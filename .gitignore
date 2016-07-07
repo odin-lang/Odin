@@ -1,0 +1,4 @@
+bin/
+misc/
+*.sln
+*.suo

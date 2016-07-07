@@ -1,0 +1,6 @@
+#include "checker/value.cpp"
+#include "checker/entity.cpp"
+#include "checker/type.cpp"
+#include "checker/checker.cpp"
+#include "checker/expression.cpp"
+#include "checker/statements.cpp"
