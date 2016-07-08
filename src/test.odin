@@ -1,9 +1,18 @@
-type float: f32;
+type Vec2: struct {
+	x, y: f32;
+}
+
+
+print_string_array :: proc(args: []string) {
+	args[0] = "";
+}
 
 main :: proc() {
 	thing :: proc(n: int) -> int, f32 {
 		return n*n, 13.37;
 	}
 
-	_, _ := 1, 2;
+	thang :: proc(a: int, b: f32, s: string) {
+	}
+
 }

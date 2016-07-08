@@ -47,6 +47,7 @@ AstNode__ExpressionBegin,
 	AstNode_CallExpression,
 	AstNode_SelectorExpression,
 	AstNode_IndexExpression,
+	AstNode_SliceExpression,
 	AstNode_CastExpression,
 	AstNode_DereferenceExpression,
 AstNode__ExpressionEnd,
@@ -117,7 +118,7 @@ struct AstNode {
 		struct { Token op; AstNode *left, *right; }                 binary_expression;
 		struct { AstNode *expression; Token open, close; }          paren_expression;
 		struct { Token token; AstNode *operand, *selector; }        selector_expression;
-	struct { AstNode *expression, *value; Token open, close; }  index_expression;
+		struct { AstNode *expression, *value; Token open, close; }  index_expression;
 		struct { Token token; AstNode *type_expression, *operand; } cast_expression;
 		struct {
 			AstNode *proc, *arg_list;
@@ -125,6 +126,12 @@ struct AstNode {
 			Token open, close;
 		} call_expression;
 		struct { Token op; AstNode *operand; } dereference_expression;
+		struct {
+			AstNode *expression;
+			Token open, close;
+			AstNode *low, *high, *max;
+			b32 triple_indexed; // [(1st):2nd:3rd]
+		} slice_expression;
 
 		struct { Token begin, end; }              bad_statement;
 		struct { Token token; }                   empty_statement;
@@ -271,6 +278,8 @@ Token ast_node_token(AstNode *node) {
 		return ast_node_token(node->selector_expression.selector);
 	case AstNode_IndexExpression:
 		return node->index_expression.open;
+	case AstNode_SliceExpression:
+		return node->slice_expression.open;
 	case AstNode_CastExpression:
 		return node->cast_expression.token;
 	case AstNode_DereferenceExpression:
@@ -436,6 +445,19 @@ gb_inline AstNode *make_index_expression(Parser *p, AstNode *expression, AstNode
 	result->index_expression.value = value;
 	result->index_expression.open = open;
 	result->index_expression.close = close;
+	return result;
+}
+
+
+gb_inline AstNode *make_slice_expression(Parser *p, AstNode *expression, Token open, Token close, AstNode *low, AstNode *high, AstNode *max, b32 triple_indexed) {
+	AstNode *result = make_node(p, AstNode_SliceExpression);
+	result->slice_expression.expression = expression;
+	result->slice_expression.open = open;
+	result->slice_expression.close = close;
+	result->slice_expression.low = low;
+	result->slice_expression.high = high;
+	result->slice_expression.max = max;
+	result->slice_expression.triple_indexed = triple_indexed;
 	return result;
 }
 
@@ -865,14 +887,43 @@ AstNode *parse_atom_expression(Parser *p, b32 lhs) {
 			if (lhs) {
 				// TODO(bill): Handle this
 			}
-			AstNode *value;
 			Token open, close;
+			AstNode *indices[3] = {};
 
 			open = expect_token(p, Token_OpenBracket);
-			value = parse_expression(p, false);
+			if (p->cursor[0].kind != Token_Colon)
+				indices[0] = parse_expression(p, false);
+			isize colon_count = 0;
+			Token colons[2] = {};
+
+			while (p->cursor[0].kind == Token_Colon && colon_count < 2) {
+				colons[colon_count++] = p->cursor[0];
+				next_token(p);
+				if (p->cursor[0].kind != Token_Colon &&
+				    p->cursor[0].kind != Token_CloseBracket &&
+				    p->cursor[0].kind != Token_EOF) {
+					indices[colon_count] = parse_expression(p, false);
+				}
+			}
 			close = expect_token(p, Token_CloseBracket);
 
-			operand = make_index_expression(p, operand, value, open, close);
+			if (colon_count == 0) {
+				operand = make_index_expression(p, operand, indices[0], open, close);
+			} else {
+				b32 triple_indexed = false;
+				if (colon_count == 2) {
+					triple_indexed = true;
+					if (indices[1] == NULL) {
+						print_parse_error(p, colons[0], "Second index is required in a triple indexed slice");
+						indices[1] = make_bad_expression(p, colons[0], colons[1]);
+					}
+					if (indices[2] == NULL) {
+						print_parse_error(p, colons[1], "Third index is required in a triple indexed slice");
+						indices[2] = make_bad_expression(p, colons[1], close);
+					}
+				}
+				operand = make_slice_expression(p, operand, open, close, indices[0], indices[1], indices[2], triple_indexed);
+			}
 		} break;
 
 		case Token_Pointer: // Deference

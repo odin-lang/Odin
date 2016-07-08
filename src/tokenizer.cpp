@@ -195,7 +195,7 @@ char const *TOKEN_STRINGS[] = {
 "_KeywordBegin",
 	"type",
 	"proc",
-	"switch",
+	"match",
 	"break",
 	"continue",
 	"fallthrough",

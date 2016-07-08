@@ -71,6 +71,9 @@ enum BuiltinProcedureId {
 	BuiltinProcedure_offset_of,
 	BuiltinProcedure_offset_of_val,
 	BuiltinProcedure_static_assert,
+	BuiltinProcedure_len,
+	BuiltinProcedure_cap,
+	BuiltinProcedure_copy,
 	BuiltinProcedure_print,
 	BuiltinProcedure_println,
 
@@ -111,6 +114,9 @@ gb_global BuiltinProcedure builtin_procedures[BuiltinProcedure_Count] = {
 	{STR_LIT("offset_of"),        2, false, Expression_Expression},
 	{STR_LIT("offset_of_val"),    1, false, Expression_Expression},
 	{STR_LIT("static_assert"),    1, false, Expression_Statement},
+	{STR_LIT("len"),              1, false, Expression_Expression},
+	{STR_LIT("cap"),              1, false, Expression_Expression},
+	{STR_LIT("copy"),             2, false, Expression_Expression},
 	{STR_LIT("print"),            1, true,  Expression_Statement},
 	{STR_LIT("println"),          1, true,  Expression_Statement},
 };

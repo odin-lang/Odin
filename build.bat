@@ -24,6 +24,7 @@ set compiler_warnings= ^
 	-wd4505 -wd4512 -wd4550 ^
 
 set compiler_includes= ^
+
 	rem -I"C:\Program Files\LLVM\include"
 
 set libs= kernel32.lib user32.lib gdi32.lib opengl32.lib ^

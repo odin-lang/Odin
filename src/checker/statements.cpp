@@ -38,8 +38,14 @@ b32 check_assignable_to(Checker *c, Operand *operand, Type *type) {
 
 	if (sb->kind == Type_Array && tb->kind == Type_Array) {
 		if (are_types_identical(sb->array.element, tb->array.element)) {
-			if (tb->array.count == 0) // NOTE(bill): Not static size
-				return true;
+			return sb->array.count == tb->array.count;
+		}
+	}
+
+	if ((sb->kind == Type_Array || sb->kind == Type_Slice) &&
+	    tb->kind == Type_Slice) {
+		if (are_types_identical(sb->array.element, tb->slice.element)) {
+			return true;
 		}
 	}
 
@@ -233,7 +239,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNode *in
 	if (i < lhs_count) {
 		if (lhs[i]->type == NULL)
 			print_checker_error(c, lhs[i]->token, "Too few values on the right hand side of the declaration");
-	} else if (rhs != NULL) {	
+	} else if (rhs != NULL) {
 		print_checker_error(c, ast_node_token(rhs), "Too many values on the right hand side of the declaration");
 	}
 }

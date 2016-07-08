@@ -252,8 +252,9 @@ Type *check_type_expression_extra(Checker *c, AstNode *expression, Type *named_t
 			set_base_type(named_type, t);
 			return t;
 		} else {
-			print_checker_error(c, ast_node_token(expression), "Empty array size");
-			return NULL;
+			Type *t = make_type_slice(check_type(c, expression->array_type.element));
+			set_base_type(named_type, t);
+			return t;
 		}
 		break;
 
@@ -335,12 +336,17 @@ Type *check_type(Checker *c, AstNode *expression, Type *named_type) {
 	case AstNode_ParenExpression:
 		return check_type(c, expression->paren_expression.expression, named_type);
 
-	case AstNode_ArrayType:
-		type = make_type_array(check_type(c, expression->array_type.element),
-		                       check_array_count(c, expression->array_type.count));
-		set_base_type(named_type, type);
+	case AstNode_ArrayType: {
+		if (expression->array_type.count != NULL) {
+			type = make_type_array(check_type(c, expression->array_type.element),
+			                       check_array_count(c, expression->array_type.count));
+			set_base_type(named_type, type);
+		} else {
+			type = make_type_slice(check_type(c, expression->array_type.element));
+			set_base_type(named_type, type);
+		}
 		goto end;
-		break;
+	} break;
 
 	case AstNode_StructType: {
 		type = make_type_structure();
@@ -860,34 +866,42 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 	operand->type = target_type;
 }
 
-b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, b32 bound_checks) {
+b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *value) {
 	Operand operand = {Addressing_Invalid};
 	check_expression(c, &operand, index_value);
-	if (operand.mode == Addressing_Invalid)
+	if (operand.mode == Addressing_Invalid) {
+		if (value) *value = 0;
 		return false;
+	}
 
 	convert_to_typed(c, &operand, &basic_types[Basic_int]);
-	if (operand.mode == Addressing_Invalid)
+	if (operand.mode == Addressing_Invalid) {
+		if (value) *value = 0;
 		return false;
+	}
 
 	if (!is_type_integer(operand.type)) {
 		gbString expr_str = expression_to_string(operand.expression);
 		print_checker_error(c, ast_node_token(operand.expression),
 		                    "Index `%s` must be an integer", expr_str);
 		gb_string_free(expr_str);
+		if (value) *value = 0;
 		return false;
 	}
 
 	if (operand.mode == Addressing_Constant) {
-		if (bound_checks && max_count > 0) { // NOTE(bill): Do array bound checking
+		if (max_count >= 0) { // NOTE(bill): Do array bound checking
 			i64 i = value_to_integer(operand.value).value_integer;
 			if (i < 0) {
 				gbString expr_str = expression_to_string(operand.expression);
 				print_checker_error(c, ast_node_token(operand.expression),
 				                    "Index `%s` cannot be a negative value", expr_str);
 				gb_string_free(expr_str);
+				if (value) *value = 0;
 				return false;
 			}
+
+			if (value) *value = i;
 
 			if (i >= max_count) {
 				gbString expr_str = expression_to_string(operand.expression);
@@ -896,10 +910,13 @@ b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, b32 bound
 				gb_string_free(expr_str);
 				return false;
 			}
+
+			return true;
 		}
 	}
 
 	// NOTE(bill): It's alright :D
+	if (value) *value = -1;
 	return true;
 }
 
@@ -920,10 +937,6 @@ Entity *lookup_field(Type *type, AstNode *field_node, isize *index = NULL) {
 				return f;
 			}
 		}
-	} else {
-		// TODO(bill): Array.count
-		// TODO(bill): Array.elements
-		// TODO(bill): Or should these be functions?
 	}
 
 	return NULL;
@@ -960,7 +973,6 @@ void check_selector(Checker *c, Operand *operand, AstNode *node) {
 
 }
 
-
 b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id) {
 	GB_ASSERT(call->kind == AstNode_CallExpression);
 	auto *ce = &call->call_expression;
@@ -972,10 +984,9 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		if (ce->arg_list_count > bp->arg_count && !bp->variadic)
 			err = "Too many";
 		if (err) {
-			gbString call_str = expression_to_string(call);
-			defer (gb_string_free(call_str));
-			print_checker_error(c, ce->close, "`%s` arguments for `%s`, expected %td, got %td",
-			                    err, call_str, bp->arg_count, ce->arg_list_count);
+			print_checker_error(c, ce->close, "`%s` arguments for `%.*s`, expected %td, got %td",
+			                    err, LIT(call->call_expression.proc->identifier.token.string),
+			                    bp->arg_count, ce->arg_list_count);
 			return false;
 		}
 	}
@@ -1044,7 +1055,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 				print_checker_error(c, ast_node_token(ce->arg_list), "Expected a structure type for `offset_of`");
 				return false;
 			}
-			if (field_arg->kind != AstNode_Identifier) {
+			if (field_arg == NULL ||
+			    field_arg->kind != AstNode_Identifier) {
 				print_checker_error(c, ast_node_token(field_arg), "Expected an identifier for field argument");
 				return false;
 			}
@@ -1055,7 +1067,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		if (entity == NULL) {
 			gbString type_str = type_to_string(type);
 			print_checker_error(c, ast_node_token(ce->arg_list),
-			                    "`%s` has no field named `%s`", type_str, LIT(field_arg->identifier.token.string));
+			                    "`%s` has no field named `%.*s`", type_str, LIT(field_arg->identifier.token.string));
 			return false;
 		}
 
@@ -1089,7 +1101,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		if (entity == NULL) {
 			gbString type_str = type_to_string(type);
 			print_checker_error(c, ast_node_token(arg),
-			                    "`%s` has no field named `%s`", type_str, LIT(s->selector->identifier.token.string));
+			                    "`%s` has no field named `%.*s`", type_str, LIT(s->selector->identifier.token.string));
 			return false;
 		}
 
@@ -1099,6 +1111,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	} break;
 
 	case BuiltinProcedure_static_assert:
+		// static_assert :: proc(cond: bool)
+
 		if (operand->mode != Addressing_Constant ||
 		    !is_type_boolean(operand->type)) {
 			gbString str = expression_to_string(ce->arg_list);
@@ -1115,6 +1129,92 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			return true;
 		}
 		break;
+
+	case BuiltinProcedure_len:
+	case BuiltinProcedure_cap: {
+		Type *t = get_base_type(operand->type);
+
+		AddressingMode mode = Addressing_Invalid;
+		Value value = {};
+
+		switch (t->kind) {
+		case Type_Basic:
+			if (id == BuiltinProcedure_len) {
+				if (is_type_string(t)) {
+					if (operand->mode == Addressing_Constant) {
+						mode = Addressing_Constant;
+						value = make_value_integer(operand->value.value_string.len);
+					} else {
+						mode = Addressing_Value;
+					}
+				}
+			}
+			break;
+
+		case Type_Array:
+			mode = Addressing_Constant;
+			value = make_value_integer(t->array.count);
+			break;
+
+		case Type_Slice:
+			mode = Addressing_Value;
+			break;
+		}
+
+		if (mode == Addressing_Invalid) {
+			gbString str = expression_to_string(operand->expression);
+			print_checker_error(c, ast_node_token(operand->expression),
+			                    "Invalid expression `%s` for `%.*s`",
+			                    str, LIT(bp->name));
+			gb_string_free(str);
+			return false;
+		}
+
+		operand->mode = mode;
+		operand->type = &basic_types[Basic_int];
+		operand->value = value;
+
+	} break;
+
+	case BuiltinProcedure_copy: {
+		// copy :: proc(x, y: []Type) -> int
+		Type *dest_type = NULL, *src_type = NULL;
+		Type *d = get_base_type(operand->type);
+		if (d->kind == Type_Slice)
+			dest_type = d->slice.element;
+
+		Operand op = {};
+		check_expression(c, &op, ce->arg_list->next);
+		if (op.mode == Addressing_Invalid)
+			return false;
+		Type *s = get_base_type(op.type);
+		if (s->kind == Type_Slice)
+			src_type = s->slice.element;
+
+		if (dest_type == NULL || src_type == NULL) {
+			print_checker_error(c, ast_node_token(call), "`copy` only expects slices as arguments");
+			return false;
+		}
+
+		if (!are_types_identical(dest_type, src_type)) {
+			gbString d_arg = expression_to_string(ce->arg_list);
+			gbString s_arg = expression_to_string(ce->arg_list->next);
+			gbString d_str = type_to_string(dest_type);
+			gbString s_str = type_to_string(src_type);
+			defer (gb_string_free(d_arg));
+			defer (gb_string_free(s_arg));
+			defer (gb_string_free(d_str));
+			defer (gb_string_free(s_str));
+			print_checker_error(c, ast_node_token(call),
+			                    "Arguments to `copy`, %s, %s, have different element types: %s vs %s",
+			                    d_arg, s_arg, d_str, s_str);
+			return false;
+		}
+
+		operand->type = &basic_types[Basic_int]; // Returns number of elements copied
+		operand->mode = Addressing_Value;
+	} break;
+
 
 	case BuiltinProcedure_print:
 	case BuiltinProcedure_println: {
@@ -1170,7 +1270,6 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 					operand->mode = Addressing_Value;
 					check_not_tuple(c, operand);
 					check_assignment(c, operand, sig_params[param_index]->type, make_string("argument"));
-
 				}
 
 				if (i < tuple->variable_count && param_index == param_count) {
@@ -1179,7 +1278,7 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 				}
 			}
 
-			if (param_index < param_count)
+			if (param_index >= param_count)
 				break;
 		}
 
@@ -1392,8 +1491,7 @@ ExpressionKind check_expression_base(Checker *c, Operand *operand, AstNode *expr
 			goto error;
 
 		b32 valid = false;
-		b32 bound_checks = false;
-		i64 max_count = 0;
+		i64 max_count = -1;
 		Type *t = get_base_type(operand->type);
 		switch (t->kind) {
 		case Type_Basic:
@@ -1401,7 +1499,6 @@ ExpressionKind check_expression_base(Checker *c, Operand *operand, AstNode *expr
 				valid = true;
 				if (operand->mode == Addressing_Constant) {
 					max_count = operand->value.value_string.len;
-					bound_checks = true;
 				}
 				operand->mode = Addressing_Value;
 				operand->type = &basic_types[Basic_u8];
@@ -1411,16 +1508,19 @@ ExpressionKind check_expression_base(Checker *c, Operand *operand, AstNode *expr
 		case Type_Array:
 			valid = true;
 			max_count = t->array.count;
-			bound_checks = max_count > 0;
 			if (operand->mode != Addressing_Variable)
 				operand->mode = Addressing_Value;
 			operand->type = t->array.element;
 			break;
 
+		case Type_Slice:
+			valid = true;
+			operand->type = t->slice.element;
+			operand->mode = Addressing_Variable;
+			break;
+
 		case Type_Pointer:
 			valid = true;
-			bound_checks = false;
-			max_count = 0;
 			operand->mode = Addressing_Variable;
 			operand->type = get_base_type(t->pointer.element);
 			break;
@@ -1442,7 +1542,92 @@ ExpressionKind check_expression_base(Checker *c, Operand *operand, AstNode *expr
 			goto error;
 		}
 
-		check_index_value(c, expression->index_expression.value, max_count, bound_checks);
+		check_index_value(c, expression->index_expression.value, max_count, NULL);
+	} break;
+
+
+	case AstNode_SliceExpression: {
+		auto *se = &expression->slice_expression;
+		check_expression(c, operand, se->expression);
+		if (operand->mode == Addressing_Invalid)
+			goto error;
+
+		b32 valid = false;
+		i64 max_count = -1;
+		Type *t = get_base_type(operand->type);
+		switch (t->kind) {
+		case Type_Basic:
+			if (is_type_string(t)) {
+				valid = true;
+				if (operand->mode == Addressing_Constant) {
+					max_count = operand->value.value_string.len;
+				}
+				operand->mode = Addressing_Value;
+			}
+			break;
+
+		case Type_Array:
+			valid = true;
+			max_count = t->array.count;
+			if (operand->mode != Addressing_Variable) {
+				gbString str = expression_to_string(expression);
+				print_checker_error(c, ast_node_token(expression), "Cannot slice array `%s`, value is not addressable", str);
+				gb_string_free(str);
+				goto error;
+			}
+			operand->type = make_type_slice(t->array.element);
+			operand->mode = Addressing_Value;
+			break;
+
+		case Type_Slice:
+			valid = true;
+			operand->mode = Addressing_Value;
+			break;
+
+		case Type_Pointer:
+			valid = true;
+			operand->type = make_type_slice(get_base_type(t->pointer.element));
+			operand->mode = Addressing_Value;
+			break;
+		}
+
+		if (!valid) {
+			gbString str = expression_to_string(operand->expression);
+			print_checker_error(c, ast_node_token(operand->expression),
+			                    "Cannot slice `%s`", str);
+			gb_string_free(str);
+			goto error;
+		}
+
+		i64 indices[3] = {};
+		AstNode *nodes[3] = {se->low, se->high, se->max};
+		for (isize i = 0; i < gb_count_of(nodes); i++) {
+			AstNode *node = nodes[i];
+			i64 index = max_count;
+			if (node != NULL) {
+				i64 capacity = -1;
+				if (max_count >= 0)
+					capacity = max_count;
+				i64 j = 0;
+				if (check_index_value(c, node, capacity, &j)) {
+					index = j;
+				}
+			} else if (i == 0) {
+				index = 0;
+			}
+			indices[i] = index;
+		}
+
+		for (isize i = 0; i < gb_count_of(indices); i++) {
+			i64 a = indices[i];
+			for (isize j = i+1; j < gb_count_of(indices); j++) {
+				i64 b = indices[j];
+				if (a > b && b >= 0) {
+					print_checker_error(c, se->close, "Invalid slice indices: [%td > %td]", a, b);
+				}
+			}
+		}
+
 	} break;
 
 	case AstNode_CastExpression: {

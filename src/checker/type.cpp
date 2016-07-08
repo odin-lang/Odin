@@ -55,6 +55,7 @@ enum TypeKind {
 
 	Type_Basic,
 	Type_Array,
+	Type_Slice,
 	Type_Structure,
 	Type_Pointer,
 	Type_Named,
@@ -71,6 +72,9 @@ struct Type {
 			Type *element;
 			i64 count;
 		} array;
+		struct {
+			Type *element;
+		} slice;
 		struct {
 			// Theses are arrays
 			Entity **fields; // Entity_Variable
@@ -111,6 +115,7 @@ void set_base_type(Type *t, Type *base) {
 }
 
 
+// TODO(bill): Remove heap allocation
 Type *alloc_type(TypeKind kind) {
 	Type *t = gb_alloc_item(gb_heap_allocator(), Type);
 	t->kind = kind;
@@ -123,10 +128,17 @@ Type *make_type_basic(BasicType basic) {
 	t->basic = basic;
 	return t;
 }
+
 Type *make_type_array(Type *element, i64 count) {
 	Type *t = alloc_type(Type_Array);
 	t->array.element = element;
 	t->array.count = count;
+	return t;
+}
+
+Type *make_type_slice(Type *element) {
+	Type *t = alloc_type(Type_Slice);
+	t->array.element = element;
 	return t;
 }
 
@@ -166,7 +178,7 @@ Type *make_type_procedure(Scope *scope, Type *params, isize params_count, Type *
 
 
 
-#define STR_LIT(x) {cast(u8 *)x, gb_size_of(x)-1}
+#define STR_LIT(x) {cast(u8 *)(x), gb_size_of(x)-1}
 gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_Invalid,        0,                                      STR_LIT("invalid type")}},
 	{Type_Basic, {Basic_bool,           BasicFlag_Boolean,                      STR_LIT("bool")}},
@@ -483,10 +495,11 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 }
 
 i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, isize index) {
-	GB_ASSERT(t->kind == Type_Structure);
-	type_set_offsets(s, allocator, t);
-	if (gb_is_between(index, 0, t->structure.field_count-1)) {
-		return t->structure.offsets[index];
+	if (t->kind == Type_Structure) {
+		type_set_offsets(s, allocator, t);
+		if (gb_is_between(index, 0, t->structure.field_count-1)) {
+			return t->structure.offsets[index];
+		}
 	}
 	return 0;
 }
@@ -501,6 +514,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_Basic:
 		str = gb_string_append_length(str, type->basic.name.text, type->basic.name.len);
 		break;
+
 	case Type_Array:
 		if (type->array.count >= 0) {
 			str = gb_string_appendc(str, gb_bprintf("[%td]", type->array.count));
@@ -509,12 +523,18 @@ gbString write_type_to_string(gbString str, Type *type) {
 		}
 		str = write_type_to_string(str, type->array.element);
 		break;
+
+	case Type_Slice:
+		str = gb_string_appendc(str, "[]");
+		str = write_type_to_string(str, type->array.element);
+		break;
+
 	case Type_Structure: {
 		str = gb_string_appendc(str, "struct{");
 		for (isize i = 0; i < type->structure.field_count; i++) {
 			Entity *f = type->structure.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable);
-			if (i < type->structure.field_count-1)
+			if (i > 0)
 				str = gb_string_appendc(str, "; ");
 			str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
 			str = gb_string_appendc(str, ": ");
@@ -564,6 +584,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 		}
 		break;
 	}
+
 	return str;
 }
 
