@@ -115,59 +115,58 @@ void set_base_type(Type *t, Type *base) {
 }
 
 
-// TODO(bill): Remove heap allocation
-Type *alloc_type(TypeKind kind) {
-	Type *t = gb_alloc_item(gb_heap_allocator(), Type);
+Type *alloc_type(gbAllocator a, TypeKind kind) {
+	Type *t = gb_alloc_item(a, Type);
 	t->kind = kind;
 	return t;
 }
 
 
-Type *make_type_basic(BasicType basic) {
-	Type *t = alloc_type(Type_Basic);
+Type *make_type_basic(gbAllocator a, BasicType basic) {
+	Type *t = alloc_type(a, Type_Basic);
 	t->basic = basic;
 	return t;
 }
 
-Type *make_type_array(Type *element, i64 count) {
-	Type *t = alloc_type(Type_Array);
+Type *make_type_array(gbAllocator a, Type *element, i64 count) {
+	Type *t = alloc_type(a, Type_Array);
 	t->array.element = element;
 	t->array.count = count;
 	return t;
 }
 
-Type *make_type_slice(Type *element) {
-	Type *t = alloc_type(Type_Slice);
+Type *make_type_slice(gbAllocator a, Type *element) {
+	Type *t = alloc_type(a, Type_Slice);
 	t->array.element = element;
 	return t;
 }
 
-Type *make_type_structure(void) {
-	Type *t = alloc_type(Type_Structure);
+Type *make_type_structure(gbAllocator a) {
+	Type *t = alloc_type(a, Type_Structure);
 	return t;
 }
 
-Type *make_type_pointer(Type *element) {
-	Type *t = alloc_type(Type_Pointer);
+Type *make_type_pointer(gbAllocator a, Type *element) {
+	Type *t = alloc_type(a, Type_Pointer);
 	t->pointer.element = element;
 	return t;
 }
 
-Type *make_type_named(String name, Type *base, Entity *type_name) {
-	Type *t = alloc_type(Type_Named);
+Type *make_type_named(gbAllocator a, String name, Type *base, Entity *type_name) {
+	Type *t = alloc_type(a, Type_Named);
 	t->named.name = name;
 	t->named.base = base;
 	t->named.type_name = type_name;
 	return t;
 }
 
-Type *make_type_tuple(void) {
-	Type *t = alloc_type(Type_Tuple);
+Type *make_type_tuple(gbAllocator a) {
+	Type *t = alloc_type(a, Type_Tuple);
 	return t;
 }
 
-Type *make_type_procedure(Scope *scope, Type *params, isize params_count, Type *results, isize results_count) {
-	Type *t = alloc_type(Type_Procedure);
+Type *make_type_procedure(gbAllocator a, Scope *scope, Type *params, isize params_count, Type *results, isize results_count) {
+	Type *t = alloc_type(a, Type_Procedure);
 	t->procedure.scope = scope;
 	t->procedure.params = params;
 	t->procedure.params_count = params_count;
@@ -382,6 +381,13 @@ Type *default_type(Type *type) {
 }
 
 
+// NOTE(bill): Internal sizes of certain types
+// string: 2*word_size  (ptr+len)
+// slice:  3*word_size  (ptr+len+cap)
+// array:  count*size_of(element) aligned
+
+// NOTE(bill): Alignment of structures and other types are to be compatible with C
+
 struct BaseTypeSizes {
 	i64 word_size;
 	i64 max_align;
@@ -406,6 +412,7 @@ gb_global i64 basic_type_sizes[] = {
 
 i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
 i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
+i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, i64 index);
 
 i64 align_formula(i64 size, i64 align) {
 	i64 result = size + align-1;
@@ -481,6 +488,9 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		return alignment*(count-1) + size;
 	} break;
 
+	case Type_Slice: // ptr + len + cap
+		return 3 * s.word_size;
+
 	case Type_Structure: {
 		i64 count = t->structure.field_count;
 		if (count == 0)
@@ -516,11 +526,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_Array:
-		if (type->array.count >= 0) {
-			str = gb_string_appendc(str, gb_bprintf("[%td]", type->array.count));
-		} else {
-			str = gb_string_appendc(str, "[]");
-		}
+		str = gb_string_appendc(str, gb_bprintf("[%td]", type->array.count));
 		str = write_type_to_string(str, type->array.element);
 		break;
 
@@ -553,7 +559,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 			str = gb_string_append_length(str, type->named.name.text, type->named.name.len);
 		} else {
 			// NOTE(bill): Just in case
-			str = gb_string_appendc(str, "<Type_Named>");
+			str = gb_string_appendc(str, "<named type>");
 		}
 		break;
 

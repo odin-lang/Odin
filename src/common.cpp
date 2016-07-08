@@ -46,6 +46,23 @@ gb_inline u64 hash_pointer(void *ptr) {
 	return p;
 }
 
+
+
+// Doubly Linked Lists
+
+#define DLIST_SET(curr_element, next_element)  do { \
+	(curr_element)->next = (next_element);             \
+	(curr_element)->next->prev = (curr_element);       \
+	(curr_element) = (curr_element)->next;             \
+} while (0)
+
+#define DLIST_APPEND(root_element, curr_element, next_element) do { \
+	if ((root_element) == NULL) \
+		(root_element) = (curr_element) = (next_element); \
+	else \
+		DLIST_SET(curr_element, next_element); \
+} while (0)
+
 ////////////////////////////////////////////////////////////////
 //
 // Generic Data Structures

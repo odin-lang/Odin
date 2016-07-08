@@ -13,31 +13,25 @@ struct Generator {
 
 #define print_generator_error(p, token, fmt, ...) print_generator_error_(p, __FUNCTION__, token, fmt, ##__VA_ARGS__)
 void print_generator_error_(Generator *g, char *function, Token token, char *fmt, ...) {
-	va_list va;
 
 	// NOTE(bill): Duplicate error, skip it
-	if (g->error_prev_line == token.line && g->error_prev_column == token.column) {
-		goto error;
+	if (g->error_prev_line != token.line || g->error_prev_column != token.column) {
+		va_list va;
+
+		g->error_prev_line = token.line;
+		g->error_prev_column = token.column;
+
+	#if 0
+		gb_printf_err("%s()\n", function);
+	#endif
+		va_start(va, fmt);
+		gb_printf_err("%s(%td:%td) %s\n",
+		              g->checker->parser->tokenizer.fullpath, token.line, token.column,
+		              gb_bprintf_va(fmt, va));
+		va_end(va);
+
 	}
-	g->error_prev_line = token.line;
-	g->error_prev_column = token.column;
-
-#if 0
-	gb_printf_err("%s()\n", function);
-#endif
-	va_start(va, fmt);
-	gb_printf_err("%s(%td:%td) %s\n",
-	              g->checker->parser->tokenizer.fullpath, token.line, token.column,
-	              gb_bprintf_va(fmt, va));
-	va_end(va);
-
-error:
 	g->error_count++;
-	// NOTE(bill): If there are too many errors, just quit
-	if (g->error_count > MAX_GENERATOR_ERROR_COUNT) {
-		gb_exit(1);
-		return;
-	}
 }
 
 

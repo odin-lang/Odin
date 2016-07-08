@@ -1,4 +1,5 @@
 void           check_assignment        (Checker *c, Operand *operand, Type *type, String context_name);
+b32            check_is_assignable_to  (Checker *c, Operand *operand, Type *type);
 void           check_expression        (Checker *c, Operand *operand, AstNode *expression);
 void           check_multi_expression  (Checker *c, Operand *operand, AstNode *expression);
 void           check_expression_or_type(Checker *c, Operand *operand, AstNode *expression);
@@ -31,8 +32,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 		}
 	}
 
-	Entity **fields = gb_alloc_array(gb_arena_allocator(&c->entity_arena),
-	                                 Entity *, st->field_count);
+	Entity **fields = gb_alloc_array(c->allocator, Entity *, st->field_count);
 	isize field_index = 0;
 	for (AstNode *field = st->field_list; field != NULL; field = field->next) {
 		Type *type = check_type(c, field->field.type_expression);
@@ -60,10 +60,9 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize fiel
 	if (field_list == NULL || field_count == 0)
 		return NULL;
 
-	Type *tuple = make_type_tuple();
+	Type *tuple = make_type_tuple(c->allocator);
 
-	Entity **variables = gb_alloc_array(gb_arena_allocator(&c->entity_arena),
-	                                    Entity *, field_count);
+	Entity **variables = gb_alloc_array(c->allocator, Entity *, field_count);
 	isize variable_index = 0;
 	for (AstNode *field = field_list; field != NULL; field = field->next) {
 		GB_ASSERT(field->kind == AstNode_Field);
@@ -87,10 +86,9 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize fiel
 Type *check_get_results(Checker *c, Scope *scope, AstNode *list, isize list_count) {
 	if (list == NULL)
 		return NULL;
-	Type *tuple = make_type_tuple();
+	Type *tuple = make_type_tuple(c->allocator);
 
-	Entity **variables = gb_alloc_array(gb_arena_allocator(&c->entity_arena),
-	                                    Entity *, list_count);
+	Entity **variables = gb_alloc_array(c->allocator, Entity *, list_count);
 	isize variable_index = 0;
 	for (AstNode *item = list; item != NULL; item = item->next) {
 		Type *type = check_type(c, item);
@@ -143,7 +141,7 @@ void check_identifier(Checker *c, Operand *operand, AstNode *n, Type *named_type
 	scope_lookup_parent_entity(c->curr_scope, n->identifier.token.string, NULL, &e);
 	if (e == NULL) {
 		print_checker_error(c, n->identifier.token,
-		                    "Undeclared type/identifier: %.*s", LIT(n->identifier.token.string));
+		                    "Undeclared type/identifier `%.*s`", LIT(n->identifier.token.string));
 		return;
 	}
 	add_entity_use(c, n, e);
@@ -247,32 +245,33 @@ Type *check_type_expression_extra(Checker *c, AstNode *expression, Type *named_t
 
 	case AstNode_ArrayType:
 		if (expression->array_type.count != NULL) {
-			Type *t = make_type_array(check_type(c, expression->array_type.element),
+			Type *t = make_type_array(c->allocator,
+			                          check_type(c, expression->array_type.element),
 			                          check_array_count(c, expression->array_type.count));
 			set_base_type(named_type, t);
 			return t;
 		} else {
-			Type *t = make_type_slice(check_type(c, expression->array_type.element));
+			Type *t = make_type_slice(c->allocator, check_type(c, expression->array_type.element));
 			set_base_type(named_type, t);
 			return t;
 		}
 		break;
 
 	case AstNode_StructType: {
-		Type *t = make_type_structure();
+		Type *t = make_type_structure(c->allocator);
 		set_base_type(named_type, t);
 		check_struct_type(c, t, expression);
 		return t;
 	} break;
 
 	case AstNode_PointerType: {
-		Type *t = make_type_pointer(check_type(c, expression->pointer_type.type_expression));
+		Type *t = make_type_pointer(c->allocator, check_type(c, expression->pointer_type.type_expression));
 		set_base_type(named_type, t);
 		return t;
 	} break;
 
 	case AstNode_ProcedureType: {
-		Type *t = alloc_type(Type_Procedure);
+		Type *t = alloc_type(c->allocator, Type_Procedure);
 		set_base_type(named_type, t);
 		check_open_scope(c, expression);
 		check_procedure_type(c, t, expression);
@@ -338,31 +337,32 @@ Type *check_type(Checker *c, AstNode *expression, Type *named_type) {
 
 	case AstNode_ArrayType: {
 		if (expression->array_type.count != NULL) {
-			type = make_type_array(check_type(c, expression->array_type.element),
+			type = make_type_array(c->allocator,
+			                       check_type(c, expression->array_type.element),
 			                       check_array_count(c, expression->array_type.count));
 			set_base_type(named_type, type);
 		} else {
-			type = make_type_slice(check_type(c, expression->array_type.element));
+			type = make_type_slice(c->allocator, check_type(c, expression->array_type.element));
 			set_base_type(named_type, type);
 		}
 		goto end;
 	} break;
 
 	case AstNode_StructType: {
-		type = make_type_structure();
+		type = make_type_structure(c->allocator);
 		set_base_type(named_type, type);
 		check_struct_type(c, type, expression);
 		goto end;
 	} break;
 
 	case AstNode_PointerType: {
-		type = make_type_pointer(check_type(c, expression->pointer_type.type_expression));
+		type = make_type_pointer(c->allocator, check_type(c, expression->pointer_type.type_expression));
 		set_base_type(named_type, type);
 		goto end;
 	} break;
 
 	case AstNode_ProcedureType: {
-		type = alloc_type(Type_Procedure);
+		type = alloc_type(c->allocator, Type_Procedure);
 		set_base_type(named_type, type);
 		check_procedure_type(c, type, expression);
 		goto end;
@@ -482,7 +482,7 @@ b32 check_value_is_expressible(Checker *c, Value in_value, Type *type, Value *ou
 			return false;
 		if (out_value) *out_value = in_value;
 		i64 i = in_value.value_integer;
-		i64 s = 8*type_size_of(c->sizes, gb_arena_allocator(&c->entity_arena), type);
+		i64 s = 8*type_size_of(c->sizes, c->allocator, type);
 		u64 umax = ~0ull;
 		if (s < 64)
 			umax = (1ull << s) - 1ull;
@@ -570,7 +570,7 @@ void check_unary_expression(Checker *c, Operand *operand, Token op, AstNode *nod
 			return;
 		}
 		operand->mode = Addressing_Value;
-		operand->type = make_type_pointer(operand->type);
+		operand->type = make_type_pointer(c->allocator, operand->type);
 		return;
 	}
 
@@ -584,7 +584,7 @@ void check_unary_expression(Checker *c, Operand *operand, Token op, AstNode *nod
 		GB_ASSERT(type->kind == Type_Basic);
 		i32 precision = 0;
 		if (is_type_unsigned(type))
-			precision = cast(i32)(8 * type_size_of(c->sizes, gb_arena_allocator(&c->entity_arena), type));
+			precision = cast(i32)(8 * type_size_of(c->sizes, c->allocator, type));
 		operand->value = unary_operator_value(op, operand->value, precision);
 
 		if (is_type_typed(type)) {
@@ -598,14 +598,12 @@ void check_unary_expression(Checker *c, Operand *operand, Token op, AstNode *nod
 	operand->mode = Addressing_Value;
 }
 
-b32 check_assignable_to(Checker *c, Operand *operand, Type *type);
-
 void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 	gbString err_str = NULL;
 	defer (gb_string_free(err_str));
 
-	if (check_assignable_to(c, x, y->type) ||
-	    check_assignable_to(c, y, x->type)) {
+	if (check_is_assignable_to(c, x, y->type) ||
+	    check_is_assignable_to(c, y, x->type)) {
 		b32 defined = false;
 		switch (op.kind) {
 		case Token_CmpEq:
@@ -787,7 +785,7 @@ void convert_untyped_error(Checker *c, Operand *operand, Type *target_type) {
 
 	if (operand->mode == Addressing_Constant) {
 		if (operand->value.value_integer == 0) {
-			// NOTE(bill): Doesn't matter what the type is as it's still zero
+			// NOTE(bill): Doesn't matter what the type is as it's still zero in the union
 			extra_text = " - Did you want `null`?";
 		}
 	}
@@ -927,7 +925,8 @@ Entity *lookup_field(Type *type, AstNode *field_node, isize *index = NULL) {
 		type = get_base_type(type->pointer.element);
 
 	String field_str = field_node->identifier.token.string;
-	if (type->kind == Type_Structure) {
+	switch (type->kind) {
+	case Type_Structure:
 		for (isize i = 0; i < type->structure.field_count; i++) {
 			Entity *f = type->structure.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable && f->variable.is_field);
@@ -937,6 +936,10 @@ Entity *lookup_field(Type *type, AstNode *field_node, isize *index = NULL) {
 				return f;
 			}
 		}
+		break;
+	// TODO(bill): Other types and extra "hidden" fields (e.g. introspection stuff)
+	// TODO(bill): Allow for access of field through index? e.g. `x.3` will get member of index 3
+	// Or is this only suitable if tuples are first-class?
 	}
 
 	return NULL;
@@ -995,15 +998,15 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	case BuiltinProcedure_size_of:
 	case BuiltinProcedure_align_of:
 	case BuiltinProcedure_offset_of:
+		// NOTE(bill): The first arg is a Type, this will be checked case by case
 		break;
 	default:
 		check_multi_expression(c, operand, ce->arg_list);
 	}
 
-	gbAllocator allocator = gb_arena_allocator(&c->entity_arena);
-
 	switch (id) {
 	case BuiltinProcedure_size_of: {
+		// size_of :: proc(Type)
 		Type *type = check_type(c, ce->arg_list);
 		if (!type) {
 			print_checker_error(c, ast_node_token(ce->arg_list), "Expected a type for `size_of`");
@@ -1011,43 +1014,47 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_value_integer(type_size_of(c->sizes, allocator, type));
+		operand->value = make_value_integer(type_size_of(c->sizes, c->allocator, type));
 		operand->type = &basic_types[Basic_int];
 
 	} break;
 
 	case BuiltinProcedure_size_of_val:
+		// size_of_val :: proc(val)
 		check_assignment(c, operand, NULL, make_string("argument of `size_of`"));
 		if (operand->mode == Addressing_Invalid)
 			return false;
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_value_integer(type_size_of(c->sizes, allocator, operand->type));
+		operand->value = make_value_integer(type_size_of(c->sizes, c->allocator, operand->type));
 		operand->type = &basic_types[Basic_int];
 		break;
 
 	case BuiltinProcedure_align_of: {
+		// align_of :: proc(Type)
 		Type *type = check_type(c, ce->arg_list);
 		if (!type) {
 			print_checker_error(c, ast_node_token(ce->arg_list), "Expected a type for `align_of`");
 			return false;
 		}
 		operand->mode = Addressing_Constant;
-		operand->value = make_value_integer(type_align_of(c->sizes, allocator, type));
+		operand->value = make_value_integer(type_align_of(c->sizes, c->allocator, type));
 		operand->type = &basic_types[Basic_int];
 	} break;
 
 	case BuiltinProcedure_align_of_val:
+		// align_of_val :: proc(val)
 		check_assignment(c, operand, NULL, make_string("argument of `align_of`"));
 		if (operand->mode == Addressing_Invalid)
 			return false;
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_value_integer(type_align_of(c->sizes, allocator, operand->type));
+		operand->value = make_value_integer(type_align_of(c->sizes, c->allocator, operand->type));
 		operand->type = &basic_types[Basic_int];
 		break;
 
 	case BuiltinProcedure_offset_of: {
+		// offset_val :: proc(Type, field)
 		Type *type = get_base_type(check_type(c, ce->arg_list));
 		AstNode *field_arg = unparen_expression(ce->arg_list->next);
 		if (type) {
@@ -1072,11 +1079,12 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_value_integer(type_offset_of(c->sizes, allocator, type, index));
+		operand->value = make_value_integer(type_offset_of(c->sizes, c->allocator, type, index));
 		operand->type  = &basic_types[Basic_int];
 	} break;
 
 	case BuiltinProcedure_offset_of_val: {
+		// offset_val :: proc(val)
 		AstNode *arg = unparen_expression(ce->arg_list);
 		if (arg->kind != AstNode_SelectorExpression) {
 			gbString str = expression_to_string(arg);
@@ -1106,12 +1114,13 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_value_integer(type_offset_of(c->sizes, allocator, type, index));
+		operand->value = make_value_integer(type_offset_of(c->sizes, c->allocator, type, index));
 		operand->type  = &basic_types[Basic_int];
 	} break;
 
 	case BuiltinProcedure_static_assert:
 		// static_assert :: proc(cond: bool)
+		// TODO(bill): Should `static_assert` and `assert` be unified?
 
 		if (operand->mode != Addressing_Constant ||
 		    !is_type_boolean(operand->type)) {
@@ -1130,6 +1139,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 		break;
 
+	// TODO(bill): Should these be procedures and are their names appropriate?
 	case BuiltinProcedure_len:
 	case BuiltinProcedure_cap: {
 		Type *t = get_base_type(operand->type);
@@ -1176,9 +1186,11 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 	} break;
 
+	// TODO(bill): copy() pointer version?
 	case BuiltinProcedure_copy: {
 		// copy :: proc(x, y: []Type) -> int
 		Type *dest_type = NULL, *src_type = NULL;
+
 		Type *d = get_base_type(operand->type);
 		if (d->kind == Type_Slice)
 			dest_type = d->slice.element;
@@ -1219,6 +1231,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	case BuiltinProcedure_print:
 	case BuiltinProcedure_println: {
 		for (AstNode *arg = ce->arg_list; arg != NULL; arg = arg->next) {
+			// TOOD(bill): `check_assignment` doesn't allow tuples at the moment, should it?
+			// Or should we destruct the tuple and use each element?
 			check_assignment(c, operand, NULL, make_string("argument"));
 			if (operand->mode == Addressing_Invalid)
 				return false;
@@ -1358,7 +1372,7 @@ ExpressionKind check_call_expression(Checker *c, Operand *operand, AstNode *call
 }
 
 b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
-	if (check_assignable_to(c, operand, y))
+	if (check_is_assignable_to(c, operand, y))
 		return true;
 
 	Type *x = operand->type;
@@ -1399,10 +1413,10 @@ b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
 }
 
 void check_cast_expression(Checker *c, Operand *operand, Type *type) {
-	b32 const_expr = operand->mode == Addressing_Constant;
+	b32 is_const_expr = operand->mode == Addressing_Constant;
 	b32 can_convert = false;
 
-	if (const_expr && is_type_constant_type(type)) {
+	if (is_const_expr && is_type_constant_type(type)) {
 		Type *t = get_base_type(type);
 		if (t->kind == Type_Basic) {
 			if (check_value_is_expressible(c, operand->value, t, &operand->value)) {
@@ -1575,7 +1589,7 @@ ExpressionKind check_expression_base(Checker *c, Operand *operand, AstNode *expr
 				gb_string_free(str);
 				goto error;
 			}
-			operand->type = make_type_slice(t->array.element);
+			operand->type = make_type_slice(c->allocator, t->array.element);
 			operand->mode = Addressing_Value;
 			break;
 
@@ -1586,7 +1600,7 @@ ExpressionKind check_expression_base(Checker *c, Operand *operand, AstNode *expr
 
 		case Type_Pointer:
 			valid = true;
-			operand->type = make_type_slice(get_base_type(t->pointer.element));
+			operand->type = make_type_slice(c->allocator, get_base_type(t->pointer.element));
 			operand->mode = Addressing_Value;
 			break;
 		}
@@ -1842,6 +1856,20 @@ gbString write_expression_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, "]");
 		break;
 
+	case AstNode_SliceExpression:
+		str = write_expression_to_string(str, node->slice_expression.expression);
+		str = gb_string_appendc(str, "[");
+		str = write_expression_to_string(str, node->slice_expression.low);
+		str = gb_string_appendc(str, ":");
+		str = write_expression_to_string(str, node->slice_expression.high);
+		if (node->slice_expression.triple_indexed) {
+			str = gb_string_appendc(str, ":");
+			str = write_expression_to_string(str, node->slice_expression.max);
+		}
+		str = gb_string_appendc(str, "]");
+		break;
+
+
 	case AstNode_CastExpression:
 		str = gb_string_appendc(str, "cast(");
 		str = write_expression_to_string(str, node->cast_expression.type_expression);
@@ -1851,7 +1879,7 @@ gbString write_expression_to_string(gbString str, AstNode *node) {
 
 
 	case AstNode_PointerType:
-		str = gb_string_appendc(str, "*");
+		str = gb_string_appendc(str, "^");
 		str = write_expression_to_string(str, node->pointer_type.type_expression);
 		break;
 	case AstNode_ArrayType:
@@ -1860,6 +1888,7 @@ gbString write_expression_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, "]");
 		str = write_expression_to_string(str, node->array_type.element);
 		break;
+
 
 	case AstNode_CallExpression: {
 		str = write_expression_to_string(str, node->call_expression.proc);

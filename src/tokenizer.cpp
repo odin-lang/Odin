@@ -289,6 +289,8 @@ struct Tokenizer {
 	u8 *  read_curr;   // pos from start
 	u8 *  line;        // current line pos
 	isize line_count;
+
+	isize error_count;
 };
 
 
@@ -299,7 +301,9 @@ void tokenizer_error_(Tokenizer *t, char *function, char *msg, ...) {
 	if (column < 1)
 		column = 1;
 
+#if 0
 	gb_printf_err("%s()\n", function);
+#endif
 	gb_printf_err("%s(%td:%td) ", t->fullpath, t->line_count, column);
 
 	va_start(va, msg);
@@ -308,7 +312,7 @@ void tokenizer_error_(Tokenizer *t, char *function, char *msg, ...) {
 
 	gb_printf_err("\n");
 
-	gb_exit(1);
+	t->error_count++;
 }
 
 void advance_to_next_rune(Tokenizer *t) {
@@ -471,7 +475,9 @@ Token scan_number_to_token(Tokenizer *t, b32 seen_decimal_point) {
 				goto fraction;
 			}
 		}
-		goto end;
+
+		token.string.len = t->curr - token.string.text;
+		return token;
 	}
 
 	scan_mantissa(t, 10);
@@ -492,7 +498,6 @@ exponent:
 		scan_mantissa(t, 10);
 	}
 
-end:
 	token.string.len = t->curr - token.string.text;
 	return token;
 }

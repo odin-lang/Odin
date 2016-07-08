@@ -10,7 +10,7 @@ enum ValueKind {
 	Value_String,
 	Value_Integer,
 	Value_Float,
-	Value_Pointer, // TODO(bill): Value_Pointer
+	Value_Pointer, // TODO(bill): Handle Value_Pointer correctly
 
 	Value_Count,
 };
@@ -154,6 +154,7 @@ Value unary_operator_value(Token op, Value v, i32 precision) {
 		case Value_Invalid:
 			return v;
 		case Value_Integer:
+			i = v.value_integer;
 			i = ~i;
 			break;
 		default:
@@ -163,7 +164,7 @@ Value unary_operator_value(Token op, Value v, i32 precision) {
 		// NOTE(bill): unsigned integers will be negative and will need to be
 		// limited to the types precision
 		if (precision > 0)
-			i &= ~((-1)<<precision);
+			i &= ~((~0ll)<<precision);
 
 		return make_value_integer(i);
 	} break;
@@ -220,7 +221,7 @@ void match_values(Value *x, Value *y) {
 	case Value_String:
 		return;
 
-	case Value_Integer: {
+	case Value_Integer:
 		switch (y->kind) {
 		case Value_Integer:
 			return;
@@ -229,17 +230,18 @@ void match_values(Value *x, Value *y) {
 			*x = make_value_float(cast(f64)x->value_integer);
 			return;
 		}
-	} break;
+		break;
 
-	case Value_Float: {
+	case Value_Float:
 		if (y->kind == Value_Float)
 			return;
-	} break;
+		break;
 	}
 
 	GB_PANIC("How'd you get here? Invalid Value.kind");
 }
 
+// TODO(bill): Allow for pointer arithmetic? Or are pointer slices good enough?
 Value binary_operator_value(Token op, Value x, Value y) {
 	match_values(&x, &y);
 

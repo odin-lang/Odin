@@ -4,17 +4,17 @@ struct AstScope;
 
 // NOTE(bill): Just used to quickly check if there is double declaration in the same scope
 // No type checking actually happens
+// TODO(bill): Should this be completely handled in the semantic checker or is it better here?
 struct AstEntity {
-	Token    token;
+	Token     token;
 	AstScope *parent;
-	AstNode *declaration;
+	AstNode * declaration;
 };
 
 struct AstScope {
 	AstScope *parent;
 	Map<AstEntity> entities; // Key: Token.string
 };
-
 
 struct Parser {
 	gbArena        arena;
@@ -53,7 +53,7 @@ AstNode__ExpressionBegin,
 AstNode__ExpressionEnd,
 
 AstNode__StatementBegin,
-	AstNode_BadStatement,
+	AstNode_BadStatement, // NOTE(bill): Naughty statement
 	AstNode_EmptyStatement,
 	AstNode_ExpressionStatement,
 	AstNode_IncDecStatement,
@@ -70,7 +70,7 @@ AstNode__ComplexStatementEnd,
 AstNode__StatementEnd,
 
 AstNode__DeclarationBegin,
-	AstNode_BadDeclaration,
+	AstNode_BadDeclaration, // NOTE(bill): Naughty declaration
 	AstNode_VariableDeclaration,
 	AstNode_ProcedureDeclaration,
 	AstNode_TypeDeclaration,
@@ -192,11 +192,13 @@ struct AstNode {
 			AstNode *name;           // AstNode_Identifier
 			AstNode *procedure_type; // AstNode_ProcedureType
 			AstNode *body;           // AstNode_BlockStatement
-			AstNode *tag;            // AstNode_TagExpression;
+			AstNode *tag;            // AstNode_TagExpression
+			// TODO(bill): Allow for multiple tags
+			// TODO(bill): Modifiers: inline, no_inline, etc.
 		} procedure_declaration;
 		struct {
 			Token token;
-			AstNode *name;
+			AstNode *name; // AstNode_Identifier
 			AstNode *type_expression;
 		} type_declaration;
 
@@ -207,7 +209,7 @@ struct AstNode {
 		} pointer_type;
 		struct {
 			Token token;
-			AstNode *count;
+			AstNode *count; // NOTE(bill): Zero/NULL is probably a slice
 			AstNode *element;
 		} array_type;
 		struct {
@@ -217,20 +219,6 @@ struct AstNode {
 		} struct_type;
 	};
 };
-
-
-#define DLIST_SET(curr_element, next_element)  do { \
-	(curr_element)->next = (next_element);             \
-	(curr_element)->next->prev = (curr_element);       \
-	(curr_element) = (curr_element)->next;             \
-} while (0)
-
-#define DLIST_APPEND(root_element, curr_element, next_element) do { \
-	if ((root_element) == NULL) \
-		(root_element) = (curr_element) = (next_element); \
-	else \
-		DLIST_SET(curr_element, next_element); \
-} while (0)
 
 
 gb_inline AstScope *make_ast_scope(Parser *p, AstScope *parent) {
@@ -649,31 +637,24 @@ gb_inline AstNode *make_type_declaration(Parser *p, Token token, AstNode *name, 
 
 #define print_parse_error(p, token, fmt, ...) print_parse_error_(p, __FUNCTION__, token, fmt, ##__VA_ARGS__)
 void print_parse_error_(Parser *p, char *function, Token token, char *fmt, ...) {
-	va_list va;
 
 	// NOTE(bill): Duplicate error, skip it
-	if (p->error_prev_line == token.line && p->error_prev_column == token.column) {
-		goto error;
+	if (p->error_prev_line != token.line || p->error_prev_column != token.column) {
+		va_list va;
+
+		p->error_prev_line = token.line;
+		p->error_prev_column = token.column;
+
+	#if 0
+		gb_printf_err("%s()\n", function);
+	#endif
+		va_start(va, fmt);
+		gb_printf_err("%s(%td:%td) %s\n",
+		              p->tokenizer.fullpath, token.line, token.column,
+		              gb_bprintf_va(fmt, va));
+		va_end(va);
 	}
-	p->error_prev_line = token.line;
-	p->error_prev_column = token.column;
-
-#if 1
-	gb_printf_err("%s()\n", function);
-#endif
-	va_start(va, fmt);
-	gb_printf_err("%s(%td:%td) %s\n",
-	              p->tokenizer.fullpath, token.line, token.column,
-	              gb_bprintf_va(fmt, va));
-	va_end(va);
-
-error:
 	p->error_count++;
-	// NOTE(bill): If there are too many errors, just quit
-	if (p->error_count > MAX_PARSER_ERROR_COUNT) {
-		gb_exit(1);
-		return;
-	}
 }
 
 
@@ -788,10 +769,6 @@ AstNode *parse_identifier(Parser *p) {
 	return make_identifier(p, identifier);
 }
 
-AstNode *parse_rhs(Parser *p) {
-	return parse_expression(p, false);
-}
-
 AstNode *unparen_expression(AstNode *node) {
 	for (;;) {
 		if (node->kind != AstNode_ParenExpression)
@@ -822,7 +799,7 @@ AstNode *parse_atom_expression(Parser *p, b32 lhs) {
 		Token open, close;
 		// NOTE(bill): Skip the Paren Expression
 		open = expect_token(p, Token_OpenParen);
-		operand = parse_rhs(p);
+		operand = parse_expression(p, false);
 		close = expect_token(p, Token_CloseParen);
 		operand = make_paren_expression(p, operand, open, close);
 	} break;
@@ -848,7 +825,7 @@ AstNode *parse_atom_expression(Parser *p, b32 lhs) {
 				if (p->cursor[0].kind == Token_Comma)
 					print_parse_error(p, p->cursor[0], "Expected an expression not a ,");
 
-				DLIST_APPEND(arg_list, arg_list_curr, parse_rhs(p));
+				DLIST_APPEND(arg_list, arg_list_curr, parse_expression(p, false));
 				arg_list_count++;
 
 				if (p->cursor[0].kind != Token_Comma) {
@@ -1229,14 +1206,14 @@ AstNode *parse_identifier_or_type(Parser *p) {
 		return parse_identifier(p);
 
 	case Token_Pointer:
-		return make_pointer_type(p,  expect_token(p, Token_Pointer), parse_type(p));
+		return make_pointer_type(p, expect_token(p, Token_Pointer), parse_type(p));
 
 	case Token_OpenBracket: {
 		Token token = expect_token(p, Token_OpenBracket);
 		AstNode *count_expression = NULL;
 
 		if (p->cursor[0].kind != Token_CloseBracket)
-			count_expression = parse_rhs(p);
+			count_expression = parse_expression(p, false);
 		expect_token(p, Token_CloseBracket);
 		return make_array_type(p, token, count_expression, parse_type(p));
 	}
@@ -1290,11 +1267,12 @@ AstNode *parse_identifier_or_type(Parser *p) {
 	return NULL;
 }
 
-AstNode *parse_parameters(Parser *p, AstScope *scope, isize *param_count_, b32 use_parens) {
+// TODO(bill): Probably unify `parse_parameters` and `parse_results`
+AstNode *parse_parameters(Parser *p, AstScope *scope, isize *param_count_) {
 	AstNode *param_list = NULL;
 	AstNode *param_list_curr = NULL;
 	isize param_count = 0;
-	if (use_parens) expect_token(p, Token_OpenParen);
+	expect_token(p, Token_OpenParen);
 	while (p->cursor[0].kind != Token_CloseParen) {
 		DLIST_APPEND(param_list, param_list_curr, parse_field_declaration(p, scope));
 		param_count++;
@@ -1302,7 +1280,7 @@ AstNode *parse_parameters(Parser *p, AstScope *scope, isize *param_count_, b32 u
 			break;
 		next_token(p);
 	}
-	if (use_parens) expect_token(p, Token_CloseParen);
+	expect_token(p, Token_CloseParen);
 
 	if (param_count_) *param_count_ = param_count;
 	return param_list;
@@ -1334,7 +1312,7 @@ AstNode *parse_results(Parser *p, AstScope *scope, isize *result_count_) {
 void parse_procedure_signature(Parser *p, AstScope *scope,
                                AstNode **param_list, isize *param_count,
                                AstNode **result_list, isize *result_count) {
-	*param_list  = parse_parameters(p, scope, param_count, true);
+	*param_list  = parse_parameters(p, scope, param_count);
 	*result_list = parse_results(p, scope, result_count);
 }
 

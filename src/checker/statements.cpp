@@ -1,6 +1,6 @@
-//
+// Statements and Declarations
 
-b32 check_assignable_to(Checker *c, Operand *operand, Type *type) {
+b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
 	if (operand->mode == Addressing_Invalid ||
 	    type == &basic_types[Basic_Invalid]) {
 		return true;
@@ -54,6 +54,7 @@ b32 check_assignable_to(Checker *c, Operand *operand, Type *type) {
 
 
 // NOTE(bill): `content_name` is for debugging
+// TODO(bill): Maybe allow assignment to tuples?
 void check_assignment(Checker *c, Operand *operand, Type *type, String context_name) {
 	check_not_tuple(c, operand);
 	if (operand->mode == Addressing_Invalid)
@@ -70,7 +71,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 	}
 
 	if (type != NULL) {
-		if (!check_assignable_to(c, operand, type)) {
+		if (!check_is_assignable_to(c, operand, type)) {
 			gbString type_string = type_to_string(type);
 			gbString op_type_string = type_to_string(operand->type);
 			defer (gb_string_free(type_string));
@@ -90,9 +91,9 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 }
 
 
-Type *check_assign_variable(Checker *c, Operand *x, AstNode *lhs) {
-	if (x->mode == Addressing_Invalid ||
-	    x->type == &basic_types[Basic_Invalid]) {
+Type *check_assign_variable(Checker *c, Operand *op_a, AstNode *lhs) {
+	if (op_a->mode == Addressing_Invalid ||
+	    op_a->type == &basic_types[Basic_Invalid]) {
 		return NULL;
 	}
 
@@ -102,10 +103,10 @@ Type *check_assign_variable(Checker *c, Operand *x, AstNode *lhs) {
 	if (node->kind == AstNode_Identifier &&
 	    are_strings_equal(node->identifier.token.string, make_string("_"))) {
     	add_entity_definition(c, node, NULL);
-    	check_assignment(c, x, NULL, make_string("assignment to `_` identifier"));
-    	if (x->mode == Addressing_Invalid)
+    	check_assignment(c, op_a, NULL, make_string("assignment to `_` identifier"));
+    	if (op_a->mode == Addressing_Invalid)
     		return NULL;
-    	return x->type;
+    	return op_a->type;
     }
 
 	Entity *e = NULL;
@@ -119,41 +120,42 @@ Type *check_assign_variable(Checker *c, Operand *x, AstNode *lhs) {
 	}
 
 
-	Operand y = {Addressing_Invalid};
-	check_expression(c, &y, lhs);
+	Operand op_b = {Addressing_Invalid};
+	check_expression(c, &op_b, lhs);
 	if (e) e->variable.used = used;
 
-	if (y.mode == Addressing_Invalid ||
-	    y.type == &basic_types[Basic_Invalid]) {
+	if (op_b.mode == Addressing_Invalid ||
+	    op_b.type == &basic_types[Basic_Invalid]) {
 		return NULL;
 	}
 
-	switch (y.mode) {
+	switch (op_b.mode) {
 	case Addressing_Variable:
 		break;
 	case Addressing_Invalid:
 		return NULL;
 	default: {
-		if (y.expression->kind == AstNode_SelectorExpression) {
+		if (op_b.expression->kind == AstNode_SelectorExpression) {
 			// NOTE(bill): Extra error checks
-			Operand z = {Addressing_Invalid};
-			check_expression(c, &z, y.expression->selector_expression.operand);
+			Operand op_c = {Addressing_Invalid};
+			check_expression(c, &op_c, op_b.expression->selector_expression.operand);
 		}
 
-		gbString str = expression_to_string(y.expression);
+		gbString str = expression_to_string(op_b.expression);
 		defer (gb_string_free(str));
-		print_checker_error(c, ast_node_token(y.expression),
+		print_checker_error(c, ast_node_token(op_b.expression),
 		                    "Cannot assign to `%s`", str);
 	} break;
 	}
 
-	check_assignment(c, x, y.type, make_string("assignment"));
-	if (x->mode == Addressing_Invalid)
+	check_assignment(c, op_a, op_b.type, make_string("assignment"));
+	if (op_a->mode == Addressing_Invalid)
 		return NULL;
 
-	return x->type;
+	return op_a->type;
 }
 
+// TODO(bill): Do I need to pass the *_count?
 void check_assign_variables(Checker *c,
                             AstNode *lhs_list, isize lhs_count,
                             AstNode *rhs_list, isize rhs_count) {
@@ -312,6 +314,10 @@ void check_statement_list(Checker *c, AstNode *node) {
 		check_statement(c, node);
 }
 
+
+// NOTE(bill): The last expression has to be a `return` statement
+// TODO(bill): This is a mild hack and should be probably handled
+// TODO(bill): Warn/err against code after `return` that it won't be executed
 b32 check_is_terminating(Checker *c, AstNode *node);
 
 b32 check_is_terminating_list(Checker *c, AstNode *node_list) {
@@ -545,14 +551,12 @@ void check_statement(Checker *c, AstNode *node) {
 // Declarations
 	case AstNode_VariableDeclaration: {
 		auto *vd = &node->variable_declaration;
-		gbAllocator allocator = gb_arena_allocator(&c->entity_arena);
-
 		isize entity_count = vd->name_list_count;
 		isize entity_index = 0;
-		Entity **entities = gb_alloc_array(allocator, Entity *, entity_count);
+		Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
 		switch (vd->kind) {
 		case Declaration_Mutable: {
-			Entity **new_entities = gb_alloc_array(allocator, Entity *, entity_count);
+			Entity **new_entities = gb_alloc_array(c->allocator, Entity *, entity_count);
 			isize new_entity_count = 0;
 
 			for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
@@ -564,7 +568,7 @@ void check_statement(Checker *c, AstNode *node) {
 					// NOTE(bill): Ignore assignments to `_`
 					b32 can_be_ignored = are_strings_equal(str, make_string("_"));
 					if (!can_be_ignored) {
-						found = scope_lookup_entity_current(c->curr_scope, str);
+						found = current_scope_lookup_entity(c->curr_scope, str);
 					}
 					if (found == NULL) {
 						entity = make_entity_variable(c, c->curr_scope, token, NULL);
@@ -650,14 +654,16 @@ void check_statement(Checker *c, AstNode *node) {
 	case AstNode_ProcedureDeclaration: {
 		auto *pd = &node->procedure_declaration;
 		GB_ASSERT_MSG(pd->kind == Declaration_Immutable, "Mutable/temp procedures are not yet implemented");
-		// TODO(bill): Should this be the case? And are the scopes correct?
-		// TODO(bill): Should procedures just have global scope?
 		Entity *e = make_entity_procedure(c, c->curr_scope, pd->name->identifier.token, NULL);
 		add_entity(c, c->curr_scope, pd->name, e);
 
-		Type *proc_type = make_type_procedure(e->parent, NULL, 0, NULL, 0);
+		Type *proc_type = make_type_procedure(c->allocator, e->parent, NULL, 0, NULL, 0);
 		e->type = proc_type;
 
+		// NOTE(bill): Procedures are just in file scope only.
+		// This is because closures/lambdas are not supported yet (or maybe never)
+		Scope *origin_curr_scope = c->curr_scope;
+		c->curr_scope = c->file_scope;
 		check_open_scope(c, pd->procedure_type);
 		{
 			check_procedure_type(c, proc_type, pd->procedure_type);
@@ -676,12 +682,14 @@ void check_statement(Checker *c, AstNode *node) {
 				GB_ASSERT(pd->tag->kind == AstNode_TagExpression);
 
 				String tag_name = pd->tag->tag_expression.name.string;
-				if (gb_strncmp("foreign", cast(char *)tag_name.text, tag_name.len) == 0) {
+				if (are_strings_equal(tag_name, make_string("foreign"))) {
 					// NOTE(bill): Foreign procedure (linking stage)
 				}
+				// TODO(bill): Other tags
 			}
 		}
 		check_close_scope(c);
+		c->curr_scope = origin_curr_scope;
 
 	} break;
 
@@ -691,7 +699,7 @@ void check_statement(Checker *c, AstNode *node) {
 		Entity *e = make_entity_type_name(c, c->curr_scope, name->identifier.token, NULL);
 		add_entity(c, c->curr_scope, name, e);
 
-		e->type = make_type_named(e->token.string, NULL, e);
+		e->type = make_type_named(c->allocator, e->token.string, NULL, e);
 		check_type(c, td->type_expression, e->type);
 		// NOTE(bill): Prevent recursive definition
 		set_base_type(e->type, get_base_type(e->type));

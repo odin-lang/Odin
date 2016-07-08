@@ -17,7 +17,7 @@ struct Operand {
 	Value value;
 
 	AstNode *expression;
-	i32 builtin_id;
+	BuiltinProcedureId builtin_id;
 };
 
 struct TypeAndValue {
@@ -44,21 +44,15 @@ ExpressionInfo make_expression_info(b32 is_lhs, AddressingMode mode, Type *type,
 
 struct Scope {
 	Scope *parent;
-	gbArray(Scope *) children; // TODO(bill): Remove and make into a linked list
-	Map<Entity *>    elements; // Key: String
+	Scope *prev, *next;
+	Scope *first_child, *last_child;
+	Map<Entity *> elements; // Key: String
 };
 
 enum ExpressionKind {
 	Expression_Expression,
 	Expression_Conversion,
 	Expression_Statement,
-};
-
-struct BuiltinProcedure {
-	String name;
-	isize arg_count;
-	b32 variadic;
-	ExpressionKind kind;
 };
 
 enum BuiltinProcedureId {
@@ -79,32 +73,12 @@ enum BuiltinProcedureId {
 
 	BuiltinProcedure_Count,
 };
-
-struct Checker {
-	Parser *            parser;
-	Map<TypeAndValue>   types;       // Key: AstNode * | Expression -> Type (and value)
-	Map<Entity *>       definitions; // Key: AstNode * | Identifier -> Entity
-	Map<Entity *>       uses;        // Key: AstNode * | Identifier -> Entity (Anonymous field)
-	Map<Scope *>        scopes;      // Key: AstNode * | Node       -> Scope
-	Map<ExpressionInfo> untyped;     // Key: AstNode * | Expression -> ExpressionInfo
-	BaseTypeSizes       sizes;
-	Scope *             file_scope;
-
-	gbArena entity_arena;
-
-	Scope *curr_scope;
-	gbArray(Type *) procedure_stack;
-	b32 in_defer;
-
-#define MAX_CHECKER_ERROR_COUNT 10
-	isize error_prev_line;
-	isize error_prev_column;
-	isize error_count;
+struct BuiltinProcedure {
+	String name;
+	isize arg_count;
+	b32 variadic;
+	ExpressionKind kind;
 };
-
-
-gb_global Scope *global_scope = NULL;
-
 gb_global BuiltinProcedure builtin_procedures[BuiltinProcedure_Count] = {
 	{STR_LIT(""),                 0, false, Expression_Statement},
 	{STR_LIT("size_of"),          1, false, Expression_Expression},
@@ -122,25 +96,50 @@ gb_global BuiltinProcedure builtin_procedures[BuiltinProcedure_Count] = {
 };
 
 
-// TODO(bill): Arena allocation
-Scope *make_scope(Scope *parent) {
-	gbAllocator a = gb_heap_allocator();
-	Scope *s = gb_alloc_item(a, Scope);
+
+struct Checker {
+	Parser *            parser;
+	Map<TypeAndValue>   types;       // Key: AstNode * | Expression -> Type (and value)
+	Map<Entity *>       definitions; // Key: AstNode * | Identifier -> Entity
+	Map<Entity *>       uses;        // Key: AstNode * | Identifier -> Entity
+	Map<Scope *>        scopes;      // Key: AstNode * | Node       -> Scope
+	Map<ExpressionInfo> untyped;     // Key: AstNode * | Expression -> ExpressionInfo
+	BaseTypeSizes       sizes;
+	Scope *             file_scope;
+
+	gbArena     arena;
+	gbAllocator allocator;
+
+	Scope *curr_scope;
+	gbArray(Type *) procedure_stack;
+	b32 in_defer;
+
+#define MAX_CHECKER_ERROR_COUNT 10
+	isize error_prev_line;
+	isize error_prev_column;
+	isize error_count;
+};
+
+
+gb_global Scope *global_scope = NULL;
+
+
+Scope *make_scope(Scope *parent, gbAllocator allocator) {
+	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
-	gb_array_init(s->children, a);
-	map_init(&s->elements, a);
-	if (parent != NULL && parent != global_scope)
-		gb_array_append(parent->children, s);
+	map_init(&s->elements, gb_heap_allocator());
+	if (parent != NULL && parent != global_scope) {
+		DLIST_APPEND(parent->first_child, parent->last_child, s);
+	}
 	return s;
 }
 
 void destroy_scope(Scope *scope) {
-	for (isize i = 0; i < gb_array_count(scope->children); i++) {
-		destroy_scope(scope->children[i]);
+	for (Scope *child = scope->first_child; child != NULL; child = child->next) {
+		destroy_scope(child);
 	}
 	map_destroy(&scope->elements);
-	gb_array_free(scope->children);
-	gb_free(gb_heap_allocator(), scope);
+	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
 }
 
 
@@ -164,7 +163,7 @@ Entity *scope_lookup_entity(Scope *s, String name) {
 	return entity;
 }
 
-Entity *scope_lookup_entity_current(Scope *s, String name) {
+Entity *current_scope_lookup_entity(Scope *s, String name) {
 	u64 key = hash_string(name);
 	Entity **found = map_get(&s->elements, key);
 	if (found)
@@ -201,8 +200,9 @@ void add_global_entity(Entity *entity) {
 }
 
 void init_global_scope(void) {
-	global_scope = make_scope(NULL);
+	// NOTE(bill): No need to free these
 	gbAllocator a = gb_heap_allocator();
+	global_scope = make_scope(NULL, a);
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
@@ -237,7 +237,7 @@ void init_global_scope(void) {
 
 // Builtin Procedures
 	for (isize i = 0; i < gb_count_of(builtin_procedures); i++) {
-		i32 id = cast(i32)i;
+		BuiltinProcedureId id = cast(BuiltinProcedureId)i;
 		Token token = {Token_Identifier};
 		token.string = builtin_procedures[i].name;
 		Entity *entity = alloc_entity(a, Entity_Builtin, NULL, token, &basic_types[Basic_Invalid]);
@@ -265,14 +265,16 @@ void init_checker(Checker *c, Parser *parser) {
 
 	map_init(&c->untyped, a);
 
-	c->file_scope = make_scope(global_scope);
-	c->curr_scope = c->file_scope;
-
 	gb_array_init(c->procedure_stack, a);
 
 	// NOTE(bill): Is this big enough or too small?
-	isize entity_arena_size = 2 * gb_size_of(Entity) * gb_array_count(c->parser->tokens);
-	gb_arena_init_from_allocator(&c->entity_arena, a, entity_arena_size);
+	isize item_size = gb_max(gb_max(gb_size_of(Entity), gb_size_of(Type)), gb_size_of(Scope));
+	isize arena_size = 2 * item_size * gb_array_count(c->parser->tokens);
+	gb_arena_init_from_allocator(&c->arena, a, arena_size);
+	c->allocator = gb_arena_allocator(&c->arena);
+
+	c->file_scope = make_scope(global_scope, c->allocator);
+	c->curr_scope = c->file_scope;
 }
 
 void destroy_checker(Checker *c) {
@@ -283,7 +285,7 @@ void destroy_checker(Checker *c) {
 	map_destroy(&c->untyped);
 	destroy_scope(c->file_scope);
 	gb_array_free(c->procedure_stack);
-	gb_arena_free(&c->entity_arena);
+	gb_arena_free(&c->arena);
 }
 
 #define print_checker_error(p, token, fmt, ...) print_checker_error_(p, __FUNCTION__, token, fmt, ##__VA_ARGS__)
@@ -397,7 +399,7 @@ void add_scope(Checker *c, AstNode *node, Scope *scope) {
 
 
 void check_open_scope(Checker *c, AstNode *statement) {
-	Scope *scope = make_scope(c->curr_scope);
+	Scope *scope = make_scope(c->curr_scope, c->allocator);
 	add_scope(c, statement, scope);
 	c->curr_scope = scope;
 }
@@ -418,40 +420,40 @@ void pop_procedure(Checker *c) {
 
 
 Entity *make_entity_variable(Checker *c, Scope *parent, Token token, Type *type) {
-	Entity *entity = alloc_entity(gb_arena_allocator(&c->entity_arena), Entity_Variable, parent, token, type);
+	Entity *entity = alloc_entity(c->allocator, Entity_Variable, parent, token, type);
 	return entity;
 }
 
 Entity *make_entity_constant(Checker *c, Scope *parent, Token token, Type *type, Value value) {
-	Entity *entity = alloc_entity(gb_arena_allocator(&c->entity_arena), Entity_Constant, parent, token, type);
+	Entity *entity = alloc_entity(c->allocator, Entity_Constant, parent, token, type);
 	entity->constant.value = value;
 	return entity;
 }
 
 Entity *make_entity_type_name(Checker *c, Scope *parent, Token token, Type *type) {
-	Entity *entity = alloc_entity(gb_arena_allocator(&c->entity_arena), Entity_TypeName, parent, token, type);
+	Entity *entity = alloc_entity(c->allocator, Entity_TypeName, parent, token, type);
 	return entity;
 }
 
 Entity *make_entity_param(Checker *c, Scope *parent, Token token, Type *type) {
-	Entity *entity = alloc_entity(gb_arena_allocator(&c->entity_arena), Entity_Variable, parent, token, type);
+	Entity *entity = alloc_entity(c->allocator, Entity_Variable, parent, token, type);
 	entity->variable.used = true;
 	return entity;
 }
 
 Entity *make_entity_field(Checker *c, Scope *parent, Token token, Type *type) {
-	Entity *entity = alloc_entity(gb_arena_allocator(&c->entity_arena), Entity_Variable, parent, token, type);
+	Entity *entity = alloc_entity(c->allocator, Entity_Variable, parent, token, type);
 	entity->variable.is_field  = true;
 	return entity;
 }
 
 Entity *make_entity_procedure(Checker *c, Scope *parent, Token token, Type *signature_type) {
-	Entity *entity = alloc_entity(gb_arena_allocator(&c->entity_arena), Entity_Procedure, parent, token, signature_type);
+	Entity *entity = alloc_entity(c->allocator, Entity_Procedure, parent, token, signature_type);
 	return entity;
 }
 
-Entity *make_entity_builtin(Checker *c, Scope *parent, Token token, Type *type, i32 id) {
-	Entity *entity = alloc_entity(gb_arena_allocator(&c->entity_arena), Entity_Builtin, parent, token, type);
+Entity *make_entity_builtin(Checker *c, Scope *parent, Token token, Type *type, BuiltinProcedureId id) {
+	Entity *entity = alloc_entity(c->allocator, Entity_Builtin, parent, token, type);
 	entity->builtin.id = id;
 	return entity;
 }

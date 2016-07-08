@@ -1,5 +1,6 @@
 struct Scope;
 struct Checker;
+enum BuiltinProcedureId;
 
 enum EntityKind {
 	Entity_Invalid,
@@ -32,7 +33,7 @@ struct Entity {
 		} variable;
 		struct {} type_name;
 		struct {} procedure;
-		struct { i32 id; } builtin;
+		struct { BuiltinProcedureId id; } builtin;
 	};
 };
 
@@ -54,7 +55,7 @@ Entity *alloc_entity(gbAllocator a, EntityKind kind, Scope *parent, Token token,
 
 
 
-
+// NOTE(bill): Defined in "checker.cpp"
 Entity *make_entity_variable (Checker *c, Scope *parent, Token token, Type *type);
 Entity *make_entity_constant (Checker *c, Scope *parent, Token token, Type *type, Value value);
 Entity *make_entity_type_name(Checker *c, Scope *parent, Token token, Type *type);
@@ -62,5 +63,4 @@ Entity *make_entity_param    (Checker *c, Scope *parent, Token token, Type *type
 Entity *make_entity_field    (Checker *c, Scope *parent, Token token, Type *type);
 Entity *make_entity_procedure(Checker *c, Scope *parent, Token token, Type *signature_type);
 Entity *make_entity_builtin  (Checker *c, Scope *parent, Token token, Type *type, i32 id);
-
 Entity *make_entity_dummy_variable(Checker *c, Token token);
