@@ -55,6 +55,7 @@ AstNode__ExpressionEnd,
 AstNode__StatementBegin,
 	AstNode_BadStatement, // NOTE(bill): Naughty statement
 	AstNode_EmptyStatement,
+	AstNode_TagStatement,
 	AstNode_ExpressionStatement,
 	AstNode_IncDecStatement,
 	AstNode_AssignStatement,
@@ -111,6 +112,7 @@ struct AstNode {
 		struct {
 			Token token;
 			Token name;
+			AstNode *expression;
 		} tag_expression;
 
 		struct { Token begin, end; }                                bad_expression;
@@ -137,6 +139,11 @@ struct AstNode {
 		struct { Token token; }                   empty_statement;
 		struct { AstNode *expression; }           expression_statement;
 		struct { Token op; AstNode *expression; } inc_dec_statement;
+		struct {
+			Token token;
+			Token name;
+			AstNode *statement;
+		} tag_statement;
 		struct {
 			Token op;
 			AstNode *lhs_list, *rhs_list;
@@ -182,7 +189,7 @@ struct AstNode {
 		} field;
 		struct {
 			Token token;
-			AstNode *param_list; // AstNode_Field
+			AstNode *param_list; // AstNode_Field list
 			isize param_count;
 			AstNode *results_list; // type expression list
 			isize result_count;
@@ -192,9 +199,8 @@ struct AstNode {
 			AstNode *name;           // AstNode_Identifier
 			AstNode *procedure_type; // AstNode_ProcedureType
 			AstNode *body;           // AstNode_BlockStatement
-			AstNode *tag;            // AstNode_TagExpression
-			// TODO(bill): Allow for multiple tags
-			// TODO(bill): Modifiers: inline, no_inline, etc.
+			AstNode *tag_list;       // AstNode_TagExpression
+			isize tag_count;
 		} procedure_declaration;
 		struct {
 			Token token;
@@ -252,6 +258,8 @@ Token ast_node_token(AstNode *node) {
 		return node->basic_literal;
 	case AstNode_Identifier:
 		return node->identifier.token;
+	case AstNode_TagExpression:
+		return node->tag_expression.token;
 	case AstNode_BadExpression:
 		return node->bad_expression.begin;
 	case AstNode_UnaryExpression:
@@ -278,6 +286,8 @@ Token ast_node_token(AstNode *node) {
 		return node->empty_statement.token;
 	case AstNode_ExpressionStatement:
 		return ast_node_token(node->expression_statement.expression);
+	case AstNode_TagStatement:
+		return node->tag_statement.token;
 	case AstNode_IncDecStatement:
 		return node->inc_dec_statement.op;
 	case AstNode_AssignStatement:
@@ -366,8 +376,36 @@ AstEntity *ast_scope_insert(AstScope *scope, AstEntity entity) {
 	return prev;
 }
 
-// NOTE(bill): And this below is why is need a new language! Discriminated unions are a pain in C/C++
+
+#define print_parse_error(p, token, fmt, ...) print_parse_error_(p, __FUNCTION__, token, fmt, ##__VA_ARGS__)
+void print_parse_error_(Parser *p, char *function, Token token, char *fmt, ...) {
+
+	// NOTE(bill): Duplicate error, skip it
+	if (p->error_prev_line != token.line || p->error_prev_column != token.column) {
+		va_list va;
+
+		p->error_prev_line = token.line;
+		p->error_prev_column = token.column;
+
+	#if 1
+		gb_printf_err("%s()\n", function);
+	#endif
+		va_start(va, fmt);
+		gb_printf_err("%s(%td:%td) Syntax error: %s\n",
+		              p->tokenizer.fullpath, token.line, token.column,
+		              gb_bprintf_va(fmt, va));
+		va_end(va);
+	}
+	p->error_count++;
+}
+
+
+// NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
 gb_inline AstNode *make_node(Parser *p, AstNodeKind kind) {
+	if (gb_arena_size_remaining(&p->arena, GB_DEFAULT_MEMORY_ALIGNMENT) < gb_size_of(AstNode)) {
+		// NOTE(bill): If a syntax error is so bad, just quit!
+		gb_exit(1);
+	}
 	AstNode *node = gb_alloc_item(gb_arena_allocator(&p->arena), AstNode);
 	node->kind = kind;
 	return node;
@@ -380,10 +418,19 @@ gb_inline AstNode *make_bad_expression(Parser *p, Token begin, Token end) {
 	return result;
 }
 
-gb_inline AstNode *make_tag_expression(Parser *p, Token token, Token name) {
+gb_inline AstNode *make_tag_expression(Parser *p, Token token, Token name, AstNode *expression) {
 	AstNode *result = make_node(p, AstNode_TagExpression);
 	result->tag_expression.token = token;
 	result->tag_expression.name = name;
+	result->tag_expression.expression = expression;
+	return result;
+}
+
+gb_inline AstNode *make_tag_statement(Parser *p, Token token, Token name, AstNode *statement) {
+	AstNode *result = make_node(p, AstNode_TagStatement);
+	result->tag_statement.token = token;
+	result->tag_statement.name = name;
+	result->tag_statement.statement = statement;
 	return result;
 }
 
@@ -593,13 +640,14 @@ gb_inline AstNode *make_procedure_type(Parser *p, Token token, AstNode *param_li
 	return result;
 }
 
-gb_inline AstNode *make_procedure_declaration(Parser *p, DeclarationKind kind, AstNode *name, AstNode *procedure_type, AstNode *body, AstNode *tag) {
+gb_inline AstNode *make_procedure_declaration(Parser *p, DeclarationKind kind, AstNode *name, AstNode *procedure_type, AstNode *body, AstNode *tag_list, isize tag_count) {
 	AstNode *result = make_node(p, AstNode_ProcedureDeclaration);
 	result->procedure_declaration.kind = kind;
 	result->procedure_declaration.name = name;
 	result->procedure_declaration.procedure_type = procedure_type;
 	result->procedure_declaration.body = body;
-	result->procedure_declaration.tag = tag;
+	result->procedure_declaration.tag_list = tag_list;
+	result->procedure_declaration.tag_count = tag_count;
 	return result;
 }
 
@@ -634,28 +682,6 @@ gb_inline AstNode *make_type_declaration(Parser *p, Token token, AstNode *name, 
 	return result;
 }
 
-
-#define print_parse_error(p, token, fmt, ...) print_parse_error_(p, __FUNCTION__, token, fmt, ##__VA_ARGS__)
-void print_parse_error_(Parser *p, char *function, Token token, char *fmt, ...) {
-
-	// NOTE(bill): Duplicate error, skip it
-	if (p->error_prev_line != token.line || p->error_prev_column != token.column) {
-		va_list va;
-
-		p->error_prev_line = token.line;
-		p->error_prev_column = token.column;
-
-	#if 0
-		gb_printf_err("%s()\n", function);
-	#endif
-		va_start(va, fmt);
-		gb_printf_err("%s(%td:%td) %s\n",
-		              p->tokenizer.fullpath, token.line, token.column,
-		              gb_bprintf_va(fmt, va));
-		va_end(va);
-	}
-	p->error_count++;
-}
 
 
 gb_inline b32 next_token(Parser *p) {
@@ -724,7 +750,7 @@ b32 init_parser(Parser *p, char *filename) {
 
 		// NOTE(bill): Is this big enough or too small?
 		isize arena_size = gb_max(gb_size_of(AstNode), gb_size_of(AstScope));
-		arena_size *= 1.25*gb_array_count(p->tokens);
+		arena_size *= 2*gb_array_count(p->tokens);
 		gb_arena_init_from_allocator(&p->arena, gb_heap_allocator(), arena_size);
 
 		open_ast_scope(p);
@@ -746,7 +772,10 @@ void destroy_parser(Parser *p) {
 
 gb_internal void add_ast_entity(Parser *p, AstScope *scope, AstNode *declaration, AstNode *name_list) {
 	for (AstNode *n = name_list; n != NULL; n = n->next) {
-		GB_ASSERT_MSG(n->kind == AstNode_Identifier, "Identifier is already declared or resolved");
+		if (n->kind != AstNode_Identifier) {
+			print_parse_error(p, ast_node_token(declaration), "Identifier is already declared or resolved");
+			continue;
+		}
 
 		AstEntity *entity = make_ast_entity(p, n->identifier.token, declaration, scope);
 		n->identifier.entity = entity;
@@ -765,8 +794,26 @@ gb_internal void add_ast_entity(Parser *p, AstScope *scope, AstNode *declaration
 AstNode *parse_expression(Parser *p, b32 lhs);
 
 AstNode *parse_identifier(Parser *p) {
-	Token identifier = expect_token(p, Token_Identifier);
-	return make_identifier(p, identifier);
+	Token token = p->cursor[0];
+	if (token.kind == Token_Identifier) {
+		next_token(p);
+	} else {
+		token.string = make_string("_");
+		expect_token(p, Token_Identifier);
+	}
+	return make_identifier(p, token);
+}
+
+AstNode *parse_tag_expression(Parser *p, AstNode *expression) {
+	Token token = expect_token(p, Token_Hash);
+	Token name  = expect_token(p, Token_Identifier);
+	return make_tag_expression(p, token, name, expression);
+}
+
+AstNode *parse_tag_statement(Parser *p, AstNode *statement) {
+	Token token = expect_token(p, Token_Hash);
+	Token name  = expect_token(p, Token_Identifier);
+	return make_tag_statement(p, token, name, statement);
 }
 
 AstNode *unparen_expression(AstNode *node) {
@@ -802,6 +849,11 @@ AstNode *parse_atom_expression(Parser *p, b32 lhs) {
 		operand = parse_expression(p, false);
 		close = expect_token(p, Token_CloseParen);
 		operand = make_paren_expression(p, operand, open, close);
+	} break;
+
+	case Token_Hash: {
+		operand = parse_tag_expression(p, NULL);
+		operand->tag_expression.expression = parse_expression(p, false);
 	} break;
 	}
 
@@ -852,10 +904,9 @@ AstNode *parse_atom_expression(Parser *p, b32 lhs) {
 				operand = make_selector_expression(p, token, operand, parse_identifier(p));
 				break;
 			default: {
-				Token token = p->cursor[0];
-				print_parse_error(p, token, "Expected a selector");
+				print_parse_error(p, p->cursor[0], "Expected a selector");
 				next_token(p);
-				operand = make_selector_expression(p, token, operand, NULL);
+				operand = make_selector_expression(p, p->cursor[0], operand, NULL);
 			} break;
 			}
 		} break;
@@ -1153,50 +1204,21 @@ AstNode *parse_field_declaration(Parser *p, AstScope *scope) {
 	return field;
 }
 
+Token parse_procedure_signature(Parser *p, AstScope *scope,
+                                AstNode **param_list, isize *param_count,
+                                AstNode **result_list, isize *result_count);
+
 AstNode *parse_procedure_type(Parser *p, AstScope **scope_) {
-	Token token = expect_token(p, Token_proc);
 	AstScope *scope = make_ast_scope(p, p->file_scope); // Procedure's scope
 	AstNode *params = NULL;
 	AstNode *results = NULL;
 	isize param_count = 0;
 	isize result_count = 0;
 
-	expect_token(p, Token_OpenParen);
-	if (p->cursor[0].kind != Token_CloseParen) {
-		// IMPORTANT TODO(bill): Allow for lhs-expression list style types
-		// proc(x, y: int, a, b: f32);
-		AstNode *params_curr = NULL;
-		do {
-			AstNode *type_node = parse_type(p);
-			DLIST_APPEND(params, params_curr, type_node);
-			param_count++;
-			if (p->cursor[0].kind != Token_Comma ||
-			    p->cursor[0].kind == Token_EOF)
-			    break;
-			next_token(p);
-		} while (true);
-	}
-	expect_token(p, Token_CloseParen);
-
-	// NOTE(bill): Has results
-	if (allow_token(p, Token_ArrowRight)) {
-		if (p->cursor[0].kind != Token_Semicolon) {
-			AstNode *results_curr = NULL;
-			do {
-				DLIST_APPEND(results, results_curr, parse_type(p));
-				result_count++;
-				if (p->cursor[0].kind != Token_Comma ||
-				    p->cursor[0].kind == Token_EOF)
-				    break;
-				next_token(p);
-			} while (true);
-		} else {
-			print_parse_error(p, p->cursor[0], "Expected at least one type after the `->`");
-		}
-	}
+	Token proc_token = parse_procedure_signature(p, scope, &params, &param_count, &results, &result_count);
 
 	if (scope_) *scope_ = scope;
-	return make_procedure_type(p, token, params, param_count, results, result_count);
+	return make_procedure_type(p, proc_token, params, param_count, results, result_count);
 }
 
 
@@ -1260,22 +1282,23 @@ AstNode *parse_identifier_or_type(Parser *p) {
 		break;
 
 	default:
-		print_parse_error(p, p->cursor[0], "Expected type after type separator `:`");
+		print_parse_error(p, p->cursor[0],
+		                  "Expected a type after `%.*s`, got `%.*s`", LIT(p->cursor[-1].string), LIT(p->cursor[0].string));
 		break;
 	}
 
 	return NULL;
 }
 
-// TODO(bill): Probably unify `parse_parameters` and `parse_results`
 AstNode *parse_parameters(Parser *p, AstScope *scope, isize *param_count_) {
 	AstNode *param_list = NULL;
 	AstNode *param_list_curr = NULL;
 	isize param_count = 0;
 	expect_token(p, Token_OpenParen);
 	while (p->cursor[0].kind != Token_CloseParen) {
-		DLIST_APPEND(param_list, param_list_curr, parse_field_declaration(p, scope));
-		param_count++;
+		AstNode *field = parse_field_declaration(p, scope);
+		DLIST_APPEND(param_list, param_list_curr, field);
+		param_count += field->field.name_list_count;
 		if (p->cursor[0].kind != Token_Comma)
 			break;
 		next_token(p);
@@ -1286,34 +1309,42 @@ AstNode *parse_parameters(Parser *p, AstScope *scope, isize *param_count_) {
 	return param_list;
 }
 
-AstNode *parse_results(Parser *p, AstScope *scope, isize *result_count_) {
-	AstNode *result_list = NULL;
-	AstNode *result_list_curr = NULL;
-	isize result_count = 0;
-
+AstNode *parse_results(Parser *p, AstScope *scope, isize *result_count) {
 	if (allow_token(p, Token_ArrowRight)) {
-		while (p->cursor[0].kind != Token_OpenBrace &&
-		       p->cursor[0].kind != Token_Semicolon) {
-			DLIST_APPEND(result_list, result_list_curr, parse_type(p));
-			result_count++;
-			if (p->cursor[0].kind != Token_Comma)
-				break;
-			next_token(p);
+		if (p->cursor[0].kind == Token_OpenParen) {
+			expect_token(p, Token_OpenParen);
+			AstNode *list = NULL;
+			AstNode *list_curr = NULL;
+			isize count = 0;
+			while (p->cursor[0].kind != Token_CloseParen &&
+			       p->cursor[0].kind != Token_EOF) {
+				DLIST_APPEND(list, list_curr, parse_type(p));
+				count++;
+				if (p->cursor[0].kind != Token_Comma)
+					break;
+				next_token(p);
+			}
+			expect_token(p, Token_CloseParen);
+
+			if (result_count) *result_count = count;
+			return list;
 		}
 
-		if (result_count == 0)
-			print_parse_error(p, p->cursor[0], "Expected return types after `->`");
+		AstNode *field = make_field(p, NULL, 0, parse_type(p));
+		if (result_count) *result_count = 1;
+		return field;
 	}
-
-	if (result_count_) *result_count_ = result_count;
-	return result_list;
+	if (result_count) *result_count = 0;
+	return NULL;
 }
 
-void parse_procedure_signature(Parser *p, AstScope *scope,
+Token parse_procedure_signature(Parser *p, AstScope *scope,
                                AstNode **param_list, isize *param_count,
                                AstNode **result_list, isize *result_count) {
+	Token proc_token = expect_token(p, Token_proc);
 	*param_list  = parse_parameters(p, scope, param_count);
 	*result_list = parse_results(p, scope, result_count);
+	return proc_token;
 }
 
 AstNode *parse_body(Parser *p, AstScope *scope) {
@@ -1327,13 +1358,6 @@ AstNode *parse_body(Parser *p, AstScope *scope) {
 	return make_block_statement(p, statement_list, statement_list_count, open, close);
 }
 
-
-AstNode *parse_tag_expression(Parser *p) {
-	Token token = expect_token(p, Token_Hash);
-	Token name  = expect_token(p, Token_Identifier);
-	return make_tag_expression(p, token, name);
-}
-
 AstNode *parse_procedure_declaration(Parser *p, Token proc_token, AstNode *name, DeclarationKind kind) {
 	AstNode *param_list = NULL;
 	AstNode *result_list = NULL;
@@ -1344,17 +1368,22 @@ AstNode *parse_procedure_declaration(Parser *p, Token proc_token, AstNode *name,
 
 	parse_procedure_signature(p, scope, &param_list, &param_count, &result_list, &result_count);
 
-	AstNode *body = NULL, *tag = NULL;
+	AstNode *body = NULL;
+	AstNode *tag_list = NULL;
+	AstNode *tag_list_curr = NULL;
+	isize tag_count = 0;
+	while (p->cursor[0].kind == Token_Hash) {
+		DLIST_APPEND(tag_list, tag_list_curr, parse_tag_expression(p, NULL));
+		tag_count++;
+	}
 	if (p->cursor[0].kind == Token_OpenBrace) {
 		body = parse_body(p, scope);
-	} else if (p->cursor[0].kind == Token_Hash) {
-		tag = parse_tag_expression(p);
 	}
 
 	close_ast_scope(p);
 
 	AstNode *proc_type = make_procedure_type(p, proc_token, param_list, param_count, result_list, result_count);
-	return make_procedure_declaration(p, kind, name, proc_type, body, tag);
+	return make_procedure_declaration(p, kind, name, proc_type, body, tag_list, tag_count);
 }
 
 AstNode *parse_declaration(Parser *p, AstNode *name_list, isize name_list_count) {
@@ -1379,16 +1408,15 @@ AstNode *parse_declaration(Parser *p, AstNode *name_list, isize name_list_count)
 			Token proc_token = p->cursor[0];
 			AstNode *name = name_list;
 			if (name_list_count != 1) {
-				print_parse_error(p, p->cursor[0], "You can only declare one procedure at a time (at the moment)");
-				return make_bad_declaration(p, name->identifier.token, p->cursor[0]);
+				print_parse_error(p, proc_token, "You can only declare one procedure at a time (at the moment)");
+				return make_bad_declaration(p, name->identifier.token, proc_token);
 			}
 
 			// TODO(bill): Allow for mutable procedures
 			if (declaration_kind != Declaration_Immutable) {
-				print_parse_error(p, p->cursor[0], "Only immutable procedures are supported (at the moment)");
-				return make_bad_declaration(p, name->identifier.token, p->cursor[0]);
+				print_parse_error(p, proc_token, "Only immutable procedures are supported (at the moment)");
+				return make_bad_declaration(p, name->identifier.token, proc_token);
 			}
-			next_token(p); // Skip `proc` token
 
 			AstNode *procedure_declaration = parse_procedure_declaration(p, proc_token, name, declaration_kind);
 			add_ast_entity(p, p->curr_scope, procedure_declaration, name_list);
@@ -1549,7 +1577,8 @@ AstNode *parse_type_declaration(Parser *p) {
 
 	AstNode *type_declaration = make_type_declaration(p, token, name, type_expression);
 
-	if (type_expression->kind != AstNode_StructType)
+	if (type_expression->kind != AstNode_StructType &&
+	    type_expression->kind != AstNode_ProcedureType)
 		expect_token(p, Token_Semicolon);
 
 	return type_declaration;
@@ -1588,8 +1617,12 @@ AstNode *parse_statement(Parser *p) {
 	// case Token_match:
 	// case Token_case:
 
+	case Token_Hash:
+		s = parse_tag_statement(p, NULL);
+		s->tag_statement.statement = parse_statement(p); // TODO(bill): Find out why this doesn't work as an argument
+		return s;
+
 	case Token_OpenBrace: return parse_block_statement(p);
-	// case Token_CloseBrace: s = make_empty_statement(p, token); break;
 
 	case Token_Semicolon:
 		s = make_empty_statement(p, token);
@@ -1607,7 +1640,6 @@ AstNode *parse_statement_list(Parser *p, isize *list_count_) {
 	isize list_count = 0;
 
 	while (p->cursor[0].kind != Token_case &&
-	       p->cursor[0].kind != Token_default &&
 	       p->cursor[0].kind != Token_CloseBrace &&
 	       p->cursor[0].kind != Token_EOF) {
 		DLIST_APPEND(list_root, list_curr, parse_statement(p));

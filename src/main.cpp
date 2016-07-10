@@ -5,6 +5,7 @@
 #include "checker.cpp"
 #include "generator.cpp"
 
+
 int main(int argc, char **argv) {
 	if (argc < 2) {
 		gb_printf_err("Please specify a .odin file\n");
@@ -29,11 +30,13 @@ int main(int argc, char **argv) {
 
 			check_statement_list(&checker, root_node);
 
+#if 0
 			Generator generator = {};
 			if (init_generator(&generator, &checker)) {
 				defer (destroy_generator(&generator));
 				generate_code(&generator, root_node);
 			}
+#endif
 		}
 	}
 

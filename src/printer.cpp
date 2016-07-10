@@ -24,6 +24,7 @@ void print_ast(AstNode *node, isize indent) {
 		gb_printf("(tag)\n");
 		print_indent(indent+1);
 		print_token(node->tag_expression.name);
+		print_ast(node->tag_expression.expression, indent+1);
 		break;
 
 	case AstNode_UnaryExpression:
@@ -137,7 +138,7 @@ void print_ast(AstNode *node, isize indent) {
 			gb_printf("(decl:proc,immutable)\n");
 		print_ast(node->procedure_declaration.procedure_type, indent+1);
 		print_ast(node->procedure_declaration.body, indent+1);
-		print_ast(node->procedure_declaration.tag, indent+1);
+		print_ast(node->procedure_declaration.tag_list, indent+1);
 		break;
 
 	case AstNode_TypeDeclaration:

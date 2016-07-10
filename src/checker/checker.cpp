@@ -68,6 +68,7 @@ enum BuiltinProcedureId {
 	BuiltinProcedure_len,
 	BuiltinProcedure_cap,
 	BuiltinProcedure_copy,
+	BuiltinProcedure_copy_bytes,
 	BuiltinProcedure_print,
 	BuiltinProcedure_println,
 
@@ -91,6 +92,7 @@ gb_global BuiltinProcedure builtin_procedures[BuiltinProcedure_Count] = {
 	{STR_LIT("len"),              1, false, Expression_Expression},
 	{STR_LIT("cap"),              1, false, Expression_Expression},
 	{STR_LIT("copy"),             2, false, Expression_Expression},
+	{STR_LIT("copy_bytes"),       3, false, Expression_Statement},
 	{STR_LIT("print"),            1, true,  Expression_Statement},
 	{STR_LIT("println"),          1, true,  Expression_Statement},
 };
@@ -112,7 +114,7 @@ struct Checker {
 
 	Scope *curr_scope;
 	gbArray(Type *) procedure_stack;
-	b32 in_defer;
+	b32 in_defer; // TODO(bill): Actually handle correctly
 
 #define MAX_CHECKER_ERROR_COUNT 10
 	isize error_prev_line;
@@ -199,6 +201,14 @@ void add_global_entity(Entity *entity) {
 	}
 }
 
+void add_global_constant(gbAllocator a, String name, Type *type, Value value) {
+	Token token = {Token_Identifier};
+	token.string = name;
+	Entity *entity = alloc_entity(a, Entity_Constant, NULL, token, type);
+	entity->constant.value = value;
+	add_global_entity(entity);
+}
+
 void init_global_scope(void) {
 	// NOTE(bill): No need to free these
 	gbAllocator a = gb_heap_allocator();
@@ -217,23 +227,9 @@ void init_global_scope(void) {
 	}
 
 // Constants
-	Token true_token = {Token_Identifier};
-	true_token.string = make_string("true");
-	Entity *true_entity = alloc_entity(a, Entity_Constant, NULL, true_token, &basic_types[Basic_UntypedBool]);
-	true_entity->constant.value = make_value_bool(true);
-	add_global_entity(true_entity);
-
-	Token false_token = {Token_Identifier};
-	false_token.string = make_string("false");
-	Entity *false_entity = alloc_entity(a, Entity_Constant, NULL, false_token, &basic_types[Basic_UntypedBool]);
-	false_entity->constant.value = make_value_bool(false);
-	add_global_entity(false_entity);
-
-	Token null_token = {Token_Identifier};
-	null_token.string = make_string("null");
-	Entity *null_entity = alloc_entity(a, Entity_Constant, NULL, null_token, &basic_types[Basic_UntypedPointer]);
-	null_entity->constant.value = make_value_pointer(NULL);
-	add_global_entity(null_entity);
+	add_global_constant(a, make_string("true"),  &basic_types[Basic_UntypedBool],    make_value_bool(true));
+	add_global_constant(a, make_string("false"), &basic_types[Basic_UntypedBool],    make_value_bool(false));
+	add_global_constant(a, make_string("null"),  &basic_types[Basic_UntypedPointer], make_value_pointer(NULL));
 
 // Builtin Procedures
 	for (isize i = 0; i < gb_count_of(builtin_procedures); i++) {
@@ -290,25 +286,25 @@ void destroy_checker(Checker *c) {
 
 #define print_checker_error(p, token, fmt, ...) print_checker_error_(p, __FUNCTION__, token, fmt, ##__VA_ARGS__)
 void print_checker_error_(Checker *c, char *function, Token token, char *fmt, ...) {
-	va_list va;
+
 
 	// NOTE(bill): Duplicate error, skip it
-	if (c->error_prev_line == token.line && c->error_prev_column == token.column) {
-		goto error;
+	if (!(c->error_prev_line == token.line && c->error_prev_column == token.column)) {
+		c->error_prev_line = token.line;
+		c->error_prev_column = token.column;
+
+	#if 0
+		gb_printf_err("%s()\n", function);
+	#endif
+
+		va_list va;
+		va_start(va, fmt);
+		gb_printf_err("%s(%td:%td) %s\n",
+		              c->parser->tokenizer.fullpath, token.line, token.column,
+		              gb_bprintf_va(fmt, va));
+		va_end(va);
+
 	}
-	c->error_prev_line = token.line;
-	c->error_prev_column = token.column;
-
-#if 0
-	gb_printf_err("%s()\n", function);
-#endif
-	va_start(va, fmt);
-	gb_printf_err("%s(%td:%td) %s\n",
-	              c->parser->tokenizer.fullpath, token.line, token.column,
-	              gb_bprintf_va(fmt, va));
-	va_end(va);
-
-error:
 	c->error_count++;
 	// NOTE(bill): If there are too many errors, just quit
 	if (c->error_count > MAX_CHECKER_ERROR_COUNT) {

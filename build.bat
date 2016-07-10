@@ -43,7 +43,6 @@ set libs= kernel32.lib user32.lib gdi32.lib opengl32.lib ^
 
 
 
-
 set linker_flags= -incremental:no -opt:ref -subsystem:console
 
 rem Debug

@@ -70,10 +70,14 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize fiel
 		if (type_expression) {
 			Type *type = check_type(c, type_expression);
 			for (AstNode *name = field->field.name_list; name != NULL; name = name->next) {
-				GB_ASSERT(name->kind == AstNode_Identifier);
-				Entity *param = make_entity_param(c, scope, name->identifier.token, type);
-				add_entity(c, scope, name, param);
-				variables[variable_index++] = param;
+				if (name->kind == AstNode_Identifier) {
+					Entity *param = make_entity_param(c, scope, name->identifier.token, type);
+					add_entity(c, scope, name, param);
+					variables[variable_index++] = param;
+				} else {
+					print_checker_error(c, ast_node_token(name),
+					                    "Invalid parameter (invalid AST)");
+				}
 			}
 		}
 	}
@@ -98,6 +102,10 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *list, isize list_coun
 		Entity *param = make_entity_param(c, scope, token, type);
 		// NOTE(bill): No need to record
 		variables[variable_index++] = param;
+
+		if (get_base_type(type)->kind == Type_Array) {
+			print_checker_error(c, token, "You cannot return an array from a procedure");
+		}
 	}
 	tuple->tuple.variables = variables;
 	tuple->tuple.variable_count = list_count;
@@ -107,23 +115,12 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *list, isize list_coun
 
 
 void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
-	isize param_count = 0;
-	isize result_count = 0;
+	isize param_count = proc_type_node->procedure_type.param_count;
+	isize result_count = proc_type_node->procedure_type.result_count;
 
-	// NOTE(bill): Each field can store multiple items
-	for (AstNode *field = proc_type_node->procedure_type.param_list;
-	     field != NULL;
-	     field = field->next) {
-		param_count += field->field.name_list_count;
-	}
+	// gb_printf("%td -> %td\n", param_count, result_count);
 
-	for (AstNode *item = proc_type_node->procedure_type.results_list;
-	     item != NULL;
-	     item = item->next) {
-		result_count++;
-	}
-
-	Type *params  = check_get_params (c, c->curr_scope, proc_type_node->procedure_type.param_list, param_count);
+	Type *params  = check_get_params(c, c->curr_scope, proc_type_node->procedure_type.param_list,   param_count);
 	Type *results = check_get_results(c, c->curr_scope, proc_type_node->procedure_type.results_list, result_count);
 
 	type->procedure.scope = c->curr_scope;
@@ -1227,6 +1224,52 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->mode = Addressing_Value;
 	} break;
 
+	case BuiltinProcedure_copy_bytes: {
+		// copy_bytes :: proc(dest, source: rawptr, byte_count: int)
+		Type *dest_type = NULL, *src_type = NULL;
+
+		Type *d = get_base_type(operand->type);
+		if (is_type_pointer(d))
+			dest_type = d;
+
+		Operand op = {};
+		check_expression(c, &op, ce->arg_list->next);
+		if (op.mode == Addressing_Invalid)
+			return false;
+		Type *s = get_base_type(op.type);
+		if (is_type_pointer(s))
+			src_type = s;
+
+		if (dest_type == NULL || src_type == NULL) {
+			print_checker_error(c, ast_node_token(call), "`copy_bytes` only expects pointers for the destintation and source");
+			return false;
+		}
+
+		check_expression(c, &op, ce->arg_list->next->next);
+		if (op.mode == Addressing_Invalid)
+			return false;
+
+		convert_to_typed(c, &op, &basic_types[Basic_int]);
+		if (op.mode == Addressing_Invalid ||
+		    op.type->kind != Type_Basic ||
+		    op.type->basic.kind != Basic_int) {
+			gbString str = type_to_string(op.type);
+			defer (gb_string_free(str));
+			print_checker_error(c, ast_node_token(call), "`copy_bytes` 3rd argument must be of type `int`, a `%s` was given", str);
+			return false;
+		}
+
+		if (op.mode == Addressing_Constant) {
+			if (value_to_integer(op.value).value_integer <= 0) {
+				print_checker_error(c, ast_node_token(call), "You cannot copy a zero or negative amount of bytes with `copy_bytes`");
+				return false;
+			}
+		}
+
+		operand->type = NULL;
+		operand->mode = Addressing_NoValue;
+	} break;
+
 
 	case BuiltinProcedure_print:
 	case BuiltinProcedure_println: {
@@ -1445,62 +1488,69 @@ void check_cast_expression(Checker *c, Operand *operand, Type *type) {
 
 
 
-ExpressionKind check_expression_base(Checker *c, Operand *operand, AstNode *expression, Type *type_hint) {
+ExpressionKind check_expression_base(Checker *c, Operand *operand, AstNode *node, Type *type_hint) {
 	ExpressionKind kind = Expression_Statement;
 
 	operand->mode = Addressing_Invalid;
 	operand->type = &basic_types[Basic_Invalid];
 
-	switch (expression->kind) {
+	switch (node->kind) {
 	case AstNode_BadExpression:
 		goto error;
 
 	case AstNode_Identifier:
-		check_identifier(c, operand, expression, type_hint);
+		check_identifier(c, operand, node, type_hint);
 		break;
 	case AstNode_BasicLiteral: {
-		BasicKind kind = Basic_Invalid;
-		Token lit = expression->basic_literal;
+		BasicKind basic_kind = Basic_Invalid;
+		Token lit = node->basic_literal;
 		switch (lit.kind) {
-		case Token_Integer: kind = Basic_UntypedInteger; break;
-		case Token_Float:   kind = Basic_UntypedFloat;   break;
-		case Token_String:  kind = Basic_UntypedString;  break;
-		case Token_Rune:    kind = Basic_UntypedRune;    break;
-		default:            GB_PANIC("Unknown literal"); break;
+		case Token_Integer: basic_kind = Basic_UntypedInteger; break;
+		case Token_Float:   basic_kind = Basic_UntypedFloat;   break;
+		case Token_String:  basic_kind = Basic_UntypedString;  break;
+		case Token_Rune:    basic_kind = Basic_UntypedRune;    break;
+		default:            GB_PANIC("Unknown literal");       break;
 		}
 		operand->mode  = Addressing_Constant;
-		operand->type  = &basic_types[kind];
+		operand->type  = &basic_types[basic_kind];
 		operand->value = make_value_from_basic_literal(lit);
 	} break;
 
 	case AstNode_ParenExpression:
-		kind = check_expression_base(c, operand, expression->paren_expression.expression);
-		operand->expression = expression;
+		kind = check_expression_base(c, operand, node->paren_expression.expression, type_hint);
+		operand->expression = node;
+		break;
+
+	case AstNode_TagExpression:
+		// TODO(bill): Tag expressions
+		print_checker_error(c, ast_node_token(node), "Tag expressions are not supported yet");
+		kind = check_expression_base(c, operand, node->tag_expression.expression, type_hint);
+		operand->expression = node;
 		break;
 
 	case AstNode_UnaryExpression:
-		check_expression(c, operand, expression->unary_expression.operand);
+		check_expression(c, operand, node->unary_expression.operand);
 		if (operand->mode == Addressing_Invalid)
 			goto error;
-		check_unary_expression(c, operand, expression->unary_expression.op, expression);
+		check_unary_expression(c, operand, node->unary_expression.op, node);
 		if (operand->mode == Addressing_Invalid)
 			goto error;
 		break;
 
 	case AstNode_BinaryExpression:
-		check_binary_expression(c, operand, expression);
+		check_binary_expression(c, operand, node);
 		if (operand->mode == Addressing_Invalid)
 			goto error;
 		break;
 
 
 	case AstNode_SelectorExpression:
-		check_expression_base(c, operand, expression->selector_expression.operand);
-		check_selector(c, operand, expression);
+		check_expression_base(c, operand, node->selector_expression.operand);
+		check_selector(c, operand, node);
 		break;
 
 	case AstNode_IndexExpression: {
-		check_expression(c, operand, expression->index_expression.expression);
+		check_expression(c, operand, node->index_expression.expression);
 		if (operand->mode == Addressing_Invalid)
 			goto error;
 
@@ -1548,7 +1598,7 @@ ExpressionKind check_expression_base(Checker *c, Operand *operand, AstNode *expr
 			goto error;
 		}
 
-		if (expression->index_expression.value == NULL) {
+		if (node->index_expression.value == NULL) {
 			gbString str = expression_to_string(operand->expression);
 			print_checker_error(c, ast_node_token(operand->expression),
 			                    "Missing index for `%s`", str);
@@ -1556,12 +1606,12 @@ ExpressionKind check_expression_base(Checker *c, Operand *operand, AstNode *expr
 			goto error;
 		}
 
-		check_index_value(c, expression->index_expression.value, max_count, NULL);
+		check_index_value(c, node->index_expression.value, max_count, NULL);
 	} break;
 
 
 	case AstNode_SliceExpression: {
-		auto *se = &expression->slice_expression;
+		auto *se = &node->slice_expression;
 		check_expression(c, operand, se->expression);
 		if (operand->mode == Addressing_Invalid)
 			goto error;
@@ -1584,8 +1634,8 @@ ExpressionKind check_expression_base(Checker *c, Operand *operand, AstNode *expr
 			valid = true;
 			max_count = t->array.count;
 			if (operand->mode != Addressing_Variable) {
-				gbString str = expression_to_string(expression);
-				print_checker_error(c, ast_node_token(expression), "Cannot slice array `%s`, value is not addressable", str);
+				gbString str = expression_to_string(node);
+				print_checker_error(c, ast_node_token(node), "Cannot slice array `%s`, value is not addressable", str);
 				gb_string_free(str);
 				goto error;
 			}
@@ -1645,18 +1695,18 @@ ExpressionKind check_expression_base(Checker *c, Operand *operand, AstNode *expr
 	} break;
 
 	case AstNode_CastExpression: {
-		Type *cast_type = check_type(c, expression->cast_expression.type_expression);
-		check_expression_or_type(c, operand, expression->cast_expression.operand);
+		Type *cast_type = check_type(c, node->cast_expression.type_expression);
+		check_expression_or_type(c, operand, node->cast_expression.operand);
 		if (operand->mode != Addressing_Invalid)
 			check_cast_expression(c, operand, cast_type);
 
 	} break;
 
 	case AstNode_CallExpression:
-		return check_call_expression(c, operand, expression);
+		return check_call_expression(c, operand, node);
 
 	case AstNode_DereferenceExpression:
-		check_expression_or_type(c, operand, expression->dereference_expression.operand);
+		check_expression_or_type(c, operand, node->dereference_expression.operand);
 		if (operand->mode == Addressing_Invalid) {
 			goto error;
 		} else {
@@ -1679,17 +1729,17 @@ ExpressionKind check_expression_base(Checker *c, Operand *operand, AstNode *expr
 	case AstNode_ArrayType:
 	case AstNode_StructType:
 		operand->mode = Addressing_Type;
-		operand->type = check_type(c, expression);
+		operand->type = check_type(c, node);
 		break;
 	}
 
 	kind = Expression_Expression;
-	operand->expression = expression;
+	operand->expression = node;
 	goto after_error;
 
 error:
 	operand->mode = Addressing_Invalid;
-	operand->expression = expression;
+	operand->expression = node;
 	goto after_error;
 
 after_error:
@@ -1713,9 +1763,9 @@ after_error:
 
 	if (type) {
 		if (is_type_untyped(type)) {
-			add_untyped(c, expression, false, operand->mode, type, value);
+			add_untyped(c, node, false, operand->mode, type, value);
 		} else {
-			add_type_and_value(c, expression, operand->mode, type, value);
+			add_type_and_value(c, node, operand->mode, type, value);
 		}
 	}
 	return kind;
@@ -1822,6 +1872,12 @@ gbString write_expression_to_string(gbString str, AstNode *node) {
 
 	case AstNode_BasicLiteral:
 		str = string_append_token(str, node->basic_literal);
+		break;
+
+	case AstNode_TagExpression:
+		str = gb_string_appendc(str, "#");
+		str = string_append_token(str, node->tag_expression.name);
+		str = write_expression_to_string(str, node->tag_expression.expression);
 		break;
 
 	case AstNode_UnaryExpression:

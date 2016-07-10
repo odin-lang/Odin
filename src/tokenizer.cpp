@@ -109,7 +109,6 @@ Token__KeywordBegin,
 	Token_continue,
 	Token_fallthrough,
 	Token_case,
-	Token_default,
 
 	Token_if,
 	Token_else,
@@ -122,9 +121,6 @@ Token__KeywordBegin,
 	Token_struct,
 	Token_union,
 	Token_enum,
-
-	Token_inline,
-	Token_no_inline,
 Token__KeywordEnd,
 
 	Token_Count,
@@ -200,7 +196,6 @@ char const *TOKEN_STRINGS[] = {
 	"continue",
 	"fallthrough",
 	"case",
-	"default",
 	"if",
 	"else",
 	"for",
@@ -211,9 +206,6 @@ char const *TOKEN_STRINGS[] = {
 	"struct",
 	"union",
 	"enum",
-	"inline",
-	"no_inline",
-	"import",
 "_KeywordEnd",
 };
 
@@ -621,7 +613,6 @@ Token tokenizer_get_token(Tokenizer *t) {
 			KWT("continue",    Token_continue);
 			KWT("fallthrough", Token_fallthrough);
 			KWT("case",        Token_case);
-			KWT("default",     Token_default);
 			KWT("if",          Token_if);
 			KWT("else",        Token_else);
 			KWT("for",         Token_for);
@@ -632,8 +623,6 @@ Token tokenizer_get_token(Tokenizer *t) {
 			KWT("struct",      Token_struct);
 			KWT("union",       Token_union);
 			KWT("enum",        Token_enum);
-			KWT("inline",      Token_inline);
-			KWT("no_inline",   Token_no_inline);
 			KWE
 
 		#undef KWB

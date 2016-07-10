@@ -385,6 +385,12 @@ void check_statement(Checker *c, AstNode *node) {
 		}
 	} break;
 
+	case AstNode_TagStatement:
+		// TODO(bill): Tag Statements
+		print_checker_error(c, ast_node_token(node), "Tag statements are not supported yet");
+		check_statement(c, node->tag_statement.statement);
+		break;
+
 	case AstNode_IncDecStatement: {
 		Token op = {};
 		auto *s = &node->inc_dec_statement;
@@ -653,7 +659,7 @@ void check_statement(Checker *c, AstNode *node) {
 
 	case AstNode_ProcedureDeclaration: {
 		auto *pd = &node->procedure_declaration;
-		GB_ASSERT_MSG(pd->kind == Declaration_Immutable, "Mutable/temp procedures are not yet implemented");
+		GB_ASSERT_MSG(pd->kind == Declaration_Immutable, "Mutable/temp/anonymous procedures are not yet implemented");
 		Entity *e = make_entity_procedure(c, c->curr_scope, pd->name->identifier.token, NULL);
 		add_entity(c, c->curr_scope, pd->name, e);
 
@@ -667,8 +673,37 @@ void check_statement(Checker *c, AstNode *node) {
 		check_open_scope(c, pd->procedure_type);
 		{
 			check_procedure_type(c, proc_type, pd->procedure_type);
+			b32 is_foreign = false;
+			b32 is_inline = false;
+			b32 is_no_inline = false;
+			for (AstNode *tag = pd->tag_list; tag != NULL; tag = tag->next) {
+				GB_ASSERT(tag->kind == AstNode_TagExpression);
+
+				String tag_name = tag->tag_expression.name.string;
+				if (are_strings_equal(tag_name, make_string("foreign"))) {
+					is_foreign = true;
+				} else if (are_strings_equal(tag_name, make_string("inline"))) {
+					is_inline = true;
+				} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
+					is_no_inline = true;
+				} else {
+					print_checker_error(c, ast_node_token(tag), "Unknown procedure tag");
+				}
+				// TODO(bill): Other tags
+			}
+
+			if (is_inline && is_no_inline) {
+				print_checker_error(c, ast_node_token(pd->tag_list),
+				                    "You cannot apply both `inline` and `no_inline` to a procedure");
+			}
+
 			if (pd->body) {
 				GB_ASSERT(pd->body->kind == AstNode_BlockStatement);
+
+				if (is_foreign) {
+					print_checker_error(c, ast_node_token(pd->body),
+					                    "A procedure tagged as `#foreign` cannot have a body");
+				}
 
 				push_procedure(c, proc_type);
 				check_statement_list(c, pd->body->block_statement.list);
@@ -678,14 +713,6 @@ void check_statement(Checker *c, AstNode *node) {
 					}
 				}
 				pop_procedure(c);
-			} else if (pd->tag) {
-				GB_ASSERT(pd->tag->kind == AstNode_TagExpression);
-
-				String tag_name = pd->tag->tag_expression.name.string;
-				if (are_strings_equal(tag_name, make_string("foreign"))) {
-					// NOTE(bill): Foreign procedure (linking stage)
-				}
-				// TODO(bill): Other tags
 			}
 		}
 		check_close_scope(c);

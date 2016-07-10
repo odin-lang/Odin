@@ -570,10 +570,6 @@ gbString write_type_to_string(gbString str, Type *type) {
 				GB_ASSERT(var->kind == Entity_Variable);
 				if (i > 0)
 					str = gb_string_appendc(str, ", ");
-				if (var->token.string.len > 0) {
-					str = gb_string_append_length(str, var->token.string.text, var->token.string.len);
-					str = gb_string_appendc(str, ": ");
-				}
 				str = write_type_to_string(str, var->type);
 			}
 		}
