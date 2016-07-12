@@ -310,8 +310,12 @@ Token ast_node_token(AstNode *node) {
 		return node->procedure_declaration.name->identifier.token;
 	case AstNode_TypeDeclaration:
 		return node->type_declaration.token;
-	case AstNode_Field:
-		return ast_node_token(node->field.name_list);
+	case AstNode_Field: {
+		if (node->field.name_list)
+			return ast_node_token(node->field.name_list);
+		else
+			return ast_node_token(node->field.type_expression);
+	}
 	case AstNode_ProcedureType:
 		return node->procedure_type.token;
 	case AstNode_PointerType:
@@ -1330,9 +1334,9 @@ AstNode *parse_results(Parser *p, AstScope *scope, isize *result_count) {
 			return list;
 		}
 
-		AstNode *field = make_field(p, NULL, 0, parse_type(p));
+		AstNode *result = parse_type(p);
 		if (result_count) *result_count = 1;
-		return field;
+		return result;
 	}
 	if (result_count) *result_count = 0;
 	return NULL;

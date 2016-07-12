@@ -1,5 +1,63 @@
 // Statements and Declarations
 
+void check_statement(Checker *c, AstNode *node);
+
+void check_statement_list(Checker *c, AstNode *node) {
+	for (; node != NULL; node = node->next)
+		check_statement(c, node);
+}
+
+
+// NOTE(bill): The last expression has to be a `return` statement
+// TODO(bill): This is a mild hack and should be probably handled
+// TODO(bill): Warn/err against code after `return` that it won't be executed
+b32 check_is_terminating(Checker *c, AstNode *node);
+
+b32 check_is_terminating_list(Checker *c, AstNode *node_list) {
+	AstNode *end_of_list = node_list;
+	for (; end_of_list != NULL; end_of_list = end_of_list->next) {
+		if (end_of_list->next == NULL)
+			break;
+	}
+
+	for (AstNode *node = end_of_list; node != NULL; node = node->prev) {
+		if (node->kind == AstNode_EmptyStatement)
+			continue;
+		return check_is_terminating(c, node);
+	}
+	return false;
+}
+
+b32 check_is_terminating(Checker *c, AstNode *node) {
+	switch (node->kind) {
+	case AstNode_BlockStatement:
+		return check_is_terminating_list(c, node->block_statement.list);
+
+	case AstNode_ExpressionStatement:
+		return check_is_terminating(c, node->expression_statement.expression);
+
+	case AstNode_ReturnStatement:
+		return true;
+
+	case AstNode_IfStatement:
+		if (node->if_statement.else_statement != NULL) {
+			if (check_is_terminating(c, node->if_statement.body) &&
+			    check_is_terminating(c, node->if_statement.else_statement))
+			    return true;
+		}
+		break;
+
+	case AstNode_ForStatement:
+		if (node->for_statement.cond == NULL) {
+			return true;
+		}
+		break;
+	}
+
+	return false;
+}
+
+
 b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
 	if (operand->mode == Addressing_Invalid ||
 	    type == &basic_types[Basic_Invalid]) {
@@ -42,9 +100,8 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
 		}
 	}
 
-	if ((sb->kind == Type_Array || sb->kind == Type_Slice) &&
-	    tb->kind == Type_Slice) {
-		if (are_types_identical(sb->array.element, tb->slice.element)) {
+	if (sb->kind == Type_Slice && tb->kind == Type_Slice) {
+		if (are_types_identical(sb->slice.element, tb->slice.element)) {
 			return true;
 		}
 	}
@@ -214,13 +271,13 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 }
 
 void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNode *init_list, isize init_count, String context_name) {
-	if (lhs_count == 0 && init_count == 0)
+	if ((lhs == NULL || lhs_count == 0) && init_count == 0)
 		return;
 
 	isize i = 0;
 	AstNode *rhs = init_list;
 	for (;
-	     i < lhs_count && rhs != NULL;
+	     i < lhs_count && i < init_count && rhs != NULL;
 	     i++, rhs = rhs->next) {
 		Operand operand = {};
 		check_multi_expression(c, &operand, rhs);
@@ -229,7 +286,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNode *in
 		} else {
 			auto *tuple = &operand.type->tuple;
 			for (isize j = 0;
-			     j < tuple->variable_count && i < lhs_count;
+			     j < tuple->variable_count && i < lhs_count && i < init_count;
 			     j++, i++) {
 				Type *type = tuple->variables[j]->type;
 				operand.type = type;
@@ -238,7 +295,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNode *in
 		}
 	}
 
-	if (i < lhs_count) {
+	if (i < lhs_count && i < init_count) {
 		if (lhs[i]->type == NULL)
 			print_checker_error(c, lhs[i]->token, "Too few values on the right hand side of the declaration");
 	} else if (rhs != NULL) {
@@ -250,7 +307,6 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	if (operand->mode == Addressing_Invalid ||
 	    operand->type == &basic_types[Basic_Invalid] ||
 	    e->type == &basic_types[Basic_Invalid]) {
-
 		if (e->type == NULL)
 			e->type = &basic_types[Basic_Invalid];
 		return;
@@ -266,7 +322,7 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	}
 	if (!is_type_constant_type(operand->type)) {
 		// NOTE(bill): no need to free string as it's panicking
-		GB_PANIC("Type `%s` not constant!!!", type_to_string(operand->type));
+		GB_PANIC("Compiler error: Type `%s` not constant!!!", type_to_string(operand->type));
 	}
 
 	if (e->type == NULL) // NOTE(bill): type inference
@@ -279,7 +335,8 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	e->constant.value = operand->value;
 }
 
-void check_constant_declaration(Checker *c, Entity *e, AstNode *type_expression, AstNode *init_expression) {
+
+void check_constant_declaration(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr) {
 	GB_ASSERT(e->type == NULL);
 
 	if (e->variable.visited) {
@@ -288,12 +345,12 @@ void check_constant_declaration(Checker *c, Entity *e, AstNode *type_expression,
 	}
 	e->variable.visited = true;
 
-	if (type_expression) {
-		Type *t = check_type(c, type_expression);
+	if (type_expr) {
+		Type *t = check_type(c, type_expr);
 		if (!is_type_constant_type(t)) {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
-			print_checker_error(c, ast_node_token(type_expression),
+			print_checker_error(c, ast_node_token(type_expr),
 			                    "Invalid constant type `%s`", str);
 			e->type = &basic_types[Basic_Invalid];
 			return;
@@ -302,67 +359,168 @@ void check_constant_declaration(Checker *c, Entity *e, AstNode *type_expression,
 	}
 
 	Operand operand = {Addressing_Invalid};
-	if (init_expression)
-		check_expression(c, &operand, init_expression);
+	if (init_expr)
+		check_expression(c, &operand, init_expr);
 	check_init_constant(c, e, &operand);
 }
 
-void check_statement(Checker *c, AstNode *node);
+void check_type_declaration(Checker *c, Entity *e, AstNode *type_expr, Type *named_type) {
+	GB_ASSERT(e->type == NULL);
+	Type *named = make_type_named(c->allocator, e->token.string, NULL, e);
+	named->named.type_name = e;
+	set_base_type(named_type, named);
+	e->type = named;
 
-void check_statement_list(Checker *c, AstNode *node) {
-	for (; node != NULL; node = node->next)
-		check_statement(c, node);
+	check_type(c, type_expr, named);
+
+	set_base_type(named, get_base_type(get_base_type(named)));
 }
 
 
-// NOTE(bill): The last expression has to be a `return` statement
-// TODO(bill): This is a mild hack and should be probably handled
-// TODO(bill): Warn/err against code after `return` that it won't be executed
-b32 check_is_terminating(Checker *c, AstNode *node);
-
-b32 check_is_terminating_list(Checker *c, AstNode *node_list) {
-	AstNode *end_of_list = node_list;
-	for (; end_of_list != NULL; end_of_list = end_of_list->next) {
-		if (end_of_list->next == NULL)
-			break;
-	}
-
-	for (AstNode *node = end_of_list; node != NULL; node = node->prev) {
-		if (node->kind == AstNode_EmptyStatement)
-			continue;
-		return check_is_terminating(c, node);
-	}
-	return false;
-}
-
-b32 check_is_terminating(Checker *c, AstNode *node) {
-	switch (node->kind) {
-	case AstNode_BlockStatement:
-		return check_is_terminating_list(c, node->block_statement.list);
-
-	case AstNode_ExpressionStatement:
-		return check_is_terminating(c, node->expression_statement.expression);
-
-	case AstNode_ReturnStatement:
-		return true;
-
-	case AstNode_IfStatement:
-		if (node->if_statement.else_statement != NULL) {
-			if (check_is_terminating(c, node->if_statement.body) &&
-			    check_is_terminating(c, node->if_statement.else_statement))
-			    return true;
+void check_procedure_body(Checker *c, Token token, DeclarationInfo *decl, Type *type, AstNode *body) {
+	GB_ASSERT(body->kind == AstNode_BlockStatement);
+	Scope *origin_curr_scope = c->curr_scope;
+	c->curr_scope = decl->scope;
+	push_procedure(c, type);
+	check_statement_list(c, body->block_statement.list);
+	if (decl->type_expr != NULL &&
+	    decl->type_expr->procedure_type.result_count > 0) {
+		if (!check_is_terminating(c, body)) {
+			print_checker_error(c, body->block_statement.close, "Missing return statement at the end of the procedure");
 		}
-		break;
+	}
+	pop_procedure(c);
 
-	case AstNode_ForStatement:
-		if (node->for_statement.cond == NULL) {
-			return true;
+	c->curr_scope = origin_curr_scope;
+}
+
+void check_procedure_declaration(Checker *c, Entity *e, DeclarationInfo *d, b32 check_body_later) {
+	GB_ASSERT(e->type == NULL);
+
+	Type *proc_type = make_type_procedure(c->allocator, e->parent, NULL, 0, NULL, 0);
+	e->type = proc_type;
+	auto *pd = &d->proc_decl->procedure_declaration;
+
+#if 1
+	Scope *origin_curr_scope = c->curr_scope;
+	c->curr_scope = c->file_scope;
+	check_open_scope(c, pd->procedure_type);
+#endif
+	check_procedure_type(c, proc_type, pd->procedure_type);
+	b32 is_foreign   = false;
+	b32 is_inline    = false;
+	b32 is_no_inline = false;
+	for (AstNode *tag = pd->tag_list; tag != NULL; tag = tag->next) {
+		GB_ASSERT(tag->kind == AstNode_TagExpression);
+
+		String tag_name = tag->tag_expression.name.string;
+		if (are_strings_equal(tag_name, make_string("foreign"))) {
+			is_foreign = true;
+		} else if (are_strings_equal(tag_name, make_string("inline"))) {
+			is_inline = true;
+		} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
+			is_no_inline = true;
+		} else {
+			print_checker_error(c, ast_node_token(tag), "Unknown procedure tag");
 		}
+		// TODO(bill): Other tags
+	}
+
+	if (is_inline && is_no_inline) {
+		print_checker_error(c, ast_node_token(pd->tag_list),
+		                    "You cannot apply both `inline` and `no_inline` to a procedure");
+	}
+
+	if (pd->body != NULL) {
+		if (is_foreign) {
+			print_checker_error(c, ast_node_token(pd->body),
+			                    "A procedure tagged as `#foreign` cannot have a body");
+		}
+
+		d->scope = c->curr_scope;
+
+		GB_ASSERT(pd->body->kind == AstNode_BlockStatement);
+		if (check_body_later) {
+			check_procedure_later(c, e->token, d, proc_type, pd->body);
+		} else {
+			check_procedure_body(c, e->token, d, proc_type, pd->body);
+		}
+	}
+
+#if 1
+	check_close_scope(c);
+	c->curr_scope = origin_curr_scope;
+#endif
+
+}
+
+void check_variable_declaration(Checker *c, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, AstNode *init_expr) {
+	GB_ASSERT(e->type == NULL);
+	GB_ASSERT(e->kind == Entity_Variable);
+
+	if (e->variable.visited) {
+		e->type = &basic_types[Basic_Invalid];
+		return;
+	}
+	e->variable.visited = true;
+
+	if (type_expr != NULL)
+		e->type = check_type(c, type_expr, NULL);
+
+	if (init_expr == NULL) {
+		if (type_expr == NULL)
+			e->type = &basic_types[Basic_Invalid];
+		return;
+	}
+
+	if (entities == NULL || entity_count == 1) {
+		GB_ASSERT(entities == NULL || entities[0] == e);
+		Operand operand = {};
+		check_expression(c, &operand, init_expr);
+		check_init_variable(c, e, &operand, make_string("variable declaration"));
+	}
+
+	if (type_expr != NULL) {
+		for (isize i = 0; i < entity_count; i++)
+			entities[i]->type = e->type;
+	}
+
+	check_init_variables(c, entities, entity_count, init_expr, 1, make_string("variable declaration"));
+}
+
+
+
+void check_entity_declaration(Checker *c, Entity *e, Type *named_type) {
+	if (e->type != NULL)
+		return;
+
+	DeclarationInfo **found = map_get(&c->entities, hash_pointer(e));
+	if (found == NULL) {
+		GB_PANIC("Compiler error: This entity should be declared!");
+	}
+	DeclarationInfo *d = *found;
+
+	switch (e->kind) {
+	case Entity_Constant:
+		c->decl = d;
+		check_constant_declaration(c, e, d->type_expr, d->init_expr);
+		break;
+	case Entity_Variable:
+		c->decl = d;
+		check_variable_declaration(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr);
+		break;
+	case Entity_TypeName:
+		check_type_declaration(c, e, d->type_expr, named_type);
+		break;
+	case Entity_Procedure:
+		check_procedure_declaration(c, e, d, true);
 		break;
 	}
 
-	return false;
 }
+
+
+
 
 void check_statement(Checker *c, AstNode *node) {
 	switch (node->kind) {
@@ -577,7 +735,7 @@ void check_statement(Checker *c, AstNode *node) {
 						found = current_scope_lookup_entity(c->curr_scope, str);
 					}
 					if (found == NULL) {
-						entity = make_entity_variable(c, c->curr_scope, token, NULL);
+						entity = make_entity_variable(c->allocator, c->curr_scope, token, NULL);
 						if (!can_be_ignored) {
 							new_entities[new_entity_count++] = entity;
 						}
@@ -589,7 +747,7 @@ void check_statement(Checker *c, AstNode *node) {
 					print_checker_error(c, token, "A variable declaration must be an identifier");
 				}
 				if (entity == NULL)
-					entity = make_entity_dummy_variable(c, token);
+					entity = make_entity_dummy_variable(c->allocator, c->file_scope, token);
 				entities[entity_index++] = entity;
 			}
 
@@ -629,7 +787,7 @@ void check_statement(Checker *c, AstNode *node) {
 			     name = name->next, value = value->next) {
 				GB_ASSERT(name->kind == AstNode_Identifier);
 				Value v = {Value_Invalid};
-				Entity *e = make_entity_constant(c, c->curr_scope, name->identifier.token, NULL, v);
+				Entity *e = make_entity_constant(c->allocator, c->curr_scope, name->identifier.token, NULL, v);
 				entities[entity_index++] = e;
 				check_constant_declaration(c, e, vd->type_expression, value);
 			}
@@ -656,81 +814,23 @@ void check_statement(Checker *c, AstNode *node) {
 		}
 	} break;
 
-
 	case AstNode_ProcedureDeclaration: {
 		auto *pd = &node->procedure_declaration;
-		GB_ASSERT_MSG(pd->kind == Declaration_Immutable, "Mutable/temp/anonymous procedures are not yet implemented");
-		Entity *e = make_entity_procedure(c, c->curr_scope, pd->name->identifier.token, NULL);
+		Entity *e = make_entity_procedure(c->allocator, c->curr_scope, pd->name->identifier.token, NULL);
 		add_entity(c, c->curr_scope, pd->name, e);
 
-		Type *proc_type = make_type_procedure(c->allocator, e->parent, NULL, 0, NULL, 0);
-		e->type = proc_type;
-
-		// NOTE(bill): Procedures are just in file scope only.
-		// This is because closures/lambdas are not supported yet (or maybe never)
-		Scope *origin_curr_scope = c->curr_scope;
-		c->curr_scope = c->file_scope;
-		check_open_scope(c, pd->procedure_type);
-		{
-			check_procedure_type(c, proc_type, pd->procedure_type);
-			b32 is_foreign = false;
-			b32 is_inline = false;
-			b32 is_no_inline = false;
-			for (AstNode *tag = pd->tag_list; tag != NULL; tag = tag->next) {
-				GB_ASSERT(tag->kind == AstNode_TagExpression);
-
-				String tag_name = tag->tag_expression.name.string;
-				if (are_strings_equal(tag_name, make_string("foreign"))) {
-					is_foreign = true;
-				} else if (are_strings_equal(tag_name, make_string("inline"))) {
-					is_inline = true;
-				} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
-					is_no_inline = true;
-				} else {
-					print_checker_error(c, ast_node_token(tag), "Unknown procedure tag");
-				}
-				// TODO(bill): Other tags
-			}
-
-			if (is_inline && is_no_inline) {
-				print_checker_error(c, ast_node_token(pd->tag_list),
-				                    "You cannot apply both `inline` and `no_inline` to a procedure");
-			}
-
-			if (pd->body) {
-				GB_ASSERT(pd->body->kind == AstNode_BlockStatement);
-
-				if (is_foreign) {
-					print_checker_error(c, ast_node_token(pd->body),
-					                    "A procedure tagged as `#foreign` cannot have a body");
-				}
-
-				push_procedure(c, proc_type);
-				check_statement_list(c, pd->body->block_statement.list);
-				if (pd->procedure_type->procedure_type.result_count > 0) {
-					if (!check_is_terminating(c, pd->body)) {
-						print_checker_error(c, pd->body->block_statement.close, "Missing return statement at the end of the procedure");
-					}
-				}
-				pop_procedure(c);
-			}
-		}
-		check_close_scope(c);
-		c->curr_scope = origin_curr_scope;
-
+		DeclarationInfo *decl = make_declaration_info(gb_heap_allocator(), e->parent);
+		decl->proc_decl = node;
+		check_procedure_declaration(c, e, decl, false);
+		destroy_declaration_info(decl);
 	} break;
 
 	case AstNode_TypeDeclaration: {
 		auto *td = &node->type_declaration;
 		AstNode *name = td->name;
-		Entity *e = make_entity_type_name(c, c->curr_scope, name->identifier.token, NULL);
+		Entity *e = make_entity_type_name(c->allocator, c->curr_scope, name->identifier.token, NULL);
 		add_entity(c, c->curr_scope, name, e);
-
-		e->type = make_type_named(c->allocator, e->token.string, NULL, e);
-		check_type(c, td->type_expression, e->type);
-		// NOTE(bill): Prevent recursive definition
-		set_base_type(e->type, get_base_type(e->type));
-
+		check_type_declaration(c, e, td->type_expression, NULL);
 	} break;
 	}
 }

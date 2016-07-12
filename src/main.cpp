@@ -2,7 +2,7 @@
 #include "tokenizer.cpp"
 #include "parser.cpp"
 #include "printer.cpp"
-#include "checker.cpp"
+#include "checker/checker.cpp"
 #include "generator.cpp"
 
 
@@ -21,20 +21,20 @@ int main(int argc, char **argv) {
 
 		if (init_parser(&parser, filename)) {
 			defer (destroy_parser(&parser));
-			AstNode *root_node = parse_statement_list(&parser, NULL);
-			// print_ast(root_node, 0);
+			AstNode *file_node = parse_statement_list(&parser, NULL);
+			// print_ast(file_node, 0);
 
 			Checker checker = {};
 			init_checker(&checker, &parser);
 			defer (destroy_checker(&checker));
 
-			check_statement_list(&checker, root_node);
+			check_file(&checker, file_node);
 
-#if 0
+#if 1
 			Generator generator = {};
 			if (init_generator(&generator, &checker)) {
 				defer (destroy_generator(&generator));
-				generate_code(&generator, root_node);
+				generate_code(&generator, file_node);
 			}
 #endif
 		}

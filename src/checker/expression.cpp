@@ -9,6 +9,7 @@ void           check_selector          (Checker *c, Operand *operand, AstNode *n
 void           check_not_tuple         (Checker *c, Operand *operand);
 void           convert_to_typed        (Checker *c, Operand *operand, Type *target_type);
 gbString       expression_to_string    (AstNode *expression);
+void           check_entity_declaration(Checker *c, Entity *e, Type *named_type);
 
 
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
@@ -40,7 +41,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 			GB_ASSERT(name->kind == AstNode_Identifier);
 			Token name_token = name->identifier.token;
 			// TODO(bill): is the curr_scope correct?
-			Entity *e = make_entity_field(c, c->curr_scope, name_token, type);
+			Entity *e = make_entity_field(c->allocator, c->curr_scope, name_token, type);
 			u64 key = hash_string(name_token.string);
 			if (map_get(&entity_map, key)) {
 				// TODO(bill): Scope checking already checks the declaration
@@ -71,7 +72,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize fiel
 			Type *type = check_type(c, type_expression);
 			for (AstNode *name = field->field.name_list; name != NULL; name = name->next) {
 				if (name->kind == AstNode_Identifier) {
-					Entity *param = make_entity_param(c, scope, name->identifier.token, type);
+					Entity *param = make_entity_param(c->allocator, scope, name->identifier.token, type);
 					add_entity(c, scope, name, param);
 					variables[variable_index++] = param;
 				} else {
@@ -99,11 +100,12 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *list, isize list_coun
 		Token token = ast_node_token(item);
 		token.string = make_string(""); // NOTE(bill): results are not named
 		// TODO(bill): Should I have named results?
-		Entity *param = make_entity_param(c, scope, token, type);
+		Entity *param = make_entity_param(c->allocator, scope, token, type);
 		// NOTE(bill): No need to record
 		variables[variable_index++] = param;
 
 		if (get_base_type(type)->kind == Type_Array) {
+			// TODO(bill): Should I allow array's to returned?
 			print_checker_error(c, token, "You cannot return an array from a procedure");
 		}
 	}
@@ -123,12 +125,13 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 	Type *params  = check_get_params(c, c->curr_scope, proc_type_node->procedure_type.param_list,   param_count);
 	Type *results = check_get_results(c, c->curr_scope, proc_type_node->procedure_type.results_list, result_count);
 
-	type->procedure.scope = c->curr_scope;
-	type->procedure.params = params;
-	type->procedure.params_count = proc_type_node->procedure_type.param_count;
-	type->procedure.results = results;
+	type->procedure.scope         = c->curr_scope;
+	type->procedure.params        = params;
+	type->procedure.params_count  = proc_type_node->procedure_type.param_count;
+	type->procedure.results       = results;
 	type->procedure.results_count = proc_type_node->procedure_type.result_count;
 }
+
 
 void check_identifier(Checker *c, Operand *operand, AstNode *n, Type *named_type) {
 	GB_ASSERT(n->kind == AstNode_Identifier);
@@ -138,17 +141,22 @@ void check_identifier(Checker *c, Operand *operand, AstNode *n, Type *named_type
 	scope_lookup_parent_entity(c->curr_scope, n->identifier.token.string, NULL, &e);
 	if (e == NULL) {
 		print_checker_error(c, n->identifier.token,
-		                    "Undeclared type/identifier `%.*s`", LIT(n->identifier.token.string));
+		                    "Undeclared type or identifier `%.*s`", LIT(n->identifier.token.string));
 		return;
 	}
 	add_entity_use(c, n, e);
 
-	Type *type = e->type;
-	GB_ASSERT(type != NULL);
+	check_entity_declaration(c, e, named_type);
+
+	if (e->type == NULL) {
+		GB_PANIC("Compiler error: How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(n->identifier.token.string));
+		return;
+	}
 
 	switch (e->kind) {
 	case Entity_Constant:
-		if (type == &basic_types[Basic_Invalid])
+		add_declaration_dependency(c, e);
+		if (e->type == &basic_types[Basic_Invalid])
 			return;
 		operand->value = e->constant.value;
 		GB_ASSERT(operand->value.kind != Value_Invalid);
@@ -156,8 +164,9 @@ void check_identifier(Checker *c, Operand *operand, AstNode *n, Type *named_type
 		break;
 
 	case Entity_Variable:
+		add_declaration_dependency(c, e);
 		e->variable.used = true;
-		if (type == &basic_types[Basic_Invalid])
+		if (e->type == &basic_types[Basic_Invalid])
 			return;
 		operand->mode = Addressing_Variable;
 		break;
@@ -167,6 +176,7 @@ void check_identifier(Checker *c, Operand *operand, AstNode *n, Type *named_type
 		break;
 
 	case Entity_Procedure:
+		add_declaration_dependency(c, e);
 		operand->mode = Addressing_Value;
 		break;
 
@@ -176,11 +186,11 @@ void check_identifier(Checker *c, Operand *operand, AstNode *n, Type *named_type
 		break;
 
 	default:
-		GB_PANIC("Unknown EntityKind");
+		GB_PANIC("Compiler error: Unknown EntityKind");
 		break;
 	}
 
-	operand->type = type;
+	operand->type = e->type;
 }
 
 i64 check_array_count(Checker *c, AstNode *expression) {
@@ -504,7 +514,7 @@ b32 check_value_is_expressible(Checker *c, Value in_value, Type *type, Value *ou
 		case Basic_UntypedInteger:
 			return true;
 
-		default: GB_PANIC("Unknown integer type!"); break;
+		default: GB_PANIC("Compiler error: Unknown integer type!"); break;
 		}
 	} else if (is_type_float(type)) {
 		Value v = value_to_float(in_value);
@@ -1291,24 +1301,22 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	GB_ASSERT(call->kind == AstNode_CallExpression);
 	GB_ASSERT(proc_type->kind == Type_Procedure);
 	auto *ce = &call->call_expression;
+	isize error_code = 0;
+	isize param_index = 0;
 	isize param_count = 0;
+
 	if (proc_type->procedure.params)
 		param_count = proc_type->procedure.params->tuple.variable_count;
 
  	if (ce->arg_list_count == 0 && param_count == 0)
 		return;
 
-	isize error_code = 0;
-
 	if (ce->arg_list_count > param_count) {
 		error_code = +1;
 	} else {
 		Entity **sig_params = proc_type->procedure.params->tuple.variables;
-		isize param_index = 0;
 		AstNode *call_arg = ce->arg_list;
-		for (;
-		     call_arg != NULL && param_index < param_count;
-		     call_arg = call_arg->next) {
+		for (; call_arg != NULL; call_arg = call_arg->next) {
 			check_multi_expression(c, operand, call_arg);
 			if (operand->mode == Addressing_Invalid)
 				continue;
@@ -1339,6 +1347,7 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 				break;
 		}
 
+
 		if (param_index < param_count) {
 			error_code = -1;
 		} else if (call_arg != NULL && call_arg->next != NULL) {
@@ -1348,10 +1357,11 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 
 	if (error_code != 0) {
 		char *err_fmt = "";
-		if (error_code < 0)
+		if (error_code < 0) {
 			err_fmt = "Too few arguments for `%s`, expected %td arguments";
-		else
+		} else {
 			err_fmt = "Too many arguments for `%s`, expected %td arguments";
+		}
 
 		gbString proc_str = expression_to_string(ce->proc);
 		print_checker_error(c, ast_node_token(call), err_fmt, proc_str, param_count);
@@ -1666,14 +1676,13 @@ ExpressionKind check_expression_base(Checker *c, Operand *operand, AstNode *node
 		i64 indices[3] = {};
 		AstNode *nodes[3] = {se->low, se->high, se->max};
 		for (isize i = 0; i < gb_count_of(nodes); i++) {
-			AstNode *node = nodes[i];
 			i64 index = max_count;
-			if (node != NULL) {
+			if (nodes[i] != NULL) {
 				i64 capacity = -1;
 				if (max_count >= 0)
 					capacity = max_count;
 				i64 j = 0;
-				if (check_index_value(c, node, capacity, &j)) {
+				if (check_index_value(c, nodes[i], capacity, &j)) {
 					index = j;
 				}
 			} else if (i == 0) {

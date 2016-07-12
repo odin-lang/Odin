@@ -219,6 +219,9 @@ struct Token {
 };
 
 
+Token empty_token = {Token_Invalid};
+
+
 
 char const *token_kind_to_string(TokenKind kind) {
 	return TOKEN_STRINGS[kind];

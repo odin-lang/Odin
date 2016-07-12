@@ -23,6 +23,7 @@ struct Entity {
 	Scope *parent;
 	Token token;
 	Type *type;
+	isize order;
 
 	union {
 		struct { Value value; } constant;
@@ -53,14 +54,47 @@ Entity *alloc_entity(gbAllocator a, EntityKind kind, Scope *parent, Token token,
 	return entity;
 }
 
+Entity *make_entity_variable(gbAllocator a, Scope *parent, Token token, Type *type) {
+	Entity *entity = alloc_entity(a, Entity_Variable, parent, token, type);
+	return entity;
+}
 
+Entity *make_entity_constant(gbAllocator a, Scope *parent, Token token, Type *type, Value value) {
+	Entity *entity = alloc_entity(a, Entity_Constant, parent, token, type);
+	entity->constant.value = value;
+	return entity;
+}
 
-// NOTE(bill): Defined in "checker.cpp"
-Entity *make_entity_variable (Checker *c, Scope *parent, Token token, Type *type);
-Entity *make_entity_constant (Checker *c, Scope *parent, Token token, Type *type, Value value);
-Entity *make_entity_type_name(Checker *c, Scope *parent, Token token, Type *type);
-Entity *make_entity_param    (Checker *c, Scope *parent, Token token, Type *type);
-Entity *make_entity_field    (Checker *c, Scope *parent, Token token, Type *type);
-Entity *make_entity_procedure(Checker *c, Scope *parent, Token token, Type *signature_type);
-Entity *make_entity_builtin  (Checker *c, Scope *parent, Token token, Type *type, i32 id);
-Entity *make_entity_dummy_variable(Checker *c, Token token);
+Entity *make_entity_type_name(gbAllocator a, Scope *parent, Token token, Type *type) {
+	Entity *entity = alloc_entity(a, Entity_TypeName, parent, token, type);
+	return entity;
+}
+
+Entity *make_entity_param(gbAllocator a, Scope *parent, Token token, Type *type) {
+	Entity *entity = alloc_entity(a, Entity_Variable, parent, token, type);
+	entity->variable.used = true;
+	return entity;
+}
+
+Entity *make_entity_field(gbAllocator a, Scope *parent, Token token, Type *type) {
+	Entity *entity = alloc_entity(a, Entity_Variable, parent, token, type);
+	entity->variable.is_field  = true;
+	return entity;
+}
+
+Entity *make_entity_procedure(gbAllocator a, Scope *parent, Token token, Type *signature_type) {
+	Entity *entity = alloc_entity(a, Entity_Procedure, parent, token, signature_type);
+	return entity;
+}
+
+Entity *make_entity_builtin(gbAllocator a, Scope *parent, Token token, Type *type, BuiltinProcedureId id) {
+	Entity *entity = alloc_entity(a, Entity_Builtin, parent, token, type);
+	entity->builtin.id = id;
+	return entity;
+}
+
+Entity *make_entity_dummy_variable(gbAllocator a, Scope *file_scope, Token token) {
+	token.string = make_string("_");
+	return make_entity_variable(a, file_scope, token, NULL);
+}
+

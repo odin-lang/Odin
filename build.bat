@@ -21,23 +21,36 @@ set compiler_warnings= ^
 	-wd4201 -wd4204 -wd4244 ^
 	-wd4306 ^
 	-wd4480 ^
-	-wd4505 -wd4512 -wd4550 ^
+	-wd4505 -wd4512 -wd4550
 
-set compiler_includes= ^
-
-	rem -I"C:\Program Files\LLVM\include"
+set compiler_includes=-I"C:\Program Files\LLVM\include"
 
 set libs= kernel32.lib user32.lib gdi32.lib opengl32.lib ^
+	-libpath:"C:\Program Files\LLVM\lib"
 
-	rem -libpath:"C:\Program Files\LLVM\lib" ^
+	rem LLVMX86Disassembler.lib ^
+	rem LLVMX86AsmParser.lib ^
+	rem LLVMX86CodeGen.lib ^
+	rem LLVMSelectionDAG.lib ^
+	rem LLVMAsmPrinter.lib ^
 	rem LLVMCodeGen.lib ^
 	rem LLVMTarget.lib ^
+	rem LLVMScalarOpts.lib ^
+	rem LLVMInstCombine.lib ^
+	rem LLVMInstrumentation.lib ^
+	rem LLVMProfileData.lib ^
+	rem LLVMTransformUtils.lib ^
 	rem LLVMBitWriter.lib ^
 	rem LLVMAnalysis.lib ^
+	rem LLVMX86Desc.lib ^
 	rem LLVMObject.lib ^
 	rem LLVMMCParser.lib ^
 	rem LLVMBitReader.lib ^
+	rem LLVMMCDisassembler.lib ^
+	rem LLVMX86Info.lib ^
+	rem LLVMX86AsmPrinter.lib ^
 	rem LLVMMC.lib ^
+	rem LLVMX86Utils.lib ^
 	rem LLVMCore.lib ^
 	rem LLVMSupport.lib
 
@@ -48,8 +61,9 @@ set linker_flags= -incremental:no -opt:ref -subsystem:console
 rem Debug
 if %release_mode% EQU 0 (set linker_flags=%linker_flags% -debug)
 
-set compiler_settings=%compiler_flags% %compiler_warnings% %compiler_includes%
+set compiler_settings=%compiler_includes% %compiler_flags% %compiler_warnings%
 set linker_settings=%libs% %linker_flags%
+
 
 set build_dir= "%base_dir%\bin\"
 if not exist %build_dir% mkdir %build_dir%

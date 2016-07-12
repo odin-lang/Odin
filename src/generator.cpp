@@ -1,9 +1,9 @@
-// #include <llvm-c/llvm>
+#include <llvm-c/Core.h>
+#include <llvm-c/BitWriter.h>
 
 struct Generator {
 	Checker *checker;
-	String output_fullpath;
-	gbFile output;
+	String output_path;
 
 #define MAX_GENERATOR_ERROR_COUNT 10
 	isize error_prev_line;
@@ -43,14 +43,10 @@ b32 init_generator(Generator *g, Checker *checker) {
 
 	char *fullpath = checker->parser->tokenizer.fullpath;
 	char const *ext = gb_path_extension(fullpath);
-	isize base_len = ext-fullpath;
-	isize ext_len = gb_strlen("cpp");
-	isize len = base_len + ext_len + 1;
+	isize len = ext-fullpath;
 	u8 *text = gb_alloc_array(gb_heap_allocator(), u8, len);
-	gb_memcopy(text, fullpath, base_len);
-	gb_memcopy(text+base_len, "cpp", ext_len);
-	g->output_fullpath = make_string(text, len);
-
+	gb_memcopy(text, fullpath, len);
+	g->output_path = make_string(text, len);
 
 	return true;
 }
@@ -60,12 +56,27 @@ void destroy_generator(Generator *g) {
 
 	}
 
-	if (g->output_fullpath.text)
-		gb_free(gb_heap_allocator(), g->output_fullpath.text);
+	if (g->output_path.text)
+		gb_free(gb_heap_allocator(), g->output_path.text);
 }
 
 
+void emit_var_decl(Generator *g, String name, Type *type) {
+	// gb_printf("%.*s: %s;\n", LIT(name), type_to_string(type));
+}
 
-void generate_code(Generator *g, AstNode *root_node) {
+
+void generate_code(Generator *g, AstNode *file_node) {
+	// if (file_node->kind == AstNode_VariableDeclaration) {
+	// 	auto *vd = &file_node->variable_declaration;
+	// 	if (vd->kind == Declaration_Mutable) {
+	// 		for (AstNode *name_item = vd->name_list; name_item != NULL; name_item = name_item->next) {
+	// 			String name = name_item->identifier.token.string;
+	// 			Entity *entity = entity_of_identifier(g->checker, name_item);
+	// 			Type *type = entity->type;
+	// 			emit_var_decl(g, name, type);
+	// 		}
+	// 	}
+	// }
 
 }
