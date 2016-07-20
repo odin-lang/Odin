@@ -26,6 +26,7 @@ enum BasicKind {
 
 	Basic_Count,
 
+	Basic_byte = Basic_u8,
 	Basic_rune = Basic_i32,
 };
 
@@ -204,7 +205,8 @@ gb_global Type basic_types[] = {
 };
 
 gb_global Type basic_type_aliases[] = {
-	{Type_Basic, {Basic_rune, BasicFlag_Integer,  STR_LIT("rune")}},
+	{Type_Basic, {Basic_byte, BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("byte")}},
+	{Type_Basic, {Basic_rune, BasicFlag_Integer,                      STR_LIT("rune")}},
 };
 
 

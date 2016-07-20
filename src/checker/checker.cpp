@@ -1,4 +1,4 @@
-#include "value.cpp"
+#include "../exact_value.cpp"
 #include "entity.cpp"
 #include "type.cpp"
 
@@ -18,7 +18,7 @@ enum AddressingMode {
 struct Operand {
 	AddressingMode mode;
 	Type *type;
-	Value value;
+	ExactValue value;
 
 	AstNode *expression;
 	BuiltinProcedureId builtin_id;
@@ -27,7 +27,7 @@ struct Operand {
 struct TypeAndValue {
 	AddressingMode mode;
 	Type *type;
-	Value value;
+	ExactValue value;
 };
 
 struct DeclarationInfo {
@@ -44,10 +44,15 @@ struct DeclarationInfo {
 	i32 mark;
 };
 
-DeclarationInfo *make_declaration_info(gbAllocator a, Scope *scope) {
-	DeclarationInfo *d = gb_alloc_item(a, DeclarationInfo);
+
+void init_declaration_info(DeclarationInfo *d, Scope *scope) {
 	d->scope = scope;
 	map_init(&d->deps, gb_heap_allocator());
+}
+
+DeclarationInfo *make_declaration_info(gbAllocator a, Scope *scope) {
+	DeclarationInfo *d = gb_alloc_item(a, DeclarationInfo);
+	init_declaration_info(d, scope);
 	return d;
 }
 
@@ -71,10 +76,10 @@ struct ExpressionInfo {
 	b32 is_lhs; // Debug info
 	AddressingMode mode;
 	Type *type; // Type_Basic
-	Value value;
+	ExactValue value;
 };
 
-ExpressionInfo make_expression_info(b32 is_lhs, AddressingMode mode, Type *type, Value value) {
+ExpressionInfo make_expression_info(b32 is_lhs, AddressingMode mode, Type *type, ExactValue value) {
 	ExpressionInfo ei = {};
 	ei.is_lhs = is_lhs;
 	ei.mode   = mode;
@@ -84,6 +89,7 @@ ExpressionInfo make_expression_info(b32 is_lhs, AddressingMode mode, Type *type,
 }
 
 struct ProcedureInfo {
+	AstFile *file;
 	Token            token;
 	DeclarationInfo *decl;
 	Type *           type; // Type_Procedure
@@ -155,8 +161,9 @@ struct Checker {
 	Map<ExpressionInfo>    untyped;     // Key: AstNode * | Expression -> ExpressionInfo
 	Map<DeclarationInfo *> entities;    // Key: Entity *
 
+	AstFile *              curr_ast_file;
 	BaseTypeSizes          sizes;
-	Scope *                file_scope;
+	Scope *                global_scope;
 	gbArray(ProcedureInfo) procedures; // NOTE(bill): Procedures to check
 
 	gbArena     arena;
@@ -168,21 +175,20 @@ struct Checker {
 	gbArray(Type *) procedure_stack;
 	b32 in_defer; // TODO(bill): Actually handle correctly
 
-#define MAX_CHECKER_ERROR_COUNT 10
 	isize error_prev_line;
 	isize error_prev_column;
 	isize error_count;
 };
 
 
-gb_global Scope *global_scope = NULL;
+gb_global Scope *universal_scope = NULL;
 
 
 Scope *make_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
 	map_init(&s->elements, gb_heap_allocator());
-	if (parent != NULL && parent != global_scope) {
+	if (parent != NULL && parent != universal_scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
 	}
 	return s;
@@ -258,12 +264,12 @@ void add_global_entity(Entity *entity) {
 	if (gb_memchr(name.text, ' ', name.len)) {
 		return; // NOTE(bill): `untyped thing`
 	}
-	if (scope_insert_entity(global_scope, entity)) {
+	if (scope_insert_entity(universal_scope, entity)) {
 		GB_PANIC("Compiler error: double declaration");
 	}
 }
 
-void add_global_constant(gbAllocator a, String name, Type *type, Value value) {
+void add_global_constant(gbAllocator a, String name, Type *type, ExactValue value) {
 	Token token = {Token_Identifier};
 	token.string = name;
 	Entity *entity = alloc_entity(a, Entity_Constant, NULL, token, type);
@@ -271,10 +277,10 @@ void add_global_constant(gbAllocator a, String name, Type *type, Value value) {
 	add_global_entity(entity);
 }
 
-void init_global_scope(void) {
+void init_universal_scope(void) {
 	// NOTE(bill): No need to free these
 	gbAllocator a = gb_heap_allocator();
-	global_scope = make_scope(NULL, a);
+	universal_scope = make_scope(NULL, a);
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
@@ -289,9 +295,9 @@ void init_global_scope(void) {
 	}
 
 // Constants
-	add_global_constant(a, make_string("true"),  &basic_types[Basic_UntypedBool],    make_value_bool(true));
-	add_global_constant(a, make_string("false"), &basic_types[Basic_UntypedBool],    make_value_bool(false));
-	add_global_constant(a, make_string("null"),  &basic_types[Basic_UntypedPointer], make_value_pointer(NULL));
+	add_global_constant(a, make_string("true"),  &basic_types[Basic_UntypedBool],    make_exact_value_bool(true));
+	add_global_constant(a, make_string("false"), &basic_types[Basic_UntypedBool],    make_exact_value_bool(false));
+	add_global_constant(a, make_string("null"),  &basic_types[Basic_UntypedPointer], make_exact_value_pointer(NULL));
 
 // Builtin Procedures
 	for (isize i = 0; i < gb_count_of(builtin_procedures); i++) {
@@ -329,12 +335,17 @@ void init_checker(Checker *c, Parser *parser) {
 
 	// NOTE(bill): Is this big enough or too small?
 	isize item_size = gb_max(gb_max(gb_size_of(Entity), gb_size_of(Type)), gb_size_of(Scope));
-	isize arena_size = 2 * item_size * gb_array_count(c->parser->tokens);
+	isize total_token_count = 0;
+	for (isize i = 0; i < gb_array_count(c->parser->files); i++) {
+		AstFile *f = &c->parser->files[i];
+		total_token_count += gb_array_count(f->tokens);
+	}
+	isize arena_size = 2 * item_size * total_token_count;
 	gb_arena_init_from_allocator(&c->arena, a, arena_size);
 	c->allocator = gb_arena_allocator(&c->arena);
 
-	c->file_scope = make_scope(global_scope, c->allocator);
-	c->curr_scope = c->file_scope;
+	c->global_scope = make_scope(universal_scope, c->allocator);
+	c->curr_scope = c->global_scope;
 }
 
 void destroy_checker(Checker *c) {
@@ -344,7 +355,7 @@ void destroy_checker(Checker *c) {
 	map_destroy(&c->scopes);
 	map_destroy(&c->untyped);
 	map_destroy(&c->entities);
-	destroy_scope(c->file_scope);
+	destroy_scope(c->global_scope);
 	gb_array_free(c->procedure_stack);
 	gb_array_free(c->procedures);
 
@@ -353,8 +364,8 @@ void destroy_checker(Checker *c) {
 
 
 
-#define print_checker_error(p, token, fmt, ...) print_checker_error_(p, __FUNCTION__, token, fmt, ##__VA_ARGS__)
-void print_checker_error_(Checker *c, char *function, Token token, char *fmt, ...) {
+#define checker_err(p, token, fmt, ...) checker_err_(p, __FUNCTION__, token, fmt, ##__VA_ARGS__)
+void checker_err_(Checker *c, char *function, Token token, char *fmt, ...) {
 
 
 	// NOTE(bill): Duplicate error, skip it
@@ -368,20 +379,20 @@ void print_checker_error_(Checker *c, char *function, Token token, char *fmt, ..
 
 		va_list va;
 		va_start(va, fmt);
-		gb_printf_err("%s(%td:%td) %s\n",
-		              c->parser->tokenizer.fullpath, token.line, token.column,
+		gb_printf_err("%.*s(%td:%td) %s\n",
+		              LIT(c->curr_ast_file->tokenizer.fullpath), token.line, token.column,
 		              gb_bprintf_va(fmt, va));
 		va_end(va);
 
 	}
 	c->error_count++;
 	// NOTE(bill): If there are too many errors, just quit
-	if (c->error_count > MAX_CHECKER_ERROR_COUNT) {
-		gb_exit(1);
-		return;
-	}
 }
 
+TypeAndValue *type_and_value_of_expression(Checker *c, AstNode *expression) {
+	TypeAndValue *found = map_get(&c->types, hash_pointer(expression));
+	return found;
+}
 
 
 Entity *entity_of_identifier(Checker *c, AstNode *identifier) {
@@ -397,7 +408,7 @@ Entity *entity_of_identifier(Checker *c, AstNode *identifier) {
 }
 
 Type *type_of_expression(Checker *c, AstNode *expression) {
-	TypeAndValue *found = map_get(&c->types, hash_pointer(expression));
+	TypeAndValue *found = type_and_value_of_expression(c, expression);
 	if (found)
 		return found->type;
 	if (expression->kind == AstNode_Identifier) {
@@ -410,19 +421,19 @@ Type *type_of_expression(Checker *c, AstNode *expression) {
 }
 
 
-void add_untyped(Checker *c, AstNode *expression, b32 lhs, AddressingMode mode, Type *basic_type, Value value) {
+void add_untyped(Checker *c, AstNode *expression, b32 lhs, AddressingMode mode, Type *basic_type, ExactValue value) {
 	map_set(&c->untyped, hash_pointer(expression), make_expression_info(lhs, mode, basic_type, value));
 }
 
 
-void add_type_and_value(Checker *c, AstNode *expression, AddressingMode mode, Type *type, Value value) {
+void add_type_and_value(Checker *c, AstNode *expression, AddressingMode mode, Type *type, ExactValue value) {
 	GB_ASSERT(expression != NULL);
 	GB_ASSERT(type != NULL);
 	if (mode == Addressing_Invalid)
 		return;
 
 	if (mode == Addressing_Constant) {
-		GB_ASSERT(value.kind != Value_Invalid);
+		GB_ASSERT(value.kind != ExactValue_Invalid);
 		GB_ASSERT(type == &basic_types[Basic_Invalid] || is_type_constant_type(type));
 	}
 
@@ -443,7 +454,7 @@ void add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 	if (!are_strings_equal(entity->token.string, make_string("_"))) {
 		Entity *insert_entity = scope_insert_entity(scope, entity);
 		if (insert_entity) {
-			print_checker_error(c, entity->token, "Redeclared entity in this scope: %.*s", LIT(entity->token.string));
+			checker_err(c, entity->token, "Redeclared entity in this scope: %.*s", LIT(entity->token.string));
 			return;
 		}
 	}
@@ -463,14 +474,15 @@ void add_file_entity(Checker *c, AstNode *identifier, Entity *e, DeclarationInfo
 	GB_ASSERT(are_strings_equal(identifier->identifier.token.string, e->token.string));
 
 
-	add_entity(c, c->file_scope, identifier, e);
+	add_entity(c, c->global_scope, identifier, e);
 	map_set(&c->entities, hash_pointer(e), d);
 	e->order = gb_array_count(c->entities.entries);
 }
 
 
-void check_procedure_later(Checker *c, Token token, DeclarationInfo *decl, Type *type, AstNode *body) {
+void check_procedure_later(Checker *c, AstFile *file, Token token, DeclarationInfo *decl, Type *type, AstNode *body) {
 	ProcedureInfo info = {};
+	info.file = file;
 	info.token = token;
 	info.decl  = decl;
 	info.type  = type;
@@ -506,6 +518,12 @@ void pop_procedure(Checker *c) {
 }
 
 
+void add_curr_ast_file(Checker *c, AstFile *file) {
+	c->error_prev_line = 0;
+	c->error_prev_column = 0;
+	c->curr_ast_file = file;
+}
+
 
 
 
@@ -523,162 +541,115 @@ GB_COMPARE_PROC(entity_order_cmp) {
 	return p->order < q->order ? -1 : p->order > q->order;
 }
 
-void check_file(Checker *c, AstNode *file_node) {
+void check_parsed_files(Checker *c) {
+	// Collect Entities
+	for (isize i = 0; i < gb_array_count(c->parser->files); i++) {
+		AstFile *f = &c->parser->files[i];
+		add_curr_ast_file(c, f);
+		for (AstNode *decl = f->declarations; decl != NULL; decl = decl->next) {
+			if (!is_ast_node_declaration(decl))
+				continue;
 
-// Collect Entities
-	for (AstNode *decl = file_node; decl != NULL; decl = decl->next) {
-		if (!is_ast_node_declaration(decl))
-			continue;
+			switch (decl->kind) {
+			case AstNode_BadDeclaration:
+				break;
 
-		switch (decl->kind) {
-		case AstNode_BadDeclaration:
-			break;
+			case AstNode_VariableDeclaration: {
+				auto *vd = &decl->variable_declaration;
 
-		case AstNode_VariableDeclaration: {
-			auto *vd = &decl->variable_declaration;
+				switch (vd->kind) {
+				case Declaration_Immutable: {
+					for (AstNode *name = vd->name_list, *value = vd->value_list;
+					     name != NULL && value != NULL;
+					     name = name->next, value = value->next) {
+						GB_ASSERT(name->kind == AstNode_Identifier);
+						ExactValue v = {ExactValue_Invalid};
+						Entity *e = make_entity_constant(c->allocator, c->curr_scope, name->identifier.token, NULL, v);
+						DeclarationInfo *di = make_declaration_info(c->allocator, c->global_scope);
+						di->type_expr = vd->type_expression;
+						di->init_expr = value;
+						add_file_entity(c, name, e, di);
+					}
 
-			switch (vd->kind) {
-			case Declaration_Immutable: {
-				for (AstNode *name = vd->name_list, *value = vd->value_list;
-				     name != NULL && value != NULL;
-				     name = name->next, value = value->next) {
-					GB_ASSERT(name->kind == AstNode_Identifier);
-					Value v = {Value_Invalid};
-					Entity *e = make_entity_constant(c->allocator, c->curr_scope, name->identifier.token, NULL, v);
-					DeclarationInfo *di = make_declaration_info(c->allocator, c->file_scope);
-					di->type_expr = vd->type_expression;
-					di->init_expr = value;
-					add_file_entity(c, name, e, di);
+					isize lhs_count = vd->name_list_count;
+					isize rhs_count = vd->value_list_count;
+
+					if (rhs_count == 0 && vd->type_expression == NULL) {
+						checker_err(c, ast_node_token(decl), "Missing type or initial expression");
+					} else if (lhs_count < rhs_count) {
+						checker_err(c, ast_node_token(decl), "Extra initial expression");
+					}
+				} break;
+
+				case Declaration_Mutable: {
+					isize entity_count = vd->name_list_count;
+					isize entity_index = 0;
+					Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
+					DeclarationInfo *di = NULL;
+					if (vd->value_list_count == 1) {
+						di = make_declaration_info(gb_heap_allocator(), c->global_scope);
+						di->entities = entities;
+						di->entity_count = entity_count;
+						di->type_expr = vd->type_expression;
+						di->init_expr = vd->value_list;
+					}
+
+					AstNode *value = vd->value_list;
+					for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
+						Entity *e = make_entity_variable(c->allocator, c->global_scope, name->identifier.token, NULL);
+						entities[entity_index++] = e;
+
+						DeclarationInfo *d = di;
+						if (d == NULL) {
+							AstNode *init_expr = value;
+							d = make_declaration_info(gb_heap_allocator(), c->global_scope);
+							d->type_expr = vd->type_expression;
+							d->init_expr = init_expr;
+						}
+
+						add_file_entity(c, name, e, d);
+
+						if (value != NULL)
+							value = value->next;
+					}
+				} break;
 				}
 
-				isize lhs_count = vd->name_list_count;
-				isize rhs_count = vd->value_list_count;
 
-				if (rhs_count == 0 && vd->type_expression == NULL) {
-					print_checker_error(c, ast_node_token(decl), "Missing type or initial expression");
-				} else if (lhs_count < rhs_count) {
-					print_checker_error(c, ast_node_token(decl), "Extra initial expression");
-				}
 			} break;
 
-			case Declaration_Mutable: {
-				isize entity_count = vd->name_list_count;
-				isize entity_index = 0;
-				Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
-				DeclarationInfo *di = NULL;
-				if (vd->value_list_count == 1) {
-					di = make_declaration_info(gb_heap_allocator(), c->file_scope);
-					di->entities = entities;
-					di->entity_count = entity_count;
-					di->type_expr = vd->type_expression;
-					di->init_expr = vd->value_list;
-				}
-
-				AstNode *value = vd->value_list;
-				for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
-					Entity *e = make_entity_variable(c->allocator, c->file_scope, name->identifier.token, NULL);
-					entities[entity_index++] = e;
-
-					DeclarationInfo *d = di;
-					if (d == NULL) {
-						AstNode *init_expr = value;
-						d = make_declaration_info(gb_heap_allocator(), c->file_scope);
-						d->type_expr = vd->type_expression;
-						d->init_expr = init_expr;
-					}
-
-					add_file_entity(c, name, e, d);
-
-					if (value != NULL)
-						value = value->next;
-				}
-
-#if 0
-				for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
-					Entity *entity = NULL;
-					Token token = name->identifier.token;
-					if (name->kind == AstNode_Identifier) {
-						String str = token.string;
-						Entity *found = NULL;
-						// NOTE(bill): Ignore assignments to `_`
-						b32 can_be_ignored = are_strings_equal(str, make_string("_"));
-						if (!can_be_ignored) {
-							found = current_scope_lookup_entity(c->file_scope, str);
-						}
-						if (found == NULL) {
-							entity = make_entity_variable(c->allocator, c->file_scope, token, NULL);
-							if (!can_be_ignored) {
-								new_entities[new_entity_count++] = entity;
-							}
-							add_entity_definition(c, name, entity);
-						} else {
-							entity = found;
-						}
-					} else {
-						print_checker_error(c, token, "A variable declaration must be an identifier");
-					}
-					if (entity == NULL)
-						entity = make_entity_dummy_variable(c, token);
-					entities[entity_index++] = entity;
-				}
-
-				Type *init_type = NULL;
-				if (vd->type_expression) {
-					init_type = check_type(c, vd->type_expression, NULL);
-					if (init_type == NULL)
-						init_type = &basic_types[Basic_Invalid];
-				}
-
-				for (isize i = 0; i < entity_count; i++) {
-					Entity *e = entities[i];
-					GB_ASSERT(e != NULL);
-					if (e->variable.visited) {
-						e->type = &basic_types[Basic_Invalid];
-						continue;
-					}
-					e->variable.visited = true;
-
-					if (e->type == NULL)
-						e->type = init_type;
-				}
-
-
-				check_init_variables(c, entities, entity_count, vd->value_list, vd->value_list_count, make_string("variable declaration"));
-#endif
+			case AstNode_TypeDeclaration: {
+				AstNode *identifier = decl->type_declaration.name;
+				Entity *e = make_entity_type_name(c->allocator, c->global_scope, identifier->identifier.token, NULL);
+				DeclarationInfo *d = make_declaration_info(c->allocator, e->parent);
+				d->type_expr = decl->type_declaration.type_expression;
+				add_file_entity(c, identifier, e, d);
 			} break;
+
+			case AstNode_ProcedureDeclaration: {
+				AstNode *identifier = decl->procedure_declaration.name;
+				Token token = identifier->identifier.token;
+				Entity *e = make_entity_procedure(c->allocator, c->global_scope, token, NULL);
+				add_entity(c, c->global_scope, identifier, e);
+				DeclarationInfo *d = make_declaration_info(c->allocator, e->parent);
+				d->proc_decl = decl;
+				map_set(&c->entities, hash_pointer(e), d);
+				e->order = gb_array_count(c->entities.entries);
+
+			} break;
+
+			case AstNode_ImportDeclaration:
+				// NOTE(bill): ignore
+				break;
+
+			default:
+				checker_err(c, ast_node_token(decl), "Only declarations are allowed at file scope");
+				break;
 			}
-
-
-		} break;
-
-		case AstNode_TypeDeclaration: {
-			AstNode *identifier = decl->type_declaration.name;
-			Entity *e = make_entity_type_name(c->allocator, c->file_scope, identifier->identifier.token, NULL);
-			DeclarationInfo *d = make_declaration_info(c->allocator, e->parent);
-			d->type_expr = decl->type_declaration.type_expression;
-			add_file_entity(c, identifier, e, d);
-		} break;
-
-		case AstNode_ProcedureDeclaration: {
-			AstNode *identifier = decl->procedure_declaration.name;
-			Token token = identifier->identifier.token;
-			Entity *e = make_entity_procedure(c->allocator, c->file_scope, token, NULL);
-			add_entity(c, c->file_scope, identifier, e);
-			DeclarationInfo *d = make_declaration_info(c->allocator, e->parent);
-			d->proc_decl = decl;
-			map_set(&c->entities, hash_pointer(e), d);
-			e->order = gb_array_count(c->entities.entries);
-
-		} break;
-
-		default:
-			print_checker_error(c, ast_node_token(decl), "Only declarations are allowed at file scope");
-			break;
 		}
 	}
 
-// Order entities
-	{
+	{ // Order entities
 		gbArray(Entity *) entities;
 		isize count = gb_array_count(c->entities.entries);
 		gb_array_init_reserve(entities, gb_heap_allocator(), count);
@@ -698,9 +669,26 @@ void check_file(Checker *c, AstNode *file_node) {
 	}
 
 
+	// Check procedure bodies
 	for (isize i = 0; i < gb_array_count(c->procedures); i++) {
 		ProcedureInfo *pi = &c->procedures[i];
+		add_curr_ast_file(c, pi->file);
 		check_procedure_body(c, pi->token, pi->decl, pi->type, pi->body);
+	}
+
+
+	{ // Add untyped expression values
+		isize count = gb_array_count(c->untyped.entries);
+		for (isize i = 0; i < count; i++) {
+			auto *entry = c->untyped.entries + i;
+			u64 key = entry->key;
+			AstNode *expr = cast(AstNode *)cast(uintptr)key;
+			ExpressionInfo *info = &entry->value;
+			if (is_type_typed(info->type)) {
+				GB_PANIC("%s (type %s) is typed!", expression_to_string(expr), info->type);
+			}
+			add_type_and_value(c, expr, info->mode, info->type, info->value);
+		}
 	}
 }
 

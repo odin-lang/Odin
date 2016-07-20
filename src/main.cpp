@@ -3,7 +3,7 @@
 #include "parser.cpp"
 #include "printer.cpp"
 #include "checker/checker.cpp"
-#include "generator.cpp"
+// #include "codegen/codegen.cpp"
 
 
 int main(int argc, char **argv) {
@@ -12,29 +12,29 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	init_global_scope();
+	init_universal_scope();
 
 	for (int arg_index = 1; arg_index < argc; arg_index++) {
 		char *arg = argv[arg_index];
-		char *filename = arg;
+		char *init_filename = arg;
 		Parser parser = {0};
 
-		if (init_parser(&parser, filename)) {
+		if (init_parser(&parser)) {
 			defer (destroy_parser(&parser));
-			AstNode *file_node = parse_statement_list(&parser, NULL);
-			// print_ast(file_node, 0);
+
+			parse_files(&parser, init_filename);
 
 			Checker checker = {};
 			init_checker(&checker, &parser);
 			defer (destroy_checker(&checker));
 
-			check_file(&checker, file_node);
+			check_parsed_files(&checker);
+#if 0
+			Codegen codegen = {};
+			if (init_codegen(&codegen, &checker)) {
+				defer (destroy_codegen(&codegen));
 
-#if 1
-			Generator generator = {};
-			if (init_generator(&generator, &checker)) {
-				defer (destroy_generator(&generator));
-				generate_code(&generator, file_node);
+				generate_code(&codegen, file_node);
 			}
 #endif
 		}

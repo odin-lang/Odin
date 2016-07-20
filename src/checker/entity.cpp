@@ -26,7 +26,7 @@ struct Entity {
 	isize order;
 
 	union {
-		struct { Value value; } constant;
+		struct { ExactValue value; } constant;
 		struct {
 			b8 visited;
 			b8 is_field;
@@ -59,7 +59,7 @@ Entity *make_entity_variable(gbAllocator a, Scope *parent, Token token, Type *ty
 	return entity;
 }
 
-Entity *make_entity_constant(gbAllocator a, Scope *parent, Token token, Type *type, Value value) {
+Entity *make_entity_constant(gbAllocator a, Scope *parent, Token token, Type *type, ExactValue value) {
 	Entity *entity = alloc_entity(a, Entity_Constant, parent, token, type);
 	entity->constant.value = value;
 	return entity;

@@ -1631,7 +1631,8 @@ GB_STATIC_ASSERT(GB_ARRAY_GROW_FORMULA(0) > 0);
 	void **gb__array_ = cast(void **)&(x); \
 	gbArrayHeader *gb__ah = cast(gbArrayHeader *)gb_alloc(allocator_, gb_size_of(gbArrayHeader)+gb_size_of(*(x))*(cap)); \
 	gb__ah->allocator = allocator_; \
-	gb__ah->count = gb__ah->capacity = 0; \
+	gb__ah->count = 0; \
+	gb__ah->capacity = cap; \
 	*gb__array_ = cast(void *)(gb__ah+1); \
 } while (0)
 
@@ -8120,6 +8121,10 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 		case 'p':
 			info.base = 16;
 			info.flags |= (gbFmt_Lower|gbFmt_Unsigned|gbFmt_Alt|gbFmt_Intptr);
+			break;
+
+		case '%':
+			len = gb__print_char(text, remaining, &info, '%');
 			break;
 
 		default: fmt--; break;

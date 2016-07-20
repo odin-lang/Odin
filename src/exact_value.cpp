@@ -3,20 +3,20 @@
 // TODO(bill): Big numbers
 // IMPORTANT TODO(bill): This needs to be completely fixed!!!!!!!!
 
-enum ValueKind {
-	Value_Invalid,
+enum ExactValueKind {
+	ExactValue_Invalid,
 
-	Value_Bool,
-	Value_String,
-	Value_Integer,
-	Value_Float,
-	Value_Pointer, // TODO(bill): Handle Value_Pointer correctly
+	ExactValue_Bool,
+	ExactValue_String,
+	ExactValue_Integer,
+	ExactValue_Float,
+	ExactValue_Pointer, // TODO(bill): Handle ExactValue_Pointer correctly
 
-	Value_Count,
+	ExactValue_Count,
 };
 
-struct Value {
-	ValueKind kind;
+struct ExactValue {
+	ExactValueKind kind;
 	union {
 		b32    value_bool;
 		String value_string;
@@ -26,22 +26,22 @@ struct Value {
 	};
 };
 
-Value make_value_bool(b32 b) {
-	Value result = {Value_Bool};
+ExactValue make_exact_value_bool(b32 b) {
+	ExactValue result = {ExactValue_Bool};
 	result.value_bool = (b != 0);
 	return result;
 }
 
-Value make_value_string(String string) {
+ExactValue make_exact_value_string(String string) {
 	// TODO(bill): Allow for numbers with underscores in them
-	Value result = {Value_String};
+	ExactValue result = {ExactValue_String};
 	result.value_string = string;
 	return result;
 }
 
-Value make_value_integer(String string) {
+ExactValue make_exact_value_integer(String string) {
 	// TODO(bill): Allow for numbers with underscores in them
-	Value result = {Value_Integer};
+	ExactValue result = {ExactValue_Integer};
 	i32 base = 10;
 	if (string.text[0] == '0') {
 		switch (string.text[1]) {
@@ -57,91 +57,91 @@ Value make_value_integer(String string) {
 	return result;
 }
 
-Value make_value_integer(i64 i) {
-	Value result = {Value_Integer};
+ExactValue make_exact_value_integer(i64 i) {
+	ExactValue result = {ExactValue_Integer};
 	result.value_integer = i;
 	return result;
 }
 
-Value make_value_float(String string) {
+ExactValue make_exact_value_float(String string) {
 	// TODO(bill): Allow for numbers with underscores in them
-	Value result = {Value_Float};
+	ExactValue result = {ExactValue_Float};
 	result.value_float = gb_str_to_f64(cast(char *)string.text, NULL);
 	return result;
 }
 
-Value make_value_float(f64 f) {
-	Value result = {Value_Float};
+ExactValue make_exact_value_float(f64 f) {
+	ExactValue result = {ExactValue_Float};
 	result.value_float = f;
 	return result;
 }
 
-Value make_value_pointer(void *ptr) {
-	Value result = {Value_Pointer};
+ExactValue make_exact_value_pointer(void *ptr) {
+	ExactValue result = {ExactValue_Pointer};
 	result.value_pointer = ptr;
 	return result;
 }
 
-Value make_value_from_basic_literal(Token token) {
+ExactValue make_exact_value_from_basic_literal(Token token) {
 	switch (token.kind) {
-	case Token_String:  return make_value_string(token.string);
-	case Token_Integer: return make_value_integer(token.string);
-	case Token_Float:   return make_value_float(token.string);
-	case Token_Rune:    return make_value_integer(token.string);
+	case Token_String:  return make_exact_value_string(token.string);
+	case Token_Integer: return make_exact_value_integer(token.string);
+	case Token_Float:   return make_exact_value_float(token.string);
+	case Token_Rune:    return make_exact_value_integer(token.string);
 	default:
 		GB_PANIC("Invalid token for basic literal");
 		break;
 	}
 
-	Value result = {Value_Invalid};
+	ExactValue result = {ExactValue_Invalid};
 	return result;
 }
 
-Value value_to_integer(Value v) {
+ExactValue exact_value_to_integer(ExactValue v) {
 	switch (v.kind) {
-	case Value_Integer:
+	case ExactValue_Integer:
 		return v;
-	case Value_Float:
-		return make_value_integer(cast(i64)v.value_float);
+	case ExactValue_Float:
+		return make_exact_value_integer(cast(i64)v.value_float);
 	}
-	Value r = {Value_Invalid};
+	ExactValue r = {ExactValue_Invalid};
 	return r;
 }
 
-Value value_to_float(Value v) {
+ExactValue exact_value_to_float(ExactValue v) {
 	switch (v.kind) {
-	case Value_Integer:
-		return make_value_float(cast(i64)v.value_integer);
-	case Value_Float:
+	case ExactValue_Integer:
+		return make_exact_value_float(cast(i64)v.value_integer);
+	case ExactValue_Float:
 		return v;
 	}
-	Value r = {Value_Invalid};
+	ExactValue r = {ExactValue_Invalid};
 	return r;
 }
 
 
-Value unary_operator_value(Token op, Value v, i32 precision) {
+ExactValue exact_unary_operator_value(Token op, ExactValue v, i32 precision) {
 	switch (op.kind) {
 	case Token_Add:	{
 		switch (v.kind) {
-		case Value_Invalid:
-		case Value_Integer:
-		case Value_Float:
+		case ExactValue_Invalid:
+		case ExactValue_Integer:
+		case ExactValue_Float:
 			return v;
 		}
 	} break;
 
 	case Token_Sub:	{
 		switch (v.kind) {
-		case Value_Invalid:
+		case ExactValue_Invalid:
 			return v;
-		case Value_Integer: {
-			Value i = v;
+		case ExactValue_Integer: {
+			ExactValue i = v;
 			i.value_integer = -i.value_integer;
 			return i;
 		}
-		case Value_Float: {
-			Value i = v;
+		case ExactValue_Float: {
+			ExactValue i = v;
 			i.value_float = -i.value_float;
 			return i;
 		}
@@ -151,9 +151,9 @@ Value unary_operator_value(Token op, Value v, i32 precision) {
 	case Token_Xor: {
 		i64 i = 0;
 		switch (v.kind) {
-		case Value_Invalid:
+		case ExactValue_Invalid:
 			return v;
-		case Value_Integer:
+		case ExactValue_Integer:
 			i = v.value_integer;
 			i = ~i;
 			break;
@@ -166,14 +166,14 @@ Value unary_operator_value(Token op, Value v, i32 precision) {
 		if (precision > 0)
 			i &= ~((~0ll)<<precision);
 
-		return make_value_integer(i);
+		return make_exact_value_integer(i);
 	} break;
 
 	case Token_Not: {
 		switch (v.kind) {
-		case Value_Invalid: return v;
-		case Value_Bool:
-			return make_value_bool(!v.value_bool);
+		case ExactValue_Invalid: return v;
+		case ExactValue_Bool:
+			return make_exact_value_bool(!v.value_bool);
 		}
 	} break;
 	}
@@ -181,23 +181,23 @@ Value unary_operator_value(Token op, Value v, i32 precision) {
 failure:
 	GB_PANIC("Invalid unary operation, %s", token_kind_to_string(op.kind));
 
-	Value error_value = {};
+	ExactValue error_value = {};
 	return error_value;
 }
 
 // NOTE(bill): Make sure things are evaluated in correct order
-i32 value_order(Value v) {
+i32 exact_value_order(ExactValue v) {
 	switch (v.kind) {
-	case Value_Invalid:
+	case ExactValue_Invalid:
 		return 0;
-	case Value_Bool:
-	case Value_String:
+	case ExactValue_Bool:
+	case ExactValue_String:
 		return 1;
-	case Value_Integer:
+	case ExactValue_Integer:
 		return 2;
-	case Value_Float:
+	case ExactValue_Float:
 		return 3;
-	case Value_Pointer:
+	case ExactValue_Pointer:
 		return 4;
 
 	default:
@@ -206,58 +206,58 @@ i32 value_order(Value v) {
 	}
 }
 
-void match_values(Value *x, Value *y) {
-	if (value_order(*y) < value_order(*x)) {
-		match_values(y, x);
+void match_exact_values(ExactValue *x, ExactValue *y) {
+	if (exact_value_order(*y) < exact_value_order(*x)) {
+		match_exact_values(y, x);
 		return;
 	}
 
 	switch (x->kind) {
-	case Value_Invalid:
+	case ExactValue_Invalid:
 		*y = *x;
 		return;
 
-	case Value_Bool:
-	case Value_String:
+	case ExactValue_Bool:
+	case ExactValue_String:
 		return;
 
-	case Value_Integer:
+	case ExactValue_Integer:
 		switch (y->kind) {
-		case Value_Integer:
+		case ExactValue_Integer:
 			return;
-		case Value_Float:
+		case ExactValue_Float:
 			// TODO(bill): Is this good enough?
-			*x = make_value_float(cast(f64)x->value_integer);
+			*x = make_exact_value_float(cast(f64)x->value_integer);
 			return;
 		}
 		break;
 
-	case Value_Float:
-		if (y->kind == Value_Float)
+	case ExactValue_Float:
+		if (y->kind == ExactValue_Float)
 			return;
 		break;
 	}
 
-	GB_PANIC("How'd you get here? Invalid Value.kind");
+	GB_PANIC("How'd you get here? Invalid ExactValueKind");
 }
 
 // TODO(bill): Allow for pointer arithmetic? Or are pointer slices good enough?
-Value binary_operator_value(Token op, Value x, Value y) {
-	match_values(&x, &y);
+ExactValue exact_binary_operator_value(Token op, ExactValue x, ExactValue y) {
+	match_exact_values(&x, &y);
 
 	switch (x.kind) {
-	case Value_Invalid:
+	case ExactValue_Invalid:
 		return x;
 
-	case Value_Bool:
+	case ExactValue_Bool:
 		switch (op.kind) {
-		case Token_CmpAnd: return make_value_bool(x.value_bool && y.value_bool);
-		case Token_CmpOr:  return make_value_bool(x.value_bool || y.value_bool);
+		case Token_CmpAnd: return make_exact_value_bool(x.value_bool && y.value_bool);
+		case Token_CmpOr:  return make_exact_value_bool(x.value_bool || y.value_bool);
 		default: goto error;
 		}
 		break;
 
-	case Value_Integer: {
+	case ExactValue_Integer: {
 		i64 a = x.value_integer;
 		i64 b = y.value_integer;
 		i64 c = 0;
@@ -265,7 +265,7 @@ Value binary_operator_value(Token op, Value x, Value y) {
 		case Token_Add:    c = a + b;  break;
 		case Token_Sub:    c = a - b;  break;
 		case Token_Mul:    c = a * b;  break;
-		case Token_Quo:    return make_value_float(fmod(cast(f64)a, cast(f64)b));
+		case Token_Quo:    return make_exact_value_float(fmod(cast(f64)a, cast(f64)b));
 		case Token_QuoEq:  c = a / b;  break; // NOTE(bill): Integer division
 		case Token_Mod:    c = a % b;  break;
 		case Token_And:    c = a & b;  break;
@@ -274,53 +274,53 @@ Value binary_operator_value(Token op, Value x, Value y) {
 		case Token_AndNot: c = a&(~b); break;
 		default: goto error;
 		}
-		return make_value_integer(c);
+		return make_exact_value_integer(c);
 	} break;
 
-	case Value_Float: {
+	case ExactValue_Float: {
 		f64 a = x.value_float;
 		f64 b = y.value_float;
 		switch (op.kind) {
-		case Token_Add: return make_value_float(a + b);
-		case Token_Sub: return make_value_float(a - b);
-		case Token_Mul: return make_value_float(a * b);
-		case Token_Quo: return make_value_float(a / b);
+		case Token_Add: return make_exact_value_float(a + b);
+		case Token_Sub: return make_exact_value_float(a - b);
+		case Token_Mul: return make_exact_value_float(a * b);
+		case Token_Quo: return make_exact_value_float(a / b);
 		default: goto error;
 		}
 	} break;
 	}
 
 error:
-	Value error_value = {};
-	GB_PANIC("Invalid binary operation: %s", token_kind_to_string(op.kind));
+	ExactValue error_value = {};
+	// gb_printf_err("Invalid binary operation: %s\n", token_kind_to_string(op.kind));
 	return error_value;
 }
 
-gb_inline Value value_add(Value x, Value y) { Token op = {Token_Add}; return binary_operator_value(op, x, y); }
-gb_inline Value value_sub(Value x, Value y) { Token op = {Token_Sub}; return binary_operator_value(op, x, y); }
-gb_inline Value value_mul(Value x, Value y) { Token op = {Token_Mul}; return binary_operator_value(op, x, y); }
-gb_inline Value value_quo(Value x, Value y) { Token op = {Token_Quo}; return binary_operator_value(op, x, y); }
+gb_inline ExactValue exact_value_add(ExactValue x, ExactValue y) { Token op = {Token_Add}; return exact_binary_operator_value(op, x, y); }
+gb_inline ExactValue exact_value_sub(ExactValue x, ExactValue y) { Token op = {Token_Sub}; return exact_binary_operator_value(op, x, y); }
+gb_inline ExactValue exact_value_mul(ExactValue x, ExactValue y) { Token op = {Token_Mul}; return exact_binary_operator_value(op, x, y); }
+gb_inline ExactValue exact_value_quo(ExactValue x, ExactValue y) { Token op = {Token_Quo}; return exact_binary_operator_value(op, x, y); }
 
 
 i32 cmp_f64(f64 a, f64 b) {
 	return (a > b) - (a < b);
 }
 
-b32 compare_values(Token op, Value x, Value y) {
-	match_values(&x, &y);
+b32 compare_exact_values(Token op, ExactValue x, ExactValue y) {
+	match_exact_values(&x, &y);
 
 	switch (x.kind) {
-	case Value_Invalid:
+	case ExactValue_Invalid:
 		return false;
 
-	case Value_Bool:
+	case ExactValue_Bool:
 		switch (op.kind) {
 		case Token_CmpEq: return x.value_bool == y.value_bool;
 		case Token_NotEq: return x.value_bool != y.value_bool;
 		}
 		break;
 
-	case Value_Integer: {
+	case ExactValue_Integer: {
 		i64 a = x.value_integer;
 		i64 b = y.value_integer;
 		switch (op.kind) {
@@ -333,7 +333,7 @@ b32 compare_values(Token op, Value x, Value y) {
 		}
 	} break;
 
-	case Value_Float: {
+	case ExactValue_Float: {
 		f64 a = x.value_float;
 		f64 b = y.value_float;
 		switch (op.kind) {
@@ -346,7 +346,7 @@ b32 compare_values(Token op, Value x, Value y) {
 		}
 	} break;
 
-	case Value_String: {
+	case ExactValue_String: {
 		String a = x.value_string;
 		String b = y.value_string;
 		isize len = gb_min(a.len, b.len);

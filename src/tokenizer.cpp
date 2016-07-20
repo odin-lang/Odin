@@ -103,7 +103,6 @@ Token__OperatorEnd,
 Token__KeywordBegin,
 	Token_type,
 	Token_proc,
-
 	Token_match, // TODO(bill): switch vs match?
 	Token_break,
 	Token_continue,
@@ -275,7 +274,7 @@ gb_inline void print_token(Token t) { gb_printf("%.*s\n", LIT(t.string)); }
 
 typedef struct Tokenizer Tokenizer;
 struct Tokenizer {
-	char *fullpath;
+	String fullpath;
 	u8 *start;
 	u8 *end;
 
@@ -289,8 +288,8 @@ struct Tokenizer {
 };
 
 
-#define tokenizer_error(t, msg, ...) tokenizer_error_(t, __FUNCTION__, msg, ##__VA_ARGS__)
-void tokenizer_error_(Tokenizer *t, char *function, char *msg, ...) {
+#define tokenizer_err(t, msg, ...) tokenizer_err_(t, __FUNCTION__, msg, ##__VA_ARGS__)
+void tokenizer_err_(Tokenizer *t, char *function, char *msg, ...) {
 	va_list va;
 	isize column = t->read_curr - t->line+1;
 	if (column < 1)
@@ -322,13 +321,13 @@ void advance_to_next_rune(Tokenizer *t) {
 		}
 		rune = *t->read_curr;
 		if (rune == 0) {
-			tokenizer_error(t, "Illegal character NUL");
+			tokenizer_err(t, "Illegal character NUL");
 		} else if (rune >= 0x80) { // not ASCII
 			width = gb_utf8_decode(t->read_curr, t->end-t->read_curr, &rune);
 			if (rune == GB_RUNE_INVALID && width == 1)
-				tokenizer_error(t, "Illegal UTF-8 encoding");
+				tokenizer_err(t, "Illegal UTF-8 encoding");
 			else if (rune == GB_RUNE_BOM && t->curr-t->start > 0)
-				tokenizer_error(t, "Illegal byte order mark");
+				tokenizer_err(t, "Illegal byte order mark");
 		}
 		t->read_curr += width;
 		t->curr_rune = rune;
@@ -342,15 +341,20 @@ void advance_to_next_rune(Tokenizer *t) {
 	}
 }
 
-b32 init_tokenizer(Tokenizer *t, char *filename) {
-	gbFileContents fc = gb_file_read_contents(gb_heap_allocator(), true, filename);
+b32 init_tokenizer(Tokenizer *t, String fullpath) {
+	char *c_str = gb_alloc_array(gb_heap_allocator(), char, fullpath.len+1);
+	memcpy(c_str, fullpath.text, fullpath.len);
+	c_str[fullpath.len] = '\0';
+	defer (gb_free(gb_heap_allocator(), c_str));
+
+	gbFileContents fc = gb_file_read_contents(gb_heap_allocator(), true, c_str);
 	gb_zero_item(t);
 	if (fc.data) {
 		t->start = cast(u8 *)fc.data;
 		t->line = t->read_curr = t->curr = t->start;
 		t->end = t->start + fc.size;
 
-		t->fullpath = gb_path_get_full_name(gb_heap_allocator(), filename);
+		t->fullpath = fullpath;
 
 		t->line_count = 1;
 
@@ -527,9 +531,9 @@ b32 scan_escape(Tokenizer *t, Rune quote) {
 		len = 8; base = 16; max = GB_RUNE_MAX;
 	} else {
 		if (t->curr_rune < 0)
-			tokenizer_error(t, "Escape sequence was not terminated");
+			tokenizer_err(t, "Escape sequence was not terminated");
 		else
-			tokenizer_error(t, "Unknown escape sequence");
+			tokenizer_err(t, "Unknown escape sequence");
 		return false;
 	}
 
@@ -537,9 +541,9 @@ b32 scan_escape(Tokenizer *t, Rune quote) {
 		u32 d = cast(u32)digit_value(t->curr_rune);
 		if (d >= base) {
 			if (t->curr_rune < 0)
-				tokenizer_error(t, "Escape sequence was not terminated");
+				tokenizer_err(t, "Escape sequence was not terminated");
 			else
-				tokenizer_error(t, "Illegal character %d in escape sequence", t->curr_rune);
+				tokenizer_err(t, "Illegal character %d in escape sequence", t->curr_rune);
 			return false;
 		}
 
@@ -646,7 +650,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 			for (;;) {
 				Rune r = t->curr_rune;
 				if (r == '\n' || r < 0) {
-					tokenizer_error(t, "String literal not terminated");
+					tokenizer_err(t, "String literal not terminated");
 					break;
 				}
 				advance_to_next_rune(t);
@@ -665,7 +669,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 				Rune r = t->curr_rune;
 				if (r == '\n' || r < 0) {
 					if (valid)
-						tokenizer_error(t, "Rune literal not terminated");
+						tokenizer_err(t, "Rune literal not terminated");
 					break;
 				}
 				advance_to_next_rune(t);
@@ -679,7 +683,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 			}
 
 			if (valid && len != 1)
-				tokenizer_error(t, "Illegal rune literal");
+				tokenizer_err(t, "Illegal rune literal");
 		} break;
 
 		case '.':
@@ -722,10 +726,8 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '&':
 			token.kind = Token_And;
 			if (t->curr_rune == '~') {
-				advance_to_next_rune(t);
 				token.kind = token_type_variant2(t, Token_AndNot, Token_AndNotEq);
 			} else {
-				advance_to_next_rune(t);
 				token.kind = token_type_variant3(t, Token_And, Token_AndEq, '&', Token_CmpAnd);
 				if (t->curr_rune == '=') {
 					token.kind = Token_CmpAndEq;
@@ -735,8 +737,6 @@ Token tokenizer_get_token(Tokenizer *t) {
 			break;
 
 		case '|':
-			token.kind = Token_Or;
-			advance_to_next_rune(t);
 			token.kind = token_type_variant3(t, Token_Or, Token_OrEq, '|', Token_CmpOr);
 			if (t->curr_rune == '=')  {
 				token.kind = Token_CmpOrEq;
@@ -746,7 +746,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 		default:
 			if (curr_rune != GB_RUNE_BOM)
-				tokenizer_error(t, "Illegal character: %c (%d) ", cast(char)curr_rune, curr_rune);
+				tokenizer_err(t, "Illegal character: %c (%d) ", cast(char)curr_rune, curr_rune);
 			token.kind = Token_Invalid;
 			break;
 		}
