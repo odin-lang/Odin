@@ -31,6 +31,35 @@ gb_inline b32 are_strings_equal(String a, String b) {
 	return false;
 }
 
+
+gb_inline isize string_has_any_extension(String str) {
+	isize dot_pos = -1;
+	isize i = str.len;
+	b32 seen_dot = false;
+	while (i --> 0) {
+		if (str.text[i] == GB_PATH_SEPARATOR)
+			break;
+		if (str.text[i] == '.') {
+			dot_pos = i;
+			break;
+		}
+	}
+
+	return dot_pos;
+}
+
+gb_inline b32 string_has_extension(String str, String ext) {
+	if (str.len > ext.len+1) {
+		u8 *s = str.text+str.len - ext.len-1;
+		if (s[0] == '.') {
+			s++;
+			return gb_memcompare(s, ext.text, ext.len) == 0;
+		}
+		return false;
+	}
+	return false;
+}
+
 // Hasing
 
 gb_inline u64 hashing_proc(void const *data, isize len) {

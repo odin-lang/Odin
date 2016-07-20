@@ -1670,10 +1670,12 @@ AstNode *parse_statement_list(AstFile *f, isize *list_count_) {
 }
 
 
-// void parse_file(AstFile *f, )
-
 
 b32 init_ast_file(AstFile *f, String fullpath) {
+	if (!string_has_extension(fullpath, make_string("odin"))) {
+		gb_printf_err("Only `.odin` files are allowed\n");
+		return false;
+	}
 	if (init_tokenizer(&f->tokenizer, fullpath)) {
 		gb_array_init(f->tokens, gb_heap_allocator());
 		for (;;) {
@@ -1804,7 +1806,7 @@ void parse_files(Parser *p, char *init_filename) {
 		AstFile file = {};
 		b32 ok = init_ast_file(&file, import_path);
 		if (!ok) {
-			gb_printf_err("Failed to parse file: %.*s", LIT(import_path));
+			gb_printf_err("Failed to parse file: %.*s\n", LIT(import_path));
 			return;
 		}
 		parse_file(p, &file);
