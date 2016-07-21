@@ -32,7 +32,7 @@ gb_inline b32 are_strings_equal(String a, String b) {
 }
 
 
-gb_inline isize string_has_any_extension(String str) {
+gb_inline isize string_extension_position(String str) {
 	isize dot_pos = -1;
 	isize i = str.len;
 	b32 seen_dot = false;

@@ -1718,17 +1718,17 @@ b32 init_parser(Parser *p) {
 }
 
 void destroy_parser(Parser *p) {
-#if 0
 	// TODO(bill): Fix memory leak
 	for (isize i = 0; i < gb_array_count(p->files); i++) {
 		destroy_ast_file(&p->files[i]);
 	}
+#if 1
 	for (isize i = 0; i < gb_array_count(p->imports); i++) {
 		// gb_free(gb_heap_allocator(), p->imports[i].text);
 	}
+#endif
 	gb_array_free(p->files);
 	gb_array_free(p->imports);
-#endif
 }
 
 // NOTE(bill): Returns true if it's added
@@ -1742,6 +1742,45 @@ b32 try_add_import_path(Parser *p, String import_file) {
 
 	gb_array_append(p->imports, import_file);
 	return true;
+}
+
+gb_global Rune illegal_import_runes[] = {
+	'"', '\'', '`', ' ',
+	'\\', // NOTE(bill): Disallow windows style filepaths
+	'!', '$', '%', '^', '&', '*', '(', ')', '=', '+',
+	'[', ']', '{', '}',
+	';', ':', '#',
+	'|', ',',  '<', '>', '?',
+};
+
+b32 is_import_path_valid(String path) {
+	if (path.len > 0) {
+		u8 *start = path.text;
+		u8 *end = path.text + path.len;
+		u8 *curr = start;
+		Rune r = -1;
+		while (curr < end) {
+			isize width = 1;
+			r = curr[0];
+			if (r >= 0x80) {
+				width = gb_utf8_decode(curr, end-curr, &r);
+				if (r == GB_RUNE_INVALID && width == 1)
+					return false;
+				else if (r == GB_RUNE_BOM && curr-start > 0)
+					return false;
+			}
+
+			for (isize i = 0; i < gb_count_of(illegal_import_runes); i++) {
+				if (r == illegal_import_runes[i])
+					return false;
+			}
+
+			curr += width;
+		}
+
+		return true;
+	}
+	return false;
 }
 
 
@@ -1770,19 +1809,26 @@ void parse_file(Parser *p, AstFile *f) {
 
 				char ext[] = ".odin";
 				isize ext_len = gb_size_of(ext)-1;
-				if (file_str.len > ext_len) {
-					if (gb_memcompare(file_str.text+file_str.len-ext_len, ext, ext_len) == 0) {
-						file_str.len -= ext_len;
-					}
+				b32 append_ext = false;
+
+				if (!is_import_path_valid(file_str)) {
+					ast_file_err(f, ast_node_token(node), "Invalid import path");
+					continue;
 				}
 
-				isize str_len = base_dir.len + file_str.len + ext_len;
+				if (string_extension_position(file_str) < 0)
+					append_ext = true;
+
+				isize str_len = base_dir.len+file_str.len;
+				if (append_ext)
+					str_len += ext_len;
 				u8 *str = gb_alloc_array(gb_heap_allocator(), u8, str_len+1);
 				defer (gb_free(gb_heap_allocator(), str));
 
 				gb_memcopy(str, base_dir.text, base_dir.len);
 				gb_memcopy(str+base_dir.len, file_str.text, file_str.len);
-				gb_memcopy(str+base_dir.len+file_str.len, ext, ext_len+1);
+				if (append_ext)
+					gb_memcopy(str+base_dir.len+file_str.len, ext, ext_len+1);
 				str[str_len] = '\0';
 				char *path_str = gb_path_get_full_name(gb_heap_allocator(), cast(char *)str);
 				String import_file = make_string(path_str);
