@@ -307,6 +307,11 @@ b32 are_types_identical(Type *x, Type *y) {
 	if (x == y)
 		return true;
 
+	if ((x == NULL && y != NULL) ||
+	    (x != NULL && y == NULL)) {
+		return false;
+	}
+
 	switch (x->kind) {
 	case Type_Basic:
 		if (y->kind == Type_Basic)

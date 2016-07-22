@@ -172,7 +172,7 @@ Type *check_assign_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	Entity *e = NULL;
 	b32 used = false;
 	if (node->kind == AstNode_Identifier) {
-		scope_lookup_parent_entity(c->curr_scope, node->identifier.token.string,
+		scope_lookup_parent_entity(c->proc_context.scope, node->identifier.token.string,
 		                           NULL, &e);
 		if (e != NULL && e->kind == Entity_Variable) {
 			used = e->variable.used; // TODO(bill): Make backup just in case
@@ -381,8 +381,11 @@ void check_type_declaration(Checker *c, Entity *e, AstNode *type_expr, Type *nam
 
 void check_procedure_body(Checker *c, Token token, DeclarationInfo *decl, Type *type, AstNode *body) {
 	GB_ASSERT(body->kind == AstNode_BlockStatement);
-	Scope *origin_curr_scope = c->curr_scope;
-	c->curr_scope = decl->scope;
+
+	ProcedureContext old_proc_context = c->proc_context;
+	c->proc_context.scope = decl->scope;
+	c->proc_context.decl = decl;
+
 	push_procedure(c, type);
 	check_statement_list(c, body->block_statement.list);
 	if (type->procedure.results_count > 0) {
@@ -392,7 +395,7 @@ void check_procedure_body(Checker *c, Token token, DeclarationInfo *decl, Type *
 	}
 	pop_procedure(c);
 
-	c->curr_scope = origin_curr_scope;
+	c->proc_context = old_proc_context;
 }
 
 void check_procedure_declaration(Checker *c, Entity *e, DeclarationInfo *d, b32 check_body_later) {
@@ -403,8 +406,8 @@ void check_procedure_declaration(Checker *c, Entity *e, DeclarationInfo *d, b32 
 	auto *pd = &d->proc_decl->procedure_declaration;
 
 #if 1
-	Scope *origin_curr_scope = c->curr_scope;
-	c->curr_scope = c->global_scope;
+	Scope *original_curr_scope = c->proc_context.scope;
+	c->proc_context.scope = c->global_scope;
 	check_open_scope(c, pd->procedure_type);
 #endif
 	check_procedure_type(c, proc_type, pd->procedure_type);
@@ -438,7 +441,7 @@ void check_procedure_declaration(Checker *c, Entity *e, DeclarationInfo *d, b32 
 			            "A procedure tagged as `#foreign` cannot have a body");
 		}
 
-		d->scope = c->curr_scope;
+		d->scope = c->proc_context.scope;
 
 		GB_ASSERT(pd->body->kind == AstNode_BlockStatement);
 		if (check_body_later) {
@@ -450,7 +453,7 @@ void check_procedure_declaration(Checker *c, Entity *e, DeclarationInfo *d, b32 
 
 #if 1
 	check_close_scope(c);
-	c->curr_scope = origin_curr_scope;
+	c->proc_context.scope = original_curr_scope;
 #endif
 
 }
@@ -503,11 +506,11 @@ void check_entity_declaration(Checker *c, Entity *e, Type *named_type) {
 
 	switch (e->kind) {
 	case Entity_Constant:
-		c->decl = d;
+		c->proc_context.decl = d;
 		check_constant_declaration(c, e, d->type_expr, d->init_expr);
 		break;
 	case Entity_Variable:
-		c->decl = d;
+		c->proc_context.decl = d;
 		check_variable_declaration(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr);
 		break;
 	case Entity_TypeName:
@@ -736,10 +739,10 @@ void check_statement(Checker *c, AstNode *node) {
 					// NOTE(bill): Ignore assignments to `_`
 					b32 can_be_ignored = are_strings_equal(str, make_string("_"));
 					if (!can_be_ignored) {
-						found = current_scope_lookup_entity(c->curr_scope, str);
+						found = current_scope_lookup_entity(c->proc_context.scope, str);
 					}
 					if (found == NULL) {
-						entity = make_entity_variable(c->allocator, c->curr_scope, token, NULL);
+						entity = make_entity_variable(c->allocator, c->proc_context.scope, token, NULL);
 						if (!can_be_ignored) {
 							new_entities[new_entity_count++] = entity;
 						}
@@ -780,7 +783,7 @@ void check_statement(Checker *c, AstNode *node) {
 
 			AstNode *name = vd->name_list;
 			for (isize i = 0; i < new_entity_count; i++, name = name->next) {
-				add_entity(c, c->curr_scope, name, new_entities[i]);
+				add_entity(c, c->proc_context.scope, name, new_entities[i]);
 			}
 
 		} break;
@@ -791,7 +794,7 @@ void check_statement(Checker *c, AstNode *node) {
 			     name = name->next, value = value->next) {
 				GB_ASSERT(name->kind == AstNode_Identifier);
 				ExactValue v = {ExactValue_Invalid};
-				Entity *e = make_entity_constant(c->allocator, c->curr_scope, name->identifier.token, NULL, v);
+				Entity *e = make_entity_constant(c->allocator, c->proc_context.scope, name->identifier.token, NULL, v);
 				entities[entity_index++] = e;
 				check_constant_declaration(c, e, vd->type_expression, value);
 			}
@@ -808,7 +811,7 @@ void check_statement(Checker *c, AstNode *node) {
 
 			AstNode *name = vd->name_list;
 			for (isize i = 0; i < entity_count; i++, name = name->next) {
-				add_entity(c, c->curr_scope, name, entities[i]);
+				add_entity(c, c->proc_context.scope, name, entities[i]);
 			}
 		} break;
 
@@ -820,8 +823,8 @@ void check_statement(Checker *c, AstNode *node) {
 
 	case AstNode_ProcedureDeclaration: {
 		auto *pd = &node->procedure_declaration;
-		Entity *e = make_entity_procedure(c->allocator, c->curr_scope, pd->name->identifier.token, NULL);
-		add_entity(c, c->curr_scope, pd->name, e);
+		Entity *e = make_entity_procedure(c->allocator, c->proc_context.scope, pd->name->identifier.token, NULL);
+		add_entity(c, c->proc_context.scope, pd->name, e);
 
 		DeclarationInfo decl = {};
 		init_declaration_info(&decl, e->parent);
@@ -833,8 +836,8 @@ void check_statement(Checker *c, AstNode *node) {
 	case AstNode_TypeDeclaration: {
 		auto *td = &node->type_declaration;
 		AstNode *name = td->name;
-		Entity *e = make_entity_type_name(c->allocator, c->curr_scope, name->identifier.token, NULL);
-		add_entity(c, c->curr_scope, name, e);
+		Entity *e = make_entity_type_name(c->allocator, c->proc_context.scope, name->identifier.token, NULL);
+		add_entity(c, c->proc_context.scope, name, e);
 		check_type_declaration(c, e, td->type_expression, NULL);
 	} break;
 	}

@@ -48,6 +48,7 @@ enum AstNodeKind {
 
 	AstNode_BasicLiteral,
 	AstNode_Identifier,
+	AstNode_ProcedureLiteral,
 
 AstNode__ExpressionBegin,
 	AstNode_BadExpression, // NOTE(bill): Naughty expression
@@ -121,6 +122,11 @@ struct AstNode {
 			Token token;
 			AstEntity *entity;
 		} identifier;
+		struct {
+			AstNode *type; // AstNode_ProcedureType
+			AstNode *body; // AstNode_BlockStatement
+		} procedure_literal;
+
 		struct {
 			Token token;
 			Token name;
@@ -273,6 +279,8 @@ Token ast_node_token(AstNode *node) {
 		return node->basic_literal;
 	case AstNode_Identifier:
 		return node->identifier.token;
+	case AstNode_ProcedureLiteral:
+		return ast_node_token(node->procedure_literal.type);
 	case AstNode_TagExpression:
 		return node->tag_expression.token;
 	case AstNode_BadExpression:
@@ -558,6 +566,13 @@ gb_inline AstNode *make_identifier(AstFile *f, Token token, AstEntity *entity = 
 	return result;
 }
 
+gb_inline AstNode *make_procedure_literal(AstFile *f, AstNode *type, AstNode *body) {
+	AstNode *result = make_node(f, AstNode_ProcedureLiteral);
+	result->procedure_literal.type = type;
+	result->procedure_literal.body = body;
+	return result;
+}
+
 gb_inline AstNode *make_bad_statement(AstFile *f, Token begin, Token end) {
 	AstNode *result = make_node(f, AstNode_BadStatement);
 	result->bad_statement.begin = begin;
@@ -773,9 +788,6 @@ gb_inline b32 allow_token(AstFile *f, TokenKind kind) {
 }
 
 
-
-
-
 gb_internal void add_ast_entity(AstFile *f, AstScope *scope, AstNode *declaration, AstNode *name_list) {
 	for (AstNode *n = name_list; n != NULL; n = n->next) {
 		if (n->kind != AstNode_Identifier) {
@@ -797,7 +809,15 @@ gb_internal void add_ast_entity(AstFile *f, AstScope *scope, AstNode *declaratio
 	}
 }
 
+
+
+
+
 AstNode *parse_expression(AstFile *f, b32 lhs);
+AstNode *parse_procedure_type(AstFile *f, AstScope **scope_);
+AstNode *parse_statement_list(AstFile *f, isize *list_count_);
+AstNode *parse_statement(AstFile *f);
+AstNode *parse_body(AstFile *f, AstScope *scope);
 
 AstNode *parse_identifier(AstFile *f) {
 	Token token = f->cursor[0];
@@ -830,6 +850,8 @@ AstNode *unparen_expression(AstNode *node) {
 	}
 }
 
+
+
 AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 	AstNode *operand = NULL; // Operand
 	switch (f->cursor[0].kind) {
@@ -860,6 +882,18 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 	case Token_Hash: {
 		operand = parse_tag_expression(f, NULL);
 		operand->tag_expression.expression = parse_expression(f, false);
+	} break;
+
+	// Parse Procedure Type or Literal
+	case Token_proc: {
+		AstScope *scope = NULL;
+		AstNode *type = parse_procedure_type(f, &scope);
+		if (f->cursor[0].kind != Token_OpenBrace) {
+			return type;
+		}
+
+		AstNode *body = parse_body(f, scope);
+		return make_procedure_literal(f, type, body);
 	} break;
 	}
 
@@ -1123,9 +1157,7 @@ AstNode *parse_simple_statement(AstFile *f) {
 	return make_expression_statement(f, lhs_expression_list);
 }
 
-AstNode *parse_statement_list(AstFile *f, isize *list_count_);
-AstNode *parse_statement(AstFile *f);
-AstNode *parse_body(AstFile *f, AstScope *scope);
+
 
 AstNode *parse_block_statement(AstFile *f) {
 	if (f->curr_scope == f->file_scope) {
@@ -1796,7 +1828,9 @@ void parse_file(Parser *p, AstFile *f) {
 	}
 
 	for (AstNode *node = f->declarations; node != NULL; node = node->next) {
-		if (!is_ast_node_declaration(node)) {
+		if (!is_ast_node_declaration(node) &&
+		    node->kind != AstNode_BadStatement &&
+		    node->kind != AstNode_EmptyStatement) {
 			// NOTE(bill): Sanity check
 			ast_file_err(f, ast_node_token(node), "Only declarations are allowed at file scope");
 		} else {

@@ -151,6 +151,11 @@ gb_global BuiltinProcedure builtin_procedures[BuiltinProcedure_Count] = {
 	{STR_LIT("println"),          1, true,  Expression_Statement},
 };
 
+struct ProcedureContext {
+	Scope *scope;
+	DeclarationInfo *decl;
+};
+
 
 struct Checker {
 	Parser *               parser;
@@ -169,8 +174,7 @@ struct Checker {
 	gbArena     arena;
 	gbAllocator allocator;
 
-	Scope *            curr_scope;
-	DeclarationInfo *  decl;
+	ProcedureContext   proc_context;
 
 	gbArray(Type *) procedure_stack;
 	b32 in_defer; // TODO(bill): Actually handle correctly
@@ -250,10 +254,10 @@ void add_dependency(DeclarationInfo *d, Entity *e) {
 }
 
 void add_declaration_dependency(Checker *c, Entity *e) {
-	if (c->decl) {
+	if (c->proc_context.decl) {
 		auto found = map_get(&c->entities, hash_pointer(e));
 		if (found) {
-			add_dependency(c->decl, e);
+			add_dependency(c->proc_context.decl, e);
 		}
 	}
 }
@@ -345,7 +349,7 @@ void init_checker(Checker *c, Parser *parser) {
 	c->allocator = gb_arena_allocator(&c->arena);
 
 	c->global_scope = make_scope(universal_scope, c->allocator);
-	c->curr_scope = c->global_scope;
+	c->proc_context.scope = c->global_scope;
 }
 
 void destroy_checker(Checker *c) {
@@ -500,13 +504,13 @@ void add_scope(Checker *c, AstNode *node, Scope *scope) {
 
 
 void check_open_scope(Checker *c, AstNode *statement) {
-	Scope *scope = make_scope(c->curr_scope, c->allocator);
+	Scope *scope = make_scope(c->proc_context.scope, c->allocator);
 	add_scope(c, statement, scope);
-	c->curr_scope = scope;
+	c->proc_context.scope = scope;
 }
 
 void check_close_scope(Checker *c) {
-	c->curr_scope = c->curr_scope->parent;
+	c->proc_context.scope = c->proc_context.scope->parent;
 }
 
 void push_procedure(Checker *c, Type *procedure_type) {
@@ -564,7 +568,7 @@ void check_parsed_files(Checker *c) {
 					     name = name->next, value = value->next) {
 						GB_ASSERT(name->kind == AstNode_Identifier);
 						ExactValue v = {ExactValue_Invalid};
-						Entity *e = make_entity_constant(c->allocator, c->curr_scope, name->identifier.token, NULL, v);
+						Entity *e = make_entity_constant(c->allocator, c->proc_context.scope, name->identifier.token, NULL, v);
 						DeclarationInfo *di = make_declaration_info(c->allocator, c->global_scope);
 						di->type_expr = vd->type_expression;
 						di->init_expr = value;

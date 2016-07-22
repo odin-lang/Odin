@@ -10,6 +10,7 @@ void           check_not_tuple         (Checker *c, Operand *operand);
 void           convert_to_typed        (Checker *c, Operand *operand, Type *target_type);
 gbString       expression_to_string    (AstNode *expression);
 void           check_entity_declaration(Checker *c, Entity *e, Type *named_type);
+void           check_procedure_body(Checker *c, Token token, DeclarationInfo *decl, Type *type, AstNode *body);
 
 
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
@@ -41,7 +42,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 			GB_ASSERT(name->kind == AstNode_Identifier);
 			Token name_token = name->identifier.token;
 			// TODO(bill): is the curr_scope correct?
-			Entity *e = make_entity_field(c->allocator, c->curr_scope, name_token, type);
+			Entity *e = make_entity_field(c->allocator, c->proc_context.scope, name_token, type);
 			u64 key = hash_string(name_token.string);
 			if (map_get(&entity_map, key)) {
 				// TODO(bill): Scope checking already checks the declaration
@@ -122,10 +123,10 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 
 	// gb_printf("%td -> %td\n", param_count, result_count);
 
-	Type *params  = check_get_params(c, c->curr_scope, proc_type_node->procedure_type.param_list,   param_count);
-	Type *results = check_get_results(c, c->curr_scope, proc_type_node->procedure_type.results_list, result_count);
+	Type *params  = check_get_params(c, c->proc_context.scope, proc_type_node->procedure_type.param_list,   param_count);
+	Type *results = check_get_results(c, c->proc_context.scope, proc_type_node->procedure_type.results_list, result_count);
 
-	type->procedure.scope         = c->curr_scope;
+	type->procedure.scope         = c->proc_context.scope;
 	type->procedure.params        = params;
 	type->procedure.params_count  = proc_type_node->procedure_type.param_count;
 	type->procedure.results       = results;
@@ -138,7 +139,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 	o->mode = Addressing_Invalid;
 	o->expression = n;
 	Entity *e = NULL;
-	scope_lookup_parent_entity(c->curr_scope, n->identifier.token.string, NULL, &e);
+	scope_lookup_parent_entity(c->proc_context.scope, n->identifier.token.string, NULL, &e);
 	if (e == NULL) {
 		checker_err(c, n->identifier.token,
 		            "Undeclared type or identifier `%.*s`", LIT(n->identifier.token.string));
@@ -1532,6 +1533,21 @@ ExpressionKind check__expression_base(Checker *c, Operand *o, AstNode *node, Typ
 		o->value = make_exact_value_from_basic_literal(lit);
 	} break;
 
+	case AstNode_ProcedureLiteral: {
+		Scope *origin_curr_scope = c->proc_context.scope;
+		Type *proc_type = check_type(c, node->procedure_literal.type);
+		if (proc_type != NULL) {
+			check_procedure_body(c, empty_token, c->proc_context.decl, proc_type, node->procedure_literal.body);
+			o->mode = Addressing_Value;
+			o->type = proc_type;
+		} else {
+			gbString str = expression_to_string(node);
+			checker_err(c, ast_node_token(node), "Invalid procedure literal `%s`", str);
+			gb_string_free(str);
+			goto error;
+		}
+	} break;
+
 	case AstNode_ParenExpression:
 		kind = check_expression_base(c, o, node->paren_expression.expression, type_hint);
 		o->expression = node;
@@ -1885,6 +1901,10 @@ gbString write_expression_to_string(gbString str, AstNode *node) {
 
 	case AstNode_BasicLiteral:
 		str = string_append_token(str, node->basic_literal);
+		break;
+
+	case AstNode_ProcedureLiteral:
+		str = write_expression_to_string(str, node->procedure_literal.type);
 		break;
 
 	case AstNode_TagExpression:
