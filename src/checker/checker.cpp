@@ -151,11 +151,10 @@ gb_global BuiltinProcedure builtin_procedures[BuiltinProcedure_Count] = {
 	{STR_LIT("println"),          1, true,  Expression_Statement},
 };
 
-struct ProcedureContext {
+struct CheckerContext {
 	Scope *scope;
 	DeclarationInfo *decl;
 };
-
 
 struct Checker {
 	Parser *               parser;
@@ -174,16 +173,13 @@ struct Checker {
 	gbArena     arena;
 	gbAllocator allocator;
 
-	ProcedureContext   proc_context;
+	CheckerContext context;
 
 	gbArray(Type *) procedure_stack;
 	b32 in_defer; // TODO(bill): Actually handle correctly
 
-	isize error_prev_line;
-	isize error_prev_column;
-	isize error_count;
+	ErrorCollector error_collector;
 };
-
 
 gb_global Scope *universal_scope = NULL;
 
@@ -199,9 +195,20 @@ Scope *make_scope(Scope *parent, gbAllocator allocator) {
 }
 
 void destroy_scope(Scope *scope) {
+	isize element_count = gb_array_count(scope->elements.entries);
+	for (isize i = 0; i < element_count; i++) {
+		Entity *e =scope->elements.entries[i].value;
+		if (e->kind == Entity_Variable) {
+			if (!e->variable.used) {
+				warning(e->token, "Unused variable `%.*s`", LIT(e->token.string));
+			}
+		}
+	}
+
 	for (Scope *child = scope->first_child; child != NULL; child = child->next) {
 		destroy_scope(child);
 	}
+
 	map_destroy(&scope->elements);
 	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
 }
@@ -254,10 +261,10 @@ void add_dependency(DeclarationInfo *d, Entity *e) {
 }
 
 void add_declaration_dependency(Checker *c, Entity *e) {
-	if (c->proc_context.decl) {
+	if (c->context.decl) {
 		auto found = map_get(&c->entities, hash_pointer(e));
 		if (found) {
-			add_dependency(c->proc_context.decl, e);
+			add_dependency(c->context.decl, e);
 		}
 	}
 }
@@ -349,7 +356,7 @@ void init_checker(Checker *c, Parser *parser) {
 	c->allocator = gb_arena_allocator(&c->arena);
 
 	c->global_scope = make_scope(universal_scope, c->allocator);
-	c->proc_context.scope = c->global_scope;
+	c->context.scope = c->global_scope;
 }
 
 void destroy_checker(Checker *c) {
@@ -366,32 +373,6 @@ void destroy_checker(Checker *c) {
 	gb_arena_free(&c->arena);
 }
 
-
-
-#define checker_err(p, token, fmt, ...) checker_err_(p, __FUNCTION__, token, fmt, ##__VA_ARGS__)
-void checker_err_(Checker *c, char *function, Token token, char *fmt, ...) {
-
-
-	// NOTE(bill): Duplicate error, skip it
-	if (!(c->error_prev_line == token.line && c->error_prev_column == token.column)) {
-		c->error_prev_line = token.line;
-		c->error_prev_column = token.column;
-
-	#if 0
-		gb_printf_err("%s()\n", function);
-	#endif
-
-		va_list va;
-		va_start(va, fmt);
-		gb_printf_err("%.*s(%td:%td) %s\n",
-		              LIT(c->curr_ast_file->tokenizer.fullpath), token.line, token.column,
-		              gb_bprintf_va(fmt, va));
-		va_end(va);
-
-	}
-	c->error_count++;
-	// NOTE(bill): If there are too many errors, just quit
-}
 
 TypeAndValue *type_and_value_of_expression(Checker *c, AstNode *expression) {
 	TypeAndValue *found = map_get(&c->types, hash_pointer(expression));
@@ -458,7 +439,7 @@ void add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 	if (!are_strings_equal(entity->token.string, make_string("_"))) {
 		Entity *insert_entity = scope_insert_entity(scope, entity);
 		if (insert_entity) {
-			checker_err(c, entity->token, "Redeclared entity in this scope: %.*s", LIT(entity->token.string));
+			error(&c->error_collector, entity->token, "Redeclared entity in this scope: %.*s", LIT(entity->token.string));
 			return;
 		}
 	}
@@ -504,13 +485,13 @@ void add_scope(Checker *c, AstNode *node, Scope *scope) {
 
 
 void check_open_scope(Checker *c, AstNode *statement) {
-	Scope *scope = make_scope(c->proc_context.scope, c->allocator);
+	Scope *scope = make_scope(c->context.scope, c->allocator);
 	add_scope(c, statement, scope);
-	c->proc_context.scope = scope;
+	c->context.scope = scope;
 }
 
 void check_close_scope(Checker *c) {
-	c->proc_context.scope = c->proc_context.scope->parent;
+	c->context.scope = c->context.scope->parent;
 }
 
 void push_procedure(Checker *c, Type *procedure_type) {
@@ -523,8 +504,7 @@ void pop_procedure(Checker *c) {
 
 
 void add_curr_ast_file(Checker *c, AstFile *file) {
-	c->error_prev_line = 0;
-	c->error_prev_column = 0;
+	gb_zero_item(&c->error_collector);
 	c->curr_ast_file = file;
 }
 
@@ -568,7 +548,7 @@ void check_parsed_files(Checker *c) {
 					     name = name->next, value = value->next) {
 						GB_ASSERT(name->kind == AstNode_Identifier);
 						ExactValue v = {ExactValue_Invalid};
-						Entity *e = make_entity_constant(c->allocator, c->proc_context.scope, name->identifier.token, NULL, v);
+						Entity *e = make_entity_constant(c->allocator, c->context.scope, name->identifier.token, NULL, v);
 						DeclarationInfo *di = make_declaration_info(c->allocator, c->global_scope);
 						di->type_expr = vd->type_expression;
 						di->init_expr = value;
@@ -579,9 +559,9 @@ void check_parsed_files(Checker *c) {
 					isize rhs_count = vd->value_list_count;
 
 					if (rhs_count == 0 && vd->type_expression == NULL) {
-						checker_err(c, ast_node_token(decl), "Missing type or initial expression");
+						error(&c->error_collector, ast_node_token(decl), "Missing type or initial expression");
 					} else if (lhs_count < rhs_count) {
-						checker_err(c, ast_node_token(decl), "Extra initial expression");
+						error(&c->error_collector, ast_node_token(decl), "Extra initial expression");
 					}
 				} break;
 
@@ -647,7 +627,7 @@ void check_parsed_files(Checker *c) {
 				break;
 
 			default:
-				checker_err(c, ast_node_token(decl), "Only declarations are allowed at file scope");
+				error(&c->error_collector, ast_node_token(decl), "Only declarations are allowed at file scope");
 				break;
 			}
 		}

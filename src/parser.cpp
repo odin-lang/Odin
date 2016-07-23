@@ -18,8 +18,7 @@ struct AstFile {
 	isize scope_level;
 
 	isize error_count;
-	isize error_prev_line;
-	isize error_prev_column;
+	TokenPos error_prev_pos;
 };
 
 
@@ -49,6 +48,7 @@ enum AstNodeKind {
 	AstNode_BasicLiteral,
 	AstNode_Identifier,
 	AstNode_ProcedureLiteral,
+	AstNode_CompoundLiteral,
 
 AstNode__ExpressionBegin,
 	AstNode_BadExpression, // NOTE(bill): Naughty expression
@@ -126,6 +126,12 @@ struct AstNode {
 			AstNode *type; // AstNode_ProcedureType
 			AstNode *body; // AstNode_BlockStatement
 		} procedure_literal;
+		struct {
+			AstNode *type_expression;
+			AstNode *element_list;
+			isize element_count;
+			Token open, close;
+		} compound_literal;
 
 		struct {
 			Token token;
@@ -281,6 +287,8 @@ Token ast_node_token(AstNode *node) {
 		return node->identifier.token;
 	case AstNode_ProcedureLiteral:
 		return ast_node_token(node->procedure_literal.type);
+	case AstNode_CompoundLiteral:
+		return ast_node_token(node->compound_literal.type_expression);
 	case AstNode_TagExpression:
 		return node->tag_expression.token;
 	case AstNode_BadExpression:
@@ -409,18 +417,17 @@ AstEntity *ast_scope_insert(AstScope *scope, AstEntity entity) {
 #define ast_file_err(f, token, fmt, ...) ast_file_err_(f, __FUNCTION__, token, fmt, ##__VA_ARGS__)
 void ast_file_err_(AstFile *file, char *function, Token token, char *fmt, ...) {
 	// NOTE(bill): Duplicate error, skip it
-	if (file->error_prev_line != token.line || file->error_prev_column != token.column) {
+	if (!token_pos_are_equal(file->error_prev_pos, token.pos)) {
 		va_list va;
 
-		file->error_prev_line = token.line;
-		file->error_prev_column = token.column;
+		file->error_prev_pos = token.pos;
 
 	#if 0
 		gb_printf_err("%s()\n", function);
 	#endif
 		va_start(va, fmt);
 		gb_printf_err("%.*s(%td:%td) Syntax error: %s\n",
-		              LIT(file->tokenizer.fullpath), token.line, token.column,
+		              LIT(token.pos.file), token.pos.line, token.pos.column,
 		              gb_bprintf_va(fmt, va));
 		va_end(va);
 	}
@@ -570,6 +577,18 @@ gb_inline AstNode *make_procedure_literal(AstFile *f, AstNode *type, AstNode *bo
 	AstNode *result = make_node(f, AstNode_ProcedureLiteral);
 	result->procedure_literal.type = type;
 	result->procedure_literal.body = body;
+	return result;
+}
+
+
+gb_inline AstNode *make_compound_literal(AstFile *f, AstNode *type_expression, AstNode *element_list, isize element_count,
+                                         Token open, Token close) {
+	AstNode *result = make_node(f, AstNode_CompoundLiteral);
+	result->compound_literal.type_expression = type_expression;
+	result->compound_literal.element_list = element_list;
+	result->compound_literal.element_count = element_count;
+	result->compound_literal.open = open;
+	result->compound_literal.close = close;
 	return result;
 }
 
@@ -802,9 +821,12 @@ gb_internal void add_ast_entity(AstFile *f, AstScope *scope, AstNode *declaratio
 		if (insert_entity != NULL &&
 		    !are_strings_equal(insert_entity->token.string, make_string("_"))) {
 			ast_file_err(f, entity->token,
-			             "There is already a previous declaration of `%.*s` in the current scope at (%td:%td)",
+			             "There is already a previous declaration of `%.*s` in the current scope at\n"
+			             "\t%.*s(%td:%td)",
 			             LIT(insert_entity->token.string),
-			             insert_entity->token.line, insert_entity->token.column);
+			             LIT(insert_entity->token.pos.file),
+			             insert_entity->token.pos.line,
+			             insert_entity->token.pos.column);
 		}
 	}
 }
@@ -850,9 +872,55 @@ AstNode *unparen_expression(AstNode *node) {
 	}
 }
 
+AstNode *parse_value(AstFile *f);
 
+AstNode *parse_element_list(AstFile *f, isize *element_count_) {
+	AstNode *root = NULL;
+	AstNode *curr = NULL;
+	isize element_count = 0;
 
-AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
+	while (f->cursor[0].kind != Token_CloseBrace &&
+	       f->cursor[0].kind != Token_EOF) {
+		AstNode *elem = parse_value(f);
+	#if 0
+		// TODO(bill): Designated Initializers
+		if (f->cursor[0].kind == Token_Eq) {
+			Token eq = expect_token(f, Token_Eq);
+		}
+	#endif
+		DLIST_APPEND(root, curr, elem);
+		element_count++;
+		if (f->cursor[0].kind != Token_Comma)
+			break;
+		next_token(f);
+	}
+
+	if (element_count_) *element_count_ = element_count;
+	return root;
+}
+
+AstNode *parse_literal_value(AstFile *f, AstNode *type_expression) {
+	AstNode *element_list = NULL;
+	isize element_count = 0;
+	Token open = expect_token(f, Token_OpenBrace);
+	if (f->cursor[0].kind != Token_CloseBrace)
+		element_list = parse_element_list(f, &element_count);
+	Token close = expect_token(f, Token_CloseBrace);
+
+	return make_compound_literal(f, type_expression, element_list, element_count, open, close);
+}
+
+AstNode *parse_value(AstFile *f) {
+	if (f->cursor[0].kind == Token_OpenBrace)
+		return parse_literal_value(f, NULL);
+
+	AstNode *value = parse_expression(f, false);
+	return value;
+}
+
+AstNode *parse_identifier_or_type(AstFile *f);
+
+AstNode *parse_operand(AstFile *f, b32 lhs) {
 	AstNode *operand = NULL; // Operand
 	switch (f->cursor[0].kind) {
 	case Token_Identifier:
@@ -860,7 +928,7 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 		if (!lhs) {
 			// TODO(bill): Handle?
 		}
-		break;
+		return operand;
 
 	case Token_Integer:
 	case Token_Float:
@@ -868,7 +936,7 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 	case Token_Rune:
 		operand = make_basic_literal(f, f->cursor[0]);
 		next_token(f);
-		break;
+		return operand;
 
 	case Token_OpenParen: {
 		Token open, close;
@@ -877,11 +945,13 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 		operand = parse_expression(f, false);
 		close = expect_token(f, Token_CloseParen);
 		operand = make_paren_expression(f, operand, open, close);
+		return operand;
 	} break;
 
 	case Token_Hash: {
 		operand = parse_tag_expression(f, NULL);
 		operand->tag_expression.expression = parse_expression(f, false);
+		return operand;
 	} break;
 
 	// Parse Procedure Type or Literal
@@ -895,8 +965,23 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 		AstNode *body = parse_body(f, scope);
 		return make_procedure_literal(f, type, body);
 	} break;
+
+	default: {
+		AstNode *type = parse_identifier_or_type(f);
+		if (type != NULL) {
+			// NOTE(bill): Sanity check as identifiers should be handled already
+			GB_ASSERT_MSG(type->kind != AstNode_Identifier, "Type Cannot be identifier");
+			return type;
+		}
+	} break;
 	}
 
+	ast_file_err(f, f->cursor[0], "Expected an operand");
+	return make_bad_expression(f, f->cursor[0], f->cursor[0]);
+}
+
+AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
+	AstNode *operand = parse_operand(f, lhs);
 	b32 loop = true;
 
 	while (loop) {
@@ -997,6 +1082,24 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 		case Token_Pointer: // Deference
 			operand = make_dereference_expression(f, operand, expect_token(f, Token_Pointer));
 			break;
+
+		case Token_OpenBrace: {
+			switch (operand->kind) {
+			case AstNode_BadExpression:
+			case AstNode_Identifier:
+			case AstNode_ArrayType:
+			case AstNode_StructType: {
+				if (lhs) {
+					// TODO(bill): Handle this
+				}
+				operand = parse_literal_value(f, operand);
+			} break;
+
+			default:
+				loop = false;
+				break;
+			}
+		} break;
 
 		default:
 			loop = false;
@@ -1203,7 +1306,6 @@ AstNode *parse_identfier_list(AstFile *f, isize *list_count_) {
 }
 
 
-AstNode *parse_identifier_or_type(AstFile *f);
 
 AstNode *parse_type_attempt(AstFile *f) {
 	AstNode *type = parse_identifier_or_type(f);
@@ -1315,13 +1417,22 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		return make_paren_expression(f, type_expression, open, close);
 	}
 
+#if 0
+	// TODO(bill): Why did I add this?
 	case Token_Colon:
 	case Token_Eq:
 		break;
+#endif
+	case Token_Colon:
+		break;
 
+	case Token_Eq:
+		if (f->cursor[-1].kind == Token_Colon)
+			break;
+		// fallthrough
 	default:
 		ast_file_err(f, f->cursor[0],
-		                  "Expected a type after `%.*s`, got `%.*s`", LIT(f->cursor[-1].string), LIT(f->cursor[0].string));
+		             "Expected a type after `%.*s`, got `%.*s`", LIT(f->cursor[-1].string), LIT(f->cursor[0].string));
 		break;
 	}
 

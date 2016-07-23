@@ -1,27 +1,10 @@
-// import "other"
-
-TAU :: 6.28;
-PI :: PI/2;
-
-type AddProc: proc(a, b: int) -> int;
-
-
-do_thing :: proc(p: AddProc) {
-	p(1, 2);
-}
-
-add :: proc(a, b: int) -> int {
-	return a + b;
-}
-
-
 main :: proc() {
-	x : int = 2;
-	x = x * 3;
-
-	// do_thing(add(1, x));
-	do_thing(proc(a, b: int) -> f32 {
-		return a*b - a%b;
-	});
-
+	type Vec2: struct { x, y: f32; }
+	v := Vec2{1, 1};
+	a := [2]int{1, 2}; // Array 2 of int
+	s := []int{1, 2};  // Slice of int
+	_, _ = a, s;
+	// Equivalent to
+	// sa := [2]int{1, 2}; s := sa[:];
+	v.x = 1;
 }

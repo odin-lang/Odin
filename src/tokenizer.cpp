@@ -209,16 +209,62 @@ char const *TOKEN_STRINGS[] = {
 };
 
 
-// NOTE(bill): Text is UTF-8, thus why u8 and not char
-typedef struct Token Token;
-struct Token {
-	TokenKind kind;
-	String string;
+struct TokenPos {
+	String file;
 	isize line, column;
 };
 
+b32 token_pos_are_equal(TokenPos a, TokenPos b) {
+	if (a.line == b.line) {
+		if (a.column == b.column) {
+			return are_strings_equal(a.file, b.file);
+		}
+	}
+	return false;
+
+}
+
+// NOTE(bill): Text is UTF-8, thus why u8 and not char
+struct Token {
+	TokenKind kind;
+	String string;
+	TokenPos pos;
+};
 
 Token empty_token = {Token_Invalid};
+
+
+struct ErrorCollector {
+	TokenPos prev;
+	isize count;
+};
+
+void error(ErrorCollector *ec, Token token, char *fmt, ...) {
+	// NOTE(bill): Duplicate error, skip it
+	if (!token_pos_are_equal(ec->prev, token.pos)) {
+		ec->prev = token.pos;
+
+		va_list va;
+		va_start(va, fmt);
+		gb_printf_err("%.*s(%td:%td) Error: %s\n",
+		              LIT(token.pos.file), token.pos.line, token.pos.column,
+		              gb_bprintf_va(fmt, va));
+		va_end(va);
+
+	}
+	ec->count++;
+}
+
+void warning(Token token, char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	gb_printf_err("%.*s(%td:%td) Warning: %s\n",
+	              LIT(token.pos.file), token.pos.line, token.pos.column,
+	              gb_bprintf_va(fmt, va));
+	va_end(va);
+}
+
+
 
 
 
@@ -432,8 +478,9 @@ Token scan_number_to_token(Tokenizer *t, b32 seen_decimal_point) {
 	u8 *start_curr = t->curr;
 	token.kind = Token_Integer;
 	token.string = make_string(start_curr, 1);
-	token.line = t->line_count;
-	token.column = t->curr-t->line+1;
+	token.pos.file = t->fullpath;
+	token.pos.line = t->line_count;
+	token.pos.column = t->curr-t->line+1;
 
 	if (seen_decimal_point) {
 		start_curr--;
@@ -595,8 +642,9 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 	tokenizer_skip_whitespace(t);
 	token.string = make_string(t->curr, 1);
-	token.line = t->line_count;
-	token.column = t->curr - t->line + 1;
+	token.pos.file = t->fullpath;
+	token.pos.line = t->line_count;
+	token.pos.column = t->curr - t->line + 1;
 
 	curr_rune = t->curr_rune;
 	if (rune_is_letter(curr_rune)) {

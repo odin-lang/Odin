@@ -9,29 +9,23 @@ void check_statement_list(Checker *c, AstNode *node) {
 
 
 // NOTE(bill): The last expression has to be a `return` statement
-// TODO(bill): This is a mild hack and should be probably handled
+// TODO(bill): This is a mild hack and should be probably handled properly
 // TODO(bill): Warn/err against code after `return` that it won't be executed
-b32 check_is_terminating(Checker *c, AstNode *node);
-
-b32 check_is_terminating_list(Checker *c, AstNode *node_list) {
-	AstNode *end_of_list = node_list;
-	for (; end_of_list != NULL; end_of_list = end_of_list->next) {
-		if (end_of_list->next == NULL)
-			break;
-	}
-
-	for (AstNode *node = end_of_list; node != NULL; node = node->prev) {
-		if (node->kind == AstNode_EmptyStatement)
-			continue;
-		return check_is_terminating(c, node);
-	}
-	return false;
-}
-
 b32 check_is_terminating(Checker *c, AstNode *node) {
 	switch (node->kind) {
-	case AstNode_BlockStatement:
-		return check_is_terminating_list(c, node->block_statement.list);
+	case AstNode_BlockStatement: {
+		for (; node != NULL; node = node->next) {
+			if (node->next == NULL)
+				break;
+		}
+
+		for (AstNode *n = node; node != NULL; n = n->prev) {
+			if (n->kind == AstNode_EmptyStatement)
+				continue;
+			return check_is_terminating(c, n);
+		}
+		return false;
+	}
 
 	case AstNode_ExpressionStatement:
 		return check_is_terminating(c, node->expression_statement.expression);
@@ -138,12 +132,12 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 
 
 			// TODO(bill): is this a good enough error message?
-			checker_err(c, ast_node_token(operand->expression),
-			            "Cannot assign value `%s` of type `%s` to `%s` in %.*s",
-			            expr_str,
-			            op_type_string,
-			            type_string,
-			            LIT(context_name));
+			error(&c->error_collector, ast_node_token(operand->expression),
+			      "Cannot assign value `%s` of type `%s` to `%s` in %.*s",
+			      expr_str,
+			      op_type_string,
+			      type_string,
+			      LIT(context_name));
 
 			operand->mode = Addressing_Invalid;
 		}
@@ -151,7 +145,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 }
 
 
-Type *check_assign_variable(Checker *c, Operand *op_a, AstNode *lhs) {
+Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	if (op_a->mode == Addressing_Invalid ||
 	    op_a->type == &basic_types[Basic_Invalid]) {
 		return NULL;
@@ -172,8 +166,7 @@ Type *check_assign_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	Entity *e = NULL;
 	b32 used = false;
 	if (node->kind == AstNode_Identifier) {
-		scope_lookup_parent_entity(c->proc_context.scope, node->identifier.token.string,
-		                           NULL, &e);
+		e = scope_lookup_entity(c->context.scope, node->identifier.token.string);
 		if (e != NULL && e->kind == Entity_Variable) {
 			used = e->variable.used; // TODO(bill): Make backup just in case
 		}
@@ -203,7 +196,7 @@ Type *check_assign_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 
 		gbString str = expression_to_string(op_b.expression);
 		defer (gb_string_free(str));
-		checker_err(c, ast_node_token(op_b.expression), "Cannot assign to `%s`", str);
+		error(&c->error_collector, ast_node_token(op_b.expression), "Cannot assign to `%s`", str);
 	} break;
 	}
 
@@ -212,33 +205,6 @@ Type *check_assign_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 		return NULL;
 
 	return op_a->type;
-}
-
-// TODO(bill): Do I need to pass the *_count?
-void check_assign_variables(Checker *c,
-                            AstNode *lhs_list, isize lhs_count,
-                            AstNode *rhs_list, isize rhs_count) {
-	Operand operand = {Addressing_Invalid};
-	AstNode *lhs = lhs_list, *rhs = rhs_list;
-	for (;
-	     lhs != NULL && rhs != NULL;
-	     lhs = lhs->next, rhs = rhs->next) {
-		check_multi_expression(c, &operand, rhs);
-		if (operand.type->kind != Type_Tuple) {
-			check_assign_variable(c, &operand, lhs);
-		} else {
-			auto *tuple = &operand.type->tuple;
-			for (isize i = 0;
-			     i < tuple->variable_count && lhs != NULL;
-			     i++, lhs = lhs->next) {
-				// TODO(bill): More error checking
-				operand.type = tuple->variables[i]->type;
-				check_assign_variable(c, &operand, lhs);
-			}
-			if (lhs == NULL)
-				break;
-		}
-	}
 }
 
 // NOTE(bill): `content_name` is for debugging
@@ -256,7 +222,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 		Type *t = operand->type;
 		if (is_type_untyped(t)) {
 			if (t == &basic_types[Basic_Invalid]) {
-				checker_err(c, e->token, "Use of untyped thing in %.*s", LIT(context_name));
+				error(&c->error_collector, e->token, "Use of untyped thing in %.*s", LIT(context_name));
 				e->type = &basic_types[Basic_Invalid];
 				return NULL;
 			}
@@ -299,9 +265,9 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNode *in
 
 	if (i < lhs_count && i < init_count) {
 		if (lhs[i]->type == NULL)
-			checker_err(c, lhs[i]->token, "Too few values on the right hand side of the declaration");
+			error(&c->error_collector, lhs[i]->token, "Too few values on the right hand side of the declaration");
 	} else if (rhs != NULL) {
-		checker_err(c, ast_node_token(rhs), "Too many values on the right hand side of the declaration");
+		error(&c->error_collector, ast_node_token(rhs), "Too many values on the right hand side of the declaration");
 	}
 }
 
@@ -316,8 +282,8 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 
 	if (operand->mode != Addressing_Constant) {
 		// TODO(bill): better error
-		checker_err(c, ast_node_token(operand->expression),
-		            "`%.*s` is not a constant", LIT(ast_node_token(operand->expression).string));
+		error(&c->error_collector, ast_node_token(operand->expression),
+		      "`%.*s` is not a constant", LIT(ast_node_token(operand->expression).string));
 		if (e->type == NULL)
 			e->type = &basic_types[Basic_Invalid];
 		return;
@@ -352,8 +318,8 @@ void check_constant_declaration(Checker *c, Entity *e, AstNode *type_expr, AstNo
 		if (!is_type_constant_type(t)) {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
-			checker_err(c, ast_node_token(type_expr),
-			            "Invalid constant type `%s`", str);
+			error(&c->error_collector, ast_node_token(type_expr),
+			      "Invalid constant type `%s`", str);
 			e->type = &basic_types[Basic_Invalid];
 			return;
 		}
@@ -382,20 +348,20 @@ void check_type_declaration(Checker *c, Entity *e, AstNode *type_expr, Type *nam
 void check_procedure_body(Checker *c, Token token, DeclarationInfo *decl, Type *type, AstNode *body) {
 	GB_ASSERT(body->kind == AstNode_BlockStatement);
 
-	ProcedureContext old_proc_context = c->proc_context;
-	c->proc_context.scope = decl->scope;
-	c->proc_context.decl = decl;
+	CheckerContext old_context = c->context;
+	c->context.scope = decl->scope;
+	c->context.decl = decl;
 
 	push_procedure(c, type);
 	check_statement_list(c, body->block_statement.list);
 	if (type->procedure.results_count > 0) {
 		if (!check_is_terminating(c, body)) {
-			checker_err(c, body->block_statement.close, "Missing return statement at the end of the procedure");
+			error(&c->error_collector, body->block_statement.close, "Missing return statement at the end of the procedure");
 		}
 	}
 	pop_procedure(c);
 
-	c->proc_context = old_proc_context;
+	c->context = old_context;
 }
 
 void check_procedure_declaration(Checker *c, Entity *e, DeclarationInfo *d, b32 check_body_later) {
@@ -406,8 +372,8 @@ void check_procedure_declaration(Checker *c, Entity *e, DeclarationInfo *d, b32 
 	auto *pd = &d->proc_decl->procedure_declaration;
 
 #if 1
-	Scope *original_curr_scope = c->proc_context.scope;
-	c->proc_context.scope = c->global_scope;
+	Scope *original_curr_scope = c->context.scope;
+	c->context.scope = c->global_scope;
 	check_open_scope(c, pd->procedure_type);
 #endif
 	check_procedure_type(c, proc_type, pd->procedure_type);
@@ -425,23 +391,23 @@ void check_procedure_declaration(Checker *c, Entity *e, DeclarationInfo *d, b32 
 		} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
 			is_no_inline = true;
 		} else {
-			checker_err(c, ast_node_token(tag), "Unknown procedure tag");
+			error(&c->error_collector, ast_node_token(tag), "Unknown procedure tag");
 		}
 		// TODO(bill): Other tags
 	}
 
 	if (is_inline && is_no_inline) {
-		checker_err(c, ast_node_token(pd->tag_list),
-		            "You cannot apply both `inline` and `no_inline` to a procedure");
+		error(&c->error_collector, ast_node_token(pd->tag_list),
+		      "You cannot apply both `inline` and `no_inline` to a procedure");
 	}
 
 	if (pd->body != NULL) {
 		if (is_foreign) {
-			checker_err(c, ast_node_token(pd->body),
-			            "A procedure tagged as `#foreign` cannot have a body");
+			error(&c->error_collector, ast_node_token(pd->body),
+			      "A procedure tagged as `#foreign` cannot have a body");
 		}
 
-		d->scope = c->proc_context.scope;
+		d->scope = c->context.scope;
 
 		GB_ASSERT(pd->body->kind == AstNode_BlockStatement);
 		if (check_body_later) {
@@ -453,7 +419,7 @@ void check_procedure_declaration(Checker *c, Entity *e, DeclarationInfo *d, b32 
 
 #if 1
 	check_close_scope(c);
-	c->proc_context.scope = original_curr_scope;
+	c->context.scope = original_curr_scope;
 #endif
 
 }
@@ -506,11 +472,11 @@ void check_entity_declaration(Checker *c, Entity *e, Type *named_type) {
 
 	switch (e->kind) {
 	case Entity_Constant:
-		c->proc_context.decl = d;
+		c->context.decl = d;
 		check_constant_declaration(c, e, d->type_expr, d->init_expr);
 		break;
 	case Entity_Variable:
-		c->proc_context.decl = d;
+		c->context.decl = d;
 		check_variable_declaration(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr);
 		break;
 	case Entity_TypeName:
@@ -537,19 +503,19 @@ void check_statement(Checker *c, AstNode *node) {
 		ExpressionKind kind = check_expression_base(c, &operand, node->expression_statement.expression);
 		switch (operand.mode) {
 		case Addressing_Type:
-			checker_err(c, ast_node_token(node), "Is not an expression");
+			error(&c->error_collector, ast_node_token(node), "Is not an expression");
 			break;
 		default:
 			if (kind == Expression_Statement)
 				return;
-			checker_err(c, ast_node_token(node), "Expression is not used");
+			error(&c->error_collector, ast_node_token(node), "Expression is not used");
 			break;
 		}
 	} break;
 
 	case AstNode_TagStatement:
 		// TODO(bill): Tag Statements
-		checker_err(c, ast_node_token(node), "Tag statements are not supported yet");
+		error(&c->error_collector, ast_node_token(node), "Tag statements are not supported yet");
 		check_statement(c, node->tag_statement.statement);
 		break;
 
@@ -567,7 +533,7 @@ void check_statement(Checker *c, AstNode *node) {
 			op.string.len = 1;
 			break;
 		default:
-			checker_err(c, s->op, "Unknown inc/dec operation %.*s", LIT(s->op.string));
+			error(&c->error_collector, s->op, "Unknown inc/dec operation %.*s", LIT(s->op.string));
 			return;
 		}
 
@@ -576,7 +542,7 @@ void check_statement(Checker *c, AstNode *node) {
 		if (operand.mode == Addressing_Invalid)
 			return;
 		if (!is_type_numeric(operand.type)) {
-			checker_err(c, s->op, "Non numeric type");
+			error(&c->error_collector, s->op, "Non numeric type");
 			return;
 		}
 
@@ -594,25 +560,56 @@ void check_statement(Checker *c, AstNode *node) {
 
 	case AstNode_AssignStatement:
 		switch (node->assign_statement.op.kind) {
-		case Token_Eq:
+		case Token_Eq: {
+			// a, b, c = 1, 2, 3;  // Multisided
 			if (node->assign_statement.lhs_count == 0) {
-				checker_err(c, node->assign_statement.op, "Missing lhs in assignment statement");
+				error(&c->error_collector, node->assign_statement.op, "Missing lhs in assignment statement");
 				return;
 			}
-			check_assign_variables(c,
-			                       node->assign_statement.lhs_list, node->assign_statement.lhs_count,
-			                       node->assign_statement.rhs_list, node->assign_statement.rhs_count);
-			break;
+
+			Operand operand = {};
+			AstNode *lhs = node->assign_statement.lhs_list;
+			AstNode *rhs = node->assign_statement.rhs_list;
+			isize i = 0;
+			for (;
+			     lhs != NULL && rhs != NULL;
+			     lhs = lhs->next, rhs = rhs->next) {
+				check_multi_expression(c, &operand, rhs);
+				if (operand.type->kind != Type_Tuple) {
+					check_assignment_variable(c, &operand, lhs);
+					i++;
+				} else {
+					auto *tuple = &operand.type->tuple;
+					for (isize j = 0;
+					     j < tuple->variable_count && lhs != NULL;
+					     j++, i++, lhs = lhs->next) {
+						// TODO(bill): More error checking
+						operand.type = tuple->variables[j]->type;
+						check_assignment_variable(c, &operand, lhs);
+					}
+					if (lhs == NULL)
+						break;
+				}
+			}
+
+			if (i < node->assign_statement.lhs_count && i < node->assign_statement.rhs_count) {
+				if (lhs == NULL)
+					error(&c->error_collector, ast_node_token(lhs), "Too few values on the right hand side of the declaration");
+			} else if (rhs != NULL) {
+				error(&c->error_collector, ast_node_token(rhs), "Too many values on the right hand side of the declaration");
+			}
+		} break;
 
 		default: {
+			// a += 1; // Single-sided
 			Token op = node->assign_statement.op;
 			if (node->assign_statement.lhs_count != 1 ||
 			    node->assign_statement.rhs_count != 1) {
-				checker_err(c, op, "Assignment operation `%.*s` requires single-valued expressions", LIT(op.string));
+				error(&c->error_collector, op, "Assignment operation `%.*s` requires single-valued expressions", LIT(op.string));
 				return;
 			}
 			if (!gb_is_between(op.kind, Token_AddEq, Token_ModEq)) {
-				checker_err(c, op, "Unknown Assignment operation `%.*s`", LIT(op.string));
+				error(&c->error_collector, op, "Unknown Assignment operation `%.*s`", LIT(op.string));
 				return;
 			}
 			// TODO(bill): Check if valid assignment operator
@@ -627,7 +624,7 @@ void check_statement(Checker *c, AstNode *node) {
 			if (operand.mode == Addressing_Invalid)
 				return;
 			// NOTE(bill): Only use the first one will be used
-			check_assign_variable(c, &operand, node->assign_statement.lhs_list);
+			check_assignment_variable(c, &operand, node->assign_statement.lhs_list);
 		} break;
 		}
 		break;
@@ -643,7 +640,7 @@ void check_statement(Checker *c, AstNode *node) {
 		check_expression(c, &operand, node->if_statement.cond);
 		if (operand.mode != Addressing_Invalid &&
 		    !is_type_boolean(operand.type)) {
-			checker_err(c, ast_node_token(node->if_statement.cond),
+			error(&c->error_collector, ast_node_token(node->if_statement.cond),
 			            "Non-boolean condition in `if` statement");
 		}
 		check_statement(c, node->if_statement.body);
@@ -655,7 +652,7 @@ void check_statement(Checker *c, AstNode *node) {
 				check_statement(c, node->if_statement.else_statement);
 				break;
 			default:
-				checker_err(c, ast_node_token(node->if_statement.else_statement),
+				error(&c->error_collector, ast_node_token(node->if_statement.else_statement),
 				            "Invalid `else` statement in `if` statement");
 				break;
 			}
@@ -667,7 +664,7 @@ void check_statement(Checker *c, AstNode *node) {
 		GB_ASSERT(gb_array_count(c->procedure_stack) > 0);
 
 		if (c->in_defer) {
-			checker_err(c, rs->token, "You cannot `return` within a defer statement");
+			error(&c->error_collector, rs->token, "You cannot `return` within a defer statement");
 			// TODO(bill): Should I break here?
 			break;
 		}
@@ -677,7 +674,7 @@ void check_statement(Checker *c, AstNode *node) {
 		if (proc_type->procedure.results)
 			result_count = proc_type->procedure.results->tuple.variable_count;
 		if (result_count != rs->result_count) {
-			checker_err(c, rs->token, "Expected %td return %s, got %td",
+			error(&c->error_collector, rs->token, "Expected %td return %s, got %td",
 			            result_count,
 			            (result_count != 1 ? "values" : "value"),
 			            rs->result_count);
@@ -698,8 +695,8 @@ void check_statement(Checker *c, AstNode *node) {
 			check_expression(c, &operand, node->for_statement.cond);
 			if (operand.mode != Addressing_Invalid &&
 			    !is_type_boolean(operand.type)) {
-				checker_err(c, ast_node_token(node->for_statement.cond),
-				            "Non-boolean condition in `for` statement");
+				error(&c->error_collector, ast_node_token(node->for_statement.cond),
+				      "Non-boolean condition in `for` statement");
 			}
 		}
 		check_statement(c, node->for_statement.end);
@@ -709,7 +706,7 @@ void check_statement(Checker *c, AstNode *node) {
 	case AstNode_DeferStatement: {
 		auto *ds = &node->defer_statement;
 		if (is_ast_node_declaration(ds->statement)) {
-			checker_err(c, ds->token, "You cannot defer a declaration");
+			error(&c->error_collector, ds->token, "You cannot defer a declaration");
 		} else {
 			b32 out_in_defer = c->in_defer;
 			c->in_defer = true;
@@ -739,10 +736,10 @@ void check_statement(Checker *c, AstNode *node) {
 					// NOTE(bill): Ignore assignments to `_`
 					b32 can_be_ignored = are_strings_equal(str, make_string("_"));
 					if (!can_be_ignored) {
-						found = current_scope_lookup_entity(c->proc_context.scope, str);
+						found = current_scope_lookup_entity(c->context.scope, str);
 					}
 					if (found == NULL) {
-						entity = make_entity_variable(c->allocator, c->proc_context.scope, token, NULL);
+						entity = make_entity_variable(c->allocator, c->context.scope, token, NULL);
 						if (!can_be_ignored) {
 							new_entities[new_entity_count++] = entity;
 						}
@@ -751,7 +748,7 @@ void check_statement(Checker *c, AstNode *node) {
 						entity = found;
 					}
 				} else {
-					checker_err(c, token, "A variable declaration must be an identifier");
+					error(&c->error_collector, token, "A variable declaration must be an identifier");
 				}
 				if (entity == NULL)
 					entity = make_entity_dummy_variable(c->allocator, c->global_scope, token);
@@ -783,7 +780,7 @@ void check_statement(Checker *c, AstNode *node) {
 
 			AstNode *name = vd->name_list;
 			for (isize i = 0; i < new_entity_count; i++, name = name->next) {
-				add_entity(c, c->proc_context.scope, name, new_entities[i]);
+				add_entity(c, c->context.scope, name, new_entities[i]);
 			}
 
 		} break;
@@ -794,7 +791,7 @@ void check_statement(Checker *c, AstNode *node) {
 			     name = name->next, value = value->next) {
 				GB_ASSERT(name->kind == AstNode_Identifier);
 				ExactValue v = {ExactValue_Invalid};
-				Entity *e = make_entity_constant(c->allocator, c->proc_context.scope, name->identifier.token, NULL, v);
+				Entity *e = make_entity_constant(c->allocator, c->context.scope, name->identifier.token, NULL, v);
 				entities[entity_index++] = e;
 				check_constant_declaration(c, e, vd->type_expression, value);
 			}
@@ -804,27 +801,27 @@ void check_statement(Checker *c, AstNode *node) {
 
 			// TODO(bill): Better error messages or is this good enough?
 			if (rhs_count == 0 && vd->type_expression == NULL) {
-				checker_err(c, ast_node_token(node), "Missing type or initial expression");
+				error(&c->error_collector, ast_node_token(node), "Missing type or initial expression");
 			} else if (lhs_count < rhs_count) {
-				checker_err(c, ast_node_token(node), "Extra initial expression");
+				error(&c->error_collector, ast_node_token(node), "Extra initial expression");
 			}
 
 			AstNode *name = vd->name_list;
 			for (isize i = 0; i < entity_count; i++, name = name->next) {
-				add_entity(c, c->proc_context.scope, name, entities[i]);
+				add_entity(c, c->context.scope, name, entities[i]);
 			}
 		} break;
 
 		default:
-			checker_err(c, ast_node_token(node), "Unknown variable declaration kind. Probably an invalid AST.");
+			error(&c->error_collector, ast_node_token(node), "Unknown variable declaration kind. Probably an invalid AST.");
 			return;
 		}
 	} break;
 
 	case AstNode_ProcedureDeclaration: {
 		auto *pd = &node->procedure_declaration;
-		Entity *e = make_entity_procedure(c->allocator, c->proc_context.scope, pd->name->identifier.token, NULL);
-		add_entity(c, c->proc_context.scope, pd->name, e);
+		Entity *e = make_entity_procedure(c->allocator, c->context.scope, pd->name->identifier.token, NULL);
+		add_entity(c, c->context.scope, pd->name, e);
 
 		DeclarationInfo decl = {};
 		init_declaration_info(&decl, e->parent);
@@ -836,8 +833,8 @@ void check_statement(Checker *c, AstNode *node) {
 	case AstNode_TypeDeclaration: {
 		auto *td = &node->type_declaration;
 		AstNode *name = td->name;
-		Entity *e = make_entity_type_name(c->allocator, c->proc_context.scope, name->identifier.token, NULL);
-		add_entity(c, c->proc_context.scope, name, e);
+		Entity *e = make_entity_type_name(c->allocator, c->context.scope, name->identifier.token, NULL);
+		add_entity(c, c->context.scope, name, e);
 		check_type_declaration(c, e, td->type_expression, NULL);
 	} break;
 	}

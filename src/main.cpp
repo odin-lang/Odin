@@ -24,11 +24,14 @@ int main(int argc, char **argv) {
 
 			parse_files(&parser, init_filename);
 
+			// print_ast(parser.files[0].declarations, 0);
+
 			Checker checker = {};
 			init_checker(&checker, &parser);
 			defer (destroy_checker(&checker));
 
 			check_parsed_files(&checker);
+
 #if 0
 			Codegen codegen = {};
 			if (init_codegen(&codegen, &checker)) {

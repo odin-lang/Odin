@@ -18,6 +18,20 @@ void print_ast(AstNode *node, isize indent) {
 		print_indent(indent);
 		print_token(node->identifier.token);
 		break;
+	case AstNode_ProcedureLiteral:
+		print_indent(indent);
+		gb_printf("(proc lit)\n");
+		print_ast(node->procedure_literal.type, indent+1);
+		print_ast(node->procedure_literal.body, indent+1);
+		break;
+
+	case AstNode_CompoundLiteral:
+		print_indent(indent);
+		gb_printf("(compound lit)\n");
+		print_ast(node->compound_literal.type_expression, indent+1);
+		print_ast(node->compound_literal.element_list, indent+1);
+		break;
+
 
 	case AstNode_TagExpression:
 		print_indent(indent);
