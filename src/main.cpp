@@ -5,7 +5,6 @@
 #include "checker/checker.cpp"
 // #include "codegen/codegen.cpp"
 
-
 int main(int argc, char **argv) {
 	if (argc < 2) {
 		gb_printf_err("Please specify a .odin file\n");
@@ -22,24 +21,23 @@ int main(int argc, char **argv) {
 		if (init_parser(&parser)) {
 			defer (destroy_parser(&parser));
 
-			parse_files(&parser, init_filename);
+			if (parse_files(&parser, init_filename) == ParseFile_None) {
+				// print_ast(parser.files[0].declarations, 0);
 
-			// print_ast(parser.files[0].declarations, 0);
+				Checker checker = {};
+				init_checker(&checker, &parser);
+				defer (destroy_checker(&checker));
 
-			Checker checker = {};
-			init_checker(&checker, &parser);
-			defer (destroy_checker(&checker));
-
-			check_parsed_files(&checker);
-
+				check_parsed_files(&checker);
 #if 0
-			Codegen codegen = {};
-			if (init_codegen(&codegen, &checker)) {
-				defer (destroy_codegen(&codegen));
+				Codegen codegen = {};
+				if (init_codegen(&codegen, &checker)) {
+					defer (destroy_codegen(&codegen));
 
-				generate_code(&codegen, file_node);
-			}
+					generate_code(&codegen, file_node);
+				}
 #endif
+			}
 		}
 	}
 

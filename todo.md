@@ -8,7 +8,8 @@
 
 ## Parser
 * Extra checking here rather than in the checker
-* Mulitple files
+* Mulitple files (done)
+	- Namespaces
 
 ## Checker
 * Cyclic Type Checking
@@ -18,10 +19,10 @@
 	- integer
 	- rational
 	- real
-* Multiple files
+* Multiple files (done)
+	- Namespaces
 
 ## Codegen
-* Begin!!!
 * Emit LLVM-IR using custom library
 * Debug info
 
@@ -29,3 +30,9 @@
 * Begin!!!
 * Choose/determine architecture
 
+
+
+
+## Language
+
+* should `if/for` statements init statement be of the same scope as the block scope or not? (currently not)

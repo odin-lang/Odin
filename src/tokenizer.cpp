@@ -214,14 +214,20 @@ struct TokenPos {
 	isize line, column;
 };
 
-b32 token_pos_are_equal(TokenPos a, TokenPos b) {
+i32 token_pos_cmp(TokenPos a, TokenPos b) {
 	if (a.line == b.line) {
 		if (a.column == b.column) {
-			return are_strings_equal(a.file, b.file);
+			isize min_len = gb_min(a.file.len, b.file.len);
+			return gb_memcompare(a.file.text, b.file.text, min_len);
 		}
+		return (a.column < b.column) ? -1 : +1;
 	}
-	return false;
 
+	return (a.line < b.line) ? -1 : +1;
+}
+
+b32 token_pos_are_equal(TokenPos a, TokenPos b) {
+	return token_pos_cmp(a, b) == 0;
 }
 
 // NOTE(bill): Text is UTF-8, thus why u8 and not char
@@ -318,7 +324,19 @@ gb_inline b32 token_is_comparison(Token t) {
 
 gb_inline void print_token(Token t) { gb_printf("%.*s\n", LIT(t.string)); }
 
-typedef struct Tokenizer Tokenizer;
+
+enum TokenizerInitError {
+	TokenizerInit_None,
+
+	TokenizerInit_Invalid,
+	TokenizerInit_NotExists,
+	TokenizerInit_Permission,
+	TokenizerInit_Empty,
+
+	TokenizerInit_Count,
+};
+
+
 struct Tokenizer {
 	String fullpath;
 	u8 *start;
@@ -387,7 +405,7 @@ void advance_to_next_rune(Tokenizer *t) {
 	}
 }
 
-b32 init_tokenizer(Tokenizer *t, String fullpath) {
+TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 	char *c_str = gb_alloc_array(gb_heap_allocator(), char, fullpath.len+1);
 	memcpy(c_str, fullpath.text, fullpath.len);
 	c_str[fullpath.len] = '\0';
@@ -395,7 +413,7 @@ b32 init_tokenizer(Tokenizer *t, String fullpath) {
 
 	gbFileContents fc = gb_file_read_contents(gb_heap_allocator(), true, c_str);
 	gb_zero_item(t);
-	if (fc.data) {
+	if (fc.data != NULL) {
 		t->start = cast(u8 *)fc.data;
 		t->line = t->read_curr = t->curr = t->start;
 		t->end = t->start + fc.size;
@@ -407,13 +425,30 @@ b32 init_tokenizer(Tokenizer *t, String fullpath) {
 		advance_to_next_rune(t);
 		if (t->curr_rune == GB_RUNE_BOM)
 			advance_to_next_rune(t); // Ignore BOM at file beginning
-		return true;
+		return TokenizerInit_None;
 	}
-	return false;
+
+	gbFile f = {};
+	gbFileError err = gb_file_open(&f, c_str);
+	defer (gb_file_close(&f));
+
+	switch (err) {
+	case gbFileError_Invalid:
+		return TokenizerInit_Invalid;
+	case gbFileError_NotExists:
+		return TokenizerInit_NotExists;
+	case gbFileError_Permission:
+		return TokenizerInit_Permission;
+	}
+
+	if (gb_file_size(&f) == 0)
+		return TokenizerInit_Empty;
+	return TokenizerInit_None;
 }
 
 gb_inline void destroy_tokenizer(Tokenizer *t) {
-	gb_free(gb_heap_allocator(), t->start);
+	if (t->start != NULL)
+		gb_free(gb_heap_allocator(), t->start);
 }
 
 void tokenizer_skip_whitespace(Tokenizer *t) {

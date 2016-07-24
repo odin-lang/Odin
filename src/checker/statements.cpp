@@ -1,43 +1,59 @@
 // Statements and Declarations
 
-void check_statement(Checker *c, AstNode *node);
+enum StatementFlag : u32 {
+	Statement_BreakAllowed       = GB_BIT(0),
+	Statement_ContinueAllowed    = GB_BIT(1),
+	// Statement_FallthroughAllowed = GB_BIT(2), // TODO(bill): fallthrough
+};
 
-void check_statement_list(Checker *c, AstNode *node) {
-	for (; node != NULL; node = node->next)
-		check_statement(c, node);
+void check_statement(Checker *c, AstNode *node, u32 flags);
+
+void check_statement_list(Checker *c, AstNode *node, u32 flags) {
+	for (; node != NULL; node = node->next) {
+		if (node->kind != AstNode_EmptyStatement) {
+			check_statement(c, node, flags);
+		}
+	}
 }
 
+b32 check_is_terminating(Checker *c, AstNode *node);
+
+b32 check_is_terminating_list(Checker *c, AstNode *list) {
+	// Get to end of list
+	for (; list != NULL; list = list->next) {
+		if (list->next == NULL)
+			break;
+	}
+
+	// Iterate backwards
+	for (AstNode *n = list; n != NULL; n = n->prev) {
+		if (n->kind != AstNode_EmptyStatement)
+			return check_is_terminating(c, n);
+	}
+
+	return false;
+}
 
 // NOTE(bill): The last expression has to be a `return` statement
 // TODO(bill): This is a mild hack and should be probably handled properly
 // TODO(bill): Warn/err against code after `return` that it won't be executed
 b32 check_is_terminating(Checker *c, AstNode *node) {
 	switch (node->kind) {
-	case AstNode_BlockStatement: {
-		for (; node != NULL; node = node->next) {
-			if (node->next == NULL)
-				break;
-		}
+	case AstNode_ReturnStatement:
+		return true;
 
-		for (AstNode *n = node; node != NULL; n = n->prev) {
-			if (n->kind == AstNode_EmptyStatement)
-				continue;
-			return check_is_terminating(c, n);
-		}
-		return false;
-	}
+	case AstNode_BlockStatement:
+		return check_is_terminating_list(c, node->block_statement.list);
 
 	case AstNode_ExpressionStatement:
 		return check_is_terminating(c, node->expression_statement.expression);
 
-	case AstNode_ReturnStatement:
-		return true;
-
 	case AstNode_IfStatement:
 		if (node->if_statement.else_statement != NULL) {
 			if (check_is_terminating(c, node->if_statement.body) &&
-			    check_is_terminating(c, node->if_statement.else_statement))
+			    check_is_terminating(c, node->if_statement.else_statement)) {
 			    return true;
+		    }
 		}
 		break;
 
@@ -353,7 +369,7 @@ void check_procedure_body(Checker *c, Token token, DeclarationInfo *decl, Type *
 	c->context.decl = decl;
 
 	push_procedure(c, type);
-	check_statement_list(c, body->block_statement.list);
+	check_statement_list(c, body->block_statement.list, 0);
 	if (type->procedure.results_count > 0) {
 		if (!check_is_terminating(c, body)) {
 			error(&c->error_collector, body->block_statement.close, "Missing return statement at the end of the procedure");
@@ -492,7 +508,7 @@ void check_entity_declaration(Checker *c, Entity *e, Type *named_type) {
 
 
 
-void check_statement(Checker *c, AstNode *node) {
+void check_statement(Checker *c, AstNode *node, u32 flags) {
 	switch (node->kind) {
 	case AstNode_EmptyStatement: break;
 	case AstNode_BadStatement:   break;
@@ -516,7 +532,7 @@ void check_statement(Checker *c, AstNode *node) {
 	case AstNode_TagStatement:
 		// TODO(bill): Tag Statements
 		error(&c->error_collector, ast_node_token(node), "Tag statements are not supported yet");
-		check_statement(c, node->tag_statement.statement);
+		check_statement(c, node->tag_statement.statement, flags);
 		break;
 
 	case AstNode_IncDecStatement: {
@@ -631,11 +647,18 @@ void check_statement(Checker *c, AstNode *node) {
 
 	case AstNode_BlockStatement:
 		check_open_scope(c, node);
-		check_statement_list(c, node->block_statement.list);
+		check_statement_list(c, node->block_statement.list, flags);
 		check_close_scope(c);
 		break;
 
 	case AstNode_IfStatement: {
+		check_open_scope(c, node);
+		defer (check_close_scope(c));
+		auto *is = &node->if_statement;
+
+		if (is->init != NULL)
+			check_statement(c, is->init, 0);
+
 		Operand operand = {Addressing_Invalid};
 		check_expression(c, &operand, node->if_statement.cond);
 		if (operand.mode != Addressing_Invalid &&
@@ -643,13 +666,14 @@ void check_statement(Checker *c, AstNode *node) {
 			error(&c->error_collector, ast_node_token(node->if_statement.cond),
 			            "Non-boolean condition in `if` statement");
 		}
-		check_statement(c, node->if_statement.body);
+
+		check_statement(c, node->if_statement.body, flags);
 
 		if (node->if_statement.else_statement) {
 			switch (node->if_statement.else_statement->kind) {
 			case AstNode_IfStatement:
 			case AstNode_BlockStatement:
-				check_statement(c, node->if_statement.else_statement);
+				check_statement(c, node->if_statement.else_statement, flags);
 				break;
 			default:
 				error(&c->error_collector, ast_node_token(node->if_statement.else_statement),
@@ -686,10 +710,12 @@ void check_statement(Checker *c, AstNode *node) {
 	} break;
 
 	case AstNode_ForStatement: {
+		flags |= Statement_BreakAllowed | Statement_ContinueAllowed;
 		check_open_scope(c, node);
 		defer (check_close_scope(c));
 
-		check_statement(c, node->for_statement.init);
+		if (node->for_statement.init != NULL)
+			check_statement(c, node->for_statement.init, 0);
 		if (node->for_statement.cond) {
 			Operand operand = {Addressing_Invalid};
 			check_expression(c, &operand, node->for_statement.cond);
@@ -699,8 +725,9 @@ void check_statement(Checker *c, AstNode *node) {
 				      "Non-boolean condition in `for` statement");
 			}
 		}
-		check_statement(c, node->for_statement.end);
-		check_statement(c, node->for_statement.body);
+		if (node->for_statement.end != NULL)
+			check_statement(c, node->for_statement.end, 0);
+		check_statement(c, node->for_statement.body, flags);
 	} break;
 
 	case AstNode_DeferStatement: {
@@ -710,8 +737,25 @@ void check_statement(Checker *c, AstNode *node) {
 		} else {
 			b32 out_in_defer = c->in_defer;
 			c->in_defer = true;
-			check_statement(c, ds->statement);
+			check_statement(c, ds->statement, 0);
 			c->in_defer = out_in_defer;
+		}
+	} break;
+
+	case AstNode_BranchStatement: {
+		Token token = node->branch_statement.token;
+		switch (token.kind) {
+		case Token_break:
+			if ((flags & Statement_BreakAllowed) == 0)
+				error(&c->error_collector, token, "`break` only allowed in `for` statement");
+			break;
+		case Token_continue:
+			if ((flags & Statement_ContinueAllowed) == 0)
+				error(&c->error_collector, token, "`continue` only allowed in `for` statement");
+			break;
+		default:
+			error(&c->error_collector, token, "Invalid AST: Branch Statement `%.*s`", LIT(token.string));
+			break;
 		}
 	} break;
 

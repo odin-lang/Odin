@@ -104,8 +104,9 @@ struct Type {
 };
 
 Type *get_base_type(Type *t) {
-	while (t->kind == Type_Named)
+	while (t->kind == Type_Named) {
 		t = t->named.base;
+	}
 	return t;
 }
 

@@ -3,12 +3,30 @@ struct Type;
 struct AstScope;
 
 
+enum ParseFileError {
+	ParseFile_None,
+
+	ParseFile_WrongExtension,
+	ParseFile_InvalidFile,
+	ParseFile_EmptyFile,
+	ParseFile_Permission,
+	ParseFile_NotFound,
+	ParseFile_InvalidToken,
+
+	ParseFile_Count,
+};
+
 
 struct AstFile {
 	gbArena        arena;
 	Tokenizer      tokenizer;
 	gbArray(Token) tokens;
 	Token *        cursor; // NOTE(bill): Current token, easy to peek forward and backwards if needed
+
+	// >= 0: In Expression
+	// <  0: In Control Clause
+	// NOTE(bill): Used to prevent type literals in control clauses
+	isize expression_level;
 
 	AstNode *declarations;
 	isize declaration_count;
@@ -19,6 +37,11 @@ struct AstFile {
 
 	isize error_count;
 	TokenPos error_prev_pos;
+
+	// NOTE(bill): Error recovery
+#define PARSER_MAX_FIX_COUNT 6
+	isize    fix_count;
+	TokenPos fix_prev_pos;
 };
 
 
@@ -78,6 +101,8 @@ AstNode__ComplexStatementBegin,
 	AstNode_ReturnStatement,
 	AstNode_ForStatement,
 	AstNode_DeferStatement,
+	AstNode_BranchStatement,
+
 AstNode__ComplexStatementEnd,
 
 AstNode__StatementEnd,
@@ -180,7 +205,10 @@ struct AstNode {
 		} block_statement;
 		struct {
 			Token token;
-			AstNode *cond, *body, *else_statement;
+			AstNode *init;
+			AstNode *cond;
+			AstNode *body;
+			AstNode *else_statement;
 		} if_statement;
 		struct {
 			Token token;
@@ -196,6 +224,9 @@ struct AstNode {
 			Token token;
 			AstNode *statement;
 		} defer_statement;
+		struct {
+			Token token;
+		} branch_statement;
 
 		struct { Token begin, end; } bad_declaration;
 		struct {
@@ -333,6 +364,8 @@ Token ast_node_token(AstNode *node) {
 		return node->for_statement.token;
 	case AstNode_DeferStatement:
 		return node->defer_statement.token;
+	case AstNode_BranchStatement:
+		return node->branch_statement.token;
 	case AstNode_BadDeclaration:
 		return node->bad_declaration.begin;
 	case AstNode_VariableDeclaration:
@@ -359,8 +392,7 @@ Token ast_node_token(AstNode *node) {
 		return node->struct_type.token;
 	}
 
-	Token null_token = {};
-	return null_token;
+	return empty_token;
 ;}
 
 gb_inline void destroy_ast_scope(AstScope *scope) {
@@ -637,9 +669,10 @@ gb_inline AstNode *make_block_statement(AstFile *f, AstNode *list, isize list_co
 	return result;
 }
 
-gb_inline AstNode *make_if_statement(AstFile *f, Token token, AstNode *cond, AstNode *body, AstNode *else_statement) {
+gb_inline AstNode *make_if_statement(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *body, AstNode *else_statement) {
 	AstNode *result = make_node(f, AstNode_IfStatement);
 	result->if_statement.token = token;
+	result->if_statement.init = init;
 	result->if_statement.cond = cond;
 	result->if_statement.body = body;
 	result->if_statement.else_statement = else_statement;
@@ -669,6 +702,13 @@ gb_inline AstNode *make_defer_statement(AstFile *f, Token token, AstNode *statem
 	result->defer_statement.statement = statement;
 	return result;
 }
+
+gb_inline AstNode *make_branch_statement(AstFile *f, Token token) {
+	AstNode *result = make_node(f, AstNode_BranchStatement);
+	result->branch_statement.token = token;
+	return result;
+}
+
 
 gb_inline AstNode *make_bad_declaration(AstFile *f, Token begin, Token end) {
 	AstNode *result = make_node(f, AstNode_BadDeclaration);
@@ -770,8 +810,8 @@ gb_inline Token expect_token(AstFile *f, TokenKind kind) {
 	Token prev = f->cursor[0];
 	if (prev.kind != kind) {
 		ast_file_err(f, f->cursor[0], "Expected `%s`, got `%s`",
-		           token_kind_to_string(kind),
-		           token_kind_to_string(prev.kind));
+		             token_kind_to_string(kind),
+		             token_kind_to_string(prev.kind));
 	}
 	next_token(f);
 	return prev;
@@ -781,7 +821,7 @@ gb_inline Token expect_operator(AstFile *f) {
 	Token prev = f->cursor[0];
 	if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
 		ast_file_err(f, f->cursor[0], "Expected an operator, got `%s`",
-		           token_kind_to_string(prev.kind));
+		             token_kind_to_string(prev.kind));
 	}
 	next_token(f);
 	return prev;
@@ -791,7 +831,7 @@ gb_inline Token expect_keyword(AstFile *f) {
 	Token prev = f->cursor[0];
 	if (!gb_is_between(prev.kind, Token__KeywordBegin+1, Token__KeywordEnd-1)) {
 		ast_file_err(f, f->cursor[0], "Expected a keyword, got `%s`",
-		           token_kind_to_string(prev.kind));
+		             token_kind_to_string(prev.kind));
 	}
 	next_token(f);
 	return prev;
@@ -832,6 +872,39 @@ gb_internal void add_ast_entity(AstFile *f, AstScope *scope, AstNode *declaratio
 }
 
 
+
+void fix_advance_to_next_statement(AstFile *f) {
+#if 0
+	for (;;) {
+		Token t = f->cursor[0];
+		switch (t.kind) {
+		case Token_EOF:
+			return;
+
+		case Token_type:
+		case Token_break:
+		case Token_continue:
+		case Token_fallthrough:
+		case Token_if:
+		case Token_for:
+		case Token_defer:
+		case Token_return:
+			if (token_pos_are_equal(t.pos, f->fix_prev_pos) &&
+			    f->fix_count < PARSER_MAX_FIX_COUNT) {
+				f->fix_count++;
+				return;
+			}
+			if (token_pos_cmp(f->fix_prev_pos, t.pos) < 0) {
+				f->fix_prev_pos = t.pos;
+				f->fix_count = 0; // NOTE(bill): Reset
+				return;
+			}
+
+		}
+		next_token(f);
+	}
+#endif
+}
 
 
 
@@ -903,8 +976,10 @@ AstNode *parse_literal_value(AstFile *f, AstNode *type_expression) {
 	AstNode *element_list = NULL;
 	isize element_count = 0;
 	Token open = expect_token(f, Token_OpenBrace);
+	f->expression_level++;
 	if (f->cursor[0].kind != Token_CloseBrace)
 		element_list = parse_element_list(f, &element_count);
+	f->expression_level--;
 	Token close = expect_token(f, Token_CloseBrace);
 
 	return make_compound_literal(f, type_expression, element_list, element_count, open, close);
@@ -942,29 +1017,36 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 		Token open, close;
 		// NOTE(bill): Skip the Paren Expression
 		open = expect_token(f, Token_OpenParen);
+		f->expression_level++;
 		operand = parse_expression(f, false);
+		f->expression_level--;
 		close = expect_token(f, Token_CloseParen);
-		operand = make_paren_expression(f, operand, open, close);
-		return operand;
-	} break;
+		return make_paren_expression(f, operand, open, close);
+	}
 
 	case Token_Hash: {
 		operand = parse_tag_expression(f, NULL);
 		operand->tag_expression.expression = parse_expression(f, false);
 		return operand;
-	} break;
+	}
 
 	// Parse Procedure Type or Literal
 	case Token_proc: {
 		AstScope *scope = NULL;
 		AstNode *type = parse_procedure_type(f, &scope);
+
 		if (f->cursor[0].kind != Token_OpenBrace) {
 			return type;
-		}
+		} else {
+			AstNode *body;
 
-		AstNode *body = parse_body(f, scope);
-		return make_procedure_literal(f, type, body);
-	} break;
+			f->expression_level++;
+			body = parse_body(f, scope);
+			f->expression_level--;
+
+			return make_procedure_literal(f, type, body);
+		}
+	}
 
 	default: {
 		AstNode *type = parse_identifier_or_type(f);
@@ -973,17 +1055,30 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 			GB_ASSERT_MSG(type->kind != AstNode_Identifier, "Type Cannot be identifier");
 			return type;
 		}
-	} break;
+	}
 	}
 
-	ast_file_err(f, f->cursor[0], "Expected an operand");
-	return make_bad_expression(f, f->cursor[0], f->cursor[0]);
+	Token begin = f->cursor[0];
+	ast_file_err(f, begin, "Expected an operand");
+	fix_advance_to_next_statement(f);
+	return make_bad_expression(f, begin, f->cursor[0]);
+}
+
+b32 is_literal_type(AstNode *node) {
+	switch (node->kind) {
+	case AstNode_BadExpression:
+	case AstNode_Identifier:
+	case AstNode_ArrayType:
+	case AstNode_StructType:
+		return true;
+	}
+	return false;
 }
 
 AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 	AstNode *operand = parse_operand(f, lhs);
-	b32 loop = true;
 
+	b32 loop = true;
 	while (loop) {
 		switch (f->cursor[0].kind) {
 		case Token_OpenParen: {
@@ -995,6 +1090,7 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 			isize arg_list_count = 0;
 			Token open_paren, close_paren;
 
+			f->expression_level++;
 			open_paren = expect_token(f, Token_OpenParen);
 
 			while (f->cursor[0].kind != Token_CloseParen &&
@@ -1013,6 +1109,7 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 				next_token(f);
 			}
 
+			f->expression_level--;
 			close_paren = expect_token(f, Token_CloseParen);
 
 			operand = make_call_expression(f, operand, arg_list, arg_list_count, open_paren, close_paren);
@@ -1043,7 +1140,9 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 			Token open, close;
 			AstNode *indices[3] = {};
 
+			f->expression_level++;
 			open = expect_token(f, Token_OpenBracket);
+
 			if (f->cursor[0].kind != Token_Colon)
 				indices[0] = parse_expression(f, false);
 			isize colon_count = 0;
@@ -1058,6 +1157,8 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 					indices[colon_count] = parse_expression(f, false);
 				}
 			}
+
+			f->expression_level--;
 			close = expect_token(f, Token_CloseBracket);
 
 			if (colon_count == 0) {
@@ -1084,20 +1185,14 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 			break;
 
 		case Token_OpenBrace: {
-			switch (operand->kind) {
-			case AstNode_BadExpression:
-			case AstNode_Identifier:
-			case AstNode_ArrayType:
-			case AstNode_StructType: {
+			if (is_literal_type(operand) && f->expression_level >= 0) {
+				gb_printf_err("here\n");
 				if (lhs) {
 					// TODO(bill): Handle this
 				}
 				operand = parse_literal_value(f, operand);
-			} break;
-
-			default:
+			} else {
 				loop = false;
-				break;
 			}
 		} break;
 
@@ -1275,14 +1370,14 @@ AstNode *parse_block_statement(AstFile *f) {
 	return block_statement;
 }
 
-AstNode *convert_statement_to_expression(AstFile *f, AstNode *statement, char *kind) {
+AstNode *convert_statement_to_expression(AstFile *f, AstNode *statement, String kind) {
 	if (statement == NULL)
 		return NULL;
 
 	if (statement->kind == AstNode_ExpressionStatement)
 		return statement->expression_statement.expression;
 
-	ast_file_err(f, f->cursor[0], "Expected `%s`, found a simple statement.", kind);
+	ast_file_err(f, f->cursor[0], "Expected `%.*s`, found a simple statement.", LIT(kind));
 	return make_bad_expression(f, f->cursor[0], f->cursor[1]);
 }
 
@@ -1371,12 +1466,14 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		return make_pointer_type(f, expect_token(f, Token_Pointer), parse_type(f));
 
 	case Token_OpenBracket: {
+		f->expression_level++;
 		Token token = expect_token(f, Token_OpenBracket);
 		AstNode *count_expression = NULL;
 
 		if (f->cursor[0].kind != Token_CloseBracket)
 			count_expression = parse_expression(f, false);
 		expect_token(f, Token_CloseBracket);
+		f->expression_level--;
 		return make_array_type(f, token, count_expression, parse_type(f));
 	}
 
@@ -1417,12 +1514,6 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		return make_paren_expression(f, type_expression, open, close);
 	}
 
-#if 0
-	// TODO(bill): Why did I add this?
-	case Token_Colon:
-	case Token_Eq:
-		break;
-#endif
 	case Token_Colon:
 		break;
 
@@ -1595,8 +1686,10 @@ AstNode *parse_declaration(AstFile *f, AstNode *name_list, isize name_list_count
 			return make_bad_declaration(f, f->cursor[0], f->cursor[0]);
 		}
 	} else {
-		ast_file_err(f, f->cursor[0], "Unknown type of variable declaration");
-		return make_bad_declaration(f, f->cursor[0], f->cursor[0]);
+		Token begin = f->cursor[0];
+		ast_file_err(f, begin, "Unknown type of variable declaration");
+		fix_advance_to_next_statement(f);
+		return make_bad_declaration(f, begin, f->cursor[0]);
 	}
 
 	AstNode *variable_declaration = make_variable_declaration(f, declaration_kind, name_list, name_list_count, type_expression, value_list, value_list_count);
@@ -1612,18 +1705,41 @@ AstNode *parse_if_statement(AstFile *f) {
 	}
 
 	Token token = expect_token(f, Token_if);
-	AstNode *cond, *body, *else_statement;
+	AstNode *init = NULL;
+	AstNode *cond = NULL;
+	AstNode *body = NULL;
+	AstNode *else_statement = NULL;
 
 	open_ast_scope(f);
+	defer (close_ast_scope(f));
 
-	cond = convert_statement_to_expression(f, parse_simple_statement(f), "boolean expression");
+	isize prev_level = f->expression_level;
+	f->expression_level = -1;
+
+
+	if (allow_token(f, Token_Semicolon)) {
+		cond = parse_expression(f, false);
+	} else {
+		init = parse_simple_statement(f);
+		if (allow_token(f, Token_Semicolon)) {
+			cond = parse_expression(f, false);
+		} else {
+			cond = convert_statement_to_expression(f, init, make_string("boolean expression"));
+			init = NULL;
+		}
+	}
+
+
+	f->expression_level = prev_level;
+
+
+
 
 	if (cond == NULL) {
 		ast_file_err(f, f->cursor[0], "Expected condition for if statement");
 	}
 
 	body = parse_block_statement(f);
-	else_statement = NULL;
 	if (allow_token(f, Token_else)) {
 		switch (f->cursor[0].kind) {
 		case Token_if:
@@ -1639,8 +1755,7 @@ AstNode *parse_if_statement(AstFile *f) {
 		}
 	}
 
-	close_ast_scope(f);
-	return make_if_statement(f, token, cond, body, else_statement);
+	return make_if_statement(f, token, init, cond, body, else_statement);
 }
 
 AstNode *parse_return_statement(AstFile *f) {
@@ -1667,32 +1782,42 @@ AstNode *parse_for_statement(AstFile *f) {
 
 	Token token = expect_token(f, Token_for);
 	open_ast_scope(f);
-	AstNode *init_statement = NULL, *cond = NULL, *end_statement = NULL, *body = NULL;
+	defer (close_ast_scope(f));
+
+	AstNode *init = NULL;
+	AstNode *cond = NULL;
+	AstNode *end  = NULL;
+	AstNode *body = NULL;
 
 	if (f->cursor[0].kind != Token_OpenBrace) {
-		cond = parse_simple_statement(f);
-		if (is_ast_node_complex_statement(cond)) {
-			ast_file_err(f, f->cursor[0],
-			           "You are not allowed that type of statement in a for statement, it's too complex!");
+		isize prev_level = f->expression_level;
+		f->expression_level = -1;
+		if (f->cursor[0].kind != Token_Semicolon) {
+			cond = parse_simple_statement(f);
+			if (is_ast_node_complex_statement(cond)) {
+				ast_file_err(f, f->cursor[0],
+				             "You are not allowed that type of statement in a for statement, it is too complex!");
+			}
 		}
 
 		if (allow_token(f, Token_Semicolon)) {
-			init_statement = cond;
+			init = cond;
 			cond = NULL;
 			if (f->cursor[0].kind != Token_Semicolon) {
 				cond = parse_simple_statement(f);
 			}
 			expect_token(f, Token_Semicolon);
 			if (f->cursor[0].kind != Token_OpenBrace) {
-				end_statement = parse_simple_statement(f);
+				end = parse_simple_statement(f);
 			}
 		}
+		f->expression_level = prev_level;
 	}
 	body = parse_block_statement(f);
 
-	close_ast_scope(f);
+	cond = convert_statement_to_expression(f, cond, make_string("boolean expression"));
 
-	return make_for_statement(f, token, init_statement, cond, end_statement, body);
+	return make_for_statement(f, token, init, cond, end, body);
 }
 
 AstNode *parse_defer_statement(AstFile *f) {
@@ -1775,8 +1900,15 @@ AstNode *parse_statement(AstFile *f) {
 	case Token_return: return parse_return_statement(f);
 	case Token_for:    return parse_for_statement(f);
 	case Token_defer:  return parse_defer_statement(f);
-	// case Token_match:
-	// case Token_case:
+	// case Token_match: return NULL; // TODO(bill): Token_match
+	// case Token_case: return NULL; // TODO(bill): Token_case
+
+	case Token_break:
+	case Token_continue:
+	case Token_fallthrough:
+		next_token(f);
+		expect_token(f, Token_Semicolon);
+		return make_branch_statement(f, token);
 
 	case Token_Hash:
 		s = parse_tag_statement(f, NULL);
@@ -1789,9 +1921,12 @@ AstNode *parse_statement(AstFile *f) {
 		s = make_empty_statement(f, token);
 		next_token(f);
 		return s;
+
+
 	}
 
 	ast_file_err(f, token, "Expected a statement, got `%s`", token_kind_to_string(token.kind));
+	fix_advance_to_next_statement(f);
 	return make_bad_statement(f, token, f->cursor[0]);
 }
 
@@ -1814,17 +1949,18 @@ AstNode *parse_statement_list(AstFile *f, isize *list_count_) {
 
 
 
-b32 init_ast_file(AstFile *f, String fullpath) {
+ParseFileError init_ast_file(AstFile *f, String fullpath) {
 	if (!string_has_extension(fullpath, make_string("odin"))) {
 		gb_printf_err("Only `.odin` files are allowed\n");
-		return false;
+		return ParseFile_WrongExtension;
 	}
-	if (init_tokenizer(&f->tokenizer, fullpath)) {
+	TokenizerInitError err = init_tokenizer(&f->tokenizer, fullpath);
+	if (err == TokenizerInit_None) {
 		gb_array_init(f->tokens, gb_heap_allocator());
 		for (;;) {
 			Token token = tokenizer_get_token(&f->tokenizer);
 			if (token.kind == Token_Invalid)
-				return false;
+				return ParseFile_InvalidToken;
 			gb_array_append(f->tokens, token);
 
 			if (token.kind == Token_EOF)
@@ -1841,9 +1977,19 @@ b32 init_ast_file(AstFile *f, String fullpath) {
 		open_ast_scope(f);
 		f->file_scope = f->curr_scope;
 
-		return true;
+		return ParseFile_None;
 	}
-	return false;
+
+	switch (err) {
+	case TokenizerInit_NotExists:
+		return ParseFile_NotFound;
+	case TokenizerInit_Permission:
+		return ParseFile_Permission;
+	case TokenizerInit_Empty:
+		return ParseFile_EmptyFile;
+	}
+
+	return ParseFile_InvalidFile;
 }
 
 void destroy_ast_file(AstFile *f) {
@@ -1928,8 +2074,6 @@ b32 is_import_path_valid(String path) {
 
 
 void parse_file(Parser *p, AstFile *f) {
-	f->declarations = parse_statement_list(f, &f->declaration_count);
-
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = filepath;
 	for (isize i = filepath.len-1; i >= 0; i--) {
@@ -1937,6 +2081,8 @@ void parse_file(Parser *p, AstFile *f) {
 			break;
 		base_dir.len--;
 	}
+
+	f->declarations = parse_statement_list(f, &f->declaration_count);
 
 	for (AstNode *node = f->declarations; node != NULL; node = node->next) {
 		if (!is_ast_node_declaration(node) &&
@@ -1987,7 +2133,7 @@ void parse_file(Parser *p, AstFile *f) {
 }
 
 
-void parse_files(Parser *p, char *init_filename) {
+ParseFileError parse_files(Parser *p, char *init_filename) {
 	char *fullpath_str = gb_path_get_full_name(gb_heap_allocator(), init_filename);
 	String init_fullpath = make_string(fullpath_str);
 	gb_array_append(p->imports, init_fullpath);
@@ -1995,14 +2141,36 @@ void parse_files(Parser *p, char *init_filename) {
 	for (isize i = 0; i < gb_array_count(p->imports); i++) {
 		String import_path = p->imports[i];
 		AstFile file = {};
-		b32 ok = init_ast_file(&file, import_path);
-		if (!ok) {
+		ParseFileError err = init_ast_file(&file, import_path);
+		if (err != ParseFile_None) {
 			gb_printf_err("Failed to parse file: %.*s\n", LIT(import_path));
-			return;
+			switch (err) {
+			case ParseFile_WrongExtension:
+				gb_printf_err("\tInvalid file extension\n");
+				break;
+			case ParseFile_InvalidFile:
+				gb_printf_err("\tInvalid file\n");
+				break;
+			case ParseFile_EmptyFile:
+				gb_printf_err("\tFile is empty\n");
+				break;
+			case ParseFile_Permission:
+				gb_printf_err("\tFile permissions problem\n");
+				break;
+			case ParseFile_NotFound:
+				gb_printf_err("\tFile cannot be found\n");
+				break;
+			case ParseFile_InvalidToken:
+				gb_printf_err("\tInvalid token found in file\n");
+				break;
+			}
+			return err;
 		}
 		parse_file(p, &file);
 		gb_array_append(p->files, file);
 	}
+
+	return ParseFile_None;
 }
 
 
