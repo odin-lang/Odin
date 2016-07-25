@@ -166,10 +166,10 @@ void print_ast(AstNode *node, isize indent) {
 		print_indent(indent);
 		gb_printf("(type:proc)(%td -> %td)\n", node->procedure_type.param_count, node->procedure_type.result_count);
 		print_ast(node->procedure_type.param_list, indent+1);
-		if (node->procedure_type.results_list) {
+		if (node->procedure_type.result_list) {
 			print_indent(indent+1);
 			gb_printf("->\n");
-			print_ast(node->procedure_type.results_list, indent+1);
+			print_ast(node->procedure_type.result_list, indent+1);
 		}
 		break;
 	case AstNode_Field:

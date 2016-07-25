@@ -102,6 +102,7 @@ Token__OperatorEnd,
 
 Token__KeywordBegin,
 	Token_type,
+	Token_alias,
 	Token_proc,
 	Token_match, // TODO(bill): switch vs match?
 	Token_break,
@@ -189,6 +190,7 @@ char const *TOKEN_STRINGS[] = {
 "_OperatorEnd",
 "_KeywordBegin",
 	"type",
+	"alias",
 	"proc",
 	"match",
 	"break",
@@ -697,6 +699,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 			KWB
 			KWT("type",        Token_type);
+			KWT("alias",       Token_alias);
 			KWT("proc",        Token_proc);
 			KWT("match",       Token_match);
 			KWT("break",       Token_break);

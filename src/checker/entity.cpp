@@ -8,6 +8,7 @@ enum EntityKind {
 	Entity_Constant,
 	Entity_Variable,
 	Entity_TypeName,
+	Entity_AliasName,
 	Entity_Procedure,
 	Entity_Builtin,
 
@@ -33,6 +34,7 @@ struct Entity {
 			b8 used;
 		} variable;
 		struct {} type_name;
+		struct {} alias_name;
 		struct {} procedure;
 		struct { BuiltinProcedureId id; } builtin;
 	};
@@ -70,14 +72,19 @@ Entity *make_entity_type_name(gbAllocator a, Scope *parent, Token token, Type *t
 	return entity;
 }
 
+Entity *make_entity_alias_name(gbAllocator a, Scope *parent, Token token, Type *type) {
+	Entity *entity = alloc_entity(a, Entity_AliasName, parent, token, type);
+	return entity;
+}
+
 Entity *make_entity_param(gbAllocator a, Scope *parent, Token token, Type *type) {
-	Entity *entity = alloc_entity(a, Entity_Variable, parent, token, type);
+	Entity *entity = make_entity_variable(a, parent, token, type);
 	entity->variable.used = true;
 	return entity;
 }
 
 Entity *make_entity_field(gbAllocator a, Scope *parent, Token token, Type *type) {
-	Entity *entity = alloc_entity(a, Entity_Variable, parent, token, type);
+	Entity *entity = make_entity_variable(a, parent, token, type);
 	entity->variable.is_field  = true;
 	return entity;
 }

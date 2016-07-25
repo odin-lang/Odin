@@ -31,6 +31,19 @@ gb_inline b32 are_strings_equal(String a, String b) {
 	return false;
 }
 
+gb_inline b32 are_strings_equal_ignore_case(String a, String b) {
+	if (a.len == b.len) {
+		for (isize i = 0; i < a.len; i++) {
+			char x = cast(char)a.text[i];
+			char y = cast(char)b.text[i];
+			if (gb_char_to_lower(x) != gb_char_to_lower(y))
+				return false;
+		}
+		return true;
+	}
+	return false;
+}
+
 
 gb_inline isize string_extension_position(String str) {
 	isize dot_pos = -1;

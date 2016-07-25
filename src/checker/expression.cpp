@@ -123,13 +123,13 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 	// gb_printf("%td -> %td\n", param_count, result_count);
 
 	Type *params  = check_get_params(c, c->context.scope, proc_type_node->procedure_type.param_list,   param_count);
-	Type *results = check_get_results(c, c->context.scope, proc_type_node->procedure_type.results_list, result_count);
+	Type *results = check_get_results(c, c->context.scope, proc_type_node->procedure_type.result_list, result_count);
 
-	type->procedure.scope         = c->context.scope;
-	type->procedure.params        = params;
-	type->procedure.params_count  = proc_type_node->procedure_type.param_count;
-	type->procedure.results       = results;
-	type->procedure.results_count = proc_type_node->procedure_type.result_count;
+	type->procedure.scope        = c->context.scope;
+	type->procedure.params       = params;
+	type->procedure.param_count  = proc_type_node->procedure_type.param_count;
+	type->procedure.results      = results;
+	type->procedure.result_count = proc_type_node->procedure_type.result_count;
 }
 
 
@@ -171,6 +171,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 		break;
 
 	case Entity_TypeName:
+	case Entity_AliasName:
 		o->mode = Addressing_Type;
 		break;
 
@@ -1416,9 +1417,9 @@ ExpressionKind check_call_expression(Checker *c, Operand *operand, AstNode *call
 	check_call_arguments(c, operand, proc_type, call);
 
 	auto *proc = &proc_type->procedure;
-	if (proc->results_count == 0) {
+	if (proc->result_count == 0) {
 		operand->mode = Addressing_NoValue;
-	} else if (proc->results_count == 1) {
+	} else if (proc->result_count == 1) {
 		operand->mode = Addressing_Value;
 		operand->type = proc->results->tuple.variables[0]->type;
 	} else {
@@ -1523,7 +1524,6 @@ void check_expression_with_type_hint(Checker *c, Operand *o, AstNode *e, Type *t
 		o->mode = Addressing_Invalid;
 	}
 }
-
 
 ExpressionKind check__expression_base(Checker *c, Operand *o, AstNode *node, Type *type_hint) {
 	ExpressionKind kind = Expression_Statement;

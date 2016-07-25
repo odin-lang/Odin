@@ -297,12 +297,12 @@ void init_universal_scope(void) {
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
 		Token token = {Token_Identifier};
 		token.string = basic_types[i].basic.name;
-		add_global_entity(alloc_entity(a, Entity_TypeName, NULL, token, &basic_types[i]));
+		add_global_entity(make_entity_type_name(a, NULL, token, &basic_types[i]));
 	}
 	for (isize i = 0; i < gb_count_of(basic_type_aliases); i++) {
 		Token token = {Token_Identifier};
 		token.string = basic_type_aliases[i].basic.name;
-		add_global_entity(alloc_entity(a, Entity_TypeName, NULL, token, &basic_type_aliases[i]));
+		add_global_entity(make_entity_type_name(a, NULL, token, &basic_type_aliases[i]));
 	}
 
 // Constants
@@ -555,8 +555,8 @@ void check_parsed_files(Checker *c) {
 						add_file_entity(c, name, e, di);
 					}
 
-					isize lhs_count = vd->name_list_count;
-					isize rhs_count = vd->value_list_count;
+					isize lhs_count = vd->name_count;
+					isize rhs_count = vd->value_count;
 
 					if (rhs_count == 0 && vd->type_expression == NULL) {
 						error(&c->error_collector, ast_node_token(decl), "Missing type or initial expression");
@@ -566,11 +566,11 @@ void check_parsed_files(Checker *c) {
 				} break;
 
 				case Declaration_Mutable: {
-					isize entity_count = vd->name_list_count;
+					isize entity_count = vd->name_count;
 					isize entity_index = 0;
 					Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
 					DeclarationInfo *di = NULL;
-					if (vd->value_list_count == 1) {
+					if (vd->value_count == 1) {
 						di = make_declaration_info(gb_heap_allocator(), c->global_scope);
 						di->entities = entities;
 						di->entity_count = entity_count;
@@ -607,6 +607,14 @@ void check_parsed_files(Checker *c) {
 				Entity *e = make_entity_type_name(c->allocator, c->global_scope, identifier->identifier.token, NULL);
 				DeclarationInfo *d = make_declaration_info(c->allocator, e->parent);
 				d->type_expr = decl->type_declaration.type_expression;
+				add_file_entity(c, identifier, e, d);
+			} break;
+
+			case AstNode_AliasDeclaration: {
+				AstNode *identifier = decl->alias_declaration.name;
+				Entity *e = make_entity_alias_name(c->allocator, c->global_scope, identifier->identifier.token, NULL);
+				DeclarationInfo *d = make_declaration_info(c->allocator, e->parent);
+				d->type_expr = decl->alias_declaration.type_expression;
 				add_file_entity(c, identifier, e, d);
 			} break;
 

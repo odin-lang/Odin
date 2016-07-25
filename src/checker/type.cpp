@@ -60,6 +60,7 @@ enum TypeKind {
 	Type_Structure,
 	Type_Pointer,
 	Type_Named,
+	Type_Alias,
 	Type_Tuple,
 	Type_Procedure,
 
@@ -81,7 +82,7 @@ struct Type {
 			Entity **fields; // Entity_Variable
 			isize    field_count; // == offset_count
 			i64 *    offsets;
-			b32      offsets_set;
+			b32      are_offsets_set;
 		} structure;
 		struct { Type *element; } pointer;
 		struct {
@@ -90,6 +91,11 @@ struct Type {
 			Entity *type_name; // Entity_TypeName
 		} named;
 		struct {
+			String  name;
+			Type *  base;
+			Entity *alias_name; // Entity_AliasName
+		} alias;
+		struct {
 			Entity **variables; // Entity_Variable
 			isize    variable_count;
 		} tuple;
@@ -97,15 +103,18 @@ struct Type {
 			Scope *scope;
 			Type * params;  // Type_Tuple
 			Type * results; // Type_Tuple
-			isize  params_count;
-			isize  results_count;
+			isize  param_count;
+			isize  result_count;
 		} procedure;
 	};
 };
 
 Type *get_base_type(Type *t) {
-	while (t->kind == Type_Named) {
-		t = t->named.base;
+	while (t->kind == Type_Named || t->kind == Type_Alias) {
+		if (t->kind == Type_Named)
+			t = t->named.base;
+		else
+			t = t->alias.base;
 	}
 	return t;
 }
@@ -113,6 +122,8 @@ Type *get_base_type(Type *t) {
 void set_base_type(Type *t, Type *base) {
 	if (t && t->kind == Type_Named) {
 		t->named.base = base;
+	} else if (t && t->kind == Type_Alias) {
+		t->alias.base = base;
 	}
 }
 
@@ -162,18 +173,26 @@ Type *make_type_named(gbAllocator a, String name, Type *base, Entity *type_name)
 	return t;
 }
 
+Type *make_type_alias(gbAllocator a, String name, Type *base, Entity *alias_name) {
+	Type *t = alloc_type(a, Type_Alias);
+	t->alias.name = name;
+	t->alias.base = base;
+	t->alias.alias_name = alias_name;
+	return t;
+}
+
 Type *make_type_tuple(gbAllocator a) {
 	Type *t = alloc_type(a, Type_Tuple);
 	return t;
 }
 
-Type *make_type_procedure(gbAllocator a, Scope *scope, Type *params, isize params_count, Type *results, isize results_count) {
+Type *make_type_procedure(gbAllocator a, Scope *scope, Type *params, isize param_count, Type *results, isize result_count) {
 	Type *t = alloc_type(a, Type_Procedure);
 	t->procedure.scope = scope;
 	t->procedure.params = params;
-	t->procedure.params_count = params_count;
+	t->procedure.param_count = param_count;
 	t->procedure.results = results;
-	t->procedure.results_count = results_count;
+	t->procedure.result_count = result_count;
 	return t;
 }
 
@@ -343,6 +362,10 @@ b32 are_types_identical(Type *x, Type *y) {
 			return are_types_identical(x->pointer.element, y->pointer.element);
 		break;
 
+
+	case Type_Alias:
+		return are_types_identical(get_base_type(x), y);
+
 	case Type_Named:
 		if (y->kind == Type_Named)
 			return x->named.base == y->named.base;
@@ -463,9 +486,9 @@ i64 *type_set_offsets_of(BaseTypeSizes s, gbAllocator allocator, Entity **fields
 
 b32 type_set_offsets(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	GB_ASSERT(t->kind == Type_Structure);
-	if (!t->structure.offsets_set) {
+	if (!t->structure.are_offsets_set) {
 		t->structure.offsets = type_set_offsets_of(s, allocator, t->structure.fields, t->structure.field_count);
-		t->structure.offsets_set = true;
+		t->structure.are_offsets_set = true;
 		return true;
 	}
 	return false;
@@ -568,6 +591,15 @@ gbString write_type_to_string(gbString str, Type *type) {
 		} else {
 			// NOTE(bill): Just in case
 			str = gb_string_appendc(str, "<named type>");
+		}
+		break;
+
+	case Type_Alias:
+		if (type->alias.alias_name != NULL) {
+			str = gb_string_append_length(str, type->alias.name.text, type->alias.name.len);
+		} else {
+			// NOTE(bill): Just in case
+			str = gb_string_appendc(str, "<alias type>");
 		}
 		break;
 

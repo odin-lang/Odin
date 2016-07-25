@@ -112,6 +112,7 @@ AstNode__DeclarationBegin,
 	AstNode_VariableDeclaration,
 	AstNode_ProcedureDeclaration,
 	AstNode_TypeDeclaration,
+	AstNode_AliasDeclaration,
 	AstNode_ImportDeclaration,
 AstNode__DeclarationEnd,
 
@@ -234,21 +235,16 @@ struct AstNode {
 			AstNode *name_list;
 			AstNode *type_expression;
 			AstNode *value_list;
-			isize name_list_count, value_list_count;
+			isize name_count, value_count;
 		} variable_declaration;
 
 		struct {
 			AstNode *name_list;
-			isize name_list_count;
+			isize name_count;
 			AstNode *type_expression;
 		} field;
-		struct {
-			Token token;
-			AstNode *param_list; // AstNode_Field list
-			isize param_count;
-			AstNode *results_list; // type expression list
-			isize result_count;
-		} procedure_type;
+
+		// TODO(bill): Unify Procedure Declarations and Literals
 		struct {
 			DeclarationKind kind;
 			AstNode *name;           // AstNode_Identifier
@@ -262,6 +258,11 @@ struct AstNode {
 			AstNode *name; // AstNode_Identifier
 			AstNode *type_expression;
 		} type_declaration;
+		struct {
+			Token token;
+			AstNode *name; // AstNode_Identifier
+			AstNode *type_expression;
+		} alias_declaration;
 		struct {
 			Token token;
 			Token filepath;
@@ -282,6 +283,13 @@ struct AstNode {
 			AstNode *field_list; // AstNode_Field
 			isize field_count;
 		} struct_type;
+		struct {
+			Token token;
+			AstNode *param_list; // AstNode_Field list
+			isize param_count;
+			AstNode *result_list; // type expression list
+			isize result_count;
+		} procedure_type;
 	};
 };
 
@@ -374,6 +382,8 @@ Token ast_node_token(AstNode *node) {
 		return node->procedure_declaration.name->identifier.token;
 	case AstNode_TypeDeclaration:
 		return node->type_declaration.token;
+	case AstNode_AliasDeclaration:
+		return node->alias_declaration.token;
 	case AstNode_ImportDeclaration:
 		return node->import_declaration.token;
 	case AstNode_Field: {
@@ -717,31 +727,31 @@ gb_inline AstNode *make_bad_declaration(AstFile *f, Token begin, Token end) {
 	return result;
 }
 
-gb_inline AstNode *make_variable_declaration(AstFile *f, DeclarationKind kind, AstNode *name_list, isize name_list_count, AstNode *type_expression, AstNode *value_list, isize value_list_count) {
+gb_inline AstNode *make_variable_declaration(AstFile *f, DeclarationKind kind, AstNode *name_list, isize name_count, AstNode *type_expression, AstNode *value_list, isize value_count) {
 	AstNode *result = make_node(f, AstNode_VariableDeclaration);
 	result->variable_declaration.kind = kind;
 	result->variable_declaration.name_list = name_list;
-	result->variable_declaration.name_list_count = name_list_count;
+	result->variable_declaration.name_count = name_count;
 	result->variable_declaration.type_expression = type_expression;
 	result->variable_declaration.value_list = value_list;
-	result->variable_declaration.value_list_count = value_list_count;
+	result->variable_declaration.value_count = value_count;
 	return result;
 }
 
-gb_inline AstNode *make_field(AstFile *f, AstNode *name_list, isize name_list_count, AstNode *type_expression) {
+gb_inline AstNode *make_field(AstFile *f, AstNode *name_list, isize name_count, AstNode *type_expression) {
 	AstNode *result = make_node(f, AstNode_Field);
 	result->field.name_list = name_list;
-	result->field.name_list_count = name_list_count;
+	result->field.name_count = name_count;
 	result->field.type_expression = type_expression;
 	return result;
 }
 
-gb_inline AstNode *make_procedure_type(AstFile *f, Token token, AstNode *param_list, isize param_count, AstNode *results_list, isize result_count) {
+gb_inline AstNode *make_procedure_type(AstFile *f, Token token, AstNode *param_list, isize param_count, AstNode *result_list, isize result_count) {
 	AstNode *result = make_node(f, AstNode_ProcedureType);
 	result->procedure_type.token = token;
 	result->procedure_type.param_list = param_list;
 	result->procedure_type.param_count = param_count;
-	result->procedure_type.results_list = results_list;
+	result->procedure_type.result_list = result_list;
 	result->procedure_type.result_count = result_count;
 	return result;
 }
@@ -787,6 +797,15 @@ gb_inline AstNode *make_type_declaration(AstFile *f, Token token, AstNode *name,
 	result->type_declaration.type_expression = type_expression;
 	return result;
 }
+
+gb_inline AstNode *make_alias_declaration(AstFile *f, Token token, AstNode *name, AstNode *type_expression) {
+	AstNode *result = make_node(f, AstNode_AliasDeclaration);
+	result->alias_declaration.token = token;
+	result->alias_declaration.name = name;
+	result->alias_declaration.type_expression = type_expression;
+	return result;
+}
+
 
 gb_inline AstNode *make_import_declaration(AstFile *f, Token token, Token filepath) {
 	AstNode *result = make_node(f, AstNode_ImportDeclaration);
@@ -1293,7 +1312,7 @@ AstNode *parse_rhs_expression_list(AstFile *f, isize *list_count) {
 	return parse_expression_list(f, false, list_count);
 }
 
-AstNode *parse_declaration(AstFile *f, AstNode *name_list, isize name_list_count);
+AstNode *parse_declaration(AstFile *f, AstNode *name_list, isize name_count);
 
 AstNode *parse_simple_statement(AstFile *f) {
 	isize lhs_count = 0, rhs_count = 0;
@@ -1423,9 +1442,9 @@ AstNode *parse_type(AstFile *f) {
 
 AstNode *parse_field_declaration(AstFile *f, AstScope *scope) {
 	AstNode *name_list = NULL;
-	isize name_list_count = 0;
-	name_list = parse_lhs_expression_list(f, &name_list_count);
-	if (name_list_count == 0)
+	isize name_count = 0;
+	name_list = parse_lhs_expression_list(f, &name_count);
+	if (name_count == 0)
 		ast_file_err(f, f->cursor[0], "Empty field declaration");
 
 	expect_token(f, Token_Colon);
@@ -1434,7 +1453,7 @@ AstNode *parse_field_declaration(AstFile *f, AstScope *scope) {
 	if (type_expression == NULL)
 		ast_file_err(f, f->cursor[0], "Expected a type for this field declaration");
 
-	AstNode *field = make_field(f, name_list, name_list_count, type_expression);
+	AstNode *field = make_field(f, name_list, name_count, type_expression);
 	add_ast_entity(f, scope, field, name_list);
 	return field;
 }
@@ -1456,6 +1475,23 @@ AstNode *parse_procedure_type(AstFile *f, AstScope **scope_) {
 	return make_procedure_type(f, proc_token, params, param_count, results, result_count);
 }
 
+
+AstNode *parse_parameter_list(AstFile *f, AstScope *scope, isize *param_count_) {
+	AstNode *param_list = NULL;
+	AstNode *param_list_curr = NULL;
+	isize param_count = 0;
+	while (f->cursor[0].kind == Token_Identifier) {
+		AstNode *field = parse_field_declaration(f, scope);
+		DLIST_APPEND(param_list, param_list_curr, field);
+		param_count += field->field.name_count;
+		if (f->cursor[0].kind != Token_Comma)
+			break;
+		next_token(f);
+	}
+
+	if (param_count_) *param_count_ = param_count;
+	return param_list;
+}
 
 AstNode *parse_identifier_or_type(AstFile *f) {
 	switch (f->cursor[0].kind) {
@@ -1480,24 +1516,15 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 	case Token_struct: {
 		Token token = expect_token(f, Token_struct);
 		Token open, close;
-		AstNode *field_list = NULL;
-		AstNode *field_list_curr = NULL;
-		isize field_list_count = 0;
-
-		open = expect_token(f, Token_OpenBrace);
-
+		AstNode *params = NULL;
+		isize param_count = 0;
 		AstScope *scope = make_ast_scope(f, NULL); // NOTE(bill): The struct needs its own scope with NO parent
-		while (f->cursor[0].kind == Token_Identifier ||
-		       f->cursor[0].kind == Token_Mul) {
-			DLIST_APPEND(field_list, field_list_curr, parse_field_declaration(f, scope));
-			expect_token(f, Token_Semicolon);
-			field_list_count++;
-		}
-		destroy_ast_scope(scope);
 
-		close = expect_token(f, Token_CloseBrace);
+		open   = expect_token(f, Token_OpenBrace);
+		params = parse_parameter_list(f, scope, &param_count);
+		close  = expect_token(f, Token_CloseBrace);
 
-		return make_struct_type(f, token, field_list, field_list_count);
+		return make_struct_type(f, token, params, param_count);
 	}
 
 	case Token_proc:
@@ -1514,6 +1541,7 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		return make_paren_expression(f, type_expression, open, close);
 	}
 
+	// TODO(bill): Why is this even allowed? Is this a parsing error?
 	case Token_Colon:
 		break;
 
@@ -1530,24 +1558,6 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 	return NULL;
 }
 
-AstNode *parse_parameters(AstFile *f, AstScope *scope, isize *param_count_) {
-	AstNode *param_list = NULL;
-	AstNode *param_list_curr = NULL;
-	isize param_count = 0;
-	expect_token(f, Token_OpenParen);
-	while (f->cursor[0].kind != Token_CloseParen) {
-		AstNode *field = parse_field_declaration(f, scope);
-		DLIST_APPEND(param_list, param_list_curr, field);
-		param_count += field->field.name_list_count;
-		if (f->cursor[0].kind != Token_Comma)
-			break;
-		next_token(f);
-	}
-	expect_token(f, Token_CloseParen);
-
-	if (param_count_) *param_count_ = param_count;
-	return param_list;
-}
 
 AstNode *parse_results(AstFile *f, AstScope *scope, isize *result_count) {
 	if (allow_token(f, Token_ArrowRight)) {
@@ -1582,7 +1592,9 @@ Token parse_procedure_signature(AstFile *f, AstScope *scope,
                                AstNode **param_list, isize *param_count,
                                AstNode **result_list, isize *result_count) {
 	Token proc_token = expect_token(f, Token_proc);
-	*param_list  = parse_parameters(f, scope, param_count);
+	expect_token(f, Token_OpenParen);
+	*param_list = parse_parameter_list(f, scope, param_count);
+	expect_token(f, Token_CloseParen);
 	*result_list = parse_results(f, scope, result_count);
 	return proc_token;
 }
@@ -1626,10 +1638,10 @@ AstNode *parse_procedure_declaration(AstFile *f, Token proc_token, AstNode *name
 	return make_procedure_declaration(f, kind, name, proc_type, body, tag_list, tag_count);
 }
 
-AstNode *parse_declaration(AstFile *f, AstNode *name_list, isize name_list_count) {
+AstNode *parse_declaration(AstFile *f, AstNode *name_list, isize name_count) {
 	AstNode *value_list = NULL;
 	AstNode *type_expression = NULL;
-	isize value_list_count = 0;
+	isize value_count = 0;
 	if (allow_token(f, Token_Colon)) {
 		type_expression = parse_identifier_or_type(f);
 	} else if (f->cursor[0].kind != Token_Eq && f->cursor[0].kind != Token_Semicolon) {
@@ -1647,14 +1659,8 @@ AstNode *parse_declaration(AstFile *f, AstNode *name_list, isize name_list_count
 		if (f->cursor[0].kind == Token_proc) { // NOTE(bill): Procedure declarations
 			Token proc_token = f->cursor[0];
 			AstNode *name = name_list;
-			if (name_list_count != 1) {
+			if (name_count != 1) {
 				ast_file_err(f, proc_token, "You can only declare one procedure at a time (at the moment)");
-				return make_bad_declaration(f, name->identifier.token, proc_token);
-			}
-
-			// TODO(bill): Allow for mutable procedures
-			if (declaration_kind != Declaration_Immutable) {
-				ast_file_err(f, proc_token, "Only immutable procedures are supported (at the moment)");
 				return make_bad_declaration(f, name->identifier.token, proc_token);
 			}
 
@@ -1663,10 +1669,10 @@ AstNode *parse_declaration(AstFile *f, AstNode *name_list, isize name_list_count
 			return procedure_declaration;
 
 		} else {
-			value_list = parse_rhs_expression_list(f, &value_list_count);
-			if (value_list_count > name_list_count) {
+			value_list = parse_rhs_expression_list(f, &value_count);
+			if (value_count > name_count) {
 				ast_file_err(f, f->cursor[0], "Too many values on the right hand side of the declaration");
-			} else if (value_list_count < name_list_count &&
+			} else if (value_count < name_count &&
 			           declaration_kind == Declaration_Immutable) {
 				ast_file_err(f, f->cursor[0], "All constant declarations must be defined");
 			} else if (value_list == NULL) {
@@ -1681,7 +1687,7 @@ AstNode *parse_declaration(AstFile *f, AstNode *name_list, isize name_list_count
 			return make_bad_declaration(f, f->cursor[0], f->cursor[0]);
 		}
 	} else if (declaration_kind == Declaration_Immutable) {
-		if (type_expression == NULL && value_list == NULL && name_list_count > 0) {
+		if (type_expression == NULL && value_list == NULL && name_count > 0) {
 			ast_file_err(f, f->cursor[0], "Missing constant value");
 			return make_bad_declaration(f, f->cursor[0], f->cursor[0]);
 		}
@@ -1692,7 +1698,7 @@ AstNode *parse_declaration(AstFile *f, AstNode *name_list, isize name_list_count
 		return make_bad_declaration(f, begin, f->cursor[0]);
 	}
 
-	AstNode *variable_declaration = make_variable_declaration(f, declaration_kind, name_list, name_list_count, type_expression, value_list, value_list_count);
+	AstNode *variable_declaration = make_variable_declaration(f, declaration_kind, name_list, name_count, type_expression, value_list, value_count);
 	add_ast_entity(f, f->curr_scope, variable_declaration, name_list);
 	return variable_declaration;
 }
@@ -1858,6 +1864,21 @@ AstNode *parse_type_declaration(AstFile *f) {
 	return type_declaration;
 }
 
+AstNode *parse_alias_declaration(AstFile *f) {
+	Token   token = expect_token(f, Token_alias);
+	AstNode *name = parse_identifier(f);
+	expect_token(f, Token_Colon);
+	AstNode *type_expression = parse_type(f);
+
+	AstNode *alias_declaration = make_alias_declaration(f, token, name, type_expression);
+
+	if (type_expression->kind != AstNode_StructType &&
+	    type_expression->kind != AstNode_ProcedureType)
+		expect_token(f, Token_Semicolon);
+
+	return alias_declaration;
+}
+
 AstNode *parse_import_declaration(AstFile *f) {
 	Token token = expect_token(f, Token_import);
 	Token filepath = expect_token(f, Token_String);
@@ -1874,6 +1895,8 @@ AstNode *parse_statement(AstFile *f) {
 	switch (token.kind) {
 	case Token_type:
 		return parse_type_declaration(f);
+	case Token_alias:
+		return parse_alias_declaration(f);
 	case Token_import:
 		return parse_import_declaration(f);
 

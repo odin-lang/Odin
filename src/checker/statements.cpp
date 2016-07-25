@@ -360,6 +360,17 @@ void check_type_declaration(Checker *c, Entity *e, AstNode *type_expr, Type *nam
 	set_base_type(named, get_base_type(get_base_type(named)));
 }
 
+void check_alias_declaration(Checker *c, Entity *e, AstNode *type_expr, Type *alias_type) {
+	GB_ASSERT(e->type == NULL);
+	Type *named = make_type_alias(c->allocator, e->token.string, NULL, e);
+	named->alias.alias_name = e;
+	set_base_type(alias_type, named);
+	e->type = named;
+
+	check_type(c, type_expr, named);
+
+	set_base_type(named, get_base_type(get_base_type(named)));
+}
 
 void check_procedure_body(Checker *c, Token token, DeclarationInfo *decl, Type *type, AstNode *body) {
 	GB_ASSERT(body->kind == AstNode_BlockStatement);
@@ -370,7 +381,7 @@ void check_procedure_body(Checker *c, Token token, DeclarationInfo *decl, Type *
 
 	push_procedure(c, type);
 	check_statement_list(c, body->block_statement.list, 0);
-	if (type->procedure.results_count > 0) {
+	if (type->procedure.result_count > 0) {
 		if (!check_is_terminating(c, body)) {
 			error(&c->error_collector, body->block_statement.close, "Missing return statement at the end of the procedure");
 		}
@@ -497,6 +508,9 @@ void check_entity_declaration(Checker *c, Entity *e, Type *named_type) {
 		break;
 	case Entity_TypeName:
 		check_type_declaration(c, e, d->type_expr, named_type);
+		break;
+	case Entity_AliasName:
+		check_alias_declaration(c, e, d->type_expr, named_type);
 		break;
 	case Entity_Procedure:
 		check_procedure_declaration(c, e, d, true);
@@ -763,7 +777,7 @@ void check_statement(Checker *c, AstNode *node, u32 flags) {
 // Declarations
 	case AstNode_VariableDeclaration: {
 		auto *vd = &node->variable_declaration;
-		isize entity_count = vd->name_list_count;
+		isize entity_count = vd->name_count;
 		isize entity_index = 0;
 		Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
 		switch (vd->kind) {
@@ -820,7 +834,7 @@ void check_statement(Checker *c, AstNode *node, u32 flags) {
 			}
 
 
-			check_init_variables(c, entities, entity_count, vd->value_list, vd->value_list_count, make_string("variable declaration"));
+			check_init_variables(c, entities, entity_count, vd->value_list, vd->value_count, make_string("variable declaration"));
 
 			AstNode *name = vd->name_list;
 			for (isize i = 0; i < new_entity_count; i++, name = name->next) {
@@ -840,8 +854,8 @@ void check_statement(Checker *c, AstNode *node, u32 flags) {
 				check_constant_declaration(c, e, vd->type_expression, value);
 			}
 
-			isize lhs_count = vd->name_list_count;
-			isize rhs_count = vd->value_list_count;
+			isize lhs_count = vd->name_count;
+			isize rhs_count = vd->value_count;
 
 			// TODO(bill): Better error messages or is this good enough?
 			if (rhs_count == 0 && vd->type_expression == NULL) {
@@ -880,6 +894,14 @@ void check_statement(Checker *c, AstNode *node, u32 flags) {
 		Entity *e = make_entity_type_name(c->allocator, c->context.scope, name->identifier.token, NULL);
 		add_entity(c, c->context.scope, name, e);
 		check_type_declaration(c, e, td->type_expression, NULL);
+	} break;
+
+	case AstNode_AliasDeclaration: {
+		auto *ad = &node->alias_declaration;
+		AstNode *name = ad->name;
+		Entity *e = make_entity_alias_name(c->allocator, c->context.scope, name->identifier.token, NULL);
+		add_entity(c, c->context.scope, name, e);
+		check_alias_declaration(c, e, ad->type_expression, NULL);
 	} break;
 	}
 }
