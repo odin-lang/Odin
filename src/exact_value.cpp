@@ -179,7 +179,7 @@ ExactValue exact_unary_operator_value(Token op, ExactValue v, i32 precision) {
 	}
 
 failure:
-	GB_PANIC("Invalid unary operation, %s", token_kind_to_string(op.kind));
+	GB_PANIC("Invalid unary operation, %.*s", LIT(token_strings[op.kind]));
 
 	ExactValue error_value = {};
 	return error_value;

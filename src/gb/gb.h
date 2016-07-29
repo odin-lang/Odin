@@ -1,4 +1,4 @@
-/* gb.h - v0.26b - Ginger Bill's C Helper Library - public domain
+/* gb.h - v0.26c - Ginger Bill's C Helper Library - public domain
                  - no warranty implied; use at your own risk
 
 	This is a single header file with a bunch of useful stuff
@@ -58,6 +58,7 @@ TODOS
 	- More date & time functions
 
 VERSION HISTORY
+	0.26c - gb_str_to_f* fix
 	0.26b - Minor fixes
 	0.26a - gbString Fix
 	0.26  - Default allocator flags and generic hash table
@@ -6223,90 +6224,65 @@ gb_inline void gb_u64_to_str(u64 value, char *string, i32 base) {
 }
 
 gb_inline f32 gb_str_to_f32(char const *str, char **end_ptr) {
-	f32 result = 0.0f;
-	isize signed_exponent = 0;
-	char c;
-	for (c = *str; c != '\0' && gb_char_is_digit(c); c = *str++)
-		result = result*10.0f + (c-'0');
-
-	if (c == '.') {
-		for (c = *str++; c != '\0' && gb_char_is_digit(c); c = *str++) {
-			result = result*1.0f + (c-'0');
-			signed_exponent--;
-		}
-	}
-
-	if (c == 'e' || c == 'E') {
-		i64 sign = +1, i = 0;
-		c = *str++;
-		if (c == '+') {
-			c = *str++;
-		} else if (c == '-') {
-			c = *str++;
-			sign = -1;
-		}
-		while (gb_char_is_digit(c)) {
-			i = i*10 + (c-'0');
-			c = *str++;
-		}
-		signed_exponent += i*sign;
-	}
-
-	while (signed_exponent > 0) {
-		result *= 10.0f;
-		signed_exponent--;
-	}
-	while (signed_exponent < 0) {
-		result *= 0.1f;
-		signed_exponent++;
-	}
-
-	if (end_ptr) *end_ptr = cast(char *)str;
-
-	return result;
+	f64 f = gb_str_to_f64(str, end_ptr);
+	f32 r = cast(f32)f;
+	return r;
 }
 
-
-
 gb_inline f64 gb_str_to_f64(char const *str, char **end_ptr) {
-	f64 result = 0.0;
-	isize signed_exponent = 0;
-	char c;
-	for (c = *str; c != '\0' && gb_char_is_digit(c); c = *str++)
-		result = result*10.0 + (c-'0');
+	f64 result, value, sign, scale;
+	i32 frac;
 
+	while (gb_char_is_space(*str)) {
+		str++;
+	}
 
-	if (c == '.') {
-		for (c = *str; c != '\0' && gb_char_is_digit(c); c = *str++) {
-			result = result*1.0 + (c-'0');
-			signed_exponent--;
+	sign = 1.0;
+	if (*str == '-') {
+		sign = -1.0;
+		str++;
+	} else if (*str == '+') {
+		str++;
+	}
+
+	for (value = 0.0; gb_char_is_digit(*str); str++) {
+		value = value * 10.0 + (*str-'0');
+	}
+
+	if (*str == '.') {
+		f64 pow10 = 10.0;
+		str++;
+		while (gb_char_is_digit(*str)) {
+			value += (*str-'0') / pow10;
+			pow10 *= 10.0;
+			str++;
 		}
 	}
 
-	if (c == 'e' || c == 'E') {
-		i64 sign = +1, i = 0;
-		c = *str++;
-		if (c == '+') {
-			c = *str++;
-		} else if (c == '-') {
-			c = *str++;
-			sign = -1;
+	frac = 0;
+	scale = 1.0;
+	if ((*str == 'e') || (*str == 'E')) {
+		u32 exp;
+
+		str++;
+		if (*str == '-') {
+			frac = 1;
+			str++;
+		} else if (*str == '+') {
+			str++;
 		}
-		while (gb_char_is_digit(c)) {
-			i = i*10 + (c-'0');
-			c = *str++;
+
+		for (exp = 0; gb_char_is_digit(*str); str++) {
+			exp = exp * 10 + (*str-'0');
 		}
-		signed_exponent += i*sign;
+		if (exp > 308) exp = 308;
+
+		while (exp >= 50) { scale *= 1e50; exp -= 50; }
+		while (exp >=  8) { scale *= 1e8;  exp -=  8; }
+		while (exp >   0) { scale *= 10.0; exp -=  1; }
 	}
 
-	while (signed_exponent > 0) {
-		result *= 10.0;
-		signed_exponent--;
-	}
-	while (signed_exponent < 0) {
-		result *= 0.1;
-		signed_exponent++;
-	}
+	result = sign * (frac ? (value / scale) : (value * scale));
 
 	if (end_ptr) *end_ptr = cast(char *)str;
 
@@ -8006,13 +7982,13 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 
 		if (*fmt == '%') {
 			do {
-				switch (*fmt++) {
-				case '-': info.flags |= gbFmt_Minus; fmt++; break;
-				case '+': info.flags |= gbFmt_Plus;  fmt++; break;
-				case '#': info.flags |= gbFmt_Alt;   fmt++; break;
-				case ' ': info.flags |= gbFmt_Space; fmt++; break;
-				case '0': info.flags |= gbFmt_Zero;  fmt++; break;
-				default:  info.flags |= gbFmt_Done;         break;
+				switch (*++fmt) {
+				case '-': info.flags |= gbFmt_Minus; break;
+				case '+': info.flags |= gbFmt_Plus;  break;
+				case '#': info.flags |= gbFmt_Alt;   break;
+				case ' ': info.flags |= gbFmt_Space; break;
+				case '0': info.flags |= gbFmt_Zero;  break;
+				default:  info.flags |= gbFmt_Done;  break;
 				}
 			} while (!(info.flags & gbFmt_Done));
 		}
@@ -8042,6 +8018,7 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 			}
 			info.flags &= ~gbFmt_Zero;
 		}
+
 
 		switch (*fmt++) {
 		case 'h':

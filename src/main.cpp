@@ -3,7 +3,7 @@
 #include "parser.cpp"
 #include "printer.cpp"
 #include "checker/checker.cpp"
-// #include "codegen/codegen.cpp"
+#include "codegen/codegen.cpp"
 
 int main(int argc, char **argv) {
 	if (argc < 2) {
@@ -29,14 +29,13 @@ int main(int argc, char **argv) {
 				defer (destroy_checker(&checker));
 
 				check_parsed_files(&checker);
-#if 0
-				Codegen codegen = {};
-				if (init_codegen(&codegen, &checker)) {
-					defer (destroy_codegen(&codegen));
 
-					generate_code(&codegen, file_node);
+				ssaGen ssa = {};
+				if (ssa_gen_init(&ssa, &checker)) {
+					defer (ssa_gen_destroy(&ssa));
+
+					ssa_gen_code(&ssa);
 				}
-#endif
 			}
 		}
 	}

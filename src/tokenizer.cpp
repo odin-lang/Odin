@@ -25,189 +25,107 @@ b32 rune_is_whitespace(Rune r) {
 	return false;
 }
 
-typedef enum TokenKind TokenKind;
+#define TOKEN_KINDS \
+	TOKEN_KIND(Invalid, "Invalid"), \
+	TOKEN_KIND(EOF, "EOF"), \
+\
+TOKEN_KIND(_LiteralBegin, "_LiteralBegin"), \
+	TOKEN_KIND(Identifier, "Identifier"), \
+	TOKEN_KIND(Integer, "Integer"), \
+	TOKEN_KIND(Float, "Float"), \
+	TOKEN_KIND(Rune, "Rune"), \
+	TOKEN_KIND(String, "String"), \
+TOKEN_KIND(_LiteralEnd, "_LiteralEnd"), \
+\
+TOKEN_KIND(_OperatorBegin, "_OperatorBegin"), \
+	TOKEN_KIND(Eq, "="), \
+	TOKEN_KIND(Not, "!"), \
+	TOKEN_KIND(Hash, "#"), \
+	TOKEN_KIND(At, "@"), \
+	TOKEN_KIND(Pointer, "^"), \
+	TOKEN_KIND(Add, "+"), \
+	TOKEN_KIND(Sub, "-"), \
+	TOKEN_KIND(Mul, "*"), \
+	TOKEN_KIND(Quo, "/"), \
+	TOKEN_KIND(Mod, "%"), \
+	TOKEN_KIND(AddEq, "+="), \
+	TOKEN_KIND(SubEq, "-="), \
+	TOKEN_KIND(MulEq, "*="), \
+	TOKEN_KIND(QuoEq, "/="), \
+	TOKEN_KIND(ModEq, "%="), \
+	TOKEN_KIND(And, "&"), \
+	TOKEN_KIND(Or, "|"), \
+	TOKEN_KIND(Xor, "~"), \
+	TOKEN_KIND(AndNot, "&~"), \
+	TOKEN_KIND(AndEq, "&="), \
+	TOKEN_KIND(OrEq, "|="), \
+	TOKEN_KIND(XorEq, "~="), \
+	TOKEN_KIND(AndNotEq, "&~"), \
+	TOKEN_KIND(Increment, "++"), \
+	TOKEN_KIND(Decrement, "--"), \
+	TOKEN_KIND(ArrowRight, "->"), \
+	TOKEN_KIND(ArrowLeft, "<-"), \
+	TOKEN_KIND(CmpAnd, "&&"), \
+	TOKEN_KIND(CmpOr, "||"), \
+\
+TOKEN_KIND(_ComparisonBegin, "_ComparisonBegin"), \
+	TOKEN_KIND(CmpEq, "=="), \
+	TOKEN_KIND(Lt, "<"), \
+	TOKEN_KIND(Gt, ">"), \
+	TOKEN_KIND(NotEq, "!="), \
+	TOKEN_KIND(LtEq, "<="), \
+	TOKEN_KIND(GtEq, ">="), \
+TOKEN_KIND(_ComparisonEnd, "_ComparisonEnd"), \
+\
+	TOKEN_KIND(CmpAndEq, "&&="), \
+	TOKEN_KIND(CmpOrEq, "||="), \
+	TOKEN_KIND(OpenParen, "("), \
+	TOKEN_KIND(CloseParen, ")"), \
+	TOKEN_KIND(OpenBracket, "["), \
+	TOKEN_KIND(CloseBracket, "]"), \
+	TOKEN_KIND(OpenBrace, "{"), \
+	TOKEN_KIND(CloseBrace, "}"), \
+	TOKEN_KIND(Colon, ":"), \
+	TOKEN_KIND(Semicolon, ";"), \
+	TOKEN_KIND(Period, "."), \
+	TOKEN_KIND(Comma, ","), \
+	TOKEN_KIND(Ellipsis, "..."), \
+TOKEN_KIND(_OperatorEnd, "_OperatorEnd"), \
+\
+TOKEN_KIND(_KeywordBegin, "_KeywordBegin"), \
+	TOKEN_KIND(type, "type"), \
+	TOKEN_KIND(alias, "alias"), \
+	TOKEN_KIND(proc, "proc"), \
+	TOKEN_KIND(match, "match"), \
+	TOKEN_KIND(break, "break"), \
+	TOKEN_KIND(continue, "continue"), \
+	TOKEN_KIND(fallthrough, "fallthrough"), \
+	TOKEN_KIND(case, "case"), \
+	TOKEN_KIND(if, "if"), \
+	TOKEN_KIND(else, "else"), \
+	TOKEN_KIND(for, "for"), \
+	TOKEN_KIND(defer, "defer"), \
+	TOKEN_KIND(return, "return"), \
+	TOKEN_KIND(import, "import"), \
+	TOKEN_KIND(cast, "cast"), \
+	TOKEN_KIND(struct, "struct"), \
+	TOKEN_KIND(union, "union"), \
+	TOKEN_KIND(enum, "enum"), \
+TOKEN_KIND(_KeywordEnd, "_KeywordEnd"), \
+\
+	TOKEN_KIND(Count, ""), \
+
+
 enum TokenKind {
-	Token_Invalid,
-	Token_EOF,
-
-Token__LiteralBegin,
-	Token_Identifier,
-	Token_Integer,
-	Token_Float,
-	Token_Rune,
-	Token_String,
-Token__LiteralEnd,
-
-Token__OperatorBegin,
-	Token_Eq, // =
-
-	Token_Not,     // ! (Unary Boolean)
-	Token_Hash,    // #
-	Token_At,      // @ // TODO(bill): Remove
-	Token_Pointer, // ^
-
-	Token_Add, // +
-	Token_Sub, // -
-	Token_Mul, // *
-	Token_Quo, // /
-	Token_Mod, // %
-
-	Token_AddEq, // +=
-	Token_SubEq, // -=
-	Token_MulEq, // *=
-	Token_QuoEq, // /=
-	Token_ModEq, // %=
-
-	Token_And,        // &
-	Token_Or,         // |
-	Token_Xor,        // ~
-	Token_AndNot,     // &~
-
-	Token_AndEq,    // &=
-	Token_OrEq,     // |=
-	Token_XorEq,    // ~=
-	Token_AndNotEq, // &~=
-
-	Token_Increment,  // ++
-	Token_Decrement,  // --
-	Token_ArrowRight, // ->
-	Token_ArrowLeft,  // <-
-
-	Token_CmpAnd,   // &&
-	Token_CmpOr,    // ||
-Token__ComparisonBegin,
-	Token_CmpEq,    // ==
-	Token_Lt,       // <
-	Token_Gt,       // >
-	Token_NotEq,    // !=
-	Token_LtEq,     // <=
-	Token_GtEq,     // >=
-Token__ComparisonEnd,
-	Token_CmpAndEq, // &&=
-	Token_CmpOrEq,  // ||=
-
-	Token_OpenParen,    // (
-	Token_CloseParen,   // )
-	Token_OpenBracket,  // [
-	Token_CloseBracket, // ]
-	Token_OpenBrace,    // {
-	Token_CloseBrace,   // }
-
-	Token_Colon,      // :
-	Token_Semicolon,  // ;
-	Token_Period,     // .
-	Token_Comma,      // ,
-	Token_Ellipsis,   // ...
-Token__OperatorEnd,
-
-Token__KeywordBegin,
-	Token_type,
-	Token_alias,
-	Token_proc,
-	Token_match, // TODO(bill): switch vs match?
-	Token_break,
-	Token_continue,
-	Token_fallthrough,
-	Token_case,
-
-	Token_if,
-	Token_else,
-	Token_for,
-	Token_defer,
-	Token_return,
-	Token_import,
-	Token_cast,
-
-	Token_struct,
-	Token_union,
-	Token_enum,
-Token__KeywordEnd,
-
-	Token_Count,
+#define TOKEN_KIND(e, s) GB_JOIN2(Token_, e)
+	TOKEN_KINDS
+#undef TOKEN_KIND
 };
 
-char const *TOKEN_STRINGS[] = {
-	"Invalid",
-	"EOF",
-"_LiteralBegin",
-	"Identifier",
-	"Integer",
-	"Float",
-	"Rune",
-	"String",
-"_LiteralEnd",
-"_OperatorBegin",
-	"=",
-	"!",
-	"#",
-	"@",
-	"^",
-	"+",
-	"-",
-	"*",
-	"/",
-	"%",
-	"+=",
-	"-=",
-	"*=",
-	"/=",
-	"%=",
-	"&",
-	"|",
-	"~",
-	"&~",
-	"&=",
-	"|=",
-	"~=",
-	"&~=",
-	"++",
-	"--",
-	"->",
-	"<-",
-	"&&",
-	"||",
-"_ComparisonBegin",
-	"==",
-	"<",
-	">",
-	"!=",
-	"<=",
-	">=",
-"_ComparisonEnd",
-	"&&=",
-	"||=",
-	"(",
-	")",
-	"[",
-	"]",
-	"{",
-	"}",
-	":",
-	";",
-	".",
-	",",
-	"...",
-"_OperatorEnd",
-"_KeywordBegin",
-	"type",
-	"alias",
-	"proc",
-	"match",
-	"break",
-	"continue",
-	"fallthrough",
-	"case",
-	"if",
-	"else",
-	"for",
-	"defer",
-	"return",
-	"import",
-	"cast",
-	"struct",
-	"union",
-	"enum",
-"_KeywordEnd",
+String const token_strings[] = {
+#define TOKEN_KIND(e, s) {cast(u8 *)s, gb_size_of(s)-1}
+	TOKEN_KINDS
+#undef TOKEN_KIND
 };
 
 
@@ -274,11 +192,6 @@ void warning(Token token, char *fmt, ...) {
 
 
 
-
-
-char const *token_kind_to_string(TokenKind kind) {
-	return TOKEN_STRINGS[kind];
-}
 
 i32 token_precedence(Token t) {
 	switch (t.kind) {
@@ -693,34 +606,12 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 		// NOTE(bill): ALL identifiers are > 1
 		if (token.string.len > 1) {
-		#define KWB if (0) {}
-		#define KWT(keyword, token_type) else if ((gb_size_of(keyword)-1) == token.string.len && gb_strncmp((char *)token.string.text, keyword, token.string.len) == 0) token.kind = token_type
-		#define KWE else {}
-
-			KWB
-			KWT("type",        Token_type);
-			KWT("alias",       Token_alias);
-			KWT("proc",        Token_proc);
-			KWT("match",       Token_match);
-			KWT("break",       Token_break);
-			KWT("continue",    Token_continue);
-			KWT("fallthrough", Token_fallthrough);
-			KWT("case",        Token_case);
-			KWT("if",          Token_if);
-			KWT("else",        Token_else);
-			KWT("for",         Token_for);
-			KWT("defer",       Token_defer);
-			KWT("return",      Token_return);
-			KWT("import",      Token_import);
-			KWT("cast",        Token_cast);
-			KWT("struct",      Token_struct);
-			KWT("union",       Token_union);
-			KWT("enum",        Token_enum);
-			KWE
-
-		#undef KWB
-		#undef KWT
-		#undef KWE
+			for (i32 k = Token__KeywordBegin+1; k < Token__KeywordEnd; k++) {
+				if (are_strings_equal(token.string, token_strings[k])) {
+					token.kind = cast(TokenKind)k;
+					break;
+				}
+			}
 		}
 
 	} else if (gb_is_between(curr_rune, '0', '9')) {

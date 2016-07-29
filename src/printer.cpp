@@ -150,7 +150,7 @@ void print_ast(AstNode *node, isize indent) {
 			gb_printf("(decl:proc,mutable)\n");
 		else if (node->procedure_declaration.kind == Declaration_Immutable)
 			gb_printf("(decl:proc,immutable)\n");
-		print_ast(node->procedure_declaration.procedure_type, indent+1);
+		print_ast(node->procedure_declaration.type, indent+1);
 		print_ast(node->procedure_declaration.body, indent+1);
 		print_ast(node->procedure_declaration.tag_list, indent+1);
 		break;
@@ -161,6 +161,14 @@ void print_ast(AstNode *node, isize indent) {
 		print_ast(node->type_declaration.name, indent+1);
 		print_ast(node->type_declaration.type_expression, indent+1);
 		break;
+
+	case AstNode_AliasDeclaration:
+		print_indent(indent);
+		gb_printf("(alias)\n");
+		print_ast(node->alias_declaration.name, indent+1);
+		print_ast(node->alias_declaration.type_expression, indent+1);
+		break;
+
 
 	case AstNode_ProcedureType:
 		print_indent(indent);

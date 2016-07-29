@@ -3,6 +3,5 @@
 
 rem del "..\examples\test.bc"
 call ..\bin\odin.exe ..\examples/test.odin
-rem call lli ..\examples/test.ll
-
-
+call lli ..\examples/test.ll
+rem call clang ..\examples/test.c -S -emit-llvm -o -

@@ -11,6 +11,8 @@ typedef struct String {
 #define LIT(x) (x).len, (x).text
 
 
+
+
 gb_inline String make_string(u8 *text, isize len) {
 	String s;
 	s.text = text;
@@ -88,6 +90,9 @@ gb_inline u64 hash_pointer(void *ptr) {
 	return p;
 }
 
+
+
+#define gb_for_array(index_, array_) for (isize index_ = 0; index_ < gb_array_count(array_); index_++)
 
 
 // Doubly Linked Lists

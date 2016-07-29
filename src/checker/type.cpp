@@ -51,21 +51,32 @@ struct BasicType {
 };
 
 
+
+#define TYPE_KINDS \
+	TYPE_KIND(Invalid), \
+	TYPE_KIND(Basic), \
+	TYPE_KIND(Array), \
+	TYPE_KIND(Slice), \
+	TYPE_KIND(Structure), \
+	TYPE_KIND(Pointer), \
+	TYPE_KIND(Named), \
+	TYPE_KIND(Alias), \
+	TYPE_KIND(Tuple), \
+	TYPE_KIND(Procedure), \
+	TYPE_KIND(Count),
+
 enum TypeKind {
-	Type_Invalid,
-
-	Type_Basic,
-	Type_Array,
-	Type_Slice,
-	Type_Structure,
-	Type_Pointer,
-	Type_Named,
-	Type_Alias,
-	Type_Tuple,
-	Type_Procedure,
-
-	Type_Count,
+#define TYPE_KIND(k) GB_JOIN2(Type_, k)
+	TYPE_KINDS
+#undef TYPE_KIND
 };
+
+String const type_strings[] = {
+#define TYPE_KIND(k) {cast(u8 *)#k, gb_size_of(#k)-1}
+	TYPE_KINDS
+#undef TYPE_KIND
+};
+
 struct Type {
 	TypeKind kind;
 	union {

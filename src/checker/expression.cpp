@@ -9,8 +9,8 @@ void           check_selector          (Checker *c, Operand *operand, AstNode *n
 void           check_not_tuple         (Checker *c, Operand *operand);
 void           convert_to_typed        (Checker *c, Operand *operand, Type *target_type);
 gbString       expression_to_string    (AstNode *expression);
-void           check_entity_declaration(Checker *c, Entity *e, Type *named_type);
-void           check_procedure_body(Checker *c, Token token, DeclarationInfo *decl, Type *type, AstNode *body);
+void           check_entity_declaration(Checker *c, Entity *e, DeclarationInfo *decl, Type *named_type);
+void           check_procedure_body    (Checker *c, Token token, DeclarationInfo *decl, Type *type, AstNode *body);
 
 
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
@@ -51,7 +51,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 				map_set(&entity_map, key, e);
 				fields[field_index++] = e;
 			}
-			add_entity_use(c, name, e);
+			add_entity_use(&c->info, name, e);
 		}
 	}
 	struct_type->structure.fields = fields;
@@ -143,9 +143,16 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 		    "Undeclared type or identifier `%.*s`", LIT(n->identifier.token.string));
 		return;
 	}
-	add_entity_use(c, n, e);
+	add_entity_use(&c->info, n, e);
 
-	check_entity_declaration(c, e, named_type);
+	if (e->type == NULL) {
+		auto *found = map_get(&c->info.entities, hash_pointer(e));
+		if (found != NULL) {
+			check_entity_declaration(c, e, *found, named_type);
+		} else {
+			GB_PANIC("Internal Compiler Error: DeclarationInfo not found!");
+		}
+	}
 
 	if (e->type == NULL) {
 		GB_PANIC("Compiler error: How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(n->identifier.token.string));
@@ -386,7 +393,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 
 end:
 	GB_ASSERT(is_type_typed(type));
-	add_type_and_value(c, e, Addressing_Type, type, null_value);
+	add_type_and_value(&c->info, e, Addressing_Type, type, null_value);
 	return type;
 }
 
@@ -758,7 +765,7 @@ void check_binary_expression(Checker *c, Operand *x, AstNode *node) {
 
 
 void update_expression_type(Checker *c, AstNode *e, Type *type) {
-	ExpressionInfo *found = map_get(&c->untyped, hash_pointer(e));
+	ExpressionInfo *found = map_get(&c->info.untyped, hash_pointer(e));
 	if (!found)
 		return;
 
@@ -786,7 +793,7 @@ void update_expression_type(Checker *c, AstNode *e, Type *type) {
 }
 
 void update_expression_value(Checker *c, AstNode *e, ExactValue value) {
-	ExpressionInfo *found = map_get(&c->untyped, hash_pointer(e));
+	ExpressionInfo *found = map_get(&c->info.untyped, hash_pointer(e));
 	if (found)
 		found->value = value;
 }
@@ -977,7 +984,7 @@ void check_selector(Checker *c, Operand *operand, AstNode *node) {
 			operand->expression = node;
 			return;
 		}
-		add_entity_use(c, selector, entity);
+		add_entity_use(&c->info, selector, entity);
 
 		operand->type = entity->type;
 		operand->expression = node;
@@ -1240,53 +1247,6 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->type = &basic_types[Basic_int]; // Returns number of elements copied
 		operand->mode = Addressing_Value;
 	} break;
-
-	case BuiltinProcedure_copy_bytes: {
-		// copy_bytes :: proc(dest, source: rawptr, byte_count: int)
-		Type *dest_type = NULL, *src_type = NULL;
-
-		Type *d = get_base_type(operand->type);
-		if (is_type_pointer(d))
-			dest_type = d;
-
-		Operand op = {};
-		check_expression(c, &op, ce->arg_list->next);
-		if (op.mode == Addressing_Invalid)
-			return false;
-		Type *s = get_base_type(op.type);
-		if (is_type_pointer(s))
-			src_type = s;
-
-		if (dest_type == NULL || src_type == NULL) {
-			error(&c->error_collector, ast_node_token(call), "`copy_bytes` only expects pointers for the destintation and source");
-			return false;
-		}
-
-		check_expression(c, &op, ce->arg_list->next->next);
-		if (op.mode == Addressing_Invalid)
-			return false;
-
-		convert_to_typed(c, &op, &basic_types[Basic_int]);
-		if (op.mode == Addressing_Invalid ||
-		    op.type->kind != Type_Basic ||
-		    op.type->basic.kind != Basic_int) {
-			gbString str = type_to_string(op.type);
-			defer (gb_string_free(str));
-			error(&c->error_collector, ast_node_token(call), "`copy_bytes` 3rd argument must be of type `int`, a `%s` was given", str);
-			return false;
-		}
-
-		if (op.mode == Addressing_Constant) {
-			if (exact_value_to_integer(op.value).value_integer <= 0) {
-				error(&c->error_collector, ast_node_token(call), "You cannot copy a zero or negative amount of bytes with `copy_bytes`");
-				return false;
-			}
-		}
-
-		operand->type = NULL;
-		operand->mode = Addressing_NoValue;
-	} break;
-
 
 	case BuiltinProcedure_print:
 	case BuiltinProcedure_println: {
@@ -1896,9 +1856,9 @@ ExpressionKind check_expression_base(Checker *c, Operand *o, AstNode *node, Type
 
 	if (type != NULL) {
 		if (is_type_untyped(type)) {
-			add_untyped(c, node, false, o->mode, type, value);
+			add_untyped(&c->info, node, false, o->mode, type, value);
 		} else {
-			add_type_and_value(c, node, o->mode, type, value);
+			add_type_and_value(&c->info, node, o->mode, type, value);
 		}
 	}
 	return kind;

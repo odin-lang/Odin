@@ -2,18 +2,29 @@ struct Scope;
 struct Checker;
 enum BuiltinProcedureId;
 
+#define ENTITY_KINDS \
+	ENTITY_KIND(Invalid), \
+	ENTITY_KIND(Constant), \
+	ENTITY_KIND(Variable), \
+	ENTITY_KIND(TypeName), \
+	ENTITY_KIND(AliasName), \
+	ENTITY_KIND(Procedure), \
+	ENTITY_KIND(Builtin), \
+	ENTITY_KIND(Count),
+
+
 enum EntityKind {
-	Entity_Invalid,
-
-	Entity_Constant,
-	Entity_Variable,
-	Entity_TypeName,
-	Entity_AliasName,
-	Entity_Procedure,
-	Entity_Builtin,
-
-	Entity_Count,
+#define ENTITY_KIND(k) GB_JOIN2(Entity_, k)
+	ENTITY_KINDS
+#undef ENTITY_KIND
 };
+
+String const entity_strings[] = {
+#define ENTITY_KIND(k) {cast(u8 *)#k, gb_size_of(#k)-1}
+	ENTITY_KINDS
+#undef ENTITY_KIND
+};
+
 
 typedef i64 EntityGuid;
 

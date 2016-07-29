@@ -122,7 +122,6 @@ enum BuiltinProcedureId {
 	BuiltinProcedure_len,
 	BuiltinProcedure_cap,
 	BuiltinProcedure_copy,
-	BuiltinProcedure_copy_bytes,
 	BuiltinProcedure_print,
 	BuiltinProcedure_println,
 
@@ -146,7 +145,6 @@ gb_global BuiltinProcedure builtin_procedures[BuiltinProcedure_Count] = {
 	{STR_LIT("len"),              1, false, Expression_Expression},
 	{STR_LIT("cap"),              1, false, Expression_Expression},
 	{STR_LIT("copy"),             2, false, Expression_Expression},
-	{STR_LIT("copy_bytes"),       3, false, Expression_Statement},
 	{STR_LIT("print"),            1, true,  Expression_Statement},
 	{STR_LIT("println"),          1, true,  Expression_Statement},
 };
@@ -156,14 +154,18 @@ struct CheckerContext {
 	DeclarationInfo *decl;
 };
 
-struct Checker {
-	Parser *               parser;
+struct CheckerInfo {
 	Map<TypeAndValue>      types;       // Key: AstNode * | Expression -> Type (and value)
 	Map<Entity *>          definitions; // Key: AstNode * | Identifier -> Entity
 	Map<Entity *>          uses;        // Key: AstNode * | Identifier -> Entity
 	Map<Scope *>           scopes;      // Key: AstNode * | Node       -> Scope
 	Map<ExpressionInfo>    untyped;     // Key: AstNode * | Expression -> ExpressionInfo
 	Map<DeclarationInfo *> entities;    // Key: Entity *
+};
+
+struct Checker {
+	Parser *    parser;
+	CheckerInfo info;
 
 	AstFile *              curr_ast_file;
 	BaseTypeSizes          sizes;
@@ -195,12 +197,13 @@ Scope *make_scope(Scope *parent, gbAllocator allocator) {
 }
 
 void destroy_scope(Scope *scope) {
-	isize element_count = gb_array_count(scope->elements.entries);
-	for (isize i = 0; i < element_count; i++) {
+	gb_for_array(i, scope->elements.entries) {
 		Entity *e =scope->elements.entries[i].value;
 		if (e->kind == Entity_Variable) {
 			if (!e->variable.used) {
+#if 0
 				warning(e->token, "Unused variable `%.*s`", LIT(e->token.string));
+#endif
 			}
 		}
 	}
@@ -262,7 +265,7 @@ void add_dependency(DeclarationInfo *d, Entity *e) {
 
 void add_declaration_dependency(Checker *c, Entity *e) {
 	if (c->context.decl) {
-		auto found = map_get(&c->entities, hash_pointer(e));
+		auto found = map_get(&c->info.entities, hash_pointer(e));
 		if (found) {
 			add_dependency(c->context.decl, e);
 		}
@@ -324,22 +327,35 @@ void init_universal_scope(void) {
 
 
 
+void init_checker_info(CheckerInfo *i) {
+	gbAllocator a = gb_heap_allocator();
+	map_init(&i->types,       a);
+	map_init(&i->definitions, a);
+	map_init(&i->uses,        a);
+	map_init(&i->scopes,      a);
+	map_init(&i->entities,    a);
+	map_init(&i->untyped,     a);
 
+}
+
+void destroy_checker_info(CheckerInfo *i) {
+	map_destroy(&i->types);
+	map_destroy(&i->definitions);
+	map_destroy(&i->uses);
+	map_destroy(&i->scopes);
+	map_destroy(&i->entities);
+	map_destroy(&i->untyped);
+}
 
 
 void init_checker(Checker *c, Parser *parser) {
 	gbAllocator a = gb_heap_allocator();
 
 	c->parser = parser;
-	map_init(&c->types,       gb_heap_allocator());
-	map_init(&c->definitions, gb_heap_allocator());
-	map_init(&c->uses,        gb_heap_allocator());
-	map_init(&c->scopes,      gb_heap_allocator());
-	map_init(&c->entities,    gb_heap_allocator());
+	init_checker_info(&c->info);
 	c->sizes.word_size = 8;
 	c->sizes.max_align = 8;
 
-	map_init(&c->untyped, a);
 
 	gb_array_init(c->procedure_stack, a);
 	gb_array_init(c->procedures, a);
@@ -347,7 +363,7 @@ void init_checker(Checker *c, Parser *parser) {
 	// NOTE(bill): Is this big enough or too small?
 	isize item_size = gb_max(gb_max(gb_size_of(Entity), gb_size_of(Type)), gb_size_of(Scope));
 	isize total_token_count = 0;
-	for (isize i = 0; i < gb_array_count(c->parser->files); i++) {
+	gb_for_array(i, c->parser->files) {
 		AstFile *f = &c->parser->files[i];
 		total_token_count += gb_array_count(f->tokens);
 	}
@@ -360,12 +376,7 @@ void init_checker(Checker *c, Parser *parser) {
 }
 
 void destroy_checker(Checker *c) {
-	map_destroy(&c->types);
-	map_destroy(&c->definitions);
-	map_destroy(&c->uses);
-	map_destroy(&c->scopes);
-	map_destroy(&c->untyped);
-	map_destroy(&c->entities);
+	destroy_checker_info(&c->info);
 	destroy_scope(c->global_scope);
 	gb_array_free(c->procedure_stack);
 	gb_array_free(c->procedures);
@@ -374,30 +385,30 @@ void destroy_checker(Checker *c) {
 }
 
 
-TypeAndValue *type_and_value_of_expression(Checker *c, AstNode *expression) {
-	TypeAndValue *found = map_get(&c->types, hash_pointer(expression));
+TypeAndValue *type_and_value_of_expression(CheckerInfo *i, AstNode *expression) {
+	TypeAndValue *found = map_get(&i->types, hash_pointer(expression));
 	return found;
 }
 
 
-Entity *entity_of_identifier(Checker *c, AstNode *identifier) {
+Entity *entity_of_identifier(CheckerInfo *i, AstNode *identifier) {
 	GB_ASSERT(identifier->kind == AstNode_Identifier);
-	Entity **found = map_get(&c->definitions, hash_pointer(identifier));
+	Entity **found = map_get(&i->definitions, hash_pointer(identifier));
 	if (found)
 		return *found;
 
-	found = map_get(&c->uses, hash_pointer(identifier));
+	found = map_get(&i->uses, hash_pointer(identifier));
 	if (found)
 		return *found;
 	return NULL;
 }
 
-Type *type_of_expression(Checker *c, AstNode *expression) {
-	TypeAndValue *found = type_and_value_of_expression(c, expression);
+Type *type_of_expression(CheckerInfo *i, AstNode *expression) {
+	TypeAndValue *found = type_and_value_of_expression(i, expression);
 	if (found)
 		return found->type;
 	if (expression->kind == AstNode_Identifier) {
-		Entity *entity = entity_of_identifier(c, expression);
+		Entity *entity = entity_of_identifier(i, expression);
 		if (entity)
 			return entity->type;
 	}
@@ -406,12 +417,12 @@ Type *type_of_expression(Checker *c, AstNode *expression) {
 }
 
 
-void add_untyped(Checker *c, AstNode *expression, b32 lhs, AddressingMode mode, Type *basic_type, ExactValue value) {
-	map_set(&c->untyped, hash_pointer(expression), make_expression_info(lhs, mode, basic_type, value));
+void add_untyped(CheckerInfo *i, AstNode *expression, b32 lhs, AddressingMode mode, Type *basic_type, ExactValue value) {
+	map_set(&i->untyped, hash_pointer(expression), make_expression_info(lhs, mode, basic_type, value));
 }
 
 
-void add_type_and_value(Checker *c, AstNode *expression, AddressingMode mode, Type *type, ExactValue value) {
+void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode, Type *type, ExactValue value) {
 	GB_ASSERT(expression != NULL);
 	GB_ASSERT(type != NULL);
 	if (mode == Addressing_Invalid)
@@ -425,14 +436,14 @@ void add_type_and_value(Checker *c, AstNode *expression, AddressingMode mode, Ty
 	TypeAndValue tv = {};
 	tv.type = type;
 	tv.value = value;
-	map_set(&c->types, hash_pointer(expression), tv);
+	map_set(&i->types, hash_pointer(expression), tv);
 }
 
-void add_entity_definition(Checker *c, AstNode *identifier, Entity *entity) {
+void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier != NULL);
 	GB_ASSERT(identifier->kind == AstNode_Identifier);
 	u64 key = hash_pointer(identifier);
-	map_set(&c->definitions, key, entity);
+	map_set(&i->definitions, key, entity);
 }
 
 void add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
@@ -444,24 +455,23 @@ void add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 		}
 	}
 	if (identifier != NULL)
-		add_entity_definition(c, identifier, entity);
+		add_entity_definition(&c->info, identifier, entity);
 }
 
-void add_entity_use(Checker *c, AstNode *identifier, Entity *entity) {
+void add_entity_use(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier != NULL);
 	GB_ASSERT(identifier->kind == AstNode_Identifier);
 	u64 key = hash_pointer(identifier);
-	map_set(&c->uses, key, entity);
+	map_set(&i->uses, key, entity);
 }
 
 
 void add_file_entity(Checker *c, AstNode *identifier, Entity *e, DeclarationInfo *d) {
 	GB_ASSERT(are_strings_equal(identifier->identifier.token.string, e->token.string));
 
-
 	add_entity(c, c->global_scope, identifier, e);
-	map_set(&c->entities, hash_pointer(e), d);
-	e->order = gb_array_count(c->entities.entries);
+	map_set(&c->info.entities, hash_pointer(e), d);
+	e->order = gb_array_count(c->info.entities.entries);
 }
 
 
@@ -480,7 +490,7 @@ void check_procedure_later(Checker *c, AstFile *file, Token token, DeclarationIn
 void add_scope(Checker *c, AstNode *node, Scope *scope) {
 	GB_ASSERT(node != NULL);
 	GB_ASSERT(scope != NULL);
-	map_set(&c->scopes, hash_pointer(node), scope);
+	map_set(&c->info.scopes, hash_pointer(node), scope);
 }
 
 
@@ -518,16 +528,9 @@ void add_curr_ast_file(Checker *c, AstFile *file) {
 
 
 
-
-GB_COMPARE_PROC(entity_order_cmp) {
-	Entity const *p = cast(Entity const *)a;
-	Entity const *q = cast(Entity const *)b;
-	return p->order < q->order ? -1 : p->order > q->order;
-}
-
 void check_parsed_files(Checker *c) {
 	// Collect Entities
-	for (isize i = 0; i < gb_array_count(c->parser->files); i++) {
+	gb_for_array(i, c->parser->files) {
 		AstFile *f = &c->parser->files[i];
 		add_curr_ast_file(c, f);
 		for (AstNode *decl = f->declarations; decl != NULL; decl = decl->next) {
@@ -625,8 +628,8 @@ void check_parsed_files(Checker *c) {
 				add_entity(c, c->global_scope, identifier, e);
 				DeclarationInfo *d = make_declaration_info(c->allocator, e->parent);
 				d->proc_decl = decl;
-				map_set(&c->entities, hash_pointer(e), d);
-				e->order = gb_array_count(c->entities.entries);
+				map_set(&c->info.entities, hash_pointer(e), d);
+				e->order = gb_array_count(c->info.entities.entries);
 
 			} break;
 
@@ -641,46 +644,33 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
-	{ // Order entities
-		gbArray(Entity *) entities;
-		isize count = gb_array_count(c->entities.entries);
-		gb_array_init_reserve(entities, gb_heap_allocator(), count);
-		defer (gb_array_free(entities));
 
-		for (isize i = 0; i < count; i++) {
-			u64 key = c->entities.entries[i].key;
-			Entity *e = cast(Entity *)cast(uintptr)key;
-			gb_array_append(entities, e);
-		}
-
-		gb_sort_array(entities, count, entity_order_cmp);
-
-		for (isize i = 0; i < count; i++) {
-			check_entity_declaration(c, entities[i], NULL);
-		}
+	gb_for_array(i, c->info.entities.entries) {
+		auto *entry = &c->info.entities.entries[i];
+		Entity *e = cast(Entity *)cast(uintptr)entry->key;
+		DeclarationInfo *d = entry->value;
+		check_entity_declaration(c, e, d, NULL);
 	}
 
 
 	// Check procedure bodies
-	for (isize i = 0; i < gb_array_count(c->procedures); i++) {
+	gb_for_array(i, c->procedures) {
 		ProcedureInfo *pi = &c->procedures[i];
 		add_curr_ast_file(c, pi->file);
 		check_procedure_body(c, pi->token, pi->decl, pi->type, pi->body);
 	}
 
 
-	{ // Add untyped expression values
-		isize count = gb_array_count(c->untyped.entries);
-		for (isize i = 0; i < count; i++) {
-			auto *entry = c->untyped.entries + i;
-			u64 key = entry->key;
-			AstNode *expr = cast(AstNode *)cast(uintptr)key;
-			ExpressionInfo *info = &entry->value;
-			if (is_type_typed(info->type)) {
-				GB_PANIC("%s (type %s) is typed!", expression_to_string(expr), info->type);
-			}
-			add_type_and_value(c, expr, info->mode, info->type, info->value);
+	// Add untyped expression values
+	gb_for_array(i, c->info.untyped.entries) {
+		auto *entry = c->info.untyped.entries + i;
+		u64 key = entry->key;
+		AstNode *expr = cast(AstNode *)cast(uintptr)key;
+		ExpressionInfo *info = &entry->value;
+		if (is_type_typed(info->type)) {
+			GB_PANIC("%s (type %s) is typed!", expression_to_string(expr), info->type);
 		}
+		add_type_and_value(&c->info, expr, info->mode, info->type, info->value);
 	}
 }
 

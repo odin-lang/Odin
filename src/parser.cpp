@@ -35,8 +35,7 @@ struct AstFile {
 	AstScope *curr_scope;
 	isize scope_level;
 
-	isize error_count;
-	TokenPos error_prev_pos;
+	ErrorCollector error_collector;
 
 	// NOTE(bill): Error recovery
 #define PARSER_MAX_FIX_COUNT 6
@@ -247,10 +246,10 @@ struct AstNode {
 		// TODO(bill): Unify Procedure Declarations and Literals
 		struct {
 			DeclarationKind kind;
-			AstNode *name;           // AstNode_Identifier
-			AstNode *procedure_type; // AstNode_ProcedureType
-			AstNode *body;           // AstNode_BlockStatement
-			AstNode *tag_list;       // AstNode_TagExpression
+			AstNode *name;     // AstNode_Identifier
+			AstNode *type;     // AstNode_ProcedureType
+			AstNode *body;     // AstNode_BlockStatement
+			AstNode *tag_list; // AstNode_TagExpression
 			isize tag_count;
 		} procedure_declaration;
 		struct {
@@ -459,10 +458,10 @@ AstEntity *ast_scope_insert(AstScope *scope, AstEntity entity) {
 #define ast_file_err(f, token, fmt, ...) ast_file_err_(f, __FUNCTION__, token, fmt, ##__VA_ARGS__)
 void ast_file_err_(AstFile *file, char *function, Token token, char *fmt, ...) {
 	// NOTE(bill): Duplicate error, skip it
-	if (!token_pos_are_equal(file->error_prev_pos, token.pos)) {
+	if (!token_pos_are_equal(file->error_collector.prev, token.pos)) {
 		va_list va;
 
-		file->error_prev_pos = token.pos;
+		file->error_collector.prev = token.pos;
 
 	#if 0
 		gb_printf_err("%s()\n", function);
@@ -473,7 +472,7 @@ void ast_file_err_(AstFile *file, char *function, Token token, char *fmt, ...) {
 		              gb_bprintf_va(fmt, va));
 		va_end(va);
 	}
-	file->error_count++;
+	file->error_collector.count++;
 }
 
 
@@ -760,7 +759,7 @@ gb_inline AstNode *make_procedure_declaration(AstFile *f, DeclarationKind kind, 
 	AstNode *result = make_node(f, AstNode_ProcedureDeclaration);
 	result->procedure_declaration.kind = kind;
 	result->procedure_declaration.name = name;
-	result->procedure_declaration.procedure_type = procedure_type;
+	result->procedure_declaration.type = procedure_type;
 	result->procedure_declaration.body = body;
 	result->procedure_declaration.tag_list = tag_list;
 	result->procedure_declaration.tag_count = tag_count;
@@ -828,9 +827,9 @@ gb_inline b32 next_token(AstFile *f) {
 gb_inline Token expect_token(AstFile *f, TokenKind kind) {
 	Token prev = f->cursor[0];
 	if (prev.kind != kind) {
-		ast_file_err(f, f->cursor[0], "Expected `%s`, got `%s`",
-		             token_kind_to_string(kind),
-		             token_kind_to_string(prev.kind));
+		ast_file_err(f, f->cursor[0], "Expected `%.*s`, got `%.*s`",
+		             LIT(token_strings[kind]),
+		             LIT(token_strings[prev.kind]));
 	}
 	next_token(f);
 	return prev;
@@ -839,8 +838,8 @@ gb_inline Token expect_token(AstFile *f, TokenKind kind) {
 gb_inline Token expect_operator(AstFile *f) {
 	Token prev = f->cursor[0];
 	if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
-		ast_file_err(f, f->cursor[0], "Expected an operator, got `%s`",
-		             token_kind_to_string(prev.kind));
+		ast_file_err(f, f->cursor[0], "Expected an operator, got `%.*s`",
+		             LIT(token_strings[prev.kind]));
 	}
 	next_token(f);
 	return prev;
@@ -849,8 +848,8 @@ gb_inline Token expect_operator(AstFile *f) {
 gb_inline Token expect_keyword(AstFile *f) {
 	Token prev = f->cursor[0];
 	if (!gb_is_between(prev.kind, Token__KeywordBegin+1, Token__KeywordEnd-1)) {
-		ast_file_err(f, f->cursor[0], "Expected a keyword, got `%s`",
-		             token_kind_to_string(prev.kind));
+		ast_file_err(f, f->cursor[0], "Expected a keyword, got `%.*s`",
+		             LIT(token_strings[prev.kind]));
 	}
 	next_token(f);
 	return prev;
@@ -1914,7 +1913,9 @@ AstNode *parse_statement(AstFile *f) {
 	case Token_Not:
 		s = parse_simple_statement(f);
 		if (s->kind != AstNode_ProcedureDeclaration && !allow_token(f, Token_Semicolon)) {
-			ast_file_err(f, f->cursor[0], "Expected `;` after statement, got `%s`", token_kind_to_string(f->cursor[0].kind));
+			ast_file_err(f, f->cursor[0],
+			             "Expected `;` after statement, got `%.*s`",
+			             LIT(token_strings[f->cursor[0].kind]));
 		}
 		return s;
 
@@ -1948,7 +1949,9 @@ AstNode *parse_statement(AstFile *f) {
 
 	}
 
-	ast_file_err(f, token, "Expected a statement, got `%s`", token_kind_to_string(token.kind));
+	ast_file_err(f, token,
+	             "Expected a statement, got `%.*s`",
+	             LIT(token_strings[token.kind]));
 	fix_advance_to_next_statement(f);
 	return make_bad_statement(f, token, f->cursor[0]);
 }
@@ -2031,11 +2034,11 @@ b32 init_parser(Parser *p) {
 
 void destroy_parser(Parser *p) {
 	// TODO(bill): Fix memory leak
-	for (isize i = 0; i < gb_array_count(p->files); i++) {
+	gb_for_array(i, p->files) {
 		destroy_ast_file(&p->files[i]);
 	}
 #if 1
-	for (isize i = 0; i < gb_array_count(p->imports); i++) {
+	gb_for_array(i, p->imports) {
 		// gb_free(gb_heap_allocator(), p->imports[i].text);
 	}
 #endif
@@ -2045,7 +2048,7 @@ void destroy_parser(Parser *p) {
 
 // NOTE(bill): Returns true if it's added
 b32 try_add_import_path(Parser *p, String import_file) {
-	for (isize i = 0; i < gb_array_count(p->imports); i++) {
+	gb_for_array(i, p->imports) {
 		String import = p->imports[i];
 		if (are_strings_equal(import, import_file)) {
 			return false;
@@ -2161,7 +2164,7 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 	String init_fullpath = make_string(fullpath_str);
 	gb_array_append(p->imports, init_fullpath);
 
-	for (isize i = 0; i < gb_array_count(p->imports); i++) {
+	gb_for_array(i, p->imports) {
 		String import_path = p->imports[i];
 		AstFile file = {};
 		ParseFileError err = init_ast_file(&file, import_path);

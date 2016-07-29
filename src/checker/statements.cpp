@@ -172,7 +172,7 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	// NOTE(bill): Ignore assignments to `_`
 	if (node->kind == AstNode_Identifier &&
 	    are_strings_equal(node->identifier.token.string, make_string("_"))) {
-    	add_entity_definition(c, node, NULL);
+    	add_entity_definition(&c->info, node, NULL);
     	check_assignment(c, op_a, NULL, make_string("assignment to `_` identifier"));
     	if (op_a->mode == Addressing_Invalid)
     		return NULL;
@@ -279,9 +279,8 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNode *in
 		}
 	}
 
-	if (i < lhs_count && i < init_count) {
-		if (lhs[i]->type == NULL)
-			error(&c->error_collector, lhs[i]->token, "Too few values on the right hand side of the declaration");
+	if (i < lhs_count && lhs[i]->type == NULL) {
+		error(&c->error_collector, lhs[i]->token, "Too few values on the right hand side of the declaration");
 	} else if (rhs != NULL) {
 		error(&c->error_collector, ast_node_token(rhs), "Too many values on the right hand side of the declaration");
 	}
@@ -401,9 +400,9 @@ void check_procedure_declaration(Checker *c, Entity *e, DeclarationInfo *d, b32 
 #if 1
 	Scope *original_curr_scope = c->context.scope;
 	c->context.scope = c->global_scope;
-	check_open_scope(c, pd->procedure_type);
+	check_open_scope(c, pd->type);
 #endif
-	check_procedure_type(c, proc_type, pd->procedure_type);
+	check_procedure_type(c, proc_type, pd->type);
 	b32 is_foreign   = false;
 	b32 is_inline    = false;
 	b32 is_no_inline = false;
@@ -487,16 +486,9 @@ void check_variable_declaration(Checker *c, Entity *e, Entity **entities, isize 
 
 
 
-void check_entity_declaration(Checker *c, Entity *e, Type *named_type) {
+void check_entity_declaration(Checker *c, Entity *e, DeclarationInfo *d, Type *named_type) {
 	if (e->type != NULL)
 		return;
-
-	DeclarationInfo **found = map_get(&c->entities, hash_pointer(e));
-	if (found == NULL) {
-		GB_PANIC("Compiler error: This entity should be declared!");
-	}
-	DeclarationInfo *d = *found;
-
 	switch (e->kind) {
 	case Entity_Constant:
 		c->context.decl = d;
@@ -580,6 +572,7 @@ void check_statement(Checker *c, AstNode *node, u32 flags) {
 		basic_lit.basic_literal = s->op;
 		basic_lit.basic_literal.kind = Token_Integer;
 		basic_lit.basic_literal.string = make_string("1");
+
 		AstNode be = {AstNode_BinaryExpression};
 		be.binary_expression.op = op;
 		be.binary_expression.left = s->expression;;
@@ -801,7 +794,7 @@ void check_statement(Checker *c, AstNode *node, u32 flags) {
 						if (!can_be_ignored) {
 							new_entities[new_entity_count++] = entity;
 						}
-						add_entity_definition(c, name, entity);
+						add_entity_definition(&c->info, name, entity);
 					} else {
 						entity = found;
 					}
@@ -832,7 +825,6 @@ void check_statement(Checker *c, AstNode *node, u32 flags) {
 				if (e->type == NULL)
 					e->type = init_type;
 			}
-
 
 			check_init_variables(c, entities, entity_count, vd->value_list, vd->value_count, make_string("variable declaration"));
 
