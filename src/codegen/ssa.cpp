@@ -104,6 +104,7 @@ struct ssaInstruction {
 
 
 		struct {
+			Type *type;
 			Token op;
 			ssaValue *left, *right;
 		} binary_op;
@@ -114,10 +115,10 @@ struct ssaInstruction {
 enum ssaValueKind {
 	ssaValue_Invalid,
 
+	ssaValue_Constant,
 	ssaValue_TypeName,
 	ssaValue_Global,
 	ssaValue_Procedure,
-	ssaValue_Constant,
 
 	ssaValue_Block,
 	ssaValue_Instruction,
@@ -130,10 +131,10 @@ struct ssaValue {
 	i32 id;
 
 	union {
+		ssaConstant    constant;
 		ssaTypeName    type_name;
 		ssaGlobal      global;
 		ssaProcedure   procedure;
-		ssaConstant    constant;
 		ssaBlock       block;
 		ssaInstruction instruction;
 	};
@@ -156,6 +157,7 @@ struct ssaLvalue {
 		} address;
 	};
 };
+
 
 void ssa_module_init(ssaModule *m, Checker *c) {
 	m->allocator = gb_heap_allocator();
@@ -187,6 +189,8 @@ Type *ssa_instruction_type(ssaInstruction *instr) {
 		return ssa_value_type(instr->store.address);
 	case ssaInstruction_Load:
 		return ssa_value_type(instr->load.address);
+	case ssaInstruction_BinaryOp:
+		return instr->binary_op.type;
 	}
 	return NULL;
 }
@@ -201,6 +205,9 @@ void ssa_instruction_set_type(ssaInstruction *instr, Type *type) {
 		break;
 	case ssaInstruction_Load:
 		// NOTE(bill): Do nothing
+		break;
+	case ssaInstruction_BinaryOp:
+		instr->binary_op.type = type;
 		break;
 	}
 }
@@ -558,6 +565,31 @@ ssaValue *ssa_emit_arith(ssaProcedure *proc, Token op, ssaValue *left, ssaValue 
 	return ssa_emit(proc, v);
 }
 
+ssaValue *ssa_emit_compare(ssaProcedure *proc, Token op, ssaValue *left, ssaValue *right) {
+	Type *a = get_base_type(ssa_value_type(left));
+	Type *b = get_base_type(ssa_value_type(right));
+
+	if (op.kind == Token_CmpEq &&
+	    left->kind == ssaValue_Constant && left->constant.value.kind == ExactValue_Bool) {
+		if (left->constant.value.value_bool) {
+			if (is_type_boolean(b))
+				return right;
+		}
+	}
+
+	if (are_types_identical(a, b)) {
+		// NOTE(bill): No need for a conversion
+	} else if (left->kind == ssaValue_Constant) {
+		left = ssa_emit_conversion(proc, left, ssa_value_type(right));
+	} else if (right->kind == ssaValue_Constant) {
+		right = ssa_emit_conversion(proc, right, ssa_value_type(left));
+	}
+
+	ssaValue *v = ssa_make_instruction_binary_op(proc, op, left, right);
+	ssa_value_set_type(v, &basic_types[Basic_bool]);
+	return ssa_emit(proc, v);
+}
+
 ssaValue *ssa_build_single_expression(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv) {
 	switch (expr->kind) {
 	case AstNode_Identifier: {
@@ -572,6 +604,9 @@ ssaValue *ssa_build_single_expression(ssaProcedure *proc, AstNode *expr, TypeAnd
 			return ssa_emit_load(proc, *found);
 		}
 	} break;
+
+	case AstNode_ParenExpression:
+		return ssa_build_single_expression(proc, unparen_expression(expr), tv);
 
 	case AstNode_DereferenceExpression: {
 		ssaLvalue addr = ssa_build_address(proc, expr->dereference_expression.operand);
@@ -617,11 +652,37 @@ ssaValue *ssa_build_single_expression(ssaProcedure *proc, AstNode *expr, TypeAnd
 		case Token_And:
 		case Token_Or:
 		case Token_Xor:
-		case Token_AndNot:
 			return ssa_emit_arith(proc, be->op,
 			                      ssa_build_expression(proc, be->left),
 			                      ssa_build_expression(proc, be->right),
 			                      tv->type);
+
+		case Token_AndNot: {
+			AstNode ue = {AstNode_UnaryExpression};
+			ue.unary_expression.op = be->op;
+			ue.unary_expression.op.kind = Token_Xor;
+			ue.unary_expression.operand = be->right;
+			ssaValue *left = ssa_build_expression(proc, be->left);
+			ssaValue *right = ssa_build_expression(proc, &ue);
+			Token op = be->op;
+			op.kind = Token_And;
+			return ssa_emit_arith(proc, op, left, right, tv->type);
+		} break;
+
+		case Token_CmpEq:
+		case Token_NotEq:
+		case Token_Lt:
+		case Token_LtEq:
+		case Token_Gt:
+		case Token_GtEq: {
+			ssaValue *cmp = ssa_emit_compare(proc, be->op,
+			                                 ssa_build_expression(proc, be->left),
+			                                 ssa_build_expression(proc, be->right));
+			return ssa_emit_conversion(proc, cmp, default_type(tv->type));
+		} break;
+
+		default:
+			GB_PANIC("Invalid binary expression");
 		}
 	} break;
 	case AstNode_ProcedureLiteral:

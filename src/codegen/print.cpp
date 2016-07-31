@@ -278,33 +278,63 @@ void ssa_print_instruction(gbFile *f, ssaModule *m, ssaValue *value) {
 
 		ssa_fprintf(f, "%%%d = ", value->id);
 
-		if (is_type_float(type))
-			ssa_fprintf(f, "f");
-
-		switch (bo->op.kind) {
-		case Token_Add:    ssa_fprintf(f, "add"); break;
-		case Token_Sub:    ssa_fprintf(f, "sub"); break;
-		case Token_And:    ssa_fprintf(f, "and"); break;
-		case Token_Or:     ssa_fprintf(f, "or"); break;
-		case Token_Xor:    ssa_fprintf(f, "xor"); break;
-
-		case Token_AndNot: GB_PANIC("TODO(bill): print Token_AndNot");
-
-		case Token_Mul: ssa_fprintf(f, "mul"); break;
-
-		default: {
-			if (!is_type_float(type)) {
-				if (is_type_unsigned(type))
-					ssa_fprintf(f, "u");
-				else
-					ssa_fprintf(f, "s");
+		if (gb_is_between(bo->op.kind, Token__ComparisonBegin+1, Token__ComparisonEnd-1)) {
+			if (is_type_float(type)) {
+				ssa_fprintf(f, "fcmp ");
+				switch (bo->op.kind) {
+				case Token_CmpEq: ssa_fprintf(f, "oeq"); break;
+				case Token_NotEq: ssa_fprintf(f, "one"); break;
+				case Token_Lt:    ssa_fprintf(f, "olt"); break;
+				case Token_Gt:    ssa_fprintf(f, "ogt"); break;
+				case Token_LtEq:  ssa_fprintf(f, "ole"); break;
+				case Token_GtEq:  ssa_fprintf(f, "oge"); break;
+				}
+			} else {
+				ssa_fprintf(f, "icmp ");
+				if (bo->op.kind != Token_CmpEq &&
+				    bo->op.kind != Token_NotEq) {
+					if (is_type_unsigned(type)) {
+						ssa_fprintf(f, "s");
+					} else {
+						ssa_fprintf(f, "u");
+					}
+				}
+				switch (bo->op.kind) {
+				case Token_CmpEq: ssa_fprintf(f, "eq"); break;
+				case Token_NotEq: ssa_fprintf(f, "ne"); break;
+				case Token_Lt:    ssa_fprintf(f, "lt"); break;
+				case Token_Gt:    ssa_fprintf(f, "gt"); break;
+				case Token_LtEq:  ssa_fprintf(f, "le"); break;
+				case Token_GtEq:  ssa_fprintf(f, "ge"); break;
+				}
 			}
+		} else {
+			if (is_type_float(type))
+				ssa_fprintf(f, "f");
 
 			switch (bo->op.kind) {
-			case Token_Quo: ssa_fprintf(f, "div"); break;
-			case Token_Mod: ssa_fprintf(f, "rem"); break;
+			case Token_Add:    ssa_fprintf(f, "add"); break;
+			case Token_Sub:    ssa_fprintf(f, "sub"); break;
+			case Token_And:    ssa_fprintf(f, "and"); break;
+			case Token_Or:     ssa_fprintf(f, "or"); break;
+			case Token_Xor:    ssa_fprintf(f, "xor"); break;
+
+			case Token_AndNot: GB_PANIC("Token_AndNot Should never be called");
+
+			case Token_Mul:    ssa_fprintf(f, "mul"); break;
+
+			default: {
+				if (!is_type_float(type)) {
+					if (is_type_unsigned(type)) ssa_fprintf(f, "u");
+					else                        ssa_fprintf(f, "s");
+				}
+
+				switch (bo->op.kind) {
+				case Token_Quo: ssa_fprintf(f, "div"); break;
+				case Token_Mod: ssa_fprintf(f, "rem"); break;
+				}
+			} break;
 			}
-		} break;
 		}
 
 		ssa_fprintf(f, " ");

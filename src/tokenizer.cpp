@@ -74,9 +74,9 @@ TOKEN_KIND(_AssignOpEnd, "_AssignOpEnd"), \
 \
 TOKEN_KIND(_ComparisonBegin, "_ComparisonBegin"), \
 	TOKEN_KIND(CmpEq, "=="), \
+	TOKEN_KIND(NotEq, "!="), \
 	TOKEN_KIND(Lt, "<"), \
 	TOKEN_KIND(Gt, ">"), \
-	TOKEN_KIND(NotEq, "!="), \
 	TOKEN_KIND(LtEq, "<="), \
 	TOKEN_KIND(GtEq, ">="), \
 TOKEN_KIND(_ComparisonEnd, "_ComparisonEnd"), \
