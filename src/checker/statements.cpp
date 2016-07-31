@@ -631,7 +631,7 @@ void check_statement(Checker *c, AstNode *node, u32 flags) {
 				error(&c->error_collector, op, "Assignment operation `%.*s` requires single-valued expressions", LIT(op.string));
 				return;
 			}
-			if (!gb_is_between(op.kind, Token_AddEq, Token_ModEq)) {
+			if (!gb_is_between(op.kind, Token__AssignOpBegin+1, Token__AssignOpEnd-1)) {
 				error(&c->error_collector, op, "Unknown Assignment operation `%.*s`", LIT(op.string));
 				return;
 			}

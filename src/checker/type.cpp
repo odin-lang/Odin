@@ -208,6 +208,12 @@ Type *make_type_procedure(gbAllocator a, Scope *scope, Type *params, isize param
 }
 
 
+Type *type_deref(Type *t) {
+	if (t != NULL && t->kind == Type_Pointer)
+		return t->pointer.element;
+	return t;
+}
+
 
 #define STR_LIT(x) {cast(u8 *)(x), gb_size_of(x)-1}
 gb_global Type basic_types[] = {

@@ -48,25 +48,29 @@ TOKEN_KIND(_OperatorBegin, "_OperatorBegin"), \
 	TOKEN_KIND(Mul, "*"), \
 	TOKEN_KIND(Quo, "/"), \
 	TOKEN_KIND(Mod, "%"), \
+	TOKEN_KIND(And, "&"), \
+	TOKEN_KIND(Or, "|"), \
+	TOKEN_KIND(Xor, "~"), \
+	TOKEN_KIND(AndNot, "&~"), \
+TOKEN_KIND(_AssignOpBegin, "_AssignOpBegin"), \
 	TOKEN_KIND(AddEq, "+="), \
 	TOKEN_KIND(SubEq, "-="), \
 	TOKEN_KIND(MulEq, "*="), \
 	TOKEN_KIND(QuoEq, "/="), \
 	TOKEN_KIND(ModEq, "%="), \
-	TOKEN_KIND(And, "&"), \
-	TOKEN_KIND(Or, "|"), \
-	TOKEN_KIND(Xor, "~"), \
-	TOKEN_KIND(AndNot, "&~"), \
 	TOKEN_KIND(AndEq, "&="), \
 	TOKEN_KIND(OrEq, "|="), \
 	TOKEN_KIND(XorEq, "~="), \
-	TOKEN_KIND(AndNotEq, "&~"), \
+	TOKEN_KIND(AndNotEq, "&~="), \
+TOKEN_KIND(_AssignOpEnd, "_AssignOpEnd"), \
 	TOKEN_KIND(Increment, "++"), \
 	TOKEN_KIND(Decrement, "--"), \
 	TOKEN_KIND(ArrowRight, "->"), \
 	TOKEN_KIND(ArrowLeft, "<-"), \
 	TOKEN_KIND(CmpAnd, "&&"), \
 	TOKEN_KIND(CmpOr, "||"), \
+	TOKEN_KIND(CmpAndEq, "&&="), \
+	TOKEN_KIND(CmpOrEq, "||="), \
 \
 TOKEN_KIND(_ComparisonBegin, "_ComparisonBegin"), \
 	TOKEN_KIND(CmpEq, "=="), \
@@ -77,8 +81,6 @@ TOKEN_KIND(_ComparisonBegin, "_ComparisonBegin"), \
 	TOKEN_KIND(GtEq, ">="), \
 TOKEN_KIND(_ComparisonEnd, "_ComparisonEnd"), \
 \
-	TOKEN_KIND(CmpAndEq, "&&="), \
-	TOKEN_KIND(CmpOrEq, "||="), \
 	TOKEN_KIND(OpenParen, "("), \
 	TOKEN_KIND(CloseParen, ")"), \
 	TOKEN_KIND(OpenBracket, "["), \

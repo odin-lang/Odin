@@ -146,7 +146,7 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 			if (i > 0) ssa_fprintf(f, ", ");
 			ssa_print_type(f, s, &t->procedure.params[i]);
 		}
-		ssa_fprintf(f, ")");
+		ssa_fprintf(f, ") ");
 		break;
 	}
 }
@@ -159,7 +159,7 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 	case ExactValue_String: {
 		ssa_fprintf(f, "{");
 		ssa_print_type(f, m->sizes, &basic_types[Basic_i8]);
-		ssa_fprintf(f, "* \"");
+		ssa_fprintf(f, "* c\"");
 		// TODO(bill): Make unquote string function
 		String unquoted = value.value_string;
 		unquoted.text++;
@@ -209,7 +209,7 @@ void ssa_print_value(gbFile *f, ssaModule *m, ssaValue *value, Type *type_hint) 
 	}
 	switch (value->kind) {
 	case ssaValue_TypeName:
-		ssa_print_encoded_local(f, value->type_name->token.string);
+		ssa_print_encoded_local(f, value->type_name.entity->token.string);
 		break;
 	case ssaValue_Global:
 		ssa_print_encoded_global(f, value->global.entity->token.string);
@@ -237,7 +237,9 @@ void ssa_print_instruction(gbFile *f, ssaModule *m, ssaValue *value) {
 		Type *type = instr->local.entity->type;
 		ssa_fprintf(f, "%%%d = alloca ", value->id);
 		ssa_print_type(f, m->sizes, type);
-		ssa_fprintf(f, ", align %lld\n", type_align_of(m->sizes, gb_heap_allocator(), type));
+		ssa_fprintf(f, ", align %lld ", type_align_of(m->sizes, gb_heap_allocator(), type));
+		ssa_fprintf(f, "; %.*s", LIT(instr->local.entity->token.string));
+		ssa_fprintf(f, "\n");
 		ssa_fprintf(f, "\tstore ");
 		ssa_print_type(f, m->sizes, type);
 		ssa_fprintf(f, " zeroinitializer, ");
@@ -271,8 +273,10 @@ void ssa_print_instruction(gbFile *f, ssaModule *m, ssaValue *value) {
 
 
 	case ssaInstruction_BinaryOp: {
-		ssaBinaryOp *bo = &value->instruction.binary_op;
+		auto *bo = &value->instruction.binary_op;
 		Type *type = ssa_value_type(bo->left);
+
+		ssa_fprintf(f, "%%%d = ", value->id);
 
 		if (is_type_float(type))
 			ssa_fprintf(f, "f");
@@ -320,15 +324,14 @@ void ssa_print_instruction(gbFile *f, ssaModule *m, ssaValue *value) {
 }
 
 void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
-	gb_printf("-- Printing LLVM-IR -- \n\n");
 	gb_for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
 		ssaValue *v = entry->value;
 		switch (v->kind) {
 		case ssaValue_TypeName: {
-			ssa_print_encoded_local(f, v->type_name->token.string);
+			ssa_print_encoded_local(f, v->type_name.entity->token.string);
 			ssa_fprintf(f, " = type ");
-			ssa_print_type(f, m->sizes, get_base_type(v->type_name->type));
+			ssa_print_type(f, m->sizes, get_base_type(v->type_name.type));
 			ssa_fprintf(f, "\n");
 		} break;
 
