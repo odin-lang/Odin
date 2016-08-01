@@ -1,3 +1,2 @@
 main :: proc() {
-	a : int;
 }

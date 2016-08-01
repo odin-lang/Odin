@@ -26,10 +26,10 @@ struct AstFile {
 	// >= 0: In Expression
 	// <  0: In Control Clause
 	// NOTE(bill): Used to prevent type literals in control clauses
-	isize expression_level;
+	isize expr_level;
 
-	AstNode *declarations;
-	isize declaration_count;
+	AstNode *decls;
+	isize decl_count;
 
 	AstScope *file_scope;
 	AstScope *curr_scope;
@@ -50,7 +50,7 @@ struct AstFile {
 struct AstEntity {
 	Token     token;
 	AstScope *parent;
-	AstNode * declaration;
+	AstNode * decl;
 };
 
 struct AstScope {
@@ -64,69 +64,80 @@ struct Parser {
 	isize import_index;
 };
 
+#define AST_NODE_KINDS \
+	AST_NODE_KIND(Invalid), \
+\
+	AST_NODE_KIND(BasicLit), \
+	AST_NODE_KIND(Ident), \
+	AST_NODE_KIND(ProcLit), \
+	AST_NODE_KIND(CompoundLit), \
+\
+AST_NODE_KIND(_ExprBegin), \
+	AST_NODE_KIND(BadExpr), \
+	AST_NODE_KIND(TagExpr), \
+	AST_NODE_KIND(UnaryExpr), \
+	AST_NODE_KIND(BinaryExpr), \
+	AST_NODE_KIND(ParenExpr), \
+	AST_NODE_KIND(CallExpr), \
+	AST_NODE_KIND(SelectorExpr), \
+	AST_NODE_KIND(IndexExpr), \
+	AST_NODE_KIND(SliceExpr), \
+	AST_NODE_KIND(CastExpr), \
+	AST_NODE_KIND(DerefExpr), \
+AST_NODE_KIND(_ExprEnd), \
+\
+AST_NODE_KIND(_stmtBegin), \
+	AST_NODE_KIND(BadStmt), \
+	AST_NODE_KIND(EmptyStmt), \
+	AST_NODE_KIND(TagStmt), \
+	AST_NODE_KIND(ExprStmt), \
+	AST_NODE_KIND(IncDecStmt), \
+	AST_NODE_KIND(AssignStmt), \
+\
+AST_NODE_KIND(_ComplexStmtBegin), \
+	AST_NODE_KIND(BlockStmt), \
+	AST_NODE_KIND(IfStmt), \
+	AST_NODE_KIND(ReturnStmt), \
+	AST_NODE_KIND(ForStmt), \
+	AST_NODE_KIND(DeferStmt), \
+	AST_NODE_KIND(BranchStmt), \
+\
+AST_NODE_KIND(_ComplexStmtEnd), \
+\
+AST_NODE_KIND(_stmtEnd), \
+\
+AST_NODE_KIND(_DeclBegin), \
+	AST_NODE_KIND(BadDecl), \
+	AST_NODE_KIND(VarDecl), \
+	AST_NODE_KIND(ProcDecl), \
+	AST_NODE_KIND(TypeDecl), \
+	AST_NODE_KIND(AliasDecl), \
+	AST_NODE_KIND(ImportDecl), \
+AST_NODE_KIND(_DeclEnd), \
+\
+AST_NODE_KIND(_TypeBegin), \
+	AST_NODE_KIND(Field), \
+	AST_NODE_KIND(ProcType), \
+	AST_NODE_KIND(PointerType), \
+	AST_NODE_KIND(ArrayType), \
+	AST_NODE_KIND(StructType), \
+AST_NODE_KIND(_TypeEnd), \
+\
+	AST_NODE_KIND(Count),
+
 enum AstNodeKind {
-	AstNode_Invalid,
-
-	AstNode_BasicLiteral,
-	AstNode_Identifier,
-	AstNode_ProcedureLiteral,
-	AstNode_CompoundLiteral,
-
-AstNode__ExpressionBegin,
-	AstNode_BadExpression, // NOTE(bill): Naughty expression
-	AstNode_TagExpression,
-	AstNode_UnaryExpression,
-	AstNode_BinaryExpression,
-	AstNode_ParenExpression,
-	AstNode_CallExpression,
-	AstNode_SelectorExpression,
-	AstNode_IndexExpression,
-	AstNode_SliceExpression,
-	AstNode_CastExpression,
-	AstNode_DereferenceExpression,
-AstNode__ExpressionEnd,
-
-AstNode__StatementBegin,
-	AstNode_BadStatement, // NOTE(bill): Naughty statement
-	AstNode_EmptyStatement,
-	AstNode_TagStatement,
-	AstNode_ExpressionStatement,
-	AstNode_IncDecStatement,
-	AstNode_AssignStatement,
-
-AstNode__ComplexStatementBegin,
-	AstNode_BlockStatement,
-	AstNode_IfStatement,
-	AstNode_ReturnStatement,
-	AstNode_ForStatement,
-	AstNode_DeferStatement,
-	AstNode_BranchStatement,
-
-AstNode__ComplexStatementEnd,
-
-AstNode__StatementEnd,
-
-AstNode__DeclarationBegin,
-	AstNode_BadDeclaration, // NOTE(bill): Naughty declaration
-	AstNode_VariableDeclaration,
-	AstNode_ProcedureDeclaration,
-	AstNode_TypeDeclaration,
-	AstNode_AliasDeclaration,
-	AstNode_ImportDeclaration,
-AstNode__DeclarationEnd,
-
-AstNode__TypeBegin,
-	AstNode_Field,
-	AstNode_ProcedureType,
-	AstNode_PointerType,
-	AstNode_ArrayType,
-	AstNode_StructType,
-AstNode__TypeEnd,
-
-	AstNode_Count,
+#define AST_NODE_KIND(x) GB_JOIN2(AstNode_, x)
+	AST_NODE_KINDS
+#undef AST_NODE_KIND
 };
 
-enum DeclarationKind {
+String const ast_node_strings[] = {
+#define AST_NODE_KIND(x) {cast(u8 *)#x, gb_size_of(#x)-1}
+	AST_NODE_KINDS
+#undef AST_NODE_KIND
+};
+
+enum DeclKind {
 	Declaration_Invalid,
 
 	Declaration_Mutable,
@@ -139,143 +150,142 @@ enum DeclarationKind {
 struct AstNode {
 	AstNodeKind kind;
 	AstNode *prev, *next; // NOTE(bill): allow for Linked list
-	Type *type;
 	union {
 		// NOTE(bill): open/close for debugging/errors
-		Token basic_literal;
+		Token basic_lit;
 		struct {
 			Token token;
 			AstEntity *entity;
-		} identifier;
+		} ident;
 		struct {
-			AstNode *type; // AstNode_ProcedureType
-			AstNode *body; // AstNode_BlockStatement
-		} procedure_literal;
+			AstNode *type; // AstNode_ProcType
+			AstNode *body; // AstNode_BlockStmt
+		} proc_lit;
 		struct {
-			AstNode *type_expression;
-			AstNode *element_list;
-			isize element_count;
+			AstNode *type;
+			AstNode *elem_list;
+			isize elem_count;
 			Token open, close;
-		} compound_literal;
+		} compound_lit;
 
 		struct {
 			Token token;
 			Token name;
-			AstNode *expression;
-		} tag_expression;
+			AstNode *expr;
+		} tag_expr;
 
-		struct { Token begin, end; }                                bad_expression;
-		struct { Token op; AstNode *operand; }                      unary_expression;
-		struct { Token op; AstNode *left, *right; }                 binary_expression;
-		struct { AstNode *expression; Token open, close; }          paren_expression;
-		struct { Token token; AstNode *operand, *selector; }        selector_expression;
-		struct { AstNode *expression, *value; Token open, close; }  index_expression;
-		struct { Token token; AstNode *type_expression, *operand; } cast_expression;
+		struct { Token begin, end; }                         bad_expr;
+		struct { Token op; AstNode *expr; }                  unary_expr;
+		struct { Token op; AstNode *left, *right; }          binary_expr;
+		struct { AstNode *expr; Token open, close; }         paren_expr;
+		struct { Token token; AstNode *expr, *selector; }    selector_expr;
+		struct { AstNode *expr, *index; Token open, close; } index_expr;
+		struct { Token token; AstNode *type, *expr; }        cast_expr;
 		struct {
 			AstNode *proc, *arg_list;
 			isize arg_list_count;
 			Token open, close;
-		} call_expression;
-		struct { Token op; AstNode *operand; } dereference_expression;
+		} call_expr;
+		struct { Token op; AstNode *expr; } deref_expr;
 		struct {
-			AstNode *expression;
+			AstNode *expr;
 			Token open, close;
 			AstNode *low, *high, *max;
 			b32 triple_indexed; // [(1st):2nd:3rd]
-		} slice_expression;
+		} slice_expr;
 
-		struct { Token begin, end; }              bad_statement;
-		struct { Token token; }                   empty_statement;
-		struct { AstNode *expression; }           expression_statement;
-		struct { Token op; AstNode *expression; } inc_dec_statement;
+		struct { Token begin, end; }        bad_stmt;
+		struct { Token token; }             empty_stmt;
+		struct { AstNode *expr; }           expr_stmt;
+		struct { Token op; AstNode *expr; } inc_dec_stmt;
 		struct {
 			Token token;
 			Token name;
-			AstNode *statement;
-		} tag_statement;
+			AstNode *stmt;
+		} tag_stmt;
 		struct {
 			Token op;
 			AstNode *lhs_list, *rhs_list;
 			isize lhs_count, rhs_count;
-		} assign_statement;
+		} assign_stmt;
 		struct {
 			AstNode *list;
 			isize list_count;
 			Token open, close;
-		} block_statement;
+		} block_stmt;
 		struct {
 			Token token;
 			AstNode *init;
 			AstNode *cond;
 			AstNode *body;
-			AstNode *else_statement;
-		} if_statement;
+			AstNode *else_stmt;
+		} if_stmt;
 		struct {
 			Token token;
-			AstNode *results; // NOTE(bill): Return values
+			AstNode *result_list;
 			isize result_count;
-		} return_statement;
+		} return_stmt;
 		struct {
 			Token token;
 			AstNode *init, *cond, *end;
 			AstNode *body;
-		} for_statement;
+		} for_stmt;
 		struct {
 			Token token;
-			AstNode *statement;
-		} defer_statement;
+			AstNode *stmt;
+		} defer_stmt;
 		struct {
 			Token token;
-		} branch_statement;
+		} branch_stmt;
 
-		struct { Token begin, end; } bad_declaration;
+		struct { Token begin, end; } bad_decl;
 		struct {
-			DeclarationKind kind;
+			DeclKind kind;
 			AstNode *name_list;
-			AstNode *type_expression;
+			AstNode *type;
 			AstNode *value_list;
 			isize name_count, value_count;
-		} variable_declaration;
+		} var_decl;
 
 		struct {
 			AstNode *name_list;
 			isize name_count;
-			AstNode *type_expression;
+			AstNode *type;
 		} field;
 
 		// TODO(bill): Unify Procedure Declarations and Literals
 		struct {
-			DeclarationKind kind;
-			AstNode *name;     // AstNode_Identifier
-			AstNode *type;     // AstNode_ProcedureType
-			AstNode *body;     // AstNode_BlockStatement
-			AstNode *tag_list; // AstNode_TagExpression
+			DeclKind kind;
+			AstNode *name;     // AstNode_Ident
+			AstNode *type;     // AstNode_ProcType
+			AstNode *body;     // AstNode_BlockStmt
+			AstNode *tag_list; // AstNode_TagExpr
 			isize tag_count;
-		} procedure_declaration;
+		} proc_decl;
 		struct {
 			Token token;
-			AstNode *name; // AstNode_Identifier
-			AstNode *type_expression;
-		} type_declaration;
+			AstNode *name; // AstNode_Ident
+			AstNode *type;
+		} type_decl;
 		struct {
 			Token token;
-			AstNode *name; // AstNode_Identifier
-			AstNode *type_expression;
-		} alias_declaration;
+			AstNode *name; // AstNode_Ident
+			AstNode *type;
+		} alias_decl;
 		struct {
 			Token token;
 			Token filepath;
-		} import_declaration;
+		} import_decl;
 
 
 		struct {
 			Token token;
-			AstNode *type_expression;
+			AstNode *type;
 		} pointer_type;
 		struct {
 			Token token;
 			AstNode *count; // NOTE(bill): Zero/NULL is probably a slice
-			AstNode *element;
+			AstNode *elem;
 		} array_type;
 		struct {
 			Token token;
@@ -285,10 +295,10 @@ struct AstNode {
 		struct {
 			Token token;
 			AstNode *param_list; // AstNode_Field list
-			isize param_count;
 			AstNode *result_list; // type expression list
+			isize param_count;
 			isize result_count;
-		} procedure_type;
+		} proc_type;
 	};
 };
 
@@ -300,17 +310,17 @@ gb_inline AstScope *make_ast_scope(AstFile *f, AstScope *parent) {
 }
 
 
-gb_inline b32 is_ast_node_expression(AstNode *node) {
-	return gb_is_between(node->kind, AstNode__ExpressionBegin+1, AstNode__ExpressionEnd-1);
+gb_inline b32 is_ast_node_expr(AstNode *node) {
+	return gb_is_between(node->kind, AstNode__ExprBegin+1, AstNode__ExprEnd-1);
 }
-gb_inline b32 is_ast_node_statement(AstNode *node) {
-	return gb_is_between(node->kind, AstNode__StatementBegin+1, AstNode__StatementEnd-1);
+gb_inline b32 is_ast_node_stmt(AstNode *node) {
+	return gb_is_between(node->kind, AstNode__stmtBegin+1, AstNode__stmtEnd-1);
 }
-gb_inline b32 is_ast_node_complex_statement(AstNode *node) {
-	return gb_is_between(node->kind, AstNode__ComplexStatementBegin+1, AstNode__ComplexStatementEnd-1);
+gb_inline b32 is_ast_node_complex_stmt(AstNode *node) {
+	return gb_is_between(node->kind, AstNode__ComplexStmtBegin+1, AstNode__ComplexStmtEnd-1);
 }
-gb_inline b32 is_ast_node_declaration(AstNode *node) {
-	return gb_is_between(node->kind, AstNode__DeclarationBegin+1, AstNode__DeclarationEnd-1);
+gb_inline b32 is_ast_node_decl(AstNode *node) {
+	return gb_is_between(node->kind, AstNode__DeclBegin+1, AstNode__DeclEnd-1);
 }
 gb_inline b32 is_ast_node_type(AstNode *node) {
 	return gb_is_between(node->kind, AstNode__TypeBegin+1, AstNode__TypeEnd-1);
@@ -319,80 +329,80 @@ gb_inline b32 is_ast_node_type(AstNode *node) {
 
 Token ast_node_token(AstNode *node) {
 	switch (node->kind) {
-	case AstNode_BasicLiteral:
-		return node->basic_literal;
-	case AstNode_Identifier:
-		return node->identifier.token;
-	case AstNode_ProcedureLiteral:
-		return ast_node_token(node->procedure_literal.type);
-	case AstNode_CompoundLiteral:
-		return ast_node_token(node->compound_literal.type_expression);
-	case AstNode_TagExpression:
-		return node->tag_expression.token;
-	case AstNode_BadExpression:
-		return node->bad_expression.begin;
-	case AstNode_UnaryExpression:
-		return node->unary_expression.op;
-	case AstNode_BinaryExpression:
-		return ast_node_token(node->binary_expression.left);
-	case AstNode_ParenExpression:
-		return node->paren_expression.open;
-	case AstNode_CallExpression:
-		return ast_node_token(node->call_expression.proc);
-	case AstNode_SelectorExpression:
-		return ast_node_token(node->selector_expression.selector);
-	case AstNode_IndexExpression:
-		return node->index_expression.open;
-	case AstNode_SliceExpression:
-		return node->slice_expression.open;
-	case AstNode_CastExpression:
-		return node->cast_expression.token;
-	case AstNode_DereferenceExpression:
-		return node->dereference_expression.op;
-	case AstNode_BadStatement:
-		return node->bad_statement.begin;
-	case AstNode_EmptyStatement:
-		return node->empty_statement.token;
-	case AstNode_ExpressionStatement:
-		return ast_node_token(node->expression_statement.expression);
-	case AstNode_TagStatement:
-		return node->tag_statement.token;
-	case AstNode_IncDecStatement:
-		return node->inc_dec_statement.op;
-	case AstNode_AssignStatement:
-		return node->assign_statement.op;
-	case AstNode_BlockStatement:
-		return node->block_statement.open;
-	case AstNode_IfStatement:
-		return node->if_statement.token;
-	case AstNode_ReturnStatement:
-		return node->return_statement.token;
-	case AstNode_ForStatement:
-		return node->for_statement.token;
-	case AstNode_DeferStatement:
-		return node->defer_statement.token;
-	case AstNode_BranchStatement:
-		return node->branch_statement.token;
-	case AstNode_BadDeclaration:
-		return node->bad_declaration.begin;
-	case AstNode_VariableDeclaration:
-		return ast_node_token(node->variable_declaration.name_list);
-	case AstNode_ProcedureDeclaration:
-		return node->procedure_declaration.name->identifier.token;
-	case AstNode_TypeDeclaration:
-		return node->type_declaration.token;
-	case AstNode_AliasDeclaration:
-		return node->alias_declaration.token;
-	case AstNode_ImportDeclaration:
-		return node->import_declaration.token;
+	case AstNode_BasicLit:
+		return node->basic_lit;
+	case AstNode_Ident:
+		return node->ident.token;
+	case AstNode_ProcLit:
+		return ast_node_token(node->proc_lit.type);
+	case AstNode_CompoundLit:
+		return ast_node_token(node->compound_lit.type);
+	case AstNode_TagExpr:
+		return node->tag_expr.token;
+	case AstNode_BadExpr:
+		return node->bad_expr.begin;
+	case AstNode_UnaryExpr:
+		return node->unary_expr.op;
+	case AstNode_BinaryExpr:
+		return ast_node_token(node->binary_expr.left);
+	case AstNode_ParenExpr:
+		return node->paren_expr.open;
+	case AstNode_CallExpr:
+		return ast_node_token(node->call_expr.proc);
+	case AstNode_SelectorExpr:
+		return ast_node_token(node->selector_expr.selector);
+	case AstNode_IndexExpr:
+		return node->index_expr.open;
+	case AstNode_SliceExpr:
+		return node->slice_expr.open;
+	case AstNode_CastExpr:
+		return node->cast_expr.token;
+	case AstNode_DerefExpr:
+		return node->deref_expr.op;
+	case AstNode_BadStmt:
+		return node->bad_stmt.begin;
+	case AstNode_EmptyStmt:
+		return node->empty_stmt.token;
+	case AstNode_ExprStmt:
+		return ast_node_token(node->expr_stmt.expr);
+	case AstNode_TagStmt:
+		return node->tag_stmt.token;
+	case AstNode_IncDecStmt:
+		return node->inc_dec_stmt.op;
+	case AstNode_AssignStmt:
+		return node->assign_stmt.op;
+	case AstNode_BlockStmt:
+		return node->block_stmt.open;
+	case AstNode_IfStmt:
+		return node->if_stmt.token;
+	case AstNode_ReturnStmt:
+		return node->return_stmt.token;
+	case AstNode_ForStmt:
+		return node->for_stmt.token;
+	case AstNode_DeferStmt:
+		return node->defer_stmt.token;
+	case AstNode_BranchStmt:
+		return node->branch_stmt.token;
+	case AstNode_BadDecl:
+		return node->bad_decl.begin;
+	case AstNode_VarDecl:
+		return ast_node_token(node->var_decl.name_list);
+	case AstNode_ProcDecl:
+		return node->proc_decl.name->ident.token;
+	case AstNode_TypeDecl:
+		return node->type_decl.token;
+	case AstNode_AliasDecl:
+		return node->alias_decl.token;
+	case AstNode_ImportDecl:
+		return node->import_decl.token;
 	case AstNode_Field: {
 		if (node->field.name_list)
 			return ast_node_token(node->field.name_list);
 		else
-			return ast_node_token(node->field.type_expression);
+			return ast_node_token(node->field.type);
 	}
-	case AstNode_ProcedureType:
-		return node->procedure_type.token;
+	case AstNode_ProcType:
+		return node->proc_type.token;
 	case AstNode_PointerType:
 		return node->pointer_type.token;
 	case AstNode_ArrayType:
@@ -430,10 +440,10 @@ gb_inline void close_ast_scope(AstFile *f) {
 	}
 }
 
-AstEntity *make_ast_entity(AstFile *f, Token token, AstNode *declaration, AstScope *parent) {
+AstEntity *make_ast_entity(AstFile *f, Token token, AstNode *decl, AstScope *parent) {
 	AstEntity *entity = gb_alloc_item(gb_arena_allocator(&f->arena), AstEntity);
 	entity->token = token;
-	entity->declaration = declaration;
+	entity->decl = decl;
 	entity->parent = parent;
 	return entity;
 }
@@ -488,296 +498,296 @@ gb_inline AstNode *make_node(AstFile *f, AstNodeKind kind) {
 	return node;
 }
 
-gb_inline AstNode *make_bad_expression(AstFile *f, Token begin, Token end) {
-	AstNode *result = make_node(f, AstNode_BadExpression);
-	result->bad_expression.begin = begin;
-	result->bad_expression.end   = end;
+gb_inline AstNode *make_bad_expr(AstFile *f, Token begin, Token end) {
+	AstNode *result = make_node(f, AstNode_BadExpr);
+	result->bad_expr.begin = begin;
+	result->bad_expr.end   = end;
 	return result;
 }
 
-gb_inline AstNode *make_tag_expression(AstFile *f, Token token, Token name, AstNode *expression) {
-	AstNode *result = make_node(f, AstNode_TagExpression);
-	result->tag_expression.token = token;
-	result->tag_expression.name = name;
-	result->tag_expression.expression = expression;
+gb_inline AstNode *make_tag_expr(AstFile *f, Token token, Token name, AstNode *expr) {
+	AstNode *result = make_node(f, AstNode_TagExpr);
+	result->tag_expr.token = token;
+	result->tag_expr.name = name;
+	result->tag_expr.expr = expr;
 	return result;
 }
 
-gb_inline AstNode *make_tag_statement(AstFile *f, Token token, Token name, AstNode *statement) {
-	AstNode *result = make_node(f, AstNode_TagStatement);
-	result->tag_statement.token = token;
-	result->tag_statement.name = name;
-	result->tag_statement.statement = statement;
+gb_inline AstNode *make_tag_stmt(AstFile *f, Token token, Token name, AstNode *stmt) {
+	AstNode *result = make_node(f, AstNode_TagStmt);
+	result->tag_stmt.token = token;
+	result->tag_stmt.name = name;
+	result->tag_stmt.stmt = stmt;
 	return result;
 }
 
-gb_inline AstNode *make_unary_expression(AstFile *f, Token op, AstNode *operand) {
-	AstNode *result = make_node(f, AstNode_UnaryExpression);
-	result->unary_expression.op = op;
-	result->unary_expression.operand = operand;
+gb_inline AstNode *make_unary_expr(AstFile *f, Token op, AstNode *expr) {
+	AstNode *result = make_node(f, AstNode_UnaryExpr);
+	result->unary_expr.op = op;
+	result->unary_expr.expr = expr;
 	return result;
 }
 
-gb_inline AstNode *make_binary_expression(AstFile *f, Token op, AstNode *left, AstNode *right) {
-	AstNode *result = make_node(f, AstNode_BinaryExpression);
+gb_inline AstNode *make_binary_expr(AstFile *f, Token op, AstNode *left, AstNode *right) {
+	AstNode *result = make_node(f, AstNode_BinaryExpr);
 
 	if (left == NULL) {
 		ast_file_err(f, op, "No lhs expression for binary expression `%.*s`", LIT(op.string));
-		left = make_bad_expression(f, op, op);
+		left = make_bad_expr(f, op, op);
 	}
 	if (right == NULL) {
 		ast_file_err(f, op, "No rhs expression for binary expression `%.*s`", LIT(op.string));
-		right = make_bad_expression(f, op, op);
+		right = make_bad_expr(f, op, op);
 	}
 
-	result->binary_expression.op = op;
-	result->binary_expression.left = left;
-	result->binary_expression.right = right;
+	result->binary_expr.op = op;
+	result->binary_expr.left = left;
+	result->binary_expr.right = right;
 
 	return result;
 }
 
-gb_inline AstNode *make_paren_expression(AstFile *f, AstNode *expression, Token open, Token close) {
-	AstNode *result = make_node(f, AstNode_ParenExpression);
-	result->paren_expression.expression = expression;
-	result->paren_expression.open = open;
-	result->paren_expression.close = close;
+gb_inline AstNode *make_paren_expr(AstFile *f, AstNode *expr, Token open, Token close) {
+	AstNode *result = make_node(f, AstNode_ParenExpr);
+	result->paren_expr.expr = expr;
+	result->paren_expr.open = open;
+	result->paren_expr.close = close;
 	return result;
 }
 
-gb_inline AstNode *make_call_expression(AstFile *f, AstNode *proc, AstNode *arg_list, isize arg_list_count, Token open, Token close) {
-	AstNode *result = make_node(f, AstNode_CallExpression);
-	result->call_expression.proc = proc;
-	result->call_expression.arg_list = arg_list;
-	result->call_expression.arg_list_count = arg_list_count;
-	result->call_expression.open  = open;
-	result->call_expression.close = close;
+gb_inline AstNode *make_call_expr(AstFile *f, AstNode *proc, AstNode *arg_list, isize arg_list_count, Token open, Token close) {
+	AstNode *result = make_node(f, AstNode_CallExpr);
+	result->call_expr.proc = proc;
+	result->call_expr.arg_list = arg_list;
+	result->call_expr.arg_list_count = arg_list_count;
+	result->call_expr.open  = open;
+	result->call_expr.close = close;
 	return result;
 }
 
-gb_inline AstNode *make_selector_expression(AstFile *f, Token token, AstNode *operand, AstNode *selector) {
-	AstNode *result = make_node(f, AstNode_SelectorExpression);
-	result->selector_expression.operand = operand;
-	result->selector_expression.selector = selector;
+gb_inline AstNode *make_selector_expr(AstFile *f, Token token, AstNode *expr, AstNode *selector) {
+	AstNode *result = make_node(f, AstNode_SelectorExpr);
+	result->selector_expr.expr = expr;
+	result->selector_expr.selector = selector;
 	return result;
 }
 
-gb_inline AstNode *make_index_expression(AstFile *f, AstNode *expression, AstNode *value, Token open, Token close) {
-	AstNode *result = make_node(f, AstNode_IndexExpression);
-	result->index_expression.expression = expression;
-	result->index_expression.value = value;
-	result->index_expression.open = open;
-	result->index_expression.close = close;
-	return result;
-}
-
-
-gb_inline AstNode *make_slice_expression(AstFile *f, AstNode *expression, Token open, Token close, AstNode *low, AstNode *high, AstNode *max, b32 triple_indexed) {
-	AstNode *result = make_node(f, AstNode_SliceExpression);
-	result->slice_expression.expression = expression;
-	result->slice_expression.open = open;
-	result->slice_expression.close = close;
-	result->slice_expression.low = low;
-	result->slice_expression.high = high;
-	result->slice_expression.max = max;
-	result->slice_expression.triple_indexed = triple_indexed;
-	return result;
-}
-
-gb_inline AstNode *make_cast_expression(AstFile *f, Token token, AstNode *type_expression, AstNode *operand) {
-	AstNode *result = make_node(f, AstNode_CastExpression);
-	result->cast_expression.token = token;
-	result->cast_expression.type_expression = type_expression;
-	result->cast_expression.operand = operand;
+gb_inline AstNode *make_index_expr(AstFile *f, AstNode *expr, AstNode *index, Token open, Token close) {
+	AstNode *result = make_node(f, AstNode_IndexExpr);
+	result->index_expr.expr = expr;
+	result->index_expr.index = index;
+	result->index_expr.open = open;
+	result->index_expr.close = close;
 	return result;
 }
 
 
-gb_inline AstNode *make_dereference_expression(AstFile *f, AstNode *operand, Token op) {
-	AstNode *result = make_node(f, AstNode_DereferenceExpression);
-	result->dereference_expression.operand = operand;
-	result->dereference_expression.op = op;
+gb_inline AstNode *make_slice_expr(AstFile *f, AstNode *expr, Token open, Token close, AstNode *low, AstNode *high, AstNode *max, b32 triple_indexed) {
+	AstNode *result = make_node(f, AstNode_SliceExpr);
+	result->slice_expr.expr = expr;
+	result->slice_expr.open = open;
+	result->slice_expr.close = close;
+	result->slice_expr.low = low;
+	result->slice_expr.high = high;
+	result->slice_expr.max = max;
+	result->slice_expr.triple_indexed = triple_indexed;
+	return result;
+}
+
+gb_inline AstNode *make_cast_expr(AstFile *f, Token token, AstNode *type, AstNode *expr) {
+	AstNode *result = make_node(f, AstNode_CastExpr);
+	result->cast_expr.token = token;
+	result->cast_expr.type = type;
+	result->cast_expr.expr = expr;
 	return result;
 }
 
 
-gb_inline AstNode *make_basic_literal(AstFile *f, Token basic_literal) {
-	AstNode *result = make_node(f, AstNode_BasicLiteral);
-	result->basic_literal = basic_literal;
+gb_inline AstNode *make_deref_expr(AstFile *f, AstNode *expr, Token op) {
+	AstNode *result = make_node(f, AstNode_DerefExpr);
+	result->deref_expr.expr = expr;
+	result->deref_expr.op = op;
+	return result;
+}
+
+
+gb_inline AstNode *make_basic_lit(AstFile *f, Token basic_lit) {
+	AstNode *result = make_node(f, AstNode_BasicLit);
+	result->basic_lit = basic_lit;
 	return result;
 }
 
 gb_inline AstNode *make_identifier(AstFile *f, Token token, AstEntity *entity = NULL) {
-	AstNode *result = make_node(f, AstNode_Identifier);
-	result->identifier.token = token;
-	result->identifier.entity   = entity;
+	AstNode *result = make_node(f, AstNode_Ident);
+	result->ident.token = token;
+	result->ident.entity   = entity;
 	return result;
 }
 
 gb_inline AstNode *make_procedure_literal(AstFile *f, AstNode *type, AstNode *body) {
-	AstNode *result = make_node(f, AstNode_ProcedureLiteral);
-	result->procedure_literal.type = type;
-	result->procedure_literal.body = body;
+	AstNode *result = make_node(f, AstNode_ProcLit);
+	result->proc_lit.type = type;
+	result->proc_lit.body = body;
 	return result;
 }
 
 
-gb_inline AstNode *make_compound_literal(AstFile *f, AstNode *type_expression, AstNode *element_list, isize element_count,
+gb_inline AstNode *make_compound_literal(AstFile *f, AstNode *type, AstNode *elem_list, isize elem_count,
                                          Token open, Token close) {
-	AstNode *result = make_node(f, AstNode_CompoundLiteral);
-	result->compound_literal.type_expression = type_expression;
-	result->compound_literal.element_list = element_list;
-	result->compound_literal.element_count = element_count;
-	result->compound_literal.open = open;
-	result->compound_literal.close = close;
+	AstNode *result = make_node(f, AstNode_CompoundLit);
+	result->compound_lit.type = type;
+	result->compound_lit.elem_list = elem_list;
+	result->compound_lit.elem_count = elem_count;
+	result->compound_lit.open = open;
+	result->compound_lit.close = close;
 	return result;
 }
 
-gb_inline AstNode *make_bad_statement(AstFile *f, Token begin, Token end) {
-	AstNode *result = make_node(f, AstNode_BadStatement);
-	result->bad_statement.begin = begin;
-	result->bad_statement.end   = end;
+gb_inline AstNode *make_bad_stmt(AstFile *f, Token begin, Token end) {
+	AstNode *result = make_node(f, AstNode_BadStmt);
+	result->bad_stmt.begin = begin;
+	result->bad_stmt.end   = end;
 	return result;
 }
 
-gb_inline AstNode *make_empty_statement(AstFile *f, Token token) {
-	AstNode *result = make_node(f, AstNode_EmptyStatement);
-	result->empty_statement.token = token;
+gb_inline AstNode *make_empty_stmt(AstFile *f, Token token) {
+	AstNode *result = make_node(f, AstNode_EmptyStmt);
+	result->empty_stmt.token = token;
 	return result;
 }
 
-gb_inline AstNode *make_expression_statement(AstFile *f, AstNode *expression) {
-	AstNode *result = make_node(f, AstNode_ExpressionStatement);
-	result->expression_statement.expression = expression;
+gb_inline AstNode *make_expr_stmt(AstFile *f, AstNode *expr) {
+	AstNode *result = make_node(f, AstNode_ExprStmt);
+	result->expr_stmt.expr = expr;
 	return result;
 }
 
-gb_inline AstNode *make_inc_dec_statement(AstFile *f, Token op, AstNode *expression) {
-	AstNode *result = make_node(f, AstNode_IncDecStatement);
-	result->inc_dec_statement.op = op;
-	result->inc_dec_statement.expression = expression;
+gb_inline AstNode *make_inc_dec_stmt(AstFile *f, Token op, AstNode *expr) {
+	AstNode *result = make_node(f, AstNode_IncDecStmt);
+	result->inc_dec_stmt.op = op;
+	result->inc_dec_stmt.expr = expr;
 	return result;
 }
 
-gb_inline AstNode *make_assign_statement(AstFile *f, Token op, AstNode *lhs_list, isize lhs_count, AstNode *rhs_list, isize rhs_count) {
-	AstNode *result = make_node(f, AstNode_AssignStatement);
-	result->assign_statement.op = op;
-	result->assign_statement.lhs_list = lhs_list;
-	result->assign_statement.lhs_count = lhs_count;
-	result->assign_statement.rhs_list = rhs_list;
-	result->assign_statement.rhs_count = rhs_count;
+gb_inline AstNode *make_assign_stmt(AstFile *f, Token op, AstNode *lhs_list, isize lhs_count, AstNode *rhs_list, isize rhs_count) {
+	AstNode *result = make_node(f, AstNode_AssignStmt);
+	result->assign_stmt.op = op;
+	result->assign_stmt.lhs_list = lhs_list;
+	result->assign_stmt.lhs_count = lhs_count;
+	result->assign_stmt.rhs_list = rhs_list;
+	result->assign_stmt.rhs_count = rhs_count;
 	return result;
 }
 
-gb_inline AstNode *make_block_statement(AstFile *f, AstNode *list, isize list_count, Token open, Token close) {
-	AstNode *result = make_node(f, AstNode_BlockStatement);
-	result->block_statement.list = list;
-	result->block_statement.list_count = list_count;
-	result->block_statement.open = open;
-	result->block_statement.close = close;
+gb_inline AstNode *make_block_stmt(AstFile *f, AstNode *list, isize list_count, Token open, Token close) {
+	AstNode *result = make_node(f, AstNode_BlockStmt);
+	result->block_stmt.list = list;
+	result->block_stmt.list_count = list_count;
+	result->block_stmt.open = open;
+	result->block_stmt.close = close;
 	return result;
 }
 
-gb_inline AstNode *make_if_statement(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *body, AstNode *else_statement) {
-	AstNode *result = make_node(f, AstNode_IfStatement);
-	result->if_statement.token = token;
-	result->if_statement.init = init;
-	result->if_statement.cond = cond;
-	result->if_statement.body = body;
-	result->if_statement.else_statement = else_statement;
+gb_inline AstNode *make_if_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *body, AstNode *else_stmt) {
+	AstNode *result = make_node(f, AstNode_IfStmt);
+	result->if_stmt.token = token;
+	result->if_stmt.init = init;
+	result->if_stmt.cond = cond;
+	result->if_stmt.body = body;
+	result->if_stmt.else_stmt = else_stmt;
 	return result;
 }
 
-gb_inline AstNode *make_return_statement(AstFile *f, Token token, AstNode *results, isize result_count) {
-	AstNode *result = make_node(f, AstNode_ReturnStatement);
-	result->return_statement.token = token;
-	result->return_statement.results = results;
-	result->return_statement.result_count = result_count;
+gb_inline AstNode *make_return_stmt(AstFile *f, Token token, AstNode *result_list, isize result_count) {
+	AstNode *result = make_node(f, AstNode_ReturnStmt);
+	result->return_stmt.token = token;
+	result->return_stmt.result_list = result_list;
+	result->return_stmt.result_count = result_count;
 	return result;
 }
 
-gb_inline AstNode *make_for_statement(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *end, AstNode *body) {
-	AstNode *result = make_node(f, AstNode_ForStatement);
-	result->for_statement.token = token;
-	result->for_statement.init = init;
-	result->for_statement.cond = cond;
-	result->for_statement.end = end;
-	result->for_statement.body = body;
+gb_inline AstNode *make_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *end, AstNode *body) {
+	AstNode *result = make_node(f, AstNode_ForStmt);
+	result->for_stmt.token = token;
+	result->for_stmt.init = init;
+	result->for_stmt.cond = cond;
+	result->for_stmt.end = end;
+	result->for_stmt.body = body;
 	return result;
 }
-gb_inline AstNode *make_defer_statement(AstFile *f, Token token, AstNode *statement) {
-	AstNode *result = make_node(f, AstNode_DeferStatement);
-	result->defer_statement.token = token;
-	result->defer_statement.statement = statement;
-	return result;
-}
-
-gb_inline AstNode *make_branch_statement(AstFile *f, Token token) {
-	AstNode *result = make_node(f, AstNode_BranchStatement);
-	result->branch_statement.token = token;
+gb_inline AstNode *make_defer_stmt(AstFile *f, Token token, AstNode *stmt) {
+	AstNode *result = make_node(f, AstNode_DeferStmt);
+	result->defer_stmt.token = token;
+	result->defer_stmt.stmt = stmt;
 	return result;
 }
 
-
-gb_inline AstNode *make_bad_declaration(AstFile *f, Token begin, Token end) {
-	AstNode *result = make_node(f, AstNode_BadDeclaration);
-	result->bad_declaration.begin = begin;
-	result->bad_declaration.end = end;
+gb_inline AstNode *make_branch_stmt(AstFile *f, Token token) {
+	AstNode *result = make_node(f, AstNode_BranchStmt);
+	result->branch_stmt.token = token;
 	return result;
 }
 
-gb_inline AstNode *make_variable_declaration(AstFile *f, DeclarationKind kind, AstNode *name_list, isize name_count, AstNode *type_expression, AstNode *value_list, isize value_count) {
-	AstNode *result = make_node(f, AstNode_VariableDeclaration);
-	result->variable_declaration.kind = kind;
-	result->variable_declaration.name_list = name_list;
-	result->variable_declaration.name_count = name_count;
-	result->variable_declaration.type_expression = type_expression;
-	result->variable_declaration.value_list = value_list;
-	result->variable_declaration.value_count = value_count;
+
+gb_inline AstNode *make_bad_decl(AstFile *f, Token begin, Token end) {
+	AstNode *result = make_node(f, AstNode_BadDecl);
+	result->bad_decl.begin = begin;
+	result->bad_decl.end = end;
 	return result;
 }
 
-gb_inline AstNode *make_field(AstFile *f, AstNode *name_list, isize name_count, AstNode *type_expression) {
+gb_inline AstNode *make_variable_decl(AstFile *f, DeclKind kind, AstNode *name_list, isize name_count, AstNode *type, AstNode *value_list, isize value_count) {
+	AstNode *result = make_node(f, AstNode_VarDecl);
+	result->var_decl.kind = kind;
+	result->var_decl.name_list = name_list;
+	result->var_decl.name_count = name_count;
+	result->var_decl.type = type;
+	result->var_decl.value_list = value_list;
+	result->var_decl.value_count = value_count;
+	return result;
+}
+
+gb_inline AstNode *make_field(AstFile *f, AstNode *name_list, isize name_count, AstNode *type) {
 	AstNode *result = make_node(f, AstNode_Field);
 	result->field.name_list = name_list;
 	result->field.name_count = name_count;
-	result->field.type_expression = type_expression;
+	result->field.type = type;
 	return result;
 }
 
-gb_inline AstNode *make_procedure_type(AstFile *f, Token token, AstNode *param_list, isize param_count, AstNode *result_list, isize result_count) {
-	AstNode *result = make_node(f, AstNode_ProcedureType);
-	result->procedure_type.token = token;
-	result->procedure_type.param_list = param_list;
-	result->procedure_type.param_count = param_count;
-	result->procedure_type.result_list = result_list;
-	result->procedure_type.result_count = result_count;
+gb_inline AstNode *make_proc_type(AstFile *f, Token token, AstNode *param_list, isize param_count, AstNode *result_list, isize result_count) {
+	AstNode *result = make_node(f, AstNode_ProcType);
+	result->proc_type.token = token;
+	result->proc_type.param_list = param_list;
+	result->proc_type.param_count = param_count;
+	result->proc_type.result_list = result_list;
+	result->proc_type.result_count = result_count;
 	return result;
 }
 
-gb_inline AstNode *make_procedure_declaration(AstFile *f, DeclarationKind kind, AstNode *name, AstNode *procedure_type, AstNode *body, AstNode *tag_list, isize tag_count) {
-	AstNode *result = make_node(f, AstNode_ProcedureDeclaration);
-	result->procedure_declaration.kind = kind;
-	result->procedure_declaration.name = name;
-	result->procedure_declaration.type = procedure_type;
-	result->procedure_declaration.body = body;
-	result->procedure_declaration.tag_list = tag_list;
-	result->procedure_declaration.tag_count = tag_count;
+gb_inline AstNode *make_procedure_decl(AstFile *f, DeclKind kind, AstNode *name, AstNode *proc_type, AstNode *body, AstNode *tag_list, isize tag_count) {
+	AstNode *result = make_node(f, AstNode_ProcDecl);
+	result->proc_decl.kind = kind;
+	result->proc_decl.name = name;
+	result->proc_decl.type = proc_type;
+	result->proc_decl.body = body;
+	result->proc_decl.tag_list = tag_list;
+	result->proc_decl.tag_count = tag_count;
 	return result;
 }
 
-gb_inline AstNode *make_pointer_type(AstFile *f, Token token, AstNode *type_expression) {
+gb_inline AstNode *make_pointer_type(AstFile *f, Token token, AstNode *type) {
 	AstNode *result = make_node(f, AstNode_PointerType);
 	result->pointer_type.token = token;
-	result->pointer_type.type_expression = type_expression;
+	result->pointer_type.type = type;
 	return result;
 }
 
-gb_inline AstNode *make_array_type(AstFile *f, Token token, AstNode *count, AstNode *element) {
+gb_inline AstNode *make_array_type(AstFile *f, Token token, AstNode *count, AstNode *elem) {
 	AstNode *result = make_node(f, AstNode_ArrayType);
 	result->array_type.token = token;
 	result->array_type.count = count;
-	result->array_type.element = element;
+	result->array_type.elem = elem;
 	return result;
 }
 
@@ -789,27 +799,27 @@ gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNode *field_list
 	return result;
 }
 
-gb_inline AstNode *make_type_declaration(AstFile *f, Token token, AstNode *name, AstNode *type_expression) {
-	AstNode *result = make_node(f, AstNode_TypeDeclaration);
-	result->type_declaration.token = token;
-	result->type_declaration.name = name;
-	result->type_declaration.type_expression = type_expression;
+gb_inline AstNode *make_type_decl(AstFile *f, Token token, AstNode *name, AstNode *type) {
+	AstNode *result = make_node(f, AstNode_TypeDecl);
+	result->type_decl.token = token;
+	result->type_decl.name = name;
+	result->type_decl.type = type;
 	return result;
 }
 
-gb_inline AstNode *make_alias_declaration(AstFile *f, Token token, AstNode *name, AstNode *type_expression) {
-	AstNode *result = make_node(f, AstNode_AliasDeclaration);
-	result->alias_declaration.token = token;
-	result->alias_declaration.name = name;
-	result->alias_declaration.type_expression = type_expression;
+gb_inline AstNode *make_alias_decl(AstFile *f, Token token, AstNode *name, AstNode *type) {
+	AstNode *result = make_node(f, AstNode_AliasDecl);
+	result->alias_decl.token = token;
+	result->alias_decl.name = name;
+	result->alias_decl.type = type;
 	return result;
 }
 
 
-gb_inline AstNode *make_import_declaration(AstFile *f, Token token, Token filepath) {
-	AstNode *result = make_node(f, AstNode_ImportDeclaration);
-	result->import_declaration.token = token;
-	result->import_declaration.filepath = filepath;
+gb_inline AstNode *make_import_decl(AstFile *f, Token token, Token filepath) {
+	AstNode *result = make_node(f, AstNode_ImportDecl);
+	result->import_decl.token = token;
+	result->import_decl.filepath = filepath;
 	return result;
 }
 
@@ -867,13 +877,13 @@ gb_inline b32 allow_token(AstFile *f, TokenKind kind) {
 
 gb_internal void add_ast_entity(AstFile *f, AstScope *scope, AstNode *declaration, AstNode *name_list) {
 	for (AstNode *n = name_list; n != NULL; n = n->next) {
-		if (n->kind != AstNode_Identifier) {
+		if (n->kind != AstNode_Ident) {
 			ast_file_err(f, ast_node_token(declaration), "Identifier is already declared or resolved");
 			continue;
 		}
 
-		AstEntity *entity = make_ast_entity(f, n->identifier.token, declaration, scope);
-		n->identifier.entity = entity;
+		AstEntity *entity = make_ast_entity(f, n->ident.token, declaration, scope);
+		n->ident.entity = entity;
 
 		AstEntity *insert_entity = ast_scope_insert(scope, *entity);
 		if (insert_entity != NULL &&
@@ -891,7 +901,7 @@ gb_internal void add_ast_entity(AstFile *f, AstScope *scope, AstNode *declaratio
 
 
 
-void fix_advance_to_next_statement(AstFile *f) {
+void fix_advance_to_next_stmt(AstFile *f) {
 #if 0
 	for (;;) {
 		Token t = f->cursor[0];
@@ -926,10 +936,10 @@ void fix_advance_to_next_statement(AstFile *f) {
 
 
 
-AstNode *parse_expression(AstFile *f, b32 lhs);
-AstNode *parse_procedure_type(AstFile *f, AstScope **scope_);
-AstNode *parse_statement_list(AstFile *f, isize *list_count_);
-AstNode *parse_statement(AstFile *f);
+AstNode *parse_expr(AstFile *f, b32 lhs);
+AstNode *parse_proc_type(AstFile *f, AstScope **scope_);
+AstNode *parse_stmt_list(AstFile *f, isize *list_count_);
+AstNode *parse_stmt(AstFile *f);
 AstNode *parse_body(AstFile *f, AstScope *scope);
 
 AstNode *parse_identifier(AstFile *f) {
@@ -943,23 +953,23 @@ AstNode *parse_identifier(AstFile *f) {
 	return make_identifier(f, token);
 }
 
-AstNode *parse_tag_expression(AstFile *f, AstNode *expression) {
+AstNode *parse_tag_expr(AstFile *f, AstNode *expression) {
 	Token token = expect_token(f, Token_Hash);
 	Token name  = expect_token(f, Token_Identifier);
-	return make_tag_expression(f, token, name, expression);
+	return make_tag_expr(f, token, name, expression);
 }
 
-AstNode *parse_tag_statement(AstFile *f, AstNode *statement) {
+AstNode *parse_tag_stmt(AstFile *f, AstNode *statement) {
 	Token token = expect_token(f, Token_Hash);
 	Token name  = expect_token(f, Token_Identifier);
-	return make_tag_statement(f, token, name, statement);
+	return make_tag_stmt(f, token, name, statement);
 }
 
-AstNode *unparen_expression(AstNode *node) {
+AstNode *unparen_expr(AstNode *node) {
 	for (;;) {
-		if (node->kind != AstNode_ParenExpression)
+		if (node->kind != AstNode_ParenExpr)
 			return node;
-		node = node->paren_expression.expression;
+		node = node->paren_expr.expr;
 	}
 }
 
@@ -990,24 +1000,24 @@ AstNode *parse_element_list(AstFile *f, isize *element_count_) {
 	return root;
 }
 
-AstNode *parse_literal_value(AstFile *f, AstNode *type_expression) {
+AstNode *parse_literal_value(AstFile *f, AstNode *type) {
 	AstNode *element_list = NULL;
 	isize element_count = 0;
 	Token open = expect_token(f, Token_OpenBrace);
-	f->expression_level++;
+	f->expr_level++;
 	if (f->cursor[0].kind != Token_CloseBrace)
 		element_list = parse_element_list(f, &element_count);
-	f->expression_level--;
+	f->expr_level--;
 	Token close = expect_token(f, Token_CloseBrace);
 
-	return make_compound_literal(f, type_expression, element_list, element_count, open, close);
+	return make_compound_literal(f, type, element_list, element_count, open, close);
 }
 
 AstNode *parse_value(AstFile *f) {
 	if (f->cursor[0].kind == Token_OpenBrace)
 		return parse_literal_value(f, NULL);
 
-	AstNode *value = parse_expression(f, false);
+	AstNode *value = parse_expr(f, false);
 	return value;
 }
 
@@ -1027,7 +1037,7 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 	case Token_Float:
 	case Token_String:
 	case Token_Rune:
-		operand = make_basic_literal(f, f->cursor[0]);
+		operand = make_basic_lit(f, f->cursor[0]);
 		next_token(f);
 		return operand;
 
@@ -1035,32 +1045,32 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 		Token open, close;
 		// NOTE(bill): Skip the Paren Expression
 		open = expect_token(f, Token_OpenParen);
-		f->expression_level++;
-		operand = parse_expression(f, false);
-		f->expression_level--;
+		f->expr_level++;
+		operand = parse_expr(f, false);
+		f->expr_level--;
 		close = expect_token(f, Token_CloseParen);
-		return make_paren_expression(f, operand, open, close);
+		return make_paren_expr(f, operand, open, close);
 	}
 
 	case Token_Hash: {
-		operand = parse_tag_expression(f, NULL);
-		operand->tag_expression.expression = parse_expression(f, false);
+		operand = parse_tag_expr(f, NULL);
+		operand->tag_expr.expr = parse_expr(f, false);
 		return operand;
 	}
 
 	// Parse Procedure Type or Literal
 	case Token_proc: {
 		AstScope *scope = NULL;
-		AstNode *type = parse_procedure_type(f, &scope);
+		AstNode *type = parse_proc_type(f, &scope);
 
 		if (f->cursor[0].kind != Token_OpenBrace) {
 			return type;
 		} else {
 			AstNode *body;
 
-			f->expression_level++;
+			f->expr_level++;
 			body = parse_body(f, scope);
-			f->expression_level--;
+			f->expr_level--;
 
 			return make_procedure_literal(f, type, body);
 		}
@@ -1070,7 +1080,7 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 		AstNode *type = parse_identifier_or_type(f);
 		if (type != NULL) {
 			// NOTE(bill): Sanity check as identifiers should be handled already
-			GB_ASSERT_MSG(type->kind != AstNode_Identifier, "Type Cannot be identifier");
+			GB_ASSERT_MSG(type->kind != AstNode_Ident, "Type Cannot be identifier");
 			return type;
 		}
 	}
@@ -1078,14 +1088,14 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 
 	Token begin = f->cursor[0];
 	ast_file_err(f, begin, "Expected an operand");
-	fix_advance_to_next_statement(f);
-	return make_bad_expression(f, begin, f->cursor[0]);
+	fix_advance_to_next_stmt(f);
+	return make_bad_expr(f, begin, f->cursor[0]);
 }
 
 b32 is_literal_type(AstNode *node) {
 	switch (node->kind) {
-	case AstNode_BadExpression:
-	case AstNode_Identifier:
+	case AstNode_BadExpr:
+	case AstNode_Ident:
 	case AstNode_ArrayType:
 	case AstNode_StructType:
 		return true;
@@ -1093,7 +1103,7 @@ b32 is_literal_type(AstNode *node) {
 	return false;
 }
 
-AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
+AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 	AstNode *operand = parse_operand(f, lhs);
 
 	b32 loop = true;
@@ -1108,7 +1118,7 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 			isize arg_list_count = 0;
 			Token open_paren, close_paren;
 
-			f->expression_level++;
+			f->expr_level++;
 			open_paren = expect_token(f, Token_OpenParen);
 
 			while (f->cursor[0].kind != Token_CloseParen &&
@@ -1116,7 +1126,7 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 				if (f->cursor[0].kind == Token_Comma)
 					ast_file_err(f, f->cursor[0], "Expected an expression not a ,");
 
-				DLIST_APPEND(arg_list, arg_list_curr, parse_expression(f, false));
+				DLIST_APPEND(arg_list, arg_list_curr, parse_expr(f, false));
 				arg_list_count++;
 
 				if (f->cursor[0].kind != Token_Comma) {
@@ -1127,10 +1137,10 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 				next_token(f);
 			}
 
-			f->expression_level--;
+			f->expr_level--;
 			close_paren = expect_token(f, Token_CloseParen);
 
-			operand = make_call_expression(f, operand, arg_list, arg_list_count, open_paren, close_paren);
+			operand = make_call_expr(f, operand, arg_list, arg_list_count, open_paren, close_paren);
 		} break;
 
 		case Token_Period: {
@@ -1141,12 +1151,12 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 			}
 			switch (f->cursor[0].kind) {
 			case Token_Identifier:
-				operand = make_selector_expression(f, token, operand, parse_identifier(f));
+				operand = make_selector_expr(f, token, operand, parse_identifier(f));
 				break;
 			default: {
 				ast_file_err(f, f->cursor[0], "Expected a selector");
 				next_token(f);
-				operand = make_selector_expression(f, f->cursor[0], operand, NULL);
+				operand = make_selector_expr(f, f->cursor[0], operand, NULL);
 			} break;
 			}
 		} break;
@@ -1158,11 +1168,11 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 			Token open, close;
 			AstNode *indices[3] = {};
 
-			f->expression_level++;
+			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
 
 			if (f->cursor[0].kind != Token_Colon)
-				indices[0] = parse_expression(f, false);
+				indices[0] = parse_expr(f, false);
 			isize colon_count = 0;
 			Token colons[2] = {};
 
@@ -1172,38 +1182,38 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 				if (f->cursor[0].kind != Token_Colon &&
 				    f->cursor[0].kind != Token_CloseBracket &&
 				    f->cursor[0].kind != Token_EOF) {
-					indices[colon_count] = parse_expression(f, false);
+					indices[colon_count] = parse_expr(f, false);
 				}
 			}
 
-			f->expression_level--;
+			f->expr_level--;
 			close = expect_token(f, Token_CloseBracket);
 
 			if (colon_count == 0) {
-				operand = make_index_expression(f, operand, indices[0], open, close);
+				operand = make_index_expr(f, operand, indices[0], open, close);
 			} else {
 				b32 triple_indexed = false;
 				if (colon_count == 2) {
 					triple_indexed = true;
 					if (indices[1] == NULL) {
 						ast_file_err(f, colons[0], "Second index is required in a triple indexed slice");
-						indices[1] = make_bad_expression(f, colons[0], colons[1]);
+						indices[1] = make_bad_expr(f, colons[0], colons[1]);
 					}
 					if (indices[2] == NULL) {
 						ast_file_err(f, colons[1], "Third index is required in a triple indexed slice");
-						indices[2] = make_bad_expression(f, colons[1], close);
+						indices[2] = make_bad_expr(f, colons[1], close);
 					}
 				}
-				operand = make_slice_expression(f, operand, open, close, indices[0], indices[1], indices[2], triple_indexed);
+				operand = make_slice_expr(f, operand, open, close, indices[0], indices[1], indices[2], triple_indexed);
 			}
 		} break;
 
 		case Token_Pointer: // Deference
-			operand = make_dereference_expression(f, operand, expect_token(f, Token_Pointer));
+			operand = make_deref_expr(f, operand, expect_token(f, Token_Pointer));
 			break;
 
 		case Token_OpenBrace: {
-			if (is_literal_type(operand) && f->expression_level >= 0) {
+			if (is_literal_type(operand) && f->expr_level >= 0) {
 				gb_printf_err("here\n");
 				if (lhs) {
 					// TODO(bill): Handle this
@@ -1227,7 +1237,7 @@ AstNode *parse_atom_expression(AstFile *f, b32 lhs) {
 
 AstNode *parse_type(AstFile *f);
 
-AstNode *parse_unary_expression(AstFile *f, b32 lhs) {
+AstNode *parse_unary_expr(AstFile *f, b32 lhs) {
 	switch (f->cursor[0].kind) {
 	case Token_Pointer:
 	case Token_Add:
@@ -1237,27 +1247,27 @@ AstNode *parse_unary_expression(AstFile *f, b32 lhs) {
 		AstNode *operand;
 		Token op = f->cursor[0];
 		next_token(f);
-		operand = parse_unary_expression(f, false);
-		return make_unary_expression(f, op, operand);
+		operand = parse_unary_expr(f, false);
+		return make_unary_expr(f, op, operand);
 	} break;
 
 	case Token_cast: {
-		AstNode *type_expression, *operand;
+		AstNode *type, *operand;
 		Token token = f->cursor[0];
 		next_token(f);
 		expect_token(f, Token_OpenParen);
-		type_expression = parse_type(f);
+		type = parse_type(f);
 		expect_token(f, Token_CloseParen);
-		operand = parse_unary_expression(f, false);
-		return make_cast_expression(f, token, type_expression, operand);
+		operand = parse_unary_expr(f, false);
+		return make_cast_expr(f, token, type, operand);
 	} break;
 	}
 
-	return parse_atom_expression(f, lhs);
+	return parse_atom_expr(f, lhs);
 }
 
-AstNode *parse_binary_expression(AstFile *f, b32 lhs, i32 prec_in) {
-	AstNode *expression = parse_unary_expression(f, lhs);
+AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
+	AstNode *expression = parse_unary_expr(f, lhs);
 	for (i32 prec = token_precedence(f->cursor[0]); prec >= prec_in; prec--) {
 		for (;;) {
 			AstNode *right;
@@ -1270,27 +1280,27 @@ AstNode *parse_binary_expression(AstFile *f, b32 lhs, i32 prec_in) {
 				// TODO(bill): error checking
 				lhs = false;
 			}
-			right = parse_binary_expression(f, false, prec+1);
+			right = parse_binary_expr(f, false, prec+1);
 			if (!right)
 				ast_file_err(f, op, "Expected expression on the right hand side of the binary operator");
-			expression = make_binary_expression(f, op, expression, right);
+			expression = make_binary_expr(f, op, expression, right);
 		}
 	}
 	return expression;
 }
 
-AstNode *parse_expression(AstFile *f, b32 lhs) {
-	return parse_binary_expression(f, lhs, 0+1);
+AstNode *parse_expr(AstFile *f, b32 lhs) {
+	return parse_binary_expr(f, lhs, 0+1);
 }
 
 
-AstNode *parse_expression_list(AstFile *f, b32 lhs, isize *list_count_) {
+AstNode *parse_expr_list(AstFile *f, b32 lhs, isize *list_count_) {
 	AstNode *list_root = NULL;
 	AstNode *list_curr = NULL;
 	isize list_count = 0;
 
 	do {
-		DLIST_APPEND(list_root, list_curr, parse_expression(f, lhs));
+		DLIST_APPEND(list_root, list_curr, parse_expr(f, lhs));
 		list_count++;
 		if (f->cursor[0].kind != Token_Comma ||
 		    f->cursor[0].kind == Token_EOF)
@@ -1303,19 +1313,19 @@ AstNode *parse_expression_list(AstFile *f, b32 lhs, isize *list_count_) {
 	return list_root;
 }
 
-AstNode *parse_lhs_expression_list(AstFile *f, isize *list_count) {
-	return parse_expression_list(f, true, list_count);
+AstNode *parse_lhs_expr_list(AstFile *f, isize *list_count) {
+	return parse_expr_list(f, true, list_count);
 }
 
-AstNode *parse_rhs_expression_list(AstFile *f, isize *list_count) {
-	return parse_expression_list(f, false, list_count);
+AstNode *parse_rhs_expr_list(AstFile *f, isize *list_count) {
+	return parse_expr_list(f, false, list_count);
 }
 
-AstNode *parse_declaration(AstFile *f, AstNode *name_list, isize name_count);
+AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count);
 
-AstNode *parse_simple_statement(AstFile *f) {
+AstNode *parse_simple_stmt(AstFile *f) {
 	isize lhs_count = 0, rhs_count = 0;
-	AstNode *lhs_expression_list = parse_lhs_expression_list(f, &lhs_count);
+	AstNode *lhs_expr_list = parse_lhs_expr_list(f, &lhs_count);
 
 	AstNode *statement = NULL;
 	Token token = f->cursor[0];
@@ -1335,26 +1345,26 @@ AstNode *parse_simple_statement(AstFile *f) {
 	{
 		if (f->curr_scope == f->file_scope) {
 			ast_file_err(f, f->cursor[0], "You cannot use a simple statement in the file scope");
-			return make_bad_statement(f, f->cursor[0], f->cursor[0]);
+			return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 		}
 		next_token(f);
-		AstNode *rhs_expression_list = parse_rhs_expression_list(f, &rhs_count);
-		if (rhs_expression_list == NULL) {
+		AstNode *rhs_expr_list = parse_rhs_expr_list(f, &rhs_count);
+		if (rhs_expr_list == NULL) {
 			ast_file_err(f, token, "No right-hand side in assignment statement.");
-			return make_bad_statement(f, token, f->cursor[0]);
+			return make_bad_stmt(f, token, f->cursor[0]);
 		}
-		return make_assign_statement(f, token,
-		                             lhs_expression_list, lhs_count,
-		                             rhs_expression_list, rhs_count);
+		return make_assign_stmt(f, token,
+		                             lhs_expr_list, lhs_count,
+		                             rhs_expr_list, rhs_count);
 	} break;
 
 	case Token_Colon: // Declare
-		return parse_declaration(f, lhs_expression_list, lhs_count);
+		return parse_decl(f, lhs_expr_list, lhs_count);
 	}
 
 	if (lhs_count > 1) {
 		ast_file_err(f, token, "Expected 1 expression");
-		return make_bad_statement(f, token, f->cursor[0]);
+		return make_bad_stmt(f, token, f->cursor[0]);
 	}
 
 	token = f->cursor[0];
@@ -1363,40 +1373,40 @@ AstNode *parse_simple_statement(AstFile *f) {
 	case Token_Decrement:
 		if (f->curr_scope == f->file_scope) {
 			ast_file_err(f, f->cursor[0], "You cannot use a simple statement in the file scope");
-			return make_bad_statement(f, f->cursor[0], f->cursor[0]);
+			return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 		}
-		statement = make_inc_dec_statement(f, token, lhs_expression_list);
+		statement = make_inc_dec_stmt(f, token, lhs_expr_list);
 		next_token(f);
 		return statement;
 	}
 
-	return make_expression_statement(f, lhs_expression_list);
+	return make_expr_stmt(f, lhs_expr_list);
 }
 
 
 
-AstNode *parse_block_statement(AstFile *f) {
+AstNode *parse_block_stmt(AstFile *f) {
 	if (f->curr_scope == f->file_scope) {
 		ast_file_err(f, f->cursor[0], "You cannot use a block statement in the file scope");
-		return make_bad_statement(f, f->cursor[0], f->cursor[0]);
+		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
-	AstNode *block_statement;
+	AstNode *block_stmt;
 
 	open_ast_scope(f);
-	block_statement = parse_body(f, f->curr_scope);
+	block_stmt = parse_body(f, f->curr_scope);
 	close_ast_scope(f);
-	return block_statement;
+	return block_stmt;
 }
 
-AstNode *convert_statement_to_expression(AstFile *f, AstNode *statement, String kind) {
+AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
 	if (statement == NULL)
 		return NULL;
 
-	if (statement->kind == AstNode_ExpressionStatement)
-		return statement->expression_statement.expression;
+	if (statement->kind == AstNode_ExprStmt)
+		return statement->expr_stmt.expr;
 
 	ast_file_err(f, f->cursor[0], "Expected `%.*s`, found a simple statement.", LIT(kind));
-	return make_bad_expression(f, f->cursor[0], f->cursor[1]);
+	return make_bad_expr(f, f->cursor[0], f->cursor[1]);
 }
 
 AstNode *parse_identfier_list(AstFile *f, isize *list_count_) {
@@ -1434,25 +1444,25 @@ AstNode *parse_type(AstFile *f) {
 		Token token = f->cursor[0];
 		ast_file_err(f, token, "Expected a type");
 		next_token(f);
-		return make_bad_expression(f, token, f->cursor[0]);
+		return make_bad_expr(f, token, f->cursor[0]);
 	}
 	return type;
 }
 
-AstNode *parse_field_declaration(AstFile *f, AstScope *scope) {
+AstNode *parse_field_decl(AstFile *f, AstScope *scope) {
 	AstNode *name_list = NULL;
 	isize name_count = 0;
-	name_list = parse_lhs_expression_list(f, &name_count);
+	name_list = parse_lhs_expr_list(f, &name_count);
 	if (name_count == 0)
 		ast_file_err(f, f->cursor[0], "Empty field declaration");
 
 	expect_token(f, Token_Colon);
 
-	AstNode *type_expression = parse_type_attempt(f);
-	if (type_expression == NULL)
+	AstNode *type = parse_type_attempt(f);
+	if (type == NULL)
 		ast_file_err(f, f->cursor[0], "Expected a type for this field declaration");
 
-	AstNode *field = make_field(f, name_list, name_count, type_expression);
+	AstNode *field = make_field(f, name_list, name_count, type);
 	add_ast_entity(f, scope, field, name_list);
 	return field;
 }
@@ -1461,7 +1471,7 @@ Token parse_procedure_signature(AstFile *f, AstScope *scope,
                                 AstNode **param_list, isize *param_count,
                                 AstNode **result_list, isize *result_count);
 
-AstNode *parse_procedure_type(AstFile *f, AstScope **scope_) {
+AstNode *parse_proc_type(AstFile *f, AstScope **scope_) {
 	AstScope *scope = make_ast_scope(f, f->file_scope); // Procedure's scope
 	AstNode *params = NULL;
 	AstNode *results = NULL;
@@ -1471,7 +1481,7 @@ AstNode *parse_procedure_type(AstFile *f, AstScope **scope_) {
 	Token proc_token = parse_procedure_signature(f, scope, &params, &param_count, &results, &result_count);
 
 	if (scope_) *scope_ = scope;
-	return make_procedure_type(f, proc_token, params, param_count, results, result_count);
+	return make_proc_type(f, proc_token, params, param_count, results, result_count);
 }
 
 
@@ -1480,7 +1490,7 @@ AstNode *parse_parameter_list(AstFile *f, AstScope *scope, isize *param_count_) 
 	AstNode *param_list_curr = NULL;
 	isize param_count = 0;
 	while (f->cursor[0].kind == Token_Identifier) {
-		AstNode *field = parse_field_declaration(f, scope);
+		AstNode *field = parse_field_decl(f, scope);
 		DLIST_APPEND(param_list, param_list_curr, field);
 		param_count += field->field.name_count;
 		if (f->cursor[0].kind != Token_Comma)
@@ -1501,15 +1511,15 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		return make_pointer_type(f, expect_token(f, Token_Pointer), parse_type(f));
 
 	case Token_OpenBracket: {
-		f->expression_level++;
+		f->expr_level++;
 		Token token = expect_token(f, Token_OpenBracket);
-		AstNode *count_expression = NULL;
+		AstNode *count_expr = NULL;
 
 		if (f->cursor[0].kind != Token_CloseBracket)
-			count_expression = parse_expression(f, false);
+			count_expr = parse_expr(f, false);
 		expect_token(f, Token_CloseBracket);
-		f->expression_level--;
-		return make_array_type(f, token, count_expression, parse_type(f));
+		f->expr_level--;
+		return make_array_type(f, token, count_expr, parse_type(f));
 	}
 
 	case Token_struct: {
@@ -1527,17 +1537,17 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 	}
 
 	case Token_proc:
-		return parse_procedure_type(f, NULL);
+		return parse_proc_type(f, NULL);
 
 
 	case Token_OpenParen: {
 		// NOTE(bill): Skip the paren expression
-		AstNode *type_expression;
+		AstNode *type;
 		Token open, close;
 		open = expect_token(f, Token_OpenParen);
-		type_expression = parse_type(f);
+		type = parse_type(f);
 		close = expect_token(f, Token_CloseParen);
-		return make_paren_expression(f, type_expression, open, close);
+		return make_paren_expr(f, type, open, close);
 	}
 
 	// TODO(bill): Why is this even allowed? Is this a parsing error?
@@ -1603,13 +1613,13 @@ AstNode *parse_body(AstFile *f, AstScope *scope) {
 	isize statement_list_count = 0;
 	Token open, close;
 	open = expect_token(f, Token_OpenBrace);
-	statement_list = parse_statement_list(f, &statement_list_count);
+	statement_list = parse_stmt_list(f, &statement_list_count);
 	close = expect_token(f, Token_CloseBrace);
 
-	return make_block_statement(f, statement_list, statement_list_count, open, close);
+	return make_block_stmt(f, statement_list, statement_list_count, open, close);
 }
 
-AstNode *parse_procedure_declaration(AstFile *f, Token proc_token, AstNode *name, DeclarationKind kind) {
+AstNode *parse_procedure_decl(AstFile *f, Token proc_token, AstNode *name, DeclKind kind) {
 	AstNode *param_list = NULL;
 	AstNode *result_list = NULL;
 	isize param_count = 0;
@@ -1624,7 +1634,7 @@ AstNode *parse_procedure_declaration(AstFile *f, Token proc_token, AstNode *name
 	AstNode *tag_list_curr = NULL;
 	isize tag_count = 0;
 	while (f->cursor[0].kind == Token_Hash) {
-		DLIST_APPEND(tag_list, tag_list_curr, parse_tag_expression(f, NULL));
+		DLIST_APPEND(tag_list, tag_list_curr, parse_tag_expr(f, NULL));
 		tag_count++;
 	}
 	if (f->cursor[0].kind == Token_OpenBrace) {
@@ -1633,21 +1643,21 @@ AstNode *parse_procedure_declaration(AstFile *f, Token proc_token, AstNode *name
 
 	close_ast_scope(f);
 
-	AstNode *proc_type = make_procedure_type(f, proc_token, param_list, param_count, result_list, result_count);
-	return make_procedure_declaration(f, kind, name, proc_type, body, tag_list, tag_count);
+	AstNode *proc_type = make_proc_type(f, proc_token, param_list, param_count, result_list, result_count);
+	return make_procedure_decl(f, kind, name, proc_type, body, tag_list, tag_count);
 }
 
-AstNode *parse_declaration(AstFile *f, AstNode *name_list, isize name_count) {
+AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count) {
 	AstNode *value_list = NULL;
-	AstNode *type_expression = NULL;
+	AstNode *type = NULL;
 	isize value_count = 0;
 	if (allow_token(f, Token_Colon)) {
-		type_expression = parse_identifier_or_type(f);
+		type = parse_identifier_or_type(f);
 	} else if (f->cursor[0].kind != Token_Eq && f->cursor[0].kind != Token_Semicolon) {
 		ast_file_err(f, f->cursor[0], "Expected type separator `:` or `=`");
 	}
 
-	DeclarationKind declaration_kind = Declaration_Mutable;
+	DeclKind declaration_kind = Declaration_Mutable;
 
 	if (f->cursor[0].kind == Token_Eq ||
 	    f->cursor[0].kind == Token_Colon) {
@@ -1660,15 +1670,15 @@ AstNode *parse_declaration(AstFile *f, AstNode *name_list, isize name_count) {
 			AstNode *name = name_list;
 			if (name_count != 1) {
 				ast_file_err(f, proc_token, "You can only declare one procedure at a time (at the moment)");
-				return make_bad_declaration(f, name->identifier.token, proc_token);
+				return make_bad_decl(f, name->ident.token, proc_token);
 			}
 
-			AstNode *procedure_declaration = parse_procedure_declaration(f, proc_token, name, declaration_kind);
-			add_ast_entity(f, f->curr_scope, procedure_declaration, name_list);
-			return procedure_declaration;
+			AstNode *procedure_decl = parse_procedure_decl(f, proc_token, name, declaration_kind);
+			add_ast_entity(f, f->curr_scope, procedure_decl, name_list);
+			return procedure_decl;
 
 		} else {
-			value_list = parse_rhs_expression_list(f, &value_count);
+			value_list = parse_rhs_expr_list(f, &value_count);
 			if (value_count > name_count) {
 				ast_file_err(f, f->cursor[0], "Too many values on the right hand side of the declaration");
 			} else if (value_count < name_count &&
@@ -1681,61 +1691,61 @@ AstNode *parse_declaration(AstFile *f, AstNode *name_list, isize name_count) {
 	}
 
 	if (declaration_kind == Declaration_Mutable) {
-		if (type_expression == NULL && value_list == NULL) {
+		if (type == NULL && value_list == NULL) {
 			ast_file_err(f, f->cursor[0], "Missing variable type or initialization");
-			return make_bad_declaration(f, f->cursor[0], f->cursor[0]);
+			return make_bad_decl(f, f->cursor[0], f->cursor[0]);
 		}
 	} else if (declaration_kind == Declaration_Immutable) {
-		if (type_expression == NULL && value_list == NULL && name_count > 0) {
+		if (type == NULL && value_list == NULL && name_count > 0) {
 			ast_file_err(f, f->cursor[0], "Missing constant value");
-			return make_bad_declaration(f, f->cursor[0], f->cursor[0]);
+			return make_bad_decl(f, f->cursor[0], f->cursor[0]);
 		}
 	} else {
 		Token begin = f->cursor[0];
 		ast_file_err(f, begin, "Unknown type of variable declaration");
-		fix_advance_to_next_statement(f);
-		return make_bad_declaration(f, begin, f->cursor[0]);
+		fix_advance_to_next_stmt(f);
+		return make_bad_decl(f, begin, f->cursor[0]);
 	}
 
-	AstNode *variable_declaration = make_variable_declaration(f, declaration_kind, name_list, name_count, type_expression, value_list, value_count);
-	add_ast_entity(f, f->curr_scope, variable_declaration, name_list);
-	return variable_declaration;
+	AstNode *variable_decl = make_variable_decl(f, declaration_kind, name_list, name_count, type, value_list, value_count);
+	add_ast_entity(f, f->curr_scope, variable_decl, name_list);
+	return variable_decl;
 }
 
 
-AstNode *parse_if_statement(AstFile *f) {
+AstNode *parse_if_stmt(AstFile *f) {
 	if (f->curr_scope == f->file_scope) {
 		ast_file_err(f, f->cursor[0], "You cannot use an if statement in the file scope");
-		return make_bad_statement(f, f->cursor[0], f->cursor[0]);
+		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
 
 	Token token = expect_token(f, Token_if);
 	AstNode *init = NULL;
 	AstNode *cond = NULL;
 	AstNode *body = NULL;
-	AstNode *else_statement = NULL;
+	AstNode *else_stmt = NULL;
 
 	open_ast_scope(f);
 	defer (close_ast_scope(f));
 
-	isize prev_level = f->expression_level;
-	f->expression_level = -1;
+	isize prev_level = f->expr_level;
+	f->expr_level = -1;
 
 
 	if (allow_token(f, Token_Semicolon)) {
-		cond = parse_expression(f, false);
+		cond = parse_expr(f, false);
 	} else {
-		init = parse_simple_statement(f);
+		init = parse_simple_stmt(f);
 		if (allow_token(f, Token_Semicolon)) {
-			cond = parse_expression(f, false);
+			cond = parse_expr(f, false);
 		} else {
-			cond = convert_statement_to_expression(f, init, make_string("boolean expression"));
+			cond = convert_stmt_to_expr(f, init, make_string("boolean expression"));
 			init = NULL;
 		}
 	}
 
 
-	f->expression_level = prev_level;
+	f->expr_level = prev_level;
 
 
 
@@ -1744,45 +1754,45 @@ AstNode *parse_if_statement(AstFile *f) {
 		ast_file_err(f, f->cursor[0], "Expected condition for if statement");
 	}
 
-	body = parse_block_statement(f);
+	body = parse_block_stmt(f);
 	if (allow_token(f, Token_else)) {
 		switch (f->cursor[0].kind) {
 		case Token_if:
-			else_statement = parse_if_statement(f);
+			else_stmt = parse_if_stmt(f);
 			break;
 		case Token_OpenBrace:
-			else_statement = parse_block_statement(f);
+			else_stmt = parse_block_stmt(f);
 			break;
 		default:
 			ast_file_err(f, f->cursor[0], "Expected if statement block statement");
-			else_statement = make_bad_statement(f, f->cursor[0], f->cursor[1]);
+			else_stmt = make_bad_stmt(f, f->cursor[0], f->cursor[1]);
 			break;
 		}
 	}
 
-	return make_if_statement(f, token, init, cond, body, else_statement);
+	return make_if_stmt(f, token, init, cond, body, else_stmt);
 }
 
-AstNode *parse_return_statement(AstFile *f) {
+AstNode *parse_return_stmt(AstFile *f) {
 	if (f->curr_scope == f->file_scope) {
 		ast_file_err(f, f->cursor[0], "You cannot use a return statement in the file scope");
-		return make_bad_statement(f, f->cursor[0], f->cursor[0]);
+		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
 
 	Token token = expect_token(f, Token_return);
 	AstNode *result = NULL;
 	isize result_count = 0;
 	if (f->cursor[0].kind != Token_Semicolon)
-		result = parse_rhs_expression_list(f, &result_count);
+		result = parse_rhs_expr_list(f, &result_count);
 	expect_token(f, Token_Semicolon);
 
-	return make_return_statement(f, token, result, result_count);
+	return make_return_stmt(f, token, result, result_count);
 }
 
-AstNode *parse_for_statement(AstFile *f) {
+AstNode *parse_for_stmt(AstFile *f) {
 	if (f->curr_scope == f->file_scope) {
 		ast_file_err(f, f->cursor[0], "You cannot use a for statement in the file scope");
-		return make_bad_statement(f, f->cursor[0], f->cursor[0]);
+		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
 
 	Token token = expect_token(f, Token_for);
@@ -1795,11 +1805,11 @@ AstNode *parse_for_statement(AstFile *f) {
 	AstNode *body = NULL;
 
 	if (f->cursor[0].kind != Token_OpenBrace) {
-		isize prev_level = f->expression_level;
-		f->expression_level = -1;
+		isize prev_level = f->expr_level;
+		f->expr_level = -1;
 		if (f->cursor[0].kind != Token_Semicolon) {
-			cond = parse_simple_statement(f);
-			if (is_ast_node_complex_statement(cond)) {
+			cond = parse_simple_stmt(f);
+			if (is_ast_node_complex_stmt(cond)) {
 				ast_file_err(f, f->cursor[0],
 				             "You are not allowed that type of statement in a for statement, it is too complex!");
 			}
@@ -1809,95 +1819,95 @@ AstNode *parse_for_statement(AstFile *f) {
 			init = cond;
 			cond = NULL;
 			if (f->cursor[0].kind != Token_Semicolon) {
-				cond = parse_simple_statement(f);
+				cond = parse_simple_stmt(f);
 			}
 			expect_token(f, Token_Semicolon);
 			if (f->cursor[0].kind != Token_OpenBrace) {
-				end = parse_simple_statement(f);
+				end = parse_simple_stmt(f);
 			}
 		}
-		f->expression_level = prev_level;
+		f->expr_level = prev_level;
 	}
-	body = parse_block_statement(f);
+	body = parse_block_stmt(f);
 
-	cond = convert_statement_to_expression(f, cond, make_string("boolean expression"));
+	cond = convert_stmt_to_expr(f, cond, make_string("boolean expression"));
 
-	return make_for_statement(f, token, init, cond, end, body);
+	return make_for_stmt(f, token, init, cond, end, body);
 }
 
-AstNode *parse_defer_statement(AstFile *f) {
+AstNode *parse_defer_stmt(AstFile *f) {
 	if (f->curr_scope == f->file_scope) {
 		ast_file_err(f, f->cursor[0], "You cannot use a defer statement in the file scope");
-		return make_bad_statement(f, f->cursor[0], f->cursor[0]);
+		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
 
 	Token token = expect_token(f, Token_defer);
-	AstNode *statement = parse_statement(f);
+	AstNode *statement = parse_stmt(f);
 	switch (statement->kind) {
-	case AstNode_EmptyStatement:
+	case AstNode_EmptyStmt:
 		ast_file_err(f, token, "Empty statement after defer (e.g. `;`)");
 		break;
-	case AstNode_DeferStatement:
+	case AstNode_DeferStmt:
 		ast_file_err(f, token, "You cannot defer a defer statement");
 		break;
-	case AstNode_ReturnStatement:
+	case AstNode_ReturnStmt:
 		ast_file_err(f, token, "You cannot a return statement");
 		break;
 	}
 
-	return make_defer_statement(f, token, statement);
+	return make_defer_stmt(f, token, statement);
 }
 
-AstNode *parse_type_declaration(AstFile *f) {
+AstNode *parse_type_decl(AstFile *f) {
 	Token   token = expect_token(f, Token_type);
 	AstNode *name = parse_identifier(f);
 	expect_token(f, Token_Colon);
-	AstNode *type_expression = parse_type(f);
+	AstNode *type = parse_type(f);
 
-	AstNode *type_declaration = make_type_declaration(f, token, name, type_expression);
+	AstNode *type_decl = make_type_decl(f, token, name, type);
 
-	if (type_expression->kind != AstNode_StructType &&
-	    type_expression->kind != AstNode_ProcedureType)
+	if (type->kind != AstNode_StructType &&
+	    type->kind != AstNode_ProcType)
 		expect_token(f, Token_Semicolon);
 
-	return type_declaration;
+	return type_decl;
 }
 
-AstNode *parse_alias_declaration(AstFile *f) {
+AstNode *parse_alias_decl(AstFile *f) {
 	Token   token = expect_token(f, Token_alias);
 	AstNode *name = parse_identifier(f);
 	expect_token(f, Token_Colon);
-	AstNode *type_expression = parse_type(f);
+	AstNode *type = parse_type(f);
 
-	AstNode *alias_declaration = make_alias_declaration(f, token, name, type_expression);
+	AstNode *alias_decl = make_alias_decl(f, token, name, type);
 
-	if (type_expression->kind != AstNode_StructType &&
-	    type_expression->kind != AstNode_ProcedureType)
+	if (type->kind != AstNode_StructType &&
+	    type->kind != AstNode_ProcType)
 		expect_token(f, Token_Semicolon);
 
-	return alias_declaration;
+	return alias_decl;
 }
 
-AstNode *parse_import_declaration(AstFile *f) {
+AstNode *parse_import_decl(AstFile *f) {
 	Token token = expect_token(f, Token_import);
 	Token filepath = expect_token(f, Token_String);
 	if (f->curr_scope == f->file_scope) {
-		return make_import_declaration(f, token, filepath);
+		return make_import_decl(f, token, filepath);
 	}
 	ast_file_err(f, token, "You cannot `import` within a procedure. This must be done at the file scope.");
-	return make_bad_declaration(f, token, filepath);
+	return make_bad_decl(f, token, filepath);
 }
 
-AstNode *parse_statement(AstFile *f) {
+AstNode *parse_stmt(AstFile *f) {
 	AstNode *s = NULL;
 	Token token = f->cursor[0];
 	switch (token.kind) {
 	case Token_type:
-		return parse_type_declaration(f);
+		return parse_type_decl(f);
 	case Token_alias:
-		return parse_alias_declaration(f);
+		return parse_alias_decl(f);
 	case Token_import:
-		return parse_import_declaration(f);
+		return parse_import_decl(f);
 
 	// Operands
 	case Token_Identifier:
@@ -1911,8 +1921,8 @@ AstNode *parse_statement(AstFile *f) {
 	case Token_Sub:
 	case Token_Xor:
 	case Token_Not:
-		s = parse_simple_statement(f);
-		if (s->kind != AstNode_ProcedureDeclaration && !allow_token(f, Token_Semicolon)) {
+		s = parse_simple_stmt(f);
+		if (s->kind != AstNode_ProcDecl && !allow_token(f, Token_Semicolon)) {
 			ast_file_err(f, f->cursor[0],
 			             "Expected `;` after statement, got `%.*s`",
 			             LIT(token_strings[f->cursor[0].kind]));
@@ -1920,10 +1930,10 @@ AstNode *parse_statement(AstFile *f) {
 		return s;
 
 	// TODO(bill): other keywords
-	case Token_if:     return parse_if_statement(f);
-	case Token_return: return parse_return_statement(f);
-	case Token_for:    return parse_for_statement(f);
-	case Token_defer:  return parse_defer_statement(f);
+	case Token_if:     return parse_if_stmt(f);
+	case Token_return: return parse_return_stmt(f);
+	case Token_for:    return parse_for_stmt(f);
+	case Token_defer:  return parse_defer_stmt(f);
 	// case Token_match: return NULL; // TODO(bill): Token_match
 	// case Token_case: return NULL; // TODO(bill): Token_case
 
@@ -1932,17 +1942,17 @@ AstNode *parse_statement(AstFile *f) {
 	case Token_fallthrough:
 		next_token(f);
 		expect_token(f, Token_Semicolon);
-		return make_branch_statement(f, token);
+		return make_branch_stmt(f, token);
 
 	case Token_Hash:
-		s = parse_tag_statement(f, NULL);
-		s->tag_statement.statement = parse_statement(f); // TODO(bill): Find out why this doesn't work as an argument
+		s = parse_tag_stmt(f, NULL);
+		s->tag_stmt.stmt = parse_stmt(f); // TODO(bill): Find out why this doesn't work as an argument
 		return s;
 
-	case Token_OpenBrace: return parse_block_statement(f);
+	case Token_OpenBrace: return parse_block_stmt(f);
 
 	case Token_Semicolon:
-		s = make_empty_statement(f, token);
+		s = make_empty_stmt(f, token);
 		next_token(f);
 		return s;
 
@@ -1952,11 +1962,11 @@ AstNode *parse_statement(AstFile *f) {
 	ast_file_err(f, token,
 	             "Expected a statement, got `%.*s`",
 	             LIT(token_strings[token.kind]));
-	fix_advance_to_next_statement(f);
-	return make_bad_statement(f, token, f->cursor[0]);
+	fix_advance_to_next_stmt(f);
+	return make_bad_stmt(f, token, f->cursor[0]);
 }
 
-AstNode *parse_statement_list(AstFile *f, isize *list_count_) {
+AstNode *parse_stmt_list(AstFile *f, isize *list_count_) {
 	AstNode *list_root = NULL;
 	AstNode *list_curr = NULL;
 	isize list_count = 0;
@@ -1964,7 +1974,7 @@ AstNode *parse_statement_list(AstFile *f, isize *list_count_) {
 	while (f->cursor[0].kind != Token_case &&
 	       f->cursor[0].kind != Token_CloseBrace &&
 	       f->cursor[0].kind != Token_EOF) {
-		DLIST_APPEND(list_root, list_curr, parse_statement(f));
+		DLIST_APPEND(list_root, list_curr, parse_stmt(f));
 		list_count++;
 	}
 
@@ -2108,17 +2118,17 @@ void parse_file(Parser *p, AstFile *f) {
 		base_dir.len--;
 	}
 
-	f->declarations = parse_statement_list(f, &f->declaration_count);
+	f->decls = parse_stmt_list(f, &f->decl_count);
 
-	for (AstNode *node = f->declarations; node != NULL; node = node->next) {
-		if (!is_ast_node_declaration(node) &&
-		    node->kind != AstNode_BadStatement &&
-		    node->kind != AstNode_EmptyStatement) {
+	for (AstNode *node = f->decls; node != NULL; node = node->next) {
+		if (!is_ast_node_decl(node) &&
+		    node->kind != AstNode_BadStmt &&
+		    node->kind != AstNode_EmptyStmt) {
 			// NOTE(bill): Sanity check
 			ast_file_err(f, ast_node_token(node), "Only declarations are allowed at file scope");
 		} else {
-			if (node->kind == AstNode_ImportDeclaration) {
-				auto *id = &node->import_declaration;
+			if (node->kind == AstNode_ImportDecl) {
+				auto *id = &node->import_decl;
 				String file = id->filepath.string;
 				String file_str = {};
 				if (file.text[0] == '"')

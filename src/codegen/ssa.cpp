@@ -31,7 +31,7 @@ struct ssaProcedure {
 	String name;
 	Entity *entity;
 	Type *type;
-	DeclarationInfo *decl;
+	DeclInfo *decl;
 	AstNode *type_expr;
 	AstNode *body;
 
@@ -42,36 +42,26 @@ struct ssaProcedure {
 
 
 
-struct ssaTypeName {
-	Entity *entity;
-	Type *type;
-};
-struct ssaGlobal {
-	b32 generated;
-	Entity *entity;
-	Type *type;
-	ssaValue *value;
-};
-struct ssaConstant {
-	Type *type;
-	ExactValue value;
-};
-
-
+#define SSA_INSTRUCTION_KINDS \
+	SSA_INSTRUCTION_KIND(Invalid), \
+	SSA_INSTRUCTION_KIND(Local), \
+	SSA_INSTRUCTION_KIND(Store), \
+	SSA_INSTRUCTION_KIND(Load), \
+	SSA_INSTRUCTION_KIND(GetElementPtr), \
+	SSA_INSTRUCTION_KIND(Convert), \
+	SSA_INSTRUCTION_KIND(BinaryOp), \
+	SSA_INSTRUCTION_KIND(Count),
 
 enum ssaInstructionKind {
-	ssaInstruction_Invalid,
+#define SSA_INSTRUCTION_KIND(x) GB_JOIN2(ssaInstruction_, x)
+	SSA_INSTRUCTION_KINDS
+#undef SSA_INSTRUCTION_KIND
+};
 
-	ssaInstruction_Local,
-	ssaInstruction_Store,
-	ssaInstruction_Load,
-	ssaInstruction_GetElementPtr,
-
-	ssaInstruction_Convert,
-
-	ssaInstruction_BinaryOp,
-
-	ssaInstruction_Count,
+String const ssa_instruction_strings[] = {
+#define SSA_INSTRUCTION_KIND(x) {cast(u8 *)#x, gb_size_of(#x)-1}
+	SSA_INSTRUCTION_KINDS
+#undef SSA_INSTRUCTION_KIND
 };
 
 struct ssaInstruction {
@@ -91,17 +81,17 @@ struct ssaInstruction {
 			ssaValue *value;
 		} store;
 		struct {
+			Type *type;
 			ssaValue *address;
 		} load;
 		struct {
 			ssaValue *address;
-			Type *result_type;
-			Type *element_type;
-			isize index_count;
-			isize indices[2];
+			Type *    result_type;
+			Type *    element_type;
+			ssaValue *indices[2];
+			isize     index_count;
+			b32       inbounds;
 		} get_element_ptr;
-
-
 
 		struct {
 			Type *type;
@@ -131,9 +121,20 @@ struct ssaValue {
 	i32 id;
 
 	union {
-		ssaConstant    constant;
-		ssaTypeName    type_name;
-		ssaGlobal      global;
+		struct {
+			Type *     type;
+			ExactValue value;
+		} constant;
+		struct {
+			Entity *entity;
+			Type *  type;
+		} type_name;
+		struct {
+			b32       generated;
+			Entity *  entity;
+			Type *    type;
+			ssaValue *value;
+		} global;
 		ssaProcedure   procedure;
 		ssaBlock       block;
 		ssaInstruction instruction;
@@ -188,7 +189,9 @@ Type *ssa_instruction_type(ssaInstruction *instr) {
 	case ssaInstruction_Store:
 		return ssa_value_type(instr->store.address);
 	case ssaInstruction_Load:
-		return ssa_value_type(instr->load.address);
+		return instr->load.type;
+	case ssaInstruction_GetElementPtr:
+		return instr->get_element_ptr.result_type;
 	case ssaInstruction_BinaryOp:
 		return instr->binary_op.type;
 	}
@@ -204,7 +207,10 @@ void ssa_instruction_set_type(ssaInstruction *instr, Type *type) {
 		ssa_value_set_type(instr->store.value, type);
 		break;
 	case ssaInstruction_Load:
-		// NOTE(bill): Do nothing
+		instr->load.type = type;
+		break;
+	case ssaInstruction_GetElementPtr:
+		instr->get_element_ptr.result_type = type;
 		break;
 	case ssaInstruction_BinaryOp:
 		instr->binary_op.type = type;
@@ -251,8 +257,8 @@ void ssa_value_set_type(ssaValue *value, Type *type) {
 
 
 
-ssaValue *ssa_build_expression(ssaProcedure *proc, AstNode *expr);
-ssaValue *ssa_build_single_expression(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv);
+ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr);
+ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv);
 ssaLvalue ssa_build_address(ssaProcedure *proc, AstNode *expr);
 ssaValue *ssa_emit_conversion(ssaProcedure *proc, ssaValue *value, Type *a_type);
 
@@ -318,16 +324,24 @@ ssaValue *ssa_make_instruction_load(ssaProcedure *p, ssaValue *address) {
 	ssaValue *v = ssa_alloc_instruction(p->module->allocator, ssaInstruction_Load);
 	ssaInstruction *i = &v->instruction;
 	i->load.address = address;
+	i->load.type = ssa_value_type(address);
 	if (p->curr_block) {
 		gb_array_append(p->curr_block->values, v);
 	}
 	return v;
 }
 
-ssaValue *ssa_make_instruction_get_element_ptr(ssaProcedure *p, ssaValue *address) {
+ssaValue *ssa_make_instruction_get_element_ptr(ssaProcedure *p, ssaValue *address,
+                                               ssaValue *index0, ssaValue *index1, isize index_count,
+                                               b32 inbounds) {
 	ssaValue *v = ssa_alloc_instruction(p->module->allocator, ssaInstruction_GetElementPtr);
 	ssaInstruction *i = &v->instruction;
 	i->get_element_ptr.address = address;
+	i->get_element_ptr.indices[0]   = index0;
+	i->get_element_ptr.indices[1]   = index1;
+	i->get_element_ptr.index_count  = index_count;
+	i->get_element_ptr.element_type = ssa_value_type(address);
+	i->get_element_ptr.inbounds     = inbounds;
 	if (p->curr_block) {
 		gb_array_append(p->curr_block->values, v);
 	}
@@ -354,7 +368,7 @@ ssaValue *ssa_make_value_constant(gbAllocator a, Type *type, ExactValue value) {
 	return v;
 }
 
-ssaValue *ssa_make_value_procedure(gbAllocator a, Entity *e, DeclarationInfo *decl, ssaModule *m) {
+ssaValue *ssa_make_value_procedure(gbAllocator a, Entity *e, DeclInfo *decl, ssaModule *m) {
 	ssaValue *v = ssa_alloc_value(a, ssaValue_Procedure);
 	v->procedure.module = m;
 	v->procedure.entity = e;
@@ -446,8 +460,8 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 
 
 b32 ssa_is_blank_identifier(AstNode *i) {
-	GB_ASSERT(i->kind == AstNode_Identifier);
-	return are_strings_equal(i->identifier.token.string, make_string("_"));
+	GB_ASSERT(i->kind == AstNode_Ident);
+	return are_strings_equal(i->ident.token.string, make_string("_"));
 }
 
 
@@ -485,8 +499,6 @@ ssaValue *ssa_emit_store(ssaProcedure *p, ssaValue *address, ssaValue *value) {
 
 ssaValue *ssa_emit_load(ssaProcedure *p, ssaValue *address) {
 	ssaValue *v = ssa_make_instruction_load(p, address);
-	Type *t = ssa_value_type(address);
-	ssa_value_set_type(v, type_deref(t));
 	ssa_emit(p, v);
 	return v;
 }
@@ -590,12 +602,12 @@ ssaValue *ssa_emit_compare(ssaProcedure *proc, Token op, ssaValue *left, ssaValu
 	return ssa_emit(proc, v);
 }
 
-ssaValue *ssa_build_single_expression(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv) {
+ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv) {
 	switch (expr->kind) {
-	case AstNode_Identifier: {
+	case AstNode_Ident: {
 		Entity *e = *map_get(&proc->module->info->uses, hash_pointer(expr));
 		if (e->kind == Entity_Builtin) {
-			// TODO(bill): Entity_Builtin
+			GB_PANIC("TODO(bill): Entity_Builtin");
 			return NULL;
 		}
 
@@ -605,32 +617,34 @@ ssaValue *ssa_build_single_expression(ssaProcedure *proc, AstNode *expr, TypeAnd
 		}
 	} break;
 
-	case AstNode_ParenExpression:
-		return ssa_build_single_expression(proc, unparen_expression(expr), tv);
+	case AstNode_ParenExpr:
+		return ssa_build_single_expr(proc, unparen_expr(expr), tv);
 
-	case AstNode_DereferenceExpression: {
-		ssaLvalue addr = ssa_build_address(proc, expr->dereference_expression.operand);
-		return ssa_lvalue_load(addr, proc);
+	case AstNode_DerefExpr: {
+		ssaLvalue addr = ssa_build_address(proc, expr);
+		ssaValue *load = ssa_lvalue_load(addr, proc);
+		ssa_value_set_type(load, type_deref(ssa_value_type(load)));
+		return load;
 	} break;
 
-	case AstNode_UnaryExpression: {
-		auto *ue = &expr->unary_expression;
+	case AstNode_UnaryExpr: {
+		auto *ue = &expr->unary_expr;
 		switch (ue->op.kind) {
 		case Token_Pointer:
-			return ssa_lvalue_address(ssa_build_address(proc, ue->operand), proc);
+			return ssa_lvalue_address(ssa_build_address(proc, ue->expr), proc);
 		case Token_Add:
-			return ssa_build_expression(proc, ue->operand);
+			return ssa_build_expr(proc, ue->expr);
 		case Token_Sub: {
-			// NOTE(bill): -x == 0 - x
+			// NOTE(bill): -`x` == 0 - `x`
 			ExactValue zero = make_exact_value_integer(0);
 			ssaValue *left = ssa_make_value_constant(proc->module->allocator, tv->type, zero);
-			ssaValue *right = ssa_build_expression(proc, ue->operand);
+			ssaValue *right = ssa_build_expr(proc, ue->expr);
 			return ssa_emit_arith(proc, ue->op, left, right, tv->type);
 		} break;
 		case Token_Xor: { // Bitwise not
-			// NOTE(bill): "not" x == x "xor" -1
+			// NOTE(bill): "not" `x` == `x` "xor" `-1`
 			ExactValue neg_one = make_exact_value_integer(-1);
-			ssaValue *left = ssa_build_expression(proc, ue->operand);
+			ssaValue *left = ssa_build_expr(proc, ue->expr);
 			ssaValue *right = ssa_make_value_constant(proc->module->allocator, tv->type, neg_one);
 			return ssa_emit_arith(proc, ue->op, left, right, tv->type);
 		} break;
@@ -641,8 +655,8 @@ ssaValue *ssa_build_single_expression(ssaProcedure *proc, AstNode *expr, TypeAnd
 		}
 	} break;
 
-	case AstNode_BinaryExpression: {
-		auto *be = &expr->binary_expression;
+	case AstNode_BinaryExpr: {
+		auto *be = &expr->binary_expr;
 		switch (be->op.kind) {
 		case Token_Add:
 		case Token_Sub:
@@ -653,17 +667,17 @@ ssaValue *ssa_build_single_expression(ssaProcedure *proc, AstNode *expr, TypeAnd
 		case Token_Or:
 		case Token_Xor:
 			return ssa_emit_arith(proc, be->op,
-			                      ssa_build_expression(proc, be->left),
-			                      ssa_build_expression(proc, be->right),
+			                      ssa_build_expr(proc, be->left),
+			                      ssa_build_expr(proc, be->right),
 			                      tv->type);
 
 		case Token_AndNot: {
-			AstNode ue = {AstNode_UnaryExpression};
-			ue.unary_expression.op = be->op;
-			ue.unary_expression.op.kind = Token_Xor;
-			ue.unary_expression.operand = be->right;
-			ssaValue *left = ssa_build_expression(proc, be->left);
-			ssaValue *right = ssa_build_expression(proc, &ue);
+			AstNode ue = {AstNode_UnaryExpr};
+			ue.unary_expr.op = be->op;
+			ue.unary_expr.op.kind = Token_Xor;
+			ue.unary_expr.expr = be->right;
+			ssaValue *left = ssa_build_expr(proc, be->left);
+			ssaValue *right = ssa_build_expr(proc, &ue);
 			Token op = be->op;
 			op.kind = Token_And;
 			return ssa_emit_arith(proc, op, left, right, tv->type);
@@ -676,8 +690,8 @@ ssaValue *ssa_build_single_expression(ssaProcedure *proc, AstNode *expr, TypeAnd
 		case Token_Gt:
 		case Token_GtEq: {
 			ssaValue *cmp = ssa_emit_compare(proc, be->op,
-			                                 ssa_build_expression(proc, be->left),
-			                                 ssa_build_expression(proc, be->right));
+			                                 ssa_build_expr(proc, be->left),
+			                                 ssa_build_expr(proc, be->right));
 			return ssa_emit_conversion(proc, cmp, default_type(tv->type));
 		} break;
 
@@ -685,18 +699,43 @@ ssaValue *ssa_build_single_expression(ssaProcedure *proc, AstNode *expr, TypeAnd
 			GB_PANIC("Invalid binary expression");
 		}
 	} break;
-	case AstNode_ProcedureLiteral:
+	case AstNode_ProcLit:
 		break;
-	case AstNode_CastExpression:
+	case AstNode_CastExpr:
 		break;
-	case AstNode_CallExpression:
+	case AstNode_CallExpr:
 		break;
-	case AstNode_SliceExpression:
+	case AstNode_SliceExpr:
 		break;
-	case AstNode_IndexExpression: {
+	case AstNode_IndexExpr: {
+		auto *ie = &expr->index_expr;
+		Type *t = type_of_expr(proc->module->info, ie->expr);
+		t = get_base_type(t);
+		switch (t->kind) {
+		case Type_Basic: {
+			// TODO(bill): Strings AstNode_IndexExpression
+		} break;
 
+		case Type_Array: {
+			Type *t_int = &basic_types[Basic_int];
+			ssaValue *e = ssa_lvalue_address(ssa_build_address(proc, ie->expr), proc);
+			ssaValue *i0 = ssa_make_value_constant(proc->module->allocator, t_int, make_exact_value_integer(0));
+			ssaValue *i1 = ssa_emit_conversion(proc, ssa_build_expr(proc, ie->index), t_int);
+			ssaValue *gep = ssa_make_instruction_get_element_ptr(proc, e,
+			                                                     i0, i1, 2,
+			                                                     true);
+			ssa_value_set_type(gep, t->array.element);
+			return ssa_emit_load(proc, ssa_emit(proc, gep));
+		} break;
+
+		case Type_Slice:
+			break;
+
+		case Type_Pointer:
+			break;
+		}
 	} break;
-	case AstNode_SelectorExpression:
+	case AstNode_SelectorExpr:
 		break;
 	}
 
@@ -705,8 +744,8 @@ ssaValue *ssa_build_single_expression(ssaProcedure *proc, AstNode *expr, TypeAnd
 }
 
 
-ssaValue *ssa_build_expression(ssaProcedure *proc, AstNode *expr) {
-	expr = unparen_expression(expr);
+ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
+	expr = unparen_expr(expr);
 
 	TypeAndValue *tv = map_get(&proc->module->info->types, hash_pointer(expr));
 	if (tv) {
@@ -723,7 +762,7 @@ ssaValue *ssa_build_expression(ssaProcedure *proc, AstNode *expr) {
 			gb_printf("!Addressable!\n");
 			// TODO(bill): Addressing_Variable
 		} else {
-			value = ssa_build_single_expression(proc, expr, tv);
+			value = ssa_build_single_expr(proc, expr, tv);
 		}
 
 		return value;
@@ -734,9 +773,9 @@ ssaValue *ssa_build_expression(ssaProcedure *proc, AstNode *expr) {
 
 ssaLvalue ssa_build_address(ssaProcedure *proc, AstNode *expr) {
 	switch (expr->kind) {
-	case AstNode_Identifier: {
+	case AstNode_Ident: {
 		if (!ssa_is_blank_identifier(expr)) {
-			Entity *e = entity_of_identifier(proc->module->info, expr);
+			Entity *e = entity_of_ident(proc->module->info, expr);
 
 			ssaLvalue val = {ssaLvalue_Address};
 			val.address.expr = expr;
@@ -748,22 +787,65 @@ ssaLvalue ssa_build_address(ssaProcedure *proc, AstNode *expr) {
 		}
 	} break;
 
-	case AstNode_ParenExpression:
-		return ssa_build_address(proc, unparen_expression(expr));
+	case AstNode_ParenExpr:
+		return ssa_build_address(proc, unparen_expr(expr));
 
-	case AstNode_DereferenceExpression: {
+/*
+	ssaLvalue addr = ssa_build_address(proc, expr->dereference_expr.operand);
+	ssaValue *load = ssa_lvalue_load(addr, proc);
+	ssaValue *deref = ssa_emit_load(proc, load);
+	ssa_value_set_type(deref, type_deref(ssa_value_type(deref)));
+	return deref;
+*/
+
+#if 1
+	case AstNode_DerefExpr: {
+		AstNode *operand = expr->deref_expr.expr;
+		ssaLvalue addr = ssa_build_address(proc, operand);
+		ssaValue *value = ssa_lvalue_load(addr, proc);
+
 		ssaLvalue val = {ssaLvalue_Address};
-		AstNode *operand = expr->dereference_expression.operand;
-		val.address.value = ssa_build_expression(proc, operand);
+		val.address.value = value;
 		val.address.expr  = expr;
 		return val;
 	} break;
+#endif
 
-	case AstNode_SelectorExpression:
+	case AstNode_SelectorExpr:
 		break;
 
-	case AstNode_IndexExpression:
-		break;
+	case AstNode_IndexExpr: {
+		ssaValue *v = NULL;
+		Type *element_type = NULL;
+		auto *ie = &expr->index_expr;
+		Type *t = type_of_expr(proc->module->info, expr->index_expr.expr);
+		t = get_base_type(t);
+		switch (t->kind) {
+		case Type_Array: {
+			Type *t_int = &basic_types[Basic_int];
+			ssaValue *e = ssa_lvalue_address(ssa_build_address(proc, ie->expr), proc);
+			ssaValue *i0 = ssa_make_value_constant(proc->module->allocator, t_int, make_exact_value_integer(0));
+			ssaValue *i1 = ssa_emit_conversion(proc, ssa_build_expr(proc, ie->index), t_int);
+			ssaValue *gep = ssa_make_instruction_get_element_ptr(proc, e,
+			                                                     i0, i1, 2,
+			                                                     true);
+			element_type = t->array.element;
+			v = gep;
+		} break;
+		case Type_Pointer:
+			GB_PANIC("ssa_build_address AstNode_IndexExpression Type_Slice");
+			break;
+		case Type_Slice:
+			GB_PANIC("ssa_build_address AstNode_IndexExpression Type_Slice");
+			break;
+		}
+
+		ssa_value_set_type(v, element_type);
+		ssaLvalue val = {ssaLvalue_Address};
+		val.address.value = ssa_emit(proc, v);
+		val.address.expr  = expr;
+		return val;
+	} break;
 
 	// TODO(bill): Others address
 	}
@@ -782,19 +864,19 @@ void ssa_build_assign_op(ssaProcedure *proc, ssaLvalue lhs, ssaValue *value, Tok
 }
 
 
-void ssa_build_statement(ssaProcedure *proc, AstNode *s);
+void ssa_build_stmt(ssaProcedure *proc, AstNode *s);
 
-void ssa_build_statement_list(ssaProcedure *proc, AstNode *list) {
+void ssa_build_stmt_list(ssaProcedure *proc, AstNode *list) {
 	for (AstNode *stmt = list ; stmt != NULL; stmt = stmt->next)
-		ssa_build_statement(proc, stmt);
+		ssa_build_stmt(proc, stmt);
 }
 
-void ssa_build_statement(ssaProcedure *proc, AstNode *s) {
+void ssa_build_stmt(ssaProcedure *proc, AstNode *s) {
 	switch (s->kind) {
-	case AstNode_EmptyStatement:
+	case AstNode_EmptyStmt:
 		break;
-	case AstNode_VariableDeclaration: {
-		auto *vd = &s->variable_declaration;
+	case AstNode_VarDecl: {
+		auto *vd = &s->var_decl;
 		if (vd->kind == Declaration_Mutable) {
 			if (vd->name_count == vd->value_count) { // 1:1 assigment
 				gbArray(ssaLvalue)  lvals;
@@ -815,7 +897,7 @@ void ssa_build_statement(ssaProcedure *proc, AstNode *s) {
 				}
 
 				for (AstNode *value = vd->value_list; value != NULL; value = value->next) {
-					ssaValue *init = ssa_build_expression(proc, value);
+					ssaValue *init = ssa_build_expr(proc, value);
 					gb_array_append(inits, init);
 				}
 
@@ -837,22 +919,22 @@ void ssa_build_statement(ssaProcedure *proc, AstNode *s) {
 		}
 	} break;
 
-	case AstNode_IncDecStatement: {
-		Token op = s->inc_dec_statement.op;
+	case AstNode_IncDecStmt: {
+		Token op = s->inc_dec_stmt.op;
 		if (op.kind == Token_Increment) {
 			op.kind = Token_Add;
 		} else if (op.kind == Token_Decrement) {
 			op.kind = Token_Sub;
 		}
-		ssaLvalue lval = ssa_build_address(proc, s->inc_dec_statement.expression);
+		ssaLvalue lval = ssa_build_address(proc, s->inc_dec_stmt.expr);
 		ssaValue *one = ssa_make_value_constant(proc->module->allocator, ssa_lvalue_type(lval),
 		                                        make_exact_value_integer(1));
 		ssa_build_assign_op(proc, lval, one, op);
 
 	} break;
 
-	case AstNode_AssignStatement: {
-		auto *assign = &s->assign_statement;
+	case AstNode_AssignStmt: {
+		auto *assign = &s->assign_stmt;
 		switch (assign->op.kind) {
 		case Token_Eq: {
 			gbArray(ssaLvalue) lvals;
@@ -873,7 +955,7 @@ void ssa_build_statement(ssaProcedure *proc, AstNode *s) {
 				if (assign->lhs_count == 1) {
 					AstNode *lhs = assign->lhs_list;
 					AstNode *rhs = assign->rhs_list;
-					ssaValue *init = ssa_build_expression(proc, rhs);
+					ssaValue *init = ssa_build_expr(proc, rhs);
 					ssa_lvalue_store(lvals[0], proc, init);
 				} else {
 					gbArray(ssaValue *) inits;
@@ -881,7 +963,7 @@ void ssa_build_statement(ssaProcedure *proc, AstNode *s) {
 					defer (gb_array_free(inits));
 
 					for (AstNode *rhs = assign->rhs_list; rhs != NULL; rhs = rhs->next) {
-						ssaValue *init = ssa_build_expression(proc, rhs);
+						ssaValue *init = ssa_build_expr(proc, rhs);
 						gb_array_append(inits, init);
 					}
 
@@ -903,33 +985,33 @@ void ssa_build_statement(ssaProcedure *proc, AstNode *s) {
 			kind += Token_Add - Token_AddEq; // Convert += to +
 			op.kind = cast(TokenKind)kind;
 			ssaLvalue lhs = ssa_build_address(proc, assign->lhs_list);
-			ssaValue *value = ssa_build_expression(proc, assign->rhs_list);
+			ssaValue *value = ssa_build_expr(proc, assign->rhs_list);
 			ssa_build_assign_op(proc, lhs, value, op);
 		} break;
 		}
 	} break;
 
-	case AstNode_ExpressionStatement:
-		ssa_build_expression(proc, s->expression_statement.expression);
+	case AstNode_ExprStmt:
+		ssa_build_expr(proc, s->expr_stmt.expr);
 		break;
 
-	case AstNode_BlockStatement:
-		ssa_build_statement_list(proc, s->block_statement.list);
+	case AstNode_BlockStmt:
+		ssa_build_stmt_list(proc, s->block_stmt.list);
 		break;
 
-	case AstNode_IfStatement:
+	case AstNode_IfStmt:
 		GB_PANIC("AstNode_IfStatement");
 		break;
-	case AstNode_ReturnStatement:
+	case AstNode_ReturnStmt:
 		GB_PANIC("AstNode_ReturnStatement");
 		break;
-	case AstNode_ForStatement:
+	case AstNode_ForStmt:
 		GB_PANIC("AstNode_ForStatement");
 		break;
-	case AstNode_DeferStatement:
+	case AstNode_DeferStmt:
 		GB_PANIC("AstNode_DeferStatement");
 		break;
-	case AstNode_BranchStatement:
+	case AstNode_BranchStmt:
 		GB_PANIC("AstNode_BranchStatement");
 		break;
 	}
@@ -945,9 +1027,9 @@ void ssa_build_procedure(ssaValue *value) {
 
 	AstNode *proc_decl = proc->decl->proc_decl;
 	switch (proc_decl->kind) {
-	case AstNode_ProcedureDeclaration:
-		proc->type_expr = proc_decl->procedure_declaration.type;
-		proc->body = proc_decl->procedure_declaration.body;
+	case AstNode_ProcDecl:
+		proc->type_expr = proc_decl->proc_decl.type;
+		proc->body = proc_decl->proc_decl.body;
 		break;
 	default:
 		return;
@@ -960,7 +1042,7 @@ void ssa_build_procedure(ssaValue *value) {
 
 
 	ssa_begin_procedure_body(proc);
-	ssa_build_statement(proc, proc->body);
+	ssa_build_stmt(proc, proc->body);
 	ssa_end_procedure_body(proc);
 
 }

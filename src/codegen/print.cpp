@@ -228,10 +228,9 @@ void ssa_print_value(gbFile *f, ssaModule *m, ssaValue *value, Type *type_hint) 
 
 void ssa_print_instruction(gbFile *f, ssaModule *m, ssaValue *value) {
 	GB_ASSERT(value->kind == ssaValue_Instruction);
+	ssaInstruction *instr = &value->instruction;
 
 	ssa_fprintf(f, "\t");
-
-	ssaInstruction *instr = &value->instruction;
 	switch (instr->kind) {
 	case ssaInstruction_Local: {
 		Type *type = instr->local.entity->type;
@@ -261,13 +260,39 @@ void ssa_print_instruction(gbFile *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstruction_Load: {
-		Type *type = ssa_value_type(instr->load.address);
+		Type *type = instr->load.type;
 		ssa_fprintf(f, "%%%d = load ", value->id);
 		ssa_print_type(f, m->sizes, type);
 		ssa_fprintf(f, ", ");
 		ssa_print_type(f, m->sizes, type);
 		ssa_fprintf(f, "* ");
 		ssa_print_value(f, m, instr->load.address, type);
+		ssa_fprintf(f, "\n");
+	} break;
+
+	case ssaInstruction_GetElementPtr: {
+		Type *rt = instr->get_element_ptr.result_type;
+		Type *et = instr->get_element_ptr.element_type;
+		Type *t_int = &basic_types[Basic_int];
+		ssa_fprintf(f, "%%%d = getelementptr ", value->id);
+		if (instr->get_element_ptr.inbounds)
+		ssa_fprintf(f, "inbounds ");
+
+		ssa_print_type(f, m->sizes, et);
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m->sizes, et);
+		ssa_fprintf(f, "* ");
+		ssa_print_value(f, m, instr->get_element_ptr.address, et);
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m->sizes, t_int);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, instr->get_element_ptr.indices[0], t_int);
+		if (instr->get_element_ptr.index_count == 2) {
+			ssa_fprintf(f, ", ");
+			ssa_print_type(f, m->sizes, t_int);
+			ssa_fprintf(f, " ");
+			ssa_print_value(f, m, instr->get_element_ptr.indices[1], t_int);
+		}
 		ssa_fprintf(f, "\n");
 	} break;
 
@@ -366,7 +391,7 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 		} break;
 
 		case ssaValue_Global: {
-			ssaGlobal *g = &v->global;
+			auto *g = &v->global;
 			ssa_print_encoded_global(f, g->entity->token.string);
 			ssa_fprintf(f, " = global ");
 			ssa_print_type(f, m->sizes, get_base_type(g->entity->type));

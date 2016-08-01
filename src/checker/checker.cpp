@@ -19,8 +19,7 @@ struct Operand {
 	AddressingMode mode;
 	Type *type;
 	ExactValue value;
-
-	AstNode *expression;
+	AstNode *expr;
 	BuiltinProcedureId builtin_id;
 };
 
@@ -30,7 +29,7 @@ struct TypeAndValue {
 	ExactValue value;
 };
 
-struct DeclarationInfo {
+struct DeclInfo {
 	Scope *scope;
 
 	Entity **entities;
@@ -45,26 +44,26 @@ struct DeclarationInfo {
 };
 
 
-void init_declaration_info(DeclarationInfo *d, Scope *scope) {
+void init_declaration_info(DeclInfo *d, Scope *scope) {
 	d->scope = scope;
 	map_init(&d->deps, gb_heap_allocator());
 }
 
-DeclarationInfo *make_declaration_info(gbAllocator a, Scope *scope) {
-	DeclarationInfo *d = gb_alloc_item(a, DeclarationInfo);
+DeclInfo *make_declaration_info(gbAllocator a, Scope *scope) {
+	DeclInfo *d = gb_alloc_item(a, DeclInfo);
 	init_declaration_info(d, scope);
 	return d;
 }
 
-void destroy_declaration_info(DeclarationInfo *d) {
+void destroy_declaration_info(DeclInfo *d) {
 	map_destroy(&d->deps);
 }
 
-b32 has_init(DeclarationInfo *d) {
+b32 has_init(DeclInfo *d) {
 	if (d->init_expr != NULL)
 		return true;
 	if (d->proc_decl != NULL) {
-		if (d->proc_decl->procedure_declaration.body != NULL)
+		if (d->proc_decl->proc_decl.body != NULL)
 			return true;
 	}
 
@@ -91,7 +90,7 @@ ExpressionInfo make_expression_info(b32 is_lhs, AddressingMode mode, Type *type,
 struct ProcedureInfo {
 	AstFile *file;
 	Token            token;
-	DeclarationInfo *decl;
+	DeclInfo *decl;
 	Type *           type; // Type_Procedure
 	AstNode *        body; // AstNode_BlockStatement
 };
@@ -151,7 +150,7 @@ gb_global BuiltinProcedure builtin_procedures[BuiltinProcedure_Count] = {
 
 struct CheckerContext {
 	Scope *scope;
-	DeclarationInfo *decl;
+	DeclInfo *decl;
 };
 
 struct CheckerInfo {
@@ -160,7 +159,7 @@ struct CheckerInfo {
 	Map<Entity *>          uses;        // Key: AstNode * | Identifier -> Entity
 	Map<Scope *>           scopes;      // Key: AstNode * | Node       -> Scope
 	Map<ExpressionInfo>    untyped;     // Key: AstNode * | Expression -> ExpressionInfo
-	Map<DeclarationInfo *> entities;    // Key: Entity *
+	Map<DeclInfo *> entities;    // Key: Entity *
 };
 
 struct Checker {
@@ -259,7 +258,7 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	return NULL;
 }
 
-void add_dependency(DeclarationInfo *d, Entity *e) {
+void add_dependency(DeclInfo *d, Entity *e) {
 	map_set(&d->deps, hash_pointer(e), cast(b32)true);
 }
 
@@ -391,8 +390,8 @@ TypeAndValue *type_and_value_of_expression(CheckerInfo *i, AstNode *expression) 
 }
 
 
-Entity *entity_of_identifier(CheckerInfo *i, AstNode *identifier) {
-	GB_ASSERT(identifier->kind == AstNode_Identifier);
+Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
+	GB_ASSERT(identifier->kind == AstNode_Ident);
 	Entity **found = map_get(&i->definitions, hash_pointer(identifier));
 	if (found)
 		return *found;
@@ -403,12 +402,12 @@ Entity *entity_of_identifier(CheckerInfo *i, AstNode *identifier) {
 	return NULL;
 }
 
-Type *type_of_expression(CheckerInfo *i, AstNode *expression) {
+Type *type_of_expr(CheckerInfo *i, AstNode *expression) {
 	TypeAndValue *found = type_and_value_of_expression(i, expression);
 	if (found)
 		return found->type;
-	if (expression->kind == AstNode_Identifier) {
-		Entity *entity = entity_of_identifier(i, expression);
+	if (expression->kind == AstNode_Ident) {
+		Entity *entity = entity_of_ident(i, expression);
 		if (entity)
 			return entity->type;
 	}
@@ -441,7 +440,7 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 
 void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier != NULL);
-	GB_ASSERT(identifier->kind == AstNode_Identifier);
+	GB_ASSERT(identifier->kind == AstNode_Ident);
 	u64 key = hash_pointer(identifier);
 	map_set(&i->definitions, key, entity);
 }
@@ -460,14 +459,14 @@ void add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 
 void add_entity_use(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier != NULL);
-	GB_ASSERT(identifier->kind == AstNode_Identifier);
+	GB_ASSERT(identifier->kind == AstNode_Ident);
 	u64 key = hash_pointer(identifier);
 	map_set(&i->uses, key, entity);
 }
 
 
-void add_file_entity(Checker *c, AstNode *identifier, Entity *e, DeclarationInfo *d) {
-	GB_ASSERT(are_strings_equal(identifier->identifier.token.string, e->token.string));
+void add_file_entity(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d) {
+	GB_ASSERT(are_strings_equal(identifier->ident.token.string, e->token.string));
 
 	add_entity(c, c->global_scope, identifier, e);
 	map_set(&c->info.entities, hash_pointer(e), d);
@@ -475,7 +474,7 @@ void add_file_entity(Checker *c, AstNode *identifier, Entity *e, DeclarationInfo
 }
 
 
-void check_procedure_later(Checker *c, AstFile *file, Token token, DeclarationInfo *decl, Type *type, AstNode *body) {
+void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body) {
 	ProcedureInfo info = {};
 	info.file = file;
 	info.token = token;
@@ -533,27 +532,27 @@ void check_parsed_files(Checker *c) {
 	gb_for_array(i, c->parser->files) {
 		AstFile *f = &c->parser->files[i];
 		add_curr_ast_file(c, f);
-		for (AstNode *decl = f->declarations; decl != NULL; decl = decl->next) {
-			if (!is_ast_node_declaration(decl))
+		for (AstNode *decl = f->decls; decl != NULL; decl = decl->next) {
+			if (!is_ast_node_decl(decl))
 				continue;
 
 			switch (decl->kind) {
-			case AstNode_BadDeclaration:
+			case AstNode_BadDecl:
 				break;
 
-			case AstNode_VariableDeclaration: {
-				auto *vd = &decl->variable_declaration;
+			case AstNode_VarDecl: {
+				auto *vd = &decl->var_decl;
 
 				switch (vd->kind) {
 				case Declaration_Immutable: {
 					for (AstNode *name = vd->name_list, *value = vd->value_list;
 					     name != NULL && value != NULL;
 					     name = name->next, value = value->next) {
-						GB_ASSERT(name->kind == AstNode_Identifier);
+						GB_ASSERT(name->kind == AstNode_Ident);
 						ExactValue v = {ExactValue_Invalid};
-						Entity *e = make_entity_constant(c->allocator, c->context.scope, name->identifier.token, NULL, v);
-						DeclarationInfo *di = make_declaration_info(c->allocator, c->global_scope);
-						di->type_expr = vd->type_expression;
+						Entity *e = make_entity_constant(c->allocator, c->context.scope, name->ident.token, NULL, v);
+						DeclInfo *di = make_declaration_info(c->allocator, c->global_scope);
+						di->type_expr = vd->type;
 						di->init_expr = value;
 						add_file_entity(c, name, e, di);
 					}
@@ -561,7 +560,7 @@ void check_parsed_files(Checker *c) {
 					isize lhs_count = vd->name_count;
 					isize rhs_count = vd->value_count;
 
-					if (rhs_count == 0 && vd->type_expression == NULL) {
+					if (rhs_count == 0 && vd->type == NULL) {
 						error(&c->error_collector, ast_node_token(decl), "Missing type or initial expression");
 					} else if (lhs_count < rhs_count) {
 						error(&c->error_collector, ast_node_token(decl), "Extra initial expression");
@@ -572,25 +571,25 @@ void check_parsed_files(Checker *c) {
 					isize entity_count = vd->name_count;
 					isize entity_index = 0;
 					Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
-					DeclarationInfo *di = NULL;
+					DeclInfo *di = NULL;
 					if (vd->value_count == 1) {
 						di = make_declaration_info(gb_heap_allocator(), c->global_scope);
 						di->entities = entities;
 						di->entity_count = entity_count;
-						di->type_expr = vd->type_expression;
+						di->type_expr = vd->type;
 						di->init_expr = vd->value_list;
 					}
 
 					AstNode *value = vd->value_list;
 					for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
-						Entity *e = make_entity_variable(c->allocator, c->global_scope, name->identifier.token, NULL);
+						Entity *e = make_entity_variable(c->allocator, c->global_scope, name->ident.token, NULL);
 						entities[entity_index++] = e;
 
-						DeclarationInfo *d = di;
+						DeclInfo *d = di;
 						if (d == NULL) {
 							AstNode *init_expr = value;
 							d = make_declaration_info(gb_heap_allocator(), c->global_scope);
-							d->type_expr = vd->type_expression;
+							d->type_expr = vd->type;
 							d->init_expr = init_expr;
 						}
 
@@ -605,35 +604,35 @@ void check_parsed_files(Checker *c) {
 
 			} break;
 
-			case AstNode_TypeDeclaration: {
-				AstNode *identifier = decl->type_declaration.name;
-				Entity *e = make_entity_type_name(c->allocator, c->global_scope, identifier->identifier.token, NULL);
-				DeclarationInfo *d = make_declaration_info(c->allocator, e->parent);
-				d->type_expr = decl->type_declaration.type_expression;
+			case AstNode_TypeDecl: {
+				AstNode *identifier = decl->type_decl.name;
+				Entity *e = make_entity_type_name(c->allocator, c->global_scope, identifier->ident.token, NULL);
+				DeclInfo *d = make_declaration_info(c->allocator, e->parent);
+				d->type_expr = decl->type_decl.type;
 				add_file_entity(c, identifier, e, d);
 			} break;
 
-			case AstNode_AliasDeclaration: {
-				AstNode *identifier = decl->alias_declaration.name;
-				Entity *e = make_entity_alias_name(c->allocator, c->global_scope, identifier->identifier.token, NULL);
-				DeclarationInfo *d = make_declaration_info(c->allocator, e->parent);
-				d->type_expr = decl->alias_declaration.type_expression;
+			case AstNode_AliasDecl: {
+				AstNode *identifier = decl->alias_decl.name;
+				Entity *e = make_entity_alias_name(c->allocator, c->global_scope, identifier->ident.token, NULL);
+				DeclInfo *d = make_declaration_info(c->allocator, e->parent);
+				d->type_expr = decl->alias_decl.type;
 				add_file_entity(c, identifier, e, d);
 			} break;
 
-			case AstNode_ProcedureDeclaration: {
-				AstNode *identifier = decl->procedure_declaration.name;
-				Token token = identifier->identifier.token;
+			case AstNode_ProcDecl: {
+				AstNode *identifier = decl->proc_decl.name;
+				Token token = identifier->ident.token;
 				Entity *e = make_entity_procedure(c->allocator, c->global_scope, token, NULL);
 				add_entity(c, c->global_scope, identifier, e);
-				DeclarationInfo *d = make_declaration_info(c->allocator, e->parent);
+				DeclInfo *d = make_declaration_info(c->allocator, e->parent);
 				d->proc_decl = decl;
 				map_set(&c->info.entities, hash_pointer(e), d);
 				e->order = gb_array_count(c->info.entities.entries);
 
 			} break;
 
-			case AstNode_ImportDeclaration:
+			case AstNode_ImportDecl:
 				// NOTE(bill): ignore
 				break;
 
@@ -648,8 +647,8 @@ void check_parsed_files(Checker *c) {
 	gb_for_array(i, c->info.entities.entries) {
 		auto *entry = &c->info.entities.entries[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key;
-		DeclarationInfo *d = entry->value;
-		check_entity_declaration(c, e, d, NULL);
+		DeclInfo *d = entry->value;
+		check_entity_decl(c, e, d, NULL);
 	}
 
 
@@ -657,7 +656,7 @@ void check_parsed_files(Checker *c) {
 	gb_for_array(i, c->procedures) {
 		ProcedureInfo *pi = &c->procedures[i];
 		add_curr_ast_file(c, pi->file);
-		check_procedure_body(c, pi->token, pi->decl, pi->type, pi->body);
+		check_proc_body(c, pi->token, pi->decl, pi->type, pi->body);
 	}
 
 
@@ -668,7 +667,7 @@ void check_parsed_files(Checker *c) {
 		AstNode *expr = cast(AstNode *)cast(uintptr)key;
 		ExpressionInfo *info = &entry->value;
 		if (is_type_typed(info->type)) {
-			GB_PANIC("%s (type %s) is typed!", expression_to_string(expr), info->type);
+			GB_PANIC("%s (type %s) is typed!", expr_to_string(expr), info->type);
 		}
 		add_type_and_value(&c->info, expr, info->mode, info->type, info->value);
 	}
