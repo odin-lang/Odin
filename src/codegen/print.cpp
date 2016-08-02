@@ -146,7 +146,7 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 			if (i > 0) ssa_fprintf(f, ", ");
 			ssa_print_type(f, s, &t->procedure.params[i]);
 		}
-		ssa_fprintf(f, ") ");
+		ssa_fprintf(f, ")*");
 		break;
 	}
 }
@@ -201,6 +201,12 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 	}
 }
 
+void ssa_print_block_name(gbFile *f, ssaBlock *b) {
+	ssa_fprintf(f, "\"");
+	ssa_print_escape_string(f, b->label);
+	ssa_fprintf(f, " - %d", b->id);
+	ssa_fprintf(f, "\"");
+}
 
 void ssa_print_value(gbFile *f, ssaModule *m, ssaValue *value, Type *type_hint) {
 	if (value == NULL) {
@@ -208,18 +214,21 @@ void ssa_print_value(gbFile *f, ssaModule *m, ssaValue *value, Type *type_hint) 
 		return;
 	}
 	switch (value->kind) {
+	case ssaValue_Constant:
+		ssa_print_exact_value(f, m, value->constant.value, type_hint);
+		break;
 	case ssaValue_TypeName:
 		ssa_print_encoded_local(f, value->type_name.entity->token.string);
 		break;
 	case ssaValue_Global:
 		ssa_print_encoded_global(f, value->global.entity->token.string);
 		break;
-	case ssaValue_Procedure:
+	case ssaValue_Param:
+		ssa_print_encoded_local(f, value->param.entity->token.string);
+		break;
+	case ssaValue_Proc:
 		ssa_print_encoded_global(f, value->proc.entity->token.string);
 		break;
-	case ssaValue_Constant: {
-		ssa_print_exact_value(f, m, value->constant.value, type_hint);
-	} break;
 	case ssaValue_Instr:
 		ssa_fprintf(f, "%%%d", value->id);
 		break;
@@ -301,12 +310,32 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 			ssa_fprintf(f, ", ", instr->br.cond->id);
 		}
 		ssa_fprintf(f, "label ");
-		ssa_print_encoded_local(f, instr->br.true_block->label);
+		ssa_fprintf(f, "%%"); ssa_print_block_name(f, instr->br.true_block);
 		if (instr->br.false_block != NULL) {
 			ssa_fprintf(f, ", label ");
-			ssa_print_encoded_local(f, instr->br.false_block->label);
+			ssa_fprintf(f, "%%"); ssa_print_block_name(f, instr->br.false_block);
 		}
 		ssa_fprintf(f, "\n");
+	} break;
+
+	case ssaInstr_Ret: {
+		auto *ret = &instr->ret;
+		ssa_fprintf(f, "ret ");
+		if (ret->value == NULL) {
+			ssa_fprintf(f, "void");
+		} else {
+			Type *t = ssa_value_type(ret->value);
+			ssa_print_type(f, m->sizes, t);
+			ssa_fprintf(f, " ");
+			ssa_print_value(f, m, ret->value, t);
+		}
+
+		ssa_fprintf(f, "\n");
+
+	} break;
+
+	case ssaInstr_Unreachable: {
+		ssa_fprintf(f, "unreachable\n");
 	} break;
 
 	case ssaInstr_BinaryOp: {
@@ -391,6 +420,10 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 }
 
 void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
+	if (m->layout.len > 0) {
+		ssa_fprintf(f, "target datalayout = %.*s\n", LIT(m->layout));
+	}
+
 	gb_for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
 		ssaValue *v = entry->value;
@@ -412,7 +445,7 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 			ssa_fprintf(f, ", align %td\n", type_align_of(m->sizes, gb_heap_allocator(), g->entity->type));
 		} break;
 
-		case ssaValue_Procedure: {
+		case ssaValue_Proc: {
 			ssaProcedure *proc = &v->proc;
 			if (proc->body == NULL) {
 				ssa_fprintf(f, "declare ");
@@ -450,19 +483,20 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 				ssa_fprintf(f, "\n");
  			} else {
  				ssa_fprintf(f, "{\n");
- 				gb_for_array(i, proc->blocks.entries) {
- 					ssaBlock *block = &proc->blocks.entries[i].value->block;
- 					ssa_fprintf(f, "%.*s:\n", LIT(block->label));
+ 				gb_for_array(i, proc->blocks) {
+ 					ssaBlock *block = proc->blocks[i];
+
+ 					if (i > 0) ssa_fprintf(f, "\n");
+ 					ssa_print_block_name(f, block);
+ 					ssa_fprintf(f, ":\n");
+
  					gb_for_array(j, block->instrs) {
  						ssaValue *value = block->instrs[j];
  						ssa_print_instr(f, m, value);
  					}
  				}
 
- 				if (proc_type->result_count == 0) {
- 					ssa_fprintf(f, "\tret void\n");
- 				}
- 				ssa_fprintf(f, "}\n");
+ 				ssa_fprintf(f, "}\n\n");
  			}
 
 		} break;

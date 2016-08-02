@@ -101,6 +101,7 @@ struct Scope {
 	Scope *prev, *next;
 	Scope *first_child, *last_child;
 	Map<Entity *> elements; // Key: String
+	gbArray(AstNode *) deferred_stmts;
 };
 
 enum ExpressionKind {
@@ -154,13 +155,14 @@ struct CheckerContext {
 	DeclInfo *decl;
 };
 
+// NOTE(bill): Symbol tables
 struct CheckerInfo {
 	Map<TypeAndValue>      types;       // Key: AstNode * | Expression -> Type (and value)
 	Map<Entity *>          definitions; // Key: AstNode * | Identifier -> Entity
 	Map<Entity *>          uses;        // Key: AstNode * | Identifier -> Entity
 	Map<Scope *>           scopes;      // Key: AstNode * | Node       -> Scope
 	Map<ExpressionInfo>    untyped;     // Key: AstNode * | Expression -> ExpressionInfo
-	Map<DeclInfo *> entities;    // Key: Entity *
+	Map<DeclInfo *>        entities;    // Key: Entity *
 };
 
 struct Checker {
@@ -190,6 +192,7 @@ Scope *make_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
 	map_init(&s->elements, gb_heap_allocator());
+	gb_array_init(s->deferred_stmts, gb_heap_allocator());
 	if (parent != NULL && parent != universal_scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
 	}
@@ -504,6 +507,12 @@ void check_close_scope(Checker *c) {
 	c->context.scope = c->context.scope->parent;
 }
 
+void check_add_deferred_stmt(Checker *c, AstNode *stmt) {
+	GB_ASSERT(stmt != NULL);
+	GB_ASSERT(is_ast_node_stmt(stmt));
+	gb_array_append(c->context.scope->deferred_stmts, stmt);
+}
+
 void push_procedure(Checker *c, Type *procedure_type) {
 	gb_array_append(c->procedure_stack, procedure_type);
 }
@@ -511,7 +520,6 @@ void push_procedure(Checker *c, Type *procedure_type) {
 void pop_procedure(Checker *c) {
 	gb_array_pop(c->procedure_stack);
 }
-
 
 void add_curr_ast_file(Checker *c, AstFile *file) {
 	gb_zero_item(&c->error_collector);

@@ -36,6 +36,7 @@ void ssa_gen_code(ssaGen *s) {
 	ssaModule *m = &s->module;
 	CheckerInfo *info = m->info;
 	gbAllocator a = m->allocator;
+
 	gb_for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key;
@@ -66,8 +67,8 @@ void ssa_gen_code(ssaGen *s) {
 	gb_for_array(i, m->members.entries) {
 		auto *entry = &m->members.entries[i];
 		ssaValue *v = entry->value;
-		if (v->kind == ssaValue_Procedure)
-			ssa_build_procedure(v);
+		if (v->kind == ssaValue_Proc)
+			ssa_build_proc(v);
 	}
 
 	ssa_print_llvm_ir(&s->output_file, &s->module);

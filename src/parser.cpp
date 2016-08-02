@@ -144,7 +144,7 @@ AST_NODE_KIND(_ComplexStmtBegin, struct{}) \
 	}) \
 	AST_NODE_KIND(ForStmt, struct { \
 		Token token; \
-		AstNode *init, *cond, *end; \
+		AstNode *init, *cond, *post; \
 		AstNode *body; \
 	}) \
 	AST_NODE_KIND(DeferStmt,  struct { Token token; AstNode *stmt; }) \
@@ -638,12 +638,12 @@ gb_inline AstNode *make_return_stmt(AstFile *f, Token token, AstNode *result_lis
 	return result;
 }
 
-gb_inline AstNode *make_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *end, AstNode *body) {
+gb_inline AstNode *make_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *post, AstNode *body) {
 	AstNode *result = make_node(f, AstNode_ForStmt);
 	result->ForStmt.token = token;
 	result->ForStmt.init = init;
 	result->ForStmt.cond = cond;
-	result->ForStmt.end = end;
+	result->ForStmt.post = post;
 	result->ForStmt.body = body;
 	return result;
 }

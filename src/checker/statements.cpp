@@ -724,7 +724,6 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(fs, ForStmt, node);
-		flags |= Statement_BreakAllowed | Statement_ContinueAllowed;
 		check_open_scope(c, node);
 		defer (check_close_scope(c));
 
@@ -739,9 +738,9 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				      "Non-boolean condition in `for` statement");
 			}
 		}
-		if (fs->end != NULL)
-			check_stmt(c, fs->end, 0);
-		check_stmt(c, fs->body, flags);
+		if (fs->post != NULL)
+			check_stmt(c, fs->post, 0);
+		check_stmt(c, fs->body, flags | Statement_BreakAllowed | Statement_ContinueAllowed);
 	case_end;
 
 	case_ast_node(ds, DeferStmt, node);
@@ -752,6 +751,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			c->in_defer = true;
 			check_stmt(c, ds->stmt, 0);
 			c->in_defer = out_in_defer;
+			check_add_deferred_stmt(c, ds->stmt);
 		}
 	case_end;
 

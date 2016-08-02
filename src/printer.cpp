@@ -124,7 +124,7 @@ void print_ast(AstNode *node, isize indent) {
 		gb_printf("(for)\n");
 		print_ast(node->ForStmt.init, indent+1);
 		print_ast(node->ForStmt.cond, indent+1);
-		print_ast(node->ForStmt.end, indent+1);
+		print_ast(node->ForStmt.post, indent+1);
 		print_ast(node->ForStmt.body, indent+1);
 		break;
 	case AstNode_DeferStmt:
