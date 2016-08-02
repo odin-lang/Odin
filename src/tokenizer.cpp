@@ -705,7 +705,12 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '&':
 			token.kind = Token_And;
 			if (t->curr_rune == '~') {
-				token.kind = token_type_variant2(t, Token_AndNot, Token_AndNotEq);
+				token.kind = Token_AndNot;
+				advance_to_next_rune(t);
+				if (t->curr_rune == '=') {
+					token.kind = Token_AndNotEq;
+					advance_to_next_rune(t);
+				}
 			} else {
 				token.kind = token_type_variant3(t, Token_And, Token_AndEq, '&', Token_CmpAnd);
 				if (t->curr_rune == '=') {

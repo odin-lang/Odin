@@ -43,7 +43,6 @@ struct AstFile {
 	TokenPos fix_prev_pos;
 };
 
-
 // NOTE(bill): Just used to quickly check if there is double declaration in the same scope
 // No type checking actually happens
 // TODO(bill): Should this be completely handled in the semantic checker or is it better here?
@@ -64,243 +63,176 @@ struct Parser {
 	isize import_index;
 };
 
+enum DeclKind {
+	Declaration_Invalid,
+	Declaration_Mutable,
+	Declaration_Immutable,
+	Declaration_Count,
+};
+
 #define AST_NODE_KINDS \
-	AST_NODE_KIND(Invalid), \
+	AST_NODE_KIND(Invalid, struct{}) \
+	AST_NODE_KIND(BasicLit, Token) \
+	AST_NODE_KIND(Ident, struct { \
+		Token token; \
+		AstEntity *entity; \
+	}) \
+	AST_NODE_KIND(ProcLit, struct { \
+		AstNode *type; \
+		AstNode *body; \
+	}) \
+	AST_NODE_KIND(CompoundLit, struct { \
+		AstNode *type; \
+		AstNode *elem_list; \
+		isize elem_count; \
+		Token open, close; \
+	}) \
+AST_NODE_KIND(_ExprBegin,       struct{}) \
+	AST_NODE_KIND(BadExpr,      struct { Token begin, end; }) \
+	AST_NODE_KIND(TagExpr,      struct { Token token, name; AstNode *expr; }) \
+	AST_NODE_KIND(UnaryExpr,    struct { Token op; AstNode *expr; }) \
+	AST_NODE_KIND(BinaryExpr,   struct { Token op; AstNode *left, *right; } ) \
+	AST_NODE_KIND(ParenExpr,    struct { AstNode *expr; Token open, close; }) \
+	AST_NODE_KIND(SelectorExpr, struct { Token token; AstNode *expr, *selector; }) \
+	AST_NODE_KIND(IndexExpr,    struct { AstNode *expr, *index; Token open, close; }) \
+	AST_NODE_KIND(CastExpr,     struct { Token token; AstNode *type, *expr; }) \
+	AST_NODE_KIND(DerefExpr,    struct { Token op; AstNode *expr; }) \
+	AST_NODE_KIND(CallExpr, struct { \
+		AstNode *proc, *arg_list; \
+		isize arg_list_count; \
+		Token open, close; \
+	}) \
+	AST_NODE_KIND(SliceExpr, struct { \
+		AstNode *expr; \
+		Token open, close; \
+		AstNode *low, *high, *max; \
+		b32 triple_indexed; \
+	}) \
+AST_NODE_KIND(_ExprEnd,       struct{}) \
+AST_NODE_KIND(_StmtBegin,     struct{}) \
+	AST_NODE_KIND(BadStmt,    struct { Token begin, end; }) \
+	AST_NODE_KIND(EmptyStmt,  struct { Token token; }) \
+	AST_NODE_KIND(ExprStmt,   struct { AstNode *expr; } ) \
+	AST_NODE_KIND(IncDecStmt, struct { Token op; AstNode *expr; }) \
+	AST_NODE_KIND(TagStmt, struct { \
+		Token token; \
+		Token name; \
+		AstNode *stmt; \
+	}) \
+	AST_NODE_KIND(AssignStmt, struct { \
+		Token op; \
+		AstNode *lhs_list, *rhs_list; \
+		isize lhs_count, rhs_count; \
+	}) \
+AST_NODE_KIND(_ComplexStmtBegin, struct{}) \
+	AST_NODE_KIND(BlockStmt, struct { \
+		AstNode *list; \
+		isize list_count; \
+		Token open, close; \
+	}) \
+	AST_NODE_KIND(IfStmt, struct { \
+		Token token; \
+		AstNode *init; \
+		AstNode *cond; \
+		AstNode *body; \
+		AstNode *else_stmt; \
+	}) \
+	AST_NODE_KIND(ReturnStmt, struct { \
+		Token token; \
+		AstNode *result_list; \
+		isize result_count; \
+	}) \
+	AST_NODE_KIND(ForStmt, struct { \
+		Token token; \
+		AstNode *init, *cond, *end; \
+		AstNode *body; \
+	}) \
+	AST_NODE_KIND(DeferStmt,  struct { Token token; AstNode *stmt; }) \
+	AST_NODE_KIND(BranchStmt, struct { Token token; }) \
 \
-	AST_NODE_KIND(BasicLit), \
-	AST_NODE_KIND(Ident), \
-	AST_NODE_KIND(ProcLit), \
-	AST_NODE_KIND(CompoundLit), \
-\
-AST_NODE_KIND(_ExprBegin), \
-	AST_NODE_KIND(BadExpr), \
-	AST_NODE_KIND(TagExpr), \
-	AST_NODE_KIND(UnaryExpr), \
-	AST_NODE_KIND(BinaryExpr), \
-	AST_NODE_KIND(ParenExpr), \
-	AST_NODE_KIND(CallExpr), \
-	AST_NODE_KIND(SelectorExpr), \
-	AST_NODE_KIND(IndexExpr), \
-	AST_NODE_KIND(SliceExpr), \
-	AST_NODE_KIND(CastExpr), \
-	AST_NODE_KIND(DerefExpr), \
-AST_NODE_KIND(_ExprEnd), \
-\
-AST_NODE_KIND(_stmtBegin), \
-	AST_NODE_KIND(BadStmt), \
-	AST_NODE_KIND(EmptyStmt), \
-	AST_NODE_KIND(TagStmt), \
-	AST_NODE_KIND(ExprStmt), \
-	AST_NODE_KIND(IncDecStmt), \
-	AST_NODE_KIND(AssignStmt), \
-\
-AST_NODE_KIND(_ComplexStmtBegin), \
-	AST_NODE_KIND(BlockStmt), \
-	AST_NODE_KIND(IfStmt), \
-	AST_NODE_KIND(ReturnStmt), \
-	AST_NODE_KIND(ForStmt), \
-	AST_NODE_KIND(DeferStmt), \
-	AST_NODE_KIND(BranchStmt), \
-\
-AST_NODE_KIND(_ComplexStmtEnd), \
-\
-AST_NODE_KIND(_stmtEnd), \
-\
-AST_NODE_KIND(_DeclBegin), \
-	AST_NODE_KIND(BadDecl), \
-	AST_NODE_KIND(VarDecl), \
-	AST_NODE_KIND(ProcDecl), \
-	AST_NODE_KIND(TypeDecl), \
-	AST_NODE_KIND(AliasDecl), \
-	AST_NODE_KIND(ImportDecl), \
-AST_NODE_KIND(_DeclEnd), \
-\
-AST_NODE_KIND(_TypeBegin), \
-	AST_NODE_KIND(Field), \
-	AST_NODE_KIND(ProcType), \
-	AST_NODE_KIND(PointerType), \
-	AST_NODE_KIND(ArrayType), \
-	AST_NODE_KIND(StructType), \
-AST_NODE_KIND(_TypeEnd), \
-\
-	AST_NODE_KIND(Count),
+AST_NODE_KIND(_ComplexStmtEnd, struct{}) \
+AST_NODE_KIND(_StmtEnd,        struct{}) \
+AST_NODE_KIND(_DeclBegin,      struct{}) \
+	AST_NODE_KIND(BadDecl, struct { Token begin, end; }) \
+	AST_NODE_KIND(VarDecl, struct { \
+			DeclKind kind; \
+			AstNode *name_list; \
+			AstNode *type; \
+			AstNode *value_list; \
+			isize name_count, value_count; \
+		}) \
+	AST_NODE_KIND(ProcDecl, struct { \
+			DeclKind kind;     \
+			AstNode *name;     \
+			AstNode *type;     \
+			AstNode *body;     \
+			AstNode *tag_list; \
+			isize tag_count;   \
+		}) \
+	AST_NODE_KIND(TypeDecl,   struct { Token token; AstNode *name, *type; }) \
+	AST_NODE_KIND(AliasDecl,  struct { Token token; AstNode *name, *type; }) \
+	AST_NODE_KIND(ImportDecl, struct { Token token, filepath; }) \
+AST_NODE_KIND(_DeclEnd, struct{}) \
+AST_NODE_KIND(_TypeBegin, struct{}) \
+	AST_NODE_KIND(Field, struct { \
+		AstNode *name_list; \
+		isize name_count; \
+		AstNode *type; \
+	}) \
+	AST_NODE_KIND(ProcType, struct { \
+		Token token;          \
+		AstNode *param_list;  \
+		AstNode *result_list; \
+		isize param_count;    \
+		isize result_count;   \
+	}) \
+	AST_NODE_KIND(PointerType, struct { \
+		Token token; \
+		AstNode *type; \
+	}) \
+	AST_NODE_KIND(ArrayType, struct { \
+		Token token; \
+		AstNode *count; \
+		AstNode *elem; \
+	}) \
+	AST_NODE_KIND(StructType, struct { \
+		Token token; \
+		AstNode *field_list; \
+		isize field_count; \
+	}) \
+AST_NODE_KIND(_TypeEnd, struct{}) \
+	AST_NODE_KIND(Count, struct{})
 
 enum AstNodeKind {
-#define AST_NODE_KIND(x) GB_JOIN2(AstNode_, x)
+#define AST_NODE_KIND(name, ...) GB_JOIN2(AstNode_, name),
 	AST_NODE_KINDS
 #undef AST_NODE_KIND
 };
 
 String const ast_node_strings[] = {
-#define AST_NODE_KIND(x) {cast(u8 *)#x, gb_size_of(#x)-1}
+#define AST_NODE_KIND(name, ...) {cast(u8 *)#name, gb_size_of(#name)-1},
 	AST_NODE_KINDS
 #undef AST_NODE_KIND
 };
-
-enum DeclKind {
-	Declaration_Invalid,
-
-	Declaration_Mutable,
-	Declaration_Immutable,
-
-	Declaration_Count,
-};
-
 
 struct AstNode {
 	AstNodeKind kind;
 	AstNode *prev, *next; // NOTE(bill): allow for Linked list
 	union {
-		// NOTE(bill): open/close for debugging/errors
-		Token basic_lit;
-		struct {
-			Token token;
-			AstEntity *entity;
-		} ident;
-		struct {
-			AstNode *type; // AstNode_ProcType
-			AstNode *body; // AstNode_BlockStmt
-		} proc_lit;
-		struct {
-			AstNode *type;
-			AstNode *elem_list;
-			isize elem_count;
-			Token open, close;
-		} compound_lit;
-
-		struct {
-			Token token;
-			Token name;
-			AstNode *expr;
-		} tag_expr;
-
-		struct { Token begin, end; }                         bad_expr;
-		struct { Token op; AstNode *expr; }                  unary_expr;
-		struct { Token op; AstNode *left, *right; }          binary_expr;
-		struct { AstNode *expr; Token open, close; }         paren_expr;
-		struct { Token token; AstNode *expr, *selector; }    selector_expr;
-		struct { AstNode *expr, *index; Token open, close; } index_expr;
-		struct { Token token; AstNode *type, *expr; }        cast_expr;
-		struct {
-			AstNode *proc, *arg_list;
-			isize arg_list_count;
-			Token open, close;
-		} call_expr;
-		struct { Token op; AstNode *expr; } deref_expr;
-		struct {
-			AstNode *expr;
-			Token open, close;
-			AstNode *low, *high, *max;
-			b32 triple_indexed; // [(1st):2nd:3rd]
-		} slice_expr;
-
-		struct { Token begin, end; }        bad_stmt;
-		struct { Token token; }             empty_stmt;
-		struct { AstNode *expr; }           expr_stmt;
-		struct { Token op; AstNode *expr; } inc_dec_stmt;
-		struct {
-			Token token;
-			Token name;
-			AstNode *stmt;
-		} tag_stmt;
-		struct {
-			Token op;
-			AstNode *lhs_list, *rhs_list;
-			isize lhs_count, rhs_count;
-		} assign_stmt;
-		struct {
-			AstNode *list;
-			isize list_count;
-			Token open, close;
-		} block_stmt;
-		struct {
-			Token token;
-			AstNode *init;
-			AstNode *cond;
-			AstNode *body;
-			AstNode *else_stmt;
-		} if_stmt;
-		struct {
-			Token token;
-			AstNode *result_list;
-			isize result_count;
-		} return_stmt;
-		struct {
-			Token token;
-			AstNode *init, *cond, *end;
-			AstNode *body;
-		} for_stmt;
-		struct {
-			Token token;
-			AstNode *stmt;
-		} defer_stmt;
-		struct {
-			Token token;
-		} branch_stmt;
-
-		struct { Token begin, end; } bad_decl;
-		struct {
-			DeclKind kind;
-			AstNode *name_list;
-			AstNode *type;
-			AstNode *value_list;
-			isize name_count, value_count;
-		} var_decl;
-
-		struct {
-			AstNode *name_list;
-			isize name_count;
-			AstNode *type;
-		} field;
-
-		// TODO(bill): Unify Procedure Declarations and Literals
-		struct {
-			DeclKind kind;
-			AstNode *name;     // AstNode_Ident
-			AstNode *type;     // AstNode_ProcType
-			AstNode *body;     // AstNode_BlockStmt
-			AstNode *tag_list; // AstNode_TagExpr
-			isize tag_count;
-		} proc_decl;
-		struct {
-			Token token;
-			AstNode *name; // AstNode_Ident
-			AstNode *type;
-		} type_decl;
-		struct {
-			Token token;
-			AstNode *name; // AstNode_Ident
-			AstNode *type;
-		} alias_decl;
-		struct {
-			Token token;
-			Token filepath;
-		} import_decl;
-
-
-		struct {
-			Token token;
-			AstNode *type;
-		} pointer_type;
-		struct {
-			Token token;
-			AstNode *count; // NOTE(bill): Zero/NULL is probably a slice
-			AstNode *elem;
-		} array_type;
-		struct {
-			Token token;
-			AstNode *field_list; // AstNode_Field
-			isize field_count;
-		} struct_type;
-		struct {
-			Token token;
-			AstNode *param_list; // AstNode_Field list
-			AstNode *result_list; // type expression list
-			isize param_count;
-			isize result_count;
-		} proc_type;
+#define AST_NODE_KIND(_kind_name_, ...) __VA_ARGS__ _kind_name_;
+	AST_NODE_KINDS
+#undef AST_NODE_KIND
 	};
 };
+
+
+#define ast_node(n_, Kind_, node_) auto *n_ = &(node_)->Kind_; GB_ASSERT((node_)->kind == GB_JOIN2(AstNode_, Kind_))
+#define case_ast_node(n_, Kind_, node_) case GB_JOIN2(AstNode_, Kind_): { ast_node(n_, Kind_, node_);
+#define case_end } break;
+
+
+
+
 
 gb_inline AstScope *make_ast_scope(AstFile *f, AstScope *parent) {
 	AstScope *scope = gb_alloc_item(gb_arena_allocator(&f->arena), AstScope);
@@ -314,7 +246,7 @@ gb_inline b32 is_ast_node_expr(AstNode *node) {
 	return gb_is_between(node->kind, AstNode__ExprBegin+1, AstNode__ExprEnd-1);
 }
 gb_inline b32 is_ast_node_stmt(AstNode *node) {
-	return gb_is_between(node->kind, AstNode__stmtBegin+1, AstNode__stmtEnd-1);
+	return gb_is_between(node->kind, AstNode__StmtBegin+1, AstNode__StmtEnd-1);
 }
 gb_inline b32 is_ast_node_complex_stmt(AstNode *node) {
 	return gb_is_between(node->kind, AstNode__ComplexStmtBegin+1, AstNode__ComplexStmtEnd-1);
@@ -330,85 +262,85 @@ gb_inline b32 is_ast_node_type(AstNode *node) {
 Token ast_node_token(AstNode *node) {
 	switch (node->kind) {
 	case AstNode_BasicLit:
-		return node->basic_lit;
+		return node->BasicLit;
 	case AstNode_Ident:
-		return node->ident.token;
+		return node->Ident.token;
 	case AstNode_ProcLit:
-		return ast_node_token(node->proc_lit.type);
+		return ast_node_token(node->ProcLit.type);
 	case AstNode_CompoundLit:
-		return ast_node_token(node->compound_lit.type);
+		return ast_node_token(node->CompoundLit.type);
 	case AstNode_TagExpr:
-		return node->tag_expr.token;
+		return node->TagExpr.token;
 	case AstNode_BadExpr:
-		return node->bad_expr.begin;
+		return node->BadExpr.begin;
 	case AstNode_UnaryExpr:
-		return node->unary_expr.op;
+		return node->UnaryExpr.op;
 	case AstNode_BinaryExpr:
-		return ast_node_token(node->binary_expr.left);
+		return ast_node_token(node->BinaryExpr.left);
 	case AstNode_ParenExpr:
-		return node->paren_expr.open;
+		return node->ParenExpr.open;
 	case AstNode_CallExpr:
-		return ast_node_token(node->call_expr.proc);
+		return ast_node_token(node->CallExpr.proc);
 	case AstNode_SelectorExpr:
-		return ast_node_token(node->selector_expr.selector);
+		return ast_node_token(node->SelectorExpr.selector);
 	case AstNode_IndexExpr:
-		return node->index_expr.open;
+		return node->IndexExpr.open;
 	case AstNode_SliceExpr:
-		return node->slice_expr.open;
+		return node->SliceExpr.open;
 	case AstNode_CastExpr:
-		return node->cast_expr.token;
+		return node->CastExpr.token;
 	case AstNode_DerefExpr:
-		return node->deref_expr.op;
+		return node->DerefExpr.op;
 	case AstNode_BadStmt:
-		return node->bad_stmt.begin;
+		return node->BadStmt.begin;
 	case AstNode_EmptyStmt:
-		return node->empty_stmt.token;
+		return node->EmptyStmt.token;
 	case AstNode_ExprStmt:
-		return ast_node_token(node->expr_stmt.expr);
+		return ast_node_token(node->ExprStmt.expr);
 	case AstNode_TagStmt:
-		return node->tag_stmt.token;
+		return node->TagStmt.token;
 	case AstNode_IncDecStmt:
-		return node->inc_dec_stmt.op;
+		return node->IncDecStmt.op;
 	case AstNode_AssignStmt:
-		return node->assign_stmt.op;
+		return node->AssignStmt.op;
 	case AstNode_BlockStmt:
-		return node->block_stmt.open;
+		return node->BlockStmt.open;
 	case AstNode_IfStmt:
-		return node->if_stmt.token;
+		return node->IfStmt.token;
 	case AstNode_ReturnStmt:
-		return node->return_stmt.token;
+		return node->ReturnStmt.token;
 	case AstNode_ForStmt:
-		return node->for_stmt.token;
+		return node->ForStmt.token;
 	case AstNode_DeferStmt:
-		return node->defer_stmt.token;
+		return node->DeferStmt.token;
 	case AstNode_BranchStmt:
-		return node->branch_stmt.token;
+		return node->BranchStmt.token;
 	case AstNode_BadDecl:
-		return node->bad_decl.begin;
+		return node->BadDecl.begin;
 	case AstNode_VarDecl:
-		return ast_node_token(node->var_decl.name_list);
+		return ast_node_token(node->VarDecl.name_list);
 	case AstNode_ProcDecl:
-		return node->proc_decl.name->ident.token;
+		return node->ProcDecl.name->Ident.token;
 	case AstNode_TypeDecl:
-		return node->type_decl.token;
+		return node->TypeDecl.token;
 	case AstNode_AliasDecl:
-		return node->alias_decl.token;
+		return node->AliasDecl.token;
 	case AstNode_ImportDecl:
-		return node->import_decl.token;
+		return node->ImportDecl.token;
 	case AstNode_Field: {
-		if (node->field.name_list)
-			return ast_node_token(node->field.name_list);
+		if (node->Field.name_list)
+			return ast_node_token(node->Field.name_list);
 		else
-			return ast_node_token(node->field.type);
+			return ast_node_token(node->Field.type);
 	}
 	case AstNode_ProcType:
-		return node->proc_type.token;
+		return node->ProcType.token;
 	case AstNode_PointerType:
-		return node->pointer_type.token;
+		return node->PointerType.token;
 	case AstNode_ArrayType:
-		return node->array_type.token;
+		return node->ArrayType.token;
 	case AstNode_StructType:
-		return node->struct_type.token;
+		return node->StructType.token;
 	}
 
 	return empty_token;
@@ -500,31 +432,31 @@ gb_inline AstNode *make_node(AstFile *f, AstNodeKind kind) {
 
 gb_inline AstNode *make_bad_expr(AstFile *f, Token begin, Token end) {
 	AstNode *result = make_node(f, AstNode_BadExpr);
-	result->bad_expr.begin = begin;
-	result->bad_expr.end   = end;
+	result->BadExpr.begin = begin;
+	result->BadExpr.end   = end;
 	return result;
 }
 
 gb_inline AstNode *make_tag_expr(AstFile *f, Token token, Token name, AstNode *expr) {
 	AstNode *result = make_node(f, AstNode_TagExpr);
-	result->tag_expr.token = token;
-	result->tag_expr.name = name;
-	result->tag_expr.expr = expr;
+	result->TagExpr.token = token;
+	result->TagExpr.name = name;
+	result->TagExpr.expr = expr;
 	return result;
 }
 
 gb_inline AstNode *make_tag_stmt(AstFile *f, Token token, Token name, AstNode *stmt) {
 	AstNode *result = make_node(f, AstNode_TagStmt);
-	result->tag_stmt.token = token;
-	result->tag_stmt.name = name;
-	result->tag_stmt.stmt = stmt;
+	result->TagStmt.token = token;
+	result->TagStmt.name = name;
+	result->TagStmt.stmt = stmt;
 	return result;
 }
 
 gb_inline AstNode *make_unary_expr(AstFile *f, Token op, AstNode *expr) {
 	AstNode *result = make_node(f, AstNode_UnaryExpr);
-	result->unary_expr.op = op;
-	result->unary_expr.expr = expr;
+	result->UnaryExpr.op = op;
+	result->UnaryExpr.expr = expr;
 	return result;
 }
 
@@ -540,94 +472,94 @@ gb_inline AstNode *make_binary_expr(AstFile *f, Token op, AstNode *left, AstNode
 		right = make_bad_expr(f, op, op);
 	}
 
-	result->binary_expr.op = op;
-	result->binary_expr.left = left;
-	result->binary_expr.right = right;
+	result->BinaryExpr.op = op;
+	result->BinaryExpr.left = left;
+	result->BinaryExpr.right = right;
 
 	return result;
 }
 
 gb_inline AstNode *make_paren_expr(AstFile *f, AstNode *expr, Token open, Token close) {
 	AstNode *result = make_node(f, AstNode_ParenExpr);
-	result->paren_expr.expr = expr;
-	result->paren_expr.open = open;
-	result->paren_expr.close = close;
+	result->ParenExpr.expr = expr;
+	result->ParenExpr.open = open;
+	result->ParenExpr.close = close;
 	return result;
 }
 
 gb_inline AstNode *make_call_expr(AstFile *f, AstNode *proc, AstNode *arg_list, isize arg_list_count, Token open, Token close) {
 	AstNode *result = make_node(f, AstNode_CallExpr);
-	result->call_expr.proc = proc;
-	result->call_expr.arg_list = arg_list;
-	result->call_expr.arg_list_count = arg_list_count;
-	result->call_expr.open  = open;
-	result->call_expr.close = close;
+	result->CallExpr.proc = proc;
+	result->CallExpr.arg_list = arg_list;
+	result->CallExpr.arg_list_count = arg_list_count;
+	result->CallExpr.open  = open;
+	result->CallExpr.close = close;
 	return result;
 }
 
 gb_inline AstNode *make_selector_expr(AstFile *f, Token token, AstNode *expr, AstNode *selector) {
 	AstNode *result = make_node(f, AstNode_SelectorExpr);
-	result->selector_expr.expr = expr;
-	result->selector_expr.selector = selector;
+	result->SelectorExpr.expr = expr;
+	result->SelectorExpr.selector = selector;
 	return result;
 }
 
 gb_inline AstNode *make_index_expr(AstFile *f, AstNode *expr, AstNode *index, Token open, Token close) {
 	AstNode *result = make_node(f, AstNode_IndexExpr);
-	result->index_expr.expr = expr;
-	result->index_expr.index = index;
-	result->index_expr.open = open;
-	result->index_expr.close = close;
+	result->IndexExpr.expr = expr;
+	result->IndexExpr.index = index;
+	result->IndexExpr.open = open;
+	result->IndexExpr.close = close;
 	return result;
 }
 
 
 gb_inline AstNode *make_slice_expr(AstFile *f, AstNode *expr, Token open, Token close, AstNode *low, AstNode *high, AstNode *max, b32 triple_indexed) {
 	AstNode *result = make_node(f, AstNode_SliceExpr);
-	result->slice_expr.expr = expr;
-	result->slice_expr.open = open;
-	result->slice_expr.close = close;
-	result->slice_expr.low = low;
-	result->slice_expr.high = high;
-	result->slice_expr.max = max;
-	result->slice_expr.triple_indexed = triple_indexed;
+	result->SliceExpr.expr = expr;
+	result->SliceExpr.open = open;
+	result->SliceExpr.close = close;
+	result->SliceExpr.low = low;
+	result->SliceExpr.high = high;
+	result->SliceExpr.max = max;
+	result->SliceExpr.triple_indexed = triple_indexed;
 	return result;
 }
 
 gb_inline AstNode *make_cast_expr(AstFile *f, Token token, AstNode *type, AstNode *expr) {
 	AstNode *result = make_node(f, AstNode_CastExpr);
-	result->cast_expr.token = token;
-	result->cast_expr.type = type;
-	result->cast_expr.expr = expr;
+	result->CastExpr.token = token;
+	result->CastExpr.type = type;
+	result->CastExpr.expr = expr;
 	return result;
 }
 
 
 gb_inline AstNode *make_deref_expr(AstFile *f, AstNode *expr, Token op) {
 	AstNode *result = make_node(f, AstNode_DerefExpr);
-	result->deref_expr.expr = expr;
-	result->deref_expr.op = op;
+	result->DerefExpr.expr = expr;
+	result->DerefExpr.op = op;
 	return result;
 }
 
 
 gb_inline AstNode *make_basic_lit(AstFile *f, Token basic_lit) {
 	AstNode *result = make_node(f, AstNode_BasicLit);
-	result->basic_lit = basic_lit;
+	result->BasicLit = basic_lit;
 	return result;
 }
 
 gb_inline AstNode *make_identifier(AstFile *f, Token token, AstEntity *entity = NULL) {
 	AstNode *result = make_node(f, AstNode_Ident);
-	result->ident.token = token;
-	result->ident.entity   = entity;
+	result->Ident.token = token;
+	result->Ident.entity   = entity;
 	return result;
 }
 
 gb_inline AstNode *make_procedure_literal(AstFile *f, AstNode *type, AstNode *body) {
 	AstNode *result = make_node(f, AstNode_ProcLit);
-	result->proc_lit.type = type;
-	result->proc_lit.body = body;
+	result->ProcLit.type = type;
+	result->ProcLit.body = body;
 	return result;
 }
 
@@ -635,191 +567,191 @@ gb_inline AstNode *make_procedure_literal(AstFile *f, AstNode *type, AstNode *bo
 gb_inline AstNode *make_compound_literal(AstFile *f, AstNode *type, AstNode *elem_list, isize elem_count,
                                          Token open, Token close) {
 	AstNode *result = make_node(f, AstNode_CompoundLit);
-	result->compound_lit.type = type;
-	result->compound_lit.elem_list = elem_list;
-	result->compound_lit.elem_count = elem_count;
-	result->compound_lit.open = open;
-	result->compound_lit.close = close;
+	result->CompoundLit.type = type;
+	result->CompoundLit.elem_list = elem_list;
+	result->CompoundLit.elem_count = elem_count;
+	result->CompoundLit.open = open;
+	result->CompoundLit.close = close;
 	return result;
 }
 
 gb_inline AstNode *make_bad_stmt(AstFile *f, Token begin, Token end) {
 	AstNode *result = make_node(f, AstNode_BadStmt);
-	result->bad_stmt.begin = begin;
-	result->bad_stmt.end   = end;
+	result->BadStmt.begin = begin;
+	result->BadStmt.end   = end;
 	return result;
 }
 
 gb_inline AstNode *make_empty_stmt(AstFile *f, Token token) {
 	AstNode *result = make_node(f, AstNode_EmptyStmt);
-	result->empty_stmt.token = token;
+	result->EmptyStmt.token = token;
 	return result;
 }
 
 gb_inline AstNode *make_expr_stmt(AstFile *f, AstNode *expr) {
 	AstNode *result = make_node(f, AstNode_ExprStmt);
-	result->expr_stmt.expr = expr;
+	result->ExprStmt.expr = expr;
 	return result;
 }
 
 gb_inline AstNode *make_inc_dec_stmt(AstFile *f, Token op, AstNode *expr) {
 	AstNode *result = make_node(f, AstNode_IncDecStmt);
-	result->inc_dec_stmt.op = op;
-	result->inc_dec_stmt.expr = expr;
+	result->IncDecStmt.op = op;
+	result->IncDecStmt.expr = expr;
 	return result;
 }
 
 gb_inline AstNode *make_assign_stmt(AstFile *f, Token op, AstNode *lhs_list, isize lhs_count, AstNode *rhs_list, isize rhs_count) {
 	AstNode *result = make_node(f, AstNode_AssignStmt);
-	result->assign_stmt.op = op;
-	result->assign_stmt.lhs_list = lhs_list;
-	result->assign_stmt.lhs_count = lhs_count;
-	result->assign_stmt.rhs_list = rhs_list;
-	result->assign_stmt.rhs_count = rhs_count;
+	result->AssignStmt.op = op;
+	result->AssignStmt.lhs_list = lhs_list;
+	result->AssignStmt.lhs_count = lhs_count;
+	result->AssignStmt.rhs_list = rhs_list;
+	result->AssignStmt.rhs_count = rhs_count;
 	return result;
 }
 
 gb_inline AstNode *make_block_stmt(AstFile *f, AstNode *list, isize list_count, Token open, Token close) {
 	AstNode *result = make_node(f, AstNode_BlockStmt);
-	result->block_stmt.list = list;
-	result->block_stmt.list_count = list_count;
-	result->block_stmt.open = open;
-	result->block_stmt.close = close;
+	result->BlockStmt.list = list;
+	result->BlockStmt.list_count = list_count;
+	result->BlockStmt.open = open;
+	result->BlockStmt.close = close;
 	return result;
 }
 
 gb_inline AstNode *make_if_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *body, AstNode *else_stmt) {
 	AstNode *result = make_node(f, AstNode_IfStmt);
-	result->if_stmt.token = token;
-	result->if_stmt.init = init;
-	result->if_stmt.cond = cond;
-	result->if_stmt.body = body;
-	result->if_stmt.else_stmt = else_stmt;
+	result->IfStmt.token = token;
+	result->IfStmt.init = init;
+	result->IfStmt.cond = cond;
+	result->IfStmt.body = body;
+	result->IfStmt.else_stmt = else_stmt;
 	return result;
 }
 
 gb_inline AstNode *make_return_stmt(AstFile *f, Token token, AstNode *result_list, isize result_count) {
 	AstNode *result = make_node(f, AstNode_ReturnStmt);
-	result->return_stmt.token = token;
-	result->return_stmt.result_list = result_list;
-	result->return_stmt.result_count = result_count;
+	result->ReturnStmt.token = token;
+	result->ReturnStmt.result_list = result_list;
+	result->ReturnStmt.result_count = result_count;
 	return result;
 }
 
 gb_inline AstNode *make_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *end, AstNode *body) {
 	AstNode *result = make_node(f, AstNode_ForStmt);
-	result->for_stmt.token = token;
-	result->for_stmt.init = init;
-	result->for_stmt.cond = cond;
-	result->for_stmt.end = end;
-	result->for_stmt.body = body;
+	result->ForStmt.token = token;
+	result->ForStmt.init = init;
+	result->ForStmt.cond = cond;
+	result->ForStmt.end = end;
+	result->ForStmt.body = body;
 	return result;
 }
 gb_inline AstNode *make_defer_stmt(AstFile *f, Token token, AstNode *stmt) {
 	AstNode *result = make_node(f, AstNode_DeferStmt);
-	result->defer_stmt.token = token;
-	result->defer_stmt.stmt = stmt;
+	result->DeferStmt.token = token;
+	result->DeferStmt.stmt = stmt;
 	return result;
 }
 
 gb_inline AstNode *make_branch_stmt(AstFile *f, Token token) {
 	AstNode *result = make_node(f, AstNode_BranchStmt);
-	result->branch_stmt.token = token;
+	result->BranchStmt.token = token;
 	return result;
 }
 
 
 gb_inline AstNode *make_bad_decl(AstFile *f, Token begin, Token end) {
 	AstNode *result = make_node(f, AstNode_BadDecl);
-	result->bad_decl.begin = begin;
-	result->bad_decl.end = end;
+	result->BadDecl.begin = begin;
+	result->BadDecl.end = end;
 	return result;
 }
 
 gb_inline AstNode *make_variable_decl(AstFile *f, DeclKind kind, AstNode *name_list, isize name_count, AstNode *type, AstNode *value_list, isize value_count) {
 	AstNode *result = make_node(f, AstNode_VarDecl);
-	result->var_decl.kind = kind;
-	result->var_decl.name_list = name_list;
-	result->var_decl.name_count = name_count;
-	result->var_decl.type = type;
-	result->var_decl.value_list = value_list;
-	result->var_decl.value_count = value_count;
+	result->VarDecl.kind = kind;
+	result->VarDecl.name_list = name_list;
+	result->VarDecl.name_count = name_count;
+	result->VarDecl.type = type;
+	result->VarDecl.value_list = value_list;
+	result->VarDecl.value_count = value_count;
 	return result;
 }
 
 gb_inline AstNode *make_field(AstFile *f, AstNode *name_list, isize name_count, AstNode *type) {
 	AstNode *result = make_node(f, AstNode_Field);
-	result->field.name_list = name_list;
-	result->field.name_count = name_count;
-	result->field.type = type;
+	result->Field.name_list = name_list;
+	result->Field.name_count = name_count;
+	result->Field.type = type;
 	return result;
 }
 
 gb_inline AstNode *make_proc_type(AstFile *f, Token token, AstNode *param_list, isize param_count, AstNode *result_list, isize result_count) {
 	AstNode *result = make_node(f, AstNode_ProcType);
-	result->proc_type.token = token;
-	result->proc_type.param_list = param_list;
-	result->proc_type.param_count = param_count;
-	result->proc_type.result_list = result_list;
-	result->proc_type.result_count = result_count;
+	result->ProcType.token = token;
+	result->ProcType.param_list = param_list;
+	result->ProcType.param_count = param_count;
+	result->ProcType.result_list = result_list;
+	result->ProcType.result_count = result_count;
 	return result;
 }
 
 gb_inline AstNode *make_procedure_decl(AstFile *f, DeclKind kind, AstNode *name, AstNode *proc_type, AstNode *body, AstNode *tag_list, isize tag_count) {
 	AstNode *result = make_node(f, AstNode_ProcDecl);
-	result->proc_decl.kind = kind;
-	result->proc_decl.name = name;
-	result->proc_decl.type = proc_type;
-	result->proc_decl.body = body;
-	result->proc_decl.tag_list = tag_list;
-	result->proc_decl.tag_count = tag_count;
+	result->ProcDecl.kind = kind;
+	result->ProcDecl.name = name;
+	result->ProcDecl.type = proc_type;
+	result->ProcDecl.body = body;
+	result->ProcDecl.tag_list = tag_list;
+	result->ProcDecl.tag_count = tag_count;
 	return result;
 }
 
 gb_inline AstNode *make_pointer_type(AstFile *f, Token token, AstNode *type) {
 	AstNode *result = make_node(f, AstNode_PointerType);
-	result->pointer_type.token = token;
-	result->pointer_type.type = type;
+	result->PointerType.token = token;
+	result->PointerType.type = type;
 	return result;
 }
 
 gb_inline AstNode *make_array_type(AstFile *f, Token token, AstNode *count, AstNode *elem) {
 	AstNode *result = make_node(f, AstNode_ArrayType);
-	result->array_type.token = token;
-	result->array_type.count = count;
-	result->array_type.elem = elem;
+	result->ArrayType.token = token;
+	result->ArrayType.count = count;
+	result->ArrayType.elem = elem;
 	return result;
 }
 
 gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNode *field_list, isize field_count) {
 	AstNode *result = make_node(f, AstNode_StructType);
-	result->struct_type.token = token;
-	result->struct_type.field_list = field_list;
-	result->struct_type.field_count = field_count;
+	result->StructType.token = token;
+	result->StructType.field_list = field_list;
+	result->StructType.field_count = field_count;
 	return result;
 }
 
 gb_inline AstNode *make_type_decl(AstFile *f, Token token, AstNode *name, AstNode *type) {
 	AstNode *result = make_node(f, AstNode_TypeDecl);
-	result->type_decl.token = token;
-	result->type_decl.name = name;
-	result->type_decl.type = type;
+	result->TypeDecl.token = token;
+	result->TypeDecl.name = name;
+	result->TypeDecl.type = type;
 	return result;
 }
 
 gb_inline AstNode *make_alias_decl(AstFile *f, Token token, AstNode *name, AstNode *type) {
 	AstNode *result = make_node(f, AstNode_AliasDecl);
-	result->alias_decl.token = token;
-	result->alias_decl.name = name;
-	result->alias_decl.type = type;
+	result->AliasDecl.token = token;
+	result->AliasDecl.name = name;
+	result->AliasDecl.type = type;
 	return result;
 }
 
 
 gb_inline AstNode *make_import_decl(AstFile *f, Token token, Token filepath) {
 	AstNode *result = make_node(f, AstNode_ImportDecl);
-	result->import_decl.token = token;
-	result->import_decl.filepath = filepath;
+	result->ImportDecl.token = token;
+	result->ImportDecl.filepath = filepath;
 	return result;
 }
 
@@ -882,8 +814,8 @@ gb_internal void add_ast_entity(AstFile *f, AstScope *scope, AstNode *declaratio
 			continue;
 		}
 
-		AstEntity *entity = make_ast_entity(f, n->ident.token, declaration, scope);
-		n->ident.entity = entity;
+		AstEntity *entity = make_ast_entity(f, n->Ident.token, declaration, scope);
+		n->Ident.entity = entity;
 
 		AstEntity *insert_entity = ast_scope_insert(scope, *entity);
 		if (insert_entity != NULL &&
@@ -969,7 +901,7 @@ AstNode *unparen_expr(AstNode *node) {
 	for (;;) {
 		if (node->kind != AstNode_ParenExpr)
 			return node;
-		node = node->paren_expr.expr;
+		node = node->ParenExpr.expr;
 	}
 }
 
@@ -1054,7 +986,7 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 
 	case Token_Hash: {
 		operand = parse_tag_expr(f, NULL);
-		operand->tag_expr.expr = parse_expr(f, false);
+		operand->TagExpr.expr = parse_expr(f, false);
 		return operand;
 	}
 
@@ -1403,7 +1335,7 @@ AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
 		return NULL;
 
 	if (statement->kind == AstNode_ExprStmt)
-		return statement->expr_stmt.expr;
+		return statement->ExprStmt.expr;
 
 	ast_file_err(f, f->cursor[0], "Expected `%.*s`, found a simple statement.", LIT(kind));
 	return make_bad_expr(f, f->cursor[0], f->cursor[1]);
@@ -1492,7 +1424,7 @@ AstNode *parse_parameter_list(AstFile *f, AstScope *scope, isize *param_count_) 
 	while (f->cursor[0].kind == Token_Identifier) {
 		AstNode *field = parse_field_decl(f, scope);
 		DLIST_APPEND(param_list, param_list_curr, field);
-		param_count += field->field.name_count;
+		param_count += field->Field.name_count;
 		if (f->cursor[0].kind != Token_Comma)
 			break;
 		next_token(f);
@@ -1670,7 +1602,7 @@ AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count) {
 			AstNode *name = name_list;
 			if (name_count != 1) {
 				ast_file_err(f, proc_token, "You can only declare one procedure at a time (at the moment)");
-				return make_bad_decl(f, name->ident.token, proc_token);
+				return make_bad_decl(f, name->Ident.token, proc_token);
 			}
 
 			AstNode *procedure_decl = parse_procedure_decl(f, proc_token, name, declaration_kind);
@@ -1946,7 +1878,7 @@ AstNode *parse_stmt(AstFile *f) {
 
 	case Token_Hash:
 		s = parse_tag_stmt(f, NULL);
-		s->tag_stmt.stmt = parse_stmt(f); // TODO(bill): Find out why this doesn't work as an argument
+		s->TagStmt.stmt = parse_stmt(f); // TODO(bill): Find out why this doesn't work as an argument
 		return s;
 
 	case Token_OpenBrace: return parse_block_stmt(f);
@@ -2128,7 +2060,7 @@ void parse_file(Parser *p, AstFile *f) {
 			ast_file_err(f, ast_node_token(node), "Only declarations are allowed at file scope");
 		} else {
 			if (node->kind == AstNode_ImportDecl) {
-				auto *id = &node->import_decl;
+				auto *id = &node->ImportDecl;
 				String file = id->filepath.string;
 				String file_str = {};
 				if (file.text[0] == '"')

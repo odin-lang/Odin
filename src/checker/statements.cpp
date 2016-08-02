@@ -39,29 +39,32 @@ b32 check_is_terminating_list(Checker *c, AstNode *list) {
 // TODO(bill): Warn/err against code after `return` that it won't be executed
 b32 check_is_terminating(Checker *c, AstNode *node) {
 	switch (node->kind) {
-	case AstNode_ReturnStmt:
+	case_ast_node(rs, ReturnStmt, node);
 		return true;
+	case_end;
 
-	case AstNode_BlockStmt:
-		return check_is_terminating_list(c, node->block_stmt.list);
+	case_ast_node(bs, BlockStmt, node);
+		return check_is_terminating_list(c, bs->list);
+	case_end;
 
-	case AstNode_ExprStmt:
-		return check_is_terminating(c, node->expr_stmt.expr);
+	case_ast_node(es, ExprStmt, node);
+		return check_is_terminating(c, es->expr);
+	case_end;
 
-	case AstNode_IfStmt:
-		if (node->if_stmt.else_stmt != NULL) {
-			if (check_is_terminating(c, node->if_stmt.body) &&
-			    check_is_terminating(c, node->if_stmt.else_stmt)) {
+	case_ast_node(is, IfStmt, node);
+		if (is->else_stmt != NULL) {
+			if (check_is_terminating(c, is->body) &&
+			    check_is_terminating(c, is->else_stmt)) {
 			    return true;
 		    }
 		}
-		break;
+	case_end;
 
-	case AstNode_ForStmt:
-		if (node->for_stmt.cond == NULL) {
+	case_ast_node(fs, ForStmt, node);
+		if (fs->cond == NULL) {
 			return true;
 		}
-		break;
+	case_end;
 	}
 
 	return false;
@@ -170,19 +173,22 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	AstNode *node = unparen_expr(lhs);
 
 	// NOTE(bill): Ignore assignments to `_`
-	if (node->kind == AstNode_Ident &&
-	    are_strings_equal(node->ident.token.string, make_string("_"))) {
-    	add_entity_definition(&c->info, node, NULL);
-    	check_assignment(c, op_a, NULL, make_string("assignment to `_` identifier"));
-    	if (op_a->mode == Addressing_Invalid)
-    		return NULL;
-    	return op_a->type;
-    }
+	if (node->kind == AstNode_Ident) {
+		ast_node(i, Ident, node);
+		if (are_strings_equal(i->token.string, make_string("_"))) {
+			add_entity_definition(&c->info, node, NULL);
+			check_assignment(c, op_a, NULL, make_string("assignment to `_` identifier"));
+			if (op_a->mode == Addressing_Invalid)
+				return NULL;
+			return op_a->type;
+		}
+	}
 
 	Entity *e = NULL;
 	b32 used = false;
 	if (node->kind == AstNode_Ident) {
-		e = scope_lookup_entity(c->context.scope, node->ident.token.string);
+		ast_node(i, Ident, node);
+		e = scope_lookup_entity(c->context.scope, i->token.string);
 		if (e != NULL && e->kind == Entity_Variable) {
 			used = e->variable.used; // TODO(bill): Make backup just in case
 		}
@@ -207,7 +213,8 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 		if (op_b.expr->kind == AstNode_SelectorExpr) {
 			// NOTE(bill): Extra error checks
 			Operand op_c = {Addressing_Invalid};
-			check_expr(c, &op_c, op_b.expr->selector_expr.expr);
+			ast_node(se, SelectorExpr, op_b.expr);
+			check_expr(c, &op_c, se->expr);
 		}
 
 		gbString str = expr_to_string(op_b.expr);
@@ -379,10 +386,11 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	c->context.decl = decl;
 
 	push_procedure(c, type);
-	check_stmt_list(c, body->block_stmt.list, 0);
+	ast_node(bs, BlockStmt, body);
+	check_stmt_list(c, bs->list, 0);
 	if (type->procedure.result_count > 0) {
 		if (!check_is_terminating(c, body)) {
-			error(&c->error_collector, body->block_stmt.close, "Missing return statement at the end of the procedure");
+			error(&c->error_collector, bs->close, "Missing return statement at the end of the procedure");
 		}
 	}
 	pop_procedure(c);
@@ -395,7 +403,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 
 	Type *proc_type = make_type_procedure(c->allocator, e->parent, NULL, 0, NULL, 0);
 	e->type = proc_type;
-	auto *pd = &d->proc_decl->proc_decl;
+	ast_node(pd, ProcDecl, d->proc_decl);
 
 #if 1
 	Scope *original_curr_scope = c->context.scope;
@@ -409,7 +417,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 	for (AstNode *tag = pd->tag_list; tag != NULL; tag = tag->next) {
 		GB_ASSERT(tag->kind == AstNode_TagExpr);
 
-		String tag_name = tag->tag_expr.name.string;
+		ast_node(te, TagExpr, tag);
+		String tag_name = te->name.string;
 		if (are_strings_equal(tag_name, make_string("foreign"))) {
 			is_foreign = true;
 		} else if (are_strings_equal(tag_name, make_string("inline"))) {
@@ -516,13 +525,13 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 
 void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	switch (node->kind) {
-	case AstNode_EmptyStmt: break;
-	case AstNode_BadStmt:   break;
-	case AstNode_BadDecl: break;
+	case_ast_node(_, EmptyStmt, node); case_end;
+	case_ast_node(_, BadStmt,   node); case_end;
+	case_ast_node(_, BadDecl,   node); case_end;
 
-	case AstNode_ExprStmt: {
+	case_ast_node(es, ExprStmt, node)
 		Operand operand = {Addressing_Invalid};
-		ExpressionKind kind = check_expr_base(c, &operand, node->expr_stmt.expr);
+		ExpressionKind kind = check_expr_base(c, &operand, es->expr);
 		switch (operand.mode) {
 		case Addressing_Type:
 			error(&c->error_collector, ast_node_token(node), "Is not an expression");
@@ -533,19 +542,18 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			error(&c->error_collector, ast_node_token(node), "Expression is not used");
 			break;
 		}
-	} break;
+	case_end;
 
-	case AstNode_TagStmt:
+	case_ast_node(ts, TagStmt, node);
 		// TODO(bill): Tag Statements
 		error(&c->error_collector, ast_node_token(node), "Tag statements are not supported yet");
-		check_stmt(c, node->tag_stmt.stmt, flags);
-		break;
+		check_stmt(c, ts->stmt, flags);
+	case_end;
 
-	case AstNode_IncDecStmt: {
+	case_ast_node(ids, IncDecStmt, node);
 		Token op = {};
-		auto *s = &node->inc_dec_stmt;
-		op = s->op;
-		switch (s->op.kind) {
+		op = ids->op;
+		switch (ids->op.kind) {
 		case Token_Increment:
 			op.kind = Token_Add;
 			op.string.len = 1;
@@ -555,44 +563,45 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			op.string.len = 1;
 			break;
 		default:
-			error(&c->error_collector, s->op, "Unknown inc/dec operation %.*s", LIT(s->op.string));
+			error(&c->error_collector, ids->op, "Unknown inc/dec operation %.*s", LIT(ids->op.string));
 			return;
 		}
 
 		Operand operand = {Addressing_Invalid};
-		check_expr(c, &operand, s->expr);
+		check_expr(c, &operand, ids->expr);
 		if (operand.mode == Addressing_Invalid)
 			return;
 		if (!is_type_numeric(operand.type)) {
-			error(&c->error_collector, s->op, "Non numeric type");
+			error(&c->error_collector, ids->op, "Non numeric type");
 			return;
 		}
 
 		AstNode basic_lit = {AstNode_BasicLit};
-		basic_lit.basic_lit = s->op;
-		basic_lit.basic_lit.kind = Token_Integer;
-		basic_lit.basic_lit.string = make_string("1");
+		ast_node(bl, BasicLit, &basic_lit);
+		*bl = ids->op;
+		bl->kind = Token_Integer;
+		bl->string = make_string("1");
 
-		AstNode be = {AstNode_BinaryExpr};
-		be.binary_expr.op = op;
-		be.binary_expr.left = s->expr;;
-		be.binary_expr.right = &basic_lit;
-		check_binary_expr(c, &operand, &be);
+		AstNode binary_expr = {AstNode_BinaryExpr};
+		ast_node(be, BinaryExpr, &binary_expr);
+		be->op = op;
+		be->left = ids->expr;
+		be->right = &basic_lit;
+		check_binary_expr(c, &operand, &binary_expr);
+	case_end;
 
-	} break;
-
-	case AstNode_AssignStmt:
-		switch (node->assign_stmt.op.kind) {
+	case_ast_node(as, AssignStmt, node);
+		switch (as->op.kind) {
 		case Token_Eq: {
 			// a, b, c = 1, 2, 3;  // Multisided
-			if (node->assign_stmt.lhs_count == 0) {
-				error(&c->error_collector, node->assign_stmt.op, "Missing lhs in assignment statement");
+			if (as->lhs_count == 0) {
+				error(&c->error_collector, as->op, "Missing lhs in assignment statement");
 				return;
 			}
 
 			Operand operand = {};
-			AstNode *lhs = node->assign_stmt.lhs_list;
-			AstNode *rhs = node->assign_stmt.rhs_list;
+			AstNode *lhs = as->lhs_list;
+			AstNode *rhs = as->rhs_list;
 			isize i = 0;
 			for (;
 			     lhs != NULL && rhs != NULL;
@@ -615,7 +624,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				}
 			}
 
-			if (i < node->assign_stmt.lhs_count && i < node->assign_stmt.rhs_count) {
+			if (i < as->lhs_count && i < as->rhs_count) {
 				if (lhs == NULL)
 					error(&c->error_collector, ast_node_token(lhs), "Too few values on the right hand side of the declaration");
 			} else if (rhs != NULL) {
@@ -625,9 +634,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 		default: {
 			// a += 1; // Single-sided
-			Token op = node->assign_stmt.op;
-			if (node->assign_stmt.lhs_count != 1 ||
-			    node->assign_stmt.rhs_count != 1) {
+			Token op = as->op;
+			if (as->lhs_count != 1 || as->rhs_count != 1) {
 				error(&c->error_collector, op, "Assignment operation `%.*s` requires single-valued expressions", LIT(op.string));
 				return;
 			}
@@ -637,61 +645,60 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			}
 			// TODO(bill): Check if valid assignment operator
 			Operand operand = {Addressing_Invalid};
-			AstNode be = {AstNode_BinaryExpr};
-			be.binary_expr.op    = op;
+			AstNode binary_expr = {AstNode_BinaryExpr};
+			ast_node(be, BinaryExpr, &binary_expr);
+			be->op    = op;
 			 // NOTE(bill): Only use the first one will be used
-			be.binary_expr.left  = node->assign_stmt.lhs_list;
-			be.binary_expr.right = node->assign_stmt.rhs_list;
+			be->left  = as->lhs_list;
+			be->right = as->rhs_list;
 
-			check_binary_expr(c, &operand, &be);
+			check_binary_expr(c, &operand, &binary_expr);
 			if (operand.mode == Addressing_Invalid)
 				return;
 			// NOTE(bill): Only use the first one will be used
-			check_assignment_variable(c, &operand, node->assign_stmt.lhs_list);
+			check_assignment_variable(c, &operand, as->lhs_list);
 		} break;
 		}
-		break;
+	case_end;
 
-	case AstNode_BlockStmt:
+	case_ast_node(bs, BlockStmt, node);
 		check_open_scope(c, node);
-		check_stmt_list(c, node->block_stmt.list, flags);
+		check_stmt_list(c, bs->list, flags);
 		check_close_scope(c);
-		break;
+	case_end;
 
-	case AstNode_IfStmt: {
+	case_ast_node(is, IfStmt, node);
 		check_open_scope(c, node);
 		defer (check_close_scope(c));
-		auto *is = &node->if_stmt;
 
 		if (is->init != NULL)
 			check_stmt(c, is->init, 0);
 
 		Operand operand = {Addressing_Invalid};
-		check_expr(c, &operand, node->if_stmt.cond);
+		check_expr(c, &operand, is->cond);
 		if (operand.mode != Addressing_Invalid &&
 		    !is_type_boolean(operand.type)) {
-			error(&c->error_collector, ast_node_token(node->if_stmt.cond),
+			error(&c->error_collector, ast_node_token(is->cond),
 			            "Non-boolean condition in `if` statement");
 		}
 
-		check_stmt(c, node->if_stmt.body, flags);
+		check_stmt(c, is->body, flags);
 
-		if (node->if_stmt.else_stmt) {
-			switch (node->if_stmt.else_stmt->kind) {
+		if (is->else_stmt) {
+			switch (is->else_stmt->kind) {
 			case AstNode_IfStmt:
 			case AstNode_BlockStmt:
-				check_stmt(c, node->if_stmt.else_stmt, flags);
+				check_stmt(c, is->else_stmt, flags);
 				break;
 			default:
-				error(&c->error_collector, ast_node_token(node->if_stmt.else_stmt),
+				error(&c->error_collector, ast_node_token(is->else_stmt),
 				            "Invalid `else` statement in `if` statement");
 				break;
 			}
 		}
-	} break;
+	case_end;
 
-	case AstNode_ReturnStmt: {
-		auto *rs = &node->return_stmt;
+	case_ast_node(rs, ReturnStmt, node);
 		GB_ASSERT(gb_array_count(c->procedure_stack) > 0);
 
 		if (c->in_defer) {
@@ -714,31 +721,30 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			check_init_variables(c, tuple->variables, tuple->variable_count,
 			                     rs->result_list, rs->result_count, make_string("return statement"));
 		}
-	} break;
+	case_end;
 
-	case AstNode_ForStmt: {
+	case_ast_node(fs, ForStmt, node);
 		flags |= Statement_BreakAllowed | Statement_ContinueAllowed;
 		check_open_scope(c, node);
 		defer (check_close_scope(c));
 
-		if (node->for_stmt.init != NULL)
-			check_stmt(c, node->for_stmt.init, 0);
-		if (node->for_stmt.cond) {
+		if (fs->init != NULL)
+			check_stmt(c, fs->init, 0);
+		if (fs->cond) {
 			Operand operand = {Addressing_Invalid};
-			check_expr(c, &operand, node->for_stmt.cond);
+			check_expr(c, &operand, fs->cond);
 			if (operand.mode != Addressing_Invalid &&
 			    !is_type_boolean(operand.type)) {
-				error(&c->error_collector, ast_node_token(node->for_stmt.cond),
+				error(&c->error_collector, ast_node_token(fs->cond),
 				      "Non-boolean condition in `for` statement");
 			}
 		}
-		if (node->for_stmt.end != NULL)
-			check_stmt(c, node->for_stmt.end, 0);
-		check_stmt(c, node->for_stmt.body, flags);
-	} break;
+		if (fs->end != NULL)
+			check_stmt(c, fs->end, 0);
+		check_stmt(c, fs->body, flags);
+	case_end;
 
-	case AstNode_DeferStmt: {
-		auto *ds = &node->defer_stmt;
+	case_ast_node(ds, DeferStmt, node);
 		if (is_ast_node_decl(ds->stmt)) {
 			error(&c->error_collector, ds->token, "You cannot defer a declaration");
 		} else {
@@ -747,10 +753,10 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			check_stmt(c, ds->stmt, 0);
 			c->in_defer = out_in_defer;
 		}
-	} break;
+	case_end;
 
-	case AstNode_BranchStmt: {
-		Token token = node->branch_stmt.token;
+	case_ast_node(bs, BranchStmt, node);
+		Token token = bs->token;
 		switch (token.kind) {
 		case Token_break:
 			if ((flags & Statement_BreakAllowed) == 0)
@@ -764,12 +770,11 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			error(&c->error_collector, token, "Invalid AST: Branch Statement `%.*s`", LIT(token.string));
 			break;
 		}
-	} break;
+	case_end;
 
 
 // Declarations
-	case AstNode_VarDecl: {
-		auto *vd = &node->var_decl;
+	case_ast_node(vd, VarDecl, node);
 		isize entity_count = vd->name_count;
 		isize entity_index = 0;
 		Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
@@ -780,7 +785,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 			for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
 				Entity *entity = NULL;
-				Token token = name->ident.token;
+				Token token = name->Ident.token;
 				if (name->kind == AstNode_Ident) {
 					String str = token.string;
 					Entity *found = NULL;
@@ -841,7 +846,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			     name = name->next, value = value->next) {
 				GB_ASSERT(name->kind == AstNode_Ident);
 				ExactValue v = {ExactValue_Invalid};
-				Entity *e = make_entity_constant(c->allocator, c->context.scope, name->ident.token, NULL, v);
+				ast_node(i, Ident, name);
+				Entity *e = make_entity_constant(c->allocator, c->context.scope, i->token, NULL, v);
 				entities[entity_index++] = e;
 				check_const_decl(c, e, vd->type, value);
 			}
@@ -866,11 +872,11 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			error(&c->error_collector, ast_node_token(node), "Unknown variable declaration kind. Probably an invalid AST.");
 			return;
 		}
-	} break;
+	case_end;
 
-	case AstNode_ProcDecl: {
-		auto *pd = &node->proc_decl;
-		Entity *e = make_entity_procedure(c->allocator, c->context.scope, pd->name->ident.token, NULL);
+	case_ast_node(pd, ProcDecl, node);
+		ast_node(name, Ident, pd->name);
+		Entity *e = make_entity_procedure(c->allocator, c->context.scope, name->token, NULL);
 		add_entity(c, c->context.scope, pd->name, e);
 
 		DeclInfo decl = {};
@@ -878,22 +884,20 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		decl.proc_decl = node;
 		check_proc_decl(c, e, &decl, false);
 		destroy_declaration_info(&decl);
-	} break;
+	case_end;
 
-	case AstNode_TypeDecl: {
-		auto *td = &node->type_decl;
-		AstNode *name = td->name;
-		Entity *e = make_entity_type_name(c->allocator, c->context.scope, name->ident.token, NULL);
-		add_entity(c, c->context.scope, name, e);
+	case_ast_node(td, TypeDecl, node);
+		ast_node(name, Ident, td->name);
+		Entity *e = make_entity_type_name(c->allocator, c->context.scope, name->token, NULL);
+		add_entity(c, c->context.scope, td->name, e);
 		check_type_decl(c, e, td->type, NULL);
-	} break;
+	case_end;
 
-	case AstNode_AliasDecl: {
-		auto *ad = &node->alias_decl;
-		AstNode *name = ad->name;
-		Entity *e = make_entity_alias_name(c->allocator, c->context.scope, name->ident.token, NULL);
-		add_entity(c, c->context.scope, name, e);
+	case_ast_node(ad, AliasDecl, node);
+		ast_node(name, Ident, ad->name);
+		Entity *e = make_entity_alias_name(c->allocator, c->context.scope, name->token, NULL);
+		add_entity(c, c->context.scope, ad->name, e);
 		check_alias_decl(c, e, ad->type, NULL);
-	} break;
+	case_end;
 	}
 }

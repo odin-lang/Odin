@@ -63,7 +63,8 @@ b32 has_init(DeclInfo *d) {
 	if (d->init_expr != NULL)
 		return true;
 	if (d->proc_decl != NULL) {
-		if (d->proc_decl->proc_decl.body != NULL)
+		ast_node(pd, ProcDecl, d->proc_decl);
+		if (pd->body != NULL)
 			return true;
 	}
 
@@ -466,7 +467,7 @@ void add_entity_use(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 
 
 void add_file_entity(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d) {
-	GB_ASSERT(are_strings_equal(identifier->ident.token.string, e->token.string));
+	GB_ASSERT(are_strings_equal(identifier->Ident.token.string, e->token.string));
 
 	add_entity(c, c->global_scope, identifier, e);
 	map_set(&c->info.entities, hash_pointer(e), d);
@@ -537,20 +538,18 @@ void check_parsed_files(Checker *c) {
 				continue;
 
 			switch (decl->kind) {
-			case AstNode_BadDecl:
-				break;
+			case_ast_node(bd, BadDecl, decl);
+			case_end;
 
-			case AstNode_VarDecl: {
-				auto *vd = &decl->var_decl;
-
+			case_ast_node(vd, VarDecl, decl);
 				switch (vd->kind) {
 				case Declaration_Immutable: {
 					for (AstNode *name = vd->name_list, *value = vd->value_list;
 					     name != NULL && value != NULL;
 					     name = name->next, value = value->next) {
-						GB_ASSERT(name->kind == AstNode_Ident);
+						ast_node(n, Ident, name);
 						ExactValue v = {ExactValue_Invalid};
-						Entity *e = make_entity_constant(c->allocator, c->context.scope, name->ident.token, NULL, v);
+						Entity *e = make_entity_constant(c->allocator, c->context.scope, n->token, NULL, v);
 						DeclInfo *di = make_declaration_info(c->allocator, c->global_scope);
 						di->type_expr = vd->type;
 						di->init_expr = value;
@@ -582,7 +581,8 @@ void check_parsed_files(Checker *c) {
 
 					AstNode *value = vd->value_list;
 					for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
-						Entity *e = make_entity_variable(c->allocator, c->global_scope, name->ident.token, NULL);
+						ast_node(n, Ident, name);
+						Entity *e = make_entity_variable(c->allocator, c->global_scope, n->token, NULL);
 						entities[entity_index++] = e;
 
 						DeclInfo *d = di;
@@ -600,41 +600,39 @@ void check_parsed_files(Checker *c) {
 					}
 				} break;
 				}
+			case_end;
 
-
-			} break;
-
-			case AstNode_TypeDecl: {
-				AstNode *identifier = decl->type_decl.name;
-				Entity *e = make_entity_type_name(c->allocator, c->global_scope, identifier->ident.token, NULL);
+			case_ast_node(td, TypeDecl, decl);
+				ast_node(n, Ident, td->name);
+				Entity *e = make_entity_type_name(c->allocator, c->global_scope, n->token, NULL);
 				DeclInfo *d = make_declaration_info(c->allocator, e->parent);
-				d->type_expr = decl->type_decl.type;
-				add_file_entity(c, identifier, e, d);
-			} break;
+				d->type_expr = td->type;
+				add_file_entity(c, td->name, e, d);
+			case_end;
 
-			case AstNode_AliasDecl: {
-				AstNode *identifier = decl->alias_decl.name;
-				Entity *e = make_entity_alias_name(c->allocator, c->global_scope, identifier->ident.token, NULL);
+			case_ast_node(ad, AliasDecl, decl);
+				ast_node(n, Ident, ad->name);
+				Entity *e = make_entity_alias_name(c->allocator, c->global_scope, n->token, NULL);
 				DeclInfo *d = make_declaration_info(c->allocator, e->parent);
-				d->type_expr = decl->alias_decl.type;
-				add_file_entity(c, identifier, e, d);
-			} break;
+				d->type_expr = ad->type;
+				add_file_entity(c, ad->name, e, d);
+			case_end;
 
-			case AstNode_ProcDecl: {
-				AstNode *identifier = decl->proc_decl.name;
-				Token token = identifier->ident.token;
+			case_ast_node(pd, ProcDecl, decl);
+				ast_node(n, Ident, pd->name);
+				Token token = n->token;
 				Entity *e = make_entity_procedure(c->allocator, c->global_scope, token, NULL);
-				add_entity(c, c->global_scope, identifier, e);
+				add_entity(c, c->global_scope, pd->name, e);
 				DeclInfo *d = make_declaration_info(c->allocator, e->parent);
 				d->proc_decl = decl;
 				map_set(&c->info.entities, hash_pointer(e), d);
 				e->order = gb_array_count(c->info.entities.entries);
 
-			} break;
+			case_end;
 
-			case AstNode_ImportDecl:
+			case_ast_node(id, ImportDecl, decl);
 				// NOTE(bill): ignore
-				break;
+			case_end;
 
 			default:
 				error(&c->error_collector, ast_node_token(decl), "Only declarations are allowed at file scope");

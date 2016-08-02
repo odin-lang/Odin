@@ -1,6 +1,11 @@
 int main() {
-	float a = 0.5;
-	float b = 1.5;
-	int c = a < b;
+	int x = 15;
+	int y = 4;
+	x = x & (~y);
+	if (x > 0) {
+		x = 123;
+	} else {
+		x = 321;
+	}
 	return 0;
 }
