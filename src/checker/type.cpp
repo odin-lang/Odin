@@ -246,6 +246,29 @@ gb_global Type basic_type_aliases[] = {
 	{Type_Basic, {Basic_rune, BasicFlag_Integer,                      STR_LIT("rune")}},
 };
 
+gb_global Type *t_invalid         = &basic_types[Basic_Invalid];
+gb_global Type *t_bool            = &basic_types[Basic_bool];
+gb_global Type *t_i8              = &basic_types[Basic_i8];
+gb_global Type *t_i16             = &basic_types[Basic_i16];
+gb_global Type *t_i32             = &basic_types[Basic_i32];
+gb_global Type *t_i64             = &basic_types[Basic_i64];
+gb_global Type *t_u8              = &basic_types[Basic_u8];
+gb_global Type *t_u16             = &basic_types[Basic_u16];
+gb_global Type *t_u32             = &basic_types[Basic_u32];
+gb_global Type *t_u64             = &basic_types[Basic_u64];
+gb_global Type *t_f32             = &basic_types[Basic_f32];
+gb_global Type *t_f64             = &basic_types[Basic_f64];
+gb_global Type *t_int             = &basic_types[Basic_int];
+gb_global Type *t_uint            = &basic_types[Basic_uint];
+gb_global Type *t_rawptr          = &basic_types[Basic_rawptr];
+gb_global Type *t_string          = &basic_types[Basic_string];
+gb_global Type *t_untyped_bool    = &basic_types[Basic_UntypedBool];
+gb_global Type *t_untyped_integer = &basic_types[Basic_UntypedInteger];
+gb_global Type *t_untyped_float   = &basic_types[Basic_UntypedFloat];
+gb_global Type *t_untyped_pointer = &basic_types[Basic_UntypedPointer];
+gb_global Type *t_untyped_string  = &basic_types[Basic_UntypedString];
+gb_global Type *t_untyped_rune    = &basic_types[Basic_UntypedRune];
+
 
 b32 is_type_named(Type *t) {
 	if (t->kind == Type_Basic)

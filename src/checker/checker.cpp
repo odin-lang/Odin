@@ -312,16 +312,16 @@ void init_universal_scope(void) {
 	}
 
 // Constants
-	add_global_constant(a, make_string("true"),  &basic_types[Basic_UntypedBool],    make_exact_value_bool(true));
-	add_global_constant(a, make_string("false"), &basic_types[Basic_UntypedBool],    make_exact_value_bool(false));
-	add_global_constant(a, make_string("null"),  &basic_types[Basic_UntypedPointer], make_exact_value_pointer(NULL));
+	add_global_constant(a, make_string("true"),  t_untyped_bool,    make_exact_value_bool(true));
+	add_global_constant(a, make_string("false"), t_untyped_bool,    make_exact_value_bool(false));
+	add_global_constant(a, make_string("null"),  t_untyped_pointer, make_exact_value_pointer(NULL));
 
 // Builtin Procedures
 	for (isize i = 0; i < gb_count_of(builtin_procedures); i++) {
 		BuiltinProcedureId id = cast(BuiltinProcedureId)i;
 		Token token = {Token_Identifier};
 		token.string = builtin_procedures[i].name;
-		Entity *entity = alloc_entity(a, Entity_Builtin, NULL, token, &basic_types[Basic_Invalid]);
+		Entity *entity = alloc_entity(a, Entity_Builtin, NULL, token, t_invalid);
 		entity->builtin.id = id;
 		add_global_entity(entity);
 	}
@@ -433,7 +433,7 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 
 	if (mode == Addressing_Constant) {
 		GB_ASSERT(value.kind != ExactValue_Invalid);
-		GB_ASSERT(type == &basic_types[Basic_Invalid] || is_type_constant_type(type));
+		GB_ASSERT(type == t_invalid || is_type_constant_type(type));
 	}
 
 	TypeAndValue tv = {};

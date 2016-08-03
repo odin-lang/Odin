@@ -73,7 +73,7 @@ b32 check_is_terminating(Checker *c, AstNode *node) {
 
 b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
 	if (operand->mode == Addressing_Invalid ||
-	    type == &basic_types[Basic_Invalid]) {
+	    type == t_invalid) {
 		return true;
 	}
 
@@ -166,7 +166,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 
 Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	if (op_a->mode == Addressing_Invalid ||
-	    op_a->type == &basic_types[Basic_Invalid]) {
+	    op_a->type == t_invalid) {
 		return NULL;
 	}
 
@@ -200,7 +200,7 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	if (e) e->variable.used = used;
 
 	if (op_b.mode == Addressing_Invalid ||
-	    op_b.type == &basic_types[Basic_Invalid]) {
+	    op_b.type == t_invalid) {
 		return NULL;
 	}
 
@@ -233,10 +233,10 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 // NOTE(bill): `content_name` is for debugging
 Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String context_name) {
 	if (operand->mode == Addressing_Invalid ||
-	    operand->type == &basic_types[Basic_Invalid] ||
-	    e->type == &basic_types[Basic_Invalid]) {
+	    operand->type == t_invalid ||
+	    e->type == t_invalid) {
 		if (e->type == NULL)
-			e->type = &basic_types[Basic_Invalid];
+			e->type = t_invalid;
 		return NULL;
 	}
 
@@ -244,9 +244,9 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 		// NOTE(bill): Use the type of the operand
 		Type *t = operand->type;
 		if (is_type_untyped(t)) {
-			if (t == &basic_types[Basic_Invalid]) {
+			if (t == t_invalid) {
 				error(&c->error_collector, e->token, "Use of untyped thing in %.*s", LIT(context_name));
-				e->type = &basic_types[Basic_Invalid];
+				e->type = t_invalid;
 				return NULL;
 			}
 			t = default_type(t);
@@ -295,10 +295,10 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNode *in
 
 void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	if (operand->mode == Addressing_Invalid ||
-	    operand->type == &basic_types[Basic_Invalid] ||
-	    e->type == &basic_types[Basic_Invalid]) {
+	    operand->type == t_invalid ||
+	    e->type == t_invalid) {
 		if (e->type == NULL)
-			e->type = &basic_types[Basic_Invalid];
+			e->type = t_invalid;
 		return;
 	}
 
@@ -307,7 +307,7 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 		error(&c->error_collector, ast_node_token(operand->expr),
 		      "`%.*s` is not a constant", LIT(ast_node_token(operand->expr).string));
 		if (e->type == NULL)
-			e->type = &basic_types[Basic_Invalid];
+			e->type = t_invalid;
 		return;
 	}
 	if (!is_type_constant_type(operand->type)) {
@@ -330,7 +330,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 	GB_ASSERT(e->type == NULL);
 
 	if (e->variable.visited) {
-		e->type = &basic_types[Basic_Invalid];
+		e->type = t_invalid;
 		return;
 	}
 	e->variable.visited = true;
@@ -342,7 +342,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 			defer (gb_string_free(str));
 			error(&c->error_collector, ast_node_token(type_expr),
 			      "Invalid constant type `%s`", str);
-			e->type = &basic_types[Basic_Invalid];
+			e->type = t_invalid;
 			return;
 		}
 		e->type = t;
@@ -464,7 +464,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	GB_ASSERT(e->kind == Entity_Variable);
 
 	if (e->variable.visited) {
-		e->type = &basic_types[Basic_Invalid];
+		e->type = t_invalid;
 		return;
 	}
 	e->variable.visited = true;
@@ -474,7 +474,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 
 	if (init_expr == NULL) {
 		if (type_expr == NULL)
-			e->type = &basic_types[Basic_Invalid];
+			e->type = t_invalid;
 		return;
 	}
 
@@ -815,14 +815,14 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			if (vd->type) {
 				init_type = check_type(c, vd->type, NULL);
 				if (init_type == NULL)
-					init_type = &basic_types[Basic_Invalid];
+					init_type = t_invalid;
 			}
 
 			for (isize i = 0; i < entity_count; i++) {
 				Entity *e = entities[i];
 				GB_ASSERT(e != NULL);
 				if (e->variable.visited) {
-					e->type = &basic_types[Basic_Invalid];
+					e->type = t_invalid;
 					continue;
 				}
 				e->variable.visited = true;

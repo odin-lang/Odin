@@ -104,7 +104,7 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 	case Type_Slice:
 		ssa_fprintf(f, "{");
 		ssa_print_type(f, s, t->slice.element);
-		ssa_fprintf(f, "*, %lld, %lld}", word_bits, word_bits);
+		ssa_fprintf(f, "*, i%lld, i%lld}", word_bits, word_bits);
 		break;
 	case Type_Structure:
 		ssa_fprintf(f, "{");
@@ -158,7 +158,7 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 		break;
 	case ExactValue_String: {
 		ssa_fprintf(f, "{");
-		ssa_print_type(f, m->sizes, &basic_types[Basic_i8]);
+		ssa_print_type(f, m->sizes, t_i8);
 		ssa_fprintf(f, "* c\"");
 		// TODO(bill): Make unquote string function
 		String unquoted = value.value_string;
@@ -166,7 +166,7 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 		unquoted.len -= 2;
 		ssa_print_escape_string(f, unquoted);
 		ssa_fprintf(f, "\", ");
-		ssa_print_type(f, m->sizes, &basic_types[Basic_int]);
+		ssa_print_type(f, m->sizes, t_int);
 		ssa_fprintf(f, " %td}", value.value_string.len);
 	} break;
 	case ExactValue_Integer:
@@ -246,7 +246,11 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "%%%d = alloca ", value->id);
 		ssa_print_type(f, m->sizes, type);
 		ssa_fprintf(f, ", align %lld ", type_align_of(m->sizes, gb_heap_allocator(), type));
-		ssa_fprintf(f, "; %.*s", LIT(instr->local.entity->token.string));
+		{
+			String str = instr->local.entity->token.string;
+			if (str.len > 0)
+			ssa_fprintf(f, "; %.*s", LIT(instr->local.entity->token.string));
+		}
 		ssa_fprintf(f, "\n");
 		ssa_fprintf(f, "\tstore ");
 		ssa_print_type(f, m->sizes, type);
@@ -281,7 +285,6 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 
 	case ssaInstr_GetElementPtr: {
 		Type *et = instr->get_element_ptr.element_type;
-		Type *t_int = &basic_types[Basic_int];
 		ssa_fprintf(f, "%%%d = getelementptr ", value->id);
 		if (instr->get_element_ptr.inbounds)
 		ssa_fprintf(f, "inbounds ");
@@ -292,10 +295,12 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "* ");
 		ssa_print_value(f, m, instr->get_element_ptr.address, et);
 		for (isize i = 0; i < instr->get_element_ptr.index_count; i++) {
+			ssaValue *index = instr->get_element_ptr.indices[i];
+			Type *t = ssa_value_type(index);
 			ssa_fprintf(f, ", ");
-			ssa_print_type(f, m->sizes, t_int);
+			ssa_print_type(f, m->sizes, t);
 			ssa_fprintf(f, " ");
-			ssa_print_value(f, m, instr->get_element_ptr.indices[i], t_int);
+			ssa_print_value(f, m, index, t);
 		}
 		ssa_fprintf(f, "\n");
 	} break;
@@ -303,7 +308,6 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	case ssaInstr_Br: {
 		ssa_fprintf(f, "br ");
 		if (instr->br.cond != NULL) {
-			Type *t_bool = &basic_types[Basic_bool];
 			ssa_print_type(f, m->sizes, t_bool);
 			ssa_fprintf(f, " ");
 			ssa_print_value(f, m, instr->br.cond, t_bool);
@@ -495,7 +499,6 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
  						ssa_print_instr(f, m, value);
  					}
  				}
-
  				ssa_fprintf(f, "}\n\n");
  			}
 

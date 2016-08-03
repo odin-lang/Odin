@@ -33,6 +33,14 @@ void ssa_gen_destroy(ssaGen *s) {
 }
 
 void ssa_gen_code(ssaGen *s) {
+	if (v_zero == NULL) {
+		v_zero   = ssa_make_value_constant(gb_heap_allocator(), t_int, make_exact_value_integer(0));
+		v_one    = ssa_make_value_constant(gb_heap_allocator(), t_int, make_exact_value_integer(1));
+		v_zero32 = ssa_make_value_constant(gb_heap_allocator(), t_i32, make_exact_value_integer(0));
+		v_one32  = ssa_make_value_constant(gb_heap_allocator(), t_i32, make_exact_value_integer(1));
+		v_two32  = ssa_make_value_constant(gb_heap_allocator(), t_i32, make_exact_value_integer(2));
+	}
+
 	ssaModule *m = &s->module;
 	CheckerInfo *info = m->info;
 	gbAllocator a = m->allocator;

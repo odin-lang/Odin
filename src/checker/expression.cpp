@@ -167,7 +167,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 	switch (e->kind) {
 	case Entity_Constant:
 		add_declaration_dependency(c, e);
-		if (e->type == &basic_types[Basic_Invalid])
+		if (e->type == t_invalid)
 			return;
 		o->value = e->constant.value;
 		GB_ASSERT(o->value.kind != ExactValue_Invalid);
@@ -177,7 +177,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 	case Entity_Variable:
 		add_declaration_dependency(c, e);
 		e->variable.used = true;
-		if (e->type == &basic_types[Basic_Invalid])
+		if (e->type == t_invalid)
 			return;
 		o->mode = Addressing_Variable;
 		break;
@@ -306,7 +306,7 @@ Type *check_type_expr_extra(Checker *c, AstNode *e, Type *named_type) {
 		break;
 	}
 
-	Type *t = &basic_types[Basic_Invalid];
+	Type *t = t_invalid;
 	set_base_type(named_type, t);
 	return t;
 }
@@ -396,7 +396,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 		break;
 	}
 
-	type = &basic_types[Basic_Invalid];
+	type = t_invalid;
 	set_base_type(named_type, type);
 
 end:
@@ -672,7 +672,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 		// TODO(bill): What should I do?
 	}
 
-	x->type = &basic_types[Basic_UntypedBool];
+	x->type = t_untyped_bool;
 }
 
 void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
@@ -707,8 +707,8 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	}
 
 	if (!are_types_identical(x->type, y->type)) {
-		if (x->type != &basic_types[Basic_Invalid] &&
-		    y->type  != &basic_types[Basic_Invalid]) {
+		if (x->type != t_invalid &&
+		    y->type  != t_invalid) {
 			gbString xt = type_to_string(x->type);
 			gbString yt = type_to_string(y->type);
 			defer (gb_string_free(xt));
@@ -833,7 +833,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 	GB_ASSERT_NOT_NULL(target_type);
 	if (operand->mode == Addressing_Invalid ||
 	    is_type_typed(operand->type) ||
-	    target_type == &basic_types[Basic_Invalid]) {
+	    target_type == t_invalid) {
 		return;
 	}
 
@@ -883,7 +883,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 	case Type_Pointer:
 		switch (operand->type->basic.kind) {
 		case Basic_UntypedPointer:
-			target_type = &basic_types[Basic_UntypedPointer];
+			target_type = t_untyped_pointer;
 			break;
 		default:
 			convert_untyped_error(c, operand, target_type);
@@ -907,7 +907,7 @@ b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *valu
 		return false;
 	}
 
-	convert_to_typed(c, &operand, &basic_types[Basic_int]);
+	convert_to_typed(c, &operand, t_int);
 	if (operand.mode == Addressing_Invalid) {
 		if (value) *value = 0;
 		return false;
@@ -1052,7 +1052,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		operand->mode = Addressing_Constant;
 		operand->value = make_exact_value_integer(type_size_of(c->sizes, c->allocator, type));
-		operand->type = &basic_types[Basic_int];
+		operand->type = t_int;
 
 	} break;
 
@@ -1064,7 +1064,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		operand->mode = Addressing_Constant;
 		operand->value = make_exact_value_integer(type_size_of(c->sizes, c->allocator, operand->type));
-		operand->type = &basic_types[Basic_int];
+		operand->type = t_int;
 		break;
 
 	case BuiltinProcedure_align_of: {
@@ -1076,7 +1076,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 		operand->mode = Addressing_Constant;
 		operand->value = make_exact_value_integer(type_align_of(c->sizes, c->allocator, type));
-		operand->type = &basic_types[Basic_int];
+		operand->type = t_int;
 	} break;
 
 	case BuiltinProcedure_align_of_val:
@@ -1087,7 +1087,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		operand->mode = Addressing_Constant;
 		operand->value = make_exact_value_integer(type_align_of(c->sizes, c->allocator, operand->type));
-		operand->type = &basic_types[Basic_int];
+		operand->type = t_int;
 		break;
 
 	case BuiltinProcedure_offset_of: {
@@ -1118,7 +1118,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		operand->mode = Addressing_Constant;
 		operand->value = make_exact_value_integer(type_offset_of(c->sizes, c->allocator, type, index));
-		operand->type  = &basic_types[Basic_int];
+		operand->type  = t_int;
 	} break;
 
 	case BuiltinProcedure_offset_of_val: {
@@ -1154,7 +1154,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		operand->mode = Addressing_Constant;
 		operand->value = make_exact_value_integer(type_offset_of(c->sizes, c->allocator, type, index));
-		operand->type  = &basic_types[Basic_int];
+		operand->type  = t_int;
 	} break;
 
 	case BuiltinProcedure_static_assert:
@@ -1220,7 +1220,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 
 		operand->mode = mode;
-		operand->type = &basic_types[Basic_int];
+		operand->type = t_int;
 		operand->value = value;
 
 	} break;
@@ -1262,7 +1262,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			return false;
 		}
 
-		operand->type = &basic_types[Basic_int]; // Returns number of elements copied
+		operand->type = t_int; // Returns number of elements copied
 		operand->mode = Addressing_Value;
 	} break;
 
@@ -1507,7 +1507,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 	ExpressionKind kind = Expression_Statement;
 
 	o->mode = Addressing_Invalid;
-	o->type = &basic_types[Basic_Invalid];
+	o->type = t_invalid;
 
 	switch (node->kind) {
 	case_ast_node(be, BadExpr, node)
@@ -1519,16 +1519,16 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 	case_end;
 
 	case_ast_node(bl, BasicLit, node);
-		BasicKind basic_kind = Basic_Invalid;
+		Type *t = t_invalid;
 		switch (bl->kind) {
-		case Token_Integer: basic_kind = Basic_UntypedInteger; break;
-		case Token_Float:   basic_kind = Basic_UntypedFloat;   break;
-		case Token_String:  basic_kind = Basic_UntypedString;  break;
-		case Token_Rune:    basic_kind = Basic_UntypedRune;    break;
+		case Token_Integer: t = t_untyped_integer; break;
+		case Token_Float:   t = t_untyped_float;   break;
+		case Token_String:  t = t_untyped_string;  break;
+		case Token_Rune:    t = t_untyped_rune;    break;
 		default:            GB_PANIC("Unknown literal");       break;
 		}
 		o->mode  = Addressing_Constant;
-		o->type  = &basic_types[basic_kind];
+		o->type  = t;
 		o->value = make_exact_value_from_basic_literal(*bl);
 	case_end;
 
@@ -1684,7 +1684,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 					max_count = o->value.value_string.len;
 				}
 				o->mode = Addressing_Value;
-				o->type = &basic_types[Basic_u8];
+				o->type = t_u8;
 			}
 			break;
 
@@ -1866,7 +1866,7 @@ ExpressionKind check_expr_base(Checker *c, Operand *o, AstNode *node, Type *type
 	ExactValue value = {ExactValue_Invalid};
 	switch (o->mode) {
 	case Addressing_Invalid:
-		type = &basic_types[Basic_Invalid];
+		type = t_invalid;
 		break;
 	case Addressing_NoValue:
 		type = NULL;
