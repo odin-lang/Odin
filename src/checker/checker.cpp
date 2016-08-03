@@ -427,7 +427,6 @@ void add_untyped(CheckerInfo *i, AstNode *expression, b32 lhs, AddressingMode mo
 
 void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode, Type *type, ExactValue value) {
 	GB_ASSERT(expression != NULL);
-	GB_ASSERT(type != NULL);
 	if (mode == Addressing_Invalid)
 		return;
 
@@ -530,8 +529,8 @@ void add_curr_ast_file(Checker *c, AstFile *file) {
 
 
 
-#include "expression.cpp"
-#include "statements.cpp"
+#include "expr.cpp"
+#include "stmt.cpp"
 
 
 

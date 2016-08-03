@@ -268,6 +268,8 @@ gb_global Type *t_untyped_float   = &basic_types[Basic_UntypedFloat];
 gb_global Type *t_untyped_pointer = &basic_types[Basic_UntypedPointer];
 gb_global Type *t_untyped_string  = &basic_types[Basic_UntypedString];
 gb_global Type *t_untyped_rune    = &basic_types[Basic_UntypedRune];
+gb_global Type *t_byte            = &basic_type_aliases[Basic_byte];
+gb_global Type *t_rune            = &basic_type_aliases[Basic_rune];
 
 
 b32 is_type_named(Type *t) {

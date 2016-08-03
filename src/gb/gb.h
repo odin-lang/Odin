@@ -6352,16 +6352,17 @@ gb_inline void gb_string_clear(gbString str) { gb__set_string_length(str, 0); st
 gb_inline gbString gb_string_append(gbString str, gbString const other) { return gb_string_append_length(str, other, gb_string_length(other)); }
 
 gbString gb_string_append_length(gbString str, void const *other, isize other_len) {
-	isize curr_len = gb_string_length(str);
+	if (other_len > 0) {
+		isize curr_len = gb_string_length(str);
 
-	str = gb_string_make_space_for(str, other_len);
-	if (str == NULL)
-		return NULL;
+		str = gb_string_make_space_for(str, other_len);
+		if (str == NULL)
+			return NULL;
 
-	gb_memcopy(str + curr_len, other, other_len);
-	str[curr_len + other_len] = '\0';
-	gb__set_string_length(str, curr_len + other_len);
-
+		gb_memcopy(str + curr_len, other, other_len);
+		str[curr_len + other_len] = '\0';
+		gb__set_string_length(str, curr_len + other_len);
+	}
 	return str;
 }
 

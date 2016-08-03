@@ -11,6 +11,8 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
+	int success = 1;
+
 	init_universal_scope();
 
 	for (int arg_index = 1; arg_index < argc; arg_index++) {
@@ -31,14 +33,16 @@ int main(int argc, char **argv) {
 				check_parsed_files(&checker);
 
 				ssaGen ssa = {};
-				if (ssa_gen_init(&ssa, &checker)) {
+				if (false && ssa_gen_init(&ssa, &checker)) {
 					defer (ssa_gen_destroy(&ssa));
 
 					ssa_gen_code(&ssa);
+
+					success = 0;
 				}
 			}
 		}
 	}
 
-	return 0;
+	return success;
 }

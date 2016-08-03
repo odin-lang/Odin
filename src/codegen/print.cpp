@@ -157,17 +157,13 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 		ssa_fprintf(f, (value.value_bool ? "true" : "false"));
 		break;
 	case ExactValue_String: {
-		ssa_fprintf(f, "{");
-		ssa_print_type(f, m->sizes, t_i8);
-		ssa_fprintf(f, "* c\"");
+		ssa_fprintf(f, "c\"");
 		// TODO(bill): Make unquote string function
 		String unquoted = value.value_string;
 		unquoted.text++;
 		unquoted.len -= 2;
 		ssa_print_escape_string(f, unquoted);
-		ssa_fprintf(f, "\", ");
-		ssa_print_type(f, m->sizes, t_int);
-		ssa_fprintf(f, " %td}", value.value_string.len);
+		ssa_fprintf(f, "\"");
 	} break;
 	case ExactValue_Integer:
 		ssa_fprintf(f, "%lld", value.value_integer);
@@ -417,6 +413,36 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 
 	} break;
 
+	case ssaInstr_Call: {
+		auto *call = &instr->call;
+		if (call->type) {
+			ssa_fprintf(f, "%%%d = ", value->id);
+		}
+		ssa_fprintf(f, "call ");
+		if (call->type) {
+			ssa_print_type(f, m->sizes, call->type);
+		} else {
+			ssa_fprintf(f, "void");
+		}
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, call->value, call->type);
+
+
+		ssa_fprintf(f, "(");
+		for (isize i = 0; i < call->arg_count; i++) {
+			ssaValue *arg = call->args[i];
+			Type *t = ssa_value_type(arg);
+			if (i > 0) {
+				ssa_fprintf(f, ", ");
+			}
+			ssa_print_type(f, m->sizes, t);
+			ssa_fprintf(f, " ");
+			ssa_print_value(f, m, arg, t);
+		}
+		ssa_fprintf(f, ")\n");
+
+	} break;
+
 	default:
 		ssa_fprintf(f, "; <unknown instr> %d\n", instr->kind);
 		break;
@@ -442,11 +468,17 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 		case ssaValue_Global: {
 			auto *g = &v->global;
 			ssa_print_encoded_global(f, g->entity->token.string);
-			ssa_fprintf(f, " = global ");
+			ssa_fprintf(f, " = ");
+			if (g->is_constant) {
+				ssa_fprintf(f, "private constant ");
+			} else {
+				ssa_fprintf(f, "global ");
+			}
+
 			ssa_print_type(f, m->sizes, get_base_type(g->entity->type));
 			ssa_fprintf(f, " ");
 			ssa_print_value(f, m, g->value, g->entity->type);
-			ssa_fprintf(f, ", align %td\n", type_align_of(m->sizes, gb_heap_allocator(), g->entity->type));
+			ssa_fprintf(f, "\n");
 		} break;
 
 		case ssaValue_Proc: {

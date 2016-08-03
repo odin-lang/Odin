@@ -1232,7 +1232,8 @@ AstNode *parse_expr_list(AstFile *f, b32 lhs, isize *list_count_) {
 	isize list_count = 0;
 
 	do {
-		DLIST_APPEND(list_root, list_curr, parse_expr(f, lhs));
+		AstNode *e = parse_expr(f, lhs);
+		DLIST_APPEND(list_root, list_curr, e);
 		list_count++;
 		if (f->cursor[0].kind != Token_Comma ||
 		    f->cursor[0].kind == Token_EOF)
@@ -1258,6 +1259,7 @@ AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count);
 AstNode *parse_simple_stmt(AstFile *f) {
 	isize lhs_count = 0, rhs_count = 0;
 	AstNode *lhs_expr_list = parse_lhs_expr_list(f, &lhs_count);
+
 
 	AstNode *statement = NULL;
 	Token token = f->cursor[0];

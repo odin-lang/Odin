@@ -265,31 +265,34 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNode *in
 	if ((lhs == NULL || lhs_count == 0) && init_count == 0)
 		return;
 
-	isize i = 0;
-	AstNode *rhs = init_list;
-	for (;
-	     i < lhs_count && i < init_count && rhs != NULL;
-	     i++, rhs = rhs->next) {
-		Operand operand = {};
-		check_multi_expr(c, &operand, rhs);
-		if (operand.type->kind != Type_Tuple) {
-			check_init_variable(c, lhs[i], &operand, context_name);
+	// TODO(bill): Do not use heap allocation here if I can help it
+	gbArray(Operand) operands;
+	gb_array_init(operands, gb_heap_allocator());
+	defer (gb_array_free(operands));
+
+	for (AstNode *rhs = init_list; rhs != NULL; rhs = rhs->next) {
+		Operand o = {};
+		check_multi_expr(c, &o, rhs);
+		if (o.type->kind != Type_Tuple) {
+			gb_array_append(operands, o);
 		} else {
-			auto *tuple = &operand.type->tuple;
-			for (isize j = 0;
-			     j < tuple->variable_count && i < lhs_count && i < init_count;
-			     j++, i++) {
-				Type *type = tuple->variables[j]->type;
-				operand.type = type;
-				check_init_variable(c, lhs[i], &operand, context_name);
+			auto *tuple = &o.type->tuple;
+			for (isize j = 0; j < tuple->variable_count; j++) {
+				o.type = tuple->variables[j]->type;
+				gb_array_append(operands, o);
 			}
 		}
 	}
 
-	if (i < lhs_count && lhs[i]->type == NULL) {
-		error(&c->error_collector, lhs[i]->token, "Too few values on the right hand side of the declaration");
-	} else if (rhs != NULL) {
-		error(&c->error_collector, ast_node_token(rhs), "Too many values on the right hand side of the declaration");
+	isize rhs_count = gb_array_count(operands);
+
+	isize max = gb_min(lhs_count, rhs_count);
+	for (isize i = 0; i < max; i++) {
+		check_init_variable(c, lhs[i], &operands[i], context_name);
+	}
+
+	if (rhs_count > 0 && lhs_count != rhs_count) {
+		error(&c->error_collector, lhs[0]->token, "Assignment count mismatch `%td` := `%td`", lhs_count, rhs_count);
 	}
 }
 
@@ -599,36 +602,37 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				return;
 			}
 
-			Operand operand = {};
-			AstNode *lhs = as->lhs_list;
-			AstNode *rhs = as->rhs_list;
-			isize i = 0;
-			for (;
-			     lhs != NULL && rhs != NULL;
-			     lhs = lhs->next, rhs = rhs->next) {
-				check_multi_expr(c, &operand, rhs);
-				if (operand.type->kind != Type_Tuple) {
-					check_assignment_variable(c, &operand, lhs);
-					i++;
+			// TODO(bill): Do not use heap allocation here if I can help it
+			gbArray(Operand) operands;
+			gb_array_init(operands, gb_heap_allocator());
+			defer (gb_array_free(operands));
+
+			for (AstNode *rhs = as->rhs_list; rhs != NULL; rhs = rhs->next) {
+				Operand o = {};
+				check_multi_expr(c, &o, rhs);
+				if (o.type->kind != Type_Tuple) {
+					gb_array_append(operands, o);
 				} else {
-					auto *tuple = &operand.type->tuple;
-					for (isize j = 0;
-					     j < tuple->variable_count && lhs != NULL;
-					     j++, i++, lhs = lhs->next) {
-						// TODO(bill): More error checking
-						operand.type = tuple->variables[j]->type;
-						check_assignment_variable(c, &operand, lhs);
+					auto *tuple = &o.type->tuple;
+					for (isize j = 0; j < tuple->variable_count; j++) {
+						o.type = tuple->variables[j]->type;
+						gb_array_append(operands, o);
 					}
-					if (lhs == NULL)
-						break;
 				}
 			}
 
-			if (i < as->lhs_count && i < as->rhs_count) {
-				if (lhs == NULL)
-					error(&c->error_collector, ast_node_token(lhs), "Too few values on the right hand side of the declaration");
-			} else if (rhs != NULL) {
-				error(&c->error_collector, ast_node_token(rhs), "Too many values on the right hand side of the declaration");
+			isize lhs_count = as->lhs_count;
+			isize rhs_count = gb_array_count(operands);
+
+			isize operand_index = 0;
+			for (AstNode *lhs = as->lhs_list;
+			     lhs != NULL;
+			     lhs = lhs->next, operand_index++) {
+				check_assignment_variable(c, &operands[operand_index], lhs);
+
+			}
+			if (lhs_count != rhs_count) {
+				error(&c->error_collector, ast_node_token(as->lhs_list), "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
 			}
 		} break;
 

@@ -8,9 +8,9 @@ Type *         check_type              (Checker *c, AstNode *expression, Type *n
 void           check_selector          (Checker *c, Operand *operand, AstNode *node);
 void           check_not_tuple         (Checker *c, Operand *operand);
 void           convert_to_typed        (Checker *c, Operand *operand, Type *target_type);
-gbString       expr_to_string    (AstNode *expression);
+gbString       expr_to_string          (AstNode *expression);
 void           check_entity_decl       (Checker *c, Entity *e, DeclInfo *decl, Type *named_type);
-void           check_proc_body    (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
+void           check_proc_body         (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
 
 
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
@@ -1880,12 +1880,10 @@ ExpressionKind check_expr_base(Checker *c, Operand *o, AstNode *node, Type *type
 		break;
 	}
 
-	if (type != NULL) {
-		if (is_type_untyped(type)) {
-			add_untyped(&c->info, node, false, o->mode, type, value);
-		} else {
-			add_type_and_value(&c->info, node, o->mode, type, value);
-		}
+	if (type != NULL && is_type_untyped(type)) {
+		add_untyped(&c->info, node, false, o->mode, type, value);
+	} else {
+		add_type_and_value(&c->info, node, o->mode, type, value);
 	}
 	return kind;
 }
@@ -1972,7 +1970,9 @@ gbString write_field_list_to_string(gbString str, AstNode *field_list, char *sep
 }
 
 gbString string_append_token(gbString str, Token token) {
-	return gb_string_append_length(str, token.string.text, token.string.len);
+	if (token.string.len > 0)
+		return gb_string_append_length(str, token.string.text, token.string.len);
+	return str;
 }
 
 
@@ -1980,9 +1980,13 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	if (node == NULL)
 		return str;
 
+	if (is_ast_node_stmt(node)) {
+		GB_ASSERT("stmt passed to write_expr_to_string");
+	}
+
 	switch (node->kind) {
 	default:
-		str = gb_string_appendc(str, "(bad expression)");
+		str = gb_string_appendc(str, "(BadExpr)");
 		break;
 
 	case_ast_node(i, Ident, node);
@@ -2000,7 +2004,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_ast_node(cl, CompoundLit, node);
 		str = gb_string_appendc(str, "(");
 		str = write_expr_to_string(str, cl->type);
-		str = gb_string_appendc(str, " literal)");
+		str = gb_string_appendc(str, " lit)");
 	case_end;
 
 	case_ast_node(te, TagExpr, node);
@@ -2061,7 +2065,6 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, ce->expr);
 	case_end;
 
-
 	case_ast_node(pt, PointerType, node);
 		str = gb_string_appendc(str, "^");
 		str = write_expr_to_string(str, pt->type);
@@ -2079,7 +2082,9 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, "(");
 		isize i = 0;
 		for (AstNode *arg = ce->arg_list; arg != NULL; arg = arg->next) {
-			if (i > 0) gb_string_appendc(str, ", ");
+			if (i > 0) {
+				str = gb_string_appendc(str, ", ");
+			}
 			str = write_expr_to_string(str, arg);
 			i++;
 		}

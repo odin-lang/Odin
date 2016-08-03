@@ -1,5 +1,7 @@
+add :: proc(x, y : int) -> (int, int) {
+	return x+y, 1;
+}
+
 main :: proc() {
-	a : [16]int;
-	b := a[0:1:2];
 
 }
