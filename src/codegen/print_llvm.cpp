@@ -1,15 +1,26 @@
+#define SSA_PRINT_TO_STDOUT 0
+
 void ssa_fprintf(gbFile *f, char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	gb_fprintf_va(f, fmt, va);
-#if 1
+#if SSA_PRINT_TO_STDOUT
 	gb_printf_va(fmt, va);
 #endif
 	va_end(va);
 }
 
+void ssa_file_write(gbFile *f, void *data, isize len) {
+	gb_file_write(f, data, len);
+#if SSA_PRINT_TO_STDOUT
+	gb_file_write(gb_file_get_standard(gbFileStandard_Output), data, len);
+#endif
+}
 
 b32 ssa_valid_char(u8 c) {
+	if (c >= 0x80)
+		return false;
+
 	if (gb_char_is_alphanumeric(c))
 		return true;
 
@@ -55,7 +66,7 @@ void ssa_print_escape_string(gbFile *f, String name) {
 		}
 	}
 
-	gb_file_write(f, buf, buf_len);
+	ssa_file_write(f, buf, buf_len);
 }
 
 
@@ -92,8 +103,8 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 		case Basic_f64:    ssa_fprintf(f, "double");                  break;
 		case Basic_rawptr: ssa_fprintf(f, "void*");                   break;
 		case Basic_string: ssa_fprintf(f, "{i8*, i%lld}", word_bits); break;
-		case Basic_int:    ssa_fprintf(f, "i%lld", word_bits);        break;
 		case Basic_uint:   ssa_fprintf(f, "i%lld", word_bits);        break;
+		case Basic_int:    ssa_fprintf(f, "i%lld", word_bits);        break;
 		}
 		break;
 	case Type_Array:
@@ -109,7 +120,9 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 	case Type_Structure:
 		ssa_fprintf(f, "{");
 		for (isize i = 0; i < t->structure.field_count; i++) {
-			if (i > 0) ssa_fprintf(f, ", ");
+			if (i > 0) {
+				ssa_fprintf(f, ", ");
+			}
 			ssa_print_type(f, s, t->structure.fields[i]->type);
 		}
 		ssa_fprintf(f, "}");
@@ -137,13 +150,16 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 		}
 		break;
 	case Type_Procedure:
-		if (t->procedure.result_count == 0)
+		if (t->procedure.result_count == 0) {
 			ssa_fprintf(f, "void");
-		else
+		} else {
 			ssa_print_type(f, s, t->procedure.results);
+		}
 		ssa_fprintf(f, " (");
 		for (isize i = 0; i < t->procedure.param_count; i++) {
-			if (i > 0) ssa_fprintf(f, ", ");
+			if (i > 0) {
+				ssa_fprintf(f, ", ");
+			}
 			ssa_print_type(f, s, &t->procedure.params[i]);
 		}
 		ssa_fprintf(f, ")*");
@@ -158,11 +174,7 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 		break;
 	case ExactValue_String: {
 		ssa_fprintf(f, "c\"");
-		// TODO(bill): Make unquote string function
-		String unquoted = value.value_string;
-		unquoted.text++;
-		unquoted.len -= 2;
-		ssa_print_escape_string(f, unquoted);
+		ssa_print_escape_string(f, value.value_string);
 		ssa_fprintf(f, "\"");
 	} break;
 	case ExactValue_Integer:
@@ -330,6 +342,18 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 			ssa_print_value(f, m, ret->value, t);
 		}
 
+		ssa_fprintf(f, "\n");
+
+	} break;
+
+	case ssaInstr_Conv: {
+		auto *c = &instr->conv;
+		ssa_fprintf(f, "%%%d = %.*s ", value->id, LIT(ssa_conv_strings[c->kind]));
+		ssa_print_type(f, m->sizes, c->from);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, c->value, c->from);
+		ssa_fprintf(f, " to ");
+		ssa_print_type(f, m->sizes, c->to);
 		ssa_fprintf(f, "\n");
 
 	} break;

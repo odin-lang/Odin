@@ -954,6 +954,7 @@ b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *valu
 }
 
 Entity *lookup_field(Type *type, AstNode *field_node, isize *index = NULL) {
+	GB_ASSERT(type != NULL);
 	GB_ASSERT(field_node->kind == AstNode_Ident);
 	type = get_base_type(type);
 	if (type->kind == Type_Pointer)
@@ -1192,7 +1193,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 				if (is_type_string(t)) {
 					if (operand->mode == Addressing_Constant) {
 						mode = Addressing_Constant;
-						value = make_exact_value_integer(operand->value.value_string.len);
+						value = make_exact_value_integer(operand->value.value_string);
 					} else {
 						mode = Addressing_Value;
 					}
@@ -1683,7 +1684,6 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 				if (o->mode == Addressing_Constant) {
 					max_count = o->value.value_string.len;
 				}
-				o->mode = Addressing_Value;
 				o->type = t_u8;
 			}
 			break;
@@ -1743,6 +1743,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 				if (o->mode == Addressing_Constant) {
 					max_count = o->value.value_string.len;
 				}
+				o->type = t_string;
 				o->mode = Addressing_Value;
 			}
 			break;

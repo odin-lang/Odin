@@ -219,6 +219,23 @@ void destroy_scope(Scope *scope) {
 	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
 }
 
+void add_scope(Checker *c, AstNode *node, Scope *scope) {
+	GB_ASSERT(node != NULL);
+	GB_ASSERT(scope != NULL);
+	map_set(&c->info.scopes, hash_pointer(node), scope);
+}
+
+
+void check_open_scope(Checker *c, AstNode *stmt) {
+	GB_ASSERT(is_ast_node_stmt(stmt) || stmt->kind == AstNode_ProcType);
+	Scope *scope = make_scope(c->context.scope, c->allocator);
+	add_scope(c, stmt, scope);
+	c->context.scope = scope;
+}
+
+void check_close_scope(Checker *c) {
+	c->context.scope = c->context.scope->parent;
+}
 
 void scope_lookup_parent_entity(Scope *s, String name, Scope **scope, Entity **entity) {
 	u64 key = hash_string(name);
@@ -359,7 +376,6 @@ void init_checker(Checker *c, Parser *parser) {
 	c->sizes.word_size = 8;
 	c->sizes.max_align = 8;
 
-
 	gb_array_init(c->procedure_stack, a);
 	gb_array_init(c->procedures, a);
 
@@ -485,25 +501,6 @@ void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *dec
 	info.type  = type;
 	info.body  = body;
 	gb_array_append(c->procedures, info);
-}
-
-
-
-void add_scope(Checker *c, AstNode *node, Scope *scope) {
-	GB_ASSERT(node != NULL);
-	GB_ASSERT(scope != NULL);
-	map_set(&c->info.scopes, hash_pointer(node), scope);
-}
-
-
-void check_open_scope(Checker *c, AstNode *statement) {
-	Scope *scope = make_scope(c->context.scope, c->allocator);
-	add_scope(c, statement, scope);
-	c->context.scope = scope;
-}
-
-void check_close_scope(Checker *c) {
-	c->context.scope = c->context.scope->parent;
 }
 
 void check_add_deferred_stmt(Checker *c, AstNode *stmt) {

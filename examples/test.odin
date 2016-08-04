@@ -1,7 +1,5 @@
-add :: proc(x, y : int) -> (int, int) {
-	return x+y, 1;
-}
+import "basic"
 
 main :: proc() {
-
+	print_string("Hello, 世界");
 }

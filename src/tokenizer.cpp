@@ -114,9 +114,7 @@ TOKEN_KIND(_KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(union, "union"), \
 	TOKEN_KIND(enum, "enum"), \
 TOKEN_KIND(_KeywordEnd, "_KeywordEnd"), \
-\
-	TOKEN_KIND(Count, ""), \
-
+	TOKEN_KIND(Count, "")
 
 enum TokenKind {
 #define TOKEN_KIND(e, s) GB_JOIN2(Token_, e)
@@ -168,6 +166,7 @@ struct ErrorCollector {
 };
 
 void error(ErrorCollector *ec, Token token, char *fmt, ...) {
+	ec->count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (!token_pos_are_equal(ec->prev, token.pos)) {
 		ec->prev = token.pos;
@@ -180,7 +179,6 @@ void error(ErrorCollector *ec, Token token, char *fmt, ...) {
 		va_end(va);
 
 	}
-	ec->count++;
 }
 
 void warning(Token token, char *fmt, ...) {
@@ -266,6 +264,7 @@ struct Tokenizer {
 	isize line_count;
 
 	isize error_count;
+	gbArray(String) allocated_strings;
 };
 
 
@@ -342,6 +341,9 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 		advance_to_next_rune(t);
 		if (t->curr_rune == GB_RUNE_BOM)
 			advance_to_next_rune(t); // Ignore BOM at file beginning
+
+		gb_array_init(t->allocated_strings, gb_heap_allocator());
+
 		return TokenizerInit_None;
 	}
 
@@ -360,12 +362,18 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 
 	if (gb_file_size(&f) == 0)
 		return TokenizerInit_Empty;
+
+
 	return TokenizerInit_None;
 }
 
 gb_inline void destroy_tokenizer(Tokenizer *t) {
-	if (t->start != NULL)
+	if (t->start != NULL) {
 		gb_free(gb_heap_allocator(), t->start);
+	}
+	if (t->allocated_strings != NULL) {
+		gb_array_free(t->allocated_strings);
+	}
 }
 
 void tokenizer_skip_whitespace(Tokenizer *t) {
@@ -624,21 +632,48 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case GB_RUNE_EOF:
 			token.kind = Token_EOF;
 			break;
+
+		case '`': // Raw String Literal
 		case '"': // String Literal
+		{
+			Rune quote = curr_rune;
 			token.kind = Token_String;
-			for (;;) {
-				Rune r = t->curr_rune;
-				if (r == '\n' || r < 0) {
-					tokenizer_err(t, "String literal not terminated");
-					break;
+			if (curr_rune == '"') {
+				for (;;) {
+					Rune r = t->curr_rune;
+					if (r == '\n' || r < 0) {
+						tokenizer_err(t, "String literal not terminated");
+						break;
+					}
+					advance_to_next_rune(t);
+					if (r == quote)
+						break;
+					if (r == '\\')
+						scan_escape(t, '"');
 				}
-				advance_to_next_rune(t);
-				if (r == '"')
-					break;
-				if (r == '\\')
-					scan_escape(t, '"');
+			} else {
+				for (;;) {
+					Rune r = t->curr_rune;
+					if (r < 0) {
+						tokenizer_err(t, "String literal not terminated");
+						break;
+					}
+					advance_to_next_rune(t);
+					if (r == quote)
+						break;
+				}
 			}
-			break;
+			token.string.len = t->curr - token.string.text;
+			i32 success = unquote_string(gb_heap_allocator(), &token.string);
+			if (success > 0) {
+				if (success == 2) {
+					gb_array_append(t->allocated_strings, token.string);
+				}
+				return token;
+			} else {
+				tokenizer_err(t, "Invalid string literal");
+			}
+		} break;
 
 		case '\'': { // Rune Literal
 			b32 valid = true;
@@ -663,6 +698,16 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 			if (valid && len != 1)
 				tokenizer_err(t, "Illegal rune literal");
+			token.string.len = t->curr - token.string.text;
+			i32 success = unquote_string(gb_heap_allocator(), &token.string);
+			if (success > 0) {
+				if (success == 2) {
+					gb_array_append(t->allocated_strings, token.string);
+				}
+				return token;
+			} else {
+				tokenizer_err(t, "Invalid rune literal");
+			}
 		} break;
 
 		case '.':

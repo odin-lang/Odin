@@ -408,11 +408,15 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 	e->type = proc_type;
 	ast_node(pd, ProcDecl, d->proc_decl);
 
-#if 1
 	Scope *original_curr_scope = c->context.scope;
 	c->context.scope = c->global_scope;
 	check_open_scope(c, pd->type);
-#endif
+	defer ({
+		check_close_scope(c);
+		c->context.scope = original_curr_scope;
+	});
+
+
 	check_procedure_type(c, proc_type, pd->type);
 	b32 is_foreign   = false;
 	b32 is_inline    = false;
@@ -454,11 +458,6 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 			check_proc_body(c, e->token, d, proc_type, pd->body);
 		}
 	}
-
-#if 1
-	check_close_scope(c);
-	c->context.scope = original_curr_scope;
-#endif
 
 }
 
@@ -554,8 +553,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(ids, IncDecStmt, node);
-		Token op = {};
-		op = ids->op;
+		Token op = ids->op;
 		switch (ids->op.kind) {
 		case Token_Increment:
 			op.kind = Token_Add;
@@ -717,9 +715,9 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			result_count = proc_type->procedure.results->tuple.variable_count;
 		if (result_count != rs->result_count) {
 			error(&c->error_collector, rs->token, "Expected %td return %s, got %td",
-			            result_count,
-			            (result_count != 1 ? "values" : "value"),
-			            rs->result_count);
+			      result_count,
+			      (result_count != 1 ? "values" : "value"),
+			      rs->result_count);
 		} else if (result_count > 0) {
 			auto *tuple = &proc_type->procedure.results->tuple;
 			check_init_variables(c, tuple->variables, tuple->variable_count,

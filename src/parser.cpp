@@ -2063,10 +2063,7 @@ void parse_file(Parser *p, AstFile *f) {
 		} else {
 			if (node->kind == AstNode_ImportDecl) {
 				auto *id = &node->ImportDecl;
-				String file = id->filepath.string;
-				String file_str = {};
-				if (file.text[0] == '"')
-					file_str = make_string(file.text+1, file.len-2);
+				String file_str = id->filepath.string;
 
 				char ext[] = ".odin";
 				isize ext_len = gb_size_of(ext)-1;

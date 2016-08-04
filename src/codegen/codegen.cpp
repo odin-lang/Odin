@@ -1,5 +1,5 @@
 #include "ssa.cpp"
-#include "print.cpp"
+#include "print_llvm.cpp"
 
 struct ssaGen {
 	ssaModule module;
@@ -7,14 +7,14 @@ struct ssaGen {
 };
 
 b32 ssa_gen_init(ssaGen *s, Checker *c) {
-	if (c->error_collector.count != 0)
+	if (c->error_collector.count > 0)
 		return false;
 
 	gb_for_array(i, c->parser->files) {
 		AstFile *f = &c->parser->files[i];
-		if (f->error_collector.count != 0)
+		if (f->error_collector.count > 0)
 			return false;
-		if (f->tokenizer.error_count != 0)
+		if (f->tokenizer.error_count > 0)
 			return false;
 	}
 

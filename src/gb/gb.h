@@ -1370,6 +1370,7 @@ GB_DEF u8 * gb_ucs2_to_utf8_buf(u16 const *str); // NOTE(bill): Uses locally per
 // NOTE(bill): Returns size of codepoint in bytes
 GB_DEF isize gb_utf8_decode        (u8 const *str, isize str_len, Rune *codepoint);
 GB_DEF isize gb_utf8_codepoint_size(u8 const *str, isize str_len);
+GB_DEF isize gb_utf8_encode_rune   (u8 buf[4], Rune r);
 
 ////////////////////////////////////////////////////////////////
 //
@@ -5871,7 +5872,7 @@ gb_inline i32 gb_hex_digit_to_int(char c) {
 		return c - 'a' + 10;
 	else if (gb_is_between(c, 'A', 'F'))
 		return c - 'A' + 10;
-	return 0;
+	return -1;
 }
 
 
@@ -6691,6 +6692,43 @@ isize gb_utf8_codepoint_size(u8 const *str, isize str_len) {
 	return i+1;
 }
 
+isize gb_utf8_encode_rune(u8 buf[4], Rune r) {
+	u32 i = cast(u32)r;
+	u8 mask = 0x3f;
+	if (i <= (1<<7)-1) {
+		buf[0] = cast(u8)r;
+		return 1;
+	}
+	if (i <= (1<<11)-1) {
+		buf[0] = 0xc0 | cast(u8)(r>>6);
+		buf[1] = 0x80 | cast(u8)(r)&mask;
+		return 2;
+	}
+
+	// Invalid or Surrogate range
+	if (i > GB_RUNE_MAX ||
+	    gb_is_between(i, 0xd800, 0xdfff)) {
+		r = GB_RUNE_INVALID;
+
+		buf[0] = 0xe0 | cast(u8)(r>>12);
+		buf[1] = 0x80 | cast(u8)(r>>6)&mask;
+		buf[2] = 0x80 | cast(u8)(r)&mask;
+		return 3;
+	}
+
+	if (i <= (1<<16)-1) {
+		buf[0] = 0xe0 | cast(u8)(r>>12);
+		buf[1] = 0x80 | cast(u8)(r>>6)&mask;
+		buf[2] = 0x80 | cast(u8)(r)&mask;
+		return 3;
+	}
+
+	buf[0] = 0xf0 | cast(u8)(r>>18);
+	buf[1] = 0x80 | cast(u8)(r>>12)&mask;
+	buf[2] = 0x80 | cast(u8)(r>>6)&mask;
+	buf[3] = 0x80 | cast(u8)(r)&mask;
+	return 4;
+}
 
 
 

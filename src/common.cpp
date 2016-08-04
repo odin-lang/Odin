@@ -2,78 +2,7 @@
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
-// NOTE(bill): Used for UTF-8 strings
-typedef struct String {
-	u8 *text;
-	isize len;
-} String;
-// NOTE(bill): used for printf style arguments
-#define LIT(x) (x).len, (x).text
-
-
-
-
-gb_inline String make_string(u8 *text, isize len) {
-	String s;
-	s.text = text;
-	if (len < 0)
-		len = gb_strlen(cast(char *)text);
-	s.len = len;
-	return s;
-}
-
-gb_inline String make_string(char *text) {
-	return make_string(cast(u8 *)cast(void *)text, gb_strlen(text));
-}
-
-gb_inline b32 are_strings_equal(String a, String b) {
-	if (a.len == b.len) {
-		return gb_memcompare(a.text, b.text, a.len) == 0;
-	}
-	return false;
-}
-
-gb_inline b32 are_strings_equal_ignore_case(String a, String b) {
-	if (a.len == b.len) {
-		for (isize i = 0; i < a.len; i++) {
-			char x = cast(char)a.text[i];
-			char y = cast(char)b.text[i];
-			if (gb_char_to_lower(x) != gb_char_to_lower(y))
-				return false;
-		}
-		return true;
-	}
-	return false;
-}
-
-
-gb_inline isize string_extension_position(String str) {
-	isize dot_pos = -1;
-	isize i = str.len;
-	b32 seen_dot = false;
-	while (i --> 0) {
-		if (str.text[i] == GB_PATH_SEPARATOR)
-			break;
-		if (str.text[i] == '.') {
-			dot_pos = i;
-			break;
-		}
-	}
-
-	return dot_pos;
-}
-
-gb_inline b32 string_has_extension(String str, String ext) {
-	if (str.len > ext.len+1) {
-		u8 *s = str.text+str.len - ext.len-1;
-		if (s[0] == '.') {
-			s++;
-			return gb_memcompare(s, ext.text, ext.len) == 0;
-		}
-		return false;
-	}
-	return false;
-}
+#include "string.cpp"
 
 // Hasing
 
@@ -86,7 +15,8 @@ gb_inline u64 hash_string(String s) {
 }
 
 gb_inline u64 hash_pointer(void *ptr) {
-	u64 p = cast(u64)cast(uintptr)ptr;
+	uintptr u = cast(uintptr)ptr;
+	u64 p = cast(u64)u;
 	return p;
 }
 
@@ -125,9 +55,9 @@ typedef struct MapFindResult {
 
 template <typename T>
 struct MapEntry {
-	u64 key;
+	u64   key;
 	isize next;
-	T value;
+	T     value;
 };
 
 template <typename T>

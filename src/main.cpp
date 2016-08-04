@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
 				check_parsed_files(&checker);
 
 				ssaGen ssa = {};
-				if (false && ssa_gen_init(&ssa, &checker)) {
+				if (ssa_gen_init(&ssa, &checker)) {
 					defer (ssa_gen_destroy(&ssa));
 
 					ssa_gen_code(&ssa);
