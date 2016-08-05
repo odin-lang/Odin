@@ -48,6 +48,7 @@ void ssa_print_escape_string(gbFile *f, String name) {
 		return;
 	}
 
+
 	char hex_table[] = "0123456789ABCDEF";
 	isize buf_len = name.len + extra;
 	u8 *buf = gb_alloc_array(gb_heap_allocator(), u8, buf_len);
@@ -101,20 +102,20 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 		case Basic_u64:    ssa_fprintf(f, "i64");                     break;
 		case Basic_f32:    ssa_fprintf(f, "float");                   break;
 		case Basic_f64:    ssa_fprintf(f, "double");                  break;
-		case Basic_rawptr: ssa_fprintf(f, "void*");                   break;
-		case Basic_string: ssa_fprintf(f, "{i8*, i%lld}", word_bits); break;
+		case Basic_rawptr: ssa_fprintf(f, "%%-rawptr");               break;
+		case Basic_string: ssa_fprintf(f, "%%-string");               break;
 		case Basic_uint:   ssa_fprintf(f, "i%lld", word_bits);        break;
 		case Basic_int:    ssa_fprintf(f, "i%lld", word_bits);        break;
 		}
 		break;
 	case Type_Array:
 		ssa_fprintf(f, "[%lld x ", t->array.count);
-		ssa_print_type(f, s, t->array.element);
+		ssa_print_type(f, s, t->array.elem);
 		ssa_fprintf(f, "]");
 		break;
 	case Type_Slice:
 		ssa_fprintf(f, "{");
-		ssa_print_type(f, s, t->slice.element);
+		ssa_print_type(f, s, t->slice.elem);
 		ssa_fprintf(f, "*, i%lld, i%lld}", word_bits, word_bits);
 		break;
 	case Type_Structure:
@@ -128,7 +129,7 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 		ssa_fprintf(f, "}");
 		break;
 	case Type_Pointer:
-		ssa_print_type(f, s, t->pointer.element);
+		ssa_print_type(f, s, t->pointer.elem);
 		ssa_fprintf(f, "*");
 		break;
 	case Type_Named:
@@ -149,18 +150,18 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 			ssa_fprintf(f, "}");
 		}
 		break;
-	case Type_Procedure:
-		if (t->procedure.result_count == 0) {
+	case Type_Proc:
+		if (t->proc.result_count == 0) {
 			ssa_fprintf(f, "void");
 		} else {
-			ssa_print_type(f, s, t->procedure.results);
+			ssa_print_type(f, s, t->proc.results);
 		}
 		ssa_fprintf(f, " (");
-		for (isize i = 0; i < t->procedure.param_count; i++) {
+		for (isize i = 0; i < t->proc.param_count; i++) {
 			if (i > 0) {
 				ssa_fprintf(f, ", ");
 			}
-			ssa_print_type(f, s, &t->procedure.params[i]);
+			ssa_print_type(f, s, &t->proc.params[i]);
 		}
 		ssa_fprintf(f, ")*");
 		break;
@@ -292,7 +293,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_GetElementPtr: {
-		Type *et = instr->get_element_ptr.element_type;
+		Type *et = instr->get_element_ptr.elem_type;
 		ssa_fprintf(f, "%%%d = getelementptr ", value->id);
 		if (instr->get_element_ptr.inbounds)
 		ssa_fprintf(f, "inbounds ");
@@ -478,6 +479,15 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 		ssa_fprintf(f, "target datalayout = %.*s\n", LIT(m->layout));
 	}
 
+	ssa_print_encoded_local(f, make_string("-string"));
+	ssa_fprintf(f, " = type {i8*, ");
+	ssa_print_type(f, m->sizes, t_int);
+	ssa_fprintf(f, "} ; Basic_string\n\n");
+
+	ssa_print_encoded_local(f, make_string("-rawptr"));
+	ssa_fprintf(f, " = type i8*");
+	ssa_fprintf(f, " ; Basic_rawptr\n\n");
+
 	gb_for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
 		ssaValue *v = entry->value;
@@ -513,7 +523,7 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 				ssa_fprintf(f, "define ");
 			}
 
-			auto *proc_type = &proc->entity->type->procedure;
+			auto *proc_type = &proc->entity->type->proc;
 
 			if (proc_type->result_count == 0) {
 				ssa_fprintf(f, "void");
@@ -540,7 +550,7 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 			ssa_fprintf(f, ") ");
 
  			if (proc->body == NULL) {
-				ssa_fprintf(f, "\n");
+				ssa_fprintf(f, "\t; foreign procedure\n\n");
  			} else {
  				ssa_fprintf(f, "{\n");
  				gb_for_array(i, proc->blocks) {

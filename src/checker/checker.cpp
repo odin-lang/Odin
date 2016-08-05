@@ -20,7 +20,7 @@ struct Operand {
 	Type *type;
 	ExactValue value;
 	AstNode *expr;
-	BuiltinProcedureId builtin_id;
+	BuiltinProcId builtin_id;
 };
 
 struct TypeAndValue {
@@ -110,32 +110,34 @@ enum ExpressionKind {
 	Expression_Statement,
 };
 
-enum BuiltinProcedureId {
-	BuiltinProcedure_Invalid,
+enum BuiltinProcId {
+	BuiltinProc_Invalid,
 
-	BuiltinProcedure_size_of,
-	BuiltinProcedure_size_of_val,
-	BuiltinProcedure_align_of,
-	BuiltinProcedure_align_of_val,
-	BuiltinProcedure_offset_of,
-	BuiltinProcedure_offset_of_val,
-	BuiltinProcedure_static_assert,
-	BuiltinProcedure_len,
-	BuiltinProcedure_cap,
-	BuiltinProcedure_copy,
-	BuiltinProcedure_print,
-	BuiltinProcedure_println,
+	BuiltinProc_size_of,
+	BuiltinProc_size_of_val,
+	BuiltinProc_align_of,
+	BuiltinProc_align_of_val,
+	BuiltinProc_offset_of,
+	BuiltinProc_offset_of_val,
+	BuiltinProc_static_assert,
+	BuiltinProc_len,
+	BuiltinProc_cap,
+	BuiltinProc_copy,
+	BuiltinProc_append,
+	BuiltinProc_print,
+	BuiltinProc_println,
 
-	BuiltinProcedure_Count,
+	BuiltinProc_Count,
 };
-struct BuiltinProcedure {
+struct BuiltinProc {
 	String name;
 	isize arg_count;
 	b32 variadic;
 	ExpressionKind kind;
 };
-gb_global BuiltinProcedure builtin_procedures[BuiltinProcedure_Count] = {
+gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT(""),                 0, false, Expression_Statement},
+
 	{STR_LIT("size_of"),          1, false, Expression_Expression},
 	{STR_LIT("size_of_val"),      1, false, Expression_Expression},
 	{STR_LIT("align_of"),         1, false, Expression_Expression},
@@ -143,9 +145,11 @@ gb_global BuiltinProcedure builtin_procedures[BuiltinProcedure_Count] = {
 	{STR_LIT("offset_of"),        2, false, Expression_Expression},
 	{STR_LIT("offset_of_val"),    1, false, Expression_Expression},
 	{STR_LIT("static_assert"),    1, false, Expression_Statement},
+
 	{STR_LIT("len"),              1, false, Expression_Expression},
 	{STR_LIT("cap"),              1, false, Expression_Expression},
 	{STR_LIT("copy"),             2, false, Expression_Expression},
+	{STR_LIT("append"),           2, false, Expression_Expression},
 	{STR_LIT("print"),            1, true,  Expression_Statement},
 	{STR_LIT("println"),          1, true,  Expression_Statement},
 };
@@ -172,14 +176,14 @@ struct Checker {
 	AstFile *              curr_ast_file;
 	BaseTypeSizes          sizes;
 	Scope *                global_scope;
-	gbArray(ProcedureInfo) procedures; // NOTE(bill): Procedures to check
+	gbArray(ProcedureInfo) procs; // NOTE(bill): Procedures to check
 
 	gbArena     arena;
 	gbAllocator allocator;
 
 	CheckerContext context;
 
-	gbArray(Type *) procedure_stack;
+	gbArray(Type *) proc_stack;
 	b32 in_defer; // TODO(bill): Actually handle correctly
 
 	ErrorCollector error_collector;
@@ -334,10 +338,10 @@ void init_universal_scope(void) {
 	add_global_constant(a, make_string("null"),  t_untyped_pointer, make_exact_value_pointer(NULL));
 
 // Builtin Procedures
-	for (isize i = 0; i < gb_count_of(builtin_procedures); i++) {
-		BuiltinProcedureId id = cast(BuiltinProcedureId)i;
+	for (isize i = 0; i < gb_count_of(builtin_procs); i++) {
+		BuiltinProcId id = cast(BuiltinProcId)i;
 		Token token = {Token_Identifier};
-		token.string = builtin_procedures[i].name;
+		token.string = builtin_procs[i].name;
 		Entity *entity = alloc_entity(a, Entity_Builtin, NULL, token, t_invalid);
 		entity->builtin.id = id;
 		add_global_entity(entity);
@@ -376,8 +380,8 @@ void init_checker(Checker *c, Parser *parser) {
 	c->sizes.word_size = 8;
 	c->sizes.max_align = 8;
 
-	gb_array_init(c->procedure_stack, a);
-	gb_array_init(c->procedures, a);
+	gb_array_init(c->proc_stack, a);
+	gb_array_init(c->procs, a);
 
 	// NOTE(bill): Is this big enough or too small?
 	isize item_size = gb_max(gb_max(gb_size_of(Entity), gb_size_of(Type)), gb_size_of(Scope));
@@ -397,8 +401,8 @@ void init_checker(Checker *c, Parser *parser) {
 void destroy_checker(Checker *c) {
 	destroy_checker_info(&c->info);
 	destroy_scope(c->global_scope);
-	gb_array_free(c->procedure_stack);
-	gb_array_free(c->procedures);
+	gb_array_free(c->proc_stack);
+	gb_array_free(c->procs);
 
 	gb_arena_free(&c->arena);
 }
@@ -500,7 +504,7 @@ void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *dec
 	info.decl  = decl;
 	info.type  = type;
 	info.body  = body;
-	gb_array_append(c->procedures, info);
+	gb_array_append(c->procs, info);
 }
 
 void check_add_deferred_stmt(Checker *c, AstNode *stmt) {
@@ -509,12 +513,12 @@ void check_add_deferred_stmt(Checker *c, AstNode *stmt) {
 	gb_array_append(c->context.scope->deferred_stmts, stmt);
 }
 
-void push_procedure(Checker *c, Type *procedure_type) {
-	gb_array_append(c->procedure_stack, procedure_type);
+void push_procedure(Checker *c, Type *type) {
+	gb_array_append(c->proc_stack, type);
 }
 
 void pop_procedure(Checker *c) {
-	gb_array_pop(c->procedure_stack);
+	gb_array_pop(c->proc_stack);
 }
 
 void add_curr_ast_file(Checker *c, AstFile *file) {
@@ -655,8 +659,8 @@ void check_parsed_files(Checker *c) {
 
 
 	// Check procedure bodies
-	gb_for_array(i, c->procedures) {
-		ProcedureInfo *pi = &c->procedures[i];
+	gb_for_array(i, c->procs) {
+		ProcedureInfo *pi = &c->procs[i];
 		add_curr_ast_file(c, pi->file);
 		check_proc_body(c, pi->token, pi->decl, pi->type, pi->body);
 	}

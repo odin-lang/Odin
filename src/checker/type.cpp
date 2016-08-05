@@ -62,7 +62,7 @@ struct BasicType {
 	TYPE_KIND(Named), \
 	TYPE_KIND(Alias), \
 	TYPE_KIND(Tuple), \
-	TYPE_KIND(Procedure), \
+	TYPE_KIND(Proc), \
 	TYPE_KIND(Count),
 
 enum TypeKind {
@@ -82,11 +82,11 @@ struct Type {
 	union {
 		BasicType basic;
 		struct {
-			Type *element;
+			Type *elem;
 			i64 count;
 		} array;
 		struct {
-			Type *element;
+			Type *elem;
 		} slice;
 		struct {
 			// Theses are arrays
@@ -95,7 +95,7 @@ struct Type {
 			i64 *    offsets;
 			b32      are_offsets_set;
 		} structure;
-		struct { Type *element; } pointer;
+		struct { Type *elem; } pointer;
 		struct {
 			String  name;
 			Type *  base;
@@ -116,7 +116,7 @@ struct Type {
 			Type * results; // Type_Tuple
 			isize  param_count;
 			isize  result_count;
-		} procedure;
+		} proc;
 	};
 };
 
@@ -152,16 +152,16 @@ Type *make_type_basic(gbAllocator a, BasicType basic) {
 	return t;
 }
 
-Type *make_type_array(gbAllocator a, Type *element, i64 count) {
+Type *make_type_array(gbAllocator a, Type *elem, i64 count) {
 	Type *t = alloc_type(a, Type_Array);
-	t->array.element = element;
+	t->array.elem = elem;
 	t->array.count = count;
 	return t;
 }
 
-Type *make_type_slice(gbAllocator a, Type *element) {
+Type *make_type_slice(gbAllocator a, Type *elem) {
 	Type *t = alloc_type(a, Type_Slice);
-	t->array.element = element;
+	t->array.elem = elem;
 	return t;
 }
 
@@ -170,9 +170,9 @@ Type *make_type_structure(gbAllocator a) {
 	return t;
 }
 
-Type *make_type_pointer(gbAllocator a, Type *element) {
+Type *make_type_pointer(gbAllocator a, Type *elem) {
 	Type *t = alloc_type(a, Type_Pointer);
-	t->pointer.element = element;
+	t->pointer.elem = elem;
 	return t;
 }
 
@@ -197,20 +197,20 @@ Type *make_type_tuple(gbAllocator a) {
 	return t;
 }
 
-Type *make_type_procedure(gbAllocator a, Scope *scope, Type *params, isize param_count, Type *results, isize result_count) {
-	Type *t = alloc_type(a, Type_Procedure);
-	t->procedure.scope = scope;
-	t->procedure.params = params;
-	t->procedure.param_count = param_count;
-	t->procedure.results = results;
-	t->procedure.result_count = result_count;
+Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_count, Type *results, isize result_count) {
+	Type *t = alloc_type(a, Type_Proc);
+	t->proc.scope = scope;
+	t->proc.params = params;
+	t->proc.param_count = param_count;
+	t->proc.results = results;
+	t->proc.result_count = result_count;
 	return t;
 }
 
 
 Type *type_deref(Type *t) {
 	if (t != NULL && t->kind == Type_Pointer)
-		return t->pointer.element;
+		return t->pointer.elem;
 	return t;
 }
 
@@ -338,10 +338,24 @@ b32 is_type_int_or_uint(Type *t) {
 		return (t->basic.kind == Basic_int) || (t->basic.kind == Basic_uint);
 	return false;
 }
-
 b32 is_type_rawptr(Type *t) {
 	if (t->kind == Type_Basic)
 		return t->basic.kind == Basic_rawptr;
+	return false;
+}
+b32 is_type_byte(Type *t) {
+	if (t->kind == Type_Basic)
+		return t->basic.kind == Basic_byte;
+	return false;
+}
+b32 is_type_slice(Type *t) {
+	return t->kind == Type_Slice;
+}
+
+
+b32 is_type_byte_slice(Type *t) {
+	if (t->kind == Type_Slice)
+		return is_type_byte(t->slice.elem);
 	return false;
 }
 
@@ -360,7 +374,7 @@ b32 is_type_comparable(Type *t) {
 		return true;
 	} break;
 	case Type_Array:
-		return is_type_comparable(t->array.element);
+		return is_type_comparable(t->array.elem);
 	}
 	return false;
 }
@@ -382,7 +396,7 @@ b32 are_types_identical(Type *x, Type *y) {
 
 	case Type_Array:
 		if (y->kind == Type_Array)
-			return (x->array.count == y->array.count) && are_types_identical(x->array.element, y->array.element);
+			return (x->array.count == y->array.count) && are_types_identical(x->array.elem, y->array.elem);
 		break;
 
 	case Type_Structure:
@@ -401,7 +415,7 @@ b32 are_types_identical(Type *x, Type *y) {
 
 	case Type_Pointer:
 		if (y->kind == Type_Pointer)
-			return are_types_identical(x->pointer.element, y->pointer.element);
+			return are_types_identical(x->pointer.elem, y->pointer.elem);
 		break;
 
 
@@ -426,10 +440,10 @@ b32 are_types_identical(Type *x, Type *y) {
 		}
 		break;
 
-	case Type_Procedure:
-		if (y->kind == Type_Procedure) {
-			return are_types_identical(x->procedure.params, y->procedure.params) &&
-			       are_types_identical(x->procedure.results, y->procedure.results);
+	case Type_Proc:
+		if (y->kind == Type_Proc) {
+			return are_types_identical(x->proc.params, y->proc.params) &&
+			       are_types_identical(x->proc.results, y->proc.results);
 		}
 		break;
 	}
@@ -457,7 +471,7 @@ Type *default_type(Type *type) {
 // NOTE(bill): Internal sizes of certain types
 // string: 2*word_size  (ptr+len)
 // slice:  3*word_size  (ptr+len+cap)
-// array:  count*size_of(element) aligned
+// array:  count*size_of(elem) aligned
 
 // NOTE(bill): Alignment of structures and other types are to be compatible with C
 
@@ -497,7 +511,7 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 
 	switch (t->kind) {
 	case Type_Array:
-		return type_align_of(s, allocator, t->array.element);
+		return type_align_of(s, allocator, t->array.elem);
 	case Type_Structure: {
 		i64 max = 1;
 		for (isize i = 0; i < t->structure.field_count; i++) {
@@ -555,8 +569,8 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		i64 count = t->array.count;
 		if (count == 0)
 			return 0;
-		i64 align = type_align_of(s, allocator, t->array.element);
-		i64 size  = type_size_of(s,  allocator, t->array.element);
+		i64 align = type_align_of(s, allocator, t->array.elem);
+		i64 size  = type_size_of(s,  allocator, t->array.elem);
 		i64 alignment = align_formula(size, align);
 		return alignment*(count-1) + size;
 	} break;
@@ -600,12 +614,12 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_Array:
 		str = gb_string_appendc(str, gb_bprintf("[%td]", type->array.count));
-		str = write_type_to_string(str, type->array.element);
+		str = write_type_to_string(str, type->array.elem);
 		break;
 
 	case Type_Slice:
 		str = gb_string_appendc(str, "[]");
-		str = write_type_to_string(str, type->array.element);
+		str = write_type_to_string(str, type->array.elem);
 		break;
 
 	case Type_Structure: {
@@ -624,7 +638,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_Pointer:
 		str = gb_string_appendc(str, "^");
-		str = write_type_to_string(str, type->pointer.element);
+		str = write_type_to_string(str, type->pointer.elem);
 		break;
 
 	case Type_Named:
@@ -657,14 +671,14 @@ gbString write_type_to_string(gbString str, Type *type) {
 		}
 		break;
 
-	case Type_Procedure:
+	case Type_Proc:
 		str = gb_string_appendc(str, "proc(");
-		if (type->procedure.params)
-			str = write_type_to_string(str, type->procedure.params);
+		if (type->proc.params)
+			str = write_type_to_string(str, type->proc.params);
 		str = gb_string_appendc(str, ")");
-		if (type->procedure.results) {
+		if (type->proc.results) {
 			str = gb_string_appendc(str, " -> ");
-			str = write_type_to_string(str, type->procedure.results);
+			str = write_type_to_string(str, type->proc.results);
 		}
 		break;
 	}

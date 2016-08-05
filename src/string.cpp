@@ -80,7 +80,7 @@ b32 string_contains_char(String s, u8 c) {
 	return false;
 }
 
-b32 unquote_char(String s, u8 quote, Rune *rune, b32 *multi, String *tail_string) {
+b32 unquote_char(String s, u8 quote, Rune *rune, b32 *multiple_bytes, String *tail_string) {
 	if (s.text[0] == quote &&
 	    (quote == '\'' || quote == '"')) {
 		return false;
@@ -88,6 +88,7 @@ b32 unquote_char(String s, u8 quote, Rune *rune, b32 *multi, String *tail_string
 		Rune r = -1;
 		isize size = gb_utf8_decode(s.text, s.len, &r);
 		*rune = r;
+		*multiple_bytes = true;
 		*tail_string = make_string(s.text+size, s.len-size);
 		return true;
 	} else if (s.text[0] != '\\') {
@@ -131,12 +132,12 @@ b32 unquote_char(String s, u8 quote, Rune *rune, b32 *multi, String *tail_string
 	case '5':
 	case '6':
 	case '7': {
-		i32 r = c - '0';
+		i32 r = gb_digit_to_int(c);
 		if (s.len < 2) {
 			return false;
 		}
 		for (isize i = 0; i < 2; i++) {
-			i32 d = s.text[i] - '0';
+			i32 d = gb_digit_to_int(s.text[i]);
 			if (d < 0 || d > 7) {
 				return false;
 			}
@@ -152,25 +153,25 @@ b32 unquote_char(String s, u8 quote, Rune *rune, b32 *multi, String *tail_string
 	case 'x':
 	case 'u':
 	case 'U': {
-		isize n = 0;
+		isize count = 0;
 		switch (c) {
-		case 'x': n = 2; break;
-		case 'u': n = 4; break;
-		case 'U': n = 8; break;
+		case 'x': count = 2; break;
+		case 'u': count = 4; break;
+		case 'U': count = 8; break;
 		}
 
 		Rune r = 0;
-		if (s.len < n) {
+		if (s.len < count) {
 			return false;
 		}
-		for (isize i = 0; i < n; i++) {
+		for (isize i = 0; i < count; i++) {
 			i32 d = gb_hex_digit_to_int(s.text[i]);
 			if (d < 0) {
 				return false;
 			}
 			r = (r<<4) | d;
 		}
-		s = make_string(s.text+n, s.len-n);
+		s = make_string(s.text+count, s.len-count);
 		if (c == 'x') {
 			*rune = r;
 			break;
@@ -179,7 +180,7 @@ b32 unquote_char(String s, u8 quote, Rune *rune, b32 *multi, String *tail_string
 			return false;
 		}
 		*rune = r;
-		*multi = true;
+		*multiple_bytes = true;
 	} break;
 	}
 	*tail_string = s;
@@ -229,27 +230,28 @@ i32 unquote_string(gbAllocator a, String *s_) {
 		}
 	}
 
+
 	u8 rune_temp[4] = {};
 	isize buf_len = 3*s.len / 2;
 	u8 *buf = gb_alloc_array(a, u8, buf_len);
-	isize len = 0;
+	isize offset = 0;
 	while (s.len > 0) {
 		String tail_string = {};
 		Rune r = 0;
-		b32 multi = false;
-		b32 success = unquote_char(s, quote, &r, &multi, &tail_string);
+		b32 multiple_bytes = false;
+		b32 success = unquote_char(s, quote, &r, &multiple_bytes, &tail_string);
 		if (!success) {
 			gb_free(a, buf);
 			return 0;
 		}
 		s = tail_string;
 
-		if (r < 0x80 || !multi) {
-			buf[len++] = cast(u8)r;
+		if (r < 0x80 || !multiple_bytes) {
+			buf[offset++] = cast(u8)r;
 		} else {
 			isize size = gb_utf8_encode_rune(rune_temp, r);
-			gb_memcopy(buf+len, rune_temp, size);
-			len += size;
+			gb_memcopy(buf+offset, rune_temp, size);
+			offset += size;
 		}
 
 		if (quote == '\'' && s.len != 0) {
@@ -257,6 +259,6 @@ i32 unquote_string(gbAllocator a, String *s_) {
 			return 0;
 		}
 	}
-	*s_ = make_string(buf, len);
+	*s_ = make_string(buf, offset);
 	return 2;
 }

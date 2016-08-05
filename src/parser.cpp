@@ -58,6 +58,7 @@ struct AstScope {
 };
 
 struct Parser {
+	String init_fullpath;
 	gbArray(AstFile) files;
 	gbArray(String) imports;
 	isize import_index;
@@ -2104,6 +2105,7 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 	char *fullpath_str = gb_path_get_full_name(gb_heap_allocator(), init_filename);
 	String init_fullpath = make_string(fullpath_str);
 	gb_array_append(p->imports, init_fullpath);
+	p->init_fullpath = init_fullpath;
 
 	gb_for_array(i, p->imports) {
 		String import_path = p->imports[i];

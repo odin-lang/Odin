@@ -1,6 +1,6 @@
 struct Scope;
 struct Checker;
-enum BuiltinProcedureId;
+enum BuiltinProcId;
 
 #define ENTITY_KINDS \
 	ENTITY_KIND(Invalid), \
@@ -47,7 +47,7 @@ struct Entity {
 		struct {} type_name;
 		struct {} alias_name;
 		struct {} procedure;
-		struct { BuiltinProcedureId id; } builtin;
+		struct { BuiltinProcId id; } builtin;
 	};
 };
 
@@ -105,7 +105,7 @@ Entity *make_entity_procedure(gbAllocator a, Scope *parent, Token token, Type *s
 	return entity;
 }
 
-Entity *make_entity_builtin(gbAllocator a, Scope *parent, Token token, Type *type, BuiltinProcedureId id) {
+Entity *make_entity_builtin(gbAllocator a, Scope *parent, Token token, Type *type, BuiltinProcId id) {
 	Entity *entity = alloc_entity(a, Entity_Builtin, parent, token, type);
 	entity->builtin.id = id;
 	return entity;

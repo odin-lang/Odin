@@ -105,11 +105,6 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *list, isize list_coun
 		Entity *param = make_entity_param(c->allocator, scope, token, type);
 		// NOTE(bill): No need to record
 		variables[variable_index++] = param;
-
-		if (get_base_type(type)->kind == Type_Array) {
-			// TODO(bill): Should I allow array's to returned?
-			error(&c->error_collector, token, "You cannot return an array from a procedure");
-		}
 	}
 	tuple->tuple.variables = variables;
 	tuple->tuple.variable_count = list_count;
@@ -129,11 +124,11 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 	Type *params  = check_get_params(c, c->context.scope, pt->param_list,   param_count);
 	Type *results = check_get_results(c, c->context.scope, pt->result_list, result_count);
 
-	type->procedure.scope        = c->context.scope;
-	type->procedure.params       = params;
-	type->procedure.param_count  = pt->param_count;
-	type->procedure.results      = results;
-	type->procedure.result_count = pt->result_count;
+	type->proc.scope        = c->context.scope;
+	type->proc.params       = params;
+	type->proc.param_count  = pt->param_count;
+	type->proc.results      = results;
+	type->proc.result_count = pt->result_count;
 }
 
 
@@ -292,7 +287,7 @@ Type *check_type_expr_extra(Checker *c, AstNode *e, Type *named_type) {
 	case_end;
 
 	case_ast_node(pt, ProcType, e);
-		Type *t = alloc_type(c->allocator, Type_Procedure);
+		Type *t = alloc_type(c->allocator, Type_Proc);
 		set_base_type(named_type, t);
 		check_open_scope(c, e);
 		check_procedure_type(c, t, e);
@@ -384,7 +379,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 	case_end;
 
 	case_ast_node(pt, ProcType, e);
-		type = alloc_type(c->allocator, Type_Procedure);
+		type = alloc_type(c->allocator, Type_Proc);
 		set_base_type(named_type, type);
 		check_procedure_type(c, type, e);
 		goto end;
@@ -958,7 +953,7 @@ Entity *lookup_field(Type *type, AstNode *field_node, isize *index = NULL) {
 	GB_ASSERT(field_node->kind == AstNode_Ident);
 	type = get_base_type(type);
 	if (type->kind == Type_Pointer)
-		type = get_base_type(type->pointer.element);
+		type = get_base_type(type->pointer.elem);
 
 	ast_node(i, Ident, field_node);
 	String field_str = i->token.string;
@@ -1016,7 +1011,7 @@ void check_selector(Checker *c, Operand *operand, AstNode *node) {
 b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id) {
 	GB_ASSERT(call->kind == AstNode_CallExpr);
 	ast_node(ce, CallExpr, call);
-	BuiltinProcedure *bp = &builtin_procedures[id];
+	BuiltinProc *bp = &builtin_procs[id];
 	{
 		char *err = NULL;
 		if (ce->arg_list_count < bp->arg_count)
@@ -1033,9 +1028,9 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	}
 
 	switch (id) {
-	case BuiltinProcedure_size_of:
-	case BuiltinProcedure_align_of:
-	case BuiltinProcedure_offset_of:
+	case BuiltinProc_size_of:
+	case BuiltinProc_align_of:
+	case BuiltinProc_offset_of:
 		// NOTE(bill): The first arg is a Type, this will be checked case by case
 		break;
 	default:
@@ -1043,7 +1038,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	}
 
 	switch (id) {
-	case BuiltinProcedure_size_of: {
+	case BuiltinProc_size_of: {
 		// size_of :: proc(Type)
 		Type *type = check_type(c, ce->arg_list);
 		if (!type) {
@@ -1057,7 +1052,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 	} break;
 
-	case BuiltinProcedure_size_of_val:
+	case BuiltinProc_size_of_val:
 		// size_of_val :: proc(val)
 		check_assignment(c, operand, NULL, make_string("argument of `size_of`"));
 		if (operand->mode == Addressing_Invalid)
@@ -1068,7 +1063,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->type = t_int;
 		break;
 
-	case BuiltinProcedure_align_of: {
+	case BuiltinProc_align_of: {
 		// align_of :: proc(Type)
 		Type *type = check_type(c, ce->arg_list);
 		if (!type) {
@@ -1080,7 +1075,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->type = t_int;
 	} break;
 
-	case BuiltinProcedure_align_of_val:
+	case BuiltinProc_align_of_val:
 		// align_of_val :: proc(val)
 		check_assignment(c, operand, NULL, make_string("argument of `align_of`"));
 		if (operand->mode == Addressing_Invalid)
@@ -1091,7 +1086,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->type = t_int;
 		break;
 
-	case BuiltinProcedure_offset_of: {
+	case BuiltinProc_offset_of: {
 		// offset_val :: proc(Type, field)
 		Type *type = get_base_type(check_type(c, ce->arg_list));
 		AstNode *field_arg = unparen_expr(ce->arg_list->next);
@@ -1122,7 +1117,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->type  = t_int;
 	} break;
 
-	case BuiltinProcedure_offset_of_val: {
+	case BuiltinProc_offset_of_val: {
 		// offset_val :: proc(val)
 		AstNode *arg = unparen_expr(ce->arg_list);
 		if (arg->kind != AstNode_SelectorExpr) {
@@ -1140,7 +1135,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		if (get_base_type(type)->kind == Type_Pointer) {
 			Type *p = get_base_type(type);
 			if (get_base_type(p)->kind == Type_Structure)
-				type = p->pointer.element;
+				type = p->pointer.elem;
 		}
 
 		isize index = 0;
@@ -1158,7 +1153,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->type  = t_int;
 	} break;
 
-	case BuiltinProcedure_static_assert:
+	case BuiltinProc_static_assert:
 		// static_assert :: proc(cond: bool)
 		// TODO(bill): Should `static_assert` and `assert` be unified?
 
@@ -1180,8 +1175,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		break;
 
 	// TODO(bill): Should these be procedures and are their names appropriate?
-	case BuiltinProcedure_len:
-	case BuiltinProcedure_cap: {
+	case BuiltinProc_len:
+	case BuiltinProc_cap: {
 		Type *t = get_base_type(operand->type);
 
 		AddressingMode mode = Addressing_Invalid;
@@ -1189,7 +1184,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		switch (t->kind) {
 		case Type_Basic:
-			if (id == BuiltinProcedure_len) {
+			if (id == BuiltinProc_len) {
 				if (is_type_string(t)) {
 					if (operand->mode == Addressing_Constant) {
 						mode = Addressing_Constant;
@@ -1226,14 +1221,13 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 	} break;
 
-	// TODO(bill): copy() pointer version?
-	case BuiltinProcedure_copy: {
+	case BuiltinProc_copy: {
 		// copy :: proc(x, y: []Type) -> int
 		Type *dest_type = NULL, *src_type = NULL;
 
 		Type *d = get_base_type(operand->type);
 		if (d->kind == Type_Slice)
-			dest_type = d->slice.element;
+			dest_type = d->slice.elem;
 
 		Operand op = {};
 		check_expr(c, &op, ce->arg_list->next);
@@ -1241,7 +1235,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			return false;
 		Type *s = get_base_type(op.type);
 		if (s->kind == Type_Slice)
-			src_type = s->slice.element;
+			src_type = s->slice.elem;
 
 		if (dest_type == NULL || src_type == NULL) {
 			error(&c->error_collector, ast_node_token(call), "`copy` only expects slices as arguments");
@@ -1258,20 +1252,56 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			defer (gb_string_free(d_str));
 			defer (gb_string_free(s_str));
 			error(&c->error_collector, ast_node_token(call),
-			      "Arguments to `copy`, %s, %s, have different element types: %s vs %s",
+			      "Arguments to `copy`, %s, %s, have different elem types: %s vs %s",
 			      d_arg, s_arg, d_str, s_str);
 			return false;
 		}
 
-		operand->type = t_int; // Returns number of elements copied
+		operand->type = t_int; // Returns number of elems copied
 		operand->mode = Addressing_Value;
 	} break;
 
-	case BuiltinProcedure_print:
-	case BuiltinProcedure_println: {
+	case BuiltinProc_append: {
+		// append :: proc(x : ^[]Type, y : Type) -> bool
+		Type *x_type = NULL, *y_type = NULL;
+		x_type = get_base_type(operand->type);
+
+		Operand op = {};
+		check_expr(c, &op, ce->arg_list->next);
+		if (op.mode == Addressing_Invalid)
+			return false;
+		y_type = get_base_type(op.type);
+
+		if (!(is_type_pointer(x_type) && is_type_slice(x_type->pointer.elem))) {
+			error(&c->error_collector, ast_node_token(call), "First argument to `append` must be a pointer to a slice");
+			return false;
+		}
+
+		Type *elem_type = x_type->pointer.elem->slice.elem;
+		if (!check_is_assignable_to(c, &op, elem_type)) {
+			gbString d_arg = expr_to_string(ce->arg_list);
+			gbString s_arg = expr_to_string(ce->arg_list->next);
+			gbString d_str = type_to_string(elem_type);
+			gbString s_str = type_to_string(y_type);
+			defer (gb_string_free(d_arg));
+			defer (gb_string_free(s_arg));
+			defer (gb_string_free(d_str));
+			defer (gb_string_free(s_str));
+			error(&c->error_collector, ast_node_token(call),
+			      "Arguments to `append`, %s, %s, have different element types: %s vs %s",
+			      d_arg, s_arg, d_str, s_str);
+			return false;
+		}
+
+		operand->type = t_bool; // Returns if it was successful
+		operand->mode = Addressing_Value;
+	} break;
+
+	case BuiltinProc_print:
+	case BuiltinProc_println: {
 		for (AstNode *arg = ce->arg_list; arg != NULL; arg = arg->next) {
 			// TOOD(bill): `check_assignment` doesn't allow tuples at the moment, should it?
-			// Or should we destruct the tuple and use each element?
+			// Or should we destruct the tuple and use each elem?
 			check_assignment(c, operand, NULL, make_string("argument"));
 			if (operand->mode == Addressing_Invalid)
 				return false;
@@ -1285,14 +1315,14 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
 	GB_ASSERT(call->kind == AstNode_CallExpr);
-	GB_ASSERT(proc_type->kind == Type_Procedure);
+	GB_ASSERT(proc_type->kind == Type_Proc);
 	ast_node(ce, CallExpr, call);
 	isize error_code = 0;
 	isize param_index = 0;
 	isize param_count = 0;
 
-	if (proc_type->procedure.params)
-		param_count = proc_type->procedure.params->tuple.variable_count;
+	if (proc_type->proc.params)
+		param_count = proc_type->proc.params->tuple.variable_count;
 
  	if (ce->arg_list_count == 0 && param_count == 0)
 		return;
@@ -1300,7 +1330,7 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	if (ce->arg_list_count > param_count) {
 		error_code = +1;
 	} else {
-		Entity **sig_params = proc_type->procedure.params->tuple.variables;
+		Entity **sig_params = proc_type->proc.params->tuple.variables;
 		AstNode *call_arg = ce->arg_list;
 		for (; call_arg != NULL; call_arg = call_arg->next) {
 			check_multi_expr(c, operand, call_arg);
@@ -1376,11 +1406,11 @@ ExpressionKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		if (!check_builtin_procedure(c, operand, call, id))
 			operand->mode = Addressing_Invalid;
 		operand->expr = call;
-		return builtin_procedures[id].kind;
+		return builtin_procs[id].kind;
 	}
 
 	Type *proc_type = get_base_type(operand->type);
-	if (proc_type == NULL || proc_type->kind != Type_Procedure) {
+	if (proc_type == NULL || proc_type->kind != Type_Proc) {
 		AstNode *e = operand->expr;
 		gbString str = expr_to_string(e);
 		defer (gb_string_free(str));
@@ -1395,7 +1425,7 @@ ExpressionKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 
 	check_call_arguments(c, operand, proc_type, call);
 
-	auto *proc = &proc_type->procedure;
+	auto *proc = &proc_type->proc;
 	if (proc->result_count == 0) {
 		operand->mode = Addressing_NoValue;
 	} else if (proc->result_count == 1) {
@@ -1446,6 +1476,14 @@ b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
 	if (is_type_pointer(xb)) {
 		if (is_type_pointer(yb) || is_type_int_or_uint(yb))
 			return true;
+	}
+
+	// []byte/[]u8 <-> string
+	if (is_type_byte_slice(xb) && is_type_string(yb)) {
+		return true;
+	}
+	if (is_type_string(xb) && is_type_byte_slice(yb)) {
+		return true;
 	}
 
 	return false;
@@ -1590,13 +1628,13 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 		case Type_Slice:
 		case Type_Array:
 		{
-			Type *element_type = NULL;
+			Type *elem_type = NULL;
 			String context_name = {};
 			if (t->kind == Type_Slice) {
-				element_type = t->slice.element;
+				elem_type = t->slice.elem;
 				context_name = make_string("slice literal");
 			} else {
-				element_type = t->array.element;
+				elem_type = t->array.elem;
 				context_name = make_string("array literal");
 			}
 
@@ -1612,8 +1650,8 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 				}
 
 				Operand o = {};
-				check_expr_with_type_hint(c, &o, e, element_type);
-				check_assignment(c, &o, element_type, context_name);
+				check_expr_with_type_hint(c, &o, e, elem_type);
+				check_assignment(c, &o, elem_type, context_name);
 			}
 			if (max < index)
 				max = index;
@@ -1693,19 +1731,19 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 			max_count = t->array.count;
 			if (o->mode != Addressing_Variable)
 				o->mode = Addressing_Value;
-			o->type = t->array.element;
+			o->type = t->array.elem;
 			break;
 
 		case Type_Slice:
 			valid = true;
-			o->type = t->slice.element;
+			o->type = t->slice.elem;
 			o->mode = Addressing_Variable;
 			break;
 
 		case Type_Pointer:
 			valid = true;
 			o->mode = Addressing_Variable;
-			o->type = get_base_type(t->pointer.element);
+			o->type = get_base_type(t->pointer.elem);
 			break;
 		}
 
@@ -1757,7 +1795,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 				gb_string_free(str);
 				goto error;
 			}
-			o->type = make_type_slice(c->allocator, t->array.element);
+			o->type = make_type_slice(c->allocator, t->array.elem);
 			o->mode = Addressing_Value;
 			break;
 
@@ -1768,7 +1806,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 
 		case Type_Pointer:
 			valid = true;
-			o->type = make_type_slice(c->allocator, get_base_type(t->pointer.element));
+			o->type = make_type_slice(c->allocator, get_base_type(t->pointer.elem));
 			o->mode = Addressing_Value;
 			break;
 		}
@@ -1832,7 +1870,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 			Type *t = get_base_type(o->type);
 			if (t->kind == Type_Pointer) {
 				o->mode = Addressing_Variable;
-				o->type = t->pointer.element;
+				o->type = t->pointer.elem;
  			} else {
  				gbString str = expr_to_string(o->expr);
  				error(&c->error_collector, ast_node_token(o->expr), "Cannot dereference `%s`", str);
@@ -1911,7 +1949,6 @@ void check_multi_expr(Checker *c, Operand *o, AstNode *e) {
 	o->mode = Addressing_Invalid;
 }
 
-// TODO(bill): Should I remove this entirely?
 void check_not_tuple(Checker *c, Operand *o) {
 	if (o->mode == Addressing_Value) {
 		// NOTE(bill): Tuples are not first class thus never named

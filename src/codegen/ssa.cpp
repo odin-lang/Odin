@@ -129,7 +129,7 @@ struct ssaInstr {
 		struct {
 			ssaValue *address;
 			Type *    result_type;
-			Type *    element_type;
+			Type *    elem_type;
 			ssaValue *indices[2];
 			isize     index_count;
 			b32       inbounds;
@@ -436,7 +436,7 @@ ssaValue *ssa_make_instr_get_element_ptr(ssaProcedure *p, ssaValue *address,
 	i->get_element_ptr.indices[0]   = index0;
 	i->get_element_ptr.indices[1]   = index1;
 	i->get_element_ptr.index_count  = index_count;
-	i->get_element_ptr.element_type = ssa_value_type(address);
+	i->get_element_ptr.elem_type = ssa_value_type(address);
 	i->get_element_ptr.inbounds     = inbounds;
 	if (p->curr_block) {
 		gb_array_append(p->curr_block->values, v);
@@ -627,7 +627,8 @@ ssaValue *ssa_lvalue_address(ssaLvalue lval, ssaProcedure *p) {
 Type *ssa_lvalue_type(ssaLvalue lval) {
 	switch (lval.kind) {
 	case ssaLvalue_Address:
-		return type_deref(ssa_value_type(lval.address.value));
+		// return type_deref(ssa_value_type(lval.address.value));
+		return ssa_value_type(lval.address.value);
 	}
 	return NULL;
 }
@@ -701,8 +702,8 @@ void ssa_begin_procedure_body(ssaProcedure *proc) {
 	gb_array_init(proc->blocks, gb_heap_allocator());
 	proc->curr_block = ssa_add_block(proc, proc->type_expr, make_string("entry"));
 
-	if (proc->type->procedure.params != NULL) {
-		auto *params = &proc->type->procedure.params->tuple;
+	if (proc->type->proc.params != NULL) {
+		auto *params = &proc->type->proc.params->tuple;
 		for (isize i = 0; i < params->variable_count; i++) {
 			Entity *e = params->variables[i];
 			ssa_add_param(proc, e);
@@ -711,7 +712,7 @@ void ssa_begin_procedure_body(ssaProcedure *proc) {
 }
 
 void ssa_end_procedure_body(ssaProcedure *proc) {
-	if (proc->type->procedure.result_count == 0) {
+	if (proc->type->proc.result_count == 0) {
 		ssa_emit_ret(proc, NULL);
 	}
 
@@ -758,83 +759,6 @@ void ssa_pop_target_list(ssaProcedure *proc) {
 
 
 
-
-ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
-	Type *src_type = ssa_value_type(value);
-	if (are_types_identical(t, src_type))
-		return value;
-
-	Type *src = get_base_type(src_type);
-	Type *dst = get_base_type(t);
-
-	if (value->kind == ssaValue_Constant) {
-		if (dst->kind == Type_Basic)
-			return ssa_make_value_constant(proc->module->allocator, t, value->constant.value);
-	}
-
-	// integer -> integer
-	if (is_type_integer(src) && is_type_integer(dst)) {
-		i64 sz = basic_type_sizes[src->basic.kind];
-		i64 dz = basic_type_sizes[dst->basic.kind];
-		ssaConvKind kind = ssaConv_trunc;
-		if (dz >= sz) {
-			kind = ssaConv_zext;
-		}
-		return ssa_emit(proc, ssa_make_instr_conv(proc, kind, value, src, dst));
-	}
-
-	// float -> float
-	if (is_type_float(src) && is_type_float(dst)) {
-		i64 sz = basic_type_sizes[src->basic.kind];
-		i64 dz = basic_type_sizes[dst->basic.kind];
-		ssaConvKind kind = ssaConv_fptrunc;
-		if (dz >= sz) {
-			kind = ssaConv_fpext;
-		}
-		return ssa_emit(proc, ssa_make_instr_conv(proc, kind, value, src, dst));
-	}
-
-	// float -> integer
-	if (is_type_float(src) && is_type_integer(dst)) {
-		ssaConvKind kind = ssaConv_fptosi;
-		if (is_type_unsigned(dst)) {
-			kind = ssaConv_fptoui;
-		}
-		return ssa_emit(proc, ssa_make_instr_conv(proc, kind, value, src, dst));
-	}
-
-	// integer -> float
-	if (is_type_integer(src) && is_type_float(dst)) {
-		ssaConvKind kind = ssaConv_sitofp;
-		if (is_type_unsigned(dst)) {
-			kind = ssaConv_uitofp;
-		}
-		return ssa_emit(proc, ssa_make_instr_conv(proc, kind, value, src, dst));
-	}
-
-	// Pointer to int
-	if (is_type_pointer(src) && is_type_integer(dst)) {
-		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_ptrtoint, value, src, dst));
-	}
-
-	// int to Pointer
-	if (is_type_integer(src) && is_type_pointer(dst)) {
-		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_inttoptr, value, src, dst));
-	}
-
-	// Pointer to Pointer
-	if (is_type_pointer(src) && is_type_pointer(dst)) {
-		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, value, src, dst));
-	}
-
-
-	GB_PANIC("TODO(bill): ssa_emit_conv");
-	GB_PANIC("TODO(bill): string -> []byte");
-	GB_PANIC("TODO(bill): []byte -> string");
-
-	return NULL;
-}
-
 ssaValue *ssa_emit_arith(ssaProcedure *proc, Token op, ssaValue *left, ssaValue *right, Type *type) {
 	switch (op.kind) {
 	case Token_AndNot: {
@@ -860,6 +784,7 @@ ssaValue *ssa_emit_arith(ssaProcedure *proc, Token op, ssaValue *left, ssaValue 
 	}
 
 	ssaValue *v = ssa_make_instr_binary_op(proc, op, left, right);
+	ssa_value_set_type(v, type);
 	return ssa_emit(proc, v);
 }
 
@@ -885,7 +810,7 @@ ssaValue *ssa_emit_ptr_offset(ssaProcedure *proc, ssaValue *ptr, ssaValue *offse
 	ssaValue *gep = NULL;
 	offset = ssa_emit_conv(proc, offset, t_int);
 	gep = ssa_make_instr_get_element_ptr(proc, ptr, offset, NULL, 1, false);
-	gep->instr.get_element_ptr.element_type = type_deref(type);
+	gep->instr.get_element_ptr.elem_type = type_deref(type);
 	gep->instr.get_element_ptr.result_type  = type;
 	return ssa_emit(proc, gep);
 }
@@ -895,7 +820,7 @@ ssaValue *ssa_emit_struct_gep(ssaProcedure *proc, ssaValue *s, ssaValue *index, 
 	// NOTE(bill): For some weird legacy reason in LLVM, structure elements must be accessed as an i32
 	index = ssa_emit_conv(proc, index, t_i32);
 	gep = ssa_make_instr_get_element_ptr(proc, s, v_zero, index, 2, true);
-	gep->instr.get_element_ptr.element_type = ssa_value_type(s);
+	gep->instr.get_element_ptr.elem_type = ssa_value_type(s);
 	gep->instr.get_element_ptr.result_type = result_type;
 
 	return ssa_emit(proc, gep);
@@ -905,10 +830,10 @@ ssaValue *ssa_emit_struct_gep(ssaProcedure *proc, ssaValue *s, ssaValue *index, 
 ssaValue *ssa_array_elem(ssaProcedure *proc, ssaValue *array) {
 	Type *t = ssa_value_type(array);
 	GB_ASSERT(t->kind == Type_Array);
-	Type *base_type = t->array.element;
+	Type *base_type = t->array.elem;
 	ssaValue *elem = ssa_make_instr_get_element_ptr(proc, array, v_zero, v_zero, 2, true);
 	Type *result_type = make_type_pointer(proc->module->allocator, base_type);
-	elem->instr.get_element_ptr.element_type = t;
+	elem->instr.get_element_ptr.elem_type = t;
 	elem->instr.get_element_ptr.result_type = result_type;
 	return ssa_emit(proc, elem);
 }
@@ -925,7 +850,7 @@ ssaValue *ssa_slice_elem(ssaProcedure *proc, ssaValue *slice) {
 	Type *t = ssa_value_type(slice);
 	GB_ASSERT(t->kind == Type_Slice);
 
-	Type *result_type = make_type_pointer(proc->module->allocator, t->slice.element);
+	Type *result_type = make_type_pointer(proc->module->allocator, t->slice.elem);
 	return ssa_emit_load(proc, ssa_emit_struct_gep(proc, slice, v_zero32, result_type));
 }
 ssaValue *ssa_slice_len(ssaProcedure *proc, ssaValue *slice) {
@@ -945,7 +870,7 @@ ssaValue *ssa_string_elem(ssaProcedure *proc, ssaValue *string) {
 	Type *base_type = t_u8;
 	ssaValue *elem = ssa_make_instr_get_element_ptr(proc, string, v_zero, v_zero32, 2, true);
 	Type *result_type = make_type_pointer(proc->module->allocator, base_type);
-	elem->instr.get_element_ptr.element_type = t;
+	elem->instr.get_element_ptr.elem_type = t;
 	elem->instr.get_element_ptr.result_type = result_type;
 	ssa_emit(proc, elem);
 
@@ -955,9 +880,6 @@ ssaValue *ssa_string_len(ssaProcedure *proc, ssaValue *string) {
 	Type *t = ssa_value_type(string);
 	GB_ASSERT(t->kind == Type_Basic && t->basic.kind == Basic_string);
 	return ssa_emit_load(proc, ssa_emit_struct_gep(proc, string, v_one32, t_int));
-}
-ssaValue *ssa_string_cap(ssaProcedure *proc, ssaValue *string) {
-	return ssa_string_len(proc, string);
 }
 
 
@@ -1070,7 +992,8 @@ ssaValue *ssa_add_global_string_array(ssaProcedure *proc, ExactValue value) {
 ssaValue *ssa_emit_string(ssaProcedure *proc, ssaValue *elem, ssaValue *len) {
 	Type *t_u8_ptr = ssa_value_type(elem);
 	GB_ASSERT(t_u8_ptr->kind == Type_Pointer);
-	GB_ASSERT(t_u8_ptr->pointer.element == t_u8);
+
+	GB_ASSERT(is_type_byte(t_u8_ptr->pointer.elem));
 
 	ssaValue *str = ssa_add_local_generated(proc, t_string);
 	ssaValue *str_elem = ssa_emit_struct_gep(proc, str, v_zero32, t_u8_ptr);
@@ -1079,6 +1002,102 @@ ssaValue *ssa_emit_string(ssaProcedure *proc, ssaValue *elem, ssaValue *len) {
 	ssa_emit_store(proc, str_len, len);
 	return ssa_emit_load(proc, str);
 }
+
+
+
+
+ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
+	Type *src_type = ssa_value_type(value);
+	if (are_types_identical(t, src_type))
+		return value;
+
+	Type *src = get_base_type(src_type);
+	Type *dst = get_base_type(t);
+
+	if (value->kind == ssaValue_Constant) {
+		if (dst->kind == Type_Basic)
+			return ssa_make_value_constant(proc->module->allocator, t, value->constant.value);
+	}
+
+	// integer -> integer
+	if (is_type_integer(src) && is_type_integer(dst)) {
+		i64 sz = basic_type_sizes[src->basic.kind];
+		i64 dz = basic_type_sizes[dst->basic.kind];
+		ssaConvKind kind = ssaConv_trunc;
+		if (dz >= sz) {
+			kind = ssaConv_zext;
+		}
+		return ssa_emit(proc, ssa_make_instr_conv(proc, kind, value, src, dst));
+	}
+
+	// float -> float
+	if (is_type_float(src) && is_type_float(dst)) {
+		i64 sz = basic_type_sizes[src->basic.kind];
+		i64 dz = basic_type_sizes[dst->basic.kind];
+		ssaConvKind kind = ssaConv_fptrunc;
+		if (dz >= sz) {
+			kind = ssaConv_fpext;
+		}
+		return ssa_emit(proc, ssa_make_instr_conv(proc, kind, value, src, dst));
+	}
+
+	// float <-> integer
+	if (is_type_float(src) && is_type_integer(dst)) {
+		ssaConvKind kind = ssaConv_fptosi;
+		if (is_type_unsigned(dst)) {
+			kind = ssaConv_fptoui;
+		}
+		return ssa_emit(proc, ssa_make_instr_conv(proc, kind, value, src, dst));
+	}
+	if (is_type_integer(src) && is_type_float(dst)) {
+		ssaConvKind kind = ssaConv_sitofp;
+		if (is_type_unsigned(dst)) {
+			kind = ssaConv_uitofp;
+		}
+		return ssa_emit(proc, ssa_make_instr_conv(proc, kind, value, src, dst));
+	}
+
+	// Pointer <-> int
+	if (is_type_pointer(src) && is_type_int_or_uint(dst)) {
+		ssaValue *p = ssa_emit_load(proc, value);
+		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_ptrtoint, p, src, dst));
+	}
+	if (is_type_int_or_uint(src) && is_type_pointer(dst)) {
+		ssaValue *i = ssa_emit_load(proc, value);
+		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_inttoptr, i, src, dst));
+	}
+
+	// Pointer <-> Pointer
+	if (is_type_pointer(src) && is_type_pointer(dst)) {
+		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, value, src, dst));
+	}
+
+
+	// []byte/[]u8 <-> string
+	if (is_type_byte_slice(src) && is_type_string(dst)) {
+		ssaValue *slice = ssa_add_local_generated(proc, src);
+		ssa_emit_store(proc, slice, value);
+		ssaValue *elem = ssa_slice_elem(proc, slice);
+		ssaValue *len  = ssa_slice_len(proc, slice);
+		return ssa_emit_string(proc, elem, len);
+	}
+	if (is_type_string(src) && is_type_byte_slice(dst)) {
+		ssaValue *str = ssa_add_local_generated(proc, src);
+		ssa_emit_store(proc, str, value);
+		ssaValue *elem = ssa_string_elem(proc, str);
+		ssaValue *len  = ssa_string_len(proc, str);
+		ssaValue *v = ssa_emit_slice(proc, dst, elem, v_zero, len, len);
+		return v;
+	}
+
+
+	GB_PANIC("Invalid type conversion: `%s` to `%s`", type_to_string(src_type), type_to_string(t));
+
+	return NULL;
+}
+
+
+
 
 
 ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv) {
@@ -1117,8 +1136,10 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
-		case Token_Pointer:
-			return ssa_lvalue_address(ssa_build_addr(proc, ue->expr), proc);
+		case Token_Pointer: {
+			ssaLvalue lval = ssa_build_addr(proc, ue->expr);
+			return ssa_lvalue_address(lval, proc);
+		}
 		case Token_Add:
 			return ssa_build_expr(proc, ue->expr);
 		case Token_Sub: {
@@ -1181,8 +1202,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 	case_end;
 
 	case_ast_node(ce, CastExpr, expr);
-		ssaValue *v = ssa_build_expr(proc, ce->expr);
-		return ssa_emit_conv(proc, v, tv->type);
+		return ssa_emit_conv(proc, ssa_build_expr(proc, ce->expr), tv->type);
 	case_end;
 
 	case_ast_node(ce, CallExpr, expr);
@@ -1192,7 +1212,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			if (found && (*found)->kind == Entity_Builtin) {
 				Entity *e = *found;
 				switch (e->builtin.id) {
-				case BuiltinProcedure_len: {
+				case BuiltinProc_len: {
+					// NOTE(bill): len of an array is a constant expression
 					ssaValue *v = ssa_lvalue_address(ssa_build_addr(proc, ce->arg_list), proc);
 					Type *t = get_base_type(ssa_value_type(v));
 					if (t == t_string)
@@ -1200,22 +1221,27 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					else if (t->kind == Type_Slice)
 						return ssa_slice_len(proc, v);
 				} break;
-				case BuiltinProcedure_cap: {
+				case BuiltinProc_cap: {
+					// NOTE(bill): cap of an array is a constant expression
 					ssaValue *v = ssa_lvalue_address(ssa_build_addr(proc, ce->arg_list), proc);
 					Type *t = get_base_type(ssa_value_type(v));
-					if (t == t_string)
-						return ssa_string_cap(proc, v);
-					else if (t->kind == Type_Slice)
-						return ssa_slice_cap(proc, v);
+					return ssa_slice_cap(proc, v);
 				} break;
-				case BuiltinProcedure_copy: {
-					GB_PANIC("TODO(bill): BuiltinProcedure_copy");
+				case BuiltinProc_copy: {
+					GB_PANIC("TODO(bill): BuiltinProc_copy");
+					// TODO(bill): Should this be llvm.memmove internally?
+					// http://llvm.org/docs/LangRef.html#llvm-memmove-intrinsic
+					// declare void @llvm.memmove.p0i8.p0i8.i32(i8* <dest>, i8* <src>, i32 <len>, i32 <align>, i1 <isvolatile>)
+					// declare void @llvm.memmove.p0i8.p0i8.i64(i8* <dest>, i8* <src>, i64 <len>, i32 <align>, i1 <isvolatile>)
 				} break;
-				case BuiltinProcedure_print: {
-					GB_PANIC("TODO(bill): BuiltinProcedure_print");
+				case BuiltinProc_append: {
+					GB_PANIC("TODO(bill): BuiltinProc_append");
 				} break;
-				case BuiltinProcedure_println: {
-					GB_PANIC("TODO(bill): BuiltinProcedure_println");
+				case BuiltinProc_print: {
+					GB_PANIC("TODO(bill): BuiltinProc_print");
+				} break;
+				case BuiltinProc_println: {
+					GB_PANIC("TODO(bill): BuiltinProc_println");
 				} break;
 				}
 			}
@@ -1225,8 +1251,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		// NOTE(bill): Regular call
 		ssaValue *value = ssa_build_expr(proc, ce->proc);
 		Type *proc_type_ = ssa_value_type(value);
-		GB_ASSERT(proc_type_->kind == Type_Procedure);
-		auto *type = &proc_type_->procedure;
+		GB_ASSERT(proc_type_->kind == Type_Proc);
+		auto *type = &proc_type_->proc;
 
 		isize arg_index = 0;
 		isize arg_count = type->param_count;
@@ -1242,10 +1268,12 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			}
 		}
 
+#if 0
 		for (isize i = 0; i < arg_count; i++) {
 			Entity *e = type->params->tuple.variables[i];
 			args[i] = ssa_emit_conv(proc, args[i], e->type);
 		}
+#endif
 
 		ssaValue *call = ssa_make_instr_call(proc, value, args, arg_count, tv->type);
 		return ssa_emit(proc, call);
@@ -1391,7 +1419,7 @@ ssaLvalue ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		ssaValue *gep = ssa_make_instr_get_element_ptr(proc, e, NULL, NULL, 0, false);
 		Type *t = type_deref(get_base_type(ssa_value_type(e)));
 		gep->instr.get_element_ptr.result_type  = t;
-		gep->instr.get_element_ptr.element_type = t;
+		gep->instr.get_element_ptr.elem_type = t;
 		ssaValue *v = ssa_emit(proc, gep);
 		return ssa_make_lvalue_address(v, expr);
 	case_end;
@@ -1484,7 +1512,8 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 
 				gb_for_array(i, inits) {
-					ssa_lvalue_store(lvals[i], proc, inits[i]);
+					ssaValue *v = ssa_emit_conv(proc, inits[i], ssa_lvalue_type(lvals[i]));
+					ssa_lvalue_store(lvals[i], proc, v);
 				}
 
 			} else if (vd->value_count == 0) { // declared and zero-initialized
@@ -1583,8 +1612,8 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 	case_ast_node(rs, ReturnStmt, node);
 		ssaValue *v = NULL;
-		auto *return_type_tuple  = &proc->type->procedure.results->tuple;
-		isize return_count = proc->type->procedure.result_count;
+		auto *return_type_tuple  = &proc->type->proc.results->tuple;
+		isize return_count = proc->type->proc.result_count;
 		if (rs->result_count == 1 && return_count > 1) {
 			GB_PANIC("ReturnStmt tuple return statement");
 		} else if (return_count == 1) {
@@ -1595,7 +1624,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			// No return values
 		} else {
 			// 1:1 multiple return values
-			Type *ret_type = proc->type->procedure.results;
+			Type *ret_type = proc->type->proc.results;
 			v = ssa_add_local_generated(proc, ret_type);
 			isize i = 0;
 			AstNode *r = rs->result_list;

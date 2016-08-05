@@ -108,13 +108,13 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
 	    return true;
 
 	if (sb->kind == Type_Array && tb->kind == Type_Array) {
-		if (are_types_identical(sb->array.element, tb->array.element)) {
+		if (are_types_identical(sb->array.elem, tb->array.elem)) {
 			return sb->array.count == tb->array.count;
 		}
 	}
 
 	if (sb->kind == Type_Slice && tb->kind == Type_Slice) {
-		if (are_types_identical(sb->slice.element, tb->slice.element)) {
+		if (are_types_identical(sb->slice.elem, tb->slice.elem)) {
 			return true;
 		}
 	}
@@ -391,7 +391,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	push_procedure(c, type);
 	ast_node(bs, BlockStmt, body);
 	check_stmt_list(c, bs->list, 0);
-	if (type->procedure.result_count > 0) {
+	if (type->proc.result_count > 0) {
 		if (!check_is_terminating(c, body)) {
 			error(&c->error_collector, bs->close, "Missing return statement at the end of the procedure");
 		}
@@ -404,7 +404,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 	GB_ASSERT(e->type == NULL);
 
-	Type *proc_type = make_type_procedure(c->allocator, e->parent, NULL, 0, NULL, 0);
+	Type *proc_type = make_type_proc(c->allocator, e->parent, NULL, 0, NULL, 0);
 	e->type = proc_type;
 	ast_node(pd, ProcDecl, d->proc_decl);
 
@@ -701,7 +701,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);
-		GB_ASSERT(gb_array_count(c->procedure_stack) > 0);
+		GB_ASSERT(gb_array_count(c->proc_stack) > 0);
 
 		if (c->in_defer) {
 			error(&c->error_collector, rs->token, "You cannot `return` within a defer statement");
@@ -709,17 +709,17 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			break;
 		}
 
-		Type *proc_type = c->procedure_stack[gb_array_count(c->procedure_stack)-1];
+		Type *proc_type = c->proc_stack[gb_array_count(c->proc_stack)-1];
 		isize result_count = 0;
-		if (proc_type->procedure.results)
-			result_count = proc_type->procedure.results->tuple.variable_count;
+		if (proc_type->proc.results)
+			result_count = proc_type->proc.results->tuple.variable_count;
 		if (result_count != rs->result_count) {
 			error(&c->error_collector, rs->token, "Expected %td return %s, got %td",
 			      result_count,
 			      (result_count != 1 ? "values" : "value"),
 			      rs->result_count);
 		} else if (result_count > 0) {
-			auto *tuple = &proc_type->procedure.results->tuple;
+			auto *tuple = &proc_type->proc.results->tuple;
 			check_init_variables(c, tuple->variables, tuple->variable_count,
 			                     rs->result_list, rs->result_count, make_string("return statement"));
 		}
