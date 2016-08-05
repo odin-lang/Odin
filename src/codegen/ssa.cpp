@@ -7,6 +7,7 @@ struct ssaValue;
 struct ssaModule {
 	CheckerInfo *info;
 	BaseTypeSizes sizes;
+	gbArena     arena;
 	gbAllocator allocator;
 
 	String layout;
@@ -244,7 +245,10 @@ ssaLvalue ssa_make_lvalue_address(ssaValue *value, AstNode *expr) {
 
 
 void ssa_module_init(ssaModule *m, Checker *c) {
-	m->allocator = gb_heap_allocator();
+	isize token_count = c->parser->total_token_count;
+	isize arena_size = 3 * token_count * gb_size_of(ssaValue);
+	gb_arena_init_from_allocator(&m->arena, gb_heap_allocator(), arena_size);
+	m->allocator = gb_arena_allocator(&m->arena);
 	m->info = &c->info;
 	m->sizes = c->sizes;
 
@@ -255,6 +259,7 @@ void ssa_module_init(ssaModule *m, Checker *c) {
 void ssa_module_destroy(ssaModule *m) {
 	map_destroy(&m->values);
 	map_destroy(&m->members);
+	gb_arena_free(&m->arena);
 }
 
 void ssa_module_add_value(ssaModule *m, Entity *e, ssaValue *v) {
@@ -279,6 +284,8 @@ Type *ssa_instr_type(ssaInstr *instr) {
 		return instr->binary_op.type;
 	case ssaInstr_Conv:
 		return instr->conv.to;
+	case ssaInstr_Call:
+		return instr->call.type;
 	}
 	return NULL;
 }
@@ -302,6 +309,9 @@ void ssa_instr_set_type(ssaInstr *instr, Type *type) {
 		break;
 	case ssaInstr_Conv:
 		instr->conv.to = type;
+		break;
+	case ssaInstr_Call:
+		instr->call.type = type;
 		break;
 	}
 }
@@ -351,8 +361,6 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr);
 ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv);
 ssaLvalue ssa_build_addr(ssaProcedure *proc, AstNode *expr);
 ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *a_type);
-
-
 
 
 
@@ -733,7 +741,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 			case ssaInstr_Unreachable:
 				continue;
 			case ssaInstr_Call:
-				if (instr->call.type == NULL) {
+				if (instr->call.type->proc.results == NULL) {
 					continue;
 				}
 				break;
@@ -993,7 +1001,7 @@ ssaValue *ssa_emit_string(ssaProcedure *proc, ssaValue *elem, ssaValue *len) {
 	Type *t_u8_ptr = ssa_value_type(elem);
 	GB_ASSERT(t_u8_ptr->kind == Type_Pointer);
 
-	GB_ASSERT(is_type_byte(t_u8_ptr->pointer.elem));
+	GB_ASSERT(is_type_u8(t_u8_ptr->pointer.elem));
 
 	ssaValue *str = ssa_add_local_generated(proc, t_string);
 	ssaValue *str_elem = ssa_emit_struct_gep(proc, str, v_zero32, t_u8_ptr);
@@ -1074,14 +1082,14 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 
 
 	// []byte/[]u8 <-> string
-	if (is_type_byte_slice(src) && is_type_string(dst)) {
+	if (is_type_u8_slice(src) && is_type_string(dst)) {
 		ssaValue *slice = ssa_add_local_generated(proc, src);
 		ssa_emit_store(proc, slice, value);
 		ssaValue *elem = ssa_slice_elem(proc, slice);
 		ssaValue *len  = ssa_slice_len(proc, slice);
 		return ssa_emit_string(proc, elem, len);
 	}
-	if (is_type_string(src) && is_type_byte_slice(dst)) {
+	if (is_type_string(src) && is_type_u8_slice(dst)) {
 		ssaValue *str = ssa_add_local_generated(proc, src);
 		ssa_emit_store(proc, str, value);
 		ssaValue *elem = ssa_string_elem(proc, str);
@@ -1276,6 +1284,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 #endif
 
 		ssaValue *call = ssa_make_instr_call(proc, value, args, arg_count, tv->type);
+		ssa_value_set_type(call, proc_type_);
 		return ssa_emit(proc, call);
 	case_end;
 
@@ -1318,26 +1327,25 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 	expr = unparen_expr(expr);
 
 	TypeAndValue *tv = map_get(&proc->module->info->types, hash_pointer(expr));
-	if (tv) {
-		if (tv->value.kind != ExactValue_Invalid) {
-			if (tv->value.kind == ExactValue_String) {
-				ssaValue *array = ssa_add_global_string_array(proc, tv->value);
-				ssaValue *elem = ssa_array_elem(proc, array);
-				return ssa_emit_string(proc, elem, ssa_array_len(proc, array));
-			}
-			return ssa_make_value_constant(proc->module->allocator, tv->type, tv->value);
-		}
+	GB_ASSERT_NOT_NULL(tv);
 
-		ssaValue *value = NULL;
-		if (tv->mode == Addressing_Variable) {
-			value = ssa_lvalue_load(ssa_build_addr(proc, expr), proc);
-		} else {
-			value = ssa_build_single_expr(proc, expr, tv);
+	if (tv->value.kind != ExactValue_Invalid) {
+		if (tv->value.kind == ExactValue_String) {
+			ssaValue *array = ssa_add_global_string_array(proc, tv->value);
+			ssaValue *elem = ssa_array_elem(proc, array);
+			return ssa_emit_string(proc, elem, ssa_array_len(proc, array));
 		}
-
-		return value;
+		return ssa_make_value_constant(proc->module->allocator, tv->type, tv->value);
 	}
-	return NULL;
+
+	ssaValue *value = NULL;
+	if (tv->mode == Addressing_Variable) {
+		value = ssa_lvalue_load(ssa_build_addr(proc, expr), proc);
+	} else {
+		value = ssa_build_single_expr(proc, expr, tv);
+	}
+
+	return value;
 }
 
 
@@ -1383,33 +1391,35 @@ ssaLvalue ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	case_ast_node(ie, IndexExpr, expr);
 		ssaValue *v = NULL;
 		Type *t = get_base_type(type_of_expr(proc->module->info, ie->expr));
+		ssaValue *elem = NULL;
 		switch (t->kind) {
 		case Type_Array: {
 			ssaValue *array = ssa_lvalue_address(ssa_build_addr(proc, ie->expr), proc);
-			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
-			ssaValue *elem = ssa_array_elem(proc, array);
-			v = ssa_emit_ptr_offset(proc, elem, index);
+			elem = ssa_array_elem(proc, array);
 		} break;
 		case Type_Slice: {
 			ssaValue *slice = ssa_lvalue_address(ssa_build_addr(proc, ie->expr), proc);
-			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
-			ssaValue *elem = ssa_slice_elem(proc, slice);
-			v = ssa_emit_ptr_offset(proc, elem, index);
+			elem = ssa_slice_elem(proc, slice);
 		} break;
 		case Type_Basic: { // Basic_string
-			ssaValue *str = ssa_lvalue_address(ssa_build_addr(proc, ie->expr), proc);
-			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
-			ssaValue *elem = ssa_string_elem(proc, str);
-			v = ssa_emit_ptr_offset(proc, elem, index);
+			TypeAndValue *tv = map_get(&proc->module->info->types, hash_pointer(ie->expr));
+			if (tv->mode == Addressing_Constant) {
+				ssaValue *array = ssa_add_global_string_array(proc, tv->value);
+				elem = ssa_array_elem(proc, array);
+			} else {
+				ssaLvalue lval = ssa_build_addr(proc, ie->expr);
+				ssaValue *str = ssa_lvalue_address(lval, proc);
+				elem = ssa_string_elem(proc, str);
+			}
 		} break;
 		case Type_Pointer: {
-			ssaValue *ptr = ssa_emit_load(proc, ssa_lvalue_address(ssa_build_addr(proc, ie->expr), proc));
-			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
-			v = ssa_emit_ptr_offset(proc, ptr, index);
+			elem = ssa_emit_load(proc, ssa_lvalue_address(ssa_build_addr(proc, ie->expr), proc));
 		} break;
 		}
 
-		// NOTE(bill): lvalue address encodes the pointer, thus the deref
+		ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
+		v = ssa_emit_ptr_offset(proc, elem, index);
+
 		ssa_value_set_type(v, type_deref(ssa_value_type(v)));
 		return ssa_make_lvalue_address(v, expr);
 	case_end;
@@ -1425,7 +1435,8 @@ ssaLvalue ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	case_end;
 	}
 
-	GB_PANIC("Unexpected address expression");
+	GB_PANIC("Unexpected address expression\n"
+	         "\tAstNode: %.*s\n", LIT(ast_node_strings[expr->kind]));
 
 	ssaLvalue blank = {ssaLvalue_Blank};
 	return blank;

@@ -62,6 +62,7 @@ struct Parser {
 	gbArray(AstFile) files;
 	gbArray(String) imports;
 	isize import_index;
+	isize total_token_count;
 };
 
 enum DeclKind {
@@ -2137,7 +2138,9 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 		}
 		parse_file(p, &file);
 		gb_array_append(p->files, file);
+		p->total_token_count += gb_array_count(file.tokens);
 	}
+
 
 	return ParseFile_None;
 }

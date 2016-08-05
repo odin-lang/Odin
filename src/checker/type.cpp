@@ -26,7 +26,7 @@ enum BasicKind {
 
 	Basic_Count,
 
-	Basic_byte = Basic_u8,
+	// Basic_byte = Basic_u8,
 	Basic_rune = Basic_i32,
 };
 
@@ -242,7 +242,7 @@ gb_global Type basic_types[] = {
 };
 
 gb_global Type basic_type_aliases[] = {
-	{Type_Basic, {Basic_byte, BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("byte")}},
+	// {Type_Basic, {Basic_byte, BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("byte")}},
 	{Type_Basic, {Basic_rune, BasicFlag_Integer,                      STR_LIT("rune")}},
 };
 
@@ -268,7 +268,7 @@ gb_global Type *t_untyped_float   = &basic_types[Basic_UntypedFloat];
 gb_global Type *t_untyped_pointer = &basic_types[Basic_UntypedPointer];
 gb_global Type *t_untyped_string  = &basic_types[Basic_UntypedString];
 gb_global Type *t_untyped_rune    = &basic_types[Basic_UntypedRune];
-gb_global Type *t_byte            = &basic_type_aliases[Basic_byte];
+// gb_global Type *t_byte            = &basic_type_aliases[Basic_byte];
 gb_global Type *t_rune            = &basic_type_aliases[Basic_rune];
 
 
@@ -343,9 +343,9 @@ b32 is_type_rawptr(Type *t) {
 		return t->basic.kind == Basic_rawptr;
 	return false;
 }
-b32 is_type_byte(Type *t) {
+b32 is_type_u8(Type *t) {
 	if (t->kind == Type_Basic)
-		return t->basic.kind == Basic_byte;
+		return t->basic.kind == Basic_u8;
 	return false;
 }
 b32 is_type_slice(Type *t) {
@@ -353,9 +353,9 @@ b32 is_type_slice(Type *t) {
 }
 
 
-b32 is_type_byte_slice(Type *t) {
+b32 is_type_u8_slice(Type *t) {
 	if (t->kind == Type_Slice)
-		return is_type_byte(t->slice.elem);
+		return is_type_u8(t->slice.elem);
 	return false;
 }
 

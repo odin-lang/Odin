@@ -440,12 +440,13 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 
 	case ssaInstr_Call: {
 		auto *call = &instr->call;
-		if (call->type) {
+		Type *result_type = call->type->proc.results;
+		if (result_type) {
 			ssa_fprintf(f, "%%%d = ", value->id);
 		}
 		ssa_fprintf(f, "call ");
-		if (call->type) {
-			ssa_print_type(f, m->sizes, call->type);
+		if (result_type) {
+			ssa_print_type(f, m->sizes, result_type);
 		} else {
 			ssa_fprintf(f, "void");
 		}
@@ -454,14 +455,17 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 
 
 		ssa_fprintf(f, "(");
+		auto *params = &call->type->proc.params->tuple;
 		for (isize i = 0; i < call->arg_count; i++) {
-			ssaValue *arg = call->args[i];
-			Type *t = ssa_value_type(arg);
+			Entity *e = params->variables[i];
+			GB_ASSERT(e != NULL);
+			Type *t = e->type;
 			if (i > 0) {
 				ssa_fprintf(f, ", ");
 			}
 			ssa_print_type(f, m->sizes, t);
 			ssa_fprintf(f, " ");
+			ssaValue *arg = call->args[i];
 			ssa_print_value(f, m, arg, t);
 		}
 		ssa_fprintf(f, ")\n");

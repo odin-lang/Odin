@@ -26,98 +26,98 @@ b32 rune_is_whitespace(Rune r) {
 }
 
 #define TOKEN_KINDS \
-	TOKEN_KIND(Invalid, "Invalid"), \
-	TOKEN_KIND(EOF, "EOF"), \
+	TOKEN_KIND(Token_Invalid, "Invalid"), \
+	TOKEN_KIND(Token_EOF, "EOF"), \
 \
-TOKEN_KIND(_LiteralBegin, "_LiteralBegin"), \
-	TOKEN_KIND(Identifier, "Identifier"), \
-	TOKEN_KIND(Integer, "Integer"), \
-	TOKEN_KIND(Float, "Float"), \
-	TOKEN_KIND(Rune, "Rune"), \
-	TOKEN_KIND(String, "String"), \
-TOKEN_KIND(_LiteralEnd, "_LiteralEnd"), \
+TOKEN_KIND(Token__LiteralBegin, "_LiteralBegin"), \
+	TOKEN_KIND(Token_Identifier, "Identifier"), \
+	TOKEN_KIND(Token_Integer, "Integer"), \
+	TOKEN_KIND(Token_Float, "Float"), \
+	TOKEN_KIND(Token_Rune, "Rune"), \
+	TOKEN_KIND(Token_String, "String"), \
+TOKEN_KIND(Token__LiteralEnd, "_LiteralEnd"), \
 \
-TOKEN_KIND(_OperatorBegin, "_OperatorBegin"), \
-	TOKEN_KIND(Eq, "="), \
-	TOKEN_KIND(Not, "!"), \
-	TOKEN_KIND(Hash, "#"), \
-	TOKEN_KIND(At, "@"), \
-	TOKEN_KIND(Pointer, "^"), \
-	TOKEN_KIND(Add, "+"), \
-	TOKEN_KIND(Sub, "-"), \
-	TOKEN_KIND(Mul, "*"), \
-	TOKEN_KIND(Quo, "/"), \
-	TOKEN_KIND(Mod, "%"), \
-	TOKEN_KIND(And, "&"), \
-	TOKEN_KIND(Or, "|"), \
-	TOKEN_KIND(Xor, "~"), \
-	TOKEN_KIND(AndNot, "&~"), \
-TOKEN_KIND(_AssignOpBegin, "_AssignOpBegin"), \
-	TOKEN_KIND(AddEq, "+="), \
-	TOKEN_KIND(SubEq, "-="), \
-	TOKEN_KIND(MulEq, "*="), \
-	TOKEN_KIND(QuoEq, "/="), \
-	TOKEN_KIND(ModEq, "%="), \
-	TOKEN_KIND(AndEq, "&="), \
-	TOKEN_KIND(OrEq, "|="), \
-	TOKEN_KIND(XorEq, "~="), \
-	TOKEN_KIND(AndNotEq, "&~="), \
-TOKEN_KIND(_AssignOpEnd, "_AssignOpEnd"), \
-	TOKEN_KIND(Increment, "++"), \
-	TOKEN_KIND(Decrement, "--"), \
-	TOKEN_KIND(ArrowRight, "->"), \
-	TOKEN_KIND(ArrowLeft, "<-"), \
-	TOKEN_KIND(CmpAnd, "&&"), \
-	TOKEN_KIND(CmpOr, "||"), \
-	TOKEN_KIND(CmpAndEq, "&&="), \
-	TOKEN_KIND(CmpOrEq, "||="), \
+TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
+	TOKEN_KIND(Token_Eq, "="), \
+	TOKEN_KIND(Token_Not, "!"), \
+	TOKEN_KIND(Token_Hash, "#"), \
+	TOKEN_KIND(Token_At, "@"), \
+	TOKEN_KIND(Token_Pointer, "^"), \
+	TOKEN_KIND(Token_Add, "+"), \
+	TOKEN_KIND(Token_Sub, "-"), \
+	TOKEN_KIND(Token_Mul, "*"), \
+	TOKEN_KIND(Token_Quo, "/"), \
+	TOKEN_KIND(Token_Mod, "%"), \
+	TOKEN_KIND(Token_And, "&"), \
+	TOKEN_KIND(Token_Or, "|"), \
+	TOKEN_KIND(Token_Xor, "~"), \
+	TOKEN_KIND(Token_AndNot, "&~"), \
+TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
+	TOKEN_KIND(Token_AddEq, "+="), \
+	TOKEN_KIND(Token_SubEq, "-="), \
+	TOKEN_KIND(Token_MulEq, "*="), \
+	TOKEN_KIND(Token_QuoEq, "/="), \
+	TOKEN_KIND(Token_ModEq, "%="), \
+	TOKEN_KIND(Token_AndEq, "&="), \
+	TOKEN_KIND(Token_OrEq, "|="), \
+	TOKEN_KIND(Token_XorEq, "~="), \
+	TOKEN_KIND(Token_AndNotEq, "&~="), \
+TOKEN_KIND(Token__AssignOpEnd, "_AssignOpEnd"), \
+	TOKEN_KIND(Token_Increment, "++"), \
+	TOKEN_KIND(Token_Decrement, "--"), \
+	TOKEN_KIND(Token_ArrowRight, "->"), \
+	TOKEN_KIND(Token_ArrowLeft, "<-"), \
+	TOKEN_KIND(Token_CmpAnd, "&&"), \
+	TOKEN_KIND(Token_CmpOr, "||"), \
+	TOKEN_KIND(Token_CmpAndEq, "&&="), \
+	TOKEN_KIND(Token_CmpOrEq, "||="), \
 \
-TOKEN_KIND(_ComparisonBegin, "_ComparisonBegin"), \
-	TOKEN_KIND(CmpEq, "=="), \
-	TOKEN_KIND(NotEq, "!="), \
-	TOKEN_KIND(Lt, "<"), \
-	TOKEN_KIND(Gt, ">"), \
-	TOKEN_KIND(LtEq, "<="), \
-	TOKEN_KIND(GtEq, ">="), \
-TOKEN_KIND(_ComparisonEnd, "_ComparisonEnd"), \
+TOKEN_KIND(Token__ComparisonBegin, "_ComparisonBegin"), \
+	TOKEN_KIND(Token_CmpEq, "=="), \
+	TOKEN_KIND(Token_NotEq, "!="), \
+	TOKEN_KIND(Token_Lt, "<"), \
+	TOKEN_KIND(Token_Gt, ">"), \
+	TOKEN_KIND(Token_LtEq, "<="), \
+	TOKEN_KIND(Token_GtEq, ">="), \
+TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 \
-	TOKEN_KIND(OpenParen, "("), \
-	TOKEN_KIND(CloseParen, ")"), \
-	TOKEN_KIND(OpenBracket, "["), \
-	TOKEN_KIND(CloseBracket, "]"), \
-	TOKEN_KIND(OpenBrace, "{"), \
-	TOKEN_KIND(CloseBrace, "}"), \
-	TOKEN_KIND(Colon, ":"), \
-	TOKEN_KIND(Semicolon, ";"), \
-	TOKEN_KIND(Period, "."), \
-	TOKEN_KIND(Comma, ","), \
-	TOKEN_KIND(Ellipsis, "..."), \
-TOKEN_KIND(_OperatorEnd, "_OperatorEnd"), \
+	TOKEN_KIND(Token_OpenParen, "("), \
+	TOKEN_KIND(Token_CloseParen, ")"), \
+	TOKEN_KIND(Token_OpenBracket, "["), \
+	TOKEN_KIND(Token_CloseBracket, "]"), \
+	TOKEN_KIND(Token_OpenBrace, "{"), \
+	TOKEN_KIND(Token_CloseBrace, "}"), \
+	TOKEN_KIND(Token_Colon, ":"), \
+	TOKEN_KIND(Token_Semicolon, ";"), \
+	TOKEN_KIND(Token_Period, "."), \
+	TOKEN_KIND(Token_Comma, ","), \
+	TOKEN_KIND(Token_Ellipsis, "..."), \
+TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
-TOKEN_KIND(_KeywordBegin, "_KeywordBegin"), \
-	TOKEN_KIND(type, "type"), \
-	TOKEN_KIND(alias, "alias"), \
-	TOKEN_KIND(proc, "proc"), \
-	TOKEN_KIND(match, "match"), \
-	TOKEN_KIND(break, "break"), \
-	TOKEN_KIND(continue, "continue"), \
-	TOKEN_KIND(fallthrough, "fallthrough"), \
-	TOKEN_KIND(case, "case"), \
-	TOKEN_KIND(if, "if"), \
-	TOKEN_KIND(else, "else"), \
-	TOKEN_KIND(for, "for"), \
-	TOKEN_KIND(defer, "defer"), \
-	TOKEN_KIND(return, "return"), \
-	TOKEN_KIND(import, "import"), \
-	TOKEN_KIND(cast, "cast"), \
-	TOKEN_KIND(struct, "struct"), \
-	TOKEN_KIND(union, "union"), \
-	TOKEN_KIND(enum, "enum"), \
-TOKEN_KIND(_KeywordEnd, "_KeywordEnd"), \
-	TOKEN_KIND(Count, "")
+TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
+	TOKEN_KIND(Token_type, "type"), \
+	TOKEN_KIND(Token_alias, "alias"), \
+	TOKEN_KIND(Token_proc, "proc"), \
+	TOKEN_KIND(Token_match, "match"), \
+	TOKEN_KIND(Token_break, "break"), \
+	TOKEN_KIND(Token_continue, "continue"), \
+	TOKEN_KIND(Token_fallthrough, "fallthrough"), \
+	TOKEN_KIND(Token_case, "case"), \
+	TOKEN_KIND(Token_if, "if"), \
+	TOKEN_KIND(Token_else, "else"), \
+	TOKEN_KIND(Token_for, "for"), \
+	TOKEN_KIND(Token_defer, "defer"), \
+	TOKEN_KIND(Token_return, "return"), \
+	TOKEN_KIND(Token_import, "import"), \
+	TOKEN_KIND(Token_cast, "cast"), \
+	TOKEN_KIND(Token_struct, "struct"), \
+	TOKEN_KIND(Token_union, "union"), \
+	TOKEN_KIND(Token_enum, "enum"), \
+TOKEN_KIND(Token__KeywordEnd, "_KeywordEnd"), \
+	TOKEN_KIND(Token_Count, "")
 
 enum TokenKind {
-#define TOKEN_KIND(e, s) GB_JOIN2(Token_, e)
+#define TOKEN_KIND(e, s) e
 	TOKEN_KINDS
 #undef TOKEN_KIND
 };
@@ -162,10 +162,10 @@ Token empty_token = {Token_Invalid};
 
 struct ErrorCollector {
 	TokenPos prev;
-	isize count;
+	i64 count;
 };
 
-void error(ErrorCollector *ec, Token token, char *fmt, ...) {
+gb_no_inline void error(ErrorCollector *ec, Token token, char *fmt, ...) {
 	ec->count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (!token_pos_are_equal(ec->prev, token.pos)) {
@@ -181,7 +181,7 @@ void error(ErrorCollector *ec, Token token, char *fmt, ...) {
 	}
 }
 
-void warning(Token token, char *fmt, ...) {
+gb_no_inline void warning(Token token, char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	gb_printf_err("%.*s(%td:%td) Warning: %s\n",

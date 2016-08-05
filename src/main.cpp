@@ -27,11 +27,11 @@ int main(int argc, char **argv) {
 				// print_ast(parser.files[0].declarations, 0);
 
 				Checker checker = {};
+
 				init_checker(&checker, &parser);
 				defer (destroy_checker(&checker));
 
 				check_parsed_files(&checker);
-
 				ssaGen ssa = {};
 				if (ssa_gen_init(&ssa, &checker)) {
 					defer (ssa_gen_destroy(&ssa));

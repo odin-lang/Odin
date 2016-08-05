@@ -456,8 +456,9 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 	}
 
 	TypeAndValue tv = {};
-	tv.type = type;
+	tv.type  = type;
 	tv.value = value;
+	tv.mode  = mode;
 	map_set(&i->types, hash_pointer(expression), tv);
 }
 
@@ -522,7 +523,8 @@ void pop_procedure(Checker *c) {
 }
 
 void add_curr_ast_file(Checker *c, AstFile *file) {
-	gb_zero_item(&c->error_collector);
+	TokenPos zero_pos = {};
+	c->error_collector.prev = zero_pos;
 	c->curr_ast_file = file;
 }
 
@@ -672,10 +674,12 @@ void check_parsed_files(Checker *c) {
 		u64 key = entry->key;
 		AstNode *expr = cast(AstNode *)cast(uintptr)key;
 		ExpressionInfo *info = &entry->value;
-		if (is_type_typed(info->type)) {
-			GB_PANIC("%s (type %s) is typed!", expr_to_string(expr), info->type);
+		if (info != NULL && expr != NULL) {
+			if (is_type_typed(info->type)) {
+				GB_PANIC("%s (type %s) is typed!", expr_to_string(expr), info->type);
+			}
+			add_type_and_value(&c->info, expr, info->mode, info->type, info->value);
 		}
-		add_type_and_value(&c->info, expr, info->mode, info->type, info->value);
 	}
 }
 

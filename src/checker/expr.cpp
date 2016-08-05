@@ -11,6 +11,7 @@ void           convert_to_typed        (Checker *c, Operand *operand, Type *targ
 gbString       expr_to_string          (AstNode *expression);
 void           check_entity_decl       (Checker *c, Entity *e, DeclInfo *decl, Type *named_type);
 void           check_proc_body         (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
+void           update_expr_type        (Checker *c, AstNode *e, Type *type, b32 final);
 
 
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
@@ -664,7 +665,10 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 	    y->mode == Addressing_Constant) {
 		x->value = make_exact_value_bool(compare_exact_values(op, x->value, y->value));
 	} else {
-		// TODO(bill): What should I do?
+		x->mode = Addressing_Value;
+
+		update_expr_type(c, x->expr, default_type(x->type), true);
+		update_expr_type(c, y->expr, default_type(y->type), true);
 	}
 
 	x->type = t_untyped_bool;
@@ -770,33 +774,35 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 }
 
 
-void update_expr_type(Checker *c, AstNode *e, Type *type) {
-	ExpressionInfo *found = map_get(&c->info.untyped, hash_pointer(e));
-	if (!found)
+void update_expr_type(Checker *c, AstNode *e, Type *type, b32 final) {
+	u64 key = hash_pointer(e);
+	ExpressionInfo *found = map_get(&c->info.untyped, key);
+	if (found == NULL)
 		return;
 
 	switch (e->kind) {
 	case_ast_node(ue, UnaryExpr, e);
 		if (found->value.kind != ExactValue_Invalid)
 			break;
-		update_expr_type(c, ue->expr, type);
-		break;
+		update_expr_type(c, ue->expr, type, final);
 	case_end;
 
 	case_ast_node(be, BinaryExpr, e);
 		if (found->value.kind != ExactValue_Invalid)
 			break;
 		if (!token_is_comparison(be->op)) {
-			update_expr_type(c, be->left,  type);
-			update_expr_type(c, be->right, type);
+			update_expr_type(c, be->left,  type, final);
+			update_expr_type(c, be->right, type, final);
 		}
 	case_end;
 	}
 
-	if (is_type_untyped(type)) {
+	if (!final && is_type_untyped(type)) {
 		found->type = get_base_type(type);
+		map_set(&c->info.untyped, key, *found);
 	} else {
-		found->type = type;
+		map_remove(&c->info.untyped, key);
+		add_type_and_value(&c->info, e, found->mode, type, found->value);
 	}
 }
 
@@ -838,7 +844,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 		if (is_type_numeric(x) && is_type_numeric(y)) {
 			if (x < y) {
 				operand->type = target_type;
-				update_expr_type(c, operand->expr, target_type);
+				update_expr_type(c, operand->expr, target_type, false);
 			}
 		} else if (x != y) {
 			convert_untyped_error(c, operand, target_type);
@@ -1479,10 +1485,10 @@ b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
 	}
 
 	// []byte/[]u8 <-> string
-	if (is_type_byte_slice(xb) && is_type_string(yb)) {
+	if (is_type_u8_slice(xb) && is_type_string(yb)) {
 		return true;
 	}
-	if (is_type_string(xb) && is_type_byte_slice(yb)) {
+	if (is_type_string(xb) && is_type_u8_slice(yb)) {
 		return true;
 	}
 
@@ -1722,6 +1728,8 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 				if (o->mode == Addressing_Constant) {
 					max_count = o->value.value_string.len;
 				}
+				if (o->mode != Addressing_Variable)
+					o->mode = Addressing_Value;
 				o->type = t_u8;
 			}
 			break;
