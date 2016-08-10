@@ -6625,6 +6625,8 @@ gb_global gbUtf8AcceptRange const gb__utf8_accept_ranges[] = {
 
 
 isize gb_utf8_decode(u8 const *str, isize str_len, Rune *codepoint_out) {
+
+
 	isize width = 0;
 	Rune codepoint = GB_RUNE_INVALID;
 
@@ -6636,6 +6638,11 @@ isize gb_utf8_decode(u8 const *str, isize str_len, Rune *codepoint_out) {
 		if (x > 0xf0) {
 			Rune mask = (cast(Rune)x >> 31) << 31;
 			codepoint = (cast(Rune)s0 & (~mask)) | (GB_RUNE_INVALID & mask);
+			width = 1;
+			goto end;
+		}
+		if (s0 < 0x80) {
+			codepoint = s0;
 			width = 1;
 			goto end;
 		}

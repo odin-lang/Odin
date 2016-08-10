@@ -522,6 +522,14 @@ void pop_procedure(Checker *c) {
 	gb_array_pop(c->proc_stack);
 }
 
+Type *const curr_procedure(Checker *c) {
+	isize count = gb_array_count(c->proc_stack);
+	if (count > 0) {
+		return c->proc_stack[count-1];
+	}
+	return NULL;
+}
+
 void add_curr_ast_file(Checker *c, AstFile *file) {
 	TokenPos zero_pos = {};
 	c->error_collector.prev = zero_pos;

@@ -87,7 +87,12 @@ ExactValue make_exact_value_from_basic_literal(Token token) {
 	case Token_String:  return make_exact_value_string(token.string);
 	case Token_Integer: return make_exact_value_integer(token.string);
 	case Token_Float:   return make_exact_value_float(token.string);
-	case Token_Rune:    return make_exact_value_integer(token.string);
+	case Token_Rune: {
+		Rune r = GB_RUNE_INVALID;
+		gb_utf8_decode(token.string.text, token.string.len, &r);
+		// gb_printf("%.*s rune: %d\n", LIT(token.string), r);
+		return make_exact_value_integer(r);
+	}
 	default:
 		GB_PANIC("Invalid token for basic literal");
 		break;

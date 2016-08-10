@@ -46,6 +46,8 @@ void ssa_gen_code(ssaGen *s) {
 	ssaModule *m = &s->module;
 	CheckerInfo *info = m->info;
 	gbAllocator a = m->allocator;
+	ssaProcedure dummy_proc = {};
+	dummy_proc.module = m;
 
 	gb_for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
@@ -61,7 +63,14 @@ void ssa_gen_code(ssaGen *s) {
 		} break;
 
 		case Entity_Variable: {
-			ssaValue *g = ssa_make_value_global(a, e, NULL);
+			ssaValue *value = ssa_build_expr(&dummy_proc, decl->init_expr);
+			if (value->kind == ssaValue_Instr) {
+				ssaInstr *i = &value->instr;
+				if (i->kind == ssaInstr_Load) {
+					value = i->load.address;
+				}
+			}
+			ssaValue *g = ssa_make_value_global(a, e, value);
 			map_set(&m->values, hash_pointer(e), g);
 			map_set(&m->members, hash_string(name), g);
 		} break;

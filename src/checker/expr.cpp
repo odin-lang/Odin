@@ -1553,6 +1553,7 @@ ExpressionKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		return Expression_Statement;
 	}
 
+
 	if (operand->mode == Addressing_Builtin) {
 		i32 id = operand->builtin_id;
 		if (!check_builtin_procedure(c, operand, call, id))
@@ -1574,6 +1575,17 @@ ExpressionKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		return Expression_Statement;
 	}
 
+	if (curr_procedure(c) == NULL) {
+		AstNode *e = operand->expr;
+		gbString str = expr_to_string(e);
+		defer (gb_string_free(str));
+		error(&c->error_collector, ast_node_token(e), "Can ony call procedure within a procedure: `%s`", str);
+
+		operand->mode = Addressing_Invalid;
+		operand->expr = call;
+
+		return Expression_Statement;
+	}
 
 	check_call_arguments(c, operand, proc_type, call);
 

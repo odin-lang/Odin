@@ -312,8 +312,9 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	case ssaInstr_GetElementPtr: {
 		Type *et = instr->get_element_ptr.elem_type;
 		ssa_fprintf(f, "%%%d = getelementptr ", value->id);
-		if (instr->get_element_ptr.inbounds)
-		ssa_fprintf(f, "inbounds ");
+		if (instr->get_element_ptr.inbounds) {
+			ssa_fprintf(f, "inbounds ");
+		}
 
 		ssa_print_type(f, m->sizes, et);
 		ssa_fprintf(f, ", ");
@@ -329,6 +330,16 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 			ssa_print_value(f, m, index, t);
 		}
 		ssa_fprintf(f, "\n");
+	} break;
+
+	case ssaInstr_ExtractValue: {
+		Type *et = instr->extract_value.elem_type;
+		ssa_fprintf(f, "%%%d = extractvalue ", value->id);
+
+		ssa_print_type(f, m->sizes, et);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, instr->extract_value.address, et);
+		ssa_fprintf(f, ", %d\n", instr->extract_value.index);
 	} break;
 
 	case ssaInstr_Br: {
@@ -494,7 +505,41 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 
 	} break;
 
+	case ssaInstr_Select: {
+		ssa_fprintf(f, "%%%d = select i1 ", value->id);
+		ssa_print_value(f, m, instr->select.cond, t_bool);
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m->sizes, ssa_value_type(instr->select.true_value));
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, instr->select.true_value, ssa_value_type(instr->select.true_value));
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m->sizes, ssa_value_type(instr->select.false_value));
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, instr->select.false_value, ssa_value_type(instr->select.false_value));
+		ssa_fprintf(f, "\n");
+	} break;
+
+	case ssaInstr_CopyMemory: {
+		ssa_fprintf(f, "call void @llvm.memmove.p0i8.p0i8.");
+		ssa_print_type(f, m->sizes, t_int);
+		ssa_fprintf(f, "(i8* ");
+		ssa_print_value(f, m, instr->copy_memory.dst, t_rawptr);
+		ssa_fprintf(f, ", i8* ");
+		ssa_print_value(f, m, instr->copy_memory.src, t_rawptr);
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m->sizes, t_int);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, instr->copy_memory.len, t_int);
+		char *vol_str = "false";
+		if (instr->copy_memory.is_volatile) {
+			vol_str = "true";
+		}
+		ssa_fprintf(f, ", i32 %d, i1 %s)\n", instr->copy_memory.align, vol_str);
+
+	} break;
+
 	default:
+		GB_PANIC("<unknown instr> %d\n", instr->kind);
 		ssa_fprintf(f, "; <unknown instr> %d\n", instr->kind);
 		break;
 	}
@@ -511,8 +556,12 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 	ssa_fprintf(f, "} ; Basic_string\n\n");
 
 	ssa_print_encoded_local(f, make_string(".rawptr"));
-	ssa_fprintf(f, " = type i8*");
-	ssa_fprintf(f, " ; Basic_rawptr\n\n");
+	ssa_fprintf(f, " = type i8* ; Basic_rawptr\n\n");
+	ssa_fprintf(f, "declare void @llvm.memmove.p0i8.p0i8.");
+	ssa_print_type(f, m->sizes, t_int);
+	ssa_fprintf(f, "(i8*, i8*, ");
+	ssa_print_type(f, m->sizes, t_int);
+	ssa_fprintf(f, ", i32, i1)\n\n");
 
 	gb_for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];

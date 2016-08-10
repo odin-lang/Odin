@@ -14,17 +14,18 @@ string_byte_reverse :: proc(s: string) {
 	}
 }
 
-encode_rune :: proc(buf : []u8, r : rune) -> int {
+encode_rune :: proc(r : rune) -> ([4]u8, int) {
+	buf : [4]u8;
 	i := cast(u32)r;
 	mask : u8 : 0x3f;
 	if i <= 1<<7-1 {
 		buf[0] = cast(u8)r;
-		return 1;
+		return buf, 1;
 	}
 	if i <= 1<<11-1 {
 		buf[0] = 0xc0 | cast(u8)(r>>6);
 		buf[1] = 0x80 | cast(u8)(r)&mask;
-		return 2;
+		return buf, 2;
 	}
 
 	// Invalid or Surrogate range
@@ -37,26 +38,28 @@ encode_rune :: proc(buf : []u8, r : rune) -> int {
 		buf[0] = 0xe0 | cast(u8)(r>>12);
 		buf[1] = 0x80 | cast(u8)(r>>6)&mask;
 		buf[2] = 0x80 | cast(u8)(r)&mask;
-		return 3;
+		return buf, 3;
 	}
 
 	buf[0] = 0xf0 | cast(u8)(r>>18);
 	buf[1] = 0x80 | cast(u8)(r>>12)&mask;
 	buf[2] = 0x80 | cast(u8)(r>>6)&mask;
 	buf[3] = 0x80 | cast(u8)(r)&mask;
-	return 4;
+	return buf, 4;
 }
 
 print_rune :: proc(r : rune) {
-	buf : [4]u8;
-	n := encode_rune(buf[:], r);
+	buf, n := encode_rune(r);
 	str := cast(string)buf[:n];
-
 	print_string(str);
 }
 
-print_int :: proc(i, base : int) {
+print_int :: proc(i : int) {
+	print_int_base(i, 10);
+}
+print_int_base :: proc(i, base : int) {
 	NUM_TO_CHAR_TABLE :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$";
+	NEG :: "-";
 
 	buf: [21]u8;
 	len := 0;
@@ -65,16 +68,15 @@ print_int :: proc(i, base : int) {
 		negative = true;
 		i = -i;
 	}
-	if i > 0 {
-		for i > 0 {
-			c : u8 = NUM_TO_CHAR_TABLE[i % base];
-			buf[len] = c;
-			len++;
-			i /= base;
-		}
-	} else {
+	if i == 0 {
 		buf[len] = '0';
 		len++;
+	}
+	for i > 0 {
+		c : u8 = NUM_TO_CHAR_TABLE[i % base];
+		buf[len] = c;
+		len++;
+		i /= base;
 	}
 
 	if negative {
