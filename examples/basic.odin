@@ -31,11 +31,6 @@ encode_rune :: proc(buf : []u8, r : rune) -> int {
 	if i > 0x0010ffff ||
 	   (i >= 0xd800 && i <= 0xdfff) {
 		r = 0xfffd;
-
-		buf[0] = 0xe0 | cast(u8)(r>>12);
-		buf[1] = 0x80 | cast(u8)(r>>6)&mask;
-		buf[2] = 0x80 | cast(u8)(r)&mask;
-		return 3;
 	}
 
 	if i <= 1<<16-1 {

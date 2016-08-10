@@ -2,8 +2,56 @@
 
 %.rawptr = type i8* ; Basic_rawptr
 
+define {i64, i64} @tuple() {
+"entry - 0":
+	%0 = alloca {i64, i64}, align 8 
+	store {i64, i64} zeroinitializer, {i64, i64}* %0
+	%1 = getelementptr inbounds {i64, i64}, {i64, i64}* %0, i64 0, i32 0
+	store i64 1, i64* %1
+	%2 = getelementptr inbounds {i64, i64}, {i64, i64}* %0, i64 0, i32 1
+	store i64 2, i64* %2
+	%3 = load {i64, i64}, {i64, i64}* %0
+	ret {i64, i64} %3
+}
+
 define void @main() {
 "entry - 0":
+	%0 = alloca i64, align 8 ; a
+	store i64 zeroinitializer, i64* %0
+	%1 = alloca i64, align 8 ; b
+	store i64 zeroinitializer, i64* %1
+	%2 = call {i64, i64} @tuple()
+	%3 = alloca {i64, i64}, align 8 
+	store {i64, i64} zeroinitializer, {i64, i64}* %3
+	store {i64, i64} %2, {i64, i64}* %3
+	%4 = getelementptr inbounds {i64, i64}, {i64, i64}* %3, i64 0, i32 0
+	%5 = load i64, i64* %4
+	%6 = getelementptr inbounds {i64, i64}, {i64, i64}* %3, i64 0, i32 1
+	%7 = load i64, i64* %6
+	store i64 %5, i64* %0
+	store i64 %7, i64* %1
+	%8 = load i64, i64* %0
+	call void @print_int(i64 %8, i64 10)
+	%9 = getelementptr inbounds [1 x i8], [1 x i8]* @.str0, i64 0, i64 0
+	%10 = alloca %.string, align 8 
+	store %.string zeroinitializer, %.string* %10
+	%11 = getelementptr inbounds %.string, %.string* %10, i64 0, i32 0
+	%12 = getelementptr inbounds %.string, %.string* %10, i64 0, i32 1
+	store i8* %9, i8** %11
+	store i64 1, i64* %12
+	%13 = load %.string, %.string* %10
+	call void @print_string(%.string %13)
+	%14 = load i64, i64* %1
+	call void @print_int(i64 %14, i64 10)
+	%15 = getelementptr inbounds [1 x i8], [1 x i8]* @.str1, i64 0, i64 0
+	%16 = alloca %.string, align 8 
+	store %.string zeroinitializer, %.string* %16
+	%17 = getelementptr inbounds %.string, %.string* %16, i64 0, i32 0
+	%18 = getelementptr inbounds %.string, %.string* %16, i64 0, i32 1
+	store i8* %15, i8** %17
+	store i64 1, i64* %18
+	%19 = load %.string, %.string* %16
+	call void @print_string(%.string %19)
 	ret void
 }
 
@@ -167,62 +215,65 @@ define i64 @encode_rune({i8*, i64, i64} %buf, i32 %r) {
 
 "if.then - 5":
 	store i32 65533, i32* %1
-	%29 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %0, i64 0, i32 0
-	%30 = load i8*, i8** %29
-	%31 = getelementptr i8, i8* %30, i64 0
-	%32 = load i32, i32* %1
-	%33 = lshr i32 %32, 12
-	%34 = trunc i32 %33 to i8
-	%35 = or i8 224, %34
-	store i8 %35, i8* %31
-	%36 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %0, i64 0, i32 0
-	%37 = load i8*, i8** %36
-	%38 = getelementptr i8, i8* %37, i64 1
-	%39 = load i32, i32* %1
-	%40 = lshr i32 %39, 6
-	%41 = trunc i32 %40 to i8
-	%42 = and i8 %41, 63
-	%43 = or i8 128, %42
-	store i8 %43, i8* %38
-	%44 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %0, i64 0, i32 0
-	%45 = load i8*, i8** %44
-	%46 = getelementptr i8, i8* %45, i64 2
-	%47 = load i32, i32* %1
-	%48 = trunc i32 %47 to i8
-	%49 = and i8 %48, 63
-	%50 = or i8 128, %49
-	store i8 %50, i8* %46
-	ret i64 3
+	br label %"if.done - 8"
 
 "cmp-or - 6":
-	%51 = load i32, i32* %2
-	%52 = icmp uge i32 %51, 55296
-	br i1 %52, label %"cmp-and - 7", label %"if.done - 8"
+	%29 = load i32, i32* %2
+	%30 = icmp uge i32 %29, 55296
+	br i1 %30, label %"cmp-and - 7", label %"if.done - 8"
 
 "cmp-and - 7":
-	%53 = load i32, i32* %2
-	%54 = icmp ule i32 %53, 57343
-	br i1 %54, label %"if.then - 5", label %"if.done - 8"
+	%31 = load i32, i32* %2
+	%32 = icmp ule i32 %31, 57343
+	br i1 %32, label %"if.then - 5", label %"if.done - 8"
 
 "if.done - 8":
-	%55 = load i32, i32* %2
-	%56 = icmp ule i32 %55, 65535
-	br i1 %56, label %"if.then - 9", label %"if.done - 10"
+	%33 = load i32, i32* %2
+	%34 = icmp ule i32 %33, 65535
+	br i1 %34, label %"if.then - 9", label %"if.done - 10"
 
 "if.then - 9":
+	%35 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %0, i64 0, i32 0
+	%36 = load i8*, i8** %35
+	%37 = getelementptr i8, i8* %36, i64 0
+	%38 = load i32, i32* %1
+	%39 = lshr i32 %38, 12
+	%40 = trunc i32 %39 to i8
+	%41 = or i8 224, %40
+	store i8 %41, i8* %37
+	%42 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %0, i64 0, i32 0
+	%43 = load i8*, i8** %42
+	%44 = getelementptr i8, i8* %43, i64 1
+	%45 = load i32, i32* %1
+	%46 = lshr i32 %45, 6
+	%47 = trunc i32 %46 to i8
+	%48 = and i8 %47, 63
+	%49 = or i8 128, %48
+	store i8 %49, i8* %44
+	%50 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %0, i64 0, i32 0
+	%51 = load i8*, i8** %50
+	%52 = getelementptr i8, i8* %51, i64 2
+	%53 = load i32, i32* %1
+	%54 = trunc i32 %53 to i8
+	%55 = and i8 %54, 63
+	%56 = or i8 128, %55
+	store i8 %56, i8* %52
+	ret i64 3
+
+"if.done - 10":
 	%57 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %0, i64 0, i32 0
 	%58 = load i8*, i8** %57
 	%59 = getelementptr i8, i8* %58, i64 0
 	%60 = load i32, i32* %1
-	%61 = lshr i32 %60, 12
+	%61 = lshr i32 %60, 18
 	%62 = trunc i32 %61 to i8
-	%63 = or i8 224, %62
+	%63 = or i8 240, %62
 	store i8 %63, i8* %59
 	%64 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %0, i64 0, i32 0
 	%65 = load i8*, i8** %64
 	%66 = getelementptr i8, i8* %65, i64 1
 	%67 = load i32, i32* %1
-	%68 = lshr i32 %67, 6
+	%68 = lshr i32 %67, 12
 	%69 = trunc i32 %68 to i8
 	%70 = and i8 %69, 63
 	%71 = or i8 128, %70
@@ -231,47 +282,19 @@ define i64 @encode_rune({i8*, i64, i64} %buf, i32 %r) {
 	%73 = load i8*, i8** %72
 	%74 = getelementptr i8, i8* %73, i64 2
 	%75 = load i32, i32* %1
-	%76 = trunc i32 %75 to i8
-	%77 = and i8 %76, 63
-	%78 = or i8 128, %77
-	store i8 %78, i8* %74
-	ret i64 3
-
-"if.done - 10":
-	%79 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %0, i64 0, i32 0
-	%80 = load i8*, i8** %79
-	%81 = getelementptr i8, i8* %80, i64 0
-	%82 = load i32, i32* %1
-	%83 = lshr i32 %82, 18
+	%76 = lshr i32 %75, 6
+	%77 = trunc i32 %76 to i8
+	%78 = and i8 %77, 63
+	%79 = or i8 128, %78
+	store i8 %79, i8* %74
+	%80 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %0, i64 0, i32 0
+	%81 = load i8*, i8** %80
+	%82 = getelementptr i8, i8* %81, i64 3
+	%83 = load i32, i32* %1
 	%84 = trunc i32 %83 to i8
-	%85 = or i8 240, %84
-	store i8 %85, i8* %81
-	%86 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %0, i64 0, i32 0
-	%87 = load i8*, i8** %86
-	%88 = getelementptr i8, i8* %87, i64 1
-	%89 = load i32, i32* %1
-	%90 = lshr i32 %89, 12
-	%91 = trunc i32 %90 to i8
-	%92 = and i8 %91, 63
-	%93 = or i8 128, %92
-	store i8 %93, i8* %88
-	%94 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %0, i64 0, i32 0
-	%95 = load i8*, i8** %94
-	%96 = getelementptr i8, i8* %95, i64 2
-	%97 = load i32, i32* %1
-	%98 = lshr i32 %97, 6
-	%99 = trunc i32 %98 to i8
-	%100 = and i8 %99, 63
-	%101 = or i8 128, %100
-	store i8 %101, i8* %96
-	%102 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %0, i64 0, i32 0
-	%103 = load i8*, i8** %102
-	%104 = getelementptr i8, i8* %103, i64 3
-	%105 = load i32, i32* %1
-	%106 = trunc i32 %105 to i8
-	%107 = and i8 %106, 63
-	%108 = or i8 128, %107
-	store i8 %108, i8* %104
+	%85 = and i8 %84, 63
+	%86 = or i8 128, %85
+	store i8 %86, i8* %82
 	ret i64 4
 }
 
@@ -384,7 +407,7 @@ define void @print_int(i64 %i, i64 %base) {
 "for.body - 5":
 	%16 = alloca i8, align 1 ; c
 	store i8 zeroinitializer, i8* %16
-	%17 = getelementptr inbounds [64 x i8], [64 x i8]* @.str0, i64 0, i64 0
+	%17 = getelementptr inbounds [64 x i8], [64 x i8]* @.str2, i64 0, i64 0
 	%18 = load i64, i64* %1
 	%19 = load i64, i64* %0
 	%20 = srem i64 %19, %18
@@ -466,4 +489,6 @@ define void @print_int(i64 %i, i64 %base) {
 	ret void
 }
 
-@.str0 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"
+@.str0 = global [1 x i8] c"\0A"
+@.str1 = global [1 x i8] c"\0A"
+@.str2 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"

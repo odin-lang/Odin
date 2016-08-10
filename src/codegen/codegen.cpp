@@ -81,6 +81,8 @@ void ssa_gen_code(ssaGen *s) {
 			ssa_build_proc(v);
 	}
 
+	// m->layout = make_string("e-p:64:64:64");
+
 	ssa_print_llvm_ir(&s->output_file, &s->module);
 }
 

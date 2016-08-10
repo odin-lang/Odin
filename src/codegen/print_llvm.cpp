@@ -129,6 +129,9 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 		ssa_fprintf(f, "*, i%lld, i%lld}", word_bits, word_bits);
 		break;
 	case Type_Structure:
+		if (t->structure.is_packed) {
+			ssa_fprintf(f, "<");
+		}
 		ssa_fprintf(f, "{");
 		for (isize i = 0; i < t->structure.field_count; i++) {
 			if (i > 0) {
@@ -137,6 +140,10 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 			ssa_print_type(f, s, t->structure.fields[i]->type);
 		}
 		ssa_fprintf(f, "}");
+		if (t->structure.is_packed) {
+			ssa_fprintf(f, ">");
+		}
+
 		break;
 	case Type_Pointer:
 		ssa_print_type(f, s, t->pointer.elem);

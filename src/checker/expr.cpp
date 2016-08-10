@@ -58,6 +58,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	}
 	struct_type->structure.fields = fields;
 	struct_type->structure.field_count = field_count;
+	struct_type->structure.is_packed = st->is_packed;
 }
 
 Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize field_count) {

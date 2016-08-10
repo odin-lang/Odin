@@ -103,6 +103,7 @@ struct Type {
 			isize    field_count; // == offset_count
 			i64 *    offsets;
 			b32      are_offsets_set;
+			b32      is_packed;
 		} structure;
 		struct { Type *elem; } pointer;
 		struct {
@@ -563,37 +564,46 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	} break;
 
 	case Type_Structure: {
-		i64 max = 1;
-		for (isize i = 0; i < t->structure.field_count; i++) {
-			i64 align = type_align_of(s, allocator, t->structure.fields[i]->type);
-			if (max < align)
-				max = align;
+		if (!t->structure.is_packed) {
+			i64 max = 1;
+			for (isize i = 0; i < t->structure.field_count; i++) {
+				i64 align = type_align_of(s, allocator, t->structure.fields[i]->type);
+				if (max < align)
+					max = align;
+			}
+			return max;
 		}
-		return max;
 	} break;
 	}
 
-	return gb_clamp(type_size_of(s, allocator, t), 1, s.max_align);
+	return gb_clamp(next_pow2(type_size_of(s, allocator, t)), 1, s.max_align);
 }
 
-i64 *type_set_offsets_of(BaseTypeSizes s, gbAllocator allocator, Entity **fields, isize field_count) {
+i64 *type_set_offsets_of(BaseTypeSizes s, gbAllocator allocator, Entity **fields, isize field_count, b32 is_packed) {
 	// TODO(bill): use arena allocation
 	i64 *offsets = gb_alloc_array(allocator, i64, field_count);
 	i64 curr_offset = 0;
-	for (isize i = 0; i < field_count; i++) {
-		i64 align = type_align_of(s, allocator, fields[i]->type);
-		curr_offset = align_formula(curr_offset, align);
-		offsets[i] = curr_offset;
-		curr_offset += type_size_of(s, allocator, fields[i]->type);
-	}
+	if (is_packed) {
+		for (isize i = 0; i < field_count; i++) {
+			offsets[i] = curr_offset;
+			curr_offset += type_size_of(s, allocator, fields[i]->type);
+		}
 
+	} else {
+		for (isize i = 0; i < field_count; i++) {
+			i64 align = type_align_of(s, allocator, fields[i]->type);
+			curr_offset = align_formula(curr_offset, align);
+			offsets[i] = curr_offset;
+			curr_offset += type_size_of(s, allocator, fields[i]->type);
+		}
+	}
 	return offsets;
 }
 
 b32 type_set_offsets(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	GB_ASSERT(t->kind == Type_Structure);
 	if (!t->structure.are_offsets_set) {
-		t->structure.offsets = type_set_offsets_of(s, allocator, t->structure.fields, t->structure.field_count);
+		t->structure.offsets = type_set_offsets_of(s, allocator, t->structure.fields, t->structure.field_count, t->structure.is_packed);
 		t->structure.are_offsets_set = true;
 		return true;
 	}

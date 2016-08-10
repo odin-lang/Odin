@@ -206,6 +206,7 @@ AST_NODE_KIND(_TypeBegin, struct{}) \
 		Token token; \
 		AstNode *field_list; \
 		isize field_count; \
+		b32 is_packed; \
 	}) \
 AST_NODE_KIND(_TypeEnd, struct{}) \
 	AST_NODE_KIND(Count, struct{})
@@ -740,11 +741,12 @@ gb_inline AstNode *make_vector_type(AstFile *f, Token token, AstNode *count, Ast
 	return result;
 }
 
-gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNode *field_list, isize field_count) {
+gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNode *field_list, isize field_count, b32 is_packed) {
 	AstNode *result = make_node(f, AstNode_StructType);
 	result->StructType.token = token;
 	result->StructType.field_list = field_list;
 	result->StructType.field_count = field_count;
+	result->StructType.is_packed = is_packed;
 	return result;
 }
 
@@ -1491,12 +1493,21 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		AstNode *params = NULL;
 		isize param_count = 0;
 		AstScope *scope = make_ast_scope(f, NULL); // NOTE(bill): The struct needs its own scope with NO parent
+		b32 is_packed = false;
+		if (allow_token(f, Token_Hash)) {
+			Token tag = expect_token(f, Token_Identifier);
+			if (are_strings_equal(tag.string, make_string("packed"))) {
+				is_packed = true;
+			} else {
+				ast_file_err(f, tag, "Expected a `#packed` tag");
+			}
+		}
 
 		open   = expect_token(f, Token_OpenBrace);
 		params = parse_parameter_list(f, scope, &param_count);
 		close  = expect_token(f, Token_CloseBrace);
 
-		return make_struct_type(f, token, params, param_count);
+		return make_struct_type(f, token, params, param_count, is_packed);
 	}
 
 	case Token_proc:

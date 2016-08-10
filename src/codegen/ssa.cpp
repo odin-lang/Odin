@@ -1244,6 +1244,11 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		GB_PANIC("TODO(bill): ssa_build_single_expr ProcLit");
 	case_end;
 
+
+	case_ast_node(pl, CompoundLit, expr);
+		GB_PANIC("TODO(bill): ssa_build_single_expr CompoundLit");
+	case_end;
+
 	case_ast_node(ce, CastExpr, expr);
 		return ssa_emit_conv(proc, ssa_build_expr(proc, ce->expr), tv->type);
 	case_end;
@@ -1305,18 +1310,19 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			ssaValue *a = ssa_build_expr(proc, arg);
 			Type *at = ssa_value_type(a);
 			if (at->kind == Type_Tuple) {
-				GB_PANIC("TODO(bill): tuple call arguments");
+				ssaValue *tuple = ssa_add_local_generated(proc, at);
+				ssa_emit_store(proc, tuple, a);
+				for (isize i = 0; i < at->tuple.variable_count; i++) {
+					Entity *e = at->tuple.variables[i];
+					ssaValue *index = ssa_make_value_constant(proc->module->allocator, t_i32, make_exact_value_integer(i));
+					ssaValue *v = ssa_emit_struct_gep(proc, tuple, index, e->type);
+					v = ssa_emit_load(proc, v);
+					args[arg_index++] = v;
+				}
 			} else {
 				args[arg_index++] = a;
 			}
 		}
-
-#if 0
-		for (isize i = 0; i < arg_count; i++) {
-			Entity *e = type->params->tuple.variables[i];
-			args[i] = ssa_emit_conv(proc, args[i], e->type);
-		}
-#endif
 
 		ssaValue *call = ssa_make_instr_call(proc, value, args, arg_count, tv->type);
 		ssa_value_set_type(call, proc_type_);
@@ -1569,7 +1575,46 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 					}
 				}
 			} else { // Tuple(s)
-				GB_PANIC("TODO(bill): tuple assignment variable declaration");
+				gbArray(ssaLvalue)  lvals;
+				gbArray(ssaValue *) inits;
+				gb_array_init_reserve(lvals, gb_heap_allocator(), vd->name_count);
+				gb_array_init_reserve(inits, gb_heap_allocator(), vd->name_count);
+				defer (gb_array_free(lvals));
+				defer (gb_array_free(inits));
+
+				for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
+					ssaLvalue lval = {ssaLvalue_Blank};
+					if (!ssa_is_blank_ident(name)) {
+						ssa_add_local_for_identifier(proc, name);
+						lval = ssa_build_addr(proc, name);
+					}
+
+					gb_array_append(lvals, lval);
+				}
+
+				for (AstNode *value = vd->value_list; value != NULL; value = value->next) {
+					ssaValue *init = ssa_build_expr(proc, value);
+					Type *t = ssa_value_type(init);
+					if (t->kind == Type_Tuple) {
+						ssaValue *tuple = ssa_add_local_generated(proc, t);
+						ssa_emit_store(proc, tuple, init);
+						for (isize i = 0; i < t->tuple.variable_count; i++) {
+							Entity *e = t->tuple.variables[i];
+							ssaValue *index = ssa_make_value_constant(proc->module->allocator, t_i32, make_exact_value_integer(i));
+							ssaValue *v = ssa_emit_struct_gep(proc, tuple, index, e->type);
+							v = ssa_emit_load(proc, v);
+							gb_array_append(inits, v);
+						}
+					} else {
+						gb_array_append(inits, init);
+					}
+				}
+
+
+				gb_for_array(i, inits) {
+					ssaValue *v = ssa_emit_conv(proc, inits[i], ssa_lvalue_type(lvals[i]));
+					ssa_lvalue_store(lvals[i], proc, v);
+				}
 			}
 		}
 	case_end;
@@ -1624,7 +1669,32 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 					}
 				}
 			} else {
-				GB_PANIC("TODO(bill): tuple assignment");
+				gbArray(ssaValue *) inits;
+				gb_array_init_reserve(inits, gb_heap_allocator(), gb_array_count(lvals));
+				defer (gb_array_free(inits));
+
+				for (AstNode *rhs = as->rhs_list; rhs != NULL; rhs = rhs->next) {
+					ssaValue *init = ssa_build_expr(proc, rhs);
+					Type *t = ssa_value_type(init);
+					// TODO(bill): refactor for code reuse as this is repeated a bit
+					if (t->kind == Type_Tuple) {
+						ssaValue *tuple = ssa_add_local_generated(proc, t);
+						ssa_emit_store(proc, tuple, init);
+						for (isize i = 0; i < t->tuple.variable_count; i++) {
+							Entity *e = t->tuple.variables[i];
+							ssaValue *index = ssa_make_value_constant(proc->module->allocator, t_i32, make_exact_value_integer(i));
+							ssaValue *v = ssa_emit_struct_gep(proc, tuple, index, e->type);
+							v = ssa_emit_load(proc, v);
+							gb_array_append(inits, v);
+						}
+					} else {
+						gb_array_append(inits, init);
+					}
+				}
+
+				gb_for_array(i, inits) {
+					ssa_lvalue_store(lvals[i], proc, inits[i]);
+				}
 			}
 
 		} break;
