@@ -284,8 +284,15 @@ Type *ssa_instr_type(ssaInstr *instr) {
 		return instr->binary_op.type;
 	case ssaInstr_Conv:
 		return instr->conv.to;
-	case ssaInstr_Call:
-		return instr->call.type;
+	case ssaInstr_Call: {
+		Type *pt = instr->call.type;
+		GB_ASSERT(pt->kind == Type_Proc);
+		auto *tuple = &pt->proc.results->tuple;
+		if (tuple->variable_count != 1)
+			return pt->proc.results;
+		else
+			return tuple->variables[0]->type;
+	}
 	}
 	return NULL;
 }
@@ -560,12 +567,28 @@ b32 ssa_is_blank_ident(AstNode *node) {
 }
 
 
+ssaInstr *ssa_get_last_instr(ssaBlock *block) {
+	isize len = gb_array_count(block->instrs);
+	if (len > 0) {
+		ssaValue *v = block->instrs[len-1];
+		GB_ASSERT(v->kind == ssaValue_Instr);
+		return &v->instr;
+	}
+	return NULL;
+
+}
 
 ssaValue *ssa_emit(ssaProcedure *proc, ssaValue *instr) {
 	ssaBlock *b = proc->curr_block;
 	instr->instr.parent = b;
 	if (b) {
-		gb_array_append(b->instrs, instr);
+		ssaInstr *i = ssa_get_last_instr(b);
+		if (i && (i->kind == ssaInstr_Ret || i->kind == ssaInstr_Unreachable)) {
+			// NOTE(bill): any instruction in the current block after a `ret`
+			// or an `unreachable`, is never executed
+		} else {
+			gb_array_append(b->instrs, instr);
+		}
 	}
 	return instr;
 }
@@ -688,11 +711,13 @@ void ssa_emit_if(ssaProcedure *proc, ssaValue *cond, ssaBlock *true_block, ssaBl
 
 ssaBlock *ssa__make_block(ssaProcedure *proc, AstNode *node, String label) {
 	Scope *scope = NULL;
-	Scope **found = map_get(&proc->module->info->scopes, hash_pointer(node));
-	if (found) {
-		scope = *found;
-	} else {
-		GB_PANIC("Block scope not found");
+	if (node != NULL) {
+		Scope **found = map_get(&proc->module->info->scopes, hash_pointer(node));
+		if (found) {
+			scope = *found;
+		} else {
+			GB_PANIC("Block scope not found for %.*s", LIT(ast_node_strings[node->kind]));
+		}
 	}
 
 	ssaValue *block = ssa_make_value_block(proc, node, scope, label);
@@ -1021,6 +1046,8 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 
 	Type *src = get_base_type(src_type);
 	Type *dst = get_base_type(t);
+	if (are_types_identical(t, src_type))
+		return value;
 
 	if (value->kind == ssaValue_Constant) {
 		if (dst->kind == Type_Basic)
@@ -1035,6 +1062,12 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 		if (dz >= sz) {
 			kind = ssaConv_zext;
 		}
+
+		if (sz == dz) {
+			// NOTE(bill): In LLVM, all integers are signed and rely upon 2's compliment
+			return value;
+		}
+
 		return ssa_emit(proc, ssa_make_instr_conv(proc, kind, value, src, dst));
 	}
 
@@ -1117,7 +1150,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 	case_ast_node(i, Ident, expr);
 		Entity *e = *map_get(&proc->module->info->uses, hash_pointer(expr));
 		if (e->kind == Entity_Builtin) {
-			GB_PANIC("TODO(bill): Entity_Builtin");
+			GB_PANIC("TODO(bill): ssa_build_single_expr Entity_Builtin");
 			return NULL;
 		}
 
@@ -1181,6 +1214,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		case Token_Or:
 		case Token_Xor:
 		case Token_AndNot:
+		case Token_Shl:
+		case Token_Shr:
 			return ssa_emit_arith(proc, be->op,
 			                      ssa_build_expr(proc, be->left),
 			                      ssa_build_expr(proc, be->right),

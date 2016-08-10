@@ -274,6 +274,22 @@ Type *check_type_expr_extra(Checker *c, AstNode *e, Type *named_type) {
 		}
 	case_end;
 
+	case_ast_node(vt, VectorType, e);
+		Type *elem = check_type(c, vt->elem);
+		Type *be = get_base_type(elem);
+		if (!is_type_vector(be) &&
+			!(is_type_boolean(be) || is_type_numeric(be))) {
+			err_str = type_to_string(elem);
+			error(&c->error_collector, ast_node_token(vt->elem), "Vector element type must be a boolean, numerical, or vector. Got `%s`", err_str);
+			break;
+		} else {
+			i64 count = check_array_count(c, vt->count);
+			Type *t = make_type_vector(c->allocator, elem, count);
+			set_base_type(named_type, t);
+			return t;
+		}
+	case_end;
+
 	case_ast_node(st, StructType, e);
 		Type *t = make_type_structure(c->allocator);
 		set_base_type(named_type, t);
@@ -366,6 +382,22 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 		goto end;
 	case_end;
 
+
+	case_ast_node(vt, VectorType, e);
+		Type *elem = check_type(c, vt->elem);
+		Type *be = get_base_type(elem);
+		i64 count = check_array_count(c, vt->count);
+		if (!is_type_vector(be) &&
+			!(is_type_boolean(be) || is_type_numeric(be))) {
+			err_str = type_to_string(elem);
+			error(&c->error_collector, ast_node_token(vt->elem), "Vector element type must be a boolean, numerical, or vector. Got `%s`", err_str);
+		} else {
+		}
+		type = make_type_vector(c->allocator, elem, count);
+		set_base_type(named_type, type);
+		goto end;
+	case_end;
+
 	case_ast_node(st, StructType, e);
 		type = make_type_structure(c->allocator);
 		set_base_type(named_type, type);
@@ -404,25 +436,26 @@ end:
 
 b32 check_unary_op(Checker *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
+	Type *type = get_base_type(base_vector_type(o->type));
 	gbString str = NULL;
 	defer (gb_string_free(str));
 	switch (op.kind) {
 	case Token_Add:
 	case Token_Sub:
-		if (!is_type_numeric(o->type)) {
+		if (!is_type_numeric(type)) {
 			str = expr_to_string(o->expr);
 			error(&c->error_collector, op, "Operator `%.*s` is not allowed with `%s`", LIT(op.string), str);
 		}
 		break;
 
 	case Token_Xor:
-		if (!is_type_integer(o->type)) {
+		if (!is_type_integer(type)) {
 			error(&c->error_collector, op, "Operator `%.*s` is only allowed with integers", LIT(op.string));
 		}
 		break;
 
 	case Token_Not:
-		if (!is_type_boolean(o->type)) {
+		if (!is_type_boolean(type)) {
 			str = expr_to_string(o->expr);
 			error(&c->error_collector, op, "Operator `%.*s` is only allowed on boolean expression", LIT(op.string));
 		}
@@ -438,6 +471,7 @@ b32 check_unary_op(Checker *c, Operand *o, Token op) {
 
 b32 check_binary_op(Checker *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
+	Type *type = get_base_type(base_vector_type(o->type));
 	switch (op.kind) {
 	case Token_Add:
 	case Token_Sub:
@@ -448,7 +482,7 @@ b32 check_binary_op(Checker *c, Operand *o, Token op) {
 	case Token_SubEq:
 	case Token_MulEq:
 	case Token_QuoEq:
-		if (!is_type_numeric(o->type)) {
+		if (!is_type_numeric(type)) {
 			error(&c->error_collector, op, "Operator `%.*s` is only allowed with numeric expressions", LIT(op.string));
 			return false;
 		}
@@ -465,7 +499,7 @@ b32 check_binary_op(Checker *c, Operand *o, Token op) {
 	case Token_OrEq:
 	case Token_XorEq:
 	case Token_AndNotEq:
-		if (!is_type_integer(o->type)) {
+		if (!is_type_integer(type)) {
 			error(&c->error_collector, op, "Operator `%.*s` is only allowed with integers", LIT(op.string));
 			return false;
 		}
@@ -476,7 +510,7 @@ b32 check_binary_op(Checker *c, Operand *o, Token op) {
 
 	case Token_CmpAndEq:
 	case Token_CmpOrEq:
-		if (!is_type_boolean(o->type)) {
+		if (!is_type_boolean(type)) {
 			error(&c->error_collector, op, "Operator `%.*s` is only allowed with boolean expressions", LIT(op.string));
 			return false;
 		}
@@ -671,7 +705,107 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 		update_expr_type(c, y->expr, default_type(y->type), true);
 	}
 
+	if (is_type_vector(x->type)) {
+		Type *vec_bool = NULL;
+		do {
+		} while (is_type_vector(x->type->vector.elem));
+	}
 	x->type = t_untyped_bool;
+
+}
+
+void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
+	GB_ASSERT(node->kind == AstNode_BinaryExpr);
+	ast_node(be, BinaryExpr, node);
+
+
+	ExactValue x_val = {};
+	if (x->mode == Addressing_Constant) {
+		x_val = exact_value_to_integer(x->value);
+	}
+
+	b32 x_is_untyped = is_type_untyped(x->type);
+	if (!(is_type_integer(x->type) || (x_is_untyped && x_val.kind == ExactValue_Integer))) {
+		gbString err_str = expr_to_string(x->expr);
+		defer (gb_string_free(err_str));
+		error(&c->error_collector, ast_node_token(node),
+		      "Shifted operand `%s` must be an integer", err_str);
+		x->mode = Addressing_Invalid;
+		return;
+	}
+
+	if (is_type_unsigned(y->type)) {
+
+	} else if (is_type_untyped(y->type)) {
+		convert_to_typed(c, y, t_untyped_integer);
+		if (y->mode == Addressing_Invalid) {
+			x->mode = Addressing_Invalid;
+			return;
+		}
+	} else {
+		gbString err_str = expr_to_string(y->expr);
+		defer (gb_string_free(err_str));
+		error(&c->error_collector, ast_node_token(node),
+		      "Shift amount `%s` must be an unsigned integer", err_str);
+		x->mode = Addressing_Invalid;
+		return;
+	}
+
+
+	if (x->mode == Addressing_Constant) {
+		if (y->mode == Addressing_Constant) {
+			ExactValue y_val = exact_value_to_integer(y->value);
+			if (y_val.kind != ExactValue_Integer) {
+				gbString err_str = expr_to_string(y->expr);
+				defer (gb_string_free(err_str));
+				error(&c->error_collector, ast_node_token(node),
+				      "Shift amount `%s` must be an unsigned integer", err_str);
+				x->mode = Addressing_Invalid;
+				return;
+			}
+
+			u64 amount = cast(u64)y_val.value_integer;
+			if (amount > 1074) {
+				gbString err_str = expr_to_string(y->expr);
+				defer (gb_string_free(err_str));
+				error(&c->error_collector, ast_node_token(node),
+				      "Shift amount too large: `%s`", err_str);
+				x->mode = Addressing_Invalid;
+				return;
+			}
+
+			if (!is_type_integer(x->type)) {
+				// NOTE(bill): It could be an untyped float but still representable
+				// as an integer
+				x->type = t_untyped_integer;
+			}
+
+			x->value = exact_value_shift(be->op, x_val, make_exact_value_integer(amount));
+
+			if (is_type_typed(x->type)) {
+				check_is_expressible(c, x, get_base_type(x->type));
+			}
+			return;
+		}
+
+		if (x_is_untyped) {
+			ExpressionInfo *info = map_get(&c->info.untyped, hash_pointer(x->expr));
+			if (info != NULL) {
+				info->is_lhs = true;
+			}
+			x->mode = Addressing_Value;
+			return;
+		}
+	}
+
+	if (y->mode == Addressing_Constant && y->value.value_integer < 0) {
+		gbString err_str = expr_to_string(y->expr);
+		defer (gb_string_free(err_str));
+		error(&c->error_collector, ast_node_token(node),
+		      "Shift amount cannot be negative: `%s`", err_str);
+	}
+
+	x->mode = Addressing_Value;
 }
 
 void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
@@ -684,10 +818,17 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 
 	check_expr(c, x, be->left);
 	check_expr(c, y, be->right);
-	if (x->mode == Addressing_Invalid) return;
+	if (x->mode == Addressing_Invalid) {
+		return;
+	}
 	if (y->mode == Addressing_Invalid) {
 		x->mode = Addressing_Invalid;
 		x->expr = y->expr;
+		return;
+	}
+
+	if (token_is_shift(be->op)) {
+		check_shift(c, x, y, node);
 		return;
 	}
 
@@ -791,8 +932,12 @@ void update_expr_type(Checker *c, AstNode *e, Type *type, b32 final) {
 		if (found->value.kind != ExactValue_Invalid)
 			break;
 		if (!token_is_comparison(be->op)) {
-			update_expr_type(c, be->left,  type, final);
-			update_expr_type(c, be->right, type, final);
+			if (token_is_shift(be->op)) {
+				update_expr_type(c, be->left,  type, final);
+			} else {
+				update_expr_type(c, be->left,  type, final);
+				update_expr_type(c, be->right, type, final);
+			}
 		}
 	case_end;
 	}
@@ -1891,6 +2036,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 	case AstNode_ProcType:
 	case AstNode_PointerType:
 	case AstNode_ArrayType:
+	case AstNode_VectorType:
 	case AstNode_StructType:
 		o->mode = Addressing_Type;
 		o->type = check_type(c, node);
@@ -2121,6 +2267,13 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, at->count);
 		str = gb_string_appendc(str, "]");
 		str = write_expr_to_string(str, at->elem);
+	case_end;
+
+	case_ast_node(vt, VectorType, node);
+		str = gb_string_appendc(str, "{");
+		str = write_expr_to_string(str, vt->count);
+		str = gb_string_appendc(str, "}");
+		str = write_expr_to_string(str, vt->elem);
 	case_end;
 
 	case_ast_node(ce, CallExpr, node);

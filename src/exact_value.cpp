@@ -272,6 +272,8 @@ ExactValue exact_binary_operator_value(Token op, ExactValue x, ExactValue y) {
 		case Token_Or:     c = a | b;  break;
 		case Token_Xor:    c = a ^ b;  break;
 		case Token_AndNot: c = a&(~b); break;
+		case Token_Shl:    c = a << b; break;
+		case Token_Shr:    c = a >> b; break;
 		default: goto error;
 		}
 		return make_exact_value_integer(c);
@@ -296,10 +298,11 @@ error:
 	return error_value;
 }
 
-gb_inline ExactValue exact_value_add(ExactValue x, ExactValue y) { Token op = {Token_Add}; return exact_binary_operator_value(op, x, y); }
-gb_inline ExactValue exact_value_sub(ExactValue x, ExactValue y) { Token op = {Token_Sub}; return exact_binary_operator_value(op, x, y); }
-gb_inline ExactValue exact_value_mul(ExactValue x, ExactValue y) { Token op = {Token_Mul}; return exact_binary_operator_value(op, x, y); }
-gb_inline ExactValue exact_value_quo(ExactValue x, ExactValue y) { Token op = {Token_Quo}; return exact_binary_operator_value(op, x, y); }
+gb_inline ExactValue exact_value_add(ExactValue x, ExactValue y) { Token op = {Token_Add};        return exact_binary_operator_value(op, x, y); }
+gb_inline ExactValue exact_value_sub(ExactValue x, ExactValue y) { Token op = {Token_Sub};        return exact_binary_operator_value(op, x, y); }
+gb_inline ExactValue exact_value_mul(ExactValue x, ExactValue y) { Token op = {Token_Mul};        return exact_binary_operator_value(op, x, y); }
+gb_inline ExactValue exact_value_quo(ExactValue x, ExactValue y) { Token op = {Token_Quo};        return exact_binary_operator_value(op, x, y); }
+gb_inline ExactValue exact_value_shift(Token op, ExactValue x, ExactValue y) { return exact_binary_operator_value(op, x, y); }
 
 
 i32 cmp_f64(f64 a, f64 b) {

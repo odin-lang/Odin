@@ -96,14 +96,18 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 		case Basic_i16:    ssa_fprintf(f, "i16");                     break;
 		case Basic_i32:    ssa_fprintf(f, "i32");                     break;
 		case Basic_i64:    ssa_fprintf(f, "i64");                     break;
+		case Basic_i128:   ssa_fprintf(f, "i128");                    break;
 		case Basic_u8:     ssa_fprintf(f, "i8");                      break;
 		case Basic_u16:    ssa_fprintf(f, "i16");                     break;
 		case Basic_u32:    ssa_fprintf(f, "i32");                     break;
 		case Basic_u64:    ssa_fprintf(f, "i64");                     break;
+		case Basic_u128:   ssa_fprintf(f, "u128");                    break;
+		case Basic_f16:    ssa_fprintf(f, "half");                    break;
 		case Basic_f32:    ssa_fprintf(f, "float");                   break;
 		case Basic_f64:    ssa_fprintf(f, "double");                  break;
-		case Basic_rawptr: ssa_fprintf(f, "%%-rawptr");               break;
-		case Basic_string: ssa_fprintf(f, "%%-string");               break;
+		case Basic_f128:   ssa_fprintf(f, "fp128");                   break;
+		case Basic_rawptr: ssa_fprintf(f, "%%.rawptr");               break;
+		case Basic_string: ssa_fprintf(f, "%%.string");               break;
 		case Basic_uint:   ssa_fprintf(f, "i%lld", word_bits);        break;
 		case Basic_int:    ssa_fprintf(f, "i%lld", word_bits);        break;
 		}
@@ -113,6 +117,12 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 		ssa_print_type(f, s, t->array.elem);
 		ssa_fprintf(f, "]");
 		break;
+	case Type_Vector: {
+		// TODO(bill): actually do correctly
+		ssa_fprintf(f, "<%lld x ", t->vector.count);
+		ssa_print_type(f, s, t->vector.elem);
+		ssa_fprintf(f, ">");
+	} break;
 	case Type_Slice:
 		ssa_fprintf(f, "{");
 		ssa_print_type(f, s, t->slice.elem);
@@ -366,11 +376,15 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	case ssaInstr_BinaryOp: {
 		auto *bo = &value->instr.binary_op;
 		Type *type = ssa_value_type(bo->left);
+		Type *elem_type = type;
+		while (elem_type->kind == Type_Vector) {
+			elem_type = elem_type->vector.elem;
+		}
 
 		ssa_fprintf(f, "%%%d = ", value->id);
 
 		if (gb_is_between(bo->op.kind, Token__ComparisonBegin+1, Token__ComparisonEnd-1)) {
-			if (is_type_float(type)) {
+			if (is_type_float(elem_type)) {
 				ssa_fprintf(f, "fcmp ");
 				switch (bo->op.kind) {
 				case Token_CmpEq: ssa_fprintf(f, "oeq"); break;
@@ -384,7 +398,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 				ssa_fprintf(f, "icmp ");
 				if (bo->op.kind != Token_CmpEq &&
 				    bo->op.kind != Token_NotEq) {
-					if (is_type_unsigned(type)) {
+					if (is_type_unsigned(elem_type)) {
 						ssa_fprintf(f, "u");
 					} else {
 						ssa_fprintf(f, "s");
@@ -400,24 +414,25 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 				}
 			}
 		} else {
-			if (is_type_float(type))
+			if (is_type_float(elem_type))
 				ssa_fprintf(f, "f");
 
 			switch (bo->op.kind) {
 			case Token_Add:    ssa_fprintf(f, "add"); break;
 			case Token_Sub:    ssa_fprintf(f, "sub"); break;
 			case Token_And:    ssa_fprintf(f, "and"); break;
-			case Token_Or:     ssa_fprintf(f, "or"); break;
+			case Token_Or:     ssa_fprintf(f, "or");  break;
 			case Token_Xor:    ssa_fprintf(f, "xor"); break;
+			case Token_Shl:    ssa_fprintf(f, "shl"); break;
+			case Token_Shr:    ssa_fprintf(f, "lshr"); break;
+			case Token_Mul:    ssa_fprintf(f, "mul"); break;
 
 			case Token_AndNot: GB_PANIC("Token_AndNot Should never be called");
 
-			case Token_Mul:    ssa_fprintf(f, "mul"); break;
-
 			default: {
-				if (!is_type_float(type)) {
-					if (is_type_unsigned(type)) ssa_fprintf(f, "u");
-					else                        ssa_fprintf(f, "s");
+				if (!is_type_float(elem_type)) {
+					if (is_type_unsigned(elem_type)) ssa_fprintf(f, "u");
+					else                             ssa_fprintf(f, "s");
 				}
 
 				switch (bo->op.kind) {
@@ -483,12 +498,12 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 		ssa_fprintf(f, "target datalayout = %.*s\n", LIT(m->layout));
 	}
 
-	ssa_print_encoded_local(f, make_string("-string"));
+	ssa_print_encoded_local(f, make_string(".string"));
 	ssa_fprintf(f, " = type {i8*, ");
 	ssa_print_type(f, m->sizes, t_int);
 	ssa_fprintf(f, "} ; Basic_string\n\n");
 
-	ssa_print_encoded_local(f, make_string("-rawptr"));
+	ssa_print_encoded_local(f, make_string(".rawptr"));
 	ssa_fprintf(f, " = type i8*");
 	ssa_fprintf(f, " ; Basic_rawptr\n\n");
 

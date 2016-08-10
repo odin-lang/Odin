@@ -7,12 +7,16 @@ enum BasicKind {
 	Basic_i16,
 	Basic_i32,
 	Basic_i64,
+	Basic_i128,
 	Basic_u8,
 	Basic_u16,
 	Basic_u32,
 	Basic_u64,
+	Basic_u128,
+	Basic_f16,
 	Basic_f32,
 	Basic_f64,
+	Basic_f128,
 	Basic_int,
 	Basic_uint,
 	Basic_rawptr,
@@ -56,6 +60,7 @@ struct BasicType {
 	TYPE_KIND(Invalid), \
 	TYPE_KIND(Basic), \
 	TYPE_KIND(Array), \
+	TYPE_KIND(Vector), \
 	TYPE_KIND(Slice), \
 	TYPE_KIND(Structure), \
 	TYPE_KIND(Pointer), \
@@ -85,6 +90,10 @@ struct Type {
 			Type *elem;
 			i64 count;
 		} array;
+		struct {
+			Type *elem;
+			i64 count;
+		} vector;
 		struct {
 			Type *elem;
 		} slice;
@@ -159,6 +168,13 @@ Type *make_type_array(gbAllocator a, Type *elem, i64 count) {
 	return t;
 }
 
+Type *make_type_vector(gbAllocator a, Type *elem, i64 count) {
+	Type *t = alloc_type(a, Type_Vector);
+	t->vector.elem = elem;
+	t->vector.count = count;
+	return t;
+}
+
 Type *make_type_slice(gbAllocator a, Type *elem) {
 	Type *t = alloc_type(a, Type_Slice);
 	t->array.elem = elem;
@@ -223,12 +239,16 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_i16,            BasicFlag_Integer,                      STR_LIT("i16")}},
 	{Type_Basic, {Basic_i32,            BasicFlag_Integer,                      STR_LIT("i32")}},
 	{Type_Basic, {Basic_i64,            BasicFlag_Integer,                      STR_LIT("i64")}},
+	{Type_Basic, {Basic_i128,           BasicFlag_Integer,                      STR_LIT("i128")}},
 	{Type_Basic, {Basic_u8,             BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u8")}},
 	{Type_Basic, {Basic_u16,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u16")}},
 	{Type_Basic, {Basic_u32,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u32")}},
 	{Type_Basic, {Basic_u64,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u64")}},
+	{Type_Basic, {Basic_u128,           BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u128")}},
+	{Type_Basic, {Basic_f16,            BasicFlag_Float,                        STR_LIT("f16")}},
 	{Type_Basic, {Basic_f32,            BasicFlag_Float,                        STR_LIT("f32")}},
 	{Type_Basic, {Basic_f64,            BasicFlag_Float,                        STR_LIT("f64")}},
+	{Type_Basic, {Basic_f128,           BasicFlag_Float,                        STR_LIT("f128")}},
 	{Type_Basic, {Basic_int,            BasicFlag_Integer,                      STR_LIT("int")}},
 	{Type_Basic, {Basic_uint,           BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("uint")}},
 	{Type_Basic, {Basic_rawptr,         BasicFlag_Pointer,                      STR_LIT("rawptr")}},
@@ -256,8 +276,10 @@ gb_global Type *t_u8              = &basic_types[Basic_u8];
 gb_global Type *t_u16             = &basic_types[Basic_u16];
 gb_global Type *t_u32             = &basic_types[Basic_u32];
 gb_global Type *t_u64             = &basic_types[Basic_u64];
+gb_global Type *t_f16             = &basic_types[Basic_f16];
 gb_global Type *t_f32             = &basic_types[Basic_f32];
 gb_global Type *t_f64             = &basic_types[Basic_f64];
+gb_global Type *t_f128            = &basic_types[Basic_f128];
 gb_global Type *t_int             = &basic_types[Basic_int];
 gb_global Type *t_uint            = &basic_types[Basic_uint];
 gb_global Type *t_rawptr          = &basic_types[Basic_rawptr];
@@ -295,6 +317,8 @@ b32 is_type_unsigned(Type *t) {
 b32 is_type_numeric(Type *t) {
 	if (t->kind == Type_Basic)
 		return (t->basic.flags & BasicFlag_Numeric) != 0;
+	if (t->kind == Type_Vector)
+		return is_type_numeric(t->vector.elem);
 	return false;
 }
 b32 is_type_string(Type *t) {
@@ -351,13 +375,22 @@ b32 is_type_u8(Type *t) {
 b32 is_type_slice(Type *t) {
 	return t->kind == Type_Slice;
 }
-
-
 b32 is_type_u8_slice(Type *t) {
 	if (t->kind == Type_Slice)
 		return is_type_u8(t->slice.elem);
 	return false;
 }
+b32 is_type_vector(Type *t) {
+	return t->kind == Type_Vector;
+}
+Type *base_vector_type(Type *t) {
+	while (is_type_vector(t)) {
+		t = t->vector.elem;
+	}
+	return t;
+}
+
+
 
 b32 is_type_comparable(Type *t) {
 	t = get_base_type(t);
@@ -375,6 +408,8 @@ b32 is_type_comparable(Type *t) {
 	} break;
 	case Type_Array:
 		return is_type_comparable(t->array.elem);
+	case Type_Vector:
+		return is_type_comparable(t->vector.elem);
 	}
 	return false;
 }
@@ -397,6 +432,11 @@ b32 are_types_identical(Type *x, Type *y) {
 	case Type_Array:
 		if (y->kind == Type_Array)
 			return (x->array.count == y->array.count) && are_types_identical(x->array.elem, y->array.elem);
+		break;
+
+	case Type_Vector:
+		if (y->kind == Type_Vector)
+			return (x->vector.count == y->vector.count) && are_types_identical(x->vector.elem, y->vector.elem);
 		break;
 
 	case Type_Structure:
@@ -482,18 +522,22 @@ struct BaseTypeSizes {
 
 // TODO(bill): Change
 gb_global i64 basic_type_sizes[] = {
-	0, // Basic_Invalid
-	1, // Basic_bool // TODO(bill): What size should this be? And should I have different booleans?
-	1, // Basic_i8
-	2, // Basic_i16
-	4, // Basic_i32
-	8, // Basic_i64
-	1, // Basic_u8
-	2, // Basic_u16
-	4, // Basic_u32
-	8, // Basic_u64
-	4, // Basic_f32
-	8, // Basic_f64
+	0,  // Basic_Invalid
+	1,  // Basic_bool // TODO(bill): What size should this be? And should I have different booleans?
+	1,  // Basic_i8
+	2,  // Basic_i16
+	4,  // Basic_i32
+	8,  // Basic_i64
+	16, // Basic_i128
+	1,  // Basic_u8
+	2,  // Basic_u16
+	4,  // Basic_u32
+	8,  // Basic_u64
+	16, // Basic_u128
+	2,  // Basic_f16
+	4,  // Basic_f32
+	8,  // Basic_f64
+	16, // Basic_f128
 };
 
 
@@ -512,6 +556,12 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	switch (t->kind) {
 	case Type_Array:
 		return type_align_of(s, allocator, t->array.elem);
+	case Type_Vector: {
+		i64 size = type_size_of(s, allocator, t->vector.elem);
+		// TODO(bill): Type_Vector type_align_of
+		return gb_clamp(size, 1, 2*s.max_align);
+	} break;
+
 	case Type_Structure: {
 		i64 max = 1;
 		for (isize i = 0; i < t->structure.field_count; i++) {
@@ -575,6 +625,18 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		return alignment*(count-1) + size;
 	} break;
 
+	case Type_Vector: {
+		i64 count = t->vector.count;
+		if (count == 0)
+			return 0;
+		count = next_pow2(count);
+		i64 align = type_align_of(s, allocator, t->vector.elem);
+		i64 size  = type_size_of(s,  allocator, t->vector.elem);
+		i64 alignment = align_formula(size, align);
+		return alignment*(count-1) + size;
+	} break;
+
+
 	case Type_Slice: // ptr + len + cap
 		return 3 * s.word_size;
 
@@ -615,6 +677,11 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_Array:
 		str = gb_string_appendc(str, gb_bprintf("[%td]", type->array.count));
 		str = write_type_to_string(str, type->array.elem);
+		break;
+
+	case Type_Vector:
+		str = gb_string_appendc(str, gb_bprintf("{%td}", type->vector.count));
+		str = write_type_to_string(str, type->vector.elem);
 		break;
 
 	case Type_Slice:

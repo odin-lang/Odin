@@ -20,6 +20,17 @@ gb_inline u64 hash_pointer(void *ptr) {
 	return p;
 }
 
+i64 next_pow2(i64 n) {
+	n--;
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	n |= n >> 32;
+	n++;
+	return n;
+}
 
 
 #define gb_for_array(index_, array_) for (isize index_ = 0; index_ < gb_array_count(array_); index_++)

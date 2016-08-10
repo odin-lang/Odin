@@ -197,6 +197,11 @@ AST_NODE_KIND(_TypeBegin, struct{}) \
 		AstNode *count; \
 		AstNode *elem; \
 	}) \
+	AST_NODE_KIND(VectorType, struct { \
+		Token token; \
+		AstNode *count; \
+		AstNode *elem; \
+	}) \
 	AST_NODE_KIND(StructType, struct { \
 		Token token; \
 		AstNode *field_list; \
@@ -341,6 +346,8 @@ Token ast_node_token(AstNode *node) {
 		return node->PointerType.token;
 	case AstNode_ArrayType:
 		return node->ArrayType.token;
+	case AstNode_VectorType:
+		return node->VectorType.token;
 	case AstNode_StructType:
 		return node->StructType.token;
 	}
@@ -725,6 +732,14 @@ gb_inline AstNode *make_array_type(AstFile *f, Token token, AstNode *count, AstN
 	return result;
 }
 
+gb_inline AstNode *make_vector_type(AstFile *f, Token token, AstNode *count, AstNode *elem) {
+	AstNode *result = make_node(f, AstNode_VectorType);
+	result->VectorType.token = token;
+	result->VectorType.count = count;
+	result->VectorType.elem  = elem;
+	return result;
+}
+
 gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNode *field_list, isize field_count) {
 	AstNode *result = make_node(f, AstNode_StructType);
 	result->StructType.token = token;
@@ -1031,6 +1046,7 @@ b32 is_literal_type(AstNode *node) {
 	case AstNode_BadExpr:
 	case AstNode_Ident:
 	case AstNode_ArrayType:
+	case AstNode_VectorType:
 	case AstNode_StructType:
 		return true;
 	}
@@ -1275,6 +1291,8 @@ AstNode *parse_simple_stmt(AstFile *f) {
 	case Token_AndEq:
 	case Token_OrEq:
 	case Token_XorEq:
+	case Token_ShlEq:
+	case Token_ShrEq:
 	case Token_AndNotEq:
 	case Token_CmpAndEq:
 	case Token_CmpOrEq:
@@ -1456,6 +1474,15 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		expect_token(f, Token_CloseBracket);
 		f->expr_level--;
 		return make_array_type(f, token, count_expr, parse_type(f));
+	}
+
+	case Token_OpenBrace: {
+		f->expr_level++;
+		Token token = expect_token(f, Token_OpenBrace);
+		AstNode *count_expr = parse_expr(f, false);
+		expect_token(f, Token_CloseBrace);
+		f->expr_level--;
+		return make_vector_type(f, token, count_expr, parse_type(f));
 	}
 
 	case Token_struct: {

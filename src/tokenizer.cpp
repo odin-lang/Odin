@@ -52,6 +52,8 @@ TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
 	TOKEN_KIND(Token_Or, "|"), \
 	TOKEN_KIND(Token_Xor, "~"), \
 	TOKEN_KIND(Token_AndNot, "&~"), \
+	TOKEN_KIND(Token_Shl, "<<"), \
+	TOKEN_KIND(Token_Shr, ">>"), \
 TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
 	TOKEN_KIND(Token_AddEq, "+="), \
 	TOKEN_KIND(Token_SubEq, "-="), \
@@ -62,6 +64,8 @@ TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
 	TOKEN_KIND(Token_OrEq, "|="), \
 	TOKEN_KIND(Token_XorEq, "~="), \
 	TOKEN_KIND(Token_AndNotEq, "&~="), \
+	TOKEN_KIND(Token_ShlEq, "<<="), \
+	TOKEN_KIND(Token_ShrEq, ">>="), \
 TOKEN_KIND(Token__AssignOpEnd, "_AssignOpEnd"), \
 	TOKEN_KIND(Token_Increment, "++"), \
 	TOKEN_KIND(Token_Decrement, "--"), \
@@ -217,6 +221,8 @@ i32 token_precedence(Token t) {
 	case Token_Mod:
 	case Token_And:
 	case Token_AndNot:
+	case Token_Shl:
+	case Token_Shr:
 		return 5;
 	}
 
@@ -235,6 +241,9 @@ gb_inline b32 token_is_keyword(Token t) {
 }
 gb_inline b32 token_is_comparison(Token t) {
 	return gb_is_between(t.kind, Token__ComparisonBegin+1, Token__ComparisonEnd-1);
+}
+gb_inline b32 token_is_shift(Token t) {
+	return t.kind == Token_Shl || t.kind == Token_Shr;
 }
 
 gb_inline void print_token(Token t) { gb_printf("%.*s\n", LIT(t.string)); }
@@ -561,7 +570,7 @@ b32 scan_escape(Tokenizer *t, Rune quote) {
 	return true;
 }
 
-gb_inline TokenKind token_type_variant2(Tokenizer *t, TokenKind a, TokenKind b) {
+gb_inline TokenKind token_kind_variant2(Tokenizer *t, TokenKind a, TokenKind b) {
 	if (t->curr_rune == '=') {
 		advance_to_next_rune(t);
 		return b;
@@ -570,7 +579,7 @@ gb_inline TokenKind token_type_variant2(Tokenizer *t, TokenKind a, TokenKind b) 
 }
 
 
-gb_inline TokenKind token_type_variant3(Tokenizer *t, TokenKind a, TokenKind b, Rune ch_c, TokenKind c) {
+gb_inline TokenKind token_kind_variant3(Tokenizer *t, TokenKind a, TokenKind b, Rune ch_c, TokenKind c) {
 	if (t->curr_rune == '=') {
 		advance_to_next_rune(t);
 		return b;
@@ -582,7 +591,7 @@ gb_inline TokenKind token_type_variant3(Tokenizer *t, TokenKind a, TokenKind b, 
 	return a;
 }
 
-gb_inline TokenKind token_type_variant4(Tokenizer *t, TokenKind a, TokenKind b, Rune ch_c, TokenKind c, Rune ch_d, TokenKind d) {
+gb_inline TokenKind token_kind_variant4(Tokenizer *t, TokenKind a, TokenKind b, Rune ch_c, TokenKind c, Rune ch_d, TokenKind d) {
 	if (t->curr_rune == '=') {
 		advance_to_next_rune(t);
 		return b;
@@ -594,6 +603,22 @@ gb_inline TokenKind token_type_variant4(Tokenizer *t, TokenKind a, TokenKind b, 
 		return d;
 	}
 	return a;
+}
+
+
+gb_inline TokenKind token_kind_dub_eq(Tokenizer *t, Rune sing_rune, TokenKind sing, TokenKind sing_eq, TokenKind dub, TokenKind dub_eq) {
+	if (t->curr_rune == '=') {
+		advance_to_next_rune(t);
+		return sing_eq;
+	} else if (t->curr_rune == sing_rune) {
+		advance_to_next_rune(t);
+		if (t->curr_rune == '=') {
+			advance_to_next_rune(t);
+			return dub_eq;
+		}
+		return dub;
+	}
+	return sing;
 }
 
 Token tokenizer_get_token(Tokenizer *t) {
@@ -736,16 +761,25 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '}': token.kind = Token_CloseBrace;   break;
 		case ':': token.kind = Token_Colon;        break;
 
-		case '*': token.kind = token_type_variant2(t, Token_Mul,   Token_MulEq);     break;
-		case '/': token.kind = token_type_variant2(t, Token_Quo,   Token_QuoEq);     break;
-		case '%': token.kind = token_type_variant2(t, Token_Mod,   Token_ModEq);     break;
-		case '=': token.kind = token_type_variant2(t, Token_Eq,    Token_CmpEq);     break;
-		case '~': token.kind = token_type_variant2(t, Token_Xor,   Token_XorEq);     break;
-		case '!': token.kind = token_type_variant2(t, Token_Not,   Token_NotEq);     break;
-		case '>': token.kind = token_type_variant2(t, Token_Gt,    Token_GtEq);      break;
-		case '<': token.kind = token_type_variant3(t, Token_Lt,    Token_LtEq,  '-', Token_ArrowLeft); break;
-		case '+': token.kind = token_type_variant3(t, Token_Add,   Token_AddEq, '+', Token_Increment); break;
-		case '-': token.kind = token_type_variant4(t, Token_Sub,   Token_SubEq, '-', Token_Decrement, '>', Token_ArrowRight); break;
+		case '*': token.kind = token_kind_variant2(t, Token_Mul,   Token_MulEq);     break;
+		case '/': token.kind = token_kind_variant2(t, Token_Quo,   Token_QuoEq);     break;
+		case '%': token.kind = token_kind_variant2(t, Token_Mod,   Token_ModEq);     break;
+		case '=': token.kind = token_kind_variant2(t, Token_Eq,    Token_CmpEq);     break;
+		case '~': token.kind = token_kind_variant2(t, Token_Xor,   Token_XorEq);     break;
+		case '!': token.kind = token_kind_variant2(t, Token_Not,   Token_NotEq);     break;
+		case '+': token.kind = token_kind_variant3(t, Token_Add,   Token_AddEq, '+', Token_Increment); break;
+		case '-': token.kind = token_kind_variant4(t, Token_Sub,   Token_SubEq, '-', Token_Decrement, '>', Token_ArrowRight); break;
+
+		case '<':
+			if (t->curr_rune == '-') {
+				token.kind = Token_ArrowLeft;
+			} else {
+				token.kind = token_kind_dub_eq(t, '<', Token_Lt, Token_LtEq, Token_Shl, Token_ShlEq);
+			}
+			break;
+		case '>':
+			token.kind = token_kind_dub_eq(t, '>', Token_Gt, Token_GtEq, Token_Shr, Token_ShrEq);
+			break;
 
 		case '&':
 			token.kind = Token_And;
@@ -757,25 +791,18 @@ Token tokenizer_get_token(Tokenizer *t) {
 					advance_to_next_rune(t);
 				}
 			} else {
-				token.kind = token_type_variant3(t, Token_And, Token_AndEq, '&', Token_CmpAnd);
-				if (t->curr_rune == '=') {
-					token.kind = Token_CmpAndEq;
-					advance_to_next_rune(t);
-				}
+				token.kind = token_kind_dub_eq(t, '&', Token_And, Token_AndEq, Token_CmpAnd, Token_CmpAndEq);
 			}
 			break;
 
-		case '|':
-			token.kind = token_type_variant3(t, Token_Or, Token_OrEq, '|', Token_CmpOr);
-			if (t->curr_rune == '=')  {
-				token.kind = Token_CmpOrEq;
-				advance_to_next_rune(t);
-			}
-			break;
+		case '|': token.kind = token_kind_dub_eq(t, '|', Token_Or, Token_OrEq, Token_CmpOr, Token_CmpOrEq); break;
 
 		default:
-			if (curr_rune != GB_RUNE_BOM)
-				tokenizer_err(t, "Illegal character: %c (%d) ", cast(char)curr_rune, curr_rune);
+			if (curr_rune != GB_RUNE_BOM) {
+				u8 str[4] = {};
+				int len = cast(int)gb_utf8_encode_rune(str, curr_rune);
+				tokenizer_err(t, "Illegal character: %.*s (%d) ", len, str, curr_rune);
+			}
 			token.kind = Token_Invalid;
 			break;
 		}
