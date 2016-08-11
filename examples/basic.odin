@@ -2,29 +2,28 @@ putchar :: proc(c: i32) -> i32 #foreign
 
 print_string :: proc(s: string) {
 	for i := 0; i < len(s); i++ {
-		c := cast(i32)s[i];
-		putchar(c);
+		putchar(cast(i32)s[i]);
 	}
 }
 
-string_byte_reverse :: proc(s: string) {
-	n := len(s);
+byte_reverse :: proc(b: []byte) {
+	n := len(b);
 	for i := 0; i < n/2; i++ {
-		s[i], s[n-1-i] = s[n-1-i], s[i];
+		b[i], b[n-1-i] = b[n-1-i], b[i];
 	}
 }
 
-encode_rune :: proc(r : rune) -> ([4]u8, int) {
-	buf : [4]u8;
+encode_rune :: proc(r : rune) -> ([4]byte, int) {
+	buf : [4]byte;
 	i := cast(u32)r;
-	mask : u8 : 0x3f;
+	mask : byte : 0x3f;
 	if i <= 1<<7-1 {
-		buf[0] = cast(u8)r;
+		buf[0] = cast(byte)r;
 		return buf, 1;
 	}
 	if i <= 1<<11-1 {
-		buf[0] = 0xc0 | cast(u8)(r>>6);
-		buf[1] = 0x80 | cast(u8)(r)&mask;
+		buf[0] = 0xc0 | cast(byte)(r>>6);
+		buf[1] = 0x80 | cast(byte)(r)&mask;
 		return buf, 2;
 	}
 
@@ -35,16 +34,16 @@ encode_rune :: proc(r : rune) -> ([4]u8, int) {
 	}
 
 	if i <= 1<<16-1 {
-		buf[0] = 0xe0 | cast(u8)(r>>12);
-		buf[1] = 0x80 | cast(u8)(r>>6)&mask;
-		buf[2] = 0x80 | cast(u8)(r)&mask;
+		buf[0] = 0xe0 | cast(byte)(r>>12);
+		buf[1] = 0x80 | cast(byte)(r>>6)&mask;
+		buf[2] = 0x80 | cast(byte)(r)&mask;
 		return buf, 3;
 	}
 
-	buf[0] = 0xf0 | cast(u8)(r>>18);
-	buf[1] = 0x80 | cast(u8)(r>>12)&mask;
-	buf[2] = 0x80 | cast(u8)(r>>6)&mask;
-	buf[3] = 0x80 | cast(u8)(r)&mask;
+	buf[0] = 0xf0 | cast(byte)(r>>18);
+	buf[1] = 0x80 | cast(byte)(r>>12)&mask;
+	buf[2] = 0x80 | cast(byte)(r>>6)&mask;
+	buf[3] = 0x80 | cast(byte)(r)&mask;
 	return buf, 4;
 }
 
@@ -59,9 +58,8 @@ print_int :: proc(i : int) {
 }
 print_int_base :: proc(i, base : int) {
 	NUM_TO_CHAR_TABLE :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$";
-	NEG :: "-";
 
-	buf: [21]u8;
+	buf: [21]byte;
 	len := 0;
 	negative := false;
 	if i < 0 {
@@ -73,8 +71,7 @@ print_int_base :: proc(i, base : int) {
 		len++;
 	}
 	for i > 0 {
-		c : u8 = NUM_TO_CHAR_TABLE[i % base];
-		buf[len] = c;
+		buf[len] = NUM_TO_CHAR_TABLE[i % base];
 		len++;
 		i /= base;
 	}
@@ -84,7 +81,6 @@ print_int_base :: proc(i, base : int) {
 		len++;
 	}
 
-	str := cast(string)buf[:len];
-	string_byte_reverse(str);
-	print_string(str);
+	byte_reverse(buf[:len]);
+	print_string(cast(string)buf[:len]);
 }

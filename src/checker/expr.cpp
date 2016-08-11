@@ -598,7 +598,7 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 	GB_ASSERT(type->kind == Type_Basic);
 	GB_ASSERT(o->mode == Addressing_Constant);
 	if (!check_value_is_expressible(c, o->value, type, &o->value)) {
-		gbString a = type_to_string(o->type);
+		gbString a = expr_to_string(o->expr);
 		gbString b = type_to_string(type);
 		defer (gb_string_free(a));
 		defer (gb_string_free(b));
@@ -606,7 +606,7 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error(&c->error_collector, ast_node_token(o->expr), "`%s` truncated to `%s`", a, b);
 			} else {
-				error(&c->error_collector, ast_node_token(o->expr), "`%s` overflows to `%s`", a, b);
+				error(&c->error_collector, ast_node_token(o->expr), "`%s` overflows `%s`", a, b);
 			}
 		} else {
 			error(&c->error_collector, ast_node_token(o->expr), "Cannot convert `%s` to `%s`", a, b);
@@ -1736,9 +1736,16 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);
-		Scope *origin_curr_scope = c->context.scope;
 		Type *proc_type = check_type(c, pl->type);
 		if (proc_type != NULL) {
+			auto context = c->context;
+			c->context.scope = c->global_scope;
+			check_open_scope(c, pl->type);
+			c->context.decl = make_declaration_info(c->allocator, c->context.scope);
+			defer ({
+				c->context = context;
+				check_close_scope(c);
+			});
 			check_proc_body(c, empty_token, c->context.decl, proc_type, pl->body);
 			o->mode = Addressing_Value;
 			o->type = proc_type;

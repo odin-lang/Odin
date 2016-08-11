@@ -36,11 +36,13 @@ void ssa_gen_destroy(ssaGen *s) {
 
 void ssa_gen_code(ssaGen *s) {
 	if (v_zero == NULL) {
-		v_zero   = ssa_make_value_constant(gb_heap_allocator(), t_int, make_exact_value_integer(0));
-		v_one    = ssa_make_value_constant(gb_heap_allocator(), t_int, make_exact_value_integer(1));
-		v_zero32 = ssa_make_value_constant(gb_heap_allocator(), t_i32, make_exact_value_integer(0));
-		v_one32  = ssa_make_value_constant(gb_heap_allocator(), t_i32, make_exact_value_integer(1));
-		v_two32  = ssa_make_value_constant(gb_heap_allocator(), t_i32, make_exact_value_integer(2));
+		v_zero   = ssa_make_value_constant(gb_heap_allocator(), t_int,  make_exact_value_integer(0));
+		v_one    = ssa_make_value_constant(gb_heap_allocator(), t_int,  make_exact_value_integer(1));
+		v_zero32 = ssa_make_value_constant(gb_heap_allocator(), t_i32,  make_exact_value_integer(0));
+		v_one32  = ssa_make_value_constant(gb_heap_allocator(), t_i32,  make_exact_value_integer(1));
+		v_two32  = ssa_make_value_constant(gb_heap_allocator(), t_i32,  make_exact_value_integer(2));
+		v_false  = ssa_make_value_constant(gb_heap_allocator(), t_bool, make_exact_value_bool(false));
+		v_true   = ssa_make_value_constant(gb_heap_allocator(), t_bool, make_exact_value_bool(true));
 	}
 
 	ssaModule *m = &s->module;
@@ -76,7 +78,8 @@ void ssa_gen_code(ssaGen *s) {
 		} break;
 
 		case Entity_Procedure: {
-			ssaValue *p = ssa_make_value_procedure(a, e, decl, m);
+			AstNode *body = decl->proc_decl->ProcDecl.body;
+			ssaValue *p = ssa_make_value_procedure(a, m, e->type, decl->type_expr, body, e->token.string);
 			map_set(&m->values, hash_pointer(e), p);
 			map_set(&m->members, hash_string(name), p);
 		} break;
@@ -87,7 +90,7 @@ void ssa_gen_code(ssaGen *s) {
 		auto *entry = &m->members.entries[i];
 		ssaValue *v = entry->value;
 		if (v->kind == ssaValue_Proc)
-			ssa_build_proc(v);
+			ssa_build_proc(v, NULL);
 	}
 
 	// m->layout = make_string("e-p:64:64:64");

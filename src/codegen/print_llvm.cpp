@@ -102,10 +102,8 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 		case Basic_u32:    ssa_fprintf(f, "i32");                     break;
 		case Basic_u64:    ssa_fprintf(f, "i64");                     break;
 		case Basic_u128:   ssa_fprintf(f, "u128");                    break;
-		case Basic_f16:    ssa_fprintf(f, "half");                    break;
 		case Basic_f32:    ssa_fprintf(f, "float");                   break;
 		case Basic_f64:    ssa_fprintf(f, "double");                  break;
-		case Basic_f128:   ssa_fprintf(f, "fp128");                   break;
 		case Basic_rawptr: ssa_fprintf(f, "%%.rawptr");               break;
 		case Basic_string: ssa_fprintf(f, "%%.string");               break;
 		case Basic_uint:   ssa_fprintf(f, "i%lld", word_bits);        break;
@@ -199,20 +197,16 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 		ssa_fprintf(f, "%lld", value.value_integer);
 		break;
 	case ExactValue_Float: {
-		u64 u = 0;
+		u64 u = *cast(u64*)&value.value_float;
 		if (is_type_float(type) && type->basic.kind == Basic_f32) {
 			// IMPORTANT NOTE(bill): LLVM requires all floating point constants to be
 			// a 64 bit number if bits_of(float type) <= 64.
-			// To overcome this problem, fill the "bottom" 32 bits with zeros
+			// For some bizarre reason, you need to clear the bottom 28 bits
 			// https://groups.google.com/forum/#!topic/llvm-dev/IlqV3TbSk6M
-			f32 fp = cast(f32)value.value_float;
-			u = *cast(u32 *)&fp;
-			u <<= 32;
-
-		} else {
-			u = *cast(u64 *)&value.value_float;
+			u >>= 28;
+			u <<= 28;
 		}
-		ssa_fprintf(f, "0x%llx", u);
+		ssa_fprintf(f, "0x%016llx", u);
 	} break;
 	case ExactValue_Pointer:
 		if (value.value_float == NULL) {
@@ -253,7 +247,7 @@ void ssa_print_value(gbFile *f, ssaModule *m, ssaValue *value, Type *type_hint) 
 		ssa_print_encoded_local(f, value->param.entity->token.string);
 		break;
 	case ssaValue_Proc:
-		ssa_print_encoded_global(f, value->proc.entity->token.string);
+		ssa_print_encoded_global(f, value->proc.name);
 		break;
 	case ssaValue_Instr:
 		ssa_fprintf(f, "%%%d", value->id);
@@ -545,8 +539,66 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	}
 }
 
+void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
+	if (proc->body == NULL) {
+		ssa_fprintf(f, "declare ");
+	} else {
+		ssa_fprintf(f, "define ");
+	}
+
+	auto *proc_type = &proc->type->proc;
+
+	if (proc_type->result_count == 0) {
+		ssa_fprintf(f, "void");
+	} else {
+		ssa_print_type(f, m->sizes, proc_type->results);
+	}
+
+	ssa_fprintf(f, " ");
+
+	ssa_print_encoded_global(f, proc->name);
+	ssa_fprintf(f, "(");
+
+	if (proc_type->param_count > 0) {
+		auto *params = &proc_type->params->tuple;
+		for (isize i = 0; i < params->variable_count; i++) {
+			Entity *e = params->variables[i];
+			if (i > 0)
+
+				ssa_fprintf(f, ", ");
+			ssa_print_type(f, m->sizes, e->type);
+			ssa_fprintf(f, " %%%.*s", LIT(e->token.string));
+		}
+	}
+
+	ssa_fprintf(f, ") ");
+
+	if (proc->body == NULL) {
+		ssa_fprintf(f, "\t; foreign procedure\n\n");
+	} else {
+		ssa_fprintf(f, "{\n");
+		gb_for_array(i, proc->blocks) {
+			ssaBlock *block = proc->blocks[i];
+
+			if (i > 0) ssa_fprintf(f, "\n");
+			ssa_print_block_name(f, block);
+			ssa_fprintf(f, ":\n");
+
+			gb_for_array(j, block->instrs) {
+				ssaValue *value = block->instrs[j];
+				ssa_print_instr(f, m, value);
+			}
+		}
+		ssa_fprintf(f, "}\n\n");
+	}
+
+	gb_for_array(i, proc->anon_procs) {
+		ssa_print_proc(f, m, proc->anon_procs[i]);
+	}
+}
+
 void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
-	if (m->layout.len > 0) {
+if (m->layout.len > 0) {
 		ssa_fprintf(f, "target datalayout = %.*s\n", LIT(m->layout));
 	}
 
@@ -591,58 +643,7 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 		} break;
 
 		case ssaValue_Proc: {
-			ssaProcedure *proc = &v->proc;
-			if (proc->body == NULL) {
-				ssa_fprintf(f, "declare ");
-			} else {
-				ssa_fprintf(f, "define ");
-			}
-
-			auto *proc_type = &proc->entity->type->proc;
-
-			if (proc_type->result_count == 0) {
-				ssa_fprintf(f, "void");
-			} else {
-				ssa_print_type(f, m->sizes, proc_type->results);
-			}
-
-			ssa_fprintf(f, " ");
-
-			ssa_print_encoded_global(f, proc->name);
-			ssa_fprintf(f, "(");
-
-			if (proc_type->param_count > 0) {
-				auto *params = &proc_type->params->tuple;
-				for (isize i = 0; i < params->variable_count; i++) {
-					Entity *e = params->variables[i];
-					if (i > 0)
-						ssa_fprintf(f, ", ");
-					ssa_print_type(f, m->sizes, e->type);
-					ssa_fprintf(f, " %%%.*s", LIT(e->token.string));
-				}
-			}
-
-			ssa_fprintf(f, ") ");
-
- 			if (proc->body == NULL) {
-				ssa_fprintf(f, "\t; foreign procedure\n\n");
- 			} else {
- 				ssa_fprintf(f, "{\n");
- 				gb_for_array(i, proc->blocks) {
- 					ssaBlock *block = proc->blocks[i];
-
- 					if (i > 0) ssa_fprintf(f, "\n");
- 					ssa_print_block_name(f, block);
- 					ssa_fprintf(f, ":\n");
-
- 					gb_for_array(j, block->instrs) {
- 						ssaValue *value = block->instrs[j];
- 						ssa_print_instr(f, m, value);
- 					}
- 				}
- 				ssa_fprintf(f, "}\n\n");
- 			}
-
+			ssa_print_proc(f, m, &v->proc);
 		} break;
 		}
 	}

@@ -33,7 +33,7 @@ i64 next_pow2(i64 n) {
 }
 
 
-#define gb_for_array(index_, array_) for (isize index_ = 0; index_ < gb_array_count(array_); index_++)
+#define gb_for_array(index_, array_) for (isize index_ = 0; (array_) != NULL && index_ < gb_array_count(array_); index_++)
 
 
 // Doubly Linked Lists

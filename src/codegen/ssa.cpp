@@ -5,10 +5,10 @@ struct ssaValue;
 
 
 struct ssaModule {
-	CheckerInfo *info;
+	CheckerInfo * info;
 	BaseTypeSizes sizes;
-	gbArena     arena;
-	gbAllocator allocator;
+	gbArena       arena;
+	gbAllocator   allocator;
 
 	String layout;
 
@@ -31,25 +31,25 @@ struct ssaBlock {
 
 struct ssaTargetList {
 	ssaTargetList *prev;
-	ssaBlock *break_;
-	ssaBlock *continue_;
-	ssaBlock *fallthrough_;
+	ssaBlock *     break_;
+	ssaBlock *     continue_;
+	ssaBlock *     fallthrough_;
 };
 
 struct ssaProcedure {
-	ssaModule *module;
-	String name;
-	Entity *entity;
-	Type *type;
-	DeclInfo *decl;
-	AstNode *type_expr;
-	AstNode *body;
+	ssaProcedure *parent;
+	ssaModule *   module;
+	String        name;
+	Entity *      entity;
+	Type *        type;
+	AstNode *     type_expr;
+	AstNode *     body;
 
 	gbArray(ssaBlock *) blocks;
-	ssaBlock *curr_block;
-	ssaTargetList *target_list;
+	ssaBlock *          curr_block;
+	ssaTargetList *     target_list;
 
-	gbArray(ssaValue *) anonymous_procedures;
+	gbArray(ssaProcedure *) anon_procs;
 };
 
 
@@ -233,6 +233,8 @@ gb_global ssaValue *v_one     = NULL;
 gb_global ssaValue *v_zero32  = NULL;
 gb_global ssaValue *v_one32   = NULL;
 gb_global ssaValue *v_two32   = NULL;
+gb_global ssaValue *v_false   = NULL;
+gb_global ssaValue *v_true    = NULL;
 
 enum ssaLvalueKind {
 	ssaLvalue_Blank,
@@ -397,6 +399,7 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr);
 ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv);
 ssaLvalue ssa_build_addr(ssaProcedure *proc, AstNode *expr);
 ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *a_type);
+void      ssa_build_proc(ssaValue *value, ssaProcedure *parent);
 
 
 
@@ -603,13 +606,13 @@ ssaValue *ssa_make_value_constant(gbAllocator a, Type *type, ExactValue value) {
 	return v;
 }
 
-ssaValue *ssa_make_value_procedure(gbAllocator a, Entity *e, DeclInfo *decl, ssaModule *m) {
+ssaValue *ssa_make_value_procedure(gbAllocator a, ssaModule *m, Type *type, AstNode *type_expr, AstNode *body, String name) {
 	ssaValue *v = ssa_alloc_value(a, ssaValue_Proc);
 	v->proc.module = m;
-	v->proc.entity = e;
-	v->proc.type   = e->type;
-	v->proc.decl   = decl;
-	v->proc.name   = e->token.string;
+	v->proc.type   = type;
+	v->proc.type_expr = type_expr;
+	v->proc.body   = body;
+	v->proc.name   = name;
 	return v;
 }
 
@@ -752,9 +755,10 @@ void ssa_emit_defer_stmts(ssaProcedure *proc, ssaBlock *block) {
 
 	// IMPORTANT TODO(bill): ssa defer - Place where needed!!!
 
+#if 0
 	Scope *curr_scope = block->scope;
 	if (curr_scope == NULL) {
-		GB_PANIC("No scope found for deferred statements");
+		// GB_PANIC("No scope found for deferred statements");
 	}
 
 	for (Scope *s = curr_scope; s != NULL; s = s->parent) {
@@ -763,6 +767,7 @@ void ssa_emit_defer_stmts(ssaProcedure *proc, ssaBlock *block) {
 			ssa_build_stmt(proc, s->deferred_stmts[i]);
 		}
 	}
+#endif
 }
 
 void ssa_emit_unreachable(ssaProcedure *proc) {
@@ -1183,7 +1188,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 	}
 	if (is_type_integer(src) && is_type_float(dst)) {
 		ssaConvKind kind = ssaConv_sitofp;
-		if (is_type_unsigned(dst)) {
+		if (is_type_unsigned(src)) {
 			kind = ssaConv_uitofp;
 		}
 		return ssa_emit(proc, ssa_make_instr_conv(proc, kind, value, src, dst));
@@ -1331,7 +1336,29 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 	case_end;
 
 	case_ast_node(pl, ProcLit, expr);
-		GB_PANIC("TODO(bill): ssa_build_single_expr ProcLit");
+		if (proc->anon_procs == NULL) {
+			// TODO(bill): Cleanup
+			gb_array_init(proc->anon_procs, gb_heap_allocator());
+		}
+		// NOTE(bill): Generate a new name
+		// parent$count
+		isize name_len = proc->name.len + 1 + 8 + 1;
+		u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
+		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$%d", LIT(proc->name), cast(i32)gb_array_count(proc->anon_procs));
+		String name = make_string(name_text, name_len-1);
+
+
+		// auto **found = map_get(&proc->module->info->definitions,
+		                       // hash_pointer(expr))
+		Type *type = type_of_expr(proc->module->info, expr);
+		ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
+		                                           proc->module, type, pl->type, pl->body, name);
+		ssaProcedure *np = &value->proc;
+
+		gb_array_append(proc->anon_procs, np);
+		ssa_build_proc(value, proc);
+
+		return value; // TODO(bill): Is this correct?
 	case_end;
 
 
@@ -1673,6 +1700,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 					if (!ssa_is_blank_ident(name)) {
 						ssa_add_local_for_identifier(proc, name);
 						lval = ssa_build_addr(proc, name);
+						GB_ASSERT(lval.address.value != NULL);
 					}
 
 					gb_array_append(lvals, lval);
@@ -1685,8 +1713,10 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 
 				gb_for_array(i, inits) {
-					ssaValue *v = ssa_emit_conv(proc, inits[i], ssa_lvalue_type(lvals[i]));
-					ssa_lvalue_store(lvals[i], proc, v);
+					if (lvals[i].kind != ssaLvalue_Blank) {
+						ssaValue *v = ssa_emit_conv(proc, inits[i], ssa_lvalue_type(lvals[i]));
+						ssa_lvalue_store(lvals[i], proc, v);
+					}
 				}
 
 			} else if (vd->value_count == 0) { // declared and zero-initialized
@@ -1734,6 +1764,10 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 				}
 			}
 		}
+	case_end;
+
+	case_ast_node(pd, ProcDecl, node);
+
 	case_end;
 
 	case_ast_node(ids, IncDecStmt, node);
@@ -1957,18 +1991,10 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 	}
 }
 
-void ssa_build_proc(ssaValue *value) {
+void ssa_build_proc(ssaValue *value, ssaProcedure *parent) {
 	ssaProcedure *proc = &value->proc;
 
-	AstNode *proc_decl = proc->decl->proc_decl;
-	switch (proc_decl->kind) {
-	case_ast_node(pd, ProcDecl, proc_decl);
-		proc->type_expr = pd->type;
-		proc->body = pd->body;
-	case_end;
-	default:
-		return;
-	}
+	proc->parent = parent;
 
 	if (proc->body != NULL) {
 		ssa_begin_procedure_body(proc);

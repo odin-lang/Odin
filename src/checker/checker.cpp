@@ -37,7 +37,7 @@ struct DeclInfo {
 
 	AstNode *type_expr;
 	AstNode *init_expr;
-	AstNode *proc_decl; // AstNode_ProcedureDeclaration
+	AstNode *proc_decl; // AstNode_ProcDecl
 
 	Map<b32> deps; // Key: Entity *
 	i32 mark;

@@ -1018,10 +1018,13 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 			return type;
 		} else {
 			AstNode *body;
+			AstScope *curr_scope = f->curr_scope;
 
+			f->curr_scope = scope;
 			f->expr_level++;
 			body = parse_body(f, scope);
 			f->expr_level--;
+			f->curr_scope = curr_scope;
 
 			return make_procedure_literal(f, type, body);
 		}
