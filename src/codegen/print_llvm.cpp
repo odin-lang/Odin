@@ -595,6 +595,9 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 	gb_for_array(i, proc->anon_procs) {
 		ssa_print_proc(f, m, proc->anon_procs[i]);
 	}
+	gb_for_array(i, proc->nested_procs) {
+		ssa_print_proc(f, m, proc->nested_procs[i]);
+	}
 }
 
 void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {

@@ -4,7 +4,7 @@
 
 declare void @llvm.memmove.p0i8.p0i8.i64(i8*, i8*, i64, i32, i1)
 
-define void @thing(i64 ()* %p) {
+define void @exec(i64 ()* %p) {
 "entry - 0":
 	%0 = alloca i64 ()*, align 8 ; p
 	store i64 ()* zeroinitializer, i64 ()** %0
@@ -26,11 +26,11 @@ define void @main() {
 	call void @print_int(i64 %2)
 	call void @print_rune(i32 128149)
 	call void @print_rune(i32 10)
-	call void @thing(i64 ()* @main$0)
+	call void @exec(i64 ()* @main$cool_beans)
 	ret void
 }
 
-define i64 @main$0() {
+define i64 @main$cool_beans() {
 "entry - 0":
 	%0 = alloca i64, align 8 ; a
 	store i64 zeroinitializer, i64* %0

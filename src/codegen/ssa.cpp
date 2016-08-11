@@ -40,7 +40,6 @@ struct ssaProcedure {
 	ssaProcedure *parent;
 	ssaModule *   module;
 	String        name;
-	Entity *      entity;
 	Type *        type;
 	AstNode *     type_expr;
 	AstNode *     body;
@@ -50,6 +49,7 @@ struct ssaProcedure {
 	ssaTargetList *     target_list;
 
 	gbArray(ssaProcedure *) anon_procs;
+	gbArray(ssaProcedure *) nested_procs;
 };
 
 
@@ -1256,6 +1256,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 				return v;
 			return ssa_emit_load(proc, v);
 		}
+		return NULL;
 	case_end;
 
 	case_ast_node(pe, ParenExpr, expr);
@@ -1481,7 +1482,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 	case_end;
 	}
 
-	GB_PANIC("Unexpected expression");
+	GB_PANIC("Unexpected expression: %.*s", LIT(ast_node_strings[expr->kind]));
 	return NULL;
 }
 
@@ -1767,6 +1768,26 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 	case_end;
 
 	case_ast_node(pd, ProcDecl, node);
+		if (proc->nested_procs == NULL) {
+			// TODO(bill): Cleanup
+			gb_array_init(proc->nested_procs, gb_heap_allocator());
+		}
+		// NOTE(bill): Generate a new name
+		// parent$name
+		String pd_name = pd->name->Ident.token.string;
+		isize name_len = proc->name.len + 1 + pd_name.len + 1;
+		u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
+		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$%.*s", LIT(proc->name), LIT(pd_name));
+		String name = make_string(name_text, name_len-1);
+
+		Entity *e = *map_get(&proc->module->info->definitions, hash_pointer(pd->name));
+		ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
+		                                           proc->module, e->type, pd->type, pd->body, name);
+		ssaProcedure *np = &value->proc;
+		gb_array_append(proc->nested_procs, np);
+		ssa_build_proc(value, proc);
+
+		map_set(&proc->module->values, hash_pointer(e), value);
 
 	case_end;
 

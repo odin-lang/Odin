@@ -2,7 +2,7 @@ import "basic"
 
 TWO_HEARTS :: '💕';
 
-thing :: proc(p : proc() -> int) {
+exec :: proc(p : proc() -> int) {
 	print_int(p());
 	print_rune('\n');
 }
@@ -12,12 +12,14 @@ main :: proc() {
 	print_int(cast(int)a);
 	print_rune(TWO_HEARTS);
 	print_rune('\n');
-	thing(proc() -> int {
+
+	cool_beans :: proc() -> int {
 		a : int = 1337;
-		print_rune(TWO_HEARTS);
+		print_rune('💕');
 		print_rune('\n');
 		return a;
-	});
+	}
+	exec(cool_beans);
 }
 
 /*
