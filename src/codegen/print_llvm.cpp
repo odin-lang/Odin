@@ -184,6 +184,12 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 }
 
 void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type) {
+	if (is_type_float(type)) {
+		value = exact_value_to_float(value);
+	} else if (is_type_integer(type)) {
+		value = exact_value_to_integer(value);
+	}
+
 	switch (value.kind) {
 	case ExactValue_Bool:
 		ssa_fprintf(f, (value.value_bool ? "true" : "false"));
@@ -238,7 +244,7 @@ void ssa_print_value(gbFile *f, ssaModule *m, ssaValue *value, Type *type_hint) 
 		ssa_print_exact_value(f, m, value->constant.value, type_hint);
 		break;
 	case ssaValue_TypeName:
-		ssa_print_encoded_local(f, value->type_name.entity->token.string);
+		ssa_print_encoded_local(f, value->type_name.name);
 		break;
 	case ssaValue_Global:
 		ssa_print_encoded_global(f, value->global.entity->token.string);
@@ -592,16 +598,21 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 		ssa_fprintf(f, "}\n\n");
 	}
 
-	gb_for_array(i, proc->anon_procs) {
-		ssa_print_proc(f, m, proc->anon_procs[i]);
-	}
-	gb_for_array(i, proc->nested_procs) {
-		ssa_print_proc(f, m, proc->nested_procs[i]);
+	gb_for_array(i, proc->children) {
+		ssa_print_proc(f, m, proc->children[i]);
 	}
 }
 
+void ssa_print_type_name(gbFile *f, ssaModule *m, ssaValue *v) {
+	GB_ASSERT(v->kind == ssaValue_TypeName);
+	ssa_print_encoded_local(f, v->type_name.name);
+	ssa_fprintf(f, " = type ");
+	ssa_print_type(f, m->sizes, get_base_type(v->type_name.type));
+	ssa_fprintf(f, "\n");
+}
+
 void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
-if (m->layout.len > 0) {
+	if (m->layout.len > 0) {
 		ssa_fprintf(f, "target datalayout = %.*s\n", LIT(m->layout));
 	}
 
@@ -618,12 +629,17 @@ if (m->layout.len > 0) {
 	ssa_print_type(f, m->sizes, t_int);
 	ssa_fprintf(f, ", i32, i1)\n\n");
 
+	gb_for_array(i, m->nested_type_names) {
+		ssaValue *v = m->nested_type_names[i];
+		ssa_print_type_name(f, m, v);
+	}
+
 	gb_for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
 		ssaValue *v = entry->value;
 		switch (v->kind) {
 		case ssaValue_TypeName: {
-			ssa_print_encoded_local(f, v->type_name.entity->token.string);
+			ssa_print_encoded_local(f, v->type_name.name);
 			ssa_fprintf(f, " = type ");
 			ssa_print_type(f, m->sizes, get_base_type(v->type_name.type));
 			ssa_fprintf(f, "\n");

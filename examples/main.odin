@@ -2,24 +2,37 @@ import "basic"
 
 TWO_HEARTS :: '💕';
 
+
 exec :: proc(p : proc() -> int) {
 	print_int(p());
 	print_rune('\n');
 }
 
 main :: proc() {
-	a : u8 = 123;
-	print_int(cast(int)a);
+	i := 123;
+	print_int(i);
 	print_rune(TWO_HEARTS);
 	print_rune('\n');
 
-	cool_beans :: proc() -> int {
-		a : int = 1337;
+	type Vec2: {2}f32;
+
+	v := Vec2{1, 2};
+	a := [4] int{i, 2, 3, 7};
+	e := [..]int{i, 2, 3, 7};
+	s := []  int{i, 2, 3, 7};
+
+	for i := 0; i < len(a); i++ {
+		print_int(a[i]);
+		print_string(", ");
+	}
+	print_rune('\n');
+
+	exec(proc() -> int {
+		i : int = 1337;
 		print_rune('💕');
 		print_rune('\n');
-		return a;
-	}
-	exec(cool_beans);
+		return i;
+	});
 }
 
 /*

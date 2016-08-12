@@ -18,10 +18,6 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_StructType);
 	GB_ASSERT(struct_type->kind == Type_Structure);
 	ast_node(st, StructType, node);
-	if (st->field_count == 0) {
-		error(&c->error_collector, ast_node_token(node), "Empty struct{} definition");
-		return;
-	}
 
 	Map<Entity *> entity_map = {};
 	map_init(&entity_map, gb_heap_allocator());
@@ -1759,8 +1755,21 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 
 	case_ast_node(cl, CompoundLit, node);
 		Type *type = type_hint;
+		b32 ellipsis_array = false;
 		if (cl->type != NULL) {
-			type = check_type(c, cl->type);
+			type = NULL;
+
+			// [..]Type
+			if (cl->type->kind == AstNode_ArrayType && cl->type->ArrayType.count != NULL) {
+				if (cl->type->ArrayType.count->kind == AstNode_Ellipsis) {
+					type = make_type_array(c->allocator, check_type(c, cl->type->ArrayType.elem), -1);
+					ellipsis_array = true;
+				}
+			}
+
+			if (type == NULL) {
+				type = check_type(c, cl->type);
+			}
 		}
 
 		if (type == NULL) {
@@ -1798,12 +1807,16 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 
 		case Type_Slice:
 		case Type_Array:
+		case Type_Vector:
 		{
 			Type *elem_type = NULL;
 			String context_name = {};
 			if (t->kind == Type_Slice) {
 				elem_type = t->slice.elem;
 				context_name = make_string("slice literal");
+			} else if (t->kind == Type_Vector) {
+				elem_type = t->vector.elem;
+				context_name = make_string("vector literal");
 			} else {
 				elem_type = t->array.elem;
 				context_name = make_string("array literal");
@@ -1826,6 +1839,10 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 			}
 			if (max < index)
 				max = index;
+
+			if (t->kind == Type_Array && ellipsis_array) {
+				t->array.count = max;
+			}
 		} break;
 
 		default: {
@@ -2275,6 +2292,10 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, ce->type);
 		str = gb_string_appendc(str, ")");
 		str = write_expr_to_string(str, ce->expr);
+	case_end;
+
+	case_ast_node(e, Ellipsis, node);
+		str = gb_string_appendc(str, "..");
 	case_end;
 
 	case_ast_node(pt, PointerType, node);

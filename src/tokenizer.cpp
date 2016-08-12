@@ -95,7 +95,7 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 	TOKEN_KIND(Token_Semicolon, ";"), \
 	TOKEN_KIND(Token_Period, "."), \
 	TOKEN_KIND(Token_Comma, ","), \
-	TOKEN_KIND(Token_Ellipsis, "..."), \
+	TOKEN_KIND(Token_Ellipsis, ".."), \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
@@ -741,10 +741,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 				token = scan_number_to_token(t, true);
 			} else if (t->curr_rune == '.') { // Could be an ellipsis
 				advance_to_next_rune(t);
-				if (t->curr_rune == '.') {
-					advance_to_next_rune(t);
-					token.kind = Token_Ellipsis;
-				}
+				token.kind = Token_Ellipsis;
 			}
 			break;
 

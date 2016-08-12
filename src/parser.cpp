@@ -2,7 +2,6 @@ struct AstNode;
 struct Type;
 struct AstScope;
 
-
 enum ParseFileError {
 	ParseFile_None,
 
@@ -110,6 +109,7 @@ AST_NODE_KIND(_ExprBegin,       struct{}) \
 		AstNode *low, *high, *max; \
 		b32 triple_indexed; \
 	}) \
+	AST_NODE_KIND(Ellipsis, struct { Token token; }) \
 AST_NODE_KIND(_ExprEnd,       struct{}) \
 AST_NODE_KIND(_StmtBegin,     struct{}) \
 	AST_NODE_KIND(BadStmt,    struct { Token begin, end; }) \
@@ -164,7 +164,6 @@ AST_NODE_KIND(_DeclBegin,      struct{}) \
 			isize name_count, value_count; \
 		}) \
 	AST_NODE_KIND(ProcDecl, struct { \
-			DeclKind kind;     \
 			AstNode *name;     \
 			AstNode *type;     \
 			AstNode *body;     \
@@ -295,6 +294,8 @@ Token ast_node_token(AstNode *node) {
 		return node->IndexExpr.open;
 	case AstNode_SliceExpr:
 		return node->SliceExpr.open;
+	case AstNode_Ellipsis:
+		return node->Ellipsis.token;
 	case AstNode_CastExpr:
 		return node->CastExpr.token;
 	case AstNode_DerefExpr:
@@ -553,6 +554,11 @@ gb_inline AstNode *make_deref_expr(AstFile *f, AstNode *expr, Token op) {
 }
 
 
+gb_inline AstNode *make_ellipsis(AstFile *f, Token token) {
+	AstNode *result = make_node(f, AstNode_Ellipsis);
+	result->Ellipsis.token = token;
+	return result;
+}
 gb_inline AstNode *make_basic_lit(AstFile *f, Token basic_lit) {
 	AstNode *result = make_node(f, AstNode_BasicLit);
 	result->BasicLit = basic_lit;
@@ -678,7 +684,7 @@ gb_inline AstNode *make_bad_decl(AstFile *f, Token begin, Token end) {
 	return result;
 }
 
-gb_inline AstNode *make_variable_decl(AstFile *f, DeclKind kind, AstNode *name_list, isize name_count, AstNode *type, AstNode *value_list, isize value_count) {
+gb_inline AstNode *make_var_decl(AstFile *f, DeclKind kind, AstNode *name_list, isize name_count, AstNode *type, AstNode *value_list, isize value_count) {
 	AstNode *result = make_node(f, AstNode_VarDecl);
 	result->VarDecl.kind = kind;
 	result->VarDecl.name_list = name_list;
@@ -707,9 +713,8 @@ gb_inline AstNode *make_proc_type(AstFile *f, Token token, AstNode *param_list, 
 	return result;
 }
 
-gb_inline AstNode *make_procedure_decl(AstFile *f, DeclKind kind, AstNode *name, AstNode *proc_type, AstNode *body, AstNode *tag_list, isize tag_count) {
+gb_inline AstNode *make_proc_decl(AstFile *f, AstNode *name, AstNode *proc_type, AstNode *body, AstNode *tag_list, isize tag_count) {
 	AstNode *result = make_node(f, AstNode_ProcDecl);
-	result->ProcDecl.kind = kind;
 	result->ProcDecl.name = name;
 	result->ProcDecl.type = proc_type;
 	result->ProcDecl.body = body;
@@ -1169,7 +1174,6 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 
 		case Token_OpenBrace: {
 			if (is_literal_type(operand) && f->expr_level >= 0) {
-				gb_printf_err("here\n");
 				if (lhs) {
 					// TODO(bill): Handle this
 				}
@@ -1474,8 +1478,12 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		Token token = expect_token(f, Token_OpenBracket);
 		AstNode *count_expr = NULL;
 
-		if (f->cursor[0].kind != Token_CloseBracket)
+		if (f->cursor[0].kind == Token_Ellipsis) {
+			count_expr = make_ellipsis(f, f->cursor[0]);
+			next_token(f);
+		} else if (f->cursor[0].kind != Token_CloseBracket) {
 			count_expr = parse_expr(f, false);
+		}
 		expect_token(f, Token_CloseBracket);
 		f->expr_level--;
 		return make_array_type(f, token, count_expr, parse_type(f));
@@ -1596,7 +1604,7 @@ AstNode *parse_body(AstFile *f, AstScope *scope) {
 	return make_block_stmt(f, statement_list, statement_list_count, open, close);
 }
 
-AstNode *parse_procedure_decl(AstFile *f, Token proc_token, AstNode *name, DeclKind kind) {
+	AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 	AstNode *param_list = NULL;
 	AstNode *result_list = NULL;
 	isize param_count = 0;
@@ -1621,7 +1629,7 @@ AstNode *parse_procedure_decl(AstFile *f, Token proc_token, AstNode *name, DeclK
 	close_ast_scope(f);
 
 	AstNode *proc_type = make_proc_type(f, proc_token, param_list, param_count, result_list, result_count);
-	return make_procedure_decl(f, kind, name, proc_type, body, tag_list, tag_count);
+	return make_proc_decl(f, name, proc_type, body, tag_list, tag_count);
 }
 
 AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count) {
@@ -1642,7 +1650,9 @@ AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count) {
 			declaration_kind = Declaration_Immutable;
 		next_token(f);
 
-		if (f->cursor[0].kind == Token_proc) { // NOTE(bill): Procedure declarations
+		if (f->cursor[0].kind == Token_proc &&
+		    declaration_kind == Declaration_Immutable) {
+		    // NOTE(bill): Procedure declarations
 			Token proc_token = f->cursor[0];
 			AstNode *name = name_list;
 			if (name_count != 1) {
@@ -1650,9 +1660,9 @@ AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count) {
 				return make_bad_decl(f, name->Ident.token, proc_token);
 			}
 
-			AstNode *procedure_decl = parse_procedure_decl(f, proc_token, name, declaration_kind);
-			add_ast_entity(f, f->curr_scope, procedure_decl, name_list);
-			return procedure_decl;
+			AstNode *proc_decl = parse_proc_decl(f, proc_token, name);
+			add_ast_entity(f, f->curr_scope, proc_decl, name_list);
+			return proc_decl;
 
 		} else {
 			value_list = parse_rhs_expr_list(f, &value_count);
@@ -1684,9 +1694,9 @@ AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count) {
 		return make_bad_decl(f, begin, f->cursor[0]);
 	}
 
-	AstNode *variable_decl = make_variable_decl(f, declaration_kind, name_list, name_count, type, value_list, value_count);
-	add_ast_entity(f, f->curr_scope, variable_decl, name_list);
-	return variable_decl;
+	AstNode *var_decl = make_var_decl(f, declaration_kind, name_list, name_count, type, value_list, value_count);
+	add_ast_entity(f, f->curr_scope, var_decl, name_list);
+	return var_decl;
 }
 
 
@@ -1761,7 +1771,8 @@ AstNode *parse_return_stmt(AstFile *f) {
 	isize result_count = 0;
 	if (f->cursor[0].kind != Token_Semicolon)
 		result = parse_rhs_expr_list(f, &result_count);
-	expect_token(f, Token_Semicolon);
+	if (f->cursor[0].kind != Token_CloseBrace)
+		expect_token(f, Token_Semicolon);
 
 	return make_return_stmt(f, token, result, result_count);
 }
@@ -1899,7 +1910,10 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Xor:
 	case Token_Not:
 		s = parse_simple_stmt(f);
-		if (s->kind != AstNode_ProcDecl && !allow_token(f, Token_Semicolon)) {
+		if (s->kind != AstNode_ProcDecl &&
+			!allow_token(f, Token_Semicolon) &&
+			f->cursor[0].kind == Token_CloseBrace) {
+			// TODO(bill): Cleanup semicolon handling in parser
 			ast_file_err(f, f->cursor[0],
 			             "Expected `;` after statement, got `%.*s`",
 			             LIT(token_strings[f->cursor[0].kind]));

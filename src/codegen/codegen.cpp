@@ -60,7 +60,8 @@ void ssa_gen_code(ssaGen *s) {
 
 		switch (e->kind) {
 		case Entity_TypeName: {
-			ssaValue *t = ssa_make_value_type_name(a, e);
+			ssaValue *t = ssa_make_value_type_name(a, e->token.string, e->type);
+			map_set(&m->values,  hash_pointer(e), t);
 			map_set(&m->members, hash_string(name), t);
 		} break;
 

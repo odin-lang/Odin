@@ -4,6 +4,7 @@
 
 declare void @llvm.memmove.p0i8.p0i8.i64(i8*, i8*, i64, i32, i1)
 
+%main.Vec2 = type <2 x float>
 define void @exec(i64 ()* %p) {
 "entry - 0":
 	%0 = alloca i64 ()*, align 8 ; p
@@ -18,21 +19,119 @@ define void @exec(i64 ()* %p) {
 
 define void @main() {
 "entry - 0":
-	%0 = alloca i8, align 1 ; a
-	store i8 zeroinitializer, i8* %0
-	store i8 123, i8* %0
-	%1 = load i8, i8* %0
-	%2 = zext i8 %1 to i64
-	call void @print_int(i64 %2)
+	%0 = alloca i64, align 8 ; i
+	store i64 zeroinitializer, i64* %0
+	store i64 123, i64* %0
+	%1 = load i64, i64* %0
+	call void @print_int(i64 %1)
 	call void @print_rune(i32 128149)
 	call void @print_rune(i32 10)
-	call void @exec(i64 ()* @main$cool_beans)
+	%2 = alloca %main.Vec2, align 2 ; v
+	store %main.Vec2 zeroinitializer, %main.Vec2* %2
+	%3 = alloca %main.Vec2, align 2 
+	store %main.Vec2 zeroinitializer, %main.Vec2* %3
+	%4 = getelementptr inbounds %main.Vec2, %main.Vec2* %3, i64 0, i32 0
+	store float 0x3ff0000000000000, float* %4
+	%5 = getelementptr inbounds %main.Vec2, %main.Vec2* %3, i64 0, i32 1
+	store float 0x4000000000000000, float* %5
+	%6 = load %main.Vec2, %main.Vec2* %3
+	store %main.Vec2 %6, %main.Vec2* %2
+	%7 = alloca [4 x i64], align 8 ; a
+	store [4 x i64] zeroinitializer, [4 x i64]* %7
+	%8 = alloca [4 x i64], align 8 
+	store [4 x i64] zeroinitializer, [4 x i64]* %8
+	%9 = load i64, i64* %0
+	%10 = getelementptr inbounds [4 x i64], [4 x i64]* %8, i64 0, i32 0
+	store i64 %9, i64* %10
+	%11 = getelementptr inbounds [4 x i64], [4 x i64]* %8, i64 0, i32 1
+	store i64 2, i64* %11
+	%12 = getelementptr inbounds [4 x i64], [4 x i64]* %8, i64 0, i32 2
+	store i64 3, i64* %12
+	%13 = getelementptr inbounds [4 x i64], [4 x i64]* %8, i64 0, i32 3
+	store i64 7, i64* %13
+	%14 = load [4 x i64], [4 x i64]* %8
+	store [4 x i64] %14, [4 x i64]* %7
+	%15 = alloca [4 x i64], align 8 ; e
+	store [4 x i64] zeroinitializer, [4 x i64]* %15
+	%16 = alloca [4 x i64], align 8 
+	store [4 x i64] zeroinitializer, [4 x i64]* %16
+	%17 = load i64, i64* %0
+	%18 = getelementptr inbounds [4 x i64], [4 x i64]* %16, i64 0, i32 0
+	store i64 %17, i64* %18
+	%19 = getelementptr inbounds [4 x i64], [4 x i64]* %16, i64 0, i32 1
+	store i64 2, i64* %19
+	%20 = getelementptr inbounds [4 x i64], [4 x i64]* %16, i64 0, i32 2
+	store i64 3, i64* %20
+	%21 = getelementptr inbounds [4 x i64], [4 x i64]* %16, i64 0, i32 3
+	store i64 7, i64* %21
+	%22 = load [4 x i64], [4 x i64]* %16
+	store [4 x i64] %22, [4 x i64]* %15
+	%23 = alloca {i64*, i64, i64}, align 8 ; s
+	store {i64*, i64, i64} zeroinitializer, {i64*, i64, i64}* %23
+	%24 = alloca {i64*, i64, i64}, align 8 
+	store {i64*, i64, i64} zeroinitializer, {i64*, i64, i64}* %24
+	%25 = alloca [4 x i64], align 8 
+	store [4 x i64] zeroinitializer, [4 x i64]* %25
+	%26 = load i64, i64* %0
+	%27 = getelementptr inbounds [4 x i64], [4 x i64]* %25, i64 0, i32 0
+	store i64 %26, i64* %27
+	%28 = getelementptr inbounds [4 x i64], [4 x i64]* %25, i64 0, i32 1
+	store i64 2, i64* %28
+	%29 = getelementptr inbounds [4 x i64], [4 x i64]* %25, i64 0, i32 2
+	store i64 3, i64* %29
+	%30 = getelementptr inbounds [4 x i64], [4 x i64]* %25, i64 0, i32 3
+	store i64 7, i64* %30
+	%31 = getelementptr inbounds [4 x i64], [4 x i64]* %25, i64 0, i32 0
+	%32 = getelementptr inbounds {i64*, i64, i64}, {i64*, i64, i64}* %24, i64 0, i32 0
+	store i64* %31, i64** %32
+	%33 = getelementptr inbounds {i64*, i64, i64}, {i64*, i64, i64}* %24, i64 0, i32 1
+	store i64 4, i64* %33
+	%34 = getelementptr inbounds {i64*, i64, i64}, {i64*, i64, i64}* %24, i64 0, i32 2
+	store i64 4, i64* %34
+	%35 = load {i64*, i64, i64}, {i64*, i64, i64}* %24
+	store {i64*, i64, i64} %35, {i64*, i64, i64}* %23
+	%36 = alloca i64, align 8 ; i
+	store i64 zeroinitializer, i64* %36
+	store i64 0, i64* %36
+	br label %"for.loop - 2"
+
+"for.body - 1":
+	%37 = getelementptr inbounds [4 x i64], [4 x i64]* %7, i64 0, i64 0
+	%38 = load i64, i64* %36
+	%39 = getelementptr i64, i64* %37, i64 %38
+	%40 = load i64, i64* %39
+	call void @print_int(i64 %40)
+	%41 = getelementptr inbounds [2 x i8], [2 x i8]* @.str0, i64 0, i64 0
+	%42 = alloca %.string, align 8 
+	store %.string zeroinitializer, %.string* %42
+	%43 = getelementptr inbounds %.string, %.string* %42, i64 0, i32 0
+	%44 = getelementptr inbounds %.string, %.string* %42, i64 0, i32 1
+	store i8* %41, i8** %43
+	store i64 2, i64* %44
+	%45 = load %.string, %.string* %42
+	call void @print_string(%.string %45)
+	br label %"for.post - 3"
+
+"for.loop - 2":
+	%46 = load i64, i64* %36
+	%47 = icmp slt i64 %46, 4
+	br i1 %47, label %"for.body - 1", label %"for.done - 4"
+
+"for.post - 3":
+	%48 = load i64, i64* %36
+	%49 = add i64 %48, 1
+	store i64 %49, i64* %36
+	br label %"for.loop - 2"
+
+"for.done - 4":
+	call void @print_rune(i32 10)
+	call void @exec(i64 ()* @main$0)
 	ret void
 }
 
-define i64 @main$cool_beans() {
+define i64 @main$0() {
 "entry - 0":
-	%0 = alloca i64, align 8 ; a
+	%0 = alloca i64, align 8 ; i
 	store i64 zeroinitializer, i64* %0
 	store i64 1337, i64* %0
 	call void @print_rune(i32 128149)
@@ -411,7 +510,7 @@ define void @print_int_base(i64 %i, i64 %base) {
 	%16 = getelementptr inbounds [21 x i8], [21 x i8]* %2, i64 0, i64 0
 	%17 = load i64, i64* %3
 	%18 = getelementptr i8, i8* %16, i64 %17
-	%19 = getelementptr inbounds [64 x i8], [64 x i8]* @.str0, i64 0, i64 0
+	%19 = getelementptr inbounds [64 x i8], [64 x i8]* @.str1, i64 0, i64 0
 	%20 = load i64, i64* %1
 	%21 = load i64, i64* %0
 	%22 = srem i64 %21, %20
@@ -494,4 +593,5 @@ define void @print_int_base(i64 %i, i64 %base) {
 	ret void
 }
 
-@.str0 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"
+@.str0 = global [2 x i8] c"\2C\20"
+@.str1 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"

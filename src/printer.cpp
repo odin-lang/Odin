@@ -146,10 +146,7 @@ void print_ast(AstNode *node, isize indent) {
 		break;
 	case AstNode_ProcDecl:
 		print_indent(indent);
-		if (node->ProcDecl.kind == Declaration_Mutable)
-			gb_printf("(decl:proc,mutable)\n");
-		else if (node->ProcDecl.kind == Declaration_Immutable)
-			gb_printf("(decl:proc,immutable)\n");
+		gb_printf("(decl:proc)\n");
 		print_ast(node->ProcDecl.type, indent+1);
 		print_ast(node->ProcDecl.body, indent+1);
 		print_ast(node->ProcDecl.tag_list, indent+1);

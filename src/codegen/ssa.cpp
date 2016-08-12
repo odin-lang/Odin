@@ -14,6 +14,7 @@ struct ssaModule {
 
 	Map<ssaValue *> values;  // Key: Entity *
 	Map<ssaValue *> members; // Key: String
+	gbArray(ssaValue *) nested_type_names; // ssaValue_TypeName
 	i32 global_string_index;
 };
 
@@ -38,6 +39,8 @@ struct ssaTargetList {
 
 struct ssaProcedure {
 	ssaProcedure *parent;
+	gbArray(ssaProcedure *) children;
+
 	ssaModule *   module;
 	String        name;
 	Type *        type;
@@ -47,9 +50,6 @@ struct ssaProcedure {
 	gbArray(ssaBlock *) blocks;
 	ssaBlock *          curr_block;
 	ssaTargetList *     target_list;
-
-	gbArray(ssaProcedure *) anon_procs;
-	gbArray(ssaProcedure *) nested_procs;
 };
 
 
@@ -208,7 +208,7 @@ struct ssaValue {
 			ExactValue value;
 		} constant;
 		struct {
-			Entity *entity;
+			String name;
 			Type *  type;
 		} type_name;
 		struct {
@@ -276,11 +276,13 @@ void ssa_module_init(ssaModule *m, Checker *c) {
 
 	map_init(&m->values,  m->allocator);
 	map_init(&m->members, m->allocator);
+	gb_array_init(m->nested_type_names, m->allocator);
 }
 
 void ssa_module_destroy(ssaModule *m) {
 	map_destroy(&m->values);
 	map_destroy(&m->members);
+	gb_array_free(m->nested_type_names);
 	gb_arena_free(&m->arena);
 }
 
@@ -416,10 +418,10 @@ ssaValue *ssa_alloc_instr(gbAllocator a, ssaInstrKind kind) {
 	return v;
 }
 
-ssaValue *ssa_make_value_type_name(gbAllocator a, Entity *e) {
+ssaValue *ssa_make_value_type_name(gbAllocator a, String name, Type *type) {
 	ssaValue *v = ssa_alloc_value(a, ssaValue_TypeName);
-	v->type_name.entity = e;
-	v->type_name.type = e->type;
+	v->type_name.name = name;
+	v->type_name.type = type;
 	return v;
 }
 
@@ -1146,8 +1148,17 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 		return value;
 
 	if (value->kind == ssaValue_Constant) {
-		if (dst->kind == Type_Basic)
-			return ssa_make_value_constant(proc->module->allocator, t, value->constant.value);
+		if (dst->kind == Type_Basic) {
+			ExactValue ev = value->constant.value;
+			if (is_type_float(dst)) {
+				ev = exact_value_to_float(ev);
+			} else if (is_type_string(dst)) {
+				//
+			} else if (is_type_integer(dst)) {
+				ev = exact_value_to_integer(ev);
+			}
+			return ssa_make_value_constant(proc->module->allocator, t, ev);
+		}
 	}
 
 	// integer -> integer
@@ -1337,34 +1348,113 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 	case_end;
 
 	case_ast_node(pl, ProcLit, expr);
-		if (proc->anon_procs == NULL) {
-			// TODO(bill): Cleanup
-			gb_array_init(proc->anon_procs, gb_heap_allocator());
+		if (proc->children == NULL) {
+			gb_array_init(proc->children, gb_heap_allocator());
 		}
 		// NOTE(bill): Generate a new name
 		// parent$count
 		isize name_len = proc->name.len + 1 + 8 + 1;
 		u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$%d", LIT(proc->name), cast(i32)gb_array_count(proc->anon_procs));
+		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$%d", LIT(proc->name), cast(i32)gb_array_count(proc->children));
 		String name = make_string(name_text, name_len-1);
 
-
-		// auto **found = map_get(&proc->module->info->definitions,
-		                       // hash_pointer(expr))
 		Type *type = type_of_expr(proc->module->info, expr);
 		ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
 		                                           proc->module, type, pl->type, pl->body, name);
-		ssaProcedure *np = &value->proc;
 
-		gb_array_append(proc->anon_procs, np);
+		gb_array_append(proc->children, &value->proc);
 		ssa_build_proc(value, proc);
 
-		return value; // TODO(bill): Is this correct?
+		return value;
 	case_end;
 
 
-	case_ast_node(pl, CompoundLit, expr);
-		GB_PANIC("TODO(bill): ssa_build_single_expr CompoundLit");
+	case_ast_node(cl, CompoundLit, expr);
+		Type *type = type_of_expr(proc->module->info, expr);
+		Type *base_type = get_base_type(type);
+		ssaValue *v = ssa_add_local_generated(proc, type);
+
+		Type *et = NULL;
+		switch (base_type->kind) {
+		case Type_Vector: et = base_type->vector.elem; break;
+		case Type_Array:  et = base_type->array.elem;  break;
+		case Type_Slice:  et = base_type->slice.elem;  break;
+		}
+
+		switch (base_type->kind) {
+		default: GB_PANIC("Unknown CompoundLit type: %s", type_to_string(type)); break;
+		case Type_Structure: {
+			auto *st = &base_type->structure;
+			isize index = 0;
+			for (AstNode *elem = cl->elem_list;
+				elem != NULL;
+				elem = elem->next) {
+				ssaValue *field_expr = ssa_build_expr(proc, elem);
+				Type *t = ssa_value_type(field_expr);
+				if (t->kind != Type_Tuple) {
+					Entity *field = st->fields[index];
+					Type *ft = field->type;
+					ssaValue *fv = ssa_emit_conv(proc, field_expr, ft);
+					ssaValue *gep = ssa_emit_struct_gep(proc, v, index, ft);
+					ssa_emit_store(proc, gep, fv);
+					index++;
+				} else {
+					GB_PANIC("TODO(bill): tuples in struct literals");
+				}
+			}
+
+		} break;
+		case Type_Vector:
+		case Type_Array: {
+			isize index = 0;
+			for (AstNode *elem = cl->elem_list;
+				elem != NULL;
+				elem = elem->next) {
+				ssaValue *field_expr = ssa_build_expr(proc, elem);
+				Type *t = ssa_value_type(field_expr);
+				if (t->kind != Type_Tuple) {
+					ssaValue *ev = ssa_emit_conv(proc, field_expr, et);
+					ssaValue *gep = ssa_emit_struct_gep(proc, v, index, et);
+					ssa_emit_store(proc, gep, ev);
+					index++;
+				} else {
+					GB_PANIC("TODO(bill): tuples in array literals");
+				}
+			}
+		} break;
+		case Type_Slice: {
+			i64 count = cl->elem_count;
+			ssaValue *array = ssa_add_local_generated(proc, make_type_array(proc->module->allocator, et, count));
+			isize index = 0;
+			for (AstNode *elem = cl->elem_list;
+				elem != NULL;
+				elem = elem->next) {
+				ssaValue *field_expr = ssa_build_expr(proc, elem);
+				Type *t = ssa_value_type(field_expr);
+				if (t->kind != Type_Tuple) {
+					ssaValue *ev = ssa_emit_conv(proc, field_expr, et);
+					ssaValue *gep = ssa_emit_struct_gep(proc, array, index, et);
+					ssa_emit_store(proc, gep, ev);
+					index++;
+				} else {
+					GB_PANIC("TODO(bill): tuples in array literals");
+				}
+			}
+
+			ssaValue *elem = ssa_emit_struct_gep(proc, array, v_zero32,
+			                                     make_type_pointer(proc->module->allocator, et));
+			ssaValue *len = ssa_array_len(proc, array);
+			ssaValue *gep = NULL;
+			gep = ssa_emit_struct_gep(proc, v, v_zero32, ssa_value_type(elem));
+			ssa_emit_store(proc, gep, elem);
+			gep = ssa_emit_struct_gep(proc, v, v_one32, t_int);
+			ssa_emit_store(proc, gep, len);
+			gep = ssa_emit_struct_gep(proc, v, v_two32, t_int);
+			ssa_emit_store(proc, gep, len);
+		} break;
+		}
+
+		return ssa_emit_load(proc, v);
 	case_end;
 
 	case_ast_node(ce, CastExpr, expr);
@@ -1768,9 +1858,8 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 	case_end;
 
 	case_ast_node(pd, ProcDecl, node);
-		if (proc->nested_procs == NULL) {
-			// TODO(bill): Cleanup
-			gb_array_init(proc->nested_procs, gb_heap_allocator());
+		if (proc->children == NULL) {
+			gb_array_init(proc->children, gb_heap_allocator());
 		}
 		// NOTE(bill): Generate a new name
 		// parent$name
@@ -1780,15 +1869,36 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$%.*s", LIT(proc->name), LIT(pd_name));
 		String name = make_string(name_text, name_len-1);
 
-		Entity *e = *map_get(&proc->module->info->definitions, hash_pointer(pd->name));
+		Entity **found = map_get(&proc->module->info->definitions, hash_pointer(pd->name));
+		GB_ASSERT(found != NULL);
+		Entity *e = *found;
 		ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
 		                                           proc->module, e->type, pd->type, pd->body, name);
-		ssaProcedure *np = &value->proc;
-		gb_array_append(proc->nested_procs, np);
+
+		ssa_module_add_value(proc->module, e, value);
+		gb_array_append(proc->children, &value->proc);
 		ssa_build_proc(value, proc);
+	case_end;
 
-		map_set(&proc->module->values, hash_pointer(e), value);
+	case_ast_node(td, TypeDecl, node);
 
+		// NOTE(bill): Generate a new name
+		// parent_proc.name
+		String td_name = td->name->Ident.token.string;
+		isize name_len = proc->name.len + 1 + td_name.len + 1;
+		u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
+		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s", LIT(proc->name), LIT(td_name));
+		String name = make_string(name_text, name_len-1);
+
+		Entity **found = map_get(&proc->module->info->definitions, hash_pointer(td->name));
+		GB_ASSERT(found != NULL);
+		Entity *e = *found;
+		ssaValue *value = ssa_make_value_type_name(proc->module->allocator,
+		                                           name, e->type);
+		// HACK(bill): Override name of type so printer prints it correctly
+		e->type->named.name = name;
+		ssa_module_add_value(proc->module, e, value);
+		gb_array_append(proc->module->nested_type_names, value);
 	case_end;
 
 	case_ast_node(ids, IncDecStmt, node);
