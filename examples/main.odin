@@ -1,36 +1,25 @@
+import "c_runtime"
 import "basic"
 
 TWO_HEARTS :: '💕';
 
 main :: proc() {
-	a, b := {8}f32{1, 2, 3, 4}, {8}f32{1, 2, 3, 4};
-	c := a == b;
-	x := {32}bool{true, false, true};
-	d := ((^x[0]) as ^u32)^;
-	print_int_base(d as int, 2);
-	// print_string("\n");
-	// print_int(x[0] as int);
-	// print_int(x[1] as int);
-	// print_int(x[2] as int);
-	// print_string("\n");
+	DATA_SIZE :: 100;
+	data := malloc(DATA_SIZE);
 
-	// for i := 0; false && i < len(x); i++ {
-	// 	v := x[i];
-	// 	print_int(v);
-	// 	print_string("\n");
-	// }
+	slice := (data as ^u8)[:0:DATA_SIZE];
+	for i := 0; i < cap(slice); i++ {
+		ok := append(^slice, (i*i) as u8);
+	}
 
-	// for i := 0; i < len(c); i++ {
-	// 	if i > 0 {
-	// 		print_string("\n");
-	// 	}
-	// 	print_int(a[i] as int);
-	// 	print_string(" == ");
-	// 	print_int(b[i] as int);
-	// 	print_string(" => ");
-	// 	print_int(c[i] as int);
-	// }
-	// print_rune('\n');
+	for i := 0; i < len(slice); i++ {
+		print_int(slice[i] as int);
+		print_string(", ");
+		if (i+1) % 8 == 0 {
+			print_string("\n");
+		}
+	}
+	free(data);
 }
 
 /*

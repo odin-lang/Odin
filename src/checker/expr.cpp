@@ -857,45 +857,6 @@ b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
 	return false;
 }
 
-void check_cast_expr(Checker *c, Operand *operand, Type *type) {
-	b32 is_const_expr = operand->mode == Addressing_Constant;
-	b32 can_convert = false;
-
-	if (is_const_expr && is_type_constant_type(type)) {
-		Type *t = get_base_type(type);
-		if (t->kind == Type_Basic) {
-			if (check_value_is_expressible(c, operand->value, t, &operand->value)) {
-				can_convert = true;
-			}
-		}
-	} else if (check_castable_to(c, operand, type)) {
-		operand->mode = Addressing_Value;
-		can_convert = true;
-	}
-
-	if (!can_convert) {
-		gbString expr_str = expr_to_string(operand->expr);
-		gbString type_str = type_to_string(type);
-		defer (gb_string_free(expr_str));
-		defer (gb_string_free(type_str));
-		error(&c->error_collector, ast_node_token(operand->expr), "Cannot cast `%s` to `%s`", expr_str, type_str);
-
-		operand->mode = Addressing_Invalid;
-		return;
-	}
-
-	if (is_type_untyped(operand->type)) {
-		Type *final_type = type;
-		if (is_const_expr && !is_type_constant_type(type)) {
-			final_type = default_type(operand->type);
-		}
-		update_expr_type(c, operand->expr, final_type, true);
-	}
-
-	operand->type = type;
-}
-
-
 void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_BinaryExpr);
 	Operand y_ = {}, *y = &y_;
@@ -906,10 +867,82 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 
 	if (be->op.kind == Token_as) {
 		check_expr(c, x, be->left);
-		Type *cast_type = check_type(c, be->right);
+		Type *type = check_type(c, be->right);
 		if (x->mode == Addressing_Invalid)
 			return;
-		check_cast_expr(c, x, cast_type);
+
+		b32 is_const_expr = x->mode == Addressing_Constant;
+		b32 can_convert = false;
+
+		if (is_const_expr && is_type_constant_type(type)) {
+			Type *t = get_base_type(type);
+			if (t->kind == Type_Basic) {
+				if (check_value_is_expressible(c, x->value, t, &x->value)) {
+					can_convert = true;
+				}
+			}
+		} else if (check_castable_to(c, x, type)) {
+			x->mode = Addressing_Value;
+			can_convert = true;
+		}
+
+		if (!can_convert) {
+			gbString expr_str = expr_to_string(x->expr);
+			gbString type_str = type_to_string(type);
+			defer (gb_string_free(expr_str));
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(x->expr), "Cannot cast `%s` to `%s`", expr_str, type_str);
+
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		if (is_type_untyped(x->type)) {
+			Type *final_type = type;
+			if (is_const_expr && !is_type_constant_type(type)) {
+				final_type = default_type(x->type);
+			}
+			update_expr_type(c, x->expr, final_type, true);
+		}
+
+		x->type = type;
+		return;
+	} else if (be->op.kind == Token_transmute) {
+		check_expr(c, x, be->left);
+		Type *type = check_type(c, be->right);
+		if (x->mode == Addressing_Invalid)
+			return;
+
+		if (x->mode == Addressing_Constant) {
+			gbString expr_str = expr_to_string(x->expr);
+			defer (gb_string_free(expr_str));
+			error(&c->error_collector, ast_node_token(x->expr), "Cannot transmute constant expression: `%s`", expr_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		if (is_type_untyped(x->type)) {
+			gbString expr_str = expr_to_string(x->expr);
+			defer (gb_string_free(expr_str));
+			error(&c->error_collector, ast_node_token(x->expr), "Cannot transmute untyped expression: `%s`", expr_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		i64 otz = type_size_of(c->sizes, c->allocator, x->type);
+		i64 ttz = type_size_of(c->sizes, c->allocator, type);
+		if (otz != ttz) {
+			gbString expr_str = expr_to_string(x->expr);
+			gbString type_str = type_to_string(type);
+			defer (gb_string_free(expr_str));
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(x->expr), "Cannot transmute `%s` to `%s`, %lld vs %lld bytes", expr_str, type_str, otz, ttz);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		x->type = type;
+
 		return;
 	}
 

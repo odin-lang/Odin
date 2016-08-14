@@ -54,7 +54,10 @@ TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
 	TOKEN_KIND(Token_AndNot, "&~"), \
 	TOKEN_KIND(Token_Shl, "<<"), \
 	TOKEN_KIND(Token_Shr, ">>"), \
+\
 	TOKEN_KIND(Token_as, "as"), \
+	TOKEN_KIND(Token_transmute, "transmute"), \
+\
 TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
 	TOKEN_KIND(Token_AddEq, "+="), \
 	TOKEN_KIND(Token_SubEq, "-="), \
@@ -101,23 +104,23 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
-	TOKEN_KIND(Token_type, "type"), \
-	TOKEN_KIND(Token_alias, "alias"), \
-	TOKEN_KIND(Token_proc, "proc"), \
-	TOKEN_KIND(Token_match, "match"), \
-	TOKEN_KIND(Token_break, "break"), \
-	TOKEN_KIND(Token_continue, "continue"), \
+	TOKEN_KIND(Token_type,        "type"), \
+	TOKEN_KIND(Token_alias,       "alias"), \
+	TOKEN_KIND(Token_proc,        "proc"), \
+	TOKEN_KIND(Token_match,       "match"), \
+	TOKEN_KIND(Token_break,       "break"), \
+	TOKEN_KIND(Token_continue,    "continue"), \
 	TOKEN_KIND(Token_fallthrough, "fallthrough"), \
-	TOKEN_KIND(Token_case, "case"), \
-	TOKEN_KIND(Token_if, "if"), \
-	TOKEN_KIND(Token_else, "else"), \
-	TOKEN_KIND(Token_for, "for"), \
-	TOKEN_KIND(Token_defer, "defer"), \
-	TOKEN_KIND(Token_return, "return"), \
-	TOKEN_KIND(Token_import, "import"), \
-	TOKEN_KIND(Token_struct, "struct"), \
-	TOKEN_KIND(Token_union, "union"), \
-	TOKEN_KIND(Token_enum, "enum"), \
+	TOKEN_KIND(Token_case,        "case"), \
+	TOKEN_KIND(Token_if,          "if"), \
+	TOKEN_KIND(Token_else,        "else"), \
+	TOKEN_KIND(Token_for,         "for"), \
+	TOKEN_KIND(Token_defer,       "defer"), \
+	TOKEN_KIND(Token_return,      "return"), \
+	TOKEN_KIND(Token_import,      "import"), \
+	TOKEN_KIND(Token_struct,      "struct"), \
+	TOKEN_KIND(Token_union,       "union"), \
+	TOKEN_KIND(Token_enum,        "enum"), \
 TOKEN_KIND(Token__KeywordEnd, "_KeywordEnd"), \
 	TOKEN_KIND(Token_Count, "")
 
@@ -225,6 +228,7 @@ i32 token_precedence(Token t) {
 	case Token_Shr:
 		return 5;
 	case Token_as:
+	case Token_transmute:
 		return 6;
 	}
 
@@ -645,6 +649,8 @@ Token tokenizer_get_token(Tokenizer *t) {
 		if (token.string.len > 1) {
 			if (are_strings_equal(token.string, token_strings[Token_as])) {
 				token.kind = Token_as;
+			} else if (are_strings_equal(token.string, token_strings[Token_transmute])) {
+				token.kind = Token_transmute;
 			} else {
 				for (i32 k = Token__KeywordBegin+1; k < Token__KeywordEnd; k++) {
 					if (are_strings_equal(token.string, token_strings[k])) {
@@ -730,6 +736,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 			if (valid && len != 1)
 				tokenizer_err(t, "Illegal rune literal");
 			token.string.len = t->curr - token.string.text;
+
 			i32 success = unquote_string(gb_heap_allocator(), &token.string);
 			if (success > 0) {
 				if (success == 2) {

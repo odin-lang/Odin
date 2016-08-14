@@ -1212,16 +1212,13 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 			i32 op_prec = token_precedence(op);
 			if (op_prec != prec)
 				break;
-			if (op.kind != Token_as) {
-				expect_operator(f); // NOTE(bill): error checks too
-			}
+			expect_operator(f); // NOTE(bill): error checks too
 			if (lhs) {
 				// TODO(bill): error checking
 				lhs = false;
 			}
 
-			if (op.kind == Token_as) {
-				next_token(f);
+			if (op.kind == Token_as || op.kind == Token_transmute) {
 				right = parse_type(f);
 			} else {
 				right = parse_binary_expr(f, false, prec+1);

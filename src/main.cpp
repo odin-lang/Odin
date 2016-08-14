@@ -39,6 +39,8 @@ int main(int argc, char **argv) {
 					ssa_gen_code(&ssa);
 
 					success = 0;
+				} else {
+					gb_printf("Failed to build: %s\n", init_filename);
 				}
 			}
 		}

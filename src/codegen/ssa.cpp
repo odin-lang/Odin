@@ -401,6 +401,7 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr);
 ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv);
 ssaLvalue ssa_build_addr(ssaProcedure *proc, AstNode *expr);
 ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *a_type);
+ssaValue *ssa_emit_transmute(ssaProcedure *proc, ssaValue *value, Type *a_type);
 void      ssa_build_proc(ssaValue *value, ssaProcedure *parent);
 
 
@@ -1077,7 +1078,7 @@ ssaValue *ssa_emit_slice(ssaProcedure *proc, Type *slice_type, ssaValue *base, s
 	switch (base_type->kind) {
 	case Type_Array:   elem = ssa_array_elem(proc, base); break;
 	case Type_Slice:   elem = ssa_slice_elem(proc, base); break;
-	case Type_Pointer: elem = base;                       break;
+	case Type_Pointer: elem = ssa_emit_load(proc, base);  break;
 	}
 
 	elem = ssa_emit_ptr_offset(proc, elem, low);
@@ -1175,8 +1176,6 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 	Type *dst = get_base_type(t);
 	if (are_types_identical(t, src_type))
 		return value;
-
-
 
 	if (value->kind == ssaValue_Constant) {
 		if (dst->kind == Type_Basic) {
@@ -1291,6 +1290,31 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 }
 
 
+ssaValue *ssa_emit_transmute(ssaProcedure *proc, ssaValue *value, Type *t) {
+	Type *src_type = ssa_value_type(value);
+	if (are_types_identical(t, src_type)) {
+		return value;
+	}
+
+	Type *src = get_base_type(src_type);
+	Type *dst = get_base_type(t);
+	if (are_types_identical(t, src_type))
+		return value;
+
+	i64 sz = type_size_of(proc->module->sizes, proc->module->allocator, src);
+	i64 dz = type_size_of(proc->module->sizes, proc->module->allocator, dst);
+
+	if (sz == dz) {
+		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, value, src, dst));
+	}
+
+
+	GB_PANIC("Invalid transmute conversion: `%s` to `%s`", type_to_string(src_type), type_to_string(t));
+
+	return NULL;
+}
+
+
 
 
 
@@ -1391,6 +1415,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 		case Token_as:
 			return ssa_emit_conv(proc, ssa_build_expr(proc, be->left), tv->type);
+
+		case Token_transmute:
+			return ssa_emit_transmute(proc, ssa_build_expr(proc, be->left), tv->type);
 
 		default:
 			GB_PANIC("Invalid binary expression");
@@ -1583,8 +1610,44 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					return len;
 				} break;
 				case BuiltinProc_append: {
-					// copy :: proc(s: ^[]Type, value: Type) -> bool
-					GB_PANIC("TODO(bill): BuiltinProc_append");
+					// append :: proc(s: ^[]Type, item: Type) -> bool
+					AstNode *sptr_node = ce->arg_list;
+					AstNode *item_node = ce->arg_list->next;
+					ssaValue *slice = ssa_build_addr(proc, sptr_node).address;
+					ssaValue *item = ssa_build_addr(proc, item_node).address;
+					Type *item_type = type_deref(ssa_value_type(item));
+
+					ssaValue *elem = ssa_slice_elem(proc, slice);
+					ssaValue *len = ssa_slice_len(proc, slice);
+					ssaValue *cap = ssa_slice_cap(proc, slice);
+
+					// NOTE(bill): Check if can append is possible
+					Token lt = {Token_Lt};
+					ssaValue *cond = ssa_emit_comp(proc, lt, len, cap);
+					ssaBlock *able = ssa_add_block(proc, NULL, make_string("builtin.append.able"));
+					ssaBlock *done = ssa__make_block(proc, NULL, make_string("builtin.append.done"));
+
+					ssa_emit_if(proc, cond, able, done);
+					proc->curr_block = able;
+
+					// Add new slice item
+					ssaValue *offset = ssa_emit_ptr_offset(proc, elem, len);
+					i64 item_size = type_size_of(proc->module->sizes, proc->module->allocator, item_type);
+					ssaValue *byte_count = ssa_make_value_constant(proc->module->allocator, t_int,
+					                                               make_exact_value_integer(item_size));
+					ssa_emit(proc, ssa_make_instr_copy_memory(proc, offset, item, byte_count, 1, false));
+
+					// Increment slice length
+					Token add = {Token_Add};
+					ssaValue *new_len = ssa_emit_arith(proc, add, len, v_one, t_int);
+					ssaValue *gep = ssa_emit_struct_gep(proc, slice, v_one32, t_int);
+					ssa_emit_store(proc, gep, new_len);
+
+					ssa_emit_jump(proc, done);
+					gb_array_append(proc->blocks, done);
+					proc->curr_block = done;
+
+					return ssa_emit_conv(proc, cond, t_bool);
 				} break;
 				case BuiltinProc_print: {
 					// print :: proc(...)
@@ -1735,10 +1798,19 @@ ssaLvalue ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	case_ast_node(be, BinaryExpr, expr);
 		switch (be->op.kind) {
 		case Token_as: {
+			// HACK(bill): Do have to make new variable to do this?
 			// NOTE(bill): Needed for dereference of pointer conversion
 			Type *type = type_of_expr(proc->module->info, expr);
 			ssaValue *v = ssa_add_local_generated(proc, type);
 			ssa_emit_store(proc, v, ssa_emit_conv(proc, ssa_build_expr(proc, be->left), type));
+			return ssa_make_lvalue(v, expr);
+		}
+		case Token_transmute: {
+			// HACK(bill): Do have to make new variable to do this?
+			// NOTE(bill): Needed for dereference of pointer conversion
+			Type *type = type_of_expr(proc->module->info, expr);
+			ssaValue *v = ssa_add_local_generated(proc, type);
+			ssa_emit_store(proc, v, ssa_emit_transmute(proc, ssa_build_expr(proc, be->left), type));
 			return ssa_make_lvalue(v, expr);
 		}
 		default:
@@ -1971,33 +2043,48 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		if (proc->children == NULL) {
 			gb_array_init(proc->children, gb_heap_allocator());
 		}
-		// NOTE(bill): Generate a new name
-		// parent$name
-		String pd_name = pd->name->Ident.token.string;
-		isize name_len = proc->name.len + 1 + pd_name.len + 1;
-		u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$%.*s", LIT(proc->name), LIT(pd_name));
-		String name = make_string(name_text, name_len-1);
+		if (pd->body != NULL) {
+			// NOTE(bill): Generate a new name
+			// parent$name-guid
+			String pd_name = pd->name->Ident.token.string;
+			isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
+			u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
+			i32 guid = cast(i32)gb_array_count(proc->children);
+			name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
+			String name = make_string(name_text, name_len-1);
 
-		Entity **found = map_get(&proc->module->info->definitions, hash_pointer(pd->name));
-		GB_ASSERT(found != NULL);
-		Entity *e = *found;
-		ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
-		                                           proc->module, e->type, pd->type, pd->body, name);
+			Entity **found = map_get(&proc->module->info->definitions, hash_pointer(pd->name));
+			GB_ASSERT(found != NULL);
+			Entity *e = *found;
+			ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
+			                                           proc->module, e->type, pd->type, pd->body, name);
 
-		ssa_module_add_value(proc->module, e, value);
-		gb_array_append(proc->children, &value->proc);
-		ssa_build_proc(value, proc);
+			ssa_module_add_value(proc->module, e, value);
+			gb_array_append(proc->children, &value->proc);
+			ssa_build_proc(value, proc);
+		} else {
+			String name = pd->name->Ident.token.string;
+
+			Entity **found = map_get(&proc->module->info->definitions, hash_pointer(pd->name));
+			GB_ASSERT(found != NULL);
+			Entity *e = *found;
+			ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
+			                                           proc->module, e->type, pd->type, pd->body, name);
+			ssa_module_add_value(proc->module, e, value);
+			gb_array_append(proc->children, &value->proc);
+			ssa_build_proc(value, proc);
+		}
 	case_end;
 
 	case_ast_node(td, TypeDecl, node);
 
 		// NOTE(bill): Generate a new name
-		// parent_proc.name
+		// parent_proc.name-guid
 		String td_name = td->name->Ident.token.string;
-		isize name_len = proc->name.len + 1 + td_name.len + 1;
+		isize name_len = proc->name.len + 1 + td_name.len + 1 + 10 + 1;
 		u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s", LIT(proc->name), LIT(td_name));
+		i32 guid = cast(i32)gb_array_count(proc->module->nested_type_names);
+		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(td_name), guid);
 		String name = make_string(name_text, name_len-1);
 
 		Entity **found = map_get(&proc->module->info->definitions, hash_pointer(td->name));

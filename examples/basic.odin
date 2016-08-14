@@ -1,5 +1,3 @@
-putchar :: proc(c: i32) -> i32 #foreign
-
 print_string :: proc(s: string) {
 	for i := 0; i < len(s); i++ {
 		putchar(s[i] as i32);
@@ -22,8 +20,8 @@ encode_rune :: proc(r : rune) -> ([4]byte, int) {
 		return buf, 1;
 	}
 	if i <= 1<<11-1 {
-		buf[0] = (0xc0 | r>>6) as byte;
-		buf[1] = (0x80 | r) as byte & mask;
+		buf[0] = 0xc0 | (r>>6) as byte;
+		buf[1] = 0x80 | (r)    as byte & mask;
 		return buf, 2;
 	}
 
@@ -34,16 +32,16 @@ encode_rune :: proc(r : rune) -> ([4]byte, int) {
 	}
 
 	if i <= 1<<16-1 {
-		buf[0] = (0xe0 | r>>12) as byte ;
-		buf[1] = (0x80 | r>>6)  as byte & mask;
-		buf[2] = (0x80 | r)     as byte & mask;
+		buf[0] = 0xe0 | (r>>12) as byte;
+		buf[1] = 0x80 | (r>>6)  as byte & mask;
+		buf[2] = 0x80 | (r)     as byte & mask;
 		return buf, 3;
 	}
 
-	buf[0] = (0xf0 | r>>18) as byte;
-	buf[1] = (0x80 | r>>12) as byte & mask;
-	buf[2] = (0x80 | r>>6)  as byte & mask;
-	buf[3] = (0x80 | r)     as byte & mask;
+	buf[0] = 0xf0 | (r>>18) as byte;
+	buf[1] = 0x80 | (r>>12) as byte & mask;
+	buf[2] = 0x80 | (r>>6)  as byte & mask;
+	buf[3] = 0x80 | (r)     as byte & mask;
 	return buf, 4;
 }
 

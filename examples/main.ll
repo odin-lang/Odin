@@ -6,61 +6,148 @@ declare void @llvm.memmove.p0i8.p0i8.i64(i8*, i8*, i64, i32, i1)
 
 define void @main() {
 "entry - 0":
-	%0 = alloca <8 x float>, align 4 ; a
-	store <8 x float> zeroinitializer, <8 x float>* %0
-	%1 = alloca <8 x float>, align 4 ; b
-	store <8 x float> zeroinitializer, <8 x float>* %1
-	%2 = alloca <8 x float>, align 4 
-	store <8 x float> zeroinitializer, <8 x float>* %2
-	%3 = load <8 x float>, <8 x float>* %2
-	%4 = insertelement <8 x float> %3, float 0x3ff0000000000000, i64 0
-	%5 = insertelement <8 x float> %4, float 0x4000000000000000, i64 1
-	%6 = insertelement <8 x float> %5, float 0x4008000000000000, i64 2
-	%7 = insertelement <8 x float> %6, float 0x4010000000000000, i64 3
-	%8 = alloca <8 x float>, align 4 
-	store <8 x float> zeroinitializer, <8 x float>* %8
-	%9 = load <8 x float>, <8 x float>* %8
-	%10 = insertelement <8 x float> %9, float 0x3ff0000000000000, i64 0
-	%11 = insertelement <8 x float> %10, float 0x4000000000000000, i64 1
-	%12 = insertelement <8 x float> %11, float 0x4008000000000000, i64 2
-	%13 = insertelement <8 x float> %12, float 0x4010000000000000, i64 3
-	store <8 x float> %7, <8 x float>* %0
-	store <8 x float> %13, <8 x float>* %1
-	%14 = alloca <8 x i1>, align 1 ; c
-	store <8 x i1> zeroinitializer, <8 x i1>* %14
-	%15 = load <8 x float>, <8 x float>* %0
-	%16 = load <8 x float>, <8 x float>* %1
-	%17 = fcmp oeq <8 x float> %15, %16
-	store <8 x i1> %17, <8 x i1>* %14
-	%18 = alloca <32 x i1>, align 1 ; x
-	store <32 x i1> zeroinitializer, <32 x i1>* %18
-	%19 = alloca <32 x i1>, align 1 
-	store <32 x i1> zeroinitializer, <32 x i1>* %19
-	%20 = load <32 x i1>, <32 x i1>* %19
-	%21 = insertelement <32 x i1> %20, i1 true, i64 0
-	%22 = insertelement <32 x i1> %21, i1 false, i64 1
-	%23 = insertelement <32 x i1> %22, i1 true, i64 2
-	store <32 x i1> %23, <32 x i1>* %18
-	%24 = alloca i32, align 4 ; d
-	store i32 zeroinitializer, i32* %24
-	%25 = alloca i32*, align 8 
-	store i32* zeroinitializer, i32** %25
-	%26 = getelementptr inbounds <32 x i1>, <32 x i1>* %18, i64 0, i32 0
-	%27 = getelementptr i1, i1* %26, i64 0
-	%28 = getelementptr inbounds i1, i1* %27
-	%29 = bitcast i1* %28 to i32*
-	store i32* %29, i32** %25
-	%30 = load i32*, i32** %25
-	%31 = getelementptr i32, i32* %30
-	%32 = load i32, i32* %31
-	store i32 %32, i32* %24
-	%33 = load i32, i32* %24
-	%34 = zext i32 %33 to i64
-	call void @print_int_base(i64 %34, i64 2)
+	%0 = alloca %.rawptr, align 8 ; data
+	store %.rawptr zeroinitializer, %.rawptr* %0
+	%1 = call %.rawptr @malloc(i64 100)
+	store %.rawptr %1, %.rawptr* %0
+	%2 = alloca {i8*, i64, i64}, align 8 ; slice
+	store {i8*, i64, i64} zeroinitializer, {i8*, i64, i64}* %2
+	%3 = alloca i8*, align 8 
+	store i8* zeroinitializer, i8** %3
+	%4 = load %.rawptr, %.rawptr* %0
+	%5 = bitcast %.rawptr %4 to i8*
+	store i8* %5, i8** %3
+	%6 = sub i64 0, 0
+	%7 = sub i64 100, 0
+	%8 = load i8*, i8** %3
+	%9 = getelementptr i8, i8* %8, i64 0
+	%10 = alloca {i8*, i64, i64}, align 8 
+	store {i8*, i64, i64} zeroinitializer, {i8*, i64, i64}* %10
+	%11 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %10, i64 0, i32 0
+	store i8* %9, i8** %11
+	%12 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %10, i64 0, i32 1
+	store i64 %6, i64* %12
+	%13 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %10, i64 0, i32 2
+	store i64 %7, i64* %13
+	%14 = load {i8*, i64, i64}, {i8*, i64, i64}* %10
+	store {i8*, i64, i64} %14, {i8*, i64, i64}* %2
+	%15 = alloca i64, align 8 ; i
+	store i64 zeroinitializer, i64* %15
+	store i64 0, i64* %15
+	br label %"for.loop - 2"
+
+"for.body - 1":
+	%16 = alloca i1, align 1 ; ok
+	store i1 zeroinitializer, i1* %16
+	%17 = alloca i8, align 1 
+	store i8 zeroinitializer, i8* %17
+	%18 = load i64, i64* %15
+	%19 = load i64, i64* %15
+	%20 = mul i64 %19, %18
+	%21 = trunc i64 %20 to i8
+	store i8 %21, i8* %17
+	%22 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %2, i64 0, i32 0
+	%23 = load i8*, i8** %22
+	%24 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %2, i64 0, i32 1
+	%25 = load i64, i64* %24
+	%26 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %2, i64 0, i32 2
+	%27 = load i64, i64* %26
+	%28 = icmp slt i64 %25, %27
+	br i1 %28, label %"builtin.append.able - 4", label %"builtin.append.done - 5"
+
+"for.loop - 2":
+	%29 = load i64, i64* %15
+	%30 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %2, i64 0, i32 2
+	%31 = load i64, i64* %30
+	%32 = icmp slt i64 %29, %31
+	br i1 %32, label %"for.body - 1", label %"for.done - 6"
+
+"for.post - 3":
+	%33 = load i64, i64* %15
+	%34 = add i64 %33, 1
+	store i64 %34, i64* %15
+	br label %"for.loop - 2"
+
+"builtin.append.able - 4":
+	%35 = getelementptr i8, i8* %23, i64 %25
+	call void @llvm.memmove.p0i8.p0i8.i64(i8* %35, i8* %17, i64 1, i32 1, i1 false)
+	%36 = add i64 %25, 1
+	%37 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %2, i64 0, i32 1
+	store i64 %36, i64* %37
+	br label %"builtin.append.done - 5"
+
+"builtin.append.done - 5":
+	store i1 %28, i1* %16
+	br label %"for.post - 3"
+
+"for.done - 6":
+	%38 = alloca i64, align 8 ; i
+	store i64 zeroinitializer, i64* %38
+	store i64 0, i64* %38
+	br label %"for.loop - 8"
+
+"for.body - 7":
+	%39 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %2, i64 0, i32 0
+	%40 = load i8*, i8** %39
+	%41 = load i64, i64* %38
+	%42 = getelementptr i8, i8* %40, i64 %41
+	%43 = load i8, i8* %42
+	%44 = zext i8 %43 to i64
+	call void @print_int(i64 %44)
+	%45 = getelementptr inbounds [2 x i8], [2 x i8]* @.str0, i64 0, i64 0
+	%46 = alloca %.string, align 8 
+	store %.string zeroinitializer, %.string* %46
+	%47 = getelementptr inbounds %.string, %.string* %46, i64 0, i32 0
+	%48 = getelementptr inbounds %.string, %.string* %46, i64 0, i32 1
+	store i8* %45, i8** %47
+	store i64 2, i64* %48
+	%49 = load %.string, %.string* %46
+	call void @print_string(%.string %49)
+	%50 = load i64, i64* %38
+	%51 = add i64 %50, 1
+	%52 = srem i64 %51, 8
+	%53 = icmp eq i64 %52, 0
+	br i1 %53, label %"if.then - 10", label %"if.done - 11"
+
+"for.loop - 8":
+	%54 = load i64, i64* %38
+	%55 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %2, i64 0, i32 1
+	%56 = load i64, i64* %55
+	%57 = icmp slt i64 %54, %56
+	br i1 %57, label %"for.body - 7", label %"for.done - 12"
+
+"for.post - 9":
+	%58 = load i64, i64* %38
+	%59 = add i64 %58, 1
+	store i64 %59, i64* %38
+	br label %"for.loop - 8"
+
+"if.then - 10":
+	%60 = getelementptr inbounds [1 x i8], [1 x i8]* @.str1, i64 0, i64 0
+	%61 = alloca %.string, align 8 
+	store %.string zeroinitializer, %.string* %61
+	%62 = getelementptr inbounds %.string, %.string* %61, i64 0, i32 0
+	%63 = getelementptr inbounds %.string, %.string* %61, i64 0, i32 1
+	store i8* %60, i8** %62
+	store i64 1, i64* %63
+	%64 = load %.string, %.string* %61
+	call void @print_string(%.string %64)
+	br label %"if.done - 11"
+
+"if.done - 11":
+	br label %"for.post - 9"
+
+"for.done - 12":
+	%65 = load %.rawptr, %.rawptr* %0
+	call void @free(%.rawptr %65)
 	ret void
 }
 
 declare i32 @putchar(i32 %c) 	; foreign procedure
+
+declare %.rawptr @malloc(i64 %sz) 	; foreign procedure
+
+declare void @free(%.rawptr %ptr) 	; foreign procedure
 
 define void @print_string(%.string %s) {
 "entry - 0":
@@ -201,15 +288,15 @@ define {[4 x i8], i64} @encode_rune(i32 %r) {
 	%18 = getelementptr i8, i8* %17, i64 0
 	%19 = load i32, i32* %0
 	%20 = lshr i32 %19, 6
-	%21 = or i32 192, %20
-	%22 = trunc i32 %21 to i8
+	%21 = trunc i32 %20 to i8
+	%22 = or i8 192, %21
 	store i8 %22, i8* %18
 	%23 = getelementptr inbounds [4 x i8], [4 x i8]* %1, i64 0, i64 0
 	%24 = getelementptr i8, i8* %23, i64 1
 	%25 = load i32, i32* %0
-	%26 = or i32 128, %25
-	%27 = trunc i32 %26 to i8
-	%28 = and i8 %27, 63
+	%26 = trunc i32 %25 to i8
+	%27 = and i8 %26, 63
+	%28 = or i8 128, %27
 	store i8 %28, i8* %24
 	%29 = alloca {[4 x i8], i64}, align 8 
 	store {[4 x i8], i64} zeroinitializer, {[4 x i8], i64}* %29
@@ -250,23 +337,23 @@ define {[4 x i8], i64} @encode_rune(i32 %r) {
 	%43 = getelementptr i8, i8* %42, i64 0
 	%44 = load i32, i32* %0
 	%45 = lshr i32 %44, 12
-	%46 = or i32 224, %45
-	%47 = trunc i32 %46 to i8
+	%46 = trunc i32 %45 to i8
+	%47 = or i8 224, %46
 	store i8 %47, i8* %43
 	%48 = getelementptr inbounds [4 x i8], [4 x i8]* %1, i64 0, i64 0
 	%49 = getelementptr i8, i8* %48, i64 1
 	%50 = load i32, i32* %0
 	%51 = lshr i32 %50, 6
-	%52 = or i32 128, %51
-	%53 = trunc i32 %52 to i8
-	%54 = and i8 %53, 63
+	%52 = trunc i32 %51 to i8
+	%53 = and i8 %52, 63
+	%54 = or i8 128, %53
 	store i8 %54, i8* %49
 	%55 = getelementptr inbounds [4 x i8], [4 x i8]* %1, i64 0, i64 0
 	%56 = getelementptr i8, i8* %55, i64 2
 	%57 = load i32, i32* %0
-	%58 = or i32 128, %57
-	%59 = trunc i32 %58 to i8
-	%60 = and i8 %59, 63
+	%58 = trunc i32 %57 to i8
+	%59 = and i8 %58, 63
+	%60 = or i8 128, %59
 	store i8 %60, i8* %56
 	%61 = alloca {[4 x i8], i64}, align 8 
 	store {[4 x i8], i64} zeroinitializer, {[4 x i8], i64}* %61
@@ -283,31 +370,31 @@ define {[4 x i8], i64} @encode_rune(i32 %r) {
 	%67 = getelementptr i8, i8* %66, i64 0
 	%68 = load i32, i32* %0
 	%69 = lshr i32 %68, 18
-	%70 = or i32 240, %69
-	%71 = trunc i32 %70 to i8
+	%70 = trunc i32 %69 to i8
+	%71 = or i8 240, %70
 	store i8 %71, i8* %67
 	%72 = getelementptr inbounds [4 x i8], [4 x i8]* %1, i64 0, i64 0
 	%73 = getelementptr i8, i8* %72, i64 1
 	%74 = load i32, i32* %0
 	%75 = lshr i32 %74, 12
-	%76 = or i32 128, %75
-	%77 = trunc i32 %76 to i8
-	%78 = and i8 %77, 63
+	%76 = trunc i32 %75 to i8
+	%77 = and i8 %76, 63
+	%78 = or i8 128, %77
 	store i8 %78, i8* %73
 	%79 = getelementptr inbounds [4 x i8], [4 x i8]* %1, i64 0, i64 0
 	%80 = getelementptr i8, i8* %79, i64 2
 	%81 = load i32, i32* %0
 	%82 = lshr i32 %81, 6
-	%83 = or i32 128, %82
-	%84 = trunc i32 %83 to i8
-	%85 = and i8 %84, 63
+	%83 = trunc i32 %82 to i8
+	%84 = and i8 %83, 63
+	%85 = or i8 128, %84
 	store i8 %85, i8* %80
 	%86 = getelementptr inbounds [4 x i8], [4 x i8]* %1, i64 0, i64 0
 	%87 = getelementptr i8, i8* %86, i64 3
 	%88 = load i32, i32* %0
-	%89 = or i32 128, %88
-	%90 = trunc i32 %89 to i8
-	%91 = and i8 %90, 63
+	%89 = trunc i32 %88 to i8
+	%90 = and i8 %89, 63
+	%91 = or i8 128, %90
 	store i8 %91, i8* %87
 	%92 = alloca {[4 x i8], i64}, align 8 
 	store {[4 x i8], i64} zeroinitializer, {[4 x i8], i64}* %92
@@ -430,7 +517,7 @@ define void @print_int_base(i64 %i, i64 %base) {
 	%16 = getelementptr inbounds [65 x i8], [65 x i8]* %2, i64 0, i64 0
 	%17 = load i64, i64* %3
 	%18 = getelementptr i8, i8* %16, i64 %17
-	%19 = getelementptr inbounds [64 x i8], [64 x i8]* @.str0, i64 0, i64 0
+	%19 = getelementptr inbounds [64 x i8], [64 x i8]* @.str2, i64 0, i64 0
 	%20 = load i64, i64* %1
 	%21 = load i64, i64* %0
 	%22 = srem i64 %21, %20
@@ -572,7 +659,7 @@ define void @print_uint_base(i64 %i, i64 %base) {
 	%16 = getelementptr inbounds [65 x i8], [65 x i8]* %2, i64 0, i64 0
 	%17 = load i64, i64* %3
 	%18 = getelementptr i8, i8* %16, i64 %17
-	%19 = getelementptr inbounds [64 x i8], [64 x i8]* @.str1, i64 0, i64 0
+	%19 = getelementptr inbounds [64 x i8], [64 x i8]* @.str3, i64 0, i64 0
 	%20 = load i64, i64* %1
 	%21 = load i64, i64* %0
 	%22 = urem i64 %21, %20
@@ -688,5 +775,7 @@ define void @print_f64(double %f) {
 	ret void
 }
 
-@.str0 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"
-@.str1 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"
+@.str0 = global [2 x i8] c"\2C\20"
+@.str1 = global [1 x i8] c"\0A"
+@.str2 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"
+@.str3 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"

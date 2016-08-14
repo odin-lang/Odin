@@ -438,6 +438,11 @@ b32 are_types_identical(Type *x, Type *y) {
 			return (x->vector.count == y->vector.count) && are_types_identical(x->vector.elem, y->vector.elem);
 		break;
 
+	case Type_Slice:
+		if (y->kind == Type_Slice)
+			return are_types_identical(x->slice.elem, y->slice.elem);
+		break;
+
 	case Type_Structure:
 		if (y->kind == Type_Structure) {
 			if (x->structure.field_count == y->structure.field_count) {
