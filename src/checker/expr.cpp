@@ -610,10 +610,21 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 	}
 }
 
+b32 check_is_expr_vector_index(Checker *c, AstNode *expr) {
+	// HACK(bill): Handle this correctly. Maybe with a custom AddressingMode
+	expr = unparen_expr(expr);
+	if (expr->kind == AstNode_IndexExpr) {
+		ast_node(ie, IndexExpr, expr);
+		Type *t = get_base_type(type_of_expr(&c->info, ie->expr));
+		return is_type_vector(t);
+	}
+	return false;
+}
 
 void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 	if (op.kind == Token_Pointer) { // Pointer address
-		if (o->mode != Addressing_Variable) {
+		if (o->mode != Addressing_Variable ||
+		    check_is_expr_vector_index(c, o->expr)) {
 			ast_node(ue, UnaryExpr, node);
 			gbString str = expr_to_string(ue->expr);
 			defer (gb_string_free(str));

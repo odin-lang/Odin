@@ -1,3 +1,9 @@
+// C Runtime procedures
+putchar :: proc(c: i32) -> i32 #foreign
+malloc  :: proc(sz: int) -> rawptr #foreign;
+free    :: proc(ptr: rawptr)       #foreign;
+
+
 print_string :: proc(s: string) {
 	for i := 0; i < len(s); i++ {
 		putchar(s[i] as i32);
@@ -116,21 +122,10 @@ print_uint_base :: proc(i, base : uint) {
 }
 
 
-// f64
-
-
-print_f64 :: proc(f : f64) {
-	buf: [128]byte;
-
-	if f == 0 {
-		value : u64;
-
+print_bool :: proc(b : bool) {
+	if b {
+		print_string("true");
 	} else {
-		if f < 0 {
-			print_rune('-');
-		}
-		print_rune('0');
+		print_string("false");
 	}
-
 }
-

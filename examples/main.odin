@@ -1,15 +1,26 @@
-import "c_runtime"
 import "basic"
 
 TWO_HEARTS :: '💕';
 
 main :: proc() {
+	nl :: proc() { print_rune('\n'); }
+
+	t :: true;
+	f :: false;
+
+	v := {16}bool{
+		t, f, f, f, f, f, f, f,
+		f, f, f, f, f, f, f, t,
+	};
+	print_bool(v[0]); nl();
+	print_bool(v[1]); nl();
+/*
 	DATA_SIZE :: 100;
 	data := malloc(DATA_SIZE);
 
 	slice := (data as ^u8)[:0:DATA_SIZE];
 	for i := 0; i < cap(slice); i++ {
-		ok := append(^slice, (i*i) as u8);
+		ok := append(^slice, (i*i) as u8 % 8);
 	}
 
 	for i := 0; i < len(slice); i++ {
@@ -19,20 +30,24 @@ main :: proc() {
 			print_string("\n");
 		}
 	}
+
+	print_string("\n");
 	free(data);
+*/
 }
 
-/*
-"Chinese    - 你好世界\n"
-"Dutch      - Hello wereld\n"
-"English    - Hello world\n"
-"French     - Bonjour monde\n"
-"German     - Hallo Welt\n"
-"Greek      - γειά σου κόσμος\n"
-"Italian    - Ciao mondo\n"
-"Japanese   - こんにちは世界\n"
-"Korean     - 여보세요 세계\n"
-"Portuguese - Olá mundo\n"
-"Russian    - Здравствулте мир\n"
-"Spanish    - Hola mundo\n"
-*/
+
+print_hello :: proc() {
+	print_string("Chinese    - 你好世界\n");
+	print_string("Dutch      - Hello wereld\n");
+	print_string("English    - Hello world\n");
+	print_string("French     - Bonjour monde\n");
+	print_string("German     - Hallo Welt\n");
+	print_string("Greek      - γειά σου κόσμος\n");
+	print_string("Italian    - Ciao mondo\n");
+	print_string("Japanese   - こんにちは世界\n");
+	print_string("Korean     - 여보세요 세계\n");
+	print_string("Portuguese - Olá mundo\n");
+	print_string("Russian    - Здравствулте мир\n");
+	print_string("Spanish    - Hola mundo\n");
+}

@@ -228,10 +228,8 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 }
 
 void ssa_print_block_name(gbFile *f, ssaBlock *b) {
-	ssa_fprintf(f, "\"");
 	ssa_print_escape_string(f, b->label);
-	ssa_fprintf(f, " - %d", b->id);
-	ssa_fprintf(f, "\"");
+	ssa_fprintf(f, ".-.%d", b->id);
 }
 
 void ssa_print_value(gbFile *f, ssaModule *m, ssaValue *value, Type *type_hint) {
@@ -538,6 +536,21 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 
+	case ssaInstr_ExtractElement: {
+		Type *vt = ssa_value_type(instr->extract_element.vector);
+		ssa_fprintf(f, "%%%d = extractelement ", value->id);
+
+		ssa_print_type(f, m->sizes, vt);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, instr->extract_element.vector, vt);
+		ssa_fprintf(f, ", ");
+		Type *it = ssa_value_type(instr->extract_element.index);
+		ssa_print_type(f, m->sizes, it);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, instr->extract_element.index, it);
+		ssa_fprintf(f, "\n");
+	} break;
+
 	case ssaInstr_InsertElement: {
 		auto *ie = &instr->insert_element;
 		Type *vt = ssa_value_type(ie->vector);
@@ -558,7 +571,6 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_print_value(f, m, ie->index, ssa_value_type(ie->index));
 
 		ssa_fprintf(f, "\n");
-
 	} break;
 
 
