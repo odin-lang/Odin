@@ -54,6 +54,7 @@ TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
 	TOKEN_KIND(Token_AndNot, "&~"), \
 	TOKEN_KIND(Token_Shl, "<<"), \
 	TOKEN_KIND(Token_Shr, ">>"), \
+	TOKEN_KIND(Token_as, "as"), \
 TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
 	TOKEN_KIND(Token_AddEq, "+="), \
 	TOKEN_KIND(Token_SubEq, "-="), \
@@ -71,6 +72,7 @@ TOKEN_KIND(Token__AssignOpEnd, "_AssignOpEnd"), \
 	TOKEN_KIND(Token_Decrement, "--"), \
 	TOKEN_KIND(Token_ArrowRight, "->"), \
 	TOKEN_KIND(Token_ArrowLeft, "<-"), \
+\
 	TOKEN_KIND(Token_CmpAnd, "&&"), \
 	TOKEN_KIND(Token_CmpOr, "||"), \
 	TOKEN_KIND(Token_CmpAndEq, "&&="), \
@@ -113,7 +115,6 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_defer, "defer"), \
 	TOKEN_KIND(Token_return, "return"), \
 	TOKEN_KIND(Token_import, "import"), \
-	TOKEN_KIND(Token_cast, "cast"), \
 	TOKEN_KIND(Token_struct, "struct"), \
 	TOKEN_KIND(Token_union, "union"), \
 	TOKEN_KIND(Token_enum, "enum"), \
@@ -199,9 +200,10 @@ gb_no_inline void warning(Token token, char *fmt, ...) {
 
 i32 token_precedence(Token t) {
 	switch (t.kind) {
-	case Token_CmpOr:  return 1;
-	case Token_CmpAnd: return 2;
-
+	case Token_CmpOr:
+		return 1;
+	case Token_CmpAnd:
+		return 2;
 	case Token_CmpEq:
 	case Token_NotEq:
 	case Token_Lt:
@@ -209,13 +211,11 @@ i32 token_precedence(Token t) {
 	case Token_LtEq:
 	case Token_GtEq:
 		return 3;
-
 	case Token_Add:
 	case Token_Sub:
 	case Token_Or:
 	case Token_Xor:
 		return 4;
-
 	case Token_Mul:
 	case Token_Quo:
 	case Token_Mod:
@@ -224,6 +224,8 @@ i32 token_precedence(Token t) {
 	case Token_Shl:
 	case Token_Shr:
 		return 5;
+	case Token_as:
+		return 6;
 	}
 
 	return 0;
@@ -641,10 +643,14 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 		// NOTE(bill): ALL identifiers are > 1
 		if (token.string.len > 1) {
-			for (i32 k = Token__KeywordBegin+1; k < Token__KeywordEnd; k++) {
-				if (are_strings_equal(token.string, token_strings[k])) {
-					token.kind = cast(TokenKind)k;
-					break;
+			if (are_strings_equal(token.string, token_strings[Token_as])) {
+				token.kind = Token_as;
+			} else {
+				for (i32 k = Token__KeywordBegin+1; k < Token__KeywordEnd; k++) {
+					if (are_strings_equal(token.string, token_strings[k])) {
+						token.kind = cast(TokenKind)k;
+						break;
+					}
 				}
 			}
 		}

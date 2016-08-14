@@ -96,7 +96,6 @@ AST_NODE_KIND(_ExprBegin,       struct{}) \
 	AST_NODE_KIND(ParenExpr,    struct { AstNode *expr; Token open, close; }) \
 	AST_NODE_KIND(SelectorExpr, struct { Token token; AstNode *expr, *selector; }) \
 	AST_NODE_KIND(IndexExpr,    struct { AstNode *expr, *index; Token open, close; }) \
-	AST_NODE_KIND(CastExpr,     struct { Token token; AstNode *type, *expr; }) \
 	AST_NODE_KIND(DerefExpr,    struct { Token op; AstNode *expr; }) \
 	AST_NODE_KIND(CallExpr, struct { \
 		AstNode *proc, *arg_list; \
@@ -296,8 +295,6 @@ Token ast_node_token(AstNode *node) {
 		return node->SliceExpr.open;
 	case AstNode_Ellipsis:
 		return node->Ellipsis.token;
-	case AstNode_CastExpr:
-		return node->CastExpr.token;
 	case AstNode_DerefExpr:
 		return node->DerefExpr.op;
 	case AstNode_BadStmt:
@@ -536,15 +533,6 @@ gb_inline AstNode *make_slice_expr(AstFile *f, AstNode *expr, Token open, Token 
 	result->SliceExpr.triple_indexed = triple_indexed;
 	return result;
 }
-
-gb_inline AstNode *make_cast_expr(AstFile *f, Token token, AstNode *type, AstNode *expr) {
-	AstNode *result = make_node(f, AstNode_CastExpr);
-	result->CastExpr.token = token;
-	result->CastExpr.type = type;
-	result->CastExpr.expr = expr;
-	return result;
-}
-
 
 gb_inline AstNode *make_deref_expr(AstFile *f, AstNode *expr, Token op) {
 	AstNode *result = make_node(f, AstNode_DerefExpr);
@@ -858,6 +846,7 @@ gb_internal void add_ast_entity(AstFile *f, AstScope *scope, AstNode *declaratio
 
 
 void fix_advance_to_next_stmt(AstFile *f) {
+	// TODO(bill): fix_advance_to_next_stmt
 #if 0
 	for (;;) {
 		Token t = f->cursor[0];
@@ -1209,17 +1198,6 @@ AstNode *parse_unary_expr(AstFile *f, b32 lhs) {
 		operand = parse_unary_expr(f, false);
 		return make_unary_expr(f, op, operand);
 	} break;
-
-	case Token_cast: {
-		AstNode *type, *operand;
-		Token token = f->cursor[0];
-		next_token(f);
-		expect_token(f, Token_OpenParen);
-		type = parse_type(f);
-		expect_token(f, Token_CloseParen);
-		operand = parse_unary_expr(f, false);
-		return make_cast_expr(f, token, type, operand);
-	} break;
 	}
 
 	return parse_atom_expr(f, lhs);
@@ -1234,15 +1212,25 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 			i32 op_prec = token_precedence(op);
 			if (op_prec != prec)
 				break;
-			expect_operator(f); // NOTE(bill): error checks too
+			if (op.kind != Token_as) {
+				expect_operator(f); // NOTE(bill): error checks too
+			}
 			if (lhs) {
 				// TODO(bill): error checking
 				lhs = false;
 			}
-			right = parse_binary_expr(f, false, prec+1);
-			if (!right)
-				ast_file_err(f, op, "Expected expression on the right hand side of the binary operator");
+
+			if (op.kind == Token_as) {
+				next_token(f);
+				right = parse_type(f);
+			} else {
+				right = parse_binary_expr(f, false, prec+1);
+				if (!right) {
+					ast_file_err(f, op, "Expected expression on the right hand side of the binary operator");
+				}
+			}
 			expression = make_binary_expr(f, op, expression, right);
+
 		}
 	}
 	return expression;
@@ -1731,11 +1719,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 		}
 	}
 
-
 	f->expr_level = prev_level;
-
-
-
 
 	if (cond == NULL) {
 		ast_file_err(f, f->cursor[0], "Expected condition for if statement");
@@ -1846,56 +1830,51 @@ AstNode *parse_defer_stmt(AstFile *f) {
 	return make_defer_stmt(f, token, statement);
 }
 
-AstNode *parse_type_decl(AstFile *f) {
-	Token   token = expect_token(f, Token_type);
-	AstNode *name = parse_identifier(f);
-	expect_token(f, Token_Colon);
-	AstNode *type = parse_type(f);
-
-	AstNode *type_decl = make_type_decl(f, token, name, type);
-
-	if (type->kind != AstNode_StructType &&
-	    type->kind != AstNode_ProcType)
-		expect_token(f, Token_Semicolon);
-
-	return type_decl;
-}
-
-AstNode *parse_alias_decl(AstFile *f) {
-	Token   token = expect_token(f, Token_alias);
-	AstNode *name = parse_identifier(f);
-	expect_token(f, Token_Colon);
-	AstNode *type = parse_type(f);
-
-	AstNode *alias_decl = make_alias_decl(f, token, name, type);
-
-	if (type->kind != AstNode_StructType &&
-	    type->kind != AstNode_ProcType)
-		expect_token(f, Token_Semicolon);
-
-	return alias_decl;
-}
-
-AstNode *parse_import_decl(AstFile *f) {
-	Token token = expect_token(f, Token_import);
-	Token filepath = expect_token(f, Token_String);
-	if (f->curr_scope == f->file_scope) {
-		return make_import_decl(f, token, filepath);
-	}
-	ast_file_err(f, token, "You cannot `import` within a procedure. This must be done at the file scope.");
-	return make_bad_decl(f, token, filepath);
-}
-
 AstNode *parse_stmt(AstFile *f) {
 	AstNode *s = NULL;
 	Token token = f->cursor[0];
 	switch (token.kind) {
-	case Token_type:
-		return parse_type_decl(f);
-	case Token_alias:
-		return parse_alias_decl(f);
-	case Token_import:
-		return parse_import_decl(f);
+	case Token_type: {
+		Token   token = expect_token(f, Token_type);
+		AstNode *name = parse_identifier(f);
+		expect_token(f, Token_Colon);
+		AstNode *type = parse_type(f);
+
+		AstNode *type_decl = make_type_decl(f, token, name, type);
+
+		if (type->kind != AstNode_StructType &&
+		    type->kind != AstNode_ProcType) {
+			expect_token(f, Token_Semicolon);
+		}
+
+		return type_decl;
+	} break;
+
+	case Token_alias: {
+		Token   token = expect_token(f, Token_alias);
+		AstNode *name = parse_identifier(f);
+		expect_token(f, Token_Colon);
+		AstNode *type = parse_type(f);
+
+		AstNode *alias_decl = make_alias_decl(f, token, name, type);
+
+		if (type->kind != AstNode_StructType &&
+		    type->kind != AstNode_ProcType) {
+			expect_token(f, Token_Semicolon);
+		}
+
+		return alias_decl;
+	} break;
+
+	case Token_import: {
+		Token token = expect_token(f, Token_import);
+		Token filepath = expect_token(f, Token_String);
+		if (f->curr_scope == f->file_scope) {
+			return make_import_decl(f, token, filepath);
+		}
+		ast_file_err(f, token, "You cannot `import` within a procedure. This must be done at the file scope.");
+		return make_bad_decl(f, token, filepath);
+	} break;
 
 	// Operands
 	case Token_Identifier:
@@ -1910,10 +1889,8 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Xor:
 	case Token_Not:
 		s = parse_simple_stmt(f);
-		if (s->kind != AstNode_ProcDecl &&
-			!allow_token(f, Token_Semicolon) &&
-			f->cursor[0].kind == Token_CloseBrace) {
-			// TODO(bill): Cleanup semicolon handling in parser
+		if (s->kind != AstNode_ProcDecl && !allow_token(f, Token_Semicolon)) {
+			// CLEANUP(bill): Semicolon handling in parser
 			ast_file_err(f, f->cursor[0],
 			             "Expected `;` after statement, got `%.*s`",
 			             LIT(token_strings[f->cursor[0].kind]));
@@ -1946,8 +1923,6 @@ AstNode *parse_stmt(AstFile *f) {
 		s = make_empty_stmt(f, token);
 		next_token(f);
 		return s;
-
-
 	}
 
 	ast_file_err(f, token,

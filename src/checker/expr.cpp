@@ -384,11 +384,9 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 		Type *elem = check_type(c, vt->elem);
 		Type *be = get_base_type(elem);
 		i64 count = check_array_count(c, vt->count);
-		if (!is_type_vector(be) &&
-			!(is_type_boolean(be) || is_type_numeric(be))) {
+		if (!is_type_boolean(be) && !is_type_numeric(be)) {
 			err_str = type_to_string(elem);
-			error(&c->error_collector, ast_node_token(vt->elem), "Vector element type must be a boolean, numerical, or vector. Got `%s`", err_str);
-		} else {
+			error(&c->error_collector, ast_node_token(vt->elem), "Vector element type must be numerical or a boolean. Got `%s`", err_str);
 		}
 		type = make_type_vector(c->allocator, elem, count);
 		set_base_type(named_type, type);
@@ -433,7 +431,7 @@ end:
 
 b32 check_unary_op(Checker *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
-	Type *type = get_base_type(base_vector_type(o->type));
+	Type *type = get_base_type(base_vector_type(get_base_type(o->type)));
 	gbString str = NULL;
 	defer (gb_string_free(str));
 	switch (op.kind) {
@@ -702,13 +700,11 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 		update_expr_type(c, y->expr, default_type(y->type), true);
 	}
 
-	if (is_type_vector(x->type)) {
-		Type *vec_bool = NULL;
-		do {
-		} while (is_type_vector(x->type->vector.elem));
+	if (is_type_vector(get_base_type(y->type))) {
+		x->type = make_type_vector(c->allocator, t_bool, get_base_type(y->type)->vector.count);
+	} else {
+		x->type = t_untyped_bool;
 	}
-	x->type = t_untyped_bool;
-
 }
 
 void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
@@ -805,6 +801,101 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 	x->mode = Addressing_Value;
 }
 
+b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
+	if (check_is_assignable_to(c, operand, y))
+		return true;
+
+	Type *x = operand->type;
+	Type *xb = get_base_type(x);
+	Type *yb = get_base_type(y);
+	if (are_types_identical(xb, yb))
+		return true;
+
+
+	// Cast between booleans and integers
+	if (is_type_boolean(x) || is_type_integer(x)) {
+		if (is_type_boolean(y) || is_type_integer(y))
+			return true;
+	}
+
+	// Cast between numbers
+	if (is_type_integer(x) || is_type_float(x)) {
+		if (is_type_integer(y) || is_type_float(y))
+			return true;
+	}
+
+	// Cast between pointers
+	if (is_type_pointer(x)) {
+		if (is_type_pointer(y))
+			return true;
+	}
+
+	// untyped integers -> pointers
+	if (is_type_untyped(xb) && is_type_integer(xb)) {
+		if (is_type_pointer(yb))
+			return true;
+	}
+
+	// (u)int <-> pointer
+	if (is_type_pointer(xb) || is_type_int_or_uint(xb)) {
+		if (is_type_pointer(yb))
+			return true;
+	}
+	if (is_type_pointer(xb)) {
+		if (is_type_pointer(yb) || is_type_int_or_uint(yb))
+			return true;
+	}
+
+	// []byte/[]u8 <-> string
+	if (is_type_u8_slice(xb) && is_type_string(yb)) {
+		return true;
+	}
+	if (is_type_string(xb) && is_type_u8_slice(yb)) {
+		return true;
+	}
+
+	return false;
+}
+
+void check_cast_expr(Checker *c, Operand *operand, Type *type) {
+	b32 is_const_expr = operand->mode == Addressing_Constant;
+	b32 can_convert = false;
+
+	if (is_const_expr && is_type_constant_type(type)) {
+		Type *t = get_base_type(type);
+		if (t->kind == Type_Basic) {
+			if (check_value_is_expressible(c, operand->value, t, &operand->value)) {
+				can_convert = true;
+			}
+		}
+	} else if (check_castable_to(c, operand, type)) {
+		operand->mode = Addressing_Value;
+		can_convert = true;
+	}
+
+	if (!can_convert) {
+		gbString expr_str = expr_to_string(operand->expr);
+		gbString type_str = type_to_string(type);
+		defer (gb_string_free(expr_str));
+		defer (gb_string_free(type_str));
+		error(&c->error_collector, ast_node_token(operand->expr), "Cannot cast `%s` to `%s`", expr_str, type_str);
+
+		operand->mode = Addressing_Invalid;
+		return;
+	}
+
+	if (is_type_untyped(operand->type)) {
+		Type *final_type = type;
+		if (is_const_expr && !is_type_constant_type(type)) {
+			final_type = default_type(operand->type);
+		}
+		update_expr_type(c, operand->expr, final_type, true);
+	}
+
+	operand->type = type;
+}
+
+
 void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_BinaryExpr);
 	Operand y_ = {}, *y = &y_;
@@ -812,6 +903,15 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	defer (gb_string_free(err_str));
 
 	ast_node(be, BinaryExpr, node);
+
+	if (be->op.kind == Token_as) {
+		check_expr(c, x, be->left);
+		Type *cast_type = check_type(c, be->right);
+		if (x->mode == Addressing_Invalid)
+			return;
+		check_cast_expr(c, x, cast_type);
+		return;
+	}
 
 	check_expr(c, x, be->left);
 	check_expr(c, y, be->right);
@@ -890,7 +990,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	}
 
 	if (x->mode == Addressing_Constant &&
-	    y->mode  == Addressing_Constant) {
+	    y->mode == Addressing_Constant) {
 		ExactValue a = x->value;
 		ExactValue b = y->value;
 
@@ -943,7 +1043,18 @@ void update_expr_type(Checker *c, AstNode *e, Type *type, b32 final) {
 		found->type = get_base_type(type);
 		map_set(&c->info.untyped, key, *found);
 	} else {
+		ExpressionInfo old = *found;
 		map_remove(&c->info.untyped, key);
+
+		if (old.is_lhs && !is_type_integer(type)) {
+			gbString expr_str = expr_to_string(e);
+			gbString type_str = type_to_string(type);
+			defer (gb_string_free(expr_str));
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(e), "Shifted operand %s must be an integer, got %s", expr_str, type_str);
+			return;
+		}
+
 		add_type_and_value(&c->info, e, found->mode, type, found->value);
 	}
 }
@@ -1349,6 +1460,11 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			value = make_exact_value_integer(t->array.count);
 			break;
 
+		case Type_Vector:
+			mode = Addressing_Constant;
+			value = make_exact_value_integer(t->vector.count);
+			break;
+
 		case Type_Slice:
 			mode = Addressing_Value;
 			break;
@@ -1600,85 +1716,6 @@ ExpressionKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	return Expression_Statement;
 }
 
-b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
-	if (check_is_assignable_to(c, operand, y))
-		return true;
-
-	Type *x = operand->type;
-	Type *xb = get_base_type(x);
-	Type *yb = get_base_type(y);
-	if (are_types_identical(xb, yb))
-		return true;
-
-	// Cast between numbers
-	if (is_type_integer(x) || is_type_float(x)) {
-		if (is_type_integer(y) || is_type_float(y))
-			return true;
-	}
-
-	// Cast between pointers
-	if (is_type_pointer(x)) {
-		if (is_type_pointer(y))
-			return true;
-	}
-
-	// untyped integers -> pointers
-	if (is_type_untyped(xb) && is_type_integer(xb)) {
-		if (is_type_pointer(yb))
-			return true;
-	}
-
-	// (u)int <-> pointer
-	if (is_type_pointer(xb) || is_type_int_or_uint(xb)) {
-		if (is_type_pointer(yb))
-			return true;
-	}
-	if (is_type_pointer(xb)) {
-		if (is_type_pointer(yb) || is_type_int_or_uint(yb))
-			return true;
-	}
-
-	// []byte/[]u8 <-> string
-	if (is_type_u8_slice(xb) && is_type_string(yb)) {
-		return true;
-	}
-	if (is_type_string(xb) && is_type_u8_slice(yb)) {
-		return true;
-	}
-
-	return false;
-}
-
-void check_cast_expr(Checker *c, Operand *operand, Type *type) {
-	b32 is_const_expr = operand->mode == Addressing_Constant;
-	b32 can_convert = false;
-
-	if (is_const_expr && is_type_constant_type(type)) {
-		Type *t = get_base_type(type);
-		if (t->kind == Type_Basic) {
-			if (check_value_is_expressible(c, operand->value, t, &operand->value)) {
-				can_convert = true;
-			}
-		}
-	} else if (check_castable_to(c, operand, type)) {
-		operand->mode = Addressing_Value;
-		can_convert = true;
-	}
-
-	if (!can_convert) {
-		gbString expr_str = expr_to_string(operand->expr);
-		gbString type_str = type_to_string(type);
-		defer (gb_string_free(expr_str));
-		defer (gb_string_free(type_str));
-		error(&c->error_collector, ast_node_token(operand->expr), "Cannot cast `%s` to `%s`", expr_str, type_str);
-
-		operand->mode = Addressing_Invalid;
-		return;
-	}
-
-	operand->type = type;
-}
-
 void check_expr_with_type_hint(Checker *c, Operand *o, AstNode *e, Type *t) {
 	check_expr_base(c, o, e, t);
 	check_not_tuple(c, o);
@@ -1924,6 +1961,15 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 			o->type = t->array.elem;
 			break;
 
+		case Type_Vector:
+			valid = true;
+			max_count = t->vector.count;
+			if (o->mode != Addressing_Variable)
+				o->mode = Addressing_Value;
+			o->type = t->vector.elem;
+			break;
+
+
 		case Type_Slice:
 			valid = true;
 			o->type = t->slice.elem;
@@ -2035,15 +2081,6 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 				}
 			}
 		}
-
-	case_end;
-
-
-	case_ast_node(ce, CastExpr, node);
-		Type *cast_type = check_type(c, ce->type);
-		check_expr_or_type(c, o, ce->expr);
-		if (o->mode != Addressing_Invalid)
-			check_cast_expr(c, o, cast_type);
 
 	case_end;
 
@@ -2285,13 +2322,6 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 			str = write_expr_to_string(str, se->max);
 		}
 		str = gb_string_appendc(str, "]");
-	case_end;
-
-	case_ast_node(ce, CastExpr, node);
-		str = gb_string_appendc(str, "cast(");
-		str = write_expr_to_string(str, ce->type);
-		str = gb_string_appendc(str, ")");
-		str = write_expr_to_string(str, ce->expr);
 	case_end;
 
 	case_ast_node(e, Ellipsis, node);

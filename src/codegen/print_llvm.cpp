@@ -393,10 +393,10 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 
 	case ssaInstr_BinaryOp: {
 		auto *bo = &value->instr.binary_op;
-		Type *type = ssa_value_type(bo->left);
+		Type *type = get_base_type(ssa_value_type(bo->left));
 		Type *elem_type = type;
 		while (elem_type->kind == Type_Vector) {
-			elem_type = elem_type->vector.elem;
+			elem_type = get_base_type(elem_type->vector.elem);
 		}
 
 		ssa_fprintf(f, "%%%d = ", value->id);
@@ -535,13 +535,37 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 			vol_str = "true";
 		}
 		ssa_fprintf(f, ", i32 %d, i1 %s)\n", instr->copy_memory.align, vol_str);
+	} break;
+
+
+	case ssaInstr_InsertElement: {
+		auto *ie = &instr->insert_element;
+		Type *vt = ssa_value_type(ie->vector);
+		ssa_fprintf(f, "%%%d = insertelement ", value->id);
+
+		ssa_print_type(f, m->sizes, vt);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, ie->vector, vt);
+		ssa_fprintf(f, ", ");
+
+		ssa_print_type(f, m->sizes, ssa_value_type(ie->elem));
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, ie->elem, ssa_value_type(ie->elem));
+		ssa_fprintf(f, ", ");
+
+		ssa_print_type(f, m->sizes, ssa_value_type(ie->index));
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, ie->index, ssa_value_type(ie->index));
+
+		ssa_fprintf(f, "\n");
 
 	} break;
 
-	default:
+
+	default: {
 		GB_PANIC("<unknown instr> %d\n", instr->kind);
 		ssa_fprintf(f, "; <unknown instr> %d\n", instr->kind);
-		break;
+	} break;
 	}
 }
 
@@ -613,7 +637,7 @@ void ssa_print_type_name(gbFile *f, ssaModule *m, ssaValue *v) {
 
 void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 	if (m->layout.len > 0) {
-		ssa_fprintf(f, "target datalayout = %.*s\n", LIT(m->layout));
+		ssa_fprintf(f, "target datalayout = \"%.*s\"\n", LIT(m->layout));
 	}
 
 	ssa_print_encoded_local(f, make_string(".string"));

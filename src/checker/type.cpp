@@ -39,11 +39,12 @@ enum BasicFlag : u32 {
 	BasicFlag_Float    = GB_BIT(3),
 	BasicFlag_Pointer  = GB_BIT(4),
 	BasicFlag_String   = GB_BIT(5),
-	BasicFlag_Untyped  = GB_BIT(6),
+	BasicFlag_Rune     = GB_BIT(6),
+	BasicFlag_Untyped  = GB_BIT(7),
 
 	BasicFlag_Numeric      = BasicFlag_Integer | BasicFlag_Float,
 	BasicFlag_Ordered      = BasicFlag_Numeric | BasicFlag_String  | BasicFlag_Pointer,
-	BasicFlag_ConstantType = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_String | BasicFlag_Pointer,
+	BasicFlag_ConstantType = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_Pointer | BasicFlag_String | BasicFlag_Rune,
 };
 
 struct BasicType {
@@ -130,10 +131,11 @@ struct Type {
 
 Type *get_base_type(Type *t) {
 	while (t->kind == Type_Named || t->kind == Type_Alias) {
-		if (t->kind == Type_Named)
+		if (t->kind == Type_Named) {
 			t = t->named.base;
-		else
+		} else {
 			t = t->alias.base;
+		}
 	}
 	return t;
 }
@@ -381,8 +383,8 @@ b32 is_type_vector(Type *t) {
 	return t->kind == Type_Vector;
 }
 Type *base_vector_type(Type *t) {
-	while (is_type_vector(t)) {
-		t = t->vector.elem;
+	if (is_type_vector(t)) {
+		return t->vector.elem;
 	}
 	return t;
 }
@@ -520,7 +522,7 @@ struct BaseTypeSizes {
 // TODO(bill): Change
 gb_global i64 basic_type_sizes[] = {
 	0,  // Basic_Invalid
-	1,  // Basic_bool // TODO(bill): What size should this be? And should I have different booleans?
+	1,  // Basic_bool
 	1,  // Basic_i8
 	2,  // Basic_i16
 	4,  // Basic_i32
@@ -531,12 +533,9 @@ gb_global i64 basic_type_sizes[] = {
 	4,  // Basic_u32
 	8,  // Basic_u64
 	16, // Basic_u128
-	2,  // Basic_f16
 	4,  // Basic_f32
 	8,  // Basic_f64
-	16, // Basic_f128
 };
-
 
 i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
 i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
@@ -635,11 +634,18 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		i64 count = t->vector.count;
 		if (count == 0)
 			return 0;
-		count = next_pow2(count);
-		i64 align = type_align_of(s, allocator, t->vector.elem);
-		i64 size  = type_size_of(s,  allocator, t->vector.elem);
-		i64 alignment = align_formula(size, align);
-		return alignment*(count-1) + size;
+		// i64 align = type_align_of(s, allocator, t->vector.elem);
+		i64 bit_size = 8*type_size_of(s,  allocator, t->vector.elem);
+		if (is_type_boolean(t->vector.elem)) {
+			bit_size = 1; // NOTE(bill): LLVM can store booleans as 1 bit because a boolean _is_ an `i1`
+			              // Silly LLVM spec
+		}
+		i64 total_size_in_bits = bit_size * count;
+		i64 total_size = (total_size_in_bits+7)/8;
+		return total_size;
+
+		// i64 alignment = align_formula(size, align);
+		// return alignment*(count-1) + size;
 	} break;
 
 

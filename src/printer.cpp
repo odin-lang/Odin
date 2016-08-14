@@ -70,12 +70,6 @@ void print_ast(AstNode *node, isize indent) {
 		print_ast(node->IndexExpr.expr, indent+1);
 		print_ast(node->IndexExpr.index, indent+1);
 		break;
-	case AstNode_CastExpr:
-		print_indent(indent);
-		gb_printf("(cast)\n");
-		print_ast(node->CastExpr.type, indent+1);
-		print_ast(node->CastExpr.expr, indent+1);
-		break;
 	case AstNode_DerefExpr:
 		print_indent(indent);
 		gb_printf("(deref)\n");
