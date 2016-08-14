@@ -71,6 +71,12 @@ enum DeclKind {
 	Declaration_Count,
 };
 
+enum ProcTag {
+	ProcTag_foreign   = GB_BIT(0),
+	ProcTag_inline    = GB_BIT(1),
+	ProcTag_no_inline = GB_BIT(2),
+};
+
 #define AST_NODE_KINDS \
 	AST_NODE_KIND(Invalid, struct{}) \
 	AST_NODE_KIND(BasicLit, Token) \
@@ -163,11 +169,11 @@ AST_NODE_KIND(_DeclBegin,      struct{}) \
 			isize name_count, value_count; \
 		}) \
 	AST_NODE_KIND(ProcDecl, struct { \
-			AstNode *name;     \
-			AstNode *type;     \
-			AstNode *body;     \
-			AstNode *tag_list; \
-			isize tag_count;   \
+			AstNode *name;           \
+			AstNode *type;           \
+			AstNode *body;           \
+			u64     tags;            \
+			String  foreign_name;    \
 		}) \
 	AST_NODE_KIND(TypeDecl,   struct { Token token; AstNode *name, *type; }) \
 	AST_NODE_KIND(AliasDecl,  struct { Token token; AstNode *name, *type; }) \
@@ -701,13 +707,13 @@ gb_inline AstNode *make_proc_type(AstFile *f, Token token, AstNode *param_list, 
 	return result;
 }
 
-gb_inline AstNode *make_proc_decl(AstFile *f, AstNode *name, AstNode *proc_type, AstNode *body, AstNode *tag_list, isize tag_count) {
+gb_inline AstNode *make_proc_decl(AstFile *f, AstNode *name, AstNode *proc_type, AstNode *body, u64 tags, String foreign_name) {
 	AstNode *result = make_node(f, AstNode_ProcDecl);
 	result->ProcDecl.name = name;
 	result->ProcDecl.type = proc_type;
 	result->ProcDecl.body = body;
-	result->ProcDecl.tag_list = tag_list;
-	result->ProcDecl.tag_count = tag_count;
+	result->ProcDecl.tags = tags;
+	result->ProcDecl.foreign_name = foreign_name;
 	return result;
 }
 
@@ -1589,7 +1595,7 @@ AstNode *parse_body(AstFile *f, AstScope *scope) {
 	return make_block_stmt(f, statement_list, statement_list_count, open, close);
 }
 
-	AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
+AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 	AstNode *param_list = NULL;
 	AstNode *result_list = NULL;
 	isize param_count = 0;
@@ -1600,21 +1606,50 @@ AstNode *parse_body(AstFile *f, AstScope *scope) {
 	parse_procedure_signature(f, scope, &param_list, &param_count, &result_list, &result_count);
 
 	AstNode *body = NULL;
-	AstNode *tag_list = NULL;
-	AstNode *tag_list_curr = NULL;
-	isize tag_count = 0;
+	u64 tags = 0;
+	String foreign_name = {};
 	while (f->cursor[0].kind == Token_Hash) {
-		DLIST_APPEND(tag_list, tag_list_curr, parse_tag_expr(f, NULL));
-		tag_count++;
+		AstNode *tag_expr = parse_tag_expr(f, NULL);
+		ast_node(te, TagExpr, tag_expr);
+		String tag_name = te->name.string;
+		if (are_strings_equal(tag_name, make_string("foreign"))) {
+			tags |= ProcTag_foreign;
+			if (f->cursor[0].kind == Token_String) {
+				foreign_name = f->cursor[0].string;
+				// TODO(bill): Check if valid string
+				if (foreign_name.len == 0) {
+					ast_file_err(f, ast_node_token(tag_expr), "Invalid alternative foreign procedure name");
+				}
+
+				next_token(f);
+			}
+		} else if (are_strings_equal(tag_name, make_string("inline"))) {
+			tags |= ProcTag_inline;
+		} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
+			tags |= ProcTag_no_inline;
+		} else {
+			ast_file_err(f, ast_node_token(tag_expr), "Unknown procedure tag");
+		}
 	}
+
+	b32 is_inline    = (tags & ProcTag_inline) != 0;
+	b32 is_no_inline = (tags & ProcTag_no_inline) != 0;
+
+	if (is_inline && is_no_inline) {
+		ast_file_err(f, f->cursor[0], "You cannot apply both `inline` and `no_inline` to a procedure");
+	}
+
 	if (f->cursor[0].kind == Token_OpenBrace) {
+		if ((tags & ProcTag_foreign) != 0) {
+			ast_file_err(f, f->cursor[0], "A procedure tagged as `#foreign` cannot have a body");
+		}
 		body = parse_body(f, scope);
 	}
 
 	close_ast_scope(f);
 
 	AstNode *proc_type = make_proc_type(f, proc_token, param_list, param_count, result_list, result_count);
-	return make_proc_decl(f, name, proc_type, body, tag_list, tag_count);
+	return make_proc_decl(f, name, proc_type, body, tags, foreign_name);
 }
 
 AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count) {

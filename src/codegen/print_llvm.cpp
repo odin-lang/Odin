@@ -269,7 +269,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		Type *type = instr->local.entity->type;
 		ssa_fprintf(f, "%%%d = alloca ", value->id);
 		ssa_print_type(f, m->sizes, type);
-		ssa_fprintf(f, ", align %lld ", type_align_of(m->sizes, gb_heap_allocator(), type));
+		ssa_fprintf(f, ", align %lld ", type_align_of(m->sizes, m->allocator, type));
 		{
 			String str = instr->local.entity->token.string;
 			if (str.len > 0)
@@ -304,7 +304,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_print_type(f, m->sizes, type);
 		ssa_fprintf(f, "* ");
 		ssa_print_value(f, m, instr->load.address, type);
-		ssa_fprintf(f, "\n");
+		ssa_fprintf(f, ", align %lld\n", type_align_of(m->sizes, m->allocator, type));
 	} break;
 
 	case ssaInstr_GetElementPtr: {
@@ -616,7 +616,7 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 	ssa_fprintf(f, ") ");
 
 	if (proc->body == NULL) {
-		ssa_fprintf(f, "\t; foreign procedure\n\n");
+		ssa_fprintf(f, "; foreign procedure\n\n");
 	} else {
 		ssa_fprintf(f, "{\n");
 		gb_for_array(i, proc->blocks) {

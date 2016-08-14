@@ -18,6 +18,11 @@ b32 ssa_gen_init(ssaGen *s, Checker *c) {
 			return false;
 	}
 
+	isize tc = c->parser->total_token_count;
+	if (tc < 2) {
+		return false;
+	}
+
 	ssa_module_init(&s->module, c);
 
 	// TODO(bill): generate appropriate output name
@@ -79,8 +84,13 @@ void ssa_gen_code(ssaGen *s) {
 		} break;
 
 		case Entity_Procedure: {
-			AstNode *body = decl->proc_decl->ProcDecl.body;
-			ssaValue *p = ssa_make_value_procedure(a, m, e->type, decl->type_expr, body, e->token.string);
+			auto *pd = &decl->proc_decl->ProcDecl;
+			String name = e->token.string;
+			AstNode *body = pd->body;
+			if (pd->foreign_name.len > 0) {
+				name = pd->foreign_name;
+			}
+			ssaValue *p = ssa_make_value_procedure(a, m, e->type, decl->type_expr, body, name);
 			map_set(&m->values, hash_pointer(e), p);
 			map_set(&m->members, hash_string(name), p);
 		} break;

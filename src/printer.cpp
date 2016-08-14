@@ -143,7 +143,6 @@ void print_ast(AstNode *node, isize indent) {
 		gb_printf("(decl:proc)\n");
 		print_ast(node->ProcDecl.type, indent+1);
 		print_ast(node->ProcDecl.body, indent+1);
-		print_ast(node->ProcDecl.tag_list, indent+1);
 		break;
 
 	case AstNode_TypeDecl:

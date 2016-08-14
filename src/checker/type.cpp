@@ -560,7 +560,7 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	case Type_Vector: {
 		i64 size = type_size_of(s, allocator, t->vector.elem);
 		// TODO(bill): Type_Vector type_align_of
-		return gb_clamp(size, 1, 2*s.max_align);
+		return gb_clamp(size, s.max_align, 2*s.max_align);
 	} break;
 
 	case Type_Structure: {

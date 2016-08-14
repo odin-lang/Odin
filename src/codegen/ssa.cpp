@@ -2067,6 +2067,9 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			ssa_build_proc(value, proc);
 		} else {
 			String name = pd->name->Ident.token.string;
+			if (pd->foreign_name.len > 0) {
+				name = pd->foreign_name;
+			}
 
 			Entity **found = map_get(&proc->module->info->definitions, hash_pointer(pd->name));
 			GB_ASSERT(found != NULL);
@@ -2240,6 +2243,9 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 	case_ast_node(is, IfStmt, node);
 		if (is->init != NULL) {
+			ssaBlock *init = ssa_add_block(proc, node, make_string("if.init"));
+			ssa_emit_jump(proc, init);
+			proc->curr_block = init;
 			ssa_build_stmt(proc, is->init);
 		}
 		ssaBlock *then = ssa_add_block(proc, node, make_string("if.then"));
@@ -2265,9 +2271,12 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 	case_ast_node(fs, ForStmt, node);
 		if (fs->init != NULL) {
+			ssaBlock *init = ssa_add_block(proc, node, make_string("for.init"));
+			ssa_emit_jump(proc, init);
+			proc->curr_block = init;
 			ssa_build_stmt(proc, fs->init);
 		}
-		ssaBlock *body = ssa_add_block(proc, node, make_string("for.body"));
+		ssaBlock *body = ssa__make_block(proc, node, make_string("for.body"));
 		ssaBlock *done = ssa__make_block(proc, node, make_string("for.done")); // NOTE(bill): Append later
 
 		ssaBlock *loop = body;
@@ -2283,6 +2292,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		proc->curr_block = loop;
 		if (loop != body) {
 			ssa_build_cond(proc, fs->cond, body, done);
+			gb_array_append(proc->blocks, body);
 			proc->curr_block = body;
 		}
 

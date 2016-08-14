@@ -418,28 +418,12 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 
 
 	check_procedure_type(c, proc_type, pd->type);
-	b32 is_foreign   = false;
-	b32 is_inline    = false;
-	b32 is_no_inline = false;
-	for (AstNode *tag = pd->tag_list; tag != NULL; tag = tag->next) {
-		GB_ASSERT(tag->kind == AstNode_TagExpr);
-
-		ast_node(te, TagExpr, tag);
-		String tag_name = te->name.string;
-		if (are_strings_equal(tag_name, make_string("foreign"))) {
-			is_foreign = true;
-		} else if (are_strings_equal(tag_name, make_string("inline"))) {
-			is_inline = true;
-		} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
-			is_no_inline = true;
-		} else {
-			error(&c->error_collector, ast_node_token(tag), "Unknown procedure tag");
-		}
-		// TODO(bill): Other tags
-	}
+	b32 is_foreign   = (pd->tags & ProcTag_foreign) != 0;
+	b32 is_inline    = (pd->tags & ProcTag_inline) != 0;
+	b32 is_no_inline = (pd->tags & ProcTag_no_inline) != 0;
 
 	if (is_inline && is_no_inline) {
-		error(&c->error_collector, ast_node_token(pd->tag_list),
+		error(&c->error_collector, ast_node_token(pd->type),
 		      "You cannot apply both `inline` and `no_inline` to a procedure");
 	}
 
