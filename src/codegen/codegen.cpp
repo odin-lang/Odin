@@ -91,6 +91,8 @@ void ssa_gen_code(ssaGen *s) {
 				name = pd->foreign_name;
 			}
 			ssaValue *p = ssa_make_value_procedure(a, m, e->type, decl->type_expr, body, name);
+			p->proc.tags = pd->tags;
+
 			map_set(&m->values, hash_pointer(e), p);
 			map_set(&m->members, hash_string(name), p);
 		} break;

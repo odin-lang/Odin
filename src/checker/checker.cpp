@@ -452,7 +452,8 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 
 	if (mode == Addressing_Constant) {
 		GB_ASSERT(value.kind != ExactValue_Invalid);
-		GB_ASSERT(type == t_invalid || is_type_constant_type(type));
+		GB_ASSERT_MSG(type != t_invalid || is_type_constant_type(type),
+		              "type: %s", type_to_string(type));
 	}
 
 	TypeAndValue tv = {};
@@ -473,7 +474,11 @@ void add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 	if (!are_strings_equal(entity->token.string, make_string("_"))) {
 		Entity *insert_entity = scope_insert_entity(scope, entity);
 		if (insert_entity) {
-			error(&c->error_collector, entity->token, "Redeclared entity in this scope: %.*s", LIT(entity->token.string));
+			error(&c->error_collector, entity->token,
+			      "Redeclararation of `%.*s` in this scope\n"
+			      "\tat %.*s(%td:%td)",
+			      LIT(entity->token.string),
+			      LIT(entity->token.pos.file), entity->token.pos.line, entity->token.pos.column);
 			return;
 		}
 	}

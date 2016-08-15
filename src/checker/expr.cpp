@@ -1807,7 +1807,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 		case Token_Float:   t = t_untyped_float;   break;
 		case Token_String:  t = t_untyped_string;  break;
 		case Token_Rune:    t = t_untyped_rune;    break;
-		default:            GB_PANIC("Unknown literal");       break;
+		default:            GB_PANIC("Unknown literal"); break;
 		}
 		o->mode  = Addressing_Constant;
 		o->type  = t;
@@ -1815,16 +1815,16 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);
+		auto curr_context = c->context;
+		c->context.scope = c->global_scope;
+		check_open_scope(c, pl->type);
+		c->context.decl = make_declaration_info(c->allocator, c->context.scope);
+		defer ({
+			check_close_scope(c);
+			c->context = curr_context;
+		});
 		Type *proc_type = check_type(c, pl->type);
 		if (proc_type != NULL) {
-			auto context = c->context;
-			c->context.scope = c->global_scope;
-			check_open_scope(c, pl->type);
-			c->context.decl = make_declaration_info(c->allocator, c->context.scope);
-			defer ({
-				c->context = context;
-				check_close_scope(c);
-			});
 			check_proc_body(c, empty_token, c->context.decl, proc_type, pl->body);
 			o->mode = Addressing_Value;
 			o->type = proc_type;

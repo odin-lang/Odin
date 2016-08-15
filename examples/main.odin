@@ -1,49 +1,64 @@
 #load "basic.odin"
-
-TWO_HEARTS :: '💕';
+#load "win32.odin"
 
 main :: proc() {
-	nl :: proc() { print_rune('\n'); }
-	世界 :: proc() { print_string(`日本語`); }
+	wc: WNDCLASSEXA;
+	instance := GetModuleHandleA(null);
 
-	print_string("Hellope\n");
-	世界();
-
-
-/*
-	DATA_SIZE :: 100;
-	data := malloc(DATA_SIZE);
-
-	slice := (data as ^u8)[:0:DATA_SIZE];
-	for i := 0; i < cap(slice); i++ {
-		ok := append(^slice, (i*i) as u8 % 8);
+	// Yuck!
+	to_c_string :: proc(s: string) -> ^u8 {
+		c_str := heap_alloc(len(s)+1) as ^u8;
+		mem_copy(c_str, ^s[0], len(s));
+		c_str[len(s)] = 0;
+		return c_str;
 	}
 
-	for i := 0; i < len(slice); i++ {
-		print_int(slice[i] as int);
-		print_string(", ");
-		if (i+1) % 8 == 0 {
-			print_string("\n");
+	class_name := to_c_string("Odin-Language-Demo");
+	title := to_c_string("Odin-Language-Demo");
+
+	wc.cbSize = size_of(WNDCLASSEXA) as u32;
+	wc.style = CS_VREDRAW | CS_HREDRAW;
+	wc.hInstance = instance;
+	wc.className = class_name;
+	wc.wndProc = proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #no_inline {
+		if (msg == WM_DESTROY ||
+		    msg == WM_CLOSE ||
+		    msg == WM_QUIT) {
+			ExitProcess(0);
+			return 0;
+		}
+		// HACK(bill): Compiler bug
+		return DefWindowProcA(hwnd, msg, wparam, lparam);
+	};
+
+	if RegisterClassExA(^wc) == 0 {
+		return;
+	}
+
+	hwnd := CreateWindowExA(0,
+	                        class_name, title,
+	                        WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+	                        0, 0, 854, 480,
+	                        null, null, instance, null);
+
+
+	if hwnd == null {
+		print_string("GetLastError: ");
+		print_int(GetLastError() as int);
+		print_string("\n");
+		return;
+	}
+
+	msg: MSG;
+	for {
+		ok := PeekMessageA(^msg, null, 0, 0, PM_REMOVE);
+		if ok == 0 { break; }
+
+		if msg.message == WM_QUIT {
+			return;
+		} else {
+			_ = TranslateMessage(^msg);
+			_ = DispatchMessageA(^msg);
 		}
 	}
-
-	print_string("\n");
-	free(data);
-*/
 }
-
-
-// print_hello :: proc() {
-// 	print_string("Chinese    - 你好世界\n");
-// 	print_string("Dutch      - Hello wereld\n");
-// 	print_string("English    - Hello world\n");
-// 	print_string("French     - Bonjour monde\n");
-// 	print_string("German     - Hallo Welt\n");
-// 	print_string("Greek      - γειά σου κόσμος\n");
-// 	print_string("Italian    - Ciao mondo\n");
-// 	print_string("Japanese   - こんにちは世界\n");
-// 	print_string("Korean     - 여보세요 세계\n");
-// 	print_string("Portuguese - Olá mundo\n");
-// 	print_string("Russian    - Здравствулте мир\n");
-// 	print_string("Spanish    - Hola mundo\n");
-// }
