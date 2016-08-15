@@ -1,49 +1,108 @@
 #load "basic.odin"
+#load "win32.odin"
 
-TWO_HEARTS :: '💕';
+win32_perf_count_freq: i64;
 
-main :: proc() {
-	nl :: proc() { print_rune('\n'); }
-	世界 :: proc() { print_string(`日本語`); }
-
-	print_string("Hellope\n");
-	世界();
-
-
-/*
-	DATA_SIZE :: 100;
-	data := malloc(DATA_SIZE);
-
-	slice := (data as ^u8)[:0:DATA_SIZE];
-	for i := 0; i < cap(slice); i++ {
-		ok := append(^slice, (i*i) as u8 % 8);
+time_now :: proc() -> f64 {
+	if win32_perf_count_freq == 0 {
+		debug_trap();
 	}
 
-	for i := 0; i < len(slice); i++ {
-		print_int(slice[i] as int);
-		print_string(", ");
-		if (i+1) % 8 == 0 {
-			print_string("\n");
-		}
-	}
-
-	print_string("\n");
-	free(data);
-*/
+	counter: i64;
+	_ = QueryPerformanceCounter(^counter);
+	result := counter as f64 / win32_perf_count_freq as f64;
+	return result;
 }
 
 
-// print_hello :: proc() {
-// 	print_string("Chinese    - 你好世界\n");
-// 	print_string("Dutch      - Hello wereld\n");
-// 	print_string("English    - Hello world\n");
-// 	print_string("French     - Bonjour monde\n");
-// 	print_string("German     - Hallo Welt\n");
-// 	print_string("Greek      - γειά σου κόσμος\n");
-// 	print_string("Italian    - Ciao mondo\n");
-// 	print_string("Japanese   - こんにちは世界\n");
-// 	print_string("Korean     - 여보세요 세계\n");
-// 	print_string("Portuguese - Olá mundo\n");
-// 	print_string("Russian    - Здравствулте мир\n");
-// 	print_string("Spanish    - Hola mundo\n");
-// }
+win32_print_last_error :: proc() {
+	err_code := GetLastError() as int;
+	if err_code != 0 {
+		print_string("GetLastError: ");
+		print_int(err_code);
+		print_string("\n");
+	}
+}
+
+main :: proc() {
+	wc: WNDCLASSEXA;
+	instance := GetModuleHandleA(null);
+
+	// Init time info
+	_ = QueryPerformanceFrequency(^win32_perf_count_freq);
+
+	// Yuck!
+	to_c_string :: proc(s: string) -> ^u8 {
+		c_str := heap_alloc(len(s)+1) as ^u8;
+		mem_copy(c_str, ^s[0], len(s));
+		c_str[len(s)] = 0;
+		return c_str;
+	}
+
+	class_name := to_c_string("Odin-Language-Demo");
+	title := to_c_string("Odin Language Demo");
+
+	wc.cbSize = size_of(WNDCLASSEXA) as u32;
+	wc.style = CS_VREDRAW | CS_HREDRAW;
+	wc.hInstance = instance;
+	wc.className = class_name;
+	wc.hbrBackground = COLOR_BACKGROUND as HBRUSH;
+
+	wc.wndProc = proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #no_inline {
+		if msg == WM_DESTROY || msg == WM_CLOSE || msg == WM_QUIT {
+			ExitProcess(0);
+			return 0;
+		}
+		return DefWindowProcA(hwnd, msg, wparam, lparam);
+	};
+
+	if RegisterClassExA(^wc) == 0 {
+		return;
+	}
+
+
+	hwnd := CreateWindowExA(0,
+	                        class_name, title,
+	                        WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+	                        0, 0, 854, 480,
+	                        null, null, instance, null);
+
+
+	if hwnd == null {
+		win32_print_last_error();
+		return;
+	}
+
+	start_time := time_now();
+	running := true;
+	tick_count := 0;
+	for running {
+		curr_time := time_now();
+		dt := curr_time - start_time;
+		if dt > 2.0 {
+			running = false;
+		}
+
+		msg: MSG;
+		for {
+			ok := PeekMessageA(^msg, null, 0, 0, PM_REMOVE) != 0;
+			if !ok {
+				break;
+			}
+
+			if msg.message == WM_QUIT {
+				return;
+			} else {
+				_ = TranslateMessage(^msg);
+				_ = DispatchMessageA(^msg);
+			}
+		}
+
+		print_string("Tick: ");
+		print_int(tick_count);
+		tick_count++;
+		print_rune('\n');
+
+		sleep_ms(16);
+	}
+}

@@ -87,6 +87,7 @@ enum ProcTag {
 	AST_NODE_KIND(ProcLit, struct { \
 		AstNode *type; \
 		AstNode *body; \
+		u64 tags;      \
 	}) \
 	AST_NODE_KIND(CompoundLit, struct { \
 		AstNode *type; \
@@ -559,23 +560,24 @@ gb_inline AstNode *make_basic_lit(AstFile *f, Token basic_lit) {
 	return result;
 }
 
-gb_inline AstNode *make_identifier(AstFile *f, Token token, AstEntity *entity = NULL) {
+gb_inline AstNode *make_ident(AstFile *f, Token token, AstEntity *entity = NULL) {
 	AstNode *result = make_node(f, AstNode_Ident);
 	result->Ident.token = token;
 	result->Ident.entity   = entity;
 	return result;
 }
 
-gb_inline AstNode *make_procedure_literal(AstFile *f, AstNode *type, AstNode *body) {
+gb_inline AstNode *make_proc_lit(AstFile *f, AstNode *type, AstNode *body, u64 tags) {
 	AstNode *result = make_node(f, AstNode_ProcLit);
 	result->ProcLit.type = type;
 	result->ProcLit.body = body;
+	result->ProcLit.tags = tags;
 	return result;
 }
 
 
-gb_inline AstNode *make_compound_literal(AstFile *f, AstNode *type, AstNode *elem_list, isize elem_count,
-                                         Token open, Token close) {
+gb_inline AstNode *make_compound_lit(AstFile *f, AstNode *type, AstNode *elem_list, isize elem_count,
+                                     Token open, Token close) {
 	AstNode *result = make_node(f, AstNode_CompoundLit);
 	result->CompoundLit.type = type;
 	result->CompoundLit.elem_list = elem_list;
@@ -845,16 +847,12 @@ gb_internal void add_ast_entity(AstFile *f, AstScope *scope, AstNode *declaratio
 		AstEntity *insert_entity = ast_scope_insert(scope, *entity);
 		if (insert_entity != NULL && !is_blank_ident(insert_entity->token.string)) {
 			ast_file_err(f, entity->token,
-			             "There is already a previous declaration of `%.*s` in the current scope at\n"
-			             "\t%.*s(%td:%td)",
+			             "There is already a previous declaration of `%.*s` in the current scope\n"
+			             "at \t%.*s(%td:%td)",
 			             LIT(insert_entity->token.string),
 			             LIT(insert_entity->token.pos.file),
 			             insert_entity->token.pos.line,
 			             insert_entity->token.pos.column);
-
-			gb_printf_err("Hashes\n");
-			gb_printf_err("%16llx - %.*s\n", hash_string(insert_entity->token.string), LIT(insert_entity->token.string));
-			gb_printf_err("%16llx - %.*s\n\n", hash_string(entity->token.string), LIT(entity->token.string));
 		}
 	}
 }
@@ -911,7 +909,7 @@ AstNode *parse_identifier(AstFile *f) {
 		token.string = make_string("_");
 		expect_token(f, Token_Identifier);
 	}
-	return make_identifier(f, token);
+	return make_ident(f, token);
 }
 
 AstNode *parse_tag_expr(AstFile *f, AstNode *expression) {
@@ -971,7 +969,7 @@ AstNode *parse_literal_value(AstFile *f, AstNode *type) {
 	f->expr_level--;
 	Token close = expect_token(f, Token_CloseBrace);
 
-	return make_compound_literal(f, type, element_list, element_count, open, close);
+	return make_compound_lit(f, type, element_list, element_count, open, close);
 }
 
 AstNode *parse_value(AstFile *f) {
@@ -983,6 +981,93 @@ AstNode *parse_value(AstFile *f) {
 }
 
 AstNode *parse_identifier_or_type(AstFile *f);
+
+
+void check_proc_add_tag(AstFile *f, AstNode *tag_expr, u64 *tags, ProcTag tag, String tag_name) {
+	if (*tags & tag) {
+		ast_file_err(f, ast_node_token(tag_expr), "Procedure tag already used: %.*s", LIT(tag_name));
+	}
+	*tags |= tag;
+}
+
+b32 is_foreign_name_valid(String name) {
+	// TODO(bill): is_foreign_name_valid
+	if (name.len == 0)
+		return false;
+	isize offset = 0;
+	while (offset < name.len) {
+		Rune rune;
+		isize remaining = name.len - offset;
+		isize width = gb_utf8_decode(name.text+offset, remaining, &rune);
+		if (rune == GB_RUNE_INVALID && width == 1) {
+			return false;
+		} else if (rune == GB_RUNE_BOM && remaining > 0) {
+			return false;
+		}
+
+		if (offset == 0) {
+			switch (rune) {
+			case '-':
+			case '$':
+			case '.':
+			case '_':
+				break;
+			default:
+				if (!rune_is_letter(rune))
+					return false;
+				break;
+			}
+		} else {
+			switch (rune) {
+			case '-':
+			case '$':
+			case '.':
+			case '_':
+				break;
+			default:
+				if (!rune_is_letter(rune) && !rune_is_digit(rune)) {
+					return false;
+				}
+				break;
+			}
+		}
+
+		offset += width;
+	}
+
+	return true;
+}
+
+void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
+	// TODO(bill): Add this to procedure literals too
+	while (f->cursor[0].kind == Token_Hash) {
+		AstNode *tag_expr = parse_tag_expr(f, NULL);
+		ast_node(te, TagExpr, tag_expr);
+		String tag_name = te->name.string;
+		if (are_strings_equal(tag_name, make_string("foreign"))) {
+			check_proc_add_tag(f, tag_expr, tags, ProcTag_foreign, tag_name);
+			if (f->cursor[0].kind == Token_String) {
+				*foreign_name = f->cursor[0].string;
+				// TODO(bill): Check if valid string
+				if (!is_foreign_name_valid(*foreign_name)) {
+					ast_file_err(f, ast_node_token(tag_expr), "Invalid alternative foreign procedure name");
+				}
+
+				next_token(f);
+			}
+		} else if (are_strings_equal(tag_name, make_string("inline"))) {
+			check_proc_add_tag(f, tag_expr, tags, ProcTag_inline, tag_name);
+		} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
+			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_inline, tag_name);
+		} else {
+			ast_file_err(f, ast_node_token(tag_expr), "Unknown procedure tag");
+		}
+	}
+
+	if ((*tags & ProcTag_inline) && (*tags & ProcTag_no_inline)) {
+		ast_file_err(f, f->cursor[0], "You cannot apply both `inline` and `no_inline` to a procedure");
+	}
+}
 
 AstNode *parse_operand(AstFile *f, b32 lhs) {
 	AstNode *operand = NULL; // Operand
@@ -1024,6 +1109,13 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 		AstScope *scope = NULL;
 		AstNode *type = parse_proc_type(f, &scope);
 
+		u64 tags = 0;
+		String foreign_name = {};
+		parse_proc_tags(f, &tags, &foreign_name);
+		if (tags & ProcTag_foreign) {
+			ast_file_err(f, f->cursor[0], "#foreign cannot be applied to procedure literals");
+		}
+
 		if (f->cursor[0].kind != Token_OpenBrace) {
 			return type;
 		} else {
@@ -1036,7 +1128,7 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 			f->expr_level--;
 			f->curr_scope = curr_scope;
 
-			return make_procedure_literal(f, type, body);
+			return make_proc_lit(f, type, body, tags);
 		}
 	}
 
@@ -1605,60 +1697,7 @@ AstNode *parse_body(AstFile *f, AstScope *scope) {
 	return make_block_stmt(f, statement_list, statement_list_count, open, close);
 }
 
-b32 is_foreign_name_valid(String name) {
-	// TODO(bill): is_foreign_name_valid
-	if (name.len == 0)
-		return false;
-	isize offset = 0;
-	while (offset < name.len) {
-		Rune rune;
-		isize remaining = name.len - offset;
-		isize width = gb_utf8_decode(name.text+offset, remaining, &rune);
-		if (rune == GB_RUNE_INVALID && width == 1) {
-			return false;
-		} else if (rune == GB_RUNE_BOM && remaining > 0) {
-			return false;
-		}
 
-		if (offset == 0) {
-			switch (rune) {
-			case '-':
-			case '$':
-			case '.':
-			case '_':
-				break;
-			default:
-				if (!rune_is_letter(rune))
-					return false;
-				break;
-			}
-		} else {
-			switch (rune) {
-			case '-':
-			case '$':
-			case '.':
-			case '_':
-				break;
-			default:
-				if (!rune_is_letter(rune) && !rune_is_digit(rune)) {
-					return false;
-				}
-				break;
-			}
-		}
-
-		offset += width;
-	}
-
-	return true;
-}
-
-void check_proc_add_tag(AstFile *f, AstNode *tag_expr, u64 *tags, ProcTag tag, String tag_name) {
-	if (*tags & tag) {
-		ast_file_err(f, ast_node_token(tag_expr), "Procedure tag already used: %.*s", LIT(tag_name));
-	}
-	*tags |= tag;
-}
 
 AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 	AstNode *param_list = NULL;
@@ -1673,36 +1712,8 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 	AstNode *body = NULL;
 	u64 tags = 0;
 	String foreign_name = {};
-	while (f->cursor[0].kind == Token_Hash) {
-		AstNode *tag_expr = parse_tag_expr(f, NULL);
-		ast_node(te, TagExpr, tag_expr);
-		String tag_name = te->name.string;
-		if (are_strings_equal(tag_name, make_string("foreign"))) {
-			check_proc_add_tag(f, tag_expr, &tags, ProcTag_foreign, tag_name);
-			if (f->cursor[0].kind == Token_String) {
-				foreign_name = f->cursor[0].string;
-				// TODO(bill): Check if valid string
-				if (!is_foreign_name_valid(foreign_name)) {
-					ast_file_err(f, ast_node_token(tag_expr), "Invalid alternative foreign procedure name");
-				}
 
-				next_token(f);
-			}
-		} else if (are_strings_equal(tag_name, make_string("inline"))) {
-			check_proc_add_tag(f, tag_expr, &tags, ProcTag_inline, tag_name);
-		} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
-			check_proc_add_tag(f, tag_expr, &tags, ProcTag_no_inline, tag_name);
-		} else {
-			ast_file_err(f, ast_node_token(tag_expr), "Unknown procedure tag");
-		}
-	}
-
-	b32 is_inline    = (tags & ProcTag_inline) != 0;
-	b32 is_no_inline = (tags & ProcTag_no_inline) != 0;
-
-	if (is_inline && is_no_inline) {
-		ast_file_err(f, f->cursor[0], "You cannot apply both `inline` and `no_inline` to a procedure");
-	}
+	parse_proc_tags(f, &tags, &foreign_name);
 
 	if (f->cursor[0].kind == Token_OpenBrace) {
 		if ((tags & ProcTag_foreign) != 0) {

@@ -46,6 +46,7 @@ struct ssaProcedure {
 	Type *        type;
 	AstNode *     type_expr;
 	AstNode *     body;
+	u64           tags;
 
 	gbArray(ssaBlock *) blocks;
 	ssaBlock *          curr_block;
@@ -318,13 +319,13 @@ Type *ssa_instr_type(ssaInstr *instr) {
 	case ssaInstr_Select:
 		return ssa_value_type(instr->select.true_value);
 	case ssaInstr_Call: {
-		Type *pt = instr->call.type;
-		GB_ASSERT(pt->kind == Type_Proc);
-		auto *tuple = &pt->proc.results->tuple;
-		if (tuple->variable_count != 1)
-			return pt->proc.results;
-		else
-			return tuple->variables[0]->type;
+		Type *pt = get_base_type(instr->call.type);
+		if (pt != NULL) {
+			if (pt->kind == Type_Tuple && pt->tuple.variable_count == 1)
+				return pt->tuple.variables[0]->type;
+			return pt;
+		}
+		return NULL;
 	}
 	case ssaInstr_CopyMemory:
 		return t_int;
@@ -891,7 +892,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 			case ssaInstr_CopyMemory:
 				continue;
 			case ssaInstr_Call:
-				if (instr->call.type->proc.results == NULL) {
+				if (instr->call.type == NULL) {
 					continue;
 				}
 				break;
@@ -1194,6 +1195,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 		return value;
 	}
 
+
 	Type *src = get_base_type(src_type);
 	Type *dst = get_base_type(t);
 	if (are_types_identical(t, src_type))
@@ -1208,6 +1210,10 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 				//
 			} else if (is_type_integer(dst)) {
 				ev = exact_value_to_integer(ev);
+			} else if (is_type_pointer(dst)) {
+				// IMPORTANT NOTE(bill): LLVM doesn't support pointer constants expect `null`
+				ssaValue *i = ssa_make_value_constant(proc->module->allocator, t_uint, ev);
+				return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_inttoptr, i, t_uint, dst));
 			}
 			return ssa_make_value_constant(proc->module->allocator, t, ev);
 		}
@@ -1459,6 +1465,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
 		                                           proc->module, type, pl->type, pl->body, name);
 
+		value->proc.tags = pl->tags;
+
 		gb_array_append(proc->children, &value->proc);
 		ssa_build_proc(value, proc);
 
@@ -1693,8 +1701,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			}
 		}
 
-		ssaValue *call = ssa_make_instr_call(proc, value, args, arg_count, tv->type);
-		ssa_value_set_type(call, proc_type_);
+		ssaValue *call = ssa_make_instr_call(proc, value, args, arg_count, type->results);
 		return ssa_emit(proc, call);
 	case_end;
 
@@ -1725,6 +1732,7 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 			ssaValue *elem = ssa_array_elem(proc, array);
 			return ssa_emit_load(proc, ssa_emit_string(proc, elem, ssa_array_len(proc, array)));
 		}
+
 		return ssa_make_value_constant(proc->module->allocator, tv->type, tv->value);
 	}
 
@@ -2043,6 +2051,8 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		if (proc->children == NULL) {
 			gb_array_init(proc->children, gb_heap_allocator());
 		}
+
+
 		if (pd->body != NULL) {
 			// NOTE(bill): Generate a new name
 			// parent$name-guid
@@ -2058,6 +2068,8 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			Entity *e = *found;
 			ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
 			                                           proc->module, e->type, pd->type, pd->body, name);
+
+			value->proc.tags = pd->tags;
 
 			ssa_module_add_value(proc->module, e, value);
 			gb_array_append(proc->children, &value->proc);
@@ -2273,7 +2285,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			proc->curr_block = init;
 			ssa_build_stmt(proc, fs->init);
 		}
-		ssaBlock *body = ssa__make_block(proc, node, make_string("for.body"));
+		ssaBlock *body = ssa_add_block(proc, node, make_string("for.body"));
 		ssaBlock *done = ssa__make_block(proc, node, make_string("for.done")); // NOTE(bill): Append later
 
 		ssaBlock *loop = body;
@@ -2289,7 +2301,6 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		proc->curr_block = loop;
 		if (loop != body) {
 			ssa_build_cond(proc, fs->cond, body, done);
-			gb_array_append(proc->blocks, body);
 			proc->curr_block = body;
 		}
 

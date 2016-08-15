@@ -351,7 +351,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 		e->type = t;
 	}
 
-	Operand operand = {Addressing_Invalid};
+	Operand operand = {};
 	if (init_expr)
 		check_expr(c, &operand, init_expr);
 	check_init_constant(c, e, &operand);

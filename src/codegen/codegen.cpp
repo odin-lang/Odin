@@ -71,14 +71,15 @@ void ssa_gen_code(ssaGen *s) {
 		} break;
 
 		case Entity_Variable: {
-			ssaValue *value = ssa_build_expr(&dummy_proc, decl->init_expr);
-			if (value->kind == ssaValue_Instr) {
-				ssaInstr *i = &value->instr;
-				if (i->kind == ssaInstr_Load) {
-					value = i->load.address;
-				}
-			}
-			ssaValue *g = ssa_make_value_global(a, e, value);
+			// ssaValue *value = ssa_build_expr(&dummy_proc, decl->init_expr);
+			// if (value->kind == ssaValue_Instr) {
+			// 	ssaInstr *i = &value->instr;
+			// 	if (i->kind == ssaInstr_Load) {
+			// 		value = i->load.address;
+			// 	}
+			// }
+			// TODO(bill): global runtime initialization
+			ssaValue *g = ssa_make_value_global(a, e, NULL);
 			map_set(&m->values, hash_pointer(e), g);
 			map_set(&m->members, hash_string(name), g);
 		} break;
@@ -91,6 +92,8 @@ void ssa_gen_code(ssaGen *s) {
 				name = pd->foreign_name;
 			}
 			ssaValue *p = ssa_make_value_procedure(a, m, e->type, decl->type_expr, body, name);
+			p->proc.tags = pd->tags;
+
 			map_set(&m->values, hash_pointer(e), p);
 			map_set(&m->members, hash_string(name), p);
 		} break;

@@ -3,9 +3,13 @@
 
 rem call clang -c -emit-llvm -DGB_IMPLEMENTATION -DGB_DEF=GB_DLL_EXPORT ..\src\gb\gb.h
 
+pushd ..\examples
 call ..\bin\odin.exe ..\examples/main.odin ^
-	&& ..\misc\llvm-bin\opt.exe -mem2reg ..\examples/main.ll -o ..\examples/main.bc ^
-	&& ..\misc\llvm-bin\lli.exe ..\examples/main.bc
+	&& opt -mem2reg main.ll -o main.bc ^
+	&& clang main.bc -o main.exe ^
+		-Wno-override-module -lkernel32.lib -luser32.lib ^
+	&& main.exe
+popd
 
 	rem && llvm-dis ..\examples/main.bc -o - ^
 rem call ..\misc\llvm-bin\opt.exe -mem2reg ..\examples/output.ll > ..\examples/main.bc

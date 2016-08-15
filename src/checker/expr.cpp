@@ -843,19 +843,19 @@ b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
 			return true;
 	}
 
-	// untyped integers -> pointers
-	if (is_type_untyped(xb) && is_type_integer(xb)) {
-		if (is_type_pointer(yb))
-			return true;
-	}
+	// // untyped integers -> pointers
+	// if (is_type_untyped(xb) && is_type_integer(xb)) {
+	// 	if (is_type_pointer(yb))
+	// 		return true;
+	// }
 
 	// (u)int <-> pointer
-	if (is_type_pointer(xb) || is_type_int_or_uint(xb)) {
+	if (is_type_pointer(xb) || (is_type_int_or_uint(xb) && !is_type_untyped(xb))) {
 		if (is_type_pointer(yb))
 			return true;
 	}
 	if (is_type_pointer(xb)) {
-		if (is_type_pointer(yb) || is_type_int_or_uint(yb))
+		if (is_type_pointer(yb) || (is_type_int_or_uint(yb) && !is_type_untyped(yb)))
 			return true;
 	}
 
@@ -888,9 +888,9 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		b32 can_convert = false;
 
 		if (is_const_expr && is_type_constant_type(type)) {
-			Type *t = get_base_type(type);
-			if (t->kind == Type_Basic) {
-				if (check_value_is_expressible(c, x->value, t, &x->value)) {
+			Type *base_type = get_base_type(type);
+			if (base_type->kind == Type_Basic) {
+				if (check_value_is_expressible(c, x->value, base_type, &x->value)) {
 					can_convert = true;
 				}
 			}
@@ -1807,7 +1807,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 		case Token_Float:   t = t_untyped_float;   break;
 		case Token_String:  t = t_untyped_string;  break;
 		case Token_Rune:    t = t_untyped_rune;    break;
-		default:            GB_PANIC("Unknown literal");       break;
+		default:            GB_PANIC("Unknown literal"); break;
 		}
 		o->mode  = Addressing_Constant;
 		o->type  = t;
@@ -1815,16 +1815,16 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);
+		auto curr_context = c->context;
+		c->context.scope = c->global_scope;
+		check_open_scope(c, pl->type);
+		c->context.decl = make_declaration_info(c->allocator, c->context.scope);
+		defer ({
+			check_close_scope(c);
+			c->context = curr_context;
+		});
 		Type *proc_type = check_type(c, pl->type);
 		if (proc_type != NULL) {
-			auto context = c->context;
-			c->context.scope = c->global_scope;
-			check_open_scope(c, pl->type);
-			c->context.decl = make_declaration_info(c->allocator, c->context.scope);
-			defer ({
-				c->context = context;
-				check_close_scope(c);
-			});
 			check_proc_body(c, empty_token, c->context.decl, proc_type, pl->body);
 			o->mode = Addressing_Value;
 			o->type = proc_type;

@@ -174,21 +174,22 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 			ssa_fprintf(f, "}");
 		}
 		break;
-	case Type_Proc:
+	case Type_Proc: {
 		if (t->proc.result_count == 0) {
 			ssa_fprintf(f, "void");
 		} else {
 			ssa_print_type(f, s, t->proc.results);
 		}
 		ssa_fprintf(f, " (");
+		auto *params = &t->proc.params->tuple;
 		for (isize i = 0; i < t->proc.param_count; i++) {
 			if (i > 0) {
 				ssa_fprintf(f, ", ");
 			}
-			ssa_print_type(f, s, &t->proc.params[i]);
+			ssa_print_type(f, s, params->variables[i]->type);
 		}
 		ssa_fprintf(f, ")*");
-		break;
+	} break;
 	}
 }
 
@@ -208,9 +209,9 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 		ssa_print_escape_string(f, value.value_string, false);
 		ssa_fprintf(f, "\"");
 	} break;
-	case ExactValue_Integer:
+	case ExactValue_Integer: {
 		ssa_fprintf(f, "%lld", value.value_integer);
-		break;
+	} break;
 	case ExactValue_Float: {
 		u64 u = *cast(u64*)&value.value_float;
 		if (is_type_float(type) && type->basic.kind == Basic_f32) {
@@ -506,7 +507,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 
 	case ssaInstr_Call: {
 		auto *call = &instr->call;
-		Type *result_type = call->type->proc.results;
+		Type *result_type = call->type;
 		if (result_type) {
 			ssa_fprintf(f, "%%%d = ", value->id);
 		}
@@ -521,18 +522,22 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 
 
 		ssa_fprintf(f, "(");
-		auto *params = &call->type->proc.params->tuple;
-		for (isize i = 0; i < call->arg_count; i++) {
-			Entity *e = params->variables[i];
-			GB_ASSERT(e != NULL);
-			Type *t = e->type;
-			if (i > 0) {
-				ssa_fprintf(f, ", ");
+		if (call->arg_count > 0) {
+			Type *proc_type = get_base_type(ssa_value_type(call->value));
+			GB_ASSERT(proc_type->kind == Type_Proc);
+			auto *params = &proc_type->proc.params->tuple;
+			for (isize i = 0; i < call->arg_count; i++) {
+				Entity *e = params->variables[i];
+				GB_ASSERT(e != NULL);
+				Type *t = e->type;
+				if (i > 0) {
+					ssa_fprintf(f, ", ");
+				}
+				ssa_print_type(f, m->sizes, t);
+				ssa_fprintf(f, " ");
+				ssaValue *arg = call->args[i];
+				ssa_print_value(f, m, arg, t);
 			}
-			ssa_print_type(f, m->sizes, t);
-			ssa_fprintf(f, " ");
-			ssaValue *arg = call->args[i];
-			ssa_print_value(f, m, arg, t);
 		}
 		ssa_fprintf(f, ")\n");
 
@@ -650,9 +655,18 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 
 	ssa_fprintf(f, ") ");
 
-	if (proc->body == NULL) {
-		ssa_fprintf(f, "; foreign procedure\n\n");
-	} else {
+	if (proc->tags != 0) {
+		if (proc->tags & ProcTag_inline)
+			ssa_fprintf(f, "alwaysinline ");
+		if (proc->tags & ProcTag_no_inline)
+			ssa_fprintf(f, "noinline ");
+
+
+		if (proc->tags & ProcTag_foreign)
+			ssa_fprintf(f, "; foreign\n");
+	}
+
+	if (proc->body != NULL) {
 		ssa_fprintf(f, "{\n");
 		gb_for_array(i, proc->blocks) {
 			ssaBlock *block = proc->blocks[i];
@@ -682,6 +696,7 @@ void ssa_print_type_name(gbFile *f, ssaModule *m, ssaValue *v) {
 	ssa_fprintf(f, "\n");
 }
 
+
 void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 	if (m->layout.len > 0) {
 		ssa_fprintf(f, "target datalayout = \"%.*s\"\n", LIT(m->layout));
@@ -695,17 +710,6 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 	ssa_print_encoded_local(f, make_string(".rawptr"));
 	ssa_fprintf(f, " = type i8* ; Basic_rawptr\n\n");
 
-	ssa_fprintf(f, "declare void @llvm.memmove.p0i8.p0i8.");
-	ssa_print_type(f, m->sizes, t_int);
-	ssa_fprintf(f, "(i8*, i8*, ");
-	ssa_print_type(f, m->sizes, t_int);
-	ssa_fprintf(f, ", i32, i1) argmemonly nounwind \n\n");
-
-	gb_for_array(i, m->nested_type_names) {
-		ssaValue *v = m->nested_type_names[i];
-		ssa_print_type_name(f, m, v);
-	}
-
 	gb_for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
 		ssaValue *v = entry->value;
@@ -716,7 +720,27 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 			ssa_print_type(f, m->sizes, get_base_type(v->type_name.type));
 			ssa_fprintf(f, "\n");
 		} break;
+		}
+	}
 
+	gb_for_array(i, m->nested_type_names) {
+		ssaValue *v = m->nested_type_names[i];
+		ssa_print_type_name(f, m, v);
+	}
+
+
+	ssa_fprintf(f, "declare void @llvm.memmove.p0i8.p0i8.");
+	ssa_print_type(f, m->sizes, t_int);
+	ssa_fprintf(f, "(i8*, i8*, ");
+	ssa_print_type(f, m->sizes, t_int);
+	ssa_fprintf(f, ", i32, i1) argmemonly nounwind \n\n");
+
+
+
+	gb_for_array(member_index, m->members.entries) {
+		auto *entry = &m->members.entries[member_index];
+		ssaValue *v = entry->value;
+		switch (v->kind) {
 		case ssaValue_Global: {
 			auto *g = &v->global;
 			ssa_print_encoded_global(f, g->entity->token.string);
@@ -729,7 +753,11 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 
 			ssa_print_type(f, m->sizes, get_base_type(g->entity->type));
 			ssa_fprintf(f, " ");
-			ssa_print_value(f, m, g->value, g->entity->type);
+			if (g->value != NULL) {
+				ssa_print_value(f, m, g->value, g->entity->type);
+			} else {
+				ssa_fprintf(f, "zeroinitializer");
+			}
 			ssa_fprintf(f, "\n");
 		} break;
 
