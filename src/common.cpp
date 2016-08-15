@@ -34,6 +34,7 @@ gb_inline HashKey hash_pointer(void *ptr) {
 
 b32 hash_key_equal(HashKey a, HashKey b) {
 	if (a.key == b.key) {
+		// NOTE(bill): If two string's hashes collide, compare the strings themselves
 		if (a.is_string) {
 			if (b.is_string) return are_strings_equal(a.string, b.string);
 			return false;

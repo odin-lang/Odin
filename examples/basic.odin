@@ -1,10 +1,14 @@
 // CRT
-putchar :: proc(c: i32) -> i32     #foreign
+putchar :: proc(c: i32) -> i32 #foreign
+
 heap_alloc  :: proc(sz: int) -> rawptr #foreign "malloc"
 heap_free   :: proc(ptr: rawptr)       #foreign "free"
+
 mem_compare :: proc(dst, src : rawptr, len: int) -> i32 #foreign "memcmp"
 mem_copy    :: proc(dst, src : rawptr, len: int) -> i32 #foreign "memcpy"
 mem_move    :: proc(dst, src : rawptr, len: int) -> i32 #foreign "memmove"
+
+debug_trap :: proc() #foreign "llvm.debugtrap"
 
 
 print_string :: proc(s: string) {

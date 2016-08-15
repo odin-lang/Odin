@@ -35,7 +35,7 @@ b32 ssa_valid_char(u8 c) {
 	return false;
 }
 
-void ssa_print_escape_string(gbFile *f, String name) {
+void ssa_print_escape_string(gbFile *f, String name, b32 print_quotes) {
 	isize extra = 0;
 	for (isize i = 0; i < name.len; i++) {
 		u8 c = name.text[i];
@@ -50,11 +50,16 @@ void ssa_print_escape_string(gbFile *f, String name) {
 
 
 	char hex_table[] = "0123456789ABCDEF";
-	isize buf_len = name.len + extra;
+	isize buf_len = name.len + extra + 2;
 	u8 *buf = gb_alloc_array(gb_heap_allocator(), u8, buf_len);
 	defer (gb_free(gb_heap_allocator(), buf));
 
 	isize j = 0;
+
+	if (print_quotes) {
+		buf[j++] = '"';
+	}
+
 	for (isize i = 0; i < name.len; i++) {
 		u8 c = name.text[i];
 		if (ssa_valid_char(c)) {
@@ -67,19 +72,23 @@ void ssa_print_escape_string(gbFile *f, String name) {
 		}
 	}
 
-	ssa_file_write(f, buf, buf_len);
+	if (print_quotes) {
+		buf[j++] = '"';
+	}
+
+	ssa_file_write(f, buf, j);
 }
 
 
 
 void ssa_print_encoded_local(gbFile *f, String name) {
 	ssa_fprintf(f, "%%");
-	ssa_print_escape_string(f, name);
+	ssa_print_escape_string(f, name, true);
 }
 
 void ssa_print_encoded_global(gbFile *f, String name) {
 	ssa_fprintf(f, "@");
-	ssa_print_escape_string(f, name);
+	ssa_print_escape_string(f, name, true);
 }
 
 
@@ -196,7 +205,7 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 		break;
 	case ExactValue_String: {
 		ssa_fprintf(f, "c\"");
-		ssa_print_escape_string(f, value.value_string);
+		ssa_print_escape_string(f, value.value_string, false);
 		ssa_fprintf(f, "\"");
 	} break;
 	case ExactValue_Integer:
@@ -228,7 +237,7 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 }
 
 void ssa_print_block_name(gbFile *f, ssaBlock *b) {
-	ssa_print_escape_string(f, b->label);
+	ssa_print_escape_string(f, b->label, false);
 	ssa_fprintf(f, ".-.%d", b->id);
 }
 

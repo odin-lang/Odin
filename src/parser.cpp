@@ -1605,6 +1605,61 @@ AstNode *parse_body(AstFile *f, AstScope *scope) {
 	return make_block_stmt(f, statement_list, statement_list_count, open, close);
 }
 
+b32 is_foreign_name_valid(String name) {
+	// TODO(bill): is_foreign_name_valid
+	if (name.len == 0)
+		return false;
+	isize offset = 0;
+	while (offset < name.len) {
+		Rune rune;
+		isize remaining = name.len - offset;
+		isize width = gb_utf8_decode(name.text+offset, remaining, &rune);
+		if (rune == GB_RUNE_INVALID && width == 1) {
+			return false;
+		} else if (rune == GB_RUNE_BOM && remaining > 0) {
+			return false;
+		}
+
+		if (offset == 0) {
+			switch (rune) {
+			case '-':
+			case '$':
+			case '.':
+			case '_':
+				break;
+			default:
+				if (!rune_is_letter(rune))
+					return false;
+				break;
+			}
+		} else {
+			switch (rune) {
+			case '-':
+			case '$':
+			case '.':
+			case '_':
+				break;
+			default:
+				if (!rune_is_letter(rune) && !rune_is_digit(rune)) {
+					return false;
+				}
+				break;
+			}
+		}
+
+		offset += width;
+	}
+
+	return true;
+}
+
+void check_proc_add_tag(AstFile *f, AstNode *tag_expr, u64 *tags, ProcTag tag, String tag_name) {
+	if (*tags & tag) {
+		ast_file_err(f, ast_node_token(tag_expr), "Procedure tag already used: %.*s", LIT(tag_name));
+	}
+	*tags |= tag;
+}
+
 AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 	AstNode *param_list = NULL;
 	AstNode *result_list = NULL;
@@ -1623,20 +1678,20 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 		ast_node(te, TagExpr, tag_expr);
 		String tag_name = te->name.string;
 		if (are_strings_equal(tag_name, make_string("foreign"))) {
-			tags |= ProcTag_foreign;
+			check_proc_add_tag(f, tag_expr, &tags, ProcTag_foreign, tag_name);
 			if (f->cursor[0].kind == Token_String) {
 				foreign_name = f->cursor[0].string;
 				// TODO(bill): Check if valid string
-				if (foreign_name.len == 0) {
+				if (!is_foreign_name_valid(foreign_name)) {
 					ast_file_err(f, ast_node_token(tag_expr), "Invalid alternative foreign procedure name");
 				}
 
 				next_token(f);
 			}
 		} else if (are_strings_equal(tag_name, make_string("inline"))) {
-			tags |= ProcTag_inline;
+			check_proc_add_tag(f, tag_expr, &tags, ProcTag_inline, tag_name);
 		} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
-			tags |= ProcTag_no_inline;
+			check_proc_add_tag(f, tag_expr, &tags, ProcTag_no_inline, tag_name);
 		} else {
 			ast_file_err(f, ast_node_token(tag_expr), "Unknown procedure tag");
 		}
@@ -2154,8 +2209,6 @@ void parse_file(Parser *p, AstFile *f) {
 				str[str_len] = '\0';
 				char *path_str = gb_path_get_full_name(gb_heap_allocator(), cast(char *)str);
 				String import_file = make_string(path_str);
-
-				gb_printf_err("load path: %.*s\n", LIT(import_file));
 
 				if (!try_add_load_path(p, import_file)) {
 					gb_free(gb_heap_allocator(), import_file.text);

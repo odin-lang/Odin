@@ -1,4 +1,5 @@
 #include "common.cpp"
+#include "unicode.cpp"
 #include "tokenizer.cpp"
 #include "parser.cpp"
 #include "printer.cpp"

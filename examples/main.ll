@@ -5,62 +5,36 @@ declare void @llvm.memmove.p0i8.p0i8.i64(i8*, i8*, i64, i32, i1) argmemonly noun
 
 define void @main() {
 entry.-.0:
-	%0 = alloca %.string, align 8 ; a
-	store %.string zeroinitializer, %.string* %0
-	%1 = getelementptr inbounds [5 x i8], [5 x i8]* @.str0, i64 0, i64 0
-	%2 = alloca %.string, align 8 
-	store %.string zeroinitializer, %.string* %2
-	%3 = getelementptr inbounds %.string, %.string* %2, i64 0, i32 0
-	%4 = getelementptr inbounds %.string, %.string* %2, i64 0, i32 1
-	store i8* %1, i8** %3
-	store i64 5, i64* %4
-	%5 = load %.string, %.string* %2, align 8
-	store %.string %5, %.string* %0
-	%6 = load %.string, %.string* %0, align 8
-	%7 = getelementptr inbounds [5 x i8], [5 x i8]* @.str1, i64 0, i64 0
-	%8 = alloca %.string, align 8 
-	store %.string zeroinitializer, %.string* %8
-	%9 = getelementptr inbounds %.string, %.string* %8, i64 0, i32 0
-	%10 = getelementptr inbounds %.string, %.string* %8, i64 0, i32 1
-	store i8* %7, i8** %9
-	store i64 5, i64* %10
-	%11 = load %.string, %.string* %8, align 8
-	%12 = call i1 @__string_gt(%.string %6, %.string %11)
-	br i1 %12, label %if.then.-.1, label %if.else.-.2
-
-if.then.-.1:
-	%13 = getelementptr inbounds [2 x i8], [2 x i8]* @.str2, i64 0, i64 0
-	%14 = alloca %.string, align 8 
-	store %.string zeroinitializer, %.string* %14
-	%15 = getelementptr inbounds %.string, %.string* %14, i64 0, i32 0
-	%16 = getelementptr inbounds %.string, %.string* %14, i64 0, i32 1
-	store i8* %13, i8** %15
-	store i64 2, i64* %16
-	%17 = load %.string, %.string* %14, align 8
-	call void @print_string(%.string %17)
-	call void @main$nl-0()
-	br label %if.done.-.3
-
-if.else.-.2:
-	%18 = getelementptr inbounds [3 x i8], [3 x i8]* @.str3, i64 0, i64 0
-	%19 = alloca %.string, align 8 
-	store %.string zeroinitializer, %.string* %19
-	%20 = getelementptr inbounds %.string, %.string* %19, i64 0, i32 0
-	%21 = getelementptr inbounds %.string, %.string* %19, i64 0, i32 1
-	store i8* %18, i8** %20
-	store i64 3, i64* %21
-	%22 = load %.string, %.string* %19, align 8
-	call void @print_string(%.string %22)
-	call void @main$nl-0()
-	br label %if.done.-.3
-
-if.done.-.3:
+	%0 = getelementptr inbounds [8 x i8], [8 x i8]* @.str1, i64 0, i64 0
+	%1 = alloca %.string, align 8 
+	store %.string zeroinitializer, %.string* %1
+	%2 = getelementptr inbounds %.string, %.string* %1, i64 0, i32 0
+	%3 = getelementptr inbounds %.string, %.string* %1, i64 0, i32 1
+	store i8* %0, i8** %2
+	store i64 8, i64* %3
+	%4 = load %.string, %.string* %1, align 8
+	call void @print_string(%.string %4)
+	call void @"main$\E4\B8\96\E7\95\8C-1"()
 	ret void
 }
 
 define void @main$nl-0() {
 entry.-.0:
 	call void @print_rune(i32 10)
+	ret void
+}
+
+define void @"main$\E4\B8\96\E7\95\8C-1"() {
+entry.-.0:
+	%0 = getelementptr inbounds [9 x i8], [9 x i8]* @.str0, i64 0, i64 0
+	%1 = alloca %.string, align 8 
+	store %.string zeroinitializer, %.string* %1
+	%2 = getelementptr inbounds %.string, %.string* %1, i64 0, i32 0
+	%3 = getelementptr inbounds %.string, %.string* %1, i64 0, i32 1
+	store i8* %0, i8** %2
+	store i64 9, i64* %3
+	%4 = load %.string, %.string* %1, align 8
+	call void @print_string(%.string %4)
 	ret void
 }
 
@@ -75,6 +49,8 @@ declare i32 @memcmp(%.rawptr %dst, %.rawptr %src, i64 %len) ; foreign procedure
 declare i32 @memcpy(%.rawptr %dst, %.rawptr %src, i64 %len) ; foreign procedure
 
 declare i32 @memmove(%.rawptr %dst, %.rawptr %src, i64 %len) ; foreign procedure
+
+declare void @llvm.debugtrap() ; foreign procedure
 
 define void @print_string(%.string %s) {
 entry.-.0:
@@ -455,7 +431,7 @@ for.body.-.6:
 	%18 = getelementptr inbounds [65 x i8], [65 x i8]* %2, i64 0, i64 0
 	%19 = load i64, i64* %3, align 8
 	%20 = getelementptr i8, i8* %18, i64 %19
-	%21 = getelementptr inbounds [64 x i8], [64 x i8]* @.str4, i64 0, i64 0
+	%21 = getelementptr inbounds [64 x i8], [64 x i8]* @.str2, i64 0, i64 0
 	%22 = load i64, i64* %1, align 8
 	%23 = load i64, i64* %0, align 8
 	%24 = srem i64 %23, %22
@@ -597,7 +573,7 @@ for.body.-.6:
 	%18 = getelementptr inbounds [65 x i8], [65 x i8]* %2, i64 0, i64 0
 	%19 = load i64, i64* %3, align 8
 	%20 = getelementptr i8, i8* %18, i64 %19
-	%21 = getelementptr inbounds [64 x i8], [64 x i8]* @.str5, i64 0, i64 0
+	%21 = getelementptr inbounds [64 x i8], [64 x i8]* @.str3, i64 0, i64 0
 	%22 = load i64, i64* %1, align 8
 	%23 = load i64, i64* %0, align 8
 	%24 = urem i64 %23, %22
@@ -684,7 +660,7 @@ entry.-.0:
 	br i1 %1, label %if.then.-.1, label %if.else.-.2
 
 if.then.-.1:
-	%2 = getelementptr inbounds [4 x i8], [4 x i8]* @.str6, i64 0, i64 0
+	%2 = getelementptr inbounds [4 x i8], [4 x i8]* @.str4, i64 0, i64 0
 	%3 = alloca %.string, align 8 
 	store %.string zeroinitializer, %.string* %3
 	%4 = getelementptr inbounds %.string, %.string* %3, i64 0, i32 0
@@ -696,7 +672,7 @@ if.then.-.1:
 	br label %if.done.-.3
 
 if.else.-.2:
-	%7 = getelementptr inbounds [5 x i8], [5 x i8]* @.str7, i64 0, i64 0
+	%7 = getelementptr inbounds [5 x i8], [5 x i8]* @.str5, i64 0, i64 0
 	%8 = alloca %.string, align 8 
 	store %.string zeroinitializer, %.string* %8
 	%9 = getelementptr inbounds %.string, %.string* %8, i64 0, i32 0
@@ -950,11 +926,9 @@ entry.-.0:
 	ret i1 %5
 }
 
-@.str0 = global [5 x i8] c"Hello"
-@.str1 = global [5 x i8] c"Hello"
-@.str2 = global [2 x i8] c"\3AD"
-@.str3 = global [3 x i8] c"\3A\27\28"
-@.str4 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"
-@.str5 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"
-@.str6 = global [4 x i8] c"true"
-@.str7 = global [5 x i8] c"false"
+@.str0 = global [9 x i8] c"\E6\97\A5\E6\9C\AC\E8\AA\9E"
+@.str1 = global [8 x i8] c"Hellope\0A"
+@.str2 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"
+@.str3 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"
+@.str4 = global [4 x i8] c"true"
+@.str5 = global [5 x i8] c"false"

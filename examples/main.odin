@@ -4,13 +4,10 @@ TWO_HEARTS :: '💕';
 
 main :: proc() {
 	nl :: proc() { print_rune('\n'); }
+	世界 :: proc() { print_string(`日本語`); }
 
-	a := "Hello";
-	if a >= "Hello" {
-		print_string(":D"); nl();
-	} else {
-		print_string(":'("); nl();
-	}
+	print_string("Hellope\n");
+	世界();
 
 
 /*

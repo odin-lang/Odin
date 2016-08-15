@@ -1,30 +1,3 @@
-// TODO(bill): Unicode support
-b32 rune_is_letter(Rune r) {
-	if (r < 0x80 && gb_char_is_alpha(cast(char)r) || r == '_') {
-		return true;
-	}
-	return false;
-}
-
-b32 rune_is_digit(Rune r) {
-	if (r < 0x80 && gb_is_between(r, '0', '9'))
-		return true;
-	return false;
-}
-
-b32 rune_is_whitespace(Rune r) {
-	switch (r) {
-	case ' ':
-	case '\t':
-	case '\n':
-	case '\r':
-	case '\f':
-	case '\v':
-		return true;
-	}
-	return false;
-}
-
 #define TOKEN_KINDS \
 	TOKEN_KIND(Token_Invalid, "Invalid"), \
 	TOKEN_KIND(Token_EOF, "EOF"), \
