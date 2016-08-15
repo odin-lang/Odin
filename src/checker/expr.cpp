@@ -41,7 +41,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 			Token name_token = i->token;
 			// TODO(bill): is the curr_scope correct?
 			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type);
-			u64 key = hash_string(name_token.string);
+			HashKey key = hash_string(name_token.string);
 			if (map_get(&entity_map, key)) {
 				// TODO(bill): Scope checking already checks the declaration
 				error(&c->error_collector, name_token, "`%.*s` is already declared in this structure", LIT(name_token.string));
@@ -615,8 +615,10 @@ b32 check_is_expr_vector_index(Checker *c, AstNode *expr) {
 	expr = unparen_expr(expr);
 	if (expr->kind == AstNode_IndexExpr) {
 		ast_node(ie, IndexExpr, expr);
-		Type *t = get_base_type(type_of_expr(&c->info, ie->expr));
-		return is_type_vector(t);
+		Type *t = type_of_expr(&c->info, ie->expr);
+		if (t != NULL) {
+			return is_type_vector(get_base_type(t));
+		}
 	}
 	return false;
 }
@@ -1057,7 +1059,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 
 
 void update_expr_type(Checker *c, AstNode *e, Type *type, b32 final) {
-	u64 key = hash_pointer(e);
+	HashKey key = hash_pointer(e);
 	ExpressionInfo *found = map_get(&c->info.untyped, key);
 	if (found == NULL)
 		return;

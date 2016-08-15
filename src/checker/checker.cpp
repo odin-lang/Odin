@@ -242,7 +242,7 @@ void check_close_scope(Checker *c) {
 }
 
 void scope_lookup_parent_entity(Scope *s, String name, Scope **scope, Entity **entity) {
-	u64 key = hash_string(name);
+	HashKey key = hash_string(name);
 	for (; s != NULL; s = s->parent) {
 		Entity **found = map_get(&s->elements, key);
 		if (found) {
@@ -262,7 +262,7 @@ Entity *scope_lookup_entity(Scope *s, String name) {
 }
 
 Entity *current_scope_lookup_entity(Scope *s, String name) {
-	u64 key = hash_string(name);
+	HashKey key = hash_string(name);
 	Entity **found = map_get(&s->elements, key);
 	if (found)
 		return *found;
@@ -273,7 +273,7 @@ Entity *current_scope_lookup_entity(Scope *s, String name) {
 
 Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	String name = entity->token.string;
-	u64 key = hash_string(name);
+	HashKey key = hash_string(name);
 	Entity **found = map_get(&s->elements, key);
 	if (found)
 		return *found;
@@ -465,7 +465,7 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier != NULL);
 	GB_ASSERT(identifier->kind == AstNode_Ident);
-	u64 key = hash_pointer(identifier);
+	HashKey key = hash_pointer(identifier);
 	map_set(&i->definitions, key, entity);
 }
 
@@ -484,7 +484,7 @@ void add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 void add_entity_use(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier != NULL);
 	GB_ASSERT(identifier->kind == AstNode_Ident);
-	u64 key = hash_pointer(identifier);
+	HashKey key = hash_pointer(identifier);
 	map_set(&i->uses, key, entity);
 }
 
@@ -648,7 +648,7 @@ void check_parsed_files(Checker *c) {
 
 			case_end;
 
-			case_ast_node(id, ImportDecl, decl);
+			case_ast_node(ld, LoadDecl, decl);
 				// NOTE(bill): ignore
 			case_end;
 
@@ -662,7 +662,7 @@ void check_parsed_files(Checker *c) {
 
 	gb_for_array(i, c->info.entities.entries) {
 		auto *entry = &c->info.entities.entries[i];
-		Entity *e = cast(Entity *)cast(uintptr)entry->key;
+		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		DeclInfo *d = entry->value;
 		check_entity_decl(c, e, d, NULL);
 	}
@@ -679,8 +679,8 @@ void check_parsed_files(Checker *c) {
 	// Add untyped expression values
 	gb_for_array(i, c->info.untyped.entries) {
 		auto *entry = c->info.untyped.entries + i;
-		u64 key = entry->key;
-		AstNode *expr = cast(AstNode *)cast(uintptr)key;
+		HashKey key = entry->key;
+		AstNode *expr = cast(AstNode *)cast(uintptr)key.key;
 		ExpressionInfo *info = &entry->value;
 		if (info != NULL && expr != NULL) {
 			if (is_type_typed(info->type)) {

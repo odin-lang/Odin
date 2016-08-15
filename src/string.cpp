@@ -25,7 +25,12 @@ gb_inline String make_string(char *text) {
 
 gb_inline b32 are_strings_equal(String a, String b) {
 	if (a.len == b.len) {
-		return gb_memcompare(a.text, b.text, a.len) == 0;
+		for (isize i = 0; i < a.len; i++) {
+			if (a.text[i] != b.text[i]) {
+				return false;
+			}
+		}
+		return true;
 	}
 	return false;
 }

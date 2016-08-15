@@ -59,8 +59,8 @@ struct AstScope {
 struct Parser {
 	String init_fullpath;
 	gbArray(AstFile) files;
-	gbArray(String) imports;
-	isize import_index;
+	gbArray(String) loads;
+	isize load_index;
 	isize total_token_count;
 };
 
@@ -177,7 +177,7 @@ AST_NODE_KIND(_DeclBegin,      struct{}) \
 		}) \
 	AST_NODE_KIND(TypeDecl,   struct { Token token; AstNode *name, *type; }) \
 	AST_NODE_KIND(AliasDecl,  struct { Token token; AstNode *name, *type; }) \
-	AST_NODE_KIND(ImportDecl, struct { Token token, filepath; }) \
+	AST_NODE_KIND(LoadDecl, struct { Token token, filepath; }) \
 AST_NODE_KIND(_DeclEnd, struct{}) \
 AST_NODE_KIND(_TypeBegin, struct{}) \
 	AST_NODE_KIND(Field, struct { \
@@ -337,8 +337,8 @@ Token ast_node_token(AstNode *node) {
 		return node->TypeDecl.token;
 	case AstNode_AliasDecl:
 		return node->AliasDecl.token;
-	case AstNode_ImportDecl:
-		return node->ImportDecl.token;
+	case AstNode_LoadDecl:
+		return node->LoadDecl.token;
 	case AstNode_Field: {
 		if (node->Field.name_list)
 			return ast_node_token(node->Field.name_list);
@@ -394,7 +394,7 @@ AstEntity *make_ast_entity(AstFile *f, Token token, AstNode *decl, AstScope *par
 	return entity;
 }
 
-u64 hash_token(Token t) {
+HashKey hash_token(Token t) {
 	return hash_string(t.string);
 }
 
@@ -766,10 +766,10 @@ gb_inline AstNode *make_alias_decl(AstFile *f, Token token, AstNode *name, AstNo
 }
 
 
-gb_inline AstNode *make_import_decl(AstFile *f, Token token, Token filepath) {
-	AstNode *result = make_node(f, AstNode_ImportDecl);
-	result->ImportDecl.token = token;
-	result->ImportDecl.filepath = filepath;
+gb_inline AstNode *make_load_decl(AstFile *f, Token token, Token filepath) {
+	AstNode *result = make_node(f, AstNode_LoadDecl);
+	result->LoadDecl.token = token;
+	result->LoadDecl.filepath = filepath;
 	return result;
 }
 
@@ -825,6 +825,13 @@ gb_inline b32 allow_token(AstFile *f, TokenKind kind) {
 }
 
 
+b32 is_blank_ident(String str) {
+	if (str.len == 1) {
+		return str.text[0] == '_';
+	}
+	return false;
+}
+
 gb_internal void add_ast_entity(AstFile *f, AstScope *scope, AstNode *declaration, AstNode *name_list) {
 	for (AstNode *n = name_list; n != NULL; n = n->next) {
 		if (n->kind != AstNode_Ident) {
@@ -836,8 +843,7 @@ gb_internal void add_ast_entity(AstFile *f, AstScope *scope, AstNode *declaratio
 		n->Ident.entity = entity;
 
 		AstEntity *insert_entity = ast_scope_insert(scope, *entity);
-		if (insert_entity != NULL &&
-		    !are_strings_equal(insert_entity->token.string, make_string("_"))) {
+		if (insert_entity != NULL && !is_blank_ident(insert_entity->token.string)) {
 			ast_file_err(f, entity->token,
 			             "There is already a previous declaration of `%.*s` in the current scope at\n"
 			             "\t%.*s(%td:%td)",
@@ -845,6 +851,10 @@ gb_internal void add_ast_entity(AstFile *f, AstScope *scope, AstNode *declaratio
 			             LIT(insert_entity->token.pos.file),
 			             insert_entity->token.pos.line,
 			             insert_entity->token.pos.column);
+
+			gb_printf_err("Hashes\n");
+			gb_printf_err("%16llx - %.*s\n", hash_string(insert_entity->token.string), LIT(insert_entity->token.string));
+			gb_printf_err("%16llx - %.*s\n\n", hash_string(entity->token.string), LIT(entity->token.string));
 		}
 	}
 }
@@ -1898,16 +1908,6 @@ AstNode *parse_stmt(AstFile *f) {
 		return alias_decl;
 	} break;
 
-	case Token_import: {
-		Token token = expect_token(f, Token_import);
-		Token filepath = expect_token(f, Token_String);
-		if (f->curr_scope == f->file_scope) {
-			return make_import_decl(f, token, filepath);
-		}
-		ast_file_err(f, token, "You cannot `import` within a procedure. This must be done at the file scope.");
-		return make_bad_decl(f, token, filepath);
-	} break;
-
 	// Operands
 	case Token_Identifier:
 	case Token_Integer:
@@ -1944,10 +1944,20 @@ AstNode *parse_stmt(AstFile *f) {
 		expect_token(f, Token_Semicolon);
 		return make_branch_stmt(f, token);
 
-	case Token_Hash:
+	case Token_Hash: {
 		s = parse_tag_stmt(f, NULL);
+
+		if (are_strings_equal(s->TagStmt.name.string, make_string("load"))) {
+			Token file_path = expect_token(f, Token_String);
+			if (f->curr_scope == f->file_scope) {
+				return make_load_decl(f, s->TagStmt.token, file_path);
+			}
+			ast_file_err(f, token, "You cannot `load` within a procedure. This must be done at the file scope.");
+			return make_bad_decl(f, token, file_path);
+		}
 		s->TagStmt.stmt = parse_stmt(f); // TODO(bill): Find out why this doesn't work as an argument
 		return s;
+	} break;
 
 	case Token_OpenBrace: return parse_block_stmt(f);
 
@@ -2036,7 +2046,7 @@ void destroy_ast_file(AstFile *f) {
 
 b32 init_parser(Parser *p) {
 	gb_array_init(p->files, gb_heap_allocator());
-	gb_array_init(p->imports, gb_heap_allocator());
+	gb_array_init(p->loads, gb_heap_allocator());
 	return true;
 }
 
@@ -2046,24 +2056,24 @@ void destroy_parser(Parser *p) {
 		destroy_ast_file(&p->files[i]);
 	}
 #if 1
-	gb_for_array(i, p->imports) {
-		// gb_free(gb_heap_allocator(), p->imports[i].text);
+	gb_for_array(i, p->loads) {
+		// gb_free(gb_heap_allocator(), p->loads[i].text);
 	}
 #endif
 	gb_array_free(p->files);
-	gb_array_free(p->imports);
+	gb_array_free(p->loads);
 }
 
 // NOTE(bill): Returns true if it's added
-b32 try_add_import_path(Parser *p, String import_file) {
-	gb_for_array(i, p->imports) {
-		String import = p->imports[i];
+b32 try_add_load_path(Parser *p, String import_file) {
+	gb_for_array(i, p->loads) {
+		String import = p->loads[i];
 		if (are_strings_equal(import, import_file)) {
 			return false;
 		}
 	}
 
-	gb_array_append(p->imports, import_file);
+	gb_array_append(p->loads, import_file);
 	return true;
 }
 
@@ -2076,7 +2086,7 @@ gb_global Rune illegal_import_runes[] = {
 	'|', ',',  '<', '>', '?',
 };
 
-b32 is_import_path_valid(String path) {
+b32 is_load_path_valid(String path) {
 	if (path.len > 0) {
 		u8 *start = path.text;
 		u8 *end = path.text + path.len;
@@ -2125,37 +2135,29 @@ void parse_file(Parser *p, AstFile *f) {
 			// NOTE(bill): Sanity check
 			ast_file_err(f, ast_node_token(node), "Only declarations are allowed at file scope");
 		} else {
-			if (node->kind == AstNode_ImportDecl) {
-				auto *id = &node->ImportDecl;
+			if (node->kind == AstNode_LoadDecl) {
+				auto *id = &node->LoadDecl;
 				String file_str = id->filepath.string;
 
-				char ext[] = ".odin";
-				isize ext_len = gb_size_of(ext)-1;
-				b32 append_ext = false;
-
-				if (!is_import_path_valid(file_str)) {
+				if (!is_load_path_valid(file_str)) {
 					ast_file_err(f, ast_node_token(node), "Invalid import path");
 					continue;
 				}
 
-				if (string_extension_position(file_str) < 0)
-					append_ext = true;
 
 				isize str_len = base_dir.len+file_str.len;
-				if (append_ext)
-					str_len += ext_len;
 				u8 *str = gb_alloc_array(gb_heap_allocator(), u8, str_len+1);
 				defer (gb_free(gb_heap_allocator(), str));
 
 				gb_memcopy(str, base_dir.text, base_dir.len);
 				gb_memcopy(str+base_dir.len, file_str.text, file_str.len);
-				if (append_ext)
-					gb_memcopy(str+base_dir.len+file_str.len, ext, ext_len+1);
 				str[str_len] = '\0';
 				char *path_str = gb_path_get_full_name(gb_heap_allocator(), cast(char *)str);
 				String import_file = make_string(path_str);
 
-				if (!try_add_import_path(p, import_file)) {
+				gb_printf_err("load path: %.*s\n", LIT(import_file));
+
+				if (!try_add_load_path(p, import_file)) {
 					gb_free(gb_heap_allocator(), import_file.text);
 				}
 			}
@@ -2167,11 +2169,11 @@ void parse_file(Parser *p, AstFile *f) {
 ParseFileError parse_files(Parser *p, char *init_filename) {
 	char *fullpath_str = gb_path_get_full_name(gb_heap_allocator(), init_filename);
 	String init_fullpath = make_string(fullpath_str);
-	gb_array_append(p->imports, init_fullpath);
+	gb_array_append(p->loads, init_fullpath);
 	p->init_fullpath = init_fullpath;
 
-	gb_for_array(i, p->imports) {
-		String import_path = p->imports[i];
+	gb_for_array(i, p->loads) {
+		String import_path = p->loads[i];
 		AstFile file = {};
 		ParseFileError err = init_ast_file(&file, import_path);
 		if (err != ParseFile_None) {

@@ -1,57 +1,18 @@
-pc :: proc(c: i32) #foreign "putchar"
-
-main :: proc() {
-	f :: false;
-	t :: true;
-	v := {8}bool{t, f, t, f, t, f, t, f};
-	pc(v[0] as rune + 'A');
-	pc(v[1] as rune + 'A');
-	pc(v[2] as rune + 'A');
-	pc(v[3] as rune + 'A');
-	pc('\n');
-}
-
-/*
-import "basic"
+#load "basic.odin"
 
 TWO_HEARTS :: '💕';
 
 main :: proc() {
 	nl :: proc() { print_rune('\n'); }
 
-	t :: true;
-	f :: false;
-
-	// v := {8}bool{t, t, t, f, f, f, t, t};
-	v : {8}bool;
-	v[0] = true;
-	v[1] = false;
-	v[2] = true;
-
-	for i := 0; i < len(v); i++ {
-		b := v[i];
-		if b {
-			print_rune('t');
-		} else {
-			print_rune('f');
-		}
-		nl();
+	a := "Hello";
+	if a >= "Hello" {
+		print_string(":D"); nl();
+	} else {
+		print_string(":'("); nl();
 	}
-	// v[1] = false;
-	// v[2] = true;
-	// print_rune(v[0] as rune + 65); nl();
-	// print_rune(v[1] as rune + 65); nl();
-	// print_rune(v[2] as rune + 65); nl();
 
 
-	// for i := 0; i < len(v); i++ {
-		// v[i] = (i%2) == 0;
-	// }
-	// for i := 0; i < len(v); i++ {
-	// 	print_bool(v[i]); nl();
-	// }
-
-	// print_int(v transmute u8 as int);
 /*
 	DATA_SIZE :: 100;
 	data := malloc(DATA_SIZE);
@@ -89,4 +50,3 @@ main :: proc() {
 // 	print_string("Russian    - Здравствулте мир\n");
 // 	print_string("Spanish    - Hola mundo\n");
 // }
-*/

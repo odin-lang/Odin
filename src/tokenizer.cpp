@@ -117,7 +117,6 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_for,         "for"), \
 	TOKEN_KIND(Token_defer,       "defer"), \
 	TOKEN_KIND(Token_return,      "return"), \
-	TOKEN_KIND(Token_import,      "import"), \
 	TOKEN_KIND(Token_struct,      "struct"), \
 	TOKEN_KIND(Token_union,       "union"), \
 	TOKEN_KIND(Token_enum,        "enum"), \

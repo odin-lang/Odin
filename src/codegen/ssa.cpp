@@ -670,7 +670,7 @@ ssaValue *ssa_make_value_block(ssaProcedure *proc, AstNode *node, Scope *scope, 
 b32 ssa_is_blank_ident(AstNode *node) {
 	if (node->kind == AstNode_Ident) {
 		ast_node(i, Ident, node);
-		return are_strings_equal(i->token.string, make_string("_"));
+		return is_blank_ident(i->token.string);
 	}
 	return false;
 }
@@ -1390,6 +1390,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			ssaValue *right = ssa_build_expr(proc, ue->expr);
 			return ssa_emit_arith(proc, ue->op, left, right, tv->type);
 		} break;
+		case Token_Not: // Boolean not
 		case Token_Xor: { // Bitwise not
 			// NOTE(bill): "not" `x` == `x` "xor" `-1`
 			ExactValue neg_one = make_exact_value_integer(-1);
@@ -1397,10 +1398,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			ssaValue *right = ssa_make_value_constant(proc->module->allocator, tv->type, neg_one);
 			return ssa_emit_arith(proc, ue->op, left, right, tv->type);
 		} break;
-		case Token_Not: // Boolean not
-			GB_PANIC("Token_Not");
-			return NULL;
-
 		}
 	case_end;
 
@@ -2057,7 +2054,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			String name = make_string(name_text, name_len-1);
 
 			Entity **found = map_get(&proc->module->info->definitions, hash_pointer(pd->name));
-			GB_ASSERT(found != NULL);
+			GB_ASSERT_MSG(found != NULL, "Unable to find: %.*s", LIT(pd->name->Ident.token.string));
 			Entity *e = *found;
 			ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
 			                                           proc->module, e->type, pd->type, pd->body, name);

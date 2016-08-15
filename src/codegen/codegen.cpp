@@ -58,7 +58,7 @@ void ssa_gen_code(ssaGen *s) {
 
 	gb_for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
-		Entity *e = cast(Entity *)cast(uintptr)entry->key;
+		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		DeclInfo *decl = entry->value;
 
 		String name = e->token.string;

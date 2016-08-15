@@ -6,18 +6,41 @@
 
 // Hasing
 
-gb_inline u64 hashing_proc(void const *data, isize len) {
-	return gb_murmur64(data, len);
+struct HashKey {
+	u64 key;
+	b32 is_string;
+	String string; // if String, s.len > 0
+};
+
+gb_inline HashKey hashing_proc(void const *data, isize len) {
+	HashKey h = {};
+	h.key = gb_murmur64(data, len);
+	// h.key = gb_fnv64a(data, len);
+	return h;
 }
 
-gb_inline u64 hash_string(String s) {
-	return hashing_proc(s.text, s.len);
+gb_inline HashKey hash_string(String s) {
+	HashKey h = hashing_proc(s.text, s.len);
+	h.is_string = true;
+	h.string = s;
+	return h;
 }
 
-gb_inline u64 hash_pointer(void *ptr) {
-	uintptr u = cast(uintptr)ptr;
-	u64 p = cast(u64)u;
-	return p;
+gb_inline HashKey hash_pointer(void *ptr) {
+	uintptr p = cast(uintptr)ptr;
+	HashKey h = {cast(u64)p};
+	return h;
+}
+
+b32 hash_key_equal(HashKey a, HashKey b) {
+	if (a.key == b.key) {
+		if (a.is_string) {
+			if (b.is_string) return are_strings_equal(a.string, b.string);
+			return false;
+		}
+		return true;
+	}
+	return false;
 }
 
 i64 next_pow2(i64 n) {
@@ -58,17 +81,17 @@ i64 next_pow2(i64 n) {
 ////////////////////////////////////////////////////////////////
 
 
-typedef struct MapFindResult {
+struct MapFindResult {
 	isize hash_index;
 	isize entry_prev;
 	isize entry_index;
-} MapFindResult;
+};
 
 template <typename T>
 struct MapEntry {
-	u64   key;
-	isize next;
-	T     value;
+	HashKey key;
+	isize   next;
+	T       value;
 };
 
 template <typename T>
@@ -79,9 +102,9 @@ struct Map {
 
 template <typename T> void map_init   (Map<T> *h, gbAllocator a);
 template <typename T> void map_destroy(Map<T> *h);
-template <typename T> T *  map_get    (Map<T> *h, u64 key);
-template <typename T> void map_set    (Map<T> *h, u64 key, T value);
-template <typename T> void map_remove (Map<T> *h, u64 key);
+template <typename T> T *  map_get    (Map<T> *h, HashKey key);
+template <typename T> void map_set    (Map<T> *h, HashKey key, T value);
+template <typename T> void map_remove (Map<T> *h, HashKey key);
 template <typename T> void map_clear  (Map<T> *h);
 template <typename T> void map_grow   (Map<T> *h);
 template <typename T> void map_rehash (Map<T> *h, isize new_count);
@@ -101,7 +124,7 @@ gb_inline void map_destroy(Map<T> *h) {
 }
 
 template <typename T>
-gb_internal isize map__add_entry(Map<T> *h, u64 key) {
+gb_internal isize map__add_entry(Map<T> *h, HashKey key) {
 	MapEntry<T> e = {0};
 	e.key = key;
 	e.next = -1;
@@ -110,14 +133,15 @@ gb_internal isize map__add_entry(Map<T> *h, u64 key) {
 }
 
 template <typename T>
-gb_internal MapFindResult map__find(Map<T> *h, u64 key) {
+gb_internal MapFindResult map__find(Map<T> *h, HashKey key) {
 	MapFindResult fr = {-1, -1, -1};
 	if (gb_array_count(h->hashes) > 0) {
-		fr.hash_index  = key % gb_array_count(h->hashes);
+		fr.hash_index  = key.key % gb_array_count(h->hashes);
 		fr.entry_index = h->hashes[fr.hash_index];
 		while (fr.entry_index >= 0) {
-			if (h->entries[fr.entry_index].key == key)
+			if (hash_key_equal(h->entries[fr.entry_index].key, key)) {
 				return fr;
+			}
 			fr.entry_prev = fr.entry_index;
 			fr.entry_index = h->entries[fr.entry_index].next;
 		}
@@ -166,7 +190,7 @@ void map_rehash(Map<T> *h, isize new_count) {
 }
 
 template <typename T>
-gb_inline T *map_get(Map<T> *h, u64 key) {
+gb_inline T *map_get(Map<T> *h, HashKey key) {
 	isize index = map__find(h, key).entry_index;
 	if (index >= 0)
 		return &h->entries[index].value;
@@ -174,7 +198,7 @@ gb_inline T *map_get(Map<T> *h, u64 key) {
 }
 
 template <typename T>
-void map_set(Map<T> *h, u64 key, T value) {
+void map_set(Map<T> *h, HashKey key, T value) {
 	isize index;
 	MapFindResult fr;
 	if (gb_array_count(h->hashes) == 0)
@@ -197,7 +221,7 @@ void map_set(Map<T> *h, u64 key, T value) {
 }
 
 template <typename T>
-void map_remove(Map<T> *h, u64 key) {
+void map_remove(Map<T> *h, HashKey key) {
 	MapFindResult fr = map__find(h, key);
 	if (fr.entry_index >= 0) {
 		if (fr.entry_prev < 0) {

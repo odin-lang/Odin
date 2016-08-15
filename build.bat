@@ -47,6 +47,7 @@ pushd %build_dir%
 		/link %linker_settings% -OUT:%exe_name% ^
 		&& call ..\run.bat
 
+
 	:do_not_compile_exe
 popd
 :end_of_build

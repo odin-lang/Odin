@@ -400,7 +400,32 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "%%%d = ", value->id);
 
 		if (gb_is_between(bo->op.kind, Token__ComparisonBegin+1, Token__ComparisonEnd-1)) {
-			if (is_type_float(elem_type)) {
+
+			if (is_type_string(elem_type)) {
+				ssa_fprintf(f, "call ");
+				ssa_print_type(f, m->sizes, t_bool);
+				char *runtime_proc = "";
+				switch (bo->op.kind) {
+				case Token_CmpEq: runtime_proc = "__string_eq"; break;
+				case Token_NotEq: runtime_proc = "__string_ne"; break;
+				case Token_Lt:    runtime_proc = "__string_lt"; break;
+				case Token_Gt:    runtime_proc = "__string_gt"; break;
+				case Token_LtEq:  runtime_proc = "__string_le"; break;
+				case Token_GtEq:  runtime_proc = "__string_gt"; break;
+				}
+
+				ssa_fprintf(f, " @%s(", runtime_proc);
+				ssa_print_type(f, m->sizes, type);
+				ssa_fprintf(f, " ");
+				ssa_print_value(f, m, bo->left, type);
+				ssa_fprintf(f, ", ");
+				ssa_print_type(f, m->sizes, type);
+				ssa_fprintf(f, " ");
+				ssa_print_value(f, m, bo->right, type);
+				ssa_fprintf(f, ")\n");
+				return;
+
+			} else if (is_type_float(elem_type)) {
 				ssa_fprintf(f, "fcmp ");
 				switch (bo->op.kind) {
 				case Token_CmpEq: ssa_fprintf(f, "oeq"); break;
@@ -434,14 +459,15 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 				ssa_fprintf(f, "f");
 
 			switch (bo->op.kind) {
-			case Token_Add:    ssa_fprintf(f, "add"); break;
-			case Token_Sub:    ssa_fprintf(f, "sub"); break;
-			case Token_And:    ssa_fprintf(f, "and"); break;
-			case Token_Or:     ssa_fprintf(f, "or");  break;
-			case Token_Xor:    ssa_fprintf(f, "xor"); break;
-			case Token_Shl:    ssa_fprintf(f, "shl"); break;
+			case Token_Add:    ssa_fprintf(f, "add");  break;
+			case Token_Sub:    ssa_fprintf(f, "sub");  break;
+			case Token_And:    ssa_fprintf(f, "and");  break;
+			case Token_Or:     ssa_fprintf(f, "or");   break;
+			case Token_Xor:    ssa_fprintf(f, "xor");  break;
+			case Token_Shl:    ssa_fprintf(f, "shl");  break;
 			case Token_Shr:    ssa_fprintf(f, "lshr"); break;
-			case Token_Mul:    ssa_fprintf(f, "mul"); break;
+			case Token_Mul:    ssa_fprintf(f, "mul");  break;
+			case Token_Not:    ssa_fprintf(f, "xor");  break;
 
 			case Token_AndNot: GB_PANIC("Token_AndNot Should never be called");
 
@@ -655,15 +681,16 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 	ssa_print_encoded_local(f, make_string(".string"));
 	ssa_fprintf(f, " = type {i8*, ");
 	ssa_print_type(f, m->sizes, t_int);
-	ssa_fprintf(f, "} ; Basic_string\n\n");
+	ssa_fprintf(f, "} ; Basic_string\n");
 
 	ssa_print_encoded_local(f, make_string(".rawptr"));
 	ssa_fprintf(f, " = type i8* ; Basic_rawptr\n\n");
+
 	ssa_fprintf(f, "declare void @llvm.memmove.p0i8.p0i8.");
 	ssa_print_type(f, m->sizes, t_int);
 	ssa_fprintf(f, "(i8*, i8*, ");
 	ssa_print_type(f, m->sizes, t_int);
-	ssa_fprintf(f, ", i32, i1)\n\n");
+	ssa_fprintf(f, ", i32, i1) argmemonly nounwind \n\n");
 
 	gb_for_array(i, m->nested_type_names) {
 		ssaValue *v = m->nested_type_names[i];
