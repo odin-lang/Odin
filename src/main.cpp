@@ -6,7 +6,7 @@
 #include "checker/checker.cpp"
 #include "codegen/codegen.cpp"
 
-void win32_exec_command_line_app(char *fmt, ...) {
+i32 win32_exec_command_line_app(char *fmt, ...) {
 	STARTUPINFOA start_info = {gb_size_of(STARTUPINFOA)};
 	PROCESS_INFORMATION pi = {};
 	start_info.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
@@ -25,12 +25,19 @@ void win32_exec_command_line_app(char *fmt, ...) {
 	                   NULL, NULL, true, 0, NULL, NULL,
 	                   &start_info, &pi)) {
 		WaitForSingleObject(pi.hProcess, INFINITE);
+
+		DWORD exit_code = 0;
+		GetExitCodeProcess(pi.hProcess, &exit_code);
+
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
+
+		return cast(i32)exit_code;
 	} else {
 		// NOTE(bill): failed to create process
 	}
 
+	return 0;
 }
 
 int main(int argc, char **argv) {
@@ -71,20 +78,19 @@ int main(int argc, char **argv) {
 				char const *output_name = ssa.output_file.filename;
 				isize base_name_len = gb_path_extension(output_name)-1 - output_name;
 
-				win32_exec_command_line_app(
+				i32 exit_code = win32_exec_command_line_app(
 					"opt -mem2reg %s -o %.*s.bc",
 					output_name, cast(int)base_name_len, output_name);
-				win32_exec_command_line_app(
-					"clang %.*s.bc -o %.*s.exe -Wno-override-module "
-					"-lkernel32.lib -luser32.lib -lgdi32.lib -lopengl32.lib",
-					cast(int)base_name_len, output_name,
-					cast(int)base_name_len, output_name);
-
-
-				if (run_output) {
-					win32_exec_command_line_app("%.*s.exe", cast(int)base_name_len, output_name);
+				if (exit_code == 0) {
+					win32_exec_command_line_app(
+						"clang %.*s.bc -o %.*s.exe -Wno-override-module "
+						"-lkernel32.lib -luser32.lib -lgdi32.lib -lopengl32.lib",
+						cast(int)base_name_len, output_name,
+						cast(int)base_name_len, output_name);
+					if (run_output) {
+						win32_exec_command_line_app("%.*s.exe", cast(int)base_name_len, output_name);
+					}
 				}
-
 
 				return 0;
 			}

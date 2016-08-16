@@ -1576,20 +1576,34 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 		case Type_Structure: {
 			auto *st = &base_type->structure;
-			isize index = 0;
-			for (AstNode *elem = cl->elem_list;
-				elem != NULL;
-				elem = elem->next, index++) {
-				ssaValue *field_expr = ssa_build_expr(proc, elem);
-				Type *t = ssa_value_type(field_expr);
-				GB_ASSERT(t->kind != Type_Tuple);
-				Entity *field = st->fields[index];
-				Type *ft = field->type;
-				ssaValue *fv = ssa_emit_conv(proc, field_expr, ft);
-				ssaValue *gep = ssa_emit_struct_gep(proc, v, index, ft);
-				ssa_emit_store(proc, gep, fv);
-			}
+			if (cl->elem_list != NULL) {
+				isize index = 0;
+				AstNode *elem = cl->elem_list;
+				for (;
+				     elem != NULL;
+				     elem = elem->next, index++) {
+					isize field_index = index;
+					ssaValue *field_expr = NULL;
+					Entity *field = NULL;
 
+					if (elem->kind == AstNode_FieldValue) {
+						ast_node(kv, FieldValue, elem);
+						Entity *e = lookup_field(base_type, kv->field, &field_index);
+						field_expr = ssa_build_expr(proc, kv->value);
+					} else {
+						field_expr = ssa_build_expr(proc, elem);
+					}
+
+					GB_ASSERT(ssa_value_type(field_expr)->kind != Type_Tuple);
+
+					field = st->fields[field_index];
+
+					Type *ft = field->type;
+					ssaValue *fv = ssa_emit_conv(proc, field_expr, ft);
+					ssaValue *gep = ssa_emit_struct_gep(proc, v, field_index, ft);
+					ssa_emit_store(proc, gep, fv);
+				}
+			}
 		} break;
 		case Type_Array: {
 			isize index = 0;

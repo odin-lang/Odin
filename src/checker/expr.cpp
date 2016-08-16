@@ -1862,21 +1862,69 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 			{ // Checker values
 				AstNode *elem = cl->elem_list;
 				isize field_count = t->structure.field_count;
-				isize index = 0;
-				for (;
-				     elem != NULL;
-				     elem = elem->next, index++) {
-					Entity *field = t->structure.fields[index];
+				if (elem->kind == AstNode_FieldValue) {
+					b32 *fields_visited = gb_alloc_array(c->allocator, b32, field_count);
 
-					check_expr(c, o, elem);
-					if (index >= field_count) {
-						error(&c->error_collector, ast_node_token(o->expr), "Too many values in structure literal, expected %td", field_count);
-						break;
+					for (;
+					     elem != NULL;
+					     elem = elem->next) {
+						if (elem->kind != AstNode_FieldValue) {
+							error(&c->error_collector, ast_node_token(elem),
+							      "Mixture of `field = value` and value elements in a structure literal is not allowed");
+							continue;
+						}
+						ast_node(kv, FieldValue, elem);
+						if (kv->field->kind != AstNode_Ident) {
+							gbString expr_str = expr_to_string(kv->field);
+							defer (gb_string_free(expr_str));
+							error(&c->error_collector, ast_node_token(elem),
+							      "Invalid field name `%s` in structure literal", expr_str);
+							continue;
+						}
+						String name = kv->field->Ident.token.string;
+
+						isize index = 0;
+						Entity *e = lookup_field(type, kv->field, &index);
+						if (e == NULL) {
+							error(&c->error_collector, ast_node_token(elem),
+							      "Unknown field `%.*s` in structure literal", LIT(name));
+							continue;
+						}
+						Entity *field = t->structure.fields[index];
+						add_entity_use(&c->info, kv->field, field);
+
+						if (fields_visited[index]) {
+							error(&c->error_collector, ast_node_token(elem),
+							      "Duplicate field `%.*s` in structure literal", LIT(name));
+							continue;
+						}
+
+						fields_visited[index] = true;
+						check_expr(c, o, kv->value);
+						check_assignment(c, o, field->type, make_string("structure literal"));
 					}
-					check_assignment(c, o, field->type, make_string("structure literal"));
-				}
-				if (cl->elem_count < field_count) {
-					error(&c->error_collector, cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elem_count);
+				} else {
+					isize index = 0;
+					for (;
+					     elem != NULL;
+					     elem = elem->next, index++) {
+						if (elem->kind == AstNode_FieldValue) {
+							error(&c->error_collector, ast_node_token(elem),
+							      "Mixture of `field = value` and value elements in a structure literal is not allowed");
+							continue;
+						}
+						Entity *field = t->structure.fields[index];
+
+						check_expr(c, o, elem);
+						if (index >= field_count) {
+							error(&c->error_collector, ast_node_token(o->expr), "Too many values in structure literal, expected %td", field_count);
+							break;
+						}
+						check_assignment(c, o, field->type, make_string("structure literal"));
+					}
+					if (cl->elem_count < field_count) {
+						error(&c->error_collector, cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elem_count);
+					}
 				}
 			}
 
@@ -2366,6 +2414,12 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(e, Ellipsis, node);
 		str = gb_string_appendc(str, "..");
+	case_end;
+
+	case_ast_node(fv, FieldValue, node);
+		str = write_expr_to_string(str, fv->field);
+		str = gb_string_appendc(str, " = ");
+		str = write_expr_to_string(str, fv->value);
 	case_end;
 
 	case_ast_node(pt, PointerType, node);

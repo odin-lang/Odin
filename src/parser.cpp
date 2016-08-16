@@ -115,6 +115,7 @@ AST_NODE_KIND(_ExprBegin,       struct{}) \
 		AstNode *low, *high, *max; \
 		b32 triple_indexed; \
 	}) \
+	AST_NODE_KIND(FieldValue, struct { Token eq; AstNode *field, *value; }) \
 	AST_NODE_KIND(Ellipsis, struct { Token token; }) \
 AST_NODE_KIND(_ExprEnd,       struct{}) \
 AST_NODE_KIND(_StmtBegin,     struct{}) \
@@ -301,6 +302,8 @@ Token ast_node_token(AstNode *node) {
 		return node->SliceExpr.open;
 	case AstNode_Ellipsis:
 		return node->Ellipsis.token;
+	case AstNode_FieldValue:
+		return node->FieldValue.eq;
 	case AstNode_DerefExpr:
 		return node->DerefExpr.op;
 	case AstNode_BadStmt:
@@ -572,6 +575,13 @@ gb_inline AstNode *make_proc_lit(AstFile *f, AstNode *type, AstNode *body, u64 t
 	return result;
 }
 
+gb_inline AstNode *make_field_value(AstFile *f, AstNode *field, AstNode *value, Token eq) {
+	AstNode *result = make_node(f, AstNode_FieldValue);
+	result->FieldValue.field = field;
+	result->FieldValue.value = value;
+	result->FieldValue.eq = eq;
+	return result;
+}
 
 gb_inline AstNode *make_compound_lit(AstFile *f, AstNode *type, AstNode *elem_list, isize elem_count,
                                      Token open, Token close) {
@@ -930,12 +940,11 @@ AstNode *parse_element_list(AstFile *f, isize *element_count_) {
 	while (f->cursor[0].kind != Token_CloseBrace &&
 	       f->cursor[0].kind != Token_EOF) {
 		AstNode *elem = parse_value(f);
-	#if 0
-		// TODO(bill): Designated Initializers
 		if (f->cursor[0].kind == Token_Eq) {
 			Token eq = expect_token(f, Token_Eq);
+			AstNode *value = parse_value(f);
+			elem = make_field_value(f, elem, value, eq);
 		}
-	#endif
 		DLIST_APPEND(root, curr, elem);
 		element_count++;
 		if (f->cursor[0].kind != Token_Comma)

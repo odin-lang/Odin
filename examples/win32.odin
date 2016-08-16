@@ -175,7 +175,7 @@ type PIXELFORMATDESCRIPTOR: struct  {
 	dwDamageMask: u32,
 }
 
-GetDC :: proc(h: HANDLE) -> HDC #foreign
+GetDC             :: proc(h: HANDLE) -> HDC #foreign
 SetPixelFormat    :: proc(hdc: HDC, pixel_format: i32, pfd: ^PIXELFORMATDESCRIPTOR ) -> BOOL #foreign
 ChoosePixelFormat :: proc(hdc: HDC, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 #foreign
 wglCreateContext  :: proc(hdc: HDC) -> HGLRC #foreign
