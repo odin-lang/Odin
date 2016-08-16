@@ -101,3 +101,11 @@ TranslateMessage :: proc(msg: ^MSG) -> BOOL #foreign
 DispatchMessageA :: proc(msg: ^MSG) -> LRESULT #foreign
 
 DefWindowProcA   :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #foreign
+
+
+
+GetQueryPerformanceFrequency :: proc() -> i64 {
+	r: i64;
+	_ = QueryPerformanceFrequency(^r);
+	return r;
+}

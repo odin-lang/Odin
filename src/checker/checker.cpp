@@ -594,7 +594,7 @@ void check_parsed_files(Checker *c) {
 					isize entity_index = 0;
 					Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
 					DeclInfo *di = NULL;
-					if (vd->value_count == 1) {
+					if (vd->value_count > 0) {
 						di = make_declaration_info(gb_heap_allocator(), c->global_scope);
 						di->entities = entities;
 						di->entity_count = entity_count;

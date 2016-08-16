@@ -263,10 +263,7 @@ void tokenizer_err_(Tokenizer *t, char *function, char *msg, ...) {
 	if (column < 1)
 		column = 1;
 
-#if 0
-	gb_printf_err("%s()\n", function);
-#endif
-	gb_printf_err("%s(%td:%td) ", t->fullpath, t->line_count, column);
+	gb_printf_err("%.*s(%td:%td) Syntax error: ", LIT(t->fullpath), t->line_count, column);
 
 	va_start(va, msg);
 	gb_printf_err_va(msg, va);
@@ -360,6 +357,9 @@ gb_inline void destroy_tokenizer(Tokenizer *t) {
 		gb_free(gb_heap_allocator(), t->start);
 	}
 	if (t->allocated_strings != NULL) {
+		gb_for_array(i, t->allocated_strings) {
+			gb_free(gb_heap_allocator(), t->allocated_strings[i].text);
+		}
 		gb_array_free(t->allocated_strings);
 	}
 }
@@ -618,7 +618,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 		token.string.len = t->curr - token.string.text;
 
-		// NOTE(bill): ALL identifiers are > 1
+		// NOTE(bill): All keywords are > 1
 		if (token.string.len > 1) {
 			if (are_strings_equal(token.string, token_strings[Token_as])) {
 				token.kind = Token_as;
@@ -706,18 +706,19 @@ Token tokenizer_get_token(Tokenizer *t) {
 				}
 			}
 
-			if (valid && len != 1)
-				tokenizer_err(t, "Illegal rune literal");
 			token.string.len = t->curr - token.string.text;
-
-			i32 success = unquote_string(gb_heap_allocator(), &token.string);
-			if (success > 0) {
-				if (success == 2) {
-					gb_array_append(t->allocated_strings, token.string);
-				}
-				return token;
+			if (valid && len != 1) {
+				tokenizer_err(t, "Invalid rune literal %.*s", LIT(token.string));
 			} else {
-				tokenizer_err(t, "Invalid rune literal");
+				i32 success = unquote_string(gb_heap_allocator(), &token.string);
+				if (success > 0) {
+					if (success == 2) {
+						gb_array_append(t->allocated_strings, token.string);
+					}
+					return token;
+				} else {
+					tokenizer_err(t, "Invalid rune literal %.*s", LIT(token.string));
+				}
 			}
 		} break;
 

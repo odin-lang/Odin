@@ -121,10 +121,7 @@ print_uint_base :: proc(i, base : uint) {
 
 
 print_bool :: proc(b : bool) {
-	if b {
-		print_string("true");
-	} else {
-		print_string("false");
-	}
+	if b { print_string("true"); }
+	else { print_string("false"); }
 }
 

@@ -1,15 +1,33 @@
 #load "basic.odin"
-#load "win32.odin"
 
-constant := 1;
+main :: proc() {
+	print_string("Hellope\n");
+	defer print_string("World\n");
 
-win32_perf_count_freq: i64 = win32_get_perf_count_freq();
-win32_get_perf_count_freq :: proc() -> i64 {
-	r: i64;
-	_ = QueryPerformanceFrequency(^r);
-	return r;
+	for i := 0; i < 4; i++ {
+		defer {
+			print_int(i);
+			print_rune('\n');
+		}
+
+		if i > 2 {
+			defer print_string("break\n");
+			break;
+		}
+		if i == 2 {
+			// return;
+		}
+	}
+
+	print_string("Never called\n");
 }
 
+
+
+/*
+#load "win32.odin"
+
+win32_perf_count_freq := GetQueryPerformanceFrequency();
 
 time_now :: proc() -> f64 {
 	if win32_perf_count_freq == 0 {
@@ -22,7 +40,6 @@ time_now :: proc() -> f64 {
 	return result;
 }
 
-
 win32_print_last_error :: proc() {
 	err_code := GetLastError() as int;
 	if err_code != 0 {
@@ -33,6 +50,7 @@ win32_print_last_error :: proc() {
 }
 
 main :: proc() {
+/*
 	wc: WNDCLASSEXA;
 	instance := GetModuleHandleA(null);
 
@@ -113,4 +131,6 @@ main :: proc() {
 
 		sleep_ms(16);
 	}
+*/
 }
+*/

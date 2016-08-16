@@ -23,6 +23,7 @@ struct ssaBlock {
 	i32 id;
 	AstNode *node;
 	Scope *scope;
+	isize scope_index;
 	String label;
 	ssaProcedure *parent;
 
@@ -37,6 +38,17 @@ struct ssaTargetList {
 	ssaBlock *     fallthrough_;
 };
 
+enum ssaDeferKind {
+	ssaDefer_Default,
+	ssaDefer_Return,
+	ssaDefer_Branch,
+};
+struct ssaDefer {
+	AstNode *stmt;
+	isize scope_index;
+	ssaBlock *block;
+};
+
 struct ssaProcedure {
 	ssaProcedure *parent;
 	gbArray(ssaProcedure *) children;
@@ -48,6 +60,8 @@ struct ssaProcedure {
 	AstNode *     body;
 	u64           tags;
 
+	isize               scope_index;
+	gbArray(ssaDefer)   defer_stmts;
 	gbArray(ssaBlock *) blocks;
 	ssaBlock *          curr_block;
 	ssaTargetList *     target_list;
@@ -71,6 +85,7 @@ struct ssaProcedure {
 	SSA_INSTR_KIND(BinaryOp), \
 	SSA_INSTR_KIND(Call), \
 	SSA_INSTR_KIND(MemCopy), \
+	SSA_INSTR_KIND(NoOp), \
 	SSA_INSTR_KIND(ExtractElement), \
 	SSA_INSTR_KIND(InsertElement), \
 	SSA_INSTR_KIND(ShuffleVector), \
@@ -121,7 +136,6 @@ struct ssaInstr {
 
 	ssaBlock *parent;
 	Type *type;
-	TokenPos pos;
 
 	union {
 		struct {
@@ -637,6 +651,13 @@ ssaValue *ssa_make_instr_insert_element(ssaProcedure *p, ssaValue *vector, ssaVa
 	return v;
 }
 
+ssaValue *ssa_make_instr_no_op(ssaProcedure *p) {
+	ssaValue *v = ssa_alloc_instr(p->module->allocator, ssaInstr_NoOp);
+	if (p->curr_block) {
+		gb_array_append(p->curr_block->values, v);
+	}
+	return v;
+}
 
 
 
@@ -682,11 +703,16 @@ b32 ssa_is_blank_ident(AstNode *node) {
 
 
 ssaInstr *ssa_get_last_instr(ssaBlock *block) {
-	isize len = gb_array_count(block->instrs);
-	if (len > 0) {
-		ssaValue *v = block->instrs[len-1];
-		GB_ASSERT(v->kind == ssaValue_Instr);
-		return &v->instr;
+	if (block != NULL) {
+		isize len = 0;
+		if (block->instrs != NULL) {
+			len = gb_array_count(block->instrs);
+		}
+		if (len > 0) {
+			ssaValue *v = block->instrs[len-1];
+			GB_ASSERT(v->kind == ssaValue_Instr);
+			return &v->instr;
+		}
 	}
 	return NULL;
 
@@ -762,36 +788,77 @@ Type *ssa_lvalue_type(ssaLvalue lval) {
 	return NULL;
 }
 
-
-void ssa_build_stmt(ssaProcedure *proc, AstNode *s);
-
-void ssa_emit_defer_stmts(ssaProcedure *proc, ssaBlock *block) {
-	if (block == NULL)
-		return;
-
-	// IMPORTANT TODO(bill): ssa defer - Place where needed!!!
-
-#if 0
-	Scope *curr_scope = block->scope;
-	if (curr_scope == NULL) {
-		// GB_PANIC("No scope found for deferred statements");
-	}
-
-	for (Scope *s = curr_scope; s != NULL; s = s->parent) {
-		isize count = gb_array_count(s->deferred_stmts);
-		for (isize i = count-1; i >= 0; i--) {
-			ssa_build_stmt(proc, s->deferred_stmts[i]);
+ssaBlock *ssa__make_block(ssaProcedure *proc, AstNode *node, String label) {
+	Scope *scope = NULL;
+	if (node != NULL) {
+		Scope **found = map_get(&proc->module->info->scopes, hash_pointer(node));
+		if (found) {
+			scope = *found;
+		} else {
+			GB_PANIC("Block scope not found for %.*s", LIT(ast_node_strings[node->kind]));
 		}
 	}
-#endif
+
+	ssaValue *block = ssa_make_value_block(proc, node, scope, label);
+	return &block->block;
 }
+
+ssaBlock *ssa_add_block(ssaProcedure *proc, AstNode *node, String label) {
+	ssaBlock *block = ssa__make_block(proc, node, label);
+	gb_array_append(proc->blocks, block);
+	return block;
+}
+
+void ssa_build_stmt(ssaProcedure *proc, AstNode *s);
+void ssa_emit_no_op(ssaProcedure *proc);
+void ssa_emit_jump(ssaProcedure *proc, ssaBlock *block);
+
+void ssa_build_defer_stmt(ssaProcedure *proc, ssaDefer d) {
+	ssaBlock *b = ssa__make_block(proc, NULL, make_string("defer"));
+	// HACK(bill): The prev block may defer injection before it's terminator
+	ssaInstr *last_instr = ssa_get_last_instr(proc->curr_block);
+	if (last_instr == NULL || !ssa_is_instr_terminating(last_instr)) {
+		ssa_emit_jump(proc, b);
+	}
+	gb_array_append(proc->blocks, b);
+	proc->curr_block = b;
+	ssa_build_stmt(proc, d.stmt);
+}
+
+void ssa_emit_defer_stmts(ssaProcedure *proc, ssaDeferKind kind, ssaBlock *block) {
+	isize count = gb_array_count(proc->defer_stmts);
+	isize i = count;
+	while (i --> 0) {
+		ssaDefer d = proc->defer_stmts[i];
+		if (kind == ssaDefer_Return) {
+			ssa_build_defer_stmt(proc, d);
+		} else if (kind == ssaDefer_Default) {
+			if (proc->scope_index == d.scope_index) {
+				ssa_build_defer_stmt(proc, d);
+				gb_array_pop(proc->defer_stmts);
+				continue;
+			} else {
+				break;
+			}
+		} else if (kind == ssaDefer_Branch) {
+			GB_ASSERT(block != NULL);
+			isize lower_limit = block->scope_index+1;
+			if (lower_limit < d.scope_index) {
+				ssa_build_defer_stmt(proc, d);
+			}
+		}
+	}
+}
+
+
+
 
 void ssa_emit_unreachable(ssaProcedure *proc) {
 	ssa_emit(proc, ssa_make_instr_unreachable(proc));
 }
 
 void ssa_emit_ret(ssaProcedure *proc, ssaValue *v) {
-	ssa_emit_defer_stmts(proc, proc->curr_block);
+	ssa_emit_defer_stmts(proc, ssaDefer_Return, NULL);
 	ssa_emit(proc, ssa_make_instr_ret(proc, v));
 }
 
@@ -805,6 +872,11 @@ void ssa_emit_if(ssaProcedure *proc, ssaValue *cond, ssaBlock *true_block, ssaBl
 	ssa_emit(proc, br);
 	proc->curr_block = NULL;
 }
+
+void ssa_emit_no_op(ssaProcedure *proc) {
+	ssa_emit(proc, ssa_make_instr_no_op(proc));
+}
+
 
 
 ssaValue *ssa_lvalue_store(ssaProcedure *proc, ssaLvalue lval, ssaValue *value) {
@@ -838,30 +910,10 @@ ssaValue *ssa_lvalue_load(ssaProcedure *proc, ssaLvalue lval) {
 
 
 
-ssaBlock *ssa__make_block(ssaProcedure *proc, AstNode *node, String label) {
-	Scope *scope = NULL;
-	if (node != NULL) {
-		Scope **found = map_get(&proc->module->info->scopes, hash_pointer(node));
-		if (found) {
-			scope = *found;
-		} else {
-			GB_PANIC("Block scope not found for %.*s", LIT(ast_node_strings[node->kind]));
-		}
-	}
-
-	ssaValue *block = ssa_make_value_block(proc, node, scope, label);
-	return &block->block;
-}
-
-ssaBlock *ssa_add_block(ssaProcedure *proc, AstNode *node, String label) {
-	ssaBlock *block = ssa__make_block(proc, node, label);
-	gb_array_append(proc->blocks, block);
-	return block;
-}
-
 
 void ssa_begin_procedure_body(ssaProcedure *proc) {
 	gb_array_init(proc->blocks, gb_heap_allocator());
+	gb_array_init(proc->defer_stmts, gb_heap_allocator());
 	proc->curr_block = ssa_add_block(proc, proc->type_expr, make_string("entry"));
 
 	if (proc->type->proc.params != NULL) {
@@ -877,6 +929,13 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 	if (proc->type->proc.result_count == 0) {
 		ssa_emit_ret(proc, NULL);
 	}
+
+
+#if 0
+	gb_for_array(i, proc->defer_stmts) {
+		gb_printf("defer %td - %p\n", proc->defer_stmts[i].scope_index, proc->defer_stmts[i].stmt);
+	}
+#endif
 
 // Number blocks and registers
 	i32 reg_id = 0;
@@ -2214,11 +2273,18 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 	case_end;
 
 	case_ast_node(bs, BlockStmt, node);
+		proc->scope_index++;
 		ssa_build_stmt_list(proc, bs->list);
+		ssa_emit_defer_stmts(proc, ssaDefer_Default, NULL);
+		proc->scope_index--;
 	case_end;
 
-	case_ast_node(bs, DeferStmt, node);
-		GB_PANIC("DeferStmt");
+	case_ast_node(ds, DeferStmt, node);
+		isize scope_index = proc->scope_index;
+		if (ds->stmt->kind == AstNode_BlockStmt)
+			scope_index--;
+		ssaDefer d = {ds->stmt, scope_index, proc->curr_block};
+		gb_array_append(proc->defer_stmts, d);
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);
@@ -2250,7 +2316,6 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			}
 			v = ssa_emit_load(proc, v);
 		}
-
 		ssa_emit_ret(proc, v);
 
 	case_end;
@@ -2271,12 +2336,23 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 		ssa_build_cond(proc, is->cond, then, else_);
 		proc->curr_block = then;
+
+		proc->scope_index++;
 		ssa_build_stmt(proc, is->body);
+		ssa_emit_defer_stmts(proc, ssaDefer_Default, NULL);
+		proc->scope_index--;
+
 		ssa_emit_jump(proc, done);
 
 		if (is->else_stmt != NULL) {
 			proc->curr_block = else_;
+
+			proc->scope_index++;
 			ssa_build_stmt(proc, is->else_stmt);
+			ssa_emit_defer_stmts(proc, ssaDefer_Default, NULL);
+			proc->scope_index--;
+
+
 			ssa_emit_jump(proc, done);
 		}
 		gb_array_append(proc->blocks, done);
@@ -2301,6 +2377,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		ssaBlock *cont = loop;
 		if (fs->post != NULL) {
 			cont = ssa_add_block(proc, node, make_string("for.post"));
+
 		}
 		ssa_emit_jump(proc, loop);
 		proc->curr_block = loop;
@@ -2310,7 +2387,12 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		}
 
 		ssa_push_target_list(proc, done, cont, NULL);
+
+		proc->scope_index++;
 		ssa_build_stmt(proc, fs->body);
+		ssa_emit_defer_stmts(proc, ssaDefer_Default, NULL);
+		proc->scope_index--;
+
 		ssa_pop_target_list(proc);
 		ssa_emit_jump(proc, cont);
 
@@ -2319,6 +2401,8 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			ssa_build_stmt(proc, fs->post);
 			ssa_emit_jump(proc, loop);
 		}
+
+
 		gb_array_append(proc->blocks, done);
 		proc->curr_block = done;
 
@@ -2327,16 +2411,24 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 	case_ast_node(bs, BranchStmt, node);
 		ssaBlock *block = NULL;
 		switch (bs->token.kind) {
-		#define BRANCH_GET_BLOCK(kind_) \
-			case GB_JOIN2(Token_, kind_): { \
-				for (ssaTargetList *t = proc->target_list; t != NULL && block == NULL; t = t->prev) { \
-					block = GB_JOIN3(t->, kind_, _); \
-				} \
-			} break
-		BRANCH_GET_BLOCK(break);
-		BRANCH_GET_BLOCK(continue);
-		BRANCH_GET_BLOCK(fallthrough);
-		#undef BRANCH_GET_BLOCK
+		case Token_break: {
+			for (ssaTargetList *t = proc->target_list; t != NULL && block == NULL; t = t->prev) {
+				block = t->break_;
+			}
+		} break;
+		case Token_continue: {
+			for (ssaTargetList *t = proc->target_list; t != NULL && block == NULL; t = t->prev) {
+				block = t->continue_;
+			}
+		} break;
+		case Token_fallthrough: {
+			for (ssaTargetList *t = proc->target_list; t != NULL && block == NULL; t = t->prev) {
+				block = t->fallthrough_;
+			}
+		} break;
+		}
+		if (block != NULL && bs->token.kind != Token_fallthrough) {
+			ssa_emit_defer_stmts(proc, ssaDefer_Branch, block);
 		}
 		ssa_emit_jump(proc, block);
 		ssa_emit_unreachable(proc);

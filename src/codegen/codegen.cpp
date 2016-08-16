@@ -128,6 +128,7 @@ void ssa_gen_code(ssaGen *s) {
 		map_set(&m->members, hash_string(name), p);
 
 		ssaProcedure *proc = &p->proc;
+		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
 
 		ssa_begin_procedure_body(proc);
 

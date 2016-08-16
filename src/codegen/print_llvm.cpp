@@ -274,6 +274,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	ssaInstr *instr = &value->instr;
 
 	ssa_fprintf(f, "\t");
+
 	switch (instr->kind) {
 	case ssaInstr_StartupRuntime: {
 		ssa_fprintf(f, "call void @" SSA_STARTUP_RUNTIME_PROC_NAME "()\n");
@@ -354,7 +355,11 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, ", %d\n", instr->extract_value.index);
 	} break;
 
-	case ssaInstr_Br: {
+	case ssaInstr_NoOp: {;
+		ssa_fprintf(f, "%%%d = add i32 0, 0\n", value->id);
+	} break;
+
+	case ssaInstr_Br: {;
 		ssa_fprintf(f, "br ");
 		if (instr->br.cond != NULL) {
 			ssa_print_type(f, m->sizes, t_bool);

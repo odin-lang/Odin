@@ -1834,6 +1834,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 	}
 
 	body = parse_block_stmt(f);
+
 	if (allow_token(f, Token_else)) {
 		switch (f->cursor[0].kind) {
 		case Token_if:

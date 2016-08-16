@@ -5917,21 +5917,36 @@ gb_inline isize gb_strnlen(char const *str, isize max_len) {
 }
 
 gb_inline isize gb_utf8_strlen(u8 const *str) {
-	isize result = 0;
-	for (; *str; str++) {
-		if ((*str & 0xc0) != 0x80)
-			result++;
+	isize count = 0;
+	for (; *str; count++) {
+		u8 c = *str;
+		isize inc = 0;
+		     if (c < 0x80)           inc = 1;
+		else if ((c & 0xe0) == 0xc0) inc = 2;
+		else if ((c & 0xf0) == 0xe0) inc = 3;
+		else if ((c & 0xf8) == 0xf0) inc = 4;
+		else return -1;
+
+		str += inc;
 	}
-	return result;
+	return count;
 }
 
 gb_inline isize gb_utf8_strnlen(u8 const *str, isize max_len) {
-	isize result = 0;
-	for (; *str && result < max_len; str++) {
-		if ((*str & 0xc0) != 0x80)
-			result++;
+	isize count = 0;
+	for (; *str && max_len > 0; count++) {
+		u8 c = *str;
+		isize inc = 0;
+		     if (c < 0x80)           inc = 1;
+		else if ((c & 0xe0) == 0xc0) inc = 2;
+		else if ((c & 0xf0) == 0xe0) inc = 3;
+		else if ((c & 0xf8) == 0xf0) inc = 4;
+		else return -1;
+
+		str += inc;
+		max_len -= inc;
 	}
-	return result;
+	return count;
 }
 
 
