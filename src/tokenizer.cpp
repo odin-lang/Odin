@@ -78,7 +78,6 @@ TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_type,        "type"), \
-	TOKEN_KIND(Token_alias,       "alias"), \
 	TOKEN_KIND(Token_proc,        "proc"), \
 	TOKEN_KIND(Token_match,       "match"), \
 	TOKEN_KIND(Token_break,       "break"), \

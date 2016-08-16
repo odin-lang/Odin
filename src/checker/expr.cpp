@@ -600,10 +600,10 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error(&c->error_collector, ast_node_token(o->expr), "`%s` truncated to `%s`", a, b);
 			} else {
-				error(&c->error_collector, ast_node_token(o->expr), "`%s` overflows `%s`", a, b);
+				error(&c->error_collector, ast_node_token(o->expr), "`%s = %lld` overflows `%s`", a, o->value.value_integer, b);
 			}
 		} else {
-			error(&c->error_collector, ast_node_token(o->expr), "Cannot convert `%s` to `%s`", a, b);
+			error(&c->error_collector, ast_node_token(o->expr), "Cannot convert `%s`  to `%s`", a, b);
 		}
 
 		o->mode = Addressing_Invalid;
@@ -864,6 +864,11 @@ b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
 		return true;
 	}
 	if (is_type_string(xb) && is_type_u8_slice(yb)) {
+		return true;
+	}
+
+	// proc <-> proc
+	if (is_type_proc(xb), is_type_proc(yb)) {
 		return true;
 	}
 

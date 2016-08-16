@@ -878,12 +878,5 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		add_entity(c, c->context.scope, td->name, e);
 		check_type_decl(c, e, td->type, NULL);
 	case_end;
-
-	case_ast_node(ad, AliasDecl, node);
-		ast_node(name, Ident, ad->name);
-		Entity *e = make_entity_alias_name(c->allocator, c->context.scope, name->token, NULL);
-		add_entity(c, c->context.scope, ad->name, e);
-		check_alias_decl(c, e, ad->type, NULL);
-	case_end;
 	}
 }

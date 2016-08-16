@@ -633,14 +633,6 @@ void check_parsed_files(Checker *c) {
 				add_file_entity(c, td->name, e, d);
 			case_end;
 
-			case_ast_node(ad, AliasDecl, decl);
-				ast_node(n, Ident, ad->name);
-				Entity *e = make_entity_alias_name(c->allocator, c->global_scope, n->token, NULL);
-				DeclInfo *d = make_declaration_info(c->allocator, e->parent);
-				d->type_expr = ad->type;
-				add_file_entity(c, ad->name, e, d);
-			case_end;
-
 			case_ast_node(pd, ProcDecl, decl);
 				ast_node(n, Ident, pd->name);
 				Token token = n->token;

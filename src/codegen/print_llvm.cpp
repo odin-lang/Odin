@@ -210,7 +210,15 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 		ssa_fprintf(f, "\"");
 	} break;
 	case ExactValue_Integer: {
-		ssa_fprintf(f, "%lld", value.value_integer);
+		if (is_type_pointer(get_base_type(type))) {
+			if (value.value_integer == 0) {
+				ssa_fprintf(f, "null");
+			} else {
+				GB_PANIC("TODO(bill): Pointer constant");
+			}
+		} else {
+			ssa_fprintf(f, "%lld", value.value_integer);
+		}
 	} break;
 	case ExactValue_Float: {
 		u64 u = *cast(u64*)&value.value_float;

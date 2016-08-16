@@ -1,30 +1,4 @@
 #load "basic.odin"
-
-main :: proc() {
-	print_string("Hellope\n");
-	defer print_string("World\n");
-
-	for i := 0; i < 4; i++ {
-		defer {
-			print_int(i);
-			print_rune('\n');
-		}
-
-		if i > 2 {
-			defer print_string("break\n");
-			break;
-		}
-		if i == 2 {
-			// return;
-		}
-	}
-
-	print_string("Never called\n");
-}
-
-
-
-/*
 #load "win32.odin"
 
 win32_perf_count_freq := GetQueryPerformanceFrequency();
@@ -50,7 +24,6 @@ win32_print_last_error :: proc() {
 }
 
 main :: proc() {
-/*
 	wc: WNDCLASSEXA;
 	instance := GetModuleHandleA(null);
 
@@ -67,12 +40,13 @@ main :: proc() {
 
 	class_name := to_c_string("Odin-Language-Demo");
 	title := to_c_string("Odin Language Demo");
+	defer heap_free(class_name);
+	defer heap_free(title);
 
 	wc.cbSize = size_of(WNDCLASSEXA) as u32;
 	wc.style = CS_VREDRAW | CS_HREDRAW;
 	wc.hInstance = instance;
 	wc.className = class_name;
-	wc.hbrBackground = COLOR_BACKGROUND as HBRUSH;
 
 	wc.wndProc = proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #no_inline {
 		if msg == WM_DESTROY || msg == WM_CLOSE || msg == WM_QUIT {
@@ -90,7 +64,7 @@ main :: proc() {
 	hwnd := CreateWindowExA(0,
 	                        class_name, title,
 	                        WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-	                        0, 0, 854, 480,
+	                        CW_USEDEFAULT, CW_USEDEFAULT, 854, 480,
 	                        null, null, instance, null);
 
 
@@ -99,9 +73,45 @@ main :: proc() {
 		return;
 	}
 
+	dc := GetDC(hwnd);
+	opengl_context: HGLRC;
+
+	{
+		attribs : [8]i32;
+		pfd: PIXELFORMATDESCRIPTOR;
+		pfd.nSize = size_of(PIXELFORMATDESCRIPTOR) as u32;
+		pfd.nVersion     = 1;
+		pfd.dwFlags      = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+		pfd.iPixelType   = PFD_TYPE_RGBA;
+		pfd.cColorBits   = 32;
+		pfd.cAlphaBits   = 8;
+		pfd.cDepthBits   = 24;
+		pfd.cStencilBits = 8;
+		pfd.iLayerType   = PFD_MAIN_PLANE;
+
+		SetPixelFormat(dc, ChoosePixelFormat(dc, ^pfd), null);
+		opengl_context = wglCreateContext(dc);
+		wglMakeCurrent(dc, opengl_context);
+
+		attribs[0] = 0x2091; // WGL_CONTEXT_MAJOR_VERSION_ARB
+		attribs[1] = 2; // Major
+		attribs[2] = 0x2092; // WGL_CONTEXT_MINOR_VERSION_ARB
+		attribs[3] = 1; // Minor
+
+		attribs[4] = 0x9126; // WGL_CONTEXT_PROFILE_MASK_ARB
+		attribs[5] = 0x0002; // WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB
+
+		attribs[6] = 0; // NOTE(bill): tells the proc that this is the end of attribs
+
+		wgl_string := "wglCreateContextAttribsARB\x00";
+		wglCreateContextAttribsARB := wglGetProcAddress(^wgl_string[0]) as wglCreateContextAttribsARBType;
+		rc := wglCreateContextAttribsARB(dc, 0, ^attribs[0]);
+		wglMakeCurrent(dc, rc);
+		SwapBuffers(dc);
+	}
+
 	start_time := time_now();
 	running := true;
-	tick_count := 0;
 	for running {
 		curr_time := time_now();
 		dt := curr_time - start_time;
@@ -124,13 +134,7 @@ main :: proc() {
 			}
 		}
 
-		print_string("Tick: ");
-		print_int(tick_count);
-		tick_count++;
-		print_rune('\n');
-
-		sleep_ms(16);
+		SwapBuffers(dc);
+		sleep_ms(2);
 	}
-*/
 }
-*/

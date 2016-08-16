@@ -1,117 +1,451 @@
 %.string = type {i8*, i64} ; Basic_string
 %.rawptr = type i8* ; Basic_rawptr
 
+%HANDLE = type %.rawptr
+%HWND = type %.rawptr
+%HDC = type %.rawptr
+%HINSTANCE = type %.rawptr
+%HICON = type %.rawptr
+%HCURSOR = type %.rawptr
+%HMENU = type %.rawptr
+%HBRUSH = type %.rawptr
+%WPARAM = type i64
+%LPARAM = type i64
+%LRESULT = type i64
+%ATOM = type i16
+%POINT = type {i32, i32}
+%BOOL = type i32
+%WNDPROC = type %LRESULT (%HWND, i32, %WPARAM, %LPARAM)*
+%WNDCLASSEXA = type {i32, i32, %WNDPROC, i32, i32, %HINSTANCE, %HICON, %HCURSOR, %HBRUSH, i8*, i8*, %HICON}
+%MSG = type {%HWND, i32, %WPARAM, %LPARAM, i32, %POINT}
+%HGLRC = type %.rawptr
+%PROC = type void ()*
+%wglCreateContextAttribsARBType = type %HGLRC (%HDC, %.rawptr, i32*)*
+%PIXELFORMATDESCRIPTOR = type {i32, i32, i32, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i32, i32, i32}
 declare void @llvm.memmove.p0i8.p0i8.i64(i8*, i8*, i64, i32, i1) argmemonly nounwind 
+
+@win32_perf_count_freq = global i64 zeroinitializer
+define double @time_now() {
+entry.-.0:
+	%0 = load i64, i64* @win32_perf_count_freq, align 8
+	%1 = icmp eq i64 %0, 0
+	br i1 %1, label %if.then.-.1, label %if.done.-.2
+
+if.then.-.1:
+	call void @llvm.debugtrap()
+	br label %if.done.-.2
+
+if.done.-.2:
+	%2 = alloca i64, align 8 ; counter
+	store i64 zeroinitializer, i64* %2
+	%3 = getelementptr inbounds i64, i64* %2
+	%4 = call i32 @QueryPerformanceCounter(i64* %3)
+	%5 = alloca double, align 8 ; result
+	store double zeroinitializer, double* %5
+	%6 = load i64, i64* @win32_perf_count_freq, align 8
+	%7 = sitofp i64 %6 to double
+	%8 = load i64, i64* %2, align 8
+	%9 = sitofp i64 %8 to double
+	%10 = fdiv double %9, %7
+	store double %10, double* %5
+	%11 = load double, double* %5, align 8
+	ret double %11
+}
+
+define void @win32_print_last_error() {
+entry.-.0:
+	%0 = alloca i64, align 8 ; err_code
+	store i64 zeroinitializer, i64* %0
+	%1 = call i32 @GetLastError()
+	%2 = zext i32 %1 to i64
+	store i64 %2, i64* %0
+	%3 = load i64, i64* %0, align 8
+	%4 = icmp ne i64 %3, 0
+	br i1 %4, label %if.then.-.1, label %if.done.-.2
+
+if.then.-.1:
+	%5 = getelementptr inbounds [14 x i8], [14 x i8]* @.str0, i64 0, i64 0
+	%6 = alloca %.string, align 8 
+	store %.string zeroinitializer, %.string* %6
+	%7 = getelementptr inbounds %.string, %.string* %6, i64 0, i32 0
+	%8 = getelementptr inbounds %.string, %.string* %6, i64 0, i32 1
+	store i8* %5, i8** %7
+	store i64 14, i64* %8
+	%9 = load %.string, %.string* %6, align 8
+	call void @print_string(%.string %9)
+	%10 = load i64, i64* %0, align 8
+	call void @print_int(i64 %10)
+	%11 = getelementptr inbounds [1 x i8], [1 x i8]* @.str1, i64 0, i64 0
+	%12 = alloca %.string, align 8 
+	store %.string zeroinitializer, %.string* %12
+	%13 = getelementptr inbounds %.string, %.string* %12, i64 0, i32 0
+	%14 = getelementptr inbounds %.string, %.string* %12, i64 0, i32 1
+	store i8* %11, i8** %13
+	store i64 1, i64* %14
+	%15 = load %.string, %.string* %12, align 8
+	call void @print_string(%.string %15)
+	br label %if.done.-.2
+
+if.done.-.2:
+	ret void
+}
 
 define void @main() {
 entry.-.0:
 	call void @__$startup_runtime()
-	%0 = getelementptr inbounds [8 x i8], [8 x i8]* @.str0, i64 0, i64 0
-	%1 = alloca %.string, align 8 
-	store %.string zeroinitializer, %.string* %1
-	%2 = getelementptr inbounds %.string, %.string* %1, i64 0, i32 0
-	%3 = getelementptr inbounds %.string, %.string* %1, i64 0, i32 1
-	store i8* %0, i8** %2
-	store i64 8, i64* %3
-	%4 = load %.string, %.string* %1, align 8
-	call void @print_string(%.string %4)
-	br label %for.init.-.1
+	%0 = alloca %WNDCLASSEXA, align 8 ; wc
+	store %WNDCLASSEXA zeroinitializer, %WNDCLASSEXA* %0
+	%1 = alloca %HINSTANCE, align 8 ; instance
+	store %HINSTANCE zeroinitializer, %HINSTANCE* %1
+	%2 = call %HINSTANCE @GetModuleHandleA(i8* null)
+	store %HINSTANCE %2, %HINSTANCE* %1
+	%3 = getelementptr inbounds i64, i64* @win32_perf_count_freq
+	%4 = call i32 @QueryPerformanceFrequency(i64* %3)
+	%5 = alloca i8*, align 8 ; class_name
+	store i8* zeroinitializer, i8** %5
+	%6 = getelementptr inbounds [18 x i8], [18 x i8]* @.str2, i64 0, i64 0
+	%7 = alloca %.string, align 8 
+	store %.string zeroinitializer, %.string* %7
+	%8 = getelementptr inbounds %.string, %.string* %7, i64 0, i32 0
+	%9 = getelementptr inbounds %.string, %.string* %7, i64 0, i32 1
+	store i8* %6, i8** %8
+	store i64 18, i64* %9
+	%10 = load %.string, %.string* %7, align 8
+	%11 = call i8* @main$to_c_string-0(%.string %10)
+	store i8* %11, i8** %5
+	%12 = alloca i8*, align 8 ; title
+	store i8* zeroinitializer, i8** %12
+	%13 = getelementptr inbounds [18 x i8], [18 x i8]* @.str3, i64 0, i64 0
+	%14 = alloca %.string, align 8 
+	store %.string zeroinitializer, %.string* %14
+	%15 = getelementptr inbounds %.string, %.string* %14, i64 0, i32 0
+	%16 = getelementptr inbounds %.string, %.string* %14, i64 0, i32 1
+	store i8* %13, i8** %15
+	store i64 18, i64* %16
+	%17 = load %.string, %.string* %14, align 8
+	%18 = call i8* @main$to_c_string-0(%.string %17)
+	store i8* %18, i8** %12
+	%19 = getelementptr inbounds %WNDCLASSEXA, %WNDCLASSEXA* %0, i64 0, i32 0
+	store i32 80, i32* %19
+	%20 = getelementptr inbounds %WNDCLASSEXA, %WNDCLASSEXA* %0, i64 0, i32 1
+	store i32 3, i32* %20
+	%21 = getelementptr inbounds %WNDCLASSEXA, %WNDCLASSEXA* %0, i64 0, i32 5
+	%22 = load %HINSTANCE, %HINSTANCE* %1, align 8
+	store %HINSTANCE %22, %HINSTANCE* %21
+	%23 = getelementptr inbounds %WNDCLASSEXA, %WNDCLASSEXA* %0, i64 0, i32 10
+	%24 = load i8*, i8** %5, align 8
+	store i8* %24, i8** %23
+	%25 = getelementptr inbounds %WNDCLASSEXA, %WNDCLASSEXA* %0, i64 0, i32 2
+	store %WNDPROC @main$1, %WNDPROC* %25
+	%26 = getelementptr inbounds %WNDCLASSEXA, %WNDCLASSEXA* %0
+	%27 = call %ATOM @RegisterClassExA(%WNDCLASSEXA* %26)
+	%28 = icmp eq i16 %27, 0
+	br i1 %28, label %if.then.-.1, label %if.done.-.4
 
-for.init.-.1:
-	%5 = alloca i64, align 8 ; i
-	store i64 zeroinitializer, i64* %5
-	store i64 0, i64* %5
-	br label %for.loop.-.3
+if.then.-.1:
+	br label %defer.-.2
 
-for.body.-.2:
-	%6 = load i64, i64* %5, align 8
-	%7 = icmp sgt i64 %6, 2
-	br i1 %7, label %if.then.-.5, label %if.done.-.9
+defer.-.2:
+	%29 = load i8*, i8** %12, align 8
+	call void @free(%.rawptr %29)
+	br label %defer.-.3
 
-for.loop.-.3:
-	%8 = load i64, i64* %5, align 8
-	%9 = icmp slt i64 %8, 4
-	br i1 %9, label %for.body.-.2, label %for.done.-.13
+defer.-.3:
+	%30 = load i8*, i8** %5, align 8
+	call void @free(%.rawptr %30)
+	ret void
 
-for.post.-.4:
-	%10 = load i64, i64* %5, align 8
-	%11 = add i64 %10, 1
-	store i64 %11, i64* %5
-	br label %for.loop.-.3
+if.done.-.4:
+	%31 = alloca %HWND, align 8 ; hwnd
+	store %HWND zeroinitializer, %HWND* %31
+	%32 = load i8*, i8** %5, align 8
+	%33 = load i8*, i8** %12, align 8
+	%34 = load %HINSTANCE, %HINSTANCE* %1, align 8
+	%35 = call %HWND @CreateWindowExA(i32 0, i8* %32, i8* %33, i32 281673728, i32 2147483648, i32 2147483648, i32 854, i32 480, %HWND null, %HMENU null, %HINSTANCE %34, %.rawptr null)
+	store %HWND %35, %HWND* %31
+	%36 = load %HWND, %HWND* %31, align 8
+	%37 = icmp eq %.rawptr %36, null
+	br i1 %37, label %if.then.-.5, label %if.done.-.8
 
 if.then.-.5:
+	call void @win32_print_last_error()
 	br label %defer.-.6
 
 defer.-.6:
-	%12 = getelementptr inbounds [6 x i8], [6 x i8]* @.str1, i64 0, i64 0
-	%13 = alloca %.string, align 8 
-	store %.string zeroinitializer, %.string* %13
-	%14 = getelementptr inbounds %.string, %.string* %13, i64 0, i32 0
-	%15 = getelementptr inbounds %.string, %.string* %13, i64 0, i32 1
-	store i8* %12, i8** %14
-	store i64 6, i64* %15
-	%16 = load %.string, %.string* %13, align 8
-	call void @print_string(%.string %16)
+	%38 = load i8*, i8** %12, align 8
+	call void @free(%.rawptr %38)
 	br label %defer.-.7
 
 defer.-.7:
-	%17 = load i64, i64* %5, align 8
-	call void @print_int(i64 %17)
-	call void @print_rune(i32 10)
-	br label %for.done.-.13
-
-defer.-.8:
-	%18 = getelementptr inbounds [6 x i8], [6 x i8]* @.str2, i64 0, i64 0
-	%19 = alloca %.string, align 8 
-	store %.string zeroinitializer, %.string* %19
-	%20 = getelementptr inbounds %.string, %.string* %19, i64 0, i32 0
-	%21 = getelementptr inbounds %.string, %.string* %19, i64 0, i32 1
-	store i8* %18, i8** %20
-	store i64 6, i64* %21
-	%22 = load %.string, %.string* %19, align 8
-	call void @print_string(%.string %22)
-	br label %if.done.-.9
-
-if.done.-.9:
-	%23 = load i64, i64* %5, align 8
-	%24 = icmp eq i64 %23, 2
-	br i1 %24, label %if.then.-.10, label %if.done.-.11
-
-if.then.-.10:
-	br label %if.done.-.11
-
-if.done.-.11:
-	br label %defer.-.12
-
-defer.-.12:
-	%25 = load i64, i64* %5, align 8
-	call void @print_int(i64 %25)
-	call void @print_rune(i32 10)
-	br label %for.post.-.4
-
-for.done.-.13:
-	%26 = getelementptr inbounds [13 x i8], [13 x i8]* @.str3, i64 0, i64 0
-	%27 = alloca %.string, align 8 
-	store %.string zeroinitializer, %.string* %27
-	%28 = getelementptr inbounds %.string, %.string* %27, i64 0, i32 0
-	%29 = getelementptr inbounds %.string, %.string* %27, i64 0, i32 1
-	store i8* %26, i8** %28
-	store i64 13, i64* %29
-	%30 = load %.string, %.string* %27, align 8
-	call void @print_string(%.string %30)
-	br label %defer.-.14
-
-defer.-.14:
-	%31 = getelementptr inbounds [6 x i8], [6 x i8]* @.str4, i64 0, i64 0
-	%32 = alloca %.string, align 8 
-	store %.string zeroinitializer, %.string* %32
-	%33 = getelementptr inbounds %.string, %.string* %32, i64 0, i32 0
-	%34 = getelementptr inbounds %.string, %.string* %32, i64 0, i32 1
-	store i8* %31, i8** %33
-	store i64 6, i64* %34
-	%35 = load %.string, %.string* %32, align 8
-	call void @print_string(%.string %35)
+	%39 = load i8*, i8** %5, align 8
+	call void @free(%.rawptr %39)
 	ret void
+
+if.done.-.8:
+	%40 = alloca %HDC, align 8 ; dc
+	store %HDC zeroinitializer, %HDC* %40
+	%41 = load %HWND, %HWND* %31, align 8
+	%42 = call %HDC @GetDC(%HANDLE %41)
+	store %HDC %42, %HDC* %40
+	%43 = alloca %HGLRC, align 8 ; opengl_context
+	store %HGLRC zeroinitializer, %HGLRC* %43
+	%44 = alloca [8 x i32], align 4 ; attribs
+	store [8 x i32] zeroinitializer, [8 x i32]* %44
+	%45 = alloca %PIXELFORMATDESCRIPTOR, align 4 ; pfd
+	store %PIXELFORMATDESCRIPTOR zeroinitializer, %PIXELFORMATDESCRIPTOR* %45
+	%46 = getelementptr inbounds %PIXELFORMATDESCRIPTOR, %PIXELFORMATDESCRIPTOR* %45, i64 0, i32 0
+	store i32 44, i32* %46
+	%47 = getelementptr inbounds %PIXELFORMATDESCRIPTOR, %PIXELFORMATDESCRIPTOR* %45, i64 0, i32 1
+	store i32 1, i32* %47
+	%48 = getelementptr inbounds %PIXELFORMATDESCRIPTOR, %PIXELFORMATDESCRIPTOR* %45, i64 0, i32 2
+	store i32 37, i32* %48
+	%49 = getelementptr inbounds %PIXELFORMATDESCRIPTOR, %PIXELFORMATDESCRIPTOR* %45, i64 0, i32 3
+	store i8 0, i8* %49
+	%50 = getelementptr inbounds %PIXELFORMATDESCRIPTOR, %PIXELFORMATDESCRIPTOR* %45, i64 0, i32 4
+	store i8 32, i8* %50
+	%51 = getelementptr inbounds %PIXELFORMATDESCRIPTOR, %PIXELFORMATDESCRIPTOR* %45, i64 0, i32 11
+	store i8 8, i8* %51
+	%52 = getelementptr inbounds %PIXELFORMATDESCRIPTOR, %PIXELFORMATDESCRIPTOR* %45, i64 0, i32 18
+	store i8 24, i8* %52
+	%53 = getelementptr inbounds %PIXELFORMATDESCRIPTOR, %PIXELFORMATDESCRIPTOR* %45, i64 0, i32 19
+	store i8 8, i8* %53
+	%54 = getelementptr inbounds %PIXELFORMATDESCRIPTOR, %PIXELFORMATDESCRIPTOR* %45, i64 0, i32 21
+	store i8 0, i8* %54
+	%55 = load %HDC, %HDC* %40, align 8
+	%56 = load %HDC, %HDC* %40, align 8
+	%57 = getelementptr inbounds %PIXELFORMATDESCRIPTOR, %PIXELFORMATDESCRIPTOR* %45
+	%58 = call i32 @ChoosePixelFormat(%HDC %56, %PIXELFORMATDESCRIPTOR* %57)
+	%59 = call %BOOL @SetPixelFormat(%HDC %55, i32 %58, %PIXELFORMATDESCRIPTOR* null)
+	%60 = load %HDC, %HDC* %40, align 8
+	%61 = call %HGLRC @wglCreateContext(%HDC %60)
+	store %HGLRC %61, %HGLRC* %43
+	%62 = load %HDC, %HDC* %40, align 8
+	%63 = load %HGLRC, %HGLRC* %43, align 8
+	%64 = call %BOOL @wglMakeCurrent(%HDC %62, %HGLRC %63)
+	%65 = getelementptr inbounds [8 x i32], [8 x i32]* %44, i64 0, i64 0
+	%66 = getelementptr i32, i32* %65, i64 0
+	store i32 8337, i32* %66
+	%67 = getelementptr inbounds [8 x i32], [8 x i32]* %44, i64 0, i64 0
+	%68 = getelementptr i32, i32* %67, i64 1
+	store i32 2, i32* %68
+	%69 = getelementptr inbounds [8 x i32], [8 x i32]* %44, i64 0, i64 0
+	%70 = getelementptr i32, i32* %69, i64 2
+	store i32 8338, i32* %70
+	%71 = getelementptr inbounds [8 x i32], [8 x i32]* %44, i64 0, i64 0
+	%72 = getelementptr i32, i32* %71, i64 3
+	store i32 1, i32* %72
+	%73 = getelementptr inbounds [8 x i32], [8 x i32]* %44, i64 0, i64 0
+	%74 = getelementptr i32, i32* %73, i64 4
+	store i32 37158, i32* %74
+	%75 = getelementptr inbounds [8 x i32], [8 x i32]* %44, i64 0, i64 0
+	%76 = getelementptr i32, i32* %75, i64 5
+	store i32 2, i32* %76
+	%77 = getelementptr inbounds [8 x i32], [8 x i32]* %44, i64 0, i64 0
+	%78 = getelementptr i32, i32* %77, i64 6
+	store i32 0, i32* %78
+	%79 = alloca %.string, align 8 ; wgl_string
+	store %.string zeroinitializer, %.string* %79
+	%80 = getelementptr inbounds [27 x i8], [27 x i8]* @.str4, i64 0, i64 0
+	%81 = alloca %.string, align 8 
+	store %.string zeroinitializer, %.string* %81
+	%82 = getelementptr inbounds %.string, %.string* %81, i64 0, i32 0
+	%83 = getelementptr inbounds %.string, %.string* %81, i64 0, i32 1
+	store i8* %80, i8** %82
+	store i64 27, i64* %83
+	%84 = load %.string, %.string* %81, align 8
+	store %.string %84, %.string* %79
+	%85 = alloca %wglCreateContextAttribsARBType, align 8 ; wglCreateContextAttribsARB
+	store %wglCreateContextAttribsARBType zeroinitializer, %wglCreateContextAttribsARBType* %85
+	%86 = getelementptr inbounds %.string, %.string* %79, i64 0, i32 0
+	%87 = load i8*, i8** %86, align 8
+	%88 = getelementptr i8, i8* %87, i64 0
+	%89 = getelementptr inbounds i8, i8* %88
+	%90 = call %PROC @wglGetProcAddress(i8* %89)
+	%91 = bitcast void ()* %90 to %HGLRC (%HDC, %.rawptr, i32*)*
+	%92 = bitcast %HGLRC (%HDC, %.rawptr, i32*)* %91 to %HGLRC (%HDC, %.rawptr, i32*)*
+	store %wglCreateContextAttribsARBType %92, %wglCreateContextAttribsARBType* %85
+	%93 = alloca %HGLRC, align 8 ; rc
+	store %HGLRC zeroinitializer, %HGLRC* %93
+	%94 = load %wglCreateContextAttribsARBType, %wglCreateContextAttribsARBType* %85, align 8
+	%95 = load %HDC, %HDC* %40, align 8
+	%96 = getelementptr inbounds [8 x i32], [8 x i32]* %44, i64 0, i64 0
+	%97 = getelementptr i32, i32* %96, i64 0
+	%98 = getelementptr inbounds i32, i32* %97
+	%99 = call %HGLRC %94(%HDC %95, %.rawptr null, i32* %98)
+	store %HGLRC %99, %HGLRC* %93
+	%100 = load %HDC, %HDC* %40, align 8
+	%101 = load %HGLRC, %HGLRC* %93, align 8
+	%102 = call %BOOL @wglMakeCurrent(%HDC %100, %HGLRC %101)
+	%103 = load %HDC, %HDC* %40, align 8
+	%104 = call %BOOL @SwapBuffers(%HDC %103)
+	%105 = alloca double, align 8 ; start_time
+	store double zeroinitializer, double* %105
+	%106 = call double @time_now()
+	store double %106, double* %105
+	%107 = alloca i1, align 1 ; running
+	store i1 zeroinitializer, i1* %107
+	store i1 true, i1* %107
+	br label %for.loop.-.10
+
+for.body.-.9:
+	%108 = alloca double, align 8 ; curr_time
+	store double zeroinitializer, double* %108
+	%109 = call double @time_now()
+	store double %109, double* %108
+	%110 = alloca double, align 8 ; dt
+	store double zeroinitializer, double* %110
+	%111 = load double, double* %105, align 8
+	%112 = load double, double* %108, align 8
+	%113 = fsub double %112, %111
+	store double %113, double* %110
+	%114 = load double, double* %110, align 8
+	%115 = fcmp ogt double %114, 0x4000000000000000
+	br i1 %115, label %if.then.-.11, label %if.done.-.12
+
+for.loop.-.10:
+	%116 = load i1, i1* %107, align 1
+	br i1 %116, label %for.body.-.9, label %for.done.-.22
+
+if.then.-.11:
+	store i1 false, i1* %107
+	br label %if.done.-.12
+
+if.done.-.12:
+	%117 = alloca %MSG, align 8 ; msg
+	store %MSG zeroinitializer, %MSG* %117
+	br label %for.body.-.13
+
+for.body.-.13:
+	%118 = alloca i1, align 1 ; ok
+	store i1 zeroinitializer, i1* %118
+	%119 = getelementptr inbounds %MSG, %MSG* %117
+	%120 = call %BOOL @PeekMessageA(%MSG* %119, %HWND null, i32 0, i32 0, i32 1)
+	%121 = icmp ne i32 %120, 0
+	store i1 %121, i1* %118
+	%122 = load i1, i1* %118, align 1
+	br i1 %122, label %if.done.-.15, label %if.then.-.14
+
+if.then.-.14:
+	br label %for.done.-.21
+
+if.done.-.15:
+	%123 = getelementptr inbounds %MSG, %MSG* %117, i64 0, i32 1
+	%124 = load i32, i32* %123, align 4
+	%125 = icmp eq i32 %124, 18
+	br i1 %125, label %if.then.-.16, label %if.else.-.17
+
+if.then.-.16:
+	br label %defer.-.18
+
+if.else.-.17:
+	%126 = getelementptr inbounds %MSG, %MSG* %117
+	%127 = call %BOOL @TranslateMessage(%MSG* %126)
+	%128 = getelementptr inbounds %MSG, %MSG* %117
+	%129 = call %LRESULT @DispatchMessageA(%MSG* %128)
+	br label %if.done.-.20
+
+defer.-.18:
+	%130 = load i8*, i8** %12, align 8
+	call void @free(%.rawptr %130)
+	br label %defer.-.19
+
+defer.-.19:
+	%131 = load i8*, i8** %5, align 8
+	call void @free(%.rawptr %131)
+	ret void
+
+if.done.-.20:
+	br label %for.body.-.13
+
+for.done.-.21:
+	%132 = load %HDC, %HDC* %40, align 8
+	%133 = call %BOOL @SwapBuffers(%HDC %132)
+	call void @sleep_ms(i32 2)
+	br label %for.loop.-.10
+
+for.done.-.22:
+	br label %defer.-.23
+
+defer.-.23:
+	%134 = load i8*, i8** %12, align 8
+	call void @free(%.rawptr %134)
+	br label %defer.-.24
+
+defer.-.24:
+	%135 = load i8*, i8** %5, align 8
+	call void @free(%.rawptr %135)
+	ret void
+}
+
+define i8* @main$to_c_string-0(%.string %s) {
+entry.-.0:
+	%0 = alloca %.string, align 8 ; s
+	store %.string zeroinitializer, %.string* %0
+	store %.string %s, %.string* %0
+	%1 = alloca i8*, align 8 ; c_str
+	store i8* zeroinitializer, i8** %1
+	%2 = getelementptr inbounds %.string, %.string* %0, i64 0, i32 1
+	%3 = load i64, i64* %2, align 8
+	%4 = add i64 %3, 1
+	%5 = call %.rawptr @malloc(i64 %4)
+	%6 = bitcast %.rawptr %5 to i8*
+	store i8* %6, i8** %1
+	%7 = load i8*, i8** %1, align 8
+	%8 = getelementptr inbounds %.string, %.string* %0, i64 0, i32 0
+	%9 = load i8*, i8** %8, align 8
+	%10 = getelementptr i8, i8* %9, i64 0
+	%11 = getelementptr inbounds i8, i8* %10
+	%12 = getelementptr inbounds %.string, %.string* %0, i64 0, i32 1
+	%13 = load i64, i64* %12, align 8
+	%14 = call i32 @memcpy(%.rawptr %7, %.rawptr %11, i64 %13)
+	%15 = load i8*, i8** %1, align 8
+	%16 = getelementptr inbounds %.string, %.string* %0, i64 0, i32 1
+	%17 = load i64, i64* %16, align 8
+	%18 = getelementptr i8, i8* %15, i64 %17
+	store i8 0, i8* %18
+	%19 = load i8*, i8** %1, align 8
+	ret i8* %19
+}
+
+define %LRESULT @main$1(%HWND %hwnd, i32 %msg, %WPARAM %wparam, %LPARAM %lparam) noinline {
+entry.-.0:
+	%0 = alloca %HWND, align 8 ; hwnd
+	store %HWND zeroinitializer, %HWND* %0
+	store %HWND %hwnd, %HWND* %0
+	%1 = alloca i32, align 4 ; msg
+	store i32 zeroinitializer, i32* %1
+	store i32 %msg, i32* %1
+	%2 = alloca %WPARAM, align 8 ; wparam
+	store %WPARAM zeroinitializer, %WPARAM* %2
+	store %WPARAM %wparam, %WPARAM* %2
+	%3 = alloca %LPARAM, align 8 ; lparam
+	store %LPARAM zeroinitializer, %LPARAM* %3
+	store %LPARAM %lparam, %LPARAM* %3
+	%4 = load i32, i32* %1, align 4
+	%5 = icmp eq i32 %4, 2
+	br i1 %5, label %if.then.-.1, label %cmp-or.-.3
+
+if.then.-.1:
+	call void @ExitProcess(i32 0)
+	ret %LRESULT 0
+
+cmp-or.-.2:
+	%6 = load i32, i32* %1, align 4
+	%7 = icmp eq i32 %6, 18
+	br i1 %7, label %if.then.-.1, label %if.done.-.4
+
+cmp-or.-.3:
+	%8 = load i32, i32* %1, align 4
+	%9 = icmp eq i32 %8, 16
+	br i1 %9, label %if.then.-.1, label %cmp-or.-.2
+
+if.done.-.4:
+	%10 = load %HWND, %HWND* %0, align 8
+	%11 = load i32, i32* %1, align 4
+	%12 = load %WPARAM, %WPARAM* %2, align 8
+	%13 = load %LPARAM, %LPARAM* %3, align 8
+	%14 = call %LRESULT @DefWindowProcA(%HWND %10, i32 %11, %WPARAM %12, %LPARAM %13)
+	ret i64 %14
 }
 
 define void @print_string(%.string %s) {
@@ -749,6 +1083,54 @@ if.done.-.3:
 	ret void
 }
 
+declare %HANDLE @GetStdHandle(i32 %h) ; foreign
+declare i32 @CloseHandle(%HANDLE %h) ; foreign
+declare i32 @WriteFileA(%HANDLE %h, %.rawptr %buf, i32 %len, i32* %written_result, %.rawptr %overlapped) ; foreign
+declare i32 @GetLastError() ; foreign
+declare void @ExitProcess(i32 %exit_code) ; foreign
+declare %HWND @GetDesktopWindow() ; foreign
+declare i32 @GetCursorPos(%POINT* %p) ; foreign
+declare i32 @ScreenToClient(%HWND %h, %POINT* %p) ; foreign
+declare %HINSTANCE @GetModuleHandleA(i8* %module_name) ; foreign
+declare i32 @QueryPerformanceFrequency(i64* %result) ; foreign
+declare i32 @QueryPerformanceCounter(i64* %result) ; foreign
+define void @sleep_ms(i32 %ms) {
+entry.-.0:
+	%0 = alloca i32, align 4 ; ms
+	store i32 zeroinitializer, i32* %0
+	store i32 %ms, i32* %0
+	%1 = load i32, i32* %0, align 4
+	%2 = call i32 @Sleep(i32 %1)
+	ret void
+}
+
+declare i32 @Sleep(i32 %ms) declare void @OutputDebugStringA(i8* %c_str) ; foreign
+declare %ATOM @RegisterClassExA(%WNDCLASSEXA* %wc) ; foreign
+declare %HWND @CreateWindowExA(i32 %ex_style, i8* %class_name, i8* %title, i32 %style, i32 %x, i32 %y, i32 %w, i32 %h, %HWND %parent, %HMENU %menu, %HINSTANCE %instance, %.rawptr %param) ; foreign
+declare %BOOL @ShowWindow(%HWND %hwnd, i32 %cmd_show) ; foreign
+declare %BOOL @UpdateWindow(%HWND %hwnd) ; foreign
+declare %BOOL @PeekMessageA(%MSG* %msg, %HWND %hwnd, i32 %msg_filter_min, i32 %msg_filter_max, i32 %remove_msg) ; foreign
+declare %BOOL @TranslateMessage(%MSG* %msg) ; foreign
+declare %LRESULT @DispatchMessageA(%MSG* %msg) ; foreign
+declare %LRESULT @DefWindowProcA(%HWND %hwnd, i32 %msg, %WPARAM %wparam, %LPARAM %lparam) ; foreign
+define i64 @GetQueryPerformanceFrequency() {
+entry.-.0:
+	%0 = alloca i64, align 8 ; r
+	store i64 zeroinitializer, i64* %0
+	%1 = getelementptr inbounds i64, i64* %0
+	%2 = call i32 @QueryPerformanceFrequency(i64* %1)
+	%3 = load i64, i64* %0, align 8
+	ret i64 %3
+}
+
+declare %HDC @GetDC(%HANDLE %h) ; foreign
+declare %BOOL @SetPixelFormat(%HDC %hdc, i32 %pixel_format, %PIXELFORMATDESCRIPTOR* %pfd) ; foreign
+declare i32 @ChoosePixelFormat(%HDC %hdc, %PIXELFORMATDESCRIPTOR* %pfd) ; foreign
+declare %HGLRC @wglCreateContext(%HDC %hdc) ; foreign
+declare %BOOL @wglMakeCurrent(%HDC %hdc, %HGLRC %hglrc) ; foreign
+declare %PROC @wglGetProcAddress(i8* %c_str) ; foreign
+declare %BOOL @wglDeleteContext(%HGLRC %hglrc) ; foreign
+declare %BOOL @SwapBuffers(%HDC %hdc) ; foreign
 declare i32 @putchar(i32 %c) ; foreign
 declare %.rawptr @malloc(i64 %sz) ; foreign
 declare void @free(%.rawptr %ptr) ; foreign
@@ -995,17 +1377,19 @@ entry.-.0:
 	ret i1 %5
 }
 
-@.str0 = global [8 x i8] c"Hellope\0A"
-@.str1 = global [6 x i8] c"break\0A"
-@.str2 = global [6 x i8] c"break\0A"
-@.str3 = global [13 x i8] c"Never\20called\0A"
-@.str4 = global [6 x i8] c"World\0A"
+@.str0 = global [14 x i8] c"GetLastError\3A\20"
+@.str1 = global [1 x i8] c"\0A"
+@.str2 = global [18 x i8] c"Odin-Language-Demo"
+@.str3 = global [18 x i8] c"Odin\20Language\20Demo"
+@.str4 = global [27 x i8] c"wglCreateContextAttribsARB\00"
 @.str5 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"
 @.str6 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"
 @.str7 = global [4 x i8] c"true"
 @.str8 = global [5 x i8] c"false"
 define void @__$startup_runtime() noinline {
 entry.-.0:
+	%0 = call i64 @GetQueryPerformanceFrequency()
+	store i64 %0, i64* @win32_perf_count_freq
 	ret void
 }
 

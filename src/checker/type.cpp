@@ -382,6 +382,9 @@ b32 is_type_u8_slice(Type *t) {
 b32 is_type_vector(Type *t) {
 	return t->kind == Type_Vector;
 }
+b32 is_type_proc(Type *t) {
+	return t->kind == Type_Proc;
+}
 Type *base_vector_type(Type *t) {
 	if (is_type_vector(t)) {
 		return t->vector.elem;
@@ -747,10 +750,12 @@ gbString write_type_to_string(gbString str, Type *type) {
 		if (type->tuple.variable_count > 0) {
 			for (isize i = 0; i < type->tuple.variable_count; i++) {
 				Entity *var = type->tuple.variables[i];
-				GB_ASSERT(var->kind == Entity_Variable);
-				if (i > 0)
-					str = gb_string_appendc(str, ", ");
-				str = write_type_to_string(str, var->type);
+				if (var != NULL) {
+					GB_ASSERT(var->kind == Entity_Variable);
+					if (i > 0)
+						str = gb_string_appendc(str, ", ");
+					str = write_type_to_string(str, var->type);
+				}
 			}
 		}
 		break;

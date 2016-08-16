@@ -5,6 +5,4 @@ rem call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" 
 set _NO_DEBUG_HEAP=1
 
 set path=w:\Odin\misc;%path%
-wmic
-
 cls

@@ -21,25 +21,25 @@ WM_QUIT    :: 0x12;
 
 PM_REMOVE :: 1;
 
-COLOR_BACKGROUND : rawptr : 1; // NOTE(bill): cast to HBRUSH when needed
+COLOR_BACKGROUND: rawptr : 1; // NOTE(bill): cast to HBRUSH when needed
 
 
-type HANDLE: rawptr;
-type HWND: HANDLE;
-type HDC: HANDLE;
-type HINSTANCE: HANDLE;
-type HICON: HANDLE;
-type HCURSOR: HANDLE;
-type HMENU: HANDLE;
-type HBRUSH: HANDLE;
-type WPARAM: uint;
-type LPARAM: int;
-type LRESULT: int;
-type ATOM: i16;
+type HANDLE: rawptr
+type HWND: HANDLE
+type HDC: HANDLE
+type HINSTANCE: HANDLE
+type HICON: HANDLE
+type HCURSOR: HANDLE
+type HMENU: HANDLE
+type HBRUSH: HANDLE
+type WPARAM: uint
+type LPARAM: int
+type LRESULT: int
+type ATOM: i16
 type POINT: struct { x, y: i32 }
-type BOOL: i32;
+type BOOL: i32
 
-type WNDPROC: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
+type WNDPROC: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT
 
 type WNDCLASSEXA: struct {
 	cbSize, style: u32,
@@ -89,7 +89,8 @@ RegisterClassExA :: proc(wc: ^WNDCLASSEXA) -> ATOM #foreign
 CreateWindowExA  :: proc(ex_style: u32,
                          class_name, title: ^u8,
                          style: u32,
-                         x, y, w, h: i32,
+                         x, y: u32,
+                         w, h: i32,
                          parent: HWND, menu: HMENU, instance: HINSTANCE,
                          param: rawptr) -> HWND #foreign
 
@@ -109,3 +110,76 @@ GetQueryPerformanceFrequency :: proc() -> i64 {
 	_ = QueryPerformanceFrequency(^r);
 	return r;
 }
+
+
+
+
+
+// Windows OpenGL
+
+PFD_TYPE_RGBA             :: 0;
+PFD_TYPE_COLORINDEX       :: 1;
+PFD_MAIN_PLANE            :: 0;
+PFD_OVERLAY_PLANE         :: 1;
+PFD_UNDERLAY_PLANE        :: -1;
+PFD_DOUBLEBUFFER          :: 1;
+PFD_STEREO                :: 2;
+PFD_DRAW_TO_WINDOW        :: 4;
+PFD_DRAW_TO_BITMAP        :: 8;
+PFD_SUPPORT_GDI           :: 16;
+PFD_SUPPORT_OPENGL        :: 32;
+PFD_GENERIC_FORMAT        :: 64;
+PFD_NEED_PALETTE          :: 128;
+PFD_NEED_SYSTEM_PALETTE   :: 0x00000100;
+PFD_SWAP_EXCHANGE         :: 0x00000200;
+PFD_SWAP_COPY             :: 0x00000400;
+PFD_SWAP_LAYER_BUFFERS    :: 0x00000800;
+PFD_GENERIC_ACCELERATED   :: 0x00001000;
+PFD_DEPTH_DONTCARE        :: 0x20000000;
+PFD_DOUBLEBUFFER_DONTCARE :: 0x40000000;
+PFD_STEREO_DONTCARE       :: 0x80000000;
+
+type HGLRC: HANDLE
+type PROC: proc()
+type wglCreateContextAttribsARBType: proc(hdc: HDC, hshareContext: rawptr, attribList: ^i32) -> HGLRC
+
+
+type PIXELFORMATDESCRIPTOR: struct  {
+	nSize,
+	nVersion,
+	dwFlags: u32,
+
+	iPixelType,
+	cColorBits,
+	cRedBits,
+	cRedShift,
+	cGreenBits,
+	cGreenShift,
+	cBlueBits,
+	cBlueShift,
+	cAlphaBits,
+	cAlphaShift,
+	cAccumBits,
+	cAccumRedBits,
+	cAccumGreenBits,
+	cAccumBlueBits,
+	cAccumAlphaBits,
+	cDepthBits,
+	cStencilBits,
+	cAuxBuffers,
+	iLayerType,
+	bReserved: byte,
+
+	dwLayerMask,
+	dwVisibleMask,
+	dwDamageMask: u32,
+}
+
+GetDC :: proc(h: HANDLE) -> HDC #foreign
+SetPixelFormat    :: proc(hdc: HDC, pixel_format: i32, pfd: ^PIXELFORMATDESCRIPTOR ) -> BOOL #foreign
+ChoosePixelFormat :: proc(hdc: HDC, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 #foreign
+wglCreateContext  :: proc(hdc: HDC) -> HGLRC #foreign
+wglMakeCurrent    :: proc(hdc: HDC, hglrc: HGLRC) -> BOOL #foreign
+wglGetProcAddress :: proc(c_str: ^u8) -> PROC #foreign
+wglDeleteContext  :: proc(hglrc: HGLRC) -> BOOL #foreign
+SwapBuffers       :: proc(hdc: HDC) -> BOOL #foreign

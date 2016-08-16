@@ -177,7 +177,6 @@ AST_NODE_KIND(_DeclBegin,      struct{}) \
 			String  foreign_name;    \
 		}) \
 	AST_NODE_KIND(TypeDecl,   struct { Token token; AstNode *name, *type; }) \
-	AST_NODE_KIND(AliasDecl,  struct { Token token; AstNode *name, *type; }) \
 	AST_NODE_KIND(LoadDecl, struct { Token token, filepath; }) \
 AST_NODE_KIND(_DeclEnd, struct{}) \
 AST_NODE_KIND(_TypeBegin, struct{}) \
@@ -336,8 +335,6 @@ Token ast_node_token(AstNode *node) {
 		return node->ProcDecl.name->Ident.token;
 	case AstNode_TypeDecl:
 		return node->TypeDecl.token;
-	case AstNode_AliasDecl:
-		return node->AliasDecl.token;
 	case AstNode_LoadDecl:
 		return node->LoadDecl.token;
 	case AstNode_Field: {
@@ -758,15 +755,6 @@ gb_inline AstNode *make_type_decl(AstFile *f, Token token, AstNode *name, AstNod
 	result->TypeDecl.type = type;
 	return result;
 }
-
-gb_inline AstNode *make_alias_decl(AstFile *f, Token token, AstNode *name, AstNode *type) {
-	AstNode *result = make_node(f, AstNode_AliasDecl);
-	result->AliasDecl.token = token;
-	result->AliasDecl.name = name;
-	result->AliasDecl.type = type;
-	return result;
-}
-
 
 gb_inline AstNode *make_load_decl(AstFile *f, Token token, Token filepath) {
 	AstNode *result = make_node(f, AstNode_LoadDecl);
@@ -1948,31 +1936,7 @@ AstNode *parse_stmt(AstFile *f) {
 		AstNode *name = parse_identifier(f);
 		expect_token(f, Token_Colon);
 		AstNode *type = parse_type(f);
-
-		AstNode *type_decl = make_type_decl(f, token, name, type);
-
-		if (type->kind != AstNode_StructType &&
-		    type->kind != AstNode_ProcType) {
-			expect_token(f, Token_Semicolon);
-		}
-
-		return type_decl;
-	} break;
-
-	case Token_alias: {
-		Token   token = expect_token(f, Token_alias);
-		AstNode *name = parse_identifier(f);
-		expect_token(f, Token_Colon);
-		AstNode *type = parse_type(f);
-
-		AstNode *alias_decl = make_alias_decl(f, token, name, type);
-
-		if (type->kind != AstNode_StructType &&
-		    type->kind != AstNode_ProcType) {
-			expect_token(f, Token_Semicolon);
-		}
-
-		return alias_decl;
+		return make_type_decl(f, token, name, type);
 	} break;
 
 	// Operands

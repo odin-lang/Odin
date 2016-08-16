@@ -152,14 +152,6 @@ void print_ast(AstNode *node, isize indent) {
 		print_ast(node->TypeDecl.type, indent+1);
 		break;
 
-	case AstNode_AliasDecl:
-		print_indent(indent);
-		gb_printf("(alias)\n");
-		print_ast(node->AliasDecl.name, indent+1);
-		print_ast(node->AliasDecl.type, indent+1);
-		break;
-
-
 	case AstNode_ProcType:
 		print_indent(indent);
 		gb_printf("(type:proc)(%td -> %td)\n", node->ProcType.param_count, node->ProcType.result_count);

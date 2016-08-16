@@ -1355,6 +1355,11 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, value, src, dst));
 	}
 
+	// proc <-> proc
+	if (is_type_proc(src) && is_type_proc(dst)) {
+		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, value, src, dst));
+	}
+
 
 	// []byte/[]u8 <-> string
 	if (is_type_u8_slice(src) && is_type_string(dst)) {
@@ -1743,7 +1748,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 		// NOTE(bill): Regular call
 		ssaValue *value = ssa_build_expr(proc, ce->proc);
-		Type *proc_type_ = ssa_value_type(value);
+		Type *proc_type_ = get_base_type(ssa_value_type(value));
 		GB_ASSERT(proc_type_->kind == Type_Proc);
 		auto *type = &proc_type_->proc;
 
