@@ -2964,8 +2964,6 @@ extern "C" {
 		DWORD dwFlags;
 	} MONITORINFO;
 
-
-
 	#define INFINITE 0xffffffffl
 	#define INVALID_HANDLE_VALUE ((void *)(intptr)(-1))
 
@@ -2983,7 +2981,6 @@ extern "C" {
 	                                                 DWORD creation_flags, DWORD *thread_id);
 	GB_DLL_IMPORT DWORD   WINAPI GetThreadId        (HANDLE handle);
 	GB_DLL_IMPORT void    WINAPI RaiseException     (DWORD, DWORD, DWORD, ULONG_PTR const *);
-
 
 
 	GB_DLL_IMPORT BOOL      WINAPI GetLogicalProcessorInformation(SYSTEM_LOGICAL_PROCESSOR_INFORMATION *buffer, DWORD *return_length);

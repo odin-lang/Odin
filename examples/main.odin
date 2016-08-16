@@ -33,7 +33,6 @@ win32_print_last_error :: proc() {
 }
 
 main :: proc() {
-/*
 	wc: WNDCLASSEXA;
 	instance := GetModuleHandleA(null);
 
@@ -114,5 +113,4 @@ main :: proc() {
 
 		sleep_ms(16);
 	}
-*/
 }

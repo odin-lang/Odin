@@ -561,7 +561,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "\n");
 	} break;
 
-	case ssaInstr_CopyMemory: {
+	case ssaInstr_MemCopy: {
 		ssa_fprintf(f, "call void @llvm.memmove.p0i8.p0i8.");
 		ssa_print_type(f, m->sizes, t_int);
 		ssa_fprintf(f, "(i8* ");

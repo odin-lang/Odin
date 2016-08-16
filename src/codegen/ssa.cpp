@@ -70,7 +70,7 @@ struct ssaProcedure {
 	SSA_INSTR_KIND(Unreachable), \
 	SSA_INSTR_KIND(BinaryOp), \
 	SSA_INSTR_KIND(Call), \
-	SSA_INSTR_KIND(CopyMemory), \
+	SSA_INSTR_KIND(MemCopy), \
 	SSA_INSTR_KIND(ExtractElement), \
 	SSA_INSTR_KIND(InsertElement), \
 	SSA_INSTR_KIND(ShuffleVector), \
@@ -330,8 +330,8 @@ Type *ssa_instr_type(ssaInstr *instr) {
 			return pt;
 		}
 		return NULL;
-	}
-	case ssaInstr_CopyMemory:
+	} break;
+	case ssaInstr_MemCopy:
 		return t_int;
 
 	case ssaInstr_ExtractElement: {
@@ -592,7 +592,7 @@ ssaValue *ssa_make_instr_call(ssaProcedure *p, ssaValue *value, ssaValue **args,
 }
 
 ssaValue *ssa_make_instr_copy_memory(ssaProcedure *p, ssaValue *dst, ssaValue *src, ssaValue *len, i32 align, b32 is_volatile) {
-	ssaValue *v = ssa_alloc_instr(p->module->allocator, ssaInstr_CopyMemory);
+	ssaValue *v = ssa_alloc_instr(p->module->allocator, ssaInstr_MemCopy);
 	v->instr.copy_memory.dst = dst;
 	v->instr.copy_memory.src = src;
 	v->instr.copy_memory.len = len;
@@ -893,7 +893,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 			case ssaInstr_Br:
 			case ssaInstr_Ret:
 			case ssaInstr_Unreachable:
-			case ssaInstr_CopyMemory:
+			case ssaInstr_MemCopy:
 			case ssaInstr_StartupRuntime:
 				continue;
 			case ssaInstr_Call:

@@ -1,4 +1,4 @@
-#define GB_NO_WINDOWS_H
+// #define GB_NO_WINDOWS_H
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
