@@ -876,6 +876,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	gbString err_str = NULL;
 	defer (gb_string_free(err_str));
 
+
 	ast_node(be, BinaryExpr, node);
 
 	if (be->op.kind == Token_as) {
