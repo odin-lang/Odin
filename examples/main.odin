@@ -1,7 +1,15 @@
 #load "basic.odin"
 #load "win32.odin"
 
-win32_perf_count_freq: i64;
+constant := 1;
+
+win32_perf_count_freq: i64 = win32_get_perf_count_freq();
+win32_get_perf_count_freq :: proc() -> i64 {
+	r: i64;
+	_ = QueryPerformanceFrequency(^r);
+	return r;
+}
+
 
 time_now :: proc() -> f64 {
 	if win32_perf_count_freq == 0 {
@@ -25,6 +33,7 @@ win32_print_last_error :: proc() {
 }
 
 main :: proc() {
+/*
 	wc: WNDCLASSEXA;
 	instance := GetModuleHandleA(null);
 
@@ -105,4 +114,5 @@ main :: proc() {
 
 		sleep_ms(16);
 	}
+*/
 }

@@ -275,6 +275,10 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 
 	ssa_fprintf(f, "\t");
 	switch (instr->kind) {
+	case ssaInstr_StartupRuntime: {
+		ssa_fprintf(f, "call void @" SSA_STARTUP_RUNTIME_PROC_NAME "()\n");
+	} break;
+
 	case ssaInstr_Local: {
 		Type *type = instr->local.entity->type;
 		ssa_fprintf(f, "%%%d = alloca ", value->id);

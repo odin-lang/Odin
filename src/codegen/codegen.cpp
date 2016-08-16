@@ -39,6 +39,11 @@ void ssa_gen_destroy(ssaGen *s) {
 	gb_file_close(&s->output_file);
 }
 
+struct ssaGlobalVariable {
+	ssaValue *var, *init;
+	DeclInfo *decl;
+};
+
 void ssa_gen_code(ssaGen *s) {
 	if (v_zero == NULL) {
 		v_zero   = ssa_make_value_constant(gb_heap_allocator(), t_int,  make_exact_value_integer(0));
@@ -53,8 +58,9 @@ void ssa_gen_code(ssaGen *s) {
 	ssaModule *m = &s->module;
 	CheckerInfo *info = m->info;
 	gbAllocator a = m->allocator;
-	ssaProcedure dummy_proc = {};
-	dummy_proc.module = m;
+	gbArray(ssaGlobalVariable) global_variables;
+	gb_array_init(global_variables, gb_heap_allocator());
+	defer (gb_array_free(global_variables));
 
 	gb_for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
@@ -71,15 +77,12 @@ void ssa_gen_code(ssaGen *s) {
 		} break;
 
 		case Entity_Variable: {
-			// ssaValue *value = ssa_build_expr(&dummy_proc, decl->init_expr);
-			// if (value->kind == ssaValue_Instr) {
-			// 	ssaInstr *i = &value->instr;
-			// 	if (i->kind == ssaInstr_Load) {
-			// 		value = i->load.address;
-			// 	}
-			// }
 			// TODO(bill): global runtime initialization
 			ssaValue *g = ssa_make_value_global(a, e, NULL);
+			ssaGlobalVariable var = {};
+			var.var = g;
+			var.decl = decl;
+			gb_array_append(global_variables, var);
 			map_set(&m->values, hash_pointer(e), g);
 			map_set(&m->members, hash_string(name), g);
 		} break;
@@ -106,6 +109,58 @@ void ssa_gen_code(ssaGen *s) {
 		if (v->kind == ssaValue_Proc)
 			ssa_build_proc(v, NULL);
 	}
+
+
+
+	{ // Startup Runtime
+		// Cleanup(bill): probably better way of doing code insertion
+		String name = make_string(SSA_STARTUP_RUNTIME_PROC_NAME);
+		Type *proc_type = make_type_proc(a, gb_alloc_item(a, Scope),
+		                                 NULL, 0,
+		                                 NULL, 0);
+		AstNode *body = gb_alloc_item(a, AstNode);
+		ssaValue *p = ssa_make_value_procedure(a, m, proc_type, NULL, body, name);
+		Token token = {};
+		token.string = name;
+		Entity *e = make_entity_procedure(a, NULL, token, proc_type);
+
+		map_set(&m->values, hash_pointer(e), p);
+		map_set(&m->members, hash_string(name), p);
+
+		ssaProcedure *proc = &p->proc;
+
+		ssa_begin_procedure_body(proc);
+
+		// TODO(bill): Should do a dependency graph do check which order to initialize them in?
+		gb_for_array(i, global_variables) {
+			ssaGlobalVariable *var = &global_variables[i];
+			if (var->decl->init_expr != NULL) {
+				var->init = ssa_build_expr(proc, var->decl->init_expr);
+			}
+		}
+
+		// NOTE(bill): Initialize constants first
+		gb_for_array(i, global_variables) {
+			ssaGlobalVariable *var = &global_variables[i];
+			if (var->init != NULL) {
+				if (var->init->kind == ssaValue_Constant) {
+					ssa_emit_store(proc, var->var, var->init);
+				}
+			}
+		}
+
+		gb_for_array(i, global_variables) {
+			ssaGlobalVariable *var = &global_variables[i];
+			if (var->init != NULL) {
+				if (var->init->kind != ssaValue_Constant) {
+					ssa_emit_store(proc, var->var, var->init);
+				}
+			}
+		}
+
+		ssa_end_procedure_body(proc);
+	}
+
 
 	// m->layout = make_string("e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64");
 

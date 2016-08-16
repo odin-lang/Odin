@@ -53,6 +53,7 @@ struct ssaProcedure {
 	ssaTargetList *     target_list;
 };
 
+#define SSA_STARTUP_RUNTIME_PROC_NAME "__$startup_runtime"
 
 
 #define SSA_INSTR_KINDS \
@@ -73,6 +74,7 @@ struct ssaProcedure {
 	SSA_INSTR_KIND(ExtractElement), \
 	SSA_INSTR_KIND(InsertElement), \
 	SSA_INSTR_KIND(ShuffleVector), \
+	SSA_INSTR_KIND(StartupRuntime), \
 	SSA_INSTR_KIND(Count),
 
 enum ssaInstrKind {
@@ -192,6 +194,8 @@ struct ssaInstr {
 			ssaValue *elem;
 			ssaValue *index;
 		} insert_element;
+
+		struct {} startup_runtime;
 	};
 };
 
@@ -890,6 +894,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 			case ssaInstr_Ret:
 			case ssaInstr_Unreachable:
 			case ssaInstr_CopyMemory:
+			case ssaInstr_StartupRuntime:
 				continue;
 			case ssaInstr_Call:
 				if (instr->call.type == NULL) {
@@ -2340,6 +2345,26 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 	}
 }
 
+
+void ssa_emit_startup_runtime(ssaProcedure *proc) {
+	GB_ASSERT(proc->parent == NULL && are_strings_equal(proc->name, make_string("main")));
+
+	ssaValue *v = ssa_alloc_instr(proc->module->allocator, ssaInstr_StartupRuntime);
+	if (proc->curr_block) {
+		gb_array_append(proc->curr_block->values, v);
+	}
+	ssa_emit(proc, v);
+}
+
+void ssa_insert_code_before_proc(ssaProcedure* proc, ssaProcedure *parent) {
+	if (parent == NULL) {
+		if (are_strings_equal(proc->name, make_string("main"))) {
+			ssa_emit_startup_runtime(proc);
+		}
+	}
+}
+
+
 void ssa_build_proc(ssaValue *value, ssaProcedure *parent) {
 	ssaProcedure *proc = &value->proc;
 
@@ -2347,6 +2372,7 @@ void ssa_build_proc(ssaValue *value, ssaProcedure *parent) {
 
 	if (proc->body != NULL) {
 		ssa_begin_procedure_body(proc);
+		ssa_insert_code_before_proc(proc, parent);
 		ssa_build_stmt(proc, proc->body);
 		ssa_end_procedure_body(proc);
 	}
