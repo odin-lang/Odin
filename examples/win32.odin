@@ -178,8 +178,15 @@ type PIXELFORMATDESCRIPTOR: struct  {
 GetDC             :: proc(h: HANDLE) -> HDC #foreign
 SetPixelFormat    :: proc(hdc: HDC, pixel_format: i32, pfd: ^PIXELFORMATDESCRIPTOR ) -> BOOL #foreign
 ChoosePixelFormat :: proc(hdc: HDC, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 #foreign
+SwapBuffers       :: proc(hdc: HDC) -> BOOL #foreign
+
+
+WGL_CONTEXT_MAJOR_VERSION_ARB             :: 0x2091;
+WGL_CONTEXT_MINOR_VERSION_ARB             :: 0x2092;
+WGL_CONTEXT_PROFILE_MASK_ARB              :: 0x9126;
+WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB :: 0x0002;
+
 wglCreateContext  :: proc(hdc: HDC) -> HGLRC #foreign
 wglMakeCurrent    :: proc(hdc: HDC, hglrc: HGLRC) -> BOOL #foreign
 wglGetProcAddress :: proc(c_str: ^u8) -> PROC #foreign
 wglDeleteContext  :: proc(hglrc: HGLRC) -> BOOL #foreign
-SwapBuffers       :: proc(hdc: HDC) -> BOOL #foreign

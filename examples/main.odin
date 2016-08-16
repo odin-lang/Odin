@@ -1,5 +1,6 @@
 #load "basic.odin"
 #load "win32.odin"
+#load "opengl.odin"
 
 win32_perf_count_freq := GetQueryPerformanceFrequency();
 
@@ -26,10 +27,10 @@ win32_print_last_error :: proc() {
 main :: proc() {
 	instance := GetModuleHandleA(null);
 
-	class_name := "Odin-Language-Demo\x00";
-	title := "Odin Language Demo\x00";
+	class_name   := "Odin-Language-Demo\x00";
+	title        := "Odin Language Demo\x00";
 	c_class_name := ^class_name[0];
-	c_title := ^title[0];
+	c_title      := ^title[0];
 
 	wc := WNDCLASSEXA{
 		cbSize    = size_of(WNDCLASSEXA) as u32,
@@ -49,10 +50,14 @@ main :: proc() {
 		return;
 	}
 
+	WINDOW_WIDTH  :: 854;
+	WINDOW_HEIGHT :: 480;
+
 	hwnd := CreateWindowExA(0,
 	                        c_class_name, c_title,
 	                        WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-	                        CW_USEDEFAULT, CW_USEDEFAULT, 854, 480,
+	                        CW_USEDEFAULT, CW_USEDEFAULT,
+	                        WINDOW_WIDTH, WINDOW_HEIGHT,
 	                        null, null, instance, null);
 
 
@@ -82,30 +87,25 @@ main :: proc() {
 		wglMakeCurrent(dc, opengl_context);
 
 		attribs := [8]i32{
-			0x2091, // WGL_CONTEXT_MAJOR_VERSION_ARB
-			2, // Major
-			0x2092, // WGL_CONTEXT_MINOR_VERSION_ARB
-			1, // Minor
-			0x9126, // WGL_CONTEXT_PROFILE_MASK_ARB
-			0x0002, // WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB
+			WGL_CONTEXT_MAJOR_VERSION_ARB, 2,
+			WGL_CONTEXT_MINOR_VERSION_ARB, 1,
+			WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
 			0, // NOTE(bill): tells the proc that this is the end of attribs
 		};
 
 		wgl_string := "wglCreateContextAttribsARB\x00";
-		wglCreateContextAttribsARB := wglGetProcAddress(^wgl_string[0]) as wglCreateContextAttribsARBType;
+		c_wgl_string := ^wgl_string[0];
+		wglCreateContextAttribsARB := wglGetProcAddress(c_wgl_string) as wglCreateContextAttribsARBType;
 		rc := wglCreateContextAttribsARB(dc, 0, ^attribs[0]);
 		wglMakeCurrent(dc, rc);
 		SwapBuffers(dc);
 	}
 
 	start_time := time_now();
-	running := false;
+	running := true;
 	for running {
 		curr_time := time_now();
 		dt := curr_time - start_time;
-		if dt > 2.0 {
-			running = false;
-		}
 
 		msg: MSG;
 		for {
@@ -115,14 +115,34 @@ main :: proc() {
 			}
 
 			if msg.message == WM_QUIT {
-				return;
-			} else {
-				_ = TranslateMessage(^msg);
-				_ = DispatchMessageA(^msg);
+				running = false;
+				break;
 			}
+			_ = TranslateMessage(^msg);
+			_ = DispatchMessageA(^msg);
+		}
+
+		glClearColor(0.5, 0.7, 1.0, 1.0);
+		glClear(GL_COLOR_BUFFER_BIT);
+		// glOrtho(0, WINDOW_WIDTH, 0, WINDOW_HEIGHT, -1, +1);
+
+		{
+			glBegin(GL_TRIANGLES);
+			defer glEnd();
+
+			glColor3f(1, 0, 0); glVertex3f(+0.5, -0.5, 0);
+			glColor3f(0, 1, 0); glVertex3f(+0.5, +0.5, 0);
+			glColor3f(0, 0, 1); glVertex3f(-0.5, +0.5, 0);
+
+			glColor3f(0, 0, 1); glVertex3f(-0.5, +0.5, 0);
+			glColor3f(1, 1, 0); glVertex3f(-0.5, -0.5, 0);
+			glColor3f(1, 0, 0); glVertex3f(+0.5, -0.5, 0);
 		}
 
 		SwapBuffers(dc);
-		sleep_ms(2);
+		{
+			ms := (16 - dt*1000) as i32;
+			if ms > 0 { sleep_ms(ms); }
+		}
 	}
 }
