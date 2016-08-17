@@ -1,6 +1,7 @@
 #load "basic.odin"
 #load "win32.odin"
 #load "opengl.odin"
+#load "stb_image.odin"
 
 win32_perf_count_freq := GetQueryPerformanceFrequency();
 

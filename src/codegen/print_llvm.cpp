@@ -642,7 +642,7 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 	if (proc->body == NULL) {
 		ssa_fprintf(f, "declare ");
 	} else {
-		ssa_fprintf(f, "define ");
+		ssa_fprintf(f, "\ndefine ");
 	}
 
 	auto *proc_type = &proc->type->proc;
@@ -697,7 +697,7 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 				ssa_print_instr(f, m, value);
 			}
 		}
-		ssa_fprintf(f, "}\n\n");
+		ssa_fprintf(f, "}\n");
 	}
 
 	gb_for_array(i, proc->children) {

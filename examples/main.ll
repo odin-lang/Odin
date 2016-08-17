@@ -22,9 +22,11 @@
 %PROC = type void ()*
 %wglCreateContextAttribsARBType = type %HGLRC (%HDC, %.rawptr, i32*)*
 %PIXELFORMATDESCRIPTOR = type {i32, i32, i32, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i32, i32, i32}
+%Bitmap = type {i32, i32, i32, {i8*, i64, i64}}
 declare void @llvm.memmove.p0i8.p0i8.i64(i8*, i8*, i64, i32, i1) argmemonly nounwind 
 
 @win32_perf_count_freq = global i64 zeroinitializer
+
 define double @time_now() {
 entry.-.0:
 	%0 = load i64, i64* @win32_perf_count_freq, align 8
@@ -250,103 +252,131 @@ if.done.-.4:
 	store i64 27, i64* %85
 	%86 = load %.string, %.string* %83, align 8
 	store %.string %86, %.string* %81
-	%87 = alloca %wglCreateContextAttribsARBType, align 8 ; wglCreateContextAttribsARB
-	store %wglCreateContextAttribsARBType zeroinitializer, %wglCreateContextAttribsARBType* %87
+	%87 = alloca i8*, align 8 ; c_wgl_string
+	store i8* zeroinitializer, i8** %87
 	%88 = getelementptr inbounds %.string, %.string* %81, i64 0, i32 0
 	%89 = load i8*, i8** %88, align 8
 	%90 = getelementptr i8, i8* %89, i64 0
 	%91 = getelementptr inbounds i8, i8* %90
-	%92 = call %PROC @wglGetProcAddress(i8* %91)
-	%93 = bitcast void ()* %92 to %HGLRC (%HDC, %.rawptr, i32*)*
-	%94 = bitcast %HGLRC (%HDC, %.rawptr, i32*)* %93 to %HGLRC (%HDC, %.rawptr, i32*)*
-	store %wglCreateContextAttribsARBType %94, %wglCreateContextAttribsARBType* %87
-	%95 = alloca %HGLRC, align 8 ; rc
-	store %HGLRC zeroinitializer, %HGLRC* %95
-	%96 = load %wglCreateContextAttribsARBType, %wglCreateContextAttribsARBType* %87, align 8
-	%97 = load %HDC, %HDC* %45, align 8
-	%98 = getelementptr inbounds [8 x i32], [8 x i32]* %71, i64 0, i64 0
-	%99 = getelementptr i32, i32* %98, i64 0
-	%100 = getelementptr inbounds i32, i32* %99
-	%101 = call %HGLRC %96(%HDC %97, %.rawptr null, i32* %100)
-	store %HGLRC %101, %HGLRC* %95
-	%102 = load %HDC, %HDC* %45, align 8
-	%103 = load %HGLRC, %HGLRC* %95, align 8
-	%104 = call %BOOL @wglMakeCurrent(%HDC %102, %HGLRC %103)
-	%105 = load %HDC, %HDC* %45, align 8
-	%106 = call %BOOL @SwapBuffers(%HDC %105)
-	%107 = alloca double, align 8 ; start_time
-	store double zeroinitializer, double* %107
-	%108 = call double @time_now()
-	store double %108, double* %107
-	%109 = alloca i1, align 1 ; running
-	store i1 zeroinitializer, i1* %109
-	store i1 false, i1* %109
+	store i8* %91, i8** %87
+	%92 = alloca %wglCreateContextAttribsARBType, align 8 ; wglCreateContextAttribsARB
+	store %wglCreateContextAttribsARBType zeroinitializer, %wglCreateContextAttribsARBType* %92
+	%93 = load i8*, i8** %87, align 8
+	%94 = call %PROC @wglGetProcAddress(i8* %93)
+	%95 = bitcast void ()* %94 to %HGLRC (%HDC, %.rawptr, i32*)*
+	%96 = bitcast %HGLRC (%HDC, %.rawptr, i32*)* %95 to %HGLRC (%HDC, %.rawptr, i32*)*
+	store %wglCreateContextAttribsARBType %96, %wglCreateContextAttribsARBType* %92
+	%97 = alloca %HGLRC, align 8 ; rc
+	store %HGLRC zeroinitializer, %HGLRC* %97
+	%98 = load %wglCreateContextAttribsARBType, %wglCreateContextAttribsARBType* %92, align 8
+	%99 = load %HDC, %HDC* %45, align 8
+	%100 = getelementptr inbounds [8 x i32], [8 x i32]* %71, i64 0, i64 0
+	%101 = getelementptr i32, i32* %100, i64 0
+	%102 = getelementptr inbounds i32, i32* %101
+	%103 = call %HGLRC %98(%HDC %99, %.rawptr null, i32* %102)
+	store %HGLRC %103, %HGLRC* %97
+	%104 = load %HDC, %HDC* %45, align 8
+	%105 = load %HGLRC, %HGLRC* %97, align 8
+	%106 = call %BOOL @wglMakeCurrent(%HDC %104, %HGLRC %105)
+	%107 = load %HDC, %HDC* %45, align 8
+	%108 = call %BOOL @SwapBuffers(%HDC %107)
+	%109 = alloca double, align 8 ; start_time
+	store double zeroinitializer, double* %109
+	%110 = call double @time_now()
+	store double %110, double* %109
+	%111 = alloca i1, align 1 ; running
+	store i1 zeroinitializer, i1* %111
+	store i1 true, i1* %111
 	br label %for.loop.-.6
 
 for.body.-.5:
-	%110 = alloca double, align 8 ; curr_time
-	store double zeroinitializer, double* %110
-	%111 = call double @time_now()
-	store double %111, double* %110
-	%112 = alloca double, align 8 ; dt
+	%112 = alloca double, align 8 ; curr_time
 	store double zeroinitializer, double* %112
-	%113 = load double, double* %107, align 8
-	%114 = load double, double* %110, align 8
-	%115 = fsub double %114, %113
-	store double %115, double* %112
+	%113 = call double @time_now()
+	store double %113, double* %112
+	%114 = alloca double, align 8 ; dt
+	store double zeroinitializer, double* %114
+	%115 = load double, double* %109, align 8
 	%116 = load double, double* %112, align 8
-	%117 = fcmp ogt double %116, 0x4000000000000000
-	br i1 %117, label %if.then.-.7, label %if.done.-.8
+	%117 = fsub double %116, %115
+	store double %117, double* %114
+	%118 = alloca %MSG, align 8 ; msg
+	store %MSG zeroinitializer, %MSG* %118
+	br label %for.body.-.7
 
 for.loop.-.6:
-	%118 = load i1, i1* %109, align 1
-	br i1 %118, label %for.body.-.5, label %for.done.-.16
+	%119 = load i1, i1* %111, align 1
+	br i1 %119, label %for.body.-.5, label %for.done.-.16
 
-if.then.-.7:
-	store i1 false, i1* %109
-	br label %if.done.-.8
-
-if.done.-.8:
-	%119 = alloca %MSG, align 8 ; msg
-	store %MSG zeroinitializer, %MSG* %119
-	br label %for.body.-.9
-
-for.body.-.9:
+for.body.-.7:
 	%120 = alloca i1, align 1 ; ok
 	store i1 zeroinitializer, i1* %120
-	%121 = getelementptr inbounds %MSG, %MSG* %119
+	%121 = getelementptr inbounds %MSG, %MSG* %118
 	%122 = call %BOOL @PeekMessageA(%MSG* %121, %HWND null, i32 0, i32 0, i32 1)
 	%123 = icmp ne i32 %122, 0
 	store i1 %123, i1* %120
 	%124 = load i1, i1* %120, align 1
-	br i1 %124, label %if.done.-.11, label %if.then.-.10
+	br i1 %124, label %if.done.-.9, label %if.then.-.8
 
-if.then.-.10:
-	br label %for.done.-.15
+if.then.-.8:
+	br label %for.done.-.12
 
-if.done.-.11:
-	%125 = getelementptr inbounds %MSG, %MSG* %119, i64 0, i32 1
+if.done.-.9:
+	%125 = getelementptr inbounds %MSG, %MSG* %118, i64 0, i32 1
 	%126 = load i32, i32* %125, align 4
 	%127 = icmp eq i32 %126, 18
-	br i1 %127, label %if.then.-.12, label %if.else.-.13
+	br i1 %127, label %if.then.-.10, label %if.done.-.11
 
-if.then.-.12:
-	ret void
+if.then.-.10:
+	store i1 false, i1* %111
+	br label %for.done.-.12
 
-if.else.-.13:
-	%128 = getelementptr inbounds %MSG, %MSG* %119
+if.done.-.11:
+	%128 = getelementptr inbounds %MSG, %MSG* %118
 	%129 = call %BOOL @TranslateMessage(%MSG* %128)
-	%130 = getelementptr inbounds %MSG, %MSG* %119
+	%130 = getelementptr inbounds %MSG, %MSG* %118
 	%131 = call %LRESULT @DispatchMessageA(%MSG* %130)
-	br label %if.done.-.14
+	br label %for.body.-.7
 
-if.done.-.14:
-	br label %for.body.-.9
+for.done.-.12:
+	call void @glClearColor(float 0x3fe0000000000000, float 0x3fe6666660000000, float 0x3ff0000000000000, float 0x3ff0000000000000)
+	call void @glClear(i32 16384)
+	call void @glBegin(i32 4)
+	call void @glColor3f(float 0x3ff0000000000000, float 0x0000000000000000, float 0x0000000000000000)
+	call void @glVertex3f(float 0x3fe0000000000000, float 0xbfe0000000000000, float 0x0000000000000000)
+	call void @glColor3f(float 0x0000000000000000, float 0x3ff0000000000000, float 0x0000000000000000)
+	call void @glVertex3f(float 0x3fe0000000000000, float 0x3fe0000000000000, float 0x0000000000000000)
+	call void @glColor3f(float 0x0000000000000000, float 0x0000000000000000, float 0x3ff0000000000000)
+	call void @glVertex3f(float 0xbfe0000000000000, float 0x3fe0000000000000, float 0x0000000000000000)
+	call void @glColor3f(float 0x0000000000000000, float 0x0000000000000000, float 0x3ff0000000000000)
+	call void @glVertex3f(float 0xbfe0000000000000, float 0x3fe0000000000000, float 0x0000000000000000)
+	call void @glColor3f(float 0x3ff0000000000000, float 0x3ff0000000000000, float 0x0000000000000000)
+	call void @glVertex3f(float 0xbfe0000000000000, float 0xbfe0000000000000, float 0x0000000000000000)
+	call void @glColor3f(float 0x3ff0000000000000, float 0x0000000000000000, float 0x0000000000000000)
+	call void @glVertex3f(float 0x3fe0000000000000, float 0xbfe0000000000000, float 0x0000000000000000)
+	br label %defer.-.13
 
-for.done.-.15:
+defer.-.13:
+	call void @glEnd()
 	%132 = load %HDC, %HDC* %45, align 8
 	%133 = call %BOOL @SwapBuffers(%HDC %132)
-	call void @sleep_ms(i32 2)
+	%134 = alloca i32, align 4 ; ms
+	store i32 zeroinitializer, i32* %134
+	%135 = load double, double* %114, align 8
+	%136 = fmul double %135, 0x408f400000000000
+	%137 = fsub double 0x4030000000000000, %136
+	%138 = fptosi double %137 to i32
+	store i32 %138, i32* %134
+	%139 = load i32, i32* %134, align 4
+	%140 = icmp sgt i32 %139, 0
+	br i1 %140, label %if.then.-.14, label %if.done.-.15
+
+if.then.-.14:
+	%141 = load i32, i32* %134, align 4
+	call void @sleep_ms(i32 %141)
+	br label %if.done.-.15
+
+if.done.-.15:
 	br label %for.loop.-.6
 
 for.done.-.16:
@@ -1028,7 +1058,6 @@ if.else.-.2:
 if.done.-.3:
 	ret void
 }
-
 declare %HANDLE @GetStdHandle(i32 %h) ; foreign
 declare i32 @CloseHandle(%HANDLE %h) ; foreign
 declare i32 @WriteFileA(%HANDLE %h, %.rawptr %buf, i32 %len, i32* %written_result, %.rawptr %overlapped) ; foreign
@@ -1040,6 +1069,7 @@ declare i32 @ScreenToClient(%HWND %h, %POINT* %p) ; foreign
 declare %HINSTANCE @GetModuleHandleA(i8* %module_name) ; foreign
 declare i32 @QueryPerformanceFrequency(i64* %result) ; foreign
 declare i32 @QueryPerformanceCounter(i64* %result) ; foreign
+
 define void @sleep_ms(i32 %ms) {
 entry.-.0:
 	%0 = alloca i32, align 4 ; ms
@@ -1049,7 +1079,6 @@ entry.-.0:
 	%2 = call i32 @Sleep(i32 %1)
 	ret void
 }
-
 declare i32 @Sleep(i32 %ms) declare void @OutputDebugStringA(i8* %c_str) ; foreign
 declare %ATOM @RegisterClassExA(%WNDCLASSEXA* %wc) ; foreign
 declare %HWND @CreateWindowExA(i32 %ex_style, i8* %class_name, i8* %title, i32 %style, i32 %x, i32 %y, i32 %w, i32 %h, %HWND %parent, %HMENU %menu, %HINSTANCE %instance, %.rawptr %param) ; foreign
@@ -1059,6 +1088,7 @@ declare %BOOL @PeekMessageA(%MSG* %msg, %HWND %hwnd, i32 %msg_filter_min, i32 %m
 declare %BOOL @TranslateMessage(%MSG* %msg) ; foreign
 declare %LRESULT @DispatchMessageA(%MSG* %msg) ; foreign
 declare %LRESULT @DefWindowProcA(%HWND %hwnd, i32 %msg, %WPARAM %wparam, %LPARAM %lparam) ; foreign
+
 define i64 @GetQueryPerformanceFrequency() {
 entry.-.0:
 	%0 = alloca i64, align 8 ; r
@@ -1068,22 +1098,201 @@ entry.-.0:
 	%3 = load i64, i64* %0, align 8
 	ret i64 %3
 }
-
 declare %HDC @GetDC(%HANDLE %h) ; foreign
 declare %BOOL @SetPixelFormat(%HDC %hdc, i32 %pixel_format, %PIXELFORMATDESCRIPTOR* %pfd) ; foreign
 declare i32 @ChoosePixelFormat(%HDC %hdc, %PIXELFORMATDESCRIPTOR* %pfd) ; foreign
+declare %BOOL @SwapBuffers(%HDC %hdc) ; foreign
 declare %HGLRC @wglCreateContext(%HDC %hdc) ; foreign
 declare %BOOL @wglMakeCurrent(%HDC %hdc, %HGLRC %hglrc) ; foreign
 declare %PROC @wglGetProcAddress(i8* %c_str) ; foreign
 declare %BOOL @wglDeleteContext(%HGLRC %hglrc) ; foreign
-declare %BOOL @SwapBuffers(%HDC %hdc) ; foreign
-declare i32 @putchar(i32 %c) ; foreign
+declare void @glClear(i32 %mask) ; foreign
+declare void @glClearColor(float %r, float %g, float %b, float %a) ; foreign
+declare void @glBegin(i32 %mode) ; foreign
+declare void @glEnd() ; foreign
+declare void @glColor3f(float %r, float %g, float %b) ; foreign
+declare void @glColor4f(float %r, float %g, float %b, float %a) ; foreign
+declare void @glVertex3f(float %x, float %y, float %z) ; foreign
+declare void @glTexCoord2f(float %u, float %v) ; foreign
+declare void @glLoadIdentity() ; foreign
+declare void @glOrtho(double %left, double %right, double %bottom, double %top, double %near, double %far) ; foreign
+declare void @glBlendFunc(i32 %sfactor, i32 %dfactor) ; foreign
+declare void @glEnable(i32 %cap) ; foreign
+declare void @glDisable(i32 %cap) ; foreign
+declare void @glGenTextures(i32 %count, i32* %result) ; foreign
+declare void @glTexParameteri(i32 %target, i32 %pname, i32 %param) ; foreign
+declare void @glTexParameterf(i32 %target, i32 %pname, float %param) ; foreign
+declare void @glBindTexture(i32 %target, i32 %texture) ; foreign
+declare void @glTexImage2D(i32 %target, i32 %level, i32 %internal_format, i32 %width, i32 %height, i32 %border, i32 %format, i32 %_type, %.rawptr %pixels) ; foreign
+
+define %Bitmap @make_bitmap(%.string %filename) {
+entry.-.0:
+	%0 = alloca %.string, align 8 ; filename
+	store %.string zeroinitializer, %.string* %0
+	store %.string %filename, %.string* %0
+	%1 = alloca [1024 x i8], align 1 ; c_buf
+	store [1024 x i8] zeroinitializer, [1024 x i8]* %1
+	%2 = alloca {i8*, i64, i64}, align 8 ; bytes
+	store {i8*, i64, i64} zeroinitializer, {i8*, i64, i64}* %2
+	%3 = load %.string, %.string* %0, align 8
+	%4 = alloca %.string, align 8 
+	store %.string zeroinitializer, %.string* %4
+	store %.string %3, %.string* %4
+	%5 = getelementptr inbounds %.string, %.string* %4, i64 0, i32 0
+	%6 = load i8*, i8** %5, align 8
+	%7 = alloca i8*, align 8 
+	store i8* zeroinitializer, i8** %7
+	store i8* %6, i8** %7
+	%8 = getelementptr inbounds %.string, %.string* %4, i64 0, i32 1
+	%9 = load i64, i64* %8, align 8
+	%10 = sub i64 %9, 0
+	%11 = sub i64 %9, 0
+	%12 = load i8*, i8** %7, align 8
+	%13 = getelementptr i8, i8* %12, i64 0
+	%14 = alloca {i8*, i64, i64}, align 8 
+	store {i8*, i64, i64} zeroinitializer, {i8*, i64, i64}* %14
+	%15 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %14, i64 0, i32 0
+	store i8* %13, i8** %15
+	%16 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %14, i64 0, i32 1
+	store i64 %10, i64* %16
+	%17 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %14, i64 0, i32 2
+	store i64 %11, i64* %17
+	%18 = load {i8*, i64, i64}, {i8*, i64, i64}* %14, align 8
+	store {i8*, i64, i64} %18, {i8*, i64, i64}* %2
+	%19 = alloca i64, align 8 ; str_len
+	store i64 zeroinitializer, i64* %19
+	%20 = sub i64 1024, 0
+	%21 = sub i64 1024, 0
+	%22 = getelementptr inbounds [1024 x i8], [1024 x i8]* %1, i64 0, i64 0
+	%23 = getelementptr i8, i8* %22, i64 0
+	%24 = alloca {i8*, i64, i64}, align 8 
+	store {i8*, i64, i64} zeroinitializer, {i8*, i64, i64}* %24
+	%25 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %24, i64 0, i32 0
+	store i8* %23, i8** %25
+	%26 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %24, i64 0, i32 1
+	store i64 %20, i64* %26
+	%27 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %24, i64 0, i32 2
+	store i64 %21, i64* %27
+	%28 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %24, i64 0, i32 0
+	%29 = load i8*, i8** %28, align 8
+	%30 = bitcast i8* %29 to %.rawptr
+	%31 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %2, i64 0, i32 0
+	%32 = load i8*, i8** %31, align 8
+	%33 = bitcast i8* %32 to %.rawptr
+	%34 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %24, i64 0, i32 1
+	%35 = load i64, i64* %34, align 8
+	%36 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %2, i64 0, i32 1
+	%37 = load i64, i64* %36, align 8
+	%38 = icmp slt i64 %35, %37
+	%39 = select i1 %38, i64 %35, i64 %37
+	%40 = mul i64 %39, 1
+	call void @llvm.memmove.p0i8.p0i8.i64(i8* %30, i8* %33, i64 %40, i32 1, i1 false)
+	store i64 %39, i64* %19
+	%41 = alloca %Bitmap, align 8 ; b
+	store %Bitmap zeroinitializer, %Bitmap* %41
+	%42 = alloca i8*, align 8 ; pixels
+	store i8* zeroinitializer, i8** %42
+	%43 = getelementptr inbounds [1024 x i8], [1024 x i8]* %1, i64 0, i64 0
+	%44 = getelementptr i8, i8* %43, i64 0
+	%45 = getelementptr inbounds i8, i8* %44
+	%46 = getelementptr inbounds %Bitmap, %Bitmap* %41, i64 0, i32 0
+	%47 = getelementptr inbounds i32, i32* %46
+	%48 = getelementptr inbounds %Bitmap, %Bitmap* %41, i64 0, i32 1
+	%49 = getelementptr inbounds i32, i32* %48
+	%50 = getelementptr inbounds %Bitmap, %Bitmap* %41, i64 0, i32 2
+	%51 = getelementptr inbounds i32, i32* %50
+	%52 = call i8* @stbi_load(i8* %45, i32* %47, i32* %49, i32* %51, i32 4)
+	store i8* %52, i8** %42
+	%53 = alloca i64, align 8 ; len
+	store i64 zeroinitializer, i64* %53
+	%54 = getelementptr inbounds %Bitmap, %Bitmap* %41, i64 0, i32 2
+	%55 = load i32, i32* %54, align 4
+	%56 = getelementptr inbounds %Bitmap, %Bitmap* %41, i64 0, i32 1
+	%57 = load i32, i32* %56, align 4
+	%58 = getelementptr inbounds %Bitmap, %Bitmap* %41, i64 0, i32 0
+	%59 = load i32, i32* %58, align 4
+	%60 = mul i32 %59, %57
+	%61 = mul i32 %60, %55
+	%62 = zext i32 %61 to i64
+	store i64 %62, i64* %53
+	%63 = getelementptr inbounds %Bitmap, %Bitmap* %41, i64 0, i32 3
+	%64 = load i64, i64* %53, align 8
+	%65 = sub i64 %64, 0
+	%66 = sub i64 %64, 0
+	%67 = load i8*, i8** %42, align 8
+	%68 = getelementptr i8, i8* %67, i64 0
+	%69 = alloca {i8*, i64, i64}, align 8 
+	store {i8*, i64, i64} zeroinitializer, {i8*, i64, i64}* %69
+	%70 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %69, i64 0, i32 0
+	store i8* %68, i8** %70
+	%71 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %69, i64 0, i32 1
+	store i64 %65, i64* %71
+	%72 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %69, i64 0, i32 2
+	store i64 %66, i64* %72
+	%73 = load {i8*, i64, i64}, {i8*, i64, i64}* %69, align 8
+	store {i8*, i64, i64} %73, {i8*, i64, i64}* %63
+	%74 = load %Bitmap, %Bitmap* %41, align 8
+	ret %Bitmap %74
+}
+declare i8* @stbi_load(i8* %filename, i32* %x, i32* %y, i32* %comp, i32 %req_comp) 
+define void @destroy_bitmap(%Bitmap* %b) {
+entry.-.0:
+	%0 = alloca %Bitmap*, align 8 ; b
+	store %Bitmap* zeroinitializer, %Bitmap** %0
+	store %Bitmap* %b, %Bitmap** %0
+	%1 = load %Bitmap*, %Bitmap** %0, align 8
+	%2 = getelementptr %Bitmap, %Bitmap* %1, i64 0
+	%3 = getelementptr inbounds %Bitmap, %Bitmap* %2, i64 0, i32 3
+	%4 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %3, i64 0, i32 0
+	%5 = load i8*, i8** %4, align 8
+	%6 = getelementptr i8, i8* %5, i64 0
+	%7 = getelementptr inbounds i8, i8* %6
+	call void @stbi_image_free(%.rawptr %7)
+	%8 = load %Bitmap*, %Bitmap** %0, align 8
+	%9 = getelementptr %Bitmap, %Bitmap* %8, i64 0
+	%10 = getelementptr inbounds %Bitmap, %Bitmap* %9, i64 0, i32 3
+	%11 = load %Bitmap*, %Bitmap** %0, align 8
+	%12 = getelementptr %Bitmap, %Bitmap* %11, i64 0
+	%13 = getelementptr inbounds %Bitmap, %Bitmap* %12, i64 0, i32 3
+	%14 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %13, i64 0, i32 2
+	%15 = load i64, i64* %14, align 8
+	%16 = sub i64 0, 0
+	%17 = sub i64 %15, 0
+	%18 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %13, i64 0, i32 0
+	%19 = load i8*, i8** %18, align 8
+	%20 = getelementptr i8, i8* %19, i64 0
+	%21 = alloca {i8*, i64, i64}, align 8 
+	store {i8*, i64, i64} zeroinitializer, {i8*, i64, i64}* %21
+	%22 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %21, i64 0, i32 0
+	store i8* %20, i8** %22
+	%23 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %21, i64 0, i32 1
+	store i64 %16, i64* %23
+	%24 = getelementptr inbounds {i8*, i64, i64}, {i8*, i64, i64}* %21, i64 0, i32 2
+	store i64 %17, i64* %24
+	%25 = load {i8*, i64, i64}, {i8*, i64, i64}* %21, align 8
+	store {i8*, i64, i64} %25, {i8*, i64, i64}* %10
+	%26 = load %Bitmap*, %Bitmap** %0, align 8
+	%27 = getelementptr %Bitmap, %Bitmap* %26, i64 0
+	%28 = getelementptr inbounds %Bitmap, %Bitmap* %27, i64 0, i32 0
+	store i32 0, i32* %28
+	%29 = load %Bitmap*, %Bitmap** %0, align 8
+	%30 = getelementptr %Bitmap, %Bitmap* %29, i64 0
+	%31 = getelementptr inbounds %Bitmap, %Bitmap* %30, i64 0, i32 1
+	store i32 0, i32* %31
+	%32 = load %Bitmap*, %Bitmap** %0, align 8
+	%33 = getelementptr %Bitmap, %Bitmap* %32, i64 0
+	%34 = getelementptr inbounds %Bitmap, %Bitmap* %33, i64 0, i32 2
+	store i32 0, i32* %34
+	ret void
+}
+declare void @stbi_image_free(%.rawptr %retval_from_stbi_load) declare i32 @putchar(i32 %c) ; foreign
 declare %.rawptr @malloc(i64 %sz) ; foreign
 declare void @free(%.rawptr %ptr) ; foreign
 declare i32 @memcmp(%.rawptr %dst, %.rawptr %src, i64 %len) ; foreign
 declare i32 @memcpy(%.rawptr %dst, %.rawptr %src, i64 %len) ; foreign
 declare i32 @memmove(%.rawptr %dst, %.rawptr %src, i64 %len) ; foreign
 declare void @llvm.debugtrap() ; foreign
+
 define i1 @__string_eq(%.string %a, %.string %b) {
 entry.-.0:
 	%0 = alloca %.string, align 8 ; a
@@ -1322,7 +1531,6 @@ entry.-.0:
 	%5 = icmp sge i64 %4, 0
 	ret i1 %5
 }
-
 @.str0 = global [14 x i8] c"GetLastError\3A\20"
 @.str1 = global [1 x i8] c"\0A"
 @.str2 = global [19 x i8] c"Odin-Language-Demo\00"
@@ -1332,10 +1540,10 @@ entry.-.0:
 @.str6 = global [64 x i8] c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\40$"
 @.str7 = global [4 x i8] c"true"
 @.str8 = global [5 x i8] c"false"
+
 define void @__$startup_runtime() noinline {
 entry.-.0:
 	%0 = call i64 @GetQueryPerformanceFrequency()
 	store i64 %0, i64* @win32_perf_count_freq
 	ret void
 }
-

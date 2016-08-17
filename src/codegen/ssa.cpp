@@ -1120,9 +1120,7 @@ ssaValue *ssa_string_elem(ssaProcedure *proc, ssaValue *string) {
 	Type *result_type = make_type_pointer(proc->module->allocator, base_type);
 	elem->instr.get_element_ptr.elem_type = t;
 	elem->instr.get_element_ptr.result_type = result_type;
-	ssa_emit(proc, elem);
-
-	return ssa_emit_load(proc, elem);
+	return ssa_emit_load(proc, ssa_emit(proc, elem));
 }
 ssaValue *ssa_string_len(ssaProcedure *proc, ssaValue *string) {
 	Type *t = ssa_value_type(string);
@@ -1373,12 +1371,17 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 		ssaValue *str = ssa_add_local_generated(proc, src);
 		ssa_emit_store(proc, str, value);
 		ssaValue *elem = ssa_string_elem(proc, str);
+		ssaValue *elem_ptr = ssa_add_local_generated(proc, ssa_value_type(elem));
+		ssa_emit_store(proc, elem_ptr, elem);
+
 		ssaValue *len  = ssa_string_len(proc, str);
-		return ssa_emit_load(proc, ssa_emit_slice(proc, dst, elem, v_zero, len, len));
+		ssaValue *slice = ssa_emit_slice(proc, dst, elem_ptr, v_zero, len, len);
+		return ssa_emit_load(proc, slice);
 	}
 
 
-	gb_printf("Not Identical %s != %s\n", type_to_string(src_type), type_to_string(t));
+	gb_printf_err("Not Identical %s != %s\n", type_to_string(src_type), type_to_string(t));
+	gb_printf_err("Not Identical %s != %s\n", type_to_string(src), type_to_string(dst));
 
 
 	GB_PANIC("Invalid type conversion: `%s` to `%s`", type_to_string(src_type), type_to_string(t));
@@ -1850,21 +1853,24 @@ ssaLvalue ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(se, SelectorExpr, expr);
-		Type *type = type_of_expr(proc->module->info, se->expr);
+		Type *type = get_base_type(type_of_expr(proc->module->info, se->expr));
 
 		isize field_index = 0;
 		Entity *entity = lookup_field(type, unparen_expr(se->selector), &field_index);
 		GB_ASSERT(entity != NULL);
 
 		ssaValue *e = ssa_build_addr(proc, se->expr).address;
+		Type *gep_type = entity->type;
 
-		if (type->kind == Type_Pointer) {
+		if (is_type_pointer(type)) {
 			// NOTE(bill): Allow x^.y and x.y to be the same
-			type = type_deref(type);
+			gep_type = type_deref(gep_type);
 			e = ssa_emit_load(proc, e);
+			e = ssa_emit_ptr_offset(proc, e, v_zero);
+			ssa_value_set_type(e, type_deref(type));
 		}
 
-		ssaValue *v = ssa_emit_struct_gep(proc, e, field_index, entity->type);
+		ssaValue *v = ssa_emit_struct_gep(proc, e, field_index, gep_type);
 		return ssa_make_lvalue(v, expr);
 	case_end;
 
