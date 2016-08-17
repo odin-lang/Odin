@@ -409,7 +409,10 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 	case_ast_node(pt, ProcType, e);
 		type = alloc_type(c->allocator, Type_Proc);
 		set_base_type(named_type, type);
+		CheckerContext context = c->context;
+		c->context.scope = make_scope(c->context.scope, c->allocator);
 		check_procedure_type(c, type, e);
+		c->context = context;
 		goto end;
 	case_end;
 

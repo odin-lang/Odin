@@ -144,7 +144,12 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 			if (i > 0) {
 				ssa_fprintf(f, ", ");
 			}
-			ssa_print_type(f, s, t->structure.fields[i]->type);
+			Type *ft = t->structure.fields[i]->type;
+			Type *bft = get_base_type(ft);
+			if (bft->kind != Type_Structure) {
+				ft = bft;
+			}
+			ssa_print_type(f, s, ft);
 		}
 		ssa_fprintf(f, "}");
 		if (t->structure.is_packed) {

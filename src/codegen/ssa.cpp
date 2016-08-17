@@ -1824,7 +1824,8 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 
 	ssaValue *value = NULL;
 	if (tv->mode == Addressing_Variable) {
-		value = ssa_lvalue_load(proc, ssa_build_addr(proc, expr));
+		ssaLvalue addr = ssa_build_addr(proc, expr);
+		value = ssa_lvalue_load(proc, addr);
 	} else {
 		value = ssa_build_single_expr(proc, expr, tv);
 	}
@@ -1844,7 +1845,11 @@ ssaLvalue ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		Entity *e = entity_of_ident(proc->module->info, expr);
 		ssaValue *v = NULL;
 		ssaValue **found = map_get(&proc->module->values, hash_pointer(e));
-		if (found) v = *found;
+		if (found) {
+			v = *found;
+		} else {
+			GB_PANIC("Unknown value: %s, entity: %p\n", expr_to_string(expr), e);
+		}
 		return ssa_make_lvalue(v, expr);
 	case_end;
 
@@ -1860,17 +1865,15 @@ ssaLvalue ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		GB_ASSERT(entity != NULL);
 
 		ssaValue *e = ssa_build_addr(proc, se->expr).address;
-		Type *gep_type = entity->type;
 
 		if (is_type_pointer(type)) {
 			// NOTE(bill): Allow x^.y and x.y to be the same
-			gep_type = type_deref(gep_type);
 			e = ssa_emit_load(proc, e);
 			e = ssa_emit_ptr_offset(proc, e, v_zero);
 			ssa_value_set_type(e, type_deref(type));
 		}
 
-		ssaValue *v = ssa_emit_struct_gep(proc, e, field_index, gep_type);
+		ssaValue *v = ssa_emit_struct_gep(proc, e, field_index, entity->type);
 		return ssa_make_lvalue(v, expr);
 	case_end;
 

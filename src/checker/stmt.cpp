@@ -737,7 +737,6 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			c->in_defer = true;
 			check_stmt(c, ds->stmt, 0);
 			c->in_defer = out_in_defer;
-			check_add_deferred_stmt(c, ds->stmt);
 		}
 	case_end;
 

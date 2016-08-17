@@ -101,7 +101,6 @@ struct Scope {
 	Scope *prev, *next;
 	Scope *first_child, *last_child;
 	Map<Entity *> elements; // Key: String
-	gbArray(AstNode *) deferred_stmts;
 };
 
 enum ExpressionKind {
@@ -196,7 +195,6 @@ Scope *make_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
 	map_init(&s->elements, gb_heap_allocator());
-	gb_array_init(s->deferred_stmts, gb_heap_allocator());
 	if (parent != NULL && parent != universal_scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
 	}
@@ -511,12 +509,6 @@ void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *dec
 	info.type  = type;
 	info.body  = body;
 	gb_array_append(c->procs, info);
-}
-
-void check_add_deferred_stmt(Checker *c, AstNode *stmt) {
-	GB_ASSERT(stmt != NULL);
-	GB_ASSERT(is_ast_node_stmt(stmt));
-	gb_array_append(c->context.scope->deferred_stmts, stmt);
 }
 
 void push_procedure(Checker *c, Type *type) {
