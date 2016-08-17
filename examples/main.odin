@@ -1,7 +1,24 @@
 #load "basic.odin"
+main :: proc() {
+	a := {4}f32{1}; // {1, 1, 1, 1} broadcasts to all
+	a = swizzle({4}f32{1, 2, 3, 4}, 1, 3, 2, 0);
+
+	for i := 0; i < len(a); i++ {
+		if i > 0 {
+			print_string(", ");
+		}
+
+		print_int(a[i] as int);
+	}
+	print_string("\n");
+
+}
+
+/*
 #load "win32.odin"
 #load "opengl.odin"
 #load "stb_image.odin"
+#load "math.odin"
 
 win32_perf_count_freq := GetQueryPerformanceFrequency();
 time_now :: proc() -> f64 {
@@ -148,48 +165,54 @@ display_window :: proc(w: ^Window) {
 
 
 
-main :: proc() {
-	WINDOW_WIDTH  :: 854;
-	WINDOW_HEIGHT :: 480;
 
-	window, window_success := make_window("Odin Language Demo", WINDOW_WIDTH, WINDOW_HEIGHT);
+main :: proc() {
+	window, window_success := make_window("Odin Language Demo", 854, 480);
 	if !window_success {
 		return;
 	}
 	defer destroy_window(^window);
 
-	start_time := time_now();
+	{
+		v := Vec2{1, 2};
+		c := v * 2;
+	}
+
+
+	prev_time := time_now();
 	running := true;
 	for running {
 		curr_time := time_now();
-		dt := curr_time - start_time;
+		dt := (curr_time - prev_time) as f32;
+		prev_time = curr_time;
 
 		if update_window(^window) {
 			running = false;
 		}
 
-
 		glClearColor(0.5, 0.7, 1.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT);
-		// glOrtho(0, WINDOW_WIDTH, 0, WINDOW_HEIGHT, -1, +1);
 
-		{
+		glLoadIdentity();
+		glOrtho(0, window.width as f64,
+		        0, window.height as f64, 0, 1);
+		draw_rect :: proc(x, y, w, h: f32) {
 			glBegin(GL_TRIANGLES);
-			defer glEnd();
+			glColor3f(1, 0, 0); glVertex3f(x,   y,   0);
+			glColor3f(0, 1, 0); glVertex3f(x+w, y,   0);
+			glColor3f(0, 0, 1); glVertex3f(x+w, y+h, 0);
 
-			glColor3f(1, 0, 0); glVertex3f(+0.5, -0.5, 0);
-			glColor3f(0, 1, 0); glVertex3f(+0.5, +0.5, 0);
-			glColor3f(0, 0, 1); glVertex3f(-0.5, +0.5, 0);
+			glColor3f(0, 0, 1); glVertex3f(x+w, y+h, 0);
+			glColor3f(1, 1, 0); glVertex3f(x,   y+h, 0);
+			glColor3f(1, 0, 0); glVertex3f(x,   y,   0);
 
-			glColor3f(0, 0, 1); glVertex3f(-0.5, +0.5, 0);
-			glColor3f(1, 1, 0); glVertex3f(-0.5, -0.5, 0);
-			glColor3f(1, 0, 0); glVertex3f(+0.5, -0.5, 0);
+			glEnd();
 		}
+
+		x, y : f32 = 100, 100;
+		draw_rect(x, y, 50, 50);
 
 		display_window(^window);
-		{
-			ms := (16 - dt*1000) as i32;
-			if ms > 0 { sleep_ms(ms); }
-		}
 	}
 }
+*/

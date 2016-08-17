@@ -31,6 +31,7 @@ glBegin         :: proc(mode: i32) #foreign
 glEnd           :: proc() #foreign
 glColor3f       :: proc(r, g, b: f32) #foreign
 glColor4f       :: proc(r, g, b, a: f32) #foreign
+glVertex2f      :: proc(x, y: f32) #foreign
 glVertex3f      :: proc(x, y, z: f32) #foreign
 glTexCoord2f    :: proc(u, v: f32) #foreign
 glLoadIdentity  :: proc() #foreign

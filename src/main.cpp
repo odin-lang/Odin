@@ -84,8 +84,8 @@ int main(int argc, char **argv) {
 				if (exit_code == 0) {
 					win32_exec_command_line_app(
 						"clang -o %.*s.exe %.*s.bc -Wno-override-module "
-						" ../c_libs/stb_image.c -DSTB_IMAGE_IMPLEMENTATION "
-						"-lkernel32.lib -luser32.lib -lgdi32.lib -lopengl32.lib",
+						"-lkernel32.lib -luser32.lib -lgdi32.lib -lopengl32.lib "
+						"-l../c_libs/stb_image.lib",
 						cast(int)base_name_len, output_name,
 						cast(int)base_name_len, output_name);
 					if (run_output) {

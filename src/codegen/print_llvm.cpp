@@ -164,9 +164,6 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 	case Type_Named:
 		ssa_print_encoded_local(f, t->named.name);
 		break;
-	case Type_Alias:
-		ssa_print_type(f, s, t->alias.base);
-		break;
 	case Type_Tuple:
 		if (t->tuple.variable_count == 1) {
 			ssa_print_type(f, s, t->tuple.variables[0]->type);
@@ -632,6 +629,29 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, " ");
 		ssa_print_value(f, m, ie->index, ssa_value_type(ie->index));
 
+		ssa_fprintf(f, "\n");
+	} break;
+
+	case ssaInstr_ShuffleVector: {
+		auto *sv = &instr->shuffle_vector;
+		Type *vt = ssa_value_type(sv->vector);
+		ssa_fprintf(f, "%%%d = shufflevector ", value->id);
+
+		ssa_print_type(f, m->sizes, vt);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, sv->vector, vt);
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m->sizes, vt);
+		ssa_fprintf(f, " undef,");
+
+		ssa_fprintf(f, " <%td x i32> <", sv->index_count);
+		for (isize i = 0; i < sv->index_count; i++) {
+			if (i > 0) {
+				ssa_fprintf(f, ", ");
+			}
+			ssa_fprintf(f, "i32 %d", sv->indices[i]);
+		}
+		ssa_fprintf(f, ">");
 		ssa_fprintf(f, "\n");
 	} break;
 

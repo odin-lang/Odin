@@ -208,6 +208,12 @@ struct ssaInstr {
 			ssaValue *elem;
 			ssaValue *index;
 		} insert_element;
+		struct {
+			ssaValue *vector;
+			i32 *indices;
+			isize index_count;
+			Type *type;
+		} shuffle_vector;
 
 		struct {} startup_runtime;
 	};
@@ -291,8 +297,9 @@ ssaLvalue ssa_make_lvalue_vector(ssaValue *address, ssaValue *index, AstNode *ex
 
 
 void ssa_module_init(ssaModule *m, Checker *c) {
+	// TODO(bill): Determine a decent size for the arena
 	isize token_count = c->parser->total_token_count;
-	isize arena_size = 3 * token_count * gb_size_of(ssaValue);
+	isize arena_size = 4 * token_count * gb_size_of(ssaValue);
 	gb_arena_init_from_allocator(&m->arena, gb_heap_allocator(), arena_size);
 	m->allocator = gb_arena_allocator(&m->arena);
 	m->info = &c->info;
@@ -354,6 +361,8 @@ Type *ssa_instr_type(ssaInstr *instr) {
 	} break;
 	case ssaInstr_InsertElement:
 		return ssa_value_type(instr->insert_element.vector);
+	case ssaInstr_ShuffleVector:
+		return instr->shuffle_vector.type;
 	}
 	return NULL;
 }
@@ -645,6 +654,21 @@ ssaValue *ssa_make_instr_insert_element(ssaProcedure *p, ssaValue *vector, ssaVa
 	v->instr.insert_element.vector = vector;
 	v->instr.insert_element.elem   = elem;
 	v->instr.insert_element.index  = index;
+	if (p->curr_block) {
+		gb_array_append(p->curr_block->values, v);
+	}
+	return v;
+}
+
+ssaValue *ssa_make_instr_shuffle_vector(ssaProcedure *p, ssaValue *vector, i32 *indices, isize index_count) {
+	ssaValue *v = ssa_alloc_instr(p->module->allocator, ssaInstr_ShuffleVector);
+	v->instr.shuffle_vector.vector      = vector;
+	v->instr.shuffle_vector.indices     = indices;
+	v->instr.shuffle_vector.index_count = index_count;
+
+	Type *vt = get_base_type(ssa_value_type(vector));
+	v->instr.shuffle_vector.type = make_type_vector(p->module->allocator, vt->vector.elem, index_count);
+
 	if (p->curr_block) {
 		gb_array_append(p->curr_block->values, v);
 	}
@@ -1379,6 +1403,23 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 		return ssa_emit_load(proc, slice);
 	}
 
+	if (is_type_vector(dst)) {
+		Type *dst_elem = dst->vector.elem;
+		value = ssa_emit_conv(proc, value, dst_elem);
+		ssaValue *v = ssa_add_local_generated(proc, t);
+		v = ssa_emit_load(proc, v);
+		v = ssa_emit(proc, ssa_make_instr_insert_element(proc, v, value, v_zero32));
+		// NOTE(bill): Broadcast lowest value to all values
+		isize index_count = dst->vector.count;
+		i32 *indices = gb_alloc_array(proc->module->allocator, i32, index_count);
+		for (isize i = 0; i < index_count; i++) {
+			indices[i] = 0;
+		}
+
+		v = ssa_emit(proc, ssa_make_instr_shuffle_vector(proc, v, indices, index_count));
+		return v;
+	}
+
 
 	gb_printf_err("Not Identical %s != %s\n", type_to_string(src_type), type_to_string(t));
 	gb_printf_err("Not Identical %s != %s\n", type_to_string(src), type_to_string(dst));
@@ -1574,6 +1615,15 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 				ssaValue *i = ssa_make_value_constant(proc->module->allocator, t_int, make_exact_value_integer(index));
 				result = ssa_emit(proc, ssa_make_instr_insert_element(proc, result, ev, i));
 			}
+			if (index == 1 && base_type->vector.count > 1) {
+				isize index_count = base_type->vector.count;
+				i32 *indices = gb_alloc_array(proc->module->allocator, i32, index_count);
+				for (isize i = 0; i < index_count; i++) {
+					indices[i] = 0;
+				}
+				return ssa_emit(proc, ssa_make_instr_shuffle_vector(proc, result, indices, index_count));
+			}
+
 			return result;
 		} break;
 
@@ -1750,6 +1800,27 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					return ssa_emit_conv(proc, cond, t_bool);
 				} break;
+
+				case BuiltinProc_swizzle: {
+					ssaValue *vector = ssa_build_expr(proc, ce->arg_list);
+					isize index_count = ce->arg_list_count-1;
+					if (index_count == 0) {
+						return vector;
+					}
+
+					i32 *indices = gb_alloc_array(proc->module->allocator, i32, index_count);
+					isize index = 0;
+					for (AstNode *arg = ce->arg_list->next; arg != NULL; arg = arg->next) {
+						TypeAndValue *tv = type_and_value_of_expression(proc->module->info, arg);
+						GB_ASSERT(is_type_integer(tv->type));
+						GB_ASSERT(tv->value.kind == ExactValue_Integer);
+						indices[index++] = cast(i32)tv->value.value_integer;
+					}
+
+					return ssa_emit(proc, ssa_make_instr_shuffle_vector(proc, vector, indices, index_count));
+
+				} break;
+
 				case BuiltinProc_print: {
 					// print :: proc(...)
 					GB_PANIC("TODO(bill): BuiltinProc_print");

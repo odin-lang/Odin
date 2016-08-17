@@ -369,18 +369,6 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *named_type
 	set_base_type(named, get_base_type(get_base_type(named)));
 }
 
-void check_alias_decl(Checker *c, Entity *e, AstNode *type_expr, Type *alias_type) {
-	GB_ASSERT(e->type == NULL);
-	Type *named = make_type_alias(c->allocator, e->token.string, NULL, e);
-	named->alias.alias_name = e;
-	set_base_type(alias_type, named);
-	e->type = named;
-
-	check_type(c, type_expr, named);
-
-	set_base_type(named, get_base_type(get_base_type(named)));
-}
-
 void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body) {
 	GB_ASSERT(body->kind == AstNode_BlockStmt);
 
@@ -495,9 +483,6 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 		break;
 	case Entity_TypeName:
 		check_type_decl(c, e, d->type_expr, named_type);
-		break;
-	case Entity_AliasName:
-		check_alias_decl(c, e, d->type_expr, named_type);
 		break;
 	case Entity_Procedure:
 		check_proc_decl(c, e, d, true);

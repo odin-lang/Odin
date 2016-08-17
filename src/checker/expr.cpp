@@ -409,10 +409,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 	case_ast_node(pt, ProcType, e);
 		type = alloc_type(c->allocator, Type_Proc);
 		set_base_type(named_type, type);
-		CheckerContext context = c->context;
-		c->context.scope = make_scope(c->context.scope, c->allocator);
 		check_procedure_type(c, type, e);
-		c->context = context;
 		goto end;
 	case_end;
 
@@ -979,7 +976,10 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		return;
 	}
 
-	if (token_is_shift(be->op)) {
+	Token op = be->op;
+
+
+	if (token_is_shift(op)) {
 		check_shift(c, x, y, node);
 		return;
 	}
@@ -992,7 +992,6 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		return;
 	}
 
-	Token op = be->op;
 	if (token_is_comparison(op)) {
 		check_comparison(c, x, y, op);
 		return;
@@ -1616,6 +1615,54 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->mode = Addressing_Value;
 	} break;
 
+	case BuiltinProc_swizzle: {
+		// swizzle :: proc(v: {N}T, T...) -> {M}T
+		Type *vector_type = get_base_type(operand->type);
+		if (!is_type_vector(vector_type)) {
+			gbString type_str = type_to_string(operand->type);
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(call),
+			      "You can only `swizzle` a vector, got `%s`",
+			      type_str);
+			return false;
+		}
+
+		isize max_count = vector_type->vector.count;
+		isize arg_count = 0;
+		for (AstNode *arg = ce->arg_list->next; arg != NULL; arg = arg->next) {
+			Operand op = {};
+			check_expr(c, &op, arg);
+			if (op.mode == Addressing_Invalid)
+				return false;
+			Type *arg_type = get_base_type(op.type);
+			if (!is_type_integer(arg_type) || op.mode != Addressing_Constant) {
+				error(&c->error_collector, ast_node_token(op.expr), "Indices to `swizzle` must be constant integers");
+				return false;
+			}
+
+			if (op.value.value_integer < 0) {
+				error(&c->error_collector, ast_node_token(op.expr), "Negative `swizzle` index");
+				return false;
+			}
+
+			if (max_count <= op.value.value_integer) {
+				error(&c->error_collector, ast_node_token(op.expr), "`swizzle` index exceeds vector length");
+				return false;
+			}
+
+			arg_count++;
+		}
+
+		if (arg_count > max_count) {
+			error(&c->error_collector, ast_node_token(call), "Too many `swizzle` indices, %td > %td", arg_count, max_count);
+			return false;
+		}
+
+		Type *elem_type = vector_type->vector.elem;
+		operand->type = make_type_vector(c->allocator, elem_type, arg_count);
+		operand->mode = Addressing_Value;
+	}
+
 	case BuiltinProc_print:
 	case BuiltinProc_println: {
 		for (AstNode *arg = ce->arg_list; arg != NULL; arg = arg->next) {
@@ -1958,7 +2005,12 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 				if (t->kind == Type_Array &&
 				    t->array.count >= 0 &&
 				    index >= t->array.count) {
-					error(&c->error_collector, ast_node_token(elem), "Index %lld is out of bounds (>= %lld)", index, t->array.count);
+					error(&c->error_collector, ast_node_token(elem), "Index %lld is out of bounds (>= %lld) for array literal", index, t->array.count);
+				}
+				if (t->kind == Type_Vector &&
+				    t->vector.count >= 0 &&
+				    index >= t->vector.count) {
+					error(&c->error_collector, ast_node_token(elem), "Index %lld is out of bounds (>= %lld) for vector literal", index, t->vector.count);
 				}
 
 				Operand o = {};
@@ -1967,6 +2019,13 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 			}
 			if (max < index)
 				max = index;
+
+			if (t->kind == Type_Vector) {
+				if (t->vector.count > 1 && gb_is_between(index, 2, t->vector.count-1)) {
+					error(&c->error_collector, ast_node_token(cl->elem_list),
+					      "Expected either 1 (broadcast) or %td elements in vector literal, got %td", t->vector.count, index);
+				}
+			}
 
 			if (t->kind == Type_Array && ellipsis_array) {
 				t->array.count = max;

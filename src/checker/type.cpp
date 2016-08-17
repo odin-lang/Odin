@@ -64,7 +64,6 @@ struct BasicType {
 	TYPE_KIND(Structure), \
 	TYPE_KIND(Pointer), \
 	TYPE_KIND(Named), \
-	TYPE_KIND(Alias), \
 	TYPE_KIND(Tuple), \
 	TYPE_KIND(Proc), \
 	TYPE_KIND(Count),
@@ -111,11 +110,6 @@ struct Type {
 			Entity *type_name; // Entity_TypeName
 		} named;
 		struct {
-			String  name;
-			Type *  base;
-			Entity *alias_name; // Entity_AliasName
-		} alias;
-		struct {
 			Entity **variables; // Entity_Variable
 			isize    variable_count;
 		} tuple;
@@ -130,12 +124,8 @@ struct Type {
 };
 
 Type *get_base_type(Type *t) {
-	while (t->kind == Type_Named || t->kind == Type_Alias) {
-		if (t->kind == Type_Named) {
-			t = t->named.base;
-		} else {
-			t = t->alias.base;
-		}
+	while (t->kind == Type_Named) {
+		t = t->named.base;
 	}
 	return t;
 }
@@ -143,8 +133,6 @@ Type *get_base_type(Type *t) {
 void set_base_type(Type *t, Type *base) {
 	if (t && t->kind == Type_Named) {
 		t->named.base = base;
-	} else if (t && t->kind == Type_Alias) {
-		t->alias.base = base;
 	}
 }
 
@@ -198,14 +186,6 @@ Type *make_type_named(gbAllocator a, String name, Type *base, Entity *type_name)
 	t->named.name = name;
 	t->named.base = base;
 	t->named.type_name = type_name;
-	return t;
-}
-
-Type *make_type_alias(gbAllocator a, String name, Type *base, Entity *alias_name) {
-	Type *t = alloc_type(a, Type_Alias);
-	t->alias.name = name;
-	t->alias.base = base;
-	t->alias.alias_name = alias_name;
 	return t;
 }
 
@@ -465,15 +445,10 @@ b32 are_types_identical(Type *x, Type *y) {
 			return are_types_identical(x->pointer.elem, y->pointer.elem);
 		break;
 
-
-	case Type_Alias:
-		return are_types_identical(get_base_type(x), y);
-
 	case Type_Named:
 		if (y->kind == Type_Named)
 			return x->named.base == y->named.base;
 		break;
-
 
 	case Type_Tuple:
 		if (y->kind == Type_Tuple) {
@@ -734,15 +709,6 @@ gbString write_type_to_string(gbString str, Type *type) {
 		} else {
 			// NOTE(bill): Just in case
 			str = gb_string_appendc(str, "<named type>");
-		}
-		break;
-
-	case Type_Alias:
-		if (type->alias.alias_name != NULL) {
-			str = gb_string_append_length(str, type->alias.name.text, type->alias.name.len);
-		} else {
-			// NOTE(bill): Just in case
-			str = gb_string_appendc(str, "<alias type>");
 		}
 		break;
 
