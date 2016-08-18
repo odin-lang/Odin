@@ -1364,12 +1364,10 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 
 	// Pointer <-> int
 	if (is_type_pointer(src) && is_type_int_or_uint(dst)) {
-		ssaValue *p = ssa_emit_load(proc, value);
-		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_ptrtoint, p, src, dst));
+		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_ptrtoint, value, src, dst));
 	}
 	if (is_type_int_or_uint(src) && is_type_pointer(dst)) {
-		ssaValue *i = ssa_emit_load(proc, value);
-		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_inttoptr, i, src, dst));
+		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_inttoptr, value, src, dst));
 	}
 
 	// Pointer <-> Pointer
@@ -1708,7 +1706,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			Entity **found = map_get(&proc->module->info->uses, hash_pointer(p));
 			if (found && (*found)->kind == Entity_Builtin) {
 				Entity *e = *found;
-				switch (e->builtin.id) {
+				switch (e->Builtin.id) {
 				case BuiltinProc_len: {
 					// len :: proc(Type) -> int
 					// NOTE(bill): len of an array is a constant expression

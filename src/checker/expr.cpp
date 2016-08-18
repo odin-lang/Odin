@@ -162,21 +162,20 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 		add_declaration_dependency(c, e);
 		if (e->type == t_invalid)
 			return;
-		o->value = e->constant.value;
+		o->value = e->Constant.value;
 		GB_ASSERT(o->value.kind != ExactValue_Invalid);
 		o->mode = Addressing_Constant;
 		break;
 
 	case Entity_Variable:
 		add_declaration_dependency(c, e);
-		e->variable.used = true;
+		e->Variable.used = true;
 		if (e->type == t_invalid)
 			return;
 		o->mode = Addressing_Variable;
 		break;
 
 	case Entity_TypeName:
-	case Entity_AliasName:
 		o->mode = Addressing_Type;
 		break;
 
@@ -186,7 +185,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 		break;
 
 	case Entity_Builtin:
-		o->builtin_id = e->builtin.id;
+		o->builtin_id = e->Builtin.id;
 		o->mode = Addressing_Builtin;
 		break;
 
@@ -665,7 +664,10 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 
 void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 	gbString err_str = NULL;
-	defer (gb_string_free(err_str));
+	defer ({
+		if (err_str != NULL)
+			gb_string_free(err_str);
+	});
 
 	if (check_is_assignable_to(c, x, y->type) ||
 	    check_is_assignable_to(c, y, x->type)) {
@@ -673,13 +675,13 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 		switch (op.kind) {
 		case Token_CmpEq:
 		case Token_NotEq:
-			defined = is_type_comparable(x->type);
+			defined = is_type_comparable(get_base_type(x->type));
 			break;
 		case Token_Lt:
 		case Token_Gt:
 		case Token_LtEq:
 		case Token_GtEq: {
-			defined = is_type_ordered(x->type);
+			defined = is_type_ordered(get_base_type(x->type));
 		} break;
 		}
 
@@ -698,7 +700,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 		                         gb_bprintf("mismatched types `%s` and `%s`", xt, yt));
 	}
 
-	if (err_str) {
+	if (err_str != NULL) {
 		error(&c->error_collector, op, "Cannot compare expression, %s", err_str);
 		return;
 	}
@@ -893,8 +895,8 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		b32 is_const_expr = x->mode == Addressing_Constant;
 		b32 can_convert = false;
 
-		if (is_const_expr && is_type_constant_type(type)) {
-			Type *base_type = get_base_type(type);
+		Type *base_type = get_base_type(type);
+		if (is_const_expr && is_type_constant_type(base_type)) {
 			if (base_type->kind == Type_Basic) {
 				if (check_value_is_expressible(c, x->value, base_type, &x->value)) {
 					can_convert = true;
@@ -1274,7 +1276,7 @@ Entity *lookup_field(Type *type, AstNode *field_node, isize *index = NULL) {
 	case Type_Structure:
 		for (isize i = 0; i < type->structure.field_count; i++) {
 			Entity *f = type->structure.fields[i];
-			GB_ASSERT(f->kind == Entity_Variable && f->variable.is_field);
+			GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
 			String str = f->token.string;
 			if (are_strings_equal(field_str, str)) {
 				if (index) *index = i;

@@ -35,9 +35,8 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 		return cast(i32)exit_code;
 	} else {
 		// NOTE(bill): failed to create process
+		return -1;
 	}
-
-	return 0;
 }
 
 int main(int argc, char **argv) {
@@ -79,19 +78,19 @@ int main(int argc, char **argv) {
 				isize base_name_len = gb_path_extension(output_name)-1 - output_name;
 
 				i32 exit_code = win32_exec_command_line_app(
-					"opt -mem2reg %s -o %.*s.bc",
+					"../misc/llvm-bin/opt -mem2reg %s -o %.*s.bc",
 					output_name, cast(int)base_name_len, output_name);
 				if (exit_code == 0) {
 					win32_exec_command_line_app(
 						"clang -o %.*s.exe %.*s.bc -Wno-override-module "
 						"-lKernel32.lib -lUser32.lib -lGdi32.lib -lOpengl32.lib "
-						"-l../c_libs/stb_image.lib"
 						,
 						cast(int)base_name_len, output_name,
 						cast(int)base_name_len, output_name);
 					if (run_output) {
 						win32_exec_command_line_app("%.*s.exe", cast(int)base_name_len, output_name);
 					}
+				} else {
 				}
 
 				return 0;

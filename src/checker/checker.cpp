@@ -210,7 +210,7 @@ void destroy_scope(Scope *scope) {
 	gb_for_array(i, scope->elements.entries) {
 		Entity *e =scope->elements.entries[i].value;
 		if (e->kind == Entity_Variable) {
-			if (!e->variable.used) {
+			if (!e->Variable.used) {
 #if 0
 				warning(e->token, "Unused variable `%.*s`", LIT(e->token.string));
 #endif
@@ -314,7 +314,7 @@ void add_global_constant(gbAllocator a, String name, Type *type, ExactValue valu
 	Token token = {Token_Identifier};
 	token.string = name;
 	Entity *entity = alloc_entity(a, Entity_Constant, NULL, token, type);
-	entity->constant.value = value;
+	entity->Constant.value = value;
 	add_global_entity(entity);
 }
 
@@ -346,7 +346,7 @@ void init_universal_scope(void) {
 		Token token = {Token_Identifier};
 		token.string = builtin_procs[i].name;
 		Entity *entity = alloc_entity(a, Entity_Builtin, NULL, token, t_invalid);
-		entity->builtin.id = id;
+		entity->Builtin.id = id;
 		add_global_entity(entity);
 	}
 }

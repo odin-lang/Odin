@@ -1,8 +1,9 @@
 #load "basic.odin"
 #load "win32.odin"
 #load "opengl.odin"
-#load "stb_image.odin"
 #load "math.odin"
+
+TWO_HEARTS :: '💕';
 
 win32_perf_count_freq := GetQueryPerformanceFrequency();
 time_now :: proc() -> f64 {
@@ -26,7 +27,7 @@ win32_print_last_error :: proc() {
 
 // Yuk!
 to_c_string :: proc(s: string) -> ^u8 {
-	c_str := heap_alloc(len(s)+1) as ^u8;
+	c_str: ^u8 = heap_alloc(len(s)+1);
 	mem_copy(c_str, ^s[0], len(s));
 	c_str[len(s)] = 0;
 	return c_str;
@@ -38,20 +39,12 @@ type Window: struct {
 	wc: WNDCLASSEXA,
 	dc: HDC,
 	hwnd: HWND,
-	opengl_context: HGLRC,
+	opengl_context: rawptr,
 	rc: HGLRC,
 	c_title: ^u8,
 }
 
-win32_proc :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #no_inline {
-	if msg == WM_DESTROY || msg == WM_CLOSE || msg == WM_QUIT {
-		ExitProcess(0);
-		return 0;
-	}
-	return DefWindowProcA(hwnd, msg, wparam, lparam);
-}
-
-make_window :: proc(title: string, msg, height: int) -> (Window, bool) {
+make_window :: proc(title: string, msg, height: int, window_proc: WNDPROC) -> (Window, bool) {
 	w: Window;
 	w.width, w.height = msg, height;
 
@@ -66,7 +59,7 @@ make_window :: proc(title: string, msg, height: int) -> (Window, bool) {
 		style     = CS_VREDRAW | CS_HREDRAW,
 		hInstance = instance as HINSTANCE,
 		className = c_class_name,
-		wndProc   = win32_proc,
+		wndProc   = window_proc,
 	};
 
 	if RegisterClassExA(^w.wc) == 0 {
@@ -126,23 +119,6 @@ destroy_window :: proc(w: ^Window) {
 	heap_free(w.c_title);
 }
 
-update_window :: proc(w: ^Window) -> bool {
-	msg: MSG;
-	for {
-		ok := PeekMessageA(^msg, null, 0, 0, PM_REMOVE) != 0;
-		if !ok {
-			break;
-		}
-
-		if msg.message == WM_QUIT {
-			return true;
-		}
-		_ = TranslateMessage(^msg);
-		_ = DispatchMessageA(^msg);
-	}
-	return false;
-}
-
 display_window :: proc(w: ^Window) {
 	SwapBuffers(w.dc);
 }
@@ -151,11 +127,22 @@ display_window :: proc(w: ^Window) {
 
 
 main :: proc() {
-	window, window_success := make_window("Odin Language Demo", 854, 480);
+	win32_proc :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #no_inline {
+		if msg == WM_DESTROY || msg == WM_CLOSE || msg == WM_QUIT {
+			ExitProcess(0);
+			return 0;
+		}
+		return DefWindowProcA(hwnd, msg, wparam, lparam);
+	}
+	print_f64(13.37);
+	print_rune('\n');
+/*
+	window, window_success := make_window("Odin Language Demo", 854, 480, win32_proc);
 	if !window_success {
 		return;
 	}
 	defer destroy_window(^window);
+
 
 	prev_time := time_now();
 	running := true;
@@ -164,8 +151,13 @@ main :: proc() {
 		dt := (curr_time - prev_time) as f32;
 		prev_time = curr_time;
 
-		if update_window(^window) {
-			running = false;
+		msg: MSG;
+		for PeekMessageA(^msg, null, 0, 0, PM_REMOVE) > 0 {
+			if msg.message == WM_QUIT {
+				running = false;
+			}
+			_ = TranslateMessage(^msg);
+			_ = DispatchMessageA(^msg);
 		}
 
 		glClearColor(0.5, 0.7, 1.0, 1.0);
@@ -176,6 +168,7 @@ main :: proc() {
 		        0, window.height as f64, 0, 1);
 		draw_rect :: proc(x, y, w, h: f32) {
 			glBegin(GL_TRIANGLES);
+
 			glColor3f(1, 0, 0); glVertex3f(x,   y,   0);
 			glColor3f(0, 1, 0); glVertex3f(x+w, y,   0);
 			glColor3f(0, 0, 1); glVertex3f(x+w, y+h, 0);
@@ -187,9 +180,14 @@ main :: proc() {
 			glEnd();
 		}
 
-		x, y : f32 = 100, 100;
+		x, y : f32 = 100+50*sinf(curr_time as f32), 100;
 		draw_rect(x, y, 50, 50);
 
 		display_window(^window);
+		ms_to_sleep := (16 - 1000*dt) as i32;
+		if ms_to_sleep > 0 {
+			sleep_ms(ms_to_sleep);
+		}
 	}
+*/
 }

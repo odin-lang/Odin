@@ -172,7 +172,7 @@ gb_no_inline void warning(Token token, char *fmt, ...) {
 
 
 
-
+// NOTE(bill): result == priority
 i32 token_precedence(Token t) {
 	switch (t.kind) {
 	case Token_CmpOr:

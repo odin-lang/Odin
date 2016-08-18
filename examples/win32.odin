@@ -24,20 +24,20 @@ PM_REMOVE :: 1;
 COLOR_BACKGROUND: rawptr : 1; // NOTE(bill): cast to HBRUSH when needed
 
 
-type HANDLE: rawptr
-type HWND: HANDLE
-type HDC: HANDLE
+type HANDLE:    rawptr
+type HWND:      HANDLE
+type HDC:       HANDLE
 type HINSTANCE: HANDLE
-type HICON: HANDLE
-type HCURSOR: HANDLE
-type HMENU: HANDLE
-type HBRUSH: HANDLE
-type WPARAM: uint
-type LPARAM: int
-type LRESULT: int
-type ATOM: i16
+type HICON:     HANDLE
+type HCURSOR:   HANDLE
+type HMENU:     HANDLE
+type HBRUSH:    HANDLE
+type WPARAM:    uint
+type LPARAM:    int
+type LRESULT:   int
+type ATOM:      i16
+type BOOL:      i32
 type POINT: struct { x, y: i32 }
-type BOOL: i32
 
 type WNDPROC: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT
 

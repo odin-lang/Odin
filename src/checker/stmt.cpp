@@ -190,14 +190,14 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 		ast_node(i, Ident, node);
 		e = scope_lookup_entity(c->context.scope, i->token.string);
 		if (e != NULL && e->kind == Entity_Variable) {
-			used = e->variable.used; // TODO(bill): Make backup just in case
+			used = e->Variable.used; // TODO(bill): Make backup just in case
 		}
 	}
 
 
 	Operand op_b = {Addressing_Invalid};
 	check_expr(c, &op_b, lhs);
-	if (e) e->variable.used = used;
+	if (e) e->Variable.used = used;
 
 	if (op_b.mode == Addressing_Invalid ||
 	    op_b.type == t_invalid) {
@@ -325,18 +325,18 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	if (operand->mode == Addressing_Invalid)
 		return;
 
-	e->constant.value = operand->value;
+	e->Constant.value = operand->value;
 }
 
 
 void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr) {
 	GB_ASSERT(e->type == NULL);
 
-	if (e->variable.visited) {
+	if (e->Variable.visited) {
 		e->type = t_invalid;
 		return;
 	}
-	e->variable.visited = true;
+	e->Variable.visited = true;
 
 	if (type_expr) {
 		Type *t = check_type(c, type_expr);
@@ -437,11 +437,11 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	GB_ASSERT(e->type == NULL);
 	GB_ASSERT(e->kind == Entity_Variable);
 
-	if (e->variable.visited) {
+	if (e->Variable.visited) {
 		e->type = t_invalid;
 		return;
 	}
-	e->variable.visited = true;
+	e->Variable.visited = true;
 
 	if (type_expr != NULL)
 		e->type = check_type(c, type_expr, NULL);
@@ -791,11 +791,11 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			for (isize i = 0; i < entity_count; i++) {
 				Entity *e = entities[i];
 				GB_ASSERT(e != NULL);
-				if (e->variable.visited) {
+				if (e->Variable.visited) {
 					e->type = t_invalid;
 					continue;
 				}
-				e->variable.visited = true;
+				e->Variable.visited = true;
 
 				if (e->type == NULL)
 					e->type = init_type;
