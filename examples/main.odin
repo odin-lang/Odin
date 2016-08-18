@@ -1,20 +1,4 @@
 #load "basic.odin"
-main :: proc() {
-	a := {4}f32{1}; // {1, 1, 1, 1} broadcasts to all
-	a = swizzle({4}f32{1, 2, 3, 4}, 1, 3, 2, 0);
-
-	for i := 0; i < len(a); i++ {
-		if i > 0 {
-			print_string(", ");
-		}
-
-		print_int(a[i] as int);
-	}
-	print_string("\n");
-
-}
-
-/*
 #load "win32.odin"
 #load "opengl.odin"
 #load "stb_image.odin"
@@ -173,12 +157,6 @@ main :: proc() {
 	}
 	defer destroy_window(^window);
 
-	{
-		v := Vec2{1, 2};
-		c := v * 2;
-	}
-
-
 	prev_time := time_now();
 	running := true;
 	for running {
@@ -215,4 +193,3 @@ main :: proc() {
 		display_window(^window);
 	}
 }
-*/
