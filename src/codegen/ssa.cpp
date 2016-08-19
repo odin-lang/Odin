@@ -1818,15 +1818,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					return ssa_emit(proc, ssa_make_instr_shuffle_vector(proc, vector, indices, index_count));
 
 				} break;
-
-				case BuiltinProc_print: {
-					// print :: proc(...)
-					GB_PANIC("TODO(bill): BuiltinProc_print");
-				} break;
-				case BuiltinProc_println: {
-					// println :: proc(...)
-					GB_PANIC("TODO(bill): BuiltinProc_println");
-				} break;
 				}
 			}
 		}

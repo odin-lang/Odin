@@ -1470,7 +1470,6 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 	case BuiltinProc_static_assert:
 		// static_assert :: proc(cond: bool)
-		// TODO(bill): Should `static_assert` and `assert` be unified?
 
 		if (operand->mode != Addressing_Constant ||
 		    !is_type_boolean(operand->type)) {
@@ -1663,17 +1662,6 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		Type *elem_type = vector_type->vector.elem;
 		operand->type = make_type_vector(c->allocator, elem_type, arg_count);
 		operand->mode = Addressing_Value;
-	}
-
-	case BuiltinProc_print:
-	case BuiltinProc_println: {
-		for (AstNode *arg = ce->arg_list; arg != NULL; arg = arg->next) {
-			// TOOD(bill): `check_assignment` doesn't allow tuples at the moment, should it?
-			// Or should we destruct the tuple and use each elem?
-			check_assignment(c, operand, NULL, make_string("argument"));
-			if (operand->mode == Addressing_Invalid)
-				return false;
-		}
 	} break;
 	}
 

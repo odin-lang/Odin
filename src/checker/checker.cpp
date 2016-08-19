@@ -124,8 +124,6 @@ enum BuiltinProcId {
 	BuiltinProc_copy,
 	BuiltinProc_append,
 	BuiltinProc_swizzle,
-	BuiltinProc_print,
-	BuiltinProc_println,
 
 	BuiltinProc_Count,
 };
@@ -152,10 +150,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("append"),           2, false, Expression_Expression},
 
 	{STR_LIT("swizzle"),          1, true,  Expression_Expression},
-
-	{STR_LIT("print"),            1, true,  Expression_Statement},
-	{STR_LIT("println"),          1, true,  Expression_Statement},
-
 };
 
 struct CheckerContext {

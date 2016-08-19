@@ -641,10 +641,13 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, " ");
 		ssa_print_value(f, m, sv->vector, vt);
 		ssa_fprintf(f, ", ");
-		ssa_print_type(f, m->sizes, vt);
-		ssa_fprintf(f, " undef,");
 
-		ssa_fprintf(f, " <%td x i32> <", sv->index_count);
+		ssa_print_type(f, m->sizes, vt);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, sv->vector, vt);
+		ssa_fprintf(f, ", ");
+
+		ssa_fprintf(f, "<%td x i32> <", sv->index_count);
 		for (isize i = 0; i < sv->index_count; i++) {
 			if (i > 0) {
 				ssa_fprintf(f, ", ");

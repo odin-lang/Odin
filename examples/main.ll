@@ -1031,38 +1031,6 @@ for.done.-.8:
 	ret void
 }
 
-define void @print_pointer(%.rawptr %p) alwaysinline {
-entry.-.0:
-	%0 = alloca %.rawptr, align 8 ; p
-	store %.rawptr zeroinitializer, %.rawptr* %0
-	store %.rawptr %p, %.rawptr* %0
-	%1 = load %.rawptr, %.rawptr* %0, align 8
-	%2 = ptrtoint %.rawptr %1 to i64
-	call void @print__uint(i64 %2, i64 16, i64 0, i8 32)
-	ret void
-}
-
-define void @print_f32(float %f) alwaysinline {
-entry.-.0:
-	%0 = alloca float, align 4 ; f
-	store float zeroinitializer, float* %0
-	store float %f, float* %0
-	%1 = load float, float* %0, align 4
-	%2 = fpext float %1 to double
-	call void @print__f64(double %2, i64 7)
-	ret void
-}
-
-define void @print_f64(double %f) alwaysinline {
-entry.-.0:
-	%0 = alloca double, align 8 ; f
-	store double zeroinitializer, double* %0
-	store double %f, double* %0
-	%1 = load double, double* %0, align 8
-	call void @print__f64(double %1, i64 10)
-	ret void
-}
-
 define void @print_bool(i1 %b) {
 entry.-.0:
 	%0 = alloca i1, align 1 ; b
@@ -1096,6 +1064,38 @@ if.else.-.2:
 	br label %if.done.-.3
 
 if.done.-.3:
+	ret void
+}
+
+define void @print_pointer(%.rawptr %p) alwaysinline {
+entry.-.0:
+	%0 = alloca %.rawptr, align 8 ; p
+	store %.rawptr zeroinitializer, %.rawptr* %0
+	store %.rawptr %p, %.rawptr* %0
+	%1 = load %.rawptr, %.rawptr* %0, align 8
+	%2 = ptrtoint %.rawptr %1 to i64
+	call void @print__uint(i64 %2, i64 16, i64 0, i8 32)
+	ret void
+}
+
+define void @print_f32(float %f) alwaysinline {
+entry.-.0:
+	%0 = alloca float, align 4 ; f
+	store float zeroinitializer, float* %0
+	store float %f, float* %0
+	%1 = load float, float* %0, align 4
+	%2 = fpext float %1 to double
+	call void @print__f64(double %2, i64 7)
+	ret void
+}
+
+define void @print_f64(double %f) alwaysinline {
+entry.-.0:
+	%0 = alloca double, align 8 ; f
+	store double zeroinitializer, double* %0
+	store double %f, double* %0
+	%1 = load double, double* %0, align 8
+	call void @print__f64(double %1, i64 10)
 	ret void
 }
 
