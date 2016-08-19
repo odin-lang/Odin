@@ -125,8 +125,7 @@ display_window :: proc(w: ^Window) {
 
 
 
-
-main :: proc() {
+run_game :: proc() {
 	win32_proc :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #no_inline {
 		if msg == WM_DESTROY || msg == WM_CLOSE || msg == WM_QUIT {
 			ExitProcess(0);
@@ -134,9 +133,7 @@ main :: proc() {
 		}
 		return DefWindowProcA(hwnd, msg, wparam, lparam);
 	}
-	print_f64(13.37);
-	print_rune('\n');
-/*
+
 	window, window_success := make_window("Odin Language Demo", 854, 480, win32_proc);
 	if !window_success {
 		return;
@@ -189,5 +186,4 @@ main :: proc() {
 			sleep_ms(ms_to_sleep);
 		}
 	}
-*/
 }

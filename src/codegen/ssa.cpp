@@ -908,7 +908,9 @@ ssaValue *ssa_lvalue_store(ssaProcedure *proc, ssaLvalue lval, ssaValue *value) 
 		if (lval.is_vector) {
 			// HACK(bill): Fix how lvalues for vectors work
 			ssaValue *v = ssa_emit_load(proc, lval.address);
-			ssaValue *out = ssa_emit(proc, ssa_make_instr_insert_element(proc, v, value, lval.index));
+			Type *elem_type = get_base_type(ssa_value_type(v))->vector.elem;
+			ssaValue *elem = ssa_emit_conv(proc, value, elem_type);
+			ssaValue *out = ssa_emit(proc, ssa_make_instr_insert_element(proc, v, elem, lval.index));
 			return ssa_emit_store(proc, lval.address, out);
 		}
 		return ssa_emit_store(proc, lval.address, value);
@@ -1401,22 +1403,22 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 		return ssa_emit_load(proc, slice);
 	}
 
-	if (is_type_vector(dst)) {
-		Type *dst_elem = dst->vector.elem;
-		value = ssa_emit_conv(proc, value, dst_elem);
-		ssaValue *v = ssa_add_local_generated(proc, t);
-		v = ssa_emit_load(proc, v);
-		v = ssa_emit(proc, ssa_make_instr_insert_element(proc, v, value, v_zero32));
-		// NOTE(bill): Broadcast lowest value to all values
-		isize index_count = dst->vector.count;
-		i32 *indices = gb_alloc_array(proc->module->allocator, i32, index_count);
-		for (isize i = 0; i < index_count; i++) {
-			indices[i] = 0;
-		}
+	// if (is_type_vector(dst)) {
+	// 	Type *dst_elem = dst->vector.elem;
+	// 	value = ssa_emit_conv(proc, value, dst_elem);
+	// 	ssaValue *v = ssa_add_local_generated(proc, t);
+	// 	v = ssa_emit_load(proc, v);
+	// 	v = ssa_emit(proc, ssa_make_instr_insert_element(proc, v, value, v_zero32));
+	// 	// NOTE(bill): Broadcast lowest value to all values
+	// 	isize index_count = dst->vector.count;
+	// 	i32 *indices = gb_alloc_array(proc->module->allocator, i32, index_count);
+	// 	for (isize i = 0; i < index_count; i++) {
+	// 		indices[i] = 0;
+	// 	}
 
-		v = ssa_emit(proc, ssa_make_instr_shuffle_vector(proc, v, indices, index_count));
-		return v;
-	}
+	// 	v = ssa_emit(proc, ssa_make_instr_shuffle_vector(proc, v, indices, index_count));
+	// 	return v;
+	// }
 
 
 	gb_printf_err("Not Identical %s != %s\n", type_to_string(src_type), type_to_string(t));
@@ -1606,10 +1608,10 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			for (AstNode *elem = cl->elem_list;
 				elem != NULL;
 				elem = elem->next, index++) {
-				ssaValue *field_expr = ssa_build_expr(proc, elem);
-				Type *t = ssa_value_type(field_expr);
+				ssaValue *field_elem = ssa_build_expr(proc, elem);
+				Type *t = ssa_value_type(field_elem);
 				GB_ASSERT(t->kind != Type_Tuple);
-				ssaValue *ev = ssa_emit_conv(proc, field_expr, et);
+				ssaValue *ev = ssa_emit_conv(proc, field_elem, et);
 				ssaValue *i = ssa_make_value_constant(proc->module->allocator, t_int, make_exact_value_integer(index));
 				result = ssa_emit(proc, ssa_make_instr_insert_element(proc, result, ev, i));
 			}
@@ -1619,7 +1621,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 				for (isize i = 0; i < index_count; i++) {
 					indices[i] = 0;
 				}
-				return ssa_emit(proc, ssa_make_instr_shuffle_vector(proc, result, indices, index_count));
+				ssaValue *sv = ssa_emit(proc, ssa_make_instr_shuffle_vector(proc, result, indices, index_count));
+				ssa_emit_store(proc, v, sv);
+				return ssa_emit_load(proc, v);
 			}
 
 			return result;
@@ -1761,14 +1765,19 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					AstNode *sptr_node = ce->arg_list;
 					AstNode *item_node = ce->arg_list->next;
 					ssaValue *slice = ssa_build_addr(proc, sptr_node).address;
-					ssaValue *item_value = ssa_build_expr(proc, item_node);
-					Type *item_type = ssa_value_type(item_value);
-					ssaValue *item = ssa_add_local_generated(proc, item_type);
-					ssa_emit_store(proc, item, item_value);
 
 					ssaValue *elem = ssa_slice_elem(proc, slice);
 					ssaValue *len = ssa_slice_len(proc, slice);
 					ssaValue *cap = ssa_slice_cap(proc, slice);
+
+					Type *elem_type = type_deref(get_base_type(ssa_value_type(elem)));
+
+					ssaValue *item_value = ssa_build_expr(proc, item_node);
+					item_value = ssa_emit_conv(proc, item_value, elem_type);
+
+					ssaValue *item = ssa_add_local_generated(proc, elem_type);
+					ssa_emit_store(proc, item, item_value);
+
 
 					// NOTE(bill): Check if can append is possible
 					Token lt = {Token_Lt};
@@ -1781,9 +1790,13 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					// Add new slice item
 					ssaValue *offset = ssa_emit_ptr_offset(proc, elem, len);
-					i64 item_size = type_size_of(proc->module->sizes, proc->module->allocator, item_type);
+					i64 item_size = type_size_of(proc->module->sizes, proc->module->allocator, elem_type);
 					ssaValue *byte_count = ssa_make_value_constant(proc->module->allocator, t_int,
 					                                               make_exact_value_integer(item_size));
+					offset = ssa_emit_conv(proc, offset, t_rawptr);
+					item = ssa_emit_ptr_offset(proc, item, v_zero);
+					ssa_value_set_type(item, make_type_pointer(proc->module->allocator, ssa_value_type(item)));
+					item = ssa_emit_conv(proc, item, t_rawptr);
 					ssa_emit(proc, ssa_make_instr_copy_memory(proc, offset, item, byte_count, 1, false));
 
 					// Increment slice length
@@ -1845,6 +1858,11 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			} else {
 				args[arg_index++] = a;
 			}
+		}
+
+		auto *pt = &proc_type_->proc.params->tuple;
+		for (isize i = 0; i < arg_count; i++) {
+			args[i] = ssa_emit_conv(proc, args[i], pt->variables[i]->type);
 		}
 
 		ssaValue *call = ssa_make_instr_call(proc, value, args, arg_count, type->results);

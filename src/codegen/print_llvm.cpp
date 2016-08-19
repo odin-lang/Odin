@@ -196,9 +196,12 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 }
 
 void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type) {
+	type = get_base_type(type);
 	if (is_type_float(type)) {
 		value = exact_value_to_float(value);
 	} else if (is_type_integer(type)) {
+		value = exact_value_to_integer(value);
+	} else if (is_type_pointer(type)) {
 		value = exact_value_to_integer(value);
 	}
 
@@ -212,7 +215,7 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 		ssa_fprintf(f, "\"");
 	} break;
 	case ExactValue_Integer: {
-		if (is_type_pointer(get_base_type(type))) {
+		if (is_type_pointer(type)) {
 			if (value.value_integer == 0) {
 				ssa_fprintf(f, "null");
 			} else {
@@ -235,14 +238,14 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 		ssa_fprintf(f, "0x%016llx", u);
 	} break;
 	case ExactValue_Pointer:
-		if (value.value_float == NULL) {
+		if (value.value_pointer == NULL) {
 			ssa_fprintf(f, "null");
 		} else {
 			GB_PANIC("TODO(bill): ExactValue_Pointer");
 		}
 		break;
 	default:
-		GB_PANIC("Invalid ExactValue");
+		GB_PANIC("Invalid ExactValue: %d", value.kind);
 		break;
 	}
 }

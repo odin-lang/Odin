@@ -108,6 +108,8 @@ ExactValue exact_value_to_integer(ExactValue v) {
 		return v;
 	case ExactValue_Float:
 		return make_exact_value_integer(cast(i64)v.value_float);
+	case ExactValue_Pointer:
+		return make_exact_value_integer(cast(i64)cast(intptr)v.value_pointer);
 	}
 	ExactValue r = {ExactValue_Invalid};
 	return r;
