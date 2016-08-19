@@ -35,13 +35,12 @@ to_c_string :: proc(s: string) -> ^u8 {
 
 
 type Window: struct {
-	width, height: int,
-	wc: WNDCLASSEXA,
-	dc: HDC,
-	hwnd: HWND,
-	opengl_context: rawptr,
-	rc: HGLRC,
-	c_title: ^u8,
+	width, height:      int,
+	wc:                 WNDCLASSEXA,
+	dc:                 HDC,
+	hwnd:               HWND,
+	opengl_context, rc: HGLRC,
+	c_title:            ^u8,
 }
 
 make_window :: proc(title: string, msg, height: int, window_proc: WNDPROC) -> (Window, bool) {
@@ -55,11 +54,11 @@ make_window :: proc(title: string, msg, height: int, window_proc: WNDPROC) -> (W
 	instance := GetModuleHandleA(null);
 
 	w.wc = WNDCLASSEXA{
-		cbSize    = size_of(WNDCLASSEXA) as u32,
-		style     = CS_VREDRAW | CS_HREDRAW,
-		hInstance = instance as HINSTANCE,
-		className = c_class_name,
-		wndProc   = window_proc,
+		size       = size_of(WNDCLASSEXA) as u32,
+		style      = CS_VREDRAW | CS_HREDRAW,
+		instance   = instance as HINSTANCE,
+		class_name = c_class_name,
+		wnd_proc   = window_proc,
 	};
 
 	if RegisterClassExA(^w.wc) == 0 {
@@ -82,15 +81,15 @@ make_window :: proc(title: string, msg, height: int, window_proc: WNDPROC) -> (W
 
 	{
 		pfd := PIXELFORMATDESCRIPTOR{
-			nSize        = size_of(PIXELFORMATDESCRIPTOR) as u32,
-			nVersion     = 1,
-			dwFlags      = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
-			iPixelType   = PFD_TYPE_RGBA,
-			cColorBits   = 32,
-			cAlphaBits   = 8,
-			cDepthBits   = 24,
-			cStencilBits = 8,
-			iLayerType   = PFD_MAIN_PLANE,
+			size         = size_of(PIXELFORMATDESCRIPTOR) as u32,
+			version      = 1,
+			flags        = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
+			pixel_type   = PFD_TYPE_RGBA,
+			color_bits   = 32,
+			alpha_bits   = 8,
+			depth_bits   = 24,
+			stencil_bits = 8,
+			layer_type   = PFD_MAIN_PLANE,
 		};
 
 		SetPixelFormat(w.dc, ChoosePixelFormat(w.dc, ^pfd), null);
@@ -124,6 +123,11 @@ display_window :: proc(w: ^Window) {
 }
 
 
+type Entity: struct {
+	pos: Vec2,
+	dim: Vec2,
+}
+
 
 run_game :: proc() {
 	win32_proc :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #no_inline {
@@ -143,6 +147,9 @@ run_game :: proc() {
 
 	prev_time := time_now();
 	running := true;
+
+	pos := Vec2{100, 100};
+
 	for running {
 		curr_time := time_now();
 		dt := (curr_time - prev_time) as f32;
@@ -157,12 +164,32 @@ run_game :: proc() {
 			_ = DispatchMessageA(^msg);
 		}
 
+		if is_key_down(VK_ESCAPE) {
+			running = false;
+		}
+
+		{
+			SPEED :: 500;
+			v: Vec2;
+
+			if is_key_down(VK_RIGHT) { v[0] += 1; }
+			if is_key_down(VK_LEFT)  { v[0] -= 1; }
+			if is_key_down(VK_UP)    { v[1] += 1; }
+			if is_key_down(VK_DOWN)  { v[1] -= 1; }
+
+			v = vec2_norm0(v);
+
+			pos += v * Vec2{SPEED * dt};
+		}
+
+
 		glClearColor(0.5, 0.7, 1.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		glLoadIdentity();
 		glOrtho(0, window.width as f64,
 		        0, window.height as f64, 0, 1);
+
 		draw_rect :: proc(x, y, w, h: f32) {
 			glBegin(GL_TRIANGLES);
 
@@ -177,8 +204,7 @@ run_game :: proc() {
 			glEnd();
 		}
 
-		x, y : f32 = 100+50*sinf(curr_time as f32), 100;
-		draw_rect(x, y, 50, 50);
+		draw_rect(pos[0], pos[1], 50, 50);
 
 		display_window(^window);
 		ms_to_sleep := (16 - 1000*dt) as i32;

@@ -77,8 +77,10 @@ void ssa_gen_code(ssaGen *s) {
 		} break;
 
 		case Entity_Variable: {
-			// TODO(bill): global runtime initialization
 			ssaValue *g = ssa_make_value_global(a, e, NULL);
+			if (decl->var_decl_tags & VarDeclTag_thread_local) {
+				g->Global.is_thread_local = true;
+			}
 			ssaGlobalVariable var = {};
 			var.var = g;
 			var.decl = decl;
@@ -95,7 +97,7 @@ void ssa_gen_code(ssaGen *s) {
 				name = pd->foreign_name;
 			}
 			ssaValue *p = ssa_make_value_procedure(a, m, e->type, decl->type_expr, body, name);
-			p->proc.tags = pd->tags;
+			p->Proc.tags = pd->tags;
 
 			map_set(&m->values, hash_pointer(e), p);
 			map_set(&m->members, hash_string(name), p);
@@ -127,7 +129,7 @@ void ssa_gen_code(ssaGen *s) {
 		map_set(&m->values, hash_pointer(e), p);
 		map_set(&m->members, hash_string(name), p);
 
-		ssaProcedure *proc = &p->proc;
+		ssaProcedure *proc = &p->Proc;
 		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
 
 		ssa_begin_procedure_body(proc);

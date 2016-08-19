@@ -874,6 +874,12 @@ b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+
+	// proc -> rawptr
+	if (is_type_proc(xb), is_type_rawptr(yb)) {
+		return true;
+	}
+
 	return false;
 }
 
@@ -912,7 +918,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			gbString type_str = type_to_string(type);
 			defer (gb_string_free(expr_str));
 			defer (gb_string_free(type_str));
-			error(&c->error_collector, ast_node_token(x->expr), "Cannot cast `%s` to `%s`", expr_str, type_str);
+			error(&c->error_collector, ast_node_token(x->expr), "Cannot cast `%s` as `%s`", expr_str, type_str);
 
 			x->mode = Addressing_Invalid;
 			return;
@@ -1199,8 +1205,18 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 			convert_untyped_error(c, operand, target_type);
 			return;
 		}
-
 		break;
+
+	case Type_Proc:
+		switch (operand->type->basic.kind) {
+		case Basic_UntypedPointer:
+			break;
+		default:
+			convert_untyped_error(c, operand, target_type);
+			return;
+		}
+		break;
+
 	default:
 		convert_untyped_error(c, operand, target_type);
 		return;
@@ -1992,6 +2008,13 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 			i64 max = 0;
 			for (AstNode *elem = cl->elem_list; elem != NULL; elem = elem->next, index++) {
 				AstNode *e = elem;
+				if (e->kind == AstNode_FieldValue) {
+					error(&c->error_collector, ast_node_token(e),
+					      "`field = value` is only allowed in structure literals");
+					continue;
+				}
+
+
 				if (t->kind == Type_Array &&
 				    t->array.count >= 0 &&
 				    index >= t->array.count) {

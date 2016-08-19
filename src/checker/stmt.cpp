@@ -119,7 +119,9 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
 		}
 	}
 
+
 	return false;
+
 }
 
 
@@ -742,8 +744,6 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		}
 	case_end;
 
-
-// Declarations
 	case_ast_node(vd, VarDecl, node);
 		isize entity_count = vd->name_count;
 		isize entity_index = 0;

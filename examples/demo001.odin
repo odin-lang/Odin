@@ -1,6 +1,7 @@
+// Demo 001
 #load "basic.odin"
 #load "math.odin"
-// #load "game.odin"
+#load "game.odin"
 
 main :: proc() {
 	_ = hellope();
@@ -9,7 +10,8 @@ main :: proc() {
 	constants();
 	types();
 	data_control();
-	// run_game();
+
+	run_game();
 }
 
 hellope :: proc() -> int {
@@ -17,9 +19,22 @@ hellope :: proc() -> int {
 	return 1;
 }
 
+
+// Line comment
+/*
+	Block Comment
+*/
+/*
+	Nested /*
+		Block /*
+			Comment
+		*/
+	*/
+*/
+
 apple, banana, carrot: bool;
 box, carboard: bool = true, false;
-hellope_value := hellope();
+hellope_value: int = hellope();
 
 variables :: proc() {
 	i: int; // initialized with zero value
@@ -39,21 +54,23 @@ variables :: proc() {
 	//
 	// f32 f64
 	//
-	// int uint (size_of(int) = size_of(rawptr))
+	// int uint (size_of(int) == size_of(uint) == size_of(rawptr))
 	//
-	// rawptr
+	// rawptr (equivalent to void * in C/C++)
 	//
 	// string
 	//
 	// byte - alias for u8
 	// rune - alias for i32 // Unicode Codepoint
 	//
-	// untyped bool      - "untyped" types can implicitly convert to any of the "typed" types
-	// untyped integer
-	// untyped float
-	// untyped pointer
-	// untyped string
-	// untyped rune
+	// "untyped" types can implicitly convert to any of the "typed" types
+	//                      Default Type
+	// untyped bool      -  bool
+	// untyped integer   -  int
+	// untyped float     -  f64
+	// untyped pointer   -  rawptr
+	// untyped string    -  string
+	// untyped rune      -  rune/i32
 
 
 	// // Zero values
@@ -62,6 +79,7 @@ variables :: proc() {
 	zero_pointer := null;
 	zero_string1 := ""; // Escaped string
 	zero_string2 := ``; // Raw string
+	// Compound types have a different kind of zero value
 
 	// Unary operators
 	// +a
@@ -70,28 +88,28 @@ variables :: proc() {
 	// !a
 
 	// Binary operators
-	// a + b
-	// a - b
-	// a ~ b
-	// a | b
+	// a + b    add
+	// a - b    sub
+	// a ~ b    xor
+	// a | b     or
 
-	// a * b
-	// a / b
-	// a % b
-	// a & b
-	// a &~ b   == a & (~b)
-	// a << b
-	// a >> b
+	// a * b    mul
+	// a / b    quo
+	// a % b    mod
+	// a & b    and
+	// a &~ b   bitclear == a & (~b)
+	// a << b   shl
+	// a >> b   shr
 
-	// a as Type
-	// a transmute Type
+	// a as Type         // Type cast
+	// a transmute Type  // Bit  cast
 
-	// a == b
-	// a != b
-	// a < b
-	// a > b
-	// a <= b
-	// a >= b
+	// a == b   eq
+	// a != b   ne
+	// a < b    lt
+	// a > b    gt
+	// a <= b   le
+	// a >= b   ge
 
 }
 
@@ -115,10 +133,11 @@ procedures :: proc() {
 	print_string(b);
 
 	a, b = b, a; // Quirk of grammar the of multiple assignments
+	             // Swap variables
 	print_string(a);
 	print_string(b);
 
-	// Not hints, it's mandatory
+	// Not a hint like C/C++, it's mandatory (unless it cannot do it but it will warn)
 	proc1 :: proc(a, b: int) #inline {
 		print_int(a + b);
 	}
@@ -136,6 +155,16 @@ constants :: proc() {
 
 	TAU_32 : f32 : 6.28318530718;
 	TAU_AS_32 :: 6.28318530718 as f32;
+
+	PI :: TAU / 2;
+
+	CLOSE_TO_PI :: 3;
+
+	DIFF :: (PI - CLOSE_TO_PI) / PI; // Evaluated at compile time
+
+	a := TAU;         // the constant's value becomes typed as f32
+	b := CLOSE_TO_PI; // the constant's value becomes typed as int
+	c := DIFF;
 }
 
 nl :: proc() { print_rune('\n'); }
@@ -147,12 +176,21 @@ types :: proc() {
 	// z: f32 = x; // invalid
 	z: f32 = x as f32;
 
-	ptr_z := ^z; // Pascal notation
+
+	ptr_z := ^z;  // Pascal notation
 	ptr_z^ = 123; // Derefence Notation
+	w: f32 = ptr_z^;  // 123
 	print_f32(z); nl();
 
 	// ^z - pointer to z
 	// z^ - z from pointer
+
+	// Implicit conversion to and from rawptr
+	r_ptr: rawptr = ptr_z;
+	ptr_z = r_ptr;
+
+
+
 
 	f32_array: [12]f32; // Array of 12 f32
 	f32_array[0] = 2;
@@ -162,15 +200,28 @@ types :: proc() {
 	f32_array_len := len(f32_array); // builtin procedure
 	f32_array_cap := cap(f32_array); // == len(f32_array)
 
+
+	mda: [2][3][4]int; // Column-major
+	// mda[x][y][z]
+
+
+
 	api: [2]^f32;
 	papi: ^[2]^f32;
 
-	f32_slice: []f32; // Array reference
+
+
+
+	f32_slice: []f32; // Slice / Array reference
 	f32_slice = f32_array[0:5];
 	f32_slice = f32_array[:5];
 	f32_slice = f32_array[:]; // f32_array[0:len(f32_array)-1];
 
-	f32_slice = f32_array[1:5:7]; // low:1, high:5, capacity:7
+	f32_slice = f32_array[1:5:7]; // low:1, high:5, max:7
+	                              // len: 5-1 == 4
+	                              // cap: 7-1 == 6
+
+
 
 	append_success := append(^f32_slice, 1);
 	_ = append(^f32_slice, 2);
@@ -178,8 +229,16 @@ types :: proc() {
 	_ = copy(f32_array[0:2], f32_array[2:4]); // You can use memcpy/memmove if you want
 
 
+
+
+
+
 	s := "Hellope World";
-	sub_string := s[5:10];
+	sub_string: string = s[5:10];
+
+
+
+
 
 	v0: {4}f32; // Vector of 4 f32
 	v0[0] = 1;
@@ -197,6 +256,11 @@ types :: proc() {
 
 	v3: {4}bool = v0 == v2;
 	// LLVM rant?
+
+
+
+
+
 
 
 	type Vec4: {4}f32;
@@ -218,7 +282,7 @@ types :: proc() {
 		b: u16,
 		c: u32,
 	}
-	static_assert(size_of(Packed) == 7);
+	static_assert(size_of(Packed) == 7); // builtin procedure
 
 
 	{
@@ -261,14 +325,16 @@ types :: proc() {
 		}
 
 		// transmute only works if the size of the types are equal
-		/{
+		/*
 			// in C
 			union {
 				i32 i;
 				f32 y;
 			};
-		 }/
+		 */
 	}
+
+
 
 	{ // Compound Literals
 		a := [3]int{1, 2, 3};
@@ -293,7 +359,10 @@ types :: proc() {
 		print_f32(i[1]); print_rune('\n');
 	}
 
-	{
+
+
+	{ // First class procedures
+
 		do_thing :: proc(p: proc(a, b: int) -> int) {
 			print_int(p(3, 4)); nl();
 		}
@@ -309,10 +378,12 @@ types :: proc() {
 
 		do_thing(add);
 		do_thing(add_lambda);
-		do_thing(proc(a, b: int) -> int {
+		do_thing(proc(a, b: int) -> int { // Anonymous
 			return a * b;
 		});
 	}
+
+
 
 	{ // strings and runes
 		escaped := "Hellope World\n";
@@ -346,11 +417,12 @@ void main() {
 }`;
 
 
-		knot1 := '⌘';
-		knot2 := '\u2318';     // 16 bit
-		knot3 := '\U00002318'; // 32 bit
-		knot4 := "\xe2\x8c\x98"; // Note it's a string, should I allow untyped string -> untyped rune casts?
+		hearts1 := '💕';
+		hearts2 := '\U0001f495'; // 32 bit
+		hearts3 := "\xf0\x9f\x92\x95"; // Note it's a string, should I allow untyped string -> untyped rune casts?
 
+		㐒 := '㐒';
+		㐒16 := '\u4db5'; // 16 bit
 		// String ideas "nicked" from Go, so far. I think I might change how some of it works later.
 	}
 
@@ -439,7 +511,7 @@ data_control :: proc() {
 
 
 
-	{
+	{ // Defer statement
 		defer print_string("日本語\n");
 		print_string("Japanese\n");
 	}
@@ -451,21 +523,26 @@ data_control :: proc() {
 	}
 
 	{
+		prev_allocator := context.allocator;
+		context.allocator = __default_allocator();
+		defer context.allocator = prev_allocator;
+
 		// C strings, yuk!
-		to_c_string :: proc(s: string) -> ^u8 {
-			c := heap_alloc(len(s)+1) as ^u8;
+		to_c_string := proc(s: string) -> ^u8 {
+			c := alloc(len(s)+1) as ^u8;
 			mem_copy(c, ^s[0], len(s));
 			c[len(s)] = 0;
 			return c;
-		}
+		};
+
 
 		fopen  :: proc(filename, mode: ^u8) -> rawptr #foreign
 		fclose :: proc(f: rawptr) -> i32 #foreign
 
 		filename := to_c_string("../examples/base.odin");
 		mode := to_c_string("rb");
-		defer heap_free(filename);
-		defer heap_free(mode);
+		defer dealloc(filename);
+		defer dealloc(mode);
 
 		f := fopen(filename, mode);
 		if f == null {
@@ -478,10 +555,10 @@ data_control :: proc() {
 		// rest of code
 
 		// Better version
-		/{
+		/*
 			type File: struct { filename: string }
 			type FileError: int
-			open_file :: proc(filename: string) -> (File, FileError) { ... }
+			open_file  :: proc(filename: string) -> (File, FileError) { ... }
 			close_file :: proc(f: ^File) { ... }
 			f, err := open_file("Test");
 			if err != 0 {
@@ -489,17 +566,17 @@ data_control :: proc() {
 			}
 			defer close_file(^f);
 
-		}/
+		 */
 
 
 	}
 
 	for i := 0; i < 100; i++ {
-		blah := heap_alloc(100 * size_of(int)) as ^int;
+		blah := alloc(100 * size_of(int)) as ^int;
 		defer {
 			defer print_string("!");
-			defer print_string("heap_free");
-			heap_free(blah);
+			defer print_string("dealloc");
+			dealloc(blah);
 		}
 
 		if i == 3 {
@@ -509,7 +586,7 @@ data_control :: proc() {
 
 		if i == 5 {
 			// defers called
-			return;
+			return; // End of procedure
 		}
 
 		if i == 8 {
@@ -522,4 +599,5 @@ data_control :: proc() {
 	print_string("It'll never happen, mate 2");
 	print_string("It'll never happen, mate 3");
 }
+
 

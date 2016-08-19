@@ -80,7 +80,13 @@ String const type_strings[] = {
 #undef TYPE_KIND
 };
 
+enum TypeFlag {
+	TypeFlag_thread_local = GB_BIT(0),
+	TypeFlag_volatile     = GB_BIT(1),
+};
+
 struct Type {
+	u32 flags;
 	TypeKind kind;
 	union {
 		BasicType basic;
@@ -206,43 +212,46 @@ Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_coun
 
 
 Type *type_deref(Type *t) {
-	if (t != NULL && t->kind == Type_Pointer)
-		return t->pointer.elem;
+	if (t != NULL) {
+		Type *bt = get_base_type(t);
+		if (bt != NULL && bt->kind == Type_Pointer)
+			return bt->pointer.elem;
+	}
 	return t;
 }
 
 
 #define STR_LIT(x) {cast(u8 *)(x), gb_size_of(x)-1}
 gb_global Type basic_types[] = {
-	{Type_Basic, {Basic_Invalid,        0,                                      STR_LIT("invalid type")}},
-	{Type_Basic, {Basic_bool,           BasicFlag_Boolean,                      STR_LIT("bool")}},
-	{Type_Basic, {Basic_i8,             BasicFlag_Integer,                      STR_LIT("i8")}},
-	{Type_Basic, {Basic_i16,            BasicFlag_Integer,                      STR_LIT("i16")}},
-	{Type_Basic, {Basic_i32,            BasicFlag_Integer,                      STR_LIT("i32")}},
-	{Type_Basic, {Basic_i64,            BasicFlag_Integer,                      STR_LIT("i64")}},
-	{Type_Basic, {Basic_i128,           BasicFlag_Integer,                      STR_LIT("i128")}},
-	{Type_Basic, {Basic_u8,             BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u8")}},
-	{Type_Basic, {Basic_u16,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u16")}},
-	{Type_Basic, {Basic_u32,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u32")}},
-	{Type_Basic, {Basic_u64,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u64")}},
-	{Type_Basic, {Basic_u128,           BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u128")}},
-	{Type_Basic, {Basic_f32,            BasicFlag_Float,                        STR_LIT("f32")}},
-	{Type_Basic, {Basic_f64,            BasicFlag_Float,                        STR_LIT("f64")}},
-	{Type_Basic, {Basic_int,            BasicFlag_Integer,                      STR_LIT("int")}},
-	{Type_Basic, {Basic_uint,           BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("uint")}},
-	{Type_Basic, {Basic_rawptr,         BasicFlag_Pointer,                      STR_LIT("rawptr")}},
-	{Type_Basic, {Basic_string,         BasicFlag_String,                       STR_LIT("string")}},
-	{Type_Basic, {Basic_UntypedBool,    BasicFlag_Boolean | BasicFlag_Untyped,  STR_LIT("untyped bool")}},
-	{Type_Basic, {Basic_UntypedInteger, BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped integer")}},
-	{Type_Basic, {Basic_UntypedFloat,   BasicFlag_Float   | BasicFlag_Untyped,  STR_LIT("untyped float")}},
-	{Type_Basic, {Basic_UntypedPointer, BasicFlag_Pointer | BasicFlag_Untyped,  STR_LIT("untyped pointer")}},
-	{Type_Basic, {Basic_UntypedString,  BasicFlag_String  | BasicFlag_Untyped,  STR_LIT("untyped string")}},
-	{Type_Basic, {Basic_UntypedRune,    BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped rune")}},
+	{0, Type_Basic, {Basic_Invalid,        0,                                      STR_LIT("invalid type")}},
+	{0, Type_Basic, {Basic_bool,           BasicFlag_Boolean,                      STR_LIT("bool")}},
+	{0, Type_Basic, {Basic_i8,             BasicFlag_Integer,                      STR_LIT("i8")}},
+	{0, Type_Basic, {Basic_i16,            BasicFlag_Integer,                      STR_LIT("i16")}},
+	{0, Type_Basic, {Basic_i32,            BasicFlag_Integer,                      STR_LIT("i32")}},
+	{0, Type_Basic, {Basic_i64,            BasicFlag_Integer,                      STR_LIT("i64")}},
+	{0, Type_Basic, {Basic_i128,           BasicFlag_Integer,                      STR_LIT("i128")}},
+	{0, Type_Basic, {Basic_u8,             BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u8")}},
+	{0, Type_Basic, {Basic_u16,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u16")}},
+	{0, Type_Basic, {Basic_u32,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u32")}},
+	{0, Type_Basic, {Basic_u64,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u64")}},
+	{0, Type_Basic, {Basic_u128,           BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u128")}},
+	{0, Type_Basic, {Basic_f32,            BasicFlag_Float,                        STR_LIT("f32")}},
+	{0, Type_Basic, {Basic_f64,            BasicFlag_Float,                        STR_LIT("f64")}},
+	{0, Type_Basic, {Basic_int,            BasicFlag_Integer,                      STR_LIT("int")}},
+	{0, Type_Basic, {Basic_uint,           BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("uint")}},
+	{0, Type_Basic, {Basic_rawptr,         BasicFlag_Pointer,                      STR_LIT("rawptr")}},
+	{0, Type_Basic, {Basic_string,         BasicFlag_String,                       STR_LIT("string")}},
+	{0, Type_Basic, {Basic_UntypedBool,    BasicFlag_Boolean | BasicFlag_Untyped,  STR_LIT("untyped bool")}},
+	{0, Type_Basic, {Basic_UntypedInteger, BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped integer")}},
+	{0, Type_Basic, {Basic_UntypedFloat,   BasicFlag_Float   | BasicFlag_Untyped,  STR_LIT("untyped float")}},
+	{0, Type_Basic, {Basic_UntypedPointer, BasicFlag_Pointer | BasicFlag_Untyped,  STR_LIT("untyped pointer")}},
+	{0, Type_Basic, {Basic_UntypedString,  BasicFlag_String  | BasicFlag_Untyped,  STR_LIT("untyped string")}},
+	{0, Type_Basic, {Basic_UntypedRune,    BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped rune")}},
 };
 
 gb_global Type basic_type_aliases[] = {
-	{Type_Basic, {Basic_byte, BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("byte")}},
-	{Type_Basic, {Basic_rune, BasicFlag_Integer,                      STR_LIT("rune")}},
+	{0, Type_Basic, {Basic_byte, BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("byte")}},
+	{0, Type_Basic, {Basic_rune, BasicFlag_Integer,                      STR_LIT("rune")}},
 };
 
 gb_global Type *t_invalid         = &basic_types[Basic_Invalid];
@@ -392,6 +401,8 @@ b32 is_type_comparable(Type *t) {
 		return is_type_comparable(t->array.elem);
 	case Type_Vector:
 		return is_type_comparable(t->vector.elem);
+	case Type_Proc:
+		return true;
 	}
 	return false;
 }

@@ -371,25 +371,25 @@ void tokenizer_skip_whitespace(Tokenizer *t) {
 			if (t->read_curr[0] == '/') { // Line comment //
 				while (t->curr_rune != '\n')
 					advance_to_next_rune(t);
-			} else if (t->read_curr[0] == '{') { // (Nested) Block comment /{}/
+			} else if (t->read_curr[0] == '*') { // (Nested) Block comment /**/
 				isize comment_scope = 1;
 				for (;;) {
 					advance_to_next_rune(t);
 					if (t->curr_rune == '/') {
 						advance_to_next_rune(t);
-						if (t->curr_rune == '{') {
+						if (t->curr_rune == '*') {
 							advance_to_next_rune(t);
 							comment_scope++;
 						}
 					}
-					if (t->curr_rune == '}') {
+					if (t->curr_rune == '*') {
 						advance_to_next_rune(t);
 						if (t->curr_rune == '/') {
 							advance_to_next_rune(t);
 							comment_scope--;
 						}
 					}
-					if (comment_scope == 0)
+					if (comment_scope <= 0)
 						break;
 				}
 			} else {

@@ -38,9 +38,9 @@ struct DeclInfo {
 	AstNode *type_expr;
 	AstNode *init_expr;
 	AstNode *proc_decl; // AstNode_ProcDecl
+	u32 var_decl_tags;
 
 	Map<b32> deps; // Key: Entity *
-	i32 mark;
 };
 
 
@@ -605,6 +605,7 @@ void check_parsed_files(Checker *c) {
 							d = make_declaration_info(gb_heap_allocator(), c->global_scope);
 							d->type_expr = vd->type;
 							d->init_expr = init_expr;
+							d->var_decl_tags = vd->tags;
 						}
 
 						add_file_entity(c, name, e, d);

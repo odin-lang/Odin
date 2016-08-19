@@ -77,6 +77,10 @@ enum ProcTag {
 	ProcTag_no_inline = GB_BIT(2),
 };
 
+enum VarDeclTag {
+	VarDeclTag_thread_local = GB_BIT(0),
+};
+
 #define AST_NODE_KINDS \
 	AST_NODE_KIND(Invalid, struct{}) \
 	AST_NODE_KIND(BasicLit, Token) \
@@ -165,6 +169,7 @@ AST_NODE_KIND(_DeclBegin,      struct{}) \
 	AST_NODE_KIND(BadDecl, struct { Token begin, end; }) \
 	AST_NODE_KIND(VarDecl, struct { \
 			DeclKind kind; \
+			u32      tags; \
 			AstNode *name_list; \
 			AstNode *type; \
 			AstNode *value_list; \
@@ -177,7 +182,7 @@ AST_NODE_KIND(_DeclBegin,      struct{}) \
 			u64     tags;            \
 			String  foreign_name;    \
 		}) \
-	AST_NODE_KIND(TypeDecl,   struct { Token token; AstNode *name, *type; }) \
+	AST_NODE_KIND(TypeDecl, struct { Token token; AstNode *name, *type; }) \
 	AST_NODE_KIND(LoadDecl, struct { Token token, filepath; }) \
 AST_NODE_KIND(_DeclEnd, struct{}) \
 AST_NODE_KIND(_TypeBegin, struct{}) \
@@ -1994,7 +1999,22 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			ast_file_err(f, token, "You cannot `load` within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
+		} else if (are_strings_equal(s->TagStmt.name.string, make_string("thread_local"))) {
+			AstNode *var_decl = parse_simple_stmt(f);
+			if (var_decl->kind != AstNode_VarDecl ||
+			    var_decl->VarDecl.kind != Declaration_Mutable) {
+				ast_file_err(f, token, "#thread_local may only be applied to variable declarations");
+				return make_bad_decl(f, token, ast_node_token(var_decl));
+			}
+			if (f->curr_scope != f->file_scope) {
+				ast_file_err(f, token, "#thread_local is only allowed at the file scope.");
+				return make_bad_decl(f, token, ast_node_token(var_decl));
+			}
+			var_decl->VarDecl.tags |= VarDeclTag_thread_local;
+			return var_decl;
 		}
+
+
 		s->TagStmt.stmt = parse_stmt(f); // TODO(bill): Find out why this doesn't work as an argument
 		return s;
 	} break;

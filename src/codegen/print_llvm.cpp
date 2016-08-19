@@ -230,10 +230,10 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 		if (is_type_float(type) && type->basic.kind == Basic_f32) {
 			// IMPORTANT NOTE(bill): LLVM requires all floating point constants to be
 			// a 64 bit number if bits_of(float type) <= 64.
-			// For some bizarre reason, you need to clear the bottom 28 bits
+			// For some bizarre reason, you need to clear the bottom 29 bits
 			// https://groups.google.com/forum/#!topic/llvm-dev/IlqV3TbSk6M
-			u >>= 28;
-			u <<= 28;
+			u >>= 29;
+			u <<= 29;
 		}
 		ssa_fprintf(f, "0x%016llx", u);
 	} break;
@@ -262,19 +262,19 @@ void ssa_print_value(gbFile *f, ssaModule *m, ssaValue *value, Type *type_hint) 
 	}
 	switch (value->kind) {
 	case ssaValue_Constant:
-		ssa_print_exact_value(f, m, value->constant.value, type_hint);
+		ssa_print_exact_value(f, m, value->Constant.value, type_hint);
 		break;
 	case ssaValue_TypeName:
-		ssa_print_encoded_local(f, value->type_name.name);
+		ssa_print_encoded_local(f, value->TypeName.name);
 		break;
 	case ssaValue_Global:
-		ssa_print_encoded_global(f, value->global.entity->token.string);
+		ssa_print_encoded_global(f, value->Global.entity->token.string);
 		break;
 	case ssaValue_Param:
-		ssa_print_encoded_local(f, value->param.entity->token.string);
+		ssa_print_encoded_local(f, value->Param.entity->token.string);
 		break;
 	case ssaValue_Proc:
-		ssa_print_encoded_global(f, value->proc.name);
+		ssa_print_encoded_global(f, value->Proc.name);
 		break;
 	case ssaValue_Instr:
 		ssa_fprintf(f, "%%%d", value->id);
@@ -284,7 +284,7 @@ void ssa_print_value(gbFile *f, ssaModule *m, ssaValue *value, Type *type_hint) 
 
 void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	GB_ASSERT(value->kind == ssaValue_Instr);
-	ssaInstr *instr = &value->instr;
+	ssaInstr *instr = &value->Instr;
 
 	ssa_fprintf(f, "\t");
 
@@ -294,14 +294,14 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_Local: {
-		Type *type = instr->local.entity->type;
+		Type *type = instr->Local.entity->type;
 		ssa_fprintf(f, "%%%d = alloca ", value->id);
 		ssa_print_type(f, m->sizes, type);
 		ssa_fprintf(f, ", align %lld ", type_align_of(m->sizes, m->allocator, type));
 		{
-			String str = instr->local.entity->token.string;
+			String str = instr->Local.entity->token.string;
 			if (str.len > 0)
-			ssa_fprintf(f, "; %.*s", LIT(instr->local.entity->token.string));
+			ssa_fprintf(f, "; %.*s", LIT(instr->Local.entity->token.string));
 		}
 		ssa_fprintf(f, "\n");
 		ssa_fprintf(f, "\tstore ");
@@ -312,33 +312,33 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_Store: {
-		Type *type = ssa_value_type(instr->store.address);
+		Type *type = ssa_type(instr->Store.address);
 		ssa_fprintf(f, "store ");
 		ssa_print_type(f, m->sizes, type);
 		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, instr->store.value, type);
+		ssa_print_value(f, m, instr->Store.value, type);
 		ssa_fprintf(f, ", ");
 		ssa_print_type(f, m->sizes, type);
 		ssa_fprintf(f, "* ");
-		ssa_print_value(f, m, instr->store.address, type);
+		ssa_print_value(f, m, instr->Store.address, type);
 		ssa_fprintf(f, "\n");
 	} break;
 
 	case ssaInstr_Load: {
-		Type *type = instr->load.type;
+		Type *type = instr->Load.type;
 		ssa_fprintf(f, "%%%d = load ", value->id);
 		ssa_print_type(f, m->sizes, type);
 		ssa_fprintf(f, ", ");
 		ssa_print_type(f, m->sizes, type);
 		ssa_fprintf(f, "* ");
-		ssa_print_value(f, m, instr->load.address, type);
+		ssa_print_value(f, m, instr->Load.address, type);
 		ssa_fprintf(f, ", align %lld\n", type_align_of(m->sizes, m->allocator, type));
 	} break;
 
 	case ssaInstr_GetElementPtr: {
-		Type *et = instr->get_element_ptr.elem_type;
+		Type *et = instr->GetElementPtr.elem_type;
 		ssa_fprintf(f, "%%%d = getelementptr ", value->id);
-		if (instr->get_element_ptr.inbounds) {
+		if (instr->GetElementPtr.inbounds) {
 			ssa_fprintf(f, "inbounds ");
 		}
 
@@ -346,10 +346,10 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, ", ");
 		ssa_print_type(f, m->sizes, et);
 		ssa_fprintf(f, "* ");
-		ssa_print_value(f, m, instr->get_element_ptr.address, et);
-		for (isize i = 0; i < instr->get_element_ptr.index_count; i++) {
-			ssaValue *index = instr->get_element_ptr.indices[i];
-			Type *t = ssa_value_type(index);
+		ssa_print_value(f, m, instr->GetElementPtr.address, et);
+		for (isize i = 0; i < instr->GetElementPtr.index_count; i++) {
+			ssaValue *index = instr->GetElementPtr.indices[i];
+			Type *t = ssa_type(index);
 			ssa_fprintf(f, ", ");
 			ssa_print_type(f, m->sizes, t);
 			ssa_fprintf(f, " ");
@@ -359,13 +359,13 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_ExtractValue: {
-		Type *et = instr->extract_value.elem_type;
+		Type *et = instr->ExtractValue.elem_type;
 		ssa_fprintf(f, "%%%d = extractvalue ", value->id);
 
 		ssa_print_type(f, m->sizes, et);
 		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, instr->extract_value.address, et);
-		ssa_fprintf(f, ", %d\n", instr->extract_value.index);
+		ssa_print_value(f, m, instr->ExtractValue.address, et);
+		ssa_fprintf(f, ", %d\n", instr->ExtractValue.index);
 	} break;
 
 	case ssaInstr_NoOp: {;
@@ -374,28 +374,28 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 
 	case ssaInstr_Br: {;
 		ssa_fprintf(f, "br ");
-		if (instr->br.cond != NULL) {
+		if (instr->Br.cond != NULL) {
 			ssa_print_type(f, m->sizes, t_bool);
 			ssa_fprintf(f, " ");
-			ssa_print_value(f, m, instr->br.cond, t_bool);
-			ssa_fprintf(f, ", ", instr->br.cond->id);
+			ssa_print_value(f, m, instr->Br.cond, t_bool);
+			ssa_fprintf(f, ", ", instr->Br.cond->id);
 		}
 		ssa_fprintf(f, "label ");
-		ssa_fprintf(f, "%%"); ssa_print_block_name(f, instr->br.true_block);
-		if (instr->br.false_block != NULL) {
+		ssa_fprintf(f, "%%"); ssa_print_block_name(f, instr->Br.true_block);
+		if (instr->Br.false_block != NULL) {
 			ssa_fprintf(f, ", label ");
-			ssa_fprintf(f, "%%"); ssa_print_block_name(f, instr->br.false_block);
+			ssa_fprintf(f, "%%"); ssa_print_block_name(f, instr->Br.false_block);
 		}
 		ssa_fprintf(f, "\n");
 	} break;
 
 	case ssaInstr_Ret: {
-		auto *ret = &instr->ret;
+		auto *ret = &instr->Ret;
 		ssa_fprintf(f, "ret ");
 		if (ret->value == NULL) {
 			ssa_fprintf(f, "void");
 		} else {
-			Type *t = ssa_value_type(ret->value);
+			Type *t = ssa_type(ret->value);
 			ssa_print_type(f, m->sizes, t);
 			ssa_fprintf(f, " ");
 			ssa_print_value(f, m, ret->value, t);
@@ -406,7 +406,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_Conv: {
-		auto *c = &instr->conv;
+		auto *c = &instr->Conv;
 		ssa_fprintf(f, "%%%d = %.*s ", value->id, LIT(ssa_conv_strings[c->kind]));
 		ssa_print_type(f, m->sizes, c->from);
 		ssa_fprintf(f, " ");
@@ -422,8 +422,8 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_BinaryOp: {
-		auto *bo = &value->instr.binary_op;
-		Type *type = get_base_type(ssa_value_type(bo->left));
+		auto *bo = &value->Instr.BinaryOp;
+		Type *type = get_base_type(ssa_type(bo->left));
 		Type *elem_type = type;
 		while (elem_type->kind == Type_Vector) {
 			elem_type = get_base_type(elem_type->vector.elem);
@@ -528,7 +528,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_Call: {
-		auto *call = &instr->call;
+		auto *call = &instr->Call;
 		Type *result_type = call->type;
 		if (result_type) {
 			ssa_fprintf(f, "%%%d = ", value->id);
@@ -545,7 +545,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 
 		ssa_fprintf(f, "(");
 		if (call->arg_count > 0) {
-			Type *proc_type = get_base_type(ssa_value_type(call->value));
+			Type *proc_type = get_base_type(ssa_type(call->value));
 			GB_ASSERT(proc_type->kind == Type_Proc);
 			auto *params = &proc_type->proc.params->tuple;
 			for (isize i = 0; i < call->arg_count; i++) {
@@ -567,15 +567,15 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 
 	case ssaInstr_Select: {
 		ssa_fprintf(f, "%%%d = select i1 ", value->id);
-		ssa_print_value(f, m, instr->select.cond, t_bool);
+		ssa_print_value(f, m, instr->Select.cond, t_bool);
 		ssa_fprintf(f, ", ");
-		ssa_print_type(f, m->sizes, ssa_value_type(instr->select.true_value));
+		ssa_print_type(f, m->sizes, ssa_type(instr->Select.true_value));
 		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, instr->select.true_value, ssa_value_type(instr->select.true_value));
+		ssa_print_value(f, m, instr->Select.true_value, ssa_type(instr->Select.true_value));
 		ssa_fprintf(f, ", ");
-		ssa_print_type(f, m->sizes, ssa_value_type(instr->select.false_value));
+		ssa_print_type(f, m->sizes, ssa_type(instr->Select.false_value));
 		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, instr->select.false_value, ssa_value_type(instr->select.false_value));
+		ssa_print_value(f, m, instr->Select.false_value, ssa_type(instr->Select.false_value));
 		ssa_fprintf(f, "\n");
 	} break;
 
@@ -583,39 +583,39 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "call void @llvm.memmove.p0i8.p0i8.");
 		ssa_print_type(f, m->sizes, t_int);
 		ssa_fprintf(f, "(i8* ");
-		ssa_print_value(f, m, instr->copy_memory.dst, t_rawptr);
+		ssa_print_value(f, m, instr->CopyMemory.dst, t_rawptr);
 		ssa_fprintf(f, ", i8* ");
-		ssa_print_value(f, m, instr->copy_memory.src, t_rawptr);
+		ssa_print_value(f, m, instr->CopyMemory.src, t_rawptr);
 		ssa_fprintf(f, ", ");
 		ssa_print_type(f, m->sizes, t_int);
 		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, instr->copy_memory.len, t_int);
+		ssa_print_value(f, m, instr->CopyMemory.len, t_int);
 		char *vol_str = "false";
-		if (instr->copy_memory.is_volatile) {
+		if (instr->CopyMemory.is_volatile) {
 			vol_str = "true";
 		}
-		ssa_fprintf(f, ", i32 %d, i1 %s)\n", instr->copy_memory.align, vol_str);
+		ssa_fprintf(f, ", i32 %d, i1 %s)\n", instr->CopyMemory.align, vol_str);
 	} break;
 
 
 	case ssaInstr_ExtractElement: {
-		Type *vt = ssa_value_type(instr->extract_element.vector);
+		Type *vt = ssa_type(instr->ExtractElement.vector);
 		ssa_fprintf(f, "%%%d = extractelement ", value->id);
 
 		ssa_print_type(f, m->sizes, vt);
 		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, instr->extract_element.vector, vt);
+		ssa_print_value(f, m, instr->ExtractElement.vector, vt);
 		ssa_fprintf(f, ", ");
-		Type *it = ssa_value_type(instr->extract_element.index);
+		Type *it = ssa_type(instr->ExtractElement.index);
 		ssa_print_type(f, m->sizes, it);
 		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, instr->extract_element.index, it);
+		ssa_print_value(f, m, instr->ExtractElement.index, it);
 		ssa_fprintf(f, "\n");
 	} break;
 
 	case ssaInstr_InsertElement: {
-		auto *ie = &instr->insert_element;
-		Type *vt = ssa_value_type(ie->vector);
+		auto *ie = &instr->InsertElement;
+		Type *vt = ssa_type(ie->vector);
 		ssa_fprintf(f, "%%%d = insertelement ", value->id);
 
 		ssa_print_type(f, m->sizes, vt);
@@ -623,21 +623,21 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_print_value(f, m, ie->vector, vt);
 		ssa_fprintf(f, ", ");
 
-		ssa_print_type(f, m->sizes, ssa_value_type(ie->elem));
+		ssa_print_type(f, m->sizes, ssa_type(ie->elem));
 		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, ie->elem, ssa_value_type(ie->elem));
+		ssa_print_value(f, m, ie->elem, ssa_type(ie->elem));
 		ssa_fprintf(f, ", ");
 
-		ssa_print_type(f, m->sizes, ssa_value_type(ie->index));
+		ssa_print_type(f, m->sizes, ssa_type(ie->index));
 		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, ie->index, ssa_value_type(ie->index));
+		ssa_print_value(f, m, ie->index, ssa_type(ie->index));
 
 		ssa_fprintf(f, "\n");
 	} break;
 
 	case ssaInstr_ShuffleVector: {
-		auto *sv = &instr->shuffle_vector;
-		Type *vt = ssa_value_type(sv->vector);
+		auto *sv = &instr->ShuffleVector;
+		Type *vt = ssa_type(sv->vector);
 		ssa_fprintf(f, "%%%d = shufflevector ", value->id);
 
 		ssa_print_type(f, m->sizes, vt);
@@ -738,9 +738,9 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 
 void ssa_print_type_name(gbFile *f, ssaModule *m, ssaValue *v) {
 	GB_ASSERT(v->kind == ssaValue_TypeName);
-	ssa_print_encoded_local(f, v->type_name.name);
+	ssa_print_encoded_local(f, v->TypeName.name);
 	ssa_fprintf(f, " = type ");
-	ssa_print_type(f, m->sizes, get_base_type(v->type_name.type));
+	ssa_print_type(f, m->sizes, get_base_type(v->TypeName.type));
 	ssa_fprintf(f, "\n");
 }
 
@@ -763,9 +763,9 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 		ssaValue *v = entry->value;
 		switch (v->kind) {
 		case ssaValue_TypeName: {
-			ssa_print_encoded_local(f, v->type_name.name);
+			ssa_print_encoded_local(f, v->TypeName.name);
 			ssa_fprintf(f, " = type ");
-			ssa_print_type(f, m->sizes, get_base_type(v->type_name.type));
+			ssa_print_type(f, m->sizes, get_base_type(v->TypeName.type));
 			ssa_fprintf(f, "\n");
 		} break;
 		}
@@ -790,16 +790,20 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 		ssaValue *v = entry->value;
 		switch (v->kind) {
 		case ssaValue_Global: {
-			auto *g = &v->global;
+			auto *g = &v->Global;
 			ssa_print_encoded_global(f, g->entity->token.string);
 			ssa_fprintf(f, " = ");
+			if (g->is_thread_local) {
+				ssa_fprintf(f, "thread_local ");
+			}
 			if (g->is_constant) {
 				ssa_fprintf(f, "private constant ");
 			} else {
 				ssa_fprintf(f, "global ");
 			}
 
-			ssa_print_type(f, m->sizes, get_base_type(g->entity->type));
+
+			ssa_print_type(f, m->sizes, g->entity->type);
 			ssa_fprintf(f, " ");
 			if (g->value != NULL) {
 				ssa_print_value(f, m, g->value, g->entity->type);
@@ -810,7 +814,7 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 		} break;
 
 		case ssaValue_Proc: {
-			ssa_print_proc(f, m, &v->proc);
+			ssa_print_proc(f, m, &v->Proc);
 		} break;
 		}
 	}
