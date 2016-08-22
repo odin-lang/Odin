@@ -1,5 +1,4 @@
 #load "basic.odin"
-#load "win32.odin"
 #load "opengl.odin"
 #load "math.odin"
 
@@ -28,13 +27,13 @@ win32_print_last_error :: proc() {
 // Yuk!
 to_c_string :: proc(s: string) -> ^u8 {
 	c_str: ^u8 = heap_alloc(len(s)+1);
-	mem_copy(c_str, ^s[0], len(s));
+	memory_copy(c_str, ^s[0], len(s));
 	c_str[len(s)] = 0;
 	return c_str;
 }
 
 
-type Window: struct {
+Window :: type struct {
 	width, height:      int,
 	wc:                 WNDCLASSEXA,
 	dc:                 HDC,
@@ -123,7 +122,7 @@ display_window :: proc(w: ^Window) {
 }
 
 
-type Entity: struct {
+Entity :: type struct {
 	pos: Vec2,
 	dim: Vec2,
 }

@@ -1,7 +1,3 @@
-STD_INPUT_HANDLE  :: -10;
-STD_OUTPUT_HANDLE :: -11;
-STD_ERROR_HANDLE  :: -12;
-
 CS_VREDRAW    :: 1;
 CS_HREDRAW    :: 2;
 CW_USEDEFAULT :: 0x80000000;
@@ -21,27 +17,29 @@ WM_QUIT    :: 0x12;
 
 PM_REMOVE :: 1;
 
-COLOR_BACKGROUND: rawptr : 1; // NOTE(bill): cast to HBRUSH when needed
+COLOR_BACKGROUND :: 1 as HBRUSH;
 
 
-type HANDLE:    rawptr
-type HWND:      HANDLE
-type HDC:       HANDLE
-type HINSTANCE: HANDLE
-type HICON:     HANDLE
-type HCURSOR:   HANDLE
-type HMENU:     HANDLE
-type HBRUSH:    HANDLE
-type WPARAM:    uint
-type LPARAM:    int
-type LRESULT:   int
-type ATOM:      i16
-type BOOL:      i32
-type POINT: struct { x, y: i32 }
+HANDLE    :: type rawptr;
+HWND      :: type HANDLE;
+HDC       :: type HANDLE;
+HINSTANCE :: type HANDLE;
+HICON     :: type HANDLE;
+HCURSOR   :: type HANDLE;
+HMENU     :: type HANDLE;
+HBRUSH    :: type HANDLE;
+WPARAM    :: type uint;
+LPARAM    :: type int;
+LRESULT   :: type int;
+ATOM      :: type i16;
+BOOL      :: type i32;
+POINT     :: type struct { x, y: i32 };
 
-type WNDPROC: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT
+INVALID_HANDLE_VALUE :: (-1 as int) as HANDLE;
 
-type WNDCLASSEXA: struct {
+WNDPROC :: type proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT
+
+WNDCLASSEXA :: type struct {
 	size, style:           u32,
 	wnd_proc:              WNDPROC,
 	cls_extra, wnd_extra:  i32,
@@ -53,7 +51,7 @@ type WNDCLASSEXA: struct {
 	sm:                    HICON,
 }
 
-type MSG: struct {
+MSG :: type struct {
 	hwnd:    HWND,
 	message: u32,
 	wparam:  WPARAM,
@@ -63,9 +61,7 @@ type MSG: struct {
 }
 
 
-GetStdHandle     :: proc(h: i32) -> HANDLE #foreign
-CloseHandle      :: proc(h: HANDLE) -> i32 #foreign
-WriteFileA       :: proc(h: HANDLE, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> i32 #foreign
+
 GetLastError     :: proc() -> i32 #foreign
 ExitProcess      :: proc(exit_code: u32) #foreign
 GetDesktopWindow :: proc() -> HWND #foreign
@@ -113,6 +109,52 @@ GetQueryPerformanceFrequency :: proc() -> i64 {
 
 
 
+// File Stuff
+
+CloseHandle  :: proc(h: HANDLE) -> i32 #foreign
+GetStdHandle :: proc(h: i32) -> HANDLE #foreign
+CreateFileA  :: proc(filename: ^u8, desired_access, share_mode: u32,
+                     security: rawptr,
+                     creation, flags_and_attribs: u32, template_file: HANDLE) -> HANDLE #foreign
+ReadFile     :: proc(h: HANDLE, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> BOOL #foreign
+WriteFile    :: proc(h: HANDLE, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> i32 #foreign
+
+GetFileSizeEx :: proc(file_handle: HANDLE, file_size: ^i64) -> BOOL #foreign
+
+FILE_SHARE_READ      :: 0x00000001;
+FILE_SHARE_WRITE     :: 0x00000002;
+FILE_SHARE_DELETE    :: 0x00000004;
+FILE_GENERIC_ALL     :: 0x10000000;
+FILE_GENERIC_EXECUTE :: 0x20000000;
+FILE_GENERIC_WRITE   :: 0x40000000;
+FILE_GENERIC_READ    :: 0x80000000;
+
+STD_INPUT_HANDLE  :: -10;
+STD_OUTPUT_HANDLE :: -11;
+STD_ERROR_HANDLE  :: -12;
+
+CREATE_NEW        :: 1;
+CREATE_ALWAYS     :: 2;
+OPEN_EXISTING     :: 3;
+OPEN_ALWAYS       :: 4;
+TRUNCATE_EXISTING :: 5;
+
+
+HeapAlloc :: proc(h: HANDLE, flags: u32, bytes: int) -> rawptr #foreign
+HeapFree  :: proc(h: HANDLE, flags: u32, memory: rawptr) -> BOOL #foreign
+GetProcessHeap :: proc() -> HANDLE #foreign
+
+HEAP_ZERO_MEMORY :: 0x00000008;
+
+
+
+
+
+
+
+
+
+
 
 
 // Windows OpenGL
@@ -139,12 +181,12 @@ PFD_DEPTH_DONTCARE        :: 0x20000000;
 PFD_DOUBLEBUFFER_DONTCARE :: 0x40000000;
 PFD_STEREO_DONTCARE       :: 0x80000000;
 
-type HGLRC: HANDLE
-type PROC: proc()
-type wglCreateContextAttribsARBType: proc(hdc: HDC, hshareContext: rawptr, attribList: ^i32) -> HGLRC
+HGLRC :: type HANDLE;
+PROC  :: type proc();
+wglCreateContextAttribsARBType :: type proc(hdc: HDC, hshareContext: rawptr, attribList: ^i32) -> HGLRC;
 
 
-type PIXELFORMATDESCRIPTOR: struct  {
+PIXELFORMATDESCRIPTOR :: type struct  {
 	size,
 	version,
 	flags: u32,

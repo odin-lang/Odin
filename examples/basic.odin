@@ -1,9 +1,9 @@
 #load "runtime.odin"
+#load "win32.odin"
+#load "file.odin"
 
 print_string :: proc(s: string) {
-	for i := 0; i < len(s); i++ {
-		putchar(s[i] as i32);
-	}
+	file_write(file_get_standard(FILE_STANDARD_OUTPUT), ^s[0], len(s));
 }
 
 byte_reverse :: proc(b: []byte) {
@@ -52,6 +52,9 @@ print_rune :: proc(r: rune) {
 	str := buf[:n] as string;
 	print_string(str);
 }
+
+print_space :: proc() { print_rune(' '); }
+print_nl    :: proc() { print_rune('\n'); }
 
 print_int :: proc(i: int) {
 	print_int_base(i, 10);

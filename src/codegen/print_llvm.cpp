@@ -219,7 +219,11 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 			if (value.value_integer == 0) {
 				ssa_fprintf(f, "null");
 			} else {
-				GB_PANIC("TODO(bill): Pointer constant");
+				ssa_fprintf(f, "inttoptr (");
+				ssa_print_type(f, m->sizes, t_int);
+				ssa_fprintf(f, " %llu to ", value.value_integer);
+				ssa_print_type(f, m->sizes, t_rawptr);
+				ssa_fprintf(f, ")");
 			}
 		} else {
 			ssa_fprintf(f, "%lld", value.value_integer);
@@ -241,7 +245,11 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 		if (value.value_pointer == NULL) {
 			ssa_fprintf(f, "null");
 		} else {
-			GB_PANIC("TODO(bill): ExactValue_Pointer");
+			ssa_fprintf(f, "inttoptr (");
+			ssa_print_type(f, m->sizes, t_int);
+			ssa_fprintf(f, " %llu to ", cast(u64)cast(uintptr)value.value_pointer);
+			ssa_print_type(f, m->sizes, t_rawptr);
+			ssa_fprintf(f, ")");
 		}
 		break;
 	default:
@@ -580,8 +588,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_MemCopy: {
-		ssa_fprintf(f, "call void @llvm.memmove.p0i8.p0i8.");
-		ssa_print_type(f, m->sizes, t_int);
+		ssa_fprintf(f, "call void @memory_move");
 		ssa_fprintf(f, "(i8* ");
 		ssa_print_value(f, m, instr->CopyMemory.dst, t_rawptr);
 		ssa_fprintf(f, ", i8* ");
@@ -590,11 +597,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_print_type(f, m->sizes, t_int);
 		ssa_fprintf(f, " ");
 		ssa_print_value(f, m, instr->CopyMemory.len, t_int);
-		char *vol_str = "false";
-		if (instr->CopyMemory.is_volatile) {
-			vol_str = "true";
-		}
-		ssa_fprintf(f, ", i32 %d, i1 %s)\n", instr->CopyMemory.align, vol_str);
+		ssa_fprintf(f, ")\n");
 	} break;
 
 
@@ -671,7 +674,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 
 void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 	if (proc->body == NULL) {
-		ssa_fprintf(f, "declare ");
+		ssa_fprintf(f, "\ndeclare ");
 	} else {
 		ssa_fprintf(f, "\ndefine ");
 	}
@@ -775,14 +778,6 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 		ssaValue *v = m->nested_type_names[i];
 		ssa_print_type_name(f, m, v);
 	}
-
-
-	ssa_fprintf(f, "declare void @llvm.memmove.p0i8.p0i8.");
-	ssa_print_type(f, m->sizes, t_int);
-	ssa_fprintf(f, "(i8*, i8*, ");
-	ssa_print_type(f, m->sizes, t_int);
-	ssa_fprintf(f, ", i32, i1) argmemonly nounwind \n\n");
-
 
 
 	gb_for_array(member_index, m->members.entries) {

@@ -3616,9 +3616,9 @@ gb_inline void gb_zero_size(void *ptr, isize size) { gb_memset(ptr, 0, size); }
 gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 #if defined(_MSC_VER)
 	// TODO(bill): Is this good enough?
-	__movsb(cast(u8 *gb_restrict)dest, cast(u8 *gb_restrict)source, n);
+	__movsb(cast(u8 *)dest, cast(u8 *)source, n);
 #elif defined(GB_CPU_X86)
-	__asm__ __volatile__("rep movsb" : "+D"(cast(u8 *gb_restrict)dest), "+S"(cast(u8 *gb_restrict)source), "+c"(n) : : "memory");
+	__asm__ __volatile__("rep movsb" : "+D"(cast(u8 *)dest), "+S"(cast(u8 *)source), "+c"(n) : : "memory");
 #else
 	u8 *d = cast(u8 *)dest;
 	u8 const *s = cast(u8 const *)source;
@@ -5753,7 +5753,7 @@ void gb_sort(void *base_, isize count, isize size, gbCompareProc cmp) {
 			Type radix_piece = (radix_value >> byte_index) & 0xff; \
 			dest[offsets[radix_piece]++] = source[i]; \
 		} \
-		gb_swap(Type *gb_restrict, source, dest); \
+		gb_swap(Type *, source, dest); \
 	} \
 }
 

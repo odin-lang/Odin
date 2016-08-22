@@ -343,6 +343,10 @@ void init_universal_scope(void) {
 		entity->Builtin.id = id;
 		add_global_entity(entity);
 	}
+
+// Custom Runtime Types
+	{
+	}
 }
 
 

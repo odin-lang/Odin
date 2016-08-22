@@ -441,7 +441,7 @@ void ast_file_err_(AstFile *file, char *function, Token token, char *fmt, ...) {
 // NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
 gb_inline AstNode *make_node(AstFile *f, AstNodeKind kind) {
 	gbArena *arena = &f->arena;
-	if (gb_arena_size_remaining(arena, GB_DEFAULT_MEMORY_ALIGNMENT) < gb_size_of(AstNode)) {
+	if (gb_arena_size_remaining(arena, GB_DEFAULT_MEMORY_ALIGNMENT) <= gb_size_of(AstNode)) {
 		// NOTE(bill): If a syntax error is so bad, just quit!
 		gb_exit(1);
 	}
@@ -1735,7 +1735,9 @@ AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count) {
 	AstNode *type = NULL;
 	isize value_count = 0;
 	if (allow_token(f, Token_Colon)) {
-		type = parse_identifier_or_type(f);
+		if (!allow_token(f, Token_type)) {
+			type = parse_identifier_or_type(f);
+		}
 	} else if (f->cursor[0].kind != Token_Eq && f->cursor[0].kind != Token_Semicolon) {
 		ast_file_err(f, f->cursor[0], "Expected type separator `:` or `=`");
 	}
@@ -1748,13 +1750,30 @@ AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count) {
 			declaration_kind = Declaration_Immutable;
 		next_token(f);
 
-		if (f->cursor[0].kind == Token_proc &&
+		if (f->cursor[0].kind == Token_type) {
+			Token token = expect_token(f, Token_type);
+			if (name_count != 1) {
+				ast_file_err(f, ast_node_token(name_list), "You can only declare one type at a time");
+				return make_bad_decl(f, name_list->Ident.token, token);
+			}
+
+			if (type != NULL) {
+				ast_file_err(f, f->cursor[-1], "Expected either `type` or nothing between : and :");
+				// NOTE(bill): Do not fail though
+			}
+
+			AstNode *type = parse_type(f);
+			// if (type->kind != AstNode_StructType) {
+				// expect_token(f, Token_Semicolon);
+			// }
+			return make_type_decl(f, token, name_list, type);
+		} else if (f->cursor[0].kind == Token_proc &&
 		    declaration_kind == Declaration_Immutable) {
 		    // NOTE(bill): Procedure declarations
 			Token proc_token = f->cursor[0];
 			AstNode *name = name_list;
 			if (name_count != 1) {
-				ast_file_err(f, proc_token, "You can only declare one procedure at a time (at the moment)");
+				ast_file_err(f, proc_token, "You can only declare one procedure at a time");
 				return make_bad_decl(f, name->Ident.token, proc_token);
 			}
 
@@ -1945,14 +1964,6 @@ AstNode *parse_stmt(AstFile *f) {
 	AstNode *s = NULL;
 	Token token = f->cursor[0];
 	switch (token.kind) {
-	case Token_type: {
-		Token   token = expect_token(f, Token_type);
-		AstNode *name = parse_identifier(f);
-		expect_token(f, Token_Colon);
-		AstNode *type = parse_type(f);
-		return make_type_decl(f, token, name, type);
-	} break;
-
 	// Operands
 	case Token_Identifier:
 	case Token_Integer:
@@ -1966,7 +1977,11 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Xor:
 	case Token_Not:
 		s = parse_simple_stmt(f);
-		if (s->kind != AstNode_ProcDecl && !allow_token(f, Token_Semicolon)) {
+		if (s->kind != AstNode_ProcDecl &&
+		    (s->kind == AstNode_TypeDecl &&
+		     s->TypeDecl.type->kind != AstNode_StructType &&
+		     s->TypeDecl.type->kind != AstNode_ProcType) &&
+		    !allow_token(f, Token_Semicolon)) {
 			// CLEANUP(bill): Semicolon handling in parser
 			ast_file_err(f, f->cursor[0],
 			             "Expected `;` after statement, got `%.*s`",

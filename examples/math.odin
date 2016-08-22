@@ -13,14 +13,16 @@ MATH_LOG_TEN      :: 2.30258509299404568401799145468436421;
 
 MATH_EPSILON      :: 1.19209290e-7;
 
+τ :: MATH_TAU;
+π :: MATH_PI;
 
-type Vec2: {2}f32
-type Vec3: {3}f32
-type Vec4: {4}f32
+Vec2 :: type {2}f32;
+Vec3 :: type {3}f32;
+Vec4 :: type {4}f32;
 
-type Mat2:  {4}f32
-type Mat3:  {9}f32
-type Mat4: {16}f32
+Mat2 :: type  {4}f32;
+Mat3 :: type  {9}f32;
+Mat4 :: type {16}f32;
 
 
 fsqrt    :: proc(x: f32) -> f32 #foreign "llvm.sqrt.f32"

@@ -80,19 +80,23 @@ int main(int argc, char **argv) {
 				i32 exit_code = win32_exec_command_line_app(
 					"../misc/llvm-bin/opt -mem2reg %s -o %.*s.bc",
 					output_name, cast(int)base_name_len, output_name);
-				if (exit_code == 0) {
-					win32_exec_command_line_app(
-						"clang -o %.*s.exe %.*s.bc -Wno-override-module "
-						"-lKernel32.lib -lUser32.lib -lGdi32.lib -lOpengl32.lib "
-						,
-						cast(int)base_name_len, output_name,
-						cast(int)base_name_len, output_name);
-					if (run_output) {
-						win32_exec_command_line_app("%.*s.exe", cast(int)base_name_len, output_name);
-					}
-				} else {
-				}
+				if (exit_code != 0)
+					return exit_code;
 
+				exit_code = win32_exec_command_line_app(
+					"clang -o %.*s.exe %.*s.bc "
+					"-Wno-override-module "
+					// "-nostartfiles "
+					"-lKernel32.lib -lUser32.lib -lGdi32.lib -lOpengl32.lib "
+					,
+					cast(int)base_name_len, output_name,
+					cast(int)base_name_len, output_name);
+				if (exit_code != 0)
+					return exit_code;
+
+				if (run_output) {
+					win32_exec_command_line_app("%.*s.exe", cast(int)base_name_len, output_name);
+				}
 				return 0;
 			}
 		}

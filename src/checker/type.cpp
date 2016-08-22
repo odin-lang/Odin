@@ -288,21 +288,25 @@ b32 is_type_named(Type *t) {
 	return t->kind == Type_Named;
 }
 b32 is_type_boolean(Type *t) {
+	t = get_base_type(t);
 	if (t->kind == Type_Basic)
 		return (t->basic.flags & BasicFlag_Boolean) != 0;
 	return false;
 }
 b32 is_type_integer(Type *t) {
+	t = get_base_type(t);
 	if (t->kind == Type_Basic)
 		return (t->basic.flags & BasicFlag_Integer) != 0;
 	return false;
 }
 b32 is_type_unsigned(Type *t) {
+	t = get_base_type(t);
 	if (t->kind == Type_Basic)
 		return (t->basic.flags & BasicFlag_Unsigned) != 0;
 	return false;
 }
 b32 is_type_numeric(Type *t) {
+	t = get_base_type(t);
 	if (t->kind == Type_Basic)
 		return (t->basic.flags & BasicFlag_Numeric) != 0;
 	if (t->kind == Type_Vector)
@@ -310,36 +314,45 @@ b32 is_type_numeric(Type *t) {
 	return false;
 }
 b32 is_type_string(Type *t) {
+	t = get_base_type(t);
 	if (t->kind == Type_Basic)
 		return (t->basic.flags & BasicFlag_String) != 0;
 	return false;
 }
 b32 is_type_typed(Type *t) {
+	t = get_base_type(t);
 	if (t->kind == Type_Basic)
 		return (t->basic.flags & BasicFlag_Untyped) == 0;
 	return true;
 }
 b32 is_type_untyped(Type *t) {
+	t = get_base_type(t);
 	if (t->kind == Type_Basic)
 		return (t->basic.flags & BasicFlag_Untyped) != 0;
 	return false;
 }
 b32 is_type_ordered(Type *t) {
+	t = get_base_type(t);
 	if (t->kind == Type_Basic)
 		return (t->basic.flags & BasicFlag_Ordered) != 0;
+	if (t->kind == Type_Pointer)
+		return true;
 	return false;
 }
 b32 is_type_constant_type(Type *t) {
+	t = get_base_type(t);
 	if (t->kind == Type_Basic)
 		return (t->basic.flags & BasicFlag_ConstantType) != 0;
 	return false;
 }
 b32 is_type_float(Type *t) {
+	t = get_base_type(t);
 	if (t->kind == Type_Basic)
 		return (t->basic.flags & BasicFlag_Float) != 0;
 	return false;
 }
 b32 is_type_pointer(Type *t) {
+	t = get_base_type(t);
 	if (t->kind == Type_Basic)
 		return (t->basic.flags & BasicFlag_Pointer) != 0;
 	return t->kind == Type_Pointer;
@@ -361,9 +374,11 @@ b32 is_type_u8(Type *t) {
 	return false;
 }
 b32 is_type_slice(Type *t) {
+	t = get_base_type(t);
 	return t->kind == Type_Slice;
 }
 b32 is_type_u8_slice(Type *t) {
+	t = get_base_type(t);
 	if (t->kind == Type_Slice)
 		return is_type_u8(t->slice.elem);
 	return false;
@@ -372,6 +387,7 @@ b32 is_type_vector(Type *t) {
 	return t->kind == Type_Vector;
 }
 b32 is_type_proc(Type *t) {
+	t = get_base_type(t);
 	return t->kind == Type_Proc;
 }
 Type *base_vector_type(Type *t) {
@@ -548,8 +564,10 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		return type_align_of(s, allocator, t->array.elem);
 	case Type_Vector: {
 		i64 size = type_size_of(s, allocator, t->vector.elem);
+		size *= t->vector.count;
+		size = next_pow2(size);
 		// TODO(bill): Type_Vector type_align_of
-		return gb_clamp(size, s.max_align, 2*s.max_align);
+		return gb_clamp(size, s.max_align, 4*s.max_align);
 	} break;
 
 	case Type_Structure: {

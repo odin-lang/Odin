@@ -4,12 +4,12 @@
 #load "game.odin"
 
 main :: proc() {
-	_ = hellope();
-	procedures();
-	variables();
-	constants();
-	types();
-	data_control();
+	// _ = hellope();
+	// procedures();
+	// variables();
+	// constants();
+	// types();
+	// data_control();
 
 	run_game();
 }
@@ -263,21 +263,21 @@ types :: proc() {
 
 
 
-	type Vec4: {4}f32;
-	type Array3Int: [3]int;
+	Vec4 :: type {4}f32;
+	Array3Int :: type [3]int;
 
-	type Vec3: struct {
+	Vec3 :: type struct {
 		x, y, z: f32
 	}
 
-	type BinaryNode: struct {
+	BinaryNode :: type struct {
 		left, right: ^BinaryNode, // same format as procedure argument
 		data: rawptr,
 	}
 
-	type AddProc: proc(a, b: int) -> int
+	AddProc :: type proc(a, b: int) -> int
 
-	type Packed: struct #packed {
+	Packed :: type struct #packed {
 		a: u8,
 		b: u16,
 		c: u32,
@@ -286,7 +286,7 @@ types :: proc() {
 
 
 	{
-		type MyInt: int
+		MyInt :: type int;
 		x: int = 1;
 		y: MyInt = 2;
 		// z := x + y; // Failure - types cannot implicit convert*
@@ -347,7 +347,7 @@ types :: proc() {
 		f := {4}f32{1}; // broadcasts to all
 		// g := {4}f32{1, 2}; // require either 1 or 4 elements
 
-		type Vec2: {2}f32;
+		Vec2 :: type {2}f32;
 
 		h := Vec2{1, 2};
 
@@ -428,7 +428,7 @@ void main() {
 
 
 	{ // size, align, offset
-		type Thing: struct {
+		Thing :: type struct {
 			a: u8,
 			b: u16,
 			c, d, e: u32,
@@ -527,46 +527,17 @@ data_control :: proc() {
 		context.allocator = __default_allocator();
 		defer context.allocator = prev_allocator;
 
-		// C strings, yuk!
-		to_c_string := proc(s: string) -> ^u8 {
-			c := alloc(len(s)+1) as ^u8;
-			mem_copy(c, ^s[0], len(s));
-			c[len(s)] = 0;
-			return c;
-		};
-
-
-		fopen  :: proc(filename, mode: ^u8) -> rawptr #foreign
-		fclose :: proc(f: rawptr) -> i32 #foreign
-
-		filename := to_c_string("../examples/base.odin");
-		mode := to_c_string("rb");
-		defer dealloc(filename);
-		defer dealloc(mode);
-
-		f := fopen(filename, mode);
-		if f == null {
+	/*
+		type File: struct { filename: string }
+		type FileError: int
+		open_file  :: proc(filename: string) -> (File, FileError) { ... }
+		close_file :: proc(f: ^File) { ... }
+		f, err := open_file("Test");
+		if err != 0 {
 			// handle error
 		}
-		defer if f != null {
-			_ = fclose(f);
-		}
-
-		// rest of code
-
-		// Better version
-		/*
-			type File: struct { filename: string }
-			type FileError: int
-			open_file  :: proc(filename: string) -> (File, FileError) { ... }
-			close_file :: proc(f: ^File) { ... }
-			f, err := open_file("Test");
-			if err != 0 {
-				// handle error
-			}
-			defer close_file(^f);
-
-		 */
+		defer close_file(^f);
+	*/
 
 
 	}

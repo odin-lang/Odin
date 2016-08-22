@@ -811,9 +811,10 @@ void ssa_emit_defer_stmts(ssaProcedure *proc, ssaDeferKind kind, ssaBlock *block
 	while (i --> 0) {
 		ssaDefer d = proc->defer_stmts[i];
 		if (kind == ssaDefer_Return) {
-			ssa_build_defer_stmt(proc, d);
+				ssa_build_defer_stmt(proc, d);
 		} else if (kind == ssaDefer_Default) {
-			if (proc->scope_index == d.scope_index) {
+			if (proc->scope_index == d.scope_index &&
+			    d.scope_index > 1) {
 				ssa_build_defer_stmt(proc, d);
 				gb_array_pop(proc->defer_stmts);
 				continue;
