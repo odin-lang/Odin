@@ -190,7 +190,7 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	b32 used = false;
 	if (node->kind == AstNode_Ident) {
 		ast_node(i, Ident, node);
-		e = scope_lookup_entity(c->context.scope, i->token.string);
+		e = scope_lookup_entity(c, c->context.scope, i->token.string);
 		if (e != NULL && e->kind == Entity_Variable) {
 			used = e->Variable.used; // TODO(bill): Make backup just in case
 		}
@@ -398,19 +398,33 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 	e->type = proc_type;
 	ast_node(pd, ProcDecl, d->proc_decl);
 
-	Scope *original_curr_scope = c->context.scope;
-	c->context.scope = c->global_scope;
 	check_open_scope(c, pd->type);
 	defer ({
 		check_close_scope(c);
-		c->context.scope = original_curr_scope;
 	});
 
 
 	check_procedure_type(c, proc_type, pd->type);
-	b32 is_foreign   = (pd->tags & ProcTag_foreign) != 0;
-	b32 is_inline    = (pd->tags & ProcTag_inline) != 0;
+	b32 is_foreign   = (pd->tags & ProcTag_foreign)   != 0;
+	b32 is_inline    = (pd->tags & ProcTag_inline)    != 0;
 	b32 is_no_inline = (pd->tags & ProcTag_no_inline) != 0;
+
+
+
+	if (d->scope == c->global_scope &&
+	    are_strings_equal(e->token.string, make_string("main"))) {
+		if (proc_type != NULL) {
+			auto *pt = &proc_type->proc;
+			if (pt->param_count != 0 ||
+			    pt->result_count) {
+				gbString str = type_to_string(proc_type);
+				defer (gb_string_free(str));
+
+				error(&c->error_collector, e->token,
+				      "Procedure type of `main` was expected to be `proc()`, got %s", str);
+			}
+		}
+	}
 
 	if (is_inline && is_no_inline) {
 		error(&c->error_collector, ast_node_token(pd->type),

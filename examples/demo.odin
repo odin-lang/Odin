@@ -124,6 +124,14 @@ procedures :: proc() {
 		return x + y;
 	}
 
+	fibonacci :: proc(n: int) -> int {
+		if n < 2 {
+			return n;
+		}
+		return fibonacci(n-1) + fibonacci(n-2);
+	}
+	print_int(fibonacci(12)); nl();
+
 
 	swap_strings :: proc(x, y: string) -> (string, string) {
 		return y, x;
@@ -554,19 +562,17 @@ data_control :: proc() {
 		context.allocator = __default_allocator();
 		defer context.allocator = prev_allocator;
 
-	/*
-		type File: struct { filename: string }
-		type FileError: int
-		open_file  :: proc(filename: string) -> (File, FileError) { ... }
-		close_file :: proc(f: ^File) { ... }
+		File :: type struct { filename: string };
+		FileError :: type int;
+		open_file  :: proc(filename: string) -> (File, FileError) {
+			return File{}, 0;
+		}
+		close_file :: proc(f: ^File) {}
 		f, err := open_file("Test");
 		if err != 0 {
 			// handle error
 		}
 		defer close_file(^f);
-	*/
-
-
 	}
 
 	for i := 0; i < 100; i++ {

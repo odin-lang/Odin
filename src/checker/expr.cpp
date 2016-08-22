@@ -202,7 +202,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 	o->mode = Addressing_Invalid;
 	o->expr = n;
 	ast_node(i, Ident, n);
-	Entity *e = scope_lookup_entity(c->context.scope, i->token.string);
+	Entity *e = scope_lookup_entity(c, c->context.scope, i->token.string);
 	if (e == NULL) {
 		error(&c->error_collector, i->token,
 		    "Undeclared type or identifier `%.*s`", LIT(i->token.string));
@@ -1959,14 +1959,9 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);
-		auto curr_context = c->context;
-		c->context.scope = c->global_scope;
 		check_open_scope(c, pl->type);
 		c->context.decl = make_declaration_info(c->allocator, c->context.scope);
-		defer ({
-			check_close_scope(c);
-			c->context = curr_context;
-		});
+		defer (check_close_scope(c));
 		Type *proc_type = check_type(c, pl->type);
 		if (proc_type != NULL) {
 			check_proc_body(c, empty_token, c->context.decl, proc_type, pl->body);

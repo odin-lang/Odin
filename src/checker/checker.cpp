@@ -89,14 +89,15 @@ ExpressionInfo make_expression_info(b32 is_lhs, AddressingMode mode, Type *type,
 }
 
 struct ProcedureInfo {
-	AstFile *file;
-	Token            token;
+	AstFile * file;
+	Token     token;
 	DeclInfo *decl;
-	Type *           type; // Type_Procedure
-	AstNode *        body; // AstNode_BlockStatement
+	Type *    type; // Type_Procedure
+	AstNode * body; // AstNode_BlockStatement
 };
 
 struct Scope {
+	b32 is_proc;
 	Scope *parent;
 	Scope *prev, *next;
 	Scope *first_child, *last_child;
@@ -231,6 +232,9 @@ void check_open_scope(Checker *c, AstNode *stmt) {
 	GB_ASSERT(is_ast_node_stmt(stmt) || stmt->kind == AstNode_ProcType);
 	Scope *scope = make_scope(c->context.scope, c->allocator);
 	add_scope(c, stmt, scope);
+	if (stmt->kind == AstNode_ProcType) {
+		scope->is_proc = true;
+	}
 	c->context.scope = scope;
 }
 
@@ -238,23 +242,36 @@ void check_close_scope(Checker *c) {
 	c->context.scope = c->context.scope->parent;
 }
 
-void scope_lookup_parent_entity(Scope *s, String name, Scope **scope, Entity **entity) {
+void scope_lookup_parent_entity(Checker *c, Scope *s, String name, Scope **scope, Entity **entity) {
+	b32 gone_thru_proc = false;
 	HashKey key = hash_string(name);
 	for (; s != NULL; s = s->parent) {
+
 		Entity **found = map_get(&s->elements, key);
 		if (found) {
-			if (entity) *entity = *found;
+			Entity *e = *found;
+			if (gone_thru_proc) {
+				if (e->kind == Entity_Variable && e->parent != c->global_scope) {
+					continue;
+				}
+			}
+
+			if (entity) *entity = e;
 			if (scope) *scope = s;
 			return;
+		}
+
+		if (s->is_proc) {
+			gone_thru_proc = true;
 		}
 	}
 	if (entity) *entity = NULL;
 	if (scope) *scope = NULL;
 }
 
-Entity *scope_lookup_entity(Scope *s, String name) {
+Entity *scope_lookup_entity(Checker *c, Scope *s, String name) {
 	Entity *entity = NULL;
-	scope_lookup_parent_entity(s, name, NULL, &entity);
+	scope_lookup_parent_entity(c, s, name, NULL, &entity);
 	return entity;
 }
 
@@ -500,7 +517,6 @@ void add_file_entity(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d) {
 
 	add_entity(c, c->global_scope, identifier, e);
 	map_set(&c->info.entities, hash_pointer(e), d);
-	e->order = gb_array_count(c->info.entities.entries);
 }
 
 
@@ -637,8 +653,6 @@ void check_parsed_files(Checker *c) {
 				DeclInfo *d = make_declaration_info(c->allocator, e->parent);
 				d->proc_decl = decl;
 				map_set(&c->info.entities, hash_pointer(e), d);
-				e->order = gb_array_count(c->info.entities.entries);
-
 			case_end;
 
 			case_ast_node(ld, LoadDecl, decl);
