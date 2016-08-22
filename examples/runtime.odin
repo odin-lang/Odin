@@ -1,13 +1,14 @@
+#load "win32.odin"
+
 debug_trap :: proc() #foreign "llvm.debugtrap"
 
 // TODO(bill): make custom heap procedures
-heap_alloc   :: proc(len: int) -> rawptr {
+heap_alloc :: proc(len: int) -> rawptr {
 	return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, len);
 }
 heap_free :: proc(ptr: rawptr) {
 	_ = HeapFree(GetProcessHeap(), 0, ptr);
 }
-
 
 
 memory_compare :: proc(dst, src: rawptr, len: int) -> int {
@@ -226,6 +227,7 @@ __string_cmp :: proc(a, b : string) -> int {
 			return +1;
 		}
 	}
+
 	if len(a) < len(b) {
 		return -1;
 	} else if len(a) > len(b) {
@@ -240,11 +242,15 @@ __string_le :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) <
 __string_ge :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) >= 0; }
 
 
-AllocationMode :: type int;
-ALLOCATION_ALLOC       :: 0;
-ALLOCATION_DEALLOC     :: 1;
-ALLOCATION_DEALLOC_ALL :: 2;
-ALLOCATION_RESIZE      :: 3;
+
+
+AllocationMode :: type enum {
+	ALLOC,
+	DEALLOC,
+	DEALLOC_ALL,
+	RESIZE,
+}
+
 
 
 AllocatorProc :: type proc(allocator_data: rawptr, mode: AllocationMode,
@@ -272,11 +278,14 @@ DEFAULT_ALIGNMENT :: 2*size_of(int);
 
 
 __check_context :: proc() {
+	static_assert(AllocationMode.ALLOC == 0);
+	static_assert(AllocationMode.DEALLOC == 1);
+	static_assert(AllocationMode.DEALLOC_ALL == 2);
+	static_assert(AllocationMode.RESIZE == 3);
+
 	if context.allocator.procedure == null {
 		context.allocator = __default_allocator();
 	}
-
-	ptr := __check_context as rawptr;
 }
 
 
@@ -285,18 +294,18 @@ alloc :: proc(size: int) -> rawptr #inline { return alloc_align(size, DEFAULT_AL
 alloc_align :: proc(size, alignment: int) -> rawptr #inline {
 	__check_context();
 	a := context.allocator;
-	return a.procedure(a.data, ALLOCATION_ALLOC, size, alignment, null, 0, 0);
+	return a.procedure(a.data, AllocationMode.ALLOC, size, alignment, null, 0, 0);
 }
 
 dealloc :: proc(ptr: rawptr) #inline {
 	__check_context();
 	a := context.allocator;
-	_ = a.procedure(a.data, ALLOCATION_DEALLOC, 0, 0, ptr, 0, 0);
+	_ = a.procedure(a.data, AllocationMode.DEALLOC, 0, 0, ptr, 0, 0);
 }
 dealloc_all :: proc(ptr: rawptr) #inline {
 	__check_context();
 	a := context.allocator;
-	_ = a.procedure(a.data, ALLOCATION_DEALLOC_ALL, 0, 0, ptr, 0, 0);
+	_ = a.procedure(a.data, AllocationMode.DEALLOC_ALL, 0, 0, ptr, 0, 0);
 }
 
 
@@ -304,7 +313,7 @@ resize       :: proc(ptr: rawptr, old_size, new_size: int) -> rawptr #inline { r
 resize_align :: proc(ptr: rawptr, old_size, new_size, alignment: int) -> rawptr #inline {
 	__check_context();
 	a := context.allocator;
-	return a.procedure(a.data, ALLOCATION_RESIZE, new_size, alignment, ptr, old_size, 0);
+	return a.procedure(a.data, AllocationMode.RESIZE, new_size, alignment, ptr, old_size, 0);
 }
 
 
@@ -340,13 +349,13 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 __default_allocator_proc :: proc(allocator_data: rawptr, mode: AllocationMode,
                                  size, alignment: int,
                                  old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
-	if mode == ALLOCATION_ALLOC {
+	if mode == AllocationMode.ALLOC {
 		return heap_alloc(size);
-	} else if mode == ALLOCATION_RESIZE {
+	} else if mode == AllocationMode.RESIZE {
 		return default_resize_align(old_memory, old_size, size, alignment);
-	} else if mode == ALLOCATION_DEALLOC {
+	} else if mode == AllocationMode.DEALLOC {
 		heap_free(old_memory);
-	} else if mode == ALLOCATION_DEALLOC_ALL {
+	} else if mode == AllocationMode.DEALLOC_ALL {
 		// NOTE(bill): Does nothing
 	}
 

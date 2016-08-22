@@ -57,6 +57,73 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	struct_type->structure.is_packed = st->is_packed;
 }
 
+void check_enum_type(Checker *c, Type *enum_type, AstNode *node) {
+	GB_ASSERT(node->kind == AstNode_EnumType);
+	GB_ASSERT(enum_type->kind == Type_Enumeration);
+	ast_node(et, EnumType, node);
+
+	Map<Entity *> entity_map = {};
+	map_init(&entity_map, gb_heap_allocator());
+	defer (map_destroy(&entity_map));
+
+	Type *base_type = t_int;
+	if (et->base_type != NULL) {
+		base_type = check_type(c, et->base_type);
+	}
+
+	if (base_type == NULL || !is_type_integer(base_type)) {
+		error(&c->error_collector, et->token, "Base type for enumeration must be an integer");
+		return;
+	} else
+	if (base_type == NULL) {
+		base_type = t_int;
+	}
+	enum_type->enumeration.base = base_type;
+
+	Entity **fields = gb_alloc_array(c->allocator, Entity *, et->field_count);
+	isize field_index = 0;
+	ExactValue iota = make_exact_value_integer(-1);
+	for (AstNode *field = et->field_list; field != NULL; field = field->next) {
+		ast_node(f, FieldValue, field);
+		Token name_token = f->field->Ident.token;
+
+		Operand o = {};
+		if (f->value != NULL) {
+			check_expr(c, &o, f->value);
+			if (o.mode != Addressing_Constant) {
+				error(&c->error_collector, ast_node_token(f->value), "Enumeration value must be a constant integer");
+				o.mode = Addressing_Invalid;
+			}
+			if (o.mode != Addressing_Invalid) {
+				check_assignment(c, &o, base_type, make_string("enumeration"));
+			}
+			if (o.mode != Addressing_Invalid) {
+				iota = o.value;
+			} else {
+				Token add_token = {Token_Add};
+				iota = exact_binary_operator_value(add_token, iota, make_exact_value_integer(1));
+			}
+		} else {
+			Token add_token = {Token_Add};
+			iota = exact_binary_operator_value(add_token, iota, make_exact_value_integer(1));
+		}
+
+		Entity *e = make_entity_constant(c->allocator, c->context.scope, name_token, enum_type, iota);
+
+		HashKey key = hash_string(name_token.string);
+		if (map_get(&entity_map, key)) {
+			// TODO(bill): Scope checking already checks the declaration
+			error(&c->error_collector, name_token, "`%.*s` is already declared in this enumeration", LIT(name_token.string));
+		} else {
+			map_set(&entity_map, key, e);
+			fields[field_index++] = e;
+		}
+		add_entity_use(&c->info, f->field, e);
+	}
+	enum_type->enumeration.fields = fields;
+	enum_type->enumeration.field_count = et->field_count;
+}
+
 Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize field_count) {
 	if (field_list == NULL || field_count == 0)
 		return NULL;
@@ -399,6 +466,13 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 		goto end;
 	case_end;
 
+	case_ast_node(et, EnumType, e);
+		type = make_type_enumeration(c->allocator);
+		set_base_type(named_type, type);
+		check_enum_type(c, type, e);
+		goto end;
+	case_end;
+
 	case_ast_node(pt, PointerType, e);
 		type = make_type_pointer(c->allocator, check_type(c, pt->type));
 		set_base_type(named_type, type);
@@ -583,6 +657,7 @@ b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exac
 			return true;
 		if (out_value) *out_value = in_value;
 	}
+
 
 	return false;
 }
@@ -821,8 +896,8 @@ b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
 		return true;
 
 	Type *x = operand->type;
-	Type *xb = get_base_type(x);
-	Type *yb = get_base_type(y);
+	Type *xb = get_enum_base_type(get_base_type(x));
+	Type *yb = get_enum_base_type(get_base_type(y));
 	if (are_types_identical(xb, yb))
 		return true;
 
@@ -870,13 +945,12 @@ b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
 	}
 
 	// proc <-> proc
-	if (is_type_proc(xb), is_type_proc(yb)) {
+	if (is_type_proc(xb) && is_type_proc(yb)) {
 		return true;
 	}
 
-
 	// proc -> rawptr
-	if (is_type_proc(xb), is_type_rawptr(yb)) {
+	if (is_type_proc(xb) && is_type_rawptr(yb)) {
 		return true;
 	}
 
@@ -903,6 +977,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 
 		Type *base_type = get_base_type(type);
 		if (is_const_expr && is_type_constant_type(base_type)) {
+
 			if (base_type->kind == Type_Basic) {
 				if (check_value_is_expressible(c, x->value, base_type, &x->value)) {
 					can_convert = true;
@@ -1167,7 +1242,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 		return;
 	}
 
-	Type *t = get_base_type(target_type);
+	Type *t = get_enum_base_type(get_base_type(target_type));
 	switch (t->kind) {
 	case Type_Basic:
 		if (operand->mode == Addressing_Constant) {
@@ -1239,7 +1314,7 @@ b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *valu
 		return false;
 	}
 
-	if (!is_type_integer(operand.type)) {
+	if (!is_type_integer(get_enum_base_type(operand.type))) {
 		gbString expr_str = expr_to_string(operand.expr);
 		error(&c->error_collector, ast_node_token(operand.expr),
 		            "Index `%s` must be an integer", expr_str);
@@ -1300,6 +1375,18 @@ Entity *lookup_field(Type *type, AstNode *field_node, isize *index = NULL) {
 			}
 		}
 		break;
+	case Type_Enumeration:
+		for (isize i = 0; i < type->enumeration.field_count; i++) {
+			Entity *f = type->enumeration.fields[i];
+			GB_ASSERT(f->kind == Entity_Constant);
+			String str = f->token.string;
+			if (are_strings_equal(field_str, str)) {
+				if (index) *index = i;
+				return f;
+			}
+		}
+		break;
+		break;
 	// TODO(bill): Other types and extra "hidden" fields (e.g. introspection stuff)
 	// TODO(bill): Allow for access of field through index? e.g. `x.3` will get member of index 3
 	// Or is this only suitable if tuples are first-class?
@@ -1328,10 +1415,17 @@ void check_selector(Checker *c, Operand *operand, AstNode *node) {
 		}
 		add_entity_use(&c->info, selector, entity);
 
-		operand->type = entity->type;
-		operand->expr = node;
-		if (operand->mode != Addressing_Variable)
-			operand->mode = Addressing_Value;
+		if (is_type_enum(operand->type)) {
+			operand->type = entity->type;
+			operand->expr = node;
+			operand->mode = Addressing_Constant;
+			operand->value = entity->Constant.value;
+		} else {
+			operand->type = entity->type;
+			operand->expr = node;
+			if (operand->mode != Addressing_Variable)
+				operand->mode = Addressing_Value;
+		}
 	} else {
 		operand->mode = Addressing_Invalid;
 		operand->expr = node;
@@ -2046,7 +2140,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 		} break;
 
 		default: {
-			gbString str = type_to_string(t);
+			gbString str = type_to_string(type);
 			error(&c->error_collector, ast_node_token(node), "Invalid compound literal type `%s`", str);
 			gb_string_free(str);
 			goto error;

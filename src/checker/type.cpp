@@ -62,6 +62,7 @@ struct BasicType {
 	TYPE_KIND(Vector), \
 	TYPE_KIND(Slice), \
 	TYPE_KIND(Structure), \
+	TYPE_KIND(Enumeration), \
 	TYPE_KIND(Pointer), \
 	TYPE_KIND(Named), \
 	TYPE_KIND(Tuple), \
@@ -126,6 +127,11 @@ struct Type {
 			isize  param_count;
 			isize  result_count;
 		} proc;
+		struct {
+			Type *   base; // Default is `int`
+			Entity **fields; // Entity_Constant
+			isize    field_count;
+		} enumeration;
 	};
 };
 
@@ -178,6 +184,11 @@ Type *make_type_slice(gbAllocator a, Type *elem) {
 
 Type *make_type_structure(gbAllocator a) {
 	Type *t = alloc_type(a, Type_Structure);
+	return t;
+}
+
+Type *make_type_enumeration(gbAllocator a) {
+	Type *t = alloc_type(a, Type_Enumeration);
 	return t;
 }
 
@@ -396,6 +407,17 @@ Type *base_vector_type(Type *t) {
 	}
 	return t;
 }
+b32 is_type_enum(Type *t) {
+	t = get_base_type(t);
+	return t->kind == Type_Enumeration;
+}
+Type *get_enum_base_type(Type *t) {
+	Type *bt = get_base_type(t);
+	if (is_type_enum(bt)) {
+		return bt->enumeration.base;
+	}
+	return t;
+}
 
 
 
@@ -417,6 +439,8 @@ b32 is_type_comparable(Type *t) {
 		return is_type_comparable(t->array.elem);
 	case Type_Vector:
 		return is_type_comparable(t->vector.elem);
+	case Type_Enumeration:
+		return is_type_comparable(t->enumeration.base);
 	case Type_Proc:
 		return true;
 	}
@@ -581,6 +605,9 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 			return max;
 		}
 	} break;
+
+	case Type_Enumeration:
+		return type_align_of(s, allocator, t->enumeration.base);
 	}
 
 	return gb_clamp(next_pow2(type_size_of(s, allocator, t)), 1, s.max_align);
@@ -671,6 +698,9 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		type_set_offsets(s, allocator, t);
 		return t->structure.offsets[count-1] + type_size_of(s, allocator, t->structure.fields[count-1]->type);
 	} break;
+
+	case Type_Enumeration:
+		return type_size_of(s, allocator, t->enumeration.base);
 	}
 
 	// Catch all
@@ -725,6 +755,11 @@ gbString write_type_to_string(gbString str, Type *type) {
 			str = write_type_to_string(str, f->type);
 		}
 		str = gb_string_appendc(str, "}");
+	} break;
+
+	case Type_Enumeration: {
+		str = gb_string_appendc(str, "enum ");
+		str = write_type_to_string(str, type->enumeration.base);
 	} break;
 
 	case Type_Pointer:

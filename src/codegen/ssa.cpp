@@ -1237,10 +1237,11 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 	}
 
 
-	Type *src = get_base_type(src_type);
-	Type *dst = get_base_type(t);
-	if (are_types_identical(t, src_type))
+	Type *src = get_enum_base_type(get_base_type(src_type));
+	Type *dst = get_enum_base_type(get_base_type(t));
+	if (are_types_identical(src, dst)) {
 		return value;
+	}
 
 	if (value->kind == ssaValue_Constant) {
 		if (dst->kind == Type_Basic) {
@@ -1382,7 +1383,6 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 		v = ssa_emit(proc, ssa_make_instr_shuffle_vector(proc, v, indices, index_count));
 		return v;
 	}
-
 
 	gb_printf_err("Not Identical %s != %s\n", type_to_string(src_type), type_to_string(t));
 	gb_printf_err("Not Identical %s != %s\n", type_to_string(src), type_to_string(dst));

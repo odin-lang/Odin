@@ -42,7 +42,7 @@ variables :: proc() {
 	x, y: int = 1, 2;
 
 	// Type inference
-	apple, banana, carrot := true, 123, "carrot";
+	apple, banana, 世界 := true, 123, "world";
 
 
 	// Basic Types of the Language
@@ -73,7 +73,7 @@ variables :: proc() {
 	// untyped rune      -  rune/i32
 
 
-	// // Zero values
+	// Zero values
 	zero_numeric := 0;
 	zero_boolean := false;
 	zero_pointer := null;
@@ -324,7 +324,8 @@ types :: proc() {
 			return y;
 		}
 
-		// transmute only works if the size of the types are equal
+		// NOTE(bill): transmute only works if the size of the types are equal
+
 		/*
 			// in C
 			union {
@@ -332,6 +333,32 @@ types :: proc() {
 				f32 y;
 			};
 		 */
+	}
+
+	{ // Enumeration
+		Thing :: type enum {
+			APPLE,
+			FROG,
+			TREE,
+			TOMB,
+		}
+		a := Thing.APPLE;
+
+		Sized :: type enum u64 {
+			APPLE,
+			FROG,
+			TREE,
+			TOMB,
+		}
+		static_assert(size_of(Sized) == size_of(u64));
+
+		Certain :: type enum {
+			APPLE = 3,
+			FROG,
+			TREE = 7,
+			TOMB,
+		}
+		static_assert(Certain.TOMB == 8);
 	}
 
 

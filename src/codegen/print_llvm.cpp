@@ -157,6 +157,9 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 		}
 
 		break;
+	case Type_Enumeration:
+		ssa_print_type(f, s, t->enumeration.base);
+		break;
 	case Type_Pointer:
 		ssa_print_type(f, s, t->pointer.elem);
 		ssa_fprintf(f, "*");

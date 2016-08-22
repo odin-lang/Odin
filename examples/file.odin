@@ -9,10 +9,9 @@ File :: type struct {
 file_open :: proc(name: string) -> (File, bool) {
 	buf: [300]byte;
 	_ = copy(buf[:], name as []byte);
-	handle := CreateFileA(^buf[0], FILE_GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, 0, null);
-
-	f: File;
-	f.handle = handle as FileHandle;
+	f := File{
+		handle = CreateFileA(^buf[0], FILE_GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, 0, null),
+	};
 	success := f.handle != INVALID_HANDLE_VALUE as FileHandle;
 	return f, success;
 }
@@ -20,10 +19,9 @@ file_open :: proc(name: string) -> (File, bool) {
 file_create :: proc(name: string) -> (File, bool) {
 	buf: [300]byte;
 	_ = copy(buf[:], name as []byte);
-	handle := CreateFileA(^buf[0], FILE_GENERIC_WRITE, FILE_SHARE_READ, null, CREATE_ALWAYS, 0, null);
-
-	f: File;
-	f.handle = handle as FileHandle;
+	f := File{
+		handle = CreateFileA(^buf[0], FILE_GENERIC_WRITE, FILE_SHARE_READ, null, CREATE_ALWAYS, 0, null),
+	};
 	success := f.handle != INVALID_HANDLE_VALUE as FileHandle;
 	return f, success;
 }
@@ -38,23 +36,24 @@ file_write :: proc(f: ^File, buf: rawptr, len: int) -> bool {
 	return WriteFile(f.handle, buf, len as i32, ^bytes_written, null) != 0;
 }
 
-FileStandardType :: type int;
-FILE_STANDARD_INPUT  : FileStandardType : 0;
-FILE_STANDARD_OUTPUT : FileStandardType : 1;
-FILE_STANDARD_ERROR  : FileStandardType : 2;
-FILE_STANDARD__COUNT : FileStandardType : 3;
+FileStandard :: type enum {
+	INPUT,
+	OUTPUT,
+	ERROR,
+	COUNT,
+}
 
 __std_file_set := false;
-__std_files: [FILE_STANDARD__COUNT]File;
+__std_files: [FileStandard.COUNT as int]File;
 
-file_get_standard :: proc(std: FileStandardType) -> ^File {
+file_get_standard :: proc(std: FileStandard) -> ^File {
 	if (!__std_file_set) {
-		__std_files[FILE_STANDARD_INPUT] .handle = GetStdHandle(STD_INPUT_HANDLE);
-		__std_files[FILE_STANDARD_OUTPUT].handle = GetStdHandle(STD_OUTPUT_HANDLE);
-		__std_files[FILE_STANDARD_ERROR] .handle = GetStdHandle(STD_ERROR_HANDLE);
+		__std_files[FileStandard.INPUT] .handle = GetStdHandle(STD_INPUT_HANDLE);
+		__std_files[FileStandard.OUTPUT].handle = GetStdHandle(STD_OUTPUT_HANDLE);
+		__std_files[FileStandard.ERROR] .handle = GetStdHandle(STD_ERROR_HANDLE);
 		__std_file_set = true;
 	}
-	return ^__std_files[std as int];
+	return ^__std_files[std];
 }
 
 

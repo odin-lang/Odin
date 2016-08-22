@@ -218,6 +218,12 @@ AST_NODE_KIND(_TypeBegin, struct{}) \
 		isize field_count; \
 		b32 is_packed; \
 	}) \
+	AST_NODE_KIND(EnumType, struct { \
+		Token token; \
+		AstNode *base_type; \
+		AstNode *field_list; \
+		isize field_count; \
+	}) \
 AST_NODE_KIND(_TypeEnd, struct{}) \
 	AST_NODE_KIND(Count, struct{})
 
@@ -361,6 +367,8 @@ Token ast_node_token(AstNode *node) {
 		return node->VectorType.token;
 	case AstNode_StructType:
 		return node->StructType.token;
+	case AstNode_EnumType:
+		return node->EnumType.token;
 	}
 
 	return empty_token;
@@ -760,6 +768,16 @@ gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNode *field_list
 	result->StructType.field_list = field_list;
 	result->StructType.field_count = field_count;
 	result->StructType.is_packed = is_packed;
+	return result;
+}
+
+
+gb_inline AstNode *make_enum_type(AstFile *f, Token token, AstNode *base_type, AstNode *field_list, isize field_count) {
+	AstNode *result = make_node(f, AstNode_EnumType);
+	result->EnumType.token = token;
+	result->EnumType.base_type = base_type;
+	result->EnumType.field_list = field_list;
+	result->EnumType.field_count = field_count;
 	return result;
 }
 
@@ -1616,6 +1634,43 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		return make_struct_type(f, token, params, param_count, is_packed);
 	}
 
+	case Token_enum: {
+		Token token = expect_token(f, Token_enum);
+		AstNode *base_type = NULL;
+		Token open, close;
+		
+		if (f->cursor[0].kind != Token_OpenBrace) {
+			base_type = parse_type(f);
+		}
+
+		AstNode *root = NULL;
+		AstNode *curr = NULL;
+		isize field_count = 0;
+
+		open  = expect_token(f, Token_OpenBrace);
+
+		while (f->cursor[0].kind != Token_CloseBrace &&
+		       f->cursor[0].kind != Token_EOF) {
+			AstNode *name = parse_identifier(f);
+			AstNode *value = NULL;
+			Token eq = empty_token;
+			if (f->cursor[0].kind == Token_Eq) {
+				eq = expect_token(f, Token_Eq);
+				value = parse_value(f);
+			}
+			AstNode *field = make_field_value(f, name, value, eq);
+			DLIST_APPEND(root, curr, field);
+			field_count++;
+			if (f->cursor[0].kind != Token_Comma)
+				break;
+			next_token(f);
+		}
+
+		close = expect_token(f, Token_CloseBrace);
+
+		return make_enum_type(f, token, base_type, root, field_count);
+	}	
+
 	case Token_proc:
 		return parse_proc_type(f, NULL);
 
@@ -1763,9 +1818,6 @@ AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count) {
 			}
 
 			AstNode *type = parse_type(f);
-			// if (type->kind != AstNode_StructType) {
-				// expect_token(f, Token_Semicolon);
-			// }
 			return make_type_decl(f, token, name_list, type);
 		} else if (f->cursor[0].kind == Token_proc &&
 		    declaration_kind == Declaration_Immutable) {
@@ -1980,6 +2032,7 @@ AstNode *parse_stmt(AstFile *f) {
 		if (s->kind != AstNode_ProcDecl &&
 		    (s->kind == AstNode_TypeDecl &&
 		     s->TypeDecl.type->kind != AstNode_StructType &&
+		     s->TypeDecl.type->kind != AstNode_EnumType &&
 		     s->TypeDecl.type->kind != AstNode_ProcType) &&
 		    !allow_token(f, Token_Semicolon)) {
 			// CLEANUP(bill): Semicolon handling in parser
