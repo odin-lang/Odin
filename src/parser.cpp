@@ -81,6 +81,12 @@ enum VarDeclTag {
 	VarDeclTag_thread_local = GB_BIT(0),
 };
 
+enum CallExprKind {
+	CallExpr_Normal,
+	CallExpr_UnaryOp,
+	CallExpr_BinaryOp,
+};
+
 #define AST_NODE_KINDS \
 	AST_NODE_KIND(Invalid, struct{}) \
 	AST_NODE_KIND(BasicLit, Token) \
@@ -112,6 +118,7 @@ AST_NODE_KIND(_ExprBegin,       struct{}) \
 		AstNode *proc, *arg_list; \
 		isize arg_list_count; \
 		Token open, close; \
+		CallExprKind kind; \
 	}) \
 	AST_NODE_KIND(SliceExpr, struct { \
 		AstNode *expr; \
@@ -1186,6 +1193,16 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 	b32 loop = true;
 	while (loop) {
 		switch (f->cursor[0].kind) {
+
+		case Token_CustomUnaryOp: {
+			Token op = expect_token(f, Token_CustomUnaryOp);
+			if (lhs) {
+				// TODO(bill): Handle this
+			}
+			AstNode *proc = make_ident(f, op);
+			operand = make_call_expr(f, proc, operand, 1, ast_node_token(operand), op);
+		} break;
+
 		case Token_OpenParen: {
 			if (lhs) {
 				// TODO(bill): Handle this shit! Is this even allowed in this language?!
@@ -1354,8 +1371,14 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 					ast_file_err(f, op, "Expected expression on the right hand side of the binary operator");
 				}
 			}
-			expression = make_binary_expr(f, op, expression, right);
 
+			if (op.kind == Token_CustomBinaryOp) {
+				AstNode *proc = make_ident(f, op);
+				expression->next = right;
+				expression = make_call_expr(f, proc, expression, 2, ast_node_token(expression), ast_node_token(right));
+			} else {
+				expression = make_binary_expr(f, op, expression, right);
+			}
 		}
 	}
 	return expression;
@@ -1638,7 +1661,7 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		Token token = expect_token(f, Token_enum);
 		AstNode *base_type = NULL;
 		Token open, close;
-		
+
 		if (f->cursor[0].kind != Token_OpenBrace) {
 			base_type = parse_type(f);
 		}
@@ -1669,7 +1692,7 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		close = expect_token(f, Token_CloseBrace);
 
 		return make_enum_type(f, token, base_type, root, field_count);
-	}	
+	}
 
 	case Token_proc:
 		return parse_proc_type(f, NULL);

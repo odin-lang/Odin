@@ -2,7 +2,7 @@
 #load "opengl.odin"
 #load "math.odin"
 
-TWO_HEARTS :: '💕';
+TWO_HEARTS :: $💕$;
 
 win32_perf_count_freq := GetQueryPerformanceFrequency();
 time_now :: proc() -> f64 {

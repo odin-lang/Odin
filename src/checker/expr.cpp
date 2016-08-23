@@ -1386,7 +1386,6 @@ Entity *lookup_field(Type *type, AstNode *field_node, isize *index = NULL) {
 			}
 		}
 		break;
-		break;
 	// TODO(bill): Other types and extra "hidden" fields (e.g. introspection stuff)
 	// TODO(bill): Allow for access of field through index? e.g. `x.3` will get member of index 3
 	// Or is this only suitable if tuples are first-class?
@@ -1402,7 +1401,14 @@ void check_selector(Checker *c, Operand *operand, AstNode *node) {
 	AstNode *op_expr  = se->expr;
 	AstNode *selector = se->selector;
 	if (selector) {
-		Entity *entity = lookup_field(operand->type, selector);
+		Entity *entity = NULL;
+		if (is_type_enum(operand->type)) {
+			if (operand->mode == Addressing_Type) {
+				entity = lookup_field(operand->type, selector);
+			}
+		} else {
+			entity = lookup_field(operand->type, selector);
+		}
 		if (entity == NULL) {
 			gbString op_str  = expr_to_string(op_expr);
 			gbString sel_str = expr_to_string(selector);
@@ -2631,6 +2637,15 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, "}");
 	case_end;
 
+	case_ast_node(et, EnumType, node);
+		str = gb_string_appendc(str, "enum ");
+		if (et->base_type != NULL) {
+			str = write_expr_to_string(str, et->base_type);
+			str = gb_string_appendc(str, " ");
+		}
+		str = gb_string_appendc(str, "{");
+		str = gb_string_appendc(str, "}");
+	case_end;
 	}
 
 	return str;

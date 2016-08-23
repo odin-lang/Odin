@@ -11,7 +11,7 @@ main :: proc() {
 	// types();
 	// data_control();
 
-	run_game();
+	// run_game();
 }
 
 hellope :: proc() -> int {
@@ -118,7 +118,7 @@ procedures :: proc() {
 		return x + y;
 	}
 	print_int(add(3, 4)); // 7
-	print_rune('\n');
+	print_nl();
 
 	add_v2 :: proc(x, y: int) -> int {
 		return x + y;
@@ -152,6 +152,11 @@ procedures :: proc() {
 	proc2 :: proc(a, b: int) #no_inline {
 		print_int(a + b);
 	}
+
+	print_int(3 'add' 4);     // Infix style
+	print_nl();
+	print_int(12 'fibonacci); // Postfix style
+	print_nl();
 }
 
 
@@ -175,7 +180,7 @@ constants :: proc() {
 	c := DIFF;
 }
 
-nl :: proc() { print_rune('\n'); }
+nl :: proc() { print_nl(); }
 
 types :: proc() {
 
@@ -390,8 +395,8 @@ types :: proc() {
 		// FORENOTE: 5 * h was originally allowed but it was an edge case in the
 		// compiler I didn't think it was enough to justify have it it.
 
-		print_f32(i[0]); print_rune(',');
-		print_f32(i[1]); print_rune('\n');
+		print_f32(i[0]); print_rune($,$);
+		print_f32(i[1]); print_nl();
 	}
 
 
@@ -452,12 +457,12 @@ void main() {
 }`;
 
 
-		hearts1 := '💕';
-		hearts2 := '\U0001f495'; // 32 bit
+		hearts1 := $💕$;
+		hearts2 := $\U0001f495$; // 32 bit
 		hearts3 := "\xf0\x9f\x92\x95"; // Note it's a string, should I allow untyped string -> untyped rune casts?
 
-		㐒 := '㐒';
-		㐒16 := '\u4db5'; // 16 bit
+		㐒 := $㐒$;
+		㐒16 := $\u4db5$; // 16 bit
 		// String ideas "nicked" from Go, so far. I think I might change how some of it works later.
 	}
 

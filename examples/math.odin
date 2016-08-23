@@ -61,7 +61,7 @@ floor :: proc(x: f32) -> f32 {
 	}
 	return (x-0.5) as int as f32;
 }
-ceil  :: proc(x: f32) -> f32 {
+ceil :: proc(x: f32) -> f32 {
 	if x < 0 {
 		return x as int as f32;
 	}
@@ -91,14 +91,20 @@ to_degrees :: proc(radians: f32) -> f32 { return radians * 360 / MATH_TAU; }
 
 
 
-vec2_dot :: proc(a, b: Vec2) -> f32 { c := a*b; return c[0] + c[1]; }
-vec3_dot :: proc(a, b: Vec3) -> f32 { c := a*b; return c[0] + c[1] + c[2]; }
-vec4_dot :: proc(a, b: Vec4) -> f32 { c := a*b; return c[0] + c[1] + c[2] + c[3]; }
+dot2 :: proc(a, b: Vec2) -> f32 { c := a*b; return c[0] + c[1]; }
+dot3 :: proc(a, b: Vec3) -> f32 { c := a*b; return c[0] + c[1] + c[2]; }
+dot4 :: proc(a, b: Vec4) -> f32 { c := a*b; return c[0] + c[1] + c[2] + c[3]; }
+
+cross :: proc(x, y: Vec3) -> Vec3 {
+	a := swizzle(x, 1, 2, 0) * swizzle(y, 2, 0, 1);
+	b := swizzle(x, 2, 0, 1) * swizzle(y, 1, 2, 0);
+	return a - b;
+}
 
 
-vec2_mag :: proc(v: Vec2) -> f32 { return fsqrt(vec2_dot(v, v)); }
-vec3_mag :: proc(v: Vec3) -> f32 { return fsqrt(vec3_dot(v, v)); }
-vec4_mag :: proc(v: Vec4) -> f32 { return fsqrt(vec4_dot(v, v)); }
+vec2_mag :: proc(v: Vec2) -> f32 { return fsqrt(v 'dot2' v); }
+vec3_mag :: proc(v: Vec3) -> f32 { return fsqrt(v 'dot3' v); }
+vec4_mag :: proc(v: Vec4) -> f32 { return fsqrt(v 'dot4' v); }
 
 vec2_norm :: proc(v: Vec2) -> Vec2 { return v / Vec2{vec2_mag(v)}; }
 vec3_norm :: proc(v: Vec3) -> Vec3 { return v / Vec3{vec3_mag(v)}; }

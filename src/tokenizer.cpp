@@ -31,6 +31,9 @@ TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
 	TOKEN_KIND(Token_as, "as"), \
 	TOKEN_KIND(Token_transmute, "transmute"), \
 \
+	TOKEN_KIND(Token_CustomUnaryOp, "custom unary op"), \
+	TOKEN_KIND(Token_CustomBinaryOp, "custom binary op"), \
+\
 TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
 	TOKEN_KIND(Token_AddEq, "+="), \
 	TOKEN_KIND(Token_SubEq, "-="), \
@@ -199,9 +202,11 @@ i32 token_precedence(Token t) {
 	case Token_Shl:
 	case Token_Shr:
 		return 5;
+	case Token_CustomBinaryOp:
+		return 6;
 	case Token_as:
 	case Token_transmute:
-		return 6;
+		return 7;
 	}
 
 	return 0;
@@ -642,6 +647,27 @@ Token tokenizer_get_token(Tokenizer *t) {
 			token.kind = Token_EOF;
 			break;
 
+		case '\'': {
+			token.kind = Token_CustomUnaryOp;
+			while (rune_is_whitespace(t->curr_rune))
+				advance_to_next_rune(t);
+			token.string.text = t->curr;
+			while (rune_is_letter(t->curr_rune) || rune_is_digit(t->curr_rune)) {
+				advance_to_next_rune(t);
+			}
+			token.string.len = t->curr - token.string.text;
+
+			while (rune_is_whitespace(t->curr_rune))
+				advance_to_next_rune(t);
+
+			if (t->curr_rune == '\'') {
+				advance_to_next_rune(t);
+				token.kind = Token_CustomBinaryOp;
+			}
+
+			return token;
+		} break;
+
 		case '`': // Raw String Literal
 		case '"': // String Literal
 		{
@@ -684,7 +710,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 			}
 		} break;
 
-		case '\'': { // Rune Literal
+		case '$': { // Rune Literal
 			b32 valid = true;
 			isize len = 0;
 			token.kind = Token_Rune;
@@ -696,11 +722,11 @@ Token tokenizer_get_token(Tokenizer *t) {
 					break;
 				}
 				advance_to_next_rune(t);
-				if (r == '\'')
+				if (r == '$')
 					break;
 				len++;
 				if (r == '\\') {
-					if (!scan_escape(t, '\''))
+					if (!scan_escape(t, '$'))
 						valid = false;
 				}
 			}

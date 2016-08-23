@@ -82,7 +82,7 @@ b32 string_contains_char(String s, u8 c) {
 
 b32 unquote_char(String s, u8 quote, Rune *rune, b32 *multiple_bytes, String *tail_string) {
 	if (s.text[0] == quote &&
-	    (quote == '\'' || quote == '"')) {
+	    (quote == '$' || quote == '"')) {
 		return false;
 	} else if (s.text[0] >= 0x80) {
 		Rune r = -1;
@@ -116,7 +116,7 @@ b32 unquote_char(String s, u8 quote, Rune *rune, b32 *multiple_bytes, String *ta
 	case '\\': *rune = '\\'; break;
 
 
-	case '\'':
+	case '$':
 	case '"':
 		if (c != quote) {
 			return false;
@@ -210,7 +210,7 @@ i32 unquote_string(gbAllocator a, String *s_) {
 		*s_ = s;
 		return 1;
 	}
-	if (quote != '"' && quote != '\'')
+	if (quote != '"' && quote != '$')
 		return 0;
 
 	if (string_contains_char(s, '\n'))
@@ -220,7 +220,7 @@ i32 unquote_string(gbAllocator a, String *s_) {
 		if (quote == '"') {
 			*s_ = s;
 			return 1;
-		} else if (quote == '\'') {
+		} else if (quote == '$') {
 			Rune r = GB_RUNE_INVALID;
 			isize size = gb_utf8_decode(s.text, s.len, &r);
 			if ((size == s.len) && (r != -1 || size != 1)) {
@@ -254,7 +254,7 @@ i32 unquote_string(gbAllocator a, String *s_) {
 			offset += size;
 		}
 
-		if (quote == '\'' && s.len != 0) {
+		if (quote == '$' && s.len != 0) {
 			gb_free(a, buf);
 			return 0;
 		}
