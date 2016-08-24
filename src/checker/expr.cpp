@@ -16,7 +16,7 @@ void           update_expr_type        (Checker *c, AstNode *e, Type *type, b32 
 
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_StructType);
-	GB_ASSERT(struct_type->kind == Type_Structure);
+	GB_ASSERT(struct_type->kind == Type_Struct);
 	ast_node(st, StructType, node);
 
 	Map<Entity *> entity_map = {};
@@ -52,14 +52,57 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 			add_entity_use(&c->info, name, e);
 		}
 	}
-	struct_type->structure.fields = fields;
-	struct_type->structure.field_count = field_count;
-	struct_type->structure.is_packed = st->is_packed;
+	struct_type->Struct.fields = fields;
+	struct_type->Struct.field_count = field_count;
+	struct_type->Struct.is_packed = st->is_packed;
 }
+
+void check_union_type(Checker *c, Type *union_type, AstNode *node) {
+	GB_ASSERT(node->kind == AstNode_UnionType);
+	GB_ASSERT(union_type->kind == Type_Union);
+	ast_node(ut, UnionType, node);
+
+	Map<Entity *> entity_map = {};
+	map_init(&entity_map, gb_heap_allocator());
+	defer (map_destroy(&entity_map));
+
+	isize field_count = 0;
+	for (AstNode *field = ut->field_list; field != NULL; field = field->next) {
+		for (AstNode *name = field->Field.name_list; name != NULL; name = name->next) {
+			GB_ASSERT(name->kind == AstNode_Ident);
+			field_count++;
+		}
+	}
+
+	Entity **fields = gb_alloc_array(c->allocator, Entity *, ut->field_count);
+	isize field_index = 0;
+	for (AstNode *field = ut->field_list; field != NULL; field = field->next) {
+		ast_node(f, Field, field);
+		Type *type = check_type(c, f->type);
+		for (AstNode *name = f->name_list; name != NULL; name = name->next) {
+			ast_node(i, Ident, name);
+			Token name_token = i->token;
+			// TODO(bill): is the curr_scope correct?
+			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type);
+			HashKey key = hash_string(name_token.string);
+			if (map_get(&entity_map, key)) {
+				// TODO(bill): Scope checking already checks the declaration
+				error(&c->error_collector, name_token, "`%.*s` is already declared in this union", LIT(name_token.string));
+			} else {
+				map_set(&entity_map, key, e);
+				fields[field_index++] = e;
+			}
+			add_entity_use(&c->info, name, e);
+		}
+	}
+	union_type->Union.fields = fields;
+	union_type->Union.field_count = field_count;
+}
+
 
 void check_enum_type(Checker *c, Type *enum_type, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_EnumType);
-	GB_ASSERT(enum_type->kind == Type_Enumeration);
+	GB_ASSERT(enum_type->kind == Type_Enum);
 	ast_node(et, EnumType, node);
 
 	Map<Entity *> entity_map = {};
@@ -78,7 +121,7 @@ void check_enum_type(Checker *c, Type *enum_type, AstNode *node) {
 	if (base_type == NULL) {
 		base_type = t_int;
 	}
-	enum_type->enumeration.base = base_type;
+	enum_type->Enum.base = base_type;
 
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, et->field_count);
 	isize field_index = 0;
@@ -120,8 +163,8 @@ void check_enum_type(Checker *c, Type *enum_type, AstNode *node) {
 		}
 		add_entity_use(&c->info, f->field, e);
 	}
-	enum_type->enumeration.fields = fields;
-	enum_type->enumeration.field_count = et->field_count;
+	enum_type->Enum.fields = fields;
+	enum_type->Enum.field_count = et->field_count;
 }
 
 Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize field_count) {
@@ -149,8 +192,8 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize fiel
 			}
 		}
 	}
-	tuple->tuple.variables = variables;
-	tuple->tuple.variable_count = field_count;
+	tuple->Tuple.variables = variables;
+	tuple->Tuple.variable_count = field_count;
 
 	return tuple;
 }
@@ -171,8 +214,8 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *list, isize list_coun
 		// NOTE(bill): No need to record
 		variables[variable_index++] = param;
 	}
-	tuple->tuple.variables = variables;
-	tuple->tuple.variable_count = list_count;
+	tuple->Tuple.variables = variables;
+	tuple->Tuple.variable_count = list_count;
 
 	return tuple;
 }
@@ -189,11 +232,11 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 	Type *params  = check_get_params(c, c->context.scope, pt->param_list,   param_count);
 	Type *results = check_get_results(c, c->context.scope, pt->result_list, result_count);
 
-	type->proc.scope        = c->context.scope;
-	type->proc.params       = params;
-	type->proc.param_count  = pt->param_count;
-	type->proc.results      = results;
-	type->proc.result_count = pt->result_count;
+	type->Proc.scope        = c->context.scope;
+	type->Proc.params       = params;
+	type->Proc.param_count  = pt->param_count;
+	type->Proc.results      = results;
+	type->Proc.result_count = pt->result_count;
 }
 
 
@@ -354,7 +397,7 @@ Type *check_type_expr_extra(Checker *c, AstNode *e, Type *named_type) {
 	case_end;
 
 	case_ast_node(st, StructType, e);
-		Type *t = make_type_structure(c->allocator);
+		Type *t = make_type_struct(c->allocator);
 		set_base_type(named_type, t);
 		check_struct_type(c, t, e);
 		return t;
@@ -460,14 +503,21 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 	case_end;
 
 	case_ast_node(st, StructType, e);
-		type = make_type_structure(c->allocator);
+		type = make_type_struct(c->allocator);
 		set_base_type(named_type, type);
 		check_struct_type(c, type, e);
 		goto end;
 	case_end;
 
+	case_ast_node(st, UnionType, e);
+		type = make_type_union(c->allocator);
+		set_base_type(named_type, type);
+		check_union_type(c, type, e);
+		goto end;
+	case_end;
+
 	case_ast_node(et, EnumType, e);
-		type = make_type_enumeration(c->allocator);
+		type = make_type_enum(c->allocator);
 		set_base_type(named_type, type);
 		check_enum_type(c, type, e);
 		goto end;
@@ -613,7 +663,7 @@ b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exac
 		i64 imax = (1ll << (s-1ll));
 
 
-		switch (type->basic.kind) {
+		switch (type->Basic.kind) {
 		case Basic_i8:
 		case Basic_i16:
 		case Basic_i32:
@@ -638,7 +688,7 @@ b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exac
 		if (v.kind != ExactValue_Float)
 			return false;
 
-		switch (type->basic.kind) {
+		switch (type->Basic.kind) {
 		case Basic_f32:
 			if (out_value) *out_value = v;
 			return true;
@@ -791,7 +841,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 	}
 
 	if (is_type_vector(get_base_type(y->type))) {
-		x->type = make_type_vector(c->allocator, t_bool, get_base_type(y->type)->vector.count);
+		x->type = make_type_vector(c->allocator, t_bool, get_base_type(y->type)->Vector.count);
 	} else {
 		x->type = t_untyped_bool;
 	}
@@ -1253,7 +1303,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 			update_expr_value(c, operand->expr, operand->value);
 		} else {
 			// TODO(bill): Is this really needed?
-			switch (operand->type->basic.kind) {
+			switch (operand->type->Basic.kind) {
 			case Basic_UntypedBool:
 				if (!is_type_boolean(target_type)) {
 					convert_untyped_error(c, operand, target_type);
@@ -1272,7 +1322,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 		}
 		break;
 	case Type_Pointer:
-		switch (operand->type->basic.kind) {
+		switch (operand->type->Basic.kind) {
 		case Basic_UntypedPointer:
 			target_type = t_untyped_pointer;
 			break;
@@ -1283,7 +1333,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 		break;
 
 	case Type_Proc:
-		switch (operand->type->basic.kind) {
+		switch (operand->type->Basic.kind) {
 		case Basic_UntypedPointer:
 			break;
 		default:
@@ -1359,14 +1409,14 @@ Entity *lookup_field(Type *type, AstNode *field_node, isize *index = NULL) {
 	GB_ASSERT(field_node->kind == AstNode_Ident);
 	type = get_base_type(type);
 	if (type->kind == Type_Pointer)
-		type = get_base_type(type->pointer.elem);
+		type = get_base_type(type->Pointer.elem);
 
 	ast_node(i, Ident, field_node);
 	String field_str = i->token.string;
 	switch (type->kind) {
-	case Type_Structure:
-		for (isize i = 0; i < type->structure.field_count; i++) {
-			Entity *f = type->structure.fields[i];
+	case Type_Struct:
+		for (isize i = 0; i < type->Struct.field_count; i++) {
+			Entity *f = type->Struct.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
 			String str = f->token.string;
 			if (are_strings_equal(field_str, str)) {
@@ -1375,9 +1425,22 @@ Entity *lookup_field(Type *type, AstNode *field_node, isize *index = NULL) {
 			}
 		}
 		break;
-	case Type_Enumeration:
-		for (isize i = 0; i < type->enumeration.field_count; i++) {
-			Entity *f = type->enumeration.fields[i];
+
+	case Type_Union:
+		for (isize i = 0; i < type->Union.field_count; i++) {
+			Entity *f = type->Union.fields[i];
+			GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
+			String str = f->token.string;
+			if (are_strings_equal(field_str, str)) {
+				if (index) *index = i;
+				return f;
+			}
+		}
+		break;
+
+	case Type_Enum:
+		for (isize i = 0; i < type->Enum.field_count; i++) {
+			Entity *f = type->Enum.fields[i];
 			GB_ASSERT(f->kind == Entity_Constant);
 			String str = f->token.string;
 			if (are_strings_equal(field_str, str)) {
@@ -1522,7 +1585,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		Type *type = get_base_type(check_type(c, ce->arg_list));
 		AstNode *field_arg = unparen_expr(ce->arg_list->next);
 		if (type) {
-			if (type->kind != Type_Structure) {
+			if (type->kind != Type_Struct) {
 				error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a structure type for `offset_of`");
 				return false;
 			}
@@ -1565,8 +1628,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		Type *type = operand->type;
 		if (get_base_type(type)->kind == Type_Pointer) {
 			Type *p = get_base_type(type);
-			if (get_base_type(p)->kind == Type_Structure)
-				type = p->pointer.elem;
+			if (get_base_type(p)->kind == Type_Struct)
+				type = p->Pointer.elem;
 		}
 
 		isize index = 0;
@@ -1628,12 +1691,12 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		case Type_Array:
 			mode = Addressing_Constant;
-			value = make_exact_value_integer(t->array.count);
+			value = make_exact_value_integer(t->Array.count);
 			break;
 
 		case Type_Vector:
 			mode = Addressing_Constant;
-			value = make_exact_value_integer(t->vector.count);
+			value = make_exact_value_integer(t->Vector.count);
 			break;
 
 		case Type_Slice:
@@ -1662,7 +1725,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		Type *d = get_base_type(operand->type);
 		if (d->kind == Type_Slice)
-			dest_type = d->slice.elem;
+			dest_type = d->Slice.elem;
 
 		Operand op = {};
 		check_expr(c, &op, ce->arg_list->next);
@@ -1670,7 +1733,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			return false;
 		Type *s = get_base_type(op.type);
 		if (s->kind == Type_Slice)
-			src_type = s->slice.elem;
+			src_type = s->Slice.elem;
 
 		if (dest_type == NULL || src_type == NULL) {
 			error(&c->error_collector, ast_node_token(call), "`copy` only expects slices as arguments");
@@ -1707,12 +1770,12 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			return false;
 		y_type = get_base_type(op.type);
 
-		if (!(is_type_pointer(x_type) && is_type_slice(x_type->pointer.elem))) {
+		if (!(is_type_pointer(x_type) && is_type_slice(x_type->Pointer.elem))) {
 			error(&c->error_collector, ast_node_token(call), "First argument to `append` must be a pointer to a slice");
 			return false;
 		}
 
-		Type *elem_type = x_type->pointer.elem->slice.elem;
+		Type *elem_type = x_type->Pointer.elem->Slice.elem;
 		if (!check_is_assignable_to(c, &op, elem_type)) {
 			gbString d_arg = expr_to_string(ce->arg_list);
 			gbString s_arg = expr_to_string(ce->arg_list->next);
@@ -1744,7 +1807,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			return false;
 		}
 
-		isize max_count = vector_type->vector.count;
+		isize max_count = vector_type->Vector.count;
 		isize arg_count = 0;
 		for (AstNode *arg = ce->arg_list->next; arg != NULL; arg = arg->next) {
 			Operand op = {};
@@ -1775,7 +1838,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			return false;
 		}
 
-		Type *elem_type = vector_type->vector.elem;
+		Type *elem_type = vector_type->Vector.elem;
 		operand->type = make_type_vector(c->allocator, elem_type, arg_count);
 		operand->mode = Addressing_Value;
 	} break;
@@ -1793,8 +1856,8 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	isize param_index = 0;
 	isize param_count = 0;
 
-	if (proc_type->proc.params)
-		param_count = proc_type->proc.params->tuple.variable_count;
+	if (proc_type->Proc.params)
+		param_count = proc_type->Proc.params->Tuple.variable_count;
 
  	if (ce->arg_list_count == 0 && param_count == 0)
 		return;
@@ -1802,7 +1865,7 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	if (ce->arg_list_count > param_count) {
 		error_code = +1;
 	} else {
-		Entity **sig_params = proc_type->proc.params->tuple.variables;
+		Entity **sig_params = proc_type->Proc.params->Tuple.variables;
 		AstNode *call_arg = ce->arg_list;
 		for (; call_arg != NULL; call_arg = call_arg->next) {
 			check_multi_expr(c, operand, call_arg);
@@ -1813,7 +1876,7 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 				check_assignment(c, operand, sig_params[param_index]->type, make_string("argument"));
 				param_index++;
 			} else {
-				auto *tuple = &operand->type->tuple;
+				auto *tuple = &operand->type->Tuple;
 				isize i = 0;
 				for (;
 				     i < tuple->variable_count && param_index < param_count;
@@ -1897,12 +1960,12 @@ ExpressionKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 
 	check_call_arguments(c, operand, proc_type, call);
 
-	auto *proc = &proc_type->proc;
+	auto *proc = &proc_type->Proc;
 	if (proc->result_count == 0) {
 		operand->mode = Addressing_NoValue;
 	} else if (proc->result_count == 1) {
 		operand->mode = Addressing_Value;
-		operand->type = proc->results->tuple.variables[0]->type;
+		operand->type = proc->results->Tuple.variables[0]->type;
 	} else {
 		operand->mode = Addressing_Value;
 		operand->type = proc->results;
@@ -2007,12 +2070,12 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 
 		Type *t = get_base_type(type);
 		switch (t->kind) {
-		case Type_Structure: {
+		case Type_Struct: {
 			if (cl->elem_count == 0)
 				break; // NOTE(bill): No need to init
 			{ // Checker values
 				AstNode *elem = cl->elem_list;
-				isize field_count = t->structure.field_count;
+				isize field_count = t->Struct.field_count;
 				if (elem->kind == AstNode_FieldValue) {
 					b32 *fields_visited = gb_alloc_array(c->allocator, b32, field_count);
 
@@ -2041,7 +2104,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 							      "Unknown field `%.*s` in structure literal", LIT(name));
 							continue;
 						}
-						Entity *field = t->structure.fields[index];
+						Entity *field = t->Struct.fields[index];
 						add_entity_use(&c->info, kv->field, field);
 
 						if (fields_visited[index]) {
@@ -2064,7 +2127,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 							      "Mixture of `field = value` and value elements in a structure literal is not allowed");
 							continue;
 						}
-						Entity *field = t->structure.fields[index];
+						Entity *field = t->Struct.fields[index];
 
 						check_expr(c, o, elem);
 						if (index >= field_count) {
@@ -2088,13 +2151,13 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 			Type *elem_type = NULL;
 			String context_name = {};
 			if (t->kind == Type_Slice) {
-				elem_type = t->slice.elem;
+				elem_type = t->Slice.elem;
 				context_name = make_string("slice literal");
 			} else if (t->kind == Type_Vector) {
-				elem_type = t->vector.elem;
+				elem_type = t->Vector.elem;
 				context_name = make_string("vector literal");
 			} else {
-				elem_type = t->array.elem;
+				elem_type = t->Array.elem;
 				context_name = make_string("array literal");
 			}
 
@@ -2111,14 +2174,14 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 
 
 				if (t->kind == Type_Array &&
-				    t->array.count >= 0 &&
-				    index >= t->array.count) {
-					error(&c->error_collector, ast_node_token(elem), "Index %lld is out of bounds (>= %lld) for array literal", index, t->array.count);
+				    t->Array.count >= 0 &&
+				    index >= t->Array.count) {
+					error(&c->error_collector, ast_node_token(elem), "Index %lld is out of bounds (>= %lld) for array literal", index, t->Array.count);
 				}
 				if (t->kind == Type_Vector &&
-				    t->vector.count >= 0 &&
-				    index >= t->vector.count) {
-					error(&c->error_collector, ast_node_token(elem), "Index %lld is out of bounds (>= %lld) for vector literal", index, t->vector.count);
+				    t->Vector.count >= 0 &&
+				    index >= t->Vector.count) {
+					error(&c->error_collector, ast_node_token(elem), "Index %lld is out of bounds (>= %lld) for vector literal", index, t->Vector.count);
 				}
 
 				Operand o = {};
@@ -2129,14 +2192,14 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 				max = index;
 
 			if (t->kind == Type_Vector) {
-				if (t->vector.count > 1 && gb_is_between(index, 2, t->vector.count-1)) {
+				if (t->Vector.count > 1 && gb_is_between(index, 2, t->Vector.count-1)) {
 					error(&c->error_collector, ast_node_token(cl->elem_list),
-					      "Expected either 1 (broadcast) or %td elements in vector literal, got %td", t->vector.count, index);
+					      "Expected either 1 (broadcast) or %td elements in vector literal, got %td", t->Vector.count, index);
 				}
 			}
 
 			if (t->kind == Type_Array && ellipsis_array) {
-				t->array.count = max;
+				t->Array.count = max;
 			}
 		} break;
 
@@ -2213,31 +2276,31 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 
 		case Type_Array:
 			valid = true;
-			max_count = t->array.count;
+			max_count = t->Array.count;
 			if (o->mode != Addressing_Variable)
 				o->mode = Addressing_Value;
-			o->type = t->array.elem;
+			o->type = t->Array.elem;
 			break;
 
 		case Type_Vector:
 			valid = true;
-			max_count = t->vector.count;
+			max_count = t->Vector.count;
 			if (o->mode != Addressing_Variable)
 				o->mode = Addressing_Value;
-			o->type = t->vector.elem;
+			o->type = t->Vector.elem;
 			break;
 
 
 		case Type_Slice:
 			valid = true;
-			o->type = t->slice.elem;
+			o->type = t->Slice.elem;
 			o->mode = Addressing_Variable;
 			break;
 
 		case Type_Pointer:
 			valid = true;
 			o->mode = Addressing_Variable;
-			o->type = get_base_type(t->pointer.elem);
+			o->type = get_base_type(t->Pointer.elem);
 			break;
 		}
 
@@ -2282,14 +2345,14 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 
 		case Type_Array:
 			valid = true;
-			max_count = t->array.count;
+			max_count = t->Array.count;
 			if (o->mode != Addressing_Variable) {
 				gbString str = expr_to_string(node);
 				error(&c->error_collector, ast_node_token(node), "Cannot slice array `%s`, value is not addressable", str);
 				gb_string_free(str);
 				goto error;
 			}
-			o->type = make_type_slice(c->allocator, t->array.elem);
+			o->type = make_type_slice(c->allocator, t->Array.elem);
 			o->mode = Addressing_Value;
 			break;
 
@@ -2300,7 +2363,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 
 		case Type_Pointer:
 			valid = true;
-			o->type = make_type_slice(c->allocator, get_base_type(t->pointer.elem));
+			o->type = make_type_slice(c->allocator, get_base_type(t->Pointer.elem));
 			o->mode = Addressing_Value;
 			break;
 		}
@@ -2355,7 +2418,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 			Type *t = get_base_type(o->type);
 			if (t->kind == Type_Pointer) {
 				o->mode = Addressing_Variable;
-				o->type = t->pointer.elem;
+				o->type = t->Pointer.elem;
  			} else {
  				gbString str = expr_to_string(o->expr);
  				error(&c->error_collector, ast_node_token(o->expr), "Cannot dereference `%s`", str);
@@ -2439,7 +2502,7 @@ void check_not_tuple(Checker *c, Operand *o) {
 	if (o->mode == Addressing_Value) {
 		// NOTE(bill): Tuples are not first class thus never named
 		if (o->type->kind == Type_Tuple) {
-			isize count = o->type->tuple.variable_count;
+			isize count = o->type->Tuple.variable_count;
 			GB_ASSERT(count != 1);
 			error(&c->error_collector, ast_node_token(o->expr),
 			      "%td-valued tuple found where single value expected", count);

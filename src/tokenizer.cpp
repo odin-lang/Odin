@@ -31,8 +31,8 @@ TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
 	TOKEN_KIND(Token_as, "as"), \
 	TOKEN_KIND(Token_transmute, "transmute"), \
 \
-	TOKEN_KIND(Token_CustomUnaryOp, "custom unary op"), \
-	TOKEN_KIND(Token_CustomBinaryOp, "custom binary op"), \
+	TOKEN_KIND(Token_Prime, "'"), \
+	TOKEN_KIND(Token_DoublePrime, "''"), \
 \
 TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
 	TOKEN_KIND(Token_AddEq, "+="), \
@@ -96,6 +96,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_struct,      "struct"), \
 	TOKEN_KIND(Token_union,       "union"), \
 	TOKEN_KIND(Token_enum,        "enum"), \
+	TOKEN_KIND(Token_using,       "using"), \
 TOKEN_KIND(Token__KeywordEnd, "_KeywordEnd"), \
 	TOKEN_KIND(Token_Count, "")
 
@@ -202,7 +203,7 @@ i32 token_precedence(Token t) {
 	case Token_Shl:
 	case Token_Shr:
 		return 5;
-	case Token_CustomBinaryOp:
+	case Token_DoublePrime:
 		return 6;
 	case Token_as:
 	case Token_transmute:
@@ -647,26 +648,13 @@ Token tokenizer_get_token(Tokenizer *t) {
 			token.kind = Token_EOF;
 			break;
 
-		case '\'': {
-			token.kind = Token_CustomUnaryOp;
-			while (rune_is_whitespace(t->curr_rune))
-				advance_to_next_rune(t);
-			token.string.text = t->curr;
-			while (rune_is_letter(t->curr_rune) || rune_is_digit(t->curr_rune)) {
-				advance_to_next_rune(t);
-			}
-			token.string.len = t->curr - token.string.text;
-
-			while (rune_is_whitespace(t->curr_rune))
-				advance_to_next_rune(t);
-
+		case '\'':
+			token.kind = Token_Prime;
 			if (t->curr_rune == '\'') {
 				advance_to_next_rune(t);
-				token.kind = Token_CustomBinaryOp;
+				token.kind = Token_DoublePrime;
 			}
-
-			return token;
-		} break;
+			break;
 
 		case '`': // Raw String Literal
 		case '"': // String Literal

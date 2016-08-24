@@ -337,12 +337,12 @@ void init_universal_scope(void) {
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
 		Token token = {Token_Identifier};
-		token.string = basic_types[i].basic.name;
+		token.string = basic_types[i].Basic.name;
 		add_global_entity(make_entity_type_name(a, NULL, token, &basic_types[i]));
 	}
 	for (isize i = 0; i < gb_count_of(basic_type_aliases); i++) {
 		Token token = {Token_Identifier};
-		token.string = basic_type_aliases[i].basic.name;
+		token.string = basic_type_aliases[i].Basic.name;
 		add_global_entity(make_entity_type_name(a, NULL, token, &basic_type_aliases[i]));
 	}
 

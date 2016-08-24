@@ -99,7 +99,7 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 
 	switch (t->kind) {
 	case Type_Basic:
-		switch (t->basic.kind) {
+		switch (t->Basic.kind) {
 		case Basic_bool:   ssa_fprintf(f, "i1");                      break;
 		case Basic_i8:     ssa_fprintf(f, "i8");                      break;
 		case Basic_i16:    ssa_fprintf(f, "i16");                     break;
@@ -120,74 +120,78 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 		}
 		break;
 	case Type_Array:
-		ssa_fprintf(f, "[%lld x ", t->array.count);
-		ssa_print_type(f, s, t->array.elem);
+		ssa_fprintf(f, "[%lld x ", t->Array.count);
+		ssa_print_type(f, s, t->Array.elem);
 		ssa_fprintf(f, "]");
 		break;
 	case Type_Vector: {
 		// TODO(bill): actually do correctly
-		ssa_fprintf(f, "<%lld x ", t->vector.count);
-		ssa_print_type(f, s, t->vector.elem);
+		ssa_fprintf(f, "<%lld x ", t->Vector.count);
+		ssa_print_type(f, s, t->Vector.elem);
 		ssa_fprintf(f, ">");
 	} break;
 	case Type_Slice:
 		ssa_fprintf(f, "{");
-		ssa_print_type(f, s, t->slice.elem);
+		ssa_print_type(f, s, t->Slice.elem);
 		ssa_fprintf(f, "*, i%lld, i%lld}", word_bits, word_bits);
 		break;
-	case Type_Structure:
-		if (t->structure.is_packed) {
+	case Type_Struct:
+		if (t->Struct.is_packed) {
 			ssa_fprintf(f, "<");
 		}
 		ssa_fprintf(f, "{");
-		for (isize i = 0; i < t->structure.field_count; i++) {
+		for (isize i = 0; i < t->Struct.field_count; i++) {
 			if (i > 0) {
 				ssa_fprintf(f, ", ");
 			}
-			Type *ft = t->structure.fields[i]->type;
+			Type *ft = t->Struct.fields[i]->type;
 			Type *bft = get_base_type(ft);
-			if (bft->kind != Type_Structure) {
+			if (bft->kind != Type_Struct) {
 				ft = bft;
 			}
 			ssa_print_type(f, s, ft);
 		}
 		ssa_fprintf(f, "}");
-		if (t->structure.is_packed) {
+		if (t->Struct.is_packed) {
 			ssa_fprintf(f, ">");
 		}
 
 		break;
-	case Type_Enumeration:
-		ssa_print_type(f, s, t->enumeration.base);
+	case Type_Union: {
+		i64 size = type_size_of(s, gb_heap_allocator(), t);
+		ssa_fprintf(f, "[%lld x i8]", size);
+	} break;
+	case Type_Enum:
+		ssa_print_type(f, s, t->Enum.base);
 		break;
 	case Type_Pointer:
-		ssa_print_type(f, s, t->pointer.elem);
+		ssa_print_type(f, s, t->Pointer.elem);
 		ssa_fprintf(f, "*");
 		break;
 	case Type_Named:
-		ssa_print_encoded_local(f, t->named.name);
+		ssa_print_encoded_local(f, t->Named.name);
 		break;
 	case Type_Tuple:
-		if (t->tuple.variable_count == 1) {
-			ssa_print_type(f, s, t->tuple.variables[0]->type);
+		if (t->Tuple.variable_count == 1) {
+			ssa_print_type(f, s, t->Tuple.variables[0]->type);
 		} else {
 			ssa_fprintf(f, "{");
-			for (isize i = 0; i < t->tuple.variable_count; i++) {
+			for (isize i = 0; i < t->Tuple.variable_count; i++) {
 				if (i > 0) ssa_fprintf(f, ", ");
-				ssa_print_type(f, s, t->tuple.variables[i]->type);
+				ssa_print_type(f, s, t->Tuple.variables[i]->type);
 			}
 			ssa_fprintf(f, "}");
 		}
 		break;
 	case Type_Proc: {
-		if (t->proc.result_count == 0) {
+		if (t->Proc.result_count == 0) {
 			ssa_fprintf(f, "void");
 		} else {
-			ssa_print_type(f, s, t->proc.results);
+			ssa_print_type(f, s, t->Proc.results);
 		}
 		ssa_fprintf(f, " (");
-		auto *params = &t->proc.params->tuple;
-		for (isize i = 0; i < t->proc.param_count; i++) {
+		auto *params = &t->Proc.params->Tuple;
+		for (isize i = 0; i < t->Proc.param_count; i++) {
 			if (i > 0) {
 				ssa_fprintf(f, ", ");
 			}
@@ -234,7 +238,7 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 	} break;
 	case ExactValue_Float: {
 		u64 u = *cast(u64*)&value.value_float;
-		if (is_type_float(type) && type->basic.kind == Basic_f32) {
+		if (is_type_float(type) && type->Basic.kind == Basic_f32) {
 			// IMPORTANT NOTE(bill): LLVM requires all floating point constants to be
 			// a 64 bit number if bits_of(float type) <= 64.
 			// For some bizarre reason, you need to clear the bottom 29 bits
@@ -437,7 +441,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		Type *type = get_base_type(ssa_type(bo->left));
 		Type *elem_type = type;
 		while (elem_type->kind == Type_Vector) {
-			elem_type = get_base_type(elem_type->vector.elem);
+			elem_type = get_base_type(elem_type->Vector.elem);
 		}
 
 		ssa_fprintf(f, "%%%d = ", value->id);
@@ -558,7 +562,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		if (call->arg_count > 0) {
 			Type *proc_type = get_base_type(ssa_type(call->value));
 			GB_ASSERT(proc_type->kind == Type_Proc);
-			auto *params = &proc_type->proc.params->tuple;
+			auto *params = &proc_type->Proc.params->Tuple;
 			for (isize i = 0; i < call->arg_count; i++) {
 				Entity *e = params->variables[i];
 				GB_ASSERT(e != NULL);
@@ -682,7 +686,7 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 		ssa_fprintf(f, "\ndefine ");
 	}
 
-	auto *proc_type = &proc->type->proc;
+	auto *proc_type = &proc->type->Proc;
 
 	if (proc_type->result_count == 0) {
 		ssa_fprintf(f, "void");
@@ -696,7 +700,7 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 	ssa_fprintf(f, "(");
 
 	if (proc_type->param_count > 0) {
-		auto *params = &proc_type->params->tuple;
+		auto *params = &proc_type->params->Tuple;
 		for (isize i = 0; i < params->variable_count; i++) {
 			Entity *e = params->variables[i];
 			if (i > 0)

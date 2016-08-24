@@ -35,6 +35,7 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 		return cast(i32)exit_code;
 	} else {
 		// NOTE(bill): failed to create process
+		gb_printf_err("Failed to execute command:\n\t%s\n", cmd_line);
 		return -1;
 	}
 }
@@ -56,51 +57,50 @@ int main(int argc, char **argv) {
 	Parser parser = {0};
 
 
-	if (init_parser(&parser)) {
-		defer (destroy_parser(&parser));
+	if (!init_parser(&parser))
+		return 1;
+	defer (destroy_parser(&parser));
 
-		if (parse_files(&parser, init_filename) == ParseFile_None) {
-			// print_ast(parser.files[0].decls, 0);
+	if (parse_files(&parser, init_filename) != ParseFile_None)
+		return 1;
 
-			Checker checker = {};
+	// print_ast(parser.files[0].decls, 0);
 
-			init_checker(&checker, &parser);
-			defer (destroy_checker(&checker));
+	Checker checker = {};
 
-			check_parsed_files(&checker);
-			ssaGen ssa = {};
-			if (ssa_gen_init(&ssa, &checker)) {
-				defer (ssa_gen_destroy(&ssa));
+	init_checker(&checker, &parser);
+	defer (destroy_checker(&checker));
 
-				ssa_gen_code(&ssa);
+	check_parsed_files(&checker);
+	ssaGen ssa = {};
+	if (!ssa_gen_init(&ssa, &checker))
+		return 1;
+	defer (ssa_gen_destroy(&ssa));
 
-				char const *output_name = ssa.output_file.filename;
-				isize base_name_len = gb_path_extension(output_name)-1 - output_name;
+	ssa_gen_code(&ssa);
 
-				i32 exit_code = win32_exec_command_line_app(
-					"../misc/llvm-bin/opt -mem2reg %s -o %.*s.bc",
-					output_name, cast(int)base_name_len, output_name);
-				if (exit_code != 0)
-					return exit_code;
+	char const *output_name = ssa.output_file.filename;
+	isize base_name_len = gb_path_extension(output_name)-1 - output_name;
 
-				exit_code = win32_exec_command_line_app(
-					"clang -o %.*s.exe %.*s.bc "
-					"-Wno-override-module "
-					// "-nostartfiles "
-					"-lKernel32.lib -lUser32.lib -lGdi32.lib -lOpengl32.lib "
-					,
-					cast(int)base_name_len, output_name,
-					cast(int)base_name_len, output_name);
-				if (exit_code != 0)
-					return exit_code;
+	i32 exit_code = win32_exec_command_line_app(
+		"../misc/llvm-bin/opt -mem2reg %s -o %.*s.bc",
+		output_name, cast(int)base_name_len, output_name);
+	if (exit_code != 0)
+		return exit_code;
 
-				if (run_output) {
-					win32_exec_command_line_app("%.*s.exe", cast(int)base_name_len, output_name);
-				}
-				return 0;
-			}
-		}
+	exit_code = win32_exec_command_line_app(
+		"clang -o %.*s.exe %.*s.bc "
+		"-Wno-override-module "
+		// "-nostartfiles "
+		"-lKernel32.lib -lUser32.lib -lGdi32.lib -lOpengl32.lib "
+		,
+		cast(int)base_name_len, output_name,
+		cast(int)base_name_len, output_name);
+	if (exit_code != 0)
+		return exit_code;
+
+	if (run_output) {
+		win32_exec_command_line_app("%.*s.exe", cast(int)base_name_len, output_name);
 	}
-
-	return 1;
+	return 0;
 }

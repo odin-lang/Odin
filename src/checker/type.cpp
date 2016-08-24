@@ -61,8 +61,9 @@ struct BasicType {
 	TYPE_KIND(Array), \
 	TYPE_KIND(Vector), \
 	TYPE_KIND(Slice), \
-	TYPE_KIND(Structure), \
-	TYPE_KIND(Enumeration), \
+	TYPE_KIND(Struct), \
+	TYPE_KIND(Union), \
+	TYPE_KIND(Enum), \
 	TYPE_KIND(Pointer), \
 	TYPE_KIND(Named), \
 	TYPE_KIND(Tuple), \
@@ -90,18 +91,18 @@ struct Type {
 	u32 flags;
 	TypeKind kind;
 	union {
-		BasicType basic;
+		BasicType Basic;
 		struct {
 			Type *elem;
 			i64 count;
-		} array;
+		} Array;
 		struct {
 			Type *elem;
 			i64 count;
-		} vector;
+		} Vector;
 		struct {
 			Type *elem;
-		} slice;
+		} Slice;
 		struct {
 			// Theses are arrays
 			Entity **fields; // Entity_Variable
@@ -109,42 +110,46 @@ struct Type {
 			i64 *    offsets;
 			b32      are_offsets_set;
 			b32      is_packed;
-		} structure;
-		struct { Type *elem; } pointer;
+		} Struct;
+		struct {
+			Entity **fields; // Entity_Variable
+			isize    field_count;
+		} Union;
+		struct { Type *elem; } Pointer;
 		struct {
 			String  name;
 			Type *  base;
 			Entity *type_name; // Entity_TypeName
-		} named;
+		} Named;
 		struct {
 			Entity **variables; // Entity_Variable
 			isize    variable_count;
-		} tuple;
+		} Tuple;
 		struct {
 			Scope *scope;
 			Type * params;  // Type_Tuple
 			Type * results; // Type_Tuple
 			isize  param_count;
 			isize  result_count;
-		} proc;
+		} Proc;
 		struct {
 			Type *   base; // Default is `int`
 			Entity **fields; // Entity_Constant
 			isize    field_count;
-		} enumeration;
+		} Enum;
 	};
 };
 
 Type *get_base_type(Type *t) {
 	while (t->kind == Type_Named) {
-		t = t->named.base;
+		t = t->Named.base;
 	}
 	return t;
 }
 
 void set_base_type(Type *t, Type *base) {
 	if (t && t->kind == Type_Named) {
-		t->named.base = base;
+		t->Named.base = base;
 	}
 }
 
@@ -158,51 +163,56 @@ Type *alloc_type(gbAllocator a, TypeKind kind) {
 
 Type *make_type_basic(gbAllocator a, BasicType basic) {
 	Type *t = alloc_type(a, Type_Basic);
-	t->basic = basic;
+	t->Basic = basic;
 	return t;
 }
 
 Type *make_type_array(gbAllocator a, Type *elem, i64 count) {
 	Type *t = alloc_type(a, Type_Array);
-	t->array.elem = elem;
-	t->array.count = count;
+	t->Array.elem = elem;
+	t->Array.count = count;
 	return t;
 }
 
 Type *make_type_vector(gbAllocator a, Type *elem, i64 count) {
 	Type *t = alloc_type(a, Type_Vector);
-	t->vector.elem = elem;
-	t->vector.count = count;
+	t->Vector.elem = elem;
+	t->Vector.count = count;
 	return t;
 }
 
 Type *make_type_slice(gbAllocator a, Type *elem) {
 	Type *t = alloc_type(a, Type_Slice);
-	t->array.elem = elem;
+	t->Array.elem = elem;
 	return t;
 }
 
-Type *make_type_structure(gbAllocator a) {
-	Type *t = alloc_type(a, Type_Structure);
+Type *make_type_struct(gbAllocator a) {
+	Type *t = alloc_type(a, Type_Struct);
 	return t;
 }
 
-Type *make_type_enumeration(gbAllocator a) {
-	Type *t = alloc_type(a, Type_Enumeration);
+Type *make_type_union(gbAllocator a) {
+	Type *t = alloc_type(a, Type_Union);
+	return t;
+}
+
+Type *make_type_enum(gbAllocator a) {
+	Type *t = alloc_type(a, Type_Enum);
 	return t;
 }
 
 Type *make_type_pointer(gbAllocator a, Type *elem) {
 	Type *t = alloc_type(a, Type_Pointer);
-	t->pointer.elem = elem;
+	t->Pointer.elem = elem;
 	return t;
 }
 
 Type *make_type_named(gbAllocator a, String name, Type *base, Entity *type_name) {
 	Type *t = alloc_type(a, Type_Named);
-	t->named.name = name;
-	t->named.base = base;
-	t->named.type_name = type_name;
+	t->Named.name = name;
+	t->Named.base = base;
+	t->Named.type_name = type_name;
 	return t;
 }
 
@@ -213,11 +223,11 @@ Type *make_type_tuple(gbAllocator a) {
 
 Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_count, Type *results, isize result_count) {
 	Type *t = alloc_type(a, Type_Proc);
-	t->proc.scope = scope;
-	t->proc.params = params;
-	t->proc.param_count = param_count;
-	t->proc.results = results;
-	t->proc.result_count = result_count;
+	t->Proc.scope = scope;
+	t->Proc.params = params;
+	t->Proc.param_count = param_count;
+	t->Proc.results = results;
+	t->Proc.result_count = result_count;
 	return t;
 }
 
@@ -226,7 +236,7 @@ Type *type_deref(Type *t) {
 	if (t != NULL) {
 		Type *bt = get_base_type(t);
 		if (bt != NULL && bt->kind == Type_Pointer)
-			return bt->pointer.elem;
+			return bt->Pointer.elem;
 	}
 	return t;
 }
@@ -301,51 +311,51 @@ b32 is_type_named(Type *t) {
 b32 is_type_boolean(Type *t) {
 	t = get_base_type(t);
 	if (t->kind == Type_Basic)
-		return (t->basic.flags & BasicFlag_Boolean) != 0;
+		return (t->Basic.flags & BasicFlag_Boolean) != 0;
 	return false;
 }
 b32 is_type_integer(Type *t) {
 	t = get_base_type(t);
 	if (t->kind == Type_Basic)
-		return (t->basic.flags & BasicFlag_Integer) != 0;
+		return (t->Basic.flags & BasicFlag_Integer) != 0;
 	return false;
 }
 b32 is_type_unsigned(Type *t) {
 	t = get_base_type(t);
 	if (t->kind == Type_Basic)
-		return (t->basic.flags & BasicFlag_Unsigned) != 0;
+		return (t->Basic.flags & BasicFlag_Unsigned) != 0;
 	return false;
 }
 b32 is_type_numeric(Type *t) {
 	t = get_base_type(t);
 	if (t->kind == Type_Basic)
-		return (t->basic.flags & BasicFlag_Numeric) != 0;
+		return (t->Basic.flags & BasicFlag_Numeric) != 0;
 	if (t->kind == Type_Vector)
-		return is_type_numeric(t->vector.elem);
+		return is_type_numeric(t->Vector.elem);
 	return false;
 }
 b32 is_type_string(Type *t) {
 	t = get_base_type(t);
 	if (t->kind == Type_Basic)
-		return (t->basic.flags & BasicFlag_String) != 0;
+		return (t->Basic.flags & BasicFlag_String) != 0;
 	return false;
 }
 b32 is_type_typed(Type *t) {
 	t = get_base_type(t);
 	if (t->kind == Type_Basic)
-		return (t->basic.flags & BasicFlag_Untyped) == 0;
+		return (t->Basic.flags & BasicFlag_Untyped) == 0;
 	return true;
 }
 b32 is_type_untyped(Type *t) {
 	t = get_base_type(t);
 	if (t->kind == Type_Basic)
-		return (t->basic.flags & BasicFlag_Untyped) != 0;
+		return (t->Basic.flags & BasicFlag_Untyped) != 0;
 	return false;
 }
 b32 is_type_ordered(Type *t) {
 	t = get_base_type(t);
 	if (t->kind == Type_Basic)
-		return (t->basic.flags & BasicFlag_Ordered) != 0;
+		return (t->Basic.flags & BasicFlag_Ordered) != 0;
 	if (t->kind == Type_Pointer)
 		return true;
 	return false;
@@ -353,35 +363,35 @@ b32 is_type_ordered(Type *t) {
 b32 is_type_constant_type(Type *t) {
 	t = get_base_type(t);
 	if (t->kind == Type_Basic)
-		return (t->basic.flags & BasicFlag_ConstantType) != 0;
+		return (t->Basic.flags & BasicFlag_ConstantType) != 0;
 	return false;
 }
 b32 is_type_float(Type *t) {
 	t = get_base_type(t);
 	if (t->kind == Type_Basic)
-		return (t->basic.flags & BasicFlag_Float) != 0;
+		return (t->Basic.flags & BasicFlag_Float) != 0;
 	return false;
 }
 b32 is_type_pointer(Type *t) {
 	t = get_base_type(t);
 	if (t->kind == Type_Basic)
-		return (t->basic.flags & BasicFlag_Pointer) != 0;
+		return (t->Basic.flags & BasicFlag_Pointer) != 0;
 	return t->kind == Type_Pointer;
 }
 
 b32 is_type_int_or_uint(Type *t) {
 	if (t->kind == Type_Basic)
-		return (t->basic.kind == Basic_int) || (t->basic.kind == Basic_uint);
+		return (t->Basic.kind == Basic_int) || (t->Basic.kind == Basic_uint);
 	return false;
 }
 b32 is_type_rawptr(Type *t) {
 	if (t->kind == Type_Basic)
-		return t->basic.kind == Basic_rawptr;
+		return t->Basic.kind == Basic_rawptr;
 	return false;
 }
 b32 is_type_u8(Type *t) {
 	if (t->kind == Type_Basic)
-		return t->basic.kind == Basic_u8;
+		return t->Basic.kind == Basic_u8;
 	return false;
 }
 b32 is_type_slice(Type *t) {
@@ -391,7 +401,7 @@ b32 is_type_slice(Type *t) {
 b32 is_type_u8_slice(Type *t) {
 	t = get_base_type(t);
 	if (t->kind == Type_Slice)
-		return is_type_u8(t->slice.elem);
+		return is_type_u8(t->Slice.elem);
 	return false;
 }
 b32 is_type_vector(Type *t) {
@@ -403,18 +413,18 @@ b32 is_type_proc(Type *t) {
 }
 Type *base_vector_type(Type *t) {
 	if (is_type_vector(t)) {
-		return t->vector.elem;
+		return t->Vector.elem;
 	}
 	return t;
 }
 b32 is_type_enum(Type *t) {
 	t = get_base_type(t);
-	return t->kind == Type_Enumeration;
+	return t->kind == Type_Enum;
 }
 Type *get_enum_base_type(Type *t) {
 	Type *bt = get_base_type(t);
 	if (is_type_enum(bt)) {
-		return bt->enumeration.base;
+		return bt->Enum.base;
 	}
 	return t;
 }
@@ -428,19 +438,19 @@ b32 is_type_comparable(Type *t) {
 		return true;
 	case Type_Pointer:
 		return true;
-	case Type_Structure: {
-		for (isize i = 0; i < t->structure.field_count; i++) {
-			if (!is_type_comparable(t->structure.fields[i]->type))
+	case Type_Struct: {
+		for (isize i = 0; i < t->Struct.field_count; i++) {
+			if (!is_type_comparable(t->Struct.fields[i]->type))
 				return false;
 		}
 		return true;
 	} break;
 	case Type_Array:
-		return is_type_comparable(t->array.elem);
+		return is_type_comparable(t->Array.elem);
 	case Type_Vector:
-		return is_type_comparable(t->vector.elem);
-	case Type_Enumeration:
-		return is_type_comparable(t->enumeration.base);
+		return is_type_comparable(t->Vector.elem);
+	case Type_Enum:
+		return is_type_comparable(t->Enum.base);
 	case Type_Proc:
 		return true;
 	}
@@ -459,29 +469,29 @@ b32 are_types_identical(Type *x, Type *y) {
 	switch (x->kind) {
 	case Type_Basic:
 		if (y->kind == Type_Basic)
-			return x->basic.kind == y->basic.kind;
+			return x->Basic.kind == y->Basic.kind;
 		break;
 
 	case Type_Array:
 		if (y->kind == Type_Array)
-			return (x->array.count == y->array.count) && are_types_identical(x->array.elem, y->array.elem);
+			return (x->Array.count == y->Array.count) && are_types_identical(x->Array.elem, y->Array.elem);
 		break;
 
 	case Type_Vector:
 		if (y->kind == Type_Vector)
-			return (x->vector.count == y->vector.count) && are_types_identical(x->vector.elem, y->vector.elem);
+			return (x->Vector.count == y->Vector.count) && are_types_identical(x->Vector.elem, y->Vector.elem);
 		break;
 
 	case Type_Slice:
 		if (y->kind == Type_Slice)
-			return are_types_identical(x->slice.elem, y->slice.elem);
+			return are_types_identical(x->Slice.elem, y->Slice.elem);
 		break;
 
-	case Type_Structure:
-		if (y->kind == Type_Structure) {
-			if (x->structure.field_count == y->structure.field_count) {
-				for (isize i = 0; i < x->structure.field_count; i++) {
-					if (!are_types_identical(x->structure.fields[i]->type, y->structure.fields[i]->type)) {
+	case Type_Struct:
+		if (y->kind == Type_Struct) {
+			if (x->Struct.field_count == y->Struct.field_count) {
+				for (isize i = 0; i < x->Struct.field_count; i++) {
+					if (!are_types_identical(x->Struct.fields[i]->type, y->Struct.fields[i]->type)) {
 						return false;
 					}
 				}
@@ -493,19 +503,19 @@ b32 are_types_identical(Type *x, Type *y) {
 
 	case Type_Pointer:
 		if (y->kind == Type_Pointer)
-			return are_types_identical(x->pointer.elem, y->pointer.elem);
+			return are_types_identical(x->Pointer.elem, y->Pointer.elem);
 		break;
 
 	case Type_Named:
 		if (y->kind == Type_Named)
-			return x->named.base == y->named.base;
+			return x->Named.base == y->Named.base;
 		break;
 
 	case Type_Tuple:
 		if (y->kind == Type_Tuple) {
-			if (x->tuple.variable_count == y->tuple.variable_count) {
-				for (isize i = 0; i < x->tuple.variable_count; i++) {
-					if (!are_types_identical(x->tuple.variables[i]->type, y->tuple.variables[i]->type))
+			if (x->Tuple.variable_count == y->Tuple.variable_count) {
+				for (isize i = 0; i < x->Tuple.variable_count; i++) {
+					if (!are_types_identical(x->Tuple.variables[i]->type, y->Tuple.variables[i]->type))
 						return false;
 				}
 				return true;
@@ -515,8 +525,8 @@ b32 are_types_identical(Type *x, Type *y) {
 
 	case Type_Proc:
 		if (y->kind == Type_Proc) {
-			return are_types_identical(x->proc.params, y->proc.params) &&
-			       are_types_identical(x->proc.results, y->proc.results);
+			return are_types_identical(x->Proc.params, y->Proc.params) &&
+			       are_types_identical(x->Proc.results, y->Proc.results);
 		}
 		break;
 	}
@@ -528,7 +538,7 @@ b32 are_types_identical(Type *x, Type *y) {
 
 Type *default_type(Type *type) {
 	if (type->kind == Type_Basic) {
-		switch (type->basic.kind) {
+		switch (type->Basic.kind) {
 		case Basic_UntypedBool:    return &basic_types[Basic_bool];
 		case Basic_UntypedInteger: return &basic_types[Basic_int];
 		case Basic_UntypedFloat:   return &basic_types[Basic_f64];
@@ -585,20 +595,20 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 
 	switch (t->kind) {
 	case Type_Array:
-		return type_align_of(s, allocator, t->array.elem);
+		return type_align_of(s, allocator, t->Array.elem);
 	case Type_Vector: {
-		i64 size = type_size_of(s, allocator, t->vector.elem);
-		size *= t->vector.count;
+		i64 size = type_size_of(s, allocator, t->Vector.elem);
+		size *= t->Vector.count;
 		size = next_pow2(size);
 		// TODO(bill): Type_Vector type_align_of
 		return gb_clamp(size, s.max_align, 4*s.max_align);
 	} break;
 
-	case Type_Structure: {
-		if (!t->structure.is_packed) {
+	case Type_Struct: {
+		if (!t->Struct.is_packed) {
 			i64 max = 1;
-			for (isize i = 0; i < t->structure.field_count; i++) {
-				i64 align = type_align_of(s, allocator, t->structure.fields[i]->type);
+			for (isize i = 0; i < t->Struct.field_count; i++) {
+				i64 align = type_align_of(s, allocator, t->Struct.fields[i]->type);
 				if (max < align)
 					max = align;
 			}
@@ -606,8 +616,18 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		}
 	} break;
 
-	case Type_Enumeration:
-		return type_align_of(s, allocator, t->enumeration.base);
+	case Type_Union: {
+		i64 max = 1;
+		for (isize i = 0; i < t->Union.field_count; i++) {
+			i64 align = type_align_of(s, allocator, t->Union.fields[i]->type);
+			if (max < align)
+				max = align;
+		}
+		return max;
+	} break;
+
+	case Type_Enum:
+		return type_align_of(s, allocator, t->Enum.base);
 	}
 
 	return gb_clamp(next_pow2(type_size_of(s, allocator, t)), 1, s.max_align);
@@ -635,10 +655,10 @@ i64 *type_set_offsets_of(BaseTypeSizes s, gbAllocator allocator, Entity **fields
 }
 
 b32 type_set_offsets(BaseTypeSizes s, gbAllocator allocator, Type *t) {
-	GB_ASSERT(t->kind == Type_Structure);
-	if (!t->structure.are_offsets_set) {
-		t->structure.offsets = type_set_offsets_of(s, allocator, t->structure.fields, t->structure.field_count, t->structure.is_packed);
-		t->structure.are_offsets_set = true;
+	GB_ASSERT(t->kind == Type_Struct);
+	if (!t->Struct.are_offsets_set) {
+		t->Struct.offsets = type_set_offsets_of(s, allocator, t->Struct.fields, t->Struct.field_count, t->Struct.is_packed);
+		t->Struct.are_offsets_set = true;
 		return true;
 	}
 	return false;
@@ -649,7 +669,7 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	switch (t->kind) {
 	case Type_Basic: {
 		GB_ASSERT(is_type_typed(t));
-		BasicKind kind = t->basic.kind;
+		BasicKind kind = t->Basic.kind;
 		if (kind < gb_count_of(basic_type_sizes)) {
 			i64 size = basic_type_sizes[kind];
 			if (size > 0)
@@ -660,22 +680,22 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	} break;
 
 	case Type_Array: {
-		i64 count = t->array.count;
+		i64 count = t->Array.count;
 		if (count == 0)
 			return 0;
-		i64 align = type_align_of(s, allocator, t->array.elem);
-		i64 size  = type_size_of(s,  allocator, t->array.elem);
+		i64 align = type_align_of(s, allocator, t->Array.elem);
+		i64 size  = type_size_of(s,  allocator, t->Array.elem);
 		i64 alignment = align_formula(size, align);
 		return alignment*(count-1) + size;
 	} break;
 
 	case Type_Vector: {
-		i64 count = t->vector.count;
+		i64 count = t->Vector.count;
 		if (count == 0)
 			return 0;
-		// i64 align = type_align_of(s, allocator, t->vector.elem);
-		i64 bit_size = 8*type_size_of(s,  allocator, t->vector.elem);
-		if (is_type_boolean(t->vector.elem)) {
+		// i64 align = type_align_of(s, allocator, t->Vector.elem);
+		i64 bit_size = 8*type_size_of(s,  allocator, t->Vector.elem);
+		if (is_type_boolean(t->Vector.elem)) {
 			bit_size = 1; // NOTE(bill): LLVM can store booleans as 1 bit because a boolean _is_ an `i1`
 			              // Silly LLVM spec
 		}
@@ -691,16 +711,27 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	case Type_Slice: // ptr + len + cap
 		return 3 * s.word_size;
 
-	case Type_Structure: {
-		i64 count = t->structure.field_count;
+	case Type_Struct: {
+		i64 count = t->Struct.field_count;
 		if (count == 0)
 			return 0;
 		type_set_offsets(s, allocator, t);
-		return t->structure.offsets[count-1] + type_size_of(s, allocator, t->structure.fields[count-1]->type);
+		return t->Struct.offsets[count-1] + type_size_of(s, allocator, t->Struct.fields[count-1]->type);
 	} break;
 
-	case Type_Enumeration:
-		return type_size_of(s, allocator, t->enumeration.base);
+	case Type_Union: {
+		i64 count = t->Union.field_count;
+		i64 max = 0;
+		for (isize i = 0; i < count; i++) {
+			i64 size = type_size_of(s, allocator, t->Struct.fields[i]->type);
+			if (max < size)
+				max = size;
+		}
+		return max;
+	} break;
+
+	case Type_Enum:
+		return type_size_of(s, allocator, t->Enum.base);
 	}
 
 	// Catch all
@@ -708,10 +739,10 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 }
 
 i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, isize index) {
-	if (t->kind == Type_Structure) {
+	if (t->kind == Type_Struct) {
 		type_set_offsets(s, allocator, t);
-		if (gb_is_between(index, 0, t->structure.field_count-1)) {
-			return t->structure.offsets[index];
+		if (gb_is_between(index, 0, t->Struct.field_count-1)) {
+			return t->Struct.offsets[index];
 		}
 	}
 	return 0;
@@ -725,31 +756,31 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	switch (type->kind) {
 	case Type_Basic:
-		str = gb_string_append_length(str, type->basic.name.text, type->basic.name.len);
+		str = gb_string_append_length(str, type->Basic.name.text, type->Basic.name.len);
 		break;
 
 	case Type_Array:
-		str = gb_string_appendc(str, gb_bprintf("[%td]", type->array.count));
-		str = write_type_to_string(str, type->array.elem);
+		str = gb_string_appendc(str, gb_bprintf("[%td]", type->Array.count));
+		str = write_type_to_string(str, type->Array.elem);
 		break;
 
 	case Type_Vector:
-		str = gb_string_appendc(str, gb_bprintf("{%td}", type->vector.count));
-		str = write_type_to_string(str, type->vector.elem);
+		str = gb_string_appendc(str, gb_bprintf("{%td}", type->Vector.count));
+		str = write_type_to_string(str, type->Vector.elem);
 		break;
 
 	case Type_Slice:
 		str = gb_string_appendc(str, "[]");
-		str = write_type_to_string(str, type->array.elem);
+		str = write_type_to_string(str, type->Array.elem);
 		break;
 
-	case Type_Structure: {
+	case Type_Struct: {
 		str = gb_string_appendc(str, "struct{");
-		for (isize i = 0; i < type->structure.field_count; i++) {
-			Entity *f = type->structure.fields[i];
+		for (isize i = 0; i < type->Struct.field_count; i++) {
+			Entity *f = type->Struct.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable);
 			if (i > 0)
-				str = gb_string_appendc(str, "; ");
+				str = gb_string_appendc(str, ", ");
 			str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
 			str = gb_string_appendc(str, ": ");
 			str = write_type_to_string(str, f->type);
@@ -757,19 +788,33 @@ gbString write_type_to_string(gbString str, Type *type) {
 		str = gb_string_appendc(str, "}");
 	} break;
 
-	case Type_Enumeration: {
+	case Type_Union: {
+		str = gb_string_appendc(str, "union{");
+		for (isize i = 0; i < type->Union.field_count; i++) {
+			Entity *f = type->Union.fields[i];
+			GB_ASSERT(f->kind == Entity_Variable);
+			if (i > 0)
+				str = gb_string_appendc(str, ", ");
+			str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
+			str = gb_string_appendc(str, ": ");
+			str = write_type_to_string(str, f->type);
+		}
+		str = gb_string_appendc(str, "}");
+	} break;
+
+	case Type_Enum: {
 		str = gb_string_appendc(str, "enum ");
-		str = write_type_to_string(str, type->enumeration.base);
+		str = write_type_to_string(str, type->Enum.base);
 	} break;
 
 	case Type_Pointer:
 		str = gb_string_appendc(str, "^");
-		str = write_type_to_string(str, type->pointer.elem);
+		str = write_type_to_string(str, type->Pointer.elem);
 		break;
 
 	case Type_Named:
-		if (type->named.type_name != NULL) {
-			str = gb_string_append_length(str, type->named.name.text, type->named.name.len);
+		if (type->Named.type_name != NULL) {
+			str = gb_string_append_length(str, type->Named.name.text, type->Named.name.len);
 		} else {
 			// NOTE(bill): Just in case
 			str = gb_string_appendc(str, "<named type>");
@@ -777,9 +822,9 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_Tuple:
-		if (type->tuple.variable_count > 0) {
-			for (isize i = 0; i < type->tuple.variable_count; i++) {
-				Entity *var = type->tuple.variables[i];
+		if (type->Tuple.variable_count > 0) {
+			for (isize i = 0; i < type->Tuple.variable_count; i++) {
+				Entity *var = type->Tuple.variables[i];
 				if (var != NULL) {
 					GB_ASSERT(var->kind == Entity_Variable);
 					if (i > 0)
@@ -792,12 +837,12 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_Proc:
 		str = gb_string_appendc(str, "proc(");
-		if (type->proc.params)
-			str = write_type_to_string(str, type->proc.params);
+		if (type->Proc.params)
+			str = write_type_to_string(str, type->Proc.params);
 		str = gb_string_appendc(str, ")");
-		if (type->proc.results) {
+		if (type->Proc.results) {
 			str = gb_string_appendc(str, " -> ");
-			str = write_type_to_string(str, type->proc.results);
+			str = write_type_to_string(str, type->Proc.results);
 		}
 		break;
 	}

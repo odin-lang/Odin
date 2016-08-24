@@ -82,9 +82,9 @@ enum VarDeclTag {
 };
 
 enum CallExprKind {
-	CallExpr_Normal,
-	CallExpr_UnaryOp,
-	CallExpr_BinaryOp,
+	CallExpr_Prefix,  // call(...)
+	CallExpr_Postfix, // a'call
+	CallExpr_Infix,   // a ''call b
 };
 
 #define AST_NODE_KINDS \
@@ -224,6 +224,11 @@ AST_NODE_KIND(_TypeBegin, struct{}) \
 		AstNode *field_list; \
 		isize field_count; \
 		b32 is_packed; \
+	}) \
+	AST_NODE_KIND(UnionType, struct { \
+		Token token; \
+		AstNode *field_list; \
+		isize field_count; \
 	}) \
 	AST_NODE_KIND(EnumType, struct { \
 		Token token; \
@@ -374,6 +379,8 @@ Token ast_node_token(AstNode *node) {
 		return node->VectorType.token;
 	case AstNode_StructType:
 		return node->StructType.token;
+	case AstNode_UnionType:
+		return node->UnionType.token;
 	case AstNode_EnumType:
 		return node->EnumType.token;
 	}
@@ -775,6 +782,14 @@ gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNode *field_list
 	result->StructType.field_list = field_list;
 	result->StructType.field_count = field_count;
 	result->StructType.is_packed = is_packed;
+	return result;
+}
+
+gb_inline AstNode *make_union_type(AstFile *f, Token token, AstNode *field_list, isize field_count) {
+	AstNode *result = make_node(f, AstNode_UnionType);
+	result->UnionType.token = token;
+	result->UnionType.field_list = field_list;
+	result->UnionType.field_count = field_count;
 	return result;
 }
 
@@ -1194,12 +1209,12 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 	while (loop) {
 		switch (f->cursor[0].kind) {
 
-		case Token_CustomUnaryOp: {
-			Token op = expect_token(f, Token_CustomUnaryOp);
+		case Token_Prime: {
+			Token op = expect_token(f, Token_Prime);
 			if (lhs) {
 				// TODO(bill): Handle this
 			}
-			AstNode *proc = make_ident(f, op);
+			AstNode *proc = parse_identifier(f);
 			operand = make_call_expr(f, proc, operand, 1, ast_node_token(operand), op);
 		} break;
 
@@ -1363,6 +1378,15 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 				lhs = false;
 			}
 
+
+			if (op.kind == Token_DoublePrime) {
+				AstNode *proc = parse_identifier(f);
+				AstNode *right = parse_binary_expr(f, false, prec+1);
+				expression->next = right;
+				expression = make_call_expr(f, proc, expression, 2, op, ast_node_token(right));
+				continue;
+			}
+
 			if (op.kind == Token_as || op.kind == Token_transmute) {
 				right = parse_type(f);
 			} else {
@@ -1372,13 +1396,7 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 				}
 			}
 
-			if (op.kind == Token_CustomBinaryOp) {
-				AstNode *proc = make_ident(f, op);
-				expression->next = right;
-				expression = make_call_expr(f, proc, expression, 2, ast_node_token(expression), ast_node_token(right));
-			} else {
-				expression = make_binary_expr(f, op, expression, right);
-			}
+			expression = make_binary_expr(f, op, expression, right);
 		}
 	}
 	return expression;
@@ -1655,6 +1673,20 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		close  = expect_token(f, Token_CloseBrace);
 
 		return make_struct_type(f, token, params, param_count, is_packed);
+	}
+
+	case Token_union: {
+		Token token = expect_token(f, Token_union);
+		Token open, close;
+		AstNode *params = NULL;
+		isize param_count = 0;
+		AstScope *scope = make_ast_scope(f, NULL); // NOTE(bill): The union needs its own scope with NO parent
+
+		open   = expect_token(f, Token_OpenBrace);
+		params = parse_parameter_list(f, scope, &param_count);
+		close  = expect_token(f, Token_CloseBrace);
+
+		return make_union_type(f, token, params, param_count);
 	}
 
 	case Token_enum: {
@@ -2055,6 +2087,7 @@ AstNode *parse_stmt(AstFile *f) {
 		if (s->kind != AstNode_ProcDecl &&
 		    (s->kind == AstNode_TypeDecl &&
 		     s->TypeDecl.type->kind != AstNode_StructType &&
+		     s->TypeDecl.type->kind != AstNode_UnionType &&
 		     s->TypeDecl.type->kind != AstNode_EnumType &&
 		     s->TypeDecl.type->kind != AstNode_ProcType) &&
 		    !allow_token(f, Token_Semicolon)) {

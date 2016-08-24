@@ -91,10 +91,10 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
 			if (operand->mode == Addressing_Constant)
 				return check_value_is_expressible(c, operand->value, tb, NULL);
 			if (sb->kind == Type_Basic)
-				return sb->basic.kind == Basic_UntypedBool && is_type_boolean(tb);
+				return sb->Basic.kind == Basic_UntypedBool && is_type_boolean(tb);
 			break;
 		case Type_Pointer:
-			return sb->basic.kind == Basic_UntypedPointer;
+			return sb->Basic.kind == Basic_UntypedPointer;
 		}
 	}
 
@@ -108,13 +108,13 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
 	    return true;
 
 	if (sb->kind == Type_Array && tb->kind == Type_Array) {
-		if (are_types_identical(sb->array.elem, tb->array.elem)) {
-			return sb->array.count == tb->array.count;
+		if (are_types_identical(sb->Array.elem, tb->Array.elem)) {
+			return sb->Array.count == tb->Array.count;
 		}
 	}
 
 	if (sb->kind == Type_Slice && tb->kind == Type_Slice) {
-		if (are_types_identical(sb->slice.elem, tb->slice.elem)) {
+		if (are_types_identical(sb->Slice.elem, tb->Slice.elem)) {
 			return true;
 		}
 	}
@@ -278,7 +278,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNode *in
 		if (o.type->kind != Type_Tuple) {
 			gb_array_append(operands, o);
 		} else {
-			auto *tuple = &o.type->tuple;
+			auto *tuple = &o.type->Tuple;
 			for (isize j = 0; j < tuple->variable_count; j++) {
 				o.type = tuple->variables[j]->type;
 				gb_array_append(operands, o);
@@ -362,7 +362,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *named_type) {
 	GB_ASSERT(e->type == NULL);
 	Type *named = make_type_named(c->allocator, e->token.string, NULL, e);
-	named->named.type_name = e;
+	named->Named.type_name = e;
 	set_base_type(named_type, named);
 	e->type = named;
 
@@ -381,7 +381,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	push_procedure(c, type);
 	ast_node(bs, BlockStmt, body);
 	check_stmt_list(c, bs->list, 0);
-	if (type->proc.result_count > 0) {
+	if (type->Proc.result_count > 0) {
 		if (!check_is_terminating(c, body)) {
 			error(&c->error_collector, bs->close, "Missing return statement at the end of the procedure");
 		}
@@ -414,7 +414,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 	if (d->scope == c->global_scope &&
 	    are_strings_equal(e->token.string, make_string("main"))) {
 		if (proc_type != NULL) {
-			auto *pt = &proc_type->proc;
+			auto *pt = &proc_type->Proc;
 			if (pt->param_count != 0 ||
 			    pt->result_count) {
 				gbString str = type_to_string(proc_type);
@@ -596,7 +596,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				if (o.type->kind != Type_Tuple) {
 					gb_array_append(operands, o);
 				} else {
-					auto *tuple = &o.type->tuple;
+					auto *tuple = &o.type->Tuple;
 					for (isize j = 0; j < tuple->variable_count; j++) {
 						o.type = tuple->variables[j]->type;
 						gb_array_append(operands, o);
@@ -696,15 +696,15 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 		Type *proc_type = c->proc_stack[gb_array_count(c->proc_stack)-1];
 		isize result_count = 0;
-		if (proc_type->proc.results)
-			result_count = proc_type->proc.results->tuple.variable_count;
+		if (proc_type->Proc.results)
+			result_count = proc_type->Proc.results->Tuple.variable_count;
 		if (result_count != rs->result_count) {
 			error(&c->error_collector, rs->token, "Expected %td return %s, got %td",
 			      result_count,
 			      (result_count != 1 ? "values" : "value"),
 			      rs->result_count);
 		} else if (result_count > 0) {
-			auto *tuple = &proc_type->proc.results->tuple;
+			auto *tuple = &proc_type->Proc.results->Tuple;
 			check_init_variables(c, tuple->variables, tuple->variable_count,
 			                     rs->result_list, rs->result_count, make_string("return statement"));
 		}

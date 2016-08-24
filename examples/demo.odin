@@ -12,6 +12,15 @@ main :: proc() {
 	// data_control();
 
 	// run_game();
+
+	Thing :: type union {
+		i: i32,
+		f: f32,
+	}
+	t: Thing;
+	t.f = 123;
+	print_int_base(t.i as int, 16);
+	print_nl();
 }
 
 hellope :: proc() -> int {
@@ -153,7 +162,7 @@ procedures :: proc() {
 		print_int(a + b);
 	}
 
-	print_int(3 'add' 4);     // Infix style
+	print_int(3 ''add 4);     // Infix style
 	print_nl();
 	print_int(12 'fibonacci); // Postfix style
 	print_nl();
