@@ -40,24 +40,24 @@ INVALID_HANDLE_VALUE :: (-1 as int) as HANDLE;
 WNDPROC :: type proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT
 
 WNDCLASSEXA :: type struct {
-	size, style:           u32,
-	wnd_proc:              WNDPROC,
-	cls_extra, wnd_extra:  i32,
-	instance:              HINSTANCE,
-	icon:                  HICON,
-	cursor:                HCURSOR,
-	background:            HBRUSH,
-	menu_name, class_name: ^u8,
-	sm:                    HICON,
+	size, style:           u32;
+	wnd_proc:              WNDPROC;
+	cls_extra, wnd_extra:  i32;
+	instance:              HINSTANCE;
+	icon:                  HICON;
+	cursor:                HCURSOR;
+	background:            HBRUSH;
+	menu_name, class_name: ^u8;
+	sm:                    HICON;
 }
 
 MSG :: type struct {
-	hwnd:    HWND,
-	message: u32,
-	wparam:  WPARAM,
-	lparam:  LPARAM,
-	time:    u32,
-	pt:      POINT,
+	hwnd:    HWND;
+	message: u32;
+	wparam:  WPARAM;
+	lparam:  LPARAM;
+	time:    u32;
+	pt:      POINT;
 }
 
 
@@ -189,7 +189,7 @@ wglCreateContextAttribsARBType :: type proc(hdc: HDC, hshareContext: rawptr, att
 PIXELFORMATDESCRIPTOR :: type struct  {
 	size,
 	version,
-	flags: u32,
+	flags: u32;
 
 	pixel_type,
 	color_bits,
@@ -210,11 +210,11 @@ PIXELFORMATDESCRIPTOR :: type struct  {
 	stencil_bits,
 	aux_buffers,
 	layer_type,
-	reserved: byte,
+	reserved: byte;
 
 	layer_mask,
 	visible_mask,
-	damage_mask: u32,
+	damage_mask: u32;
 }
 
 GetDC             :: proc(h: HANDLE) -> HDC #foreign

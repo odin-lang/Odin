@@ -197,6 +197,7 @@ AST_NODE_KIND(_TypeBegin, struct{}) \
 		AstNode *name_list; \
 		isize name_count; \
 		AstNode *type; \
+		b32 is_using; \
 	}) \
 	AST_NODE_KIND(ProcType, struct { \
 		Token token;          \
@@ -725,11 +726,12 @@ gb_inline AstNode *make_var_decl(AstFile *f, DeclKind kind, AstNode *name_list, 
 	return result;
 }
 
-gb_inline AstNode *make_field(AstFile *f, AstNode *name_list, isize name_count, AstNode *type) {
+gb_inline AstNode *make_field(AstFile *f, AstNode *name_list, isize name_count, AstNode *type, b32 is_using) {
 	AstNode *result = make_node(f, AstNode_Field);
 	result->Field.name_list = name_list;
 	result->Field.name_count = name_count;
 	result->Field.type = type;
+	result->Field.is_using = is_using;
 	return result;
 }
 
@@ -1566,12 +1568,24 @@ AstNode *parse_type(AstFile *f) {
 	return type;
 }
 
-AstNode *parse_field_decl(AstFile *f, AstScope *scope) {
+AstNode *parse_field_decl(AstFile *f, AstScope *scope, b32 allow_using) {
+	b32 is_using = false;
 	AstNode *name_list = NULL;
 	isize name_count = 0;
+	if (allow_using) {
+		if (allow_token(f, Token_using)) {
+			is_using = true;
+		}
+	}
+
 	name_list = parse_lhs_expr_list(f, &name_count);
 	if (name_count == 0)
 		ast_file_err(f, f->cursor[0], "Empty field declaration");
+
+	if (name_count > 1 && is_using) {
+		ast_file_err(f, f->cursor[0], "Cannot apply `using` to more than one of the same type");
+	}
+
 
 	expect_token(f, Token_Colon);
 
@@ -1579,7 +1593,7 @@ AstNode *parse_field_decl(AstFile *f, AstScope *scope) {
 	if (type == NULL)
 		ast_file_err(f, f->cursor[0], "Expected a type for this field declaration");
 
-	AstNode *field = make_field(f, name_list, name_count, type);
+	AstNode *field = make_field(f, name_list, name_count, type, is_using);
 	add_ast_entity(f, scope, field, name_list);
 	return field;
 }
@@ -1602,15 +1616,19 @@ AstNode *parse_proc_type(AstFile *f, AstScope **scope_) {
 }
 
 
-AstNode *parse_parameter_list(AstFile *f, AstScope *scope, isize *param_count_) {
+AstNode *parse_parameter_list(AstFile *f, AstScope *scope, isize *param_count_, TokenKind separator, b32 allow_using) {
 	AstNode *param_list = NULL;
 	AstNode *param_list_curr = NULL;
 	isize param_count = 0;
-	while (f->cursor[0].kind == Token_Identifier) {
-		AstNode *field = parse_field_decl(f, scope);
+	while (f->cursor[0].kind == Token_Identifier ||
+	       (allow_using && f->cursor[0].kind == Token_using)) {
+		if (!allow_using && allow_token(f, Token_using)) {
+			ast_file_err(f, f->cursor[-1], "`using` is only allowed within structures (at the moment)");
+		}
+		AstNode *field = parse_field_decl(f, scope, allow_using);
 		DLIST_APPEND(param_list, param_list_curr, field);
 		param_count += field->Field.name_count;
-		if (f->cursor[0].kind != Token_Comma)
+		if (f->cursor[0].kind != separator)
 			break;
 		next_token(f);
 	}
@@ -1669,7 +1687,7 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		}
 
 		open   = expect_token(f, Token_OpenBrace);
-		params = parse_parameter_list(f, scope, &param_count);
+		params = parse_parameter_list(f, scope, &param_count, Token_Semicolon, true);
 		close  = expect_token(f, Token_CloseBrace);
 
 		return make_struct_type(f, token, params, param_count, is_packed);
@@ -1683,7 +1701,7 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		AstScope *scope = make_ast_scope(f, NULL); // NOTE(bill): The union needs its own scope with NO parent
 
 		open   = expect_token(f, Token_OpenBrace);
-		params = parse_parameter_list(f, scope, &param_count);
+		params = parse_parameter_list(f, scope, &param_count, Token_Semicolon, true);
 		close  = expect_token(f, Token_CloseBrace);
 
 		return make_union_type(f, token, params, param_count);
@@ -1792,7 +1810,7 @@ Token parse_procedure_signature(AstFile *f, AstScope *scope,
                                AstNode **result_list, isize *result_count) {
 	Token proc_token = expect_token(f, Token_proc);
 	expect_token(f, Token_OpenParen);
-	*param_list = parse_parameter_list(f, scope, param_count);
+	*param_list = parse_parameter_list(f, scope, param_count, Token_Comma, false);
 	expect_token(f, Token_CloseParen);
 	*result_list = parse_results(f, scope, result_count);
 	return proc_token;

@@ -38,9 +38,10 @@ struct Entity {
 	union {
 		struct { ExactValue value; } Constant;
 		struct {
-			b8 visited;
-			b8 is_field;
-			b8 used;
+			b8 visited;   // Cycle detection
+			b8 is_field;  // Is struct field
+			b8 used;      // Variable is used
+			b8 anonymous; // Variable is an anonymous struct field
 		} Variable;
 		struct { b8 used; } Procedure;
 		struct { BuiltinProcId id; } Builtin;
@@ -85,9 +86,10 @@ Entity *make_entity_param(gbAllocator a, Scope *parent, Token token, Type *type)
 	return entity;
 }
 
-Entity *make_entity_field(gbAllocator a, Scope *parent, Token token, Type *type) {
+Entity *make_entity_field(gbAllocator a, Scope *parent, Token token, Type *type, b32 is_anonymous) {
 	Entity *entity = make_entity_variable(a, parent, token, type);
 	entity->Variable.is_field  = true;
+	entity->Variable.anonymous = cast(b8)is_anonymous;
 	return entity;
 }
 

@@ -1,26 +1,18 @@
 // Demo 001
 #load "basic.odin"
-#load "math.odin"
 #load "game.odin"
 
 main :: proc() {
-	// _ = hellope();
-	// procedures();
-	// variables();
-	// constants();
-	// types();
-	// data_control();
+	_ = hellope();
+	procedures();
+	variables();
+	constants();
+	types();
+	data_control();
+	using_fields();
+
 
 	// run_game();
-
-	Thing :: type union {
-		i: i32,
-		f: f32,
-	}
-	t: Thing;
-	t.f = 123;
-	print_int_base(t.i as int, 16);
-	print_nl();
 }
 
 hellope :: proc() -> int {
@@ -43,7 +35,7 @@ hellope :: proc() -> int {
 
 apple, banana, carrot: bool;
 box, carboard: bool = true, false;
-hellope_value: int = hellope();
+hellope_value: int = hellope(); // The procedure is ran just before `main`
 
 variables :: proc() {
 	i: int; // initialized with zero value
@@ -293,16 +285,16 @@ types :: proc() {
 	}
 
 	BinaryNode :: type struct {
-		left, right: ^BinaryNode, // same format as procedure argument
-		data: rawptr,
+		left, right: ^BinaryNode; // same format as procedure argument
+		data: rawptr;
 	}
 
 	AddProc :: type proc(a, b: int) -> int
 
 	Packed :: type struct #packed {
-		a: u8,
-		b: u16,
-		c: u32,
+		a: u8;
+		b: u16;
+		c: u32;
 	}
 	static_assert(size_of(Packed) == 7); // builtin procedure
 
@@ -381,6 +373,50 @@ types :: proc() {
 			TOMB,
 		}
 		static_assert(Certain.TOMB == 8);
+	}
+
+	{ // Untagged union
+		BitHack :: type union {
+			i: i32;
+			f: f32;
+		}
+		b: BitHack;
+		b.f = 123;
+		print_int(b.i as int); print_nl();
+
+
+
+		// Manually tagged union
+
+		EntityKind :: type enum {
+			Invalid,
+			Constant,
+			Variable,
+			TypeName,
+			Procedure,
+			Builtin,
+			Count,
+		}
+
+		Entity :: type struct {
+			kind: EntityKind;
+			guid: u64;
+
+			// Other data
+
+			/*using*/
+			data: union {
+				constant: struct{};
+				variable: struct{
+					visited, is_field, used, anonymous: bool;
+				};
+				procedure: struct { used: bool };
+				buitlin: struct { id: i32 };
+			};
+		}
+
+
+		// NOTE(bill): Tagged unions are not added yet but are planned
 	}
 
 
@@ -478,9 +514,9 @@ void main() {
 
 	{ // size, align, offset
 		Thing :: type struct {
-			a: u8,
-			b: u16,
-			c, d, e: u32,
+			a: u8;
+			b: u16;
+			c, d, e: u32;
 		}
 
 		s := size_of(Thing);
@@ -619,3 +655,59 @@ data_control :: proc() {
 }
 
 
+using_fields :: proc() {
+	{ // Everyday stuff
+		Vec3 :: type struct { x, y, z: f32; }
+
+		Entity :: type struct {
+			name: string;
+			using pos: Vec3;
+			vel: Vec3;
+		}
+		t: Entity;
+		t.y = 456;
+		print_f32(t.y);     print_nl();
+		print_f32(t.pos.y); print_nl();
+		print_f32(t.vel.y); print_nl();
+
+
+		Frog :: type struct { // Subtype (kind of)
+			using entity: Entity;
+			colour: u32;
+			jump_height: f32;
+		}
+
+		f: Frog;
+		f.y = 1337;
+		print_f32(f.y);     print_nl();
+		print_f32(f.pos.y); print_nl();
+		print_f32(f.vel.y); print_nl();
+
+
+		Buffalo :: type struct {
+			using entity: Entity;
+			speed: f32;
+			noise_level: f32;
+		}
+	}
+
+
+	{ // Crazy Shit
+		Vec2 :: type union {
+			using _xy: struct {x, y: f32};
+			e: [2]f32;
+			v: {2}f32;
+		}
+
+		Entity :: type struct {
+			using pos: ^Vec2;
+			name: string;
+		}
+		t: Entity;
+		t.pos = alloc(size_of(Vec2)) as ^Vec2; // TODO(bill): make an alloc type? i.e. new(Type)?
+		t.x = 123;
+		print_f32(t._xy.x);     print_nl();
+		print_f32(t.pos.x);     print_nl();
+		print_f32(t.pos._xy.x); print_nl();
+	}
+}

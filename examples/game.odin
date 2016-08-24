@@ -34,12 +34,12 @@ to_c_string :: proc(s: string) -> ^u8 {
 
 
 Window :: type struct {
-	width, height:      int,
-	wc:                 WNDCLASSEXA,
-	dc:                 HDC,
-	hwnd:               HWND,
-	opengl_context, rc: HGLRC,
-	c_title:            ^u8,
+	width, height:      int;
+	wc:                 WNDCLASSEXA;
+	dc:                 HDC;
+	hwnd:               HWND;
+	opengl_context, rc: HGLRC;
+	c_title:            ^u8;
 }
 
 make_window :: proc(title: string, msg, height: int, window_proc: WNDPROC) -> (Window, bool) {
@@ -123,8 +123,8 @@ display_window :: proc(w: ^Window) {
 
 
 Entity :: type struct {
-	pos: Vec2,
-	dim: Vec2,
+	pos: Vec2;
+	dim: Vec2;
 }
 
 

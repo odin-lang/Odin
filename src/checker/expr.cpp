@@ -13,15 +13,90 @@ void           check_entity_decl       (Checker *c, Entity *e, DeclInfo *decl, T
 void           check_proc_body         (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
 void           update_expr_type        (Checker *c, AstNode *e, Type *type, b32 final);
 
+void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *> *entity_map) {
+	t = get_base_type(type_deref(t));
+	gbString str = expr_to_string(node);
+	defer (gb_string_free(str));
+
+	switch (t->kind) {
+	// IMPORTANT HACK(bill): The positions of fields and field_count
+	// must be same for Struct and Union
+	case Type_Struct:
+	case Type_Union:
+		for (isize i = 0; i < t->Struct.field_count; i++) {
+			Entity *f = t->Struct.fields[i];
+			GB_ASSERT(f->kind == Entity_Variable);
+			String name = f->token.string;
+			HashKey key = hash_string(name);
+			Entity **found = map_get(entity_map, key);
+			if (found != NULL) {
+				Entity *e = *found;
+				// TODO(bill): Better type error
+				error(&c->error_collector, e->token, "`%.*s` is already declared in `%s`", LIT(name), str);
+			} else {
+				map_set(entity_map, key, f);
+				if (f->Variable.anonymous) {
+					populate_using_entity_map(c, node, f->type, entity_map);
+				}
+			}
+		}
+		break;
+	}
+
+}
+
+void check_fields(Checker *c, AstNode *node, AstNode *field_list, Entity **fields, isize field_count, String context) {
+	Map<Entity *> entity_map = {};
+	map_init(&entity_map, gb_heap_allocator());
+	defer (map_destroy(&entity_map));
+
+	isize field_index = 0;
+	for (AstNode *field = field_list; field != NULL; field = field->next) {
+		ast_node(f, Field, field);
+		Type *type = check_type(c, f->type);
+
+		if (f->is_using) {
+			if (f->name_count > 1) {
+				error(&c->error_collector, ast_node_token(f->name_list),
+				      "Cannot apply `using` to more than one of the same type");
+			}
+		}
+
+		for (AstNode *name = f->name_list; name != NULL; name = name->next) {
+			ast_node(i, Ident, name);
+			Token name_token = i->token;
+
+			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, f->is_using);
+			HashKey key = hash_string(name_token.string);
+			if (map_get(&entity_map, key) != NULL) {
+				// TODO(bill): Scope checking already checks the declaration
+				error(&c->error_collector, name_token, "`%.*s` is already declared in this %.*s", LIT(name_token.string), LIT(context));
+			} else {
+				map_set(&entity_map, key, e);
+				fields[field_index++] = e;
+			}
+			add_entity_use(&c->info, name, e);
+		}
+
+
+		if (f->is_using) {
+			Type *t = get_base_type(type_deref(type));
+			if (t->kind != Type_Struct &&
+			    t->kind != Type_Union) {
+				Token name_token = f->name_list->Ident.token;
+				error(&c->error_collector, name_token, "`using` on a field `%.*s` must be a structure or union", LIT(name_token.string));
+				continue;
+			}
+
+			populate_using_entity_map(c, node, type, &entity_map);
+		}
+	}
+}
 
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_StructType);
 	GB_ASSERT(struct_type->kind == Type_Struct);
 	ast_node(st, StructType, node);
-
-	Map<Entity *> entity_map = {};
-	map_init(&entity_map, gb_heap_allocator());
-	defer (map_destroy(&entity_map));
 
 	isize field_count = 0;
 	for (AstNode *field = st->field_list; field != NULL; field = field->next) {
@@ -32,26 +107,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	}
 
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, st->field_count);
-	isize field_index = 0;
-	for (AstNode *field = st->field_list; field != NULL; field = field->next) {
-		ast_node(f, Field, field);
-		Type *type = check_type(c, f->type);
-		for (AstNode *name = f->name_list; name != NULL; name = name->next) {
-			ast_node(i, Ident, name);
-			Token name_token = i->token;
-			// TODO(bill): is the curr_scope correct?
-			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type);
-			HashKey key = hash_string(name_token.string);
-			if (map_get(&entity_map, key)) {
-				// TODO(bill): Scope checking already checks the declaration
-				error(&c->error_collector, name_token, "`%.*s` is already declared in this structure", LIT(name_token.string));
-			} else {
-				map_set(&entity_map, key, e);
-				fields[field_index++] = e;
-			}
-			add_entity_use(&c->info, name, e);
-		}
-	}
+	check_fields(c, node, st->field_list, fields, field_count, make_string("structure"));
 	struct_type->Struct.fields = fields;
 	struct_type->Struct.field_count = field_count;
 	struct_type->Struct.is_packed = st->is_packed;
@@ -62,10 +118,6 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	GB_ASSERT(union_type->kind == Type_Union);
 	ast_node(ut, UnionType, node);
 
-	Map<Entity *> entity_map = {};
-	map_init(&entity_map, gb_heap_allocator());
-	defer (map_destroy(&entity_map));
-
 	isize field_count = 0;
 	for (AstNode *field = ut->field_list; field != NULL; field = field->next) {
 		for (AstNode *name = field->Field.name_list; name != NULL; name = name->next) {
@@ -75,26 +127,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	}
 
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, ut->field_count);
-	isize field_index = 0;
-	for (AstNode *field = ut->field_list; field != NULL; field = field->next) {
-		ast_node(f, Field, field);
-		Type *type = check_type(c, f->type);
-		for (AstNode *name = f->name_list; name != NULL; name = name->next) {
-			ast_node(i, Ident, name);
-			Token name_token = i->token;
-			// TODO(bill): is the curr_scope correct?
-			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type);
-			HashKey key = hash_string(name_token.string);
-			if (map_get(&entity_map, key)) {
-				// TODO(bill): Scope checking already checks the declaration
-				error(&c->error_collector, name_token, "`%.*s` is already declared in this union", LIT(name_token.string));
-			} else {
-				map_set(&entity_map, key, e);
-				fields[field_index++] = e;
-			}
-			add_entity_use(&c->info, name, e);
-		}
-	}
+	check_fields(c, node, ut->field_list, fields, field_count, make_string("union"));
 	union_type->Union.fields = fields;
 	union_type->Union.field_count = field_count;
 }
@@ -1404,24 +1437,64 @@ b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *valu
 	return true;
 }
 
-Entity *lookup_field(Type *type, AstNode *field_node, isize *index = NULL) {
-	GB_ASSERT(type != NULL);
-	GB_ASSERT(field_node->kind == AstNode_Ident);
-	type = get_base_type(type);
-	if (type->kind == Type_Pointer)
-		type = get_base_type(type->Pointer.elem);
+struct Selection {
+	Entity *entity;
+	gbArray(isize) index;
+	b32 indirect; // Set if there was a pointer deref anywhere down the line
+};
+Selection empty_selection = {};
 
-	ast_node(i, Ident, field_node);
-	String field_str = i->token.string;
+Selection make_selection(Entity *entity, gbArray(isize) index, b32 indirect) {
+	Selection s = {entity, index, indirect};
+	return s;
+}
+
+void selection_add_index(Selection *s, isize index) {
+	if (s->index == NULL) {
+		gb_array_init(s->index, gb_heap_allocator());
+	}
+	gb_array_append(s->index, index);
+}
+
+Selection lookup_field(Type *type_, String field_name, Selection sel = empty_selection) {
+	GB_ASSERT(type_ != NULL);
+
+	if (are_strings_equal(field_name, make_string("_"))) {
+		return empty_selection;
+	}
+
+	Type *type = type_deref(type_);
+	b32 is_ptr = type != type_;
+	type = get_base_type(type);
+
 	switch (type->kind) {
 	case Type_Struct:
 		for (isize i = 0; i < type->Struct.field_count; i++) {
 			Entity *f = type->Struct.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
 			String str = f->token.string;
-			if (are_strings_equal(field_str, str)) {
-				if (index) *index = i;
-				return f;
+			if (are_strings_equal(field_name, str)) {
+				selection_add_index(&sel, i);
+				sel.entity = f;
+				return sel;
+			}
+
+			if (f->Variable.anonymous) {
+				isize prev_count = 0;
+				if (sel.index != NULL) {
+					prev_count = gb_array_count(sel.index);
+				}
+				selection_add_index(&sel, i); // HACK(bill): Leaky memory
+
+				sel = lookup_field(f->type, field_name, sel);
+
+				if (sel.entity != NULL) {
+					// gb_printf("%.*s, %.*s, %.*s\n", LIT(field_name), LIT(str), LIT(sel.entity->token.string));
+					if (is_type_pointer(f->type))
+						sel.indirect = true;
+					return sel;
+				}
+				gb_array_count(sel.index) = prev_count;
 			}
 		}
 		break;
@@ -1431,7 +1504,66 @@ Entity *lookup_field(Type *type, AstNode *field_node, isize *index = NULL) {
 			Entity *f = type->Union.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
 			String str = f->token.string;
-			if (are_strings_equal(field_str, str)) {
+			if (are_strings_equal(field_name, str)) {
+				selection_add_index(&sel, i);
+				sel.entity = f;
+				return sel;
+			}
+		}
+		for (isize i = 0; i < type->Union.field_count; i++) {
+			Entity *f = type->Union.fields[i];
+			GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
+			String str = f->token.string;
+			if (f->Variable.anonymous) {
+				selection_add_index(&sel, i); // HACK(bill): Leaky memory
+				sel = lookup_field(f->type, field_name, sel);
+				if (sel.entity != NULL && is_type_pointer(f->type)) {
+					sel.indirect = true;
+				}
+				return sel;
+			}
+		}
+		break;
+
+	case Type_Enum:
+		for (isize i = 0; i < type->Enum.field_count; i++) {
+			Entity *f = type->Enum.fields[i];
+			GB_ASSERT(f->kind == Entity_Constant);
+			String str = f->token.string;
+			if (are_strings_equal(field_name, str)) {
+				// Enums are constant expression
+				return make_selection(f, NULL, i);
+			}
+		}
+		break;
+	}
+
+	return sel;
+
+/*
+	switch (type->kind) {
+	case Type_Struct:
+		for (isize i = 0; i < type->Struct.field_count; i++) {
+			Entity *f = type->Struct.fields[i];
+			GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
+			String str = f->token.string;
+			if (are_strings_equal(field_name, str)) {
+				make_selection()
+				FoundField ff = {f, i, offset+field_offset};
+				return ff;
+			}
+			if (f->Variable.anonymous) {
+				return lookup_field(f->type, field_node, offset+field_offset);
+			}
+		}
+		break;
+
+	case Type_Union:
+		for (isize i = 0; i < type->Union.field_count; i++) {
+			Entity *f = type->Union.fields[i];
+			GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
+			String str = f->token.string;
+			if (are_strings_equal(field_name, str)) {
 				if (index) *index = i;
 				return f;
 			}
@@ -1443,7 +1575,7 @@ Entity *lookup_field(Type *type, AstNode *field_node, isize *index = NULL) {
 			Entity *f = type->Enum.fields[i];
 			GB_ASSERT(f->kind == Entity_Constant);
 			String str = f->token.string;
-			if (are_strings_equal(field_str, str)) {
+			if (are_strings_equal(field_name, str)) {
 				if (index) *index = i;
 				return f;
 			}
@@ -1454,7 +1586,7 @@ Entity *lookup_field(Type *type, AstNode *field_node, isize *index = NULL) {
 	// Or is this only suitable if tuples are first-class?
 	}
 
-	return NULL;
+*/
 }
 
 void check_selector(Checker *c, Operand *operand, AstNode *node) {
@@ -1467,10 +1599,10 @@ void check_selector(Checker *c, Operand *operand, AstNode *node) {
 		Entity *entity = NULL;
 		if (is_type_enum(operand->type)) {
 			if (operand->mode == Addressing_Type) {
-				entity = lookup_field(operand->type, selector);
+				entity = lookup_field(operand->type, selector->Ident.token.string).entity;
 			}
 		} else {
-			entity = lookup_field(operand->type, selector);
+			entity = lookup_field(operand->type, selector->Ident.token.string).entity;
 		}
 		if (entity == NULL) {
 			gbString op_str  = expr_to_string(op_expr);
@@ -1596,10 +1728,10 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			}
 		}
 
-		isize index = 0;
-		Entity *entity = lookup_field(type, field_arg, &index);
-		if (entity == NULL) {
-			ast_node(arg, Ident, field_arg);
+
+		ast_node(arg, Ident, field_arg);
+		Selection sel = lookup_field(type, arg->token.string);
+		if (sel.entity == NULL) {
 			gbString type_str = type_to_string(type);
 			error(&c->error_collector, ast_node_token(ce->arg_list),
 			      "`%s` has no field named `%.*s`", type_str, LIT(arg->token.string));
@@ -1607,7 +1739,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_offset_of(c->sizes, c->allocator, type, index));
+		// IMPORTANT TODO(bill): Fix for anonymous fields
+		operand->value = make_exact_value_integer(type_offset_of(c->sizes, c->allocator, type, sel.index[0]));
 		operand->type  = t_int;
 	} break;
 
@@ -1632,10 +1765,10 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 				type = p->Pointer.elem;
 		}
 
-		isize index = 0;
-		Entity *entity = lookup_field(type, s->selector, &index);
-		if (entity == NULL) {
-			ast_node(i, Ident, s->selector);
+
+		ast_node(i, Ident, s->selector);
+		Selection sel = lookup_field(type, i->token.string);
+		if (sel.entity == NULL) {
 			gbString type_str = type_to_string(type);
 			error(&c->error_collector, ast_node_token(arg),
 			      "`%s` has no field named `%.*s`", type_str, LIT(i->token.string));
@@ -1643,7 +1776,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_offset_of(c->sizes, c->allocator, type, index));
+		// IMPORTANT TODO(bill): Fix for anonymous fields
+		operand->value = make_exact_value_integer(type_offset_of(c->sizes, c->allocator, type, sel.index[0]));
 		operand->type  = t_int;
 	} break;
 
@@ -2097,23 +2231,29 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 						}
 						String name = kv->field->Ident.token.string;
 
-						isize index = 0;
-						Entity *e = lookup_field(type, kv->field, &index);
-						if (e == NULL) {
+						Selection sel = lookup_field(type, kv->field->Ident.token.string);
+						if (sel.entity == NULL) {
 							error(&c->error_collector, ast_node_token(elem),
 							      "Unknown field `%.*s` in structure literal", LIT(name));
 							continue;
 						}
-						Entity *field = t->Struct.fields[index];
+
+						if (gb_array_count(sel.index) > 1) {
+							error(&c->error_collector, ast_node_token(elem),
+							      "You cannot assign to an anonymous field `%.*s` in a structure literal (at the moment)", LIT(name));
+							continue;
+						}
+
+						Entity *field = t->Struct.fields[sel.index[0]];
 						add_entity_use(&c->info, kv->field, field);
 
-						if (fields_visited[index]) {
+						if (fields_visited[sel.index[0]]) {
 							error(&c->error_collector, ast_node_token(elem),
 							      "Duplicate field `%.*s` in structure literal", LIT(name));
 							continue;
 						}
 
-						fields_visited[index] = true;
+						fields_visited[sel.index[0]] = true;
 						check_expr(c, o, kv->value);
 						check_assignment(c, o, field->type, make_string("structure literal"));
 					}
@@ -2540,17 +2680,7 @@ gbString write_field_list_to_string(gbString str, AstNode *field_list, char *sep
 		if (i > 0)
 			str = gb_string_appendc(str, sep);
 
-		isize j = 0;
-		for (AstNode *name = f->name_list; name != NULL; name = name->next) {
-			if (j > 0)
-				str = gb_string_appendc(str, ", ");
-			str = write_expr_to_string(str, name);
-			j++;
-		}
-
-		str = gb_string_appendc(str, ": ");
-		str = write_expr_to_string(str, f->type);
-
+		str = write_expr_to_string(str, field);
 		i++;
 	}
 	return str;
@@ -2672,6 +2802,22 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, vt->count);
 		str = gb_string_appendc(str, "}");
 		str = write_expr_to_string(str, vt->elem);
+	case_end;
+
+	case_ast_node(f, Field, node);
+		if (f->is_using) {
+			str = gb_string_appendc(str, "using ");
+		}
+		isize i = 0;
+		for (AstNode *name = f->name_list; name != NULL; name = name->next) {
+			if (i > 0)
+				str = gb_string_appendc(str, ", ");
+			str = write_expr_to_string(str, name);
+			i++;
+		}
+
+		str = gb_string_appendc(str, ": ");
+		str = write_expr_to_string(str, f->type);
 	case_end;
 
 	case_ast_node(ce, CallExpr, node);

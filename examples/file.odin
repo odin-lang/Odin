@@ -3,7 +3,7 @@
 FileHandle :: type HANDLE;
 
 File :: type struct {
-	handle: FileHandle,
+	handle: FileHandle;
 }
 
 file_open :: proc(name: string) -> (File, bool) {

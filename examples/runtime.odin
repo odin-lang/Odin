@@ -258,18 +258,18 @@ AllocatorProc :: type proc(allocator_data: rawptr, mode: AllocationMode,
                            old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
 
 Allocator :: type struct {
-	procedure: AllocatorProc,
-	data:      rawptr,
+	procedure: AllocatorProc;
+	data:      rawptr;
 }
 
 
 Context :: type struct {
-	thread_id: i32,
+	thread_id: i32;
 
-	user_index: i32,
-	user_data:  rawptr,
+	user_index: i32;
+	user_data:  rawptr;
 
-	allocator: Allocator,
+	allocator: Allocator;
 }
 
 #thread_local context: Context;

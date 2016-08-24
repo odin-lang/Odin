@@ -112,6 +112,8 @@ struct Type {
 			b32      is_packed;
 		} Struct;
 		struct {
+			// IMPORTANT HACK(bill): The positions of fields and field_count
+			// must be same for Struct and Union
 			Entity **fields; // Entity_Variable
 			isize    field_count;
 		} Union;

@@ -14,8 +14,8 @@ struct HashKey {
 
 gb_inline HashKey hashing_proc(void const *data, isize len) {
 	HashKey h = {};
-	h.key = gb_murmur64(data, len);
-	// h.key = gb_fnv64a(data, len);
+	// h.key = gb_murmur64(data, len);
+	h.key = gb_fnv64a(data, len);
 	return h;
 }
 

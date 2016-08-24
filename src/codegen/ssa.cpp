@@ -1606,7 +1606,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					if (elem->kind == AstNode_FieldValue) {
 						ast_node(kv, FieldValue, elem);
-						Entity *e = lookup_field(base_type, kv->field, &field_index);
+						Selection sel = lookup_field(base_type, kv->field->Ident.token.string);
+						field_index = sel.index[0];
 						field_expr = ssa_build_expr(proc, kv->value);
 					} else {
 						field_expr = ssa_build_expr(proc, elem);
@@ -1874,6 +1875,36 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 	return value;
 }
 
+ssaValue *ssa_emit_deep_field_gep(ssaProcedure *proc, Type *type, ssaValue *e, Selection sel) {
+	GB_ASSERT(gb_array_count(sel.index) > 0);
+
+	gb_for_array(i, sel.index) {
+		isize index = sel.index[i];
+		if (is_type_pointer(type)) {
+			type = type_deref(type);
+			e = ssa_emit_load(proc, e);
+			e = ssa_emit_ptr_offset(proc, e, v_zero);
+			ssa_set_type(e, type);
+		}
+		type = get_base_type(type);
+
+
+		if (type->kind == Type_Union) {
+			ssaValue *v = ssa_emit_ptr_offset(proc, e, v_zero);
+			ssa_set_type(v, make_type_pointer(proc->module->allocator, type));
+			type = type->Union.fields[index]->type;
+			e = ssa_emit_conv(proc, v, make_type_pointer(proc->module->allocator, type));
+			e = ssa_emit_ptr_offset(proc, e, v_zero);
+			ssa_set_type(e, type);
+		} else {
+			type = type->Union.fields[index]->type;
+			e = ssa_emit_struct_gep(proc, e, index, type);
+		}
+	}
+
+	return e;
+}
+
 
 ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	switch (expr->kind) {
@@ -1901,31 +1932,12 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	case_ast_node(se, SelectorExpr, expr);
 		Type *type = get_base_type(type_of_expr(proc->module->info, se->expr));
 
-		isize field_index = 0;
-		Entity *entity = lookup_field(type, unparen_expr(se->selector), &field_index);
-		GB_ASSERT(entity != NULL);
+		Selection sel = lookup_field(type, unparen_expr(se->selector)->Ident.token.string);
+		GB_ASSERT(sel.entity != NULL);
 
 		ssaValue *e = ssa_build_addr(proc, se->expr).addr;
-
-		if (is_type_pointer(type)) {
-			// NOTE(bill): Allow x^.y and x.y to be the same
-			e = ssa_emit_load(proc, e);
-			e = ssa_emit_ptr_offset(proc, e, v_zero);
-			ssa_set_type(e, type_deref(type));
-		}
-
-		if (type->kind == Type_Union) {
-			ssaValue *v = ssa_emit_ptr_offset(proc, e, v_zero);
-			ssa_set_type(v, make_type_pointer(proc->module->allocator, type));
-			ssaValue *f = ssa_emit_conv(proc, v, make_type_pointer(proc->module->allocator, entity->type));
-			f = ssa_emit_ptr_offset(proc, f, v_zero);
-			ssa_set_type(f, entity->type);
-			return ssa_make_addr(f, expr);
-
-		} else {
-			ssaValue *v = ssa_emit_struct_gep(proc, e, field_index, entity->type);
-			return ssa_make_addr(v, expr);
-		}
+		e = ssa_emit_deep_field_gep(proc, type, e, sel);
+		return ssa_make_addr(e, expr);
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, expr);
