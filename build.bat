@@ -23,12 +23,18 @@ set compiler_warnings= ^
 	-wd4505 -wd4512 -wd4550
 
 set compiler_includes=
-set libs= kernel32.lib user32.lib gdi32.lib opengl32.lib ..\src\utf8proc\utf8proc.lib
+set libs= kernel32.lib user32.lib gdi32.lib opengl32.lib
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console
 
-rem Debug
-if %release_mode% EQU 0 (set linker_flags=%linker_flags% -debug)
+
+if %release_mode% EQU 0 ( rem Debug
+	set linker_flags=%linker_flags% -debug
+	set libs=%libs% ..\src\utf8proc\utf8proc_debug.lib
+) else ( rem Release
+	set linker_flags=%linker_flags%
+	set libs=%libs% ..\src\utf8proc\utf8proc.lib
+)
 
 set compiler_settings=%compiler_includes% %compiler_flags% %compiler_warnings%
 set linker_settings=%libs% %linker_flags%

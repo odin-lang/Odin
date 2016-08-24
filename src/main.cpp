@@ -82,11 +82,16 @@ int main(int argc, char **argv) {
 	char const *output_name = ssa.output_file.filename;
 	isize base_name_len = gb_path_extension(output_name)-1 - output_name;
 
-	i32 exit_code = win32_exec_command_line_app(
+
+
+	i32 exit_code = 0;
+	exit_code = win32_exec_command_line_app(
 		"../misc/llvm-bin/opt -mem2reg %s -o %.*s.bc",
 		output_name, cast(int)base_name_len, output_name);
 	if (exit_code != 0)
 		return exit_code;
+#if 1
+#endif
 
 	exit_code = win32_exec_command_line_app(
 		"clang -o %.*s.exe %.*s.bc "

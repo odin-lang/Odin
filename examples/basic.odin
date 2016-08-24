@@ -53,8 +53,8 @@ print_rune :: proc(r: rune) {
 	print_string(str);
 }
 
-print_space :: proc() { print_rune($ $); }
-print_nl    :: proc() { print_rune($\n$); }
+print_space :: proc() { print_rune(#rune " "); }
+print_nl    :: proc() { print_rune(#rune "\n"); }
 
 print_int :: proc(i: int) {
 	print_int_base(i, 10);
@@ -70,7 +70,7 @@ print_int_base :: proc(i, base: int) {
 		i = -i;
 	}
 	if i == 0 {
-		buf[len] = $0$;
+		buf[len] = #rune "0";
 		len++;
 	}
 	for i > 0 {
@@ -80,7 +80,7 @@ print_int_base :: proc(i, base: int) {
 	}
 
 	if negative {
-		buf[len] = $-$;
+		buf[len] = #rune "-";
 		len++;
 	}
 
@@ -89,7 +89,7 @@ print_int_base :: proc(i, base: int) {
 }
 
 print_uint :: proc(i: uint) {
-	print__uint(i, 10, 0, $ $);
+	print__uint(i, 10, 0, #rune " ");
 }
 print__uint :: proc(i, base: uint, min_width: int, pad_char: byte) {
 	NUM_TO_CHAR_TABLE :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$";
@@ -97,7 +97,7 @@ print__uint :: proc(i, base: uint, min_width: int, pad_char: byte) {
 	buf: [65]byte;
 	len := 0;
 	if i == 0 {
-		buf[len] = $0$;
+		buf[len] = #rune "0";
 		len++;
 	}
 	for i > 0 {
@@ -119,18 +119,18 @@ print_bool :: proc(b : bool) {
 	else { print_string("false"); }
 }
 
-print_pointer :: proc(p: rawptr) #inline { print__uint(p as uint, 16, 0, $ $); }
+print_pointer :: proc(p: rawptr) #inline { print__uint(p as uint, 16, 0, #rune " "); }
 
 print_f32     :: proc(f: f32) #inline { print__f64(f as f64, 7); }
 print_f64     :: proc(f: f64) #inline { print__f64(f, 10); }
 
 print__f64 :: proc(f: f64, decimal_places: int) {
 	if f == 0 {
-		print_rune($0$);
+		print_rune(#rune "0");
 		return;
 	}
 	if f < 0 {
-		print_rune($-$);
+		print_rune(#rune "-");
 		f = -f;
 	}
 
@@ -140,7 +140,7 @@ print__f64 :: proc(f: f64, decimal_places: int) {
 		buf: [22]byte;
 		len := 0;
 		if i == 0 {
-			buf[len] = $0$;
+			buf[len] = #rune "0";
 			len++;
 		}
 		for i > 0 {
@@ -156,7 +156,7 @@ print__f64 :: proc(f: f64, decimal_places: int) {
 	print_u64(i);
 	f -= i as f64;
 
-	print_rune($.$);
+	print_rune(#rune ".");
 
 	mult := 10.0;
 	for decimal_places := 6; decimal_places >= 0; decimal_places-- {

@@ -380,6 +380,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 
 	push_procedure(c, type);
 	ast_node(bs, BlockStmt, body);
+	// TODO(bill): Check declarations first (except mutable variable declarations)
 	check_stmt_list(c, bs->list, 0);
 	if (type->Proc.result_count > 0) {
 		if (!check_is_terminating(c, body)) {
@@ -394,7 +395,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 	GB_ASSERT(e->type == NULL);
 
-	Type *proc_type = make_type_proc(c->allocator, e->parent, NULL, 0, NULL, 0);
+	Type *proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0);
 	e->type = proc_type;
 	ast_node(pd, ProcDecl, d->proc_decl);
 
@@ -864,7 +865,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		add_entity(c, c->context.scope, pd->name, e);
 
 		DeclInfo decl = {};
-		init_declaration_info(&decl, e->parent);
+		init_declaration_info(&decl, e->scope);
 		decl.proc_decl = node;
 		check_proc_decl(c, e, &decl, false);
 		destroy_declaration_info(&decl);

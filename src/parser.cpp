@@ -1144,7 +1144,22 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 
 	case Token_Hash: {
 		operand = parse_tag_expr(f, NULL);
-		operand->TagExpr.expr = parse_expr(f, false);
+		String name = operand->TagExpr.name.string;
+		if (are_strings_equal(name, make_string("rune"))) {
+			if (f->cursor[0].kind == Token_String) {
+				Token *s = &f->cursor[0];
+
+				if (gb_utf8_strnlen(s->string.text, s->string.len) != 1) {
+					ast_file_err(f, *s, "Invalid rune literal %.*s", LIT(s->string));
+				}
+				s->kind = Token_Rune; // NOTE(bill): Change it
+			} else {
+				expect_token(f, Token_String);
+			}
+			operand = parse_operand(f, lhs);
+		} else {
+			operand->TagExpr.expr = parse_expr(f, false);
+		}
 		return operand;
 	}
 

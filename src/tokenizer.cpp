@@ -698,43 +698,6 @@ Token tokenizer_get_token(Tokenizer *t) {
 			}
 		} break;
 
-		case '$': { // Rune Literal
-			b32 valid = true;
-			isize len = 0;
-			token.kind = Token_Rune;
-			for (;;) {
-				Rune r = t->curr_rune;
-				if (r == '\n' || r < 0) {
-					if (valid)
-						tokenizer_err(t, "Rune literal not terminated");
-					break;
-				}
-				advance_to_next_rune(t);
-				if (r == '$')
-					break;
-				len++;
-				if (r == '\\') {
-					if (!scan_escape(t, '$'))
-						valid = false;
-				}
-			}
-
-			token.string.len = t->curr - token.string.text;
-			if (valid && len != 1) {
-				tokenizer_err(t, "Invalid rune literal %.*s", LIT(token.string));
-			} else {
-				i32 success = unquote_string(gb_heap_allocator(), &token.string);
-				if (success > 0) {
-					if (success == 2) {
-						gb_array_append(t->allocated_strings, token.string);
-					}
-					return token;
-				} else {
-					tokenizer_err(t, "Invalid rune literal %.*s", LIT(token.string));
-				}
-			}
-		} break;
-
 		case '.':
 			token.kind = Token_Period; // Default
 			if (gb_is_between(t->curr_rune, '0', '9')) { // Might be a number

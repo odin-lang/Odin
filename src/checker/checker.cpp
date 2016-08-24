@@ -251,7 +251,7 @@ void scope_lookup_parent_entity(Checker *c, Scope *s, String name, Scope **scope
 		if (found) {
 			Entity *e = *found;
 			if (gone_thru_proc) {
-				if (e->kind == Entity_Variable && e->parent != c->global_scope) {
+				if (e->kind == Entity_Variable && e->scope != c->global_scope) {
 					continue;
 				}
 			}
@@ -292,8 +292,8 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	if (found)
 		return *found;
 	map_set(&s->elements, key, entity);
-	if (entity->parent == NULL)
-		entity->parent = s;
+	if (entity->scope == NULL)
+		entity->scope = s;
 	return NULL;
 }
 
@@ -640,7 +640,7 @@ void check_parsed_files(Checker *c) {
 			case_ast_node(td, TypeDecl, decl);
 				ast_node(n, Ident, td->name);
 				Entity *e = make_entity_type_name(c->allocator, c->global_scope, n->token, NULL);
-				DeclInfo *d = make_declaration_info(c->allocator, e->parent);
+				DeclInfo *d = make_declaration_info(c->allocator, e->scope);
 				d->type_expr = td->type;
 				add_file_entity(c, td->name, e, d);
 			case_end;
@@ -650,7 +650,7 @@ void check_parsed_files(Checker *c) {
 				Token token = n->token;
 				Entity *e = make_entity_procedure(c->allocator, c->global_scope, token, NULL);
 				add_entity(c, c->global_scope, pd->name, e);
-				DeclInfo *d = make_declaration_info(c->allocator, e->parent);
+				DeclInfo *d = make_declaration_info(c->allocator, e->scope);
 				d->proc_decl = decl;
 				map_set(&c->info.entities, hash_pointer(e), d);
 			case_end;

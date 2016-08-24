@@ -3,16 +3,16 @@
 #load "game.odin"
 
 main :: proc() {
-	_ = hellope();
-	procedures();
-	variables();
-	constants();
-	types();
-	data_control();
-	using_fields();
+	// _ = hellope();
+	// procedures();
+	// variables();
+	// constants();
+	// types();
+	// data_control();
+	// using_fields();
 
 
-	// run_game();
+	run_game();
 }
 
 hellope :: proc() -> int {
@@ -440,7 +440,7 @@ types :: proc() {
 		// FORENOTE: 5 * h was originally allowed but it was an edge case in the
 		// compiler I didn't think it was enough to justify have it it.
 
-		print_f32(i[0]); print_rune($,$);
+		print_f32(i[0]); print_rune(#rune ",");
 		print_f32(i[1]); print_nl();
 	}
 
@@ -502,12 +502,12 @@ void main() {
 }`;
 
 
-		hearts1 := $💕$;
-		hearts2 := $\U0001f495$; // 32 bit
-		hearts3 := "\xf0\x9f\x92\x95"; // Note it's a string, should I allow untyped string -> untyped rune casts?
+		hearts1 := #rune "💕";
+		hearts2 := #rune "\U0001f495"; // 32 bit
+		hearts3 := #rune "\xf0\x9f\x92\x95";
 
-		㐒 := $㐒$;
-		㐒16 := $\u4db5$; // 16 bit
+		㐒 := #rune "㐒";
+		㐒16 := #rune "\u4db5"; // 16 bit but will be `rune`
 		// String ideas "nicked" from Go, so far. I think I might change how some of it works later.
 	}
 
