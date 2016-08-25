@@ -143,7 +143,10 @@ struct Type {
 };
 
 Type *get_base_type(Type *t) {
-	while (t->kind == Type_Named) {
+	for (;;) {
+		if (t == NULL || t->kind != Type_Named) {
+			break;
+		}
 		t = t->Named.base;
 	}
 	return t;
@@ -583,6 +586,8 @@ gb_global i64 basic_type_sizes[] = {
 	8,  // Basic_f64
 };
 
+
+
 i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
 i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
 i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, i64 index);
@@ -668,6 +673,7 @@ b32 type_set_offsets(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 
 i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	t = get_base_type(t);
+
 	switch (t->kind) {
 	case Type_Basic: {
 		GB_ASSERT(is_type_typed(t));

@@ -3,17 +3,17 @@
 #load "game.odin"
 
 main :: proc() {
-	// _ = hellope();
-	// procedures();
-	// variables();
-	// constants();
-	// types();
-	// data_control();
-	// using_fields();
+	_ = hellope();
+	procedures();
+	variables();
+	constants();
+	types();
+	data_control();
+	using_fields();
 
-
-	run_game();
+	// run_game();
 }
+
 
 hellope :: proc() -> int {
 	print_string("Hellope, 世界\n");
@@ -35,7 +35,7 @@ hellope :: proc() -> int {
 
 apple, banana, carrot: bool;
 box, carboard: bool = true, false;
-hellope_value: int = hellope(); // The procedure is ran just before `main`
+// hellope_value: int = hellope(); // The procedure is ran just before `main`
 
 variables :: proc() {
 	i: int; // initialized with zero value
@@ -711,3 +711,4 @@ using_fields :: proc() {
 		print_f32(t.pos._xy.x); print_nl();
 	}
 }
+

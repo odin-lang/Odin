@@ -157,7 +157,7 @@ gb_no_inline void error(ErrorCollector *ec, Token token, char *fmt, ...) {
 
 		va_list va;
 		va_start(va, fmt);
-		gb_printf_err("%.*s(%td:%td) Error: %s\n",
+		gb_printf_err("%.*s(%td:%td) %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
 		              gb_bprintf_va(fmt, va));
 		va_end(va);

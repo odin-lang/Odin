@@ -1057,7 +1057,7 @@ b32 is_foreign_name_valid(String name) {
 			case '_':
 				break;
 			default:
-				if (!rune_is_letter(rune))
+				if (!gb_char_is_alpha(cast(char)rune))
 					return false;
 				break;
 			}
@@ -1069,7 +1069,7 @@ b32 is_foreign_name_valid(String name) {
 			case '_':
 				break;
 			default:
-				if (!rune_is_letter(rune) && !rune_is_digit(rune)) {
+				if (!gb_char_is_alphanumeric(cast(char)rune)) {
 					return false;
 				}
 				break;

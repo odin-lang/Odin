@@ -359,16 +359,30 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 	check_init_constant(c, e, &operand);
 }
 
-void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *named_type) {
+void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, CycleChecker *cycle_checker) {
 	GB_ASSERT(e->type == NULL);
 	Type *named = make_type_named(c->allocator, e->token.string, NULL, e);
 	named->Named.type_name = e;
-	set_base_type(named_type, named);
+	if (def != NULL && def->kind == Type_Named) {
+		def->Named.base = named;
+	}
 	e->type = named;
 
-	check_type(c, type_expr, named);
+	CycleChecker local_cycle_checker = {};
+	if (cycle_checker == NULL) {
+		cycle_checker = &local_cycle_checker;
+	}
+	defer (if (local_cycle_checker.path != NULL) {
+		gb_array_free(local_cycle_checker.path);
+	});
 
-	set_base_type(named, get_base_type(get_base_type(named)));
+	check_type(c, type_expr, named, cycle_checker_add(cycle_checker, e));
+
+
+	named->Named.base = get_base_type(named->Named.base);
+	if (named->Named.base == t_invalid) {
+		gb_printf("%s\n", type_to_string(named));
+	}
 }
 
 void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body) {
@@ -486,7 +500,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 
 
 
-void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
+void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, CycleChecker *cycle_checker) {
 	if (e->type != NULL)
 		return;
 	switch (e->kind) {
@@ -498,9 +512,17 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 		c->context.decl = d;
 		check_var_decl(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr);
 		break;
-	case Entity_TypeName:
-		check_type_decl(c, e, d->type_expr, named_type);
-		break;
+	case Entity_TypeName: {
+		CycleChecker local_cycle_checker = {};
+		if (cycle_checker == NULL) {
+			cycle_checker = &local_cycle_checker;
+		}
+		check_type_decl(c, e, d->type_expr, named_type, cycle_checker);
+
+		if (local_cycle_checker.path != NULL) {
+			gb_array_free(local_cycle_checker.path);
+		}
+	} break;
 	case Entity_Procedure:
 		check_proc_decl(c, e, d, true);
 		break;
@@ -875,7 +897,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		ast_node(name, Ident, td->name);
 		Entity *e = make_entity_type_name(c->allocator, c->context.scope, name->token, NULL);
 		add_entity(c, c->context.scope, td->name, e);
-		check_type_decl(c, e, td->type, NULL);
+		check_type_decl(c, e, td->type, NULL, NULL);
 	case_end;
 	}
 }
