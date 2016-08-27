@@ -120,11 +120,17 @@ enum BuiltinProcId {
 	BuiltinProc_offset_of,
 	BuiltinProc_offset_of_val,
 	BuiltinProc_static_assert,
+
 	BuiltinProc_len,
 	BuiltinProc_cap,
 	BuiltinProc_copy,
 	BuiltinProc_append,
+
 	BuiltinProc_swizzle,
+
+	BuiltinProc_ptr_offset,
+	BuiltinProc_ptr_sub,
+	BuiltinProc_slice_ptr,
 
 	BuiltinProc_Count,
 };
@@ -151,6 +157,10 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("append"),           2, false, Expression_Expression},
 
 	{STR_LIT("swizzle"),          1, true,  Expression_Expression},
+
+	{STR_LIT("ptr_offset"),       2, false, Expression_Expression},
+	{STR_LIT("ptr_sub"),          2, false, Expression_Expression},
+	{STR_LIT("slice_ptr"),        2, true,  Expression_Expression},
 };
 
 struct CheckerContext {

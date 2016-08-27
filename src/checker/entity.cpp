@@ -39,11 +39,13 @@ struct Entity {
 		struct { ExactValue value; } Constant;
 		struct {
 			b8 visited;   // Cycle detection
-			b8 is_field;  // Is struct field
 			b8 used;      // Variable is used
-			b8 anonymous; // Variable is an anonymous struct field
+			b8 is_field;  // Is struct field
+			b8 anonymous; // Variable is an anonymous
 		} Variable;
-		struct { b8 used; } Procedure;
+		struct {
+			b8 used;
+		} Procedure;
 		struct { BuiltinProcId id; } Builtin;
 	};
 };

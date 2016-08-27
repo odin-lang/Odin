@@ -985,9 +985,9 @@ ssaValue *ssa_emit_arith(ssaProcedure *proc, Token op, ssaValue *left, ssaValue 
 		break;
 	}
 
-	ssaValue *v = ssa_make_instr_binary_op(proc, op, left, right);
+	ssaValue *v = ssa_emit(proc, ssa_make_instr_binary_op(proc, op, left, right));
 	ssa_set_type(v, type);
-	return ssa_emit(proc, v);
+	return v;
 }
 
 ssaValue *ssa_emit_comp(ssaProcedure *proc, Token op, ssaValue *left, ssaValue *right) {
@@ -1696,18 +1696,23 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					// copy :: proc(dst, src: []Type) -> int
 					AstNode *dst_node = ce->arg_list;
 					AstNode *src_node = ce->arg_list->next;
-					ssaValue *dst_slice = ssa_build_addr(proc, dst_node).addr;
-					ssaValue *src_slice = ssa_build_addr(proc, src_node).addr;
+					ssaValue *dst_slice = ssa_build_expr(proc, dst_node);
+					ssaValue *src_slice = ssa_build_expr(proc, src_node);
 					Type *slice_type = get_base_type(ssa_type(dst_slice));
 					GB_ASSERT(slice_type->kind == Type_Slice);
 					Type *elem_type = slice_type->Slice.elem;
 					i64 size_of_elem = type_size_of(proc->module->sizes, proc->module->allocator, elem_type);
 
-					ssaValue *dst = ssa_emit_conv(proc, ssa_slice_elem(proc, dst_slice), t_rawptr);
-					ssaValue *src = ssa_emit_conv(proc, ssa_slice_elem(proc, src_slice), t_rawptr);
+					ssaValue *d = ssa_add_local_generated(proc, slice_type);
+					ssaValue *s = ssa_add_local_generated(proc, slice_type);
+					ssa_emit_store(proc, d, dst_slice);
+					ssa_emit_store(proc, s, src_slice);
 
-					ssaValue *len_dst = ssa_slice_len(proc, dst_slice);
-					ssaValue *len_src = ssa_slice_len(proc, src_slice);
+					ssaValue *dst = ssa_emit_conv(proc, ssa_slice_elem(proc, d), t_rawptr);
+					ssaValue *src = ssa_emit_conv(proc, ssa_slice_elem(proc, s), t_rawptr);
+
+					ssaValue *len_dst = ssa_slice_len(proc, d);
+					ssaValue *len_src = ssa_slice_len(proc, s);
 
 					Token lt = {Token_Lt};
 					ssaValue *cond = ssa_emit_comp(proc, lt, len_dst, len_src);
@@ -1794,6 +1799,51 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					return ssa_emit(proc, ssa_make_instr_shuffle_vector(proc, vector, indices, index_count));
 
+				} break;
+
+				case BuiltinProc_ptr_offset: {
+					ssaValue *ptr = ssa_build_expr(proc, ce->arg_list);
+					ssaValue *offset = ssa_build_expr(proc, ce->arg_list->next);
+					return ssa_emit_ptr_offset(proc, ptr, offset);
+				} break;
+
+				case BuiltinProc_ptr_sub: {
+					ssaValue *ptr_a = ssa_build_expr(proc, ce->arg_list);
+					ssaValue *ptr_b = ssa_build_expr(proc, ce->arg_list->next);
+					Type *ptr_type = get_base_type(ssa_type(ptr_a));
+					GB_ASSERT(ptr_type->kind == Type_Pointer);
+					isize elem_size = type_size_of(proc->module->sizes, proc->module->allocator, ptr_type->Pointer.elem);
+					Token sub = {Token_Sub};
+					ssaValue *v = ssa_emit_arith(proc, sub, ptr_a, ptr_b, t_int);
+					if (elem_size > 1) {
+						Token quo = {Token_Quo};
+						ssaValue *ez = ssa_make_value_constant(proc->module->allocator, t_int,
+						                                       make_exact_value_integer(elem_size));
+						v = ssa_emit_arith(proc, quo, v, ez, t_int);
+					}
+
+					return v;
+				} break;
+
+				case BuiltinProc_slice_ptr: {
+					ssaValue *ptr = ssa_build_expr(proc, ce->arg_list);
+					ssaValue *len = ssa_build_expr(proc, ce->arg_list->next);
+					ssaValue *cap = len;
+
+					len = ssa_emit_conv(proc, len, t_int);
+
+					if (ce->arg_list->next->next != NULL) {
+						cap = ssa_build_expr(proc, ce->arg_list->next->next);
+						cap = ssa_emit_conv(proc, cap, t_int);
+					}
+
+
+					Type *slice_type = make_type_slice(proc->module->allocator, type_deref(ssa_type(ptr)));
+					ssaValue *slice = ssa_add_local_generated(proc, slice_type);
+					ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_zero32, ssa_type(ptr)), ptr);
+					ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_one32,  t_int),         len);
+					ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_two32,  t_int),         cap);
+					return ssa_emit_load(proc, slice);
 				} break;
 				}
 			}
@@ -2010,7 +2060,8 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			}
 		} break;
 		case Type_Pointer: {
-			elem = ssa_emit_load(proc, ssa_build_addr(proc, ie->expr).addr);
+			ssaValue *array = ssa_emit_load(proc, ssa_build_expr(proc, ie->expr));
+			elem = ssa_array_elem(proc, array);
 		} break;
 		}
 
@@ -2050,18 +2101,24 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(de, DerefExpr, expr);
-		ssaValue *e = ssa_emit_load(proc, ssa_build_addr(proc, de->expr).addr);
-		ssaValue *gep = ssa_make_instr_get_element_ptr(proc, e, NULL, NULL, 0, false);
+		ssaValue *e = ssa_build_expr(proc, de->expr);
+		ssaValue *gep = ssa_emit_zero_gep(proc, e);
+		// HACK(bill): need to deref here as stack variables are of type pointer
+		// and addresses are already pointers
+		// TODO(bill): Completely redo the type system for SSA
 		Type *t = type_deref(ssa_type(e));
 		gep->Instr.GetElementPtr.result_type  = t;
 		gep->Instr.GetElementPtr.elem_type = t;
-		ssaValue *v = ssa_emit(proc, gep);
-		return ssa_make_addr(v, expr);
+		return ssa_make_addr(gep, expr);
 	case_end;
 	}
 
+	TokenPos token_pos = ast_node_token(expr).pos;
 	GB_PANIC("Unexpected address expression\n"
-	         "\tAstNode: %.*s\n", LIT(ast_node_strings[expr->kind]));
+	         "\tAstNode: %.*s @ "
+	         "%.*s(%td:%td)\n",
+	         LIT(ast_node_strings[expr->kind]),
+	         LIT(token_pos.file), token_pos.line, token_pos.column);
 
 
 	return ssa_make_addr(NULL, NULL);

@@ -2,6 +2,8 @@
 #pragma warning(disable: 4245)
 
 #include "utf8proc/utf8proc.h"
+// #define UTF8PROC_IMPLEMENTATION
+// #include "utf8proc/utf8proc_new.h"
 
 #pragma warning(pop)
 

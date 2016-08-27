@@ -1,17 +1,124 @@
-void           check_assignment        (Checker *c, Operand *operand, Type *type, String context_name);
-b32            check_is_assignable_to  (Checker *c, Operand *operand, Type *type);
-void           check_expr              (Checker *c, Operand *operand, AstNode *expression);
-void           check_multi_expr        (Checker *c, Operand *operand, AstNode *expression);
-void           check_expr_or_type      (Checker *c, Operand *operand, AstNode *expression);
-ExpressionKind check_expr_base         (Checker *c, Operand *operand, AstNode *expression, Type *type_hint = NULL);
-Type *         check_type              (Checker *c, AstNode *expression, Type *named_type = NULL, CycleChecker *cycle_checker = NULL);
-void           check_selector          (Checker *c, Operand *operand, AstNode *node);
-void           check_not_tuple         (Checker *c, Operand *operand);
-void           convert_to_typed        (Checker *c, Operand *operand, Type *target_type);
-gbString       expr_to_string          (AstNode *expression);
-void           check_entity_decl       (Checker *c, Entity *e, DeclInfo *decl, Type *named_type, CycleChecker *cycle_checker = NULL);
-void           check_proc_body         (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
-void           update_expr_type        (Checker *c, AstNode *e, Type *type, b32 final);
+void           check_expr                (Checker *c, Operand *operand, AstNode *expression);
+void           check_multi_expr          (Checker *c, Operand *operand, AstNode *expression);
+void           check_expr_or_type        (Checker *c, Operand *operand, AstNode *expression);
+ExpressionKind check_expr_base           (Checker *c, Operand *operand, AstNode *expression, Type *type_hint = NULL);
+Type *         check_type                (Checker *c, AstNode *expression, Type *named_type = NULL, CycleChecker *cycle_checker = NULL);
+void           check_selector            (Checker *c, Operand *operand, AstNode *node);
+void           check_not_tuple           (Checker *c, Operand *operand);
+b32            check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
+void           convert_to_typed          (Checker *c, Operand *operand, Type *target_type);
+gbString       expr_to_string            (AstNode *expression);
+void           check_entity_decl         (Checker *c, Entity *e, DeclInfo *decl, Type *named_type, CycleChecker *cycle_checker = NULL);
+void           check_proc_body           (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
+void           update_expr_type          (Checker *c, AstNode *e, Type *type, b32 final);
+
+
+
+b32 check_is_assignable_to_using_subtype(Checker *c, Type *dst, Type *src) {
+	return false;
+}
+
+b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argument = false) {
+	if (operand->mode == Addressing_Invalid ||
+	    type == t_invalid) {
+		return true;
+	}
+
+	Type *s = operand->type;
+
+	if (are_types_identical(s, type))
+		return true;
+
+	Type *src = get_base_type(s);
+	Type *dst = get_base_type(type);
+
+	if (is_type_untyped(src)) {
+		switch (dst->kind) {
+		case Type_Basic:
+			if (operand->mode == Addressing_Constant)
+				return check_value_is_expressible(c, operand->value, dst, NULL);
+			if (src->kind == Type_Basic)
+				return src->Basic.kind == Basic_UntypedBool && is_type_boolean(dst);
+			break;
+		case Type_Pointer:
+			return src->Basic.kind == Basic_UntypedPointer;
+		}
+	}
+
+	if (are_types_identical(dst, src) && (!is_type_named(dst) || !is_type_named(src)))
+		return true;
+
+	if (is_type_pointer(dst) && is_type_rawptr(src))
+	    return true;
+
+	if (is_type_rawptr(dst) && is_type_pointer(src))
+	    return true;
+
+	if (dst->kind == Type_Array && src->kind == Type_Array) {
+		if (are_types_identical(dst->Array.elem, src->Array.elem)) {
+			return dst->Array.count == src->Array.count;
+		}
+	}
+
+	if (dst->kind == Type_Slice && src->kind == Type_Slice) {
+		if (are_types_identical(dst->Slice.elem, src->Slice.elem)) {
+			return true;
+		}
+	}
+
+	if (is_argument) {
+		// Polymorphism for subtyping
+		if (check_is_assignable_to_using_subtype(c, dst, src)) {
+			return true;
+		}
+	}
+
+
+	return false;
+
+}
+
+
+// NOTE(bill): `content_name` is for debugging
+// TODO(bill): Maybe allow assignment to tuples?
+void check_assignment(Checker *c, Operand *operand, Type *type, String context_name, b32 is_argument = false) {
+	check_not_tuple(c, operand);
+	if (operand->mode == Addressing_Invalid)
+		return;
+
+	if (is_type_untyped(operand->type)) {
+		Type *target_type = type;
+
+		if (type == NULL)
+			target_type = default_type(operand->type);
+		convert_to_typed(c, operand, target_type);
+		if (operand->mode == Addressing_Invalid)
+			return;
+	}
+
+	if (type != NULL) {
+		if (!check_is_assignable_to(c, operand, type, is_argument)) {
+			gbString type_string = type_to_string(type);
+			gbString op_type_string = type_to_string(operand->type);
+			gbString expr_str = expr_to_string(operand->expr);
+			defer (gb_string_free(type_string));
+			defer (gb_string_free(op_type_string));
+			defer (gb_string_free(expr_str));
+
+
+			// TODO(bill): is this a good enough error message?
+			error(&c->error_collector, ast_node_token(operand->expr),
+			      "Cannot assign value `%s` of type `%s` to `%s` in %.*s",
+			      expr_str,
+			      op_type_string,
+			      type_string,
+			      LIT(context_name));
+
+			operand->mode = Addressing_Invalid;
+		}
+	}
+}
+
 
 void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *> *entity_map) {
 	t = get_base_type(type_deref(t));
@@ -1095,7 +1202,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 
 	if (!are_types_identical(x->type, y->type)) {
 		if (x->type != t_invalid &&
-		    y->type  != t_invalid) {
+		    y->type != t_invalid) {
 			gbString xt = type_to_string(x->type);
 			gbString yt = type_to_string(y->type);
 			defer (gb_string_free(xt));
@@ -1906,6 +2013,166 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->type = make_type_vector(c->allocator, elem_type, arg_count);
 		operand->mode = Addressing_Value;
 	} break;
+
+	case BuiltinProc_ptr_offset: {
+		// ptr_offset :: proc(ptr: ^T, offset: int) -> ^T
+		// ^T cannot be rawptr
+		Type *ptr_type = get_base_type(operand->type);
+		if (!is_type_pointer(ptr_type)) {
+			gbString type_str = type_to_string(operand->type);
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(call),
+			      "Expected a pointer to `ptr_offset`, got `%s`",
+			      type_str);
+			return false;
+		}
+
+		if (ptr_type == t_rawptr) {
+			error(&c->error_collector, ast_node_token(call),
+			      "`rawptr` cannot have pointer arithmetic");
+			return false;
+		}
+
+		AstNode *offset = ce->arg_list->next;
+		Operand op = {};
+		check_expr(c, &op, offset);
+		if (op.mode == Addressing_Invalid)
+			return false;
+		Type *offset_type = get_base_type(op.type);
+		if (!is_type_integer(offset_type)) {
+			error(&c->error_collector, ast_node_token(op.expr), "Pointer offsets for `ptr_offset` must be an integer");
+			return false;
+		}
+
+		if (operand->mode == Addressing_Constant &&
+		    op.mode == Addressing_Constant) {
+			u8 *ptr = cast(u8 *)operand->value.value_pointer;
+			isize elem_size = type_size_of(c->sizes, c->allocator, ptr_type->Pointer.elem);
+			ptr += elem_size * op.value.value_integer;
+			operand->value.value_pointer = ptr;
+		} else {
+			operand->mode = Addressing_Value;
+		}
+
+	} break;
+
+	case BuiltinProc_ptr_sub: {
+		// ptr_sub :: proc(a, b: ^T) -> int
+		// ^T cannot be rawptr
+		Type *ptr_type = get_base_type(operand->type);
+		if (!is_type_pointer(ptr_type)) {
+			gbString type_str = type_to_string(operand->type);
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(call),
+			      "Expected a pointer to `ptr_add`, got `%s`",
+			      type_str);
+			return false;
+		}
+
+		if (ptr_type == t_rawptr) {
+			error(&c->error_collector, ast_node_token(call),
+			      "`rawptr` cannot have pointer arithmetic");
+			return false;
+		}
+		AstNode *offset = ce->arg_list->next;
+		Operand op = {};
+		check_expr(c, &op, offset);
+		if (op.mode == Addressing_Invalid)
+			return false;
+		if (!is_type_pointer(op.type)) {
+			gbString type_str = type_to_string(operand->type);
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(call),
+			      "Expected a pointer to `ptr_add`, got `%s`",
+			      type_str);
+			return false;
+		}
+
+		if (get_base_type(op.type) == t_rawptr) {
+			error(&c->error_collector, ast_node_token(call),
+			      "`rawptr` cannot have pointer arithmetic");
+			return false;
+		}
+
+		if (!are_types_identical(operand->type, op.type)) {
+			gbString a = type_to_string(operand->type);
+			gbString b = type_to_string(op.type);
+			defer (gb_string_free(a));
+			defer (gb_string_free(b));
+			error(&c->error_collector, ast_node_token(op.expr),
+			      "`ptr_sub` requires to pointer of the same type. Got `%s` and `%s`.", a, b);
+			return false;
+		}
+
+		operand->type = t_int;
+
+		if (operand->mode == Addressing_Constant &&
+		    op.mode == Addressing_Constant) {
+			u8 *ptr_a = cast(u8 *)operand->value.value_pointer;
+			u8 *ptr_b = cast(u8 *)op.value.value_pointer;
+			isize elem_size = type_size_of(c->sizes, c->allocator, ptr_type->Pointer.elem);
+			operand->value = make_exact_value_integer((ptr_a - ptr_b) / elem_size);
+		} else {
+			operand->mode = Addressing_Value;
+		}
+	} break;
+
+	case BuiltinProc_slice_ptr: {
+		// slice_ptr :: proc(a: ^T, len: int[, cap: int]) -> []T
+		// ^T cannot be rawptr
+		Type *ptr_type = get_base_type(operand->type);
+		if (!is_type_pointer(ptr_type)) {
+			gbString type_str = type_to_string(operand->type);
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(call),
+			      "Expected a pointer to `ptr_add`, got `%s`",
+			      type_str);
+			return false;
+		}
+
+		if (ptr_type == t_rawptr) {
+			error(&c->error_collector, ast_node_token(call),
+			      "`rawptr` cannot have pointer arithmetic");
+			return false;
+		}
+		AstNode *len = ce->arg_list->next;
+		Operand op = {};
+		check_expr(c, &op, len);
+		if (op.mode == Addressing_Invalid)
+			return false;
+		if (!is_type_integer(op.type)) {
+			gbString type_str = type_to_string(operand->type);
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(call),
+			      "Length for `slice_ptr` must be an integer, got `%s`",
+			      type_str);
+			return false;
+		}
+
+		AstNode *cap = len->next;
+		if (cap != NULL) {
+			check_expr(c, &op, len);
+			if (op.mode == Addressing_Invalid)
+				return false;
+			if (!is_type_integer(op.type)) {
+				gbString type_str = type_to_string(operand->type);
+				defer (gb_string_free(type_str));
+				error(&c->error_collector, ast_node_token(call),
+				      "Capacity for `slice_ptr` must be an integer, got `%s`",
+				      type_str);
+				return false;
+			}
+			if (cap->next != NULL) {
+				error(&c->error_collector, ast_node_token(call),
+				      "Too many arguments to `slice_ptr`, expected either 2 or 3");
+				return false;
+			}
+		}
+
+		operand->type = make_type_slice(c->allocator, ptr_type->Pointer.elem);
+		operand->mode = Addressing_Value;
+	} break;
+
 	}
 
 	return true;
@@ -1937,7 +2204,7 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 				continue;
 			if (operand->type->kind != Type_Tuple) {
 				check_not_tuple(c, operand);
-				check_assignment(c, operand, sig_params[param_index]->type, make_string("argument"));
+				check_assignment(c, operand, sig_params[param_index]->type, make_string("argument"), true);
 				param_index++;
 			} else {
 				auto *tuple = &operand->type->Tuple;
@@ -1949,7 +2216,7 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 					operand->type = e->type;
 					operand->mode = Addressing_Value;
 					check_not_tuple(c, operand);
-					check_assignment(c, operand, sig_params[param_index]->type, make_string("argument"));
+					check_assignment(c, operand, sig_params[param_index]->type, make_string("argument"), true);
 				}
 
 				if (i < tuple->variable_count && param_index == param_count) {
@@ -2367,11 +2634,15 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 			o->mode = Addressing_Variable;
 			break;
 
-		case Type_Pointer:
-			valid = true;
-			o->mode = Addressing_Variable;
-			o->type = get_base_type(t->Pointer.elem);
-			break;
+		case Type_Pointer: {
+			Type *bt = get_base_type(t->Pointer.elem);
+			if (bt->kind == Type_Array) {
+				valid = true;
+				max_count = bt->Array.count;
+				o->mode = Addressing_Variable;
+				o->type = bt->Array.elem;
+			}
+		} break;
 		}
 
 		if (!valid) {
@@ -2409,7 +2680,6 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 					max_count = o->value.value_string.len;
 				}
 				o->type = t_string;
-				o->mode = Addressing_Value;
 			}
 			break;
 
@@ -2423,19 +2693,20 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 				goto error;
 			}
 			o->type = make_type_slice(c->allocator, t->Array.elem);
-			o->mode = Addressing_Value;
 			break;
 
 		case Type_Slice:
 			valid = true;
-			o->mode = Addressing_Value;
 			break;
 
-		case Type_Pointer:
-			valid = true;
-			o->type = make_type_slice(c->allocator, get_base_type(t->Pointer.elem));
-			o->mode = Addressing_Value;
-			break;
+		case Type_Pointer: {
+			Type *bt = get_base_type(t->Pointer.elem);
+			if (bt->kind == Type_Array) {
+				valid = true;
+				max_count = bt->Array.count;
+				o->type = make_type_slice(c->allocator, bt->Array.elem);
+			}
+		} break;
 		}
 
 		if (!valid) {
@@ -2444,6 +2715,8 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 			gb_string_free(str);
 			goto error;
 		}
+
+		o->mode = Addressing_Value;
 
 		i64 indices[3] = {};
 		AstNode *nodes[3] = {se->low, se->high, se->max};
