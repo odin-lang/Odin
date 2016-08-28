@@ -1,16 +1,16 @@
-void           check_expr                (Checker *c, Operand *operand, AstNode *expression);
-void           check_multi_expr          (Checker *c, Operand *operand, AstNode *expression);
-void           check_expr_or_type        (Checker *c, Operand *operand, AstNode *expression);
-ExpressionKind check_expr_base           (Checker *c, Operand *operand, AstNode *expression, Type *type_hint = NULL);
-Type *         check_type                (Checker *c, AstNode *expression, Type *named_type = NULL, CycleChecker *cycle_checker = NULL);
-void           check_selector            (Checker *c, Operand *operand, AstNode *node);
-void           check_not_tuple           (Checker *c, Operand *operand);
-b32            check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
-void           convert_to_typed          (Checker *c, Operand *operand, Type *target_type);
-gbString       expr_to_string            (AstNode *expression);
-void           check_entity_decl         (Checker *c, Entity *e, DeclInfo *decl, Type *named_type, CycleChecker *cycle_checker = NULL);
-void           check_proc_body           (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
-void           update_expr_type          (Checker *c, AstNode *e, Type *type, b32 final);
+void     check_expr                (Checker *c, Operand *operand, AstNode *expression);
+void     check_multi_expr          (Checker *c, Operand *operand, AstNode *expression);
+void     check_expr_or_type        (Checker *c, Operand *operand, AstNode *expression);
+ExprKind check_expr_base           (Checker *c, Operand *operand, AstNode *expression, Type *type_hint = NULL);
+Type *   check_type                (Checker *c, AstNode *expression, Type *named_type = NULL, CycleChecker *cycle_checker = NULL);
+void     check_selector            (Checker *c, Operand *operand, AstNode *node);
+void     check_not_tuple           (Checker *c, Operand *operand);
+b32      check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
+void     convert_to_typed          (Checker *c, Operand *operand, Type *target_type);
+gbString expr_to_string            (AstNode *expression);
+void     check_entity_decl         (Checker *c, Entity *e, DeclInfo *decl, Type *named_type, CycleChecker *cycle_checker = NULL);
+void     check_proc_body           (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
+void     update_expr_type          (Checker *c, AstNode *e, Type *type, b32 final);
 
 
 
@@ -1691,6 +1691,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	}
 
 	switch (id) {
+	case BuiltinProc_new:
+	case BuiltinProc_new_slice:
 	case BuiltinProc_size_of:
 	case BuiltinProc_align_of:
 	case BuiltinProc_offset_of:
@@ -1701,8 +1703,80 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	}
 
 	switch (id) {
+	case BuiltinProc_new: {
+		// new :: proc(Type) -> ^Type
+		Type *type = check_type(c, ce->arg_list);
+		if (type == NULL || type == t_invalid) {
+			error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a type for `size_of`");
+			return false;
+		}
+		operand->mode = Addressing_Value;
+		operand->type = make_type_pointer(c->allocator, type);
+	} break;
+	case BuiltinProc_new_slice: {
+		// new_slice :: proc(Type, len: int[, cap: int]) -> []Type
+		Type *type = check_type(c, ce->arg_list);
+		if (type == NULL || type == t_invalid) {
+			error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a type for `size_of`");
+			return false;
+		}
+
+		AstNode *len = ce->arg_list->next;
+		AstNode *cap = len->next;
+
+		Operand op = {};
+		check_expr(c, &op, len);
+		if (op.mode == Addressing_Invalid)
+			return false;
+		if (!is_type_integer(op.type)) {
+			gbString type_str = type_to_string(operand->type);
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(call),
+			      "Length for `new_slice` must be an integer, got `%s`",
+			      type_str);
+			return false;
+		}
+
+		if (cap != NULL) {
+			check_expr(c, &op, len);
+			if (op.mode == Addressing_Invalid)
+				return false;
+			if (!is_type_integer(op.type)) {
+				gbString type_str = type_to_string(operand->type);
+				defer (gb_string_free(type_str));
+				error(&c->error_collector, ast_node_token(call),
+				      "Capacity for `new_slice` must be an integer, got `%s`",
+				      type_str);
+				return false;
+			}
+			if (cap->next != NULL) {
+				error(&c->error_collector, ast_node_token(call),
+				      "Too many arguments to `new_slice`, expected either 2 or 3");
+				return false;
+			}
+		}
+
+		operand->mode = Addressing_Value;
+		operand->type = make_type_slice(c->allocator, type);
+	} break;
+	case BuiltinProc_delete: {
+		// delete :: proc(ptr: ^T)
+		Type *type = get_base_type(operand->type);
+		if (!is_type_pointer(type) && !is_type_slice(type)) {
+			gbString type_str = type_to_string(operand->type);
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(call),
+			      "Expected a pointer or slice to `delete`, got `%s`",
+			      type_str);
+			return false;
+		}
+
+		operand->mode = Addressing_Value;
+		operand->type = NULL;
+	} break;
+
 	case BuiltinProc_size_of: {
-		// size_of :: proc(Type)
+		// size_of :: proc(Type) -> int
 		Type *type = check_type(c, ce->arg_list);
 		if (!type) {
 			error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a type for `size_of`");
@@ -1716,7 +1790,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	} break;
 
 	case BuiltinProc_size_of_val:
-		// size_of_val :: proc(val)
+		// size_of_val :: proc(val: Type) -> int
 		check_assignment(c, operand, NULL, make_string("argument of `size_of`"));
 		if (operand->mode == Addressing_Invalid)
 			return false;
@@ -1727,7 +1801,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		break;
 
 	case BuiltinProc_align_of: {
-		// align_of :: proc(Type)
+		// align_of :: proc(Type) -> int
 		Type *type = check_type(c, ce->arg_list);
 		if (!type) {
 			error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a type for `align_of`");
@@ -1739,7 +1813,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	} break;
 
 	case BuiltinProc_align_of_val:
-		// align_of_val :: proc(val)
+		// align_of_val :: proc(val: Type) -> int
 		check_assignment(c, operand, NULL, make_string("argument of `align_of`"));
 		if (operand->mode == Addressing_Invalid)
 			return false;
@@ -1750,7 +1824,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		break;
 
 	case BuiltinProc_offset_of: {
-		// offset_val :: proc(Type, field)
+		// offset_val :: proc(Type, field) -> int
 		Type *type = get_base_type(check_type(c, ce->arg_list));
 		AstNode *field_arg = unparen_expr(ce->arg_list->next);
 		if (type) {
@@ -1782,7 +1856,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	} break;
 
 	case BuiltinProc_offset_of_val: {
-		// offset_val :: proc(val)
+		// offset_val :: proc(val: expression) -> int
 		AstNode *arg = unparen_expr(ce->arg_list);
 		if (arg->kind != AstNode_SelectorExpr) {
 			gbString str = expr_to_string(arg);
@@ -2125,7 +2199,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			gbString type_str = type_to_string(operand->type);
 			defer (gb_string_free(type_str));
 			error(&c->error_collector, ast_node_token(call),
-			      "Expected a pointer to `ptr_add`, got `%s`",
+			      "Expected a pointer to `slice_ptr`, got `%s`",
 			      type_str);
 			return false;
 		}
@@ -2135,7 +2209,10 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			      "`rawptr` cannot have pointer arithmetic");
 			return false;
 		}
+
 		AstNode *len = ce->arg_list->next;
+		AstNode *cap = len->next;
+
 		Operand op = {};
 		check_expr(c, &op, len);
 		if (op.mode == Addressing_Invalid)
@@ -2149,7 +2226,6 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			return false;
 		}
 
-		AstNode *cap = len->next;
 		if (cap != NULL) {
 			check_expr(c, &op, len);
 			if (op.mode == Addressing_Invalid)
@@ -2254,7 +2330,7 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 }
 
 
-ExpressionKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
+ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	GB_ASSERT(call->kind == AstNode_CallExpr);
 	ast_node(ce, CallExpr, call);
 	check_expr_or_type(c, operand, ce->proc);
@@ -2264,7 +2340,7 @@ ExpressionKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 			check_expr_base(c, operand, arg);
 		operand->mode = Addressing_Invalid;
 		operand->expr = call;
-		return Expression_Statement;
+		return Expr_Stmt;
 	}
 
 
@@ -2286,7 +2362,7 @@ ExpressionKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		operand->mode = Addressing_Invalid;
 		operand->expr = call;
 
-		return Expression_Statement;
+		return Expr_Stmt;
 	}
 
 	check_call_arguments(c, operand, proc_type, call);
@@ -2303,7 +2379,7 @@ ExpressionKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	}
 
 	operand->expr = call;
-	return Expression_Statement;
+	return Expr_Stmt;
 }
 
 void check_expr_with_type_hint(Checker *c, Operand *o, AstNode *e, Type *t) {
@@ -2329,8 +2405,8 @@ void check_expr_with_type_hint(Checker *c, Operand *o, AstNode *e, Type *t) {
 	}
 }
 
-ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint) {
-	ExpressionKind kind = Expression_Statement;
+ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint) {
+	ExprKind kind = Expr_Stmt;
 
 	o->mode = Addressing_Invalid;
 	o->type = t_invalid;
@@ -2781,7 +2857,7 @@ ExpressionKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *typ
 		break;
 	}
 
-	kind = Expression_Expression;
+	kind = Expr_Expr;
 	o->expr = node;
 	return kind;
 
@@ -2791,8 +2867,8 @@ error:
 	return kind;
 }
 
-ExpressionKind check_expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint) {
-	ExpressionKind kind = check__expr_base(c, o, node, type_hint);
+ExprKind check_expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint) {
+	ExprKind kind = check__expr_base(c, o, node, type_hint);
 	Type *type = NULL;
 	ExactValue value = {ExactValue_Invalid};
 	switch (o->mode) {

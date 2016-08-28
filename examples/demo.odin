@@ -3,13 +3,36 @@
 #load "game.odin"
 
 main :: proc() {
-	_ = hellope();
-	procedures();
-	variables();
-	constants();
-	types();
-	data_control();
-	using_fields();
+	// _ = hellope();
+	// variables();
+	// procedures();
+	// constants();
+	// types();
+	// data_control();
+	// using_fields();
+
+	Entity :: type struct {
+		guid: u64;
+		name: string;
+	}
+
+	Frog :: type struct {
+		using entity: Entity;
+		jump_height: f32;
+	}
+
+
+	e: Entity;
+	frog : Frog;
+	frog.name = "Ribbit";
+
+	a: [16]u32;
+	x := ^a[1];
+	y := ^a[5];
+	d := ptr_sub(y, ptr_offset(x, 1));
+	print_int(d); nl();
+
+
 
 	// run_game();
 }
@@ -35,7 +58,7 @@ hellope :: proc() -> int {
 
 apple, banana, carrot: bool;
 box, carboard: bool = true, false;
-// hellope_value: int = hellope(); // The procedure is ran just before `main`
+hellope_value: int = hellope(); // The procedure is ran just before `main`
 
 variables :: proc() {
 	i: int; // initialized with zero value
@@ -176,7 +199,7 @@ constants :: proc() {
 
 	DIFF :: (PI - CLOSE_TO_PI) / PI; // Evaluated at compile time
 
-	a := TAU;         // the constant's value becomes typed as f32
+	a := TAU;         // the constant's value becomes typed as f64
 	b := CLOSE_TO_PI; // the constant's value becomes typed as int
 	c := DIFF;
 }
@@ -205,7 +228,6 @@ types :: proc() {
 
 
 
-
 	f32_array: [12]f32; // Array of 12 f32
 	f32_array[0] = 2;
 	f32_array[1] = 3;
@@ -217,7 +239,6 @@ types :: proc() {
 
 	mda: [2][3][4]int; // Column-major
 	// mda[x][y][z]
-
 
 
 	api: [2]^f32;
@@ -241,7 +262,6 @@ types :: proc() {
 	_ = append(^f32_slice, 2);
 
 	_ = copy(f32_array[0:2], f32_array[2:4]); // You can use memcpy/memmove if you want
-
 
 
 
@@ -382,7 +402,7 @@ types :: proc() {
 		}
 		b: BitHack;
 		b.f = 123;
-		print_int(b.i as int); print_nl();
+		print_int_base(b.i as int, 16); print_nl();
 
 
 
@@ -623,14 +643,17 @@ data_control :: proc() {
 			// handle error
 		}
 		defer close_file(^f);
+
+		// Rest of code!!!
 	}
 
 	for i := 0; i < 100; i++ {
-		blah := alloc(100 * size_of(int)) as ^int;
+		blah := new(int);
 		defer {
 			defer print_string("!");
+			defer print_int(i);
 			defer print_string("dealloc");
-			dealloc(blah);
+			delete(blah);
 		}
 
 		if i == 3 {
@@ -704,7 +727,8 @@ using_fields :: proc() {
 			name: string;
 		}
 		t: Entity;
-		t.pos = alloc(size_of(Vec2)) as ^Vec2; // TODO(bill): make an alloc type? i.e. new(Type)?
+		t.pos = new(Vec2);
+		defer delete(t.pos);
 		t.x = 123;
 		print_f32(t._xy.x);     print_nl();
 		print_f32(t.pos.x);     print_nl();

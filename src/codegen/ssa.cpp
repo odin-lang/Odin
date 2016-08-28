@@ -536,7 +536,7 @@ ssaValue *ssa_make_instr_extract_value(ssaProcedure *p, ssaValue *address, i32 i
 	i->ExtractValue.result_type = result_type;
 	Type *et = ssa_type(address);
 	i->ExtractValue.elem_type = et;
-	GB_ASSERT(et->kind == Type_Struct || et->kind == Type_Array || et->kind == Type_Tuple);
+	// GB_ASSERT(et->kind == Type_Struct || et->kind == Type_Array || et->kind == Type_Tuple);
 	return v;
 }
 
@@ -1675,8 +1675,89 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			if (found && (*found)->kind == Entity_Builtin) {
 				Entity *e = *found;
 				switch (e->Builtin.id) {
+				case BuiltinProc_new: {
+					// new :: proc(Type) -> ^Type
+					gbAllocator allocator = proc->module->allocator;
+
+					Type *type = type_of_expr(proc->module->info, ce->arg_list);
+					Type *ptr_type = make_type_pointer(allocator, type);
+
+					i64 s = type_size_of(proc->module->sizes, allocator, type);
+					i64 a = type_align_of(proc->module->sizes, allocator, type);
+					// TODO(bill): Make procedure for: ssa_get_global_procedure()
+					ssaValue *alloc_align_proc = *map_get(&proc->module->members, hash_string(make_string("alloc_align")));
+
+					ssaValue **args = gb_alloc_array(allocator, ssaValue *, 2);
+					args[0] = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(s));
+					args[1] = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(a));
+
+					ssaValue *call = ssa_emit(proc, ssa_make_instr_call(proc, alloc_align_proc, args, 2, t_rawptr));
+					ssaValue *v = ssa_emit_conv(proc, call, ptr_type);
+					return v;
+				} break;
+
+				case BuiltinProc_new_slice: {
+					// new_slice :: proc(Type, len: int[, cap: int]) -> ^Type
+					gbAllocator allocator = proc->module->allocator;
+
+					Type *type = type_of_expr(proc->module->info, ce->arg_list);
+					Type *ptr_type = make_type_pointer(allocator, type);
+					Type *slice_type = make_type_slice(allocator, type);
+
+					i64 s = type_size_of(proc->module->sizes, allocator, type);
+					i64 a = type_align_of(proc->module->sizes, allocator, type);
+					ssaValue *alloc_align_proc = *map_get(&proc->module->members, hash_string(make_string("alloc_align")));
+
+					ssaValue *elem_size  = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(s));
+					ssaValue *elem_align = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(a));
+
+					AstNode *len_node = ce->arg_list->next;
+					AstNode *cap_node = len_node->next;
+
+					ssaValue *len = ssa_build_expr(proc, len_node);
+					ssaValue *cap = len;
+					if (cap_node != NULL) {
+						cap = ssa_build_expr(proc, cap_node);
+					}
+
+					Token mul = {Token_Mul};
+					ssaValue *slice_size = ssa_emit_arith(proc, mul, elem_size, cap, t_int);
+
+					ssaValue **args = gb_alloc_array(allocator, ssaValue *, 2);
+					args[0] = slice_size;
+					args[1] = elem_align;
+
+					ssaValue *call = ssa_emit(proc, ssa_make_instr_call(proc, alloc_align_proc, args, 2, t_rawptr));
+					ssaValue *ptr = ssa_emit_conv(proc, call, ptr_type);
+					ssaValue *slice = ssa_add_local_generated(proc, slice_type);
+					ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_zero32, ptr_type), ptr);
+					ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_one32,  t_int),    len);
+					ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_two32,  t_int),    cap);
+					return ssa_emit_load(proc, slice);
+				} break;
+
+				case BuiltinProc_delete: {
+					// delete :: proc(ptr: ^Type)
+					// delete :: proc(slice: []Type)
+					gbAllocator allocator = proc->module->allocator;
+
+					ssaValue *value = ssa_build_expr(proc, ce->arg_list);
+					ssaValue *dealloc_proc = *map_get(&proc->module->members, hash_string(make_string("dealloc")));
+
+					if (is_type_slice(ssa_type(value))) {
+						Type *etp = get_base_type(ssa_type(value));
+						etp = make_type_pointer(allocator, etp->Slice.elem);
+						value = ssa_emit(proc, ssa_make_instr_extract_value(proc, value, 0, etp));
+					}
+
+					ssaValue **args = gb_alloc_array(allocator, ssaValue *, 1);
+					args[0] = ssa_emit_conv(proc, value, t_rawptr);
+
+					return ssa_emit(proc, ssa_make_instr_call(proc, dealloc_proc, args, 1, NULL));
+				} break;
+
 				case BuiltinProc_len: {
-					// len :: proc(Type) -> int
+					// len :: proc(v: Type) -> int
 					// NOTE(bill): len of an array is a constant expression
 					ssaValue *v = ssa_build_addr(proc, ce->arg_list).addr;
 					Type *t = get_base_type(ssa_type(v));
@@ -1686,7 +1767,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 						return ssa_slice_len(proc, v);
 				} break;
 				case BuiltinProc_cap: {
-					// cap :: proc(Type) -> int
+					// cap :: proc(v: Type) -> int
 					// NOTE(bill): cap of an array is a constant expression
 					ssaValue *v = ssa_build_addr(proc, ce->arg_list).addr;
 					Type *t = get_base_type(ssa_type(v));

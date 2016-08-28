@@ -104,14 +104,17 @@ struct Scope {
 	Map<Entity *> elements; // Key: String
 };
 
-enum ExpressionKind {
-	Expression_Expression,
-	Expression_Conversion,
-	Expression_Statement,
+enum ExprKind {
+	Expr_Expr,
+	Expr_Stmt,
 };
 
 enum BuiltinProcId {
 	BuiltinProc_Invalid,
+
+	BuiltinProc_new,
+	BuiltinProc_new_slice,
+	BuiltinProc_delete,
 
 	BuiltinProc_size_of,
 	BuiltinProc_size_of_val,
@@ -138,29 +141,33 @@ struct BuiltinProc {
 	String name;
 	isize arg_count;
 	b32 variadic;
-	ExpressionKind kind;
+	ExprKind kind;
 };
 gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
-	{STR_LIT(""),                 0, false, Expression_Statement},
+	{STR_LIT(""),                 0, false, Expr_Stmt},
 
-	{STR_LIT("size_of"),          1, false, Expression_Expression},
-	{STR_LIT("size_of_val"),      1, false, Expression_Expression},
-	{STR_LIT("align_of"),         1, false, Expression_Expression},
-	{STR_LIT("align_of_val"),     1, false, Expression_Expression},
-	{STR_LIT("offset_of"),        2, false, Expression_Expression},
-	{STR_LIT("offset_of_val"),    1, false, Expression_Expression},
-	{STR_LIT("static_assert"),    1, false, Expression_Statement},
+	{STR_LIT("new"),              1, false, Expr_Expr},
+	{STR_LIT("new_slice"),        2, true,  Expr_Expr},
+	{STR_LIT("delete"),           1, false, Expr_Stmt},
 
-	{STR_LIT("len"),              1, false, Expression_Expression},
-	{STR_LIT("cap"),              1, false, Expression_Expression},
-	{STR_LIT("copy"),             2, false, Expression_Expression},
-	{STR_LIT("append"),           2, false, Expression_Expression},
+	{STR_LIT("size_of"),          1, false, Expr_Expr},
+	{STR_LIT("size_of_val"),      1, false, Expr_Expr},
+	{STR_LIT("align_of"),         1, false, Expr_Expr},
+	{STR_LIT("align_of_val"),     1, false, Expr_Expr},
+	{STR_LIT("offset_of"),        2, false, Expr_Expr},
+	{STR_LIT("offset_of_val"),    1, false, Expr_Expr},
+	{STR_LIT("static_assert"),    1, false, Expr_Stmt},
 
-	{STR_LIT("swizzle"),          1, true,  Expression_Expression},
+	{STR_LIT("len"),              1, false, Expr_Expr},
+	{STR_LIT("cap"),              1, false, Expr_Expr},
+	{STR_LIT("copy"),             2, false, Expr_Expr},
+	{STR_LIT("append"),           2, false, Expr_Expr},
 
-	{STR_LIT("ptr_offset"),       2, false, Expression_Expression},
-	{STR_LIT("ptr_sub"),          2, false, Expression_Expression},
-	{STR_LIT("slice_ptr"),        2, true,  Expression_Expression},
+	{STR_LIT("swizzle"),          1, true,  Expr_Expr},
+
+	{STR_LIT("ptr_offset"),       2, false, Expr_Expr},
+	{STR_LIT("ptr_sub"),          2, false, Expr_Expr},
+	{STR_LIT("slice_ptr"),        2, true,  Expr_Expr},
 };
 
 struct CheckerContext {

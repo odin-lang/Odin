@@ -28,7 +28,7 @@ win32_print_last_error :: proc() {
 to_c_string :: proc(s: string) -> ^u8 {
 	c_str: ^u8 = alloc(len(s)+1);
 	memory_copy(c_str, ^s[0], len(s));
-	c_str[len(s)] = 0;
+	ptr_offset(c_str, len(s))^ = 0;
 	return c_str;
 }
 

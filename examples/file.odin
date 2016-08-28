@@ -75,8 +75,8 @@ read_entire_file :: proc(name: string) -> (string, bool) {
 		return "", false;
 	}
 
-	data: ^u8 = alloc(length as int);
-	if data == null {
+	data := new_slice(u8, length);
+	if ^data[0] == null {
 		return "", false;
 	}
 
@@ -95,12 +95,12 @@ read_entire_file :: proc(name: string) -> (string, bool) {
 
 		ReadFile(f.handle as HANDLE, ^data[total_read], to_read, ^single_read_length, null);
 		if single_read_length <= 0 {
-			dealloc(data);
+			delete(data);
 			return "", false;
 		}
 
 		total_read += single_read_length as i64;
 	}
 
-	return data[:length] as string, true;
+	return data as string, true;
 }

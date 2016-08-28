@@ -14,8 +14,10 @@ heap_free :: proc(ptr: rawptr) {
 memory_compare :: proc(dst, src: rawptr, len: int) -> int {
 	s1, s2: ^u8 = dst, src;
 	for i := 0; i < len; i++ {
-		if s1[i] != s2[i] {
-			return (s1[i] - s2[i]) as int;
+		a := ptr_offset(s1, i)^;
+		b := ptr_offset(s2, i)^;
+		if a != b {
+			return (a - b) as int;
 		}
 	}
 	return 0;
@@ -32,30 +34,30 @@ memory_copy :: proc(dst, src: rawptr, n: int) #inline {
 	d, s: ^u8 = dst, src;
 
 	for ; s as uint % 16 != 0 && n != 0; n-- {
-		d[0] = s[0];
-		d, s = ^d[1], ^s[1];
+		d^ = s^;
+		d, s = ptr_offset(d, 1), ptr_offset(s, 1);
 	}
 
 	if d as uint % 16 == 0 {
-		for ; n >= 16; d, s, n = ^d[16], ^s[16], n-16 {
-			(d as ^v128b)[0] = (s as ^v128b)[0];
+		for ; n >= 16; d, s, n = ptr_offset(d, 16), ptr_offset(s, 16), n-16 {
+			(d as ^v128b)^ = (s as ^v128b)^;
 		}
 
 		if n&8 != 0 {
-			(d as ^u64)[0] = (s as ^u64)[0];
-			d, s = ^d[8], ^s[8];
+			(d as ^u64)^ = (s as ^u64)^;
+			d, s = ptr_offset(d, 8), ptr_offset(s, 8);
 		}
 		if n&4 != 0 {
-			(d as ^u32)[0] = (s as ^u32)[0];
-			d, s = ^d[4], ^s[4];
+			(d as ^u32)^ = (s as ^u32)^;
+			d, s = ptr_offset(d, 4), ptr_offset(s, 4);
 		}
 		if n&2 != 0 {
-			(d as ^u16)[0] = (s as ^u16)[0];
-			d, s = ^d[2], ^s[2];
+			(d as ^u16)^ = (s as ^u16)^;
+			d, s = ptr_offset(d, 2), ptr_offset(s, 2);
 		}
 		if n&1 != 0 {
-			d[0] = s[0];
-			d, s = ^d[1], ^s[1];
+			d^ = s^;
+			d, s = ptr_offset(d, 1), ptr_offset(s, 1);
 		}
 		return;
 	}
@@ -72,71 +74,86 @@ memory_copy :: proc(dst, src: rawptr, n: int) #inline {
 
 	if d as uint % 4 == 1 {
 		w = (s as ^u32)^;
-		d[0] = s[0];
-		d[1] = s[1];
-		d[2] = s[2];
-		d, s, n = ^d[3], ^s[3], n-3;
+		d^ = s^; d = ptr_offset(d, 1); s = ptr_offset(s, 1);
+		d^ = s^; d = ptr_offset(d, 1); s = ptr_offset(s, 1);
+		d^ = s^; d = ptr_offset(d, 1); s = ptr_offset(s, 1);
+		n -= 3;
 
 		for n > 16 {
 			d32 := d as ^u32;
-			x = (^s[1]  as ^u32)^; d32[0] = LS(w, 24) | RS(x, 8);
-			w = (^s[5]  as ^u32)^; d32[1] = LS(x, 24) | RS(w, 8);
-			x = (^s[9]  as ^u32)^; d32[2] = LS(w, 24) | RS(x, 8);
-			w = (^s[13] as ^u32)^; d32[3] = LS(x, 24) | RS(w, 8);
+			s32 := ptr_offset(s, 1) as ^u32;
+			x = s32^; d32^ = LS(w, 24) | RS(x, 8);
+			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1);
+			w = s32^; d32^ = LS(x, 24) | RS(w, 8);
+			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1);
+			x = s32^; d32^ = LS(w, 24) | RS(x, 8);
+			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1);
+			w = s32^; d32^ = LS(x, 24) | RS(w, 8);
+			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1);
 
-			d, s, n = ^d[16], ^s[16], n-16;
+			d, s, n = ptr_offset(d, 16), ptr_offset(s, 16), n-16;
 		}
 
 	} else if d as uint % 4 == 2 {
 		w = (s as ^u32)^;
-		d[0] = s[0];
-		d[1] = s[1];
-		d, s, n = ^d[2], ^s[2], n-2;
+		d^ = s^; d = ptr_offset(d, 1); s = ptr_offset(s, 1);
+		d^ = s^; d = ptr_offset(d, 1); s = ptr_offset(s, 1);
+		n -= 2
 
 		for n > 17 {
 			d32 := d as ^u32;
-			x = (^s[2]  as ^u32)^; d32[0] = LS(w, 16) | RS(x, 16);
-			w = (^s[6]  as ^u32)^; d32[1] = LS(x, 16) | RS(w, 16);
-			x = (^s[10] as ^u32)^; d32[2] = LS(w, 16) | RS(x, 16);
-			w = (^s[14] as ^u32)^; d32[3] = LS(x, 16) | RS(w, 16);
+			s32 := ptr_offset(s, 2) as ^u32;
+			x = s32^; d32^ = LS(w, 16) | RS(x, 16);
+			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1);
+			w = s32^; d32^ = LS(x, 16) | RS(w, 16);
+			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1);
+			x = s32^; d32^ = LS(w, 16) | RS(x, 16);
+			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1);
+			w = s32^; d32^ = LS(x, 16) | RS(w, 16);
+			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1);
 
-			d, s, n = ^d[16], ^s[16], n-16;
+			d, s, n = ptr_offset(d, 16), ptr_offset(s, 16), n-16;
 		}
 
 	} else if d as uint % 4 == 3 {
 		w = (s as ^u32)^;
-		d[0] = s[0];
-		d, s, n = ^d[1], ^s[1], n-1;
+		d^ = s^;
+		n -= 1;
 
 		for n > 18 {
 			d32 := d as ^u32;
-			x = (^s[3]  as ^u32)^; d32[0] = LS(w, 8) | RS(x, 24);
-			w = (^s[7]  as ^u32)^; d32[1] = LS(x, 8) | RS(w, 24);
-			x = (^s[11] as ^u32)^; d32[2] = LS(w, 8) | RS(x, 24);
-			w = (^s[15] as ^u32)^; d32[3] = LS(x, 8) | RS(w, 24);
+			s32 := ptr_offset(s, 3) as ^u32;
+			x = s32^; d32^ = LS(w, 8) | RS(x, 24);
+			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1);
+			w = s32^; d32^ = LS(x, 8) | RS(w, 24);
+			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1);
+			x = s32^; d32^ = LS(w, 8) | RS(x, 24);
+			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1);
+			w = s32^; d32^ = LS(x, 8) | RS(w, 24);
+			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1);
 
-			d, s, n = ^d[16], ^s[16], n-16;
+			d, s, n = ptr_offset(d, 16), ptr_offset(s, 16), n-16;
 		}
 	}
 
 	if n&16 != 0 {
-		(d as ^v128b)[0] = (s as ^v128b)[0];
-		d, s = ^d[16], ^s[16];
+		(d as ^v128b)^ = (s as ^v128b)^;
+		d, s = ptr_offset(d, 16), ptr_offset(s, 16);
 	}
 	if n&8 != 0 {
-		(d as ^u64)[0] = (s as ^u64)[0];
-		d, s = ^d[8], ^s[8];
+		(d as ^u64)^ = (s as ^u64)^;
+		d, s = ptr_offset(d, 8), ptr_offset(s, 8);
 	}
 	if n&4 != 0 {
-		(d as ^u32)[0] = (s as ^u32)[0];
-		d, s = ^d[4], ^s[4];
+		(d as ^u32)^ = (s as ^u32)^;
+		d, s = ptr_offset(d, 4), ptr_offset(s, 4);
 	}
 	if n&2 != 0 {
-		(d as ^u16)[0] = (s as ^u16)[0];
-		d, s = ^d[2], ^s[2];
+		(d as ^u16)^ = (s as ^u16)^;
+		d, s = ptr_offset(d, 2), ptr_offset(s, 2);
 	}
 	if n&1 != 0 {
-		d[0]  = s[0];
+		d^  = s^;
 	}
 }
 
@@ -145,7 +162,7 @@ memory_move :: proc(dst, src: rawptr, n: int) #inline {
 	if d == s {
 		return;
 	}
-	if d >= ^s[n] || ^d[n] <= s {
+	if d >= ptr_offset(s, n) || ptr_offset(d, n) <= s {
 		memory_copy(d, s, n);
 		return;
 	}
@@ -158,43 +175,46 @@ memory_move :: proc(dst, src: rawptr, n: int) #inline {
 					return;
 				}
 				n--;
-				d[0] = s[0];
-				d, s = ^d[1], ^s[1];
+				d^ = s^;
+				d, s = ptr_offset(d, 1), ptr_offset(s, 1);
 			}
 			di, si := d as ^int, s as ^int;
 			for n >= size_of(int) {
-				di[0] = si[0];
-				di, si = ^di[1], ^si[1];
+				di^ = si^;
+				di, si = ptr_offset(di, 1), ptr_offset(si, 1);
 				n -= size_of(int);
 			}
 		}
 		for ; n > 0; n-- {
-			d[0] = s[0];
-			d, s = ^d[1], ^s[1];
+			d^ = s^;
+			d, s = ptr_offset(d, 1), ptr_offset(s, 1);
 		}
 	} else {
 		if s as int % size_of(int) == d as int % size_of(int) {
-			for ^d[n] as int % size_of(int) != 0 {
+			for ptr_offset(d, n) as int % size_of(int) != 0 {
 				if n == 0 {
 					return;
 				}
 				n--;
-				d[0] = s[0];
-				d, s = ^d[1], ^s[1];
+				d^ = s^;
+				d, s = ptr_offset(d, 1), ptr_offset(s, 1);
 			}
 			for n >= size_of(int) {
 				n -= size_of(int);
-				di, si := ^d[n] as ^int, ^s[n] as ^int;
-				di[0] = si[0];
+				di := ptr_offset(d, n) as ^int;
+				si := ptr_offset(s, n) as ^int;
+				di^ = si^;
 			}
 			for ; n > 0; n-- {
-				d[0] = s[0];
-				d, s = ^d[1], ^s[1];
+				d^ = s^;
+				d, s = ptr_offset(d, 1), ptr_offset(s, 1);
 			}
 		}
 		for n > 0 {
 			n--;
-			d[n] = s[n];
+			dn := ptr_offset(d, n);
+			sn := ptr_offset(s, n);
+			dn^ = sn^;
 		}
 	}
 }
@@ -340,7 +360,7 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 	if new_memory == null {
 		return null;
 	}
-	_ = copy((new_memory as ^u8)[:new_size], (old_memory as ^u8)[:old_size]);
+	_ = copy(slice_ptr(new_memory as ^u8, new_size), slice_ptr(old_memory as ^u8, old_size));
 	dealloc(old_memory);
 	return new_memory;
 }

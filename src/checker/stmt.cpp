@@ -445,13 +445,13 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(es, ExprStmt, node)
 		Operand operand = {Addressing_Invalid};
-		ExpressionKind kind = check_expr_base(c, &operand, es->expr);
+		ExprKind kind = check_expr_base(c, &operand, es->expr);
 		switch (operand.mode) {
 		case Addressing_Type:
 			error(&c->error_collector, ast_node_token(node), "Is not an expression");
 			break;
 		default:
-			if (kind == Expression_Statement)
+			if (kind == Expr_Stmt)
 				return;
 			error(&c->error_collector, ast_node_token(node), "Expression is not used");
 			break;
