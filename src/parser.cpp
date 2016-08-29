@@ -169,6 +169,7 @@ AST_NODE_KIND(_ComplexStmtBegin, struct{}) \
 	}) \
 	AST_NODE_KIND(DeferStmt,  struct { Token token; AstNode *stmt; }) \
 	AST_NODE_KIND(BranchStmt, struct { Token token; }) \
+	AST_NODE_KIND(UsingStmt,  struct { Token token; AstNode *node; }) \
 \
 AST_NODE_KIND(_ComplexStmtEnd, struct{}) \
 AST_NODE_KIND(_StmtEnd,        struct{}) \
@@ -177,6 +178,7 @@ AST_NODE_KIND(_DeclBegin,      struct{}) \
 	AST_NODE_KIND(VarDecl, struct { \
 			DeclKind kind; \
 			u32      tags; \
+			b32      is_using; \
 			AstNode *name_list; \
 			AstNode *type; \
 			AstNode *value_list; \
@@ -222,8 +224,8 @@ AST_NODE_KIND(_TypeBegin, struct{}) \
 	}) \
 	AST_NODE_KIND(StructType, struct { \
 		Token token; \
-		AstNode *field_list; \
-		isize field_count; \
+		AstNode *decl_list; \
+		isize decl_count; \
 		b32 is_packed; \
 	}) \
 	AST_NODE_KIND(UnionType, struct { \
@@ -354,6 +356,8 @@ Token ast_node_token(AstNode *node) {
 		return node->DeferStmt.token;
 	case AstNode_BranchStmt:
 		return node->BranchStmt.token;
+	case AstNode_UsingStmt:
+		return node->UsingStmt.token;
 	case AstNode_BadDecl:
 		return node->BadDecl.begin;
 	case AstNode_VarDecl:
@@ -707,6 +711,13 @@ gb_inline AstNode *make_branch_stmt(AstFile *f, Token token) {
 	return result;
 }
 
+gb_inline AstNode *make_using_stmt(AstFile *f, Token token, AstNode *node) {
+	AstNode *result = make_node(f, AstNode_UsingStmt);
+	result->UsingStmt.token = token;
+	result->UsingStmt.node  = node;
+	return result;
+}
+
 
 gb_inline AstNode *make_bad_decl(AstFile *f, Token begin, Token end) {
 	AstNode *result = make_node(f, AstNode_BadDecl);
@@ -778,11 +789,11 @@ gb_inline AstNode *make_vector_type(AstFile *f, Token token, AstNode *count, Ast
 	return result;
 }
 
-gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNode *field_list, isize field_count, b32 is_packed) {
+gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNode *decl_list, isize decl_count, b32 is_packed) {
 	AstNode *result = make_node(f, AstNode_StructType);
 	result->StructType.token = token;
-	result->StructType.field_list = field_list;
-	result->StructType.field_count = field_count;
+	result->StructType.decl_list = decl_list;
+	result->StructType.decl_count = decl_count;
 	result->StructType.is_packed = is_packed;
 	return result;
 }
@@ -938,6 +949,32 @@ void fix_advance_to_next_stmt(AstFile *f) {
 #endif
 }
 
+b32 expect_semicolon_after_stmt(AstFile *f, AstNode *s) {
+	if (s != NULL) {
+		switch (s->kind) {
+		case AstNode_ProcDecl:
+			return true;
+		case AstNode_TypeDecl: {
+			switch (s->TypeDecl.type->kind) {
+			case AstNode_StructType:
+			case AstNode_UnionType:
+			case AstNode_EnumType:
+			case AstNode_ProcType:
+				return true;
+			}
+		} break;
+		}
+	}
+
+	if (!allow_token(f, Token_Semicolon)) {
+		// CLEANUP(bill): Semicolon handling in parser
+		ast_file_err(f, f->cursor[0],
+		             "Expected `;` after %.*s, got `%.*s`",
+		             LIT(ast_node_strings[s->kind]), LIT(token_strings[f->cursor[0].kind]));
+		return false;
+	}
+	return true;
+}
 
 
 AstNode *parse_expr(AstFile *f, b32 lhs);
@@ -1211,6 +1248,7 @@ b32 is_literal_type(AstNode *node) {
 	switch (node->kind) {
 	case AstNode_BadExpr:
 	case AstNode_Ident:
+	case AstNode_SelectorExpr:
 	case AstNode_ArrayType:
 	case AstNode_VectorType:
 	case AstNode_StructType:
@@ -1652,10 +1690,19 @@ AstNode *parse_parameter_list(AstFile *f, AstScope *scope, isize *param_count_, 
 	return param_list;
 }
 
+
 AstNode *parse_identifier_or_type(AstFile *f) {
 	switch (f->cursor[0].kind) {
-	case Token_Identifier:
-		return parse_identifier(f);
+	case Token_Identifier: {
+		AstNode *ident = parse_identifier(f);
+		while (f->cursor[0].kind == Token_Period) {
+			Token token = f->cursor[0];
+			next_token(f);
+			AstNode *sel = parse_identifier(f);
+			ident = make_selector_expr(f, token, ident, sel);
+		}
+		return ident;
+	}
 
 	case Token_Pointer:
 		return make_pointer_type(f, expect_token(f, Token_Pointer), parse_type(f));
@@ -1687,10 +1734,6 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 
 	case Token_struct: {
 		Token token = expect_token(f, Token_struct);
-		Token open, close;
-		AstNode *params = NULL;
-		isize param_count = 0;
-		AstScope *scope = make_ast_scope(f, NULL); // NOTE(bill): The struct needs its own scope with NO parent
 		b32 is_packed = false;
 		if (allow_token(f, Token_Hash)) {
 			Token tag = expect_token(f, Token_Identifier);
@@ -1701,12 +1744,72 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 			}
 		}
 
-		open   = expect_token(f, Token_OpenBrace);
-		params = parse_parameter_list(f, scope, &param_count, Token_Semicolon, true);
-		close  = expect_token(f, Token_CloseBrace);
+		AstScope *scope = make_ast_scope(f, NULL); // NOTE(bill): The struct needs its own scope with NO parent
+		AstScope *curr_scope = f->curr_scope;
+		f->curr_scope = scope;
+		defer (f->curr_scope = curr_scope);
 
-		return make_struct_type(f, token, params, param_count, is_packed);
-	}
+
+		Token open = expect_token(f, Token_OpenBrace);
+		AstNode *decls = NULL;
+		AstNode *decls_curr = NULL;
+		isize decl_count = 0;
+
+		while (f->cursor[0].kind == Token_Identifier ||
+		       f->cursor[0].kind == Token_using) {
+			b32 is_using = false;
+			if (allow_token(f, Token_using)) {
+				is_using = true;
+			}
+			isize name_count = 0;
+			AstNode *name_list = parse_lhs_expr_list(f, &name_count);
+			if (name_count == 0) {
+				ast_file_err(f, f->cursor[0], "Empty field declaration");
+			}
+
+			if (name_count > 1 && is_using) {
+				ast_file_err(f, f->cursor[0], "Cannot apply `using` to more than one of the same type");
+			}
+
+			AstNode *decl = NULL;
+
+			if (f->cursor[0].kind == Token_Colon) {
+				decl = parse_decl(f, name_list, name_count);
+
+				if (decl->kind == AstNode_ProcDecl) {
+					ast_file_err(f, f->cursor[0], "Procedure declarations are not allowed within a structure");
+					decl = make_bad_decl(f, ast_node_token(name_list), f->cursor[0]);
+				}
+			} else {
+				ast_file_err(f, f->cursor[0], "Illegal structure field");
+				decl = make_bad_decl(f, ast_node_token(name_list), f->cursor[0]);
+			}
+
+			expect_semicolon_after_stmt(f, decl);
+
+			if (decl != NULL && is_ast_node_decl(decl)) {
+				DLIST_APPEND(decls, decls_curr, decl);
+				if (decl->kind == AstNode_VarDecl) {
+					decl_count += decl->VarDecl.name_count;
+					decl->VarDecl.is_using = is_using;
+
+					if (decl->VarDecl.kind == Declaration_Mutable) {
+						if (decl->VarDecl.value_count > 0) {
+							ast_file_err(f, f->cursor[0], "Default variable assignments within a structure will be ignored (at the moment)");
+						}
+					}
+
+				} else {
+					decl_count += 1;
+				}
+			}
+		}
+		Token close = expect_token(f, Token_CloseBrace);
+
+		// params = parse_parameter_list(f, scope, &param_count, Token_Semicolon, true);
+
+		return make_struct_type(f, token, decls, decl_count, is_packed);
+	} break;
 
 	case Token_union: {
 		Token token = expect_token(f, Token_union);
@@ -2100,6 +2203,7 @@ AstNode *parse_defer_stmt(AstFile *f) {
 	return make_defer_stmt(f, token, statement);
 }
 
+
 AstNode *parse_stmt(AstFile *f) {
 	AstNode *s = NULL;
 	Token token = f->cursor[0];
@@ -2117,18 +2221,7 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Xor:
 	case Token_Not:
 		s = parse_simple_stmt(f);
-		if (s->kind != AstNode_ProcDecl &&
-		    (s->kind == AstNode_TypeDecl &&
-		     s->TypeDecl.type->kind != AstNode_StructType &&
-		     s->TypeDecl.type->kind != AstNode_UnionType &&
-		     s->TypeDecl.type->kind != AstNode_EnumType &&
-		     s->TypeDecl.type->kind != AstNode_ProcType) &&
-		    !allow_token(f, Token_Semicolon)) {
-			// CLEANUP(bill): Semicolon handling in parser
-			ast_file_err(f, f->cursor[0],
-			             "Expected `;` after statement, got `%.*s`",
-			             LIT(token_strings[f->cursor[0].kind]));
-		}
+		expect_semicolon_after_stmt(f, s);
 		return s;
 
 	// TODO(bill): other keywords
@@ -2145,6 +2238,36 @@ AstNode *parse_stmt(AstFile *f) {
 		next_token(f);
 		expect_token(f, Token_Semicolon);
 		return make_branch_stmt(f, token);
+
+	case Token_using: {
+		AstNode *node = NULL;
+
+		next_token(f);
+		node = parse_stmt(f);
+
+		b32 valid = false;
+
+		switch (node->kind) {
+		case AstNode_ExprStmt:
+			if (node->ExprStmt.expr->kind == AstNode_Ident) {
+				valid = true;
+			}
+			break;
+		case AstNode_VarDecl:
+			if (node->VarDecl.kind == Declaration_Mutable) {
+				valid = true;
+			}
+			break;
+		}
+
+		if (!valid) {
+			ast_file_err(f, token, "Illegal use of `using` statement.");
+			return make_bad_stmt(f, token, f->cursor[0]);
+		}
+
+
+		return make_using_stmt(f, token, node);
+	} break;
 
 	case Token_Hash: {
 		s = parse_tag_stmt(f, NULL);

@@ -110,6 +110,9 @@ struct Type {
 			i64 *    offsets;
 			b32      are_offsets_set;
 			b32      is_packed;
+
+			Entity **other_fields; // Entity_Constant or Entity_TypeName
+			isize    other_field_count;
 		} Struct;
 		struct {
 			// IMPORTANT HACK(bill): The positions of fields and field_count

@@ -34,6 +34,7 @@ struct Entity {
 	Scope *scope;
 	Token token;
 	Type *type;
+	Entity *using_parent;
 
 	union {
 		struct { ExactValue value; } Constant;

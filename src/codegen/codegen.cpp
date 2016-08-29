@@ -70,11 +70,9 @@ void ssa_gen_code(ssaGen *s) {
 		String name = e->token.string;
 
 		switch (e->kind) {
-		case Entity_TypeName: {
-			ssaValue *t = ssa_make_value_type_name(a, e->token.string, e->type);
-			map_set(&m->values,  hash_pointer(e), t);
-			map_set(&m->members, hash_string(name), t);
-		} break;
+		case Entity_TypeName:
+			ssa_gen_global_type_name(m, e, name);
+			break;
 
 		case Entity_Variable: {
 			ssaValue *g = ssa_make_value_global(a, e, NULL);

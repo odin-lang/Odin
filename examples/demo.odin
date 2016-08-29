@@ -32,6 +32,30 @@ main :: proc() {
 	d := ptr_sub(y, ptr_offset(x, 1));
 	print_int(d); nl();
 
+	Thing :: type struct {
+		CONSTANT :: 123;
+		Thing :: type struct {
+			y: f32;
+
+			z: int;
+			w: int;
+		}
+
+		x: Thing;
+	}
+
+	test :: proc() -> int {
+		t_outer: Thing;
+		t_outer.x = Thing.Thing{};
+		using Thing;
+		t_inner: Thing;
+		t_inner.y = 1;
+		print_int(CONSTANT); nl();
+		return CONSTANT;
+	}
+
+	test__ := test();
+
 
 
 	// run_game();
@@ -301,7 +325,7 @@ types :: proc() {
 	Array3Int :: type [3]int;
 
 	Vec3 :: type struct {
-		x, y, z: f32
+		x, y, z: f32;
 	}
 
 	BinaryNode :: type struct {
@@ -430,8 +454,8 @@ types :: proc() {
 				variable: struct{
 					visited, is_field, used, anonymous: bool;
 				};
-				procedure: struct { used: bool };
-				buitlin: struct { id: i32 };
+				procedure: struct { used: bool; };
+				buitlin: struct { id: i32; };
 			};
 		}
 
@@ -632,7 +656,7 @@ data_control :: proc() {
 		context.allocator = __default_allocator();
 		defer context.allocator = prev_allocator;
 
-		File :: type struct { filename: string };
+		File :: type struct { filename: string; };
 		FileError :: type int;
 		open_file  :: proc(filename: string) -> (File, FileError) {
 			return File{}, 0;
@@ -717,7 +741,7 @@ using_fields :: proc() {
 
 	{ // Crazy Shit
 		Vec2 :: type union {
-			using _xy: struct {x, y: f32};
+			using _xy: struct { x, y: f32; };
 			e: [2]f32;
 			v: {2}f32;
 		}

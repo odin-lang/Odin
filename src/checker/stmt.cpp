@@ -685,6 +685,75 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		}
 	case_end;
 
+	case_ast_node(us, UsingStmt, node);
+		switch (us->node->kind) {
+		case_ast_node(es, ExprStmt, us->node);
+			AstNode *ident = es->expr;
+			GB_ASSERT(ident->kind == AstNode_Ident);
+			String name = ident->Ident.token.string;
+
+			Entity *e = scope_lookup_entity(c, c->context.scope, name);
+			if (e == NULL) {
+				error(&c->error_collector, us->token, "`using` applied to an unknown entity");
+				return;
+			}
+
+			switch (e->kind) {
+			case Entity_TypeName: {
+				Type *t = get_base_type(e->type);
+				if (t->kind == Type_Enum) {
+					for (isize i = 0; i < t->Enum.field_count; i++) {
+						Entity *f = t->Enum.fields[i];
+						Entity *found = scope_insert_entity(c->context.scope, f);
+						if (found != NULL) {
+							error(&c->error_collector, us->token, "Namespace collision while `using` `%.*s` of the constant: %.*s", LIT(name), LIT(found->token.string));
+							return;
+						}
+						f->using_parent = e;
+					}
+				} else if (t->kind == Type_Struct) {
+					for (isize i = 0; i < t->Struct.other_field_count; i++) {
+						Entity *f = t->Struct.other_fields[i];
+						Entity *found = scope_insert_entity(c->context.scope, f);
+						if (found != NULL) {
+							error(&c->error_collector, us->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(found->token.string));
+							return;
+						}
+						f->using_parent = e;
+					}
+				}
+			} break;
+
+			case Entity_Constant:
+				error(&c->error_collector, us->token, "`using` cannot be applied to a constant");
+				break;
+
+			case Entity_Procedure:
+			case Entity_Builtin:
+				error(&c->error_collector, us->token, "`using` cannot be applied to a procedure");
+				break;
+
+			default:
+				GB_PANIC("TODO(bill): using Ident");
+			}
+		case_end;
+
+		case_ast_node(vd, VarDecl, us->node);
+			GB_PANIC("TODO(bill): using VarDecl");
+		case_end;
+
+
+		default:
+			error(&c->error_collector, us->token, "Invalid AST: Using Statement");
+			break;
+		}
+	case_end;
+
+
+
+
+
+
 	case_ast_node(vd, VarDecl, node);
 		isize entity_count = vd->name_count;
 		isize entity_index = 0;

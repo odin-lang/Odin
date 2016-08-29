@@ -98,7 +98,7 @@ memory_copy :: proc(dst, src: rawptr, n: int) #inline {
 		w = (s as ^u32)^;
 		d^ = s^; d = ptr_offset(d, 1); s = ptr_offset(s, 1);
 		d^ = s^; d = ptr_offset(d, 1); s = ptr_offset(s, 1);
-		n -= 2
+		n -= 2;
 
 		for n > 17 {
 			d32 := d as ^u32;

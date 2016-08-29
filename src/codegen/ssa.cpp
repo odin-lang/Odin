@@ -14,7 +14,6 @@ struct ssaModule {
 
 	Map<ssaValue *> values;  // Key: Entity *
 	Map<ssaValue *> members; // Key: String
-	gbArray(ssaValue *) nested_type_names; // ssaValue_TypeName
 	i32 global_string_index;
 };
 
@@ -308,13 +307,11 @@ void ssa_module_init(ssaModule *m, Checker *c) {
 
 	map_init(&m->values,  m->allocator);
 	map_init(&m->members, m->allocator);
-	gb_array_init(m->nested_type_names, m->allocator);
 }
 
 void ssa_module_destroy(ssaModule *m) {
 	map_destroy(&m->values);
 	map_destroy(&m->members);
-	gb_array_free(m->nested_type_names);
 	gb_arena_free(&m->arena);
 }
 
@@ -1606,7 +1603,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					if (elem->kind == AstNode_FieldValue) {
 						ast_node(kv, FieldValue, elem);
-						Selection sel = lookup_field(base_type, kv->field->Ident.token.string);
+						Selection sel = lookup_field(base_type, kv->field->Ident.token.string, Addressing_Value);
 						field_index = sel.index[0];
 						field_expr = ssa_build_expr(proc, kv->value);
 					} else {
@@ -2063,7 +2060,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	case_ast_node(se, SelectorExpr, expr);
 		Type *type = get_base_type(type_of_expr(proc->module->info, se->expr));
 
-		Selection sel = lookup_field(type, unparen_expr(se->selector)->Ident.token.string);
+		Selection sel = lookup_field(type, unparen_expr(se->selector)->Ident.token.string, Addressing_Value);
 		GB_ASSERT(sel.entity != NULL);
 
 		ssaValue *e = ssa_build_addr(proc, se->expr).addr;
@@ -2248,6 +2245,36 @@ void ssa_build_cond(ssaProcedure *proc, AstNode *cond, ssaBlock *true_block, ssa
 }
 
 
+void ssa_gen_global_type_name(ssaModule *m, Entity *e, String name) {
+	ssaValue *t = ssa_make_value_type_name(m->allocator, name, e->type);
+	map_set(&m->values, hash_pointer(e), t);
+	map_set(&m->members, hash_string(name), t);
+
+	Type *bt = get_base_type(e->type);
+	if (bt->kind == Type_Struct) {
+		auto *s = &bt->Struct;
+		for (isize j = 0; j < s->other_field_count; j++) {
+			Entity *field = s->other_fields[j];
+			if (field->kind == Entity_TypeName) {
+				// HACK(bill): Override name of type so printer prints it correctly
+				auto *tn = &field->type->Named;
+				String cn = field->token.string;
+				isize len = name.len + 1 + cn.len;
+				String child = {NULL, len};
+				child.text = gb_alloc_array(m->allocator, u8, len);
+				isize i = 0;
+				gb_memcopy(child.text+i, name.text, name.len);
+				i += name.len;
+				child.text[i++] = '.';
+				gb_memcopy(child.text+i, cn.text, cn.len);
+				tn->name = child;
+				ssa_gen_global_type_name(m, field, tn->name);
+			}
+		}
+	}
+}
+
+
 
 void ssa_build_stmt_list(ssaProcedure *proc, AstNode *list) {
 	for (AstNode *stmt = list ; stmt != NULL; stmt = stmt->next)
@@ -2389,7 +2416,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		String td_name = td->name->Ident.token.string;
 		isize name_len = proc->name.len + 1 + td_name.len + 1 + 10 + 1;
 		u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-		i32 guid = cast(i32)gb_array_count(proc->module->nested_type_names);
+		i32 guid = cast(i32)gb_array_count(proc->module->members.entries);
 		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(td_name), guid);
 		String name = make_string(name_text, name_len-1);
 
@@ -2400,8 +2427,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		                                           name, e->type);
 		// HACK(bill): Override name of type so printer prints it correctly
 		e->type->Named.name = name;
-		ssa_module_add_value(proc->module, e, value);
-		gb_array_append(proc->module->nested_type_names, value);
+		ssa_gen_global_type_name(proc->module, e, name);
 	case_end;
 
 	case_ast_node(ids, IncDecStmt, node);

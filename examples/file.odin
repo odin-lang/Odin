@@ -1,18 +1,16 @@
 #load "win32.odin"
 
-FileHandle :: type HANDLE;
-
 File :: type struct {
-	handle: FileHandle;
+	Handle :: type HANDLE;
+	handle: Handle;
 }
 
 file_open :: proc(name: string) -> (File, bool) {
 	buf: [300]byte;
 	_ = copy(buf[:], name as []byte);
-	f := File{
-		handle = CreateFileA(^buf[0], FILE_GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, 0, null),
-	};
-	success := f.handle != INVALID_HANDLE_VALUE as FileHandle;
+	f := File{CreateFileA(^buf[0], FILE_GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, 0, null)};
+	success := f.handle != INVALID_HANDLE_VALUE as File.Handle;
+
 	return f, success;
 }
 
@@ -22,7 +20,7 @@ file_create :: proc(name: string) -> (File, bool) {
 	f := File{
 		handle = CreateFileA(^buf[0], FILE_GENERIC_WRITE, FILE_SHARE_READ, null, CREATE_ALWAYS, 0, null),
 	};
-	success := f.handle != INVALID_HANDLE_VALUE as FileHandle;
+	success := f.handle != INVALID_HANDLE_VALUE as File.Handle;
 	return f, success;
 }
 
@@ -31,9 +29,9 @@ file_close :: proc(f: ^File) {
 	CloseHandle(f.handle);
 }
 
-file_write :: proc(f: ^File, buf: rawptr, len: int) -> bool {
+file_write :: proc(f: ^File, buf: []byte) -> bool {
 	bytes_written: i32;
-	return WriteFile(f.handle, buf, len as i32, ^bytes_written, null) != 0;
+	return WriteFile(f.handle, ^buf[0], len(buf) as i32, ^bytes_written, null) != 0;
 }
 
 FileStandard :: type enum {
@@ -47,10 +45,12 @@ __std_file_set := false;
 __std_files: [FileStandard.COUNT as int]File;
 
 file_get_standard :: proc(std: FileStandard) -> ^File {
+	// using FileStandard;
 	if (!__std_file_set) {
-		__std_files[FileStandard.INPUT] .handle = GetStdHandle(STD_INPUT_HANDLE);
-		__std_files[FileStandard.OUTPUT].handle = GetStdHandle(STD_OUTPUT_HANDLE);
-		__std_files[FileStandard.ERROR] .handle = GetStdHandle(STD_ERROR_HANDLE);
+		using FileStandard;
+		__std_files[INPUT] .handle = GetStdHandle(STD_INPUT_HANDLE);
+		__std_files[OUTPUT].handle = GetStdHandle(STD_OUTPUT_HANDLE);
+		__std_files[ERROR] .handle = GetStdHandle(STD_ERROR_HANDLE);
 		__std_file_set = true;
 	}
 	return ^__std_files[std];

@@ -169,7 +169,11 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 		ssa_fprintf(f, "*");
 		break;
 	case Type_Named:
-		ssa_print_encoded_local(f, t->Named.name);
+		if (get_base_type(t)->kind == Type_Struct) {
+			ssa_print_encoded_local(f, t->Named.name);
+		} else {
+			ssa_print_type(f, s, get_base_type(t));
+		}
 		break;
 	case Type_Tuple:
 		if (t->Tuple.variable_count == 1) {
@@ -748,12 +752,14 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 
 void ssa_print_type_name(gbFile *f, ssaModule *m, ssaValue *v) {
 	GB_ASSERT(v->kind == ssaValue_TypeName);
+	Type *base_type = get_base_type(ssa_type(v));
+	if (base_type->kind != Type_Struct)
+		return;
 	ssa_print_encoded_local(f, v->TypeName.name);
 	ssa_fprintf(f, " = type ");
 	ssa_print_type(f, m->sizes, get_base_type(v->TypeName.type));
 	ssa_fprintf(f, "\n");
 }
-
 
 void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 	if (m->layout.len > 0) {
@@ -772,20 +778,11 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 		auto *entry = &m->members.entries[member_index];
 		ssaValue *v = entry->value;
 		switch (v->kind) {
-		case ssaValue_TypeName: {
-			ssa_print_encoded_local(f, v->TypeName.name);
-			ssa_fprintf(f, " = type ");
-			ssa_print_type(f, m->sizes, get_base_type(v->TypeName.type));
-			ssa_fprintf(f, "\n");
-		} break;
+		case ssaValue_TypeName:
+			ssa_print_type_name(f, m, v);
+			break;
 		}
 	}
-
-	gb_for_array(i, m->nested_type_names) {
-		ssaValue *v = m->nested_type_names[i];
-		ssa_print_type_name(f, m, v);
-	}
-
 
 	gb_for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];

@@ -3,7 +3,7 @@
 #load "file.odin"
 
 print_string :: proc(s: string) {
-	file_write(file_get_standard(FileStandard.OUTPUT), ^s[0], len(s));
+	file_write(file_get_standard(FileStandard.OUTPUT), s as []byte);
 }
 
 byte_reverse :: proc(b: []byte) {

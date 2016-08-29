@@ -2,18 +2,28 @@
 #include "entity.cpp"
 #include "type.cpp"
 
+#define ADDRESSING_KINDS \
+	ADDRESSING_MODE(Invalid), \
+	ADDRESSING_MODE(NoValue), \
+	ADDRESSING_MODE(Value), \
+	ADDRESSING_MODE(Variable), \
+	ADDRESSING_MODE(Constant), \
+	ADDRESSING_MODE(Type), \
+	ADDRESSING_MODE(Builtin), \
+	ADDRESSING_MODE(Count), \
+
 enum AddressingMode {
-	Addressing_Invalid,
-
-	Addressing_NoValue,
-	Addressing_Value,
-	Addressing_Variable,
-	Addressing_Constant,
-	Addressing_Type,
-	Addressing_Builtin,
-
-	Addressing_Count,
+#define ADDRESSING_MODE(x) GB_JOIN2(Addressing_, x)
+	ADDRESSING_KINDS
+#undef ADDRESSING_MODE
 };
+
+String const addressing_mode_strings[] = {
+#define ADDRESSING_MODE(x) {cast(u8 *)#x, gb_size_of(#x)-1}
+	ADDRESSING_KINDS
+#undef ADDRESSING_MODE
+};
+
 
 struct Operand {
 	AddressingMode mode;
@@ -261,7 +271,7 @@ void add_scope(Checker *c, AstNode *node, Scope *scope) {
 
 
 void check_open_scope(Checker *c, AstNode *stmt) {
-	GB_ASSERT(is_ast_node_stmt(stmt) || stmt->kind == AstNode_ProcType);
+	GB_ASSERT(is_ast_node_stmt(stmt) || is_ast_node_type(stmt));
 	Scope *scope = make_scope(c->context.scope, c->allocator);
 	add_scope(c, stmt, scope);
 	if (stmt->kind == AstNode_ProcType) {
@@ -524,11 +534,20 @@ void add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 	if (!are_strings_equal(entity->token.string, make_string("_"))) {
 		Entity *insert_entity = scope_insert_entity(scope, entity);
 		if (insert_entity) {
-			error(&c->error_collector, entity->token,
-			      "Redeclararation of `%.*s` in this scope\n"
-			      "\tat %.*s(%td:%td)",
-			      LIT(entity->token.string),
-			      LIT(entity->token.pos.file), entity->token.pos.line, entity->token.pos.column);
+			Entity *up = insert_entity->using_parent;
+			if (up != NULL) {
+				error(&c->error_collector, entity->token,
+				      "Redeclararation of `%.*s` in this scope through `using`\n"
+				      "\tat %.*s(%td:%td)",
+				      LIT(entity->token.string),
+				      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
+			} else {
+				error(&c->error_collector, entity->token,
+				      "Redeclararation of `%.*s` in this scope\n"
+				      "\tat %.*s(%td:%td)",
+				      LIT(entity->token.string),
+				      LIT(entity->token.pos.file), entity->token.pos.line, entity->token.pos.column);
+			}
 			return;
 		}
 	}

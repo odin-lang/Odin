@@ -33,7 +33,7 @@ LPARAM    :: type int;
 LRESULT   :: type int;
 ATOM      :: type i16;
 BOOL      :: type i32;
-POINT     :: type struct { x, y: i32 };
+POINT     :: type struct { x, y: i32; };
 
 INVALID_HANDLE_VALUE :: (-1 as int) as HANDLE;
 

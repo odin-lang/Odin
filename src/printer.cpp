@@ -180,7 +180,7 @@ void print_ast(AstNode *node, isize indent) {
 	case AstNode_StructType:
 		print_indent(indent);
 		gb_printf("(struct)\n");
-		print_ast(node->StructType.field_list, indent+1);
+		print_ast(node->StructType.decl_list, indent+1);
 		break;
 	}
 
