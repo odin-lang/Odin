@@ -436,6 +436,107 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 
 
 
+void check_var_decl(Checker *c, AstNode *node) {
+	ast_node(vd, VarDecl, node);
+	isize entity_count = vd->name_count;
+	isize entity_index = 0;
+	Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
+	switch (vd->kind) {
+	case Declaration_Mutable: {
+		Entity **new_entities = gb_alloc_array(c->allocator, Entity *, entity_count);
+		isize new_entity_count = 0;
+
+		for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
+			Entity *entity = NULL;
+			Token token = name->Ident.token;
+			if (name->kind == AstNode_Ident) {
+				String str = token.string;
+				Entity *found = NULL;
+				// NOTE(bill): Ignore assignments to `_`
+				b32 can_be_ignored = are_strings_equal(str, make_string("_"));
+				if (!can_be_ignored) {
+					found = current_scope_lookup_entity(c->context.scope, str);
+				}
+				if (found == NULL) {
+					entity = make_entity_variable(c->allocator, c->context.scope, token, NULL);
+					if (!can_be_ignored) {
+						new_entities[new_entity_count++] = entity;
+					}
+					add_entity_definition(&c->info, name, entity);
+				} else {
+					entity = found;
+				}
+			} else {
+				error(&c->error_collector, token, "A variable declaration must be an identifier");
+			}
+			if (entity == NULL)
+				entity = make_entity_dummy_variable(c->allocator, c->global_scope, token);
+			entities[entity_index++] = entity;
+		}
+
+		Type *init_type = NULL;
+		if (vd->type) {
+			init_type = check_type(c, vd->type, NULL);
+			if (init_type == NULL)
+				init_type = t_invalid;
+		}
+
+		for (isize i = 0; i < entity_count; i++) {
+			Entity *e = entities[i];
+			GB_ASSERT(e != NULL);
+			if (e->Variable.visited) {
+				e->type = t_invalid;
+				continue;
+			}
+			e->Variable.visited = true;
+
+			if (e->type == NULL)
+				e->type = init_type;
+		}
+
+		check_init_variables(c, entities, entity_count, vd->value_list, vd->value_count, make_string("variable declaration"));
+
+		AstNode *name = vd->name_list;
+		for (isize i = 0; i < new_entity_count; i++, name = name->next) {
+			add_entity(c, c->context.scope, name, new_entities[i]);
+		}
+
+	} break;
+
+	case Declaration_Immutable: {
+		for (AstNode *name = vd->name_list, *value = vd->value_list;
+		     name != NULL && value != NULL;
+		     name = name->next, value = value->next) {
+			GB_ASSERT(name->kind == AstNode_Ident);
+			ExactValue v = {ExactValue_Invalid};
+			ast_node(i, Ident, name);
+			Entity *e = make_entity_constant(c->allocator, c->context.scope, i->token, NULL, v);
+			entities[entity_index++] = e;
+			check_const_decl(c, e, vd->type, value);
+		}
+
+		isize lhs_count = vd->name_count;
+		isize rhs_count = vd->value_count;
+
+		// TODO(bill): Better error messages or is this good enough?
+		if (rhs_count == 0 && vd->type == NULL) {
+			error(&c->error_collector, ast_node_token(node), "Missing type or initial expression");
+		} else if (lhs_count < rhs_count) {
+			error(&c->error_collector, ast_node_token(node), "Extra initial expression");
+		}
+
+		AstNode *name = vd->name_list;
+		for (isize i = 0; i < entity_count; i++, name = name->next) {
+			add_entity(c, c->context.scope, name, entities[i]);
+		}
+	} break;
+
+	default:
+		error(&c->error_collector, ast_node_token(node), "Unknown variable declaration kind. Probably an invalid AST.");
+		return;
+	}
+}
+
 
 void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	switch (node->kind) {
@@ -688,15 +789,27 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_ast_node(us, UsingStmt, node);
 		switch (us->node->kind) {
 		case_ast_node(es, ExprStmt, us->node);
-			AstNode *ident = es->expr;
-			GB_ASSERT(ident->kind == AstNode_Ident);
-			String name = ident->Ident.token.string;
+			Entity *e = NULL;
 
-			Entity *e = scope_lookup_entity(c, c->context.scope, name);
+			b32 is_selector = false;
+			AstNode *expr = unparen_expr(es->expr);
+			if (expr->kind == AstNode_Ident) {
+				String name = expr->Ident.token.string;
+				e = scope_lookup_entity(c, c->context.scope, name);
+			} else if (expr->kind == AstNode_SelectorExpr) {
+				Operand o = {};
+				check_expr_base(c, &o, expr->SelectorExpr.expr);
+				e = check_selector(c, &o, expr);
+				is_selector = true;
+			}
+
 			if (e == NULL) {
 				error(&c->error_collector, us->token, "`using` applied to an unknown entity");
 				return;
 			}
+
+			gbString expr_str = expr_to_string(expr);
+			defer (gb_string_free(expr_str));
 
 			switch (e->kind) {
 			case Entity_TypeName: {
@@ -706,20 +819,34 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 						Entity *f = t->Enum.fields[i];
 						Entity *found = scope_insert_entity(c->context.scope, f);
 						if (found != NULL) {
-							error(&c->error_collector, us->token, "Namespace collision while `using` `%.*s` of the constant: %.*s", LIT(name), LIT(found->token.string));
+							error(&c->error_collector, us->token, "Namespace collision while `using` `%s` of the constant: %.*s", expr_str, LIT(found->token.string));
 							return;
 						}
 						f->using_parent = e;
 					}
 				} else if (t->kind == Type_Struct) {
-					for (isize i = 0; i < t->Struct.other_field_count; i++) {
-						Entity *f = t->Struct.other_fields[i];
-						Entity *found = scope_insert_entity(c->context.scope, f);
-						if (found != NULL) {
-							error(&c->error_collector, us->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(found->token.string));
-							return;
+					Scope **found = map_get(&c->info.scopes, hash_pointer(t->Struct.node));
+					if (found != NULL) {
+						gb_for_array(i, (*found)->elements.entries) {
+							Entity *f = (*found)->elements.entries[i].value;
+							Entity *found = scope_insert_entity(c->context.scope, f);
+							if (found != NULL) {
+								error(&c->error_collector, us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+								return;
+							}
+							f->using_parent = e;
 						}
-						f->using_parent = e;
+					} else {
+						for (isize i = 0; i < t->Struct.other_field_count; i++) {
+							// TODO(bill): using field types too
+							Entity *f = t->Struct.other_fields[i];
+							Entity *found = scope_insert_entity(c->context.scope, f);
+							if (found != NULL) {
+								error(&c->error_collector, us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+								return;
+							}
+							f->using_parent = e;
+						}
 					}
 				}
 			} break;
@@ -733,13 +860,70 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				error(&c->error_collector, us->token, "`using` cannot be applied to a procedure");
 				break;
 
+			case Entity_Variable:
+			case Entity_UsingVariable: {
+				Type *t = get_base_type(type_deref(e->type));
+				if (t->kind == Type_Struct || t->kind == Type_Union) {
+					// IMPORTANT HACK(bill): Entity_(Struct|Union) overlap in some memory allowing
+					// for some variables to accessed to same
+					Scope **found = map_get(&c->info.scopes, hash_pointer(t->Struct.node));
+					GB_ASSERT(found != NULL);
+					gb_for_array(i, (*found)->elements.entries) {
+						Entity *f = (*found)->elements.entries[i].value;
+						if (f->kind == Entity_Variable) {
+							Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
+							if (is_selector) {
+								uvar->using_expr = expr;
+							}
+							Entity *prev = scope_insert_entity(c->context.scope, uvar);
+							if (prev != NULL) {
+								error(&c->error_collector, us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(prev->token.string));
+								return;
+							}
+						}
+					}
+				} else {
+					error(&c->error_collector, us->token, "`using` can only be applied to variables of type struct or union");
+					return;
+				}
+			} break;
+
 			default:
 				GB_PANIC("TODO(bill): using Ident");
 			}
 		case_end;
 
 		case_ast_node(vd, VarDecl, us->node);
-			GB_PANIC("TODO(bill): using VarDecl");
+			if (vd->name_count > 1) {
+				error(&c->error_collector, us->token, "`using` can only be applied to one variable of the same type");
+			}
+			check_var_decl(c, us->node);
+			ast_node(i, Ident, vd->name_list);
+
+			String name = i->token.string;
+			Entity *e = scope_lookup_entity(c, c->context.scope, name);
+
+			Type *t = get_base_type(type_deref(e->type));
+			if (t->kind == Type_Struct || t->kind == Type_Union) {
+				// IMPORTANT HACK(bill): Entity_(Struct|Union) overlap in some memory allowing
+				// for some variables to accessed to same
+				Scope **found = map_get(&c->info.scopes, hash_pointer(t->Struct.node));
+				GB_ASSERT(found != NULL);
+				gb_for_array(i, (*found)->elements.entries) {
+					Entity *f = (*found)->elements.entries[i].value;
+					if (f->kind == Entity_Variable) {
+						Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
+						Entity *prev = scope_insert_entity(c->context.scope, uvar);
+						if (prev != NULL) {
+							error(&c->error_collector, us->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
+							return;
+						}
+					}
+				}
+			} else {
+				error(&c->error_collector, us->token, "`using` can only be applied to variables of type struct or union");
+				return;
+			}
 		case_end;
 
 
@@ -755,103 +939,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 
 	case_ast_node(vd, VarDecl, node);
-		isize entity_count = vd->name_count;
-		isize entity_index = 0;
-		Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
-		switch (vd->kind) {
-		case Declaration_Mutable: {
-			Entity **new_entities = gb_alloc_array(c->allocator, Entity *, entity_count);
-			isize new_entity_count = 0;
-
-			for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
-				Entity *entity = NULL;
-				Token token = name->Ident.token;
-				if (name->kind == AstNode_Ident) {
-					String str = token.string;
-					Entity *found = NULL;
-					// NOTE(bill): Ignore assignments to `_`
-					b32 can_be_ignored = are_strings_equal(str, make_string("_"));
-					if (!can_be_ignored) {
-						found = current_scope_lookup_entity(c->context.scope, str);
-					}
-					if (found == NULL) {
-						entity = make_entity_variable(c->allocator, c->context.scope, token, NULL);
-						if (!can_be_ignored) {
-							new_entities[new_entity_count++] = entity;
-						}
-						add_entity_definition(&c->info, name, entity);
-					} else {
-						entity = found;
-					}
-				} else {
-					error(&c->error_collector, token, "A variable declaration must be an identifier");
-				}
-				if (entity == NULL)
-					entity = make_entity_dummy_variable(c->allocator, c->global_scope, token);
-				entities[entity_index++] = entity;
-			}
-
-			Type *init_type = NULL;
-			if (vd->type) {
-				init_type = check_type(c, vd->type, NULL);
-				if (init_type == NULL)
-					init_type = t_invalid;
-			}
-
-			for (isize i = 0; i < entity_count; i++) {
-				Entity *e = entities[i];
-				GB_ASSERT(e != NULL);
-				if (e->Variable.visited) {
-					e->type = t_invalid;
-					continue;
-				}
-				e->Variable.visited = true;
-
-				if (e->type == NULL)
-					e->type = init_type;
-			}
-
-			check_init_variables(c, entities, entity_count, vd->value_list, vd->value_count, make_string("variable declaration"));
-
-			AstNode *name = vd->name_list;
-			for (isize i = 0; i < new_entity_count; i++, name = name->next) {
-				add_entity(c, c->context.scope, name, new_entities[i]);
-			}
-
-		} break;
-
-		case Declaration_Immutable: {
-			for (AstNode *name = vd->name_list, *value = vd->value_list;
-			     name != NULL && value != NULL;
-			     name = name->next, value = value->next) {
-				GB_ASSERT(name->kind == AstNode_Ident);
-				ExactValue v = {ExactValue_Invalid};
-				ast_node(i, Ident, name);
-				Entity *e = make_entity_constant(c->allocator, c->context.scope, i->token, NULL, v);
-				entities[entity_index++] = e;
-				check_const_decl(c, e, vd->type, value);
-			}
-
-			isize lhs_count = vd->name_count;
-			isize rhs_count = vd->value_count;
-
-			// TODO(bill): Better error messages or is this good enough?
-			if (rhs_count == 0 && vd->type == NULL) {
-				error(&c->error_collector, ast_node_token(node), "Missing type or initial expression");
-			} else if (lhs_count < rhs_count) {
-				error(&c->error_collector, ast_node_token(node), "Extra initial expression");
-			}
-
-			AstNode *name = vd->name_list;
-			for (isize i = 0; i < entity_count; i++, name = name->next) {
-				add_entity(c, c->context.scope, name, entities[i]);
-			}
-		} break;
-
-		default:
-			error(&c->error_collector, ast_node_token(node), "Unknown variable declaration kind. Probably an invalid AST.");
-			return;
-		}
+		check_var_decl(c, node);
 	case_end;
 
 	case_ast_node(pd, ProcDecl, node);

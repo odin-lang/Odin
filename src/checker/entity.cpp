@@ -6,6 +6,7 @@ enum BuiltinProcId;
 	ENTITY_KIND(Invalid), \
 	ENTITY_KIND(Constant), \
 	ENTITY_KIND(Variable), \
+	ENTITY_KIND(UsingVariable), \
 	ENTITY_KIND(TypeName), \
 	ENTITY_KIND(Procedure), \
 	ENTITY_KIND(Builtin), \
@@ -35,6 +36,7 @@ struct Entity {
 	Token token;
 	Type *type;
 	Entity *using_parent;
+	AstNode *using_expr;
 
 	union {
 		struct { ExactValue value; } Constant;
@@ -44,9 +46,9 @@ struct Entity {
 			b8 is_field;  // Is struct field
 			b8 anonymous; // Variable is an anonymous
 		} Variable;
-		struct {
-			b8 used;
-		} Procedure;
+		struct {} UsingVariable;
+		struct {} TypeName;
+		struct { b8 used; } Procedure;
 		struct { BuiltinProcId id; } Builtin;
 	};
 };
@@ -71,6 +73,14 @@ Entity *make_entity_variable(gbAllocator a, Scope *scope, Token token, Type *typ
 	Entity *entity = alloc_entity(a, Entity_Variable, scope, token, type);
 	return entity;
 }
+
+Entity *make_entity_using_variable(gbAllocator a, Entity *parent, Token token, Type *type) {
+	GB_ASSERT(parent != NULL);
+	Entity *entity = alloc_entity(a, Entity_UsingVariable, parent->scope, token, type);
+	entity->using_parent = parent;
+	return entity;
+}
+
 
 Entity *make_entity_constant(gbAllocator a, Scope *scope, Token token, Type *type, ExactValue value) {
 	Entity *entity = alloc_entity(a, Entity_Constant, scope, token, type);

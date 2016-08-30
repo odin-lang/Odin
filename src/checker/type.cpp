@@ -107,18 +107,22 @@ struct Type {
 			// Theses are arrays
 			Entity **fields; // Entity_Variable
 			isize    field_count; // == offset_count
+			AstNode *node;
+
 			i64 *    offsets;
 			b32      are_offsets_set;
 			b32      is_packed;
 
 			Entity **other_fields; // Entity_Constant or Entity_TypeName
 			isize    other_field_count;
+
 		} Struct;
 		struct {
-			// IMPORTANT HACK(bill): The positions of fields and field_count
+			// IMPORTANT HACK(bill): The positions of fields, field_count, and node
 			// must be same for Struct and Union
 			Entity **fields; // Entity_Variable
 			isize    field_count;
+			AstNode *node;
 		} Union;
 		struct { Type *elem; } Pointer;
 		struct {

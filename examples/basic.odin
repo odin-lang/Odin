@@ -3,166 +3,166 @@
 #load "file.odin"
 
 print_string :: proc(s: string) {
-	file_write(file_get_standard(FileStandard.OUTPUT), s as []byte);
+	file_write(file_get_standard(FileStandard.OUTPUT), s as []byte)
 }
 
 byte_reverse :: proc(b: []byte) {
-	n := len(b);
+	n := len(b)
 	for i := 0; i < n/2; i++ {
-		b[i], b[n-1-i] = b[n-1-i], b[i];
+		b[i], b[n-1-i] = b[n-1-i], b[i]
 	}
 }
 
 encode_rune :: proc(r: rune) -> ([4]byte, int) {
-	buf: [4]byte;
-	i := r as u32;
-	mask: byte : 0x3f;
+	buf: [4]byte
+	i := r as u32
+	mask: byte : 0x3f
 	if i <= 1<<7-1 {
-		buf[0] = r as byte;
-		return buf, 1;
+		buf[0] = r as byte
+		return buf, 1
 	}
 	if i <= 1<<11-1 {
-		buf[0] = 0xc0 | (r>>6) as byte;
-		buf[1] = 0x80 | (r)    as byte & mask;
-		return buf, 2;
+		buf[0] = 0xc0 | (r>>6) as byte
+		buf[1] = 0x80 | (r)    as byte & mask
+		return buf, 2
 	}
 
 	// Invalid or Surrogate range
 	if i > 0x0010ffff ||
 	   (i >= 0xd800 && i <= 0xdfff) {
-		r = 0xfffd;
+		r = 0xfffd
 	}
 
 	if i <= 1<<16-1 {
-		buf[0] = 0xe0 | (r>>12) as byte;
-		buf[1] = 0x80 | (r>>6)  as byte & mask;
-		buf[2] = 0x80 | (r)     as byte & mask;
-		return buf, 3;
+		buf[0] = 0xe0 | (r>>12) as byte
+		buf[1] = 0x80 | (r>>6)  as byte & mask
+		buf[2] = 0x80 | (r)     as byte & mask
+		return buf, 3
 	}
 
-	buf[0] = 0xf0 | (r>>18) as byte;
-	buf[1] = 0x80 | (r>>12) as byte & mask;
-	buf[2] = 0x80 | (r>>6)  as byte & mask;
-	buf[3] = 0x80 | (r)     as byte & mask;
-	return buf, 4;
+	buf[0] = 0xf0 | (r>>18) as byte
+	buf[1] = 0x80 | (r>>12) as byte & mask
+	buf[2] = 0x80 | (r>>6)  as byte & mask
+	buf[3] = 0x80 | (r)     as byte & mask
+	return buf, 4
 }
 
 print_rune :: proc(r: rune) {
-	buf, n := encode_rune(r);
-	str := buf[:n] as string;
-	print_string(str);
+	buf, n := encode_rune(r)
+	str := buf[:n] as string
+	print_string(str)
 }
 
-print_space :: proc() { print_rune(#rune " "); }
-print_nl    :: proc() { print_rune(#rune "\n"); }
+print_space :: proc() { print_rune(#rune " ") }
+print_nl    :: proc() { print_rune(#rune "\n") }
 
 print_int :: proc(i: int) {
 	print_int_base(i, 10);
 }
 print_int_base :: proc(i, base: int) {
-	NUM_TO_CHAR_TABLE :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$";
+	NUM_TO_CHAR_TABLE :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$"
 
-	buf: [65]byte;
-	len := 0;
-	negative := false;
+	buf: [65]byte
+	len := 0
+	negative := false
 	if i < 0 {
-		negative = true;
-		i = -i;
+		negative = true
+		i = -i
 	}
 	if i == 0 {
-		buf[len] = #rune "0";
-		len++;
+		buf[len] = #rune "0"
+		len++
 	}
 	for i > 0 {
-		buf[len] = NUM_TO_CHAR_TABLE[i % base];
+		buf[len] = NUM_TO_CHAR_TABLE[i % base]
 		len++;
-		i /= base;
+		i /= base
 	}
 
 	if negative {
-		buf[len] = #rune "-";
-		len++;
+		buf[len] = #rune "-"
+		len++
 	}
 
-	byte_reverse(buf[:len]);
-	print_string(buf[:len] as string);
+	byte_reverse(buf[:len])
+	print_string(buf[:len] as string)
 }
 
 print_uint :: proc(i: uint) {
-	print__uint(i, 10, 0, #rune " ");
+	print__uint(i, 10, 0, #rune " ")
 }
 print__uint :: proc(i, base: uint, min_width: int, pad_char: byte) {
-	NUM_TO_CHAR_TABLE :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$";
+	NUM_TO_CHAR_TABLE :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$"
 
-	buf: [65]byte;
-	len := 0;
+	buf: [65]byte
+	len := 0
 	if i == 0 {
-		buf[len] = #rune "0";
-		len++;
+		buf[len] = #rune "0"
+		len++
 	}
 	for i > 0 {
-		buf[len] = NUM_TO_CHAR_TABLE[i % base];
-		len++;
-		i /= base;
+		buf[len] = NUM_TO_CHAR_TABLE[i % base]
+		len++
+		i /= base
 	}
 	for len < min_width {
-		buf[len] = pad_char;
-		len++;
+		buf[len] = pad_char
+		len++
 	}
 
-	byte_reverse(buf[:len]);
-	print_string(buf[:len] as string);
+	byte_reverse(buf[:len])
+	print_string(buf[:len] as string)
 }
 
 print_bool :: proc(b : bool) {
-	if b { print_string("true"); }
-	else { print_string("false"); }
+	if b { print_string("true") }
+	else { print_string("false") }
 }
 
-print_pointer :: proc(p: rawptr) #inline { print__uint(p as uint, 16, 0, #rune " "); }
+print_pointer :: proc(p: rawptr) #inline { print__uint(p as uint, 16, 0, #rune " ") }
 
-print_f32     :: proc(f: f32) #inline { print__f64(f as f64, 7); }
-print_f64     :: proc(f: f64) #inline { print__f64(f, 10); }
+print_f32     :: proc(f: f32) #inline { print__f64(f as f64, 7) }
+print_f64     :: proc(f: f64) #inline { print__f64(f, 10) }
 
 print__f64 :: proc(f: f64, decimal_places: int) {
 	if f == 0 {
-		print_rune(#rune "0");
-		return;
+		print_rune(#rune "0")
+		return
 	}
 	if f < 0 {
-		print_rune(#rune "-");
-		f = -f;
+		print_rune(#rune "-")
+		f = -f
 	}
 
 	print_u64 :: proc(i: u64) {
-		NUM_TO_CHAR_TABLE :: "0123456789";
+		NUM_TO_CHAR_TABLE :: "0123456789"
 
-		buf: [22]byte;
-		len := 0;
+		buf: [22]byte
+		len := 0
 		if i == 0 {
-			buf[len] = #rune "0";
-			len++;
+			buf[len] = #rune "0"
+			len++
 		}
 		for i > 0 {
-			buf[len] = NUM_TO_CHAR_TABLE[i % 10];
-			len++;
-			i /= 10;
+			buf[len] = NUM_TO_CHAR_TABLE[i % 10]
+			len++
+			i /= 10
 		}
-		byte_reverse(buf[:len]);
-		print_string(buf[:len] as string);
+		byte_reverse(buf[:len])
+		print_string(buf[:len] as string)
 	}
 
-	i := f as u64;
-	print_u64(i);
-	f -= i as f64;
+	i := f as u64
+	print_u64(i)
+	f -= i as f64
 
-	print_rune(#rune ".");
+	print_rune(#rune ".")
 
-	mult := 10.0;
+	mult := 10.0
 	for decimal_places := 6; decimal_places >= 0; decimal_places-- {
-		i = (f * mult) as u64;
-		print_u64(i as u64);
-		f -= i as f64 / mult;
-		mult *= 10;
+		i = (f * mult) as u64
+		print_u64(i as u64)
+		f -= i as f64 / mult
+		mult *= 10
 	}
 }

@@ -2034,6 +2034,30 @@ ssaValue *ssa_emit_deep_field_gep(ssaProcedure *proc, Type *type, ssaValue *e, S
 }
 
 
+ssaValue *ssa_add_using_variable(ssaProcedure *proc, Entity *e) {
+	GB_ASSERT(e->kind == Entity_UsingVariable);
+	String name = e->token.string;
+	Entity *parent = e->using_parent;
+	ssaValue *p = NULL;
+	if (parent->kind == Entity_UsingVariable) {
+		p = ssa_add_using_variable(proc, parent);
+	}
+
+	Selection sel = lookup_field(parent->type, name, Addressing_Variable);
+	GB_ASSERT(sel.entity != NULL);
+	ssaValue **pv = map_get(&proc->module->values, hash_pointer(parent));
+	ssaValue *v = NULL;
+	if (pv != NULL) {
+		v = *pv;
+	} else {
+		v = ssa_build_addr(proc, e->using_expr).addr;
+	}
+	GB_ASSERT(v != NULL);
+	ssaValue *var = ssa_emit_deep_field_gep(proc, parent->type, v, sel);
+	map_set(&proc->module->values, hash_pointer(e), var);
+	return var;
+}
+
 ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	switch (expr->kind) {
 	case_ast_node(i, Ident, expr);
@@ -2047,9 +2071,13 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		ssaValue **found = map_get(&proc->module->values, hash_pointer(e));
 		if (found) {
 			v = *found;
-		} else {
+		} else if (e->kind == Entity_UsingVariable) {
+			v = ssa_add_using_variable(proc, e);
+		}
+		if (v == NULL) {
 			GB_PANIC("Unknown value: %s, entity: %p\n", expr_to_string(expr), e);
 		}
+
 		return ssa_make_addr(v, expr);
 	case_end;
 
@@ -2284,6 +2312,13 @@ void ssa_build_stmt_list(ssaProcedure *proc, AstNode *list) {
 void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 	switch (node->kind) {
 	case_ast_node(bs, EmptyStmt, node);
+	case_end;
+
+	case_ast_node(us, UsingStmt, node);
+		AstNode *decl = unparen_expr(us->node);
+		if (decl->kind == AstNode_VarDecl) {
+			ssa_build_stmt(proc, decl);
+		}
 	case_end;
 
 	case_ast_node(vd, VarDecl, node);

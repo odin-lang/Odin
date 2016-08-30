@@ -4,7 +4,7 @@ void     check_expr_or_type        (Checker *c, Operand *operand, AstNode *expre
 ExprKind check_expr_base           (Checker *c, Operand *operand, AstNode *expression, Type *type_hint = NULL);
 Type *   check_type                (Checker *c, AstNode *expression, Type *named_type = NULL, CycleChecker *cycle_checker = NULL);
 void     check_type_decl           (Checker *c, Entity *e, AstNode *type_expr, Type *def, CycleChecker *cycle_checker);
-void     check_selector            (Checker *c, Operand *operand, AstNode *node);
+Entity * check_selector            (Checker *c, Operand *operand, AstNode *node);
 void     check_not_tuple           (Checker *c, Operand *operand);
 b32      check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
 void     convert_to_typed          (Checker *c, Operand *operand, Type *target_type);
@@ -143,6 +143,7 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 				error(&c->error_collector, e->token, "`%.*s` is already declared in `%s`", LIT(name), str);
 			} else {
 				map_set(entity_map, key, f);
+				add_entity(c, c->context.scope, NULL, f);
 				if (f->Variable.anonymous) {
 					populate_using_entity_map(c, node, f->type, entity_map);
 				}
@@ -338,6 +339,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecke
 			} else {
 				map_set(&entity_map, key, e);
 				fields[field_index++] = e;
+				add_entity(c, c->context.scope, name, e);
 			}
 			add_entity_use(&c->info, name, e);
 		}
@@ -610,6 +612,11 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 		o->mode = Addressing_Builtin;
 		break;
 
+	case Entity_UsingVariable:
+		// TODO(bill): Entity_UsingVariable: is this correct?
+		o->mode = Addressing_Variable;
+		break;
+
 	default:
 		GB_PANIC("Compiler error: Unknown EntityKind");
 		break;
@@ -727,6 +734,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		check_open_scope(c, e);
 		check_struct_type(c, type, e, cycle_checker);
 		check_close_scope(c);
+		type->Struct.node = e;
 		goto end;
 	case_end;
 
@@ -736,6 +744,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		check_open_scope(c, e);
 		check_union_type(c, type, e, cycle_checker);
 		check_close_scope(c);
+		type->Union.node = e;
 		goto end;
 	case_end;
 
@@ -1746,7 +1755,7 @@ Selection lookup_field(Type *type_, String field_name, AddressingMode mode, Sele
 	return sel;
 }
 
-void check_selector(Checker *c, Operand *operand, AstNode *node) {
+Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_SelectorExpr);
 
 	ast_node(se, SelectorExpr, node);
@@ -1764,7 +1773,7 @@ void check_selector(Checker *c, Operand *operand, AstNode *node) {
 			error(&c->error_collector, ast_node_token(op_expr), "`%s` (`%s`) has no field `%s`", op_str, type_str, sel_str);
 			operand->mode = Addressing_Invalid;
 			operand->expr = node;
-			return;
+			return NULL;
 		}
 		add_entity_use(&c->info, selector, entity);
 
@@ -1779,11 +1788,12 @@ void check_selector(Checker *c, Operand *operand, AstNode *node) {
 			if (operand->mode != Addressing_Variable)
 				operand->mode = Addressing_Value;
 		}
+		return entity;
 	} else {
 		operand->mode = Addressing_Invalid;
 		operand->expr = node;
 	}
-
+	return NULL;
 }
 
 b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id) {
@@ -1886,7 +1896,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			return false;
 		}
 
-		operand->mode = Addressing_Value;
+		operand->mode = Addressing_NoValue;
 		operand->type = NULL;
 	} break;
 
@@ -2967,6 +2977,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case AstNode_ArrayType:
 	case AstNode_VectorType:
 	case AstNode_StructType:
+	case AstNode_UnionType:
 		o->mode = Addressing_Type;
 		o->type = check_type(c, node);
 		break;
@@ -3239,6 +3250,13 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		// str = write_field_list_to_string(str, st->decl_list, ", ");
 		str = gb_string_appendc(str, "}");
 	case_end;
+
+	case_ast_node(st, UnionType, node);
+		str = gb_string_appendc(str, "union{");
+		// str = write_field_list_to_string(str, st->decl_list, ", ");
+		str = gb_string_appendc(str, "}");
+	case_end;
+
 
 	case_ast_node(et, EnumType, node);
 		str = gb_string_appendc(str, "enum ");

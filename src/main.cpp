@@ -93,14 +93,26 @@ int main(int argc, char **argv) {
 #if 1
 #endif
 
+	gbString lib_str = gb_string_make(gb_heap_allocator(), "-lKernel32.lib");
+	char lib_str_buf[1024] = {};
+	gb_for_array(i, parser.system_libraries) {
+		String lib = parser.system_libraries[i];
+		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+		                        " -l%.*s.lib", LIT(lib));
+		lib_str = gb_string_appendc(lib_str, lib_str_buf);
+	}
+
+
 	exit_code = win32_exec_command_line_app(
 		"clang -o %.*s.exe %.*s.bc "
 		"-Wno-override-module "
 		// "-nostartfiles "
-		"-lKernel32.lib -lUser32.lib -lGdi32.lib -lOpengl32.lib "
+		"%s "
 		,
 		cast(int)base_name_len, output_name,
-		cast(int)base_name_len, output_name);
+		cast(int)base_name_len, output_name,
+		lib_str);
+	gb_string_free(lib_str);
 	if (exit_code != 0)
 		return exit_code;
 

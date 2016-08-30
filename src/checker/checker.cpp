@@ -530,7 +530,7 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 	map_set(&i->definitions, key, entity);
 }
 
-void add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
+b32 add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 	if (!are_strings_equal(entity->token.string, make_string("_"))) {
 		Entity *insert_entity = scope_insert_entity(scope, entity);
 		if (insert_entity) {
@@ -541,18 +541,20 @@ void add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 				      "\tat %.*s(%td:%td)",
 				      LIT(entity->token.string),
 				      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
+				return false;
 			} else {
 				error(&c->error_collector, entity->token,
 				      "Redeclararation of `%.*s` in this scope\n"
 				      "\tat %.*s(%td:%td)",
 				      LIT(entity->token.string),
 				      LIT(entity->token.pos.file), entity->token.pos.line, entity->token.pos.column);
+				return false;
 			}
-			return;
 		}
 	}
 	if (identifier != NULL)
 		add_entity_definition(&c->info, identifier, entity);
+	return true;
 }
 
 void add_entity_use(CheckerInfo *i, AstNode *identifier, Entity *entity) {
@@ -733,6 +735,10 @@ void check_parsed_files(Checker *c) {
 			case_ast_node(ld, LoadDecl, decl);
 				// NOTE(bill): ignore
 			case_end;
+			case_ast_node(fsl, ForeignSystemLibrary, decl);
+				// NOTE(bill): ignore
+			case_end;
+
 
 			default:
 				error(&c->error_collector, ast_node_token(decl), "Only declarations are allowed at file scope");

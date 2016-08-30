@@ -32,6 +32,7 @@ struct AstFile {
 
 	AstScope *file_scope;
 	AstScope *curr_scope;
+	AstNode *curr_proc;
 	isize scope_level;
 
 	ErrorCollector error_collector;
@@ -60,6 +61,8 @@ struct Parser {
 	String init_fullpath;
 	gbArray(AstFile) files;
 	gbArray(String) loads;
+	gbArray(String) libraries;
+	gbArray(String) system_libraries;
 	isize load_index;
 	isize total_token_count;
 };
@@ -193,6 +196,7 @@ AST_NODE_KIND(_DeclBegin,      struct{}) \
 		}) \
 	AST_NODE_KIND(TypeDecl, struct { Token token; AstNode *name, *type; }) \
 	AST_NODE_KIND(LoadDecl, struct { Token token, filepath; }) \
+	AST_NODE_KIND(ForeignSystemLibrary, struct { Token token, filepath; }) \
 AST_NODE_KIND(_DeclEnd, struct{}) \
 AST_NODE_KIND(_TypeBegin, struct{}) \
 	AST_NODE_KIND(Field, struct { \
@@ -368,6 +372,8 @@ Token ast_node_token(AstNode *node) {
 		return node->TypeDecl.token;
 	case AstNode_LoadDecl:
 		return node->LoadDecl.token;
+	case AstNode_ForeignSystemLibrary:
+		return node->ForeignSystemLibrary.token;
 	case AstNode_Field: {
 		if (node->Field.name_list)
 			return ast_node_token(node->Field.name_list);
@@ -831,6 +837,12 @@ gb_inline AstNode *make_load_decl(AstFile *f, Token token, Token filepath) {
 	return result;
 }
 
+gb_inline AstNode *make_foreign_system_library(AstFile *f, Token token, Token filepath) {
+	AstNode *result = make_node(f, AstNode_ForeignSystemLibrary);
+	result->ForeignSystemLibrary.token = token;
+	result->ForeignSystemLibrary.filepath = filepath;
+	return result;
+}
 
 gb_inline b32 next_token(AstFile *f) {
 	if (f->cursor+1 < f->tokens + gb_array_count(f->tokens)) {
@@ -967,11 +979,15 @@ b32 expect_semicolon_after_stmt(AstFile *f, AstNode *s) {
 	}
 
 	if (!allow_token(f, Token_Semicolon)) {
-		// CLEANUP(bill): Semicolon handling in parser
-		ast_file_err(f, f->cursor[0],
-		             "Expected `;` after %.*s, got `%.*s`",
-		             LIT(ast_node_strings[s->kind]), LIT(token_strings[f->cursor[0].kind]));
-		return false;
+		if (f->cursor[0].pos.line == f->cursor[-1].pos.line) {
+			if (f->cursor[0].kind != Token_CloseBrace) {
+				// CLEANUP(bill): Semicolon handling in parser
+				ast_file_err(f, f->cursor[0],
+				             "Expected `;` after %.*s, got `%.*s`",
+				             LIT(ast_node_strings[s->kind]), LIT(token_strings[f->cursor[0].kind]));
+				return false;
+			}
+		}
 	}
 	return true;
 }
@@ -1203,7 +1219,10 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 	// Parse Procedure Type or Literal
 	case Token_proc: {
 		AstScope *scope = NULL;
+		AstNode *curr_proc = f->curr_proc;
 		AstNode *type = parse_proc_type(f, &scope);
+		f->curr_proc = type;
+		defer (f->curr_proc = curr_proc);
 
 		u64 tags = 0;
 		String foreign_name = {};
@@ -1862,8 +1881,13 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		return make_enum_type(f, token, base_type, root, field_count);
 	}
 
-	case Token_proc:
-		return parse_proc_type(f, NULL);
+	case Token_proc: {
+		AstNode *curr_proc = f->curr_proc;
+		AstNode *type = parse_proc_type(f, NULL);
+		f->curr_proc = type;
+		f->curr_proc = curr_proc;
+		return type;
+	}
 
 
 	case Token_OpenParen: {
@@ -2126,10 +2150,14 @@ AstNode *parse_return_stmt(AstFile *f) {
 	Token token = expect_token(f, Token_return);
 	AstNode *result = NULL;
 	isize result_count = 0;
-	if (f->cursor[0].kind != Token_Semicolon)
+
+	if (f->cursor[0].kind != Token_Semicolon && f->cursor[0].kind != Token_CloseBrace &&
+	    f->cursor[0].pos.line == token.pos.line) {
 		result = parse_rhs_expr_list(f, &result_count);
-	if (f->cursor[0].kind != Token_CloseBrace)
-		expect_token(f, Token_Semicolon);
+	}
+	if (f->cursor[0].kind != Token_CloseBrace) {
+		expect_semicolon_after_stmt(f, result);
+	}
 
 	return make_return_stmt(f, token, result, result_count);
 }
@@ -2248,11 +2276,15 @@ AstNode *parse_stmt(AstFile *f) {
 		b32 valid = false;
 
 		switch (node->kind) {
-		case AstNode_ExprStmt:
-			if (node->ExprStmt.expr->kind == AstNode_Ident) {
+		case AstNode_ExprStmt: {
+			AstNode *e = unparen_expr(node->ExprStmt.expr);
+			while (e->kind == AstNode_SelectorExpr) {
+				e = unparen_expr(e->SelectorExpr.selector);
+			}
+			if (e->kind == AstNode_Ident) {
 				valid = true;
 			}
-			break;
+		} break;
 		case AstNode_VarDecl:
 			if (node->VarDecl.kind == Declaration_Mutable) {
 				valid = true;
@@ -2278,6 +2310,13 @@ AstNode *parse_stmt(AstFile *f) {
 				return make_load_decl(f, s->TagStmt.token, file_path);
 			}
 			ast_file_err(f, token, "You cannot `load` within a procedure. This must be done at the file scope.");
+			return make_bad_decl(f, token, file_path);
+		} else if (are_strings_equal(s->TagStmt.name.string, make_string("foreign_system_library"))) {
+			Token file_path = expect_token(f, Token_String);
+			if (f->curr_scope == f->file_scope) {
+				return make_foreign_system_library(f, s->TagStmt.token, file_path);
+			}
+			ast_file_err(f, token, "You cannot using `foreign_system_library` within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
 		} else if (are_strings_equal(s->TagStmt.name.string, make_string("thread_local"))) {
 			AstNode *var_decl = parse_simple_stmt(f);
@@ -2387,6 +2426,8 @@ void destroy_ast_file(AstFile *f) {
 b32 init_parser(Parser *p) {
 	gb_array_init(p->files, gb_heap_allocator());
 	gb_array_init(p->loads, gb_heap_allocator());
+	gb_array_init(p->libraries, gb_heap_allocator());
+	gb_array_init(p->system_libraries, gb_heap_allocator());
 	return true;
 }
 
@@ -2402,6 +2443,8 @@ void destroy_parser(Parser *p) {
 #endif
 	gb_array_free(p->files);
 	gb_array_free(p->loads);
+	gb_array_free(p->libraries);
+	gb_array_free(p->system_libraries);
 }
 
 // NOTE(bill): Returns true if it's added
@@ -2414,6 +2457,18 @@ b32 try_add_load_path(Parser *p, String import_file) {
 	}
 
 	gb_array_append(p->loads, import_file);
+	return true;
+}
+
+// NOTE(bill): Returns true if it's added
+b32 try_add_foreign_system_library_path(Parser *p, String import_file) {
+	gb_for_array(i, p->system_libraries) {
+		String import = p->system_libraries[i];
+		if (are_strings_equal(import, import_file)) {
+			return false;
+		}
+	}
+	gb_array_append(p->system_libraries, import_file);
 	return true;
 }
 
@@ -2480,7 +2535,7 @@ void parse_file(Parser *p, AstFile *f) {
 				String file_str = id->filepath.string;
 
 				if (!is_load_path_valid(file_str)) {
-					ast_file_err(f, ast_node_token(node), "Invalid import path");
+					ast_file_err(f, ast_node_token(node), "Invalid `load` path");
 					continue;
 				}
 
@@ -2498,6 +2553,16 @@ void parse_file(Parser *p, AstFile *f) {
 				if (!try_add_load_path(p, import_file)) {
 					gb_free(gb_heap_allocator(), import_file.text);
 				}
+			} else if (node->kind == AstNode_ForeignSystemLibrary) {
+				auto *id = &node->ForeignSystemLibrary;
+				String file_str = id->filepath.string;
+
+				if (!is_load_path_valid(file_str)) {
+					ast_file_err(f, ast_node_token(node), "Invalid `foreign_system_library` path");
+					continue;
+				}
+
+				try_add_foreign_system_library_path(p, file_str);
 			}
 		}
 	}
