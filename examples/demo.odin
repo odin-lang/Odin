@@ -3,26 +3,28 @@
 #load "game.odin"
 
 main :: proc() {
-
-	Thing :: type struct {
-		using x: struct { a, b: int }
+	Vec3   :: type struct { x, y, z: f32 }
+	Entity :: type struct {
+		using pos: Vec3
+		name:      string
 	}
 
-	{
-		using t := new(Thing)
-		defer delete(t)
-		a = 321
-		print_int(a); nl()
+	Frog :: type struct {
+		using entity: Entity
+		jump_height:  f32
 	}
 
-	// {
-	// 	using t := new(Thing)
-	// 	defer delete(t)
-	// 	a = 1337
-	// 	print_int(a); nl()
-	// }
+	f := Frog{}
+	f.name = "ribbit"
 
-	// run_game()
+	print_name :: proc(using e: Entity) {
+		print_string(name); nl()
+	}
+
+	print_name(f.entity)
+	print_name(f)
+
+
 }
 
 

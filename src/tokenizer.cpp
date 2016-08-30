@@ -501,7 +501,7 @@ exponent:
 	return token;
 }
 
-// Quote == " for string and ' for char
+// Quote == " for string
 b32 scan_escape(Tokenizer *t, Rune quote) {
 	isize len = 0;
 	u32 base = 0, max = 0, x = 0;

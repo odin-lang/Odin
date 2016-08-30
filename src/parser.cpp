@@ -91,94 +91,94 @@ enum CallExprKind {
 };
 
 #define AST_NODE_KINDS \
-	AST_NODE_KIND(Invalid, struct{}) \
-	AST_NODE_KIND(BasicLit, Token) \
-	AST_NODE_KIND(Ident, struct { \
+	AST_NODE_KIND(Invalid,  "invalid node", struct{}) \
+	AST_NODE_KIND(BasicLit, "basic literal", Token) \
+	AST_NODE_KIND(Ident,    "identifier", struct { \
 		Token token; \
 		AstEntity *entity; \
 	}) \
-	AST_NODE_KIND(ProcLit, struct { \
+	AST_NODE_KIND(ProcLit, "procedure literal", struct { \
 		AstNode *type; \
 		AstNode *body; \
 		u64 tags;      \
 	}) \
-	AST_NODE_KIND(CompoundLit, struct { \
+	AST_NODE_KIND(CompoundLit, "compound literal", struct { \
 		AstNode *type; \
 		AstNode *elem_list; \
 		isize elem_count; \
 		Token open, close; \
 	}) \
-AST_NODE_KIND(_ExprBegin,       struct{}) \
-	AST_NODE_KIND(BadExpr,      struct { Token begin, end; }) \
-	AST_NODE_KIND(TagExpr,      struct { Token token, name; AstNode *expr; }) \
-	AST_NODE_KIND(UnaryExpr,    struct { Token op; AstNode *expr; }) \
-	AST_NODE_KIND(BinaryExpr,   struct { Token op; AstNode *left, *right; } ) \
-	AST_NODE_KIND(ParenExpr,    struct { AstNode *expr; Token open, close; }) \
-	AST_NODE_KIND(SelectorExpr, struct { Token token; AstNode *expr, *selector; }) \
-	AST_NODE_KIND(IndexExpr,    struct { AstNode *expr, *index; Token open, close; }) \
-	AST_NODE_KIND(DerefExpr,    struct { Token op; AstNode *expr; }) \
-	AST_NODE_KIND(CallExpr, struct { \
+AST_NODE_KIND(_ExprBegin,  "",  struct{}) \
+	AST_NODE_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
+	AST_NODE_KIND(TagExpr,      "tag expression",         struct { Token token, name; AstNode *expr; }) \
+	AST_NODE_KIND(UnaryExpr,    "unary expression",       struct { Token op; AstNode *expr; }) \
+	AST_NODE_KIND(BinaryExpr,   "binary expression",      struct { Token op; AstNode *left, *right; } ) \
+	AST_NODE_KIND(ParenExpr,    "parentheses expression", struct { AstNode *expr; Token open, close; }) \
+	AST_NODE_KIND(SelectorExpr, "selector expression",    struct { Token token; AstNode *expr, *selector; }) \
+	AST_NODE_KIND(IndexExpr,    "index expression",       struct { AstNode *expr, *index; Token open, close; }) \
+	AST_NODE_KIND(DerefExpr,    "dereference expression", struct { Token op; AstNode *expr; }) \
+	AST_NODE_KIND(CallExpr,     "call expression", struct { \
 		AstNode *proc, *arg_list; \
 		isize arg_list_count; \
 		Token open, close; \
 		CallExprKind kind; \
 	}) \
-	AST_NODE_KIND(SliceExpr, struct { \
+	AST_NODE_KIND(SliceExpr, "slice expression", struct { \
 		AstNode *expr; \
 		Token open, close; \
 		AstNode *low, *high, *max; \
 		b32 triple_indexed; \
 	}) \
-	AST_NODE_KIND(FieldValue, struct { Token eq; AstNode *field, *value; }) \
-	AST_NODE_KIND(Ellipsis, struct { Token token; }) \
-AST_NODE_KIND(_ExprEnd,       struct{}) \
-AST_NODE_KIND(_StmtBegin,     struct{}) \
-	AST_NODE_KIND(BadStmt,    struct { Token begin, end; }) \
-	AST_NODE_KIND(EmptyStmt,  struct { Token token; }) \
-	AST_NODE_KIND(ExprStmt,   struct { AstNode *expr; } ) \
-	AST_NODE_KIND(IncDecStmt, struct { Token op; AstNode *expr; }) \
-	AST_NODE_KIND(TagStmt, struct { \
+	AST_NODE_KIND(FieldValue, "field value", struct { Token eq; AstNode *field, *value; }) \
+	AST_NODE_KIND(Ellipsis,   "ellipsis",    struct { Token token; }) \
+AST_NODE_KIND(_ExprEnd,       "", struct{}) \
+AST_NODE_KIND(_StmtBegin,     "", struct{}) \
+	AST_NODE_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
+	AST_NODE_KIND(EmptyStmt,  "empty statement",               struct { Token token; }) \
+	AST_NODE_KIND(ExprStmt,   "expression statement",          struct { AstNode *expr; } ) \
+	AST_NODE_KIND(IncDecStmt, "increment/decrement statement", struct { Token op; AstNode *expr; }) \
+	AST_NODE_KIND(TagStmt,    "tag statement", struct { \
 		Token token; \
 		Token name; \
 		AstNode *stmt; \
 	}) \
-	AST_NODE_KIND(AssignStmt, struct { \
+	AST_NODE_KIND(AssignStmt, "assign statement", struct { \
 		Token op; \
 		AstNode *lhs_list, *rhs_list; \
 		isize lhs_count, rhs_count; \
 	}) \
-AST_NODE_KIND(_ComplexStmtBegin, struct{}) \
-	AST_NODE_KIND(BlockStmt, struct { \
+AST_NODE_KIND(_ComplexStmtBegin, "", struct{}) \
+	AST_NODE_KIND(BlockStmt, "block statement", struct { \
 		AstNode *list; \
 		isize list_count; \
 		Token open, close; \
 	}) \
-	AST_NODE_KIND(IfStmt, struct { \
+	AST_NODE_KIND(IfStmt, "if statement", struct { \
 		Token token; \
 		AstNode *init; \
 		AstNode *cond; \
 		AstNode *body; \
 		AstNode *else_stmt; \
 	}) \
-	AST_NODE_KIND(ReturnStmt, struct { \
+	AST_NODE_KIND(ReturnStmt, "return statement", struct { \
 		Token token; \
 		AstNode *result_list; \
 		isize result_count; \
 	}) \
-	AST_NODE_KIND(ForStmt, struct { \
+	AST_NODE_KIND(ForStmt, "for statement", struct { \
 		Token token; \
 		AstNode *init, *cond, *post; \
 		AstNode *body; \
 	}) \
-	AST_NODE_KIND(DeferStmt,  struct { Token token; AstNode *stmt; }) \
-	AST_NODE_KIND(BranchStmt, struct { Token token; }) \
-	AST_NODE_KIND(UsingStmt,  struct { Token token; AstNode *node; }) \
+	AST_NODE_KIND(DeferStmt,  "defer statement",  struct { Token token; AstNode *stmt; }) \
+	AST_NODE_KIND(BranchStmt, "branch statement", struct { Token token; }) \
+	AST_NODE_KIND(UsingStmt,  "using statement",  struct { Token token; AstNode *node; }) \
 \
-AST_NODE_KIND(_ComplexStmtEnd, struct{}) \
-AST_NODE_KIND(_StmtEnd,        struct{}) \
-AST_NODE_KIND(_DeclBegin,      struct{}) \
-	AST_NODE_KIND(BadDecl, struct { Token begin, end; }) \
-	AST_NODE_KIND(VarDecl, struct { \
+AST_NODE_KIND(_ComplexStmtEnd, "", struct{}) \
+AST_NODE_KIND(_StmtEnd,        "", struct{}) \
+AST_NODE_KIND(_DeclBegin,      "", struct{}) \
+	AST_NODE_KIND(BadDecl,  "bad declaration", struct { Token begin, end; }) \
+	AST_NODE_KIND(VarDecl,  "variable declaration", struct { \
 			DeclKind kind; \
 			u32      tags; \
 			b32      is_using; \
@@ -187,73 +187,73 @@ AST_NODE_KIND(_DeclBegin,      struct{}) \
 			AstNode *value_list; \
 			isize name_count, value_count; \
 		}) \
-	AST_NODE_KIND(ProcDecl, struct { \
-			AstNode *name;           \
-			AstNode *type;           \
-			AstNode *body;           \
-			u64     tags;            \
-			String  foreign_name;    \
+	AST_NODE_KIND(ProcDecl, "procedure declaration", struct { \
+			AstNode *name;        \
+			AstNode *type;        \
+			AstNode *body;        \
+			u64     tags;         \
+			String  foreign_name; \
 		}) \
-	AST_NODE_KIND(TypeDecl, struct { Token token; AstNode *name, *type; }) \
-	AST_NODE_KIND(LoadDecl, struct { Token token, filepath; }) \
-	AST_NODE_KIND(ForeignSystemLibrary, struct { Token token, filepath; }) \
-AST_NODE_KIND(_DeclEnd, struct{}) \
-AST_NODE_KIND(_TypeBegin, struct{}) \
-	AST_NODE_KIND(Field, struct { \
+	AST_NODE_KIND(TypeDecl, "type declaration", struct { Token token; AstNode *name, *type; }) \
+	AST_NODE_KIND(LoadDecl, "load declaration", struct { Token token, filepath; }) \
+	AST_NODE_KIND(ForeignSystemLibrary, "foreign system library", struct { Token token, filepath; }) \
+AST_NODE_KIND(_DeclEnd,   "", struct{}) \
+AST_NODE_KIND(_TypeBegin, "", struct{}) \
+	AST_NODE_KIND(Field, "field", struct { \
 		AstNode *name_list; \
 		isize name_count; \
 		AstNode *type; \
 		b32 is_using; \
 	}) \
-	AST_NODE_KIND(ProcType, struct { \
+	AST_NODE_KIND(ProcType, "procedure type", struct { \
 		Token token;          \
 		AstNode *param_list;  \
 		AstNode *result_list; \
 		isize param_count;    \
 		isize result_count;   \
 	}) \
-	AST_NODE_KIND(PointerType, struct { \
+	AST_NODE_KIND(PointerType, "pointer type", struct { \
 		Token token; \
 		AstNode *type; \
 	}) \
-	AST_NODE_KIND(ArrayType, struct { \
+	AST_NODE_KIND(ArrayType, "array type", struct { \
 		Token token; \
 		AstNode *count; \
 		AstNode *elem; \
 	}) \
-	AST_NODE_KIND(VectorType, struct { \
+	AST_NODE_KIND(VectorType, "vector type", struct { \
 		Token token; \
 		AstNode *count; \
 		AstNode *elem; \
 	}) \
-	AST_NODE_KIND(StructType, struct { \
+	AST_NODE_KIND(StructType, "struct type", struct { \
 		Token token; \
 		AstNode *decl_list; \
 		isize decl_count; \
 		b32 is_packed; \
 	}) \
-	AST_NODE_KIND(UnionType, struct { \
+	AST_NODE_KIND(UnionType, "union type", struct { \
 		Token token; \
-		AstNode *field_list; \
-		isize field_count; \
+		AstNode *decl_list; \
+		isize decl_count; \
 	}) \
-	AST_NODE_KIND(EnumType, struct { \
+	AST_NODE_KIND(EnumType, "enum type", struct { \
 		Token token; \
 		AstNode *base_type; \
 		AstNode *field_list; \
 		isize field_count; \
 	}) \
-AST_NODE_KIND(_TypeEnd, struct{}) \
-	AST_NODE_KIND(Count, struct{})
+AST_NODE_KIND(_TypeEnd,  "", struct{}) \
+	AST_NODE_KIND(Count, "", struct{})
 
 enum AstNodeKind {
-#define AST_NODE_KIND(name, ...) GB_JOIN2(AstNode_, name),
+#define AST_NODE_KIND(_kind_name_, ...) GB_JOIN2(AstNode_, _kind_name_),
 	AST_NODE_KINDS
 #undef AST_NODE_KIND
 };
 
 String const ast_node_strings[] = {
-#define AST_NODE_KIND(name, ...) {cast(u8 *)#name, gb_size_of(#name)-1},
+#define AST_NODE_KIND(_kind_name_, name, ...) {cast(u8 *)name, gb_size_of(name)-1},
 	AST_NODE_KINDS
 #undef AST_NODE_KIND
 };
@@ -262,7 +262,7 @@ struct AstNode {
 	AstNodeKind kind;
 	AstNode *prev, *next; // NOTE(bill): allow for Linked list
 	union {
-#define AST_NODE_KIND(_kind_name_, ...) __VA_ARGS__ _kind_name_;
+#define AST_NODE_KIND(_kind_name_, name, ...) __VA_ARGS__ _kind_name_;
 	AST_NODE_KINDS
 #undef AST_NODE_KIND
 	};
@@ -804,11 +804,11 @@ gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNode *decl_list,
 	return result;
 }
 
-gb_inline AstNode *make_union_type(AstFile *f, Token token, AstNode *field_list, isize field_count) {
+gb_inline AstNode *make_union_type(AstFile *f, Token token, AstNode *decl_list, isize decl_count) {
 	AstNode *result = make_node(f, AstNode_UnionType);
 	result->UnionType.token = token;
-	result->UnionType.field_list = field_list;
-	result->UnionType.field_count = field_count;
+	result->UnionType.decl_list = decl_list;
+	result->UnionType.decl_count = decl_count;
 	return result;
 }
 
@@ -962,21 +962,21 @@ void fix_advance_to_next_stmt(AstFile *f) {
 }
 
 b32 expect_semicolon_after_stmt(AstFile *f, AstNode *s) {
-	if (s != NULL) {
-		switch (s->kind) {
-		case AstNode_ProcDecl:
-			return true;
-		case AstNode_TypeDecl: {
-			switch (s->TypeDecl.type->kind) {
-			case AstNode_StructType:
-			case AstNode_UnionType:
-			case AstNode_EnumType:
-			case AstNode_ProcType:
-				return true;
-			}
-		} break;
-		}
-	}
+	// if (s != NULL) {
+	// 	switch (s->kind) {
+	// 	case AstNode_ProcDecl:
+	// 		return true;
+	// 	case AstNode_TypeDecl: {
+	// 		switch (s->TypeDecl.type->kind) {
+	// 		case AstNode_StructType:
+	// 		case AstNode_UnionType:
+	// 		case AstNode_EnumType:
+	// 		case AstNode_ProcType:
+	// 			return true;
+	// 		}
+	// 	} break;
+	// 	}
+	// }
 
 	if (!allow_token(f, Token_Semicolon)) {
 		if (f->cursor[0].pos.line == f->cursor[-1].pos.line) {
@@ -1710,6 +1710,65 @@ AstNode *parse_parameter_list(AstFile *f, AstScope *scope, isize *param_count_, 
 }
 
 
+AstNode *parse_struct_params(AstFile *f, isize *decl_count_) {
+	AstNode *decls = NULL;
+	AstNode *decls_curr = NULL;
+	isize decl_count = 0;
+
+	while (f->cursor[0].kind == Token_Identifier ||
+	       f->cursor[0].kind == Token_using) {
+		b32 is_using = false;
+		if (allow_token(f, Token_using)) {
+			is_using = true;
+		}
+		isize name_count = 0;
+		AstNode *name_list = parse_lhs_expr_list(f, &name_count);
+		if (name_count == 0) {
+			ast_file_err(f, f->cursor[0], "Empty field declaration");
+		}
+
+		if (name_count > 1 && is_using) {
+			ast_file_err(f, f->cursor[0], "Cannot apply `using` to more than one of the same type");
+		}
+
+		AstNode *decl = NULL;
+
+		if (f->cursor[0].kind == Token_Colon) {
+			decl = parse_decl(f, name_list, name_count);
+
+			if (decl->kind == AstNode_ProcDecl) {
+				ast_file_err(f, f->cursor[0], "Procedure declarations are not allowed within a structure");
+				decl = make_bad_decl(f, ast_node_token(name_list), f->cursor[0]);
+			}
+		} else {
+			ast_file_err(f, f->cursor[0], "Illegal structure field");
+			decl = make_bad_decl(f, ast_node_token(name_list), f->cursor[0]);
+		}
+
+		expect_semicolon_after_stmt(f, decl);
+
+		if (decl != NULL && is_ast_node_decl(decl)) {
+			DLIST_APPEND(decls, decls_curr, decl);
+			if (decl->kind == AstNode_VarDecl) {
+				decl_count += decl->VarDecl.name_count;
+				decl->VarDecl.is_using = is_using;
+
+				if (decl->VarDecl.kind == Declaration_Mutable) {
+					if (decl->VarDecl.value_count > 0) {
+						ast_file_err(f, f->cursor[0], "Default variable assignments within a structure will be ignored (at the moment)");
+					}
+				}
+
+			} else {
+				decl_count += 1;
+			}
+		}
+	}
+
+	if (decl_count_) *decl_count_ = decl_count;
+	return decls;
+}
+
 AstNode *parse_identifier_or_type(AstFile *f) {
 	switch (f->cursor[0].kind) {
 	case Token_Identifier: {
@@ -1770,78 +1829,27 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 
 
 		Token open = expect_token(f, Token_OpenBrace);
-		AstNode *decls = NULL;
-		AstNode *decls_curr = NULL;
 		isize decl_count = 0;
-
-		while (f->cursor[0].kind == Token_Identifier ||
-		       f->cursor[0].kind == Token_using) {
-			b32 is_using = false;
-			if (allow_token(f, Token_using)) {
-				is_using = true;
-			}
-			isize name_count = 0;
-			AstNode *name_list = parse_lhs_expr_list(f, &name_count);
-			if (name_count == 0) {
-				ast_file_err(f, f->cursor[0], "Empty field declaration");
-			}
-
-			if (name_count > 1 && is_using) {
-				ast_file_err(f, f->cursor[0], "Cannot apply `using` to more than one of the same type");
-			}
-
-			AstNode *decl = NULL;
-
-			if (f->cursor[0].kind == Token_Colon) {
-				decl = parse_decl(f, name_list, name_count);
-
-				if (decl->kind == AstNode_ProcDecl) {
-					ast_file_err(f, f->cursor[0], "Procedure declarations are not allowed within a structure");
-					decl = make_bad_decl(f, ast_node_token(name_list), f->cursor[0]);
-				}
-			} else {
-				ast_file_err(f, f->cursor[0], "Illegal structure field");
-				decl = make_bad_decl(f, ast_node_token(name_list), f->cursor[0]);
-			}
-
-			expect_semicolon_after_stmt(f, decl);
-
-			if (decl != NULL && is_ast_node_decl(decl)) {
-				DLIST_APPEND(decls, decls_curr, decl);
-				if (decl->kind == AstNode_VarDecl) {
-					decl_count += decl->VarDecl.name_count;
-					decl->VarDecl.is_using = is_using;
-
-					if (decl->VarDecl.kind == Declaration_Mutable) {
-						if (decl->VarDecl.value_count > 0) {
-							ast_file_err(f, f->cursor[0], "Default variable assignments within a structure will be ignored (at the moment)");
-						}
-					}
-
-				} else {
-					decl_count += 1;
-				}
-			}
-		}
+		AstNode *decls = parse_struct_params(f, &decl_count);
 		Token close = expect_token(f, Token_CloseBrace);
-
-		// params = parse_parameter_list(f, scope, &param_count, Token_Semicolon, true);
 
 		return make_struct_type(f, token, decls, decl_count, is_packed);
 	} break;
 
 	case Token_union: {
 		Token token = expect_token(f, Token_union);
-		Token open, close;
-		AstNode *params = NULL;
-		isize param_count = 0;
-		AstScope *scope = make_ast_scope(f, NULL); // NOTE(bill): The union needs its own scope with NO parent
+		AstScope *scope = make_ast_scope(f, NULL); // NOTE(bill): The struct needs its own scope with NO parent
+		AstScope *curr_scope = f->curr_scope;
+		f->curr_scope = scope;
+		defer (f->curr_scope = curr_scope);
 
-		open   = expect_token(f, Token_OpenBrace);
-		params = parse_parameter_list(f, scope, &param_count, Token_Semicolon, true);
-		close  = expect_token(f, Token_CloseBrace);
 
-		return make_union_type(f, token, params, param_count);
+		Token open = expect_token(f, Token_OpenBrace);
+		isize decl_count = 0;
+		AstNode *decls = parse_struct_params(f, &decl_count);
+		Token close = expect_token(f, Token_CloseBrace);
+
+		return make_union_type(f, token, decls, decl_count);
 	}
 
 	case Token_enum: {
@@ -1952,7 +1960,7 @@ Token parse_procedure_signature(AstFile *f, AstScope *scope,
                                AstNode **result_list, isize *result_count) {
 	Token proc_token = expect_token(f, Token_proc);
 	expect_token(f, Token_OpenParen);
-	*param_list = parse_parameter_list(f, scope, param_count, Token_Comma, false);
+	*param_list = parse_parameter_list(f, scope, param_count, Token_Comma, true);
 	expect_token(f, Token_CloseParen);
 	*result_list = parse_results(f, scope, result_count);
 	return proc_token;

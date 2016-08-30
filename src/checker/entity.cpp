@@ -93,9 +93,10 @@ Entity *make_entity_type_name(gbAllocator a, Scope *scope, Token token, Type *ty
 	return entity;
 }
 
-Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type) {
+Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, b32 is_anonymous) {
 	Entity *entity = make_entity_variable(a, scope, token, type);
 	entity->Variable.used = true;
+	entity->Variable.anonymous = cast(b8)is_anonymous;
 	return entity;
 }
 

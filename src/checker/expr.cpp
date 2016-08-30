@@ -16,6 +16,28 @@ void     update_expr_type          (Checker *c, AstNode *e, Type *type, b32 fina
 
 
 b32 check_is_assignable_to_using_subtype(Checker *c, Type *dst, Type *src) {
+	Type *prev_src = src;
+	// Type *prev_dst = dst;
+	src = get_base_type(type_deref(src));
+	// dst = get_base_type(type_deref(dst));
+	b32 src_is_ptr = src != prev_src;
+	// b32 dst_is_ptr = dst != prev_dst;
+
+	if (src->kind == Type_Struct) {
+		for (isize i = 0; i < src->Struct.field_count; i++) {
+			Entity *f = src->Struct.fields[i];
+			if (f->kind == Entity_Variable && f->Variable.anonymous) {
+				if (are_types_identical(dst, f->type)) {
+					return true;
+				}
+				if (src_is_ptr && is_type_pointer(dst)) {
+					if (are_types_identical(type_deref(dst), f->type)) {
+						return true;
+					}
+				}
+			}
+		}
+	}
 	return false;
 }
 
@@ -68,8 +90,8 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 	}
 
 	if (is_argument) {
-		// Polymorphism for subtyping
-		if (check_is_assignable_to_using_subtype(c, dst, src)) {
+		// NOTE(bill): Polymorphism for subtyping
+		if (check_is_assignable_to_using_subtype(c, type, src)) {
 			return true;
 		}
 	}
@@ -154,96 +176,27 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 
 }
 
-void check_fields(Checker *c, AstNode *node,
-                  AstNode *field_list, Entity **fields, isize field_count,
-                  CycleChecker *cycle_checker, String context) {
-	Map<Entity *> entity_map = {};
-	map_init(&entity_map, gb_heap_allocator());
-	defer (map_destroy(&entity_map));
-
-	isize field_index = 0;
-	for (AstNode *field = field_list; field != NULL; field = field->next) {
-		ast_node(f, Field, field);
-		Type *type = check_type(c, f->type, NULL, cycle_checker);
-
-		if (f->is_using) {
-			if (f->name_count > 1) {
-				error(&c->error_collector, ast_node_token(f->name_list),
-				      "Cannot apply `using` to more than one of the same type");
-			}
-		}
-
-		for (AstNode *name = f->name_list; name != NULL; name = name->next) {
-			ast_node(i, Ident, name);
-			Token name_token = i->token;
-
-			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, f->is_using);
-			HashKey key = hash_string(name_token.string);
-			if (map_get(&entity_map, key) != NULL) {
-				// TODO(bill): Scope checking already checks the declaration
-				error(&c->error_collector, name_token, "`%.*s` is already declared in this %.*s", LIT(name_token.string), LIT(context));
-			} else {
-				map_set(&entity_map, key, e);
-				fields[field_index++] = e;
-			}
-			add_entity_use(&c->info, name, e);
-		}
-
-
-		if (f->is_using) {
-			Type *t = get_base_type(type_deref(type));
-			if (t->kind != Type_Struct &&
-			    t->kind != Type_Union) {
-				Token name_token = f->name_list->Ident.token;
-				error(&c->error_collector, name_token, "`using` on a field `%.*s` must be a structure or union", LIT(name_token.string));
-				continue;
-			}
-
-			populate_using_entity_map(c, node, type, &entity_map);
-		}
-	}
-}
-
 void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr);
 
-void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecker *cycle_checker) {
-	GB_ASSERT(node->kind == AstNode_StructType);
-	GB_ASSERT(struct_type->kind == Type_Struct);
-	ast_node(st, StructType, node);
-
-	isize field_count = 0;
-	isize other_field_count = 0;
-	for (AstNode *decl = st->decl_list; decl != NULL; decl = decl->next) {
-		switch (decl->kind) {
-		case_ast_node(vd, VarDecl, decl);
-			if (vd->kind == Declaration_Mutable) {
-				field_count += vd->name_count;
-			} else {
-				other_field_count += vd->name_count;
-			}
-		case_end;
-
-		case_ast_node(td, TypeDecl, decl);
-			other_field_count += 1;
-		case_end;
-		}
-	}
-
-	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
+void check_fields(Checker *c, AstNode *node, AstNode *decl_list,
+                  Entity **fields, isize field_count,
+                  Entity **other_fields, isize other_field_count,
+                  CycleChecker *cycle_checker, String context) {
 
 	Map<Entity *> entity_map = {};
 	map_init(&entity_map, gb_heap_allocator());
 	defer (map_destroy(&entity_map));
 
-	Entity **other_fields = gb_alloc_array(c->allocator, Entity *, other_field_count);
 	isize other_field_index = 0;
+
+
 	// TODO(bill): Random declarations with DeclInfo
 #if 0
 	Entity *e;
 	DeclInfo *d;d
 	check_entity_decl(c, e, d, NULL);
 #endif
-	for (AstNode *decl = st->decl_list; decl != NULL; decl = decl->next) {
+	for (AstNode *decl = decl_list; decl != NULL; decl = decl->next) {
 		if (decl->kind == AstNode_VarDecl) {
 			ast_node(vd, VarDecl, decl);
 			if (vd->kind != Declaration_Immutable)
@@ -312,7 +265,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecke
 	}
 
 	isize field_index = 0;
-	for (AstNode *decl = st->decl_list; decl != NULL; decl = decl->next) {
+	for (AstNode *decl = decl_list; decl != NULL; decl = decl->next) {
 		if (decl->kind != AstNode_VarDecl)
 			continue;
 		ast_node(vd, VarDecl, decl);
@@ -360,6 +313,39 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecke
 
 
 
+}
+
+
+void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecker *cycle_checker) {
+	GB_ASSERT(node->kind == AstNode_StructType);
+	GB_ASSERT(struct_type->kind == Type_Struct);
+	ast_node(st, StructType, node);
+
+	// TODO(bill): check_struct_type and check_union_type are very similar so why not and try to merge them better
+
+	isize field_count = 0;
+	isize other_field_count = 0;
+	for (AstNode *decl = st->decl_list; decl != NULL; decl = decl->next) {
+		switch (decl->kind) {
+		case_ast_node(vd, VarDecl, decl);
+			if (vd->kind == Declaration_Mutable) {
+				field_count += vd->name_count;
+			} else {
+				other_field_count += vd->name_count;
+			}
+		case_end;
+
+		case_ast_node(td, TypeDecl, decl);
+			other_field_count += 1;
+		case_end;
+		}
+	}
+
+	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
+	Entity **other_fields = gb_alloc_array(c->allocator, Entity *, other_field_count);
+
+	check_fields(c, node, st->decl_list, fields, field_count, other_fields, other_field_count, cycle_checker, make_string("struct"));
+
 	struct_type->Struct.is_packed         = st->is_packed;
 	struct_type->Struct.fields            = fields;
 	struct_type->Struct.field_count       = field_count;
@@ -373,17 +359,32 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker 
 	ast_node(ut, UnionType, node);
 
 	isize field_count = 0;
-	for (AstNode *field = ut->field_list; field != NULL; field = field->next) {
-		for (AstNode *name = field->Field.name_list; name != NULL; name = name->next) {
-			GB_ASSERT(name->kind == AstNode_Ident);
-			field_count++;
+	isize other_field_count = 0;
+	for (AstNode *decl = ut->decl_list; decl != NULL; decl = decl->next) {
+		switch (decl->kind) {
+		case_ast_node(vd, VarDecl, decl);
+			if (vd->kind == Declaration_Mutable) {
+				field_count += vd->name_count;
+			} else {
+				other_field_count += vd->name_count;
+			}
+		case_end;
+
+		case_ast_node(td, TypeDecl, decl);
+			other_field_count += 1;
+		case_end;
 		}
 	}
 
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
-	check_fields(c, node, ut->field_list, fields, field_count, cycle_checker, make_string("union"));
+	Entity **other_fields = gb_alloc_array(c->allocator, Entity *, other_field_count);
+
+	check_fields(c, node, ut->decl_list, fields, field_count, other_fields, other_field_count, cycle_checker, make_string("union"));
+
 	union_type->Union.fields = fields;
 	union_type->Union.field_count = field_count;
+	union_type->Union.other_fields = other_fields;
+	union_type->Union.other_field_count = other_field_count;
 }
 
 
@@ -470,7 +471,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize fiel
 			for (AstNode *name = f->name_list; name != NULL; name = name->next) {
 				if (name->kind == AstNode_Ident) {
 					ast_node(i, Ident, name);
-					Entity *param = make_entity_param(c->allocator, scope, i->token, type);
+					Entity *param = make_entity_param(c->allocator, scope, i->token, type, f->is_using);
 					add_entity(c, scope, name, param);
 					variables[variable_index++] = param;
 				} else {
@@ -497,7 +498,7 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *list, isize list_coun
 		Token token = ast_node_token(item);
 		token.string = make_string(""); // NOTE(bill): results are not named
 		// TODO(bill): Should I have named results?
-		Entity *param = make_entity_param(c->allocator, scope, token, type);
+		Entity *param = make_entity_param(c->allocator, scope, token, type, false);
 		// NOTE(bill): No need to record
 		variables[variable_index++] = param;
 	}

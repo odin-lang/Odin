@@ -296,6 +296,39 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	c->context.scope = decl->scope;
 	c->context.decl = decl;
 
+	GB_ASSERT(type->kind == Type_Proc);
+	if (type->Proc.param_count > 0) {
+		auto *params = &type->Proc.params->Tuple;
+		for (isize i = 0; i < params->variable_count; i++) {
+			Entity *e = params->variables[i];
+			GB_ASSERT(e->kind == Entity_Variable);
+			if (!e->Variable.anonymous)
+				continue;
+			String name = e->token.string;
+			Type *t = get_base_type(type_deref(e->type));
+			if (t->kind == Type_Struct || t->kind == Type_Union) {
+				// IMPORTANT HACK(bill): Entity_(Struct|Union) overlap in some memory allowing
+				// for some variables to accessed to same
+				Scope **found = map_get(&c->info.scopes, hash_pointer(t->Struct.node));
+				GB_ASSERT(found != NULL);
+				gb_for_array(i, (*found)->elements.entries) {
+					Entity *f = (*found)->elements.entries[i].value;
+					if (f->kind == Entity_Variable) {
+						Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
+						Entity *prev = scope_insert_entity(c->context.scope, uvar);
+						if (prev != NULL) {
+							error(&c->error_collector, e->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
+							break;
+						}
+					}
+				}
+			} else {
+				error(&c->error_collector, e->token, "`using` can only be applied to variables of type struct or union");
+				break;
+			}
+		}
+	}
+
 	push_procedure(c, type);
 	ast_node(bs, BlockStmt, body);
 	// TODO(bill): Check declarations first (except mutable variable declarations)
@@ -789,6 +822,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_ast_node(us, UsingStmt, node);
 		switch (us->node->kind) {
 		case_ast_node(es, ExprStmt, us->node);
+			// TODO(bill): Allow for just a LHS expression list rather than this silly code
 			Entity *e = NULL;
 
 			b32 is_selector = false;
@@ -889,40 +923,41 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			} break;
 
 			default:
-				GB_PANIC("TODO(bill): using Ident");
+				GB_PANIC("TODO(bill): using other expressions?");
 			}
 		case_end;
 
 		case_ast_node(vd, VarDecl, us->node);
-			if (vd->name_count > 1) {
+			if (vd->name_count > 1 && vd->type != NULL) {
 				error(&c->error_collector, us->token, "`using` can only be applied to one variable of the same type");
 			}
 			check_var_decl(c, us->node);
-			ast_node(i, Ident, vd->name_list);
 
-			String name = i->token.string;
-			Entity *e = scope_lookup_entity(c, c->context.scope, name);
-
-			Type *t = get_base_type(type_deref(e->type));
-			if (t->kind == Type_Struct || t->kind == Type_Union) {
-				// IMPORTANT HACK(bill): Entity_(Struct|Union) overlap in some memory allowing
-				// for some variables to accessed to same
-				Scope **found = map_get(&c->info.scopes, hash_pointer(t->Struct.node));
-				GB_ASSERT(found != NULL);
-				gb_for_array(i, (*found)->elements.entries) {
-					Entity *f = (*found)->elements.entries[i].value;
-					if (f->kind == Entity_Variable) {
-						Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
-						Entity *prev = scope_insert_entity(c->context.scope, uvar);
-						if (prev != NULL) {
-							error(&c->error_collector, us->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
-							return;
+			for (AstNode *item = vd->name_list; item != NULL; item = item->next) {
+				ast_node(i, Ident, item);
+				String name = i->token.string;
+				Entity *e = scope_lookup_entity(c, c->context.scope, name);
+				Type *t = get_base_type(type_deref(e->type));
+				if (t->kind == Type_Struct || t->kind == Type_Union) {
+					// IMPORTANT HACK(bill): Entity_(Struct|Union) overlap in some memory allowing
+					// for some variables to accessed to same
+					Scope **found = map_get(&c->info.scopes, hash_pointer(t->Struct.node));
+					GB_ASSERT(found != NULL);
+					gb_for_array(i, (*found)->elements.entries) {
+						Entity *f = (*found)->elements.entries[i].value;
+						if (f->kind == Entity_Variable) {
+							Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
+							Entity *prev = scope_insert_entity(c->context.scope, uvar);
+							if (prev != NULL) {
+								error(&c->error_collector, us->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
+								return;
+							}
 						}
 					}
+				} else {
+					error(&c->error_collector, us->token, "`using` can only be applied to variables of type struct or union");
+					return;
 				}
-			} else {
-				error(&c->error_collector, us->token, "`using` can only be applied to variables of type struct or union");
-				return;
 			}
 		case_end;
 
