@@ -27,23 +27,23 @@ GL_TEXTURE_MIN_FILTER  :: 0x2801
 GL_TEXTURE_WRAP_S      :: 0x2802
 GL_TEXTURE_WRAP_T      :: 0x2803
 
-glClear         :: proc(mask: u32) #foreign
-glClearColor    :: proc(r, g, b, a: f32) #foreign
-glBegin         :: proc(mode: i32) #foreign
-glEnd           :: proc() #foreign
-glColor3f       :: proc(r, g, b: f32) #foreign
-glColor4f       :: proc(r, g, b, a: f32) #foreign
-glVertex2f      :: proc(x, y: f32) #foreign
-glVertex3f      :: proc(x, y, z: f32) #foreign
-glTexCoord2f    :: proc(u, v: f32) #foreign
-glLoadIdentity  :: proc() #foreign
+glClear         :: proc(mask: u32)                                #foreign
+glClearColor    :: proc(r, g, b, a: f32)                          #foreign
+glBegin         :: proc(mode: i32)                                #foreign
+glEnd           :: proc()                                         #foreign
+glColor3f       :: proc(r, g, b: f32)                             #foreign
+glColor4f       :: proc(r, g, b, a: f32)                          #foreign
+glVertex2f      :: proc(x, y: f32)                                #foreign
+glVertex3f      :: proc(x, y, z: f32)                             #foreign
+glTexCoord2f    :: proc(u, v: f32)                                #foreign
+glLoadIdentity  :: proc()                                         #foreign
 glOrtho         :: proc(left, right, bottom, top, near, far: f64) #foreign
-glBlendFunc     :: proc(sfactor, dfactor: i32) #foreign
-glEnable        :: proc(cap: i32) #foreign
-glDisable       :: proc(cap: i32) #foreign
-glGenTextures   :: proc(count: i32, result: ^u32) #foreign
-glTexParameteri :: proc(target, pname, param: i32) #foreign
-glTexParameterf :: proc(target: i32, pname: i32, param: f32) #foreign
-glBindTexture   :: proc(target: i32, texture: u32) #foreign
+glBlendFunc     :: proc(sfactor, dfactor: i32)                    #foreign
+glEnable        :: proc(cap: i32)                                 #foreign
+glDisable       :: proc(cap: i32)                                 #foreign
+glGenTextures   :: proc(count: i32, result: ^u32)                 #foreign
+glTexParameteri :: proc(target, pname, param: i32)                #foreign
+glTexParameterf :: proc(target: i32, pname: i32, param: f32)      #foreign
+glBindTexture   :: proc(target: i32, texture: u32)                #foreign
 glTexImage2D    :: proc(target, level, internal_format, width, height, border, format, _type: i32, pixels: rawptr) #foreign
 

@@ -30,6 +30,7 @@ TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
 \
 	TOKEN_KIND(Token_as, "as"), \
 	TOKEN_KIND(Token_transmute, "transmute"), \
+	TOKEN_KIND(Token_down_cast, "down_cast"), \
 \
 	TOKEN_KIND(Token_Prime, "'"), \
 	TOKEN_KIND(Token_DoublePrime, "''"), \
@@ -207,6 +208,7 @@ i32 token_precedence(Token t) {
 		return 6;
 	case Token_as:
 	case Token_transmute:
+	case Token_down_cast:
 		return 7;
 	}
 
@@ -629,6 +631,8 @@ Token tokenizer_get_token(Tokenizer *t) {
 				token.kind = Token_as;
 			} else if (are_strings_equal(token.string, token_strings[Token_transmute])) {
 				token.kind = Token_transmute;
+			} else if (are_strings_equal(token.string, token_strings[Token_down_cast])) {
+				token.kind = Token_down_cast;
 			} else {
 				for (i32 k = Token__KeywordBegin+1; k < Token__KeywordEnd; k++) {
 					if (are_strings_equal(token.string, token_strings[k])) {

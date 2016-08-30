@@ -9,20 +9,32 @@ main :: proc() {
 		name:      string
 	}
 
-	Frog :: type struct {
+	Amp :: type struct {
 		using entity: Entity
 		jump_height:  f32
 	}
-
-	f := Frog{}
-	f.name = "ribbit"
-
-	print_name :: proc(using e: Entity) {
-		print_string(name); nl()
+	Frog :: type struct {
+		using amp: Amp
+		volume: f64
 	}
 
-	print_name(f.entity)
-	print_name(f)
+	f := Frog{};
+	f.name = "ribbit";
+	f.jump_height = 1337;
+
+	e := ^f.entity;
+	parent := e down_cast ^Frog;
+
+	print_name :: proc(using e: Entity, v: Vec3) {
+		print_string(name); nl()
+		print_int(v.x as int); nl()
+	}
+
+	print_f32(f.jump_height); nl()
+	print_f32(parent.jump_height); nl()
+
+	print_name(f.entity, Vec3{1, 2, 3})
+	print_name(parent.entity, Vec3{3, 2, 1})
 
 
 }

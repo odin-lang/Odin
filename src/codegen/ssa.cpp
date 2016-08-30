@@ -1408,7 +1408,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 
 			if (field_name.len > 0) {
 				// NOTE(bill): It can be casted
-				Selection sel = lookup_field(sb, field_name, Addressing_Variable);
+				Selection sel = lookup_field(sb, field_name, false);
 				if (sel.entity != NULL) {
 					if (src_is_ptr) {
 						value = ssa_emit_load(proc, value);
@@ -1517,6 +1517,24 @@ ssaValue *ssa_emit_transmute(ssaProcedure *proc, ssaValue *value, Type *t) {
 	return NULL;
 }
 
+ssaValue *ssa_emit_down_cast(ssaProcedure *proc, ssaValue *value, Type *t) {
+	GB_ASSERT(is_type_pointer(ssa_type(value)));
+	gbAllocator allocator = proc->module->allocator;
+
+	// String field_name = check_down_cast_name(t, ssa_type(value));
+	String field_name = check_down_cast_name(t, type_deref(ssa_type(value)));
+	GB_ASSERT(field_name.len > 0);
+	Selection sel = lookup_field(t, field_name, false);
+	Type *t_u8_ptr = make_type_pointer(allocator, t_u8);
+	ssaValue *bytes = ssa_emit_conv(proc, value, t_u8_ptr);
+
+	// IMPORTANT TODO(bill): THIS ONLY DOES ONE LAY DEEP!!! FUCKING HELL THIS IS NOT WHAT I SIGNED UP FOR!
+
+	i64 offset_ = type_offset_of_from_selection(proc->module->sizes, allocator, type_deref(t), sel);
+	ssaValue *offset = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(-offset_));
+	ssaValue *head = ssa_emit_ptr_offset(proc, bytes, offset);
+	return ssa_emit_conv(proc, head, t);
+}
 
 
 
@@ -1619,6 +1637,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		case Token_transmute:
 			return ssa_emit_transmute(proc, ssa_build_expr(proc, be->left), tv->type);
 
+		case Token_down_cast:
+			return ssa_emit_down_cast(proc, ssa_build_expr(proc, be->left), tv->type);
+
 		default:
 			GB_PANIC("Invalid binary expression");
 			break;
@@ -1705,7 +1726,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					if (elem->kind == AstNode_FieldValue) {
 						ast_node(kv, FieldValue, elem);
-						Selection sel = lookup_field(base_type, kv->field->Ident.token.string, Addressing_Value);
+						Selection sel = lookup_field(base_type, kv->field->Ident.token.string, false);
 						field_index = sel.index[0];
 						field_expr = ssa_build_expr(proc, kv->value);
 					} else {
@@ -2115,7 +2136,7 @@ ssaValue *ssa_add_using_variable(ssaProcedure *proc, Entity *e) {
 		p = ssa_add_using_variable(proc, parent);
 	}
 
-	Selection sel = lookup_field(parent->type, name, Addressing_Variable);
+	Selection sel = lookup_field(parent->type, name, false);
 	GB_ASSERT(sel.entity != NULL);
 	ssaValue **pv = map_get(&proc->module->values, hash_pointer(parent));
 	ssaValue *v = NULL;
@@ -2160,7 +2181,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	case_ast_node(se, SelectorExpr, expr);
 		Type *type = get_base_type(type_of_expr(proc->module->info, se->expr));
 
-		Selection sel = lookup_field(type, unparen_expr(se->selector)->Ident.token.string, Addressing_Value);
+		Selection sel = lookup_field(type, unparen_expr(se->selector)->Ident.token.string, false);
 		GB_ASSERT(sel.entity != NULL);
 
 		ssaValue *e = ssa_build_addr(proc, se->expr).addr;

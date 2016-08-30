@@ -1240,6 +1240,35 @@ b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
 	return false;
 }
 
+String check_down_cast_name(Type *dst_, Type *src_) {
+	String result = {};
+	Type *dst = type_deref(dst_);
+	Type *src = type_deref(src_);
+	Type *dst_s = get_base_type(dst);
+	GB_ASSERT(dst_s->kind == Type_Struct || dst_s->kind == Type_Union);
+	// HACK(bill): struct/union variable overlay from unsafe tagged union
+	for (isize i = 0; i < dst_s->Struct.field_count; i++) {
+		Entity *f = dst_s->Struct.fields[i];
+		GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
+		if (f->Variable.anonymous) {
+			if (are_types_identical(f->type, src_)) {
+				return f->token.string;
+			}
+			if (are_types_identical(type_deref(f->type), src_)) {
+				return f->token.string;
+			}
+
+			if (!is_type_pointer(f->type)) {
+				result = check_down_cast_name(f->type, src_);
+				if (result.len > 0)
+					return result;
+			}
+		}
+	}
+
+	return result;
+}
+
 void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_BinaryExpr);
 	Operand y_ = {}, *y = &y_;
@@ -1328,6 +1357,69 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 
 		x->type = type;
 
+		return;
+	} else if (be->op.kind == Token_down_cast) {
+		check_expr(c, x, be->left);
+		Type *type = check_type(c, be->right);
+		if (x->mode == Addressing_Invalid)
+			return;
+
+		if (x->mode == Addressing_Constant) {
+			gbString expr_str = expr_to_string(node);
+			defer (gb_string_free(expr_str));
+			error(&c->error_collector, ast_node_token(node), "Cannot `down_cast` a constant expression: `%s`", expr_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		if (is_type_untyped(x->type)) {
+			gbString expr_str = expr_to_string(node);
+			defer (gb_string_free(expr_str));
+			error(&c->error_collector, ast_node_token(node), "Cannot `down_cast` an untyped expression: `%s`", expr_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		if (!(is_type_pointer(x->type) && is_type_pointer(type))) {
+			gbString expr_str = expr_to_string(node);
+			defer (gb_string_free(expr_str));
+			error(&c->error_collector, ast_node_token(node), "Can only `down_cast` pointers: `%s`", expr_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		Type *src = type_deref(x->type);
+		Type *dst = type_deref(type);
+		Type *bsrc = get_base_type(src);
+		Type *bdst = get_base_type(dst);
+
+		if (!(bsrc->kind == Type_Struct || bsrc->kind == Type_Union)) {
+			gbString expr_str = expr_to_string(node);
+			defer (gb_string_free(expr_str));
+			error(&c->error_collector, ast_node_token(node), "Can only `down_cast` pointer from structs or unions: `%s`", expr_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		if (!(bdst->kind == Type_Struct || bdst->kind == Type_Union)) {
+			gbString expr_str = expr_to_string(node);
+			defer (gb_string_free(expr_str));
+			error(&c->error_collector, ast_node_token(node), "Can only `down_cast` pointer to structs or unions: `%s`", expr_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		String param_name = check_down_cast_name(dst, src);
+		if (param_name.len == 0) {
+			gbString expr_str = expr_to_string(node);
+			defer (gb_string_free(expr_str));
+			error(&c->error_collector, ast_node_token(node), "Illegal `down_cast`: `%s`", expr_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		x->mode = Addressing_Value;
+		x->type = type;
 		return;
 	}
 
@@ -1637,125 +1729,6 @@ b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *valu
 	return true;
 }
 
-struct Selection {
-	Entity *entity;
-	gbArray(isize) index;
-	b32 indirect; // Set if there was a pointer deref anywhere down the line
-};
-Selection empty_selection = {};
-
-Selection make_selection(Entity *entity, gbArray(isize) index, b32 indirect) {
-	Selection s = {entity, index, indirect};
-	return s;
-}
-
-void selection_add_index(Selection *s, isize index) {
-	if (s->index == NULL) {
-		gb_array_init(s->index, gb_heap_allocator());
-	}
-	gb_array_append(s->index, index);
-}
-
-Selection lookup_field(Type *type_, String field_name, AddressingMode mode, Selection sel = empty_selection) {
-	GB_ASSERT(type_ != NULL);
-
-	if (are_strings_equal(field_name, make_string("_"))) {
-		return empty_selection;
-	}
-
-	Type *type = type_deref(type_);
-	b32 is_ptr = type != type_;
-	type = get_base_type(type);
-
-	switch (type->kind) {
-	case Type_Struct:
-		if (mode == Addressing_Type) {
-			for (isize i = 0; i < type->Struct.other_field_count; i++) {
-				Entity *f = type->Struct.other_fields[i];
-				GB_ASSERT(f->kind != Entity_Variable);
-				String str = f->token.string;
-				if (are_strings_equal(field_name, str)) {
-					selection_add_index(&sel, i);
-					sel.entity = f;
-					return sel;
-				}
-			}
-		} else {
-			for (isize i = 0; i < type->Struct.field_count; i++) {
-				Entity *f = type->Struct.fields[i];
-				GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
-				String str = f->token.string;
-				if (are_strings_equal(field_name, str)) {
-					selection_add_index(&sel, i);
-					sel.entity = f;
-					return sel;
-				}
-
-				if (f->Variable.anonymous) {
-					isize prev_count = 0;
-					if (sel.index != NULL) {
-						prev_count = gb_array_count(sel.index);
-					}
-					selection_add_index(&sel, i); // HACK(bill): Leaky memory
-
-					sel = lookup_field(f->type, field_name, mode, sel);
-
-					if (sel.entity != NULL) {
-						// gb_printf("%.*s, %.*s, %.*s\n", LIT(field_name), LIT(str), LIT(sel.entity->token.string));
-						if (is_type_pointer(f->type))
-							sel.indirect = true;
-						return sel;
-					}
-					gb_array_count(sel.index) = prev_count;
-				}
-			}
-		}
-		break;
-
-	case Type_Union:
-		for (isize i = 0; i < type->Union.field_count; i++) {
-			Entity *f = type->Union.fields[i];
-			GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
-			String str = f->token.string;
-			if (are_strings_equal(field_name, str)) {
-				selection_add_index(&sel, i);
-				sel.entity = f;
-				return sel;
-			}
-		}
-		for (isize i = 0; i < type->Union.field_count; i++) {
-			Entity *f = type->Union.fields[i];
-			GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
-			String str = f->token.string;
-			if (f->Variable.anonymous) {
-				selection_add_index(&sel, i); // HACK(bill): Leaky memory
-				sel = lookup_field(f->type, field_name, mode, sel);
-				if (sel.entity != NULL && is_type_pointer(f->type)) {
-					sel.indirect = true;
-				}
-				return sel;
-			}
-		}
-		break;
-
-	case Type_Enum:
-		if (mode == Addressing_Type) {
-			for (isize i = 0; i < type->Enum.field_count; i++) {
-				Entity *f = type->Enum.fields[i];
-				GB_ASSERT(f->kind == Entity_Constant);
-				String str = f->token.string;
-				if (are_strings_equal(field_name, str)) {
-					// Enums are constant expression
-					return make_selection(f, NULL, i);
-				}
-			}
-		}
-		break;
-	}
-
-	return sel;
-}
-
 Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_SelectorExpr);
 
@@ -1763,7 +1736,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 	AstNode *op_expr  = se->expr;
 	AstNode *selector = se->selector;
 	if (selector) {
-		Entity *entity = lookup_field(operand->type, selector->Ident.token.string, operand->mode).entity;
+		Entity *entity = lookup_field(operand->type, selector->Ident.token.string, operand->mode == Addressing_Type).entity;
 		if (entity == NULL) {
 			gbString op_str   = expr_to_string(op_expr);
 			gbString type_str = type_to_string(operand->type);
@@ -1967,7 +1940,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 
 		ast_node(arg, Ident, field_arg);
-		Selection sel = lookup_field(type, arg->token.string, operand->mode);
+		Selection sel = lookup_field(type, arg->token.string, operand->mode == Addressing_Type);
 		if (sel.entity == NULL) {
 			gbString type_str = type_to_string(type);
 			error(&c->error_collector, ast_node_token(ce->arg_list),
@@ -2004,7 +1977,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 
 		ast_node(i, Ident, s->selector);
-		Selection sel = lookup_field(type, i->token.string, operand->mode);
+		Selection sel = lookup_field(type, i->token.string, operand->mode == Addressing_Type);
 		if (sel.entity == NULL) {
 			gbString type_str = type_to_string(type);
 			error(&c->error_collector, ast_node_token(arg),
@@ -2630,7 +2603,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 						}
 						String name = kv->field->Ident.token.string;
 
-						Selection sel = lookup_field(type, kv->field->Ident.token.string, o->mode);
+						Selection sel = lookup_field(type, kv->field->Ident.token.string, o->mode == Addressing_Type);
 						if (sel.entity == NULL) {
 							error(&c->error_collector, ast_node_token(elem),
 							      "Unknown field `%.*s` in structure literal", LIT(name));

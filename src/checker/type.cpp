@@ -247,6 +247,8 @@ Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_coun
 Type *type_deref(Type *t) {
 	if (t != NULL) {
 		Type *bt = get_base_type(t);
+		if (bt == NULL)
+			return NULL;
 		if (bt != NULL && bt->kind == Type_Pointer)
 			return bt->Pointer.elem;
 	}
@@ -595,6 +597,102 @@ gb_global i64 basic_type_sizes[] = {
 
 
 
+struct Selection {
+	Entity *entity;
+	gbArray(isize) index;
+	b32 indirect; // Set if there was a pointer deref anywhere down the line
+};
+Selection empty_selection = {};
+
+Selection make_selection(Entity *entity, gbArray(isize) index, b32 indirect) {
+	Selection s = {entity, index, indirect};
+	return s;
+}
+
+void selection_add_index(Selection *s, isize index) {
+	if (s->index == NULL) {
+		gb_array_init(s->index, gb_heap_allocator());
+	}
+	gb_array_append(s->index, index);
+}
+
+Selection lookup_field(Type *type_, String field_name, b32 is_type, Selection sel = empty_selection) {
+	GB_ASSERT(type_ != NULL);
+
+	if (are_strings_equal(field_name, make_string("_"))) {
+		return empty_selection;
+	}
+
+	Type *type = type_deref(type_);
+	b32 is_ptr = type != type_;
+	type = get_base_type(type);
+
+	switch (type->kind) {
+	// HACK(bill): struct/union variable overlay from unsafe tagged union
+	case Type_Struct:
+	case Type_Union:
+		if (is_type) {
+			for (isize i = 0; i < type->Struct.other_field_count; i++) {
+				Entity *f = type->Struct.other_fields[i];
+				GB_ASSERT(f->kind != Entity_Variable);
+				String str = f->token.string;
+				if (are_strings_equal(field_name, str)) {
+					selection_add_index(&sel, i);
+					sel.entity = f;
+					return sel;
+				}
+			}
+		} else {
+			for (isize i = 0; i < type->Struct.field_count; i++) {
+				Entity *f = type->Struct.fields[i];
+				GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
+				String str = f->token.string;
+				if (are_strings_equal(field_name, str)) {
+					selection_add_index(&sel, i);
+					sel.entity = f;
+					return sel;
+				}
+
+				if (f->Variable.anonymous) {
+					isize prev_count = 0;
+					if (sel.index != NULL) {
+						prev_count = gb_array_count(sel.index);
+					}
+					selection_add_index(&sel, i); // HACK(bill): Leaky memory
+
+					sel = lookup_field(f->type, field_name, is_type, sel);
+
+					if (sel.entity != NULL) {
+						if (is_type_pointer(f->type))
+							sel.indirect = true;
+						return sel;
+					}
+					gb_array_count(sel.index) = prev_count;
+				}
+			}
+		}
+		break;
+
+	case Type_Enum:
+		if (is_type) {
+			for (isize i = 0; i < type->Enum.field_count; i++) {
+				Entity *f = type->Enum.fields[i];
+				GB_ASSERT(f->kind == Entity_Constant);
+				String str = f->token.string;
+				if (are_strings_equal(field_name, str)) {
+					// Enums are constant expression
+					return make_selection(f, NULL, i);
+				}
+			}
+		}
+		break;
+	}
+
+	return sel;
+}
+
+
+
 i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
 i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
 i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, i64 index);
@@ -763,6 +861,24 @@ i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, isize index)
 	return 0;
 }
 
+gbString type_to_string(Type *type, gbAllocator a = gb_heap_allocator());
+
+i64 type_offset_of_from_selection(BaseTypeSizes s, gbAllocator allocator, Type *t, Selection sel) {
+	i64 offset = 0;
+	for (isize i = 0; i < gb_array_count(sel.index); i++) {
+		isize index = sel.index[i];
+		t = get_base_type(t);
+		if (t->kind == Type_Struct) {
+			type_set_offsets(s, allocator, t);
+			GB_ASSERT(gb_is_between(index, 0, t->Struct.field_count-1));
+			offset += t->Struct.offsets[index];
+			t = t->Struct.fields[index]->type;
+		}
+	}
+	return offset;
+}
+
+
 
 gbString write_type_to_string(gbString str, Type *type) {
 	if (type == NULL) {
@@ -866,7 +982,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 }
 
 
-gbString type_to_string(Type *type, gbAllocator a = gb_heap_allocator()) {
+gbString type_to_string(Type *type, gbAllocator a) {
 	gbString str = gb_string_make(a, "");
 	return write_type_to_string(str, type);
 }

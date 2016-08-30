@@ -1452,24 +1452,28 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 				lhs = false;
 			}
 
-
-			if (op.kind == Token_DoublePrime) {
+			switch (op.kind) {
+			case Token_DoublePrime: {
 				AstNode *proc = parse_identifier(f);
 				AstNode *right = parse_binary_expr(f, false, prec+1);
 				expression->next = right;
 				expression = make_call_expr(f, proc, expression, 2, op, ast_node_token(right));
 				continue;
-			}
+			} break;
 
-			if (op.kind == Token_as || op.kind == Token_transmute) {
+			case Token_as:
+			case Token_transmute:
+			case Token_down_cast:
 				right = parse_type(f);
-			} else {
+				break;
+
+			default:
 				right = parse_binary_expr(f, false, prec+1);
 				if (!right) {
 					ast_file_err(f, op, "Expected expression on the right hand side of the binary operator");
 				}
+				break;
 			}
-
 			expression = make_binary_expr(f, op, expression, right);
 		}
 	}
