@@ -15,7 +15,7 @@ void     update_expr_type          (Checker *c, AstNode *e, Type *type, b32 fina
 
 
 
-b32 check_is_assignable_to_using_subtype(Checker *c, Type *dst, Type *src) {
+b32 check_is_assignable_to_using_subtype(Type *dst, Type *src) {
 	Type *prev_src = src;
 	// Type *prev_dst = dst;
 	src = get_base_type(type_deref(src));
@@ -34,6 +34,10 @@ b32 check_is_assignable_to_using_subtype(Checker *c, Type *dst, Type *src) {
 					if (are_types_identical(type_deref(dst), f->type)) {
 						return true;
 					}
+				}
+				b32 ok = check_is_assignable_to_using_subtype(dst, f->type);
+				if (ok) {
+					return true;
 				}
 			}
 		}
@@ -91,7 +95,7 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 
 	if (is_argument) {
 		// NOTE(bill): Polymorphism for subtyping
-		if (check_is_assignable_to_using_subtype(c, type, src)) {
+		if (check_is_assignable_to_using_subtype(type, src)) {
 			return true;
 		}
 	}

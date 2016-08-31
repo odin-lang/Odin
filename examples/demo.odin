@@ -33,8 +33,8 @@ main :: proc() {
 	print_f32(f.jump_height); nl()
 	print_f32(parent.jump_height); nl()
 
-	print_name(f.entity, Vec3{1, 2, 3})
-	print_name(parent.entity, Vec3{3, 2, 1})
+	print_name(f, Vec3{1, 2, 3})
+	print_name(parent, Vec3{3, 2, 1})
 
 
 }

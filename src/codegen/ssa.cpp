@@ -1288,7 +1288,34 @@ ssaValue *ssa_emit_string(ssaProcedure *proc, ssaValue *elem, ssaValue *len) {
 	return str;
 }
 
+String lookup_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
+	Type *prev_src = src;
+	// Type *prev_dst = dst;
+	src = get_base_type(type_deref(src));
+	// dst = get_base_type(type_deref(dst));
+	b32 src_is_ptr = src != prev_src;
+	// b32 dst_is_ptr = dst != prev_dst;
 
+	GB_ASSERT(src->kind == Type_Struct);
+	for (isize i = 0; i < src->Struct.field_count; i++) {
+		Entity *f = src->Struct.fields[i];
+		if (f->kind == Entity_Variable && f->Variable.anonymous) {
+			if (are_types_identical(dst, f->type)) {
+				return f->token.string;
+			}
+			if (src_is_ptr && is_type_pointer(dst)) {
+				if (are_types_identical(type_deref(dst), f->type)) {
+					return f->token.string;
+				}
+			}
+			String name = lookup_polymorphic_field(info, dst, f->type);
+			if (name.len > 0) {
+				return name;
+			}
+		}
+	}
+	return make_string("");
+}
 
 
 ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_argument) {
@@ -1394,18 +1421,8 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 		Type *sb = get_base_type(type_deref(src));
 		b32 src_is_ptr = src != sb;
 		if (sb->kind == Type_Struct) {
-			// NOTE(bill): Check
-			String field_name = {};
-			for (isize i = 0; i < sb->Struct.field_count; i++) {
-				Entity *f = sb->Struct.fields[i];
-				if (f->kind == Entity_Variable && f->Variable.anonymous) {
-					if (are_types_identical(t, f->type)) {
-						field_name = f->token.string;
-						break;
-					}
-				}
-			}
-
+			String field_name = lookup_polymorphic_field(proc->module->info, t, src);
+			// gb_printf("field_name: %.*s\n", LIT(field_name));
 			if (field_name.len > 0) {
 				// NOTE(bill): It can be casted
 				Selection sel = lookup_field(sb, field_name, false);
