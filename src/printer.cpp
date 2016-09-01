@@ -16,7 +16,7 @@ void print_ast(AstNode *node, isize indent) {
 		break;
 	case AstNode_Ident:
 		print_indent(indent);
-		print_token(node->Ident.token);
+		print_token(node->Ident);
 		break;
 	case AstNode_ProcLit:
 		print_indent(indent);

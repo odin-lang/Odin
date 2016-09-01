@@ -3,6 +3,26 @@
 #load "game.odin"
 
 main :: proc() {
+
+
+	match x := "1"; x {
+	case "1":
+		print_string("1!\n")
+	case "2":
+		print_string("2!\n")
+		if true {
+			break
+		}
+	case "3", "4":
+		print_string("3 or 4!\n")
+		fallthrough
+	default:
+		print_string("default!\n")
+	}
+
+	nl()
+
+/*
 	Vec3   :: type struct { x, y, z: f32 }
 	Entity :: type struct {
 		using pos: Vec3
@@ -19,11 +39,11 @@ main :: proc() {
 	}
 
 	f := Frog{};
-	f.name = "ribbit";
-	f.jump_height = 1337;
+	f.name = "ribbit"
+	f.jump_height = 1337
 
-	e := ^f.entity;
-	parent := e down_cast ^Frog;
+	e := ^f.entity
+	parent := e down_cast ^Frog
 
 	print_name :: proc(using e: Entity, v: Vec3) {
 		print_string(name); nl()
@@ -35,10 +55,8 @@ main :: proc() {
 
 	print_name(f, Vec3{1, 2, 3})
 	print_name(parent, Vec3{3, 2, 1})
-
-
+*/
 }
 
-
-nl :: proc() #inline { print_nl() }
+nl :: proc() { print_nl() }
 

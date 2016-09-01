@@ -72,6 +72,8 @@ int main(int argc, char **argv) {
 	defer (destroy_checker(&checker));
 
 	check_parsed_files(&checker);
+
+#if 1
 	ssaGen ssa = {};
 	if (!ssa_gen_init(&ssa, &checker))
 		return 1;
@@ -90,8 +92,6 @@ int main(int argc, char **argv) {
 		output_name, cast(int)base_name_len, output_name);
 	if (exit_code != 0)
 		return exit_code;
-#if 1
-#endif
 
 	gbString lib_str = gb_string_make(gb_heap_allocator(), "-lKernel32.lib");
 	char lib_str_buf[1024] = {};
@@ -119,5 +119,7 @@ int main(int argc, char **argv) {
 	if (run_output) {
 		win32_exec_command_line_app("%.*s.exe", cast(int)base_name_len, output_name);
 	}
+#endif
+
 	return 0;
 }

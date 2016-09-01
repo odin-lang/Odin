@@ -339,6 +339,7 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	return NULL;
 }
 
+
 void add_dependency(DeclInfo *d, Entity *e) {
 	map_set(&d->deps, hash_pointer(e), cast(b32)true);
 }
@@ -543,6 +544,7 @@ b32 add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 				      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
 				return false;
 			} else {
+				gb_printf_err("!!Here\n");
 				error(&c->error_collector, entity->token,
 				      "Redeclararation of `%.*s` in this scope\n"
 				      "\tat %.*s(%td:%td)",
@@ -557,6 +559,78 @@ b32 add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 	return true;
 }
 
+
+/*
+b32 add_proc_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
+	GB_ASSERT(entity->kind == Entity_Procedure);
+
+	auto error_proc_redecl = [](Checker *c, Token token, Entity *other_entity, char *extra_msg) {
+		error(&c->error_collector, token,
+		      "Redeclararation of `%.*s` in this scope %s\n"
+		      "\tat %.*s(%td:%td)",
+		      LIT(other_entity->token.string),
+		      extra_msg,
+		      LIT(other_entity->token.pos.file), other_entity->token.pos.line, other_entity->token.pos.column);
+	};
+
+	String name = entity->token.string;
+	HashKey key = hash_string(name);
+
+	b32 insert_overload = false;
+
+	if (!are_strings_equal(name, make_string("_"))) {
+		Entity *insert_entity = scope_insert_entity(scope, entity);
+		if (insert_entity != NULL) {
+			if (insert_entity != entity) {
+				isize count = multi_map_count(&scope->elements, key);
+				GB_ASSERT(count > 0);
+				Entity **entities = gb_alloc_array(gb_heap_allocator(), Entity *, count);
+				defer (gb_free(gb_heap_allocator(), entities));
+				multi_map_get_all(&scope->elements, key, entities);
+
+				for (isize i = 0; i < count; i++) {
+					Entity *e = entities[i];
+					if (e == entity) {
+						continue;
+					}
+					if (e->kind == Entity_Procedure) {
+						Type *proc_type = entity->type;
+						Type *other_proc_type = e->type;
+						// gb_printf_err("%s == %s\n", type_to_string(proc_type), type_to_string(other_proc_type));
+						if (are_types_identical(proc_type, other_proc_type)) {
+							error_proc_redecl(c, entity->token, e, "with identical types");
+							return false;
+						}
+
+						if (proc_type != NULL && other_proc_type != NULL) {
+							Type *params = proc_type->Proc.params;
+							Type *other_params = other_proc_type->Proc.params;
+
+							if (are_types_identical(params, other_params)) {
+								error_proc_redecl(c, entity->token, e, "with 2identical parameters");
+								return false;
+							}
+						}
+					} else {
+						error_proc_redecl(c, entity->token, e, "");
+						return false;
+					}
+				}
+				insert_overload = true;
+			}
+		}
+	}
+
+	if (insert_overload) {
+		multi_map_insert(&scope->elements, key, entity);
+	}
+
+	if (identifier != NULL)
+		add_entity_definition(&c->info, identifier, entity);
+	return true;
+}
+*/
+
 void add_entity_use(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier != NULL);
 	GB_ASSERT(identifier->kind == AstNode_Ident);
@@ -566,7 +640,7 @@ void add_entity_use(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 
 
 void add_file_entity(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d) {
-	GB_ASSERT(are_strings_equal(identifier->Ident.token.string, e->token.string));
+	GB_ASSERT(are_strings_equal(identifier->Ident.string, e->token.string));
 
 	add_entity(c, c->global_scope, identifier, e);
 	map_set(&c->info.entities, hash_pointer(e), d);
@@ -604,7 +678,6 @@ void add_curr_ast_file(Checker *c, AstFile *file) {
 	c->error_collector.prev = zero_pos;
 	c->curr_ast_file = file;
 }
-
 
 
 
@@ -658,9 +731,8 @@ void check_parsed_files(Checker *c) {
 					for (AstNode *name = vd->name_list, *value = vd->value_list;
 					     name != NULL && value != NULL;
 					     name = name->next, value = value->next) {
-						ast_node(n, Ident, name);
 						ExactValue v = {ExactValue_Invalid};
-						Entity *e = make_entity_constant(c->allocator, c->context.scope, n->token, NULL, v);
+						Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
 						DeclInfo *di = make_declaration_info(c->allocator, c->global_scope);
 						di->type_expr = vd->type;
 						di->init_expr = value;
@@ -692,8 +764,7 @@ void check_parsed_files(Checker *c) {
 
 					AstNode *value = vd->value_list;
 					for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
-						ast_node(n, Ident, name);
-						Entity *e = make_entity_variable(c->allocator, c->global_scope, n->token, NULL);
+						Entity *e = make_entity_variable(c->allocator, c->global_scope, name->Ident, NULL);
 						entities[entity_index++] = e;
 
 						DeclInfo *d = di;
@@ -716,7 +787,7 @@ void check_parsed_files(Checker *c) {
 
 			case_ast_node(td, TypeDecl, decl);
 				ast_node(n, Ident, td->name);
-				Entity *e = make_entity_type_name(c->allocator, c->global_scope, n->token, NULL);
+				Entity *e = make_entity_type_name(c->allocator, c->global_scope, *n, NULL);
 				DeclInfo *d = make_declaration_info(c->allocator, e->scope);
 				d->type_expr = td->type;
 				add_file_entity(c, td->name, e, d);
@@ -724,9 +795,8 @@ void check_parsed_files(Checker *c) {
 
 			case_ast_node(pd, ProcDecl, decl);
 				ast_node(n, Ident, pd->name);
-				Token token = n->token;
+				Token token = *n;
 				Entity *e = make_entity_procedure(c->allocator, c->global_scope, token, NULL);
-				add_entity(c, c->global_scope, pd->name, e);
 				DeclInfo *d = make_declaration_info(c->allocator, e->scope);
 				d->proc_decl = decl;
 				map_set(&c->info.entities, hash_pointer(e), d);
@@ -747,14 +817,21 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
+	auto check_global_entity = [](Checker *c, EntityKind kind) {
+		gb_for_array(i, c->info.entities.entries) {
+			auto *entry = &c->info.entities.entries[i];
+			Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
+			if (e->kind == kind) {
+				DeclInfo *d = entry->value;
+				check_entity_decl(c, e, d, NULL);
+			}
+		}
+	};
 
-	gb_for_array(i, c->info.entities.entries) {
-		auto *entry = &c->info.entities.entries[i];
-		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
-		DeclInfo *d = entry->value;
-		check_entity_decl(c, e, d, NULL);
-	}
-
+	check_global_entity(c, Entity_TypeName);
+	check_global_entity(c, Entity_Constant);
+	check_global_entity(c, Entity_Procedure);
+	check_global_entity(c, Entity_Variable);
 
 	// Check procedure bodies
 	gb_for_array(i, c->procs) {

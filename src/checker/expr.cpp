@@ -23,9 +23,9 @@ b32 check_is_assignable_to_using_subtype(Type *dst, Type *src) {
 	b32 src_is_ptr = src != prev_src;
 	// b32 dst_is_ptr = dst != prev_dst;
 
-	if (src->kind == Type_Struct) {
-		for (isize i = 0; i < src->Struct.field_count; i++) {
-			Entity *f = src->Struct.fields[i];
+	if (is_type_struct(src)) {
+		for (isize i = 0; i < src->Record.field_count; i++) {
+			Entity *f = src->Record.fields[i];
 			if (f->kind == Entity_Variable && f->Variable.anonymous) {
 				if (are_types_identical(dst, f->type)) {
 					return true;
@@ -152,13 +152,9 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 	gbString str = expr_to_string(node);
 	defer (gb_string_free(str));
 
-	switch (t->kind) {
-	// IMPORTANT HACK(bill): The positions of fields and field_count
-	// must be same for Struct and Union
-	case Type_Struct:
-	case Type_Union:
-		for (isize i = 0; i < t->Struct.field_count; i++) {
-			Entity *f = t->Struct.fields[i];
+	if (t->kind == Type_Record) {
+		for (isize i = 0; i < t->Record.field_count; i++) {
+			Entity *f = t->Record.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable);
 			String name = f->token.string;
 			HashKey key = hash_string(name);
@@ -175,7 +171,6 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 				}
 			}
 		}
-		break;
 	}
 
 }
@@ -215,8 +210,7 @@ void check_fields(Checker *c, AstNode *node, AstNode *decl_list,
 			     name = name->next, value = value->next) {
 				GB_ASSERT(name->kind == AstNode_Ident);
 				ExactValue v = {ExactValue_Invalid};
-				ast_node(i, Ident, name);
-				Token name_token = i->token;
+				Token name_token = name->Ident;
 				Entity *e = make_entity_constant(c->allocator, c->context.scope, name_token, NULL, v);
 				entities[entity_index++] = e;
 				check_const_decl(c, e, vd->type, value);
@@ -235,7 +229,7 @@ void check_fields(Checker *c, AstNode *node, AstNode *decl_list,
 			AstNode *name = vd->name_list;
 			for (isize i = 0; i < entity_count; i++, name = name->next) {
 				Entity *e = entities[i];
-				Token name_token = name->Ident.token;
+				Token name_token = name->Ident;
 				HashKey key = hash_string(name_token.string);
 				if (map_get(&entity_map, key) != NULL) {
 					// TODO(bill): Scope checking already checks the declaration
@@ -248,10 +242,9 @@ void check_fields(Checker *c, AstNode *node, AstNode *decl_list,
 			}
 		} else if (decl->kind == AstNode_TypeDecl) {
 			ast_node(td, TypeDecl, decl);
-			ast_node(name, Ident, td->name);
-			Token name_token = name->token;
+			Token name_token = td->name->Ident;
 
-			Entity *e = make_entity_type_name(c->allocator, c->context.scope, name->token, NULL);
+			Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, NULL);
 			check_type_decl(c, e, td->type, NULL, NULL);
 			add_entity(c, c->context.scope, td->name, e);
 
@@ -285,8 +278,7 @@ void check_fields(Checker *c, AstNode *node, AstNode *decl_list,
 		}
 
 		for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
-			ast_node(i, Ident, name);
-			Token name_token = i->token;
+			Token name_token = name->Ident;
 
 			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, vd->is_using);
 			HashKey key = hash_string(name_token.string);
@@ -304,9 +296,8 @@ void check_fields(Checker *c, AstNode *node, AstNode *decl_list,
 
 		if (vd->is_using) {
 			Type *t = get_base_type(type_deref(type));
-			if (t->kind != Type_Struct &&
-			    t->kind != Type_Union) {
-				Token name_token = vd->name_list->Ident.token;
+			if (!is_type_struct(t) && !is_type_raw_union(t)) {
+				Token name_token = vd->name_list->Ident;
 				error(&c->error_collector, name_token, "`using` on a field `%.*s` must be a structure or union", LIT(name_token.string));
 				continue;
 			}
@@ -322,12 +313,12 @@ void check_fields(Checker *c, AstNode *node, AstNode *decl_list,
 
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecker *cycle_checker) {
 	GB_ASSERT(node->kind == AstNode_StructType);
-	GB_ASSERT(struct_type->kind == Type_Struct);
+	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
 
 	// TODO(bill): check_struct_type and check_union_type are very similar so why not and try to merge them better
 
-	isize field_count = 0;
+isize field_count = 0;
 	isize other_field_count = 0;
 	for (AstNode *decl = st->decl_list; decl != NULL; decl = decl->next) {
 		switch (decl->kind) {
@@ -350,17 +341,17 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecke
 
 	check_fields(c, node, st->decl_list, fields, field_count, other_fields, other_field_count, cycle_checker, make_string("struct"));
 
-	struct_type->Struct.is_packed         = st->is_packed;
-	struct_type->Struct.fields            = fields;
-	struct_type->Struct.field_count       = field_count;
-	struct_type->Struct.other_fields      = other_fields;
-	struct_type->Struct.other_field_count = other_field_count;
+	struct_type->Record.struct_is_packed  = st->is_packed;
+	struct_type->Record.fields            = fields;
+	struct_type->Record.field_count       = field_count;
+	struct_type->Record.other_fields      = other_fields;
+	struct_type->Record.other_field_count = other_field_count;
 }
 
-void check_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker *cycle_checker) {
-	GB_ASSERT(node->kind == AstNode_UnionType);
-	GB_ASSERT(union_type->kind == Type_Union);
-	ast_node(ut, UnionType, node);
+void check_raw_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker *cycle_checker) {
+	GB_ASSERT(node->kind == AstNode_RawUnionType);
+	GB_ASSERT(is_type_raw_union(union_type));
+	ast_node(ut, RawUnionType, node);
 
 	isize field_count = 0;
 	isize other_field_count = 0;
@@ -385,16 +376,16 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker 
 
 	check_fields(c, node, ut->decl_list, fields, field_count, other_fields, other_field_count, cycle_checker, make_string("union"));
 
-	union_type->Union.fields = fields;
-	union_type->Union.field_count = field_count;
-	union_type->Union.other_fields = other_fields;
-	union_type->Union.other_field_count = other_field_count;
+	union_type->Record.fields = fields;
+	union_type->Record.field_count = field_count;
+	union_type->Record.other_fields = other_fields;
+	union_type->Record.other_field_count = other_field_count;
 }
 
 
 void check_enum_type(Checker *c, Type *enum_type, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_EnumType);
-	GB_ASSERT(enum_type->kind == Type_Enum);
+	GB_ASSERT(is_type_enum(enum_type));
 	ast_node(et, EnumType, node);
 
 	Map<Entity *> entity_map = {};
@@ -413,14 +404,14 @@ void check_enum_type(Checker *c, Type *enum_type, AstNode *node) {
 	if (base_type == NULL) {
 		base_type = t_int;
 	}
-	enum_type->Enum.base = base_type;
+	enum_type->Record.enum_base = base_type;
 
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, et->field_count);
 	isize field_index = 0;
 	ExactValue iota = make_exact_value_integer(-1);
 	for (AstNode *field = et->field_list; field != NULL; field = field->next) {
 		ast_node(f, FieldValue, field);
-		Token name_token = f->field->Ident.token;
+		Token name_token = f->field->Ident;
 
 		Operand o = {};
 		if (f->value != NULL) {
@@ -455,8 +446,8 @@ void check_enum_type(Checker *c, Type *enum_type, AstNode *node) {
 		}
 		add_entity_use(&c->info, f->field, e);
 	}
-	enum_type->Enum.fields = fields;
-	enum_type->Enum.field_count = et->field_count;
+	enum_type->Record.other_fields = fields;
+	enum_type->Record.other_field_count = et->field_count;
 }
 
 Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize field_count) {
@@ -474,8 +465,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize fiel
 			Type *type = check_type(c, type_expr);
 			for (AstNode *name = f->name_list; name != NULL; name = name->next) {
 				if (name->kind == AstNode_Ident) {
-					ast_node(i, Ident, name);
-					Entity *param = make_entity_param(c->allocator, scope, i->token, type, f->is_using);
+					Entity *param = make_entity_param(c->allocator, scope, name->Ident, type, f->is_using);
 					add_entity(c, scope, name, param);
 					variables[variable_index++] = param;
 				} else {
@@ -536,11 +526,10 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 	GB_ASSERT(n->kind == AstNode_Ident);
 	o->mode = Addressing_Invalid;
 	o->expr = n;
-	ast_node(i, Ident, n);
-	Entity *e = scope_lookup_entity(c, c->context.scope, i->token.string);
+	Entity *e = scope_lookup_entity(c, c->context.scope, n->Ident.string);
 	if (e == NULL) {
-		error(&c->error_collector, i->token,
-		    "Undeclared type or identifier `%.*s`", LIT(i->token.string));
+		error(&c->error_collector, n->Ident,
+		    "Undeclared type or identifier `%.*s`", LIT(n->Ident.string));
 		return;
 	}
 	add_entity_use(&c->info, n, e);
@@ -563,7 +552,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 	}
 
 	if (e->type == NULL) {
-		GB_PANIC("Compiler error: How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(i->token.string));
+		GB_PANIC("Compiler error: How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(n->Ident.string));
 		return;
 	}
 
@@ -739,17 +728,17 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		check_open_scope(c, e);
 		check_struct_type(c, type, e, cycle_checker);
 		check_close_scope(c);
-		type->Struct.node = e;
+		type->Record.node = e;
 		goto end;
 	case_end;
 
-	case_ast_node(st, UnionType, e);
-		type = make_type_union(c->allocator);
+	case_ast_node(st, RawUnionType, e);
+		type = make_type_raw_union(c->allocator);
 		set_base_type(named_type, type);
 		check_open_scope(c, e);
-		check_union_type(c, type, e, cycle_checker);
+		check_raw_union_type(c, type, e, cycle_checker);
 		check_close_scope(c);
-		type->Union.node = e;
+		type->Record.node = e;
 		goto end;
 	case_end;
 
@@ -757,6 +746,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		type = make_type_enum(c->allocator);
 		set_base_type(named_type, type);
 		check_enum_type(c, type, e);
+		type->Record.node = e;
 		goto end;
 	case_end;
 
@@ -1249,10 +1239,9 @@ String check_down_cast_name(Type *dst_, Type *src_) {
 	Type *dst = type_deref(dst_);
 	Type *src = type_deref(src_);
 	Type *dst_s = get_base_type(dst);
-	GB_ASSERT(dst_s->kind == Type_Struct || dst_s->kind == Type_Union);
-	// HACK(bill): struct/union variable overlay from unsafe tagged union
-	for (isize i = 0; i < dst_s->Struct.field_count; i++) {
-		Entity *f = dst_s->Struct.fields[i];
+	GB_ASSERT(is_type_struct(dst_s) || is_type_raw_union(dst_s));
+	for (isize i = 0; i < dst_s->Record.field_count; i++) {
+		Entity *f = dst_s->Record.fields[i];
 		GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
 		if (f->Variable.anonymous) {
 			if (are_types_identical(f->type, src_)) {
@@ -1397,7 +1386,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		Type *bsrc = get_base_type(src);
 		Type *bdst = get_base_type(dst);
 
-		if (!(bsrc->kind == Type_Struct || bsrc->kind == Type_Union)) {
+		if (!(is_type_struct(bsrc) || is_type_raw_union(bsrc))) {
 			gbString expr_str = expr_to_string(node);
 			defer (gb_string_free(expr_str));
 			error(&c->error_collector, ast_node_token(node), "Can only `down_cast` pointer from structs or unions: `%s`", expr_str);
@@ -1405,7 +1394,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			return;
 		}
 
-		if (!(bdst->kind == Type_Struct || bdst->kind == Type_Union)) {
+		if (!(is_type_struct(bdst) || is_type_struct(bdst))) {
 			gbString expr_str = expr_to_string(node);
 			defer (gb_string_free(expr_str));
 			error(&c->error_collector, ast_node_token(node), "Can only `down_cast` pointer to structs or unions: `%s`", expr_str);
@@ -1740,7 +1729,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 	AstNode *op_expr  = se->expr;
 	AstNode *selector = se->selector;
 	if (selector) {
-		Entity *entity = lookup_field(operand->type, selector->Ident.token.string, operand->mode == Addressing_Type).entity;
+		Entity *entity = lookup_field(operand->type, selector->Ident.string, operand->mode == Addressing_Type).entity;
 		if (entity == NULL) {
 			gbString op_str   = expr_to_string(op_expr);
 			gbString type_str = type_to_string(operand->type);
@@ -1787,7 +1776,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		if (err) {
 			ast_node(proc, Ident, ce->proc);
 			error(&c->error_collector, ce->close, "`%s` arguments for `%.*s`, expected %td, got %td",
-			      err, LIT(proc->token.string),
+			      err, LIT(proc->string),
 			      bp->arg_count, ce->arg_list_count);
 			return false;
 		}
@@ -1931,7 +1920,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		Type *type = get_base_type(check_type(c, ce->arg_list));
 		AstNode *field_arg = unparen_expr(ce->arg_list->next);
 		if (type) {
-			if (type->kind != Type_Struct) {
+			if (!is_type_struct(type)) {
 				error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a structure type for `offset_of`");
 				return false;
 			}
@@ -1944,11 +1933,11 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 
 		ast_node(arg, Ident, field_arg);
-		Selection sel = lookup_field(type, arg->token.string, operand->mode == Addressing_Type);
+		Selection sel = lookup_field(type, arg->string, operand->mode == Addressing_Type);
 		if (sel.entity == NULL) {
 			gbString type_str = type_to_string(type);
 			error(&c->error_collector, ast_node_token(ce->arg_list),
-			      "`%s` has no field named `%.*s`", type_str, LIT(arg->token.string));
+			      "`%s` has no field named `%.*s`", type_str, LIT(arg->string));
 			return false;
 		}
 
@@ -1975,17 +1964,18 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		Type *type = operand->type;
 		if (get_base_type(type)->kind == Type_Pointer) {
 			Type *p = get_base_type(type);
-			if (get_base_type(p)->kind == Type_Struct)
+			if (is_type_struct(p)) {
 				type = p->Pointer.elem;
+			}
 		}
 
 
 		ast_node(i, Ident, s->selector);
-		Selection sel = lookup_field(type, i->token.string, operand->mode == Addressing_Type);
+		Selection sel = lookup_field(type, i->string, operand->mode == Addressing_Type);
 		if (sel.entity == NULL) {
 			gbString type_str = type_to_string(type);
 			error(&c->error_collector, ast_node_token(arg),
-			      "`%s` has no field named `%.*s`", type_str, LIT(i->token.string));
+			      "`%s` has no field named `%.*s`", type_str, LIT(i->string));
 			return false;
 		}
 
@@ -2357,7 +2347,6 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	return true;
 }
 
-
 void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
 	GB_ASSERT(call->kind == AstNode_CallExpr);
 	GB_ASSERT(proc_type->kind == Type_Proc);
@@ -2439,8 +2428,9 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	check_expr_or_type(c, operand, ce->proc);
 
 	if (operand->mode == Addressing_Invalid) {
-		for (AstNode *arg = ce->arg_list; arg != NULL; arg = arg->next)
+		for (AstNode *arg = ce->arg_list; arg != NULL; arg = arg->next) {
 			check_expr_base(c, operand, arg);
+		}
 		operand->mode = Addressing_Invalid;
 		operand->expr = call;
 		return Expr_Stmt;
@@ -2449,8 +2439,9 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 
 	if (operand->mode == Addressing_Builtin) {
 		i32 id = operand->builtin_id;
-		if (!check_builtin_procedure(c, operand, call, id))
+		if (!check_builtin_procedure(c, operand, call, id)) {
 			operand->mode = Addressing_Invalid;
+		}
 		operand->expr = call;
 		return builtin_procs[id].kind;
 	}
@@ -2470,15 +2461,14 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 
 	check_call_arguments(c, operand, proc_type, call);
 
-	auto *proc = &proc_type->Proc;
-	if (proc->result_count == 0) {
+	if (proc_type->Proc.result_count == 0) {
 		operand->mode = Addressing_NoValue;
-	} else if (proc->result_count == 1) {
+	} else if (proc_type->Proc.result_count == 1) {
 		operand->mode = Addressing_Value;
-		operand->type = proc->results->Tuple.variables[0]->type;
+		operand->type = proc_type->Proc.results->Tuple.variables[0]->type;
 	} else {
 		operand->mode = Addressing_Value;
-		operand->type = proc->results;
+		operand->type = proc_type->Proc.results;
 	}
 
 	operand->expr = call;
@@ -2580,12 +2570,14 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 		Type *t = get_base_type(type);
 		switch (t->kind) {
-		case Type_Struct: {
+		case Type_Record: {
+			if (!is_type_struct(t))
+				break;
 			if (cl->elem_count == 0)
 				break; // NOTE(bill): No need to init
 			{ // Checker values
 				AstNode *elem = cl->elem_list;
-				isize field_count = t->Struct.field_count;
+				isize field_count = t->Record.field_count;
 				if (elem->kind == AstNode_FieldValue) {
 					b32 *fields_visited = gb_alloc_array(c->allocator, b32, field_count);
 
@@ -2605,9 +2597,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 							      "Invalid field name `%s` in structure literal", expr_str);
 							continue;
 						}
-						String name = kv->field->Ident.token.string;
+						String name = kv->field->Ident.string;
 
-						Selection sel = lookup_field(type, kv->field->Ident.token.string, o->mode == Addressing_Type);
+						Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
 						if (sel.entity == NULL) {
 							error(&c->error_collector, ast_node_token(elem),
 							      "Unknown field `%.*s` in structure literal", LIT(name));
@@ -2620,7 +2612,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 							continue;
 						}
 
-						Entity *field = t->Struct.fields[sel.index[0]];
+						Entity *field = t->Record.fields[sel.index[0]];
 						add_entity_use(&c->info, kv->field, field);
 
 						if (fields_visited[sel.index[0]]) {
@@ -2643,7 +2635,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 							      "Mixture of `field = value` and value elements in a structure literal is not allowed");
 							continue;
 						}
-						Entity *field = t->Struct.fields[index];
+						Entity *field = t->Record.fields[index];
 
 						check_expr(c, o, elem);
 						if (index >= field_count) {
@@ -2955,7 +2947,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case AstNode_ArrayType:
 	case AstNode_VectorType:
 	case AstNode_StructType:
-	case AstNode_UnionType:
+	case AstNode_RawUnionType:
 		o->mode = Addressing_Type;
 		o->type = check_type(c, node);
 		break;
@@ -3090,7 +3082,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		break;
 
 	case_ast_node(i, Ident, node);
-		str = string_append_token(str, i->token);
+		str = string_append_token(str, *i);
 	case_end;
 
 	case_ast_node(bl, BasicLit, node);
@@ -3229,8 +3221,8 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, "}");
 	case_end;
 
-	case_ast_node(st, UnionType, node);
-		str = gb_string_appendc(str, "union{");
+	case_ast_node(st, RawUnionType, node);
+		str = gb_string_appendc(str, "raw_union{");
 		// str = write_field_list_to_string(str, st->decl_list, ", ");
 		str = gb_string_appendc(str, "}");
 	case_end;

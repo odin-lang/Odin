@@ -110,6 +110,15 @@ template <typename T> void map_clear  (Map<T> *h);
 template <typename T> void map_grow   (Map<T> *h);
 template <typename T> void map_rehash (Map<T> *h, isize new_count);
 
+template <typename T> typename MapEntry<T> *multi_map_find_first(Map<T> *h, HashKey key);
+template <typename T> typename MapEntry<T> *multi_map_find_next (Map<T> *h, typename MapEntry<T> *e);
+
+template <typename T> isize multi_map_count     (Map<T> *h, HashKey key);
+template <typename T> void  multi_map_get_all   (Map<T> *h, HashKey key, T *items);
+template <typename T> void  multi_map_insert    (Map<T> *h, HashKey key, T value);
+template <typename T> void  multi_map_remove    (Map<T> *h, HashKey key, typename MapEntry<T> *e);
+template <typename T> void  multi_map_remove_all(Map<T> *h, HashKey key);
+
 
 
 template <typename T>
@@ -149,6 +158,24 @@ gb_internal MapFindResult map__find(Map<T> *h, HashKey key) {
 	}
 	return fr;
 }
+
+template <typename T>
+gb_internal MapFindResult map__find(Map<T> *h, typename MapEntry<T> *e) {
+	MapFindResult fr = {-1, -1, -1};
+	if (gb_array_count(h->hashes) > 0) {
+		fr.hash_index  = e->key.key % gb_array_count(h->hashes);
+		fr.entry_index = h->hashes[fr.hash_index];
+		while (fr.entry_index >= 0) {
+			if (&h->entries[fr.entry_index] == e) {
+				return fr;
+			}
+			fr.entry_prev = fr.entry_index;
+			fr.entry_index = h->entries[fr.entry_index].next;
+		}
+	}
+	return fr;
+}
+
 
 template <typename T>
 gb_internal b32 map__full(Map<T> *h) {
@@ -221,26 +248,33 @@ void map_set(Map<T> *h, HashKey key, T value) {
 		map_grow(h);
 }
 
+
+
+template <typename T>
+void map__erase(Map<T> *h, MapFindResult fr) {
+	if (fr.entry_prev < 0) {
+		h->hashes[fr.hash_index] = h->entries[fr.entry_index].next;
+	} else {
+		h->entries[fr.entry_prev].next = h->entries[fr.entry_index].next;
+	}
+	if (fr.entry_index == gb_array_count(h->entries)-1) {
+		gb_array_pop(h->entries);
+		return;
+	}
+	h->entries[fr.entry_index] = h->entries[gb_array_count(h->entries)-1];
+	MapFindResult last = map__find(h, h->entries[fr.entry_index].key);
+	if (last.entry_prev >= 0) {
+		h->entries[last.entry_prev].next = fr.entry_index;
+	} else {
+		h->hashes[last.hash_index] = fr.entry_index;
+	}
+}
+
 template <typename T>
 void map_remove(Map<T> *h, HashKey key) {
 	MapFindResult fr = map__find(h, key);
 	if (fr.entry_index >= 0) {
-		if (fr.entry_prev < 0) {
-			h->hashes[fr.hash_index] = h->entries[fr.entry_index].next;
-		} else {
-			h->entries[fr.entry_prev].next = h->entries[fr.entry_index].next;
-		}
-		if (fr.entry_index == gb_array_count(h->entries)-1) {
-			gb_array_pop(h->entries);
-			return;
-		}
-		h->entries[fr.entry_index] = h->entries[gb_array_count(h->entries)-1];
-		MapFindResult last = map__find(h, h->entries[fr.entry_index].key);
-		if (last.entry_prev >= 0) {
-			h->entries[last.entry_prev].next = fr.entry_index;
-		} else {
-			h->hashes[last.hash_index] = fr.entry_index;
-		}
+		map__erase(h, fr);
 	}
 }
 
@@ -249,3 +283,82 @@ gb_inline void map_clear(Map<T> *h) {
 	gb_array_clear(h->hashes);
 	gb_array_clear(h->entries);
 }
+
+
+
+template <typename T>
+typename MapEntry<T> *multi_map_find_first(Map<T> *h, HashKey key) {
+	isize i = map__find(h, key).entry_index;
+	if (i < 0) {
+		return NULL;
+	}
+	return &h->entries[i];
+}
+
+template <typename T>
+typename MapEntry<T> *multi_map_find_next(Map<T> *h, typename MapEntry<T> *e) {
+	isize i = e->next;
+	while (i >= 0) {
+		if (hash_key_equal(h->entries[i].key, e->key)) {
+			return &h->entries[i];
+		}
+		i = h->entries[i].next;
+	}
+	return NULL;
+}
+
+template <typename T>
+isize multi_map_count(Map<T> *h, HashKey key) {
+	isize count = 0;
+	auto *e = multi_map_find_first(h, key);
+	while (e != NULL) {
+		count++;
+		e = multi_map_find_next(h, e);
+	}
+	return count;
+}
+
+template <typename T>
+void multi_map_get_all(Map<T> *h, HashKey key, T *items) {
+	isize i = 0;
+	auto *e = multi_map_find_first(h, key);
+	while (e != NULL) {
+		items[i++] = e->value;
+		e = multi_map_find_next(h, e);
+	}
+}
+
+template <typename T>
+void multi_map_insert(Map<T> *h, HashKey key, T value) {
+	if (gb_array_count(h->hashes) == 0) {
+		map_grow(h);
+	}
+	MapFindResult fr = map__find(h, key);
+	isize i = map__add_entry(h, key);
+	if (fr.entry_prev < 0) {
+		h->hashes[fr.hash_index] = i;
+	} else {
+		h->entries[fr.entry_prev].next = i;
+	}
+	h->entries[i].next = fr.entry_index;
+	h->entries[i].value = value;
+	if (map__full(h)) {
+		map_grow(h);
+	}
+}
+
+template <typename T>
+void multi_map_remove(Map<T> *h, HashKey key, typename MapEntry<T> *e) {
+	MapFindResult fr = map__find(h, e);
+	if (fr.entry_index >= 0) {
+		map__erase(h, fr);
+	}
+}
+
+template <typename T>
+void multi_map_remove_all(Map<T> *h, HashKey key) {
+	while (map_get(h, key) != NULL) {
+		map_remove(h, key);
+	}
+}
+

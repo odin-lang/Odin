@@ -26,6 +26,10 @@ struct ExactValue {
 	};
 };
 
+HashKey hash_exact_value(ExactValue v) {
+	return hashing_proc(&v, gb_size_of(ExactValue));
+}
+
 ExactValue make_exact_value_bool(b32 b) {
 	ExactValue result = {ExactValue_Bool};
 	result.value_bool = (b != 0);

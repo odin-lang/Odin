@@ -25,6 +25,7 @@ struct ssaBlock {
 	isize scope_index;
 	String label;
 	ssaProcedure *parent;
+	b32 added;
 
 	gbArray(ssaValue *) instrs;
 	gbArray(ssaValue *) values;
@@ -672,7 +673,7 @@ ssaValue *ssa_make_value_block(ssaProcedure *proc, AstNode *node, Scope *scope, 
 b32 ssa_is_blank_ident(AstNode *node) {
 	if (node->kind == AstNode_Ident) {
 		ast_node(i, Ident, node);
-		return is_blank_ident(i->token.string);
+		return is_blank_ident(i->string);
 	}
 	return false;
 }
@@ -710,7 +711,7 @@ ssaValue *ssa_emit(ssaProcedure *proc, ssaValue *instr) {
 	GB_ASSERT(instr->kind == ssaValue_Instr);
 	ssaBlock *b = proc->curr_block;
 	instr->Instr.parent = b;
-	if (b) {
+	if (b != NULL) {
 		ssaInstr *i = ssa_get_last_instr(b);
 		if (!ssa_is_instr_terminating(i)) {
 			gb_array_append(b->instrs, instr);
@@ -742,8 +743,11 @@ ssaValue *ssa_add_local_for_identifier(ssaProcedure *proc, AstNode *name) {
 }
 
 ssaValue *ssa_add_local_generated(ssaProcedure *proc, Type *type) {
+	Scope *scope = NULL;
+	if (proc->curr_block)
+		scope = proc->curr_block->scope;
 	Entity *entity = make_entity_variable(proc->module->allocator,
-	                                      proc->curr_block->scope,
+	                                      scope,
 	                                      empty_token,
 	                                      type);
 	return ssa_emit(proc, ssa_make_instr_local(proc, entity));
@@ -1064,15 +1068,15 @@ ssaValue *ssa_emit_deep_field_gep(ssaProcedure *proc, Type *type, ssaValue *e, S
 		type = get_base_type(type);
 
 
-		if (type->kind == Type_Union) {
+		if (is_type_raw_union(type)) {
 			ssaValue *v = ssa_emit_ptr_offset(proc, e, v_zero);
 			ssa_set_type(v, make_type_pointer(proc->module->allocator, type));
-			type = type->Union.fields[index]->type;
+			type = type->Record.fields[index]->type;
 			e = ssa_emit_conv(proc, v, make_type_pointer(proc->module->allocator, type));
 			e = ssa_emit_ptr_offset(proc, e, v_zero);
 			ssa_set_type(e, type);
 		} else {
-			type = type->Union.fields[index]->type;
+			type = type->Record.fields[index]->type;
 			e = ssa_emit_struct_gep(proc, e, index, type);
 		}
 	}
@@ -1095,15 +1099,15 @@ ssaValue *ssa_emit_deep_field_ev(ssaProcedure *proc, Type *type, ssaValue *e, Se
 		type = get_base_type(type);
 
 
-		if (type->kind == Type_Union) {
+		if (is_type_raw_union(type)) {
 			ssaValue *v = ssa_emit_ptr_offset(proc, e, v_zero);
 			ssa_set_type(v, make_type_pointer(proc->module->allocator, type));
-			type = type->Union.fields[index]->type;
+			type = type->Record.fields[index]->type;
 			e = ssa_emit_conv(proc, v, make_type_pointer(proc->module->allocator, type));
 			e = ssa_emit_ptr_offset(proc, e, v_zero);
 			ssa_set_type(e, type);
 		} else {
-			type = type->Union.fields[index]->type;
+			type = type->Record.fields[index]->type;
 			e = ssa_emit_struct_ev(proc, e, index, type);
 		}
 	}
@@ -1296,9 +1300,9 @@ String lookup_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
 	b32 src_is_ptr = src != prev_src;
 	// b32 dst_is_ptr = dst != prev_dst;
 
-	GB_ASSERT(src->kind == Type_Struct);
-	for (isize i = 0; i < src->Struct.field_count; i++) {
-		Entity *f = src->Struct.fields[i];
+	GB_ASSERT(is_type_struct(src));
+	for (isize i = 0; i < src->Record.field_count; i++) {
+		Entity *f = src->Record.fields[i];
 		if (f->kind == Entity_Variable && f->Variable.anonymous) {
 			if (are_types_identical(dst, f->type)) {
 				return f->token.string;
@@ -1420,7 +1424,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 	if (is_argument) {
 		Type *sb = get_base_type(type_deref(src));
 		b32 src_is_ptr = src != sb;
-		if (sb->kind == Type_Struct) {
+		if (is_type_struct(sb)) {
 			String field_name = lookup_polymorphic_field(proc->module->info, t, src);
 			// gb_printf("field_name: %.*s\n", LIT(field_name));
 			if (field_name.len > 0) {
@@ -1729,8 +1733,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			return result;
 		} break;
 
-		case Type_Struct: {
-			auto *st = &base_type->Struct;
+		case Type_Record: {
+			GB_ASSERT(is_type_struct(base_type));
+			auto *st = &base_type->Record;
 			if (cl->elem_list != NULL) {
 				isize index = 0;
 				AstNode *elem = cl->elem_list;
@@ -1743,7 +1748,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					if (elem->kind == AstNode_FieldValue) {
 						ast_node(kv, FieldValue, elem);
-						Selection sel = lookup_field(base_type, kv->field->Ident.token.string, false);
+						Selection sel = lookup_field(base_type, kv->field->Ident.string, false);
 						field_index = sel.index[0];
 						field_expr = ssa_build_expr(proc, kv->value);
 					} else {
@@ -2198,7 +2203,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	case_ast_node(se, SelectorExpr, expr);
 		Type *type = get_base_type(type_of_expr(proc->module->info, se->expr));
 
-		Selection sel = lookup_field(type, unparen_expr(se->selector)->Ident.token.string, false);
+		Selection sel = lookup_field(type, unparen_expr(se->selector)->Ident.string, false);
 		GB_ASSERT(sel.entity != NULL);
 
 		ssaValue *e = ssa_build_addr(proc, se->expr).addr;
@@ -2389,8 +2394,8 @@ void ssa_gen_global_type_name(ssaModule *m, Entity *e, String name) {
 	map_set(&m->members, hash_string(name), t);
 
 	Type *bt = get_base_type(e->type);
-	if (bt->kind == Type_Struct) {
-		auto *s = &bt->Struct;
+	if (is_type_struct(bt)) {
+		auto *s = &bt->Record;
 		for (isize j = 0; j < s->other_field_count; j++) {
 			Entity *field = s->other_fields[j];
 			if (field->kind == Entity_TypeName) {
@@ -2519,7 +2524,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		if (pd->body != NULL) {
 			// NOTE(bill): Generate a new name
 			// parent$name-guid
-			String pd_name = pd->name->Ident.token.string;
+			String pd_name = pd->name->Ident.string;
 			isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
 			u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
 			i32 guid = cast(i32)gb_array_count(proc->children);
@@ -2527,7 +2532,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			String name = make_string(name_text, name_len-1);
 
 			Entity **found = map_get(&proc->module->info->definitions, hash_pointer(pd->name));
-			GB_ASSERT_MSG(found != NULL, "Unable to find: %.*s", LIT(pd->name->Ident.token.string));
+			GB_ASSERT_MSG(found != NULL, "Unable to find: %.*s", LIT(pd->name->Ident.string));
 			Entity *e = *found;
 			ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
 			                                           proc->module, e->type, pd->type, pd->body, name);
@@ -2538,12 +2543,14 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			gb_array_append(proc->children, &value->Proc);
 			ssa_build_proc(value, proc);
 		} else {
-			String name = pd->name->Ident.token.string;
+			String original_name = pd->name->Ident.string;
+			String name = original_name;
 			if (pd->foreign_name.len > 0) {
 				name = pd->foreign_name;
 			}
+			auto *info = proc->module->info;
 
-			Entity **found = map_get(&proc->module->info->definitions, hash_pointer(pd->name));
+			Entity **found = map_get(&info->definitions, hash_pointer(pd->name));
 			GB_ASSERT(found != NULL);
 			Entity *e = *found;
 			ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
@@ -2558,7 +2565,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 		// NOTE(bill): Generate a new name
 		// parent_proc.name-guid
-		String td_name = td->name->Ident.token.string;
+		String td_name = td->name->Ident.string;
 		isize name_len = proc->name.len + 1 + td_name.len + 1 + 10 + 1;
 		u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
 		i32 guid = cast(i32)gb_array_count(proc->module->members.entries);
@@ -2804,6 +2811,99 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		gb_array_append(proc->blocks, done);
 		proc->curr_block = done;
 
+	case_end;
+
+	case_ast_node(ms, MatchStmt, node);
+		if (ms->init != NULL) {
+			ssa_build_stmt(proc, ms->init);
+		}
+		ssaValue *tag = v_true;
+		if (ms->tag != NULL) {
+			tag = ssa_build_expr(proc, ms->tag);
+		}
+		ssaBlock *done = ssa__make_block(proc, node, make_string("match.done")); // NOTE(bill): Append later
+
+		ast_node(body, BlockStmt, ms->body);
+
+
+		AstNode *default_stmts = NULL;
+		ssaBlock *default_fall = NULL;
+		ssaBlock *default_block = NULL;
+
+		ssaBlock *fall = NULL;
+		b32 append_fall = false;
+
+		isize case_count = body->list_count;
+		isize i = 0;
+		for (AstNode *clause = body->list;
+		     clause != NULL;
+		     clause = clause->next, i++) {
+			ssaBlock *body = fall;
+			b32 append_body = false;
+
+
+			ast_node(cc, CaseClause, clause);
+
+			if (body == NULL) {
+				append_body = true;
+				if (cc->list == NULL) {
+					body = ssa__make_block(proc, clause, make_string("match.dflt.body"));
+				} else {
+					body = ssa__make_block(proc, clause, make_string("match.case.body"));
+				}
+			}
+			if (append_fall && body == fall) {
+				append_fall = false;
+				append_body = true;
+			}
+
+			fall = done;
+			if (i+1 < case_count) {
+				append_fall = true;
+				fall = ssa__make_block(proc, clause, make_string("match.fall.body"));
+			}
+
+			if (cc->list == NULL) {
+				// default case
+				default_stmts  = cc->stmts;
+				default_fall  = fall;
+				default_block = body;
+				continue;
+			}
+
+			ssaBlock *next_cond = NULL;
+			Token eq = {Token_CmpEq};
+			for (AstNode *expr = cc->list; expr != NULL; expr = expr->next) {
+				next_cond = ssa__make_block(proc, clause, make_string("match.case.next"));
+
+				ssaValue *cond = ssa_emit_comp(proc, eq, tag, ssa_build_expr(proc, expr));
+				ssa_emit_if(proc, cond, body, next_cond);
+				gb_array_append(proc->blocks, next_cond);
+				proc->curr_block = next_cond;
+			}
+			if (append_body) {
+				gb_array_append(proc->blocks, body);
+			}
+			proc->curr_block = body;
+			ssa_push_target_list(proc, done, NULL, fall);
+			ssa_build_stmt_list(proc, cc->stmts);
+			ssa_pop_target_list(proc);
+			ssa_emit_jump(proc, done);
+			proc->curr_block = next_cond;
+		}
+
+		if (default_block != NULL) {
+			ssa_emit_jump(proc, default_block);
+			gb_array_append(proc->blocks, default_block);
+			proc->curr_block = default_block;
+			ssa_push_target_list(proc, done, NULL, default_fall);
+			ssa_build_stmt_list(proc, default_stmts);
+			ssa_pop_target_list(proc);
+		}
+
+		ssa_emit_jump(proc, done);
+		gb_array_append(proc->blocks, done);
+		proc->curr_block = done;
 	case_end;
 
 	case_ast_node(bs, BranchStmt, node);

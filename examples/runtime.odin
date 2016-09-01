@@ -365,13 +365,14 @@ __default_allocator_proc :: proc(allocator_data: rawptr, mode: AllocationMode,
                                  size, alignment: int,
                                  old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
 	using AllocationMode
-	if mode == ALLOC {
+	match mode {
+	case ALLOC:
 		return heap_alloc(size)
-	} else if mode == RESIZE {
+	case RESIZE:
 		return default_resize_align(old_memory, old_size, size, alignment)
-	} else if mode == DEALLOC {
+	case DEALLOC:
 		heap_free(old_memory)
-	} else if mode == DEALLOC_ALL {
+	case DEALLOC_ALL:
 		// NOTE(bill): Does nothing
 	}
 

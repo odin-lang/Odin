@@ -27,6 +27,7 @@ String const entity_strings[] = {
 
 
 typedef i64 EntityGuid;
+typedef struct Type Type;
 
 struct Entity {
 	EntityKind kind;

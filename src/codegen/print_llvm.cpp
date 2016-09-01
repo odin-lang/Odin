@@ -135,41 +135,44 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 		ssa_print_type(f, s, t->Slice.elem);
 		ssa_fprintf(f, "*, i%lld, i%lld}", word_bits, word_bits);
 		break;
-	case Type_Struct:
-		if (t->Struct.is_packed) {
-			ssa_fprintf(f, "<");
-		}
-		ssa_fprintf(f, "{");
-		for (isize i = 0; i < t->Struct.field_count; i++) {
-			if (i > 0) {
-				ssa_fprintf(f, ", ");
+	case Type_Record: {
+		switch (t->Record.kind) {
+		case TypeRecord_Struct:
+			if (t->Record.struct_is_packed) {
+				ssa_fprintf(f, "<");
 			}
-			Type *ft = t->Struct.fields[i]->type;
-			Type *bft = get_base_type(ft);
-			if (bft->kind != Type_Struct) {
-				ft = bft;
+			ssa_fprintf(f, "{");
+			for (isize i = 0; i < t->Record.field_count; i++) {
+				if (i > 0) {
+					ssa_fprintf(f, ", ");
+				}
+				Type *ft = t->Record.fields[i]->type;
+				Type *bft = get_base_type(ft);
+				if (!is_type_struct(bft)) {
+					ft = bft;
+				}
+				ssa_print_type(f, s, ft);
 			}
-			ssa_print_type(f, s, ft);
+			ssa_fprintf(f, "}");
+			if (t->Record.struct_is_packed) {
+				ssa_fprintf(f, ">");
+			}
+			break;
+		case TypeRecord_RawUnion:
+			ssa_fprintf(f, "[%lld x i8]", type_size_of(s, gb_heap_allocator(), t));
+			break;
+		case TypeRecord_Enum:
+			ssa_print_type(f, s, t->Record.enum_base);
+			break;
 		}
-		ssa_fprintf(f, "}");
-		if (t->Struct.is_packed) {
-			ssa_fprintf(f, ">");
-		}
-
-		break;
-	case Type_Union: {
-		i64 size = type_size_of(s, gb_heap_allocator(), t);
-		ssa_fprintf(f, "[%lld x i8]", size);
 	} break;
-	case Type_Enum:
-		ssa_print_type(f, s, t->Enum.base);
-		break;
+
 	case Type_Pointer:
 		ssa_print_type(f, s, t->Pointer.elem);
 		ssa_fprintf(f, "*");
 		break;
 	case Type_Named:
-		if (get_base_type(t)->kind == Type_Struct) {
+		if (is_type_struct(t)) {
 			ssa_print_encoded_local(f, t->Named.name);
 		} else {
 			ssa_print_type(f, s, get_base_type(t));
@@ -271,7 +274,7 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 
 void ssa_print_block_name(gbFile *f, ssaBlock *b) {
 	ssa_print_escape_string(f, b->label, false);
-	ssa_fprintf(f, ".-.%d", b->id);
+	ssa_fprintf(f, "..%d", b->id);
 }
 
 void ssa_print_value(gbFile *f, ssaModule *m, ssaValue *value, Type *type_hint) {
@@ -753,7 +756,7 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 void ssa_print_type_name(gbFile *f, ssaModule *m, ssaValue *v) {
 	GB_ASSERT(v->kind == ssaValue_TypeName);
 	Type *base_type = get_base_type(ssa_type(v));
-	if (base_type->kind != Type_Struct)
+	if (!is_type_struct(base_type))
 		return;
 	ssa_print_encoded_local(f, v->TypeName.name);
 	ssa_fprintf(f, " = type ");

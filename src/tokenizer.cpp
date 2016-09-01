@@ -88,6 +88,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_continue,    "continue"), \
 	TOKEN_KIND(Token_fallthrough, "fallthrough"), \
 	TOKEN_KIND(Token_case,        "case"), \
+	TOKEN_KIND(Token_default,     "default"), \
 	TOKEN_KIND(Token_then,        "then"), \
 	TOKEN_KIND(Token_if,          "if"), \
 	TOKEN_KIND(Token_else,        "else"), \
@@ -96,6 +97,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_return,      "return"), \
 	TOKEN_KIND(Token_struct,      "struct"), \
 	TOKEN_KIND(Token_union,       "union"), \
+	TOKEN_KIND(Token_raw_union,   "raw_union"), \
 	TOKEN_KIND(Token_enum,        "enum"), \
 	TOKEN_KIND(Token_using,       "using"), \
 TOKEN_KIND(Token__KeywordEnd, "_KeywordEnd"), \

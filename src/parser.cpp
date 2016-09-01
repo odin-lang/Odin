@@ -1,6 +1,4 @@
 struct AstNode;
-struct Type;
-struct AstScope;
 
 enum ParseFileError {
 	ParseFile_None,
@@ -30,8 +28,6 @@ struct AstFile {
 	AstNode *decls;
 	isize decl_count;
 
-	AstScope *file_scope;
-	AstScope *curr_scope;
 	AstNode *curr_proc;
 	isize scope_level;
 
@@ -43,19 +39,6 @@ struct AstFile {
 	TokenPos fix_prev_pos;
 };
 
-// NOTE(bill): Just used to quickly check if there is double declaration in the same scope
-// No type checking actually happens
-// TODO(bill): Should this be completely handled in the semantic checker or is it better here?
-struct AstEntity {
-	Token     token;
-	AstScope *parent;
-	AstNode * decl;
-};
-
-struct AstScope {
-	AstScope *parent;
-	Map<AstEntity> entities; // Key: Token.string
-};
 
 struct Parser {
 	String init_fullpath;
@@ -91,12 +74,9 @@ enum CallExprKind {
 };
 
 #define AST_NODE_KINDS \
-	AST_NODE_KIND(Invalid,  "invalid node", struct{}) \
+	AST_NODE_KIND(Invalid,  "invalid node",  struct{}) \
 	AST_NODE_KIND(BasicLit, "basic literal", Token) \
-	AST_NODE_KIND(Ident,    "identifier", struct { \
-		Token token; \
-		AstEntity *entity; \
-	}) \
+	AST_NODE_KIND(Ident,    "identifier",    Token) \
 	AST_NODE_KIND(ProcLit, "procedure literal", struct { \
 		AstNode *type; \
 		AstNode *body; \
@@ -170,6 +150,17 @@ AST_NODE_KIND(_ComplexStmtBegin, "", struct{}) \
 		AstNode *init, *cond, *post; \
 		AstNode *body; \
 	}) \
+	AST_NODE_KIND(CaseClause, "case clause", struct { \
+		Token token; \
+		AstNode *list; \
+		AstNode *stmts; \
+		isize list_count, stmt_count; \
+	}) \
+	AST_NODE_KIND(MatchStmt, "match statement", struct { \
+		Token token; \
+		AstNode *init, *tag; \
+		AstNode *body; \
+	}) \
 	AST_NODE_KIND(DeferStmt,  "defer statement",  struct { Token token; AstNode *stmt; }) \
 	AST_NODE_KIND(BranchStmt, "branch statement", struct { Token token; }) \
 	AST_NODE_KIND(UsingStmt,  "using statement",  struct { Token token; AstNode *node; }) \
@@ -232,7 +223,7 @@ AST_NODE_KIND(_TypeBegin, "", struct{}) \
 		isize decl_count; \
 		b32 is_packed; \
 	}) \
-	AST_NODE_KIND(UnionType, "union type", struct { \
+	AST_NODE_KIND(RawUnionType, "raw union type", struct { \
 		Token token; \
 		AstNode *decl_list; \
 		isize decl_count; \
@@ -276,15 +267,6 @@ struct AstNode {
 
 
 
-
-gb_inline AstScope *make_ast_scope(AstFile *f, AstScope *parent) {
-	AstScope *scope = gb_alloc_item(gb_arena_allocator(&f->arena), AstScope);
-	map_init(&scope->entities, gb_heap_allocator());
-	scope->parent = parent;
-	return scope;
-}
-
-
 gb_inline b32 is_ast_node_expr(AstNode *node) {
 	return gb_is_between(node->kind, AstNode__ExprBegin+1, AstNode__ExprEnd-1);
 }
@@ -307,7 +289,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_BasicLit:
 		return node->BasicLit;
 	case AstNode_Ident:
-		return node->Ident.token;
+		return node->Ident;
 	case AstNode_ProcLit:
 		return ast_node_token(node->ProcLit.type);
 	case AstNode_CompoundLit:
@@ -356,6 +338,10 @@ Token ast_node_token(AstNode *node) {
 		return node->ReturnStmt.token;
 	case AstNode_ForStmt:
 		return node->ForStmt.token;
+	case AstNode_MatchStmt:
+		return node->MatchStmt.token;
+	case AstNode_CaseClause:
+		return node->CaseClause.token;
 	case AstNode_DeferStmt:
 		return node->DeferStmt.token;
 	case AstNode_BranchStmt:
@@ -367,7 +353,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_VarDecl:
 		return ast_node_token(node->VarDecl.name_list);
 	case AstNode_ProcDecl:
-		return node->ProcDecl.name->Ident.token;
+		return node->ProcDecl.name->Ident;
 	case AstNode_TypeDecl:
 		return node->TypeDecl.token;
 	case AstNode_LoadDecl:
@@ -390,65 +376,18 @@ Token ast_node_token(AstNode *node) {
 		return node->VectorType.token;
 	case AstNode_StructType:
 		return node->StructType.token;
-	case AstNode_UnionType:
-		return node->UnionType.token;
+	case AstNode_RawUnionType:
+		return node->RawUnionType.token;
 	case AstNode_EnumType:
 		return node->EnumType.token;
 	}
 
 	return empty_token;
-;}
-
-gb_inline void destroy_ast_scope(AstScope *scope) {
-	// NOTE(bill): No need to free the actual pointer to the AstScope
-	// as there should be enough room in the arena
-	map_destroy(&scope->entities);
-}
-
-gb_inline AstScope *open_ast_scope(AstFile *f) {
-	AstScope *scope = make_ast_scope(f, f->curr_scope);
-	f->curr_scope = scope;
-	f->scope_level++;
-	return f->curr_scope;
-}
-
-gb_inline void close_ast_scope(AstFile *f) {
-	GB_ASSERT_NOT_NULL(f->curr_scope);
-	GB_ASSERT(f->scope_level > 0);
-	{
-		AstScope *parent = f->curr_scope->parent;
-		if (f->curr_scope) {
-			destroy_ast_scope(f->curr_scope);
-		}
-		f->curr_scope = parent;
-		f->scope_level--;
-	}
-}
-
-AstEntity *make_ast_entity(AstFile *f, Token token, AstNode *decl, AstScope *parent) {
-	AstEntity *entity = gb_alloc_item(gb_arena_allocator(&f->arena), AstEntity);
-	entity->token = token;
-	entity->decl = decl;
-	entity->parent = parent;
-	return entity;
 }
 
 HashKey hash_token(Token t) {
 	return hash_string(t.string);
 }
-
-AstEntity *ast_scope_lookup(AstScope *scope, Token token) {
-	return map_get(&scope->entities, hash_token(token));
-}
-
-AstEntity *ast_scope_insert(AstScope *scope, AstEntity entity) {
-	AstEntity *prev = ast_scope_lookup(scope, entity.token);
-	if (prev == NULL) {
-		map_set(&scope->entities, hash_token(entity.token), entity);
-	}
-	return prev;
-}
-
 
 #define ast_file_err(f, token, fmt, ...) ast_file_err_(f, __FUNCTION__, token, fmt, ##__VA_ARGS__)
 void ast_file_err_(AstFile *file, char *function, Token token, char *fmt, ...) {
@@ -598,10 +537,9 @@ gb_inline AstNode *make_basic_lit(AstFile *f, Token basic_lit) {
 	return result;
 }
 
-gb_inline AstNode *make_ident(AstFile *f, Token token, AstEntity *entity = NULL) {
+gb_inline AstNode *make_ident(AstFile *f, Token token) {
 	AstNode *result = make_node(f, AstNode_Ident);
-	result->Ident.token = token;
-	result->Ident.entity   = entity;
+	result->Ident = token;
 	return result;
 }
 
@@ -698,12 +636,34 @@ gb_inline AstNode *make_return_stmt(AstFile *f, Token token, AstNode *result_lis
 gb_inline AstNode *make_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *post, AstNode *body) {
 	AstNode *result = make_node(f, AstNode_ForStmt);
 	result->ForStmt.token = token;
-	result->ForStmt.init = init;
-	result->ForStmt.cond = cond;
-	result->ForStmt.post = post;
-	result->ForStmt.body = body;
+	result->ForStmt.init  = init;
+	result->ForStmt.cond  = cond;
+	result->ForStmt.post  = post;
+	result->ForStmt.body  = body;
 	return result;
 }
+
+
+gb_inline AstNode *make_match_stmt(AstFile *f, Token token, AstNode *init, AstNode *tag, AstNode *body) {
+	AstNode *result = make_node(f, AstNode_MatchStmt);
+	result->MatchStmt.token = token;
+	result->MatchStmt.init  = init;
+	result->MatchStmt.tag   = tag;
+	result->MatchStmt.body  = body;
+	return result;
+}
+
+gb_inline AstNode *make_case_clause(AstFile *f, Token token, AstNode *list, isize list_count, AstNode *stmts, isize stmt_count) {
+	AstNode *result = make_node(f, AstNode_CaseClause);
+	result->CaseClause.token = token;
+	result->CaseClause.list  = list;
+	result->CaseClause.list_count = list_count;
+	result->CaseClause.stmts = stmts;
+	result->CaseClause.stmt_count = stmt_count;
+	return result;
+}
+
+
 gb_inline AstNode *make_defer_stmt(AstFile *f, Token token, AstNode *stmt) {
 	AstNode *result = make_node(f, AstNode_DeferStmt);
 	result->DeferStmt.token = token;
@@ -804,11 +764,11 @@ gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNode *decl_list,
 	return result;
 }
 
-gb_inline AstNode *make_union_type(AstFile *f, Token token, AstNode *decl_list, isize decl_count) {
-	AstNode *result = make_node(f, AstNode_UnionType);
-	result->UnionType.token = token;
-	result->UnionType.decl_list = decl_list;
-	result->UnionType.decl_count = decl_count;
+gb_inline AstNode *make_raw_union_type(AstFile *f, Token token, AstNode *decl_list, isize decl_count) {
+	AstNode *result = make_node(f, AstNode_RawUnionType);
+	result->RawUnionType.token = token;
+	result->RawUnionType.decl_list = decl_list;
+	result->RawUnionType.decl_count = decl_count;
 	return result;
 }
 
@@ -902,30 +862,6 @@ b32 is_blank_ident(String str) {
 	return false;
 }
 
-gb_internal void add_ast_entity(AstFile *f, AstScope *scope, AstNode *declaration, AstNode *name_list) {
-	for (AstNode *n = name_list; n != NULL; n = n->next) {
-		if (n->kind != AstNode_Ident) {
-			ast_file_err(f, ast_node_token(declaration), "Identifier is already declared or resolved");
-			continue;
-		}
-
-		AstEntity *entity = make_ast_entity(f, n->Ident.token, declaration, scope);
-		n->Ident.entity = entity;
-
-		AstEntity *insert_entity = ast_scope_insert(scope, *entity);
-		if (insert_entity != NULL && !is_blank_ident(insert_entity->token.string)) {
-			ast_file_err(f, entity->token,
-			             "There is already a previous declaration of `%.*s` in the current scope\n"
-			             "at \t%.*s(%td:%td)",
-			             LIT(insert_entity->token.string),
-			             LIT(insert_entity->token.pos.file),
-			             insert_entity->token.pos.line,
-			             insert_entity->token.pos.column);
-		}
-	}
-}
-
-
 
 void fix_advance_to_next_stmt(AstFile *f) {
 	// TODO(bill): fix_advance_to_next_stmt
@@ -994,10 +930,10 @@ b32 expect_semicolon_after_stmt(AstFile *f, AstNode *s) {
 
 
 AstNode *parse_expr(AstFile *f, b32 lhs);
-AstNode *parse_proc_type(AstFile *f, AstScope **scope_);
+AstNode *parse_proc_type(AstFile *f);
 AstNode *parse_stmt_list(AstFile *f, isize *list_count_);
 AstNode *parse_stmt(AstFile *f);
-AstNode *parse_body(AstFile *f, AstScope *scope);
+AstNode *parse_body(AstFile *f);
 
 AstNode *parse_identifier(AstFile *f) {
 	Token token = f->cursor[0];
@@ -1218,9 +1154,8 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 
 	// Parse Procedure Type or Literal
 	case Token_proc: {
-		AstScope *scope = NULL;
 		AstNode *curr_proc = f->curr_proc;
-		AstNode *type = parse_proc_type(f, &scope);
+		AstNode *type = parse_proc_type(f);
 		f->curr_proc = type;
 		defer (f->curr_proc = curr_proc);
 
@@ -1235,13 +1170,10 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 			return type;
 		} else {
 			AstNode *body;
-			AstScope *curr_scope = f->curr_scope;
 
-			f->curr_scope = scope;
 			f->expr_level++;
-			body = parse_body(f, scope);
+			body = parse_body(f);
 			f->expr_level--;
-			f->curr_scope = curr_scope;
 
 			return make_proc_lit(f, type, body, tags);
 		}
@@ -1538,7 +1470,7 @@ AstNode *parse_simple_stmt(AstFile *f) {
 	case Token_CmpAndEq:
 	case Token_CmpOrEq:
 	{
-		if (f->curr_scope == f->file_scope) {
+		if (f->curr_proc == NULL) {
 			ast_file_err(f, f->cursor[0], "You cannot use a simple statement in the file scope");
 			return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 		}
@@ -1566,7 +1498,7 @@ AstNode *parse_simple_stmt(AstFile *f) {
 	switch (token.kind) {
 	case Token_Increment:
 	case Token_Decrement:
-		if (f->curr_scope == f->file_scope) {
+		if (f->curr_proc == NULL) {
 			ast_file_err(f, f->cursor[0], "You cannot use a simple statement in the file scope");
 			return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 		}
@@ -1581,15 +1513,11 @@ AstNode *parse_simple_stmt(AstFile *f) {
 
 
 AstNode *parse_block_stmt(AstFile *f) {
-	if (f->curr_scope == f->file_scope) {
+	if (f->curr_proc == NULL) {
 		ast_file_err(f, f->cursor[0], "You cannot use a block statement in the file scope");
 		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
-	AstNode *block_stmt;
-
-	open_ast_scope(f);
-	block_stmt = parse_body(f, f->curr_scope);
-	close_ast_scope(f);
+	AstNode *block_stmt = parse_body(f);
 	return block_stmt;
 }
 
@@ -1644,7 +1572,7 @@ AstNode *parse_type(AstFile *f) {
 	return type;
 }
 
-AstNode *parse_field_decl(AstFile *f, AstScope *scope, b32 allow_using) {
+AstNode *parse_field_decl(AstFile *f, b32 allow_using) {
 	b32 is_using = false;
 	AstNode *name_list = NULL;
 	isize name_count = 0;
@@ -1670,29 +1598,26 @@ AstNode *parse_field_decl(AstFile *f, AstScope *scope, b32 allow_using) {
 		ast_file_err(f, f->cursor[0], "Expected a type for this field declaration");
 
 	AstNode *field = make_field(f, name_list, name_count, type, is_using);
-	add_ast_entity(f, scope, field, name_list);
 	return field;
 }
 
-Token parse_procedure_signature(AstFile *f, AstScope *scope,
+Token parse_procedure_signature(AstFile *f,
                                 AstNode **param_list, isize *param_count,
                                 AstNode **result_list, isize *result_count);
 
-AstNode *parse_proc_type(AstFile *f, AstScope **scope_) {
-	AstScope *scope = make_ast_scope(f, f->file_scope); // Procedure's scope
+AstNode *parse_proc_type(AstFile *f) {
 	AstNode *params = NULL;
 	AstNode *results = NULL;
 	isize param_count = 0;
 	isize result_count = 0;
 
-	Token proc_token = parse_procedure_signature(f, scope, &params, &param_count, &results, &result_count);
+	Token proc_token = parse_procedure_signature(f, &params, &param_count, &results, &result_count);
 
-	if (scope_) *scope_ = scope;
 	return make_proc_type(f, proc_token, params, param_count, results, result_count);
 }
 
 
-AstNode *parse_parameter_list(AstFile *f, AstScope *scope, isize *param_count_, TokenKind separator, b32 allow_using) {
+AstNode *parse_parameter_list(AstFile *f, isize *param_count_, TokenKind separator, b32 allow_using) {
 	AstNode *param_list = NULL;
 	AstNode *param_list_curr = NULL;
 	isize param_count = 0;
@@ -1701,7 +1626,7 @@ AstNode *parse_parameter_list(AstFile *f, AstScope *scope, isize *param_count_, 
 		if (!allow_using && allow_token(f, Token_using)) {
 			ast_file_err(f, f->cursor[-1], "`using` is only allowed within structures (at the moment)");
 		}
-		AstNode *field = parse_field_decl(f, scope, allow_using);
+		AstNode *field = parse_field_decl(f, allow_using);
 		DLIST_APPEND(param_list, param_list_curr, field);
 		param_count += field->Field.name_count;
 		if (f->cursor[0].kind != separator)
@@ -1826,12 +1751,6 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 			}
 		}
 
-		AstScope *scope = make_ast_scope(f, NULL); // NOTE(bill): The struct needs its own scope with NO parent
-		AstScope *curr_scope = f->curr_scope;
-		f->curr_scope = scope;
-		defer (f->curr_scope = curr_scope);
-
-
 		Token open = expect_token(f, Token_OpenBrace);
 		isize decl_count = 0;
 		AstNode *decls = parse_struct_params(f, &decl_count);
@@ -1840,20 +1759,14 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		return make_struct_type(f, token, decls, decl_count, is_packed);
 	} break;
 
-	case Token_union: {
-		Token token = expect_token(f, Token_union);
-		AstScope *scope = make_ast_scope(f, NULL); // NOTE(bill): The struct needs its own scope with NO parent
-		AstScope *curr_scope = f->curr_scope;
-		f->curr_scope = scope;
-		defer (f->curr_scope = curr_scope);
-
-
+	case Token_raw_union: {
+		Token token = expect_token(f, Token_raw_union);
 		Token open = expect_token(f, Token_OpenBrace);
 		isize decl_count = 0;
 		AstNode *decls = parse_struct_params(f, &decl_count);
 		Token close = expect_token(f, Token_CloseBrace);
 
-		return make_union_type(f, token, decls, decl_count);
+		return make_raw_union_type(f, token, decls, decl_count);
 	}
 
 	case Token_enum: {
@@ -1895,7 +1808,7 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 
 	case Token_proc: {
 		AstNode *curr_proc = f->curr_proc;
-		AstNode *type = parse_proc_type(f, NULL);
+		AstNode *type = parse_proc_type(f);
 		f->curr_proc = type;
 		f->curr_proc = curr_proc;
 		return type;
@@ -1930,7 +1843,7 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 }
 
 
-AstNode *parse_results(AstFile *f, AstScope *scope, isize *result_count) {
+AstNode *parse_results(AstFile *f, isize *result_count) {
 	if (allow_token(f, Token_ArrowRight)) {
 		if (f->cursor[0].kind == Token_OpenParen) {
 			expect_token(f, Token_OpenParen);
@@ -1959,18 +1872,18 @@ AstNode *parse_results(AstFile *f, AstScope *scope, isize *result_count) {
 	return NULL;
 }
 
-Token parse_procedure_signature(AstFile *f, AstScope *scope,
+Token parse_procedure_signature(AstFile *f,
                                AstNode **param_list, isize *param_count,
                                AstNode **result_list, isize *result_count) {
 	Token proc_token = expect_token(f, Token_proc);
 	expect_token(f, Token_OpenParen);
-	*param_list = parse_parameter_list(f, scope, param_count, Token_Comma, true);
+	*param_list = parse_parameter_list(f, param_count, Token_Comma, true);
 	expect_token(f, Token_CloseParen);
-	*result_list = parse_results(f, scope, result_count);
+	*result_list = parse_results(f, result_count);
 	return proc_token;
 }
 
-AstNode *parse_body(AstFile *f, AstScope *scope) {
+AstNode *parse_body(AstFile *f) {
 	AstNode *statement_list = NULL;
 	isize statement_list_count = 0;
 	Token open, close;
@@ -1989,9 +1902,8 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 	isize param_count = 0;
 	isize result_count = 0;
 
-	AstScope *scope = open_ast_scope(f);
-
-	parse_procedure_signature(f, scope, &param_list, &param_count, &result_list, &result_count);
+	parse_procedure_signature(f, &param_list, &param_count, &result_list, &result_count);
+	AstNode *proc_type = make_proc_type(f, proc_token, param_list, param_count, result_list, result_count);
 
 	AstNode *body = NULL;
 	u64 tags = 0;
@@ -1999,16 +1911,17 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 
 	parse_proc_tags(f, &tags, &foreign_name);
 
+	AstNode *curr_proc = f->curr_proc;
+	f->curr_proc = proc_type;
+	defer (f->curr_proc = curr_proc);
+
 	if (f->cursor[0].kind == Token_OpenBrace) {
 		if ((tags & ProcTag_foreign) != 0) {
 			ast_file_err(f, f->cursor[0], "A procedure tagged as `#foreign` cannot have a body");
 		}
-		body = parse_body(f, scope);
+		body = parse_body(f);
 	}
 
-	close_ast_scope(f);
-
-	AstNode *proc_type = make_proc_type(f, proc_token, param_list, param_count, result_list, result_count);
 	return make_proc_decl(f, name, proc_type, body, tags, foreign_name);
 }
 
@@ -2036,7 +1949,7 @@ AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count) {
 			Token token = expect_token(f, Token_type);
 			if (name_count != 1) {
 				ast_file_err(f, ast_node_token(name_list), "You can only declare one type at a time");
-				return make_bad_decl(f, name_list->Ident.token, token);
+				return make_bad_decl(f, name_list->Ident, token);
 			}
 
 			if (type != NULL) {
@@ -2053,11 +1966,10 @@ AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count) {
 			AstNode *name = name_list;
 			if (name_count != 1) {
 				ast_file_err(f, proc_token, "You can only declare one procedure at a time");
-				return make_bad_decl(f, name->Ident.token, proc_token);
+				return make_bad_decl(f, name->Ident, proc_token);
 			}
 
 			AstNode *proc_decl = parse_proc_decl(f, proc_token, name);
-			add_ast_entity(f, f->curr_scope, proc_decl, name_list);
 			return proc_decl;
 
 		} else {
@@ -2091,13 +2003,12 @@ AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count) {
 	}
 
 	AstNode *var_decl = make_var_decl(f, declaration_kind, name_list, name_count, type, value_list, value_count);
-	add_ast_entity(f, f->curr_scope, var_decl, name_list);
 	return var_decl;
 }
 
 
 AstNode *parse_if_stmt(AstFile *f) {
-	if (f->curr_scope == f->file_scope) {
+	if (f->curr_proc == NULL) {
 		ast_file_err(f, f->cursor[0], "You cannot use an if statement in the file scope");
 		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
@@ -2107,9 +2018,6 @@ AstNode *parse_if_stmt(AstFile *f) {
 	AstNode *cond = NULL;
 	AstNode *body = NULL;
 	AstNode *else_stmt = NULL;
-
-	open_ast_scope(f);
-	defer (close_ast_scope(f));
 
 	isize prev_level = f->expr_level;
 	f->expr_level = -1;
@@ -2154,7 +2062,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 }
 
 AstNode *parse_return_stmt(AstFile *f) {
-	if (f->curr_scope == f->file_scope) {
+	if (f->curr_proc == NULL) {
 		ast_file_err(f, f->cursor[0], "You cannot use a return statement in the file scope");
 		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
@@ -2175,14 +2083,12 @@ AstNode *parse_return_stmt(AstFile *f) {
 }
 
 AstNode *parse_for_stmt(AstFile *f) {
-	if (f->curr_scope == f->file_scope) {
+	if (f->curr_proc == NULL) {
 		ast_file_err(f, f->cursor[0], "You cannot use a for statement in the file scope");
 		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
 
 	Token token = expect_token(f, Token_for);
-	open_ast_scope(f);
-	defer (close_ast_scope(f));
 
 	AstNode *init = NULL;
 	AstNode *cond = NULL;
@@ -2220,8 +2126,78 @@ AstNode *parse_for_stmt(AstFile *f) {
 	return make_for_stmt(f, token, init, cond, end, body);
 }
 
+AstNode *parse_case_clause(AstFile *f) {
+	Token token = f->cursor[0];
+	AstNode *list = NULL;
+	isize list_count = 0;
+	if (allow_token(f, Token_case)) {
+		list = parse_rhs_expr_list(f, &list_count);
+	} else {
+		expect_token(f, Token_default);
+	}
+	expect_token(f, Token_Colon); // TODO(bill): Is this the best syntax?
+	isize stmt_count = 0;
+	AstNode *stmts = parse_stmt_list(f, &stmt_count);
+
+	return make_case_clause(f, token, list, list_count, stmts, stmt_count);
+}
+
+AstNode *parse_match_stmt(AstFile *f) {
+	if (f->curr_proc == NULL) {
+		ast_file_err(f, f->cursor[0], "You cannot use a match statement in the file scope");
+		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
+	}
+
+	Token token = expect_token(f, Token_match);
+
+	AstNode *init = NULL;
+	AstNode *tag = NULL;
+	if (f->cursor[0].kind != Token_OpenBrace) {
+		isize prev_level = f->expr_level;
+		f->expr_level = -1;
+		if (f->cursor[0].kind != Token_Semicolon) {
+			tag = parse_simple_stmt(f);
+		}
+		if (allow_token(f, Token_Semicolon)) {
+			init = tag;
+			tag = NULL;
+			if (f->cursor[0].kind != Token_OpenBrace) {
+				tag = parse_simple_stmt(f);
+			}
+		}
+
+		f->expr_level = prev_level;
+	}
+
+	Token open = expect_token(f, Token_OpenBrace);
+	AstNode *list = NULL;
+	AstNode *list_curr = NULL;
+	isize list_count = 0;
+#if 1
+	while (f->cursor[0].kind == Token_case ||
+	       f->cursor[0].kind == Token_default) {
+		DLIST_APPEND(list, list_curr, parse_case_clause(f));
+		list_count++;
+	}
+#else
+
+	while (f->cursor[0].kind == Token_ArrowRight) {
+		DLIST_APPEND(list, list_curr, parse_case_clause(f));
+		list_count++;
+	}
+
+#endif
+	Token close = expect_token(f, Token_CloseBrace);
+
+	AstNode *body = make_block_stmt(f, list, list_count, open, close);
+
+	tag = convert_stmt_to_expr(f, tag, make_string("match expression"));
+	return make_match_stmt(f, token, init, tag, body);
+}
+
+
 AstNode *parse_defer_stmt(AstFile *f) {
-	if (f->curr_scope == f->file_scope) {
+	if (f->curr_proc == NULL) {
 		ast_file_err(f, f->cursor[0], "You cannot use a defer statement in the file scope");
 		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
@@ -2268,16 +2244,16 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_if:     return parse_if_stmt(f);
 	case Token_return: return parse_return_stmt(f);
 	case Token_for:    return parse_for_stmt(f);
+	case Token_match:  return parse_match_stmt(f);
 	case Token_defer:  return parse_defer_stmt(f);
-	// case Token_match: return NULL; // TODO(bill): Token_match
-	// case Token_case: return NULL; // TODO(bill): Token_case
 
 	case Token_break:
 	case Token_continue:
 	case Token_fallthrough:
 		next_token(f);
-		expect_token(f, Token_Semicolon);
-		return make_branch_stmt(f, token);
+		s = make_branch_stmt(f, token);
+		expect_semicolon_after_stmt(f, s);
+		return s;
 
 	case Token_using: {
 		AstNode *node = NULL;
@@ -2318,14 +2294,14 @@ AstNode *parse_stmt(AstFile *f) {
 
 		if (are_strings_equal(s->TagStmt.name.string, make_string("load"))) {
 			Token file_path = expect_token(f, Token_String);
-			if (f->curr_scope == f->file_scope) {
+			if (f->curr_proc == NULL) {
 				return make_load_decl(f, s->TagStmt.token, file_path);
 			}
 			ast_file_err(f, token, "You cannot `load` within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
 		} else if (are_strings_equal(s->TagStmt.name.string, make_string("foreign_system_library"))) {
 			Token file_path = expect_token(f, Token_String);
-			if (f->curr_scope == f->file_scope) {
+			if (f->curr_proc == NULL) {
 				return make_foreign_system_library(f, s->TagStmt.token, file_path);
 			}
 			ast_file_err(f, token, "You cannot using `foreign_system_library` within a procedure. This must be done at the file scope.");
@@ -2337,7 +2313,7 @@ AstNode *parse_stmt(AstFile *f) {
 				ast_file_err(f, token, "#thread_local may only be applied to variable declarations");
 				return make_bad_decl(f, token, ast_node_token(var_decl));
 			}
-			if (f->curr_scope != f->file_scope) {
+			if (f->curr_proc != NULL) {
 				ast_file_err(f, token, "#thread_local is only allowed at the file scope.");
 				return make_bad_decl(f, token, ast_node_token(var_decl));
 			}
@@ -2371,10 +2347,14 @@ AstNode *parse_stmt_list(AstFile *f, isize *list_count_) {
 	isize list_count = 0;
 
 	while (f->cursor[0].kind != Token_case &&
+	       f->cursor[0].kind != Token_default &&
 	       f->cursor[0].kind != Token_CloseBrace &&
 	       f->cursor[0].kind != Token_EOF) {
-		DLIST_APPEND(list_root, list_curr, parse_stmt(f));
-		list_count++;
+		AstNode *stmt = parse_stmt(f);
+		if (stmt && stmt->kind != AstNode_EmptyStmt) {
+			DLIST_APPEND(list_root, list_curr, stmt);
+			list_count++;
+		}
 	}
 
 	if (list_count_) *list_count_ = list_count;
@@ -2405,12 +2385,11 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 		f->cursor = &f->tokens[0];
 
 		// NOTE(bill): Is this big enough or too small?
-		isize arena_size = gb_max(gb_size_of(AstNode), gb_size_of(AstScope));
+		isize arena_size = gb_size_of(AstNode);
 		arena_size *= 2*gb_array_count(f->tokens);
 		gb_arena_init_from_allocator(&f->arena, gb_heap_allocator(), arena_size);
 
-		open_ast_scope(f);
-		f->file_scope = f->curr_scope;
+		f->curr_proc = NULL;
 
 		return ParseFile_None;
 	}
@@ -2428,7 +2407,6 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 }
 
 void destroy_ast_file(AstFile *f) {
-	close_ast_scope(f);
 	gb_arena_free(&f->arena);
 	gb_array_free(f->tokens);
 	gb_free(gb_heap_allocator(), f->tokenizer.fullpath.text);

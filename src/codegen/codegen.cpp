@@ -89,11 +89,25 @@ void ssa_gen_code(ssaGen *s) {
 
 		case Entity_Procedure: {
 			auto *pd = &decl->proc_decl->ProcDecl;
-			String name = e->token.string;
+			String original_name = e->token.string;
+			String name = original_name;
 			AstNode *body = pd->body;
 			if (pd->foreign_name.len > 0) {
 				name = pd->foreign_name;
 			}
+
+			if (are_strings_equal(name, original_name)) {
+				Scope *scope = *map_get(&info->scopes, hash_pointer(pd->type));
+				isize count = multi_map_count(&scope->elements, hash_string(original_name));
+				if (count > 1) {
+					gb_printf("%.*s\n", LIT(name));
+					isize name_len = name.len + 1 + 10 + 1;
+					u8 *name_text = gb_alloc_array(m->allocator, u8, name_len);
+					name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$%d", LIT(name), e->guid);
+					name = make_string(name_text, name_len-1);
+				}
+			}
+
 			ssaValue *p = ssa_make_value_procedure(a, m, e->type, decl->type_expr, body, name);
 			p->Proc.tags = pd->tags;
 
