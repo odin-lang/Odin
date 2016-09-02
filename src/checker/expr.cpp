@@ -123,6 +123,8 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 			return;
 	}
 
+
+
 	if (type != NULL) {
 		if (!check_is_assignable_to(c, operand, type, is_argument)) {
 			gbString type_string = type_to_string(type);
@@ -132,16 +134,23 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 			defer (gb_string_free(op_type_string));
 			defer (gb_string_free(expr_str));
 
-
-			// TODO(bill): is this a good enough error message?
-			error(&c->error_collector, ast_node_token(operand->expr),
-			      "Cannot assign value `%s` of type `%s` to `%s` in %.*s",
-			      expr_str,
-			      op_type_string,
-			      type_string,
-			      LIT(context_name));
-
+			if (operand->mode == Addressing_Builtin) {
+				// TODO(bill): is this a good enough error message?
+				error(&c->error_collector, ast_node_token(operand->expr),
+				      "Cannot assign builtin procedure `%s` in %.*s",
+				      expr_str,
+				      LIT(context_name));
+			} else {
+				// TODO(bill): is this a good enough error message?
+				error(&c->error_collector, ast_node_token(operand->expr),
+				      "Cannot assign value `%s` of type `%s` to `%s` in %.*s",
+				      expr_str,
+				      op_type_string,
+				      type_string,
+				      LIT(context_name));
+			}
 			operand->mode = Addressing_Invalid;
+			return;
 		}
 	}
 }
@@ -1987,23 +1996,26 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->type  = t_int;
 	} break;
 
-	case BuiltinProc_static_assert:
-		// static_assert :: proc(cond: bool)
+	case BuiltinProc_assert:
+		// assert :: proc(cond: bool)
 
-		if (operand->mode != Addressing_Constant ||
-		    !is_type_boolean(operand->type)) {
+		if (!is_type_boolean(operand->type)) {
 			gbString str = expr_to_string(ce->arg_list);
 			defer (gb_string_free(str));
 			error(&c->error_collector, ast_node_token(call),
-			      "`%s` is not a constant boolean", str);
+			      "`%s` is not a boolean", str);
 			return false;
 		}
-		if (!operand->value.value_bool) {
+		if (operand->mode == Addressing_Constant &&
+		    !operand->value.value_bool) {
 			gbString str = expr_to_string(ce->arg_list);
 			defer (gb_string_free(str));
 			error(&c->error_collector, ast_node_token(call),
 			      "Static assertion: `%s`", str);
 			return true;
+		}
+		if (operand->mode != Addressing_Constant) {
+			operand->mode = Addressing_NoValue;
 		}
 		break;
 

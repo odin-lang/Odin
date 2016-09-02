@@ -3,16 +3,15 @@
 #load "game.odin"
 
 main :: proc() {
-
 	print_int(min(1, 2)); nl()
 	print_int(max(1, 2)); nl()
 	print_int(abs(-1337)); nl()
 
 	a, b, c := 1, 2, -1337
+
 	print_int(min(a, b)); nl()
 	print_int(max(a, b)); nl()
 	print_int(abs(c) as int); nl()
-
 
 	nl()
 /*

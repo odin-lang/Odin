@@ -761,6 +761,20 @@ ssaValue *ssa_add_param(ssaProcedure *proc, Entity *e) {
 }
 
 
+ssaValue *ssa_emit_call(ssaProcedure *p, ssaValue *value, ssaValue **args, isize arg_count) {
+	Type *pt = get_base_type(ssa_type(value));
+	GB_ASSERT(pt->kind == Type_Proc);
+	Type *results = pt->Proc.results;
+	return ssa_emit(p, ssa_make_instr_call(p, value, args, arg_count, results));
+}
+
+ssaValue *ssa_emit_global_call(ssaProcedure *proc, char *name, ssaValue **args, isize arg_count) {
+	ssaValue **found = map_get(&proc->module->members, hash_string(make_string(name)));
+	GB_ASSERT_MSG(found != NULL, "%s", name);
+	ssaValue *gp = *found;
+	return ssa_emit_call(proc, gp, args, arg_count);
+}
+
 
 Type *ssa_type(ssaAddr lval) {
 	if (lval.addr != NULL) {
@@ -1558,8 +1572,6 @@ ssaValue *ssa_emit_down_cast(ssaProcedure *proc, ssaValue *value, Type *t) {
 }
 
 
-
-
 ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv) {
 	switch (expr->kind) {
 	case_ast_node(bl, BasicLit, expr);
@@ -1826,14 +1838,11 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					i64 s = type_size_of(proc->module->sizes, allocator, type);
 					i64 a = type_align_of(proc->module->sizes, allocator, type);
-					// TODO(bill): Make procedure for: ssa_get_global_procedure()
-					ssaValue *alloc_align_proc = *map_get(&proc->module->members, hash_string(make_string("alloc_align")));
 
 					ssaValue **args = gb_alloc_array(allocator, ssaValue *, 2);
 					args[0] = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(s));
 					args[1] = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(a));
-
-					ssaValue *call = ssa_emit(proc, ssa_make_instr_call(proc, alloc_align_proc, args, 2, t_rawptr));
+					ssaValue *call = ssa_emit_global_call(proc, "alloc_align", args, 2);
 					ssaValue *v = ssa_emit_conv(proc, call, ptr_type);
 					return v;
 				} break;
@@ -1848,7 +1857,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					i64 s = type_size_of(proc->module->sizes, allocator, type);
 					i64 a = type_align_of(proc->module->sizes, allocator, type);
-					ssaValue *alloc_align_proc = *map_get(&proc->module->members, hash_string(make_string("alloc_align")));
 
 					ssaValue *elem_size  = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(s));
 					ssaValue *elem_align = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(a));
@@ -1868,8 +1876,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssaValue **args = gb_alloc_array(allocator, ssaValue *, 2);
 					args[0] = slice_size;
 					args[1] = elem_align;
+					ssaValue *call = ssa_emit_global_call(proc, "alloc_align", args, 2);
 
-					ssaValue *call = ssa_emit(proc, ssa_make_instr_call(proc, alloc_align_proc, args, 2, t_rawptr));
 					ssaValue *ptr = ssa_emit_conv(proc, call, ptr_type, true);
 					ssaValue *slice = ssa_add_local_generated(proc, slice_type);
 					ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_zero32, ptr_type), ptr);
@@ -1884,7 +1892,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					gbAllocator allocator = proc->module->allocator;
 
 					ssaValue *value = ssa_build_expr(proc, ce->arg_list);
-					ssaValue *dealloc_proc = *map_get(&proc->module->members, hash_string(make_string("dealloc")));
 
 					if (is_type_slice(ssa_type(value))) {
 						Type *etp = get_base_type(ssa_type(value));
@@ -1894,8 +1901,50 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					ssaValue **args = gb_alloc_array(allocator, ssaValue *, 1);
 					args[0] = ssa_emit_conv(proc, value, t_rawptr, true);
+					return ssa_emit_global_call(proc, "dealloc", args, 1);
+				} break;
 
-					return ssa_emit(proc, ssa_make_instr_call(proc, dealloc_proc, args, 1, NULL));
+
+				case BuiltinProc_assert: {
+					ssaValue *cond = ssa_build_expr(proc, ce->arg_list);
+					GB_ASSERT(is_type_boolean(ssa_type(cond)));
+
+					Token eq = {Token_CmpEq};
+					cond = ssa_emit_comp(proc, eq, cond, v_false);
+					ssaBlock *err  = ssa_add_block(proc, NULL, make_string("builtin.assert.err"));
+					ssaBlock *done = ssa__make_block(proc, NULL, make_string("builtin.assert.done"));
+
+					ssa_emit_if(proc, cond, err, done);
+					proc->curr_block = err;
+
+					Token token = ast_node_token(ce->arg_list);
+					TokenPos pos = token.pos;
+					gbString expr = expr_to_string(ce->arg_list);
+					defer (gb_string_free(expr));
+
+					isize err_len = pos.file.len + 1 + 10 + 1 + 10 + 1;
+					err_len += 20;
+					err_len += gb_string_length(expr);
+					err_len += 2;
+					// HACK(bill): memory leaks
+					u8 *err_str = gb_alloc_array(gb_heap_allocator(), u8, err_len);
+					isize len = gb_snprintf(cast(char *)err_str, err_len,
+					                        "%.*s(%td:%td) Runtime assertion: %s\n",
+					                        LIT(pos.file), pos.line, pos.column, expr);
+
+					ssaValue *array = ssa_add_global_string_array(proc, make_exact_value_string(make_string(err_str, len-1)));
+					ssaValue *elem = ssa_array_elem(proc, array);
+					ssaValue *string = ssa_emit_load(proc, ssa_emit_string(proc, elem, ssa_array_len(proc, array)));
+
+					ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, 1);
+					args[0] = string;
+					ssa_emit_global_call(proc, "__assert", args, 1);
+
+					ssa_emit_jump(proc, done);
+					gb_array_append(proc->blocks, done);
+					proc->curr_block = done;
+
+					return NULL;
 				} break;
 
 				case BuiltinProc_len: {
@@ -2132,8 +2181,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			args[i] = ssa_emit_conv(proc, args[i], pt->variables[i]->type, true);
 		}
 
-		ssaValue *call = ssa_make_instr_call(proc, value, args, arg_count, type->results);
-		return ssa_emit(proc, call);
+		return ssa_emit_call(proc, value, args, arg_count);
 	case_end;
 
 	case_ast_node(se, SliceExpr, expr);

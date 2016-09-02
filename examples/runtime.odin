@@ -36,7 +36,7 @@ memory_copy :: proc(dst, src: rawptr, n: int) #inline {
 	}
 
 	v128b :: type {4}u32
-	static_assert(align_of(v128b) == 16)
+	assert(align_of(v128b) == 16)
 
 	d, s: ^byte = dst, src
 
@@ -236,10 +236,6 @@ __string_eq :: proc(a, b: string) -> bool {
 	return memory_compare(^a[0], ^b[0], len(a)) == 0
 }
 
-__string_ne :: proc(a, b : string) -> bool #inline {
-	return !__string_eq(a, b)
-}
-
 __string_cmp :: proc(a, b : string) -> int {
 	min_len := len(a)
 	if len(b) < min_len {
@@ -263,6 +259,7 @@ __string_cmp :: proc(a, b : string) -> int {
 	return 0
 }
 
+__string_ne :: proc(a, b : string) -> bool #inline { return !__string_eq(a, b) }
 __string_lt :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) < 0 }
 __string_gt :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) > 0 }
 __string_le :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) <= 0 }
@@ -291,9 +288,9 @@ Allocator :: type struct {
 
 
 Context :: type struct {
-	thread_id: i32
+	thread_id: int
 
-	user_index: i32
+	user_index: int
 	user_data:  rawptr
 
 	allocator: Allocator
@@ -350,11 +347,7 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 		return null
 	}
 
-	if new_size < old_size {
-		new_size = old_size
-	}
-
-	if old_size == new_size {
+	if new_size == old_size {
 		return old_memory
 	}
 
@@ -362,11 +355,8 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 	if new_memory == null {
 		return null
 	}
-	min_size := old_size;
-	if min_size > new_size {
-		min_size = new_size;
-	}
-	memory_copy(new_memory, old_memory, min_size);
+
+	memory_copy(new_memory, old_memory, min(old_size, new_size));
 	dealloc(old_memory)
 	return new_memory
 }
@@ -399,3 +389,10 @@ __default_allocator :: proc() -> Allocator {
 	}
 }
 
+
+
+
+__assert :: proc(msg: string) {
+	file_write(file_get_standard(File_Standard.ERROR), msg as []byte)
+	debug_trap()
+}
