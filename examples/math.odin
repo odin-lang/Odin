@@ -29,16 +29,9 @@ fsqrt    :: proc(x: f32) -> f32 #foreign "llvm.sqrt.f32"
 fsin     :: proc(x: f32) -> f32 #foreign "llvm.sin.f32"
 fcos     :: proc(x: f32) -> f32 #foreign "llvm.cos.f32"
 flerp    :: proc(a, b, t: f32) -> f32 { return a*(1-t) + b*t }
-fclamp   :: proc(x, lower, upper: f32) -> f32 { return fmin(fmax(x, lower), upper) }
+fclamp   :: proc(x, lower, upper: f32) -> f32 { return min(max(x, lower), upper) }
 fclamp01 :: proc(x: f32) -> f32 { return fclamp(x, 0, 1) }
-fabs     :: proc(x: f32) -> f32 { if x < 0 { x = -x } return x }
 fsign    :: proc(x: f32) -> f32 { if x >= 0 { return +1 } return -1 }
-
-fmin     :: proc(a, b: f32) -> f32 { if a < b { return a } return b }
-fmax     :: proc(a, b: f32) -> f32 { if a > b { return a } return b }
-fmin3    :: proc(a, b, c: f32) -> f32 { return fmin(fmin(a, b), c) }
-fmax3    :: proc(a, b, c: f32) -> f32 { return fmax(fmax(a, b), c) }
-
 
 copy_sign :: proc(x, y: f32) -> f32 {
 	ix := x transmute u32
@@ -76,8 +69,8 @@ remainder :: proc(x, y: f32) -> f32 {
 }
 
 fmod :: proc(x, y: f32) -> f32 {
-	y = fabs(y)
-	result := remainder(fabs(x), y)
+	y = abs(y)
+	result := remainder(abs(x), y)
 	if fsign(result) < 0 {
 		result += y
 	}

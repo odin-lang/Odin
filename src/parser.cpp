@@ -164,6 +164,20 @@ AST_NODE_KIND(_ComplexStmtBegin, "", struct{}) \
 	AST_NODE_KIND(DeferStmt,  "defer statement",  struct { Token token; AstNode *stmt; }) \
 	AST_NODE_KIND(BranchStmt, "branch statement", struct { Token token; }) \
 	AST_NODE_KIND(UsingStmt,  "using statement",  struct { Token token; AstNode *node; }) \
+	AST_NODE_KIND(AsmOperand, "assembly operand", struct { \
+		Token string; \
+		AstNode *operand; \
+	}) \
+	AST_NODE_KIND(AsmStmt,    "assembly statement", struct { \
+		Token token; \
+		b32 is_volatile; \
+		Token open, close; \
+		Token code_string; \
+		AstNode *output_list; \
+		AstNode *input_list; \
+		AstNode *clobber_list; \
+		isize output_count, input_count, clobber_count; \
+	}) \
 \
 AST_NODE_KIND(_ComplexStmtEnd, "", struct{}) \
 AST_NODE_KIND(_StmtEnd,        "", struct{}) \
@@ -348,6 +362,8 @@ Token ast_node_token(AstNode *node) {
 		return node->BranchStmt.token;
 	case AstNode_UsingStmt:
 		return node->UsingStmt.token;
+	case AstNode_AsmStmt:
+		return node->AsmStmt.token;
 	case AstNode_BadDecl:
 		return node->BadDecl.begin;
 	case AstNode_VarDecl:
@@ -683,6 +699,35 @@ gb_inline AstNode *make_using_stmt(AstFile *f, Token token, AstNode *node) {
 	result->UsingStmt.node  = node;
 	return result;
 }
+
+gb_inline AstNode *make_asm_operand(AstFile *f, Token string, AstNode *operand) {
+	AstNode *result = make_node(f, AstNode_AsmOperand);
+	result->AsmOperand.string  = string;
+	result->AsmOperand.operand = operand;
+	return result;
+
+}
+
+gb_inline AstNode *make_asm_stmt(AstFile *f, Token token, b32 is_volatile, Token open, Token close, Token code_string,
+                                 AstNode *output_list, AstNode *input_list, AstNode *clobber_list,
+                                 isize output_count, isize input_count, isize clobber_count) {
+	AstNode *result = make_node(f, AstNode_AsmStmt);
+	result->AsmStmt.token = token;
+	result->AsmStmt.is_volatile = is_volatile;
+	result->AsmStmt.open  = open;
+	result->AsmStmt.close = close;
+	result->AsmStmt.code_string = code_string;
+	result->AsmStmt.output_list = output_list;
+	result->AsmStmt.input_list = input_list;
+	result->AsmStmt.clobber_list = clobber_list;
+	result->AsmStmt.output_count = output_count;
+	result->AsmStmt.input_count = input_count;
+	result->AsmStmt.clobber_count = clobber_count;
+	return result;
+}
+
+
+
 
 
 gb_inline AstNode *make_bad_decl(AstFile *f, Token begin, Token end) {
@@ -2219,6 +2264,37 @@ AstNode *parse_defer_stmt(AstFile *f) {
 	return make_defer_stmt(f, token, statement);
 }
 
+AstNode *parse_asm_stmt(AstFile *f) {
+	Token token = expect_token(f, Token_asm);
+	b32 is_volatile = false;
+	if (allow_token(f, Token_volatile)) {
+		is_volatile = true;
+	}
+	Token open, close, code_string;
+	open = expect_token(f, Token_OpenBrace);
+	code_string = expect_token(f, Token_String);
+	AstNode *output_list = NULL;
+	AstNode *input_list = NULL;
+	AstNode *clobber_list = NULL;
+	isize output_count = 0;
+	isize input_count = 0;
+	isize clobber_count = 0;
+
+	// TODO(bill): Finish asm statement and determine syntax
+
+	// if (f->cursor[0].kind != Token_CloseBrace) {
+		// expect_token(f, Token_Colon);
+	// }
+
+	close = expect_token(f, Token_CloseBrace);
+
+	return make_asm_stmt(f, token, is_volatile, open, close, code_string,
+	                     output_list, input_list, clobber_list,
+	                     output_count, input_count, clobber_count);
+
+}
+
+
 
 AstNode *parse_stmt(AstFile *f) {
 	AstNode *s = NULL;
@@ -2246,6 +2322,7 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_for:    return parse_for_stmt(f);
 	case Token_match:  return parse_match_stmt(f);
 	case Token_defer:  return parse_defer_stmt(f);
+	case Token_asm:    return parse_asm_stmt(f);
 
 	case Token_break:
 	case Token_continue:
@@ -2254,6 +2331,7 @@ AstNode *parse_stmt(AstFile *f) {
 		s = make_branch_stmt(f, token);
 		expect_semicolon_after_stmt(f, s);
 		return s;
+
 
 	case Token_using: {
 		AstNode *node = NULL;

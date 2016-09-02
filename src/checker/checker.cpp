@@ -145,6 +145,10 @@ enum BuiltinProcId {
 	BuiltinProc_ptr_sub,
 	BuiltinProc_slice_ptr,
 
+	BuiltinProc_min,
+	BuiltinProc_max,
+	BuiltinProc_abs,
+
 	BuiltinProc_Count,
 };
 struct BuiltinProc {
@@ -178,6 +182,10 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("ptr_offset"),       2, false, Expr_Expr},
 	{STR_LIT("ptr_sub"),          2, false, Expr_Expr},
 	{STR_LIT("slice_ptr"),        2, true,  Expr_Expr},
+
+	{STR_LIT("min"),              2, false, Expr_Expr},
+	{STR_LIT("max"),              2, false, Expr_Expr},
+	{STR_LIT("abs"),              1, false, Expr_Expr},
 };
 
 struct CheckerContext {

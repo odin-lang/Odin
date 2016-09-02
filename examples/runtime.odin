@@ -11,8 +11,15 @@ heap_free :: proc(ptr: rawptr) {
 }
 
 
+memory_zero :: proc(data: rawptr, len: int) {
+	d := slice_ptr(data as ^byte, len)
+	for i := 0; i < len; i++ {
+		d[i] = 0
+	}
+}
+
 memory_compare :: proc(dst, src: rawptr, len: int) -> int {
-	s1, s2: ^u8 = dst, src
+	s1, s2: ^byte = dst, src
 	for i := 0; i < len; i++ {
 		a := ptr_offset(s1, i)^
 		b := ptr_offset(s2, i)^
@@ -31,7 +38,7 @@ memory_copy :: proc(dst, src: rawptr, n: int) #inline {
 	v128b :: type {4}u32
 	static_assert(align_of(v128b) == 16)
 
-	d, s: ^u8 = dst, src
+	d, s: ^byte = dst, src
 
 	for ; s as uint % 16 != 0 && n != 0; n-- {
 		d^ = s^
@@ -158,7 +165,7 @@ memory_copy :: proc(dst, src: rawptr, n: int) #inline {
 }
 
 memory_move :: proc(dst, src: rawptr, n: int) #inline {
-	d, s: ^u8 = dst, src
+	d, s: ^byte = dst, src
 	if d == s {
 		return
 	}
@@ -264,7 +271,7 @@ __string_ge :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) >
 
 
 
-AllocationMode :: type enum {
+Allocation_Mode :: type enum {
 	ALLOC,
 	DEALLOC,
 	DEALLOC_ALL,
@@ -273,12 +280,12 @@ AllocationMode :: type enum {
 
 
 
-AllocatorProc :: type proc(allocator_data: rawptr, mode: AllocationMode,
-                           size, alignment: int,
-                           old_memory: rawptr, old_size: int, flags: u64) -> rawptr
+Allocator_Proc :: type proc(allocator_data: rawptr, mode: Allocation_Mode,
+                            size, alignment: int,
+                            old_memory: rawptr, old_size: int, flags: u64) -> rawptr
 
 Allocator :: type struct {
-	procedure: AllocatorProc;
+	procedure: Allocator_Proc;
 	data:      rawptr
 }
 
@@ -309,18 +316,18 @@ alloc :: proc(size: int) -> rawptr #inline { return alloc_align(size, DEFAULT_AL
 alloc_align :: proc(size, alignment: int) -> rawptr #inline {
 	__check_context()
 	a := context.allocator
-	return a.procedure(a.data, AllocationMode.ALLOC, size, alignment, null, 0, 0)
+	return a.procedure(a.data, Allocation_Mode.ALLOC, size, alignment, null, 0, 0)
 }
 
 dealloc :: proc(ptr: rawptr) #inline {
 	__check_context()
 	a := context.allocator
-	_ = a.procedure(a.data, AllocationMode.DEALLOC, 0, 0, ptr, 0, 0)
+	_ = a.procedure(a.data, Allocation_Mode.DEALLOC, 0, 0, ptr, 0, 0)
 }
 dealloc_all :: proc(ptr: rawptr) #inline {
 	__check_context()
 	a := context.allocator
-	_ = a.procedure(a.data, AllocationMode.DEALLOC_ALL, 0, 0, ptr, 0, 0)
+	_ = a.procedure(a.data, Allocation_Mode.DEALLOC_ALL, 0, 0, ptr, 0, 0)
 }
 
 
@@ -328,7 +335,7 @@ resize       :: proc(ptr: rawptr, old_size, new_size: int) -> rawptr #inline { r
 resize_align :: proc(ptr: rawptr, old_size, new_size, alignment: int) -> rawptr #inline {
 	__check_context()
 	a := context.allocator
-	return a.procedure(a.data, AllocationMode.RESIZE, new_size, alignment, ptr, old_size, 0)
+	return a.procedure(a.data, Allocation_Mode.RESIZE, new_size, alignment, ptr, old_size, 0)
 }
 
 
@@ -355,19 +362,25 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 	if new_memory == null {
 		return null
 	}
-	_ = copy(slice_ptr(new_memory as ^u8, new_size), slice_ptr(old_memory as ^u8, old_size))
+	min_size := old_size;
+	if min_size > new_size {
+		min_size = new_size;
+	}
+	memory_copy(new_memory, old_memory, min_size);
 	dealloc(old_memory)
 	return new_memory
 }
 
 
-__default_allocator_proc :: proc(allocator_data: rawptr, mode: AllocationMode,
+__default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocation_Mode,
                                  size, alignment: int,
                                  old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
-	using AllocationMode
+	using Allocation_Mode
 	match mode {
 	case ALLOC:
-		return heap_alloc(size)
+		data := heap_alloc(size)
+		memory_zero(data, size)
+		return data
 	case RESIZE:
 		return default_resize_align(old_memory, old_size, size, alignment)
 	case DEALLOC:

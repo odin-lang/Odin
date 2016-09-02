@@ -878,10 +878,11 @@ b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exac
 	} else if (is_type_string(type)) {
 		return in_value.kind == ExactValue_String;
 	} else if (is_type_integer(type)) {
-		if (in_value.kind != ExactValue_Integer)
+		ExactValue v = exact_value_to_integer(in_value);
+		if (v.kind != ExactValue_Integer)
 			return false;
-		if (out_value) *out_value = in_value;
-		i64 i = in_value.value_integer;
+		if (out_value) *out_value = v;
+		i64 i = v.value_integer;
 		i64 s = 8*type_size_of(c->sizes, c->allocator, type);
 		u64 umax = ~0ull;
 		if (s < 64) {
@@ -1282,7 +1283,6 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 
 		Type *base_type = get_base_type(type);
 		if (is_const_expr && is_type_constant_type(base_type)) {
-
 			if (base_type->kind == Type_Basic) {
 				if (check_value_is_expressible(c, x->value, base_type, &x->value)) {
 					can_convert = true;
@@ -1295,10 +1295,12 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 
 		if (!can_convert) {
 			gbString expr_str = expr_to_string(x->expr);
-			gbString type_str = type_to_string(type);
+			gbString to_type  = type_to_string(type);
+			gbString from_type = type_to_string(x->type);
 			defer (gb_string_free(expr_str));
-			defer (gb_string_free(type_str));
-			error(&c->error_collector, ast_node_token(x->expr), "Cannot cast `%s` as `%s`", expr_str, type_str);
+			defer (gb_string_free(to_type));
+			defer (gb_string_free(from_type));
+			error(&c->error_collector, ast_node_token(x->expr), "Cannot cast `%s` as `%s` from `%s`", expr_str, to_type, from_type);
 
 			x->mode = Addressing_Invalid;
 			return;
@@ -2340,6 +2342,157 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		operand->type = make_type_slice(c->allocator, ptr_type->Pointer.elem);
 		operand->mode = Addressing_Value;
+	} break;
+
+	case BuiltinProc_min: {
+		// min :: proc(a, b: comparable) -> comparable
+		Type *type = get_base_type(operand->type);
+		if (!is_type_comparable(type) || !is_type_numeric(type)) {
+			gbString type_str = type_to_string(operand->type);
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(call),
+			      "Expected a comparable numeric type to `min`, got `%s`",
+			      type_str);
+			return false;
+		}
+
+		AstNode *other_arg = ce->arg_list->next;
+		Operand a = *operand;
+		Operand b = {};
+		check_expr(c, &b, other_arg);
+		if (b.mode == Addressing_Invalid)
+			return false;
+		if (!is_type_comparable(b.type) || !is_type_numeric(type)) {
+			gbString type_str = type_to_string(b.type);
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(call),
+			      "Expected a comparable numeric type to `min`, got `%s`",
+			      type_str);
+			return false;
+		}
+
+
+		if (a.mode == Addressing_Constant &&
+		    b.mode == Addressing_Constant) {
+			ExactValue x = a.value;
+			ExactValue y = b.value;
+			Token lt = {Token_Lt};
+
+			operand->mode = Addressing_Constant;
+			if (compare_exact_values(lt, x, y)) {
+				operand->value = x;
+				operand->type = a.type;
+			} else {
+				operand->value = y;
+				operand->type = b.type;
+			}
+		} else {
+			operand->mode = Addressing_Value;
+			operand->type = type;
+
+			if (!are_types_identical(operand->type, b.type)) {
+				gbString type_a = type_to_string(a.type);
+				gbString type_b = type_to_string(b.type);
+				defer (gb_string_free(type_a));
+				defer (gb_string_free(type_b));
+				error(&c->error_collector, ast_node_token(call),
+				      "Mismatched types to `min`, `%s` vs `%s`",
+				      type_a, type_b);
+				return false;
+			}
+		}
+
+	} break;
+
+	case BuiltinProc_max: {
+		// min :: proc(a, b: comparable) -> comparable
+		Type *type = get_base_type(operand->type);
+		if (!is_type_comparable(type) || !is_type_numeric(type)) {
+			gbString type_str = type_to_string(operand->type);
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(call),
+			      "Expected a comparable numeric type to `max`, got `%s`",
+			      type_str);
+			return false;
+		}
+
+		AstNode *other_arg = ce->arg_list->next;
+		Operand a = *operand;
+		Operand b = {};
+		check_expr(c, &b, other_arg);
+		if (b.mode == Addressing_Invalid)
+			return false;
+		if (!is_type_comparable(b.type) || !is_type_numeric(type)) {
+			gbString type_str = type_to_string(b.type);
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(call),
+			      "Expected a comparable numeric type to `max`, got `%s`",
+			      type_str);
+			return false;
+		}
+
+
+		if (a.mode == Addressing_Constant &&
+		    b.mode == Addressing_Constant) {
+			ExactValue x = a.value;
+			ExactValue y = b.value;
+			Token gt = {Token_Gt};
+
+			operand->mode = Addressing_Constant;
+			if (compare_exact_values(gt, x, y)) {
+				operand->value = x;
+				operand->type = a.type;
+			} else {
+				operand->value = y;
+				operand->type = b.type;
+			}
+		} else {
+			operand->mode = Addressing_Value;
+			operand->type = type;
+
+			if (!are_types_identical(operand->type, b.type)) {
+				gbString type_a = type_to_string(a.type);
+				gbString type_b = type_to_string(b.type);
+				defer (gb_string_free(type_a));
+				defer (gb_string_free(type_b));
+				error(&c->error_collector, ast_node_token(call),
+				      "Mismatched types to `max`, `%s` vs `%s`",
+				      type_a, type_b);
+				return false;
+			}
+		}
+
+	} break;
+
+	case BuiltinProc_abs: {
+		// abs :: proc(n: numeric) -> numeric
+		Type *type = get_base_type(operand->type);
+		if (!is_type_numeric(type)) {
+			gbString type_str = type_to_string(operand->type);
+			defer (gb_string_free(type_str));
+			error(&c->error_collector, ast_node_token(call),
+			      "Expected a numeric type to `abs`, got `%s`",
+			      type_str);
+			return false;
+		}
+
+		if (operand->mode == Addressing_Constant) {
+			switch (operand->value.kind) {
+			case ExactValue_Integer:
+				operand->value.value_integer = gb_abs(operand->value.value_integer);
+				break;
+			case ExactValue_Float:
+				operand->value.value_float = gb_abs(operand->value.value_float);
+				break;
+			default:
+				GB_PANIC("Invalid numeric constant");
+				break;
+			}
+		} else {
+			operand->mode = Addressing_Value;
+		}
+
+		operand->type = type;
 	} break;
 
 	}

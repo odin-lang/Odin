@@ -34,7 +34,7 @@ file_write :: proc(f: ^File, buf: []byte) -> bool {
 	return WriteFile(f.handle, ^buf[0], len(buf) as i32, ^bytes_written, null) != 0
 }
 
-FileStandard :: type enum {
+File_Standard :: type enum {
 	INPUT,
 	OUTPUT,
 	ERROR,
@@ -42,12 +42,12 @@ FileStandard :: type enum {
 }
 
 __std_file_set := false;
-__std_files: [FileStandard.COUNT as int]File;
+__std_files: [File_Standard.COUNT as int]File;
 
-file_get_standard :: proc(std: FileStandard) -> ^File {
-	// using FileStandard;
+file_get_standard :: proc(std: File_Standard) -> ^File {
+	// using File_Standard;
 	if (!__std_file_set) {
-		using FileStandard
+		using File_Standard
 		__std_files[INPUT] .handle = GetStdHandle(STD_INPUT_HANDLE)
 		__std_files[OUTPUT].handle = GetStdHandle(STD_OUTPUT_HANDLE)
 		__std_files[ERROR] .handle = GetStdHandle(STD_ERROR_HANDLE)

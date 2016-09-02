@@ -4,24 +4,17 @@
 
 main :: proc() {
 
+	print_int(min(1, 2)); nl()
+	print_int(max(1, 2)); nl()
+	print_int(abs(-1337)); nl()
 
-	match x := "1"; x {
-	case "1":
-		print_string("1!\n")
-	case "2":
-		print_string("2!\n")
-		if true {
-			break
-		}
-	case "3", "4":
-		print_string("3 or 4!\n")
-		fallthrough
-	default:
-		print_string("default!\n")
-	}
+	a, b, c := 1, 2, -1337
+	print_int(min(a, b)); nl()
+	print_int(max(a, b)); nl()
+	print_int(abs(c) as int); nl()
+
 
 	nl()
-
 /*
 	Vec3   :: type struct { x, y, z: f32 }
 	Entity :: type struct {

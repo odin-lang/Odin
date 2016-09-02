@@ -1569,7 +1569,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 	case_ast_node(i, Ident, expr);
 		Entity *e = *map_get(&proc->module->info->uses, hash_pointer(expr));
 		if (e->kind == Entity_Builtin) {
-			GB_PANIC("TODO(bill): ssa_build_single_expr Entity_Builtin");
+			GB_PANIC("TODO(bill): ssa_build_single_expr Entity_Builtin `%.*s`", LIT(builtin_procs[e->Builtin.id].name));
 			return NULL;
 		}
 
@@ -2067,6 +2067,36 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_one32,  t_int),         len);
 					ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_two32,  t_int),         cap);
 					return ssa_emit_load(proc, slice);
+				} break;
+
+				case BuiltinProc_min: {
+					ssaValue *x = ssa_build_expr(proc, ce->arg_list);
+					ssaValue *y = ssa_build_expr(proc, ce->arg_list->next);
+					Type *t = get_base_type(ssa_type(x));
+					Token lt = {Token_Lt};
+					ssaValue *cond = ssa_emit_comp(proc, lt, x, y);
+					return ssa_emit_select(proc, cond, x, y);
+				} break;
+
+				case BuiltinProc_max: {
+					ssaValue *x = ssa_build_expr(proc, ce->arg_list);
+					ssaValue *y = ssa_build_expr(proc, ce->arg_list->next);
+					Type *t = get_base_type(ssa_type(x));
+					Token gt = {Token_Gt};
+					ssaValue *cond = ssa_emit_comp(proc, gt, x, y);
+					return ssa_emit_select(proc, cond, x, y);
+				} break;
+
+				case BuiltinProc_abs: {
+					Token lt = {Token_Lt};
+					Token sub = {Token_Sub};
+
+					ssaValue *x = ssa_build_expr(proc, ce->arg_list);
+					Type *t = ssa_type(x);
+
+					ssaValue *neg_x = ssa_emit_arith(proc, sub, v_zero, x, t);
+					ssaValue *cond = ssa_emit_comp(proc, lt, x, v_zero);
+					return ssa_emit_select(proc, cond, neg_x, x);
 				} break;
 				}
 			}

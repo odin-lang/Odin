@@ -78,6 +78,7 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 	TOKEN_KIND(Token_Period, "."), \
 	TOKEN_KIND(Token_Comma, ","), \
 	TOKEN_KIND(Token_Ellipsis, ".."), \
+	TOKEN_KIND(Token_RangeExclusive, "..<"), \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
@@ -93,6 +94,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_if,          "if"), \
 	TOKEN_KIND(Token_else,        "else"), \
 	TOKEN_KIND(Token_for,         "for"), \
+	TOKEN_KIND(Token_range,       "range"), \
 	TOKEN_KIND(Token_defer,       "defer"), \
 	TOKEN_KIND(Token_return,      "return"), \
 	TOKEN_KIND(Token_struct,      "struct"), \
@@ -100,6 +102,8 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_raw_union,   "raw_union"), \
 	TOKEN_KIND(Token_enum,        "enum"), \
 	TOKEN_KIND(Token_using,       "using"), \
+	TOKEN_KIND(Token_asm,         "asm"), \
+	TOKEN_KIND(Token_volatile,    "volatile"), \
 TOKEN_KIND(Token__KeywordEnd, "_KeywordEnd"), \
 	TOKEN_KIND(Token_Count, "")
 
@@ -711,6 +715,10 @@ Token tokenizer_get_token(Tokenizer *t) {
 			} else if (t->curr_rune == '.') { // Could be an ellipsis
 				advance_to_next_rune(t);
 				token.kind = Token_Ellipsis;
+				if (t->curr_rune == '<') {
+					advance_to_next_rune(t);
+					token.kind = Token_RangeExclusive;
+				}
 			}
 			break;
 

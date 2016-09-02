@@ -702,6 +702,10 @@ extern "C++" {
 #define gb_is_between(x, lower, upper) (((x) >= (lower)) && ((x) <= (upper)))
 #endif
 
+#ifndef gb_abs
+#define gb_abs(x) ((x) < 0 ? -(x) : (x))
+#endif
+
 /* NOTE(bill): Very useful bit setting */
 #ifndef GB_MASK_SET
 #define GB_MASK_SET(var, set, mask) do { \
