@@ -77,6 +77,10 @@ enum CallExprKind {
 	AST_NODE_KIND(Invalid,  "invalid node",  struct{}) \
 	AST_NODE_KIND(BasicLit, "basic literal", Token) \
 	AST_NODE_KIND(Ident,    "identifier",    Token) \
+	AST_NODE_KIND(Ellipsis, "ellipsis", struct { \
+		Token token; \
+		AstNode *expr; \
+	}) \
 	AST_NODE_KIND(ProcLit, "procedure literal", struct { \
 		AstNode *type; \
 		AstNode *body; \
@@ -110,7 +114,6 @@ AST_NODE_KIND(_ExprBegin,  "",  struct{}) \
 		b32 triple_indexed; \
 	}) \
 	AST_NODE_KIND(FieldValue, "field value", struct { Token eq; AstNode *field, *value; }) \
-	AST_NODE_KIND(Ellipsis,   "ellipsis",    struct { Token token; }) \
 AST_NODE_KIND(_ExprEnd,       "", struct{}) \
 AST_NODE_KIND(_StmtBegin,     "", struct{}) \
 	AST_NODE_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
@@ -542,11 +545,6 @@ gb_inline AstNode *make_deref_expr(AstFile *f, AstNode *expr, Token op) {
 }
 
 
-gb_inline AstNode *make_ellipsis(AstFile *f, Token token) {
-	AstNode *result = make_node(f, AstNode_Ellipsis);
-	result->Ellipsis.token = token;
-	return result;
-}
 gb_inline AstNode *make_basic_lit(AstFile *f, Token basic_lit) {
 	AstNode *result = make_node(f, AstNode_BasicLit);
 	result->BasicLit = basic_lit;
@@ -558,6 +556,14 @@ gb_inline AstNode *make_ident(AstFile *f, Token token) {
 	result->Ident = token;
 	return result;
 }
+
+gb_inline AstNode *make_ellipsis(AstFile *f, Token token, AstNode *expr) {
+	AstNode *result = make_node(f, AstNode_Ellipsis);
+	result->Ellipsis.token = token;
+	result->Ellipsis.expr = expr;
+	return result;
+}
+
 
 gb_inline AstNode *make_proc_lit(AstFile *f, AstNode *type, AstNode *body, u64 tags) {
 	AstNode *result = make_node(f, AstNode_ProcLit);
@@ -1253,6 +1259,37 @@ b32 is_literal_type(AstNode *node) {
 	return false;
 }
 
+AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
+	AstNode *arg_list = NULL;
+	AstNode *arg_list_curr = NULL;
+	isize arg_list_count = 0;
+	Token open_paren, close_paren;
+
+	f->expr_level++;
+	open_paren = expect_token(f, Token_OpenParen);
+
+	while (f->cursor[0].kind != Token_CloseParen &&
+	       f->cursor[0].kind != Token_EOF) {
+		if (f->cursor[0].kind == Token_Comma)
+			ast_file_err(f, f->cursor[0], "Expected an expression not a ,");
+
+		DLIST_APPEND(arg_list, arg_list_curr, parse_expr(f, false));
+		arg_list_count++;
+
+		if (f->cursor[0].kind != Token_Comma) {
+			if (f->cursor[0].kind == Token_CloseParen)
+				break;
+		}
+
+		next_token(f);
+	}
+
+	f->expr_level--;
+	close_paren = expect_token(f, Token_CloseParen);
+
+	return make_call_expr(f, operand, arg_list, arg_list_count, open_paren, close_paren);
+}
+
 AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 	AstNode *operand = parse_operand(f, lhs);
 
@@ -1273,34 +1310,7 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 			if (lhs) {
 				// TODO(bill): Handle this shit! Is this even allowed in this language?!
 			}
-			AstNode *arg_list = NULL;
-			AstNode *arg_list_curr = NULL;
-			isize arg_list_count = 0;
-			Token open_paren, close_paren;
-
-			f->expr_level++;
-			open_paren = expect_token(f, Token_OpenParen);
-
-			while (f->cursor[0].kind != Token_CloseParen &&
-			       f->cursor[0].kind != Token_EOF) {
-				if (f->cursor[0].kind == Token_Comma)
-					ast_file_err(f, f->cursor[0], "Expected an expression not a ,");
-
-				DLIST_APPEND(arg_list, arg_list_curr, parse_expr(f, false));
-				arg_list_count++;
-
-				if (f->cursor[0].kind != Token_Comma) {
-					if (f->cursor[0].kind == Token_CloseParen)
-						break;
-				}
-
-				next_token(f);
-			}
-
-			f->expr_level--;
-			close_paren = expect_token(f, Token_CloseParen);
-
-			operand = make_call_expr(f, operand, arg_list, arg_list_count, open_paren, close_paren);
+			operand = parse_call_expr(f, operand);
 		} break;
 
 		case Token_Period: {
@@ -1617,34 +1627,6 @@ AstNode *parse_type(AstFile *f) {
 	return type;
 }
 
-AstNode *parse_field_decl(AstFile *f, b32 allow_using) {
-	b32 is_using = false;
-	AstNode *name_list = NULL;
-	isize name_count = 0;
-	if (allow_using) {
-		if (allow_token(f, Token_using)) {
-			is_using = true;
-		}
-	}
-
-	name_list = parse_lhs_expr_list(f, &name_count);
-	if (name_count == 0)
-		ast_file_err(f, f->cursor[0], "Empty field declaration");
-
-	if (name_count > 1 && is_using) {
-		ast_file_err(f, f->cursor[0], "Cannot apply `using` to more than one of the same type");
-	}
-
-
-	expect_token(f, Token_Colon);
-
-	AstNode *type = parse_type_attempt(f);
-	if (type == NULL)
-		ast_file_err(f, f->cursor[0], "Expected a type for this field declaration");
-
-	AstNode *field = make_field(f, name_list, name_count, type, is_using);
-	return field;
-}
 
 Token parse_procedure_signature(AstFile *f,
                                 AstNode **param_list, isize *param_count,
@@ -1661,20 +1643,65 @@ AstNode *parse_proc_type(AstFile *f) {
 	return make_proc_type(f, proc_token, params, param_count, results, result_count);
 }
 
+AstNode *parse_field_decl(AstFile *f) {
+	AstNode *name_list = NULL;
+	isize name_count = 0;
+	b32 is_using = false;
+	if (allow_token(f, Token_using)) {
+		is_using = true;
+	}
 
-AstNode *parse_parameter_list(AstFile *f, isize *param_count_, TokenKind separator, b32 allow_using) {
+	name_list = parse_lhs_expr_list(f, &name_count);
+	if (name_count == 0) {
+		ast_file_err(f, f->cursor[0], "Empty field declaration");
+	}
+
+	if (name_count > 1 && is_using) {
+		ast_file_err(f, f->cursor[0], "Cannot apply `using` to more than one of the same type");
+		is_using = false;
+	}
+
+
+	expect_token(f, Token_Colon);
+
+	AstNode *type = NULL;
+	if (f->cursor[0].kind == Token_Ellipsis) {
+		Token ellipsis = f->cursor[0];
+		next_token(f);
+		type = parse_type_attempt(f);
+		if (type == NULL) {
+			ast_file_err(f, f->cursor[0], "variadic parameter is missing a type after `..`");
+			type = make_bad_expr(f, ellipsis, f->cursor[0]);
+		} else {
+			if (name_count > 1) {
+				ast_file_err(f, f->cursor[0], "mutliple variadic parameters, only 1 is allowed");
+				type = make_bad_expr(f, ellipsis, f->cursor[0]);
+			} else {
+				type = make_ellipsis(f, ellipsis, type);
+			}
+		}
+	} else {
+		type = parse_type_attempt(f);
+	}
+
+	if (type == NULL) {
+		ast_file_err(f, f->cursor[0], "Expected a type for this field declaration");
+	}
+
+	AstNode *field = make_field(f, name_list, name_count, type, is_using);
+	return field;
+}
+
+AstNode *parse_parameter_list(AstFile *f, isize *param_count_) {
 	AstNode *param_list = NULL;
 	AstNode *param_list_curr = NULL;
 	isize param_count = 0;
 	while (f->cursor[0].kind == Token_Identifier ||
-	       (allow_using && f->cursor[0].kind == Token_using)) {
-		if (!allow_using && allow_token(f, Token_using)) {
-			ast_file_err(f, f->cursor[-1], "`using` is only allowed within structures (at the moment)");
-		}
-		AstNode *field = parse_field_decl(f, allow_using);
+	       f->cursor[0].kind == Token_using) {
+		AstNode *field = parse_field_decl(f);
 		DLIST_APPEND(param_list, param_list_curr, field);
 		param_count += field->Field.name_count;
-		if (f->cursor[0].kind != separator)
+		if (f->cursor[0].kind != Token_Comma)
 			break;
 		next_token(f);
 	}
@@ -1746,14 +1773,18 @@ AstNode *parse_struct_params(AstFile *f, isize *decl_count_) {
 AstNode *parse_identifier_or_type(AstFile *f) {
 	switch (f->cursor[0].kind) {
 	case Token_Identifier: {
-		AstNode *ident = parse_identifier(f);
+		AstNode *e = parse_identifier(f);
 		while (f->cursor[0].kind == Token_Period) {
 			Token token = f->cursor[0];
 			next_token(f);
 			AstNode *sel = parse_identifier(f);
-			ident = make_selector_expr(f, token, ident, sel);
+			e = make_selector_expr(f, token, e, sel);
 		}
-		return ident;
+		if (f->cursor[0].kind == Token_OpenParen) {
+			// HACK NOTE(bill): For type_of_val(expr)
+			e = parse_call_expr(f, e);
+		}
+		return e;
 	}
 
 	case Token_Pointer:
@@ -1765,7 +1796,7 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		AstNode *count_expr = NULL;
 
 		if (f->cursor[0].kind == Token_Ellipsis) {
-			count_expr = make_ellipsis(f, f->cursor[0]);
+			count_expr = make_ellipsis(f, f->cursor[0], NULL);
 			next_token(f);
 		} else if (f->cursor[0].kind != Token_CloseBracket) {
 			count_expr = parse_expr(f, false);
@@ -1922,7 +1953,7 @@ Token parse_procedure_signature(AstFile *f,
                                AstNode **result_list, isize *result_count) {
 	Token proc_token = expect_token(f, Token_proc);
 	expect_token(f, Token_OpenParen);
-	*param_list = parse_parameter_list(f, param_count, Token_Comma, true);
+	*param_list = parse_parameter_list(f, param_count);
 	expect_token(f, Token_CloseParen);
 	*result_list = parse_results(f, result_count);
 	return proc_token;

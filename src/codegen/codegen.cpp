@@ -131,7 +131,7 @@ void ssa_gen_code(ssaGen *s) {
 		String name = make_string(SSA_STARTUP_RUNTIME_PROC_NAME);
 		Type *proc_type = make_type_proc(a, gb_alloc_item(a, Scope),
 		                                 NULL, 0,
-		                                 NULL, 0);
+		                                 NULL, 0, false);
 		AstNode *body = gb_alloc_item(a, AstNode);
 		ssaValue *p = ssa_make_value_procedure(a, m, proc_type, NULL, body, name);
 		Token token = {};

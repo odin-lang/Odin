@@ -110,6 +110,8 @@ GetQueryPerformanceFrequency :: proc() -> i64 {
 	return r
 }
 
+GetCommandLineA :: proc() -> ^u8 #foreign
+
 
 
 // File Stuff

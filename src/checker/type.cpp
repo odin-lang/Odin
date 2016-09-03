@@ -149,6 +149,7 @@ struct Type {
 			Type * results; // Type_Tuple
 			isize  param_count;
 			isize  result_count;
+			b32    variadic;
 		} Proc;
 	};
 };
@@ -240,13 +241,27 @@ Type *make_type_tuple(gbAllocator a) {
 	return t;
 }
 
-Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_count, Type *results, isize result_count) {
+Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_count, Type *results, isize result_count, b32 variadic) {
 	Type *t = alloc_type(a, Type_Proc);
-	t->Proc.scope = scope;
-	t->Proc.params = params;
-	t->Proc.param_count = param_count;
-	t->Proc.results = results;
+
+	if (variadic) {
+		if (param_count == 0) {
+			GB_PANIC("variadic procedure must have at least one parameter");
+		}
+		GB_ASSERT(params != NULL && params->kind == Type_Tuple);
+		Entity *e = params->Tuple.variables[param_count-1];
+		if (get_base_type(e->type)->kind != Type_Slice) {
+			// NOTE(bill): For custom calling convention
+			GB_PANIC("variadic parameter must be of type slice");
+		}
+	}
+
+	t->Proc.scope        = scope;
+	t->Proc.params       = params;
+	t->Proc.param_count  = param_count;
+	t->Proc.results      = results;
 	t->Proc.result_count = result_count;
+	t->Proc.variadic     = variadic;
 	return t;
 }
 

@@ -2159,10 +2159,23 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		auto *type = &proc_type_->Proc;
 
 		isize arg_index = 0;
-		isize arg_count = type->param_count;
-		ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, arg_count);
 
-		for (AstNode *arg = ce->arg_list; arg != NULL; arg = arg->next) {
+		isize arg_count = 0;
+		for (AstNode *a = ce->arg_list; a != NULL; a = a->next) {
+			Type *at = get_base_type(type_of_expr(proc->module->info, a));
+			if (at->kind == Type_Tuple) {
+				arg_count += at->Tuple.variable_count;
+			} else {
+				arg_count++;
+			}
+		}
+		ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, arg_count);
+		b32 variadic = proc_type_->Proc.variadic;
+
+		AstNode *arg = ce->arg_list;
+		for (;
+		     arg != NULL;
+		     arg = arg->next) {
 			ssaValue *a = ssa_build_expr(proc, arg);
 			Type *at = ssa_type(a);
 			if (at->kind == Type_Tuple) {
@@ -2176,10 +2189,53 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			}
 		}
 
-		auto *pt = &proc_type_->Proc.params->Tuple;
-		for (isize i = 0; i < arg_count; i++) {
-			args[i] = ssa_emit_conv(proc, args[i], pt->variables[i]->type, true);
+		auto *pt = &type->params->Tuple;
+
+		if (variadic) {
+			isize i = 0;
+			for (; i < type->param_count-1; i++) {
+				args[i] = ssa_emit_conv(proc, args[i], pt->variables[i]->type, true);
+			}
+			Type *variadic_type = pt->variables[i]->type;
+			GB_ASSERT(is_type_slice(variadic_type));
+			variadic_type = get_base_type(variadic_type)->Slice.elem;
+			for (; i < arg_count; i++) {
+				args[i] = ssa_emit_conv(proc, args[i], variadic_type, true);
+			}
+		} else {
+			for (isize i = 0; i < arg_count; i++) {
+				args[i] = ssa_emit_conv(proc, args[i], pt->variables[i]->type, true);
+			}
 		}
+
+		if (variadic) {
+			gbAllocator allocator = proc->module->allocator;
+			Type *slice_type = pt->variables[type->param_count-1]->type;
+			Type *elem_type  = get_base_type(slice_type)->Slice.elem;
+			Type *elem_ptr_type = make_type_pointer(allocator, elem_type);
+			ssaValue *slice = ssa_add_local_generated(proc, slice_type);
+			isize slice_len = arg_count+1 - type->param_count;
+
+			if (slice_len > 0) {
+				ssaValue *base_array = ssa_add_local_generated(proc, make_type_array(allocator, elem_type, slice_len));
+
+				for (isize i = type->param_count-1, j = 0; i < arg_count; i++, j++) {
+					ssaValue *addr = ssa_emit_struct_gep(proc, base_array, j, elem_type);
+					ssa_emit_store(proc, addr, args[i]);
+				}
+
+				ssaValue *base_elem = ssa_emit_struct_gep(proc, base_array, v_zero32, elem_type);
+				ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_zero32, elem_ptr_type), base_elem);
+				ssaValue *len = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(slice_len));
+				ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_one32, t_int), len);
+				ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_two32, t_int), len);
+			}
+
+
+			arg_count = type->param_count;
+			args[arg_count-1] = ssa_emit_load(proc, slice);
+		}
+
 
 		return ssa_emit_call(proc, value, args, arg_count);
 	case_end;

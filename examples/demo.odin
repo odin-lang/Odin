@@ -3,17 +3,28 @@
 #load "game.odin"
 
 main :: proc() {
-	print_int(min(1, 2)); nl()
-	print_int(max(1, 2)); nl()
-	print_int(abs(-1337)); nl()
 
-	a, b, c := 1, 2, -1337
+	print_ints :: proc(args: ..int) {
+		for i := 0; i < len(args); i++ {
+			print_int(args[i])
+			nl()
+		}
+	}
+	// print_ints()
+	// print_ints(1)
+	print_ints(1, 2, 3, 4, 5)
 
-	print_int(min(a, b)); nl()
-	print_int(max(a, b)); nl()
-	print_int(abs(c) as int); nl()
+	// print_int(min(1, 2)); nl()
+	// print_int(max(1, 2)); nl()
+	// print_int(abs(-1337)); nl()
 
-	nl()
+	// a, b, c := 1, 2, -1337
+
+	// print_int(min(a, b)); nl()
+	// print_int(max(a, b)); nl()
+	// print_int(abs(c) as int); nl()
+
+	// nl()
 /*
 	Vec3   :: type struct { x, y, z: f32 }
 	Entity :: type struct {

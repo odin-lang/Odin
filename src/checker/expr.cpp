@@ -459,9 +459,11 @@ void check_enum_type(Checker *c, Type *enum_type, AstNode *node) {
 	enum_type->Record.other_field_count = et->field_count;
 }
 
-Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize field_count) {
+Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize field_count, b32 *is_variadic_) {
 	if (field_list == NULL || field_count == 0)
 		return NULL;
+
+	b32 is_variadic = false;
 
 	Type *tuple = make_type_tuple(c->allocator);
 
@@ -471,6 +473,15 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize fiel
 		ast_node(f, Field, field);
 		AstNode *type_expr = f->type;
 		if (type_expr) {
+			if (type_expr->kind == AstNode_Ellipsis) {
+				type_expr = type_expr->Ellipsis.expr;
+				if (field->next == NULL) {
+					is_variadic = true;
+				} else {
+					error(&c->error_collector, ast_node_token(field), "Invalid AST: Invalid variadic parameter");
+				}
+			}
+
 			Type *type = check_type(c, type_expr);
 			for (AstNode *name = f->name_list; name != NULL; name = name->next) {
 				if (name->kind == AstNode_Ident) {
@@ -478,13 +489,23 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *field_list, isize fiel
 					add_entity(c, scope, name, param);
 					variables[variable_index++] = param;
 				} else {
-					error(&c->error_collector, ast_node_token(name), "Invalid parameter (invalid AST)");
+					error(&c->error_collector, ast_node_token(name), "Invalid AST: Invalid parameter");
 				}
 			}
 		}
 	}
+
+	if (is_variadic && field_count > 0) {
+		// NOTE(bill): Change last variadic parameter to be a slice
+		// Custom Calling convention for variadic parameters
+		Entity *end = variables[field_count-1];
+		end->type = make_type_slice(c->allocator, end->type);
+	}
+
 	tuple->Tuple.variables = variables;
 	tuple->Tuple.variable_count = field_count;
+
+	if (is_variadic_) *is_variadic_ = is_variadic;
 
 	return tuple;
 }
@@ -520,7 +541,8 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 
 	// gb_printf("%td -> %td\n", param_count, result_count);
 
-	Type *params  = check_get_params(c, c->context.scope, pt->param_list,   param_count);
+	b32 variadic = false;
+	Type *params  = check_get_params(c, c->context.scope, pt->param_list,   param_count, &variadic);
 	Type *results = check_get_results(c, c->context.scope, pt->result_list, result_count);
 
 	type->Proc.scope        = c->context.scope;
@@ -528,6 +550,7 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 	type->Proc.param_count  = pt->param_count;
 	type->Proc.results      = results;
 	type->Proc.result_count = pt->result_count;
+	type->Proc.variadic     = variadic;
 }
 
 
@@ -772,10 +795,19 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		goto end;
 	case_end;
 
-	default:
+	default: {
+		if (e->kind == AstNode_CallExpr) {
+			Operand o = {};
+			check_expr_or_type(c, &o, e);
+			if (o.mode == Addressing_Type) {
+				type = o.type;
+				goto end;
+			}
+		}
+
 		err_str = expr_to_string(e);
 		error(&c->error_collector, ast_node_token(e), "`%s` is not a type", err_str);
-		break;
+	} break;
 	}
 
 	type = t_invalid;
@@ -1894,7 +1926,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 	case BuiltinProc_size_of_val:
 		// size_of_val :: proc(val: Type) -> int
-		check_assignment(c, operand, NULL, make_string("argument of `size_of`"));
+		check_assignment(c, operand, NULL, make_string("argument of `size_of_val`"));
 		if (operand->mode == Addressing_Invalid)
 			return false;
 
@@ -1917,7 +1949,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 	case BuiltinProc_align_of_val:
 		// align_of_val :: proc(val: Type) -> int
-		check_assignment(c, operand, NULL, make_string("argument of `align_of`"));
+		check_assignment(c, operand, NULL, make_string("argument of `align_of_val`"));
 		if (operand->mode == Addressing_Invalid)
 			return false;
 
@@ -1995,6 +2027,14 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->value = make_exact_value_integer(type_offset_of(c->sizes, c->allocator, type, sel.index[0]));
 		operand->type  = t_int;
 	} break;
+
+	case BuiltinProc_type_of_val:
+		// type_of_val :: proc(val: Type) -> type(Type)
+		check_assignment(c, operand, NULL, make_string("argument of `type_of_val`"));
+		if (operand->mode == Addressing_Invalid)
+			return false;
+		operand->mode = Addressing_Type;
+		break;
 
 	case BuiltinProc_assert:
 		// assert :: proc(cond: bool)
@@ -2519,14 +2559,20 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	isize error_code = 0;
 	isize param_index = 0;
 	isize param_count = 0;
+	b32 variadic = proc_type->Proc.variadic;
 
-	if (proc_type->Proc.params)
+	if (proc_type->Proc.params) {
 		param_count = proc_type->Proc.params->Tuple.variable_count;
+	}
 
- 	if (ce->arg_list_count == 0 && param_count == 0)
-		return;
+	if (ce->arg_list_count == 0) {
+		if (variadic && param_count-1 == 0)
+			return;
+		if (param_count == 0)
+			return;
+	}
 
-	if (ce->arg_list_count > param_count) {
+	if (ce->arg_list_count > param_count && !variadic) {
 		error_code = +1;
 	} else {
 		Entity **sig_params = proc_type->Proc.params->Tuple.variables;
@@ -2537,19 +2583,40 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 				continue;
 			if (operand->type->kind != Type_Tuple) {
 				check_not_tuple(c, operand);
-				check_assignment(c, operand, sig_params[param_index]->type, make_string("argument"), true);
+				isize index = param_index;
+				b32 end_variadic = false;
+				if (variadic && param_index >= param_count-1) {
+					index = param_count-1;
+					end_variadic = true;
+				}
+				Type *arg_type = sig_params[index]->type;
+				if (end_variadic && is_type_slice(arg_type)) {
+					arg_type = get_base_type(arg_type)->Slice.elem;
+				}
+				check_assignment(c, operand, arg_type, make_string("argument"), true);
 				param_index++;
 			} else {
 				auto *tuple = &operand->type->Tuple;
 				isize i = 0;
 				for (;
-				     i < tuple->variable_count && param_index < param_count;
-				     i++, param_index++) {
+				     i < tuple->variable_count && (param_index < param_count && !variadic);
+				     i++) {
 					Entity *e = tuple->variables[i];
 					operand->type = e->type;
 					operand->mode = Addressing_Value;
 					check_not_tuple(c, operand);
-					check_assignment(c, operand, sig_params[param_index]->type, make_string("argument"), true);
+					isize index = param_index;
+					b32 end_variadic = false;
+					if (variadic && param_index >= param_count-1) {
+						index = param_count-1;
+						end_variadic = true;
+					}
+					Type *arg_type = sig_params[index]->type;
+					if (end_variadic && is_type_slice(arg_type)) {
+						arg_type = get_base_type(arg_type)->Slice.elem;
+					}
+					check_assignment(c, operand, arg_type, make_string("argument"), true);
+					param_index++;
 				}
 
 				if (i < tuple->variable_count && param_index == param_count) {
@@ -2558,12 +2625,13 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 				}
 			}
 
-			if (param_index >= param_count)
+			if (!variadic && param_index >= param_count)
 				break;
 		}
 
 
-		if (param_index < param_count) {
+		if ((!variadic && param_index < param_count) ||
+		    (variadic  && param_index < param_count-1)) {
 			error_code = -1;
 		} else if (call_arg != NULL && call_arg->next != NULL) {
 			error_code = +1;

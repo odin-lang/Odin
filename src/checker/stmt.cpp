@@ -421,7 +421,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 	GB_ASSERT(e->type == NULL);
 
-	Type *proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0);
+	Type *proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0, false);
 	e->type = proc_type;
 	ast_node(pd, ProcDecl, d->proc_decl);
 	check_open_scope(c, pd->type);

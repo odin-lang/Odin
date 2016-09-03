@@ -132,6 +132,7 @@ enum BuiltinProcId {
 	BuiltinProc_align_of_val,
 	BuiltinProc_offset_of,
 	BuiltinProc_offset_of_val,
+	BuiltinProc_type_of_val,
 	BuiltinProc_assert,
 
 	BuiltinProc_len,
@@ -170,6 +171,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("align_of_val"),     1, false, Expr_Expr},
 	{STR_LIT("offset_of"),        2, false, Expr_Expr},
 	{STR_LIT("offset_of_val"),    1, false, Expr_Expr},
+	{STR_LIT("type_of_val"),      1, false, Expr_Expr},
 	{STR_LIT("assert"),           1, false, Expr_Stmt},
 
 	{STR_LIT("len"),              1, false, Expr_Expr},
