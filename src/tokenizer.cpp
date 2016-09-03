@@ -383,28 +383,29 @@ void tokenizer_skip_whitespace(Tokenizer *t) {
 			advance_to_next_rune(t);
 		} else if (t->curr_rune == '/') {
 			if (t->read_curr[0] == '/') { // Line comment //
-				while (t->curr_rune != '\n')
+				while (t->curr_rune != '\n') {
 					advance_to_next_rune(t);
+				}
 			} else if (t->read_curr[0] == '*') { // (Nested) Block comment /**/
+				advance_to_next_rune(t);
+				advance_to_next_rune(t);
 				isize comment_scope = 1;
-				for (;;) {
-					advance_to_next_rune(t);
+				while (comment_scope > 0) {
 					if (t->curr_rune == '/') {
 						advance_to_next_rune(t);
 						if (t->curr_rune == '*') {
 							advance_to_next_rune(t);
 							comment_scope++;
 						}
-					}
-					if (t->curr_rune == '*') {
+					} else if (t->curr_rune == '*') {
 						advance_to_next_rune(t);
 						if (t->curr_rune == '/') {
 							advance_to_next_rune(t);
 							comment_scope--;
 						}
+					} else {
+						advance_to_next_rune(t);
 					}
-					if (comment_scope <= 0)
-						break;
 				}
 			} else {
 				break;

@@ -3434,6 +3434,11 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, ue->expr);
 	case_end;
 
+	case_ast_node(de, DerefExpr, node);
+		str = write_expr_to_string(str, de->expr);
+		str = gb_string_appendc(str, "^");
+	case_end;
+
 	case_ast_node(be, BinaryExpr, node);
 		str = write_expr_to_string(str, be->left);
 		str = gb_string_appendc(str, " ");

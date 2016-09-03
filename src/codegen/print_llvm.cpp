@@ -338,7 +338,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_Store: {
-		Type *type = ssa_type(instr->Store.address);
+		Type *type = ssa_type(instr);
 		ssa_fprintf(f, "store ");
 		ssa_print_type(f, m->sizes, type);
 		ssa_fprintf(f, " ");
@@ -368,10 +368,10 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 			ssa_fprintf(f, "inbounds ");
 		}
 
-		ssa_print_type(f, m->sizes, et);
+		ssa_print_type(f, m->sizes, type_deref(et));
 		ssa_fprintf(f, ", ");
 		ssa_print_type(f, m->sizes, et);
-		ssa_fprintf(f, "* ");
+		ssa_fprintf(f, " ");
 		ssa_print_value(f, m, instr->GetElementPtr.address, et);
 		for (isize i = 0; i < instr->GetElementPtr.index_count; i++) {
 			ssaValue *index = instr->GetElementPtr.indices[i];
