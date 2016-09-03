@@ -1432,6 +1432,34 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_inttoptr, value, src, dst));
 	}
 
+	if (is_type_union(dst)) {
+		for (isize i = 0; i < dst->Record.field_count; i++) {
+			Entity *f = dst->Record.fields[i];
+			if (are_types_identical(f->type, src_type)) {
+				gbAllocator allocator = proc->module->allocator;
+				ssaValue *parent = ssa_add_local_generated(proc, t);
+				ssaValue *tag = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(i));
+				ssa_emit_store(proc, ssa_emit_struct_gep(proc, parent, v_zero32, t_int), tag);
+
+				i64 int_size = proc->module->sizes.word_size;
+				i64 underlying_array_size = type_size_of(proc->module->sizes, allocator, ssa_type(parent));
+				underlying_array_size -= int_size;
+				Type *array_type = make_type_array(allocator, t_u8, underlying_array_size);
+				ssaValue *data = ssa_emit_struct_gep(proc, parent, v_one32, array_type);
+				data = ssa_array_elem(proc, data);
+
+				Type *tag_type = src_type;
+				Type *t_u8_ptr = make_type_pointer(allocator, t_u8);
+				Type *tag_type_ptr = make_type_pointer(allocator, tag_type);
+				ssaValue *underlying = ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, data, t_u8_ptr, tag_type_ptr));
+				// underlying = ssa_emit_zero_gep(proc, underlying);
+				// ssa_set_type(underlying, src);
+				// ssa_emit_store(proc, underlying, value);
+
+				return ssa_emit_load(proc, parent);
+			}
+		}
+	}
 
 	// NOTE(bill): This has to be done beofre `Pointer <-> Pointer` as it's
 	// subtype polymorphism casting
@@ -1660,6 +1688,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		case Token_GtEq: {
 			ssaValue *left  = ssa_build_expr(proc, be->left);
 			ssaValue *right = ssa_build_expr(proc, be->right);
+
 			ssaValue *cmp = ssa_emit_comp(proc, be->op, left, right);
 			return ssa_emit_conv(proc, cmp, default_type(tv->type));
 		} break;

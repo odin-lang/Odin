@@ -158,6 +158,10 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 				ssa_fprintf(f, ">");
 			}
 			break;
+		case TypeRecord_Union: {
+			i64 size_of_union = type_size_of(s, gb_heap_allocator(), t) - s.word_size;
+			ssa_fprintf(f, "{i%lld, [%lld x i8]}", word_bits, size_of_union);
+		} break;
 		case TypeRecord_RawUnion:
 			ssa_fprintf(f, "[%lld x i8]", type_size_of(s, gb_heap_allocator(), t));
 			break;
@@ -172,7 +176,7 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 		ssa_fprintf(f, "*");
 		break;
 	case Type_Named:
-		if (is_type_struct(t)) {
+		if (is_type_struct(t) || is_type_union(t)) {
 			ssa_print_encoded_local(f, t->Named.name);
 		} else {
 			ssa_print_type(f, s, get_base_type(t));
@@ -454,7 +458,6 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "%%%d = ", value->id);
 
 		if (gb_is_between(bo->op.kind, Token__ComparisonBegin+1, Token__ComparisonEnd-1)) {
-
 			if (is_type_string(elem_type)) {
 				ssa_fprintf(f, "call ");
 				ssa_print_type(f, m->sizes, t_bool);
@@ -756,8 +759,9 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 void ssa_print_type_name(gbFile *f, ssaModule *m, ssaValue *v) {
 	GB_ASSERT(v->kind == ssaValue_TypeName);
 	Type *base_type = get_base_type(ssa_type(v));
-	if (!is_type_struct(base_type))
+	if (!is_type_struct(base_type) && !is_type_union(base_type)) {
 		return;
+	}
 	ssa_print_encoded_local(f, v->TypeName.name);
 	ssa_fprintf(f, " = type ");
 	ssa_print_type(f, m->sizes, get_base_type(v->TypeName.type));

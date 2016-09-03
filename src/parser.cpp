@@ -240,6 +240,11 @@ AST_NODE_KIND(_TypeBegin, "", struct{}) \
 		isize decl_count; \
 		b32 is_packed; \
 	}) \
+	AST_NODE_KIND(UnionType, "union type", struct { \
+		Token token; \
+		AstNode *decl_list; \
+		isize decl_count; \
+	}) \
 	AST_NODE_KIND(RawUnionType, "raw union type", struct { \
 		Token token; \
 		AstNode *decl_list; \
@@ -395,6 +400,8 @@ Token ast_node_token(AstNode *node) {
 		return node->VectorType.token;
 	case AstNode_StructType:
 		return node->StructType.token;
+	case AstNode_UnionType:
+		return node->UnionType.token;
 	case AstNode_RawUnionType:
 		return node->RawUnionType.token;
 	case AstNode_EnumType:
@@ -812,6 +819,15 @@ gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNode *decl_list,
 	result->StructType.decl_list = decl_list;
 	result->StructType.decl_count = decl_count;
 	result->StructType.is_packed = is_packed;
+	return result;
+}
+
+
+gb_inline AstNode *make_union_type(AstFile *f, Token token, AstNode *decl_list, isize decl_count) {
+	AstNode *result = make_node(f, AstNode_UnionType);
+	result->UnionType.token = token;
+	result->UnionType.decl_list = decl_list;
+	result->UnionType.decl_count = decl_count;
 	return result;
 }
 
@@ -1674,8 +1690,7 @@ AstNode *parse_field_decl(AstFile *f) {
 			type = make_bad_expr(f, ellipsis, f->cursor[0]);
 		} else {
 			if (name_count > 1) {
-				ast_file_err(f, f->cursor[0], "mutliple variadic parameters, only 1 is allowed");
-				type = make_bad_expr(f, ellipsis, f->cursor[0]);
+				ast_file_err(f, f->cursor[0], "mutliple variadic parameters, only  `..`");
 			} else {
 				type = make_ellipsis(f, ellipsis, type);
 			}
@@ -1711,7 +1726,7 @@ AstNode *parse_parameter_list(AstFile *f, isize *param_count_) {
 }
 
 
-AstNode *parse_struct_params(AstFile *f, isize *decl_count_) {
+AstNode *parse_struct_params(AstFile *f, isize *decl_count_, b32 using_allowed) {
 	AstNode *decls = NULL;
 	AstNode *decls_curr = NULL;
 	isize decl_count = 0;
@@ -1728,6 +1743,10 @@ AstNode *parse_struct_params(AstFile *f, isize *decl_count_) {
 			ast_file_err(f, f->cursor[0], "Empty field declaration");
 		}
 
+		if (!using_allowed && is_using) {
+			ast_file_err(f, f->cursor[0], "Cannot apply `using` to members of a union");
+			is_using = false;
+		}
 		if (name_count > 1 && is_using) {
 			ast_file_err(f, f->cursor[0], "Cannot apply `using` to more than one of the same type");
 		}
@@ -1752,7 +1771,7 @@ AstNode *parse_struct_params(AstFile *f, isize *decl_count_) {
 			DLIST_APPEND(decls, decls_curr, decl);
 			if (decl->kind == AstNode_VarDecl) {
 				decl_count += decl->VarDecl.name_count;
-				decl->VarDecl.is_using = is_using;
+				decl->VarDecl.is_using = is_using && using_allowed;
 
 				if (decl->VarDecl.kind == Declaration_Mutable) {
 					if (decl->VarDecl.value_count > 0) {
@@ -1829,17 +1848,27 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 
 		Token open = expect_token(f, Token_OpenBrace);
 		isize decl_count = 0;
-		AstNode *decls = parse_struct_params(f, &decl_count);
+		AstNode *decls = parse_struct_params(f, &decl_count, true);
 		Token close = expect_token(f, Token_CloseBrace);
 
 		return make_struct_type(f, token, decls, decl_count, is_packed);
 	} break;
 
+	case Token_union: {
+		Token token = expect_token(f, Token_union);
+		Token open = expect_token(f, Token_OpenBrace);
+		isize decl_count = 0;
+		AstNode *decls = parse_struct_params(f, &decl_count, false);
+		Token close = expect_token(f, Token_CloseBrace);
+
+		return make_union_type(f, token, decls, decl_count);
+	}
+
 	case Token_raw_union: {
 		Token token = expect_token(f, Token_raw_union);
 		Token open = expect_token(f, Token_OpenBrace);
 		isize decl_count = 0;
-		AstNode *decls = parse_struct_params(f, &decl_count);
+		AstNode *decls = parse_struct_params(f, &decl_count, true);
 		Token close = expect_token(f, Token_CloseBrace);
 
 		return make_raw_union_type(f, token, decls, decl_count);

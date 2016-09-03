@@ -122,12 +122,6 @@ display_window :: proc(w: ^Window) {
 }
 
 
-Entity :: type struct {
-	pos: Vec2
-	dim: Vec2
-}
-
-
 run_game :: proc() {
 	win32_proc :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #no_inline {
 		if msg == WM_DESTROY || msg == WM_CLOSE || msg == WM_QUIT {

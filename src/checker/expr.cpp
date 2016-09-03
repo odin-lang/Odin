@@ -53,11 +53,15 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 
 	Type *s = operand->type;
 
-	if (are_types_identical(s, type))
+
+
+	if (are_types_identical(s, type)) {
 		return true;
+	}
 
 	Type *src = get_base_type(s);
 	Type *dst = get_base_type(type);
+
 
 	if (is_type_untyped(src)) {
 		switch (dst->kind) {
@@ -72,8 +76,12 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 		}
 	}
 
-	if (are_types_identical(dst, src) && (!is_type_named(dst) || !is_type_named(src)))
+	if (are_types_identical(dst, src) && (!is_type_named(dst) || !is_type_named(src))) {
+		if (is_type_enum(dst) && is_type_enum(src))  {
+			return are_types_identical(s, type);
+		}
 		return true;
+	}
 
 	if (is_type_pointer(dst) && is_type_rawptr(src))
 	    return true;
@@ -90,6 +98,15 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 	if (dst->kind == Type_Slice && src->kind == Type_Slice) {
 		if (are_types_identical(dst->Slice.elem, src->Slice.elem)) {
 			return true;
+		}
+	}
+
+	if (is_type_union(dst)) {
+		for (isize i = 0; i < dst->Record.field_count; i++) {
+			Entity *f = dst->Record.fields[i];
+			if (are_types_identical(f->type, s)) {
+				return true;
+			}
 		}
 	}
 
@@ -270,64 +287,87 @@ void check_fields(Checker *c, AstNode *node, AstNode *decl_list,
 
 	}
 
-	isize field_index = 0;
-	for (AstNode *decl = decl_list; decl != NULL; decl = decl->next) {
-		if (decl->kind != AstNode_VarDecl)
-			continue;
-		ast_node(vd, VarDecl, decl);
-		if (vd->kind != Declaration_Mutable)
-			continue;
-		Type *type = check_type(c, vd->type, NULL, cycle_checker);
-
-		if (vd->is_using) {
-			if (vd->name_count > 1) {
-				error(&c->error_collector, ast_node_token(vd->name_list),
-				      "Cannot apply `using` to more than one of the same type");
-			}
-		}
-
-		for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
-			Token name_token = name->Ident;
-
-			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, vd->is_using);
-			HashKey key = hash_string(name_token.string);
-			if (map_get(&entity_map, key) != NULL) {
-				// TODO(bill): Scope checking already checks the declaration
-				error(&c->error_collector, name_token, "`%.*s` is already declared in this structure", LIT(name_token.string));
-			} else {
-				map_set(&entity_map, key, e);
-				fields[field_index++] = e;
-				add_entity(c, c->context.scope, name, e);
-			}
-			add_entity_use(&c->info, name, e);
-		}
-
-
-		if (vd->is_using) {
-			Type *t = get_base_type(type_deref(type));
-			if (!is_type_struct(t) && !is_type_raw_union(t)) {
-				Token name_token = vd->name_list->Ident;
-				error(&c->error_collector, name_token, "`using` on a field `%.*s` must be a structure or union", LIT(name_token.string));
+	if (node->kind == AstNode_UnionType) {
+		isize field_index = 0;
+		fields[field_index++] = make_entity_type_name(c->allocator, c->context.scope, empty_token, NULL);
+		for (AstNode *decl = decl_list; decl != NULL; decl = decl->next) {
+			if (decl->kind != AstNode_VarDecl)
 				continue;
+			ast_node(vd, VarDecl, decl);
+			if (vd->kind != Declaration_Mutable)
+				continue;
+			Type *type = check_type(c, vd->type, NULL, cycle_checker);
+
+			for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
+				Token name_token = name->Ident;
+
+				Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, type);
+				HashKey key = hash_string(name_token.string);
+				if (map_get(&entity_map, key) != NULL) {
+					// TODO(bill): Scope checking already checks the declaration
+					error(&c->error_collector, name_token, "`%.*s` is already declared in this union", LIT(name_token.string));
+				} else {
+					map_set(&entity_map, key, e);
+					fields[field_index++] = e;
+					add_entity(c, c->context.scope, name, e);
+				}
+				add_entity_use(&c->info, name, e);
+			}
+		}
+	} else {
+		isize field_index = 0;
+		for (AstNode *decl = decl_list; decl != NULL; decl = decl->next) {
+			if (decl->kind != AstNode_VarDecl)
+				continue;
+			ast_node(vd, VarDecl, decl);
+			if (vd->kind != Declaration_Mutable)
+				continue;
+			Type *type = check_type(c, vd->type, NULL, cycle_checker);
+
+			if (vd->is_using) {
+				if (vd->name_count > 1) {
+					error(&c->error_collector, ast_node_token(vd->name_list),
+					      "Cannot apply `using` to more than one of the same type");
+				}
 			}
 
-			populate_using_entity_map(c, node, type, &entity_map);
+			for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
+				Token name_token = name->Ident;
+
+				Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, vd->is_using);
+				HashKey key = hash_string(name_token.string);
+				if (map_get(&entity_map, key) != NULL) {
+					// TODO(bill): Scope checking already checks the declaration
+					error(&c->error_collector, name_token, "`%.*s` is already declared in this type", LIT(name_token.string));
+				} else {
+					map_set(&entity_map, key, e);
+					fields[field_index++] = e;
+					add_entity(c, c->context.scope, name, e);
+				}
+				add_entity_use(&c->info, name, e);
+			}
+
+
+			if (vd->is_using) {
+				Type *t = get_base_type(type_deref(type));
+				if (!is_type_struct(t) && !is_type_raw_union(t)) {
+					Token name_token = vd->name_list->Ident;
+					error(&c->error_collector, name_token, "`using` on a field `%.*s` must be a type", LIT(name_token.string));
+					continue;
+				}
+
+				populate_using_entity_map(c, node, type, &entity_map);
+			}
 		}
 	}
-
-
-
 }
 
 
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecker *cycle_checker) {
-	GB_ASSERT(node->kind == AstNode_StructType);
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
 
-	// TODO(bill): check_struct_type and check_union_type are very similar so why not and try to merge them better
-
-isize field_count = 0;
+	isize field_count = 0;
 	isize other_field_count = 0;
 	for (AstNode *decl = st->decl_list; decl != NULL; decl = decl->next) {
 		switch (decl->kind) {
@@ -357,6 +397,39 @@ isize field_count = 0;
 	struct_type->Record.other_field_count = other_field_count;
 }
 
+void check_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker *cycle_checker) {
+	GB_ASSERT(is_type_union(union_type));
+	ast_node(ut, UnionType, node);
+
+	isize field_count = 1;
+	isize other_field_count = 0;
+	for (AstNode *decl = ut->decl_list; decl != NULL; decl = decl->next) {
+		switch (decl->kind) {
+		case_ast_node(vd, VarDecl, decl);
+			if (vd->kind == Declaration_Mutable) {
+				field_count += vd->name_count;
+			} else {
+				other_field_count += vd->name_count;
+			}
+		case_end;
+
+		case_ast_node(td, TypeDecl, decl);
+			other_field_count += 1;
+		case_end;
+		}
+	}
+
+	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
+	Entity **other_fields = gb_alloc_array(c->allocator, Entity *, other_field_count);
+
+	check_fields(c, node, ut->decl_list, fields, field_count, other_fields, other_field_count, cycle_checker, make_string("union"));
+
+	union_type->Record.fields            = fields;
+	union_type->Record.field_count       = field_count;
+	union_type->Record.other_fields      = other_fields;
+	union_type->Record.other_field_count = other_field_count;
+}
+
 void check_raw_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker *cycle_checker) {
 	GB_ASSERT(node->kind == AstNode_RawUnionType);
 	GB_ASSERT(is_type_raw_union(union_type));
@@ -383,7 +456,7 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node, CycleChec
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
 	Entity **other_fields = gb_alloc_array(c->allocator, Entity *, other_field_count);
 
-	check_fields(c, node, ut->decl_list, fields, field_count, other_fields, other_field_count, cycle_checker, make_string("union"));
+	check_fields(c, node, ut->decl_list, fields, field_count, other_fields, other_field_count, cycle_checker, make_string("raw union"));
 
 	union_type->Record.fields = fields;
 	union_type->Record.field_count = field_count;
@@ -392,7 +465,7 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node, CycleChec
 }
 
 
-void check_enum_type(Checker *c, Type *enum_type, AstNode *node) {
+void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_EnumType);
 	GB_ASSERT(is_type_enum(enum_type));
 	ast_node(et, EnumType, node);
@@ -443,7 +516,11 @@ void check_enum_type(Checker *c, Type *enum_type, AstNode *node) {
 			iota = exact_binary_operator_value(add_token, iota, make_exact_value_integer(1));
 		}
 
-		Entity *e = make_entity_constant(c->allocator, c->context.scope, name_token, enum_type, iota);
+		Type *constant_type = enum_type;
+		if (named_type != NULL) {
+			constant_type = named_type;
+		}
+		Entity *e = make_entity_constant(c->allocator, c->context.scope, name_token, constant_type, iota);
 
 		HashKey key = hash_string(name_token.string);
 		if (map_get(&entity_map, key)) {
@@ -764,7 +841,17 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		goto end;
 	case_end;
 
-	case_ast_node(st, RawUnionType, e);
+	case_ast_node(ut, UnionType, e);
+		type = make_type_union(c->allocator);
+		set_base_type(named_type, type);
+		check_open_scope(c, e);
+		check_union_type(c, type, e, cycle_checker);
+		check_close_scope(c);
+		type->Record.node = e;
+		goto end;
+	case_end;
+
+	case_ast_node(rut, RawUnionType, e);
 		type = make_type_raw_union(c->allocator);
 		set_base_type(named_type, type);
 		check_open_scope(c, e);
@@ -777,7 +864,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 	case_ast_node(et, EnumType, e);
 		type = make_type_enum(c->allocator);
 		set_base_type(named_type, type);
-		check_enum_type(c, type, e);
+		check_enum_type(c, type, named_type, e);
 		type->Record.node = e;
 		goto end;
 	case_end;
@@ -1096,6 +1183,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 
 	if (err_str != NULL) {
 		error(&c->error_collector, op, "Cannot compare expression, %s", err_str);
+		x->type = t_untyped_bool;
 		return;
 	}
 
@@ -1215,10 +1303,13 @@ b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
 		return true;
 
 	Type *x = operand->type;
-	Type *xb = get_enum_base_type(get_base_type(x));
-	Type *yb = get_enum_base_type(get_base_type(y));
-	if (are_types_identical(xb, yb))
+	Type *xb = get_base_type(x);
+	Type *yb = get_base_type(y);
+	if (are_types_identical(xb, yb)) {
 		return true;
+	}
+	xb = get_enum_base_type(x);
+	yb = get_enum_base_type(y);
 
 
 	// Cast between booleans and integers

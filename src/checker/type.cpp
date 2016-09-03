@@ -154,6 +154,8 @@ struct Type {
 	};
 };
 
+gbString type_to_string(Type *type, gbAllocator a = gb_heap_allocator());
+
 Type *get_base_type(Type *t) {
 	for (;;) {
 		if (t == NULL || t->kind != Type_Named) {
@@ -207,6 +209,12 @@ Type *make_type_slice(gbAllocator a, Type *elem) {
 Type *make_type_struct(gbAllocator a) {
 	Type *t = alloc_type(a, Type_Record);
 	t->Record.kind = TypeRecord_Struct;
+	return t;
+}
+
+Type *make_type_union(gbAllocator a) {
+	Type *t = alloc_type(a, Type_Record);
+	t->Record.kind = TypeRecord_Union;
 	return t;
 }
 
@@ -453,6 +461,8 @@ Type *base_vector_type(Type *t) {
 	}
 	return t;
 }
+
+
 b32 is_type_enum(Type *t) {
 	t = get_base_type(t);
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_Enum);
@@ -460,6 +470,10 @@ b32 is_type_enum(Type *t) {
 b32 is_type_struct(Type *t) {
 	t = get_base_type(t);
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct);
+}
+b32 is_type_union(Type *t) {
+	t = get_base_type(t);
+	return (t->kind == Type_Record && t->Record.kind == TypeRecord_Union);
 }
 b32 is_type_raw_union(Type *t) {
 	t = get_base_type(t);
@@ -484,7 +498,8 @@ b32 is_type_comparable(Type *t) {
 	case Type_Pointer:
 		return true;
 	case Type_Record: {
-		if (is_type_struct(t)) {
+		if (false && is_type_struct(t)) {
+			// TODO(bill): Should I even allow this?
 			for (isize i = 0; i < t->Record.field_count; i++) {
 				if (!is_type_comparable(t->Record.fields[i]->type))
 					return false;
@@ -492,7 +507,7 @@ b32 is_type_comparable(Type *t) {
 		} else if (is_type_enum(t)) {
 			return is_type_comparable(t->Record.enum_base);
 		}
-		return true;
+		return false;
 	} break;
 	case Type_Array:
 		return is_type_comparable(t->Array.elem);
@@ -547,9 +562,10 @@ b32 are_types_identical(Type *x, Type *y) {
 								return false;
 							}
 						}
-
 						return true;
 					}
+					break;
+
 				case TypeRecord_Enum:
 					return are_types_identical(x->Record.enum_base, y->Record.enum_base);
 				}
@@ -563,8 +579,9 @@ b32 are_types_identical(Type *x, Type *y) {
 		break;
 
 	case Type_Named:
-		if (y->kind == Type_Named)
+		if (y->kind == Type_Named) {
 			return x->Named.base == y->Named.base;
+		}
 		break;
 
 	case Type_Tuple:
@@ -673,24 +690,29 @@ Selection lookup_field(Type *type_, String field_name, b32 is_type, Selection se
 		return sel;
 	}
 	if (is_type) {
+
+		if (is_type_union(type)) {
+			for (isize i = 0; i < type->Record.field_count; i++) {
+				Entity *f = type->Record.fields[i];
+				GB_ASSERT(f->kind == Entity_TypeName);
+				String str = f->token.string;
+
+				if (are_strings_equal(field_name, str)) {
+					return make_selection(f, NULL, i);
+				}
+			}
+		}
+
 		for (isize i = 0; i < type->Record.other_field_count; i++) {
 			Entity *f = type->Record.other_fields[i];
 			GB_ASSERT(f->kind != Entity_Variable);
 			String str = f->token.string;
 
 			if (are_strings_equal(field_name, str)) {
-				if (is_type_enum(type)) {
-					GB_ASSERT(f->kind == Entity_Constant);
-					// NOTE(bill): Enums are constant expression
-					return make_selection(f, NULL, i);
-				} else {
-					selection_add_index(&sel, i);
-					sel.entity = f;
-					return sel;
-				}
+				return make_selection(f, NULL, i);
 			}
 		}
-	} else if (!is_type_enum(type)) {
+	} else if (!is_type_enum(type) && !is_type_union(type)) {
 		for (isize i = 0; i < type->Record.field_count; i++) {
 			Entity *f = type->Record.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
@@ -761,6 +783,16 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 				return max;
 			}
 			break;
+		case TypeRecord_Union: {
+			i64 max = s.word_size;
+			for (isize i = 1; i < t->Record.field_count; i++) {
+				// NOTE(bill): field zero is null
+				i64 align = type_align_of(s, allocator, t->Record.fields[i]->type);
+				if (max < align)
+					max = align;
+			}
+			return max;
+		} break;
 		case TypeRecord_RawUnion: {
 			i64 max = 1;
 			for (isize i = 0; i < t->Record.field_count; i++) {
@@ -868,6 +900,18 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 			return t->Record.struct_offsets[count-1] + type_size_of(s, allocator, t->Record.fields[count-1]->type);
 		} break;
 
+		case TypeRecord_Union: {
+			i64 count = t->Record.field_count;
+			i64 max = 0;
+			// NOTE(bill): Zeroth field is invalid
+			for (isize i = 1; i < count; i++) {
+				i64 size = type_size_of(s, allocator, t->Record.fields[i]->type);
+				if (max < size)
+					max = size;
+			}
+			return type_size_of(s, allocator, t_int) + max;
+		} break;
+
 		case TypeRecord_RawUnion: {
 			i64 count = t->Record.field_count;
 			i64 max = 0;
@@ -900,7 +944,6 @@ i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, isize index)
 	return 0;
 }
 
-gbString type_to_string(Type *type, gbAllocator a = gb_heap_allocator());
 
 i64 type_offset_of_from_selection(BaseTypeSizes s, gbAllocator allocator, Type *t, Selection sel) {
 	i64 offset = 0;
@@ -952,7 +995,22 @@ gbString write_type_to_string(gbString str, Type *type) {
 				Entity *f = type->Record.fields[i];
 				GB_ASSERT(f->kind == Entity_Variable);
 				if (i > 0)
-					str = gb_string_appendc(str, ", ");
+					str = gb_string_appendc(str, "; ");
+				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
+				str = gb_string_appendc(str, ": ");
+				str = write_type_to_string(str, f->type);
+			}
+			str = gb_string_appendc(str, "}");
+			break;
+
+		case TypeRecord_Union:
+			str = gb_string_appendc(str, "union{");
+			for (isize i = 0; i < type->Record.field_count; i++) {
+				Entity *f = type->Record.fields[i];
+				GB_ASSERT(f->kind == Entity_TypeName);
+				if (i > 0) {
+					str = gb_string_appendc(str, "; ");
+				}
 				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
 				str = gb_string_appendc(str, ": ");
 				str = write_type_to_string(str, f->type);
