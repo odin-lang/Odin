@@ -1934,9 +1934,11 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	switch (id) {
 	case BuiltinProc_new: {
 		// new :: proc(Type) -> ^Type
-		Type *type = check_type(c, ce->arg_list);
-		if (type == NULL || type == t_invalid) {
-			error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a type for `size_of`");
+		Operand op = {};
+		check_expr_or_type(c, &op, ce->arg_list);
+		Type *type = op.type;
+		if (op.mode != Addressing_Type && type == NULL || type == t_invalid) {
+			error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a type for `new`");
 			return false;
 		}
 		operand->mode = Addressing_Value;
@@ -1944,16 +1946,17 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	} break;
 	case BuiltinProc_new_slice: {
 		// new_slice :: proc(Type, len: int[, cap: int]) -> []Type
-		Type *type = check_type(c, ce->arg_list);
-		if (type == NULL || type == t_invalid) {
-			error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a type for `size_of`");
+		Operand op = {};
+		check_expr_or_type(c, &op, ce->arg_list);
+		Type *type = op.type;
+		if (op.mode != Addressing_Type && type == NULL || type == t_invalid) {
+			error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a type for `new_slice`");
 			return false;
 		}
 
 		AstNode *len = ce->arg_list->next;
 		AstNode *cap = len->next;
 
-		Operand op = {};
 		check_expr(c, &op, len);
 		if (op.mode == Addressing_Invalid)
 			return false;
@@ -1967,7 +1970,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 
 		if (cap != NULL) {
-			check_expr(c, &op, len);
+			check_expr(c, &op, cap);
 			if (op.mode == Addressing_Invalid)
 				return false;
 			if (!is_type_integer(op.type)) {
@@ -2006,7 +2009,9 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 	case BuiltinProc_size_of: {
 		// size_of :: proc(Type) -> int
-		Type *type = check_type(c, ce->arg_list);
+		Operand op = {};
+		check_expr_or_type(c, &op, ce->arg_list);
+		Type *type = op.type;
 		if (!type) {
 			error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a type for `size_of`");
 			return false;
@@ -2031,7 +2036,9 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 	case BuiltinProc_align_of: {
 		// align_of :: proc(Type) -> int
-		Type *type = check_type(c, ce->arg_list);
+		Operand op = {};
+		check_expr_or_type(c, &op, ce->arg_list);
+		Type *type = op.type;
 		if (!type) {
 			error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a type for `align_of`");
 			return false;
@@ -2054,18 +2061,22 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 	case BuiltinProc_offset_of: {
 		// offset_val :: proc(Type, field) -> int
-		Type *type = get_base_type(check_type(c, ce->arg_list));
+		Operand op = {};
+		check_expr_or_type(c, &op, ce->arg_list);
+		Type *type = get_base_type(op.type);
 		AstNode *field_arg = unparen_expr(ce->arg_list->next);
-		if (type) {
-			if (!is_type_struct(type)) {
-				error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a structure type for `offset_of`");
-				return false;
-			}
-			if (field_arg == NULL ||
-			    field_arg->kind != AstNode_Ident) {
-				error(&c->error_collector, ast_node_token(field_arg), "Expected an identifier for field argument");
-				return false;
-			}
+		if (type != NULL) {
+			error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a type for `offset_of`");
+			return false;
+		}
+		if (!is_type_struct(type)) {
+			error(&c->error_collector, ast_node_token(ce->arg_list), "Expected a structure type for `offset_of`");
+			return false;
+		}
+		if (field_arg == NULL ||
+		    field_arg->kind != AstNode_Ident) {
+			error(&c->error_collector, ast_node_token(field_arg), "Expected an identifier for field argument");
+			return false;
 		}
 
 
@@ -2145,7 +2156,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			gbString str = expr_to_string(ce->arg_list);
 			defer (gb_string_free(str));
 			error(&c->error_collector, ast_node_token(call),
-			      "Static assertion: `%s`", str);
+			      "Compile time assertion: `%s`", str);
 			return true;
 		}
 		if (operand->mode != Addressing_Constant) {
@@ -2468,7 +2479,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 
 		if (cap != NULL) {
-			check_expr(c, &op, len);
+			check_expr(c, &op, cap);
 			if (op.mode == Addressing_Invalid)
 				return false;
 			if (!is_type_integer(op.type)) {

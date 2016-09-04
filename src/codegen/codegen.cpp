@@ -65,7 +65,7 @@ struct ssaGlobalVariable {
 	DeclInfo *decl;
 };
 
-void ssa_gen_code(ssaGen *s) {
+void ssa_gen_tree(ssaGen *s) {
 	if (v_zero == NULL) {
 		v_zero   = ssa_make_value_constant(gb_heap_allocator(), t_int,  make_exact_value_integer(0));
 		v_one    = ssa_make_value_constant(gb_heap_allocator(), t_int,  make_exact_value_integer(1));
@@ -203,7 +203,10 @@ void ssa_gen_code(ssaGen *s) {
 
 	// m->layout = make_string("e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64");
 
-	ssa_print_llvm_ir(&s->output_file, &s->module);
+
 }
 
 
+void ssa_gen_ir(ssaGen *s) {
+	ssa_print_llvm_ir(&s->output_file, &s->module);
+}

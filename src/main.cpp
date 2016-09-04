@@ -46,6 +46,9 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
+	u64 start_time, end_time;
+	start_time = gb_utc_time_now();
+
 	init_universal_scope();
 
 	char *init_filename = argv[1];
@@ -64,6 +67,10 @@ int main(int argc, char **argv) {
 	if (parse_files(&parser, init_filename) != ParseFile_None)
 		return 1;
 
+	end_time = gb_utc_time_now();
+	gb_printf_err("Parser: %lld ms\n", (end_time - start_time)/1000);
+	start_time = gb_utc_time_now();
+
 	// print_ast(parser.files[0].decls, 0);
 
 	Checker checker = {};
@@ -73,13 +80,30 @@ int main(int argc, char **argv) {
 
 	check_parsed_files(&checker);
 
+
+	// end_time = gb_utc_time_now();
+	// gb_printf_err("Checker: %lld ms\n", (end_time - start_time)/1000);
+	// start_time = gb_utc_time_now();
+
 #if 1
 	ssaGen ssa = {};
 	if (!ssa_gen_init(&ssa, &checker))
 		return 1;
 	defer (ssa_gen_destroy(&ssa));
 
-	ssa_gen_code(&ssa);
+	ssa_gen_tree(&ssa);
+
+	// end_time = gb_utc_time_now();
+	// gb_printf_err("ssa tree: %lld ms\n", (end_time - start_time)/1000);
+	// start_time = gb_utc_time_now();
+
+	// TODO(bill): Speedup writing to file for IR code
+	ssa_gen_ir(&ssa);
+
+	// end_time = gb_utc_time_now();
+	// gb_printf_err("ssa ir: %lld ms\n", (end_time - start_time)/1000);
+	// start_time = gb_utc_time_now();
+
 
 	char const *output_name = ssa.output_file.filename;
 	isize base_name_len = gb_path_extension(output_name)-1 - output_name;
@@ -92,6 +116,10 @@ int main(int argc, char **argv) {
 		output_name, cast(int)base_name_len, output_name);
 	if (exit_code != 0)
 		return exit_code;
+
+	// end_time = gb_utc_time_now();
+	// gb_printf_err("llvm-opt: %lld ms\n", (end_time - start_time)/1000);
+	// start_time = gb_utc_time_now();
 
 	gbString lib_str = gb_string_make(gb_heap_allocator(), "-lKernel32.lib");
 	char lib_str_buf[1024] = {};
@@ -115,6 +143,9 @@ int main(int argc, char **argv) {
 	gb_string_free(lib_str);
 	if (exit_code != 0)
 		return exit_code;
+
+	// end_time = gb_utc_time_now();
+	// gb_printf_err("clang: %lld ms\n\n\n", (end_time - start_time)/1000);
 
 	if (run_output) {
 		win32_exec_command_line_app("%.*s.exe", cast(int)base_name_len, output_name);

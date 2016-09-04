@@ -313,8 +313,8 @@ void ssa_module_init(ssaModule *m, Checker *c) {
 	m->info = &c->info;
 	m->sizes = c->sizes;
 
-	map_init(&m->values,  m->allocator);
-	map_init(&m->members, m->allocator);
+	map_init(&m->values,  gb_heap_allocator());
+	map_init(&m->members, gb_heap_allocator());
 }
 
 void ssa_module_destroy(ssaModule *m) {
@@ -1394,20 +1394,13 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 				gbAllocator allocator = proc->module->allocator;
 				ssaValue *parent = ssa_add_local_generated(proc, t);
 				ssaValue *tag = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(i));
-				ssa_emit_store(proc, ssa_emit_struct_gep(proc, parent, v_zero32, t_int), tag);
+				ssa_emit_store(proc, ssa_emit_struct_gep(proc, parent, v_one32, t_int), tag);
 
-				i64 tag_size = proc->module->sizes.word_size;
-				i64 underlying_array_size = type_size_of(proc->module->sizes, allocator, t);
-				underlying_array_size -= tag_size;
-				Type *array_type = make_type_array(allocator, t_u8, underlying_array_size);
-				Type *array_type_ptr = make_type_pointer(allocator, array_type);
-				ssaValue *data = ssa_emit_struct_gep(proc, parent, v_one32, array_type_ptr);
-				data = ssa_array_elem(proc, data);
+				ssaValue *data = ssa_emit_conv(proc, parent, t_rawptr);
 
 				Type *tag_type = src_type;
-				Type *t_u8_ptr = make_type_pointer(allocator, t_u8);
 				Type *tag_type_ptr = make_type_pointer(allocator, tag_type);
-				ssaValue *underlying = ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, data, t_u8_ptr, tag_type_ptr));
+				ssaValue *underlying = ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, data, t_rawptr, tag_type_ptr));
 				ssa_emit_store(proc, underlying, value);
 
 				return ssa_emit_load(proc, parent);
@@ -1534,20 +1527,45 @@ ssaValue *ssa_emit_down_cast(ssaProcedure *proc, ssaValue *value, Type *t) {
 	GB_ASSERT(is_type_pointer(ssa_type(value)));
 	gbAllocator allocator = proc->module->allocator;
 
-	// String field_name = check_down_cast_name(t, ssa_type(value));
 	String field_name = check_down_cast_name(t, type_deref(ssa_type(value)));
 	GB_ASSERT(field_name.len > 0);
 	Selection sel = lookup_field(t, field_name, false);
 	Type *t_u8_ptr = make_type_pointer(allocator, t_u8);
 	ssaValue *bytes = ssa_emit_conv(proc, value, t_u8_ptr);
 
-	// IMPORTANT TODO(bill): THIS ONLY DOES ONE LAY DEEP!!! FUCKING HELL THIS IS NOT WHAT I SIGNED UP FOR!
+	// IMPORTANT TODO(bill): THIS ONLY DOES ONE LAYER DEEP!!! FUCKING HELL THIS IS NOT WHAT I SIGNED UP FOR!
 
 	i64 offset_ = type_offset_of_from_selection(proc->module->sizes, allocator, type_deref(t), sel);
 	ssaValue *offset = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(-offset_));
 	ssaValue *head = ssa_emit_ptr_offset(proc, bytes, offset);
 	return ssa_emit_conv(proc, head, t);
 }
+
+void ssa_build_cond(ssaProcedure *proc, AstNode *cond, ssaBlock *true_block, ssaBlock *false_block);
+
+ssaValue *ssa_emit_logical_binary_expr(ssaProcedure *proc, AstNode *expr) {
+	ast_node(be, BinaryExpr, expr);
+	ssaBlock *true_   = ssa_add_block(proc, NULL, make_string("logical.cmp.true"));
+	ssaBlock *false_  = ssa_add_block(proc, NULL, make_string("logical.cmp.false"));
+	ssaBlock *done  = ssa__make_block(proc, NULL, make_string("logical.cmp.done"));
+
+	ssaValue *result = ssa_add_local_generated(proc, t_bool);
+	ssa_build_cond(proc, expr, true_, false_);
+
+	proc->curr_block = true_;
+	ssa_emit_store(proc, result, v_true);
+	ssa_emit_jump(proc, done);
+
+	proc->curr_block = false_;
+	ssa_emit_store(proc, result, v_false);
+	ssa_emit_jump(proc, done);
+
+	gb_array_append(proc->blocks, done);
+	proc->curr_block = done;
+
+	return ssa_emit_load(proc, result);
+}
+
 
 
 ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv) {
@@ -1643,6 +1661,10 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			ssaValue *cmp = ssa_emit_comp(proc, be->op, left, right);
 			return ssa_emit_conv(proc, cmp, default_type(tv->type));
 		} break;
+
+		case Token_CmpAnd:
+		case Token_CmpOr:
+			return ssa_emit_logical_binary_expr(proc, expr);
 
 		case Token_as:
 			ssa_emit_comment(proc, make_string("cast - as"));
@@ -1917,13 +1939,15 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					err_len += 2;
 					// HACK(bill): memory leaks
 					u8 *err_str = gb_alloc_array(gb_heap_allocator(), u8, err_len);
-					isize len = gb_snprintf(cast(char *)err_str, err_len,
-					                        "%.*s(%td:%td) Runtime assertion: %s\n",
-					                        LIT(pos.file), pos.line, pos.column, expr);
+					err_len = gb_snprintf(cast(char *)err_str, err_len,
+					                      "%.*s(%td:%td) Runtime assertion: %s\n",
+					                      LIT(pos.file), pos.line, pos.column, expr);
+					err_len--;
 
-					ssaValue *array = ssa_add_global_string_array(proc, make_exact_value_string(make_string(err_str, len-1)));
+					ssaValue *array = ssa_add_global_string_array(proc, make_exact_value_string(make_string(err_str, err_len)));
 					ssaValue *elem = ssa_array_elem(proc, array);
-					ssaValue *string = ssa_emit_load(proc, ssa_emit_string(proc, elem, ssa_array_len(proc, array)));
+					ssaValue *len = ssa_make_value_constant(proc->module->allocator, t_int, make_exact_value_integer(err_len));
+					ssaValue *string = ssa_emit_string(proc, elem, len);
 
 					ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, 1);
 					args[0] = string;
@@ -2224,8 +2248,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssa_emit_store(proc, addr, args[i]);
 				}
 
-				ssaValue *base_elem = ssa_emit_struct_gep(proc, base_array, v_zero32, elem_type);
-				ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_zero32, elem_ptr_type), base_elem);
+				ssaValue *base_elem  = ssa_emit_struct_gep(proc, base_array, v_zero32, elem_ptr_type);
+				ssaValue *slice_elem = ssa_emit_struct_gep(proc, slice,      v_zero32, elem_ptr_type);
+				ssa_emit_store(proc, slice_elem, base_elem);
 				ssaValue *len = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(slice_len));
 				ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_one32, t_int), len);
 				ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_two32, t_int), len);
@@ -2425,7 +2450,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			}
 		} break;
 		case Type_Pointer: {
-			ssaValue *array = ssa_emit_load(proc, ssa_build_expr(proc, ie->expr));
+			ssaValue *array = ssa_build_expr(proc, ie->expr);
 			elem = ssa_array_elem(proc, array);
 		} break;
 		}
@@ -2545,13 +2570,13 @@ void ssa_build_cond(ssaProcedure *proc, AstNode *cond, ssaBlock *true_block, ssa
 
 	case_ast_node(be, BinaryExpr, cond);
 		if (be->op.kind == Token_CmpAnd) {
-			ssaBlock *block = ssa_add_block(proc, NULL, make_string("cmp-and"));
+			ssaBlock *block = ssa_add_block(proc, NULL, make_string("cmp.and"));
 			ssa_build_cond(proc, be->left, block, false_block);
 			proc->curr_block = block;
 			ssa_build_cond(proc, be->right, true_block, false_block);
 			return;
 		} else if (be->op.kind == Token_CmpOr) {
-			ssaBlock *block = ssa_add_block(proc, NULL, make_string("cmp-or"));
+			ssaBlock *block = ssa_add_block(proc, NULL, make_string("cmp.or"));
 			ssa_build_cond(proc, be->left, true_block, block);
 			proc->curr_block = block;
 			ssa_build_cond(proc, be->right, true_block, false_block);
@@ -3123,18 +3148,12 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		Type *union_type = type_deref(ssa_type(parent));
 		GB_ASSERT(is_type_union(union_type));
 
-		ssaValue *tag_index = ssa_emit_struct_gep(proc, parent, v_zero32, make_type_pointer(allocator, t_int));
+		ssaValue *tag_index = ssa_emit_struct_gep(proc, parent, v_one32, make_type_pointer(allocator, t_int));
 		tag_index = ssa_emit_load(proc, tag_index);
 
-		i64 tag_size = proc->module->sizes.word_size;
-		i64 underlying_array_size = type_size_of(proc->module->sizes, allocator, union_type);
-		underlying_array_size -= tag_size;
-		Type *array_type = make_type_array(allocator, t_u8, underlying_array_size);
-		Type *array_type_ptr = make_type_pointer(allocator, array_type);
-		ssaValue *data = ssa_emit_struct_gep(proc, parent, v_one32, array_type_ptr);
-		data = ssa_array_elem(proc, data);
+		ssaValue *data = ssa_emit_conv(proc, parent, t_rawptr);
 
-		ssaBlock *done = ssa__make_block(proc, node, make_string("type.match.done")); // NOTE(bill): Append later
+		ssaBlock *done = ssa__make_block(proc, node, make_string("type-match.done")); // NOTE(bill): Append later
 
 		ast_node(body, BlockStmt, ms->body);
 
@@ -3157,9 +3176,9 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			if (body == NULL) {
 				append_body = true;
 				if (cc->list == NULL) {
-					body = ssa__make_block(proc, clause, make_string("type.match.dflt.body"));
+					body = ssa__make_block(proc, clause, make_string("type-match.dflt.body"));
 				} else {
-					body = ssa__make_block(proc, clause, make_string("type.match.case.body"));
+					body = ssa__make_block(proc, clause, make_string("type-match.case.body"));
 				}
 			}
 
@@ -3189,7 +3208,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			}
 			GB_ASSERT(index != NULL);
 
-			ssaBlock *next_cond = ssa__make_block(proc, clause, make_string("type.match.case.next"));
+			ssaBlock *next_cond = ssa__make_block(proc, clause, make_string("type-match.case.next"));
 			Token eq = {Token_CmpEq};
 			ssaValue *cond = ssa_emit_comp(proc, eq, tag_index, index);
 			ssa_emit_if(proc, cond, body, next_cond);

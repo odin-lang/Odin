@@ -117,8 +117,8 @@ struct Type {
 
 			// All record types
 			// Theses are arrays
-			Entity **fields; // Entity_Variable
-			isize    field_count; // == offset_count
+			Entity **fields;      // Entity_Variable (otherwise Entity_TypeName if union)
+			isize    field_count; // == offset_count is struct
 			AstNode *node;
 
 			// enum only
@@ -909,7 +909,7 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 				if (max < size)
 					max = size;
 			}
-			return type_size_of(s, allocator, t_int) + max;
+			return align_formula(max, s.max_align) + type_size_of(s, allocator, t_int);
 		} break;
 
 		case TypeRecord_RawUnion: {

@@ -160,7 +160,7 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 			break;
 		case TypeRecord_Union: {
 			i64 size_of_union = type_size_of(s, gb_heap_allocator(), t) - s.word_size;
-			ssa_fprintf(f, "{i%lld, [%lld x i8]}", word_bits, size_of_union);
+			ssa_fprintf(f, "{[%lld x i8], i%lld}", size_of_union, word_bits);
 		} break;
 		case TypeRecord_RawUnion:
 			ssa_fprintf(f, "[%lld x i8]", type_size_of(s, gb_heap_allocator(), t));
