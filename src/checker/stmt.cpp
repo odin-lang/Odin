@@ -127,6 +127,21 @@ b32 check_is_terminating(AstNode *node) {
 		}
 		return has_default;
 	case_end;
+
+	case_ast_node(ms, TypeMatchStmt, node);
+		b32 has_default = false;
+		for (AstNode *clause = ms->body->BlockStmt.list; clause != NULL; clause = clause->next) {
+			ast_node(cc, CaseClause, clause);
+			if (cc->list == NULL) {
+				has_default = true;
+			}
+			if (!check_is_terminating_list(cc->stmts) ||
+			    check_has_break_list(cc->stmts, true)) {
+				return false;
+			}
+		}
+		return has_default;
+	case_end;
 	}
 
 	return false;
@@ -472,6 +487,31 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 			check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pd->body);
 		} else {
 			check_proc_body(c, e->token, d, proc_type, pd->body);
+		}
+	}
+
+	if (is_foreign) {
+		auto *fp = &c->info.foreign_procs;
+		auto *proc_decl = &d->proc_decl->ProcDecl;
+		String name = proc_decl->name->Ident.string;
+		if (proc_decl->foreign_name.len > 0) {
+			name = proc_decl->foreign_name;
+		}
+		HashKey key = hash_string(name);
+		auto *found = map_get(fp, key);
+		if (found) {
+			Entity *f = *found;
+			TokenPos pos = f->token.pos;
+			Type *this_type = get_base_type(e->type);
+			Type *other_type = get_base_type(f->type);
+			if (!are_types_identical(this_type, other_type)) {
+				error(&c->error_collector, ast_node_token(d->proc_decl),
+				      "Redeclaration of #foreign procedure `%.*s` with different type signatures\n"
+				      "\tat %.*s(%td:%td)",
+				      LIT(name), LIT(pos.file), pos.line, pos.column);
+			}
+		} else {
+			map_set(fp, key, e);
 		}
 	}
 
@@ -1018,8 +1058,122 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			check_close_scope(c);
 			i++;
 		}
+	case_end;
+
+	case_ast_node(ms, TypeMatchStmt, node);
+		Operand x = {};
+
+		mod_flags |= Stmt_BreakAllowed;
+		check_open_scope(c, node);
+		defer (check_close_scope(c));
 
 
+		check_expr(c, &x, ms->tag);
+		check_assignment(c, &x, NULL, make_string("type match expression"));
+		if (!is_type_pointer(x.type) || !is_type_union(type_deref(x.type))) {
+			gbString str = type_to_string(x.type);
+			defer (gb_string_free(str));
+			error(&c->error_collector, ast_node_token(x.expr),
+			      "Expected a pointer to a union for this type match expression, got `%s`", str);
+			break;
+		}
+		Type *base_union = get_base_type(type_deref(x.type));
+
+
+		// NOTE(bill): Check for multiple defaults
+		AstNode *first_default = NULL;
+		ast_node(bs, BlockStmt, ms->body);
+		for (AstNode *stmt = bs->list; stmt != NULL; stmt = stmt->next) {
+			AstNode *default_stmt = NULL;
+			if (stmt->kind == AstNode_CaseClause) {
+				ast_node(c, CaseClause, stmt);
+				if (c->list_count == 0) {
+					default_stmt = stmt;
+				}
+			} else {
+				error(&c->error_collector, ast_node_token(stmt), "Invalid AST - expected case clause");
+			}
+
+			if (default_stmt != NULL) {
+				if (first_default != NULL) {
+					TokenPos pos = ast_node_token(first_default).pos;
+					error(&c->error_collector, ast_node_token(stmt),
+					      "multiple `default` clauses\n"
+					      "\tfirst at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
+				} else {
+					first_default = default_stmt;
+				}
+			}
+		}
+
+		if (ms->var->kind != AstNode_Ident) {
+			break;
+		}
+
+
+		Map<b32> seen = {};
+		map_init(&seen, gb_heap_allocator());
+		defer (map_destroy(&seen));
+
+
+
+		for (AstNode *stmt = bs->list; stmt != NULL; stmt = stmt->next) {
+			if (stmt->kind != AstNode_CaseClause) {
+				// NOTE(bill): error handled by above multiple default checker
+				continue;
+			}
+			ast_node(cc, CaseClause, stmt);
+
+			AstNode *type_expr = cc->list;
+			Type *tag_type = NULL;
+			if (type_expr != NULL) { // Otherwise it's a default expression
+				Operand y = {};
+				check_expr_or_type(c, &y, type_expr);
+				b32 tag_type_found = false;
+				for (isize i = 0; i < base_union->Record.field_count; i++) {
+					Entity *f = base_union->Record.fields[i];
+					if (are_types_identical(f->type, y.type)) {
+						tag_type_found = true;
+						break;
+					}
+				}
+				if (!tag_type_found) {
+					gbString type_str = type_to_string(y.type);
+					defer (gb_string_free(type_str));
+					error(&c->error_collector, ast_node_token(y.expr),
+					      "Unknown tag type, got `%s`", type_str);
+					continue;
+				}
+				tag_type = y.type;
+
+				HashKey key = hash_pointer(y.type);
+				auto *found = map_get(&seen, key);
+				if (found) {
+					TokenPos pos = cc->token.pos;
+					gbString expr_str = expr_to_string(y.expr);
+					error(&c->error_collector,
+					      ast_node_token(y.expr),
+					      "Duplicate type case `%s`\n"
+					      "\tprevious type case at %.*s(%td:%td)",
+					      expr_str,
+					      LIT(pos.file), pos.line, pos.column);
+					gb_string_free(expr_str);
+					break;
+				}
+				map_set(&seen, key, cast(b32)true);
+
+			}
+
+			check_open_scope(c, stmt);
+			if (tag_type != NULL) {
+				// NOTE(bill): Dummy type
+				Type *tag_ptr_type = make_type_pointer(c->allocator, tag_type);
+				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, ms->var->Ident, tag_ptr_type);
+				add_entity(c, c->context.scope, ms->var, tag_var);
+			}
+			check_stmt_list(c, cc->stmts, cc->stmt_count, mod_flags);
+			check_close_scope(c);
+		}
 	case_end;
 
 
@@ -1096,27 +1250,27 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 					}
 				} else if (is_type_struct(t)) {
 					Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
-					if (found != NULL) {
-						gb_for_array(i, (*found)->elements.entries) {
-							Entity *f = (*found)->elements.entries[i].value;
-							Entity *found = scope_insert_entity(c->context.scope, f);
-							if (found != NULL) {
-								error(&c->error_collector, us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
-								return;
-							}
-							f->using_parent = e;
+					GB_ASSERT(found != NULL);
+					gb_for_array(i, (*found)->elements.entries) {
+						Entity *f = (*found)->elements.entries[i].value;
+						Entity *found = scope_insert_entity(c->context.scope, f);
+						if (found != NULL) {
+							error(&c->error_collector, us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+							return;
 						}
-					} else {
-						for (isize i = 0; i < t->Record.other_field_count; i++) {
-							// TODO(bill): using field types too
-							Entity *f = t->Record.other_fields[i];
-							Entity *found = scope_insert_entity(c->context.scope, f);
-							if (found != NULL) {
-								error(&c->error_collector, us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
-								return;
-							}
-							f->using_parent = e;
+						f->using_parent = e;
+					}
+				} else if (is_type_union(t)) {
+					Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
+					GB_ASSERT(found != NULL);
+					gb_for_array(i, (*found)->elements.entries) {
+						Entity *f = (*found)->elements.entries[i].value;
+						Entity *found = scope_insert_entity(c->context.scope, f);
+						if (found != NULL) {
+							error(&c->error_collector, us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+							return;
 						}
+						f->using_parent = e;
 					}
 				}
 			} break;

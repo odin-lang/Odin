@@ -319,22 +319,22 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "call void @" SSA_STARTUP_RUNTIME_PROC_NAME "()\n");
 	} break;
 
+	case ssaInstr_Comment:
+		ssa_fprintf(f, "; %.*s\n", LIT(instr->Comment.text));
+		break;
+
 	case ssaInstr_Local: {
 		Type *type = instr->Local.entity->type;
 		ssa_fprintf(f, "%%%d = alloca ", value->id);
 		ssa_print_type(f, m->sizes, type);
-		ssa_fprintf(f, ", align %lld ", type_align_of(m->sizes, m->allocator, type));
-		{
-			String str = instr->Local.entity->token.string;
-			if (str.len > 0)
-			ssa_fprintf(f, "; %.*s", LIT(instr->Local.entity->token.string));
+		ssa_fprintf(f, ", align %lld\n", type_align_of(m->sizes, m->allocator, type));
+		if (instr->Local.zero_initialized) {
+			ssa_fprintf(f, "\tstore ");
+			ssa_print_type(f, m->sizes, type);
+			ssa_fprintf(f, " zeroinitializer, ");
+			ssa_print_type(f, m->sizes, type);
+			ssa_fprintf(f, "* %%%d\n", value->id);
 		}
-		ssa_fprintf(f, "\n");
-		ssa_fprintf(f, "\tstore ");
-		ssa_print_type(f, m->sizes, type);
-		ssa_fprintf(f, " zeroinitializer, ");
-		ssa_print_type(f, m->sizes, type);
-		ssa_fprintf(f, "* %%%d\n", value->id);
 	} break;
 
 	case ssaInstr_Store: {
@@ -713,9 +713,9 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 		auto *params = &proc_type->params->Tuple;
 		for (isize i = 0; i < params->variable_count; i++) {
 			Entity *e = params->variables[i];
-			if (i > 0)
-
+			if (i > 0) {
 				ssa_fprintf(f, ", ");
+			}
 			ssa_print_type(f, m->sizes, e->type);
 			ssa_fprintf(f, " %%%.*s", LIT(e->token.string));
 		}
@@ -724,14 +724,18 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 	ssa_fprintf(f, ") ");
 
 	if (proc->tags != 0) {
-		if (proc->tags & ProcTag_inline)
+		if (proc->tags & ProcTag_inline) {
 			ssa_fprintf(f, "alwaysinline ");
-		if (proc->tags & ProcTag_no_inline)
+		}
+		if (proc->tags & ProcTag_no_inline) {
 			ssa_fprintf(f, "noinline ");
+		}
 
 
-		if (proc->tags & ProcTag_foreign)
+		if (proc->tags & ProcTag_foreign) {
+			// TODO(bill): Set calling convention
 			ssa_fprintf(f, "; foreign\n");
+		}
 	}
 
 	if (proc->body != NULL) {
@@ -803,7 +807,10 @@ void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
 				ssa_fprintf(f, "thread_local ");
 			}
 			if (g->is_constant) {
-				ssa_fprintf(f, "private constant ");
+				if (g->is_private) {
+					ssa_fprintf(f, "private ");
+				}
+				ssa_fprintf(f, "constant ");
 			} else {
 				ssa_fprintf(f, "global ");
 			}

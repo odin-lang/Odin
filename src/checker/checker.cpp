@@ -197,12 +197,13 @@ struct CheckerContext {
 
 // NOTE(bill): Symbol tables
 struct CheckerInfo {
-	Map<TypeAndValue>      types;       // Key: AstNode * | Expression -> Type (and value)
-	Map<Entity *>          definitions; // Key: AstNode * | Identifier -> Entity
-	Map<Entity *>          uses;        // Key: AstNode * | Identifier -> Entity
-	Map<Scope *>           scopes;      // Key: AstNode * | Node       -> Scope
-	Map<ExpressionInfo>    untyped;     // Key: AstNode * | Expression -> ExpressionInfo
-	Map<DeclInfo *>        entities;    // Key: Entity *
+	Map<TypeAndValue>      types;         // Key: AstNode * | Expression -> Type (and value)
+	Map<Entity *>          definitions;   // Key: AstNode * | Identifier -> Entity
+	Map<Entity *>          uses;          // Key: AstNode * | Identifier -> Entity
+	Map<Scope *>           scopes;        // Key: AstNode * | Node       -> Scope
+	Map<ExpressionInfo>    untyped;       // Key: AstNode * | Expression -> ExpressionInfo
+	Map<DeclInfo *>        entities;      // Key: Entity *
+	Map<Entity *>          foreign_procs; // Key: String
 };
 
 struct Checker {
@@ -424,12 +425,13 @@ void init_universal_scope(void) {
 
 void init_checker_info(CheckerInfo *i) {
 	gbAllocator a = gb_heap_allocator();
-	map_init(&i->types,       a);
-	map_init(&i->definitions, a);
-	map_init(&i->uses,        a);
-	map_init(&i->scopes,      a);
-	map_init(&i->entities,    a);
-	map_init(&i->untyped,     a);
+	map_init(&i->types,         a);
+	map_init(&i->definitions,   a);
+	map_init(&i->uses,          a);
+	map_init(&i->scopes,        a);
+	map_init(&i->entities,      a);
+	map_init(&i->untyped,       a);
+	map_init(&i->foreign_procs, a);
 
 }
 
@@ -440,6 +442,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->scopes);
 	map_destroy(&i->entities);
 	map_destroy(&i->untyped);
+	map_destroy(&i->foreign_procs);
 }
 
 

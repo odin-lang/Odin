@@ -296,12 +296,16 @@ void check_fields(Checker *c, AstNode *node, AstNode *decl_list,
 			ast_node(vd, VarDecl, decl);
 			if (vd->kind != Declaration_Mutable)
 				continue;
-			Type *type = check_type(c, vd->type, NULL, cycle_checker);
+			Type *base_type = check_type(c, vd->type, NULL, cycle_checker);
 
 			for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
 				Token name_token = name->Ident;
 
+				Type *type = make_type_named(c->allocator, name_token.string, base_type, NULL);
 				Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, type);
+				type->Named.type_name = e;
+				add_entity(c, c->context.scope, name, e);
+
 				HashKey key = hash_string(name_token.string);
 				if (map_get(&entity_map, key) != NULL) {
 					// TODO(bill): Scope checking already checks the declaration
@@ -309,7 +313,6 @@ void check_fields(Checker *c, AstNode *node, AstNode *decl_list,
 				} else {
 					map_set(&entity_map, key, e);
 					fields[field_index++] = e;
-					add_entity(c, c->context.scope, name, e);
 				}
 				add_entity_use(&c->info, name, e);
 			}
@@ -3154,7 +3157,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			goto error;
 		}
 
-		check_index_value(c, ie->index, max_count, NULL);
+		i64 index = 0;
+		b32 ok = check_index_value(c, ie->index, max_count, &index);
+
 	case_end;
 
 

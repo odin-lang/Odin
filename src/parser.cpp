@@ -164,6 +164,11 @@ AST_NODE_KIND(_ComplexStmtBegin, "", struct{}) \
 		AstNode *init, *tag; \
 		AstNode *body; \
 	}) \
+	AST_NODE_KIND(TypeMatchStmt, "type match statement", struct { \
+		Token token; \
+		AstNode *tag, *var; \
+		AstNode *body; \
+	}) \
 	AST_NODE_KIND(DeferStmt,  "defer statement",  struct { Token token; AstNode *stmt; }) \
 	AST_NODE_KIND(BranchStmt, "branch statement", struct { Token token; }) \
 	AST_NODE_KIND(UsingStmt,  "using statement",  struct { Token token; AstNode *node; }) \
@@ -679,6 +684,16 @@ gb_inline AstNode *make_match_stmt(AstFile *f, Token token, AstNode *init, AstNo
 	result->MatchStmt.init  = init;
 	result->MatchStmt.tag   = tag;
 	result->MatchStmt.body  = body;
+	return result;
+}
+
+
+gb_inline AstNode *make_type_match_stmt(AstFile *f, Token token, AstNode *tag, AstNode *var, AstNode *body) {
+	AstNode *result = make_node(f, AstNode_TypeMatchStmt);
+	result->TypeMatchStmt.token = token;
+	result->TypeMatchStmt.tag   = tag;
+	result->TypeMatchStmt.var   = var;
+	result->TypeMatchStmt.body  = body;
 	return result;
 }
 
@@ -1399,10 +1414,7 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 			break;
 
 		case Token_OpenBrace: {
-			if (is_literal_type(operand) && f->expr_level >= 0) {
-				if (lhs) {
-					// TODO(bill): Handle this
-				}
+			if (!lhs && is_literal_type(operand) && f->expr_level >= 0) {
 				operand = parse_literal_value(f, operand);
 			} else {
 				loop = false;
@@ -1432,7 +1444,7 @@ AstNode *parse_unary_expr(AstFile *f, b32 lhs) {
 		AstNode *operand;
 		Token op = f->cursor[0];
 		next_token(f);
-		operand = parse_unary_expr(f, false);
+		operand = parse_unary_expr(f, lhs);
 		return make_unary_expr(f, op, operand);
 	} break;
 	}
@@ -2247,6 +2259,23 @@ AstNode *parse_case_clause(AstFile *f) {
 	return make_case_clause(f, token, list, list_count, stmts, stmt_count);
 }
 
+
+AstNode *parse_type_case_clause(AstFile *f) {
+	Token token = f->cursor[0];
+	AstNode *clause = NULL;
+	if (allow_token(f, Token_case)) {
+		clause = parse_expr(f, false);
+	} else {
+		expect_token(f, Token_default);
+	}
+	expect_token(f, Token_Colon); // TODO(bill): Is this the best syntax?
+	isize stmt_count = 0;
+	AstNode *stmts = parse_stmt_list(f, &stmt_count);
+
+	return make_case_clause(f, token, clause, 1, stmts, stmt_count);
+}
+
+
 AstNode *parse_match_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
 		ast_file_err(f, f->cursor[0], "You cannot use a match statement in the file scope");
@@ -2254,50 +2283,66 @@ AstNode *parse_match_stmt(AstFile *f) {
 	}
 
 	Token token = expect_token(f, Token_match);
-
 	AstNode *init = NULL;
 	AstNode *tag = NULL;
-	if (f->cursor[0].kind != Token_OpenBrace) {
-		isize prev_level = f->expr_level;
-		f->expr_level = -1;
-		if (f->cursor[0].kind != Token_Semicolon) {
-			tag = parse_simple_stmt(f);
+	AstNode *body = NULL;
+	Token open, close;
+
+	if (allow_token(f, Token_type)) {
+		tag = parse_expr(f, true);
+		expect_token(f, Token_ArrowRight);
+		AstNode *var = parse_identifier(f);
+
+		open = expect_token(f, Token_OpenBrace);
+		AstNode *list = NULL;
+		AstNode *list_curr = NULL;
+		isize list_count = 0;
+
+		while (f->cursor[0].kind == Token_case ||
+		       f->cursor[0].kind == Token_default) {
+			DLIST_APPEND(list, list_curr, parse_type_case_clause(f));
+			list_count++;
 		}
-		if (allow_token(f, Token_Semicolon)) {
-			init = tag;
-			tag = NULL;
-			if (f->cursor[0].kind != Token_OpenBrace) {
+
+		close = expect_token(f, Token_CloseBrace);
+		body = make_block_stmt(f, list, list_count, open, close);
+		return make_type_match_stmt(f, token, tag, var, body);
+	} else {
+		if (f->cursor[0].kind != Token_OpenBrace) {
+			isize prev_level = f->expr_level;
+			f->expr_level = -1;
+			if (f->cursor[0].kind != Token_Semicolon) {
 				tag = parse_simple_stmt(f);
 			}
+			if (allow_token(f, Token_Semicolon)) {
+				init = tag;
+				tag = NULL;
+				if (f->cursor[0].kind != Token_OpenBrace) {
+					tag = parse_simple_stmt(f);
+				}
+			}
+
+			f->expr_level = prev_level;
 		}
 
-		f->expr_level = prev_level;
+		open = expect_token(f, Token_OpenBrace);
+		AstNode *list = NULL;
+		AstNode *list_curr = NULL;
+		isize list_count = 0;
+
+		while (f->cursor[0].kind == Token_case ||
+		       f->cursor[0].kind == Token_default) {
+			DLIST_APPEND(list, list_curr, parse_case_clause(f));
+			list_count++;
+		}
+
+		close = expect_token(f, Token_CloseBrace);
+
+		body = make_block_stmt(f, list, list_count, open, close);
+
+		tag = convert_stmt_to_expr(f, tag, make_string("match expression"));
+		return make_match_stmt(f, token, init, tag, body);
 	}
-
-	Token open = expect_token(f, Token_OpenBrace);
-	AstNode *list = NULL;
-	AstNode *list_curr = NULL;
-	isize list_count = 0;
-#if 1
-	while (f->cursor[0].kind == Token_case ||
-	       f->cursor[0].kind == Token_default) {
-		DLIST_APPEND(list, list_curr, parse_case_clause(f));
-		list_count++;
-	}
-#else
-
-	while (f->cursor[0].kind == Token_ArrowRight) {
-		DLIST_APPEND(list, list_curr, parse_case_clause(f));
-		list_count++;
-	}
-
-#endif
-	Token close = expect_token(f, Token_CloseBrace);
-
-	AstNode *body = make_block_stmt(f, list, list_count, open, close);
-
-	tag = convert_stmt_to_expr(f, tag, make_string("match expression"));
-	return make_match_stmt(f, token, init, tag, body);
 }
 
 

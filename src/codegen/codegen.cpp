@@ -31,6 +31,27 @@ b32 ssa_gen_init(ssaGen *s, Checker *c) {
 	if (err != gbFileError_None)
 		return false;
 
+#if 0
+	Map<i32> type_map; // Key: Type *
+	map_init(&type_map, gb_heap_allocator());
+	i32 index = 0;
+	gb_for_array(i, c->info.types.entries) {
+		TypeAndValue tav = c->info.types.entries[i].value;
+		Type *type = tav.type;
+		HashKey key = hash_pointer(type);
+		auto found = map_get(&type_map, key);
+		if (!found) {
+			map_set(&type_map, key, index);
+			index++;
+		}
+	}
+	gb_for_array(i, type_map.entries) {
+		auto *e = &type_map.entries[i];
+		Type *t = cast(Type *)cast(uintptr)e->key.key;
+		gb_printf("%s\n", type_to_string(t));
+	}
+#endif
+
 	return true;
 }
 
@@ -112,7 +133,10 @@ void ssa_gen_code(ssaGen *s) {
 			p->Proc.tags = pd->tags;
 
 			map_set(&m->values, hash_pointer(e), p);
-			map_set(&m->members, hash_string(name), p);
+			HashKey hash_name = hash_string(name);
+			if (map_get(&m->members, hash_name) == NULL) {
+				map_set(&m->members, hash_name, p);
+			}
 		} break;
 		}
 	}
