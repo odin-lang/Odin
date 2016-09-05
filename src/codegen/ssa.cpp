@@ -742,9 +742,10 @@ ssaValue *ssa_emit_call(ssaProcedure *p, ssaValue *value, ssaValue **args, isize
 	return ssa_emit(p, ssa_make_instr_call(p, value, args, arg_count, results));
 }
 
-ssaValue *ssa_emit_global_call(ssaProcedure *proc, char *name, ssaValue **args, isize arg_count) {
-	ssaValue **found = map_get(&proc->module->members, hash_string(make_string(name)));
-	GB_ASSERT_MSG(found != NULL, "%s", name);
+ssaValue *ssa_emit_global_call(ssaProcedure *proc, char *name_, ssaValue **args, isize arg_count) {
+	String name = make_string(name_);
+	ssaValue **found = map_get(&proc->module->members, hash_string(name));
+	GB_ASSERT_MSG(found != NULL, "%.*s", LIT(name));
 	ssaValue *gp = *found;
 	return ssa_emit_call(proc, gp, args, arg_count);
 }
@@ -1229,7 +1230,7 @@ ssaValue *ssa_add_global_string_array(ssaProcedure *proc, ExactValue value) {
 
 	isize max_len = 4+8+1;
 	u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
-	isize len = gb_snprintf(cast(char *)str, max_len, ".str%x", proc->module->global_string_index);
+	isize len = gb_snprintf(cast(char *)str, max_len, "__str$%x", proc->module->global_string_index);
 	proc->module->global_string_index++;
 
 	String name = make_string(str, len-1);
@@ -1238,7 +1239,8 @@ ssaValue *ssa_add_global_string_array(ssaProcedure *proc, ExactValue value) {
 	Type *type = make_type_array(a, t_u8, value.value_string.len);
 	Entity *entity = make_entity_constant(a, NULL, token, type, value);
 	ssaValue *g = ssa_make_value_global(a, entity, ssa_make_value_constant(a, type, value));
-	g->Global.is_private = true;
+	g->Global.is_private  = true;
+	g->Global.is_constant = true;
 
 	map_set(&proc->module->values, hash_pointer(entity), g);
 	map_set(&proc->module->members, hash_string(name), g);
@@ -2780,6 +2782,9 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			Entity *f = *map_get(&info->foreign_procs, hash_string(name));
 			ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
 			                                           proc->module, e->type, pd->type, pd->body, name);
+
+			value->Proc.tags = pd->tags;
+
 			ssa_module_add_value(proc->module, e, value);
 			ssa_build_proc(value, proc);
 			if (e == f) {

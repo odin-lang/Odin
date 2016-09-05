@@ -51,7 +51,7 @@ pushd %build_dir%
 
 	cl %compiler_settings% "..\src\main.cpp" ^
 		/link %linker_settings% -OUT:%exe_name% ^
-	&& odin run ..\examples/demo.odin
+	&& odin ..\examples/demo.odin
 	rem odin run ..\examples/demo.odin
 
 

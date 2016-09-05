@@ -6,9 +6,7 @@ TWO_HEARTS :: #rune "💕"
 
 win32_perf_count_freq := GetQueryPerformanceFrequency()
 time_now :: proc() -> f64 {
-	if win32_perf_count_freq == 0 {
-		debug_trap()
-	}
+	assert(win32_perf_count_freq != 0)
 
 	counter: i64
 	_ = QueryPerformanceCounter(^counter)
@@ -25,10 +23,10 @@ win32_print_last_error :: proc() {
 }
 
 // Yuk!
-to_c_string :: proc(s: string) -> ^u8 {
-	c_str: ^u8 = alloc(len(s)+1)
-	memory_copy(c_str, ^s[0], len(s))
-	ptr_offset(c_str, len(s))^ = 0
+to_c_string :: proc(s: string) -> []u8 {
+	c_str := new_slice(u8, len(s)+1)
+	_ = copy(c_str, s as []byte)
+	c_str[len(s)] = 0
 	return c_str
 }
 
@@ -39,7 +37,7 @@ Window :: type struct {
 	dc:                 HDC
 	hwnd:               HWND
 	opengl_context, rc: HGLRC
-	c_title:            ^u8
+	c_title:            []u8
 }
 
 make_window :: proc(title: string, msg, height: int, window_proc: WNDPROC) -> (Window, bool) {
@@ -65,7 +63,7 @@ make_window :: proc(title: string, msg, height: int, window_proc: WNDPROC) -> (W
 	}
 
 	w.hwnd = CreateWindowExA(0,
-	                         c_class_name, w.c_title,
+	                         c_class_name, ^w.c_title[0],
 	                         WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
 	                         CW_USEDEFAULT, CW_USEDEFAULT,
 	                         w.width as i32, w.height as i32,
@@ -114,7 +112,7 @@ make_window :: proc(title: string, msg, height: int, window_proc: WNDPROC) -> (W
 }
 
 destroy_window :: proc(w: ^Window) {
-	heap_free(w.c_title)
+	delete(w.c_title)
 }
 
 display_window :: proc(w: ^Window) {

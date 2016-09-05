@@ -1,15 +1,25 @@
 #load "win32.odin"
 
-debug_trap :: proc() #foreign "llvm.debugtrap"
+assume :: proc(cond: bool) #foreign "llvm.assume"
+
+__debug_trap           :: proc()           #foreign "llvm.debugtrap"
+__trap                 :: proc()           #foreign "llvm.trap"
+read_cycle_counter     :: proc() -> u64    #foreign "llvm.readcyclecounter"
+
+bit_reverse16 :: proc(b: u16) -> u16 #foreign "llvm.bitreverse.i16"
+bit_reverse32 :: proc(b: u32) -> u32 #foreign "llvm.bitreverse.i32"
+bit_reverse64 :: proc(b: u64) -> u64 #foreign "llvm.bitreverse.i64"
+
+byte_swap16 :: proc(b: u16) -> u16 #foreign "llvm.bswap.i16"
+byte_swap32 :: proc(b: u32) -> u32 #foreign "llvm.bswap.i32"
+byte_swap64 :: proc(b: u64) -> u64 #foreign "llvm.bswap.i64"
+
+fmuladd_f32 :: proc(a, b, c: f32) -> f32 #foreign "llvm.fmuladd.f32"
+fmuladd_f64 :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
 
 // TODO(bill): make custom heap procedures
-heap_alloc :: proc(len: int) -> rawptr {
-	return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, len)
-}
-heap_free :: proc(ptr: rawptr) {
-	_ = HeapFree(GetProcessHeap(), 0, ptr)
-}
-
+heap_alloc   :: proc(len: int)   -> rawptr #foreign "malloc"
+heap_dealloc :: proc(ptr: rawptr)          #foreign "free"
 
 memory_zero :: proc(data: rawptr, len: int) {
 	d := slice_ptr(data as ^byte, len)
@@ -288,10 +298,10 @@ Allocator :: type struct {
 
 
 Context :: type struct {
-	thread_id: int
+	thread_ptr: rawptr
 
-	user_index: int
 	user_data:  rawptr
+	user_index: int
 
 	allocator: Allocator
 }
@@ -304,6 +314,10 @@ DEFAULT_ALIGNMENT :: 2*size_of(int)
 __check_context :: proc() {
 	if context.allocator.procedure == null {
 		context.allocator = __default_allocator()
+	}
+	if context.thread_ptr == null {
+		// TODO(bill):
+		// context.thread_ptr = current_thread_pointer()
 	}
 }
 
@@ -368,13 +382,11 @@ __default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocation_Mode,
 	using Allocation_Mode
 	match mode {
 	case ALLOC:
-		data := heap_alloc(size)
-		memory_zero(data, size)
-		return data
+		return heap_alloc(size)
 	case RESIZE:
 		return default_resize_align(old_memory, old_size, size, alignment)
 	case DEALLOC:
-		heap_free(old_memory)
+		heap_dealloc(old_memory)
 	case DEALLOC_ALL:
 		// NOTE(bill): Does nothing
 	}
@@ -394,5 +406,7 @@ __default_allocator :: proc() -> Allocator {
 
 __assert :: proc(msg: string) {
 	file_write(file_get_standard(File_Standard.ERROR), msg as []byte)
-	debug_trap()
+	// TODO(bill): Which is better?
+	// __trap()
+	__debug_trap()
 }

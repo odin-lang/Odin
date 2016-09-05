@@ -33,6 +33,7 @@ struct AstFile {
 
 	ErrorCollector error_collector;
 
+	// TODO(bill): Error recovery
 	// NOTE(bill): Error recovery
 #define PARSER_MAX_FIX_COUNT 6
 	isize    fix_count;

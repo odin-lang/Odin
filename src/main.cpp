@@ -40,14 +40,29 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 	}
 }
 
+
+#define INIT_TIMER() u64 start_time, end_time = 0, total_time = 0; start_time = gb_utc_time_now()
+#define PRINT_TIMER(section) do { \
+	u64 diff; \
+	end_time = gb_utc_time_now(); \
+	diff = end_time - start_time; \
+	total_time += diff; \
+	gb_printf_err("%s: %lld ms\n", section, diff/1000); \
+	start_time = gb_utc_time_now(); \
+} while (0)
+
+#define PRINT_ACCUMULATION() do { \
+	gb_printf_err("Total compilation time: %lld ms\n", total_time/1000); \
+} while (0)
+
+
 int main(int argc, char **argv) {
 	if (argc < 2) {
 		gb_printf_err("Please specify a .odin file\n");
 		return 1;
 	}
 
-	u64 start_time, end_time;
-	start_time = gb_utc_time_now();
+	INIT_TIMER();
 
 	init_universal_scope();
 
@@ -67,9 +82,7 @@ int main(int argc, char **argv) {
 	if (parse_files(&parser, init_filename) != ParseFile_None)
 		return 1;
 
-	end_time = gb_utc_time_now();
-	gb_printf_err("Parser: %lld ms\n", (end_time - start_time)/1000);
-	start_time = gb_utc_time_now();
+	PRINT_TIMER("Syntax Parser");
 
 	// print_ast(parser.files[0].decls, 0);
 
@@ -81,9 +94,7 @@ int main(int argc, char **argv) {
 	check_parsed_files(&checker);
 
 
-	// end_time = gb_utc_time_now();
-	// gb_printf_err("Checker: %lld ms\n", (end_time - start_time)/1000);
-	// start_time = gb_utc_time_now();
+	PRINT_TIMER("Semantic Checker");
 
 #if 1
 	ssaGen ssa = {};
@@ -93,17 +104,12 @@ int main(int argc, char **argv) {
 
 	ssa_gen_tree(&ssa);
 
-	// end_time = gb_utc_time_now();
-	// gb_printf_err("ssa tree: %lld ms\n", (end_time - start_time)/1000);
-	// start_time = gb_utc_time_now();
+	PRINT_TIMER("SSA Tree");
 
 	// TODO(bill): Speedup writing to file for IR code
 	ssa_gen_ir(&ssa);
 
-	// end_time = gb_utc_time_now();
-	// gb_printf_err("ssa ir: %lld ms\n", (end_time - start_time)/1000);
-	// start_time = gb_utc_time_now();
-
+	PRINT_TIMER("SSA IR");
 
 	char const *output_name = ssa.output_file.filename;
 	isize base_name_len = gb_path_extension(output_name)-1 - output_name;
@@ -112,16 +118,23 @@ int main(int argc, char **argv) {
 
 	i32 exit_code = 0;
 	exit_code = win32_exec_command_line_app(
-		"../misc/llvm-bin/opt -mem2reg %s -o %.*s.bc",
+		"../misc/llvm-bin/opt %s -o %.*s.bc "
+		"-memcpyopt "
+		"-mem2reg "
+		"-die -dse "
+		"-dce "
+		// "-S "
+		// "-debug-pass=Arguments "
+		"",
 		output_name, cast(int)base_name_len, output_name);
 	if (exit_code != 0)
 		return exit_code;
 
-	// end_time = gb_utc_time_now();
-	// gb_printf_err("llvm-opt: %lld ms\n", (end_time - start_time)/1000);
-	// start_time = gb_utc_time_now();
+	PRINT_TIMER("llvm-opt");
 
+#if 1
 	gbString lib_str = gb_string_make(gb_heap_allocator(), "-lKernel32.lib");
+	defer (gb_string_free(lib_str));
 	char lib_str_buf[1024] = {};
 	gb_for_array(i, parser.system_libraries) {
 		String lib = parser.system_libraries[i];
@@ -130,26 +143,26 @@ int main(int argc, char **argv) {
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);
 	}
 
-
 	exit_code = win32_exec_command_line_app(
-		"clang -o %.*s.exe %.*s.bc "
+		"clang %.*s.bc -o %.*s.o "
+		"-O0 "
 		"-Wno-override-module "
-		// "-nostartfiles "
-		"%s "
-		,
+		"%s",
 		cast(int)base_name_len, output_name,
 		cast(int)base_name_len, output_name,
 		lib_str);
-	gb_string_free(lib_str);
+
 	if (exit_code != 0)
 		return exit_code;
 
-	// end_time = gb_utc_time_now();
-	// gb_printf_err("clang: %lld ms\n\n\n", (end_time - start_time)/1000);
+	PRINT_TIMER("clang-compiler");
+
+	PRINT_ACCUMULATION();
 
 	if (run_output) {
 		win32_exec_command_line_app("%.*s.exe", cast(int)base_name_len, output_name);
 	}
+#endif
 #endif
 
 	return 0;

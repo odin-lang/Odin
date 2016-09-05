@@ -118,6 +118,7 @@ void ssa_gen_tree(ssaGen *s) {
 			}
 
 			if (are_strings_equal(name, original_name)) {
+			#if 0
 				Scope *scope = *map_get(&info->scopes, hash_pointer(pd->type));
 				isize count = multi_map_count(&scope->elements, hash_string(original_name));
 				if (count > 1) {
@@ -127,6 +128,7 @@ void ssa_gen_tree(ssaGen *s) {
 					name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$%d", LIT(name), e->guid);
 					name = make_string(name_text, name_len-1);
 				}
+			#endif
 			}
 
 			ssaValue *p = ssa_make_value_procedure(a, m, e->type, decl->type_expr, body, name);
@@ -208,5 +210,9 @@ void ssa_gen_tree(ssaGen *s) {
 
 
 void ssa_gen_ir(ssaGen *s) {
-	ssa_print_llvm_ir(&s->output_file, &s->module);
+	ssaFileBuffer buf = {};
+	ssa_file_buffer_init(&buf, &s->output_file);
+	defer (ssa_file_buffer_destroy(&buf));
+
+	ssa_print_llvm_ir(&buf, &s->module);
 }

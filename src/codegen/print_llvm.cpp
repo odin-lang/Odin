@@ -1,20 +1,53 @@
-#define SSA_PRINT_TO_STDOUT 0
+struct ssaFileBuffer {
+	gbVirtualMemory vm;
+	isize offset;
+	gbFile *output;
+};
 
-void ssa_fprintf(gbFile *f, char *fmt, ...) {
+void ssa_file_buffer_init(ssaFileBuffer *f, gbFile *output) {
+	isize size = 8*gb_virtual_memory_page_size(NULL);
+	f->vm = gb_vm_alloc(NULL, size);
+	f->offset = 0;
+	f->output = output;
+}
+
+void ssa_file_buffer_destroy(ssaFileBuffer *f) {
+	if (f->offset > 0) {
+		// NOTE(bill): finish writing buffered data
+		gb_file_write(f->output, f->vm.data, f->offset);
+	}
+
+	gb_vm_free(f->vm);
+}
+
+void ssa_file_buffer_write(ssaFileBuffer *f, void *data, isize len) {
+	if (len > f->vm.size) {
+		gb_file_write(f->output, data, len);
+		return;
+	}
+
+	if ((f->vm.size - f->offset) < len) {
+		gb_file_write(f->output, f->vm.data, f->offset);
+		f->offset = 0;
+	}
+	u8 *cursor = cast(u8 *)f->vm.data + f->offset;
+	gb_memcopy(cursor, data, len);
+	f->offset += len;
+}
+
+
+void ssa_fprintf(ssaFileBuffer *f, char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	gb_fprintf_va(f, fmt, va);
-#if SSA_PRINT_TO_STDOUT
-	gb_printf_va(fmt, va);
-#endif
+	char buf[4096] = {};
+	isize len = gb_snprintf_va(buf, gb_size_of(buf), fmt, va);
+	ssa_file_buffer_write(f, buf, len-1);
 	va_end(va);
 }
 
-void ssa_file_write(gbFile *f, void *data, isize len) {
-	gb_file_write(f, data, len);
-#if SSA_PRINT_TO_STDOUT
-	gb_file_write(gb_file_get_standard(gbFileStandard_Output), data, len);
-#endif
+
+void ssa_file_write(ssaFileBuffer *f, void *data, isize len) {
+	ssa_file_buffer_write(f, data, len);
 }
 
 b32 ssa_valid_char(u8 c) {
@@ -35,7 +68,7 @@ b32 ssa_valid_char(u8 c) {
 	return false;
 }
 
-void ssa_print_escape_string(gbFile *f, String name, b32 print_quotes) {
+void ssa_print_escape_string(ssaFileBuffer *f, String name, b32 print_quotes) {
 	isize extra = 0;
 	for (isize i = 0; i < name.len; i++) {
 		u8 c = name.text[i];
@@ -81,18 +114,21 @@ void ssa_print_escape_string(gbFile *f, String name, b32 print_quotes) {
 
 
 
-void ssa_print_encoded_local(gbFile *f, String name) {
+void ssa_print_encoded_local(ssaFileBuffer *f, String name) {
 	ssa_fprintf(f, "%%");
 	ssa_print_escape_string(f, name, true);
 }
 
-void ssa_print_encoded_global(gbFile *f, String name) {
+void ssa_print_encoded_global(ssaFileBuffer *f, String name, b32 global_scope = false) {
 	ssa_fprintf(f, "@");
+	if (!global_scope) {
+		ssa_fprintf(f, ".");
+	}
 	ssa_print_escape_string(f, name, true);
 }
 
 
-void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
+void ssa_print_type(ssaFileBuffer *f, BaseTypeSizes s, Type *t) {
 	i64 word_bits = 8*s.word_size;
 	GB_ASSERT_NOT_NULL(t);
 	t = default_type(t);
@@ -113,8 +149,8 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 		case Basic_u128:   ssa_fprintf(f, "u128");                    break;
 		case Basic_f32:    ssa_fprintf(f, "float");                   break;
 		case Basic_f64:    ssa_fprintf(f, "double");                  break;
-		case Basic_rawptr: ssa_fprintf(f, "%%.rawptr");               break;
-		case Basic_string: ssa_fprintf(f, "%%.string");               break;
+		case Basic_rawptr: ssa_fprintf(f, "%%..rawptr");              break;
+		case Basic_string: ssa_fprintf(f, "%%..string");              break;
 		case Basic_uint:   ssa_fprintf(f, "i%lld", word_bits);        break;
 		case Basic_int:    ssa_fprintf(f, "i%lld", word_bits);        break;
 		}
@@ -213,7 +249,7 @@ void ssa_print_type(gbFile *f, BaseTypeSizes s, Type *t) {
 	}
 }
 
-void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type) {
+void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Type *type) {
 	type = get_base_type(type);
 	if (is_type_float(type)) {
 		value = exact_value_to_float(value);
@@ -276,12 +312,12 @@ void ssa_print_exact_value(gbFile *f, ssaModule *m, ExactValue value, Type *type
 	}
 }
 
-void ssa_print_block_name(gbFile *f, ssaBlock *b) {
+void ssa_print_block_name(ssaFileBuffer *f, ssaBlock *b) {
 	ssa_print_escape_string(f, b->label, false);
 	ssa_fprintf(f, "..%d", b->id);
 }
 
-void ssa_print_value(gbFile *f, ssaModule *m, ssaValue *value, Type *type_hint) {
+void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type_hint) {
 	if (value == NULL) {
 		ssa_fprintf(f, "!!!NULL_VALUE");
 		return;
@@ -300,7 +336,7 @@ void ssa_print_value(gbFile *f, ssaModule *m, ssaValue *value, Type *type_hint) 
 		ssa_print_encoded_local(f, value->Param.entity->token.string);
 		break;
 	case ssaValue_Proc:
-		ssa_print_encoded_global(f, value->Proc.name);
+		ssa_print_encoded_global(f, value->Proc.name, (value->Proc.tags & ProcTag_foreign) != 0);
 		break;
 	case ssaValue_Instr:
 		ssa_fprintf(f, "%%%d", value->id);
@@ -308,7 +344,7 @@ void ssa_print_value(gbFile *f, ssaModule *m, ssaValue *value, Type *type_hint) 
 	}
 }
 
-void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
+void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	GB_ASSERT(value->kind == ssaValue_Instr);
 	ssaInstr *instr = &value->Instr;
 
@@ -316,7 +352,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 
 	switch (instr->kind) {
 	case ssaInstr_StartupRuntime: {
-		ssa_fprintf(f, "call void @" SSA_STARTUP_RUNTIME_PROC_NAME "()\n");
+		ssa_fprintf(f, "call void @." SSA_STARTUP_RUNTIME_PROC_NAME "()\n");
 	} break;
 
 	case ssaInstr_Comment:
@@ -471,7 +507,9 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 				case Token_GtEq:  runtime_proc = "__string_gt"; break;
 				}
 
-				ssa_fprintf(f, " @%s(", runtime_proc);
+				ssa_fprintf(f, " ");
+				ssa_print_encoded_global(f, make_string(runtime_proc), false);
+				ssa_fprintf(f, "(");
 				ssa_print_type(f, m->sizes, type);
 				ssa_fprintf(f, " ");
 				ssa_print_value(f, m, bo->left, type);
@@ -605,7 +643,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_MemCopy: {
-		ssa_fprintf(f, "call void @memory_move");
+		ssa_fprintf(f, "call void @.memory_move");
 		ssa_fprintf(f, "(i8* ");
 		ssa_print_value(f, m, instr->CopyMemory.dst, t_rawptr);
 		ssa_fprintf(f, ", i8* ");
@@ -689,7 +727,7 @@ void ssa_print_instr(gbFile *f, ssaModule *m, ssaValue *value) {
 	}
 }
 
-void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
+void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 	if (proc->body == NULL) {
 		ssa_fprintf(f, "\ndeclare ");
 	} else {
@@ -705,8 +743,11 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 	}
 
 	ssa_fprintf(f, " ");
-
-	ssa_print_encoded_global(f, proc->name);
+	if (are_strings_equal(proc->name, make_string("main"))) {
+		ssa_print_encoded_global(f, proc->name, true);
+	} else {
+		ssa_print_encoded_global(f, proc->name, (proc->tags & ProcTag_foreign) != 0);
+	}
 	ssa_fprintf(f, "(");
 
 	if (proc_type->param_count > 0) {
@@ -760,7 +801,7 @@ void ssa_print_proc(gbFile *f, ssaModule *m, ssaProcedure *proc) {
 	}
 }
 
-void ssa_print_type_name(gbFile *f, ssaModule *m, ssaValue *v) {
+void ssa_print_type_name(ssaFileBuffer *f, ssaModule *m, ssaValue *v) {
 	GB_ASSERT(v->kind == ssaValue_TypeName);
 	Type *base_type = get_base_type(ssa_type(v));
 	if (!is_type_struct(base_type) && !is_type_union(base_type)) {
@@ -772,17 +813,17 @@ void ssa_print_type_name(gbFile *f, ssaModule *m, ssaValue *v) {
 	ssa_fprintf(f, "\n");
 }
 
-void ssa_print_llvm_ir(gbFile *f, ssaModule *m) {
+void ssa_print_llvm_ir(ssaFileBuffer *f, ssaModule *m) {
 	if (m->layout.len > 0) {
 		ssa_fprintf(f, "target datalayout = \"%.*s\"\n", LIT(m->layout));
 	}
 
-	ssa_print_encoded_local(f, make_string(".string"));
+	ssa_print_encoded_local(f, make_string("..string"));
 	ssa_fprintf(f, " = type {i8*, ");
 	ssa_print_type(f, m->sizes, t_int);
 	ssa_fprintf(f, "} ; Basic_string\n");
 
-	ssa_print_encoded_local(f, make_string(".rawptr"));
+	ssa_print_encoded_local(f, make_string("..rawptr"));
 	ssa_fprintf(f, " = type i8* ; Basic_rawptr\n\n");
 
 	gb_for_array(member_index, m->members.entries) {

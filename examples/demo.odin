@@ -1,444 +1,740 @@
-// Demo 001
+// Demo 002
 #load "basic.odin"
 #load "game.odin"
 
+#thread_local tls_int: int
+
 main :: proc() {
-	Entity :: type union {
-		Frog: struct {
+	// Forenotes
+
+	// Semicolons are now optional
+	// Rule for when a semicolon is expected after a statement
+	// - If the next token is not on the same line
+	// - if the next token is a closing brace }
+	// - Otherwise, a semicolon is needed
+	//
+	// Expections:
+	// for, if, match
+	// if x := thing(); x < 123 {}
+	// for i := 0; i < 123; i++ {}
+
+	// Q: Should I use the new rule or go back to the old one without optional semicolons?
+
+
+	// #thread_local - see runtime.odin and above at `tls_int`
+	// #foreign_system_library - see win32.odin
+
+	struct_compound_literals()
+	enumerations()
+	variadic_procedures()
+	new_builtins()
+	match_statement()
+	namespacing()
+	subtyping()
+	tagged_unions()
+}
+
+struct_compound_literals :: proc() {
+	Thing :: type struct {
+		id: int
+		x: f32
+		name: string
+	}
+	{
+		t1: Thing
+		t1.id = 1
+
+		t3 := Thing{}
+		t4 := Thing{1, 2, "Fred"}
+		// t5 := Thing{1, 2}
+
+		t6 := Thing{
+			name = "Tom",
+			x = 23,
+		}
+	}
+}
+
+enumerations :: proc() {
+	{
+		Fruit :: type enum {
+			APPLE,  // 0
+			BANANA, // 1
+			PEAR,   // 2
+		}
+
+		f := Fruit.APPLE
+		// g: int = Fruit.BANANA
+		g: int = Fruit.BANANA as int
+	}
+	{
+		Fruit1 :: type enum int {
+			APPLE,
+			BANANA,
+			PEAR,
+		}
+
+		Fruit2 :: type enum u8 {
+			APPLE,
+			BANANA,
+			PEAR,
+		}
+
+		Fruit3 :: type enum u8 {
+			APPLE = 1,
+			BANANA, // 2
+			PEAR  = 5,
+			TOMATO, // 6
+		}
+	}
+}
+
+variadic_procedures :: proc() {
+	print_ints :: proc(args: ..int) {
+		for i := 0; i < len(args); i++ {
+			if i > 0 {
+				print_string(", ")
+			}
+			print_int(args[i])
+		}
+	}
+
+	print_ints(); nl()
+	print_ints(1); nl()
+	print_ints(1, 2, 3); nl()
+
+	print_prefix_f32s :: proc(prefix: string, args: ..f32) {
+		print_string(prefix)
+		print_string(": ")
+		for i := 0; i < len(args); i++ {
+			if i > 0 {
+				print_string(", ")
+			}
+			print_f32(args[i])
+		}
+	}
+
+	print_prefix_f32s("a"); nl()
+	print_prefix_f32s("b", 1); nl()
+	print_prefix_f32s("c", 1, 2, 3); nl()
+
+	// Internally, the variadic procedures get allocated to an array on the stack,
+	// and this array is passed a slice
+
+	// This is first step for a `print` procedure but I do not have an `any` type
+	// yet as this requires a few other things first - i.e. introspection
+}
+
+new_builtins :: proc() {
+	{
+		a := new(int)
+		b := new_slice(int, 12)
+		c := new_slice(int, 12, 16)
+
+		defer delete(a)
+		defer delete(b)
+		defer delete(c)
+
+		// NOTE(bill): These use the current context's allocator not the default allocator
+		// see runtime.odin
+
+		// Q: Should this be `free` rather than `delete` and should I overload it for slices too?
+	}
+
+	{
+		a: int = 123
+		b: type_of_val(a) = 321
+
+		// NOTE(bill): This matches the current naming scheme
+		// size_of
+		// align_of
+		// offset_of
+		//
+		// size_of_val
+		// align_of_val
+		// offset_of_val
+		// type_of_val
+	}
+
+	{
+		// Compile time assert
+		COND :: true
+		assert(COND)
+		// assert(!COND)
+
+		// Runtime assert
+		x := true
+		assert(x)
+		// assert(!x)
+	}
+
+	{
+		x: ^u32 = null;
+		y := ptr_offset(x, 100)
+		z := ptr_sub(y, x)
+		w := slice_ptr(x, 12)
+		t := slice_ptr(x, 12, 16)
+
+		// NOTE(bill): These are here because I've removed:
+		// pointer arithmetic
+		// pointer indexing
+		// pointer slicing
+
+		// Reason
+
+		a: [16]int
+		a[1] = 1;
+		b := ^a
+		// Auto pointer deref
+		// consistent with record members
+		assert(b[1] == 1)
+
+		// Q: Should I add them back in at the cost of inconsitency?
+	}
+
+	{
+		a, b := -1, 2
+		print_int(min(a, b)); nl()
+		print_int(max(a, b)); nl()
+		print_int(abs(a)); nl()
+
+		// These work at compile time too
+		A :: -1
+		B :: 2
+		C :: min(A, B)
+		D :: max(A, B)
+		E :: abs(A)
+
+		print_int(C); nl()
+		print_int(D); nl()
+		print_int(E); nl()
+	}
+}
+
+
+match_statement :: proc() {
+	// NOTE(bill): `match` statements are similar to `switch` statements
+	// in other languages but there are few differences
+
+	{
+		match x := 2; x {
+		case 1: // cases must be constant expression
+			print_string("1!\n")
+			// break by default
+
+		case 2:
+			s := "2!\n"; // Each case has its own scope
+			print_string(s)
+			break // explicit break
+
+		case 3, 4: // multiple cases
+			print_string("3 or 4!\n")
+
+		case 5:
+			print_string("5!\n")
+			fallthrough // explicit fallthrough
+
+		default:
+			print_string("default!\n")
+		}
+
+
+
+		match x := 1.5; x {
+		case 1.5:
+			print_string("1.5!\n")
+			// break by default
+		case MATH_TAU:
+			print_string("τ!\n")
+		default:
+			print_string("default!\n")
+		}
+
+
+
+		match x := "Hello"; x {
+		case "Hello":
+			print_string("greeting\n")
+			// break by default
+		case "Goodbye":
+			print_string("farewell\n")
+		default:
+			print_string("???\n")
+		}
+
+
+
+
+
+
+		a := 53
+		match {
+		case a == 1:
+			print_string("one\n")
+		case a == 2:
+			print_string("a couple\n")
+		case a < 7, a == 7:
+			print_string("a few\n")
+		case a < 12: // intentional bug
+			print_string("several\n")
+		case a >= 12 && a < 100:
+			print_string("dozens\n")
+		case a >= 100 && a < 1000:
+			print_string("hundreds\n")
+		default:
+			print_string("a fuck ton\n")
+		}
+
+		// Identical to this
+
+		b := 53
+		if b == 1 {
+			print_string("one\n")
+		} else if b == 2 {
+			print_string("a couple\n")
+		} else if b < 7 || b == 7 {
+			print_string("a few\n")
+		} else if b < 12 { // intentional bug
+			print_string("several\n")
+		} else if b >= 12 && b < 100 {
+			print_string("dozens\n")
+		} else if b >= 100 && b < 1000 {
+			print_string("hundreds\n")
+		} else {
+			print_string("a fuck ton\n")
+		}
+
+		// However, match statements allow for `break` and `fallthrough` unlike
+		// an if statement
+	}
+}
+
+Vector3 :: type struct {
+	x, y, z: f32
+}
+
+print_floats :: proc(args: ..f32) {
+	for i := 0; i < len(args); i++ {
+		if i > 0 {
+			print_string(", ")
+		}
+		print_f32(args[i])
+	}
+	print_nl()
+}
+
+namespacing :: proc() {
+	{
+		Thing :: type struct {
+			x: f32
+			name: string
+		}
+
+		a: Thing
+		a.x = 3
+		{
+			Thing :: type struct {
+				y: int
+				test: bool
+			}
+
+			b: Thing // Uses this scope's Thing
+			b.test = true
+		}
+	}
+
+	{
+		Entity :: type struct {
+			Guid :: type int
+			Nested :: type struct {
+				MyInt :: type int
+				i: int
+			}
+
+			CONSTANT :: 123
+
+
+			guid:   Guid
+			name:   string
+			pos:    Vector3
+			vel:    Vector3
+			nested: Nested
+		}
+
+		guid: Entity.Guid = Entity.CONSTANT
+		i: Entity.Nested.MyInt
+
+
+
+		{
+			using Entity
+			guid: Guid = CONSTANT
+			using Nested
+			i: MyInt
+		}
+
+
+		{
+			using Entity.Nested
+			guid: Entity.Guid = Entity.CONSTANT
+			i: MyInt
+		}
+
+
+		{
+			e: Entity
+			using e
+			guid = 78456
+			name = "Thing"
+
+			print_int(e.guid as int); nl()
+			print_string(e.name); nl()
+		}
+
+		{
+			using e: Entity
+			guid = 78456
+			name = "Thing"
+
+			print_int(e.guid as int); nl()
+			print_string(e.name); nl()
+		}
+	}
+
+	{
+		Entity :: type struct {
+			Guid :: type int
+			Nested :: type struct {
+				MyInt :: type int
+				i: int
+			}
+
+			CONSTANT :: 123
+
+
+			guid:      Guid
+			name:      string
+			using pos: Vector3
+			vel:       Vector3
+			using nested: ^Nested
+		}
+
+		e := Entity{nested = new(Entity.Nested)}
+		e.x = 123
+		e.i = Entity.CONSTANT
+	}
+
+
+
+	{
+		Entity :: type struct {
+			position: Vector3
+		}
+
+		print_pos_1 :: proc(entity: ^Entity) {
+			print_string("print_pos_1: ")
+			print_floats(entity.position.x, entity.position.y, entity.position.z)
+		}
+
+		print_pos_2 :: proc(entity: ^Entity) {
+			using entity
+			print_string("print_pos_2: ")
+			print_floats(position.x, position.y, position.z)
+		}
+
+		print_pos_3 :: proc(using entity: ^Entity) {
+			print_string("print_pos_3: ")
+			print_floats(position.x, position.y, position.z)
+		}
+
+		print_pos_4 :: proc(using entity: ^Entity) {
+			using position
+			print_string("print_pos_4: ")
+			print_floats(x, y, z)
+		}
+
+		e := Entity{position = Vector3{1, 2, 3}}
+		print_pos_1(^e)
+		print_pos_2(^e)
+		print_pos_3(^e)
+		print_pos_4(^e)
+
+		// This is similar to C++'s `this` pointer that is implicit and only available in methods
+	}
+}
+
+subtyping :: proc() {
+	{
+		// C way for subtyping/subclassing
+
+		Entity :: type struct {
+			position: Vector3
+		}
+
+		Frog :: type struct {
+			entity: Entity
 			jump_height: f32
 		}
-		Helicopter: struct {
-			weight:     f32
-			blade_code: int
-		}
-	}
 
-	using Entity
-	f: Entity = Frog{137}
-	h: Entity = Helicopter{123, 4}
+		f: Frog
+		f.entity.position = Vector3{1, 2, 3}
 
-	match type ^f -> e {
-	case Frog:
-		print_string("Frog!\n")
-		print_f32(e.jump_height); nl()
-		e.jump_height = 69
-		print_f32(e.jump_height); nl()
-	case Helicopter:
-		print_string("Helicopter!\n")
-		e.weight = 1337
-	default:
-		print_string("Unknown!\n")
-	}
-}
+		using f.entity
+		position = Vector3{1, 2, 3}
 
-nl :: proc() { print_nl() }
-
-/*
-// Demo 001
-#load "basic.odin"
-#load "game.odin"
-
-main :: proc() {
-	// _ = hellope()
-	// procedures()
-	// variables()
-	// constants()
-	// types()
-	// data_control()
-	// using_fields()
-
-	run_game()
-}
-
-
-hellope :: proc() -> int {
-	print_string("Hellope, 世界\n")
-	return 1
-}
-
-
-// Line comment
-/*
-	Block Comment
-*/
-/*
-	Nested /*
-		Block /*
-			Comment
-		*/
-	*/
-*/
-
-apple, banana, carrot: bool
-box, carboard: bool = true, false
-// hellope_value: int = hellope() // The procedure is ran just before `main`
-
-variables :: proc() {
-	i: int // initialized with zero value
-	j: int = 1
-	x, y: int = 1, 2
-
-	// Type inference
-	apple, banana, 世界 := true, 123, "world"
-
-
-	// Basic Types of the Language
-	//
-	// bool
-	//
-	// i8 i16 i32 i64 i128
-	// u8 u16 u32 u64 u128
-	//
-	// f32 f64
-	//
-	// int uint (size_of(int) == size_of(uint) == size_of(rawptr))
-	//
-	// rawptr (equivalent to void * in C/C++)
-	//
-	// string
-	//
-	// byte - alias for u8
-	// rune - alias for i32 // Unicode Codepoint
-	//
-	// "untyped" types can implicitly convert to any of the "typed" types
-	//                      Default Type
-	// untyped bool      -  bool
-	// untyped integer   -  int
-	// untyped float     -  f64
-	// untyped pointer   -  rawptr
-	// untyped string    -  string
-	// untyped rune      -  rune/i32
-
-
-	// Zero values
-	zero_numeric := 0
-	zero_boolean := false
-	zero_pointer := null
-	zero_string1 := "" // Escaped string
-	zero_string2 := `` // Raw string
-	// Compound types have a different kind of zero value
-
-	// Unary operators
-	// +a
-	// -a
-	// ~a
-	// !a
-
-	// Binary operators
-	// a + b    add
-	// a - b    sub
-	// a ~ b    xor
-	// a | b     or
-
-	// a * b    mul
-	// a / b    quo
-	// a % b    mod
-	// a & b    and
-	// a &~ b   bitclear == a & (~b)
-	// a << b   shl
-	// a >> b   shr
-
-	// a as Type         // Type cast
-	// a transmute Type  // Bit  cast
-
-	// a == b   eq
-	// a != b   ne
-	// a < b    lt
-	// a > b    gt
-	// a <= b   le
-	// a >= b   ge
-
-}
-
-procedures :: proc() {
-	add :: proc(x: int, y: int) -> int {
-		return x + y
-	}
-	print_int(add(3, 4)) // 7
-	print_nl()
-
-	add_v2 :: proc(x, y: int) -> int {
-		return x + y
-	}
-
-	fibonacci :: proc(n: int) -> int {
-		if n < 2 {
-			return n
-		}
-		return fibonacci(n-1) + fibonacci(n-2)
-	}
-	print_int(fibonacci(12)); nl()
-
-
-	swap_strings :: proc(x, y: string) -> (string, string) {
-		return y, x
-	}
-	a, b := swap_strings("Hellope\n", "World\n")
-	print_string(a)
-	print_string(b)
-
-	a, b = b, a // Quirk of grammar the of multiple assignments
-	             // Swap variables
-	print_string(a)
-	print_string(b)
-
-	// Not a hint like C/C++, it's mandatory (unless it cannot do it but it will warn)
-	proc1 :: proc(a, b: int) #inline {
-		print_int(a + b)
-	}
-	proc2 :: proc(a, b: int) #no_inline {
-		print_int(a + b)
-	}
-
-	print_int(3 ''add 4)     // Infix style
-	print_nl()
-	print_int(12 'fibonacci) // Postfix style
-	print_nl()
-}
-
-
-TAU :: 6.28318530718
-
-constants :: proc() {
-	TAU :: 6.28318530718 // untyped float
-	WORLD_JAPANESE :: "世界" // untyped string
-
-	TAU_32 : f32 : 6.28318530718
-	TAU_AS_32 :: 6.28318530718 as f32
-
-	PI :: TAU / 2
-
-	CLOSE_TO_PI :: 3
-
-	DIFF :: (PI - CLOSE_TO_PI) / PI // Evaluated at compile time
-
-	a := TAU         // the constant's value becomes typed as f32
-	b := CLOSE_TO_PI // the constant's value becomes typed as int
-	c := DIFF
-}
-
-nl :: proc() { print_nl() }
-
-types :: proc() {
-
-	x: int = 123
-	y := x // y: int = x
-	// z: f32 = x // invalid
-	z: f32 = x as f32
-
-
-	ptr_z := ^z  // Pascal notation
-	ptr_z^ = 123 // Derefence Notation
-	w: f32 = ptr_z^  // 123
-	print_f32(z); nl()
-
-	// ^z - pointer to z
-	// z^ - z from pointer
-
-	// Implicit conversion to and from rawptr
-	r_ptr: rawptr = ptr_z
-	ptr_z = r_ptr
-
-
-
-
-	f32_array: [12]f32 // Array of 12 f32
-	f32_array[0] = 2
-	f32_array[1] = 3
-	// f32_array[-1] = 2 // Error - compile time check
-	// f32_array[13]  = 2 // Error - compile time check
-	f32_array_len := len(f32_array) // builtin procedure
-	f32_array_cap := cap(f32_array) // == len(f32_array)
-
-
-	mda: [2][3][4]int // Column-major
-	// mda[x][y][z]
-
-
-
-	api: [2]^f32
-	papi: ^[2]^f32
-
-
-
-
-	f32_slice: []f32 // Slice / Array reference
-	f32_slice = f32_array[0:5]
-	f32_slice = f32_array[:5]
-	f32_slice = f32_array[:] // f32_array[0:len(f32_array)-1]
-
-	f32_slice = f32_array[1:5:7] // low:1, high:5, max:7
-	                              // len: 5-1 == 4
-	                              // cap: 7-1 == 6
-
-
-
-	append_success := append(^f32_slice, 1)
-	_ = append(^f32_slice, 2)
-
-	_ = copy(f32_array[0:2], f32_array[2:4]) // You can use memcpy/memmove if you want
-
-
-
-
-
-
-	s := "Hellope World"
-	sub_string: string = s[5:10]
-
-
-
-
-
-	v0: {4}f32 // Vector of 4 f32
-	v0[0] = 1
-	v0[1] = 3
-	v0[2] = 6
-	v0[3] = 10
-
-	v1 := v0 + v0 // Simd Arithmetic
-	v1 = v1 - v0
-	v1 *= v0 // i.e. hadamard product
-	v1 /= v0
-
-	// builtin procedure
-	v2 := swizzle(v0, 3, 2, 1, 0) // {10, 6, 3, 1}
-
-	v3: {4}bool = v0 == v2
-	// LLVM rant?
-
-
-
-
-
-
-
-	Vec4 :: type {4}f32
-	Array3Int :: type [3]int
-
-	Vec3 :: type struct {
-		x, y, z: f32
-	}
-
-	BinaryNode :: type struct {
-		left, right: ^BinaryNode // same format as procedure argument
-		data: rawptr
-	}
-
-	AddProc :: type proc(a, b: int) -> int
-
-	Packed :: type struct #packed {
-		a: u8
-		b: u16
-		c: u32
-	}
-	assert(size_of(Packed) == 7) // builtin procedure
-	{
-		a, b: ^BinaryNode
-		a = alloc(size_of(BinaryNode)) as ^BinaryNode
-		b = alloc(size_of(BinaryNode)) as ^BinaryNode
-
-		c := BinaryNode{a, b, null}
-		c.left^.data = null
-		c.left.data = null // No need to deference
-
-		dealloc(a)
-		dealloc(b)
 	}
 
 	{
-		MyInt :: type int
-		x: int = 1
-		y: MyInt = 2
-		// z := x + y // Failure - types cannot implicit convert*
-		z := x as MyInt + y // Type cast using `as`
+		// C++ way for subtyping/subclassing
+
+		Entity :: type struct {
+			position: Vector3
+		}
+
+		Frog :: type struct {
+			using entity: Entity
+			jump_height: f32
+		}
+
+		f: Frog
+		f.position = Vector3{1, 2, 3}
+
+
+		print_pos :: proc(using entity: Entity) {
+			print_string("print_pos: ")
+			print_floats(position.x, position.y, position.z)
+		}
+
+		print_pos(f.entity)
+		print_pos(f)
+
+		// Subtype Polymorphism
 	}
 
+	{
+		// More than C++ way for subtyping/subclassing
+
+		Entity :: type struct {
+			position: Vector3
+		}
+
+		Frog :: type struct {
+			jump_height: f32
+			using entity: ^Entity // Doesn't have to be first member!
+		}
+
+		f: Frog
+		f.entity = new(Entity)
+		f.position = Vector3{1, 2, 3}
+
+
+		print_pos :: proc(using entity: ^Entity) {
+			print_string("print_pos: ")
+			print_floats(position.x, position.y, position.z)
+		}
+
+		print_pos(f.entity)
+		print_pos(^f)
+		print_pos(f)
+	}
 
 	{
-		// From: Quake III Arena
-		Q_rsqrt :: proc(number: f32) -> f32 {
-			i: i32
-			x2, y: f32
-			THREE_HALFS :: 1.5
+		// More efficient subtyping
 
-			x2 = number * 0.5
-			y = number
-			i = (^y as ^i32)^                      // evil floating point bit level hacking
-			i = 0x5f3759df - i>>1                  // what the fuck?
-			y = (^i as ^f32)^
-			y = y * (THREE_HALFS - (x2 * y *y))    // 1st iteration
-		//	y = y * (THREE_HALFS - (x2 * y *y))    // 2nd iteration, this can be removed
-			return y
+		Entity :: type struct {
+			position: Vector3
 		}
 
-		Q_rsqrt_v2 :: proc(number: f32) -> f32 {
-			THREE_HALFS :: 1.5
-
-			x2 := number * 0.5
-			y := number
-			i := y transmute i32                   // evil floating point bit level hacking
-			i = 0x5f3759df - i>>1                  // what the fuck?
-			y = i transmute f32
-			y = y * (THREE_HALFS - (x2 * y *y))    // 1st iteration
-		//	y = y * (THREE_HALFS - (x2 * y *y))    // 2nd iteration, this can be removed
-			return y
+		Frog :: type struct {
+			jump_height: f32
+			using entity: ^Entity
 		}
 
-		// NOTE(bill): transmute only works if the size of the types are equal
+		MAX_ENTITES :: 64
+		entities: [MAX_ENTITES]Entity
+		entity_count := 0
 
-		/*
-			// in C
-			union {
-				i32 i
-				f32 y
+		next_entity :: proc(entities: []Entity, entity_count: ^int) -> ^Entity {
+			e := ^entities[entity_count^]
+			entity_count^++
+			return e
+		}
+
+		f: Frog
+		f.entity = next_entity(entities[:], ^entity_count)
+		f.position = Vector3{3, 4, 6}
+
+		using f.position
+		print_floats(x, y, z)
+	}
+
+	{
+		// Down casting
+
+		Entity :: type struct {
+			position: Vector3
+		}
+
+		Frog :: type struct {
+			jump_height: f32
+			using entity: Entity
+		}
+
+		f: Frog
+		f.jump_height = 564
+		e := ^f.entity
+
+		frog := e down_cast ^Frog
+		print_string("down_cast: ")
+		print_f32(frog.jump_height); nl()
+
+		// NOTE(bill): `down_cast` is unsafe and there are not check are compile time or run time
+	}
+
+	{
+		// Multiple "inheritance"
+
+		Entity :: type struct {
+			position: Vector3
+		}
+		Climber :: type struct {
+			speed: f32
+		}
+
+		Frog :: type struct {
+			using entity:  Entity
+			using climber: Climber
+		}
+	}
+}
+
+tagged_unions :: proc() {
+	{
+		EntityKind :: type enum {
+			INVALID,
+			FROG,
+			GIRAFFE,
+			HELICOPTER,
+		}
+
+		Entity :: type struct {
+			kind: EntityKind
+			using data: raw_union {
+				frog: struct {
+					jump_height: f32
+					colour: u32
+				}
+				giraffe: struct {
+					neck_length: f32
+					spot_count: int
+				}
+				helicopter: struct {
+					blade_count: int
+					weight: f32
+					pilot_name: string
+				}
 			}
-		 */
+		}
+
+		e: Entity
+		e.kind = EntityKind.FROG
+		e.frog.jump_height = 12
+
+		f: type_of_val(e.frog);
+
+		// But this is very unsafe and extremely cumbersome to write
+		// In C++, I use macros to alleviate this but it's not a solution
 	}
 
-	{ // Enumeration
-		Thing :: type enum {
-			APPLE,
-			FROG,
-			TREE,
-			TOMB,
+	{
+		Entity :: type union {
+			Frog: struct {
+				jump_height: f32
+				colour: u32
+			}
+			Giraffe: struct {
+				neck_length: f32
+				spot_count: int
+			}
+			Helicopter: struct {
+				blade_count: int
+				weight: f32
+				pilot_name: string
+			}
 		}
-		a := Thing.APPLE
 
-		Sized :: type enum u64 {
-			APPLE,
-			FROG,
-			TREE,
-			TOMB,
-		}
-		assert(size_of(Sized) == size_of(u64))
+		using Entity
+		f1: Frog = Frog{12, 0xff9900}
+		f2: Entity = Frog{12, 0xff9900} // Implicit cast
+		f3 := Frog{12, 0xff9900} as Entity // Explicit cast
 
-		Certain :: type enum {
-			APPLE = 3,
-			FROG,
-			TREE = 7,
-			TOMB,
+		// f3.Frog.jump_height = 12 // There are "members" of a union
+
+
+
+		e, f, g, h: Entity
+		f = Frog{12, 0xff9900}
+		g = Giraffe{2.1, 23}
+		h = Helicopter{4, 1000, "Frank"}
+
+
+
+
+		// Requires a pointer to the union
+		// `x` will be a pointer to type of the case
+		// Q: Allow for a non pointer version with takes a copy instead?
+		match type ^f -> x {
+		case Frog:
+			print_string("Frog!\n")
+			print_f32(x.jump_height); nl()
+			x.jump_height = 3
+			print_f32(x.jump_height); nl()
+		case Giraffe:
+			print_string("Giraffe!\n")
+		case Helicopter:
+			print_string("ROFLCOPTER!\n")
+		default:
+			print_string("invalid entity\n")
 		}
-		assert(Certain.TOMB == 8)
+
+		fp := ^f as ^Frog // Unsafe
+		print_f32(fp.jump_height); nl()
+
+
+		// Internals of a tagged union
+		/*
+			struct {
+				data: [size_of_biggest_tag]u8
+				tag_index: int
+			}
+		*/
+		// This is to allow for pointer casting if needed
+
+
+		// Advantage over subtyping version
+		MAX_ENTITES :: 64
+		entities: [MAX_ENTITES]Entity
+
+		entities[0] = Frog{}
+		entities[1] = Helicopter{}
+		// etc.
 	}
 
-	{ // Untagged union
-		BitHack :: type raw_union {
-			i: i32
-			f: f32
-		}
-		b: BitHack
-		b.f = 123
-		print_int(b.i as int); print_nl()
 
-
-
-		// Manually tagged union
+	{
+		// Transliteration of code from this actual compiler
+		// Some stuff is missing
+		Type       :: type struct {}
+		Scope      :: type struct {}
+		Token      :: type struct {}
+		AstNode    :: type struct {}
+		ExactValue :: type struct {}
 
 		EntityKind :: type enum {
 			Invalid,
 			Constant,
 			Variable,
+			UsingVariable,
 			TypeName,
 			Procedure,
 			Builtin,
@@ -446,316 +742,133 @@ types :: proc() {
 		}
 
 		Entity :: type struct {
+			Guid :: type i64
+
 			kind: EntityKind
-			guid: u64
+			guid: Guid
 
-			// Other data
+			scope: ^Scope
+			token: Token
+			type_: ^Type
 
-			/*using*/
-			data: union {
-				constant: struct{}
-				variable: struct{
-					visited, is_field, used, anonymous: bool
+			using data: raw_union {
+				Constant: struct {
+					value: ExactValue
 				}
-				procedure: struct { used: bool }
-				buitlin: struct { id: i32 }
+				Variable: struct {
+					visited:   bool // Cycle detection
+					used:      bool // Variable is used
+					is_field:  bool // Is struct field
+					anonymous: bool // Variable is an anonymous
+				}
+				UsingVariable: struct {
+				}
+				TypeName: struct {
+				}
+				Procedure: struct {
+					used: bool
+				}
+				Builtin: struct {
+					id: int
+				}
 			}
 		}
 
-
-		// NOTE(bill): Tagged unions are not added yet but are planned
-	}
-
-
-
-	{ // Compound Literals
-		a := [3]int{1, 2, 3}
-		b := [3]int{}
-		c := [..]int{1, 2, 3}
-
-		d := []int{1, 2, 3} // slice
-
-		e := {4}f32{1, 2, 3, 4}
-		f := {4}f32{1} // broadcasts to all
-		// g := {4}f32{1, 2} // require either 1 or 4 elements
-
-		Vec2 :: type {2}f32
-
-		h := Vec2{1, 2}
-
-		i := Vec2{5} * h // For strong type safety
-		// FORENOTE: 5 * h was originally allowed but it was an edge case in the
-		// compiler I didn't think it was enough to justify have it it.
-
-		print_f32(i[0]); print_rune(#rune ",")
-		print_f32(i[1]); print_nl()
-	}
-
-
-
-	{ // First class procedures
-
-		do_thing :: proc(p: proc(a, b: int) -> int) {
-			print_int(p(3, 4)); nl()
-		}
-
-		add :: proc(a, b: int) -> int {
-			return a + b
-		}
-
-
-		add_lambda := proc(a, b: int) -> int {
-			return a - b
-		} // note semicolon
-
-		do_thing(add)
-		do_thing(add_lambda)
-		do_thing(proc(a, b: int) -> int { // Anonymous
-			return a * b
-		})
-	}
-
-
-
-	{ // strings and runes
-		escaped := "Hellope World\n"
-		raw     := `Hellope World\n`
-		print_string(escaped)
-		print_string(raw); nl()
-
-		// Crap shader example
-		shader_string :=
-`#version 410
-
-layout (location = 0) in vec3 a_position
-layout (location = 1) in vec3 a_normal;
-layout (location = 2) in vec2 a_tex_coord;
-
-out vec3 v_position;
-out vec3 v_normal;
-out vec2 v_tex_coord;
-
-uniform mat4 u_model_view;
-uniform mat3 u_normal;
-uniform mat4 u_proj;
-uniform mat4 u_mvp;
-
-void main() {
-    v_tex_coord = a_tex_coord;
-    v_normal = normalize(u_normal * a_normal);
-    v_position = vec3(u_model_view * vec4(a_position, 1.0));
-
-    gl_Position = u_mvp * vec4(a_position, 1.0);
-}`;
-
-
-		hearts1 := #rune "💕";
-		hearts2 := #rune "\U0001f495"; // 32 bit
-		hearts3 := #rune "\xf0\x9f\x92\x95";
-
-		㐒 := #rune "㐒";
-		㐒16 := #rune "\u4db5"; // 16 bit but will be `rune`
-		// String ideas "nicked" from Go, so far. I think I might change how some of it works later.
-	}
-
-
-	{ // size, align, offset
-		Thing :: type struct {
-			a: u8;
-			b: u16;
-			c, d, e: u32;
-		}
-
-		s := size_of(Thing);
-		a := align_of(Thing);
-		o := offset_of(Thing, b);
-
-		t: Thing;
-
-		sv := size_of_val(t);
-		av := align_of_val(t);
-		ov := offset_of_val(t.b);
-	}
-}
-
-data_control :: proc() {
-	sum := 0
-	for i := 0; i < 12; i++ {
-		sum += 1
-	}
-	print_string("sum = "); print_int(sum); nl()
-
-	sum = 1
-	for ; sum < 1000000; {
-		sum += sum
-	}
-	print_string("sum = "); print_int(sum); nl()
-
-	sum = 1
-	for sum < 1000000 {
-		sum += sum
-	}
-	print_string("sum = "); print_int(sum); nl()
-
-	// loop
-	// for { } == for true {}
-
-	// Question: Should I separate all these concepts and rename it?
-	//
-	// range - iterable
-	// for   - c style
-	// while
-	// loop  - while true
-
-	// Notes:
-	// conditions _must_ a boolean expression
-	// i++ and i-- are statements, not expressions
-
-
-	x := 2
-	if x < 3 {
-		print_string("x < 2\n")
-	}
-
-	// Unified initializer syntax - same as for statements
-	if x := 2; x < 3 {
-		print_string("x < 2\n")
-	}
-
-	if x := 4; x < 3 {
-		print_string("Never called\n")
-	} else {
-		print_string("This is called\n")
-	}
-
-	{ // String comparison
-		a := "Hellope"
-		b := "World"
-		if a < b {
-			print_string("a < b\n")
-		}
-		if a != b {
-			print_string("a != b\n")
-		}
-
-	}
-
-
-
-
-	{ // Defer statement
-		defer print_string("日本語\n")
-		print_string("Japanese\n")
+		// Plus all the constructing procedures that go along with them!!!!
+		// It's a nightmare
 	}
 
 	{
-		defer print_string("1\n")
-		defer print_string("2\n")
-		defer print_string("3\n")
+		Type       :: type struct {}
+		Scope      :: type struct {}
+		Token      :: type struct {}
+		AstNode    :: type struct {}
+		ExactValue :: type struct {}
+
+
+		EntityBase :: type struct {
+			Guid :: type i64
+			guid: Guid
+
+			scope: ^Scope
+			token: Token
+			type_: ^Type
+		}
+
+		Entity :: type union {
+			Constant: struct {
+				using base: EntityBase
+				value: ExactValue
+			}
+			Variable: struct {
+				using base: EntityBase
+				visited:   bool // Cycle detection
+				used:      bool // Variable is used
+				is_field:  bool // Is struct field
+				anonymous: bool // Variable is an anonymous
+			}
+			UsingVariable: struct {
+				using base: EntityBase
+			}
+			TypeName: struct {
+				using base: EntityBase
+			}
+			Procedure: struct {
+				using base: EntityBase
+				used: bool
+			}
+			Builtin: struct {
+				using base: EntityBase
+				id: int
+			}
+		}
+
+		using Entity
+
+		e: Entity
+
+		e = Variable{
+			base = EntityBase{},
+			used = true,
+			anonymous = false,
+		}
+
+
+
+		// Q: Allow a "base" type to be added to a union?
 	}
+
 
 	{
-		prev_allocator := context.allocator
-		context.allocator = __default_allocator()
-		defer context.allocator = prev_allocator
+		// `Raw` unions still have uses, especially for mathematic types
 
-		File :: type struct { filename: string }
-		FileError :: type int;
-		open_file  :: proc(filename: string) -> (File, FileError) {
-			return File{}, 0
-		}
-		close_file :: proc(f: ^File) {}
-		f, err := open_file("Test")
-		if err != 0 {
-			// handle error
-		}
-		defer close_file(^f)
-	}
-
-	for i := 0; i < 100; i++ {
-		blah := new_slice(int, 100)
-		defer {
-			defer print_string("!")
-			defer print_string("dealloc")
-			delete(blah)
+		Vector2 :: type raw_union {
+			using xy_: struct { x, y: f32 }
+			e: [2]f32
+			v: {2}f32
 		}
 
-		if i == 3 {
-			// defers called
-			continue
+		Vector3 :: type raw_union {
+			using xyz_: struct { x, y, z: f32 }
+			xy: Vector2
+			e: [3]f32
+			v: {3}f32
 		}
 
-		if i == 5 {
-			// defers called
-			return // End of procedure
-		}
+		v2: Vector2
+		v2.x = 1
+		v2.e[0] = 1
+		v2.v[0] = 1
 
-		if i == 8 {
-			// defers called
-			break // never happens
-		}
-	}
+		v3: Vector3
+		v3.x = 1
+		v3.e[0] = 1
+		v3.v[0] = 1
+		v3.xy.x = 1
 
-	defer print_string("It'll never happen, mate 1")
-	print_string("It'll never happen, mate 2")
-	print_string("It'll never happen, mate 3")
-}
-
-
-using_fields :: proc() {
-	{ // Everyday stuff
-		Vec3 :: type struct { x, y, z: f32; }
-
-		Entity :: type struct {
-			name: string;
-			using pos: Vec3;
-			vel: Vec3;
-		}
-		t: Entity;
-		t.y = 456;
-		print_f32(t.y);     print_nl();
-		print_f32(t.pos.y); print_nl();
-		print_f32(t.vel.y); print_nl();
-
-
-		Frog :: type struct { // Subtype (kind of)
-			using entity: Entity;
-			colour: u32;
-			jump_height: f32;
-		}
-
-		f: Frog;
-		f.y = 1337;
-		print_f32(f.y);     print_nl();
-		print_f32(f.pos.y); print_nl();
-		print_f32(f.vel.y); print_nl();
-
-
-		Buffalo :: type struct {
-			using entity: Entity;
-			speed: f32;
-			noise_level: f32;
-		}
-	}
-
-
-	{ // Crazy Shit
-		Vec2 :: type raw_union {
-			using _xy: struct {x, y: f32};
-			e: [2]f32;
-			v: {2}f32;
-		}
-
-		Entity :: type struct {
-			using pos: ^Vec2;
-			name: string;
-		}
-		t: Entity;
-		t.pos = alloc(size_of(Vec2)) as ^Vec2; // TODO(bill): make an alloc type? i.e. new(Type)?
-		t.x = 123;
-		print_f32(t._xy.x);     print_nl();
-		print_f32(t.pos.x);     print_nl();
-		print_f32(t.pos._xy.x); print_nl();
+		// Q: If I applied using to a vector element in a raw_union,
+		// should that type now act as if it was a vector?
 	}
 }
-*/
+
+nl :: proc() { print_nl() }
