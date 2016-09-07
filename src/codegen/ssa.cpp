@@ -2273,6 +2273,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		}
 		ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, arg_count);
 		b32 variadic = proc_type_->Proc.variadic;
+		b32 vari_expand = ce->ellipsis.pos.line != 0;
 
 		gb_for_array(i, ce->args) {
 			ssaValue *a = ssa_build_expr(proc, ce->args[i]);
@@ -2295,11 +2296,13 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			for (; i < type->param_count-1; i++) {
 				args[i] = ssa_emit_conv(proc, args[i], pt->variables[i]->type, true);
 			}
-			Type *variadic_type = pt->variables[i]->type;
-			GB_ASSERT(is_type_slice(variadic_type));
-			variadic_type = get_base_type(variadic_type)->Slice.elem;
-			for (; i < arg_count; i++) {
-				args[i] = ssa_emit_conv(proc, args[i], variadic_type, true);
+			if (!vari_expand) {
+				Type *variadic_type = pt->variables[i]->type;
+				GB_ASSERT(is_type_slice(variadic_type));
+				variadic_type = get_base_type(variadic_type)->Slice.elem;
+				for (; i < arg_count; i++) {
+					args[i] = ssa_emit_conv(proc, args[i], variadic_type, true);
+				}
 			}
 		} else {
 			for (isize i = 0; i < arg_count; i++) {
@@ -2307,7 +2310,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			}
 		}
 
-		if (variadic) {
+		if (variadic && !vari_expand) {
 			ssa_emit_comment(proc, make_string("variadic call argument generation"));
 			gbAllocator allocator = proc->module->allocator;
 			Type *slice_type = pt->variables[type->param_count-1]->type;

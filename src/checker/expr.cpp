@@ -2032,7 +2032,10 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 
 		AstNode *len = ce->args[1];
-		AstNode *cap = ce->args[2];
+		AstNode *cap = NULL;
+		if (gb_array_count(ce->args) > 2) {
+			cap = ce->args[2];
+		}
 
 		check_expr(c, &op, len);
 		if (op.mode == Addressing_Invalid)
@@ -2542,7 +2545,10 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 
 		AstNode *len = ce->args[1];
-		AstNode *cap = ce->args[2];
+		AstNode *cap = NULL;
+		if (gb_array_count(ce->args) > 2) {
+			cap = ce->args[2];
+		}
 
 		Operand op = {};
 		check_expr(c, &op, len);
@@ -2753,6 +2759,7 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	isize param_index = 0;
 	isize param_count = 0;
 	b32 variadic = proc_type->Proc.variadic;
+	b32 vari_expand = (ce->ellipsis.pos.line != 0);
 
 	if (proc_type->Proc.params) {
 		param_count = proc_type->Proc.params->Tuple.variable_count;
@@ -2782,23 +2789,37 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	} else {
 		Entity **sig_params = proc_type->Proc.params->Tuple.variables;
 		gb_for_array(arg_index, ce->args) {
-			AstNode *call_arg = ce->args[arg_index];
-			check_multi_expr(c, operand, call_arg);
+			check_multi_expr(c, operand, ce->args[arg_index]);
 			if (operand->mode == Addressing_Invalid)
 				continue;
 			if (operand->type->kind != Type_Tuple) {
 				check_not_tuple(c, operand);
 				isize index = param_index;
 				b32 end_variadic = false;
+				b32 variadic_expand = false;
 				if (variadic && param_index >= param_count-1) {
 					index = param_count-1;
 					end_variadic = true;
+					if (vari_expand) {
+						variadic_expand = true;
+						if (param_index != param_count-1) {
+							error(&c->error_collector, ast_node_token(operand->expr),
+							      "`..` in a variadic procedure can only have one variadic argument at the end");
+							break;
+						}
+					}
 				}
 				Type *arg_type = sig_params[index]->type;
 				if (end_variadic && is_type_slice(arg_type)) {
-					arg_type = get_base_type(arg_type)->Slice.elem;
+					if (variadic_expand) {
+						check_assignment(c, operand, arg_type, make_string("argument"), true);
+					} else {
+						arg_type = get_base_type(arg_type)->Slice.elem;
+						check_assignment(c, operand, arg_type, make_string("argument"), true);
+					}
+				} else {
+					check_assignment(c, operand, arg_type, make_string("argument"), true);
 				}
-				check_assignment(c, operand, arg_type, make_string("argument"), true);
 				param_index++;
 			} else {
 				auto *tuple = &operand->type->Tuple;
@@ -2815,6 +2836,11 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 					if (variadic && param_index >= param_count-1) {
 						index = param_count-1;
 						end_variadic = true;
+						if (vari_expand) {
+							error(&c->error_collector, ast_node_token(operand->expr),
+							      "`..` in a variadic procedure cannot be applied to a %td-valued expression", tuple->variable_count);
+							goto end;
+						}
 					}
 					Type *arg_type = sig_params[index]->type;
 					if (end_variadic && is_type_slice(arg_type)) {
@@ -2823,6 +2849,8 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 					check_assignment(c, operand, arg_type, make_string("argument"), true);
 					param_index++;
 				}
+
+			end:
 
 				if (i < tuple->variable_count && param_index == param_count) {
 					error_code = +1;
