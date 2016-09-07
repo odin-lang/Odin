@@ -63,8 +63,8 @@ print_nl_to_buffer    :: proc(buf: ^[]byte) { print_rune_to_buffer(buf, #rune "\
 print_int_to_buffer :: proc(buf: ^[]byte, i: int) {
 	print_int_base_to_buffer(buf, i, 10);
 }
+PRINT__NUM_TO_CHAR_TABLE :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$"
 print_int_base_to_buffer :: proc(buffer: ^[]byte, i, base: int) {
-	NUM_TO_CHAR_TABLE :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$"
 
 	buf: [65]byte
 	len := 0
@@ -78,7 +78,7 @@ print_int_base_to_buffer :: proc(buffer: ^[]byte, i, base: int) {
 		len++
 	}
 	for i > 0 {
-		buf[len] = NUM_TO_CHAR_TABLE[i % base]
+		buf[len] = PRINT__NUM_TO_CHAR_TABLE[i % base]
 		len++;
 		i /= base
 	}
@@ -96,8 +96,6 @@ print_uint_to_buffer :: proc(buffer: ^[]byte, i: uint) {
 	print_uint_base_to_buffer(buffer, i, 10, 0, #rune " ")
 }
 print_uint_base_to_buffer :: proc(buffer: ^[]byte, i, base: uint, min_width: int, pad_char: byte) {
-	NUM_TO_CHAR_TABLE :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$"
-
 	buf: [65]byte
 	len := 0
 	if i == 0 {
@@ -105,7 +103,7 @@ print_uint_base_to_buffer :: proc(buffer: ^[]byte, i, base: uint, min_width: int
 		len++
 	}
 	for i > 0 {
-		buf[len] = NUM_TO_CHAR_TABLE[i % base]
+		buf[len] = PRINT__NUM_TO_CHAR_TABLE[i % base]
 		len++
 		i /= base
 	}
@@ -139,8 +137,6 @@ print__f64 :: proc(buffer: ^[]byte, f: f64, decimal_places: int) {
 	}
 
 	print_u64_to_buffer :: proc(buffer: ^[]byte, i: u64) {
-		NUM_TO_CHAR_TABLE :: "0123456789"
-
 		buf: [22]byte
 		len := 0
 		if i == 0 {
@@ -148,7 +144,7 @@ print__f64 :: proc(buffer: ^[]byte, f: f64, decimal_places: int) {
 			len++
 		}
 		for i > 0 {
-			buf[len] = NUM_TO_CHAR_TABLE[i % 10]
+			buf[len] = PRINT__NUM_TO_CHAR_TABLE[i % 10]
 			len++
 			i /= 10
 		}
@@ -173,13 +169,14 @@ print__f64 :: proc(buffer: ^[]byte, f: f64, decimal_places: int) {
 
 
 
-print_any_to_buffer :: proc(buf: ^[]byte ,arg: any)  {
+print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 	using Type_Info
 	match type arg.type_info -> info {
 	case Named:
-		print_string_to_buffer(buf, "(")
-		print_string_to_buffer(buf, info.name)
-		print_string_to_buffer(buf, ")")
+		a: any
+		a.type_info = info.base
+		a.data = arg.data
+		print_any_to_buffer(buf, a)
 
 	case Integer:
 		if info.signed {
@@ -250,7 +247,6 @@ print_any_to_buffer :: proc(buf: ^[]byte ,arg: any)  {
 	case Slice:     print_string_to_buffer(buf, "(slice)")
 	case Vector:    print_string_to_buffer(buf, "(vector)")
 
-
 	case Struct:    print_string_to_buffer(buf, "(struct)")
 	case Union:     print_string_to_buffer(buf, "(union)")
 	case Raw_Union: print_string_to_buffer(buf, "(raw_union)")
@@ -265,38 +261,22 @@ print_any_to_buffer :: proc(buf: ^[]byte ,arg: any)  {
 
 print_to_buffer :: proc(buf: ^[]byte, args: ..any) {
 	for i := 0; i < len(args); i++ {
-		arg := args[i]
-
 		if i > 0 {
 			print_space_to_buffer(buf)
 		}
-		print_any_to_buffer(buf, arg)
+		print_any_to_buffer(buf, args[i])
 	}
-	print_nl_to_buffer(buf)
 }
 
 println_to_buffer :: proc(buf: ^[]byte, args: ..any) {
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-
-		if i > 0 {
-			print_space_to_buffer(buf)
-		}
-		print_any_to_buffer(buf, arg)
-	}
+	print_to_buffer(buf, ..args)
+	print_nl_to_buffer(buf)
 }
 
 print :: proc(args: ..any) {
 	data: [4096]byte
 	buf := data[:0]
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-
-		if i > 0 {
-			print_space_to_buffer(^buf)
-		}
-		print_any_to_buffer(^buf, arg)
-	}
+	print_to_buffer(^buf, ..args)
 	file_write(file_get_standard(File_Standard.OUTPUT), buf)
 }
 
@@ -304,14 +284,6 @@ print :: proc(args: ..any) {
 println :: proc(args: ..any) {
 	data: [4096]byte
 	buf := data[:0]
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-
-		if i > 0 {
-			print_space_to_buffer(^buf)
-		}
-		print_any_to_buffer(^buf, arg)
-	}
-	print_nl_to_buffer(^buf)
+	println_to_buffer(^buf, ..args)
 	file_write(file_get_standard(File_Standard.OUTPUT), buf)
 }

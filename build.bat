@@ -10,6 +10,7 @@ set compiler_flags= -nologo -Oi -TP -W4 -fp:fast -fp:except- -Gm- -MP -FC -Z7 -G
 
 if %release_mode% EQU 0 ( rem Debug
 	set compiler_flags=%compiler_flags% -Od -MDd -Z7
+	rem -DDISPLAY_TIMING
 ) else ( rem Release
 	set compiler_flags=%compiler_flags% -O2 -MT
 )

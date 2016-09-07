@@ -369,6 +369,7 @@ gb_global Type *t_type_info_struct    = NULL;
 gb_global Type *t_type_info_union     = NULL;
 gb_global Type *t_type_info_raw_union = NULL;
 gb_global Type *t_type_info_enum      = NULL;
+gb_global Type *t_type_info_any       = NULL;
 
 
 

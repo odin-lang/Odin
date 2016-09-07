@@ -9,7 +9,7 @@ Type_Info :: union {
 		offset: int
 	}
 	Record :: struct {
-		fields: []Member
+		fields: []Member // NOTE(bill): This will need to be allocated on the heap
 	}
 
 
@@ -48,6 +48,7 @@ Type_Info :: union {
 		base: ^Type_Info
 	}
 }
+
 
 
 assume :: proc(cond: bool) #foreign "llvm.assume"
@@ -276,7 +277,5 @@ __default_allocator :: proc() -> Allocator {
 
 __assert :: proc(msg: string) {
 	file_write(file_get_standard(File_Standard.ERROR), msg as []byte)
-	// TODO(bill): Which is better?
-	// __trap()
 	__debug_trap()
 }

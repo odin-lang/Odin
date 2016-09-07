@@ -452,6 +452,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 	b32 is_foreign   = (pd->tags & ProcTag_foreign)   != 0;
 	b32 is_inline    = (pd->tags & ProcTag_inline)    != 0;
 	b32 is_no_inline = (pd->tags & ProcTag_no_inline) != 0;
+	b32 is_pure      = (pd->tags & ProcTag_pure)      != 0;
 
 
 
@@ -1283,8 +1284,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				error(&c->error_collector, us->token, "`using` cannot be applied to a procedure");
 				break;
 
-			case Entity_Variable:
-			case Entity_UsingVariable: {
+			case Entity_Variable: {
 				Type *t = get_base_type(type_deref(e->type));
 				if (is_type_struct(t) || is_type_raw_union(t)) {
 					Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));

@@ -866,7 +866,7 @@ void check_parsed_files(Checker *c) {
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
 
 		auto *record = &get_base_type(e->type)->Record;
-		GB_ASSERT(record->field_count == 15);
+		GB_ASSERT_MSG(record->field_count == 15, "Internal Compiler Error: Invalid `Type_Info` layout");
 		t_type_info_named     = record->fields[ 1]->type;
 		t_type_info_integer   = record->fields[ 2]->type;
 		t_type_info_float     = record->fields[ 3]->type;
@@ -881,6 +881,7 @@ void check_parsed_files(Checker *c) {
 		t_type_info_union     = record->fields[12]->type;
 		t_type_info_raw_union = record->fields[13]->type;
 		t_type_info_enum      = record->fields[14]->type;
+		// t_type_info_any       = record->fields[15]->type;
 	}
 
 	check_global_entity(c, Entity_Constant);

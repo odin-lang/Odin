@@ -91,8 +91,6 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 
 	Type *s = operand->type;
 
-
-
 	if (are_types_identical(s, type)) {
 		return true;
 	}
@@ -179,6 +177,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 		Type *target_type = type;
 
 		if (type == NULL || is_type_any(type)) {
+			add_type_info_type(c, type);
 			target_type = default_type(operand->type);
 		}
 		convert_to_typed(c, operand, target_type);
@@ -793,11 +792,6 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 	case Entity_Builtin:
 		o->builtin_id = e->Builtin.id;
 		o->mode = Addressing_Builtin;
-		break;
-
-	case Entity_UsingVariable:
-		// TODO(bill): Entity_UsingVariable: is this correct?
-		o->mode = Addressing_Variable;
 		break;
 
 	default:

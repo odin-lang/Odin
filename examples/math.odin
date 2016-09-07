@@ -95,9 +95,9 @@ cross :: proc(x, y: Vec3) -> Vec3 {
 }
 
 
-vec2_mag :: proc(v: Vec2) -> f32 { return fsqrt(v ''dot2 v) }
-vec3_mag :: proc(v: Vec3) -> f32 { return fsqrt(v ''dot3 v) }
-vec4_mag :: proc(v: Vec4) -> f32 { return fsqrt(v ''dot4 v) }
+vec2_mag :: proc(v: Vec2) -> f32 { return fsqrt(dot2(v, v)) }
+vec3_mag :: proc(v: Vec3) -> f32 { return fsqrt(dot3(v, v)) }
+vec4_mag :: proc(v: Vec4) -> f32 { return fsqrt(dot4(v, v)) }
 
 vec2_norm :: proc(v: Vec2) -> Vec2 { return v / Vec2{vec2_mag(v)} }
 vec3_norm :: proc(v: Vec3) -> Vec3 { return v / Vec3{vec3_mag(v)} }

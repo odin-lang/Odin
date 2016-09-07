@@ -1532,7 +1532,6 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 		ssaValue *type_info_data = *found;
 		CheckerInfo *info = proc->module->info;
 
-
 		ssaValue *result = ssa_add_local_generated(proc, t_any);
 
 		// NOTE(bill): Make copy on stack so I can reference it later
@@ -1542,8 +1541,20 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 
 
 		MapFindResult fr = map__find(&info->type_info_types, hash_pointer(src_type));
-		GB_ASSERT(fr.entry_index >= 0);
-		ssaValue *ti = ssa_emit_struct_gep(proc, type_info_data, fr.entry_index, t_type_info_ptr);
+		isize entry_index = fr.entry_index;
+		if (entry_index < 0) {
+			// NOTE(bill): Do manual search
+			// TODO(bill): This is O(n) and can be very slow
+			gb_for_array(i, info->type_info_types.entries){
+				auto *e = &info->type_info_types.entries[i];
+				Type *t = e->value;
+				if (are_types_identical(t, src_type)) {
+					entry_index = i;
+					break;
+				}
+			}
+		}
+		ssaValue *ti = ssa_emit_struct_gep(proc, type_info_data, entry_index, t_type_info_ptr);
 
 		ssaValue *gep0 = ssa_emit_struct_gep(proc, result, v_zero32, make_type_pointer(proc->module->allocator, t_type_info_ptr));
 		ssaValue *gep1 = ssa_emit_struct_gep(proc, result, v_one32,  make_type_pointer(proc->module->allocator, t_rawptr));
@@ -2396,11 +2407,11 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 
 
 ssaValue *ssa_add_using_variable(ssaProcedure *proc, Entity *e) {
-	GB_ASSERT(e->kind == Entity_UsingVariable);
+	GB_ASSERT(e->kind == Entity_Variable && e->Variable.is_using);
 	String name = e->token.string;
 	Entity *parent = e->using_parent;
 	ssaValue *p = NULL;
-	if (parent->kind == Entity_UsingVariable) {
+	if (parent->kind == Entity_Variable && parent->Variable.is_using) {
 		p = ssa_add_using_variable(proc, parent);
 	}
 
@@ -2432,7 +2443,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		ssaValue **found = map_get(&proc->module->values, hash_pointer(e));
 		if (found) {
 			v = *found;
-		} else if (e->kind == Entity_UsingVariable) {
+		} else if (e->kind == Entity_Variable && e->Variable.is_using) {
 			v = ssa_add_using_variable(proc, e);
 		}
 		if (v == NULL) {
@@ -2536,7 +2547,6 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 		ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
 		v = ssa_emit_ptr_offset(proc, elem, index);
-		// gb_printf_err("HERE! %s -> %s\n", type_to_string(ssa_type(v)), expr_to_string(expr));
 		return ssa_make_addr(v, expr);
 	case_end;
 

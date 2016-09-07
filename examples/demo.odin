@@ -2,13 +2,6 @@
 #load "math.odin"
 
 main :: proc() {
-	i: int
-	s: struct {
-		x, y, z: f32
-	}
-	p := ^s
-
-	a: any = i
-
+	a: any = 1
 	println(137, "Hello", 1.25, true)
 }

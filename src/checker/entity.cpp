@@ -6,7 +6,6 @@ enum BuiltinProcId;
 	ENTITY_KIND(Invalid), \
 	ENTITY_KIND(Constant), \
 	ENTITY_KIND(Variable), \
-	ENTITY_KIND(UsingVariable), \
 	ENTITY_KIND(TypeName), \
 	ENTITY_KIND(Procedure), \
 	ENTITY_KIND(Builtin), \
@@ -46,10 +45,12 @@ struct Entity {
 			b8 used;      // Variable is used
 			b8 is_field;  // Is struct field
 			b8 anonymous; // Variable is an anonymous
+			b8 is_using;  // `using` variable
 		} Variable;
-		struct {} UsingVariable;
 		struct {} TypeName;
-		struct { b8 used; } Procedure;
+		struct {
+			b8 pure;
+		} Procedure;
 		struct { BuiltinProcId id; } Builtin;
 	};
 };
@@ -77,8 +78,9 @@ Entity *make_entity_variable(gbAllocator a, Scope *scope, Token token, Type *typ
 
 Entity *make_entity_using_variable(gbAllocator a, Entity *parent, Token token, Type *type) {
 	GB_ASSERT(parent != NULL);
-	Entity *entity = alloc_entity(a, Entity_UsingVariable, parent->scope, token, type);
+	Entity *entity = alloc_entity(a, Entity_Variable, parent->scope, token, type);
 	entity->using_parent = parent;
+	entity->Variable.is_using = true;
 	return entity;
 }
 

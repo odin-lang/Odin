@@ -62,6 +62,7 @@ enum ProcTag {
 	ProcTag_foreign   = GB_BIT(0),
 	ProcTag_inline    = GB_BIT(1),
 	ProcTag_no_inline = GB_BIT(2),
+	ProcTag_pure      = GB_BIT(3),
 };
 
 enum VarDeclTag {
@@ -1157,6 +1158,8 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_inline, tag_name);
 		} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_inline, tag_name);
+		}  else if (are_strings_equal(tag_name, make_string("pure"))) {
+			check_proc_add_tag(f, tag_expr, tags, ProcTag_pure, tag_name);
 		} else {
 			ast_file_err(f, ast_node_token(tag_expr), "Unknown procedure tag");
 		}
