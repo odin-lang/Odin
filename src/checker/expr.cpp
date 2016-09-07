@@ -2714,6 +2714,8 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	GB_ASSERT(call->kind == AstNode_CallExpr);
 	GB_ASSERT(proc_type->kind == Type_Proc);
 	ast_node(ce, CallExpr, call);
+
+
 	isize error_code = 0;
 	isize param_index = 0;
 	isize param_count = 0;
@@ -2723,12 +2725,23 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 		param_count = proc_type->Proc.params->Tuple.variable_count;
 	}
 
+	if (ce->ellipsis.pos.line != 0) {
+		if (!variadic) {
+			error(&c->error_collector, ce->ellipsis,
+			      "Cannot use `..` in call to a non-variadic procedure: `%.*s`",
+			      LIT(ce->proc->Ident.string));
+			return;
+		}
+	}
+
 	if (ce->arg_list_count == 0) {
 		if (variadic && param_count-1 == 0)
 			return;
 		if (param_count == 0)
 			return;
 	}
+
+
 
 	if (ce->arg_list_count > param_count && !variadic) {
 		error_code = +1;

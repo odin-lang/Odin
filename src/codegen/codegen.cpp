@@ -238,7 +238,7 @@ void ssa_gen_tree(ssaGen *s) {
 					case Basic_uint: {
 						tag = ssa_add_local_generated(proc, t_type_info_integer);
 						b32 is_unsigned = (basic_types[t->Basic.kind].flags & BasicFlag_Unsigned) != 0;
-						ssaValue *bits      = ssa_make_value_constant(a, t_int, make_exact_value_integer(8*type_size_of(m->sizes, a, t)));
+						ssaValue *bits      = ssa_make_value_constant(a, t_int, make_exact_value_integer(type_size_of(m->sizes, a, t)));
 						ssaValue *is_signed = ssa_make_value_constant(a, t_bool, make_exact_value_bool(!is_unsigned));
 						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_int_ptr),  bits);
 						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_one32,  t_bool_ptr), is_signed);
@@ -247,7 +247,7 @@ void ssa_gen_tree(ssaGen *s) {
 					case Basic_f32:
 					case Basic_f64: {
 						tag = ssa_add_local_generated(proc, t_type_info_float);
-						ssaValue *bits = ssa_make_value_constant(a, t_int, make_exact_value_integer(8*type_size_of(m->sizes, a, t)));
+						ssaValue *bits = ssa_make_value_constant(a, t_int, make_exact_value_integer(type_size_of(m->sizes, a, t)));
 						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_int_ptr), bits);
 					} break;
 

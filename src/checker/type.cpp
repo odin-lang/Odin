@@ -722,7 +722,7 @@ Selection lookup_field(Type *type_, String field_name, b32 is_type, Selection se
 	if (type->kind == Type_Basic) {
 		if (type->Basic.kind == Basic_any) {
 			String type_info_str = make_string("type_info");
-			String data_str = make_string("data_str");
+			String data_str = make_string("data");
 			if (entity_any_type_info == NULL) {
 				Token token = {Token_Identifier};
 				token.string = type_info_str;

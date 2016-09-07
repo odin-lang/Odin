@@ -2085,12 +2085,12 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					// append :: proc(s: ^[]Type, item: Type) -> bool
 					AstNode *sptr_node = ce->arg_list;
 					AstNode *item_node = ce->arg_list->next;
-					ssaValue *slice_ptr = ssa_build_addr(proc, sptr_node).addr;
+					ssaValue *slice_ptr = ssa_build_expr(proc, sptr_node);
 					ssaValue *slice = ssa_emit_load(proc, slice_ptr);
 
 					ssaValue *elem = ssa_slice_elem(proc, slice);
-					ssaValue *len  = ssa_slice_len(proc, slice);
-					ssaValue *cap  = ssa_slice_cap(proc, slice);
+					ssaValue *len  = ssa_slice_len(proc,  slice);
+					ssaValue *cap  = ssa_slice_cap(proc,  slice);
 
 					Type *elem_type = type_deref(ssa_type(elem));
 

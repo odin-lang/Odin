@@ -106,6 +106,7 @@ AST_NODE_KIND(_ExprBegin,  "",  struct{}) \
 		AstNode *proc, *arg_list; \
 		isize arg_list_count; \
 		Token open, close; \
+		Token ellipsis; \
 		CallExprKind kind; \
 	}) \
 	AST_NODE_KIND(SliceExpr, "slice expression", struct { \
@@ -511,13 +512,14 @@ gb_inline AstNode *make_paren_expr(AstFile *f, AstNode *expr, Token open, Token 
 	return result;
 }
 
-gb_inline AstNode *make_call_expr(AstFile *f, AstNode *proc, AstNode *arg_list, isize arg_list_count, Token open, Token close) {
+gb_inline AstNode *make_call_expr(AstFile *f, AstNode *proc, AstNode *arg_list, isize arg_list_count, Token open, Token close, Token ellipsis) {
 	AstNode *result = make_node(f, AstNode_CallExpr);
 	result->CallExpr.proc = proc;
 	result->CallExpr.arg_list = arg_list;
 	result->CallExpr.arg_list_count = arg_list_count;
-	result->CallExpr.open  = open;
-	result->CallExpr.close = close;
+	result->CallExpr.open     = open;
+	result->CallExpr.close    = close;
+	result->CallExpr.ellipsis = ellipsis;
 	return result;
 }
 
@@ -1296,14 +1298,21 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 	AstNode *arg_list_curr = NULL;
 	isize arg_list_count = 0;
 	Token open_paren, close_paren;
+	Token ellipsis = {};
 
 	f->expr_level++;
 	open_paren = expect_token(f, Token_OpenParen);
 
 	while (f->cursor[0].kind != Token_CloseParen &&
-	       f->cursor[0].kind != Token_EOF) {
+	       f->cursor[0].kind != Token_EOF &&
+	       ellipsis.pos.line == 0) {
 		if (f->cursor[0].kind == Token_Comma)
 			ast_file_err(f, f->cursor[0], "Expected an expression not a ,");
+
+		if (f->cursor[0].kind == Token_Ellipsis) {
+			ellipsis = f->cursor[0];
+			next_token(f);
+		}
 
 		DLIST_APPEND(arg_list, arg_list_curr, parse_expr(f, false));
 		arg_list_count++;
@@ -1319,7 +1328,7 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 	f->expr_level--;
 	close_paren = expect_token(f, Token_CloseParen);
 
-	return make_call_expr(f, operand, arg_list, arg_list_count, open_paren, close_paren);
+	return make_call_expr(f, operand, arg_list, arg_list_count, open_paren, close_paren, ellipsis);
 }
 
 AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
@@ -1335,7 +1344,7 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 				// TODO(bill): Handle this
 			}
 			AstNode *proc = parse_identifier(f);
-			operand = make_call_expr(f, proc, operand, 1, ast_node_token(operand), op);
+			operand = make_call_expr(f, proc, operand, 1, ast_node_token(operand), op, empty_token);
 		} break;
 
 		case Token_OpenParen: {
@@ -1473,7 +1482,7 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 				AstNode *proc = parse_identifier(f);
 				AstNode *right = parse_binary_expr(f, false, prec+1);
 				expression->next = right;
-				expression = make_call_expr(f, proc, expression, 2, op, ast_node_token(right));
+				expression = make_call_expr(f, proc, expression, 2, op, ast_node_token(right), empty_token);
 				continue;
 			} break;
 

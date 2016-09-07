@@ -146,7 +146,7 @@ void ssa_print_type(ssaFileBuffer *f, BaseTypeSizes s, Type *t) {
 		case Basic_u16:    ssa_fprintf(f, "i16");                     break;
 		case Basic_u32:    ssa_fprintf(f, "i32");                     break;
 		case Basic_u64:    ssa_fprintf(f, "i64");                     break;
-		case Basic_u128:   ssa_fprintf(f, "u128");                    break;
+		case Basic_u128:   ssa_fprintf(f, "i128");                    break;
 		case Basic_f32:    ssa_fprintf(f, "float");                   break;
 		case Basic_f64:    ssa_fprintf(f, "double");                  break;
 		case Basic_rawptr: ssa_fprintf(f, "%%..rawptr");              break;
