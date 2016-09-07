@@ -41,7 +41,7 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 }
 
 
-#if 0
+#if 1
 #define INIT_TIMER() u64 start_time, end_time = 0, total_time = 0; start_time = gb_utc_time_now()
 #define PRINT_TIMER(section) do { \
 	u64 diff; \
@@ -92,6 +92,7 @@ int main(int argc, char **argv) {
 
 	// print_ast(parser.files[0].decls, 0);
 
+#if 1
 	Checker checker = {};
 
 	init_checker(&checker, &parser);
@@ -101,7 +102,7 @@ int main(int argc, char **argv) {
 
 
 	PRINT_TIMER("Semantic Checker");
-
+#endif
 #if 1
 	ssaGen ssa = {};
 	if (!ssa_gen_init(&ssa, &checker))

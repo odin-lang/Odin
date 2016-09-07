@@ -9,17 +9,17 @@ enum StmtFlag : u32 {
 
 void check_stmt(Checker *c, AstNode *node, u32 flags);
 
-void check_stmt_list(Checker *c, AstNode *list, isize list_count, u32 flags) {
+void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 	b32 ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
 	u32 f = flags & (~Stmt_FallthroughAllowed);
 
-	isize i = 0;
-	for (AstNode *n = list; n != NULL; n = n->next, i++) {
+	gb_for_array(i, stmts) {
+		AstNode *n = stmts[i];
 		if (n->kind == AstNode_EmptyStmt) {
 			continue;
 		}
 		u32 new_flags = f;
-		if (ft_ok && i+1 == list_count) {
+		if (ft_ok && i+1 == gb_array_count(stmts)) {
 			new_flags |= Stmt_FallthroughAllowed;
 		}
 		check_stmt(c, n, new_flags);
@@ -29,24 +29,22 @@ void check_stmt_list(Checker *c, AstNode *list, isize list_count, u32 flags) {
 b32 check_is_terminating(AstNode *node);
 b32 check_has_break(AstNode *stmt, b32 implicit);
 
-b32 check_is_terminating_list(AstNode *list) {
-	// Get to end of list
-	for (; list != NULL; list = list->next) {
-		if (list->next == NULL)
-			break;
-	}
+b32 check_is_terminating_list(AstNodeArray stmts) {
 
 	// Iterate backwards
-	for (AstNode *n = list; n != NULL; n = n->prev) {
-		if (n->kind != AstNode_EmptyStmt)
-			return check_is_terminating(n);
+	for (isize n = gb_array_count(stmts)-1; n >= 0; n--) {
+		AstNode *stmt = stmts[n];
+		if (stmt->kind != AstNode_EmptyStmt) {
+			return check_is_terminating(stmt);
+		}
 	}
 
 	return false;
 }
 
-b32 check_has_break_list(AstNode *list, b32 implicit) {
-	for (AstNode *stmt = list; stmt != NULL; stmt = stmt->next) {
+b32 check_has_break_list(AstNodeArray stmts, b32 implicit) {
+	gb_for_array(i, stmts) {
+		AstNode *stmt = stmts[i];
 		if (check_has_break(stmt, implicit)) {
 			return true;
 		}
@@ -63,7 +61,7 @@ b32 check_has_break(AstNode *stmt, b32 implicit) {
 		}
 		break;
 	case AstNode_BlockStmt:
-		return check_has_break_list(stmt->BlockStmt.list, implicit);
+		return check_has_break_list(stmt->BlockStmt.stmts, implicit);
 
 	case AstNode_IfStmt:
 		if (check_has_break(stmt->IfStmt.body, implicit) ||
@@ -91,7 +89,7 @@ b32 check_is_terminating(AstNode *node) {
 	case_end;
 
 	case_ast_node(bs, BlockStmt, node);
-		return check_is_terminating_list(bs->list);
+		return check_is_terminating_list(bs->stmts);
 	case_end;
 
 	case_ast_node(es, ExprStmt, node);
@@ -115,7 +113,8 @@ b32 check_is_terminating(AstNode *node) {
 
 	case_ast_node(ms, MatchStmt, node);
 		b32 has_default = false;
-		for (AstNode *clause = ms->body->BlockStmt.list; clause != NULL; clause = clause->next) {
+		gb_for_array(i, ms->body->BlockStmt.stmts) {
+			AstNode *clause = ms->body->BlockStmt.stmts[i];
 			ast_node(cc, CaseClause, clause);
 			if (cc->list == NULL) {
 				has_default = true;
@@ -130,7 +129,8 @@ b32 check_is_terminating(AstNode *node) {
 
 	case_ast_node(ms, TypeMatchStmt, node);
 		b32 has_default = false;
-		for (AstNode *clause = ms->body->BlockStmt.list; clause != NULL; clause = clause->next) {
+		gb_for_array(i, ms->body->BlockStmt.stmts) {
+			AstNode *clause = ms->body->BlockStmt.stmts[i];
 			ast_node(cc, CaseClause, clause);
 			if (cc->list == NULL) {
 				has_default = true;
@@ -259,8 +259,8 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 	return e->type;
 }
 
-void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNode *init_list, isize init_count, String context_name) {
-	if ((lhs == NULL || lhs_count == 0) && init_count == 0)
+void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArray inits, String context_name) {
+	if ((lhs == NULL || lhs_count == 0) && gb_array_count(inits) == 0)
 		return;
 
 	// TODO(bill): Do not use heap allocation here if I can help it
@@ -268,7 +268,8 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNode *in
 	gb_array_init(operands, gb_heap_allocator());
 	defer (gb_array_free(operands));
 
-	for (AstNode *rhs = init_list; rhs != NULL; rhs = rhs->next) {
+	gb_for_array(i, inits) {
+		AstNode *rhs = inits[i];
 		Operand o = {};
 		check_multi_expr(c, &o, rhs);
 		if (o.type->kind != Type_Tuple) {
@@ -422,7 +423,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	push_procedure(c, type);
 	ast_node(bs, BlockStmt, body);
 	// TODO(bill): Check declarations first (except mutable variable declarations)
-	check_stmt_list(c, bs->list, bs->list_count, 0);
+	check_stmt_list(c, bs->stmts, 0);
 	if (type->Proc.result_count > 0) {
 		if (!check_is_terminating(body)) {
 			error(&c->error_collector, bs->close, "Missing return statement at the end of the procedure");
@@ -548,7 +549,10 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 			entities[i]->type = e->type;
 	}
 
-	check_init_variables(c, entities, entity_count, init_expr, 1, make_string("variable declaration"));
+	AstNodeArray inits;
+	gb_array_init(inits, c->allocator);
+	gb_array_append(inits, init_expr);
+	check_init_variables(c, entities, entity_count, inits, make_string("variable declaration"));
 }
 
 
@@ -587,7 +591,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 
 void check_var_decl_node(Checker *c, AstNode *node) {
 	ast_node(vd, VarDecl, node);
-	isize entity_count = vd->name_count;
+	isize entity_count = gb_array_count(vd->names);
 	isize entity_index = 0;
 	Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
 	switch (vd->kind) {
@@ -595,7 +599,8 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 		Entity **new_entities = gb_alloc_array(c->allocator, Entity *, entity_count);
 		isize new_entity_count = 0;
 
-		for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
+		gb_for_array(i, vd->names) {
+			AstNode *name = vd->names[i];
 			Entity *entity = NULL;
 			Token token = name->Ident;
 			if (name->kind == AstNode_Ident) {
@@ -648,23 +653,22 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 				e->type = init_type;
 		}
 
-		check_init_variables(c, entities, entity_count, vd->value_list, vd->value_count, make_string("variable declaration"));
+		check_init_variables(c, entities, entity_count, vd->values, make_string("variable declaration"));
 
-		AstNode *name = vd->name_list;
-		for (isize i = 0; i < new_entity_count; i++, name = name->next) {
-			add_entity(c, c->context.scope, name, new_entities[i]);
+		gb_for_array(i, vd->names) {
+			add_entity(c, c->context.scope, vd->names[i], new_entities[i]);
 		}
 
 	} break;
 
 	case Declaration_Immutable: {
-		for (AstNode *name = vd->name_list, *value = vd->value_list;
-		     name != NULL && value != NULL;
-		     name = name->next, value = value->next) {
+		gb_for_array(i, vd->values) {
+			AstNode *name = vd->names[i];
+			AstNode *value = vd->values[i];
+
 			GB_ASSERT(name->kind == AstNode_Ident);
 			ExactValue v = {ExactValue_Invalid};
-			ast_node(i, Ident, name);
-			String str = i->string;
+			String str = name->Ident.string;
 			Entity *found = current_scope_lookup_entity(c->context.scope, str);
 			if (found == NULL) {
 				Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
@@ -675,8 +679,8 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 			}
 		}
 
-		isize lhs_count = vd->name_count;
-		isize rhs_count = vd->value_count;
+		isize lhs_count = gb_array_count(vd->names);
+		isize rhs_count = gb_array_count(vd->values);
 
 		// TODO(bill): Better error messages or is this good enough?
 		if (rhs_count == 0 && vd->type == NULL) {
@@ -685,9 +689,8 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 			error(&c->error_collector, ast_node_token(node), "Extra initial expression");
 		}
 
-		AstNode *name = vd->name_list;
-		for (isize i = 0; i < entity_count; i++, name = name->next) {
-			add_entity(c, c->context.scope, name, entities[i]);
+		gb_for_array(i, vd->names) {
+			add_entity(c, c->context.scope, vd->names[i], entities[i]);
 		}
 	} break;
 
@@ -769,7 +772,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		switch (as->op.kind) {
 		case Token_Eq: {
 			// a, b, c = 1, 2, 3;  // Multisided
-			if (as->lhs_count == 0) {
+			if (gb_array_count(as->lhs) == 0) {
 				error(&c->error_collector, as->op, "Missing lhs in assignment statement");
 				return;
 			}
@@ -779,7 +782,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			gb_array_init(operands, gb_heap_allocator());
 			defer (gb_array_free(operands));
 
-			for (AstNode *rhs = as->rhs_list; rhs != NULL; rhs = rhs->next) {
+			gb_for_array(i, as->rhs) {
+				AstNode *rhs = as->rhs[i];
 				Operand o = {};
 				check_multi_expr(c, &o, rhs);
 				if (o.type->kind != Type_Tuple) {
@@ -793,25 +797,23 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				}
 			}
 
-			isize lhs_count = as->lhs_count;
+			isize lhs_count = gb_array_count(as->lhs);
 			isize rhs_count = gb_array_count(operands);
 
 			isize operand_index = 0;
-			for (AstNode *lhs = as->lhs_list;
-			     lhs != NULL;
-			     lhs = lhs->next, operand_index++) {
-				check_assignment_variable(c, &operands[operand_index], lhs);
-
+			gb_for_array(i, as->lhs) {
+				AstNode *lhs = as->lhs[i];
+				check_assignment_variable(c, &operands[i], lhs);
 			}
 			if (lhs_count != rhs_count) {
-				error(&c->error_collector, ast_node_token(as->lhs_list), "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
+				error(&c->error_collector, ast_node_token(as->lhs[0]), "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
 			}
 		} break;
 
 		default: {
 			// a += 1; // Single-sided
 			Token op = as->op;
-			if (as->lhs_count != 1 || as->rhs_count != 1) {
+			if (gb_array_count(as->lhs) != 1 || gb_array_count(as->rhs) != 1) {
 				error(&c->error_collector, op, "Assignment operation `%.*s` requires single-valued expressions", LIT(op.string));
 				return;
 			}
@@ -825,21 +827,21 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			ast_node(be, BinaryExpr, &binary_expr);
 			be->op    = op;
 			 // NOTE(bill): Only use the first one will be used
-			be->left  = as->lhs_list;
-			be->right = as->rhs_list;
+			be->left  = as->lhs[0];
+			be->right = as->rhs[0];
 
 			check_binary_expr(c, &operand, &binary_expr);
 			if (operand.mode == Addressing_Invalid)
 				return;
 			// NOTE(bill): Only use the first one will be used
-			check_assignment_variable(c, &operand, as->lhs_list);
+			check_assignment_variable(c, &operand, as->lhs[0]);
 		} break;
 		}
 	case_end;
 
 	case_ast_node(bs, BlockStmt, node);
 		check_open_scope(c, node);
-		check_stmt_list(c, bs->list, bs->list_count, mod_flags);
+		check_stmt_list(c, bs->stmts, mod_flags);
 		check_close_scope(c);
 	case_end;
 
@@ -887,15 +889,15 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		isize result_count = 0;
 		if (proc_type->Proc.results)
 			result_count = proc_type->Proc.results->Tuple.variable_count;
-		if (result_count != rs->result_count) {
+		if (result_count != gb_array_count(rs->results)) {
 			error(&c->error_collector, rs->token, "Expected %td return %s, got %td",
 			      result_count,
 			      (result_count != 1 ? "values" : "value"),
-			      rs->result_count);
+			      gb_array_count(rs->results));
 		} else if (result_count > 0) {
 			auto *tuple = &proc_type->Proc.results->Tuple;
 			check_init_variables(c, tuple->variables, tuple->variable_count,
-			                     rs->result_list, rs->result_count, make_string("return statement"));
+			                     rs->results, make_string("return statement"));
 		}
 	case_end;
 
@@ -947,11 +949,12 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		// NOTE(bill): Check for multiple defaults
 		AstNode *first_default = NULL;
 		ast_node(bs, BlockStmt, ms->body);
-		for (AstNode *stmt = bs->list; stmt != NULL; stmt = stmt->next) {
+		gb_for_array(i, bs->stmts) {
+			AstNode *stmt = bs->stmts[i];
 			AstNode *default_stmt = NULL;
 			if (stmt->kind == AstNode_CaseClause) {
 				ast_node(c, CaseClause, stmt);
-				if (c->list_count == 0) {
+				if (gb_array_count(c->list) == 0) {
 					default_stmt = stmt;
 				}
 			} else {
@@ -979,8 +982,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		Map<TypeAndToken> seen = {}; // Multimap
 		map_init(&seen, gb_heap_allocator());
 		defer (map_destroy(&seen));
-		isize i = 0;
-		for (AstNode *stmt = bs->list; stmt != NULL; stmt = stmt->next) {
+		gb_for_array(i, bs->stmts) {
+			AstNode *stmt = bs->stmts[i];
 			if (stmt->kind != AstNode_CaseClause) {
 				// NOTE(bill): error handled by above multiple default checker
 				continue;
@@ -988,7 +991,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			ast_node(cc, CaseClause, stmt);
 
 
-			for (AstNode *expr = cc->list; expr != NULL; expr = expr->next) {
+			gb_for_array(j, cc->list) {
+				AstNode *expr = cc->list[j];
 				Operand y = {};
 				Operand z = {};
 				Token eq = {Token_CmpEq};
@@ -1051,12 +1055,11 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 			check_open_scope(c, stmt);
 			u32 ft_flags = mod_flags;
-			if (i+1 < bs->list_count) {
+			if (i+1 < gb_array_count(bs->stmts)) {
 				ft_flags |= Stmt_FallthroughAllowed;
 			}
-			check_stmt_list(c, cc->stmts, cc->stmt_count, ft_flags);
+			check_stmt_list(c, cc->stmts, ft_flags);
 			check_close_scope(c);
-			i++;
 		}
 	case_end;
 
@@ -1083,11 +1086,12 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		// NOTE(bill): Check for multiple defaults
 		AstNode *first_default = NULL;
 		ast_node(bs, BlockStmt, ms->body);
-		for (AstNode *stmt = bs->list; stmt != NULL; stmt = stmt->next) {
+		gb_for_array(i, bs->stmts) {
+			AstNode *stmt = bs->stmts[i];
 			AstNode *default_stmt = NULL;
 			if (stmt->kind == AstNode_CaseClause) {
 				ast_node(c, CaseClause, stmt);
-				if (c->list_count == 0) {
+				if (gb_array_count(c->list) == 0) {
 					default_stmt = stmt;
 				}
 			} else {
@@ -1116,15 +1120,15 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		defer (map_destroy(&seen));
 
 
-
-		for (AstNode *stmt = bs->list; stmt != NULL; stmt = stmt->next) {
+		gb_for_array(i, bs->stmts) {
+			AstNode *stmt = bs->stmts[i];
 			if (stmt->kind != AstNode_CaseClause) {
 				// NOTE(bill): error handled by above multiple default checker
 				continue;
 			}
 			ast_node(cc, CaseClause, stmt);
 
-			AstNode *type_expr = cc->list;
+			AstNode *type_expr = cc->list[0];
 			Type *tag_type = NULL;
 			if (type_expr != NULL) { // Otherwise it's a default expression
 				Operand y = {};
@@ -1171,7 +1175,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, ms->var->Ident, tag_ptr_type);
 				add_entity(c, c->context.scope, ms->var, tag_var);
 			}
-			check_stmt_list(c, cc->stmts, cc->stmt_count, mod_flags);
+			check_stmt_list(c, cc->stmts, mod_flags);
 			check_close_scope(c);
 		}
 	case_end;
@@ -1311,12 +1315,13 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		case_end;
 
 		case_ast_node(vd, VarDecl, us->node);
-			if (vd->name_count > 1 && vd->type != NULL) {
+			if (gb_array_count(vd->names) > 1 && vd->type != NULL) {
 				error(&c->error_collector, us->token, "`using` can only be applied to one variable of the same type");
 			}
 			check_var_decl_node(c, us->node);
 
-			for (AstNode *item = vd->name_list; item != NULL; item = item->next) {
+			gb_for_array(name_index, vd->names) {
+				AstNode *item = vd->names[name_index];
 				ast_node(i, Ident, item);
 				String name = i->string;
 				Entity *e = scope_lookup_entity(c, c->context.scope, name);

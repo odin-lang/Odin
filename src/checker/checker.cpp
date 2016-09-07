@@ -741,7 +741,8 @@ void check_parsed_files(Checker *c) {
 	gb_for_array(i, c->parser->files) {
 		AstFile *f = &c->parser->files[i];
 		add_curr_ast_file(c, f);
-		for (AstNode *decl = f->decls; decl != NULL; decl = decl->next) {
+		gb_for_array(decl_index, f->decls) {
+			AstNode *decl = f->decls[decl_index];
 			if (!is_ast_node_decl(decl))
 				continue;
 
@@ -752,9 +753,9 @@ void check_parsed_files(Checker *c) {
 			case_ast_node(vd, VarDecl, decl);
 				switch (vd->kind) {
 				case Declaration_Immutable: {
-					for (AstNode *name = vd->name_list, *value = vd->value_list;
-					     name != NULL && value != NULL;
-					     name = name->next, value = value->next) {
+					gb_for_array(i, vd->values) {
+						AstNode *name = vd->names[i];
+						AstNode *value = vd->values[i];
 						ExactValue v = {ExactValue_Invalid};
 						Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
 						DeclInfo *di = make_declaration_info(c->allocator, c->global_scope);
@@ -763,8 +764,8 @@ void check_parsed_files(Checker *c) {
 						add_file_entity(c, name, e, di);
 					}
 
-					isize lhs_count = vd->name_count;
-					isize rhs_count = vd->value_count;
+					isize lhs_count = gb_array_count(vd->names);
+					isize rhs_count = gb_array_count(vd->values);
 
 					if (rhs_count == 0 && vd->type == NULL) {
 						error(&c->error_collector, ast_node_token(decl), "Missing type or initial expression");
@@ -774,20 +775,24 @@ void check_parsed_files(Checker *c) {
 				} break;
 
 				case Declaration_Mutable: {
-					isize entity_count = vd->name_count;
+					isize entity_count = gb_array_count(vd->names);
 					isize entity_index = 0;
 					Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
 					DeclInfo *di = NULL;
-					if (vd->value_count > 0) {
+					if (gb_array_count(vd->values) > 0) {
 						di = make_declaration_info(gb_heap_allocator(), c->global_scope);
 						di->entities = entities;
 						di->entity_count = entity_count;
 						di->type_expr = vd->type;
-						di->init_expr = vd->value_list;
+						di->init_expr = vd->values[0]; // TODO(bill): Is this correct?
 					}
 
-					AstNode *value = vd->value_list;
-					for (AstNode *name = vd->name_list; name != NULL; name = name->next) {
+					gb_for_array(i, vd->names) {
+						AstNode *name = vd->names[i];
+						AstNode *value = NULL;
+						if (i < gb_array_count(vd->values)) {
+							value = vd->values[i];
+						}
 						Entity *e = make_entity_variable(c->allocator, c->global_scope, name->Ident, NULL);
 						entities[entity_index++] = e;
 
@@ -801,9 +806,6 @@ void check_parsed_files(Checker *c) {
 						}
 
 						add_file_entity(c, name, e, d);
-
-						if (value != NULL)
-							value = value->next;
 					}
 				} break;
 				}
