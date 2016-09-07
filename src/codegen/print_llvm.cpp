@@ -314,7 +314,7 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 
 void ssa_print_block_name(ssaFileBuffer *f, ssaBlock *b) {
 	ssa_print_escape_string(f, b->label, false);
-	ssa_fprintf(f, "..%d", b->id);
+	ssa_fprintf(f, "-%d", b->id);
 }
 
 void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type_hint) {
@@ -352,7 +352,9 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 
 	switch (instr->kind) {
 	case ssaInstr_StartupRuntime: {
-		ssa_fprintf(f, "call void @." SSA_STARTUP_RUNTIME_PROC_NAME "()\n");
+		ssa_fprintf(f, "call void ");
+		ssa_print_encoded_global(f, make_string(SSA_STARTUP_RUNTIME_PROC_NAME));
+		ssa_fprintf(f, "()\n");
 	} break;
 
 	case ssaInstr_Comment:
@@ -641,20 +643,6 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_print_value(f, m, instr->Select.false_value, ssa_type(instr->Select.false_value));
 		ssa_fprintf(f, "\n");
 	} break;
-
-	case ssaInstr_MemCopy: {
-		ssa_fprintf(f, "call void @.memory_move");
-		ssa_fprintf(f, "(i8* ");
-		ssa_print_value(f, m, instr->CopyMemory.dst, t_rawptr);
-		ssa_fprintf(f, ", i8* ");
-		ssa_print_value(f, m, instr->CopyMemory.src, t_rawptr);
-		ssa_fprintf(f, ", ");
-		ssa_print_type(f, m->sizes, t_int);
-		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, instr->CopyMemory.len, t_int);
-		ssa_fprintf(f, ")\n");
-	} break;
-
 
 	case ssaInstr_ExtractElement: {
 		Type *vt = ssa_type(instr->ExtractElement.vector);

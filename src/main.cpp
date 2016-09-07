@@ -41,6 +41,7 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 }
 
 
+#if 0
 #define INIT_TIMER() u64 start_time, end_time = 0, total_time = 0; start_time = gb_utc_time_now()
 #define PRINT_TIMER(section) do { \
 	u64 diff; \
@@ -54,6 +55,11 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 #define PRINT_ACCUMULATION() do { \
 	gb_printf_err("Total compilation time: %lld ms\n", total_time/1000); \
 } while (0)
+#else
+#define INIT_TIMER()
+#define PRINT_TIMER(section)
+#define PRINT_ACCUMULATION()
+#endif
 
 
 int main(int argc, char **argv) {
@@ -117,8 +123,10 @@ int main(int argc, char **argv) {
 
 
 	i32 exit_code = 0;
+	// For more passes arguments: http://llvm.org/docs/Passes.html
 	exit_code = win32_exec_command_line_app(
-		"../misc/llvm-bin/opt %s -o %.*s.bc "
+		// "../misc/llvm-bin/opt %s -o %.*s.bc "
+		"opt %s -o %.*s.bc "
 		"-memcpyopt "
 		"-mem2reg "
 		"-die -dse "
@@ -144,7 +152,7 @@ int main(int argc, char **argv) {
 	}
 
 	exit_code = win32_exec_command_line_app(
-		"clang %.*s.bc -o %.*s.o "
+		"clang %.*s.bc -o %.*s.exe "
 		"-O0 "
 		"-Wno-override-module "
 		"%s",

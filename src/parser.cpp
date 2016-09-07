@@ -2063,8 +2063,15 @@ AstNode *parse_decl(AstFile *f, AstNode *name_list, isize name_count) {
 			declaration_kind = Declaration_Immutable;
 		next_token(f);
 
-		if (f->cursor[0].kind == Token_type) {
-			Token token = expect_token(f, Token_type);
+		if (f->cursor[0].kind == Token_type ||
+		    f->cursor[0].kind == Token_struct ||
+		    f->cursor[0].kind == Token_enum ||
+		    f->cursor[0].kind == Token_union ||
+		    f->cursor[0].kind == Token_raw_union) {
+			Token token = f->cursor[0];
+			if (token.kind == Token_type) {
+				next_token(f);
+			}
 			if (name_count != 1) {
 				ast_file_err(f, ast_node_token(name_list), "You can only declare one type at a time");
 				return make_bad_decl(f, name_list->Ident, token);
@@ -2290,9 +2297,9 @@ AstNode *parse_match_stmt(AstFile *f) {
 	Token open, close;
 
 	if (allow_token(f, Token_type)) {
-		tag = parse_expr(f, true);
-		expect_token(f, Token_ArrowRight);
 		AstNode *var = parse_identifier(f);
+		expect_token(f, Token_Colon);
+		tag = parse_simple_stmt(f);
 
 		open = expect_token(f, Token_OpenBrace);
 		AstNode *list = NULL;
@@ -2307,6 +2314,8 @@ AstNode *parse_match_stmt(AstFile *f) {
 
 		close = expect_token(f, Token_CloseBrace);
 		body = make_block_stmt(f, list, list_count, open, close);
+
+		tag = convert_stmt_to_expr(f, tag, make_string("type match expression"));
 		return make_type_match_stmt(f, token, tag, var, body);
 	} else {
 		if (f->cursor[0].kind != Token_OpenBrace) {

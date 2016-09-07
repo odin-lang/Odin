@@ -1,10 +1,68 @@
 #load "win32.odin"
 
+// IMPORTANT NOTE(bill): Do not change the order of any of this data
+// The compiler relies upon this _exact_ order
+Type_Info :: union {
+	Member :: struct {
+		name:   string
+		type_:  ^Type_Info
+		offset: int
+	}
+	Record :: struct {
+		fields: []Member
+	}
+
+
+	Named: struct {
+		name: string
+		base: ^Type_Info
+	}
+	Integer: struct {
+		bits: int
+		signed: bool
+	}
+	Float: struct {
+		bits: int
+	}
+	String:  struct {}
+	Boolean: struct {}
+	Pointer: struct {
+		elem: ^Type_Info
+	}
+	Procedure: struct{}
+	Array: struct {
+		elem: ^Type_Info
+		count: int
+	}
+	Slice: struct {
+		elem: ^Type_Info
+	}
+	Vector: struct {
+		elem: ^Type_Info
+		count: int
+	}
+	Struct:    Record
+	Union:     Record
+	Raw_Union: Record
+	Enum: struct {
+		base: ^Type_Info
+	}
+}
+
+Any :: struct {
+	type_info: ^Type_Info
+	// pointer to the data stored
+	data: rawptr
+}
+
+
+
+
 assume :: proc(cond: bool) #foreign "llvm.assume"
 
-__debug_trap           :: proc()           #foreign "llvm.debugtrap"
-__trap                 :: proc()           #foreign "llvm.trap"
-read_cycle_counter     :: proc() -> u64    #foreign "llvm.readcyclecounter"
+__debug_trap           :: proc()        #foreign "llvm.debugtrap"
+__trap                 :: proc()        #foreign "llvm.trap"
+read_cycle_counter     :: proc() -> u64 #foreign "llvm.readcyclecounter"
 
 bit_reverse16 :: proc(b: u16) -> u16 #foreign "llvm.bitreverse.i16"
 bit_reverse32 :: proc(b: u32) -> u32 #foreign "llvm.bitreverse.i32"
@@ -22,218 +80,29 @@ heap_alloc   :: proc(len: int)   -> rawptr #foreign "malloc"
 heap_dealloc :: proc(ptr: rawptr)          #foreign "free"
 
 memory_zero :: proc(data: rawptr, len: int) {
-	d := slice_ptr(data as ^byte, len)
-	for i := 0; i < len; i++ {
-		d[i] = 0
-	}
+	llvm_memset_64bit :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) #foreign "llvm.memset.p0i8.i64"
+	llvm_memset_64bit(data, 0, len, 1, false)
 }
 
 memory_compare :: proc(dst, src: rawptr, len: int) -> int {
-	s1, s2: ^byte = dst, src
+	// TODO(bill): make a faster `memory_compare`
+	a, b := slice_ptr(dst as ^byte, len), slice_ptr(src as ^byte, len)
 	for i := 0; i < len; i++ {
-		a := ptr_offset(s1, i)^
-		b := ptr_offset(s2, i)^
-		if a != b {
-			return (a - b) as int
+		if a[i] != b[i] {
+			return (a[i] - b[i]) as int
 		}
 	}
 	return 0
 }
 
-memory_copy :: proc(dst, src: rawptr, n: int) #inline {
-	if dst == src {
-		return
-	}
-
-	v128b :: type {4}u32
-	assert(align_of(v128b) == 16)
-
-	d, s: ^byte = dst, src
-
-	for ; s as uint % 16 != 0 && n != 0; n-- {
-		d^ = s^
-		d, s = ptr_offset(d, 1), ptr_offset(s, 1)
-	}
-
-	if d as uint % 16 == 0 {
-		for ; n >= 16; d, s, n = ptr_offset(d, 16), ptr_offset(s, 16), n-16 {
-			(d as ^v128b)^ = (s as ^v128b)^
-		}
-
-		if n&8 != 0 {
-			(d as ^u64)^ = (s as ^u64)^
-			d, s = ptr_offset(d, 8), ptr_offset(s, 8)
-		}
-		if n&4 != 0 {
-			(d as ^u32)^ = (s as ^u32)^;
-			d, s = ptr_offset(d, 4), ptr_offset(s, 4)
-		}
-		if n&2 != 0 {
-			(d as ^u16)^ = (s as ^u16)^
-			d, s = ptr_offset(d, 2), ptr_offset(s, 2)
-		}
-		if n&1 != 0 {
-			d^ = s^
-			d, s = ptr_offset(d, 1), ptr_offset(s, 1)
-		}
-		return;
-	}
-
-	// IMPORTANT NOTE(bill): Little endian only
-	LS :: proc(a, b: u32) -> u32 #inline { return a << b }
-	RS :: proc(a, b: u32) -> u32 #inline { return a >> b }
-	/* NOTE(bill): Big endian version
-	LS :: proc(a, b: u32) -> u32 #inline { return a >> b; }
-	RS :: proc(a, b: u32) -> u32 #inline { return a << b; }
-	*/
-
-	w, x: u32
-
-	if d as uint % 4 == 1 {
-		w = (s as ^u32)^
-		d^ = s^; d = ptr_offset(d, 1); s = ptr_offset(s, 1)
-		d^ = s^; d = ptr_offset(d, 1); s = ptr_offset(s, 1)
-		d^ = s^; d = ptr_offset(d, 1); s = ptr_offset(s, 1)
-		n -= 3
-
-		for n > 16 {
-			d32 := d as ^u32
-			s32 := ptr_offset(s, 1) as ^u32
-			x = s32^; d32^ = LS(w, 24) | RS(x, 8)
-			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1)
-			w = s32^; d32^ = LS(x, 24) | RS(w, 8)
-			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1)
-			x = s32^; d32^ = LS(w, 24) | RS(x, 8)
-			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1)
-			w = s32^; d32^ = LS(x, 24) | RS(w, 8)
-			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1)
-
-			d, s, n = ptr_offset(d, 16), ptr_offset(s, 16), n-16
-		}
-
-	} else if d as uint % 4 == 2 {
-		w = (s as ^u32)^
-		d^ = s^; d = ptr_offset(d, 1); s = ptr_offset(s, 1)
-		d^ = s^; d = ptr_offset(d, 1); s = ptr_offset(s, 1)
-		n -= 2
-
-		for n > 17 {
-			d32 := d as ^u32
-			s32 := ptr_offset(s, 2) as ^u32
-			x = s32^; d32^ = LS(w, 16) | RS(x, 16)
-			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1)
-			w = s32^; d32^ = LS(x, 16) | RS(w, 16)
-			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1)
-			x = s32^; d32^ = LS(w, 16) | RS(x, 16)
-			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1)
-			w = s32^; d32^ = LS(x, 16) | RS(w, 16)
-			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1)
-
-			d, s, n = ptr_offset(d, 16), ptr_offset(s, 16), n-16
-		}
-
-	} else if d as uint % 4 == 3 {
-		w = (s as ^u32)^
-		d^ = s^
-		n -= 1
-
-		for n > 18 {
-			d32 := d as ^u32
-			s32 := ptr_offset(s, 3) as ^u32
-			x = s32^; d32^ = LS(w, 8) | RS(x, 24)
-			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1)
-			w = s32^; d32^ = LS(x, 8) | RS(w, 24)
-			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1)
-			x = s32^; d32^ = LS(w, 8) | RS(x, 24)
-			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1)
-			w = s32^; d32^ = LS(x, 8) | RS(w, 24)
-			d32, s32 = ptr_offset(d32, 1), ptr_offset(s32, 1)
-
-			d, s, n = ptr_offset(d, 16), ptr_offset(s, 16), n-16
-		}
-	}
-
-	if n&16 != 0 {
-		(d as ^v128b)^ = (s as ^v128b)^
-		d, s = ptr_offset(d, 16), ptr_offset(s, 16)
-	}
-	if n&8 != 0 {
-		(d as ^u64)^ = (s as ^u64)^
-		d, s = ptr_offset(d, 8), ptr_offset(s, 8)
-	}
-	if n&4 != 0 {
-		(d as ^u32)^ = (s as ^u32)^;
-		d, s = ptr_offset(d, 4), ptr_offset(s, 4)
-	}
-	if n&2 != 0 {
-		(d as ^u16)^ = (s as ^u16)^
-		d, s = ptr_offset(d, 2), ptr_offset(s, 2)
-	}
-	if n&1 != 0 {
-		d^  = s^
-	}
+memory_copy :: proc(dst, src: rawptr, len: int) #inline {
+	llvm_memcpy_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memcpy.p0i8.p0i8.i64"
+	llvm_memcpy_64bit(dst, src, len, 1, false)
 }
 
-memory_move :: proc(dst, src: rawptr, n: int) #inline {
-	d, s: ^byte = dst, src
-	if d == s {
-		return
-	}
-	if d >= ptr_offset(s, n) || ptr_offset(d, n) <= s {
-		memory_copy(d, s, n)
-		return
-	}
-
-	// TODO(bill): Vectorize the shit out of this
-	if d < s {
-		if s as int % size_of(int) == d as int % size_of(int) {
-			for d as int % size_of(int) != 0 {
-				if n == 0 {
-					return
-				}
-				n--
-				d^ = s^
-				d, s = ptr_offset(d, 1), ptr_offset(s, 1)
-			}
-			di, si := d as ^int, s as ^int
-			for n >= size_of(int) {
-				di^ = si^
-				di, si = ptr_offset(di, 1), ptr_offset(si, 1)
-				n -= size_of(int)
-			}
-		}
-		for ; n > 0; n-- {
-			d^ = s^
-			d, s = ptr_offset(d, 1), ptr_offset(s, 1)
-		}
-	} else {
-		if s as int % size_of(int) == d as int % size_of(int) {
-			for ptr_offset(d, n) as int % size_of(int) != 0 {
-				if n == 0 {
-					return
-				}
-				n--
-				d^ = s^
-				d, s = ptr_offset(d, 1), ptr_offset(s, 1)
-			}
-			for n >= size_of(int) {
-				n -= size_of(int)
-				di := ptr_offset(d, n) as ^int
-				si := ptr_offset(s, n) as ^int
-				di^ = si^
-			}
-			for ; n > 0; n-- {
-				d^ = s^
-				d, s = ptr_offset(d, 1), ptr_offset(s, 1)
-			}
-		}
-		for n > 0 {
-			n--
-			dn := ptr_offset(d, n)
-			sn := ptr_offset(s, n)
-			dn^ = sn^
-		}
-	}
+memory_move :: proc(dst, src: rawptr, len: int) #inline {
+	llvm_memmove_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memmove.p0i8.p0i8.i64"
+	llvm_memmove_64bit(dst, src, len, 1, false)
 }
 
 __string_eq :: proc(a, b: string) -> bool {
@@ -247,25 +116,36 @@ __string_eq :: proc(a, b: string) -> bool {
 }
 
 __string_cmp :: proc(a, b : string) -> int {
-	min_len := len(a)
-	if len(b) < min_len {
-		min_len = len(b)
+	// Translation of http://mgronhol.github.io/fast-strcmp/
+	n := min(len(a), len(b))
+
+	fast := n/size_of(int) + 1
+	offset := (fast-1)*size_of(int)
+	curr_block := 0
+	if n <= size_of(int) {
+		fast = 0
 	}
-	for i := 0; i < min_len; i++ {
-		x := a[i]
-		y := b[i]
-		if x < y {
-			return -1
-		} else if x > y {
-			return +1
+
+	la := slice_ptr(^a[0] as ^int, fast)
+	lb := slice_ptr(^b[0] as ^int, fast)
+
+	for ; curr_block < fast; curr_block++ {
+		if (la[curr_block] ~ lb[curr_block]) != 0 {
+			for pos := curr_block*size_of(int); pos < n; pos++ {
+				if (a[pos] ~ b[pos]) != 0 {
+					return a[pos] as int - b[pos] as int
+				}
+			}
+		}
+
+	}
+
+	for ; offset < n; offset++ {
+		if (a[offset] ~ b[offset]) != 0 {
+			return a[offset] as int - b[offset] as int
 		}
 	}
 
-	if len(a) < len(b) {
-		return -1
-	} else if len(a) > len(b) {
-		return +1
-	}
 	return 0
 }
 
@@ -278,26 +158,24 @@ __string_ge :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) >
 
 
 
-Allocation_Mode :: type enum {
+Allocation_Mode :: enum {
 	ALLOC,
 	DEALLOC,
 	DEALLOC_ALL,
 	RESIZE,
 }
 
-
-
 Allocator_Proc :: type proc(allocator_data: rawptr, mode: Allocation_Mode,
                             size, alignment: int,
                             old_memory: rawptr, old_size: int, flags: u64) -> rawptr
 
-Allocator :: type struct {
+Allocator :: struct {
 	procedure: Allocator_Proc;
 	data:      rawptr
 }
 
 
-Context :: type struct {
+Context :: struct {
 	thread_ptr: rawptr
 
 	user_data:  rawptr

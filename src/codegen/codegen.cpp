@@ -31,27 +31,6 @@ b32 ssa_gen_init(ssaGen *s, Checker *c) {
 	if (err != gbFileError_None)
 		return false;
 
-#if 0
-	Map<i32> type_map; // Key: Type *
-	map_init(&type_map, gb_heap_allocator());
-	i32 index = 0;
-	gb_for_array(i, c->info.types.entries) {
-		TypeAndValue tav = c->info.types.entries[i].value;
-		Type *type = tav.type;
-		HashKey key = hash_pointer(type);
-		auto found = map_get(&type_map, key);
-		if (!found) {
-			map_set(&type_map, key, index);
-			index++;
-		}
-	}
-	gb_for_array(i, type_map.entries) {
-		auto *e = &type_map.entries[i];
-		Type *t = cast(Type *)cast(uintptr)e->key.key;
-		gb_printf("%s\n", type_to_string(t));
-	}
-#endif
-
 	return true;
 }
 
@@ -195,6 +174,149 @@ void ssa_gen_tree(ssaGen *s) {
 			if (var->init != NULL) {
 				if (var->init->kind != ssaValue_Constant) {
 					ssa_emit_store(proc, var->var, var->init);
+				}
+			}
+		}
+
+		{ // NOTE(bill): Setup type_info data
+			ssaValue **found = map_get(&proc->module->members, hash_string(make_string("__type_info_data")));
+			GB_ASSERT(found != NULL);
+			ssaValue *type_info_data = *found;
+			CheckerInfo *info = proc->module->info;
+
+
+			Type *t_int_ptr           = make_type_pointer(a, t_int);
+			Type *t_bool_ptr          = make_type_pointer(a, t_bool);
+			Type *t_string_ptr        = make_type_pointer(a, t_string);
+			Type *t_type_info_ptr_ptr = make_type_pointer(a, t_type_info_ptr);
+
+			auto get_type_info_ptr = [](ssaProcedure *proc, ssaValue *type_info_data, Type *type) -> ssaValue * {
+				auto *info = proc->module->info;
+				MapFindResult fr = map__find(&info->type_info_types, hash_pointer(type));
+				GB_ASSERT(fr.entry_index >= 0);
+				return ssa_emit_struct_gep(proc, type_info_data, fr.entry_index, t_type_info_ptr);
+			};
+
+
+			gb_for_array(entry_index, info->type_info_types.entries) {
+				auto *entry = &info->type_info_types.entries[entry_index];
+				Type *t = entry->value;
+
+				ssaValue *tag = NULL;
+
+				switch (t->kind) {
+				case Type_Named: {
+					tag = ssa_add_local_generated(proc, t_type_info_named);
+
+					ssaValue *gsa  = ssa_add_global_string_array(proc, make_exact_value_string(t->Named.name));
+					ssaValue *elem = ssa_array_elem(proc, gsa);
+					ssaValue *len  = ssa_array_len(proc, ssa_emit_load(proc, gsa));
+					ssaValue *name = ssa_emit_string(proc, elem, len);
+
+					ssaValue *gep  = get_type_info_ptr(proc, type_info_data, t->Named.base);
+
+					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero,  t_string_ptr), name);
+					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_one32, t_type_info_ptr), gep);
+				} break;
+
+				case Type_Basic:
+					switch (t->Basic.kind) {
+					case Basic_bool:
+						tag = ssa_add_local_generated(proc, t_type_info_boolean);
+						break;
+					case Basic_i8:
+					case Basic_i16:
+					case Basic_i32:
+					case Basic_i64:
+					case Basic_i128:
+					case Basic_u8:
+					case Basic_u16:
+					case Basic_u32:
+					case Basic_u64:
+					case Basic_u128:
+					case Basic_int:
+					case Basic_uint: {
+						tag = ssa_add_local_generated(proc, t_type_info_integer);
+						b32 is_unsigned = (basic_types[t->Basic.kind].flags & BasicFlag_Unsigned) != 0;
+						ssaValue *bits      = ssa_make_value_constant(a, t_int, make_exact_value_integer(8*type_size_of(m->sizes, a, t)));
+						ssaValue *is_signed = ssa_make_value_constant(a, t_bool, make_exact_value_bool(!is_unsigned));
+						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_int_ptr),  bits);
+						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_one32,  t_bool_ptr), is_signed);
+					} break;
+
+					case Basic_f32:
+					case Basic_f64: {
+						tag = ssa_add_local_generated(proc, t_type_info_float);
+						ssaValue *bits = ssa_make_value_constant(a, t_int, make_exact_value_integer(8*type_size_of(m->sizes, a, t)));
+						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_int_ptr), bits);
+					} break;
+
+					case Basic_rawptr:
+						tag = ssa_add_local_generated(proc, t_type_info_pointer);
+						break;
+
+					case Basic_string:
+						tag = ssa_add_local_generated(proc, t_type_info_string);
+						break;
+					}
+					break;
+
+				case Type_Pointer: {
+					tag = ssa_add_local_generated(proc, t_type_info_pointer);
+					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Pointer.elem);
+					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_type_info_ptr_ptr), gep);
+				} break;
+				case Type_Array: {
+					tag = ssa_add_local_generated(proc, t_type_info_array);
+					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Array.elem);
+					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_type_info_ptr_ptr), gep);
+				} break;
+				case Type_Slice: {
+					tag = ssa_add_local_generated(proc, t_type_info_slice);
+					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Slice.elem);
+					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_type_info_ptr_ptr), gep);
+				} break;
+				case Type_Vector: {
+					tag = ssa_add_local_generated(proc, t_type_info_vector);
+					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Vector.elem);
+					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_type_info_ptr_ptr), gep);
+				} break;
+				case Type_Record: {
+					switch (t->Record.kind) {
+					// TODO(bill): Record members for `Type_Info`
+					case TypeRecord_Struct:
+						tag = ssa_add_local_generated(proc, t_type_info_struct);
+						break;
+					case TypeRecord_Union:
+						tag = ssa_add_local_generated(proc, t_type_info_union);
+						break;
+					case TypeRecord_RawUnion:
+						tag = ssa_add_local_generated(proc, t_type_info_raw_union);
+						break;
+					case TypeRecord_Enum: {
+						tag = ssa_add_local_generated(proc, t_type_info_enum);
+						Type *enum_base = t->Record.enum_base;
+						if (enum_base == NULL) {
+							enum_base = t_int;
+						}
+						ssaValue *gep = get_type_info_ptr(proc, type_info_data, enum_base);
+						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_type_info_ptr_ptr), gep);
+					} break;
+					}
+				} break;
+
+				case Type_Tuple:
+					// TODO(bill): Type_Info for tuples
+					break;
+				case Type_Proc:
+					// TODO(bill): Type_Info for procedures
+					break;
+				}
+
+				if (tag != NULL) {
+					ssaValue *gep = ssa_emit_struct_gep(proc, type_info_data, entry_index, t_type_info_ptr);
+					ssaValue *val = ssa_emit_conv(proc, ssa_emit_load(proc, tag), t_type_info);
+					ssa_emit_store(proc, gep, val);
 				}
 			}
 		}

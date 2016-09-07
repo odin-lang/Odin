@@ -85,7 +85,6 @@ struct ssaProcedure {
 	SSA_INSTR_KIND(Unreachable), \
 	SSA_INSTR_KIND(BinaryOp), \
 	SSA_INSTR_KIND(Call), \
-	SSA_INSTR_KIND(MemCopy), \
 	SSA_INSTR_KIND(NoOp), \
 	SSA_INSTR_KIND(ExtractElement), \
 	SSA_INSTR_KIND(InsertElement), \
@@ -199,13 +198,6 @@ struct ssaInstr {
 			isize arg_count;
 		} Call;
 		struct {
-			ssaValue *dst, *src;
-			ssaValue *len;
-			i32 align;
-			b32 is_volatile;
-		} CopyMemory;
-
-		struct {
 			ssaValue *vector;
 			ssaValue *index;
 		} ExtractElement;
@@ -315,6 +307,25 @@ void ssa_module_init(ssaModule *m, Checker *c) {
 
 	map_init(&m->values,  gb_heap_allocator());
 	map_init(&m->members, gb_heap_allocator());
+
+	{
+		// Add type info data
+		ssaValue *ssa_make_value_global(gbAllocator a, Entity *e, ssaValue *value);
+
+
+		String name = make_string("__type_info_data");
+		Token token = {};
+		token.kind = Token_Identifier;
+		token.string = name;
+
+
+		isize count = gb_array_count(c->info.type_info_types.entries);
+		Entity *e = make_entity_variable(m->allocator, NULL, token, make_type_array(m->allocator, t_type_info, count));
+		ssaValue *g = ssa_make_value_global(m->allocator, e, NULL);
+		g->Global.is_private  = true;
+		map_set(&m->values, hash_pointer(e), g);
+		map_set(&m->members, hash_string(name), g);
+	}
 }
 
 void ssa_module_destroy(ssaModule *m) {
@@ -356,9 +367,6 @@ Type *ssa_type(ssaInstr *instr) {
 		}
 		return NULL;
 	} break;
-	case ssaInstr_MemCopy:
-		return t_int;
-
 	case ssaInstr_ExtractElement: {
 		Type *vt = ssa_type(instr->ExtractElement.vector);
 		Type *bt = base_vector_type(get_base_type(vt));
@@ -542,16 +550,6 @@ ssaValue *ssa_make_instr_call(ssaProcedure *p, ssaValue *value, ssaValue **args,
 	v->Instr.Call.args = args;
 	v->Instr.Call.arg_count = arg_count;
 	v->Instr.Call.type = result_type;
-	return v;
-}
-
-ssaValue *ssa_make_instr_copy_memory(ssaProcedure *p, ssaValue *dst, ssaValue *src, ssaValue *len, i32 align, b32 is_volatile) {
-	ssaValue *v = ssa_alloc_instr(p, ssaInstr_MemCopy);
-	v->Instr.CopyMemory.dst = dst;
-	v->Instr.CopyMemory.src = src;
-	v->Instr.CopyMemory.len = len;
-	v->Instr.CopyMemory.align = align;
-	v->Instr.CopyMemory.is_volatile = is_volatile;
 	return v;
 }
 
@@ -925,7 +923,6 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 			case ssaInstr_Br:
 			case ssaInstr_Ret:
 			case ssaInstr_Unreachable:
-			case ssaInstr_MemCopy:
 			case ssaInstr_StartupRuntime:
 				continue;
 			case ssaInstr_Call:
@@ -2008,11 +2005,13 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					                                              make_exact_value_integer(size_of_elem));
 					ssaValue *byte_count = ssa_emit_arith(proc, mul, len, elem_size, t_int);
 
+					ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, 3);
+					args[0] = dst;
+					args[1] = src;
+					args[2] = byte_count;
 
-					i32 align = cast(i32)type_align_of(proc->module->sizes, proc->module->allocator, elem_type);
-					b32 is_volatile = false;
+					ssa_emit_global_call(proc, "memory_move", args, 3);
 
-					ssa_emit(proc, ssa_make_instr_copy_memory(proc, dst, src, byte_count, align, is_volatile));
 					return len;
 				} break;
 				case BuiltinProc_append: {
@@ -2056,7 +2055,12 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					item = ssa_emit_ptr_offset(proc, item, v_zero);
 					item = ssa_emit_conv(proc, item, t_rawptr, true);
 
-					ssa_emit(proc, ssa_make_instr_copy_memory(proc, offset, item, byte_count, 1, false));
+					ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, 3);
+					args[0] = offset;
+					args[1] = item;
+					args[2] = byte_count;
+
+					ssa_emit_global_call(proc, "memory_move", args, 3);
 
 					// Increment slice length
 					Token add = {Token_Add};
@@ -2171,6 +2175,22 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssaValue *neg_x = ssa_emit_arith(proc, sub, v_zero, x, t);
 					ssaValue *cond = ssa_emit_comp(proc, lt, x, v_zero);
 					return ssa_emit_select(proc, cond, neg_x, x);
+				} break;
+
+
+				case BuiltinProc_type_info: {
+					ssaValue **found = map_get(&proc->module->members, hash_string(make_string("__type_info_data")));
+					GB_ASSERT(found != NULL);
+					ssaValue *type_info_data = *found;
+					ssaValue *x = ssa_build_expr(proc, ce->arg_list);
+					Type *t = default_type(type_of_expr(proc->module->info, ce->arg_list));
+					MapFindResult fr = map__find(&proc->module->info->type_info_types, hash_pointer(t));
+					GB_ASSERT(fr.entry_index >= 0);
+					// Zero is null and void
+					isize offset = fr.entry_index;
+
+					ssaValue *gep = ssa_emit_struct_gep(proc, type_info_data, offset, t_type_info_ptr);
+					return gep;
 				} break;
 				}
 			}
@@ -3153,10 +3173,15 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		Type *union_type = type_deref(ssa_type(parent));
 		GB_ASSERT(is_type_union(union_type));
 
+		ssa_emit_comment(proc, make_string("get union's tag"));
 		ssaValue *tag_index = ssa_emit_struct_gep(proc, parent, v_one32, make_type_pointer(allocator, t_int));
 		tag_index = ssa_emit_load(proc, tag_index);
 
 		ssaValue *data = ssa_emit_conv(proc, parent, t_rawptr);
+
+		ssaBlock *start_block = ssa_add_block(proc, node, make_string("type-match.case.first"));
+		ssa_emit_jump(proc, start_block);
+		proc->curr_block = start_block;
 
 		ssaBlock *done = ssa__make_block(proc, node, make_string("type-match.done")); // NOTE(bill): Append later
 
@@ -3173,30 +3198,22 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		for (AstNode *clause = body->list;
 		     clause != NULL;
 		     clause = clause->next, i++) {
-			ssaBlock *body = NULL;
-			b32 append_body = false;
-
 			ast_node(cc, CaseClause, clause);
-
-			if (body == NULL) {
-				append_body = true;
-				if (cc->list == NULL) {
-					body = ssa__make_block(proc, clause, make_string("type-match.dflt.body"));
-				} else {
-					body = ssa__make_block(proc, clause, make_string("type-match.case.body"));
-				}
-			}
-
 
 			if (cc->list == NULL) {
 				// default case
 				default_stmts  = cc->stmts;
-				default_block = body;
+				default_block = ssa__make_block(proc, clause, make_string("type-match.dflt.body"));
 				continue;
 			}
 
+
+			ssaBlock *body = ssa__make_block(proc, clause, make_string("type-match.case.body"));
+
+
 			Scope *scope = *map_get(&proc->module->info->scopes, hash_pointer(clause));
 			Entity *tag_var_entity = current_scope_lookup_entity(scope, tag_var_name);
+			GB_ASSERT(tag_var_entity != NULL);
 			ssaValue *tag_var = ssa_add_local(proc, tag_var_entity);
 			ssaValue *data_ptr = ssa_emit_conv(proc, data, tag_var_entity->type);
 			ssa_emit_store(proc, tag_var, data_ptr);
@@ -3205,10 +3222,13 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 			Type *base_type = type_deref(tag_var_entity->type);
 			ssaValue *index = NULL;
-			for (isize i = 0; i < get_base_type(union_type)->Record.field_count; i++) {
-				Entity *f = get_base_type(union_type)->Record.fields[i];
+			Type *ut = get_base_type(union_type);
+			GB_ASSERT(ut->Record.kind == TypeRecord_Union);
+			for (isize field_index = 1; field_index < ut->Record.field_count; field_index++) {
+				Entity *f = get_base_type(union_type)->Record.fields[field_index];
 				if (are_types_identical(f->type, base_type)) {
-					index = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(i));
+					index = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(field_index));
+					break;
 				}
 			}
 			GB_ASSERT(index != NULL);
@@ -3220,9 +3240,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			gb_array_append(proc->blocks, next_cond);
 			proc->curr_block = next_cond;
 
-			if (append_body) {
-				gb_array_append(proc->blocks, body);
-			}
+			gb_array_append(proc->blocks, body);
 			proc->curr_block = body;
 			ssa_push_target_list(proc, done, NULL, NULL);
 			ssa_build_stmt_list(proc, cc->stmts);

@@ -150,6 +150,8 @@ enum BuiltinProcId {
 	BuiltinProc_max,
 	BuiltinProc_abs,
 
+	BuiltinProc_type_info,
+
 	BuiltinProc_Count,
 };
 struct BuiltinProc {
@@ -188,6 +190,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("min"),              2, false, Expr_Expr},
 	{STR_LIT("max"),              2, false, Expr_Expr},
 	{STR_LIT("abs"),              1, false, Expr_Expr},
+
+	{STR_LIT("type_info"),        1, false, Expr_Expr},
 };
 
 struct CheckerContext {
@@ -197,13 +201,14 @@ struct CheckerContext {
 
 // NOTE(bill): Symbol tables
 struct CheckerInfo {
-	Map<TypeAndValue>      types;         // Key: AstNode * | Expression -> Type (and value)
-	Map<Entity *>          definitions;   // Key: AstNode * | Identifier -> Entity
-	Map<Entity *>          uses;          // Key: AstNode * | Identifier -> Entity
-	Map<Scope *>           scopes;        // Key: AstNode * | Node       -> Scope
-	Map<ExpressionInfo>    untyped;       // Key: AstNode * | Expression -> ExpressionInfo
-	Map<DeclInfo *>        entities;      // Key: Entity *
-	Map<Entity *>          foreign_procs; // Key: String
+	Map<TypeAndValue>      types;           // Key: AstNode * | Expression -> Type (and value)
+	Map<Entity *>          definitions;     // Key: AstNode * | Identifier -> Entity
+	Map<Entity *>          uses;            // Key: AstNode * | Identifier -> Entity
+	Map<Scope *>           scopes;          // Key: AstNode * | Node       -> Scope
+	Map<ExpressionInfo>    untyped;         // Key: AstNode * | Expression -> ExpressionInfo
+	Map<DeclInfo *>        entities;        // Key: Entity *
+	Map<Entity *>          foreign_procs;   // Key: String
+	Map<Type *>            type_info_types; // Key: Type *
 };
 
 struct Checker {
@@ -383,6 +388,26 @@ void add_global_constant(gbAllocator a, String name, Type *type, ExactValue valu
 	add_global_entity(entity);
 }
 
+
+Type *t_type_info           = NULL;
+Type *t_type_info_ptr       = NULL;
+
+Type *t_type_info_named     = NULL;
+Type *t_type_info_integer   = NULL;
+Type *t_type_info_float     = NULL;
+Type *t_type_info_string    = NULL;
+Type *t_type_info_boolean   = NULL;
+Type *t_type_info_pointer   = NULL;
+Type *t_type_info_procedure = NULL;
+Type *t_type_info_array     = NULL;
+Type *t_type_info_slice     = NULL;
+Type *t_type_info_vector    = NULL;
+Type *t_type_info_struct    = NULL;
+Type *t_type_info_union     = NULL;
+Type *t_type_info_raw_union = NULL;
+Type *t_type_info_enum      = NULL;
+
+
 void init_universal_scope(void) {
 	// NOTE(bill): No need to free these
 	gbAllocator a = gb_heap_allocator();
@@ -425,13 +450,14 @@ void init_universal_scope(void) {
 
 void init_checker_info(CheckerInfo *i) {
 	gbAllocator a = gb_heap_allocator();
-	map_init(&i->types,         a);
-	map_init(&i->definitions,   a);
-	map_init(&i->uses,          a);
-	map_init(&i->scopes,        a);
-	map_init(&i->entities,      a);
-	map_init(&i->untyped,       a);
-	map_init(&i->foreign_procs, a);
+	map_init(&i->types,           a);
+	map_init(&i->definitions,     a);
+	map_init(&i->uses,            a);
+	map_init(&i->scopes,          a);
+	map_init(&i->entities,        a);
+	map_init(&i->untyped,         a);
+	map_init(&i->foreign_procs,   a);
+	map_init(&i->type_info_types, a);
 
 }
 
@@ -443,6 +469,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->entities);
 	map_destroy(&i->untyped);
 	map_destroy(&i->foreign_procs);
+	map_destroy(&i->type_info_types);
 }
 
 

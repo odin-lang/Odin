@@ -1900,6 +1900,42 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 	return NULL;
 }
 
+void add_type_info_type(Checker *c, Type *t) {
+	if (t == NULL) {
+		return;
+	}
+	t = default_type(t);
+	if (map_get(&c->info.type_info_types, hash_pointer(t)) != NULL) {
+		// Types have already been added
+		return;
+	}
+
+	map_set(&c->info.type_info_types, hash_pointer(t), t);
+	Type *bt = get_base_type(t);
+	switch (bt->kind) {
+	case Type_Named:   add_type_info_type(c, bt->Named.base);   break;
+	case Type_Array:   add_type_info_type(c, bt->Array.elem);   break;
+	case Type_Slice:   add_type_info_type(c, bt->Slice.elem);   break;
+	case Type_Vector:  add_type_info_type(c, bt->Vector.elem);  break;
+	case Type_Pointer: add_type_info_type(c, bt->Pointer.elem); break;
+	case Type_Record: {
+		switch (bt->Record.kind) {
+		case TypeRecord_Enum:
+			add_type_info_type(c, bt->Record.enum_base);
+			break;
+		default:
+			for (isize i = 0; i < bt->Record.field_count; i++) {
+				Entity *f = bt->Record.fields[i];
+				add_type_info_type(c, f->type);
+			}
+			break;
+		}
+	} break;
+	}
+	// TODO(bill): Type info for procedures and tuples
+	// TODO(bill): Remove duplicate identical types efficiently
+}
+
 b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id) {
 	GB_ASSERT(call->kind == AstNode_CallExpr);
 	ast_node(ce, CallExpr, call);
@@ -2652,6 +2688,38 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->type = type;
 	} break;
 
+
+	case BuiltinProc_type_info: {
+		if (t_type_info == NULL) {
+			String type_info_str = make_string("Type_Info");
+			Entity **found = map_get(&c->global_scope->elements, hash_string(type_info_str));
+			GB_ASSERT_MSG(found != NULL, "Internal Compiler Error: Could not find type declaration for `Type_Info`");
+			Entity *e = *found;
+			t_type_info = e->type;
+			t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
+
+			auto *record = &get_base_type(e->type)->Record;
+			GB_ASSERT(record->field_count == 15);
+			t_type_info_named     = record->fields[ 1]->type;
+			t_type_info_integer   = record->fields[ 2]->type;
+			t_type_info_float     = record->fields[ 3]->type;
+			t_type_info_string    = record->fields[ 4]->type;
+			t_type_info_boolean   = record->fields[ 5]->type;
+			t_type_info_pointer   = record->fields[ 6]->type;
+			t_type_info_procedure = record->fields[ 7]->type;
+			t_type_info_array     = record->fields[ 8]->type;
+			t_type_info_slice     = record->fields[ 9]->type;
+			t_type_info_vector    = record->fields[10]->type;
+			t_type_info_struct    = record->fields[11]->type;
+			t_type_info_union     = record->fields[12]->type;
+			t_type_info_raw_union = record->fields[13]->type;
+			t_type_info_enum      = record->fields[14]->type;
+		}
+
+		add_type_info_type(c, operand->type);
+		operand->mode = Addressing_Value;
+		operand->type = t_type_info_ptr;
+	} break;
 	}
 
 	return true;
