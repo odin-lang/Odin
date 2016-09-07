@@ -19,12 +19,16 @@ enum BasicKind {
 	Basic_uint,
 	Basic_rawptr,
 	Basic_string,
+
+	Basic_any,
+
 	Basic_UntypedBool,
 	Basic_UntypedInteger,
 	Basic_UntypedFloat,
 	Basic_UntypedPointer,
 	Basic_UntypedString,
 	Basic_UntypedRune,
+
 
 	Basic_Count,
 
@@ -306,6 +310,7 @@ gb_global Type basic_types[] = {
 	{0, Type_Basic, {Basic_uint,           BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("uint")}},
 	{0, Type_Basic, {Basic_rawptr,         BasicFlag_Pointer,                      STR_LIT("rawptr")}},
 	{0, Type_Basic, {Basic_string,         BasicFlag_String,                       STR_LIT("string")}},
+	{0, Type_Basic, {Basic_any,            0,                                      STR_LIT("any")}},
 	{0, Type_Basic, {Basic_UntypedBool,    BasicFlag_Boolean | BasicFlag_Untyped,  STR_LIT("untyped bool")}},
 	{0, Type_Basic, {Basic_UntypedInteger, BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped integer")}},
 	{0, Type_Basic, {Basic_UntypedFloat,   BasicFlag_Float   | BasicFlag_Untyped,  STR_LIT("untyped float")}},
@@ -337,6 +342,7 @@ gb_global Type *t_int             = &basic_types[Basic_int];
 gb_global Type *t_uint            = &basic_types[Basic_uint];
 gb_global Type *t_rawptr          = &basic_types[Basic_rawptr];
 gb_global Type *t_string          = &basic_types[Basic_string];
+gb_global Type *t_any             = &basic_types[Basic_any];
 gb_global Type *t_untyped_bool    = &basic_types[Basic_UntypedBool];
 gb_global Type *t_untyped_integer = &basic_types[Basic_UntypedInteger];
 gb_global Type *t_untyped_float   = &basic_types[Basic_UntypedFloat];
@@ -345,6 +351,25 @@ gb_global Type *t_untyped_string  = &basic_types[Basic_UntypedString];
 gb_global Type *t_untyped_rune    = &basic_types[Basic_UntypedRune];
 gb_global Type *t_byte            = &basic_type_aliases[Basic_byte];
 gb_global Type *t_rune            = &basic_type_aliases[Basic_rune];
+
+gb_global Type *t_type_info           = NULL;
+gb_global Type *t_type_info_ptr       = NULL;
+
+gb_global Type *t_type_info_named     = NULL;
+gb_global Type *t_type_info_integer   = NULL;
+gb_global Type *t_type_info_float     = NULL;
+gb_global Type *t_type_info_string    = NULL;
+gb_global Type *t_type_info_boolean   = NULL;
+gb_global Type *t_type_info_pointer   = NULL;
+gb_global Type *t_type_info_procedure = NULL;
+gb_global Type *t_type_info_array     = NULL;
+gb_global Type *t_type_info_slice     = NULL;
+gb_global Type *t_type_info_vector    = NULL;
+gb_global Type *t_type_info_struct    = NULL;
+gb_global Type *t_type_info_union     = NULL;
+gb_global Type *t_type_info_raw_union = NULL;
+gb_global Type *t_type_info_enum      = NULL;
+
 
 
 b32 is_type_named(Type *t) {
@@ -486,6 +511,11 @@ Type *get_enum_base_type(Type *t) {
 		return bt->Record.enum_base;
 	}
 	return t;
+}
+
+b32 is_type_any(Type *t) {
+	t = get_base_type(t);
+	return (t->kind == Type_Basic && t->Basic.kind == Basic_any);
 }
 
 
@@ -675,6 +705,9 @@ void selection_add_index(Selection *s, isize index) {
 	gb_array_append(s->index, index);
 }
 
+gb_global Entity *entity_any_type_info = NULL;
+gb_global Entity *entity_any_data      = NULL;
+
 Selection lookup_field(Type *type_, String field_name, b32 is_type, Selection sel = empty_selection) {
 	GB_ASSERT(type_ != NULL);
 
@@ -686,11 +719,39 @@ Selection lookup_field(Type *type_, String field_name, b32 is_type, Selection se
 	b32 is_ptr = type != type_;
 	type = get_base_type(type);
 
+	if (type->kind == Type_Basic) {
+		if (type->Basic.kind == Basic_any) {
+			String type_info_str = make_string("type_info");
+			String data_str = make_string("data_str");
+			if (entity_any_type_info == NULL) {
+				Token token = {Token_Identifier};
+				token.string = type_info_str;
+				entity_any_type_info = make_entity_field(gb_heap_allocator(), NULL, token, t_type_info_ptr, false);
+			}
+			if (entity_any_data == NULL) {
+				Token token = {Token_Identifier};
+				token.string = data_str;
+				entity_any_data = make_entity_field(gb_heap_allocator(), NULL, token, t_type_info_ptr, false);
+			}
+
+			if (are_strings_equal(field_name, type_info_str)) {
+				selection_add_index(&sel, 0);
+				sel.entity = entity_any_type_info;
+				return sel;
+			} else if (are_strings_equal(field_name, data_str)) {
+				selection_add_index(&sel, 1);
+				sel.entity = entity_any_data;
+				return sel;
+			}
+		}
+
+		return sel;
+	}
+
 	if (type->kind != Type_Record) {
 		return sel;
 	}
 	if (is_type) {
-
 		if (is_type_union(type)) {
 			for (isize i = 0; i < type->Record.field_count; i++) {
 				Entity *f = type->Record.fields[i];

@@ -389,23 +389,7 @@ void add_global_constant(gbAllocator a, String name, Type *type, ExactValue valu
 }
 
 
-Type *t_type_info           = NULL;
-Type *t_type_info_ptr       = NULL;
 
-Type *t_type_info_named     = NULL;
-Type *t_type_info_integer   = NULL;
-Type *t_type_info_float     = NULL;
-Type *t_type_info_string    = NULL;
-Type *t_type_info_boolean   = NULL;
-Type *t_type_info_pointer   = NULL;
-Type *t_type_info_procedure = NULL;
-Type *t_type_info_array     = NULL;
-Type *t_type_info_slice     = NULL;
-Type *t_type_info_vector    = NULL;
-Type *t_type_info_struct    = NULL;
-Type *t_type_info_union     = NULL;
-Type *t_type_info_raw_union = NULL;
-Type *t_type_info_enum      = NULL;
 
 
 void init_universal_scope(void) {
@@ -857,6 +841,7 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
+
 	auto check_global_entity = [](Checker *c, EntityKind kind) {
 		gb_for_array(i, c->info.entities.entries) {
 			auto *entry = &c->info.entities.entries[i];
@@ -869,6 +854,33 @@ void check_parsed_files(Checker *c) {
 	};
 
 	check_global_entity(c, Entity_TypeName);
+
+	if (t_type_info == NULL) {
+		String type_info_str = make_string("Type_Info");
+		Entity **found = map_get(&c->global_scope->elements, hash_string(type_info_str));
+		GB_ASSERT_MSG(found != NULL, "Internal Compiler Error: Could not find type declaration for `Type_Info`");
+		Entity *e = *found;
+		t_type_info = e->type;
+		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
+
+		auto *record = &get_base_type(e->type)->Record;
+		GB_ASSERT(record->field_count == 15);
+		t_type_info_named     = record->fields[ 1]->type;
+		t_type_info_integer   = record->fields[ 2]->type;
+		t_type_info_float     = record->fields[ 3]->type;
+		t_type_info_string    = record->fields[ 4]->type;
+		t_type_info_boolean   = record->fields[ 5]->type;
+		t_type_info_pointer   = record->fields[ 6]->type;
+		t_type_info_procedure = record->fields[ 7]->type;
+		t_type_info_array     = record->fields[ 8]->type;
+		t_type_info_slice     = record->fields[ 9]->type;
+		t_type_info_vector    = record->fields[10]->type;
+		t_type_info_struct    = record->fields[11]->type;
+		t_type_info_union     = record->fields[12]->type;
+		t_type_info_raw_union = record->fields[13]->type;
+		t_type_info_enum      = record->fields[14]->type;
+	}
+
 	check_global_entity(c, Entity_Constant);
 	check_global_entity(c, Entity_Procedure);
 	check_global_entity(c, Entity_Variable);

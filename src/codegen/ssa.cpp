@@ -1053,9 +1053,26 @@ ssaValue *ssa_emit_deep_field_gep(ssaProcedure *proc, Type *type, ssaValue *e, S
 		if (is_type_raw_union(type)) {
 			type = type->Record.fields[index]->type;
 			e = ssa_emit_conv(proc, e, make_type_pointer(proc->module->allocator, type));
-		} else {
+		} else if (type->kind == Type_Record) {
 			type = type->Record.fields[index]->type;
 			e = ssa_emit_struct_gep(proc, e, index, make_type_pointer(proc->module->allocator, type));
+		} else if (type->kind == Type_Basic) {
+			switch (type->Basic.kind) {
+			case Basic_any: {
+				if (index == 0) {
+					type = t_type_info_ptr;
+				} else if (index == 1) {
+					type = t_rawptr;
+				}
+				e = ssa_emit_struct_gep(proc, e, index, make_type_pointer(proc->module->allocator, type));
+			} break;
+
+			default:
+				GB_PANIC("un-gep-able type");
+				break;
+			}
+		} else {
+			GB_PANIC("un-gep-able type");
 		}
 	}
 
@@ -1079,9 +1096,26 @@ ssaValue *ssa_emit_deep_field_ev(ssaProcedure *proc, Type *type, ssaValue *e, Se
 		if (is_type_raw_union(type)) {
 			type = type->Record.fields[index]->type;
 			e = ssa_emit_conv(proc, e, make_type_pointer(proc->module->allocator, type));
-		} else {
+		} else if (type->kind == Type_Record) {
 			type = type->Record.fields[index]->type;
 			e = ssa_emit_struct_ev(proc, e, index, type);
+		} else if (type->kind == Type_Basic) {
+			switch (type->Basic.kind) {
+			case Basic_any: {
+				if (index == 0) {
+					type = t_type_info_ptr;
+				} else if (index == 1) {
+					type = t_rawptr;
+				}
+				e = ssa_emit_struct_ev(proc, e, index, type);
+			} break;
+
+			default:
+				GB_PANIC("un-ev-able type");
+				break;
+			}
+		} else {
+			GB_PANIC("un-ev-able type");
 		}
 	}
 
@@ -1303,12 +1337,17 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 	}
 
 	if (value->kind == ssaValue_Constant) {
-		if (dst->kind == Type_Basic) {
+		if (is_type_any(dst)) {
+			Type *dt = default_type(src);
+			ssaValue *default_value = ssa_add_local_generated(proc, dt);
+			ssa_emit_store(proc, default_value, value);
+			return ssa_emit_conv(proc, ssa_emit_load(proc, default_value), t_any, is_argument);
+		} else if (dst->kind == Type_Basic) {
 			ExactValue ev = value->Constant.value;
 			if (is_type_float(dst)) {
 				ev = exact_value_to_float(ev);
 			} else if (is_type_string(dst)) {
-				//
+				// Handled elsewhere
 			} else if (is_type_integer(dst)) {
 				ev = exact_value_to_integer(ev);
 			} else if (is_type_pointer(dst)) {
@@ -1485,6 +1524,33 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 
 		v = ssa_emit(proc, ssa_make_instr_shuffle_vector(proc, v, indices, index_count));
 		return v;
+	}
+
+	if (is_type_any(dst)) {
+		ssaValue **found = map_get(&proc->module->members, hash_string(make_string("__type_info_data")));
+		GB_ASSERT(found != NULL);
+		ssaValue *type_info_data = *found;
+		CheckerInfo *info = proc->module->info;
+
+
+		ssaValue *result = ssa_add_local_generated(proc, t_any);
+
+		// NOTE(bill): Make copy on stack so I can reference it later
+		ssaValue *data = ssa_add_local_generated(proc, src_type);
+		ssa_emit_store(proc, data, value);
+		data = ssa_emit_conv(proc, data, t_rawptr);
+
+
+		MapFindResult fr = map__find(&info->type_info_types, hash_pointer(src_type));
+		GB_ASSERT(fr.entry_index >= 0);
+		ssaValue *ti = ssa_emit_struct_gep(proc, type_info_data, fr.entry_index, t_type_info_ptr);
+
+		ssaValue *gep0 = ssa_emit_struct_gep(proc, result, v_zero32, make_type_pointer(proc->module->allocator, t_type_info_ptr));
+		ssaValue *gep1 = ssa_emit_struct_gep(proc, result, v_one32,  make_type_pointer(proc->module->allocator, t_rawptr));
+		ssa_emit_store(proc, gep0, ti);
+		ssa_emit_store(proc, gep1, data);
+
+		return ssa_emit_load(proc, result);
 	}
 
 
@@ -3194,10 +3260,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		ssaBlock *default_block = NULL;
 
 		isize case_count = body->list_count;
-		isize i = 0;
-		for (AstNode *clause = body->list;
-		     clause != NULL;
-		     clause = clause->next, i++) {
+		for (AstNode *clause = body->list; clause != NULL; clause = clause->next) {
 			ast_node(cc, CaseClause, clause);
 
 			if (cc->list == NULL) {

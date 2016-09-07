@@ -18,11 +18,11 @@ Type_Info :: union {
 		base: ^Type_Info
 	}
 	Integer: struct {
-		bits: int
+		size: int // in bytes
 		signed: bool
 	}
 	Float: struct {
-		bits: int
+		size: int // in bytes
 	}
 	String:  struct {}
 	Boolean: struct {}
@@ -48,14 +48,6 @@ Type_Info :: union {
 		base: ^Type_Info
 	}
 }
-
-Any :: struct {
-	type_info: ^Type_Info
-	// pointer to the data stored
-	data: rawptr
-}
-
-
 
 
 assume :: proc(cond: bool) #foreign "llvm.assume"

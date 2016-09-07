@@ -153,6 +153,13 @@ void ssa_print_type(ssaFileBuffer *f, BaseTypeSizes s, Type *t) {
 		case Basic_string: ssa_fprintf(f, "%%..string");              break;
 		case Basic_uint:   ssa_fprintf(f, "i%lld", word_bits);        break;
 		case Basic_int:    ssa_fprintf(f, "i%lld", word_bits);        break;
+		case Basic_any:
+			ssa_fprintf(f, "{");
+			ssa_print_type(f, s, t_type_info_ptr);
+			ssa_fprintf(f, ", ");
+			ssa_print_type(f, s, t_rawptr);
+			ssa_fprintf(f, "}");
+			break;
 		}
 		break;
 	case Type_Array:
