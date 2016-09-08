@@ -183,10 +183,10 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 			u: uint = 0;
 			if arg.data != null {
 				match info.size {
-				case 1:  u = (arg.data as ^u8)^ as uint
-				case 2:  u = (arg.data as ^u16)^ as uint
-				case 4:  u = (arg.data as ^u32)^ as uint
-				case 8:  u = (arg.data as ^u64)^ as uint
+				case 1:  u = (arg.data as ^u8)^   as uint
+				case 2:  u = (arg.data as ^u16)^  as uint
+				case 4:  u = (arg.data as ^u32)^  as uint
+				case 8:  u = (arg.data as ^u64)^  as uint
 				case 16: u = (arg.data as ^u128)^ as uint
 				}
 			}
@@ -195,10 +195,10 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 			v: int = 0;
 			if arg.data != null {
 				match info.size {
-				case 1:  v = (arg.data as ^i8)^ as int
-				case 2:  v = (arg.data as ^i16)^ as int
-				case 4:  v = (arg.data as ^i32)^ as int
-				case 8:  v = (arg.data as ^i64)^ as int
+				case 1:  v = (arg.data as ^i8)^   as int
+				case 2:  v = (arg.data as ^i16)^  as int
+				case 4:  v = (arg.data as ^i32)^  as int
+				case 8:  v = (arg.data as ^i64)^  as int
 				case 16: v = (arg.data as ^i128)^ as int
 				}
 			}

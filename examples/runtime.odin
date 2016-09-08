@@ -68,9 +68,13 @@ byte_swap64 :: proc(b: u64) -> u64 #foreign "llvm.bswap.i64"
 fmuladd_f32 :: proc(a, b, c: f32) -> f32 #foreign "llvm.fmuladd.f32"
 fmuladd_f64 :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
 
-// TODO(bill): make custom heap procedures
-heap_alloc   :: proc(len: int)   -> rawptr #foreign "malloc"
-heap_dealloc :: proc(ptr: rawptr)          #foreign "free"
+heap_alloc   :: proc(len: int) -> rawptr {
+	return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, len)
+}
+
+heap_dealloc :: proc(ptr: rawptr) {
+	_ = HeapFree(GetProcessHeap(), 0, ptr)
+}
 
 memory_zero :: proc(data: rawptr, len: int) {
 	llvm_memset_64bit :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) #foreign "llvm.memset.p0i8.i64"
@@ -258,6 +262,7 @@ __default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocation_Mode,
 		return default_resize_align(old_memory, old_size, size, alignment)
 	case DEALLOC:
 		heap_dealloc(old_memory)
+		return null
 	case DEALLOC_ALL:
 		// NOTE(bill): Does nothing
 	}

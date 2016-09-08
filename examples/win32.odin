@@ -242,160 +242,160 @@ wglDeleteContext  :: proc(hglrc: HGLRC) -> BOOL #foreign
 
 GetAsyncKeyState :: proc(v_key: i32) -> i16 #foreign
 
-is_key_down :: proc(key: int) -> bool {
+is_key_down :: proc(key: Key_Code) -> bool {
 	return GetAsyncKeyState(key as i32) < 0
 }
 
+Key_Code :: enum i32 {
+	LBUTTON    = 0x01,
+	RBUTTON    = 0x02,
+	CANCEL     = 0x03,
+	MBUTTON    = 0x04,
 
-VK_LBUTTON    :: 0x01
-VK_RBUTTON    :: 0x02
-VK_CANCEL     :: 0x03
-VK_MBUTTON    :: 0x04
+	BACK       = 0x08,
+	TAB        = 0x09,
 
-VK_BACK       :: 0x08
-VK_TAB        :: 0x09
+	CLEAR      = 0x0C,
+	RETURN     = 0x0D,
 
-VK_CLEAR      :: 0x0C
-VK_RETURN     :: 0x0D
+	SHIFT      = 0x10,
+	CONTROL    = 0x11,
+	MENU       = 0x12,
+	PAUSE      = 0x13,
+	CAPITAL    = 0x14,
 
-VK_SHIFT      :: 0x10
-VK_CONTROL    :: 0x11
-VK_MENU       :: 0x12
-VK_PAUSE      :: 0x13
-VK_CAPITAL    :: 0x14
+	KANA       = 0x15,
+	HANGEUL    = 0x15,
+	HANGUL     = 0x15,
+	JUNJA      = 0x17,
+	FINAL      = 0x18,
+	HANJA      = 0x19,
+	KANJI      = 0x19,
 
-VK_KANA       :: 0x15
-VK_HANGEUL    :: 0x15
-VK_HANGUL     :: 0x15
-VK_JUNJA      :: 0x17
-VK_FINAL      :: 0x18
-VK_HANJA      :: 0x19
-VK_KANJI      :: 0x19
+	ESCAPE     = 0x1B,
 
-VK_ESCAPE     :: 0x1B
+	CONVERT    = 0x1C,
+	NONCONVERT = 0x1D,
+	ACCEPT     = 0x1E,
+	MODECHANGE = 0x1F,
 
-VK_CONVERT    :: 0x1C
-VK_NONCONVERT :: 0x1D
-VK_ACCEPT     :: 0x1E
-VK_MODECHANGE :: 0x1F
+	SPACE      = 0x20,
+	PRIOR      = 0x21,
+	NEXT       = 0x22,
+	END        = 0x23,
+	HOME       = 0x24,
+	LEFT       = 0x25,
+	UP         = 0x26,
+	RIGHT      = 0x27,
+	DOWN       = 0x28,
+	SELECT     = 0x29,
+	PRINT      = 0x2A,
+	EXECUTE    = 0x2B,
+	SNAPSHOT   = 0x2C,
+	INSERT     = 0x2D,
+	DELETE     = 0x2E,
+	HELP       = 0x2F,
 
-VK_SPACE      :: 0x20
-VK_PRIOR      :: 0x21
-VK_NEXT       :: 0x22
-VK_END        :: 0x23
-VK_HOME       :: 0x24
-VK_LEFT       :: 0x25
-VK_UP         :: 0x26
-VK_RIGHT      :: 0x27
-VK_DOWN       :: 0x28
-VK_SELECT     :: 0x29
-VK_PRINT      :: 0x2A
-VK_EXECUTE    :: 0x2B
-VK_SNAPSHOT   :: 0x2C
-VK_INSERT     :: 0x2D
-VK_DELETE     :: 0x2E
-VK_HELP       :: 0x2F
+	NUM0 = #rune "0",
+	NUM1 = #rune "1",
+	NUM2 = #rune "2",
+	NUM3 = #rune "3",
+	NUM4 = #rune "4",
+	NUM5 = #rune "5",
+	NUM6 = #rune "6",
+	NUM7 = #rune "7",
+	NUM8 = #rune "8",
+	NUM9 = #rune "9",
 
-VK_0 :: #rune "0"
-VK_1 :: #rune "1"
-VK_2 :: #rune "2"
-VK_3 :: #rune "3"
-VK_4 :: #rune "4"
-VK_5 :: #rune "5"
-VK_6 :: #rune "6"
-VK_7 :: #rune "7"
-VK_8 :: #rune "8"
-VK_9 :: #rune "9"
+	A = #rune "A",
+	B = #rune "B",
+	C = #rune "C",
+	D = #rune "D",
+	E = #rune "E",
+	F = #rune "F",
+	G = #rune "G",
+	H = #rune "H",
+	I = #rune "I",
+	J = #rune "J",
+	K = #rune "K",
+	L = #rune "L",
+	M = #rune "M",
+	N = #rune "N",
+	O = #rune "O",
+	P = #rune "P",
+	Q = #rune "Q",
+	R = #rune "R",
+	S = #rune "S",
+	T = #rune "T",
+	U = #rune "U",
+	V = #rune "V",
+	W = #rune "W",
+	X = #rune "X",
+	Y = #rune "Y",
+	Z = #rune "Z",
 
-VK_A :: #rune "A"
-VK_B :: #rune "B"
-VK_C :: #rune "C"
-VK_D :: #rune "D"
-VK_E :: #rune "E"
-VK_F :: #rune "F"
-VK_G :: #rune "G"
-VK_H :: #rune "H"
-VK_I :: #rune "I"
-VK_J :: #rune "J"
-VK_K :: #rune "K"
-VK_L :: #rune "L"
-VK_M :: #rune "M"
-VK_N :: #rune "N"
-VK_O :: #rune "O"
-VK_P :: #rune "P"
-VK_Q :: #rune "Q"
-VK_R :: #rune "R"
-VK_S :: #rune "S"
-VK_T :: #rune "T"
-VK_U :: #rune "U"
-VK_V :: #rune "V"
-VK_W :: #rune "W"
-VK_X :: #rune "X"
-VK_Y :: #rune "Y"
-VK_Z :: #rune "Z"
+	LWIN       = 0x5B,
+	RWIN       = 0x5C,
+	APPS       = 0x5D,
 
-VK_LWIN       :: 0x5B
-VK_RWIN       :: 0x5C
-VK_APPS       :: 0x5D
+	NUMPAD0    = 0x60,
+	NUMPAD1    = 0x61,
+	NUMPAD2    = 0x62,
+	NUMPAD3    = 0x63,
+	NUMPAD4    = 0x64,
+	NUMPAD5    = 0x65,
+	NUMPAD6    = 0x66,
+	NUMPAD7    = 0x67,
+	NUMPAD8    = 0x68,
+	NUMPAD9    = 0x69,
+	MULTIPLY   = 0x6A,
+	ADD        = 0x6B,
+	SEPARATOR  = 0x6C,
+	SUBTRACT   = 0x6D,
+	DECIMAL    = 0x6E,
+	DIVIDE     = 0x6F,
+	F1         = 0x70,
+	F2         = 0x71,
+	F3         = 0x72,
+	F4         = 0x73,
+	F5         = 0x74,
+	F6         = 0x75,
+	F7         = 0x76,
+	F8         = 0x77,
+	F9         = 0x78,
+	F10        = 0x79,
+	F11        = 0x7A,
+	F12        = 0x7B,
+	F13        = 0x7C,
+	F14        = 0x7D,
+	F15        = 0x7E,
+	F16        = 0x7F,
+	F17        = 0x80,
+	F18        = 0x81,
+	F19        = 0x82,
+	F20        = 0x83,
+	F21        = 0x84,
+	F22        = 0x85,
+	F23        = 0x86,
+	F24        = 0x87,
 
-VK_NUMPAD0    :: 0x60
-VK_NUMPAD1    :: 0x61
-VK_NUMPAD2    :: 0x62
-VK_NUMPAD3    :: 0x63
-VK_NUMPAD4    :: 0x64
-VK_NUMPAD5    :: 0x65
-VK_NUMPAD6    :: 0x66
-VK_NUMPAD7    :: 0x67
-VK_NUMPAD8    :: 0x68
-VK_NUMPAD9    :: 0x69
-VK_MULTIPLY   :: 0x6A
-VK_ADD        :: 0x6B
-VK_SEPARATOR  :: 0x6C
-VK_SUBTRACT   :: 0x6D
-VK_DECIMAL    :: 0x6E
-VK_DIVIDE     :: 0x6F
-VK_F1         :: 0x70
-VK_F2         :: 0x71
-VK_F3         :: 0x72
-VK_F4         :: 0x73
-VK_F5         :: 0x74
-VK_F6         :: 0x75
-VK_F7         :: 0x76
-VK_F8         :: 0x77
-VK_F9         :: 0x78
-VK_F10        :: 0x79
-VK_F11        :: 0x7A
-VK_F12        :: 0x7B
-VK_F13        :: 0x7C
-VK_F14        :: 0x7D
-VK_F15        :: 0x7E
-VK_F16        :: 0x7F
-VK_F17        :: 0x80
-VK_F18        :: 0x81
-VK_F19        :: 0x82
-VK_F20        :: 0x83
-VK_F21        :: 0x84
-VK_F22        :: 0x85
-VK_F23        :: 0x86
-VK_F24        :: 0x87
+	NUMLOCK    = 0x90,
+	SCROLL     = 0x91,
 
-VK_NUMLOCK    :: 0x90
-VK_SCROLL     :: 0x91
-
-VK_LSHIFT     :: 0xA0
-VK_RSHIFT     :: 0xA1
-VK_LCONTROL   :: 0xA2
-VK_RCONTROL   :: 0xA3
-VK_LMENU      :: 0xA4
-VK_RMENU      :: 0xA5
-VK_PROCESSKEY :: 0xE5
-VK_ATTN       :: 0xF6
-VK_CRSEL      :: 0xF7
-VK_EXSEL      :: 0xF8
-VK_EREOF      :: 0xF9
-VK_PLAY       :: 0xFA
-VK_ZOOM       :: 0xFB
-VK_NONAME     :: 0xFC
-VK_PA1        :: 0xFD
-VK_OEM_CLEAR  :: 0xFE
-
+	LSHIFT     = 0xA0,
+	RSHIFT     = 0xA1,
+	LCONTROL   = 0xA2,
+	RCONTROL   = 0xA3,
+	LMENU      = 0xA4,
+	RMENU      = 0xA5,
+	PROCESSKEY = 0xE5,
+	ATTN       = 0xF6,
+	CRSEL      = 0xF7,
+	EXSEL      = 0xF8,
+	EREOF      = 0xF9,
+	PLAY       = 0xFA,
+	ZOOM       = 0xFB,
+	NONAME     = 0xFC,
+	PA1        = 0xFD,
+	OEM_CLEAR  = 0xFE,
+}

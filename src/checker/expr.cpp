@@ -57,11 +57,31 @@ void add_type_info_type(Checker *c, Type *t) {
 	}
 
 	map_set(&c->info.type_info_types, hash_pointer(t), t);
+
+	if (t->kind == Type_Named) {
+		// NOTE(bill): Just in case
+		add_type_info_type(c, t->Named.base);
+		return;
+	}
+
 	Type *bt = get_base_type(t);
 	switch (bt->kind) {
-	case Type_Named:   add_type_info_type(c, bt->Named.base);   break;
-	case Type_Array:   add_type_info_type(c, bt->Array.elem);   break;
-	case Type_Slice:   add_type_info_type(c, bt->Slice.elem);   break;
+	case Type_Basic: {
+		if (bt->Basic.kind == Basic_string) {
+			add_type_info_type(c, make_type_pointer(c->allocator, t_u8));
+			add_type_info_type(c, t_int);
+		}
+	} break;
+	case Type_Array:
+		add_type_info_type(c, bt->Array.elem);
+		add_type_info_type(c, make_type_pointer(c->allocator, bt->Array.elem));
+		add_type_info_type(c, t_int);
+		break;
+	case Type_Slice:
+		add_type_info_type(c, bt->Slice.elem);
+		add_type_info_type(c, make_type_pointer(c->allocator, bt->Slice.elem));
+		add_type_info_type(c, t_int);
+		break;
 	case Type_Vector:  add_type_info_type(c, bt->Vector.elem);  break;
 	case Type_Pointer: add_type_info_type(c, bt->Pointer.elem); break;
 	case Type_Record: {
@@ -1372,7 +1392,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 	x->mode = Addressing_Value;
 }
 
-b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
+b32 check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 	if (check_is_assignable_to(c, operand, y))
 		return true;
 
@@ -1387,20 +1407,20 @@ b32 check_castable_to(Checker *c, Operand *operand, Type *y) {
 
 
 	// Cast between booleans and integers
-	if (is_type_boolean(x) || is_type_integer(x)) {
-		if (is_type_boolean(y) || is_type_integer(y))
+	if (is_type_boolean(xb) || is_type_integer(xb)) {
+		if (is_type_boolean(yb) || is_type_integer(yb))
 			return true;
 	}
 
 	// Cast between numbers
-	if (is_type_integer(x) || is_type_float(x)) {
-		if (is_type_integer(y) || is_type_float(y))
+	if (is_type_integer(xb) || is_type_float(xb)) {
+		if (is_type_integer(yb) || is_type_float(yb))
 			return true;
 	}
 
 	// Cast between pointers
-	if (is_type_pointer(x)) {
-		if (is_type_pointer(y))
+	if (is_type_pointer(xb)) {
+		if (is_type_pointer(yb))
 			return true;
 	}
 
@@ -1494,7 +1514,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 					can_convert = true;
 				}
 			}
-		} else if (check_castable_to(c, x, type)) {
+		} else if (check_is_castable_to(c, x, type)) {
 			x->mode = Addressing_Value;
 			can_convert = true;
 		}

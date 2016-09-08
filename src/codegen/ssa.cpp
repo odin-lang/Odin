@@ -3184,9 +3184,9 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 				fall = ssa__make_block(proc, clause, make_string("match.fall.body"));
 			}
 
-			if (gb_array_count(cc->list)) {
+			if (gb_array_count(cc->list) == 0) {
 				// default case
-				default_stmts  = cc->stmts;
+				default_stmts = cc->stmts;
 				default_fall  = fall;
 				default_block = body;
 				continue;

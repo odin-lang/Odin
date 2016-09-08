@@ -706,8 +706,8 @@ void selection_add_index(Selection *s, isize index) {
 	gb_array_append(s->index, index);
 }
 
-gb_global Entity *entity_any_type_info = NULL;
-gb_global Entity *entity_any_data      = NULL;
+gb_global Entity *entity__any_type_info = NULL;
+gb_global Entity *entity__any_data      = NULL;
 
 Selection lookup_field(Type *type_, String field_name, b32 is_type, Selection sel = empty_selection) {
 	GB_ASSERT(type_ != NULL);
@@ -721,29 +721,31 @@ Selection lookup_field(Type *type_, String field_name, b32 is_type, Selection se
 	type = get_base_type(type);
 
 	if (type->kind == Type_Basic) {
-		if (type->Basic.kind == Basic_any) {
+		switch (type->Basic.kind) {
+		case Basic_any: {
 			String type_info_str = make_string("type_info");
 			String data_str = make_string("data");
-			if (entity_any_type_info == NULL) {
+			if (entity__any_type_info == NULL) {
 				Token token = {Token_Identifier};
 				token.string = type_info_str;
-				entity_any_type_info = make_entity_field(gb_heap_allocator(), NULL, token, t_type_info_ptr, false);
+				entity__any_type_info = make_entity_field(gb_heap_allocator(), NULL, token, t_type_info_ptr, false);
 			}
-			if (entity_any_data == NULL) {
+			if (entity__any_data == NULL) {
 				Token token = {Token_Identifier};
 				token.string = data_str;
-				entity_any_data = make_entity_field(gb_heap_allocator(), NULL, token, t_type_info_ptr, false);
+				entity__any_data = make_entity_field(gb_heap_allocator(), NULL, token, t_rawptr, false);
 			}
 
 			if (are_strings_equal(field_name, type_info_str)) {
 				selection_add_index(&sel, 0);
-				sel.entity = entity_any_type_info;
+				sel.entity = entity__any_type_info;
 				return sel;
 			} else if (are_strings_equal(field_name, data_str)) {
 				selection_add_index(&sel, 1);
-				sel.entity = entity_any_data;
+				sel.entity = entity__any_data;
 				return sel;
 			}
+		} break;
 		}
 
 		return sel;
@@ -916,8 +918,11 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 			if (size > 0)
 				return size;
 		}
-		if (kind == Basic_string)
+		if (kind == Basic_string) {
 			return 2 * s.word_size;
+		} else if (kind == Basic_any) {
+			return 2 * s.word_size;
+		}
 	} break;
 
 	case Type_Array: {

@@ -78,6 +78,7 @@ enum CallExprKind {
 AstNodeArray make_ast_node_array(AstFile *f) {
 	AstNodeArray a;
 	gb_array_init(a, gb_arena_allocator(&f->arena));
+	GB_ASSERT(a != NULL);
 	return a;
 }
 
@@ -2220,7 +2221,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 
 AstNode *parse_case_clause(AstFile *f) {
 	Token token = f->cursor[0];
-	AstNodeArray list = NULL;
+	AstNodeArray list = make_ast_node_array(f);
 	if (allow_token(f, Token_case)) {
 		list = parse_rhs_expr_list(f);
 	} else {

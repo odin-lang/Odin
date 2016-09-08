@@ -323,6 +323,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 	char *c_str = gb_alloc_array(gb_heap_allocator(), char, fullpath.len+1);
 	memcpy(c_str, fullpath.text, fullpath.len);
 	c_str[fullpath.len] = '\0';
+
 	defer (gb_free(gb_heap_allocator(), c_str));
 
 	gbFileContents fc = gb_file_read_contents(gb_heap_allocator(), true, c_str);

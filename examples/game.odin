@@ -16,9 +16,7 @@ time_now :: proc() -> f64 {
 win32_print_last_error :: proc() {
 	err_code := GetLastError() as int
 	if err_code != 0 {
-		print_string("GetLastError: ")
-		print_int(err_code)
-		print_string("\n")
+		println("GetLastError:", err_code)
 	}
 }
 
@@ -46,7 +44,8 @@ make_window :: proc(title: string, msg, height: int, window_proc: WNDPROC) -> (W
 
 	class_name   := "Win32-Odin-Window\x00"
 	c_class_name := ^class_name[0]
-	w.c_title = to_c_string(title)
+	// w.c_title = to_c_string(title)
+	w.c_title = "Title\x00" as []byte
 
 	instance := GetModuleHandleA(null)
 
@@ -59,6 +58,7 @@ make_window :: proc(title: string, msg, height: int, window_proc: WNDPROC) -> (W
 	};
 
 	if RegisterClassExA(^w.wc) == 0 {
+		win32_print_last_error( )
 		return w, false
 	}
 
@@ -129,6 +129,7 @@ run_game :: proc() {
 		return DefWindowProcA(hwnd, msg, wparam, lparam)
 	}
 
+
 	window, window_success := make_window("Odin Language Demo", 854, 480, win32_proc)
 	if !window_success {
 		return
@@ -155,7 +156,7 @@ run_game :: proc() {
 			_ = DispatchMessageA(^msg)
 		}
 
-		if is_key_down(VK_ESCAPE) {
+		if is_key_down(Key_Code.ESCAPE) {
 			running = false
 		}
 
@@ -163,10 +164,10 @@ run_game :: proc() {
 			SPEED :: 500
 			v: Vec2
 
-			if is_key_down(VK_RIGHT) { v[0] += 1 }
-			if is_key_down(VK_LEFT)  { v[0] -= 1 }
-			if is_key_down(VK_UP)    { v[1] += 1 }
-			if is_key_down(VK_DOWN)  { v[1] -= 1 }
+			if is_key_down(Key_Code.RIGHT) { v[0] += 1 }
+			if is_key_down(Key_Code.LEFT)  { v[0] -= 1 }
+			if is_key_down(Key_Code.UP)    { v[1] += 1 }
+			if is_key_down(Key_Code.DOWN)  { v[1] -= 1 }
 
 			v = vec2_norm0(v)
 
