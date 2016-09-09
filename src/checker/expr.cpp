@@ -46,63 +46,6 @@ b32 check_is_assignable_to_using_subtype(Type *dst, Type *src) {
 }
 
 
-void add_type_info_type(Checker *c, Type *t) {
-	if (t == NULL) {
-		return;
-	}
-	t = default_type(t);
-	if (map_get(&c->info.type_info_types, hash_pointer(t)) != NULL) {
-		// Types have already been added
-		return;
-	}
-
-	map_set(&c->info.type_info_types, hash_pointer(t), t);
-
-	if (t->kind == Type_Named) {
-		// NOTE(bill): Just in case
-		add_type_info_type(c, t->Named.base);
-		return;
-	}
-
-	Type *bt = get_base_type(t);
-	switch (bt->kind) {
-	case Type_Basic: {
-		if (bt->Basic.kind == Basic_string) {
-			add_type_info_type(c, make_type_pointer(c->allocator, t_u8));
-			add_type_info_type(c, t_int);
-		}
-	} break;
-	case Type_Array:
-		add_type_info_type(c, bt->Array.elem);
-		add_type_info_type(c, make_type_pointer(c->allocator, bt->Array.elem));
-		add_type_info_type(c, t_int);
-		break;
-	case Type_Slice:
-		add_type_info_type(c, bt->Slice.elem);
-		add_type_info_type(c, make_type_pointer(c->allocator, bt->Slice.elem));
-		add_type_info_type(c, t_int);
-		break;
-	case Type_Vector:  add_type_info_type(c, bt->Vector.elem);  break;
-	case Type_Pointer: add_type_info_type(c, bt->Pointer.elem); break;
-	case Type_Record: {
-		switch (bt->Record.kind) {
-		case TypeRecord_Enum:
-			add_type_info_type(c, bt->Record.enum_base);
-			break;
-		default:
-			for (isize i = 0; i < bt->Record.field_count; i++) {
-				Entity *f = bt->Record.fields[i];
-				add_type_info_type(c, f->type);
-			}
-			break;
-		}
-	} break;
-	}
-	// TODO(bill): Type info for procedures and tuples
-	// TODO(bill): Remove duplicate identical types efficiently
-}
-
-
 b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argument = false) {
 	if (operand->mode == Addressing_Invalid ||
 	    type == t_invalid) {

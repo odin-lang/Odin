@@ -3,11 +3,21 @@
 #load "file.odin"
 
 print_string_to_buffer :: proc(buf: ^[]byte, s: string) {
-	for i := 0; i < len(s); i++ {
-		if !append(buf, s[i]) {
-			// Buffer is full
-			return
-		}
+	// NOTE(bill): This is quite a hack
+	// TODO(bill): Should I allow the raw editing of a slice by exposing its
+	// internal members?
+	Raw_Bytes :: struct {
+		data: ^byte
+		len:  int
+		cap:  int
+	}
+
+	slice := buf as ^Raw_Bytes
+	if slice.len < slice.cap {
+		n := min(slice.cap-slice.len, len(s))
+		offset := ((slice.data as int) + slice.len) as ^byte
+		memory_move(offset, ^s[0], n)
+		slice.len += n
 	}
 }
 
@@ -79,7 +89,7 @@ print_int_base_to_buffer :: proc(buffer: ^[]byte, i, base: int) {
 	}
 	for i > 0 {
 		buf[len] = PRINT__NUM_TO_CHAR_TABLE[i % base]
-		len++;
+		len++
 		i /= base
 	}
 
@@ -171,12 +181,32 @@ print__f64 :: proc(buffer: ^[]byte, f: f64, decimal_places: int) {
 
 print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 	using Type_Info
-	match type arg.type_info -> info {
+	match type info : arg.type_info {
 	case Named:
 		a: any
 		a.type_info = info.base
 		a.data = arg.data
-		print_any_to_buffer(buf, a)
+		match type b : info.base {
+		case Struct:
+			print_string_to_buffer(buf, info.name)
+			print_string_to_buffer(buf, "{")
+			for i := 0; i < len(b.fields); i++ {
+				f := b.fields[i];
+				if i > 0 {
+					print_string_to_buffer(buf, ", ")
+				}
+				print_any_to_buffer(buf, f.name)
+				print_string_to_buffer(buf, " = ")
+				v: any
+				v.type_info = f.type_info
+				v.data = ptr_offset(arg.data as ^u8, f.offset)
+				print_any_to_buffer(buf, v)
+			}
+			print_string_to_buffer(buf, "}")
+
+		default:
+			print_any_to_buffer(buf, a)
+		}
 
 	case Integer:
 		if info.signed {
@@ -243,11 +273,59 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 		print_any_to_buffer(buf, v)
 
 
-	case Array:     print_string_to_buffer(buf, "(array)")
-	case Slice:     print_string_to_buffer(buf, "(slice)")
-	case Vector:    print_string_to_buffer(buf, "(vector)")
+	case Array:
+		print_string_to_buffer(buf, "[")
+		for i := 0; i < info.len; i++ {
+			if i > 0 {
+				print_string_to_buffer(buf, ", ")
+			}
 
-	case Struct:    print_string_to_buffer(buf, "(struct)")
+			elem: any
+			elem.data = (arg.data as int + i*info.elem_size) as rawptr
+			elem.type_info = info.elem
+			print_any_to_buffer(buf, elem)
+		}
+		print_string_to_buffer(buf, "]")
+
+	case Slice:
+		slice := arg.data as ^struct { data: rawptr; len, cap: int }
+		print_string_to_buffer(buf, "[")
+		for i := 0; i < slice.len; i++ {
+			if i > 0 {
+				print_string_to_buffer(buf, ", ")
+			}
+
+			elem: any
+			elem.data = (slice.data as int + i*info.elem_size) as rawptr
+			elem.type_info = info.elem
+			print_any_to_buffer(buf, elem)
+		}
+		print_string_to_buffer(buf, "]")
+
+	case Vector:
+		print_string_to_buffer(buf, "<")
+		for i := 0; i < info.len; i++ {
+			if i > 0 {
+				print_string_to_buffer(buf, ", ")
+			}
+
+			elem: any
+			elem.data = (arg.data as int + i*info.elem_size) as rawptr
+			elem.type_info = info.elem
+			print_any_to_buffer(buf, elem)
+		}
+		print_string_to_buffer(buf, ">")
+
+
+	case Struct:
+		print_string_to_buffer(buf, "(struct ")
+		for i := 0; i < len(info.fields); i++ {
+			if i > 0 {
+				print_string_to_buffer(buf, ", ")
+			}
+			print_any_to_buffer(buf, info.fields[i].name)
+		}
+		print_string_to_buffer(buf, ")")
 	case Union:     print_string_to_buffer(buf, "(union)")
 	case Raw_Union: print_string_to_buffer(buf, "(raw_union)")
 	case Procedure:
@@ -259,12 +337,34 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 	}
 }
 
+type_info_is_string :: proc(info: ^Type_Info) -> bool {
+	using Type_Info
+	if info == null {
+		return false
+	}
+
+	for {
+		match type i : info {
+		case Named:
+			info = i.base
+			continue
+		case String:
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
+
 print_to_buffer :: proc(buf: ^[]byte, args: ..any) {
+	prev_string := false
 	for i := 0; i < len(args); i++ {
+		arg := args[i]
 		if i > 0 {
 			print_space_to_buffer(buf)
 		}
-		print_any_to_buffer(buf, args[i])
+		print_any_to_buffer(buf, arg)
 	}
 }
 

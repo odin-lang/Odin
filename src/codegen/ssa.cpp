@@ -319,7 +319,7 @@ void ssa_module_init(ssaModule *m, Checker *c) {
 		token.string = name;
 
 
-		isize count = gb_array_count(c->info.type_info_types.entries);
+		isize count = gb_array_count(c->info.type_info_map.entries);
 		Entity *e = make_entity_variable(m->allocator, NULL, token, make_type_array(m->allocator, t_type_info, count));
 		ssaValue *g = ssa_make_value_global(m->allocator, e, NULL);
 		g->Global.is_private  = true;
@@ -881,6 +881,29 @@ ssaValue *ssa_lvalue_load(ssaProcedure *proc, ssaAddr lval) {
 }
 
 
+isize ssa_type_info_index(CheckerInfo *info, Type *type) {
+	isize entry_index = -1;
+	HashKey key = hash_pointer(type);
+	auto *found_entry_index = map_get(&info->type_info_map, key);
+	if (found_entry_index) {
+		entry_index = *found_entry_index;
+	}
+	if (entry_index < 0) {
+		// NOTE(bill): Do manual search
+		// TODO(bill): This is O(n) and can be very slow
+		gb_for_array(i, info->type_info_map.entries){
+			auto *e = &info->type_info_map.entries[i];
+			Type *prev_type = cast(Type *)cast(uintptr)e->key.key;
+			if (are_types_identical(prev_type, type)) {
+				entry_index = e->value;
+				map_set(&info->type_info_map, key, entry_index);
+				break;
+			}
+		}
+	}
+	GB_ASSERT(entry_index >= 0);
+	return entry_index;
+}
 
 
 
@@ -1540,20 +1563,8 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 		data = ssa_emit_conv(proc, data, t_rawptr);
 
 
-		MapFindResult fr = map__find(&info->type_info_types, hash_pointer(src_type));
-		isize entry_index = fr.entry_index;
-		if (entry_index < 0) {
-			// NOTE(bill): Do manual search
-			// TODO(bill): This is O(n) and can be very slow
-			gb_for_array(i, info->type_info_types.entries){
-				auto *e = &info->type_info_types.entries[i];
-				Type *t = e->value;
-				if (are_types_identical(t, src_type)) {
-					entry_index = i;
-					break;
-				}
-			}
-		}
+		isize entry_index = ssa_type_info_index(info, src_type);
+
 		ssaValue *ti = ssa_emit_struct_gep(proc, type_info_data, entry_index, t_type_info_ptr);
 
 		ssaValue *gep0 = ssa_emit_struct_gep(proc, result, v_zero32, make_type_pointer(proc->module->allocator, t_type_info_ptr));
@@ -2251,12 +2262,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssaValue *type_info_data = *found;
 					ssaValue *x = ssa_build_expr(proc, ce->args[0]);
 					Type *t = default_type(type_of_expr(proc->module->info, ce->args[0]));
-					MapFindResult fr = map__find(&proc->module->info->type_info_types, hash_pointer(t));
-					GB_ASSERT(fr.entry_index >= 0);
-					// Zero is null and void
-					isize offset = fr.entry_index;
+					isize entry_index = ssa_type_info_index(proc->module->info, t);
 
-					ssaValue *gep = ssa_emit_struct_gep(proc, type_info_data, offset, t_type_info_ptr);
+					ssaValue *gep = ssa_emit_struct_gep(proc, type_info_data, entry_index, t_type_info_ptr);
 					return gep;
 				} break;
 				}
@@ -2369,6 +2377,14 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 }
 
 
+ssaValue *ssa_emit_global_string(ssaProcedure *proc, ExactValue value) {
+	GB_ASSERT(value.kind == ExactValue_String);
+	ssaValue *global_array = ssa_add_global_string_array(proc, value);
+	ssaValue *elem = ssa_array_elem(proc, global_array);
+	ssaValue *len = ssa_array_len(proc, ssa_emit_load(proc, global_array));
+	return ssa_emit_string(proc, elem, len);
+}
+
 ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 	expr = unparen_expr(expr);
 
@@ -2381,10 +2397,7 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 
 			// TODO(bill): Optimize by not allocating everytime
 			if (tv->value.value_string.len > 0) {
-				ssaValue *global_array = ssa_add_global_string_array(proc, tv->value);
-				ssaValue *elem = ssa_array_elem(proc, global_array);
-				ssaValue *len = ssa_array_len(proc, ssa_emit_load(proc, global_array));
-				return ssa_emit_string(proc, elem, len);
+				return ssa_emit_global_string(proc, tv->value);
 			} else {
 				ssaValue *null_string = ssa_add_local_generated(proc, t_string);
 				return ssa_emit_load(proc, null_string);

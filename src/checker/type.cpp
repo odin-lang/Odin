@@ -352,24 +352,27 @@ gb_global Type *t_untyped_rune    = &basic_types[Basic_UntypedRune];
 gb_global Type *t_byte            = &basic_type_aliases[Basic_byte];
 gb_global Type *t_rune            = &basic_type_aliases[Basic_rune];
 
-gb_global Type *t_type_info           = NULL;
-gb_global Type *t_type_info_ptr       = NULL;
+gb_global Type *t_type_info            = NULL;
+gb_global Type *t_type_info_ptr        = NULL;
+gb_global Type *t_type_info_member     = NULL;
+gb_global Type *t_type_info_member_ptr = NULL;
 
-gb_global Type *t_type_info_named     = NULL;
-gb_global Type *t_type_info_integer   = NULL;
-gb_global Type *t_type_info_float     = NULL;
-gb_global Type *t_type_info_string    = NULL;
-gb_global Type *t_type_info_boolean   = NULL;
-gb_global Type *t_type_info_pointer   = NULL;
-gb_global Type *t_type_info_procedure = NULL;
-gb_global Type *t_type_info_array     = NULL;
-gb_global Type *t_type_info_slice     = NULL;
-gb_global Type *t_type_info_vector    = NULL;
-gb_global Type *t_type_info_struct    = NULL;
-gb_global Type *t_type_info_union     = NULL;
-gb_global Type *t_type_info_raw_union = NULL;
-gb_global Type *t_type_info_enum      = NULL;
-gb_global Type *t_type_info_any       = NULL;
+gb_global Type *t_type_info_named      = NULL;
+gb_global Type *t_type_info_integer    = NULL;
+gb_global Type *t_type_info_float      = NULL;
+gb_global Type *t_type_info_string     = NULL;
+gb_global Type *t_type_info_boolean    = NULL;
+gb_global Type *t_type_info_pointer    = NULL;
+gb_global Type *t_type_info_procedure  = NULL;
+gb_global Type *t_type_info_array      = NULL;
+gb_global Type *t_type_info_slice      = NULL;
+gb_global Type *t_type_info_vector     = NULL;
+gb_global Type *t_type_info_tuple      = NULL;
+gb_global Type *t_type_info_struct     = NULL;
+gb_global Type *t_type_info_union      = NULL;
+gb_global Type *t_type_info_raw_union  = NULL;
+gb_global Type *t_type_info_enum       = NULL;
+gb_global Type *t_type_info_any        = NULL;
 
 
 

@@ -4,9 +4,9 @@
 // The compiler relies upon this _exact_ order
 Type_Info :: union {
 	Member :: struct {
-		name:   string
-		type_:  ^Type_Info
-		offset: int
+		name:      string
+		type_info: ^Type_Info
+		offset:    int
 	}
 	Record :: struct {
 		fields: []Member // NOTE(bill): This will need to be allocated on the heap
@@ -32,15 +32,19 @@ Type_Info :: union {
 	Procedure: struct{}
 	Array: struct {
 		elem: ^Type_Info
-		count: int
+		elem_size: int
+		len: int
 	}
 	Slice: struct {
 		elem: ^Type_Info
+		elem_size: int
 	}
 	Vector: struct {
 		elem: ^Type_Info
-		count: int
+		elem_size: int
+		len: int
 	}
+	Tuple:     Record
 	Struct:    Record
 	Union:     Record
 	Raw_Union: Record

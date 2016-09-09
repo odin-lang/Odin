@@ -2261,10 +2261,17 @@ AstNode *parse_match_stmt(AstFile *f) {
 	AstNode *body = NULL;
 	Token open, close;
 
+
+
 	if (allow_token(f, Token_type)) {
-		tag = parse_expr(f, true);
-		expect_token(f, Token_ArrowRight);
+		isize prev_level = f->expr_level;
+		f->expr_level = -1;
+
 		AstNode *var = parse_identifier(f);
+		expect_token(f, Token_Colon);
+		tag = parse_simple_stmt(f);
+
+		f->expr_level = prev_level;
 
 		open = expect_token(f, Token_OpenBrace);
 		AstNodeArray list = make_ast_node_array(f);
@@ -2277,6 +2284,7 @@ AstNode *parse_match_stmt(AstFile *f) {
 		close = expect_token(f, Token_CloseBrace);
 		body = make_block_stmt(f, list, open, close);
 
+		tag = convert_stmt_to_expr(f, tag, make_string("type match expression"));
 		return make_type_match_stmt(f, token, tag, var, body);
 	} else {
 		if (f->cursor[0].kind != Token_OpenBrace) {

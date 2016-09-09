@@ -190,17 +190,16 @@ void ssa_gen_tree(ssaGen *s) {
 			Type *t_string_ptr        = make_type_pointer(a, t_string);
 			Type *t_type_info_ptr_ptr = make_type_pointer(a, t_type_info_ptr);
 
+
 			auto get_type_info_ptr = [](ssaProcedure *proc, ssaValue *type_info_data, Type *type) -> ssaValue * {
-				auto *info = proc->module->info;
-				MapFindResult fr = map__find(&info->type_info_types, hash_pointer(type));
-				GB_ASSERT(fr.entry_index >= 0);
-				return ssa_emit_struct_gep(proc, type_info_data, fr.entry_index, t_type_info_ptr);
+				return ssa_emit_struct_gep(proc, type_info_data,
+				                           ssa_type_info_index(proc->module->info, type),
+				                           t_type_info_ptr);
 			};
 
-
-			gb_for_array(entry_index, info->type_info_types.entries) {
-				auto *entry = &info->type_info_types.entries[entry_index];
-				Type *t = entry->value;
+			gb_for_array(entry_index, info->type_info_map.entries) {
+				auto *entry = &info->type_info_map.entries[entry_index];
+				Type *t = cast(Type *)cast(uintptr)entry->key.key;
 
 				ssaValue *tag = NULL;
 
@@ -270,29 +269,120 @@ void ssa_gen_tree(ssaGen *s) {
 					tag = ssa_add_local_generated(proc, t_type_info_array);
 					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Array.elem);
 					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_type_info_ptr_ptr), gep);
+
+					isize ez = type_size_of(m->sizes, a, t->Array.elem);
+					ssaValue *elem_size = ssa_emit_struct_gep(proc, tag, v_one32, t_int_ptr);
+					ssa_emit_store(proc, elem_size, ssa_make_value_constant(a, t_int, make_exact_value_integer(ez)));
+
+					ssaValue *count = ssa_emit_struct_gep(proc, tag, v_two32, t_int_ptr);
+					ssa_emit_store(proc, count, ssa_make_value_constant(a, t_int, make_exact_value_integer(t->Array.count)));
+
 				} break;
 				case Type_Slice: {
 					tag = ssa_add_local_generated(proc, t_type_info_slice);
 					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Slice.elem);
 					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_type_info_ptr_ptr), gep);
+
+					isize ez = type_size_of(m->sizes, a, t->Slice.elem);
+					ssaValue *elem_size = ssa_emit_struct_gep(proc, tag, v_one32, t_int_ptr);
+					ssa_emit_store(proc, elem_size, ssa_make_value_constant(a, t_int, make_exact_value_integer(ez)));
+
 				} break;
 				case Type_Vector: {
 					tag = ssa_add_local_generated(proc, t_type_info_vector);
 					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Vector.elem);
 					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_type_info_ptr_ptr), gep);
+
+					isize ez = type_size_of(m->sizes, a, t->Vector.elem);
+					ssaValue *elem_size = ssa_emit_struct_gep(proc, tag, v_one32, t_int_ptr);
+					ssa_emit_store(proc, elem_size, ssa_make_value_constant(a, t_int, make_exact_value_integer(ez)));
+
+					ssaValue *count = ssa_emit_struct_gep(proc, tag, v_two32, t_int_ptr);
+					ssa_emit_store(proc, count, ssa_make_value_constant(a, t_int, make_exact_value_integer(t->Vector.count)));
+
 				} break;
 				case Type_Record: {
 					switch (t->Record.kind) {
 					// TODO(bill): Record members for `Type_Info`
-					case TypeRecord_Struct:
+					case TypeRecord_Struct: {
 						tag = ssa_add_local_generated(proc, t_type_info_struct);
-						break;
+						ssaValue **args = gb_alloc_array(a, ssaValue *, 1);
+						isize element_size = type_size_of(m->sizes, a, t_type_info_member);
+						isize allocation_size = t->Record.field_count * element_size;
+						ssaValue *size = ssa_make_value_constant(a, t_int, make_exact_value_integer(allocation_size));
+						args[0] = size;
+						ssaValue *memory = ssa_emit_global_call(proc, "alloc", args, 1);
+						memory = ssa_emit_conv(proc, memory, t_type_info_member_ptr);
+
+						type_set_offsets(m->sizes, a, t); // NOTE(bill): Just incase the offsets have not been set yet
+						for (isize i = 0; i < t->Record.field_count; i++) {
+							ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_value_constant(a, t_int, make_exact_value_integer(i)));
+							ssaValue *name      = ssa_emit_struct_gep(proc, field, v_zero32, t_string_ptr);
+							ssaValue *type_info = ssa_emit_struct_gep(proc, field, v_one32, t_type_info_ptr_ptr);
+							ssaValue *offset    = ssa_emit_struct_gep(proc, field, v_two32, t_int_ptr);
+
+							Entity *f = t->Record.fields[i];
+							ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
+							i64 foffset = t->Record.struct_offsets[i];
+
+							ssa_emit_store(proc, name, ssa_emit_global_string(proc, make_exact_value_string(f->token.string)));
+							ssa_emit_store(proc, type_info, tip);
+							ssa_emit_store(proc, offset, ssa_make_value_constant(a, t_int, make_exact_value_integer(foffset)));
+						}
+
+						Type *slice_type = make_type_slice(a, t_type_info_member);
+						Type *slice_type_ptr = make_type_pointer(a, slice_type);
+						ssaValue *slice = ssa_emit_struct_gep(proc, tag, v_zero32, slice_type_ptr);
+						ssaValue *field_count = ssa_make_value_constant(a, t_int, make_exact_value_integer(t->Record.field_count));
+
+						ssaValue *elem = ssa_emit_struct_gep(proc, slice, v_zero32, make_type_pointer(a, t_type_info_member_ptr));
+						ssaValue *len  = ssa_emit_struct_gep(proc, slice, v_one32,  make_type_pointer(a, t_int_ptr));
+						ssaValue *cap  = ssa_emit_struct_gep(proc, slice, v_two32,  make_type_pointer(a, t_int_ptr));
+
+						ssa_emit_store(proc, elem, memory);
+						ssa_emit_store(proc, len, field_count);
+						ssa_emit_store(proc, cap, field_count);
+					} break;
 					case TypeRecord_Union:
 						tag = ssa_add_local_generated(proc, t_type_info_union);
 						break;
-					case TypeRecord_RawUnion:
+					case TypeRecord_RawUnion: {
 						tag = ssa_add_local_generated(proc, t_type_info_raw_union);
-						break;
+						ssaValue **args = gb_alloc_array(a, ssaValue *, 1);
+						isize element_size = type_size_of(m->sizes, a, t_type_info_member);
+						isize allocation_size = t->Record.field_count * element_size;
+						ssaValue *size = ssa_make_value_constant(a, t_int, make_exact_value_integer(allocation_size));
+						args[0] = size;
+						ssaValue *memory = ssa_emit_global_call(proc, "alloc", args, 1);
+						memory = ssa_emit_conv(proc, memory, t_type_info_member_ptr);
+
+						for (isize i = 0; i < t->Record.field_count; i++) {
+							ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_value_constant(a, t_int, make_exact_value_integer(i)));
+							ssaValue *name      = ssa_emit_struct_gep(proc, field, v_zero32, t_string_ptr);
+							ssaValue *type_info = ssa_emit_struct_gep(proc, field, v_one32, t_type_info_ptr_ptr);
+							ssaValue *offset    = ssa_emit_struct_gep(proc, field, v_two32, t_int_ptr);
+
+							Entity *f = t->Record.fields[i];
+							ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
+
+							ssa_emit_store(proc, name, ssa_emit_global_string(proc, make_exact_value_string(f->token.string)));
+							ssa_emit_store(proc, type_info, tip);
+							ssa_emit_store(proc, offset, ssa_make_value_constant(a, t_int, make_exact_value_integer(0)));
+						}
+
+						Type *slice_type = make_type_slice(a, t_type_info_member);
+						Type *slice_type_ptr = make_type_pointer(a, slice_type);
+						ssaValue *slice = ssa_emit_struct_gep(proc, tag, v_zero32, slice_type_ptr);
+						ssaValue *field_count = ssa_make_value_constant(a, t_int, make_exact_value_integer(t->Record.field_count));
+
+						ssaValue *elem = ssa_emit_struct_gep(proc, slice, v_zero32, make_type_pointer(a, t_type_info_member_ptr));
+						ssaValue *len  = ssa_emit_struct_gep(proc, slice, v_one32,  make_type_pointer(a, t_int_ptr));
+						ssaValue *cap  = ssa_emit_struct_gep(proc, slice, v_two32,  make_type_pointer(a, t_int_ptr));
+
+						ssa_emit_store(proc, elem, memory);
+						ssa_emit_store(proc, len, field_count);
+						ssa_emit_store(proc, cap, field_count);
+					} break;
 					case TypeRecord_Enum: {
 						tag = ssa_add_local_generated(proc, t_type_info_enum);
 						Type *enum_base = t->Record.enum_base;

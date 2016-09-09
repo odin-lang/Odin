@@ -208,7 +208,8 @@ struct CheckerInfo {
 	Map<ExpressionInfo>    untyped;         // Key: AstNode * | Expression -> ExpressionInfo
 	Map<DeclInfo *>        entities;        // Key: Entity *
 	Map<Entity *>          foreign_procs;   // Key: String
-	Map<Type *>            type_info_types; // Key: Type *
+	Map<isize>             type_info_map;   // Key: Type *
+	isize                  type_info_index;
 };
 
 struct Checker {
@@ -441,7 +442,8 @@ void init_checker_info(CheckerInfo *i) {
 	map_init(&i->entities,        a);
 	map_init(&i->untyped,         a);
 	map_init(&i->foreign_procs,   a);
-	map_init(&i->type_info_types, a);
+	map_init(&i->type_info_map,   a);
+	i->type_info_index = 0;
 
 }
 
@@ -453,7 +455,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->entities);
 	map_destroy(&i->untyped);
 	map_destroy(&i->foreign_procs);
-	map_destroy(&i->type_info_types);
+	map_destroy(&i->type_info_map);
 }
 
 
@@ -670,6 +672,82 @@ void add_file_entity(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d) {
 	map_set(&c->info.entities, hash_pointer(e), d);
 }
 
+void add_type_info_type(Checker *c, Type *t) {
+	if (t == NULL) {
+		return;
+	}
+	t = default_type(t);
+	if (map_get(&c->info.type_info_map, hash_pointer(t)) != NULL) {
+		// Types have already been added
+		return;
+	}
+
+	isize found = -1;
+	gb_for_array(i, c->info.type_info_map.entries) {
+		auto *e = &c->info.type_info_map.entries[i];
+		Type *prev_type = cast(Type *)cast(uintptr)e->key.key;
+		if (are_types_identical(t, prev_type)) {
+			found = i;
+			break;
+		}
+	}
+	if (found >= 0) {
+		// Duplicate entry
+		map_set(&c->info.type_info_map, hash_pointer(t), found);
+	} else {
+		// Unique entry
+		isize index = c->info.type_info_index;
+		c->info.type_info_index++;
+		map_set(&c->info.type_info_map, hash_pointer(t), index);
+	}
+
+
+	if (t->kind == Type_Named) {
+		// NOTE(bill): Just in case
+		add_type_info_type(c, t->Named.base);
+		return;
+	}
+
+	Type *bt = get_base_type(t);
+	switch (bt->kind) {
+	case Type_Basic: {
+		if (bt->Basic.kind == Basic_string) {
+			add_type_info_type(c, make_type_pointer(c->allocator, t_u8));
+			add_type_info_type(c, t_int);
+		}
+	} break;
+	case Type_Array:
+		add_type_info_type(c, bt->Array.elem);
+		add_type_info_type(c, make_type_pointer(c->allocator, bt->Array.elem));
+		add_type_info_type(c, t_int);
+		break;
+	case Type_Slice:
+		add_type_info_type(c, bt->Slice.elem);
+		add_type_info_type(c, make_type_pointer(c->allocator, bt->Slice.elem));
+		add_type_info_type(c, t_int);
+		break;
+	case Type_Vector:  add_type_info_type(c, bt->Vector.elem);  break;
+	case Type_Pointer: add_type_info_type(c, bt->Pointer.elem); break;
+	case Type_Record: {
+		switch (bt->Record.kind) {
+		case TypeRecord_Enum:
+			add_type_info_type(c, bt->Record.enum_base);
+			break;
+		default:
+			for (isize i = 0; i < bt->Record.field_count; i++) {
+				Entity *f = bt->Record.fields[i];
+				add_type_info_type(c, f->type);
+			}
+			break;
+		}
+	} break;
+	}
+	// TODO(bill): Type info for procedures and tuples
+	// TODO(bill): Remove duplicate identical types efficiently
+}
+
+
+
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body) {
 	ProcedureInfo info = {};
@@ -866,7 +944,11 @@ void check_parsed_files(Checker *c) {
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
 
 		auto *record = &get_base_type(e->type)->Record;
-		GB_ASSERT_MSG(record->field_count == 15, "Internal Compiler Error: Invalid `Type_Info` layout");
+
+		t_type_info_member = record->other_fields[0]->type;
+		t_type_info_member_ptr = make_type_pointer(c->allocator, t_type_info_member);
+
+		GB_ASSERT_MSG(record->field_count == 16, "Internal Compiler Error: Invalid `Type_Info` layout");
 		t_type_info_named     = record->fields[ 1]->type;
 		t_type_info_integer   = record->fields[ 2]->type;
 		t_type_info_float     = record->fields[ 3]->type;
@@ -877,11 +959,11 @@ void check_parsed_files(Checker *c) {
 		t_type_info_array     = record->fields[ 8]->type;
 		t_type_info_slice     = record->fields[ 9]->type;
 		t_type_info_vector    = record->fields[10]->type;
-		t_type_info_struct    = record->fields[11]->type;
-		t_type_info_union     = record->fields[12]->type;
-		t_type_info_raw_union = record->fields[13]->type;
-		t_type_info_enum      = record->fields[14]->type;
-		// t_type_info_any       = record->fields[15]->type;
+		t_type_info_tuple     = record->fields[11]->type;
+		t_type_info_struct    = record->fields[12]->type;
+		t_type_info_union     = record->fields[13]->type;
+		t_type_info_raw_union = record->fields[14]->type;
+		t_type_info_enum      = record->fields[15]->type;
 	}
 
 	check_global_entity(c, Entity_Constant);
