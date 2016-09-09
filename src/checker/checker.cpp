@@ -133,6 +133,10 @@ enum BuiltinProcId {
 	BuiltinProc_offset_of,
 	BuiltinProc_offset_of_val,
 	BuiltinProc_type_of_val,
+
+	BuiltinProc_type_info,
+
+	BuiltinProc_compile_assert,
 	BuiltinProc_assert,
 
 	BuiltinProc_len,
@@ -150,7 +154,6 @@ enum BuiltinProcId {
 	BuiltinProc_max,
 	BuiltinProc_abs,
 
-	BuiltinProc_type_info,
 
 	BuiltinProc_Count,
 };
@@ -174,6 +177,10 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("offset_of"),        2, false, Expr_Expr},
 	{STR_LIT("offset_of_val"),    1, false, Expr_Expr},
 	{STR_LIT("type_of_val"),      1, false, Expr_Expr},
+
+	{STR_LIT("type_info"),        1, false, Expr_Expr},
+
+	{STR_LIT("compile_assert"),   1, false, Expr_Stmt},
 	{STR_LIT("assert"),           1, false, Expr_Stmt},
 
 	{STR_LIT("len"),              1, false, Expr_Expr},
@@ -191,7 +198,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("max"),              2, false, Expr_Expr},
 	{STR_LIT("abs"),              1, false, Expr_Expr},
 
-	{STR_LIT("type_info"),        1, false, Expr_Expr},
 };
 
 struct CheckerContext {
@@ -682,25 +688,26 @@ void add_type_info_type(Checker *c, Type *t) {
 		return;
 	}
 
-	isize found = -1;
+	isize ti_index = -1;
 	gb_for_array(i, c->info.type_info_map.entries) {
 		auto *e = &c->info.type_info_map.entries[i];
 		Type *prev_type = cast(Type *)cast(uintptr)e->key.key;
 		if (are_types_identical(t, prev_type)) {
-			found = i;
+			// Duplicate entry
+			ti_index = i;
 			break;
 		}
 	}
-	if (found >= 0) {
-		// Duplicate entry
-		map_set(&c->info.type_info_map, hash_pointer(t), found);
-	} else {
+	if (ti_index < 0) {
 		// Unique entry
-		isize index = c->info.type_info_index;
+		// NOTE(bill): map entries grow linearly and in order
+		ti_index = c->info.type_info_index;
 		c->info.type_info_index++;
-		map_set(&c->info.type_info_map, hash_pointer(t), index);
 	}
+	map_set(&c->info.type_info_map, hash_pointer(t), ti_index);
 
+
+	// Add nested types
 
 	if (t->kind == Type_Named) {
 		// NOTE(bill): Just in case
@@ -716,6 +723,11 @@ void add_type_info_type(Checker *c, Type *t) {
 			add_type_info_type(c, t_int);
 		}
 	} break;
+
+	case Type_Pointer:
+		add_type_info_type(c, bt->Pointer.elem);
+		break;
+
 	case Type_Array:
 		add_type_info_type(c, bt->Array.elem);
 		add_type_info_type(c, make_type_pointer(c->allocator, bt->Array.elem));
@@ -726,8 +738,11 @@ void add_type_info_type(Checker *c, Type *t) {
 		add_type_info_type(c, make_type_pointer(c->allocator, bt->Slice.elem));
 		add_type_info_type(c, t_int);
 		break;
-	case Type_Vector:  add_type_info_type(c, bt->Vector.elem);  break;
-	case Type_Pointer: add_type_info_type(c, bt->Pointer.elem); break;
+	case Type_Vector:
+		add_type_info_type(c, bt->Vector.elem);
+		add_type_info_type(c, t_int);
+		break;
+
 	case Type_Record: {
 		switch (bt->Record.kind) {
 		case TypeRecord_Enum:
@@ -741,9 +756,20 @@ void add_type_info_type(Checker *c, Type *t) {
 			break;
 		}
 	} break;
+
+	case Type_Tuple:
+		for (isize i = 0; i < bt->Tuple.variable_count; i++) {
+			Entity *var = bt->Tuple.variables[i];
+			add_type_info_type(c, var->type);
+		}
+		break;
+
+	case Type_Proc:
+		add_type_info_type(c, bt->Proc.params);
+		add_type_info_type(c, bt->Proc.results);
+		break;
 	}
-	// TODO(bill): Type info for procedures and tuples
-	// TODO(bill): Remove duplicate identical types efficiently
+
 }
 
 

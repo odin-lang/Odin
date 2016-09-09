@@ -16,7 +16,7 @@ print_string_to_buffer :: proc(buf: ^[]byte, s: string) {
 	if slice.len < slice.cap {
 		n := min(slice.cap-slice.len, len(s))
 		offset := ((slice.data as int) + slice.len) as ^byte
-		memory_move(offset, ^s[0], n)
+		memory_copy(offset, ^s[0], n)
 		slice.len += n
 	}
 }

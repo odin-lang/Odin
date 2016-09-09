@@ -42,7 +42,7 @@ INVALID_HANDLE_VALUE :: (-1 as int) as HANDLE
 
 WNDPROC :: type proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT
 
-WNDCLASSEXA :: struct {
+WNDCLASSEXA :: struct #ordered {
 	size, style:           u32
 	wnd_proc:              WNDPROC
 	cls_extra, wnd_extra:  i32
@@ -54,7 +54,7 @@ WNDCLASSEXA :: struct {
 	sm:                    HICON
 }
 
-MSG :: struct {
+MSG :: struct #ordered {
 	hwnd:    HWND
 	message: u32
 	wparam:  WPARAM
@@ -191,7 +191,7 @@ PROC  :: type proc()
 wglCreateContextAttribsARBType :: type proc(hdc: HDC, hshareContext: rawptr, attribList: ^i32) -> HGLRC
 
 
-PIXELFORMATDESCRIPTOR :: struct  {
+PIXELFORMATDESCRIPTOR :: struct #ordered {
 	size,
 	version,
 	flags: u32

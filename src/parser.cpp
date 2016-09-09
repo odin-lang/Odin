@@ -245,6 +245,7 @@ AST_NODE_KIND(_TypeBegin, "", struct{}) \
 		AstNodeArray decls; \
 		isize decl_count; \
 		b32 is_packed; \
+		b32 is_ordered; \
 	}) \
 	AST_NODE_KIND(UnionType, "union type", struct { \
 		Token token; \
@@ -815,12 +816,13 @@ gb_inline AstNode *make_vector_type(AstFile *f, Token token, AstNode *count, Ast
 	return result;
 }
 
-gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNodeArray decls, isize decl_count, b32 is_packed) {
+gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNodeArray decls, isize decl_count, b32 is_packed, b32 is_ordered) {
 	AstNode *result = make_node(f, AstNode_StructType);
 	result->StructType.token = token;
 	result->StructType.decls = decls;
 	result->StructType.decl_count = decl_count;
 	result->StructType.is_packed = is_packed;
+	result->StructType.is_ordered = is_ordered;
 	return result;
 }
 
@@ -1826,12 +1828,15 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 	case Token_struct: {
 		Token token = expect_token(f, Token_struct);
 		b32 is_packed = false;
-		if (allow_token(f, Token_Hash)) {
+		b32 is_ordered = false;
+		while (allow_token(f, Token_Hash)) {
 			Token tag = expect_token(f, Token_Identifier);
 			if (are_strings_equal(tag.string, make_string("packed"))) {
 				is_packed = true;
-			} else {
-				ast_file_err(f, tag, "Expected a `#packed` tag");
+			} else if (are_strings_equal(tag.string, make_string("ordered"))) {
+				is_ordered = true;
+			}  else {
+				ast_file_err(f, tag, "Expected a `#packed` or `#ordered` tag");
 			}
 		}
 
@@ -1840,7 +1845,7 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		AstNodeArray decls = parse_struct_params(f, &decl_count, true);
 		Token close = expect_token(f, Token_CloseBrace);
 
-		return make_struct_type(f, token, decls, decl_count, is_packed);
+		return make_struct_type(f, token, decls, decl_count, is_packed, is_ordered);
 	} break;
 
 	case Token_union: {

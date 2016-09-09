@@ -386,6 +386,22 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 }
 
 
+// TODO(bill): Cleanup struct field reordering
+gb_global BaseTypeSizes __checker_sizes = {};
+gb_global gbAllocator   __checker_allocator = {};
+
+GB_COMPARE_PROC(cmp_struct_entity_size) {
+	// NOTE(bill): Biggest to smallest
+	Entity *x = *(Entity **)a;
+	Entity *y = *(Entity **)b;
+	i64 xs = type_size_of(__checker_sizes, __checker_allocator, x->type);
+	i64 ys = type_size_of(__checker_sizes, __checker_allocator, y->type);
+	if (xs == ys) {
+		return string_cmp(&x->token.string, &y->token.string);
+	}
+	return xs > ys ? -1 : xs < ys;
+}
+
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecker *cycle_checker) {
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
@@ -414,7 +430,20 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecke
 
 	check_fields(c, node, st->decls, fields, field_count, other_fields, other_field_count, cycle_checker, make_string("struct"));
 
+	if (!st->is_packed && !st->is_ordered) {
+		// NOTE(bill): Reorder fields for reduced size/performance
+		// NOTE(bill): Hacky thing
+		__checker_sizes = c->sizes;
+		__checker_allocator = c->allocator;
+
+		// TODO(bill): Figure out rules more
+		// sorting rules
+		// compound literal order must match source not layout
+		// gb_sort_array(fields, field_count, cmp_struct_entity_size);
+	}
+
 	struct_type->Record.struct_is_packed  = st->is_packed;
+	struct_type->Record.struct_is_ordered = st->is_ordered;
 	struct_type->Record.fields            = fields;
 	struct_type->Record.field_count       = field_count;
 	struct_type->Record.other_fields      = other_fields;
@@ -1959,7 +1988,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	case BuiltinProc_size_of:
 	case BuiltinProc_align_of:
 	case BuiltinProc_offset_of:
-		// NOTE(bill): The first arg is a Type, this will be checked case by case
+	case BuiltinProc_type_info:
+		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 	default:
 		check_multi_expr(c, operand, ce->args[0]);
@@ -2178,6 +2208,34 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->mode = Addressing_Type;
 		break;
 
+
+	case BuiltinProc_type_info: {
+		// type_info :: proc(val_or_type) -> ^Type_Info
+		Operand op = {};
+		check_expr_or_type(c, &op, ce->args[0]);
+		add_type_info_type(c, op.type);
+		operand->mode = Addressing_Value;
+		operand->type = t_type_info_ptr;
+	} break;
+
+	case BuiltinProc_compile_assert:
+		// compile_assert :: proc(cond: bool)
+
+		if (!is_type_boolean(operand->type) && operand->mode != Addressing_Constant) {
+			gbString str = expr_to_string(ce->args[0]);
+			defer (gb_string_free(str));
+			error(&c->error_collector, ast_node_token(call),
+			      "`%s` is not a constant boolean", str);
+			return false;
+		}
+		if (!operand->value.value_bool) {
+			gbString str = expr_to_string(ce->args[0]);
+			defer (gb_string_free(str));
+			error(&c->error_collector, ast_node_token(call),
+			      "Compile time assertion: `%s`", str);
+		}
+		break;
+
 	case BuiltinProc_assert:
 		// assert :: proc(cond: bool)
 
@@ -2188,14 +2246,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			      "`%s` is not a boolean", str);
 			return false;
 		}
-		if (operand->mode == Addressing_Constant &&
-		    !operand->value.value_bool) {
-			gbString str = expr_to_string(ce->args[0]);
-			defer (gb_string_free(str));
-			error(&c->error_collector, ast_node_token(call),
-			      "Compile time assertion: `%s`", str);
-			return true;
-		}
+
 		if (operand->mode != Addressing_Constant) {
 			operand->mode = Addressing_NoValue;
 		}
@@ -2692,13 +2743,6 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 
 		operand->type = type;
-	} break;
-
-
-	case BuiltinProc_type_info: {
-		add_type_info_type(c, operand->type);
-		operand->mode = Addressing_Value;
-		operand->type = t_type_info_ptr;
 	} break;
 	}
 

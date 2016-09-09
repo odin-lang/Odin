@@ -43,6 +43,46 @@ gb_inline b32 are_strings_equal_ignore_case(String a, String b) {
 	return false;
 }
 
+GB_COMPARE_PROC(string_cmp) {
+	String x = *cast(String *)a;
+	String y = *cast(String *)b;
+
+	if (x.len == y.len &&
+	    x.text == y.text) {
+		return 0;
+	}
+
+	isize n = gb_min(x.len, y.len);
+
+	isize fast = n/gb_size_of(isize) + 1;
+	isize offset = (fast-1)*gb_size_of(isize);
+	isize curr_block = 0;
+	if (n <= gb_size_of(isize)) {
+		fast = 0;
+	}
+
+	isize *la = cast(isize *)x.text;
+	isize *lb = cast(isize *)y.text;
+
+	for (; curr_block < fast; curr_block++) {
+		if ((la[curr_block] ^ lb[curr_block]) != 0) {
+			for (isize pos = curr_block*gb_size_of(isize); pos < n; pos++) {
+				if ((x.text[pos] ^ y.text[pos]) != 0) {
+					return cast(int)x.text[pos] - cast(int)y.text[pos];
+				}
+			}
+		}
+	}
+
+	for (; offset < n; offset++) {
+		if ((x.text[offset] ^ y.text[offset]) != 0) {
+			return cast(int)x.text[offset] - cast(int)y.text[offset];
+		}
+	}
+
+	return 0;
+}
+
 
 gb_inline isize string_extension_position(String str) {
 	isize dot_pos = -1;

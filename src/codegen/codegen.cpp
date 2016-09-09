@@ -179,16 +179,25 @@ void ssa_gen_tree(ssaGen *s) {
 		}
 
 		{ // NOTE(bill): Setup type_info data
-			ssaValue **found = map_get(&proc->module->members, hash_string(make_string("__type_info_data")));
+			ssaValue *type_info_data = NULL;
+			ssaValue *type_info_member_data = NULL;
+
+			ssaValue **found = NULL;
+			found = map_get(&proc->module->members, hash_string(make_string("__type_info_data")));
 			GB_ASSERT(found != NULL);
-			ssaValue *type_info_data = *found;
+			type_info_data = *found;
+
+			found = map_get(&proc->module->members, hash_string(make_string("__type_info_member_data")));
+			GB_ASSERT(found != NULL);
+			type_info_member_data = *found;
+
 			CheckerInfo *info = proc->module->info;
 
-
-			Type *t_int_ptr           = make_type_pointer(a, t_int);
-			Type *t_bool_ptr          = make_type_pointer(a, t_bool);
-			Type *t_string_ptr        = make_type_pointer(a, t_string);
-			Type *t_type_info_ptr_ptr = make_type_pointer(a, t_type_info_ptr);
+			// Useful types
+			Type *t_int_ptr              = make_type_pointer(a, t_int);
+			Type *t_bool_ptr             = make_type_pointer(a, t_bool);
+			Type *t_string_ptr           = make_type_pointer(a, t_string);
+			Type *t_type_info_ptr_ptr    = make_type_pointer(a, t_type_info_ptr);
 
 
 			auto get_type_info_ptr = [](ssaProcedure *proc, ssaValue *type_info_data, Type *type) -> ssaValue * {
@@ -196,6 +205,15 @@ void ssa_gen_tree(ssaGen *s) {
 				                           ssa_type_info_index(proc->module->info, type),
 				                           t_type_info_ptr);
 			};
+
+			isize type_info_member_index = 0;
+
+			auto type_info_member_offset = [](ssaProcedure *proc, ssaValue *data, isize count, isize *index) -> ssaValue * {
+				ssaValue *offset = ssa_emit_struct_gep(proc, data, *index, t_type_info_member_ptr);
+				*index += count;
+				return offset;
+			};
+
 
 			gb_for_array(entry_index, info->type_info_map.entries) {
 				auto *entry = &info->type_info_map.entries[entry_index];
@@ -207,7 +225,9 @@ void ssa_gen_tree(ssaGen *s) {
 				case Type_Named: {
 					tag = ssa_add_local_generated(proc, t_type_info_named);
 
-					ssaValue *gsa  = ssa_add_global_string_array(proc, make_exact_value_string(t->Named.name));
+					// TODO(bill): Which is better? The mangled name or actual name?
+					// ssaValue *gsa  = ssa_add_global_string_array(proc, make_exact_value_string(t->Named.name));
+					ssaValue *gsa  = ssa_add_global_string_array(proc, make_exact_value_string(t->Named.type_name->token.string));
 					ssaValue *elem = ssa_array_elem(proc, gsa);
 					ssaValue *len  = ssa_array_len(proc, ssa_emit_load(proc, gsa));
 					ssaValue *name = ssa_emit_string(proc, elem, len);
@@ -303,16 +323,10 @@ void ssa_gen_tree(ssaGen *s) {
 				} break;
 				case Type_Record: {
 					switch (t->Record.kind) {
-					// TODO(bill): Record members for `Type_Info`
 					case TypeRecord_Struct: {
 						tag = ssa_add_local_generated(proc, t_type_info_struct);
-						ssaValue **args = gb_alloc_array(a, ssaValue *, 1);
-						isize element_size = type_size_of(m->sizes, a, t_type_info_member);
-						isize allocation_size = t->Record.field_count * element_size;
-						ssaValue *size = ssa_make_value_constant(a, t_int, make_exact_value_integer(allocation_size));
-						args[0] = size;
-						ssaValue *memory = ssa_emit_global_call(proc, "alloc", args, 1);
-						memory = ssa_emit_conv(proc, memory, t_type_info_member_ptr);
+
+						ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Record.field_count, &type_info_member_index);
 
 						type_set_offsets(m->sizes, a, t); // NOTE(bill): Just incase the offsets have not been set yet
 						for (isize i = 0; i < t->Record.field_count; i++) {
@@ -325,7 +339,9 @@ void ssa_gen_tree(ssaGen *s) {
 							ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
 							i64 foffset = t->Record.struct_offsets[i];
 
-							ssa_emit_store(proc, name, ssa_emit_global_string(proc, make_exact_value_string(f->token.string)));
+							if (f->token.string.len > 0) {
+								ssa_emit_store(proc, name, ssa_emit_global_string(proc, make_exact_value_string(f->token.string)));
+							}
 							ssa_emit_store(proc, type_info, tip);
 							ssa_emit_store(proc, offset, ssa_make_value_constant(a, t_int, make_exact_value_integer(foffset)));
 						}
@@ -348,13 +364,8 @@ void ssa_gen_tree(ssaGen *s) {
 						break;
 					case TypeRecord_RawUnion: {
 						tag = ssa_add_local_generated(proc, t_type_info_raw_union);
-						ssaValue **args = gb_alloc_array(a, ssaValue *, 1);
-						isize element_size = type_size_of(m->sizes, a, t_type_info_member);
-						isize allocation_size = t->Record.field_count * element_size;
-						ssaValue *size = ssa_make_value_constant(a, t_int, make_exact_value_integer(allocation_size));
-						args[0] = size;
-						ssaValue *memory = ssa_emit_global_call(proc, "alloc", args, 1);
-						memory = ssa_emit_conv(proc, memory, t_type_info_member_ptr);
+
+						ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Record.field_count, &type_info_member_index);
 
 						for (isize i = 0; i < t->Record.field_count; i++) {
 							ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_value_constant(a, t_int, make_exact_value_integer(i)));
@@ -365,7 +376,9 @@ void ssa_gen_tree(ssaGen *s) {
 							Entity *f = t->Record.fields[i];
 							ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
 
-							ssa_emit_store(proc, name, ssa_emit_global_string(proc, make_exact_value_string(f->token.string)));
+							if (f->token.string.len > 0) {
+								ssa_emit_store(proc, name, ssa_emit_global_string(proc, make_exact_value_string(f->token.string)));
+							}
 							ssa_emit_store(proc, type_info, tip);
 							ssa_emit_store(proc, offset, ssa_make_value_constant(a, t_int, make_exact_value_integer(0)));
 						}
@@ -395,12 +408,54 @@ void ssa_gen_tree(ssaGen *s) {
 					}
 				} break;
 
-				case Type_Tuple:
-					// TODO(bill): Type_Info for tuples
-					break;
-				case Type_Proc:
+				case Type_Tuple: {
+					tag = ssa_add_local_generated(proc, t_type_info_tuple);
+
+					ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Tuple.variable_count, &type_info_member_index);
+
+					for (isize i = 0; i < t->Tuple.variable_count; i++) {
+						ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_value_constant(a, t_int, make_exact_value_integer(i)));
+						ssaValue *name      = ssa_emit_struct_gep(proc, field, v_zero32, t_string_ptr);
+						ssaValue *type_info = ssa_emit_struct_gep(proc, field, v_one32, t_type_info_ptr_ptr);
+						// NOTE(bill): offset is not used for tuples
+
+						Entity *f = t->Tuple.variables[i];
+						ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
+
+						if (f->token.string.len > 0) {
+							ssa_emit_store(proc, name, ssa_emit_global_string(proc, make_exact_value_string(f->token.string)));
+						}
+						ssa_emit_store(proc, type_info, tip);
+					}
+
+					Type *slice_type = make_type_slice(a, t_type_info_member);
+					Type *slice_type_ptr = make_type_pointer(a, slice_type);
+					ssaValue *slice = ssa_emit_struct_gep(proc, tag, v_zero32, slice_type_ptr);
+					ssaValue *variable_count = ssa_make_value_constant(a, t_int, make_exact_value_integer(t->Tuple.variable_count));
+
+					ssaValue *elem = ssa_emit_struct_gep(proc, slice, v_zero32, make_type_pointer(a, t_type_info_member_ptr));
+					ssaValue *len  = ssa_emit_struct_gep(proc, slice, v_one32,  make_type_pointer(a, t_int_ptr));
+					ssaValue *cap  = ssa_emit_struct_gep(proc, slice, v_two32,  make_type_pointer(a, t_int_ptr));
+
+					ssa_emit_store(proc, elem, memory);
+					ssa_emit_store(proc, len, variable_count);
+					ssa_emit_store(proc, cap, variable_count);
+				} break;
+
+				case Type_Proc: {
+					tag = ssa_add_local_generated(proc, t_type_info_procedure);
+
+					ssaValue *params   = ssa_emit_struct_gep(proc, tag, v_zero32, t_type_info_ptr_ptr);
+					ssaValue *results  = ssa_emit_struct_gep(proc, tag, v_one32,  t_type_info_ptr_ptr);
+					ssaValue *variadic = ssa_emit_struct_gep(proc, tag, v_two32,  t_bool_ptr);
+
+
+					ssa_emit_store(proc, params,   get_type_info_ptr(proc, type_info_data, t->Proc.params));
+					ssa_emit_store(proc, results,  get_type_info_ptr(proc, type_info_data, t->Proc.results));
+					ssa_emit_store(proc, variadic, ssa_make_value_constant(a, t_bool, make_exact_value_bool(t->Proc.variadic)));
+
 					// TODO(bill): Type_Info for procedures
-					break;
+				} break;
 				}
 
 				if (tag != NULL) {

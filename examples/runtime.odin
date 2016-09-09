@@ -3,43 +3,47 @@
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
 Type_Info :: union {
-	Member :: struct {
-		name:      string
+	Member :: struct #ordered {
+		name:      string     // can be empty if tuple
 		type_info: ^Type_Info
-		offset:    int
+		offset:    int        // offsets are not used in tuples
 	}
-	Record :: struct {
-		fields: []Member // NOTE(bill): This will need to be allocated on the heap
+	Record :: struct #ordered {
+		fields: []Member // IMPORTANT: This will need to be allocated on the heap
 	}
 
 
-	Named: struct {
+	Named: struct #ordered {
 		name: string
 		base: ^Type_Info
 	}
-	Integer: struct {
+	Integer: struct #ordered {
 		size: int // in bytes
 		signed: bool
 	}
-	Float: struct {
+	Float: struct #ordered {
 		size: int // in bytes
 	}
-	String:  struct {}
-	Boolean: struct {}
-	Pointer: struct {
+	String:  struct #ordered {}
+	Boolean: struct #ordered {}
+	Pointer: struct #ordered {
 		elem: ^Type_Info
 	}
-	Procedure: struct{}
-	Array: struct {
+	Procedure: struct #ordered {
+		params:  ^Type_Info // Type_Info.Tuple
+		results: ^Type_Info // Type_Info.Tuple
+		variadic: bool
+	}
+	Array: struct #ordered {
 		elem: ^Type_Info
 		elem_size: int
 		len: int
 	}
-	Slice: struct {
+	Slice: struct #ordered {
 		elem: ^Type_Info
 		elem_size: int
 	}
-	Vector: struct {
+	Vector: struct #ordered {
 		elem: ^Type_Info
 		elem_size: int
 		len: int
@@ -48,7 +52,7 @@ Type_Info :: union {
 	Struct:    Record
 	Union:     Record
 	Raw_Union: Record
-	Enum: struct {
+	Enum: struct #ordered {
 		base: ^Type_Info
 	}
 }
@@ -57,9 +61,9 @@ Type_Info :: union {
 
 assume :: proc(cond: bool) #foreign "llvm.assume"
 
-__debug_trap           :: proc()        #foreign "llvm.debugtrap"
-__trap                 :: proc()        #foreign "llvm.trap"
-read_cycle_counter     :: proc() -> u64 #foreign "llvm.readcyclecounter"
+__debug_trap       :: proc()        #foreign "llvm.debugtrap"
+__trap             :: proc()        #foreign "llvm.trap"
+read_cycle_counter :: proc() -> u64 #foreign "llvm.readcyclecounter"
 
 bit_reverse16 :: proc(b: u16) -> u16 #foreign "llvm.bitreverse.i16"
 bit_reverse32 :: proc(b: u32) -> u32 #foreign "llvm.bitreverse.i32"
@@ -87,7 +91,8 @@ memory_zero :: proc(data: rawptr, len: int) {
 
 memory_compare :: proc(dst, src: rawptr, len: int) -> int {
 	// TODO(bill): make a faster `memory_compare`
-	a, b := slice_ptr(dst as ^byte, len), slice_ptr(src as ^byte, len)
+	a := slice_ptr(dst as ^byte, len)
+	b := slice_ptr(src as ^byte, len)
 	for i := 0; i < len; i++ {
 		if a[i] != b[i] {
 			return (a[i] - b[i]) as int
@@ -97,11 +102,6 @@ memory_compare :: proc(dst, src: rawptr, len: int) -> int {
 }
 
 memory_copy :: proc(dst, src: rawptr, len: int) #inline {
-	llvm_memcpy_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memcpy.p0i8.p0i8.i64"
-	llvm_memcpy_64bit(dst, src, len, 1, false)
-}
-
-memory_move :: proc(dst, src: rawptr, len: int) #inline {
 	llvm_memmove_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memmove.p0i8.p0i8.i64"
 	llvm_memmove_64bit(dst, src, len, 1, false)
 }

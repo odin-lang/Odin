@@ -180,8 +180,8 @@ new_builtins :: proc() {
 	{
 		// Compile time assert
 		COND :: true
-		assert(COND)
-		// assert(!COND)
+		compile_assert(COND)
+		// compile_assert(!COND)
 
 		// Runtime assert
 		x := true

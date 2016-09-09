@@ -132,6 +132,7 @@ struct Type {
 			i64 *    struct_offsets;
 			b32      struct_are_offsets_set;
 			b32      struct_is_packed;
+			b32      struct_is_ordered;
 
 			// Entity_Constant or Entity_TypeName
 			Entity **other_fields;

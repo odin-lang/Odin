@@ -294,6 +294,7 @@ ssaAddr ssa_make_addr_vector(ssaValue *addr, ssaValue *index, AstNode *expr) {
 }
 
 
+ssaValue *ssa_make_value_global(gbAllocator a, Entity *e, ssaValue *value);
 
 
 void ssa_module_init(ssaModule *m, Checker *c) {
@@ -310,21 +311,53 @@ void ssa_module_init(ssaModule *m, Checker *c) {
 
 	{
 		// Add type info data
-		ssaValue *ssa_make_value_global(gbAllocator a, Entity *e, ssaValue *value);
+		{
+			String name = make_string("__type_info_data");
+			Token token = {Token_Identifier};
+			token.string = name;
 
 
-		String name = make_string("__type_info_data");
-		Token token = {};
-		token.kind = Token_Identifier;
-		token.string = name;
+			isize count = gb_array_count(c->info.type_info_map.entries);
+			Entity *e = make_entity_variable(m->allocator, NULL, token, make_type_array(m->allocator, t_type_info, count));
+			ssaValue *g = ssa_make_value_global(m->allocator, e, NULL);
+			g->Global.is_private  = true;
+			map_set(&m->values, hash_pointer(e), g);
+			map_set(&m->members, hash_string(name), g);
+		}
 
+		// Type info member buffer
+		{
+			// NOTE(bill): Removes need for heap allocation by making it global memory
+			isize count = 0;
 
-		isize count = gb_array_count(c->info.type_info_map.entries);
-		Entity *e = make_entity_variable(m->allocator, NULL, token, make_type_array(m->allocator, t_type_info, count));
-		ssaValue *g = ssa_make_value_global(m->allocator, e, NULL);
-		g->Global.is_private  = true;
-		map_set(&m->values, hash_pointer(e), g);
-		map_set(&m->members, hash_string(name), g);
+			gb_for_array(entry_index, m->info->type_info_map.entries) {
+				auto *entry = &m->info->type_info_map.entries[entry_index];
+				Type *t = cast(Type *)cast(uintptr)entry->key.key;
+
+				switch (t->kind) {
+				case Type_Record:
+					switch (t->Record.kind) {
+					case TypeRecord_Struct:
+					case TypeRecord_RawUnion:
+						count += t->Record.field_count;
+					}
+					break;
+				case Type_Tuple:
+					count += t->Tuple.variable_count;
+					break;
+				}
+			}
+
+			String name = make_string("__type_info_member_data");
+			Token token = {Token_Identifier};
+			token.string = name;
+
+			Entity *e = make_entity_variable(m->allocator, NULL, token,
+			                                 make_type_array(m->allocator, t_type_info_member, count));
+			ssaValue *g = ssa_make_value_global(m->allocator, e, NULL);
+			map_set(&m->values, hash_pointer(e), g);
+			map_set(&m->members, hash_string(name), g);
+		}
 	}
 }
 
@@ -2087,7 +2120,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					args[1] = src;
 					args[2] = byte_count;
 
-					ssa_emit_global_call(proc, "memory_move", args, 3);
+					ssa_emit_global_call(proc, "memory_copy", args, 3);
 
 					return len;
 				} break;
@@ -2137,7 +2170,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					args[1] = item;
 					args[2] = byte_count;
 
-					ssa_emit_global_call(proc, "memory_move", args, 3);
+					ssa_emit_global_call(proc, "memory_copy", args, 3);
 
 					// Increment slice length
 					Token add = {Token_Add};
