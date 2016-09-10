@@ -41,11 +41,13 @@ struct Entity {
 	union {
 		struct { ExactValue value; } Constant;
 		struct {
-			b8 visited;   // Cycle detection
-			b8 used;      // Variable is used
-			b8 is_field;  // Is struct field
-			b8 anonymous; // Variable is an anonymous
-			b8 is_using;  // `using` variable
+			b8  visited;   // Cycle detection
+			b8  used;      // Variable is used
+			b8  anonymous; // Variable is an anonymous
+			b8  is_using;  // `using` variable
+
+			i32 field_index; // Order in source
+			b8  is_field;    // Is struct field
 		} Variable;
 		struct {} TypeName;
 		struct {
@@ -103,8 +105,9 @@ Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, 
 	return entity;
 }
 
-Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, b32 is_anonymous) {
+Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, b32 is_anonymous, i32 field_index) {
 	Entity *entity = make_entity_variable(a, scope, token, type);
+	entity->Variable.field_index = field_index;
 	entity->Variable.is_field  = true;
 	entity->Variable.anonymous = cast(b8)is_anonymous;
 	return entity;

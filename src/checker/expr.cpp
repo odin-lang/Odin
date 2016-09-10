@@ -357,14 +357,15 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 				AstNode *name = vd->names[name_index];
 				Token name_token = name->Ident;
 
-				Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, vd->is_using);
+				Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, vd->is_using, cast(i32)field_index);
 				HashKey key = hash_string(name_token.string);
 				if (map_get(&entity_map, key) != NULL) {
 					// TODO(bill): Scope checking already checks the declaration
 					error(&c->error_collector, name_token, "`%.*s` is already declared in this type", LIT(name_token.string));
 				} else {
 					map_set(&entity_map, key, e);
-					fields[field_index++] = e;
+					fields[field_index] = e;
+					field_index++;
 					add_entity(c, c->context.scope, name, e);
 				}
 				add_entity_use(&c->info, name, e);
@@ -391,13 +392,19 @@ gb_global BaseTypeSizes __checker_sizes = {};
 gb_global gbAllocator   __checker_allocator = {};
 
 GB_COMPARE_PROC(cmp_struct_entity_size) {
-	// NOTE(bill): Biggest to smallest
+	// Rule: Biggest to smallest
+	// if same size, order by order in source
 	Entity *x = *(Entity **)a;
 	Entity *y = *(Entity **)b;
+	GB_ASSERT(x != NULL);
+	GB_ASSERT(y != NULL);
+	GB_ASSERT(x->kind == Entity_Variable);
+	GB_ASSERT(y->kind == Entity_Variable);
 	i64 xs = type_size_of(__checker_sizes, __checker_allocator, x->type);
 	i64 ys = type_size_of(__checker_sizes, __checker_allocator, y->type);
 	if (xs == ys) {
-		return string_cmp(&x->token.string, &y->token.string);
+		i32 diff = x->Variable.field_index - y->Variable.field_index;
+		return diff < 0 ? -1 : diff > 0;
 	}
 	return xs > ys ? -1 : xs < ys;
 }
@@ -430,24 +437,36 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecke
 
 	check_fields(c, node, st->decls, fields, field_count, other_fields, other_field_count, cycle_checker, make_string("struct"));
 
+
+	struct_type->Record.struct_is_packed    = st->is_packed;
+	struct_type->Record.struct_is_ordered   = st->is_ordered;
+	struct_type->Record.fields              = fields;
+	struct_type->Record.fields_in_src_order = fields;
+	struct_type->Record.field_count         = field_count;
+	struct_type->Record.other_fields        = other_fields;
+	struct_type->Record.other_field_count   = other_field_count;
+
+
+
 	if (!st->is_packed && !st->is_ordered) {
 		// NOTE(bill): Reorder fields for reduced size/performance
+
+		Entity **reordered_fields = gb_alloc_array(c->allocator, Entity *, field_count);
+		for (isize i = 0; i < field_count; i++) {
+			reordered_fields[i] = struct_type->Record.fields_in_src_order[i];
+		}
+
 		// NOTE(bill): Hacky thing
 		__checker_sizes = c->sizes;
 		__checker_allocator = c->allocator;
-
 		// TODO(bill): Figure out rules more
 		// sorting rules
 		// compound literal order must match source not layout
-		// gb_sort_array(fields, field_count, cmp_struct_entity_size);
+		gb_sort_array(reordered_fields, field_count, cmp_struct_entity_size);
+
+		struct_type->Record.fields = reordered_fields;
 	}
 
-	struct_type->Record.struct_is_packed  = st->is_packed;
-	struct_type->Record.struct_is_ordered = st->is_ordered;
-	struct_type->Record.fields            = fields;
-	struct_type->Record.field_count       = field_count;
-	struct_type->Record.other_fields      = other_fields;
-	struct_type->Record.other_field_count = other_field_count;
 }
 
 void check_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker *cycle_checker) {
@@ -3097,7 +3116,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 							      "Mixture of `field = value` and value elements in a structure literal is not allowed");
 							continue;
 						}
-						Entity *field = t->Record.fields[index];
+						Entity *field = t->Record.fields_in_src_order[index];
 
 						check_expr(c, o, elem);
 						if (index >= field_count) {

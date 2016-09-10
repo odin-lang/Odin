@@ -43,10 +43,7 @@ gb_inline b32 are_strings_equal_ignore_case(String a, String b) {
 	return false;
 }
 
-GB_COMPARE_PROC(string_cmp) {
-	String x = *cast(String *)a;
-	String y = *cast(String *)b;
-
+int string_compare(String x, String y) {
 	if (x.len == y.len &&
 	    x.text == y.text) {
 		return 0;
@@ -65,9 +62,9 @@ GB_COMPARE_PROC(string_cmp) {
 	isize *lb = cast(isize *)y.text;
 
 	for (; curr_block < fast; curr_block++) {
-		if ((la[curr_block] ^ lb[curr_block]) != 0) {
+		if (la[curr_block] ^ lb[curr_block]) {
 			for (isize pos = curr_block*gb_size_of(isize); pos < n; pos++) {
-				if ((x.text[pos] ^ y.text[pos]) != 0) {
+				if (x.text[pos] ^ y.text[pos]) {
 					return cast(int)x.text[pos] - cast(int)y.text[pos];
 				}
 			}
@@ -75,12 +72,18 @@ GB_COMPARE_PROC(string_cmp) {
 	}
 
 	for (; offset < n; offset++) {
-		if ((x.text[offset] ^ y.text[offset]) != 0) {
+		if (x.text[offset] ^ y.text[offset]) {
 			return cast(int)x.text[offset] - cast(int)y.text[offset];
 		}
 	}
 
 	return 0;
+}
+
+GB_COMPARE_PROC(string_cmp_proc) {
+	String x = *(String *)a;
+	String y = *(String *)b;
+	return string_compare(x, y);
 }
 
 

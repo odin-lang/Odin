@@ -6,7 +6,7 @@ print_string_to_buffer :: proc(buf: ^[]byte, s: string) {
 	// NOTE(bill): This is quite a hack
 	// TODO(bill): Should I allow the raw editing of a slice by exposing its
 	// internal members?
-	Raw_Bytes :: struct {
+	Raw_Bytes :: struct #ordered {
 		data: ^byte
 		len:  int
 		cap:  int

@@ -133,6 +133,8 @@ struct Type {
 			b32      struct_are_offsets_set;
 			b32      struct_is_packed;
 			b32      struct_is_ordered;
+			Entity **fields_in_src_order; // Entity_Variable
+
 
 			// Entity_Constant or Entity_TypeName
 			Entity **other_fields;
@@ -732,12 +734,12 @@ Selection lookup_field(Type *type_, String field_name, b32 is_type, Selection se
 			if (entity__any_type_info == NULL) {
 				Token token = {Token_Identifier};
 				token.string = type_info_str;
-				entity__any_type_info = make_entity_field(gb_heap_allocator(), NULL, token, t_type_info_ptr, false);
+				entity__any_type_info = make_entity_field(gb_heap_allocator(), NULL, token, t_type_info_ptr, false, 0);
 			}
 			if (entity__any_data == NULL) {
 				Token token = {Token_Identifier};
 				token.string = data_str;
-				entity__any_data = make_entity_field(gb_heap_allocator(), NULL, token, t_rawptr, false);
+				entity__any_data = make_entity_field(gb_heap_allocator(), NULL, token, t_rawptr, false, 1);
 			}
 
 			if (are_strings_equal(field_name, type_info_str)) {

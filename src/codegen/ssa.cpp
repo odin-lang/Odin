@@ -1875,26 +1875,29 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			auto *st = &base_type->Record;
 			if (cl->elems != NULL && gb_array_count(cl->elems) > 0) {
 				gb_for_array(field_index, cl->elems) {
-					AstNode *elem = cl->elems[field_index];
+					isize index = field_index;
+					AstNode *elem = cl->elems[index];
 					ssaValue *field_expr = NULL;
 					Entity *field = NULL;
 
 					if (elem->kind == AstNode_FieldValue) {
 						ast_node(kv, FieldValue, elem);
 						Selection sel = lookup_field(base_type, kv->field->Ident.string, false);
-						field_index = sel.index[0];
+						index = sel.index[0];
 						field_expr = ssa_build_expr(proc, kv->value);
 					} else {
+						Selection sel = lookup_field(base_type, st->fields_in_src_order[field_index]->token.string, false);
+						index = sel.index[0];
 						field_expr = ssa_build_expr(proc, elem);
 					}
 
 					GB_ASSERT(ssa_type(field_expr)->kind != Type_Tuple);
 
-					field = st->fields[field_index];
+					field = st->fields[index];
 
 					Type *ft = field->type;
 					ssaValue *fv = ssa_emit_conv(proc, field_expr, ft);
-					ssaValue *gep = ssa_emit_struct_gep(proc, v, field_index, ft);
+					ssaValue *gep = ssa_emit_struct_gep(proc, v, index, ft);
 					ssa_emit_store(proc, gep, fv);
 				}
 			}

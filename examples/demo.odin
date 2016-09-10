@@ -1,13 +1,14 @@
 #load "basic.odin"
 
 main :: proc() {
-	Vector3 :: struct {
+	Vector4 :: struct {
 		x: i8
 		y: i32
 		z: i16
+		w: i16
 	}
 
-	v := Vector3{1, 4, 9}
+	v := Vector4{1, 4, 9, 16}
 
 	t := type_info(v)
 
