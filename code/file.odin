@@ -41,18 +41,18 @@ File_Standard :: type enum {
 	COUNT,
 }
 
-__std_file_set := false;
-__std_files: [File_Standard.COUNT as int]File;
+
+__std_files := __set_file_standards();
+
+__set_file_standards :: proc() -> [File_Standard.COUNT as int]File {
+	return [File_Standard.COUNT as int]File{
+		File{handle = GetStdHandle(STD_INPUT_HANDLE)},
+		File{handle = GetStdHandle(STD_OUTPUT_HANDLE)},
+		File{handle = GetStdHandle(STD_ERROR_HANDLE)},
+	}
+}
 
 file_get_standard :: proc(std: File_Standard) -> ^File {
-	// using File_Standard;
-	if (!__std_file_set) {
-		using File_Standard
-		__std_files[INPUT] .handle = GetStdHandle(STD_INPUT_HANDLE)
-		__std_files[OUTPUT].handle = GetStdHandle(STD_OUTPUT_HANDLE)
-		__std_files[ERROR] .handle = GetStdHandle(STD_ERROR_HANDLE)
-		__std_file_set = true
-	}
 	return ^__std_files[std]
 }
 

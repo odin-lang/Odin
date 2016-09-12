@@ -59,11 +59,11 @@ enum DeclKind {
 };
 
 enum ProcTag {
-	ProcTag_abc       = GB_BIT(0),
-	ProcTag_no_abc    = GB_BIT(1),
-	ProcTag_foreign   = GB_BIT(2),
-	ProcTag_inline    = GB_BIT(3),
-	ProcTag_no_inline = GB_BIT(4),
+	ProcTag_bounds_check    = GB_BIT(0),
+	ProcTag_no_bounds_check = GB_BIT(1),
+	ProcTag_foreign         = GB_BIT(2),
+	ProcTag_inline          = GB_BIT(3),
+	ProcTag_no_inline       = GB_BIT(4),
 };
 
 enum VarDeclTag {
@@ -78,8 +78,8 @@ enum TypeFlag : u32 {
 };
 
 enum StmtStateFlag : u32 {
-	StmtStateFlag_abc    = GB_BIT(0),
-	StmtStateFlag_no_abc = GB_BIT(1),
+	StmtStateFlag_bounds_check    = GB_BIT(0),
+	StmtStateFlag_no_bounds_check = GB_BIT(1),
 };
 
 
@@ -1177,10 +1177,10 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_inline, tag_name);
 		} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_inline, tag_name);
-		} else if (are_strings_equal(tag_name, make_string("abc"))) {
-			check_proc_add_tag(f, tag_expr, tags, ProcTag_abc, tag_name);
-		} else if (are_strings_equal(tag_name, make_string("no_abc"))) {
-			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_abc, tag_name);
+		} else if (are_strings_equal(tag_name, make_string("bounds_check"))) {
+			check_proc_add_tag(f, tag_expr, tags, ProcTag_bounds_check, tag_name);
+		} else if (are_strings_equal(tag_name, make_string("no_bounds_check"))) {
+			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_bounds_check, tag_name);
 		} else {
 			ast_file_err(f, ast_node_token(tag_expr), "Unknown procedure tag");
 		}
@@ -1190,12 +1190,12 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
 		ast_file_err(f, f->cursor[0], "You cannot apply both #inline and #no_inline to a procedure");
 	}
 
-	if ((*tags & ProcTag_abc) && (*tags & ProcTag_no_abc)) {
-		ast_file_err(f, f->cursor[0], "You cannot apply both #abc and #no_abc to a procedure");
+	if ((*tags & ProcTag_bounds_check) && (*tags & ProcTag_no_bounds_check)) {
+		ast_file_err(f, f->cursor[0], "You cannot apply both #bounds_check and #no_bounds_check to a procedure");
 	}
 
-	if (((*tags & ProcTag_abc) || (*tags & ProcTag_no_abc)) && (*tags & ProcTag_foreign)) {
-		ast_file_err(f, f->cursor[0], "You cannot apply both #abc or #no_abc to a procedure without a body");
+	if (((*tags & ProcTag_bounds_check) || (*tags & ProcTag_no_bounds_check)) && (*tags & ProcTag_foreign)) {
+		ast_file_err(f, f->cursor[0], "You cannot apply both #bounds_check or #no_bounds_check to a procedure without a body");
 	}
 }
 
@@ -2540,18 +2540,18 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			var_decl->VarDecl.tags |= VarDeclTag_thread_local;
 			return var_decl;
-		} else if (are_strings_equal(tag, make_string("abc"))) {
+		} else if (are_strings_equal(tag, make_string("bounds_check"))) {
 			s = parse_stmt(f);
-			s->stmt_state_flags |= StmtStateFlag_abc;
-			if ((s->stmt_state_flags & StmtStateFlag_no_abc) != 0) {
-				ast_file_err(f, token, "#abc and #no_abc cannot be applied together");
+			s->stmt_state_flags |= StmtStateFlag_bounds_check;
+			if ((s->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
+				ast_file_err(f, token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return s;
-		} else if (are_strings_equal(tag, make_string("no_abc"))) {
+		} else if (are_strings_equal(tag, make_string("no_bounds_check"))) {
 			s = parse_stmt(f);
-			s->stmt_state_flags |= StmtStateFlag_no_abc;
-			if ((s->stmt_state_flags & StmtStateFlag_abc) != 0) {
-				ast_file_err(f, token, "#abc and #no_abc cannot be applied together");
+			s->stmt_state_flags |= StmtStateFlag_no_bounds_check;
+			if ((s->stmt_state_flags & StmtStateFlag_bounds_check) != 0) {
+				ast_file_err(f, token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return s;
 		}

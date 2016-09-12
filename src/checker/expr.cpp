@@ -52,6 +52,10 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 		return true;
 	}
 
+	if (operand->mode == Addressing_Builtin) {
+		return false;
+	}
+
 	Type *s = operand->type;
 
 	if (are_types_identical(s, type)) {

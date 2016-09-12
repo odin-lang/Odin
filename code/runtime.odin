@@ -290,17 +290,23 @@ __assert :: proc(msg: string) {
 	__debug_trap()
 }
 
-__abc_error :: proc(file: string, line, column: int, index, len: int) {
-	print(file, "(", line, ":", line, ") Index `", index, "` is of bounds range [0, ", len, ")\n")
+__bounds_check_error :: proc(file: string, line, column: int,
+                             index, count: int) {
+	println_err("%(%:%) Index % is out of bounds range [0, %)",
+	            file, line, column, index, count)
 	__debug_trap()
 }
 
-__slice_expr_error :: proc(file: string, line, column: int, low, high, max: int) {
-	print(file, "(", line, ":", line, ") Invalid slice indices: [", low, ":", high, ":", max, "]\n")
+__slice_expr_error :: proc(file: string, line, column: int,
+                           low, high, max: int) {
+	print_err("%(%:%) Invalid slice indices: [%:%:%]\n",
+	          file, line, column, low, high, max)
 	__debug_trap()
 }
-__substring_expr_error :: proc(file: string, line, column: int, low, high: int) {
-	print(file, "(", line, ":", line, ") Invalid substring indices: [", low, ":", high, "]\n")
+__substring_expr_error :: proc(file: string, line, column: int,
+                               low, high: int) {
+	print_err("%(%:%) Invalid substring indices: [%:%:%]\n",
+	          file, line, column, low, high)
 	__debug_trap()
 }
 

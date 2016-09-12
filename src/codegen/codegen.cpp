@@ -42,13 +42,13 @@ void ssa_gen_destroy(ssaGen *s) {
 
 void ssa_gen_tree(ssaGen *s) {
 	if (v_zero == NULL) {
-		v_zero   = ssa_make_value_constant(gb_heap_allocator(), t_int,  make_exact_value_integer(0));
-		v_one    = ssa_make_value_constant(gb_heap_allocator(), t_int,  make_exact_value_integer(1));
-		v_zero32 = ssa_make_value_constant(gb_heap_allocator(), t_i32,  make_exact_value_integer(0));
-		v_one32  = ssa_make_value_constant(gb_heap_allocator(), t_i32,  make_exact_value_integer(1));
-		v_two32  = ssa_make_value_constant(gb_heap_allocator(), t_i32,  make_exact_value_integer(2));
-		v_false  = ssa_make_value_constant(gb_heap_allocator(), t_bool, make_exact_value_bool(false));
-		v_true   = ssa_make_value_constant(gb_heap_allocator(), t_bool, make_exact_value_bool(true));
+		v_zero   = ssa_make_const_int (gb_heap_allocator(), 0);
+		v_one    = ssa_make_const_int (gb_heap_allocator(), 1);
+		v_zero32 = ssa_make_const_i32 (gb_heap_allocator(), 0);
+		v_one32  = ssa_make_const_i32 (gb_heap_allocator(), 1);
+		v_two32  = ssa_make_const_i32 (gb_heap_allocator(), 2);
+		v_false  = ssa_make_const_bool(gb_heap_allocator(), false);
+		v_true   = ssa_make_const_bool(gb_heap_allocator(), true);
 	}
 
 	struct ssaGlobalVariable {
@@ -90,7 +90,7 @@ void ssa_gen_tree(ssaGen *s) {
 					ExactValue v = tav->value;
 					if (v.kind == ExactValue_String) {
 						// NOTE(bill): The printer will fix the value correctly
-						g->Global.value = ssa_add_global_string_array(m, v);
+						g->Global.value = ssa_add_global_string_array(m, v.value_string);
 					} else {
 						g->Global.value = ssa_make_value_constant(a, tav->type, v);
 					}
@@ -231,7 +231,7 @@ void ssa_gen_tree(ssaGen *s) {
 
 					// TODO(bill): Which is better? The mangled name or actual name?
 					// ssaValue *gsa  = ssa_add_global_string_array(proc, make_exact_value_string(t->Named.name));
-					ssaValue *gsa  = ssa_add_global_string_array(m, make_exact_value_string(t->Named.type_name->token.string));
+					ssaValue *gsa  = ssa_add_global_string_array(m, t->Named.type_name->token.string);
 					ssaValue *elem = ssa_array_elem(proc, gsa);
 					ssaValue *len  = ssa_array_len(proc, ssa_emit_load(proc, gsa));
 					ssaValue *name = ssa_emit_string(proc, elem, len);
@@ -261,8 +261,8 @@ void ssa_gen_tree(ssaGen *s) {
 					case Basic_uint: {
 						tag = ssa_add_local_generated(proc, t_type_info_integer);
 						b32 is_unsigned = (basic_types[t->Basic.kind].flags & BasicFlag_Unsigned) != 0;
-						ssaValue *bits      = ssa_make_value_constant(a, t_int, make_exact_value_integer(type_size_of(m->sizes, a, t)));
-						ssaValue *is_signed = ssa_make_value_constant(a, t_bool, make_exact_value_bool(!is_unsigned));
+						ssaValue *bits      = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
+						ssaValue *is_signed = ssa_make_const_bool(a, !is_unsigned);
 						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_int_ptr),  bits);
 						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_one32,  t_bool_ptr), is_signed);
 					} break;
@@ -270,7 +270,7 @@ void ssa_gen_tree(ssaGen *s) {
 					case Basic_f32:
 					case Basic_f64: {
 						tag = ssa_add_local_generated(proc, t_type_info_float);
-						ssaValue *bits = ssa_make_value_constant(a, t_int, make_exact_value_integer(type_size_of(m->sizes, a, t)));
+						ssaValue *bits = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
 						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_int_ptr), bits);
 					} break;
 
@@ -296,10 +296,10 @@ void ssa_gen_tree(ssaGen *s) {
 
 					isize ez = type_size_of(m->sizes, a, t->Array.elem);
 					ssaValue *elem_size = ssa_emit_struct_gep(proc, tag, v_one32, t_int_ptr);
-					ssa_emit_store(proc, elem_size, ssa_make_value_constant(a, t_int, make_exact_value_integer(ez)));
+					ssa_emit_store(proc, elem_size, ssa_make_const_int(a, ez));
 
 					ssaValue *count = ssa_emit_struct_gep(proc, tag, v_two32, t_int_ptr);
-					ssa_emit_store(proc, count, ssa_make_value_constant(a, t_int, make_exact_value_integer(t->Array.count)));
+					ssa_emit_store(proc, count, ssa_make_const_int(a, t->Array.count));
 
 				} break;
 				case Type_Slice: {
@@ -309,7 +309,7 @@ void ssa_gen_tree(ssaGen *s) {
 
 					isize ez = type_size_of(m->sizes, a, t->Slice.elem);
 					ssaValue *elem_size = ssa_emit_struct_gep(proc, tag, v_one32, t_int_ptr);
-					ssa_emit_store(proc, elem_size, ssa_make_value_constant(a, t_int, make_exact_value_integer(ez)));
+					ssa_emit_store(proc, elem_size, ssa_make_const_int(a, ez));
 
 				} break;
 				case Type_Vector: {
@@ -319,10 +319,10 @@ void ssa_gen_tree(ssaGen *s) {
 
 					isize ez = type_size_of(m->sizes, a, t->Vector.elem);
 					ssaValue *elem_size = ssa_emit_struct_gep(proc, tag, v_one32, t_int_ptr);
-					ssa_emit_store(proc, elem_size, ssa_make_value_constant(a, t_int, make_exact_value_integer(ez)));
+					ssa_emit_store(proc, elem_size, ssa_make_const_int(a, ez));
 
 					ssaValue *count = ssa_emit_struct_gep(proc, tag, v_two32, t_int_ptr);
-					ssa_emit_store(proc, count, ssa_make_value_constant(a, t_int, make_exact_value_integer(t->Vector.count)));
+					ssa_emit_store(proc, count, ssa_make_const_int(a, t->Vector.count));
 
 				} break;
 				case Type_Record: {
@@ -341,22 +341,22 @@ void ssa_gen_tree(ssaGen *s) {
 							GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
 							isize source_index = f->Variable.field_index;
 
-							ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_value_constant(a, t_int, make_exact_value_integer(source_index)));
+							ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_const_int(a, source_index));
 							ssaValue *name      = ssa_emit_struct_gep(proc, field, v_zero32, t_string_ptr);
 							ssaValue *type_info = ssa_emit_struct_gep(proc, field, v_one32, t_type_info_ptr_ptr);
 							ssaValue *offset    = ssa_emit_struct_gep(proc, field, v_two32, t_int_ptr);
 
 							if (f->token.string.len > 0) {
-								ssa_emit_store(proc, name, ssa_emit_global_string(proc, make_exact_value_string(f->token.string)));
+								ssa_emit_store(proc, name, ssa_emit_global_string(proc, f->token.string));
 							}
 							ssa_emit_store(proc, type_info, tip);
-							ssa_emit_store(proc, offset, ssa_make_value_constant(a, t_int, make_exact_value_integer(foffset)));
+							ssa_emit_store(proc, offset, ssa_make_const_int(a, foffset));
 						}
 
 						Type *slice_type = make_type_slice(a, t_type_info_member);
 						Type *slice_type_ptr = make_type_pointer(a, slice_type);
 						ssaValue *slice = ssa_emit_struct_gep(proc, tag, v_zero32, slice_type_ptr);
-						ssaValue *field_count = ssa_make_value_constant(a, t_int, make_exact_value_integer(t->Record.field_count));
+						ssaValue *field_count = ssa_make_const_int(a, t->Record.field_count);
 
 						ssaValue *elem = ssa_emit_struct_gep(proc, slice, v_zero32, make_type_pointer(a, t_type_info_member_ptr));
 						ssaValue *len  = ssa_emit_struct_gep(proc, slice, v_one32,  make_type_pointer(a, t_int_ptr));
@@ -375,7 +375,7 @@ void ssa_gen_tree(ssaGen *s) {
 						ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Record.field_count, &type_info_member_index);
 
 						for (isize i = 0; i < t->Record.field_count; i++) {
-							ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_value_constant(a, t_int, make_exact_value_integer(i)));
+							ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_const_int(a, i));
 							ssaValue *name      = ssa_emit_struct_gep(proc, field, v_zero32, t_string_ptr);
 							ssaValue *type_info = ssa_emit_struct_gep(proc, field, v_one32, t_type_info_ptr_ptr);
 							ssaValue *offset    = ssa_emit_struct_gep(proc, field, v_two32, t_int_ptr);
@@ -384,16 +384,16 @@ void ssa_gen_tree(ssaGen *s) {
 							ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
 
 							if (f->token.string.len > 0) {
-								ssa_emit_store(proc, name, ssa_emit_global_string(proc, make_exact_value_string(f->token.string)));
+								ssa_emit_store(proc, name, ssa_emit_global_string(proc, f->token.string));
 							}
 							ssa_emit_store(proc, type_info, tip);
-							ssa_emit_store(proc, offset, ssa_make_value_constant(a, t_int, make_exact_value_integer(0)));
+							ssa_emit_store(proc, offset, ssa_make_const_int(a, 0));
 						}
 
 						Type *slice_type = make_type_slice(a, t_type_info_member);
 						Type *slice_type_ptr = make_type_pointer(a, slice_type);
 						ssaValue *slice = ssa_emit_struct_gep(proc, tag, v_zero32, slice_type_ptr);
-						ssaValue *field_count = ssa_make_value_constant(a, t_int, make_exact_value_integer(t->Record.field_count));
+						ssaValue *field_count = ssa_make_const_int(a, t->Record.field_count);
 
 						ssaValue *elem = ssa_emit_struct_gep(proc, slice, v_zero32, make_type_pointer(a, t_type_info_member_ptr));
 						ssaValue *len  = ssa_emit_struct_gep(proc, slice, v_one32,  make_type_pointer(a, t_int_ptr));
@@ -421,7 +421,7 @@ void ssa_gen_tree(ssaGen *s) {
 					ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Tuple.variable_count, &type_info_member_index);
 
 					for (isize i = 0; i < t->Tuple.variable_count; i++) {
-						ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_value_constant(a, t_int, make_exact_value_integer(i)));
+						ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_const_int(a, i));
 						ssaValue *name      = ssa_emit_struct_gep(proc, field, v_zero32, t_string_ptr);
 						ssaValue *type_info = ssa_emit_struct_gep(proc, field, v_one32, t_type_info_ptr_ptr);
 						// NOTE(bill): offset is not used for tuples
@@ -430,7 +430,7 @@ void ssa_gen_tree(ssaGen *s) {
 						ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
 
 						if (f->token.string.len > 0) {
-							ssa_emit_store(proc, name, ssa_emit_global_string(proc, make_exact_value_string(f->token.string)));
+							ssa_emit_store(proc, name, ssa_emit_global_string(proc, f->token.string));
 						}
 						ssa_emit_store(proc, type_info, tip);
 					}
@@ -438,7 +438,7 @@ void ssa_gen_tree(ssaGen *s) {
 					Type *slice_type = make_type_slice(a, t_type_info_member);
 					Type *slice_type_ptr = make_type_pointer(a, slice_type);
 					ssaValue *slice = ssa_emit_struct_gep(proc, tag, v_zero32, slice_type_ptr);
-					ssaValue *variable_count = ssa_make_value_constant(a, t_int, make_exact_value_integer(t->Tuple.variable_count));
+					ssaValue *variable_count = ssa_make_const_int(a, t->Tuple.variable_count);
 
 					ssaValue *elem = ssa_emit_struct_gep(proc, slice, v_zero32, make_type_pointer(a, t_type_info_member_ptr));
 					ssaValue *len  = ssa_emit_struct_gep(proc, slice, v_one32,  make_type_pointer(a, t_int_ptr));
@@ -459,7 +459,7 @@ void ssa_gen_tree(ssaGen *s) {
 
 					ssa_emit_store(proc, params,   get_type_info_ptr(proc, type_info_data, t->Proc.params));
 					ssa_emit_store(proc, results,  get_type_info_ptr(proc, type_info_data, t->Proc.results));
-					ssa_emit_store(proc, variadic, ssa_make_value_constant(a, t_bool, make_exact_value_bool(t->Proc.variadic)));
+					ssa_emit_store(proc, variadic, ssa_make_const_bool(a, t->Proc.variadic));
 
 					// TODO(bill): Type_Info for procedures
 				} break;

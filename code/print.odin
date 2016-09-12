@@ -2,7 +2,7 @@
 #load "win32.odin"
 #load "file.odin"
 
-print_string_to_buffer :: proc(buf: ^[]byte, s: string) {
+print_byte_buffer :: proc(buf: ^[]byte, b: []byte) {
 	// NOTE(bill): This is quite a hack
 	// TODO(bill): Should I allow the raw editing of a slice by exposing its
 	// internal members?
@@ -14,12 +14,19 @@ print_string_to_buffer :: proc(buf: ^[]byte, s: string) {
 
 	slice := buf as ^Raw_Bytes
 	if slice.len < slice.cap {
-		n := min(slice.cap-slice.len, len(s))
-		offset := ptr_offset(slice.data, slice.len)
-		memory_copy(offset, ^s[0], n)
-		slice.len += n
+		n := min(slice.cap-slice.len, len(b))
+		if n > 0 {
+			offset := ptr_offset(slice.data, slice.len)
+			memory_copy(offset, ^b[0], n)
+			slice.len += n
+		}
 	}
 }
+
+print_string_to_buffer :: proc(buf: ^[]byte, s: string) {
+	print_byte_buffer(buf, s as []byte)
+}
+
 
 byte_reverse :: proc(b: []byte) {
 	n := len(b)
@@ -357,43 +364,100 @@ type_info_is_string :: proc(info: ^Type_Info) -> bool {
 	return false
 }
 
-print_to_buffer :: proc(buf: ^[]byte, args: ..any) {
-	prev_string := false
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		is_string := arg.data != null && type_info_is_string(arg.type_info)
-		if i > 0 && !is_string && !prev_string {
-			// Add space between two non-string arguments
-			print_space_to_buffer(buf)
-		}
-		print_any_to_buffer(buf, arg)
-		prev_string = is_string
+
+print_to_buffer :: proc(buf: ^[]byte, fmt: string, args: ..any) {
+	is_digit :: proc(r: rune) -> bool #inline {
+		return r >= #rune "0" && r <= #rune "9"
 	}
-}
 
-println_to_buffer :: proc(buf: ^[]byte, args: ..any) {
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if i > 0 {
-			print_space_to_buffer(buf)
+	parse_int :: proc(s: string, offset: int) -> (int, int) {
+		result := 0
+
+		for ; offset < len(s); offset++ {
+			c := s[offset] as rune
+			if !is_digit(c) {
+				break
+			}
+
+			result *= 10
+			result += (c - #rune "0") as int
 		}
-		print_any_to_buffer(buf, arg)
+
+		return result, offset
 	}
-	print_nl_to_buffer(buf)
+
+	prev := 0
+	implicit_index := 0
+
+	for i := 0; i < len(fmt); i++ {
+		r := fmt[i] as rune
+
+		if r != #rune "%" {
+			continue
+		}
+
+		print_string_to_buffer(buf, fmt[prev:i])
+		i++ // Skip %
+		if i >= len(fmt) {
+			return
+		}
+
+		next := fmt[i] as rune
+		if next == #rune "%" {
+			print_string_to_buffer(buf, "%")
+			i++
+			prev = i
+			continue
+		}
+
+		index := implicit_index
+		set_prev := true
+
+		if is_digit(next) {
+			index, i = parse_int(fmt, i)
+		}
+
+		if 0 <= index && index < len(args) {
+			print_any_to_buffer(buf, args[index])
+			implicit_index = index+1
+		} else {
+			// TODO(bill): Error check index out bounds
+			print_string_to_buffer(buf, "<invalid>")
+		}
+
+		prev = i
+	}
+
+	print_string_to_buffer(buf, fmt[prev:])
+}
+
+PRINT_BUF_SIZE :: 1<<12
+
+print_to_file :: proc(f: ^File, fmt: string, args: ..any) {
+	data: [PRINT_BUF_SIZE]byte
+	buf := data[:0]
+	print_to_buffer(^buf, fmt, ..args)
+	file_write(f, buf)
+}
+
+println_to_file :: proc(f: ^File, fmt: string, args: ..any) {
+	data: [PRINT_BUF_SIZE]byte
+	buf := data[:0]
+	print_to_buffer(^buf, fmt, ..args)
+	print_nl_to_buffer(^buf)
+	file_write(f, buf)
 }
 
 
-print :: proc(args: ..any) {
-	data: [4096]byte
-	buf := data[:0]
-	print_to_buffer(^buf, ..args)
-	file_write(file_get_standard(File_Standard.OUTPUT), buf)
+print :: proc(fmt: string, args: ..any) {
+	print_to_file(file_get_standard(File_Standard.OUTPUT), fmt, ..args)
 }
-
-
-println :: proc(args: ..any) {
-	data: [4096]byte
-	buf := data[:0]
-	println_to_buffer(^buf, ..args)
-	file_write(file_get_standard(File_Standard.OUTPUT), buf)
+print_err :: proc(fmt: string, args: ..any) {
+	print_to_file(file_get_standard(File_Standard.ERROR), fmt, ..args)
+}
+println :: proc(fmt: string, args: ..any) {
+	println_to_file(file_get_standard(File_Standard.OUTPUT), fmt, ..args)
+}
+println_err :: proc(fmt: string, args: ..any) {
+	println_to_file(file_get_standard(File_Standard.ERROR), fmt, ..args)
 }

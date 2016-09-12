@@ -318,7 +318,7 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 
 	// Default states
 	m->stmt_state_flags = 0;
-	m->stmt_state_flags |= StmtStateFlag_abc;
+	m->stmt_state_flags |= StmtStateFlag_bounds_check;
 
 	{
 		// Add type info data
@@ -650,6 +650,17 @@ ssaValue *ssa_make_value_constant(gbAllocator a, Type *type, ExactValue value) {
 	return v;
 }
 
+ssaValue *ssa_make_const_int(gbAllocator a, i64 i) {
+	return ssa_make_value_constant(a, t_int, make_exact_value_integer(i));
+}
+ssaValue *ssa_make_const_i32(gbAllocator a, i64 i) {
+	return ssa_make_value_constant(a, t_i32, make_exact_value_integer(i));
+}
+ssaValue *ssa_make_const_bool(gbAllocator a, b32 b) {
+	return ssa_make_value_constant(a, t_bool, make_exact_value_bool(b != 0));
+}
+
+
 ssaValue *ssa_make_value_procedure(gbAllocator a, ssaModule *m, Type *type, AstNode *type_expr, AstNode *body, String name) {
 	ssaValue *v = ssa_alloc_value(a, ssaValue_Proc);
 	v->Proc.module = m;
@@ -791,7 +802,9 @@ ssaValue *ssa_emit_global_call(ssaProcedure *proc, char *name_, ssaValue **args,
 
 Type *ssa_addr_type(ssaAddr lval) {
 	if (lval.addr != NULL) {
-		return type_deref(ssa_type(lval.addr));
+		Type *t = ssa_type(lval.addr);
+		GB_ASSERT(is_type_pointer(t));
+		return type_deref(t);
 	}
 	return NULL;
 }
@@ -1210,7 +1223,7 @@ ssaValue *ssa_array_elem(ssaProcedure *proc, ssaValue *array) {
 ssaValue *ssa_array_len(ssaProcedure *proc, ssaValue *array) {
 	Type *t = ssa_type(array);
 	GB_ASSERT(t->kind == Type_Array);
-	return ssa_make_value_constant(proc->module->allocator, t_int, make_exact_value_integer(t->Array.count));
+	return ssa_make_const_int(proc->module->allocator, t->Array.count);
 }
 ssaValue *ssa_array_cap(ssaProcedure *proc, ssaValue *array) {
 	return ssa_array_len(proc, array);
@@ -1302,8 +1315,7 @@ ssaValue *ssa_add_local_slice(ssaProcedure *proc, Type *slice_type, ssaValue *ba
 }
 
 
-ssaValue *ssa_add_global_string_array(ssaModule *m, ExactValue value) {
-	GB_ASSERT(value.kind == ExactValue_String);
+ssaValue *ssa_add_global_string_array(ssaModule *m, String string) {
 	gbAllocator a = gb_heap_allocator();
 
 	isize max_len = 4+8+1;
@@ -1314,9 +1326,10 @@ ssaValue *ssa_add_global_string_array(ssaModule *m, ExactValue value) {
 	String name = make_string(str, len-1);
 	Token token = {Token_String};
 	token.string = name;
-	Type *type = make_type_array(a, t_u8, value.value_string.len);
-	Entity *entity = make_entity_constant(a, NULL, token, type, value);
-	ssaValue *g = ssa_make_value_global(a, entity, ssa_make_value_constant(a, type, value));
+	Type *type = make_type_array(a, t_u8, string.len);
+	ExactValue ev = make_exact_value_string(string);
+	Entity *entity = make_entity_constant(a, NULL, token, type, ev);
+	ssaValue *g = ssa_make_value_global(a, entity, ssa_make_value_constant(a, type, ev));
 	g->Global.is_private  = true;
 	// g->Global.is_constant = true;
 
@@ -1341,11 +1354,10 @@ ssaValue *ssa_emit_string(ssaProcedure *proc, ssaValue *elem, ssaValue *len) {
 }
 
 
-ssaValue *ssa_emit_global_string(ssaProcedure *proc, ExactValue value) {
-	GB_ASSERT(value.kind == ExactValue_String);
-	ssaValue *global_array = ssa_add_global_string_array(proc->module, value);
+ssaValue *ssa_emit_global_string(ssaProcedure *proc, String str) {
+	ssaValue *global_array = ssa_add_global_string_array(proc->module, str);
 	ssaValue *elem = ssa_array_elem(proc, global_array);
-	ssaValue *len = ssa_array_len(proc, ssa_emit_load(proc, global_array));
+	ssaValue *len =  ssa_make_const_int(proc->module->allocator, str.len);
 	return ssa_emit_string(proc, elem, len);
 }
 
@@ -1488,7 +1500,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 				ssa_emit_comment(proc, make_string("union - child to parent"));
 				gbAllocator allocator = proc->module->allocator;
 				ssaValue *parent = ssa_add_local_generated(proc, t);
-				ssaValue *tag = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(i));
+				ssaValue *tag = ssa_make_const_int(allocator, i);
 				ssa_emit_store(proc, ssa_emit_struct_gep(proc, parent, v_one32, t_int), tag);
 
 				ssaValue *data = ssa_emit_conv(proc, parent, t_rawptr);
@@ -1587,7 +1599,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 		ssaValue *result = ssa_add_local_generated(proc, t_any);
 
 		ssaValue *data = NULL;
-		if (value->kind == ssaValue_Instr &&
+		if (false && value->kind == ssaValue_Instr &&
 		    value->Instr.kind == ssaInstr_Load) {
 			// NOTE(bill): Addressable value
 			data = value->Instr.Load.address;
@@ -1657,7 +1669,7 @@ ssaValue *ssa_emit_down_cast(ssaProcedure *proc, ssaValue *value, Type *t) {
 	// IMPORTANT TODO(bill): THIS ONLY DOES ONE LAYER DEEP!!! FUCKING HELL THIS IS NOT WHAT I SIGNED UP FOR!
 
 	i64 offset_ = type_offset_of_from_selection(proc->module->sizes, allocator, type_deref(t), sel);
-	ssaValue *offset = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(-offset_));
+	ssaValue *offset = ssa_make_const_int(allocator, -offset_);
 	ssaValue *head = ssa_emit_ptr_offset(proc, bytes, offset);
 	return ssa_emit_conv(proc, head, t);
 }
@@ -1689,41 +1701,36 @@ ssaValue *ssa_emit_logical_binary_expr(ssaProcedure *proc, AstNode *expr) {
 
 
 void ssa_array_bounds_check(ssaProcedure *proc, Token token, ssaValue *index, ssaValue *len) {
-	if ((proc->module->stmt_state_flags & StmtStateFlag_no_abc) != 0) {
+	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
 		return;
 	}
 	ssa_emit_comment(proc, make_string("ArrayBoundsCheck"));
-
 	index = ssa_emit_conv(proc, index, t_int);
-	len   = ssa_emit_conv(proc, len, t_int);
+	len = ssa_emit_conv(proc, len, t_int);
 
+	Token le = {Token_LtEq};
 	Token lt = {Token_Lt};
-	Token ge = {Token_GtEq};
-	Token cmp_or = {Token_Or}; // NOTE(bill): Just `or` it as both sides have been evaluated anyway
-	ssaValue *lower = ssa_emit_comp(proc, lt, index, v_zero);
-	ssaValue *upper = ssa_emit_comp(proc, ge, index, len);
-	ssaValue *cond  = ssa_emit_arith(proc, cmp_or, lower, upper, t_bool);
+	Token cmp_and = {Token_And}; // NOTE(bill): Doesn't need to be logical
+	ssaValue *c0 = ssa_emit_comp(proc, le, v_zero, index);
+	ssaValue *c1 = ssa_emit_comp(proc, lt, index, len);
+	ssaValue *cond = ssa_emit_comp(proc, cmp_and, c0, c1);
 
 	ssaBlock *then = ssa_add_block(proc, NULL, make_string("abc.then"));
-	ssaBlock *done = ssa__make_block(proc, NULL, make_string("abc.done")); // NOTE(bill): Append later
+	ssaBlock *done = ssa__make_block(proc, NULL, make_string("abc.done"));
 
-	ssa_emit_if(proc, cond, then, done);
+	ssa_emit_if(proc, cond, done, then);
 	proc->curr_block = then;
 
+
 	gbAllocator a = proc->module->allocator;
-
-	ssaValue *file   = ssa_emit_global_string(proc, make_exact_value_string(token.pos.file));
-	ssaValue *line   = ssa_make_value_constant(a, t_int, make_exact_value_integer(token.pos.line));
-	ssaValue *column = ssa_make_value_constant(a, t_int, make_exact_value_integer(token.pos.column));
-
 	ssaValue **args = gb_alloc_array(a, ssaValue *, 5);
-	args[0] = file;
-	args[1] = line;
-	args[2] = column;
+	args[0] = ssa_emit_global_string(proc, token.pos.file);
+	args[1] = ssa_make_const_int(a, token.pos.line);
+	args[2] = ssa_make_const_int(a, token.pos.column);
 	args[3] = index;
 	args[4] = len;
 
-	ssa_emit_global_call(proc, "__abc_error", args, 5);
+	ssa_emit_global_call(proc, "__bounds_check_error", args, 5);
 
 	ssa_emit_jump(proc, done);
 	gb_array_append(proc->blocks, done);
@@ -1731,52 +1738,42 @@ void ssa_array_bounds_check(ssaProcedure *proc, Token token, ssaValue *index, ss
 }
 
 void ssa_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low, ssaValue *high, ssaValue *max, b32 is_substring) {
-	if ((proc->module->stmt_state_flags & StmtStateFlag_no_abc) != 0) {
+	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
 		return;
 	}
-	ssa_emit_comment(proc, make_string("SliceBoundsCheck"));
 
 	low  = ssa_emit_conv(proc, low, t_int);
 	high = ssa_emit_conv(proc, high, t_int);
 	max  = ssa_emit_conv(proc, max, t_int);
 
-	Token lt = {Token_Lt};
-	Token gt = {Token_Gt};
-	Token cmp_or = {Token_Or}; // NOTE(bill): Just `or` it as both sides have been evaluated anyway
-	ssaValue *c0 = ssa_emit_comp(proc, lt, low, v_zero);
-	ssaValue *c1 = ssa_emit_comp(proc, gt, low,  high);
-	ssaValue *c2 = ssa_emit_comp(proc, gt, low,  max);
-	ssaValue *c3 = ssa_emit_comp(proc, gt, high, max);
+	Token le = {Token_LtEq};
+	Token cmp_and = {Token_And}; // NOTE(bill): Doesn't need to be logical
+	ssaValue *c0 = ssa_emit_comp(proc, le, v_zero, low);
+	ssaValue *c1 = ssa_emit_comp(proc, le, low, high);
+	ssaValue *c2 = ssa_emit_comp(proc, le, high, max);
 	ssaValue *cond = NULL;
-	cond = ssa_emit_arith(proc, cmp_or, c0, c1, t_bool);
-	cond = ssa_emit_arith(proc, cmp_or, c2, cond, t_bool);
-	cond = ssa_emit_arith(proc, cmp_or, c3, cond, t_bool);
+	cond = ssa_emit_comp(proc, cmp_and, c0, c1);
+	cond = ssa_emit_comp(proc, cmp_and, cond, c2);
 
+	ssaBlock *then = ssa_add_block(proc, NULL, make_string("seb.then"));
+	ssaBlock *done = ssa__make_block(proc, NULL, make_string("seb.done"));
 
-	ssaBlock *then = ssa_add_block(proc, NULL, make_string("slice.expr.then"));
-	ssaBlock *done = ssa__make_block(proc, NULL, make_string("slice.expr.done")); // NOTE(bill): Append later
-
-	ssa_emit_if(proc, cond, then, done);
+	ssa_emit_if(proc, cond, done, then);
 	proc->curr_block = then;
 
 	gbAllocator a = proc->module->allocator;
-
-	ssaValue *file   = ssa_emit_global_string(proc, make_exact_value_string(token.pos.file));
-	ssaValue *line   = ssa_make_value_constant(a, t_int, make_exact_value_integer(token.pos.line));
-	ssaValue *column = ssa_make_value_constant(a, t_int, make_exact_value_integer(token.pos.column));
-
 	ssaValue **args = gb_alloc_array(a, ssaValue *, 6);
-	args[0] = file;
-	args[1] = line;
-	args[2] = column;
+	args[0] = ssa_emit_global_string(proc, token.pos.file);
+	args[1] = ssa_make_const_int(a, token.pos.line);
+	args[2] = ssa_make_const_int(a, token.pos.column);
 	args[3] = low;
 	args[4] = high;
 	args[5] = max;
 
-	if (is_substring) {
-		ssa_emit_global_call(proc, "__substring_expr_error", args, 5);
-	} else {
+	if (!is_substring) {
 		ssa_emit_global_call(proc, "__slice_expr_error", args, 6);
+	} else {
+		ssa_emit_global_call(proc, "__substring_expr_error", args, 5);
 	}
 
 	ssa_emit_jump(proc, done);
@@ -1950,7 +1947,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 				Type *t = ssa_type(field_elem);
 				GB_ASSERT(t->kind != Type_Tuple);
 				ssaValue *ev = ssa_emit_conv(proc, field_elem, et);
-				ssaValue *i = ssa_make_value_constant(proc->module->allocator, t_int, make_exact_value_integer(index));
+				ssaValue *i = ssa_make_const_int(proc->module->allocator, index);
 				result = ssa_emit(proc, ssa_make_instr_insert_element(proc, result, ev, i));
 			}
 			if (index == 1 && base_type->Vector.count > 1) {
@@ -2066,8 +2063,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					i64 a = type_align_of(proc->module->sizes, allocator, type);
 
 					ssaValue **args = gb_alloc_array(allocator, ssaValue *, 2);
-					args[0] = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(s));
-					args[1] = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(a));
+					args[0] = ssa_make_const_int(allocator, s);
+					args[1] = ssa_make_const_int(allocator, a);
 					ssaValue *call = ssa_emit_global_call(proc, "alloc_align", args, 2);
 					ssaValue *v = ssa_emit_conv(proc, call, ptr_type);
 					return v;
@@ -2085,8 +2082,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					i64 s = type_size_of(proc->module->sizes, allocator, type);
 					i64 a = type_align_of(proc->module->sizes, allocator, type);
 
-					ssaValue *elem_size  = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(s));
-					ssaValue *elem_align = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(a));
+					ssaValue *elem_size  = ssa_make_const_int(allocator, s);
+					ssaValue *elem_align = ssa_make_const_int(allocator, a);
 
 					ssaValue *len = ssa_build_expr(proc, ce->args[1]);
 					ssaValue *cap = len;
@@ -2161,9 +2158,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					                      LIT(pos.file), pos.line, pos.column, expr);
 					err_len--;
 
-					ssaValue *array = ssa_add_global_string_array(proc->module, make_exact_value_string(make_string(err_str, err_len)));
+					ssaValue *array = ssa_add_global_string_array(proc->module, make_string(err_str, err_len));
 					ssaValue *elem = ssa_array_elem(proc, array);
-					ssaValue *len = ssa_make_value_constant(proc->module->allocator, t_int, make_exact_value_integer(err_len));
+					ssaValue *len = ssa_make_const_int(proc->module->allocator, err_len);
 					ssaValue *string = ssa_emit_string(proc, elem, len);
 
 					ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, 1);
@@ -2219,8 +2216,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssaValue *cond = ssa_emit_comp(proc, lt, len_dst, len_src);
 					ssaValue *len = ssa_emit_select(proc, cond, len_dst, len_src);
 					Token mul = {Token_Mul};
-					ssaValue *elem_size = ssa_make_value_constant(proc->module->allocator, t_int,
-					                                              make_exact_value_integer(size_of_elem));
+					ssaValue *elem_size = ssa_make_const_int(proc->module->allocator, size_of_elem);
 					ssaValue *byte_count = ssa_emit_arith(proc, mul, len, elem_size, t_int);
 
 					ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, 3);
@@ -2264,8 +2260,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					// Add new slice item
 					i64 item_size = type_size_of(proc->module->sizes, proc->module->allocator, elem_type);
-					ssaValue *byte_count = ssa_make_value_constant(proc->module->allocator, t_int,
-					                                               make_exact_value_integer(item_size));
+					ssaValue *byte_count = ssa_make_const_int(proc->module->allocator, item_size);
 
 					ssaValue *offset = ssa_emit_ptr_offset(proc, elem, len);
 					offset = ssa_emit_conv(proc, offset, t_rawptr, true);
@@ -2333,8 +2328,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssaValue *v = ssa_emit_arith(proc, sub, ptr_a, ptr_b, t_int);
 					if (elem_size > 1) {
 						Token quo = {Token_Quo};
-						ssaValue *ez = ssa_make_value_constant(proc->module->allocator, t_int,
-						                                       make_exact_value_integer(elem_size));
+						ssaValue *ez = ssa_make_const_int(proc->module->allocator, elem_size);
 						v = ssa_emit_arith(proc, quo, v, ez, t_int);
 					}
 
@@ -2477,7 +2471,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 				ssaValue *base_elem  = ssa_emit_struct_gep(proc, base_array, v_zero32, elem_ptr_type);
 				ssaValue *slice_elem = ssa_emit_struct_gep(proc, slice,      v_zero32, elem_ptr_type);
 				ssa_emit_store(proc, slice_elem, base_elem);
-				ssaValue *len = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(slice_len));
+				ssaValue *len = ssa_make_const_int(allocator, slice_len);
 				ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_one32, t_int), len);
 				ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_two32, t_int), len);
 			}
@@ -2517,7 +2511,7 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 
 			// TODO(bill): Optimize by not allocating everytime
 			if (tv->value.value_string.len > 0) {
-				return ssa_emit_global_string(proc, tv->value);
+				return ssa_emit_global_string(proc, tv->value.value_string);
 			} else {
 				ssaValue *null_string = ssa_add_local_generated(proc, t_string);
 				return ssa_emit_load(proc, null_string);
@@ -2648,7 +2642,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			// HACK(bill): Fix how lvalues for vectors work
 			ssaValue *vector = ssa_build_addr(proc, ie->expr).addr;
 			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
-			ssaValue *len = ssa_make_value_constant(a, t_int, make_exact_value_integer(t->Vector.count));
+			ssaValue *len = ssa_make_const_int(a, t->Vector.count);
 			ssa_array_bounds_check(proc, ast_node_token(ie->index), index, len);
 			return ssa_make_addr_vector(vector, index, expr);
 		} break;
@@ -2658,7 +2652,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			Type *et = make_type_pointer(proc->module->allocator, t->Array.elem);
 			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
 			ssaValue *elem = ssa_emit_struct_gep(proc, array, index, et);
-			ssaValue *len = ssa_make_value_constant(a, t_int, make_exact_value_integer(t->Vector.count));
+			ssaValue *len = ssa_make_const_int(a, t->Vector.count);
 			ssa_array_bounds_check(proc, ast_node_token(ie->index), index, len);
 			return ssa_make_addr(elem, expr);
 		} break;
@@ -2679,9 +2673,9 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			ssaValue *elem = NULL;
 			ssaValue *len = NULL;
 			if (tv->mode == Addressing_Constant) {
-				ssaValue *array = ssa_add_global_string_array(proc->module, tv->value);
+				ssaValue *array = ssa_add_global_string_array(proc->module, tv->value.value_string);
 				elem = ssa_array_elem(proc, array);
-				len = ssa_make_value_constant(a, t_int, make_exact_value_integer(tv->value.value_string.len));
+				len = ssa_make_const_int(a, tv->value.value_string.len);
 			} else {
 				ssaValue *str = ssa_build_expr(proc, ie->expr);
 				elem = ssa_string_elem(proc, str);
@@ -2922,12 +2916,12 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		u32 out = proc->module->stmt_state_flags;
 		defer (proc->module->stmt_state_flags = out);
 
-		if (in & StmtStateFlag_abc) {
-			out |= StmtStateFlag_abc;
-			out &= ~StmtStateFlag_no_abc;
-		} else if (in & StmtStateFlag_no_abc) {
-			out |= StmtStateFlag_no_abc;
-			out &= ~StmtStateFlag_abc;
+		if (in & StmtStateFlag_bounds_check) {
+			out |= StmtStateFlag_bounds_check;
+			out &= ~StmtStateFlag_no_bounds_check;
+		} else if (in & StmtStateFlag_no_bounds_check) {
+			out |= StmtStateFlag_no_bounds_check;
+			out &= ~StmtStateFlag_bounds_check;
 		}
 	}
 
@@ -3481,7 +3475,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			for (isize field_index = 1; field_index < ut->Record.field_count; field_index++) {
 				Entity *f = get_base_type(union_type)->Record.fields[field_index];
 				if (are_types_identical(f->type, base_type)) {
-					index = ssa_make_value_constant(allocator, t_int, make_exact_value_integer(field_index));
+					index = ssa_make_const_int(allocator, field_index);
 					break;
 				}
 			}
@@ -3581,12 +3575,12 @@ void ssa_build_proc(ssaValue *value, ssaProcedure *parent) {
 			u32 out = proc->module->stmt_state_flags;
 			defer (proc->module->stmt_state_flags = out);
 
-			if (in & ProcTag_abc) {
-				out |= ProcTag_abc;
-				out &= ~ProcTag_no_abc;
-			} else if (in & ProcTag_no_abc) {
-				out |= ProcTag_no_abc;
-				out &= ~ProcTag_abc;
+			if (in & ProcTag_bounds_check) {
+				out |= ProcTag_bounds_check;
+				out &= ~ProcTag_no_bounds_check;
+			} else if (in & ProcTag_no_bounds_check) {
+				out |= ProcTag_no_bounds_check;
+				out &= ~ProcTag_bounds_check;
 			}
 		}
 
