@@ -1301,34 +1301,6 @@ ssaValue *ssa_add_local_slice(ssaProcedure *proc, Type *slice_type, ssaValue *ba
 	return slice;
 }
 
-ssaValue *ssa_emit_substring(ssaProcedure *proc, ssaValue *base, ssaValue *low, ssaValue *high) {
-	Type *bt = get_base_type(ssa_type(base));
-	GB_ASSERT(bt == t_string);
-	if (low == NULL) {
-		low = v_zero;
-	}
-	if (high == NULL) {
-		high = ssa_string_len(proc, base);
-	}
-
-	Token op_sub = {Token_Sub};
-	ssaValue *elem, *len;
-	len = ssa_emit_arith(proc, op_sub, high, low, t_int);
-
-	elem = ssa_string_elem(proc, base);
-	elem = ssa_emit_ptr_offset(proc, elem, low);
-
-	ssaValue *str, *gep;
-	str = ssa_add_local_generated(proc, t_string);
-	gep = ssa_emit_struct_gep(proc, str, v_zero32, ssa_type(elem));
-	ssa_emit_store(proc, gep, elem);
-
-	gep = ssa_emit_struct_gep(proc, str, v_one32, t_int);
-	ssa_emit_store(proc, gep, len);
-
-	return str;
-}
-
 
 ssaValue *ssa_add_global_string_array(ssaModule *m, ExactValue value) {
 	GB_ASSERT(value.kind == ExactValue_String);
@@ -1720,11 +1692,10 @@ void ssa_array_bounds_check(ssaProcedure *proc, Token token, ssaValue *index, ss
 	if ((proc->module->stmt_state_flags & StmtStateFlag_no_abc) != 0) {
 		return;
 	}
+	ssa_emit_comment(proc, make_string("ArrayBoundsCheck"));
 
 	index = ssa_emit_conv(proc, index, t_int);
 	len   = ssa_emit_conv(proc, len, t_int);
-
-	ssa_emit_comment(proc, make_string("ArrayBoundsCheck"));
 
 	Token lt = {Token_Lt};
 	Token ge = {Token_GtEq};
@@ -1753,6 +1724,60 @@ void ssa_array_bounds_check(ssaProcedure *proc, Token token, ssaValue *index, ss
 	args[4] = len;
 
 	ssa_emit_global_call(proc, "__abc_error", args, 5);
+
+	ssa_emit_jump(proc, done);
+	gb_array_append(proc->blocks, done);
+	proc->curr_block = done;
+}
+
+void ssa_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low, ssaValue *high, ssaValue *max, b32 is_substring) {
+	if ((proc->module->stmt_state_flags & StmtStateFlag_no_abc) != 0) {
+		return;
+	}
+	ssa_emit_comment(proc, make_string("SliceBoundsCheck"));
+
+	low  = ssa_emit_conv(proc, low, t_int);
+	high = ssa_emit_conv(proc, high, t_int);
+	max  = ssa_emit_conv(proc, max, t_int);
+
+	Token lt = {Token_Lt};
+	Token gt = {Token_Gt};
+	Token cmp_or = {Token_Or}; // NOTE(bill): Just `or` it as both sides have been evaluated anyway
+	ssaValue *c0 = ssa_emit_comp(proc, lt, low, v_zero);
+	ssaValue *c1 = ssa_emit_comp(proc, gt, low,  high);
+	ssaValue *c2 = ssa_emit_comp(proc, gt, low,  max);
+	ssaValue *c3 = ssa_emit_comp(proc, gt, high, max);
+	ssaValue *cond = NULL;
+	cond = ssa_emit_arith(proc, cmp_or, c0, c1, t_bool);
+	cond = ssa_emit_arith(proc, cmp_or, c2, cond, t_bool);
+	cond = ssa_emit_arith(proc, cmp_or, c3, cond, t_bool);
+
+
+	ssaBlock *then = ssa_add_block(proc, NULL, make_string("slice.expr.then"));
+	ssaBlock *done = ssa__make_block(proc, NULL, make_string("slice.expr.done")); // NOTE(bill): Append later
+
+	ssa_emit_if(proc, cond, then, done);
+	proc->curr_block = then;
+
+	gbAllocator a = proc->module->allocator;
+
+	ssaValue *file   = ssa_emit_global_string(proc, make_exact_value_string(token.pos.file));
+	ssaValue *line   = ssa_make_value_constant(a, t_int, make_exact_value_integer(token.pos.line));
+	ssaValue *column = ssa_make_value_constant(a, t_int, make_exact_value_integer(token.pos.column));
+
+	ssaValue **args = gb_alloc_array(a, ssaValue *, 6);
+	args[0] = file;
+	args[1] = line;
+	args[2] = column;
+	args[3] = low;
+	args[4] = high;
+	args[5] = max;
+
+	if (is_substring) {
+		ssa_emit_global_call(proc, "__substring_expr_error", args, 5);
+	} else {
+		ssa_emit_global_call(proc, "__slice_expr_error", args, 6);
+	}
 
 	ssa_emit_jump(proc, done);
 	gb_array_append(proc->blocks, done);
@@ -2068,6 +2093,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					if (gb_array_count(ce->args) == 3) {
 						cap = ssa_build_expr(proc, ce->args[2]);
 					}
+
+					ssa_slice_bounds_check(proc, ast_node_token(ce->args[1]), v_zero, len, cap, false);
 
 					Token mul = {Token_Mul};
 					ssaValue *slice_size = ssa_emit_arith(proc, mul, elem_size, cap, t_int);
@@ -2622,7 +2649,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			ssaValue *vector = ssa_build_addr(proc, ie->expr).addr;
 			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
 			ssaValue *len = ssa_make_value_constant(a, t_int, make_exact_value_integer(t->Vector.count));
-			ssa_array_bounds_check(proc, ast_node_token(expr), index, len);
+			ssa_array_bounds_check(proc, ast_node_token(ie->index), index, len);
 			return ssa_make_addr_vector(vector, index, expr);
 		} break;
 
@@ -2632,7 +2659,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
 			ssaValue *elem = ssa_emit_struct_gep(proc, array, index, et);
 			ssaValue *len = ssa_make_value_constant(a, t_int, make_exact_value_integer(t->Vector.count));
-			ssa_array_bounds_check(proc, ast_node_token(expr), index, len);
+			ssa_array_bounds_check(proc, ast_node_token(ie->index), index, len);
 			return ssa_make_addr(elem, expr);
 		} break;
 
@@ -2641,7 +2668,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			ssaValue *elem = ssa_slice_elem(proc, slice);
 			ssaValue *len = ssa_slice_len(proc, slice);
 			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
-			ssa_array_bounds_check(proc, ast_node_token(expr), index, len);
+			ssa_array_bounds_check(proc, ast_node_token(ie->index), index, len);
 			ssaValue *v = ssa_emit_ptr_offset(proc, elem, index);
 			return ssa_make_addr(v, expr);
 
@@ -2662,7 +2689,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			}
 
 			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
-			ssa_array_bounds_check(proc, ast_node_token(expr), index, len);
+			ssa_array_bounds_check(proc, ast_node_token(ie->index), index, len);
 
 			ssaValue *v = ssa_emit_ptr_offset(proc, elem, index);
 			return ssa_make_addr(v, expr);
@@ -2692,6 +2719,9 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			if (high == NULL) high = ssa_slice_len(proc, ssa_emit_load(proc, base.addr));
 			if (max == NULL)  max  = ssa_slice_cap(proc, ssa_emit_load(proc, base.addr));
 			GB_ASSERT(max != NULL);
+
+			ssa_slice_bounds_check(proc, se->open, low, high, max, false);
+
 			Token op_sub = {Token_Sub};
 			ssaValue *elem = ssa_slice_elem(proc, ssa_emit_load(proc, base.addr));
 			ssaValue *len  = ssa_emit_arith(proc, op_sub, high, low, t_int);
@@ -2714,6 +2744,9 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			if (high == NULL) high = ssa_array_len(proc, ssa_emit_load(proc, base.addr));
 			if (max == NULL)  max  = ssa_array_cap(proc, ssa_emit_load(proc, base.addr));
 			GB_ASSERT(max != NULL);
+
+			ssa_slice_bounds_check(proc, se->open, low, high, max, false);
+
 			Token op_sub = {Token_Sub};
 			ssaValue *elem = ssa_array_elem(proc, base.addr);
 			ssaValue *len  = ssa_emit_arith(proc, op_sub, high, low, t_int);
@@ -2730,8 +2763,29 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			return ssa_make_addr(slice, expr);
 		}
 
-		case Type_Basic:
-			return ssa_make_addr(ssa_emit_substring(proc, ssa_emit_load(proc, base.addr), low, high), expr);
+		case Type_Basic: {
+			GB_ASSERT(type == t_string);
+			if (high == NULL) {
+				high = ssa_string_len(proc, ssa_emit_load(proc, base.addr));
+			}
+
+			ssa_slice_bounds_check(proc, se->open, low, high, high, true);
+
+			Token op_sub = {Token_Sub};
+			ssaValue *elem, *len;
+			len = ssa_emit_arith(proc, op_sub, high, low, t_int);
+
+			elem = ssa_string_elem(proc, ssa_emit_load(proc, base.addr));
+			elem = ssa_emit_ptr_offset(proc, elem, low);
+
+			ssaValue *str = ssa_add_local_generated(proc, t_string);
+			ssaValue *gep0 = ssa_emit_struct_gep(proc, str, v_zero32, ssa_type(elem));
+			ssaValue *gep1 = ssa_emit_struct_gep(proc, str, v_one32, t_int);
+			ssa_emit_store(proc, gep0, elem);
+			ssa_emit_store(proc, gep1, len);
+
+			return ssa_make_addr(str, expr);
+		} break;
 		}
 
 		GB_PANIC("Unknown slicable type");

@@ -3347,6 +3347,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 				if (o->mode == Addressing_Constant) {
 					max_count = o->value.value_string.len;
 				}
+				if (se->max != NULL) {
+					error(&c->error_collector, ast_node_token(se->max), "Max (3rd) index not needed in substring expression");
+				}
 				o->type = t_string;
 			}
 			break;
