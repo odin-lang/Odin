@@ -15,7 +15,7 @@ print_string_to_buffer :: proc(buf: ^[]byte, s: string) {
 	slice := buf as ^Raw_Bytes
 	if slice.len < slice.cap {
 		n := min(slice.cap-slice.len, len(s))
-		offset := ((slice.data as int) + slice.len) as ^byte
+		offset := ptr_offset(slice.data, slice.len)
 		memory_copy(offset, ^s[0], n)
 		slice.len += n
 	}
@@ -199,7 +199,7 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 				print_string_to_buffer(buf, " = ")
 				v: any
 				v.type_info = f.type_info
-				v.data = ptr_offset(arg.data as ^u8, f.offset)
+				v.data = ptr_offset(arg.data as ^byte, f.offset)
 				print_any_to_buffer(buf, v)
 			}
 			print_string_to_buffer(buf, "}")
@@ -210,29 +210,29 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 
 	case Integer:
 		if info.signed {
-			u: uint = 0;
+			i: int = 0;
 			if arg.data != null {
 				match info.size {
-				case 1:  u = (arg.data as ^u8)^   as uint
-				case 2:  u = (arg.data as ^u16)^  as uint
-				case 4:  u = (arg.data as ^u32)^  as uint
-				case 8:  u = (arg.data as ^u64)^  as uint
-				case 16: u = (arg.data as ^u128)^ as uint
+				case 1:  i = (arg.data as ^i8)^   as int
+				case 2:  i = (arg.data as ^i16)^  as int
+				case 4:  i = (arg.data as ^i32)^  as int
+				case 8:  i = (arg.data as ^i64)^  as int
+				case 16: i = (arg.data as ^i128)^ as int
 				}
 			}
-			print_uint_to_buffer(buf, u)
+			print_int_to_buffer(buf, i)
 		} else {
-			v: int = 0;
+			i: uint = 0;
 			if arg.data != null {
 				match info.size {
-				case 1:  v = (arg.data as ^i8)^   as int
-				case 2:  v = (arg.data as ^i16)^  as int
-				case 4:  v = (arg.data as ^i32)^  as int
-				case 8:  v = (arg.data as ^i64)^  as int
-				case 16: v = (arg.data as ^i128)^ as int
+				case 1:  i = (arg.data as ^u8)^   as uint
+				case 2:  i = (arg.data as ^u16)^  as uint
+				case 4:  i = (arg.data as ^u32)^  as uint
+				case 8:  i = (arg.data as ^u64)^  as uint
+				case 16: i = (arg.data as ^u128)^ as uint
 				}
 			}
-			print_int_to_buffer(buf, v)
+			print_uint_to_buffer(buf, i)
 		}
 
 	case Float:
@@ -361,17 +361,27 @@ print_to_buffer :: proc(buf: ^[]byte, args: ..any) {
 	prev_string := false
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
+		is_string := arg.data != null && type_info_is_string(arg.type_info)
+		if i > 0 && !is_string && !prev_string {
+			// Add space between two non-string arguments
+			print_space_to_buffer(buf)
+		}
+		print_any_to_buffer(buf, arg)
+		prev_string = is_string
+	}
+}
+
+println_to_buffer :: proc(buf: ^[]byte, args: ..any) {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
 		if i > 0 {
 			print_space_to_buffer(buf)
 		}
 		print_any_to_buffer(buf, arg)
 	}
-}
-
-println_to_buffer :: proc(buf: ^[]byte, args: ..any) {
-	print_to_buffer(buf, ..args)
 	print_nl_to_buffer(buf)
 }
+
 
 print :: proc(args: ..any) {
 	data: [4096]byte

@@ -59,10 +59,11 @@ enum DeclKind {
 };
 
 enum ProcTag {
-	ProcTag_foreign   = GB_BIT(0),
-	ProcTag_inline    = GB_BIT(1),
-	ProcTag_no_inline = GB_BIT(2),
-	ProcTag_pure      = GB_BIT(3),
+	ProcTag_abc       = GB_BIT(0),
+	ProcTag_no_abc    = GB_BIT(1),
+	ProcTag_foreign   = GB_BIT(2),
+	ProcTag_inline    = GB_BIT(3),
+	ProcTag_no_inline = GB_BIT(4),
 };
 
 enum VarDeclTag {
@@ -75,6 +76,12 @@ enum TypeFlag : u32 {
 	TypeFlag_volatile     = GB_BIT(1),
 	TypeFlag_atomic       = GB_BIT(1),
 };
+
+enum StmtStateFlag : u32 {
+	StmtStateFlag_abc    = GB_BIT(0),
+	StmtStateFlag_no_abc = GB_BIT(1),
+};
+
 
 enum CallExprKind {
 	CallExpr_Prefix,  // call(...)
@@ -288,6 +295,7 @@ struct AstNode {
 	AstNodeKind kind;
 	// AstNode *prev, *next; // NOTE(bill): allow for Linked list
 	u32 type_flags;
+	u32 stmt_state_flags;
 	union {
 #define AST_NODE_KIND(_kind_name_, name, ...) __VA_ARGS__ _kind_name_;
 	AST_NODE_KINDS
@@ -1169,15 +1177,25 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_inline, tag_name);
 		} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_inline, tag_name);
-		}  else if (are_strings_equal(tag_name, make_string("pure"))) {
-			check_proc_add_tag(f, tag_expr, tags, ProcTag_pure, tag_name);
+		} else if (are_strings_equal(tag_name, make_string("abc"))) {
+			check_proc_add_tag(f, tag_expr, tags, ProcTag_abc, tag_name);
+		} else if (are_strings_equal(tag_name, make_string("no_abc"))) {
+			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_abc, tag_name);
 		} else {
 			ast_file_err(f, ast_node_token(tag_expr), "Unknown procedure tag");
 		}
 	}
 
 	if ((*tags & ProcTag_inline) && (*tags & ProcTag_no_inline)) {
-		ast_file_err(f, f->cursor[0], "You cannot apply both `inline` and `no_inline` to a procedure");
+		ast_file_err(f, f->cursor[0], "You cannot apply both #inline and #no_inline to a procedure");
+	}
+
+	if ((*tags & ProcTag_abc) && (*tags & ProcTag_no_abc)) {
+		ast_file_err(f, f->cursor[0], "You cannot apply both #abc and #no_abc to a procedure");
+	}
+
+	if (((*tags & ProcTag_abc) || (*tags & ProcTag_no_abc)) && (*tags & ProcTag_foreign)) {
+		ast_file_err(f, f->cursor[0], "You cannot apply both #abc or #no_abc to a procedure without a body");
 	}
 }
 
@@ -2493,22 +2511,23 @@ AstNode *parse_stmt(AstFile *f) {
 
 	case Token_Hash: {
 		s = parse_tag_stmt(f, NULL);
+		String tag = s->TagStmt.name.string;
 
-		if (are_strings_equal(s->TagStmt.name.string, make_string("load"))) {
+		if (are_strings_equal(tag, make_string("load"))) {
 			Token file_path = expect_token(f, Token_String);
 			if (f->curr_proc == NULL) {
 				return make_load_decl(f, s->TagStmt.token, file_path);
 			}
-			ast_file_err(f, token, "You cannot `load` within a procedure. This must be done at the file scope.");
+			ast_file_err(f, token, "You cannot use #load within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
-		} else if (are_strings_equal(s->TagStmt.name.string, make_string("foreign_system_library"))) {
+		} else if (are_strings_equal(tag, make_string("foreign_system_library"))) {
 			Token file_path = expect_token(f, Token_String);
 			if (f->curr_proc == NULL) {
 				return make_foreign_system_library(f, s->TagStmt.token, file_path);
 			}
-			ast_file_err(f, token, "You cannot using `foreign_system_library` within a procedure. This must be done at the file scope.");
+			ast_file_err(f, token, "You cannot use #foreign_system_library within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
-		} else if (are_strings_equal(s->TagStmt.name.string, make_string("thread_local"))) {
+		} else if (are_strings_equal(tag, make_string("thread_local"))) {
 			AstNode *var_decl = parse_simple_stmt(f);
 			if (var_decl->kind != AstNode_VarDecl ||
 			    var_decl->VarDecl.kind != Declaration_Mutable) {
@@ -2521,6 +2540,20 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			var_decl->VarDecl.tags |= VarDeclTag_thread_local;
 			return var_decl;
+		} else if (are_strings_equal(tag, make_string("abc"))) {
+			s = parse_stmt(f);
+			s->stmt_state_flags |= StmtStateFlag_abc;
+			if ((s->stmt_state_flags & StmtStateFlag_no_abc) != 0) {
+				ast_file_err(f, token, "#abc and #no_abc cannot be applied together");
+			}
+			return s;
+		} else if (are_strings_equal(tag, make_string("no_abc"))) {
+			s = parse_stmt(f);
+			s->stmt_state_flags |= StmtStateFlag_no_abc;
+			if ((s->stmt_state_flags & StmtStateFlag_abc) != 0) {
+				ast_file_err(f, token, "#abc and #no_abc cannot be applied together");
+			}
+			return s;
 		}
 
 

@@ -29,7 +29,7 @@ to_c_string :: proc(s: string) -> []u8 {
 }
 
 
-Window :: type struct {
+Window :: struct {
 	width, height:      int
 	wc:                 WNDCLASSEXA
 	dc:                 HDC

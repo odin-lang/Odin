@@ -23,7 +23,7 @@ b32 ssa_gen_init(ssaGen *s, Checker *c) {
 		return false;
 	}
 
-	ssa_module_init(&s->module, c);
+	ssa_init_module(&s->module, c);
 
 	// TODO(bill): generate appropriate output name
 	isize pos = string_extension_position(c->parser->init_fullpath);
@@ -35,7 +35,7 @@ b32 ssa_gen_init(ssaGen *s, Checker *c) {
 }
 
 void ssa_gen_destroy(ssaGen *s) {
-	ssa_module_destroy(&s->module);
+	ssa_destroy_module(&s->module);
 	gb_file_close(&s->output_file);
 }
 

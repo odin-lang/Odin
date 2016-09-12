@@ -1,4 +1,5 @@
 #load "win32.odin"
+#load "print.odin"
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
@@ -9,7 +10,7 @@ Type_Info :: union {
 		offset:    int        // offsets are not used in tuples
 	}
 	Record :: struct #ordered {
-		fields: []Member // IMPORTANT: This will need to be allocated on the heap
+		fields: []Member
 	}
 
 
@@ -288,3 +289,9 @@ __assert :: proc(msg: string) {
 	file_write(file_get_standard(File_Standard.ERROR), msg as []byte)
 	__debug_trap()
 }
+
+__abc_error :: proc(file: string, line, column: int, index, len: int) {
+	print(file, "(", line, ":", line, ") Index out of bounds: index: ", index, ", len: ", len, "\n")
+	__debug_trap()
+}
+

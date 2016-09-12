@@ -1926,19 +1926,18 @@ b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *valu
 	}
 
 	if (operand.mode == Addressing_Constant) {
+		i64 i = exact_value_to_integer(operand.value).value_integer;
+		if (i < 0) {
+			gbString expr_str = expr_to_string(operand.expr);
+			error(&c->error_collector, ast_node_token(operand.expr),
+			            "Index `%s` cannot be a negative value", expr_str);
+			gb_string_free(expr_str);
+			if (value) *value = 0;
+			return false;
+		}
+
 		if (max_count >= 0) { // NOTE(bill): Do array bound checking
-			i64 i = exact_value_to_integer(operand.value).value_integer;
-			if (i < 0) {
-				gbString expr_str = expr_to_string(operand.expr);
-				error(&c->error_collector, ast_node_token(operand.expr),
-				            "Index `%s` cannot be a negative value", expr_str);
-				gb_string_free(expr_str);
-				if (value) *value = 0;
-				return false;
-			}
-
 			if (value) *value = i;
-
 			if (i >= max_count) {
 				gbString expr_str = expr_to_string(operand.expr);
 				error(&c->error_collector, ast_node_token(operand.expr),

@@ -452,7 +452,6 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 	b32 is_foreign   = (pd->tags & ProcTag_foreign)   != 0;
 	b32 is_inline    = (pd->tags & ProcTag_inline)    != 0;
 	b32 is_no_inline = (pd->tags & ProcTag_no_inline) != 0;
-	b32 is_pure      = (pd->tags & ProcTag_pure)      != 0;
 
 
 
