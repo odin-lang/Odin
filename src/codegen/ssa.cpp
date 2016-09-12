@@ -67,7 +67,9 @@ struct ssaProcedure {
 	ssaTargetList *     target_list;
 };
 
-#define SSA_STARTUP_RUNTIME_PROC_NAME "__$startup_runtime"
+#define SSA_STARTUP_RUNTIME_PROC_NAME  "__$startup_runtime"
+#define SSA_TYPE_INFO_DATA_NAME        "__$type_info_data"
+#define SSA_TYPE_INFO_DATA_MEMBER_NAME "__$type_info_data_member"
 
 
 #define SSA_INSTR_KINDS \
@@ -225,7 +227,6 @@ enum ssaValueKind {
 	ssaValue_TypeName,
 	ssaValue_Global,
 	ssaValue_Param,
-	ssaValue_GlobalString,
 
 	ssaValue_Proc,
 	ssaValue_Block,
@@ -312,7 +313,7 @@ void ssa_module_init(ssaModule *m, Checker *c) {
 	{
 		// Add type info data
 		{
-			String name = make_string("__type_info_data");
+			String name = make_string(SSA_TYPE_INFO_DATA_NAME);
 			Token token = {Token_Identifier};
 			token.string = name;
 
@@ -348,7 +349,7 @@ void ssa_module_init(ssaModule *m, Checker *c) {
 				}
 			}
 
-			String name = make_string("__type_info_member_data");
+			String name = make_string(SSA_TYPE_INFO_DATA_MEMBER_NAME);
 			Token token = {Token_Identifier};
 			token.string = name;
 
@@ -914,33 +915,6 @@ ssaValue *ssa_lvalue_load(ssaProcedure *proc, ssaAddr lval) {
 }
 
 
-isize ssa_type_info_index(CheckerInfo *info, Type *type) {
-	isize entry_index = -1;
-	HashKey key = hash_pointer(type);
-	auto *found_entry_index = map_get(&info->type_info_map, key);
-	if (found_entry_index) {
-		entry_index = *found_entry_index;
-	}
-	if (entry_index < 0) {
-		// NOTE(bill): Do manual search
-		// TODO(bill): This is O(n) and can be very slow
-		gb_for_array(i, info->type_info_map.entries){
-			auto *e = &info->type_info_map.entries[i];
-			Type *prev_type = cast(Type *)cast(uintptr)e->key.key;
-			if (are_types_identical(prev_type, type)) {
-				entry_index = e->value;
-				map_set(&info->type_info_map, key, entry_index);
-				break;
-			}
-		}
-	}
-	GB_ASSERT(entry_index >= 0);
-	return entry_index;
-}
-
-
-
-
 
 
 void ssa_begin_procedure_body(ssaProcedure *proc) {
@@ -1180,6 +1154,45 @@ ssaValue *ssa_emit_deep_field_ev(ssaProcedure *proc, Type *type, ssaValue *e, Se
 
 
 
+isize ssa_type_info_index(CheckerInfo *info, Type *type) {
+	isize entry_index = -1;
+	HashKey key = hash_pointer(type);
+	auto *found_entry_index = map_get(&info->type_info_map, key);
+	if (found_entry_index) {
+		entry_index = *found_entry_index;
+	}
+	if (entry_index < 0) {
+		// NOTE(bill): Do manual search
+		// TODO(bill): This is O(n) and can be very slow
+		gb_for_array(i, info->type_info_map.entries){
+			auto *e = &info->type_info_map.entries[i];
+			Type *prev_type = cast(Type *)cast(uintptr)e->key.key;
+			if (are_types_identical(prev_type, type)) {
+				entry_index = e->value;
+				// NOTE(bill): Add it to the search map
+				map_set(&info->type_info_map, key, entry_index);
+				break;
+			}
+		}
+	}
+	GB_ASSERT(entry_index >= 0);
+	return entry_index;
+}
+
+ssaValue *ssa_type_info(ssaProcedure *proc, Type *type) {
+	ssaValue **found = map_get(&proc->module->members, hash_string(make_string(SSA_TYPE_INFO_DATA_NAME)));
+	GB_ASSERT(found != NULL);
+	ssaValue *type_info_data = *found;
+
+	CheckerInfo *info = proc->module->info;
+	isize entry_index = ssa_type_info_index(info, type);
+	return ssa_emit_struct_gep(proc, type_info_data, entry_index, t_type_info_ptr);
+}
+
+
+
+
+
 
 
 ssaValue *ssa_array_elem(ssaProcedure *proc, ssaValue *array) {
@@ -1311,14 +1324,14 @@ ssaValue *ssa_emit_substring(ssaProcedure *proc, ssaValue *base, ssaValue *low, 
 }
 
 
-ssaValue *ssa_add_global_string_array(ssaProcedure *proc, ExactValue value) {
+ssaValue *ssa_add_global_string_array(ssaModule *m, ExactValue value) {
 	GB_ASSERT(value.kind == ExactValue_String);
 	gbAllocator a = gb_heap_allocator();
 
 	isize max_len = 4+8+1;
 	u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
-	isize len = gb_snprintf(cast(char *)str, max_len, "__str$%x", proc->module->global_string_index);
-	proc->module->global_string_index++;
+	isize len = gb_snprintf(cast(char *)str, max_len, "__str$%x", m->global_string_index);
+	m->global_string_index++;
 
 	String name = make_string(str, len-1);
 	Token token = {Token_String};
@@ -1327,10 +1340,10 @@ ssaValue *ssa_add_global_string_array(ssaProcedure *proc, ExactValue value) {
 	Entity *entity = make_entity_constant(a, NULL, token, type, value);
 	ssaValue *g = ssa_make_value_global(a, entity, ssa_make_value_constant(a, type, value));
 	g->Global.is_private  = true;
-	g->Global.is_constant = true;
+	// g->Global.is_constant = true;
 
-	map_set(&proc->module->values, hash_pointer(entity), g);
-	map_set(&proc->module->members, hash_string(name), g);
+	map_set(&m->values, hash_pointer(entity), g);
+	map_set(&m->members, hash_string(name), g);
 
 	return g;
 }
@@ -1583,22 +1596,22 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 	}
 
 	if (is_type_any(dst)) {
-		ssaValue **found = map_get(&proc->module->members, hash_string(make_string("__type_info_data")));
-		GB_ASSERT(found != NULL);
-		ssaValue *type_info_data = *found;
-		CheckerInfo *info = proc->module->info;
-
 		ssaValue *result = ssa_add_local_generated(proc, t_any);
 
-		// NOTE(bill): Make copy on stack so I can reference it later
-		ssaValue *data = ssa_add_local_generated(proc, src_type);
-		ssa_emit_store(proc, data, value);
+		ssaValue *data = NULL;
+		if (value->kind == ssaValue_Instr &&
+		    value->Instr.kind == ssaInstr_Load) {
+			// NOTE(bill): Addressable value
+			data = value->Instr.Load.address;
+		} else {
+			// NOTE(bill): Non-addressable value
+			data = ssa_add_local_generated(proc, src_type);
+			ssa_emit_store(proc, data, value);
+		}
 		data = ssa_emit_conv(proc, data, t_rawptr);
 
 
-		isize entry_index = ssa_type_info_index(info, src_type);
-
-		ssaValue *ti = ssa_emit_struct_gep(proc, type_info_data, entry_index, t_type_info_ptr);
+		ssaValue *ti = ssa_type_info(proc, src_type);
 
 		ssaValue *gep0 = ssa_emit_struct_gep(proc, result, v_zero32, make_type_pointer(proc->module->allocator, t_type_info_ptr));
 		ssaValue *gep1 = ssa_emit_struct_gep(proc, result, v_one32,  make_type_pointer(proc->module->allocator, t_rawptr));
@@ -1951,6 +1964,12 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			if (found && (*found)->kind == Entity_Builtin) {
 				Entity *e = *found;
 				switch (e->Builtin.id) {
+				case BuiltinProc_type_info: {
+					ssaValue *x = ssa_build_expr(proc, ce->args[0]);
+					Type *t = default_type(type_of_expr(proc->module->info, ce->args[0]));
+					return ssa_type_info(proc, t);
+				} break;
+
 				case BuiltinProc_new: {
 					ssa_emit_comment(proc, make_string("new"));
 					// new :: proc(Type) -> ^Type
@@ -2056,7 +2075,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					                      LIT(pos.file), pos.line, pos.column, expr);
 					err_len--;
 
-					ssaValue *array = ssa_add_global_string_array(proc, make_exact_value_string(make_string(err_str, err_len)));
+					ssaValue *array = ssa_add_global_string_array(proc->module, make_exact_value_string(make_string(err_str, err_len)));
 					ssaValue *elem = ssa_array_elem(proc, array);
 					ssaValue *len = ssa_make_value_constant(proc->module->allocator, t_int, make_exact_value_integer(err_len));
 					ssaValue *string = ssa_emit_string(proc, elem, len);
@@ -2290,19 +2309,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssaValue *cond = ssa_emit_comp(proc, lt, x, v_zero);
 					return ssa_emit_select(proc, cond, neg_x, x);
 				} break;
-
-
-				case BuiltinProc_type_info: {
-					ssaValue **found = map_get(&proc->module->members, hash_string(make_string("__type_info_data")));
-					GB_ASSERT(found != NULL);
-					ssaValue *type_info_data = *found;
-					ssaValue *x = ssa_build_expr(proc, ce->args[0]);
-					Type *t = default_type(type_of_expr(proc->module->info, ce->args[0]));
-					isize entry_index = ssa_type_info_index(proc->module->info, t);
-
-					ssaValue *gep = ssa_emit_struct_gep(proc, type_info_data, entry_index, t_type_info_ptr);
-					return gep;
-				} break;
 				}
 			}
 		}
@@ -2415,7 +2421,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 ssaValue *ssa_emit_global_string(ssaProcedure *proc, ExactValue value) {
 	GB_ASSERT(value.kind == ExactValue_String);
-	ssaValue *global_array = ssa_add_global_string_array(proc, value);
+	ssaValue *global_array = ssa_add_global_string_array(proc->module, value);
 	ssaValue *elem = ssa_array_elem(proc, global_array);
 	ssaValue *len = ssa_array_len(proc, ssa_emit_load(proc, global_array));
 	return ssa_emit_string(proc, elem, len);
@@ -2582,7 +2588,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		case Type_Basic: { // Basic_string
 			TypeAndValue *tv = map_get(&proc->module->info->types, hash_pointer(ie->expr));
 			if (tv->mode == Addressing_Constant) {
-				ssaValue *array = ssa_add_global_string_array(proc, tv->value);
+				ssaValue *array = ssa_add_global_string_array(proc->module, tv->value);
 				elem = ssa_array_elem(proc, array);
 			} else {
 				elem = ssa_string_elem(proc, ssa_build_expr(proc, ie->expr));

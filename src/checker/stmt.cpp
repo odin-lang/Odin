@@ -717,8 +717,9 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			error(&c->error_collector, ast_node_token(node), "Is not an expression");
 			break;
 		default:
-			if (kind == Expr_Stmt)
+			if (kind == Expr_Stmt) {
 				return;
+			}
 			error(&c->error_collector, ast_node_token(node), "Expression is not used");
 			break;
 		}

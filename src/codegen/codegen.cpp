@@ -39,10 +39,6 @@ void ssa_gen_destroy(ssaGen *s) {
 	gb_file_close(&s->output_file);
 }
 
-struct ssaGlobalVariable {
-	ssaValue *var, *init;
-	DeclInfo *decl;
-};
 
 void ssa_gen_tree(ssaGen *s) {
 	if (v_zero == NULL) {
@@ -54,6 +50,11 @@ void ssa_gen_tree(ssaGen *s) {
 		v_false  = ssa_make_value_constant(gb_heap_allocator(), t_bool, make_exact_value_bool(false));
 		v_true   = ssa_make_value_constant(gb_heap_allocator(), t_bool, make_exact_value_bool(true));
 	}
+
+	struct ssaGlobalVariable {
+		ssaValue *var, *init;
+		DeclInfo *decl;
+	};
 
 	ssaModule *m = &s->module;
 	CheckerInfo *info = m->info;
@@ -82,7 +83,24 @@ void ssa_gen_tree(ssaGen *s) {
 			ssaGlobalVariable var = {};
 			var.var = g;
 			var.decl = decl;
-			gb_array_append(global_variables, var);
+
+			if (decl->init_expr != NULL) {
+				TypeAndValue *tav = map_get(&info->types, hash_pointer(decl->init_expr));
+				if (tav != NULL && tav->value.kind != ExactValue_Invalid) {
+					ExactValue v = tav->value;
+					if (v.kind == ExactValue_String) {
+						// NOTE(bill): The printer will fix the value correctly
+						g->Global.value = ssa_add_global_string_array(m, v);
+					} else {
+						g->Global.value = ssa_make_value_constant(a, tav->type, v);
+					}
+				}
+			}
+
+			if (g->Global.value == NULL) {
+				gb_array_append(global_variables, var);
+			}
+
 			map_set(&m->values, hash_pointer(e), g);
 			map_set(&m->members, hash_string(name), g);
 		} break;
@@ -94,20 +112,6 @@ void ssa_gen_tree(ssaGen *s) {
 			AstNode *body = pd->body;
 			if (pd->foreign_name.len > 0) {
 				name = pd->foreign_name;
-			}
-
-			if (are_strings_equal(name, original_name)) {
-			#if 0
-				Scope *scope = *map_get(&info->scopes, hash_pointer(pd->type));
-				isize count = multi_map_count(&scope->elements, hash_string(original_name));
-				if (count > 1) {
-					gb_printf("%.*s\n", LIT(name));
-					isize name_len = name.len + 1 + 10 + 1;
-					u8 *name_text = gb_alloc_array(m->allocator, u8, name_len);
-					name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$%d", LIT(name), e->guid);
-					name = make_string(name_text, name_len-1);
-				}
-			#endif
 			}
 
 			ssaValue *p = ssa_make_value_procedure(a, m, e->type, decl->type_expr, body, name);
@@ -183,11 +187,11 @@ void ssa_gen_tree(ssaGen *s) {
 			ssaValue *type_info_member_data = NULL;
 
 			ssaValue **found = NULL;
-			found = map_get(&proc->module->members, hash_string(make_string("__type_info_data")));
+			found = map_get(&proc->module->members, hash_string(make_string(SSA_TYPE_INFO_DATA_NAME)));
 			GB_ASSERT(found != NULL);
 			type_info_data = *found;
 
-			found = map_get(&proc->module->members, hash_string(make_string("__type_info_member_data")));
+			found = map_get(&proc->module->members, hash_string(make_string(SSA_TYPE_INFO_DATA_MEMBER_NAME)));
 			GB_ASSERT(found != NULL);
 			type_info_member_data = *found;
 
@@ -227,7 +231,7 @@ void ssa_gen_tree(ssaGen *s) {
 
 					// TODO(bill): Which is better? The mangled name or actual name?
 					// ssaValue *gsa  = ssa_add_global_string_array(proc, make_exact_value_string(t->Named.name));
-					ssaValue *gsa  = ssa_add_global_string_array(proc, make_exact_value_string(t->Named.type_name->token.string));
+					ssaValue *gsa  = ssa_add_global_string_array(m, make_exact_value_string(t->Named.type_name->token.string));
 					ssaValue *elem = ssa_array_elem(proc, gsa);
 					ssaValue *len  = ssa_array_len(proc, ssa_emit_load(proc, gsa));
 					ssaValue *name = ssa_emit_string(proc, elem, len);
@@ -330,14 +334,17 @@ void ssa_gen_tree(ssaGen *s) {
 
 						type_set_offsets(m->sizes, a, t); // NOTE(bill): Just incase the offsets have not been set yet
 						for (isize i = 0; i < t->Record.field_count; i++) {
-							ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_value_constant(a, t_int, make_exact_value_integer(i)));
-							ssaValue *name      = ssa_emit_struct_gep(proc, field, v_zero32, t_string_ptr);
-							ssaValue *type_info = ssa_emit_struct_gep(proc, field, v_one32, t_type_info_ptr_ptr);
-							ssaValue *offset    = ssa_emit_struct_gep(proc, field, v_two32, t_int_ptr);
-
+							// NOTE(bill): Order fields in source order not layout order
 							Entity *f = t->Record.fields[i];
 							ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
 							i64 foffset = t->Record.struct_offsets[i];
+							GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
+							isize source_index = f->Variable.field_index;
+
+							ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_value_constant(a, t_int, make_exact_value_integer(source_index)));
+							ssaValue *name      = ssa_emit_struct_gep(proc, field, v_zero32, t_string_ptr);
+							ssaValue *type_info = ssa_emit_struct_gep(proc, field, v_one32, t_type_info_ptr_ptr);
+							ssaValue *offset    = ssa_emit_struct_gep(proc, field, v_two32, t_int_ptr);
 
 							if (f->token.string.len > 0) {
 								ssa_emit_store(proc, name, ssa_emit_global_string(proc, make_exact_value_string(f->token.string)));

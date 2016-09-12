@@ -336,9 +336,23 @@ void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type
 	case ssaValue_TypeName:
 		ssa_print_encoded_local(f, value->TypeName.name);
 		break;
-	case ssaValue_Global:
-		ssa_print_encoded_global(f, value->Global.entity->token.string);
-		break;
+	case ssaValue_Global: {
+		if (type_hint != NULL && is_type_string(type_hint)) {
+			ssa_fprintf(f, "{i8* getelementptr inbounds (");
+			ssa_print_type(f, m->sizes, value->Global.entity->type);
+			ssa_fprintf(f, ", ");
+			ssa_print_type(f, m->sizes, value->Global.entity->type);
+			ssa_fprintf(f, "* ");
+			ssa_print_encoded_global(f, value->Global.entity->token.string);
+			ssa_fprintf(f, ", ");
+			ssa_print_type(f, m->sizes, t_int);
+			ssa_fprintf(f, " 0, i32 0), ");
+			ssa_print_type(f, m->sizes, t_int);
+			ssa_fprintf(f, " %lld}", 0);
+		} else {
+			ssa_print_encoded_global(f, value->Global.entity->token.string);
+		}
+	} break;
 	case ssaValue_Param:
 		ssa_print_encoded_local(f, value->Param.entity->token.string);
 		break;
@@ -385,6 +399,9 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	case ssaInstr_Store: {
 		Type *type = ssa_type(instr);
 		ssa_fprintf(f, "store ");
+		if ((type->flags & TypeFlag_volatile) != 0) {
+			ssa_fprintf(f, "volatile ");
+		}
 		ssa_print_type(f, m->sizes, type);
 		ssa_fprintf(f, " ");
 		ssa_print_value(f, m, instr->Store.value, type);
@@ -398,6 +415,9 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	case ssaInstr_Load: {
 		Type *type = instr->Load.type;
 		ssa_fprintf(f, "%%%d = load ", value->id);
+		if ((type->flags & TypeFlag_volatile) != 0) {
+			ssa_fprintf(f, "volatile ");
+		}
 		ssa_print_type(f, m->sizes, type);
 		ssa_fprintf(f, ", ");
 		ssa_print_type(f, m->sizes, type);

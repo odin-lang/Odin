@@ -69,6 +69,13 @@ enum VarDeclTag {
 	VarDeclTag_thread_local = GB_BIT(0),
 };
 
+
+enum TypeFlag : u32 {
+	TypeFlag_thread_local = GB_BIT(0),
+	TypeFlag_volatile     = GB_BIT(1),
+	TypeFlag_atomic       = GB_BIT(1),
+};
+
 enum CallExprKind {
 	CallExpr_Prefix,  // call(...)
 	CallExpr_Postfix, // a'call
@@ -280,6 +287,7 @@ String const ast_node_strings[] = {
 struct AstNode {
 	AstNodeKind kind;
 	// AstNode *prev, *next; // NOTE(bill): allow for Linked list
+	u32 type_flags;
 	union {
 #define AST_NODE_KIND(_kind_name_, name, ...) __VA_ARGS__ _kind_name_;
 	AST_NODE_KINDS
@@ -1082,7 +1090,7 @@ AstNode *parse_value(AstFile *f) {
 	return value;
 }
 
-AstNode *parse_identifier_or_type(AstFile *f);
+AstNode *parse_identifier_or_type(AstFile *f, u32 flags = 0);
 
 
 void check_proc_add_tag(AstFile *f, AstNode *tag_expr, u64 *tags, ProcTag tag, String tag_name) {
@@ -1780,8 +1788,16 @@ AstNodeArray parse_struct_params(AstFile *f, isize *decl_count_, b32 using_allow
 	return decls;
 }
 
-AstNode *parse_identifier_or_type(AstFile *f) {
+AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 	switch (f->cursor[0].kind) {
+	case Token_volatile:
+		next_token(f);
+		return parse_identifier_or_type(f, flags | TypeFlag_volatile);
+
+	case Token_atomic:
+		next_token(f);
+		return parse_identifier_or_type(f, flags | TypeFlag_atomic);
+
 	case Token_Identifier: {
 		AstNode *e = parse_identifier(f);
 		while (f->cursor[0].kind == Token_Period) {
@@ -1794,11 +1810,15 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 			// HACK NOTE(bill): For type_of_val(expr)
 			e = parse_call_expr(f, e);
 		}
+		e->type_flags = flags;
 		return e;
 	}
 
-	case Token_Pointer:
-		return make_pointer_type(f, expect_token(f, Token_Pointer), parse_type(f));
+	case Token_Pointer: {
+		AstNode *e = make_pointer_type(f, expect_token(f, Token_Pointer), parse_type(f));
+		e->type_flags = flags;
+		return e;
+	}
 
 	case Token_OpenBracket: {
 		f->expr_level++;
@@ -1813,7 +1833,9 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		}
 		expect_token(f, Token_CloseBracket);
 		f->expr_level--;
-		return make_array_type(f, token, count_expr, parse_type(f));
+		AstNode *e = make_array_type(f, token, count_expr, parse_type(f));
+		e->type_flags = flags;
+		return e;
 	}
 
 	case Token_OpenBrace: {
@@ -1822,7 +1844,9 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		AstNode *count_expr = parse_expr(f, false);
 		expect_token(f, Token_CloseBrace);
 		f->expr_level--;
-		return make_vector_type(f, token, count_expr, parse_type(f));
+		AstNode *e = make_vector_type(f, token, count_expr, parse_type(f));
+		e->type_flags = flags;
+		return e;
 	}
 
 	case Token_struct: {
@@ -1840,12 +1864,18 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 			}
 		}
 
+		if (is_packed && is_ordered) {
+			ast_file_err(f, token, "`#ordered` is not needed with `#packed` which implies ordering");
+		}
+
 		Token open = expect_token(f, Token_OpenBrace);
 		isize decl_count = 0;
 		AstNodeArray decls = parse_struct_params(f, &decl_count, true);
 		Token close = expect_token(f, Token_CloseBrace);
 
-		return make_struct_type(f, token, decls, decl_count, is_packed, is_ordered);
+		AstNode *e = make_struct_type(f, token, decls, decl_count, is_packed, is_ordered);
+		e->type_flags = flags;
+		return e;
 	} break;
 
 	case Token_union: {
@@ -1855,7 +1885,9 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		AstNodeArray decls = parse_struct_params(f, &decl_count, false);
 		Token close = expect_token(f, Token_CloseBrace);
 
-		return make_union_type(f, token, decls, decl_count);
+		AstNode *e = make_union_type(f, token, decls, decl_count);
+		e->type_flags = flags;
+		return e;
 	}
 
 	case Token_raw_union: {
@@ -1865,7 +1897,9 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		AstNodeArray decls = parse_struct_params(f, &decl_count, true);
 		Token close = expect_token(f, Token_CloseBrace);
 
-		return make_raw_union_type(f, token, decls, decl_count);
+		AstNode *e = make_raw_union_type(f, token, decls, decl_count);
+		e->type_flags = flags;
+		return e;
 	}
 
 	case Token_enum: {
@@ -1900,7 +1934,9 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 
 		close = expect_token(f, Token_CloseBrace);
 
-		return make_enum_type(f, token, base_type, fields);
+		AstNode *e = make_enum_type(f, token, base_type, fields);
+		e->type_flags = flags;
+		return e;
 	}
 
 	case Token_proc: {
@@ -1919,7 +1955,9 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		open = expect_token(f, Token_OpenParen);
 		type = parse_type(f);
 		close = expect_token(f, Token_CloseParen);
-		return make_paren_expr(f, type, open, close);
+		AstNode *e = make_paren_expr(f, type, open, close);
+		e->type_flags = flags;
+		return e;
 	}
 
 	// TODO(bill): Why is this even allowed? Is this a parsing error?

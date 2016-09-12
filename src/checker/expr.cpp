@@ -851,6 +851,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		switch (operand.mode) {
 		case Addressing_Type: {
 			type = operand.type;
+			type->flags |= e->type_flags;
 			set_base_type(named_type, type);
 			goto end;
 		} break;
@@ -881,12 +882,15 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 
 		if (o.mode == Addressing_Type) {
 			set_base_type(type, o.type);
+			o.type->flags |= e->type_flags;
 			return o.type;
 		}
 	case_end;
 
 	case_ast_node(pe, ParenExpr, e);
-		return check_type(c, pe->expr, named_type, cycle_checker);
+		type = check_type(c, pe->expr, named_type, cycle_checker);
+		type->flags |= e->type_flags;
+		return type;
 	case_end;
 
 	case_ast_node(at, ArrayType, e);
@@ -894,9 +898,11 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 			type = make_type_array(c->allocator,
 			                       check_type(c, at->elem, NULL, cycle_checker),
 			                       check_array_count(c, at->count));
+			type->flags |= e->type_flags;
 			set_base_type(named_type, type);
 		} else {
 			type = make_type_slice(c->allocator, check_type(c, at->elem));
+			type->flags |= e->type_flags;
 			set_base_type(named_type, type);
 		}
 		goto end;
@@ -912,6 +918,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 			error(&c->error_collector, ast_node_token(vt->elem), "Vector element type must be numerical or a boolean. Got `%s`", err_str);
 		}
 		type = make_type_vector(c->allocator, elem, count);
+		type->flags |= e->type_flags;
 		set_base_type(named_type, type);
 		goto end;
 	case_end;
@@ -923,6 +930,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		check_struct_type(c, type, e, cycle_checker);
 		check_close_scope(c);
 		type->Record.node = e;
+		type->flags |= e->type_flags;
 		goto end;
 	case_end;
 
@@ -933,6 +941,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		check_union_type(c, type, e, cycle_checker);
 		check_close_scope(c);
 		type->Record.node = e;
+		type->flags |= e->type_flags;
 		goto end;
 	case_end;
 
@@ -943,6 +952,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		check_raw_union_type(c, type, e, cycle_checker);
 		check_close_scope(c);
 		type->Record.node = e;
+		type->flags |= e->type_flags;
 		goto end;
 	case_end;
 
@@ -951,17 +961,20 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		set_base_type(named_type, type);
 		check_enum_type(c, type, named_type, e);
 		type->Record.node = e;
+		type->flags |= e->type_flags;
 		goto end;
 	case_end;
 
 	case_ast_node(pt, PointerType, e);
 		type = make_type_pointer(c->allocator, check_type(c, pt->type));
+		type->flags |= e->type_flags;
 		set_base_type(named_type, type);
 		goto end;
 	case_end;
 
 	case_ast_node(pt, ProcType, e);
 		type = alloc_type(c->allocator, Type_Proc);
+		type->flags |= e->type_flags;
 		set_base_type(named_type, type);
 		check_procedure_type(c, type, e);
 		goto end;
@@ -973,6 +986,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 			check_expr_or_type(c, &o, e);
 			if (o.mode == Addressing_Type) {
 				type = o.type;
+				type->flags |= e->type_flags;
 				goto end;
 			}
 		}
@@ -987,6 +1001,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 
 end:
 	GB_ASSERT(is_type_typed(type));
+	type->flags |= e->type_flags;
 	add_type_and_value(&c->info, e, Addressing_Type, type, null_value);
 	return type;
 }
@@ -3576,9 +3591,15 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_end;
 
 	case_ast_node(cl, CompoundLit, node);
-		str = gb_string_appendc(str, "(");
 		str = write_expr_to_string(str, cl->type);
-		str = gb_string_appendc(str, " lit)");
+		str = gb_string_appendc(str, "{");
+		gb_for_array(i, cl->elems) {
+			if (i > 0) {
+				str = gb_string_appendc(str, ", ");
+			}
+			str = write_expr_to_string(str, cl->elems[i]);
+		}
+		str = gb_string_appendc(str, "}");
 	case_end;
 
 	case_ast_node(te, TagExpr, node);

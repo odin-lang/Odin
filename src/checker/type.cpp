@@ -84,11 +84,6 @@ String const type_strings[] = {
 #undef TYPE_KIND
 };
 
-enum TypeFlag {
-	TypeFlag_thread_local = GB_BIT(0),
-	TypeFlag_volatile     = GB_BIT(1),
-};
-
 enum TypeRecordKind {
 	TypeRecord_Invalid,
 
