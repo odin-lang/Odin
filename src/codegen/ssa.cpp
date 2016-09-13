@@ -2723,6 +2723,13 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		ssaValue *gep = ssa_emit_zero_gep(proc, e);
 		return ssa_make_addr(gep, expr);
 	case_end;
+
+	case_ast_node(ce, CallExpr, expr);
+		ssaValue *e = ssa_build_expr(proc, expr);
+		ssaValue *v = ssa_add_local_generated(proc, ssa_type(e));
+		ssa_emit_store(proc, v, e);
+		return ssa_make_addr(v, expr);
+	case_end;
 	}
 
 	TokenPos token_pos = ast_node_token(expr).pos;
@@ -3505,7 +3512,6 @@ void ssa_insert_code_before_proc(ssaProcedure* proc, ssaProcedure *parent) {
 		}
 	}
 }
-
 
 void ssa_build_proc(ssaValue *value, ssaProcedure *parent) {
 	ssaProcedure *proc = &value->Proc;

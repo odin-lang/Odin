@@ -704,9 +704,6 @@ Type *check_get_results(Checker *c, Scope *scope, AstNodeArray results) {
 void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 	ast_node(pt, ProcType, proc_type_node);
 
-
-	// gb_printf("%td -> %td\n", param_count, result_count);
-
 	b32 variadic = false;
 	Type *params  = check_get_params(c, c->context.scope, pt->params, &variadic);
 	Type *results = check_get_results(c, c->context.scope, pt->results);
@@ -716,12 +713,14 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 	if (params)  param_count  = params ->Tuple.variable_count;
 	if (results) result_count = results->Tuple.variable_count;
 
-	type->Proc.scope        = c->context.scope;
-	type->Proc.params       = params;
-	type->Proc.param_count  = param_count;
-	type->Proc.results      = results;
-	type->Proc.result_count = result_count;
-	type->Proc.variadic     = variadic;
+
+	type->Proc.scope            = c->context.scope;
+	type->Proc.params           = params;
+	type->Proc.param_count      = param_count;
+	type->Proc.results          = results;
+	type->Proc.result_count     = result_count;
+	type->Proc.variadic         = variadic;
+	// type->Proc.implicit_context = implicit_context;
 }
 
 
@@ -1983,15 +1982,26 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 
 		operand->type = entity->type;
 		operand->expr = node;
-		if (entity->kind == Entity_Constant) {
+		switch (entity->kind) {
+		case Entity_Constant:
 			operand->mode = Addressing_Constant;
 			operand->value = entity->Constant.value;
-		} else if (entity->kind == Entity_TypeName) {
+			break;
+		case Entity_Variable:
+			operand->mode = Addressing_Variable;
+			break;
+		case Entity_TypeName:
 			operand->mode = Addressing_Type;
-		} else {
-			if (operand->mode != Addressing_Variable)
-				operand->mode = Addressing_Value;
+			break;
+		case Entity_Procedure:
+			operand->mode = Addressing_Value;
+			break;
+		case Entity_Builtin:
+			operand->mode = Addressing_Builtin;
+			operand->builtin_id = entity->Builtin.id;
+			break;
 		}
+
 		return entity;
 	} else {
 		operand->mode = Addressing_Invalid;
@@ -2896,14 +2906,18 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 
 	check_call_arguments(c, operand, proc_type, call);
 
-	if (proc_type->Proc.result_count == 0) {
+	switch (proc_type->Proc.result_count) {
+	case 0:
 		operand->mode = Addressing_NoValue;
-	} else if (proc_type->Proc.result_count == 1) {
+		break;
+	case 1:
 		operand->mode = Addressing_Value;
 		operand->type = proc_type->Proc.results->Tuple.variables[0]->type;
-	} else {
+		break;
+	default:
 		operand->mode = Addressing_Value;
 		operand->type = proc_type->Proc.results;
+		break;
 	}
 
 	operand->expr = call;
@@ -3042,7 +3056,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 						if (gb_array_count(sel.index) > 1) {
 							error(&c->error_collector, ast_node_token(elem),
-							      "You cannot assign to an anonymous field `%.*s` in a structure literal (at the moment)", LIT(name));
+							      "Cannot assign to an anonymous field `%.*s` in a structure literal (at the moment)", LIT(name));
 							continue;
 						}
 

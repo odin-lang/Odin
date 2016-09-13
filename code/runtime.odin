@@ -87,6 +87,11 @@ heap_free :: proc(ptr: rawptr) {
 	_ = HeapFree(GetProcessHeap(), 0, ptr)
 }
 
+current_thread_id :: proc() -> int {
+	id := GetCurrentThreadId()
+	return id as int
+}
+
 memory_zero :: proc(data: rawptr, len: int) {
 	llvm_memset_64bit :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) #foreign "llvm.memset.p0i8.i64"
 	llvm_memset_64bit(data, 0, len, 1, false)
@@ -224,7 +229,7 @@ Allocator :: struct {
 
 
 Context :: struct {
-	thread_ptr: rawptr
+	thread_id: int
 
 	allocator: Allocator
 
@@ -235,45 +240,48 @@ Context :: struct {
 #thread_local __context: Context
 
 
-DEFAULT_ALIGNMENT :: 2*size_of(int)
+DEFAULT_ALIGNMENT :: align_of({4}f32)
 
 
-__check_context :: proc(c: ^Context) {
+current_context :: proc() -> ^Context {
+	return ^__context
+}
+
+__check_context :: proc() {
+	c := current_context()
 	assert(c != null)
+
 	if c.allocator.procedure == null {
 		c.allocator = __default_allocator()
 	}
-	if c.thread_ptr == null {
-		// TODO(bill):
-		// c.thread_ptr = current_thread_pointer()
+	if c.thread_id == 0 {
+		c.thread_id = current_thread_id()
 	}
 }
-
 
 alloc :: proc(size: int) -> rawptr #inline { return alloc_align(size, DEFAULT_ALIGNMENT) }
 
 alloc_align :: proc(size, alignment: int) -> rawptr #inline {
-	__check_context(^__context)
-	a := __context.allocator
+	__check_context()
+	a := current_context().allocator
 	return a.procedure(a.data, Allocator.Mode.ALLOC, size, alignment, null, 0, 0)
 }
 
 free :: proc(ptr: rawptr) #inline {
-	__check_context(^__context)
-	a := __context.allocator
+	__check_context()
+	a := current_context().allocator
 	_ = a.procedure(a.data, Allocator.Mode.FREE, 0, 0, ptr, 0, 0)
 }
 free_all :: proc() #inline {
-	__check_context(^__context)
-	a := __context.allocator
+	__check_context()
+	a := current_context().allocator
 	_ = a.procedure(a.data, Allocator.Mode.FREE_ALL, 0, 0, null, 0, 0)
 }
 
 
 resize       :: proc(ptr: rawptr, old_size, new_size: int) -> rawptr #inline { return resize_align(ptr, old_size, new_size, DEFAULT_ALIGNMENT) }
 resize_align :: proc(ptr: rawptr, old_size, new_size, alignment: int) -> rawptr #inline {
-	__check_context(^__context)
-	a := __context.allocator
+	a := current_context().allocator
 	return a.procedure(a.data, Allocator.Mode.RESIZE, new_size, alignment, ptr, old_size, 0)
 }
 

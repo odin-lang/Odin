@@ -64,7 +64,6 @@ enum ProcTag {
 	ProcTag_foreign         = GB_BIT(2),
 	ProcTag_inline          = GB_BIT(3),
 	ProcTag_no_inline       = GB_BIT(4),
-	ProcTag_no_context      = GB_BIT(5),
 };
 
 enum VarDeclTag {
@@ -75,7 +74,8 @@ enum VarDeclTag {
 enum TypeFlag : u32 {
 	TypeFlag_thread_local = GB_BIT(0),
 	TypeFlag_volatile     = GB_BIT(1),
-	TypeFlag_atomic       = GB_BIT(1),
+	TypeFlag_atomic       = GB_BIT(2),
+
 };
 
 enum StmtStateFlag : u32 {
@@ -238,7 +238,7 @@ AST_NODE_KIND(_TypeBegin, "", struct{}) \
 	}) \
 	AST_NODE_KIND(ProcType, "procedure type", struct { \
 		Token token;          \
-		AstNodeArray params; \
+		AstNodeArray params;  \
 		AstNodeArray results; \
 	}) \
 	AST_NODE_KIND(PointerType, "pointer type", struct { \
@@ -1182,8 +1182,8 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_inline, tag_name);
 		} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_inline, tag_name);
-		} else if (are_strings_equal(tag_name, make_string("no_context"))) {
-			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_context, tag_name);
+		// } else if (are_strings_equal(tag_name, make_string("no_context"))) {
+			// check_proc_add_tag(f, tag_expr, tags, ProcTag_no_context, tag_name);
 		} else {
 			ast_file_err(f, ast_node_token(tag_expr), "Unknown procedure tag");
 		}

@@ -112,7 +112,7 @@ GetQueryPerformanceFrequency :: proc() -> i64 {
 
 GetCommandLineA :: proc() -> ^u8 #foreign
 
-
+GetCurrentThreadId :: proc() -> u32 #foreign
 
 // File Stuff
 
