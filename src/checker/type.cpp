@@ -350,6 +350,7 @@ gb_global Type *t_untyped_rune    = &basic_types[Basic_UntypedRune];
 gb_global Type *t_byte            = &basic_type_aliases[Basic_byte];
 gb_global Type *t_rune            = &basic_type_aliases[Basic_rune];
 
+
 gb_global Type *t_type_info            = NULL;
 gb_global Type *t_type_info_ptr        = NULL;
 gb_global Type *t_type_info_member     = NULL;
@@ -588,7 +589,9 @@ b32 are_types_identical(Type *x, Type *y) {
 				case TypeRecord_Struct:
 				case TypeRecord_RawUnion:
 				case TypeRecord_Union:
-					if (x->Record.field_count == y->Record.field_count) {
+					if (x->Record.field_count == y->Record.field_count &&
+					    x->Record.struct_is_packed == y->Record.struct_is_packed &&
+					    x->Record.struct_is_ordered == y->Record.struct_is_ordered) {
 						for (isize i = 0; i < x->Record.field_count; i++) {
 							if (!are_types_identical(x->Record.fields[i]->type, y->Record.fields[i]->type)) {
 								return false;
@@ -709,6 +712,8 @@ void selection_add_index(Selection *s, isize index) {
 
 gb_global Entity *entity__any_type_info = NULL;
 gb_global Entity *entity__any_data      = NULL;
+gb_global Entity *entity__string_data   = NULL;
+gb_global Entity *entity__string_count = NULL;
 
 Selection lookup_field(Type *type_, String field_name, b32 is_type, Selection sel = empty_selection) {
 	GB_ASSERT(type_ != NULL);
@@ -717,6 +722,7 @@ Selection lookup_field(Type *type_, String field_name, b32 is_type, Selection se
 		return empty_selection;
 	}
 
+	gbAllocator a = gb_heap_allocator();
 	Type *type = type_deref(type_);
 	b32 is_ptr = type != type_;
 	type = get_base_type(type);
@@ -729,12 +735,12 @@ Selection lookup_field(Type *type_, String field_name, b32 is_type, Selection se
 			if (entity__any_type_info == NULL) {
 				Token token = {Token_Identifier};
 				token.string = type_info_str;
-				entity__any_type_info = make_entity_field(gb_heap_allocator(), NULL, token, t_type_info_ptr, false, 0);
+				entity__any_type_info = make_entity_field(a, NULL, token, t_type_info_ptr, false, 0);
 			}
 			if (entity__any_data == NULL) {
 				Token token = {Token_Identifier};
 				token.string = data_str;
-				entity__any_data = make_entity_field(gb_heap_allocator(), NULL, token, t_rawptr, false, 1);
+				entity__any_data = make_entity_field(a, NULL, token, t_rawptr, false, 1);
 			}
 
 			if (are_strings_equal(field_name, type_info_str)) {
@@ -747,9 +753,81 @@ Selection lookup_field(Type *type_, String field_name, b32 is_type, Selection se
 				return sel;
 			}
 		} break;
+		case Basic_string: {
+			String data_str = make_string("data");
+			String count_str = make_string("count");
+			if (entity__string_data == NULL) {
+				Token token = {Token_Identifier};
+				token.string = data_str;
+				entity__string_data = make_entity_field(a, NULL, token, make_type_pointer(a, t_byte), false, 0);
+			}
+
+			if (entity__string_count == NULL) {
+				Token token = {Token_Identifier};
+				token.string = count_str;
+				entity__string_count = make_entity_field(a, NULL, token, t_int, false, 1);
+			}
+
+			if (are_strings_equal(field_name, data_str)) {
+				selection_add_index(&sel, 0);
+				sel.entity = entity__string_data;
+				return sel;
+			} else if (are_strings_equal(field_name, count_str)) {
+				selection_add_index(&sel, 1);
+				sel.entity = entity__string_count;
+				return sel;
+			}
+		} break;
 		}
 
 		return sel;
+	} else if (type->kind == Type_Array) {
+		String count_str = make_string("count");
+		// NOTE(bill):U nderlying memory address cannot be changed
+		if (are_strings_equal(field_name, count_str)) {
+			Token token = {Token_Identifier};
+			token.string = count_str;
+			// HACK(bill): Memory leak
+			sel.entity = make_entity_constant(a, NULL, token, t_int, make_exact_value_integer(type->Array.count));
+			return sel;
+		}
+	} else if (type->kind == Type_Vector) {
+		String count_str = make_string("count");
+		// NOTE(bill): Vectors are not addressable
+		if (are_strings_equal(field_name, count_str)) {
+			Token token = {Token_Identifier};
+			token.string = count_str;
+			// HACK(bill): Memory leak
+			sel.entity = make_entity_constant(a, NULL, token, t_int, make_exact_value_integer(type->Vector.count));
+			return sel;
+		}
+	} else if (type->kind == Type_Slice) {
+		String data_str     = make_string("data");
+		String count_str    = make_string("count");
+		String capacity_str = make_string("capacity");
+
+		if (are_strings_equal(field_name, data_str)) {
+			selection_add_index(&sel, 0);
+			Token token = {Token_Identifier};
+			token.string = data_str;
+			// HACK(bill): Memory leak
+			sel.entity = make_entity_field(a, NULL, token, make_type_pointer(a, type->Slice.elem), false, 0);
+			return sel;
+		} else if (are_strings_equal(field_name, count_str)) {
+			selection_add_index(&sel, 1);
+			Token token = {Token_Identifier};
+			token.string = count_str;
+			// HACK(bill): Memory leak
+			sel.entity = make_entity_field(a, NULL, token, t_int, false, 1);
+			return sel;
+		} else if (are_strings_equal(field_name, capacity_str)) {
+			selection_add_index(&sel, 2);
+			Token token = {Token_Identifier};
+			token.string = capacity_str;
+			// HACK(bill): Memory leak
+			sel.entity = make_entity_field(a, NULL, token, t_int, false, 2);
+			return sel;
+		}
 	}
 
 	if (type->kind != Type_Record) {

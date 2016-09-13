@@ -3,22 +3,12 @@
 #load "file.odin"
 
 print_byte_buffer :: proc(buf: ^[]byte, b: []byte) {
-	// NOTE(bill): This is quite a hack
-	// TODO(bill): Should I allow the raw editing of a slice by exposing its
-	// internal members?
-	Raw_Bytes :: struct #ordered {
-		data: ^byte
-		len:  int
-		cap:  int
-	}
-
-	slice := buf as ^Raw_Bytes
-	if slice.len < slice.cap {
-		n := min(slice.cap-slice.len, len(b))
+	if buf.count < buf.capacity {
+		n := min(buf.capacity-buf.count, b.count)
 		if n > 0 {
-			offset := ptr_offset(slice.data, slice.len)
+			offset := ptr_offset(buf.data, buf.count)
 			memory_copy(offset, ^b[0], n)
-			slice.len += n
+			buf.count += n
 		}
 	}
 }
@@ -29,7 +19,7 @@ print_string_to_buffer :: proc(buf: ^[]byte, s: string) {
 
 
 byte_reverse :: proc(b: []byte) {
-	n := len(b)
+	n := b.count
 	for i := 0; i < n/2; i++ {
 		b[i], b[n-1-i] = b[n-1-i], b[i]
 	}
@@ -184,6 +174,128 @@ print__f64 :: proc(buffer: ^[]byte, f: f64, decimal_places: int) {
 	}
 }
 
+print_type_to_buffer :: proc(buf: ^[]byte, ti: ^Type_Info) {
+	if ti == null { return }
+
+	using Type_Info
+	match type info : ti {
+	case Named:
+		print_string_to_buffer(buf, info.name)
+	case Integer:
+		match {
+		case ti == type_info(int):
+			print_string_to_buffer(buf, "int")
+		case ti == type_info(uint):
+			print_string_to_buffer(buf, "uint")
+		default:
+			if info.signed {
+				print_string_to_buffer(buf, "i")
+			} else {
+				print_string_to_buffer(buf, "u")
+			}
+			print_int_to_buffer(buf, 8*info.size)
+		}
+
+	case Float:
+		match info.size {
+		case 4: print_string_to_buffer(buf, "f32")
+		case 8: print_string_to_buffer(buf, "f64")
+		}
+	case String:  print_string_to_buffer(buf, "string")
+	case Boolean: print_string_to_buffer(buf, "bool")
+	case Pointer:
+		print_string_to_buffer(buf, "^")
+		print_type_to_buffer(buf, info.elem)
+	case Procedure:
+		print_string_to_buffer(buf, "proc")
+		if info.params == null {
+			print_string_to_buffer(buf, "()")
+		} else {
+			count := (info.params as ^Tuple).fields.count
+			if count == 1 { print_string_to_buffer(buf, "(") }
+			print_type_to_buffer(buf, info.params)
+			if count == 1 { print_string_to_buffer(buf, ")") }
+		}
+		if info.results != null {
+			print_string_to_buffer(buf, " -> ")
+			print_type_to_buffer(buf, info.results)
+		}
+	case Tuple:
+		count := info.fields.count
+		if count != 1 { print_string_to_buffer(buf, "(") }
+		for i := 0; i < count; i++ {
+			if i > 0 { print_string_to_buffer(buf, ", ") }
+
+			f := info.fields[i]
+
+			if f.name.count > 0 {
+				print_string_to_buffer(buf, f.name)
+				print_string_to_buffer(buf, ": ")
+			}
+			print_type_to_buffer(buf, f.type_info)
+		}
+		if count != 1 { print_string_to_buffer(buf, ")") }
+
+	case Array:
+		print_string_to_buffer(buf, "[")
+		print_int_to_buffer(buf, info.count)
+		print_string_to_buffer(buf, "]")
+		print_type_to_buffer(buf, info.elem)
+	case Slice:
+		print_string_to_buffer(buf, "[")
+		print_string_to_buffer(buf, "]")
+		print_type_to_buffer(buf, info.elem)
+	case Vector:
+		print_string_to_buffer(buf, "{")
+		print_int_to_buffer(buf, info.count)
+		print_string_to_buffer(buf, "}")
+		print_type_to_buffer(buf, info.elem)
+
+	case Struct:
+		print_string_to_buffer(buf, "struct ")
+		if info.packed  { print_string_to_buffer(buf, "#packed ") }
+		if info.ordered { print_string_to_buffer(buf, "#ordered ") }
+		print_string_to_buffer(buf, "{")
+		for i := 0; i < info.fields.count; i++ {
+			if i > 0 {
+				print_string_to_buffer(buf, ", ")
+			}
+			print_any_to_buffer(buf, info.fields[i].name)
+			print_string_to_buffer(buf, ": ")
+			print_type_to_buffer(buf, info.fields[i].type_info)
+		}
+		print_string_to_buffer(buf, "}")
+
+	case Union:
+		print_string_to_buffer(buf, "union {")
+		for i := 0; i < info.fields.count; i++ {
+			if i > 0 {
+				print_string_to_buffer(buf, ", ")
+			}
+			print_any_to_buffer(buf, info.fields[i].name)
+			print_string_to_buffer(buf, ": ")
+			print_type_to_buffer(buf, info.fields[i].type_info)
+		}
+		print_string_to_buffer(buf, "}")
+
+	case Raw_Union:
+		print_string_to_buffer(buf, "raw_union {")
+		for i := 0; i < info.fields.count; i++ {
+			if i > 0 {
+				print_string_to_buffer(buf, ", ")
+			}
+			print_any_to_buffer(buf, info.fields[i].name)
+			print_string_to_buffer(buf, ": ")
+			print_type_to_buffer(buf, info.fields[i].type_info)
+		}
+		print_string_to_buffer(buf, "}")
+
+	case Enum:
+		print_string_to_buffer(buf, "enum ")
+		print_type_to_buffer(buf, info.base)
+		print_string_to_buffer(buf, "{}")
+	}
+}
 
 
 print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
@@ -197,7 +309,7 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 		case Struct:
 			print_string_to_buffer(buf, info.name)
 			print_string_to_buffer(buf, "{")
-			for i := 0; i < len(b.fields); i++ {
+			for i := 0; i < b.fields.count; i++ {
 				f := b.fields[i];
 				if i > 0 {
 					print_string_to_buffer(buf, ", ")
@@ -282,7 +394,9 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 
 	case Array:
 		print_string_to_buffer(buf, "[")
-		for i := 0; i < info.len; i++ {
+		defer print_string_to_buffer(buf, "]")
+
+		for i := 0; i < info.count; i++ {
 			if i > 0 {
 				print_string_to_buffer(buf, ", ")
 			}
@@ -292,55 +406,66 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 			elem.type_info = info.elem
 			print_any_to_buffer(buf, elem)
 		}
-		print_string_to_buffer(buf, "]")
 
 	case Slice:
-		slice := arg.data as ^struct { data: rawptr; len, cap: int }
+		slice := arg.data as ^[]byte
 		print_string_to_buffer(buf, "[")
-		for i := 0; i < slice.len; i++ {
+		defer print_string_to_buffer(buf, "]")
+
+		for i := 0; i < slice.count; i++ {
 			if i > 0 {
 				print_string_to_buffer(buf, ", ")
 			}
 
 			elem: any
-			elem.data = (slice.data as int + i*info.elem_size) as rawptr
+			elem.data = ptr_offset(slice.data, i*info.elem_size)
 			elem.type_info = info.elem
 			print_any_to_buffer(buf, elem)
 		}
-		print_string_to_buffer(buf, "]")
 
 	case Vector:
 		print_string_to_buffer(buf, "<")
-		for i := 0; i < info.len; i++ {
+		defer print_string_to_buffer(buf, ">")
+
+		for i := 0; i < info.count; i++ {
 			if i > 0 {
 				print_string_to_buffer(buf, ", ")
 			}
 
 			elem: any
-			elem.data = (arg.data as int + i*info.elem_size) as rawptr
+			elem.data = ptr_offset(arg.data as ^byte, i*info.elem_size)
 			elem.type_info = info.elem
 			print_any_to_buffer(buf, elem)
 		}
-		print_string_to_buffer(buf, ">")
 
 
 	case Struct:
-		print_string_to_buffer(buf, "(struct ")
-		for i := 0; i < len(info.fields); i++ {
+		print_string_to_buffer(buf, "struct")
+		print_string_to_buffer(buf, "{")
+		defer print_string_to_buffer(buf, "}")
+
+		for i := 0; i < info.fields.count; i++ {
 			if i > 0 {
 				print_string_to_buffer(buf, ", ")
 			}
 			print_any_to_buffer(buf, info.fields[i].name)
+			print_string_to_buffer(buf, " = ")
+			a: any
+			a.data = ptr_offset(arg.data as ^byte, info.fields[i].offset)
+			a.type_info = info.fields[i].type_info
+			print_any_to_buffer(buf, a)
 		}
-		print_string_to_buffer(buf, ")")
-	case Union:     print_string_to_buffer(buf, "(union)")
-	case Raw_Union: print_string_to_buffer(buf, "(raw_union)")
+
+	case Union:
+		print_string_to_buffer(buf, "(union)")
+	case Raw_Union:
+		print_string_to_buffer(buf, "(raw_union)")
 	case Procedure:
-		print_string_to_buffer(buf, "(procedure 0x")
+		print_type_to_buffer(buf, arg.type_info)
+		print_string_to_buffer(buf, " @ 0x")
 		print_pointer_to_buffer(buf, (arg.data as ^rawptr)^)
-		print_string_to_buffer(buf, ")")
+
 	default:
-		print_string_to_buffer(buf, "")
 	}
 }
 
@@ -373,7 +498,7 @@ print_to_buffer :: proc(buf: ^[]byte, fmt: string, args: ..any) {
 	parse_int :: proc(s: string, offset: int) -> (int, int) {
 		result := 0
 
-		for ; offset < len(s); offset++ {
+		for ; offset < s.count; offset++ {
 			c := s[offset] as rune
 			if !is_digit(c) {
 				break
@@ -389,8 +514,9 @@ print_to_buffer :: proc(buf: ^[]byte, fmt: string, args: ..any) {
 	prev := 0
 	implicit_index := 0
 
-	for i := 0; i < len(fmt); i++ {
+	for i := 0; i < fmt.count; i++ {
 		r := fmt[i] as rune
+		index := implicit_index
 
 		if r != #rune "%" {
 			continue
@@ -398,26 +524,22 @@ print_to_buffer :: proc(buf: ^[]byte, fmt: string, args: ..any) {
 
 		print_string_to_buffer(buf, fmt[prev:i])
 		i++ // Skip %
-		if i >= len(fmt) {
-			return
+		if i < fmt.count {
+			next := fmt[i] as rune
+
+			if next == #rune "%" {
+				print_string_to_buffer(buf, "%")
+				i++
+				prev = i
+				continue
+			}
+
+			if is_digit(next) {
+				index, i = parse_int(fmt, i)
+			}
 		}
 
-		next := fmt[i] as rune
-		if next == #rune "%" {
-			print_string_to_buffer(buf, "%")
-			i++
-			prev = i
-			continue
-		}
-
-		index := implicit_index
-		set_prev := true
-
-		if is_digit(next) {
-			index, i = parse_int(fmt, i)
-		}
-
-		if 0 <= index && index < len(args) {
+		if 0 <= index && index < args.count {
 			print_any_to_buffer(buf, args[index])
 			implicit_index = index+1
 		} else {

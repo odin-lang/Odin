@@ -1116,10 +1116,16 @@ ssaValue *ssa_emit_deep_field_gep(ssaProcedure *proc, Type *type, ssaValue *e, S
 				e = ssa_emit_struct_gep(proc, e, index, make_type_pointer(proc->module->allocator, type));
 			} break;
 
+			case Basic_string:
+				e = ssa_emit_struct_gep(proc, e, index, make_type_pointer(proc->module->allocator, sel.entity->type));
+				break;
+
 			default:
 				GB_PANIC("un-gep-able type");
 				break;
 			}
+		} else if (type->kind == Type_Slice) {
+			e = ssa_emit_struct_gep(proc, e, index, make_type_pointer(proc->module->allocator, sel.entity->type));
 		} else {
 			GB_PANIC("un-gep-able type");
 		}
@@ -1159,10 +1165,16 @@ ssaValue *ssa_emit_deep_field_ev(ssaProcedure *proc, Type *type, ssaValue *e, Se
 				e = ssa_emit_struct_ev(proc, e, index, type);
 			} break;
 
+			case Basic_string:
+				e = ssa_emit_struct_ev(proc, e, index, sel.entity->type);
+				break;
+
 			default:
 				GB_PANIC("un-ev-able type");
 				break;
 			}
+		} else if (type->kind == Type_Slice) {
+			e = ssa_emit_struct_gep(proc, e, index, make_type_pointer(proc->module->allocator, sel.entity->type));
 		} else {
 			GB_PANIC("un-ev-able type");
 		}
@@ -1193,6 +1205,9 @@ isize ssa_type_info_index(CheckerInfo *info, Type *type) {
 				break;
 			}
 		}
+	}
+	if (entry_index < 0) {
+		gb_printf_err("%s\n", type_to_string(type));
 	}
 	GB_ASSERT(entry_index >= 0);
 	return entry_index;
@@ -1599,7 +1614,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 		ssaValue *result = ssa_add_local_generated(proc, t_any);
 
 		ssaValue *data = NULL;
-		if (false && value->kind == ssaValue_Instr &&
+		if (value->kind == ssaValue_Instr &&
 		    value->Instr.kind == ssaInstr_Load) {
 			// NOTE(bill): Addressable value
 			data = value->Instr.Load.address;
@@ -1704,37 +1719,16 @@ void ssa_array_bounds_check(ssaProcedure *proc, Token token, ssaValue *index, ss
 	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
 		return;
 	}
-	ssa_emit_comment(proc, make_string("ArrayBoundsCheck"));
-	index = ssa_emit_conv(proc, index, t_int);
-	len = ssa_emit_conv(proc, len, t_int);
-
-	Token le = {Token_LtEq};
-	Token lt = {Token_Lt};
-	Token cmp_and = {Token_And}; // NOTE(bill): Doesn't need to be logical
-	ssaValue *c0 = ssa_emit_comp(proc, le, v_zero, index);
-	ssaValue *c1 = ssa_emit_comp(proc, lt, index, len);
-	ssaValue *cond = ssa_emit_comp(proc, cmp_and, c0, c1);
-
-	ssaBlock *then = ssa_add_block(proc, NULL, make_string("abc.then"));
-	ssaBlock *done = ssa__make_block(proc, NULL, make_string("abc.done"));
-
-	ssa_emit_if(proc, cond, done, then);
-	proc->curr_block = then;
-
 
 	gbAllocator a = proc->module->allocator;
 	ssaValue **args = gb_alloc_array(a, ssaValue *, 5);
 	args[0] = ssa_emit_global_string(proc, token.pos.file);
 	args[1] = ssa_make_const_int(a, token.pos.line);
 	args[2] = ssa_make_const_int(a, token.pos.column);
-	args[3] = index;
-	args[4] = len;
+	args[3] = ssa_emit_conv(proc, index, t_int);
+	args[4] = ssa_emit_conv(proc, len, t_int);
 
 	ssa_emit_global_call(proc, "__bounds_check_error", args, 5);
-
-	ssa_emit_jump(proc, done);
-	gb_array_append(proc->blocks, done);
-	proc->curr_block = done;
 }
 
 void ssa_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low, ssaValue *high, ssaValue *max, b32 is_substring) {
@@ -1742,43 +1736,20 @@ void ssa_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low, ssaV
 		return;
 	}
 
-	low  = ssa_emit_conv(proc, low, t_int);
-	high = ssa_emit_conv(proc, high, t_int);
-	max  = ssa_emit_conv(proc, max, t_int);
-
-	Token le = {Token_LtEq};
-	Token cmp_and = {Token_And}; // NOTE(bill): Doesn't need to be logical
-	ssaValue *c0 = ssa_emit_comp(proc, le, v_zero, low);
-	ssaValue *c1 = ssa_emit_comp(proc, le, low, high);
-	ssaValue *c2 = ssa_emit_comp(proc, le, high, max);
-	ssaValue *cond = NULL;
-	cond = ssa_emit_comp(proc, cmp_and, c0, c1);
-	cond = ssa_emit_comp(proc, cmp_and, cond, c2);
-
-	ssaBlock *then = ssa_add_block(proc, NULL, make_string("seb.then"));
-	ssaBlock *done = ssa__make_block(proc, NULL, make_string("seb.done"));
-
-	ssa_emit_if(proc, cond, done, then);
-	proc->curr_block = then;
-
 	gbAllocator a = proc->module->allocator;
 	ssaValue **args = gb_alloc_array(a, ssaValue *, 6);
 	args[0] = ssa_emit_global_string(proc, token.pos.file);
 	args[1] = ssa_make_const_int(a, token.pos.line);
 	args[2] = ssa_make_const_int(a, token.pos.column);
-	args[3] = low;
-	args[4] = high;
-	args[5] = max;
+	args[3] = ssa_emit_conv(proc, low, t_int);
+	args[4] = ssa_emit_conv(proc, high, t_int);
+	args[5] = ssa_emit_conv(proc, max, t_int);
 
 	if (!is_substring) {
 		ssa_emit_global_call(proc, "__slice_expr_error", args, 6);
 	} else {
 		ssa_emit_global_call(proc, "__substring_expr_error", args, 5);
 	}
-
-	ssa_emit_jump(proc, done);
-	gb_array_append(proc->blocks, done);
-	proc->curr_block = done;
 }
 
 
@@ -2109,26 +2080,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					return ssa_emit_load(proc, slice);
 				} break;
 
-				case BuiltinProc_delete: {
-					ssa_emit_comment(proc, make_string("delete"));
-					// delete :: proc(ptr: ^Type)
-					// delete :: proc(slice: []Type)
-					gbAllocator allocator = proc->module->allocator;
-
-					ssaValue *value = ssa_build_expr(proc, ce->args[0]);
-
-					if (is_type_slice(ssa_type(value))) {
-						Type *etp = get_base_type(ssa_type(value));
-						etp = make_type_pointer(allocator, etp->Slice.elem);
-						value = ssa_emit(proc, ssa_make_instr_extract_value(proc, value, 0, etp));
-					}
-
-					ssaValue **args = gb_alloc_array(allocator, ssaValue *, 1);
-					args[0] = ssa_emit_conv(proc, value, t_rawptr, true);
-					return ssa_emit_global_call(proc, "dealloc", args, 1);
-				} break;
-
-
 				case BuiltinProc_assert: {
 					ssa_emit_comment(proc, make_string("assert"));
 					ssaValue *cond = ssa_build_expr(proc, ce->args[0]);
@@ -2174,25 +2125,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					return NULL;
 				} break;
 
-				case BuiltinProc_len: {
-					ssa_emit_comment(proc, make_string("len"));
-					// len :: proc(v: Type) -> int
-					// NOTE(bill): len of an array is a constant expression
-					ssaValue *v = ssa_build_expr(proc, ce->args[0]);
-					Type *t = get_base_type(ssa_type(v));
-					if (t == t_string)
-						return ssa_string_len(proc, v);
-					else if (t->kind == Type_Slice)
-						return ssa_slice_len(proc, v);
-				} break;
-				case BuiltinProc_cap: {
-					ssa_emit_comment(proc, make_string("cap"));
-					// cap :: proc(v: Type) -> int
-					// NOTE(bill): cap of an array is a constant expression
-					ssaValue *v = ssa_build_expr(proc, ce->args[0]);
-					Type *t = get_base_type(ssa_type(v));
-					return ssa_slice_cap(proc, v);
-				} break;
 				case BuiltinProc_copy: {
 					ssa_emit_comment(proc, make_string("copy"));
 					// copy :: proc(dst, src: []Type) -> int
@@ -3393,9 +3325,15 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 				gb_array_append(proc->blocks, body);
 			}
 			proc->curr_block = body;
+
+			// TODO(bill): Handle fallthrough scope exit correctly
+			proc->scope_index++;
 			ssa_push_target_list(proc, done, NULL, fall);
 			ssa_build_stmt_list(proc, cc->stmts);
+			ssa_emit_defer_stmts(proc, ssaDefer_Default, body);
 			ssa_pop_target_list(proc);
+			proc->scope_index--;
+
 			ssa_emit_jump(proc, done);
 			proc->curr_block = next_cond;
 		}
@@ -3404,9 +3342,14 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			ssa_emit_jump(proc, default_block);
 			gb_array_append(proc->blocks, default_block);
 			proc->curr_block = default_block;
+
+			// TODO(bill): Handle fallthrough scope exit correctly
+			proc->scope_index++;
 			ssa_push_target_list(proc, done, NULL, default_fall);
 			ssa_build_stmt_list(proc, default_stmts);
+			ssa_emit_defer_stmts(proc, ssaDefer_Default, default_block);
 			ssa_pop_target_list(proc);
+			proc->scope_index--;
 		}
 
 		ssa_emit_jump(proc, done);
@@ -3490,9 +3433,14 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 			gb_array_append(proc->blocks, body);
 			proc->curr_block = body;
+
+			proc->scope_index++;
 			ssa_push_target_list(proc, done, NULL, NULL);
 			ssa_build_stmt_list(proc, cc->stmts);
+			ssa_emit_defer_stmts(proc, ssaDefer_Default, body);
 			ssa_pop_target_list(proc);
+			proc->scope_index--;
+
 			ssa_emit_jump(proc, done);
 			proc->curr_block = next_cond;
 		}
@@ -3501,9 +3449,13 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			ssa_emit_jump(proc, default_block);
 			gb_array_append(proc->blocks, default_block);
 			proc->curr_block = default_block;
+
+			proc->scope_index++;
 			ssa_push_target_list(proc, done, NULL, NULL);
 			ssa_build_stmt_list(proc, default_stmts);
+			ssa_emit_defer_stmts(proc, ssaDefer_Default, default_block);
 			ssa_pop_target_list(proc);
+			proc->scope_index--;
 		}
 
 		ssa_emit_jump(proc, done);
@@ -3513,24 +3465,18 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 	case_ast_node(bs, BranchStmt, node);
 		ssaBlock *block = NULL;
+		#define branch_case(x) case GB_JOIN2(Token_, x): \
+			for (ssaTargetList *t = proc->target_list; t != NULL && block == NULL; t = t->prev) { \
+				block = GB_JOIN3(t->, x, _); \
+			} break
 		switch (bs->token.kind) {
-		case Token_break: {
-			for (ssaTargetList *t = proc->target_list; t != NULL && block == NULL; t = t->prev) {
-				block = t->break_;
-			}
-		} break;
-		case Token_continue: {
-			for (ssaTargetList *t = proc->target_list; t != NULL && block == NULL; t = t->prev) {
-				block = t->continue_;
-			}
-		} break;
-		case Token_fallthrough: {
-			for (ssaTargetList *t = proc->target_list; t != NULL && block == NULL; t = t->prev) {
-				block = t->fallthrough_;
-			}
-		} break;
+		branch_case(break);
+		branch_case(continue);
+		branch_case(fallthrough);
 		}
-		if (block != NULL && bs->token.kind != Token_fallthrough) {
+		// TODO(bill): Handle fallthrough scope exit correctly
+		// if (block != NULL && bs->token.kind != Token_fallthrough) {
+		if (block != NULL) {
 			ssa_emit_defer_stmts(proc, ssaDefer_Branch, block);
 		}
 		switch (bs->token.kind) {

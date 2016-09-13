@@ -330,6 +330,13 @@ void ssa_gen_tree(ssaGen *s) {
 					case TypeRecord_Struct: {
 						tag = ssa_add_local_generated(proc, t_type_info_struct);
 
+						{
+							ssaValue *packed  = ssa_make_const_bool(a, t->Record.struct_is_packed);
+							ssaValue *ordered = ssa_make_const_bool(a, t->Record.struct_is_ordered);
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_one32, t_bool_ptr), packed);
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_two32, t_bool_ptr), ordered);
+						}
+
 						ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Record.field_count, &type_info_member_index);
 
 						type_set_offsets(m->sizes, a, t); // NOTE(bill): Just incase the offsets have not been set yet
@@ -456,9 +463,12 @@ void ssa_gen_tree(ssaGen *s) {
 					ssaValue *results  = ssa_emit_struct_gep(proc, tag, v_one32,  t_type_info_ptr_ptr);
 					ssaValue *variadic = ssa_emit_struct_gep(proc, tag, v_two32,  t_bool_ptr);
 
-
-					ssa_emit_store(proc, params,   get_type_info_ptr(proc, type_info_data, t->Proc.params));
-					ssa_emit_store(proc, results,  get_type_info_ptr(proc, type_info_data, t->Proc.results));
+					if (t->Proc.params) {
+						ssa_emit_store(proc, params,   get_type_info_ptr(proc, type_info_data, t->Proc.params));
+					}
+					if (t->Proc.results) {
+						ssa_emit_store(proc, results,  get_type_info_ptr(proc, type_info_data, t->Proc.results));
+					}
 					ssa_emit_store(proc, variadic, ssa_make_const_bool(a, t->Proc.variadic));
 
 					// TODO(bill): Type_Info for procedures

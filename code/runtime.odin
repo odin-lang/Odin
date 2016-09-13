@@ -11,6 +11,8 @@ Type_Info :: union {
 	}
 	Record :: struct #ordered {
 		fields: []Member
+		packed: bool
+		ordered: bool
 	}
 
 
@@ -38,7 +40,7 @@ Type_Info :: union {
 	Array: struct #ordered {
 		elem: ^Type_Info
 		elem_size: int
-		len: int
+		count: int
 	}
 	Slice: struct #ordered {
 		elem: ^Type_Info
@@ -47,7 +49,7 @@ Type_Info :: union {
 	Vector: struct #ordered {
 		elem: ^Type_Info
 		elem_size: int
-		len: int
+		count: int
 	}
 	Tuple:     Record
 	Struct:    Record
@@ -81,7 +83,7 @@ heap_alloc   :: proc(len: int) -> rawptr {
 	return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, len)
 }
 
-heap_dealloc :: proc(ptr: rawptr) {
+heap_free :: proc(ptr: rawptr) {
 	_ = HeapFree(GetProcessHeap(), 0, ptr)
 }
 
@@ -108,18 +110,18 @@ memory_copy :: proc(dst, src: rawptr, len: int) #inline {
 }
 
 __string_eq :: proc(a, b: string) -> bool {
-	if len(a) != len(b) {
+	if a.count != b.count {
 		return false
 	}
 	if ^a[0] == ^b[0] {
 		return true
 	}
-	return memory_compare(^a[0], ^b[0], len(a)) == 0
+	return memory_compare(^a[0], ^b[0], a.count) == 0
 }
 
 __string_cmp :: proc(a, b : string) -> int {
 	// Translation of http://mgronhol.github.io/fast-strcmp/
-	n := min(len(a), len(b))
+	n := min(a.count, b.count)
 
 	fast := n/size_of(int) + 1
 	offset := (fast-1)*size_of(int)
@@ -159,20 +161,64 @@ __string_ge :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) >
 
 
 
-
-Allocation_Mode :: enum {
-	ALLOC,
-	DEALLOC,
-	DEALLOC_ALL,
-	RESIZE,
+__assert :: proc(msg: string) {
+	file_write(file_get_standard(File_Standard.ERROR), msg as []byte)
+	__debug_trap()
 }
 
-Allocator_Proc :: type proc(allocator_data: rawptr, mode: Allocation_Mode,
-                            size, alignment: int,
-                            old_memory: rawptr, old_size: int, flags: u64) -> rawptr
+__bounds_check_error :: proc(file: string, line, column: int,
+                             index, count: int) {
+	if 0 <= index && index < count {
+		return
+	}
+	// TODO(bill): Probably reduce the need for `print` in the runtime if possible
+	println_err("%(%:%) Index % is out of bounds range [0, %)",
+	            file, line, column, index, count)
+	__debug_trap()
+}
+
+__slice_expr_error :: proc(file: string, line, column: int,
+                           low, high, max: int) {
+	if 0 <= low && low <= high && high <= max {
+		return
+	}
+	println_err("%(%:%) Invalid slice indices: [%:%:%]",
+	          file, line, column, low, high, max)
+	__debug_trap()
+}
+__substring_expr_error :: proc(file: string, line, column: int,
+                               low, high: int) {
+	if 0 <= low && low <= high {
+		return
+	}
+	println_err("%(%:%) Invalid substring indices: [%:%:%]",
+	          file, line, column, low, high)
+	__debug_trap()
+}
+
+
+
+
+
+
+
+
+
+
 
 Allocator :: struct {
-	procedure: Allocator_Proc;
+	Mode :: enum {
+		ALLOC,
+		FREE,
+		FREE_ALL,
+		RESIZE,
+	}
+	Proc :: type proc(allocator_data: rawptr, mode: Mode,
+	                  size, alignment: int,
+	                  old_memory: rawptr, old_size: int, flags: u64) -> rawptr
+
+
+	procedure: Proc;
 	data:      rawptr
 }
 
@@ -180,24 +226,26 @@ Allocator :: struct {
 Context :: struct {
 	thread_ptr: rawptr
 
+	allocator: Allocator
+
 	user_data:  rawptr
 	user_index: int
-
-	allocator: Allocator
 }
 
-#thread_local context: Context
+#thread_local __context: Context
+
 
 DEFAULT_ALIGNMENT :: 2*size_of(int)
 
 
-__check_context :: proc() {
-	if context.allocator.procedure == null {
-		context.allocator = __default_allocator()
+__check_context :: proc(c: ^Context) {
+	assert(c != null)
+	if c.allocator.procedure == null {
+		c.allocator = __default_allocator()
 	}
-	if context.thread_ptr == null {
+	if c.thread_ptr == null {
 		// TODO(bill):
-		// context.thread_ptr = current_thread_pointer()
+		// c.thread_ptr = current_thread_pointer()
 	}
 }
 
@@ -205,28 +253,28 @@ __check_context :: proc() {
 alloc :: proc(size: int) -> rawptr #inline { return alloc_align(size, DEFAULT_ALIGNMENT) }
 
 alloc_align :: proc(size, alignment: int) -> rawptr #inline {
-	__check_context()
-	a := context.allocator
-	return a.procedure(a.data, Allocation_Mode.ALLOC, size, alignment, null, 0, 0)
+	__check_context(^__context)
+	a := __context.allocator
+	return a.procedure(a.data, Allocator.Mode.ALLOC, size, alignment, null, 0, 0)
 }
 
-dealloc :: proc(ptr: rawptr) #inline {
-	__check_context()
-	a := context.allocator
-	_ = a.procedure(a.data, Allocation_Mode.DEALLOC, 0, 0, ptr, 0, 0)
+free :: proc(ptr: rawptr) #inline {
+	__check_context(^__context)
+	a := __context.allocator
+	_ = a.procedure(a.data, Allocator.Mode.FREE, 0, 0, ptr, 0, 0)
 }
-dealloc_all :: proc(ptr: rawptr) #inline {
-	__check_context()
-	a := context.allocator
-	_ = a.procedure(a.data, Allocation_Mode.DEALLOC_ALL, 0, 0, ptr, 0, 0)
+free_all :: proc() #inline {
+	__check_context(^__context)
+	a := __context.allocator
+	_ = a.procedure(a.data, Allocator.Mode.FREE_ALL, 0, 0, null, 0, 0)
 }
 
 
 resize       :: proc(ptr: rawptr, old_size, new_size: int) -> rawptr #inline { return resize_align(ptr, old_size, new_size, DEFAULT_ALIGNMENT) }
 resize_align :: proc(ptr: rawptr, old_size, new_size, alignment: int) -> rawptr #inline {
-	__check_context()
-	a := context.allocator
-	return a.procedure(a.data, Allocation_Mode.RESIZE, new_size, alignment, ptr, old_size, 0)
+	__check_context(^__context)
+	a := __context.allocator
+	return a.procedure(a.data, Allocator.Mode.RESIZE, new_size, alignment, ptr, old_size, 0)
 }
 
 
@@ -237,7 +285,7 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 	}
 
 	if new_size == 0 {
-		dealloc(old_memory)
+		free(old_memory)
 		return null
 	}
 
@@ -251,24 +299,24 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 	}
 
 	memory_copy(new_memory, old_memory, min(old_size, new_size));
-	dealloc(old_memory)
+	free(old_memory)
 	return new_memory
 }
 
 
-__default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocation_Mode,
+__default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
                                  size, alignment: int,
                                  old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
-	using Allocation_Mode
+	using Allocator.Mode
 	match mode {
 	case ALLOC:
 		return heap_alloc(size)
 	case RESIZE:
 		return default_resize_align(old_memory, old_size, size, alignment)
-	case DEALLOC:
-		heap_dealloc(old_memory)
+	case FREE:
+		heap_free(old_memory)
 		return null
-	case DEALLOC_ALL:
+	case FREE_ALL:
 		// NOTE(bill): Does nothing
 	}
 
@@ -277,39 +325,10 @@ __default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocation_Mode,
 
 __default_allocator :: proc() -> Allocator {
 	return Allocator{
-		__default_allocator_proc,
-		null,
+		procedure = __default_allocator_proc,
+		data = null,
 	}
 }
-
-
-
-
-__assert :: proc(msg: string) {
-	file_write(file_get_standard(File_Standard.ERROR), msg as []byte)
-	__debug_trap()
-}
-
-__bounds_check_error :: proc(file: string, line, column: int,
-                             index, count: int) {
-	println_err("%(%:%) Index % is out of bounds range [0, %)",
-	            file, line, column, index, count)
-	__debug_trap()
-}
-
-__slice_expr_error :: proc(file: string, line, column: int,
-                           low, high, max: int) {
-	print_err("%(%:%) Invalid slice indices: [%:%:%]\n",
-	          file, line, column, low, high, max)
-	__debug_trap()
-}
-__substring_expr_error :: proc(file: string, line, column: int,
-                               low, high: int) {
-	print_err("%(%:%) Invalid substring indices: [%:%:%]\n",
-	          file, line, column, low, high)
-	__debug_trap()
-}
-
 
 
 

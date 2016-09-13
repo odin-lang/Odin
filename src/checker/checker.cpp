@@ -124,7 +124,6 @@ enum BuiltinProcId {
 
 	BuiltinProc_new,
 	BuiltinProc_new_slice,
-	BuiltinProc_delete,
 
 	BuiltinProc_size_of,
 	BuiltinProc_size_of_val,
@@ -139,8 +138,6 @@ enum BuiltinProcId {
 	BuiltinProc_compile_assert,
 	BuiltinProc_assert,
 
-	BuiltinProc_len,
-	BuiltinProc_cap,
 	BuiltinProc_copy,
 	BuiltinProc_append,
 
@@ -168,7 +165,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 
 	{STR_LIT("new"),              1, false, Expr_Expr},
 	{STR_LIT("new_slice"),        2, true,  Expr_Expr},
-	{STR_LIT("delete"),           1, false, Expr_Stmt},
 
 	{STR_LIT("size_of"),          1, false, Expr_Expr},
 	{STR_LIT("size_of_val"),      1, false, Expr_Expr},
@@ -183,8 +179,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("compile_assert"),   1, false, Expr_Stmt},
 	{STR_LIT("assert"),           1, false, Expr_Stmt},
 
-	{STR_LIT("len"),              1, false, Expr_Expr},
-	{STR_LIT("cap"),              1, false, Expr_Expr},
 	{STR_LIT("copy"),             2, false, Expr_Expr},
 	{STR_LIT("append"),           2, false, Expr_Expr},
 

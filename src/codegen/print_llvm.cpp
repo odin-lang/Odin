@@ -121,7 +121,7 @@ void ssa_print_encoded_local(ssaFileBuffer *f, String name) {
 
 void ssa_print_encoded_global(ssaFileBuffer *f, String name, b32 global_scope = false) {
 	ssa_fprintf(f, "@");
-	if (!global_scope) {
+	if (!global_scope && !are_strings_equal(name, make_string("main"))) {
 		ssa_fprintf(f, ".");
 	}
 	ssa_print_escape_string(f, name, true);

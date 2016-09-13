@@ -2095,21 +2095,6 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->mode = Addressing_Value;
 		operand->type = make_type_slice(c->allocator, type);
 	} break;
-	case BuiltinProc_delete: {
-		// delete :: proc(ptr: ^T)
-		Type *type = get_base_type(operand->type);
-		if (!is_type_pointer(type) && !is_type_slice(type)) {
-			gbString type_str = type_to_string(operand->type);
-			defer (gb_string_free(type_str));
-			error(&c->error_collector, ast_node_token(call),
-			      "Expected a pointer or slice to `delete`, got `%s`",
-			      type_str);
-			return false;
-		}
-
-		operand->mode = Addressing_NoValue;
-		operand->type = NULL;
-	} break;
 
 	case BuiltinProc_size_of: {
 		// size_of :: proc(Type) -> int
@@ -2288,58 +2273,6 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			operand->mode = Addressing_NoValue;
 		}
 		break;
-
-	// TODO(bill): Should these be procedures and are their names appropriate?
-	case BuiltinProc_len:
-	case BuiltinProc_cap: {
-		Type *t = get_base_type(operand->type);
-
-		AddressingMode mode = Addressing_Invalid;
-		ExactValue value = {};
-
-		switch (t->kind) {
-		case Type_Basic:
-			if (id == BuiltinProc_len) {
-				if (is_type_string(t)) {
-					if (operand->mode == Addressing_Constant) {
-						mode = Addressing_Constant;
-						value = make_exact_value_integer(operand->value.value_string);
-					} else {
-						mode = Addressing_Value;
-					}
-				}
-			}
-			break;
-
-		case Type_Array:
-			mode = Addressing_Constant;
-			value = make_exact_value_integer(t->Array.count);
-			break;
-
-		case Type_Vector:
-			mode = Addressing_Constant;
-			value = make_exact_value_integer(t->Vector.count);
-			break;
-
-		case Type_Slice:
-			mode = Addressing_Value;
-			break;
-		}
-
-		if (mode == Addressing_Invalid) {
-			gbString str = expr_to_string(operand->expr);
-			error(&c->error_collector, ast_node_token(operand->expr),
-			      "Invalid expression `%s` for `%.*s`",
-			      str, LIT(bp->name));
-			gb_string_free(str);
-			return false;
-		}
-
-		operand->mode = mode;
-		operand->type = t_int;
-		operand->value = value;
-
-	} break;
 
 	case BuiltinProc_copy: {
 		// copy :: proc(x, y: []Type) -> int

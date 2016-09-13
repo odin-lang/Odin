@@ -64,6 +64,7 @@ enum ProcTag {
 	ProcTag_foreign         = GB_BIT(2),
 	ProcTag_inline          = GB_BIT(3),
 	ProcTag_no_inline       = GB_BIT(4),
+	ProcTag_no_context      = GB_BIT(5),
 };
 
 enum VarDeclTag {
@@ -1173,14 +1174,16 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
 
 				next_token(f);
 			}
-		} else if (are_strings_equal(tag_name, make_string("inline"))) {
-			check_proc_add_tag(f, tag_expr, tags, ProcTag_inline, tag_name);
-		} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
-			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_inline, tag_name);
 		} else if (are_strings_equal(tag_name, make_string("bounds_check"))) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_bounds_check, tag_name);
 		} else if (are_strings_equal(tag_name, make_string("no_bounds_check"))) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_bounds_check, tag_name);
+		} else if (are_strings_equal(tag_name, make_string("inline"))) {
+			check_proc_add_tag(f, tag_expr, tags, ProcTag_inline, tag_name);
+		} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
+			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_inline, tag_name);
+		} else if (are_strings_equal(tag_name, make_string("no_context"))) {
+			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_context, tag_name);
 		} else {
 			ast_file_err(f, ast_node_token(tag_expr), "Unknown procedure tag");
 		}
@@ -1490,17 +1493,16 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 			}
 
 			switch (op.kind) {
-			// case Token_DoublePrime: {
-			// 	AstNode *proc = parse_identifier(f);
-			// 	AstNode *right = parse_binary_expr(f, false, prec+1);
-			// 	expression->next = right;
-			// 	gbArray(AstNode *) args;
-			// 	gb_array_init_reserve(args, gb_arena_allocator(&f->arena), 2);
-			// 	gb_array_append(args, expression);
-			// 	gb_array_append(args, right);
-			// 	expression = make_call_expr(f, proc, args, op, ast_node_token(right), empty_token);
-			// 	continue;
-			// } break;
+			case Token_DoublePrime: {
+				AstNode *proc = parse_identifier(f);
+				AstNode *right = parse_binary_expr(f, false, prec+1);
+				gbArray(AstNode *) args;
+				gb_array_init_reserve(args, gb_arena_allocator(&f->arena), 2);
+				gb_array_append(args, expression);
+				gb_array_append(args, right);
+				expression = make_call_expr(f, proc, args, op, ast_node_token(right), empty_token);
+				continue;
+			} break;
 
 			case Token_as:
 			case Token_transmute:
@@ -2074,6 +2076,18 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 	AstNodeArray values = NULL;
 	AstNode *type = NULL;
 
+	gb_for_array(i, names) {
+		AstNode *name = names[i];
+		if (name->kind == AstNode_Ident) {
+			String n = name->Ident.string;
+			// NOTE(bill): Check for reserved identifiers
+			if (are_strings_equal(n, make_string("context"))) {
+				ast_file_err(f, ast_node_token(name), "`context` is a reserved identifier");
+				break;
+			}
+		}
+	}
+
 	if (allow_token(f, Token_Colon)) {
 		if (!allow_token(f, Token_type)) {
 			type = parse_identifier_or_type(f);
@@ -2449,6 +2463,7 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Rune:
 	case Token_String:
 	case Token_OpenParen:
+	case Token_proc:
 	// Unary Operators
 	case Token_Add:
 	case Token_Sub:

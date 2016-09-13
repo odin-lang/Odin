@@ -31,7 +31,7 @@ file_close :: proc(f: ^File) {
 
 file_write :: proc(f: ^File, buf: []byte) -> bool {
 	bytes_written: i32
-	return WriteFile(f.handle, ^buf[0], len(buf) as i32, ^bytes_written, null) != 0
+	return WriteFile(f.handle, ^buf[0], buf.count as i32, ^bytes_written, null) != 0
 }
 
 File_Standard :: type enum {
@@ -95,7 +95,7 @@ read_entire_file :: proc(name: string) -> (string, bool) {
 
 		ReadFile(f.handle as HANDLE, ^data[total_read], to_read, ^single_read_length, null)
 		if single_read_length <= 0 {
-			delete(data)
+			free(^data[0])
 			return "", false
 		}
 
