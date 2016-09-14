@@ -118,6 +118,7 @@ struct Scope {
 	b32 is_global;
 	b32 is_file;
 	b32 is_init;
+	AstFile *file;
 };
 
 enum ExprKind {
@@ -635,6 +636,10 @@ void add_entity_use(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier->kind == AstNode_Ident);
 	HashKey key = hash_pointer(identifier);
 	map_set(&i->uses, key, entity);
+
+	if (entity != NULL && entity->kind == Entity_ImportName) {
+		entity->ImportName.used = true;
+	}
 }
 
 
@@ -820,8 +825,10 @@ void check_parsed_files(Checker *c) {
 		scope = make_scope(c->global_scope, c->allocator);
 		scope->is_global = f->is_global_scope;
 		scope->is_file   = true;
+		scope->file      = f;
 		if (i == 0) {
 			// NOTE(bill): First file is always the initial file
+			// thus it must contain main
 			scope->is_init = true;
 		}
 
@@ -830,7 +837,8 @@ void check_parsed_files(Checker *c) {
 		}
 
 		f->scope = scope;
-		map_set(&file_scopes, hash_string(f->tokenizer.fullpath), scope);
+		HashKey key = hash_string(f->tokenizer.fullpath);
+		map_set(&file_scopes, key, scope);
 	}
 
 	// Collect Entities
@@ -980,6 +988,7 @@ void check_parsed_files(Checker *c) {
 					}
 				}
 			} else {
+				GB_ASSERT(id->import_name.string.len > 0);
 				Entity *e = make_entity_import_name(c->allocator, file_scope, id->import_name, t_invalid,
 				                                    id->fullpath, id->import_name.string,
 				                                    scope);
@@ -995,10 +1004,11 @@ void check_parsed_files(Checker *c) {
 			if (e->kind == kind) {
 				DeclInfo *d = entry->value;
 
+				add_curr_ast_file(c, d->scope->file);
+
 				Scope *prev_scope = c->context.scope;
 				c->context.scope = d->scope;
-				defer (c->context.scope = prev_scope);
-
+				GB_ASSERT(d->scope == e->scope);
 				check_entity_decl(c, e, d, NULL);
 			}
 		}

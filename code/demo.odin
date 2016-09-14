@@ -1,10 +1,12 @@
-#import "print.odin" as _
+#import "fmt.odin" as fmt
+#import "game.odin" as game
 
 test_proc :: proc() {
-	println("Hello?")
+	fmt.println("Hello?")
 }
 
 
 main :: proc() {
-	println("% % % %", "Hellope", true, 6.28, {4}int{1, 2, 3, 4})
+	// fmt.println("% % % %", "Hellope", true, 6.28, {4}int{1, 2, 3, 4})
+	game.run()
 }

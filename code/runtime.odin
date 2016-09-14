@@ -1,9 +1,9 @@
-#global_scope
+#shared_global_scope
 
-// TODO(bill): Remove #import in runtime.odin
+// TODO(bill): Create a standard library "location" so I don't have to manually import "runtime.odin"
 #import "win32.odin" as win32
-#import "os.odin"  as os
-#import "print.odin" as _
+#import "os.odin"    as os
+#import "fmt.odin"   as fmt
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
@@ -14,8 +14,8 @@ Type_Info :: union {
 		offset:    int        // offsets are not used in tuples
 	}
 	Record :: struct #ordered {
-		fields: []Member
-		packed: bool
+		fields:  []Member
+		packed:  bool
 		ordered: bool
 	}
 
@@ -25,7 +25,7 @@ Type_Info :: union {
 		base: ^Type_Info
 	}
 	Integer: struct #ordered {
-		size: int // in bytes
+		size:   int // in bytes
 		signed: bool
 	}
 	Float: struct #ordered {
@@ -37,23 +37,23 @@ Type_Info :: union {
 		elem: ^Type_Info
 	}
 	Procedure: struct #ordered {
-		params:  ^Type_Info // Type_Info.Tuple
-		results: ^Type_Info // Type_Info.Tuple
+		params:   ^Type_Info // Type_Info.Tuple
+		results:  ^Type_Info // Type_Info.Tuple
 		variadic: bool
 	}
 	Array: struct #ordered {
-		elem: ^Type_Info
+		elem:      ^Type_Info
 		elem_size: int
-		count: int
+		count:     int
 	}
 	Slice: struct #ordered {
-		elem: ^Type_Info
+		elem:      ^Type_Info
 		elem_size: int
 	}
 	Vector: struct #ordered {
-		elem: ^Type_Info
+		elem:      ^Type_Info
 		elem_size: int
-		count: int
+		count:     int
 	}
 	Tuple:     Record
 	Struct:    Record
@@ -171,7 +171,7 @@ __string_ge :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) >
 
 
 __assert :: proc(msg: string) {
-	os.write(os.file_get_standard(os.File_Standard.ERROR), msg as []byte)
+	os.write(os.get_standard_file(os.File_Standard.ERROR), msg as []byte)
 	__debug_trap()
 }
 
@@ -181,8 +181,8 @@ __bounds_check_error :: proc(file: string, line, column: int,
 		return
 	}
 	// TODO(bill): Probably reduce the need for `print` in the runtime if possible
-	println_err("%(%:%) Index % is out of bounds range [0, %)",
-	            file, line, column, index, count)
+	fmt.println_err("%(%:%) Index % is out of bounds range [0, %)",
+	                file, line, column, index, count)
 	__debug_trap()
 }
 
@@ -191,8 +191,8 @@ __slice_expr_error :: proc(file: string, line, column: int,
 	if 0 <= low && low <= high && high <= max {
 		return
 	}
-	println_err("%(%:%) Invalid slice indices: [%:%:%]",
-	          file, line, column, low, high, max)
+	fmt.println_err("%(%:%) Invalid slice indices: [%:%:%]",
+	                file, line, column, low, high, max)
 	__debug_trap()
 }
 __substring_expr_error :: proc(file: string, line, column: int,
@@ -200,8 +200,8 @@ __substring_expr_error :: proc(file: string, line, column: int,
 	if 0 <= low && low <= high {
 		return
 	}
-	println_err("%(%:%) Invalid substring indices: [%:%:%]",
-	          file, line, column, low, high)
+	fmt.println_err("%(%:%) Invalid substring indices: [%:%:%]",
+	                file, line, column, low, high)
 	__debug_trap()
 }
 

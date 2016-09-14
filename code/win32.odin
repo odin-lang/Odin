@@ -1,12 +1,6 @@
 #foreign_system_library "user32"
 #foreign_system_library "gdi32"
 
-
-test_proc :: proc() {
-	x := "Goodbye?"
-}
-
-
 HANDLE    :: type rawptr
 HWND      :: type HANDLE
 HDC       :: type HANDLE
@@ -70,10 +64,10 @@ MSG :: struct #ordered {
 
 
 
-GetLastError     :: proc() -> i32 #foreign
-ExitProcess      :: proc(exit_code: u32) #foreign
-GetDesktopWindow :: proc() -> HWND #foreign
-GetCursorPos     :: proc(p: ^POINT) -> i32 #foreign
+GetLastError     :: proc() -> i32                   #foreign
+ExitProcess      :: proc(exit_code: u32)            #foreign
+GetDesktopWindow :: proc() -> HWND                  #foreign
+GetCursorPos     :: proc(p: ^POINT) -> i32          #foreign
 ScreenToClient   :: proc(h: HWND, p: ^POINT) -> i32 #foreign
 
 GetModuleHandleA :: proc(module_name: ^u8) -> HINSTANCE #foreign
@@ -99,11 +93,11 @@ CreateWindowExA  :: proc(ex_style: u32,
                          param: rawptr) -> HWND #foreign
 
 ShowWindow       :: proc(hwnd: HWND, cmd_show: i32) -> BOOL #foreign
-UpdateWindow     :: proc(hwnd: HWND) -> BOOL #foreign
+TranslateMessage :: proc(msg: ^MSG) -> BOOL                 #foreign
+DispatchMessageA :: proc(msg: ^MSG) -> LRESULT              #foreign
+UpdateWindow     :: proc(hwnd: HWND) -> BOOL                #foreign
 PeekMessageA     :: proc(msg: ^MSG, hwnd: HWND,
                          msg_filter_min, msg_filter_max, remove_msg: u32) -> BOOL #foreign
-TranslateMessage :: proc(msg: ^MSG) -> BOOL #foreign
-DispatchMessageA :: proc(msg: ^MSG) -> LRESULT #foreign
 
 DefWindowProcA   :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #foreign
 

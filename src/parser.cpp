@@ -2539,18 +2539,19 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Hash: {
 		s = parse_tag_stmt(f, NULL);
 		String tag = s->TagStmt.name.string;
-		if (are_strings_equal(tag, make_string("global_scope"))) {
+		if (are_strings_equal(tag, make_string("shared_global_scope"))) {
 			if (f->curr_proc == NULL) {
 				f->is_global_scope = true;
 				return make_empty_stmt(f, f->cursor[0]);
 			}
-			ast_file_err(f, token, "You cannot use #global_scope within a procedure. This must be done at the file scope.");
+			ast_file_err(f, token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, f->cursor[0]);
 		} else if (are_strings_equal(tag, make_string("import"))) {
 			// TODO(bill): better error messages
+			Token import_name;
 			Token file_path = expect_token(f, Token_String);
-			Token as = expect_token(f, Token_as);
-			Token import_name = expect_token(f, Token_Identifier);
+			expect_token(f, Token_as);
+			import_name = expect_token(f, Token_Identifier);
 
 			if (f->curr_proc == NULL) {
 				return make_import_decl(f, s->TagStmt.token, file_path, import_name);

@@ -446,7 +446,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 	// add_proc_entity(c, d->scope, pd->name, e);
 	if (d->scope->is_proc) {
 		// Nested procedures
-		add_entity(c, d->scope, pd->name, e);
+		add_entity(c, d->scope->parent, pd->name, e);
 	}
 
 
@@ -562,11 +562,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, CycleChecker *cycle_checker) {
 	if (e->type != NULL) {
-		if (e->type->kind == Type_Named && e->type->Named.base == NULL) {
-			// NOTE(bill): Some weird declaration error from Entity_ImportName
-		} else {
-			return;
-		}
+		return;
 	}
 
 	if (d == NULL) {
@@ -578,26 +574,42 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 		}
 	}
 
+	c->context.decl = d;
+
+	if (e->kind == Entity_Procedure) {
+		check_proc_decl(c, e, d, true);
+		return;
+	}
+
+
+
 	switch (e->kind) {
 	case Entity_Constant: {
 		Scope *prev = c->context.scope;
 		c->context.scope = d->scope;
-		c->context.decl = d;
+		defer (c->context.scope = prev);
 
 		check_const_decl(c, e, d->type_expr, d->init_expr);
-
-		c->context.scope = prev;
 	} break;
+
 	case Entity_Variable: {
 		Scope *prev = c->context.scope;
 		c->context.scope = d->scope;
-		c->context.decl = d;
+		defer (c->context.scope = prev);
 
 		check_var_decl(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr);
-
-		c->context.scope = prev;
 	} break;
+
+	case Entity_Procedure: {
+		check_proc_decl(c, e, d, true);
+	} break;
+
+
 	case Entity_TypeName: {
+		Scope *prev = c->context.scope;
+		c->context.scope = d->scope;
+		defer (c->context.scope = prev);
+
 		CycleChecker local_cycle_checker = {};
 		if (cycle_checker == NULL) {
 			cycle_checker = &local_cycle_checker;
@@ -608,11 +620,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 			gb_array_free(local_cycle_checker.path);
 		}
 	} break;
-	case Entity_Procedure:
-		check_proc_decl(c, e, d, true);
-		break;
 	}
-
 }
 
 
@@ -1309,7 +1317,14 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 					Entity *decl = scope->elements.entries[i].value;
 					Entity *found = scope_insert_entity(c->context.scope, decl);
 					if (found != NULL) {
-						error(&c->error_collector, us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+						error(&c->error_collector, us->token,
+						      "Namespace collision while `using` `%s` of: %.*s\n"
+						      "\tat %.*s(%td:%td)\n"
+						      "\tat %.*s(%td:%td)",
+						      expr_str, LIT(found->token.string),
+						      LIT(found->token.pos.file), found->token.pos.line, found->token.pos.column,
+						      LIT(decl->token.pos.file), decl->token.pos.line, decl->token.pos.column
+						      );
 						return;
 					}
 				}
@@ -1406,13 +1421,11 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_ast_node(pd, ProcDecl, node);
 		ast_node(name, Ident, pd->name);
 		Entity *e = make_entity_procedure(c->allocator, c->context.scope, *name, NULL);
-		// add_proc_entity(c, c->context.scope, pd->name, e);
+		add_entity(c, c->context.scope, pd->name, e);
 
-		DeclInfo decl = {};
-		init_declaration_info(&decl, e->scope);
-		decl.proc_decl = node;
-		check_proc_decl(c, e, &decl, false);
-		destroy_declaration_info(&decl);
+		DeclInfo *decl = make_declaration_info(c->allocator, e->scope);
+		decl->proc_decl = node;
+		check_proc_decl(c, e, decl, false);
 	case_end;
 
 	case_ast_node(td, TypeDecl, node);

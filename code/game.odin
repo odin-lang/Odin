@@ -1,44 +1,47 @@
-#load "basic.odin"
-#load "opengl.odin"
-#load "math.odin"
+#import "win32.odin"  as win32
+#import "fmt.odin"    as fmt
+#import "opengl.odin" as gl
+#import "math.odin"   as math
 
 TWO_HEARTS :: #rune "💕"
 
-win32_perf_count_freq := GetQueryPerformanceFrequency()
+win32_perf_count_freq := win32.GetQueryPerformanceFrequency()
 time_now :: proc() -> f64 {
 	assert(win32_perf_count_freq != 0)
 
 	counter: i64
-	_ = QueryPerformanceCounter(^counter)
+	_ = win32.QueryPerformanceCounter(^counter)
 	result := counter as f64 / win32_perf_count_freq as f64
 	return result
 }
 win32_print_last_error :: proc() {
-	err_code := GetLastError() as int
+	err_code := win32.GetLastError() as int
 	if err_code != 0 {
-		println("GetLastError:", err_code)
+		fmt.println("GetLastError: %", err_code)
 	}
 }
 
 // Yuk!
 to_c_string :: proc(s: string) -> []u8 {
-	c_str := new_slice(u8, len(s)+1)
+	c_str := new_slice(u8, s.count+1)
 	_ = copy(c_str, s as []byte)
-	c_str[len(s)] = 0
+	c_str[s.count] = 0
 	return c_str
 }
 
 
 Window :: struct {
 	width, height:      int
-	wc:                 WNDCLASSEXA
-	dc:                 HDC
-	hwnd:               HWND
-	opengl_context, rc: HGLRC
+	wc:                 win32.WNDCLASSEXA
+	dc:                 win32.HDC
+	hwnd:               win32.HWND
+	opengl_context, rc: win32.HGLRC
 	c_title:            []u8
 }
 
-make_window :: proc(title: string, msg, height: int, window_proc: WNDPROC) -> (Window, bool) {
+make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC) -> (Window, bool) {
+	using win32
+
 	w: Window
 	w.width, w.height = msg, height
 
@@ -58,7 +61,7 @@ make_window :: proc(title: string, msg, height: int, window_proc: WNDPROC) -> (W
 	};
 
 	if RegisterClassExA(^w.wc) == 0 {
-		win32_print_last_error( )
+		win32_print_last_error()
 		return w, false
 	}
 
@@ -112,15 +115,16 @@ make_window :: proc(title: string, msg, height: int, window_proc: WNDPROC) -> (W
 }
 
 destroy_window :: proc(w: ^Window) {
-	delete(w.c_title)
+	free(w.c_title.data)
 }
 
 display_window :: proc(w: ^Window) {
-	SwapBuffers(w.dc)
+	win32.SwapBuffers(w.dc)
 }
 
 
-run_game :: proc() {
+run :: proc() {
+	using win32
 	win32_proc :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #no_inline {
 		if msg == WM_DESTROY || msg == WM_CLOSE || msg == WM_QUIT {
 			ExitProcess(0)
@@ -140,7 +144,7 @@ run_game :: proc() {
 	prev_time := time_now()
 	running := true
 
-	pos := Vec2{100, 100}
+	pos := math.Vec2{100, 100}
 
 	for running {
 		curr_time := time_now()
@@ -162,38 +166,38 @@ run_game :: proc() {
 
 		{
 			SPEED :: 500
-			v: Vec2
+			v: math.Vec2
 
 			if is_key_down(Key_Code.RIGHT) { v[0] += 1 }
 			if is_key_down(Key_Code.LEFT)  { v[0] -= 1 }
 			if is_key_down(Key_Code.UP)    { v[1] += 1 }
 			if is_key_down(Key_Code.DOWN)  { v[1] -= 1 }
 
-			v = vec2_norm0(v)
+			v = math.vec2_norm0(v)
 
-			pos += v * Vec2{SPEED * dt}
+			pos += v * math.Vec2{SPEED * dt}
 		}
 
 
-		glClearColor(0.5, 0.7, 1.0, 1.0)
-		glClear(GL_COLOR_BUFFER_BIT)
+		gl.clear_color(0.5, 0.7, 1.0, 1.0)
+		gl.clear(gl.COLOR_BUFFER_BIT)
 
-		glLoadIdentity()
-		glOrtho(0, window.width as f64,
-		        0, window.height as f64, 0, 1)
+		gl.load_identity()
+		gl.ortho(0, window.width as f64,
+		         0, window.height as f64, 0, 1)
 
 		draw_rect :: proc(x, y, w, h: f32) {
-			glBegin(GL_TRIANGLES)
+			gl.begin(gl.TRIANGLES)
 
-			glColor3f(1, 0, 0); glVertex3f(x,   y,   0)
-			glColor3f(0, 1, 0); glVertex3f(x+w, y,   0)
-			glColor3f(0, 0, 1); glVertex3f(x+w, y+h, 0)
+			gl.color3f(1, 0, 0); gl.vertex3f(x,   y,   0)
+			gl.color3f(0, 1, 0); gl.vertex3f(x+w, y,   0)
+			gl.color3f(0, 0, 1); gl.vertex3f(x+w, y+h, 0)
 
-			glColor3f(0, 0, 1); glVertex3f(x+w, y+h, 0)
-			glColor3f(1, 1, 0); glVertex3f(x,   y+h, 0)
-			glColor3f(1, 0, 0); glVertex3f(x,   y,   0)
+			gl.color3f(0, 0, 1); gl.vertex3f(x+w, y+h, 0)
+			gl.color3f(1, 1, 0); gl.vertex3f(x,   y+h, 0)
+			gl.color3f(1, 0, 0); gl.vertex3f(x,   y,   0)
 
-			glEnd()
+			gl.end()
 		}
 
 		draw_rect(pos[0], pos[1], 50, 50)

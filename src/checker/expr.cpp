@@ -287,7 +287,6 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 
 			Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, NULL);
 			add_entity(c, c->context.scope, td->name, e);
-			gb_printf("%.*s\n", LIT(e->token.string));
 			check_type_decl(c, e, td->type, NULL, NULL);
 
 			HashKey key = hash_string(name_token.string);
@@ -734,8 +733,25 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 		if (are_strings_equal(n->Ident.string, make_string("_"))) {
 			error(&c->error_collector, n->Ident, "`_` cannot be used as a value type");
 		} else {
+			auto *entries = c->context.scope->elements.entries;
+			// gb_for_array(i, entries) {
+			// 	Entity *elem = entries[i].value;
+			// 	if (i > 0)  {
+			// 		gb_printf(", ");
+			// 	}
+			// 	gb_printf("%.*s", LIT(elem->token.string));
+			// }
+			// for (Scope *s = c->context.scope; s != NULL; s = s->parent) {
+			// 	Entity *elem = s->elements.entries[0].value;
+			// 	if (elem == NULL) continue;
+			// 	gb_printf("%.*s\n", LIT(elem->token.pos.file));
+			// }
+			// gb_printf("\n");
+
+
+			// Entity *e = scope_lookup_entity(c->context.scope, n->Ident.string);
 			error(&c->error_collector, n->Ident,
-			    "Undeclared named: `%.*s`", LIT(n->Ident.string));
+			      "Undeclared name: %.*s", LIT(n->Ident.string));
 		}
 		return;
 	}
@@ -915,11 +931,9 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 			type = make_type_array(c->allocator,
 			                       check_type(c, at->elem, NULL, cycle_checker),
 			                       check_array_count(c, at->count));
-			type->flags |= e->type_flags;
 			set_base_type(named_type, type);
 		} else {
 			type = make_type_slice(c->allocator, check_type(c, at->elem));
-			type->flags |= e->type_flags;
 			set_base_type(named_type, type);
 		}
 		goto end;
@@ -935,7 +949,6 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 			error(&c->error_collector, ast_node_token(vt->elem), "Vector element type must be numerical or a boolean. Got `%s`", err_str);
 		}
 		type = make_type_vector(c->allocator, elem, count);
-		type->flags |= e->type_flags;
 		set_base_type(named_type, type);
 		goto end;
 	case_end;
@@ -947,7 +960,6 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		check_struct_type(c, type, e, cycle_checker);
 		check_close_scope(c);
 		type->Record.node = e;
-		type->flags |= e->type_flags;
 		goto end;
 	case_end;
 
@@ -958,7 +970,6 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		check_union_type(c, type, e, cycle_checker);
 		check_close_scope(c);
 		type->Record.node = e;
-		type->flags |= e->type_flags;
 		goto end;
 	case_end;
 
@@ -969,7 +980,6 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		check_raw_union_type(c, type, e, cycle_checker);
 		check_close_scope(c);
 		type->Record.node = e;
-		type->flags |= e->type_flags;
 		goto end;
 	case_end;
 
@@ -978,22 +988,21 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		set_base_type(named_type, type);
 		check_enum_type(c, type, named_type, e);
 		type->Record.node = e;
-		type->flags |= e->type_flags;
 		goto end;
 	case_end;
 
 	case_ast_node(pt, PointerType, e);
 		type = make_type_pointer(c->allocator, check_type(c, pt->type));
-		type->flags |= e->type_flags;
 		set_base_type(named_type, type);
 		goto end;
 	case_end;
 
 	case_ast_node(pt, ProcType, e);
 		type = alloc_type(c->allocator, Type_Proc);
-		type->flags |= e->type_flags;
 		set_base_type(named_type, type);
+		check_open_scope(c, e);
 		check_procedure_type(c, type, e);
+		check_close_scope(c);
 		goto end;
 	case_end;
 
@@ -1003,7 +1012,6 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 			check_expr_or_type(c, &o, e);
 			if (o.mode == Addressing_Type) {
 				type = o.type;
-				type->flags |= e->type_flags;
 				goto end;
 			}
 		}

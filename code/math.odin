@@ -1,24 +1,42 @@
-MATH_TAU          :: 6.28318530717958647692528676655900576
-MATH_PI           :: 3.14159265358979323846264338327950288
-MATH_ONE_OVER_TAU :: 0.636619772367581343075535053490057448
-MATH_ONE_OVER_PI  :: 0.159154943091895335768883763372514362
+TAU          :: 6.28318530717958647692528676655900576
+PI           :: 3.14159265358979323846264338327950288
+ONE_OVER_TAU :: 0.636619772367581343075535053490057448
+ONE_OVER_PI  :: 0.159154943091895335768883763372514362
 
-MATH_E            :: 2.71828182845904523536
-MATH_SQRT_TWO     :: 1.41421356237309504880168872420969808
-MATH_SQRT_THREE   :: 1.73205080756887729352744634150587236
-MATH_SQRT_FIVE    :: 2.23606797749978969640917366873127623
+E            :: 2.71828182845904523536
+SQRT_TWO     :: 1.41421356237309504880168872420969808
+SQRT_THREE   :: 1.73205080756887729352744634150587236
+SQRT_FIVE    :: 2.23606797749978969640917366873127623
 
-MATH_LOG_TWO      :: 0.693147180559945309417232121458176568
-MATH_LOG_TEN      :: 2.30258509299404568401799145468436421
+LOG_TWO      :: 0.693147180559945309417232121458176568
+LOG_TEN      :: 2.30258509299404568401799145468436421
 
-MATH_EPSILON      :: 1.19209290e-7
+EPSILON      :: 1.19209290e-7
 
-τ :: MATH_TAU
-π :: MATH_PI
+τ :: TAU
+π :: PI
 
-Vec2 :: type {2}f32
-Vec3 :: type {3}f32
-Vec4 :: type {4}f32
+// Vec2 :: type raw_union {
+// 	using xy_: struct {x, y: f32}
+// 	v: {2}f32
+// 	e: [2]f32
+// }
+// Vec3 :: type raw_union {
+// 	using xyz_: struct {x, y, z: f32}
+// 	xy: Vec2
+// 	v:  {3}f32
+// 	e:  [3]f32
+// }
+// Vec4 :: type raw_union {
+// 	using xyzw_: struct {x, y, z, w: f32}
+// 	xy:  Vec2
+// 	xyz: Vec3
+// 	v:   {4}f32
+// 	e:   [4]f32
+// }
+Vec2 :: type  {2}f32
+Vec3 :: type  {3}f32
+Vec4 :: type  {4}f32
 
 Mat2 :: type  {4}f32
 Mat3 :: type  {9}f32
@@ -78,8 +96,8 @@ fmod :: proc(x, y: f32) -> f32 {
 }
 
 
-to_radians :: proc(degrees: f32) -> f32 { return degrees * MATH_TAU / 360 }
-to_degrees :: proc(radians: f32) -> f32 { return radians * 360 / MATH_TAU }
+to_radians :: proc(degrees: f32) -> f32 { return degrees * TAU / 360 }
+to_degrees :: proc(radians: f32) -> f32 { return radians * 360 / TAU }
 
 
 
