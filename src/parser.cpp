@@ -43,11 +43,15 @@ struct AstFile {
 	TokenPos fix_prev_pos;
 };
 
+struct ImportedFile {
+	String path;
+	TokenPos pos; // #import
+};
 
 struct Parser {
 	String init_fullpath;
 	gbArray(AstFile) files;
-	gbArray(String) imports;
+	gbArray(ImportedFile) imports;
 	gbArray(String) libraries;
 	gbArray(String) system_libraries;
 	isize load_index;
@@ -232,7 +236,8 @@ AST_NODE_KIND(_DeclBegin,      "", struct{}) \
 	AST_NODE_KIND(TypeDecl,   "type declaration",   struct { Token token; AstNode *name, *type; }) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
 		Token token, relpath; \
-		String fullpath; \
+		String fullpath;      \
+		Token import_name;    \
 	}) \
 	AST_NODE_KIND(ForeignSystemLibrary, "foreign system library", struct { Token token, filepath; }) \
 AST_NODE_KIND(_DeclEnd,   "", struct{}) \
@@ -883,10 +888,11 @@ gb_inline AstNode *make_type_decl(AstFile *f, Token token, AstNode *name, AstNod
 	return result;
 }
 
-gb_inline AstNode *make_import_decl(AstFile *f, Token token, Token relpath) {
+gb_inline AstNode *make_import_decl(AstFile *f, Token token, Token relpath, Token import_name) {
 	AstNode *result = make_node(f, AstNode_ImportDecl);
 	result->ImportDecl.token = token;
 	result->ImportDecl.relpath = relpath;
+	result->ImportDecl.import_name = import_name;
 	return result;
 }
 
@@ -2541,9 +2547,13 @@ AstNode *parse_stmt(AstFile *f) {
 			ast_file_err(f, token, "You cannot use #global_scope within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, f->cursor[0]);
 		} else if (are_strings_equal(tag, make_string("import"))) {
+			// TODO(bill): better error messages
 			Token file_path = expect_token(f, Token_String);
+			Token as = expect_token(f, Token_as);
+			Token import_name = expect_token(f, Token_Identifier);
+
 			if (f->curr_proc == NULL) {
-				return make_import_decl(f, s->TagStmt.token, file_path);
+				return make_import_decl(f, s->TagStmt.token, file_path, import_name);
 			}
 			ast_file_err(f, token, "You cannot use #import within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
@@ -2695,15 +2705,18 @@ void destroy_parser(Parser *p) {
 }
 
 // NOTE(bill): Returns true if it's added
-b32 try_add_import_path(Parser *p, String import_file, AstNode *node) {
+b32 try_add_import_path(Parser *p, String path, TokenPos pos) {
 	gb_for_array(i, p->imports) {
-		String import = p->imports[i];
-		if (are_strings_equal(import, import_file)) {
+		String import = p->imports[i].path;
+		if (are_strings_equal(import, path)) {
 			return false;
 		}
 	}
 
-	gb_array_append(p->imports, import_file);
+	ImportedFile item;
+	item.path = path;
+	item.pos = pos;
+	gb_array_append(p->imports, item);
 	return true;
 }
 
@@ -2799,7 +2812,7 @@ void parse_file(Parser *p, AstFile *f) {
 				String import_file = make_string(path_str);
 
 				id->fullpath = import_file;
-				if (!try_add_import_path(p, import_file, node)) {
+				if (!try_add_import_path(p, import_file, ast_node_token(node).pos)) {
 					// gb_free(gb_heap_allocator(), import_file.text);
 				}
 			} else if (node->kind == AstNode_ForeignSystemLibrary) {
@@ -2821,14 +2834,20 @@ void parse_file(Parser *p, AstFile *f) {
 ParseFileError parse_files(Parser *p, char *init_filename) {
 	char *fullpath_str = gb_path_get_full_name(gb_heap_allocator(), init_filename);
 	String init_fullpath = make_string(fullpath_str);
-	gb_array_append(p->imports, init_fullpath);
+	TokenPos init_pos = {};
+	ImportedFile init_imported_file = {init_fullpath, init_pos};
+	gb_array_append(p->imports, init_imported_file);
 	p->init_fullpath = init_fullpath;
 
 	gb_for_array(i, p->imports) {
-		String import_path = p->imports[i];
+		String import_path = p->imports[i].path;
+		TokenPos pos = p->imports[i].pos;
 		AstFile file = {};
 		ParseFileError err = init_ast_file(&file, import_path);
 		if (err != ParseFile_None) {
+			if (pos.line != 0) {
+				gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
+			}
 			gb_printf_err("Failed to parse file: %.*s\n", LIT(import_path));
 			switch (err) {
 			case ParseFile_WrongExtension:

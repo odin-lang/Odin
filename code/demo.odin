@@ -1,4 +1,4 @@
-#import "print.odin"
+#import "print.odin" as _
 
 test_proc :: proc() {
 	println("Hello?")

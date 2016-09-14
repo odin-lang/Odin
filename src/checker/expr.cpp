@@ -286,8 +286,9 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 			Token name_token = td->name->Ident;
 
 			Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, NULL);
-			check_type_decl(c, e, td->type, NULL, NULL);
 			add_entity(c, c->context.scope, td->name, e);
+			gb_printf("%.*s\n", LIT(e->token.string));
+			check_type_decl(c, e, td->type, NULL, NULL);
 
 			HashKey key = hash_string(name_token.string);
 			if (map_get(&entity_map, key) != NULL) {
@@ -728,10 +729,14 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 	GB_ASSERT(n->kind == AstNode_Ident);
 	o->mode = Addressing_Invalid;
 	o->expr = n;
-	Entity *e = scope_lookup_entity(c, c->context.scope, n->Ident.string);
+	Entity *e = scope_lookup_entity(c->context.scope, n->Ident.string);
 	if (e == NULL) {
-		error(&c->error_collector, n->Ident,
-		    "Undeclared type or identifier `%.*s`", LIT(n->Ident.string));
+		if (are_strings_equal(n->Ident.string, make_string("_"))) {
+			error(&c->error_collector, n->Ident, "`_` cannot be used as a value type");
+		} else {
+			error(&c->error_collector, n->Ident,
+			    "Undeclared named: `%.*s`", LIT(n->Ident.string));
+		}
 		return;
 	}
 	add_entity_use(&c->info, n, e);
@@ -744,14 +749,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 		gb_array_free(local_cycle_checker.path);
 	});
 
-	if (e->type == NULL) {
-		auto *found = map_get(&c->info.entities, hash_pointer(e));
-		if (found != NULL) {
-			check_entity_decl(c, e, *found, named_type, cycle_checker);
-		} else {
-			GB_PANIC("Internal Compiler Error: DeclInfo not found!");
-		}
-	}
+	check_entity_decl(c, e, NULL, named_type, cycle_checker);
 
 	if (e->type == NULL) {
 		GB_PANIC("Compiler error: How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(n->Ident.string));
@@ -807,6 +805,10 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 		o->builtin_id = e->Builtin.id;
 		o->mode = Addressing_Builtin;
 		break;
+
+	case Entity_ImportName:
+		error(&c->error_collector, ast_node_token(n), "Use of import `%.*s` not in selector", LIT(e->ImportName.name));
+		return;
 
 	default:
 		GB_PANIC("Compiler error: Unknown EntityKind");
@@ -875,18 +877,30 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 
 	case_ast_node(se, SelectorExpr, e);
 		Operand o = {};
-		o.mode = Addressing_Type;
-		o.type = check_type(c, se->expr, named_type, cycle_checker);
-		// gb_printf_err("mode: %.*s\n", LIT(addressing_mode_strings[o.mode]));
 		check_selector(c, &o, e);
-		// gb_printf_err("%s.%s\n", expr_to_string(se->expr), expr_to_string(se->selector));
-		// gb_printf_err("%s\n", type_to_string(o.type));
-		// gb_printf_err("mode: %.*s\n", LIT(addressing_mode_strings[o.mode]));
 
-		if (o.mode == Addressing_Type) {
+		switch (o.mode) {
+		case Addressing_Type:
+			GB_ASSERT(o.type != NULL);
 			set_base_type(type, o.type);
 			o.type->flags |= e->type_flags;
 			return o.type;
+
+		case Addressing_Invalid:
+			break;
+		case Addressing_NoValue: {
+			gbString err = expr_to_string(e);
+			defer (gb_string_free(err));
+			error(&c->error_collector, ast_node_token(e), "`%s` used as a type", err);
+		} break;
+		default: {
+			gbString err = expr_to_string(e);
+			defer (gb_string_free(err));
+			error(&c->error_collector, ast_node_token(e), "`%s` is not a type", err);
+		} break;
+		}
+
+		if (o.mode == Addressing_Type) {
 		}
 	case_end;
 
@@ -1959,54 +1973,90 @@ b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *valu
 }
 
 Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
-	GB_ASSERT(node->kind == AstNode_SelectorExpr);
-
 	ast_node(se, SelectorExpr, node);
+
+	b32 check_op_expr = true;
+	Entity *entity = NULL;
+
 	AstNode *op_expr  = se->expr;
-	AstNode *selector = se->selector;
-	if (selector) {
-		Entity *entity = lookup_field(operand->type, selector->Ident.string, operand->mode == Addressing_Type).entity;
-		if (entity == NULL) {
-			gbString op_str   = expr_to_string(op_expr);
-			gbString type_str = type_to_string(operand->type);
-			gbString sel_str  = expr_to_string(selector);
-			defer (gb_string_free(op_str));
-			defer (gb_string_free(type_str));
-			defer (gb_string_free(sel_str));
-			error(&c->error_collector, ast_node_token(op_expr), "`%s` (`%s`) has no field `%s`", op_str, type_str, sel_str);
-			operand->mode = Addressing_Invalid;
-			operand->expr = node;
-			return NULL;
-		}
-		add_entity_use(&c->info, selector, entity);
-
-		operand->type = entity->type;
-		operand->expr = node;
-		switch (entity->kind) {
-		case Entity_Constant:
-			operand->mode = Addressing_Constant;
-			operand->value = entity->Constant.value;
-			break;
-		case Entity_Variable:
-			operand->mode = Addressing_Variable;
-			break;
-		case Entity_TypeName:
-			operand->mode = Addressing_Type;
-			break;
-		case Entity_Procedure:
-			operand->mode = Addressing_Value;
-			break;
-		case Entity_Builtin:
-			operand->mode = Addressing_Builtin;
-			operand->builtin_id = entity->Builtin.id;
-			break;
-		}
-
-		return entity;
-	} else {
-		operand->mode = Addressing_Invalid;
-		operand->expr = node;
+	AstNode *selector = unparen_expr(se->selector);
+	if (selector == NULL) {
+		goto error;
 	}
+
+	GB_ASSERT(selector->kind == AstNode_Ident);
+
+	if (op_expr->kind == AstNode_Ident) {
+		String name = op_expr->Ident.string;
+		Entity *e = scope_lookup_entity(c->context.scope, name);
+		add_entity_use(&c->info, op_expr, e);
+		if (e != NULL && e->kind == Entity_ImportName) {
+			check_op_expr = false;
+			entity = scope_lookup_entity(e->ImportName.scope, selector->Ident.string);
+			add_entity_use(&c->info, selector, entity);
+			if (entity == NULL) {
+				gbString sel_str = expr_to_string(selector);
+				defer (gb_string_free(sel_str));
+				error(&c->error_collector, ast_node_token(op_expr), "`%s` is not declared in `%.*s`", sel_str, LIT(name));
+				goto error;
+			}
+			if (entity->type == NULL) { // Not setup yet
+				check_entity_decl(c, entity, NULL, NULL);
+			}
+			GB_ASSERT(entity->type != NULL);
+		}
+	}
+	if (check_op_expr) {
+		check_expr_base(c, operand, op_expr);
+		if (operand->mode == Addressing_Invalid) {
+			goto error;
+		}
+	}
+
+	if (entity == NULL) {
+		entity = lookup_field(operand->type, selector->Ident.string, operand->mode == Addressing_Type).entity;
+	}
+	if (entity == NULL) {
+		gbString op_str   = expr_to_string(op_expr);
+		gbString type_str = type_to_string(operand->type);
+		gbString sel_str  = expr_to_string(selector);
+		defer (gb_string_free(op_str));
+		defer (gb_string_free(type_str));
+		defer (gb_string_free(sel_str));
+		error(&c->error_collector, ast_node_token(op_expr), "`%s` (`%s`) has no field `%s`", op_str, type_str, sel_str);
+		goto error;
+	}
+
+
+	add_entity_use(&c->info, selector, entity);
+
+	operand->type = entity->type;
+	operand->expr = node;
+	switch (entity->kind) {
+	case Entity_Constant:
+		operand->mode = Addressing_Constant;
+		operand->value = entity->Constant.value;
+		break;
+	case Entity_Variable:
+		operand->mode = Addressing_Variable;
+		break;
+	case Entity_TypeName:
+		operand->mode = Addressing_Type;
+		break;
+	case Entity_Procedure:
+		operand->mode = Addressing_Value;
+		break;
+	case Entity_Builtin:
+		operand->mode = Addressing_Builtin;
+		operand->builtin_id = entity->Builtin.id;
+		break;
+	}
+
+	return entity;
+
+error:
+	operand->mode = Addressing_Invalid;
+	operand->expr = node;
 	return NULL;
 }
 
@@ -3202,7 +3252,6 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 
 	case_ast_node(se, SelectorExpr, node);
-		check_expr_base(c, o, se->expr);
 		check_selector(c, o, node);
 	case_end;
 

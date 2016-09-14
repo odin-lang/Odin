@@ -1,6 +1,5 @@
-#import "runtime.odin"
-#import "win32.odin"
-#import "file.odin"
+#import "runtime.odin" as _
+#import "os.odin" as os
 
 print_byte_buffer :: proc(buf: ^[]byte, b: []byte) {
 	if buf.count < buf.capacity {
@@ -555,31 +554,31 @@ print_to_buffer :: proc(buf: ^[]byte, fmt: string, args: ..any) {
 
 PRINT_BUF_SIZE :: 1<<12
 
-print_to_file :: proc(f: ^File, fmt: string, args: ..any) {
+print_to_file :: proc(f: ^os.File, fmt: string, args: ..any) {
 	data: [PRINT_BUF_SIZE]byte
 	buf := data[:0]
 	print_to_buffer(^buf, fmt, ..args)
-	file_write(f, buf)
+	os.write(f, buf)
 }
 
-println_to_file :: proc(f: ^File, fmt: string, args: ..any) {
+println_to_file :: proc(f: ^os.File, fmt: string, args: ..any) {
 	data: [PRINT_BUF_SIZE]byte
 	buf := data[:0]
 	print_to_buffer(^buf, fmt, ..args)
 	print_nl_to_buffer(^buf)
-	file_write(f, buf)
+	os.write(f, buf)
 }
 
 
 print :: proc(fmt: string, args: ..any) {
-	print_to_file(file_get_standard(File_Standard.OUTPUT), fmt, ..args)
+	print_to_file(os.file_get_standard(os.File_Standard.OUTPUT), fmt, ..args)
 }
 print_err :: proc(fmt: string, args: ..any) {
-	print_to_file(file_get_standard(File_Standard.ERROR), fmt, ..args)
+	print_to_file(os.file_get_standard(os.File_Standard.ERROR), fmt, ..args)
 }
 println :: proc(fmt: string, args: ..any) {
-	println_to_file(file_get_standard(File_Standard.OUTPUT), fmt, ..args)
+	println_to_file(os.file_get_standard(os.File_Standard.OUTPUT), fmt, ..args)
 }
 println_err :: proc(fmt: string, args: ..any) {
-	println_to_file(file_get_standard(File_Standard.ERROR), fmt, ..args)
+	println_to_file(os.file_get_standard(os.File_Standard.ERROR), fmt, ..args)
 }

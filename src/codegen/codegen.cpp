@@ -84,6 +84,7 @@ void ssa_gen_tree(ssaGen *s) {
 				if (str[i] == '\\') {
 					str[i] = '/';
 				}
+
 			}
 			char const *base = gb_path_base_name(str);
 			char const *ext = gb_path_extension(base);

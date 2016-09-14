@@ -315,7 +315,7 @@ void check_close_scope(Checker *c) {
 	c->context.scope = c->context.scope->parent;
 }
 
-void scope_lookup_parent_entity(Checker *c, Scope *scope, String name, Scope **scope_, Entity **entity_) {
+void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entity **entity_) {
 	b32 gone_thru_proc = false;
 	HashKey key = hash_string(name);
 	for (Scope *s = scope; s != NULL; s = s->parent) {
@@ -366,9 +366,9 @@ void scope_lookup_parent_entity(Checker *c, Scope *scope, String name, Scope **s
 	if (scope_) *scope_ = NULL;
 }
 
-Entity *scope_lookup_entity(Checker *c, Scope *s, String name) {
+Entity *scope_lookup_entity(Scope *s, String name) {
 	Entity *entity = NULL;
-	scope_lookup_parent_entity(c, s, name, NULL, &entity);
+	scope_lookup_parent_entity(s, name, NULL, &entity);
 	return entity;
 }
 
@@ -949,33 +949,41 @@ void check_parsed_files(Checker *c) {
 
 		gb_for_array(decl_index, f->decls) {
 			AstNode *decl = f->decls[decl_index];
-			switch (decl->kind) {
-			case_ast_node(id, ImportDecl, decl);
-				HashKey key = hash_string(id->fullpath);
-				auto found = map_get(&file_scopes, key);
-				GB_ASSERT_MSG(found != NULL, "Unable to find scope for file: %.*s", LIT(id->fullpath));
-				Scope *scope = *found;
-				b32 previously_added = false;
-				gb_for_array(import_index, file_scope->imported) {
-					Scope *prev = file_scope->imported[import_index];
-					if (prev == scope) {
-						previously_added = true;
-						break;
-					}
-				}
-				if (!previously_added) {
-					gb_array_append(file_scope->imported, scope);
-				}
+			if (decl->kind != AstNode_ImportDecl) {
+				continue;
+			}
+			ast_node(id, ImportDecl, decl);
 
+			HashKey key = hash_string(id->fullpath);
+			auto found = map_get(&file_scopes, key);
+			GB_ASSERT_MSG(found != NULL, "Unable to find scope for file: %.*s", LIT(id->fullpath));
+			Scope *scope = *found;
+			b32 previously_added = false;
+			gb_for_array(import_index, file_scope->imported) {
+				Scope *prev = file_scope->imported[import_index];
+				if (prev == scope) {
+					previously_added = true;
+					break;
+				}
+			}
+			if (!previously_added) {
+				gb_array_append(file_scope->imported, scope);
+			}
+
+			if (are_strings_equal(id->import_name.string, make_string("_"))) {
 				// NOTE(bill): Add imported entities to this file's scope
 				gb_for_array(elem_index, scope->elements.entries) {
 					Entity *e = scope->elements.entries[elem_index].value;
 					// NOTE(bill): Do not add other imported entities
-					if (e->scope == scope) {
+					if (e->scope == scope && e->kind != Entity_ImportName) {
 						add_entity(c, file_scope, NULL, e);
 					}
 				}
-			case_end;
+			} else {
+				Entity *e = make_entity_import_name(c->allocator, file_scope, id->import_name, t_invalid,
+				                                    id->fullpath, id->import_name.string,
+				                                    scope);
+				add_entity(c, file_scope, NULL, e);
 			}
 		}
 	}

@@ -927,6 +927,11 @@ ssaValue *ssa_lvalue_load(ssaProcedure *proc, ssaAddr lval) {
 			ssaValue *v = ssa_emit_load(proc, lval.addr);
 			return ssa_emit(proc, ssa_make_instr_extract_element(proc, v, lval.index));
 		}
+		// HACK(bill): Imported procedures don't require a load
+		Type *t = get_base_type(ssa_type(lval.addr));
+		if (t->kind == Type_Proc) {
+			return lval.addr;
+		}
 		return ssa_emit_load(proc, lval.addr);
 	}
 	GB_PANIC("Illegal lvalue load");
@@ -2519,13 +2524,20 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	case_ast_node(se, SelectorExpr, expr);
 		ssa_emit_comment(proc, make_string("SelectorExpr"));
 		Type *type = get_base_type(type_of_expr(proc->module->info, se->expr));
+		String selector = unparen_expr(se->selector)->Ident.string;
+		if (type == t_invalid) {
+			Entity *imp = entity_of_ident(proc->module->info, se->expr);
+			GB_ASSERT(imp->kind == Entity_ImportName);
+			// Entity *e = scope_lookup_entity(e->ImportName.scope, selector);
+			return ssa_build_addr(proc, unparen_expr(se->selector));
+		} else {
+			Selection sel = lookup_field(type, selector, false);
+			GB_ASSERT(sel.entity != NULL);
 
-		Selection sel = lookup_field(type, unparen_expr(se->selector)->Ident.string, false);
-		GB_ASSERT(sel.entity != NULL);
-
-		ssaValue *e = ssa_build_addr(proc, se->expr).addr;
-		e = ssa_emit_deep_field_gep(proc, type, e, sel);
-		return ssa_make_addr(e, expr);
+			ssaValue *e = ssa_build_addr(proc, se->expr).addr;
+			e = ssa_emit_deep_field_gep(proc, type, e, sel);
+			return ssa_make_addr(e, expr);
+		}
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, expr);

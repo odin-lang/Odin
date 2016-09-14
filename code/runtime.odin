@@ -1,9 +1,9 @@
 #global_scope
 
 // TODO(bill): Remove #import in runtime.odin
-#import "win32.odin"
-#import "file.odin"
-#import "print.odin"
+#import "win32.odin" as win32
+#import "os.odin"  as os
+#import "print.odin" as _
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
@@ -84,15 +84,15 @@ fmuladd_f32 :: proc(a, b, c: f32) -> f32 #foreign "llvm.fmuladd.f32"
 fmuladd_f64 :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
 
 heap_alloc   :: proc(len: int) -> rawptr {
-	return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, len)
+	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, len)
 }
 
 heap_free :: proc(ptr: rawptr) {
-	_ = HeapFree(GetProcessHeap(), 0, ptr)
+	_ = win32.HeapFree(win32.GetProcessHeap(), 0, ptr)
 }
 
 current_thread_id :: proc() -> int {
-	id := GetCurrentThreadId()
+	id := win32.GetCurrentThreadId()
 	return id as int
 }
 
@@ -171,7 +171,7 @@ __string_ge :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) >
 
 
 __assert :: proc(msg: string) {
-	file_write(file_get_standard(File_Standard.ERROR), msg as []byte)
+	os.write(os.file_get_standard(os.File_Standard.ERROR), msg as []byte)
 	__debug_trap()
 }
 

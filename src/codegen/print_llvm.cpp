@@ -744,7 +744,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 
 void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 	if (proc->body == NULL) {
-		ssa_fprintf(f, "\ndeclare ");
+		ssa_fprintf(f, "declare ");
 	} else {
 		ssa_fprintf(f, "\ndefine ");
 	}
@@ -844,47 +844,64 @@ void ssa_print_llvm_ir(ssaFileBuffer *f, ssaModule *m) {
 	gb_for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
 		ssaValue *v = entry->value;
-		switch (v->kind) {
-		case ssaValue_TypeName:
-			ssa_print_type_name(f, m, v);
-			break;
+		if (v->kind != ssaValue_TypeName) {
+			continue;
+		}
+		ssa_print_type_name(f, m, v);
+	}
+
+	gb_for_array(member_index, m->members.entries) {
+		auto *entry = &m->members.entries[member_index];
+		ssaValue *v = entry->value;
+		if (v->kind != ssaValue_Proc) {
+			continue;
+		}
+		if (v->Proc.body == NULL) {
+			ssa_print_proc(f, m, &v->Proc);
 		}
 	}
 
 	gb_for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
 		ssaValue *v = entry->value;
-		switch (v->kind) {
-		case ssaValue_Global: {
-			auto *g = &v->Global;
-			ssa_print_encoded_global(f, g->entity->token.string);
-			ssa_fprintf(f, " = ");
-			if (g->is_thread_local) {
-				ssa_fprintf(f, "thread_local ");
-			}
-			if (g->is_constant) {
-				if (g->is_private) {
-					ssa_fprintf(f, "private ");
-				}
-				ssa_fprintf(f, "constant ");
-			} else {
-				ssa_fprintf(f, "global ");
-			}
-
-
-			ssa_print_type(f, m->sizes, g->entity->type);
-			ssa_fprintf(f, " ");
-			if (g->value != NULL) {
-				ssa_print_value(f, m, g->value, g->entity->type);
-			} else {
-				ssa_fprintf(f, "zeroinitializer");
-			}
-			ssa_fprintf(f, "\n");
-		} break;
-
-		case ssaValue_Proc: {
-			ssa_print_proc(f, m, &v->Proc);
-		} break;
+		if (v->kind != ssaValue_Proc) {
+			continue;
 		}
+		if (v->Proc.body != NULL) {
+			ssa_print_proc(f, m, &v->Proc);
+		}
+	}
+
+
+	gb_for_array(member_index, m->members.entries) {
+		auto *entry = &m->members.entries[member_index];
+		ssaValue *v = entry->value;
+		if (v->kind != ssaValue_Global) {
+			continue;
+		}
+		auto *g = &v->Global;
+		ssa_print_encoded_global(f, g->entity->token.string);
+		ssa_fprintf(f, " = ");
+		if (g->is_thread_local) {
+			ssa_fprintf(f, "thread_local ");
+		}
+		if (g->is_constant) {
+			if (g->is_private) {
+				ssa_fprintf(f, "private ");
+			}
+			ssa_fprintf(f, "constant ");
+		} else {
+			ssa_fprintf(f, "global ");
+		}
+
+
+		ssa_print_type(f, m->sizes, g->entity->type);
+		ssa_fprintf(f, " ");
+		if (g->value != NULL) {
+			ssa_print_value(f, m, g->value, g->entity->type);
+		} else {
+			ssa_fprintf(f, "zeroinitializer");
+		}
+		ssa_fprintf(f, "\n");
 	}
 }

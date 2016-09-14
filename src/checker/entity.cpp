@@ -9,6 +9,7 @@ enum BuiltinProcId;
 	ENTITY_KIND(TypeName), \
 	ENTITY_KIND(Procedure), \
 	ENTITY_KIND(Builtin), \
+	ENTITY_KIND(ImportName), \
 	ENTITY_KIND(Count),
 
 
@@ -49,11 +50,19 @@ struct Entity {
 			i32 field_index; // Order in source
 			b8  is_field;    // Is struct field
 		} Variable;
-		struct {} TypeName;
+		struct {
+			struct DeclInfo *decl; // Usually NULL
+		} TypeName;
 		struct {
 			b8 pure;
 		} Procedure;
 		struct { BuiltinProcId id; } Builtin;
+		struct {
+			String path;
+			String name;
+			Scope *scope;
+			b32 used;
+		} ImportName;
 	};
 };
 
@@ -121,6 +130,15 @@ Entity *make_entity_procedure(gbAllocator a, Scope *scope, Token token, Type *si
 Entity *make_entity_builtin(gbAllocator a, Scope *scope, Token token, Type *type, BuiltinProcId id) {
 	Entity *entity = alloc_entity(a, Entity_Builtin, scope, token, type);
 	entity->Builtin.id = id;
+	return entity;
+}
+
+Entity *make_entity_import_name(gbAllocator a, Scope *scope, Token token, Type *type,
+                                String path, String name, Scope *import_scope) {
+	Entity *entity = alloc_entity(a, Entity_ImportName, scope, token, type);
+	entity->ImportName.path = path;
+	entity->ImportName.name = name;
+	entity->ImportName.scope = import_scope;
 	return entity;
 }
 

@@ -171,7 +171,7 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	b32 used = false;
 	if (node->kind == AstNode_Ident) {
 		ast_node(i, Ident, node);
-		e = scope_lookup_entity(c, c->context.scope, i->string);
+		e = scope_lookup_entity(c->context.scope, i->string);
 		if (e != NULL && e->kind == Entity_Variable) {
 			used = e->Variable.used; // TODO(bill): Make backup just in case
 		}
@@ -374,9 +374,8 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, Cycle
 		gb_array_free(local_cycle_checker.path);
 	});
 
-	check_type(c, type_expr, named, cycle_checker_add(cycle_checker, e));
-
-
+	Type *base_type = check_type(c, type_expr, named, cycle_checker_add(cycle_checker, e));
+	named->Named.base = base_type;
 	named->Named.base = get_base_type(named->Named.base);
 	if (named->Named.base == t_invalid) {
 		// gb_printf("check_type_decl: %s\n", type_to_string(named));
@@ -562,22 +561,41 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 
 
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, CycleChecker *cycle_checker) {
-	if (e->type != NULL)
-		return;
+	if (e->type != NULL) {
+		if (e->type->kind == Type_Named && e->type->Named.base == NULL) {
+			// NOTE(bill): Some weird declaration error from Entity_ImportName
+		} else {
+			return;
+		}
+	}
+
+	if (d == NULL) {
+		DeclInfo **found = map_get(&c->info.entities, hash_pointer(e));
+		if (found) {
+			d = *found;
+		} else {
+			GB_PANIC("`%.*s` should been declared!", LIT(e->token.string));
+		}
+	}
+
 	switch (e->kind) {
 	case Entity_Constant: {
 		Scope *prev = c->context.scope;
 		c->context.scope = d->scope;
-		defer (c->context.scope = prev);
 		c->context.decl = d;
+
 		check_const_decl(c, e, d->type_expr, d->init_expr);
+
+		c->context.scope = prev;
 	} break;
 	case Entity_Variable: {
 		Scope *prev = c->context.scope;
 		c->context.scope = d->scope;
-		defer (c->context.scope = prev);
 		c->context.decl = d;
+
 		check_var_decl(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr);
+
+		c->context.scope = prev;
 	} break;
 	case Entity_TypeName: {
 		CycleChecker local_cycle_checker = {};
@@ -1234,7 +1252,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			AstNode *expr = unparen_expr(es->expr);
 			if (expr->kind == AstNode_Ident) {
 				String name = expr->Ident.string;
-				e = scope_lookup_entity(c, c->context.scope, name);
+				e = scope_lookup_entity(c->context.scope, name);
 			} else if (expr->kind == AstNode_SelectorExpr) {
 				Operand o = {};
 				check_expr_base(c, &o, expr->SelectorExpr.expr);
@@ -1281,6 +1299,18 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 							return;
 						}
 						f->using_parent = e;
+					}
+				}
+			} break;
+
+			case Entity_ImportName: {
+				Scope *scope = e->ImportName.scope;
+				gb_for_array(i, scope->elements.entries) {
+					Entity *decl = scope->elements.entries[i].value;
+					Entity *found = scope_insert_entity(c->context.scope, decl);
+					if (found != NULL) {
+						error(&c->error_collector, us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+						return;
 					}
 				}
 			} break;
@@ -1334,7 +1364,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				AstNode *item = vd->names[name_index];
 				ast_node(i, Ident, item);
 				String name = i->string;
-				Entity *e = scope_lookup_entity(c, c->context.scope, name);
+				Entity *e = scope_lookup_entity(c->context.scope, name);
 				Type *t = get_base_type(type_deref(e->type));
 				if (is_type_struct(t) || is_type_raw_union(t)) {
 					Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
