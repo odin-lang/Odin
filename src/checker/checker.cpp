@@ -117,6 +117,7 @@ struct Scope {
 	b32 is_proc;
 	b32 is_global;
 	b32 is_file;
+	b32 is_init;
 };
 
 enum ExprKind {
@@ -819,6 +820,10 @@ void check_parsed_files(Checker *c) {
 		scope = make_scope(c->global_scope, c->allocator);
 		scope->is_global = f->is_global_scope;
 		scope->is_file   = true;
+		if (i == 0) {
+			// NOTE(bill): First file is always the initial file
+			scope->is_init = true;
+		}
 
 		if (scope->is_global) {
 			gb_array_append(c->global_scope->shared, scope);
@@ -843,9 +848,6 @@ void check_parsed_files(Checker *c) {
 
 			switch (decl->kind) {
 			case_ast_node(bd, BadDecl, decl);
-			case_end;
-			case_ast_node(ld, LoadDecl, decl);
-				// NOTE(bill): ignore
 			case_end;
 			case_ast_node(id, ImportDecl, decl);
 				// NOTE(bill): Handle later
@@ -947,37 +949,34 @@ void check_parsed_files(Checker *c) {
 
 		gb_for_array(decl_index, f->decls) {
 			AstNode *decl = f->decls[decl_index];
-			if (decl->kind != AstNode_ImportDecl) {
-				continue;
-			}
-	#if 1
-			ast_node(id, ImportDecl, decl);
-
-			HashKey key = hash_string(id->fullpath);
-			auto found = map_get(&file_scopes, key);
-			GB_ASSERT_MSG(found != NULL, "Unable to find scope for file: %.*s", LIT(id->fullpath));
-			Scope *scope = *found;
-			b32 previously_added = false;
-			gb_for_array(import_index, file_scope->imported) {
-				Scope *prev = file_scope->imported[import_index];
-				if (prev == scope) {
-					previously_added = true;
-					break;
+			switch (decl->kind) {
+			case_ast_node(id, ImportDecl, decl);
+				HashKey key = hash_string(id->fullpath);
+				auto found = map_get(&file_scopes, key);
+				GB_ASSERT_MSG(found != NULL, "Unable to find scope for file: %.*s", LIT(id->fullpath));
+				Scope *scope = *found;
+				b32 previously_added = false;
+				gb_for_array(import_index, file_scope->imported) {
+					Scope *prev = file_scope->imported[import_index];
+					if (prev == scope) {
+						previously_added = true;
+						break;
+					}
 				}
-			}
-			if (!previously_added) {
-				gb_array_append(file_scope->imported, scope);
-			}
-
-			// NOTE(bill): Add imported entities to this file's scope
-			gb_for_array(elem_index, scope->elements.entries) {
-				Entity *e = scope->elements.entries[elem_index].value;
-				// NOTE(bill): Do not add other imported entities
-				if (e->scope == scope) {
-					add_entity(c, file_scope, NULL, e);
+				if (!previously_added) {
+					gb_array_append(file_scope->imported, scope);
 				}
+
+				// NOTE(bill): Add imported entities to this file's scope
+				gb_for_array(elem_index, scope->elements.entries) {
+					Entity *e = scope->elements.entries[elem_index].value;
+					// NOTE(bill): Do not add other imported entities
+					if (e->scope == scope) {
+						add_entity(c, file_scope, NULL, e);
+					}
+				}
+			case_end;
 			}
-	#endif
 		}
 	}
 

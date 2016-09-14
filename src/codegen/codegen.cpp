@@ -66,12 +66,45 @@ void ssa_gen_tree(ssaGen *s) {
 	gb_for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
-		DeclInfo *decl = entry->value;
-
 		String name = e->token.string;
+
+		DeclInfo *decl = entry->value;
+		Scope *scope = e->scope;
+		if (scope->is_global ||
+		    scope->is_init) {
+
+		} else {
+			// NOTE(bill): prefix names not in the init scope
+			// TODO(bill): make robust and not just rely on the file's name
+			String path = e->token.pos.file;
+			char *str = gb_alloc_array(a, char, path.len+1);
+			gb_memcopy(str, path.text, path.len);
+			str[path.len] = 0;
+			for (isize i = 0; i < path.len; i++) {
+				if (str[i] == '\\') {
+					str[i] = '/';
+				}
+			}
+			char const *base = gb_path_base_name(str);
+			char const *ext = gb_path_extension(base);
+			isize base_len = ext-1-base;
+
+			isize new_len = base_len + 1 + name.len;
+			u8 *new_name = gb_alloc_array(a, u8, new_len);
+			gb_memcopy(new_name, base, base_len);
+			new_name[base_len] = '.';
+			gb_memcopy(new_name+base_len+1, name.text, name.len);
+
+			name = make_string(new_name, new_len);
+			// gb_printf("%.*s\n", new_len, new_name);
+		}
+
 
 		switch (e->kind) {
 		case Entity_TypeName:
+			GB_ASSERT(e->type->kind == Type_Named);
+			// HACK(bill): Rename type's name for ssa gen
+			e->type->Named.name = name;
 			ssa_gen_global_type_name(m, e, name);
 			break;
 
@@ -107,9 +140,11 @@ void ssa_gen_tree(ssaGen *s) {
 
 		case Entity_Procedure: {
 			auto *pd = &decl->proc_decl->ProcDecl;
-			String original_name = e->token.string;
-			String name = original_name;
+			String original_name = name;
 			AstNode *body = pd->body;
+			if (pd->tags & ProcTag_foreign) {
+				name = pd->name->Ident.string;
+			}
 			if (pd->foreign_name.len > 0) {
 				name = pd->foreign_name;
 			}

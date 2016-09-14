@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
 
 	PRINT_TIMER("Semantic Checker");
 #endif
-#if 0
+#if 1
 	ssaGen ssa = {};
 	if (!ssa_gen_init(&ssa, &checker))
 		return 1;

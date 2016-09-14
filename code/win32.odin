@@ -1,6 +1,12 @@
 #foreign_system_library "user32"
 #foreign_system_library "gdi32"
 
+
+test_proc :: proc() {
+	x := "Goodbye?"
+}
+
+
 HANDLE    :: type rawptr
 HWND      :: type HANDLE
 HDC       :: type HANDLE
@@ -398,3 +404,4 @@ Key_Code :: enum i32 {
 	PA1        = 0xFD,
 	OEM_CLEAR  = 0xFE,
 }
+

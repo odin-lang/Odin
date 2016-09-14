@@ -230,7 +230,6 @@ AST_NODE_KIND(_DeclBegin,      "", struct{}) \
 			String  foreign_name; \
 		}) \
 	AST_NODE_KIND(TypeDecl,   "type declaration",   struct { Token token; AstNode *name, *type; }) \
-	AST_NODE_KIND(LoadDecl,   "load declaration",   struct { Token token, filepath; }) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
 		Token token, relpath; \
 		String fullpath; \
@@ -410,8 +409,6 @@ Token ast_node_token(AstNode *node) {
 		return node->ProcDecl.name->Ident;
 	case AstNode_TypeDecl:
 		return node->TypeDecl.token;
-	case AstNode_LoadDecl:
-		return node->LoadDecl.token;
 	case AstNode_ImportDecl:
 		return node->ImportDecl.token;
 	case AstNode_ForeignSystemLibrary:
@@ -885,14 +882,6 @@ gb_inline AstNode *make_type_decl(AstFile *f, Token token, AstNode *name, AstNod
 	result->TypeDecl.type = type;
 	return result;
 }
-
-gb_inline AstNode *make_load_decl(AstFile *f, Token token, Token filepath) {
-	AstNode *result = make_node(f, AstNode_LoadDecl);
-	result->LoadDecl.token = token;
-	result->LoadDecl.filepath = filepath;
-	return result;
-}
-
 
 gb_inline AstNode *make_import_decl(AstFile *f, Token token, Token relpath) {
 	AstNode *result = make_node(f, AstNode_ImportDecl);
@@ -2551,13 +2540,6 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			ast_file_err(f, token, "You cannot use #global_scope within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, f->cursor[0]);
-		} else if (are_strings_equal(tag, make_string("load"))) {
-			Token file_path = expect_token(f, Token_String);
-			if (f->curr_proc == NULL) {
-				return make_load_decl(f, s->TagStmt.token, file_path);
-			}
-			ast_file_err(f, token, "You cannot use #load within a procedure. This must be done at the file scope.");
-			return make_bad_decl(f, token, file_path);
 		} else if (are_strings_equal(tag, make_string("import"))) {
 			Token file_path = expect_token(f, Token_String);
 			if (f->curr_proc == NULL) {
@@ -2796,29 +2778,7 @@ void parse_file(Parser *p, AstFile *f) {
 			// NOTE(bill): Sanity check
 			ast_file_err(f, ast_node_token(node), "Only declarations are allowed at file scope");
 		} else {
-			if (node->kind == AstNode_LoadDecl) {
-				auto *id = &node->LoadDecl;
-				String file_str = id->filepath.string;
-
-				if (!is_import_path_valid(file_str)) {
-					ast_file_err(f, ast_node_token(node), "Invalid `load` path");
-					continue;
-				}
-
-				isize str_len = base_dir.len+file_str.len;
-				u8 *str = gb_alloc_array(gb_heap_allocator(), u8, str_len+1);
-				defer (gb_free(gb_heap_allocator(), str));
-
-				gb_memcopy(str, base_dir.text, base_dir.len);
-				gb_memcopy(str+base_dir.len, file_str.text, file_str.len);
-				str[str_len] = '\0';
-				char *path_str = gb_path_get_full_name(gb_heap_allocator(), cast(char *)str);
-				String import_file = make_string(path_str);
-
-				if (!try_add_import_path(p, import_file, node)) {
-					gb_free(gb_heap_allocator(), import_file.text);
-				}
-			} else if (node->kind == AstNode_ImportDecl) {
+			if (node->kind == AstNode_ImportDecl) {
 				auto *id = &node->ImportDecl;
 				String file_str = id->relpath.string;
 
