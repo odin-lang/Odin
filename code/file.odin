@@ -1,4 +1,4 @@
-#load "win32.odin"
+#import "win32.odin"
 
 File :: type struct {
 	Handle :: type HANDLE

@@ -351,8 +351,9 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 	}
 
 	Operand operand = {};
-	if (init_expr)
+	if (init_expr) {
 		check_expr(c, &operand, init_expr);
+	}
 	check_init_constant(c, e, &operand);
 }
 
@@ -378,7 +379,7 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, Cycle
 
 	named->Named.base = get_base_type(named->Named.base);
 	if (named->Named.base == t_invalid) {
-		gb_printf("%s\n", type_to_string(named));
+		// gb_printf("check_type_decl: %s\n", type_to_string(named));
 	}
 }
 
@@ -444,7 +445,10 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 	defer (check_close_scope(c));
 	check_procedure_type(c, proc_type, pd->type);
 	// add_proc_entity(c, d->scope, pd->name, e);
-	add_entity(c, d->scope, pd->name, e);
+	if (d->scope->is_proc) {
+		// Nested procedures
+		add_entity(c, d->scope, pd->name, e);
+	}
 
 
 
@@ -561,14 +565,20 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 	if (e->type != NULL)
 		return;
 	switch (e->kind) {
-	case Entity_Constant:
+	case Entity_Constant: {
+		Scope *prev = c->context.scope;
+		c->context.scope = d->scope;
+		defer (c->context.scope = prev);
 		c->context.decl = d;
 		check_const_decl(c, e, d->type_expr, d->init_expr);
-		break;
-	case Entity_Variable:
+	} break;
+	case Entity_Variable: {
+		Scope *prev = c->context.scope;
+		c->context.scope = d->scope;
+		defer (c->context.scope = prev);
 		c->context.decl = d;
 		check_var_decl(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr);
-		break;
+	} break;
 	case Entity_TypeName: {
 		CycleChecker local_cycle_checker = {};
 		if (cycle_checker == NULL) {

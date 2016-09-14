@@ -1,5 +1,9 @@
-#load "win32.odin"
-#load "print.odin"
+#global_scope
+
+// TODO(bill): Remove #import in runtime.odin
+#import "win32.odin"
+#import "file.odin"
+#import "print.odin"
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order

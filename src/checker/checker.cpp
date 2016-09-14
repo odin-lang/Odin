@@ -107,11 +107,16 @@ struct ProcedureInfo {
 };
 
 struct Scope {
-	b32 is_proc;
 	Scope *parent;
 	Scope *prev, *next;
 	Scope *first_child, *last_child;
 	Map<Entity *> elements; // Key: String
+
+	gbArray(Scope *) shared;
+	gbArray(Scope *) imported;
+	b32 is_proc;
+	b32 is_global;
+	b32 is_file;
 };
 
 enum ExprKind {
@@ -253,7 +258,9 @@ CycleChecker *cycle_checker_add(CycleChecker *cc, Entity *e) {
 Scope *make_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
-	map_init(&s->elements, gb_heap_allocator());
+	map_init(&s->elements,     gb_heap_allocator());
+	gb_array_init(s->shared,   gb_heap_allocator());
+	gb_array_init(s->imported, gb_heap_allocator());
 	if (parent != NULL && parent != universal_scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
 	}
@@ -277,6 +284,9 @@ void destroy_scope(Scope *scope) {
 	}
 
 	map_destroy(&scope->elements);
+	gb_array_free(scope->shared);
+	gb_array_free(scope->imported);
+
 	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
 }
 
@@ -287,11 +297,14 @@ void add_scope(Checker *c, AstNode *node, Scope *scope) {
 }
 
 
-void check_open_scope(Checker *c, AstNode *stmt) {
-	GB_ASSERT(is_ast_node_stmt(stmt) || is_ast_node_type(stmt));
+void check_open_scope(Checker *c, AstNode *node) {
+	GB_ASSERT(node != NULL);
+	GB_ASSERT(node->kind == AstNode_Invalid ||
+	          is_ast_node_stmt(node) ||
+	          is_ast_node_type(node));
 	Scope *scope = make_scope(c->context.scope, c->allocator);
-	add_scope(c, stmt, scope);
-	if (stmt->kind == AstNode_ProcType) {
+	add_scope(c, node, scope);
+	if (node->kind == AstNode_ProcType) {
 		scope->is_proc = true;
 	}
 	c->context.scope = scope;
@@ -301,31 +314,55 @@ void check_close_scope(Checker *c) {
 	c->context.scope = c->context.scope->parent;
 }
 
-void scope_lookup_parent_entity(Checker *c, Scope *s, String name, Scope **scope, Entity **entity) {
+void scope_lookup_parent_entity(Checker *c, Scope *scope, String name, Scope **scope_, Entity **entity_) {
 	b32 gone_thru_proc = false;
 	HashKey key = hash_string(name);
-	for (; s != NULL; s = s->parent) {
-
+	for (Scope *s = scope; s != NULL; s = s->parent) {
 		Entity **found = map_get(&s->elements, key);
 		if (found) {
 			Entity *e = *found;
 			if (gone_thru_proc) {
-				if (e->kind == Entity_Variable && e->scope != c->global_scope) {
+				if (e->kind == Entity_Variable &&
+				    !e->scope->is_file &&
+				    !e->scope->is_global) {
 					continue;
 				}
 			}
 
-			if (entity) *entity = e;
-			if (scope) *scope = s;
+			if (entity_) *entity_ = e;
+			if (scope_) *scope_ = s;
 			return;
 		}
 
 		if (s->is_proc) {
 			gone_thru_proc = true;
+		} else {
+			// Check shared scopes - i.e. other files @ global scope
+			gb_for_array(i, s->shared) {
+				Scope *shared = s->shared[i];
+				Entity **found = map_get(&shared->elements, key);
+				if (found) {
+					Entity *e = *found;
+					if (e->kind == Entity_Variable &&
+					    !e->scope->is_file &&
+					    !e->scope->is_global) {
+						continue;
+					}
+
+					if (e->scope == shared) {
+						// Do not return imported entities
+						if (entity_) *entity_ = e;
+						if (scope_) *scope_ = shared;
+						return;
+					}
+				}
+			}
 		}
 	}
-	if (entity) *entity = NULL;
-	if (scope) *scope = NULL;
+
+
+	if (entity_) *entity_ = NULL;
+	if (scope_) *scope_ = NULL;
 }
 
 Entity *scope_lookup_entity(Checker *c, Scope *s, String name) {
@@ -337,8 +374,15 @@ Entity *scope_lookup_entity(Checker *c, Scope *s, String name) {
 Entity *current_scope_lookup_entity(Scope *s, String name) {
 	HashKey key = hash_string(name);
 	Entity **found = map_get(&s->elements, key);
-	if (found)
+	if (found) {
 		return *found;
+	}
+	gb_for_array(i, s->shared) {
+		Entity **found = map_get(&s->shared[i]->elements, key);
+		if (found) {
+			return *found;
+		}
+	}
 	return NULL;
 }
 
@@ -570,7 +614,6 @@ b32 add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 				      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
 				return false;
 			} else {
-				gb_printf_err("!!Here\n");
 				error(&c->error_collector, entity->token,
 				      "Redeclararation of `%.*s` in this scope\n"
 				      "\tat %.*s(%td:%td)",
@@ -580,82 +623,11 @@ b32 add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 			}
 		}
 	}
-	if (identifier != NULL)
+	if (identifier != NULL) {
 		add_entity_definition(&c->info, identifier, entity);
+	}
 	return true;
 }
-
-
-/*
-b32 add_proc_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
-	GB_ASSERT(entity->kind == Entity_Procedure);
-
-	auto error_proc_redecl = [](Checker *c, Token token, Entity *other_entity, char *extra_msg) {
-		error(&c->error_collector, token,
-		      "Redeclararation of `%.*s` in this scope %s\n"
-		      "\tat %.*s(%td:%td)",
-		      LIT(other_entity->token.string),
-		      extra_msg,
-		      LIT(other_entity->token.pos.file), other_entity->token.pos.line, other_entity->token.pos.column);
-	};
-
-	String name = entity->token.string;
-	HashKey key = hash_string(name);
-
-	b32 insert_overload = false;
-
-	if (!are_strings_equal(name, make_string("_"))) {
-		Entity *insert_entity = scope_insert_entity(scope, entity);
-		if (insert_entity != NULL) {
-			if (insert_entity != entity) {
-				isize count = multi_map_count(&scope->elements, key);
-				GB_ASSERT(count > 0);
-				Entity **entities = gb_alloc_array(gb_heap_allocator(), Entity *, count);
-				defer (gb_free(gb_heap_allocator(), entities));
-				multi_map_get_all(&scope->elements, key, entities);
-
-				for (isize i = 0; i < count; i++) {
-					Entity *e = entities[i];
-					if (e == entity) {
-						continue;
-					}
-					if (e->kind == Entity_Procedure) {
-						Type *proc_type = entity->type;
-						Type *other_proc_type = e->type;
-						// gb_printf_err("%s == %s\n", type_to_string(proc_type), type_to_string(other_proc_type));
-						if (are_types_identical(proc_type, other_proc_type)) {
-							error_proc_redecl(c, entity->token, e, "with identical types");
-							return false;
-						}
-
-						if (proc_type != NULL && other_proc_type != NULL) {
-							Type *params = proc_type->Proc.params;
-							Type *other_params = other_proc_type->Proc.params;
-
-							if (are_types_identical(params, other_params)) {
-								error_proc_redecl(c, entity->token, e, "with 2identical parameters");
-								return false;
-							}
-						}
-					} else {
-						error_proc_redecl(c, entity->token, e, "");
-						return false;
-					}
-				}
-				insert_overload = true;
-			}
-		}
-	}
-
-	if (insert_overload) {
-		multi_map_insert(&scope->elements, key, entity);
-	}
-
-	if (identifier != NULL)
-		add_entity_definition(&c->info, identifier, entity);
-	return true;
-}
-*/
 
 void add_entity_use(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier != NULL);
@@ -665,10 +637,9 @@ void add_entity_use(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 }
 
 
-void add_file_entity(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d) {
+void add_file_entity(Checker *c, Scope *file_scope, AstNode *identifier, Entity *e, DeclInfo *d) {
 	GB_ASSERT(are_strings_equal(identifier->Ident.string, e->token.string));
-
-	add_entity(c, c->global_scope, identifier, e);
+	add_entity(c, file_scope, identifier, e);
 	map_set(&c->info.entities, hash_pointer(e), d);
 }
 
@@ -763,10 +734,7 @@ void add_type_info_type(Checker *c, Type *t) {
 		add_type_info_type(c, bt->Proc.results);
 		break;
 	}
-
 }
-
-
 
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body) {
@@ -835,17 +803,55 @@ void check_type_name_cycles(Checker *c, CycleCheck *cc, Entity *e) {
 
 
 void check_parsed_files(Checker *c) {
+
+	gbArray(AstNode *) import_decls;
+	gb_array_init(import_decls, gb_heap_allocator());
+	defer (gb_array_free(import_decls));
+
+	Map<Scope *> file_scopes; // Key: String (fullpath)
+	map_init(&file_scopes, gb_heap_allocator());
+	defer (map_destroy(&file_scopes));
+
+	// Map full filepaths to Scopes
+	gb_for_array(i, c->parser->files) {
+		AstFile *f = &c->parser->files[i];
+		Scope *scope = NULL;
+		scope = make_scope(c->global_scope, c->allocator);
+		scope->is_global = f->is_global_scope;
+		scope->is_file   = true;
+
+		if (scope->is_global) {
+			gb_array_append(c->global_scope->shared, scope);
+		}
+
+		f->scope = scope;
+		map_set(&file_scopes, hash_string(f->tokenizer.fullpath), scope);
+	}
+
 	// Collect Entities
 	gb_for_array(i, c->parser->files) {
 		AstFile *f = &c->parser->files[i];
 		add_curr_ast_file(c, f);
+
+		Scope *file_scope = f->scope;
+
 		gb_for_array(decl_index, f->decls) {
 			AstNode *decl = f->decls[decl_index];
-			if (!is_ast_node_decl(decl))
+			if (!is_ast_node_decl(decl)) {
 				continue;
+			}
 
 			switch (decl->kind) {
 			case_ast_node(bd, BadDecl, decl);
+			case_end;
+			case_ast_node(ld, LoadDecl, decl);
+				// NOTE(bill): ignore
+			case_end;
+			case_ast_node(id, ImportDecl, decl);
+				// NOTE(bill): Handle later
+			case_end;
+			case_ast_node(fsl, ForeignSystemLibrary, decl);
+				// NOTE(bill): ignore
 			case_end;
 
 			case_ast_node(vd, VarDecl, decl);
@@ -855,11 +861,11 @@ void check_parsed_files(Checker *c) {
 						AstNode *name = vd->names[i];
 						AstNode *value = vd->values[i];
 						ExactValue v = {ExactValue_Invalid};
-						Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
-						DeclInfo *di = make_declaration_info(c->allocator, c->global_scope);
+						Entity *e = make_entity_constant(c->allocator, file_scope, name->Ident, NULL, v);
+						DeclInfo *di = make_declaration_info(c->allocator, file_scope);
 						di->type_expr = vd->type;
 						di->init_expr = value;
-						add_file_entity(c, name, e, di);
+						add_file_entity(c, file_scope, name, e, di);
 					}
 
 					isize lhs_count = gb_array_count(vd->names);
@@ -878,7 +884,7 @@ void check_parsed_files(Checker *c) {
 					Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
 					DeclInfo *di = NULL;
 					if (gb_array_count(vd->values) > 0) {
-						di = make_declaration_info(gb_heap_allocator(), c->global_scope);
+						di = make_declaration_info(gb_heap_allocator(), file_scope);
 						di->entities = entities;
 						di->entity_count = entity_count;
 						di->type_expr = vd->type;
@@ -891,19 +897,19 @@ void check_parsed_files(Checker *c) {
 						if (i < gb_array_count(vd->values)) {
 							value = vd->values[i];
 						}
-						Entity *e = make_entity_variable(c->allocator, c->global_scope, name->Ident, NULL);
+						Entity *e = make_entity_variable(c->allocator, file_scope, name->Ident, NULL);
 						entities[entity_index++] = e;
 
 						DeclInfo *d = di;
 						if (d == NULL) {
 							AstNode *init_expr = value;
-							d = make_declaration_info(gb_heap_allocator(), c->global_scope);
+							d = make_declaration_info(gb_heap_allocator(), file_scope);
 							d->type_expr = vd->type;
 							d->init_expr = init_expr;
 							d->var_decl_tags = vd->tags;
 						}
 
-						add_file_entity(c, name, e, d);
+						add_file_entity(c, file_scope, name, e, d);
 					}
 				} break;
 				}
@@ -911,28 +917,20 @@ void check_parsed_files(Checker *c) {
 
 			case_ast_node(td, TypeDecl, decl);
 				ast_node(n, Ident, td->name);
-				Entity *e = make_entity_type_name(c->allocator, c->global_scope, *n, NULL);
+				Entity *e = make_entity_type_name(c->allocator, file_scope, *n, NULL);
 				DeclInfo *d = make_declaration_info(c->allocator, e->scope);
 				d->type_expr = td->type;
-				add_file_entity(c, td->name, e, d);
+				add_file_entity(c, file_scope, td->name, e, d);
 			case_end;
 
 			case_ast_node(pd, ProcDecl, decl);
 				ast_node(n, Ident, pd->name);
 				Token token = *n;
-				Entity *e = make_entity_procedure(c->allocator, c->global_scope, token, NULL);
+				Entity *e = make_entity_procedure(c->allocator, file_scope, token, NULL);
 				DeclInfo *d = make_declaration_info(c->allocator, e->scope);
 				d->proc_decl = decl;
-				map_set(&c->info.entities, hash_pointer(e), d);
+				add_file_entity(c, file_scope, pd->name, e, d);
 			case_end;
-
-			case_ast_node(ld, LoadDecl, decl);
-				// NOTE(bill): ignore
-			case_end;
-			case_ast_node(fsl, ForeignSystemLibrary, decl);
-				// NOTE(bill): ignore
-			case_end;
-
 
 			default:
 				error(&c->error_collector, ast_node_token(decl), "Only declarations are allowed at file scope");
@@ -941,6 +939,47 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
+	gb_for_array(i, c->parser->files) {
+		AstFile *f = &c->parser->files[i];
+		add_curr_ast_file(c, f);
+
+		Scope *file_scope = f->scope;
+
+		gb_for_array(decl_index, f->decls) {
+			AstNode *decl = f->decls[decl_index];
+			if (decl->kind != AstNode_ImportDecl) {
+				continue;
+			}
+	#if 1
+			ast_node(id, ImportDecl, decl);
+
+			HashKey key = hash_string(id->fullpath);
+			auto found = map_get(&file_scopes, key);
+			GB_ASSERT_MSG(found != NULL, "Unable to find scope for file: %.*s", LIT(id->fullpath));
+			Scope *scope = *found;
+			b32 previously_added = false;
+			gb_for_array(import_index, file_scope->imported) {
+				Scope *prev = file_scope->imported[import_index];
+				if (prev == scope) {
+					previously_added = true;
+					break;
+				}
+			}
+			if (!previously_added) {
+				gb_array_append(file_scope->imported, scope);
+			}
+
+			// NOTE(bill): Add imported entities to this file's scope
+			gb_for_array(elem_index, scope->elements.entries) {
+				Entity *e = scope->elements.entries[elem_index].value;
+				// NOTE(bill): Do not add other imported entities
+				if (e->scope == scope) {
+					add_entity(c, file_scope, NULL, e);
+				}
+			}
+	#endif
+		}
+	}
 
 	auto check_global_entity = [](Checker *c, EntityKind kind) {
 		gb_for_array(i, c->info.entities.entries) {
@@ -948,6 +987,11 @@ void check_parsed_files(Checker *c) {
 			Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 			if (e->kind == kind) {
 				DeclInfo *d = entry->value;
+
+				Scope *prev_scope = c->context.scope;
+				c->context.scope = d->scope;
+				defer (c->context.scope = prev_scope);
+
 				check_entity_decl(c, e, d, NULL);
 			}
 		}
@@ -955,11 +999,11 @@ void check_parsed_files(Checker *c) {
 
 	check_global_entity(c, Entity_TypeName);
 
+#if 1
 	if (t_type_info == NULL) {
 		String type_info_str = make_string("Type_Info");
-		Entity **found = map_get(&c->global_scope->elements, hash_string(type_info_str));
-		GB_ASSERT_MSG(found != NULL, "Internal Compiler Error: Could not find type declaration for `Type_Info`");
-		Entity *e = *found;
+		Entity *e = current_scope_lookup_entity(c->global_scope, type_info_str);
+		GB_ASSERT_MSG(e != NULL, "Internal Compiler Error: Could not find type declaration for `Type_Info`");
 		t_type_info = e->type;
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
 
@@ -1011,6 +1055,7 @@ void check_parsed_files(Checker *c) {
 			add_type_and_value(&c->info, expr, info->mode, info->type, info->value);
 		}
 	}
+#endif
 }
 
 

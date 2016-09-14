@@ -1,6 +1,6 @@
-#load "runtime.odin"
-#load "win32.odin"
-#load "file.odin"
+#import "runtime.odin"
+#import "win32.odin"
+#import "file.odin"
 
 print_byte_buffer :: proc(buf: ^[]byte, b: []byte) {
 	if buf.count < buf.capacity {

@@ -1,6 +1,24 @@
 #foreign_system_library "user32"
 #foreign_system_library "gdi32"
 
+HANDLE    :: type rawptr
+HWND      :: type HANDLE
+HDC       :: type HANDLE
+HINSTANCE :: type HANDLE
+HICON     :: type HANDLE
+HCURSOR   :: type HANDLE
+HMENU     :: type HANDLE
+HBRUSH    :: type HANDLE
+WPARAM    :: type uint
+LPARAM    :: type int
+LRESULT   :: type int
+ATOM      :: type i16
+BOOL      :: type i32
+POINT     :: type struct { x, y: i32 }
+WNDPROC   :: type proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT
+
+INVALID_HANDLE_VALUE :: (-1 as int) as HANDLE
+
 CS_VREDRAW    :: 1
 CS_HREDRAW    :: 2
 CW_USEDEFAULT :: 0x80000000
@@ -22,25 +40,6 @@ PM_REMOVE :: 1
 
 COLOR_BACKGROUND :: 1 as HBRUSH
 
-
-HANDLE    :: type rawptr
-HWND      :: type HANDLE
-HDC       :: type HANDLE
-HINSTANCE :: type HANDLE
-HICON     :: type HANDLE
-HCURSOR   :: type HANDLE
-HMENU     :: type HANDLE
-HBRUSH    :: type HANDLE
-WPARAM    :: type uint
-LPARAM    :: type int
-LRESULT   :: type int
-ATOM      :: type i16
-BOOL      :: type i32
-POINT     :: type struct { x, y: i32 }
-
-INVALID_HANDLE_VALUE :: (-1 as int) as HANDLE
-
-WNDPROC :: type proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT
 
 WNDCLASSEXA :: struct #ordered {
 	size, style:           u32

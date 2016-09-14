@@ -1,4 +1,5 @@
 struct AstNode;
+struct Scope;
 
 enum ParseFileError {
 	ParseFile_None,
@@ -27,9 +28,11 @@ struct AstFile {
 	isize expr_level;
 
 	AstNodeArray decls;
+	b32 is_global_scope;
 
 	AstNode *curr_proc;
-	isize scope_level;
+	isize    scope_level;
+	Scope *  scope; // NOTE(bill): Created in checker
 
 	ErrorCollector error_collector;
 
@@ -44,7 +47,7 @@ struct AstFile {
 struct Parser {
 	String init_fullpath;
 	gbArray(AstFile) files;
-	gbArray(String) loads;
+	gbArray(String) imports;
 	gbArray(String) libraries;
 	gbArray(String) system_libraries;
 	isize load_index;
@@ -226,8 +229,12 @@ AST_NODE_KIND(_DeclBegin,      "", struct{}) \
 			u64     tags;         \
 			String  foreign_name; \
 		}) \
-	AST_NODE_KIND(TypeDecl, "type declaration", struct { Token token; AstNode *name, *type; }) \
-	AST_NODE_KIND(LoadDecl, "load declaration", struct { Token token, filepath; }) \
+	AST_NODE_KIND(TypeDecl,   "type declaration",   struct { Token token; AstNode *name, *type; }) \
+	AST_NODE_KIND(LoadDecl,   "load declaration",   struct { Token token, filepath; }) \
+	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
+		Token token, relpath; \
+		String fullpath; \
+	}) \
 	AST_NODE_KIND(ForeignSystemLibrary, "foreign system library", struct { Token token, filepath; }) \
 AST_NODE_KIND(_DeclEnd,   "", struct{}) \
 AST_NODE_KIND(_TypeBegin, "", struct{}) \
@@ -405,6 +412,8 @@ Token ast_node_token(AstNode *node) {
 		return node->TypeDecl.token;
 	case AstNode_LoadDecl:
 		return node->LoadDecl.token;
+	case AstNode_ImportDecl:
+		return node->ImportDecl.token;
 	case AstNode_ForeignSystemLibrary:
 		return node->ForeignSystemLibrary.token;
 	case AstNode_Field: {
@@ -881,6 +890,14 @@ gb_inline AstNode *make_load_decl(AstFile *f, Token token, Token filepath) {
 	AstNode *result = make_node(f, AstNode_LoadDecl);
 	result->LoadDecl.token = token;
 	result->LoadDecl.filepath = filepath;
+	return result;
+}
+
+
+gb_inline AstNode *make_import_decl(AstFile *f, Token token, Token relpath) {
+	AstNode *result = make_node(f, AstNode_ImportDecl);
+	result->ImportDecl.token = token;
+	result->ImportDecl.relpath = relpath;
 	return result;
 }
 
@@ -2527,13 +2544,26 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Hash: {
 		s = parse_tag_stmt(f, NULL);
 		String tag = s->TagStmt.name.string;
-
-		if (are_strings_equal(tag, make_string("load"))) {
+		if (are_strings_equal(tag, make_string("global_scope"))) {
+			if (f->curr_proc == NULL) {
+				f->is_global_scope = true;
+				return make_empty_stmt(f, f->cursor[0]);
+			}
+			ast_file_err(f, token, "You cannot use #global_scope within a procedure. This must be done at the file scope.");
+			return make_bad_decl(f, token, f->cursor[0]);
+		} else if (are_strings_equal(tag, make_string("load"))) {
 			Token file_path = expect_token(f, Token_String);
 			if (f->curr_proc == NULL) {
 				return make_load_decl(f, s->TagStmt.token, file_path);
 			}
 			ast_file_err(f, token, "You cannot use #load within a procedure. This must be done at the file scope.");
+			return make_bad_decl(f, token, file_path);
+		} else if (are_strings_equal(tag, make_string("import"))) {
+			Token file_path = expect_token(f, Token_String);
+			if (f->curr_proc == NULL) {
+				return make_import_decl(f, s->TagStmt.token, file_path);
+			}
+			ast_file_err(f, token, "You cannot use #import within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
 		} else if (are_strings_equal(tag, make_string("foreign_system_library"))) {
 			Token file_path = expect_token(f, Token_String);
@@ -2660,7 +2690,7 @@ void destroy_ast_file(AstFile *f) {
 
 b32 init_parser(Parser *p) {
 	gb_array_init(p->files, gb_heap_allocator());
-	gb_array_init(p->loads, gb_heap_allocator());
+	gb_array_init(p->imports, gb_heap_allocator());
 	gb_array_init(p->libraries, gb_heap_allocator());
 	gb_array_init(p->system_libraries, gb_heap_allocator());
 	return true;
@@ -2672,26 +2702,26 @@ void destroy_parser(Parser *p) {
 		destroy_ast_file(&p->files[i]);
 	}
 #if 1
-	gb_for_array(i, p->loads) {
-		// gb_free(gb_heap_allocator(), p->loads[i].text);
+	gb_for_array(i, p->imports) {
+		// gb_free(gb_heap_allocator(), p->imports[i].text);
 	}
 #endif
 	gb_array_free(p->files);
-	gb_array_free(p->loads);
+	gb_array_free(p->imports);
 	gb_array_free(p->libraries);
 	gb_array_free(p->system_libraries);
 }
 
 // NOTE(bill): Returns true if it's added
-b32 try_add_load_path(Parser *p, String import_file) {
-	gb_for_array(i, p->loads) {
-		String import = p->loads[i];
+b32 try_add_import_path(Parser *p, String import_file, AstNode *node) {
+	gb_for_array(i, p->imports) {
+		String import = p->imports[i];
 		if (are_strings_equal(import, import_file)) {
 			return false;
 		}
 	}
 
-	gb_array_append(p->loads, import_file);
+	gb_array_append(p->imports, import_file);
 	return true;
 }
 
@@ -2716,7 +2746,7 @@ gb_global Rune illegal_import_runes[] = {
 	'|', ',',  '<', '>', '?',
 };
 
-b32 is_load_path_valid(String path) {
+b32 is_import_path_valid(String path) {
 	if (path.len > 0) {
 		u8 *start = path.text;
 		u8 *end = path.text + path.len;
@@ -2770,11 +2800,10 @@ void parse_file(Parser *p, AstFile *f) {
 				auto *id = &node->LoadDecl;
 				String file_str = id->filepath.string;
 
-				if (!is_load_path_valid(file_str)) {
+				if (!is_import_path_valid(file_str)) {
 					ast_file_err(f, ast_node_token(node), "Invalid `load` path");
 					continue;
 				}
-
 
 				isize str_len = base_dir.len+file_str.len;
 				u8 *str = gb_alloc_array(gb_heap_allocator(), u8, str_len+1);
@@ -2786,14 +2815,38 @@ void parse_file(Parser *p, AstFile *f) {
 				char *path_str = gb_path_get_full_name(gb_heap_allocator(), cast(char *)str);
 				String import_file = make_string(path_str);
 
-				if (!try_add_load_path(p, import_file)) {
+				if (!try_add_import_path(p, import_file, node)) {
 					gb_free(gb_heap_allocator(), import_file.text);
+				}
+			} else if (node->kind == AstNode_ImportDecl) {
+				auto *id = &node->ImportDecl;
+				String file_str = id->relpath.string;
+
+				if (!is_import_path_valid(file_str)) {
+					ast_file_err(f, ast_node_token(node), "Invalid `load` path");
+					continue;
+				}
+
+				isize str_len = base_dir.len+file_str.len;
+				u8 *str = gb_alloc_array(gb_heap_allocator(), u8, str_len+1);
+				defer (gb_free(gb_heap_allocator(), str));
+
+				gb_memcopy(str, base_dir.text, base_dir.len);
+				gb_memcopy(str+base_dir.len, file_str.text, file_str.len);
+				str[str_len] = '\0';
+				// HACK(bill): memory leak
+				char *path_str = gb_path_get_full_name(gb_heap_allocator(), cast(char *)str);
+				String import_file = make_string(path_str);
+
+				id->fullpath = import_file;
+				if (!try_add_import_path(p, import_file, node)) {
+					// gb_free(gb_heap_allocator(), import_file.text);
 				}
 			} else if (node->kind == AstNode_ForeignSystemLibrary) {
 				auto *id = &node->ForeignSystemLibrary;
 				String file_str = id->filepath.string;
 
-				if (!is_load_path_valid(file_str)) {
+				if (!is_import_path_valid(file_str)) {
 					ast_file_err(f, ast_node_token(node), "Invalid `foreign_system_library` path");
 					continue;
 				}
@@ -2808,11 +2861,11 @@ void parse_file(Parser *p, AstFile *f) {
 ParseFileError parse_files(Parser *p, char *init_filename) {
 	char *fullpath_str = gb_path_get_full_name(gb_heap_allocator(), init_filename);
 	String init_fullpath = make_string(fullpath_str);
-	gb_array_append(p->loads, init_fullpath);
+	gb_array_append(p->imports, init_fullpath);
 	p->init_fullpath = init_fullpath;
 
-	gb_for_array(i, p->loads) {
-		String import_path = p->loads[i];
+	gb_for_array(i, p->imports) {
+		String import_path = p->imports[i];
 		AstFile file = {};
 		ParseFileError err = init_ast_file(&file, import_path);
 		if (err != ParseFile_None) {
