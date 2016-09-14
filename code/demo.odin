@@ -1,5 +1,5 @@
 #import "fmt.odin" as fmt
-#import "game.odin" as game
+// #import "game.odin" as game
 
 test_proc :: proc() {
 	fmt.println("Hello?")
@@ -7,6 +7,8 @@ test_proc :: proc() {
 
 
 main :: proc() {
+	x := 0
 	// fmt.println("% % % %", "Hellope", true, 6.28, {4}int{1, 2, 3, 4})
-	game.run()
+	fmt.println("%(%)", #file, #line)
+	// game.run()
 }

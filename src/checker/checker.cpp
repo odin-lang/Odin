@@ -402,6 +402,23 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	return NULL;
 }
 
+void check_scope_usage(Checker *c, Scope *scope) {
+	// TODO(bill): Use this?
+#if 0
+	gb_for_array(i, scope->elements.entries) {
+		auto *entry = scope->elements.entries + i;
+		Entity *e = entry->value;
+		if (e->kind == Entity_Variable && !e->Variable.used) {
+			warning(e->token, "Unused variable: %.*s", LIT(e->token.string));
+		}
+	}
+
+	for (Scope *child = scope->first_child; child != NULL; child = child->next) {
+		check_scope_usage(c, child);
+	}
+#endif
+}
+
 
 void add_dependency(DeclInfo *d, Entity *e) {
 	map_set(&d->deps, hash_pointer(e), cast(b32)true);
@@ -807,6 +824,39 @@ void check_type_name_cycles(Checker *c, CycleCheck *cc, Entity *e) {
 	// }
 }
 
+void init_type_info_types(Checker *c) {
+	if (t_type_info == NULL) {
+		String type_info_str = make_string("Type_Info");
+		Entity *e = current_scope_lookup_entity(c->global_scope, type_info_str);
+		GB_ASSERT_MSG(e != NULL, "Internal Compiler Error: Could not find type declaration for `Type_Info`");
+		t_type_info = e->type;
+		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
+
+		auto *record = &get_base_type(e->type)->Record;
+
+		t_type_info_member = record->other_fields[0]->type;
+		t_type_info_member_ptr = make_type_pointer(c->allocator, t_type_info_member);
+
+		GB_ASSERT_MSG(record->field_count == 16, "Internal Compiler Error: Invalid `Type_Info` layout");
+		t_type_info_named     = record->fields[ 1]->type;
+		t_type_info_integer   = record->fields[ 2]->type;
+		t_type_info_float     = record->fields[ 3]->type;
+		t_type_info_string    = record->fields[ 4]->type;
+		t_type_info_boolean   = record->fields[ 5]->type;
+		t_type_info_pointer   = record->fields[ 6]->type;
+		t_type_info_procedure = record->fields[ 7]->type;
+		t_type_info_array     = record->fields[ 8]->type;
+		t_type_info_slice     = record->fields[ 9]->type;
+		t_type_info_vector    = record->fields[10]->type;
+		t_type_info_tuple     = record->fields[11]->type;
+		t_type_info_struct    = record->fields[12]->type;
+		t_type_info_union     = record->fields[13]->type;
+		t_type_info_raw_union = record->fields[14]->type;
+		t_type_info_enum      = record->fields[15]->type;
+	}
+
+}
+
 
 void check_parsed_files(Checker *c) {
 
@@ -1016,37 +1066,8 @@ void check_parsed_files(Checker *c) {
 
 	check_global_entity(c, Entity_TypeName);
 
+	init_type_info_types(c);
 #if 1
-	if (t_type_info == NULL) {
-		String type_info_str = make_string("Type_Info");
-		Entity *e = current_scope_lookup_entity(c->global_scope, type_info_str);
-		GB_ASSERT_MSG(e != NULL, "Internal Compiler Error: Could not find type declaration for `Type_Info`");
-		t_type_info = e->type;
-		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
-
-		auto *record = &get_base_type(e->type)->Record;
-
-		t_type_info_member = record->other_fields[0]->type;
-		t_type_info_member_ptr = make_type_pointer(c->allocator, t_type_info_member);
-
-		GB_ASSERT_MSG(record->field_count == 16, "Internal Compiler Error: Invalid `Type_Info` layout");
-		t_type_info_named     = record->fields[ 1]->type;
-		t_type_info_integer   = record->fields[ 2]->type;
-		t_type_info_float     = record->fields[ 3]->type;
-		t_type_info_string    = record->fields[ 4]->type;
-		t_type_info_boolean   = record->fields[ 5]->type;
-		t_type_info_pointer   = record->fields[ 6]->type;
-		t_type_info_procedure = record->fields[ 7]->type;
-		t_type_info_array     = record->fields[ 8]->type;
-		t_type_info_slice     = record->fields[ 9]->type;
-		t_type_info_vector    = record->fields[10]->type;
-		t_type_info_tuple     = record->fields[11]->type;
-		t_type_info_struct    = record->fields[12]->type;
-		t_type_info_union     = record->fields[13]->type;
-		t_type_info_raw_union = record->fields[14]->type;
-		t_type_info_enum      = record->fields[15]->type;
-	}
-
 	check_global_entity(c, Entity_Constant);
 	check_global_entity(c, Entity_Procedure);
 	check_global_entity(c, Entity_Variable);

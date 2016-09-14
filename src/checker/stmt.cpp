@@ -388,6 +388,8 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	CheckerContext old_context = c->context;
 	c->context.scope = decl->scope;
 	c->context.decl = decl;
+	defer (c->context = old_context);
+
 
 	GB_ASSERT(type->kind == Type_Proc);
 	if (type->Proc.param_count > 0) {
@@ -431,7 +433,8 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	}
 	pop_procedure(c);
 
-	c->context = old_context;
+
+	check_scope_usage(c, c->context.scope);
 }
 
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
@@ -1211,6 +1214,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				Type *tag_ptr_type = make_type_pointer(c->allocator, tag_type);
 				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, ms->var->Ident, tag_ptr_type);
 				add_entity(c, c->context.scope, ms->var, tag_var);
+				add_entity_use(&c->info, ms->var, tag_var);
 			}
 			check_stmt_list(c, cc->stmts, mod_flags);
 			check_close_scope(c);

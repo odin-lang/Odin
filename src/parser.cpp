@@ -1258,6 +1258,18 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 				expect_token(f, Token_String);
 			}
 			operand = parse_operand(f, lhs);
+		} else if (are_strings_equal(name, make_string("file"))) {
+			Token token = operand->TagExpr.name;
+			token.kind = Token_String;
+			token.string = token.pos.file;
+			return make_basic_lit(f, token);
+		} else if (are_strings_equal(name, make_string("line"))) {
+			Token token = operand->TagExpr.name;
+			token.kind = Token_Integer;
+			char *str = gb_alloc_array(gb_arena_allocator(&f->arena), char, 20);
+			gb_i64_to_str(token.pos.line, str, 10);
+			token.string = make_string(str);
+			return make_basic_lit(f, token);
 		} else {
 			operand->TagExpr.expr = parse_expr(f, false);
 		}

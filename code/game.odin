@@ -46,9 +46,8 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 	w.width, w.height = msg, height
 
 	class_name   := "Win32-Odin-Window\x00"
-	c_class_name := ^class_name[0]
-	// w.c_title = to_c_string(title)
-	w.c_title = "Title\x00" as []byte
+	c_class_name := class_name.data
+	w.c_title = to_c_string(title)
 
 	instance := GetModuleHandleA(null)
 
@@ -66,7 +65,7 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 	}
 
 	w.hwnd = CreateWindowExA(0,
-	                         c_class_name, ^w.c_title[0],
+	                         c_class_name, w.c_title.data,
 	                         WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
 	                         CW_USEDEFAULT, CW_USEDEFAULT,
 	                         w.width as i32, w.height as i32,
@@ -125,6 +124,8 @@ display_window :: proc(w: ^Window) {
 
 run :: proc() {
 	using win32
+	using math
+
 	win32_proc :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #no_inline {
 		if msg == WM_DESTROY || msg == WM_CLOSE || msg == WM_QUIT {
 			ExitProcess(0)
@@ -144,7 +145,7 @@ run :: proc() {
 	prev_time := time_now()
 	running := true
 
-	pos := math.Vec2{100, 100}
+	pos := Vec2{100, 100}
 
 	for running {
 		curr_time := time_now()
@@ -166,38 +167,38 @@ run :: proc() {
 
 		{
 			SPEED :: 500
-			v: math.Vec2
+			v: Vec2
 
 			if is_key_down(Key_Code.RIGHT) { v[0] += 1 }
 			if is_key_down(Key_Code.LEFT)  { v[0] -= 1 }
 			if is_key_down(Key_Code.UP)    { v[1] += 1 }
 			if is_key_down(Key_Code.DOWN)  { v[1] -= 1 }
 
-			v = math.vec2_norm0(v)
+			v = vec2_norm0(v)
 
-			pos += v * math.Vec2{SPEED * dt}
+			pos += v * Vec2{SPEED * dt}
 		}
 
 
-		gl.clear_color(0.5, 0.7, 1.0, 1.0)
-		gl.clear(gl.COLOR_BUFFER_BIT)
+		gl.ClearColor(0.5, 0.7, 1.0, 1.0)
+		gl.Clear(gl.COLOR_BUFFER_BIT)
 
-		gl.load_identity()
-		gl.ortho(0, window.width as f64,
+		gl.LoadIdentity()
+		gl.Ortho(0, window.width as f64,
 		         0, window.height as f64, 0, 1)
 
 		draw_rect :: proc(x, y, w, h: f32) {
-			gl.begin(gl.TRIANGLES)
+			gl.Begin(gl.TRIANGLES)
 
-			gl.color3f(1, 0, 0); gl.vertex3f(x,   y,   0)
-			gl.color3f(0, 1, 0); gl.vertex3f(x+w, y,   0)
-			gl.color3f(0, 0, 1); gl.vertex3f(x+w, y+h, 0)
+			gl.Color3f(1, 0, 0); gl.Vertex3f(x,   y,   0)
+			gl.Color3f(0, 1, 0); gl.Vertex3f(x+w, y,   0)
+			gl.Color3f(0, 0, 1); gl.Vertex3f(x+w, y+h, 0)
 
-			gl.color3f(0, 0, 1); gl.vertex3f(x+w, y+h, 0)
-			gl.color3f(1, 1, 0); gl.vertex3f(x,   y+h, 0)
-			gl.color3f(1, 0, 0); gl.vertex3f(x,   y,   0)
+			gl.Color3f(0, 0, 1); gl.Vertex3f(x+w, y+h, 0)
+			gl.Color3f(1, 1, 0); gl.Vertex3f(x,   y+h, 0)
+			gl.Color3f(1, 0, 0); gl.Vertex3f(x,   y,   0)
 
-			gl.end()
+			gl.End()
 		}
 
 		draw_rect(pos[0], pos[1], 50, 50)

@@ -759,7 +759,7 @@ Selection lookup_field(Type *type_, String field_name, b32 is_type, Selection se
 			if (entity__string_data == NULL) {
 				Token token = {Token_Identifier};
 				token.string = data_str;
-				entity__string_data = make_entity_field(a, NULL, token, make_type_pointer(a, t_byte), false, 0);
+				entity__string_data = make_entity_field(a, NULL, token, make_type_pointer(a, t_u8), false, 0);
 			}
 
 			if (entity__string_count == NULL) {
