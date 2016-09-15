@@ -171,7 +171,7 @@ __string_ge :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) >
 
 
 __assert :: proc(msg: string) {
-	os.write(os.get_standard_file(os.File_Standard.ERROR), msg as []byte)
+	_ = os.write(os.get_standard_file(os.File_Standard.ERROR), msg as []byte)
 	__debug_trap()
 }
 

@@ -65,12 +65,19 @@ enum DeclKind {
 	Declaration_Count,
 };
 
-enum ProcTag {
+enum ProcTag : u64 {
 	ProcTag_bounds_check    = GB_BIT(0),
 	ProcTag_no_bounds_check = GB_BIT(1),
-	ProcTag_foreign         = GB_BIT(2),
-	ProcTag_inline          = GB_BIT(3),
-	ProcTag_no_inline       = GB_BIT(4),
+
+	ProcTag_foreign         = GB_BIT(10),
+	ProcTag_inline          = GB_BIT(11),
+	ProcTag_no_inline       = GB_BIT(12),
+	ProcTag_dll_import      = GB_BIT(13),
+	ProcTag_dll_export      = GB_BIT(14),
+
+	ProcTag_stdcall         = GB_BIT(15),
+	ProcTag_fastcall        = GB_BIT(16),
+	// ProcTag_cdecl           = GB_BIT(17),
 };
 
 enum VarDeclTag {
@@ -220,7 +227,7 @@ AST_NODE_KIND(_DeclBegin,      "", struct{}) \
 	AST_NODE_KIND(BadDecl,  "bad declaration", struct { Token begin, end; }) \
 	AST_NODE_KIND(VarDecl,  "variable declaration", struct { \
 			DeclKind kind; \
-			u32      tags; \
+			u64      tags; \
 			b32      is_using; \
 			AstNodeArray names; \
 			AstNode *type; \
@@ -1171,10 +1178,19 @@ b32 is_foreign_name_valid(String name) {
 
 void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
 	// TODO(bill): Add this to procedure literals too
+
+
+
 	while (f->cursor[0].kind == Token_Hash) {
 		AstNode *tag_expr = parse_tag_expr(f, NULL);
 		ast_node(te, TagExpr, tag_expr);
 		String tag_name = te->name.string;
+
+		#define ELSE_IF_ADD_TAG(name) \
+		else if (are_strings_equal(tag_name, make_string(#name))) { \
+			check_proc_add_tag(f, tag_expr, tags, ProcTag_##name, tag_name); \
+		}
+
 		if (are_strings_equal(tag_name, make_string("foreign"))) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_foreign, tag_name);
 			if (f->cursor[0].kind == Token_String) {
@@ -1186,19 +1202,21 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
 
 				next_token(f);
 			}
-		} else if (are_strings_equal(tag_name, make_string("bounds_check"))) {
-			check_proc_add_tag(f, tag_expr, tags, ProcTag_bounds_check, tag_name);
-		} else if (are_strings_equal(tag_name, make_string("no_bounds_check"))) {
-			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_bounds_check, tag_name);
-		} else if (are_strings_equal(tag_name, make_string("inline"))) {
-			check_proc_add_tag(f, tag_expr, tags, ProcTag_inline, tag_name);
-		} else if (are_strings_equal(tag_name, make_string("no_inline"))) {
-			check_proc_add_tag(f, tag_expr, tags, ProcTag_no_inline, tag_name);
-		// } else if (are_strings_equal(tag_name, make_string("no_context"))) {
-			// check_proc_add_tag(f, tag_expr, tags, ProcTag_no_context, tag_name);
-		} else {
+		}
+		ELSE_IF_ADD_TAG(bounds_check)
+		ELSE_IF_ADD_TAG(no_bounds_check)
+		ELSE_IF_ADD_TAG(inline)
+		ELSE_IF_ADD_TAG(no_inline)
+		ELSE_IF_ADD_TAG(dll_import)
+		ELSE_IF_ADD_TAG(dll_export)
+		ELSE_IF_ADD_TAG(stdcall)
+		ELSE_IF_ADD_TAG(fastcall)
+		// ELSE_IF_ADD_TAG(cdecl)
+		else {
 			ast_file_err(f, ast_node_token(tag_expr), "Unknown procedure tag");
 		}
+
+		#undef ELSE_IF_ADD_TAG
 	}
 
 	if ((*tags & ProcTag_inline) && (*tags & ProcTag_no_inline)) {

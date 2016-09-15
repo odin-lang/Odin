@@ -387,13 +387,22 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "%%%d = alloca ", value->id);
 		ssa_print_type(f, m->sizes, type);
 		ssa_fprintf(f, ", align %lld\n", type_align_of(m->sizes, m->allocator, type));
-		if (instr->Local.zero_initialized) {
-			ssa_fprintf(f, "\tstore ");
-			ssa_print_type(f, m->sizes, type);
-			ssa_fprintf(f, " zeroinitializer, ");
-			ssa_print_type(f, m->sizes, type);
-			ssa_fprintf(f, "* %%%d\n", value->id);
-		}
+		// if (instr->Local.zero_initialized) {
+		// 	ssa_fprintf(f, "\tstore ");
+		// 	ssa_print_type(f, m->sizes, type);
+		// 	ssa_fprintf(f, " zeroinitializer, ");
+		// 	ssa_print_type(f, m->sizes, type);
+		// 	ssa_fprintf(f, "* %%%d\n", value->id);
+		// }
+	} break;
+
+	case ssaInstr_ZeroInit: {
+		Type *type = type_deref(ssa_type(instr->ZeroInit.address));
+		ssa_fprintf(f, "\tstore ");
+		ssa_print_type(f, m->sizes, type);
+		ssa_fprintf(f, " zeroinitializer, ");
+		ssa_print_type(f, m->sizes, type);
+		ssa_fprintf(f, "* %%%d\n", instr->ZeroInit.address->id);
 	} break;
 
 	case ssaInstr_Store: {
@@ -745,8 +754,21 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 	if (proc->body == NULL) {
 		ssa_fprintf(f, "declare ");
+		if (proc->tags & ProcTag_dll_import) {
+			ssa_fprintf(f, "dllimport ");
+		}
+		if (proc->tags & ProcTag_dll_export) {
+			ssa_fprintf(f, "dllexport ");
+		}
 	} else {
 		ssa_fprintf(f, "\ndefine ");
+	}
+
+	if (proc->tags & ProcTag_stdcall) {
+		ssa_fprintf(f, "cc 64 ");
+	}
+	if (proc->tags & ProcTag_fastcall) {
+		ssa_fprintf(f, "cc 65 ");
 	}
 
 	auto *proc_type = &proc->type->Proc;
@@ -773,7 +795,9 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 				ssa_fprintf(f, ", ");
 			}
 			ssa_print_type(f, m->sizes, e->type);
-			ssa_fprintf(f, " %%%.*s", LIT(e->token.string));
+			if (proc->body != NULL) {
+				ssa_fprintf(f, " %%%.*s", LIT(e->token.string));
+			}
 		}
 	}
 
@@ -787,14 +811,20 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 			ssa_fprintf(f, "noinline ");
 		}
 
+		// if (proc->tags & ProcTag_stdcall) {
+		// 	ssa_fprintf(f, "\"cc\"=\"64\" ");
+		// }
+		// if (proc->tags & ProcTag_fastcall) {
+		// 	ssa_fprintf(f, "\"cc\"=\"65\" ");
+		// }
 
 		if (proc->tags & ProcTag_foreign) {
-			// TODO(bill): Set calling convention
 			ssa_fprintf(f, "; foreign\n");
 		}
 	}
 
 	if (proc->body != NULL) {
+		// ssa_fprintf(f, "nounwind uwtable {\n");
 		ssa_fprintf(f, "{\n");
 		gb_for_array(i, proc->blocks) {
 			ssaBlock *block = proc->blocks[i];

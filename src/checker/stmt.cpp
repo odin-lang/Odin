@@ -754,12 +754,14 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		case Addressing_Type:
 			error(&c->error_collector, ast_node_token(node), "Is not an expression");
 			break;
-		default:
-			if (kind == Expr_Stmt) {
-				return;
-			}
-			error(&c->error_collector, ast_node_token(node), "Expression is not used");
-			break;
+		case Addressing_NoValue:
+			return;
+		default: {
+			gbString expr_str = expr_to_string(operand.expr);
+			defer (gb_string_free(expr_str));
+
+			error(&c->error_collector, ast_node_token(node), "Expression is not used: `%s`", expr_str);
+		} break;
 		}
 	case_end;
 

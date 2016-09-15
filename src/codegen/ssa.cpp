@@ -65,6 +65,8 @@ struct ssaProcedure {
 	isize               scope_index;
 	gbArray(ssaDefer)   defer_stmts;
 	gbArray(ssaBlock *) blocks;
+	ssaBlock *          decl_block;
+	ssaBlock *          entry_block;
 	ssaBlock *          curr_block;
 	ssaTargetList *     target_list;
 };
@@ -78,6 +80,7 @@ struct ssaProcedure {
 	SSA_INSTR_KIND(Invalid), \
 	SSA_INSTR_KIND(Comment), \
 	SSA_INSTR_KIND(Local), \
+	SSA_INSTR_KIND(ZeroInit), \
 	SSA_INSTR_KIND(Store), \
 	SSA_INSTR_KIND(Load), \
 	SSA_INSTR_KIND(GetElementPtr), \
@@ -151,6 +154,9 @@ struct ssaInstr {
 			Type *  type;
 			b32     zero_initialized;
 		} Local;
+		struct {
+			ssaValue *address;
+		} ZeroInit;
 		struct {
 			ssaValue *address;
 			ssaValue *value;
@@ -509,6 +515,13 @@ ssaValue *ssa_make_instr_store(ssaProcedure *p, ssaValue *address, ssaValue *val
 	return v;
 }
 
+ssaValue *ssa_make_instr_zero_init(ssaProcedure *p, ssaValue *address) {
+	ssaValue *v = ssa_alloc_instr(p, ssaInstr_ZeroInit);
+	ssaInstr *i = &v->Instr;
+	i->ZeroInit.address = address;
+	return v;
+}
+
 ssaValue *ssa_make_instr_load(ssaProcedure *p, ssaValue *address) {
 	ssaValue *v = ssa_alloc_instr(p, ssaInstr_Load);
 	ssaInstr *i = &v->Instr;
@@ -743,13 +756,26 @@ ssaValue *ssa_emit_select(ssaProcedure *p, ssaValue *cond, ssaValue *t, ssaValue
 	return ssa_emit(p, ssa_make_instr_select(p, cond, t, f));
 }
 
+ssaValue *ssa_emit_zero_init(ssaProcedure *p, ssaValue *address)  {
+	return ssa_emit(p, ssa_make_instr_zero_init(p, address));
+}
+
 ssaValue *ssa_emit_comment(ssaProcedure *p, String text) {
 	return ssa_emit(p, ssa_make_instr_comment(p, text));
 }
 
 
 ssaValue *ssa_add_local(ssaProcedure *proc, Entity *e, b32 zero_initialized = true) {
-	return ssa_emit(proc, ssa_make_instr_local(proc, e, zero_initialized));
+	ssaBlock *b = proc->decl_block; // all variables must be in the first block
+	ssaValue *instr = ssa_make_instr_local(proc, e, zero_initialized);
+	instr->Instr.parent = b;
+	gb_array_append(b->instrs, instr);
+
+	if (zero_initialized) {
+		ssa_emit_zero_init(proc, instr);
+	}
+
+	return instr;
 }
 
 ssaValue *ssa_add_local_for_identifier(ssaProcedure *proc, AstNode *name, b32 zero_initialized) {
@@ -769,11 +795,11 @@ ssaValue *ssa_add_local_generated(ssaProcedure *proc, Type *type) {
 	if (proc->curr_block) {
 		scope = proc->curr_block->scope;
 	}
-	Entity *entity = make_entity_variable(proc->module->allocator,
-	                                      scope,
-	                                      empty_token,
-	                                      type);
-	return ssa_emit(proc, ssa_make_instr_local(proc, entity, true));
+	Entity *e = make_entity_variable(proc->module->allocator,
+	                                 scope,
+	                                 empty_token,
+	                                 type);
+	return ssa_add_local(proc, e, true);
 }
 
 ssaValue *ssa_add_param(ssaProcedure *proc, Entity *e) {
@@ -944,7 +970,9 @@ ssaValue *ssa_lvalue_load(ssaProcedure *proc, ssaAddr lval) {
 void ssa_begin_procedure_body(ssaProcedure *proc) {
 	gb_array_init(proc->blocks, gb_heap_allocator());
 	gb_array_init(proc->defer_stmts, gb_heap_allocator());
-	proc->curr_block = ssa_add_block(proc, proc->type_expr, make_string("entry"));
+	proc->decl_block  = ssa_add_block(proc, proc->type_expr, make_string("decls"));
+	proc->entry_block = ssa_add_block(proc, proc->type_expr, make_string("entry"));
+	proc->curr_block  = proc->entry_block;
 
 	if (proc->type->Proc.params != NULL) {
 		auto *params = &proc->type->Proc.params->Tuple;
@@ -960,6 +988,9 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 		ssa_emit_ret(proc, NULL);
 	}
 
+	proc->curr_block = proc->decl_block;
+	ssa_emit_jump(proc, proc->entry_block);
+
 
 // Number blocks and registers
 	i32 reg_id = 0;
@@ -973,6 +1004,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 			// NOTE(bill): Ignore non-returning instructions
 			switch (instr->kind) {
 			case ssaInstr_Comment:
+			case ssaInstr_ZeroInit:
 			case ssaInstr_Store:
 			case ssaInstr_Br:
 			case ssaInstr_Ret:
