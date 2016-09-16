@@ -2000,19 +2000,28 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 		Entity *e = scope_lookup_entity(c->context.scope, name);
 		add_entity_use(&c->info, op_expr, e);
 		if (e != NULL && e->kind == Entity_ImportName) {
+			String sel_name = selector->Ident.string;
 			check_op_expr = false;
-			entity = scope_lookup_entity(e->ImportName.scope, selector->Ident.string);
+			entity = scope_lookup_entity(e->ImportName.scope, sel_name);
 			if (entity == NULL) {
-				gbString sel_str = expr_to_string(selector);
-				defer (gb_string_free(sel_str));
-				error(&c->error_collector, ast_node_token(op_expr), "`%s` is not declared by `%.*s`", sel_str, LIT(name));
+				error(&c->error_collector, ast_node_token(op_expr), "`%.*s` is not declared by `%.*s`", LIT(sel_name), LIT(name));
 				goto error;
 			}
 			if (entity->type == NULL) { // Not setup yet
 				check_entity_decl(c, entity, NULL, NULL);
 			}
 			GB_ASSERT(entity->type != NULL);
-			if (!is_entity_exported(entity)) {
+			// if (!is_entity_exported(entity)) {
+			b32 is_not_exported = !((e->ImportName.scope == entity->scope) && (entity->kind != Entity_ImportName));
+
+			if (is_not_exported) {
+				auto found = map_get(&e->ImportName.scope->implicit, hash_string(sel_name));
+				if (!found) {
+					is_not_exported = false;
+				}
+			}
+
+			if (is_not_exported) {
 				gbString sel_str = expr_to_string(selector);
 				defer (gb_string_free(sel_str));
 				error(&c->error_collector, ast_node_token(op_expr), "`%s` is not exported by `%.*s`", sel_str, LIT(name));
@@ -3044,8 +3053,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 	case_ast_node(pl, ProcLit, node);
 		check_open_scope(c, pl->type);
-		c->context.decl = make_declaration_info(c->allocator, c->context.scope);
 		defer (check_close_scope(c));
+		c->context.decl = make_declaration_info(c->allocator, c->context.scope);
 		Type *proc_type = check_type(c, pl->type);
 		if (proc_type != NULL) {
 			check_proc_body(c, empty_token, c->context.decl, proc_type, pl->body);

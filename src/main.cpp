@@ -148,13 +148,13 @@ int main(int argc, char **argv) {
 	gb_for_array(i, parser.system_libraries) {
 		String lib = parser.system_libraries[i];
 		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-		                        " -l%.*s", LIT(lib));
+		                        " -l%.*s.lib", LIT(lib));
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);
 	}
 
 	exit_code = win32_exec_command_line_app(
 		"clang %.*s.bc -o %.*s.exe "
-		"-O0 "
+		"-O0 -g "
 		// "-O2 "
 		"-Wno-override-module "
 		"%s",

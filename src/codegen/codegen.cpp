@@ -150,7 +150,7 @@ void ssa_gen_tree(ssaGen *s) {
 				name = pd->foreign_name;
 			}
 
-			ssaValue *p = ssa_make_value_procedure(a, m, e->type, decl->type_expr, body, name);
+			ssaValue *p = ssa_make_value_procedure(a, m, e, e->type, decl->type_expr, body, name);
 			p->Proc.tags = pd->tags;
 
 			map_set(&m->values, hash_pointer(e), p);
@@ -169,6 +169,22 @@ void ssa_gen_tree(ssaGen *s) {
 			ssa_build_proc(v, NULL);
 	}
 
+	ssaDebugInfo *compile_unit = m->debug_info.entries[0].value;
+	GB_ASSERT(compile_unit->kind == ssaDebugInfo_CompileUnit);
+	ssaDebugInfo *all_procs = ssa_alloc_debug_info(m->allocator, ssaDebugInfo_AllProcs);
+	gb_array_init(all_procs->AllProcs.procs, gb_heap_allocator());
+	map_set(&m->debug_info, hash_pointer(all_procs), all_procs); // NOTE(bill): This doesn't need to be mapped
+	compile_unit->CompileUnit.all_procs = all_procs;
+
+
+	gb_for_array(i, m->debug_info.entries) {
+		auto *entry = &m->debug_info.entries[i];
+		ssaDebugInfo *di = entry->value;
+		di->id = i;
+		if (di->kind == ssaDebugInfo_Proc) {
+			gb_array_append(all_procs->AllProcs.procs, di);
+		}
+	}
 
 
 	{ // Startup Runtime
@@ -178,7 +194,7 @@ void ssa_gen_tree(ssaGen *s) {
 		                                 NULL, 0,
 		                                 NULL, 0, false);
 		AstNode *body = gb_alloc_item(a, AstNode);
-		ssaValue *p = ssa_make_value_procedure(a, m, proc_type, NULL, body, name);
+		ssaValue *p = ssa_make_value_procedure(a, m, NULL, proc_type, NULL, body, name);
 		Token token = {};
 		token.string = name;
 		Entity *e = make_entity_procedure(a, NULL, token, proc_type);
@@ -521,6 +537,8 @@ void ssa_gen_tree(ssaGen *s) {
 
 		ssa_end_procedure_body(proc);
 	}
+
+
 
 
 	// m->layout = make_string("e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64");

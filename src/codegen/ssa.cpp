@@ -4,19 +4,61 @@ struct ssaBlock;
 struct ssaValue;
 
 
+enum ssaDebugInfoKind {
+	ssaDebugInfo_Invalid,
+
+	ssaDebugInfo_CompileUnit,
+	ssaDebugInfo_File,
+	ssaDebugInfo_Proc,
+	ssaDebugInfo_AllProcs,
+
+	ssaDebugInfo_Count,
+};
+
+struct ssaDebugInfo {
+	ssaDebugInfoKind kind;
+	i32 id;
+
+	union {
+		struct {
+			AstFile *file;
+			String   producer;
+			ssaDebugInfo *all_procs;
+		} CompileUnit;
+		struct {
+			AstFile *file;
+			String filename;
+			String directory;
+		} File;
+		struct {
+			Entity *      entity;
+			String        name;
+			ssaDebugInfo *file;
+			TokenPos      pos;
+		} Proc;
+		struct {
+			gbArray(ssaDebugInfo *) procs;
+		} AllProcs;
+	};
+};
+
 struct ssaModule {
 	CheckerInfo * info;
 	BaseTypeSizes sizes;
 	gbArena       arena;
 	gbAllocator   allocator;
+	b32 generate_debug_info;
 
 	u32 stmt_state_flags;
 
+	// String source_filename;
 	String layout;
+	// String triple;
 
-	Map<ssaValue *> values;  // Key: Entity *
-	Map<ssaValue *> members; // Key: String
-	i32 global_string_index;
+	Map<ssaValue *>     values;     // Key: Entity *
+	Map<ssaValue *>     members;    // Key: String
+	Map<ssaDebugInfo *> debug_info; // Key: Unique pointer
+	i32                 global_string_index;
 };
 
 
@@ -55,6 +97,7 @@ struct ssaProcedure {
 	ssaProcedure *parent;
 	gbArray(ssaProcedure *) children;
 
+	Entity *      entity;
 	ssaModule *   module;
 	String        name;
 	Type *        type;
@@ -310,6 +353,12 @@ void ssa_module_add_value(ssaModule *m, Entity *e, ssaValue *v) {
 	map_set(&m->values, hash_pointer(e), v);
 }
 
+ssaDebugInfo *ssa_alloc_debug_info(gbAllocator a, ssaDebugInfoKind kind) {
+	ssaDebugInfo *di = gb_alloc_item(a, ssaDebugInfo);
+	di->kind = kind;
+	return di;
+}
+
 void ssa_init_module(ssaModule *m, Checker *c) {
 	// TODO(bill): Determine a decent size for the arena
 	isize token_count = c->parser->total_token_count;
@@ -319,8 +368,9 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 	m->info = &c->info;
 	m->sizes = c->sizes;
 
-	map_init(&m->values,  gb_heap_allocator());
-	map_init(&m->members, gb_heap_allocator());
+	map_init(&m->values,     gb_heap_allocator());
+	map_init(&m->members,    gb_heap_allocator());
+	map_init(&m->debug_info, gb_heap_allocator());
 
 	// Default states
 	m->stmt_state_flags = 0;
@@ -376,11 +426,20 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 			map_set(&m->members, hash_string(name), g);
 		}
 	}
+
+	{
+		ssaDebugInfo *di = ssa_alloc_debug_info(m->allocator, ssaDebugInfo_CompileUnit);
+		di->CompileUnit.file = m->info->files.entries[0].value; // Zeroth is the init file
+		di->CompileUnit.producer = make_string("odin");
+
+		map_set(&m->debug_info, hash_pointer(m), di);
+	}
 }
 
 void ssa_destroy_module(ssaModule *m) {
 	map_destroy(&m->values);
 	map_destroy(&m->members);
+	map_destroy(&m->debug_info);
 	gb_arena_free(&m->arena);
 }
 
@@ -443,6 +502,46 @@ Type *ssa_type(ssaValue *value) {
 		return ssa_type(&value->Instr);
 	}
 	return NULL;
+}
+
+ssaDebugInfo *ssa_add_debug_info_file(ssaProcedure *proc, AstFile *file) {
+	GB_ASSERT(file != NULL);
+	ssaDebugInfo *di = ssa_alloc_debug_info(proc->module->allocator, ssaDebugInfo_File);
+	di->File.file = file;
+
+	String filename = file->tokenizer.fullpath;
+	String directory = filename;
+	isize slash_index = 0;
+	for (isize i = filename.len-1; i >= 0; i--) {
+		if (filename.text[i] == '\\' ||
+		    filename.text[i] == '/') {
+			break;
+		}
+		slash_index = i;
+	}
+	directory.len = slash_index-1;
+	filename.text = filename.text + slash_index;
+	filename.len -= slash_index;
+
+
+	di->File.filename = filename;
+	di->File.directory = directory;
+
+	map_set(&proc->module->debug_info, hash_pointer(file), di);
+	return di;
+}
+
+
+ssaDebugInfo *ssa_add_debug_info_proc(ssaProcedure *proc, Entity *entity, String name, ssaDebugInfo *file) {
+	GB_ASSERT(entity != NULL);
+	ssaDebugInfo *di = ssa_alloc_debug_info(proc->module->allocator, ssaDebugInfo_Proc);
+	di->Proc.entity = entity;
+	di->Proc.name = name;
+	di->Proc.file = file;
+	di->Proc.pos = entity->token.pos;
+
+	map_set(&proc->module->debug_info, hash_pointer(entity), di);
+	return di;
 }
 
 
@@ -674,9 +773,10 @@ ssaValue *ssa_make_const_bool(gbAllocator a, b32 b) {
 }
 
 
-ssaValue *ssa_make_value_procedure(gbAllocator a, ssaModule *m, Type *type, AstNode *type_expr, AstNode *body, String name) {
+ssaValue *ssa_make_value_procedure(gbAllocator a, ssaModule *m, Entity *entity, Type *type, AstNode *type_expr, AstNode *body, String name) {
 	ssaValue *v = ssa_alloc_value(a, ssaValue_Proc);
 	v->Proc.module = m;
+	v->Proc.entity = entity;
 	v->Proc.type   = type;
 	v->Proc.type_expr = type_expr;
 	v->Proc.body   = body;
@@ -1919,7 +2019,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 		Type *type = type_of_expr(proc->module->info, expr);
 		ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
-		                                           proc->module, type, pl->type, pl->body, name);
+		                                           proc->module, NULL, type, pl->type, pl->body, name);
 
 		value->Proc.tags = pl->tags;
 
@@ -3053,7 +3153,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			GB_ASSERT_MSG(found != NULL, "Unable to find: %.*s", LIT(pd->name->Ident.string));
 			Entity *e = *found;
 			ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
-			                                           proc->module, e->type, pd->type, pd->body, name);
+			                                           proc->module, e, e->type, pd->type, pd->body, name);
 
 			value->Proc.tags = pd->tags;
 
@@ -3072,7 +3172,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			Entity *e = *map_get(&info->definitions, hash_pointer(pd->name));
 			Entity *f = *map_get(&info->foreign_procs, hash_string(name));
 			ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
-			                                           proc->module, e->type, pd->type, pd->body, name);
+			                                           proc->module, e, e->type, pd->type, pd->body, name);
 
 			value->Proc.tags = pd->tags;
 
@@ -3593,6 +3693,28 @@ void ssa_build_proc(ssaValue *value, ssaProcedure *parent) {
 	ssaProcedure *proc = &value->Proc;
 
 	proc->parent = parent;
+
+	if (proc->entity != NULL) {
+		ssaModule *m = proc->module;
+		CheckerInfo *info = m->info;
+		Entity *e = proc->entity;
+		String filename = e->token.pos.file;
+		AstFile **found = map_get(&info->files, hash_string(filename));
+		GB_ASSERT(found != NULL);
+		AstFile *f = *found;
+		ssaDebugInfo *di_file = NULL;
+
+
+		ssaDebugInfo **di_file_found = map_get(&m->debug_info, hash_pointer(f));
+		if (di_file_found) {
+			di_file = *di_file_found;
+			GB_ASSERT(di_file->kind == ssaDebugInfo_File);
+		} else {
+			di_file = ssa_add_debug_info_file(proc, f);
+		}
+
+		ssa_add_debug_info_proc(proc, e, proc->name, di_file);
+	}
 
 	if (proc->body != NULL) {
 		u32 prev_stmt_state_flags = proc->module->stmt_state_flags;

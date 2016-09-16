@@ -766,8 +766,7 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 
 	if (proc->tags & ProcTag_stdcall) {
 		ssa_fprintf(f, "cc 64 ");
-	}
-	if (proc->tags & ProcTag_fastcall) {
+	} else if (proc->tags & ProcTag_fastcall) {
 		ssa_fprintf(f, "cc 65 ");
 	}
 
@@ -803,28 +802,34 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 
 	ssa_fprintf(f, ") ");
 
-	if (proc->tags != 0) {
-		if (proc->tags & ProcTag_inline) {
-			ssa_fprintf(f, "alwaysinline ");
-		}
-		if (proc->tags & ProcTag_no_inline) {
-			ssa_fprintf(f, "noinline ");
-		}
+	if (proc->tags & ProcTag_inline) {
+		ssa_fprintf(f, "alwaysinline ");
+	}
+	if (proc->tags & ProcTag_no_inline) {
+		ssa_fprintf(f, "noinline ");
+	}
 
-		// if (proc->tags & ProcTag_stdcall) {
-		// 	ssa_fprintf(f, "\"cc\"=\"64\" ");
-		// }
-		// if (proc->tags & ProcTag_fastcall) {
-		// 	ssa_fprintf(f, "\"cc\"=\"65\" ");
-		// }
+	// if (proc->tags & ProcTag_stdcall) {
+	// 	ssa_fprintf(f, "\"cc\"=\"64\" ");
+	// }
+	// if (proc->tags & ProcTag_fastcall) {
+	// 	ssa_fprintf(f, "\"cc\"=\"65\" ");
+	// }
 
-		if (proc->tags & ProcTag_foreign) {
-			ssa_fprintf(f, "; foreign\n");
-		}
+	if (proc->module->generate_debug_info && proc->entity != NULL) {
+		ssaDebugInfo *di = *map_get(&proc->module->debug_info, hash_pointer(proc->entity));
+		GB_ASSERT(di->kind == ssaDebugInfo_Proc);
+			ssa_fprintf(f, "!dbg !%d ", di->id);
+	}
+
+
+	if (proc->tags & ProcTag_foreign) {
+		ssa_fprintf(f, "; foreign\n");
 	}
 
 	if (proc->body != NULL) {
 		// ssa_fprintf(f, "nounwind uwtable {\n");
+
 		ssa_fprintf(f, "{\n");
 		gb_for_array(i, proc->blocks) {
 			ssaBlock *block = proc->blocks[i];
@@ -933,5 +938,68 @@ void ssa_print_llvm_ir(ssaFileBuffer *f, ssaModule *m) {
 			ssa_fprintf(f, "zeroinitializer");
 		}
 		ssa_fprintf(f, "\n");
+	}
+
+
+	if (m->generate_debug_info) {
+		ssa_fprintf(f, "\n");
+		ssa_fprintf(f, "!llvm.dbg.cu = !{!0}\n");
+
+		gb_for_array(di_index, m->debug_info.entries) {
+			auto *entry = &m->debug_info.entries[di_index];
+			ssaDebugInfo *di = entry->value;
+			ssa_fprintf(f, "!%d = ", di->id);
+			defer (ssa_fprintf(f, "\n"));
+
+			switch (di->kind) {
+			case ssaDebugInfo_CompileUnit: {
+				auto *cu = &di->CompileUnit;
+				ssaDebugInfo *file = *map_get(&m->debug_info, hash_pointer(cu->file));
+				ssa_fprintf(f,
+				            "distinct !DICompileUnit("
+				            "language: DW_LANG_Go, " // Is this good enough?
+				            "file: !%d, "
+				            "producer: \"%.*s\", "
+				            "flags: \"\", "
+				            "runtimeVersion: 0, "
+				            "isOptimized: false, "
+				            "emissionKind: FullDebug"
+				            ")",
+				            file->id, LIT(cu->producer));
+
+			} break;
+			case ssaDebugInfo_File:
+				ssa_fprintf(f, "!DIFile(filename: \"");
+				ssa_print_escape_string(f, di->File.filename, false);
+				ssa_fprintf(f, "\", directory: \"");
+				ssa_print_escape_string(f, di->File.directory, false);
+				ssa_fprintf(f, "\")");
+				break;
+			case ssaDebugInfo_Proc:
+				ssa_fprintf(f, "distinct !DISubprogram("
+				            "name: \"%.*s\", "
+				            // "linkageName: \"\", "
+				            "file: !%d, "
+				            "line: %td, "
+				            "isDefinition: true, "
+				            "isLocal: false, "
+				            "unit: !0"
+				            ")",
+				            LIT(di->Proc.name),
+				            di->Proc.file->id,
+				            di->Proc.pos.line);
+				break;
+
+			case ssaDebugInfo_AllProcs:
+				ssa_fprintf(f, "!{");
+				gb_for_array(proc_index, di->AllProcs.procs) {
+					ssaDebugInfo *p = di->AllProcs.procs[proc_index];
+					if (proc_index > 0) {ssa_fprintf(f, ",");}
+					ssa_fprintf(f, "!%d", p->id);
+				}
+				ssa_fprintf(f, "}");
+				break;
+			}
+		}
 	}
 }

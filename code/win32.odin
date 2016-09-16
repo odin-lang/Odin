@@ -96,7 +96,7 @@ SetWindowTextA   :: proc(hwnd: HWND, c_string: ^u8) -> BOOL #foreign #dll_import
 QueryPerformanceFrequency :: proc(result: ^i64) -> i32 #foreign #dll_import
 QueryPerformanceCounter   :: proc(result: ^i64) -> i32 #foreign #dll_import
 
-Sleep :: proc(ms: i32) -> i32 #foreign
+Sleep :: proc(ms: i32) -> i32 #foreign #dll_import
 
 OutputDebugStringA :: proc(c_str: ^u8) #foreign #dll_import
 

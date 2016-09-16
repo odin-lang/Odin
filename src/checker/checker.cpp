@@ -111,6 +111,7 @@ struct Scope {
 	Scope *prev, *next;
 	Scope *first_child, *last_child;
 	Map<Entity *> elements; // Key: String
+	Map<Entity *> implicit; // Key: String
 
 	gbArray(Scope *) shared;
 	gbArray(Scope *) imported;
@@ -216,6 +217,7 @@ struct CheckerInfo {
 	Map<DeclInfo *>        entities;        // Key: Entity *
 	Map<Entity *>          foreign_procs;   // Key: String
 	Map<isize>             type_info_map;   // Key: Type *
+	Map<AstFile *>         files;           // Key: String
 	isize                  type_info_index;
 };
 
@@ -261,8 +263,10 @@ Scope *make_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
 	map_init(&s->elements,     gb_heap_allocator());
+	map_init(&s->implicit,     gb_heap_allocator());
 	gb_array_init(s->shared,   gb_heap_allocator());
 	gb_array_init(s->imported, gb_heap_allocator());
+
 	if (parent != NULL && parent != universal_scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
 	}
@@ -286,6 +290,7 @@ void destroy_scope(Scope *scope) {
 	}
 
 	map_destroy(&scope->elements);
+	map_destroy(&scope->implicit);
 	gb_array_free(scope->shared);
 	gb_array_free(scope->imported);
 
@@ -397,8 +402,9 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	if (found)
 		return *found;
 	map_set(&s->elements, key, entity);
-	if (entity->scope == NULL)
+	if (entity->scope == NULL) {
 		entity->scope = s;
+	}
 	return NULL;
 }
 
@@ -506,6 +512,7 @@ void init_checker_info(CheckerInfo *i) {
 	map_init(&i->untyped,         a);
 	map_init(&i->foreign_procs,   a);
 	map_init(&i->type_info_map,   a);
+	map_init(&i->files,           a);
 	i->type_info_index = 0;
 
 }
@@ -519,6 +526,8 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->untyped);
 	map_destroy(&i->foreign_procs);
 	map_destroy(&i->type_info_map);
+	map_destroy(&i->files);
+
 }
 
 
@@ -889,6 +898,7 @@ void check_parsed_files(Checker *c) {
 		f->scope = scope;
 		HashKey key = hash_string(f->tokenizer.fullpath);
 		map_set(&file_scopes, key, scope);
+		map_set(&c->info.files, key, f);
 	}
 
 	// Collect Entities
@@ -1032,10 +1042,17 @@ void check_parsed_files(Checker *c) {
 				// NOTE(bill): Add imported entities to this file's scope
 				gb_for_array(elem_index, scope->elements.entries) {
 					Entity *e = scope->elements.entries[elem_index].value;
+					if (e->scope == file_scope) {
+						continue;
+					}
 					// NOTE(bill): Do not add other imported entities
-					if (e->scope == scope && e->kind != Entity_ImportName) {
+					if (e->kind != Entity_ImportName) {
 						if (is_entity_exported(e)) {
 							add_entity(c, file_scope, NULL, e);
+							if (!id->is_load) {
+								HashKey key = hash_string(e->token.string);
+								map_set(&file_scope->implicit, key, e);
+							}
 						}
 					}
 				}

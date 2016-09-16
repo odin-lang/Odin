@@ -246,6 +246,7 @@ AST_NODE_KIND(_DeclBegin,      "", struct{}) \
 		Token token, relpath; \
 		String fullpath;      \
 		Token import_name;    \
+		b32 is_load;          \
 	}) \
 	AST_NODE_KIND(ForeignSystemLibrary, "foreign system library", struct { Token token, filepath; }) \
 AST_NODE_KIND(_DeclEnd,   "", struct{}) \
@@ -896,11 +897,12 @@ gb_inline AstNode *make_type_decl(AstFile *f, Token token, AstNode *name, AstNod
 	return result;
 }
 
-gb_inline AstNode *make_import_decl(AstFile *f, Token token, Token relpath, Token import_name) {
+gb_inline AstNode *make_import_decl(AstFile *f, Token token, Token relpath, Token import_name, b32 is_load) {
 	AstNode *result = make_node(f, AstNode_ImportDecl);
 	result->ImportDecl.token = token;
 	result->ImportDecl.relpath = relpath;
 	result->ImportDecl.import_name = import_name;
+	result->ImportDecl.is_load = is_load;
 	return result;
 }
 
@@ -2585,9 +2587,20 @@ AstNode *parse_stmt(AstFile *f) {
 			import_name = expect_token(f, Token_Identifier);
 
 			if (f->curr_proc == NULL) {
-				return make_import_decl(f, s->TagStmt.token, file_path, import_name);
+				return make_import_decl(f, s->TagStmt.token, file_path, import_name, false);
 			}
 			ast_file_err(f, token, "You cannot use #import within a procedure. This must be done at the file scope.");
+			return make_bad_decl(f, token, file_path);
+		} else if (are_strings_equal(tag, make_string("load"))) {
+			// TODO(bill): better error messages
+			Token file_path = expect_token(f, Token_String);
+			Token import_name = file_path;
+			import_name.string = make_string("_");
+
+			if (f->curr_proc == NULL) {
+				return make_import_decl(f, s->TagStmt.token, file_path, import_name, true);
+			}
+			ast_file_err(f, token, "You cannot use #load within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
 		} else if (are_strings_equal(tag, make_string("foreign_system_library"))) {
 			Token file_path = expect_token(f, Token_String);
