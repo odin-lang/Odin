@@ -2535,6 +2535,23 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		}
 
 		Entity *e = entity_of_ident(proc->module->info, expr);
+
+		if (e->kind == Entity_Constant) {
+			if (get_base_type(e->type) == t_string) {
+				// HACK TODO(bill): This is lazy but it works
+				String str = e->Constant.value.value_string;
+				ssaValue *global_array = ssa_add_global_string_array(proc->module, str);
+				ssaValue *elem = ssa_array_elem(proc, global_array);
+				ssaValue *len =  ssa_make_const_int(proc->module->allocator, str.len);
+				ssaValue *v = ssa_add_local_generated(proc, e->type);
+				ssaValue *str_elem = ssa_emit_struct_gep(proc, v, v_zero32, ssa_type(elem));
+				ssaValue *str_len = ssa_emit_struct_gep(proc, v, v_one32, t_int);
+				ssa_emit_store(proc, str_elem, elem);
+				ssa_emit_store(proc, str_len, len);
+				return ssa_make_addr(v, expr);
+			}
+		}
+
 		ssaValue *v = NULL;
 		ssaValue **found = map_get(&proc->module->values, hash_pointer(e));
 		if (found) {
@@ -2555,20 +2572,35 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 	case_ast_node(se, SelectorExpr, expr);
 		ssa_emit_comment(proc, make_string("SelectorExpr"));
-		Type *type = get_base_type(type_of_expr(proc->module->info, se->expr));
 		String selector = unparen_expr(se->selector)->Ident.string;
+		Type *type = get_base_type(type_of_expr(proc->module->info, se->expr));
+
+
 		if (type == t_invalid) {
+			// Imports
 			Entity *imp = entity_of_ident(proc->module->info, se->expr);
-			GB_ASSERT(imp->kind == Entity_ImportName);
-			// Entity *e = scope_lookup_entity(e->ImportName.scope, selector);
+			if (imp != NULL) {
+				GB_ASSERT(imp->kind == Entity_ImportName);
+			}
 			return ssa_build_addr(proc, unparen_expr(se->selector));
-		} else {
+		} /* else if (type == t_string) {
 			Selection sel = lookup_field(type, selector, false);
 			GB_ASSERT(sel.entity != NULL);
 
-			ssaValue *e = ssa_build_addr(proc, se->expr).addr;
-			e = ssa_emit_deep_field_gep(proc, type, e, sel);
-			return ssa_make_addr(e, expr);
+			// NOTE(bill): This could a constant and the only non constant
+			// selector is the `.data`, so build the expression instead
+			ssaValue *e = ssa_build_expr(proc, se->expr);
+			ssaValue *a = ssa_build_addr(proc, se->expr).addr;
+
+			a = ssa_emit_deep_field_gep(proc, type, a, sel);
+			return ssa_make_addr(a, expr);
+		}  */else {
+			Selection sel = lookup_field(type, selector, false);
+			GB_ASSERT(sel.entity != NULL);
+
+			ssaValue *a = ssa_build_addr(proc, se->expr).addr;
+			a = ssa_emit_deep_field_gep(proc, type, a, sel);
+			return ssa_make_addr(a, expr);
 		}
 	case_end;
 

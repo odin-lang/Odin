@@ -45,6 +45,7 @@ struct AstFile {
 
 struct ImportedFile {
 	String path;
+	String rel_path;
 	TokenPos pos; // #import
 };
 
@@ -2736,7 +2737,7 @@ void destroy_parser(Parser *p) {
 }
 
 // NOTE(bill): Returns true if it's added
-b32 try_add_import_path(Parser *p, String path, TokenPos pos) {
+b32 try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
 	gb_for_array(i, p->imports) {
 		String import = p->imports[i].path;
 		if (are_strings_equal(import, path)) {
@@ -2746,6 +2747,7 @@ b32 try_add_import_path(Parser *p, String path, TokenPos pos) {
 
 	ImportedFile item;
 	item.path = path;
+	item.rel_path = rel_path;
 	item.pos = pos;
 	gb_array_append(p->imports, item);
 	return true;
@@ -2807,8 +2809,10 @@ void parse_file(Parser *p, AstFile *f) {
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = filepath;
 	for (isize i = filepath.len-1; i >= 0; i--) {
-		if (base_dir.text[i] == GB_PATH_SEPARATOR)
+		if (base_dir.text[i] == '\\' ||
+		    base_dir.text[i] == '/') {
 			break;
+		}
 		base_dir.len--;
 	}
 
@@ -2843,7 +2847,7 @@ void parse_file(Parser *p, AstFile *f) {
 				String import_file = make_string(path_str);
 
 				id->fullpath = import_file;
-				if (!try_add_import_path(p, import_file, ast_node_token(node).pos)) {
+				if (!try_add_import_path(p, import_file, file_str, ast_node_token(node).pos)) {
 					// gb_free(gb_heap_allocator(), import_file.text);
 				}
 			} else if (node->kind == AstNode_ForeignSystemLibrary) {
@@ -2866,15 +2870,40 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 	char *fullpath_str = gb_path_get_full_name(gb_heap_allocator(), init_filename);
 	String init_fullpath = make_string(fullpath_str);
 	TokenPos init_pos = {};
-	ImportedFile init_imported_file = {init_fullpath, init_pos};
+	ImportedFile init_imported_file = {init_fullpath, init_fullpath, init_pos};
 	gb_array_append(p->imports, init_imported_file);
 	p->init_fullpath = init_fullpath;
 
+	// {
+	// 	// IMPORTANT TODO(bill): Don't embed this, do it relative to the .exe
+	// 	char *path = gb_path_get_full_name(gb_heap_allocator(), "W:/Odin/core/__runtime.odin");
+	// 	String s = make_string(path);
+	// 	ImportedFile runtime_file = {s, s, init_pos};
+	// 	gb_array_append(p->imports, runtime_file);
+	// }
+
 	gb_for_array(i, p->imports) {
 		String import_path = p->imports[i].path;
+		String import_rel_path = p->imports[i].rel_path;
 		TokenPos pos = p->imports[i].pos;
 		AstFile file = {};
 		ParseFileError err = init_ast_file(&file, import_path);
+
+		// if (err == ParseFile_NotFound) {
+		// 	// HACK(bill): Check core directory
+		// 	char buf[300] = {};
+		// 	char core[] = "W:/Odin/core/";
+		// 	isize len = gb_size_of(core)-1;
+		// 	gb_memcopy(buf, core, len);
+		// 	gb_memcopy(buf+len, import_rel_path.text, import_rel_path.len);
+		// 	char *path = gb_path_get_full_name(gb_heap_allocator(), buf);
+		// 	gb_printf_err("%s\n", path);
+
+		// 	import_path = make_string(path);
+		// 	err = init_ast_file(&file, import_path);
+		// 	p->imports[i].path = import_path;
+		// }
+
 		if (err != ParseFile_None) {
 			if (pos.line != 0) {
 				gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);

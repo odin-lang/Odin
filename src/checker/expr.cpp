@@ -835,27 +835,28 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 }
 
 i64 check_array_count(Checker *c, AstNode *e) {
-	if (e) {
-		Operand o = {};
-		check_expr(c, &o, e);
-		if (o.mode != Addressing_Constant) {
-			if (o.mode != Addressing_Invalid) {
-				error(&c->error_collector, ast_node_token(e), "Array count must be a constant");
-			}
+	if (e == NULL) {
+		return 0;
+	}
+	Operand o = {};
+	check_expr(c, &o, e);
+	if (o.mode != Addressing_Constant) {
+		if (o.mode != Addressing_Invalid) {
+			error(&c->error_collector, ast_node_token(e), "Array count must be a constant");
+		}
+		return 0;
+	}
+	if (is_type_untyped(o.type) || is_type_integer(o.type)) {
+		if (o.value.kind == ExactValue_Integer) {
+			i64 count = o.value.value_integer;
+			if (count >= 0)
+				return count;
+			error(&c->error_collector, ast_node_token(e), "Invalid array count");
 			return 0;
 		}
-		if (is_type_untyped(o.type) || is_type_integer(o.type)) {
-			if (o.value.kind == ExactValue_Integer) {
-				i64 count = o.value.value_integer;
-				if (count >= 0)
-					return count;
-				error(&c->error_collector, ast_node_token(e), "Invalid array count");
-				return 0;
-			}
-		}
-
-		error(&c->error_collector, ast_node_token(e), "Array count must be an integer");
 	}
+
+	error(&c->error_collector, ast_node_token(e), "Array count must be an integer");
 	return 0;
 }
 
@@ -2001,17 +2002,24 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 		if (e != NULL && e->kind == Entity_ImportName) {
 			check_op_expr = false;
 			entity = scope_lookup_entity(e->ImportName.scope, selector->Ident.string);
-			add_entity_use(&c->info, selector, entity);
 			if (entity == NULL) {
 				gbString sel_str = expr_to_string(selector);
 				defer (gb_string_free(sel_str));
-				error(&c->error_collector, ast_node_token(op_expr), "`%s` is not declared in `%.*s`", sel_str, LIT(name));
+				error(&c->error_collector, ast_node_token(op_expr), "`%s` is not declared by `%.*s`", sel_str, LIT(name));
 				goto error;
 			}
 			if (entity->type == NULL) { // Not setup yet
 				check_entity_decl(c, entity, NULL, NULL);
 			}
 			GB_ASSERT(entity->type != NULL);
+			if (!is_entity_exported(entity)) {
+				gbString sel_str = expr_to_string(selector);
+				defer (gb_string_free(sel_str));
+				error(&c->error_collector, ast_node_token(op_expr), "`%s` is not exported by `%.*s`", sel_str, LIT(name));
+				// NOTE(bill): Not really an error so don't goto error
+			}
+
+			add_entity_use(&c->info, selector, entity);
 		}
 	}
 	if (check_op_expr) {

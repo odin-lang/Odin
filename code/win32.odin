@@ -83,14 +83,15 @@ RECT :: struct #ordered {
 }
 
 
-GetLastError     :: proc() -> i32                       #foreign #dll_import
-ExitProcess      :: proc(exit_code: u32)                #foreign #dll_import
-GetDesktopWindow :: proc() -> HWND                      #foreign #dll_import
-GetCursorPos     :: proc(p: ^POINT) -> i32              #foreign #dll_import
-ScreenToClient   :: proc(h: HWND, p: ^POINT) -> i32     #foreign #dll_import
-GetModuleHandleA :: proc(module_name: ^u8) -> HINSTANCE #foreign #dll_import
-GetStockObject   :: proc(fn_object: i32) -> HGDIOBJ     #foreign #dll_import
-PostQuitMessage  :: proc(exit_code: i32)                #foreign #dll_import
+GetLastError     :: proc() -> i32                           #foreign #dll_import
+ExitProcess      :: proc(exit_code: u32)                    #foreign #dll_import
+GetDesktopWindow :: proc() -> HWND                          #foreign #dll_import
+GetCursorPos     :: proc(p: ^POINT) -> i32                  #foreign #dll_import
+ScreenToClient   :: proc(h: HWND, p: ^POINT) -> i32         #foreign #dll_import
+GetModuleHandleA :: proc(module_name: ^u8) -> HINSTANCE     #foreign #dll_import
+GetStockObject   :: proc(fn_object: i32) -> HGDIOBJ         #foreign #dll_import
+PostQuitMessage  :: proc(exit_code: i32)                    #foreign #dll_import
+SetWindowTextA   :: proc(hwnd: HWND, c_string: ^u8) -> BOOL #foreign #dll_import
 
 QueryPerformanceFrequency :: proc(result: ^i64) -> i32 #foreign #dll_import
 QueryPerformanceCounter   :: proc(result: ^i64) -> i32 #foreign #dll_import
@@ -122,7 +123,7 @@ AdjustWindowRect :: proc(rect: ^RECT, style: u32, menu: BOOL) -> BOOL #foreign #
 
 GetQueryPerformanceFrequency :: proc() -> i64 {
 	r: i64
-	_ = QueryPerformanceFrequency(^r)
+	QueryPerformanceFrequency(^r)
 	return r
 }
 
@@ -287,6 +288,7 @@ wglDeleteContext  :: proc(hglrc: HGLRC) -> BOOL #foreign #dll_import
 
 
 
+GetKeyState      :: proc(v_key: i32) -> i16 #foreign #dll_import
 GetAsyncKeyState :: proc(v_key: i32) -> i16 #foreign #dll_import
 
 is_key_down :: proc(key: Key_Code) -> bool {

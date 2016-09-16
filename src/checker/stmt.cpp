@@ -8,6 +8,7 @@ enum StmtFlag : u32 {
 
 
 void check_stmt(Checker *c, AstNode *node, u32 flags);
+void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later);
 
 void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 	b32 ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
@@ -437,6 +438,44 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	check_scope_usage(c, c->context.scope);
 }
 
+b32 are_signatures_similar_enough(Type *a_, Type *b_) {
+	GB_ASSERT(a_->kind == Type_Proc);
+	GB_ASSERT(b_->kind == Type_Proc);
+	auto *a = &a_->Proc;
+	auto *b = &b_->Proc;
+
+	if (a->param_count != b->param_count) {
+		return false;
+	}
+	if (a->result_count != b->result_count) {
+		return false;
+	}
+	for (isize i = 0; i < a->param_count; i++) {
+		Type *x = get_base_type(a->params->Tuple.variables[i]->type);
+		Type *y = get_base_type(b->params->Tuple.variables[i]->type);
+		if (is_type_pointer(x) && is_type_pointer(y)) {
+			continue;
+		}
+
+		if (!are_types_identical(x, y)) {
+			return false;
+		}
+	}
+	for (isize i = 0; i < a->result_count; i++) {
+		Type *x = get_base_type(a->results->Tuple.variables[i]->type);
+		Type *y = get_base_type(b->results->Tuple.variables[i]->type);
+		if (is_type_pointer(x) && is_type_pointer(y)) {
+			continue;
+		}
+
+		if (!are_types_identical(x, y)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 	GB_ASSERT(e->type == NULL);
 
@@ -446,13 +485,6 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 	check_open_scope(c, pd->type);
 	defer (check_close_scope(c));
 	check_procedure_type(c, proc_type, pd->type);
-	// add_proc_entity(c, d->scope, pd->name, e);
-	if (d->scope->is_proc) {
-		// Nested procedures
-		add_entity(c, d->scope->parent, pd->name, e);
-	}
-
-
 
 
 	b32 is_foreign   = (pd->tags & ProcTag_foreign)   != 0;
@@ -460,8 +492,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 	b32 is_no_inline = (pd->tags & ProcTag_no_inline) != 0;
 
 
-
-	if (d->scope == c->global_scope &&
+	if ((d->scope->is_file || d->scope->is_global) &&
 	    are_strings_equal(e->token.string, make_string("main"))) {
 		if (proc_type != NULL) {
 			auto *pt = &proc_type->Proc;
@@ -511,7 +542,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 			TokenPos pos = f->token.pos;
 			Type *this_type = get_base_type(e->type);
 			Type *other_type = get_base_type(f->type);
-			if (!are_types_identical(this_type, other_type)) {
+			if (!are_signatures_similar_enough(this_type, other_type)) {
 				error(&c->error_collector, ast_node_token(d->proc_decl),
 				      "Redeclaration of #foreign procedure `%.*s` with different type signatures\n"
 				      "\tat %.*s(%td:%td)",
@@ -577,7 +608,10 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 		}
 	}
 
-	c->context.decl = d;
+	// c->context.decl = d;
+	// Scope *prev = c->context.scope;
+	// c->context.scope = d->scope;
+	// defer (c->context.scope = prev);
 
 	if (e->kind == Entity_Procedure) {
 		check_proc_decl(c, e, d, true);
@@ -759,6 +793,12 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		default: {
 			gbString expr_str = expr_to_string(operand.expr);
 			defer (gb_string_free(expr_str));
+			if (kind == Expr_Stmt) {
+				return;
+			}
+			if (operand.expr->kind == AstNode_CallExpr) {
+				return;
+			}
 
 			error(&c->error_collector, ast_node_token(node), "Expression is not used: `%s`", expr_str);
 		} break;

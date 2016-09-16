@@ -1034,7 +1034,9 @@ void check_parsed_files(Checker *c) {
 					Entity *e = scope->elements.entries[elem_index].value;
 					// NOTE(bill): Do not add other imported entities
 					if (e->scope == scope && e->kind != Entity_ImportName) {
-						add_entity(c, file_scope, NULL, e);
+						if (is_entity_exported(e)) {
+							add_entity(c, file_scope, NULL, e);
+						}
 					}
 				}
 			} else {

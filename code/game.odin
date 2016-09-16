@@ -10,7 +10,7 @@ time_now :: proc() -> f64 {
 	assert(win32_perf_count_freq != 0)
 
 	counter: i64
-	_ = win32.QueryPerformanceCounter(^counter)
+	win32.QueryPerformanceCounter(^counter)
 	result := counter as f64 / win32_perf_count_freq as f64
 	return result
 }
@@ -24,7 +24,7 @@ win32_print_last_error :: proc() {
 // Yuk!
 to_c_string :: proc(s: string) -> []u8 {
 	c_str := new_slice(u8, s.count+1)
-	_ = copy(c_str, s as []byte)
+	copy(c_str, s as []byte)
 	c_str[s.count] = 0
 	return c_str
 }
@@ -157,8 +157,8 @@ run :: proc() {
 			if msg.message == WM_QUIT {
 				running = false
 			}
-			_ = TranslateMessage(^msg)
-			_ = DispatchMessageA(^msg)
+			TranslateMessage(^msg)
+			DispatchMessageA(^msg)
 		}
 
 		if is_key_down(Key_Code.ESCAPE) {

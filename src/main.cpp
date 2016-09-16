@@ -128,10 +128,10 @@ int main(int argc, char **argv) {
 	exit_code = win32_exec_command_line_app(
 		// "../misc/llvm-bin/opt %s -o %.*s.bc "
 		"opt %s -o %.*s.bc "
-		// "-memcpyopt "
-		// "-mem2reg "
-		// "-die -dse "
-		// "-dce "
+		"-memcpyopt "
+		"-mem2reg "
+		"-die -dse "
+		"-dce "
 		// "-S "
 		// "-debug-pass=Arguments "
 		"",

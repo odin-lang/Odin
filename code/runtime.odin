@@ -1,10 +1,5 @@
 #shared_global_scope
 
-// TODO(bill): Create a standard library "location" so I don't have to manually import "runtime.odin"
-#import "win32.odin" as win32
-#import "os.odin"    as os
-#import "fmt.odin"   as fmt
-
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
 Type_Info :: union {
@@ -80,20 +75,22 @@ byte_swap16 :: proc(b: u16) -> u16 #foreign "llvm.bswap.i16"
 byte_swap32 :: proc(b: u32) -> u32 #foreign "llvm.bswap.i32"
 byte_swap64 :: proc(b: u64) -> u64 #foreign "llvm.bswap.i64"
 
-fmuladd_f32 :: proc(a, b, c: f32) -> f32 #foreign "llvm.fmuladd.f32"
-fmuladd_f64 :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
+fmuladd32 :: proc(a, b, c: f32) -> f32 #foreign "llvm.fmuladd.f32"
+fmuladd64 :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
 
-heap_alloc   :: proc(len: int) -> rawptr {
-	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, len)
+heap_alloc :: proc(len: int) -> rawptr {
+	c_malloc :: proc(len: int) -> rawptr #foreign "malloc"
+	return c_malloc(len)
 }
 
 heap_free :: proc(ptr: rawptr) {
-	_ = win32.HeapFree(win32.GetProcessHeap(), 0, ptr)
+	c_free :: proc(ptr: rawptr) #foreign "free"
+	c_free(ptr)
 }
 
 current_thread_id :: proc() -> int {
-	id := win32.GetCurrentThreadId()
-	return id as int
+	GetCurrentThreadId :: proc() -> u32 #foreign #dll_import
+	return GetCurrentThreadId() as int
 }
 
 memory_zero :: proc(data: rawptr, len: int) {
@@ -168,10 +165,16 @@ __string_gt :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) >
 __string_le :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) <= 0 }
 __string_ge :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) >= 0 }
 
+__print_err_str :: proc(s: string) {
 
+}
+__print_err_int :: proc(i: int) {
+
+}
 
 __assert :: proc(msg: string) {
-	_ = os.write(os.get_standard_file(os.File_Standard.ERROR), msg as []byte)
+	// TODO(bill): Write message
+	__print_err_str(msg)
 	__debug_trap()
 }
 
@@ -180,9 +183,10 @@ __bounds_check_error :: proc(file: string, line, column: int,
 	if 0 <= index && index < count {
 		return
 	}
+	// TODO(bill): Write message
 	// TODO(bill): Probably reduce the need for `print` in the runtime if possible
-	fmt.println_err("%(%:%) Index % is out of bounds range [0, %)",
-	                file, line, column, index, count)
+	// fmt.println_err("%(%:%) Index % is out of bounds range [0, %)",
+	//                 file, line, column, index, count)
 	__debug_trap()
 }
 
@@ -191,8 +195,9 @@ __slice_expr_error :: proc(file: string, line, column: int,
 	if 0 <= low && low <= high && high <= max {
 		return
 	}
-	fmt.println_err("%(%:%) Invalid slice indices: [%:%:%]",
-	                file, line, column, low, high, max)
+	// TODO(bill): Write message
+	// fmt.println_err("%(%:%) Invalid slice indices: [%:%:%]",
+	//                 file, line, column, low, high, max)
 	__debug_trap()
 }
 __substring_expr_error :: proc(file: string, line, column: int,
@@ -200,8 +205,9 @@ __substring_expr_error :: proc(file: string, line, column: int,
 	if 0 <= low && low <= high {
 		return
 	}
-	fmt.println_err("%(%:%) Invalid substring indices: [%:%:%]",
-	                file, line, column, low, high)
+	// TODO(bill): Write message
+	// fmt.println_err("%(%:%) Invalid substring indices: [%:%:%]",
+	//                 file, line, column, low, high)
 	__debug_trap()
 }
 

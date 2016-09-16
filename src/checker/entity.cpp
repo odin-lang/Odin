@@ -51,7 +51,7 @@ struct Entity {
 			b8  is_field;    // Is struct field
 		} Variable;
 		struct {
-			struct DeclInfo *decl; // Usually NULL
+			// struct DeclInfo *decl; // Usually NULL
 		} TypeName;
 		struct {
 			b8 pure;
@@ -65,6 +65,15 @@ struct Entity {
 		} ImportName;
 	};
 };
+
+b32 is_entity_exported(Entity *e) {
+	// TODO(bill): Do I really want non-exported entities?
+	// if (e->token.string.len >= 1 &&
+	    // e->token.string.text[0] == '_') {
+		// return false;
+	// }
+	return true;
+}
 
 gb_global gbAtomic64 entity_guid_counter = {0};
 

@@ -1,16 +1,28 @@
-#import "runtime.odin" as _
-#import "punity.odin" as punity
+#import "punity.odin" as pn
+#import "fmt.odin" as fmt
 
+test :: proc() {
+	thing :: proc() {
+		thing :: proc() {
+			fmt.println("Hello1")
+		}
 
+		fmt.println("Hello")
+	}
+}
 
 main :: proc() {
-	init :: proc() {
+	test()
+
+	init :: proc(c: ^pn.Core) {
 
 	}
 
-	step :: proc() {
-
+	step :: proc(c: ^pn.Core) {
+		if pn.key_down(pn.Key.ESCAPE) {
+			c.running = false
+		}
 	}
 
-	punity.run(init, step)
+	pn.run(init, step)
 }
