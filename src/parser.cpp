@@ -2741,6 +2741,45 @@ b32 try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
 	return true;
 }
 
+String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
+	isize str_len = base_dir.len+path.len;
+	u8 *str = gb_alloc_array(gb_heap_allocator(), u8, str_len+1);
+	defer (gb_free(gb_heap_allocator(), str));
+
+	gb_memcopy(str, base_dir.text, base_dir.len);
+	gb_memcopy(str+base_dir.len, path.text, path.len);
+	str[str_len] = '\0';
+	// HACK(bill): memory leak
+	char *path_str = gb_path_get_full_name(a, cast(char *)str);
+	return make_string(path_str);
+}
+
+String get_fullpath_core(gbAllocator a, String path) {
+	char buf[300] = {};
+	u32 buf_len = GetModuleFileNameA(GetModuleHandleA(NULL), buf, gb_size_of(buf));
+	for (isize i = buf_len-1; i >= 0; i--) {
+		if (buf[i] == '\\' ||
+		    buf[i] == '/') {
+			break;
+		}
+		buf_len--;
+	}
+
+	char core[] = "core/";
+	isize core_len = gb_size_of(core)-1;
+
+	isize str_len = buf_len + core_len + path.len;
+	u8 *str = gb_alloc_array(gb_heap_allocator(), u8, str_len+1);
+	defer (gb_free(gb_heap_allocator(), str));
+
+	gb_memcopy(str, buf, buf_len);
+	gb_memcopy(str+buf_len, core, core_len);
+	gb_memcopy(str+buf_len+core_len, path.text, path.len);
+	str[str_len] = '\0';
+	// HACK(bill): memory leak
+	char *path_str = gb_path_get_full_name(a, cast(char *)str);
+	return make_string(path_str);}
+
 // NOTE(bill): Returns true if it's added
 b32 try_add_foreign_system_library_path(Parser *p, String import_file) {
 	gb_for_array(i, p->system_libraries) {
@@ -2803,6 +2842,7 @@ void parse_file(Parser *p, AstFile *f) {
 		}
 		base_dir.len--;
 	}
+	gbAllocator allocator = gb_heap_allocator(); // TODO(bill): Change this allocator
 
 	f->decls = parse_stmt_list(f);
 
@@ -2819,25 +2859,27 @@ void parse_file(Parser *p, AstFile *f) {
 				String file_str = id->relpath.string;
 
 				if (!is_import_path_valid(file_str)) {
-					syntax_error(ast_node_token(node), "Invalid `load` path");
+					if (id->is_load) {
+						syntax_error(ast_node_token(node), "Invalid #load path");
+					} else {
+						syntax_error(ast_node_token(node), "Invalid #import path");
+					}
 					continue;
 				}
 
-				isize str_len = base_dir.len+file_str.len;
-				u8 *str = gb_alloc_array(gb_heap_allocator(), u8, str_len+1);
-				defer (gb_free(gb_heap_allocator(), str));
-
-				gb_memcopy(str, base_dir.text, base_dir.len);
-				gb_memcopy(str+base_dir.len, file_str.text, file_str.len);
-				str[str_len] = '\0';
-				// HACK(bill): memory leak
-				char *path_str = gb_path_get_full_name(gb_heap_allocator(), cast(char *)str);
-				String import_file = make_string(path_str);
+				String import_file = {};
+				String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
+				import_file = rel_path;
+				if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
+					String abs_path = get_fullpath_core(allocator, file_str);
+					if (gb_file_exists(cast(char *)abs_path.text)) {
+						import_file = abs_path;
+					}
+				}
 
 				id->fullpath = import_file;
-				if (!try_add_import_path(p, import_file, file_str, ast_node_token(node).pos)) {
-					// gb_free(gb_heap_allocator(), import_file.text);
-				}
+				try_add_import_path(p, import_file, file_str, ast_node_token(node).pos);
+
 			} else if (node->kind == AstNode_ForeignSystemLibrary) {
 				auto *id = &node->ForeignSystemLibrary;
 				String file_str = id->filepath.string;
@@ -2862,13 +2904,11 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 	gb_array_append(p->imports, init_imported_file);
 	p->init_fullpath = init_fullpath;
 
-	// {
-	// 	// IMPORTANT TODO(bill): Don't embed this, do it relative to the .exe
-	// 	char *path = gb_path_get_full_name(gb_heap_allocator(), "W:/Odin/core/__runtime.odin");
-	// 	String s = make_string(path);
-	// 	ImportedFile runtime_file = {s, s, init_pos};
-	// 	gb_array_append(p->imports, runtime_file);
-	// }
+	{
+		String s = get_fullpath_core(gb_heap_allocator(), make_string("runtime.odin"));
+		ImportedFile runtime_file = {s, s, init_pos};
+		gb_array_append(p->imports, runtime_file);
+	}
 
 	gb_for_array(i, p->imports) {
 		String import_path = p->imports[i].path;

@@ -31,32 +31,32 @@ set linker_flags= -incremental:no -opt:ref -subsystem:console
 
 if %release_mode% EQU 0 ( rem Debug
 	set linker_flags=%linker_flags% -debug
-	set libs=%libs% ..\src\utf8proc\utf8proc_debug.lib
+	set libs=%libs% src\utf8proc\utf8proc_debug.lib
 ) else ( rem Release
 	set linker_flags=%linker_flags%
-	set libs=%libs% ..\src\utf8proc\utf8proc.lib
+	set libs=%libs% src\utf8proc\utf8proc.lib
 )
 
 set compiler_settings=%compiler_includes% %compiler_flags% %compiler_warnings%
 set linker_settings=%libs% %linker_flags%
 
 
-set build_dir= "bin\"
-if not exist %build_dir% mkdir %build_dir%
-pushd %build_dir%
+rem set build_dir= "\"
+rem if not exist %build_dir% mkdir %build_dir%
+rem pushd %build_dir%
 	del *.pdb > NUL 2> NUL
 	del *.ilk > NUL 2> NUL
 
 	del ..\misc\*.pdb > NUL 2> NUL
 	del ..\misc\*.ilk > NUL 2> NUL
 
-	cl %compiler_settings% "..\src\main.cpp" ^
+	cl %compiler_settings% "src\main.cpp" ^
 		/link %linker_settings% -OUT:%exe_name% ^
-	&& odin run ..\code/demo.odin
-	rem odin run ..\code/demo.odin
+	&& odin run code/demo.odin
+	rem odin run code/demo.odin
 
 
 	:do_not_compile_exe
-popd
+rem popd
 :end_of_build
 

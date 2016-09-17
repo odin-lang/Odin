@@ -840,7 +840,11 @@ void init_type_info_types(Checker *c) {
 	if (t_type_info == NULL) {
 		String type_info_str = make_string("Type_Info");
 		Entity *e = current_scope_lookup_entity(c->global_scope, type_info_str);
-		GB_ASSERT_MSG(e != NULL, "Internal Compiler Error: Could not find type declaration for `Type_Info`");
+		if (e == NULL) {
+			gb_printf_err("Internal Compiler Error: Could not find type declaration for `Type_Info`\n");
+			gb_printf_err("Is `runtime.odin` missing from the `core` directory?\n");
+			gb_exit(1);
+		}
 		t_type_info = e->type;
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
 
@@ -849,7 +853,10 @@ void init_type_info_types(Checker *c) {
 		t_type_info_member = record->other_fields[0]->type;
 		t_type_info_member_ptr = make_type_pointer(c->allocator, t_type_info_member);
 
-		GB_ASSERT_MSG(record->field_count == 16, "Internal Compiler Error: Invalid `Type_Info` layout");
+		if (record->field_count != 16) {
+			gb_printf_err("Internal Compiler Error: Invalid `Type_Info` layout\n");
+			gb_exit(1);
+		}
 		t_type_info_named     = record->fields[ 1]->type;
 		t_type_info_integer   = record->fields[ 2]->type;
 		t_type_info_float     = record->fields[ 3]->type;

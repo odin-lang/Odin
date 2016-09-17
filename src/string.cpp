@@ -13,8 +13,9 @@ typedef struct String {
 gb_inline String make_string(u8 *text, isize len) {
 	String s;
 	s.text = text;
-	if (len < 0)
+	if (len < 0) {
 		len = gb_strlen(cast(char *)text);
+	}
 	s.len = len;
 	return s;
 }
