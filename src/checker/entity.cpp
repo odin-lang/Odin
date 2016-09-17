@@ -67,6 +67,9 @@ struct Entity {
 };
 
 b32 is_entity_exported(Entity *e) {
+	if (e->kind == Entity_ImportName) {
+		return false;
+	}
 	// TODO(bill): Do I really want non-exported entities?
 	// if (e->token.string.len >= 1 &&
 	    // e->token.string.text[0] == '_') {

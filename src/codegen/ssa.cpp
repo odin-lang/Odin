@@ -3053,82 +3053,80 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 	case_end;
 
 	case_ast_node(vd, VarDecl, node);
-		if (vd->kind == Declaration_Mutable) {
-			if (gb_array_count(vd->names) == gb_array_count(vd->values)) { // 1:1 assigment
-				gbArray(ssaAddr)  lvals;
-				gbArray(ssaValue *) inits;
-				gb_array_init_reserve(lvals, gb_heap_allocator(), gb_array_count(vd->names));
-				gb_array_init_reserve(inits, gb_heap_allocator(), gb_array_count(vd->names));
-				defer (gb_array_free(lvals));
-				defer (gb_array_free(inits));
+		if (gb_array_count(vd->names) == gb_array_count(vd->values)) { // 1:1 assigment
+			gbArray(ssaAddr)  lvals;
+			gbArray(ssaValue *) inits;
+			gb_array_init_reserve(lvals, gb_heap_allocator(), gb_array_count(vd->names));
+			gb_array_init_reserve(inits, gb_heap_allocator(), gb_array_count(vd->names));
+			defer (gb_array_free(lvals));
+			defer (gb_array_free(inits));
 
-				gb_for_array(i, vd->names) {
-					AstNode *name = vd->names[i];
-					ssaAddr lval = ssa_make_addr(NULL, NULL);
-					if (!ssa_is_blank_ident(name)) {
-						ssa_add_local_for_identifier(proc, name, false);
-						lval = ssa_build_addr(proc, name);
-						GB_ASSERT(lval.addr != NULL);
-					}
-
-					gb_array_append(lvals, lval);
+			gb_for_array(i, vd->names) {
+				AstNode *name = vd->names[i];
+				ssaAddr lval = ssa_make_addr(NULL, NULL);
+				if (!ssa_is_blank_ident(name)) {
+					ssa_add_local_for_identifier(proc, name, false);
+					lval = ssa_build_addr(proc, name);
+					GB_ASSERT(lval.addr != NULL);
 				}
-				gb_for_array(i, vd->values) {
-					ssaValue *init = ssa_build_expr(proc, vd->values[i]);
+
+				gb_array_append(lvals, lval);
+			}
+			gb_for_array(i, vd->values) {
+				ssaValue *init = ssa_build_expr(proc, vd->values[i]);
+				gb_array_append(inits, init);
+			}
+
+
+			gb_for_array(i, inits) {
+				ssaValue *v = ssa_emit_conv(proc, inits[i], ssa_addr_type(lvals[i]));
+				ssa_lvalue_store(proc, lvals[i], v);
+			}
+
+		} else if (gb_array_count(vd->values) == 0) { // declared and zero-initialized
+			gb_for_array(i, vd->names) {
+				AstNode *name = vd->names[i];
+				if (!ssa_is_blank_ident(name)) {
+					ssa_add_local_for_identifier(proc, name, true);
+				}
+			}
+		} else { // Tuple(s)
+			gbArray(ssaAddr)  lvals;
+			gbArray(ssaValue *) inits;
+			gb_array_init_reserve(lvals, gb_heap_allocator(), gb_array_count(vd->names));
+			gb_array_init_reserve(inits, gb_heap_allocator(), gb_array_count(vd->names));
+			defer (gb_array_free(lvals));
+			defer (gb_array_free(inits));
+
+			gb_for_array(i, vd->names) {
+				AstNode *name = vd->names[i];
+				ssaAddr lval = ssa_make_addr(NULL, NULL);
+				if (!ssa_is_blank_ident(name)) {
+					ssa_add_local_for_identifier(proc, name, false);
+					lval = ssa_build_addr(proc, name);
+				}
+
+				gb_array_append(lvals, lval);
+			}
+
+			gb_for_array(i, vd->values) {
+				ssaValue *init = ssa_build_expr(proc, vd->values[i]);
+				Type *t = ssa_type(init);
+				if (t->kind == Type_Tuple) {
+					for (isize i = 0; i < t->Tuple.variable_count; i++) {
+						Entity *e = t->Tuple.variables[i];
+						ssaValue *v = ssa_emit_struct_ev(proc, init, i, e->type);
+						gb_array_append(inits, v);
+					}
+				} else {
 					gb_array_append(inits, init);
 				}
+			}
 
 
-				gb_for_array(i, inits) {
-					ssaValue *v = ssa_emit_conv(proc, inits[i], ssa_addr_type(lvals[i]));
-					ssa_lvalue_store(proc, lvals[i], v);
-				}
-
-			} else if (gb_array_count(vd->values) == 0) { // declared and zero-initialized
-				gb_for_array(i, vd->names) {
-					AstNode *name = vd->names[i];
-					if (!ssa_is_blank_ident(name)) {
-						ssa_add_local_for_identifier(proc, name, true);
-					}
-				}
-			} else { // Tuple(s)
-				gbArray(ssaAddr)  lvals;
-				gbArray(ssaValue *) inits;
-				gb_array_init_reserve(lvals, gb_heap_allocator(), gb_array_count(vd->names));
-				gb_array_init_reserve(inits, gb_heap_allocator(), gb_array_count(vd->names));
-				defer (gb_array_free(lvals));
-				defer (gb_array_free(inits));
-
-				gb_for_array(i, vd->names) {
-					AstNode *name = vd->names[i];
-					ssaAddr lval = ssa_make_addr(NULL, NULL);
-					if (!ssa_is_blank_ident(name)) {
-						ssa_add_local_for_identifier(proc, name, false);
-						lval = ssa_build_addr(proc, name);
-					}
-
-					gb_array_append(lvals, lval);
-				}
-
-				gb_for_array(i, vd->values) {
-					ssaValue *init = ssa_build_expr(proc, vd->values[i]);
-					Type *t = ssa_type(init);
-					if (t->kind == Type_Tuple) {
-						for (isize i = 0; i < t->Tuple.variable_count; i++) {
-							Entity *e = t->Tuple.variables[i];
-							ssaValue *v = ssa_emit_struct_ev(proc, init, i, e->type);
-							gb_array_append(inits, v);
-						}
-					} else {
-						gb_array_append(inits, init);
-					}
-				}
-
-
-				gb_for_array(i, inits) {
-					ssaValue *v = ssa_emit_conv(proc, inits[i], ssa_addr_type(lvals[i]));
-					ssa_lvalue_store(proc, lvals[i], v);
-				}
+			gb_for_array(i, inits) {
+				ssaValue *v = ssa_emit_conv(proc, inits[i], ssa_addr_type(lvals[i]));
+				ssa_lvalue_store(proc, lvals[i], v);
 			}
 		}
 	case_end;

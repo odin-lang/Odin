@@ -2,7 +2,6 @@
 
 main :: proc() {
 	init :: proc(c: ^pn.Core) {
-
 	}
 
 	step :: proc(c: ^pn.Core) {
@@ -11,5 +10,5 @@ main :: proc() {
 		}
 	}
 
-	// pn.run(init, step)
+	pn.run(init, step)
 }

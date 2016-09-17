@@ -237,8 +237,6 @@ struct Checker {
 
 	gbArray(Type *) proc_stack;
 	b32 in_defer; // TODO(bill): Actually handle correctly
-
-	ErrorCollector error_collector;
 };
 
 gb_global Scope *universal_scope = NULL;
@@ -635,18 +633,23 @@ b32 add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 		if (insert_entity) {
 			Entity *up = insert_entity->using_parent;
 			if (up != NULL) {
-				error(&c->error_collector, entity->token,
+				error(entity->token,
 				      "Redeclararation of `%.*s` in this scope through `using`\n"
 				      "\tat %.*s(%td:%td)",
 				      LIT(entity->token.string),
 				      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
 				return false;
 			} else {
-				error(&c->error_collector, entity->token,
+				TokenPos pos = insert_entity->token.pos;
+				if (token_pos_are_equal(pos, entity->token.pos)) {
+					// NOTE(bill): Error should have been handled already
+					return false;
+				}
+				error(entity->token,
 				      "Redeclararation of `%.*s` in this scope\n"
 				      "\tat %.*s(%td:%td)",
 				      LIT(entity->token.string),
-				      LIT(entity->token.pos.file), entity->token.pos.line, entity->token.pos.column);
+				      LIT(pos.file), pos.line, pos.column);
 				return false;
 			}
 		}
@@ -797,7 +800,7 @@ Type *const curr_procedure(Checker *c) {
 
 void add_curr_ast_file(Checker *c, AstFile *file) {
 	TokenPos zero_pos = {};
-	c->error_collector.prev = zero_pos;
+	global_error_collector.prev = zero_pos;
 	c->curr_ast_file = file;
 }
 
@@ -924,64 +927,60 @@ void check_parsed_files(Checker *c) {
 				// NOTE(bill): ignore
 			case_end;
 
+			case_ast_node(cd, ConstDecl, decl);
+				gb_for_array(i, cd->values) {
+					AstNode *name = cd->names[i];
+					AstNode *value = cd->values[i];
+					ExactValue v = {ExactValue_Invalid};
+					Entity *e = make_entity_constant(c->allocator, file_scope, name->Ident, NULL, v);
+					DeclInfo *di = make_declaration_info(c->allocator, file_scope);
+					di->type_expr = cd->type;
+					di->init_expr = value;
+					add_file_entity(c, file_scope, name, e, di);
+				}
+
+				isize lhs_count = gb_array_count(cd->names);
+				isize rhs_count = gb_array_count(cd->values);
+
+				if (rhs_count == 0 && cd->type == NULL) {
+					error(ast_node_token(decl), "Missing type or initial expression");
+				} else if (lhs_count < rhs_count) {
+					error(ast_node_token(decl), "Extra initial expression");
+				}
+			case_end;
+
 			case_ast_node(vd, VarDecl, decl);
-				switch (vd->kind) {
-				case Declaration_Immutable: {
-					gb_for_array(i, vd->values) {
-						AstNode *name = vd->names[i];
-						AstNode *value = vd->values[i];
-						ExactValue v = {ExactValue_Invalid};
-						Entity *e = make_entity_constant(c->allocator, file_scope, name->Ident, NULL, v);
-						DeclInfo *di = make_declaration_info(c->allocator, file_scope);
-						di->type_expr = vd->type;
-						di->init_expr = value;
-						add_file_entity(c, file_scope, name, e, di);
+				isize entity_count = gb_array_count(vd->names);
+				isize entity_index = 0;
+				Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
+				DeclInfo *di = NULL;
+				if (gb_array_count(vd->values) > 0) {
+					di = make_declaration_info(gb_heap_allocator(), file_scope);
+					di->entities = entities;
+					di->entity_count = entity_count;
+					di->type_expr = vd->type;
+					di->init_expr = vd->values[0]; // TODO(bill): Is this correct?
+				}
+
+				gb_for_array(i, vd->names) {
+					AstNode *name = vd->names[i];
+					AstNode *value = NULL;
+					if (i < gb_array_count(vd->values)) {
+						value = vd->values[i];
+					}
+					Entity *e = make_entity_variable(c->allocator, file_scope, name->Ident, NULL);
+					entities[entity_index++] = e;
+
+					DeclInfo *d = di;
+					if (d == NULL) {
+						AstNode *init_expr = value;
+						d = make_declaration_info(gb_heap_allocator(), file_scope);
+						d->type_expr = vd->type;
+						d->init_expr = init_expr;
+						d->var_decl_tags = vd->tags;
 					}
 
-					isize lhs_count = gb_array_count(vd->names);
-					isize rhs_count = gb_array_count(vd->values);
-
-					if (rhs_count == 0 && vd->type == NULL) {
-						error(&c->error_collector, ast_node_token(decl), "Missing type or initial expression");
-					} else if (lhs_count < rhs_count) {
-						error(&c->error_collector, ast_node_token(decl), "Extra initial expression");
-					}
-				} break;
-
-				case Declaration_Mutable: {
-					isize entity_count = gb_array_count(vd->names);
-					isize entity_index = 0;
-					Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
-					DeclInfo *di = NULL;
-					if (gb_array_count(vd->values) > 0) {
-						di = make_declaration_info(gb_heap_allocator(), file_scope);
-						di->entities = entities;
-						di->entity_count = entity_count;
-						di->type_expr = vd->type;
-						di->init_expr = vd->values[0]; // TODO(bill): Is this correct?
-					}
-
-					gb_for_array(i, vd->names) {
-						AstNode *name = vd->names[i];
-						AstNode *value = NULL;
-						if (i < gb_array_count(vd->values)) {
-							value = vd->values[i];
-						}
-						Entity *e = make_entity_variable(c->allocator, file_scope, name->Ident, NULL);
-						entities[entity_index++] = e;
-
-						DeclInfo *d = di;
-						if (d == NULL) {
-							AstNode *init_expr = value;
-							d = make_declaration_info(gb_heap_allocator(), file_scope);
-							d->type_expr = vd->type;
-							d->init_expr = init_expr;
-							d->var_decl_tags = vd->tags;
-						}
-
-						add_file_entity(c, file_scope, name, e, d);
-					}
-				} break;
+					add_file_entity(c, file_scope, name, e, d);
 				}
 			case_end;
 
@@ -1003,7 +1002,7 @@ void check_parsed_files(Checker *c) {
 			case_end;
 
 			default:
-				error(&c->error_collector, ast_node_token(decl), "Only declarations are allowed at file scope");
+				error(ast_node_token(decl), "Only declarations are allowed at file scope");
 				break;
 			}
 		}
@@ -1046,13 +1045,11 @@ void check_parsed_files(Checker *c) {
 						continue;
 					}
 					// NOTE(bill): Do not add other imported entities
-					if (e->kind != Entity_ImportName) {
-						if (is_entity_exported(e)) {
-							add_entity(c, file_scope, NULL, e);
-							if (!id->is_load) {
-								HashKey key = hash_string(e->token.string);
-								map_set(&file_scope->implicit, key, e);
-							}
+					if (is_entity_exported(e)) {
+						add_entity(c, file_scope, NULL, e);
+						if (!id->is_load) { // `#import`ed entities don't get exported
+							HashKey key = hash_string(e->token.string);
+							map_set(&file_scope->implicit, key, e);
 						}
 					}
 				}

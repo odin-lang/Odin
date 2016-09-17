@@ -155,31 +155,58 @@ Token empty_token = {Token_Invalid};
 struct ErrorCollector {
 	TokenPos prev;
 	i64 count;
+	i64 warning_count;
 };
 
-gb_no_inline void error(ErrorCollector *ec, Token token, char *fmt, ...) {
-	ec->count++;
-	// NOTE(bill): Duplicate error, skip it
-	if (!token_pos_are_equal(ec->prev, token.pos)) {
-		ec->prev = token.pos;
+gb_global ErrorCollector global_error_collector;
 
+
+void warning(Token token, char *fmt, ...) {
+	global_error_collector.warning_count++;
+	// NOTE(bill): Duplicate error, skip it
+	if (!token_pos_are_equal(global_error_collector.prev, token.pos)) {
 		va_list va;
+
+		global_error_collector.prev = token.pos;
+
+		va_start(va, fmt);
+		gb_printf_err("%.*s(%td:%td) Warning: %s\n",
+		              LIT(token.pos.file), token.pos.line, token.pos.column,
+		              gb_bprintf_va(fmt, va));
+		va_end(va);
+	}
+}
+
+void error(Token token, char *fmt, ...) {
+	global_error_collector.count++;
+	// NOTE(bill): Duplicate error, skip it
+	if (!token_pos_are_equal(global_error_collector.prev, token.pos)) {
+		va_list va;
+
+		global_error_collector.prev = token.pos;
+
 		va_start(va, fmt);
 		gb_printf_err("%.*s(%td:%td) %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
 		              gb_bprintf_va(fmt, va));
 		va_end(va);
-
 	}
 }
 
-gb_no_inline void warning(Token token, char *fmt, ...) {
-	va_list va;
-	va_start(va, fmt);
-	gb_printf_err("%.*s(%td:%td) Warning: %s\n",
-	              LIT(token.pos.file), token.pos.line, token.pos.column,
-	              gb_bprintf_va(fmt, va));
-	va_end(va);
+void syntax_error(Token token, char *fmt, ...) {
+	global_error_collector.count++;
+	// NOTE(bill): Duplicate error, skip it
+	if (!token_pos_are_equal(global_error_collector.prev, token.pos)) {
+		va_list va;
+
+		global_error_collector.prev = token.pos;
+
+		va_start(va, fmt);
+		gb_printf_err("%.*s(%td:%td) Syntax Error: %s\n",
+		              LIT(token.pos.file), token.pos.line, token.pos.column,
+		              gb_bprintf_va(fmt, va));
+		va_end(va);
+	}
 }
 
 

@@ -34,8 +34,6 @@ struct AstFile {
 	isize    scope_level;
 	Scope *  scope; // NOTE(bill): Created in checker
 
-	ErrorCollector error_collector;
-
 	// TODO(bill): Error recovery
 	// NOTE(bill): Error recovery
 #define PARSER_MAX_FIX_COUNT 6
@@ -57,13 +55,6 @@ struct Parser {
 	gbArray(String) system_libraries;
 	isize load_index;
 	isize total_token_count;
-};
-
-enum DeclKind {
-	Declaration_Invalid,
-	Declaration_Mutable,
-	Declaration_Immutable,
-	Declaration_Count,
 };
 
 enum ProcTag : u64 {
@@ -227,20 +218,25 @@ AST_NODE_KIND(_StmtEnd,        "", struct{}) \
 AST_NODE_KIND(_DeclBegin,      "", struct{}) \
 	AST_NODE_KIND(BadDecl,  "bad declaration", struct { Token begin, end; }) \
 	AST_NODE_KIND(VarDecl,  "variable declaration", struct { \
-			DeclKind kind; \
 			u64      tags; \
 			b32      is_using; \
 			AstNodeArray names; \
 			AstNode *type; \
 			AstNodeArray values; \
-		}) \
+	}) \
+	AST_NODE_KIND(ConstDecl,  "constant declaration", struct { \
+			u64      tags; \
+			AstNodeArray names; \
+			AstNode *type; \
+			AstNodeArray values; \
+	}) \
 	AST_NODE_KIND(ProcDecl, "procedure declaration", struct { \
 			AstNode *name;        \
 			AstNode *type;        \
 			AstNode *body;        \
 			u64     tags;         \
 			String  foreign_name; \
-		}) \
+	}) \
 	AST_NODE_KIND(TypeDecl,   "type declaration",   struct { Token token; AstNode *name, *type; }) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
 		Token token, relpath; \
@@ -419,6 +415,8 @@ Token ast_node_token(AstNode *node) {
 		return node->BadDecl.begin;
 	case AstNode_VarDecl:
 		return ast_node_token(node->VarDecl.names[0]);
+	case AstNode_ConstDecl:
+		return ast_node_token(node->ConstDecl.names[0]);
 	case AstNode_ProcDecl:
 		return node->ProcDecl.name->Ident;
 	case AstNode_TypeDecl:
@@ -456,26 +454,6 @@ Token ast_node_token(AstNode *node) {
 
 HashKey hash_token(Token t) {
 	return hash_string(t.string);
-}
-
-#define ast_file_err(f, token, fmt, ...) ast_file_err_(f, __FUNCTION__, token, fmt, ##__VA_ARGS__)
-void ast_file_err_(AstFile *file, char *function, Token token, char *fmt, ...) {
-	// NOTE(bill): Duplicate error, skip it
-	if (!token_pos_are_equal(file->error_collector.prev, token.pos)) {
-		va_list va;
-
-		file->error_collector.prev = token.pos;
-
-	#if 0
-		gb_printf_err("%s()\n", function);
-	#endif
-		va_start(va, fmt);
-		gb_printf_err("%.*s(%td:%td) Syntax error: %s\n",
-		              LIT(token.pos.file), token.pos.line, token.pos.column,
-		              gb_bprintf_va(fmt, va));
-		va_end(va);
-	}
-	file->error_collector.count++;
 }
 
 
@@ -525,11 +503,11 @@ gb_inline AstNode *make_binary_expr(AstFile *f, Token op, AstNode *left, AstNode
 	AstNode *result = make_node(f, AstNode_BinaryExpr);
 
 	if (left == NULL) {
-		ast_file_err(f, op, "No lhs expression for binary expression `%.*s`", LIT(op.string));
+		syntax_error(op, "No lhs expression for binary expression `%.*s`", LIT(op.string));
 		left = make_bad_expr(f, op, op);
 	}
 	if (right == NULL) {
-		ast_file_err(f, op, "No rhs expression for binary expression `%.*s`", LIT(op.string));
+		syntax_error(op, "No rhs expression for binary expression `%.*s`", LIT(op.string));
 		right = make_bad_expr(f, op, op);
 	}
 
@@ -795,12 +773,19 @@ gb_inline AstNode *make_bad_decl(AstFile *f, Token begin, Token end) {
 	return result;
 }
 
-gb_inline AstNode *make_var_decl(AstFile *f, DeclKind kind, AstNodeArray names, AstNode *type, AstNodeArray values) {
+gb_inline AstNode *make_var_decl(AstFile *f, AstNodeArray names, AstNode *type, AstNodeArray values) {
 	AstNode *result = make_node(f, AstNode_VarDecl);
-	result->VarDecl.kind = kind;
 	result->VarDecl.names = names;
 	result->VarDecl.type = type;
 	result->VarDecl.values = values;
+	return result;
+}
+
+gb_inline AstNode *make_const_decl(AstFile *f, AstNodeArray names, AstNode *type, AstNodeArray values) {
+	AstNode *result = make_node(f, AstNode_ConstDecl);
+	result->ConstDecl.names = names;
+	result->ConstDecl.type = type;
+	result->ConstDecl.values = values;
 	return result;
 }
 
@@ -918,7 +903,7 @@ gb_inline b32 next_token(AstFile *f) {
 		f->cursor++;
 		return true;
 	} else {
-		ast_file_err(f, f->cursor[0], "Token is EOF");
+		syntax_error(f->cursor[0], "Token is EOF");
 		return false;
 	}
 }
@@ -926,7 +911,7 @@ gb_inline b32 next_token(AstFile *f) {
 gb_inline Token expect_token(AstFile *f, TokenKind kind) {
 	Token prev = f->cursor[0];
 	if (prev.kind != kind) {
-		ast_file_err(f, f->cursor[0], "Expected `%.*s`, got `%.*s`",
+		syntax_error(f->cursor[0], "Expected `%.*s`, got `%.*s`",
 		             LIT(token_strings[kind]),
 		             LIT(token_strings[prev.kind]));
 	}
@@ -937,7 +922,7 @@ gb_inline Token expect_token(AstFile *f, TokenKind kind) {
 gb_inline Token expect_operator(AstFile *f) {
 	Token prev = f->cursor[0];
 	if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
-		ast_file_err(f, f->cursor[0], "Expected an operator, got `%.*s`",
+		syntax_error(f->cursor[0], "Expected an operator, got `%.*s`",
 		             LIT(token_strings[prev.kind]));
 	}
 	next_token(f);
@@ -947,7 +932,7 @@ gb_inline Token expect_operator(AstFile *f) {
 gb_inline Token expect_keyword(AstFile *f) {
 	Token prev = f->cursor[0];
 	if (!gb_is_between(prev.kind, Token__KeywordBegin+1, Token__KeywordEnd-1)) {
-		ast_file_err(f, f->cursor[0], "Expected a keyword, got `%.*s`",
+		syntax_error(f->cursor[0], "Expected a keyword, got `%.*s`",
 		             LIT(token_strings[prev.kind]));
 	}
 	next_token(f);
@@ -1027,7 +1012,7 @@ b32 expect_semicolon_after_stmt(AstFile *f, AstNode *s) {
 		if (f->cursor[0].pos.line == f->cursor[-1].pos.line) {
 			if (f->cursor[0].kind != Token_CloseBrace) {
 				// CLEANUP(bill): Semicolon handling in parser
-				ast_file_err(f, f->cursor[0],
+				syntax_error(f->cursor[0],
 				             "Expected `;` after %.*s, got `%.*s`",
 				             LIT(ast_node_strings[s->kind]), LIT(token_strings[f->cursor[0].kind]));
 				return false;
@@ -1126,7 +1111,7 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags = 0);
 
 void check_proc_add_tag(AstFile *f, AstNode *tag_expr, u64 *tags, ProcTag tag, String tag_name) {
 	if (*tags & tag) {
-		ast_file_err(f, ast_node_token(tag_expr), "Procedure tag already used: %.*s", LIT(tag_name));
+		syntax_error(ast_node_token(tag_expr), "Procedure tag already used: %.*s", LIT(tag_name));
 	}
 	*tags |= tag;
 }
@@ -1200,7 +1185,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
 				*foreign_name = f->cursor[0].string;
 				// TODO(bill): Check if valid string
 				if (!is_foreign_name_valid(*foreign_name)) {
-					ast_file_err(f, ast_node_token(tag_expr), "Invalid alternative foreign procedure name");
+					syntax_error(ast_node_token(tag_expr), "Invalid alternative foreign procedure name");
 				}
 
 				next_token(f);
@@ -1216,22 +1201,22 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
 		ELSE_IF_ADD_TAG(fastcall)
 		// ELSE_IF_ADD_TAG(cdecl)
 		else {
-			ast_file_err(f, ast_node_token(tag_expr), "Unknown procedure tag");
+			syntax_error(ast_node_token(tag_expr), "Unknown procedure tag");
 		}
 
 		#undef ELSE_IF_ADD_TAG
 	}
 
 	if ((*tags & ProcTag_inline) && (*tags & ProcTag_no_inline)) {
-		ast_file_err(f, f->cursor[0], "You cannot apply both #inline and #no_inline to a procedure");
+		syntax_error(f->cursor[0], "You cannot apply both #inline and #no_inline to a procedure");
 	}
 
 	if ((*tags & ProcTag_bounds_check) && (*tags & ProcTag_no_bounds_check)) {
-		ast_file_err(f, f->cursor[0], "You cannot apply both #bounds_check and #no_bounds_check to a procedure");
+		syntax_error(f->cursor[0], "You cannot apply both #bounds_check and #no_bounds_check to a procedure");
 	}
 
 	if (((*tags & ProcTag_bounds_check) || (*tags & ProcTag_no_bounds_check)) && (*tags & ProcTag_foreign)) {
-		ast_file_err(f, f->cursor[0], "You cannot apply both #bounds_check or #no_bounds_check to a procedure without a body");
+		syntax_error(f->cursor[0], "You cannot apply both #bounds_check or #no_bounds_check to a procedure without a body");
 	}
 }
 
@@ -1272,7 +1257,7 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 				Token *s = &f->cursor[0];
 
 				if (gb_utf8_strnlen(s->string.text, s->string.len) != 1) {
-					ast_file_err(f, *s, "Invalid rune literal %.*s", LIT(s->string));
+					syntax_error(*s, "Invalid rune literal %.*s", LIT(s->string));
 				}
 				s->kind = Token_Rune; // NOTE(bill): Change it
 			} else {
@@ -1308,7 +1293,7 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 		String foreign_name = {};
 		parse_proc_tags(f, &tags, &foreign_name);
 		if (tags & ProcTag_foreign) {
-			ast_file_err(f, f->cursor[0], "#foreign cannot be applied to procedure literals");
+			syntax_error(f->cursor[0], "#foreign cannot be applied to procedure literals");
 		}
 
 		if (f->cursor[0].kind != Token_OpenBrace) {
@@ -1335,7 +1320,7 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 	}
 
 	Token begin = f->cursor[0];
-	ast_file_err(f, begin, "Expected an operand");
+	syntax_error(begin, "Expected an operand");
 	fix_advance_to_next_stmt(f);
 	return make_bad_expr(f, begin, f->cursor[0]);
 }
@@ -1365,7 +1350,7 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 	       f->cursor[0].kind != Token_EOF &&
 	       ellipsis.pos.line == 0) {
 		if (f->cursor[0].kind == Token_Comma)
-			ast_file_err(f, f->cursor[0], "Expected an expression not a ,");
+			syntax_error(f->cursor[0], "Expected an expression not a ,");
 
 		if (f->cursor[0].kind == Token_Ellipsis) {
 			ellipsis = f->cursor[0];
@@ -1425,7 +1410,7 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 				operand = make_selector_expr(f, token, operand, parse_identifier(f));
 				break;
 			default: {
-				ast_file_err(f, f->cursor[0], "Expected a selector");
+				syntax_error(f->cursor[0], "Expected a selector");
 				next_token(f);
 				operand = make_selector_expr(f, f->cursor[0], operand, NULL);
 			} break;
@@ -1467,11 +1452,11 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 				if (colon_count == 2) {
 					triple_indexed = true;
 					if (indices[1] == NULL) {
-						ast_file_err(f, colons[0], "Second index is required in a triple indexed slice");
+						syntax_error(colons[0], "Second index is required in a triple indexed slice");
 						indices[1] = make_bad_expr(f, colons[0], colons[1]);
 					}
 					if (indices[2] == NULL) {
-						ast_file_err(f, colons[1], "Third index is required in a triple indexed slice");
+						syntax_error(colons[1], "Third index is required in a triple indexed slice");
 						indices[2] = make_bad_expr(f, colons[1], close);
 					}
 				}
@@ -1558,7 +1543,7 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 			default:
 				right = parse_binary_expr(f, false, prec+1);
 				if (!right) {
-					ast_file_err(f, op, "Expected expression on the right hand side of the binary operator");
+					syntax_error(op, "Expected expression on the right hand side of the binary operator");
 				}
 				break;
 			}
@@ -1622,13 +1607,13 @@ AstNode *parse_simple_stmt(AstFile *f) {
 	case Token_CmpOrEq:
 	{
 		if (f->curr_proc == NULL) {
-			ast_file_err(f, f->cursor[0], "You cannot use a simple statement in the file scope");
+			syntax_error(f->cursor[0], "You cannot use a simple statement in the file scope");
 			return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 		}
 		next_token(f);
 		AstNodeArray rhs = parse_rhs_expr_list(f);
 		if (gb_array_count(rhs) == 0) {
-			ast_file_err(f, token, "No right-hand side in assignment statement.");
+			syntax_error(token, "No right-hand side in assignment statement.");
 			return make_bad_stmt(f, token, f->cursor[0]);
 		}
 		return make_assign_stmt(f, token, lhs, rhs);
@@ -1639,7 +1624,7 @@ AstNode *parse_simple_stmt(AstFile *f) {
 	}
 
 	if (lhs_count > 1) {
-		ast_file_err(f, token, "Expected 1 expression");
+		syntax_error(token, "Expected 1 expression");
 		return make_bad_stmt(f, token, f->cursor[0]);
 	}
 
@@ -1648,7 +1633,7 @@ AstNode *parse_simple_stmt(AstFile *f) {
 	case Token_Increment:
 	case Token_Decrement:
 		if (f->curr_proc == NULL) {
-			ast_file_err(f, f->cursor[0], "You cannot use a simple statement in the file scope");
+			syntax_error(f->cursor[0], "You cannot use a simple statement in the file scope");
 			return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 		}
 		statement = make_inc_dec_stmt(f, token, lhs[0]);
@@ -1663,7 +1648,7 @@ AstNode *parse_simple_stmt(AstFile *f) {
 
 AstNode *parse_block_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
-		ast_file_err(f, f->cursor[0], "You cannot use a block statement in the file scope");
+		syntax_error(f->cursor[0], "You cannot use a block statement in the file scope");
 		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
 	AstNode *block_stmt = parse_body(f);
@@ -1677,7 +1662,7 @@ AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
 	if (statement->kind == AstNode_ExprStmt)
 		return statement->ExprStmt.expr;
 
-	ast_file_err(f, f->cursor[0], "Expected `%.*s`, found a simple statement.", LIT(kind));
+	syntax_error(f->cursor[0], "Expected `%.*s`, found a simple statement.", LIT(kind));
 	return make_bad_expr(f, f->cursor[0], f->cursor[1]);
 }
 
@@ -1710,7 +1695,7 @@ AstNode *parse_type(AstFile *f) {
 	AstNode *type = parse_type_attempt(f);
 	if (type == NULL) {
 		Token token = f->cursor[0];
-		ast_file_err(f, token, "Expected a type");
+		syntax_error(token, "Expected a type");
 		next_token(f);
 		return make_bad_expr(f, token, f->cursor[0]);
 	}
@@ -1738,11 +1723,11 @@ AstNode *parse_field_decl(AstFile *f) {
 
 	AstNodeArray names = parse_lhs_expr_list(f);
 	if (gb_array_count(names) == 0) {
-		ast_file_err(f, f->cursor[0], "Empty field declaration");
+		syntax_error(f->cursor[0], "Empty field declaration");
 	}
 
 	if (gb_array_count(names) > 1 && is_using) {
-		ast_file_err(f, f->cursor[0], "Cannot apply `using` to more than one of the same type");
+		syntax_error(f->cursor[0], "Cannot apply `using` to more than one of the same type");
 		is_using = false;
 	}
 
@@ -1755,11 +1740,11 @@ AstNode *parse_field_decl(AstFile *f) {
 		next_token(f);
 		type = parse_type_attempt(f);
 		if (type == NULL) {
-			ast_file_err(f, f->cursor[0], "variadic parameter is missing a type after `..`");
+			syntax_error(f->cursor[0], "variadic parameter is missing a type after `..`");
 			type = make_bad_expr(f, ellipsis, f->cursor[0]);
 		} else {
 			if (gb_array_count(names) > 1) {
-				ast_file_err(f, f->cursor[0], "mutliple variadic parameters, only  `..`");
+				syntax_error(f->cursor[0], "mutliple variadic parameters, only  `..`");
 			} else {
 				type = make_ellipsis(f, ellipsis, type);
 			}
@@ -1769,7 +1754,7 @@ AstNode *parse_field_decl(AstFile *f) {
 	}
 
 	if (type == NULL) {
-		ast_file_err(f, f->cursor[0], "Expected a type for this field declaration");
+		syntax_error(f->cursor[0], "Expected a type for this field declaration");
 	}
 
 	AstNode *field = make_field(f, names, type, is_using);
@@ -1804,15 +1789,15 @@ AstNodeArray parse_struct_params(AstFile *f, isize *decl_count_, b32 using_allow
 		}
 		AstNodeArray names = parse_lhs_expr_list(f);
 		if (gb_array_count(names) == 0) {
-			ast_file_err(f, f->cursor[0], "Empty field declaration");
+			syntax_error(f->cursor[0], "Empty field declaration");
 		}
 
 		if (!using_allowed && is_using) {
-			ast_file_err(f, f->cursor[0], "Cannot apply `using` to members of a union");
+			syntax_error(f->cursor[0], "Cannot apply `using` to members of a union");
 			is_using = false;
 		}
 		if (gb_array_count(names) > 1 && is_using) {
-			ast_file_err(f, f->cursor[0], "Cannot apply `using` to more than one of the same type");
+			syntax_error(f->cursor[0], "Cannot apply `using` to more than one of the same type");
 		}
 
 		AstNode *decl = NULL;
@@ -1821,11 +1806,11 @@ AstNodeArray parse_struct_params(AstFile *f, isize *decl_count_, b32 using_allow
 			decl = parse_decl(f, names);
 
 			if (decl->kind == AstNode_ProcDecl) {
-				ast_file_err(f, f->cursor[0], "Procedure declarations are not allowed within a structure");
+				syntax_error(f->cursor[0], "Procedure declarations are not allowed within a structure");
 				decl = make_bad_decl(f, ast_node_token(names[0]), f->cursor[0]);
 			}
 		} else {
-			ast_file_err(f, f->cursor[0], "Illegal structure field");
+			syntax_error(f->cursor[0], "Illegal structure field");
 			decl = make_bad_decl(f, ast_node_token(names[0]), f->cursor[0]);
 		}
 
@@ -1835,13 +1820,9 @@ AstNodeArray parse_struct_params(AstFile *f, isize *decl_count_, b32 using_allow
 			gb_array_append(decls, decl);
 			if (decl->kind == AstNode_VarDecl) {
 				decl->VarDecl.is_using = is_using && using_allowed;
-
-				if (decl->VarDecl.kind == Declaration_Mutable) {
-					if (gb_array_count(decl->VarDecl.values) > 0) {
-						ast_file_err(f, f->cursor[0], "Default variable assignments within a structure will be ignored (at the moment)");
-					}
+				if (gb_array_count(decl->VarDecl.values) > 0) {
+					syntax_error(f->cursor[0], "Default variable assignments within a structure will be ignored (at the moment)");
 				}
-
 			} else {
 				decl_count += 1;
 			}
@@ -1925,12 +1906,12 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 			} else if (are_strings_equal(tag.string, make_string("ordered"))) {
 				is_ordered = true;
 			}  else {
-				ast_file_err(f, tag, "Expected a `#packed` or `#ordered` tag");
+				syntax_error(tag, "Expected a `#packed` or `#ordered` tag");
 			}
 		}
 
 		if (is_packed && is_ordered) {
-			ast_file_err(f, token, "`#ordered` is not needed with `#packed` which implies ordering");
+			syntax_error(token, "`#ordered` is not needed with `#packed` which implies ordering");
 		}
 
 		Token open = expect_token(f, Token_OpenBrace);
@@ -2034,8 +2015,8 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 			break;
 		// fallthrough
 	default:
-		ast_file_err(f, f->cursor[0],
-		             "Expected a type after `%.*s`, got `%.*s`", LIT(f->cursor[-1].string), LIT(f->cursor[0].string));
+		syntax_error(f->cursor[0],
+		             "Expected a type or identifier after `%.*s`, got `%.*s`", LIT(f->cursor[-1].string), LIT(f->cursor[0].string));
 		break;
 	}
 
@@ -2109,7 +2090,7 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 
 	if (f->cursor[0].kind == Token_OpenBrace) {
 		if ((tags & ProcTag_foreign) != 0) {
-			ast_file_err(f, f->cursor[0], "A procedure tagged as `#foreign` cannot have a body");
+			syntax_error(f->cursor[0], "A procedure tagged as `#foreign` cannot have a body");
 		}
 		body = parse_body(f);
 	}
@@ -2127,7 +2108,7 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 			String n = name->Ident.string;
 			// NOTE(bill): Check for reserved identifiers
 			if (are_strings_equal(n, make_string("context"))) {
-				ast_file_err(f, ast_node_token(name), "`context` is a reserved identifier");
+				syntax_error(ast_node_token(name), "`context` is a reserved identifier");
 				break;
 			}
 		}
@@ -2138,15 +2119,16 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 			type = parse_identifier_or_type(f);
 		}
 	} else if (f->cursor[0].kind != Token_Eq && f->cursor[0].kind != Token_Semicolon) {
-		ast_file_err(f, f->cursor[0], "Expected type separator `:` or `=`");
+		syntax_error(f->cursor[0], "Expected type separator `:` or `=`");
 	}
 
-	DeclKind declaration_kind = Declaration_Mutable;
+	b32 is_mutable = true;
 
 	if (f->cursor[0].kind == Token_Eq ||
 	    f->cursor[0].kind == Token_Colon) {
-		if (f->cursor[0].kind == Token_Colon)
-			declaration_kind = Declaration_Immutable;
+		if (f->cursor[0].kind == Token_Colon) {
+			is_mutable = false;
+		}
 		next_token(f);
 
 		if (f->cursor[0].kind == Token_type ||
@@ -2159,71 +2141,67 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 				next_token(f);
 			}
 			if (gb_array_count(names) != 1) {
-				ast_file_err(f, ast_node_token(names[0]), "You can only declare one type at a time");
+				syntax_error(ast_node_token(names[0]), "You can only declare one type at a time");
 				return make_bad_decl(f, names[0]->Ident, token);
 			}
 
 			if (type != NULL) {
-				ast_file_err(f, f->cursor[-1], "Expected either `type` or nothing between : and :");
+				syntax_error(f->cursor[-1], "Expected either `type` or nothing between : and :");
 				// NOTE(bill): Do not fail though
 			}
 
 			AstNode *type = parse_type(f);
 			return make_type_decl(f, token, names[0], type);
 		} else if (f->cursor[0].kind == Token_proc &&
-		    declaration_kind == Declaration_Immutable) {
+		    is_mutable == false) {
 		    // NOTE(bill): Procedure declarations
 			Token proc_token = f->cursor[0];
 			AstNode *name = names[0];
 			if (gb_array_count(names) != 1) {
-				ast_file_err(f, proc_token, "You can only declare one procedure at a time");
+				syntax_error(proc_token, "You can only declare one procedure at a time");
 				return make_bad_decl(f, name->Ident, proc_token);
 			}
 
-			AstNode *proc_decl = parse_proc_decl(f, proc_token, name);
-			return proc_decl;
+			return parse_proc_decl(f, proc_token, name);
 
 		} else {
 			values = parse_rhs_expr_list(f);
 			if (gb_array_count(values) > gb_array_count(names)) {
-				ast_file_err(f, f->cursor[0], "Too many values on the right hand side of the declaration");
-			} else if (gb_array_count(values) < gb_array_count(names) &&
-			           declaration_kind == Declaration_Immutable) {
-				ast_file_err(f, f->cursor[0], "All constant declarations must be defined");
+				syntax_error(f->cursor[0], "Too many values on the right hand side of the declaration");
+			} else if (gb_array_count(values) < gb_array_count(names) && !is_mutable) {
+				syntax_error(f->cursor[0], "All constant declarations must be defined");
 			} else if (gb_array_count(values) == 0) {
-				ast_file_err(f, f->cursor[0], "Expected an expression for this declaration");
+				syntax_error(f->cursor[0], "Expected an expression for this declaration");
 			}
 		}
 	}
 
-	if (declaration_kind == Declaration_Mutable) {
+	if (is_mutable) {
 		if (type == NULL && gb_array_count(values) == 0) {
-			ast_file_err(f, f->cursor[0], "Missing variable type or initialization");
-			return make_bad_decl(f, f->cursor[0], f->cursor[0]);
-		}
-	} else if (declaration_kind == Declaration_Immutable) {
-		if (type == NULL && gb_array_count(values) == 0 && gb_array_count(names) > 0) {
-			ast_file_err(f, f->cursor[0], "Missing constant value");
+			syntax_error(f->cursor[0], "Missing variable type or initialization");
 			return make_bad_decl(f, f->cursor[0], f->cursor[0]);
 		}
 	} else {
-		Token begin = f->cursor[0];
-		ast_file_err(f, begin, "Unknown type of variable declaration");
-		fix_advance_to_next_stmt(f);
-		return make_bad_decl(f, begin, f->cursor[0]);
+		if (type == NULL && gb_array_count(values) == 0 && gb_array_count(names) > 0) {
+			syntax_error(f->cursor[0], "Missing constant value");
+			return make_bad_decl(f, f->cursor[0], f->cursor[0]);
+		}
 	}
 
 	if (values == NULL) {
 		values = make_ast_node_array(f);
 	}
 
-	return make_var_decl(f, declaration_kind, names, type, values);
+	if (is_mutable) {
+		return make_var_decl(f, names, type, values);
+	}
+	return make_const_decl(f, names, type, values);
 }
 
 
 AstNode *parse_if_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
-		ast_file_err(f, f->cursor[0], "You cannot use an if statement in the file scope");
+		syntax_error(f->cursor[0], "You cannot use an if statement in the file scope");
 		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
 
@@ -2252,7 +2230,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 	f->expr_level = prev_level;
 
 	if (cond == NULL) {
-		ast_file_err(f, f->cursor[0], "Expected condition for if statement");
+		syntax_error(f->cursor[0], "Expected condition for if statement");
 	}
 
 	body = parse_block_stmt(f);
@@ -2266,7 +2244,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 			else_stmt = parse_block_stmt(f);
 			break;
 		default:
-			ast_file_err(f, f->cursor[0], "Expected if statement block statement");
+			syntax_error(f->cursor[0], "Expected if statement block statement");
 			else_stmt = make_bad_stmt(f, f->cursor[0], f->cursor[1]);
 			break;
 		}
@@ -2277,7 +2255,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 
 AstNode *parse_return_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
-		ast_file_err(f, f->cursor[0], "You cannot use a return statement in the file scope");
+		syntax_error(f->cursor[0], "You cannot use a return statement in the file scope");
 		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
 
@@ -2297,7 +2275,7 @@ AstNode *parse_return_stmt(AstFile *f) {
 
 AstNode *parse_for_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
-		ast_file_err(f, f->cursor[0], "You cannot use a for statement in the file scope");
+		syntax_error(f->cursor[0], "You cannot use a for statement in the file scope");
 		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
 
@@ -2314,7 +2292,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 		if (f->cursor[0].kind != Token_Semicolon) {
 			cond = parse_simple_stmt(f);
 			if (is_ast_node_complex_stmt(cond)) {
-				ast_file_err(f, f->cursor[0],
+				syntax_error(f->cursor[0],
 				             "You are not allowed that type of statement in a for statement, it is too complex!");
 			}
 		}
@@ -2371,7 +2349,7 @@ AstNode *parse_type_case_clause(AstFile *f) {
 
 AstNode *parse_match_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
-		ast_file_err(f, f->cursor[0], "You cannot use a match statement in the file scope");
+		syntax_error(f->cursor[0], "You cannot use a match statement in the file scope");
 		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
 
@@ -2444,7 +2422,7 @@ AstNode *parse_match_stmt(AstFile *f) {
 
 AstNode *parse_defer_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
-		ast_file_err(f, f->cursor[0], "You cannot use a defer statement in the file scope");
+		syntax_error(f->cursor[0], "You cannot use a defer statement in the file scope");
 		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
 	}
 
@@ -2452,13 +2430,13 @@ AstNode *parse_defer_stmt(AstFile *f) {
 	AstNode *statement = parse_stmt(f);
 	switch (statement->kind) {
 	case AstNode_EmptyStmt:
-		ast_file_err(f, token, "Empty statement after defer (e.g. `;`)");
+		syntax_error(token, "Empty statement after defer (e.g. `;`)");
 		break;
 	case AstNode_DeferStmt:
-		ast_file_err(f, token, "You cannot defer a defer statement");
+		syntax_error(token, "You cannot defer a defer statement");
 		break;
 	case AstNode_ReturnStmt:
-		ast_file_err(f, token, "You cannot a return statement");
+		syntax_error(token, "You cannot a return statement");
 		break;
 	}
 
@@ -2554,14 +2532,12 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 		} break;
 		case AstNode_VarDecl:
-			if (node->VarDecl.kind == Declaration_Mutable) {
-				valid = true;
-			}
+			valid = true;
 			break;
 		}
 
 		if (!valid) {
-			ast_file_err(f, token, "Illegal use of `using` statement.");
+			syntax_error(token, "Illegal use of `using` statement.");
 			return make_bad_stmt(f, token, f->cursor[0]);
 		}
 
@@ -2577,7 +2553,7 @@ AstNode *parse_stmt(AstFile *f) {
 				f->is_global_scope = true;
 				return make_empty_stmt(f, f->cursor[0]);
 			}
-			ast_file_err(f, token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope.");
+			syntax_error(token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, f->cursor[0]);
 		} else if (are_strings_equal(tag, make_string("import"))) {
 			// TODO(bill): better error messages
@@ -2589,7 +2565,7 @@ AstNode *parse_stmt(AstFile *f) {
 			if (f->curr_proc == NULL) {
 				return make_import_decl(f, s->TagStmt.token, file_path, import_name, false);
 			}
-			ast_file_err(f, token, "You cannot use #import within a procedure. This must be done at the file scope.");
+			syntax_error(token, "You cannot use #import within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
 		} else if (are_strings_equal(tag, make_string("load"))) {
 			// TODO(bill): better error messages
@@ -2600,24 +2576,23 @@ AstNode *parse_stmt(AstFile *f) {
 			if (f->curr_proc == NULL) {
 				return make_import_decl(f, s->TagStmt.token, file_path, import_name, true);
 			}
-			ast_file_err(f, token, "You cannot use #load within a procedure. This must be done at the file scope.");
+			syntax_error(token, "You cannot use #load within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
 		} else if (are_strings_equal(tag, make_string("foreign_system_library"))) {
 			Token file_path = expect_token(f, Token_String);
 			if (f->curr_proc == NULL) {
 				return make_foreign_system_library(f, s->TagStmt.token, file_path);
 			}
-			ast_file_err(f, token, "You cannot use #foreign_system_library within a procedure. This must be done at the file scope.");
+			syntax_error(token, "You cannot use #foreign_system_library within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
 		} else if (are_strings_equal(tag, make_string("thread_local"))) {
 			AstNode *var_decl = parse_simple_stmt(f);
-			if (var_decl->kind != AstNode_VarDecl ||
-			    var_decl->VarDecl.kind != Declaration_Mutable) {
-				ast_file_err(f, token, "#thread_local may only be applied to variable declarations");
+			if (var_decl->kind != AstNode_VarDecl) {
+				syntax_error(token, "#thread_local may only be applied to variable declarations");
 				return make_bad_decl(f, token, ast_node_token(var_decl));
 			}
 			if (f->curr_proc != NULL) {
-				ast_file_err(f, token, "#thread_local is only allowed at the file scope.");
+				syntax_error(token, "#thread_local is only allowed at the file scope.");
 				return make_bad_decl(f, token, ast_node_token(var_decl));
 			}
 			var_decl->VarDecl.tags |= VarDeclTag_thread_local;
@@ -2626,14 +2601,14 @@ AstNode *parse_stmt(AstFile *f) {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_bounds_check;
 			if ((s->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
-				ast_file_err(f, token, "#bounds_check and #no_bounds_check cannot be applied together");
+				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return s;
 		} else if (are_strings_equal(tag, make_string("no_bounds_check"))) {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_no_bounds_check;
 			if ((s->stmt_state_flags & StmtStateFlag_bounds_check) != 0) {
-				ast_file_err(f, token, "#bounds_check and #no_bounds_check cannot be applied together");
+				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return s;
 		}
@@ -2651,7 +2626,7 @@ AstNode *parse_stmt(AstFile *f) {
 		return s;
 	}
 
-	ast_file_err(f, token,
+	syntax_error(token,
 	             "Expected a statement, got `%.*s`",
 	             LIT(token_strings[token.kind]));
 	fix_advance_to_next_stmt(f);
@@ -2837,14 +2812,14 @@ void parse_file(Parser *p, AstFile *f) {
 		    node->kind != AstNode_BadStmt &&
 		    node->kind != AstNode_EmptyStmt) {
 			// NOTE(bill): Sanity check
-			ast_file_err(f, ast_node_token(node), "Only declarations are allowed at file scope");
+			syntax_error(ast_node_token(node), "Only declarations are allowed at file scope");
 		} else {
 			if (node->kind == AstNode_ImportDecl) {
 				auto *id = &node->ImportDecl;
 				String file_str = id->relpath.string;
 
 				if (!is_import_path_valid(file_str)) {
-					ast_file_err(f, ast_node_token(node), "Invalid `load` path");
+					syntax_error(ast_node_token(node), "Invalid `load` path");
 					continue;
 				}
 
@@ -2868,7 +2843,7 @@ void parse_file(Parser *p, AstFile *f) {
 				String file_str = id->filepath.string;
 
 				if (!is_import_path_valid(file_str)) {
-					ast_file_err(f, ast_node_token(node), "Invalid `foreign_system_library` path");
+					syntax_error(ast_node_token(node), "Invalid `foreign_system_library` path");
 					continue;
 				}
 

@@ -142,11 +142,18 @@ void print_ast(AstNode *node, isize indent) {
 
 	case AstNode_VarDecl:
 		print_indent(indent);
-		if (node->VarDecl.kind == Declaration_Mutable) {
-			gb_printf("(decl:var,mutable)\n");
-		} else if (node->VarDecl.kind == Declaration_Immutable) {
-			gb_printf("(decl:var,immutable)\n");
+		gb_printf("(decl:var)\n");
+		gb_for_array(i, node->VarDecl.names) {
+			print_ast(node->VarDecl.names[i], indent+1);
 		}
+		print_ast(node->VarDecl.type, indent+1);
+		gb_for_array(i, node->VarDecl.values) {
+			print_ast(node->VarDecl.values[i], indent+1);
+		}
+		break;
+	case AstNode_ConstDecl:
+		print_indent(indent);
+		gb_printf("(decl:const)\n");
 		gb_for_array(i, node->VarDecl.names) {
 			print_ast(node->VarDecl.names[i], indent+1);
 		}

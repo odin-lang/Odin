@@ -203,7 +203,7 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 
 		gbString str = expr_to_string(op_b.expr);
 		defer (gb_string_free(str));
-		error(&c->error_collector, ast_node_token(op_b.expr), "Cannot assign to `%s`", str);
+		error(ast_node_token(op_b.expr), "Cannot assign to `%s`", str);
 	} break;
 	}
 
@@ -225,7 +225,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 			defer (gb_string_free(expr_str));
 
 			// TODO(bill): is this a good enough error message?
-			error(&c->error_collector, ast_node_token(operand->expr),
+			error(ast_node_token(operand->expr),
 			      "Cannot assign builtin procedure `%s` in %.*s",
 			      expr_str,
 			      LIT(context_name));
@@ -244,7 +244,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 		Type *t = operand->type;
 		if (is_type_untyped(t)) {
 			if (t == t_invalid) {
-				error(&c->error_collector, e->token, "Use of untyped thing in %.*s", LIT(context_name));
+				error(e->token, "Use of untyped thing in %.*s", LIT(context_name));
 				e->type = t_invalid;
 				return NULL;
 			}
@@ -285,6 +285,12 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 	}
 
 	isize rhs_count = gb_array_count(operands);
+	gb_for_array(i, operands) {
+		if (operands[i].mode == Addressing_Invalid) {
+			rhs_count--;
+		}
+	}
+
 
 	isize max = gb_min(lhs_count, rhs_count);
 	for (isize i = 0; i < max; i++) {
@@ -292,7 +298,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 	}
 
 	if (rhs_count > 0 && lhs_count != rhs_count) {
-		error(&c->error_collector, lhs[0]->token, "Assignment count mismatch `%td` := `%td`", lhs_count, rhs_count);
+		error(lhs[0]->token, "Assignment count mismatch `%td` := `%td`", lhs_count, rhs_count);
 	}
 }
 
@@ -307,7 +313,7 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 
 	if (operand->mode != Addressing_Constant) {
 		// TODO(bill): better error
-		error(&c->error_collector, ast_node_token(operand->expr),
+		error(ast_node_token(operand->expr),
 		      "`%.*s` is not a constant", LIT(ast_node_token(operand->expr).string));
 		if (e->type == NULL)
 			e->type = t_invalid;
@@ -343,7 +349,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 		if (!is_type_constant_type(t)) {
 			gbString str = type_to_string(t);
 			defer (gb_string_free(str));
-			error(&c->error_collector, ast_node_token(type_expr),
+			error(ast_node_token(type_expr),
 			      "Invalid constant type `%s`", str);
 			e->type = t_invalid;
 			return;
@@ -411,13 +417,13 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 						Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
 						Entity *prev = scope_insert_entity(c->context.scope, uvar);
 						if (prev != NULL) {
-							error(&c->error_collector, e->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
+							error(e->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
 							break;
 						}
 					}
 				}
 			} else {
-				error(&c->error_collector, e->token, "`using` can only be applied to variables of type struct or raw_union");
+				error(e->token, "`using` can only be applied to variables of type struct or raw_union");
 				break;
 			}
 		}
@@ -429,7 +435,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	check_stmt_list(c, bs->stmts, 0);
 	if (type->Proc.result_count > 0) {
 		if (!check_is_terminating(body)) {
-			error(&c->error_collector, bs->close, "Missing return statement at the end of the procedure");
+			error(bs->close, "Missing return statement at the end of the procedure");
 		}
 	}
 	pop_procedure(c);
@@ -501,20 +507,20 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 				gbString str = type_to_string(proc_type);
 				defer (gb_string_free(str));
 
-				error(&c->error_collector, e->token,
+				error(e->token,
 				      "Procedure type of `main` was expected to be `proc()`, got %s", str);
 			}
 		}
 	}
 
 	if (is_inline && is_no_inline) {
-		error(&c->error_collector, ast_node_token(pd->type),
+		error(ast_node_token(pd->type),
 		      "You cannot apply both `inline` and `no_inline` to a procedure");
 	}
 
 	if (pd->body != NULL) {
 		if (is_foreign) {
-			error(&c->error_collector, ast_node_token(pd->body),
+			error(ast_node_token(pd->body),
 			      "A procedure tagged as `#foreign` cannot have a body");
 		}
 
@@ -543,7 +549,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 			Type *this_type = get_base_type(e->type);
 			Type *other_type = get_base_type(f->type);
 			if (!are_signatures_similar_enough(this_type, other_type)) {
-				error(&c->error_collector, ast_node_token(d->proc_decl),
+				error(ast_node_token(d->proc_decl),
 				      "Redeclaration of #foreign procedure `%.*s` with different type signatures\n"
 				      "\tat %.*s(%td:%td)",
 				      LIT(name), LIT(pos.file), pos.line, pos.column);
@@ -662,116 +668,113 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 
 
 
-void check_var_decl_node(Checker *c, AstNode *node) {
+void check_var_decl(Checker *c, AstNode *node) {
 	ast_node(vd, VarDecl, node);
 	isize entity_count = gb_array_count(vd->names);
 	isize entity_index = 0;
 	Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
-	switch (vd->kind) {
-	case Declaration_Mutable: {
-		Entity **new_entities = gb_alloc_array(c->allocator, Entity *, entity_count);
-		isize new_entity_count = 0;
 
-		gb_for_array(i, vd->names) {
-			AstNode *name = vd->names[i];
-			Entity *entity = NULL;
-			Token token = name->Ident;
-			if (name->kind == AstNode_Ident) {
-				String str = token.string;
-				Entity *found = NULL;
-				// NOTE(bill): Ignore assignments to `_`
-				b32 can_be_ignored = are_strings_equal(str, make_string("_"));
-				if (!can_be_ignored) {
-					found = current_scope_lookup_entity(c->context.scope, str);
-				}
-				if (found == NULL) {
-					entity = make_entity_variable(c->allocator, c->context.scope, token, NULL);
-					if (!can_be_ignored) {
-						new_entities[new_entity_count++] = entity;
-					}
-					add_entity_definition(&c->info, name, entity);
-				} else {
-					TokenPos pos = found->token.pos;
-					error(&c->error_collector, token,
-					      "Redeclaration of `%.*s` in this scope\n"
-					      "\tat %.*s(%td:%td)",
-					      LIT(str), LIT(pos.file), pos.line, pos.column);
-					entity = found;
-				}
-			} else {
-				error(&c->error_collector, token, "A variable declaration must be an identifier");
+	gb_for_array(i, vd->names) {
+		AstNode *name = vd->names[i];
+		Entity *entity = NULL;
+		Token token = name->Ident;
+		if (name->kind == AstNode_Ident) {
+			String str = token.string;
+			Entity *found = NULL;
+			// NOTE(bill): Ignore assignments to `_`
+			b32 can_be_ignored = are_strings_equal(str, make_string("_"));
+			if (!can_be_ignored) {
+				found = current_scope_lookup_entity(c->context.scope, str);
 			}
-			if (entity == NULL)
-				entity = make_entity_dummy_variable(c->allocator, c->global_scope, token);
-			entities[entity_index++] = entity;
-		}
-
-		Type *init_type = NULL;
-		if (vd->type) {
-			init_type = check_type(c, vd->type, NULL);
-			if (init_type == NULL)
-				init_type = t_invalid;
-		}
-
-		for (isize i = 0; i < entity_count; i++) {
-			Entity *e = entities[i];
-			GB_ASSERT(e != NULL);
-			if (e->Variable.visited) {
-				e->type = t_invalid;
-				continue;
-			}
-			e->Variable.visited = true;
-
-			if (e->type == NULL)
-				e->type = init_type;
-		}
-
-		check_init_variables(c, entities, entity_count, vd->values, make_string("variable declaration"));
-
-		gb_for_array(i, vd->names) {
-			add_entity(c, c->context.scope, vd->names[i], new_entities[i]);
-		}
-
-	} break;
-
-	case Declaration_Immutable: {
-		gb_for_array(i, vd->values) {
-			AstNode *name = vd->names[i];
-			AstNode *value = vd->values[i];
-
-			GB_ASSERT(name->kind == AstNode_Ident);
-			ExactValue v = {ExactValue_Invalid};
-			String str = name->Ident.string;
-			Entity *found = current_scope_lookup_entity(c->context.scope, str);
 			if (found == NULL) {
-				Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
-				entities[entity_index++] = e;
-				check_const_decl(c, e, vd->type, value);
+				entity = make_entity_variable(c->allocator, c->context.scope, token, NULL);
+				add_entity_definition(&c->info, name, entity);
 			} else {
-				entities[entity_index++] = found;
+				TokenPos pos = found->token.pos;
+				error(token,
+				      "Redeclaration of `%.*s` in this scope\n"
+				      "\tat %.*s(%td:%td)",
+				      LIT(str), LIT(pos.file), pos.line, pos.column);
+				entity = found;
 			}
+		} else {
+			error(token, "A variable declaration must be an identifier");
 		}
+		if (entity == NULL)
+			entity = make_entity_dummy_variable(c->allocator, c->global_scope, token);
+		entities[entity_index++] = entity;
+	}
 
-		isize lhs_count = gb_array_count(vd->names);
-		isize rhs_count = gb_array_count(vd->values);
+	Type *init_type = NULL;
+	if (vd->type) {
+		init_type = check_type(c, vd->type, NULL);
+		if (init_type == NULL)
+			init_type = t_invalid;
+	}
 
-		// TODO(bill): Better error messages or is this good enough?
-		if (rhs_count == 0 && vd->type == NULL) {
-			error(&c->error_collector, ast_node_token(node), "Missing type or initial expression");
-		} else if (lhs_count < rhs_count) {
-			error(&c->error_collector, ast_node_token(node), "Extra initial expression");
+	for (isize i = 0; i < entity_count; i++) {
+		Entity *e = entities[i];
+		GB_ASSERT(e != NULL);
+		if (e->Variable.visited) {
+			e->type = t_invalid;
+			continue;
 		}
+		e->Variable.visited = true;
 
-		gb_for_array(i, vd->names) {
+		if (e->type == NULL)
+			e->type = init_type;
+	}
+
+	check_init_variables(c, entities, entity_count, vd->values, make_string("variable declaration"));
+
+	gb_for_array(i, vd->names) {
+		if (entities[i] != NULL) {
 			add_entity(c, c->context.scope, vd->names[i], entities[i]);
 		}
-	} break;
+	}
 
-	default:
-		error(&c->error_collector, ast_node_token(node), "Unknown variable declaration kind. Probably an invalid AST.");
-		return;
+}
+
+
+void check_const_decl(Checker *c, AstNode *node) {
+	ast_node(vd, ConstDecl, node);
+	isize entity_count = gb_array_count(vd->names);
+	isize entity_index = 0;
+	Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
+
+	gb_for_array(i, vd->values) {
+		AstNode *name = vd->names[i];
+		AstNode *value = vd->values[i];
+
+		GB_ASSERT(name->kind == AstNode_Ident);
+		ExactValue v = {ExactValue_Invalid};
+		String str = name->Ident.string;
+		Entity *found = current_scope_lookup_entity(c->context.scope, str);
+		if (found == NULL) {
+			Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
+			entities[entity_index++] = e;
+			check_const_decl(c, e, vd->type, value);
+		} else {
+			entities[entity_index++] = found;
+		}
+	}
+
+	isize lhs_count = gb_array_count(vd->names);
+	isize rhs_count = gb_array_count(vd->values);
+
+	// TODO(bill): Better error messages or is this good enough?
+	if (rhs_count == 0 && vd->type == NULL) {
+		error(ast_node_token(node), "Missing type or initial expression");
+	} else if (lhs_count < rhs_count) {
+		error(ast_node_token(node), "Extra initial expression");
+	}
+
+	gb_for_array(i, vd->names) {
+		add_entity(c, c->context.scope, vd->names[i], entities[i]);
 	}
 }
+
+
 
 
 void check_stmt(Checker *c, AstNode *node, u32 flags) {
@@ -786,7 +789,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		ExprKind kind = check_expr_base(c, &operand, es->expr);
 		switch (operand.mode) {
 		case Addressing_Type:
-			error(&c->error_collector, ast_node_token(node), "Is not an expression");
+			error(ast_node_token(node), "Is not an expression");
 			break;
 		case Addressing_NoValue:
 			return;
@@ -800,14 +803,14 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				return;
 			}
 
-			error(&c->error_collector, ast_node_token(node), "Expression is not used: `%s`", expr_str);
+			error(ast_node_token(node), "Expression is not used: `%s`", expr_str);
 		} break;
 		}
 	case_end;
 
 	case_ast_node(ts, TagStmt, node);
 		// TODO(bill): Tag Statements
-		error(&c->error_collector, ast_node_token(node), "Tag statements are not supported yet");
+		error(ast_node_token(node), "Tag statements are not supported yet");
 		check_stmt(c, ts->stmt, flags);
 	case_end;
 
@@ -823,7 +826,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			op.string.len = 1;
 			break;
 		default:
-			error(&c->error_collector, ids->op, "Unknown inc/dec operation %.*s", LIT(ids->op.string));
+			error(ids->op, "Unknown inc/dec operation %.*s", LIT(ids->op.string));
 			return;
 		}
 
@@ -832,7 +835,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		if (operand.mode == Addressing_Invalid)
 			return;
 		if (!is_type_numeric(operand.type)) {
-			error(&c->error_collector, ids->op, "Non numeric type");
+			error(ids->op, "Non numeric type");
 			return;
 		}
 
@@ -855,7 +858,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		case Token_Eq: {
 			// a, b, c = 1, 2, 3;  // Multisided
 			if (gb_array_count(as->lhs) == 0) {
-				error(&c->error_collector, as->op, "Missing lhs in assignment statement");
+				error(as->op, "Missing lhs in assignment statement");
 				return;
 			}
 
@@ -888,7 +891,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				check_assignment_variable(c, &operands[i], lhs);
 			}
 			if (lhs_count != rhs_count) {
-				error(&c->error_collector, ast_node_token(as->lhs[0]), "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
+				error(ast_node_token(as->lhs[0]), "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
 			}
 		} break;
 
@@ -896,11 +899,11 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			// a += 1; // Single-sided
 			Token op = as->op;
 			if (gb_array_count(as->lhs) != 1 || gb_array_count(as->rhs) != 1) {
-				error(&c->error_collector, op, "Assignment operation `%.*s` requires single-valued expressions", LIT(op.string));
+				error(op, "Assignment operation `%.*s` requires single-valued expressions", LIT(op.string));
 				return;
 			}
 			if (!gb_is_between(op.kind, Token__AssignOpBegin+1, Token__AssignOpEnd-1)) {
-				error(&c->error_collector, op, "Unknown Assignment operation `%.*s`", LIT(op.string));
+				error(op, "Unknown Assignment operation `%.*s`", LIT(op.string));
 				return;
 			}
 			// TODO(bill): Check if valid assignment operator
@@ -938,7 +941,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		check_expr(c, &operand, is->cond);
 		if (operand.mode != Addressing_Invalid &&
 		    !is_type_boolean(operand.type)) {
-			error(&c->error_collector, ast_node_token(is->cond),
+			error(ast_node_token(is->cond),
 			            "Non-boolean condition in `if` statement");
 		}
 
@@ -951,7 +954,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				check_stmt(c, is->else_stmt, mod_flags);
 				break;
 			default:
-				error(&c->error_collector, ast_node_token(is->else_stmt),
+				error(ast_node_token(is->else_stmt),
 				            "Invalid `else` statement in `if` statement");
 				break;
 			}
@@ -962,23 +965,28 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		GB_ASSERT(gb_array_count(c->proc_stack) > 0);
 
 		if (c->in_defer) {
-			error(&c->error_collector, rs->token, "You cannot `return` within a defer statement");
+			error(rs->token, "You cannot `return` within a defer statement");
 			// TODO(bill): Should I break here?
 			break;
 		}
 
 		Type *proc_type = c->proc_stack[gb_array_count(c->proc_stack)-1];
 		isize result_count = 0;
-		if (proc_type->Proc.results)
+		if (proc_type->Proc.results) {
 			result_count = proc_type->Proc.results->Tuple.variable_count;
+		}
 		if (result_count != gb_array_count(rs->results)) {
-			error(&c->error_collector, rs->token, "Expected %td return %s, got %td",
+			error(rs->token, "Expected %td return %s, got %td",
 			      result_count,
 			      (result_count != 1 ? "values" : "value"),
 			      gb_array_count(rs->results));
 		} else if (result_count > 0) {
-			auto *tuple = &proc_type->Proc.results->Tuple;
-			check_init_variables(c, tuple->variables, tuple->variable_count,
+			Entity **variables = NULL;
+			if (proc_type->Proc.results != NULL) {
+				auto *tuple = &proc_type->Proc.results->Tuple;
+				variables = tuple->variables;
+			}
+			check_init_variables(c, variables, result_count,
 			                     rs->results, make_string("return statement"));
 		}
 	case_end;
@@ -995,7 +1003,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			check_expr(c, &operand, fs->cond);
 			if (operand.mode != Addressing_Invalid &&
 			    !is_type_boolean(operand.type)) {
-				error(&c->error_collector, ast_node_token(fs->cond),
+				error(ast_node_token(fs->cond),
 				      "Non-boolean condition in `for` statement");
 			}
 		}
@@ -1040,13 +1048,13 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 					default_stmt = stmt;
 				}
 			} else {
-				error(&c->error_collector, ast_node_token(stmt), "Invalid AST - expected case clause");
+				error(ast_node_token(stmt), "Invalid AST - expected case clause");
 			}
 
 			if (default_stmt != NULL) {
 				if (first_default != NULL) {
 					TokenPos pos = ast_node_token(first_default).pos;
-					error(&c->error_collector, ast_node_token(stmt),
+					error(ast_node_token(stmt),
 					      "multiple `default` clauses\n"
 					      "\tfirst at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
 				} else {
@@ -1114,8 +1122,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 							if (are_types_identical(y.type, tap.type)) {
 								TokenPos pos = tap.token.pos;
 								gbString expr_str = expr_to_string(y.expr);
-								error(&c->error_collector,
-								      ast_node_token(y.expr),
+								error(ast_node_token(y.expr),
 								      "Duplicate case `%s`\n"
 								      "\tprevious case at %.*s(%td:%td)",
 								      expr_str,
@@ -1158,7 +1165,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		if (!is_type_pointer(x.type) || !is_type_union(type_deref(x.type))) {
 			gbString str = type_to_string(x.type);
 			defer (gb_string_free(str));
-			error(&c->error_collector, ast_node_token(x.expr),
+			error(ast_node_token(x.expr),
 			      "Expected a pointer to a union for this type match expression, got `%s`", str);
 			break;
 		}
@@ -1177,13 +1184,13 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 					default_stmt = stmt;
 				}
 			} else {
-				error(&c->error_collector, ast_node_token(stmt), "Invalid AST - expected case clause");
+				error(ast_node_token(stmt), "Invalid AST - expected case clause");
 			}
 
 			if (default_stmt != NULL) {
 				if (first_default != NULL) {
 					TokenPos pos = ast_node_token(first_default).pos;
-					error(&c->error_collector, ast_node_token(stmt),
+					error(ast_node_token(stmt),
 					      "multiple `default` clauses\n"
 					      "\tfirst at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
 				} else {
@@ -1226,7 +1233,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				if (!tag_type_found) {
 					gbString type_str = type_to_string(y.type);
 					defer (gb_string_free(type_str));
-					error(&c->error_collector, ast_node_token(y.expr),
+					error(ast_node_token(y.expr),
 					      "Unknown tag type, got `%s`", type_str);
 					continue;
 				}
@@ -1237,8 +1244,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				if (found) {
 					TokenPos pos = cc->token.pos;
 					gbString expr_str = expr_to_string(y.expr);
-					error(&c->error_collector,
-					      ast_node_token(y.expr),
+					error(ast_node_token(y.expr),
 					      "Duplicate type case `%s`\n"
 					      "\tprevious type case at %.*s(%td:%td)",
 					      expr_str,
@@ -1266,7 +1272,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(ds, DeferStmt, node);
 		if (is_ast_node_decl(ds->stmt)) {
-			error(&c->error_collector, ds->token, "You cannot defer a declaration");
+			error(ds->token, "You cannot defer a declaration");
 		} else {
 			b32 out_in_defer = c->in_defer;
 			c->in_defer = true;
@@ -1280,18 +1286,18 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		switch (token.kind) {
 		case Token_break:
 			if ((flags & Stmt_BreakAllowed) == 0)
-				error(&c->error_collector, token, "`break` only allowed in `for` or `match` statements");
+				error(token, "`break` only allowed in `for` or `match` statements");
 			break;
 		case Token_continue:
 			if ((flags & Stmt_ContinueAllowed) == 0)
-				error(&c->error_collector, token, "`continue` only allowed in `for` statements");
+				error(token, "`continue` only allowed in `for` statements");
 			break;
 		case Token_fallthrough:
 			if ((flags & Stmt_FallthroughAllowed) == 0)
-				error(&c->error_collector, token, "`fallthrough` statement in illegal position");
+				error(token, "`fallthrough` statement in illegal position");
 			break;
 		default:
-			error(&c->error_collector, token, "Invalid AST: Branch Statement `%.*s`", LIT(token.string));
+			error(token, "Invalid AST: Branch Statement `%.*s`", LIT(token.string));
 			break;
 		}
 	case_end;
@@ -1315,7 +1321,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			}
 
 			if (e == NULL) {
-				error(&c->error_collector, us->token, "`using` applied to an unknown entity");
+				error(us->token, "`using` applied to an unknown entity");
 				return;
 			}
 
@@ -1330,7 +1336,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 						Entity *f = t->Record.other_fields[i];
 						Entity *found = scope_insert_entity(c->context.scope, f);
 						if (found != NULL) {
-							error(&c->error_collector, us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+							error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
 							return;
 						}
 						f->using_parent = e;
@@ -1340,7 +1346,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 						Entity *f = t->Record.fields[i];
 						Entity *found = scope_insert_entity(c->context.scope, f);
 						if (found != NULL) {
-							error(&c->error_collector, us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+							error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
 							return;
 						}
 						f->using_parent = e;
@@ -1349,7 +1355,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 						Entity *f = t->Record.other_fields[i];
 						Entity *found = scope_insert_entity(c->context.scope, f);
 						if (found != NULL) {
-							error(&c->error_collector, us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+							error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
 							return;
 						}
 						f->using_parent = e;
@@ -1363,7 +1369,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 					Entity *decl = scope->elements.entries[i].value;
 					Entity *found = scope_insert_entity(c->context.scope, decl);
 					if (found != NULL) {
-						error(&c->error_collector, us->token,
+						error(us->token,
 						      "Namespace collision while `using` `%s` of: %.*s\n"
 						      "\tat %.*s(%td:%td)\n"
 						      "\tat %.*s(%td:%td)",
@@ -1377,12 +1383,12 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			} break;
 
 			case Entity_Constant:
-				error(&c->error_collector, us->token, "`using` cannot be applied to a constant");
+				error(us->token, "`using` cannot be applied to a constant");
 				break;
 
 			case Entity_Procedure:
 			case Entity_Builtin:
-				error(&c->error_collector, us->token, "`using` cannot be applied to a procedure");
+				error(us->token, "`using` cannot be applied to a procedure");
 				break;
 
 			case Entity_Variable: {
@@ -1399,13 +1405,13 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 							}
 							Entity *prev = scope_insert_entity(c->context.scope, uvar);
 							if (prev != NULL) {
-								error(&c->error_collector, us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(prev->token.string));
+								error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(prev->token.string));
 								return;
 							}
 						}
 					}
 				} else {
-					error(&c->error_collector, us->token, "`using` can only be applied to variables of type struct or raw_union");
+					error(us->token, "`using` can only be applied to variables of type struct or raw_union");
 					return;
 				}
 			} break;
@@ -1417,9 +1423,9 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 		case_ast_node(vd, VarDecl, us->node);
 			if (gb_array_count(vd->names) > 1 && vd->type != NULL) {
-				error(&c->error_collector, us->token, "`using` can only be applied to one variable of the same type");
+				error(us->token, "`using` can only be applied to one variable of the same type");
 			}
-			check_var_decl_node(c, us->node);
+			check_var_decl(c, us->node);
 
 			gb_for_array(name_index, vd->names) {
 				AstNode *item = vd->names[name_index];
@@ -1436,13 +1442,13 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 							Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
 							Entity *prev = scope_insert_entity(c->context.scope, uvar);
 							if (prev != NULL) {
-								error(&c->error_collector, us->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
+								error(us->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
 								return;
 							}
 						}
 					}
 				} else {
-					error(&c->error_collector, us->token, "`using` can only be applied to variables of type struct or raw_union");
+					error(us->token, "`using` can only be applied to variables of type struct or raw_union");
 					return;
 				}
 			}
@@ -1450,7 +1456,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 
 		default:
-			error(&c->error_collector, us->token, "Invalid AST: Using Statement");
+			error(us->token, "Invalid AST: Using Statement");
 			break;
 		}
 	case_end;
@@ -1461,7 +1467,11 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 
 	case_ast_node(vd, VarDecl, node);
-		check_var_decl_node(c, node);
+		check_var_decl(c, node);
+	case_end;
+
+	case_ast_node(cd, ConstDecl, node);
+		check_const_decl(c, node);
 	case_end;
 
 	case_ast_node(pd, ProcDecl, node);

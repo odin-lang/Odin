@@ -7,16 +7,8 @@ struct ssaGen {
 };
 
 b32 ssa_gen_init(ssaGen *s, Checker *c) {
-	if (c->error_collector.count != 0)
+	if (global_error_collector.count != 0)
 		return false;
-
-	gb_for_array(i, c->parser->files) {
-		AstFile *f = &c->parser->files[i];
-		if (f->error_collector.count != 0)
-			return false;
-		if (f->tokenizer.error_count != 0)
-			return false;
-	}
 
 	isize tc = c->parser->total_token_count;
 	if (tc < 2) {
