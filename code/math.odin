@@ -43,13 +43,25 @@ Mat3 :: type  {9}f32
 Mat4 :: type {16}f32
 
 
-fsqrt    :: proc(x: f32) -> f32 #foreign "llvm.sqrt.f32"
-fsin     :: proc(x: f32) -> f32 #foreign "llvm.sin.f32"
-fcos     :: proc(x: f32) -> f32 #foreign "llvm.cos.f32"
-flerp    :: proc(a, b, t: f32) -> f32 { return a*(1-t) + b*t }
-fclamp   :: proc(x, lower, upper: f32) -> f32 { return min(max(x, lower), upper) }
-fclamp01 :: proc(x: f32) -> f32 { return fclamp(x, 0, 1) }
-fsign    :: proc(x: f32) -> f32 { if x >= 0 { return +1 } return -1 }
+sqrt32    :: proc(x: f32) -> f32 #foreign "llvm.sqrt.f32"
+sqrt64    :: proc(x: f64) -> f64 #foreign "llvm.sqrt.f64"
+
+sin32     :: proc(x: f32) -> f32 #foreign "llvm.sin.f32"
+sin64     :: proc(x: f64) -> f64 #foreign "llvm.sin.f64"
+
+cos64     :: proc(x: f64) -> f64 #foreign "llvm.cos.f64"
+cos32     :: proc(x: f32) -> f32 #foreign "llvm.cos.f32"
+
+lerp32    :: proc(a, b, t: f32) -> f32 { return a*(1-t) + b*t }
+lerp64    :: proc(a, b, t: f64) -> f64 { return a*(1-t) + b*t }
+
+clamp32   :: proc(x, lower, upper: f32) -> f32 { return min(max(x, lower), upper) }
+clamp64   :: proc(x, lower, upper: f64) -> f64 { return min(max(x, lower), upper) }
+
+sign32    :: proc(x: f32) -> f32 { if x >= 0 { return +1 } return -1 }
+sign64    :: proc(x: f64) -> f64 { if x >= 0 { return +1 } return -1 }
+
+
 
 copy_sign :: proc(x, y: f32) -> f32 {
 	ix := x transmute u32
@@ -58,8 +70,6 @@ copy_sign :: proc(x, y: f32) -> f32 {
 	ix |= iy & 0x80000000
 	return ix transmute f32
 }
-
-
 round :: proc(x: f32) -> f32 {
 	if x >= 0 {
 		return floor(x + 0.5)
@@ -78,9 +88,6 @@ ceil :: proc(x: f32) -> f32 {
 	}
 	return ((x as int)+1) as f32
 }
-
-
-
 
 remainder :: proc(x, y: f32) -> f32 {
 	return x - round(x/y) * y

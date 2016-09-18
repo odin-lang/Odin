@@ -354,12 +354,13 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 						continue;
 					}
 
-					if (e->scope == shared) {
-						// Do not return imported entities
-						if (entity_) *entity_ = e;
-						if (scope_) *scope_ = shared;
-						return;
+					if (e->scope != shared) {
+						// Do not return imported entities even #load ones
+						continue;
 					}
+					if (entity_) *entity_ = e;
+					if (scope_) *scope_ = shared;
+					return;
 				}
 			}
 		}
@@ -529,13 +530,12 @@ void destroy_checker_info(CheckerInfo *i) {
 }
 
 
-void init_checker(Checker *c, Parser *parser) {
+void init_checker(Checker *c, Parser *parser, BaseTypeSizes sizes) {
 	gbAllocator a = gb_heap_allocator();
 
 	c->parser = parser;
 	init_checker_info(&c->info);
-	c->sizes.word_size = 8;
-	c->sizes.max_align = 8;
+	c->sizes = sizes;
 
 	gb_array_init(c->proc_stack, a);
 	gb_array_init(c->procs, a);
@@ -832,6 +832,7 @@ void check_type_name_cycles(Checker *c, CycleCheck *cc, Entity *e) {
 	// if (t->kind == Type_Named) {
 	// 	if (t->Named.type_name == e) {
 	// 		gb_printf("Illegal cycle %.*s!!!\n", LIT(e->token.string));
+	// 		GB_PANIC("!!!");
 	// 	}
 	// }
 }
@@ -841,9 +842,8 @@ void init_type_info_types(Checker *c) {
 		String type_info_str = make_string("Type_Info");
 		Entity *e = current_scope_lookup_entity(c->global_scope, type_info_str);
 		if (e == NULL) {
-			gb_printf_err("Internal Compiler Error: Could not find type declaration for `Type_Info`\n");
-			gb_printf_err("Is `runtime.odin` missing from the `core` directory?\n");
-			gb_exit(1);
+			compiler_error("Could not find type declaration for `Type_Info`\n"
+			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
 		}
 		t_type_info = e->type;
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
@@ -854,8 +854,7 @@ void init_type_info_types(Checker *c) {
 		t_type_info_member_ptr = make_type_pointer(c->allocator, t_type_info_member);
 
 		if (record->field_count != 16) {
-			gb_printf_err("Internal Compiler Error: Invalid `Type_Info` layout\n");
-			gb_exit(1);
+			compiler_error("Invalid `Type_Info` layout");
 		}
 		t_type_info_named     = record->fields[ 1]->type;
 		t_type_info_integer   = record->fields[ 2]->type;
@@ -1042,6 +1041,8 @@ void check_parsed_files(Checker *c) {
 			}
 			if (!previously_added) {
 				gb_array_append(file_scope->imported, scope);
+			} else {
+				warning(id->token, "Multiple #import of the same file within this scope");
 			}
 
 			if (are_strings_equal(id->import_name.string, make_string("_"))) {

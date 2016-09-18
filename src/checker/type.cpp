@@ -96,7 +96,7 @@ enum TypeRecordKind {
 };
 
 struct Type {
-	u32 flags;
+	u32 flags; // See parser.cpp `enum TypeFlag`
 	TypeKind kind;
 	union {
 		BasicType Basic;
@@ -908,9 +908,9 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	case Type_Vector: {
 		i64 size = type_size_of(s, allocator, t->Vector.elem);
 		size *= t->Vector.count;
-		size = next_pow2(size);
+		size = prev_pow2(size);
 		// TODO(bill): Type_Vector type_align_of
-		return gb_clamp(size, s.max_align, 4*s.max_align);
+		return gb_clamp(size, 1, s.max_align);
 	} break;
 
 	case Type_Record: {
@@ -920,8 +920,9 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 				i64 max = 1;
 				for (isize i = 0; i < t->Record.field_count; i++) {
 					i64 align = type_align_of(s, allocator, t->Record.fields[i]->type);
-					if (max < align)
+					if (max < align) {
 						max = align;
+					}
 				}
 				return max;
 			}
@@ -931,8 +932,9 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 			for (isize i = 1; i < t->Record.field_count; i++) {
 				// NOTE(bill): field zero is null
 				i64 align = type_align_of(s, allocator, t->Record.fields[i]->type);
-				if (max < align)
+				if (max < align) {
 					max = align;
+				}
 			}
 			return max;
 		} break;
@@ -940,8 +942,9 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 			i64 max = 1;
 			for (isize i = 0; i < t->Record.field_count; i++) {
 				i64 align = type_align_of(s, allocator, t->Record.fields[i]->type);
-				if (max < align)
+				if (max < align) {
 					max = align;
+				}
 			}
 			return max;
 		} break;
@@ -955,7 +958,6 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 }
 
 i64 *type_set_offsets_of(BaseTypeSizes s, gbAllocator allocator, Entity **fields, isize field_count, b32 is_packed) {
-	// TODO(bill): use arena allocation
 	i64 *offsets = gb_alloc_array(allocator, i64, field_count);
 	i64 curr_offset = 0;
 	if (is_packed) {
@@ -1040,8 +1042,9 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct: {
 			i64 count = t->Record.field_count;
-			if (count == 0)
+			if (count == 0) {
 				return 0;
+			}
 			type_set_offsets(s, allocator, t);
 			return t->Record.struct_offsets[count-1] + type_size_of(s, allocator, t->Record.fields[count-1]->type);
 		} break;

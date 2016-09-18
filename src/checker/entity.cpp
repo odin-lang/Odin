@@ -26,37 +26,37 @@ String const entity_strings[] = {
 };
 
 
-typedef i64 EntityGuid;
 typedef struct Type Type;
 
 struct Entity {
 	EntityKind kind;
-	EntityGuid guid;
 
-	Scope *scope;
-	Token token;
-	Type *type;
-	Entity *using_parent;
-	AstNode *using_expr;
+	Scope *    scope;
+	Token      token;
+	Type *     type;
+	Entity *   using_parent;
+	AstNode *  using_expr;
 
 	union {
-		struct { ExactValue value; } Constant;
 		struct {
-			b8  visited;   // Cycle detection
-			b8  used;      // Variable is used
-			b8  anonymous; // Variable is an anonymous
-			b8  is_using;  // `using` variable
+			ExactValue value;
+		} Constant;
+		struct {
+			b8  visited;     // Cycle detection
+			b8  used;        // Variable is used
+			b8  anonymous;   // Variable is an anonymous
+			b8  is_using;    // `using` variable
 
 			i32 field_index; // Order in source
 			b8  is_field;    // Is struct field
 		} Variable;
 		struct {
-			// struct DeclInfo *decl; // Usually NULL
 		} TypeName;
 		struct {
-			b8 pure;
 		} Procedure;
-		struct { BuiltinProcId id; } Builtin;
+		struct {
+			BuiltinProcId id;
+		} Builtin;
 		struct {
 			String path;
 			String name;
@@ -78,16 +78,10 @@ b32 is_entity_exported(Entity *e) {
 	return true;
 }
 
-gb_global gbAtomic64 entity_guid_counter = {0};
-
-EntityGuid next_entity_guid(void) {
-	return cast(EntityGuid)gb_atomic64_fetch_add(&entity_guid_counter, 1);
-}
 
 Entity *alloc_entity(gbAllocator a, EntityKind kind, Scope *scope, Token token, Type *type) {
 	Entity *entity = gb_alloc_item(a, Entity);
 	entity->kind   = kind;
-	entity->guid   = next_entity_guid();
 	entity->scope  = scope;
 	entity->token  = token;
 	entity->type   = type;

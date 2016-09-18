@@ -17,6 +17,7 @@ enum ParseFileError {
 typedef gbArray(AstNode *) AstNodeArray;
 
 struct AstFile {
+	u32            id;
 	gbArena        arena;
 	Tokenizer      tokenizer;
 	gbArray(Token) tokens;
@@ -2661,12 +2662,14 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 		gb_array_init(f->tokens, gb_heap_allocator());
 		for (;;) {
 			Token token = tokenizer_get_token(&f->tokenizer);
-			if (token.kind == Token_Invalid)
+			if (token.kind == Token_Invalid) {
 				return ParseFile_InvalidToken;
+			}
 			gb_array_append(f->tokens, token);
 
-			if (token.kind == Token_EOF)
+			if (token.kind == Token_EOF) {
 				break;
+			}
 		}
 
 		f->cursor = &f->tokens[0];
@@ -2842,6 +2845,7 @@ void parse_file(Parser *p, AstFile *f) {
 		}
 		base_dir.len--;
 	}
+
 	gbAllocator allocator = gb_heap_allocator(); // TODO(bill): Change this allocator
 
 	f->decls = parse_stmt_list(f);
@@ -2917,26 +2921,11 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 		AstFile file = {};
 		ParseFileError err = init_ast_file(&file, import_path);
 
-		// if (err == ParseFile_NotFound) {
-		// 	// HACK(bill): Check core directory
-		// 	char buf[300] = {};
-		// 	char core[] = "W:/Odin/core/";
-		// 	isize len = gb_size_of(core)-1;
-		// 	gb_memcopy(buf, core, len);
-		// 	gb_memcopy(buf+len, import_rel_path.text, import_rel_path.len);
-		// 	char *path = gb_path_get_full_name(gb_heap_allocator(), buf);
-		// 	gb_printf_err("%s\n", path);
-
-		// 	import_path = make_string(path);
-		// 	err = init_ast_file(&file, import_path);
-		// 	p->imports[i].path = import_path;
-		// }
-
 		if (err != ParseFile_None) {
 			if (pos.line != 0) {
 				gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
 			}
-			gb_printf_err("Failed to parse file: %.*s\n", LIT(import_path));
+			gb_printf_err("Failed to parse file: %.*s\n", LIT(import_rel_path));
 			switch (err) {
 			case ParseFile_WrongExtension:
 				gb_printf_err("\tInvalid file extension\n");
@@ -2960,6 +2949,7 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 			return err;
 		}
 		parse_file(p, &file);
+		file.id = gb_array_count(p->files);
 		gb_array_append(p->files, file);
 		p->total_token_count += gb_array_count(file.tokens);
 	}

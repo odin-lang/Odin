@@ -210,6 +210,17 @@ void syntax_error(Token token, char *fmt, ...) {
 }
 
 
+void compiler_error(char *fmt, ...) {
+	va_list va;
+
+	va_start(va, fmt);
+	gb_printf_err("Internal Compiler Error: %s\n",
+	              gb_bprintf_va(fmt, va));
+	va_end(va);
+	gb_exit(1);
+}
+
+
 
 // NOTE(bill): result == priority
 i32 token_precedence(Token t) {
@@ -353,6 +364,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 	c_str[fullpath.len] = '\0';
 
 	defer (gb_free(gb_heap_allocator(), c_str));
+
 
 	gbFileContents fc = gb_file_read_contents(gb_heap_allocator(), true, c_str);
 	gb_zero_item(t);

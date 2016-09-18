@@ -668,7 +668,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 
 
 
-void check_var_decl(Checker *c, AstNode *node) {
+void check_var_decl_node(Checker *c, AstNode *node) {
 	ast_node(vd, VarDecl, node);
 	isize entity_count = gb_array_count(vd->names);
 	isize entity_index = 0;
@@ -736,7 +736,7 @@ void check_var_decl(Checker *c, AstNode *node) {
 }
 
 
-void check_const_decl(Checker *c, AstNode *node) {
+void check_const_decl_node(Checker *c, AstNode *node) {
 	ast_node(vd, ConstDecl, node);
 	isize entity_count = gb_array_count(vd->names);
 	isize entity_index = 0;
@@ -1425,7 +1425,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			if (gb_array_count(vd->names) > 1 && vd->type != NULL) {
 				error(us->token, "`using` can only be applied to one variable of the same type");
 			}
-			check_var_decl(c, us->node);
+			check_var_decl_node(c, us->node);
 
 			gb_for_array(name_index, vd->names) {
 				AstNode *item = vd->names[name_index];
@@ -1467,11 +1467,11 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 
 	case_ast_node(vd, VarDecl, node);
-		check_var_decl(c, node);
+		check_var_decl_node(c, node);
 	case_end;
 
 	case_ast_node(cd, ConstDecl, node);
-		check_const_decl(c, node);
+		check_const_decl_node(c, node);
 	case_end;
 
 	case_ast_node(pd, ProcDecl, node);

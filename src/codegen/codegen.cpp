@@ -31,6 +31,40 @@ void ssa_gen_destroy(ssaGen *s) {
 	gb_file_close(&s->output_file);
 }
 
+String ssa_mangle_name(ssaGen *s, String path, String name) {
+	// NOTE(bill): prefix names not in the init scope
+	// TODO(bill): make robust and not just rely on the file's name
+
+	ssaModule *m = &s->module;
+	CheckerInfo *info = m->info;
+	gbAllocator a = m->allocator;
+	AstFile *file = *map_get(&info->files, hash_string(path));
+
+	char *str = gb_alloc_array(a, char, path.len+1);
+	gb_memcopy(str, path.text, path.len);
+	str[path.len] = 0;
+	for (isize i = 0; i < path.len; i++) {
+		if (str[i] == '\\') {
+			str[i] = '/';
+		}
+
+	}
+
+	char const *base = gb_path_base_name(str);
+	char const *ext = gb_path_extension(base);
+	isize base_len = ext-1-base;
+
+	isize max_len = base_len + 1 + 10 + 1 + name.len;
+	u8 *new_name = gb_alloc_array(a, u8, max_len);
+	isize new_name_len = gb_snprintf(
+		cast(char *)new_name, max_len,
+		"%.*s$%u.%.*s",
+		base_len, base,
+		file->id,
+		LIT(name));
+
+	return make_string(new_name, new_name_len-1);
+}
 
 void ssa_gen_tree(ssaGen *s) {
 	if (v_zero == NULL) {
@@ -62,34 +96,8 @@ void ssa_gen_tree(ssaGen *s) {
 
 		DeclInfo *decl = entry->value;
 		Scope *scope = e->scope;
-		if (scope->is_global ||
-		    scope->is_init) {
-
-		} else {
-			// NOTE(bill): prefix names not in the init scope
-			// TODO(bill): make robust and not just rely on the file's name
-			String path = e->token.pos.file;
-			char *str = gb_alloc_array(a, char, path.len+1);
-			gb_memcopy(str, path.text, path.len);
-			str[path.len] = 0;
-			for (isize i = 0; i < path.len; i++) {
-				if (str[i] == '\\') {
-					str[i] = '/';
-				}
-
-			}
-			char const *base = gb_path_base_name(str);
-			char const *ext = gb_path_extension(base);
-			isize base_len = ext-1-base;
-
-			isize new_len = base_len + 1 + name.len;
-			u8 *new_name = gb_alloc_array(a, u8, new_len);
-			gb_memcopy(new_name, base, base_len);
-			new_name[base_len] = '.';
-			gb_memcopy(new_name+base_len+1, name.text, name.len);
-
-			name = make_string(new_name, new_len);
-			// gb_printf("%.*s\n", new_len, new_name);
+		if (!scope->is_global && !scope->is_init) {
+			name = ssa_mangle_name(s, e->token.pos.file, name);
 		}
 
 

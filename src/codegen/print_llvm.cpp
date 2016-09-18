@@ -119,7 +119,7 @@ void ssa_print_encoded_local(ssaFileBuffer *f, String name) {
 	ssa_print_escape_string(f, name, true);
 }
 
-void ssa_print_encoded_global(ssaFileBuffer *f, String name, b32 global_scope = false) {
+void ssa_print_encoded_global(ssaFileBuffer *f, String name, b32 global_scope) {
 	ssa_fprintf(f, "@");
 	if (!global_scope && !are_strings_equal(name, make_string("main"))) {
 		ssa_fprintf(f, ".");
@@ -337,20 +337,25 @@ void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type
 		ssa_print_encoded_local(f, value->TypeName.name);
 		break;
 	case ssaValue_Global: {
+		Scope *scope = value->Global.entity->scope;
+		b32 in_global_scope = false;
+		if (scope != NULL) {
+			in_global_scope = scope->is_global || scope->is_init;
+		}
 		if (type_hint != NULL && is_type_string(type_hint)) {
 			ssa_fprintf(f, "{i8* getelementptr inbounds (");
 			ssa_print_type(f, m->sizes, value->Global.entity->type);
 			ssa_fprintf(f, ", ");
 			ssa_print_type(f, m->sizes, value->Global.entity->type);
 			ssa_fprintf(f, "* ");
-			ssa_print_encoded_global(f, value->Global.entity->token.string);
+			ssa_print_encoded_global(f, value->Global.entity->token.string, in_global_scope);
 			ssa_fprintf(f, ", ");
 			ssa_print_type(f, m->sizes, t_int);
 			ssa_fprintf(f, " 0, i32 0), ");
 			ssa_print_type(f, m->sizes, t_int);
 			ssa_fprintf(f, " %lld}", 0);
 		} else {
-			ssa_print_encoded_global(f, value->Global.entity->token.string);
+			ssa_print_encoded_global(f, value->Global.entity->token.string, in_global_scope);
 		}
 	} break;
 	case ssaValue_Param:
@@ -374,7 +379,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	switch (instr->kind) {
 	case ssaInstr_StartupRuntime: {
 		ssa_fprintf(f, "call void ");
-		ssa_print_encoded_global(f, make_string(SSA_STARTUP_RUNTIME_PROC_NAME));
+		ssa_print_encoded_global(f, make_string(SSA_STARTUP_RUNTIME_PROC_NAME), false);
 		ssa_fprintf(f, "()\n");
 	} break;
 
@@ -823,10 +828,6 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 	}
 
 
-	if (proc->tags & ProcTag_foreign) {
-		ssa_fprintf(f, "; foreign\n");
-	}
-
 	if (proc->body != NULL) {
 		// ssa_fprintf(f, "nounwind uwtable {\n");
 
@@ -915,7 +916,12 @@ void ssa_print_llvm_ir(ssaFileBuffer *f, ssaModule *m) {
 			continue;
 		}
 		auto *g = &v->Global;
-		ssa_print_encoded_global(f, g->entity->token.string);
+		Scope *scope = g->entity->scope;
+		b32 in_global_scope = false;
+		if (scope != NULL) {
+			in_global_scope = scope->is_global || scope->is_init;
+		}
+		ssa_print_encoded_global(f, g->entity->token.string, in_global_scope);
 		ssa_fprintf(f, " = ");
 		if (g->is_thread_local) {
 			ssa_fprintf(f, "thread_local ");

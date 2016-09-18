@@ -1,14 +1,19 @@
-#import "punity.odin" as pn
+#import "punity.odin"   as pn
+#import "test.odin"     as t1
+#import "sub/test.odin" as t2
 
 main :: proc() {
-	init :: proc(c: ^pn.Core) {
-	}
+	t1.thing()
+	t2.thing()
 
-	step :: proc(c: ^pn.Core) {
-		if pn.key_down(pn.Key.ESCAPE) {
-			c.running = false
-		}
-	}
+	// init :: proc(c: ^pn.Core) {
+	// }
 
-	pn.run(init, step)
+	// step :: proc(c: ^pn.Core) {
+	// 	if pn.key_down(pn.Key.ESCAPE) {
+	// 		c.running = false
+	// 	}
+	// }
+
+	// pn.run(init, step)
 }

@@ -40,20 +40,19 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 	}
 }
 
-
 #if defined(DISPLAY_TIMING)
-#define INIT_TIMER() u64 start_time, end_time = 0, total_time = 0; start_time = gb_utc_time_now()
+#define INIT_TIMER() f64 start_time = gb_time_now(), end_time = 0, total_time = 0
 #define PRINT_TIMER(section) do { \
-	u64 diff; \
-	end_time = gb_utc_time_now(); \
+	f64 diff; \
+	end_time = gb_time_now(); \
 	diff = end_time - start_time; \
 	total_time += diff; \
-	gb_printf_err("%s: %.1f ms\n", section, diff/1000.0f); \
-	start_time = gb_utc_time_now(); \
+	gb_printf_err("%s: %.1f ms\n", section, diff*1000.0); \
+	start_time = gb_time_now(); \
 } while (0)
 
 #define PRINT_ACCUMULATION() do { \
-	gb_printf_err("Total compilation time: %lld ms\n", total_time/1000); \
+	gb_printf_err("Total compilation time: %.1f ms\n", total_time*1000.0); \
 } while (0)
 #else
 #define INIT_TIMER()
@@ -94,8 +93,12 @@ int main(int argc, char **argv) {
 
 #if 1
 	Checker checker = {};
+	BaseTypeSizes sizes = {};
+	// NOTE(bill): x64
+	sizes.word_size = 8;
+	sizes.max_align = 16;
 
-	init_checker(&checker, &parser);
+	init_checker(&checker, &parser, sizes);
 	defer (destroy_checker(&checker));
 
 	check_parsed_files(&checker);

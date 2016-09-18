@@ -4,6 +4,21 @@
 
 #include "string.cpp"
 
+
+struct BlockTimer {
+	u64 start;
+	u64 finish;
+	char *msg;
+	BlockTimer(char *msg) : msg(msg) {
+		start = gb_utc_time_now();
+	}
+	~BlockTimer() {
+		finish = gb_utc_time_now();
+		gb_printf_err("%s - %llu us\n", finish-start);
+	}
+};
+
+
 // Hasing
 
 struct HashKey {
@@ -45,6 +60,9 @@ b32 hash_key_equal(HashKey a, HashKey b) {
 }
 
 i64 next_pow2(i64 n) {
+	if (n <= 0) {
+		return 0;
+	}
 	n--;
 	n |= n >> 1;
 	n |= n >> 2;
@@ -54,6 +72,19 @@ i64 next_pow2(i64 n) {
 	n |= n >> 32;
 	n++;
 	return n;
+}
+
+i64 prev_pow2(i64 n) {
+	if (n <= 0) {
+		return 0;
+	}
+	n |= n >> 1;
+	n |= n >> 2;
+	n |= n >> 4;
+	n |= n >> 8;
+	n |= n >> 16;
+	n |= n >> 32;
+	return n - (n >> 1);
 }
 
 
