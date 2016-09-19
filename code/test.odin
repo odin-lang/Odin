@@ -1,5 +1,5 @@
 #import "fmt.odin" as fmt
 
-thing :: proc() {
+thing :: proc() #link_name "frankerooney" {
 	fmt.println("Hello!")
 }

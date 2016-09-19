@@ -1,5 +1,60 @@
 #import "os.odin" as os
 
+PRINT_BUF_SIZE :: 1<<12
+
+fprint :: proc(f: ^os.File, args: ..any) {
+	data: [PRINT_BUF_SIZE]byte
+	buf := data[:0]
+	prev_string := false
+
+	for i := 0; i < args.count; i++ {
+		arg := args[i]
+		is_string := arg.data != null && type_info_is_string(arg.type_info)
+		if i > 0 && is_string && !prev_string {
+			print_space_to_buffer(^buf)
+		}
+		print_any_to_buffer(^buf, arg)
+		prev_string = is_string;
+	}
+
+	os.write(f, buf)
+}
+
+fprintln :: proc(f: ^os.File, args: ..any) {
+	data: [PRINT_BUF_SIZE]byte
+	buf := data[:0]
+
+	for i := 0; i < args.count; i++ {
+		if i > 0 {
+			append(^buf, #rune " ")
+		}
+		print_any_to_buffer(^buf, args[i])
+	}
+
+	print_nl_to_buffer(^buf)
+	os.write(f, buf)
+}
+fprintf :: proc(f: ^os.File, fmt: string, args: ..any) {
+	data: [PRINT_BUF_SIZE]byte
+	buf := data[:0]
+	printf_to_buffer(^buf, fmt, ..args)
+	os.write(f, buf)
+}
+
+
+print :: proc(args: ..any) {
+	fprint(os.stdout, ..args)
+}
+println :: proc(args: ..any) {
+	fprintln(os.stdout, ..args)
+}
+printf :: proc(fmt: string, args: ..any) {
+	fprintf(os.stdout, fmt, ..args)
+}
+
+
+
+
 print_byte_buffer :: proc(buf: ^[]byte, b: []byte) {
 	if buf.count < buf.capacity {
 		n := min(buf.capacity-buf.count, b.count)
@@ -68,7 +123,7 @@ print_nl_to_buffer    :: proc(buf: ^[]byte) { print_rune_to_buffer(buf, #rune "\
 print_int_to_buffer :: proc(buf: ^[]byte, i: int) {
 	print_int_base_to_buffer(buf, i, 10);
 }
-PRINT__NUM_TO_CHAR_TABLE :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$"
+__NUM_TO_CHAR_TABLE :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$"
 print_int_base_to_buffer :: proc(buffer: ^[]byte, i, base: int) {
 
 	buf: [65]byte
@@ -83,7 +138,7 @@ print_int_base_to_buffer :: proc(buffer: ^[]byte, i, base: int) {
 		len++
 	}
 	for i > 0 {
-		buf[len] = PRINT__NUM_TO_CHAR_TABLE[i % base]
+		buf[len] = __NUM_TO_CHAR_TABLE[i % base]
 		len++
 		i /= base
 	}
@@ -108,7 +163,7 @@ print_uint_base_to_buffer :: proc(buffer: ^[]byte, i, base: uint, min_width: int
 		len++
 	}
 	for i > 0 {
-		buf[len] = PRINT__NUM_TO_CHAR_TABLE[i % base]
+		buf[len] = __NUM_TO_CHAR_TABLE[i % base]
 		len++
 		i /= base
 	}
@@ -149,7 +204,7 @@ print__f64 :: proc(buffer: ^[]byte, f: f64, decimal_places: int) {
 			len++
 		}
 		for i > 0 {
-			buf[len] = PRINT__NUM_TO_CHAR_TABLE[i % 10]
+			buf[len] = __NUM_TO_CHAR_TABLE[i % 10]
 			len++
 			i /= 10
 		}
@@ -334,7 +389,6 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 				case 2:  i = (arg.data as ^i16)^  as int
 				case 4:  i = (arg.data as ^i32)^  as int
 				case 8:  i = (arg.data as ^i64)^  as int
-				case 16: i = (arg.data as ^i128)^ as int
 				}
 			}
 			print_int_to_buffer(buf, i)
@@ -346,7 +400,6 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 				case 2:  i = (arg.data as ^u16)^  as uint
 				case 4:  i = (arg.data as ^u32)^  as uint
 				case 8:  i = (arg.data as ^u64)^  as uint
-				case 16: i = (arg.data as ^u128)^ as uint
 				}
 			}
 			print_uint_to_buffer(buf, i)
@@ -488,7 +541,7 @@ type_info_is_string :: proc(info: ^Type_Info) -> bool {
 }
 
 
-print_to_buffer :: proc(buf: ^[]byte, fmt: string, args: ..any) {
+printf_to_buffer :: proc(buf: ^[]byte, fmt: string, args: ..any) {
 	is_digit :: proc(r: rune) -> bool #inline {
 		return r >= #rune "0" && r <= #rune "9"
 	}
@@ -549,35 +602,4 @@ print_to_buffer :: proc(buf: ^[]byte, fmt: string, args: ..any) {
 	}
 
 	print_string_to_buffer(buf, fmt[prev:])
-}
-
-PRINT_BUF_SIZE :: 1<<12
-
-print_to_file :: proc(f: ^os.File, fmt: string, args: ..any) {
-	data: [PRINT_BUF_SIZE]byte
-	buf := data[:0]
-	print_to_buffer(^buf, fmt, ..args)
-	os.write(f, buf)
-}
-
-println_to_file :: proc(f: ^os.File, fmt: string, args: ..any) {
-	data: [PRINT_BUF_SIZE]byte
-	buf := data[:0]
-	print_to_buffer(^buf, fmt, ..args)
-	print_nl_to_buffer(^buf)
-	os.write(f, buf)
-}
-
-
-print :: proc(fmt: string, args: ..any) {
-	print_to_file(os.get_standard_file(os.File_Standard.OUTPUT), fmt, ..args)
-}
-print_err :: proc(fmt: string, args: ..any) {
-	print_to_file(os.get_standard_file(os.File_Standard.ERROR), fmt, ..args)
-}
-println :: proc(fmt: string, args: ..any) {
-	println_to_file(os.get_standard_file(os.File_Standard.OUTPUT), fmt, ..args)
-}
-println_err :: proc(fmt: string, args: ..any) {
-	println_to_file(os.get_standard_file(os.File_Standard.ERROR), fmt, ..args)
 }

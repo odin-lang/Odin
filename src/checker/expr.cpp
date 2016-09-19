@@ -385,25 +385,34 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 
 
 // TODO(bill): Cleanup struct field reordering
+// TODO(bill): Inline sorting procedure?
 gb_global BaseTypeSizes __checker_sizes = {};
 gb_global gbAllocator   __checker_allocator = {};
 
 GB_COMPARE_PROC(cmp_struct_entity_size) {
-	// Rule: Biggest to smallest
-	// if same size, order by order in source
+	// Rule:
+	// Biggest to smallest alignment
+	// if same alignment: biggest to smallest size
+	// if same size: order by source order
 	Entity *x = *(Entity **)a;
 	Entity *y = *(Entity **)b;
 	GB_ASSERT(x != NULL);
 	GB_ASSERT(y != NULL);
 	GB_ASSERT(x->kind == Entity_Variable);
 	GB_ASSERT(y->kind == Entity_Variable);
+	i64 xa = type_align_of(__checker_sizes, __checker_allocator, x->type);
+	i64 ya = type_align_of(__checker_sizes, __checker_allocator, y->type);
 	i64 xs = type_size_of(__checker_sizes, __checker_allocator, x->type);
 	i64 ys = type_size_of(__checker_sizes, __checker_allocator, y->type);
-	if (xs == ys) {
-		i32 diff = x->Variable.field_index - y->Variable.field_index;
-		return diff < 0 ? -1 : diff > 0;
+
+	if (xa == ya) {
+		if (xs == ys) {
+			i32 diff = x->Variable.field_index - y->Variable.field_index;
+			return diff < 0 ? -1 : diff > 0;
+		}
+		return xs > ys ? -1 : xs < ys;
 	}
-	return xs > ys ? -1 : xs < ys;
+	return xa > ya ? -1 : xa < ya;
 }
 
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecker *cycle_checker) {
@@ -746,6 +755,11 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 			error(n->Ident,
 			      "Undeclared name: %.*s", LIT(n->Ident.string));
 		}
+		o->type = t_invalid;
+		o->mode = Addressing_Invalid;
+		if (named_type != NULL) {
+			set_base_type(named_type, t_invalid);
+		}
 		return;
 	}
 	add_entity_use(&c->info, n, e);
@@ -761,7 +775,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 	check_entity_decl(c, e, NULL, named_type, cycle_checker);
 
 	if (e->type == NULL) {
-		GB_PANIC("Compiler error: How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(n->Ident.string));
+		compiler_error("Compiler error: How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(n->Ident.string));
 		return;
 	}
 
@@ -820,7 +834,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 		return;
 
 	default:
-		GB_PANIC("Compiler error: Unknown EntityKind");
+		compiler_error("Compiler error: Unknown EntityKind");
 		break;
 	}
 
@@ -2785,6 +2799,44 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		operand->type = type;
 	} break;
+
+	case BuiltinProc_enum_to_string: {
+		Type *type = get_base_type(operand->type);
+		if (!is_type_enum(type)) {
+			gbString type_str = type_to_string(operand->type);
+			defer (gb_string_free(type_str));
+			error(ast_node_token(call),
+			      "Expected an enum to `enum_to_string`, got `%s`",
+			      type_str);
+			return false;
+		}
+
+		if (operand->mode == Addressing_Constant) {
+			ExactValue value = make_exact_value_string(make_string(""));
+			if (operand->value.kind == ExactValue_Integer) {
+				i64 index = operand->value.value_integer;
+				for (isize i = 0; i < type->Record.other_field_count; i++) {
+					Entity *f = type->Record.other_fields[i];
+					if (f->kind == Entity_Constant && f->Constant.value.kind == ExactValue_Integer) {
+						i64 fv = f->Constant.value.value_integer;
+						if (index == fv) {
+							value = make_exact_value_string(f->token.string);
+							break;
+						}
+					}
+				}
+			}
+
+			operand->value = value;
+			operand->type = t_string;
+			return true;
+		}
+
+		add_type_info_type(c, operand->type);
+
+		operand->mode = Addressing_Value;
+		operand->type = t_string;
+	} break;
 	}
 
 	return true;
@@ -2832,8 +2884,10 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 		Entity **sig_params = proc_type->Proc.params->Tuple.variables;
 		gb_for_array(arg_index, ce->args) {
 			check_multi_expr(c, operand, ce->args[arg_index]);
-			if (operand->mode == Addressing_Invalid)
+			if (operand->mode == Addressing_Invalid) {
+				param_index++;
 				continue;
+			}
 			if (operand->type->kind != Type_Tuple) {
 				check_not_tuple(c, operand);
 				isize index = param_index;
@@ -3083,7 +3137,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		case Type_Record: {
 			if (!is_type_struct(t))
 				break;
-			if (gb_array_count(cl->elems) == 0) {
+			if (cl->elems == NULL || gb_array_count(cl->elems) == 0) {
 				break; // NOTE(bill): No need to init
 			}
 			{ // Checker values

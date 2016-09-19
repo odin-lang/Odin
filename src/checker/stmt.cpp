@@ -8,9 +8,12 @@ enum StmtFlag : u32 {
 
 
 void check_stmt(Checker *c, AstNode *node, u32 flags);
-void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later);
+void check_proc_decl(Checker *c, Entity *e, DeclInfo *d);
 
 void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
+	// TODO(bill): Allow declaration (expect variable) in any order
+	// even within a procedure
+
 	b32 ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
 	u32 f = flags & (~Stmt_FallthroughAllowed);
 
@@ -321,7 +324,7 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	}
 	if (!is_type_constant_type(operand->type)) {
 		// NOTE(bill): no need to free string as it's panicking
-		GB_PANIC("Compiler error: Type `%s` not constant!!!", type_to_string(operand->type));
+		compiler_error("Type `%s` not constant!!!", type_to_string(operand->type));
 	}
 
 	if (e->type == NULL) // NOTE(bill): type inference
@@ -482,7 +485,7 @@ b32 are_signatures_similar_enough(Type *a_, Type *b_) {
 	return true;
 }
 
-void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
+void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e->type == NULL);
 
 	Type *proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0, false);
@@ -494,6 +497,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 
 
 	b32 is_foreign   = (pd->tags & ProcTag_foreign)   != 0;
+	b32 is_link_name = (pd->tags & ProcTag_link_name) != 0;
 	b32 is_inline    = (pd->tags & ProcTag_inline)    != 0;
 	b32 is_no_inline = (pd->tags & ProcTag_no_inline) != 0;
 
@@ -527,11 +531,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 		d->scope = c->context.scope;
 
 		GB_ASSERT(pd->body->kind == AstNode_BlockStmt);
-		if (check_body_later) {
-			check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pd->body);
-		} else {
-			check_proc_body(c, e->token, d, proc_type, pd->body);
-		}
+		check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pd->body);
 	}
 
 	if (is_foreign) {
@@ -554,6 +554,23 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d, b32 check_body_later) {
 				      "\tat %.*s(%td:%td)",
 				      LIT(name), LIT(pos.file), pos.line, pos.column);
 			}
+		} else {
+			map_set(fp, key, e);
+		}
+	} else if (is_link_name) {
+		auto *fp = &c->info.foreign_procs;
+		auto *proc_decl = &d->proc_decl->ProcDecl;
+		String name = proc_decl->link_name;
+
+		HashKey key = hash_string(name);
+		auto *found = map_get(fp, key);
+		if (found) {
+			Entity *f = *found;
+			TokenPos pos = f->token.pos;
+			error(ast_node_token(d->proc_decl),
+			      "Non unique #link_name for procedure `%.*s`\n"
+			      "\tother at %.*s(%td:%td)",
+			      LIT(name), LIT(pos.file), pos.line, pos.column);
 		} else {
 			map_set(fp, key, e);
 		}
@@ -610,7 +627,9 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 		if (found) {
 			d = *found;
 		} else {
-			GB_PANIC("`%.*s` should been declared!", LIT(e->token.string));
+			e->type = t_invalid;
+			return;
+			// GB_PANIC("`%.*s` should been declared!", LIT(e->token.string));
 		}
 	}
 
@@ -620,7 +639,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 	// defer (c->context.scope = prev);
 
 	if (e->kind == Entity_Procedure) {
-		check_proc_decl(c, e, d, true);
+		check_proc_decl(c, e, d);
 		return;
 	}
 
@@ -644,7 +663,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 	} break;
 
 	case Entity_Procedure: {
-		check_proc_decl(c, e, d, true);
+		check_proc_decl(c, e, d);
 	} break;
 
 
@@ -1261,6 +1280,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				// NOTE(bill): Dummy type
 				Type *tag_ptr_type = make_type_pointer(c->allocator, tag_type);
 				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, ms->var->Ident, tag_ptr_type);
+				tag_var->Variable.used = true;
 				add_entity(c, c->context.scope, ms->var, tag_var);
 				add_entity_use(&c->info, ms->var, tag_var);
 			}
@@ -1481,7 +1501,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 		DeclInfo *decl = make_declaration_info(c->allocator, e->scope);
 		decl->proc_decl = node;
-		check_proc_decl(c, e, decl, false);
+		check_proc_decl(c, e, decl);
 	case_end;
 
 	case_ast_node(td, TypeDecl, node);

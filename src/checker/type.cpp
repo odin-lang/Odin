@@ -7,12 +7,10 @@ enum BasicKind {
 	Basic_i16,
 	Basic_i32,
 	Basic_i64,
-	Basic_i128,
 	Basic_u8,
 	Basic_u16,
 	Basic_u32,
 	Basic_u64,
-	Basic_u128,
 	Basic_f32,
 	Basic_f64,
 	Basic_int,
@@ -296,12 +294,10 @@ gb_global Type basic_types[] = {
 	{0, Type_Basic, {Basic_i16,            BasicFlag_Integer,                      STR_LIT("i16")}},
 	{0, Type_Basic, {Basic_i32,            BasicFlag_Integer,                      STR_LIT("i32")}},
 	{0, Type_Basic, {Basic_i64,            BasicFlag_Integer,                      STR_LIT("i64")}},
-	{0, Type_Basic, {Basic_i128,           BasicFlag_Integer,                      STR_LIT("i128")}},
 	{0, Type_Basic, {Basic_u8,             BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u8")}},
 	{0, Type_Basic, {Basic_u16,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u16")}},
 	{0, Type_Basic, {Basic_u32,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u32")}},
 	{0, Type_Basic, {Basic_u64,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u64")}},
-	{0, Type_Basic, {Basic_u128,           BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u128")}},
 	{0, Type_Basic, {Basic_f32,            BasicFlag_Float,                        STR_LIT("f32")}},
 	{0, Type_Basic, {Basic_f64,            BasicFlag_Float,                        STR_LIT("f64")}},
 	{0, Type_Basic, {Basic_int,            BasicFlag_Integer,                      STR_LIT("int")}},
@@ -328,12 +324,10 @@ gb_global Type *t_i8              = &basic_types[Basic_i8];
 gb_global Type *t_i16             = &basic_types[Basic_i16];
 gb_global Type *t_i32             = &basic_types[Basic_i32];
 gb_global Type *t_i64             = &basic_types[Basic_i64];
-gb_global Type *t_i128            = &basic_types[Basic_i128];
 gb_global Type *t_u8              = &basic_types[Basic_u8];
 gb_global Type *t_u16             = &basic_types[Basic_u16];
 gb_global Type *t_u32             = &basic_types[Basic_u32];
 gb_global Type *t_u64             = &basic_types[Basic_u64];
-gb_global Type *t_u128            = &basic_types[Basic_u128];
 gb_global Type *t_f32             = &basic_types[Basic_f32];
 gb_global Type *t_f64             = &basic_types[Basic_f64];
 gb_global Type *t_int             = &basic_types[Basic_int];
@@ -602,7 +596,12 @@ b32 are_types_identical(Type *x, Type *y) {
 					break;
 
 				case TypeRecord_Enum:
-					return are_types_identical(x->Record.enum_base, y->Record.enum_base);
+					if (are_types_identical(x->Record.enum_base, y->Record.enum_base)) {
+						if (x->Record.field_count == y->Record.field_count) {
+							return x->Record.fields == y->Record.fields;
+						}
+					}
+					return false;
 				}
 			}
 		}
@@ -679,12 +678,10 @@ gb_global i64 basic_type_sizes[] = {
 	2,  // Basic_i16
 	4,  // Basic_i32
 	8,  // Basic_i64
-	16, // Basic_i128
 	1,  // Basic_u8
 	2,  // Basic_u16
 	4,  // Basic_u32
 	8,  // Basic_u64
-	16, // Basic_u128
 	4,  // Basic_f32
 	8,  // Basic_f64
 };
@@ -954,7 +951,8 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	} break;
 	}
 
-	return gb_clamp(next_pow2(type_size_of(s, allocator, t)), 1, s.max_align);
+	// return gb_clamp(next_pow2(type_size_of(s, allocator, t)), 1, s.max_align);
+	return gb_clamp(next_pow2(type_size_of(s, allocator, t)), 1, s.word_size);
 }
 
 i64 *type_set_offsets_of(BaseTypeSizes s, gbAllocator allocator, Entity **fields, isize field_count, b32 is_packed) {

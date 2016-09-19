@@ -63,14 +63,15 @@ enum ProcTag : u64 {
 	ProcTag_no_bounds_check = GB_BIT(1),
 
 	ProcTag_foreign         = GB_BIT(10),
-	ProcTag_inline          = GB_BIT(11),
-	ProcTag_no_inline       = GB_BIT(12),
-	ProcTag_dll_import      = GB_BIT(13),
-	ProcTag_dll_export      = GB_BIT(14),
+	ProcTag_link_name       = GB_BIT(11),
+	ProcTag_inline          = GB_BIT(12),
+	ProcTag_no_inline       = GB_BIT(13),
+	ProcTag_dll_import      = GB_BIT(14),
+	ProcTag_dll_export      = GB_BIT(15),
 
-	ProcTag_stdcall         = GB_BIT(15),
-	ProcTag_fastcall        = GB_BIT(16),
-	// ProcTag_cdecl           = GB_BIT(17),
+	ProcTag_stdcall         = GB_BIT(16),
+	ProcTag_fastcall        = GB_BIT(17),
+	// ProcTag_cdecl           = GB_BIT(18),
 };
 
 enum VarDeclTag {
@@ -237,6 +238,7 @@ AST_NODE_KIND(_DeclBegin,      "", struct{}) \
 			AstNode *body;        \
 			u64     tags;         \
 			String  foreign_name; \
+			String  link_name;    \
 	}) \
 	AST_NODE_KIND(TypeDecl,   "type declaration",   struct { Token token; AstNode *name, *type; }) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
@@ -806,13 +808,14 @@ gb_inline AstNode *make_proc_type(AstFile *f, Token token, AstNodeArray params, 
 	return result;
 }
 
-gb_inline AstNode *make_proc_decl(AstFile *f, AstNode *name, AstNode *proc_type, AstNode *body, u64 tags, String foreign_name) {
+gb_inline AstNode *make_proc_decl(AstFile *f, AstNode *name, AstNode *proc_type, AstNode *body, u64 tags, String foreign_name, String link_name) {
 	AstNode *result = make_node(f, AstNode_ProcDecl);
 	result->ProcDecl.name = name;
 	result->ProcDecl.type = proc_type;
 	result->ProcDecl.body = body;
 	result->ProcDecl.tags = tags;
 	result->ProcDecl.foreign_name = foreign_name;
+	result->ProcDecl.link_name = link_name;
 	return result;
 }
 
@@ -1165,10 +1168,10 @@ b32 is_foreign_name_valid(String name) {
 	return true;
 }
 
-void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
+void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_name) {
 	// TODO(bill): Add this to procedure literals too
-
-
+	GB_ASSERT(foreign_name != NULL);
+	GB_ASSERT(link_name    != NULL);
 
 	while (f->cursor[0].kind == Token_Hash) {
 		AstNode *tag_expr = parse_tag_expr(f, NULL);
@@ -1186,10 +1189,23 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
 				*foreign_name = f->cursor[0].string;
 				// TODO(bill): Check if valid string
 				if (!is_foreign_name_valid(*foreign_name)) {
-					syntax_error(ast_node_token(tag_expr), "Invalid alternative foreign procedure name");
+					syntax_error(ast_node_token(tag_expr), "Invalid alternative foreign procedure name: `%.*s`", LIT(*foreign_name));
 				}
 
 				next_token(f);
+			}
+		} else if (are_strings_equal(tag_name, make_string("link_name"))) {
+			check_proc_add_tag(f, tag_expr, tags, ProcTag_link_name, tag_name);
+			if (f->cursor[0].kind == Token_String) {
+				*link_name = f->cursor[0].string;
+				// TODO(bill): Check if valid string
+				if (!is_foreign_name_valid(*link_name)) {
+					syntax_error(ast_node_token(tag_expr), "Invalid alternative link procedure name `%.*s`", LIT(*link_name));
+				}
+
+				next_token(f);
+			} else {
+				expect_token(f, Token_String);
 			}
 		}
 		ELSE_IF_ADD_TAG(bounds_check)
@@ -1208,6 +1224,10 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
 		#undef ELSE_IF_ADD_TAG
 	}
 
+	if ((*tags & ProcTag_foreign) && (*tags & ProcTag_link_name)) {
+		syntax_error(f->cursor[0], "You cannot apply both #foreign and #link_name to a procedure");
+	}
+
 	if ((*tags & ProcTag_inline) && (*tags & ProcTag_no_inline)) {
 		syntax_error(f->cursor[0], "You cannot apply both #inline and #no_inline to a procedure");
 	}
@@ -1218,6 +1238,10 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name) {
 
 	if (((*tags & ProcTag_bounds_check) || (*tags & ProcTag_no_bounds_check)) && (*tags & ProcTag_foreign)) {
 		syntax_error(f->cursor[0], "You cannot apply both #bounds_check or #no_bounds_check to a procedure without a body");
+	}
+
+	if ((*tags & ProcTag_stdcall) && (*tags & ProcTag_fastcall)) {
+		syntax_error(f->cursor[0], "You cannot apply one calling convention to a procedure");
 	}
 }
 
@@ -1292,9 +1316,13 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 
 		u64 tags = 0;
 		String foreign_name = {};
-		parse_proc_tags(f, &tags, &foreign_name);
+		String link_name = {};
+		parse_proc_tags(f, &tags, &foreign_name, &link_name);
 		if (tags & ProcTag_foreign) {
 			syntax_error(f->cursor[0], "#foreign cannot be applied to procedure literals");
+		}
+		if (tags & ProcTag_link_name) {
+			syntax_error(f->cursor[0], "#link_name cannot be applied to procedure literals");
 		}
 
 		if (f->cursor[0].kind != Token_OpenBrace) {
@@ -2082,8 +2110,9 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 	AstNode *body = NULL;
 	u64 tags = 0;
 	String foreign_name = {};
+	String link_name = {};
 
-	parse_proc_tags(f, &tags, &foreign_name);
+	parse_proc_tags(f, &tags, &foreign_name, &link_name);
 
 	AstNode *curr_proc = f->curr_proc;
 	f->curr_proc = proc_type;
@@ -2096,7 +2125,7 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 		body = parse_body(f);
 	}
 
-	return make_proc_decl(f, name, proc_type, body, tags, foreign_name);
+	return make_proc_decl(f, name, proc_type, body, tags, foreign_name, link_name);
 }
 
 AstNode *parse_decl(AstFile *f, AstNodeArray names) {
@@ -2794,7 +2823,7 @@ b32 try_add_foreign_system_library_path(Parser *p, String import_file) {
 }
 
 gb_global Rune illegal_import_runes[] = {
-	'"', '\'', '`', ' ',
+	'"', '\'', '`', ' ', '\t', '\r', '\n', '\v', '\f',
 	'\\', // NOTE(bill): Disallow windows style filepaths
 	'!', '$', '%', '^', '&', '*', '(', ')', '=', '+',
 	'[', ']', '{', '}',
@@ -2862,10 +2891,12 @@ void parse_file(Parser *p, AstFile *f) {
 
 				if (!is_import_path_valid(file_str)) {
 					if (id->is_load) {
-						syntax_error(ast_node_token(node), "Invalid #load path");
+						syntax_error(ast_node_token(node), "Invalid #load path: `%.*s`", LIT(file_str));
 					} else {
-						syntax_error(ast_node_token(node), "Invalid #import path");
+						syntax_error(ast_node_token(node), "Invalid #import path: `%.*s`", LIT(file_str));
 					}
+					// NOTE(bill): It's a naughty name
+					f->decls[i] = make_bad_decl(f, id->token, id->token);
 					continue;
 				}
 
@@ -2888,6 +2919,8 @@ void parse_file(Parser *p, AstFile *f) {
 
 				if (!is_import_path_valid(file_str)) {
 					syntax_error(ast_node_token(node), "Invalid `foreign_system_library` path");
+					// NOTE(bill): It's a naughty name
+					f->decls[i] = make_bad_decl(f, id->token, id->token);
 					continue;
 				}
 

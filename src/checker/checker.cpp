@@ -159,6 +159,8 @@ enum BuiltinProcId {
 	BuiltinProc_max,
 	BuiltinProc_abs,
 
+	BuiltinProc_enum_to_string,
+
 
 	BuiltinProc_Count,
 };
@@ -199,6 +201,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("min"),              2, false, Expr_Expr},
 	{STR_LIT("max"),              2, false, Expr_Expr},
 	{STR_LIT("abs"),              1, false, Expr_Expr},
+
+	{STR_LIT("enum_to_string"),   1, false, Expr_Expr},
 
 };
 
@@ -358,6 +362,9 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 						// Do not return imported entities even #load ones
 						continue;
 					}
+					if (!is_entity_exported(e)) {
+						continue;
+					}
 					if (entity_) *entity_ = e;
 					if (scope_) *scope_ = shared;
 					return;
@@ -409,7 +416,7 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 
 void check_scope_usage(Checker *c, Scope *scope) {
 	// TODO(bill): Use this?
-#if 0
+#if 1
 	gb_for_array(i, scope->elements.entries) {
 		auto *entry = scope->elements.entries + i;
 		Entity *e = entry->value;
@@ -445,7 +452,7 @@ void add_global_entity(Entity *entity) {
 		return; // NOTE(bill): `untyped thing`
 	}
 	if (scope_insert_entity(universal_scope, entity)) {
-		GB_PANIC("Compiler error: double declaration");
+		compiler_error("double declaration");
 	}
 }
 
@@ -491,10 +498,6 @@ void init_universal_scope(void) {
 		Entity *entity = alloc_entity(a, Entity_Builtin, NULL, token, t_invalid);
 		entity->Builtin.id = id;
 		add_global_entity(entity);
-	}
-
-// Custom Runtime Types
-	{
 	}
 }
 
@@ -1112,12 +1115,27 @@ void check_parsed_files(Checker *c) {
 		ExpressionInfo *info = &entry->value;
 		if (info != NULL && expr != NULL) {
 			if (is_type_typed(info->type)) {
-				GB_PANIC("%s (type %s) is typed!", expr_to_string(expr), info->type);
+				compiler_error("%s (type %s) is typed!", expr_to_string(expr), info->type);
 			}
 			add_type_and_value(&c->info, expr, info->mode, info->type, info->value);
 		}
 	}
 #endif
+
+	gb_for_array(i, c->parser->files) {
+		AstFile *f = &c->parser->files[i];
+		Scope *scope = f->scope;
+		gb_for_array(j, scope->elements.entries) {
+			Entity *e = scope->elements.entries[j].value;
+			switch (e->kind) {
+			case Entity_ImportName: {
+				if (!e->ImportName.used) {
+					warning(e->token, "Unused import name: %.*s", LIT(e->ImportName.name));
+				}
+			} break;
+			}
+		}
+	}
 }
 
 

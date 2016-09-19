@@ -46,7 +46,9 @@ struct ssaModule {
 	CheckerInfo * info;
 	BaseTypeSizes sizes;
 	gbArena       arena;
+	gbArena       tmp_arena;
 	gbAllocator   allocator;
+	gbAllocator   tmp_allocator;
 	b32 generate_debug_info;
 
 	u32 stmt_state_flags;
@@ -364,7 +366,9 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 	isize token_count = c->parser->total_token_count;
 	isize arena_size = 4 * token_count * gb_size_of(ssaValue);
 	gb_arena_init_from_allocator(&m->arena, gb_heap_allocator(), arena_size);
-	m->allocator = gb_arena_allocator(&m->arena);
+	gb_arena_init_from_allocator(&m->tmp_arena, gb_heap_allocator(), arena_size);
+	m->allocator     = gb_arena_allocator(&m->arena);
+	m->tmp_allocator = gb_arena_allocator(&m->tmp_arena);
 	m->info = &c->info;
 	m->sizes = c->sizes;
 
@@ -770,6 +774,9 @@ ssaValue *ssa_make_const_int(gbAllocator a, i64 i) {
 ssaValue *ssa_make_const_i32(gbAllocator a, i64 i) {
 	return ssa_make_value_constant(a, t_i32, make_exact_value_integer(i));
 }
+ssaValue *ssa_make_const_i64(gbAllocator a, i64 i) {
+	return ssa_make_value_constant(a, t_i64, make_exact_value_integer(i));
+}
 ssaValue *ssa_make_const_bool(gbAllocator a, b32 b) {
 	return ssa_make_value_constant(a, t_bool, make_exact_value_bool(b != 0));
 }
@@ -1066,8 +1073,10 @@ ssaValue *ssa_lvalue_load(ssaProcedure *proc, ssaAddr lval) {
 
 
 void ssa_begin_procedure_body(ssaProcedure *proc) {
-	gb_array_init(proc->blocks, gb_heap_allocator());
+	gb_array_init(proc->blocks,      gb_heap_allocator());
 	gb_array_init(proc->defer_stmts, gb_heap_allocator());
+	gb_array_init(proc->children,    gb_heap_allocator());
+
 	proc->decl_block  = ssa_add_block(proc, proc->type_expr, make_string("decls"));
 	proc->entry_block = ssa_add_block(proc, proc->type_expr, make_string("entry"));
 	proc->curr_block  = proc->entry_block;
@@ -1466,7 +1475,7 @@ ssaValue *ssa_add_local_slice(ssaProcedure *proc, Type *slice_type, ssaValue *ba
 
 
 ssaValue *ssa_add_global_string_array(ssaModule *m, String string) {
-	gbAllocator a = gb_heap_allocator();
+	gbAllocator a = m->allocator;
 
 	isize max_len = 4+8+1;
 	u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
@@ -2005,9 +2014,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 	case_end;
 
 	case_ast_node(pl, ProcLit, expr);
-		if (proc->children == NULL) {
-			gb_array_init(proc->children, gb_heap_allocator());
-		}
 		// NOTE(bill): Generate a new name
 		// parent$count
 		isize name_len = proc->name.len + 1 + 8 + 1;
@@ -2456,6 +2462,20 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssaValue *cond = ssa_emit_comp(proc, lt, x, v_zero);
 					return ssa_emit_select(proc, cond, neg_x, x);
 				} break;
+
+
+				case BuiltinProc_enum_to_string: {
+					ssa_emit_comment(proc, make_string("enum_to_string"));
+					ssaValue *x = ssa_build_expr(proc, ce->args[0]);
+					Type *t = ssa_type(x);
+					ssaValue *ti = ssa_type_info(proc, t);
+
+
+					ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, 2);
+					args[0] = ti;
+					args[1] = ssa_emit_conv(proc, x, t_i64);
+					return ssa_emit_global_call(proc, "__enum_to_string", args, 2);
+				} break;
 				}
 			}
 		}
@@ -2672,7 +2692,6 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		ssa_emit_comment(proc, make_string("SelectorExpr"));
 		String selector = unparen_expr(se->selector)->Ident.string;
 		Type *type = get_base_type(type_of_expr(proc->module->info, se->expr));
-
 
 		if (type == t_invalid) {
 			// Imports
@@ -3039,13 +3058,15 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 	case_end;
 
 	case_ast_node(vd, VarDecl, node);
+		ssaModule *m = proc->module;
+		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
+		defer (gb_temp_arena_memory_end(tmp));
+
 		if (gb_array_count(vd->names) == gb_array_count(vd->values)) { // 1:1 assigment
 			gbArray(ssaAddr)  lvals;
 			gbArray(ssaValue *) inits;
-			gb_array_init_reserve(lvals, gb_heap_allocator(), gb_array_count(vd->names));
-			gb_array_init_reserve(inits, gb_heap_allocator(), gb_array_count(vd->names));
-			defer (gb_array_free(lvals));
-			defer (gb_array_free(inits));
+			gb_array_init_reserve(lvals, m->tmp_allocator, gb_array_count(vd->names));
+			gb_array_init_reserve(inits, m->tmp_allocator, gb_array_count(vd->names));
 
 			gb_for_array(i, vd->names) {
 				AstNode *name = vd->names[i];
@@ -3079,10 +3100,8 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		} else { // Tuple(s)
 			gbArray(ssaAddr)  lvals;
 			gbArray(ssaValue *) inits;
-			gb_array_init_reserve(lvals, gb_heap_allocator(), gb_array_count(vd->names));
-			gb_array_init_reserve(inits, gb_heap_allocator(), gb_array_count(vd->names));
-			defer (gb_array_free(lvals));
-			defer (gb_array_free(inits));
+			gb_array_init_reserve(lvals, m->tmp_allocator, gb_array_count(vd->names));
+			gb_array_init_reserve(inits, m->tmp_allocator, gb_array_count(vd->names));
 
 			gb_for_array(i, vd->names) {
 				AstNode *name = vd->names[i];
@@ -3118,15 +3137,15 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 	case_end;
 
 	case_ast_node(pd, ProcDecl, node);
-		if (proc->children == NULL) {
-			gb_array_init(proc->children, gb_heap_allocator());
-		}
-
-
 		if (pd->body != NULL) {
 			// NOTE(bill): Generate a new name
 			// parent$name-guid
-			String pd_name = pd->name->Ident.string;
+			String original_name = pd->name->Ident.string;
+			String pd_name = original_name;
+			if (pd->link_name.len > 0) {
+				pd_name = pd->link_name;
+			}
+
 			isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
 			u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
 			i32 guid = cast(i32)gb_array_count(proc->children);
@@ -3205,11 +3224,15 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 	case_ast_node(as, AssignStmt, node);
 		ssa_emit_comment(proc, make_string("AssignStmt"));
+
+		ssaModule *m = proc->module;
+		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
+		defer (gb_temp_arena_memory_end(tmp));
+
 		switch (as->op.kind) {
 		case Token_Eq: {
 			gbArray(ssaAddr) lvals;
-			gb_array_init(lvals, gb_heap_allocator());
-			defer (gb_array_free(lvals));
+			gb_array_init(lvals, m->tmp_allocator);
 
 			gb_for_array(i, as->lhs) {
 				AstNode *lhs = as->lhs[i];
@@ -3227,8 +3250,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 					ssa_lvalue_store(proc, lvals[0], init);
 				} else {
 					gbArray(ssaValue *) inits;
-					gb_array_init_reserve(inits, gb_heap_allocator(), gb_array_count(lvals));
-					defer (gb_array_free(inits));
+					gb_array_init_reserve(inits, m->tmp_allocator, gb_array_count(lvals));
 
 					gb_for_array(i, as->rhs) {
 						ssaValue *init = ssa_build_expr(proc, as->rhs[i]);
@@ -3241,8 +3263,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 				}
 			} else {
 				gbArray(ssaValue *) inits;
-				gb_array_init_reserve(inits, gb_heap_allocator(), gb_array_count(lvals));
-				defer (gb_array_free(inits));
+				gb_array_init_reserve(inits, m->tmp_allocator, gb_array_count(lvals));
 
 				gb_for_array(i, as->rhs) {
 					ssaValue *init = ssa_build_expr(proc, as->rhs[i]);

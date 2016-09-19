@@ -142,12 +142,12 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 		case Basic_i16:    ssa_fprintf(f, "i16");                     break;
 		case Basic_i32:    ssa_fprintf(f, "i32");                     break;
 		case Basic_i64:    ssa_fprintf(f, "i64");                     break;
-		case Basic_i128:   ssa_fprintf(f, "i128");                    break;
+		// case Basic_i128:   ssa_fprintf(f, "i128");                    break;
 		case Basic_u8:     ssa_fprintf(f, "i8");                      break;
 		case Basic_u16:    ssa_fprintf(f, "i16");                     break;
 		case Basic_u32:    ssa_fprintf(f, "i32");                     break;
 		case Basic_u64:    ssa_fprintf(f, "i64");                     break;
-		case Basic_u128:   ssa_fprintf(f, "i128");                    break;
+		// case Basic_u128:   ssa_fprintf(f, "i128");                    break;
 		case Basic_f32:    ssa_fprintf(f, "float");                   break;
 		case Basic_f64:    ssa_fprintf(f, "double");                  break;
 		case Basic_rawptr: ssa_fprintf(f, "%%..rawptr");              break;
@@ -346,27 +346,27 @@ void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type
 		if (scope != NULL) {
 			in_global_scope = scope->is_global || scope->is_init;
 		}
-		if (type_hint != NULL && is_type_string(type_hint)) {
-			ssa_fprintf(f, "{i8* getelementptr inbounds (");
-			ssa_print_type(f, m, value->Global.entity->type);
-			ssa_fprintf(f, ", ");
-			ssa_print_type(f, m, value->Global.entity->type);
-			ssa_fprintf(f, "* ");
+		// if (type_hint != NULL && is_type_string(type_hint)) {
+		// 	ssa_fprintf(f, "{i8* getelementptr inbounds (");
+		// 	ssa_print_type(f, m, value->Global.entity->type);
+		// 	ssa_fprintf(f, ", ");
+		// 	ssa_print_type(f, m, value->Global.entity->type);
+		// 	ssa_fprintf(f, "* ");
+		// 	ssa_print_encoded_global(f, value->Global.entity->token.string, in_global_scope);
+		// 	ssa_fprintf(f, ", ");
+		// 	ssa_print_type(f, m, t_int);
+		// 	ssa_fprintf(f, " 0, i32 0), ");
+		// 	ssa_print_type(f, m, t_int);
+		// 	ssa_fprintf(f, " %lld}", 0);
+		// } else {
 			ssa_print_encoded_global(f, value->Global.entity->token.string, in_global_scope);
-			ssa_fprintf(f, ", ");
-			ssa_print_type(f, m, t_int);
-			ssa_fprintf(f, " 0, i32 0), ");
-			ssa_print_type(f, m, t_int);
-			ssa_fprintf(f, " %lld}", 0);
-		} else {
-			ssa_print_encoded_global(f, value->Global.entity->token.string, in_global_scope);
-		}
+		// }
 	} break;
 	case ssaValue_Param:
 		ssa_print_encoded_local(f, value->Param.entity->token.string);
 		break;
 	case ssaValue_Proc:
-		ssa_print_encoded_global(f, value->Proc.name, (value->Proc.tags & ProcTag_foreign) != 0);
+		ssa_print_encoded_global(f, value->Proc.name, (value->Proc.tags & (ProcTag_foreign|ProcTag_link_name)) != 0);
 		break;
 	case ssaValue_Instr:
 		ssa_fprintf(f, "%%%d", value->id);
@@ -788,11 +788,7 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 	}
 
 	ssa_fprintf(f, " ");
-	if (are_strings_equal(proc->name, make_string("main"))) {
-		ssa_print_encoded_global(f, proc->name, true);
-	} else {
-		ssa_print_encoded_global(f, proc->name, (proc->tags & ProcTag_foreign) != 0);
-	}
+	ssa_print_encoded_global(f, proc->name, (proc->tags & (ProcTag_foreign|ProcTag_link_name)) != 0);
 	ssa_fprintf(f, "(");
 
 	if (proc_type->param_count > 0) {
@@ -818,12 +814,6 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 		ssa_fprintf(f, "noinline ");
 	}
 
-	// if (proc->tags & ProcTag_stdcall) {
-	// 	ssa_fprintf(f, "\"cc\"=\"64\" ");
-	// }
-	// if (proc->tags & ProcTag_fastcall) {
-	// 	ssa_fprintf(f, "\"cc\"=\"65\" ");
-	// }
 
 	if (proc->module->generate_debug_info && proc->entity != NULL) {
 		ssaDebugInfo *di = *map_get(&proc->module->debug_info, hash_pointer(proc->entity));

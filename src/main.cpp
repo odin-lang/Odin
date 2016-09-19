@@ -40,6 +40,7 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 	}
 }
 
+
 #if defined(DISPLAY_TIMING)
 #define INIT_TIMER() f64 start_time = gb_time_now(), end_time = 0, total_time = 0
 #define PRINT_TIMER(section) do { \
@@ -82,7 +83,7 @@ int main(int argc, char **argv) {
 
 	if (!init_parser(&parser))
 		return 1;
-	defer (destroy_parser(&parser));
+	// defer (destroy_parser(&parser));
 
 	if (parse_files(&parser, init_filename) != ParseFile_None)
 		return 1;
@@ -99,7 +100,7 @@ int main(int argc, char **argv) {
 	sizes.max_align = 16;
 
 	init_checker(&checker, &parser, sizes);
-	defer (destroy_checker(&checker));
+	// defer (destroy_checker(&checker));
 
 	check_parsed_files(&checker);
 
@@ -110,7 +111,7 @@ int main(int argc, char **argv) {
 	ssaGen ssa = {};
 	if (!ssa_gen_init(&ssa, &checker))
 		return 1;
-	defer (ssa_gen_destroy(&ssa));
+	// defer (ssa_gen_destroy(&ssa));
 
 	ssa_gen_tree(&ssa);
 
@@ -146,7 +147,7 @@ int main(int argc, char **argv) {
 
 #if 1
 	gbString lib_str = gb_string_make(gb_heap_allocator(), "-lKernel32.lib");
-	defer (gb_string_free(lib_str));
+	// defer (gb_string_free(lib_str));
 	char lib_str_buf[1024] = {};
 	gb_for_array(i, parser.system_libraries) {
 		String lib = parser.system_libraries[i];

@@ -67,16 +67,6 @@ String ssa_mangle_name(ssaGen *s, String path, String name) {
 }
 
 void ssa_gen_tree(ssaGen *s) {
-	if (v_zero == NULL) {
-		v_zero   = ssa_make_const_int (gb_heap_allocator(), 0);
-		v_one    = ssa_make_const_int (gb_heap_allocator(), 1);
-		v_zero32 = ssa_make_const_i32 (gb_heap_allocator(), 0);
-		v_one32  = ssa_make_const_i32 (gb_heap_allocator(), 1);
-		v_two32  = ssa_make_const_i32 (gb_heap_allocator(), 2);
-		v_false  = ssa_make_const_bool(gb_heap_allocator(), false);
-		v_true   = ssa_make_const_bool(gb_heap_allocator(), true);
-	}
-
 	struct ssaGlobalVariable {
 		ssaValue *var, *init;
 		DeclInfo *decl;
@@ -85,9 +75,35 @@ void ssa_gen_tree(ssaGen *s) {
 	ssaModule *m = &s->module;
 	CheckerInfo *info = m->info;
 	gbAllocator a = m->allocator;
+
+	if (v_zero == NULL) {
+		v_zero   = ssa_make_const_int (m->allocator, 0);
+		v_one    = ssa_make_const_int (m->allocator, 1);
+		v_zero32 = ssa_make_const_i32 (m->allocator, 0);
+		v_one32  = ssa_make_const_i32 (m->allocator, 1);
+		v_two32  = ssa_make_const_i32 (m->allocator, 2);
+		v_false  = ssa_make_const_bool(m->allocator, false);
+		v_true   = ssa_make_const_bool(m->allocator, true);
+	}
+
+	isize global_variable_max_count = 0;
+
+	gb_for_array(i, info->entities.entries) {
+		auto *entry = &info->entities.entries[i];
+		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
+		if (e->kind == Entity_Variable) {
+			global_variable_max_count++;
+		}
+	}
+
+
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
 	gbArray(ssaGlobalVariable) global_variables;
-	gb_array_init(global_variables, gb_heap_allocator());
-	defer (gb_array_free(global_variables));
+	gb_array_init_reserve(global_variables, m->tmp_allocator, global_variable_max_count);
+
+
 
 	gb_for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
@@ -123,7 +139,7 @@ void ssa_gen_tree(ssaGen *s) {
 					ExactValue v = tav->value;
 					if (v.kind == ExactValue_String) {
 						// NOTE(bill): The printer will fix the value correctly
-						g->Global.value = ssa_add_global_string_array(m, v.value_string);
+						// g->Global.value = ssa_add_global_string_array(m, v.value_string);
 					} else {
 						g->Global.value = ssa_make_value_constant(a, tav->type, v);
 					}
@@ -147,6 +163,8 @@ void ssa_gen_tree(ssaGen *s) {
 			}
 			if (pd->foreign_name.len > 0) {
 				name = pd->foreign_name;
+			} else if (pd->link_name.len > 0) {
+				name = pd->link_name;
 			}
 
 			ssaValue *p = ssa_make_value_procedure(a, m, e, e->type, decl->type_expr, body, name);
@@ -171,7 +189,18 @@ void ssa_gen_tree(ssaGen *s) {
 	ssaDebugInfo *compile_unit = m->debug_info.entries[0].value;
 	GB_ASSERT(compile_unit->kind == ssaDebugInfo_CompileUnit);
 	ssaDebugInfo *all_procs = ssa_alloc_debug_info(m->allocator, ssaDebugInfo_AllProcs);
-	gb_array_init(all_procs->AllProcs.procs, gb_heap_allocator());
+
+	isize all_proc_max_count = 0;
+	gb_for_array(i, m->debug_info.entries) {
+		auto *entry = &m->debug_info.entries[i];
+		ssaDebugInfo *di = entry->value;
+		di->id = i;
+		if (di->kind == ssaDebugInfo_Proc) {
+			all_proc_max_count++;
+		}
+	}
+
+	gb_array_init_reserve(all_procs->AllProcs.procs, m->allocator, all_proc_max_count);
 	map_set(&m->debug_info, hash_pointer(all_procs), all_procs); // NOTE(bill): This doesn't need to be mapped
 	compile_unit->CompileUnit.all_procs = all_procs;
 
@@ -250,10 +279,12 @@ void ssa_gen_tree(ssaGen *s) {
 
 			// Useful types
 			Type *t_int_ptr              = make_type_pointer(a, t_int);
+			Type *t_i64_ptr              = make_type_pointer(a, t_i64);
 			Type *t_bool_ptr             = make_type_pointer(a, t_bool);
 			Type *t_string_ptr           = make_type_pointer(a, t_string);
 			Type *t_type_info_ptr_ptr    = make_type_pointer(a, t_type_info_ptr);
-
+			Type *t_i64_slice_ptr        = make_type_pointer(a, make_type_slice(a, t_i64));
+			Type *t_string_slice_ptr     = make_type_pointer(a, make_type_slice(a, t_string));
 
 			auto get_type_info_ptr = [](ssaProcedure *proc, ssaValue *type_info_data, Type *type) -> ssaValue * {
 				return ssa_emit_struct_gep(proc, type_info_data,
@@ -302,12 +333,12 @@ void ssa_gen_tree(ssaGen *s) {
 					case Basic_i16:
 					case Basic_i32:
 					case Basic_i64:
-					case Basic_i128:
+					// case Basic_i128:
 					case Basic_u8:
 					case Basic_u16:
 					case Basic_u32:
 					case Basic_u64:
-					case Basic_u128:
+					// case Basic_u128:
 					case Basic_int:
 					case Basic_uint: {
 						tag = ssa_add_local_generated(proc, t_type_info_integer);
@@ -467,8 +498,72 @@ void ssa_gen_tree(ssaGen *s) {
 						if (enum_base == NULL) {
 							enum_base = t_int;
 						}
-						ssaValue *gep = get_type_info_ptr(proc, type_info_data, enum_base);
-						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_type_info_ptr_ptr), gep);
+						ssaValue *base = ssa_emit_struct_gep(proc, tag, v_zero32, t_type_info_ptr_ptr);
+						ssa_emit_store(proc, base, get_type_info_ptr(proc, type_info_data, enum_base));
+
+						if (t->Record.other_field_count > 0) {
+							Entity **fields = t->Record.other_fields;
+							isize count = t->Record.other_field_count;
+							ssaValue *value_array = NULL;
+							ssaValue *name_array = NULL;
+
+
+							{
+								Token token = {Token_Identifier};
+								i32 id = cast(i32)entry_index;
+								char name_base[] = "__$enum_values";
+								isize name_len = gb_size_of(name_base) + 10;
+								token.string.text = gb_alloc_array(a, u8, name_len);
+								token.string.len = gb_snprintf(cast(char *)token.string.text, name_len,
+								                               "%s-%d", name_base, id)-1;
+								Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, t_i64, count));
+								value_array = ssa_make_value_global(a, e, NULL);
+								value_array->Global.is_private = true;
+								ssa_module_add_value(m, e, value_array);
+								map_set(&m->members, hash_string(token.string), value_array);
+							}
+							{
+								Token token = {Token_Identifier};
+								i32 id = cast(i32)entry_index;
+								char name_base[] = "__$enum_names";
+								isize name_len = gb_size_of(name_base) + 10;
+								token.string.text = gb_alloc_array(a, u8, name_len);
+								token.string.len = gb_snprintf(cast(char *)token.string.text, name_len,
+								                               "%s-%d", name_base, id)-1;
+								Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, t_string, count));
+								name_array = ssa_make_value_global(a, e, NULL);
+								name_array->Global.is_private = true;
+								ssa_module_add_value(m, e, name_array);
+								map_set(&m->members, hash_string(token.string), name_array);
+							}
+
+							for (isize i = 0; i < count; i++) {
+								ssaValue *value_gep = ssa_emit_struct_gep(proc, value_array, i, t_i64_ptr);
+								ssaValue *name_gep  = ssa_emit_struct_gep(proc, name_array, i, t_string_ptr);
+
+								ssa_emit_store(proc, value_gep, ssa_make_const_i64(a, fields[i]->Constant.value.value_integer));
+								ssa_emit_store(proc, name_gep,  ssa_emit_global_string(proc, fields[i]->token.string));
+							}
+
+							ssaValue *v_count = ssa_make_const_int(a, count);
+
+
+							ssaValue *values = ssa_emit_struct_gep(proc, tag, v_one32, t_i64_slice_ptr);
+							ssaValue *names  = ssa_emit_struct_gep(proc, tag, v_two32, t_string_slice_ptr);
+							ssaValue *value_slice = ssa_add_local_generated(proc, type_deref(t_i64_slice_ptr));
+							ssaValue *name_slice  = ssa_add_local_generated(proc, type_deref(t_string_slice_ptr));
+
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, value_slice, v_zero32, t_i64_ptr), ssa_array_elem(proc, value_array));
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, value_slice, v_one32, t_int_ptr), v_count);
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, value_slice, v_two32, t_int_ptr), v_count);
+
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, name_slice, v_zero32, t_string_ptr), ssa_array_elem(proc, name_array));
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, name_slice, v_one32, t_int_ptr), v_count);
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, name_slice, v_two32, t_int_ptr), v_count);
+
+							ssa_emit_store(proc, values, ssa_emit_load(proc, value_slice));
+							ssa_emit_store(proc, names,  ssa_emit_load(proc, name_slice));
+						}
 					} break;
 					}
 				} break;
@@ -515,10 +610,10 @@ void ssa_gen_tree(ssaGen *s) {
 					ssaValue *variadic = ssa_emit_struct_gep(proc, tag, v_two32,  t_bool_ptr);
 
 					if (t->Proc.params) {
-						ssa_emit_store(proc, params,   get_type_info_ptr(proc, type_info_data, t->Proc.params));
+						ssa_emit_store(proc, params, get_type_info_ptr(proc, type_info_data, t->Proc.params));
 					}
 					if (t->Proc.results) {
-						ssa_emit_store(proc, results,  get_type_info_ptr(proc, type_info_data, t->Proc.results));
+						ssa_emit_store(proc, results, get_type_info_ptr(proc, type_info_data, t->Proc.results));
 					}
 					ssa_emit_store(proc, variadic, ssa_make_const_bool(a, t->Proc.variadic));
 

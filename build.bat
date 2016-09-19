@@ -6,7 +6,7 @@ set exe_name=odin.exe
 :: Debug = 0, Release = 1
 set release_mode=0
 
-set compiler_flags= -nologo -Oi -TP -W4 -fp:fast -fp:except- -Gm- -MP -FC -Z7 -GS- -EHsc- -GR-
+set compiler_flags= -nologo -Oi -TP -W4 -fp:fast -fp:except- -Gm- -MP -FC -GS- -EHsc- -GR-
 
 if %release_mode% EQU 0 ( rem Debug
 	set compiler_flags=%compiler_flags% -Od -MDd -Z7
@@ -28,12 +28,11 @@ set libs= kernel32.lib user32.lib gdi32.lib opengl32.lib
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console
 
-
 if %release_mode% EQU 0 ( rem Debug
 	set linker_flags=%linker_flags% -debug
 	set libs=%libs% src\utf8proc\utf8proc_debug.lib
 ) else ( rem Release
-	set linker_flags=%linker_flags%
+	set linker_flags=%linker_flags% -debug
 	set libs=%libs% src\utf8proc\utf8proc.lib
 )
 

@@ -1,5 +1,6 @@
 #import "win32.odin" as win32
-#import "fmt.odin" as fmt
+#import "fmt.odin"   as fmt
+#import "os.odin"    as os
 
 CANVAS_WIDTH  :: 128
 CANVAS_HEIGHT :: 128
@@ -357,7 +358,7 @@ run :: proc(user_init, user_step: proc(c: ^Core)) {
 	}
 
 	if RegisterClassExA(^window_class) == 0 {
-		fmt.println_err("RegisterClassExA failed")
+		fmt.fprintln(os.stderr, "RegisterClassExA failed")
 		return
 	}
 
@@ -377,8 +378,7 @@ run :: proc(user_init, user_step: proc(c: ^Core)) {
 
 	win32_window := CreateWindowExA(0,
 	                                window_class.class_name,
-	                                WINDOW_TITLE.data,
-	                                // wt.data,
+	                                wt.data,
 	                                style,
 	                                rc.left, rc.top,
 	                                rc.right-rc.left, rc.bottom-rc.top,
@@ -386,7 +386,7 @@ run :: proc(user_init, user_step: proc(c: ^Core)) {
 	                                null);
 
 	if win32_window == null {
-		fmt.println_err("CreateWindowExA failed")
+		fmt.fprintln(os.stderr, "CreateWindowExA failed")
 		return
 	}
 
@@ -434,7 +434,7 @@ run :: proc(user_init, user_step: proc(c: ^Core)) {
 		{
 			data: [128]byte
 			buf := data[:0]
-			fmt.print_to_buffer(^buf, "Punity: % ms\x00", dt*1000)
+			fmt.printf_to_buffer(^buf, "Punity: % ms\x00", dt*1000)
 			win32.SetWindowTextA(win32_window, buf.data)
 		}
 

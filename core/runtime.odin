@@ -17,7 +17,6 @@ Type_Info :: union {
 		ordered: bool
 	}
 
-
 	Named: struct #ordered {
 		name: string
 		base: ^Type_Info
@@ -59,6 +58,8 @@ Type_Info :: union {
 	Raw_Union: Record
 	Enum: struct #ordered {
 		base: ^Type_Info
+		values: []i64
+		names:  []string
 	}
 }
 
@@ -170,7 +171,7 @@ __string_ge :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) >
 
 
 __assert :: proc(msg: string) {
-	fmt.print_err("%", msg)
+	fmt.fprintln(os.stderr, msg)
 	__debug_trap()
 }
 
@@ -179,8 +180,8 @@ __bounds_check_error :: proc(file: string, line, column: int,
 	if 0 <= index && index < count {
 		return
 	}
-	fmt.println_err("%(%:%) Index % is out of bounds range [0, %)",
-	                file, line, column, index, count)
+	fmt.fprintf(os.stderr, "%(%:%) Index % is out of bounds range [0, %)\n",
+	            file, line, column, index, count)
 	__debug_trap()
 }
 
@@ -189,8 +190,8 @@ __slice_expr_error :: proc(file: string, line, column: int,
 	if 0 <= low && low <= high && high <= max {
 		return
 	}
-	fmt.println_err("%(%:%) Invalid slice indices: [%:%:%]",
-	                file, line, column, low, high, max)
+	fmt.fprintf(os.stderr, "%(%:%) Invalid slice indices: [%:%:%]\n",
+	            file, line, column, low, high, max)
 	__debug_trap()
 }
 __substring_expr_error :: proc(file: string, line, column: int,
@@ -198,8 +199,8 @@ __substring_expr_error :: proc(file: string, line, column: int,
 	if 0 <= low && low <= high {
 		return
 	}
-	fmt.println_err("%(%:%) Invalid substring indices: [%:%:%]",
-	                file, line, column, low, high)
+	fmt.fprintf(os.stderr, "%(%:%) Invalid substring indices: [%:%:%]\n",
+	            file, line, column, low, high)
 	__debug_trap()
 }
 
@@ -341,5 +342,25 @@ __default_allocator :: proc() -> Allocator {
 }
 
 
+__enum_to_string :: proc(info: ^Type_Info, value: i64) -> string {
+	for {
+		match type i : info {
+		case Type_Info.Named:
+			info = i.base
+			continue
+		}
+		break
+	}
 
+	match type ti : info {
+	case Type_Info.Enum:
+		fmt.println("Here: ", ti.values.count)
+		for i := 0; i < ti.values.count; i++ {
+			if ti.values[i] == value {
+				return ti.names[i]
+			}
+		}
+	}
+	return ""
+}
 
