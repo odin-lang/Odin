@@ -57,6 +57,7 @@ struct ssaModule {
 
 	Map<ssaValue *>     values;     // Key: Entity *
 	Map<ssaValue *>     members;    // Key: String
+	Map<String>         type_names; // Key: Type *
 	Map<ssaDebugInfo *> debug_info; // Key: Unique pointer
 	i32                 global_string_index;
 };
@@ -330,7 +331,6 @@ struct ssaAddr {
 	ssaValue *addr;
 	AstNode *expr; // NOTE(bill): Just for testing - probably remove later
 
-	// HACK(bill): Fix how lvalues for vectors work
 	b32 is_vector;
 	ssaValue *index;
 };
@@ -371,6 +371,7 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 	map_init(&m->values,     gb_heap_allocator());
 	map_init(&m->members,    gb_heap_allocator());
 	map_init(&m->debug_info, gb_heap_allocator());
+	map_init(&m->type_names, gb_heap_allocator());
 
 	// Default states
 	m->stmt_state_flags = 0;
@@ -439,6 +440,7 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 void ssa_destroy_module(ssaModule *m) {
 	map_destroy(&m->values);
 	map_destroy(&m->members);
+	map_destroy(&m->type_names);
 	map_destroy(&m->debug_info);
 	gb_arena_free(&m->arena);
 }
@@ -962,7 +964,7 @@ void ssa_emit_jump(ssaProcedure *proc, ssaBlock *block);
 
 void ssa_build_defer_stmt(ssaProcedure *proc, ssaDefer d) {
 	ssaBlock *b = ssa__make_block(proc, NULL, make_string("defer"));
-	// HACK(bill): The prev block may defer injection before it's terminator
+	// NOTE(bill): The prev block may defer injection before it's terminator
 	ssaInstr *last_instr = ssa_get_last_instr(proc->curr_block);
 	if (last_instr == NULL || !ssa_is_instr_terminating(last_instr)) {
 		ssa_emit_jump(proc, b);
@@ -1031,17 +1033,14 @@ void ssa_emit_no_op(ssaProcedure *proc) {
 ssaValue *ssa_lvalue_store(ssaProcedure *proc, ssaAddr lval, ssaValue *value) {
 	if (lval.addr != NULL) {
 		if (lval.is_vector) {
-			// HACK(bill): Fix how lvalues for vectors work
 			ssaValue *v = ssa_emit_load(proc, lval.addr);
 			Type *elem_type = get_base_type(ssa_type(v))->Vector.elem;
 			ssaValue *elem = ssa_emit_conv(proc, value, elem_type);
 			ssaValue *out = ssa_emit(proc, ssa_make_instr_insert_element(proc, v, elem, lval.index));
 			return ssa_emit_store(proc, lval.addr, out);
 		} else {
-			// gb_printf_err("%s <- %s\n", type_to_string(ssa_addr_type(lval)), type_to_string(ssa_type(value)));
-			// gb_printf_err("%.*s - %s\n", LIT(ast_node_strings[lval.expr->kind]), expr_to_string(lval.expr));
-			value = ssa_emit_conv(proc, value, ssa_addr_type(lval));
-			return ssa_emit_store(proc, lval.addr, value);
+			ssaValue *v = ssa_emit_conv(proc, value, ssa_addr_type(lval));
+			return ssa_emit_store(proc, lval.addr, v);
 		}
 	}
 	return NULL;
@@ -1049,11 +1048,10 @@ ssaValue *ssa_lvalue_store(ssaProcedure *proc, ssaAddr lval, ssaValue *value) {
 ssaValue *ssa_lvalue_load(ssaProcedure *proc, ssaAddr lval) {
 	if (lval.addr != NULL) {
 		if (lval.is_vector) {
-			// HACK(bill): Fix how lvalues for vectors work
 			ssaValue *v = ssa_emit_load(proc, lval.addr);
 			return ssa_emit(proc, ssa_make_instr_extract_element(proc, v, lval.index));
 		}
-		// HACK(bill): Imported procedures don't require a load
+		// NOTE(bill): Imported procedures don't require a load as they are pointers
 		Type *t = get_base_type(ssa_type(lval.addr));
 		if (t->kind == Type_Proc) {
 			return lval.addr;
@@ -2239,8 +2237,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					err_len += 20;
 					err_len += gb_string_length(expr);
 					err_len += 2;
-					// HACK(bill): memory leaks
-					u8 *err_str = gb_alloc_array(gb_heap_allocator(), u8, err_len);
+
+					u8 *err_str = gb_alloc_array(proc->module->allocator, u8, err_len);
 					err_len = gb_snprintf(cast(char *)err_str, err_len,
 					                      "%.*s(%td:%td) Runtime assertion: %s\n",
 					                      LIT(pos.file), pos.line, pos.column, expr);
@@ -2718,7 +2716,6 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		switch (be->op.kind) {
 		case Token_as: {
 			ssa_emit_comment(proc, make_string("Cast - as"));
-			// HACK(bill): Do have to make new variable to do this?
 			// NOTE(bill): Needed for dereference of pointer conversion
 			Type *type = type_of_expr(proc->module->info, expr);
 			ssaValue *v = ssa_add_local_generated(proc, type);
@@ -2727,7 +2724,6 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		}
 		case Token_transmute: {
 			ssa_emit_comment(proc, make_string("Cast - transmute"));
-			// HACK(bill): Do have to make new variable to do this?
 			// NOTE(bill): Needed for dereference of pointer conversion
 			Type *type = type_of_expr(proc->module->info, expr);
 			ssaValue *v = ssa_add_local_generated(proc, type);
@@ -2747,7 +2743,6 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 		switch (t->kind) {
 		case Type_Vector: {
-			// HACK(bill): Fix how lvalues for vectors work
 			ssaValue *vector = ssa_build_addr(proc, ie->expr).addr;
 			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
 			ssaValue *len = ssa_make_const_int(a, t->Vector.count);
@@ -2961,6 +2956,27 @@ void ssa_build_cond(ssaProcedure *proc, AstNode *cond, ssaBlock *true_block, ssa
 	ssa_emit_if(proc, expr, true_block, false_block);
 }
 
+void ssa_gen_global_type_name(ssaModule *m, Entity *e, String name);
+void ssa_mangle_sub_type_name(ssaModule *m, Entity *field, String parent) {
+	if (field->kind != Entity_TypeName) {
+		return;
+	}
+	auto *tn = &field->type->Named;
+	String cn = field->token.string;
+
+	isize len = parent.len + 1 + cn.len;
+	String child = {NULL, len};
+	child.text = gb_alloc_array(m->allocator, u8, len);
+
+	isize i = 0;
+	gb_memcopy(child.text+i, parent.text, parent.len);
+	i += parent.len;
+	child.text[i++] = '.';
+	gb_memcopy(child.text+i, cn.text, cn.len);
+
+	map_set(&m->type_names, hash_pointer(field->type), child);
+	ssa_gen_global_type_name(m, field, child);
+}
 
 void ssa_gen_global_type_name(ssaModule *m, Entity *e, String name) {
 	ssaValue *t = ssa_make_value_type_name(m->allocator, name, e->type);
@@ -2971,22 +2987,7 @@ void ssa_gen_global_type_name(ssaModule *m, Entity *e, String name) {
 	if (bt->kind == Type_Record) {
 		auto *s = &bt->Record;
 		for (isize j = 0; j < s->other_field_count; j++) {
-			Entity *field = s->other_fields[j];
-			if (field->kind == Entity_TypeName) {
-				// HACK(bill): Override name of type so printer prints it correctly
-				auto *tn = &field->type->Named;
-				String cn = field->token.string;
-				isize len = name.len + 1 + cn.len;
-				String child = {NULL, len};
-				child.text = gb_alloc_array(m->allocator, u8, len);
-				isize i = 0;
-				gb_memcopy(child.text+i, name.text, name.len);
-				i += name.len;
-				child.text[i++] = '.';
-				gb_memcopy(child.text+i, cn.text, cn.len);
-				tn->name = child;
-				ssa_gen_global_type_name(m, field, tn->name);
-			}
+			ssa_mangle_sub_type_name(m, s->other_fields[j], name);
 		}
 	}
 
@@ -2994,22 +2995,7 @@ void ssa_gen_global_type_name(ssaModule *m, Entity *e, String name) {
 		auto *s = &bt->Record;
 		// NOTE(bill): Zeroth entry is null (for `match type` stmts)
 		for (isize j = 1; j < s->field_count; j++) {
-			Entity *field = s->fields[j];
-			if (field->kind == Entity_TypeName) {
-				// HACK(bill): Override name of type so printer prints it correctly
-				auto *tn = &field->type->Named;
-				String cn = field->token.string;
-				isize len = name.len + 1 + cn.len;
-				String child = {NULL, len};
-				child.text = gb_alloc_array(m->allocator, u8, len);
-				isize i = 0;
-				gb_memcopy(child.text+i, name.text, name.len);
-				i += name.len;
-				child.text[i++] = '.';
-				gb_memcopy(child.text+i, cn.text, cn.len);
-				tn->name = child;
-				ssa_gen_global_type_name(m, field, tn->name);
-			}
+			ssa_mangle_sub_type_name(m, s->fields[j], name);
 		}
 	}
 }
@@ -3199,8 +3185,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		Entity *e = *found;
 		ssaValue *value = ssa_make_value_type_name(proc->module->allocator,
 		                                           name, e->type);
-		// HACK(bill): Override name of type so printer prints it correctly
-		e->type->Named.name = name;
+		map_set(&proc->module->type_names, hash_pointer(e->type), name);
 		ssa_gen_global_type_name(proc->module, e, name);
 	case_end;
 

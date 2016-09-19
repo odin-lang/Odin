@@ -58,7 +58,7 @@ String ssa_mangle_name(ssaGen *s, String path, String name) {
 	u8 *new_name = gb_alloc_array(a, u8, max_len);
 	isize new_name_len = gb_snprintf(
 		cast(char *)new_name, max_len,
-		"%.*s$%u.%.*s",
+		"%.*s-%u.%.*s",
 		base_len, base,
 		file->id,
 		LIT(name));
@@ -104,8 +104,7 @@ void ssa_gen_tree(ssaGen *s) {
 		switch (e->kind) {
 		case Entity_TypeName:
 			GB_ASSERT(e->type->kind == Type_Named);
-			// HACK(bill): Rename type's name for ssa gen
-			e->type->Named.name = name;
+			map_set(&m->type_names, hash_pointer(e->type), name);
 			ssa_gen_global_type_name(m, e, name);
 			break;
 

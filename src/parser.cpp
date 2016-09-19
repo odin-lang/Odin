@@ -2752,7 +2752,6 @@ String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 	gb_memcopy(str, base_dir.text, base_dir.len);
 	gb_memcopy(str+base_dir.len, path.text, path.len);
 	str[str_len] = '\0';
-	// HACK(bill): memory leak
 	char *path_str = gb_path_get_full_name(a, cast(char *)str);
 	return make_string(path_str);
 }
@@ -2779,7 +2778,6 @@ String get_fullpath_core(gbAllocator a, String path) {
 	gb_memcopy(str+buf_len, core, core_len);
 	gb_memcopy(str+buf_len+core_len, path.text, path.len);
 	str[str_len] = '\0';
-	// HACK(bill): memory leak
 	char *path_str = gb_path_get_full_name(a, cast(char *)str);
 	return make_string(path_str);}
 
