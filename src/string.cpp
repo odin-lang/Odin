@@ -88,6 +88,15 @@ GB_COMPARE_PROC(string_cmp_proc) {
 }
 
 
+bool operator ==(String a, String b) { return are_strings_equal(a, b) != 0; }
+bool operator !=(String a, String b) { return !operator==(a, b); }
+bool operator < (String a, String b) { return string_compare(a, b) < 0; }
+bool operator > (String a, String b) { return string_compare(a, b) > 0; }
+bool operator <=(String a, String b) { return string_compare(a, b) <= 0; }
+bool operator >=(String a, String b) { return string_compare(a, b) >= 0; }
+
+
+
 gb_inline isize string_extension_position(String str) {
 	isize dot_pos = -1;
 	isize i = str.len;

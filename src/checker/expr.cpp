@@ -545,6 +545,7 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node, CycleChec
 }
 
 
+
 void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_EnumType);
 	GB_ASSERT(is_type_enum(enum_type));
@@ -571,11 +572,36 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, gb_array_count(et->fields));
 	isize field_index = 0;
 	ExactValue iota = make_exact_value_integer(-1);
+	i64 min_value = 0;
+	i64 max_value = 0;
+
+	Type *constant_type = enum_type;
+	if (named_type != NULL) {
+		constant_type = named_type;
+	}
+	Token blank_token = {Token_Identifier};
+	blank_token.string = make_string("");
+	Entity *blank_entity = make_entity_constant(c->allocator, c->context.scope, blank_token, constant_type, make_exact_value_integer(0));;
+
 	gb_for_array(i, et->fields) {
 		AstNode *field = et->fields[i];
 
 		ast_node(f, FieldValue, field);
 		Token name_token = f->field->Ident;
+
+		if (name_token.string == make_string("count")) {
+			error(name_token, "`count` is a reserved identifier for enums");
+			fields[field_index++] = blank_entity;
+			continue;
+		} else if (name_token.string == make_string("min_value")) {
+			error(name_token, "`min_value` is a reserved identifier for enums");
+			fields[field_index++] = blank_entity;
+			continue;
+		} else if (name_token.string == make_string("max_value")) {
+			error(name_token, "`max_value` is a reserved identifier for enums");
+			fields[field_index++] = blank_entity;
+			continue;
+		}
 
 		Operand o = {};
 		if (f->value != NULL) {
@@ -598,11 +624,14 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 			iota = exact_binary_operator_value(add_token, iota, make_exact_value_integer(1));
 		}
 
-		Type *constant_type = enum_type;
-		if (named_type != NULL) {
-			constant_type = named_type;
-		}
+
 		Entity *e = make_entity_constant(c->allocator, c->context.scope, name_token, constant_type, iota);
+		if (min_value > iota.value_integer) {
+			min_value = iota.value_integer;
+		}
+		if (max_value < iota.value_integer) {
+			max_value = iota.value_integer;
+		}
 
 		HashKey key = hash_string(name_token.string);
 		if (map_get(&entity_map, key)) {
@@ -614,6 +643,8 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		}
 		add_entity_use(&c->info, f->field, e);
 	}
+	enum_type->Record.min_value = min_value;
+	enum_type->Record.max_value = max_value;
 	enum_type->Record.other_fields = fields;
 	enum_type->Record.other_field_count = gb_array_count(et->fields);
 }
@@ -732,7 +763,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 	o->expr = n;
 	Entity *e = scope_lookup_entity(c->context.scope, n->Ident.string);
 	if (e == NULL) {
-		if (are_strings_equal(n->Ident.string, make_string("_"))) {
+		if (n->Ident.string == make_string("_")) {
 			error(n->Ident, "`_` cannot be used as a value type");
 		} else {
 			auto *entries = c->context.scope->elements.entries;

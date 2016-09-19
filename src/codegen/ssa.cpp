@@ -1566,7 +1566,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 
 	if (value->kind == ssaValue_Constant) {
 		if (is_type_any(dst)) {
-			Type *dt = default_type(src);
+			Type *dt = default_type(get_base_type(src_type));
 			ssaValue *default_value = ssa_add_local_generated(proc, dt);
 			ssa_emit_store(proc, default_value, value);
 			return ssa_emit_conv(proc, ssa_emit_load(proc, default_value), t_any, is_argument);
@@ -3680,14 +3680,14 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 
 void ssa_emit_startup_runtime(ssaProcedure *proc) {
-	GB_ASSERT(proc->parent == NULL && are_strings_equal(proc->name, make_string("main")));
+	GB_ASSERT(proc->parent == NULL && proc->name == make_string("main"));
 
 	ssa_emit(proc, ssa_alloc_instr(proc, ssaInstr_StartupRuntime));
 }
 
 void ssa_insert_code_before_proc(ssaProcedure* proc, ssaProcedure *parent) {
 	if (parent == NULL) {
-		if (are_strings_equal(proc->name, make_string("main"))) {
+		if (proc->name == make_string("main")) {
 			ssa_emit_startup_runtime(proc);
 		}
 	}

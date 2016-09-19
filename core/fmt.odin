@@ -437,10 +437,30 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 		print_pointer_to_buffer(buf, v)
 
 	case Enum:
-		v: any
-		v.data = arg.data
-		v.type_info = info.base
-		print_any_to_buffer(buf, v)
+		value: i64 = 0
+		match type i : info.base {
+		case Integer:
+			if i.signed {
+				if arg.data != null {
+					match i.size {
+					case 1:  value = (arg.data as ^i8)^   as i64
+					case 2:  value = (arg.data as ^i16)^  as i64
+					case 4:  value = (arg.data as ^i32)^  as i64
+					case 8:  value = (arg.data as ^i64)^  as i64
+					}
+				}
+			} else {
+				if arg.data != null {
+					match i.size {
+					case 1:  value = (arg.data as ^u8)^   as i64
+					case 2:  value = (arg.data as ^u16)^  as i64
+					case 4:  value = (arg.data as ^u32)^  as i64
+					case 8:  value = (arg.data as ^u64)^  as i64
+					}
+				}
+			}
+		}
+		print_string_to_buffer(buf, __enum_to_string(arg.type_info, value))
 
 
 	case Array:

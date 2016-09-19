@@ -1179,11 +1179,11 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 		String tag_name = te->name.string;
 
 		#define ELSE_IF_ADD_TAG(name) \
-		else if (are_strings_equal(tag_name, make_string(#name))) { \
+		else if (tag_name == make_string(#name)) { \
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_##name, tag_name); \
 		}
 
-		if (are_strings_equal(tag_name, make_string("foreign"))) {
+		if (tag_name == make_string("foreign")) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_foreign, tag_name);
 			if (f->cursor[0].kind == Token_String) {
 				*foreign_name = f->cursor[0].string;
@@ -1194,7 +1194,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 
 				next_token(f);
 			}
-		} else if (are_strings_equal(tag_name, make_string("link_name"))) {
+		} else if (tag_name == make_string("link_name")) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_link_name, tag_name);
 			if (f->cursor[0].kind == Token_String) {
 				*link_name = f->cursor[0].string;
@@ -1277,7 +1277,7 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 	case Token_Hash: {
 		operand = parse_tag_expr(f, NULL);
 		String name = operand->TagExpr.name.string;
-		if (are_strings_equal(name, make_string("rune"))) {
+		if (name == make_string("rune")) {
 			if (f->cursor[0].kind == Token_String) {
 				Token *s = &f->cursor[0];
 
@@ -1289,12 +1289,12 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 				expect_token(f, Token_String);
 			}
 			operand = parse_operand(f, lhs);
-		} else if (are_strings_equal(name, make_string("file"))) {
+		} else if (name == make_string("file")) {
 			Token token = operand->TagExpr.name;
 			token.kind = Token_String;
 			token.string = token.pos.file;
 			return make_basic_lit(f, token);
-		} else if (are_strings_equal(name, make_string("line"))) {
+		} else if (name == make_string("line")) {
 			Token token = operand->TagExpr.name;
 			token.kind = Token_Integer;
 			char *str = gb_alloc_array(gb_arena_allocator(&f->arena), char, 20);
@@ -1930,11 +1930,11 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		b32 is_ordered = false;
 		while (allow_token(f, Token_Hash)) {
 			Token tag = expect_token(f, Token_Identifier);
-			if (are_strings_equal(tag.string, make_string("packed"))) {
+			if (tag.string == make_string("packed")) {
 				is_packed = true;
-			} else if (are_strings_equal(tag.string, make_string("ordered"))) {
+			} else if (tag.string == make_string("ordered")) {
 				is_ordered = true;
-			}  else {
+			} else {
 				syntax_error(tag, "Expected a `#packed` or `#ordered` tag");
 			}
 		}
@@ -2137,7 +2137,7 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 		if (name->kind == AstNode_Ident) {
 			String n = name->Ident.string;
 			// NOTE(bill): Check for reserved identifiers
-			if (are_strings_equal(n, make_string("context"))) {
+			if (n == make_string("context")) {
 				syntax_error(ast_node_token(name), "`context` is a reserved identifier");
 				break;
 			}
@@ -2578,14 +2578,14 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Hash: {
 		s = parse_tag_stmt(f, NULL);
 		String tag = s->TagStmt.name.string;
-		if (are_strings_equal(tag, make_string("shared_global_scope"))) {
+		if (tag == make_string("shared_global_scope")) {
 			if (f->curr_proc == NULL) {
 				f->is_global_scope = true;
 				return make_empty_stmt(f, f->cursor[0]);
 			}
 			syntax_error(token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, f->cursor[0]);
-		} else if (are_strings_equal(tag, make_string("import"))) {
+		} else if (tag == make_string("import")) {
 			// TODO(bill): better error messages
 			Token import_name;
 			Token file_path = expect_token(f, Token_String);
@@ -2597,7 +2597,7 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			syntax_error(token, "You cannot use #import within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
-		} else if (are_strings_equal(tag, make_string("load"))) {
+		} else if (tag == make_string("load")) {
 			// TODO(bill): better error messages
 			Token file_path = expect_token(f, Token_String);
 			Token import_name = file_path;
@@ -2608,14 +2608,14 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			syntax_error(token, "You cannot use #load within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
-		} else if (are_strings_equal(tag, make_string("foreign_system_library"))) {
+		} else if (tag == make_string("foreign_system_library")) {
 			Token file_path = expect_token(f, Token_String);
 			if (f->curr_proc == NULL) {
 				return make_foreign_system_library(f, s->TagStmt.token, file_path);
 			}
 			syntax_error(token, "You cannot use #foreign_system_library within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
-		} else if (are_strings_equal(tag, make_string("thread_local"))) {
+		} else if (tag == make_string("thread_local")) {
 			AstNode *var_decl = parse_simple_stmt(f);
 			if (var_decl->kind != AstNode_VarDecl) {
 				syntax_error(token, "#thread_local may only be applied to variable declarations");
@@ -2627,14 +2627,14 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			var_decl->VarDecl.tags |= VarDeclTag_thread_local;
 			return var_decl;
-		} else if (are_strings_equal(tag, make_string("bounds_check"))) {
+		} else if (tag == make_string("bounds_check")) {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_bounds_check;
 			if ((s->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return s;
-		} else if (are_strings_equal(tag, make_string("no_bounds_check"))) {
+		} else if (tag == make_string("no_bounds_check")) {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_no_bounds_check;
 			if ((s->stmt_state_flags & StmtStateFlag_bounds_check) != 0) {
@@ -2760,7 +2760,7 @@ void destroy_parser(Parser *p) {
 b32 try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
 	gb_for_array(i, p->imports) {
 		String import = p->imports[i].path;
-		if (are_strings_equal(import, path)) {
+		if (import == path) {
 			return false;
 		}
 	}
@@ -2814,7 +2814,7 @@ String get_fullpath_core(gbAllocator a, String path) {
 b32 try_add_foreign_system_library_path(Parser *p, String import_file) {
 	gb_for_array(i, p->system_libraries) {
 		String import = p->system_libraries[i];
-		if (are_strings_equal(import, import_file)) {
+		if (import == import_file) {
 			return false;
 		}
 	}

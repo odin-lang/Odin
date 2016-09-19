@@ -631,7 +631,7 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 }
 
 b32 add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
-	if (!are_strings_equal(entity->token.string, make_string("_"))) {
+	if (entity->token.string != make_string("_")) {
 		Entity *insert_entity = scope_insert_entity(scope, entity);
 		if (insert_entity) {
 			Entity *up = insert_entity->using_parent;
@@ -676,7 +676,7 @@ void add_entity_use(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 
 
 void add_file_entity(Checker *c, Scope *file_scope, AstNode *identifier, Entity *e, DeclInfo *d) {
-	GB_ASSERT(are_strings_equal(identifier->Ident.string, e->token.string));
+	GB_ASSERT(identifier->Ident.string == e->token.string);
 	add_entity(c, file_scope, identifier, e);
 	map_set(&c->info.entities, hash_pointer(e), d);
 }
@@ -1048,7 +1048,7 @@ void check_parsed_files(Checker *c) {
 				warning(id->token, "Multiple #import of the same file within this scope");
 			}
 
-			if (are_strings_equal(id->import_name.string, make_string("_"))) {
+			if (id->import_name.string == make_string("_")) {
 				// NOTE(bill): Add imported entities to this file's scope
 				gb_for_array(elem_index, scope->elements.entries) {
 					Entity *e = scope->elements.entries[elem_index].value;

@@ -121,7 +121,7 @@ void ssa_print_encoded_local(ssaFileBuffer *f, String name) {
 
 void ssa_print_encoded_global(ssaFileBuffer *f, String name, b32 global_scope) {
 	ssa_fprintf(f, "@");
-	if (!global_scope && !are_strings_equal(name, make_string("main"))) {
+	if (!global_scope && name != make_string("main")) {
 		ssa_fprintf(f, ".");
 	}
 	ssa_print_escape_string(f, name, true);
@@ -818,7 +818,7 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 	if (proc->module->generate_debug_info && proc->entity != NULL) {
 		ssaDebugInfo *di = *map_get(&proc->module->debug_info, hash_pointer(proc->entity));
 		GB_ASSERT(di->kind == ssaDebugInfo_Proc);
-			ssa_fprintf(f, "!dbg !%d ", di->id);
+		ssa_fprintf(f, "!dbg !%d ", di->id);
 	}
 
 
@@ -839,6 +839,8 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 			}
 		}
 		ssa_fprintf(f, "}\n");
+	} else {
+		ssa_fprintf(f, "\n");
 	}
 
 	gb_for_array(i, proc->children) {

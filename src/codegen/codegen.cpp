@@ -16,6 +16,7 @@ b32 ssa_gen_init(ssaGen *s, Checker *c) {
 	}
 
 	ssa_init_module(&s->module, c);
+	s->module.generate_debug_info = false;
 
 	// TODO(bill): generate appropriate output name
 	isize pos = string_extension_position(c->parser->init_fullpath);

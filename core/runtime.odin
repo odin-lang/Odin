@@ -354,7 +354,6 @@ __enum_to_string :: proc(info: ^Type_Info, value: i64) -> string {
 
 	match type ti : info {
 	case Type_Info.Enum:
-		fmt.println("Here: ", ti.values.count)
 		for i := 0; i < ti.values.count; i++ {
 			if ti.values[i] == value {
 				return ti.names[i]

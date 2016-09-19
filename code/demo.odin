@@ -1,5 +1,27 @@
 #import "fmt.odin" as fmt
 
+main :: proc() {
+	Fruit :: enum {
+		APPLE = -2,
+		BANANA,
+		GRAPE,
+		MELON = 123,
+		TOMATO,
+	}
+
+	s1 := enum_to_string(Fruit.BANANA)
+	e := Fruit.MELON
+	s2 := enum_to_string(e)
+
+	fmt.println(Fruit.APPLE)
+	fmt.println(Fruit.count)
+	fmt.println(Fruit.min_value)
+	fmt.println(Fruit.max_value)
+}
+
+
+// #import "fmt.odin" as fmt
+
 // #foreign_system_library "Ws2_32"
 
 // WSADESCRIPTION_LEN :: 256
@@ -147,7 +169,7 @@
 // 	<title>Demo Title</title>
 // </head>
 // <body>
-// 	<h1 style="color: red;">Odin Server Demo</h1>
+// 	<h1 style="color: orange;">Odin Server Demo</h1>
 // </body>
 // </html>
 // `
@@ -174,19 +196,3 @@
 
 // 	shutdown(client, SD_SEND)
 // }
-
-main :: proc() {
-	Fruit :: enum {
-		APPLE,
-		BANANA,
-		GRAPE,
-		MELON,
-	}
-
-	s1 := enum_to_string(Fruit.APPLE)
-	e := Fruit.APPLE
-	s2 := enum_to_string(e)
-
-	fmt.println(s1)
-	fmt.println(s2)
-}

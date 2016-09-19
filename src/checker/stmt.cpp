@@ -162,7 +162,7 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	// NOTE(bill): Ignore assignments to `_`
 	if (node->kind == AstNode_Ident) {
 		ast_node(i, Ident, node);
-		if (are_strings_equal(i->string, make_string("_"))) {
+		if (i->string == make_string("_")) {
 			add_entity_definition(&c->info, node, NULL);
 			check_assignment(c, op_a, NULL, make_string("assignment to `_` identifier"));
 			if (op_a->mode == Addressing_Invalid)
@@ -503,7 +503,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 
 	if ((d->scope->is_file || d->scope->is_global) &&
-	    are_strings_equal(e->token.string, make_string("main"))) {
+	    e->token.string == make_string("main")) {
 		if (proc_type != NULL) {
 			auto *pt = &proc_type->Proc;
 			if (pt->param_count != 0 ||
@@ -701,7 +701,7 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 			String str = token.string;
 			Entity *found = NULL;
 			// NOTE(bill): Ignore assignments to `_`
-			b32 can_be_ignored = are_strings_equal(str, make_string("_"));
+			b32 can_be_ignored = str == make_string("_");
 			if (!can_be_ignored) {
 				found = current_scope_lookup_entity(c->context.scope, str);
 			}

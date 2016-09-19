@@ -675,15 +675,15 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 		// NOTE(bill): All keywords are > 1
 		if (token.string.len > 1) {
-			if (are_strings_equal(token.string, token_strings[Token_as])) {
+			if (token.string == token_strings[Token_as]) {
 				token.kind = Token_as;
-			} else if (are_strings_equal(token.string, token_strings[Token_transmute])) {
+			} else if (token.string == token_strings[Token_transmute]) {
 				token.kind = Token_transmute;
-			} else if (are_strings_equal(token.string, token_strings[Token_down_cast])) {
+			} else if (token.string == token_strings[Token_down_cast]) {
 				token.kind = Token_down_cast;
 			} else {
 				for (i32 k = Token__KeywordBegin+1; k < Token__KeywordEnd; k++) {
-					if (are_strings_equal(token.string, token_strings[k])) {
+					if (token.string == token_strings[k]) {
 						token.kind = cast(TokenKind)k;
 						break;
 					}
