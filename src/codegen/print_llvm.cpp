@@ -396,18 +396,11 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "%%%d = alloca ", value->id);
 		ssa_print_type(f, m, type);
 		ssa_fprintf(f, ", align %lld\n", type_align_of(m->sizes, m->allocator, type));
-		// if (instr->Local.zero_initialized) {
-		// 	ssa_fprintf(f, "\tstore ");
-		// 	ssa_print_type(f, m, type);
-		// 	ssa_fprintf(f, " zeroinitializer, ");
-		// 	ssa_print_type(f, m, type);
-		// 	ssa_fprintf(f, "* %%%d\n", value->id);
-		// }
 	} break;
 
 	case ssaInstr_ZeroInit: {
 		Type *type = type_deref(ssa_type(instr->ZeroInit.address));
-		ssa_fprintf(f, "\tstore ");
+		ssa_fprintf(f, "store ");
 		ssa_print_type(f, m, type);
 		ssa_fprintf(f, " zeroinitializer, ");
 		ssa_print_type(f, m, type);

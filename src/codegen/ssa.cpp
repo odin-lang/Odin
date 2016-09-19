@@ -385,12 +385,8 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 		// Add type info data
 		{
 			String name = make_string(SSA_TYPE_INFO_DATA_NAME);
-			Token token = {Token_Identifier};
-			token.string = name;
-
-
 			isize count = gb_array_count(c->info.type_info_map.entries);
-			Entity *e = make_entity_variable(m->allocator, NULL, token, make_type_array(m->allocator, t_type_info, count));
+			Entity *e = make_entity_variable(m->allocator, NULL, make_token_ident(name), make_type_array(m->allocator, t_type_info, count));
 			ssaValue *g = ssa_make_value_global(m->allocator, e, NULL);
 			g->Global.is_private  = true;
 			ssa_module_add_value(m, e, g);
@@ -421,10 +417,7 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 			}
 
 			String name = make_string(SSA_TYPE_INFO_DATA_MEMBER_NAME);
-			Token token = {Token_Identifier};
-			token.string = name;
-
-			Entity *e = make_entity_variable(m->allocator, NULL, token,
+			Entity *e = make_entity_variable(m->allocator, NULL, make_token_ident(name),
 			                                 make_type_array(m->allocator, t_type_info_member, count));
 			ssaValue *g = ssa_make_value_global(m->allocator, e, NULL);
 			ssa_module_add_value(m, e, g);
@@ -1095,6 +1088,10 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 		ssa_emit_ret(proc, NULL);
 	}
 
+	if (gb_array_count(proc->curr_block->instrs) == 0) {
+		ssa_emit_unreachable(proc);
+	}
+
 	proc->curr_block = proc->decl_block;
 	ssa_emit_jump(proc, proc->entry_block);
 
@@ -1560,14 +1557,10 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 
 	Type *src = get_enum_base_type(get_base_type(src_type));
 	Type *dst = get_enum_base_type(get_base_type(t));
-	if (are_types_identical(src, dst)) {
-		return value;
-	}
 
 	if (value->kind == ssaValue_Constant) {
 		if (is_type_any(dst)) {
-			Type *dt = default_type(get_base_type(src_type));
-			ssaValue *default_value = ssa_add_local_generated(proc, dt);
+			ssaValue *default_value = ssa_add_local_generated(proc, default_type(src_type));
 			ssa_emit_store(proc, default_value, value);
 			return ssa_emit_conv(proc, ssa_emit_load(proc, default_value), t_any, is_argument);
 		} else if (dst->kind == Type_Basic) {
@@ -1585,6 +1578,10 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 			}
 			return ssa_make_value_constant(proc->module->allocator, t, ev);
 		}
+	}
+
+	if (are_types_identical(src, dst)) {
+		return value;
 	}
 
 	// integer -> integer
@@ -1684,7 +1681,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 			// gb_printf("field_name: %.*s\n", LIT(field_name));
 			if (field_name.len > 0) {
 				// NOTE(bill): It can be casted
-				Selection sel = lookup_field(sb, field_name, false);
+				Selection sel = lookup_field(proc->module->allocator, sb, field_name, false);
 				if (sel.entity != NULL) {
 					ssa_emit_comment(proc, make_string("cast - polymorphism"));
 					if (src_is_ptr) {
@@ -1821,7 +1818,7 @@ ssaValue *ssa_emit_down_cast(ssaProcedure *proc, ssaValue *value, Type *t) {
 
 	String field_name = check_down_cast_name(t, type_deref(ssa_type(value)));
 	GB_ASSERT(field_name.len > 0);
-	Selection sel = lookup_field(t, field_name, false);
+	Selection sel = lookup_field(proc->module->allocator, t, field_name, false);
 	Type *t_u8_ptr = make_type_pointer(allocator, t_u8);
 	ssaValue *bytes = ssa_emit_conv(proc, value, t_u8_ptr);
 
@@ -2088,11 +2085,11 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					if (elem->kind == AstNode_FieldValue) {
 						ast_node(kv, FieldValue, elem);
-						Selection sel = lookup_field(base_type, kv->field->Ident.string, false);
+						Selection sel = lookup_field(proc->module->allocator, base_type, kv->field->Ident.string, false);
 						index = sel.index[0];
 						field_expr = ssa_build_expr(proc, kv->value);
 					} else {
-						Selection sel = lookup_field(base_type, st->fields_in_src_order[field_index]->token.string, false);
+						Selection sel = lookup_field(proc->module->allocator, base_type, st->fields_in_src_order[field_index]->token.string, false);
 						index = sel.index[0];
 						field_expr = ssa_build_expr(proc, elem);
 					}
@@ -2158,7 +2155,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 				Entity *e = *found;
 				switch (e->Builtin.id) {
 				case BuiltinProc_type_info: {
-					ssaValue *x = ssa_build_expr(proc, ce->args[0]);
 					Type *t = default_type(type_of_expr(proc->module->info, ce->args[0]));
 					return ssa_type_info(proc, t);
 				} break;
@@ -2629,7 +2625,7 @@ ssaValue *ssa_add_using_variable(ssaProcedure *proc, Entity *e) {
 		p = ssa_add_using_variable(proc, parent);
 	}
 
-	Selection sel = lookup_field(parent->type, name, false);
+	Selection sel = lookup_field(proc->module->allocator, parent->type, name, false);
 	GB_ASSERT(sel.entity != NULL);
 	ssaValue **pv = map_get(&proc->module->values, hash_pointer(parent));
 	ssaValue *v = NULL;
@@ -2694,25 +2690,14 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		Type *type = get_base_type(type_of_expr(proc->module->info, se->expr));
 
 		if (type == t_invalid) {
-			// Imports
+			// NOTE(bill): Imports
 			Entity *imp = entity_of_ident(proc->module->info, se->expr);
 			if (imp != NULL) {
 				GB_ASSERT(imp->kind == Entity_ImportName);
 			}
 			return ssa_build_addr(proc, unparen_expr(se->selector));
-		} /* else if (type == t_string) {
-			Selection sel = lookup_field(type, selector, false);
-			GB_ASSERT(sel.entity != NULL);
-
-			// NOTE(bill): This could a constant and the only non constant
-			// selector is the `.data`, so build the expression instead
-			ssaValue *e = ssa_build_expr(proc, se->expr);
-			ssaValue *a = ssa_build_addr(proc, se->expr).addr;
-
-			a = ssa_emit_deep_field_gep(proc, type, a, sel);
-			return ssa_make_addr(a, expr);
-		}  */else {
-			Selection sel = lookup_field(type, selector, false);
+		} else {
+			Selection sel = lookup_field(proc->module->allocator, type, selector, false);
 			GB_ASSERT(sel.entity != NULL);
 
 			ssaValue *a = ssa_build_addr(proc, se->expr).addr;

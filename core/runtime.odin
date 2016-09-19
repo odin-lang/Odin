@@ -63,6 +63,18 @@ Type_Info :: union {
 	}
 }
 
+type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
+	for {
+		match type i : info {
+		case Type_Info.Named:
+			info = i.base
+			continue
+		}
+
+		return info
+	}
+}
+
 
 
 assume :: proc(cond: bool) #foreign "llvm.assume"

@@ -2,42 +2,47 @@
 
 PRINT_BUF_SIZE :: 1<<12
 
-fprint :: proc(f: ^os.File, args: ..any) {
-	data: [PRINT_BUF_SIZE]byte
-	buf := data[:0]
+bprint :: proc(buf: ^[]byte, args: ..any) {
 	prev_string := false
 
 	for i := 0; i < args.count; i++ {
 		arg := args[i]
 		is_string := arg.data != null && type_info_is_string(arg.type_info)
-		if i > 0 && is_string && !prev_string {
-			print_space_to_buffer(^buf)
+		if i > 0 && !is_string && !prev_string {
+			print_space_to_buffer(buf)
 		}
-		print_any_to_buffer(^buf, arg)
+		print_any_to_buffer(buf, arg)
 		prev_string = is_string;
 	}
+}
 
+bprintln :: proc(buf: ^[]byte, args: ..any) {
+	for i := 0; i < args.count; i++ {
+		if i > 0 {
+			append(buf, #rune " ")
+		}
+		print_any_to_buffer(buf, args[i])
+	}
+	print_nl_to_buffer(buf)
+}
+
+fprint :: proc(f: ^os.File, args: ..any) {
+	data: [PRINT_BUF_SIZE]byte
+	buf := data[:0]
+	bprint(^buf, ..args)
 	os.write(f, buf)
 }
 
 fprintln :: proc(f: ^os.File, args: ..any) {
 	data: [PRINT_BUF_SIZE]byte
 	buf := data[:0]
-
-	for i := 0; i < args.count; i++ {
-		if i > 0 {
-			append(^buf, #rune " ")
-		}
-		print_any_to_buffer(^buf, args[i])
-	}
-
-	print_nl_to_buffer(^buf)
+	bprintln(^buf, ..args)
 	os.write(f, buf)
 }
 fprintf :: proc(f: ^os.File, fmt: string, args: ..any) {
 	data: [PRINT_BUF_SIZE]byte
 	buf := data[:0]
-	printf_to_buffer(^buf, fmt, ..args)
+	bprintf(^buf, fmt, ..args)
 	os.write(f, buf)
 }
 
@@ -52,6 +57,39 @@ printf :: proc(fmt: string, args: ..any) {
 	fprintf(os.stdout, fmt, ..args)
 }
 
+sprint :: proc(args: ..any) -> string {
+	data: [PRINT_BUF_SIZE]byte
+	buf := data[:0]
+	bprint(^buf, ..args)
+	s := new_slice(byte, buf.count)
+	copy(s, buf)
+	return s as string
+}
+sprintln :: proc(args: ..any) -> string {
+	data: [PRINT_BUF_SIZE]byte
+	buf := data[:0]
+	bprintln(^buf, ..args)
+	s := new_slice(byte, buf.count)
+	copy(s, buf)
+	return s as string
+}
+sprintf :: proc(fmt: string, args: ..any) -> string {
+	data: [PRINT_BUF_SIZE]byte
+	buf := data[:0]
+	bprintf(^buf, fmt, ..args)
+	s := new_slice(byte, buf.count)
+	copy(s, buf)
+	return s as string
+}
+
+
+
+fprint_type :: proc(f: ^os.File, info: ^Type_Info) {
+	data: [PRINT_BUF_SIZE]byte
+	buf := data[:0]
+	print_type_to_buffer(^buf, info)
+	os.write(f, buf)
+}
 
 
 
@@ -561,7 +599,7 @@ type_info_is_string :: proc(info: ^Type_Info) -> bool {
 }
 
 
-printf_to_buffer :: proc(buf: ^[]byte, fmt: string, args: ..any) {
+bprintf :: proc(buf: ^[]byte, fmt: string, args: ..any) {
 	is_digit :: proc(r: rune) -> bool #inline {
 		return r >= #rune "0" && r <= #rune "9"
 	}

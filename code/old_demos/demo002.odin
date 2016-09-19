@@ -120,7 +120,7 @@ variadic_procedures :: proc() {
 
 	print_prefix_f32s("a"); nl()
 	print_prefix_f32s("b", 1); nl()
-	print_prefix_f32s("c", 1, 2, 3); nl()
+7	print_prefix_f32s("c", 1, 2, 3); nl()
 
 	// Internally, the variadic procedures get allocated to an array on the stack,
 	// and this array is passed a slice

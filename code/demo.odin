@@ -1,28 +1,59 @@
-#import "fmt.odin" as fmt
+// #import "fmt.odin" as fmt
+// #import "os.odin" as os
 
 main :: proc() {
-	Fruit :: enum {
-		APPLE = -2,
-		BANANA,
-		GRAPE,
-		MELON = 123,
-		TOMATO,
-	}
 
-	s1 := enum_to_string(Fruit.BANANA)
-	e := Fruit.MELON
-	s2 := enum_to_string(e)
-
-	fmt.println(Fruit.APPLE)
-	fmt.println(Fruit.count)
-	fmt.println(Fruit.min_value)
-	fmt.println(Fruit.max_value)
 }
 
 
 // #import "fmt.odin" as fmt
 
 // #foreign_system_library "Ws2_32"
+
+
+// SOCKET :: type uint
+// INVALID_SOCKET :: ~(0 as SOCKET)
+
+// AF :: enum i32 {
+// 	UNSPEC    = 0,       // unspecified
+// 	UNIX      = 1,       // local to host (pipes, portals)
+// 	INET      = 2,       // internetwork: UDP, TCP, etc.
+// 	IMPLINK   = 3,       // arpanet imp addresses
+// 	PUP       = 4,       // pup protocols: e.g. BSP
+// 	CHAOS     = 5,       // mit CHAOS protocols
+// 	NS        = 6,       // XEROX NS protocols
+// 	ISO       = 7,       // ISO protocols
+// 	OSI       = ISO,     // OSI is ISO
+// 	ECMA      = 8,       // european computer manufacturers
+// 	DATAKIT   = 9,       // datakit protocols
+// 	CCITT     = 10,      // CCITT protocols, X.25 etc
+// 	SNA       = 11,      // IBM SNA
+// 	DECnet    = 12,      // DECnet
+// 	DLI       = 13,      // Direct data link interface
+// 	LAT       = 14,      // LAT
+// 	HYLINK    = 15,      // NSC Hyperchannel
+// 	APPLETALK = 16,      // AppleTalk
+// 	ROUTE     = 17,      // Internal Routing Protocol
+// 	LINK      = 18,      // Link layer interface
+// 	XTP       = 19,      // eXpress Transfer Protocol (no AF)
+// 	COIP      = 20,      // connection-oriented IP, aka ST II
+// 	CNT       = 21,      // Computer Network Technology
+// 	RTIP      = 22,      // Help Identify RTIP packets
+// 	IPX       = 23,      // Novell Internet Protocol
+// 	SIP       = 24,      // Simple Internet Protocol
+// 	PIP       = 25,      // Help Identify PIP packets
+// 	MAX       = 26,
+// }
+
+// SOCK_STREAM  :: 1
+// SOCKET_ERROR :: -1
+// IPPROTO_TCP  :: 6
+// AI_PASSIVE   :: 0x0020
+// SOMAXCONN    :: 128
+
+// SD_RECEIVE :: 0
+// SD_SEND    :: 1
+// SD_BOTH    :: 2
 
 // WSADESCRIPTION_LEN :: 256
 // WSASYS_STATUS_LEN  :: 128
@@ -31,6 +62,7 @@ main :: proc() {
 // 	high_version:  i16
 
 
+// // NOTE(bill): This is x64 ordering
 // 	max_sockets:   u16
 // 	max_udp_dg:    u16
 // 	vendor_info:   ^byte
@@ -54,48 +86,6 @@ main :: proc() {
 // 	data:   [14]byte
 // }
 
-
-// SOCKET :: type uint
-// INVALID_SOCKET :: ~(0 as SOCKET)
-
-// AF_UNSPEC      :: 0       // unspecified
-// AF_UNIX        :: 1       // local to host (pipes, portals)
-// AF_INET        :: 2       // internetwork: UDP, TCP, etc.
-// AF_IMPLINK     :: 3       // arpanet imp addresses
-// AF_PUP         :: 4       // pup protocols: e.g. BSP
-// AF_CHAOS       :: 5       // mit CHAOS protocols
-// AF_NS          :: 6       // XEROX NS protocols
-// AF_ISO         :: 7       // ISO protocols
-// AF_OSI         :: AF_ISO  // OSI is ISO
-// AF_ECMA        :: 8       // european computer manufacturers
-// AF_DATAKIT     :: 9       // datakit protocols
-// AF_CCITT       :: 10      // CCITT protocols, X.25 etc
-// AF_SNA         :: 11      // IBM SNA
-// AF_DECnet      :: 12      // DECnet
-// AF_DLI         :: 13      // Direct data link interface
-// AF_LAT         :: 14      // LAT
-// AF_HYLINK      :: 15      // NSC Hyperchannel
-// AF_APPLETALK   :: 16      // AppleTalk
-// AF_ROUTE       :: 17      // Internal Routing Protocol
-// AF_LINK        :: 18      // Link layer interface
-// pseudo_AF_XTP  :: 19      // eXpress Transfer Protocol (no AF)
-// AF_COIP        :: 20      // connection-oriented IP, aka ST II
-// AF_CNT         :: 21      // Computer Network Technology
-// pseudo_AF_RTIP :: 22      // Help Identify RTIP packets
-// AF_IPX         :: 23      // Novell Internet Protocol
-// AF_SIP         :: 24      // Simple Internet Protocol
-// pseudo_AF_PIP  :: 25      // Help Identify PIP packets
-// AF_MAX         :: 26
-
-// SOCK_STREAM  :: 1
-// SOCKET_ERROR :: -1
-// IPPROTO_TCP  :: 6
-// AI_PASSIVE   :: 0x0020
-// SOMAXCONN    :: 128
-
-// SD_RECEIVE :: 0
-// SD_SEND    :: 1
-// SD_BOTH    :: 2
 
 // WSAStartup      :: proc(version_requested: i16, data: ^WSADATA) -> i32                             #foreign #dll_import
 // WSACleanup      :: proc() -> i32                                                                   #foreign #dll_import
@@ -131,7 +121,7 @@ main :: proc() {
 // 	}
 // 	defer WSACleanup()
 
-// 	hints.family   = AF_INET
+// 	hints.family   = AF.INET as i32
 // 	hints.socktype = SOCK_STREAM
 // 	hints.protocol = IPPROTO_TCP
 // 	hints.flags    = AI_PASSIVE

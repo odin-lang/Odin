@@ -150,6 +150,13 @@ struct Token {
 };
 
 Token empty_token = {Token_Invalid};
+Token blank_token = {Token_Identifier, {cast(u8 *)"_", 1}};
+
+Token make_token_ident(String s) {
+	Token t = {Token_Identifier};
+	t.string = s;
+	return t;
+}
 
 
 struct ErrorCollector {

@@ -133,8 +133,7 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 }
 
 
-// NOTE(bill): `content_name` is for debugging
-// TODO(bill): Maybe allow assignment to tuples?
+// NOTE(bill): `content_name` is for debugging and error messages
 void check_assignment(Checker *c, Operand *operand, Type *type, String context_name, b32 is_argument = false) {
 	check_not_tuple(c, operand);
 	if (operand->mode == Addressing_Invalid)
@@ -152,8 +151,6 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 			return;
 		}
 	}
-
-
 
 	if (type != NULL) {
 		if (!check_is_assignable_to(c, operand, type, is_argument)) {
@@ -579,8 +576,6 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	if (named_type != NULL) {
 		constant_type = named_type;
 	}
-	Token blank_token = {Token_Identifier};
-	blank_token.string = make_string("");
 	Entity *blank_entity = make_entity_constant(c->allocator, c->context.scope, blank_token, constant_type, make_exact_value_integer(0));;
 
 	gb_for_array(i, et->fields) {
@@ -590,15 +585,15 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		Token name_token = f->field->Ident;
 
 		if (name_token.string == make_string("count")) {
-			error(name_token, "`count` is a reserved identifier for enums");
+			error(name_token, "`count` is a reserved identifier for enumerations");
 			fields[field_index++] = blank_entity;
 			continue;
 		} else if (name_token.string == make_string("min_value")) {
-			error(name_token, "`min_value` is a reserved identifier for enums");
+			error(name_token, "`min_value` is a reserved identifier for enumerations");
 			fields[field_index++] = blank_entity;
 			continue;
 		} else if (name_token.string == make_string("max_value")) {
-			error(name_token, "`max_value` is a reserved identifier for enums");
+			error(name_token, "`max_value` is a reserved identifier for enumerations");
 			fields[field_index++] = blank_entity;
 			continue;
 		}
@@ -611,7 +606,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 				o.mode = Addressing_Invalid;
 			}
 			if (o.mode != Addressing_Invalid) {
-				check_assignment(c, &o, base_type, make_string("enumeration"));
+				check_assignment(c, &o, constant_type, make_string("enumeration"));
 			}
 			if (o.mode != Addressing_Invalid) {
 				iota = o.value;
@@ -639,14 +634,21 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 			error(name_token, "`%.*s` is already declared in this enumeration", LIT(name_token.string));
 		} else {
 			map_set(&entity_map, key, e);
+			add_entity(c, c->context.scope, NULL, e);
 			fields[field_index++] = e;
 		}
 		add_entity_use(&c->info, f->field, e);
 	}
-	enum_type->Record.min_value = min_value;
-	enum_type->Record.max_value = max_value;
+
 	enum_type->Record.other_fields = fields;
 	enum_type->Record.other_field_count = gb_array_count(et->fields);
+
+	enum_type->Record.enum_count = make_entity_constant(c->allocator, NULL,
+		make_token_ident(make_string("count")), t_int, make_exact_value_integer(enum_type->Record.other_field_count));
+	enum_type->Record.min_value  = make_entity_constant(c->allocator, NULL,
+		make_token_ident(make_string("min_value")), constant_type, make_exact_value_integer(min_value));
+	enum_type->Record.max_value  = make_entity_constant(c->allocator, NULL,
+		make_token_ident(make_string("max_value")), constant_type, make_exact_value_integer(max_value));
 }
 
 Type *check_get_params(Checker *c, Scope *scope, AstNodeArray fields, b32 *is_variadic_) {
@@ -1019,7 +1021,9 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 	case_ast_node(et, EnumType, e);
 		type = make_type_enum(c->allocator);
 		set_base_type(named_type, type);
+		check_open_scope(c, e);
 		check_enum_type(c, type, named_type, e);
+		check_close_scope(c);
 		type->Record.node = e;
 		goto end;
 	case_end;
@@ -2070,7 +2074,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 	}
 
 	if (entity == NULL) {
-		entity = lookup_field(operand->type, selector->Ident.string, operand->mode == Addressing_Type).entity;
+		entity = lookup_field(c->allocator, operand->type, selector->Ident.string, operand->mode == Addressing_Type).entity;
 	}
 	if (entity == NULL) {
 		gbString op_str   = expr_to_string(op_expr);
@@ -2217,7 +2221,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		Operand op = {};
 		check_expr_or_type(c, &op, ce->args[0]);
 		Type *type = op.type;
-		if (!type) {
+		if (type == NULL || op.mode == Addressing_Builtin) {
 			error(ast_node_token(ce->args[0]), "Expected a type for `size_of`");
 			return false;
 		}
@@ -2231,8 +2235,9 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	case BuiltinProc_size_of_val:
 		// size_of_val :: proc(val: Type) -> int
 		check_assignment(c, operand, NULL, make_string("argument of `size_of_val`"));
-		if (operand->mode == Addressing_Invalid)
+		if (operand->mode == Addressing_Invalid) {
 			return false;
+		}
 
 		operand->mode = Addressing_Constant;
 		operand->value = make_exact_value_integer(type_size_of(c->sizes, c->allocator, operand->type));
@@ -2244,7 +2249,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		Operand op = {};
 		check_expr_or_type(c, &op, ce->args[0]);
 		Type *type = op.type;
-		if (!type) {
+		if (type == NULL || op.mode == Addressing_Builtin) {
 			error(ast_node_token(ce->args[0]), "Expected a type for `align_of`");
 			return false;
 		}
@@ -2256,8 +2261,9 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	case BuiltinProc_align_of_val:
 		// align_of_val :: proc(val: Type) -> int
 		check_assignment(c, operand, NULL, make_string("argument of `align_of_val`"));
-		if (operand->mode == Addressing_Invalid)
+		if (operand->mode == Addressing_Invalid) {
 			return false;
+		}
 
 		operand->mode = Addressing_Constant;
 		operand->value = make_exact_value_integer(type_align_of(c->sizes, c->allocator, operand->type));
@@ -2270,7 +2276,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		check_expr_or_type(c, &op, ce->args[0]);
 		Type *type = get_base_type(op.type);
 		AstNode *field_arg = unparen_expr(ce->args[1]);
-		if (type != NULL) {
+		if (type != NULL  || op.mode == Addressing_Builtin) {
 			error(ast_node_token(ce->args[0]), "Expected a type for `offset_of`");
 			return false;
 		}
@@ -2286,7 +2292,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 
 		ast_node(arg, Ident, field_arg);
-		Selection sel = lookup_field(type, arg->string, operand->mode == Addressing_Type);
+		Selection sel = lookup_field(c->allocator, type, arg->string, operand->mode == Addressing_Type);
 		if (sel.entity == NULL) {
 			gbString type_str = type_to_string(type);
 			error(ast_node_token(ce->args[0]),
@@ -2324,7 +2330,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 
 		ast_node(i, Ident, s->selector);
-		Selection sel = lookup_field(type, i->string, operand->mode == Addressing_Type);
+		Selection sel = lookup_field(c->allocator, type, i->string, operand->mode == Addressing_Type);
 		if (sel.entity == NULL) {
 			gbString type_str = type_to_string(type);
 			error(ast_node_token(arg),
@@ -2341,7 +2347,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	case BuiltinProc_type_of_val:
 		// type_of_val :: proc(val: Type) -> type(Type)
 		check_assignment(c, operand, NULL, make_string("argument of `type_of_val`"));
-		if (operand->mode == Addressing_Invalid)
+		if (operand->mode == Addressing_Invalid || operand->mode == Addressing_Builtin)
 			return false;
 		operand->mode = Addressing_Type;
 		break;
@@ -2349,11 +2355,16 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 	case BuiltinProc_type_info: {
 		// type_info :: proc(val_or_type) -> ^Type_Info
-		Operand op = {};
-		check_expr_or_type(c, &op, ce->args[0]);
-		add_type_info_type(c, op.type);
 		operand->mode = Addressing_Value;
 		operand->type = t_type_info_ptr;
+
+		Operand op = {};
+		check_expr_or_type(c, &op, ce->args[0]);
+		if (op.type == NULL || op.type == t_invalid || operand->mode == Addressing_Builtin) {
+			error(ast_node_token(op.expr), "Invalid argument to `type_info`");
+			return false;
+		}
+		add_type_info_type(c, op.type);
 	} break;
 
 	case BuiltinProc_compile_assert:
@@ -3193,7 +3204,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 						}
 						String name = kv->field->Ident.string;
 
-						Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
+						Selection sel = lookup_field(c->allocator, type, name, o->mode == Addressing_Type);
 						if (sel.entity == NULL) {
 							error(ast_node_token(elem),
 							      "Unknown field `%.*s` in structure literal", LIT(name));

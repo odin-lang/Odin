@@ -416,7 +416,7 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 
 void check_scope_usage(Checker *c, Scope *scope) {
 	// TODO(bill): Use this?
-#if 1
+#if 0
 	gb_for_array(i, scope->elements.entries) {
 		auto *entry = scope->elements.entries + i;
 		Entity *e = entry->value;
@@ -457,9 +457,7 @@ void add_global_entity(Entity *entity) {
 }
 
 void add_global_constant(gbAllocator a, String name, Type *type, ExactValue value) {
-	Token token = {Token_Identifier};
-	token.string = name;
-	Entity *entity = alloc_entity(a, Entity_Constant, NULL, token, type);
+	Entity *entity = alloc_entity(a, Entity_Constant, NULL, make_token_ident(name), type);
 	entity->Constant.value = value;
 	add_global_entity(entity);
 }
@@ -475,14 +473,10 @@ void init_universal_scope(void) {
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
-		Token token = {Token_Identifier};
-		token.string = basic_types[i].Basic.name;
-		add_global_entity(make_entity_type_name(a, NULL, token, &basic_types[i]));
+		add_global_entity(make_entity_type_name(a, NULL, make_token_ident(basic_types[i].Basic.name), &basic_types[i]));
 	}
 	for (isize i = 0; i < gb_count_of(basic_type_aliases); i++) {
-		Token token = {Token_Identifier};
-		token.string = basic_type_aliases[i].Basic.name;
-		add_global_entity(make_entity_type_name(a, NULL, token, &basic_type_aliases[i]));
+		add_global_entity(make_entity_type_name(a, NULL, make_token_ident(basic_type_aliases[i].Basic.name), &basic_type_aliases[i]));
 	}
 
 // Constants
@@ -493,9 +487,7 @@ void init_universal_scope(void) {
 // Builtin Procedures
 	for (isize i = 0; i < gb_count_of(builtin_procs); i++) {
 		BuiltinProcId id = cast(BuiltinProcId)i;
-		Token token = {Token_Identifier};
-		token.string = builtin_procs[i].name;
-		Entity *entity = alloc_entity(a, Entity_Builtin, NULL, token, t_invalid);
+		Entity *entity = alloc_entity(a, Entity_Builtin, NULL, make_token_ident(builtin_procs[i].name), t_invalid);
 		entity->Builtin.id = id;
 		add_global_entity(entity);
 	}
@@ -968,7 +960,7 @@ void check_parsed_files(Checker *c) {
 					di->entities = entities;
 					di->entity_count = entity_count;
 					di->type_expr = vd->type;
-					di->init_expr = vd->values[0]; // TODO(bill): Is this correct?
+					di->init_expr = vd->values[0];
 				}
 
 				gb_for_array(i, vd->names) {
