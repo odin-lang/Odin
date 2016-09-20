@@ -1,8 +1,31 @@
-// #import "fmt.odin" as fmt
-// #import "os.odin" as os
+#import "fmt.odin" as fmt
+#import "os.odin" as os
 
 main :: proc() {
+	Fruit :: enum {
+		APPLE,
+		BANANA,
+		GRAPE,
+		MELON,
+		PEACH,
+		TOMATO,
+	}
 
+	fruit_ti := type_info(Fruit)
+	name := (fruit_ti as ^Type_Info.Named).name // Unsafe casts
+	info := type_info_base(fruit_ti) as ^Type_Info.Enum // Unsafe casts
+
+	fmt.printf("% :: enum ", name);
+	fmt.fprint_type(os.stdout, info.base)
+	fmt.printf(" {\n")
+	for i := 0; i < info.values.count; i++ {
+		fmt.printf("\t%\t= %,\n", info.names[i], info.values[i])
+	}
+	fmt.printf("}\n")
+
+	Vector3 :: struct {x, y, z: f32}
+	v := Vector3{x = 1, y = 4, z = 9}
+	fmt.println(v)
 }
 
 

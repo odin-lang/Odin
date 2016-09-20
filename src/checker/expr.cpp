@@ -541,6 +541,25 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node, CycleChec
 	union_type->Record.other_field_count = other_field_count;
 }
 
+GB_COMPARE_PROC(cmp_enum_order) {
+	// Rule:
+	// Biggest to smallest alignment
+	// if same alignment: biggest to smallest size
+	// if same size: order by source order
+	Entity *x = *(Entity **)a;
+	Entity *y = *(Entity **)b;
+	GB_ASSERT(x != NULL);
+	GB_ASSERT(y != NULL);
+	GB_ASSERT(x->kind == Entity_Constant);
+	GB_ASSERT(y->kind == Entity_Constant);
+	GB_ASSERT(x->Constant.value.kind == ExactValue_Integer);
+	GB_ASSERT(y->Constant.value.kind == ExactValue_Integer);
+	i64 i = x->Constant.value.value_integer;
+	i64 j = y->Constant.value.value_integer;
+
+	return i < j ? -1 : i > j;
+}
+
 
 
 void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *node) {
@@ -639,6 +658,8 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		}
 		add_entity_use(&c->info, f->field, e);
 	}
+
+	gb_sort_array(fields, gb_array_count(et->fields), cmp_enum_order);
 
 	enum_type->Record.other_fields = fields;
 	enum_type->Record.other_field_count = gb_array_count(et->fields);

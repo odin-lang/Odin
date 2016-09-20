@@ -64,6 +64,9 @@ Type_Info :: union {
 }
 
 type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
+	if info == null {
+		return null
+	}
 	for {
 		match type i : info {
 		case Type_Info.Named:
@@ -355,17 +358,11 @@ __default_allocator :: proc() -> Allocator {
 
 
 __enum_to_string :: proc(info: ^Type_Info, value: i64) -> string {
-	for {
-		match type i : info {
-		case Type_Info.Named:
-			info = i.base
-			continue
-		}
-		break
-	}
+	info = type_info_base(info)
 
 	match type ti : info {
 	case Type_Info.Enum:
+		// TODO(bill): Search faster than linearly
 		for i := 0; i < ti.values.count; i++ {
 			if ti.values[i] == value {
 				return ti.names[i]
