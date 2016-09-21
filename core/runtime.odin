@@ -1,7 +1,7 @@
 #shared_global_scope
 
-#import "os.odin"  as os
-#import "fmt.odin" as fmt
+#import "os.odin"
+#import "fmt.odin"
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
@@ -133,93 +133,6 @@ memory_copy :: proc(dst, src: rawptr, len: int) #inline {
 	llvm_memmove_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memmove.p0i8.p0i8.i64"
 	llvm_memmove_64bit(dst, src, len, 1, false)
 }
-
-__string_eq :: proc(a, b: string) -> bool {
-	if a.count != b.count {
-		return false
-	}
-	if ^a[0] == ^b[0] {
-		return true
-	}
-	return memory_compare(^a[0], ^b[0], a.count) == 0
-}
-
-__string_cmp :: proc(a, b : string) -> int {
-	// Translation of http://mgronhol.github.io/fast-strcmp/
-	n := min(a.count, b.count)
-
-	fast := n/size_of(int) + 1
-	offset := (fast-1)*size_of(int)
-	curr_block := 0
-	if n <= size_of(int) {
-		fast = 0
-	}
-
-	la := slice_ptr(^a[0] as ^int, fast)
-	lb := slice_ptr(^b[0] as ^int, fast)
-
-	for ; curr_block < fast; curr_block++ {
-		if (la[curr_block] ~ lb[curr_block]) != 0 {
-			for pos := curr_block*size_of(int); pos < n; pos++ {
-				if (a[pos] ~ b[pos]) != 0 {
-					return a[pos] as int - b[pos] as int
-				}
-			}
-		}
-
-	}
-
-	for ; offset < n; offset++ {
-		if (a[offset] ~ b[offset]) != 0 {
-			return a[offset] as int - b[offset] as int
-		}
-	}
-
-	return 0
-}
-
-__string_ne :: proc(a, b : string) -> bool #inline { return !__string_eq(a, b) }
-__string_lt :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) < 0 }
-__string_gt :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) > 0 }
-__string_le :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) <= 0 }
-__string_ge :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) >= 0 }
-
-
-__assert :: proc(msg: string) {
-	fmt.fprintln(os.stderr, msg)
-	__debug_trap()
-}
-
-__bounds_check_error :: proc(file: string, line, column: int,
-                             index, count: int) {
-	if 0 <= index && index < count {
-		return
-	}
-	fmt.fprintf(os.stderr, "%(%:%) Index % is out of bounds range [0, %)\n",
-	            file, line, column, index, count)
-	__debug_trap()
-}
-
-__slice_expr_error :: proc(file: string, line, column: int,
-                           low, high, max: int) {
-	if 0 <= low && low <= high && high <= max {
-		return
-	}
-	fmt.fprintf(os.stderr, "%(%:%) Invalid slice indices: [%:%:%]\n",
-	            file, line, column, low, high, max)
-	__debug_trap()
-}
-__substring_expr_error :: proc(file: string, line, column: int,
-                               low, high: int) {
-	if 0 <= low && low <= high {
-		return
-	}
-	fmt.fprintf(os.stderr, "%(%:%) Invalid substring indices: [%:%:%]\n",
-	            file, line, column, low, high)
-	__debug_trap()
-}
-
-
 
 
 
@@ -356,6 +269,103 @@ __default_allocator :: proc() -> Allocator {
 	}
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+__string_eq :: proc(a, b: string) -> bool {
+	if a.count != b.count {
+		return false
+	}
+	if ^a[0] == ^b[0] {
+		return true
+	}
+	return memory_compare(^a[0], ^b[0], a.count) == 0
+}
+
+__string_cmp :: proc(a, b : string) -> int {
+	// Translation of http://mgronhol.github.io/fast-strcmp/
+	n := min(a.count, b.count)
+
+	fast := n/size_of(int) + 1
+	offset := (fast-1)*size_of(int)
+	curr_block := 0
+	if n <= size_of(int) {
+		fast = 0
+	}
+
+	la := slice_ptr(^a[0] as ^int, fast)
+	lb := slice_ptr(^b[0] as ^int, fast)
+
+	for ; curr_block < fast; curr_block++ {
+		if (la[curr_block] ~ lb[curr_block]) != 0 {
+			for pos := curr_block*size_of(int); pos < n; pos++ {
+				if (a[pos] ~ b[pos]) != 0 {
+					return a[pos] as int - b[pos] as int
+				}
+			}
+		}
+
+	}
+
+	for ; offset < n; offset++ {
+		if (a[offset] ~ b[offset]) != 0 {
+			return a[offset] as int - b[offset] as int
+		}
+	}
+
+	return 0
+}
+
+__string_ne :: proc(a, b : string) -> bool #inline { return !__string_eq(a, b) }
+__string_lt :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) < 0 }
+__string_gt :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) > 0 }
+__string_le :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) <= 0 }
+__string_ge :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) >= 0 }
+
+
+__assert :: proc(file: string, line, column: int, msg: string) #inline {
+	fmt.fprintf(os.stderr, "%(%:%) Runtime assertion: %\n",
+	            file, line, column, msg)
+	__debug_trap()
+}
+
+__bounds_check_error :: proc(file: string, line, column: int,
+                             index, count: int) {
+	if 0 <= index && index < count {
+		return
+	}
+	fmt.fprintf(os.stderr, "%(%:%) Index % is out of bounds range [0, %)\n",
+	            file, line, column, index, count)
+	__debug_trap()
+}
+
+__slice_expr_error :: proc(file: string, line, column: int,
+                           low, high, max: int) {
+	if 0 <= low && low <= high && high <= max {
+		return
+	}
+	fmt.fprintf(os.stderr, "%(%:%) Invalid slice indices: [%:%:%]\n",
+	            file, line, column, low, high, max)
+	__debug_trap()
+}
+__substring_expr_error :: proc(file: string, line, column: int,
+                               low, high: int) {
+	if 0 <= low && low <= high {
+		return
+	}
+	fmt.fprintf(os.stderr, "%(%:%) Invalid substring indices: [%:%:%]\n",
+	            file, line, column, low, high)
+	__debug_trap()
+}
 
 __enum_to_string :: proc(info: ^Type_Info, value: i64) -> string {
 	info = type_info_base(info)

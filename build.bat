@@ -46,9 +46,6 @@ rem pushd %build_dir%
 	del *.pdb > NUL 2> NUL
 	del *.ilk > NUL 2> NUL
 
-	del ..\misc\*.pdb > NUL 2> NUL
-	del ..\misc\*.ilk > NUL 2> NUL
-
 	cl %compiler_settings% "src\main.cpp" ^
 		/link %linker_settings% -OUT:%exe_name% ^
 	&& odin run code/demo.odin

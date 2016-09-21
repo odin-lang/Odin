@@ -145,6 +145,7 @@ enum BuiltinProcId {
 
 	BuiltinProc_compile_assert,
 	BuiltinProc_assert,
+	BuiltinProc_panic,
 
 	BuiltinProc_copy,
 	BuiltinProc_append,
@@ -188,6 +189,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 
 	{STR_LIT("compile_assert"),   1, false, Expr_Stmt},
 	{STR_LIT("assert"),           1, false, Expr_Stmt},
+	{STR_LIT("panic"),            1, false, Expr_Stmt},
 
 	{STR_LIT("copy"),             2, false, Expr_Expr},
 	{STR_LIT("append"),           2, false, Expr_Expr},
@@ -416,12 +418,15 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 
 void check_scope_usage(Checker *c, Scope *scope) {
 	// TODO(bill): Use this?
-#if 0
+#if 1
 	gb_for_array(i, scope->elements.entries) {
 		auto *entry = scope->elements.entries + i;
 		Entity *e = entry->value;
-		if (e->kind == Entity_Variable && !e->Variable.used) {
-			warning(e->token, "Unused variable: %.*s", LIT(e->token.string));
+		if (e->kind == Entity_Variable) {
+			auto *v = &e->Variable;
+			if (!v->is_field && !v->used) {
+				warning(e->token, "Unused variable: %.*s", LIT(e->token.string));
+			}
 		}
 	}
 
@@ -1040,7 +1045,7 @@ void check_parsed_files(Checker *c) {
 				warning(id->token, "Multiple #import of the same file within this scope");
 			}
 
-			if (id->import_name.string == make_string("_")) {
+			if (id->import_name.string == make_string(".")) {
 				// NOTE(bill): Add imported entities to this file's scope
 				gb_for_array(elem_index, scope->elements.entries) {
 					Entity *e = scope->elements.entries[elem_index].value;
@@ -1057,11 +1062,50 @@ void check_parsed_files(Checker *c) {
 					}
 				}
 			} else {
-				GB_ASSERT(id->import_name.string.len > 0);
-				Entity *e = make_entity_import_name(c->allocator, file_scope, id->import_name, t_invalid,
-				                                    id->fullpath, id->import_name.string,
-				                                    scope);
-				add_entity(c, file_scope, NULL, e);
+				String import_name = id->import_name.string;
+				if (import_name.len == 0) {
+					// NOTE(bill): use file name (without extension) as the identifier
+					// If it is a valid identifier
+					String filename = id->fullpath;
+					isize slash = 0;
+					isize dot = 0;
+					for (isize i = filename.len-1; i >= 0; i--) {
+						u8 c = filename.text[i];
+						if (c == '/' || c == '\\') {
+							break;
+						}
+						slash = i;
+					}
+
+					filename.text += slash;
+					filename.len -= slash;
+
+					dot = filename.len;
+					while (dot --> 0) {
+						u8 c = filename.text[dot];
+						if (c == '.') {
+							break;
+						}
+					}
+
+					filename.len = dot;
+
+					if (is_string_an_identifier(filename)) {
+						import_name = filename;
+					} else {
+						error(ast_node_token(decl),
+						      "File name, %.*s, cannot be as an import name as it is not a valid identifier",
+						      LIT(filename));
+					}
+				}
+
+				if (import_name.len > 0) {
+					id->import_name.string = import_name;
+					Entity *e = make_entity_import_name(c->allocator, file_scope, id->import_name, t_invalid,
+					                                    id->fullpath, id->import_name.string,
+					                                    scope);
+					add_entity(c, file_scope, NULL, e);
+				}
 			}
 		}
 	}

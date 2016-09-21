@@ -1534,7 +1534,9 @@ b32 check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 		return true;
 	}
 	if (is_type_string(xb) && is_type_u8_slice(yb)) {
-		return true;
+		if (is_type_typed(xb)) {
+			return true;
+		}
 	}
 
 	// proc <-> proc
@@ -2420,6 +2422,20 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		if (operand->mode != Addressing_Constant) {
 			operand->mode = Addressing_NoValue;
 		}
+		break;
+
+	case BuiltinProc_panic:
+		// panic :: proc(msg: string)
+
+		if (!is_type_string(operand->type)) {
+			gbString str = expr_to_string(ce->args[0]);
+			defer (gb_string_free(str));
+			error(ast_node_token(call),
+			      "`%s` is not a string", str);
+			return false;
+		}
+
+		operand->mode = Addressing_NoValue;
 		break;
 
 	case BuiltinProc_copy: {

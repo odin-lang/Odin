@@ -1,4 +1,4 @@
-#import "win32.odin" as win32
+#import "win32.odin"
 
 File :: type struct {
 	Handle :: type win32.HANDLE
@@ -49,7 +49,6 @@ __std_files := __set_file_standards();
 stdin  := ^__std_files[File_Standard.INPUT]
 stdout := ^__std_files[File_Standard.OUTPUT]
 stderr := ^__std_files[File_Standard.ERROR]
-
 
 __set_file_standards :: proc() -> [File_Standard.COUNT as int]File {
 	return [File_Standard.COUNT as int]File{

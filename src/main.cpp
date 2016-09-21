@@ -126,33 +126,46 @@ int main(int argc, char **argv) {
 	isize base_name_len = gb_path_extension(output_name)-1 - output_name;
 
 
-
 	i32 exit_code = 0;
-	// For more passes arguments: http://llvm.org/docs/Passes.html
-	exit_code = win32_exec_command_line_app(
-		// "../misc/llvm-bin/opt %s -o %.*s.bc "
-		"opt %s -o %.*s.bc "
-		"-memcpyopt "
-		"-mem2reg "
-		"-die -dse "
-		"-dce "
-		// "-S "
-		// "-debug-pass=Arguments "
-		"",
-		output_name, cast(int)base_name_len, output_name);
-	if (exit_code != 0)
-		return exit_code;
+	{
+		char buf[300] = {};
+		u32 buf_len = GetModuleFileNameA(GetModuleHandleA(NULL), buf, gb_size_of(buf));
+		for (isize i = buf_len-1; i >= 0; i--) {
+			if (buf[i] == '\\' ||
+			    buf[i] == '/') {
+				break;
+			}
+			buf_len--;
+		}
 
-	PRINT_TIMER("llvm-opt");
+		// For more passes arguments: http://llvm.org/docs/Passes.html
+		exit_code = win32_exec_command_line_app(
+			// "../misc/llvm-bin/opt %s -o %.*s.bc "
+			"\"%.*sbin\\opt.exe\" %s -o %.*s.bc "
+			"-memcpyopt "
+			"-mem2reg "
+			"-die -dse "
+			"-dce "
+			// "-S "
+			// "-debug-pass=Arguments "
+			"",
+			buf_len, buf,
+			output_name,
+			cast(int)base_name_len, output_name);
+		if (exit_code != 0)
+			return exit_code;
+
+		PRINT_TIMER("llvm-opt");
+	}
 
 #if 1
-	gbString lib_str = gb_string_make(gb_heap_allocator(), "-lKernel32.lib");
+	gbString lib_str = gb_string_make(gb_heap_allocator(), "-lKernel32");
 	// defer (gb_string_free(lib_str));
 	char lib_str_buf[1024] = {};
 	gb_for_array(i, parser.system_libraries) {
 		String lib = parser.system_libraries[i];
 		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-		                        " -l%.*s.lib", LIT(lib));
+		                        " -l%.*s", LIT(lib));
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);
 	}
 

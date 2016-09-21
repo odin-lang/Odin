@@ -39,3 +39,28 @@ b32 rune_is_whitespace(Rune r) {
 	}
 	return false;
 }
+
+
+b32 is_string_an_identifier(String s) {
+	if (s.len < 1) {
+		return false;
+	}
+	isize offset = 0;
+	while (offset < s.len) {
+		b32 ok = false;
+		Rune r = -1;
+		isize size = gb_utf8_decode(s.text+offset, s.len-offset, &r);
+		if (offset == 0) {
+			ok = rune_is_letter(r);
+		} else {
+			ok = rune_is_letter(r) || rune_is_digit(r);
+		}
+
+		if (!ok) {
+			return false;
+		}
+		offset += size;
+	}
+
+	return offset == s.len;
+}

@@ -1,7 +1,7 @@
-#import "win32.odin"  as win32
-#import "fmt.odin"    as fmt
+#import "win32.odin"
+#import "fmt.odin"
+#import "math.odin"
 #import "opengl.odin" as gl
-#import "math.odin"   as math
 
 TWO_HEARTS :: #rune "💕"
 

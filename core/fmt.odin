@@ -1,4 +1,4 @@
-#import "os.odin" as os
+#import "os.odin"
 
 PRINT_BUF_SIZE :: 1<<12
 

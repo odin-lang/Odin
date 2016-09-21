@@ -1,6 +1,6 @@
-#import "win32.odin" as win32
-#import "fmt.odin"   as fmt
-#import "os.odin"    as os
+#import "win32.odin"
+#import "fmt.odin"
+#import "os.odin"
 
 CANVAS_WIDTH  :: 128
 CANVAS_HEIGHT :: 128

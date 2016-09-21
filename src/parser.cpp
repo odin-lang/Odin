@@ -2587,10 +2587,18 @@ AstNode *parse_stmt(AstFile *f) {
 			return make_bad_decl(f, token, f->cursor[0]);
 		} else if (tag == make_string("import")) {
 			// TODO(bill): better error messages
-			Token import_name;
+			Token import_name = {};
 			Token file_path = expect_token(f, Token_String);
-			expect_token(f, Token_as);
-			import_name = expect_token(f, Token_Identifier);
+			if (allow_token(f, Token_as)) {
+				// NOTE(bill): Custom import name
+				if (f->cursor[0].kind == Token_Period) {
+					import_name = f->cursor[0];
+					import_name.kind = Token_Identifier;
+					next_token(f);
+				} else {
+					import_name = expect_token(f, Token_Identifier);
+				}
+			}
 
 			if (f->curr_proc == NULL) {
 				return make_import_decl(f, s->TagStmt.token, file_path, import_name, false);
@@ -2601,7 +2609,7 @@ AstNode *parse_stmt(AstFile *f) {
 			// TODO(bill): better error messages
 			Token file_path = expect_token(f, Token_String);
 			Token import_name = file_path;
-			import_name.string = make_string("_");
+			import_name.string = make_string(".");
 
 			if (f->curr_proc == NULL) {
 				return make_import_decl(f, s->TagStmt.token, file_path, import_name, true);
@@ -2683,7 +2691,7 @@ AstNodeArray parse_stmt_list(AstFile *f) {
 
 ParseFileError init_ast_file(AstFile *f, String fullpath) {
 	if (!string_has_extension(fullpath, make_string("odin"))) {
-		gb_printf_err("Only `.odin` files are allowed\n");
+		// gb_printf_err("Only `.odin` files are allowed\n");
 		return ParseFile_WrongExtension;
 	}
 	TokenizerInitError err = init_tokenizer(&f->tokenizer, fullpath);
@@ -2775,11 +2783,13 @@ b32 try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
 
 String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 	isize str_len = base_dir.len+path.len;
+
 	u8 *str = gb_alloc_array(gb_heap_allocator(), u8, str_len+1);
 	defer (gb_free(gb_heap_allocator(), str));
 
-	gb_memcopy(str, base_dir.text, base_dir.len);
-	gb_memcopy(str+base_dir.len, path.text, path.len);
+	isize i = 0;
+	gb_memcopy(str+i, base_dir.text, base_dir.len); i += base_dir.len;
+	gb_memcopy(str+i, path.text, path.len);
 	str[str_len] = '\0';
 	char *path_str = gb_path_get_full_name(a, cast(char *)str);
 	return make_string(path_str);
@@ -2861,6 +2871,26 @@ b32 is_import_path_valid(String path) {
 	return false;
 }
 
+String get_filepath_extension(String path) {
+	isize dot = 0;
+	b32 seen_slash = false;
+	for (isize i = path.len-1; i >= 0; i--) {
+		u8 c = path.text[i];
+		if (c == '/' || c == '\\') {
+			seen_slash = true;
+		}
+
+		if (c == '.') {
+			if (seen_slash) {
+				return make_string("");
+			}
+
+			dot = i;
+			break;
+		}
+	}
+	return make_string(path.text, dot);
+}
 
 void parse_file(Parser *p, AstFile *f) {
 	String filepath = f->tokenizer.fullpath;
@@ -2900,9 +2930,8 @@ void parse_file(Parser *p, AstFile *f) {
 					continue;
 				}
 
-				String import_file = {};
 				String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
-				import_file = rel_path;
+				String import_file = rel_path;
 				if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
 					String abs_path = get_fullpath_core(allocator, file_str);
 					if (gb_file_exists(cast(char *)abs_path.text)) {
@@ -2956,25 +2985,26 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 			if (pos.line != 0) {
 				gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
 			}
-			gb_printf_err("Failed to parse file: %.*s\n", LIT(import_rel_path));
+			gb_printf_err("Failed to parse file: %.*s\n\t", LIT(import_rel_path));
+			defer (gb_printf_err("\n"));
 			switch (err) {
 			case ParseFile_WrongExtension:
-				gb_printf_err("\tInvalid file extension\n");
+				gb_printf_err("Invalid file extension: File must have the extension `.odin`");
 				break;
 			case ParseFile_InvalidFile:
-				gb_printf_err("\tInvalid file\n");
+				gb_printf_err("Invalid file");
 				break;
 			case ParseFile_EmptyFile:
-				gb_printf_err("\tFile is empty\n");
+				gb_printf_err("File is empty");
 				break;
 			case ParseFile_Permission:
-				gb_printf_err("\tFile permissions problem\n");
+				gb_printf_err("File permissions problem");
 				break;
 			case ParseFile_NotFound:
-				gb_printf_err("\tFile cannot be found\n");
+				gb_printf_err("File cannot be found");
 				break;
 			case ParseFile_InvalidToken:
-				gb_printf_err("\tInvalid token found in file\n");
+				gb_printf_err("Invalid token found in file");
 				break;
 			}
 			return err;

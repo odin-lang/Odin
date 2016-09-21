@@ -1,5 +1,6 @@
-#import "fmt.odin" as fmt
-#import "os.odin" as os
+#import "fmt.odin"
+#import "os.odin"
+
 
 main :: proc() {
 	Fruit :: enum {

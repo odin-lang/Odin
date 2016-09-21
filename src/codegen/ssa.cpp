@@ -2230,30 +2230,22 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssa_emit_if(proc, cond, err, done);
 					proc->curr_block = err;
 
+					// TODO(bill): Cleanup allocations here
 					Token token = ast_node_token(ce->args[0]);
 					TokenPos pos = token.pos;
 					gbString expr = expr_to_string(ce->args[0]);
 					defer (gb_string_free(expr));
+					isize expr_len = gb_string_length(expr);
+					String expr_str = {};
+					expr_str.text = cast(u8 *)gb_alloc_copy_align(proc->module->allocator, expr, expr_len, 1);
+					expr_str.len = expr_len;
 
-					isize err_len = pos.file.len + 1 + 10 + 1 + 10 + 1;
-					err_len += 20;
-					err_len += gb_string_length(expr);
-					err_len += 2;
-
-					u8 *err_str = gb_alloc_array(proc->module->allocator, u8, err_len);
-					err_len = gb_snprintf(cast(char *)err_str, err_len,
-					                      "%.*s(%td:%td) Runtime assertion: %s\n",
-					                      LIT(pos.file), pos.line, pos.column, expr);
-					err_len--;
-
-					ssaValue *array = ssa_add_global_string_array(proc->module, make_string(err_str, err_len));
-					ssaValue *elem = ssa_array_elem(proc, array);
-					ssaValue *len = ssa_make_const_int(proc->module->allocator, err_len);
-					ssaValue *string = ssa_emit_string(proc, elem, len);
-
-					ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, 1);
-					args[0] = string;
-					ssa_emit_global_call(proc, "__assert", args, 1);
+					ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, 4);
+					args[0] = ssa_emit_global_string(proc, pos.file);
+					args[1] = ssa_make_const_int(proc->module->allocator, pos.line);
+					args[2] = ssa_make_const_int(proc->module->allocator, pos.column);
+					args[3] = ssa_emit_global_string(proc, expr_str);
+					ssa_emit_global_call(proc, "__assert", args, 4);
 
 					ssa_emit_jump(proc, done);
 					gb_array_append(proc->blocks, done);
@@ -2261,6 +2253,25 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					return NULL;
 				} break;
+
+				case BuiltinProc_panic: {
+					ssa_emit_comment(proc, make_string("panic"));
+					ssaValue *msg = ssa_build_expr(proc, ce->args[0]);
+					GB_ASSERT(is_type_string(ssa_type(msg)));
+
+					Token token = ast_node_token(ce->args[0]);
+					TokenPos pos = token.pos;
+
+					ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, 4);
+					args[0] = ssa_emit_global_string(proc, pos.file);
+					args[1] = ssa_make_const_int(proc->module->allocator, pos.line);
+					args[2] = ssa_make_const_int(proc->module->allocator, pos.column);
+					args[3] = msg;
+					ssa_emit_global_call(proc, "__assert", args, 4);
+
+					return NULL;
+				} break;
+
 
 				case BuiltinProc_copy: {
 					ssa_emit_comment(proc, make_string("copy"));
