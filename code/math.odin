@@ -96,7 +96,7 @@ remainder :: proc(x, y: f32) -> f32 {
 fmod :: proc(x, y: f32) -> f32 {
 	y = abs(y)
 	result := remainder(abs(x), y)
-	if fsign(result) < 0 {
+	if sign32(result) < 0 {
 		result += y
 	}
 	return copy_sign(result, x)
@@ -120,9 +120,9 @@ cross :: proc(x, y: Vec3) -> Vec3 {
 }
 
 
-vec2_mag :: proc(v: Vec2) -> f32 { return fsqrt(dot2(v, v)) }
-vec3_mag :: proc(v: Vec3) -> f32 { return fsqrt(dot3(v, v)) }
-vec4_mag :: proc(v: Vec4) -> f32 { return fsqrt(dot4(v, v)) }
+vec2_mag :: proc(v: Vec2) -> f32 { return sqrt32(dot2(v, v)) }
+vec3_mag :: proc(v: Vec3) -> f32 { return sqrt32(dot3(v, v)) }
+vec4_mag :: proc(v: Vec4) -> f32 { return sqrt32(dot4(v, v)) }
 
 vec2_norm :: proc(v: Vec2) -> Vec2 { return v / Vec2{vec2_mag(v)} }
 vec3_norm :: proc(v: Vec3) -> Vec3 { return v / Vec3{vec3_mag(v)} }

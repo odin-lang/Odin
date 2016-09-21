@@ -1499,7 +1499,14 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 
 		case Token_OpenBrace: {
 			if (!lhs && is_literal_type(operand) && f->expr_level >= 0) {
-				operand = parse_literal_value(f, operand);
+				if (f->cursor[0].pos.line == f->cursor[-1].pos.line) {
+					// TODO(bill): This is a hack due to optional semicolons
+					// TODO(bill): It's probably much better to solve this by changing
+					// the syntax for struct literals and array literals
+					operand = parse_literal_value(f, operand);
+				} else {
+					loop = false;
+				}
 			} else {
 				loop = false;
 			}
@@ -1553,13 +1560,24 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 
 			switch (op.kind) {
 			case Token_DoublePrime: {
+				// TODO(bill): Properly define semantic for in-fix and post-fix calls
 				AstNode *proc = parse_identifier(f);
-				AstNode *right = parse_binary_expr(f, false, prec+1);
-				gbArray(AstNode *) args;
-				gb_array_init_reserve(args, gb_arena_allocator(&f->arena), 2);
-				gb_array_append(args, expression);
-				gb_array_append(args, right);
-				expression = make_call_expr(f, proc, args, op, ast_node_token(right), empty_token);
+				/* if (f->cursor[0].kind == Token_OpenParen) {
+					AstNode *call = parse_call_expr(f, proc);
+					gb_array_append(call->CallExpr.args, expression);
+					for (isize i = gb_array_count(call->CallExpr.args)-1; i > 0; i--) {
+						gb_swap(AstNode *, call->CallExpr.args[i], call->CallExpr.args[i-1]);
+					}
+
+					expression = call;
+				} else  */{
+					AstNode *right = parse_binary_expr(f, false, prec+1);
+					gbArray(AstNode *) args;
+					gb_array_init_reserve(args, gb_arena_allocator(&f->arena), 2);
+					gb_array_append(args, expression);
+					gb_array_append(args, right);
+					expression = make_call_expr(f, proc, args, op, ast_node_token(right), empty_token);
+				}
 				continue;
 			} break;
 

@@ -206,7 +206,7 @@ run :: proc() {
 		display_window(^window)
 		ms_to_sleep := (16 - 1000*dt) as i32
 		if ms_to_sleep > 0 {
-			sleep_ms(ms_to_sleep)
+			win32.Sleep(ms_to_sleep)
 		}
 	}
 }

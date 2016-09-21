@@ -1348,9 +1348,8 @@ isize ssa_type_info_index(CheckerInfo *info, Type *type) {
 		}
 	}
 	if (entry_index < 0) {
-		gb_printf_err("%s\n", type_to_string(type));
+		compiler_error("Type_Info for `%s` could not be found", type_to_string(type));
 	}
-	GB_ASSERT(entry_index >= 0);
 	return entry_index;
 }
 

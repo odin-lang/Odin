@@ -2,6 +2,13 @@
 
 Odin in an open source programming language that is simple to read, comprehend and reason with.
 
+## Requirements
+
+* x86-64
+* Windows
+* MSVC installed
+* call `vcvarsall.bat` to setup the path
+
 ## Warnings
 
 * This is still highly in development and the language's design is quite volatile.

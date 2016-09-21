@@ -22,7 +22,7 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 	va_end(va);
 
 	if (CreateProcessA(NULL, cmd_line,
-	                   NULL, NULL, true, 0, NULL, NULL,
+                   NULL, NULL, true, 0, NULL, NULL,
 	                   &start_info, &pi)) {
 		WaitForSingleObject(pi.hProcess, INFINITE);
 

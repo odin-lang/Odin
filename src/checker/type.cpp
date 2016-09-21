@@ -599,12 +599,8 @@ b32 are_types_identical(Type *x, Type *y) {
 					break;
 
 				case TypeRecord_Enum:
-					if (are_types_identical(x->Record.enum_base, y->Record.enum_base)) {
-						if (x->Record.field_count == y->Record.field_count) {
-							return x->Record.fields == y->Record.fields;
-						}
-					}
-					return false;
+					// NOTE(bill): Each enum is unique
+					return x == y;
 				}
 			}
 		}

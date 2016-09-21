@@ -418,7 +418,7 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 
 void check_scope_usage(Checker *c, Scope *scope) {
 	// TODO(bill): Use this?
-#if 1
+#if 0
 	gb_for_array(i, scope->elements.entries) {
 		auto *entry = scope->elements.entries + i;
 		Entity *e = entry->value;
