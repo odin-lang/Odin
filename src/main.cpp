@@ -40,7 +40,7 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 	}
 }
 
-
+// #define DISPLAY_TIMING
 #if defined(DISPLAY_TIMING)
 #define INIT_TIMER() f64 start_time = gb_time_now(), end_time = 0, total_time = 0
 #define PRINT_TIMER(section) do { \
@@ -67,6 +67,18 @@ int main(int argc, char **argv) {
 		gb_printf_err("Please specify a .odin file\n");
 		return 1;
 	}
+	char module_path_buf[300] = {};
+	String module_path = {};
+	module_path.text = cast(u8 *)module_path_buf;
+	module_path.len = GetModuleFileNameA(NULL, module_path_buf, gb_size_of(module_path_buf));
+	for (isize i = module_path.len-1; i >= 0; i--) {
+		u8 c = module_path.text[i];
+		if (c == '/' || c == '\\') {
+			break;
+		}
+		module_path.len--;
+	}
+
 
 	INIT_TIMER();
 
@@ -81,12 +93,14 @@ int main(int argc, char **argv) {
 	Parser parser = {0};
 
 
-	if (!init_parser(&parser))
+	if (!init_parser(&parser)) {
 		return 1;
+	}
 	// defer (destroy_parser(&parser));
 
-	if (parse_files(&parser, init_filename) != ParseFile_None)
+	if (parse_files(&parser, init_filename) != ParseFile_None) {
 		return 1;
+	}
 
 	PRINT_TIMER("Syntax Parser");
 
@@ -109,8 +123,9 @@ int main(int argc, char **argv) {
 #endif
 #if 1
 	ssaGen ssa = {};
-	if (!ssa_gen_init(&ssa, &checker))
+	if (!ssa_gen_init(&ssa, &checker)) {
 		return 1;
+	}
 	// defer (ssa_gen_destroy(&ssa));
 
 	ssa_gen_tree(&ssa);
@@ -124,73 +139,68 @@ int main(int argc, char **argv) {
 
 	char const *output_name = ssa.output_file.filename;
 	isize base_name_len = gb_path_extension(output_name)-1 - output_name;
+	String output = make_string(cast(u8 *)output_name, base_name_len);
 
 
 	i32 exit_code = 0;
-	{
-		char buf[300] = {};
-		u32 buf_len = GetModuleFileNameA(GetModuleHandleA(NULL), buf, gb_size_of(buf));
-		for (isize i = buf_len-1; i >= 0; i--) {
-			if (buf[i] == '\\' ||
-			    buf[i] == '/') {
-				break;
-			}
-			buf_len--;
-		}
-
-		// For more passes arguments: http://llvm.org/docs/Passes.html
-		exit_code = win32_exec_command_line_app(
-			// "../misc/llvm-bin/opt %s -o %.*s.bc "
-			"\"%.*sbin\\opt.exe\" %s -o %.*s.bc "
-			"-memcpyopt "
-			"-mem2reg "
-			"-die -dse "
-			"-dce "
-			// "-S "
-			// "-debug-pass=Arguments "
-			"",
-			buf_len, buf,
-			output_name,
-			cast(int)base_name_len, output_name);
-		if (exit_code != 0)
-			return exit_code;
-
-		PRINT_TIMER("llvm-opt");
+	// For more passes arguments: http://llvm.org/docs/Passes.html
+	exit_code = win32_exec_command_line_app(
+		"%.*sbin/opt %s -o %.*s.bc "
+		"-memcpyopt "
+		"-mem2reg "
+		"-die -dse "
+		"-dce "
+		// "-S "
+		// "-debug-pass=Arguments "
+		"",
+		LIT(module_path),
+		output_name, LIT(output));
+	if (exit_code != 0) {
+		return exit_code;
 	}
 
-#if 1
-	gbString lib_str = gb_string_make(gb_heap_allocator(), "-lKernel32");
+	PRINT_TIMER("llvm-opt");
+
+	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
+	exit_code = win32_exec_command_line_app(
+		"%.*sbin/llc %.*s.bc -filetype=obj -O0 "
+		"-march=x86-64 "
+		"",
+		LIT(module_path),
+		LIT(output));
+	if (exit_code != 0) {
+		return exit_code;
+	}
+
+	PRINT_TIMER("llvm-llc");
+
+	gbString lib_str = gb_string_make(gb_heap_allocator(), "Kernel32.lib");
 	// defer (gb_string_free(lib_str));
 	char lib_str_buf[1024] = {};
 	gb_for_array(i, parser.system_libraries) {
 		String lib = parser.system_libraries[i];
 		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-		                        " -l%.*s", LIT(lib));
+		                        " %.*s.lib", LIT(lib));
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);
 	}
+	char *linker_flags = "-nologo -DEFAULTLIB:libcmt -machine:x64 -incremental:no -opt:ref -subsystem:console";
 
 	exit_code = win32_exec_command_line_app(
-		"clang %.*s.bc -o %.*s.exe "
-		"-O0 -g "
-		// "-O2 "
-		"-Wno-override-module "
-		"%s",
-		cast(int)base_name_len, output_name,
-		cast(int)base_name_len, output_name,
-		lib_str);
-
-	if (exit_code != 0)
+		"link %.*s.obj -OUT:%.*s.exe %s %s "
+		"",
+		LIT(output), LIT(output),
+		lib_str, linker_flags);
+	if (exit_code != 0) {
 		return exit_code;
+	}
 
-	PRINT_TIMER("clang-compiler");
-
+	PRINT_TIMER("msvc-link");
+#endif
 	PRINT_ACCUMULATION();
 
 	if (run_output) {
 		win32_exec_command_line_app("%.*s.exe", cast(int)base_name_len, output_name);
 	}
-#endif
-#endif
 
 	return 0;
 }
