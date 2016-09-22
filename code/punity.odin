@@ -434,7 +434,7 @@ run :: proc(user_init, user_step: proc(c: ^Core)) {
 		{
 			data: [128]byte
 			buf := data[:0]
-			fmt.printf_to_buffer(^buf, "Punity: % ms\x00", dt*1000)
+			fmt.bprintf(^buf, "Punity: % ms\x00", dt*1000)
 			win32.SetWindowTextA(win32_window, buf.data)
 		}
 
@@ -447,7 +447,7 @@ run :: proc(user_init, user_step: proc(c: ^Core)) {
 			}
 		}
 
-		memory_zero(^_core.key_deltas[0], size_of(_core.key_deltas[0]))
+		memory_zero(^_core.key_deltas[0], size_of_val(_core.key_deltas[0]))
 
 
 		for PeekMessageA(^message, null, 0, 0, PM_REMOVE) != 0 {

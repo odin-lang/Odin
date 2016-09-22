@@ -134,12 +134,12 @@ run :: proc() {
 		return DefWindowProcA(hwnd, msg, wparam, lparam)
 	}
 
-
 	window, window_success := make_window("Odin Language Demo", 854, 480, win32_proc)
 	if !window_success {
 		return
 	}
 	defer destroy_window(^window)
+
 
 
 	prev_time := time_now()
