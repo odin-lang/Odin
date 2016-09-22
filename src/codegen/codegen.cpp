@@ -302,9 +302,12 @@ void ssa_gen_tree(ssaGen *s) {
 			};
 
 
-			gb_for_array(entry_index, info->type_info_map.entries) {
-				auto *entry = &info->type_info_map.entries[entry_index];
+			gb_for_array(type_info_map_index, info->type_info_map.entries) {
+				auto *entry = &info->type_info_map.entries[type_info_map_index];
 				Type *t = cast(Type *)cast(uintptr)entry->key.key;
+				t = default_type(t);
+				isize entry_index = entry->value;
+
 
 				ssaValue *tag = NULL;
 

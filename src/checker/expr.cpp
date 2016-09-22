@@ -1072,6 +1072,13 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 				type = o.type;
 				goto end;
 			}
+		} else if (e->kind == AstNode_UnaryExpr) {
+			ast_node(ue, UnaryExpr, e);
+			if (ue->op.kind == Token_Pointer) {
+				type = make_type_pointer(c->allocator, check_type(c, ue->expr));
+				set_base_type(named_type, type);
+				goto end;
+			}
 		}
 
 		err_str = expr_to_string(e);
@@ -2241,10 +2248,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 	case BuiltinProc_size_of: {
 		// size_of :: proc(Type) -> int
-		Operand op = {};
-		check_expr_or_type(c, &op, ce->args[0]);
-		Type *type = op.type;
-		if (type == NULL || op.mode == Addressing_Builtin) {
+		Type *type = check_type(c, ce->args[0]);
+		if (type == NULL || type == t_invalid) {
 			error(ast_node_token(ce->args[0]), "Expected a type for `size_of`");
 			return false;
 		}
@@ -2269,10 +2274,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 	case BuiltinProc_align_of: {
 		// align_of :: proc(Type) -> int
-		Operand op = {};
-		check_expr_or_type(c, &op, ce->args[0]);
-		Type *type = op.type;
-		if (type == NULL || op.mode == Addressing_Builtin) {
+		Type *type = check_type(c, ce->args[0]);
+		if (type == NULL || type == t_invalid) {
 			error(ast_node_token(ce->args[0]), "Expected a type for `align_of`");
 			return false;
 		}
@@ -2296,10 +2299,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	case BuiltinProc_offset_of: {
 		// offset_val :: proc(Type, field) -> int
 		Operand op = {};
-		check_expr_or_type(c, &op, ce->args[0]);
-		Type *type = get_base_type(op.type);
-		AstNode *field_arg = unparen_expr(ce->args[1]);
-		if (type != NULL  || op.mode == Addressing_Builtin) {
+		Type *type = get_base_type(check_type(c, ce->args[0]));
+		if (type != NULL || type == t_invalid) {
 			error(ast_node_token(ce->args[0]), "Expected a type for `offset_of`");
 			return false;
 		}
@@ -2307,6 +2308,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			error(ast_node_token(ce->args[0]), "Expected a structure type for `offset_of`");
 			return false;
 		}
+
+		AstNode *field_arg = unparen_expr(ce->args[1]);
 		if (field_arg == NULL ||
 		    field_arg->kind != AstNode_Ident) {
 			error(ast_node_token(field_arg), "Expected an identifier for field argument");
@@ -2377,18 +2380,33 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 
 	case BuiltinProc_type_info: {
-		// type_info :: proc(val_or_type) -> ^Type_Info
-		operand->mode = Addressing_Value;
-		operand->type = t_type_info_ptr;
-
-		Operand op = {};
-		check_expr_or_type(c, &op, ce->args[0]);
-		if (op.type == NULL || op.type == t_invalid || operand->mode == Addressing_Builtin) {
-			error(ast_node_token(op.expr), "Invalid argument to `type_info`");
+		// type_info :: proc(Type) -> ^Type_Info
+		AstNode *expr = ce->args[0];
+		Type *type = check_type(c, expr);
+		if (type == NULL || type == t_invalid) {
+			error(ast_node_token(expr), "Invalid argument to `type_info`");
 			return false;
 		}
-		add_type_info_type(c, op.type);
+		add_type_info_type(c, type);
+
+		operand->mode = Addressing_Value;
+		operand->type = t_type_info_ptr;
 	} break;
+
+	case BuiltinProc_type_info_of_val: {
+		// type_info_of_val :: proc(val: Type) -> ^Type_Info
+		AstNode *expr = ce->args[0];
+
+		check_assignment(c, operand, NULL, make_string("argument of `type_info_of_val`"));
+		if (operand->mode == Addressing_Invalid || operand->mode == Addressing_Builtin)
+			return false;
+		add_type_info_type(c, operand->type);
+
+		operand->mode = Addressing_Value;
+		operand->type = t_type_info_ptr;
+	} break;
+
+
 
 	case BuiltinProc_compile_assert:
 		// compile_assert :: proc(cond: bool)
@@ -3379,18 +3397,21 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 	case_ast_node(ue, UnaryExpr, node);
 		check_expr(c, o, ue->expr);
-		if (o->mode == Addressing_Invalid)
+		if (o->mode == Addressing_Invalid) {
 			goto error;
+		}
 		check_unary_expr(c, o, ue->op, node);
-		if (o->mode == Addressing_Invalid)
+		if (o->mode == Addressing_Invalid) {
 			goto error;
+		}
 	case_end;
 
 
 	case_ast_node(be, BinaryExpr, node);
 		check_binary_expr(c, o, node);
-		if (o->mode == Addressing_Invalid)
+		if (o->mode == Addressing_Invalid) {
 			goto error;
+		}
 	case_end;
 
 
@@ -3402,8 +3423,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 	case_ast_node(ie, IndexExpr, node);
 		check_expr(c, o, ie->expr);
-		if (o->mode == Addressing_Invalid)
+		if (o->mode == Addressing_Invalid) {
 			goto error;
+		}
 
 		b32 valid = false;
 		i64 max_count = -1;

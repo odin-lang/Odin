@@ -8,7 +8,7 @@ main :: proc() {
 	// bounds_checking()
 	// type_introspection()
 	// any_type()
-	crazy_introspection()
+	// crazy_introspection()
 	// namespaces_and_files()
 	// miscellany()
 }
@@ -143,25 +143,51 @@ bounds_checking :: proc() {
 }
 
 type_introspection :: proc() {
+	{
+		info: ^Type_Info
+		x: int
 
-	info: ^Type_Info
-	x: int
+		info = type_info(int) // by type
+		info = type_info_of_val(x) // by value
+		// See: runtime.odin
 
-	info = type_info(int) // by type
-	info = type_info(x) // by value
-	// See: runtime.odin
+		match type i : info {
+		case Type_Info.Integer:
+			fmt.println("integer!")
+		case Type_Info.Float:
+			fmt.println("float!")
+		default:
+			fmt.println("potato!")
+		}
 
-	match type i : info {
-	case Type_Info.Integer:
-		fmt.println("integer!")
-	case Type_Info.Float:
-		fmt.println("float!")
-	default:
-		fmt.println("potato!")
+		// Unsafe cast
+		integer_info := info as ^Type_Info.Integer
 	}
 
-	// Unsafe cast
-	integer_info := info as ^Type_Info.Integer
+	{
+		Vector2 :: struct { x, y: f32 }
+		Vector3 :: struct { x, y, z: f32 }
+
+		v1: Vector2
+		v2: Vector3
+		v3: Vector3
+
+		t1 := type_info_of_val(v1)
+		t2 := type_info_of_val(v2)
+		t3 := type_info_of_val(v3)
+
+		fmt.println()
+		fmt.print("Type of v1 is:\n\t", t1)
+		// fmt.fprint_type(os.stdout, t1)
+
+		fmt.println()
+		fmt.print("Type of v2 is:\n\t")
+		fmt.fprint_type(os.stdout, t2)
+
+		fmt.println("\n")
+		fmt.println("t1 == t2:", t1 == t2)
+		fmt.println("t2 == t3:", t2 == t3)
+	}
 }
 
 any_type :: proc() {
@@ -174,14 +200,17 @@ any_type :: proc() {
 	a = x
 	a = y
 	a = z
-	a = a
+	a = a // This the "identity" type, it doesn't get converted
+
+	a = 123 // Literals are copied onto the stack first
 
 	// any has two members
 	// data      - rawptr to the data
 	// type_info - pointer to the type info
 
 	fmt.println(x, y, z)
-	// See: Implementation
+	// See: fmt.odin
+	// For variadic any procedures in action
 }
 
 crazy_introspection :: proc() {
@@ -204,6 +233,7 @@ crazy_introspection :: proc() {
 		fmt.println(s)
 
 		fmt.println(f)
+		// See: runtime.odin
 	}
 
 
@@ -225,9 +255,7 @@ crazy_introspection :: proc() {
 		name := (fruit_ti as ^Type_Info.Named).name // Unsafe casts
 		info := type_info_base(fruit_ti) as ^Type_Info.Enum // Unsafe casts
 
-		fmt.printf("% :: enum ", name);
-		fmt.fprint_type(os.stdout, info.base)
-		fmt.printf(" {\n")
+		fmt.printf("% :: enum % {", name, info.base);
 		for i := 0; i < info.values.count; i++ {
 			fmt.printf("\t%\t= %,\n", info.names[i], info.values[i])
 		}

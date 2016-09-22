@@ -1327,6 +1327,8 @@ ssaValue *ssa_emit_deep_field_ev(ssaProcedure *proc, Type *type, ssaValue *e, Se
 
 
 isize ssa_type_info_index(CheckerInfo *info, Type *type) {
+	type = default_type(type);
+
 	isize entry_index = -1;
 	HashKey key = hash_pointer(type);
 	auto *found_entry_index = map_get(&info->type_info_map, key);
@@ -1763,6 +1765,8 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 			data = ssa_add_local_generated(proc, src_type);
 			ssa_emit_store(proc, data, value);
 		}
+		GB_ASSERT(is_type_pointer(ssa_type(data)));
+		GB_ASSERT(is_type_typed(src_type));
 		data = ssa_emit_conv(proc, data, t_rawptr);
 
 
@@ -2154,6 +2158,10 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 				Entity *e = *found;
 				switch (e->Builtin.id) {
 				case BuiltinProc_type_info: {
+					Type *t = default_type(type_of_expr(proc->module->info, ce->args[0]));
+					return ssa_type_info(proc, t);
+				} break;
+				case BuiltinProc_type_info_of_val: {
 					Type *t = default_type(type_of_expr(proc->module->info, ce->args[0]));
 					return ssa_type_info(proc, t);
 				} break;

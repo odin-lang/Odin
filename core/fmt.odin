@@ -419,11 +419,15 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 		print_bool_to_buffer(buf, v)
 
 	case Pointer:
-		v := null;
 		if arg.data != null {
-			v = (arg.data as ^rawptr)^
+			if arg.type_info == type_info(^Type_Info) {
+				print_type_to_buffer(buf, (arg.data as ^^Type_Info)^)
+			} else {
+				print_pointer_to_buffer(buf, (arg.data as ^rawptr)^)
+			}
+		} else {
+			print_pointer_to_buffer(buf, null)
 		}
-		print_pointer_to_buffer(buf, v)
 
 	case Enum:
 		value: i64 = 0

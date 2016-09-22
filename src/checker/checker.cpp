@@ -142,6 +142,7 @@ enum BuiltinProcId {
 	BuiltinProc_type_of_val,
 
 	BuiltinProc_type_info,
+	BuiltinProc_type_info_of_val,
 
 	BuiltinProc_compile_assert,
 	BuiltinProc_assert,
@@ -186,6 +187,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("type_of_val"),      1, false, Expr_Expr},
 
 	{STR_LIT("type_info"),        1, false, Expr_Expr},
+	{STR_LIT("type_info_of_val"), 1, false, Expr_Expr},
 
 	{STR_LIT("compile_assert"),   1, false, Expr_Stmt},
 	{STR_LIT("assert"),           1, false, Expr_Stmt},

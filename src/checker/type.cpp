@@ -1062,7 +1062,8 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 				if (max < size)
 					max = size;
 			}
-			return align_formula(max, s.max_align) + type_size_of(s, allocator, t_int);
+			// NOTE(bill): Align to int
+			return align_formula(max, s.word_size) + type_size_of(s, allocator, t_int);
 		} break;
 
 		case TypeRecord_RawUnion: {
