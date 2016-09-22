@@ -2077,11 +2077,11 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 				check_entity_decl(c, entity, NULL, NULL);
 			}
 			GB_ASSERT(entity->type != NULL);
-			b32 is_not_exported = !((e->ImportName.scope == entity->scope) && !is_entity_exported(entity));
+			b32 is_not_exported = !is_entity_exported(entity);
 
 			if (is_not_exported) {
 				auto found = map_get(&e->ImportName.scope->implicit, hash_string(sel_name));
-				if (!found) {
+				if (!found && e->ImportName.scope != entity->scope) {
 					is_not_exported = false;
 				}
 			}
@@ -2437,9 +2437,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			return false;
 		}
 
-		if (operand->mode != Addressing_Constant) {
-			operand->mode = Addressing_NoValue;
-		}
+		operand->mode = Addressing_NoValue;
 		break;
 
 	case BuiltinProc_panic:

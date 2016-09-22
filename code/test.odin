@@ -1,38 +1,36 @@
-#import "fmt.odin"
+/*#import "fmt.odin"
 
 thing :: proc() {
-	fmt.println("Hello!")
+	fmt.println("Hello1!")
+}*/
+
+
+#import "fmt.odin" as format
+
+thing :: proc() {
+	format.println("Hello2!")
 }
 
-/*
-#import "fmt.odin" as fmt
+
+/*#import "fmt.odin" as .
 
 thing :: proc() {
-	fmt.println("Hello!")
+	println("Hello3!")
+}
+
+
+*/
+/*#import "fmt.odin" as _
+
+thing :: proc() {
+	// println("Hello4!")
 }
 */
-
-/*
-#import "fmt.odin" as .
-
-thing :: proc() {
-	println("Hello!")
-}
-*/
-
-/*
-#import "fmt.odin" as _
-
-thing :: proc() {
-	// println("Hello!")
-}
-*/
-
 
 /*
 #load "fmt.odin"
 
 thing :: proc() {
-	println("Hello!")
-}
-*/
+	println("Hello5!")
+}*/
+

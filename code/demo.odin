@@ -5,14 +5,13 @@
 // #import "punity.odin" as pn
 
 
-
 main :: proc() {
 	// struct_padding()
 	// bounds_checking()
 	// type_introspection()
 	// any_type()
 	// crazy_introspection()
-	// namespaces_and_files()
+	namespaces_and_files()
 	// miscellany()
 
 	// ht.run()
@@ -125,11 +124,11 @@ bounds_checking :: proc() {
 	// x[-1] = 0; // Compile Time
 	// x[4]  = 0; // Compile Time
 
-	/*{
+	{
 		a, b := -1, 4;
-		x[a] = 0; // Runtime Time
-		x[b] = 0; // Runtime Time
-	}*/
+		// x[a] = 0; // Runtime Time
+		// x[b] = 0; // Runtime Time
+	}
 
 	// Works for arrays, strings, slices, and related procedures & operations
 
@@ -190,11 +189,9 @@ type_introspection :: proc() {
 
 		fmt.println()
 		fmt.print("Type of v1 is:\n\t", t1)
-		// fmt.fprint_type(os.stdout, t1)
 
 		fmt.println()
-		fmt.print("Type of v2 is:\n\t")
-		fmt.fprint_type(os.stdout, t2)
+		fmt.print("Type of v2 is:\n\t", t2)
 
 		fmt.println("\n")
 		fmt.println("t1 == t2:", t1 == t2)
@@ -205,9 +202,9 @@ type_introspection :: proc() {
 any_type :: proc() {
 	a: any
 
-	x := 123
-	y := 6.28
-	z := "Yo-Yo Ma"
+	x: int = 123
+	y: f64 = 6.28
+	z: string = "Yo-Yo Ma"
 	// All types can be implicit cast to `any`
 	a = x
 	a = y
@@ -267,7 +264,7 @@ crazy_introspection :: proc() {
 		name := (fruit_ti as ^Type_Info.Named).name // Unsafe casts
 		info := type_info_base(fruit_ti) as ^Type_Info.Enum // Unsafe casts
 
-		fmt.printf("% :: enum % {", name, info.base);
+		fmt.printf("% :: enum % {\n", name, info.base);
 		for i := 0; i < info.values.count; i++ {
 			fmt.printf("\t%\t= %,\n", info.names[i], info.values[i])
 		}
@@ -293,6 +290,10 @@ crazy_introspection :: proc() {
 // #import "test.odin"
 
 namespaces_and_files :: proc() {
+
+	// test.thing()
+	// test.format.println()
+	// test.println()
 	/*
 		// Non-exporting import
 		#import "file.odin"
