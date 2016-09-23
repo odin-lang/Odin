@@ -85,15 +85,24 @@ struct ssaTargetList {
 	ssaBlock *     fallthrough_;
 };
 
-enum ssaDeferKind {
-	ssaDefer_Default,
-	ssaDefer_Return,
-	ssaDefer_Branch,
+enum ssaDeferExitKind {
+	ssaDeferExit_Default,
+	ssaDeferExit_Return,
+	ssaDeferExit_Branch,
 };
+enum ssaDeferKind {
+	ssaDefer_Node,
+	ssaDefer_Instr,
+};
+
 struct ssaDefer {
-	AstNode *stmt;
+	ssaDeferKind kind;
 	isize scope_index;
 	ssaBlock *block;
+	union {
+		AstNode *stmt;
+		ssaValue *instr;
+	};
 };
 
 struct ssaProcedure {
@@ -359,6 +368,26 @@ ssaDebugInfo *ssa_alloc_debug_info(gbAllocator a, ssaDebugInfoKind kind) {
 	ssaDebugInfo *di = gb_alloc_item(a, ssaDebugInfo);
 	di->kind = kind;
 	return di;
+}
+
+
+ssaDefer ssa_add_defer_node(ssaProcedure *proc, isize scope_index, AstNode *stmt) {
+	ssaDefer d = {ssaDefer_Node};
+	d.scope_index = scope_index;
+	d.block = proc->curr_block;
+	d.stmt = stmt;
+	gb_array_append(proc->defer_stmts, d);
+	return d;
+}
+
+
+ssaDefer ssa_add_defer_instr(ssaProcedure *proc, isize scope_index, ssaValue *instr) {
+	ssaDefer d = {ssaDefer_Instr};
+	d.scope_index = proc->scope_index;
+	d.block = proc->curr_block;
+	d.instr = cast(ssaValue *)gb_alloc_copy(proc->module->allocator, instr, gb_size_of(ssaValue));
+	gb_array_append(proc->defer_stmts, d);
+	return d;
 }
 
 void ssa_init_module(ssaModule *m, Checker *c) {
@@ -972,17 +1001,21 @@ void ssa_build_defer_stmt(ssaProcedure *proc, ssaDefer d) {
 	gb_array_append(proc->blocks, b);
 	proc->curr_block = b;
 	ssa_emit_comment(proc, make_string("defer"));
-	ssa_build_stmt(proc, d.stmt);
+	if (d.kind == ssaDefer_Node) {
+		ssa_build_stmt(proc, d.stmt);
+	} else if (d.kind == ssaDefer_Instr) {
+		ssa_emit(proc, d.instr);
+	}
 }
 
-void ssa_emit_defer_stmts(ssaProcedure *proc, ssaDeferKind kind, ssaBlock *block) {
+void ssa_emit_defer_stmts(ssaProcedure *proc, ssaDeferExitKind kind, ssaBlock *block) {
 	isize count = gb_array_count(proc->defer_stmts);
 	isize i = count;
 	while (i --> 0) {
 		ssaDefer d = proc->defer_stmts[i];
-		if (kind == ssaDefer_Return) {
+		if (kind == ssaDeferExit_Return) {
 			ssa_build_defer_stmt(proc, d);
-		} else if (kind == ssaDefer_Default) {
+		} else if (kind == ssaDeferExit_Default) {
 			if (proc->scope_index == d.scope_index &&
 			    d.scope_index > 1) {
 				ssa_build_defer_stmt(proc, d);
@@ -991,7 +1024,7 @@ void ssa_emit_defer_stmts(ssaProcedure *proc, ssaDeferKind kind, ssaBlock *block
 			} else {
 				break;
 			}
-		} else if (kind == ssaDefer_Branch) {
+		} else if (kind == ssaDeferExit_Branch) {
 			GB_ASSERT(block != NULL);
 			isize lower_limit = block->scope_index+1;
 			if (lower_limit < d.scope_index) {
@@ -1009,7 +1042,7 @@ void ssa_emit_unreachable(ssaProcedure *proc) {
 }
 
 void ssa_emit_ret(ssaProcedure *proc, ssaValue *v) {
-	ssa_emit_defer_stmts(proc, ssaDefer_Return, NULL);
+	ssa_emit_defer_stmts(proc, ssaDeferExit_Return, NULL);
 	ssa_emit(proc, ssa_make_instr_ret(proc, v));
 }
 
@@ -3316,7 +3349,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 	case_ast_node(bs, BlockStmt, node);
 		proc->scope_index++;
 		ssa_build_stmt_list(proc, bs->stmts);
-		ssa_emit_defer_stmts(proc, ssaDefer_Default, NULL);
+		ssa_emit_defer_stmts(proc, ssaDeferExit_Default, NULL);
 		proc->scope_index--;
 	case_end;
 
@@ -3325,8 +3358,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		isize scope_index = proc->scope_index;
 		if (ds->stmt->kind == AstNode_BlockStmt)
 			scope_index--;
-		ssaDefer d = {ds->stmt, scope_index, proc->curr_block};
-		gb_array_append(proc->defer_stmts, d);
+		ssa_add_defer_node(proc, scope_index, ds->stmt);
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);
@@ -3377,7 +3409,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 		proc->scope_index++;
 		ssa_build_stmt(proc, is->body);
-		ssa_emit_defer_stmts(proc, ssaDefer_Default, NULL);
+		ssa_emit_defer_stmts(proc, ssaDeferExit_Default, NULL);
 		proc->scope_index--;
 
 		ssa_emit_jump(proc, done);
@@ -3387,7 +3419,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 			proc->scope_index++;
 			ssa_build_stmt(proc, is->else_stmt);
-			ssa_emit_defer_stmts(proc, ssaDefer_Default, NULL);
+			ssa_emit_defer_stmts(proc, ssaDeferExit_Default, NULL);
 			proc->scope_index--;
 
 
@@ -3429,7 +3461,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 		proc->scope_index++;
 		ssa_build_stmt(proc, fs->body);
-		ssa_emit_defer_stmts(proc, ssaDefer_Default, NULL);
+		ssa_emit_defer_stmts(proc, ssaDeferExit_Default, NULL);
 		proc->scope_index--;
 
 		ssa_pop_target_list(proc);
@@ -3524,7 +3556,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			proc->scope_index++;
 			ssa_push_target_list(proc, done, NULL, fall);
 			ssa_build_stmt_list(proc, cc->stmts);
-			ssa_emit_defer_stmts(proc, ssaDefer_Default, body);
+			ssa_emit_defer_stmts(proc, ssaDeferExit_Default, body);
 			ssa_pop_target_list(proc);
 			proc->scope_index--;
 
@@ -3541,7 +3573,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			proc->scope_index++;
 			ssa_push_target_list(proc, done, NULL, default_fall);
 			ssa_build_stmt_list(proc, default_stmts);
-			ssa_emit_defer_stmts(proc, ssaDefer_Default, default_block);
+			ssa_emit_defer_stmts(proc, ssaDeferExit_Default, default_block);
 			ssa_pop_target_list(proc);
 			proc->scope_index--;
 		}
@@ -3631,7 +3663,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			proc->scope_index++;
 			ssa_push_target_list(proc, done, NULL, NULL);
 			ssa_build_stmt_list(proc, cc->stmts);
-			ssa_emit_defer_stmts(proc, ssaDefer_Default, body);
+			ssa_emit_defer_stmts(proc, ssaDeferExit_Default, body);
 			ssa_pop_target_list(proc);
 			proc->scope_index--;
 
@@ -3647,7 +3679,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			proc->scope_index++;
 			ssa_push_target_list(proc, done, NULL, NULL);
 			ssa_build_stmt_list(proc, default_stmts);
-			ssa_emit_defer_stmts(proc, ssaDefer_Default, default_block);
+			ssa_emit_defer_stmts(proc, ssaDeferExit_Default, default_block);
 			ssa_pop_target_list(proc);
 			proc->scope_index--;
 		}
@@ -3671,7 +3703,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		// TODO(bill): Handle fallthrough scope exit correctly
 		// if (block != NULL && bs->token.kind != Token_fallthrough) {
 		if (block != NULL) {
-			ssa_emit_defer_stmts(proc, ssaDefer_Branch, block);
+			ssa_emit_defer_stmts(proc, ssaDeferExit_Branch, block);
 		}
 		switch (bs->token.kind) {
 		case Token_break:       ssa_emit_comment(proc, make_string("break"));       break;
@@ -3686,35 +3718,39 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 	case_ast_node(pa, PushAllocator, node);
 		ssa_emit_comment(proc, make_string("PushAllocator"));
+		proc->scope_index++;
+		defer (proc->scope_index--);
 
 		ssaValue *context_ptr = *map_get(&proc->module->members, hash_string(make_string("__context")));
 		ssaValue *prev_context = ssa_add_local_generated(proc, t_context);
 		ssa_emit_store(proc, prev_context, ssa_emit_load(proc, context_ptr));
-		defer (ssa_emit_store(proc, context_ptr, ssa_emit_load(proc, prev_context)));
+
+		ssa_add_defer_instr(proc, proc->scope_index, ssa_make_instr_store(proc, context_ptr, ssa_emit_load(proc, prev_context)));
 
 		ssaValue *gep = ssa_emit_struct_gep(proc, context_ptr, 1, t_allocator_ptr);
 		ssa_emit_store(proc, gep, ssa_build_expr(proc, pa->expr));
 
-		proc->scope_index++;
 		ssa_build_stmt(proc, pa->body);
-		proc->scope_index--;
+		ssa_emit_defer_stmts(proc, ssaDeferExit_Default, NULL);
 
 	case_end;
 
 
 	case_ast_node(pa, PushContext, node);
 		ssa_emit_comment(proc, make_string("PushContext"));
+		proc->scope_index++;
+		defer (proc->scope_index--);
 
 		ssaValue *context_ptr = *map_get(&proc->module->members, hash_string(make_string("__context")));
 		ssaValue *prev_context = ssa_add_local_generated(proc, t_context);
 		ssa_emit_store(proc, prev_context, ssa_emit_load(proc, context_ptr));
-		defer (ssa_emit_store(proc, context_ptr, ssa_emit_load(proc, prev_context)));
+
+		ssa_add_defer_instr(proc, proc->scope_index, ssa_make_instr_store(proc, context_ptr, ssa_emit_load(proc, prev_context)));
 
 		ssa_emit_store(proc, context_ptr, ssa_build_expr(proc, pa->expr));
 
-		proc->scope_index++;
 		ssa_build_stmt(proc, pa->body);
-		proc->scope_index--;
+		ssa_emit_defer_stmts(proc, ssaDeferExit_Default, NULL);
 	case_end;
 
 

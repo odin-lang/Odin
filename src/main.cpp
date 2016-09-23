@@ -49,7 +49,7 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 	}
 }
 
-#define DISPLAY_TIMING
+// #define DISPLAY_TIMING
 #if defined(DISPLAY_TIMING)
 #define INIT_TIMER() f64 start_time = gb_time_now(), end_time = 0, total_time = 0
 #define PRINT_TIMER(section) do { \

@@ -26,7 +26,6 @@ create :: proc(name: string) -> (File, bool) {
 	return f, success
 }
 
-
 close :: proc(using f: ^File) {
 	win32.CloseHandle(handle)
 }

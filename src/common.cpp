@@ -12,7 +12,7 @@ String get_module_dir(gbAllocator a) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
 
-	
+
 	wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
 
 	String16 str = {text, len};
@@ -25,7 +25,7 @@ String get_module_dir(gbAllocator a) {
 		}
 		path.len--;
 	}
-	
+
 	return path;
 }
 

@@ -170,7 +170,10 @@ print_bool_to_buffer :: proc(buffer: ^[]byte, b : bool) {
 	else { print_string_to_buffer(buffer, "false") }
 }
 
-print_pointer_to_buffer :: proc(buffer: ^[]byte, p: rawptr) #inline { print_uint_base_to_buffer(buffer, p as uint, 16, 0, #rune " ") }
+print_pointer_to_buffer :: proc(buffer: ^[]byte, p: rawptr) #inline {
+	print_string_to_buffer(buffer, "0x")
+	print_uint_base_to_buffer(buffer, p as uint, 16, size_of(int), #rune "0")
+}
 
 print_f32_to_buffer :: proc(buffer: ^[]byte, f: f32) #inline { print__f64(buffer, f as f64, 7) }
 print_f64_to_buffer :: proc(buffer: ^[]byte, f: f64) #inline { print__f64(buffer, f, 10) }
