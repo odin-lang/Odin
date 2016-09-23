@@ -146,6 +146,13 @@ b32 check_is_terminating(AstNode *node) {
 		}
 		return has_default;
 	case_end;
+
+	case_ast_node(pa, PushAllocator, node);
+		return check_is_terminating(pa->body);
+	case_end;
+	case_ast_node(pc, PushContext, node);
+		return check_is_terminating(pc->body);
+	case_end;
 	}
 
 	return false;
@@ -160,15 +167,13 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	AstNode *node = unparen_expr(lhs);
 
 	// NOTE(bill): Ignore assignments to `_`
-	if (node->kind == AstNode_Ident) {
-		ast_node(i, Ident, node);
-		if (i->string == make_string("_")) {
-			add_entity_definition(&c->info, node, NULL);
-			check_assignment(c, op_a, NULL, make_string("assignment to `_` identifier"));
-			if (op_a->mode == Addressing_Invalid)
-				return NULL;
-			return op_a->type;
-		}
+	if (node->kind == AstNode_Ident &&
+	    node->Ident.string == make_string("_")) {
+		add_entity_definition(&c->info, node, NULL);
+		check_assignment(c, op_a, NULL, make_string("assignment to `_` identifier"));
+		if (op_a->mode == Addressing_Invalid)
+			return NULL;
+		return op_a->type;
 	}
 
 	Entity *e = NULL;
@@ -989,17 +994,14 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			break;
 		}
 
+
 		Type *proc_type = c->proc_stack[gb_array_count(c->proc_stack)-1];
 		isize result_count = 0;
 		if (proc_type->Proc.results) {
 			result_count = proc_type->Proc.results->Tuple.variable_count;
 		}
-		if (result_count != gb_array_count(rs->results)) {
-			error(rs->token, "Expected %td return %s, got %td",
-			      result_count,
-			      (result_count != 1 ? "values" : "value"),
-			      gb_array_count(rs->results));
-		} else if (result_count > 0) {
+
+		if (result_count > 0) {
 			Entity **variables = NULL;
 			if (proc_type->Proc.results != NULL) {
 				auto *tuple = &proc_type->Proc.results->Tuple;
@@ -1007,6 +1009,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			}
 			check_init_variables(c, variables, result_count,
 			                     rs->results, make_string("return statement"));
+		} else if (gb_array_count(rs->results) > 0) {
+			error(ast_node_token(rs->results[0]), "No result values expected");
 		}
 	case_end;
 

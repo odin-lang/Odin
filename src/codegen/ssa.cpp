@@ -3366,8 +3366,38 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		ssaValue *v = NULL;
 		auto *return_type_tuple  = &proc->type->Proc.results->Tuple;
 		isize return_count = proc->type->Proc.result_count;
-		if (gb_array_count(rs->results) == 1 && return_count > 1) {
-			GB_PANIC("ReturnStmt tuple return statement");
+		if (gb_array_count(rs->results) < return_count) {
+			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
+			defer (gb_temp_arena_memory_end(tmp));
+
+			gbArray(ssaValue *) results;
+			gb_array_init_reserve(results, proc->module->tmp_allocator, return_count);
+
+			gb_for_array(res_index, rs->results) {
+				ssaValue *res = ssa_build_expr(proc, rs->results[res_index]);
+				Type *t = ssa_type(res);
+				if (t->kind == Type_Tuple) {
+					for (isize i = 0; i < t->Tuple.variable_count; i++) {
+						Entity *e = t->Tuple.variables[i];
+						ssaValue *v = ssa_emit_struct_ev(proc, res, i, e->type);
+						gb_array_append(results, v);
+					}
+				} else {
+					gb_array_append(results, res);
+				}
+			}
+
+			Type *ret_type = proc->type->Proc.results;
+			v = ssa_add_local_generated(proc, ret_type);
+			gb_for_array(i, results) {
+				Type *t = return_type_tuple->variables[i]->type;
+				ssaValue *e = ssa_emit_conv(proc, results[i], t);
+				ssaValue *gep = ssa_emit_struct_gep(proc, v, i, make_type_pointer(proc->module->allocator, t));
+				ssa_emit_store(proc, gep, e);
+			}
+
+			v = ssa_emit_load(proc, v);
+
 		} else if (return_count == 1) {
 			Entity *e = return_type_tuple->variables[0];
 			v = ssa_emit_conv(proc, ssa_build_expr(proc, rs->results[0]), e->type);
@@ -3732,7 +3762,6 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 		ssa_build_stmt(proc, pa->body);
 		ssa_emit_defer_stmts(proc, ssaDeferExit_Default, NULL);
-
 	case_end;
 
 
