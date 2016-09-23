@@ -24,7 +24,7 @@ set compiler_warnings= ^
 	-wd4505 -wd4512 -wd4550
 
 set compiler_includes=
-set libs= kernel32.lib user32.lib gdi32.lib opengl32.lib
+set libs= kernel32.lib
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console
 

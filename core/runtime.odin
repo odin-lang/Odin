@@ -130,6 +130,7 @@ memory_compare :: proc(dst, src: rawptr, len: int) -> int {
 }
 
 memory_copy :: proc(dst, src: rawptr, len: int) #inline {
+	// NOTE(bill): This _must_ implemented like C's memmove
 	llvm_memmove_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memmove.p0i8.p0i8.i64"
 	llvm_memmove_64bit(dst, src, len, 1, false)
 }
@@ -142,7 +143,7 @@ memory_copy :: proc(dst, src: rawptr, len: int) #inline {
 
 
 
-Allocator :: struct {
+Allocator :: struct #ordered {
 	Mode :: enum {
 		ALLOC,
 		FREE,
@@ -159,7 +160,7 @@ Allocator :: struct {
 }
 
 
-Context :: struct {
+Context :: struct #ordered {
 	thread_id: int
 
 	allocator: Allocator
@@ -279,8 +280,6 @@ __default_allocator :: proc() -> Allocator {
 
 
 
-
-
 __string_eq :: proc(a, b: string) -> bool {
 	if a.count != b.count {
 		return false
@@ -381,4 +380,6 @@ __enum_to_string :: proc(info: ^Type_Info, value: i64) -> string {
 	}
 	return ""
 }
+
+
 

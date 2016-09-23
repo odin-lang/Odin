@@ -4,21 +4,20 @@ enum BasicKind {
 	Basic_Invalid,
 	Basic_bool,
 	Basic_i8,
-	Basic_i16,
-	Basic_i32,
-	Basic_i64,
 	Basic_u8,
+	Basic_i16,
 	Basic_u16,
+	Basic_i32,
 	Basic_u32,
+	Basic_i64,
 	Basic_u64,
 	Basic_f32,
 	Basic_f64,
 	Basic_int,
 	Basic_uint,
 	Basic_rawptr,
-	Basic_string,
-
-	Basic_any,
+	Basic_string, // ^u8 + int
+	Basic_any,    // ^Type_Info + rawptr
 
 	Basic_UntypedBool,
 	Basic_UntypedInteger,
@@ -26,7 +25,6 @@ enum BasicKind {
 	Basic_UntypedPointer,
 	Basic_UntypedString,
 	Basic_UntypedRune,
-
 
 	Basic_Count,
 
@@ -294,12 +292,12 @@ gb_global Type basic_types[] = {
 	{0, Type_Basic, {Basic_Invalid,        0,                                      STR_LIT("invalid type")}},
 	{0, Type_Basic, {Basic_bool,           BasicFlag_Boolean,                      STR_LIT("bool")}},
 	{0, Type_Basic, {Basic_i8,             BasicFlag_Integer,                      STR_LIT("i8")}},
-	{0, Type_Basic, {Basic_i16,            BasicFlag_Integer,                      STR_LIT("i16")}},
-	{0, Type_Basic, {Basic_i32,            BasicFlag_Integer,                      STR_LIT("i32")}},
-	{0, Type_Basic, {Basic_i64,            BasicFlag_Integer,                      STR_LIT("i64")}},
 	{0, Type_Basic, {Basic_u8,             BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u8")}},
+	{0, Type_Basic, {Basic_i16,            BasicFlag_Integer,                      STR_LIT("i16")}},
 	{0, Type_Basic, {Basic_u16,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u16")}},
+	{0, Type_Basic, {Basic_i32,            BasicFlag_Integer,                      STR_LIT("i32")}},
 	{0, Type_Basic, {Basic_u32,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u32")}},
+	{0, Type_Basic, {Basic_i64,            BasicFlag_Integer,                      STR_LIT("i64")}},
 	{0, Type_Basic, {Basic_u64,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u64")}},
 	{0, Type_Basic, {Basic_f32,            BasicFlag_Float,                        STR_LIT("f32")}},
 	{0, Type_Basic, {Basic_f64,            BasicFlag_Float,                        STR_LIT("f64")}},
@@ -369,6 +367,12 @@ gb_global Type *t_type_info_union      = NULL;
 gb_global Type *t_type_info_raw_union  = NULL;
 gb_global Type *t_type_info_enum       = NULL;
 gb_global Type *t_type_info_any        = NULL;
+
+gb_global Type *t_allocator            = NULL;
+gb_global Type *t_allocator_ptr        = NULL;
+gb_global Type *t_context              = NULL;
+gb_global Type *t_context_ptr          = NULL;
+
 
 
 
@@ -674,12 +678,12 @@ gb_global i64 basic_type_sizes[] = {
 	0,  // Basic_Invalid
 	1,  // Basic_bool
 	1,  // Basic_i8
-	2,  // Basic_i16
-	4,  // Basic_i32
-	8,  // Basic_i64
 	1,  // Basic_u8
+	2,  // Basic_i16
 	2,  // Basic_u16
+	4,  // Basic_i32
 	4,  // Basic_u32
+	8,  // Basic_i64
 	8,  // Basic_u64
 	4,  // Basic_f32
 	8,  // Basic_f64

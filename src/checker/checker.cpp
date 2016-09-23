@@ -839,10 +839,9 @@ void check_type_name_cycles(Checker *c, CycleCheck *cc, Entity *e) {
 	// }
 }
 
-void init_type_info_types(Checker *c) {
+void init_runtime_types(Checker *c) {
 	if (t_type_info == NULL) {
-		String type_info_str = make_string("Type_Info");
-		Entity *e = current_scope_lookup_entity(c->global_scope, type_info_str);
+		Entity *e = current_scope_lookup_entity(c->global_scope, make_string("Type_Info"));
 		if (e == NULL) {
 			compiler_error("Could not find type declaration for `Type_Info`\n"
 			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
@@ -875,6 +874,25 @@ void init_type_info_types(Checker *c) {
 		t_type_info_enum      = record->fields[15]->type;
 	}
 
+	if (t_allocator == NULL) {
+		Entity *e = current_scope_lookup_entity(c->global_scope, make_string("Allocator"));
+		if (e == NULL) {
+			compiler_error("Could not find type declaration for `Allocator`\n"
+			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
+		}
+		t_allocator = e->type;
+		t_allocator_ptr = make_type_pointer(c->allocator, t_allocator);
+	}
+
+	if (t_context == NULL) {
+		Entity *e = current_scope_lookup_entity(c->global_scope, make_string("Context"));
+		if (e == NULL) {
+			compiler_error("Could not find type declaration for `Context`\n"
+			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
+		}
+		t_context = e->type;
+		t_context_ptr = make_type_pointer(c->allocator, t_context);
+	}
 }
 
 
@@ -1131,7 +1149,7 @@ void check_parsed_files(Checker *c) {
 
 	check_global_entity(c, Entity_TypeName);
 
-	init_type_info_types(c);
+	init_runtime_types(c);
 #if 1
 	check_global_entity(c, Entity_Constant);
 	check_global_entity(c, Entity_Procedure);

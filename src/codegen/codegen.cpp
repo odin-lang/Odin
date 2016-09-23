@@ -48,7 +48,6 @@ String ssa_mangle_name(ssaGen *s, String path, String name) {
 		if (str[i] == '\\') {
 			str[i] = '/';
 		}
-
 	}
 
 	char const *base = gb_path_base_name(str);

@@ -3948,7 +3948,7 @@ void const *gb_memrchr(void const *data, u8 c, isize n) {
 
 gb_inline void *gb_alloc_align (gbAllocator a, isize size, isize alignment)                                { return a.proc(a.data, gbAllocation_Alloc, size, alignment, NULL, 0, GB_DEFAULT_ALLOCATOR_FLAGS); }
 gb_inline void *gb_alloc       (gbAllocator a, isize size)                                                 { return gb_alloc_align(a, size, GB_DEFAULT_MEMORY_ALIGNMENT); }
-gb_inline void  gb_free        (gbAllocator a, void *ptr)                                                  { a.proc(a.data, gbAllocation_Free, 0, 0, ptr, 0, GB_DEFAULT_ALLOCATOR_FLAGS); }
+gb_inline void  gb_free        (gbAllocator a, void *ptr)                                                  { if (ptr != NULL) a.proc(a.data, gbAllocation_Free, 0, 0, ptr, 0, GB_DEFAULT_ALLOCATOR_FLAGS); }
 gb_inline void  gb_free_all    (gbAllocator a)                                                             { a.proc(a.data, gbAllocation_FreeAll, 0, 0, NULL, 0, GB_DEFAULT_ALLOCATOR_FLAGS); }
 gb_inline void *gb_resize      (gbAllocator a, void *ptr, isize old_size, isize new_size)                  { return gb_resize_align(a, ptr, old_size, new_size, GB_DEFAULT_MEMORY_ALIGNMENT); }
 gb_inline void *gb_resize_align(gbAllocator a, void *ptr, isize old_size, isize new_size, isize alignment) { return a.proc(a.data, gbAllocation_Resize, new_size, alignment, ptr, old_size, GB_DEFAULT_ALLOCATOR_FLAGS); }
@@ -4698,7 +4698,7 @@ void gb_thread_set_name(gbThread *t, char const *name) {
 		tn.flags = 0;
 
 		__try {
-			RaiseException(0x406d1388, 0, gb_size_of(tn)/4, cast(usize *)&tn);
+			RaiseException(0x406d1388, 0, gb_size_of(tn)/4, cast(ULONG_PTR *)&tn);
 		} __except(1 /*EXCEPTION_EXECUTE_HANDLER*/) {
 		}
 

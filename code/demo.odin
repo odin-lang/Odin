@@ -1,19 +1,31 @@
 #import "fmt.odin"
 #import "os.odin"
+#import "mem.odin"
 // #import "http_test.odin" as ht
 // #import "game.odin" as game
 // #import "punity.odin" as pn
 
 
 main :: proc() {
+
+	arena: mem.Arena
+	mem.init_arena_from_context(^arena, 1000)
+	defer mem.free_arena(^arena)
+
+	push_allocator mem.arena_allocator(^arena) {
+		x := new(int)
+		x^ = 1337
+		fmt.println(x^)
+	}
+
+
 	// struct_padding()
 	// bounds_checking()
 	// type_introspection()
 	// any_type()
 	// crazy_introspection()
-	namespaces_and_files()
+	// namespaces_and_files()
 	// miscellany()
-
 	// ht.run()
 	// game.run()
 	// {

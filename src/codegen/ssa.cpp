@@ -2200,10 +2200,10 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssaValue *elem_size  = ssa_make_const_int(allocator, s);
 					ssaValue *elem_align = ssa_make_const_int(allocator, a);
 
-					ssaValue *len = ssa_build_expr(proc, ce->args[1]);
+					ssaValue *len =ssa_emit_conv(proc, ssa_build_expr(proc, ce->args[1]), t_int);
 					ssaValue *cap = len;
 					if (gb_array_count(ce->args) == 3) {
-						cap = ssa_build_expr(proc, ce->args[2]);
+						cap = ssa_emit_conv(proc, ssa_build_expr(proc, ce->args[2]), t_int);
 					}
 
 					ssa_slice_bounds_check(proc, ast_node_token(ce->args[1]), v_zero, len, cap, false);
@@ -2218,9 +2218,13 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					ssaValue *ptr = ssa_emit_conv(proc, call, ptr_type, true);
 					ssaValue *slice = ssa_add_local_generated(proc, slice_type);
-					ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_zero32, ptr_type), ptr);
-					ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_one32,  t_int),    len);
-					ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_two32,  t_int),    cap);
+
+					ssaValue *gep0 = ssa_emit_struct_gep(proc, slice, v_zero32, ptr_type);
+					ssaValue *gep1 = ssa_emit_struct_gep(proc, slice, v_one32, t_int);
+					ssaValue *gep2 = ssa_emit_struct_gep(proc, slice, v_two32, t_int);
+					ssa_emit_store(proc, gep0, ptr);
+					ssa_emit_store(proc, gep1, len);
+					ssa_emit_store(proc, gep2, cap);
 					return ssa_emit_load(proc, slice);
 				} break;
 
@@ -3677,6 +3681,42 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		ssa_emit_jump(proc, block);
 		ssa_emit_unreachable(proc);
 	case_end;
+
+
+
+	case_ast_node(pa, PushAllocator, node);
+		ssa_emit_comment(proc, make_string("PushAllocator"));
+
+		ssaValue *context_ptr = *map_get(&proc->module->members, hash_string(make_string("__context")));
+		ssaValue *prev_context = ssa_add_local_generated(proc, t_context);
+		ssa_emit_store(proc, prev_context, ssa_emit_load(proc, context_ptr));
+		defer (ssa_emit_store(proc, context_ptr, ssa_emit_load(proc, prev_context)));
+
+		ssaValue *gep = ssa_emit_struct_gep(proc, context_ptr, 1, t_allocator_ptr);
+		ssa_emit_store(proc, gep, ssa_build_expr(proc, pa->expr));
+
+		proc->scope_index++;
+		ssa_build_stmt(proc, pa->body);
+		proc->scope_index--;
+
+	case_end;
+
+
+	case_ast_node(pa, PushContext, node);
+		ssa_emit_comment(proc, make_string("PushContext"));
+
+		ssaValue *context_ptr = *map_get(&proc->module->members, hash_string(make_string("__context")));
+		ssaValue *prev_context = ssa_add_local_generated(proc, t_context);
+		ssa_emit_store(proc, prev_context, ssa_emit_load(proc, context_ptr));
+		defer (ssa_emit_store(proc, context_ptr, ssa_emit_load(proc, prev_context)));
+
+		ssa_emit_store(proc, context_ptr, ssa_build_expr(proc, pa->expr));
+
+		proc->scope_index++;
+		ssa_build_stmt(proc, pa->body);
+		proc->scope_index--;
+	case_end;
+
 
 	}
 }

@@ -214,6 +214,16 @@ AST_NODE_KIND(_ComplexStmtBegin, "", struct{}) \
 		AstNode *clobber_list; \
 		isize output_count, input_count, clobber_count; \
 	}) \
+	AST_NODE_KIND(PushAllocator, "push_allocator statement", struct { \
+		Token token; \
+		AstNode *expr; \
+		AstNode *body; \
+	}) \
+	AST_NODE_KIND(PushContext, "push_context statement", struct { \
+		Token token; \
+		AstNode *expr; \
+		AstNode *body; \
+	}) \
 \
 AST_NODE_KIND(_ComplexStmtEnd, "", struct{}) \
 AST_NODE_KIND(_StmtEnd,        "", struct{}) \
@@ -414,6 +424,10 @@ Token ast_node_token(AstNode *node) {
 		return node->UsingStmt.token;
 	case AstNode_AsmStmt:
 		return node->AsmStmt.token;
+	case AstNode_PushAllocator:
+		return node->PushAllocator.token;
+	case AstNode_PushContext:
+		return node->PushContext.token;
 	case AstNode_BadDecl:
 		return node->BadDecl.begin;
 	case AstNode_VarDecl:
@@ -765,6 +779,21 @@ gb_inline AstNode *make_asm_stmt(AstFile *f, Token token, b32 is_volatile, Token
 	return result;
 }
 
+gb_inline AstNode *make_push_allocator(AstFile *f, Token token, AstNode *expr, AstNode *body) {
+	AstNode *result = make_node(f, AstNode_PushAllocator);
+	result->PushAllocator.token = token;
+	result->PushAllocator.expr = expr;
+	result->PushAllocator.body = body;
+	return result;
+}
+
+gb_inline AstNode *make_push_context(AstFile *f, Token token, AstNode *expr, AstNode *body) {
+	AstNode *result = make_node(f, AstNode_PushContext);
+	result->PushContext.token = token;
+	result->PushContext.expr = expr;
+	result->PushContext.body = body;
+	return result;
+}
 
 
 
@@ -996,34 +1025,24 @@ void fix_advance_to_next_stmt(AstFile *f) {
 }
 
 b32 expect_semicolon_after_stmt(AstFile *f, AstNode *s) {
-	// if (s != NULL) {
-	// 	switch (s->kind) {
-	// 	case AstNode_ProcDecl:
-	// 		return true;
-	// 	case AstNode_TypeDecl: {
-	// 		switch (s->TypeDecl.type->kind) {
-	// 		case AstNode_StructType:
-	// 		case AstNode_UnionType:
-	// 		case AstNode_EnumType:
-	// 		case AstNode_ProcType:
-	// 			return true;
-	// 		}
-	// 	} break;
-	// 	}
-	// }
-
-	if (!allow_token(f, Token_Semicolon)) {
-		if (f->cursor[0].pos.line == f->cursor[-1].pos.line) {
-			if (f->cursor[0].kind != Token_CloseBrace) {
-				// CLEANUP(bill): Semicolon handling in parser
-				syntax_error(f->cursor[0],
-				             "Expected `;` after %.*s, got `%.*s`",
-				             LIT(ast_node_strings[s->kind]), LIT(token_strings[f->cursor[0].kind]));
-				return false;
-			}
-		}
+	if (allow_token(f, Token_Semicolon)) {
+		return true;
 	}
-	return true;
+
+	if (f->cursor[0].pos.line != f->cursor[-1].pos.line) {
+		return true;
+	}
+
+	switch (f->cursor[0].kind) {
+	case Token_EOF:
+	case Token_CloseBrace:
+		return true;
+	}
+
+	syntax_error(f->cursor[0],
+	             "Expected `;` after %.*s, got `%.*s`",
+	             LIT(ast_node_strings[s->kind]), LIT(token_strings[f->cursor[0].kind]));
+	return false;
 }
 
 
@@ -2593,6 +2612,28 @@ AstNode *parse_stmt(AstFile *f) {
 		return make_using_stmt(f, token, node);
 	} break;
 
+	case Token_push_allocator: {
+		next_token(f);
+		isize prev_level = f->expr_level;
+		f->expr_level = -1;
+		AstNode *expr = parse_expr(f, false);
+		f->expr_level = prev_level;
+
+		AstNode *body = parse_block_stmt(f);
+		return make_push_allocator(f, token, expr, body);
+	} break;
+
+	case Token_push_context: {
+		next_token(f);
+		isize prev_level = f->expr_level;
+		f->expr_level = -1;
+		AstNode *expr = parse_expr(f, false);
+		f->expr_level = prev_level;
+
+		AstNode *body = parse_block_stmt(f);
+		return make_push_context(f, token, expr, body);
+	} break;
+
 	case Token_Hash: {
 		s = parse_tag_stmt(f, NULL);
 		String tag = s->TagStmt.name.string;
@@ -2706,10 +2747,8 @@ AstNodeArray parse_stmt_list(AstFile *f) {
 }
 
 
-
 ParseFileError init_ast_file(AstFile *f, String fullpath) {
 	if (!string_has_extension(fullpath, make_string("odin"))) {
-		// gb_printf_err("Only `.odin` files are allowed\n");
 		return ParseFile_WrongExtension;
 	}
 	TokenizerInitError err = init_tokenizer(&f->tokenizer, fullpath);
@@ -2809,34 +2848,29 @@ String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 	gb_memcopy(str+i, base_dir.text, base_dir.len); i += base_dir.len;
 	gb_memcopy(str+i, path.text, path.len);
 	str[str_len] = '\0';
-	char *path_str = gb_path_get_full_name(a, cast(char *)str);
-	return make_string(path_str);
+	return path_to_fullpath(a, make_string(str, str_len));
 }
 
 String get_fullpath_core(gbAllocator a, String path) {
-	char buf[300] = {};
-	u32 buf_len = GetModuleFileNameA(GetModuleHandleA(NULL), buf, gb_size_of(buf));
-	for (isize i = buf_len-1; i >= 0; i--) {
-		if (buf[i] == '\\' ||
-		    buf[i] == '/') {
-			break;
-		}
-		buf_len--;
-	}
+	String module_dir = get_module_dir(gb_heap_allocator());
+	defer (if (module_dir.len > 0) {
+		gb_free(gb_heap_allocator(), module_dir.text);
+	});
 
 	char core[] = "core/";
 	isize core_len = gb_size_of(core)-1;
 
-	isize str_len = buf_len + core_len + path.len;
+	isize str_len = module_dir.len + core_len + path.len;
 	u8 *str = gb_alloc_array(gb_heap_allocator(), u8, str_len+1);
 	defer (gb_free(gb_heap_allocator(), str));
 
-	gb_memcopy(str, buf, buf_len);
-	gb_memcopy(str+buf_len, core, core_len);
-	gb_memcopy(str+buf_len+core_len, path.text, path.len);
+	gb_memcopy(str, module_dir.text, module_dir.len);
+	gb_memcopy(str+module_dir.len, core, core_len);
+	gb_memcopy(str+module_dir.len+core_len, path.text, path.len);
 	str[str_len] = '\0';
-	char *path_str = gb_path_get_full_name(a, cast(char *)str);
-	return make_string(path_str);}
+
+	return path_to_fullpath(a, make_string(str, str_len));
+}
 
 // NOTE(bill): Returns true if it's added
 b32 try_add_foreign_system_library_path(Parser *p, String import_file) {

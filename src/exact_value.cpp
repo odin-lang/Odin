@@ -190,7 +190,7 @@ ExactValue exact_unary_operator_value(Token op, ExactValue v, i32 precision) {
 	}
 
 failure:
-	compiler_error("Invalid unary operation, %.*s", LIT(token_strings[op.kind]));
+	GB_PANIC("Invalid unary operation, %.*s", LIT(token_strings[op.kind]));
 
 	ExactValue error_value = {};
 	return error_value;
@@ -212,7 +212,7 @@ i32 exact_value_order(ExactValue v) {
 		return 4;
 
 	default:
-		compiler_error("How'd you get here? Invalid Value.kind");
+		GB_PANIC("How'd you get here? Invalid Value.kind");
 		return -1;
 	}
 }

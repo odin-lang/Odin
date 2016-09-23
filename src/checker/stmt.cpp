@@ -1483,6 +1483,23 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 
 
+	case_ast_node(pa, PushAllocator, node);
+		Operand op = {};
+		check_expr(c, &op, pa->expr);
+		check_assignment(c, &op, t_allocator, make_string("argument to push_allocator"));
+		check_stmt(c, pa->body, mod_flags);
+	case_end;
+
+
+	case_ast_node(pa, PushContext, node);
+		Operand op = {};
+		check_expr(c, &op, pa->expr);
+		check_assignment(c, &op, t_context, make_string("argument to push_context"));
+		check_stmt(c, pa->body, mod_flags);
+	case_end;
+
+
+
 
 
 

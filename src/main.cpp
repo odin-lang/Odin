@@ -7,26 +7,35 @@
 #include "codegen/codegen.cpp"
 
 i32 win32_exec_command_line_app(char *fmt, ...) {
-	STARTUPINFOA start_info = {gb_size_of(STARTUPINFOA)};
+	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {};
+	char cmd_line[2048] = {};
+	isize cmd_len;
+	va_list va;
+	gbTempArenaMemory tmp;
+	String16 cmd;
+
 	start_info.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
 	start_info.wShowWindow = SW_SHOW;
 	start_info.hStdInput   = GetStdHandle(STD_INPUT_HANDLE);
 	start_info.hStdOutput  = GetStdHandle(STD_OUTPUT_HANDLE);
 	start_info.hStdError   = GetStdHandle(STD_ERROR_HANDLE);
 
-	char cmd_line[2048] = {};
-	va_list va;
 	va_start(va, fmt);
-	gb_snprintf_va(cmd_line, gb_size_of(cmd_line), fmt, va);
+	cmd_len = gb_snprintf_va(cmd_line, gb_size_of(cmd_line), fmt, va);
 	va_end(va);
 
-	if (CreateProcessA(NULL, cmd_line,
-                   NULL, NULL, true, 0, NULL, NULL,
-	                   &start_info, &pi)) {
-		WaitForSingleObject(pi.hProcess, INFINITE);
+	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+	defer (gb_temp_arena_memory_end(tmp));
 
+	cmd = string_to_string16(string_buffer_allocator, make_string(cast(u8 *)cmd_line, cmd_len-1));
+
+	if (CreateProcessW(NULL, cmd.text,
+	                   NULL, NULL, true, 0, NULL, NULL,
+	                   &start_info, &pi)) {
 		DWORD exit_code = 0;
+
+		WaitForSingleObject(pi.hProcess, INFINITE);
 		GetExitCodeProcess(pi.hProcess, &exit_code);
 
 		CloseHandle(pi.hProcess);
@@ -40,7 +49,7 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 	}
 }
 
-// #define DISPLAY_TIMING
+#define DISPLAY_TIMING
 #if defined(DISPLAY_TIMING)
 #define INIT_TIMER() f64 start_time = gb_time_now(), end_time = 0, total_time = 0
 #define PRINT_TIMER(section) do { \
@@ -62,23 +71,50 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 #endif
 
 
-int main(int argc, char **argv) {
-	if (argc < 2) {
-		gb_printf_err("Please specify a .odin file\n");
-		return 1;
-	}
-	char module_path_buf[300] = {};
-	String module_path = {};
-	module_path.text = cast(u8 *)module_path_buf;
-	module_path.len = GetModuleFileNameA(NULL, module_path_buf, gb_size_of(module_path_buf));
-	for (isize i = module_path.len-1; i >= 0; i--) {
-		u8 c = module_path.text[i];
-		if (c == '/' || c == '\\') {
-			break;
-		}
-		module_path.len--;
+enum ArchKind {
+	ArchKind_x64,
+	ArchKind_x86,
+};
+
+struct ArchData {
+	BaseTypeSizes sizes;
+	String llc_flags;
+	String link_flags;
+};
+
+ArchData make_arch_data(ArchKind kind) {
+	ArchData data = {};
+
+	switch (kind) {
+	case ArchKind_x64:
+	default:
+		data.sizes.word_size = 8;
+		data.sizes.max_align = 16;
+		data.llc_flags = make_string("-march=x86-64 ");
+		data.link_flags = make_string("/machine:x64 /defaultlib:libcmt ");
+		break;
+
+	case ArchKind_x86:
+		data.sizes.word_size = 4;
+		data.sizes.max_align = 8;
+		data.llc_flags = make_string("-march=x86 ");
+		data.link_flags = make_string("/machine:x86 /defaultlib:libcmt ");
+		break;
 	}
 
+	return data;
+}
+
+
+int main(int argc, char **argv) {
+	if (argc < 2) {
+		gb_printf_err("using: %s [run] <filename> \n", argv[0]);
+		return 1;
+	}
+	init_string_buffer_memory();
+
+	String module_dir = get_module_dir(gb_heap_allocator());
+	// defer (gb_free(gb_heap_allocator(), module_dir.text));
 
 	INIT_TIMER();
 
@@ -104,16 +140,11 @@ int main(int argc, char **argv) {
 
 	PRINT_TIMER("Syntax Parser");
 
-	// print_ast(parser.files[0].decls, 0);
-
 #if 1
 	Checker checker = {};
-	BaseTypeSizes sizes = {};
-	// NOTE(bill): x64
-	sizes.word_size = 8;
-	sizes.max_align = 16;
+	ArchData arch_data = make_arch_data(ArchKind_x64);
 
-	init_checker(&checker, &parser, sizes);
+	init_checker(&checker, &parser, arch_data.sizes);
 	// defer (destroy_checker(&checker));
 
 	check_parsed_files(&checker);
@@ -146,14 +177,14 @@ int main(int argc, char **argv) {
 	// For more passes arguments: http://llvm.org/docs/Passes.html
 	exit_code = win32_exec_command_line_app(
 		"%.*sbin/opt %s -o %.*s.bc "
-		"-memcpyopt "
 		"-mem2reg "
+		"-memcpyopt "
 		"-die -dse "
 		"-dce "
 		// "-S "
 		// "-debug-pass=Arguments "
 		"",
-		LIT(module_path),
+		LIT(module_dir),
 		output_name, LIT(output));
 	if (exit_code != 0) {
 		return exit_code;
@@ -164,10 +195,11 @@ int main(int argc, char **argv) {
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 	exit_code = win32_exec_command_line_app(
 		"%.*sbin/llc %.*s.bc -filetype=obj -O0 "
-		"-march=x86-64 "
+		"%.*s "
 		"",
-		LIT(module_path),
-		LIT(output));
+		LIT(module_dir),
+		LIT(output),
+		LIT(arch_data.llc_flags));
 	if (exit_code != 0) {
 		return exit_code;
 	}
@@ -183,13 +215,14 @@ int main(int argc, char **argv) {
 		                        " %.*s.lib", LIT(lib));
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);
 	}
-	char *linker_flags = "-nologo -DEFAULTLIB:libcmt -machine:x64 -incremental:no -opt:ref -subsystem:console";
+	char *linker_flags =
+	"/nologo /incremental:no /opt:ref /subsystem:console";
 
 	exit_code = win32_exec_command_line_app(
-		"link %.*s.obj -OUT:%.*s.exe %s %s "
+		"link %.*s.obj -OUT:%.*s.exe %s %.*s %s"
 		"",
 		LIT(output), LIT(output),
-		lib_str, linker_flags);
+		lib_str, LIT(arch_data.link_flags), linker_flags);
 	if (exit_code != 0) {
 		return exit_code;
 	}

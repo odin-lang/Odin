@@ -4,6 +4,47 @@
 
 #include "string.cpp"
 
+String get_module_dir(gbAllocator a) {
+	isize len = GetModuleFileNameW(NULL, NULL, 0);
+	if (len == 0) {
+		return make_string(NULL, 0);
+	}
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
+	
+	wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
+
+	String16 str = {text, len};
+	GetModuleFileNameW(NULL, text, len);
+	String path = string16_to_string(a, str);
+	for (isize i = path.len-1; i >= 0; i--) {
+		u8 c = path.text[i];
+		if (c == '/' || c == '\\') {
+			break;
+		}
+		path.len--;
+	}
+	
+	return path;
+}
+
+String path_to_fullpath(gbAllocator a, String s) {
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
+	String16 string16 = string_to_string16(string_buffer_allocator, s);
+
+	DWORD len = GetFullPathNameW(string16.text, 0, NULL, NULL);
+	if (len == 0) {
+		return make_string(NULL, 0);
+	}
+	wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
+	GetFullPathNameW(string16.text, len, text, NULL);
+	text[len] = 0;
+
+	return string16_to_string(a, make_string16(text, len));
+}
 
 struct BlockTimer {
 	u64 start;

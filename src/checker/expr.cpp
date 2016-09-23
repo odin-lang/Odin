@@ -266,15 +266,19 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 				AstNode *name = cd->names[i];
 				Entity *e = entities[i];
 				Token name_token = name->Ident;
-				HashKey key = hash_string(name_token.string);
-				if (map_get(&entity_map, key) != NULL) {
-					// TODO(bill): Scope checking already checks the declaration
-					error(name_token, "`%.*s` is already declared in this structure", LIT(name_token.string));
-				} else {
-					map_set(&entity_map, key, e);
+				if (name_token.string == make_string("_")) {
 					other_fields[other_field_index++] = e;
+				} else {
+					HashKey key = hash_string(name_token.string);
+					if (map_get(&entity_map, key) != NULL) {
+						// TODO(bill): Scope checking already checks the declaration
+						error(name_token, "`%.*s` is already declared in this structure", LIT(name_token.string));
+					} else {
+						map_set(&entity_map, key, e);
+						other_fields[other_field_index++] = e;
+					}
+					add_entity(c, c->context.scope, name, e);
 				}
-				add_entity(c, c->context.scope, name, e);
 			}
 		} else if (decl->kind == AstNode_TypeDecl) {
 			ast_node(td, TypeDecl, decl);
@@ -284,15 +288,19 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 			add_entity(c, c->context.scope, td->name, e);
 			check_type_decl(c, e, td->type, NULL, NULL);
 
-			HashKey key = hash_string(name_token.string);
-			if (map_get(&entity_map, key) != NULL) {
-				// TODO(bill): Scope checking already checks the declaration
-				error(name_token, "`%.*s` is already declared in this structure", LIT(name_token.string));
-			} else {
-				map_set(&entity_map, key, e);
+			if (name_token.string == make_string("_")) {
 				other_fields[other_field_index++] = e;
+			} else {
+				HashKey key = hash_string(name_token.string);
+				if (map_get(&entity_map, key) != NULL) {
+					// TODO(bill): Scope checking already checks the declaration
+					error(name_token, "`%.*s` is already declared in this structure", LIT(name_token.string));
+				} else {
+					map_set(&entity_map, key, e);
+					other_fields[other_field_index++] = e;
+				}
+				add_entity_use(&c->info, td->name, e);
 			}
-			add_entity_use(&c->info, td->name, e);
 		}
 
 	}
@@ -317,6 +325,11 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 				Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, type);
 				type->Named.type_name = e;
 				add_entity(c, c->context.scope, name, e);
+
+				if (name_token.string == make_string("_")) {
+					error(name_token, "`_` cannot be used a union subtype");
+					continue;
+				}
 
 				HashKey key = hash_string(name_token.string);
 				if (map_get(&entity_map, key) != NULL) {
@@ -352,17 +365,20 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 				Token name_token = name->Ident;
 
 				Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, vd->is_using, cast(i32)field_index);
-				HashKey key = hash_string(name_token.string);
-				if (map_get(&entity_map, key) != NULL) {
-					// TODO(bill): Scope checking already checks the declaration
-					error(name_token, "`%.*s` is already declared in this type", LIT(name_token.string));
+				if (name_token.string == make_string("_")) {
+					fields[field_index++] = e;
 				} else {
-					map_set(&entity_map, key, e);
-					fields[field_index] = e;
-					field_index++;
-					add_entity(c, c->context.scope, name, e);
+					HashKey key = hash_string(name_token.string);
+					if (map_get(&entity_map, key) != NULL) {
+						// TODO(bill): Scope checking already checks the declaration
+						error(name_token, "`%.*s` is already declared in this type", LIT(name_token.string));
+					} else {
+						map_set(&entity_map, key, e);
+						fields[field_index++] = e;
+						add_entity(c, c->context.scope, name, e);
+					}
+					add_entity_use(&c->info, name, e);
 				}
-				add_entity_use(&c->info, name, e);
 			}
 
 

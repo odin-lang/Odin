@@ -33,4 +33,3 @@ thing :: proc() {
 thing :: proc() {
 	println("Hello5!")
 }*/
-

@@ -84,8 +84,11 @@ void ssa_print_escape_string(ssaFileBuffer *f, String name, b32 print_quotes) {
 
 	char hex_table[] = "0123456789ABCDEF";
 	isize buf_len = name.len + extra + 2;
-	u8 *buf = gb_alloc_array(gb_heap_allocator(), u8, buf_len);
-	defer (gb_free(gb_heap_allocator(), buf));
+
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
+	u8 *buf = gb_alloc_array(string_buffer_allocator, u8, buf_len);
 
 	isize j = 0;
 
@@ -809,9 +812,11 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 
 
 	if (proc->module->generate_debug_info && proc->entity != NULL) {
-		ssaDebugInfo *di = *map_get(&proc->module->debug_info, hash_pointer(proc->entity));
-		GB_ASSERT(di->kind == ssaDebugInfo_Proc);
-		ssa_fprintf(f, "!dbg !%d ", di->id);
+		if (proc->body != NULL) {
+			ssaDebugInfo *di = *map_get(&proc->module->debug_info, hash_pointer(proc->entity));
+			GB_ASSERT(di->kind == ssaDebugInfo_Proc);
+			ssa_fprintf(f, "!dbg !%d ", di->id);
+		}
 	}
 
 

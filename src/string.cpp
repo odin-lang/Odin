@@ -1,13 +1,26 @@
+gb_global gbArena string_buffer_arena = {};
+gb_global gbAllocator string_buffer_allocator = {};
+
+void init_string_buffer_memory() {
+	// NOTE(bill): This should be enough memory for file systems
+	gb_arena_init_from_allocator(&string_buffer_arena, gb_heap_allocator(), gb_megabytes(1));
+	string_buffer_allocator = gb_arena_allocator(&string_buffer_arena);
+}
+
 
 // NOTE(bill): Used for UTF-8 strings
 typedef struct String {
-	u8 *text;
+	u8 *  text;
 	isize len;
 } String;
 // NOTE(bill): used for printf style arguments
 #define LIT(x) (x).len, (x).text
 
 
+typedef struct String16 {
+	wchar_t *text;
+	isize    len;
+} String16;
 
 
 gb_inline String make_string(u8 *text, isize len) {
@@ -19,6 +32,15 @@ gb_inline String make_string(u8 *text, isize len) {
 	s.len = len;
 	return s;
 }
+
+
+gb_inline String16 make_string16(wchar_t *text, isize len) {
+	String16 s;
+	s.text = text;
+	s.len = len;
+	return s;
+}
+
 
 gb_inline String make_string(char *text) {
 	return make_string(cast(u8 *)cast(void *)text, gb_strlen(text));
@@ -132,6 +154,74 @@ b32 string_contains_char(String s, u8 c) {
 	}
 	return false;
 }
+
+// TODO(bill): Make this non-windows specific
+String16 string_to_string16(gbAllocator a, String s) {
+	if (s.len < 1) {
+		return make_string16(NULL, 0);
+	}
+
+	int len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+	                              cast(char *)s.text, s.len, NULL, 0);
+	if (len == 0) {
+		return make_string16(NULL, 0);
+	}
+
+	wchar_t *text = gb_alloc_array(a, wchar_t, len+1);
+
+	int len1 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+	                               cast(char *)s.text, s.len, text, len);
+	if (len1 == 0) {
+		gb_free(a, text);
+		return make_string16(NULL, 0);
+	}
+	text[len] = 0;
+
+	return make_string16(text, len-1);
+}
+
+String string16_to_string(gbAllocator a, String16 s) {
+	if (s.len < 1) {
+		return make_string(NULL, 0);
+	}
+
+	int len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+	                              s.text, s.len, NULL, 0,
+	                              NULL, NULL);
+	if (len == 0) {
+		return make_string(NULL, 0);
+	}
+
+	u8 *text = gb_alloc_array(a, u8, len+1);
+
+	int len1 = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+	                               s.text, s.len, cast(char *)text, len,
+	                               NULL, NULL);
+	if (len1 == 0) {
+		gb_free(a, text);
+		return make_string(NULL, 0);
+	}
+	text[len] = 0;
+
+	return make_string(text, len-1);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 b32 unquote_char(String s, u8 quote, Rune *rune, b32 *multiple_bytes, String *tail_string) {
 	if (s.text[0] == quote &&
