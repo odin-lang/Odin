@@ -805,9 +805,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 		if (n->Ident.string == make_string("_")) {
 			error(n->Ident, "`_` cannot be used as a value type");
 		} else {
-			auto *entries = c->context.scope->elements.entries;
-			error(n->Ident,
-			      "Undeclared name: %.*s", LIT(n->Ident.string));
+			error(n->Ident, "Undeclared name: %.*s", LIT(n->Ident.string));
 		}
 		o->type = t_invalid;
 		o->mode = Addressing_Invalid;

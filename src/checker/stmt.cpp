@@ -59,40 +59,19 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 			Delay delay = {e, d};
 			gb_array_append(delayed, delay);
 		case_end;
-
-		case_ast_node(pd, ProcDecl, node);
-			ast_node(name, Ident, pd->name);
-			Entity *e = make_entity_procedure(c->allocator, c->context.scope, *name, NULL);
-			add_entity(c, c->context.scope, pd->name, e);
-
-			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
-			d->proc_decl = node;
-
-			Delay delay = {e, d};
-			gb_array_append(delayed, delay);
-		case_end;
 		}
 	}
 
 	auto check_scope_entity = [](Checker *c, gbArray(Delay) delayed, EntityKind kind) {
 		gb_for_array(i, delayed) {
 			auto delay = delayed[i];
-			Entity *e = delay.e;
-			if (e->kind == kind) {
-				DeclInfo *d = delay.d;
-				Scope *prev_scope = c->context.scope;
-				c->context.scope = d->scope;
-				GB_ASSERT(d->scope == e->scope);
-				check_entity_decl(c, e, d, NULL);
-				c->context.scope = prev_scope;
+			if (delay.e->kind == kind) {
+				check_entity_decl(c, delay.e, delay.d, NULL);
 			}
 		}
 	};
 	check_scope_entity(c, delayed, Entity_TypeName);
 	check_scope_entity(c, delayed, Entity_Constant);
-	check_scope_entity(c, delayed, Entity_Procedure);
-
-
 
 	b32 ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
 	u32 f = flags & (~Stmt_FallthroughAllowed);
@@ -722,36 +701,20 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 		check_proc_decl(c, e, d);
 		return;
 	}
+	Scope *prev = c->context.scope;
+	c->context.scope = d->scope;
+	defer (c->context.scope = prev);
 
 	switch (e->kind) {
-	case Entity_Constant: {
-		Scope *prev = c->context.scope;
-		c->context.scope = d->scope;
-		defer (c->context.scope = prev);
-
+	case Entity_Constant:
 		check_const_decl(c, e, d->type_expr, d->init_expr);
-	} break;
-
-	case Entity_Variable: {
-		Scope *prev = c->context.scope;
-		c->context.scope = d->scope;
-		defer (c->context.scope = prev);
-
+		break;
+	case Entity_Variable:
 		check_var_decl(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr);
-	} break;
-
-	case Entity_Procedure: {
-		check_proc_decl(c, e, d);
-	} break;
-
-
-	case Entity_TypeName: {
-		Scope *prev = c->context.scope;
-		c->context.scope = d->scope;
-		defer (c->context.scope = prev);
-
+		break;
+	case Entity_TypeName:
 		check_type_decl(c, e, d->type_expr, named_type, cycle_checker);
-	} break;
+		break;
 	}
 }
 
@@ -771,8 +734,7 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 			String str = token.string;
 			Entity *found = NULL;
 			// NOTE(bill): Ignore assignments to `_`
-			b32 can_be_ignored = str == make_string("_");
-			if (!can_be_ignored) {
+			if (str != make_string("_")) {
 				found = current_scope_lookup_entity(c->context.scope, str);
 			}
 			if (found == NULL) {
@@ -1541,12 +1503,22 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		// NOTE(bill): Handled elsewhere
 	case_end;
 
-	case_ast_node(pd, ProcDecl, node);
-		// NOTE(bill): Handled elsewhere
-	case_end;
-
 	case_ast_node(td, TypeDecl, node);
 		// NOTE(bill): Handled elsewhere
 	case_end;
+
+	case_ast_node(pd, ProcDecl, node);
+		// NOTE(bill): This must be handled here so it has access to the parent scope stuff
+		// e.g. using
+		Entity *e = make_entity_procedure(c->allocator, c->context.scope, pd->name->Ident, NULL);
+		add_entity(c, c->context.scope, pd->name, e);
+
+		DeclInfo *d = make_declaration_info(c->allocator, e->scope);
+		d->proc_decl = node;
+
+		check_entity_decl(c, e, d, NULL);
+	case_end;
+
+
 	}
 }
