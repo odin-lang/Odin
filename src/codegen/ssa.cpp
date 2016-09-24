@@ -62,6 +62,8 @@ struct ssaModule {
 	Map<String>         type_names; // Key: Type *
 	Map<ssaDebugInfo *> debug_info; // Key: Unique pointer
 	i32                 global_string_index;
+
+	gbArray(ssaValue *) procs; // NOTE(bill): Procedures to generate
 };
 
 
@@ -405,6 +407,7 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 	map_init(&m->members,    gb_heap_allocator());
 	map_init(&m->debug_info, gb_heap_allocator());
 	map_init(&m->type_names, gb_heap_allocator());
+	gb_array_init(m->procs,  gb_heap_allocator());
 
 	// Default states
 	m->stmt_state_flags = 0;
@@ -468,6 +471,7 @@ void ssa_destroy_module(ssaModule *m) {
 	map_destroy(&m->members);
 	map_destroy(&m->type_names);
 	map_destroy(&m->debug_info);
+	gb_array_free(m->procs);
 	gb_arena_free(&m->arena);
 }
 
@@ -3199,10 +3203,11 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			                                           proc->module, e, e->type, pd->type, pd->body, name);
 
 			value->Proc.tags = pd->tags;
+			value->Proc.parent = proc;
 
 			ssa_module_add_value(proc->module, e, value);
 			gb_array_append(proc->children, &value->Proc);
-			ssa_build_proc(value, proc);
+			gb_array_append(proc->module->procs, value);
 		} else {
 			// FFI - Foreign function interace
 			String original_name = pd->name->Ident.string;
@@ -3390,10 +3395,10 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			Type *ret_type = proc->type->Proc.results;
 			v = ssa_add_local_generated(proc, ret_type);
 			gb_for_array(i, results) {
-				Type *t = return_type_tuple->variables[i]->type;
-				ssaValue *e = ssa_emit_conv(proc, results[i], t);
-				ssaValue *gep = ssa_emit_struct_gep(proc, v, i, make_type_pointer(proc->module->allocator, t));
-				ssa_emit_store(proc, gep, e);
+				Entity *e = return_type_tuple->variables[i];
+				ssaValue *res = ssa_emit_conv(proc, results[i], e->type);
+				ssaValue *field = ssa_emit_struct_gep(proc, v, i, make_type_pointer(proc->module->allocator, e->type));
+				ssa_emit_store(proc, field, res);
 			}
 
 			v = ssa_emit_load(proc, v);
@@ -3410,7 +3415,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			gb_for_array(i, rs->results) {
 				Entity *e = return_type_tuple->variables[i];
 				ssaValue *res = ssa_emit_conv(proc, ssa_build_expr(proc, rs->results[i]), e->type);
-				ssaValue *field = ssa_emit_struct_gep(proc, v, i, e->type);
+				ssaValue *field = ssa_emit_struct_gep(proc, v, i, make_type_pointer(proc->module->allocator, e->type));
 				ssa_emit_store(proc, field, res);
 			}
 			v = ssa_emit_load(proc, v);
@@ -3451,7 +3456,6 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			ssa_build_stmt(proc, is->else_stmt);
 			ssa_emit_defer_stmts(proc, ssaDeferExit_Default, NULL);
 			proc->scope_index--;
-
 
 			ssa_emit_jump(proc, done);
 		}

@@ -635,6 +635,10 @@ void ssa_gen_tree(ssaGen *s) {
 		ssa_end_procedure_body(proc);
 	}
 
+	gb_for_array(i, m->procs) {
+		ssa_build_proc(m->procs[i], m->procs[i]->Proc.parent);
+	}
+
 
 
 

@@ -9,10 +9,91 @@ enum StmtFlag : u32 {
 
 void check_stmt(Checker *c, AstNode *node, u32 flags);
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d);
+void check_const_decl_node(Checker *c, AstNode *node);
 
 void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 	// TODO(bill): Allow declaration (expect variable) in any order
 	// even within a procedure
+	struct Delay {
+		Entity *e;
+		DeclInfo *d;
+	};
+	gbArray(Delay) delayed; gb_array_init(delayed, gb_heap_allocator());
+
+	gb_for_array(i, stmts) {
+		AstNode *node = stmts[i];
+		switch (node->kind) {
+		case_ast_node(cd, ConstDecl, node);
+			gb_for_array(i, cd->values) {
+				AstNode *name = cd->names[i];
+				AstNode *value = cd->values[i];
+				ExactValue v = {ExactValue_Invalid};
+
+				Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
+				add_entity(c, e->scope, name, e);
+
+				DeclInfo *di = make_declaration_info(c->allocator, e->scope);
+				di->type_expr = cd->type;
+				di->init_expr = value;
+
+				Delay delay = {e, di};
+				gb_array_append(delayed, delay);
+			}
+
+			isize lhs_count = gb_array_count(cd->names);
+			isize rhs_count = gb_array_count(cd->values);
+
+			if (rhs_count == 0 && cd->type == NULL) {
+				error(ast_node_token(node), "Missing type or initial expression");
+			} else if (lhs_count < rhs_count) {
+				error(ast_node_token(node), "Extra initial expression");
+			}
+		case_end;
+
+		case_ast_node(td, TypeDecl, node);
+			Entity *e = make_entity_type_name(c->allocator, c->context.scope, td->name->Ident, NULL);
+			add_entity(c, c->context.scope, td->name, e);
+
+			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
+			d->type_expr = td->type;
+
+			Delay delay = {e, d};
+			gb_array_append(delayed, delay);
+		case_end;
+
+		case_ast_node(pd, ProcDecl, node);
+			ast_node(name, Ident, pd->name);
+			Entity *e = make_entity_procedure(c->allocator, c->context.scope, *name, NULL);
+			add_entity(c, c->context.scope, pd->name, e);
+
+			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
+			d->proc_decl = node;
+
+			Delay delay = {e, d};
+			gb_array_append(delayed, delay);
+		case_end;
+		}
+	}
+
+	auto check_scope_entity = [](Checker *c, gbArray(Delay) delayed, EntityKind kind) {
+		gb_for_array(i, delayed) {
+			auto delay = delayed[i];
+			Entity *e = delay.e;
+			if (e->kind == kind) {
+				DeclInfo *d = delay.d;
+				Scope *prev_scope = c->context.scope;
+				c->context.scope = d->scope;
+				GB_ASSERT(d->scope == e->scope);
+				check_entity_decl(c, e, d, NULL);
+				c->context.scope = prev_scope;
+			}
+		}
+	};
+	check_scope_entity(c, delayed, Entity_TypeName);
+	check_scope_entity(c, delayed, Entity_Constant);
+	check_scope_entity(c, delayed, Entity_Procedure);
+
+
 
 	b32 ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
 	u32 f = flags & (~Stmt_FallthroughAllowed);
@@ -1512,24 +1593,15 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(cd, ConstDecl, node);
-		check_const_decl_node(c, node);
+		// NOTE(bill): Handled elsewhere
 	case_end;
 
 	case_ast_node(pd, ProcDecl, node);
-		ast_node(name, Ident, pd->name);
-		Entity *e = make_entity_procedure(c->allocator, c->context.scope, *name, NULL);
-		add_entity(c, c->context.scope, pd->name, e);
-
-		DeclInfo *decl = make_declaration_info(c->allocator, e->scope);
-		decl->proc_decl = node;
-		check_proc_decl(c, e, decl);
+		// NOTE(bill): Handled elsewhere
 	case_end;
 
 	case_ast_node(td, TypeDecl, node);
-		ast_node(name, Ident, td->name);
-		Entity *e = make_entity_type_name(c->allocator, c->context.scope, *name, NULL);
-		add_entity(c, c->context.scope, td->name, e);
-		check_type_decl(c, e, td->type, NULL, NULL);
+		// NOTE(bill): Handled elsewhere
 	case_end;
 	}
 }

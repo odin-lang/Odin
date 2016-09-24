@@ -175,13 +175,12 @@ Context :: struct #ordered {
 DEFAULT_ALIGNMENT :: align_of({4}f32)
 
 
-current_context :: proc() -> ^Context {
-	return ^__context
+current_context :: proc() -> Context { // Copy of context
+	return __context
 }
 
 __check_context :: proc() {
-	c := current_context()
-	assert(c != null)
+	c := ^__context
 
 	if c.allocator.procedure == null {
 		c.allocator = __default_allocator()
@@ -202,12 +201,14 @@ alloc_align :: proc(size, alignment: int) -> rawptr #inline {
 free :: proc(ptr: rawptr) #inline {
 	__check_context()
 	a := current_context().allocator
-	_ = a.procedure(a.data, Allocator.Mode.FREE, 0, 0, ptr, 0, 0)
+	if ptr != null {
+		a.procedure(a.data, Allocator.Mode.FREE, 0, 0, ptr, 0, 0)
+	}
 }
 free_all :: proc() #inline {
 	__check_context()
 	a := current_context().allocator
-	_ = a.procedure(a.data, Allocator.Mode.FREE_ALL, 0, 0, null, 0, 0)
+	a.procedure(a.data, Allocator.Mode.FREE_ALL, 0, 0, null, 0, 0)
 }
 
 

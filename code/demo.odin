@@ -4,16 +4,14 @@
 
 
 main :: proc() {
-	x :: proc() -> (int, int) {
-		return 1, 2
-	}
 	y :: proc() -> (int, int) {
 		return x()
 	}
+	x :: proc() -> (int, int) {
+		return 1, 2
+	}
 
 	fmt.println(y())
-
-
 
 	arena: mem.Arena
 	mem.init_arena_from_context(^arena, 1000)
