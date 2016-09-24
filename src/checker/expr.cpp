@@ -806,22 +806,6 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 			error(n->Ident, "`_` cannot be used as a value type");
 		} else {
 			auto *entries = c->context.scope->elements.entries;
-			// gb_for_array(i, entries) {
-			// 	Entity *elem = entries[i].value;
-			// 	if (i > 0)  {
-			// 		gb_printf(", ");
-			// 	}
-			// 	gb_printf("%.*s", LIT(elem->token.string));
-			// }
-			// for (Scope *s = c->context.scope; s != NULL; s = s->parent) {
-			// 	Entity *elem = s->elements.entries[0].value;
-			// 	if (elem == NULL) continue;
-			// 	gb_printf("%.*s\n", LIT(elem->token.pos.file));
-			// }
-			// gb_printf("\n");
-
-
-			// Entity *e = scope_lookup_entity(c->context.scope, n->Ident.string);
 			error(n->Ident,
 			      "Undeclared name: %.*s", LIT(n->Ident.string));
 		}

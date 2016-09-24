@@ -103,6 +103,7 @@ struct ssaDefer {
 	ssaBlock *block;
 	union {
 		AstNode *stmt;
+		// NOTE(bill): `instr` will be copied every time to create a new one
 		ssaValue *instr;
 	};
 };
@@ -387,7 +388,7 @@ ssaDefer ssa_add_defer_instr(ssaProcedure *proc, isize scope_index, ssaValue *in
 	ssaDefer d = {ssaDefer_Instr};
 	d.scope_index = proc->scope_index;
 	d.block = proc->curr_block;
-	d.instr = cast(ssaValue *)gb_alloc_copy(proc->module->allocator, instr, gb_size_of(ssaValue));
+	d.instr = instr; // NOTE(bill): It will make a copy everytime it is called
 	gb_array_append(proc->defer_stmts, d);
 	return d;
 }
@@ -903,12 +904,15 @@ ssaValue *ssa_emit_comment(ssaProcedure *p, String text) {
 ssaValue *ssa_add_local(ssaProcedure *proc, Entity *e, b32 zero_initialized = true) {
 	ssaBlock *b = proc->decl_block; // all variables must be in the first block
 	ssaValue *instr = ssa_make_instr_local(proc, e, zero_initialized);
+	ssaValue *zero = ssa_make_instr_zero_init(proc, instr);
 	instr->Instr.parent = b;
+	zero ->Instr.parent = b;
 	gb_array_append(b->instrs, instr);
+	gb_array_append(b->instrs, zero);
 
-	if (zero_initialized) {
+	// if (zero_initialized) {
 		ssa_emit_zero_init(proc, instr);
-	}
+	// }
 
 	return instr;
 }
@@ -1008,7 +1012,9 @@ void ssa_build_defer_stmt(ssaProcedure *proc, ssaDefer d) {
 	if (d.kind == ssaDefer_Node) {
 		ssa_build_stmt(proc, d.stmt);
 	} else if (d.kind == ssaDefer_Instr) {
-		ssa_emit(proc, d.instr);
+		// NOTE(bill): Need to make a new copy
+		ssaValue *instr = cast(ssaValue *)gb_alloc_copy(proc->module->allocator, d.instr, gb_size_of(ssaValue));
+		ssa_emit(proc, instr);
 	}
 }
 
@@ -3182,8 +3188,14 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 	case_ast_node(pd, ProcDecl, node);
 		if (pd->body != NULL) {
+			auto *info = proc->module->info;
+
+			Entity **found = map_get(&info->definitions, hash_pointer(pd->name));
+			GB_ASSERT_MSG(found != NULL, "Unable to find: %.*s", LIT(pd->name->Ident.string));
+			Entity *e = *found;
+
 			// NOTE(bill): Generate a new name
-			// parent$name-guid
+			// parent.name-guid
 			String original_name = pd->name->Ident.string;
 			String pd_name = original_name;
 			if (pd->link_name.len > 0) {
@@ -3193,12 +3205,10 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
 			u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
 			i32 guid = cast(i32)gb_array_count(proc->children);
-			name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
+			name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
 			String name = make_string(name_text, name_len-1);
 
-			Entity **found = map_get(&proc->module->info->definitions, hash_pointer(pd->name));
-			GB_ASSERT_MSG(found != NULL, "Unable to find: %.*s", LIT(pd->name->Ident.string));
-			Entity *e = *found;
+
 			ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
 			                                           proc->module, e, e->type, pd->type, pd->body, name);
 
@@ -3209,15 +3219,19 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			gb_array_append(proc->children, &value->Proc);
 			gb_array_append(proc->module->procs, value);
 		} else {
+			auto *info = proc->module->info;
+
+			Entity **found = map_get(&info->definitions, hash_pointer(pd->name));
+			GB_ASSERT_MSG(found != NULL, "Unable to find: %.*s", LIT(pd->name->Ident.string));
+			Entity *e = *found;
+
 			// FFI - Foreign function interace
 			String original_name = pd->name->Ident.string;
 			String name = original_name;
 			if (pd->foreign_name.len > 0) {
 				name = pd->foreign_name;
 			}
-			auto *info = proc->module->info;
 
-			Entity *e = *map_get(&info->definitions, hash_pointer(pd->name));
 			Entity *f = *map_get(&info->foreign_procs, hash_string(name));
 			ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
 			                                           proc->module, e, e->type, pd->type, pd->body, name);

@@ -27,6 +27,24 @@ align_forward :: proc(ptr: rawptr, align: int) -> rawptr {
 }
 
 
+AllocationHeader :: struct {
+	size: int
+}
+allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: int) {
+	header.size = size
+	ptr := ptr_offset(header, 1) as ^int
+
+	for i := 0; ptr as rawptr < data; i++ {
+		ptr_offset(ptr, i)^ = -1
+	}
+}
+allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
+	p := data as ^int
+	for ptr_offset(p, -1)^ == -1 {
+		p = ptr_offset(p, -1)
+	}
+	return ptr_offset(p as ^AllocationHeader, -1)
+}
 
 
 

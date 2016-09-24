@@ -2,6 +2,7 @@
 
 #import "os.odin"
 #import "fmt.odin"
+#import "mem.odin"
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
@@ -96,16 +97,6 @@ byte_swap64 :: proc(b: u64) -> u64 #foreign "llvm.bswap.i64"
 
 fmuladd32 :: proc(a, b, c: f32) -> f32 #foreign "llvm.fmuladd.f32"
 fmuladd64 :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
-
-heap_alloc :: proc(len: int) -> rawptr {
-	c_malloc :: proc(len: int) -> rawptr #foreign "malloc"
-	return c_malloc(len)
-}
-
-heap_free :: proc(ptr: rawptr) {
-	c_free :: proc(ptr: rawptr) #foreign "free"
-	c_free(ptr)
-}
 
 current_thread_id :: proc() -> int {
 	GetCurrentThreadId :: proc() -> u32 #foreign #dll_import
@@ -251,14 +242,26 @@ __default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
 	using Allocator.Mode
 	match mode {
 	case ALLOC:
-		return heap_alloc(size)
-	case RESIZE:
-		return default_resize_align(old_memory, old_size, size, alignment)
+		total_size := size + alignment + size_of(mem.AllocationHeader)
+		ptr := os.heap_alloc(total_size)
+		header := ptr as ^mem.AllocationHeader
+		ptr = mem.align_forward(ptr_offset(header, 1), alignment)
+		mem.allocation_header_fill(header, ptr, size)
+		memory_zero(ptr, size)
+		return ptr
 	case FREE:
-		heap_free(old_memory)
+		os.heap_free(mem.allocation_header(old_memory))
 		return null
 	case FREE_ALL:
 		// NOTE(bill): Does nothing
+	case RESIZE:
+		total_size := size + alignment + size_of(mem.AllocationHeader)
+		ptr := os.heap_resize(mem.allocation_header(old_memory), total_size)
+		header := ptr as ^mem.AllocationHeader
+		ptr = mem.align_forward(ptr_offset(header, 1), alignment)
+		mem.allocation_header_fill(header, ptr, size)
+		memory_zero(ptr, size)
+		return ptr
 	}
 
 	return null

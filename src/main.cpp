@@ -91,14 +91,14 @@ ArchData make_arch_data(ArchKind kind) {
 		data.sizes.word_size = 8;
 		data.sizes.max_align = 16;
 		data.llc_flags = make_string("-march=x86-64 ");
-		data.link_flags = make_string("/machine:x64 /defaultlib:libcmt ");
+		data.link_flags = make_string("/machine:x64 ");
 		break;
 
 	case ArchKind_x86:
 		data.sizes.word_size = 4;
 		data.sizes.max_align = 8;
 		data.llc_flags = make_string("-march=x86 ");
-		data.link_flags = make_string("/machine:x86 /defaultlib:libcmt ");
+		data.link_flags = make_string("/machine:x86 ");
 		break;
 	}
 
@@ -215,14 +215,14 @@ int main(int argc, char **argv) {
 		                        " %.*s.lib", LIT(lib));
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);
 	}
-	char *linker_flags =
-	"/nologo /incremental:no /opt:ref /subsystem:console";
-
 	exit_code = win32_exec_command_line_app(
-		"link %.*s.obj -OUT:%.*s.exe %s %.*s %s"
+		"link %.*s.obj -OUT:%.*s.exe %s "
+		"/defaultlib:libcmt "
+		"/nologo /incremental:no /opt:ref /subsystem:console "
+		"%.*s "
 		"",
 		LIT(output), LIT(output),
-		lib_str, LIT(arch_data.link_flags), linker_flags);
+		lib_str, LIT(arch_data.link_flags));
 	if (exit_code != 0) {
 		return exit_code;
 	}

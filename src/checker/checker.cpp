@@ -624,9 +624,13 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 
 void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier != NULL);
-	GB_ASSERT(identifier->kind == AstNode_Ident);
-	HashKey key = hash_pointer(identifier);
-	map_set(&i->definitions, key, entity);
+	if (identifier->kind == AstNode_Ident) {
+		GB_ASSERT(identifier->kind == AstNode_Ident);
+		HashKey key = hash_pointer(identifier);
+		map_set(&i->definitions, key, entity);
+	} else {
+		// NOTE(bill): Error should handled elsewhere
+	}
 }
 
 b32 add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
@@ -1139,10 +1143,11 @@ void check_parsed_files(Checker *c) {
 
 				add_curr_ast_file(c, d->scope->file);
 
-				Scope *prev_scope = c->context.scope;
-				c->context.scope = d->scope;
-				GB_ASSERT(d->scope == e->scope);
-				check_entity_decl(c, e, d, NULL);
+				if (d->scope == e->scope) {
+					Scope *prev_scope = c->context.scope;
+					c->context.scope = d->scope;
+					check_entity_decl(c, e, d, NULL);
+				}
 			}
 		}
 	};
@@ -1178,6 +1183,7 @@ void check_parsed_files(Checker *c) {
 	}
 #endif
 
+#if 0
 	gb_for_array(i, c->parser->files) {
 		AstFile *f = &c->parser->files[i];
 		Scope *scope = f->scope;
@@ -1192,6 +1198,7 @@ void check_parsed_files(Checker *c) {
 			}
 		}
 	}
+#endif
 }
 
 

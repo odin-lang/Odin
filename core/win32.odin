@@ -162,8 +162,9 @@ OPEN_ALWAYS       :: 4
 TRUNCATE_EXISTING :: 5
 
 
-HeapAlloc :: proc(h: HANDLE, flags: u32, bytes: int) -> rawptr #foreign #dll_import
-HeapFree  :: proc(h: HANDLE, flags: u32, memory: rawptr) -> BOOL #foreign #dll_import
+HeapAlloc   :: proc(h: HANDLE, flags: u32, bytes: int) -> rawptr                 #foreign #dll_import
+HeapReAlloc :: proc(h: HANDLE, flags: u32, memory: rawptr, bytes: int) -> rawptr #foreign #dll_import
+HeapFree    :: proc(h: HANDLE, flags: u32, memory: rawptr) -> BOOL               #foreign #dll_import
 GetProcessHeap :: proc() -> HANDLE #foreign #dll_import
 
 

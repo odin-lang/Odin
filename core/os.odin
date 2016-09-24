@@ -103,3 +103,15 @@ read_entire_file :: proc(name: string) -> (string, bool) {
 
 	return data as string, true
 }
+
+
+
+heap_alloc :: proc(size: int) -> rawptr {
+	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, size)
+}
+heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
+	return win32.HeapReAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, ptr, new_size)
+}
+heap_free :: proc(ptr: rawptr) {
+	win32.HeapFree(win32.GetProcessHeap(), 0, ptr)
+}

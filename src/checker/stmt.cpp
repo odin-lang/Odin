@@ -9,7 +9,6 @@ enum StmtFlag : u32 {
 
 void check_stmt(Checker *c, AstNode *node, u32 flags);
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d);
-void check_const_decl_node(Checker *c, AstNode *node);
 
 void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 	// TODO(bill): Allow declaration (expect variable) in any order
@@ -474,7 +473,7 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, Cycle
 	named->Named.base = base_type;
 	named->Named.base = get_base_type(named->Named.base);
 	if (named->Named.base == t_invalid) {
-		// gb_printf("check_type_decl: %s\n", type_to_string(named));
+		gb_printf("check_type_decl: %s\n", type_to_string(named));
 	}
 }
 
@@ -719,17 +718,10 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 		}
 	}
 
-	// c->context.decl = d;
-	// Scope *prev = c->context.scope;
-	// c->context.scope = d->scope;
-	// defer (c->context.scope = prev);
-
 	if (e->kind == Entity_Procedure) {
 		check_proc_decl(c, e, d);
 		return;
 	}
-
-
 
 	switch (e->kind) {
 	case Entity_Constant: {
@@ -758,15 +750,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 		c->context.scope = d->scope;
 		defer (c->context.scope = prev);
 
-		CycleChecker local_cycle_checker = {};
-		if (cycle_checker == NULL) {
-			cycle_checker = &local_cycle_checker;
-		}
 		check_type_decl(c, e, d->type_expr, named_type, cycle_checker);
-
-		if (local_cycle_checker.path != NULL) {
-			gb_array_free(local_cycle_checker.path);
-		}
 	} break;
 	}
 }
@@ -782,8 +766,8 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 	gb_for_array(i, vd->names) {
 		AstNode *name = vd->names[i];
 		Entity *entity = NULL;
-		Token token = name->Ident;
 		if (name->kind == AstNode_Ident) {
+			Token token = name->Ident;
 			String str = token.string;
 			Entity *found = NULL;
 			// NOTE(bill): Ignore assignments to `_`
@@ -803,10 +787,11 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 				entity = found;
 			}
 		} else {
-			error(token, "A variable declaration must be an identifier");
+			error(ast_node_token(name), "A variable declaration must be an identifier");
 		}
-		if (entity == NULL)
-			entity = make_entity_dummy_variable(c->allocator, c->global_scope, token);
+		if (entity == NULL) {
+			entity = make_entity_dummy_variable(c->allocator, c->global_scope, ast_node_token(name));
+		}
 		entities[entity_index++] = entity;
 	}
 
@@ -839,46 +824,6 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 	}
 
 }
-
-
-void check_const_decl_node(Checker *c, AstNode *node) {
-	ast_node(vd, ConstDecl, node);
-	isize entity_count = gb_array_count(vd->names);
-	isize entity_index = 0;
-	Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
-
-	gb_for_array(i, vd->values) {
-		AstNode *name = vd->names[i];
-		AstNode *value = vd->values[i];
-
-		GB_ASSERT(name->kind == AstNode_Ident);
-		ExactValue v = {ExactValue_Invalid};
-		String str = name->Ident.string;
-		Entity *found = current_scope_lookup_entity(c->context.scope, str);
-		if (found == NULL) {
-			Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
-			entities[entity_index++] = e;
-			check_const_decl(c, e, vd->type, value);
-		} else {
-			entities[entity_index++] = found;
-		}
-	}
-
-	isize lhs_count = gb_array_count(vd->names);
-	isize rhs_count = gb_array_count(vd->values);
-
-	// TODO(bill): Better error messages or is this good enough?
-	if (rhs_count == 0 && vd->type == NULL) {
-		error(ast_node_token(node), "Missing type or initial expression");
-	} else if (lhs_count < rhs_count) {
-		error(ast_node_token(node), "Extra initial expression");
-	}
-
-	gb_for_array(i, vd->names) {
-		add_entity(c, c->context.scope, vd->names[i], entities[i]);
-	}
-}
-
 
 
 

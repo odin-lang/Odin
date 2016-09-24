@@ -53,6 +53,7 @@ struct Entity {
 		struct {
 		} TypeName;
 		struct {
+			b32 used;
 		} Procedure;
 		struct {
 			BuiltinProcId id;
