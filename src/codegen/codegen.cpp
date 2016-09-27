@@ -19,7 +19,7 @@ b32 ssa_gen_init(ssaGen *s, Checker *c) {
 	s->module.generate_debug_info = false;
 
 	// TODO(bill): generate appropriate output name
-	isize pos = string_extension_position(c->parser->init_fullpath);
+	int pos = cast(int)string_extension_position(c->parser->init_fullpath);
 	gbFileError err = gb_file_create(&s->output_file, gb_bprintf("%.*s.ll", pos, c->parser->init_fullpath.text));
 	if (err != gbFileError_None)
 		return false;
@@ -59,18 +59,15 @@ String ssa_mangle_name(ssaGen *s, String path, String name) {
 	isize new_name_len = gb_snprintf(
 		cast(char *)new_name, max_len,
 		"%.*s-%u.%.*s",
-		base_len, base,
+		cast(int)base_len, base,
 		file->id,
 		LIT(name));
 
 	return make_string(new_name, new_name_len-1);
 }
 
+
 void ssa_gen_tree(ssaGen *s) {
-	struct ssaGlobalVariable {
-		ssaValue *var, *init;
-		DeclInfo *decl;
-	};
 
 	ssaModule *m = &s->module;
 	CheckerInfo *info = m->info;
@@ -87,31 +84,46 @@ void ssa_gen_tree(ssaGen *s) {
 	}
 
 	isize global_variable_max_count = 0;
-
-	gb_for_array(i, info->entities.entries) {
-		auto *entry = &info->entities.entries[i];
-		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
-		if (e->kind == Entity_Variable) {
-			global_variable_max_count++;
-		}
-	}
-
-
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
-	defer (gb_temp_arena_memory_end(tmp));
-
-	gbArray(ssaGlobalVariable) global_variables;
-	gb_array_init_reserve(global_variables, m->tmp_allocator, global_variable_max_count);
-
-
+	Entity *entry_point = NULL;
 
 	gb_for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		String name = e->token.string;
+		if (e->kind == Entity_Variable) {
+			global_variable_max_count++;
+		} else if (e->kind == Entity_Procedure) {
+			if (e->scope->is_init && name == "main") {
+				entry_point = e;
+			}
+		}
+	}
 
+	struct ssaGlobalVariable {
+		ssaValue *var, *init;
+		DeclInfo *decl;
+	};
+	gbArray(ssaGlobalVariable) global_variables;
+	gb_array_init_reserve(global_variables, m->tmp_allocator, global_variable_max_count);
+
+	auto min_dep_map = generate_minimum_dependency_map(info, entry_point);
+	defer (map_destroy(&min_dep_map));
+
+	gb_for_array(i, info->entities.entries) {
+		auto *entry = &info->entities.entries[i];
+		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
+		String name = e->token.string;
 		DeclInfo *decl = entry->value;
 		Scope *scope = e->scope;
+
+		if (entry_point != NULL) {
+			auto found = map_get(&min_dep_map, hash_pointer(e));
+			if (found == NULL) {
+				// NOTE(bill): Nothing depends upon it so doesn't need to be built
+				continue;
+			}
+		}
+
 		if (!scope->is_global && !scope->is_init) {
 			name = ssa_mangle_name(s, e->token.pos.file, name);
 		}

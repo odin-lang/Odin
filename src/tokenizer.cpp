@@ -1,6 +1,7 @@
 #define TOKEN_KINDS \
 	TOKEN_KIND(Token_Invalid, "Invalid"), \
 	TOKEN_KIND(Token_EOF, "EOF"), \
+	TOKEN_KIND(Token_Comment, "Comment"), \
 \
 TOKEN_KIND(Token__LiteralBegin, "_LiteralBegin"), \
 	TOKEN_KIND(Token_Identifier, "Identifier"), \
@@ -317,8 +318,7 @@ struct Tokenizer {
 };
 
 
-#define tokenizer_err(t, msg, ...) tokenizer_err_(t, __FUNCTION__, msg, ##__VA_ARGS__)
-void tokenizer_err_(Tokenizer *t, char *function, char *msg, ...) {
+void tokenizer_err(Tokenizer *t, char *msg, ...) {
 	va_list va;
 	isize column = t->read_curr - t->line+1;
 	if (column < 1)
@@ -428,41 +428,8 @@ gb_inline void destroy_tokenizer(Tokenizer *t) {
 }
 
 void tokenizer_skip_whitespace(Tokenizer *t) {
-	for (;;) {
-		if (rune_is_whitespace(t->curr_rune)) {
-			advance_to_next_rune(t);
-		} else if (t->curr_rune == '/') {
-			if (t->read_curr[0] == '/') { // Line comment //
-				while (t->curr_rune != '\n') {
-					advance_to_next_rune(t);
-				}
-			} else if (t->read_curr[0] == '*') { // (Nested) Block comment /**/
-				advance_to_next_rune(t);
-				advance_to_next_rune(t);
-				isize comment_scope = 1;
-				while (comment_scope > 0) {
-					if (t->curr_rune == '/') {
-						advance_to_next_rune(t);
-						if (t->curr_rune == '*') {
-							advance_to_next_rune(t);
-							comment_scope++;
-						}
-					} else if (t->curr_rune == '*') {
-						advance_to_next_rune(t);
-						if (t->curr_rune == '/') {
-							advance_to_next_rune(t);
-							comment_scope--;
-						}
-					} else {
-						advance_to_next_rune(t);
-					}
-				}
-			} else {
-				break;
-			}
-		} else {
-			break;
-		}
+	while (rune_is_whitespace(t->curr_rune)) {
+		advance_to_next_rune(t);
 	}
 }
 
@@ -787,13 +754,43 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case ':': token.kind = Token_Colon;        break;
 
 		case '*': token.kind = token_kind_variant2(t, Token_Mul,   Token_MulEq);     break;
-		case '/': token.kind = token_kind_variant2(t, Token_Quo,   Token_QuoEq);     break;
 		case '%': token.kind = token_kind_variant2(t, Token_Mod,   Token_ModEq);     break;
 		case '=': token.kind = token_kind_variant2(t, Token_Eq,    Token_CmpEq);     break;
 		case '~': token.kind = token_kind_variant2(t, Token_Xor,   Token_XorEq);     break;
 		case '!': token.kind = token_kind_variant2(t, Token_Not,   Token_NotEq);     break;
 		case '+': token.kind = token_kind_variant3(t, Token_Add,   Token_AddEq, '+', Token_Increment); break;
 		case '-': token.kind = token_kind_variant4(t, Token_Sub,   Token_SubEq, '-', Token_Decrement, '>', Token_ArrowRight); break;
+		case '/': {
+			if (t->curr_rune == '/') {
+				while (t->curr_rune != '\n') {
+					advance_to_next_rune(t);
+				}
+				token.kind = Token_Comment;
+			} else if (t->curr_rune == '*') {
+				isize comment_scope = 1;
+				advance_to_next_rune(t);
+				while (comment_scope > 0) {
+					if (curr_rune == '/') {
+						advance_to_next_rune(t);
+						if (t->curr_rune == '*') {
+							advance_to_next_rune(t);
+							comment_scope++;
+						}
+					} else if (t->curr_rune == '*') {
+						advance_to_next_rune(t);
+						if (t->curr_rune == '/') {
+							advance_to_next_rune(t);
+							comment_scope--;
+						}
+					} else {
+						advance_to_next_rune(t);
+					}
+				}
+				token.kind = Token_Comment;
+			} else {
+				token.kind = token_kind_variant2(t, Token_Quo, Token_QuoEq);
+			}
+		} break;
 
 		case '<':
 			if (t->curr_rune == '-') {

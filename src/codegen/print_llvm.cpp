@@ -194,7 +194,7 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 					ssa_fprintf(f, ", ");
 				}
 				Type *ft = t->Record.fields[i]->type;
-				Type *bft = get_base_type(ft);
+				Type *bft = base_type(ft);
 				if (!is_type_struct(bft)) {
 					ft = bft;
 				}
@@ -229,7 +229,7 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 			ssa_print_encoded_local(f, *name);
 			// ssa_print_encoded_local(f, t->Named.name);
 		} else {
-			ssa_print_type(f, m, get_base_type(t));
+			ssa_print_type(f, m, base_type(t));
 		}
 		break;
 	case Type_Tuple:
@@ -264,7 +264,7 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 }
 
 void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Type *type) {
-	type = get_base_type(type);
+	type = base_type(type);
 	if (is_type_float(type)) {
 		value = exact_value_to_float(value);
 	} else if (is_type_integer(type)) {
@@ -275,7 +275,7 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 
 	switch (value.kind) {
 	case ExactValue_Bool:
-		ssa_fprintf(f, (value.value_bool ? "true" : "false"));
+		ssa_fprintf(f, "%s", (value.value_bool ? "true" : "false"));
 		break;
 	case ExactValue_String: {
 		ssa_fprintf(f, "c\"");
@@ -528,10 +528,10 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 
 	case ssaInstr_BinaryOp: {
 		auto *bo = &value->Instr.BinaryOp;
-		Type *type = get_base_type(ssa_type(bo->left));
+		Type *type = base_type(ssa_type(bo->left));
 		Type *elem_type = type;
 		while (elem_type->kind == Type_Vector) {
-			elem_type = get_base_type(elem_type->Vector.elem);
+			elem_type = base_type(elem_type->Vector.elem);
 		}
 
 		ssa_fprintf(f, "%%%d = ", value->id);
@@ -651,7 +651,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 
 		ssa_fprintf(f, "(");
 		if (call->arg_count > 0) {
-			Type *proc_type = get_base_type(ssa_type(call->value));
+			Type *proc_type = base_type(ssa_type(call->value));
 			GB_ASSERT(proc_type->kind == Type_Proc);
 			auto *params = &proc_type->Proc.params->Tuple;
 			for (isize i = 0; i < call->arg_count; i++) {
@@ -848,13 +848,13 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 
 void ssa_print_type_name(ssaFileBuffer *f, ssaModule *m, ssaValue *v) {
 	GB_ASSERT(v->kind == ssaValue_TypeName);
-	Type *base_type = get_base_type(ssa_type(v));
-	if (!is_type_struct(base_type) && !is_type_union(base_type)) {
+	Type *bt = base_type(ssa_type(v));
+	if (!is_type_struct(bt) && !is_type_union(bt)) {
 		return;
 	}
 	ssa_print_encoded_local(f, v->TypeName.name);
 	ssa_fprintf(f, " = type ");
-	ssa_print_type(f, m, get_base_type(v->TypeName.type));
+	ssa_print_type(f, m, base_type(v->TypeName.type));
 	ssa_fprintf(f, "\n");
 }
 

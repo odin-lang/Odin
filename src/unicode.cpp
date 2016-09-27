@@ -1,15 +1,15 @@
 #pragma warning(push)
 #pragma warning(disable: 4245)
 
-#include "utf8proc/utf8proc.h"
-// #define UTF8PROC_IMPLEMENTATION
-// #include "utf8proc/utf8proc_new.h"
+// #include "utf8proc/utf8proc.h"
+#include "utf8proc/utf8proc.c"
 
 #pragma warning(pop)
 
 // TODO(bill): Unicode support
 b32 rune_is_letter(Rune r) {
-	if (r < 0x80 && gb_char_is_alpha(cast(char)r) || r == '_') {
+	if ((r < 0x80 && gb_char_is_alpha(cast(char)r)) ||
+	    r == '_') {
 		return true;
 	}
 	switch (utf8proc_category(r)) {

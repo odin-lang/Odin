@@ -14,7 +14,7 @@ typedef struct String {
 	isize len;
 } String;
 // NOTE(bill): used for printf style arguments
-#define LIT(x) (x).len, (x).text
+#define LIT(x) ((int)(x).len), (x).text
 
 
 typedef struct String16 {
@@ -44,6 +44,11 @@ gb_inline String16 make_string16(wchar_t *text, isize len) {
 
 gb_inline String make_string(char *text) {
 	return make_string(cast(u8 *)cast(void *)text, gb_strlen(text));
+}
+
+template <size_t N>
+gb_inline String make_string(char const (&text)[N]) {
+	return make_string(cast(u8 *)cast(void *)text, N-1);
 }
 
 gb_inline b32 are_strings_equal(String a, String b) {
@@ -116,6 +121,12 @@ bool operator < (String a, String b) { return string_compare(a, b) < 0; }
 bool operator > (String a, String b) { return string_compare(a, b) > 0; }
 bool operator <=(String a, String b) { return string_compare(a, b) <= 0; }
 bool operator >=(String a, String b) { return string_compare(a, b) >= 0; }
+
+template <size_t N> bool operator ==(String a, char const (&b)[N]) { return a == make_string(b); }
+template <size_t N> bool operator !=(String a, char const (&b)[N]) { return a != make_string(b); }
+template <size_t N> bool operator ==(char const (&a)[N], String b) { return make_string(a) == b; }
+template <size_t N> bool operator !=(char const (&a)[N], String b) { return make_string(a) != b; }
+
 
 
 

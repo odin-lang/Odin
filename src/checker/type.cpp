@@ -92,8 +92,8 @@ enum TypeRecordKind {
 };
 
 struct Type {
-	u32 flags; // See parser.cpp `enum TypeFlag`
 	TypeKind kind;
+	u32 flags; // See parser.cpp `enum TypeFlag`
 	union {
 		BasicType Basic;
 		struct {
@@ -157,7 +157,7 @@ struct Type {
 
 gbString type_to_string(Type *type, gbAllocator a = gb_heap_allocator());
 
-Type *get_base_type(Type *t) {
+Type *base_type(Type *t) {
 	for (;;) {
 		if (t == NULL || t->kind != Type_Named) {
 			break;
@@ -259,7 +259,7 @@ Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_coun
 		}
 		GB_ASSERT(params != NULL && params->kind == Type_Tuple);
 		Entity *e = params->Tuple.variables[param_count-1];
-		if (get_base_type(e->type)->kind != Type_Slice) {
+		if (base_type(e->type)->kind != Type_Slice) {
 			// NOTE(bill): For custom calling convention
 			GB_PANIC("variadic parameter must be of type slice");
 		}
@@ -277,7 +277,7 @@ Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_coun
 
 Type *type_deref(Type *t) {
 	if (t != NULL) {
-		Type *bt = get_base_type(t);
+		Type *bt = base_type(t);
 		if (bt == NULL)
 			return NULL;
 		if (bt != NULL && bt->kind == Type_Pointer)
@@ -289,34 +289,34 @@ Type *type_deref(Type *t) {
 
 #define STR_LIT(x) {cast(u8 *)(x), gb_size_of(x)-1}
 gb_global Type basic_types[] = {
-	{0, Type_Basic, {Basic_Invalid,        0,                                      STR_LIT("invalid type")}},
-	{0, Type_Basic, {Basic_bool,           BasicFlag_Boolean,                      STR_LIT("bool")}},
-	{0, Type_Basic, {Basic_i8,             BasicFlag_Integer,                      STR_LIT("i8")}},
-	{0, Type_Basic, {Basic_u8,             BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u8")}},
-	{0, Type_Basic, {Basic_i16,            BasicFlag_Integer,                      STR_LIT("i16")}},
-	{0, Type_Basic, {Basic_u16,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u16")}},
-	{0, Type_Basic, {Basic_i32,            BasicFlag_Integer,                      STR_LIT("i32")}},
-	{0, Type_Basic, {Basic_u32,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u32")}},
-	{0, Type_Basic, {Basic_i64,            BasicFlag_Integer,                      STR_LIT("i64")}},
-	{0, Type_Basic, {Basic_u64,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u64")}},
-	{0, Type_Basic, {Basic_f32,            BasicFlag_Float,                        STR_LIT("f32")}},
-	{0, Type_Basic, {Basic_f64,            BasicFlag_Float,                        STR_LIT("f64")}},
-	{0, Type_Basic, {Basic_int,            BasicFlag_Integer,                      STR_LIT("int")}},
-	{0, Type_Basic, {Basic_uint,           BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("uint")}},
-	{0, Type_Basic, {Basic_rawptr,         BasicFlag_Pointer,                      STR_LIT("rawptr")}},
-	{0, Type_Basic, {Basic_string,         BasicFlag_String,                       STR_LIT("string")}},
-	{0, Type_Basic, {Basic_any,            0,                                      STR_LIT("any")}},
-	{0, Type_Basic, {Basic_UntypedBool,    BasicFlag_Boolean | BasicFlag_Untyped,  STR_LIT("untyped bool")}},
-	{0, Type_Basic, {Basic_UntypedInteger, BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped integer")}},
-	{0, Type_Basic, {Basic_UntypedFloat,   BasicFlag_Float   | BasicFlag_Untyped,  STR_LIT("untyped float")}},
-	{0, Type_Basic, {Basic_UntypedPointer, BasicFlag_Pointer | BasicFlag_Untyped,  STR_LIT("untyped pointer")}},
-	{0, Type_Basic, {Basic_UntypedString,  BasicFlag_String  | BasicFlag_Untyped,  STR_LIT("untyped string")}},
-	{0, Type_Basic, {Basic_UntypedRune,    BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped rune")}},
+	{Type_Basic, 0, {Basic_Invalid,        0,                                      STR_LIT("invalid type")}},
+	{Type_Basic, 0, {Basic_bool,           BasicFlag_Boolean,                      STR_LIT("bool")}},
+	{Type_Basic, 0, {Basic_i8,             BasicFlag_Integer,                      STR_LIT("i8")}},
+	{Type_Basic, 0, {Basic_u8,             BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u8")}},
+	{Type_Basic, 0, {Basic_i16,            BasicFlag_Integer,                      STR_LIT("i16")}},
+	{Type_Basic, 0, {Basic_u16,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u16")}},
+	{Type_Basic, 0, {Basic_i32,            BasicFlag_Integer,                      STR_LIT("i32")}},
+	{Type_Basic, 0, {Basic_u32,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u32")}},
+	{Type_Basic, 0, {Basic_i64,            BasicFlag_Integer,                      STR_LIT("i64")}},
+	{Type_Basic, 0, {Basic_u64,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u64")}},
+	{Type_Basic, 0, {Basic_f32,            BasicFlag_Float,                        STR_LIT("f32")}},
+	{Type_Basic, 0, {Basic_f64,            BasicFlag_Float,                        STR_LIT("f64")}},
+	{Type_Basic, 0, {Basic_int,            BasicFlag_Integer,                      STR_LIT("int")}},
+	{Type_Basic, 0, {Basic_uint,           BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("uint")}},
+	{Type_Basic, 0, {Basic_rawptr,         BasicFlag_Pointer,                      STR_LIT("rawptr")}},
+	{Type_Basic, 0, {Basic_string,         BasicFlag_String,                       STR_LIT("string")}},
+	{Type_Basic, 0, {Basic_any,            0,                                      STR_LIT("any")}},
+	{Type_Basic, 0, {Basic_UntypedBool,    BasicFlag_Boolean | BasicFlag_Untyped,  STR_LIT("untyped bool")}},
+	{Type_Basic, 0, {Basic_UntypedInteger, BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped integer")}},
+	{Type_Basic, 0, {Basic_UntypedFloat,   BasicFlag_Float   | BasicFlag_Untyped,  STR_LIT("untyped float")}},
+	{Type_Basic, 0, {Basic_UntypedPointer, BasicFlag_Pointer | BasicFlag_Untyped,  STR_LIT("untyped pointer")}},
+	{Type_Basic, 0, {Basic_UntypedString,  BasicFlag_String  | BasicFlag_Untyped,  STR_LIT("untyped string")}},
+	{Type_Basic, 0, {Basic_UntypedRune,    BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped rune")}},
 };
 
 gb_global Type basic_type_aliases[] = {
-	{0, Type_Basic, {Basic_byte, BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("byte")}},
-	{0, Type_Basic, {Basic_rune, BasicFlag_Integer,                      STR_LIT("rune")}},
+	{Type_Basic, 0, {Basic_byte, BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("byte")}},
+	{Type_Basic, 0, {Basic_rune, BasicFlag_Integer,                      STR_LIT("rune")}},
 };
 
 gb_global Type *t_invalid         = &basic_types[Basic_Invalid];
@@ -342,8 +342,8 @@ gb_global Type *t_untyped_float   = &basic_types[Basic_UntypedFloat];
 gb_global Type *t_untyped_pointer = &basic_types[Basic_UntypedPointer];
 gb_global Type *t_untyped_string  = &basic_types[Basic_UntypedString];
 gb_global Type *t_untyped_rune    = &basic_types[Basic_UntypedRune];
-gb_global Type *t_byte            = &basic_type_aliases[Basic_byte];
-gb_global Type *t_rune            = &basic_type_aliases[Basic_rune];
+gb_global Type *t_byte            = &basic_type_aliases[0];
+gb_global Type *t_rune            = &basic_type_aliases[1];
 
 
 gb_global Type *t_type_info            = NULL;
@@ -377,140 +377,161 @@ gb_global Type *t_context_ptr          = NULL;
 
 
 b32 is_type_named(Type *t) {
-	if (t->kind == Type_Basic)
+	if (t->kind == Type_Basic) {
 		return true;
+	}
 	return t->kind == Type_Named;
 }
 b32 is_type_boolean(Type *t) {
-	t = get_base_type(t);
-	if (t->kind == Type_Basic)
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Boolean) != 0;
+	}
 	return false;
 }
 b32 is_type_integer(Type *t) {
-	t = get_base_type(t);
-	if (t->kind == Type_Basic)
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Integer) != 0;
+	}
 	return false;
 }
 b32 is_type_unsigned(Type *t) {
-	t = get_base_type(t);
-	if (t->kind == Type_Basic)
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Unsigned) != 0;
+	}
 	return false;
 }
 b32 is_type_numeric(Type *t) {
-	t = get_base_type(t);
-	if (t->kind == Type_Basic)
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Numeric) != 0;
-	if (t->kind == Type_Vector)
+	}
+	if (t->kind == Type_Vector) {
 		return is_type_numeric(t->Vector.elem);
+	}
 	return false;
 }
 b32 is_type_string(Type *t) {
-	t = get_base_type(t);
-	if (t->kind == Type_Basic)
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_String) != 0;
+	}
 	return false;
 }
 b32 is_type_typed(Type *t) {
-	t = get_base_type(t);
-	if (t->kind == Type_Basic)
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Untyped) == 0;
+	}
 	return true;
 }
 b32 is_type_untyped(Type *t) {
-	t = get_base_type(t);
-	if (t->kind == Type_Basic)
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Untyped) != 0;
+	}
 	return false;
 }
 b32 is_type_ordered(Type *t) {
-	t = get_base_type(t);
-	if (t->kind == Type_Basic)
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Ordered) != 0;
-	if (t->kind == Type_Pointer)
+	}
+	if (t->kind == Type_Pointer) {
 		return true;
+	}
 	return false;
 }
 b32 is_type_constant_type(Type *t) {
-	t = get_base_type(t);
-	if (t->kind == Type_Basic)
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_ConstantType) != 0;
+	}
+	if (t->kind == Type_Record) {
+		return t->Record.kind == TypeRecord_Enum;
+	}
 	return false;
 }
 b32 is_type_float(Type *t) {
-	t = get_base_type(t);
-	if (t->kind == Type_Basic)
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Float) != 0;
+	}
 	return false;
 }
 b32 is_type_pointer(Type *t) {
-	t = get_base_type(t);
-	if (t->kind == Type_Basic)
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Pointer) != 0;
+	}
 	return t->kind == Type_Pointer;
 }
 
 b32 is_type_int_or_uint(Type *t) {
-	if (t->kind == Type_Basic)
+	if (t->kind == Type_Basic) {
 		return (t->Basic.kind == Basic_int) || (t->Basic.kind == Basic_uint);
+	}
 	return false;
 }
 b32 is_type_rawptr(Type *t) {
-	if (t->kind == Type_Basic)
+	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_rawptr;
+	}
 	return false;
 }
 b32 is_type_u8(Type *t) {
-	if (t->kind == Type_Basic)
+	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_u8;
+	}
 	return false;
 }
 b32 is_type_slice(Type *t) {
-	t = get_base_type(t);
+	t = base_type(t);
 	return t->kind == Type_Slice;
 }
 b32 is_type_u8_slice(Type *t) {
-	t = get_base_type(t);
-	if (t->kind == Type_Slice)
+	t = base_type(t);
+	if (t->kind == Type_Slice) {
 		return is_type_u8(t->Slice.elem);
+	}
 	return false;
 }
 b32 is_type_vector(Type *t) {
 	return t->kind == Type_Vector;
 }
 b32 is_type_proc(Type *t) {
-	t = get_base_type(t);
+	t = base_type(t);
 	return t->kind == Type_Proc;
 }
 Type *base_vector_type(Type *t) {
 	if (is_type_vector(t)) {
-		return t->Vector.elem;
+		return base_type(t)->Vector.elem;
 	}
 	return t;
 }
 
 
 b32 is_type_enum(Type *t) {
-	t = get_base_type(t);
+	t = base_type(t);
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_Enum);
 }
 b32 is_type_struct(Type *t) {
-	t = get_base_type(t);
+	t = base_type(t);
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct);
 }
 b32 is_type_union(Type *t) {
-	t = get_base_type(t);
+	t = base_type(t);
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_Union);
 }
 b32 is_type_raw_union(Type *t) {
-	t = get_base_type(t);
+	t = base_type(t);
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_RawUnion);
 }
 
 Type *get_enum_base_type(Type *t) {
-	Type *bt = get_base_type(t);
+	Type *bt = base_type(t);
 	if (is_type_enum(bt)) {
 		return bt->Record.enum_base;
 	}
@@ -518,14 +539,14 @@ Type *get_enum_base_type(Type *t) {
 }
 
 b32 is_type_any(Type *t) {
-	t = get_base_type(t);
+	t = base_type(t);
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_any);
 }
 
 
 
 b32 is_type_comparable(Type *t) {
-	t = get_base_type(t);
+	t = base_type(t);
 	switch (t->kind) {
 	case Type_Basic:
 		return true;
@@ -722,13 +743,13 @@ gb_global Entity *entity__slice_capacity = NULL;
 Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_type, Selection sel = empty_selection) {
 	GB_ASSERT(type_ != NULL);
 
-	if (field_name == make_string("_")) {
+	if (field_name == "_") {
 		return empty_selection;
 	}
 
 	Type *type = type_deref(type_);
 	b32 is_ptr = type != type_;
-	type = get_base_type(type);
+	type = base_type(type);
 
 	if (type->kind == Type_Basic) {
 		switch (type->Basic.kind) {
@@ -850,13 +871,13 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 		}
 
 		if (is_type_enum(type)) {
-			if (field_name == make_string("count")) {
+			if (field_name == "count") {
 				sel.entity = type->Record.enum_count;
 				return sel;
-			} else if (field_name == make_string("min_value")) {
+			} else if (field_name == "min_value") {
 				sel.entity = type->Record.min_value;
 				return sel;
-			} else if (field_name == make_string("max_value")) {
+			} else if (field_name == "max_value") {
 				sel.entity = type->Record.max_value;
 				return sel;
 			}
@@ -907,7 +928,7 @@ i64 align_formula(i64 size, i64 align) {
 }
 
 i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
-	t = get_base_type(t);
+	t = base_type(t);
 
 	switch (t->kind) {
 	case Type_Array:
@@ -996,7 +1017,7 @@ b32 type_set_offsets(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 }
 
 i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
-	t = get_base_type(t);
+	t = base_type(t);
 
 	switch (t->kind) {
 	case Type_Basic: {
@@ -1107,7 +1128,7 @@ i64 type_offset_of_from_selection(BaseTypeSizes s, gbAllocator allocator, Type *
 	i64 offset = 0;
 	for (isize i = 0; i < gb_array_count(sel.index); i++) {
 		isize index = sel.index[i];
-		t = get_base_type(t);
+		t = base_type(t);
 		if (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct) {
 			type_set_offsets(s, allocator, t);
 			GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));

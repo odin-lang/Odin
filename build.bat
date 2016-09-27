@@ -30,10 +30,8 @@ set linker_flags= -incremental:no -opt:ref -subsystem:console
 
 if %release_mode% EQU 0 ( rem Debug
 	set linker_flags=%linker_flags% -debug
-	set libs=%libs% src\utf8proc\utf8proc_debug.lib
 ) else ( rem Release
-	set linker_flags=%linker_flags% -debug
-	set libs=%libs% src\utf8proc\utf8proc.lib
+	set linker_flags=%linker_flags%
 )
 
 set compiler_settings=%compiler_includes% %compiler_flags% %compiler_warnings%
@@ -48,7 +46,13 @@ rem pushd %build_dir%
 
 	cl %compiler_settings% "src\main.cpp" ^
 		/link %linker_settings% -OUT:%exe_name% ^
-	&& odin run code/wills_game/willsgame.odin
+	&& odin run code/demo.odin
+	rem clang++ src\main.cpp -o %exe_name% ^
+	rem 	-Wno-deprecated-declarations ^
+	rem 	-Wno-unused-value ^
+	rem 	-Wno-switch ^
+	rem 	-Wno-writable-strings
+	rem && odin run code/demo.odin
 	rem odin run code/demo.odin
 
 

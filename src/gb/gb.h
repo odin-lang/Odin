@@ -6724,7 +6724,7 @@ isize gb_utf8_encode_rune(u8 buf[4], Rune r) {
 	}
 	if (i <= (1<<11)-1) {
 		buf[0] = 0xc0 | cast(u8)(r>>6);
-		buf[1] = 0x80 | cast(u8)(r)&mask;
+		buf[1] = 0x80 | (cast(u8)(r)&mask);
 		return 2;
 	}
 
@@ -6734,22 +6734,22 @@ isize gb_utf8_encode_rune(u8 buf[4], Rune r) {
 		r = GB_RUNE_INVALID;
 
 		buf[0] = 0xe0 | cast(u8)(r>>12);
-		buf[1] = 0x80 | cast(u8)(r>>6)&mask;
-		buf[2] = 0x80 | cast(u8)(r)&mask;
+		buf[1] = 0x80 | (cast(u8)(r>>6)&mask);
+		buf[2] = 0x80 | (cast(u8)(r)&mask);
 		return 3;
 	}
 
 	if (i <= (1<<16)-1) {
 		buf[0] = 0xe0 | cast(u8)(r>>12);
-		buf[1] = 0x80 | cast(u8)(r>>6)&mask;
-		buf[2] = 0x80 | cast(u8)(r)&mask;
+		buf[1] = 0x80 | (cast(u8)(r>>6)&mask);
+		buf[2] = 0x80 | (cast(u8)(r)&mask);
 		return 3;
 	}
 
 	buf[0] = 0xf0 | cast(u8)(r>>18);
-	buf[1] = 0x80 | cast(u8)(r>>12)&mask;
-	buf[2] = 0x80 | cast(u8)(r>>6)&mask;
-	buf[3] = 0x80 | cast(u8)(r)&mask;
+	buf[1] = 0x80 | (cast(u8)(r>>12)&mask);
+	buf[2] = 0x80 | (cast(u8)(r>>6)&mask);
+	buf[3] = 0x80 | (cast(u8)(r)&mask);
 	return 4;
 }
 

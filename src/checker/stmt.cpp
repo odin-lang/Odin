@@ -17,7 +17,10 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 		Entity *e;
 		DeclInfo *d;
 	};
-	gbArray(Delay) delayed; gb_array_init(delayed, gb_heap_allocator());
+	gbArray(Delay) delayed_const; gb_array_init(delayed_const, gb_heap_allocator());
+	gbArray(Delay) delayed_type;  gb_array_init(delayed_type,  gb_heap_allocator());
+	defer (gb_array_free(delayed_const));
+	defer (gb_array_free(delayed_type));
 
 	gb_for_array(i, stmts) {
 		AstNode *node = stmts[i];
@@ -29,6 +32,7 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 				ExactValue v = {ExactValue_Invalid};
 
 				Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
+				e->identifier = name;
 				add_entity(c, e->scope, name, e);
 
 				DeclInfo *di = make_declaration_info(c->allocator, e->scope);
@@ -36,7 +40,7 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 				di->init_expr = value;
 
 				Delay delay = {e, di};
-				gb_array_append(delayed, delay);
+				gb_array_append(delayed_const, delay);
 			}
 
 			isize lhs_count = gb_array_count(cd->names);
@@ -51,27 +55,24 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 
 		case_ast_node(td, TypeDecl, node);
 			Entity *e = make_entity_type_name(c->allocator, c->context.scope, td->name->Ident, NULL);
+			e->identifier = td->name;
 			add_entity(c, c->context.scope, td->name, e);
 
 			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
 			d->type_expr = td->type;
 
 			Delay delay = {e, d};
-			gb_array_append(delayed, delay);
+			gb_array_append(delayed_type, delay);
 		case_end;
 		}
 	}
 
-	auto check_scope_entity = [](Checker *c, gbArray(Delay) delayed, EntityKind kind) {
-		gb_for_array(i, delayed) {
-			auto delay = delayed[i];
-			if (delay.e->kind == kind) {
-				check_entity_decl(c, delay.e, delay.d, NULL);
-			}
-		}
-	};
-	check_scope_entity(c, delayed, Entity_TypeName);
-	check_scope_entity(c, delayed, Entity_Constant);
+	gb_for_array(i, delayed_type) {
+		check_entity_decl(c, delayed_type[i].e, delayed_type[i].d, NULL);
+	}
+	gb_for_array(i, delayed_const) {
+		check_entity_decl(c, delayed_const[i].e, delayed_const[i].d, NULL);
+	}
 
 	b32 ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
 	u32 f = flags & (~Stmt_FallthroughAllowed);
@@ -227,7 +228,7 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 
 	// NOTE(bill): Ignore assignments to `_`
 	if (node->kind == AstNode_Ident &&
-	    node->Ident.string == make_string("_")) {
+	    node->Ident.string == "_") {
 		add_entity_definition(&c->info, node, NULL);
 		check_assignment(c, op_a, NULL, make_string("assignment to `_` identifier"));
 		if (op_a->mode == Addressing_Invalid)
@@ -301,8 +302,9 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 		}
 
 
-		if (e->type == NULL)
+		if (e->type == NULL) {
 			e->type = t_invalid;
+		}
 		return NULL;
 	}
 
@@ -321,8 +323,9 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 	}
 
 	check_assignment(c, operand, e->type, context_name);
-	if (operand->mode == Addressing_Invalid)
+	if (operand->mode == Addressing_Invalid) {
 		return NULL;
+	}
 
 	return e->type;
 }
@@ -448,9 +451,9 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, Cycle
 		gb_array_free(local_cycle_checker.path);
 	});
 
-	Type *base_type = check_type(c, type_expr, named, cycle_checker_add(cycle_checker, e));
-	named->Named.base = base_type;
-	named->Named.base = get_base_type(named->Named.base);
+	Type *bt = check_type(c, type_expr, named, cycle_checker_add(cycle_checker, e));
+	named->Named.base = bt;
+	named->Named.base = base_type(named->Named.base);
 	if (named->Named.base == t_invalid) {
 		gb_printf("check_type_decl: %s\n", type_to_string(named));
 	}
@@ -474,7 +477,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 			if (!e->Variable.anonymous)
 				continue;
 			String name = e->token.string;
-			Type *t = get_base_type(type_deref(e->type));
+			Type *t = base_type(type_deref(e->type));
 			if (is_type_struct(t) || is_type_raw_union(t)) {
 				Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
 				GB_ASSERT(found != NULL);
@@ -524,8 +527,8 @@ b32 are_signatures_similar_enough(Type *a_, Type *b_) {
 		return false;
 	}
 	for (isize i = 0; i < a->param_count; i++) {
-		Type *x = get_base_type(a->params->Tuple.variables[i]->type);
-		Type *y = get_base_type(b->params->Tuple.variables[i]->type);
+		Type *x = base_type(a->params->Tuple.variables[i]->type);
+		Type *y = base_type(b->params->Tuple.variables[i]->type);
 		if (is_type_pointer(x) && is_type_pointer(y)) {
 			continue;
 		}
@@ -535,8 +538,8 @@ b32 are_signatures_similar_enough(Type *a_, Type *b_) {
 		}
 	}
 	for (isize i = 0; i < a->result_count; i++) {
-		Type *x = get_base_type(a->results->Tuple.variables[i]->type);
-		Type *y = get_base_type(b->results->Tuple.variables[i]->type);
+		Type *x = base_type(a->results->Tuple.variables[i]->type);
+		Type *y = base_type(b->results->Tuple.variables[i]->type);
 		if (is_type_pointer(x) && is_type_pointer(y)) {
 			continue;
 		}
@@ -559,15 +562,13 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	defer (check_close_scope(c));
 	check_procedure_type(c, proc_type, pd->type);
 
-
-	b32 is_foreign   = (pd->tags & ProcTag_foreign)   != 0;
-	b32 is_link_name = (pd->tags & ProcTag_link_name) != 0;
-	b32 is_inline    = (pd->tags & ProcTag_inline)    != 0;
-	b32 is_no_inline = (pd->tags & ProcTag_no_inline) != 0;
-
+	b32 is_foreign      = (pd->tags & ProcTag_foreign)   != 0;
+	b32 is_link_name    = (pd->tags & ProcTag_link_name) != 0;
+	b32 is_inline       = (pd->tags & ProcTag_inline)    != 0;
+	b32 is_no_inline    = (pd->tags & ProcTag_no_inline) != 0;
 
 	if ((d->scope->is_file || d->scope->is_global) &&
-	    e->token.string == make_string("main")) {
+	    e->token.string == "main") {
 		if (proc_type != NULL) {
 			auto *pt = &proc_type->Proc;
 			if (pt->param_count != 0 ||
@@ -595,7 +596,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		d->scope = c->context.scope;
 
 		GB_ASSERT(pd->body->kind == AstNode_BlockStmt);
-		check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pd->body);
+		check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pd->body, pd->tags);
 	}
 
 	if (is_foreign) {
@@ -610,8 +611,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		if (found) {
 			Entity *f = *found;
 			TokenPos pos = f->token.pos;
-			Type *this_type = get_base_type(e->type);
-			Type *other_type = get_base_type(f->type);
+			Type *this_type = base_type(e->type);
+			Type *other_type = base_type(f->type);
 			if (!are_signatures_similar_enough(this_type, other_type)) {
 				error(ast_node_token(d->proc_decl),
 				      "Redeclaration of #foreign procedure `%.*s` with different type signatures\n"
@@ -639,7 +640,6 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			map_set(fp, key, e);
 		}
 	}
-
 }
 
 void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, AstNode *init_expr) {
@@ -674,7 +674,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	}
 
 	AstNodeArray inits;
-	gb_array_init(inits, c->allocator);
+	gb_array_init_reserve(inits, c->allocator, 1);
 	gb_array_append(inits, init_expr);
 	check_init_variables(c, entities, entity_count, inits, make_string("variable declaration"));
 }
@@ -701,9 +701,10 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 		check_proc_decl(c, e, d);
 		return;
 	}
-	Scope *prev = c->context.scope;
+	auto prev = c->context;
 	c->context.scope = d->scope;
-	defer (c->context.scope = prev);
+	c->context.decl  = d;
+	defer (c->context = prev);
 
 	switch (e->kind) {
 	case Entity_Constant:
@@ -790,6 +791,24 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 
 
 void check_stmt(Checker *c, AstNode *node, u32 flags) {
+	u32 prev_stmt_state_flags = c->context.stmt_state_flags;
+	defer (c->context.stmt_state_flags = prev_stmt_state_flags);
+
+	if (node->stmt_state_flags != 0) {
+		u32 in = node->stmt_state_flags;
+		u32 out = c->context.stmt_state_flags;
+		defer (c->context.stmt_state_flags = out);
+
+		if (in & StmtStateFlag_bounds_check) {
+			out |= StmtStateFlag_bounds_check;
+			out &= ~StmtStateFlag_no_bounds_check;
+		} else if (in & StmtStateFlag_no_bounds_check) {
+			out |= StmtStateFlag_no_bounds_check;
+			out &= ~StmtStateFlag_bounds_check;
+		}
+	}
+
+
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
 	case_ast_node(_, EmptyStmt, node); case_end;
@@ -1180,7 +1199,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			      "Expected a pointer to a union for this type match expression, got `%s`", str);
 			break;
 		}
-		Type *base_union = get_base_type(type_deref(x.type));
+		Type *base_union = base_type(type_deref(x.type));
 
 
 		// NOTE(bill): Check for multiple defaults
@@ -1274,7 +1293,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, ms->var->Ident, tag_ptr_type);
 				tag_var->Variable.used = true;
 				add_entity(c, c->context.scope, ms->var, tag_var);
-				add_entity_use(&c->info, ms->var, tag_var);
+				add_entity_use(c, ms->var, tag_var);
 			}
 			check_stmt_list(c, cc->stmts, mod_flags);
 			check_close_scope(c);
@@ -1342,7 +1361,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 			switch (e->kind) {
 			case Entity_TypeName: {
-				Type *t = get_base_type(e->type);
+				Type *t = base_type(e->type);
 				if (is_type_struct(t) || is_type_enum(t)) {
 					for (isize i = 0; i < t->Record.other_field_count; i++) {
 						Entity *f = t->Record.other_fields[i];
@@ -1404,7 +1423,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				break;
 
 			case Entity_Variable: {
-				Type *t = get_base_type(type_deref(e->type));
+				Type *t = base_type(type_deref(e->type));
 				if (is_type_struct(t) || is_type_raw_union(t)) {
 					Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
 					GB_ASSERT(found != NULL);
@@ -1444,7 +1463,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				ast_node(i, Ident, item);
 				String name = i->string;
 				Entity *e = scope_lookup_entity(c->context.scope, name);
-				Type *t = get_base_type(type_deref(e->type));
+				Type *t = base_type(type_deref(e->type));
 				if (is_type_struct(t) || is_type_raw_union(t)) {
 					Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
 					GB_ASSERT(found != NULL);
@@ -1511,6 +1530,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		// NOTE(bill): This must be handled here so it has access to the parent scope stuff
 		// e.g. using
 		Entity *e = make_entity_procedure(c->allocator, c->context.scope, pd->name->Ident, NULL);
+		e->identifier = pd->name;
 		add_entity(c, c->context.scope, pd->name, e);
 
 		DeclInfo *d = make_declaration_info(c->allocator, e->scope);

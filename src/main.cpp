@@ -1,3 +1,5 @@
+#define DISPLAY_TIMING
+
 #include "common.cpp"
 #include "unicode.cpp"
 #include "tokenizer.cpp"
@@ -49,7 +51,6 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 	}
 }
 
-// #define DISPLAY_TIMING
 #if defined(DISPLAY_TIMING)
 #define INIT_TIMER() f64 start_time = gb_time_now(), end_time = 0, total_time = 0
 #define PRINT_TIMER(section) do { \
@@ -111,6 +112,7 @@ int main(int argc, char **argv) {
 		gb_printf_err("using: %s [run] <filename> \n", argv[0]);
 		return 1;
 	}
+
 	init_string_buffer_memory();
 
 	String module_dir = get_module_dir(gb_heap_allocator());

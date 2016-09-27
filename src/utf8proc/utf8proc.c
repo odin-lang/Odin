@@ -458,12 +458,12 @@ UTF8PROC_DLLEXPORT utf8proc_ssize_t utf8proc_decompose_char(utf8proc_int32_t uc,
       category == UTF8PROC_CATEGORY_ME) return 0;
   }
   if (options & UTF8PROC_CASEFOLD) {
-    if (property->casefold_seqindex != UINT16_MAX) {
+    if ((utf8proc_int16_t)property->casefold_seqindex != UINT16_MAX) {
       return seqindex_write_char_decomposed(property->casefold_seqindex, dst, bufsize, options, last_boundclass);
     }
   }
   if (options & (UTF8PROC_COMPOSE|UTF8PROC_DECOMPOSE)) {
-    if (property->decomp_seqindex != UINT16_MAX &&
+    if ((utf8proc_int16_t)property->decomp_seqindex != UINT16_MAX &&
         (!property->decomp_type || (options & UTF8PROC_COMPAT))) {
       return seqindex_write_char_decomposed(property->decomp_seqindex, dst, bufsize, options, last_boundclass);
     }
@@ -621,7 +621,7 @@ UTF8PROC_DLLEXPORT utf8proc_ssize_t utf8proc_reencode(utf8proc_int32_t *buffer, 
           starter_property = unsafe_get_property(*starter);
         }
         if (starter_property->comb_index < 0x8000 &&
-            current_property->comb_index != UINT16_MAX &&
+            (utf8proc_int16_t)current_property->comb_index != UINT16_MAX &&
             current_property->comb_index >= 0x8000) {
           int sidx = starter_property->comb_index;
           int idx = (current_property->comb_index & 0x3FFF) - utf8proc_combinations[sidx];

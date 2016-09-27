@@ -34,6 +34,8 @@ struct Entity {
 	Scope *    scope;
 	Token      token;
 	Type *     type;
+	AstNode *  identifier; // Can be NULL
+
 	Entity *   using_parent;
 	AstNode *  using_expr;
 
@@ -51,6 +53,7 @@ struct Entity {
 			b8  is_field;    // Is struct field
 		} Variable;
 		struct {
+			b32 used;
 		} TypeName;
 		struct {
 			b32 used;

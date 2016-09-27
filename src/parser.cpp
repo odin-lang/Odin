@@ -1,5 +1,6 @@
 struct AstNode;
 struct Scope;
+struct DeclInfo;
 
 enum ParseFileError {
 	ParseFile_None,
@@ -21,7 +22,9 @@ struct AstFile {
 	gbArena        arena;
 	Tokenizer      tokenizer;
 	gbArray(Token) tokens;
-	Token *        cursor; // NOTE(bill): Current token, easy to peek forward and backwards if needed
+	isize          curr_token_index;
+	Token          curr_token;
+	Token          prev_token; // previous non-comment
 
 	// >= 0: In Expression
 	// <  0: In Control Clause
@@ -31,9 +34,10 @@ struct AstFile {
 	AstNodeArray decls;
 	b32 is_global_scope;
 
-	AstNode *curr_proc;
-	isize    scope_level;
-	Scope *  scope; // NOTE(bill): Created in checker
+	AstNode * curr_proc;
+	isize     scope_level;
+	Scope *   scope;       // NOTE(bill): Created in checker
+	DeclInfo *decl_info;   // NOTE(bill): Created in checker
 
 	// TODO(bill): Error recovery
 	// NOTE(bill): Error recovery
@@ -931,20 +935,27 @@ gb_inline AstNode *make_foreign_system_library(AstFile *f, Token token, Token fi
 	return result;
 }
 
-gb_inline b32 next_token(AstFile *f) {
-	if (f->cursor+1 < f->tokens + gb_array_count(f->tokens)) {
-		f->cursor++;
+b32 next_token(AstFile *f) {
+	if (f->curr_token_index+1 < gb_array_count(f->tokens)) {
+		if (f->curr_token.kind != Token_Comment) {
+			f->prev_token = f->curr_token;
+		}
+
+		f->curr_token_index++;
+		f->curr_token = f->tokens[f->curr_token_index];
+		if (f->curr_token.kind == Token_Comment) {
+			return next_token(f);
+		}
 		return true;
-	} else {
-		syntax_error(f->cursor[0], "Token is EOF");
-		return false;
 	}
+	syntax_error(f->curr_token, "Token is EOF");
+	return false;
 }
 
 gb_inline Token expect_token(AstFile *f, TokenKind kind) {
-	Token prev = f->cursor[0];
+	Token prev = f->curr_token;
 	if (prev.kind != kind) {
-		syntax_error(f->cursor[0], "Expected `%.*s`, got `%.*s`",
+		syntax_error(f->curr_token, "Expected `%.*s`, got `%.*s`",
 		             LIT(token_strings[kind]),
 		             LIT(token_strings[prev.kind]));
 	}
@@ -953,9 +964,9 @@ gb_inline Token expect_token(AstFile *f, TokenKind kind) {
 }
 
 gb_inline Token expect_operator(AstFile *f) {
-	Token prev = f->cursor[0];
+	Token prev = f->curr_token;
 	if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
-		syntax_error(f->cursor[0], "Expected an operator, got `%.*s`",
+		syntax_error(f->curr_token, "Expected an operator, got `%.*s`",
 		             LIT(token_strings[prev.kind]));
 	}
 	next_token(f);
@@ -963,9 +974,9 @@ gb_inline Token expect_operator(AstFile *f) {
 }
 
 gb_inline Token expect_keyword(AstFile *f) {
-	Token prev = f->cursor[0];
+	Token prev = f->curr_token;
 	if (!gb_is_between(prev.kind, Token__KeywordBegin+1, Token__KeywordEnd-1)) {
-		syntax_error(f->cursor[0], "Expected a keyword, got `%.*s`",
+		syntax_error(f->curr_token, "Expected a keyword, got `%.*s`",
 		             LIT(token_strings[prev.kind]));
 	}
 	next_token(f);
@@ -973,7 +984,7 @@ gb_inline Token expect_keyword(AstFile *f) {
 }
 
 gb_inline b32 allow_token(AstFile *f, TokenKind kind) {
-	Token prev = f->cursor[0];
+	Token prev = f->curr_token;
 	if (prev.kind == kind) {
 		next_token(f);
 		return true;
@@ -990,23 +1001,34 @@ b32 is_blank_ident(String str) {
 }
 
 
+// NOTE(bill): Go to next statement to prevent numerous error messages popping up
 void fix_advance_to_next_stmt(AstFile *f) {
 	// TODO(bill): fix_advance_to_next_stmt
-#if 0
+#if 1
 	for (;;) {
-		Token t = f->cursor[0];
+		Token t = f->curr_token;
 		switch (t.kind) {
 		case Token_EOF:
+		case Token_Semicolon:
 			return;
 
-		case Token_type:
+		case Token_if:
+		case Token_return:
+		case Token_for:
+		case Token_match:
+		case Token_defer:
+		case Token_asm:
+		case Token_using:
+
 		case Token_break:
 		case Token_continue:
 		case Token_fallthrough:
-		case Token_if:
-		case Token_for:
-		case Token_defer:
-		case Token_return:
+
+		case Token_push_allocator:
+		case Token_push_context:
+
+		case Token_Hash:
+		{
 			if (token_pos_are_equal(t.pos, f->fix_prev_pos) &&
 			    f->fix_count < PARSER_MAX_FIX_COUNT) {
 				f->fix_count++;
@@ -1017,7 +1039,8 @@ void fix_advance_to_next_stmt(AstFile *f) {
 				f->fix_count = 0; // NOTE(bill): Reset
 				return;
 			}
-
+			// NOTE(bill): Reaching here means there is a parsing bug
+		} break;
 		}
 		next_token(f);
 	}
@@ -1029,19 +1052,20 @@ b32 expect_semicolon_after_stmt(AstFile *f, AstNode *s) {
 		return true;
 	}
 
-	if (f->cursor[0].pos.line != f->cursor[-1].pos.line) {
+	if (f->curr_token.pos.line != f->prev_token.pos.line) {
 		return true;
 	}
 
-	switch (f->cursor[0].kind) {
+	switch (f->curr_token.kind) {
 	case Token_EOF:
 	case Token_CloseBrace:
 		return true;
 	}
 
-	syntax_error(f->cursor[0],
+	syntax_error(f->curr_token,
 	             "Expected `;` after %.*s, got `%.*s`",
-	             LIT(ast_node_strings[s->kind]), LIT(token_strings[f->cursor[0].kind]));
+	             LIT(ast_node_strings[s->kind]), LIT(token_strings[f->curr_token.kind]));
+	fix_advance_to_next_stmt(f);
 	return false;
 }
 
@@ -1053,7 +1077,7 @@ AstNode *    parse_stmt(AstFile *f);
 AstNode *    parse_body(AstFile *f);
 
 AstNode *parse_identifier(AstFile *f) {
-	Token token = f->cursor[0];
+	Token token = f->curr_token;
 	if (token.kind == Token_Identifier) {
 		next_token(f);
 	} else {
@@ -1088,10 +1112,10 @@ AstNode *parse_value(AstFile *f);
 AstNodeArray parse_element_list(AstFile *f) {
 	AstNodeArray elems = make_ast_node_array(f);
 
-	while (f->cursor[0].kind != Token_CloseBrace &&
-	       f->cursor[0].kind != Token_EOF) {
+	while (f->curr_token.kind != Token_CloseBrace &&
+	       f->curr_token.kind != Token_EOF) {
 		AstNode *elem = parse_value(f);
-		if (f->cursor[0].kind == Token_Eq) {
+		if (f->curr_token.kind == Token_Eq) {
 			Token eq = expect_token(f, Token_Eq);
 			AstNode *value = parse_value(f);
 			elem = make_field_value(f, elem, value, eq);
@@ -1099,7 +1123,7 @@ AstNodeArray parse_element_list(AstFile *f) {
 
 		gb_array_append(elems, elem);
 
-		if (f->cursor[0].kind != Token_Comma) {
+		if (f->curr_token.kind != Token_Comma) {
 			break;
 		}
 		next_token(f);
@@ -1112,7 +1136,7 @@ AstNode *parse_literal_value(AstFile *f, AstNode *type) {
 	AstNodeArray elems = NULL;
 	Token open = expect_token(f, Token_OpenBrace);
 	f->expr_level++;
-	if (f->cursor[0].kind != Token_CloseBrace) {
+	if (f->curr_token.kind != Token_CloseBrace) {
 		elems = parse_element_list(f);
 	}
 	f->expr_level--;
@@ -1122,7 +1146,7 @@ AstNode *parse_literal_value(AstFile *f, AstNode *type) {
 }
 
 AstNode *parse_value(AstFile *f) {
-	if (f->cursor[0].kind == Token_OpenBrace)
+	if (f->curr_token.kind == Token_OpenBrace)
 		return parse_literal_value(f, NULL);
 
 	AstNode *value = parse_expr(f, false);
@@ -1192,20 +1216,20 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 	GB_ASSERT(foreign_name != NULL);
 	GB_ASSERT(link_name    != NULL);
 
-	while (f->cursor[0].kind == Token_Hash) {
+	while (f->curr_token.kind == Token_Hash) {
 		AstNode *tag_expr = parse_tag_expr(f, NULL);
 		ast_node(te, TagExpr, tag_expr);
 		String tag_name = te->name.string;
 
 		#define ELSE_IF_ADD_TAG(name) \
-		else if (tag_name == make_string(#name)) { \
+		else if (tag_name == #name) { \
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_##name, tag_name); \
 		}
 
-		if (tag_name == make_string("foreign")) {
+		if (tag_name == "foreign") {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_foreign, tag_name);
-			if (f->cursor[0].kind == Token_String) {
-				*foreign_name = f->cursor[0].string;
+			if (f->curr_token.kind == Token_String) {
+				*foreign_name = f->curr_token.string;
 				// TODO(bill): Check if valid string
 				if (!is_foreign_name_valid(*foreign_name)) {
 					syntax_error(ast_node_token(tag_expr), "Invalid alternative foreign procedure name: `%.*s`", LIT(*foreign_name));
@@ -1213,10 +1237,10 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 
 				next_token(f);
 			}
-		} else if (tag_name == make_string("link_name")) {
+		} else if (tag_name == "link_name") {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_link_name, tag_name);
-			if (f->cursor[0].kind == Token_String) {
-				*link_name = f->cursor[0].string;
+			if (f->curr_token.kind == Token_String) {
+				*link_name = f->curr_token.string;
 				// TODO(bill): Check if valid string
 				if (!is_foreign_name_valid(*link_name)) {
 					syntax_error(ast_node_token(tag_expr), "Invalid alternative link procedure name `%.*s`", LIT(*link_name));
@@ -1244,29 +1268,29 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 	}
 
 	if ((*tags & ProcTag_foreign) && (*tags & ProcTag_link_name)) {
-		syntax_error(f->cursor[0], "You cannot apply both #foreign and #link_name to a procedure");
+		syntax_error(f->curr_token, "You cannot apply both #foreign and #link_name to a procedure");
 	}
 
 	if ((*tags & ProcTag_inline) && (*tags & ProcTag_no_inline)) {
-		syntax_error(f->cursor[0], "You cannot apply both #inline and #no_inline to a procedure");
+		syntax_error(f->curr_token, "You cannot apply both #inline and #no_inline to a procedure");
 	}
 
 	if ((*tags & ProcTag_bounds_check) && (*tags & ProcTag_no_bounds_check)) {
-		syntax_error(f->cursor[0], "You cannot apply both #bounds_check and #no_bounds_check to a procedure");
+		syntax_error(f->curr_token, "You cannot apply both #bounds_check and #no_bounds_check to a procedure");
 	}
 
 	if (((*tags & ProcTag_bounds_check) || (*tags & ProcTag_no_bounds_check)) && (*tags & ProcTag_foreign)) {
-		syntax_error(f->cursor[0], "You cannot apply both #bounds_check or #no_bounds_check to a procedure without a body");
+		syntax_error(f->curr_token, "You cannot apply both #bounds_check or #no_bounds_check to a procedure without a body");
 	}
 
 	if ((*tags & ProcTag_stdcall) && (*tags & ProcTag_fastcall)) {
-		syntax_error(f->cursor[0], "You cannot apply one calling convention to a procedure");
+		syntax_error(f->curr_token, "You cannot apply one calling convention to a procedure");
 	}
 }
 
 AstNode *parse_operand(AstFile *f, b32 lhs) {
 	AstNode *operand = NULL; // Operand
-	switch (f->cursor[0].kind) {
+	switch (f->curr_token.kind) {
 	case Token_Identifier:
 		operand = parse_identifier(f);
 		if (!lhs) {
@@ -1278,7 +1302,7 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 	case Token_Float:
 	case Token_String:
 	case Token_Rune:
-		operand = make_basic_lit(f, f->cursor[0]);
+		operand = make_basic_lit(f, f->curr_token);
 		next_token(f);
 		return operand;
 
@@ -1296,9 +1320,9 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 	case Token_Hash: {
 		operand = parse_tag_expr(f, NULL);
 		String name = operand->TagExpr.name.string;
-		if (name == make_string("rune")) {
-			if (f->cursor[0].kind == Token_String) {
-				Token *s = &f->cursor[0];
+		if (name == "rune") {
+			if (f->curr_token.kind == Token_String) {
+				Token *s = &f->curr_token;
 
 				if (gb_utf8_strnlen(s->string.text, s->string.len) != 1) {
 					syntax_error(*s, "Invalid rune literal %.*s", LIT(s->string));
@@ -1308,12 +1332,12 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 				expect_token(f, Token_String);
 			}
 			operand = parse_operand(f, lhs);
-		} else if (name == make_string("file")) {
+		} else if (name == "file") {
 			Token token = operand->TagExpr.name;
 			token.kind = Token_String;
 			token.string = token.pos.file;
 			return make_basic_lit(f, token);
-		} else if (name == make_string("line")) {
+		} else if (name == "line") {
 			Token token = operand->TagExpr.name;
 			token.kind = Token_Integer;
 			char *str = gb_alloc_array(gb_arena_allocator(&f->arena), char, 20);
@@ -1338,13 +1362,13 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 		String link_name = {};
 		parse_proc_tags(f, &tags, &foreign_name, &link_name);
 		if (tags & ProcTag_foreign) {
-			syntax_error(f->cursor[0], "#foreign cannot be applied to procedure literals");
+			syntax_error(f->curr_token, "#foreign cannot be applied to procedure literals");
 		}
 		if (tags & ProcTag_link_name) {
-			syntax_error(f->cursor[0], "#link_name cannot be applied to procedure literals");
+			syntax_error(f->curr_token, "#link_name cannot be applied to procedure literals");
 		}
 
-		if (f->cursor[0].kind != Token_OpenBrace) {
+		if (f->curr_token.kind != Token_OpenBrace) {
 			return type;
 		} else {
 			AstNode *body;
@@ -1367,10 +1391,10 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 	}
 	}
 
-	Token begin = f->cursor[0];
+	Token begin = f->curr_token;
 	syntax_error(begin, "Expected an operand");
 	fix_advance_to_next_stmt(f);
-	return make_bad_expr(f, begin, f->cursor[0]);
+	return make_bad_expr(f, begin, f->curr_token);
 }
 
 b32 is_literal_type(AstNode *node) {
@@ -1394,21 +1418,21 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 	f->expr_level++;
 	open_paren = expect_token(f, Token_OpenParen);
 
-	while (f->cursor[0].kind != Token_CloseParen &&
-	       f->cursor[0].kind != Token_EOF &&
+	while (f->curr_token.kind != Token_CloseParen &&
+	       f->curr_token.kind != Token_EOF &&
 	       ellipsis.pos.line == 0) {
-		if (f->cursor[0].kind == Token_Comma)
-			syntax_error(f->cursor[0], "Expected an expression not a ,");
+		if (f->curr_token.kind == Token_Comma)
+			syntax_error(f->curr_token, "Expected an expression not a ,");
 
-		if (f->cursor[0].kind == Token_Ellipsis) {
-			ellipsis = f->cursor[0];
+		if (f->curr_token.kind == Token_Ellipsis) {
+			ellipsis = f->curr_token;
 			next_token(f);
 		}
 
 		gb_array_append(args, parse_expr(f, false));
 
-		if (f->cursor[0].kind != Token_Comma) {
-			if (f->cursor[0].kind == Token_CloseParen)
+		if (f->curr_token.kind != Token_Comma) {
+			if (f->curr_token.kind == Token_CloseParen)
 				break;
 		}
 
@@ -1426,7 +1450,7 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 
 	b32 loop = true;
 	while (loop) {
-		switch (f->cursor[0].kind) {
+		switch (f->curr_token.kind) {
 
 		case Token_Prime: {
 			Token op = expect_token(f, Token_Prime);
@@ -1448,19 +1472,19 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 		} break;
 
 		case Token_Period: {
-			Token token = f->cursor[0];
+			Token token = f->curr_token;
 			next_token(f);
 			if (lhs) {
 				// TODO(bill): handle this
 			}
-			switch (f->cursor[0].kind) {
+			switch (f->curr_token.kind) {
 			case Token_Identifier:
 				operand = make_selector_expr(f, token, operand, parse_identifier(f));
 				break;
 			default: {
-				syntax_error(f->cursor[0], "Expected a selector");
+				syntax_error(f->curr_token, "Expected a selector");
 				next_token(f);
-				operand = make_selector_expr(f, f->cursor[0], operand, NULL);
+				operand = make_selector_expr(f, f->curr_token, operand, NULL);
 			} break;
 			}
 		} break;
@@ -1475,17 +1499,17 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
 
-			if (f->cursor[0].kind != Token_Colon)
+			if (f->curr_token.kind != Token_Colon)
 				indices[0] = parse_expr(f, false);
 			isize colon_count = 0;
 			Token colons[2] = {};
 
-			while (f->cursor[0].kind == Token_Colon && colon_count < 2) {
-				colons[colon_count++] = f->cursor[0];
+			while (f->curr_token.kind == Token_Colon && colon_count < 2) {
+				colons[colon_count++] = f->curr_token;
 				next_token(f);
-				if (f->cursor[0].kind != Token_Colon &&
-				    f->cursor[0].kind != Token_CloseBracket &&
-				    f->cursor[0].kind != Token_EOF) {
+				if (f->curr_token.kind != Token_Colon &&
+				    f->curr_token.kind != Token_CloseBracket &&
+				    f->curr_token.kind != Token_EOF) {
 					indices[colon_count] = parse_expr(f, false);
 				}
 			}
@@ -1518,7 +1542,7 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 
 		case Token_OpenBrace: {
 			if (!lhs && is_literal_type(operand) && f->expr_level >= 0) {
-				if (f->cursor[0].pos.line == f->cursor[-1].pos.line) {
+				if (f->curr_token.pos.line == f->prev_token.pos.line) {
 					// TODO(bill): This is a hack due to optional semicolons
 					// TODO(bill): It's probably much better to solve this by changing
 					// the syntax for struct literals and array literals
@@ -1545,14 +1569,14 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 AstNode *parse_type(AstFile *f);
 
 AstNode *parse_unary_expr(AstFile *f, b32 lhs) {
-	switch (f->cursor[0].kind) {
+	switch (f->curr_token.kind) {
 	case Token_Pointer:
 	case Token_Add:
 	case Token_Sub:
 	case Token_Not:
 	case Token_Xor: {
 		AstNode *operand;
-		Token op = f->cursor[0];
+		Token op = f->curr_token;
 		next_token(f);
 		operand = parse_unary_expr(f, lhs);
 		return make_unary_expr(f, op, operand);
@@ -1564,10 +1588,10 @@ AstNode *parse_unary_expr(AstFile *f, b32 lhs) {
 
 AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 	AstNode *expression = parse_unary_expr(f, lhs);
-	for (i32 prec = token_precedence(f->cursor[0]); prec >= prec_in; prec--) {
+	for (i32 prec = token_precedence(f->curr_token); prec >= prec_in; prec--) {
 		for (;;) {
 			AstNode *right;
-			Token op = f->cursor[0];
+			Token op = f->curr_token;
 			i32 op_prec = token_precedence(op);
 			if (op_prec != prec)
 				break;
@@ -1581,7 +1605,7 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 			case Token_DoublePrime: {
 				// TODO(bill): Properly define semantic for in-fix and post-fix calls
 				AstNode *proc = parse_identifier(f);
-				/* if (f->cursor[0].kind == Token_OpenParen) {
+				/* if (f->curr_token.kind == Token_OpenParen) {
 					AstNode *call = parse_call_expr(f, proc);
 					gb_array_append(call->CallExpr.args, expression);
 					for (isize i = gb_array_count(call->CallExpr.args)-1; i > 0; i--) {
@@ -1629,8 +1653,8 @@ AstNodeArray parse_expr_list(AstFile *f, b32 lhs) {
 	do {
 		AstNode *e = parse_expr(f, lhs);
 		gb_array_append(list, e);
-		if (f->cursor[0].kind != Token_Comma ||
-		    f->cursor[0].kind == Token_EOF) {
+		if (f->curr_token.kind != Token_Comma ||
+		    f->curr_token.kind == Token_EOF) {
 		    break;
 		}
 		next_token(f);
@@ -1655,7 +1679,7 @@ AstNode *parse_simple_stmt(AstFile *f) {
 
 
 	AstNode *statement = NULL;
-	Token token = f->cursor[0];
+	Token token = f->curr_token;
 	switch (token.kind) {
 	case Token_Eq:
 	case Token_AddEq:
@@ -1673,14 +1697,14 @@ AstNode *parse_simple_stmt(AstFile *f) {
 	case Token_CmpOrEq:
 	{
 		if (f->curr_proc == NULL) {
-			syntax_error(f->cursor[0], "You cannot use a simple statement in the file scope");
-			return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
+			syntax_error(f->curr_token, "You cannot use a simple statement in the file scope");
+			return make_bad_stmt(f, f->curr_token, f->curr_token);
 		}
 		next_token(f);
 		AstNodeArray rhs = parse_rhs_expr_list(f);
 		if (gb_array_count(rhs) == 0) {
 			syntax_error(token, "No right-hand side in assignment statement.");
-			return make_bad_stmt(f, token, f->cursor[0]);
+			return make_bad_stmt(f, token, f->curr_token);
 		}
 		return make_assign_stmt(f, token, lhs, rhs);
 	} break;
@@ -1691,16 +1715,16 @@ AstNode *parse_simple_stmt(AstFile *f) {
 
 	if (lhs_count > 1) {
 		syntax_error(token, "Expected 1 expression");
-		return make_bad_stmt(f, token, f->cursor[0]);
+		return make_bad_stmt(f, token, f->curr_token);
 	}
 
-	token = f->cursor[0];
+	token = f->curr_token;
 	switch (token.kind) {
 	case Token_Increment:
 	case Token_Decrement:
 		if (f->curr_proc == NULL) {
-			syntax_error(f->cursor[0], "You cannot use a simple statement in the file scope");
-			return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
+			syntax_error(f->curr_token, "You cannot use a simple statement in the file scope");
+			return make_bad_stmt(f, f->curr_token, f->curr_token);
 		}
 		statement = make_inc_dec_stmt(f, token, lhs[0]);
 		next_token(f);
@@ -1714,8 +1738,8 @@ AstNode *parse_simple_stmt(AstFile *f) {
 
 AstNode *parse_block_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
-		syntax_error(f->cursor[0], "You cannot use a block statement in the file scope");
-		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
+		syntax_error(f->curr_token, "You cannot use a block statement in the file scope");
+		return make_bad_stmt(f, f->curr_token, f->curr_token);
 	}
 	AstNode *block_stmt = parse_body(f);
 	return block_stmt;
@@ -1728,8 +1752,8 @@ AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
 	if (statement->kind == AstNode_ExprStmt)
 		return statement->ExprStmt.expr;
 
-	syntax_error(f->cursor[0], "Expected `%.*s`, found a simple statement.", LIT(kind));
-	return make_bad_expr(f, f->cursor[0], f->cursor[1]);
+	syntax_error(f->curr_token, "Expected `%.*s`, found a simple statement.", LIT(kind));
+	return make_bad_expr(f, f->curr_token, f->tokens[f->curr_token_index+1]);
 }
 
 AstNodeArray parse_identfier_list(AstFile *f) {
@@ -1737,8 +1761,8 @@ AstNodeArray parse_identfier_list(AstFile *f) {
 
 	do {
 		gb_array_append(list, parse_identifier(f));
-		if (f->cursor[0].kind != Token_Comma ||
-		    f->cursor[0].kind == Token_EOF) {
+		if (f->curr_token.kind != Token_Comma ||
+		    f->curr_token.kind == Token_EOF) {
 		    break;
 		}
 		next_token(f);
@@ -1760,10 +1784,10 @@ AstNode *parse_type_attempt(AstFile *f) {
 AstNode *parse_type(AstFile *f) {
 	AstNode *type = parse_type_attempt(f);
 	if (type == NULL) {
-		Token token = f->cursor[0];
+		Token token = f->curr_token;
 		syntax_error(token, "Expected a type");
 		next_token(f);
-		return make_bad_expr(f, token, f->cursor[0]);
+		return make_bad_expr(f, token, f->curr_token);
 	}
 	return type;
 }
@@ -1789,11 +1813,11 @@ AstNode *parse_field_decl(AstFile *f) {
 
 	AstNodeArray names = parse_lhs_expr_list(f);
 	if (gb_array_count(names) == 0) {
-		syntax_error(f->cursor[0], "Empty field declaration");
+		syntax_error(f->curr_token, "Empty field declaration");
 	}
 
 	if (gb_array_count(names) > 1 && is_using) {
-		syntax_error(f->cursor[0], "Cannot apply `using` to more than one of the same type");
+		syntax_error(f->curr_token, "Cannot apply `using` to more than one of the same type");
 		is_using = false;
 	}
 
@@ -1801,16 +1825,16 @@ AstNode *parse_field_decl(AstFile *f) {
 	expect_token(f, Token_Colon);
 
 	AstNode *type = NULL;
-	if (f->cursor[0].kind == Token_Ellipsis) {
-		Token ellipsis = f->cursor[0];
+	if (f->curr_token.kind == Token_Ellipsis) {
+		Token ellipsis = f->curr_token;
 		next_token(f);
 		type = parse_type_attempt(f);
 		if (type == NULL) {
-			syntax_error(f->cursor[0], "variadic parameter is missing a type after `..`");
-			type = make_bad_expr(f, ellipsis, f->cursor[0]);
+			syntax_error(f->curr_token, "variadic parameter is missing a type after `..`");
+			type = make_bad_expr(f, ellipsis, f->curr_token);
 		} else {
 			if (gb_array_count(names) > 1) {
-				syntax_error(f->cursor[0], "mutliple variadic parameters, only  `..`");
+				syntax_error(f->curr_token, "mutliple variadic parameters, only  `..`");
 			} else {
 				type = make_ellipsis(f, ellipsis, type);
 			}
@@ -1820,7 +1844,7 @@ AstNode *parse_field_decl(AstFile *f) {
 	}
 
 	if (type == NULL) {
-		syntax_error(f->cursor[0], "Expected a type for this field declaration");
+		syntax_error(f->curr_token, "Expected a type for this field declaration");
 	}
 
 	AstNode *field = make_field(f, names, type, is_using);
@@ -1829,11 +1853,11 @@ AstNode *parse_field_decl(AstFile *f) {
 
 AstNodeArray parse_parameter_list(AstFile *f) {
 	AstNodeArray params = make_ast_node_array(f);
-	while (f->cursor[0].kind == Token_Identifier ||
-	       f->cursor[0].kind == Token_using) {
+	while (f->curr_token.kind == Token_Identifier ||
+	       f->curr_token.kind == Token_using) {
 		AstNode *field = parse_field_decl(f);
 		gb_array_append(params, field);
-		if (f->cursor[0].kind != Token_Comma) {
+		if (f->curr_token.kind != Token_Comma) {
 			break;
 		}
 		next_token(f);
@@ -1847,37 +1871,37 @@ AstNodeArray parse_struct_params(AstFile *f, isize *decl_count_, b32 using_allow
 	AstNodeArray decls = make_ast_node_array(f);
 	isize decl_count = 0;
 
-	while (f->cursor[0].kind == Token_Identifier ||
-	       f->cursor[0].kind == Token_using) {
+	while (f->curr_token.kind == Token_Identifier ||
+	       f->curr_token.kind == Token_using) {
 		b32 is_using = false;
 		if (allow_token(f, Token_using)) {
 			is_using = true;
 		}
 		AstNodeArray names = parse_lhs_expr_list(f);
 		if (gb_array_count(names) == 0) {
-			syntax_error(f->cursor[0], "Empty field declaration");
+			syntax_error(f->curr_token, "Empty field declaration");
 		}
 
 		if (!using_allowed && is_using) {
-			syntax_error(f->cursor[0], "Cannot apply `using` to members of a union");
+			syntax_error(f->curr_token, "Cannot apply `using` to members of a union");
 			is_using = false;
 		}
 		if (gb_array_count(names) > 1 && is_using) {
-			syntax_error(f->cursor[0], "Cannot apply `using` to more than one of the same type");
+			syntax_error(f->curr_token, "Cannot apply `using` to more than one of the same type");
 		}
 
 		AstNode *decl = NULL;
 
-		if (f->cursor[0].kind == Token_Colon) {
+		if (f->curr_token.kind == Token_Colon) {
 			decl = parse_decl(f, names);
 
 			if (decl->kind == AstNode_ProcDecl) {
-				syntax_error(f->cursor[0], "Procedure declarations are not allowed within a structure");
-				decl = make_bad_decl(f, ast_node_token(names[0]), f->cursor[0]);
+				syntax_error(f->curr_token, "Procedure declarations are not allowed within a structure");
+				decl = make_bad_decl(f, ast_node_token(names[0]), f->curr_token);
 			}
 		} else {
-			syntax_error(f->cursor[0], "Illegal structure field");
-			decl = make_bad_decl(f, ast_node_token(names[0]), f->cursor[0]);
+			syntax_error(f->curr_token, "Illegal structure field");
+			decl = make_bad_decl(f, ast_node_token(names[0]), f->curr_token);
 		}
 
 		expect_semicolon_after_stmt(f, decl);
@@ -1887,7 +1911,7 @@ AstNodeArray parse_struct_params(AstFile *f, isize *decl_count_, b32 using_allow
 			if (decl->kind == AstNode_VarDecl) {
 				decl->VarDecl.is_using = is_using && using_allowed;
 				if (gb_array_count(decl->VarDecl.values) > 0) {
-					syntax_error(f->cursor[0], "Default variable assignments within a structure will be ignored (at the moment)");
+					syntax_error(f->curr_token, "Default variable assignments within a structure will be ignored (at the moment)");
 				}
 			} else {
 				decl_count += 1;
@@ -1901,7 +1925,7 @@ AstNodeArray parse_struct_params(AstFile *f, isize *decl_count_, b32 using_allow
 }
 
 AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
-	switch (f->cursor[0].kind) {
+	switch (f->curr_token.kind) {
 	case Token_volatile:
 		next_token(f);
 		return parse_identifier_or_type(f, flags | TypeFlag_volatile);
@@ -1912,13 +1936,13 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 
 	case Token_Identifier: {
 		AstNode *e = parse_identifier(f);
-		while (f->cursor[0].kind == Token_Period) {
-			Token token = f->cursor[0];
+		while (f->curr_token.kind == Token_Period) {
+			Token token = f->curr_token;
 			next_token(f);
 			AstNode *sel = parse_identifier(f);
 			e = make_selector_expr(f, token, e, sel);
 		}
-		if (f->cursor[0].kind == Token_OpenParen) {
+		if (f->curr_token.kind == Token_OpenParen) {
 			// HACK NOTE(bill): For type_of_val(expr)
 			e = parse_call_expr(f, e);
 		}
@@ -1937,10 +1961,10 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		Token token = expect_token(f, Token_OpenBracket);
 		AstNode *count_expr = NULL;
 
-		if (f->cursor[0].kind == Token_Ellipsis) {
-			count_expr = make_ellipsis(f, f->cursor[0], NULL);
+		if (f->curr_token.kind == Token_Ellipsis) {
+			count_expr = make_ellipsis(f, f->curr_token, NULL);
 			next_token(f);
-		} else if (f->cursor[0].kind != Token_CloseBracket) {
+		} else if (f->curr_token.kind != Token_CloseBracket) {
 			count_expr = parse_expr(f, false);
 		}
 		expect_token(f, Token_CloseBracket);
@@ -1967,9 +1991,9 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		b32 is_ordered = false;
 		while (allow_token(f, Token_Hash)) {
 			Token tag = expect_token(f, Token_Identifier);
-			if (tag.string == make_string("packed")) {
+			if (tag.string == "packed") {
 				is_packed = true;
-			} else if (tag.string == make_string("ordered")) {
+			} else if (tag.string == "ordered") {
 				is_ordered = true;
 			} else {
 				syntax_error(tag, "Expected a `#packed` or `#ordered` tag");
@@ -2019,7 +2043,7 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		AstNode *base_type = NULL;
 		Token open, close;
 
-		if (f->cursor[0].kind != Token_OpenBrace) {
+		if (f->curr_token.kind != Token_OpenBrace) {
 			base_type = parse_type(f);
 		}
 
@@ -2027,18 +2051,18 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 
 		open  = expect_token(f, Token_OpenBrace);
 
-		while (f->cursor[0].kind != Token_CloseBrace &&
-		       f->cursor[0].kind != Token_EOF) {
+		while (f->curr_token.kind != Token_CloseBrace &&
+		       f->curr_token.kind != Token_EOF) {
 			AstNode *name = parse_identifier(f);
 			AstNode *value = NULL;
 			Token eq = empty_token;
-			if (f->cursor[0].kind == Token_Eq) {
+			if (f->curr_token.kind == Token_Eq) {
 				eq = expect_token(f, Token_Eq);
 				value = parse_value(f);
 			}
 			AstNode *field = make_field_value(f, name, value, eq);
 			gb_array_append(fields, field);
-			if (f->cursor[0].kind != Token_Comma) {
+			if (f->curr_token.kind != Token_Comma) {
 				break;
 			}
 			next_token(f);
@@ -2077,12 +2101,12 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		break;
 
 	case Token_Eq:
-		if (f->cursor[-1].kind == Token_Colon)
+		if (f->prev_token.kind == Token_Colon)
 			break;
 		// fallthrough
 	default:
-		syntax_error(f->cursor[0],
-		             "Expected a type or identifier after `%.*s`, got `%.*s`", LIT(f->cursor[-1].string), LIT(f->cursor[0].string));
+		syntax_error(f->curr_token,
+		             "Expected a type or identifier after `%.*s`, got `%.*s`", LIT(f->prev_token.string), LIT(f->curr_token.string));
 		break;
 	}
 
@@ -2093,12 +2117,12 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 AstNodeArray parse_results(AstFile *f) {
 	AstNodeArray results = make_ast_node_array(f);
 	if (allow_token(f, Token_ArrowRight)) {
-		if (f->cursor[0].kind == Token_OpenParen) {
+		if (f->curr_token.kind == Token_OpenParen) {
 			expect_token(f, Token_OpenParen);
-			while (f->cursor[0].kind != Token_CloseParen &&
-			       f->cursor[0].kind != Token_EOF) {
+			while (f->curr_token.kind != Token_CloseParen &&
+			       f->curr_token.kind != Token_EOF) {
 				gb_array_append(results, parse_type(f));
-				if (f->cursor[0].kind != Token_Comma) {
+				if (f->curr_token.kind != Token_Comma) {
 					break;
 				}
 				next_token(f);
@@ -2155,9 +2179,9 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 	f->curr_proc = proc_type;
 	defer (f->curr_proc = curr_proc);
 
-	if (f->cursor[0].kind == Token_OpenBrace) {
+	if (f->curr_token.kind == Token_OpenBrace) {
 		if ((tags & ProcTag_foreign) != 0) {
-			syntax_error(f->cursor[0], "A procedure tagged as `#foreign` cannot have a body");
+			syntax_error(f->curr_token, "A procedure tagged as `#foreign` cannot have a body");
 		}
 		body = parse_body(f);
 	}
@@ -2174,7 +2198,7 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 		if (name->kind == AstNode_Ident) {
 			String n = name->Ident.string;
 			// NOTE(bill): Check for reserved identifiers
-			if (n == make_string("context")) {
+			if (n == "context") {
 				syntax_error(ast_node_token(name), "`context` is a reserved identifier");
 				break;
 			}
@@ -2185,25 +2209,25 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 		if (!allow_token(f, Token_type)) {
 			type = parse_identifier_or_type(f);
 		}
-	} else if (f->cursor[0].kind != Token_Eq && f->cursor[0].kind != Token_Semicolon) {
-		syntax_error(f->cursor[0], "Expected type separator `:` or `=`");
+	} else if (f->curr_token.kind != Token_Eq && f->curr_token.kind != Token_Semicolon) {
+		syntax_error(f->curr_token, "Expected type separator `:` or `=`");
 	}
 
 	b32 is_mutable = true;
 
-	if (f->cursor[0].kind == Token_Eq ||
-	    f->cursor[0].kind == Token_Colon) {
-		if (f->cursor[0].kind == Token_Colon) {
+	if (f->curr_token.kind == Token_Eq ||
+	    f->curr_token.kind == Token_Colon) {
+		if (f->curr_token.kind == Token_Colon) {
 			is_mutable = false;
 		}
 		next_token(f);
 
-		if (f->cursor[0].kind == Token_type ||
-		    f->cursor[0].kind == Token_struct ||
-		    f->cursor[0].kind == Token_enum ||
-		    f->cursor[0].kind == Token_union ||
-		    f->cursor[0].kind == Token_raw_union) {
-			Token token = f->cursor[0];
+		if (f->curr_token.kind == Token_type ||
+		    f->curr_token.kind == Token_struct ||
+		    f->curr_token.kind == Token_enum ||
+		    f->curr_token.kind == Token_union ||
+		    f->curr_token.kind == Token_raw_union) {
+			Token token = f->curr_token;
 			if (token.kind == Token_type) {
 				next_token(f);
 			}
@@ -2213,16 +2237,16 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 			}
 
 			if (type != NULL) {
-				syntax_error(f->cursor[-1], "Expected either `type` or nothing between : and :");
+				syntax_error(f->prev_token, "Expected either `type` or nothing between : and :");
 				// NOTE(bill): Do not fail though
 			}
 
 			AstNode *type = parse_type(f);
 			return make_type_decl(f, token, names[0], type);
-		} else if (f->cursor[0].kind == Token_proc &&
+		} else if (f->curr_token.kind == Token_proc &&
 		    is_mutable == false) {
 		    // NOTE(bill): Procedure declarations
-			Token proc_token = f->cursor[0];
+			Token proc_token = f->curr_token;
 			AstNode *name = names[0];
 			if (gb_array_count(names) != 1) {
 				syntax_error(proc_token, "You can only declare one procedure at a time");
@@ -2234,24 +2258,24 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 		} else {
 			values = parse_rhs_expr_list(f);
 			if (gb_array_count(values) > gb_array_count(names)) {
-				syntax_error(f->cursor[0], "Too many values on the right hand side of the declaration");
+				syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
 			} else if (gb_array_count(values) < gb_array_count(names) && !is_mutable) {
-				syntax_error(f->cursor[0], "All constant declarations must be defined");
+				syntax_error(f->curr_token, "All constant declarations must be defined");
 			} else if (gb_array_count(values) == 0) {
-				syntax_error(f->cursor[0], "Expected an expression for this declaration");
+				syntax_error(f->curr_token, "Expected an expression for this declaration");
 			}
 		}
 	}
 
 	if (is_mutable) {
 		if (type == NULL && gb_array_count(values) == 0) {
-			syntax_error(f->cursor[0], "Missing variable type or initialization");
-			return make_bad_decl(f, f->cursor[0], f->cursor[0]);
+			syntax_error(f->curr_token, "Missing variable type or initialization");
+			return make_bad_decl(f, f->curr_token, f->curr_token);
 		}
 	} else {
 		if (type == NULL && gb_array_count(values) == 0 && gb_array_count(names) > 0) {
-			syntax_error(f->cursor[0], "Missing constant value");
-			return make_bad_decl(f, f->cursor[0], f->cursor[0]);
+			syntax_error(f->curr_token, "Missing constant value");
+			return make_bad_decl(f, f->curr_token, f->curr_token);
 		}
 	}
 
@@ -2268,8 +2292,8 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 
 AstNode *parse_if_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
-		syntax_error(f->cursor[0], "You cannot use an if statement in the file scope");
-		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
+		syntax_error(f->curr_token, "You cannot use an if statement in the file scope");
+		return make_bad_stmt(f, f->curr_token, f->curr_token);
 	}
 
 	Token token = expect_token(f, Token_if);
@@ -2297,13 +2321,13 @@ AstNode *parse_if_stmt(AstFile *f) {
 	f->expr_level = prev_level;
 
 	if (cond == NULL) {
-		syntax_error(f->cursor[0], "Expected condition for if statement");
+		syntax_error(f->curr_token, "Expected condition for if statement");
 	}
 
 	body = parse_block_stmt(f);
 
 	if (allow_token(f, Token_else)) {
-		switch (f->cursor[0].kind) {
+		switch (f->curr_token.kind) {
 		case Token_if:
 			else_stmt = parse_if_stmt(f);
 			break;
@@ -2311,8 +2335,8 @@ AstNode *parse_if_stmt(AstFile *f) {
 			else_stmt = parse_block_stmt(f);
 			break;
 		default:
-			syntax_error(f->cursor[0], "Expected if statement block statement");
-			else_stmt = make_bad_stmt(f, f->cursor[0], f->cursor[1]);
+			syntax_error(f->curr_token, "Expected if statement block statement");
+			else_stmt = make_bad_stmt(f, f->curr_token, f->tokens[f->curr_token_index+1]);
 			break;
 		}
 	}
@@ -2322,18 +2346,18 @@ AstNode *parse_if_stmt(AstFile *f) {
 
 AstNode *parse_return_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
-		syntax_error(f->cursor[0], "You cannot use a return statement in the file scope");
-		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
+		syntax_error(f->curr_token, "You cannot use a return statement in the file scope");
+		return make_bad_stmt(f, f->curr_token, f->curr_token);
 	}
 
 	Token token = expect_token(f, Token_return);
 	AstNodeArray results = make_ast_node_array(f);
 
-	if (f->cursor[0].kind != Token_Semicolon && f->cursor[0].kind != Token_CloseBrace &&
-	    f->cursor[0].pos.line == token.pos.line) {
+	if (f->curr_token.kind != Token_Semicolon && f->curr_token.kind != Token_CloseBrace &&
+	    f->curr_token.pos.line == token.pos.line) {
 		results = parse_rhs_expr_list(f);
 	}
-	if (f->cursor[0].kind != Token_CloseBrace) {
+	if (f->curr_token.kind != Token_CloseBrace) {
 		expect_semicolon_after_stmt(f, results ? results[0] : NULL);
 	}
 
@@ -2342,8 +2366,8 @@ AstNode *parse_return_stmt(AstFile *f) {
 
 AstNode *parse_for_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
-		syntax_error(f->cursor[0], "You cannot use a for statement in the file scope");
-		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
+		syntax_error(f->curr_token, "You cannot use a for statement in the file scope");
+		return make_bad_stmt(f, f->curr_token, f->curr_token);
 	}
 
 	Token token = expect_token(f, Token_for);
@@ -2353,13 +2377,13 @@ AstNode *parse_for_stmt(AstFile *f) {
 	AstNode *end  = NULL;
 	AstNode *body = NULL;
 
-	if (f->cursor[0].kind != Token_OpenBrace) {
+	if (f->curr_token.kind != Token_OpenBrace) {
 		isize prev_level = f->expr_level;
 		f->expr_level = -1;
-		if (f->cursor[0].kind != Token_Semicolon) {
+		if (f->curr_token.kind != Token_Semicolon) {
 			cond = parse_simple_stmt(f);
 			if (is_ast_node_complex_stmt(cond)) {
-				syntax_error(f->cursor[0],
+				syntax_error(f->curr_token,
 				             "You are not allowed that type of statement in a for statement, it is too complex!");
 			}
 		}
@@ -2367,11 +2391,11 @@ AstNode *parse_for_stmt(AstFile *f) {
 		if (allow_token(f, Token_Semicolon)) {
 			init = cond;
 			cond = NULL;
-			if (f->cursor[0].kind != Token_Semicolon) {
+			if (f->curr_token.kind != Token_Semicolon) {
 				cond = parse_simple_stmt(f);
 			}
 			expect_token(f, Token_Semicolon);
-			if (f->cursor[0].kind != Token_OpenBrace) {
+			if (f->curr_token.kind != Token_OpenBrace) {
 				end = parse_simple_stmt(f);
 			}
 		}
@@ -2385,7 +2409,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 }
 
 AstNode *parse_case_clause(AstFile *f) {
-	Token token = f->cursor[0];
+	Token token = f->curr_token;
 	AstNodeArray list = make_ast_node_array(f);
 	if (allow_token(f, Token_case)) {
 		list = parse_rhs_expr_list(f);
@@ -2400,7 +2424,7 @@ AstNode *parse_case_clause(AstFile *f) {
 
 
 AstNode *parse_type_case_clause(AstFile *f) {
-	Token token = f->cursor[0];
+	Token token = f->curr_token;
 	AstNodeArray clause = make_ast_node_array(f);
 	if (allow_token(f, Token_case)) {
 		gb_array_append(clause, parse_expr(f, false));
@@ -2416,8 +2440,8 @@ AstNode *parse_type_case_clause(AstFile *f) {
 
 AstNode *parse_match_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
-		syntax_error(f->cursor[0], "You cannot use a match statement in the file scope");
-		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
+		syntax_error(f->curr_token, "You cannot use a match statement in the file scope");
+		return make_bad_stmt(f, f->curr_token, f->curr_token);
 	}
 
 	Token token = expect_token(f, Token_match);
@@ -2441,8 +2465,8 @@ AstNode *parse_match_stmt(AstFile *f) {
 		open = expect_token(f, Token_OpenBrace);
 		AstNodeArray list = make_ast_node_array(f);
 
-		while (f->cursor[0].kind == Token_case ||
-		       f->cursor[0].kind == Token_default) {
+		while (f->curr_token.kind == Token_case ||
+		       f->curr_token.kind == Token_default) {
 			gb_array_append(list, parse_type_case_clause(f));
 		}
 
@@ -2452,16 +2476,16 @@ AstNode *parse_match_stmt(AstFile *f) {
 		tag = convert_stmt_to_expr(f, tag, make_string("type match expression"));
 		return make_type_match_stmt(f, token, tag, var, body);
 	} else {
-		if (f->cursor[0].kind != Token_OpenBrace) {
+		if (f->curr_token.kind != Token_OpenBrace) {
 			isize prev_level = f->expr_level;
 			f->expr_level = -1;
-			if (f->cursor[0].kind != Token_Semicolon) {
+			if (f->curr_token.kind != Token_Semicolon) {
 				tag = parse_simple_stmt(f);
 			}
 			if (allow_token(f, Token_Semicolon)) {
 				init = tag;
 				tag = NULL;
-				if (f->cursor[0].kind != Token_OpenBrace) {
+				if (f->curr_token.kind != Token_OpenBrace) {
 					tag = parse_simple_stmt(f);
 				}
 			}
@@ -2472,8 +2496,8 @@ AstNode *parse_match_stmt(AstFile *f) {
 		open = expect_token(f, Token_OpenBrace);
 		AstNodeArray list = make_ast_node_array(f);
 
-		while (f->cursor[0].kind == Token_case ||
-		       f->cursor[0].kind == Token_default) {
+		while (f->curr_token.kind == Token_case ||
+		       f->curr_token.kind == Token_default) {
 			gb_array_append(list, parse_case_clause(f));
 		}
 
@@ -2489,8 +2513,8 @@ AstNode *parse_match_stmt(AstFile *f) {
 
 AstNode *parse_defer_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
-		syntax_error(f->cursor[0], "You cannot use a defer statement in the file scope");
-		return make_bad_stmt(f, f->cursor[0], f->cursor[0]);
+		syntax_error(f->curr_token, "You cannot use a defer statement in the file scope");
+		return make_bad_stmt(f, f->curr_token, f->curr_token);
 	}
 
 	Token token = expect_token(f, Token_defer);
@@ -2528,7 +2552,7 @@ AstNode *parse_asm_stmt(AstFile *f) {
 
 	// TODO(bill): Finish asm statement and determine syntax
 
-	// if (f->cursor[0].kind != Token_CloseBrace) {
+	// if (f->curr_token.kind != Token_CloseBrace) {
 		// expect_token(f, Token_Colon);
 	// }
 
@@ -2544,7 +2568,7 @@ AstNode *parse_asm_stmt(AstFile *f) {
 
 AstNode *parse_stmt(AstFile *f) {
 	AstNode *s = NULL;
-	Token token = f->cursor[0];
+	Token token = f->curr_token;
 	switch (token.kind) {
 	// Operands
 	case Token_Identifier:
@@ -2605,7 +2629,7 @@ AstNode *parse_stmt(AstFile *f) {
 
 		if (!valid) {
 			syntax_error(token, "Illegal use of `using` statement.");
-			return make_bad_stmt(f, token, f->cursor[0]);
+			return make_bad_stmt(f, token, f->curr_token);
 		}
 
 
@@ -2637,21 +2661,21 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Hash: {
 		s = parse_tag_stmt(f, NULL);
 		String tag = s->TagStmt.name.string;
-		if (tag == make_string("shared_global_scope")) {
+		if (tag == "shared_global_scope") {
 			if (f->curr_proc == NULL) {
 				f->is_global_scope = true;
-				return make_empty_stmt(f, f->cursor[0]);
+				return make_empty_stmt(f, f->curr_token);
 			}
 			syntax_error(token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope.");
-			return make_bad_decl(f, token, f->cursor[0]);
-		} else if (tag == make_string("import")) {
+			return make_bad_decl(f, token, f->curr_token);
+		} else if (tag == "import") {
 			// TODO(bill): better error messages
 			Token import_name = {};
 			Token file_path = expect_token(f, Token_String);
 			if (allow_token(f, Token_as)) {
 				// NOTE(bill): Custom import name
-				if (f->cursor[0].kind == Token_Period) {
-					import_name = f->cursor[0];
+				if (f->curr_token.kind == Token_Period) {
+					import_name = f->curr_token;
 					import_name.kind = Token_Identifier;
 					next_token(f);
 				} else {
@@ -2664,7 +2688,7 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			syntax_error(token, "You cannot use #import within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
-		} else if (tag == make_string("load")) {
+		} else if (tag == "load") {
 			// TODO(bill): better error messages
 			Token file_path = expect_token(f, Token_String);
 			Token import_name = file_path;
@@ -2675,14 +2699,14 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			syntax_error(token, "You cannot use #load within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
-		} else if (tag == make_string("foreign_system_library")) {
+		} else if (tag == "foreign_system_library") {
 			Token file_path = expect_token(f, Token_String);
 			if (f->curr_proc == NULL) {
 				return make_foreign_system_library(f, s->TagStmt.token, file_path);
 			}
 			syntax_error(token, "You cannot use #foreign_system_library within a procedure. This must be done at the file scope.");
 			return make_bad_decl(f, token, file_path);
-		} else if (tag == make_string("thread_local")) {
+		} else if (tag == "thread_local") {
 			AstNode *var_decl = parse_simple_stmt(f);
 			if (var_decl->kind != AstNode_VarDecl) {
 				syntax_error(token, "#thread_local may only be applied to variable declarations");
@@ -2694,14 +2718,14 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			var_decl->VarDecl.tags |= VarDeclTag_thread_local;
 			return var_decl;
-		} else if (tag == make_string("bounds_check")) {
+		} else if (tag == "bounds_check") {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_bounds_check;
 			if ((s->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return s;
-		} else if (tag == make_string("no_bounds_check")) {
+		} else if (tag == "no_bounds_check") {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_no_bounds_check;
 			if ((s->stmt_state_flags & StmtStateFlag_bounds_check) != 0) {
@@ -2727,16 +2751,16 @@ AstNode *parse_stmt(AstFile *f) {
 	             "Expected a statement, got `%.*s`",
 	             LIT(token_strings[token.kind]));
 	fix_advance_to_next_stmt(f);
-	return make_bad_stmt(f, token, f->cursor[0]);
+	return make_bad_stmt(f, token, f->curr_token);
 }
 
 AstNodeArray parse_stmt_list(AstFile *f) {
 	AstNodeArray list = make_ast_node_array(f);
 
-	while (f->cursor[0].kind != Token_case &&
-	       f->cursor[0].kind != Token_default &&
-	       f->cursor[0].kind != Token_CloseBrace &&
-	       f->cursor[0].kind != Token_EOF) {
+	while (f->curr_token.kind != Token_case &&
+	       f->curr_token.kind != Token_default &&
+	       f->curr_token.kind != Token_CloseBrace &&
+	       f->curr_token.kind != Token_EOF) {
 		AstNode *stmt = parse_stmt(f);
 		if (stmt && stmt->kind != AstNode_EmptyStmt) {
 			gb_array_append(list, stmt);
@@ -2766,7 +2790,9 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 			}
 		}
 
-		f->cursor = &f->tokens[0];
+		f->curr_token_index = 0;
+		f->prev_token = f->tokens[f->curr_token_index];
+		f->curr_token = f->tokens[f->curr_token_index];
 
 		// NOTE(bill): Is this big enough or too small?
 		isize arena_size = gb_size_of(AstNode);
