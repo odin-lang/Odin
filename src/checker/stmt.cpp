@@ -33,13 +33,14 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 
 				Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
 				e->identifier = name;
-				add_entity(c, e->scope, name, e);
 
-				DeclInfo *di = make_declaration_info(c->allocator, e->scope);
-				di->type_expr = cd->type;
-				di->init_expr = value;
+				DeclInfo *d = make_declaration_info(c->allocator, e->scope);
+				d->type_expr = cd->type;
+				d->init_expr = value;
 
-				Delay delay = {e, di};
+				add_entity_and_decl_info(c, name, e, d);
+
+				Delay delay = {e, d};
 				gb_array_append(delayed_const, delay);
 			}
 
@@ -60,6 +61,8 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 
 			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
 			d->type_expr = td->type;
+
+			add_entity_and_decl_info(c, td->name, e, d);
 
 			Delay delay = {e, d};
 			gb_array_append(delayed_type, delay);
@@ -1531,11 +1534,11 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		// e.g. using
 		Entity *e = make_entity_procedure(c->allocator, c->context.scope, pd->name->Ident, NULL);
 		e->identifier = pd->name;
-		add_entity(c, c->context.scope, pd->name, e);
 
 		DeclInfo *d = make_declaration_info(c->allocator, e->scope);
 		d->proc_decl = node;
 
+		add_entity_and_decl_info(c, pd->name, e, d);
 		check_entity_decl(c, e, d, NULL);
 	case_end;
 

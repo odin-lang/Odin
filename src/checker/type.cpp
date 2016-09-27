@@ -499,6 +499,7 @@ b32 is_type_u8_slice(Type *t) {
 	return false;
 }
 b32 is_type_vector(Type *t) {
+	t = base_type(t);
 	return t->kind == Type_Vector;
 }
 b32 is_type_proc(Type *t) {
@@ -507,7 +508,8 @@ b32 is_type_proc(Type *t) {
 }
 Type *base_vector_type(Type *t) {
 	if (is_type_vector(t)) {
-		return base_type(t)->Vector.elem;
+		t = base_type(t);
+		return t->Vector.elem;
 	}
 	return t;
 }

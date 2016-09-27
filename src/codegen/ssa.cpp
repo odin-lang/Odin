@@ -1023,9 +1023,7 @@ void ssa_emit_defer_stmts(ssaProcedure *proc, ssaDeferExitKind kind, ssaBlock *b
 	isize i = count;
 	while (i --> 0) {
 		ssaDefer d = proc->defer_stmts[i];
-		if (kind == ssaDeferExit_Return) {
-			ssa_build_defer_stmt(proc, d);
-		} else if (kind == ssaDeferExit_Default) {
+		if (kind == ssaDeferExit_Default) {
 			if (proc->scope_index == d.scope_index &&
 			    d.scope_index > 1) {
 				ssa_build_defer_stmt(proc, d);
@@ -1034,6 +1032,8 @@ void ssa_emit_defer_stmts(ssaProcedure *proc, ssaDeferExitKind kind, ssaBlock *b
 			} else {
 				break;
 			}
+		} else if (kind == ssaDeferExit_Return) {
+			ssa_build_defer_stmt(proc, d);
 		} else if (kind == ssaDeferExit_Branch) {
 			GB_ASSERT(block != NULL);
 			isize lower_limit = block->scope_index+1;
@@ -1042,6 +1042,17 @@ void ssa_emit_defer_stmts(ssaProcedure *proc, ssaDeferExitKind kind, ssaBlock *b
 			}
 		}
 	}
+}
+
+void ssa_open_scope(ssaProcedure *proc) {
+	proc->scope_index++;
+}
+
+
+void ssa_close_scope(ssaProcedure *proc, ssaDeferExitKind kind, ssaBlock *block) {
+	ssa_emit_defer_stmts(proc, kind, block);
+	GB_ASSERT(proc->scope_index > 0);
+	proc->scope_index--;
 }
 
 
@@ -2985,8 +2996,9 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 void ssa_build_assign_op(ssaProcedure *proc, ssaAddr lhs, ssaValue *value, Token op) {
 	ssaValue *old_value = ssa_lvalue_load(proc, lhs);
-	ssaValue *change = ssa_emit_conv(proc, value, ssa_type(old_value));
-	ssaValue *new_value = ssa_emit_arith(proc, op, old_value, change, ssa_type(old_value));
+	Type *type = ssa_type(old_value);
+	ssaValue *change = ssa_emit_conv(proc, value, type);
+	ssaValue *new_value = ssa_emit_arith(proc, op, old_value, change, type);
 	ssa_lvalue_store(proc, lhs, new_value);
 }
 
@@ -3112,35 +3124,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
 		defer (gb_temp_arena_memory_end(tmp));
 
-		if (gb_array_count(vd->names) == gb_array_count(vd->values)) { // 1:1 assigment
-			gbArray(ssaAddr)  lvals;
-			gbArray(ssaValue *) inits;
-			gb_array_init_reserve(lvals, m->tmp_allocator, gb_array_count(vd->names));
-			gb_array_init_reserve(inits, m->tmp_allocator, gb_array_count(vd->names));
-
-			gb_for_array(i, vd->names) {
-				AstNode *name = vd->names[i];
-				ssaAddr lval = ssa_make_addr(NULL, NULL);
-				if (!ssa_is_blank_ident(name)) {
-					ssa_add_local_for_identifier(proc, name, false);
-					lval = ssa_build_addr(proc, name);
-					GB_ASSERT(lval.addr != NULL);
-				}
-
-				gb_array_append(lvals, lval);
-			}
-			gb_for_array(i, vd->values) {
-				ssaValue *init = ssa_build_expr(proc, vd->values[i]);
-				gb_array_append(inits, init);
-			}
-
-
-			gb_for_array(i, inits) {
-				ssaValue *v = ssa_emit_conv(proc, inits[i], ssa_addr_type(lvals[i]));
-				ssa_lvalue_store(proc, lvals[i], v);
-			}
-
-		} else if (gb_array_count(vd->values) == 0) { // declared and zero-initialized
+		if (gb_array_count(vd->values) == 0) { // declared and zero-initialized
 			gb_for_array(i, vd->names) {
 				AstNode *name = vd->names[i];
 				if (!ssa_is_blank_ident(name)) {
@@ -3372,17 +3356,17 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 	case_end;
 
 	case_ast_node(bs, BlockStmt, node);
-		proc->scope_index++;
+		ssa_open_scope(proc);
 		ssa_build_stmt_list(proc, bs->stmts);
-		ssa_emit_defer_stmts(proc, ssaDeferExit_Default, NULL);
-		proc->scope_index--;
+		ssa_close_scope(proc, ssaDeferExit_Default, NULL);
 	case_end;
 
 	case_ast_node(ds, DeferStmt, node);
 		ssa_emit_comment(proc, make_string("DeferStmt"));
 		isize scope_index = proc->scope_index;
-		if (ds->stmt->kind == AstNode_BlockStmt)
+		if (ds->stmt->kind == AstNode_BlockStmt) {
 			scope_index--;
+		}
 		ssa_add_defer_node(proc, scope_index, ds->stmt);
 	case_end;
 
@@ -3391,7 +3375,12 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		ssaValue *v = NULL;
 		auto *return_type_tuple  = &proc->type->Proc.results->Tuple;
 		isize return_count = proc->type->Proc.result_count;
-		if (gb_array_count(rs->results) < return_count) {
+		if (return_count == 0) {
+			// No return values
+		} else if (return_count == 1) {
+			Entity *e = return_type_tuple->variables[0];
+			v = ssa_emit_conv(proc, ssa_build_expr(proc, rs->results[0]), e->type);
+		} else {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
 			defer (gb_temp_arena_memory_end(tmp));
 
@@ -3423,22 +3412,6 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 			v = ssa_emit_load(proc, v);
 
-		} else if (return_count == 1) {
-			Entity *e = return_type_tuple->variables[0];
-			v = ssa_emit_conv(proc, ssa_build_expr(proc, rs->results[0]), e->type);
-		} else if (return_count == 0) {
-			// No return values
-		} else {
-			// 1:1 multiple return values
-			Type *ret_type = proc->type->Proc.results;
-			v = ssa_add_local_generated(proc, ret_type);
-			gb_for_array(i, rs->results) {
-				Entity *e = return_type_tuple->variables[i];
-				ssaValue *res = ssa_emit_conv(proc, ssa_build_expr(proc, rs->results[i]), e->type);
-				ssaValue *field = ssa_emit_struct_gep(proc, v, i, make_type_pointer(proc->module->allocator, e->type));
-				ssa_emit_store(proc, field, res);
-			}
-			v = ssa_emit_load(proc, v);
 		}
 		ssa_emit_ret(proc, v);
 
@@ -3462,20 +3435,18 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		ssa_build_cond(proc, is->cond, then, else_);
 		proc->curr_block = then;
 
-		proc->scope_index++;
+		ssa_open_scope(proc);
 		ssa_build_stmt(proc, is->body);
-		ssa_emit_defer_stmts(proc, ssaDeferExit_Default, NULL);
-		proc->scope_index--;
+		ssa_close_scope(proc, ssaDeferExit_Default, NULL);
 
 		ssa_emit_jump(proc, done);
 
 		if (is->else_stmt != NULL) {
 			proc->curr_block = else_;
 
-			proc->scope_index++;
+			ssa_open_scope(proc);
 			ssa_build_stmt(proc, is->else_stmt);
-			ssa_emit_defer_stmts(proc, ssaDeferExit_Default, NULL);
-			proc->scope_index--;
+			ssa_close_scope(proc, ssaDeferExit_Default, NULL);
 
 			ssa_emit_jump(proc, done);
 		}
@@ -3513,10 +3484,9 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 		ssa_push_target_list(proc, done, cont, NULL);
 
-		proc->scope_index++;
+		ssa_open_scope(proc);
 		ssa_build_stmt(proc, fs->body);
-		ssa_emit_defer_stmts(proc, ssaDeferExit_Default, NULL);
-		proc->scope_index--;
+		ssa_close_scope(proc, ssaDeferExit_Default, NULL);
 
 		ssa_pop_target_list(proc);
 		ssa_emit_jump(proc, cont);
@@ -3606,13 +3576,11 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			}
 			proc->curr_block = body;
 
-			// TODO(bill): Handle fallthrough scope exit correctly
-			proc->scope_index++;
 			ssa_push_target_list(proc, done, NULL, fall);
+			ssa_open_scope(proc);
 			ssa_build_stmt_list(proc, cc->stmts);
-			ssa_emit_defer_stmts(proc, ssaDeferExit_Default, body);
+			ssa_close_scope(proc, ssaDeferExit_Default, body);
 			ssa_pop_target_list(proc);
-			proc->scope_index--;
 
 			ssa_emit_jump(proc, done);
 			proc->curr_block = next_cond;
@@ -3623,13 +3591,11 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			gb_array_append(proc->blocks, default_block);
 			proc->curr_block = default_block;
 
-			// TODO(bill): Handle fallthrough scope exit correctly
-			proc->scope_index++;
 			ssa_push_target_list(proc, done, NULL, default_fall);
+			ssa_open_scope(proc);
 			ssa_build_stmt_list(proc, default_stmts);
-			ssa_emit_defer_stmts(proc, ssaDeferExit_Default, default_block);
+			ssa_close_scope(proc, ssaDeferExit_Default, default_block);
 			ssa_pop_target_list(proc);
-			proc->scope_index--;
 		}
 
 		ssa_emit_jump(proc, done);
@@ -3681,7 +3647,6 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 			ssaBlock *body = ssa__make_block(proc, clause, make_string("type-match.case.body"));
 
-
 			Scope *scope = *map_get(&proc->module->info->scopes, hash_pointer(clause));
 			Entity *tag_var_entity = current_scope_lookup_entity(scope, tag_var_name);
 			GB_ASSERT_MSG(tag_var_entity != NULL, "%.*s", LIT(tag_var_name));
@@ -3714,12 +3679,11 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			gb_array_append(proc->blocks, body);
 			proc->curr_block = body;
 
-			proc->scope_index++;
 			ssa_push_target_list(proc, done, NULL, NULL);
+			ssa_open_scope(proc);
 			ssa_build_stmt_list(proc, cc->stmts);
-			ssa_emit_defer_stmts(proc, ssaDeferExit_Default, body);
+			ssa_close_scope(proc, ssaDeferExit_Default, body);
 			ssa_pop_target_list(proc);
-			proc->scope_index--;
 
 			ssa_emit_jump(proc, done);
 			proc->curr_block = next_cond;
@@ -3730,12 +3694,11 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			gb_array_append(proc->blocks, default_block);
 			proc->curr_block = default_block;
 
-			proc->scope_index++;
 			ssa_push_target_list(proc, done, NULL, NULL);
+			ssa_open_scope(proc);
 			ssa_build_stmt_list(proc, default_stmts);
-			ssa_emit_defer_stmts(proc, ssaDeferExit_Default, default_block);
+			ssa_close_scope(proc, ssaDeferExit_Default, default_block);
 			ssa_pop_target_list(proc);
-			proc->scope_index--;
 		}
 
 		ssa_emit_jump(proc, done);
@@ -3780,8 +3743,8 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 	case_ast_node(pa, PushAllocator, node);
 		ssa_emit_comment(proc, make_string("PushAllocator"));
-		proc->scope_index++;
-		defer (proc->scope_index--);
+		ssa_open_scope(proc);
+		defer (ssa_close_scope(proc, ssaDeferExit_Default, NULL));
 
 		ssaValue *context_ptr = *map_get(&proc->module->members, hash_string(make_string("__context")));
 		ssaValue *prev_context = ssa_add_local_generated(proc, t_context);
@@ -3793,14 +3756,14 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		ssa_emit_store(proc, gep, ssa_build_expr(proc, pa->expr));
 
 		ssa_build_stmt(proc, pa->body);
-		ssa_emit_defer_stmts(proc, ssaDeferExit_Default, NULL);
+
 	case_end;
 
 
 	case_ast_node(pa, PushContext, node);
 		ssa_emit_comment(proc, make_string("PushContext"));
-		proc->scope_index++;
-		defer (proc->scope_index--);
+		ssa_open_scope(proc);
+		defer (ssa_close_scope(proc, ssaDeferExit_Default, NULL));
 
 		ssaValue *context_ptr = *map_get(&proc->module->members, hash_string(make_string("__context")));
 		ssaValue *prev_context = ssa_add_local_generated(proc, t_context);
@@ -3811,7 +3774,6 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		ssa_emit_store(proc, context_ptr, ssa_build_expr(proc, pa->expr));
 
 		ssa_build_stmt(proc, pa->body);
-		ssa_emit_defer_stmts(proc, ssaDeferExit_Default, NULL);
 	case_end;
 
 

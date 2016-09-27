@@ -447,7 +447,10 @@ void add_dependency(DeclInfo *d, Entity *e) {
 }
 
 void add_declaration_dependency(Checker *c, Entity *e) {
-	if (c->context.decl) {
+	if (e == NULL) {
+		return;
+	}
+	if (c->context.decl != NULL) {
 		auto found = map_get(&c->info.entities, hash_pointer(e));
 		if (found) {
 			add_dependency(c->context.decl, e);
