@@ -106,7 +106,6 @@ ArchData make_arch_data(ArchKind kind) {
 	return data;
 }
 
-
 int main(int argc, char **argv) {
 	if (argc < 2) {
 		gb_printf_err("using: %s [run] <filename> \n", argv[0]);

@@ -1,4 +1,6 @@
 #import "os.odin"
+#import "mem.odin"
+#import "utf8.odin"
 
 PRINT_BUF_SIZE :: 1<<12
 
@@ -49,7 +51,7 @@ print_byte_buffer :: proc(buf: ^[]byte, b: []byte) {
 		n := min(buf.capacity-buf.count, b.count)
 		if n > 0 {
 			offset := ptr_offset(buf.data, buf.count)
-			memory_copy(offset, ^b[0], n)
+			mem.copy(offset, ^b[0], n)
 			buf.count += n
 		}
 	}
@@ -67,42 +69,8 @@ byte_reverse :: proc(b: []byte) {
 	}
 }
 
-encode_rune :: proc(r: rune) -> ([4]byte, int) {
-	buf: [4]byte
-	i := r as u32
-	mask: byte : 0x3f
-	if i <= 1<<7-1 {
-		buf[0] = r as byte
-		return buf, 1
-	}
-	if i <= 1<<11-1 {
-		buf[0] = 0xc0 | (r>>6) as byte
-		buf[1] = 0x80 | (r)    as byte & mask
-		return buf, 2
-	}
-
-	// Invalid or Surrogate range
-	if i > 0x0010ffff ||
-	   (i >= 0xd800 && i <= 0xdfff) {
-		r = 0xfffd
-	}
-
-	if i <= 1<<16-1 {
-		buf[0] = 0xe0 | (r>>12) as byte
-		buf[1] = 0x80 | (r>>6)  as byte & mask
-		buf[2] = 0x80 | (r)     as byte & mask
-		return buf, 3
-	}
-
-	buf[0] = 0xf0 | (r>>18) as byte
-	buf[1] = 0x80 | (r>>12) as byte & mask
-	buf[2] = 0x80 | (r>>6)  as byte & mask
-	buf[3] = 0x80 | (r)     as byte & mask
-	return buf, 4
-}
-
 print_rune_to_buffer :: proc(buf: ^[]byte, r: rune) {
-	b, n := encode_rune(r)
+	b, n := utf8.encode_rune(r)
 	print_string_to_buffer(buf, b[:n] as string)
 }
 
@@ -177,6 +145,29 @@ print_pointer_to_buffer :: proc(buffer: ^[]byte, p: rawptr) #inline {
 
 print_f32_to_buffer :: proc(buffer: ^[]byte, f: f32) #inline { print__f64(buffer, f as f64, 7) }
 print_f64_to_buffer :: proc(buffer: ^[]byte, f: f64) #inline { print__f64(buffer, f, 10) }
+print_u64_to_buffer :: proc(buffer: ^[]byte, i: u64) {
+	buf: [22]byte
+	len := 0
+	if i == 0 {
+		buf[len] = #rune "0"
+		len++
+	}
+	for i > 0 {
+		buf[len] = __NUM_TO_CHAR_TABLE[i % 10]
+		len++
+		i /= 10
+	}
+	byte_reverse(buf[:len])
+	print_string_to_buffer(buffer, buf[:len] as string)
+}
+print_i64_to_buffer :: proc(buffer: ^[]byte, i: i64) {
+	neg := i < 0
+	if neg {
+		i = -i
+	}
+	print_rune_to_buffer(buffer, #rune "-")
+	print_u64_to_buffer(buffer, i as u64)
+}
 
 print__f64 :: proc(buffer: ^[]byte, f: f64, decimal_places: int) {
 	if f == 0 {
@@ -186,22 +177,6 @@ print__f64 :: proc(buffer: ^[]byte, f: f64, decimal_places: int) {
 	if f < 0 {
 		print_rune_to_buffer(buffer, #rune "-")
 		f = -f
-	}
-
-	print_u64_to_buffer :: proc(buffer: ^[]byte, i: u64) {
-		buf: [22]byte
-		len := 0
-		if i == 0 {
-			buf[len] = #rune "0"
-			len++
-		}
-		for i > 0 {
-			buf[len] = __NUM_TO_CHAR_TABLE[i % 10]
-			len++
-			i /= 10
-		}
-		byte_reverse(buf[:len])
-		print_string_to_buffer(buffer, buf[:len] as string)
 	}
 
 	i := f as u64
@@ -374,27 +349,27 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 
 	case Integer:
 		if info.signed {
-			i: int = 0;
+			i: i64 = 0;
 			if arg.data != null {
 				match info.size {
-				case 1:  i = (arg.data as ^i8)^   as int
-				case 2:  i = (arg.data as ^i16)^  as int
-				case 4:  i = (arg.data as ^i32)^  as int
-				case 8:  i = (arg.data as ^i64)^  as int
+				case 1:  i = (arg.data as ^i8)^   as i64
+				case 2:  i = (arg.data as ^i16)^  as i64
+				case 4:  i = (arg.data as ^i32)^  as i64
+				case 8:  i = (arg.data as ^i64)^  as i64
 				}
 			}
-			print_int_to_buffer(buf, i)
+			print_i64_to_buffer(buf, i)
 		} else {
-			i: uint = 0;
+			i: u64 = 0;
 			if arg.data != null {
 				match info.size {
-				case 1:  i = (arg.data as ^u8)^   as uint
-				case 2:  i = (arg.data as ^u16)^  as uint
-				case 4:  i = (arg.data as ^u32)^  as uint
-				case 8:  i = (arg.data as ^u64)^  as uint
+				case 1:  i = (arg.data as ^u8)^   as u64
+				case 2:  i = (arg.data as ^u16)^  as u64
+				case 4:  i = (arg.data as ^u32)^  as u64
+				case 8:  i = (arg.data as ^u64)^  as u64
 				}
 			}
-			print_uint_to_buffer(buf, i)
+			print_u64_to_buffer(buf, i)
 		}
 
 	case Float:

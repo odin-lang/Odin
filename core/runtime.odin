@@ -16,11 +16,13 @@ Type_Info :: union {
 		fields:  []Member
 		packed:  bool
 		ordered: bool
+		size:    int
+		align:   int
 	}
 
 	Named: struct #ordered {
 		name: string
-		base: ^Type_Info
+		base: ^Type_Info // This will _not_ be a Type_Info.Named
 	}
 	Integer: struct #ordered {
 		size:   int // in bytes
@@ -68,15 +70,11 @@ type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 	if info == null {
 		return null
 	}
-	for {
-		match type i : info {
-		case Type_Info.Named:
-			info = i.base
-			continue
-		}
-
-		return info
+	match type i : info {
+	case Type_Info.Named:
+		info = i.base
 	}
+	return info
 }
 
 
@@ -97,35 +95,6 @@ byte_swap64 :: proc(b: u64) -> u64 #foreign "llvm.bswap.i64"
 
 fmuladd32 :: proc(a, b, c: f32) -> f32 #foreign "llvm.fmuladd.f32"
 fmuladd64 :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
-
-current_thread_id :: proc() -> int {
-	GetCurrentThreadId :: proc() -> u32 #foreign #dll_import
-	return GetCurrentThreadId() as int
-}
-
-memory_zero :: proc(data: rawptr, len: int) {
-	llvm_memset_64bit :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) #foreign "llvm.memset.p0i8.i64"
-	llvm_memset_64bit(data, 0, len, 1, false)
-}
-
-memory_compare :: proc(dst, src: rawptr, len: int) -> int {
-	// TODO(bill): make a faster `memory_compare`
-	a := slice_ptr(dst as ^byte, len)
-	b := slice_ptr(src as ^byte, len)
-	for i := 0; i < len; i++ {
-		if a[i] != b[i] {
-			return (a[i] - b[i]) as int
-		}
-	}
-	return 0
-}
-
-memory_copy :: proc(dst, src: rawptr, len: int) #inline {
-	// NOTE(bill): This _must_ implemented like C's memmove
-	llvm_memmove_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memmove.p0i8.p0i8.i64"
-	llvm_memmove_64bit(dst, src, len, 1, false)
-}
-
 
 
 
@@ -177,7 +146,7 @@ __check_context :: proc() {
 		c.allocator = __default_allocator()
 	}
 	if c.thread_id == 0 {
-		c.thread_id = current_thread_id()
+		c.thread_id = os.current_thread_id()
 	}
 }
 
@@ -230,7 +199,7 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 		return null
 	}
 
-	memory_copy(new_memory, old_memory, min(old_size, new_size));
+	mem.copy(new_memory, old_memory, min(old_size, new_size));
 	free(old_memory)
 	return new_memory
 }
@@ -247,21 +216,22 @@ __default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
 		header := ptr as ^mem.AllocationHeader
 		ptr = mem.align_forward(ptr_offset(header, 1), alignment)
 		mem.allocation_header_fill(header, ptr, size)
-		memory_zero(ptr, size)
-		return ptr
+		return mem.zero(ptr, size)
+
 	case FREE:
 		os.heap_free(mem.allocation_header(old_memory))
 		return null
+
 	case FREE_ALL:
 		// NOTE(bill): Does nothing
+
 	case RESIZE:
 		total_size := size + alignment + size_of(mem.AllocationHeader)
 		ptr := os.heap_resize(mem.allocation_header(old_memory), total_size)
 		header := ptr as ^mem.AllocationHeader
 		ptr = mem.align_forward(ptr_offset(header, 1), alignment)
 		mem.allocation_header_fill(header, ptr, size)
-		memory_zero(ptr, size)
-		return ptr
+		return mem.zero(ptr, size)
 	}
 
 	return null
@@ -291,41 +261,11 @@ __string_eq :: proc(a, b: string) -> bool {
 	if ^a[0] == ^b[0] {
 		return true
 	}
-	return memory_compare(^a[0], ^b[0], a.count) == 0
+	return mem.compare(^a[0], ^b[0], a.count) == 0
 }
 
 __string_cmp :: proc(a, b : string) -> int {
-	// Translation of http://mgronhol.github.io/fast-strcmp/
-	n := min(a.count, b.count)
-
-	fast := n/size_of(int) + 1
-	offset := (fast-1)*size_of(int)
-	curr_block := 0
-	if n <= size_of(int) {
-		fast = 0
-	}
-
-	la := slice_ptr(^a[0] as ^int, fast)
-	lb := slice_ptr(^b[0] as ^int, fast)
-
-	for ; curr_block < fast; curr_block++ {
-		if (la[curr_block] ~ lb[curr_block]) != 0 {
-			for pos := curr_block*size_of(int); pos < n; pos++ {
-				if (a[pos] ~ b[pos]) != 0 {
-					return a[pos] as int - b[pos] as int
-				}
-			}
-		}
-
-	}
-
-	for ; offset < n; offset++ {
-		if (a[offset] ~ b[offset]) != 0 {
-			return a[offset] as int - b[offset] as int
-		}
-	}
-
-	return 0
+	return mem.compare(a.data, b.data, min(a.count, b.count))
 }
 
 __string_ne :: proc(a, b : string) -> bool #inline { return !__string_eq(a, b) }

@@ -352,17 +352,15 @@ void ssa_gen_tree(ssaGen *s) {
 					case Basic_i16:
 					case Basic_i32:
 					case Basic_i64:
-					// case Basic_i128:
 					case Basic_u8:
 					case Basic_u16:
 					case Basic_u32:
 					case Basic_u64:
-					// case Basic_u128:
 					case Basic_int:
 					case Basic_uint: {
 						tag = ssa_add_local_generated(proc, t_type_info_integer);
-						b32 is_unsigned = (basic_types[t->Basic.kind].flags & BasicFlag_Unsigned) != 0;
-						ssaValue *bits      = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
+						b32 is_unsigned = (t->Basic.flags & BasicFlag_Unsigned) != 0;
+						ssaValue *bits = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
 						ssaValue *is_signed = ssa_make_const_bool(a, !is_unsigned);
 						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_int_ptr),  bits);
 						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_one32,  t_bool_ptr), is_signed);
@@ -434,8 +432,12 @@ void ssa_gen_tree(ssaGen *s) {
 						{
 							ssaValue *packed  = ssa_make_const_bool(a, t->Record.struct_is_packed);
 							ssaValue *ordered = ssa_make_const_bool(a, t->Record.struct_is_ordered);
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_one32, t_bool_ptr), packed);
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_two32, t_bool_ptr), ordered);
+							ssaValue *size    = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
+							ssaValue *align   = ssa_make_const_int(a, type_align_of(m->sizes, a, t));
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 1, t_bool_ptr), packed);
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 2, t_bool_ptr), ordered);
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 3, t_int_ptr),  size);
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 4, t_int_ptr),  align);
 						}
 
 						ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Record.field_count, &type_info_member_index);
@@ -476,9 +478,21 @@ void ssa_gen_tree(ssaGen *s) {
 					} break;
 					case TypeRecord_Union:
 						tag = ssa_add_local_generated(proc, t_type_info_union);
+						{
+							ssaValue *size    = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
+							ssaValue *align   = ssa_make_const_int(a, type_align_of(m->sizes, a, t));
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 3, t_int_ptr),  size);
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 4, t_int_ptr),  align);
+						}
 						break;
 					case TypeRecord_RawUnion: {
 						tag = ssa_add_local_generated(proc, t_type_info_raw_union);
+						{
+							ssaValue *size    = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
+							ssaValue *align   = ssa_make_const_int(a, type_align_of(m->sizes, a, t));
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 3, t_int_ptr),  size);
+							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 4, t_int_ptr),  align);
+						}
 
 						ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Record.field_count, &type_info_member_index);
 
@@ -589,6 +603,11 @@ void ssa_gen_tree(ssaGen *s) {
 
 				case Type_Tuple: {
 					tag = ssa_add_local_generated(proc, t_type_info_tuple);
+
+					{
+						ssaValue *align   = ssa_make_const_int(a, type_align_of(m->sizes, a, t));
+						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 4, t_int_ptr),  align);
+					}
 
 					ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Tuple.variable_count, &type_info_member_index);
 

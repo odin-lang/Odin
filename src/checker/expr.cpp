@@ -1200,6 +1200,7 @@ b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exac
 			return false;
 		if (out_value) *out_value = v;
 		i64 i = v.value_integer;
+		u64 u = *cast(u64 *)&i;
 		i64 s = 8*type_size_of(c->sizes, c->allocator, type);
 		u64 umax = ~0ull;
 		if (s < 64) {
@@ -1221,7 +1222,7 @@ b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exac
 		case Basic_u32:
 		case Basic_u64:
 		case Basic_uint:
-			return !(i < 0 || cast(u64)i > umax);
+			return !(u < 0 || u > umax);
 
 		case Basic_UntypedInteger:
 			return true;

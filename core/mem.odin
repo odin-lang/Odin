@@ -1,6 +1,67 @@
 #import "fmt.odin"
 #import "os.odin"
 
+set :: proc(data: rawptr, value: i32, len: int) -> rawptr #link_name "__mem_set" {
+	llvm_memset_64bit :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) #foreign "llvm.memset.p0i8.i64"
+	llvm_memset_64bit(data, value as byte, len, 1, false)
+	return data
+}
+
+zero :: proc(data: rawptr, len: int) -> rawptr {
+	return set(data, 0, len)
+}
+
+copy :: proc(dst, src: rawptr, len: int) -> rawptr #link_name "__mem_copy" {
+	// NOTE(bill): This _must_ implemented like C's memmove
+	llvm_memmove_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memmove.p0i8.p0i8.i64"
+	llvm_memmove_64bit(dst, src, len, 1, false)
+	return dst
+}
+
+copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #link_name "__mem_copy_non_overlapping" {
+	// NOTE(bill): This _must_ implemented like C's memcpy
+	llvm_memcpy_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memcpy.p0i8.p0i8.i64"
+	llvm_memcpy_64bit(dst, src, len, 1, false)
+	return dst
+}
+
+
+compare :: proc(dst, src: rawptr, n: int) -> int #link_name "__mem_compare" {
+	// Translation of http://mgronhol.github.io/fast-strcmp/
+	a := slice_ptr(dst as ^byte, n)
+	b := slice_ptr(src as ^byte, n)
+
+	fast := n/size_of(int) + 1
+	offset := (fast-1)*size_of(int)
+	curr_block := 0
+	if n <= size_of(int) {
+		fast = 0
+	}
+
+	la := slice_ptr(^a[0] as ^int, fast)
+	lb := slice_ptr(^b[0] as ^int, fast)
+
+	for ; curr_block < fast; curr_block++ {
+		if (la[curr_block] ~ lb[curr_block]) != 0 {
+			for pos := curr_block*size_of(int); pos < n; pos++ {
+				if (a[pos] ~ b[pos]) != 0 {
+					return a[pos] as int - b[pos] as int
+				}
+			}
+		}
+
+	}
+
+	for ; offset < n; offset++ {
+		if (a[offset] ~ b[offset]) != 0 {
+			return a[offset] as int - b[offset] as int
+		}
+	}
+
+	return 0
+}
+
+
 
 kilobytes :: proc(x: int) -> int #inline { return          (x) * 1024 }
 megabytes :: proc(x: int) -> int #inline { return kilobytes(x) * 1024 }
@@ -116,8 +177,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
 
 		ptr := align_forward(end, alignment)
 		arena.memory.count += total_size
-		memory_zero(ptr, size)
-		return ptr
+		return zero(ptr, size)
 
 	case FREE:
 		// NOTE(bill): Free all at once

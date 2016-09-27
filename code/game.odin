@@ -1,6 +1,7 @@
 #import "win32.odin"
 #import "fmt.odin"
 #import "math.odin"
+#import "os.odin"
 #import "opengl.odin" as gl
 
 TWO_HEARTS :: #rune "💕"
@@ -128,7 +129,7 @@ run :: proc() {
 
 	win32_proc :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #no_inline {
 		if msg == WM_DESTROY || msg == WM_CLOSE || msg == WM_QUIT {
-			ExitProcess(0)
+			os.exit(0)
 			return 0
 		}
 		return DefWindowProcA(hwnd, msg, wparam, lparam)

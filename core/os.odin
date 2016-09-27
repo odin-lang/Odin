@@ -115,3 +115,16 @@ heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 heap_free :: proc(ptr: rawptr) {
 	win32.HeapFree(win32.GetProcessHeap(), 0, ptr)
 }
+
+
+exit :: proc(code: int) {
+	win32.ExitProcess(code as u32)
+}
+
+
+
+current_thread_id :: proc() -> int {
+	GetCurrentThreadId :: proc() -> u32 #foreign #dll_import
+	return GetCurrentThreadId() as int
+}
+

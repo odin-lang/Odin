@@ -1017,10 +1017,14 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				auto *tuple = &proc_type->Proc.results->Tuple;
 				variables = tuple->variables;
 			}
-			check_init_variables(c, variables, result_count,
-			                     rs->results, make_string("return statement"));
+			if (gb_array_count(rs->results) == 0) {
+				error(ast_node_token(node), "Expected %td return values, got 0", result_count);
+			} else {
+				check_init_variables(c, variables, result_count,
+				                     rs->results, make_string("return statement"));
+			}
 		} else if (gb_array_count(rs->results) > 0) {
-			error(ast_node_token(rs->results[0]), "No result values expected");
+			error(ast_node_token(rs->results[0]), "No return values expected");
 		}
 	case_end;
 

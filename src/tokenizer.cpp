@@ -770,7 +770,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 				isize comment_scope = 1;
 				advance_to_next_rune(t);
 				while (comment_scope > 0) {
-					if (curr_rune == '/') {
+					if (t->curr_rune == '/') {
 						advance_to_next_rune(t);
 						if (t->curr_rune == '*') {
 							advance_to_next_rune(t);

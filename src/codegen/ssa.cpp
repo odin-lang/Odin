@@ -2369,7 +2369,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					args[1] = src;
 					args[2] = byte_count;
 
-					ssa_emit_global_call(proc, "memory_copy", args, 3);
+					ssa_emit_global_call(proc, "__mem_copy", args, 3);
 
 					return len;
 				} break;
@@ -2418,7 +2418,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					args[1] = item;
 					args[2] = byte_count;
 
-					ssa_emit_global_call(proc, "memory_copy", args, 3);
+					ssa_emit_global_call(proc, "__mem_copy", args, 3);
 
 					// Increment slice length
 					Token add = {Token_Add};
