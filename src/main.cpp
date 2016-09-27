@@ -1,4 +1,4 @@
-#define DISPLAY_TIMING
+// #define DISPLAY_TIMING
 
 #include "common.cpp"
 #include "unicode.cpp"
