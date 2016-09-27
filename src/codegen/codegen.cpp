@@ -116,6 +116,10 @@ void ssa_gen_tree(ssaGen *s) {
 		DeclInfo *decl = entry->value;
 		Scope *scope = e->scope;
 
+		if (!scope->is_file) {
+			continue;
+		}
+
 		if (entry_point != NULL) {
 			auto found = map_get(&min_dep_map, hash_pointer(e));
 			if (found == NULL) {
