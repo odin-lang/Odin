@@ -487,6 +487,10 @@ b32 is_type_u8(Type *t) {
 	}
 	return false;
 }
+b32 is_type_array(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_Array;
+}
 b32 is_type_slice(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Slice;
@@ -543,6 +547,11 @@ Type *get_enum_base_type(Type *t) {
 b32 is_type_any(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_any);
+}
+
+
+b32 is_type_indexable(Type *t) {
+	return is_type_array(t) || is_type_slice(t) || is_type_vector(t) || is_type_string(t);
 }
 
 

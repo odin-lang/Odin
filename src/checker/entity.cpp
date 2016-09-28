@@ -129,6 +129,7 @@ Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, 
 	entity->Variable.field_index = field_index;
 	entity->Variable.is_field  = true;
 	entity->Variable.anonymous = cast(b8)is_anonymous;
+	entity->Variable.is_using = cast(b8)is_anonymous;
 	return entity;
 }
 

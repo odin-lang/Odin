@@ -224,6 +224,8 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 
 	isize other_field_index = 0;
 
+	Entity *using_index_expr = NULL;
+
 
 	// TODO(bill): Random declarations with DeclInfo
 #if 0
@@ -365,6 +367,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 				Token name_token = name->Ident;
 
 				Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, vd->is_using, cast(i32)field_index);
+				e->identifier = name;
 				if (name_token.string == "_") {
 					fields[field_index++] = e;
 				} else {
@@ -386,8 +389,30 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 				Type *t = base_type(type_deref(type));
 				if (!is_type_struct(t) && !is_type_raw_union(t)) {
 					Token name_token = vd->names[0]->Ident;
-					error(name_token, "`using` on a field `%.*s` must be a type", LIT(name_token.string));
-					continue;
+					if (is_type_indexable(t)) {
+						b32 ok = true;
+						gb_for_array(emi, entity_map.entries) {
+							Entity *e = entity_map.entries[emi].value;
+							if (e->kind == Entity_Variable && e->Variable.anonymous) {
+								if (is_type_indexable(e->type)) {
+									if (e->identifier != vd->names[0]) {
+										ok = false;
+										using_index_expr = e;
+										break;
+									}
+								}
+							}
+						}
+						if (ok) {
+							using_index_expr = fields[field_index-1];
+						} else {
+							fields[field_index-1]->Variable.anonymous = false;
+							error(name_token, "Previous `using` for an index expression `%.*s`", LIT(name_token.string));
+						}
+					} else {
+						error(name_token, "`using` on a field `%.*s` must be a `struct` or `raw_union`", LIT(name_token.string));
+						continue;
+					}
 				}
 
 				populate_using_entity_map(c, node, type, &entity_map);
@@ -3080,6 +3105,28 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 }
 
 
+Entity *find_using_index_expr(Type *t) {
+	t = base_type(t);
+	if (t->kind != Type_Record) {
+		return NULL;
+	}
+
+	for (isize i = 0; i < t->Record.field_count; i++) {
+		Entity *f = t->Record.fields[i];
+		if (f->kind == Entity_Variable &&
+		    f->Variable.is_field && f->Variable.anonymous) {
+			if (is_type_indexable(f->type)) {
+				return f;
+			}
+			Entity *res = find_using_index_expr(f->type);
+			if (res != NULL) {
+				return res;
+			}
+		}
+	}
+	return NULL;
+}
+
 ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	GB_ASSERT(call->kind == AstNode_CallExpr);
 	ast_node(ce, CallExpr, call);
@@ -3428,54 +3475,58 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			goto error;
 		}
 
-		b32 valid = false;
-		i64 max_count = -1;
-		Type *t = base_type(o->type);
-		switch (t->kind) {
-		case Type_Basic:
-			if (is_type_string(t)) {
-				valid = true;
-				if (o->mode == Addressing_Constant) {
-					max_count = o->value.value_string.len;
+		Type *t = base_type(type_deref(o->type));
+
+		auto set_index_data = [](Operand *o, Type *t, i64 *max_count) -> b32 {
+			t = base_type(type_deref(t));
+
+			switch (t->kind) {
+			case Type_Basic:
+				if (is_type_string(t)) {
+					if (o->mode == Addressing_Constant) {
+						*max_count = o->value.value_string.len;
+					}
+					if (o->mode != Addressing_Variable)
+						o->mode = Addressing_Value;
+					o->type = t_u8;
+					return true;
 				}
-				if (o->mode != Addressing_Variable)
+				break;
+
+			case Type_Array:
+				*max_count = t->Array.count;
+				if (o->mode != Addressing_Variable) {
 					o->mode = Addressing_Value;
-				o->type = t_u8;
-			}
-			break;
+				}
+				o->type = t->Array.elem;
+				return true;
 
-		case Type_Array:
-			valid = true;
-			max_count = t->Array.count;
-			if (o->mode != Addressing_Variable)
-				o->mode = Addressing_Value;
-			o->type = t->Array.elem;
-			break;
-
-		case Type_Vector:
-			valid = true;
-			max_count = t->Vector.count;
-			if (o->mode != Addressing_Variable)
-				o->mode = Addressing_Value;
-			o->type = t->Vector.elem;
-			break;
+			case Type_Vector:
+				*max_count = t->Vector.count;
+				if (o->mode != Addressing_Variable) {
+					o->mode = Addressing_Value;
+				}
+				o->type = t->Vector.elem;
+				return true;
 
 
-		case Type_Slice:
-			valid = true;
-			o->type = t->Slice.elem;
-			o->mode = Addressing_Variable;
-			break;
-
-		case Type_Pointer: {
-			Type *bt = base_type(t->Pointer.elem);
-			if (bt->kind == Type_Array) {
-				valid = true;
-				max_count = bt->Array.count;
+			case Type_Slice:
+				o->type = t->Slice.elem;
 				o->mode = Addressing_Variable;
-				o->type = bt->Array.elem;
+				return true;
 			}
-		} break;
+
+			return false;
+		};
+
+		i64 max_count = -1;
+		b32 valid = set_index_data(o, t, &max_count);
+
+		if (!valid && (is_type_struct(t) || is_type_raw_union(t))) {
+			Entity *found = find_using_index_expr(t);
+			if (found != NULL) {
+				valid = set_index_data(o, found->type, &max_count);
+			}
 		}
 
 		if (!valid) {
@@ -3506,7 +3557,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 		b32 valid = false;
 		i64 max_count = -1;
-		Type *t = base_type(o->type);
+		Type *t = base_type(type_deref(o->type));
 		switch (t->kind) {
 		case Type_Basic:
 			if (is_type_string(t)) {
@@ -3536,15 +3587,6 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		case Type_Slice:
 			valid = true;
 			break;
-
-		case Type_Pointer: {
-			Type *bt = base_type(t->Pointer.elem);
-			if (bt->kind == Type_Array) {
-				valid = true;
-				max_count = bt->Array.count;
-				o->type = make_type_slice(c->allocator, bt->Array.elem);
-			}
-		} break;
 		}
 
 		if (!valid) {
