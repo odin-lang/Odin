@@ -590,6 +590,11 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		      "You cannot apply both `inline` and `no_inline` to a procedure");
 	}
 
+	if (is_foreign && is_link_name) {
+		error(ast_node_token(pd->type),
+		      "You cannot apply both `foreign` and `link_name` to a procedure");
+	}
+
 	if (pd->body != NULL) {
 		if (is_foreign) {
 			error(ast_node_token(pd->body),
@@ -695,6 +700,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 			d = *found;
 		} else {
 			e->type = t_invalid;
+			set_base_type(named_type, t_invalid);
 			return;
 			// GB_PANIC("`%.*s` should been declared!", LIT(e->token.string));
 		}

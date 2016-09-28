@@ -796,7 +796,7 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 }
 
 
-void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, CycleChecker *cycle_checker = NULL) {
+void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, CycleChecker *cycle_checker) {
 	GB_ASSERT(n->kind == AstNode_Ident);
 	o->mode = Addressing_Invalid;
 	o->expr = n;
@@ -816,13 +816,13 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 	}
 	add_entity_use(c, n, e);
 
-	CycleChecker local_cycle_checker = {};
-	if (cycle_checker == NULL) {
-		cycle_checker = &local_cycle_checker;
-	}
-	defer (if (local_cycle_checker.path != NULL) {
-		gb_array_free(local_cycle_checker.path);
-	});
+	// CycleChecker local_cycle_checker = {};
+	// if (cycle_checker == NULL) {
+	// 	cycle_checker = &local_cycle_checker;
+	// }
+	// defer (if (local_cycle_checker.path != NULL) {
+	// 	gb_array_free(local_cycle_checker.path);
+	// });
 
 	check_entity_decl(c, e, NULL, named_type, cycle_checker);
 
@@ -857,17 +857,19 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 		o->mode = Addressing_Type;
 #if 0
 	// TODO(bill): Fix cyclical dependancy checker
-		gb_for_array(i, cycle_checker->path) {
-			Entity *prev = cycle_checker->path[i];
-			if (prev == e) {
-				error(e->token, "Illegal declaration cycle for %.*s", LIT(e->token.string));
-				for (isize j = i; j < gb_array_count(cycle_checker->path); j++) {
-					Entity *ref = cycle_checker->path[j];
-					error(ref->token, "\t%.*s refers to", LIT(ref->token.string));
+		if (cycle_checker != NULL) {
+			gb_for_array(i, cycle_checker->path) {
+				Entity *prev = cycle_checker->path[i];
+				if (prev == e) {
+					error(e->token, "Illegal declaration cycle for %.*s", LIT(e->token.string));
+					for (isize j = i; j < gb_array_count(cycle_checker->path); j++) {
+						Entity *ref = cycle_checker->path[j];
+						error(ref->token, "\t%.*s refers to", LIT(ref->token.string));
+					}
+					error(e->token, "\t%.*s", LIT(e->token.string));
+					type = t_invalid;
+					break;
 				}
-				error(e->token, "\t%.*s", LIT(e->token.string));
-				type = t_invalid;
-				break;
 			}
 		}
 #endif
@@ -3170,7 +3172,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case_end;
 
 	case_ast_node(i, Ident, node);
-		check_identifier(c, o, node, type_hint);
+		check_identifier(c, o, node, type_hint, NULL);
 	case_end;
 
 	case_ast_node(bl, BasicLit, node);

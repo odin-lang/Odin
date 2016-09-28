@@ -180,8 +180,9 @@ int main(int argc, char **argv) {
 		"%.*sbin/opt %s -o %.*s.bc "
 		"-mem2reg "
 		"-memcpyopt "
-		"-die -dse "
-		"-dce "
+		"-die "
+		// "-dse "
+		// "-dce "
 		// "-S "
 		// "-debug-pass=Arguments "
 		"",

@@ -256,7 +256,9 @@ struct CycleChecker {
 };
 
 CycleChecker *cycle_checker_add(CycleChecker *cc, Entity *e) {
-	GB_ASSERT(cc != NULL);
+	if (cc == NULL) {
+		return NULL;
+	}
 	if (cc->path == NULL) {
 		gb_array_init(cc->path, gb_heap_allocator());
 	}

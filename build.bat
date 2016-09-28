@@ -4,7 +4,7 @@
 set exe_name=odin.exe
 
 :: Debug = 0, Release = 1
-set release_mode=0
+set release_mode=1
 
 set compiler_flags= -nologo -Oi -TP -W4 -fp:fast -fp:except- -Gm- -MP -FC -GS- -EHsc- -GR-
 
@@ -44,16 +44,10 @@ rem pushd %build_dir%
 	del *.pdb > NUL 2> NUL
 	del *.ilk > NUL 2> NUL
 
-	cl %compiler_settings% "src\main.cpp" ^
-		/link %linker_settings% -OUT:%exe_name% ^
-	&& odin run code/demo.odin
-	rem clang++ src\main.cpp -o %exe_name% ^
-	rem 	-Wno-deprecated-declarations ^
-	rem 	-Wno-unused-value ^
-	rem 	-Wno-switch ^
-	rem 	-Wno-writable-strings
+	rem cl %compiler_settings% "src\main.cpp" ^
+		rem /link %linker_settings% -OUT:%exe_name% ^
 	rem && odin run code/demo.odin
-	rem odin run code/demo.odin
+	odin run code/demo.odin
 
 
 	:do_not_compile_exe

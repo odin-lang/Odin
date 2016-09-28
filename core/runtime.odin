@@ -16,8 +16,8 @@ Type_Info :: union {
 		fields:  []Member
 		packed:  bool
 		ordered: bool
-		size:    int
-		align:   int
+		size:    int // in bytes
+		align:   int // in bytes
 	}
 
 	Named: struct #ordered {

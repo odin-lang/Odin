@@ -164,8 +164,8 @@ print_i64_to_buffer :: proc(buffer: ^[]byte, i: i64) {
 	neg := i < 0
 	if neg {
 		i = -i
+		print_rune_to_buffer(buffer, #rune "-")
 	}
-	print_rune_to_buffer(buffer, #rune "-")
 	print_u64_to_buffer(buffer, i as u64)
 }
 
