@@ -263,7 +263,32 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 	}
 }
 
-void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type_hint);
+void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Type *type);
+
+void ssa_print_compound_element(ssaFileBuffer *f, ssaModule *m, ExactValue v, Type *elem_type) {
+	if (v.kind == ExactValue_Invalid) {
+		ssa_fprintf(f, "zeroinitializer");
+	} else if (v.kind == ExactValue_String) {
+		// HACK NOTE(bill): This is a hack but it works because strings are created at the very end
+		// of the .ll file
+		ssaValue *str_array = ssa_add_global_string_array(m, v.value_string);
+
+		ssa_fprintf(f, "{i8* getelementptr inbounds (");
+		ssa_print_type(f, m, str_array->Global.entity->type);
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m, str_array->Global.entity->type);
+		ssa_fprintf(f, "* ");
+		ssa_print_encoded_global(f, str_array->Global.entity->token.string, false);
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m, t_int);
+		ssa_fprintf(f, " 0, i32 0), ");
+		ssa_print_type(f, m, t_int);
+		ssa_fprintf(f, " %lld}", cast(i64)v.value_string.len);
+
+	} else {
+		ssa_print_exact_value(f, m, v, elem_type);
+	}
+}
 
 void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Type *type) {
 	type = base_type(type);
@@ -324,14 +349,19 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 		break;
 
 	case ExactValue_Compound: {
-		// ssa_fprintf(f, "%s", (value.value_bool ? "true" : "false"));
 		type = base_type(type);
 		if (is_type_array(type)) {
+			ast_node(cl, CompoundLit, value.value_compound);
+			isize elem_count = cl->elems != NULL ? gb_array_count(cl->elems) : 0;
+			if (elem_count == 0) {
+				ssa_fprintf(f, "zeroinitializer");
+				break;
+			}
+
 			ssa_fprintf(f, "[");
 			Type *elem_type = type->Array.elem;
-			ast_node(cl, CompoundLit, value.value_compound);
 
-			for (isize i = 0; i < type->Array.count; i++) {
+			for (isize i = 0; i < elem_count; i++) {
 				if (i > 0) {
 					ssa_fprintf(f, ", ");
 				}
@@ -340,10 +370,55 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 
 				TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems[i]);
 				GB_ASSERT(tav != NULL);
-				ssa_print_exact_value(f, m, tav->value, elem_type);
+				ssa_print_compound_element(f, m, tav->value, elem_type);
+			}
+			for (isize i = elem_count; i < type->Array.count; i++) {
+				if (i >= elem_count) {
+					ssa_fprintf(f, ", ");
+				}
+				ssa_print_type(f, m, elem_type);
+				ssa_fprintf(f, " zeroinitializer");
 			}
 
 			ssa_fprintf(f, "]");
+		} else if (is_type_vector(type)) {
+			ast_node(cl, CompoundLit, value.value_compound);
+			isize elem_count = cl->elems != NULL ? gb_array_count(cl->elems) : 0;
+			if (elem_count == 0) {
+				ssa_fprintf(f, "zeroinitializer");
+				break;
+			}
+
+			ssa_fprintf(f, "<");
+			Type *elem_type = type->Vector.elem;
+
+			if (elem_count == 1 && type->Vector.count > 1) {
+				TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems[0]);
+				GB_ASSERT(tav != NULL);
+
+				for (isize i = 0; i < type->Vector.count; i++) {
+					if (i > 0) {
+						ssa_fprintf(f, ", ");
+					}
+					ssa_print_type(f, m, elem_type);
+					ssa_fprintf(f, " ");
+					ssa_print_compound_element(f, m, tav->value, elem_type);
+				}
+			} else {
+				for (isize i = 0; i < elem_count; i++) {
+					if (i > 0) {
+						ssa_fprintf(f, ", ");
+					}
+					ssa_print_type(f, m, elem_type);
+					ssa_fprintf(f, " ");
+
+					TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems[i]);
+					GB_ASSERT(tav != NULL);
+					ssa_print_compound_element(f, m, tav->value, elem_type);
+				}
+			}
+
+			ssa_fprintf(f, ">");
 		} else if (is_type_struct(type)) {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
 			defer (gb_temp_arena_memory_end(tmp));
@@ -361,7 +436,7 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 
 
 			if (cl->elems[0]->kind == AstNode_FieldValue) {
-				isize elem_count = gb_array_count(cl->elems);
+				isize elem_count = cl->elems != NULL ? gb_array_count(cl->elems) : 0;
 				for (isize i = 0; i < elem_count; i++) {
 					ast_node(fv, FieldValue, cl->elems[i]);
 					String name = fv->field->Ident.string;
@@ -401,30 +476,7 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 
 				ssa_print_type(f, m, elem_type);
 				ssa_fprintf(f, " ");
-
-				ExactValue v = values[i];
-				if (v.kind == ExactValue_Invalid) {
-					ssa_fprintf(f, "zeroinitializer");
-				} else if (v.kind == ExactValue_String) {
-					// HACK NOTE(bill): This is a hack but it works because strings are created at the very end
-					// of the .ll file
-					ssaValue *str_array = ssa_add_global_string_array(m, v.value_string);
-
-					ssa_fprintf(f, "{i8* getelementptr inbounds (");
-					ssa_print_type(f, m, str_array->Global.entity->type);
-					ssa_fprintf(f, ", ");
-					ssa_print_type(f, m, str_array->Global.entity->type);
-					ssa_fprintf(f, "* ");
-					ssa_print_encoded_global(f, str_array->Global.entity->token.string, false);
-					ssa_fprintf(f, ", ");
-					ssa_print_type(f, m, t_int);
-					ssa_fprintf(f, " 0, i32 0), ");
-					ssa_print_type(f, m, t_int);
-					ssa_fprintf(f, " %lld}", cast(i64)v.value_string.len);
-
-				} else {
-					ssa_print_exact_value(f, m, v, elem_type);
-				}
+				ssa_print_compound_element(f, m, values[i], elem_type);
 			}
 
 
@@ -455,9 +507,37 @@ void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type
 		return;
 	}
 	switch (value->kind) {
+	default: GB_PANIC("Unknown ssaValue kind"); break;
+
 	case ssaValue_Constant:
 		ssa_print_exact_value(f, m, value->Constant.value, type_hint);
 		break;
+
+	case ssaValue_ConstantSlice: {
+		auto *cs = &value->ConstantSlice;
+		if (cs->backing_array == NULL || cs->count == 0) {
+			ssa_fprintf(f, "zeroinitializer");
+		} else {
+			Type *at = base_type(type_deref(ssa_type(cs->backing_array)));
+			Type *et = at->Array.elem;
+			ssa_fprintf(f, "{");
+			ssa_print_type(f, m, et);
+			ssa_fprintf(f, "* getelementptr inbounds (");
+			ssa_print_type(f, m, at);
+			ssa_fprintf(f, ", ");
+			ssa_print_type(f, m, at);
+			ssa_fprintf(f, "* ");
+			ssa_print_value(f, m, cs->backing_array, at);
+			ssa_fprintf(f, ", ");
+			ssa_print_type(f, m, t_int);
+			ssa_fprintf(f, " 0, i32 0), ");
+			ssa_print_type(f, m, t_int);
+			ssa_fprintf(f, " %lld, ", cs->count);
+			ssa_print_type(f, m, t_int);
+			ssa_fprintf(f, " %lld}", cs->count);
+		}
+	} break;
+
 	case ssaValue_TypeName:
 		ssa_print_encoded_local(f, value->TypeName.name);
 		break;
@@ -467,21 +547,7 @@ void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type
 		if (scope != NULL) {
 			in_global_scope = scope->is_global || scope->is_init;
 		}
-		// if (type_hint != NULL && is_type_string(type_hint)) {
-		// 	ssa_fprintf(f, "{i8* getelementptr inbounds (");
-		// 	ssa_print_type(f, m, value->Global.entity->type);
-		// 	ssa_fprintf(f, ", ");
-		// 	ssa_print_type(f, m, value->Global.entity->type);
-		// 	ssa_fprintf(f, "* ");
-		// 	ssa_print_encoded_global(f, value->Global.entity->token.string, in_global_scope);
-		// 	ssa_fprintf(f, ", ");
-		// 	ssa_print_type(f, m, t_int);
-		// 	ssa_fprintf(f, " 0, i32 0), ");
-		// 	ssa_print_type(f, m, t_int);
-		// 	ssa_fprintf(f, " %lld}", 0);
-		// } else {
-			ssa_print_encoded_global(f, value->Global.entity->token.string, in_global_scope);
-		// }
+		ssa_print_encoded_global(f, value->Global.entity->token.string, in_global_scope);
 	} break;
 	case ssaValue_Param:
 		ssa_print_encoded_local(f, value->Param.entity->token.string);

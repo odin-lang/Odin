@@ -3372,7 +3372,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 		} break;
 
-		// case Type_Slice:
+		case Type_Slice:
 		case Type_Array:
 		case Type_Vector:
 		{
@@ -3392,7 +3392,11 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 			i64 max = 0;
 			isize index = 0;
-			for (; index < gb_array_count(cl->elems); index++) {
+			isize elem_count = 0;
+			if (cl->elems != NULL) {
+				elem_count = gb_array_count(cl->elems);
+			}
+			for (; index < elem_count; index++) {
 				AstNode *e = cl->elems[index];
 				if (e->kind == AstNode_FieldValue) {
 					error(ast_node_token(e),

@@ -278,6 +278,7 @@ void ssa_gen_tree(ssaGen *s) {
 		}
 
 		{ // NOTE(bill): Setup type_info data
+			// TODO(bill): Try and make a lot of this constant aggregate literals in LLVM IR
 			ssaValue *type_info_data = NULL;
 			ssaValue *type_info_member_data = NULL;
 

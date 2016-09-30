@@ -4,20 +4,39 @@
 
 #include "string.cpp"
 
-String get_module_dir(gbAllocator a) {
-	isize len = GetModuleFileNameW(NULL, NULL, 0);
-	if (len == 0) {
-		return make_string(NULL, 0);
+gb_global String global_module_path = {};
+gb_global b32 global_module_path_set = false;
+
+String get_module_dir() {
+	if (global_module_path_set) {
+		return global_module_path;
 	}
+
+	gbArray(wchar_t) path_buf;
+	gb_array_init_reserve(path_buf, gb_heap_allocator(), 300);
+	defer (gb_array_free(path_buf));
+	gb_array_resize(path_buf, 300);
+
+	isize len = 0;
+	for (;;) {
+		len = GetModuleFileNameW(NULL, path_buf, gb_array_count(path_buf));
+		if (len == 0) {
+			return make_string(NULL, 0);
+		}
+		if (len < gb_array_count(path_buf)) {
+			break;
+		}
+		gb_array_resize(path_buf, 2*gb_array_count(path_buf) + 300);
+	}
+
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
-
 
 	wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
 
 	String16 str = {text, len};
 	GetModuleFileNameW(NULL, text, len);
-	String path = string16_to_string(a, str);
+	String path = string16_to_string(gb_heap_allocator(), str);
 	for (isize i = path.len-1; i >= 0; i--) {
 		u8 c = path.text[i];
 		if (c == '/' || c == '\\') {
@@ -26,6 +45,8 @@ String get_module_dir(gbAllocator a) {
 		path.len--;
 	}
 
+	global_module_path = path;
+	global_module_path_set = true;
 
 	return path;
 }

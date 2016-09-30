@@ -2919,10 +2919,7 @@ String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 }
 
 String get_fullpath_core(gbAllocator a, String path) {
-	String module_dir = get_module_dir(gb_heap_allocator());
-	defer (if (module_dir.len > 0) {
-		gb_free(gb_heap_allocator(), module_dir.text);
-	});
+	String module_dir = get_module_dir();
 
 	char core[] = "core/";
 	isize core_len = gb_size_of(core)-1;

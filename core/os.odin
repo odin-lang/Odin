@@ -43,19 +43,16 @@ File_Standard :: type enum {
 	COUNT,
 }
 
-__std_files := __set_file_standards();
+__std_files := [..]File{
+	File{handle = win32.GetStdHandle(win32.STD_INPUT_HANDLE)},
+	File{handle = win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)},
+	File{handle = win32.GetStdHandle(win32.STD_ERROR_HANDLE)},
+}
 
 stdin  := ^__std_files[File_Standard.INPUT]
 stdout := ^__std_files[File_Standard.OUTPUT]
 stderr := ^__std_files[File_Standard.ERROR]
 
-__set_file_standards :: proc() -> [File_Standard.COUNT as int]File {
-	return [File_Standard.COUNT as int]File{
-		File{handle = win32.GetStdHandle(win32.STD_INPUT_HANDLE)},
-		File{handle = win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)},
-		File{handle = win32.GetStdHandle(win32.STD_ERROR_HANDLE)},
-	}
-}
 
 
 read_entire_file :: proc(name: string) -> (string, bool) {

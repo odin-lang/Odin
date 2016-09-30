@@ -118,8 +118,7 @@ int main(int argc, char **argv) {
 	init_string_buffer_memory();
 	init_global_error_collector();
 
-	String module_dir = get_module_dir(gb_heap_allocator());
-	// defer (gb_free(gb_heap_allocator(), module_dir.text));
+	String module_dir = get_module_dir();
 
 	INIT_TIMER();
 
