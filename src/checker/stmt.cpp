@@ -379,8 +379,9 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	if (operand->mode == Addressing_Invalid ||
 	    operand->type == t_invalid ||
 	    e->type == t_invalid) {
-		if (e->type == NULL)
+		if (e->type == NULL) {
 			e->type = t_invalid;
+		}
 		return;
 	}
 
@@ -388,21 +389,30 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 		// TODO(bill): better error
 		error(ast_node_token(operand->expr),
 		      "`%.*s` is not a constant", LIT(ast_node_token(operand->expr).string));
-		if (e->type == NULL)
+		if (e->type == NULL) {
 			e->type = t_invalid;
+		}
 		return;
 	}
-	if (!is_type_constant_type(operand->type)) {
-		// NOTE(bill): no need to free string as it's panicking
-		compiler_error("Type `%s` not constant!!!", type_to_string(operand->type));
-	}
+	// if (!is_type_constant_type(operand->type)) {
+	// 	gbString type_str = type_to_string(operand->type);
+	// 	defer (gb_string_free(type_str));
+	// 	error(ast_node_token(operand->expr),
+	// 	      "Invalid constant type: `%s`", type_str);
+	// 	if (e->type == NULL) {
+	// 		e->type = t_invalid;
+	// 	}
+	// 	return;
+	// }
 
-	if (e->type == NULL) // NOTE(bill): type inference
+	if (e->type == NULL) { // NOTE(bill): type inference
 		e->type = operand->type;
+	}
 
 	check_assignment(c, operand, e->type, make_string("constant declaration"));
-	if (operand->mode == Addressing_Invalid)
+	if (operand->mode == Addressing_Invalid) {
 		return;
+	}
 
 	e->Constant.value = operand->value;
 }

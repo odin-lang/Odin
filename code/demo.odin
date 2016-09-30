@@ -4,6 +4,12 @@
 #import "mem.odin"
 #import "game.odin"
 
-main :: proc() {
+Vec3 :: struct {
+	x, y, z: f32
+}
 
+main :: proc() {
+	v0 := V
+	v1 := V
+	v2 := V
 }
