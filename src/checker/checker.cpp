@@ -619,9 +619,11 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 		return;
 
 	if (mode == Addressing_Constant) {
-		GB_ASSERT(value.kind != ExactValue_Invalid);
-		if (!(type != t_invalid || is_type_constant_type(type))) {
-			compiler_error("add_type_and_value - invalid type: %s", type_to_string(type));
+		if (is_type_constant_type(type)) {
+			GB_ASSERT(value.kind != ExactValue_Invalid);
+			if (!(type != t_invalid || is_type_constant_type(type))) {
+				compiler_error("add_type_and_value - invalid type: %s", type_to_string(type));
+			}
 		}
 	}
 

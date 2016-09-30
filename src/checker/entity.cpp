@@ -49,7 +49,8 @@ struct Entity {
 			b8  anonymous;   // Variable is an anonymous
 			b8  is_using;    // `using` variable
 
-			i32 field_index; // Order in source
+			i32 field_index;
+			i32 field_src_index;
 			b8  is_field;    // Is struct field
 		} Variable;
 		struct {
@@ -124,9 +125,10 @@ Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, 
 	return entity;
 }
 
-Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, b32 is_anonymous, i32 field_index) {
+Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, b32 is_anonymous, i32 field_src_index) {
 	Entity *entity = make_entity_variable(a, scope, token, type);
-	entity->Variable.field_index = field_index;
+	entity->Variable.field_src_index = field_src_index;
+	entity->Variable.field_index = field_src_index;
 	entity->Variable.is_field  = true;
 	entity->Variable.anonymous = cast(b8)is_anonymous;
 	entity->Variable.is_using = cast(b8)is_anonymous;

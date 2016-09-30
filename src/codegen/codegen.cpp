@@ -151,13 +151,12 @@ void ssa_gen_tree(ssaGen *s) {
 
 			if (decl->init_expr != NULL) {
 				TypeAndValue *tav = map_get(&info->types, hash_pointer(decl->init_expr));
-				if (tav != NULL && tav->value.kind != ExactValue_Invalid) {
-					ExactValue v = tav->value;
-					if (v.kind == ExactValue_String) {
-						// NOTE(bill): The printer will fix the value correctly
-						// g->Global.value = ssa_add_global_string_array(m, v.value_string);
-					} else {
-						g->Global.value = ssa_make_value_constant(a, tav->type, v);
+				if (tav != NULL) {
+					if (tav->value.kind != ExactValue_Invalid) {
+						ExactValue v = tav->value;
+						if (v.kind != ExactValue_String) {
+							g->Global.value = ssa_add_module_constant(m, tav->type, v);
+						}
 					}
 				}
 			}
@@ -444,10 +443,10 @@ void ssa_gen_tree(ssaGen *s) {
 
 						type_set_offsets(m->sizes, a, t); // NOTE(bill): Just incase the offsets have not been set yet
 						for (isize i = 0; i < t->Record.field_count; i++) {
-							// NOTE(bill): Order fields in source order not layout order
-							Entity *f = t->Record.fields[i];
+							// TODO(bill): Order fields in source order not layout order
+							Entity *f = t->Record.fields_in_src_order[i];
 							ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
-							i64 foffset = t->Record.struct_offsets[i];
+							i64 foffset = t->Record.struct_offsets[f->Variable.field_index];
 							GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
 							isize source_index = f->Variable.field_index;
 

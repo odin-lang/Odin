@@ -64,6 +64,7 @@ struct ssaModule {
 	i32                 global_string_index;
 
 	gbArray(ssaValue *) procs; // NOTE(bill): Procedures to generate
+	gbArray(ssaValue *) const_compound_lits;
 };
 
 
@@ -290,6 +291,7 @@ enum ssaValueKind {
 	ssaValue_Invalid,
 
 	ssaValue_Constant,
+	ssaValue_ConstantArray,
 	ssaValue_TypeName,
 	ssaValue_Global,
 	ssaValue_Param,
@@ -311,8 +313,12 @@ struct ssaValue {
 			ExactValue value;
 		} Constant;
 		struct {
+			Type *type;
+			gbArray(ssaValue *) values;
+		} ConstantArray;
+		struct {
 			String name;
-			Type *  type;
+			Type * type;
 		} TypeName;
 		struct {
 			b32 is_constant;
@@ -409,6 +415,7 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 	map_init(&m->debug_info, gb_heap_allocator());
 	map_init(&m->type_names, gb_heap_allocator());
 	gb_array_init(m->procs,  gb_heap_allocator());
+	gb_array_init(m->const_compound_lits, gb_heap_allocator());
 
 	// Default states
 	m->stmt_state_flags = 0;
@@ -473,6 +480,7 @@ void ssa_destroy_module(ssaModule *m) {
 	map_destroy(&m->type_names);
 	map_destroy(&m->debug_info);
 	gb_array_free(m->procs);
+	gb_array_free(m->const_compound_lits);
 	gb_arena_free(&m->arena);
 }
 
@@ -806,6 +814,16 @@ ssaValue *ssa_make_const_i64(gbAllocator a, i64 i) {
 }
 ssaValue *ssa_make_const_bool(gbAllocator a, b32 b) {
 	return ssa_make_value_constant(a, t_bool, make_exact_value_bool(b != 0));
+}
+
+ssaValue *ssa_add_module_constant(ssaModule *m, Type *type, ExactValue value) {
+	ssaValue *v = ssa_make_value_constant(m->allocator, type, value);
+
+	if (!is_type_constant_type(type)) {
+		gb_array_append(m->const_compound_lits, v);
+	}
+
+	return v;
 }
 
 
@@ -1201,7 +1219,7 @@ ssaValue *ssa_emit_arith(ssaProcedure *proc, Token op, ssaValue *left, ssaValue 
 	case Token_AndNot: {
 		// NOTE(bill): x &~ y == x & (~y) == x & (y ~ -1)
 		// NOTE(bill): "not" `x` == `x` "xor" `-1`
-		ssaValue *neg = ssa_make_value_constant(proc->module->allocator, type, make_exact_value_integer(-1));
+		ssaValue *neg = ssa_add_module_constant(proc->module, type, make_exact_value_integer(-1));
 		op.kind = Token_Xor;
 		right = ssa_emit_arith(proc, op, right, neg, type);
 		GB_ASSERT(right->Instr.kind == ssaInstr_BinaryOp);
@@ -1270,7 +1288,7 @@ ssaValue *ssa_emit_struct_gep(ssaProcedure *proc, ssaValue *s, ssaValue *index, 
 }
 
 ssaValue *ssa_emit_struct_gep(ssaProcedure *proc, ssaValue *s, i32 index, Type *result_type) {
-	ssaValue *i = ssa_make_value_constant(proc->module->allocator, t_i32, make_exact_value_integer(index));
+	ssaValue *i = ssa_make_const_i32(proc->module->allocator, index);
 	return ssa_emit_struct_gep(proc, s, i, result_type);
 }
 
@@ -1540,7 +1558,7 @@ ssaValue *ssa_add_global_string_array(ssaModule *m, String string) {
 	Type *type = make_type_array(a, t_u8, string.len);
 	ExactValue ev = make_exact_value_string(string);
 	Entity *entity = make_entity_constant(a, NULL, token, type, ev);
-	ssaValue *g = ssa_make_value_global(a, entity, ssa_make_value_constant(a, type, ev));
+	ssaValue *g = ssa_make_value_global(a, entity, ssa_add_module_constant(m, type, ev));
 	g->Global.is_private  = true;
 	// g->Global.is_constant = true;
 
@@ -1628,10 +1646,10 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 				ev = exact_value_to_integer(ev);
 			} else if (is_type_pointer(dst)) {
 				// IMPORTANT NOTE(bill): LLVM doesn't support pointer constants expect `null`
-				ssaValue *i = ssa_make_value_constant(proc->module->allocator, t_uint, ev);
+				ssaValue *i = ssa_add_module_constant(proc->module, t_uint, ev);
 				return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_inttoptr, i, t_uint, dst));
 			}
-			return ssa_make_value_constant(proc->module->allocator, t, ev);
+			return ssa_add_module_constant(proc->module, t, ev);
 		}
 	}
 
@@ -2007,7 +2025,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			// NOTE(bill): "not" `x` == `x` "xor" `-1`
 			ExactValue neg_one = make_exact_value_integer(-1);
 			ssaValue *left = ssa_build_expr(proc, ue->expr);
-			ssaValue *right = ssa_make_value_constant(proc->module->allocator, tv->type, neg_one);
+			ssaValue *right = ssa_add_module_constant(proc->module, tv->type, neg_one);
 			return ssa_emit_arith(proc, ue->op, left, right, tv->type);
 		} break;
 		}
@@ -2105,9 +2123,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		default: GB_PANIC("Unknown CompoundLit type: %s", type_to_string(type)); break;
 
 		case Type_Vector: {
-			isize index = 0;
+
 			ssaValue *result = ssa_emit_load(proc, v);
-			for (; index < gb_array_count(cl->elems); index++) {
+			for (isize index = 0; index < gb_array_count(cl->elems); index++) {
 				AstNode *elem = cl->elems[index];
 				ssaValue *field_elem = ssa_build_expr(proc, elem);
 				Type *t = ssa_type(field_elem);
@@ -2116,7 +2134,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 				ssaValue *i = ssa_make_const_int(proc->module->allocator, index);
 				result = ssa_emit(proc, ssa_make_instr_insert_element(proc, result, ev, i));
 			}
-			if (index == 1 && bt->Vector.count > 1) {
+
+			if (gb_array_count(cl->elems) == 1 && bt->Vector.count > 1) {
 				isize index_count = bt->Vector.count;
 				i32 *indices = gb_alloc_array(proc->module->allocator, i32, index_count);
 				for (isize i = 0; i < index_count; i++) {
@@ -2677,7 +2696,7 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 			}
 		}
 
-		return ssa_make_value_constant(proc->module->allocator, tv->type, tv->value);
+		return ssa_add_module_constant(proc->module, tv->type, tv->value);
 	}
 
 	ssaValue *value = NULL;

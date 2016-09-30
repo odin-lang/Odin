@@ -4,16 +4,14 @@
 #import "mem.odin"
 
 
-A :: struct { using e: [12]int }
-Vector2 :: raw_union {
-	using _xy: struct #ordered { x, y: f32 }
-	using v: {2}f32
-	e: [2]f32
-}
 
 main :: proc() {
-	v: Vector2
-	v.x = 123
-	v[1] = 321
+	Vec3 :: struct {
+		x, y: i16
+		z: int
+	}
+
+	z := 123
+	v := Vec3{x = 4, y = 5, z = z}
 	fmt.println(v)
 }

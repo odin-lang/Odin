@@ -1,4 +1,4 @@
-// #define DISPLAY_TIMING
+#define DISPLAY_TIMING
 
 #include "common.cpp"
 #include "unicode.cpp"
@@ -106,13 +106,17 @@ ArchData make_arch_data(ArchKind kind) {
 	return data;
 }
 
+
+
 int main(int argc, char **argv) {
 	if (argc < 2) {
 		gb_printf_err("using: %s [run] <filename> \n", argv[0]);
 		return 1;
 	}
 
+#if 1
 	init_string_buffer_memory();
+	init_global_error_collector();
 
 	String module_dir = get_module_dir(gb_heap_allocator());
 	// defer (gb_free(gb_heap_allocator(), module_dir.text));
@@ -163,11 +167,11 @@ int main(int argc, char **argv) {
 	ssa_gen_tree(&ssa);
 
 	PRINT_TIMER("SSA Tree");
-
 	// TODO(bill): Speedup writing to file for IR code
 	ssa_gen_ir(&ssa);
 
 	PRINT_TIMER("SSA IR");
+#if 1
 
 	char const *output_name = ssa.output_file.filename;
 	isize base_name_len = gb_path_extension(output_name)-1 - output_name;
@@ -230,12 +234,13 @@ int main(int argc, char **argv) {
 	}
 
 	PRINT_TIMER("msvc-link");
-#endif
 	PRINT_ACCUMULATION();
 
 	if (run_output) {
 		win32_exec_command_line_app("%.*s.exe", cast(int)base_name_len, output_name);
 	}
-
+#endif
+#endif
+#endif
 	return 0;
 }

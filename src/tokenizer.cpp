@@ -166,12 +166,20 @@ struct ErrorCollector {
 	TokenPos prev;
 	i64 count;
 	i64 warning_count;
+	gbMutex mutex;
 };
 
 gb_global ErrorCollector global_error_collector;
 
+void init_global_error_collector(void) {
+	gb_mutex_init(&global_error_collector.mutex);
+}
+
 
 void warning(Token token, char *fmt, ...) {
+	gb_mutex_lock(&global_error_collector.mutex);
+	defer (gb_mutex_unlock(&global_error_collector.mutex));
+
 	global_error_collector.warning_count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (!token_pos_are_equal(global_error_collector.prev, token.pos)) {
@@ -188,6 +196,9 @@ void warning(Token token, char *fmt, ...) {
 }
 
 void error(Token token, char *fmt, ...) {
+	gb_mutex_lock(&global_error_collector.mutex);
+	defer (gb_mutex_unlock(&global_error_collector.mutex));
+
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (!token_pos_are_equal(global_error_collector.prev, token.pos)) {
@@ -204,6 +215,9 @@ void error(Token token, char *fmt, ...) {
 }
 
 void syntax_error(Token token, char *fmt, ...) {
+	gb_mutex_lock(&global_error_collector.mutex);
+	defer (gb_mutex_unlock(&global_error_collector.mutex));
+
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (!token_pos_are_equal(global_error_collector.prev, token.pos)) {
@@ -232,43 +246,6 @@ void compiler_error(char *fmt, ...) {
 
 
 
-// NOTE(bill): result == priority
-i32 token_precedence(Token t) {
-	switch (t.kind) {
-	case Token_CmpOr:
-		return 1;
-	case Token_CmpAnd:
-		return 2;
-	case Token_CmpEq:
-	case Token_NotEq:
-	case Token_Lt:
-	case Token_Gt:
-	case Token_LtEq:
-	case Token_GtEq:
-		return 3;
-	case Token_Add:
-	case Token_Sub:
-	case Token_Or:
-	case Token_Xor:
-		return 4;
-	case Token_Mul:
-	case Token_Quo:
-	case Token_Mod:
-	case Token_And:
-	case Token_AndNot:
-	case Token_Shl:
-	case Token_Shr:
-		return 5;
-	case Token_DoublePrime:
-		return 6;
-	case Token_as:
-	case Token_transmute:
-	case Token_down_cast:
-		return 7;
-	}
-
-	return 0;
-}
 
 
 gb_inline b32 token_is_literal(Token t) {

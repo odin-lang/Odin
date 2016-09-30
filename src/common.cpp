@@ -26,6 +26,7 @@ String get_module_dir(gbAllocator a) {
 		path.len--;
 	}
 
+
 	return path;
 }
 
@@ -211,7 +212,7 @@ gb_inline void map_destroy(Map<T> *h) {
 
 template <typename T>
 gb_internal isize map__add_entry(Map<T> *h, HashKey key) {
-	MapEntry<T> e = {0};
+	MapEntry<T> e = {};
 	e.key = key;
 	e.next = -1;
 	gb_array_append(h->entries, e);
@@ -267,7 +268,7 @@ gb_inline void map_grow(Map<T> *h) {
 template <typename T>
 void map_rehash(Map<T> *h, isize new_count) {
 	isize i, j;
-	Map<T> nh = {0};
+	Map<T> nh = {};
 	map_init(&nh, gb_array_allocator(h->hashes));
 	gb_array_resize(nh.hashes, new_count);
 	gb_array_reserve(nh.entries, gb_array_count(h->entries));

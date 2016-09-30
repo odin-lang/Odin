@@ -501,12 +501,15 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecke
 		}
 
 		// NOTE(bill): Hacky thing
+		// TODO(bill): Probably make an inline sorting procedure rather than use global variables
 		__checker_sizes = c->sizes;
 		__checker_allocator = c->allocator;
-		// TODO(bill): Figure out rules more
-		// sorting rules
-		// compound literal order must match source not layout
+		// NOTE(bill): compound literal order must match source not layout
 		gb_sort_array(reordered_fields, field_count, cmp_struct_entity_size);
+
+		for (isize i = 0; i < field_count; i++) {
+			reordered_fields[i]->Variable.field_index = i;
+		}
 
 		struct_type->Record.fields = reordered_fields;
 	}
@@ -3256,6 +3259,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case_ast_node(cl, CompoundLit, node);
 		Type *type = type_hint;
 		b32 ellipsis_array = false;
+		b32 is_constant = true;
 		if (cl->type != NULL) {
 			type = NULL;
 
@@ -3297,15 +3301,15 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 							      "Mixture of `field = value` and value elements in a structure literal is not allowed");
 							continue;
 						}
-						ast_node(kv, FieldValue, elem);
-						if (kv->field->kind != AstNode_Ident) {
-							gbString expr_str = expr_to_string(kv->field);
+						ast_node(fv, FieldValue, elem);
+						if (fv->field->kind != AstNode_Ident) {
+							gbString expr_str = expr_to_string(fv->field);
 							defer (gb_string_free(expr_str));
 							error(ast_node_token(elem),
 							      "Invalid field name `%s` in structure literal", expr_str);
 							continue;
 						}
-						String name = kv->field->Ident.string;
+						String name = fv->field->Ident.string;
 
 						Selection sel = lookup_field(c->allocator, type, name, o->mode == Addressing_Type);
 						if (sel.entity == NULL) {
@@ -3321,7 +3325,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 						}
 
 						Entity *field = t->Record.fields[sel.index[0]];
-						add_entity_use(c, kv->field, field);
+						add_entity_use(c, fv->field, field);
 
 						if (fields_visited[sel.index[0]]) {
 							error(ast_node_token(elem),
@@ -3330,7 +3334,12 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 						}
 
 						fields_visited[sel.index[0]] = true;
-						check_expr(c, o, kv->value);
+						check_expr(c, o, fv->value);
+
+						if (is_constant) {
+							is_constant = o->mode == Addressing_Constant;
+						}
+
 						check_assignment(c, o, field->type, make_string("structure literal"));
 					}
 				} else {
@@ -3348,6 +3357,11 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 							error(ast_node_token(o->expr), "Too many values in structure literal, expected %td", field_count);
 							break;
 						}
+
+						if (is_constant) {
+							is_constant = o->mode == Addressing_Constant;
+						}
+
 						check_assignment(c, o, field->type, make_string("structure literal"));
 					}
 					if (gb_array_count(cl->elems) < field_count) {
@@ -3358,7 +3372,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 		} break;
 
-		case Type_Slice:
+		// case Type_Slice:
 		case Type_Array:
 		case Type_Vector:
 		{
@@ -3401,6 +3415,10 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 				Operand o = {};
 				check_expr_with_type_hint(c, &o, e, elem_type);
 				check_assignment(c, &o, elem_type, context_name);
+
+				if (is_constant) {
+					is_constant = o.mode == Addressing_Constant;
+				}
 			}
 			if (max < index)
 				max = index;
@@ -3419,13 +3437,18 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 		default: {
 			gbString str = type_to_string(type);
-			error(ast_node_token(node), "Invalid compound literal type `%s`", str);
+			error(ast_node_token(node), "Invalid or unyet supported compound literal type `%s`", str);
 			gb_string_free(str);
 			goto error;
 		} break;
 		}
 
-		o->mode = Addressing_Value;
+		if (is_constant) {
+			o->mode = Addressing_Constant;
+			o->value = make_exact_value_compound(node);
+		} else {
+			o->mode = Addressing_Value;
+		}
 		o->type = type;
 	case_end;
 

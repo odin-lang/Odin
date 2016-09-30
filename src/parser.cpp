@@ -54,12 +54,12 @@ struct ImportedFile {
 
 struct Parser {
 	String init_fullpath;
-	gbArray(AstFile) files;
+	gbArray(AstFile)      files;
 	gbArray(ImportedFile) imports;
-	gbArray(String) libraries;
-	gbArray(String) system_libraries;
-	isize load_index;
+	gbAtomic32 import_index;
+	gbArray(String)       system_libraries;
 	isize total_token_count;
+	gbMutex mutex;
 };
 
 enum ProcTag : u64 {
@@ -1586,6 +1586,44 @@ AstNode *parse_unary_expr(AstFile *f, b32 lhs) {
 	return parse_atom_expr(f, lhs);
 }
 
+// NOTE(bill): result == priority
+i32 token_precedence(Token t) {
+	switch (t.kind) {
+	case Token_CmpOr:
+		return 1;
+	case Token_CmpAnd:
+		return 2;
+	case Token_CmpEq:
+	case Token_NotEq:
+	case Token_Lt:
+	case Token_Gt:
+	case Token_LtEq:
+	case Token_GtEq:
+		return 3;
+	case Token_Add:
+	case Token_Sub:
+	case Token_Or:
+	case Token_Xor:
+		return 4;
+	case Token_Mul:
+	case Token_Quo:
+	case Token_Mod:
+	case Token_And:
+	case Token_AndNot:
+	case Token_Shl:
+	case Token_Shr:
+		return 5;
+	case Token_DoublePrime:
+		return 6;
+	case Token_as:
+	case Token_transmute:
+	case Token_down_cast:
+		return 7;
+	}
+
+	return 0;
+}
+
 AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 	AstNode *expression = parse_unary_expr(f, lhs);
 	for (i32 prec = token_precedence(f->curr_token); prec >= prec_in; prec--) {
@@ -2826,8 +2864,8 @@ void destroy_ast_file(AstFile *f) {
 b32 init_parser(Parser *p) {
 	gb_array_init(p->files, gb_heap_allocator());
 	gb_array_init(p->imports, gb_heap_allocator());
-	gb_array_init(p->libraries, gb_heap_allocator());
 	gb_array_init(p->system_libraries, gb_heap_allocator());
+	gb_mutex_init(&p->mutex);
 	return true;
 }
 
@@ -2843,12 +2881,15 @@ void destroy_parser(Parser *p) {
 #endif
 	gb_array_free(p->files);
 	gb_array_free(p->imports);
-	gb_array_free(p->libraries);
 	gb_array_free(p->system_libraries);
+	gb_mutex_destroy(&p->mutex);
 }
 
 // NOTE(bill): Returns true if it's added
 b32 try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
+	gb_mutex_lock(&p->mutex);
+	defer (gb_mutex_unlock(&p->mutex));
+
 	gb_for_array(i, p->imports) {
 		String import = p->imports[i].path;
 		if (import == path) {
@@ -2900,6 +2941,9 @@ String get_fullpath_core(gbAllocator a, String path) {
 
 // NOTE(bill): Returns true if it's added
 b32 try_add_foreign_system_library_path(Parser *p, String import_file) {
+	gb_mutex_lock(&p->mutex);
+	defer (gb_mutex_unlock(&p->mutex));
+
 	gb_for_array(i, p->system_libraries) {
 		String import = p->system_libraries[i];
 		if (import == import_file) {
@@ -2981,7 +3025,6 @@ void parse_file(Parser *p, AstFile *f) {
 		base_dir.len--;
 	}
 
-	gbAllocator allocator = gb_heap_allocator(); // TODO(bill): Change this allocator
 
 	f->decls = parse_stmt_list(f);
 
@@ -3007,6 +3050,8 @@ void parse_file(Parser *p, AstFile *f) {
 					f->decls[i] = make_bad_decl(f, id->token, id->token);
 					continue;
 				}
+
+				gbAllocator allocator = gb_heap_allocator(); // TODO(bill): Change this allocator
 
 				String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
 				String import_file = rel_path;
@@ -3038,6 +3083,7 @@ void parse_file(Parser *p, AstFile *f) {
 }
 
 
+
 ParseFileError parse_files(Parser *p, char *init_filename) {
 	char *fullpath_str = gb_path_get_full_name(gb_heap_allocator(), init_filename);
 	String init_fullpath = make_string(fullpath_str);
@@ -3053,9 +3099,10 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 	}
 
 	gb_for_array(i, p->imports) {
-		String import_path = p->imports[i].path;
-		String import_rel_path = p->imports[i].rel_path;
-		TokenPos pos = p->imports[i].pos;
+		ImportedFile imported_file = p->imports[i];
+		String import_path = imported_file.path;
+		String import_rel_path = imported_file.rel_path;
+		TokenPos pos = imported_file.pos;
 		AstFile file = {};
 		ParseFileError err = init_ast_file(&file, import_path);
 
@@ -3088,9 +3135,18 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 			return err;
 		}
 		parse_file(p, &file);
-		file.id = gb_array_count(p->files);
-		gb_array_append(p->files, file);
-		p->total_token_count += gb_array_count(file.tokens);
+
+		{
+			gb_mutex_lock(&p->mutex);
+			defer (gb_mutex_unlock(&p->mutex));
+
+			file.id = gb_array_count(p->files);
+			gb_array_append(p->files, file);
+		}
+	}
+
+	gb_for_array(i, p->files) {
+		p->total_token_count += gb_array_count(p->files[i].tokens);
 	}
 
 

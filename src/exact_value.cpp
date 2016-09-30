@@ -3,6 +3,8 @@
 // TODO(bill): Big numbers
 // IMPORTANT TODO(bill): This needs to be completely fixed!!!!!!!!
 
+struct AstNode;
+
 enum ExactValueKind {
 	ExactValue_Invalid,
 
@@ -11,6 +13,7 @@ enum ExactValueKind {
 	ExactValue_Integer,
 	ExactValue_Float,
 	ExactValue_Pointer, // TODO(bill): Handle ExactValue_Pointer correctly
+	ExactValue_Compound,
 
 	ExactValue_Count,
 };
@@ -18,16 +21,24 @@ enum ExactValueKind {
 struct ExactValue {
 	ExactValueKind kind;
 	union {
-		b32    value_bool;
-		String value_string;
-		i64    value_integer;
-		f64    value_float;
-		void * value_pointer;
+		b32      value_bool;
+		String   value_string;
+		i64      value_integer;
+		f64      value_float;
+		void *   value_pointer;
+		AstNode *value_compound;
 	};
 };
 
 HashKey hash_exact_value(ExactValue v) {
 	return hashing_proc(&v, gb_size_of(ExactValue));
+}
+
+
+ExactValue make_exact_value_compound(AstNode *node) {
+	ExactValue result = {ExactValue_Compound};
+	result.value_compound = node;
+	return result;
 }
 
 ExactValue make_exact_value_bool(b32 b) {
