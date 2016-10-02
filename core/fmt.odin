@@ -80,7 +80,9 @@ print_nl_to_buffer    :: proc(buf: ^[]byte) { print_rune_to_buffer(buf, #rune "\
 print_int_to_buffer :: proc(buf: ^[]byte, i: int) {
 	print_int_base_to_buffer(buf, i, 10);
 }
-__NUM_TO_CHAR_TABLE :: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$"
+
+__NUM_TO_CHAR_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$"
+
 print_int_base_to_buffer :: proc(buffer: ^[]byte, i, base: int) {
 
 	buf: [65]byte

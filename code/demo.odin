@@ -4,12 +4,13 @@
 #import "mem.odin"
 #import "game.odin"
 
-Vec3 :: struct {
-	x, y, z: f32
-}
-
 main :: proc() {
-	v0 := V
-	v1 := V
-	v2 := V
+	Vector3 :: struct {
+		x, y, z: f32
+	}
+	Entity :: struct {
+		guid:     u64
+		position: Vector3
+	}
+
 }

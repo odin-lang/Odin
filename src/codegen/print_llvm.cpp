@@ -597,9 +597,6 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	case ssaInstr_Store: {
 		Type *type = ssa_type(instr);
 		ssa_fprintf(f, "store ");
-		if ((type->flags & TypeFlag_volatile) != 0) {
-			ssa_fprintf(f, "volatile ");
-		}
 		ssa_print_type(f, m, type);
 		ssa_fprintf(f, " ");
 		ssa_print_value(f, m, instr->Store.value, type);
@@ -613,9 +610,6 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	case ssaInstr_Load: {
 		Type *type = instr->Load.type;
 		ssa_fprintf(f, "%%%d = load ", value->id);
-		if ((type->flags & TypeFlag_volatile) != 0) {
-			ssa_fprintf(f, "volatile ");
-		}
 		ssa_print_type(f, m, type);
 		ssa_fprintf(f, ", ");
 		ssa_print_type(f, m, type);

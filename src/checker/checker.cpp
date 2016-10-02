@@ -267,6 +267,12 @@ CycleChecker *cycle_checker_add(CycleChecker *cc, Entity *e) {
 	return cc;
 }
 
+void cycle_checker_destroy(CycleChecker *cc) {
+	if (cc != NULL && cc->path != NULL)  {
+		gb_array_free(cc->path);
+	}
+}
+
 
 
 Scope *make_scope(Scope *parent, gbAllocator allocator) {
@@ -870,33 +876,6 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 
 #include "expr.cpp"
 #include "stmt.cpp"
-
-
-
-struct CycleCheck {
-	gbArray(Entity *) path; // HACK(bill): Memory Leak
-};
-
-void cycle_check_add(CycleCheck *cc, Entity *entity) {
-	if (cc == NULL)
-		return;
-	if (cc->path == NULL) {
-		gb_array_init(cc->path, gb_heap_allocator());
-	}
-	GB_ASSERT(entity->kind == Entity_TypeName);
-	gb_array_append(cc->path, entity);
-}
-
-void check_type_name_cycles(Checker *c, CycleCheck *cc, Entity *e) {
-	GB_ASSERT(e->kind == Entity_TypeName);
-	Type *t = e->type;
-	// if (t->kind == Type_Named) {
-	// 	if (t->Named.type_name == e) {
-	// 		gb_printf("Illegal cycle %.*s!!!\n", LIT(e->token.string));
-	// 		GB_PANIC("!!!");
-	// 	}
-	// }
-}
 
 void init_runtime_types(Checker *c) {
 	if (t_type_info == NULL) {

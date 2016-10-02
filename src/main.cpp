@@ -176,6 +176,8 @@ int main(int argc, char **argv) {
 	isize base_name_len = gb_path_extension(output_name)-1 - output_name;
 	String output = make_string(cast(u8 *)output_name, base_name_len);
 
+	int optimization_level = 0;
+	optimization_level = gb_clamp(optimization_level, 0, 3);
 
 	i32 exit_code = 0;
 	// For more passes arguments: http://llvm.org/docs/Passes.html
@@ -199,11 +201,12 @@ int main(int argc, char **argv) {
 
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 	exit_code = win32_exec_command_line_app(
-		"%.*sbin/llc %.*s.bc -filetype=obj -O0 "
+		"%.*sbin/llc %.*s.bc -filetype=obj -O%d "
 		"%.*s "
 		"",
 		LIT(module_dir),
 		LIT(output),
+		optimization_level,
 		LIT(arch_data.llc_flags));
 	if (exit_code != 0) {
 		return exit_code;

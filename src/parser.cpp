@@ -82,14 +82,6 @@ enum VarDeclTag {
 	VarDeclTag_thread_local = GB_BIT(0),
 };
 
-
-enum TypeFlag : u32 {
-	TypeFlag_thread_local = GB_BIT(0),
-	TypeFlag_volatile     = GB_BIT(1),
-	TypeFlag_atomic       = GB_BIT(2),
-
-};
-
 enum StmtStateFlag : u32 {
 	StmtStateFlag_bounds_check    = GB_BIT(0),
 	StmtStateFlag_no_bounds_check = GB_BIT(1),
@@ -325,20 +317,23 @@ String const ast_node_strings[] = {
 #undef AST_NODE_KIND
 };
 
+#define AST_NODE_KIND(_kind_name_, name, ...) typedef __VA_ARGS__ GB_JOIN2(AstNode, _kind_name_);
+	AST_NODE_KINDS
+#undef AST_NODE_KIND
+
 struct AstNode {
 	AstNodeKind kind;
 	// AstNode *prev, *next; // NOTE(bill): allow for Linked list
-	u32 type_flags;
 	u32 stmt_state_flags;
 	union {
-#define AST_NODE_KIND(_kind_name_, name, ...) __VA_ARGS__ _kind_name_;
+#define AST_NODE_KIND(_kind_name_, name, ...) GB_JOIN2(AstNode, _kind_name_) _kind_name_;
 	AST_NODE_KINDS
 #undef AST_NODE_KIND
 	};
 };
 
 
-#define ast_node(n_, Kind_, node_) auto *n_ = &(node_)->Kind_; GB_ASSERT((node_)->kind == GB_JOIN2(AstNode_, Kind_))
+#define ast_node(n_, Kind_, node_) GB_JOIN2(AstNode, Kind_) *n_ = &(node_)->Kind_; GB_ASSERT((node_)->kind == GB_JOIN2(AstNode_, Kind_))
 #define case_ast_node(n_, Kind_, node_) case GB_JOIN2(AstNode_, Kind_): { ast_node(n_, Kind_, node_);
 #define case_end } break;
 
@@ -371,7 +366,10 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_ProcLit:
 		return ast_node_token(node->ProcLit.type);
 	case AstNode_CompoundLit:
-		return ast_node_token(node->CompoundLit.type);
+		if (node->CompoundLit.type != NULL) {
+			return ast_node_token(node->CompoundLit.type);
+		}
+		return node->CompoundLit.open;
 	case AstNode_TagExpr:
 		return node->TagExpr.token;
 	case AstNode_BadExpr:
@@ -1964,14 +1962,6 @@ AstNodeArray parse_struct_params(AstFile *f, isize *decl_count_, b32 using_allow
 
 AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 	switch (f->curr_token.kind) {
-	case Token_volatile:
-		next_token(f);
-		return parse_identifier_or_type(f, flags | TypeFlag_volatile);
-
-	case Token_atomic:
-		next_token(f);
-		return parse_identifier_or_type(f, flags | TypeFlag_atomic);
-
 	case Token_Identifier: {
 		AstNode *e = parse_identifier(f);
 		while (f->curr_token.kind == Token_Period) {
@@ -1984,15 +1974,11 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 			// HACK NOTE(bill): For type_of_val(expr)
 			e = parse_call_expr(f, e);
 		}
-		e->type_flags = flags;
 		return e;
 	}
 
-	case Token_Pointer: {
-		AstNode *e = make_pointer_type(f, expect_token(f, Token_Pointer), parse_type(f));
-		e->type_flags = flags;
-		return e;
-	}
+	case Token_Pointer:
+		return make_pointer_type(f, expect_token(f, Token_Pointer), parse_type(f));
 
 	case Token_OpenBracket: {
 		f->expr_level++;
@@ -2008,7 +1994,6 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		expect_token(f, Token_CloseBracket);
 		f->expr_level--;
 		AstNode *e = make_array_type(f, token, count_expr, parse_type(f));
-		e->type_flags = flags;
 		return e;
 	}
 
@@ -2018,9 +2003,7 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		AstNode *count_expr = parse_expr(f, false);
 		expect_token(f, Token_CloseBrace);
 		f->expr_level--;
-		AstNode *e = make_vector_type(f, token, count_expr, parse_type(f));
-		e->type_flags = flags;
-		return e;
+		return make_vector_type(f, token, count_expr, parse_type(f));
 	}
 
 	case Token_struct: {
@@ -2030,11 +2013,17 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		while (allow_token(f, Token_Hash)) {
 			Token tag = expect_token(f, Token_Identifier);
 			if (tag.string == "packed") {
+				if (is_packed) {
+					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
+				}
 				is_packed = true;
 			} else if (tag.string == "ordered") {
+				if (is_ordered) {
+					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
+				}
 				is_ordered = true;
 			} else {
-				syntax_error(tag, "Expected a `#packed` or `#ordered` tag");
+				syntax_error(tag, "Invalid struct tag `#%.*s`", LIT(tag.string));
 			}
 		}
 
@@ -2047,9 +2036,7 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		AstNodeArray decls = parse_struct_params(f, &decl_count, true);
 		Token close = expect_token(f, Token_CloseBrace);
 
-		AstNode *e = make_struct_type(f, token, decls, decl_count, is_packed, is_ordered);
-		e->type_flags = flags;
-		return e;
+		return make_struct_type(f, token, decls, decl_count, is_packed, is_ordered);
 	} break;
 
 	case Token_union: {
@@ -2059,9 +2046,7 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		AstNodeArray decls = parse_struct_params(f, &decl_count, false);
 		Token close = expect_token(f, Token_CloseBrace);
 
-		AstNode *e = make_union_type(f, token, decls, decl_count);
-		e->type_flags = flags;
-		return e;
+		return make_union_type(f, token, decls, decl_count);
 	}
 
 	case Token_raw_union: {
@@ -2071,9 +2056,7 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		AstNodeArray decls = parse_struct_params(f, &decl_count, true);
 		Token close = expect_token(f, Token_CloseBrace);
 
-		AstNode *e = make_raw_union_type(f, token, decls, decl_count);
-		e->type_flags = flags;
-		return e;
+		return make_raw_union_type(f, token, decls, decl_count);
 	}
 
 	case Token_enum: {
@@ -2108,9 +2091,7 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 
 		close = expect_token(f, Token_CloseBrace);
 
-		AstNode *e = make_enum_type(f, token, base_type, fields);
-		e->type_flags = flags;
-		return e;
+		return make_enum_type(f, token, base_type, fields);
 	}
 
 	case Token_proc: {
@@ -2121,7 +2102,6 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		return type;
 	}
 
-
 	case Token_OpenParen: {
 		// NOTE(bill): Skip the paren expression
 		AstNode *type;
@@ -2129,9 +2109,8 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		open = expect_token(f, Token_OpenParen);
 		type = parse_type(f);
 		close = expect_token(f, Token_CloseParen);
-		AstNode *e = make_paren_expr(f, type, open, close);
-		e->type_flags = flags;
-		return e;
+		return type;
+		// return make_paren_expr(f, type, open, close);
 	}
 
 	// TODO(bill): Why is this even allowed? Is this a parsing error?

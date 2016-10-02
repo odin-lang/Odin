@@ -429,14 +429,14 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 
 	if (type_expr) {
 		Type *t = check_type(c, type_expr);
-		if (!is_type_constant_type(t)) {
-			gbString str = type_to_string(t);
-			defer (gb_string_free(str));
-			error(ast_node_token(type_expr),
-			      "Invalid constant type `%s`", str);
-			e->type = t_invalid;
-			return;
-		}
+		// if (!is_type_constant_type(t)) {
+		// 	gbString str = type_to_string(t);
+		// 	defer (gb_string_free(str));
+		// 	error(ast_node_token(type_expr),
+		// 	      "Invalid constant type `%s`", str);
+		// 	e->type = t_invalid;
+		// 	return;
+		// }
 		e->type = t;
 	}
 
@@ -460,9 +460,7 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, Cycle
 	if (cycle_checker == NULL) {
 		cycle_checker = &local_cycle_checker;
 	}
-	defer (if (local_cycle_checker.path != NULL) {
-		gb_array_free(local_cycle_checker.path);
-	});
+	defer (cycle_checker_destroy(&local_cycle_checker));
 
 	Type *bt = check_type(c, type_expr, named, cycle_checker_add(cycle_checker, e));
 	named->Named.base = bt;

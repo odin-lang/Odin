@@ -65,7 +65,6 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 	Type *src = base_type(s);
 	Type *dst = base_type(type);
 
-
 	if (is_type_untyped(src)) {
 		switch (dst->kind) {
 		case Type_Basic:
@@ -86,11 +85,13 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 		return true;
 	}
 
-	if (is_type_pointer(dst) && is_type_rawptr(src))
+	if (is_type_pointer(dst) && is_type_rawptr(src)) {
 	    return true;
+	}
 
-	if (is_type_rawptr(dst) && is_type_pointer(src))
+	if (is_type_rawptr(dst) && is_type_pointer(src)) {
 	    return true;
+	}
 
 	if (dst->kind == Type_Array && src->kind == Type_Array) {
 		if (are_types_identical(dst->Array.elem, src->Array.elem)) {
@@ -513,7 +514,6 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecke
 
 		struct_type->Record.fields = reordered_fields;
 	}
-
 }
 
 void check_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker *cycle_checker) {
@@ -848,9 +848,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 	// if (cycle_checker == NULL) {
 	// 	cycle_checker = &local_cycle_checker;
 	// }
-	// defer (if (local_cycle_checker.path != NULL) {
-	// 	gb_array_free(local_cycle_checker.path);
-	// });
+	// defer (cycle_checker_destroy(&local_cycle_checker));
 
 	check_entity_decl(c, e, NULL, named_type, cycle_checker);
 
@@ -939,8 +937,9 @@ i64 check_array_count(Checker *c, AstNode *e) {
 	if (is_type_untyped(o.type) || is_type_integer(o.type)) {
 		if (o.value.kind == ExactValue_Integer) {
 			i64 count = o.value.value_integer;
-			if (count >= 0)
+			if (count >= 0) {
 				return count;
+			}
 			error(ast_node_token(e), "Invalid array count");
 			return 0;
 		}
@@ -966,8 +965,6 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 			break;
 		case Addressing_Type: {
 			type = o.type;
-			type->flags |= e->type_flags;
-			set_base_type(named_type, type);
 			goto end;
 		} break;
 		case Addressing_NoValue:
@@ -991,9 +988,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		case Addressing_Type:
 			GB_ASSERT(o.type != NULL);
 			type = o.type;
-			type->flags |= e->type_flags;
-			set_base_type(named_type, type);
-			return type;
+			goto end;
 		case Addressing_NoValue:
 			err_str = expr_to_string(e);
 			error(ast_node_token(e), "`%s` used as a type", err_str);
@@ -1007,19 +1002,29 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 
 	case_ast_node(pe, ParenExpr, e);
 		type = check_type(c, pe->expr, named_type, cycle_checker);
-		type->flags |= e->type_flags;
-		return type;
+		goto end;
+	case_end;
+
+	case_ast_node(ue, UnaryExpr, e);
+		if (ue->op.kind == Token_Pointer) {
+			type = make_type_pointer(c->allocator, check_type(c, ue->expr));
+			goto end;
+		}
+	case_end;
+
+	case_ast_node(pt, PointerType, e);
+		Type *elem = check_type(c, pt->type);
+		type = make_type_pointer(c->allocator, elem);
+		goto end;
 	case_end;
 
 	case_ast_node(at, ArrayType, e);
 		if (at->count != NULL) {
-			type = make_type_array(c->allocator,
-			                       check_type(c, at->elem, NULL, cycle_checker),
-			                       check_array_count(c, at->count));
-			set_base_type(named_type, type);
+			Type *elem = check_type(c, at->elem, NULL, cycle_checker);
+			type = make_type_array(c->allocator, elem, check_array_count(c, at->count));
 		} else {
-			type = make_type_slice(c->allocator, check_type(c, at->elem));
-			set_base_type(named_type, type);
+			Type *elem = check_type(c, at->elem);
+			type = make_type_slice(c->allocator, elem);
 		}
 		goto end;
 	case_end;
@@ -1034,7 +1039,6 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 			error(ast_node_token(vt->elem), "Vector element type must be numerical or a boolean. Got `%s`", err_str);
 		}
 		type = make_type_vector(c->allocator, elem, count);
-		set_base_type(named_type, type);
 		goto end;
 	case_end;
 
@@ -1078,12 +1082,6 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		goto end;
 	case_end;
 
-	case_ast_node(pt, PointerType, e);
-		type = make_type_pointer(c->allocator, check_type(c, pt->type));
-		set_base_type(named_type, type);
-		goto end;
-	case_end;
-
 	case_ast_node(pt, ProcType, e);
 		type = alloc_type(c->allocator, Type_Proc);
 		set_base_type(named_type, type);
@@ -1093,34 +1091,27 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		goto end;
 	case_end;
 
-	default: {
-		if (e->kind == AstNode_CallExpr) {
-			Operand o = {};
-			check_expr_or_type(c, &o, e);
-			if (o.mode == Addressing_Type) {
-				type = o.type;
-				goto end;
-			}
-		} else if (e->kind == AstNode_UnaryExpr) {
-			ast_node(ue, UnaryExpr, e);
-			if (ue->op.kind == Token_Pointer) {
-				type = make_type_pointer(c->allocator, check_type(c, ue->expr));
-				set_base_type(named_type, type);
-				goto end;
-			}
+	case_ast_node(ce, CallExpr, e);
+		Operand o = {};
+		check_expr_or_type(c, &o, e);
+		if (o.mode == Addressing_Type) {
+			type = o.type;
+			goto end;
 		}
-
-		err_str = expr_to_string(e);
-		error(ast_node_token(e), "`%s` is not a type", err_str);
-	} break;
+	case_end;
 	}
+	err_str = expr_to_string(e);
+	error(ast_node_token(e), "`%s` is not a type", err_str);
 
 	type = t_invalid;
-	set_base_type(named_type, type);
-
 end:
+	if (type == NULL) {
+		type = t_invalid;
+	}
+
+	set_base_type(named_type, type);
 	GB_ASSERT(is_type_typed(type));
-	type->flags |= e->type_flags;
+
 	add_type_and_value(&c->info, e, Addressing_Type, type, null_value);
 	return type;
 }
@@ -1550,19 +1541,13 @@ b32 check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 			return true;
 	}
 
-	// // untyped integers -> pointers
-	// if (is_type_untyped(xb) && is_type_integer(xb)) {
-	// 	if (is_type_pointer(yb))
-	// 		return true;
-	// }
-
 	// (u)int <-> pointer
-	if (is_type_pointer(xb) || (is_type_int_or_uint(xb) && !is_type_untyped(xb))) {
+	if (is_type_int_or_uint(xb) && !is_type_untyped(xb)) {
 		if (is_type_pointer(yb))
 			return true;
 	}
 	if (is_type_pointer(xb)) {
-		if (is_type_pointer(yb) || (is_type_int_or_uint(yb) && !is_type_untyped(yb)))
+		if (is_type_int_or_uint(yb) && !is_type_untyped(yb))
 			return true;
 	}
 
@@ -1643,7 +1628,9 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 				}
 			}
 		} else if (check_is_castable_to(c, x, type)) {
-			x->mode = Addressing_Value;
+			if (x->mode != Addressing_Constant) {
+				x->mode = Addressing_Value;
+			}
 			can_convert = true;
 		}
 
@@ -3963,17 +3950,24 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_end;
 
 	case_ast_node(st, StructType, node);
-		str = gb_string_appendc(str, "struct{");
+		str = gb_string_appendc(str, "struct ");
+		if (st->is_packed)  str = gb_string_appendc(str, "#packed ");
+		if (st->is_ordered) str = gb_string_appendc(str, "#ordered ");
 		// str = write_fields_to_string(str, st->decl_list, ", ");
 		str = gb_string_appendc(str, "}");
 	case_end;
 
 	case_ast_node(st, RawUnionType, node);
-		str = gb_string_appendc(str, "raw_union{");
+		str = gb_string_appendc(str, "raw_union {");
 		// str = write_fields_to_string(str, st->decl_list, ", ");
 		str = gb_string_appendc(str, "}");
 	case_end;
 
+	case_ast_node(st, UnionType, node);
+		str = gb_string_appendc(str, "union {");
+		// str = write_fields_to_string(str, st->decl_list, ", ");
+		str = gb_string_appendc(str, "}");
+	case_end;
 
 	case_ast_node(et, EnumType, node);
 		str = gb_string_appendc(str, "enum ");
