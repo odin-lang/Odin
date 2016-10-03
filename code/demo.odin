@@ -5,12 +5,5 @@
 #import "game.odin"
 
 main :: proc() {
-	Vector3 :: struct {
-		x, y, z: f32
-	}
-	Entity :: struct {
-		guid:     u64
-		position: Vector3
-	}
-
+	fmt.println("Hellope")
 }

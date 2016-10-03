@@ -85,10 +85,13 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 		return true;
 	}
 
-	if (is_type_pointer(dst) && is_type_rawptr(src)) {
-	    return true;
-	}
+	// ^T <- rawptr
+	// TODO(bill): Should C-style (not C++) pointer cast be allowed?
+	// if (is_type_pointer(dst) && is_type_rawptr(src)) {
+	    // return true;
+	// }
 
+	// rawptr <- ^T
 	if (is_type_rawptr(dst) && is_type_pointer(src)) {
 	    return true;
 	}
@@ -121,7 +124,7 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 		return true;
 	}
 
-	if (is_argument) {
+	if (true || is_argument) {
 		// NOTE(bill): Polymorphism for subtyping
 		if (check_is_assignable_to_using_subtype(type, src)) {
 			return true;
@@ -224,16 +227,17 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 	defer (map_destroy(&entity_map));
 
 	isize other_field_index = 0;
-
 	Entity *using_index_expr = NULL;
 
+	struct Delay {
+		Entity *e;
+		AstNode *t;
+	};
+	gbArray(Delay) delayed_const; gb_array_init(delayed_const, gb_heap_allocator());
+	gbArray(Delay) delayed_type;  gb_array_init(delayed_type,  gb_heap_allocator());
+	defer (gb_array_free(delayed_const));
+	defer (gb_array_free(delayed_type));
 
-	// TODO(bill): Random declarations with DeclInfo
-#if 0
-	Entity *e;
-	DeclInfo *d;d
-	check_entity_decl(c, e, d, NULL);
-#endif
 	gb_for_array(decl_index, decls) {
 		AstNode *decl = decls[decl_index];
 		if (decl->kind == AstNode_ConstDecl) {
@@ -252,7 +256,9 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 				Token name_token = name->Ident;
 				Entity *e = make_entity_constant(c->allocator, c->context.scope, name_token, NULL, v);
 				entities[entity_index++] = e;
-				check_const_decl(c, e, cd->type, value);
+
+				Delay delay = {e, cd->type};
+				gb_array_append(delayed_const, delay);
 			}
 
 			isize lhs_count = gb_array_count(cd->names);
@@ -288,8 +294,8 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 			Token name_token = td->name->Ident;
 
 			Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, NULL);
-			add_entity(c, c->context.scope, td->name, e);
-			check_type_decl(c, e, td->type, NULL, NULL);
+			Delay delay = {e, td->type};
+			gb_array_append(delayed_type, delay);
 
 			if (name_token.string == "_") {
 				other_fields[other_field_index++] = e;
@@ -302,10 +308,17 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 					map_set(&entity_map, key, e);
 					other_fields[other_field_index++] = e;
 				}
+				add_entity(c, c->context.scope, td->name, e);
 				add_entity_use(c, td->name, e);
 			}
 		}
+	}
 
+	gb_for_array(i, delayed_type) {
+		check_const_decl(c, delayed_type[i].e, delayed_type[i].t, NULL);
+	}
+	gb_for_array(i, delayed_const) {
+		check_type_decl(c, delayed_const[i].e, delayed_const[i].t, NULL, NULL);
 	}
 
 	if (node->kind == AstNode_UnionType) {
@@ -1536,18 +1549,15 @@ b32 check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 	}
 
 	// Cast between pointers
-	if (is_type_pointer(xb)) {
-		if (is_type_pointer(yb))
+	if (is_type_pointer(xb) && is_type_pointer(yb)) {
 			return true;
 	}
 
 	// (u)int <-> pointer
-	if (is_type_int_or_uint(xb) && !is_type_untyped(xb)) {
-		if (is_type_pointer(yb))
+	if (is_type_int_or_uint(xb) && is_type_rawptr(yb)) {
 			return true;
 	}
-	if (is_type_pointer(xb)) {
-		if (is_type_int_or_uint(yb) && !is_type_untyped(yb))
+	if (is_type_rawptr(xb) && is_type_int_or_uint(yb)) {
 			return true;
 	}
 
@@ -2961,136 +2971,97 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	GB_ASSERT(proc_type->kind == Type_Proc);
 	ast_node(ce, CallExpr, call);
 
-
-	isize error_code = 0;
-	isize param_index = 0;
 	isize param_count = 0;
 	b32 variadic = proc_type->Proc.variadic;
 	b32 vari_expand = (ce->ellipsis.pos.line != 0);
 
-	if (proc_type->Proc.params) {
+	if (proc_type->Proc.params != NULL) {
 		param_count = proc_type->Proc.params->Tuple.variable_count;
-	}
-
-	if (ce->ellipsis.pos.line != 0) {
-		if (!variadic) {
-			error(ce->ellipsis,
-			      "Cannot use `..` in call to a non-variadic procedure: `%.*s`",
-			      LIT(ce->proc->Ident.string));
-			return;
+		if (variadic) {
+			param_count--;
 		}
 	}
 
-	if (gb_array_count(ce->args) == 0) {
-		if (variadic && param_count-1 == 0)
-			return;
-		if (param_count == 0)
-			return;
+	if (vari_expand && !variadic) {
+		error(ce->ellipsis,
+		      "Cannot use `..` in call to a non-variadic procedure: `%.*s`",
+		      LIT(ce->proc->Ident.string));
+		return;
 	}
 
-	// TODO(bill): Completely redo this entire code.
-	// It's from when I used linked lists instead of arrays in the parser
+	if (gb_array_count(ce->args) == 0 && param_count == 0) {
+		return;
+	}
 
-	if (gb_array_count(ce->args) > param_count && !variadic) {
+	isize operand_count = 0;
+	gbArray(Operand) operands;
+	gb_array_init_reserve(operands, gb_heap_allocator(), 2*param_count);
+	defer (gb_array_free(operands));
+
+	gb_for_array(i, ce->args) {
+		Operand o = {};
+		check_multi_expr(c, &o, ce->args[i]);
+		if (o.type->kind != Type_Tuple) {
+			gb_array_append(operands, o);
+		} else {
+			auto *tuple = &o.type->Tuple;
+			if (variadic && i >= param_count) {
+				error(ast_node_token(ce->args[i]),
+				      "`..` in a variadic procedure cannot be applied to a %td-valued expression", tuple->variable_count);
+				operand->mode = Addressing_Invalid;
+				return;
+			}
+			for (isize j = 0; j < tuple->variable_count; j++) {
+				o.type = tuple->variables[j]->type;
+				gb_array_append(operands, o);
+			}
+		}
+	}
+
+	operand_count = gb_array_count(operands);
+	i32 error_code = 0;
+	if (operand_count < param_count) {
+		error_code = -1;
+	} else if (!variadic && operand_count > param_count) {
 		error_code = +1;
-	} else {
-		Entity **sig_params = proc_type->Proc.params->Tuple.variables;
-		gb_for_array(arg_index, ce->args) {
-			check_multi_expr(c, operand, ce->args[arg_index]);
-			if (operand->mode == Addressing_Invalid) {
-				param_index++;
-				continue;
-			}
-			if (operand->type->kind != Type_Tuple) {
-				check_not_tuple(c, operand);
-				isize index = param_index;
-				b32 end_variadic = false;
-				b32 variadic_expand = false;
-				if (variadic && param_index >= param_count-1) {
-					index = param_count-1;
-					end_variadic = true;
-					if (vari_expand) {
-						variadic_expand = true;
-						if (param_index != param_count-1) {
-							error(ast_node_token(operand->expr),
-							      "`..` in a variadic procedure can only have one variadic argument at the end");
-							break;
-						}
-					}
-				}
-				Type *arg_type = sig_params[index]->type;
-				if (end_variadic && is_type_slice(arg_type)) {
-					if (variadic_expand) {
-						check_assignment(c, operand, arg_type, make_string("argument"), true);
-					} else {
-						arg_type = base_type(arg_type)->Slice.elem;
-						check_assignment(c, operand, arg_type, make_string("argument"), true);
-					}
-				} else {
-					check_assignment(c, operand, arg_type, make_string("argument"), true);
-				}
-				param_index++;
-			} else {
-				auto *tuple = &operand->type->Tuple;
-				isize i = 0;
-				for (;
-				     i < tuple->variable_count && (param_index < param_count && !variadic);
-				     i++) {
-					Entity *e = tuple->variables[i];
-					operand->type = e->type;
-					operand->mode = Addressing_Value;
-					check_not_tuple(c, operand);
-					isize index = param_index;
-					b32 end_variadic = false;
-					if (variadic && param_index >= param_count-1) {
-						index = param_count-1;
-						end_variadic = true;
-						if (vari_expand) {
-							error(ast_node_token(operand->expr),
-							      "`..` in a variadic procedure cannot be applied to a %td-valued expression", tuple->variable_count);
-							goto end;
-						}
-					}
-					Type *arg_type = sig_params[index]->type;
-					if (end_variadic && is_type_slice(arg_type)) {
-						arg_type = base_type(arg_type)->Slice.elem;
-					}
-					check_assignment(c, operand, arg_type, make_string("argument"), true);
-					param_index++;
-				}
-
-			end:
-
-				if (i < tuple->variable_count && param_index == param_count) {
-					error_code = +1;
-					break;
-				}
-			}
-
-			if (!variadic && param_index >= param_count)
-				break;
-		}
-
-
-		if ((!variadic && param_index < param_count) ||
-		    (variadic  && param_index < param_count-1)) {
-			error_code = -1;
-		}
 	}
-
 	if (error_code != 0) {
-		char *err_fmt = "";
+		char *err_fmt = "Too many arguments for `%s`, expected %td arguments";
 		if (error_code < 0) {
 			err_fmt = "Too few arguments for `%s`, expected %td arguments";
-		} else {
-			err_fmt = "Too many arguments for `%s`, expected %td arguments";
 		}
 
 		gbString proc_str = expr_to_string(ce->proc);
 		error(ast_node_token(call), err_fmt, proc_str, param_count);
 		gb_string_free(proc_str);
-
 		operand->mode = Addressing_Invalid;
+	}
+
+	GB_ASSERT(proc_type->Proc.params != NULL);
+	Entity **sig_params = proc_type->Proc.params->Tuple.variables;
+	for (isize i = 0; i < param_count; i++) {
+		Type *arg_type = sig_params[i]->type;
+		check_assignment(c, &operands[i], arg_type, make_string("argument"), true);
+	}
+
+	if (variadic) {
+		b32 variadic_expand = false;
+		Type *slice = sig_params[param_count]->type;
+		Type *elem = base_type(slice)->Slice.elem;
+		Type *t = elem;
+		for (isize i = param_count; i < operand_count; i++) {
+			Operand *o = &operands[i];
+			if (vari_expand) {
+				variadic_expand = true;
+				t = slice;
+				if (i != param_count) {
+					error(ast_node_token(o->expr),
+					      "`..` in a variadic procedure can only have one variadic argument at the end");
+					break;
+				}
+			}
+			check_assignment(c, o, t, make_string("argument"), true);
+		}
 	}
 }
 

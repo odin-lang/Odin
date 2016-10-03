@@ -1799,7 +1799,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 
 	// NOTE(bill): This has to be done beofre `Pointer <-> Pointer` as it's
 	// subtype polymorphism casting
-	if (is_argument) {
+	if (true || is_argument) {
 		Type *sb = base_type(type_deref(src));
 		b32 src_is_ptr = src != sb;
 		if (is_type_struct(sb)) {
@@ -1924,8 +1924,9 @@ ssaValue *ssa_emit_transmute(ssaProcedure *proc, ssaValue *value, Type *t) {
 
 	Type *src = base_type(src_type);
 	Type *dst = base_type(t);
-	if (are_types_identical(t, src_type))
+	if (are_types_identical(t, src_type)) {
 		return value;
+	}
 
 	i64 sz = type_size_of(proc->module->sizes, proc->module->allocator, src);
 	i64 dz = type_size_of(proc->module->sizes, proc->module->allocator, dst);
@@ -1949,8 +1950,6 @@ ssaValue *ssa_emit_down_cast(ssaProcedure *proc, ssaValue *value, Type *t) {
 	Selection sel = lookup_field(proc->module->allocator, t, field_name, false);
 	Type *t_u8_ptr = make_type_pointer(allocator, t_u8);
 	ssaValue *bytes = ssa_emit_conv(proc, value, t_u8_ptr);
-
-	// IMPORTANT TODO(bill): THIS ONLY DOES ONE LAYER DEEP!!! FUCKING HELL THIS IS NOT WHAT I SIGNED UP FOR!
 
 	i64 offset_ = type_offset_of_from_selection(proc->module->sizes, allocator, type_deref(t), sel);
 	ssaValue *offset = ssa_make_const_int(allocator, -offset_);

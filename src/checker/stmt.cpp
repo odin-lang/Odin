@@ -11,8 +11,6 @@ void check_stmt(Checker *c, AstNode *node, u32 flags);
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d);
 
 void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
-	// TODO(bill): Allow declaration (expect variable) in any order
-	// even within a procedure
 	struct Delay {
 		Entity *e;
 		DeclInfo *d;
@@ -57,7 +55,6 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 		case_ast_node(td, TypeDecl, node);
 			Entity *e = make_entity_type_name(c->allocator, c->context.scope, td->name->Ident, NULL);
 			e->identifier = td->name;
-			add_entity(c, c->context.scope, td->name, e);
 
 			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
 			d->type_expr = td->type;
@@ -339,7 +336,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 
 	// TODO(bill): Do not use heap allocation here if I can help it
 	gbArray(Operand) operands;
-	gb_array_init(operands, gb_heap_allocator());
+	gb_array_init_reserve(operands, gb_heap_allocator(), 2*lhs_count);
 	defer (gb_array_free(operands));
 
 	gb_for_array(i, inits) {
