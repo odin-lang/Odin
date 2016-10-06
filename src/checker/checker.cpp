@@ -33,6 +33,10 @@ struct Operand {
 	BuiltinProcId builtin_id;
 };
 
+b32 is_operand_nil(Operand *o) {
+	return o->mode == Addressing_Value && o->type == t_untyped_nil;
+}
+
 struct TypeAndValue {
 	AddressingMode mode;
 	Type *type;
@@ -241,7 +245,9 @@ struct Checker {
 	gbArray(ProcedureInfo) procs; // NOTE(bill): Procedures to check
 
 	gbArena     arena;
+	gbArena     tmp_arena;
 	gbAllocator allocator;
+	gbAllocator tmp_allocator;
 
 	CheckerContext context;
 
@@ -501,9 +507,10 @@ void init_universal_scope(void) {
 	}
 
 // Constants
-	add_global_constant(a, make_string("true"),  t_untyped_bool,    make_exact_value_bool(true));
-	add_global_constant(a, make_string("false"), t_untyped_bool,    make_exact_value_bool(false));
-	add_global_constant(a, make_string("null"),  t_untyped_pointer, make_exact_value_pointer(NULL));
+	add_global_constant(a, make_string("true"),  t_untyped_bool, make_exact_value_bool(true));
+	add_global_constant(a, make_string("false"), t_untyped_bool, make_exact_value_bool(false));
+
+	add_global_entity(make_entity_nil(a, NULL, make_token_ident(make_string("nil")), t_untyped_nil));
 
 // Builtin Procedures
 	for (isize i = 0; i < gb_count_of(builtin_procs); i++) {
@@ -564,7 +571,10 @@ void init_checker(Checker *c, Parser *parser, BaseTypeSizes sizes) {
 	}
 	isize arena_size = 2 * item_size * total_token_count;
 	gb_arena_init_from_allocator(&c->arena, a, arena_size);
+	gb_arena_init_from_allocator(&c->tmp_arena, a, arena_size);
+
 	c->allocator = gb_arena_allocator(&c->arena);
+	c->tmp_allocator = gb_arena_allocator(&c->tmp_arena);
 
 	c->global_scope = make_scope(universal_scope, c->allocator);
 	c->context.scope = c->global_scope;
@@ -705,6 +715,10 @@ void add_type_info_type(Checker *c, Type *t) {
 		return;
 	}
 	t = default_type(t);
+	if (is_type_untyped(t)) {
+		return; // Could be nil
+	}
+
 	if (map_get(&c->info.type_info_map, hash_pointer(t)) != NULL) {
 		// Types have already been added
 		return;

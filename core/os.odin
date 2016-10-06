@@ -9,7 +9,7 @@ open :: proc(name: string) -> (File, bool) {
 	using win32
 	buf: [300]byte
 	copy(buf[:], name as []byte)
-	f := File{CreateFileA(^buf[0], FILE_GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, 0, null)}
+	f := File{CreateFileA(^buf[0], FILE_GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, 0, nil)}
 	success := f.handle != INVALID_HANDLE_VALUE as File.Handle
 
 	return f, success
@@ -20,7 +20,7 @@ create :: proc(name: string) -> (File, bool) {
 	buf: [300]byte
 	copy(buf[:], name as []byte)
 	f := File{
-		handle = CreateFileA(^buf[0], FILE_GENERIC_WRITE, FILE_SHARE_READ, null, CREATE_ALWAYS, 0, null),
+		handle = CreateFileA(^buf[0], FILE_GENERIC_WRITE, FILE_SHARE_READ, nil, CREATE_ALWAYS, 0, nil),
 	}
 	success := f.handle != INVALID_HANDLE_VALUE as File.Handle
 	return f, success
@@ -32,7 +32,7 @@ close :: proc(using f: ^File) {
 
 write :: proc(using f: ^File, buf: []byte) -> bool {
 	bytes_written: i32
-	return win32.WriteFile(handle, buf.data, buf.count as i32, ^bytes_written, null) != 0
+	return win32.WriteFile(handle, buf.data, buf.count as i32, ^bytes_written, nil) != 0
 }
 
 
@@ -72,7 +72,7 @@ read_entire_file :: proc(name: string) -> (string, bool) {
 	}
 
 	data := new_slice(u8, length)
-	if data.data == null {
+	if data.data == nil {
 		return "", false
 	}
 
@@ -89,7 +89,7 @@ read_entire_file :: proc(name: string) -> (string, bool) {
 			to_read = MAX
 		}
 
-		win32.ReadFile(f.handle as win32.HANDLE, ^data[total_read], to_read, ^single_read_length, null)
+		win32.ReadFile(f.handle as win32.HANDLE, ^data[total_read], to_read, ^single_read_length, nil)
 		if single_read_length <= 0 {
 			free(data.data)
 			return "", false

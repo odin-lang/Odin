@@ -68,13 +68,16 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 	if (is_type_untyped(src)) {
 		switch (dst->kind) {
 		case Type_Basic:
-			if (operand->mode == Addressing_Constant)
+			if (operand->mode == Addressing_Constant) {
 				return check_value_is_expressible(c, operand->value, dst, NULL);
-			if (src->kind == Type_Basic)
-				return src->Basic.kind == Basic_UntypedBool && is_type_boolean(dst);
+			}
+			if (src->kind == Type_Basic && src->Basic.kind == Basic_UntypedBool) {
+				return is_type_boolean(dst);
+			}
 			break;
-		case Type_Pointer:
-			return src->Basic.kind == Basic_UntypedPointer;
+		}
+		if (type_has_nil(dst)) {
+			return is_operand_nil(operand);
 		}
 	}
 
@@ -83,6 +86,10 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 			return are_types_identical(s, type);
 		}
 		return true;
+	}
+
+	if (is_type_untyped_nil(src)) {
+		return type_has_nil(dst);
 	}
 
 	// ^T <- rawptr
@@ -146,7 +153,13 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
 
-		if (type == NULL || is_type_any(type)) {
+		if (type == NULL || is_type_any(type) || is_type_untyped_nil(type)) {
+			if (type == NULL && base_type(operand->type) == t_untyped_nil) {
+				error(ast_node_token(operand->expr), "Use of untyped nil in %.*s", LIT(context_name));
+				operand->mode = Addressing_Invalid;
+				return;
+			}
+
 			add_type_info_type(c, type);
 			target_type = default_type(operand->type);
 		}
@@ -229,14 +242,15 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 	isize other_field_index = 0;
 	Entity *using_index_expr = NULL;
 
+
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
 	struct Delay {
 		Entity *e;
 		AstNode *t;
 	};
-	gbArray(Delay) delayed_const; gb_array_init(delayed_const, gb_heap_allocator());
-	gbArray(Delay) delayed_type;  gb_array_init(delayed_type,  gb_heap_allocator());
-	defer (gb_array_free(delayed_const));
-	defer (gb_array_free(delayed_type));
+	gbArray(Delay) delayed_const; gb_array_init_reserve(delayed_const, c->tmp_allocator, other_field_count);
+	gbArray(Delay) delayed_type;  gb_array_init_reserve(delayed_type,  c->tmp_allocator, other_field_count);
 
 	gb_for_array(decl_index, decls) {
 		AstNode *decl = decls[decl_index];
@@ -729,8 +743,8 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		make_token_ident(make_string("max_value")), constant_type, make_exact_value_integer(max_value));
 }
 
-Type *check_get_params(Checker *c, Scope *scope, AstNodeArray fields, b32 *is_variadic_) {
-	if (fields == NULL || gb_array_count(fields) == 0)
+Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, b32 *is_variadic_) {
+	if (params == NULL || gb_array_count(params) == 0)
 		return NULL;
 
 	b32 is_variadic = false;
@@ -738,33 +752,32 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray fields, b32 *is_va
 	Type *tuple = make_type_tuple(c->allocator);
 
 	isize variable_count = 0;
-	gb_for_array(i, fields) {
-		AstNode *field = fields[i];
-		ast_node(f, Field, field);
-		variable_count += gb_array_count(f->names);
+	gb_for_array(i, params) {
+		AstNode *field = params[i];
+		ast_node(p, Parameter, field);
+		variable_count += gb_array_count(p->names);
 	}
 
 	Entity **variables = gb_alloc_array(c->allocator, Entity *, variable_count);
 	isize variable_index = 0;
-	gb_for_array(i, fields) {
-		AstNode *field = fields[i];
-		ast_node(f, Field, field);
-		AstNode *type_expr = f->type;
+	gb_for_array(i, params) {
+		ast_node(p, Parameter, params[i]);
+		AstNode *type_expr = p->type;
 		if (type_expr) {
 			if (type_expr->kind == AstNode_Ellipsis) {
 				type_expr = type_expr->Ellipsis.expr;
-				if (i+1 == gb_array_count(fields)) {
+				if (i+1 == gb_array_count(params)) {
 					is_variadic = true;
 				} else {
-					error(ast_node_token(field), "Invalid AST: Invalid variadic parameter");
+					error(ast_node_token(params[i]), "Invalid AST: Invalid variadic parameter");
 				}
 			}
 
 			Type *type = check_type(c, type_expr);
-			gb_for_array(j, f->names) {
-				AstNode *name = f->names[j];
+			gb_for_array(j, p->names) {
+				AstNode *name = p->names[j];
 				if (name->kind == AstNode_Ident) {
-					Entity *param = make_entity_param(c->allocator, scope, name->Ident, type, f->is_using);
+					Entity *param = make_entity_param(c->allocator, scope, name->Ident, type, p->is_using);
 					add_entity(c, scope, name, param);
 					variables[variable_index++] = param;
 				} else {
@@ -774,10 +787,10 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray fields, b32 *is_va
 		}
 	}
 
-	if (is_variadic && gb_array_count(fields) > 0) {
+	if (is_variadic && gb_array_count(params) > 0) {
 		// NOTE(bill): Change last variadic parameter to be a slice
 		// Custom Calling convention for variadic parameters
-		Entity *end = variables[gb_array_count(fields)-1];
+		Entity *end = variables[gb_array_count(params)-1];
 		end->type = make_type_slice(c->allocator, end->type);
 	}
 
@@ -926,6 +939,10 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 	case Entity_ImportName:
 		error(ast_node_token(n), "Use of import `%.*s` not in selector", LIT(e->ImportName.name));
 		return;
+
+	case Entity_Nil:
+		o->mode = Addressing_Value;
+		break;
 
 	default:
 		compiler_error("Compiler error: Unknown EntityKind");
@@ -1184,15 +1201,20 @@ b32 check_binary_op(Checker *c, Operand *o, Token op) {
 		}
 		break;
 
-	case Token_Mod:
 	case Token_And:
 	case Token_Or:
-	case Token_Xor:
-	case Token_AndNot:
-
-	case Token_ModEq:
 	case Token_AndEq:
 	case Token_OrEq:
+		if (!is_type_integer(type) && !is_type_boolean(type)) {
+			error(op, "Operator `%.*s` is only allowed with integers or booleans", LIT(op.string));
+			return false;
+		}
+		break;
+
+	case Token_Mod:
+	case Token_Xor:
+	case Token_AndNot:
+	case Token_ModEq:
 	case Token_XorEq:
 	case Token_AndNotEq:
 		if (!is_type_integer(type)) {
@@ -1350,7 +1372,17 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 
 	if (o->mode == Addressing_Constant) {
 		Type *type = base_type(o->type);
-		GB_ASSERT(type->kind == Type_Basic);
+		if (type->kind != Type_Basic) {
+			gbString xt = type_to_string(o->type);
+			gbString err_str = expr_to_string(node);
+			defer (gb_string_free(xt));
+			defer (gb_string_free(err_str));
+			error(op, "Invalid type, `%s`, for constant unary expression `%s`", xt, err_str);
+			o->mode = Addressing_Invalid;
+			return;
+		}
+
+
 		i32 precision = 0;
 		if (is_type_unsigned(type))
 			precision = cast(i32)(8 * type_size_of(c->sizes, c->allocator, type));
@@ -1368,6 +1400,9 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 }
 
 void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
 	gbString err_str = NULL;
 	defer ({
 		if (err_str != NULL)
@@ -1392,16 +1427,16 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 
 		if (!defined) {
 			gbString type_string = type_to_string(x->type);
-			err_str = gb_string_make(gb_heap_allocator(),
+			defer (gb_string_free(type_string));
+			err_str = gb_string_make(c->tmp_allocator,
 			                         gb_bprintf("operator `%.*s` not defined for type `%s`", LIT(op.string), type_string));
-			gb_string_free(type_string);
 		}
 	} else {
 		gbString xt = type_to_string(x->type);
 		gbString yt = type_to_string(y->type);
 		defer(gb_string_free(xt));
 		defer(gb_string_free(yt));
-		err_str = gb_string_make(gb_heap_allocator(),
+		err_str = gb_string_make(c->tmp_allocator,
 		                         gb_bprintf("mismatched types `%s` and `%s`", xt, yt));
 	}
 
@@ -1853,7 +1888,15 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		ExactValue b = y->value;
 
 		Type *type = base_type(x->type);
-		GB_ASSERT(type->kind == Type_Basic);
+		if (type->kind != Type_Basic) {
+			gbString xt = type_to_string(x->type);
+			defer (gb_string_free(xt));
+			err_str = expr_to_string(node);
+			error(op, "Invalid type, `%s`, for constant binary expression `%s`", xt, err_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
 		if (op.kind == Token_Quo && is_type_integer(type)) {
 			op.kind = Token_QuoEq; // NOTE(bill): Hack to get division of integers
 		}
@@ -1932,8 +1975,10 @@ void convert_untyped_error(Checker *c, Operand *operand, Type *target_type) {
 
 	if (operand->mode == Addressing_Constant) {
 		if (operand->value.value_integer == 0) {
-			// NOTE(bill): Doesn't matter what the type is as it's still zero in the union
-			extra_text = " - Did you want `null`?";
+			if (make_string(expr_str) != "nil") { // HACK NOTE(bill): Just in case
+				// NOTE(bill): Doesn't matter what the type is as it's still zero in the union
+				extra_text = " - Did you want `nil`?";
+			}
 		}
 	}
 	error(ast_node_token(operand->expr), "Cannot convert `%s` to `%s`%s", expr_str, type_str, extra_text);
@@ -1989,36 +2034,27 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 					return;
 				}
 				break;
-			}
-		}
-		break;
-	case Type_Pointer:
-		switch (operand->type->Basic.kind) {
-		case Basic_UntypedPointer:
-			target_type = t_untyped_pointer;
-			break;
-		default:
-			convert_untyped_error(c, operand, target_type);
-			return;
-		}
-		break;
 
-	case Type_Proc:
-		switch (operand->type->Basic.kind) {
-		case Basic_UntypedPointer:
-			break;
-		default:
-			convert_untyped_error(c, operand, target_type);
-			return;
+			case Basic_UntypedNil:
+				if (!type_has_nil(target_type)) {
+					convert_untyped_error(c, operand, target_type);
+					return;
+				}
+				break;
+			}
 		}
 		break;
 
 	default:
-		convert_untyped_error(c, operand, target_type);
-		return;
+		if (!type_has_nil(target_type)) {
+			convert_untyped_error(c, operand, target_type);
+			return;
+		}
+		break;
 	}
 
 	operand->type = target_type;
+	update_expr_type(c, operand->expr, target_type, true);
 }
 
 b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *value) {
@@ -2415,6 +2451,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			error(ast_node_token(expr), "Invalid argument to `type_info`");
 			return false;
 		}
+
 		add_type_info_type(c, type);
 
 		operand->mode = Addressing_Value;
@@ -2993,10 +3030,12 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 		return;
 	}
 
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
 	isize operand_count = 0;
 	gbArray(Operand) operands;
-	gb_array_init_reserve(operands, gb_heap_allocator(), 2*param_count);
-	defer (gb_array_free(operands));
+	gb_array_init_reserve(operands, c->tmp_allocator, 2*param_count);
 
 	gb_for_array(i, ce->args) {
 		Operand o = {};
@@ -3374,12 +3413,12 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 					error(ast_node_token(e), "Index %lld is out of bounds (>= %lld) for vector literal", index, t->Vector.count);
 				}
 
-				Operand o = {};
-				check_expr_with_type_hint(c, &o, e, elem_type);
-				check_assignment(c, &o, elem_type, context_name);
+				Operand operand = {};
+				check_expr_with_type_hint(c, &operand, e, elem_type);
+				check_assignment(c, &operand, elem_type, context_name);
 
 				if (is_constant) {
-					is_constant = o.mode == Addressing_Constant;
+					is_constant = operand.mode == Addressing_Constant;
 				}
 			}
 			if (max < index)
@@ -3730,10 +3769,9 @@ void check_expr_or_type(Checker *c, Operand *o, AstNode *e) {
 	check_expr_base(c, o, e);
 	check_not_tuple(c, o);
 	if (o->mode == Addressing_NoValue) {
-		AstNode *e = o->expr;
-		gbString str = expr_to_string(e);
+		gbString str = expr_to_string(o->expr);
 		defer (gb_string_free(str));
-		error(ast_node_token(e),
+		error(ast_node_token(o->expr),
 		      "`%s` used as value or type", str);
 		o->mode = Addressing_Invalid;
 	}
@@ -3742,15 +3780,14 @@ void check_expr_or_type(Checker *c, Operand *o, AstNode *e) {
 
 gbString write_expr_to_string(gbString str, AstNode *node);
 
-gbString write_fields_to_string(gbString str, AstNodeArray fields, char *sep) {
-	gb_for_array(i, fields) {
-		AstNode *field = fields[i];
-		ast_node(f, Field, field);
+gbString write_params_to_string(gbString str, AstNodeArray params, char *sep) {
+	gb_for_array(i, params) {
+		ast_node(p, Parameter, params[i]);
 		if (i > 0) {
 			str = gb_string_appendc(str, sep);
 		}
 
-		str = write_expr_to_string(str, field);
+		str = write_expr_to_string(str, params[i]);
 	}
 	return str;
 }
@@ -3885,19 +3922,19 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, vt->elem);
 	case_end;
 
-	case_ast_node(f, Field, node);
-		if (f->is_using) {
+	case_ast_node(p, Parameter, node);
+		if (p->is_using) {
 			str = gb_string_appendc(str, "using ");
 		}
-		gb_for_array(i, f->names) {
-			AstNode *name = f->names[i];
+		gb_for_array(i, p->names) {
+			AstNode *name = p->names[i];
 			if (i > 0)
 				str = gb_string_appendc(str, ", ");
 			str = write_expr_to_string(str, name);
 		}
 
 		str = gb_string_appendc(str, ": ");
-		str = write_expr_to_string(str, f->type);
+		str = write_expr_to_string(str, p->type);
 	case_end;
 
 	case_ast_node(ce, CallExpr, node);
@@ -3916,7 +3953,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(pt, ProcType, node);
 		str = gb_string_appendc(str, "proc(");
-		str = write_fields_to_string(str, pt->params, ", ");
+		str = write_params_to_string(str, pt->params, ", ");
 		str = gb_string_appendc(str, ")");
 	case_end;
 
@@ -3924,19 +3961,37 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, "struct ");
 		if (st->is_packed)  str = gb_string_appendc(str, "#packed ");
 		if (st->is_ordered) str = gb_string_appendc(str, "#ordered ");
-		// str = write_fields_to_string(str, st->decl_list, ", ");
+		gb_for_array(i, st->decls) {
+			if (i > 0) {
+				str = gb_string_appendc(str, "; ");
+			}
+			str = write_expr_to_string(str, st->decls[i]);
+		}
+		// str = write_params_to_string(str, st->decl_list, ", ");
 		str = gb_string_appendc(str, "}");
 	case_end;
 
 	case_ast_node(st, RawUnionType, node);
 		str = gb_string_appendc(str, "raw_union {");
-		// str = write_fields_to_string(str, st->decl_list, ", ");
+		gb_for_array(i, st->decls) {
+			if (i > 0) {
+				str = gb_string_appendc(str, "; ");
+			}
+			str = write_expr_to_string(str, st->decls[i]);
+		}
+		// str = write_params_to_string(str, st->decl_list, ", ");
 		str = gb_string_appendc(str, "}");
 	case_end;
 
 	case_ast_node(st, UnionType, node);
 		str = gb_string_appendc(str, "union {");
-		// str = write_fields_to_string(str, st->decl_list, ", ");
+		gb_for_array(i, st->decls) {
+			if (i > 0) {
+				str = gb_string_appendc(str, "; ");
+			}
+			str = write_expr_to_string(str, st->decls[i]);
+		}
+		// str = write_params_to_string(str, st->decl_list, ", ");
 		str = gb_string_appendc(str, "}");
 	case_end;
 

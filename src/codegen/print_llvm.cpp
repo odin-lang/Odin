@@ -157,13 +157,7 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 		case Basic_string: ssa_fprintf(f, "%%..string");              break;
 		case Basic_uint:   ssa_fprintf(f, "i%lld", word_bits);        break;
 		case Basic_int:    ssa_fprintf(f, "i%lld", word_bits);        break;
-		case Basic_any:
-			ssa_fprintf(f, "{");
-			ssa_print_type(f, m, t_type_info_ptr);
-			ssa_fprintf(f, ", ");
-			ssa_print_type(f, m, t_rawptr);
-			ssa_fprintf(f, "}");
-			break;
+		case Basic_any:    ssa_fprintf(f, "%%..any");                 break;
 		}
 		break;
 	case Type_Array:
@@ -491,7 +485,8 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 	} break;
 
 	default:
-		GB_PANIC("Invalid ExactValue: %d", value.kind);
+		ssa_fprintf(f, "zeroinitializer");
+		// GB_PANIC("Invalid ExactValue: %d", value.kind);
 		break;
 	}
 }
@@ -537,6 +532,10 @@ void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type
 			ssa_fprintf(f, " %lld}", cs->count);
 		}
 	} break;
+
+	case ssaValue_Nil:
+		ssa_fprintf(f, "zeroinitializer");
+		break;
 
 	case ssaValue_TypeName:
 		ssa_print_encoded_local(f, value->TypeName.name);
@@ -1045,9 +1044,16 @@ void ssa_print_llvm_ir(ssaFileBuffer *f, ssaModule *m) {
 	ssa_fprintf(f, " = type {i8*, ");
 	ssa_print_type(f, m, t_int);
 	ssa_fprintf(f, "} ; Basic_string\n");
-
 	ssa_print_encoded_local(f, make_string("..rawptr"));
-	ssa_fprintf(f, " = type i8* ; Basic_rawptr\n\n");
+	ssa_fprintf(f, " = type i8* ; Basic_rawptr\n");
+
+	ssa_print_encoded_local(f, make_string("..any"));
+	ssa_fprintf(f, " = type {");
+	ssa_print_type(f, m, t_type_info_ptr);
+	ssa_fprintf(f, ", ");
+	ssa_print_type(f, m, t_rawptr);
+	ssa_fprintf(f, "} ; Basic_any\n");
+
 
 	gb_for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];

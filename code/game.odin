@@ -50,7 +50,7 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 	c_class_name := class_name.data
 	w.c_title = to_c_string(title)
 
-	instance := GetModuleHandleA(null)
+	instance := GetModuleHandleA(nil)
 
 	w.wc = WNDCLASSEXA{
 		size       = size_of(WNDCLASSEXA) as u32,
@@ -70,9 +70,9 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 	                         WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
 	                         CW_USEDEFAULT, CW_USEDEFAULT,
 	                         w.width as i32, w.height as i32,
-	                         null, null, instance, null)
+	                         nil, nil, instance, nil)
 
-	if w.hwnd == null {
+	if w.hwnd == nil {
 		win32_print_last_error()
 		return w, false
 	}
@@ -92,7 +92,7 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 			layer_type   = PFD_MAIN_PLANE,
 		}
 
-		SetPixelFormat(w.dc, ChoosePixelFormat(w.dc, ^pfd), null)
+		SetPixelFormat(w.dc, ChoosePixelFormat(w.dc, ^pfd), nil)
 		w.opengl_context = wglCreateContext(w.dc)
 		wglMakeCurrent(w.dc, w.opengl_context)
 
@@ -154,7 +154,7 @@ run :: proc() {
 		prev_time = curr_time
 
 		msg: MSG
-		for PeekMessageA(^msg, null, 0, 0, PM_REMOVE) > 0 {
+		for PeekMessageA(^msg, nil, 0, 0, PM_REMOVE) > 0 {
 			if msg.message == WM_QUIT {
 				running = false
 			}

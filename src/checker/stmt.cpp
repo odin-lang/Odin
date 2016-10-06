@@ -11,14 +11,19 @@ void check_stmt(Checker *c, AstNode *node, u32 flags);
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d);
 
 void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
+	if (stmts == NULL) {
+		return;
+	}
+
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
 	struct Delay {
 		Entity *e;
 		DeclInfo *d;
 	};
-	gbArray(Delay) delayed_const; gb_array_init(delayed_const, gb_heap_allocator());
-	gbArray(Delay) delayed_type;  gb_array_init(delayed_type,  gb_heap_allocator());
-	defer (gb_array_free(delayed_const));
-	defer (gb_array_free(delayed_type));
+	gbArray(Delay) delayed_const; gb_array_init_reserve(delayed_const, c->tmp_allocator, gb_array_count(stmts));
+	gbArray(Delay) delayed_type;  gb_array_init_reserve(delayed_type,  c->tmp_allocator, gb_array_count(stmts));
 
 	gb_for_array(i, stmts) {
 		AstNode *node = stmts[i];
@@ -312,8 +317,8 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 		// NOTE(bill): Use the type of the operand
 		Type *t = operand->type;
 		if (is_type_untyped(t)) {
-			if (t == t_invalid) {
-				error(e->token, "Use of untyped thing in %.*s", LIT(context_name));
+			if (t == t_invalid || is_type_untyped_nil(t)) {
+				error(e->token, "Use of untyped nil in %.*s", LIT(context_name));
 				e->type = t_invalid;
 				return NULL;
 			}
@@ -331,13 +336,17 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 }
 
 void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArray inits, String context_name) {
-	if ((lhs == NULL || lhs_count == 0) && gb_array_count(inits) == 0)
+	if ((lhs == NULL || lhs_count == 0) && (inits == NULL || gb_array_count(inits) == 0)) {
 		return;
+	}
 
-	// TODO(bill): Do not use heap allocation here if I can help it
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
+	// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
+	// an extra allocation
 	gbArray(Operand) operands;
-	gb_array_init_reserve(operands, gb_heap_allocator(), 2*lhs_count);
-	defer (gb_array_free(operands));
+	gb_array_init_reserve(operands, c->tmp_allocator, 2*lhs_count);
 
 	gb_for_array(i, inits) {
 		AstNode *rhs = inits[i];
@@ -907,10 +916,13 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				return;
 			}
 
-			// TODO(bill): Do not use heap allocation here if I can help it
+			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+			defer (gb_temp_arena_memory_end(tmp));
+
+			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
+			// an extra allocation
 			gbArray(Operand) operands;
-			gb_array_init(operands, gb_heap_allocator());
-			defer (gb_array_free(operands));
+			gb_array_init_reserve(operands, c->tmp_allocator, 2 * gb_array_count(as->lhs));
 
 			gb_for_array(i, as->rhs) {
 				AstNode *rhs = as->rhs[i];
@@ -1091,8 +1103,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			AstNode *stmt = bs->stmts[i];
 			AstNode *default_stmt = NULL;
 			if (stmt->kind == AstNode_CaseClause) {
-				ast_node(c, CaseClause, stmt);
-				if (gb_array_count(c->list) == 0) {
+				ast_node(cc, CaseClause, stmt);
+				if (gb_array_count(cc->list) == 0) {
 					default_stmt = stmt;
 				}
 			} else {
@@ -1158,9 +1170,11 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 					HashKey key = hash_exact_value(y.value);
 					auto *found = map_get(&seen, key);
 					if (found != NULL) {
+						gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+						defer (gb_temp_arena_memory_end(tmp));
+
 						isize count = multi_map_count(&seen, key);
-						TypeAndToken *taps = gb_alloc_array(gb_heap_allocator(), TypeAndToken, count);
-						defer (gb_free(gb_heap_allocator(), taps));
+						TypeAndToken *taps = gb_alloc_array(c->tmp_allocator, TypeAndToken, count);
 
 						multi_map_get_all(&seen, key, taps);
 						b32 continue_outer = false;
@@ -1227,8 +1241,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			AstNode *stmt = bs->stmts[i];
 			AstNode *default_stmt = NULL;
 			if (stmt->kind == AstNode_CaseClause) {
-				ast_node(c, CaseClause, stmt);
-				if (gb_array_count(c->list) == 0) {
+				ast_node(cc, CaseClause, stmt);
+				if (gb_array_count(cc->list) == 0) {
 					default_stmt = stmt;
 				}
 			} else {

@@ -143,7 +143,7 @@ init_sub_arena :: proc(sub, parent: ^Arena, size: int) {
 }
 
 free_arena :: proc(using a: ^Arena) {
-	if backing.procedure != null {
+	if backing.procedure != nil {
 		push_allocator backing {
 			free(memory.data)
 			memory = memory[0:0:0]
@@ -170,7 +170,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
 
 		if arena.memory.count + total_size > arena.memory.capacity {
 			fmt.fprintln(os.stderr, "Arena out of memory")
-			return null
+			return nil
 		}
 
 		#no_bounds_check end := ^arena.memory[arena.memory.count]
@@ -190,7 +190,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
 		return default_resize_align(old_memory, old_size, size, alignment)
 	}
 
-	return null
+	return nil
 }
 
 begin_temp_arena_memory :: proc(a: ^Arena) -> Temp_Arena_Memory {

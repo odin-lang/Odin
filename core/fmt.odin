@@ -197,7 +197,7 @@ print__f64 :: proc(buffer: ^[]byte, f: f64, decimal_places: int) {
 }
 
 print_type_to_buffer :: proc(buf: ^[]byte, ti: ^Type_Info) {
-	if ti == null { return }
+	if ti == nil { return }
 
 	using Type_Info
 	match type info : ti {
@@ -230,7 +230,7 @@ print_type_to_buffer :: proc(buf: ^[]byte, ti: ^Type_Info) {
 		print_type_to_buffer(buf, info.elem)
 	case Procedure:
 		print_string_to_buffer(buf, "proc")
-		if info.params == null {
+		if info.params == nil {
 			print_string_to_buffer(buf, "()")
 		} else {
 			count := (info.params as ^Tuple).fields.count
@@ -238,7 +238,7 @@ print_type_to_buffer :: proc(buf: ^[]byte, ti: ^Type_Info) {
 			print_type_to_buffer(buf, info.params)
 			if count == 1 { print_string_to_buffer(buf, ")") }
 		}
-		if info.results != null {
+		if info.results != nil {
 			print_string_to_buffer(buf, " -> ")
 			print_type_to_buffer(buf, info.results)
 		}
@@ -320,7 +320,11 @@ print_type_to_buffer :: proc(buf: ^[]byte, ti: ^Type_Info) {
 }
 
 
-print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
+print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
+	if arg.type_info == nil {
+		print_string_to_buffer(buf, "<nil>")
+		return
+	}
 	using Type_Info
 	match type info : arg.type_info {
 	case Named:
@@ -352,7 +356,7 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 	case Integer:
 		if info.signed {
 			i: i64 = 0;
-			if arg.data != null {
+			if arg.data != nil {
 				match info.size {
 				case 1:  i = (arg.data as ^i8)^   as i64
 				case 2:  i = (arg.data as ^i16)^  as i64
@@ -363,7 +367,7 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 			print_i64_to_buffer(buf, i)
 		} else {
 			i: u64 = 0;
-			if arg.data != null {
+			if arg.data != nil {
 				match info.size {
 				case 1:  i = (arg.data as ^u8)^   as u64
 				case 2:  i = (arg.data as ^u16)^  as u64
@@ -376,7 +380,7 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 
 	case Float:
 		f: f64 = 0
-		if arg.data != null {
+		if arg.data != nil {
 			match info.size {
 			case 4: f = (arg.data as ^f32)^ as f64
 			case 8: f = (arg.data as ^f64)^ as f64
@@ -386,27 +390,27 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 
 	case String:
 		s := ""
-		if arg.data != null {
+		if arg.data != nil {
 			s = (arg.data as ^string)^
 		}
 		print_string_to_buffer(buf, s)
 
 	case Boolean:
 		v := false;
-		if arg.data != null {
+		if arg.data != nil {
 			v = (arg.data as ^bool)^
 		}
 		print_bool_to_buffer(buf, v)
 
 	case Pointer:
-		if arg.data != null {
+		if arg.data != nil {
 			if arg.type_info == type_info(^Type_Info) {
 				print_type_to_buffer(buf, (arg.data as ^^Type_Info)^)
 			} else {
 				print_pointer_to_buffer(buf, (arg.data as ^rawptr)^)
 			}
 		} else {
-			print_pointer_to_buffer(buf, null)
+			print_pointer_to_buffer(buf, nil)
 		}
 
 	case Enum:
@@ -414,7 +418,7 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 		match type i : info.base {
 		case Integer:
 			if i.signed {
-				if arg.data != null {
+				if arg.data != nil {
 					match i.size {
 					case 1:  value = (arg.data as ^i8)^   as i64
 					case 2:  value = (arg.data as ^i16)^  as i64
@@ -423,7 +427,7 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any)  {
 					}
 				}
 			} else {
-				if arg.data != null {
+				if arg.data != nil {
 					match i.size {
 					case 1:  value = (arg.data as ^u8)^   as i64
 					case 2:  value = (arg.data as ^u16)^  as i64
@@ -582,7 +586,7 @@ bprint :: proc(buf: ^[]byte, args: ..any) {
 	is_type_string :: proc(info: ^Type_Info) -> bool {
 		using Type_Info
 		info = type_info_base(info)
-		if info == null {
+		if info == nil {
 			return false
 		}
 
@@ -597,7 +601,7 @@ bprint :: proc(buf: ^[]byte, args: ..any) {
 	prev_string := false
 	for i := 0; i < args.count; i++ {
 		arg := args[i]
-		is_string := arg.data != null && is_type_string(arg.type_info)
+		is_string := arg.data != nil && is_type_string(arg.type_info)
 		if i > 0 && !is_string && !prev_string {
 			print_space_to_buffer(buf)
 		}

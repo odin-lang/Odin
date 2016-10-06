@@ -1,9 +1,15 @@
 #import "fmt.odin"
-#import "utf8.odin"
-#import "hash.odin"
-#import "mem.odin"
-#import "game.odin"
+
+A :: {2}f32{1, 2}
+B :: {2}f32{3, 4}
 
 main :: proc() {
-	fmt.println("Hellope")
+	Fruit :: union {
+		A: int
+		B: f32
+		C: struct {
+			x: int
+		}
+	}
 }
+

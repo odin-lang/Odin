@@ -190,11 +190,11 @@ void print_ast(AstNode *node, isize indent) {
 			}
 		}
 		break;
-	case AstNode_Field:
-		gb_for_array(i, node->Field.names) {
-			print_ast(node->Field.names[i], indent+1);
+	case AstNode_Parameter:
+		gb_for_array(i, node->Parameter.names) {
+			print_ast(node->Parameter.names[i], indent+1);
 		}
-		print_ast(node->Field.type, indent);
+		print_ast(node->Parameter.type, indent);
 		break;
 	case AstNode_PointerType:
 		print_indent(indent);

@@ -298,6 +298,7 @@ enum ssaValueKind {
 
 	ssaValue_Constant,
 	ssaValue_ConstantSlice,
+	ssaValue_Nil,
 	ssaValue_TypeName,
 	ssaValue_Global,
 	ssaValue_Param,
@@ -323,6 +324,9 @@ struct ssaValue {
 			ssaValue *backing_array;
 			i64 count;
 		} ConstantSlice;
+		struct {
+			Type *type;
+		} Nil;
 		struct {
 			String name;
 			Type * type;
@@ -540,6 +544,8 @@ Type *ssa_type(ssaValue *value) {
 		return value->Constant.type;
 	case ssaValue_ConstantSlice:
 		return value->ConstantSlice.type;
+	case ssaValue_Nil:
+		return value->Nil.type;
 	case ssaValue_TypeName:
 		return value->TypeName.type;
 	case ssaValue_Global:
@@ -643,6 +649,12 @@ ssaValue *ssa_make_value_param(gbAllocator a, ssaProcedure *parent, Entity *e) {
 	v->Param.type   = e->type;
 	return v;
 }
+ssaValue *ssa_make_value_nil(gbAllocator a, Type *type) {
+	ssaValue *v = ssa_alloc_value(a, ssaValue_Nil);
+	v->Nil.type = type;
+	return v;
+}
+
 
 
 ssaValue *ssa_make_instr_local(ssaProcedure *p, Entity *e, b32 zero_initialized) {
@@ -975,11 +987,8 @@ ssaValue *ssa_emit_comment(ssaProcedure *p, String text) {
 ssaValue *ssa_add_local(ssaProcedure *proc, Entity *e, b32 zero_initialized = true) {
 	ssaBlock *b = proc->decl_block; // all variables must be in the first block
 	ssaValue *instr = ssa_make_instr_local(proc, e, zero_initialized);
-	ssaValue *zero = ssa_make_instr_zero_init(proc, instr);
 	instr->Instr.parent = b;
-	zero ->Instr.parent = b;
 	gb_array_append(b->instrs, instr);
-	gb_array_append(b->instrs, zero);
 
 	// if (zero_initialized) {
 		ssa_emit_zero_init(proc, instr);
@@ -1301,9 +1310,9 @@ ssaValue *ssa_emit_comp(ssaProcedure *proc, Token op, ssaValue *left, ssaValue *
 
 	if (are_types_identical(a, b)) {
 		// NOTE(bill): No need for a conversion
-	} else if (left->kind == ssaValue_Constant) {
+	} else if (left->kind == ssaValue_Constant || left->kind == ssaValue_Nil) {
 		left = ssa_emit_conv(proc, left, ssa_type(right));
-	} else if (right->kind == ssaValue_Constant) {
+	} else if (right->kind == ssaValue_Constant || right->kind == ssaValue_Nil) {
 		right = ssa_emit_conv(proc, right, ssa_type(left));
 	}
 
@@ -1880,6 +1889,10 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 	if (is_type_any(dst)) {
 		ssaValue *result = ssa_add_local_generated(proc, t_any);
 
+		if (is_type_untyped_nil(src)) {
+			return ssa_emit_load(proc, result);
+		}
+
 		ssaValue *data = NULL;
 		if (value->kind == ssaValue_Instr &&
 		    value->Instr.kind == ssaInstr_Load) {
@@ -1903,6 +1916,10 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 		ssa_emit_store(proc, gep1, data);
 
 		return ssa_emit_load(proc, result);
+	}
+
+	if (is_type_untyped_nil(src) && type_has_nil(dst)) {
+		return ssa_make_value_nil(proc->module->allocator, t);
 	}
 
 
@@ -2035,6 +2052,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			         "\t at %.*s(%td:%td)", LIT(builtin_procs[e->Builtin.id].name),
 			         LIT(token.pos.file), token.pos.line, token.pos.column);
 			return NULL;
+		} else if (e->kind == Entity_Nil) {
+			return ssa_make_value_nil(proc->module->allocator, tv->type);
 		}
 
 		auto *found = map_get(&proc->module->values, hash_pointer(e));

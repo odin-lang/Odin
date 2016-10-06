@@ -12,15 +12,15 @@ if %release_mode% EQU 0 ( rem Debug
 	set compiler_flags=%compiler_flags% -Od -MDd -Z7
 	rem -DDISPLAY_TIMING
 ) else ( rem Release
-	set compiler_flags=%compiler_flags% -O2 -MT
+	set compiler_flags=%compiler_flags% -O2 -MT -Z7
 )
 
 set compiler_warnings= ^
-	-we4013 -we4706 ^
+	-we4013 -we4706 -we4002 ^
 	-wd4100 -wd4127 -wd4189 ^
 	-wd4201 -wd4204 -wd4244 ^
 	-wd4306 ^
-	-wd4480 ^
+	-wd4456 -wd4457 -wd4480 ^
 	-wd4505 -wd4512 -wd4550
 
 set compiler_includes=
@@ -31,7 +31,7 @@ set linker_flags= -incremental:no -opt:ref -subsystem:console
 if %release_mode% EQU 0 ( rem Debug
 	set linker_flags=%linker_flags% -debug
 ) else ( rem Release
-	set linker_flags=%linker_flags%
+	set linker_flags=%linker_flags% -debug
 )
 
 set compiler_settings=%compiler_includes% %compiler_flags% %compiler_warnings%

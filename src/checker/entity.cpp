@@ -10,6 +10,7 @@ enum BuiltinProcId;
 	ENTITY_KIND(Procedure), \
 	ENTITY_KIND(Builtin), \
 	ENTITY_KIND(ImportName), \
+	ENTITY_KIND(Nil), \
 	ENTITY_KIND(Count),
 
 
@@ -68,6 +69,8 @@ struct Entity {
 			Scope *scope;
 			b32 used;
 		} ImportName;
+		struct {
+		} Nil;
 	};
 };
 
@@ -154,6 +157,12 @@ Entity *make_entity_import_name(gbAllocator a, Scope *scope, Token token, Type *
 	entity->ImportName.scope = import_scope;
 	return entity;
 }
+
+Entity *make_entity_nil(gbAllocator a, Scope *scope, Token token, Type *type) {
+	Entity *entity = alloc_entity(a, Entity_Nil, scope, token, type);
+	return entity;
+}
+
 
 Entity *make_entity_dummy_variable(gbAllocator a, Scope *file_scope, Token token) {
 	token.string = make_string("_");

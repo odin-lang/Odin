@@ -275,6 +275,8 @@ ExactValue exact_binary_operator_value(Token op, ExactValue x, ExactValue y) {
 		switch (op.kind) {
 		case Token_CmpAnd: return make_exact_value_bool(x.value_bool && y.value_bool);
 		case Token_CmpOr:  return make_exact_value_bool(x.value_bool || y.value_bool);
+		case Token_And:    return make_exact_value_bool(x.value_bool & y.value_bool);
+		case Token_Or:     return make_exact_value_bool(x.value_bool | y.value_bool);
 		default: goto error;
 		}
 		break;

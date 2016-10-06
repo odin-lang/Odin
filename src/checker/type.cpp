@@ -22,9 +22,9 @@ enum BasicKind {
 	Basic_UntypedBool,
 	Basic_UntypedInteger,
 	Basic_UntypedFloat,
-	Basic_UntypedPointer,
 	Basic_UntypedString,
 	Basic_UntypedRune,
+	Basic_UntypedNil,
 
 	Basic_Count,
 
@@ -309,9 +309,9 @@ gb_global Type basic_types[] = {
 	{Type_Basic, 0, {Basic_UntypedBool,    BasicFlag_Boolean | BasicFlag_Untyped,  STR_LIT("untyped bool")}},
 	{Type_Basic, 0, {Basic_UntypedInteger, BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped integer")}},
 	{Type_Basic, 0, {Basic_UntypedFloat,   BasicFlag_Float   | BasicFlag_Untyped,  STR_LIT("untyped float")}},
-	{Type_Basic, 0, {Basic_UntypedPointer, BasicFlag_Pointer | BasicFlag_Untyped,  STR_LIT("untyped pointer")}},
 	{Type_Basic, 0, {Basic_UntypedString,  BasicFlag_String  | BasicFlag_Untyped,  STR_LIT("untyped string")}},
 	{Type_Basic, 0, {Basic_UntypedRune,    BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped rune")}},
+	{Type_Basic, 0, {Basic_UntypedNil,     BasicFlag_Untyped,                      STR_LIT("untyped nil")}},
 };
 
 gb_global Type basic_type_aliases[] = {
@@ -339,9 +339,9 @@ gb_global Type *t_any             = &basic_types[Basic_any];
 gb_global Type *t_untyped_bool    = &basic_types[Basic_UntypedBool];
 gb_global Type *t_untyped_integer = &basic_types[Basic_UntypedInteger];
 gb_global Type *t_untyped_float   = &basic_types[Basic_UntypedFloat];
-gb_global Type *t_untyped_pointer = &basic_types[Basic_UntypedPointer];
 gb_global Type *t_untyped_string  = &basic_types[Basic_UntypedString];
 gb_global Type *t_untyped_rune    = &basic_types[Basic_UntypedRune];
+gb_global Type *t_untyped_nil     = &basic_types[Basic_UntypedNil];
 gb_global Type *t_byte            = &basic_type_aliases[0];
 gb_global Type *t_rune            = &basic_type_aliases[1];
 
@@ -548,6 +548,11 @@ b32 is_type_any(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_any);
 }
+b32 is_type_untyped_nil(Type *t) {
+	t = base_type(t);
+	return (t->kind == Type_Basic && t->Basic.kind == Basic_UntypedNil);
+}
+
 
 
 b32 is_type_indexable(Type *t) {
@@ -555,12 +560,31 @@ b32 is_type_indexable(Type *t) {
 }
 
 
+b32 type_has_nil(Type *t) {
+	t = base_type(t);
+	switch (t->kind) {
+	case Type_Basic:
+		return is_type_rawptr(t);
+
+	case Type_Tuple:
+		return false;
+
+	case Type_Record:
+		switch (t->Record.kind) {
+		case TypeRecord_Enum:
+			return false;
+		}
+		break;
+	}
+	return true;
+}
+
 
 b32 is_type_comparable(Type *t) {
 	t = base_type(t);
 	switch (t->kind) {
 	case Type_Basic:
-		return true;
+		return t->kind != Basic_UntypedNil;
 	case Type_Pointer:
 		return true;
 	case Type_Record: {
@@ -681,12 +705,12 @@ b32 are_types_identical(Type *x, Type *y) {
 Type *default_type(Type *type) {
 	if (type->kind == Type_Basic) {
 		switch (type->Basic.kind) {
-		case Basic_UntypedBool:    return &basic_types[Basic_bool];
-		case Basic_UntypedInteger: return &basic_types[Basic_int];
-		case Basic_UntypedFloat:   return &basic_types[Basic_f64];
-		case Basic_UntypedString:  return &basic_types[Basic_string];
-		case Basic_UntypedRune:    return &basic_types[Basic_rune];
-		case Basic_UntypedPointer: return &basic_types[Basic_rawptr];
+		case Basic_UntypedBool:    return t_bool;
+		case Basic_UntypedInteger: return t_int;
+		case Basic_UntypedFloat:   return t_f64;
+		case Basic_UntypedString:  return t_string;
+		case Basic_UntypedRune:    return t_rune;
+		// case Basic_UntypedPointer: return &basic_types[Basic_rawptr];
 		}
 	}
 	return type;
@@ -952,6 +976,17 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		return gb_clamp(size, 1, s.max_align);
 	} break;
 
+	case Type_Tuple: {
+		i64 max = 1;
+		for (isize i = 0; i < t->Tuple.variable_count; i++) {
+			i64 align = type_align_of(s, allocator, t->Tuple.variables[i]->type);
+			if (max < align) {
+				max = align;
+			}
+		}
+		return max;
+	} break;
+
 	case Type_Record: {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct:
@@ -964,6 +999,8 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 					}
 				}
 				return max;
+			} else if (t->Record.field_count > 0) {
+				return type_align_of(s, allocator, t->Record.fields[0]->type);
 			}
 			break;
 		case TypeRecord_Union: {
