@@ -389,6 +389,11 @@ void ssa_gen_tree(ssaGen *s) {
 					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Pointer.elem);
 					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_type_info_ptr_ptr), gep);
 				} break;
+				case Type_Maybe: {
+					tag = ssa_add_local_generated(proc, t_type_info_maybe);
+					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Maybe.elem);
+					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, v_zero32, t_type_info_ptr_ptr), gep);
+				} break;
 				case Type_Array: {
 					tag = ssa_add_local_generated(proc, t_type_info_array);
 					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Array.elem);

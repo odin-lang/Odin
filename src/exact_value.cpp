@@ -25,7 +25,7 @@ struct ExactValue {
 		String   value_string;
 		i64      value_integer;
 		f64      value_float;
-		void *   value_pointer;
+		i64      value_pointer;
 		AstNode *value_compound;
 	};
 };
@@ -93,7 +93,7 @@ ExactValue make_exact_value_float(f64 f) {
 
 ExactValue make_exact_value_pointer(void *ptr) {
 	ExactValue result = {ExactValue_Pointer};
-	result.value_pointer = ptr;
+	result.value_pointer = cast(i64)cast(intptr)ptr;
 	return result;
 }
 
@@ -121,8 +121,14 @@ ExactValue exact_value_to_integer(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 		return v;
-	case ExactValue_Float:
-		return make_exact_value_integer(cast(i64)v.value_float);
+	case ExactValue_Float: {
+		i64 i = cast(i64)v.value_float;
+		f64 f = cast(f64)i;
+		if (f == v.value_float) {
+			return make_exact_value_integer(i);
+		}
+	} break;
+
 	case ExactValue_Pointer:
 		return make_exact_value_integer(cast(i64)cast(intptr)v.value_pointer);
 	}

@@ -160,6 +160,17 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 		case Basic_any:    ssa_fprintf(f, "%%..any");                 break;
 		}
 		break;
+	case Type_Pointer:
+		ssa_print_type(f, m, t->Pointer.elem);
+		ssa_fprintf(f, "*");
+		break;
+	case Type_Maybe:
+		ssa_fprintf(f, "{");
+		ssa_print_type(f, m, t->Maybe.elem);
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m, t_bool);
+		ssa_fprintf(f, "}");
+		break;
 	case Type_Array:
 		ssa_fprintf(f, "[%lld x ", t->Array.count);
 		ssa_print_type(f, m, t->Array.elem);
@@ -212,10 +223,7 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 		}
 	} break;
 
-	case Type_Pointer:
-		ssa_print_type(f, m, t->Pointer.elem);
-		ssa_fprintf(f, "*");
-		break;
+
 	case Type_Named:
 		if (is_type_struct(t) || is_type_union(t)) {
 			String *name = map_get(&m->type_names, hash_pointer(t));

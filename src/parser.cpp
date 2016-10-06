@@ -270,6 +270,10 @@ AST_NODE_KIND(_TypeBegin, "", struct{}) \
 		Token token; \
 		AstNode *type; \
 	}) \
+	AST_NODE_KIND(MaybeType, "maybe type", struct { \
+		Token token; \
+		AstNode *type; \
+	}) \
 	AST_NODE_KIND(ArrayType, "array type", struct { \
 		Token token; \
 		AstNode *count; \
@@ -454,6 +458,8 @@ Token ast_node_token(AstNode *node) {
 		return node->ProcType.token;
 	case AstNode_PointerType:
 		return node->PointerType.token;
+	case AstNode_MaybeType:
+		return node->MaybeType.token;
 	case AstNode_ArrayType:
 		return node->ArrayType.token;
 	case AstNode_VectorType:
@@ -477,7 +483,7 @@ HashKey hash_token(Token t) {
 
 
 // NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
-gb_inline AstNode *make_node(AstFile *f, AstNodeKind kind) {
+AstNode *make_node(AstFile *f, AstNodeKind kind) {
 	gbArena *arena = &f->arena;
 	if (gb_arena_size_remaining(arena, GB_DEFAULT_MEMORY_ALIGNMENT) <= gb_size_of(AstNode)) {
 		// NOTE(bill): If a syntax error is so bad, just quit!
@@ -488,14 +494,14 @@ gb_inline AstNode *make_node(AstFile *f, AstNodeKind kind) {
 	return node;
 }
 
-gb_inline AstNode *make_bad_expr(AstFile *f, Token begin, Token end) {
+AstNode *make_bad_expr(AstFile *f, Token begin, Token end) {
 	AstNode *result = make_node(f, AstNode_BadExpr);
 	result->BadExpr.begin = begin;
 	result->BadExpr.end   = end;
 	return result;
 }
 
-gb_inline AstNode *make_tag_expr(AstFile *f, Token token, Token name, AstNode *expr) {
+AstNode *make_tag_expr(AstFile *f, Token token, Token name, AstNode *expr) {
 	AstNode *result = make_node(f, AstNode_TagExpr);
 	result->TagExpr.token = token;
 	result->TagExpr.name = name;
@@ -503,7 +509,7 @@ gb_inline AstNode *make_tag_expr(AstFile *f, Token token, Token name, AstNode *e
 	return result;
 }
 
-gb_inline AstNode *make_tag_stmt(AstFile *f, Token token, Token name, AstNode *stmt) {
+AstNode *make_tag_stmt(AstFile *f, Token token, Token name, AstNode *stmt) {
 	AstNode *result = make_node(f, AstNode_TagStmt);
 	result->TagStmt.token = token;
 	result->TagStmt.name = name;
@@ -511,14 +517,14 @@ gb_inline AstNode *make_tag_stmt(AstFile *f, Token token, Token name, AstNode *s
 	return result;
 }
 
-gb_inline AstNode *make_unary_expr(AstFile *f, Token op, AstNode *expr) {
+AstNode *make_unary_expr(AstFile *f, Token op, AstNode *expr) {
 	AstNode *result = make_node(f, AstNode_UnaryExpr);
 	result->UnaryExpr.op = op;
 	result->UnaryExpr.expr = expr;
 	return result;
 }
 
-gb_inline AstNode *make_binary_expr(AstFile *f, Token op, AstNode *left, AstNode *right) {
+AstNode *make_binary_expr(AstFile *f, Token op, AstNode *left, AstNode *right) {
 	AstNode *result = make_node(f, AstNode_BinaryExpr);
 
 	if (left == NULL) {
@@ -537,7 +543,7 @@ gb_inline AstNode *make_binary_expr(AstFile *f, Token op, AstNode *left, AstNode
 	return result;
 }
 
-gb_inline AstNode *make_paren_expr(AstFile *f, AstNode *expr, Token open, Token close) {
+AstNode *make_paren_expr(AstFile *f, AstNode *expr, Token open, Token close) {
 	AstNode *result = make_node(f, AstNode_ParenExpr);
 	result->ParenExpr.expr = expr;
 	result->ParenExpr.open = open;
@@ -545,7 +551,7 @@ gb_inline AstNode *make_paren_expr(AstFile *f, AstNode *expr, Token open, Token 
 	return result;
 }
 
-gb_inline AstNode *make_call_expr(AstFile *f, AstNode *proc, AstNodeArray args, Token open, Token close, Token ellipsis) {
+AstNode *make_call_expr(AstFile *f, AstNode *proc, AstNodeArray args, Token open, Token close, Token ellipsis) {
 	AstNode *result = make_node(f, AstNode_CallExpr);
 	result->CallExpr.proc = proc;
 	result->CallExpr.args = args;
@@ -555,14 +561,14 @@ gb_inline AstNode *make_call_expr(AstFile *f, AstNode *proc, AstNodeArray args, 
 	return result;
 }
 
-gb_inline AstNode *make_selector_expr(AstFile *f, Token token, AstNode *expr, AstNode *selector) {
+AstNode *make_selector_expr(AstFile *f, Token token, AstNode *expr, AstNode *selector) {
 	AstNode *result = make_node(f, AstNode_SelectorExpr);
 	result->SelectorExpr.expr = expr;
 	result->SelectorExpr.selector = selector;
 	return result;
 }
 
-gb_inline AstNode *make_index_expr(AstFile *f, AstNode *expr, AstNode *index, Token open, Token close) {
+AstNode *make_index_expr(AstFile *f, AstNode *expr, AstNode *index, Token open, Token close) {
 	AstNode *result = make_node(f, AstNode_IndexExpr);
 	result->IndexExpr.expr = expr;
 	result->IndexExpr.index = index;
@@ -572,7 +578,7 @@ gb_inline AstNode *make_index_expr(AstFile *f, AstNode *expr, AstNode *index, To
 }
 
 
-gb_inline AstNode *make_slice_expr(AstFile *f, AstNode *expr, Token open, Token close, AstNode *low, AstNode *high, AstNode *max, b32 triple_indexed) {
+AstNode *make_slice_expr(AstFile *f, AstNode *expr, Token open, Token close, AstNode *low, AstNode *high, AstNode *max, b32 triple_indexed) {
 	AstNode *result = make_node(f, AstNode_SliceExpr);
 	result->SliceExpr.expr = expr;
 	result->SliceExpr.open = open;
@@ -584,7 +590,7 @@ gb_inline AstNode *make_slice_expr(AstFile *f, AstNode *expr, Token open, Token 
 	return result;
 }
 
-gb_inline AstNode *make_deref_expr(AstFile *f, AstNode *expr, Token op) {
+AstNode *make_deref_expr(AstFile *f, AstNode *expr, Token op) {
 	AstNode *result = make_node(f, AstNode_DerefExpr);
 	result->DerefExpr.expr = expr;
 	result->DerefExpr.op = op;
@@ -592,19 +598,19 @@ gb_inline AstNode *make_deref_expr(AstFile *f, AstNode *expr, Token op) {
 }
 
 
-gb_inline AstNode *make_basic_lit(AstFile *f, Token basic_lit) {
+AstNode *make_basic_lit(AstFile *f, Token basic_lit) {
 	AstNode *result = make_node(f, AstNode_BasicLit);
 	result->BasicLit = basic_lit;
 	return result;
 }
 
-gb_inline AstNode *make_ident(AstFile *f, Token token) {
+AstNode *make_ident(AstFile *f, Token token) {
 	AstNode *result = make_node(f, AstNode_Ident);
 	result->Ident = token;
 	return result;
 }
 
-gb_inline AstNode *make_ellipsis(AstFile *f, Token token, AstNode *expr) {
+AstNode *make_ellipsis(AstFile *f, Token token, AstNode *expr) {
 	AstNode *result = make_node(f, AstNode_Ellipsis);
 	result->Ellipsis.token = token;
 	result->Ellipsis.expr = expr;
@@ -612,7 +618,7 @@ gb_inline AstNode *make_ellipsis(AstFile *f, Token token, AstNode *expr) {
 }
 
 
-gb_inline AstNode *make_proc_lit(AstFile *f, AstNode *type, AstNode *body, u64 tags) {
+AstNode *make_proc_lit(AstFile *f, AstNode *type, AstNode *body, u64 tags) {
 	AstNode *result = make_node(f, AstNode_ProcLit);
 	result->ProcLit.type = type;
 	result->ProcLit.body = body;
@@ -620,7 +626,7 @@ gb_inline AstNode *make_proc_lit(AstFile *f, AstNode *type, AstNode *body, u64 t
 	return result;
 }
 
-gb_inline AstNode *make_field_value(AstFile *f, AstNode *field, AstNode *value, Token eq) {
+AstNode *make_field_value(AstFile *f, AstNode *field, AstNode *value, Token eq) {
 	AstNode *result = make_node(f, AstNode_FieldValue);
 	result->FieldValue.field = field;
 	result->FieldValue.value = value;
@@ -628,7 +634,7 @@ gb_inline AstNode *make_field_value(AstFile *f, AstNode *field, AstNode *value, 
 	return result;
 }
 
-gb_inline AstNode *make_compound_lit(AstFile *f, AstNode *type, AstNodeArray elems, Token open, Token close) {
+AstNode *make_compound_lit(AstFile *f, AstNode *type, AstNodeArray elems, Token open, Token close) {
 	AstNode *result = make_node(f, AstNode_CompoundLit);
 	result->CompoundLit.type = type;
 	result->CompoundLit.elems = elems;
@@ -637,33 +643,33 @@ gb_inline AstNode *make_compound_lit(AstFile *f, AstNode *type, AstNodeArray ele
 	return result;
 }
 
-gb_inline AstNode *make_bad_stmt(AstFile *f, Token begin, Token end) {
+AstNode *make_bad_stmt(AstFile *f, Token begin, Token end) {
 	AstNode *result = make_node(f, AstNode_BadStmt);
 	result->BadStmt.begin = begin;
 	result->BadStmt.end   = end;
 	return result;
 }
 
-gb_inline AstNode *make_empty_stmt(AstFile *f, Token token) {
+AstNode *make_empty_stmt(AstFile *f, Token token) {
 	AstNode *result = make_node(f, AstNode_EmptyStmt);
 	result->EmptyStmt.token = token;
 	return result;
 }
 
-gb_inline AstNode *make_expr_stmt(AstFile *f, AstNode *expr) {
+AstNode *make_expr_stmt(AstFile *f, AstNode *expr) {
 	AstNode *result = make_node(f, AstNode_ExprStmt);
 	result->ExprStmt.expr = expr;
 	return result;
 }
 
-gb_inline AstNode *make_inc_dec_stmt(AstFile *f, Token op, AstNode *expr) {
+AstNode *make_inc_dec_stmt(AstFile *f, Token op, AstNode *expr) {
 	AstNode *result = make_node(f, AstNode_IncDecStmt);
 	result->IncDecStmt.op = op;
 	result->IncDecStmt.expr = expr;
 	return result;
 }
 
-gb_inline AstNode *make_assign_stmt(AstFile *f, Token op, AstNodeArray lhs, AstNodeArray rhs) {
+AstNode *make_assign_stmt(AstFile *f, Token op, AstNodeArray lhs, AstNodeArray rhs) {
 	AstNode *result = make_node(f, AstNode_AssignStmt);
 	result->AssignStmt.op = op;
 	result->AssignStmt.lhs = lhs;
@@ -671,7 +677,7 @@ gb_inline AstNode *make_assign_stmt(AstFile *f, Token op, AstNodeArray lhs, AstN
 	return result;
 }
 
-gb_inline AstNode *make_block_stmt(AstFile *f, AstNodeArray stmts, Token open, Token close) {
+AstNode *make_block_stmt(AstFile *f, AstNodeArray stmts, Token open, Token close) {
 	AstNode *result = make_node(f, AstNode_BlockStmt);
 	result->BlockStmt.stmts = stmts;
 	result->BlockStmt.open = open;
@@ -679,7 +685,7 @@ gb_inline AstNode *make_block_stmt(AstFile *f, AstNodeArray stmts, Token open, T
 	return result;
 }
 
-gb_inline AstNode *make_if_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *body, AstNode *else_stmt) {
+AstNode *make_if_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *body, AstNode *else_stmt) {
 	AstNode *result = make_node(f, AstNode_IfStmt);
 	result->IfStmt.token = token;
 	result->IfStmt.init = init;
@@ -689,14 +695,14 @@ gb_inline AstNode *make_if_stmt(AstFile *f, Token token, AstNode *init, AstNode 
 	return result;
 }
 
-gb_inline AstNode *make_return_stmt(AstFile *f, Token token, AstNodeArray results) {
+AstNode *make_return_stmt(AstFile *f, Token token, AstNodeArray results) {
 	AstNode *result = make_node(f, AstNode_ReturnStmt);
 	result->ReturnStmt.token = token;
 	result->ReturnStmt.results = results;
 	return result;
 }
 
-gb_inline AstNode *make_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *post, AstNode *body) {
+AstNode *make_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *post, AstNode *body) {
 	AstNode *result = make_node(f, AstNode_ForStmt);
 	result->ForStmt.token = token;
 	result->ForStmt.init  = init;
@@ -707,7 +713,7 @@ gb_inline AstNode *make_for_stmt(AstFile *f, Token token, AstNode *init, AstNode
 }
 
 
-gb_inline AstNode *make_match_stmt(AstFile *f, Token token, AstNode *init, AstNode *tag, AstNode *body) {
+AstNode *make_match_stmt(AstFile *f, Token token, AstNode *init, AstNode *tag, AstNode *body) {
 	AstNode *result = make_node(f, AstNode_MatchStmt);
 	result->MatchStmt.token = token;
 	result->MatchStmt.init  = init;
@@ -717,7 +723,7 @@ gb_inline AstNode *make_match_stmt(AstFile *f, Token token, AstNode *init, AstNo
 }
 
 
-gb_inline AstNode *make_type_match_stmt(AstFile *f, Token token, AstNode *tag, AstNode *var, AstNode *body) {
+AstNode *make_type_match_stmt(AstFile *f, Token token, AstNode *tag, AstNode *var, AstNode *body) {
 	AstNode *result = make_node(f, AstNode_TypeMatchStmt);
 	result->TypeMatchStmt.token = token;
 	result->TypeMatchStmt.tag   = tag;
@@ -726,7 +732,7 @@ gb_inline AstNode *make_type_match_stmt(AstFile *f, Token token, AstNode *tag, A
 	return result;
 }
 
-gb_inline AstNode *make_case_clause(AstFile *f, Token token, AstNodeArray list, AstNodeArray stmts) {
+AstNode *make_case_clause(AstFile *f, Token token, AstNodeArray list, AstNodeArray stmts) {
 	AstNode *result = make_node(f, AstNode_CaseClause);
 	result->CaseClause.token = token;
 	result->CaseClause.list  = list;
@@ -735,27 +741,27 @@ gb_inline AstNode *make_case_clause(AstFile *f, Token token, AstNodeArray list, 
 }
 
 
-gb_inline AstNode *make_defer_stmt(AstFile *f, Token token, AstNode *stmt) {
+AstNode *make_defer_stmt(AstFile *f, Token token, AstNode *stmt) {
 	AstNode *result = make_node(f, AstNode_DeferStmt);
 	result->DeferStmt.token = token;
 	result->DeferStmt.stmt = stmt;
 	return result;
 }
 
-gb_inline AstNode *make_branch_stmt(AstFile *f, Token token) {
+AstNode *make_branch_stmt(AstFile *f, Token token) {
 	AstNode *result = make_node(f, AstNode_BranchStmt);
 	result->BranchStmt.token = token;
 	return result;
 }
 
-gb_inline AstNode *make_using_stmt(AstFile *f, Token token, AstNode *node) {
+AstNode *make_using_stmt(AstFile *f, Token token, AstNode *node) {
 	AstNode *result = make_node(f, AstNode_UsingStmt);
 	result->UsingStmt.token = token;
 	result->UsingStmt.node  = node;
 	return result;
 }
 
-gb_inline AstNode *make_asm_operand(AstFile *f, Token string, AstNode *operand) {
+AstNode *make_asm_operand(AstFile *f, Token string, AstNode *operand) {
 	AstNode *result = make_node(f, AstNode_AsmOperand);
 	result->AsmOperand.string  = string;
 	result->AsmOperand.operand = operand;
@@ -763,7 +769,7 @@ gb_inline AstNode *make_asm_operand(AstFile *f, Token string, AstNode *operand) 
 
 }
 
-gb_inline AstNode *make_asm_stmt(AstFile *f, Token token, b32 is_volatile, Token open, Token close, Token code_string,
+AstNode *make_asm_stmt(AstFile *f, Token token, b32 is_volatile, Token open, Token close, Token code_string,
                                  AstNode *output_list, AstNode *input_list, AstNode *clobber_list,
                                  isize output_count, isize input_count, isize clobber_count) {
 	AstNode *result = make_node(f, AstNode_AsmStmt);
@@ -781,7 +787,7 @@ gb_inline AstNode *make_asm_stmt(AstFile *f, Token token, b32 is_volatile, Token
 	return result;
 }
 
-gb_inline AstNode *make_push_allocator(AstFile *f, Token token, AstNode *expr, AstNode *body) {
+AstNode *make_push_allocator(AstFile *f, Token token, AstNode *expr, AstNode *body) {
 	AstNode *result = make_node(f, AstNode_PushAllocator);
 	result->PushAllocator.token = token;
 	result->PushAllocator.expr = expr;
@@ -789,7 +795,7 @@ gb_inline AstNode *make_push_allocator(AstFile *f, Token token, AstNode *expr, A
 	return result;
 }
 
-gb_inline AstNode *make_push_context(AstFile *f, Token token, AstNode *expr, AstNode *body) {
+AstNode *make_push_context(AstFile *f, Token token, AstNode *expr, AstNode *body) {
 	AstNode *result = make_node(f, AstNode_PushContext);
 	result->PushContext.token = token;
 	result->PushContext.expr = expr;
@@ -800,14 +806,14 @@ gb_inline AstNode *make_push_context(AstFile *f, Token token, AstNode *expr, Ast
 
 
 
-gb_inline AstNode *make_bad_decl(AstFile *f, Token begin, Token end) {
+AstNode *make_bad_decl(AstFile *f, Token begin, Token end) {
 	AstNode *result = make_node(f, AstNode_BadDecl);
 	result->BadDecl.begin = begin;
 	result->BadDecl.end = end;
 	return result;
 }
 
-gb_inline AstNode *make_var_decl(AstFile *f, AstNodeArray names, AstNode *type, AstNodeArray values) {
+AstNode *make_var_decl(AstFile *f, AstNodeArray names, AstNode *type, AstNodeArray values) {
 	AstNode *result = make_node(f, AstNode_VarDecl);
 	result->VarDecl.names = names;
 	result->VarDecl.type = type;
@@ -815,7 +821,7 @@ gb_inline AstNode *make_var_decl(AstFile *f, AstNodeArray names, AstNode *type, 
 	return result;
 }
 
-gb_inline AstNode *make_const_decl(AstFile *f, AstNodeArray names, AstNode *type, AstNodeArray values) {
+AstNode *make_const_decl(AstFile *f, AstNodeArray names, AstNode *type, AstNodeArray values) {
 	AstNode *result = make_node(f, AstNode_ConstDecl);
 	result->ConstDecl.names = names;
 	result->ConstDecl.type = type;
@@ -823,7 +829,7 @@ gb_inline AstNode *make_const_decl(AstFile *f, AstNodeArray names, AstNode *type
 	return result;
 }
 
-gb_inline AstNode *make_parameter(AstFile *f, AstNodeArray names, AstNode *type, b32 is_using) {
+AstNode *make_parameter(AstFile *f, AstNodeArray names, AstNode *type, b32 is_using) {
 	AstNode *result = make_node(f, AstNode_Parameter);
 	result->Parameter.names = names;
 	result->Parameter.type = type;
@@ -831,7 +837,7 @@ gb_inline AstNode *make_parameter(AstFile *f, AstNodeArray names, AstNode *type,
 	return result;
 }
 
-gb_inline AstNode *make_proc_type(AstFile *f, Token token, AstNodeArray params, AstNodeArray results) {
+AstNode *make_proc_type(AstFile *f, Token token, AstNodeArray params, AstNodeArray results) {
 	AstNode *result = make_node(f, AstNode_ProcType);
 	result->ProcType.token = token;
 	result->ProcType.params = params;
@@ -839,7 +845,7 @@ gb_inline AstNode *make_proc_type(AstFile *f, Token token, AstNodeArray params, 
 	return result;
 }
 
-gb_inline AstNode *make_proc_decl(AstFile *f, AstNode *name, AstNode *proc_type, AstNode *body, u64 tags, String foreign_name, String link_name) {
+AstNode *make_proc_decl(AstFile *f, AstNode *name, AstNode *proc_type, AstNode *body, u64 tags, String foreign_name, String link_name) {
 	AstNode *result = make_node(f, AstNode_ProcDecl);
 	result->ProcDecl.name = name;
 	result->ProcDecl.type = proc_type;
@@ -850,14 +856,21 @@ gb_inline AstNode *make_proc_decl(AstFile *f, AstNode *name, AstNode *proc_type,
 	return result;
 }
 
-gb_inline AstNode *make_pointer_type(AstFile *f, Token token, AstNode *type) {
+AstNode *make_pointer_type(AstFile *f, Token token, AstNode *type) {
 	AstNode *result = make_node(f, AstNode_PointerType);
 	result->PointerType.token = token;
 	result->PointerType.type = type;
 	return result;
 }
 
-gb_inline AstNode *make_array_type(AstFile *f, Token token, AstNode *count, AstNode *elem) {
+AstNode *make_maybe_type(AstFile *f, Token token, AstNode *type) {
+	AstNode *result = make_node(f, AstNode_MaybeType);
+	result->MaybeType.token = token;
+	result->MaybeType.type = type;
+	return result;
+}
+
+AstNode *make_array_type(AstFile *f, Token token, AstNode *count, AstNode *elem) {
 	AstNode *result = make_node(f, AstNode_ArrayType);
 	result->ArrayType.token = token;
 	result->ArrayType.count = count;
@@ -865,7 +878,7 @@ gb_inline AstNode *make_array_type(AstFile *f, Token token, AstNode *count, AstN
 	return result;
 }
 
-gb_inline AstNode *make_vector_type(AstFile *f, Token token, AstNode *count, AstNode *elem) {
+AstNode *make_vector_type(AstFile *f, Token token, AstNode *count, AstNode *elem) {
 	AstNode *result = make_node(f, AstNode_VectorType);
 	result->VectorType.token = token;
 	result->VectorType.count = count;
@@ -873,7 +886,7 @@ gb_inline AstNode *make_vector_type(AstFile *f, Token token, AstNode *count, Ast
 	return result;
 }
 
-gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNodeArray decls, isize decl_count, b32 is_packed, b32 is_ordered) {
+AstNode *make_struct_type(AstFile *f, Token token, AstNodeArray decls, isize decl_count, b32 is_packed, b32 is_ordered) {
 	AstNode *result = make_node(f, AstNode_StructType);
 	result->StructType.token = token;
 	result->StructType.decls = decls;
@@ -884,7 +897,7 @@ gb_inline AstNode *make_struct_type(AstFile *f, Token token, AstNodeArray decls,
 }
 
 
-gb_inline AstNode *make_union_type(AstFile *f, Token token, AstNodeArray decls, isize decl_count) {
+AstNode *make_union_type(AstFile *f, Token token, AstNodeArray decls, isize decl_count) {
 	AstNode *result = make_node(f, AstNode_UnionType);
 	result->UnionType.token = token;
 	result->UnionType.decls = decls;
@@ -892,7 +905,7 @@ gb_inline AstNode *make_union_type(AstFile *f, Token token, AstNodeArray decls, 
 	return result;
 }
 
-gb_inline AstNode *make_raw_union_type(AstFile *f, Token token, AstNodeArray decls, isize decl_count) {
+AstNode *make_raw_union_type(AstFile *f, Token token, AstNodeArray decls, isize decl_count) {
 	AstNode *result = make_node(f, AstNode_RawUnionType);
 	result->RawUnionType.token = token;
 	result->RawUnionType.decls = decls;
@@ -901,7 +914,7 @@ gb_inline AstNode *make_raw_union_type(AstFile *f, Token token, AstNodeArray dec
 }
 
 
-gb_inline AstNode *make_enum_type(AstFile *f, Token token, AstNode *base_type, AstNodeArray fields) {
+AstNode *make_enum_type(AstFile *f, Token token, AstNode *base_type, AstNodeArray fields) {
 	AstNode *result = make_node(f, AstNode_EnumType);
 	result->EnumType.token = token;
 	result->EnumType.base_type = base_type;
@@ -909,7 +922,7 @@ gb_inline AstNode *make_enum_type(AstFile *f, Token token, AstNode *base_type, A
 	return result;
 }
 
-gb_inline AstNode *make_type_decl(AstFile *f, Token token, AstNode *name, AstNode *type) {
+AstNode *make_type_decl(AstFile *f, Token token, AstNode *name, AstNode *type) {
 	AstNode *result = make_node(f, AstNode_TypeDecl);
 	result->TypeDecl.token = token;
 	result->TypeDecl.name = name;
@@ -917,7 +930,7 @@ gb_inline AstNode *make_type_decl(AstFile *f, Token token, AstNode *name, AstNod
 	return result;
 }
 
-gb_inline AstNode *make_import_decl(AstFile *f, Token token, Token relpath, Token import_name, b32 is_load) {
+AstNode *make_import_decl(AstFile *f, Token token, Token relpath, Token import_name, b32 is_load) {
 	AstNode *result = make_node(f, AstNode_ImportDecl);
 	result->ImportDecl.token = token;
 	result->ImportDecl.relpath = relpath;
@@ -926,7 +939,7 @@ gb_inline AstNode *make_import_decl(AstFile *f, Token token, Token relpath, Toke
 	return result;
 }
 
-gb_inline AstNode *make_foreign_system_library(AstFile *f, Token token, Token filepath) {
+AstNode *make_foreign_system_library(AstFile *f, Token token, Token filepath) {
 	AstNode *result = make_node(f, AstNode_ForeignSystemLibrary);
 	result->ForeignSystemLibrary.token = token;
 	result->ForeignSystemLibrary.filepath = filepath;
@@ -950,7 +963,7 @@ b32 next_token(AstFile *f) {
 	return false;
 }
 
-gb_inline Token expect_token(AstFile *f, TokenKind kind) {
+Token expect_token(AstFile *f, TokenKind kind) {
 	Token prev = f->curr_token;
 	if (prev.kind != kind) {
 		syntax_error(f->curr_token, "Expected `%.*s`, got `%.*s`",
@@ -961,7 +974,7 @@ gb_inline Token expect_token(AstFile *f, TokenKind kind) {
 	return prev;
 }
 
-gb_inline Token expect_token_after(AstFile *f, TokenKind kind, char *msg) {
+Token expect_token_after(AstFile *f, TokenKind kind, char *msg) {
 	Token prev = f->curr_token;
 	if (prev.kind != kind) {
 		syntax_error(f->curr_token, "Expected `%.*s` after %s, got `%.*s`",
@@ -974,7 +987,7 @@ gb_inline Token expect_token_after(AstFile *f, TokenKind kind, char *msg) {
 }
 
 
-gb_inline Token expect_operator(AstFile *f) {
+Token expect_operator(AstFile *f) {
 	Token prev = f->curr_token;
 	if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
 		syntax_error(f->curr_token, "Expected an operator, got `%.*s`",
@@ -984,7 +997,7 @@ gb_inline Token expect_operator(AstFile *f) {
 	return prev;
 }
 
-gb_inline Token expect_keyword(AstFile *f) {
+Token expect_keyword(AstFile *f) {
 	Token prev = f->curr_token;
 	if (!gb_is_between(prev.kind, Token__KeywordBegin+1, Token__KeywordEnd-1)) {
 		syntax_error(f->curr_token, "Expected a keyword, got `%.*s`",
@@ -994,7 +1007,7 @@ gb_inline Token expect_keyword(AstFile *f) {
 	return prev;
 }
 
-gb_inline b32 allow_token(AstFile *f, TokenKind kind) {
+b32 allow_token(AstFile *f, TokenKind kind) {
 	Token prev = f->curr_token;
 	if (prev.kind == kind) {
 		next_token(f);
@@ -1986,8 +1999,17 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		return e;
 	}
 
-	case Token_Pointer:
-		return make_pointer_type(f, expect_token(f, Token_Pointer), parse_type(f));
+	case Token_Pointer: {
+		Token token = expect_token(f, Token_Pointer);
+		AstNode *elem = parse_type(f);
+		return make_pointer_type(f, token, elem);
+	}
+
+	case Token_Maybe: {
+		Token token = expect_token(f, Token_Maybe);
+		AstNode *elem = parse_type(f);
+		return make_maybe_type(f, token, elem);
+	}
 
 	case Token_OpenBracket: {
 		f->expr_level++;

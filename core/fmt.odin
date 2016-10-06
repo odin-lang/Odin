@@ -413,6 +413,13 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 			print_pointer_to_buffer(buf, nil)
 		}
 
+	case Maybe:
+		if arg.data != nil {
+
+		} else {
+			print_string_to_buffer(buf, "<nil>")
+		}
+
 	case Enum:
 		value: i64 = 0
 		match type i : info.base {

@@ -1,15 +1,15 @@
 #import "fmt.odin"
 
-A :: {2}f32{1, 2}
-B :: {2}f32{3, 4}
-
 main :: proc() {
-	Fruit :: union {
-		A: int
-		B: f32
-		C: struct {
-			x: int
+	maybe_print :: proc(x: ?int) {
+		if v, ok := maybe_value(x); ok {
+			fmt.println(v)
+		} else {
+			fmt.println("nowt")
 		}
 	}
+
+	maybe_print(123) // 123
+	maybe_print(nil) // nowt
 }
 

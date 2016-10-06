@@ -7,7 +7,7 @@ void     check_type_decl           (Checker *c, Entity *e, AstNode *type_expr, T
 Entity * check_selector            (Checker *c, Operand *operand, AstNode *node);
 void     check_not_tuple           (Checker *c, Operand *operand);
 b32      check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
-void     convert_to_typed          (Checker *c, Operand *operand, Type *target_type);
+void     convert_to_typed          (Checker *c, Operand *operand, Type *target_type, i32 level = 0);
 gbString expr_to_string            (AstNode *expression);
 void     check_entity_decl         (Checker *c, Entity *e, DeclInfo *decl, Type *named_type, CycleChecker *cycle_checker = NULL);
 void     check_proc_body           (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
@@ -88,6 +88,11 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 		return true;
 	}
 
+	if (is_type_maybe(dst)) {
+		Type *elem = base_type(dst)->Maybe.elem;
+		return are_types_identical(elem, src);
+	}
+
 	if (is_type_untyped_nil(src)) {
 		return type_has_nil(dst);
 	}
@@ -102,6 +107,8 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 	if (is_type_rawptr(dst) && is_type_pointer(src)) {
 	    return true;
 	}
+
+
 
 	if (dst->kind == Type_Array && src->kind == Type_Array) {
 		if (are_types_identical(dst->Array.elem, src->Array.elem)) {
@@ -138,9 +145,7 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 		}
 	}
 
-
 	return false;
-
 }
 
 
@@ -1048,6 +1053,12 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		goto end;
 	case_end;
 
+	case_ast_node(mt, MaybeType, e);
+		Type *elem = check_type(c, mt->type);
+		type = make_type_maybe(c->allocator, elem);
+		goto end;
+	case_end;
+
 	case_ast_node(at, ArrayType, e);
 		if (at->count != NULL) {
 			Type *elem = check_type(c, at->elem, NULL, cycle_checker);
@@ -1243,8 +1254,10 @@ b32 check_binary_op(Checker *c, Operand *o, Token op) {
 
 }
 b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value) {
-	if (in_value.kind == ExactValue_Invalid)
+	if (in_value.kind == ExactValue_Invalid) {
+		// NOTE(bill): There's already been an error
 		return true;
+	}
 
 	if (is_type_boolean(type)) {
 		return in_value.kind == ExactValue_Bool;
@@ -1252,8 +1265,9 @@ b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exac
 		return in_value.kind == ExactValue_String;
 	} else if (is_type_integer(type)) {
 		ExactValue v = exact_value_to_integer(in_value);
-		if (v.kind != ExactValue_Integer)
+		if (v.kind != ExactValue_Integer) {
 			return false;
+		}
 		if (out_value) *out_value = v;
 		i64 i = v.value_integer;
 		u64 u = *cast(u64 *)&i;
@@ -1287,8 +1301,9 @@ b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exac
 		}
 	} else if (is_type_float(type)) {
 		ExactValue v = exact_value_to_float(in_value);
-		if (v.kind != ExactValue_Float)
+		if (v.kind != ExactValue_Float) {
 			return false;
+		}
 
 		switch (type->Basic.kind) {
 		case Basic_f32:
@@ -1986,7 +2001,7 @@ void convert_untyped_error(Checker *c, Operand *operand, Type *target_type) {
 	operand->mode = Addressing_Invalid;
 }
 
-void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
+void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level) {
 	GB_ASSERT_NOT_NULL(target_type);
 	if (operand->mode == Addressing_Invalid ||
 	    is_type_typed(operand->type) ||
@@ -2018,7 +2033,6 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 			}
 			update_expr_value(c, operand->expr, operand->value);
 		} else {
-			// TODO(bill): Is this really needed?
 			switch (operand->type->Basic.kind) {
 			case Basic_UntypedBool:
 				if (!is_type_boolean(target_type)) {
@@ -2045,13 +2059,23 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type) {
 		}
 		break;
 
+	case Type_Maybe:
+		if (is_type_untyped_nil(operand->type)) {
+			// Okay
+		} else if (level == 0) {
+			convert_to_typed(c, operand, t->Maybe.elem, level+1);
+			return;
+		}
+
 	default:
-		if (!type_has_nil(target_type)) {
+		if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
 			convert_untyped_error(c, operand, target_type);
 			return;
 		}
 		break;
 	}
+
+
 
 	operand->type = target_type;
 	update_expr_type(c, operand->expr, target_type, true);
@@ -2361,15 +2385,16 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		break;
 
 	case BuiltinProc_offset_of: {
-		// offset_val :: proc(Type, field) -> int
+		// offset_of :: proc(Type, field) -> int
 		Operand op = {};
-		Type *type = base_type(check_type(c, ce->args[0]));
-		if (type != NULL || type == t_invalid) {
+		Type *bt = check_type(c, ce->args[0]);
+		Type *type = base_type(bt);
+		if (type == NULL || type == t_invalid) {
 			error(ast_node_token(ce->args[0]), "Expected a type for `offset_of`");
 			return false;
 		}
 		if (!is_type_struct(type)) {
-			error(ast_node_token(ce->args[0]), "Expected a structure type for `offset_of`");
+			error(ast_node_token(ce->args[0]), "Expected a struct type for `offset_of`");
 			return false;
 		}
 
@@ -2384,7 +2409,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		ast_node(arg, Ident, field_arg);
 		Selection sel = lookup_field(c->allocator, type, arg->string, operand->mode == Addressing_Type);
 		if (sel.entity == NULL) {
-			gbString type_str = type_to_string(type);
+			gbString type_str = type_to_string(bt);
+			defer (gb_string_free(type_str));
 			error(ast_node_token(ce->args[0]),
 			      "`%s` has no field named `%.*s`", type_str, LIT(arg->string));
 			return false;
@@ -2397,7 +2423,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	} break;
 
 	case BuiltinProc_offset_of_val: {
-		// offset_val :: proc(val: expression) -> int
+		// offset_of_val :: proc(val: expression) -> int
 		AstNode *arg = unparen_expr(ce->args[0]);
 		if (arg->kind != AstNode_SelectorExpr) {
 			gbString str = expr_to_string(arg);
@@ -2416,6 +2442,11 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			if (is_type_struct(p)) {
 				type = p->Pointer.elem;
 			}
+		}
+
+		if (!is_type_struct(type)) {
+			error(ast_node_token(ce->args[0]), "Expected a struct type for `offset_of_val`");
+			return false;
 		}
 
 
@@ -2677,8 +2708,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		if (operand->mode == Addressing_Constant &&
 		    op.mode == Addressing_Constant) {
-			u8 *ptr = cast(u8 *)operand->value.value_pointer;
-			isize elem_size = type_size_of(c->sizes, c->allocator, ptr_type->Pointer.elem);
+			i64 ptr = operand->value.value_pointer;
+			i64 elem_size = type_size_of(c->sizes, c->allocator, ptr_type->Pointer.elem);
 			ptr += elem_size * op.value.value_integer;
 			operand->value.value_pointer = ptr;
 		} else {
@@ -2996,6 +3027,31 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		operand->mode = Addressing_Value;
 		operand->type = t_string;
+	} break;
+
+	case BuiltinProc_maybe_value: {
+		Type *type = operand->type;
+		if (!is_type_maybe(type)) {
+			gbString type_str = type_to_string(operand->type);
+			defer (gb_string_free(type_str));
+			error(ast_node_token(call),
+			      "Expected a maybe to `maybe_value`, got `%s`",
+			      type_str);
+			return false;
+		}
+
+		operand->mode = Addressing_Value;
+
+		Entity **variables = gb_alloc_array(c->allocator, Entity *, 2);
+		Type *elem = base_type(type)->Maybe.elem;
+		Token t = make_token_ident(make_string(""));
+		variables[0] = make_entity_param(c->allocator, NULL, t, elem, false);
+		variables[1] = make_entity_param(c->allocator, NULL, t, t_bool, false);
+
+		Type *tuple = make_type_tuple(c->allocator);
+		tuple->Tuple.variables = variables;
+		tuple->Tuple.variable_count = 2;
+		operand->type = tuple;
 	} break;
 	}
 
@@ -3677,6 +3733,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 	case AstNode_ProcType:
 	case AstNode_PointerType:
+	case AstNode_MaybeType:
 	case AstNode_ArrayType:
 	case AstNode_VectorType:
 	case AstNode_StructType:

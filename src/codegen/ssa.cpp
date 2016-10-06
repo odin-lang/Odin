@@ -561,6 +561,10 @@ Type *ssa_type(ssaValue *value) {
 }
 
 ssaDebugInfo *ssa_add_debug_info_file(ssaProcedure *proc, AstFile *file) {
+	if (!proc->module->generate_debug_info) {
+		return NULL;
+	}
+
 	GB_ASSERT(file != NULL);
 	ssaDebugInfo *di = ssa_alloc_debug_info(proc->module->allocator, ssaDebugInfo_File);
 	di->File.file = file;
@@ -589,6 +593,10 @@ ssaDebugInfo *ssa_add_debug_info_file(ssaProcedure *proc, AstFile *file) {
 
 
 ssaDebugInfo *ssa_add_debug_info_proc(ssaProcedure *proc, Entity *entity, String name, ssaDebugInfo *file) {
+	if (!proc->module->generate_debug_info) {
+		return NULL;
+	}
+
 	GB_ASSERT(entity != NULL);
 	ssaDebugInfo *di = ssa_alloc_debug_info(proc->module->allocator, ssaDebugInfo_Proc);
 	di->Proc.entity = entity;
@@ -1719,6 +1727,17 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 		return value;
 	}
 
+	if (is_type_maybe(dst)) {
+		gbAllocator a = proc->module->allocator;
+		Type *elem = base_type(dst)->Maybe.elem;
+		ssaValue *maybe = ssa_add_local_generated(proc, dst);
+		ssaValue *val = ssa_emit_struct_gep(proc, maybe, v_zero32, make_type_pointer(a, elem));
+		ssaValue *set = ssa_emit_struct_gep(proc, maybe, v_one32,  make_type_pointer(a, t_bool));
+		ssa_emit_store(proc, val, value);
+		ssa_emit_store(proc, set, v_true);
+		return ssa_emit_load(proc, maybe);
+	}
+
 	// integer -> integer
 	if (is_type_integer(src) && is_type_integer(dst)) {
 		GB_ASSERT(src->kind == Type_Basic &&
@@ -2658,7 +2677,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					return ssa_emit_select(proc, cond, neg_x, x);
 				} break;
 
-
 				case BuiltinProc_enum_to_string: {
 					ssa_emit_comment(proc, make_string("enum_to_string"));
 					ssaValue *x = ssa_build_expr(proc, ce->args[0]);
@@ -2670,6 +2688,24 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					args[0] = ti;
 					args[1] = ssa_emit_conv(proc, x, t_i64);
 					return ssa_emit_global_call(proc, "__enum_to_string", args, 2);
+				} break;
+
+				case BuiltinProc_maybe_value: {
+					ssa_emit_comment(proc, make_string("maybe_value"));
+					ssaValue *maybe = ssa_build_expr(proc, ce->args[0]);
+					Type *t = default_type(type_of_expr(proc->module->info, expr));
+					GB_ASSERT(is_type_tuple(t));
+
+					Type *elem = ssa_type(maybe);
+					GB_ASSERT(is_type_maybe(elem));
+					elem = base_type(elem)->Maybe.elem;
+
+					ssaValue *result = ssa_add_local_generated(proc, t);
+					ssaValue *gep0 = ssa_emit_struct_gep(proc, result, v_zero32, make_type_pointer(proc->module->allocator, elem));
+					ssaValue *gep1 = ssa_emit_struct_gep(proc, result, v_one32,  make_type_pointer(proc->module->allocator, t_bool));
+					ssa_emit_store(proc, gep0, ssa_emit_struct_ev(proc, maybe, 0, elem));
+					ssa_emit_store(proc, gep1, ssa_emit_struct_ev(proc, maybe, 1, t_bool));
+					return ssa_emit_load(proc, result);
 				} break;
 				}
 			}
@@ -3214,6 +3250,7 @@ void ssa_build_cond(ssaProcedure *proc, AstNode *cond, ssaBlock *true_block, ssa
 	}
 
 	ssaValue *expr = ssa_build_expr(proc, cond);
+	expr = ssa_emit_conv(proc, expr, t_bool);
 	ssa_emit_if(proc, expr, true_block, false_block);
 }
 

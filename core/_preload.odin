@@ -36,6 +36,9 @@ Type_Info :: union {
 	Pointer: struct #ordered {
 		elem: ^Type_Info
 	}
+	Maybe: struct #ordered {
+		elem: ^Type_Info
+	}
 	Procedure: struct #ordered {
 		params:   ^Type_Info // Type_Info.Tuple
 		results:  ^Type_Info // Type_Info.Tuple

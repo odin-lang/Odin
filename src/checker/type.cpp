@@ -58,11 +58,12 @@ struct BasicType {
 #define TYPE_KINDS \
 	TYPE_KIND(Invalid), \
 	TYPE_KIND(Basic), \
+	TYPE_KIND(Pointer), \
 	TYPE_KIND(Array), \
 	TYPE_KIND(Vector), \
 	TYPE_KIND(Slice), \
+	TYPE_KIND(Maybe), \
 	TYPE_KIND(Record), \
-	TYPE_KIND(Pointer), \
 	TYPE_KIND(Named), \
 	TYPE_KIND(Tuple), \
 	TYPE_KIND(Proc), \
@@ -96,6 +97,7 @@ struct Type {
 	u32 flags; // See parser.cpp `enum TypeFlag`
 	union {
 		BasicType Basic;
+		struct { Type *elem; } Pointer;
 		struct {
 			Type *elem;
 			i64 count;
@@ -107,6 +109,9 @@ struct Type {
 		struct {
 			Type *elem;
 		} Slice;
+		struct {
+			Type *elem;
+		} Maybe;
 		struct {
 			TypeRecordKind kind;
 
@@ -134,7 +139,6 @@ struct Type {
 			Entity **other_fields;
 			isize    other_field_count;
 		} Record;
-		struct { Type *elem; } Pointer;
 		struct {
 			String  name;
 			Type *  base;
@@ -187,6 +191,18 @@ Type *make_type_basic(gbAllocator a, BasicType basic) {
 	return t;
 }
 
+Type *make_type_pointer(gbAllocator a, Type *elem) {
+	Type *t = alloc_type(a, Type_Pointer);
+	t->Pointer.elem = elem;
+	return t;
+}
+
+Type *make_type_maybe(gbAllocator a, Type *elem) {
+	Type *t = alloc_type(a, Type_Maybe);
+	t->Maybe.elem = elem;
+	return t;
+}
+
 Type *make_type_array(gbAllocator a, Type *elem, i64 count) {
 	Type *t = alloc_type(a, Type_Array);
 	t->Array.elem = elem;
@@ -206,6 +222,7 @@ Type *make_type_slice(gbAllocator a, Type *elem) {
 	t->Array.elem = elem;
 	return t;
 }
+
 
 Type *make_type_struct(gbAllocator a) {
 	Type *t = alloc_type(a, Type_Record);
@@ -231,11 +248,7 @@ Type *make_type_enum(gbAllocator a) {
 	return t;
 }
 
-Type *make_type_pointer(gbAllocator a, Type *elem) {
-	Type *t = alloc_type(a, Type_Pointer);
-	t->Pointer.elem = elem;
-	return t;
-}
+
 
 Type *make_type_named(gbAllocator a, String name, Type *base, Entity *type_name) {
 	Type *t = alloc_type(a, Type_Named);
@@ -357,6 +370,7 @@ gb_global Type *t_type_info_float      = NULL;
 gb_global Type *t_type_info_string     = NULL;
 gb_global Type *t_type_info_boolean    = NULL;
 gb_global Type *t_type_info_pointer    = NULL;
+gb_global Type *t_type_info_maybe      = NULL;
 gb_global Type *t_type_info_procedure  = NULL;
 gb_global Type *t_type_info_array      = NULL;
 gb_global Type *t_type_info_slice      = NULL;
@@ -468,6 +482,15 @@ b32 is_type_pointer(Type *t) {
 	}
 	return t->kind == Type_Pointer;
 }
+b32 is_type_maybe(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_Maybe;
+}
+b32 is_type_tuple(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_Tuple;
+}
+
 
 b32 is_type_int_or_uint(Type *t) {
 	if (t->kind == Type_Basic) {
@@ -669,6 +692,11 @@ b32 are_types_identical(Type *x, Type *y) {
 	case Type_Pointer:
 		if (y->kind == Type_Pointer)
 			return are_types_identical(x->Pointer.elem, y->Pointer.elem);
+		break;
+
+	case Type_Maybe:
+		if (y->kind == Type_Maybe)
+			return are_types_identical(x->Maybe.elem, y->Maybe.elem);
 		break;
 
 	case Type_Named:
@@ -987,6 +1015,9 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		return max;
 	} break;
 
+	case Type_Maybe:
+		return gb_max(type_align_of(s, allocator, t->Maybe.elem), type_align_of(s, allocator, t_bool));
+
 	case Type_Record: {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct:
@@ -1115,6 +1146,9 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	case Type_Slice: // ptr + len + cap
 		return 3 * s.word_size;
 
+	case Type_Maybe: // value + bool
+		return type_size_of(s, allocator, t->Maybe.elem) + type_size_of(s, allocator, t_bool);
+
 	case Type_Record: {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct: {
@@ -1199,6 +1233,16 @@ gbString write_type_to_string(gbString str, Type *type) {
 		str = gb_string_append_length(str, type->Basic.name.text, type->Basic.name.len);
 		break;
 
+	case Type_Pointer:
+		str = gb_string_appendc(str, "^");
+		str = write_type_to_string(str, type->Pointer.elem);
+		break;
+
+	case Type_Maybe:
+		str = gb_string_appendc(str, "?");
+		str = write_type_to_string(str, type->Maybe.elem);
+		break;
+
 	case Type_Array:
 		str = gb_string_appendc(str, gb_bprintf("[%td]", type->Array.count));
 		str = write_type_to_string(str, type->Array.elem);
@@ -1266,10 +1310,6 @@ gbString write_type_to_string(gbString str, Type *type) {
 		}
 	} break;
 
-	case Type_Pointer:
-		str = gb_string_appendc(str, "^");
-		str = write_type_to_string(str, type->Pointer.elem);
-		break;
 
 	case Type_Named:
 		if (type->Named.type_name != NULL) {

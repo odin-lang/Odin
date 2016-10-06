@@ -17,6 +17,7 @@ TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
 	TOKEN_KIND(Token_Hash, "#"), \
 	TOKEN_KIND(Token_At, "@"), \
 	TOKEN_KIND(Token_Pointer, "^"), \
+	TOKEN_KIND(Token_Maybe, "?"), \
 	TOKEN_KIND(Token_Add, "+"), \
 	TOKEN_KIND(Token_Sub, "-"), \
 	TOKEN_KIND(Token_Mul, "*"), \
@@ -720,6 +721,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '#': token.kind = Token_Hash;         break;
 		case '@': token.kind = Token_At;           break;
 		case '^': token.kind = Token_Pointer;      break;
+		case '?': token.kind = Token_Maybe;        break;
 		case ';': token.kind = Token_Semicolon;    break;
 		case ',': token.kind = Token_Comma;        break;
 		case '(': token.kind = Token_OpenParen;    break;

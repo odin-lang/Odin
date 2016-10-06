@@ -168,6 +168,7 @@ enum BuiltinProcId {
 
 	BuiltinProc_enum_to_string,
 
+	BuiltinProc_maybe_value,
 
 	BuiltinProc_Count,
 };
@@ -212,6 +213,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("abs"),              1, false, Expr_Expr},
 
 	{STR_LIT("enum_to_string"),   1, false, Expr_Expr},
+
+	{STR_LIT("maybe_value"),      1, false, Expr_Expr},
 
 };
 
@@ -891,7 +894,7 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 #include "expr.cpp"
 #include "stmt.cpp"
 
-void init_runtime_types(Checker *c) {
+void init_preload_types(Checker *c) {
 	if (t_type_info == NULL) {
 		Entity *e = current_scope_lookup_entity(c->global_scope, make_string("Type_Info"));
 		if (e == NULL) {
@@ -900,13 +903,13 @@ void init_runtime_types(Checker *c) {
 		}
 		t_type_info = e->type;
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
-
+		GB_ASSERT(is_type_union(e->type));
 		auto *record = &base_type(e->type)->Record;
 
 		t_type_info_member = record->other_fields[0]->type;
 		t_type_info_member_ptr = make_type_pointer(c->allocator, t_type_info_member);
 
-		if (record->field_count != 16) {
+		if (record->field_count != 17) {
 			compiler_error("Invalid `Type_Info` layout");
 		}
 		t_type_info_named     = record->fields[ 1]->type;
@@ -915,15 +918,16 @@ void init_runtime_types(Checker *c) {
 		t_type_info_string    = record->fields[ 4]->type;
 		t_type_info_boolean   = record->fields[ 5]->type;
 		t_type_info_pointer   = record->fields[ 6]->type;
-		t_type_info_procedure = record->fields[ 7]->type;
-		t_type_info_array     = record->fields[ 8]->type;
-		t_type_info_slice     = record->fields[ 9]->type;
-		t_type_info_vector    = record->fields[10]->type;
-		t_type_info_tuple     = record->fields[11]->type;
-		t_type_info_struct    = record->fields[12]->type;
-		t_type_info_union     = record->fields[13]->type;
-		t_type_info_raw_union = record->fields[14]->type;
-		t_type_info_enum      = record->fields[15]->type;
+		t_type_info_maybe     = record->fields[ 7]->type;
+		t_type_info_procedure = record->fields[ 8]->type;
+		t_type_info_array     = record->fields[ 9]->type;
+		t_type_info_slice     = record->fields[10]->type;
+		t_type_info_vector    = record->fields[11]->type;
+		t_type_info_tuple     = record->fields[12]->type;
+		t_type_info_struct    = record->fields[13]->type;
+		t_type_info_union     = record->fields[14]->type;
+		t_type_info_raw_union = record->fields[15]->type;
+		t_type_info_enum      = record->fields[16]->type;
 	}
 
 	if (t_allocator == NULL) {
@@ -1206,7 +1210,7 @@ void check_parsed_files(Checker *c) {
 
 	check_global_entity(c, Entity_TypeName);
 
-	init_runtime_types(c);
+	init_preload_types(c);
 
 	check_global_entity(c, Entity_Constant);
 	check_global_entity(c, Entity_Procedure);
