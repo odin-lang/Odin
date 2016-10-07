@@ -129,6 +129,7 @@ AST_NODE_KIND(_ExprBegin,  "",  struct{}) \
 	AST_NODE_KIND(SelectorExpr, "selector expression",    struct { Token token; AstNode *expr, *selector; }) \
 	AST_NODE_KIND(IndexExpr,    "index expression",       struct { AstNode *expr, *index; Token open, close; }) \
 	AST_NODE_KIND(DerefExpr,    "dereference expression", struct { Token op; AstNode *expr; }) \
+	AST_NODE_KIND(DemaybeExpr,  "demaybe expression",     struct { Token op; AstNode *expr; }) \
 	AST_NODE_KIND(CallExpr,     "call expression", struct { \
 		AstNode *proc; \
 		AstNodeArray args; \
@@ -398,6 +399,8 @@ Token ast_node_token(AstNode *node) {
 		return node->FieldValue.eq;
 	case AstNode_DerefExpr:
 		return node->DerefExpr.op;
+	case AstNode_DemaybeExpr:
+		return node->DemaybeExpr.op;
 	case AstNode_BadStmt:
 		return node->BadStmt.begin;
 	case AstNode_EmptyStmt:
@@ -594,6 +597,13 @@ AstNode *make_deref_expr(AstFile *f, AstNode *expr, Token op) {
 	AstNode *result = make_node(f, AstNode_DerefExpr);
 	result->DerefExpr.expr = expr;
 	result->DerefExpr.op = op;
+	return result;
+}
+
+AstNode *make_demaybe_expr(AstFile *f, AstNode *expr, Token op) {
+	AstNode *result = make_node(f, AstNode_DemaybeExpr);
+	result->DemaybeExpr.expr = expr;
+	result->DemaybeExpr.op = op;
 	return result;
 }
 
@@ -1453,7 +1463,8 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 			next_token(f);
 		}
 
-		gb_array_append(args, parse_expr(f, false));
+		AstNode *arg = parse_expr(f, false);
+		gb_array_append(args, arg);
 
 		if (f->curr_token.kind != Token_Comma) {
 			if (f->curr_token.kind == Token_CloseParen)
@@ -1562,6 +1573,10 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 
 		case Token_Pointer: // Deference
 			operand = make_deref_expr(f, operand, expect_token(f, Token_Pointer));
+			break;
+
+		case Token_Maybe: // Demaybe
+			operand = make_demaybe_expr(f, operand, expect_token(f, Token_Maybe));
 			break;
 
 		case Token_OpenBrace: {
@@ -2715,12 +2730,12 @@ AstNode *parse_stmt(AstFile *f) {
 				f->is_global_scope = true;
 				return make_empty_stmt(f, f->curr_token);
 			}
-			syntax_error(token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope.");
+			syntax_error(token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope");
 			return make_bad_decl(f, token, f->curr_token);
 		} else if (tag == "import") {
 			// TODO(bill): better error messages
 			Token import_name = {};
-			Token file_path = expect_token(f, Token_String);
+			Token file_path = expect_token_after(f, Token_String, "#import");
 			if (allow_token(f, Token_as)) {
 				// NOTE(bill): Custom import name
 				if (f->curr_token.kind == Token_Period) {
@@ -2728,14 +2743,19 @@ AstNode *parse_stmt(AstFile *f) {
 					import_name.kind = Token_Identifier;
 					next_token(f);
 				} else {
-					import_name = expect_token(f, Token_Identifier);
+					import_name = expect_token_after(f, Token_Identifier, "`as` for import declaration");
+				}
+
+				if (import_name.string == "_") {
+					syntax_error(token, "Illegal import name: `_`");
+					return make_bad_decl(f, token, f->curr_token);
 				}
 			}
 
 			if (f->curr_proc == NULL) {
 				return make_import_decl(f, s->TagStmt.token, file_path, import_name, false);
 			}
-			syntax_error(token, "You cannot use #import within a procedure. This must be done at the file scope.");
+			syntax_error(token, "You cannot use #import within a procedure. This must be done at the file scope");
 			return make_bad_decl(f, token, file_path);
 		} else if (tag == "load") {
 			// TODO(bill): better error messages
@@ -2746,14 +2766,14 @@ AstNode *parse_stmt(AstFile *f) {
 			if (f->curr_proc == NULL) {
 				return make_import_decl(f, s->TagStmt.token, file_path, import_name, true);
 			}
-			syntax_error(token, "You cannot use #load within a procedure. This must be done at the file scope.");
+			syntax_error(token, "You cannot use #load within a procedure. This must be done at the file scope");
 			return make_bad_decl(f, token, file_path);
 		} else if (tag == "foreign_system_library") {
 			Token file_path = expect_token(f, Token_String);
 			if (f->curr_proc == NULL) {
 				return make_foreign_system_library(f, s->TagStmt.token, file_path);
 			}
-			syntax_error(token, "You cannot use #foreign_system_library within a procedure. This must be done at the file scope.");
+			syntax_error(token, "You cannot use #foreign_system_library within a procedure. This must be done at the file scope");
 			return make_bad_decl(f, token, file_path);
 		} else if (tag == "thread_local") {
 			AstNode *var_decl = parse_simple_stmt(f);
@@ -2762,7 +2782,7 @@ AstNode *parse_stmt(AstFile *f) {
 				return make_bad_decl(f, token, ast_node_token(var_decl));
 			}
 			if (f->curr_proc != NULL) {
-				syntax_error(token, "#thread_local is only allowed at the file scope.");
+				syntax_error(token, "#thread_local is only allowed at the file scope");
 				return make_bad_decl(f, token, ast_node_token(var_decl));
 			}
 			var_decl->VarDecl.tags |= VarDeclTag_thread_local;
@@ -2783,12 +2803,12 @@ AstNode *parse_stmt(AstFile *f) {
 			return s;
 		}
 
-
 		s->TagStmt.stmt = parse_stmt(f); // TODO(bill): Find out why this doesn't work as an argument
 		return s;
 	} break;
 
-	case Token_OpenBrace: return parse_block_stmt(f);
+	case Token_OpenBrace:
+		return parse_block_stmt(f);
 
 	case Token_Semicolon:
 		s = make_empty_stmt(f, token);

@@ -1,8 +1,9 @@
 #import "fmt.odin"
 
+
 main :: proc() {
 	maybe_print :: proc(x: ?int) {
-		if v, ok := maybe_value(x); ok {
+		if v, ok := x?; ok {
 			fmt.println(v)
 		} else {
 			fmt.println("nowt")

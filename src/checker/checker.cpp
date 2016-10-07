@@ -168,8 +168,6 @@ enum BuiltinProcId {
 
 	BuiltinProc_enum_to_string,
 
-	BuiltinProc_maybe_value,
-
 	BuiltinProc_Count,
 };
 struct BuiltinProc {
@@ -213,9 +211,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("abs"),              1, false, Expr_Expr},
 
 	{STR_LIT("enum_to_string"),   1, false, Expr_Expr},
-
-	{STR_LIT("maybe_value"),      1, false, Expr_Expr},
-
 };
 
 struct CheckerContext {
@@ -874,8 +869,6 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 	Map<Entity *> map = {}; // Key: Entity *
 	map_init(&map, gb_heap_allocator());
 
-	add_dependency_to_map(&map, info, start);
-
 	gb_for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
@@ -884,6 +877,8 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 			add_dependency_to_map(&map, info, e);
 		}
 	}
+
+	add_dependency_to_map(&map, info, start);
 
 	return map;
 }
@@ -1200,6 +1195,16 @@ void check_parsed_files(Checker *c) {
 				add_curr_ast_file(c, d->scope->file);
 
 				if (d->scope == e->scope) {
+					if (kind != Entity_Procedure && e->token.string == "main") {
+						if (e->scope->is_init) {
+							error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
+							continue;
+						}
+					} else if (e->scope->is_global && e->token.string == "main") {
+						error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
+						continue;
+					}
+
 					Scope *prev_scope = c->context.scope;
 					c->context.scope = d->scope;
 					check_entity_decl(c, e, d, NULL);

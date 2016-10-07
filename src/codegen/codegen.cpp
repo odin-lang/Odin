@@ -121,12 +121,9 @@ void ssa_gen_tree(ssaGen *s) {
 			continue;
 		}
 
-		if (entry_point != NULL) {
-			auto found = map_get(&min_dep_map, hash_pointer(e));
-			if (found == NULL) {
-				// NOTE(bill): Nothing depends upon it so doesn't need to be built
-				continue;
-			}
+		if (map_get(&min_dep_map, hash_pointer(e)) == NULL) {
+			// NOTE(bill): Nothing depends upon it so doesn't need to be built
+			continue;
 		}
 
 		if (!scope->is_global && !scope->is_init) {

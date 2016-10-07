@@ -327,6 +327,3 @@ __enum_to_string :: proc(info: ^Type_Info, value: i64) -> string {
 	}
 	return ""
 }
-
-
-

@@ -3028,31 +3028,6 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->mode = Addressing_Value;
 		operand->type = t_string;
 	} break;
-
-	case BuiltinProc_maybe_value: {
-		Type *type = operand->type;
-		if (!is_type_maybe(type)) {
-			gbString type_str = type_to_string(operand->type);
-			defer (gb_string_free(type_str));
-			error(ast_node_token(call),
-			      "Expected a maybe to `maybe_value`, got `%s`",
-			      type_str);
-			return false;
-		}
-
-		operand->mode = Addressing_Value;
-
-		Entity **variables = gb_alloc_array(c->allocator, Entity *, 2);
-		Type *elem = base_type(type)->Maybe.elem;
-		Token t = make_token_ident(make_string(""));
-		variables[0] = make_entity_param(c->allocator, NULL, t, elem, false);
-		variables[1] = make_entity_param(c->allocator, NULL, t, t_bool, false);
-
-		Type *tuple = make_type_tuple(c->allocator);
-		tuple->Tuple.variables = variables;
-		tuple->Tuple.variable_count = 2;
-		operand->type = tuple;
-	} break;
 	}
 
 	return true;
@@ -3270,6 +3245,10 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	o->type = t_invalid;
 
 	switch (node->kind) {
+	default:
+		goto error;
+		break;
+
 	case_ast_node(be, BadExpr, node)
 		goto error;
 	case_end;
@@ -3731,6 +3710,34 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		}
 	case_end;
 
+	case_ast_node(de, DemaybeExpr, node);
+		check_expr_or_type(c, o, de->expr);
+		if (o->mode == Addressing_Invalid) {
+			goto error;
+		} else {
+			Type *t = base_type(o->type);
+			if (t->kind == Type_Maybe) {
+				Entity **variables = gb_alloc_array(c->allocator, Entity *, 2);
+				Type *elem = t->Maybe.elem;
+				Token tok = make_token_ident(make_string(""));
+				variables[0] = make_entity_param(c->allocator, NULL, tok, elem, false);
+				variables[1] = make_entity_param(c->allocator, NULL, tok, t_bool, false);
+
+				Type *tuple = make_type_tuple(c->allocator);
+				tuple->Tuple.variables = variables;
+				tuple->Tuple.variable_count = 2;
+
+				o->type = tuple;
+				o->mode = Addressing_Variable;
+ 			} else {
+ 				gbString str = expr_to_string(o->expr);
+ 				error(ast_node_token(o->expr), "Cannot demaybe `%s`", str);
+ 				gb_string_free(str);
+ 				goto error;
+ 			}
+		}
+	case_end;
+
 	case AstNode_ProcType:
 	case AstNode_PointerType:
 	case AstNode_MaybeType:
@@ -3908,6 +3915,11 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_ast_node(de, DerefExpr, node);
 		str = write_expr_to_string(str, de->expr);
 		str = gb_string_appendc(str, "^");
+	case_end;
+
+	case_ast_node(de, DemaybeExpr, node);
+		str = write_expr_to_string(str, de->expr);
+		str = gb_string_appendc(str, "?");
 	case_end;
 
 	case_ast_node(be, BinaryExpr, node);

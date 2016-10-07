@@ -2689,24 +2689,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					args[1] = ssa_emit_conv(proc, x, t_i64);
 					return ssa_emit_global_call(proc, "__enum_to_string", args, 2);
 				} break;
-
-				case BuiltinProc_maybe_value: {
-					ssa_emit_comment(proc, make_string("maybe_value"));
-					ssaValue *maybe = ssa_build_expr(proc, ce->args[0]);
-					Type *t = default_type(type_of_expr(proc->module->info, expr));
-					GB_ASSERT(is_type_tuple(t));
-
-					Type *elem = ssa_type(maybe);
-					GB_ASSERT(is_type_maybe(elem));
-					elem = base_type(elem)->Maybe.elem;
-
-					ssaValue *result = ssa_add_local_generated(proc, t);
-					ssaValue *gep0 = ssa_emit_struct_gep(proc, result, v_zero32, make_type_pointer(proc->module->allocator, elem));
-					ssaValue *gep1 = ssa_emit_struct_gep(proc, result, v_one32,  make_type_pointer(proc->module->allocator, t_bool));
-					ssa_emit_store(proc, gep0, ssa_emit_struct_ev(proc, maybe, 0, elem));
-					ssa_emit_store(proc, gep1, ssa_emit_struct_ev(proc, maybe, 1, t_bool));
-					return ssa_emit_load(proc, result);
-				} break;
 				}
 			}
 		}
@@ -2801,6 +2783,10 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 
 		return ssa_emit_call(proc, value, args, arg_count);
+	case_end;
+
+	case_ast_node(de, DemaybeExpr, expr);
+		return ssa_emit_load(proc, ssa_build_addr(proc, expr).addr);
 	case_end;
 
 	case_ast_node(se, SliceExpr, expr);
@@ -3189,6 +3175,25 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		// TODO(bill): Is a ptr copy needed?
 		ssaValue *gep = ssa_emit_zero_gep(proc, e);
 		return ssa_make_addr(gep, expr);
+	case_end;
+
+	case_ast_node(de, DemaybeExpr, expr);
+		ssa_emit_comment(proc, make_string("DemaybeExpr"));
+		ssaValue *maybe = ssa_build_expr(proc, de->expr);
+		Type *t = default_type(type_of_expr(proc->module->info, expr));
+		GB_ASSERT(is_type_tuple(t));
+
+		Type *elem = ssa_type(maybe);
+		GB_ASSERT(is_type_maybe(elem));
+		elem = base_type(elem)->Maybe.elem;
+
+		ssaValue *result = ssa_add_local_generated(proc, t);
+		ssaValue *gep0 = ssa_emit_struct_gep(proc, result, v_zero32, make_type_pointer(proc->module->allocator, elem));
+		ssaValue *gep1 = ssa_emit_struct_gep(proc, result, v_one32,  make_type_pointer(proc->module->allocator, t_bool));
+		ssa_emit_store(proc, gep0, ssa_emit_struct_ev(proc, maybe, 0, elem));
+		ssa_emit_store(proc, gep1, ssa_emit_struct_ev(proc, maybe, 1, t_bool));
+
+		return ssa_make_addr(result, expr);
 	case_end;
 
 	case_ast_node(ce, CallExpr, expr);
