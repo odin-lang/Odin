@@ -23,7 +23,7 @@ struct ExactValue {
 	union {
 		b32      value_bool;
 		String   value_string;
-		i64      value_integer;
+		i64      value_integer; // NOTE(bill): This must be an integer and not a pointer
 		f64      value_float;
 		i64      value_pointer;
 		AstNode *value_compound;

@@ -1610,6 +1610,7 @@ AstNode *parse_type(AstFile *f);
 AstNode *parse_unary_expr(AstFile *f, b32 lhs) {
 	switch (f->curr_token.kind) {
 	case Token_Pointer:
+	case Token_Maybe:
 	case Token_Add:
 	case Token_Sub:
 	case Token_Not:

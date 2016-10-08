@@ -1044,6 +1044,9 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_c
 		if (ue->op.kind == Token_Pointer) {
 			type = make_type_pointer(c->allocator, check_type(c, ue->expr));
 			goto end;
+		} else if (ue->op.kind == Token_Maybe) {
+			type = make_type_maybe(c->allocator, check_type(c, ue->expr));
+			goto end;
 		}
 	case_end;
 
@@ -1365,7 +1368,8 @@ b32 check_is_expr_vector_index(Checker *c, AstNode *expr) {
 }
 
 void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
-	if (op.kind == Token_Pointer) { // Pointer address
+	switch (op.kind) {
+	case Token_Pointer: { // Pointer address
 		if (o->mode != Addressing_Variable ||
 		    check_is_expr_vector_index(c, o->expr)) {
 			ast_node(ue, UnaryExpr, node);
@@ -1378,6 +1382,27 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 		o->mode = Addressing_Value;
 		o->type = make_type_pointer(c->allocator, o->type);
 		return;
+	}
+
+	case Token_Maybe: { // Make maybe
+		Type *t = default_type(o->type);
+		b32 is_value =
+			o->mode == Addressing_Variable ||
+			o->mode == Addressing_Value ||
+			o->mode == Addressing_Constant;
+
+		if (!is_value || is_type_untyped(t)) {
+			ast_node(ue, UnaryExpr, node);
+			gbString str = expr_to_string(ue->expr);
+			defer (gb_string_free(str));
+			error(op, "Cannot convert `%s` to a maybe", str);
+			o->mode = Addressing_Invalid;
+			return;
+		}
+		o->mode = Addressing_Value;
+		o->type = make_type_maybe(c->allocator, t);
+		return;
+	}
 	}
 
 	if (!check_unary_op(c, o, op)) {
@@ -1399,8 +1424,9 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 
 
 		i32 precision = 0;
-		if (is_type_unsigned(type))
+		if (is_type_unsigned(type)) {
 			precision = cast(i32)(8 * type_size_of(c->sizes, c->allocator, type));
+		}
 		o->value = exact_unary_operator_value(op, o->value, precision);
 
 		if (is_type_typed(type)) {

@@ -2099,24 +2099,26 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
-		case Token_Pointer: {
-			return ssa_emit_zero_gep(proc, ssa_build_addr(proc, ue->expr).addr);
-		}
+		case Token_Pointer:
+			return ssa_emit_zero_gep(proc, ssa_build_addr(proc, ue->expr).addr); // Make a copy of the pointer
+
+		case Token_Maybe:
+			return ssa_emit_conv(proc, ssa_build_expr(proc, ue->expr), type_of_expr(proc->module->info, expr));
+
 		case Token_Add:
 			return ssa_build_expr(proc, ue->expr);
-		case Token_Sub: {
-			// NOTE(bill): -`x` == 0 - `x`
-			ssaValue *left = v_zero;
-			ssaValue *right = ssa_build_expr(proc, ue->expr);
-			return ssa_emit_arith(proc, ue->op, left, right, tv->type);
-		} break;
-		case Token_Not: // Boolean not
+
+		case Token_Sub: // NOTE(bill): -`x` == 0 - `x`
+			return ssa_emit_arith(proc, ue->op, v_zero, ssa_build_expr(proc, ue->expr), tv->type);
+
+		case Token_Not:   // Boolean not
 		case Token_Xor: { // Bitwise not
 			// NOTE(bill): "not" `x` == `x` "xor" `-1`
-			ExactValue neg_one = make_exact_value_integer(-1);
 			ssaValue *left = ssa_build_expr(proc, ue->expr);
-			ssaValue *right = ssa_add_module_constant(proc->module, tv->type, neg_one);
-			return ssa_emit_arith(proc, ue->op, left, right, tv->type);
+			ssaValue *right = ssa_add_module_constant(proc->module, tv->type, make_exact_value_integer(-1));
+			return ssa_emit_arith(proc, ue->op,
+			                      left, right,
+			                      tv->type);
 		} break;
 		}
 	case_end;
