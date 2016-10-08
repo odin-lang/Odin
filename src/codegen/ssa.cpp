@@ -69,7 +69,7 @@ struct ssaModule {
 
 
 struct ssaBlock {
-	i32 id;
+	isize index;
 	AstNode *node;
 	Scope *scope;
 	isize scope_index;
@@ -266,12 +266,12 @@ struct ssaInstr {
 			ssaValue *false_value;
 		} Select;
 		struct {
-			String comment;
 			Array<ssaValue *> edges;
+			Type *type;
 		} Phi;
 		struct {
 			Type *type;
-			Token op;
+			TokenKind op;
 			ssaValue *left, *right;
 		} BinaryOp;
 		struct {
@@ -513,6 +513,8 @@ Type *ssa_type(ssaInstr *instr) {
 		return instr->Load.type;
 	case ssaInstr_GetElementPtr:
 		return instr->GetElementPtr.result_type;
+	case ssaInstr_Phi:
+		return instr->Phi.type;
 	case ssaInstr_ExtractValue:
 		return instr->ExtractValue.result_type;
 	case ssaInstr_InsertValue:
@@ -742,7 +744,7 @@ ssaValue *ssa_make_instr_insert_value(ssaProcedure *p, ssaValue *value, ssaValue
 }
 
 
-ssaValue *ssa_make_instr_binary_op(ssaProcedure *p, Token op, ssaValue *left, ssaValue *right, Type *type) {
+ssaValue *ssa_make_instr_binary_op(ssaProcedure *p, TokenKind op, ssaValue *left, ssaValue *right, Type *type) {
 	ssaValue *v = ssa_alloc_instr(p, ssaInstr_BinaryOp);
 	ssaInstr *i = &v->Instr;
 	i->BinaryOp.op = op;
@@ -758,6 +760,14 @@ ssaValue *ssa_make_instr_br(ssaProcedure *p, ssaValue *cond, ssaBlock *true_bloc
 	i->Br.cond = cond;
 	i->Br.true_block = true_block;
 	i->Br.false_block = false_block;
+	return v;
+}
+
+ssaValue *ssa_make_instr_phi(ssaProcedure *p, Array<ssaValue *> edges, Type *type) {
+	ssaValue *v = ssa_alloc_instr(p, ssaInstr_Phi);
+	ssaInstr *i = &v->Instr;
+	i->Phi.edges = edges;
+	i->Phi.type = type;
 	return v;
 }
 
@@ -1065,7 +1075,7 @@ Type *ssa_addr_type(ssaAddr lval) {
 	return NULL;
 }
 
-ssaBlock *ssa__make_block(ssaProcedure *proc, AstNode *node, String label) {
+ssaBlock *ssa_add_block(ssaProcedure *proc, AstNode *node, char *label) {
 	Scope *scope = NULL;
 	if (node != NULL) {
 		Scope **found = map_get(&proc->module->info->scopes, hash_pointer(node));
@@ -1076,12 +1086,8 @@ ssaBlock *ssa__make_block(ssaProcedure *proc, AstNode *node, String label) {
 		}
 	}
 
-	ssaValue *block = ssa_make_value_block(proc, node, scope, label);
-	return &block->Block;
-}
-
-ssaBlock *ssa_add_block(ssaProcedure *proc, AstNode *node, String label) {
-	ssaBlock *block = ssa__make_block(proc, node, label);
+	ssaValue *value = ssa_make_value_block(proc, node, scope, make_string(label));
+	ssaBlock *block = &value->Block;
 	array_add(&proc->blocks, block);
 	return block;
 }
@@ -1091,13 +1097,12 @@ void ssa_emit_no_op(ssaProcedure *proc);
 void ssa_emit_jump(ssaProcedure *proc, ssaBlock *block);
 
 void ssa_build_defer_stmt(ssaProcedure *proc, ssaDefer d) {
-	ssaBlock *b = ssa__make_block(proc, NULL, make_string("defer"));
+	ssaBlock *b = ssa_add_block(proc, NULL, "defer");
 	// NOTE(bill): The prev block may defer injection before it's terminator
 	ssaInstr *last_instr = ssa_get_last_instr(proc->curr_block);
 	if (last_instr == NULL || !ssa_is_instr_terminating(last_instr)) {
 		ssa_emit_jump(proc, b);
 	}
-	array_add(&proc->blocks, b);
 	proc->curr_block = b;
 	ssa_emit_comment(proc, make_string("defer"));
 	if (d.kind == ssaDefer_Node) {
@@ -1228,8 +1233,8 @@ void ssa_begin_procedure_body(ssaProcedure *proc) {
 	array_init(&proc->defer_stmts, gb_heap_allocator());
 	array_init(&proc->children,    gb_heap_allocator());
 
-	proc->decl_block  = ssa_add_block(proc, proc->type_expr, make_string("decls"));
-	proc->entry_block = ssa_add_block(proc, proc->type_expr, make_string("entry"));
+	proc->decl_block  = ssa_add_block(proc, proc->type_expr, "decls");
+	proc->entry_block = ssa_add_block(proc, proc->type_expr, "entry");
 	proc->curr_block  = proc->entry_block;
 
 	if (proc->type->Proc.params != NULL) {
@@ -1239,6 +1244,92 @@ void ssa_begin_procedure_body(ssaProcedure *proc) {
 			ssa_add_param(proc, e);
 		}
 	}
+}
+
+void ssa_remove_pred(ssaBlock *a, ssaBlock *b) {
+
+}
+
+void ssa_remove_dead_blocks(ssaProcedure *proc) {
+	isize j = 0;
+	for_array(i, proc->blocks) {
+		ssaBlock *b = proc->blocks[i];
+		if (b != NULL) {
+			// NOTE(bill): Swap order
+			b->index = j;
+			proc->blocks[j] = b;
+			j++;
+		}
+	}
+
+	proc->blocks.count = j;
+}
+
+void ssa_mark_reachable(ssaBlock *b) {
+	isize const WHITE =  0;
+	isize const BLACK = -1;
+	b->index = BLACK;
+	for_array(i, b->succs) {
+		ssaBlock *succ = b->succs[i];
+		if (succ->index == WHITE) {
+			ssa_mark_reachable(succ);
+		}
+	}
+}
+
+void ssa_remove_unreachable_blocks(ssaProcedure *proc) {
+	isize const WHITE =  0;
+	isize const BLACK = -1;
+	for_array(i, proc->blocks) {
+		proc->blocks[i]->index = WHITE;
+	}
+
+	ssa_mark_reachable(proc->blocks[0]);
+
+	for_array(i, proc->blocks) {
+		ssaBlock *b = proc->blocks[i];
+		if (b->index == WHITE) {
+			for_array(j, b->succs) {
+				ssaBlock *c = b->succs[j];
+				if (c->index == BLACK) {
+					// ssa_remove_pred(c, b);
+				}
+			}
+			// NOTE(bill): Mark as empty but don't actually free it
+			// As it's been allocated with an arena
+			proc->blocks[i] = NULL;
+		}
+	}
+	ssa_remove_dead_blocks(proc);
+}
+
+
+void ssa_optimize_blocks(ssaProcedure *proc) {
+	ssa_remove_unreachable_blocks(proc);
+
+#if 0
+	b32 changed = false;
+	do {
+		for_array(i, proc->blocks) {
+			ssaBlock *b = proc->blocks[i];
+			if (b == NULL) {
+				continue;
+			}
+
+			// if (ssa_fuse_blocks(proc, b)) {
+			// 	changed = true;
+			// }
+
+			if (ssa_jump_threading(proc, b)) {
+				// x -> y -> z becomes x -> z if y is just a jump
+				changed = true;
+				continue;
+			}
+		}
+	} while (changed);
+#endif
+
+	ssa_remove_dead_blocks(proc);
 }
 
 void ssa_end_procedure_body(ssaProcedure *proc) {
@@ -1253,12 +1344,13 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 	proc->curr_block = proc->decl_block;
 	ssa_emit_jump(proc, proc->entry_block);
 
+	ssa_optimize_blocks(proc);
+
 
 // Number blocks and registers
 	i32 reg_id = 0;
 	for_array(i, proc->blocks) {
 		ssaBlock *b = proc->blocks[i];
-		b->id = i;
 		for_array(j, b->instrs) {
 			ssaValue *value = b->instrs[j];
 			GB_ASSERT(value->kind == ssaValue_Instr);
@@ -1300,17 +1392,17 @@ void ssa_pop_target_list(ssaProcedure *proc) {
 
 
 
-ssaValue *ssa_emit_arith(ssaProcedure *proc, Token op, ssaValue *left, ssaValue *right, Type *type) {
-	switch (op.kind) {
+ssaValue *ssa_emit_arith(ssaProcedure *proc, TokenKind op, ssaValue *left, ssaValue *right, Type *type) {
+	switch (op) {
 	case Token_AndNot: {
 		// NOTE(bill): x &~ y == x & (~y) == x & (y ~ -1)
 		// NOTE(bill): "not" `x` == `x` "xor" `-1`
 		ssaValue *neg = ssa_add_module_constant(proc->module, type, make_exact_value_integer(-1));
-		op.kind = Token_Xor;
+		op = Token_Xor;
 		right = ssa_emit_arith(proc, op, right, neg, type);
 		GB_ASSERT(right->Instr.kind == ssaInstr_BinaryOp);
 		right->Instr.BinaryOp.type = type;
-		op.kind = Token_And;
+		op = Token_And;
 	} /* fallthrough */
 	case Token_Add:
 	case Token_Sub:
@@ -1328,7 +1420,7 @@ ssaValue *ssa_emit_arith(ssaProcedure *proc, Token op, ssaValue *left, ssaValue 
 	return ssa_emit(proc, ssa_make_instr_binary_op(proc, op, left, right, type));
 }
 
-ssaValue *ssa_emit_comp(ssaProcedure *proc, Token op, ssaValue *left, ssaValue *right) {
+ssaValue *ssa_emit_comp(ssaProcedure *proc, TokenKind op_kind, ssaValue *left, ssaValue *right) {
 	Type *a = base_type(ssa_type(left));
 	Type *b = base_type(ssa_type(right));
 
@@ -1344,7 +1436,7 @@ ssaValue *ssa_emit_comp(ssaProcedure *proc, Token op, ssaValue *left, ssaValue *
 	if (is_type_vector(a)) {
 		result = make_type_vector(proc->module->allocator, t_bool, a->Vector.count);
 	}
-	return ssa_emit(proc, ssa_make_instr_binary_op(proc, op, left, right, result));
+	return ssa_emit(proc, ssa_make_instr_binary_op(proc, op_kind, left, right, result));
 }
 
 ssaValue *ssa_emit_ptr_offset(ssaProcedure *proc, ssaValue *ptr, ssaValue *offset) {
@@ -1601,9 +1693,8 @@ ssaValue *ssa_add_local_slice(ssaProcedure *proc, Type *slice_type, ssaValue *ba
 	}
 	GB_ASSERT(max != NULL);
 
-	Token op_sub = {Token_Sub};
-	ssaValue *len = ssa_emit_arith(proc, op_sub, high, low, t_int);
-	ssaValue *cap = ssa_emit_arith(proc, op_sub, max,  low, t_int);
+	ssaValue *len = ssa_emit_arith(proc, Token_Sub, high, low, t_int);
+	ssaValue *cap = ssa_emit_arith(proc, Token_Sub, max,  low, t_int);
 
 	ssaValue *elem = NULL;
 	switch (bt->kind) {
@@ -1779,8 +1870,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 
 	// integer -> boolean
 	if (is_type_integer(src) && is_type_boolean(dst)) {
-		Token op = {Token_NotEq};
-		return ssa_emit_comp(proc, op, value, v_zero);
+		return ssa_emit_comp(proc, Token_NotEq, value, v_zero);
 	}
 
 
@@ -2013,9 +2103,10 @@ void ssa_build_cond(ssaProcedure *proc, AstNode *cond, ssaBlock *true_block, ssa
 
 ssaValue *ssa_emit_logical_binary_expr(ssaProcedure *proc, AstNode *expr) {
 	ast_node(be, BinaryExpr, expr);
-	ssaBlock *true_   = ssa_add_block(proc, NULL, make_string("logical.cmp.true"));
-	ssaBlock *false_  = ssa_add_block(proc, NULL, make_string("logical.cmp.false"));
-	ssaBlock *done  = ssa__make_block(proc, NULL, make_string("logical.cmp.done"));
+#if 0
+	ssaBlock *true_   = ssa_add_block(proc, NULL, "logical.cmp.true");
+	ssaBlock *false_  = ssa_add_block(proc, NULL, "logical.cmp.false");
+	ssaBlock *done  = ssa_add_block(proc, NULL, "logical.cmp.done");
 
 	ssaValue *result = ssa_add_local_generated(proc, t_bool);
 	ssa_build_cond(proc, expr, true_, false_);
@@ -2028,10 +2119,48 @@ ssaValue *ssa_emit_logical_binary_expr(ssaProcedure *proc, AstNode *expr) {
 	ssa_emit_store(proc, result, v_false);
 	ssa_emit_jump(proc, done);
 
-	array_add(&proc->blocks, done);
 	proc->curr_block = done;
 
 	return ssa_emit_load(proc, result);
+#else
+	ssaBlock *rhs = ssa_add_block(proc, NULL, "logical.cmp.rhs");
+	ssaBlock *done = ssa_add_block(proc, NULL, "logical.cmp.done");
+
+	Type *type = type_of_expr(proc->module->info, expr);
+	type = default_type(type);
+
+	ssaValue *short_circuit = NULL;
+	if (be->op.kind == Token_CmpAnd) {
+		ssa_build_cond(proc, be->left, rhs, done);
+		short_circuit = v_false;
+	} else if (be->op.kind == Token_CmpOr) {
+		ssa_build_cond(proc, be->left, done, rhs);
+		short_circuit = v_true;
+	}
+
+	if (rhs->preds.count == 0) {
+		proc->curr_block = done;
+		return short_circuit;
+	}
+
+	if (done->preds.count == 0) {
+		proc->curr_block = rhs;
+		return ssa_build_expr(proc, be->right);
+	}
+
+	Array<ssaValue *> edges = {};
+	array_init(&edges, proc->module->allocator, done->preds.count+1);
+	for_array(i, done->preds) {
+		array_add(&edges, short_circuit);
+	}
+
+	proc->curr_block = rhs;
+	array_add(&edges, ssa_build_expr(proc, be->right));
+	ssa_emit_jump(proc, done);
+	proc->curr_block = done;
+
+	return ssa_emit(proc, ssa_make_instr_phi(proc, edges, type));
+#endif
 }
 
 
@@ -2125,14 +2254,14 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			return ssa_build_expr(proc, ue->expr);
 
 		case Token_Sub: // NOTE(bill): -`x` == 0 - `x`
-			return ssa_emit_arith(proc, ue->op, v_zero, ssa_build_expr(proc, ue->expr), tv->type);
+			return ssa_emit_arith(proc, ue->op.kind, v_zero, ssa_build_expr(proc, ue->expr), tv->type);
 
 		case Token_Not:   // Boolean not
 		case Token_Xor: { // Bitwise not
 			// NOTE(bill): "not" `x` == `x` "xor" `-1`
 			ssaValue *left = ssa_build_expr(proc, ue->expr);
 			ssaValue *right = ssa_add_module_constant(proc->module, tv->type, make_exact_value_integer(-1));
-			return ssa_emit_arith(proc, ue->op,
+			return ssa_emit_arith(proc, ue->op.kind,
 			                      left, right,
 			                      tv->type);
 		} break;
@@ -2152,7 +2281,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		case Token_AndNot:
 		case Token_Shl:
 		case Token_Shr:
-			return ssa_emit_arith(proc, be->op,
+			return ssa_emit_arith(proc, be->op.kind,
 			                      ssa_build_expr(proc, be->left),
 			                      ssa_build_expr(proc, be->right),
 			                      tv->type);
@@ -2167,7 +2296,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			ssaValue *left  = ssa_build_expr(proc, be->left);
 			ssaValue *right = ssa_build_expr(proc, be->right);
 
-			ssaValue *cmp = ssa_emit_comp(proc, be->op, left, right);
+			ssaValue *cmp = ssa_emit_comp(proc, be->op.kind, left, right);
 			return ssa_emit_conv(proc, cmp, default_type(tv->type));
 		} break;
 
@@ -2420,8 +2549,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					ssa_slice_bounds_check(proc, ast_node_token(ce->args[1]), v_zero, len, cap, false);
 
-					Token mul = {Token_Mul};
-					ssaValue *slice_size = ssa_emit_arith(proc, mul, elem_size, cap, t_int);
+					ssaValue *slice_size = ssa_emit_arith(proc, Token_Mul, elem_size, cap, t_int);
 
 					ssaValue **args = gb_alloc_array(allocator, ssaValue *, 2);
 					args[0] = slice_size;
@@ -2445,10 +2573,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssaValue *cond = ssa_build_expr(proc, ce->args[0]);
 					GB_ASSERT(is_type_boolean(ssa_type(cond)));
 
-					Token eq = {Token_CmpEq};
-					cond = ssa_emit_comp(proc, eq, cond, v_false);
-					ssaBlock *err  = ssa_add_block(proc, NULL, make_string("builtin.assert.err"));
-					ssaBlock *done = ssa__make_block(proc, NULL, make_string("builtin.assert.done"));
+					cond = ssa_emit_comp(proc, Token_CmpEq, cond, v_false);
+					ssaBlock *err  = ssa_add_block(proc, NULL, "builtin.assert.err");
+					ssaBlock *done = ssa_add_block(proc, NULL, "builtin.assert.done");
 
 					ssa_emit_if(proc, cond, err, done);
 					proc->curr_block = err;
@@ -2471,7 +2598,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssa_emit_global_call(proc, "__assert", args, 4);
 
 					ssa_emit_jump(proc, done);
-					array_add(&proc->blocks, done);
 					proc->curr_block = done;
 
 					return NULL;
@@ -2515,12 +2641,11 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssaValue *len_dst = ssa_slice_len(proc, dst_slice);
 					ssaValue *len_src = ssa_slice_len(proc, src_slice);
 
-					Token lt = {Token_Lt};
-					ssaValue *cond = ssa_emit_comp(proc, lt, len_dst, len_src);
+					ssaValue *cond = ssa_emit_comp(proc, Token_Lt, len_dst, len_src);
 					ssaValue *len = ssa_emit_select(proc, cond, len_dst, len_src);
-					Token mul = {Token_Mul};
+
 					ssaValue *elem_size = ssa_make_const_int(proc->module->allocator, size_of_elem);
-					ssaValue *byte_count = ssa_emit_arith(proc, mul, len, elem_size, t_int);
+					ssaValue *byte_count = ssa_emit_arith(proc, Token_Mul, len, elem_size, t_int);
 
 					ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, 3);
 					args[0] = dst;
@@ -2553,10 +2678,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 
 					// NOTE(bill): Check if can append is possible
-					Token lt = {Token_Lt};
-					ssaValue *cond = ssa_emit_comp(proc, lt, len, cap);
-					ssaBlock *able = ssa_add_block(proc, NULL, make_string("builtin.append.able"));
-					ssaBlock *done = ssa__make_block(proc, NULL, make_string("builtin.append.done"));
+					ssaValue *cond = ssa_emit_comp(proc, Token_Lt, len, cap);
+					ssaBlock *able = ssa_add_block(proc, NULL, "builtin.append.able");
+					ssaBlock *done = ssa_add_block(proc, NULL, "builtin.append.done");
 
 					ssa_emit_if(proc, cond, able, done);
 					proc->curr_block = able;
@@ -2579,13 +2703,11 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssa_emit_global_call(proc, "__mem_copy", args, 3);
 
 					// Increment slice length
-					Token add = {Token_Add};
-					ssaValue *new_len = ssa_emit_arith(proc, add, len, v_one, t_int);
+					ssaValue *new_len = ssa_emit_arith(proc, Token_Add, len, v_one, t_int);
 					ssaValue *gep = ssa_emit_struct_gep(proc, slice_ptr, v_one32, t_int);
 					ssa_emit_store(proc, gep, new_len);
 
 					ssa_emit_jump(proc, done);
-					array_add(&proc->blocks, done);
 					proc->curr_block = done;
 
 					return ssa_emit_conv(proc, cond, t_bool, true);
@@ -2627,12 +2749,11 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					Type *ptr_type = base_type(ssa_type(ptr_a));
 					GB_ASSERT(ptr_type->kind == Type_Pointer);
 					isize elem_size = type_size_of(proc->module->sizes, proc->module->allocator, ptr_type->Pointer.elem);
-					Token sub = {Token_Sub};
-					ssaValue *v = ssa_emit_arith(proc, sub, ptr_a, ptr_b, t_int);
+
+					ssaValue *v = ssa_emit_arith(proc, Token_Sub, ptr_a, ptr_b, t_int);
 					if (elem_size > 1) {
-						Token quo = {Token_Quo};
 						ssaValue *ez = ssa_make_const_int(proc->module->allocator, elem_size);
-						v = ssa_emit_arith(proc, quo, v, ez, t_int);
+						v = ssa_emit_arith(proc, Token_Quo, v, ez, t_int);
 					}
 
 					return v;
@@ -2665,8 +2786,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssaValue *x = ssa_build_expr(proc, ce->args[0]);
 					ssaValue *y = ssa_build_expr(proc, ce->args[1]);
 					Type *t = base_type(ssa_type(x));
-					Token lt = {Token_Lt};
-					ssaValue *cond = ssa_emit_comp(proc, lt, x, y);
+					ssaValue *cond = ssa_emit_comp(proc, Token_Lt, x, y);
 					return ssa_emit_select(proc, cond, x, y);
 				} break;
 
@@ -2675,21 +2795,18 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssaValue *x = ssa_build_expr(proc, ce->args[0]);
 					ssaValue *y = ssa_build_expr(proc, ce->args[1]);
 					Type *t = base_type(ssa_type(x));
-					Token gt = {Token_Gt};
-					ssaValue *cond = ssa_emit_comp(proc, gt, x, y);
+					ssaValue *cond = ssa_emit_comp(proc, Token_Gt, x, y);
 					return ssa_emit_select(proc, cond, x, y);
 				} break;
 
 				case BuiltinProc_abs: {
 					ssa_emit_comment(proc, make_string("abs"));
-					Token lt = {Token_Lt};
-					Token sub = {Token_Sub};
 
 					ssaValue *x = ssa_build_expr(proc, ce->args[0]);
 					Type *t = ssa_type(x);
 
-					ssaValue *neg_x = ssa_emit_arith(proc, sub, v_zero, x, t);
-					ssaValue *cond = ssa_emit_comp(proc, lt, x, v_zero);
+					ssaValue *neg_x = ssa_emit_arith(proc, Token_Sub, v_zero, x, t);
+					ssaValue *cond = ssa_emit_comp(proc, Token_Lt, x, v_zero);
 					return ssa_emit_select(proc, cond, neg_x, x);
 				} break;
 
@@ -3117,10 +3234,9 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 			ssa_slice_bounds_check(proc, se->open, low, high, max, false);
 
-			Token op_sub = {Token_Sub};
 			ssaValue *elem = ssa_slice_elem(proc, base);
-			ssaValue *len  = ssa_emit_arith(proc, op_sub, high, low, t_int);
-			ssaValue *cap  = ssa_emit_arith(proc, op_sub, max,  low, t_int);
+			ssaValue *len  = ssa_emit_arith(proc, Token_Sub, high, low, t_int);
+			ssaValue *cap  = ssa_emit_arith(proc, Token_Sub, max,  low, t_int);
 			ssaValue *slice = ssa_add_local_generated(proc, slice_type);
 
 			ssaValue *gep0 = ssa_emit_struct_gep(proc, slice, v_zero32, ssa_type(elem));
@@ -3142,10 +3258,9 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 			ssa_slice_bounds_check(proc, se->open, low, high, max, false);
 
-			Token op_sub = {Token_Sub};
 			ssaValue *elem = ssa_array_elem(proc, addr);
-			ssaValue *len  = ssa_emit_arith(proc, op_sub, high, low, t_int);
-			ssaValue *cap  = ssa_emit_arith(proc, op_sub, max,  low, t_int);
+			ssaValue *len  = ssa_emit_arith(proc, Token_Sub, high, low, t_int);
+			ssaValue *cap  = ssa_emit_arith(proc, Token_Sub, max,  low, t_int);
 			ssaValue *slice = ssa_add_local_generated(proc, slice_type);
 
 			ssaValue *gep0 = ssa_emit_struct_gep(proc, slice, v_zero32, ssa_type(elem));
@@ -3166,9 +3281,8 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 			ssa_slice_bounds_check(proc, se->open, low, high, high, true);
 
-			Token op_sub = {Token_Sub};
 			ssaValue *elem, *len;
-			len = ssa_emit_arith(proc, op_sub, high, low, t_int);
+			len = ssa_emit_arith(proc, Token_Sub, high, low, t_int);
 
 			elem = ssa_string_elem(proc, base);
 			elem = ssa_emit_ptr_offset(proc, elem, low);
@@ -3231,7 +3345,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	return ssa_make_addr(NULL, NULL);
 }
 
-void ssa_build_assign_op(ssaProcedure *proc, ssaAddr lhs, ssaValue *value, Token op) {
+void ssa_build_assign_op(ssaProcedure *proc, ssaAddr lhs, ssaValue *value, TokenKind op) {
 	ssaValue *old_value = ssa_lvalue_load(proc, lhs);
 	Type *type = ssa_type(old_value);
 	ssaValue *change = ssa_emit_conv(proc, value, type);
@@ -3255,13 +3369,13 @@ void ssa_build_cond(ssaProcedure *proc, AstNode *cond, ssaBlock *true_block, ssa
 
 	case_ast_node(be, BinaryExpr, cond);
 		if (be->op.kind == Token_CmpAnd) {
-			ssaBlock *block = ssa_add_block(proc, NULL, make_string("cmp.and"));
+			ssaBlock *block = ssa_add_block(proc, NULL, "cmp.and");
 			ssa_build_cond(proc, be->left, block, false_block);
 			proc->curr_block = block;
 			ssa_build_cond(proc, be->right, true_block, false_block);
 			return;
 		} else if (be->op.kind == Token_CmpOr) {
-			ssaBlock *block = ssa_add_block(proc, NULL, make_string("cmp.or"));
+			ssaBlock *block = ssa_add_block(proc, NULL, "cmp.or");
 			ssa_build_cond(proc, be->left, true_block, block);
 			proc->curr_block = block;
 			ssa_build_cond(proc, be->right, true_block, false_block);
@@ -3497,11 +3611,11 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 	case_ast_node(ids, IncDecStmt, node);
 		ssa_emit_comment(proc, make_string("IncDecStmt"));
-		Token op = ids->op;
-		if (op.kind == Token_Increment) {
-			op.kind = Token_Add;
-		} else if (op.kind == Token_Decrement) {
-			op.kind = Token_Sub;
+		TokenKind op = ids->op.kind;
+		if (op == Token_Increment) {
+			op = Token_Add;
+		} else if (op == Token_Decrement) {
+			op = Token_Sub;
 		}
 		ssaAddr lval = ssa_build_addr(proc, ids->expr);
 		ssaValue *one = ssa_emit_conv(proc, v_one, ssa_addr_type(lval));
@@ -3577,13 +3691,11 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		default: {
 			// NOTE(bill): Only 1 += 1 is allowed, no tuples
 			// +=, -=, etc
-			Token op = as->op;
-			i32 kind = op.kind;
-			kind += Token_Add - Token_AddEq; // Convert += to +
-			op.kind = cast(TokenKind)kind;
+			i32 op = cast(i32)as->op.kind;
+			op += Token_Add - Token_AddEq; // Convert += to +
 			ssaAddr lhs = ssa_build_addr(proc, as->lhs[0]);
 			ssaValue *value = ssa_build_expr(proc, as->rhs[0]);
-			ssa_build_assign_op(proc, lhs, value, op);
+			ssa_build_assign_op(proc, lhs, value, cast(TokenKind)op);
 		} break;
 		}
 	case_end;
@@ -3658,16 +3770,16 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 	case_ast_node(is, IfStmt, node);
 		ssa_emit_comment(proc, make_string("IfStmt"));
 		if (is->init != NULL) {
-			ssaBlock *init = ssa_add_block(proc, node, make_string("if.init"));
+			ssaBlock *init = ssa_add_block(proc, node, "if.init");
 			ssa_emit_jump(proc, init);
 			proc->curr_block = init;
 			ssa_build_stmt(proc, is->init);
 		}
-		ssaBlock *then = ssa_add_block(proc, node, make_string("if.then"));
-		ssaBlock *done = ssa__make_block(proc, node, make_string("if.done")); // NOTE(bill): Append later
+		ssaBlock *then = ssa_add_block(proc, node, "if.then");
+		ssaBlock *done = ssa_add_block(proc, node, "if.done"); // NOTE(bill): Append later
 		ssaBlock *else_ = done;
 		if (is->else_stmt != NULL) {
-			else_ = ssa_add_block(proc, is->else_stmt, make_string("if.else"));
+			else_ = ssa_add_block(proc, is->else_stmt, "if.else");
 		}
 
 		ssa_build_cond(proc, is->cond, then, else_);
@@ -3688,29 +3800,28 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 			ssa_emit_jump(proc, done);
 		}
-		array_add(&proc->blocks, done);
 		proc->curr_block = done;
 	case_end;
 
 	case_ast_node(fs, ForStmt, node);
 		ssa_emit_comment(proc, make_string("ForStmt"));
 		if (fs->init != NULL) {
-			ssaBlock *init = ssa_add_block(proc, node, make_string("for.init"));
+			ssaBlock *init = ssa_add_block(proc, node, "for.init");
 			ssa_emit_jump(proc, init);
 			proc->curr_block = init;
 			ssa_build_stmt(proc, fs->init);
 		}
-		ssaBlock *body = ssa_add_block(proc, node, make_string("for.body"));
-		ssaBlock *done = ssa__make_block(proc, node, make_string("for.done")); // NOTE(bill): Append later
+		ssaBlock *body = ssa_add_block(proc, node, "for.body");
+		ssaBlock *done = ssa_add_block(proc, node, "for.done"); // NOTE(bill): Append later
 
 		ssaBlock *loop = body;
 
 		if (fs->cond != NULL) {
-			loop = ssa_add_block(proc, node, make_string("for.loop"));
+			loop = ssa_add_block(proc, node, "for.loop");
 		}
 		ssaBlock *cont = loop;
 		if (fs->post != NULL) {
-			cont = ssa_add_block(proc, node, make_string("for.post"));
+			cont = ssa_add_block(proc, node, "for.post");
 
 		}
 		ssa_emit_jump(proc, loop);
@@ -3736,7 +3847,6 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		}
 
 
-		array_add(&proc->blocks, done);
 		proc->curr_block = done;
 
 	case_end;
@@ -3750,10 +3860,9 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		if (ms->tag != NULL) {
 			tag = ssa_build_expr(proc, ms->tag);
 		}
-		ssaBlock *done = ssa__make_block(proc, node, make_string("match.done")); // NOTE(bill): Append later
+		ssaBlock *done = ssa_add_block(proc, node, "match.done"); // NOTE(bill): Append later
 
 		ast_node(body, BlockStmt, ms->body);
-
 
 		AstNodeArray default_stmts = {};
 		ssaBlock *default_fall = NULL;
@@ -3766,28 +3875,24 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		for_array(i, body->stmts) {
 			AstNode *clause = body->stmts[i];
 			ssaBlock *body = fall;
-			b32 append_body = false;
-
 
 			ast_node(cc, CaseClause, clause);
 
 			if (body == NULL) {
-				append_body = true;
 				if (cc->list.count == 0) {
-					body = ssa__make_block(proc, clause, make_string("match.dflt.body"));
+					body = ssa_add_block(proc, clause, "match.dflt.body");
 				} else {
-					body = ssa__make_block(proc, clause, make_string("match.case.body"));
+					body = ssa_add_block(proc, clause, "match.case.body");
 				}
 			}
 			if (append_fall && body == fall) {
 				append_fall = false;
-				append_body = true;
 			}
 
 			fall = done;
 			if (i+1 < case_count) {
 				append_fall = true;
-				fall = ssa__make_block(proc, clause, make_string("match.fall.body"));
+				fall = ssa_add_block(proc, clause, "match.fall.body");
 			}
 
 			if (cc->list.count == 0) {
@@ -3799,18 +3904,13 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			}
 
 			ssaBlock *next_cond = NULL;
-			Token eq = {Token_CmpEq};
 			for_array(j, cc->list) {
 				AstNode *expr = cc->list[j];
-				next_cond = ssa__make_block(proc, clause, make_string("match.case.next"));
+				next_cond = ssa_add_block(proc, clause, "match.case.next");
 
-				ssaValue *cond = ssa_emit_comp(proc, eq, tag, ssa_build_expr(proc, expr));
+				ssaValue *cond = ssa_emit_comp(proc, Token_CmpEq, tag, ssa_build_expr(proc, expr));
 				ssa_emit_if(proc, cond, body, next_cond);
-				array_add(&proc->blocks, next_cond);
 				proc->curr_block = next_cond;
-			}
-			if (append_body) {
-				array_add(&proc->blocks, body);
 			}
 			proc->curr_block = body;
 
@@ -3826,7 +3926,6 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 		if (default_block != NULL) {
 			ssa_emit_jump(proc, default_block);
-			array_add(&proc->blocks, default_block);
 			proc->curr_block = default_block;
 
 			ssa_push_target_list(proc, done, NULL, default_fall);
@@ -3837,7 +3936,6 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		}
 
 		ssa_emit_jump(proc, done);
-		array_add(&proc->blocks, done);
 		proc->curr_block = done;
 	case_end;
 
@@ -3856,11 +3954,11 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 		ssaValue *data = ssa_emit_conv(proc, parent, t_rawptr);
 
-		ssaBlock *start_block = ssa_add_block(proc, node, make_string("type-match.case.first"));
+		ssaBlock *start_block = ssa_add_block(proc, node, "type-match.case.first");
 		ssa_emit_jump(proc, start_block);
 		proc->curr_block = start_block;
 
-		ssaBlock *done = ssa__make_block(proc, node, make_string("type-match.done")); // NOTE(bill): Append later
+		ssaBlock *done = ssa_add_block(proc, node, "type-match.done"); // NOTE(bill): Append later
 
 		ast_node(body, BlockStmt, ms->body);
 
@@ -3878,12 +3976,12 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			if (cc->list.count == 0) {
 				// default case
 				default_stmts = cc->stmts;
-				default_block = ssa__make_block(proc, clause, make_string("type-match.dflt.body"));
+				default_block = ssa_add_block(proc, clause, "type-match.dflt.body");
 				continue;
 			}
 
 
-			ssaBlock *body = ssa__make_block(proc, clause, make_string("type-match.case.body"));
+			ssaBlock *body = ssa_add_block(proc, clause, "type-match.case.body");
 
 			Scope *scope = *map_get(&proc->module->info->scopes, hash_pointer(clause));
 			Entity *tag_var_entity = current_scope_lookup_entity(scope, tag_var_name);
@@ -3907,14 +4005,11 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			}
 			GB_ASSERT(index != NULL);
 
-			ssaBlock *next_cond = ssa__make_block(proc, clause, make_string("type-match.case.next"));
-			Token eq = {Token_CmpEq};
-			ssaValue *cond = ssa_emit_comp(proc, eq, tag_index, index);
+			ssaBlock *next_cond = ssa_add_block(proc, clause, "type-match.case.next");
+			ssaValue *cond = ssa_emit_comp(proc, Token_CmpEq, tag_index, index);
 			ssa_emit_if(proc, cond, body, next_cond);
-			array_add(&proc->blocks, next_cond);
 			proc->curr_block = next_cond;
 
-			array_add(&proc->blocks, body);
 			proc->curr_block = body;
 
 			ssa_push_target_list(proc, done, NULL, NULL);
@@ -3929,7 +4024,6 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 		if (default_block != NULL) {
 			ssa_emit_jump(proc, default_block);
-			array_add(&proc->blocks, default_block);
 			proc->curr_block = default_block;
 
 			ssa_push_target_list(proc, done, NULL, NULL);
@@ -3940,7 +4034,6 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		}
 
 		ssa_emit_jump(proc, done);
-		array_add(&proc->blocks, done);
 		proc->curr_block = done;
 	case_end;
 

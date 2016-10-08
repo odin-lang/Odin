@@ -1,6 +1,6 @@
 #import "fmt.odin"
 
 main :: proc() {
-	x := ?123
+	fmt.println(123)
 }
 

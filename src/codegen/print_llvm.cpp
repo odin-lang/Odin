@@ -500,8 +500,12 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 }
 
 void ssa_print_block_name(ssaFileBuffer *f, ssaBlock *b) {
-	ssa_print_escape_string(f, b->label, false);
-	ssa_fprintf(f, "-%d", b->id);
+	if (b != NULL) {
+		ssa_print_escape_string(f, b->label, false);
+		ssa_fprintf(f, "-%td", b->index);
+	} else {
+		ssa_fprintf(f, "<INVALID-BLOCK>");
+	}
 }
 
 void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type_hint) {
@@ -648,6 +652,32 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "\n");
 	} break;
 
+	case ssaInstr_Phi: {
+		ssa_fprintf(f, "%%%d = phi ", value->id);
+		ssa_print_type(f, m, instr->Phi.type);
+		ssa_fprintf(f, " ", value->id);
+
+		for (isize i = 0; i < instr->Phi.edges.count; i++) {
+			ssaValue *edge = instr->Phi.edges[i];
+			if (i > 0) {
+				ssa_fprintf(f, ", ");
+			}
+
+			ssaBlock *block = NULL;
+			if (instr->parent != NULL &&
+			    i < instr->parent->preds.count) {
+				block = instr->parent->preds[i];
+			}
+
+			ssa_fprintf(f, "[ ");
+			ssa_print_value(f, m, edge, instr->Phi.type);
+			ssa_fprintf(f, ", %%");
+			ssa_print_block_name(f, block);
+			ssa_fprintf(f, " ]");
+		}
+		ssa_fprintf(f, "\n");
+	} break;
+
 	case ssaInstr_ExtractValue: {
 		Type *et = instr->ExtractValue.elem_type;
 		ssa_fprintf(f, "%%%d = extractvalue ", value->id);
@@ -721,12 +751,12 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 
 		ssa_fprintf(f, "%%%d = ", value->id);
 
-		if (gb_is_between(bo->op.kind, Token__ComparisonBegin+1, Token__ComparisonEnd-1)) {
+		if (gb_is_between(bo->op, Token__ComparisonBegin+1, Token__ComparisonEnd-1)) {
 			if (is_type_string(elem_type)) {
 				ssa_fprintf(f, "call ");
 				ssa_print_type(f, m, t_bool);
 				char *runtime_proc = "";
-				switch (bo->op.kind) {
+				switch (bo->op) {
 				case Token_CmpEq: runtime_proc = "__string_eq"; break;
 				case Token_NotEq: runtime_proc = "__string_ne"; break;
 				case Token_Lt:    runtime_proc = "__string_lt"; break;
@@ -750,7 +780,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 
 			} else if (is_type_float(elem_type)) {
 				ssa_fprintf(f, "fcmp ");
-				switch (bo->op.kind) {
+				switch (bo->op) {
 				case Token_CmpEq: ssa_fprintf(f, "oeq"); break;
 				case Token_NotEq: ssa_fprintf(f, "one"); break;
 				case Token_Lt:    ssa_fprintf(f, "olt"); break;
@@ -760,15 +790,15 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 				}
 			} else {
 				ssa_fprintf(f, "icmp ");
-				if (bo->op.kind != Token_CmpEq &&
-				    bo->op.kind != Token_NotEq) {
+				if (bo->op != Token_CmpEq &&
+				    bo->op != Token_NotEq) {
 					if (is_type_unsigned(elem_type)) {
 						ssa_fprintf(f, "u");
 					} else {
 						ssa_fprintf(f, "s");
 					}
 				}
-				switch (bo->op.kind) {
+				switch (bo->op) {
 				case Token_CmpEq: ssa_fprintf(f, "eq"); break;
 				case Token_NotEq: ssa_fprintf(f, "ne"); break;
 				case Token_Lt:    ssa_fprintf(f, "lt"); break;
@@ -781,7 +811,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 			if (is_type_float(elem_type))
 				ssa_fprintf(f, "f");
 
-			switch (bo->op.kind) {
+			switch (bo->op) {
 			case Token_Add:    ssa_fprintf(f, "add");  break;
 			case Token_Sub:    ssa_fprintf(f, "sub");  break;
 			case Token_And:    ssa_fprintf(f, "and");  break;
@@ -800,7 +830,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 					else                             ssa_fprintf(f, "s");
 				}
 
-				switch (bo->op.kind) {
+				switch (bo->op) {
 				case Token_Quo: ssa_fprintf(f, "div"); break;
 				case Token_Mod: ssa_fprintf(f, "rem"); break;
 				}
