@@ -15,13 +15,13 @@ enum ParseFileError {
 	ParseFile_Count,
 };
 
-typedef gbArray(AstNode *) AstNodeArray;
+typedef Array<AstNode *> AstNodeArray;
 
 struct AstFile {
 	u32            id;
 	gbArena        arena;
 	Tokenizer      tokenizer;
-	gbArray(Token) tokens;
+	Array<Token>   tokens;
 	isize          curr_token_index;
 	Token          curr_token;
 	Token          prev_token; // previous non-comment
@@ -54,10 +54,10 @@ struct ImportedFile {
 
 struct Parser {
 	String init_fullpath;
-	gbArray(AstFile)      files;
-	gbArray(ImportedFile) imports;
+	Array<AstFile>      files;
+	Array<ImportedFile> imports;
 	gbAtomic32 import_index;
-	gbArray(String)       system_libraries;
+	Array<String>       system_libraries;
 	isize total_token_count;
 	gbMutex mutex;
 };
@@ -96,8 +96,7 @@ enum CallExprKind {
 
 AstNodeArray make_ast_node_array(AstFile *f) {
 	AstNodeArray a;
-	gb_array_init(a, gb_arena_allocator(&f->arena));
-	GB_ASSERT(a != NULL);
+	array_init(&a, gb_arena_allocator(&f->arena));
 	return a;
 }
 
@@ -452,10 +451,11 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_ForeignSystemLibrary:
 		return node->ForeignSystemLibrary.token;
 	case AstNode_Parameter: {
-		if (node->Parameter.names)
+		if (node->Parameter.names.count > 0) {
 			return ast_node_token(node->Parameter.names[0]);
-		else
+		} else {
 			return ast_node_token(node->Parameter.type);
+		}
 	}
 	case AstNode_ProcType:
 		return node->ProcType.token;
@@ -957,7 +957,7 @@ AstNode *make_foreign_system_library(AstFile *f, Token token, Token filepath) {
 }
 
 b32 next_token(AstFile *f) {
-	if (f->curr_token_index+1 < gb_array_count(f->tokens)) {
+	if (f->curr_token_index+1 < f->tokens.count) {
 		if (f->curr_token.kind != Token_Comment) {
 			f->prev_token = f->curr_token;
 		}
@@ -1155,7 +1155,7 @@ AstNodeArray parse_element_list(AstFile *f) {
 			elem = make_field_value(f, elem, value, eq);
 		}
 
-		gb_array_append(elems, elem);
+		array_add(&elems, elem);
 
 		if (f->curr_token.kind != Token_Comma) {
 			break;
@@ -1167,7 +1167,7 @@ AstNodeArray parse_element_list(AstFile *f) {
 }
 
 AstNode *parse_literal_value(AstFile *f, AstNode *type) {
-	AstNodeArray elems = NULL;
+	AstNodeArray elems = {};
 	Token open = expect_token(f, Token_OpenBrace);
 	f->expr_level++;
 	if (f->curr_token.kind != Token_CloseBrace) {
@@ -1464,7 +1464,7 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 		}
 
 		AstNode *arg = parse_expr(f, false);
-		gb_array_append(args, arg);
+		array_add(&args, arg);
 
 		if (f->curr_token.kind != Token_Comma) {
 			if (f->curr_token.kind == Token_CloseParen)
@@ -1493,9 +1493,9 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 				// TODO(bill): Handle this
 			}
 			AstNode *proc = parse_identifier(f);
-			gbArray(AstNode *) args;
-			gb_array_init_reserve(args, gb_arena_allocator(&f->arena), 1);
-			gb_array_append(args, operand);
+			Array<AstNode *> args;
+			array_init(&args, gb_arena_allocator(&f->arena), 1);
+			array_add(&args, operand);
 			operand = make_call_expr(f, proc, args, ast_node_token(operand), op, empty_token);
 		} break;
 
@@ -1685,7 +1685,7 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 				AstNode *proc = parse_identifier(f);
 				/* if (f->curr_token.kind == Token_OpenParen) {
 					AstNode *call = parse_call_expr(f, proc);
-					gb_array_append(call->CallExpr.args, expression);
+					array_add(&call->CallExpr.args, expression);
 					for (isize i = gb_array_count(call->CallExpr.args)-1; i > 0; i--) {
 						gb_swap(AstNode *, call->CallExpr.args[i], call->CallExpr.args[i-1]);
 					}
@@ -1693,10 +1693,10 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 					expression = call;
 				} else  */{
 					right = parse_binary_expr(f, false, prec+1);
-					gbArray(AstNode *) args;
-					gb_array_init_reserve(args, gb_arena_allocator(&f->arena), 2);
-					gb_array_append(args, expression);
-					gb_array_append(args, right);
+					Array<AstNode *> args = {};
+					array_init(&args, gb_arena_allocator(&f->arena), 2);
+					array_add(&args, expression);
+					array_add(&args, right);
 					expression = make_call_expr(f, proc, args, op, ast_node_token(right), empty_token);
 				}
 				continue;
@@ -1730,7 +1730,7 @@ AstNodeArray parse_expr_list(AstFile *f, b32 lhs) {
 	AstNodeArray list = make_ast_node_array(f);
 	do {
 		AstNode *e = parse_expr(f, lhs);
-		gb_array_append(list, e);
+		array_add(&list, e);
 		if (f->curr_token.kind != Token_Comma ||
 		    f->curr_token.kind == Token_EOF) {
 		    break;
@@ -1780,7 +1780,7 @@ AstNode *parse_simple_stmt(AstFile *f) {
 		}
 		next_token(f);
 		AstNodeArray rhs = parse_rhs_expr_list(f);
-		if (gb_array_count(rhs) == 0) {
+		if (rhs.count == 0) {
 			syntax_error(token, "No right-hand side in assignment statement.");
 			return make_bad_stmt(f, token, f->curr_token);
 		}
@@ -1838,7 +1838,7 @@ AstNodeArray parse_identfier_list(AstFile *f) {
 	AstNodeArray list = make_ast_node_array(f);
 
 	do {
-		gb_array_append(list, parse_identifier(f));
+		array_add(&list, parse_identifier(f));
 		if (f->curr_token.kind != Token_Comma ||
 		    f->curr_token.kind == Token_EOF) {
 		    break;
@@ -1875,8 +1875,8 @@ Token parse_procedure_signature(AstFile *f,
                                 AstNodeArray *params, AstNodeArray *results);
 
 AstNode *parse_proc_type(AstFile *f) {
-	AstNodeArray params = NULL;
-	AstNodeArray results = NULL;
+	AstNodeArray params = {};
+	AstNodeArray results = {};
 
 	Token proc_token = parse_procedure_signature(f, &params, &results);
 
@@ -1895,11 +1895,11 @@ AstNodeArray parse_parameter_list(AstFile *f) {
 		}
 
 		AstNodeArray names = parse_lhs_expr_list(f);
-		if (gb_array_count(names) == 0) {
+		if (names.count == 0) {
 			syntax_error(f->curr_token, "Empty parameter declaration");
 		}
 
-		if (gb_array_count(names) > 1 && is_using) {
+		if (names.count > 1 && is_using) {
 			syntax_error(f->curr_token, "Cannot apply `using` to more than one of the same type");
 			is_using = false;
 		}
@@ -1915,7 +1915,7 @@ AstNodeArray parse_parameter_list(AstFile *f) {
 				syntax_error(f->curr_token, "variadic parameter is missing a type after `..`");
 				type = make_bad_expr(f, ellipsis, f->curr_token);
 			} else {
-				if (gb_array_count(names) > 1) {
+				if (names.count > 1) {
 					syntax_error(f->curr_token, "mutliple variadic parameters, only  `..`");
 				} else {
 					type = make_ellipsis(f, ellipsis, type);
@@ -1930,7 +1930,7 @@ AstNodeArray parse_parameter_list(AstFile *f) {
 			syntax_error(f->curr_token, "Expected a type for this parameter declaration");
 		}
 
-		gb_array_append(params, make_parameter(f, names, type, is_using));
+		array_add(&params, make_parameter(f, names, type, is_using));
 		if (f->curr_token.kind != Token_Comma) {
 			break;
 		}
@@ -1952,7 +1952,7 @@ AstNodeArray parse_struct_params(AstFile *f, isize *decl_count_, b32 using_allow
 			is_using = true;
 		}
 		AstNodeArray names = parse_lhs_expr_list(f);
-		if (gb_array_count(names) == 0) {
+		if (names.count == 0) {
 			syntax_error(f->curr_token, "Empty field declaration");
 		}
 
@@ -1960,7 +1960,7 @@ AstNodeArray parse_struct_params(AstFile *f, isize *decl_count_, b32 using_allow
 			syntax_error(f->curr_token, "Cannot apply `using` to members of a union");
 			is_using = false;
 		}
-		if (gb_array_count(names) > 1 && is_using) {
+		if (names.count > 1 && is_using) {
 			syntax_error(f->curr_token, "Cannot apply `using` to more than one of the same type");
 		}
 
@@ -1981,10 +1981,10 @@ AstNodeArray parse_struct_params(AstFile *f, isize *decl_count_, b32 using_allow
 		expect_semicolon_after_stmt(f, decl);
 
 		if (decl != NULL && is_ast_node_decl(decl)) {
-			gb_array_append(decls, decl);
+			array_add(&decls, decl);
 			if (decl->kind == AstNode_VarDecl) {
 				decl->VarDecl.is_using = is_using && using_allowed;
-				if (gb_array_count(decl->VarDecl.values) > 0) {
+				if (decl->VarDecl.values.count > 0) {
 					syntax_error(f->curr_token, "Default variable assignments within a structure will be ignored (at the moment)");
 				}
 			} else {
@@ -2129,7 +2129,7 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 				value = parse_value(f);
 			}
 			AstNode *field = make_field_value(f, name, value, eq);
-			gb_array_append(fields, field);
+			array_add(&fields, field);
 			if (f->curr_token.kind != Token_Comma) {
 				break;
 			}
@@ -2185,7 +2185,7 @@ AstNodeArray parse_results(AstFile *f) {
 			expect_token(f, Token_OpenParen);
 			while (f->curr_token.kind != Token_CloseParen &&
 			       f->curr_token.kind != Token_EOF) {
-				gb_array_append(results, parse_type(f));
+				array_add(&results, parse_type(f));
 				if (f->curr_token.kind != Token_Comma) {
 					break;
 				}
@@ -2196,7 +2196,7 @@ AstNodeArray parse_results(AstFile *f) {
 			return results;
 		}
 
-		gb_array_append(results, parse_type(f));
+		array_add(&results, parse_type(f));
 		return results;
 	}
 	return results;
@@ -2214,7 +2214,7 @@ Token parse_procedure_signature(AstFile *f,
 }
 
 AstNode *parse_body(AstFile *f) {
-	AstNodeArray stmts = NULL;
+	AstNodeArray stmts = {};
 	Token open, close;
 	open = expect_token(f, Token_OpenBrace);
 	stmts = parse_stmt_list(f);
@@ -2226,8 +2226,8 @@ AstNode *parse_body(AstFile *f) {
 
 
 AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
-	AstNodeArray params = NULL;
-	AstNodeArray results = NULL;
+	AstNodeArray params = {};
+	AstNodeArray results = {};
 
 	parse_procedure_signature(f, &params, &results);
 	AstNode *proc_type = make_proc_type(f, proc_token, params, results);
@@ -2254,10 +2254,10 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 }
 
 AstNode *parse_decl(AstFile *f, AstNodeArray names) {
-	AstNodeArray values = NULL;
+	AstNodeArray values = {};
 	AstNode *type = NULL;
 
-	// gb_for_array(i, names) {
+	// for_array(i, names) {
 	// 	AstNode *name = names[i];
 	// 	if (name->kind == AstNode_Ident) {
 	// 		String n = name->Ident.string;
@@ -2295,7 +2295,7 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 			if (token.kind == Token_type) {
 				next_token(f);
 			}
-			if (gb_array_count(names) != 1) {
+			if (names.count != 1) {
 				syntax_error(ast_node_token(names[0]), "You can only declare one type at a time");
 				return make_bad_decl(f, names[0]->Ident, token);
 			}
@@ -2311,7 +2311,7 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 		    // NOTE(bill): Procedure declarations
 			Token proc_token = f->curr_token;
 			AstNode *name = names[0];
-			if (gb_array_count(names) != 1) {
+			if (names.count != 1) {
 				syntax_error(proc_token, "You can only declare one procedure at a time");
 				return make_bad_decl(f, name->Ident, proc_token);
 			}
@@ -2320,29 +2320,29 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 
 		} else {
 			values = parse_rhs_expr_list(f);
-			if (gb_array_count(values) > gb_array_count(names)) {
+			if (values.count > names.count) {
 				syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
-			} else if (gb_array_count(values) < gb_array_count(names) && !is_mutable) {
+			} else if (values.count < names.count && !is_mutable) {
 				syntax_error(f->curr_token, "All constant declarations must be defined");
-			} else if (gb_array_count(values) == 0) {
+			} else if (values.count == 0) {
 				syntax_error(f->curr_token, "Expected an expression for this declaration");
 			}
 		}
 	}
 
 	if (is_mutable) {
-		if (type == NULL && gb_array_count(values) == 0) {
+		if (type == NULL && values.count == 0) {
 			syntax_error(f->curr_token, "Missing variable type or initialization");
 			return make_bad_decl(f, f->curr_token, f->curr_token);
 		}
 	} else {
-		if (type == NULL && gb_array_count(values) == 0 && gb_array_count(names) > 0) {
+		if (type == NULL && values.count == 0 && names.count > 0) {
 			syntax_error(f->curr_token, "Missing constant value");
 			return make_bad_decl(f, f->curr_token, f->curr_token);
 		}
 	}
 
-	if (values == NULL) {
+	if (values.data == NULL) {
 		values = make_ast_node_array(f);
 	}
 
@@ -2421,7 +2421,7 @@ AstNode *parse_return_stmt(AstFile *f) {
 		results = parse_rhs_expr_list(f);
 	}
 	if (f->curr_token.kind != Token_CloseBrace) {
-		expect_semicolon_after_stmt(f, results ? results[0] : NULL);
+		expect_semicolon_after_stmt(f, results[0]);
 	}
 
 	return make_return_stmt(f, token, results);
@@ -2491,7 +2491,7 @@ AstNode *parse_type_case_clause(AstFile *f) {
 	Token token = f->curr_token;
 	AstNodeArray clause = make_ast_node_array(f);
 	if (allow_token(f, Token_case)) {
-		gb_array_append(clause, parse_expr(f, false));
+		array_add(&clause, parse_expr(f, false));
 	} else {
 		expect_token(f, Token_default);
 	}
@@ -2532,7 +2532,7 @@ AstNode *parse_match_stmt(AstFile *f) {
 
 		while (f->curr_token.kind == Token_case ||
 		       f->curr_token.kind == Token_default) {
-			gb_array_append(list, parse_type_case_clause(f));
+			array_add(&list, parse_type_case_clause(f));
 		}
 
 		close = expect_token(f, Token_CloseBrace);
@@ -2563,7 +2563,7 @@ AstNode *parse_match_stmt(AstFile *f) {
 
 		while (f->curr_token.kind == Token_case ||
 		       f->curr_token.kind == Token_default) {
-			gb_array_append(list, parse_case_clause(f));
+			array_add(&list, parse_case_clause(f));
 		}
 
 		close = expect_token(f, Token_CloseBrace);
@@ -2833,7 +2833,7 @@ AstNodeArray parse_stmt_list(AstFile *f) {
 	       f->curr_token.kind != Token_EOF) {
 		AstNode *stmt = parse_stmt(f);
 		if (stmt && stmt->kind != AstNode_EmptyStmt) {
-			gb_array_append(list, stmt);
+			array_add(&list, stmt);
 		}
 	}
 
@@ -2847,13 +2847,13 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 	}
 	TokenizerInitError err = init_tokenizer(&f->tokenizer, fullpath);
 	if (err == TokenizerInit_None) {
-		gb_array_init(f->tokens, gb_heap_allocator());
+		array_init(&f->tokens, gb_heap_allocator());
 		for (;;) {
 			Token token = tokenizer_get_token(&f->tokenizer);
 			if (token.kind == Token_Invalid) {
 				return ParseFile_InvalidToken;
 			}
-			gb_array_append(f->tokens, token);
+			array_add(&f->tokens, token);
 
 			if (token.kind == Token_EOF) {
 				break;
@@ -2866,7 +2866,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 
 		// NOTE(bill): Is this big enough or too small?
 		isize arena_size = gb_size_of(AstNode);
-		arena_size *= 2*gb_array_count(f->tokens);
+		arena_size *= 2*f->tokens.count;
 		gb_arena_init_from_allocator(&f->arena, gb_heap_allocator(), arena_size);
 
 		f->curr_proc = NULL;
@@ -2888,32 +2888,32 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 
 void destroy_ast_file(AstFile *f) {
 	gb_arena_free(&f->arena);
-	gb_array_free(f->tokens);
+	array_free(&f->tokens);
 	gb_free(gb_heap_allocator(), f->tokenizer.fullpath.text);
 	destroy_tokenizer(&f->tokenizer);
 }
 
 b32 init_parser(Parser *p) {
-	gb_array_init(p->files, gb_heap_allocator());
-	gb_array_init(p->imports, gb_heap_allocator());
-	gb_array_init(p->system_libraries, gb_heap_allocator());
+	array_init(&p->files, gb_heap_allocator());
+	array_init(&p->imports, gb_heap_allocator());
+	array_init(&p->system_libraries, gb_heap_allocator());
 	gb_mutex_init(&p->mutex);
 	return true;
 }
 
 void destroy_parser(Parser *p) {
 	// TODO(bill): Fix memory leak
-	gb_for_array(i, p->files) {
+	for_array(i, p->files) {
 		destroy_ast_file(&p->files[i]);
 	}
 #if 1
-	gb_for_array(i, p->imports) {
+	for_array(i, p->imports) {
 		// gb_free(gb_heap_allocator(), p->imports[i].text);
 	}
 #endif
-	gb_array_free(p->files);
-	gb_array_free(p->imports);
-	gb_array_free(p->system_libraries);
+	array_free(&p->files);
+	array_free(&p->imports);
+	array_free(&p->system_libraries);
 	gb_mutex_destroy(&p->mutex);
 }
 
@@ -2922,7 +2922,7 @@ b32 try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
 	gb_mutex_lock(&p->mutex);
 	defer (gb_mutex_unlock(&p->mutex));
 
-	gb_for_array(i, p->imports) {
+	for_array(i, p->imports) {
 		String import = p->imports[i].path;
 		if (import == path) {
 			return false;
@@ -2933,7 +2933,7 @@ b32 try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
 	item.path = path;
 	item.rel_path = rel_path;
 	item.pos = pos;
-	gb_array_append(p->imports, item);
+	array_add(&p->imports, item);
 	return true;
 }
 
@@ -2973,13 +2973,13 @@ b32 try_add_foreign_system_library_path(Parser *p, String import_file) {
 	gb_mutex_lock(&p->mutex);
 	defer (gb_mutex_unlock(&p->mutex));
 
-	gb_for_array(i, p->system_libraries) {
+	for_array(i, p->system_libraries) {
 		String import = p->system_libraries[i];
 		if (import == import_file) {
 			return false;
 		}
 	}
-	gb_array_append(p->system_libraries, import_file);
+	array_add(&p->system_libraries, import_file);
 	return true;
 }
 
@@ -3057,7 +3057,7 @@ void parse_file(Parser *p, AstFile *f) {
 
 	f->decls = parse_stmt_list(f);
 
-	gb_for_array(i, f->decls) {
+	for_array(i, f->decls) {
 		AstNode *node = f->decls[i];
 		if (!is_ast_node_decl(node) &&
 		    node->kind != AstNode_BadStmt &&
@@ -3118,16 +3118,16 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 	String init_fullpath = make_string(fullpath_str);
 	TokenPos init_pos = {};
 	ImportedFile init_imported_file = {init_fullpath, init_fullpath, init_pos};
-	gb_array_append(p->imports, init_imported_file);
+	array_add(&p->imports, init_imported_file);
 	p->init_fullpath = init_fullpath;
 
 	{
 		String s = get_fullpath_core(gb_heap_allocator(), make_string("_preload.odin"));
 		ImportedFile runtime_file = {s, s, init_pos};
-		gb_array_append(p->imports, runtime_file);
+		array_add(&p->imports, runtime_file);
 	}
 
-	gb_for_array(i, p->imports) {
+	for_array(i, p->imports) {
 		ImportedFile imported_file = p->imports[i];
 		String import_path = imported_file.path;
 		String import_rel_path = imported_file.rel_path;
@@ -3169,13 +3169,13 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 			gb_mutex_lock(&p->mutex);
 			defer (gb_mutex_unlock(&p->mutex));
 
-			file.id = gb_array_count(p->files);
-			gb_array_append(p->files, file);
+			file.id = p->files.count;
+			array_add(&p->files, file);
 		}
 	}
 
-	gb_for_array(i, p->files) {
-		p->total_token_count += gb_array_count(p->files[i].tokens);
+	for_array(i, p->files) {
+		p->total_token_count += p->files[i].tokens.count;
 	}
 
 

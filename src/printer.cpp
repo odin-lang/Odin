@@ -29,7 +29,7 @@ void print_ast(AstNode *node, isize indent) {
 		print_indent(indent);
 		gb_printf("(compound lit)\n");
 		print_ast(node->CompoundLit.type, indent+1);
-		gb_for_array(i, node->CompoundLit.elems) {
+		for_array(i, node->CompoundLit.elems) {
 			print_ast(node->CompoundLit.elems[i], indent+1);
 		}
 		break;
@@ -58,7 +58,7 @@ void print_ast(AstNode *node, isize indent) {
 		print_indent(indent);
 		gb_printf("(call)\n");
 		print_ast(node->CallExpr.proc, indent+1);
-		gb_for_array(i, node->CallExpr.args) {
+		for_array(i, node->CallExpr.args) {
 			print_ast(node->CallExpr.args[i], indent+1);
 		}
 		break;
@@ -92,17 +92,17 @@ void print_ast(AstNode *node, isize indent) {
 	case AstNode_AssignStmt:
 		print_indent(indent);
 		print_token(node->AssignStmt.op);
-		gb_for_array(i, node->AssignStmt.lhs) {
+		for_array(i, node->AssignStmt.lhs) {
 			print_ast(node->AssignStmt.lhs[i], indent+1);
 		}
-		gb_for_array(i, node->AssignStmt.rhs) {
+		for_array(i, node->AssignStmt.rhs) {
 			print_ast(node->AssignStmt.rhs[i], indent+1);
 		}
 		break;
 	case AstNode_BlockStmt:
 		print_indent(indent);
 		gb_printf("(block)\n");
-		gb_for_array(i, node->BlockStmt.stmts) {
+		for_array(i, node->BlockStmt.stmts) {
 			print_ast(node->BlockStmt.stmts[i], indent+1);
 		}
 		break;
@@ -121,7 +121,7 @@ void print_ast(AstNode *node, isize indent) {
 	case AstNode_ReturnStmt:
 		print_indent(indent);
 		gb_printf("(return)\n");
-		gb_for_array(i, node->ReturnStmt.results) {
+		for_array(i, node->ReturnStmt.results) {
 			print_ast(node->ReturnStmt.results[i], indent+1);
 		}
 		break;
@@ -143,22 +143,22 @@ void print_ast(AstNode *node, isize indent) {
 	case AstNode_VarDecl:
 		print_indent(indent);
 		gb_printf("(decl:var)\n");
-		gb_for_array(i, node->VarDecl.names) {
+		for_array(i, node->VarDecl.names) {
 			print_ast(node->VarDecl.names[i], indent+1);
 		}
 		print_ast(node->VarDecl.type, indent+1);
-		gb_for_array(i, node->VarDecl.values) {
+		for_array(i, node->VarDecl.values) {
 			print_ast(node->VarDecl.values[i], indent+1);
 		}
 		break;
 	case AstNode_ConstDecl:
 		print_indent(indent);
 		gb_printf("(decl:const)\n");
-		gb_for_array(i, node->VarDecl.names) {
+		for_array(i, node->VarDecl.names) {
 			print_ast(node->VarDecl.names[i], indent+1);
 		}
 		print_ast(node->VarDecl.type, indent+1);
-		gb_for_array(i, node->VarDecl.values) {
+		for_array(i, node->VarDecl.values) {
 			print_ast(node->VarDecl.values[i], indent+1);
 		}
 		break;
@@ -178,20 +178,20 @@ void print_ast(AstNode *node, isize indent) {
 
 	case AstNode_ProcType:
 		print_indent(indent);
-		gb_printf("(type:proc)(%td -> %td)\n", gb_array_count(node->ProcType.params), gb_array_count(node->ProcType.results));
-		gb_for_array(i, node->ProcType.params) {
+		gb_printf("(type:proc)(%td -> %td)\n", node->ProcType.params.count, node->ProcType.results.count);
+		for_array(i, node->ProcType.params) {
 			print_ast(node->ProcType.params[i], indent+1);
 		}
-		if (gb_array_count(node->ProcType.results) > 0) {
+		if (node->ProcType.results.count > 0) {
 			print_indent(indent+1);
 			gb_printf("->\n");
-			gb_for_array(i, node->ProcType.results) {
+			for_array(i, node->ProcType.results) {
 				print_ast(node->ProcType.results[i], indent+1);
 			}
 		}
 		break;
 	case AstNode_Parameter:
-		gb_for_array(i, node->Parameter.names) {
+		for_array(i, node->Parameter.names) {
 			print_ast(node->Parameter.names[i], indent+1);
 		}
 		print_ast(node->Parameter.type, indent);
@@ -210,7 +210,7 @@ void print_ast(AstNode *node, isize indent) {
 	case AstNode_StructType:
 		print_indent(indent);
 		gb_printf("(struct)\n");
-		gb_for_array(i, node->StructType.decls) {
+		for_array(i, node->StructType.decls) {
 			print_ast(node->StructType.decls[i], indent+1);
 		}
 		break;

@@ -87,7 +87,7 @@ void ssa_gen_tree(ssaGen *s) {
 	isize global_variable_max_count = 0;
 	Entity *entry_point = NULL;
 
-	gb_for_array(i, info->entities.entries) {
+	for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		String name = e->token.string;
@@ -104,13 +104,13 @@ void ssa_gen_tree(ssaGen *s) {
 		ssaValue *var, *init;
 		DeclInfo *decl;
 	};
-	gbArray(ssaGlobalVariable) global_variables;
-	gb_array_init_reserve(global_variables, m->tmp_allocator, global_variable_max_count);
+	Array<ssaGlobalVariable> global_variables;
+	array_init(&global_variables, m->tmp_allocator, global_variable_max_count);
 
 	auto min_dep_map = generate_minimum_dependency_map(info, entry_point);
 	defer (map_destroy(&min_dep_map));
 
-	gb_for_array(i, info->entities.entries) {
+	for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		String name = e->token.string;
@@ -160,7 +160,7 @@ void ssa_gen_tree(ssaGen *s) {
 			}
 
 			if (g->Global.value == NULL) {
-				gb_array_append(global_variables, var);
+				array_add(&global_variables, var);
 			}
 
 			map_set(&m->values, hash_pointer(e), g);
@@ -192,7 +192,7 @@ void ssa_gen_tree(ssaGen *s) {
 		}
 	}
 
-	gb_for_array(i, m->members.entries) {
+	for_array(i, m->members.entries) {
 		auto *entry = &m->members.entries[i];
 		ssaValue *v = entry->value;
 		if (v->kind == ssaValue_Proc)
@@ -204,7 +204,7 @@ void ssa_gen_tree(ssaGen *s) {
 	ssaDebugInfo *all_procs = ssa_alloc_debug_info(m->allocator, ssaDebugInfo_AllProcs);
 
 	isize all_proc_max_count = 0;
-	gb_for_array(i, m->debug_info.entries) {
+	for_array(i, m->debug_info.entries) {
 		auto *entry = &m->debug_info.entries[i];
 		ssaDebugInfo *di = entry->value;
 		di->id = i;
@@ -213,17 +213,17 @@ void ssa_gen_tree(ssaGen *s) {
 		}
 	}
 
-	gb_array_init_reserve(all_procs->AllProcs.procs, m->allocator, all_proc_max_count);
+	array_init(&all_procs->AllProcs.procs, m->allocator, all_proc_max_count);
 	map_set(&m->debug_info, hash_pointer(all_procs), all_procs); // NOTE(bill): This doesn't need to be mapped
 	compile_unit->CompileUnit.all_procs = all_procs;
 
 
-	gb_for_array(i, m->debug_info.entries) {
+	for_array(i, m->debug_info.entries) {
 		auto *entry = &m->debug_info.entries[i];
 		ssaDebugInfo *di = entry->value;
 		di->id = i;
 		if (di->kind == ssaDebugInfo_Proc) {
-			gb_array_append(all_procs->AllProcs.procs, di);
+			array_add(&all_procs->AllProcs.procs, di);
 		}
 	}
 
@@ -249,7 +249,7 @@ void ssa_gen_tree(ssaGen *s) {
 		ssa_begin_procedure_body(proc);
 
 		// TODO(bill): Should do a dependency graph do check which order to initialize them in?
-		gb_for_array(i, global_variables) {
+		for_array(i, global_variables) {
 			ssaGlobalVariable *var = &global_variables[i];
 			if (var->decl->init_expr != NULL) {
 				var->init = ssa_build_expr(proc, var->decl->init_expr);
@@ -257,7 +257,7 @@ void ssa_gen_tree(ssaGen *s) {
 		}
 
 		// NOTE(bill): Initialize constants first
-		gb_for_array(i, global_variables) {
+		for_array(i, global_variables) {
 			ssaGlobalVariable *var = &global_variables[i];
 			if (var->init != NULL) {
 				if (var->init->kind == ssaValue_Constant) {
@@ -266,7 +266,7 @@ void ssa_gen_tree(ssaGen *s) {
 			}
 		}
 
-		gb_for_array(i, global_variables) {
+		for_array(i, global_variables) {
 			ssaGlobalVariable *var = &global_variables[i];
 			if (var->init != NULL) {
 				if (var->init->kind != ssaValue_Constant) {
@@ -315,7 +315,7 @@ void ssa_gen_tree(ssaGen *s) {
 			};
 
 
-			gb_for_array(type_info_map_index, info->type_info_map.entries) {
+			for_array(type_info_map_index, info->type_info_map.entries) {
 				auto *entry = &info->type_info_map.entries[type_info_map_index];
 				Type *t = cast(Type *)cast(uintptr)entry->key.key;
 				t = default_type(t);
@@ -673,7 +673,7 @@ void ssa_gen_tree(ssaGen *s) {
 		ssa_end_procedure_body(proc);
 	}
 
-	gb_for_array(i, m->procs) {
+	for_array(i, m->procs) {
 		ssa_build_proc(m->procs[i], m->procs[i]->Proc.parent);
 	}
 

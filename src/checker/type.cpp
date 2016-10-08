@@ -777,12 +777,12 @@ gb_global i64 basic_type_sizes[] = {
 
 struct Selection {
 	Entity *entity;
-	gbArray(isize) index;
+	Array<isize> index;
 	b32 indirect; // Set if there was a pointer deref anywhere down the line
 };
 Selection empty_selection = {};
 
-Selection make_selection(Entity *entity, gbArray(isize) index, b32 indirect) {
+Selection make_selection(Entity *entity, Array<isize> index, b32 indirect) {
 	Selection s = {entity, index, indirect};
 	return s;
 }
@@ -790,10 +790,10 @@ Selection make_selection(Entity *entity, gbArray(isize) index, b32 indirect) {
 void selection_add_index(Selection *s, isize index) {
 	// IMPORTANT NOTE(bill): this requires a stretchy buffer/dynamic array so it requires some form
 	// of heap allocation
-	if (s->index == NULL) {
-		gb_array_init(s->index, gb_heap_allocator());
+	if (s->index.data == NULL) {
+		array_init(&s->index, gb_heap_allocator());
 	}
-	gb_array_append(s->index, index);
+	array_add(&s->index, index);
 }
 
 gb_global Entity *entity__any_type_info  = NULL;
@@ -918,7 +918,8 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 				String str = f->token.string;
 
 				if (field_name == str) {
-					return make_selection(f, NULL, i);
+					Selection sel = {f, {}, i};
+					return sel;
 				}
 			}
 		}
@@ -929,7 +930,8 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 			String str = f->token.string;
 
 			if (field_name == str) {
-				return make_selection(f, NULL, i);
+				Selection sel = {f, {}, i};
+				return sel;
 			}
 		}
 
@@ -958,10 +960,7 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 			}
 
 			if (f->Variable.anonymous) {
-				isize prev_count = 0;
-				if (sel.index != NULL) {
-					prev_count = gb_array_count(sel.index);
-				}
+				isize prev_count = sel.index.count;
 				selection_add_index(&sel, i); // HACK(bill): Leaky memory
 
 				sel = lookup_field(a, f->type, field_name, is_type, sel);
@@ -971,7 +970,7 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 						sel.indirect = true;
 					return sel;
 				}
-				gb_array_count(sel.index) = prev_count;
+				sel.index.count = prev_count;
 			}
 		}
 	}
@@ -1208,7 +1207,7 @@ i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, isize index)
 
 i64 type_offset_of_from_selection(BaseTypeSizes s, gbAllocator allocator, Type *t, Selection sel) {
 	i64 offset = 0;
-	for (isize i = 0; i < gb_array_count(sel.index); i++) {
+	for_array(i, sel.index) {
 		isize index = sel.index[i];
 		t = base_type(t);
 		if (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct) {

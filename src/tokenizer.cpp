@@ -292,7 +292,7 @@ struct Tokenizer {
 	isize line_count;
 
 	isize error_count;
-	gbArray(String) allocated_strings;
+	Array<String> allocated_strings;
 };
 
 
@@ -368,7 +368,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 		if (t->curr_rune == GB_RUNE_BOM)
 			advance_to_next_rune(t); // Ignore BOM at file beginning
 
-		gb_array_init(t->allocated_strings, gb_heap_allocator());
+		array_init(&t->allocated_strings, gb_heap_allocator());
 
 		return TokenizerInit_None;
 	}
@@ -397,12 +397,10 @@ gb_inline void destroy_tokenizer(Tokenizer *t) {
 	if (t->start != NULL) {
 		gb_free(gb_heap_allocator(), t->start);
 	}
-	if (t->allocated_strings != NULL) {
-		gb_for_array(i, t->allocated_strings) {
-			gb_free(gb_heap_allocator(), t->allocated_strings[i].text);
-		}
-		gb_array_free(t->allocated_strings);
+	for_array(i, t->allocated_strings) {
+		gb_free(gb_heap_allocator(), t->allocated_strings[i].text);
 	}
+	array_free(&t->allocated_strings);
 }
 
 void tokenizer_skip_whitespace(Tokenizer *t) {
@@ -696,7 +694,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 			i32 success = unquote_string(gb_heap_allocator(), &token.string);
 			if (success > 0) {
 				if (success == 2) {
-					gb_array_append(t->allocated_strings, token.string);
+					array_add(&t->allocated_strings, token.string);
 				}
 				return token;
 			} else {

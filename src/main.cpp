@@ -189,7 +189,6 @@ int main(int argc, char **argv) {
 		// "-dse "
 		// "-dce "
 		// "-S "
-		// "-debug-pass=Arguments "
 		"",
 		LIT(module_dir),
 		output_name, LIT(output));
@@ -203,6 +202,7 @@ int main(int argc, char **argv) {
 	exit_code = win32_exec_command_line_app(
 		"%.*sbin/llc %.*s.bc -filetype=obj -O%d "
 		"%.*s "
+		// "-debug-pass=Arguments "
 		"",
 		LIT(module_dir),
 		LIT(output),
@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
 	gbString lib_str = gb_string_make(gb_heap_allocator(), "Kernel32.lib");
 	// defer (gb_string_free(lib_str));
 	char lib_str_buf[1024] = {};
-	gb_for_array(i, parser.system_libraries) {
+	for_array(i, parser.system_libraries) {
 		String lib = parser.system_libraries[i];
 		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
 		                        " %.*s.lib", LIT(lib));

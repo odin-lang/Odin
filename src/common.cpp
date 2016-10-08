@@ -2,7 +2,9 @@
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
+
 #include "string.cpp"
+#include "array.cpp"
 
 gb_global String global_module_path = {};
 gb_global b32 global_module_path_set = false;
@@ -12,21 +14,21 @@ String get_module_dir() {
 		return global_module_path;
 	}
 
-	gbArray(wchar_t) path_buf;
-	gb_array_init_reserve(path_buf, gb_heap_allocator(), 300);
-	defer (gb_array_free(path_buf));
-	gb_array_resize(path_buf, 300);
+	Array<wchar_t> path_buf;
+	array_init(&path_buf, gb_heap_allocator(), 300);
+	defer (array_free(&path_buf));
+	array_resize(&path_buf, 300);
 
 	isize len = 0;
 	for (;;) {
-		len = GetModuleFileNameW(NULL, path_buf, gb_array_count(path_buf));
+		len = GetModuleFileNameW(NULL, &path_buf[0], path_buf.count);
 		if (len == 0) {
 			return make_string(NULL, 0);
 		}
-		if (len < gb_array_count(path_buf)) {
+		if (len < path_buf.count) {
 			break;
 		}
-		gb_array_resize(path_buf, 2*gb_array_count(path_buf) + 300);
+		array_resize(&path_buf, 2*path_buf.count + 300);
 	}
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
@@ -155,6 +157,7 @@ i64 prev_pow2(i64 n) {
 
 
 #define gb_for_array(index_, array_) for (isize index_ = 0; (array_) != NULL && index_ < gb_array_count(array_); index_++)
+#define for_array(index_, array_) for (isize index_ = 0; index_ < (array_).count; index_++)
 
 
 // Doubly Linked Lists
@@ -179,6 +182,8 @@ i64 prev_pow2(i64 n) {
 ////////////////////////////////////////////////////////////////
 
 
+
+
 struct MapFindResult {
 	isize hash_index;
 	isize entry_prev;
@@ -194,8 +199,8 @@ struct MapEntry {
 
 template <typename T>
 struct Map {
-	gbArray(isize) hashes;
-	gbArray(MapEntry<T>) entries;
+	Array<isize> hashes;
+	Array<MapEntry<T> > entries;
 };
 
 template <typename T> void map_init   (Map<T> *h, gbAllocator a);
@@ -221,14 +226,14 @@ template <typename T> void  multi_map_remove_all(Map<T> *h, HashKey key);
 
 template <typename T>
 gb_inline void map_init(Map<T> *h, gbAllocator a) {
-	gb_array_init(h->hashes,  a);
-	gb_array_init(h->entries, a);
+	array_init(&h->hashes,  a);
+	array_init(&h->entries, a);
 }
 
 template <typename T>
 gb_inline void map_destroy(Map<T> *h) {
-	if (h->entries) gb_array_free(h->entries);
-	if (h->hashes)  gb_array_free(h->hashes);
+	array_free(&h->entries);
+	array_free(&h->hashes);
 }
 
 template <typename T>
@@ -236,15 +241,15 @@ gb_internal isize map__add_entry(Map<T> *h, HashKey key) {
 	MapEntry<T> e = {};
 	e.key = key;
 	e.next = -1;
-	gb_array_append(h->entries, e);
-	return gb_array_count(h->entries)-1;
+	array_add(&h->entries, e);
+	return h->entries.count-1;
 }
 
 template <typename T>
 gb_internal MapFindResult map__find(Map<T> *h, HashKey key) {
 	MapFindResult fr = {-1, -1, -1};
-	if (gb_array_count(h->hashes) > 0) {
-		fr.hash_index  = key.key % gb_array_count(h->hashes);
+	if (h->hashes.count > 0) {
+		fr.hash_index  = key.key % h->hashes.count;
 		fr.entry_index = h->hashes[fr.hash_index];
 		while (fr.entry_index >= 0) {
 			if (hash_key_equal(h->entries[fr.entry_index].key, key)) {
@@ -260,8 +265,8 @@ gb_internal MapFindResult map__find(Map<T> *h, HashKey key) {
 template <typename T>
 gb_internal MapFindResult map__find(Map<T> *h, MapEntry<T> *e) {
 	MapFindResult fr = {-1, -1, -1};
-	if (gb_array_count(h->hashes) > 0) {
-		fr.hash_index  = e->key.key % gb_array_count(h->hashes);
+	if (h->hashes.count > 0) {
+		fr.hash_index  = e->key.key % h->hashes.count;
 		fr.entry_index = h->hashes[fr.hash_index];
 		while (fr.entry_index >= 0) {
 			if (&h->entries[fr.entry_index] == e) {
@@ -277,12 +282,12 @@ gb_internal MapFindResult map__find(Map<T> *h, MapEntry<T> *e) {
 
 template <typename T>
 gb_internal b32 map__full(Map<T> *h) {
-	return 0.75f * gb_array_count(h->hashes) <= gb_array_count(h->entries);
+	return 0.75f * h->hashes.count <= h->entries.count;
 }
 
 template <typename T>
 gb_inline void map_grow(Map<T> *h) {
-	isize new_count = GB_ARRAY_GROW_FORMULA(gb_array_count(h->entries));
+	isize new_count = GB_ARRAY_GROW_FORMULA(h->entries.count);
 	map_rehash(h, new_count);
 }
 
@@ -290,16 +295,18 @@ template <typename T>
 void map_rehash(Map<T> *h, isize new_count) {
 	isize i, j;
 	Map<T> nh = {};
-	map_init(&nh, gb_array_allocator(h->hashes));
-	gb_array_resize(nh.hashes, new_count);
-	gb_array_reserve(nh.entries, gb_array_count(h->entries));
-	for (i = 0; i < new_count; i++)
+	map_init(&nh, h->hashes.allocator);
+	array_resize(&nh.hashes, new_count);
+	array_reserve(&nh.entries, h->entries.count);
+	for (i = 0; i < new_count; i++) {
 		nh.hashes[i] = -1;
-	for (i = 0; i < gb_array_count(h->entries); i++) {
+	}
+	for (i = 0; i < h->entries.count; i++) {
 		MapEntry<T> *e = &h->entries[i];
 		MapFindResult fr;
-		if (gb_array_count(nh.hashes) == 0)
+		if (nh.hashes.count == 0) {
 			map_grow(&nh);
+		}
 		fr = map__find(&nh, e->key);
 		j = map__add_entry(&nh, e->key);
 		if (fr.entry_prev < 0)
@@ -327,7 +334,7 @@ template <typename T>
 void map_set(Map<T> *h, HashKey key, T value) {
 	isize index;
 	MapFindResult fr;
-	if (gb_array_count(h->hashes) == 0)
+	if (h->hashes.count == 0)
 		map_grow(h);
 	fr = map__find(h, key);
 	if (fr.entry_index >= 0) {
@@ -355,11 +362,11 @@ void map__erase(Map<T> *h, MapFindResult fr) {
 	} else {
 		h->entries[fr.entry_prev].next = h->entries[fr.entry_index].next;
 	}
-	if (fr.entry_index == gb_array_count(h->entries)-1) {
-		gb_array_pop(h->entries);
+	if (fr.entry_index == h->entries.count-1) {
+		array_pop(&h->entries);
 		return;
 	}
-	h->entries[fr.entry_index] = h->entries[gb_array_count(h->entries)-1];
+	h->entries[fr.entry_index] = h->entries[h->entries.count-1];
 	MapFindResult last = map__find(h, h->entries[fr.entry_index].key);
 	if (last.entry_prev >= 0) {
 		h->entries[last.entry_prev].next = fr.entry_index;
@@ -428,7 +435,7 @@ void multi_map_get_all(Map<T> *h, HashKey key, T *items) {
 
 template <typename T>
 void multi_map_insert(Map<T> *h, HashKey key, T value) {
-	if (gb_array_count(h->hashes) == 0) {
+	if (h->hashes.count == 0) {
 		map_grow(h);
 	}
 	MapFindResult fr = map__find(h, key);

@@ -37,7 +37,7 @@ struct ssaDebugInfo {
 			TokenPos      pos;
 		} Proc;
 		struct {
-			gbArray(ssaDebugInfo *) procs;
+			Array<ssaDebugInfo *> procs;
 		} AllProcs;
 	};
 };
@@ -64,7 +64,7 @@ struct ssaModule {
 	i32                 global_string_index;
 	i32                 global_array_index; // For ConstantSlice
 
-	gbArray(ssaValue *) procs; // NOTE(bill): Procedures to generate
+	Array<ssaValue *> procs; // NOTE(bill): Procedures to generate
 };
 
 
@@ -77,8 +77,11 @@ struct ssaBlock {
 	ssaProcedure *parent;
 	b32 added;
 
-	gbArray(ssaValue *) instrs;
-	gbArray(ssaValue *) values;
+	Array<ssaValue *> instrs;
+	Array<ssaValue *> locals;
+
+	Array<ssaBlock *> preds;
+	Array<ssaBlock *> succs;
 };
 
 struct ssaTargetList {
@@ -111,7 +114,7 @@ struct ssaDefer {
 
 struct ssaProcedure {
 	ssaProcedure *parent;
-	gbArray(ssaProcedure *) children;
+	Array<ssaProcedure *> children;
 
 	Entity *      entity;
 	ssaModule *   module;
@@ -122,8 +125,8 @@ struct ssaProcedure {
 	u64           tags;
 
 	isize               scope_index;
-	gbArray(ssaDefer)   defer_stmts;
-	gbArray(ssaBlock *) blocks;
+	Array<ssaDefer>     defer_stmts;
+	Array<ssaBlock *>   blocks;
 	ssaBlock *          decl_block;
 	ssaBlock *          entry_block;
 	ssaBlock *          curr_block;
@@ -149,6 +152,7 @@ struct ssaProcedure {
 	SSA_INSTR_KIND(Br), \
 	SSA_INSTR_KIND(Ret), \
 	SSA_INSTR_KIND(Select), \
+	SSA_INSTR_KIND(Phi), \
 	SSA_INSTR_KIND(Unreachable), \
 	SSA_INSTR_KIND(BinaryOp), \
 	SSA_INSTR_KIND(Call), \
@@ -261,6 +265,10 @@ struct ssaInstr {
 			ssaValue *true_value;
 			ssaValue *false_value;
 		} Select;
+		struct {
+			String comment;
+			Array<ssaValue *> edges;
+		} Phi;
 		struct {
 			Type *type;
 			Token op;
@@ -396,7 +404,7 @@ ssaDefer ssa_add_defer_node(ssaProcedure *proc, isize scope_index, AstNode *stmt
 	d.scope_index = scope_index;
 	d.block = proc->curr_block;
 	d.stmt = stmt;
-	gb_array_append(proc->defer_stmts, d);
+	array_add(&proc->defer_stmts, d);
 	return d;
 }
 
@@ -406,7 +414,7 @@ ssaDefer ssa_add_defer_instr(ssaProcedure *proc, isize scope_index, ssaValue *in
 	d.scope_index = proc->scope_index;
 	d.block = proc->curr_block;
 	d.instr = instr; // NOTE(bill): It will make a copy everytime it is called
-	gb_array_append(proc->defer_stmts, d);
+	array_add(&proc->defer_stmts, d);
 	return d;
 }
 
@@ -425,7 +433,7 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 	map_init(&m->members,    gb_heap_allocator());
 	map_init(&m->debug_info, gb_heap_allocator());
 	map_init(&m->type_names, gb_heap_allocator());
-	gb_array_init(m->procs,  gb_heap_allocator());
+	array_init(&m->procs,  gb_heap_allocator());
 
 	// Default states
 	m->stmt_state_flags = 0;
@@ -435,7 +443,7 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 		// Add type info data
 		{
 			String name = make_string(SSA_TYPE_INFO_DATA_NAME);
-			isize count = gb_array_count(c->info.type_info_map.entries);
+			isize count = c->info.type_info_map.entries.count;
 			Entity *e = make_entity_variable(m->allocator, NULL, make_token_ident(name), make_type_array(m->allocator, t_type_info, count));
 			ssaValue *g = ssa_make_value_global(m->allocator, e, NULL);
 			g->Global.is_private  = true;
@@ -448,7 +456,7 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 			// NOTE(bill): Removes need for heap allocation by making it global memory
 			isize count = 0;
 
-			gb_for_array(entry_index, m->info->type_info_map.entries) {
+			for_array(entry_index, m->info->type_info_map.entries) {
 				auto *entry = &m->info->type_info_map.entries[entry_index];
 				Type *t = cast(Type *)cast(uintptr)entry->key.key;
 
@@ -489,7 +497,7 @@ void ssa_destroy_module(ssaModule *m) {
 	map_destroy(&m->members);
 	map_destroy(&m->type_names);
 	map_destroy(&m->debug_info);
-	gb_array_free(m->procs);
+	array_free(&m->procs);
 	gb_arena_free(&m->arena);
 }
 
@@ -630,9 +638,6 @@ ssaValue *ssa_alloc_value(gbAllocator a, ssaValueKind kind) {
 ssaValue *ssa_alloc_instr(ssaProcedure *proc, ssaInstrKind kind) {
 	ssaValue *v = ssa_alloc_value(proc->module->allocator, ssaValue_Instr);
 	v->Instr.kind = kind;
-	if (proc->curr_block) {
-		gb_array_append(proc->curr_block->values, v);
-	}
 	return v;
 }
 
@@ -868,10 +873,7 @@ ssaValue *ssa_add_module_constant(ssaModule *m, Type *type, ExactValue value) {
 		ast_node(cl, CompoundLit, value.value_compound);
 		gbAllocator a = m->allocator;
 
-		isize count = 0;
-		if (cl->elems) {
-			count = gb_array_count(cl->elems);
-		}
+		isize count = cl->elems.count;
 		if (count > 0) {
 			Type *elem = base_type(type)->Slice.elem;
 			Type *t = make_type_array(a, elem, count);
@@ -918,8 +920,11 @@ ssaValue *ssa_make_value_block(ssaProcedure *proc, AstNode *node, Scope *scope, 
 	v->Block.scope  = scope;
 	v->Block.parent = proc;
 
-	gb_array_init(v->Block.instrs, gb_heap_allocator());
-	gb_array_init(v->Block.values, gb_heap_allocator());
+	array_init(&v->Block.instrs, gb_heap_allocator());
+	array_init(&v->Block.locals, gb_heap_allocator());
+
+	array_init(&v->Block.preds,  gb_heap_allocator());
+	array_init(&v->Block.succs,  gb_heap_allocator());
 
 	return v;
 }
@@ -935,10 +940,7 @@ b32 ssa_is_blank_ident(AstNode *node) {
 
 ssaInstr *ssa_get_last_instr(ssaBlock *block) {
 	if (block != NULL) {
-		isize len = 0;
-		if (block->instrs != NULL) {
-			len = gb_array_count(block->instrs);
-		}
+		isize len = block->instrs.count;
 		if (len > 0) {
 			ssaValue *v = block->instrs[len-1];
 			GB_ASSERT(v->kind == ssaValue_Instr);
@@ -968,7 +970,7 @@ ssaValue *ssa_emit(ssaProcedure *proc, ssaValue *instr) {
 	if (b != NULL) {
 		ssaInstr *i = ssa_get_last_instr(b);
 		if (!ssa_is_instr_terminating(i)) {
-			gb_array_append(b->instrs, instr);
+			array_add(&b->instrs, instr);
 		}
 	}
 	return instr;
@@ -996,7 +998,8 @@ ssaValue *ssa_add_local(ssaProcedure *proc, Entity *e, b32 zero_initialized = tr
 	ssaBlock *b = proc->decl_block; // all variables must be in the first block
 	ssaValue *instr = ssa_make_instr_local(proc, e, zero_initialized);
 	instr->Instr.parent = b;
-	gb_array_append(b->instrs, instr);
+	array_add(&b->instrs, instr);
+	array_add(&b->locals, instr);
 
 	// if (zero_initialized) {
 		ssa_emit_zero_init(proc, instr);
@@ -1079,7 +1082,7 @@ ssaBlock *ssa__make_block(ssaProcedure *proc, AstNode *node, String label) {
 
 ssaBlock *ssa_add_block(ssaProcedure *proc, AstNode *node, String label) {
 	ssaBlock *block = ssa__make_block(proc, node, label);
-	gb_array_append(proc->blocks, block);
+	array_add(&proc->blocks, block);
 	return block;
 }
 
@@ -1094,7 +1097,7 @@ void ssa_build_defer_stmt(ssaProcedure *proc, ssaDefer d) {
 	if (last_instr == NULL || !ssa_is_instr_terminating(last_instr)) {
 		ssa_emit_jump(proc, b);
 	}
-	gb_array_append(proc->blocks, b);
+	array_add(&proc->blocks, b);
 	proc->curr_block = b;
 	ssa_emit_comment(proc, make_string("defer"));
 	if (d.kind == ssaDefer_Node) {
@@ -1107,7 +1110,7 @@ void ssa_build_defer_stmt(ssaProcedure *proc, ssaDefer d) {
 }
 
 void ssa_emit_defer_stmts(ssaProcedure *proc, ssaDeferExitKind kind, ssaBlock *block) {
-	isize count = gb_array_count(proc->defer_stmts);
+	isize count = proc->defer_stmts.count;
 	isize i = count;
 	while (i --> 0) {
 		ssaDefer d = proc->defer_stmts[i];
@@ -1115,7 +1118,7 @@ void ssa_emit_defer_stmts(ssaProcedure *proc, ssaDeferExitKind kind, ssaBlock *b
 			if (proc->scope_index == d.scope_index &&
 			    d.scope_index > 1) {
 				ssa_build_defer_stmt(proc, d);
-				gb_array_pop(proc->defer_stmts);
+				array_pop(&proc->defer_stmts);
 				continue;
 			} else {
 				break;
@@ -1143,6 +1146,10 @@ void ssa_close_scope(ssaProcedure *proc, ssaDeferExitKind kind, ssaBlock *block)
 	proc->scope_index--;
 }
 
+void ssa_add_edge(ssaBlock *from, ssaBlock *to) {
+	array_add(&from->succs, to);
+	array_add(&to->preds, from);
+}
 
 
 
@@ -1155,15 +1162,24 @@ void ssa_emit_ret(ssaProcedure *proc, ssaValue *v) {
 	ssa_emit(proc, ssa_make_instr_ret(proc, v));
 }
 
-void ssa_emit_jump(ssaProcedure *proc, ssaBlock *block) {
-	ssa_emit(proc, ssa_make_instr_br(proc, NULL, block, NULL));
-	proc->curr_block = NULL;
+void ssa_emit_jump(ssaProcedure *proc, ssaBlock *target_block) {
+	ssaBlock *b = proc->curr_block;
+	if (b != NULL) {
+		ssa_emit(proc, ssa_make_instr_br(proc, NULL, target_block, NULL));
+		ssa_add_edge(b, target_block);
+		proc->curr_block = NULL;
+	}
 }
 
 void ssa_emit_if(ssaProcedure *proc, ssaValue *cond, ssaBlock *true_block, ssaBlock *false_block) {
-	ssaValue *br = ssa_make_instr_br(proc, cond, true_block, false_block);
-	ssa_emit(proc, br);
-	proc->curr_block = NULL;
+	ssaBlock *b = proc->curr_block;
+	if (b != NULL) {
+		ssaValue *br = ssa_make_instr_br(proc, cond, true_block, false_block);
+		ssa_emit(proc, br);
+		ssa_add_edge(b, true_block);
+		ssa_add_edge(b, false_block);
+		proc->curr_block = NULL;
+	}
 }
 
 void ssa_emit_no_op(ssaProcedure *proc) {
@@ -1208,9 +1224,9 @@ ssaValue *ssa_lvalue_load(ssaProcedure *proc, ssaAddr lval) {
 
 
 void ssa_begin_procedure_body(ssaProcedure *proc) {
-	gb_array_init(proc->blocks,      gb_heap_allocator());
-	gb_array_init(proc->defer_stmts, gb_heap_allocator());
-	gb_array_init(proc->children,    gb_heap_allocator());
+	array_init(&proc->blocks,      gb_heap_allocator());
+	array_init(&proc->defer_stmts, gb_heap_allocator());
+	array_init(&proc->children,    gb_heap_allocator());
 
 	proc->decl_block  = ssa_add_block(proc, proc->type_expr, make_string("decls"));
 	proc->entry_block = ssa_add_block(proc, proc->type_expr, make_string("entry"));
@@ -1230,7 +1246,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 		ssa_emit_ret(proc, NULL);
 	}
 
-	if (gb_array_count(proc->curr_block->instrs) == 0) {
+	if (proc->curr_block->instrs.count == 0) {
 		ssa_emit_unreachable(proc);
 	}
 
@@ -1240,10 +1256,10 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 
 // Number blocks and registers
 	i32 reg_id = 0;
-	gb_for_array(i, proc->blocks) {
+	for_array(i, proc->blocks) {
 		ssaBlock *b = proc->blocks[i];
 		b->id = i;
-		gb_for_array(j, b->instrs) {
+		for_array(j, b->instrs) {
 			ssaValue *value = b->instrs[j];
 			GB_ASSERT(value->kind == ssaValue_Instr);
 			ssaInstr *instr = &value->Instr;
@@ -1370,9 +1386,9 @@ ssaValue *ssa_emit_struct_ev(ssaProcedure *proc, ssaValue *s, i32 index, Type *r
 
 
 ssaValue *ssa_emit_deep_field_gep(ssaProcedure *proc, Type *type, ssaValue *e, Selection sel) {
-	GB_ASSERT(gb_array_count(sel.index) > 0);
+	GB_ASSERT(sel.index.count > 0);
 
-	gb_for_array(i, sel.index) {
+	for_array(i, sel.index) {
 		isize index = sel.index[i];
 		if (is_type_pointer(type)) {
 			type = type_deref(type);
@@ -1419,9 +1435,9 @@ ssaValue *ssa_emit_deep_field_gep(ssaProcedure *proc, Type *type, ssaValue *e, S
 
 
 ssaValue *ssa_emit_deep_field_ev(ssaProcedure *proc, Type *type, ssaValue *e, Selection sel) {
-	GB_ASSERT(gb_array_count(sel.index) > 0);
+	GB_ASSERT(sel.index.count > 0);
 
-	gb_for_array(i, sel.index) {
+	for_array(i, sel.index) {
 		isize index = sel.index[i];
 		if (is_type_pointer(type)) {
 			type = type_deref(type);
@@ -1480,7 +1496,7 @@ isize ssa_type_info_index(CheckerInfo *info, Type *type) {
 	if (entry_index < 0) {
 		// NOTE(bill): Do manual search
 		// TODO(bill): This is O(n) and can be very slow
-		gb_for_array(i, info->type_info_map.entries){
+		for_array(i, info->type_info_map.entries){
 			auto *e = &info->type_info_map.entries[i];
 			Type *prev_type = cast(Type *)cast(uintptr)e->key.key;
 			if (are_types_identical(prev_type, type)) {
@@ -2012,7 +2028,7 @@ ssaValue *ssa_emit_logical_binary_expr(ssaProcedure *proc, AstNode *expr) {
 	ssa_emit_store(proc, result, v_false);
 	ssa_emit_jump(proc, done);
 
-	gb_array_append(proc->blocks, done);
+	array_add(&proc->blocks, done);
 	proc->curr_block = done;
 
 	return ssa_emit_load(proc, result);
@@ -2182,7 +2198,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		// parent$count
 		isize name_len = proc->name.len + 1 + 8 + 1;
 		u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$%d", LIT(proc->name), cast(i32)gb_array_count(proc->children));
+		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s$%d", LIT(proc->name), cast(i32)proc->children.count);
 		String name = make_string(name_text, name_len-1);
 
 		Type *type = type_of_expr(proc->module->info, expr);
@@ -2191,7 +2207,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 		value->Proc.tags = pl->tags;
 
-		gb_array_append(proc->children, &value->Proc);
+		array_add(&proc->children, &value->Proc);
 		ssa_build_proc(value, proc);
 
 		return value;
@@ -2225,30 +2241,28 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 		case Type_Vector: {
 			ssaValue *result = ssa_add_module_constant(proc->module, type, make_exact_value_compound(expr));
-			if (cl->elems != NULL) {
-				for (isize index = 0; index < gb_array_count(cl->elems); index++) {
-					AstNode *elem = cl->elems[index];
-					if (is_elem_const(proc->module, elem)) {
-						continue;
-					}
-					ssaValue *field_elem = ssa_build_expr(proc, elem);
-					Type *t = ssa_type(field_elem);
-					GB_ASSERT(t->kind != Type_Tuple);
-					ssaValue *ev = ssa_emit_conv(proc, field_elem, et);
-					ssaValue *i = ssa_make_const_int(proc->module->allocator, index);
-					result = ssa_emit(proc, ssa_make_instr_insert_element(proc, result, ev, i));
+			for_array(index, cl->elems) {
+				AstNode *elem = cl->elems[index];
+				if (is_elem_const(proc->module, elem)) {
+					continue;
 				}
+				ssaValue *field_elem = ssa_build_expr(proc, elem);
+				Type *t = ssa_type(field_elem);
+				GB_ASSERT(t->kind != Type_Tuple);
+				ssaValue *ev = ssa_emit_conv(proc, field_elem, et);
+				ssaValue *i = ssa_make_const_int(proc->module->allocator, index);
+				result = ssa_emit(proc, ssa_make_instr_insert_element(proc, result, ev, i));
+			}
 
-				if (gb_array_count(cl->elems) == 1 && bt->Vector.count > 1) {
-					isize index_count = bt->Vector.count;
-					i32 *indices = gb_alloc_array(proc->module->allocator, i32, index_count);
-					for (isize i = 0; i < index_count; i++) {
-						indices[i] = 0;
-					}
-					ssaValue *sv = ssa_emit(proc, ssa_make_instr_shuffle_vector(proc, result, indices, index_count));
-					ssa_emit_store(proc, v, sv);
-					return ssa_emit_load(proc, v);
+			if (cl->elems.count == 1 && bt->Vector.count > 1) {
+				isize index_count = bt->Vector.count;
+				i32 *indices = gb_alloc_array(proc->module->allocator, i32, index_count);
+				for (isize i = 0; i < index_count; i++) {
+					indices[i] = 0;
 				}
+				ssaValue *sv = ssa_emit(proc, ssa_make_instr_shuffle_vector(proc, result, indices, index_count));
+				ssa_emit_store(proc, v, sv);
+				return ssa_emit_load(proc, v);
 			}
 			return result;
 		} break;
@@ -2256,9 +2270,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		case Type_Record: {
 			GB_ASSERT(is_type_struct(bt));
 			auto *st = &bt->Record;
-			if (cl->elems != NULL && gb_array_count(cl->elems) > 0) {
+			if (cl->elems.count > 0) {
 				ssa_emit_store(proc, v, ssa_add_module_constant(proc->module, type, make_exact_value_compound(expr)));
-				gb_for_array(field_index, cl->elems) {
+				for_array(field_index, cl->elems) {
 					AstNode *elem = cl->elems[field_index];
 					if (is_elem_const(proc->module, elem)) {
 						continue;
@@ -2292,9 +2306,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			}
 		} break;
 		case Type_Array: {
-			if (cl->elems != NULL && gb_array_count(cl->elems) > 0) {
+			if (cl->elems.count > 0) {
 				ssa_emit_store(proc, v, ssa_add_module_constant(proc->module, type, make_exact_value_compound(expr)));
-				gb_for_array(i, cl->elems) {
+				for_array(i, cl->elems) {
 					AstNode *elem = cl->elems[i];
 					if (is_elem_const(proc->module, elem)) {
 						continue;
@@ -2309,7 +2323,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			}
 		} break;
 		case Type_Slice: {
-			if (cl->elems != NULL && gb_array_count(cl->elems) > 0) {
+			if (cl->elems.count > 0) {
 				Type *elem_type = bt->Slice.elem;
 				Type *elem_ptr_type = make_type_pointer(proc->module->allocator, elem_type);
 				Type *elem_ptr_ptr_type = make_type_pointer(proc->module->allocator, elem_ptr_type);
@@ -2319,7 +2333,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 				ssaValue *data = ssa_emit_struct_gep(proc, slice->ConstantSlice.backing_array, v_zero32, elem_ptr_type);
 
-				gb_for_array(i, cl->elems) {
+				for_array(i, cl->elems) {
 					AstNode *elem = cl->elems[i];
 					if (is_elem_const(proc->module,elem)) {
 						continue;
@@ -2400,7 +2414,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					ssaValue *len =ssa_emit_conv(proc, ssa_build_expr(proc, ce->args[1]), t_int);
 					ssaValue *cap = len;
-					if (gb_array_count(ce->args) == 3) {
+					if (ce->args.count == 3) {
 						cap = ssa_emit_conv(proc, ssa_build_expr(proc, ce->args[2]), t_int);
 					}
 
@@ -2457,7 +2471,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssa_emit_global_call(proc, "__assert", args, 4);
 
 					ssa_emit_jump(proc, done);
-					gb_array_append(proc->blocks, done);
+					array_add(&proc->blocks, done);
 					proc->curr_block = done;
 
 					return NULL;
@@ -2571,7 +2585,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssa_emit_store(proc, gep, new_len);
 
 					ssa_emit_jump(proc, done);
-					gb_array_append(proc->blocks, done);
+					array_add(&proc->blocks, done);
 					proc->curr_block = done;
 
 					return ssa_emit_conv(proc, cond, t_bool, true);
@@ -2580,14 +2594,14 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 				case BuiltinProc_swizzle: {
 					ssa_emit_comment(proc, make_string("swizzle"));
 					ssaValue *vector = ssa_build_expr(proc, ce->args[0]);
-					isize index_count = gb_array_count(ce->args)-1;
+					isize index_count = ce->args.count-1;
 					if (index_count == 0) {
 						return vector;
 					}
 
 					i32 *indices = gb_alloc_array(proc->module->allocator, i32, index_count);
 					isize index = 0;
-					gb_for_array(i, ce->args) {
+					for_array(i, ce->args) {
 						if (i == 0) continue;
 						TypeAndValue *tv = type_and_value_of_expression(proc->module->info, ce->args[i]);
 						GB_ASSERT(is_type_integer(tv->type));
@@ -2632,7 +2646,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					len = ssa_emit_conv(proc, len, t_int, true);
 
-					if (gb_array_count(ce->args) == 3) {
+					if (ce->args.count == 3) {
 						cap = ssa_build_expr(proc, ce->args[2]);
 						cap = ssa_emit_conv(proc, cap, t_int, true);
 					}
@@ -2705,7 +2719,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		isize arg_index = 0;
 
 		isize arg_count = 0;
-		gb_for_array(i, ce->args) {
+		for_array(i, ce->args) {
 			AstNode *a = ce->args[i];
 			Type *at = base_type(type_of_expr(proc->module->info, a));
 			if (at->kind == Type_Tuple) {
@@ -2718,7 +2732,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		b32 variadic = proc_type_->Proc.variadic;
 		b32 vari_expand = ce->ellipsis.pos.line != 0;
 
-		gb_for_array(i, ce->args) {
+		for_array(i, ce->args) {
 			ssaValue *a = ssa_build_expr(proc, ce->args[i]);
 			Type *at = ssa_type(a);
 			if (at->kind == Type_Tuple) {
@@ -3308,7 +3322,7 @@ void ssa_gen_global_type_name(ssaModule *m, Entity *e, String name) {
 
 
 void ssa_build_stmt_list(ssaProcedure *proc, AstNodeArray stmts) {
-	gb_for_array(i, stmts) {
+	for_array(i, stmts) {
 		ssa_build_stmt(proc, stmts[i]);
 	}
 }
@@ -3348,20 +3362,20 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
 		defer (gb_temp_arena_memory_end(tmp));
 
-		if (gb_array_count(vd->values) == 0) { // declared and zero-initialized
-			gb_for_array(i, vd->names) {
+		if (vd->values.count == 0) { // declared and zero-initialized
+			for_array(i, vd->names) {
 				AstNode *name = vd->names[i];
 				if (!ssa_is_blank_ident(name)) {
 					ssa_add_local_for_identifier(proc, name, true);
 				}
 			}
 		} else { // Tuple(s)
-			gbArray(ssaAddr)  lvals;
-			gbArray(ssaValue *) inits;
-			gb_array_init_reserve(lvals, m->tmp_allocator, gb_array_count(vd->names));
-			gb_array_init_reserve(inits, m->tmp_allocator, gb_array_count(vd->names));
+			Array<ssaAddr>  lvals;
+			Array<ssaValue *> inits;
+			array_init(&lvals, m->tmp_allocator, vd->names.count);
+			array_init(&inits, m->tmp_allocator, vd->names.count);
 
-			gb_for_array(i, vd->names) {
+			for_array(i, vd->names) {
 				AstNode *name = vd->names[i];
 				ssaAddr lval = ssa_make_addr(NULL, NULL);
 				if (!ssa_is_blank_ident(name)) {
@@ -3369,25 +3383,25 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 					lval = ssa_build_addr(proc, name);
 				}
 
-				gb_array_append(lvals, lval);
+				array_add(&lvals, lval);
 			}
 
-			gb_for_array(i, vd->values) {
+			for_array(i, vd->values) {
 				ssaValue *init = ssa_build_expr(proc, vd->values[i]);
 				Type *t = ssa_type(init);
 				if (t->kind == Type_Tuple) {
 					for (isize i = 0; i < t->Tuple.variable_count; i++) {
 						Entity *e = t->Tuple.variables[i];
 						ssaValue *v = ssa_emit_struct_ev(proc, init, i, e->type);
-						gb_array_append(inits, v);
+						array_add(&inits, v);
 					}
 				} else {
-					gb_array_append(inits, init);
+					array_add(&inits, init);
 				}
 			}
 
 
-			gb_for_array(i, inits) {
+			for_array(i, inits) {
 				ssaValue *v = ssa_emit_conv(proc, inits[i], ssa_addr_type(lvals[i]));
 				ssa_lvalue_store(proc, lvals[i], v);
 			}
@@ -3412,7 +3426,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 			isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
 			u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-			i32 guid = cast(i32)gb_array_count(proc->children);
+			i32 guid = cast(i32)proc->children.count;
 			name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
 			String name = make_string(name_text, name_len-1);
 
@@ -3424,8 +3438,8 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			value->Proc.parent = proc;
 
 			ssa_module_add_value(proc->module, e, value);
-			gb_array_append(proc->children, &value->Proc);
-			gb_array_append(proc->module->procs, value);
+			array_add(&proc->children, &value->Proc);
+			array_add(&proc->module->procs, value);
 		} else {
 			auto *info = proc->module->info;
 
@@ -3456,7 +3470,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 					map_set(&proc->module->members, key, value);
 				}
 			} else {
-				gb_array_append(proc->children, &value->Proc);
+				array_add(&proc->children, &value->Proc);
 			}
 		}
 	case_end;
@@ -3468,7 +3482,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		String td_name = td->name->Ident.string;
 		isize name_len = proc->name.len + 1 + td_name.len + 1 + 10 + 1;
 		u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-		i32 guid = cast(i32)gb_array_count(proc->module->members.entries);
+		i32 guid = cast(i32)proc->module->members.entries.count;
 		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(td_name), guid);
 		String name = make_string(name_text, name_len-1);
 
@@ -3504,41 +3518,41 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 		switch (as->op.kind) {
 		case Token_Eq: {
-			gbArray(ssaAddr) lvals;
-			gb_array_init(lvals, m->tmp_allocator);
+			Array<ssaAddr> lvals;
+			array_init(&lvals, m->tmp_allocator);
 
-			gb_for_array(i, as->lhs) {
+			for_array(i, as->lhs) {
 				AstNode *lhs = as->lhs[i];
 				ssaAddr lval = {};
 				if (!ssa_is_blank_ident(lhs)) {
 					lval = ssa_build_addr(proc, lhs);
 				}
-				gb_array_append(lvals, lval);
+				array_add(&lvals, lval);
 			}
 
-			if (gb_array_count(as->lhs) == gb_array_count(as->rhs)) {
-				if (gb_array_count(as->lhs) == 1) {
+			if (as->lhs.count == as->rhs.count) {
+				if (as->lhs.count == 1) {
 					AstNode *rhs = as->rhs[0];
 					ssaValue *init = ssa_build_expr(proc, rhs);
 					ssa_lvalue_store(proc, lvals[0], init);
 				} else {
-					gbArray(ssaValue *) inits;
-					gb_array_init_reserve(inits, m->tmp_allocator, gb_array_count(lvals));
+					Array<ssaValue *> inits;
+					array_init(&inits, m->tmp_allocator, lvals.count);
 
-					gb_for_array(i, as->rhs) {
+					for_array(i, as->rhs) {
 						ssaValue *init = ssa_build_expr(proc, as->rhs[i]);
-						gb_array_append(inits, init);
+						array_add(&inits, init);
 					}
 
-					gb_for_array(i, inits) {
+					for_array(i, inits) {
 						ssa_lvalue_store(proc, lvals[i], inits[i]);
 					}
 				}
 			} else {
-				gbArray(ssaValue *) inits;
-				gb_array_init_reserve(inits, m->tmp_allocator, gb_array_count(lvals));
+				Array<ssaValue *> inits;
+				array_init(&inits, m->tmp_allocator, lvals.count);
 
-				gb_for_array(i, as->rhs) {
+				for_array(i, as->rhs) {
 					ssaValue *init = ssa_build_expr(proc, as->rhs[i]);
 					Type *t = ssa_type(init);
 					// TODO(bill): refactor for code reuse as this is repeated a bit
@@ -3546,14 +3560,14 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 						for (isize i = 0; i < t->Tuple.variable_count; i++) {
 							Entity *e = t->Tuple.variables[i];
 							ssaValue *v = ssa_emit_struct_ev(proc, init, i, e->type);
-							gb_array_append(inits, v);
+							array_add(&inits, v);
 						}
 					} else {
-						gb_array_append(inits, init);
+						array_add(&inits, init);
 					}
 				}
 
-				gb_for_array(i, inits) {
+				for_array(i, inits) {
 					ssa_lvalue_store(proc, lvals[i], inits[i]);
 				}
 			}
@@ -3608,26 +3622,26 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
 			defer (gb_temp_arena_memory_end(tmp));
 
-			gbArray(ssaValue *) results;
-			gb_array_init_reserve(results, proc->module->tmp_allocator, return_count);
+			Array<ssaValue *> results;
+			array_init(&results, proc->module->tmp_allocator, return_count);
 
-			gb_for_array(res_index, rs->results) {
+			for_array(res_index, rs->results) {
 				ssaValue *res = ssa_build_expr(proc, rs->results[res_index]);
 				Type *t = ssa_type(res);
 				if (t->kind == Type_Tuple) {
 					for (isize i = 0; i < t->Tuple.variable_count; i++) {
 						Entity *e = t->Tuple.variables[i];
 						ssaValue *v = ssa_emit_struct_ev(proc, res, i, e->type);
-						gb_array_append(results, v);
+						array_add(&results, v);
 					}
 				} else {
-					gb_array_append(results, res);
+					array_add(&results, res);
 				}
 			}
 
 			Type *ret_type = proc->type->Proc.results;
 			v = ssa_add_local_generated(proc, ret_type);
-			gb_for_array(i, results) {
+			for_array(i, results) {
 				Entity *e = return_type_tuple->variables[i];
 				ssaValue *res = ssa_emit_conv(proc, results[i], e->type);
 				ssaValue *field = ssa_emit_struct_gep(proc, v, i, make_type_pointer(proc->module->allocator, e->type));
@@ -3674,7 +3688,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 			ssa_emit_jump(proc, done);
 		}
-		gb_array_append(proc->blocks, done);
+		array_add(&proc->blocks, done);
 		proc->curr_block = done;
 	case_end;
 
@@ -3722,7 +3736,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		}
 
 
-		gb_array_append(proc->blocks, done);
+		array_add(&proc->blocks, done);
 		proc->curr_block = done;
 
 	case_end;
@@ -3741,15 +3755,15 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		ast_node(body, BlockStmt, ms->body);
 
 
-		AstNodeArray default_stmts = NULL;
+		AstNodeArray default_stmts = {};
 		ssaBlock *default_fall = NULL;
 		ssaBlock *default_block = NULL;
 
 		ssaBlock *fall = NULL;
 		b32 append_fall = false;
 
-		isize case_count = gb_array_count(body->stmts);
-		gb_for_array(i, body->stmts) {
+		isize case_count = body->stmts.count;
+		for_array(i, body->stmts) {
 			AstNode *clause = body->stmts[i];
 			ssaBlock *body = fall;
 			b32 append_body = false;
@@ -3759,7 +3773,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 			if (body == NULL) {
 				append_body = true;
-				if (gb_array_count(cc->list)) {
+				if (cc->list.count == 0) {
 					body = ssa__make_block(proc, clause, make_string("match.dflt.body"));
 				} else {
 					body = ssa__make_block(proc, clause, make_string("match.case.body"));
@@ -3776,7 +3790,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 				fall = ssa__make_block(proc, clause, make_string("match.fall.body"));
 			}
 
-			if (gb_array_count(cc->list) == 0) {
+			if (cc->list.count == 0) {
 				// default case
 				default_stmts = cc->stmts;
 				default_fall  = fall;
@@ -3786,17 +3800,17 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 			ssaBlock *next_cond = NULL;
 			Token eq = {Token_CmpEq};
-			gb_for_array(j, cc->list) {
+			for_array(j, cc->list) {
 				AstNode *expr = cc->list[j];
 				next_cond = ssa__make_block(proc, clause, make_string("match.case.next"));
 
 				ssaValue *cond = ssa_emit_comp(proc, eq, tag, ssa_build_expr(proc, expr));
 				ssa_emit_if(proc, cond, body, next_cond);
-				gb_array_append(proc->blocks, next_cond);
+				array_add(&proc->blocks, next_cond);
 				proc->curr_block = next_cond;
 			}
 			if (append_body) {
-				gb_array_append(proc->blocks, body);
+				array_add(&proc->blocks, body);
 			}
 			proc->curr_block = body;
 
@@ -3812,7 +3826,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 		if (default_block != NULL) {
 			ssa_emit_jump(proc, default_block);
-			gb_array_append(proc->blocks, default_block);
+			array_add(&proc->blocks, default_block);
 			proc->curr_block = default_block;
 
 			ssa_push_target_list(proc, done, NULL, default_fall);
@@ -3823,7 +3837,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		}
 
 		ssa_emit_jump(proc, done);
-		gb_array_append(proc->blocks, done);
+		array_add(&proc->blocks, done);
 		proc->curr_block = done;
 	case_end;
 
@@ -3853,15 +3867,15 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 		String tag_var_name = ms->var->Ident.string;
 
-		AstNodeArray default_stmts = NULL;
+		AstNodeArray default_stmts = {};
 		ssaBlock *default_block = NULL;
 
-		isize case_count = gb_array_count(body->stmts);
-		gb_for_array(i, body->stmts) {
+		isize case_count = body->stmts.count;
+		for_array(i, body->stmts) {
 			AstNode *clause = body->stmts[i];
 			ast_node(cc, CaseClause, clause);
 
-			if (gb_array_count(cc->list) == 0) {
+			if (cc->list.count == 0) {
 				// default case
 				default_stmts = cc->stmts;
 				default_block = ssa__make_block(proc, clause, make_string("type-match.dflt.body"));
@@ -3897,10 +3911,10 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			Token eq = {Token_CmpEq};
 			ssaValue *cond = ssa_emit_comp(proc, eq, tag_index, index);
 			ssa_emit_if(proc, cond, body, next_cond);
-			gb_array_append(proc->blocks, next_cond);
+			array_add(&proc->blocks, next_cond);
 			proc->curr_block = next_cond;
 
-			gb_array_append(proc->blocks, body);
+			array_add(&proc->blocks, body);
 			proc->curr_block = body;
 
 			ssa_push_target_list(proc, done, NULL, NULL);
@@ -3915,7 +3929,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 		if (default_block != NULL) {
 			ssa_emit_jump(proc, default_block);
-			gb_array_append(proc->blocks, default_block);
+			array_add(&proc->blocks, default_block);
 			proc->curr_block = default_block;
 
 			ssa_push_target_list(proc, done, NULL, NULL);
@@ -3926,7 +3940,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		}
 
 		ssa_emit_jump(proc, done);
-		gb_array_append(proc->blocks, done);
+		array_add(&proc->blocks, done);
 		proc->curr_block = done;
 	case_end;
 

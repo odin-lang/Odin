@@ -254,19 +254,19 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 		Entity *e;
 		AstNode *t;
 	};
-	gbArray(Delay) delayed_const; gb_array_init_reserve(delayed_const, c->tmp_allocator, other_field_count);
-	gbArray(Delay) delayed_type;  gb_array_init_reserve(delayed_type,  c->tmp_allocator, other_field_count);
+	Array<Delay> delayed_const; array_init(&delayed_const, c->tmp_allocator, other_field_count);
+	Array<Delay> delayed_type;  array_init(&delayed_type,  c->tmp_allocator, other_field_count);
 
-	gb_for_array(decl_index, decls) {
+	for_array(decl_index, decls) {
 		AstNode *decl = decls[decl_index];
 		if (decl->kind == AstNode_ConstDecl) {
 			ast_node(cd, ConstDecl, decl);
 
-			isize entity_count = gb_array_count(cd->names);
+			isize entity_count = cd->names.count;
 			isize entity_index = 0;
 			Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
 
-			gb_for_array(i, cd->values) {
+			for_array(i, cd->values) {
 				AstNode *name = cd->names[i];
 				AstNode *value = cd->values[i];
 
@@ -277,11 +277,11 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 				entities[entity_index++] = e;
 
 				Delay delay = {e, cd->type};
-				gb_array_append(delayed_const, delay);
+				array_add(&delayed_const, delay);
 			}
 
-			isize lhs_count = gb_array_count(cd->names);
-			isize rhs_count = gb_array_count(cd->values);
+			isize lhs_count = cd->names.count;
+			isize rhs_count = cd->values.count;
 
 			// TODO(bill): Better error messages or is this good enough?
 			if (rhs_count == 0 && cd->type == NULL) {
@@ -290,7 +290,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 				error(ast_node_token(node), "Extra initial expression");
 			}
 
-			gb_for_array(i, cd->names) {
+			for_array(i, cd->names) {
 				AstNode *name = cd->names[i];
 				Entity *e = entities[i];
 				Token name_token = name->Ident;
@@ -314,7 +314,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 
 			Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, NULL);
 			Delay delay = {e, td->type};
-			gb_array_append(delayed_type, delay);
+			array_add(&delayed_type, delay);
 
 			if (name_token.string == "_") {
 				other_fields[other_field_index++] = e;
@@ -333,17 +333,17 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 		}
 	}
 
-	gb_for_array(i, delayed_type) {
+	for_array(i, delayed_type) {
 		check_const_decl(c, delayed_type[i].e, delayed_type[i].t, NULL);
 	}
-	gb_for_array(i, delayed_const) {
+	for_array(i, delayed_const) {
 		check_type_decl(c, delayed_const[i].e, delayed_const[i].t, NULL, NULL);
 	}
 
 	if (node->kind == AstNode_UnionType) {
 		isize field_index = 0;
 		fields[field_index++] = make_entity_type_name(c->allocator, c->context.scope, empty_token, NULL);
-		gb_for_array(decl_index, decls) {
+		for_array(decl_index, decls) {
 			AstNode *decl = decls[decl_index];
 			if (decl->kind != AstNode_VarDecl) {
 				continue;
@@ -352,7 +352,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 			ast_node(vd, VarDecl, decl);
 			Type *base_type = check_type(c, vd->type, NULL, cycle_checker);
 
-			gb_for_array(name_index, vd->names) {
+			for_array(name_index, vd->names) {
 				AstNode *name = vd->names[name_index];
 				Token name_token = name->Ident;
 
@@ -379,7 +379,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 		}
 	} else {
 		isize field_index = 0;
-		gb_for_array(decl_index, decls) {
+		for_array(decl_index, decls) {
 			AstNode *decl = decls[decl_index];
 			if (decl->kind != AstNode_VarDecl) {
 				continue;
@@ -389,13 +389,13 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 			Type *type = check_type(c, vd->type, NULL, cycle_checker);
 
 			if (vd->is_using) {
-				if (gb_array_count(vd->names) > 1) {
+				if (vd->names.count > 1) {
 					error(ast_node_token(vd->names[0]),
 					      "Cannot apply `using` to more than one of the same type");
 				}
 			}
 
-			gb_for_array(name_index, vd->names) {
+			for_array(name_index, vd->names) {
 				AstNode *name = vd->names[name_index];
 				Token name_token = name->Ident;
 
@@ -424,7 +424,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 					Token name_token = vd->names[0]->Ident;
 					if (is_type_indexable(t)) {
 						b32 ok = true;
-						gb_for_array(emi, entity_map.entries) {
+						for_array(emi, entity_map.entries) {
 							Entity *e = entity_map.entries[emi].value;
 							if (e->kind == Entity_Variable && e->Variable.anonymous) {
 								if (is_type_indexable(e->type)) {
@@ -492,15 +492,15 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecke
 
 	isize field_count = 0;
 	isize other_field_count = 0;
-	gb_for_array(decl_index, st->decls) {
+	for_array(decl_index, st->decls) {
 		AstNode *decl = st->decls[decl_index];
 		switch (decl->kind) {
 		case_ast_node(vd, VarDecl, decl);
-			field_count += gb_array_count(vd->names);
+			field_count += vd->names.count;
 		case_end;
 
 		case_ast_node(cd, ConstDecl, decl);
-			other_field_count += gb_array_count(cd->names);
+			other_field_count += cd->names.count;
 		case_end;
 
 		case_ast_node(td, TypeDecl, decl);
@@ -554,15 +554,15 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker 
 
 	isize field_count = 1;
 	isize other_field_count = 0;
-	gb_for_array(decl_index, ut->decls) {
+	for_array(decl_index, ut->decls) {
 		AstNode *decl = ut->decls[decl_index];
 		switch (decl->kind) {
 		case_ast_node(vd, VarDecl, decl);
-			field_count += gb_array_count(vd->names);
+			field_count += vd->names.count;
 		case_end;
 
 		case_ast_node(cd, ConstDecl, decl);
-			other_field_count += gb_array_count(cd->names);
+			other_field_count += cd->names.count;
 		case_end;
 
 		case_ast_node(td, TypeDecl, decl);
@@ -589,15 +589,15 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node, CycleChec
 
 	isize field_count = 0;
 	isize other_field_count = 0;
-	gb_for_array(decl_index, ut->decls) {
+	for_array(decl_index, ut->decls) {
 		AstNode *decl = ut->decls[decl_index];
 		switch (decl->kind) {
 		case_ast_node(vd, VarDecl, decl);
-			field_count += gb_array_count(vd->names);
+			field_count += vd->names.count;
 		case_end;
 
 		case_ast_node(cd, ConstDecl, decl);
-			other_field_count += gb_array_count(cd->names);
+			other_field_count += cd->names.count;
 		case_end;
 
 		case_ast_node(td, TypeDecl, decl);
@@ -661,7 +661,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	}
 	enum_type->Record.enum_base = base_type;
 
-	Entity **fields = gb_alloc_array(c->allocator, Entity *, gb_array_count(et->fields));
+	Entity **fields = gb_alloc_array(c->allocator, Entity *, et->fields.count);
 	isize field_index = 0;
 	ExactValue iota = make_exact_value_integer(-1);
 	i64 min_value = 0;
@@ -673,7 +673,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	}
 	Entity *blank_entity = make_entity_constant(c->allocator, c->context.scope, blank_token, constant_type, make_exact_value_integer(0));;
 
-	gb_for_array(i, et->fields) {
+	for_array(i, et->fields) {
 		AstNode *field = et->fields[i];
 
 		ast_node(f, FieldValue, field);
@@ -735,10 +735,10 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		add_entity_use(c, f->field, e);
 	}
 
-	gb_sort_array(fields, gb_array_count(et->fields), cmp_enum_order);
+	gb_sort_array(fields, et->fields.count, cmp_enum_order);
 
 	enum_type->Record.other_fields = fields;
-	enum_type->Record.other_field_count = gb_array_count(et->fields);
+	enum_type->Record.other_field_count = et->fields.count;
 
 	enum_type->Record.enum_count = make_entity_constant(c->allocator, NULL,
 		make_token_ident(make_string("count")), t_int, make_exact_value_integer(enum_type->Record.other_field_count));
@@ -749,29 +749,30 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 }
 
 Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, b32 *is_variadic_) {
-	if (params == NULL || gb_array_count(params) == 0)
+	if (params.count == 0) {
 		return NULL;
+	}
 
 	b32 is_variadic = false;
 
 	Type *tuple = make_type_tuple(c->allocator);
 
 	isize variable_count = 0;
-	gb_for_array(i, params) {
+	for_array(i, params) {
 		AstNode *field = params[i];
 		ast_node(p, Parameter, field);
-		variable_count += gb_array_count(p->names);
+		variable_count += p->names.count;
 	}
 
 	Entity **variables = gb_alloc_array(c->allocator, Entity *, variable_count);
 	isize variable_index = 0;
-	gb_for_array(i, params) {
+	for_array(i, params) {
 		ast_node(p, Parameter, params[i]);
 		AstNode *type_expr = p->type;
 		if (type_expr) {
 			if (type_expr->kind == AstNode_Ellipsis) {
 				type_expr = type_expr->Ellipsis.expr;
-				if (i+1 == gb_array_count(params)) {
+				if (i+1 == params.count) {
 					is_variadic = true;
 				} else {
 					error(ast_node_token(params[i]), "Invalid AST: Invalid variadic parameter");
@@ -779,7 +780,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, b32 *is_va
 			}
 
 			Type *type = check_type(c, type_expr);
-			gb_for_array(j, p->names) {
+			for_array(j, p->names) {
 				AstNode *name = p->names[j];
 				if (name->kind == AstNode_Ident) {
 					Entity *param = make_entity_param(c->allocator, scope, name->Ident, type, p->is_using);
@@ -792,10 +793,10 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, b32 *is_va
 		}
 	}
 
-	if (is_variadic && gb_array_count(params) > 0) {
+	if (is_variadic && params.count > 0) {
 		// NOTE(bill): Change last variadic parameter to be a slice
 		// Custom Calling convention for variadic parameters
-		Entity *end = variables[gb_array_count(params)-1];
+		Entity *end = variables[params.count-1];
 		end->type = make_type_slice(c->allocator, end->type);
 	}
 
@@ -808,14 +809,14 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, b32 *is_va
 }
 
 Type *check_get_results(Checker *c, Scope *scope, AstNodeArray results) {
-	if (results == NULL || gb_array_count(results) == 0) {
+	if (results.count == 0) {
 		return NULL;
 	}
 	Type *tuple = make_type_tuple(c->allocator);
 
-	Entity **variables = gb_alloc_array(c->allocator, Entity *, gb_array_count(results));
+	Entity **variables = gb_alloc_array(c->allocator, Entity *, results.count);
 	isize variable_index = 0;
-	gb_for_array(i, results) {
+	for_array(i, results) {
 		AstNode *item = results[i];
 		Type *type = check_type(c, item);
 		Token token = ast_node_token(item);
@@ -826,7 +827,7 @@ Type *check_get_results(Checker *c, Scope *scope, AstNodeArray results) {
 		variables[variable_index++] = param;
 	}
 	tuple->Tuple.variables = variables;
-	tuple->Tuple.variable_count = gb_array_count(results);
+	tuple->Tuple.variable_count = results.count;
 
 	return tuple;
 }
@@ -915,7 +916,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 #if 0
 	// TODO(bill): Fix cyclical dependancy checker
 		if (cycle_checker != NULL) {
-			gb_for_array(i, cycle_checker->path) {
+			for_array(i, cycle_checker->path) {
 				Entity *prev = cycle_checker->path[i];
 				if (prev == e) {
 					error(e->token, "Illegal declaration cycle for %.*s", LIT(e->token.string));
@@ -2270,15 +2271,17 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	BuiltinProc *bp = &builtin_procs[id];
 	{
 		char *err = NULL;
-		if (gb_array_count(ce->args) < bp->arg_count)
+		if (ce->args.count < bp->arg_count) {
 			err = "Too few";
-		if (gb_array_count(ce->args) > bp->arg_count && !bp->variadic)
+		} else if (ce->args.count > bp->arg_count && !bp->variadic) {
 			err = "Too many";
+		}
+
 		if (err) {
 			ast_node(proc, Ident, ce->proc);
 			error(ce->close, "`%s` arguments for `%.*s`, expected %td, got %td",
 			      err, LIT(proc->string),
-			      bp->arg_count, gb_array_count(ce->args));
+			      bp->arg_count, ce->args.count);
 			return false;
 		}
 	}
@@ -2321,7 +2324,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		AstNode *len = ce->args[1];
 		AstNode *cap = NULL;
-		if (gb_array_count(ce->args) > 2) {
+		if (ce->args.count > 2) {
 			cap = ce->args[2];
 		}
 
@@ -2349,7 +2352,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 				      type_str);
 				return false;
 			}
-			if (ce->args[3] != NULL) {
+			if (ce->args.count > 3) {
 				error(ast_node_token(call),
 				      "Too many arguments to `new_slice`, expected either 2 or 3");
 				return false;
@@ -2666,7 +2669,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		isize max_count = vector_type->Vector.count;
 		isize arg_count = 0;
-		gb_for_array(i, ce->args) {
+		for_array(i, ce->args) {
 			if (i == 0) continue;
 			AstNode *arg = ce->args[i];
 			Operand op = {};
@@ -2826,7 +2829,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		AstNode *len = ce->args[1];
 		AstNode *cap = NULL;
-		if (gb_array_count(ce->args) > 2) {
+		if (ce->args.count > 2) {
 			cap = ce->args[2];
 		}
 
@@ -2855,7 +2858,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 				      type_str);
 				return false;
 			}
-			if (ce->args[2] != NULL) {
+			if (ce->args.count > 3) {
 				error(ast_node_token(call),
 				      "Too many arguments to `slice_ptr`, expected either 2 or 3");
 				return false;
@@ -3083,7 +3086,7 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 		return;
 	}
 
-	if (gb_array_count(ce->args) == 0 && param_count == 0) {
+	if (ce->args.count == 0 && param_count == 0) {
 		return;
 	}
 
@@ -3091,14 +3094,14 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	defer (gb_temp_arena_memory_end(tmp));
 
 	isize operand_count = 0;
-	gbArray(Operand) operands;
-	gb_array_init_reserve(operands, c->tmp_allocator, 2*param_count);
+	Array<Operand> operands;
+	array_init(&operands, c->tmp_allocator, 2*param_count);
 
-	gb_for_array(i, ce->args) {
+	for_array(i, ce->args) {
 		Operand o = {};
 		check_multi_expr(c, &o, ce->args[i]);
 		if (o.type->kind != Type_Tuple) {
-			gb_array_append(operands, o);
+			array_add(&operands, o);
 		} else {
 			auto *tuple = &o.type->Tuple;
 			if (variadic && i >= param_count) {
@@ -3109,12 +3112,12 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 			}
 			for (isize j = 0; j < tuple->variable_count; j++) {
 				o.type = tuple->variables[j]->type;
-				gb_array_append(operands, o);
+				array_add(&operands, o);
 			}
 		}
 	}
 
-	operand_count = gb_array_count(operands);
+	operand_count = operands.count;
 	i32 error_code = 0;
 	if (operand_count < param_count) {
 		error_code = -1;
@@ -3190,7 +3193,7 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	check_expr_or_type(c, operand, ce->proc);
 
 	if (operand->mode == Addressing_Invalid) {
-		gb_for_array(i, ce->args) {
+		for_array(i, ce->args) {
 			check_expr_base(c, operand, ce->args[i]);
 		}
 		operand->mode = Addressing_Invalid;
@@ -3342,9 +3345,10 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		Type *t = base_type(type);
 		switch (t->kind) {
 		case Type_Record: {
-			if (!is_type_struct(t))
+			if (!is_type_struct(t)) {
 				break;
-			if (cl->elems == NULL || gb_array_count(cl->elems) == 0) {
+			}
+			if (cl->elems.count == 0) {
 				break; // NOTE(bill): No need to init
 			}
 			{ // Checker values
@@ -3352,7 +3356,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 				if (cl->elems[0]->kind == AstNode_FieldValue) {
 					b32 *fields_visited = gb_alloc_array(c->allocator, b32, field_count);
 
-					gb_for_array(i, cl->elems) {
+					for_array(i, cl->elems) {
 						AstNode *elem = cl->elems[i];
 						if (elem->kind != AstNode_FieldValue) {
 							error(ast_node_token(elem),
@@ -3376,7 +3380,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 							continue;
 						}
 
-						if (gb_array_count(sel.index) > 1) {
+						if (sel.index.count > 1) {
 							error(ast_node_token(elem),
 							      "Cannot assign to an anonymous field `%.*s` in a structure literal (at the moment)", LIT(name));
 							continue;
@@ -3401,7 +3405,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 						check_assignment(c, o, field->type, make_string("structure literal"));
 					}
 				} else {
-					gb_for_array(index, cl->elems) {
+					for_array(index, cl->elems) {
 						AstNode *elem = cl->elems[index];
 						if (elem->kind == AstNode_FieldValue) {
 							error(ast_node_token(elem),
@@ -3422,8 +3426,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 						check_assignment(c, o, field->type, make_string("structure literal"));
 					}
-					if (gb_array_count(cl->elems) < field_count) {
-						error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, gb_array_count(cl->elems));
+					if (cl->elems.count < field_count) {
+						error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elems.count);
 					}
 				}
 			}
@@ -3450,10 +3454,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 			i64 max = 0;
 			isize index = 0;
-			isize elem_count = 0;
-			if (cl->elems != NULL) {
-				elem_count = gb_array_count(cl->elems);
-			}
+			isize elem_count = cl->elems.count;
+
 			for (; index < elem_count; index++) {
 				AstNode *e = cl->elems[index];
 				if (e->kind == AstNode_FieldValue) {
@@ -3871,7 +3873,7 @@ void check_expr_or_type(Checker *c, Operand *o, AstNode *e) {
 gbString write_expr_to_string(gbString str, AstNode *node);
 
 gbString write_params_to_string(gbString str, AstNodeArray params, char *sep) {
-	gb_for_array(i, params) {
+	for_array(i, params) {
 		ast_node(p, Parameter, params[i]);
 		if (i > 0) {
 			str = gb_string_appendc(str, sep);
@@ -3918,7 +3920,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_ast_node(cl, CompoundLit, node);
 		str = write_expr_to_string(str, cl->type);
 		str = gb_string_appendc(str, "{");
-		gb_for_array(i, cl->elems) {
+		for_array(i, cl->elems) {
 			if (i > 0) {
 				str = gb_string_appendc(str, ", ");
 			}
@@ -4021,7 +4023,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		if (p->is_using) {
 			str = gb_string_appendc(str, "using ");
 		}
-		gb_for_array(i, p->names) {
+		for_array(i, p->names) {
 			AstNode *name = p->names[i];
 			if (i > 0)
 				str = gb_string_appendc(str, ", ");
@@ -4036,7 +4038,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, ce->proc);
 		str = gb_string_appendc(str, "(");
 
-		gb_for_array(i, ce->args) {
+		for_array(i, ce->args) {
 			AstNode *arg = ce->args[i];
 			if (i > 0) {
 				str = gb_string_appendc(str, ", ");
@@ -4056,7 +4058,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, "struct ");
 		if (st->is_packed)  str = gb_string_appendc(str, "#packed ");
 		if (st->is_ordered) str = gb_string_appendc(str, "#ordered ");
-		gb_for_array(i, st->decls) {
+		for_array(i, st->decls) {
 			if (i > 0) {
 				str = gb_string_appendc(str, "; ");
 			}
@@ -4068,7 +4070,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(st, RawUnionType, node);
 		str = gb_string_appendc(str, "raw_union {");
-		gb_for_array(i, st->decls) {
+		for_array(i, st->decls) {
 			if (i > 0) {
 				str = gb_string_appendc(str, "; ");
 			}
@@ -4080,7 +4082,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(st, UnionType, node);
 		str = gb_string_appendc(str, "union {");
-		gb_for_array(i, st->decls) {
+		for_array(i, st->decls) {
 			if (i > 0) {
 				str = gb_string_appendc(str, "; ");
 			}

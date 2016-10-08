@@ -354,7 +354,7 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 		type = base_type(type);
 		if (is_type_array(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);
-			isize elem_count = cl->elems != NULL ? gb_array_count(cl->elems) : 0;
+			isize elem_count = cl->elems.count;
 			if (elem_count == 0) {
 				ssa_fprintf(f, "zeroinitializer");
 				break;
@@ -385,7 +385,7 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 			ssa_fprintf(f, "]");
 		} else if (is_type_vector(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);
-			isize elem_count = cl->elems != NULL ? gb_array_count(cl->elems) : 0;
+			isize elem_count = cl->elems.count;
 			if (elem_count == 0) {
 				ssa_fprintf(f, "zeroinitializer");
 				break;
@@ -427,7 +427,7 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 
 			ast_node(cl, CompoundLit, value.value_compound);
 
-			if (cl->elems == NULL || gb_array_count(cl->elems) == 0) {
+			if (cl->elems.count == 0) {
 				ssa_fprintf(f, "zeroinitializer");
 				break;
 			}
@@ -438,7 +438,7 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 
 
 			if (cl->elems[0]->kind == AstNode_FieldValue) {
-				isize elem_count = cl->elems != NULL ? gb_array_count(cl->elems) : 0;
+				isize elem_count = cl->elems.count;
 				for (isize i = 0; i < elem_count; i++) {
 					ast_node(fv, FieldValue, cl->elems[i]);
 					String name = fv->field->Ident.string;
@@ -1009,14 +1009,14 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 		// ssa_fprintf(f, "nounwind uwtable {\n");
 
 		ssa_fprintf(f, "{\n");
-		gb_for_array(i, proc->blocks) {
+		for_array(i, proc->blocks) {
 			ssaBlock *block = proc->blocks[i];
 
 			if (i > 0) ssa_fprintf(f, "\n");
 			ssa_print_block_name(f, block);
 			ssa_fprintf(f, ":\n");
 
-			gb_for_array(j, block->instrs) {
+			for_array(j, block->instrs) {
 				ssaValue *value = block->instrs[j];
 				ssa_print_instr(f, m, value);
 			}
@@ -1026,7 +1026,7 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 		ssa_fprintf(f, "\n");
 	}
 
-	gb_for_array(i, proc->children) {
+	for_array(i, proc->children) {
 		ssa_print_proc(f, m, proc->children[i]);
 	}
 }
@@ -1063,7 +1063,7 @@ void ssa_print_llvm_ir(ssaFileBuffer *f, ssaModule *m) {
 	ssa_fprintf(f, "} ; Basic_any\n");
 
 
-	gb_for_array(member_index, m->members.entries) {
+	for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
 		ssaValue *v = entry->value;
 		if (v->kind != ssaValue_TypeName) {
@@ -1072,7 +1072,7 @@ void ssa_print_llvm_ir(ssaFileBuffer *f, ssaModule *m) {
 		ssa_print_type_name(f, m, v);
 	}
 
-	gb_for_array(member_index, m->members.entries) {
+	for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
 		ssaValue *v = entry->value;
 		if (v->kind != ssaValue_Proc) {
@@ -1083,7 +1083,7 @@ void ssa_print_llvm_ir(ssaFileBuffer *f, ssaModule *m) {
 		}
 	}
 
-	gb_for_array(member_index, m->members.entries) {
+	for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
 		ssaValue *v = entry->value;
 		if (v->kind != ssaValue_Proc) {
@@ -1095,7 +1095,7 @@ void ssa_print_llvm_ir(ssaFileBuffer *f, ssaModule *m) {
 	}
 
 
-	gb_for_array(member_index, m->members.entries) {
+	for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
 		ssaValue *v = entry->value;
 		if (v->kind != ssaValue_Global) {
@@ -1137,7 +1137,7 @@ void ssa_print_llvm_ir(ssaFileBuffer *f, ssaModule *m) {
 		ssa_fprintf(f, "\n");
 		ssa_fprintf(f, "!llvm.dbg.cu = !{!0}\n");
 
-		gb_for_array(di_index, m->debug_info.entries) {
+		for_array(di_index, m->debug_info.entries) {
 			auto *entry = &m->debug_info.entries[di_index];
 			ssaDebugInfo *di = entry->value;
 			ssa_fprintf(f, "!%d = ", di->id);
@@ -1184,7 +1184,7 @@ void ssa_print_llvm_ir(ssaFileBuffer *f, ssaModule *m) {
 
 			case ssaDebugInfo_AllProcs:
 				ssa_fprintf(f, "!{");
-				gb_for_array(proc_index, di->AllProcs.procs) {
+				for_array(proc_index, di->AllProcs.procs) {
 					ssaDebugInfo *p = di->AllProcs.procs[proc_index];
 					if (proc_index > 0) {ssa_fprintf(f, ",");}
 					ssa_fprintf(f, "!%d", p->id);

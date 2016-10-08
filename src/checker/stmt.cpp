@@ -11,7 +11,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags);
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d);
 
 void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
-	if (stmts == NULL) {
+	if (stmts.count == 0) {
 		return;
 	}
 
@@ -22,14 +22,14 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 		Entity *e;
 		DeclInfo *d;
 	};
-	gbArray(Delay) delayed_const; gb_array_init_reserve(delayed_const, c->tmp_allocator, gb_array_count(stmts));
-	gbArray(Delay) delayed_type;  gb_array_init_reserve(delayed_type,  c->tmp_allocator, gb_array_count(stmts));
+	Array<Delay> delayed_const; array_init(&delayed_const, c->tmp_allocator, stmts.count);
+	Array<Delay> delayed_type;  array_init(&delayed_type,  c->tmp_allocator, stmts.count);
 
-	gb_for_array(i, stmts) {
+	for_array(i, stmts) {
 		AstNode *node = stmts[i];
 		switch (node->kind) {
 		case_ast_node(cd, ConstDecl, node);
-			gb_for_array(i, cd->values) {
+			for_array(i, cd->values) {
 				AstNode *name = cd->names[i];
 				AstNode *value = cd->values[i];
 				ExactValue v = {ExactValue_Invalid};
@@ -44,11 +44,11 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 				add_entity_and_decl_info(c, name, e, d);
 
 				Delay delay = {e, d};
-				gb_array_append(delayed_const, delay);
+				array_add(&delayed_const, delay);
 			}
 
-			isize lhs_count = gb_array_count(cd->names);
-			isize rhs_count = gb_array_count(cd->values);
+			isize lhs_count = cd->names.count;
+			isize rhs_count = cd->values.count;
 
 			if (rhs_count == 0 && cd->type == NULL) {
 				error(ast_node_token(node), "Missing type or initial expression");
@@ -67,28 +67,28 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 			add_entity_and_decl_info(c, td->name, e, d);
 
 			Delay delay = {e, d};
-			gb_array_append(delayed_type, delay);
+			array_add(&delayed_type, delay);
 		case_end;
 		}
 	}
 
-	gb_for_array(i, delayed_type) {
+	for_array(i, delayed_type) {
 		check_entity_decl(c, delayed_type[i].e, delayed_type[i].d, NULL);
 	}
-	gb_for_array(i, delayed_const) {
+	for_array(i, delayed_const) {
 		check_entity_decl(c, delayed_const[i].e, delayed_const[i].d, NULL);
 	}
 
 	b32 ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
 	u32 f = flags & (~Stmt_FallthroughAllowed);
 
-	gb_for_array(i, stmts) {
+	for_array(i, stmts) {
 		AstNode *n = stmts[i];
 		if (n->kind == AstNode_EmptyStmt) {
 			continue;
 		}
 		u32 new_flags = f;
-		if (ft_ok && i+1 == gb_array_count(stmts)) {
+		if (ft_ok && i+1 == stmts.count) {
 			new_flags |= Stmt_FallthroughAllowed;
 		}
 		check_stmt(c, n, new_flags);
@@ -101,7 +101,7 @@ b32 check_has_break(AstNode *stmt, b32 implicit);
 b32 check_is_terminating_list(AstNodeArray stmts) {
 
 	// Iterate backwards
-	for (isize n = gb_array_count(stmts)-1; n >= 0; n--) {
+	for (isize n = stmts.count-1; n >= 0; n--) {
 		AstNode *stmt = stmts[n];
 		if (stmt->kind != AstNode_EmptyStmt) {
 			return check_is_terminating(stmt);
@@ -112,7 +112,7 @@ b32 check_is_terminating_list(AstNodeArray stmts) {
 }
 
 b32 check_has_break_list(AstNodeArray stmts, b32 implicit) {
-	gb_for_array(i, stmts) {
+	for_array(i, stmts) {
 		AstNode *stmt = stmts[i];
 		if (check_has_break(stmt, implicit)) {
 			return true;
@@ -182,10 +182,10 @@ b32 check_is_terminating(AstNode *node) {
 
 	case_ast_node(ms, MatchStmt, node);
 		b32 has_default = false;
-		gb_for_array(i, ms->body->BlockStmt.stmts) {
+		for_array(i, ms->body->BlockStmt.stmts) {
 			AstNode *clause = ms->body->BlockStmt.stmts[i];
 			ast_node(cc, CaseClause, clause);
-			if (cc->list == NULL) {
+			if (cc->list.count == 0) {
 				has_default = true;
 			}
 			if (!check_is_terminating_list(cc->stmts) ||
@@ -198,10 +198,10 @@ b32 check_is_terminating(AstNode *node) {
 
 	case_ast_node(ms, TypeMatchStmt, node);
 		b32 has_default = false;
-		gb_for_array(i, ms->body->BlockStmt.stmts) {
+		for_array(i, ms->body->BlockStmt.stmts) {
 			AstNode *clause = ms->body->BlockStmt.stmts[i];
 			ast_node(cc, CaseClause, clause);
-			if (cc->list == NULL) {
+			if (cc->list.count == 0) {
 				has_default = true;
 			}
 			if (!check_is_terminating_list(cc->stmts) ||
@@ -336,7 +336,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 }
 
 void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArray inits, String context_name) {
-	if ((lhs == NULL || lhs_count == 0) && (inits == NULL || gb_array_count(inits) == 0)) {
+	if ((lhs == NULL || lhs_count == 0) && inits.count == 0) {
 		return;
 	}
 
@@ -345,26 +345,26 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 
 	// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 	// an extra allocation
-	gbArray(Operand) operands;
-	gb_array_init_reserve(operands, c->tmp_allocator, 2*lhs_count);
+	Array<Operand> operands;
+	array_init(&operands, c->tmp_allocator, 2*lhs_count);
 
-	gb_for_array(i, inits) {
+	for_array(i, inits) {
 		AstNode *rhs = inits[i];
 		Operand o = {};
 		check_multi_expr(c, &o, rhs);
 		if (o.type->kind != Type_Tuple) {
-			gb_array_append(operands, o);
+			array_add(&operands, o);
 		} else {
 			auto *tuple = &o.type->Tuple;
 			for (isize j = 0; j < tuple->variable_count; j++) {
 				o.type = tuple->variables[j]->type;
-				gb_array_append(operands, o);
+				array_add(&operands, o);
 			}
 		}
 	}
 
-	isize rhs_count = gb_array_count(operands);
-	gb_for_array(i, operands) {
+	isize rhs_count = operands.count;
+	for_array(i, operands) {
 		if (operands[i].mode == Addressing_Invalid) {
 			rhs_count--;
 		}
@@ -498,7 +498,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 			if (is_type_struct(t) || is_type_raw_union(t)) {
 				Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
 				GB_ASSERT(found != NULL);
-				gb_for_array(i, (*found)->elements.entries) {
+				for_array(i, (*found)->elements.entries) {
 					Entity *f = (*found)->elements.entries[i].value;
 					if (f->kind == Entity_Variable) {
 						Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
@@ -696,8 +696,8 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	}
 
 	AstNodeArray inits;
-	gb_array_init_reserve(inits, c->allocator, 1);
-	gb_array_append(inits, init_expr);
+	array_init(&inits, c->allocator, 1);
+	array_add(&inits, init_expr);
 	check_init_variables(c, entities, entity_count, inits, make_string("variable declaration"));
 }
 
@@ -746,11 +746,11 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 
 void check_var_decl_node(Checker *c, AstNode *node) {
 	ast_node(vd, VarDecl, node);
-	isize entity_count = gb_array_count(vd->names);
+	isize entity_count = vd->names.count;
 	isize entity_index = 0;
 	Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
 
-	gb_for_array(i, vd->names) {
+	for_array(i, vd->names) {
 		AstNode *name = vd->names[i];
 		Entity *entity = NULL;
 		if (name->kind == AstNode_Ident) {
@@ -803,7 +803,7 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 
 	check_init_variables(c, entities, entity_count, vd->values, make_string("variable declaration"));
 
-	gb_for_array(i, vd->names) {
+	for_array(i, vd->names) {
 		if (entities[i] != NULL) {
 			add_entity(c, c->context.scope, vd->names[i], entities[i]);
 		}
@@ -911,7 +911,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		switch (as->op.kind) {
 		case Token_Eq: {
 			// a, b, c = 1, 2, 3;  // Multisided
-			if (gb_array_count(as->lhs) == 0) {
+			if (as->lhs.count == 0) {
 				error(as->op, "Missing lhs in assignment statement");
 				return;
 			}
@@ -921,29 +921,29 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 			// an extra allocation
-			gbArray(Operand) operands;
-			gb_array_init_reserve(operands, c->tmp_allocator, 2 * gb_array_count(as->lhs));
+			Array<Operand> operands;
+			array_init(&operands, c->tmp_allocator, 2 * as->lhs.count);
 
-			gb_for_array(i, as->rhs) {
+			for_array(i, as->rhs) {
 				AstNode *rhs = as->rhs[i];
 				Operand o = {};
 				check_multi_expr(c, &o, rhs);
 				if (o.type->kind != Type_Tuple) {
-					gb_array_append(operands, o);
+					array_add(&operands, o);
 				} else {
 					auto *tuple = &o.type->Tuple;
 					for (isize j = 0; j < tuple->variable_count; j++) {
 						o.type = tuple->variables[j]->type;
-						gb_array_append(operands, o);
+						array_add(&operands, o);
 					}
 				}
 			}
 
-			isize lhs_count = gb_array_count(as->lhs);
-			isize rhs_count = gb_array_count(operands);
+			isize lhs_count = as->lhs.count;
+			isize rhs_count = operands.count;
 
 			isize operand_index = 0;
-			gb_for_array(i, as->lhs) {
+			for_array(i, as->lhs) {
 				AstNode *lhs = as->lhs[i];
 				check_assignment_variable(c, &operands[i], lhs);
 			}
@@ -955,7 +955,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		default: {
 			// a += 1; // Single-sided
 			Token op = as->op;
-			if (gb_array_count(as->lhs) != 1 || gb_array_count(as->rhs) != 1) {
+			if (as->lhs.count != 1 || as->rhs.count != 1) {
 				error(op, "Assignment operation `%.*s` requires single-valued expressions", LIT(op.string));
 				return;
 			}
@@ -1019,7 +1019,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);
-		GB_ASSERT(gb_array_count(c->proc_stack) > 0);
+		GB_ASSERT(c->proc_stack.count > 0);
 
 		if (c->in_defer) {
 			error(rs->token, "You cannot `return` within a defer statement");
@@ -1028,7 +1028,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		}
 
 
-		Type *proc_type = c->proc_stack[gb_array_count(c->proc_stack)-1];
+		Type *proc_type = c->proc_stack[c->proc_stack.count-1];
 		isize result_count = 0;
 		if (proc_type->Proc.results) {
 			result_count = proc_type->Proc.results->Tuple.variable_count;
@@ -1040,13 +1040,13 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				auto *tuple = &proc_type->Proc.results->Tuple;
 				variables = tuple->variables;
 			}
-			if (gb_array_count(rs->results) == 0) {
+			if (rs->results.count == 0) {
 				error(ast_node_token(node), "Expected %td return values, got 0", result_count);
 			} else {
 				check_init_variables(c, variables, result_count,
 				                     rs->results, make_string("return statement"));
 			}
-		} else if (gb_array_count(rs->results) > 0) {
+		} else if (rs->results.count > 0) {
 			error(ast_node_token(rs->results[0]), "No return values expected");
 		}
 	case_end;
@@ -1099,12 +1099,12 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		// NOTE(bill): Check for multiple defaults
 		AstNode *first_default = NULL;
 		ast_node(bs, BlockStmt, ms->body);
-		gb_for_array(i, bs->stmts) {
+		for_array(i, bs->stmts) {
 			AstNode *stmt = bs->stmts[i];
 			AstNode *default_stmt = NULL;
 			if (stmt->kind == AstNode_CaseClause) {
 				ast_node(cc, CaseClause, stmt);
-				if (gb_array_count(cc->list) == 0) {
+				if (cc->list.count == 0) {
 					default_stmt = stmt;
 				}
 			} else {
@@ -1132,7 +1132,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		Map<TypeAndToken> seen = {}; // Multimap
 		map_init(&seen, gb_heap_allocator());
 		defer (map_destroy(&seen));
-		gb_for_array(i, bs->stmts) {
+		for_array(i, bs->stmts) {
 			AstNode *stmt = bs->stmts[i];
 			if (stmt->kind != AstNode_CaseClause) {
 				// NOTE(bill): error handled by above multiple default checker
@@ -1141,7 +1141,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			ast_node(cc, CaseClause, stmt);
 
 
-			gb_for_array(j, cc->list) {
+			for_array(j, cc->list) {
 				AstNode *expr = cc->list[j];
 				Operand y = {};
 				Operand z = {};
@@ -1206,7 +1206,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 			check_open_scope(c, stmt);
 			u32 ft_flags = mod_flags;
-			if (i+1 < gb_array_count(bs->stmts)) {
+			if (i+1 < bs->stmts.count) {
 				ft_flags |= Stmt_FallthroughAllowed;
 			}
 			check_stmt_list(c, cc->stmts, ft_flags);
@@ -1237,12 +1237,12 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		// NOTE(bill): Check for multiple defaults
 		AstNode *first_default = NULL;
 		ast_node(bs, BlockStmt, ms->body);
-		gb_for_array(i, bs->stmts) {
+		for_array(i, bs->stmts) {
 			AstNode *stmt = bs->stmts[i];
 			AstNode *default_stmt = NULL;
 			if (stmt->kind == AstNode_CaseClause) {
 				ast_node(cc, CaseClause, stmt);
-				if (gb_array_count(cc->list) == 0) {
+				if (cc->list.count == 0) {
 					default_stmt = stmt;
 				}
 			} else {
@@ -1271,7 +1271,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		defer (map_destroy(&seen));
 
 
-		gb_for_array(i, bs->stmts) {
+		for_array(i, bs->stmts) {
 			AstNode *stmt = bs->stmts[i];
 			if (stmt->kind != AstNode_CaseClause) {
 				// NOTE(bill): error handled by above multiple default checker
@@ -1428,7 +1428,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 			case Entity_ImportName: {
 				Scope *scope = e->ImportName.scope;
-				gb_for_array(i, scope->elements.entries) {
+				for_array(i, scope->elements.entries) {
 					Entity *decl = scope->elements.entries[i].value;
 					Entity *found = scope_insert_entity(c->context.scope, decl);
 					if (found != NULL) {
@@ -1459,7 +1459,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				if (is_type_struct(t) || is_type_raw_union(t)) {
 					Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
 					GB_ASSERT(found != NULL);
-					gb_for_array(i, (*found)->elements.entries) {
+					for_array(i, (*found)->elements.entries) {
 						Entity *f = (*found)->elements.entries[i].value;
 						if (f->kind == Entity_Variable) {
 							Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
@@ -1485,12 +1485,12 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		case_end;
 
 		case_ast_node(vd, VarDecl, us->node);
-			if (gb_array_count(vd->names) > 1 && vd->type != NULL) {
+			if (vd->names.count > 1 && vd->type != NULL) {
 				error(us->token, "`using` can only be applied to one variable of the same type");
 			}
 			check_var_decl_node(c, us->node);
 
-			gb_for_array(name_index, vd->names) {
+			for_array(name_index, vd->names) {
 				AstNode *item = vd->names[name_index];
 				ast_node(i, Ident, item);
 				String name = i->string;
@@ -1499,7 +1499,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				if (is_type_struct(t) || is_type_raw_union(t)) {
 					Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
 					GB_ASSERT(found != NULL);
-					gb_for_array(i, (*found)->elements.entries) {
+					for_array(i, (*found)->elements.entries) {
 						Entity *f = (*found)->elements.entries[i].value;
 						if (f->kind == Entity_Variable) {
 							Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
