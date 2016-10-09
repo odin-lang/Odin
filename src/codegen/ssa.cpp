@@ -76,6 +76,7 @@ struct ssaBlock {
 	String label;
 	ssaProcedure *parent;
 	b32 added;
+	b32 is_dead;
 
 	Array<ssaValue *> instrs;
 	Array<ssaValue *> locals;
@@ -320,8 +321,7 @@ enum ssaValueKind {
 
 struct ssaValue {
 	ssaValueKind kind;
-	i32 id;
-
+	i32 index;
 	union {
 		struct {
 			Type *     type;
@@ -503,12 +503,10 @@ void ssa_destroy_module(ssaModule *m) {
 
 
 Type *ssa_type(ssaValue *value);
-Type *ssa_type(ssaInstr *instr) {
+Type *ssa_instr_type(ssaInstr *instr) {
 	switch (instr->kind) {
 	case ssaInstr_Local:
 		return instr->Local.type;
-	case ssaInstr_Store:
-		return ssa_type(instr->Store.value);
 	case ssaInstr_Load:
 		return instr->Load.type;
 	case ssaInstr_GetElementPtr:
@@ -528,8 +526,9 @@ Type *ssa_type(ssaInstr *instr) {
 	case ssaInstr_Call: {
 		Type *pt = base_type(instr->Call.type);
 		if (pt != NULL) {
-			if (pt->kind == Type_Tuple && pt->Tuple.variable_count == 1)
+			if (pt->kind == Type_Tuple && pt->Tuple.variable_count == 1) {
 				return pt->Tuple.variables[0]->type;
+			}
 			return pt;
 		}
 		return NULL;
@@ -565,9 +564,15 @@ Type *ssa_type(ssaValue *value) {
 	case ssaValue_Proc:
 		return value->Proc.type;
 	case ssaValue_Instr:
-		return ssa_type(&value->Instr);
+		return ssa_instr_type(&value->Instr);
 	}
 	return NULL;
+}
+
+void ssa_set_instr_parent(ssaValue *instr, ssaBlock *parent) {
+	if (instr->kind == ssaValue_Instr) {
+		instr->Instr.parent = parent;
+	}
 }
 
 ssaDebugInfo *ssa_add_debug_info_file(ssaProcedure *proc, AstFile *file) {
@@ -1092,6 +1097,35 @@ ssaBlock *ssa_add_block(ssaProcedure *proc, AstNode *node, char *label) {
 	return block;
 }
 
+void ssa_block_replace_pred(ssaBlock *b, ssaBlock *from, ssaBlock *to) {
+	for_array(i, b->preds) {
+		ssaBlock *pred = b->preds[i];
+		if (pred == from) {
+			b->preds[i] = to;
+		}
+	}
+}
+
+void ssa_block_replace_succ(ssaBlock *b, ssaBlock *from, ssaBlock *to) {
+	for_array(i, b->succs) {
+		ssaBlock *succ = b->succs[i];
+		if (succ == from) {
+			b->succs[i] = to;
+		}
+	}
+}
+
+b32 ssa_block_has_phi(ssaBlock *b) {
+	return b->instrs[0]->Instr.kind == ssaInstr_Phi;
+}
+
+
+
+
+
+
+
+
 void ssa_build_stmt(ssaProcedure *proc, AstNode *s);
 void ssa_emit_no_op(ssaProcedure *proc);
 void ssa_emit_jump(ssaProcedure *proc, ssaBlock *block);
@@ -1246,7 +1280,53 @@ void ssa_begin_procedure_body(ssaProcedure *proc) {
 	}
 }
 
-void ssa_remove_pred(ssaBlock *a, ssaBlock *b) {
+
+b32 ssa_is_instr_jump(ssaValue *v) {
+	if (v->kind != ssaValue_Instr) {
+		return false;
+	}
+	ssaInstr *i = &v->Instr;
+	if (i->kind != ssaInstr_Br) {
+		return false;
+	}
+
+	return i->Br.false_block == NULL;
+}
+
+Array<ssaValue *> ssa_get_block_phi_nodes(ssaBlock *b) {
+	Array<ssaValue *> phis = {};
+	for_array(i, b->instrs) {
+		ssaInstr *instr = &b->instrs[i]->Instr;
+		if (instr->kind != ssaInstr_Phi) {
+			phis = b->instrs;
+			phis.count = i;
+			return phis;
+		}
+	}
+	return phis;
+}
+
+void ssa_remove_pred(ssaBlock *b, ssaBlock *p) {
+	auto phis = ssa_get_block_phi_nodes(b);
+
+	isize i = 0;
+	for_array(j, b->preds) {
+		ssaBlock *pred = b->preds[j];
+		if (pred != p) {
+			b->preds[i] = b->preds[j];
+			for_array(k, phis) {
+				auto *phi = &phis[k]->Instr.Phi;
+				phi->edges[i] = phi->edges[j];
+			}
+			i++;
+		}
+	}
+
+	b->preds.count = i;
+	for_array(k, phis) {
+		auto *phi = &phis[k]->Instr.Phi;
+		phi->edges.count = i;
+	}
 
 }
 
@@ -1254,12 +1334,12 @@ void ssa_remove_dead_blocks(ssaProcedure *proc) {
 	isize j = 0;
 	for_array(i, proc->blocks) {
 		ssaBlock *b = proc->blocks[i];
-		if (b != NULL) {
-			// NOTE(bill): Swap order
-			b->index = j;
-			proc->blocks[j] = b;
-			j++;
+		if (b == NULL || b->is_dead) {
+			continue;
 		}
+		// NOTE(bill): Swap order
+		b->index = j;
+		proc->blocks[j++] = b;
 	}
 
 	proc->blocks.count = j;
@@ -1292,41 +1372,70 @@ void ssa_remove_unreachable_blocks(ssaProcedure *proc) {
 			for_array(j, b->succs) {
 				ssaBlock *c = b->succs[j];
 				if (c->index == BLACK) {
-					// ssa_remove_pred(c, b);
+					ssa_remove_pred(c, b);
 				}
 			}
 			// NOTE(bill): Mark as empty but don't actually free it
 			// As it's been allocated with an arena
-			proc->blocks[i] = NULL;
+			b->is_dead = true;
 		}
 	}
 	ssa_remove_dead_blocks(proc);
 }
 
+b32 ssa_opt_block_fusion(ssaProcedure *proc, ssaBlock *a) {
+	if (a->succs.count != 1) {
+		return false;
+	}
+	ssaBlock *b = a->succs[0];
+	if (b->preds.count != 1) {
+		return false;
+	}
+
+	if (ssa_block_has_phi(b)) {
+		return false;
+	}
+
+	array_pop(&a->instrs); // Remove branch at end
+	for_array(i, b->instrs) {
+		array_add(&a->instrs, b->instrs[i]);
+		ssa_set_instr_parent(b->instrs[i], a);
+	}
+
+	array_clear(&a->succs);
+	for_array(i, b->succs) {
+		array_add(&a->succs, b->succs[i]);
+	}
+
+	// Fix preds links
+	for_array(i, b->succs) {
+		ssa_block_replace_pred(b->succs[i], b, a);
+	}
+
+	proc->blocks[b->index]->is_dead = true;
+	return true;
+}
 
 void ssa_optimize_blocks(ssaProcedure *proc) {
 	ssa_remove_unreachable_blocks(proc);
 
-#if 0
-	b32 changed = false;
-	do {
+#if 1
+	b32 changed = true;
+	while (changed) {
+		changed = false;
 		for_array(i, proc->blocks) {
 			ssaBlock *b = proc->blocks[i];
 			if (b == NULL) {
 				continue;
 			}
+			GB_ASSERT(b->index == i);
 
-			// if (ssa_fuse_blocks(proc, b)) {
-			// 	changed = true;
-			// }
-
-			if (ssa_jump_threading(proc, b)) {
-				// x -> y -> z becomes x -> z if y is just a jump
+			if (ssa_opt_block_fusion(proc, b)) {
 				changed = true;
-				continue;
 			}
+			// TODO(bill): other simple block optimizations
 		}
-	} while (changed);
+	}
 #endif
 
 	ssa_remove_dead_blocks(proc);
@@ -1346,33 +1455,20 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 
 	ssa_optimize_blocks(proc);
 
-
-// Number blocks and registers
-	i32 reg_id = 0;
+// Number registers
+	i32 reg_index = 0;
 	for_array(i, proc->blocks) {
 		ssaBlock *b = proc->blocks[i];
+		b->index = i;
 		for_array(j, b->instrs) {
 			ssaValue *value = b->instrs[j];
 			GB_ASSERT(value->kind == ssaValue_Instr);
 			ssaInstr *instr = &value->Instr;
-			// NOTE(bill): Ignore non-returning instructions
-			switch (instr->kind) {
-			case ssaInstr_Comment:
-			case ssaInstr_ZeroInit:
-			case ssaInstr_Store:
-			case ssaInstr_Br:
-			case ssaInstr_Ret:
-			case ssaInstr_Unreachable:
-			case ssaInstr_StartupRuntime:
+			if (ssa_instr_type(instr) == NULL) { // NOTE(bill): Ignore non-returning instructions
 				continue;
-			case ssaInstr_Call:
-				if (instr->Call.type == NULL) {
-					continue;
-				}
-				break;
 			}
-			value->id = reg_id;
-			reg_id++;
+			value->index = reg_index;
+			reg_index++;
 		}
 	}
 }

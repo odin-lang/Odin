@@ -8,16 +8,12 @@ struct Array {
 	isize capacity;
 
 	T &operator[](isize index) {
-		if (count > 0) {
-			GB_ASSERT_MSG(0 <= index && index < count, "Index out of bounds");
-		}
+		GB_ASSERT_MSG(0 <= index && index < count, "Index out of bounds");
 		return data[index];
 	}
 
 	T const &operator[](isize index) const {
-		if (count > 0) {
-			GB_ASSERT_MSG(0 <= index && index < count, "Index out of bounds");
-		}
+		GB_ASSERT_MSG(0 <= index && index < count, "Index out of bounds");
 		return data[index];
 	}
 };

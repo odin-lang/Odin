@@ -567,7 +567,7 @@ void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type
 		ssa_print_encoded_global(f, value->Proc.name, (value->Proc.tags & (ProcTag_foreign|ProcTag_link_name)) != 0);
 		break;
 	case ssaValue_Instr:
-		ssa_fprintf(f, "%%%d", value->id);
+		ssa_fprintf(f, "%%%d", value->index);
 		break;
 	}
 }
@@ -591,7 +591,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 
 	case ssaInstr_Local: {
 		Type *type = instr->Local.entity->type;
-		ssa_fprintf(f, "%%%d = alloca ", value->id);
+		ssa_fprintf(f, "%%%d = alloca ", value->index);
 		ssa_print_type(f, m, type);
 		ssa_fprintf(f, ", align %lld\n", type_align_of(m->sizes, m->allocator, type));
 	} break;
@@ -602,11 +602,11 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_print_type(f, m, type);
 		ssa_fprintf(f, " zeroinitializer, ");
 		ssa_print_type(f, m, type);
-		ssa_fprintf(f, "* %%%d\n", instr->ZeroInit.address->id);
+		ssa_fprintf(f, "* %%%d\n", instr->ZeroInit.address->index);
 	} break;
 
 	case ssaInstr_Store: {
-		Type *type = ssa_type(instr);
+		Type *type = ssa_type(instr->Store.value);
 		ssa_fprintf(f, "store ");
 		ssa_print_type(f, m, type);
 		ssa_fprintf(f, " ");
@@ -620,7 +620,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 
 	case ssaInstr_Load: {
 		Type *type = instr->Load.type;
-		ssa_fprintf(f, "%%%d = load ", value->id);
+		ssa_fprintf(f, "%%%d = load ", value->index);
 		ssa_print_type(f, m, type);
 		ssa_fprintf(f, ", ");
 		ssa_print_type(f, m, type);
@@ -631,7 +631,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 
 	case ssaInstr_GetElementPtr: {
 		Type *et = instr->GetElementPtr.elem_type;
-		ssa_fprintf(f, "%%%d = getelementptr ", value->id);
+		ssa_fprintf(f, "%%%d = getelementptr ", value->index);
 		if (instr->GetElementPtr.inbounds) {
 			ssa_fprintf(f, "inbounds ");
 		}
@@ -653,16 +653,16 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_Phi: {
-		ssa_fprintf(f, "%%%d = phi ", value->id);
+		ssa_fprintf(f, "%%%d = phi ", value->index);
 		ssa_print_type(f, m, instr->Phi.type);
-		ssa_fprintf(f, " ", value->id);
+		ssa_fprintf(f, " ", value->index);
 
 		for (isize i = 0; i < instr->Phi.edges.count; i++) {
-			ssaValue *edge = instr->Phi.edges[i];
 			if (i > 0) {
 				ssa_fprintf(f, ", ");
 			}
 
+			ssaValue *edge = instr->Phi.edges[i];
 			ssaBlock *block = NULL;
 			if (instr->parent != NULL &&
 			    i < instr->parent->preds.count) {
@@ -680,7 +680,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 
 	case ssaInstr_ExtractValue: {
 		Type *et = instr->ExtractValue.elem_type;
-		ssa_fprintf(f, "%%%d = extractvalue ", value->id);
+		ssa_fprintf(f, "%%%d = extractvalue ", value->index);
 
 		ssa_print_type(f, m, et);
 		ssa_fprintf(f, " ");
@@ -689,7 +689,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_NoOp: {;
-		ssa_fprintf(f, "%%%d = add i32 0, 0\n", value->id);
+		ssa_fprintf(f, "%%%d = add i32 0, 0\n", value->index);
 	} break;
 
 	case ssaInstr_Br: {;
@@ -698,7 +698,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 			ssa_print_type(f, m, t_bool);
 			ssa_fprintf(f, " ");
 			ssa_print_value(f, m, instr->Br.cond, t_bool);
-			ssa_fprintf(f, ", ", instr->Br.cond->id);
+			ssa_fprintf(f, ", ", instr->Br.cond->index);
 		}
 		ssa_fprintf(f, "label ");
 		ssa_fprintf(f, "%%"); ssa_print_block_name(f, instr->Br.true_block);
@@ -727,7 +727,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 
 	case ssaInstr_Conv: {
 		auto *c = &instr->Conv;
-		ssa_fprintf(f, "%%%d = %.*s ", value->id, LIT(ssa_conv_strings[c->kind]));
+		ssa_fprintf(f, "%%%d = %.*s ", value->index, LIT(ssa_conv_strings[c->kind]));
 		ssa_print_type(f, m, c->from);
 		ssa_fprintf(f, " ");
 		ssa_print_value(f, m, c->value, c->from);
@@ -749,7 +749,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 			elem_type = base_type(elem_type->Vector.elem);
 		}
 
-		ssa_fprintf(f, "%%%d = ", value->id);
+		ssa_fprintf(f, "%%%d = ", value->index);
 
 		if (gb_is_between(bo->op, Token__ComparisonBegin+1, Token__ComparisonEnd-1)) {
 			if (is_type_string(elem_type)) {
@@ -852,7 +852,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		auto *call = &instr->Call;
 		Type *result_type = call->type;
 		if (result_type) {
-			ssa_fprintf(f, "%%%d = ", value->id);
+			ssa_fprintf(f, "%%%d = ", value->index);
 		}
 		ssa_fprintf(f, "call ");
 		if (result_type) {
@@ -887,7 +887,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_Select: {
-		ssa_fprintf(f, "%%%d = select i1 ", value->id);
+		ssa_fprintf(f, "%%%d = select i1 ", value->index);
 		ssa_print_value(f, m, instr->Select.cond, t_bool);
 		ssa_fprintf(f, ", ");
 		ssa_print_type(f, m, ssa_type(instr->Select.true_value));
@@ -902,7 +902,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 
 	case ssaInstr_ExtractElement: {
 		Type *vt = ssa_type(instr->ExtractElement.vector);
-		ssa_fprintf(f, "%%%d = extractelement ", value->id);
+		ssa_fprintf(f, "%%%d = extractelement ", value->index);
 
 		ssa_print_type(f, m, vt);
 		ssa_fprintf(f, " ");
@@ -918,7 +918,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	case ssaInstr_InsertElement: {
 		auto *ie = &instr->InsertElement;
 		Type *vt = ssa_type(ie->vector);
-		ssa_fprintf(f, "%%%d = insertelement ", value->id);
+		ssa_fprintf(f, "%%%d = insertelement ", value->index);
 
 		ssa_print_type(f, m, vt);
 		ssa_fprintf(f, " ");
@@ -940,7 +940,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	case ssaInstr_ShuffleVector: {
 		auto *sv = &instr->ShuffleVector;
 		Type *vt = ssa_type(sv->vector);
-		ssa_fprintf(f, "%%%d = shufflevector ", value->id);
+		ssa_fprintf(f, "%%%d = shufflevector ", value->index);
 
 		ssa_print_type(f, m, vt);
 		ssa_fprintf(f, " ");

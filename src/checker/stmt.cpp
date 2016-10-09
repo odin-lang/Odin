@@ -1279,7 +1279,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			}
 			ast_node(cc, CaseClause, stmt);
 
-			AstNode *type_expr = cc->list[0];
+			AstNode *type_expr = cc->list.count > 0 ? cc->list[0] : NULL;
 			Type *tag_type = NULL;
 			if (type_expr != NULL) { // Otherwise it's a default expression
 				Operand y = {};
