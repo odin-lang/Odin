@@ -1,6 +1,5 @@
-// #define DISPLAY_TIMING
-
 #include "common.cpp"
+#include "profiler.cpp"
 #include "unicode.cpp"
 #include "tokenizer.cpp"
 #include "parser.cpp"
@@ -8,7 +7,9 @@
 #include "checker/checker.cpp"
 #include "codegen/codegen.cpp"
 
-i32 win32_exec_command_line_app(char *fmt, ...) {
+i32 win32_exec_command_line_app(char *name, char *fmt, ...) {
+	// PROF_SCOPED_STR(name);
+
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {};
 	char cmd_line[2048] = {};
@@ -51,25 +52,6 @@ i32 win32_exec_command_line_app(char *fmt, ...) {
 	}
 }
 
-#if defined(DISPLAY_TIMING)
-#define INIT_TIMER() f64 start_time = gb_time_now(), end_time = 0, total_time = 0
-#define PRINT_TIMER(section) do { \
-	f64 diff; \
-	end_time = gb_time_now(); \
-	diff = end_time - start_time; \
-	total_time += diff; \
-	gb_printf_err("%s: %.1f ms\n", section, diff*1000.0); \
-	start_time = gb_time_now(); \
-} while (0)
-
-#define PRINT_ACCUMULATION() do { \
-	gb_printf_err("Total compilation time: %.1f ms\n", total_time*1000.0); \
-} while (0)
-#else
-#define INIT_TIMER()
-#define PRINT_TIMER(section)
-#define PRINT_ACCUMULATION()
-#endif
 
 
 enum ArchKind {
@@ -113,14 +95,14 @@ int main(int argc, char **argv) {
 		gb_printf_err("using: %s [run] <filename> \n", argv[0]);
 		return 1;
 	}
+	prof_init();
 
 #if 1
 	init_string_buffer_memory();
 	init_global_error_collector();
 
-	String module_dir = get_module_dir();
 
-	INIT_TIMER();
+	String module_dir = get_module_dir();
 
 	init_universal_scope();
 
@@ -142,7 +124,6 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	PRINT_TIMER("Syntax Parser");
 
 #if 1
 	Checker checker = {};
@@ -154,7 +135,6 @@ int main(int argc, char **argv) {
 	check_parsed_files(&checker);
 
 
-	PRINT_TIMER("Semantic Checker");
 #endif
 #if 1
 	ssaGen ssa = {};
@@ -165,11 +145,11 @@ int main(int argc, char **argv) {
 
 	ssa_gen_tree(&ssa);
 
-	PRINT_TIMER("SSA Tree");
 	// TODO(bill): Speedup writing to file for IR code
 	ssa_gen_ir(&ssa);
 
-	PRINT_TIMER("SSA IR");
+	prof_print_all();
+
 #if 1
 
 	char const *output_name = ssa.output_file.filename;
@@ -181,7 +161,7 @@ int main(int argc, char **argv) {
 
 	i32 exit_code = 0;
 	// For more passes arguments: http://llvm.org/docs/Passes.html
-	exit_code = win32_exec_command_line_app(
+	exit_code = win32_exec_command_line_app("llvm-opt",
 		"%.*sbin/opt %s -o %.*s.bc "
 		"-mem2reg "
 		"-memcpyopt "
@@ -196,10 +176,9 @@ int main(int argc, char **argv) {
 		return exit_code;
 	}
 
-	PRINT_TIMER("llvm-opt");
 
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
-	exit_code = win32_exec_command_line_app(
+	exit_code = win32_exec_command_line_app("llvm-llc",
 		"%.*sbin/llc %.*s.bc -filetype=obj -O%d "
 		"%.*s "
 		// "-debug-pass=Arguments "
@@ -212,7 +191,6 @@ int main(int argc, char **argv) {
 		return exit_code;
 	}
 
-	PRINT_TIMER("llvm-llc");
 
 	gbString lib_str = gb_string_make(gb_heap_allocator(), "Kernel32.lib");
 	// defer (gb_string_free(lib_str));
@@ -223,7 +201,7 @@ int main(int argc, char **argv) {
 		                        " %.*s.lib", LIT(lib));
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);
 	}
-	exit_code = win32_exec_command_line_app(
+	exit_code = win32_exec_command_line_app("msvc-link",
 		"link %.*s.obj -OUT:%.*s.exe %s "
 		"/defaultlib:libcmt "
 		"/nologo /incremental:no /opt:ref /subsystem:console "
@@ -234,15 +212,15 @@ int main(int argc, char **argv) {
 	if (exit_code != 0) {
 		return exit_code;
 	}
-
-	PRINT_TIMER("msvc-link");
-	PRINT_ACCUMULATION();
+	// prof_print_all();
 
 	if (run_output) {
-		win32_exec_command_line_app("%.*s.exe", cast(int)base_name_len, output_name);
+		win32_exec_command_line_app("odin run", "%.*s.exe", cast(int)base_name_len, output_name);
 	}
 #endif
 #endif
 #endif
+
+
 	return 0;
 }

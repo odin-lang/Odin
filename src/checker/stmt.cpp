@@ -123,6 +123,8 @@ b32 check_has_break_list(AstNodeArray stmts, b32 implicit) {
 
 
 b32 check_has_break(AstNode *stmt, b32 implicit) {
+	PROF_PROC();
+
 	switch (stmt->kind) {
 	case AstNode_BranchStmt:
 		if (stmt->BranchStmt.token.kind == Token_break) {
@@ -152,6 +154,8 @@ b32 check_has_break(AstNode *stmt, b32 implicit) {
 // TODO(bill): This is a mild hack and should be probably handled properly
 // TODO(bill): Warn/err against code after `return` that it won't be executed
 b32 check_is_terminating(AstNode *node) {
+	PROF_PROC();
+
 	switch (node->kind) {
 	case_ast_node(rs, ReturnStmt, node);
 		return true;
@@ -224,6 +228,8 @@ b32 check_is_terminating(AstNode *node) {
 }
 
 Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
+	PROF_PROC();
+
 	if (op_a->mode == Addressing_Invalid ||
 	    op_a->type == t_invalid) {
 		return NULL;
@@ -289,6 +295,8 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 
 // NOTE(bill): `content_name` is for debugging
 Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String context_name) {
+	PROF_PROC();
+
 	if (operand->mode == Addressing_Invalid ||
 	    operand->type == t_invalid ||
 	    e->type == t_invalid) {
@@ -336,6 +344,8 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 }
 
 void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArray inits, String context_name) {
+	PROF_PROC();
+
 	if ((lhs == NULL || lhs_count == 0) && inits.count == 0) {
 		return;
 	}
@@ -382,6 +392,8 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 }
 
 void check_init_constant(Checker *c, Entity *e, Operand *operand) {
+	PROF_PROC();
+
 	if (operand->mode == Addressing_Invalid ||
 	    operand->type == t_invalid ||
 	    e->type == t_invalid) {
@@ -425,6 +437,8 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 
 
 void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr) {
+	PROF_PROC();
+
 	GB_ASSERT(e->type == NULL);
 
 	if (e->Variable.visited) {
@@ -454,6 +468,8 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 }
 
 void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, CycleChecker *cycle_checker) {
+	PROF_PROC();
+
 	GB_ASSERT(e->type == NULL);
 	Type *named = make_type_named(c->allocator, e->token.string, NULL, e);
 	named->Named.type_name = e;
@@ -517,12 +533,14 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	}
 
 	push_procedure(c, type);
-	ast_node(bs, BlockStmt, body);
-	// TODO(bill): Check declarations first (except mutable variable declarations)
-	check_stmt_list(c, bs->stmts, 0);
-	if (type->Proc.result_count > 0) {
-		if (!check_is_terminating(body)) {
-			error(bs->close, "Missing return statement at the end of the procedure");
+	{
+		ast_node(bs, BlockStmt, body);
+		// TODO(bill): Check declarations first (except mutable variable declarations)
+		check_stmt_list(c, bs->stmts, 0);
+		if (type->Proc.result_count > 0) {
+			if (!check_is_terminating(body)) {
+				error(bs->close, "Missing return statement at the end of the procedure");
+			}
 		}
 	}
 	pop_procedure(c);
@@ -570,6 +588,8 @@ b32 are_signatures_similar_enough(Type *a_, Type *b_) {
 }
 
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
+	PROF_PROC();
+
 	GB_ASSERT(e->type == NULL);
 
 	Type *proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0, false);
@@ -665,6 +685,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 }
 
 void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, AstNode *init_expr) {
+	PROF_PROC();
+
 	GB_ASSERT(e->type == NULL);
 	GB_ASSERT(e->kind == Entity_Variable);
 
@@ -704,6 +726,8 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 
 
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, CycleChecker *cycle_checker) {
+	PROF_PROC();
+
 	if (e->type != NULL) {
 		return;
 	}
@@ -745,6 +769,8 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 
 
 void check_var_decl_node(Checker *c, AstNode *node) {
+	PROF_PROC();
+
 	ast_node(vd, VarDecl, node);
 	isize entity_count = vd->names.count;
 	isize entity_index = 0;
@@ -839,6 +865,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_ast_node(_, BadDecl,   node); case_end;
 
 	case_ast_node(es, ExprStmt, node)
+		PROF_SCOPED("check_stmt - ExprStmt");
+
 		Operand operand = {Addressing_Invalid};
 		ExprKind kind = check_expr_base(c, &operand, es->expr);
 		switch (operand.mode) {
@@ -869,6 +897,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(ids, IncDecStmt, node);
+		PROF_SCOPED("check_stmt - IncDecStmt");
+
 		Token op = ids->op;
 		switch (ids->op.kind) {
 		case Token_Increment:
@@ -908,6 +938,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(as, AssignStmt, node);
+		PROF_SCOPED("check_stmt - AssignStmt");
+
 		switch (as->op.kind) {
 		case Token_Eq: {
 			// a, b, c = 1, 2, 3;  // Multisided
@@ -988,6 +1020,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(is, IfStmt, node);
+		PROF_SCOPED("check_stmt - IfStmt");
+
 		check_open_scope(c, node);
 		defer (check_close_scope(c));
 
@@ -1019,6 +1053,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);
+		PROF_SCOPED("check_stmt - ReturnStmt");
+
 		GB_ASSERT(c->proc_stack.count > 0);
 
 		if (c->in_defer) {
@@ -1052,6 +1088,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(fs, ForStmt, node);
+		PROF_SCOPED("check_stmt - ForStmt");
+
 		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 		check_open_scope(c, node);
 		defer (check_close_scope(c));
@@ -1073,6 +1111,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(ms, MatchStmt, node);
+		PROF_SCOPED("check_stmt - MatchStmt");
+
 		Operand x = {};
 
 		mod_flags |= Stmt_BreakAllowed;
@@ -1215,6 +1255,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(ms, TypeMatchStmt, node);
+		PROF_SCOPED("check_stmt - TypeMatchStmt");
+
 		Operand x = {};
 
 		mod_flags |= Stmt_BreakAllowed;
@@ -1366,6 +1408,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(us, UsingStmt, node);
+		PROF_SCOPED("check_stmt - UsingStmt");
+
 		switch (us->node->kind) {
 		case_ast_node(es, ExprStmt, us->node);
 			// TODO(bill): Allow for just a LHS expression list rather than this silly code
@@ -1485,6 +1529,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		case_end;
 
 		case_ast_node(vd, VarDecl, us->node);
+			PROF_SCOPED("check_stmt - VarDecl");
+
 			if (vd->names.count > 1 && vd->type != NULL) {
 				error(us->token, "`using` can only be applied to one variable of the same type");
 			}
@@ -1559,6 +1605,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(pd, ProcDecl, node);
+		PROF_SCOPED("check_stmt - ProcDecl");
+
 		// NOTE(bill): This must be handled here so it has access to the parent scope stuff
 		// e.g. using
 		Entity *e = make_entity_procedure(c->allocator, c->context.scope, pd->name->Ident, NULL);

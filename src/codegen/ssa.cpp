@@ -1421,6 +1421,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 	ssa_emit_jump(proc, proc->entry_block);
 
 	ssa_optimize_blocks(proc);
+#if 0
 	ssa_build_referrers(proc);
 	ssa_build_dom_tree(proc);
 
@@ -1430,7 +1431,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 	// [ ] Local stored once?  Replace loads with dominating store
 	// [ ] Convert to phi nodes
 	ssa_opt_mem2reg(proc);
-
+#endif
 
 // Number registers
 	i32 reg_index = 0;

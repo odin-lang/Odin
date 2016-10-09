@@ -47,6 +47,8 @@ b32 check_is_assignable_to_using_subtype(Type *dst, Type *src) {
 
 
 b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argument = false) {
+	PROF_PROC();
+
 	if (operand->mode == Addressing_Invalid ||
 	    type == t_invalid) {
 		return true;
@@ -151,6 +153,8 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 
 // NOTE(bill): `content_name` is for debugging and error messages
 void check_assignment(Checker *c, Operand *operand, Type *type, String context_name, b32 is_argument = false) {
+	PROF_PROC();
+
 	check_not_tuple(c, operand);
 	if (operand->mode == Addressing_Invalid)
 		return;
@@ -206,6 +210,8 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 
 
 void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *> *entity_map) {
+	PROF_PROC();
+
 	t = base_type(type_deref(t));
 	gbString str = expr_to_string(node);
 	defer (gb_string_free(str));
@@ -239,6 +245,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
                   Entity **fields, isize field_count,
                   Entity **other_fields, isize other_field_count,
                   CycleChecker *cycle_checker, String context) {
+	PROF_PROC();
 
 	Map<Entity *> entity_map = {};
 	map_init(&entity_map, gb_heap_allocator());
@@ -487,6 +494,8 @@ GB_COMPARE_PROC(cmp_struct_entity_size) {
 }
 
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecker *cycle_checker) {
+	PROF_PROC();
+
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
 
@@ -549,6 +558,8 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecke
 }
 
 void check_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker *cycle_checker) {
+	PROF_PROC();
+
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
 
@@ -583,6 +594,8 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker 
 }
 
 void check_raw_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker *cycle_checker) {
+	PROF_PROC();
+
 	GB_ASSERT(node->kind == AstNode_RawUnionType);
 	GB_ASSERT(is_type_raw_union(union_type));
 	ast_node(ut, RawUnionType, node);
@@ -639,6 +652,8 @@ GB_COMPARE_PROC(cmp_enum_order) {
 
 
 void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *node) {
+	PROF_PROC();
+
 	GB_ASSERT(node->kind == AstNode_EnumType);
 	GB_ASSERT(is_type_enum(enum_type));
 	ast_node(et, EnumType, node);
@@ -749,6 +764,8 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 }
 
 Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, b32 *is_variadic_) {
+	PROF_PROC();
+
 	if (params.count == 0) {
 		return NULL;
 	}
@@ -809,6 +826,8 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, b32 *is_va
 }
 
 Type *check_get_results(Checker *c, Scope *scope, AstNodeArray results) {
+	PROF_PROC();
+
 	if (results.count == 0) {
 		return NULL;
 	}
@@ -834,6 +853,8 @@ Type *check_get_results(Checker *c, Scope *scope, AstNodeArray results) {
 
 
 void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
+	PROF_PROC();
+
 	ast_node(pt, ProcType, proc_type_node);
 
 	b32 variadic = false;
@@ -857,6 +878,8 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 
 
 void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, CycleChecker *cycle_checker) {
+	PROF_PROC();
+
 	GB_ASSERT(n->kind == AstNode_Ident);
 	o->mode = Addressing_Invalid;
 	o->expr = n;
@@ -959,6 +982,8 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 }
 
 i64 check_array_count(Checker *c, AstNode *e) {
+	PROF_PROC();
+
 	if (e == NULL) {
 		return 0;
 	}
@@ -986,6 +1011,8 @@ i64 check_array_count(Checker *c, AstNode *e) {
 }
 
 Type *check_type(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_checker) {
+	PROF_PROC();
+
 	ExactValue null_value = {ExactValue_Invalid};
 	Type *type = NULL;
 	gbString err_str = NULL;
@@ -1258,6 +1285,8 @@ b32 check_binary_op(Checker *c, Operand *o, Token op) {
 
 }
 b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value) {
+	PROF_PROC();
+
 	if (in_value.kind == ExactValue_Invalid) {
 		// NOTE(bill): There's already been an error
 		return true;
@@ -1334,6 +1363,8 @@ b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exac
 }
 
 void check_is_expressible(Checker *c, Operand *o, Type *type) {
+	PROF_PROC();
+
 	GB_ASSERT(type->kind == Type_Basic);
 	GB_ASSERT(o->mode == Addressing_Constant);
 	if (!check_value_is_expressible(c, o->value, type, &o->value)) {
@@ -1369,6 +1400,8 @@ b32 check_is_expr_vector_index(Checker *c, AstNode *expr) {
 }
 
 void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
+	PROF_PROC();
+
 	switch (op.kind) {
 	case Token_Pointer: { // Pointer address
 		if (o->mode != Addressing_Variable ||
@@ -1442,6 +1475,8 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 }
 
 void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
+	PROF_PROC();
+
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 	defer (gb_temp_arena_memory_end(tmp));
 
@@ -1506,9 +1541,10 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 }
 
 void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
+	PROF_PROC();
+
 	GB_ASSERT(node->kind == AstNode_BinaryExpr);
 	ast_node(be, BinaryExpr, node);
-
 
 	ExactValue x_val = {};
 	if (x->mode == Addressing_Constant) {
@@ -1600,8 +1636,11 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 }
 
 b32 check_is_castable_to(Checker *c, Operand *operand, Type *y) {
-	if (check_is_assignable_to(c, operand, y))
+	PROF_PROC();
+
+	if (check_is_assignable_to(c, operand, y)) {
 		return true;
+	}
 
 	Type *x = operand->type;
 	Type *xb = base_type(x);
@@ -1690,6 +1729,8 @@ String check_down_cast_name(Type *dst_, Type *src_) {
 }
 
 void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
+	PROF_PROC();
+
 	GB_ASSERT(node->kind == AstNode_BinaryExpr);
 	Operand y_ = {}, *y = &y_;
 	gbString err_str = NULL;
@@ -1956,6 +1997,8 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 
 
 void update_expr_type(Checker *c, AstNode *e, Type *type, b32 final) {
+	PROF_PROC();
+
 	HashKey key = hash_pointer(e);
 	ExpressionInfo *found = map_get(&c->info.untyped, key);
 	if (found == NULL)
@@ -2029,6 +2072,8 @@ void convert_untyped_error(Checker *c, Operand *operand, Type *target_type) {
 }
 
 void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level) {
+	PROF_PROC();
+
 	GB_ASSERT_NOT_NULL(target_type);
 	if (operand->mode == Addressing_Invalid ||
 	    is_type_typed(operand->type) ||
@@ -2109,6 +2154,8 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 }
 
 b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *value) {
+	PROF_PROC();
+
 	Operand operand = {Addressing_Invalid};
 	check_expr(c, &operand, index_value);
 	if (operand.mode == Addressing_Invalid) {
@@ -2163,6 +2210,8 @@ b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *valu
 }
 
 Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
+	PROF_PROC();
+
 	ast_node(se, SelectorExpr, node);
 
 	b32 check_op_expr = true;
@@ -2266,6 +2315,8 @@ error:
 }
 
 b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id) {
+	PROF_PROC();
+
 	GB_ASSERT(call->kind == AstNode_CallExpr);
 	ast_node(ce, CallExpr, call);
 	BuiltinProc *bp = &builtin_procs[id];
@@ -3064,6 +3115,8 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 
 void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
+	PROF_PROC();
+
 	GB_ASSERT(call->kind == AstNode_CallExpr);
 	GB_ASSERT(proc_type->kind == Type_Proc);
 	ast_node(ce, CallExpr, call);
@@ -3188,6 +3241,8 @@ Entity *find_using_index_expr(Type *t) {
 }
 
 ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
+	PROF_PROC();
+
 	GB_ASSERT(call->kind == AstNode_CallExpr);
 	ast_node(ce, CallExpr, call);
 	check_expr_or_type(c, operand, ce->proc);
@@ -3318,6 +3373,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case_end;
 
 	case_ast_node(cl, CompoundLit, node);
+		PROF_SCOPED("check__expr_base - CompoundLit");
+
 		Type *type = type_hint;
 		b32 ellipsis_array = false;
 		b32 is_constant = true;
@@ -3557,6 +3614,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 
 	case_ast_node(ie, IndexExpr, node);
+		PROF_SCOPED("check__expr_base - IndexExpr");
+
 		check_expr(c, o, ie->expr);
 		if (o->mode == Addressing_Invalid) {
 			goto error;
@@ -3638,6 +3697,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 
 	case_ast_node(se, SliceExpr, node);
+		PROF_SCOPED("check__expr_base - SliceExpr");
+
 		check_expr(c, o, se->expr);
 		if (o->mode == Addressing_Invalid)
 			goto error;

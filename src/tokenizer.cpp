@@ -346,6 +346,8 @@ void advance_to_next_rune(Tokenizer *t) {
 }
 
 TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
+	PROF_PROC();
+
 	char *c_str = gb_alloc_array(gb_heap_allocator(), char, fullpath.len+1);
 	memcpy(c_str, fullpath.text, fullpath.len);
 	c_str[fullpath.len] = '\0';

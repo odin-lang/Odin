@@ -2848,15 +2848,18 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 	TokenizerInitError err = init_tokenizer(&f->tokenizer, fullpath);
 	if (err == TokenizerInit_None) {
 		array_init(&f->tokens, gb_heap_allocator());
-		for (;;) {
-			Token token = tokenizer_get_token(&f->tokenizer);
-			if (token.kind == Token_Invalid) {
-				return ParseFile_InvalidToken;
-			}
-			array_add(&f->tokens, token);
+		{
+			PROF_SCOPED("Tokenize file");
+			for (;;) {
+				Token token = tokenizer_get_token(&f->tokenizer);
+				if (token.kind == Token_Invalid) {
+					return ParseFile_InvalidToken;
+				}
+				array_add(&f->tokens, token);
 
-			if (token.kind == Token_EOF) {
-				break;
+				if (token.kind == Token_EOF) {
+					break;
+				}
 			}
 		}
 
@@ -3044,6 +3047,8 @@ String get_filepath_extension(String path) {
 }
 
 void parse_file(Parser *p, AstFile *f) {
+	PROF_PROC();
+
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = filepath;
 	for (isize i = filepath.len-1; i >= 0; i--) {

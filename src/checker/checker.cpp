@@ -551,6 +551,8 @@ void destroy_checker_info(CheckerInfo *i) {
 
 
 void init_checker(Checker *c, Parser *parser, BaseTypeSizes sizes) {
+	PROF_PROC();
+
 	gbAllocator a = gb_heap_allocator();
 
 	c->parser = parser;
@@ -890,6 +892,8 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 #include "stmt.cpp"
 
 void init_preload_types(Checker *c) {
+	PROF_PROC();
+
 	if (t_type_info == NULL) {
 		Entity *e = current_scope_lookup_entity(c->global_scope, make_string("Type_Info"));
 		if (e == NULL) {
@@ -947,7 +951,6 @@ void init_preload_types(Checker *c) {
 }
 
 void check_parsed_files(Checker *c) {
-
 	Array<AstNode *> import_decls;
 	array_init(&import_decls, gb_heap_allocator());
 	defer (array_free(&import_decls));
@@ -983,6 +986,8 @@ void check_parsed_files(Checker *c) {
 
 	// Collect Entities
 	for_array(i, c->parser->files) {
+		PROF_SCOPED("Collect Entities");
+
 		AstFile *f = &c->parser->files[i];
 		add_curr_ast_file(c, f);
 
@@ -1090,6 +1095,8 @@ void check_parsed_files(Checker *c) {
 	}
 
 	for_array(i, c->parser->files) {
+		PROF_SCOPED("Import Entities");
+
 		AstFile *f = &c->parser->files[i];
 		add_curr_ast_file(c, f);
 
@@ -1186,6 +1193,7 @@ void check_parsed_files(Checker *c) {
 	}
 
 	auto check_global_entity = [](Checker *c, EntityKind kind) {
+		PROF_SCOPED("check_global_entity");
 		for_array(i, c->info.entities.entries) {
 			auto *entry = &c->info.entities.entries[i];
 			Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
@@ -1242,24 +1250,10 @@ void check_parsed_files(Checker *c) {
 		check_proc_body(c, pi->token, pi->decl, pi->type, pi->body);
 	}
 
-	if (false) {
-		gb_printf("Dependency graph:\n");
-		for_array(i, c->info.entities.entries) {
-			auto *entry = &c->info.entities.entries[i];
-			Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
-			DeclInfo *d = entry->value;
-			if (d->deps.entries.count > 0) {
-				gb_printf("\t%.*s depends on\n", LIT(e->token.string));
-				for_array(j, d->deps.entries) {
-					Entity *e = cast(Entity *)cast(uintptr)d->deps.entries[j].key.key;
-					gb_printf("\t\t%.*s\n", LIT(e->token.string));
-				}
-			}
-		}
-	}
-
 	// Add untyped expression values
 	for_array(i, c->info.untyped.entries) {
+		PROF_SCOPED("Untyped expr values");
+
 		auto *entry = &c->info.untyped.entries[i];
 		HashKey key = entry->key;
 		AstNode *expr = cast(AstNode *)cast(uintptr)key.key;

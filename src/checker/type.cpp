@@ -918,7 +918,9 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 				String str = f->token.string;
 
 				if (field_name == str) {
-					Selection sel = {f, {}, i};
+					Selection sel = {};
+					sel.entity = f;
+					selection_add_index(&sel, i);
 					return sel;
 				}
 			}
@@ -930,7 +932,9 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 			String str = f->token.string;
 
 			if (field_name == str) {
-				Selection sel = {f, {}, i};
+				Selection sel = {};
+				sel.entity = f;
+				selection_add_index(&sel, i);
 				return sel;
 			}
 		}
