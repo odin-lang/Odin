@@ -2,6 +2,7 @@ struct ssaModule;
 struct ssaProcedure;
 struct ssaBlock;
 struct ssaValue;
+struct ssaInstr;
 
 
 enum ssaDebugInfoKind {
@@ -67,16 +68,23 @@ struct ssaModule {
 	Array<ssaValue *> procs; // NOTE(bill): Procedures to generate
 };
 
+// NOTE(bill): For more info, see https://en.wikipedia.org/wiki/Dominator_(graph_theory)
+struct ssaDomNode {
+	ssaBlock *idom; // Parent
+	Array<ssaBlock *> children;
+	i32 pre, post; // Ordering in tree
+};
+
 
 struct ssaBlock {
-	isize index;
-	AstNode *node;
-	Scope *scope;
-	isize scope_index;
-	String label;
+	i32           index;
+	String        label;
 	ssaProcedure *parent;
-	b32 added;
-	b32 is_dead;
+	AstNode *     node; // Can be NULL
+	Scope *       scope;
+	isize         scope_index;
+	ssaDomNode    dom;
+	i32           gaps;
 
 	Array<ssaValue *> instrs;
 	Array<ssaValue *> locals;
@@ -132,6 +140,7 @@ struct ssaProcedure {
 	ssaBlock *          entry_block;
 	ssaBlock *          curr_block;
 	ssaTargetList *     target_list;
+	Array<ssaValue *>   referrers;
 };
 
 #define SSA_STARTUP_RUNTIME_PROC_NAME  "__$startup_runtime"
@@ -213,11 +222,11 @@ struct ssaInstr {
 		struct {
 			String text;
 		} Comment;
-
 		struct {
-			Entity *entity;
-			Type *  type;
-			b32     zero_initialized;
+			Entity *          entity;
+			Type *            type;
+			b32               zero_initialized;
+			Array<ssaValue *> referrers;
 		} Local;
 		struct {
 			ssaValue *address;
@@ -247,7 +256,7 @@ struct ssaInstr {
 		struct {
 			ssaValue *value;
 			ssaValue *elem;
-			ssaValue *index;
+			i32       index;
 		} InsertValue;
 		struct {
 			ssaConvKind kind;
@@ -346,11 +355,13 @@ struct ssaValue {
 			Entity *  entity;
 			Type *    type;
 			ssaValue *value;
+			Array<ssaValue *> referrers;
 		} Global;
 		struct {
 			ssaProcedure *parent;
 			Entity *entity;
 			Type *  type;
+			Array<ssaValue *> referrers;
 		} Param;
 		ssaProcedure Proc;
 		ssaBlock     Block;
@@ -575,6 +586,113 @@ void ssa_set_instr_parent(ssaValue *instr, ssaBlock *parent) {
 	}
 }
 
+Array<ssaValue *> *ssa_value_referrers(ssaValue *v) {
+	switch (v->kind) {
+	case ssaValue_Global:
+		return &v->Global.referrers;
+	case ssaValue_Param:
+		return &v->Param.referrers;
+	case ssaValue_Proc: {
+		if (v->Proc.parent != NULL) {
+			return &v->Proc.referrers;
+		}
+		return NULL;
+	}
+	case ssaValue_Instr: {
+		ssaInstr *i = &v->Instr;
+		switch (i->kind) {
+		case ssaInstr_Local:
+			return &i->Local.referrers;
+		}
+	} break;
+	}
+
+	return NULL;
+}
+
+
+void ssa_add_operands(Array<ssaValue *> *ops, ssaInstr *i) {
+	switch (i->kind) {
+	case ssaInstr_Comment:
+		break;
+	case ssaInstr_Local:
+		break;
+	case ssaInstr_ZeroInit:
+		array_add(ops, i->ZeroInit.address);
+		break;
+	case ssaInstr_Store:
+		array_add(ops, i->Store.address);
+		array_add(ops, i->Store.value);
+		break;
+	case ssaInstr_Load:
+		array_add(ops, i->Load.address);
+		break;
+	case ssaInstr_GetElementPtr:
+		array_add(ops, i->GetElementPtr.address);
+		for (isize index = 0; index < i->GetElementPtr.index_count; index++) {
+			array_add(ops, i->GetElementPtr.indices[index]);
+		}
+		break;
+	case ssaInstr_ExtractValue:
+		array_add(ops, i->ExtractValue.address);
+		break;
+	case ssaInstr_InsertValue:
+		array_add(ops, i->InsertValue.value);
+		break;
+	case ssaInstr_Conv:
+		array_add(ops, i->Conv.value);
+		break;
+	case ssaInstr_Br:
+		if (i->Br.cond) {
+			array_add(ops, i->Br.cond);
+		}
+		break;
+	case ssaInstr_Ret:
+		if (i->Ret.value) {
+			array_add(ops, i->Ret.value);
+		}
+		break;
+	case ssaInstr_Select:
+		array_add(ops, i->Select.cond);
+		break;
+	case ssaInstr_Phi:
+		for_array(j, i->Phi.edges) {
+			array_add(ops, i->Phi.edges[j]);
+		}
+		break;
+	case ssaInstr_Unreachable: break;
+	case ssaInstr_BinaryOp:
+		array_add(ops, i->BinaryOp.left);
+		array_add(ops, i->BinaryOp.right);
+		break;
+	case ssaInstr_Call:
+		array_add(ops, i->Call.value);
+		for (isize j = 0; j < i->Call.arg_count; j++) {
+			array_add(ops, i->Call.args[j]);
+		}
+		break;
+	case ssaInstr_NoOp: break;
+	case ssaInstr_ExtractElement:
+		array_add(ops, i->ExtractElement.vector);
+		array_add(ops, i->ExtractElement.index);
+		break;
+	case ssaInstr_InsertElement:
+		array_add(ops, i->InsertElement.vector);
+		array_add(ops, i->InsertElement.elem);
+		array_add(ops, i->InsertElement.index);
+		break;
+	case ssaInstr_ShuffleVector:
+		array_add(ops, i->ShuffleVector.vector);
+		break;
+	case ssaInstr_StartupRuntime:
+		break;
+	}
+}
+
+
+
+
+
 ssaDebugInfo *ssa_add_debug_info_file(ssaProcedure *proc, AstFile *file) {
 	if (!proc->module->generate_debug_info) {
 		return NULL;
@@ -660,6 +778,7 @@ ssaValue *ssa_make_value_global(gbAllocator a, Entity *e, ssaValue *value) {
 	v->Global.entity = e;
 	v->Global.type = make_type_pointer(a, e->type);
 	v->Global.value = value;
+	array_init(&v->Global.referrers, gb_heap_allocator()); // TODO(bill): Replace heap allocator here
 	return v;
 }
 ssaValue *ssa_make_value_param(gbAllocator a, ssaProcedure *parent, Entity *e) {
@@ -667,6 +786,7 @@ ssaValue *ssa_make_value_param(gbAllocator a, ssaProcedure *parent, Entity *e) {
 	v->Param.parent = parent;
 	v->Param.entity = e;
 	v->Param.type   = e->type;
+	array_init(&v->Param.referrers, gb_heap_allocator()); // TODO(bill): Replace heap allocator here
 	return v;
 }
 ssaValue *ssa_make_value_nil(gbAllocator a, Type *type) {
@@ -683,6 +803,7 @@ ssaValue *ssa_make_instr_local(ssaProcedure *p, Entity *e, b32 zero_initialized)
 	i->Local.entity = e;
 	i->Local.type = make_type_pointer(p->module->allocator, e->type);
 	i->Local.zero_initialized = zero_initialized;
+	array_init(&i->Local.referrers, gb_heap_allocator()); // TODO(bill): Replace heap allocator here
 	ssa_module_add_value(p->module, e, v);
 	return v;
 }
@@ -738,7 +859,7 @@ ssaValue *ssa_make_instr_extract_value(ssaProcedure *p, ssaValue *address, i32 i
 	// GB_ASSERT(et->kind == Type_Struct || et->kind == Type_Array || et->kind == Type_Tuple);
 	return v;
 }
-ssaValue *ssa_make_instr_insert_value(ssaProcedure *p, ssaValue *value, ssaValue *elem, ssaValue *index) {
+ssaValue *ssa_make_instr_insert_value(ssaProcedure *p, ssaValue *value, ssaValue *elem, i32 index) {
 	Type *t = ssa_type(value);
 	GB_ASSERT(is_type_array(t) || is_type_struct(t));
 	ssaValue *v = ssa_alloc_instr(p, ssaInstr_InsertValue);
@@ -925,6 +1046,7 @@ ssaValue *ssa_make_value_procedure(gbAllocator a, ssaModule *m, Entity *entity, 
 	v->Proc.type_expr = type_expr;
 	v->Proc.body   = body;
 	v->Proc.name   = name;
+	array_init(&v->Proc.referrers, gb_heap_allocator(), 0); // TODO(bill): replace heap allocator
 	return v;
 }
 
@@ -1281,165 +1403,10 @@ void ssa_begin_procedure_body(ssaProcedure *proc) {
 }
 
 
-b32 ssa_is_instr_jump(ssaValue *v) {
-	if (v->kind != ssaValue_Instr) {
-		return false;
-	}
-	ssaInstr *i = &v->Instr;
-	if (i->kind != ssaInstr_Br) {
-		return false;
-	}
-
-	return i->Br.false_block == NULL;
-}
-
-Array<ssaValue *> ssa_get_block_phi_nodes(ssaBlock *b) {
-	Array<ssaValue *> phis = {};
-	for_array(i, b->instrs) {
-		ssaInstr *instr = &b->instrs[i]->Instr;
-		if (instr->kind != ssaInstr_Phi) {
-			phis = b->instrs;
-			phis.count = i;
-			return phis;
-		}
-	}
-	return phis;
-}
-
-void ssa_remove_pred(ssaBlock *b, ssaBlock *p) {
-	auto phis = ssa_get_block_phi_nodes(b);
-
-	isize i = 0;
-	for_array(j, b->preds) {
-		ssaBlock *pred = b->preds[j];
-		if (pred != p) {
-			b->preds[i] = b->preds[j];
-			for_array(k, phis) {
-				auto *phi = &phis[k]->Instr.Phi;
-				phi->edges[i] = phi->edges[j];
-			}
-			i++;
-		}
-	}
-
-	b->preds.count = i;
-	for_array(k, phis) {
-		auto *phi = &phis[k]->Instr.Phi;
-		phi->edges.count = i;
-	}
-
-}
-
-void ssa_remove_dead_blocks(ssaProcedure *proc) {
-	isize j = 0;
-	for_array(i, proc->blocks) {
-		ssaBlock *b = proc->blocks[i];
-		if (b == NULL || b->is_dead) {
-			continue;
-		}
-		// NOTE(bill): Swap order
-		b->index = j;
-		proc->blocks[j++] = b;
-	}
-
-	proc->blocks.count = j;
-}
-
-void ssa_mark_reachable(ssaBlock *b) {
-	isize const WHITE =  0;
-	isize const BLACK = -1;
-	b->index = BLACK;
-	for_array(i, b->succs) {
-		ssaBlock *succ = b->succs[i];
-		if (succ->index == WHITE) {
-			ssa_mark_reachable(succ);
-		}
-	}
-}
-
-void ssa_remove_unreachable_blocks(ssaProcedure *proc) {
-	isize const WHITE =  0;
-	isize const BLACK = -1;
-	for_array(i, proc->blocks) {
-		proc->blocks[i]->index = WHITE;
-	}
-
-	ssa_mark_reachable(proc->blocks[0]);
-
-	for_array(i, proc->blocks) {
-		ssaBlock *b = proc->blocks[i];
-		if (b->index == WHITE) {
-			for_array(j, b->succs) {
-				ssaBlock *c = b->succs[j];
-				if (c->index == BLACK) {
-					ssa_remove_pred(c, b);
-				}
-			}
-			// NOTE(bill): Mark as empty but don't actually free it
-			// As it's been allocated with an arena
-			b->is_dead = true;
-		}
-	}
-	ssa_remove_dead_blocks(proc);
-}
-
-b32 ssa_opt_block_fusion(ssaProcedure *proc, ssaBlock *a) {
-	if (a->succs.count != 1) {
-		return false;
-	}
-	ssaBlock *b = a->succs[0];
-	if (b->preds.count != 1) {
-		return false;
-	}
-
-	if (ssa_block_has_phi(b)) {
-		return false;
-	}
-
-	array_pop(&a->instrs); // Remove branch at end
-	for_array(i, b->instrs) {
-		array_add(&a->instrs, b->instrs[i]);
-		ssa_set_instr_parent(b->instrs[i], a);
-	}
-
-	array_clear(&a->succs);
-	for_array(i, b->succs) {
-		array_add(&a->succs, b->succs[i]);
-	}
-
-	// Fix preds links
-	for_array(i, b->succs) {
-		ssa_block_replace_pred(b->succs[i], b, a);
-	}
-
-	proc->blocks[b->index]->is_dead = true;
-	return true;
-}
-
-void ssa_optimize_blocks(ssaProcedure *proc) {
-	ssa_remove_unreachable_blocks(proc);
-
-#if 1
-	b32 changed = true;
-	while (changed) {
-		changed = false;
-		for_array(i, proc->blocks) {
-			ssaBlock *b = proc->blocks[i];
-			if (b == NULL) {
-				continue;
-			}
-			GB_ASSERT(b->index == i);
-
-			if (ssa_opt_block_fusion(proc, b)) {
-				changed = true;
-			}
-			// TODO(bill): other simple block optimizations
-		}
-	}
-#endif
-
-	ssa_remove_dead_blocks(proc);
-}
+void ssa_optimize_blocks(ssaProcedure *proc);
+void ssa_build_referrers(ssaProcedure *proc);
+void ssa_build_dom_tree (ssaProcedure *proc);
+void ssa_opt_mem2reg    (ssaProcedure *proc);
 
 void ssa_end_procedure_body(ssaProcedure *proc) {
 	if (proc->type->Proc.result_count == 0) {
@@ -1454,6 +1421,16 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 	ssa_emit_jump(proc, proc->entry_block);
 
 	ssa_optimize_blocks(proc);
+	ssa_build_referrers(proc);
+	ssa_build_dom_tree(proc);
+
+	// TODO(bill): mem2reg optimization
+	// [ ] Local never loaded? Eliminate
+	// [ ] Local never stored? Replace all loads with `Nil`
+	// [ ] Local stored once?  Replace loads with dominating store
+	// [ ] Convert to phi nodes
+	ssa_opt_mem2reg(proc);
+
 
 // Number registers
 	i32 reg_index = 0;
@@ -4272,4 +4249,361 @@ void ssa_build_proc(ssaValue *value, ssaProcedure *parent) {
 		ssa_build_stmt(proc, proc->body);
 		ssa_end_procedure_body(proc);
 	}
+}
+
+
+
+
+
+
+
+
+
+
+
+b32 ssa_is_instr_jump(ssaValue *v) {
+	if (v->kind != ssaValue_Instr) {
+		return false;
+	}
+	ssaInstr *i = &v->Instr;
+	if (i->kind != ssaInstr_Br) {
+		return false;
+	}
+
+	return i->Br.false_block == NULL;
+}
+
+Array<ssaValue *> ssa_get_block_phi_nodes(ssaBlock *b) {
+	Array<ssaValue *> phis = {};
+	for_array(i, b->instrs) {
+		ssaInstr *instr = &b->instrs[i]->Instr;
+		if (instr->kind != ssaInstr_Phi) {
+			phis = b->instrs;
+			phis.count = i;
+			return phis;
+		}
+	}
+	return phis;
+}
+
+void ssa_remove_pred(ssaBlock *b, ssaBlock *p) {
+	auto phis = ssa_get_block_phi_nodes(b);
+
+	isize i = 0;
+	for_array(j, b->preds) {
+		ssaBlock *pred = b->preds[j];
+		if (pred != p) {
+			b->preds[i] = b->preds[j];
+			for_array(k, phis) {
+				auto *phi = &phis[k]->Instr.Phi;
+				phi->edges[i] = phi->edges[j];
+			}
+			i++;
+		}
+	}
+
+	b->preds.count = i;
+	for_array(k, phis) {
+		auto *phi = &phis[k]->Instr.Phi;
+		phi->edges.count = i;
+	}
+
+}
+
+void ssa_remove_dead_blocks(ssaProcedure *proc) {
+	isize j = 0;
+	for_array(i, proc->blocks) {
+		ssaBlock *b = proc->blocks[i];
+		if (b == NULL) {
+			continue;
+		}
+		// NOTE(bill): Swap order
+		b->index = j;
+		proc->blocks[j++] = b;
+	}
+
+	proc->blocks.count = j;
+}
+
+void ssa_mark_reachable(ssaBlock *b) {
+	isize const WHITE =  0;
+	isize const BLACK = -1;
+	b->index = BLACK;
+	for_array(i, b->succs) {
+		ssaBlock *succ = b->succs[i];
+		if (succ->index == WHITE) {
+			ssa_mark_reachable(succ);
+		}
+	}
+}
+
+void ssa_remove_unreachable_blocks(ssaProcedure *proc) {
+	isize const WHITE =  0;
+	isize const BLACK = -1;
+	for_array(i, proc->blocks) {
+		proc->blocks[i]->index = WHITE;
+	}
+
+	ssa_mark_reachable(proc->blocks[0]);
+
+	for_array(i, proc->blocks) {
+		ssaBlock *b = proc->blocks[i];
+		if (b->index == WHITE) {
+			for_array(j, b->succs) {
+				ssaBlock *c = b->succs[j];
+				if (c->index == BLACK) {
+					ssa_remove_pred(c, b);
+				}
+			}
+			// NOTE(bill): Mark as empty but don't actually free it
+			// As it's been allocated with an arena
+			proc->blocks[i] = NULL;
+		}
+	}
+	ssa_remove_dead_blocks(proc);
+}
+
+b32 ssa_opt_block_fusion(ssaProcedure *proc, ssaBlock *a) {
+	if (a->succs.count != 1) {
+		return false;
+	}
+	ssaBlock *b = a->succs[0];
+	if (b->preds.count != 1) {
+		return false;
+	}
+
+	if (ssa_block_has_phi(b)) {
+		return false;
+	}
+
+	array_pop(&a->instrs); // Remove branch at end
+	for_array(i, b->instrs) {
+		array_add(&a->instrs, b->instrs[i]);
+		ssa_set_instr_parent(b->instrs[i], a);
+	}
+
+	array_clear(&a->succs);
+	for_array(i, b->succs) {
+		array_add(&a->succs, b->succs[i]);
+	}
+
+	// Fix preds links
+	for_array(i, b->succs) {
+		ssa_block_replace_pred(b->succs[i], b, a);
+	}
+
+	proc->blocks[b->index] = NULL;
+	return true;
+}
+
+void ssa_optimize_blocks(ssaProcedure *proc) {
+	ssa_remove_unreachable_blocks(proc);
+
+#if 1
+	b32 changed = true;
+	while (changed) {
+		changed = false;
+		for_array(i, proc->blocks) {
+			ssaBlock *b = proc->blocks[i];
+			if (b == NULL) {
+				continue;
+			}
+			GB_ASSERT(b->index == i);
+
+			if (ssa_opt_block_fusion(proc, b)) {
+				changed = true;
+			}
+			// TODO(bill): other simple block optimizations
+		}
+	}
+#endif
+
+	ssa_remove_dead_blocks(proc);
+}
+void ssa_build_referrers(ssaProcedure *proc) {
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
+	Array<ssaValue *> ops = {}; // NOTE(bill): Act as a buffer
+	array_init(&ops, proc->module->tmp_allocator, 64); // HACK(bill): This _could_ overflow the temp arena
+	for_array(i, proc->blocks) {
+		ssaBlock *b = proc->blocks[i];
+		for_array(j, b->instrs) {
+			ssaValue *instr = b->instrs[j];
+			array_clear(&ops);
+			ssa_add_operands(&ops, &instr->Instr);
+			for_array(k, ops) {
+				ssaValue *op = ops[k];
+				if (op == NULL) {
+					continue;
+				}
+				auto *refs = ssa_value_referrers(op);
+				if (refs != NULL) {
+					array_add(refs, instr);
+				}
+			}
+		}
+	}
+}
+
+
+
+
+
+
+
+// State of Lengauer-Tarjan algorithm
+// Based on this paper: http://jgaa.info/accepted/2006/GeorgiadisTarjanWerneck2006.10.1.pdf
+struct ssaLTState {
+	isize count;
+	// NOTE(bill): These are arrays
+	ssaBlock **sdom;     // Semidominator
+	ssaBlock **parent;   // Parent in DFS traversal of CFG
+	ssaBlock **ancestor;
+};
+
+// §2.2 - bottom of page
+void ssa_lt_link(ssaLTState *lt, ssaBlock *p, ssaBlock *q) {
+	lt->ancestor[q->index] = p;
+}
+
+i32 ssa_lt_depth_first_search(ssaLTState *lt, ssaBlock *p, i32 i, ssaBlock **preorder) {
+	preorder[i] = p;
+	p->dom.pre = i;
+	i++;
+	lt->sdom[p->index] = p;
+	ssa_lt_link(lt, NULL, p);
+	for_array(index, p->succs) {
+		ssaBlock *q = p->succs[index];
+		if (lt->sdom[q->index] == NULL) {
+			lt->parent[q->index] = p;
+			i = ssa_lt_depth_first_search(lt, q, i, preorder);
+		}
+	}
+	return i;
+}
+
+ssaBlock *ssa_lt_eval(ssaLTState *lt, ssaBlock *v) {
+	ssaBlock *u = v;
+	for (;
+	     lt->ancestor[v->index] != NULL;
+	     v = lt->ancestor[v->index]) {
+		if (lt->sdom[v->index]->dom.pre < lt->sdom[u->index]->dom.pre) {
+			u = v;
+		}
+	}
+	return u;
+}
+
+void ssa_number_dom_tree(ssaBlock *v, i32 pre, i32 post, i32 *pre_out, i32 *post_out) {
+	v->dom.pre = pre;
+	pre++;
+	for_array(i, v->dom.children) {
+		ssaBlock *child = v->dom.children[i];
+		i32 new_pre = 0, new_post = 0;
+		ssa_number_dom_tree(child, pre, post, &new_pre, &new_post);
+		pre = new_pre;
+		post = new_post;
+	}
+	v->dom.post = post;
+	post++;
+	*pre_out  = pre;
+	*post_out = post;
+}
+
+
+// NOTE(bill): Requires `ssa_optimize_blocks` to be called before this
+void ssa_build_dom_tree(ssaProcedure *proc) {
+	// Based on this paper: http://jgaa.info/accepted/2006/GeorgiadisTarjanWerneck2006.10.1.pdf
+
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
+	isize n = proc->blocks.count;
+	ssaBlock **buf = gb_alloc_array(proc->module->tmp_allocator, ssaBlock *, 5*n);
+
+	ssaLTState lt = {};
+	lt.count    = n;
+	lt.sdom     = &buf[0*n];
+	lt.parent   = &buf[1*n];
+	lt.ancestor = &buf[2*n];
+
+	ssaBlock **preorder = &buf[3*n];
+	ssaBlock **buckets  = &buf[4*n];
+	ssaBlock *root = proc->blocks[0];
+
+	// Step 1 - number vertices
+	i32 pre_num = ssa_lt_depth_first_search(&lt, root, 0, preorder);
+	gb_memcopy(buckets, preorder, n*gb_size_of(preorder[0]));
+
+	for (i32 i = n-1; i > 0; i--) {
+		ssaBlock *w = preorder[i];
+
+		// Step 3 - Implicitly define idom for nodes
+		for (ssaBlock *v = buckets[i]; v != w; v = buckets[v->dom.pre]) {
+			ssaBlock *u = ssa_lt_eval(&lt, v);
+			if (lt.sdom[u->index]->dom.pre < i) {
+				v->dom.idom = u;
+			} else {
+				v->dom.idom = w;
+			}
+		}
+
+		// Step 2 - Compute all sdoms
+		lt.sdom[w->index] = lt.parent[w->index];
+		for_array(pred_index, w->preds) {
+			ssaBlock *v = w->preds[pred_index];
+			ssaBlock *u = ssa_lt_eval(&lt, v);
+			if (lt.sdom[u->index]->dom.pre < lt.sdom[w->index]->dom.pre) {
+				lt.sdom[w->index] = lt.sdom[u->index];
+			}
+		}
+
+		ssa_lt_link(&lt, lt.parent[w->index], w);
+
+		if (lt.parent[w->index] == lt.sdom[w->index]) {
+			w->dom.idom = lt.parent[w->index];
+		} else {
+			buckets[i] = buckets[lt.sdom[w->index]->dom.pre];
+			buckets[lt.sdom[w->index]->dom.pre] = w;
+		}
+	}
+
+	// The rest of Step 3
+	for (ssaBlock *v = buckets[0]; v != root; v = buckets[v->dom.pre]) {
+		v->dom.idom = root;
+	}
+
+	// Step 4 - Explicitly define idom for nodes (in preorder)
+	for (isize i = 1; i < n; i++) {
+		ssaBlock *w = preorder[i];
+		if (w == root) {
+			w->dom.idom = NULL;
+		} else {
+			// Weird tree relationships here!
+
+			if (w->dom.idom != lt.sdom[w->index]) {
+				w->dom.idom = w->dom.idom->dom.idom;
+			}
+
+			// Calculate children relation as inverse of idom
+			auto *children = &w->dom.idom->dom.children;
+			if (children->data == NULL) {
+				// TODO(bill): Is this good enough for memory allocations?
+				array_init(children, gb_heap_allocator());
+			}
+			array_add(children, w);
+		}
+	}
+
+	i32 pre = 0;
+	i32 pos = 0;
+	ssa_number_dom_tree(root, 0, 0, &pre, &pos);
+}
+
+
+
+
+void ssa_opt_mem2reg(ssaProcedure *proc) {
+
 }

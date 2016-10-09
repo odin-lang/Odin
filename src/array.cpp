@@ -18,14 +18,15 @@ struct Array {
 	}
 };
 
-template <typename T> void array_init        (Array<T> *array, gbAllocator a, isize init_capacity = 8);
-template <typename T> void array_free        (Array<T> *array);
-template <typename T> void array_add         (Array<T> *array, T const &t);
-template <typename T> T    array_pop         (Array<T> *array);
-template <typename T> void array_clear       (Array<T> *array);
-template <typename T> void array_reserve     (Array<T> *array, isize capacity);
-template <typename T> void array_resize      (Array<T> *array, isize count);
-template <typename T> void array_set_capacity(Array<T> *array, isize capacity);
+template <typename T> void     array_init        (Array<T> *array, gbAllocator a, isize init_capacity = 8);
+template <typename T> Array<T> array_make        (T *data, isize count, isize capacity);
+template <typename T> void     array_free        (Array<T> *array);
+template <typename T> void     array_add         (Array<T> *array, T const &t);
+template <typename T> T        array_pop         (Array<T> *array);
+template <typename T> void     array_clear       (Array<T> *array);
+template <typename T> void     array_reserve     (Array<T> *array, isize capacity);
+template <typename T> void     array_resize      (Array<T> *array, isize count);
+template <typename T> void     array_set_capacity(Array<T> *array, isize capacity);
 
 
 template <typename T>
@@ -37,8 +38,20 @@ void array_init(Array<T> *array, gbAllocator a, isize init_capacity) {
 }
 
 template <typename T>
+Array<T> array_make(T *data, isize count, isize capacity) {
+	Array<T> a = {};
+	a.data = data;
+	a.count = count;
+	a.capacity = capacity;
+	return a;
+}
+
+
+template <typename T>
 void array_free(Array<T> *array) {
-	gb_free(array->allocator, array->data);
+	if (array->allocator.proc != NULL) {
+		gb_free(array->allocator, array->data);
+	}
 	array->count = 0;
 	array->capacity = 0;
 }
