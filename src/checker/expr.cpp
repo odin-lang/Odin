@@ -973,6 +973,10 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 		o->mode = Addressing_Value;
 		break;
 
+	case Entity_ImplicitValue:
+		o->mode = Addressing_Value;
+		break;
+
 	default:
 		compiler_error("Compiler error: Unknown EntityKind");
 		break;
@@ -1708,7 +1712,7 @@ String check_down_cast_name(Type *dst_, Type *src_) {
 	GB_ASSERT(is_type_struct(dst_s) || is_type_raw_union(dst_s));
 	for (isize i = 0; i < dst_s->Record.field_count; i++) {
 		Entity *f = dst_s->Record.fields[i];
-		GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
+		GB_ASSERT(f->kind == Entity_Variable && f->Variable.field);
 		if (f->Variable.anonymous) {
 			if (are_types_identical(f->type, src_)) {
 				return f->token.string;
@@ -2216,6 +2220,8 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 
 	b32 check_op_expr = true;
 	Entity *entity = NULL;
+	Selection sel = {}; // NOTE(bill): Not used if it's an import name
+
 
 	AstNode *op_expr  = se->expr;
 	AstNode *selector = unparen_expr(se->selector);
@@ -2267,8 +2273,10 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 		}
 	}
 
+
 	if (entity == NULL) {
-		entity = lookup_field(c->allocator, operand->type, selector->Ident.string, operand->mode == Addressing_Type).entity;
+		sel = lookup_field(c->allocator, operand->type, selector->Ident.string, operand->mode == Addressing_Type);
+		entity = sel.entity;
 	}
 	if (entity == NULL) {
 		gbString op_str   = expr_to_string(op_expr);
@@ -2284,15 +2292,16 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 
 	add_entity_use(c, selector, entity);
 
-	operand->type = entity->type;
-	operand->expr = node;
 	switch (entity->kind) {
 	case Entity_Constant:
 		operand->mode = Addressing_Constant;
 		operand->value = entity->Constant.value;
 		break;
 	case Entity_Variable:
-		operand->mode = Addressing_Variable;
+		// TODO(bill): This is the rule I need?
+		if (sel.indirect || operand->mode != Addressing_Value) {
+			operand->mode = Addressing_Variable;
+		}
 		break;
 	case Entity_TypeName:
 		operand->mode = Addressing_Type;
@@ -2304,7 +2313,18 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 		operand->mode = Addressing_Builtin;
 		operand->builtin_id = entity->Builtin.id;
 		break;
+
+	// NOTE(bill): These cases should never be hit but are here for sanity reasons
+	case Entity_Nil:
+		operand->mode = Addressing_Value;
+		break;
+	case Entity_ImplicitValue:
+		operand->mode = Addressing_Value;
+		break;
 	}
+
+	operand->type = entity->type;
+	operand->expr = node;
 
 	return entity;
 
@@ -2473,15 +2493,15 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			error(ast_node_token(ce->args[0]), "Expected a type for `offset_of`");
 			return false;
 		}
-		if (!is_type_struct(type)) {
-			error(ast_node_token(ce->args[0]), "Expected a struct type for `offset_of`");
-			return false;
-		}
 
 		AstNode *field_arg = unparen_expr(ce->args[1]);
 		if (field_arg == NULL ||
 		    field_arg->kind != AstNode_Ident) {
 			error(ast_node_token(field_arg), "Expected an identifier for field argument");
+			return false;
+		}
+		if (is_type_array(type) || is_type_vector(type)) {
+			error(ast_node_token(field_arg), "Invalid type for `offset_of`");
 			return false;
 		}
 
@@ -2495,10 +2515,16 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			      "`%s` has no field named `%.*s`", type_str, LIT(arg->string));
 			return false;
 		}
+		if (sel.indirect) {
+			gbString type_str = type_to_string(bt);
+			defer (gb_string_free(type_str));
+			error(ast_node_token(ce->args[0]),
+			      "Field `%.*s` is embedded via a pointer in `%s`", LIT(arg->string), type_str);
+			return false;
+		}
 
 		operand->mode = Addressing_Constant;
-		// IMPORTANT TODO(bill): Fix for anonymous fields
-		operand->value = make_exact_value_integer(type_offset_of(c->sizes, c->allocator, type, sel.index[0]));
+		operand->value = make_exact_value_integer(type_offset_of_from_selection(c->sizes, c->allocator, type, sel));
 		operand->type  = t_int;
 	} break;
 
@@ -2523,12 +2549,10 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 				type = p->Pointer.elem;
 			}
 		}
-
-		if (!is_type_struct(type)) {
-			error(ast_node_token(ce->args[0]), "Expected a struct type for `offset_of_val`");
+		if (is_type_array(type) || is_type_vector(type)) {
+			error(ast_node_token(arg), "Invalid type for `offset_of_val`");
 			return false;
 		}
-
 
 		ast_node(i, Ident, s->selector);
 		Selection sel = lookup_field(c->allocator, type, i->string, operand->mode == Addressing_Type);
@@ -2538,10 +2562,18 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			      "`%s` has no field named `%.*s`", type_str, LIT(i->string));
 			return false;
 		}
+		if (sel.indirect) {
+			gbString type_str = type_to_string(type);
+			defer (gb_string_free(type_str));
+			error(ast_node_token(ce->args[0]),
+			      "Field `%.*s` is embedded via a pointer in `%s`", LIT(i->string), type_str);
+			return false;
+		}
+
 
 		operand->mode = Addressing_Constant;
 		// IMPORTANT TODO(bill): Fix for anonymous fields
-		operand->value = make_exact_value_integer(type_offset_of(c->sizes, c->allocator, type, sel.index[0]));
+		operand->value = make_exact_value_integer(type_offset_of_from_selection(c->sizes, c->allocator, type, sel));
 		operand->type  = t_int;
 	} break;
 
@@ -3227,7 +3259,7 @@ Entity *find_using_index_expr(Type *t) {
 	for (isize i = 0; i < t->Record.field_count; i++) {
 		Entity *f = t->Record.fields[i];
 		if (f->kind == Entity_Variable &&
-		    f->Variable.is_field && f->Variable.anonymous) {
+		    f->Variable.field && f->Variable.anonymous) {
 			if (is_type_indexable(f->type)) {
 				return f;
 			}
@@ -3632,8 +3664,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 					if (o->mode == Addressing_Constant) {
 						*max_count = o->value.value_string.len;
 					}
-					if (o->mode != Addressing_Variable)
+					if (o->mode != Addressing_Variable) {
 						o->mode = Addressing_Value;
+					}
 					o->type = t_u8;
 					return true;
 				}
@@ -3700,8 +3733,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		PROF_SCOPED("check__expr_base - SliceExpr");
 
 		check_expr(c, o, se->expr);
-		if (o->mode == Addressing_Invalid)
+		if (o->mode == Addressing_Invalid) {
 			goto error;
+		}
 
 		b32 valid = false;
 		i64 max_count = -1;

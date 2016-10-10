@@ -226,7 +226,14 @@ print_type_to_buffer :: proc(buf: ^[]byte, ti: ^Type_Info) {
 	case String:  print_string_to_buffer(buf, "string")
 	case Boolean: print_string_to_buffer(buf, "bool")
 	case Pointer:
-		print_string_to_buffer(buf, "^")
+		if info.elem == nil {
+			print_string_to_buffer(buf, "rawptr")
+		} else {
+			print_string_to_buffer(buf, "^")
+			print_type_to_buffer(buf, info.elem)
+		}
+	case Maybe:
+		print_string_to_buffer(buf, "?")
 		print_type_to_buffer(buf, info.elem)
 	case Procedure:
 		print_string_to_buffer(buf, "proc")
@@ -415,7 +422,7 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 
 	case Maybe:
 		if arg.data != nil {
-
+			// TODO(bill): print maybe
 		} else {
 			print_string_to_buffer(buf, "<nil>")
 		}

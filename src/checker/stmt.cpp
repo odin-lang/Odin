@@ -1,5 +1,4 @@
 // Statements and Declarations
-
 enum StmtFlag : u32 {
 	Stmt_BreakAllowed       = GB_BIT(0),
 	Stmt_ContinueAllowed    = GB_BIT(1),
@@ -268,10 +267,10 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	}
 
 	switch (op_b.mode) {
-	case Addressing_Variable:
-		break;
 	case Addressing_Invalid:
 		return NULL;
+	case Addressing_Variable:
+		break;
 	default: {
 		if (op_b.expr->kind == AstNode_SelectorExpr) {
 			// NOTE(bill): Extra error checks
@@ -282,7 +281,15 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 
 		gbString str = expr_to_string(op_b.expr);
 		defer (gb_string_free(str));
-		error(ast_node_token(op_b.expr), "Cannot assign to `%s`", str);
+		switch (op_b.mode) {
+		case Addressing_Value:
+			error(ast_node_token(op_b.expr), "Cannot assign to `%s`", str);
+			break;
+		default:
+			error(ast_node_token(op_b.expr), "Cannot assign to `%s`", str);
+			break;
+		}
+
 	} break;
 	}
 
@@ -507,8 +514,9 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 		for (isize i = 0; i < params->variable_count; i++) {
 			Entity *e = params->variables[i];
 			GB_ASSERT(e->kind == Entity_Variable);
-			if (!e->Variable.anonymous)
+			if (!e->Variable.anonymous) {
 				continue;
+			}
 			String name = e->token.string;
 			Type *t = base_type(type_deref(e->type));
 			if (is_type_struct(t) || is_type_raw_union(t)) {

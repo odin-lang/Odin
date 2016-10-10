@@ -7,9 +7,8 @@
 #include "checker/checker.cpp"
 #include "codegen/codegen.cpp"
 
+// NOTE(bill): `name` is used in debugging and profiling modes
 i32 win32_exec_command_line_app(char *name, char *fmt, ...) {
-	// PROF_SCOPED_STR(name);
-
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {};
 	char cmd_line[2048] = {};
@@ -87,8 +86,6 @@ ArchData make_arch_data(ArchKind kind) {
 
 	return data;
 }
-
-
 
 int main(int argc, char **argv) {
 	if (argc < 2) {

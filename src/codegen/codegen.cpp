@@ -450,7 +450,7 @@ void ssa_gen_tree(ssaGen *s) {
 							Entity *f = t->Record.fields_in_src_order[i];
 							ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
 							i64 foffset = t->Record.struct_offsets[f->Variable.field_index];
-							GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
+							GB_ASSERT(f->kind == Entity_Variable && f->Variable.field);
 							isize source_index = f->Variable.field_index;
 
 							ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_const_int(a, source_index));

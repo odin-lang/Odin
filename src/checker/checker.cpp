@@ -24,7 +24,6 @@ String const addressing_mode_strings[] = {
 #undef ADDRESSING_MODE
 };
 
-
 struct Operand {
 	AddressingMode mode;
 	Type *type;
@@ -32,7 +31,6 @@ struct Operand {
 	AstNode *expr;
 	BuiltinProcId builtin_id;
 };
-
 b32 is_operand_nil(Operand *o) {
 	return o->mode == Addressing_Value && o->type == t_untyped_nil;
 }
@@ -58,33 +56,6 @@ struct DeclInfo {
 };
 
 
-void init_declaration_info(DeclInfo *d, Scope *scope) {
-	d->scope = scope;
-	map_init(&d->deps, gb_heap_allocator());
-}
-
-DeclInfo *make_declaration_info(gbAllocator a, Scope *scope) {
-	DeclInfo *d = gb_alloc_item(a, DeclInfo);
-	init_declaration_info(d, scope);
-	return d;
-}
-
-void destroy_declaration_info(DeclInfo *d) {
-	map_destroy(&d->deps);
-}
-
-b32 has_init(DeclInfo *d) {
-	if (d->init_expr != NULL)
-		return true;
-	if (d->proc_decl != NULL) {
-		ast_node(pd, ProcDecl, d->proc_decl);
-		if (pd->body != NULL)
-			return true;
-	}
-
-	return false;
-}
-
 
 struct ExpressionInfo {
 	b32 is_lhs; // Debug info
@@ -94,11 +65,7 @@ struct ExpressionInfo {
 };
 
 ExpressionInfo make_expression_info(b32 is_lhs, AddressingMode mode, Type *type, ExactValue value) {
-	ExpressionInfo ei = {};
-	ei.is_lhs = is_lhs;
-	ei.mode   = mode;
-	ei.type   = type;
-	ei.value  = value;
+	ExpressionInfo ei = {is_lhs, mode, type, value};
 	return ei;
 }
 
@@ -126,6 +93,7 @@ struct Scope {
 	b32 is_init;
 	AstFile *file;
 };
+gb_global Scope *universal_scope = NULL;
 
 enum ExprKind {
 	Expr_Expr,
@@ -253,11 +221,12 @@ struct Checker {
 	b32 in_defer; // TODO(bill): Actually handle correctly
 };
 
-gb_global Scope *universal_scope = NULL;
-
 struct CycleChecker {
 	Array<Entity *> path; // Entity_TypeName
 };
+
+
+
 
 CycleChecker *cycle_checker_add(CycleChecker *cc, Entity *e) {
 	if (cc == NULL) {
@@ -276,6 +245,36 @@ void cycle_checker_destroy(CycleChecker *cc) {
 		array_free(&cc->path);
 	}
 }
+
+
+void init_declaration_info(DeclInfo *d, Scope *scope) {
+	d->scope = scope;
+	map_init(&d->deps, gb_heap_allocator());
+}
+
+DeclInfo *make_declaration_info(gbAllocator a, Scope *scope) {
+	DeclInfo *d = gb_alloc_item(a, DeclInfo);
+	init_declaration_info(d, scope);
+	return d;
+}
+
+void destroy_declaration_info(DeclInfo *d) {
+	map_destroy(&d->deps);
+}
+
+b32 decl_info_has_init(DeclInfo *d) {
+	if (d->init_expr != NULL)
+		return true;
+	if (d->proc_decl != NULL) {
+		ast_node(pd, ProcDecl, d->proc_decl);
+		if (pd->body != NULL)
+			return true;
+	}
+
+	return false;
+}
+
+
 
 
 
@@ -489,8 +488,6 @@ void add_global_constant(gbAllocator a, String name, Type *type, ExactValue valu
 
 
 
-
-
 void init_universal_scope(void) {
 	// NOTE(bill): No need to free these
 	gbAllocator a = gb_heap_allocator();
@@ -508,7 +505,7 @@ void init_universal_scope(void) {
 	add_global_constant(a, make_string("true"),  t_untyped_bool, make_exact_value_bool(true));
 	add_global_constant(a, make_string("false"), t_untyped_bool, make_exact_value_bool(false));
 
-	add_global_entity(make_entity_nil(a, NULL, make_token_ident(make_string("nil")), t_untyped_nil));
+	add_global_entity(make_entity_nil(a, make_string("nil"), t_untyped_nil));
 
 // Builtin Procedures
 	for (isize i = 0; i < gb_count_of(builtin_procs); i++) {
@@ -947,6 +944,8 @@ void init_preload_types(Checker *c) {
 		}
 		t_context = e->type;
 		t_context_ptr = make_type_pointer(c->allocator, t_context);
+
+		add_global_entity(make_entity_implicit_value(gb_heap_allocator(), make_string("context"), t_context));
 	}
 }
 

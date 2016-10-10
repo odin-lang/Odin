@@ -1,5 +1,6 @@
 struct Scope;
 struct Checker;
+struct Type;
 enum BuiltinProcId;
 
 #define ENTITY_KINDS \
@@ -11,6 +12,7 @@ enum BuiltinProcId;
 	ENTITY_KIND(Builtin), \
 	ENTITY_KIND(ImportName), \
 	ENTITY_KIND(Nil), \
+	ENTITY_KIND(ImplicitValue), \
 	ENTITY_KIND(Count),
 
 
@@ -26,33 +28,27 @@ String const entity_strings[] = {
 #undef ENTITY_KIND
 };
 
-
-typedef struct Type Type;
-
 struct Entity {
 	EntityKind kind;
-
 	Scope *    scope;
 	Token      token;
 	Type *     type;
 	AstNode *  identifier; // Can be NULL
-
 	Entity *   using_parent;
 	AstNode *  using_expr;
-
 	union {
 		struct {
 			ExactValue value;
 		} Constant;
 		struct {
-			b8  visited;     // Cycle detection
-			b8  used;        // Variable is used
-			b8  anonymous;   // Variable is an anonymous
-			b8  is_using;    // `using` variable
+			b8  visited;    // Cycle detection
+			b8  used;       // Variable is used
+			b8  anonymous;  // Variable is an anonymous
+			b8  field;      // Is Record field
+			b8  param;      // Is procedure parameter
 
 			i32 field_index;
 			i32 field_src_index;
-			b8  is_field;    // Is struct field
 		} Variable;
 		struct {
 			b32 used;
@@ -69,8 +65,8 @@ struct Entity {
 			Scope *scope;
 			b32 used;
 		} ImportName;
-		struct {
-		} Nil;
+		struct {} Nil;
+		struct {} ImplicitValue;
 	};
 };
 
@@ -105,7 +101,7 @@ Entity *make_entity_using_variable(gbAllocator a, Entity *parent, Token token, T
 	GB_ASSERT(parent != NULL);
 	Entity *entity = alloc_entity(a, Entity_Variable, parent->scope, token, type);
 	entity->using_parent = parent;
-	entity->Variable.is_using = true;
+	entity->Variable.anonymous = true;
 	return entity;
 }
 
@@ -121,20 +117,20 @@ Entity *make_entity_type_name(gbAllocator a, Scope *scope, Token token, Type *ty
 	return entity;
 }
 
-Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, b32 is_anonymous) {
+Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, b32 anonymous) {
 	Entity *entity = make_entity_variable(a, scope, token, type);
 	entity->Variable.used = true;
-	entity->Variable.anonymous = cast(b8)is_anonymous;
+	entity->Variable.anonymous = cast(b8)anonymous;
+	entity->Variable.param = true;
 	return entity;
 }
 
-Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, b32 is_anonymous, i32 field_src_index) {
+Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, b32 anonymous, i32 field_src_index) {
 	Entity *entity = make_entity_variable(a, scope, token, type);
 	entity->Variable.field_src_index = field_src_index;
 	entity->Variable.field_index = field_src_index;
-	entity->Variable.is_field  = true;
-	entity->Variable.anonymous = cast(b8)is_anonymous;
-	entity->Variable.is_using = cast(b8)is_anonymous;
+	entity->Variable.field  = true;
+	entity->Variable.anonymous = cast(b8)anonymous;
 	return entity;
 }
 
@@ -158,8 +154,15 @@ Entity *make_entity_import_name(gbAllocator a, Scope *scope, Token token, Type *
 	return entity;
 }
 
-Entity *make_entity_nil(gbAllocator a, Scope *scope, Token token, Type *type) {
-	Entity *entity = alloc_entity(a, Entity_Nil, scope, token, type);
+Entity *make_entity_nil(gbAllocator a, String name, Type *type) {
+	Token token = make_token_ident(name);
+	Entity *entity = alloc_entity(a, Entity_Nil, NULL, token, type);
+	return entity;
+}
+
+Entity *make_entity_implicit_value(gbAllocator a, String name, Type *type) {
+	Token token = make_token_ident(name);
+	Entity *entity = alloc_entity(a, Entity_ImplicitValue, NULL, token, type);
 	return entity;
 }
 

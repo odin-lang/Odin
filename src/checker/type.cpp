@@ -812,6 +812,8 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 
 	Type *type = type_deref(type_);
 	b32 is_ptr = type != type_;
+	sel.indirect = sel.indirect || is_ptr;
+
 	type = base_type(type);
 
 	if (type->kind == Type_Basic) {
@@ -918,7 +920,6 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 				String str = f->token.string;
 
 				if (field_name == str) {
-					Selection sel = {};
 					sel.entity = f;
 					selection_add_index(&sel, i);
 					return sel;
@@ -932,7 +933,6 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 			String str = f->token.string;
 
 			if (field_name == str) {
-				Selection sel = {};
 				sel.entity = f;
 				selection_add_index(&sel, i);
 				return sel;
@@ -955,7 +955,7 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 	} else if (!is_type_enum(type) && !is_type_union(type)) {
 		for (isize i = 0; i < type->Record.field_count; i++) {
 			Entity *f = type->Record.fields[i];
-			GB_ASSERT(f->kind == Entity_Variable && f->Variable.is_field);
+			GB_ASSERT(f->kind == Entity_Variable && f->Variable.field);
 			String str = f->token.string;
 			if (field_name == str) {
 				selection_add_index(&sel, i);  // HACK(bill): Leaky memory
@@ -970,8 +970,9 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 				sel = lookup_field(a, f->type, field_name, is_type, sel);
 
 				if (sel.entity != NULL) {
-					if (is_type_pointer(f->type))
+					if (is_type_pointer(f->type)) {
 						sel.indirect = true;
+					}
 					return sel;
 				}
 				sel.index.count = prev_count;
@@ -1199,10 +1200,30 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 }
 
 i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, isize index) {
+	t = base_type(t);
 	if (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct) {
 		type_set_offsets(s, allocator, t);
 		if (gb_is_between(index, 0, t->Record.field_count-1)) {
 			return t->Record.struct_offsets[index];
+		}
+	} else if (t->kind == Type_Basic) {
+		gb_printf_err("here!!\n");
+		if (t->Basic.kind == Basic_string) {
+			switch (index) {
+			case 0: return 0;
+			case 1: return s.word_size;
+			}
+		} else if (t->Basic.kind == Basic_any) {
+			switch (index) {
+			case 0: return 0;
+			case 1: return s.word_size;
+			}
+		}
+	} else if (t->kind == Type_Slice) {
+		switch (index) {
+		case 0: return 0;
+		case 1: return 1*s.word_size;
+		case 2: return 2*s.word_size;
 		}
 	}
 	return 0;
@@ -1210,15 +1231,17 @@ i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, isize index)
 
 
 i64 type_offset_of_from_selection(BaseTypeSizes s, gbAllocator allocator, Type *t, Selection sel) {
+	GB_ASSERT(sel.indirect == false);
+
 	i64 offset = 0;
 	for_array(i, sel.index) {
 		isize index = sel.index[i];
 		t = base_type(t);
+		offset += type_offset_of(s, allocator, t, index);
 		if (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct) {
-			type_set_offsets(s, allocator, t);
-			GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
-			offset += t->Record.struct_offsets[index];
 			t = t->Record.fields[index]->type;
+		} else {
+			// NOTE(bill): string/any/slices don't have record fields so this case doesn't need to be handled
 		}
 	}
 	return offset;

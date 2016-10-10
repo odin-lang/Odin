@@ -34,7 +34,7 @@ Type_Info :: union {
 	String:  struct #ordered {}
 	Boolean: struct #ordered {}
 	Pointer: struct #ordered {
-		elem: ^Type_Info
+		elem: ^Type_Info // nil -> rawptr
 	}
 	Maybe: struct #ordered {
 		elem: ^Type_Info
@@ -138,10 +138,6 @@ Context :: struct #ordered {
 DEFAULT_ALIGNMENT :: align_of({4}f32)
 
 
-current_context :: proc() -> Context { // Copy of context
-	return __context
-}
-
 __check_context :: proc() {
 	c := ^__context
 
@@ -157,27 +153,27 @@ alloc :: proc(size: int) -> rawptr #inline { return alloc_align(size, DEFAULT_AL
 
 alloc_align :: proc(size, alignment: int) -> rawptr #inline {
 	__check_context()
-	a := current_context().allocator
+	a := context.allocator
 	return a.procedure(a.data, Allocator.Mode.ALLOC, size, alignment, nil, 0, 0)
 }
 
 free :: proc(ptr: rawptr) #inline {
 	__check_context()
-	a := current_context().allocator
+	a := context.allocator
 	if ptr != nil {
 		a.procedure(a.data, Allocator.Mode.FREE, 0, 0, ptr, 0, 0)
 	}
 }
 free_all :: proc() #inline {
 	__check_context()
-	a := current_context().allocator
+	a := context.allocator
 	a.procedure(a.data, Allocator.Mode.FREE_ALL, 0, 0, nil, 0, 0)
 }
 
 
 resize       :: proc(ptr: rawptr, old_size, new_size: int) -> rawptr #inline { return resize_align(ptr, old_size, new_size, DEFAULT_ALIGNMENT) }
 resize_align :: proc(ptr: rawptr, old_size, new_size, alignment: int) -> rawptr #inline {
-	a := current_context().allocator
+	a := context.allocator
 	return a.procedure(a.data, Allocator.Mode.RESIZE, new_size, alignment, ptr, old_size, 0)
 }
 

@@ -4,7 +4,6 @@ struct ssaBlock;
 struct ssaValue;
 struct ssaInstr;
 
-
 enum ssaDebugInfoKind {
 	ssaDebugInfo_Invalid,
 
@@ -389,7 +388,6 @@ ssaAddr ssa_make_addr(ssaValue *addr, AstNode *expr) {
 	ssaAddr v = {addr, expr, false, NULL};
 	return v;
 }
-
 ssaAddr ssa_make_addr_vector(ssaValue *addr, ssaValue *index, AstNode *expr) {
 	ssaAddr v = {addr, expr, true, index};
 	return v;
@@ -1421,7 +1419,6 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 	ssa_emit_jump(proc, proc->entry_block);
 
 	ssa_optimize_blocks(proc);
-#if 0
 	ssa_build_referrers(proc);
 	ssa_build_dom_tree(proc);
 
@@ -1431,7 +1428,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 	// [ ] Local stored once?  Replace loads with dominating store
 	// [ ] Convert to phi nodes
 	ssa_opt_mem2reg(proc);
-#endif
+
 
 // Number registers
 	i32 reg_index = 0;
@@ -2275,6 +2272,21 @@ void ssa_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low, ssaV
 	}
 }
 
+ssaValue *ssa_find_global_variable(ssaProcedure *proc, String name) {
+	ssaValue *value = *map_get(&proc->module->members, hash_string(name));
+	return value;
+}
+
+ssaValue *ssa_emit_implicit_value(ssaProcedure *proc, Entity *e) {
+	String name = e->token.string;
+	ssaValue *g = NULL;
+	if (name == "context") {
+		g = ssa_emit_load(proc, ssa_find_global_variable(proc, make_string("__context")));
+	}
+	GB_ASSERT(g != NULL);
+	return g;
+}
+
 
 ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv) {
 	switch (expr->kind) {
@@ -2292,13 +2304,16 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			return NULL;
 		} else if (e->kind == Entity_Nil) {
 			return ssa_make_value_nil(proc->module->allocator, tv->type);
+		} else if (e->kind == Entity_ImplicitValue) {
+			return ssa_emit_implicit_value(proc, e);
 		}
 
 		auto *found = map_get(&proc->module->values, hash_pointer(e));
 		if (found) {
 			ssaValue *v = *found;
-			if (v->kind == ssaValue_Proc)
+			if (v->kind == ssaValue_Proc) {
 				return v;
+			}
 			return ssa_emit_load(proc, v);
 		}
 		return NULL;
@@ -3043,16 +3058,10 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 	return value;
 }
 
-
 ssaValue *ssa_add_using_variable(ssaProcedure *proc, Entity *e) {
-	GB_ASSERT(e->kind == Entity_Variable && e->Variable.is_using);
+	GB_ASSERT(e->kind == Entity_Variable && e->Variable.anonymous);
 	String name = e->token.string;
 	Entity *parent = e->using_parent;
-	ssaValue *p = NULL;
-	if (parent->kind == Entity_Variable && parent->Variable.is_using) {
-		p = ssa_add_using_variable(proc, parent);
-	}
-
 	Selection sel = lookup_field(proc->module->allocator, parent->type, name, false);
 	GB_ASSERT(sel.entity != NULL);
 	ssaValue **pv = map_get(&proc->module->values, hash_pointer(parent));
@@ -3077,6 +3086,9 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		}
 
 		Entity *e = entity_of_ident(proc->module->info, expr);
+		TypeAndValue *tv = map_get(&proc->module->info->types, hash_pointer(expr));
+		// GB_ASSERT(tv == NULL || tv->mode == Addressing_Variable);
+
 
 		if (e->kind == Entity_Constant) {
 			if (base_type(e->type) == t_string) {
@@ -3098,11 +3110,17 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		ssaValue **found = map_get(&proc->module->values, hash_pointer(e));
 		if (found) {
 			v = *found;
-		} else if (e->kind == Entity_Variable && e->Variable.is_using) {
+		} else if (e->kind == Entity_Variable && e->Variable.anonymous) {
 			v = ssa_add_using_variable(proc, e);
+		} else if (e->kind == Entity_ImplicitValue) {
+			ssaValue *g = ssa_emit_implicit_value(proc, e);
+			// NOTE(bill): Create a copy as it's by value
+			v = ssa_add_local_generated(proc, ssa_type(g));
+			ssa_emit_store(proc, v, g);
 		}
+
 		if (v == NULL) {
-			GB_PANIC("Unknown value: %s, entity: %p\n", expr_to_string(expr), e);
+			GB_PANIC("Unknown value: %s, entity: %p %.*s\n", expr_to_string(expr), e, LIT(entity_strings[e->kind]));
 		}
 
 		return ssa_make_addr(v, expr);
@@ -4151,7 +4169,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		ssa_open_scope(proc);
 		defer (ssa_close_scope(proc, ssaDeferExit_Default, NULL));
 
-		ssaValue *context_ptr = *map_get(&proc->module->members, hash_string(make_string("__context")));
+		ssaValue *context_ptr = ssa_find_global_variable(proc, make_string("__context"));
 		ssaValue *prev_context = ssa_add_local_generated(proc, t_context);
 		ssa_emit_store(proc, prev_context, ssa_emit_load(proc, context_ptr));
 
@@ -4170,7 +4188,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		ssa_open_scope(proc);
 		defer (ssa_close_scope(proc, ssaDeferExit_Default, NULL));
 
-		ssaValue *context_ptr = *map_get(&proc->module->members, hash_string(make_string("__context")));
+		ssaValue *context_ptr = ssa_find_global_variable(proc, make_string("__context"));
 		ssaValue *prev_context = ssa_add_local_generated(proc, t_context);
 		ssa_emit_store(proc, prev_context, ssa_emit_load(proc, context_ptr));
 
@@ -4257,11 +4275,6 @@ void ssa_build_proc(ssaValue *value, ssaProcedure *parent) {
 
 
 
-
-
-
-
-
 b32 ssa_is_instr_jump(ssaValue *v) {
 	if (v->kind != ssaValue_Instr) {
 		return false;
@@ -4289,7 +4302,6 @@ Array<ssaValue *> ssa_get_block_phi_nodes(ssaBlock *b) {
 
 void ssa_remove_pred(ssaBlock *b, ssaBlock *p) {
 	auto phis = ssa_get_block_phi_nodes(b);
-
 	isize i = 0;
 	for_array(j, b->preds) {
 		ssaBlock *pred = b->preds[j];
@@ -4302,7 +4314,6 @@ void ssa_remove_pred(ssaBlock *b, ssaBlock *p) {
 			i++;
 		}
 	}
-
 	b->preds.count = i;
 	for_array(k, phis) {
 		auto *phi = &phis[k]->Instr.Phi;
@@ -4322,7 +4333,6 @@ void ssa_remove_dead_blocks(ssaProcedure *proc) {
 		b->index = j;
 		proc->blocks[j++] = b;
 	}
-
 	proc->blocks.count = j;
 }
 
@@ -4470,8 +4480,7 @@ void ssa_lt_link(ssaLTState *lt, ssaBlock *p, ssaBlock *q) {
 
 i32 ssa_lt_depth_first_search(ssaLTState *lt, ssaBlock *p, i32 i, ssaBlock **preorder) {
 	preorder[i] = p;
-	p->dom.pre = i;
-	i++;
+	p->dom.pre = i++;
 	lt->sdom[p->index] = p;
 	ssa_lt_link(lt, NULL, p);
 	for_array(index, p->succs) {
@@ -4497,8 +4506,7 @@ ssaBlock *ssa_lt_eval(ssaLTState *lt, ssaBlock *v) {
 }
 
 void ssa_number_dom_tree(ssaBlock *v, i32 pre, i32 post, i32 *pre_out, i32 *post_out) {
-	v->dom.pre = pre;
-	pre++;
+	v->dom.pre = pre++;
 	for_array(i, v->dom.children) {
 		ssaBlock *child = v->dom.children[i];
 		i32 new_pre = 0, new_post = 0;
@@ -4506,8 +4514,7 @@ void ssa_number_dom_tree(ssaBlock *v, i32 pre, i32 post, i32 *pre_out, i32 *post
 		pre = new_pre;
 		post = new_post;
 	}
-	v->dom.post = post;
-	post++;
+	v->dom.post = post++;
 	*pre_out  = pre;
 	*post_out = post;
 }
@@ -4606,5 +4613,5 @@ void ssa_build_dom_tree(ssaProcedure *proc) {
 
 
 void ssa_opt_mem2reg(ssaProcedure *proc) {
-
+	// TODO(bill):
 }

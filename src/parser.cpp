@@ -2257,17 +2257,17 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 	AstNodeArray values = {};
 	AstNode *type = NULL;
 
-	// for_array(i, names) {
-	// 	AstNode *name = names[i];
-	// 	if (name->kind == AstNode_Ident) {
-	// 		String n = name->Ident.string;
-	// 		// NOTE(bill): Check for reserved identifiers
-	// 		if (n == "context") {
-	// 			syntax_error(ast_node_token(name), "`context` is a reserved identifier");
-	// 			break;
-	// 		}
-	// 	}
-	// }
+	for_array(i, names) {
+		AstNode *name = names[i];
+		if (name->kind == AstNode_Ident) {
+			String n = name->Ident.string;
+			// NOTE(bill): Check for reserved identifiers
+			if (n == "context") {
+				syntax_error(ast_node_token(name), "`context` is a reserved identifier");
+				break;
+			}
+		}
+	}
 
 	if (allow_token(f, Token_Colon)) {
 		if (!allow_token(f, Token_type)) {
