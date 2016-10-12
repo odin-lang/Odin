@@ -126,8 +126,8 @@ enum BuiltinProcId {
 
 	BuiltinProc_swizzle,
 
-	BuiltinProc_ptr_offset,
-	BuiltinProc_ptr_sub,
+	// BuiltinProc_ptr_offset,
+	// BuiltinProc_ptr_sub,
 	BuiltinProc_slice_ptr,
 
 	BuiltinProc_min,
@@ -170,8 +170,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 
 	{STR_LIT("swizzle"),          1, true,  Expr_Expr},
 
-	{STR_LIT("ptr_offset"),       2, false, Expr_Expr},
-	{STR_LIT("ptr_sub"),          2, false, Expr_Expr},
+	// {STR_LIT("ptr_offset"),       2, false, Expr_Expr},
+	// {STR_LIT("ptr_sub"),          2, false, Expr_Expr},
 	{STR_LIT("slice_ptr"),        2, true,  Expr_Expr},
 
 	{STR_LIT("min"),              2, false, Expr_Expr},
@@ -757,6 +757,10 @@ void add_type_info_type(Checker *c, Type *t) {
 		}
 	} break;
 
+	case Type_Maybe:
+		add_type_info_type(c, bt->Maybe.elem);
+		break;
+
 	case Type_Pointer:
 		add_type_info_type(c, bt->Pointer.elem);
 		break;
@@ -905,25 +909,26 @@ void init_preload_types(Checker *c) {
 		t_type_info_member = record->other_fields[0]->type;
 		t_type_info_member_ptr = make_type_pointer(c->allocator, t_type_info_member);
 
-		if (record->field_count != 17) {
+		if (record->field_count != 18) {
 			compiler_error("Invalid `Type_Info` layout");
 		}
 		t_type_info_named     = record->fields[ 1]->type;
 		t_type_info_integer   = record->fields[ 2]->type;
 		t_type_info_float     = record->fields[ 3]->type;
-		t_type_info_string    = record->fields[ 4]->type;
-		t_type_info_boolean   = record->fields[ 5]->type;
-		t_type_info_pointer   = record->fields[ 6]->type;
-		t_type_info_maybe     = record->fields[ 7]->type;
-		t_type_info_procedure = record->fields[ 8]->type;
-		t_type_info_array     = record->fields[ 9]->type;
-		t_type_info_slice     = record->fields[10]->type;
-		t_type_info_vector    = record->fields[11]->type;
-		t_type_info_tuple     = record->fields[12]->type;
-		t_type_info_struct    = record->fields[13]->type;
-		t_type_info_union     = record->fields[14]->type;
-		t_type_info_raw_union = record->fields[15]->type;
-		t_type_info_enum      = record->fields[16]->type;
+		t_type_info_any       = record->fields[ 4]->type;
+		t_type_info_string    = record->fields[ 5]->type;
+		t_type_info_boolean   = record->fields[ 6]->type;
+		t_type_info_pointer   = record->fields[ 7]->type;
+		t_type_info_maybe     = record->fields[ 8]->type;
+		t_type_info_procedure = record->fields[ 9]->type;
+		t_type_info_array     = record->fields[10]->type;
+		t_type_info_slice     = record->fields[11]->type;
+		t_type_info_vector    = record->fields[12]->type;
+		t_type_info_tuple     = record->fields[13]->type;
+		t_type_info_struct    = record->fields[14]->type;
+		t_type_info_union     = record->fields[15]->type;
+		t_type_info_raw_union = record->fields[16]->type;
+		t_type_info_enum      = record->fields[17]->type;
 	}
 
 	if (t_allocator == NULL) {

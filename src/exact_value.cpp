@@ -91,9 +91,9 @@ ExactValue make_exact_value_float(f64 f) {
 	return result;
 }
 
-ExactValue make_exact_value_pointer(void *ptr) {
+ExactValue make_exact_value_pointer(i64 ptr) {
 	ExactValue result = {ExactValue_Pointer};
-	result.value_pointer = cast(i64)cast(intptr)ptr;
+	result.value_pointer = ptr;
 	return result;
 }
 

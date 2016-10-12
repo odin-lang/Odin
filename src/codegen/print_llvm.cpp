@@ -268,6 +268,16 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Type *type);
 
 void ssa_print_compound_element(ssaFileBuffer *f, ssaModule *m, ExactValue v, Type *elem_type) {
+	ssa_print_type(f, m, elem_type);
+	ssa_fprintf(f, " ");
+
+	if (v.kind != ExactValue_Invalid && is_type_maybe(elem_type)) {
+		Type *t = base_type(elem_type)->Maybe.elem;
+		ssa_fprintf(f, "{");
+		ssa_print_type(f, m, t);
+		ssa_fprintf(f, " ");
+	}
+
 	if (v.kind == ExactValue_Invalid) {
 		ssa_fprintf(f, "zeroinitializer");
 	} else if (v.kind == ExactValue_String) {
@@ -289,6 +299,13 @@ void ssa_print_compound_element(ssaFileBuffer *f, ssaModule *m, ExactValue v, Ty
 
 	} else {
 		ssa_print_exact_value(f, m, v, elem_type);
+	}
+
+	if (v.kind != ExactValue_Invalid && is_type_maybe(elem_type)) {
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m, t_bool);
+		ssa_fprintf(f, " ");
+		ssa_fprintf(f, "true}");
 	}
 }
 
@@ -367,9 +384,6 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 				if (i > 0) {
 					ssa_fprintf(f, ", ");
 				}
-				ssa_print_type(f, m, elem_type);
-				ssa_fprintf(f, " ");
-
 				TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems[i]);
 				GB_ASSERT(tav != NULL);
 				ssa_print_compound_element(f, m, tav->value, elem_type);
@@ -402,8 +416,6 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 					if (i > 0) {
 						ssa_fprintf(f, ", ");
 					}
-					ssa_print_type(f, m, elem_type);
-					ssa_fprintf(f, " ");
 					ssa_print_compound_element(f, m, tav->value, elem_type);
 				}
 			} else {
@@ -411,9 +423,6 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 					if (i > 0) {
 						ssa_fprintf(f, ", ");
 					}
-					ssa_print_type(f, m, elem_type);
-					ssa_fprintf(f, " ");
-
 					TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems[i]);
 					GB_ASSERT(tav != NULL);
 					ssa_print_compound_element(f, m, tav->value, elem_type);
@@ -476,8 +485,6 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 				}
 				Type *elem_type = type->Record.fields[i]->type;
 
-				ssa_print_type(f, m, elem_type);
-				ssa_fprintf(f, " ");
 				ssa_print_compound_element(f, m, values[i], elem_type);
 			}
 

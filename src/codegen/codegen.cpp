@@ -377,6 +377,10 @@ void ssa_gen_tree(ssaGen *s) {
 					case Basic_string:
 						tag = ssa_add_local_generated(proc, t_type_info_string);
 						break;
+
+					case Basic_any:
+						tag = ssa_add_local_generated(proc, t_type_info_any);
+						break;
 					}
 					break;
 
@@ -445,13 +449,12 @@ void ssa_gen_tree(ssaGen *s) {
 						ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Record.field_count, &type_info_member_index);
 
 						type_set_offsets(m->sizes, a, t); // NOTE(bill): Just incase the offsets have not been set yet
-						for (isize i = 0; i < t->Record.field_count; i++) {
+						for (isize source_index = 0; source_index < t->Record.field_count; source_index++) {
 							// TODO(bill): Order fields in source order not layout order
-							Entity *f = t->Record.fields_in_src_order[i];
+							Entity *f = t->Record.fields_in_src_order[source_index];
 							ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
 							i64 foffset = t->Record.struct_offsets[f->Variable.field_index];
 							GB_ASSERT(f->kind == Entity_Variable && f->Variable.field);
-							isize source_index = f->Variable.field_index;
 
 							ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_const_int(a, source_index));
 							ssaValue *name      = ssa_emit_struct_gep(proc, field, v_zero32, t_string_ptr);

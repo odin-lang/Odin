@@ -1007,14 +1007,16 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			Operand operand = {Addressing_Invalid};
 			AstNode binary_expr = {AstNode_BinaryExpr};
 			ast_node(be, BinaryExpr, &binary_expr);
-			be->op    = op;
+			be->op = op;
+			be->op.kind = cast(TokenKind)(cast(i32)be->op.kind - (Token_AddEq - Token_Add));
 			 // NOTE(bill): Only use the first one will be used
 			be->left  = as->lhs[0];
 			be->right = as->rhs[0];
 
 			check_binary_expr(c, &operand, &binary_expr);
-			if (operand.mode == Addressing_Invalid)
+			if (operand.mode == Addressing_Invalid) {
 				return;
+			}
 			// NOTE(bill): Only use the first one will be used
 			check_assignment_variable(c, &operand, as->lhs[0]);
 		} break;

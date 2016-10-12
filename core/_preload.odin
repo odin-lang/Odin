@@ -31,6 +31,7 @@ Type_Info :: union {
 	Float: struct #ordered {
 		size: int // in bytes
 	}
+	Any:     struct #ordered {}
 	String:  struct #ordered {}
 	Boolean: struct #ordered {}
 	Pointer: struct #ordered {
@@ -142,7 +143,7 @@ __check_context :: proc() {
 	c := ^__context
 
 	if c.allocator.procedure == nil {
-		c.allocator = __default_allocator()
+		c.allocator = default_allocator()
 	}
 	if c.thread_id == 0 {
 		c.thread_id = os.current_thread_id()
@@ -173,6 +174,7 @@ free_all :: proc() #inline {
 
 resize       :: proc(ptr: rawptr, old_size, new_size: int) -> rawptr #inline { return resize_align(ptr, old_size, new_size, DEFAULT_ALIGNMENT) }
 resize_align :: proc(ptr: rawptr, old_size, new_size, alignment: int) -> rawptr #inline {
+	__check_context()
 	a := context.allocator
 	return a.procedure(a.data, Allocator.Mode.RESIZE, new_size, alignment, ptr, old_size, 0)
 }
@@ -204,16 +206,16 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 }
 
 
-__default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
-                                 size, alignment: int,
-                                 old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
+default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
+                               size, alignment: int,
+                               old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
 	using Allocator.Mode
 	match mode {
 	case ALLOC:
 		total_size := size + alignment + size_of(mem.AllocationHeader)
 		ptr := os.heap_alloc(total_size)
 		header := ptr as ^mem.AllocationHeader
-		ptr = mem.align_forward(ptr_offset(header, 1), alignment)
+		ptr = mem.align_forward(header+1, alignment)
 		mem.allocation_header_fill(header, ptr, size)
 		return mem.zero(ptr, size)
 
@@ -228,7 +230,7 @@ __default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
 		total_size := size + alignment + size_of(mem.AllocationHeader)
 		ptr := os.heap_resize(mem.allocation_header(old_memory), total_size)
 		header := ptr as ^mem.AllocationHeader
-		ptr = mem.align_forward(ptr_offset(header, 1), alignment)
+		ptr = mem.align_forward(header+1, alignment)
 		mem.allocation_header_fill(header, ptr, size)
 		return mem.zero(ptr, size)
 	}
@@ -236,9 +238,9 @@ __default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
 	return nil
 }
 
-__default_allocator :: proc() -> Allocator {
+default_allocator :: proc() -> Allocator {
 	return Allocator{
-		procedure = __default_allocator_proc,
+		procedure = default_allocator_proc,
 		data = nil,
 	}
 }

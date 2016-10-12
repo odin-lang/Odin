@@ -1462,8 +1462,47 @@ void ssa_pop_target_list(ssaProcedure *proc) {
 }
 
 
+ssaValue *ssa_emit_ptr_offset(ssaProcedure *proc, ssaValue *ptr, ssaValue *offset) {
+	ssaValue *gep = NULL;
+	offset = ssa_emit_conv(proc, offset, t_int);
+	gep = ssa_make_instr_get_element_ptr(proc, ptr, offset, NULL, 1, false);
+	gep->Instr.GetElementPtr.result_type = ssa_type(ptr);
+	return ssa_emit(proc, gep);
+}
 
 ssaValue *ssa_emit_arith(ssaProcedure *proc, TokenKind op, ssaValue *left, ssaValue *right, Type *type) {
+	Type *t_left = ssa_type(left);
+	Type *t_right = ssa_type(right);
+
+	if (op == Token_Add) {
+		if (is_type_pointer(t_left)) {
+			ssaValue *ptr = ssa_emit_conv(proc, left, type);
+			ssaValue *offset = right;
+			return ssa_emit_ptr_offset(proc, ptr, offset);
+		} else if (is_type_pointer(ssa_type(right))) {
+			ssaValue *ptr = ssa_emit_conv(proc, right, type);
+			ssaValue *offset = left;
+			return ssa_emit_ptr_offset(proc, ptr, offset);
+		}
+	} else if (op == Token_Sub) {
+		if (is_type_pointer(t_left) && is_type_integer(t_right)) {
+			// ptr - int
+			ssaValue *ptr = ssa_emit_conv(proc, left, type);
+			ssaValue *offset = right;
+			return ssa_emit_ptr_offset(proc, ptr, offset);
+		} else if (is_type_pointer(t_left) && is_type_pointer(t_right)) {
+			GB_ASSERT(is_type_integer(type));
+			Type *ptr_type = t_left;
+			ssaModule *m = proc->module;
+			ssaValue *x = ssa_emit_conv(proc, left, type);
+			ssaValue *y = ssa_emit_conv(proc, right, type);
+			ssaValue *diff = ssa_emit_arith(proc, op, x, y, type);
+			ssaValue *elem_size = ssa_make_const_int(m->allocator, type_size_of(m->sizes, m->allocator, ptr_type));
+			return ssa_emit_arith(proc, Token_Quo, diff, elem_size, type);
+		}
+	}
+
+
 	switch (op) {
 	case Token_AndNot: {
 		// NOTE(bill): x &~ y == x & (~y) == x & (y ~ -1)
@@ -1510,13 +1549,7 @@ ssaValue *ssa_emit_comp(ssaProcedure *proc, TokenKind op_kind, ssaValue *left, s
 	return ssa_emit(proc, ssa_make_instr_binary_op(proc, op_kind, left, right, result));
 }
 
-ssaValue *ssa_emit_ptr_offset(ssaProcedure *proc, ssaValue *ptr, ssaValue *offset) {
-	ssaValue *gep = NULL;
-	offset = ssa_emit_conv(proc, offset, t_int);
-	gep = ssa_make_instr_get_element_ptr(proc, ptr, offset, NULL, 1, false);
-	gep->Instr.GetElementPtr.result_type = ssa_type(ptr);
-	return ssa_emit(proc, gep);
-}
+
 
 ssaValue *ssa_emit_zero_gep(ssaProcedure *proc, ssaValue *s) {
 	ssaValue *gep = NULL;
@@ -2824,6 +2857,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 				} break;
 
+#if 0
 				case BuiltinProc_ptr_offset: {
 					ssa_emit_comment(proc, make_string("ptr_offset"));
 					ssaValue *ptr = ssa_build_expr(proc, ce->args[0]);
@@ -2847,6 +2881,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					return v;
 				} break;
+#endif
 
 				case BuiltinProc_slice_ptr: {
 					ssa_emit_comment(proc, make_string("slice_ptr"));
@@ -3440,7 +3475,13 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 void ssa_build_assign_op(ssaProcedure *proc, ssaAddr lhs, ssaValue *value, TokenKind op) {
 	ssaValue *old_value = ssa_lvalue_load(proc, lhs);
 	Type *type = ssa_type(old_value);
-	ssaValue *change = ssa_emit_conv(proc, value, type);
+
+	ssaValue *change = value;
+	if (is_type_pointer(type) && is_type_integer(ssa_type(value))) {
+		change = ssa_emit_conv(proc, value, default_type(ssa_type(value)));
+	} else {
+		change = ssa_emit_conv(proc, value, type);
+	}
 	ssaValue *new_value = ssa_emit_arith(proc, op, old_value, change, type);
 	ssa_lvalue_store(proc, lhs, new_value);
 }

@@ -50,8 +50,7 @@ print_byte_buffer :: proc(buf: ^[]byte, b: []byte) {
 	if buf.count < buf.capacity {
 		n := min(buf.capacity-buf.count, b.count)
 		if n > 0 {
-			offset := ptr_offset(buf.data, buf.count)
-			mem.copy(offset, ^b[0], n)
+			mem.copy(buf.data + buf.count, ^b[0], n)
 			buf.count += n
 		}
 	}
@@ -77,63 +76,7 @@ print_rune_to_buffer :: proc(buf: ^[]byte, r: rune) {
 print_space_to_buffer :: proc(buf: ^[]byte) { print_rune_to_buffer(buf, #rune " ") }
 print_nl_to_buffer    :: proc(buf: ^[]byte) { print_rune_to_buffer(buf, #rune "\n") }
 
-print_int_to_buffer :: proc(buf: ^[]byte, i: int) {
-	print_int_base_to_buffer(buf, i, 10);
-}
-
 __NUM_TO_CHAR_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$"
-
-print_int_base_to_buffer :: proc(buffer: ^[]byte, i, base: int) {
-
-	buf: [65]byte
-	len := 0
-	negative := false
-	if i < 0 {
-		negative = true
-		i = -i
-	}
-	if i == 0 {
-		buf[len] = #rune "0"
-		len++
-	}
-	for i > 0 {
-		buf[len] = __NUM_TO_CHAR_TABLE[i % base]
-		len++
-		i /= base
-	}
-
-	if negative {
-		buf[len] = #rune "-"
-		len++
-	}
-
-	byte_reverse(buf[:len])
-	print_string_to_buffer(buffer, buf[:len] as string)
-}
-
-print_uint_to_buffer :: proc(buffer: ^[]byte, i: uint) {
-	print_uint_base_to_buffer(buffer, i, 10, 0, #rune " ")
-}
-print_uint_base_to_buffer :: proc(buffer: ^[]byte, i, base: uint, min_width: int, pad_char: byte) {
-	buf: [65]byte
-	len := 0
-	if i == 0 {
-		buf[len] = #rune "0"
-		len++
-	}
-	for i > 0 {
-		buf[len] = __NUM_TO_CHAR_TABLE[i % base]
-		len++
-		i /= base
-	}
-	for len < min_width {
-		buf[len] = pad_char
-		len++
-	}
-
-	byte_reverse(buf[:len])
-	print_string_to_buffer(buffer, buf[:len] as string)
-}
 
 print_bool_to_buffer :: proc(buffer: ^[]byte, b : bool) {
 	if b { print_string_to_buffer(buffer, "true") }
@@ -142,7 +85,7 @@ print_bool_to_buffer :: proc(buffer: ^[]byte, b : bool) {
 
 print_pointer_to_buffer :: proc(buffer: ^[]byte, p: rawptr) #inline {
 	print_string_to_buffer(buffer, "0x")
-	print_uint_base_to_buffer(buffer, p as uint, 16, size_of(int), #rune "0")
+	print_u64_to_buffer(buffer, p as uint as u64)
 }
 
 print_f32_to_buffer :: proc(buffer: ^[]byte, f: f32) #inline { print__f64(buffer, f as f64, 7) }
@@ -215,7 +158,7 @@ print_type_to_buffer :: proc(buf: ^[]byte, ti: ^Type_Info) {
 			} else {
 				print_string_to_buffer(buf, "u")
 			}
-			print_int_to_buffer(buf, 8*info.size)
+			print_u64_to_buffer(buf, 8*info.size as u64)
 		}
 
 	case Float:
@@ -267,7 +210,7 @@ print_type_to_buffer :: proc(buf: ^[]byte, ti: ^Type_Info) {
 
 	case Array:
 		print_string_to_buffer(buf, "[")
-		print_int_to_buffer(buf, info.count)
+		print_i64_to_buffer(buf, info.count as i64)
 		print_string_to_buffer(buf, "]")
 		print_type_to_buffer(buf, info.elem)
 	case Slice:
@@ -276,7 +219,7 @@ print_type_to_buffer :: proc(buf: ^[]byte, ti: ^Type_Info) {
 		print_type_to_buffer(buf, info.elem)
 	case Vector:
 		print_string_to_buffer(buf, "{")
-		print_int_to_buffer(buf, info.count)
+		print_i64_to_buffer(buf, info.count as i64)
 		print_string_to_buffer(buf, "}")
 		print_type_to_buffer(buf, info.elem)
 
@@ -327,6 +270,13 @@ print_type_to_buffer :: proc(buf: ^[]byte, ti: ^Type_Info) {
 }
 
 
+make_any :: proc(type_info: ^Type_Info, data: rawptr) -> any {
+	a: any
+	a.type_info = type_info
+	a.data = data
+	return a
+}
+
 print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 	if arg.type_info == nil {
 		print_string_to_buffer(buf, "<nil>")
@@ -347,12 +297,11 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 				if i > 0 {
 					print_string_to_buffer(buf, ", ")
 				}
-				print_any_to_buffer(buf, f.name)
+				print_string_to_buffer(buf, f.name)
+				// print_any_to_buffer(buf, f.offset)
 				print_string_to_buffer(buf, " = ")
-				v: any
-				v.type_info = f.type_info
-				v.data = ptr_offset(arg.data as ^byte, f.offset)
-				print_any_to_buffer(buf, v)
+				data := arg.data as ^byte + f.offset
+				print_any_to_buffer(buf, make_any(f.type_info, data))
 			}
 			print_string_to_buffer(buf, "}")
 
@@ -421,10 +370,12 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 		}
 
 	case Maybe:
-		if arg.data != nil {
-			// TODO(bill): print maybe
+		size := mem.size_of_type_info(info.elem)
+		data := slice_ptr(arg.data as ^byte, size+1)
+		if data[size] != 0 && arg.data != nil {
+			print_any_to_buffer(buf, make_any(info.elem, arg.data))
 		} else {
-			print_string_to_buffer(buf, "<nil>")
+			print_string_to_buffer(buf, "nil")
 		}
 
 	case Enum:
@@ -463,10 +414,8 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 				print_string_to_buffer(buf, ", ")
 			}
 
-			elem: any
-			elem.data = (arg.data as int + i*info.elem_size) as rawptr
-			elem.type_info = info.elem
-			print_any_to_buffer(buf, elem)
+			data := arg.data as ^byte + i*info.elem_size
+			print_any_to_buffer(buf, make_any(info.elem, data))
 		}
 
 	case Slice:
@@ -479,25 +428,35 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 				print_string_to_buffer(buf, ", ")
 			}
 
-			elem: any
-			elem.data = ptr_offset(slice.data, i*info.elem_size)
-			elem.type_info = info.elem
-			print_any_to_buffer(buf, elem)
+			data := slice.data + i*info.elem_size
+			print_any_to_buffer(buf, make_any(info.elem, data))
 		}
 
 	case Vector:
+		is_bool :: proc(type_info: ^Type_Info) -> bool {
+			match type info : type_info {
+			case Named:
+				return is_bool(info.base)
+			case Boolean:
+				return true
+			}
+			return false
+		}
+
 		print_string_to_buffer(buf, "<")
 		defer print_string_to_buffer(buf, ">")
+
+		if is_bool(info.elem) {
+			return
+		}
 
 		for i := 0; i < info.count; i++ {
 			if i > 0 {
 				print_string_to_buffer(buf, ", ")
 			}
 
-			elem: any
-			elem.data = ptr_offset(arg.data as ^byte, i*info.elem_size)
-			elem.type_info = info.elem
-			print_any_to_buffer(buf, elem)
+			data := arg.data as ^byte + i*info.elem_size
+			print_any_to_buffer(buf, make_any(info.elem, data))
 		}
 
 
@@ -510,12 +469,11 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 			if i > 0 {
 				print_string_to_buffer(buf, ", ")
 			}
-			print_any_to_buffer(buf, info.fields[i].name)
+			print_string_to_buffer(buf, info.fields[i].name)
 			print_string_to_buffer(buf, " = ")
-			a: any
-			a.data = ptr_offset(arg.data as ^byte, info.fields[i].offset)
-			a.type_info = info.fields[i].type_info
-			print_any_to_buffer(buf, a)
+			data := arg.data as ^byte + info.fields[i].offset
+			ti := info.fields[i].type_info
+			print_any_to_buffer(buf, make_any(ti, data))
 		}
 
 	case Union:
@@ -526,8 +484,6 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 		print_type_to_buffer(buf, arg.type_info)
 		print_string_to_buffer(buf, " @ 0x")
 		print_pointer_to_buffer(buf, (arg.data as ^rawptr)^)
-
-	default:
 	}
 }
 

@@ -555,6 +555,8 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecke
 
 		struct_type->Record.fields = reordered_fields;
 	}
+
+	type_set_offsets(c->sizes, c->allocator, struct_type);
 }
 
 void check_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker *cycle_checker) {
@@ -1232,13 +1234,27 @@ b32 check_binary_op(Checker *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
 	Type *type = base_type(base_vector_type(o->type));
 	switch (op.kind) {
-	case Token_Add:
 	case Token_Sub:
+	case Token_SubEq:
+		if (!is_type_numeric(type) && !is_type_pointer(type)) {
+			error(op, "Operator `%.*s` is only allowed with numeric or pointer expressions", LIT(op.string));
+			return false;
+		}
+		if (is_type_pointer(type)) {
+			o->type = t_int;
+		}
+		if (base_type(type) == t_rawptr) {
+			gbString str = type_to_string(type);
+			defer (gb_string_free(str));
+			error(ast_node_token(o->expr), "Invalid pointer type for pointer arithmetic: `%s`", str);
+			return false;
+		}
+		break;
+
+	case Token_Add:
 	case Token_Mul:
 	case Token_Quo:
-
 	case Token_AddEq:
-	case Token_SubEq:
 	case Token_MulEq:
 	case Token_QuoEq:
 		if (!is_type_numeric(type)) {
@@ -1732,6 +1748,44 @@ String check_down_cast_name(Type *dst_, Type *src_) {
 	return result;
 }
 
+Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offset, AstNode *node) {
+	GB_ASSERT(node->kind == AstNode_BinaryExpr);
+	ast_node(be, BinaryExpr, node);
+	GB_ASSERT(is_type_pointer(ptr->type));
+	GB_ASSERT(is_type_integer(offset->type));
+	GB_ASSERT(op == Token_Add || op == Token_Sub);
+
+	Operand operand = {};
+	operand.mode = Addressing_Value;
+	operand.type = ptr->type;
+	operand.expr = node;
+
+	if (base_type(ptr->type) == t_rawptr) {
+		gbString str = type_to_string(ptr->type);
+		defer (gb_string_free(str));
+		error(ast_node_token(node), "Invalid pointer type for pointer arithmetic: `%s`", str);
+		operand.mode = Addressing_Invalid;
+		return operand;
+	}
+
+
+	if (ptr->mode == Addressing_Constant && offset->mode == Addressing_Constant) {
+		i64 elem_size = type_size_of(c->sizes, c->allocator, ptr->type);
+		i64 ptr_val = ptr->value.value_pointer;
+		i64 offset_val = exact_value_to_integer(offset->value).value_integer;
+		i64 new_ptr_val = ptr_val;
+		if (op == Token_Add) {
+			new_ptr_val += elem_size*offset_val;
+		} else {
+			new_ptr_val -= elem_size*offset_val;
+		}
+		operand.mode = Addressing_Constant;
+		operand.value = make_exact_value_pointer(new_ptr_val);
+	}
+
+	return operand;
+}
+
 void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	PROF_PROC();
 
@@ -1904,14 +1958,35 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 
 	Token op = be->op;
 
-
 	if (token_is_shift(op)) {
 		check_shift(c, x, y, node);
 		return;
 	}
 
+	if (op.kind == Token_Add   || op.kind == Token_Sub) {
+		if (is_type_pointer(x->type) && is_type_integer(y->type)) {
+			*x = check_ptr_addition(c, op.kind, x, y, node);
+			return;
+		} else if (is_type_integer(x->type) && is_type_pointer(y->type)) {
+			if (op.kind == Token_Sub) {
+				gbString lhs = expr_to_string(x->expr);
+				gbString rhs = expr_to_string(y->expr);
+				defer (gb_string_free(lhs));
+				defer (gb_string_free(rhs));
+				error(ast_node_token(node), "Invalid pointer arithmetic, did you mean `%s %.*s %s`?", rhs, LIT(op.string), lhs);
+				x->mode = Addressing_Invalid;
+				return;
+			}
+			*x = check_ptr_addition(c, op.kind, y, x, node);
+			return;
+		}
+	}
+
+
 	convert_to_typed(c, x, y->type);
-	if (x->mode == Addressing_Invalid) return;
+	if (x->mode == Addressing_Invalid) {
+		return;
+	}
 	convert_to_typed(c, y, x->type);
 	if (y->mode == Addressing_Invalid) {
 		x->mode = Addressing_Invalid;
@@ -1952,12 +2027,14 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			b32 fail = false;
 			switch (y->value.kind) {
 			case ExactValue_Integer:
-				if (y->value.value_integer == 0)
+				if (y->value.value_integer == 0) {
 					fail = true;
+				}
 				break;
 			case ExactValue_Float:
-				if (y->value.value_float == 0.0)
+				if (y->value.value_float == 0.0) {
 					fail = true;
+				}
 				break;
 			}
 
@@ -1975,6 +2052,14 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		ExactValue b = y->value;
 
 		Type *type = base_type(x->type);
+		if (is_type_pointer(type)) {
+			GB_ASSERT(op.kind == Token_Sub);
+			i64 bytes = a.value_pointer - b.value_pointer;
+			i64 diff = bytes/type_size_of(c->sizes, c->allocator, type);
+			x->value = make_exact_value_pointer(diff);
+			return;
+		}
+
 		if (type->kind != Type_Basic) {
 			gbString xt = type_to_string(x->type);
 			defer (gb_string_free(xt));
@@ -2788,6 +2873,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->mode = Addressing_Value;
 	} break;
 
+#if 0
 	case BuiltinProc_ptr_offset: {
 		// ptr_offset :: proc(ptr: ^T, offset: int) -> ^T
 		// ^T cannot be rawptr
@@ -2890,6 +2976,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			operand->mode = Addressing_Value;
 		}
 	} break;
+#endif
 
 	case BuiltinProc_slice_ptr: {
 		// slice_ptr :: proc(a: ^T, len: int[, cap: int]) -> []T

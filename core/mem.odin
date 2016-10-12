@@ -93,18 +93,18 @@ AllocationHeader :: struct {
 }
 allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: int) {
 	header.size = size
-	ptr := ptr_offset(header, 1) as ^int
+	ptr := (header+1) as ^int
 
 	for i := 0; ptr as rawptr < data; i++ {
-		ptr_offset(ptr, i)^ = -1
+		(ptr+i)^ = -1
 	}
 }
 allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
 	p := data as ^int
-	for ptr_offset(p, -1)^ == -1 {
-		p = ptr_offset(p, -1)
+	for (p-1)^ == -1 {
+		p = (p-1)
 	}
-	return ptr_offset(p as ^AllocationHeader, -1)
+	return (p as ^AllocationHeader)-1
 }
 
 
@@ -207,3 +207,127 @@ end_temp_arena_memory :: proc(using tmp: Temp_Arena_Memory) {
 	arena.memory.count = original_count
 	arena.temp_count--
 }
+
+
+
+
+
+
+
+align_of_type_info :: proc(type_info: ^Type_Info) -> int {
+	WORD_SIZE :: size_of(int)
+	using Type_Info
+
+	match type info : type_info {
+	case Named:
+		return align_of_type_info(info.base)
+	case Integer:
+		return info.size
+	case Float:
+		return info.size
+	case String:
+		return WORD_SIZE
+	case Boolean:
+		return 1
+	case Pointer:
+		return WORD_SIZE
+	case Maybe:
+		return align_of_type_info(info.elem)
+	case Procedure:
+		return WORD_SIZE
+	case Array:
+		return align_of_type_info(info.elem)
+	case Slice:
+		return WORD_SIZE
+	case Vector:
+		return align_of_type_info(info.elem)
+	case Struct:
+		return info.align
+	case Union:
+		return info.align
+	case Raw_Union:
+		return info.align
+	case Enum:
+		return align_of_type_info(info.base)
+	}
+
+	return 0
+}
+
+align_formula :: proc(size, align: int) -> int {
+	result := size + align-1
+	return result - result%align
+}
+
+size_of_type_info :: proc(type_info: ^Type_Info) -> int {
+	WORD_SIZE :: size_of(int)
+	using Type_Info
+
+	match type info : type_info {
+	case Named:
+		return size_of_type_info(info.base)
+	case Integer:
+		return info.size
+	case Float:
+		return info.size
+	case Any:
+		return 2*WORD_SIZE
+	case String:
+		return 2*WORD_SIZE
+	case Boolean:
+		return 1
+	case Pointer:
+		return WORD_SIZE
+	case Maybe:
+		return size_of_type_info(info.elem) + 1
+	case Procedure:
+		return WORD_SIZE
+	case Array:
+		count := info.count
+		if count == 0 {
+			return 0
+		}
+		size      := size_of_type_info(info.elem)
+		align     := align_of_type_info(info.elem)
+		alignment := align_formula(size, align)
+		return alignment*(count-1) + size
+	case Slice:
+		return 3*WORD_SIZE
+	case Vector:
+		is_bool :: proc(type_info: ^Type_Info) -> bool {
+			match type info : type_info {
+			case Named:
+				return is_bool(info.base)
+			case Boolean:
+				return true
+			}
+			return false
+		}
+
+		count := info.count
+		if count == 0 {
+			return 0
+		}
+		bit_size := 8*size_of_type_info(info.elem)
+		if is_bool(info.elem) {
+			// NOTE(bill): LLVM can store booleans as 1 bit because a boolean _is_ an `i1`
+			// Silly LLVM spec
+			bit_size = 1
+		}
+		total_size_in_bits := bit_size * count
+		total_size := (total_size_in_bits+7)/8
+		return total_size
+
+	case Struct:
+		return info.size
+	case Union:
+		return info.size
+	case Raw_Union:
+		return info.size
+	case Enum:
+		return size_of_type_info(info.base)
+	}
+
+	return 0
+}
+

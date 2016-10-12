@@ -367,6 +367,7 @@ gb_global Type *t_type_info_member_ptr = NULL;
 gb_global Type *t_type_info_named      = NULL;
 gb_global Type *t_type_info_integer    = NULL;
 gb_global Type *t_type_info_float      = NULL;
+gb_global Type *t_type_info_any        = NULL;
 gb_global Type *t_type_info_string     = NULL;
 gb_global Type *t_type_info_boolean    = NULL;
 gb_global Type *t_type_info_pointer    = NULL;
@@ -380,7 +381,6 @@ gb_global Type *t_type_info_struct     = NULL;
 gb_global Type *t_type_info_union      = NULL;
 gb_global Type *t_type_info_raw_union  = NULL;
 gb_global Type *t_type_info_enum       = NULL;
-gb_global Type *t_type_info_any        = NULL;
 
 gb_global Type *t_allocator            = NULL;
 gb_global Type *t_allocator_ptr        = NULL;
@@ -990,8 +990,11 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
 i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, i64 index);
 
 i64 align_formula(i64 size, i64 align) {
-	i64 result = size + align-1;
-	return result - result%align;
+	if (align > 0) {
+		i64 result = size + align-1;
+		return result - result%align;
+	}
+	return size;
 }
 
 i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
@@ -1025,16 +1028,7 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	case Type_Record: {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct:
-			if (!t->Record.struct_is_packed) {
-				i64 max = 1;
-				for (isize i = 0; i < t->Record.field_count; i++) {
-					i64 align = type_align_of(s, allocator, t->Record.fields[i]->type);
-					if (max < align) {
-						max = align;
-					}
-				}
-				return max;
-			} else if (t->Record.field_count > 0) {
+			if (t->Record.field_count > 0) {
 				return type_align_of(s, allocator, t->Record.fields[0]->type);
 			}
 			break;
@@ -1141,17 +1135,19 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		i64 total_size_in_bits = bit_size * count;
 		i64 total_size = (total_size_in_bits+7)/8;
 		return total_size;
-
-		// i64 alignment = align_formula(size, align);
-		// return alignment*(count-1) + size;
 	} break;
 
 
 	case Type_Slice: // ptr + len + cap
 		return 3 * s.word_size;
 
-	case Type_Maybe: // value + bool
-		return type_size_of(s, allocator, t->Maybe.elem) + type_size_of(s, allocator, t_bool);
+	case Type_Maybe: { // value + bool
+		Type *elem = t->Maybe.elem;
+		i64 align = type_align_of(s, allocator, elem);
+		i64 size = align_formula(type_size_of(s, allocator, elem), align);
+		size += type_size_of(s, allocator, t_bool);
+		return align_formula(size, align);
+	}
 
 	case Type_Record: {
 		switch (t->Record.kind) {
@@ -1161,7 +1157,10 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 				return 0;
 			}
 			type_set_offsets(s, allocator, t);
-			return t->Record.struct_offsets[count-1] + type_size_of(s, allocator, t->Record.fields[count-1]->type);
+			// TODO(bill): Is this how it should work?
+			i64 size = t->Record.struct_offsets[count-1] + type_size_of(s, allocator, t->Record.fields[count-1]->type);
+			i64 align = type_align_of(s, allocator, t);
+			return align_formula(size, align);
 		} break;
 
 		case TypeRecord_Union: {
@@ -1174,7 +1173,10 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 					max = size;
 			}
 			// NOTE(bill): Align to int
-			return align_formula(max, s.word_size) + type_size_of(s, allocator, t_int);
+			i64 align = type_align_of(s, allocator, t);
+			isize size =  align_formula(max, s.word_size);
+			size += type_size_of(s, allocator, t_int);
+			return align_formula(size, align);
 		} break;
 
 		case TypeRecord_RawUnion: {
@@ -1185,7 +1187,9 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 				if (max < size)
 					max = size;
 			}
-			return max;
+			// TODO(bill): Is this how it should work?
+			i64 align = type_align_of(s, allocator, t);
+			return align_formula(max, align);
 		} break;
 
 		case TypeRecord_Enum: {
