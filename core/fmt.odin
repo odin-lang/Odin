@@ -406,8 +406,9 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 
 
 	case Array:
-		print_string_to_buffer(buf, "[")
-		defer print_string_to_buffer(buf, "]")
+		bprintf(buf, "[%]%{", info.count, info.elem)
+		defer print_string_to_buffer(buf, "}")
+
 
 		for i := 0; i < info.count; i++ {
 			if i > 0 {
@@ -420,8 +421,8 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 
 	case Slice:
 		slice := arg.data as ^[]byte
-		print_string_to_buffer(buf, "[")
-		defer print_string_to_buffer(buf, "]")
+		bprintf(buf, "[]%{", info.elem)
+		defer print_string_to_buffer(buf, "}")
 
 		for i := 0; i < slice.count; i++ {
 			if i > 0 {
@@ -443,8 +444,8 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 			return false
 		}
 
-		print_string_to_buffer(buf, "<")
-		defer print_string_to_buffer(buf, ">")
+		bprintf(buf, "{%}%{", info.count, info.elem)
+		defer print_string_to_buffer(buf, "}")
 
 		if is_bool(info.elem) {
 			return
@@ -461,8 +462,7 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 
 
 	case Struct:
-		print_string_to_buffer(buf, "struct")
-		print_string_to_buffer(buf, "{")
+		bprintf(buf, "%{", arg.type_info)
 		defer print_string_to_buffer(buf, "}")
 
 		for i := 0; i < info.fields.count; i++ {

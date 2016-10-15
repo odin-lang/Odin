@@ -1102,8 +1102,9 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		BasicKind kind = t->Basic.kind;
 		if (kind < gb_count_of(basic_type_sizes)) {
 			i64 size = basic_type_sizes[kind];
-			if (size > 0)
+			if (size > 0) {
 				return size;
+			}
 		}
 		if (kind == Basic_string) {
 			return 2 * s.word_size;
@@ -1114,8 +1115,9 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 
 	case Type_Array: {
 		i64 count = t->Array.count;
-		if (count == 0)
+		if (count == 0) {
 			return 0;
+		}
 		i64 align = type_align_of(s, allocator, t->Array.elem);
 		i64 size  = type_size_of(s,  allocator, t->Array.elem);
 		i64 alignment = align_formula(size, align);
@@ -1124,8 +1126,9 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 
 	case Type_Vector: {
 		i64 count = t->Vector.count;
-		if (count == 0)
+		if (count == 0) {
 			return 0;
+		}
 		// i64 align = type_align_of(s, allocator, t->Vector.elem);
 		i64 bit_size = 8*type_size_of(s,  allocator, t->Vector.elem);
 		if (is_type_boolean(t->Vector.elem)) {
@@ -1169,8 +1172,9 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 			// NOTE(bill): Zeroth field is invalid
 			for (isize i = 1; i < count; i++) {
 				i64 size = type_size_of(s, allocator, t->Record.fields[i]->type);
-				if (max < size)
+				if (max < size) {
 					max = size;
+				}
 			}
 			// NOTE(bill): Align to int
 			i64 align = type_align_of(s, allocator, t);
@@ -1184,8 +1188,9 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 			i64 max = 0;
 			for (isize i = 0; i < count; i++) {
 				i64 size = type_size_of(s, allocator, t->Record.fields[i]->type);
-				if (max < size)
+				if (max < size) {
 					max = size;
+				}
 			}
 			// TODO(bill): Is this how it should work?
 			i64 align = type_align_of(s, allocator, t);
@@ -1211,7 +1216,6 @@ i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, isize index)
 			return t->Record.struct_offsets[index];
 		}
 	} else if (t->kind == Type_Basic) {
-		gb_printf_err("here!!\n");
 		if (t->Basic.kind == Basic_string) {
 			switch (index) {
 			case 0: return 0;

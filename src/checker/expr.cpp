@@ -3677,7 +3677,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 		default: {
 			gbString str = type_to_string(type);
-			error(ast_node_token(node), "Invalid or unyet supported compound literal type `%s`", str);
+			error(ast_node_token(node), "Invalid compound literal type `%s`", str);
 			gb_string_free(str);
 			goto error;
 		} break;
@@ -4185,6 +4185,11 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_ast_node(pt, PointerType, node);
 		str = gb_string_appendc(str, "^");
 		str = write_expr_to_string(str, pt->type);
+	case_end;
+
+	case_ast_node(mt, MaybeType, node);
+		str = gb_string_appendc(str, "?");
+		str = write_expr_to_string(str, mt->type);
 	case_end;
 
 	case_ast_node(at, ArrayType, node);

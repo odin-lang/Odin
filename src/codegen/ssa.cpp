@@ -2306,19 +2306,20 @@ void ssa_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low, ssaV
 }
 
 ssaValue *ssa_find_global_variable(ssaProcedure *proc, String name) {
-	ssaValue *value = *map_get(&proc->module->members, hash_string(name));
-	return value;
+	ssaValue **value = map_get(&proc->module->members, hash_string(name));
+	GB_ASSERT_MSG(value != NULL, "Unable to find global variable `%.*s`", LIT(name));
+	return *value;
 }
 
-ssaValue *ssa_emit_implicit_value(ssaProcedure *proc, Entity *e) {
-	String name = e->token.string;
-	ssaValue *g = NULL;
-	if (name == "context") {
-		g = ssa_emit_load(proc, ssa_find_global_variable(proc, make_string("__context")));
-	}
-	GB_ASSERT(g != NULL);
-	return g;
+ssaValue *ssa_find_implicit_value_backing(ssaProcedure *proc, ImplicitValueId id) {
+	Entity *e = proc->module->info->implicit_values[id];
+	GB_ASSERT(e->kind == Entity_ImplicitValue);
+	Entity *backing = e->ImplicitValue.backing;
+	ssaValue **value = map_get(&proc->module->values, hash_pointer(backing));
+	GB_ASSERT_MSG(value != NULL, "Unable to find implicit value backing `%.*s`", LIT(backing->token.string));
+	return *value;
 }
+
 
 
 ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv) {
@@ -2338,7 +2339,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		} else if (e->kind == Entity_Nil) {
 			return ssa_make_value_nil(proc->module->allocator, tv->type);
 		} else if (e->kind == Entity_ImplicitValue) {
-			return ssa_emit_implicit_value(proc, e);
+			return ssa_emit_load(proc, ssa_find_implicit_value_backing(proc, e->ImplicitValue.id));
 		}
 
 		auto *found = map_get(&proc->module->values, hash_pointer(e));
@@ -3069,8 +3070,6 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 	if (tv->value.kind != ExactValue_Invalid) {
 		if (tv->value.kind == ExactValue_String) {
 			ssa_emit_comment(proc, make_string("Emit string constant"));
-
-			// TODO(bill): Optimize by not allocating everytime
 			if (tv->value.value_string.len > 0) {
 				return ssa_emit_global_string(proc, tv->value.value_string);
 			} else {
@@ -3084,8 +3083,7 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 
 	ssaValue *value = NULL;
 	if (tv->mode == Addressing_Variable) {
-		ssaAddr addr = ssa_build_addr(proc, expr);
-		value = ssa_lvalue_load(proc, addr);
+		value = ssa_lvalue_load(proc, ssa_build_addr(proc, expr));
 	} else {
 		value = ssa_build_single_expr(proc, expr, tv);
 	}
@@ -3122,8 +3120,6 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 		Entity *e = entity_of_ident(proc->module->info, expr);
 		TypeAndValue *tv = map_get(&proc->module->info->types, hash_pointer(expr));
-		// GB_ASSERT(tv == NULL || tv->mode == Addressing_Variable);
-
 
 		if (e->kind == Entity_Constant) {
 			if (base_type(e->type) == t_string) {
@@ -3148,10 +3144,8 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		} else if (e->kind == Entity_Variable && e->Variable.anonymous) {
 			v = ssa_add_using_variable(proc, e);
 		} else if (e->kind == Entity_ImplicitValue) {
-			ssaValue *g = ssa_emit_implicit_value(proc, e);
-			// NOTE(bill): Create a copy as it's by value
-			v = ssa_add_local_generated(proc, ssa_type(g));
-			ssa_emit_store(proc, v, g);
+			// TODO(bill): Should a copy be made?
+			v = ssa_find_implicit_value_backing(proc, e->ImplicitValue.id);
 		}
 
 		if (v == NULL) {
@@ -4210,7 +4204,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		ssa_open_scope(proc);
 		defer (ssa_close_scope(proc, ssaDeferExit_Default, NULL));
 
-		ssaValue *context_ptr = ssa_find_global_variable(proc, make_string("__context"));
+		ssaValue *context_ptr = ssa_find_implicit_value_backing(proc, ImplicitValue_context);
 		ssaValue *prev_context = ssa_add_local_generated(proc, t_context);
 		ssa_emit_store(proc, prev_context, ssa_emit_load(proc, context_ptr));
 
@@ -4229,7 +4223,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		ssa_open_scope(proc);
 		defer (ssa_close_scope(proc, ssaDeferExit_Default, NULL));
 
-		ssaValue *context_ptr = ssa_find_global_variable(proc, make_string("__context"));
+		ssaValue *context_ptr = ssa_find_implicit_value_backing(proc, ImplicitValue_context);
 		ssaValue *prev_context = ssa_add_local_generated(proc, t_context);
 		ssa_emit_store(proc, prev_context, ssa_emit_load(proc, context_ptr));
 

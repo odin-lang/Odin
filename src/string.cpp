@@ -115,17 +115,17 @@ GB_COMPARE_PROC(string_cmp_proc) {
 }
 
 
-bool operator ==(String a, String b) { return are_strings_equal(a, b) != 0; }
-bool operator !=(String a, String b) { return !operator==(a, b); }
-bool operator < (String a, String b) { return string_compare(a, b) < 0; }
-bool operator > (String a, String b) { return string_compare(a, b) > 0; }
-bool operator <=(String a, String b) { return string_compare(a, b) <= 0; }
-bool operator >=(String a, String b) { return string_compare(a, b) >= 0; }
+gb_inline bool operator ==(String a, String b) { return are_strings_equal(a, b) != 0; }
+gb_inline bool operator !=(String a, String b) { return !operator==(a, b); }
+gb_inline bool operator < (String a, String b) { return string_compare(a, b) < 0; }
+gb_inline bool operator > (String a, String b) { return string_compare(a, b) > 0; }
+gb_inline bool operator <=(String a, String b) { return string_compare(a, b) <= 0; }
+gb_inline bool operator >=(String a, String b) { return string_compare(a, b) >= 0; }
 
-template <size_t N> bool operator ==(String a, char const (&b)[N]) { return a == make_string(b); }
-template <size_t N> bool operator !=(String a, char const (&b)[N]) { return a != make_string(b); }
-template <size_t N> bool operator ==(char const (&a)[N], String b) { return make_string(a) == b; }
-template <size_t N> bool operator !=(char const (&a)[N], String b) { return make_string(a) != b; }
+template <size_t N> gb_inline bool operator ==(String a, char const (&b)[N]) { return a == make_string(cast(u8 *)b, N-1); }
+template <size_t N> gb_inline bool operator !=(String a, char const (&b)[N]) { return a != make_string(cast(u8 *)b, N-1); }
+template <size_t N> gb_inline bool operator ==(char const (&a)[N], String b) { return make_string(cast(u8 *)a, N-1) == b; }
+template <size_t N> gb_inline bool operator !=(char const (&a)[N], String b) { return make_string(cast(u8 *)a, N-1) != b; }
 
 
 

@@ -181,6 +181,23 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("enum_to_string"),   1, false, Expr_Expr},
 };
 
+enum ImplicitValueId {
+	ImplicitValue_Invalid,
+
+	ImplicitValue_context,
+
+	ImplicitValue_Count,
+};
+struct ImplicitValueInfo {
+	String  name;
+	String  backing_name;
+	Type *  type;
+};
+// NOTE(bill): This is initialized later
+gb_global ImplicitValueInfo implicit_value_infos[ImplicitValue_Count] = {};
+
+
+
 struct CheckerContext {
 	Scope *scope;
 	DeclInfo *decl;
@@ -199,6 +216,8 @@ struct CheckerInfo {
 	Map<isize>             type_info_map;   // Key: Type *
 	Map<AstFile *>         files;           // Key: String
 	isize                  type_info_index;
+
+	Entity *               implicit_values[ImplicitValue_Count];
 };
 
 struct Checker {
@@ -423,8 +442,9 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	String name = entity->token.string;
 	HashKey key = hash_string(name);
 	Entity **found = map_get(&s->elements, key);
-	if (found)
+	if (found) {
 		return *found;
+	}
 	map_set(&s->elements, key, entity);
 	if (entity->scope == NULL) {
 		entity->scope = s;
@@ -950,8 +970,17 @@ void init_preload_types(Checker *c) {
 		t_context = e->type;
 		t_context_ptr = make_type_pointer(c->allocator, t_context);
 
-		add_global_entity(make_entity_implicit_value(gb_heap_allocator(), make_string("context"), t_context));
 	}
+
+}
+
+void add_implicit_value(Checker *c, ImplicitValueId id, String name, String backing_name, Type *type) {
+	ImplicitValueInfo info = {name, backing_name, type};
+	Entity *value = make_entity_implicit_value(c->allocator, info.name, info.type, id);
+	Entity *prev = scope_insert_entity(c->global_scope, value);
+	GB_ASSERT(prev == NULL);
+	implicit_value_infos[id] = info;
+	c->info.implicit_values[id] = value;
 }
 
 void check_parsed_files(Checker *c) {
@@ -1228,10 +1257,23 @@ void check_parsed_files(Checker *c) {
 	check_global_entity(c, Entity_TypeName);
 
 	init_preload_types(c);
+	add_implicit_value(c, ImplicitValue_context, make_string("context"), make_string("__context"), t_context);
 
 	check_global_entity(c, Entity_Constant);
 	check_global_entity(c, Entity_Procedure);
 	check_global_entity(c, Entity_Variable);
+
+	for (isize i = 1; i < ImplicitValue_Count; i++) {
+		// NOTE(bill): First is invalid
+		Entity *e = c->info.implicit_values[i];
+		GB_ASSERT(e->kind == Entity_ImplicitValue);
+
+		ImplicitValueInfo *ivi = &implicit_value_infos[i];
+		Entity *backing = scope_lookup_entity(e->scope, ivi->backing_name);
+		GB_ASSERT(backing != NULL);
+		e->ImplicitValue.backing = backing;
+	}
+
 
 	// Check procedure bodies
 	for_array(i, c->procs) {

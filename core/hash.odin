@@ -138,7 +138,7 @@ murmur64 :: proc(data_: rawptr, len: int) -> u64 {
 			len -= 4
 		}
 
-		data8 := slice_ptr(ptr_offset(data.data, i) as ^u8, 3) // NOTE(bill): This is unsafe
+		data8 := slice_ptr((data.data+i) as ^u8, 3) // NOTE(bill): This is unsafe
 
 		match len {
 		case 3: h2 ~= data8[2] as u32 << 16; fallthrough

@@ -2,6 +2,7 @@ struct Scope;
 struct Checker;
 struct Type;
 enum BuiltinProcId;
+enum ImplicitValueId;
 
 #define ENTITY_KINDS \
 	ENTITY_KIND(Invalid), \
@@ -63,10 +64,13 @@ struct Entity {
 			String path;
 			String name;
 			Scope *scope;
-			b32 used;
+			b32    used;
 		} ImportName;
 		struct {} Nil;
-		struct {} ImplicitValue;
+		struct {
+			ImplicitValueId id;
+			Entity *        backing;
+		} ImplicitValue;
 	};
 };
 
@@ -160,9 +164,10 @@ Entity *make_entity_nil(gbAllocator a, String name, Type *type) {
 	return entity;
 }
 
-Entity *make_entity_implicit_value(gbAllocator a, String name, Type *type) {
+Entity *make_entity_implicit_value(gbAllocator a, String name, Type *type, ImplicitValueId id) {
 	Token token = make_token_ident(name);
 	Entity *entity = alloc_entity(a, Entity_ImplicitValue, NULL, token, type);
+	entity->ImplicitValue.id = id;
 	return entity;
 }
 
