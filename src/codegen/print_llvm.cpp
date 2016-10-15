@@ -145,12 +145,10 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 		case Basic_i16:    ssa_fprintf(f, "i16");                     break;
 		case Basic_i32:    ssa_fprintf(f, "i32");                     break;
 		case Basic_i64:    ssa_fprintf(f, "i64");                     break;
-		// case Basic_i128:   ssa_fprintf(f, "i128");                    break;
 		case Basic_u8:     ssa_fprintf(f, "i8");                      break;
 		case Basic_u16:    ssa_fprintf(f, "i16");                     break;
 		case Basic_u32:    ssa_fprintf(f, "i32");                     break;
 		case Basic_u64:    ssa_fprintf(f, "i64");                     break;
-		// case Basic_u128:   ssa_fprintf(f, "i128");                    break;
 		case Basic_f32:    ssa_fprintf(f, "float");                   break;
 		case Basic_f64:    ssa_fprintf(f, "double");                  break;
 		case Basic_rawptr: ssa_fprintf(f, "%%..rawptr");              break;
@@ -176,12 +174,11 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 		ssa_print_type(f, m, t->Array.elem);
 		ssa_fprintf(f, "]");
 		break;
-	case Type_Vector: {
-		// TODO(bill): actually do correctly
+	case Type_Vector:
 		ssa_fprintf(f, "<%lld x ", t->Vector.count);
 		ssa_print_type(f, m, t->Vector.elem);
 		ssa_fprintf(f, ">");
-	} break;
+		break;
 	case Type_Slice:
 		ssa_fprintf(f, "{");
 		ssa_print_type(f, m, t->Slice.elem);
@@ -278,7 +275,7 @@ void ssa_print_compound_element(ssaFileBuffer *f, ssaModule *m, ExactValue v, Ty
 		ssa_fprintf(f, " ");
 	}
 
-	if (v.kind == ExactValue_Invalid) {
+	if (v.kind == ExactValue_Invalid || base_type(elem_type) == t_any) {
 		ssa_fprintf(f, "zeroinitializer");
 	} else if (v.kind == ExactValue_String) {
 		// HACK NOTE(bill): This is a hack but it works because strings are created at the very end

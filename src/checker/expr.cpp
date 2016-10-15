@@ -933,7 +933,11 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 			o->type = t_invalid;
 			return;
 		}
-		o->mode = Addressing_Variable;
+		// if (e->Variable.param) {
+			// o->mode = Addressing_Value;
+		// } else {
+			o->mode = Addressing_Variable;
+		// }
 		break;
 
 	case Entity_TypeName: {
@@ -2239,7 +2243,6 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 
 
 	operand->type = target_type;
-	update_expr_type(c, operand->expr, target_type, true);
 }
 
 b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *value) {
@@ -3265,7 +3268,6 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 	defer (gb_temp_arena_memory_end(tmp));
 
-	isize operand_count = 0;
 	Array<Operand> operands;
 	array_init(&operands, c->tmp_allocator, 2*param_count);
 
@@ -3289,11 +3291,10 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 		}
 	}
 
-	operand_count = operands.count;
 	i32 error_code = 0;
-	if (operand_count < param_count) {
+	if (operands.count < param_count) {
 		error_code = -1;
-	} else if (!variadic && operand_count > param_count) {
+	} else if (!variadic && operands.count > param_count) {
 		error_code = +1;
 	}
 	if (error_code != 0) {
@@ -3303,16 +3304,22 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 		}
 
 		gbString proc_str = expr_to_string(ce->proc);
+		defer (gb_string_free(proc_str));
 		error(ast_node_token(call), err_fmt, proc_str, param_count);
-		gb_string_free(proc_str);
 		operand->mode = Addressing_Invalid;
 	}
 
 	GB_ASSERT(proc_type->Proc.params != NULL);
 	Entity **sig_params = proc_type->Proc.params->Tuple.variables;
-	for (isize i = 0; i < param_count; i++) {
-		Type *arg_type = sig_params[i]->type;
-		check_assignment(c, &operands[i], arg_type, make_string("argument"), true);
+	isize operand_index = 0;
+	for (; operand_index < param_count; operand_index++) {
+		Type *arg_type = sig_params[operand_index]->type;
+		Operand o = operands[operand_index];
+		if (variadic) {
+
+			o = operands[operand_index];
+		}
+		check_assignment(c, &o, arg_type, make_string("argument"), true);
 	}
 
 	if (variadic) {
@@ -3320,18 +3327,18 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 		Type *slice = sig_params[param_count]->type;
 		Type *elem = base_type(slice)->Slice.elem;
 		Type *t = elem;
-		for (isize i = param_count; i < operand_count; i++) {
-			Operand *o = &operands[i];
+		for (; operand_index < operands.count; operand_index++) {
+			Operand o = operands[operand_index];
 			if (vari_expand) {
 				variadic_expand = true;
 				t = slice;
-				if (i != param_count) {
-					error(ast_node_token(o->expr),
+				if (operand_index != param_count) {
+					error(ast_node_token(o.expr),
 					      "`..` in a variadic procedure can only have one variadic argument at the end");
 					break;
 				}
 			}
-			check_assignment(c, o, t, make_string("argument"), true);
+			check_assignment(c, &o, t, make_string("argument"), true);
 		}
 	}
 }
@@ -3574,9 +3581,13 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 						fields_visited[sel.index[0]] = true;
 						check_expr(c, o, fv->value);
 
+						if (base_type(field->type) == t_any) {
+							is_constant = false;
+						}
 						if (is_constant) {
 							is_constant = o->mode == Addressing_Constant;
 						}
+
 
 						check_assignment(c, o, field->type, make_string("structure literal"));
 					}
@@ -3596,6 +3607,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 							break;
 						}
 
+						if (base_type(field->type) == t_any) {
+							is_constant = false;
+						}
 						if (is_constant) {
 							is_constant = o->mode == Addressing_Constant;
 						}
@@ -3632,14 +3646,17 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			isize index = 0;
 			isize elem_count = cl->elems.count;
 
+			if (base_type(elem_type) == t_any) {
+				is_constant = false;
+			}
+
 			for (; index < elem_count; index++) {
 				AstNode *e = cl->elems[index];
 				if (e->kind == AstNode_FieldValue) {
 					error(ast_node_token(e),
-					      "`field = value` is only allowed in structure literals");
+					      "`field = value` is only allowed in struct literals");
 					continue;
 				}
-
 
 				if (t->kind == Type_Array &&
 				    t->Array.count >= 0 &&
@@ -3660,8 +3677,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 					is_constant = operand.mode == Addressing_Constant;
 				}
 			}
-			if (max < index)
+			if (max < index) {
 				max = index;
+			}
 
 			if (t->kind == Type_Vector) {
 				if (t->Vector.count > 1 && gb_is_between(index, 2, t->Vector.count-1)) {

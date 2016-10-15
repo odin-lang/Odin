@@ -645,7 +645,6 @@ void add_untyped(CheckerInfo *i, AstNode *expression, b32 lhs, AddressingMode mo
 	map_set(&i->untyped, hash_pointer(expression), make_expression_info(lhs, mode, basic_type, value));
 }
 
-
 void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode, Type *type, ExactValue value) {
 	GB_ASSERT(expression != NULL);
 	if (mode == Addressing_Invalid)
@@ -1306,7 +1305,7 @@ void check_parsed_files(Checker *c) {
 		ExpressionInfo *info = &entry->value;
 		if (info != NULL && expr != NULL) {
 			if (is_type_typed(info->type)) {
-				compiler_error("%s (type %s) is typed!", expr_to_string(expr), info->type);
+				compiler_error("%s (type %s) is typed!", expr_to_string(expr), type_to_string(info->type));
 			}
 			add_type_and_value(&c->info, expr, info->mode, info->type, info->value);
 		}

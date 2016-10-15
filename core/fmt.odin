@@ -90,7 +90,8 @@ print_pointer_to_buffer :: proc(buffer: ^[]byte, p: rawptr) #inline {
 
 print_f32_to_buffer :: proc(buffer: ^[]byte, f: f32) #inline { print__f64(buffer, f as f64, 7) }
 print_f64_to_buffer :: proc(buffer: ^[]byte, f: f64) #inline { print__f64(buffer, f, 10) }
-print_u64_to_buffer :: proc(buffer: ^[]byte, i: u64) {
+print_u64_to_buffer :: proc(buffer: ^[]byte, value: u64) {
+	i := value
 	buf: [22]byte
 	len := 0
 	if i == 0 {
@@ -105,7 +106,8 @@ print_u64_to_buffer :: proc(buffer: ^[]byte, i: u64) {
 	byte_reverse(buf[:len])
 	print_string_to_buffer(buffer, buf[:len] as string)
 }
-print_i64_to_buffer :: proc(buffer: ^[]byte, i: i64) {
+print_i64_to_buffer :: proc(buffer: ^[]byte, value: i64) {
+	i := value
 	neg := i < 0
 	if neg {
 		i = -i
@@ -114,7 +116,8 @@ print_i64_to_buffer :: proc(buffer: ^[]byte, i: i64) {
 	print_u64_to_buffer(buffer, i as u64)
 }
 
-print__f64 :: proc(buffer: ^[]byte, f: f64, decimal_places: int) {
+print__f64 :: proc(buffer: ^[]byte, value: f64, decimal_places: int) {
+	f := value
 	if f == 0 {
 		print_rune_to_buffer(buffer, #rune "0")
 		return
@@ -555,12 +558,11 @@ bprintf :: proc(buf: ^[]byte, fmt: string, args: ..any) {
 bprint :: proc(buf: ^[]byte, args: ..any) {
 	is_type_string :: proc(info: ^Type_Info) -> bool {
 		using Type_Info
-		info = type_info_base(info)
 		if info == nil {
 			return false
 		}
 
-		match type i : info {
+		match type i : type_info_base(info) {
 		case String:
 			return true
 		}

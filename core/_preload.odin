@@ -74,11 +74,12 @@ type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 	if info == nil {
 		return nil
 	}
-	match type i : info {
+	base := info
+	match type i : base {
 	case Type_Info.Named:
-		info = i.base
+		base = i.base
 	}
-	return info
+	return base
 }
 
 
@@ -259,10 +260,10 @@ __string_eq :: proc(a, b: string) -> bool {
 	if a.count != b.count {
 		return false
 	}
-	if ^a[0] == ^b[0] {
+	if a.data == b.data {
 		return true
 	}
-	return mem.compare(^a[0], ^b[0], a.count) == 0
+	return mem.compare(a.data, b.data, a.count) == 0
 }
 
 __string_cmp :: proc(a, b : string) -> int {
@@ -312,9 +313,7 @@ __substring_expr_error :: proc(file: string, line, column: int,
 }
 
 __enum_to_string :: proc(info: ^Type_Info, value: i64) -> string {
-	info = type_info_base(info)
-
-	match type ti : info {
+	match type ti : type_info_base(info) {
 	case Type_Info.Enum:
 		// TODO(bill): Search faster than linearly
 		for i := 0; i < ti.values.count; i++ {

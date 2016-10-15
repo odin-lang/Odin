@@ -1418,6 +1418,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 	proc->curr_block = proc->decl_block;
 	ssa_emit_jump(proc, proc->entry_block);
 
+#if 0
 	ssa_optimize_blocks(proc);
 	ssa_build_referrers(proc);
 	ssa_build_dom_tree(proc);
@@ -1428,7 +1429,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 	// [ ] Local stored once?  Replace loads with dominating store
 	// [ ] Convert to phi nodes
 	ssa_opt_mem2reg(proc);
-
+#endif
 
 // Number registers
 	i32 reg_index = 0;
@@ -1923,6 +1924,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 				ev = exact_value_to_float(ev);
 			} else if (is_type_string(dst)) {
 				// Handled elsewhere
+				GB_ASSERT(ev.kind == ExactValue_String);
 			} else if (is_type_integer(dst)) {
 				ev = exact_value_to_integer(ev);
 			} else if (is_type_pointer(dst)) {
@@ -2479,7 +2481,10 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		case Type_Slice:  et = bt->Slice.elem;  break;
 		}
 
-		auto is_elem_const = [](ssaModule *m, AstNode *elem) -> b32 {
+		auto is_elem_const = [](ssaModule *m, AstNode *elem, Type *elem_type) -> b32 {
+			if (base_type(elem_type) == t_any) {
+				return false;
+			}
 			if (elem->kind == AstNode_FieldValue) {
 				elem = elem->FieldValue.value;
 			}
@@ -2495,7 +2500,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			ssaValue *result = ssa_add_module_constant(proc->module, type, make_exact_value_compound(expr));
 			for_array(index, cl->elems) {
 				AstNode *elem = cl->elems[index];
-				if (is_elem_const(proc->module, elem)) {
+				if (is_elem_const(proc->module, elem, et)) {
 					continue;
 				}
 				ssaValue *field_elem = ssa_build_expr(proc, elem);
@@ -2526,9 +2531,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 				ssa_emit_store(proc, v, ssa_add_module_constant(proc->module, type, make_exact_value_compound(expr)));
 				for_array(field_index, cl->elems) {
 					AstNode *elem = cl->elems[field_index];
-					if (is_elem_const(proc->module, elem)) {
-						continue;
-					}
 
 					ssaValue *field_expr = NULL;
 					Entity *field = NULL;
@@ -2538,17 +2540,23 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 						ast_node(fv, FieldValue, elem);
 						Selection sel = lookup_field(proc->module->allocator, bt, fv->field->Ident.string, false);
 						index = sel.index[0];
-						field_expr = ssa_build_expr(proc, fv->value);
+						elem = fv->value;
 					} else {
 						TypeAndValue *tav = type_and_value_of_expression(proc->module->info, elem);
 						Selection sel = lookup_field(proc->module->allocator, bt, st->fields_in_src_order[field_index]->token.string, false);
 						index = sel.index[0];
-						field_expr = ssa_build_expr(proc, elem);
 					}
+
+					field = st->fields[index];
+					if (is_elem_const(proc->module, elem, field->type)) {
+						continue;
+					}
+
+					field_expr = ssa_build_expr(proc, elem);
 
 					GB_ASSERT(ssa_type(field_expr)->kind != Type_Tuple);
 
-					field = st->fields[index];
+
 
 					Type *ft = field->type;
 					ssaValue *fv = ssa_emit_conv(proc, field_expr, ft);
@@ -2562,7 +2570,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 				ssa_emit_store(proc, v, ssa_add_module_constant(proc->module, type, make_exact_value_compound(expr)));
 				for_array(i, cl->elems) {
 					AstNode *elem = cl->elems[i];
-					if (is_elem_const(proc->module, elem)) {
+					if (is_elem_const(proc->module, elem, et)) {
 						continue;
 					}
 					ssaValue *field_expr = ssa_build_expr(proc, elem);
@@ -2587,7 +2595,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 				for_array(i, cl->elems) {
 					AstNode *elem = cl->elems[i];
-					if (is_elem_const(proc->module,elem)) {
+					if (is_elem_const(proc->module, elem, et)) {
 						continue;
 					}
 
@@ -3034,11 +3042,14 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 				ssa_emit_store(proc, ssa_emit_struct_gep(proc, slice, v_two32, t_int), len);
 			}
 
+			if (args[0]->kind == ssaValue_Constant) {
+				auto *c = &args[0]->Constant;
+				gb_printf_err("%s %d\n", type_to_string(c->type), c->value.kind);
+			}
 
 			arg_count = type->param_count;
 			args[arg_count-1] = ssa_emit_load(proc, slice);
 		}
-
 
 		return ssa_emit_call(proc, value, args, arg_count);
 	case_end;
