@@ -1,4 +1,4 @@
-/* gb.h - v0.26c - Ginger Bill's C Helper Library - public domain
+/* gb.h - v0.26d - Ginger Bill's C Helper Library - public domain
                  - no warranty implied; use at your own risk
 
 	This is a single header file with a bunch of useful stuff
@@ -58,6 +58,7 @@ TODOS
 	- More date & time functions
 
 VERSION HISTORY
+	0.26d - Minor changes to how gbFile works
 	0.26c - gb_str_to_f* fix
 	0.26b - Minor fixes
 	0.26a - gbString Fix

@@ -840,7 +840,7 @@ ssaValue *ssa_make_instr_get_element_ptr(ssaProcedure *p, ssaValue *address,
 	i->GetElementPtr.indices[1]   = index1;
 	i->GetElementPtr.index_count  = index_count;
 	i->GetElementPtr.elem_type    = ssa_type(address);
-	i->GetElementPtr.inbounds     = inbounds;
+
 	GB_ASSERT_MSG(is_type_pointer(ssa_type(address)),
 	              "%s", type_to_string(ssa_type(address)));
 	return v;
@@ -1169,8 +1169,12 @@ ssaValue *ssa_add_local_generated(ssaProcedure *proc, Type *type) {
 
 ssaValue *ssa_add_param(ssaProcedure *proc, Entity *e) {
 	ssaValue *v = ssa_make_value_param(proc->module->allocator, proc, e);
+#if 1
 	ssaValue *l = ssa_add_local(proc, e);
 	ssa_emit_store(proc, l, v);
+#else
+	ssa_module_add_value(proc->module, e, v);
+#endif
 	return v;
 }
 
@@ -1418,7 +1422,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 	proc->curr_block = proc->decl_block;
 	ssa_emit_jump(proc, proc->entry_block);
 
-#if 0
+#if 1
 	ssa_optimize_blocks(proc);
 	ssa_build_referrers(proc);
 	ssa_build_dom_tree(proc);
@@ -1902,6 +1906,10 @@ String lookup_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
 	return make_string("");
 }
 
+ssaValue *ssa_emit_bitcast(ssaProcedure *proc, ssaValue *data, Type *type) {
+	return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, data, ssa_type(data), type));
+}
+
 
 ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_argument) {
 	Type *src_type = ssa_type(value);
@@ -2029,7 +2037,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 
 				Type *tag_type = src_type;
 				Type *tag_type_ptr = make_type_pointer(allocator, tag_type);
-				ssaValue *underlying = ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, data, t_rawptr, tag_type_ptr));
+				ssaValue *underlying = ssa_emit_bitcast(proc, data, tag_type_ptr);
 				ssa_emit_store(proc, underlying, value);
 
 				return ssa_emit_load(proc, parent);
@@ -2063,23 +2071,23 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 
 	// Pointer <-> Pointer
 	if (is_type_pointer(src) && is_type_pointer(dst)) {
-		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, value, src, dst));
+		return ssa_emit_bitcast(proc, value, dst);
 	}
 
 
 
 	// proc <-> proc
 	if (is_type_proc(src) && is_type_proc(dst)) {
-		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, value, src, dst));
+		return ssa_emit_bitcast(proc, value, dst);
 	}
 
 	// pointer -> proc
 	if (is_type_pointer(src) && is_type_proc(dst)) {
-		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, value, src, dst));
+		return ssa_emit_bitcast(proc, value, dst);
 	}
 	// proc -> pointer
 	if (is_type_proc(src) && is_type_pointer(dst)) {
-		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, value, src, dst));
+		return ssa_emit_bitcast(proc, value, dst);
 	}
 
 
@@ -2180,7 +2188,7 @@ ssaValue *ssa_emit_transmute(ssaProcedure *proc, ssaValue *value, Type *t) {
 	i64 dz = type_size_of(proc->module->sizes, proc->module->allocator, dst);
 
 	if (sz == dz) {
-		return ssa_emit(proc, ssa_make_instr_conv(proc, ssaConv_bitcast, value, src, dst));
+		return ssa_emit_bitcast(proc, value, dst);
 	}
 
 
@@ -2203,6 +2211,94 @@ ssaValue *ssa_emit_down_cast(ssaProcedure *proc, ssaValue *value, Type *t) {
 	ssaValue *offset = ssa_make_const_int(allocator, -offset_);
 	ssaValue *head = ssa_emit_ptr_offset(proc, bytes, offset);
 	return ssa_emit_conv(proc, head, t);
+}
+
+ssaValue *ssa_emit_union_cast(ssaProcedure *proc, ssaValue *value, Type *tuple) {
+	GB_ASSERT(tuple->kind == Type_Tuple);
+	gbAllocator a = proc->module->allocator;
+
+	Type *src_type = ssa_type(value);
+	b32 is_ptr = is_type_pointer(src_type);
+
+	Type *t_bool_ptr = make_type_pointer(a, t_bool);
+	Type *t_int_ptr  = make_type_pointer(a, t_int);
+
+	ssaValue *v = ssa_add_local_generated(proc, tuple);
+
+	if (is_ptr) {
+		Type *src = base_type(type_deref(src_type));
+		Type *src_ptr = src_type;
+		GB_ASSERT(is_type_union(src));
+		Type *dst_ptr = tuple->Tuple.variables[0]->type;
+		Type *dst = type_deref(dst_ptr);
+
+		ssaValue *tag = ssa_emit_load(proc, ssa_emit_struct_gep(proc, value, v_one32, t_int_ptr));
+		ssaValue *dst_tag = NULL;
+		for (isize i = 1; i < src->Record.field_count; i++) {
+			Entity *f = src->Record.fields[i];
+			if (are_types_identical(f->type, dst)) {
+				dst_tag = ssa_make_const_int(a, i);
+				break;
+			}
+		}
+		GB_ASSERT(dst_tag != NULL);
+
+
+		ssaBlock *ok_block = ssa_add_block(proc, NULL, "union_cast.ok");
+		ssaBlock *end_block = ssa_add_block(proc, NULL, "union_cast.end");
+		ssaValue *cond = ssa_emit_comp(proc, Token_CmpEq, tag, dst_tag);
+		ssa_emit_if(proc, cond, ok_block, end_block);
+		proc->curr_block = ok_block;
+
+		ssaValue *gep0 = ssa_emit_struct_gep(proc, v, v_zero32, make_type_pointer(a, dst_ptr));
+		ssaValue *gep1 = ssa_emit_struct_gep(proc, v, v_one32,  t_bool_ptr);
+
+		ssaValue *data = ssa_emit_conv(proc, value, dst_ptr);
+		ssa_emit_store(proc, gep0, data);
+		ssa_emit_store(proc, gep1, v_true);
+
+		ssa_emit_jump(proc, end_block);
+		proc->curr_block = end_block;
+
+	} else {
+		Type *src = base_type(src_type);
+		GB_ASSERT(is_type_union(src));
+		Type *dst = tuple->Tuple.variables[0]->type;
+		Type *dst_ptr = make_type_pointer(a, dst);
+
+		ssaValue *tag = ssa_emit_struct_ev(proc, value, 1, t_int);
+		ssaValue *dst_tag = NULL;
+		for (isize i = 1; i < src->Record.field_count; i++) {
+			Entity *f = src->Record.fields[i];
+			if (are_types_identical(f->type, dst)) {
+				dst_tag = ssa_make_const_int(a, i);
+				break;
+			}
+		}
+		GB_ASSERT(dst_tag != NULL);
+
+		// HACK(bill): This is probably not very efficient
+		ssaValue *union_copy = ssa_add_local_generated(proc, src_type);
+		ssa_emit_store(proc, union_copy, value);
+
+		ssaBlock *ok_block = ssa_add_block(proc, NULL, "union_cast.ok");
+		ssaBlock *end_block = ssa_add_block(proc, NULL, "union_cast.end");
+		ssaValue *cond = ssa_emit_comp(proc, Token_CmpEq, tag, dst_tag);
+		ssa_emit_if(proc, cond, ok_block, end_block);
+		proc->curr_block = ok_block;
+
+		ssaValue *gep0 = ssa_emit_struct_gep(proc, v, v_zero32, dst_ptr);
+		ssaValue *gep1 = ssa_emit_struct_gep(proc, v, v_one32, t_bool_ptr);
+
+		ssaValue *data = ssa_emit_load(proc, ssa_emit_conv(proc, union_copy, dst_ptr));
+		ssa_emit_store(proc, gep0, data);
+		ssa_emit_store(proc, gep1, v_true);
+
+		ssa_emit_jump(proc, end_block);
+		proc->curr_block = end_block;
+
+	}
+	return ssa_emit_load(proc, v);
 }
 
 void ssa_build_cond(ssaProcedure *proc, AstNode *cond, ssaBlock *true_block, ssaBlock *false_block);
@@ -2325,6 +2421,7 @@ ssaValue *ssa_find_implicit_value_backing(ssaProcedure *proc, ImplicitValueId id
 
 
 ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv) {
+	expr = unparen_expr(expr);
 	switch (expr->kind) {
 	case_ast_node(bl, BasicLit, expr);
 		GB_PANIC("Non-constant basic literal");
@@ -2350,13 +2447,17 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			if (v->kind == ssaValue_Proc) {
 				return v;
 			}
+			// if (e->kind == Entity_Variable && e->Variable.param) {
+				// return v;
+			// }
 			return ssa_emit_load(proc, v);
 		}
 		return NULL;
 	case_end;
 
-	case_ast_node(pe, ParenExpr, expr);
-		return ssa_build_single_expr(proc, unparen_expr(expr), tv);
+	case_ast_node(re, RunExpr, expr);
+		// TODO(bill): Run Expression
+		return ssa_build_single_expr(proc, re->expr, tv);
 	case_end;
 
 	case_ast_node(de, DerefExpr, expr);
@@ -2364,6 +2465,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 	case_end;
 
 	case_ast_node(se, SelectorExpr, expr);
+		TypeAndValue *tav = map_get(&proc->module->info->types, hash_pointer(expr));
+		GB_ASSERT(tav != NULL);
 		return ssa_lvalue_load(proc, ssa_build_addr(proc, expr));
 	case_end;
 
@@ -2440,6 +2543,10 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		case Token_down_cast:
 			ssa_emit_comment(proc, make_string("cast - down_cast"));
 			return ssa_emit_down_cast(proc, ssa_build_expr(proc, be->left), tv->type);
+
+		case Token_union_cast:
+			ssa_emit_comment(proc, make_string("cast - union_cast"));
+			return ssa_emit_union_cast(proc, ssa_build_expr(proc, be->left), tv->type);
 
 		default:
 			GB_PANIC("Invalid binary expression");

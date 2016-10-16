@@ -933,11 +933,15 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 			o->type = t_invalid;
 			return;
 		}
-		// if (e->Variable.param) {
-			// o->mode = Addressing_Value;
-		// } else {
+	#if 0
+		if (e->Variable.param) {
+			o->mode = Addressing_Value;
+		} else {
 			o->mode = Addressing_Variable;
-		// }
+		}
+	#else
+		o->mode = Addressing_Variable;
+	#endif
 		break;
 
 	case Entity_TypeName: {
@@ -1869,14 +1873,14 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			return;
 		}
 
-		i64 otz = type_size_of(c->sizes, c->allocator, x->type);
-		i64 ttz = type_size_of(c->sizes, c->allocator, type);
-		if (otz != ttz) {
+		i64 srcz = type_size_of(c->sizes, c->allocator, x->type);
+		i64 dstz = type_size_of(c->sizes, c->allocator, type);
+		if (srcz != dstz) {
 			gbString expr_str = expr_to_string(x->expr);
 			gbString type_str = type_to_string(type);
 			defer (gb_string_free(expr_str));
 			defer (gb_string_free(type_str));
-			error(ast_node_token(x->expr), "Cannot transmute `%s` to `%s`, %lld vs %lld bytes", expr_str, type_str, otz, ttz);
+			error(ast_node_token(x->expr), "Cannot transmute `%s` to `%s`, %lld vs %lld bytes", expr_str, type_str, srcz, dstz);
 			x->mode = Addressing_Invalid;
 			return;
 		}
@@ -1887,8 +1891,9 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	} else if (be->op.kind == Token_down_cast) {
 		check_expr(c, x, be->left);
 		Type *type = check_type(c, be->right);
-		if (x->mode == Addressing_Invalid)
+		if (x->mode == Addressing_Invalid) {
 			return;
+		}
 
 		if (x->mode == Addressing_Constant) {
 			gbString expr_str = expr_to_string(node);
@@ -1927,7 +1932,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			return;
 		}
 
-		if (!(is_type_struct(bdst) || is_type_struct(bdst))) {
+		if (!(is_type_struct(bdst) || is_type_raw_union(bdst))) {
 			gbString expr_str = expr_to_string(node);
 			defer (gb_string_free(expr_str));
 			error(ast_node_token(node), "Can only `down_cast` pointer to structs or unions: `%s`", expr_str);
@@ -1946,6 +1951,83 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 
 		x->mode = Addressing_Value;
 		x->type = type;
+		return;
+	} else if (be->op.kind == Token_union_cast) {
+		check_expr(c, x, be->left);
+		Type *type = check_type(c, be->right);
+		if (x->mode == Addressing_Invalid) {
+			return;
+		}
+
+		if (x->mode == Addressing_Constant) {
+			gbString expr_str = expr_to_string(node);
+			defer (gb_string_free(expr_str));
+			error(ast_node_token(node), "Cannot `union_cast` a constant expression: `%s`", expr_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		if (is_type_untyped(x->type)) {
+			gbString expr_str = expr_to_string(node);
+			defer (gb_string_free(expr_str));
+			error(ast_node_token(node), "Cannot `union_cast` an untyped expression: `%s`", expr_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		b32 src_is_ptr = is_type_pointer(x->type);
+		b32 dst_is_ptr = is_type_pointer(type);
+		Type *src = type_deref(x->type);
+		Type *dst = type_deref(type);
+		Type *bsrc = base_type(src);
+		Type *bdst = base_type(dst);
+
+		if (src_is_ptr != dst_is_ptr) {
+			gbString src_type_str = type_to_string(x->type);
+			gbString dst_type_str = type_to_string(type);
+			defer (gb_string_free(src_type_str));
+			defer (gb_string_free(dst_type_str));
+			error(ast_node_token(node), "Invalid `union_cast` types: `%s` and `%s`", src_type_str, dst_type_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		if (!is_type_union(src)) {
+			error(ast_node_token(node), "`union_cast` can only operate on unions");
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		b32 ok = false;
+		for (isize i = 1; i < bsrc->Record.field_count; i++) {
+			Entity *f = bsrc->Record.fields[i];
+			if (are_types_identical(f->type, dst)) {
+				ok = true;
+				break;
+			}
+		}
+
+		if (!ok) {
+			gbString expr_str = expr_to_string(node);
+			gbString dst_type_str = type_to_string(type);
+			defer (gb_string_free(expr_str));
+			defer (gb_string_free(dst_type_str));
+			error(ast_node_token(node), "Cannot `union_cast` `%s` to `%s`", expr_str, dst_type_str);
+			x->mode = Addressing_Invalid;
+			return;
+		}
+
+		Entity **variables = gb_alloc_array(c->allocator, Entity *, 2);
+		Token tok = make_token_ident(make_string(""));
+		variables[0] = make_entity_param(c->allocator, NULL, tok, type, false);
+		variables[1] = make_entity_param(c->allocator, NULL, tok, t_bool, false);
+
+		Type *tuple = make_type_tuple(c->allocator);
+		tuple->Tuple.variables = variables;
+		tuple->Tuple.variable_count = 2;
+
+		x->type = tuple;
+		x->mode = Addressing_Value;
 		return;
 	}
 
@@ -3720,6 +3802,12 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		// TODO(bill): Tag expressions
 		error(ast_node_token(node), "Tag expressions are not supported yet");
 		kind = check_expr_base(c, o, te->expr, type_hint);
+		o->expr = node;
+	case_end;
+
+	case_ast_node(re, RunExpr, node);
+		// TODO(bill): Tag expressions
+		kind = check_expr_base(c, o, re->expr, type_hint);
 		o->expr = node;
 	case_end;
 

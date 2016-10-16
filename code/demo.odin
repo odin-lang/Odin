@@ -1,13 +1,25 @@
 #import "fmt.odin"
 
 main :: proc() {
-	Thing :: struct {
-		f: f32
-		a: any
+	Entity :: union {
+		Apple: int
+		Banana: f32
+		Goat: struct {
+			x, y: int
+			z, w: f32
+		}
 	}
-	t := Thing{1, "Hello"}
 
+	a := 123 as Entity.Apple
+	e: Entity = a
+	fmt.println(a)
 
-	fmt.printf("Here % %\n", 123, 2.0)
+	if apple, ok := ^e union_cast ^Entity.Apple; ok {
+		apple^ = 321
+		e = apple^
+	}
+
+	apple, ok := e union_cast Entity.Apple
+	fmt.println(apple)
 }
 

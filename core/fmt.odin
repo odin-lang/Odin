@@ -4,35 +4,38 @@
 
 PRINT_BUF_SIZE :: 1<<12
 
-fprint :: proc(f: ^os.File, args: ..any) {
+fprint :: proc(f: ^os.File, args: ..any) -> int {
 	data: [PRINT_BUF_SIZE]byte
 	buf := data[:0]
 	bprint(^buf, ..args)
 	os.write(f, buf)
+	return buf.count
 }
 
-fprintln :: proc(f: ^os.File, args: ..any) {
+fprintln :: proc(f: ^os.File, args: ..any) -> int {
 	data: [PRINT_BUF_SIZE]byte
 	buf := data[:0]
 	bprintln(^buf, ..args)
 	os.write(f, buf)
+	return buf.count
 }
-fprintf :: proc(f: ^os.File, fmt: string, args: ..any) {
+fprintf :: proc(f: ^os.File, fmt: string, args: ..any) -> int {
 	data: [PRINT_BUF_SIZE]byte
 	buf := data[:0]
 	bprintf(^buf, fmt, ..args)
 	os.write(f, buf)
+	return buf.count
 }
 
 
-print :: proc(args: ..any) {
-	fprint(os.stdout, ..args)
+print :: proc(args: ..any) -> int {
+	return fprint(os.stdout, ..args)
 }
-println :: proc(args: ..any) {
-	fprintln(os.stdout, ..args)
+println :: proc(args: ..any) -> int {
+	return fprintln(os.stdout, ..args)
 }
-printf :: proc(fmt: string, args: ..any) {
-	fprintf(os.stdout, fmt, ..args)
+printf :: proc(fmt: string, args: ..any) -> int {
+	return fprintf(os.stdout, fmt, ..args)
 }
 
 
@@ -288,9 +291,7 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 	using Type_Info
 	match type info : arg.type_info {
 	case Named:
-		a: any
-		a.type_info = info.base
-		a.data = arg.data
+		a := make_any(info.base, arg.data)
 		match type b : info.base {
 		case Struct:
 			print_string_to_buffer(buf, info.name)
@@ -491,7 +492,7 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 }
 
 
-bprintf :: proc(buf: ^[]byte, fmt: string, args: ..any) {
+bprintf :: proc(buf: ^[]byte, fmt: string, args: ..any) -> int {
 	is_digit :: proc(r: rune) -> bool #inline {
 		return r >= #rune "0" && r <= #rune "9"
 	}
@@ -552,10 +553,11 @@ bprintf :: proc(buf: ^[]byte, fmt: string, args: ..any) {
 	}
 
 	print_string_to_buffer(buf, fmt[prev:])
+	return buf.count
 }
 
 
-bprint :: proc(buf: ^[]byte, args: ..any) {
+bprint :: proc(buf: ^[]byte, args: ..any) -> int {
 	is_type_string :: proc(info: ^Type_Info) -> bool {
 		using Type_Info
 		if info == nil {
@@ -580,9 +582,10 @@ bprint :: proc(buf: ^[]byte, args: ..any) {
 		print_any_to_buffer(buf, arg)
 		prev_string = is_string;
 	}
+	return buf.count
 }
 
-bprintln :: proc(buf: ^[]byte, args: ..any) {
+bprintln :: proc(buf: ^[]byte, args: ..any) -> int {
 	for i := 0; i < args.count; i++ {
 		if i > 0 {
 			append(buf, #rune " ")
@@ -590,4 +593,5 @@ bprintln :: proc(buf: ^[]byte, args: ..any) {
 		print_any_to_buffer(buf, args[i])
 	}
 	print_nl_to_buffer(buf)
+	return buf.count
 }

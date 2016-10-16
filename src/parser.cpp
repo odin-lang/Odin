@@ -122,6 +122,7 @@ AstNodeArray make_ast_node_array(AstFile *f) {
 AST_NODE_KIND(_ExprBegin,  "",  struct{}) \
 	AST_NODE_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
 	AST_NODE_KIND(TagExpr,      "tag expression",         struct { Token token, name; AstNode *expr; }) \
+	AST_NODE_KIND(RunExpr,      "run expression",         struct { Token token, name; AstNode *expr; }) \
 	AST_NODE_KIND(UnaryExpr,    "unary expression",       struct { Token op; AstNode *expr; }) \
 	AST_NODE_KIND(BinaryExpr,   "binary expression",      struct { Token op; AstNode *left, *right; } ) \
 	AST_NODE_KIND(ParenExpr,    "parentheses expression", struct { AstNode *expr; Token open, close; }) \
@@ -376,6 +377,8 @@ Token ast_node_token(AstNode *node) {
 		return node->CompoundLit.open;
 	case AstNode_TagExpr:
 		return node->TagExpr.token;
+	case AstNode_RunExpr:
+		return node->RunExpr.token;
 	case AstNode_BadExpr:
 		return node->BadExpr.begin;
 	case AstNode_UnaryExpr:
@@ -511,6 +514,15 @@ AstNode *make_tag_expr(AstFile *f, Token token, Token name, AstNode *expr) {
 	result->TagExpr.expr = expr;
 	return result;
 }
+
+AstNode *make_run_expr(AstFile *f, Token token, Token name, AstNode *expr) {
+	AstNode *result = make_node(f, AstNode_RunExpr);
+	result->RunExpr.token = token;
+	result->RunExpr.name = name;
+	result->RunExpr.expr = expr;
+	return result;
+}
+
 
 AstNode *make_tag_stmt(AstFile *f, Token token, Token name, AstNode *stmt) {
 	AstNode *result = make_node(f, AstNode_TagStmt);
@@ -1352,9 +1364,9 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 	}
 
 	case Token_Hash: {
-		operand = parse_tag_expr(f, NULL);
-		String name = operand->TagExpr.name.string;
-		if (name == "rune") {
+		Token token = expect_token(f, Token_Hash);
+		Token name  = expect_token(f, Token_Identifier);
+		if (name.string == "rune") {
 			if (f->curr_token.kind == Token_String) {
 				Token *s = &f->curr_token;
 
@@ -1366,20 +1378,28 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 				expect_token(f, Token_String);
 			}
 			operand = parse_operand(f, lhs);
-		} else if (name == "file") {
-			Token token = operand->TagExpr.name;
+		} else if (name.string == "file") {
+			Token token = name;
 			token.kind = Token_String;
 			token.string = token.pos.file;
 			return make_basic_lit(f, token);
-		} else if (name == "line") {
-			Token token = operand->TagExpr.name;
+		} else if (name.string == "line") {
+			Token token = name;
 			token.kind = Token_Integer;
 			char *str = gb_alloc_array(gb_arena_allocator(&f->arena), char, 20);
 			gb_i64_to_str(token.pos.line, str, 10);
 			token.string = make_string(str);
 			return make_basic_lit(f, token);
+		} else if (name.string == "run") {
+			AstNode *expr = parse_expr(f, false);
+			operand = make_run_expr(f, token, name, expr);
+			if (unparen_expr(expr)->kind != AstNode_CallExpr) {
+				error(ast_node_token(expr), "#run can only be applied to procedure calls");
+				operand = make_bad_expr(f, token, f->curr_token);
+			}
+			warning(token, "#run is not yet implemented");
 		} else {
-			operand->TagExpr.expr = parse_expr(f, false);
+			operand = make_tag_expr(f, token, name, parse_expr(f, false));
 		}
 		return operand;
 	}
@@ -1658,6 +1678,7 @@ i32 token_precedence(Token t) {
 	case Token_as:
 	case Token_transmute:
 	case Token_down_cast:
+	case Token_union_cast:
 		return 7;
 	}
 
@@ -1705,6 +1726,7 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 			case Token_as:
 			case Token_transmute:
 			case Token_down_cast:
+			case Token_union_cast:
 				right = parse_type(f);
 				break;
 

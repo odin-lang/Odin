@@ -26,6 +26,7 @@ i32 win32_exec_command_line_app(char *name, char *fmt, ...) {
 	va_start(va, fmt);
 	cmd_len = gb_snprintf_va(cmd_line, gb_size_of(cmd_line), fmt, va);
 	va_end(va);
+	// gb_printf("%.*s\n", cast(int)cmd_len, cmd_line);
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	defer (gb_temp_arena_memory_end(tmp));
@@ -173,7 +174,7 @@ int main(int argc, char **argv) {
 		return exit_code;
 	}
 
-
+	#if 1
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 	exit_code = win32_exec_command_line_app("llvm-llc",
 		"%.*sbin/llc %.*s.bc -filetype=obj -O%d "
@@ -214,6 +215,7 @@ int main(int argc, char **argv) {
 	if (run_output) {
 		win32_exec_command_line_app("odin run", "%.*s.exe", cast(int)base_name_len, output_name);
 	}
+	#endif
 #endif
 #endif
 #endif
