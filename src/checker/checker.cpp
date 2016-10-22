@@ -26,26 +26,23 @@ String const addressing_mode_strings[] = {
 
 struct Operand {
 	AddressingMode mode;
-	Type *type;
-	ExactValue value;
-	AstNode *expr;
-	BuiltinProcId builtin_id;
+	Type *         type;
+	ExactValue     value;
+	AstNode *      expr;
+	BuiltinProcId  builtin_id;
 };
-b32 is_operand_nil(Operand *o) {
-	return o->mode == Addressing_Value && o->type == t_untyped_nil;
-}
 
 struct TypeAndValue {
 	AddressingMode mode;
-	Type *type;
-	ExactValue value;
+	Type *         type;
+	ExactValue     value;
 };
 
 struct DeclInfo {
 	Scope *scope;
 
 	Entity **entities;
-	isize entity_count;
+	isize    entity_count;
 
 	AstNode *type_expr;
 	AstNode *init_expr;
@@ -55,13 +52,11 @@ struct DeclInfo {
 	Map<b32> deps; // Key: Entity *
 };
 
-
-
 struct ExpressionInfo {
-	b32 is_lhs; // Debug info
+	b32            is_lhs; // Debug info
 	AddressingMode mode;
-	Type *type; // Type_Basic
-	ExactValue value;
+	Type *         type; // Type_Basic
+	ExactValue     value;
 };
 
 ExpressionInfo make_expression_info(b32 is_lhs, AddressingMode mode, Type *type, ExactValue value) {
@@ -213,10 +208,9 @@ struct CheckerInfo {
 	Map<ExpressionInfo>    untyped;         // Key: AstNode * | Expression -> ExpressionInfo
 	Map<DeclInfo *>        entities;        // Key: Entity *
 	Map<Entity *>          foreign_procs;   // Key: String
+	Map<AstFile *>         files;           // Key: String (full path)
 	Map<isize>             type_info_map;   // Key: Type *
-	Map<AstFile *>         files;           // Key: String
 	isize                  type_info_index;
-
 	Entity *               implicit_values[ImplicitValue_Count];
 };
 
@@ -282,12 +276,14 @@ void destroy_declaration_info(DeclInfo *d) {
 }
 
 b32 decl_info_has_init(DeclInfo *d) {
-	if (d->init_expr != NULL)
+	if (d->init_expr != NULL) {
 		return true;
+	}
 	if (d->proc_decl != NULL) {
 		ast_node(pd, ProcDecl, d->proc_decl);
-		if (pd->body != NULL)
+		if (pd->body != NULL) {
 			return true;
+		}
 	}
 
 	return false;
@@ -629,12 +625,14 @@ Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
 
 Type *type_of_expr(CheckerInfo *i, AstNode *expression) {
 	TypeAndValue *found = type_and_value_of_expression(i, expression);
-	if (found)
+	if (found) {
 		return found->type;
+	}
 	if (expression->kind == AstNode_Ident) {
 		Entity *entity = entity_of_ident(i, expression);
-		if (entity)
+		if (entity) {
 			return entity->type;
+		}
 	}
 
 	return NULL;
@@ -647,8 +645,9 @@ void add_untyped(CheckerInfo *i, AstNode *expression, b32 lhs, AddressingMode mo
 
 void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode, Type *type, ExactValue value) {
 	GB_ASSERT(expression != NULL);
-	if (mode == Addressing_Invalid)
+	if (mode == Addressing_Invalid) {
 		return;
+	}
 
 	if (mode == Addressing_Constant) {
 		if (is_type_constant_type(type)) {
@@ -1145,6 +1144,12 @@ void check_parsed_files(Checker *c) {
 			auto found = map_get(&file_scopes, key);
 			GB_ASSERT_MSG(found != NULL, "Unable to find scope for file: %.*s", LIT(id->fullpath));
 			Scope *scope = *found;
+
+			if (scope->is_global) {
+				error(id->token, "Importing a #shared_global_scope is disallowed and unnecessary");
+				continue;
+			}
+
 			b32 previously_added = false;
 			for_array(import_index, file_scope->imported) {
 				Scope *prev = file_scope->imported[import_index];
@@ -1153,6 +1158,7 @@ void check_parsed_files(Checker *c) {
 					break;
 				}
 			}
+
 			if (!previously_added) {
 				array_add(&file_scope->imported, scope);
 			} else {

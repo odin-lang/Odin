@@ -158,8 +158,7 @@ Token empty_token = {Token_Invalid};
 Token blank_token = {Token_Identifier, {cast(u8 *)"_", 1}};
 
 Token make_token_ident(String s) {
-	Token t = {Token_Identifier};
-	t.string = s;
+	Token t = {Token_Identifier, s};
 	return t;
 }
 
@@ -356,6 +355,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 	defer (gb_free(gb_heap_allocator(), c_str));
 
 
+	// TODO(bill): Memory map rather than copy contents
 	gbFileContents fc = gb_file_read_contents(gb_heap_allocator(), true, c_str);
 	gb_zero_item(t);
 	if (fc.data != NULL) {
@@ -368,8 +368,9 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 		t->line_count = 1;
 
 		advance_to_next_rune(t);
-		if (t->curr_rune == GB_RUNE_BOM)
+		if (t->curr_rune == GB_RUNE_BOM) {
 			advance_to_next_rune(t); // Ignore BOM at file beginning
+		}
 
 		array_init(&t->allocated_strings, gb_heap_allocator());
 
@@ -389,9 +390,9 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 		return TokenizerInit_Permission;
 	}
 
-	if (gb_file_size(&f) == 0)
+	if (gb_file_size(&f) == 0) {
 		return TokenizerInit_Empty;
-
+	}
 
 	return TokenizerInit_None;
 }
@@ -413,12 +414,13 @@ void tokenizer_skip_whitespace(Tokenizer *t) {
 }
 
 gb_inline i32 digit_value(Rune r) {
-	if (gb_char_is_digit(cast(char)r))
+	if (gb_char_is_digit(cast(char)r)) {
 		return r - '0';
-	if (gb_is_between(cast(char)r, 'a', 'f'))
+	} else if (gb_is_between(cast(char)r, 'a', 'f')) {
 		return r - 'a' + 10;
-	if (gb_is_between(cast(char)r, 'A', 'F'))
+	} else if (gb_is_between(cast(char)r, 'A', 'F')) {
 		return r - 'A' + 10;
+	}
 	return 16; // NOTE(bill): Larger than highest possible
 }
 
@@ -426,22 +428,21 @@ gb_inline void scan_mantissa(Tokenizer *t, i32 base) {
 	// TODO(bill): Allow for underscores in numbers as a number separator
 	// TODO(bill): Is this a good idea?
 	// while (digit_value(t->curr_rune) < base || t->curr_rune == '_')
-	while (digit_value(t->curr_rune) < base)
+	while (digit_value(t->curr_rune) < base) {
 		advance_to_next_rune(t);
+	}
 }
 
 
 Token scan_number_to_token(Tokenizer *t, b32 seen_decimal_point) {
 	Token token = {};
-	u8 *start_curr = t->curr;
 	token.kind = Token_Integer;
-	token.string = make_string(start_curr, 1);
+	token.string = make_string(t->curr, 1);
 	token.pos.file = t->fullpath;
 	token.pos.line = t->line_count;
 	token.pos.column = t->curr-t->line+1;
 
 	if (seen_decimal_point) {
-		start_curr--;
 		token.kind = Token_Float;
 		scan_mantissa(t, 10);
 		goto exponent;
@@ -497,8 +498,9 @@ exponent:
 	if (t->curr_rune == 'e' || t->curr_rune == 'E') {
 		token.kind = Token_Float;
 		advance_to_next_rune(t);
-		if (t->curr_rune == '-' || t->curr_rune == '+')
+		if (t->curr_rune == '-' || t->curr_rune == '+') {
 			advance_to_next_rune(t);
+		}
 		scan_mantissa(t, 10);
 	}
 
@@ -623,8 +625,9 @@ Token tokenizer_get_token(Tokenizer *t) {
 	curr_rune = t->curr_rune;
 	if (rune_is_letter(curr_rune)) {
 		token.kind = Token_Identifier;
-		while (rune_is_letter(t->curr_rune) || rune_is_digit(t->curr_rune))
+		while (rune_is_letter(t->curr_rune) || rune_is_digit(t->curr_rune)) {
 			advance_to_next_rune(t);
+		}
 
 		token.string.len = t->curr - token.string.text;
 

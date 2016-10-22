@@ -983,7 +983,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			isize rhs_count = operands.count;
 
 			isize operand_index = 0;
-			for_array(i, as->lhs) {
+			for_array(i, operands) {
 				AstNode *lhs = as->lhs[i];
 				check_assignment_variable(c, &operands[i], lhs);
 			}
@@ -1400,16 +1400,19 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		Token token = bs->token;
 		switch (token.kind) {
 		case Token_break:
-			if ((flags & Stmt_BreakAllowed) == 0)
+			if ((flags & Stmt_BreakAllowed) == 0) {
 				error(token, "`break` only allowed in `for` or `match` statements");
+			}
 			break;
 		case Token_continue:
-			if ((flags & Stmt_ContinueAllowed) == 0)
+			if ((flags & Stmt_ContinueAllowed) == 0) {
 				error(token, "`continue` only allowed in `for` statements");
+			}
 			break;
 		case Token_fallthrough:
-			if ((flags & Stmt_FallthroughAllowed) == 0)
+			if ((flags & Stmt_FallthroughAllowed) == 0) {
 				error(token, "`fallthrough` statement in illegal position");
+			}
 			break;
 		default:
 			error(token, "Invalid AST: Branch Statement `%.*s`", LIT(token.string));
@@ -1432,7 +1435,6 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				e = scope_lookup_entity(c->context.scope, name);
 			} else if (expr->kind == AstNode_SelectorExpr) {
 				Operand o = {};
-				check_expr_base(c, &o, expr->SelectorExpr.expr);
 				e = check_selector(c, &o, expr);
 				is_selector = true;
 			}
@@ -1499,15 +1501,6 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				}
 			} break;
 
-			case Entity_Constant:
-				error(us->token, "`using` cannot be applied to a constant");
-				break;
-
-			case Entity_Procedure:
-			case Entity_Builtin:
-				error(us->token, "`using` cannot be applied to a procedure");
-				break;
-
 			case Entity_Variable: {
 				Type *t = base_type(type_deref(e->type));
 				if (is_type_struct(t) || is_type_raw_union(t)) {
@@ -1533,8 +1526,29 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				}
 			} break;
 
+			case Entity_Constant:
+				error(us->token, "`using` cannot be applied to a constant");
+				break;
+
+			case Entity_Procedure:
+			case Entity_Builtin:
+				error(us->token, "`using` cannot be applied to a procedure");
+				break;
+
+			case Entity_ImplicitValue:
+				error(us->token, "`using` cannot be applied to an implicit value");
+				break;
+
+			case Entity_Nil:
+				error(us->token, "`using` cannot be applied to `nil`");
+				break;
+
+			case Entity_Invalid:
+				error(us->token, "`using` cannot be applied to an invalid entity");
+				break;
+
 			default:
-				GB_PANIC("TODO(bill): using other expressions?");
+				GB_PANIC("TODO(bill): `using` other expressions?");
 			}
 		case_end;
 

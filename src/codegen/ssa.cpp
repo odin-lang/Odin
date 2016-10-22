@@ -21,14 +21,14 @@ struct ssaDebugInfo {
 
 	union {
 		struct {
-			AstFile *file;
-			String   producer;
+			AstFile *     file;
+			String        producer;
 			ssaDebugInfo *all_procs;
 		} CompileUnit;
 		struct {
 			AstFile *file;
-			String filename;
-			String directory;
+			String   filename;
+			String   directory;
 		} File;
 		struct {
 			Entity *      entity;
@@ -111,8 +111,8 @@ enum ssaDeferKind {
 
 struct ssaDefer {
 	ssaDeferKind kind;
-	isize scope_index;
-	ssaBlock *block;
+	isize        scope_index;
+	ssaBlock *   block;
 	union {
 		AstNode *stmt;
 		// NOTE(bill): `instr` will be copied every time to create a new one
@@ -121,7 +121,7 @@ struct ssaDefer {
 };
 
 struct ssaProcedure {
-	ssaProcedure *parent;
+	ssaProcedure *        parent;
 	Array<ssaProcedure *> children;
 
 	Entity *      entity;
@@ -1422,7 +1422,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 	proc->curr_block = proc->decl_block;
 	ssa_emit_jump(proc, proc->entry_block);
 
-#if 1
+#if 0
 	ssa_optimize_blocks(proc);
 	ssa_build_referrers(proc);
 	ssa_build_dom_tree(proc);
@@ -2242,7 +2242,6 @@ ssaValue *ssa_emit_union_cast(ssaProcedure *proc, ssaValue *value, Type *tuple) 
 			}
 		}
 		GB_ASSERT(dst_tag != NULL);
-
 
 		ssaBlock *ok_block = ssa_add_block(proc, NULL, "union_cast.ok");
 		ssaBlock *end_block = ssa_add_block(proc, NULL, "union_cast.end");
@@ -3647,10 +3646,10 @@ void ssa_mangle_sub_type_name(ssaModule *m, Entity *field, String parent) {
 	child.text = gb_alloc_array(m->allocator, u8, len);
 
 	isize i = 0;
-	gb_memcopy(child.text+i, parent.text, parent.len);
+	gb_memmove(child.text+i, parent.text, parent.len);
 	i += parent.len;
 	child.text[i++] = '.';
-	gb_memcopy(child.text+i, cn.text, cn.len);
+	gb_memmove(child.text+i, cn.text, cn.len);
 
 	map_set(&m->type_names, hash_pointer(field->type), child);
 	ssa_gen_global_type_name(m, field, child);
@@ -4301,8 +4300,6 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			}
 			break;
 		}
-		// TODO(bill): Handle fallthrough scope exit correctly
-		// if (block != NULL && bs->token.kind != Token_fallthrough) {
 		if (block != NULL) {
 			ssa_emit_defer_stmts(proc, ssaDeferExit_Branch, block);
 		}
@@ -4695,7 +4692,7 @@ void ssa_build_dom_tree(ssaProcedure *proc) {
 
 	// Step 1 - number vertices
 	i32 pre_num = ssa_lt_depth_first_search(&lt, root, 0, preorder);
-	gb_memcopy(buckets, preorder, n*gb_size_of(preorder[0]));
+	gb_memmove(buckets, preorder, n*gb_size_of(preorder[0]));
 
 	for (i32 i = n-1; i > 0; i--) {
 		ssaBlock *w = preorder[i];

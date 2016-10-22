@@ -7,8 +7,9 @@ struct ssaGen {
 };
 
 b32 ssa_gen_init(ssaGen *s, Checker *c) {
-	if (global_error_collector.count != 0)
+	if (global_error_collector.count != 0) {
 		return false;
+	}
 
 	isize tc = c->parser->total_token_count;
 	if (tc < 2) {
@@ -43,7 +44,7 @@ String ssa_mangle_name(ssaGen *s, String path, String name) {
 	AstFile *file = *map_get(&info->files, hash_string(path));
 
 	char *str = gb_alloc_array(a, char, path.len+1);
-	gb_memcopy(str, path.text, path.len);
+	gb_memmove(str, path.text, path.len);
 	str[path.len] = 0;
 	for (isize i = 0; i < path.len; i++) {
 		if (str[i] == '\\') {

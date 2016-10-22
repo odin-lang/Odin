@@ -1,7 +1,7 @@
 gb_global gbArena string_buffer_arena = {};
 gb_global gbAllocator string_buffer_allocator = {};
 
-void init_string_buffer_memory() {
+void init_string_buffer_memory(void) {
 	// NOTE(bill): This should be enough memory for file systems
 	gb_arena_init_from_allocator(&string_buffer_arena, gb_heap_allocator(), gb_megabytes(1));
 	string_buffer_allocator = gb_arena_allocator(&string_buffer_arena);
@@ -404,7 +404,7 @@ i32 unquote_string(gbAllocator a, String *s_) {
 			buf[offset++] = cast(u8)r;
 		} else {
 			isize size = gb_utf8_encode_rune(rune_temp, r);
-			gb_memcopy(buf+offset, rune_temp, size);
+			gb_memmove(buf+offset, rune_temp, size);
 			offset += size;
 		}
 

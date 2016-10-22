@@ -12,8 +12,8 @@ enum ExactValueKind {
 	ExactValue_String,
 	ExactValue_Integer,
 	ExactValue_Float,
-	ExactValue_Pointer, // TODO(bill): Handle ExactValue_Pointer correctly
-	ExactValue_Compound,
+	ExactValue_Pointer,
+	ExactValue_Compound, // TODO(bill): Is this good enough?
 
 	ExactValue_Count,
 };

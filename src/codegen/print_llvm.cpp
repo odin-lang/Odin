@@ -31,7 +31,7 @@ void ssa_file_buffer_write(ssaFileBuffer *f, void *data, isize len) {
 		f->offset = 0;
 	}
 	u8 *cursor = cast(u8 *)f->vm.data + f->offset;
-	gb_memcopy(cursor, data, len);
+	gb_memmove(cursor, data, len);
 	f->offset += len;
 }
 

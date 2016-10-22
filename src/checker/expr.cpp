@@ -79,7 +79,7 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 			break;
 		}
 		if (type_has_nil(dst)) {
-			return is_operand_nil(operand);
+			return operand->mode == Addressing_Value && operand->type == t_untyped_nil;
 		}
 	}
 
@@ -156,8 +156,9 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 	PROF_PROC();
 
 	check_not_tuple(c, operand);
-	if (operand->mode == Addressing_Invalid)
+	if (operand->mode == Addressing_Invalid) {
 		return;
+	}
 
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
@@ -1379,10 +1380,12 @@ b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exac
 			return true;
 		}
 	} else if (is_type_pointer(type)) {
-		if (in_value.kind == ExactValue_Pointer)
+		if (in_value.kind == ExactValue_Pointer) {
 			return true;
-		if (in_value.kind == ExactValue_Integer)
+		}
+		if (in_value.kind == ExactValue_Integer) {
 			return true;
+		}
 		if (out_value) *out_value = in_value;
 	}
 
@@ -1492,8 +1495,9 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 		o->value = exact_unary_operator_value(op, o->value, precision);
 
 		if (is_type_typed(type)) {
-			if (node != NULL)
+			if (node != NULL) {
 				o->expr = node;
+			}
 			check_is_expressible(c, o, type);
 		}
 		return;
@@ -1509,9 +1513,8 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 	defer (gb_temp_arena_memory_end(tmp));
 
 	gbString err_str = NULL;
-	defer ({
-		if (err_str != NULL)
-			gb_string_free(err_str);
+	defer (if (err_str != NULL) {
+		gb_string_free(err_str);
 	});
 
 	if (check_is_assignable_to(c, x, y->type) ||
@@ -1520,13 +1523,13 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 		switch (op.kind) {
 		case Token_CmpEq:
 		case Token_NotEq:
-			defined = is_type_comparable(base_type(x->type));
+			defined = is_type_comparable(get_enum_base_type(base_type(x->type)));
 			break;
 		case Token_Lt:
 		case Token_Gt:
 		case Token_LtEq:
 		case Token_GtEq: {
-			defined = is_type_ordered(base_type(x->type));
+			defined = is_type_ordered(get_enum_base_type(base_type(x->type)));
 		} break;
 		}
 
@@ -1546,7 +1549,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 	}
 
 	if (err_str != NULL) {
-		error(op, "Cannot compare expression, %s", err_str);
+		error(ast_node_token(x->expr), "Cannot compare expression, %s", err_str);
 		x->type = t_untyped_bool;
 		return;
 	}
@@ -1682,27 +1685,29 @@ b32 check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 
 	// Cast between booleans and integers
 	if (is_type_boolean(xb) || is_type_integer(xb)) {
-		if (is_type_boolean(yb) || is_type_integer(yb))
+		if (is_type_boolean(yb) || is_type_integer(yb)) {
 			return true;
+		}
 	}
 
 	// Cast between numbers
 	if (is_type_integer(xb) || is_type_float(xb)) {
-		if (is_type_integer(yb) || is_type_float(yb))
+		if (is_type_integer(yb) || is_type_float(yb)) {
 			return true;
+		}
 	}
 
 	// Cast between pointers
 	if (is_type_pointer(xb) && is_type_pointer(yb)) {
-			return true;
+		return true;
 	}
 
 	// (u)int <-> pointer
 	if (is_type_int_or_uint(xb) && is_type_rawptr(yb)) {
-			return true;
+		return true;
 	}
 	if (is_type_rawptr(xb) && is_type_int_or_uint(yb)) {
-			return true;
+		return true;
 	}
 
 	// []byte/[]u8 <-> string
@@ -1747,8 +1752,9 @@ String check_down_cast_name(Type *dst_, Type *src_) {
 
 			if (!is_type_pointer(f->type)) {
 				result = check_down_cast_name(f->type, src_);
-				if (result.len > 0)
+				if (result.len > 0) {
 					return result;
+				}
 			}
 		}
 	}
@@ -1808,8 +1814,9 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	if (be->op.kind == Token_as) {
 		check_expr(c, x, be->left);
 		Type *type = check_type(c, be->right);
-		if (x->mode == Addressing_Invalid)
+		if (x->mode == Addressing_Invalid) {
 			return;
+		}
 
 		b32 is_const_expr = x->mode == Addressing_Constant;
 		b32 can_convert = false;
@@ -1854,8 +1861,9 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	} else if (be->op.kind == Token_transmute) {
 		check_expr(c, x, be->left);
 		Type *type = check_type(c, be->right);
-		if (x->mode == Addressing_Invalid)
+		if (x->mode == Addressing_Invalid) {
 			return;
+		}
 
 		if (x->mode == Addressing_Constant) {
 			gbString expr_str = expr_to_string(x->expr);
@@ -2160,8 +2168,9 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		}
 		x->value = exact_binary_operator_value(op, a, b);
 		if (is_type_typed(type)) {
-			if (node != NULL)
+			if (node != NULL) {
 				x->expr = node;
+			}
 			check_is_expressible(c, x, type);
 		}
 		return;
@@ -2176,19 +2185,22 @@ void update_expr_type(Checker *c, AstNode *e, Type *type, b32 final) {
 
 	HashKey key = hash_pointer(e);
 	ExpressionInfo *found = map_get(&c->info.untyped, key);
-	if (found == NULL)
+	if (found == NULL) {
 		return;
+	}
 
 	switch (e->kind) {
 	case_ast_node(ue, UnaryExpr, e);
-		if (found->value.kind != ExactValue_Invalid)
+		if (found->value.kind != ExactValue_Invalid) {
 			break;
+		}
 		update_expr_type(c, ue->expr, type, final);
 	case_end;
 
 	case_ast_node(be, BinaryExpr, e);
-		if (found->value.kind != ExactValue_Invalid)
+		if (found->value.kind != ExactValue_Invalid) {
 			break;
+		}
 		if (!token_is_comparison(be->op)) {
 			if (token_is_shift(be->op)) {
 				update_expr_type(c, be->left,  type, final);
@@ -2222,8 +2234,9 @@ void update_expr_type(Checker *c, AstNode *e, Type *type, b32 final) {
 
 void update_expr_value(Checker *c, AstNode *e, ExactValue value) {
 	ExpressionInfo *found = map_get(&c->info.untyped, hash_pointer(e));
-	if (found)
+	if (found) {
 		found->value = value;
+	}
 }
 
 void convert_untyped_error(Checker *c, Operand *operand, Type *target_type) {
@@ -2389,9 +2402,9 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 	ast_node(se, SelectorExpr, node);
 
 	b32 check_op_expr = true;
+	Entity *expr_entity = NULL;
 	Entity *entity = NULL;
 	Selection sel = {}; // NOTE(bill): Not used if it's an import name
-
 
 	AstNode *op_expr  = se->expr;
 	AstNode *selector = unparen_expr(se->selector);
@@ -2401,10 +2414,12 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 
 	GB_ASSERT(selector->kind == AstNode_Ident);
 
+
 	if (op_expr->kind == AstNode_Ident) {
 		String name = op_expr->Ident.string;
 		Entity *e = scope_lookup_entity(c->context.scope, name);
 		add_entity_use(c, op_expr, e);
+		expr_entity = e;
 		if (e != NULL && e->kind == Entity_ImportName) {
 			String sel_name = selector->Ident.string;
 			check_op_expr = false;
@@ -2456,6 +2471,17 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 		defer (gb_string_free(type_str));
 		defer (gb_string_free(sel_str));
 		error(ast_node_token(op_expr), "`%s` (`%s`) has no field `%s`", op_str, type_str, sel_str);
+		goto error;
+	}
+
+	if (expr_entity != NULL && expr_entity->kind == Entity_Constant && entity->kind != Entity_Constant) {
+		gbString op_str   = expr_to_string(op_expr);
+		gbString type_str = type_to_string(operand->type);
+		gbString sel_str  = expr_to_string(selector);
+		defer (gb_string_free(op_str));
+		defer (gb_string_free(type_str));
+		defer (gb_string_free(sel_str));
+		error(ast_node_token(op_expr), "Cannot access non-constant field `%s` from `%s`", sel_str, op_str);
 		goto error;
 	}
 
@@ -2570,8 +2596,9 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 
 		check_expr(c, &op, len);
-		if (op.mode == Addressing_Invalid)
+		if (op.mode == Addressing_Invalid) {
 			return false;
+		}
 		if (!is_type_integer(op.type)) {
 			gbString type_str = type_to_string(operand->type);
 			defer (gb_string_free(type_str));
@@ -2583,8 +2610,9 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		if (cap != NULL) {
 			check_expr(c, &op, cap);
-			if (op.mode == Addressing_Invalid)
+			if (op.mode == Addressing_Invalid) {
 				return false;
+			}
 			if (!is_type_integer(op.type)) {
 				gbString type_str = type_to_string(operand->type);
 				defer (gb_string_free(type_str));
@@ -2709,8 +2737,9 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		ast_node(s, SelectorExpr, arg);
 
 		check_expr(c, operand, s->expr);
-		if (operand->mode == Addressing_Invalid)
+		if (operand->mode == Addressing_Invalid) {
 			return false;
+		}
 
 		Type *type = operand->type;
 		if (base_type(type)->kind == Type_Pointer) {
@@ -2750,8 +2779,9 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	case BuiltinProc_type_of_val:
 		// type_of_val :: proc(val: Type) -> type(Type)
 		check_assignment(c, operand, NULL, make_string("argument of `type_of_val`"));
-		if (operand->mode == Addressing_Invalid || operand->mode == Addressing_Builtin)
+		if (operand->mode == Addressing_Invalid || operand->mode == Addressing_Builtin) {
 			return false;
+		}
 		operand->mode = Addressing_Type;
 		break;
 
@@ -3140,8 +3170,9 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		Operand a = *operand;
 		Operand b = {};
 		check_expr(c, &b, other_arg);
-		if (b.mode == Addressing_Invalid)
+		if (b.mode == Addressing_Invalid) {
 			return false;
+		}
 		if (!is_type_comparable(b.type) || !is_type_numeric(type)) {
 			gbString type_str = type_to_string(b.type);
 			defer (gb_string_free(type_str));
@@ -3150,7 +3181,6 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			      type_str);
 			return false;
 		}
-
 
 		if (a.mode == Addressing_Constant &&
 		    b.mode == Addressing_Constant) {
@@ -3169,6 +3199,15 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		} else {
 			operand->mode = Addressing_Value;
 			operand->type = type;
+
+			convert_to_typed(c, &a, b.type);
+			if (a.mode == Addressing_Invalid) {
+				return false;
+			}
+			convert_to_typed(c, &b, a.type);
+			if (b.mode == Addressing_Invalid) {
+				return false;
+			}
 
 			if (!are_types_identical(operand->type, b.type)) {
 				gbString type_a = type_to_string(a.type);
@@ -3200,8 +3239,9 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		Operand a = *operand;
 		Operand b = {};
 		check_expr(c, &b, other_arg);
-		if (b.mode == Addressing_Invalid)
+		if (b.mode == Addressing_Invalid) {
 			return false;
+		}
 		if (!is_type_comparable(b.type) || !is_type_numeric(type)) {
 			gbString type_str = type_to_string(b.type);
 			defer (gb_string_free(type_str));
@@ -3210,7 +3250,6 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 			      type_str);
 			return false;
 		}
-
 
 		if (a.mode == Addressing_Constant &&
 		    b.mode == Addressing_Constant) {
@@ -3229,6 +3268,15 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		} else {
 			operand->mode = Addressing_Value;
 			operand->type = type;
+
+			convert_to_typed(c, &a, b.type);
+			if (a.mode == Addressing_Invalid) {
+				return false;
+			}
+			convert_to_typed(c, &b, a.type);
+			if (b.mode == Addressing_Invalid) {
+				return false;
+			}
 
 			if (!are_types_identical(operand->type, b.type)) {
 				gbString type_a = type_to_string(a.type);
@@ -3847,6 +3895,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		}
 
 		Type *t = base_type(type_deref(o->type));
+		b32 is_const = o->mode == Addressing_Constant;
+
 
 		auto set_index_data = [](Operand *o, Type *t, i64 *max_count) -> b32 {
 			t = base_type(type_deref(t));
@@ -3894,6 +3944,10 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		i64 max_count = -1;
 		b32 valid = set_index_data(o, t, &max_count);
 
+		if (is_const) {
+			valid = false;
+		}
+
 		if (!valid && (is_type_struct(t) || is_type_raw_union(t))) {
 			Entity *found = find_using_index_expr(t);
 			if (found != NULL) {
@@ -3903,7 +3957,11 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 		if (!valid) {
 			gbString str = expr_to_string(o->expr);
-			error(ast_node_token(o->expr), "Cannot index `%s`", str);
+			if (is_const) {
+				error(ast_node_token(o->expr), "Cannot index a constant `%s`", str);
+			} else {
+				error(ast_node_token(o->expr), "Cannot index `%s`", str);
+			}
 			gb_string_free(str);
 			goto error;
 		}

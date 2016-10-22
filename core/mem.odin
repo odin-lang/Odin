@@ -88,6 +88,7 @@ align_forward :: proc(ptr: rawptr, align: int) -> rawptr {
 }
 
 
+
 AllocationHeader :: struct {
 	size: int
 }
@@ -109,18 +110,22 @@ allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
 
 
 
+
+
 // Custom allocators
 
 Arena :: struct {
 	backing:    Allocator
-	memory:     []u8
+	memory:     []byte
 	temp_count: int
+
+	Temp_Memory :: struct {
+		arena:          ^Arena
+		original_count: int
+	}
 }
 
-Temp_Arena_Memory :: struct {
-	arena:          ^Arena
-	original_count: int
-}
+
 
 
 
@@ -132,14 +137,8 @@ init_arena_from_memory :: proc(using a: ^Arena, data: []byte) {
 
 init_arena_from_context :: proc(using a: ^Arena, size: int) {
 	backing = context.allocator
-	memory = new_slice(u8, 0, size)
+	memory = new_slice(byte, 0, size)
 	temp_count = 0
-}
-
-init_sub_arena :: proc(sub, parent: ^Arena, size: int) {
-	push_allocator arena_allocator(parent) {
-		init_arena_from_context(sub, size)
-	}
 }
 
 free_arena :: proc(using a: ^Arena) {
@@ -181,7 +180,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
 
 	case FREE:
 		// NOTE(bill): Free all at once
-		// Use Temp_Arena_Memory if you want to free a block
+		// Use Arena.Temp_Memory if you want to free a block
 
 	case FREE_ALL:
 		arena.memory.count = 0
@@ -193,15 +192,15 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
 	return nil
 }
 
-begin_temp_arena_memory :: proc(a: ^Arena) -> Temp_Arena_Memory {
-	tmp: Temp_Arena_Memory
+begin_arena_temp_memory :: proc(a: ^Arena) -> Arena.Temp_Memory {
+	tmp: Arena.Temp_Memory
 	tmp.arena = a
 	tmp.original_count = a.memory.count
 	a.temp_count++
 	return tmp
 }
 
-end_temp_arena_memory :: proc(using tmp: Temp_Arena_Memory) {
+end_arena_temp_memory :: proc(using tmp: Arena.Temp_Memory) {
 	assert(arena.memory.count >= original_count)
 	assert(arena.temp_count > 0)
 	arena.memory.count = original_count
@@ -232,7 +231,7 @@ align_of_type_info :: proc(type_info: ^Type_Info) -> int {
 	case Pointer:
 		return WORD_SIZE
 	case Maybe:
-		return align_of_type_info(info.elem)
+		return max(align_of_type_info(info.elem), 1)
 	case Procedure:
 		return WORD_SIZE
 	case Array:

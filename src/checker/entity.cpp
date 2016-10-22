@@ -106,6 +106,7 @@ Entity *make_entity_using_variable(gbAllocator a, Entity *parent, Token token, T
 	Entity *entity = alloc_entity(a, Entity_Variable, parent->scope, token, type);
 	entity->using_parent = parent;
 	entity->Variable.anonymous = true;
+	entity->Variable.anonymous = true;
 	return entity;
 }
 

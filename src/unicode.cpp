@@ -6,7 +6,6 @@
 
 #pragma warning(pop)
 
-// TODO(bill): Unicode support
 b32 rune_is_letter(Rune r) {
 	if ((r < 0x80 && gb_char_is_alpha(cast(char)r)) ||
 	    r == '_') {
@@ -24,8 +23,9 @@ b32 rune_is_letter(Rune r) {
 }
 
 b32 rune_is_digit(Rune r) {
-	if (r < 0x80 && gb_is_between(r, '0', '9'))
+	if (r < 0x80 && gb_is_between(r, '0', '9')) {
 		return true;
+	}
 	return utf8proc_category(r) == UTF8PROC_CATEGORY_ND;
 }
 

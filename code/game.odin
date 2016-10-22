@@ -46,9 +46,12 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 	w: Window
 	w.width, w.height = msg, height
 
-	class_name   := "Win32-Odin-Window\x00"
-	c_class_name := class_name.data
-	w.c_title = to_c_string(title)
+	c_class_name := "Win32-Odin-Window\x00".data
+	if title[title.count-1] != 0 {
+		w.c_title = to_c_string(title)
+	} else {
+		w.c_title = title as []u8
+	}
 
 	instance := GetModuleHandleA(nil)
 
@@ -190,6 +193,7 @@ run :: proc() {
 
 		draw_rect :: proc(x, y, w, h: f32) {
 			gl.Begin(gl.TRIANGLES)
+			defer gl.End()
 
 			gl.Color3f(1, 0, 0); gl.Vertex3f(x,   y,   0)
 			gl.Color3f(0, 1, 0); gl.Vertex3f(x+w, y,   0)
@@ -198,8 +202,6 @@ run :: proc() {
 			gl.Color3f(0, 0, 1); gl.Vertex3f(x+w, y+h, 0)
 			gl.Color3f(1, 1, 0); gl.Vertex3f(x,   y+h, 0)
 			gl.Color3f(1, 0, 0); gl.Vertex3f(x,   y,   0)
-
-			gl.End()
 		}
 
 		draw_rect(pos[0], pos[1], 50, 50)

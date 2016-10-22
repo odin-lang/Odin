@@ -29,37 +29,36 @@ struct AstFile {
 	// >= 0: In Expression
 	// <  0: In Control Clause
 	// NOTE(bill): Used to prevent type literals in control clauses
-	isize expr_level;
+	isize          expr_level;
 
-	AstNodeArray decls;
-	b32 is_global_scope;
+	AstNodeArray   decls;
+	b32            is_global_scope;
 
-	AstNode * curr_proc;
-	isize     scope_level;
-	Scope *   scope;       // NOTE(bill): Created in checker
-	DeclInfo *decl_info;   // NOTE(bill): Created in checker
+	AstNode *      curr_proc;
+	isize          scope_level;
+	Scope *        scope;       // NOTE(bill): Created in checker
+	DeclInfo *     decl_info;   // NOTE(bill): Created in checker
 
 	// TODO(bill): Error recovery
-	// NOTE(bill): Error recovery
 #define PARSER_MAX_FIX_COUNT 6
 	isize    fix_count;
 	TokenPos fix_prev_pos;
 };
 
 struct ImportedFile {
-	String path;
-	String rel_path;
+	String   path;
+	String   rel_path;
 	TokenPos pos; // #import
 };
 
 struct Parser {
-	String init_fullpath;
+	String              init_fullpath;
 	Array<AstFile>      files;
 	Array<ImportedFile> imports;
-	gbAtomic32 import_index;
+	gbAtomic32          import_index;
 	Array<String>       system_libraries;
-	isize total_token_count;
-	gbMutex mutex;
+	isize               total_token_count;
+	gbMutex             mutex;
 };
 
 enum ProcTag : u64 {
@@ -482,11 +481,6 @@ Token ast_node_token(AstNode *node) {
 
 	return empty_token;
 }
-
-HashKey hash_token(Token t) {
-	return hash_string(t.string);
-}
-
 
 // NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
 AstNode *make_node(AstFile *f, AstNodeKind kind) {
@@ -2969,8 +2963,8 @@ String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 	defer (gb_free(gb_heap_allocator(), str));
 
 	isize i = 0;
-	gb_memcopy(str+i, base_dir.text, base_dir.len); i += base_dir.len;
-	gb_memcopy(str+i, path.text, path.len);
+	gb_memmove(str+i, base_dir.text, base_dir.len); i += base_dir.len;
+	gb_memmove(str+i, path.text, path.len);
 	str[str_len] = '\0';
 	return path_to_fullpath(a, make_string(str, str_len));
 }
@@ -2985,9 +2979,9 @@ String get_fullpath_core(gbAllocator a, String path) {
 	u8 *str = gb_alloc_array(gb_heap_allocator(), u8, str_len+1);
 	defer (gb_free(gb_heap_allocator(), str));
 
-	gb_memcopy(str, module_dir.text, module_dir.len);
-	gb_memcopy(str+module_dir.len, core, core_len);
-	gb_memcopy(str+module_dir.len+core_len, path.text, path.len);
+	gb_memmove(str, module_dir.text, module_dir.len);
+	gb_memmove(str+module_dir.len, core, core_len);
+	gb_memmove(str+module_dir.len+core_len, path.text, path.len);
 	str[str_len] = '\0';
 
 	return path_to_fullpath(a, make_string(str, str_len));

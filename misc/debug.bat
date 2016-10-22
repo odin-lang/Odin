@@ -1,3 +1,3 @@
 @echo off
 
-call devenv.exe odin.sln
+start devenv.exe odin.sln

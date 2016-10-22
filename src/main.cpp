@@ -1,3 +1,5 @@
+#define VERSION_STRING "v0.0.3"
+
 #include "common.cpp"
 #include "profiler.cpp"
 #include "unicode.cpp"
@@ -88,9 +90,20 @@ ArchData make_arch_data(ArchKind kind) {
 	return data;
 }
 
+void usage(char *argv0) {
+	gb_printf_err("%s is a tool for managing Odin source code\n", argv0);
+	gb_printf_err("Usage:");
+	gb_printf_err("\n\t%s command [arguments]\n", argv0);
+	gb_printf_err("Commands:");
+	gb_printf_err("\n\tbuild   compile .odin file");
+	gb_printf_err("\n\trun     compile and run .odin file");
+	gb_printf_err("\n\tversion print Odin version");
+	gb_printf_err("\n\n");
+}
+
 int main(int argc, char **argv) {
 	if (argc < 2) {
-		gb_printf_err("using: %s [run] <filename> \n", argv[0]);
+		usage(argv[0]);
 		return 1;
 	}
 	prof_init();
@@ -104,11 +117,20 @@ int main(int argc, char **argv) {
 
 	init_universal_scope();
 
-	char *init_filename = argv[1];
+	char *init_filename = NULL;
 	b32 run_output = false;
-	if (gb_strncmp(argv[1], "run", 3) == 0) {
+	String arg1 = make_string(argv[1]);
+	if (arg1 == "run") {
 		run_output = true;
 		init_filename = argv[2];
+	} else if (arg1 == "build") {
+		init_filename = argv[2];
+	} else if (arg1 == "version") {
+		gb_printf("%s version %s", argv[0], VERSION_STRING);
+		return 0;
+	} else {
+		usage(argv[0]);
+		return 1;
 	}
 	Parser parser = {0};
 

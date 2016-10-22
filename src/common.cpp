@@ -1,4 +1,3 @@
-// #define GB_NO_WINDOWS_H
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
@@ -36,9 +35,8 @@ String get_module_dir() {
 
 	wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
 
-	String16 str = {text, len};
 	GetModuleFileNameW(NULL, text, len);
-	String path = string16_to_string(gb_heap_allocator(), str);
+	String path = string16_to_string(gb_heap_allocator(), make_string16(text, len));
 	for (isize i = path.len-1; i >= 0; i--) {
 		u8 c = path.text[i];
 		if (c == '/' || c == '\\') {
@@ -85,18 +83,22 @@ struct BlockTimer {
 
 
 // Hasing
+enum HashKeyKind {
+	HashKey_Default,
+	HashKey_String,
+};
 
 struct HashKey {
+	HashKeyKind kind;
+	u64         key;
 	union {
-		u64   key;
-		void *ptr;
+		String string; // if String, s.len > 0
 	};
-	b32 is_string;
-	String string; // if String, s.len > 0
 };
 
 gb_inline HashKey hashing_proc(void const *data, isize len) {
 	HashKey h = {};
+	h.kind = HashKey_Default;
 	// h.key = gb_murmur64(data, len);
 	h.key = gb_fnv64a(data, len);
 	return h;
@@ -104,22 +106,24 @@ gb_inline HashKey hashing_proc(void const *data, isize len) {
 
 gb_inline HashKey hash_string(String s) {
 	HashKey h = hashing_proc(s.text, s.len);
-	h.is_string = true;
+	h.kind = HashKey_String;
 	h.string = s;
 	return h;
 }
 
 gb_inline HashKey hash_pointer(void *ptr) {
-	uintptr p = cast(uintptr)ptr;
-	HashKey h = {cast(u64)p};
+	HashKey h = {};
+	h.key = cast(u64)cast(uintptr)ptr;
 	return h;
 }
 
 b32 hash_key_equal(HashKey a, HashKey b) {
 	if (a.key == b.key) {
 		// NOTE(bill): If two string's hashes collide, compare the strings themselves
-		if (a.is_string) {
-			if (b.is_string) return a.string == b.string;
+		if (a.kind == HashKey_String) {
+			if (b.kind == HashKey_String) {
+				return a.string == b.string;
+			}
 			return false;
 		}
 		return true;
@@ -156,7 +160,6 @@ i64 prev_pow2(i64 n) {
 }
 
 
-#define gb_for_array(index_, array_) for (isize index_ = 0; (array_) != NULL && index_ < gb_array_count(array_); index_++)
 #define for_array(index_, array_) for (isize index_ = 0; index_ < (array_).count; index_++)
 
 
@@ -169,10 +172,11 @@ i64 prev_pow2(i64 n) {
 } while (0)
 
 #define DLIST_APPEND(root_element, curr_element, next_element) do { \
-	if ((root_element) == NULL) \
+	if ((root_element) == NULL) { \
 		(root_element) = (curr_element) = (next_element); \
-	else \
+	} else { \
 		DLIST_SET(curr_element, next_element); \
+	} \
 } while (0)
 
 ////////////////////////////////////////////////////////////////
@@ -309,14 +313,16 @@ void map_rehash(Map<T> *h, isize new_count) {
 		}
 		fr = map__find(&nh, e->key);
 		j = map__add_entry(&nh, e->key);
-		if (fr.entry_prev < 0)
+		if (fr.entry_prev < 0) {
 			nh.hashes[fr.hash_index] = j;
-		else
+		} else {
 			nh.entries[fr.entry_prev].next = j;
+		}
 		nh.entries[j].next = fr.entry_index;
 		nh.entries[j].value = e->value;
-		if (map__full(&nh))
+		if (map__full(&nh)) {
 			map_grow(&nh);
+		}
 	}
 	map_destroy(h);
 	*h = nh;
@@ -466,4 +472,7 @@ void multi_map_remove_all(Map<T> *h, HashKey key) {
 		map_remove(h, key);
 	}
 }
+
+
+
 

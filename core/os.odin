@@ -43,6 +43,7 @@ File_Standard :: type enum {
 	COUNT,
 }
 
+// NOTE(bill): Uses startup to initialize it
 __std_files := [..]File{
 	File{handle = win32.GetStdHandle(win32.STD_INPUT_HANDLE)},
 	File{handle = win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)},
