@@ -46,7 +46,8 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 	w: Window
 	w.width, w.height = msg, height
 
-	c_class_name := "Win32-Odin-Window\x00".data
+	class_name := "Win32-Odin-Window\x00"
+	c_class_name := class_name.data
 	if title[title.count-1] != 0 {
 		w.c_title = to_c_string(title)
 	} else {

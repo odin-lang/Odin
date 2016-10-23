@@ -633,26 +633,59 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, ", align %lld\n", type_align_of(m->sizes, m->allocator, type));
 	} break;
 
-	case ssaInstr_GetElementPtr: {
-		Type *et = instr->GetElementPtr.elem_type;
-		ssa_fprintf(f, "%%%d = getelementptr ", value->index);
-		if (instr->GetElementPtr.inbounds) {
-			ssa_fprintf(f, "inbounds ");
-		}
+	case ssaInstr_ArrayElementPtr: {
+		Type *et = ssa_type(instr->ArrayElementPtr.address);
+		ssa_fprintf(f, "%%%d = getelementptr inbounds ", value->index);
 
 		ssa_print_type(f, m, type_deref(et));
 		ssa_fprintf(f, ", ");
 		ssa_print_type(f, m, et);
 		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, instr->GetElementPtr.address, et);
-		for (isize i = 0; i < instr->GetElementPtr.index_count; i++) {
-			ssaValue *index = instr->GetElementPtr.indices[i];
-			Type *t = ssa_type(index);
-			ssa_fprintf(f, ", ");
-			ssa_print_type(f, m, t);
-			ssa_fprintf(f, " ");
-			ssa_print_value(f, m, index, t);
-		}
+		ssa_print_value(f, m, instr->ArrayElementPtr.address, et);
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m, t_int);
+		ssa_fprintf(f, " 0, ");
+
+		ssaValue *index =instr->ArrayElementPtr.elem_index;
+		Type *t = ssa_type(index);
+		ssa_print_type(f, m, t);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, index, t);
+		ssa_fprintf(f, "\n");
+	} break;
+
+	case ssaInstr_StructElementPtr: {
+		Type *et = ssa_type(instr->StructElementPtr.address);
+		ssa_fprintf(f, "%%%d = getelementptr inbounds ", value->index);
+
+		ssa_print_type(f, m, type_deref(et));
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m, et);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, instr->StructElementPtr.address, et);
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m, t_int);
+		ssa_fprintf(f, " 0, ");
+		ssa_print_type(f, m, t_i32);
+		ssa_fprintf(f, " %d", instr->StructElementPtr.elem_index);
+		ssa_fprintf(f, "\n");
+	} break;
+
+	case ssaInstr_PtrOffset: {
+		Type *pt = ssa_type(instr->PtrOffset.address);
+		ssa_fprintf(f, "%%%d = getelementptr inbounds ", value->index);
+		ssa_print_type(f, m, type_deref(pt));
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m, pt);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, instr->PtrOffset.address, pt);
+
+		ssaValue *offset = instr->PtrOffset.offset;
+		Type *t = ssa_type(offset);
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m, t);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, offset, t);
 		ssa_fprintf(f, "\n");
 	} break;
 
@@ -692,29 +725,25 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, ", %d\n", instr->ExtractValue.index);
 	} break;
 
-	case ssaInstr_NoOp: {;
-		ssa_fprintf(f, "%%%d = add i32 0, 0\n", value->index);
-	} break;
-
-	case ssaInstr_Br: {;
-		ssa_fprintf(f, "br ");
-		if (instr->Br.cond != NULL) {
-			ssa_print_type(f, m, t_bool);
-			ssa_fprintf(f, " ");
-			ssa_print_value(f, m, instr->Br.cond, t_bool);
-			ssa_fprintf(f, ", ", instr->Br.cond->index);
-		}
-		ssa_fprintf(f, "label ");
-		ssa_fprintf(f, "%%"); ssa_print_block_name(f, instr->Br.true_block);
-		if (instr->Br.false_block != NULL) {
-			ssa_fprintf(f, ", label ");
-			ssa_fprintf(f, "%%"); ssa_print_block_name(f, instr->Br.false_block);
-		}
+	case ssaInstr_Jump: {;
+		ssa_fprintf(f, "br label %%");
+		ssa_print_block_name(f, instr->Jump.block);
 		ssa_fprintf(f, "\n");
 	} break;
 
-	case ssaInstr_Ret: {
-		auto *ret = &instr->Ret;
+	case ssaInstr_CondJump: {;
+		ssa_fprintf(f, "br ");
+		ssa_print_type(f, m, t_bool);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, instr->CondJump.cond, t_bool);
+		ssa_fprintf(f, ", ", instr->CondJump.cond->index);
+		ssa_fprintf(f, "label %%");   ssa_print_block_name(f, instr->CondJump.true_block);
+		ssa_fprintf(f, ", label %%"); ssa_print_block_name(f, instr->CondJump.false_block);
+		ssa_fprintf(f, "\n");
+	} break;
+
+	case ssaInstr_Return: {
+		auto *ret = &instr->Return;
 		ssa_fprintf(f, "ret ");
 		if (ret->value == NULL) {
 			ssa_fprintf(f, "void");
@@ -904,23 +933,23 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "\n");
 	} break;
 
-	case ssaInstr_ExtractElement: {
-		Type *vt = ssa_type(instr->ExtractElement.vector);
+	case ssaInstr_VectorExtractElement: {
+		Type *vt = ssa_type(instr->VectorExtractElement.vector);
+		Type *it = ssa_type(instr->VectorExtractElement.index);
 		ssa_fprintf(f, "%%%d = extractelement ", value->index);
 
 		ssa_print_type(f, m, vt);
 		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, instr->ExtractElement.vector, vt);
+		ssa_print_value(f, m, instr->VectorExtractElement.vector, vt);
 		ssa_fprintf(f, ", ");
-		Type *it = ssa_type(instr->ExtractElement.index);
 		ssa_print_type(f, m, it);
 		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, instr->ExtractElement.index, it);
+		ssa_print_value(f, m, instr->VectorExtractElement.index, it);
 		ssa_fprintf(f, "\n");
 	} break;
 
-	case ssaInstr_InsertElement: {
-		auto *ie = &instr->InsertElement;
+	case ssaInstr_VectorInsertElement: {
+		auto *ie = &instr->VectorInsertElement;
 		Type *vt = ssa_type(ie->vector);
 		ssa_fprintf(f, "%%%d = insertelement ", value->index);
 
@@ -941,8 +970,8 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "\n");
 	} break;
 
-	case ssaInstr_ShuffleVector: {
-		auto *sv = &instr->ShuffleVector;
+	case ssaInstr_VectorShuffle: {
+		auto *sv = &instr->VectorShuffle;
 		Type *vt = ssa_type(sv->vector);
 		ssa_fprintf(f, "%%%d = shufflevector ", value->index);
 

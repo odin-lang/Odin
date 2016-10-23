@@ -292,13 +292,8 @@ void ssa_gen_tree(ssaGen *s) {
 			CheckerInfo *info = proc->module->info;
 
 			// Useful types
-			Type *t_int_ptr              = make_type_pointer(a, t_int);
-			Type *t_i64_ptr              = make_type_pointer(a, t_i64);
-			Type *t_bool_ptr             = make_type_pointer(a, t_bool);
-			Type *t_string_ptr           = make_type_pointer(a, t_string);
-			Type *t_type_info_ptr_ptr    = make_type_pointer(a, t_type_info_ptr);
-			Type *t_i64_slice_ptr        = make_type_pointer(a, make_type_slice(a, t_i64));
-			Type *t_string_slice_ptr     = make_type_pointer(a, make_type_slice(a, t_string));
+			Type *t_i64_slice_ptr    = make_type_pointer(a, make_type_slice(a, t_i64));
+			Type *t_string_slice_ptr = make_type_pointer(a, make_type_slice(a, t_string));
 
 			auto get_type_info_ptr = [](ssaProcedure *proc, ssaValue *type_info_data, Type *type) -> ssaValue * {
 				return ssa_emit_array_gep(proc, type_info_data,
@@ -320,7 +315,6 @@ void ssa_gen_tree(ssaGen *s) {
 				t = default_type(t);
 				isize entry_index = entry->value;
 
-
 				ssaValue *tag = NULL;
 
 				switch (t->kind) {
@@ -336,8 +330,8 @@ void ssa_gen_tree(ssaGen *s) {
 
 					ssaValue *gep  = get_type_info_ptr(proc, type_info_data, t->Named.base);
 
-					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 0), name);
-					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 1), gep);
+					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), name);
+					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 1), gep);
 				} break;
 
 				case Type_Basic:
@@ -359,15 +353,15 @@ void ssa_gen_tree(ssaGen *s) {
 						b32 is_unsigned = (t->Basic.flags & BasicFlag_Unsigned) != 0;
 						ssaValue *bits = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
 						ssaValue *is_signed = ssa_make_const_bool(a, !is_unsigned);
-						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 0), bits);
-						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 1), is_signed);
+						ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), bits);
+						ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 1), is_signed);
 					} break;
 
 					case Basic_f32:
 					case Basic_f64: {
 						tag = ssa_add_local_generated(proc, t_type_info_float);
 						ssaValue *bits = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
-						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 0), bits);
+						ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), bits);
 					} break;
 
 					case Basic_rawptr:
@@ -387,46 +381,46 @@ void ssa_gen_tree(ssaGen *s) {
 				case Type_Pointer: {
 					tag = ssa_add_local_generated(proc, t_type_info_pointer);
 					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Pointer.elem);
-					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 0), gep);
+					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), gep);
 				} break;
 				case Type_Maybe: {
 					tag = ssa_add_local_generated(proc, t_type_info_maybe);
 					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Maybe.elem);
-					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 0), gep);
+					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), gep);
 				} break;
 				case Type_Array: {
 					tag = ssa_add_local_generated(proc, t_type_info_array);
 					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Array.elem);
-					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 0), gep);
+					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), gep);
 
 					isize ez = type_size_of(m->sizes, a, t->Array.elem);
-					ssaValue *elem_size = ssa_emit_struct_gep(proc, tag, 1);
+					ssaValue *elem_size = ssa_emit_struct_ep(proc, tag, 1);
 					ssa_emit_store(proc, elem_size, ssa_make_const_int(a, ez));
 
-					ssaValue *count = ssa_emit_struct_gep(proc, tag, 2);
+					ssaValue *count = ssa_emit_struct_ep(proc, tag, 2);
 					ssa_emit_store(proc, count, ssa_make_const_int(a, t->Array.count));
 
 				} break;
 				case Type_Slice: {
 					tag = ssa_add_local_generated(proc, t_type_info_slice);
 					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Slice.elem);
-					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 0), gep);
+					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), gep);
 
 					isize ez = type_size_of(m->sizes, a, t->Slice.elem);
-					ssaValue *elem_size = ssa_emit_struct_gep(proc, tag, 1);
+					ssaValue *elem_size = ssa_emit_struct_ep(proc, tag, 1);
 					ssa_emit_store(proc, elem_size, ssa_make_const_int(a, ez));
 
 				} break;
 				case Type_Vector: {
 					tag = ssa_add_local_generated(proc, t_type_info_vector);
 					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Vector.elem);
-					ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 0), gep);
+					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), gep);
 
 					isize ez = type_size_of(m->sizes, a, t->Vector.elem);
-					ssaValue *elem_size = ssa_emit_struct_gep(proc, tag, 1);
+					ssaValue *elem_size = ssa_emit_struct_ep(proc, tag, 1);
 					ssa_emit_store(proc, elem_size, ssa_make_const_int(a, ez));
 
-					ssaValue *count = ssa_emit_struct_gep(proc, tag, 2);
+					ssaValue *count = ssa_emit_struct_ep(proc, tag, 2);
 					ssa_emit_store(proc, count, ssa_make_const_int(a, t->Vector.count));
 
 				} break;
@@ -440,10 +434,10 @@ void ssa_gen_tree(ssaGen *s) {
 							ssaValue *ordered = ssa_make_const_bool(a, t->Record.struct_is_ordered);
 							ssaValue *size    = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
 							ssaValue *align   = ssa_make_const_int(a, type_align_of(m->sizes, a, t));
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 1), size);
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 2), align);
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 3), packed);
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 4), ordered);
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 1), size);
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 2), align);
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 3), packed);
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 4), ordered);
 						}
 
 						ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Record.field_count, &type_info_member_index);
@@ -457,9 +451,9 @@ void ssa_gen_tree(ssaGen *s) {
 							GB_ASSERT(f->kind == Entity_Variable && f->Variable.field);
 
 							ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_const_int(a, source_index));
-							ssaValue *name      = ssa_emit_struct_gep(proc, field, 0);
-							ssaValue *type_info = ssa_emit_struct_gep(proc, field, 1);
-							ssaValue *offset    = ssa_emit_struct_gep(proc, field, 2);
+							ssaValue *name      = ssa_emit_struct_ep(proc, field, 0);
+							ssaValue *type_info = ssa_emit_struct_ep(proc, field, 1);
+							ssaValue *offset    = ssa_emit_struct_ep(proc, field, 2);
 
 							if (f->token.string.len > 0) {
 								ssa_emit_store(proc, name, ssa_emit_global_string(proc, f->token.string));
@@ -470,12 +464,12 @@ void ssa_gen_tree(ssaGen *s) {
 
 						Type *slice_type = make_type_slice(a, t_type_info_member);
 						Type *slice_type_ptr = make_type_pointer(a, slice_type);
-						ssaValue *slice = ssa_emit_struct_gep(proc, tag, 0);
+						ssaValue *slice = ssa_emit_struct_ep(proc, tag, 0);
 						ssaValue *field_count = ssa_make_const_int(a, t->Record.field_count);
 
-						ssaValue *elem = ssa_emit_struct_gep(proc, slice, 0);
-						ssaValue *len  = ssa_emit_struct_gep(proc, slice, 1);
-						ssaValue *cap  = ssa_emit_struct_gep(proc, slice, 2);
+						ssaValue *elem = ssa_emit_struct_ep(proc, slice, 0);
+						ssaValue *len  = ssa_emit_struct_ep(proc, slice, 1);
+						ssaValue *cap  = ssa_emit_struct_ep(proc, slice, 2);
 
 						ssa_emit_store(proc, elem, memory);
 						ssa_emit_store(proc, len, field_count);
@@ -486,8 +480,8 @@ void ssa_gen_tree(ssaGen *s) {
 						{
 							ssaValue *size    = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
 							ssaValue *align   = ssa_make_const_int(a, type_align_of(m->sizes, a, t));
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 1),  size);
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 2),  align);
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 1),  size);
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 2),  align);
 						}
 						break;
 					case TypeRecord_RawUnion: {
@@ -495,17 +489,17 @@ void ssa_gen_tree(ssaGen *s) {
 						{
 							ssaValue *size    = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
 							ssaValue *align   = ssa_make_const_int(a, type_align_of(m->sizes, a, t));
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 1),  size);
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 2),  align);
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 1),  size);
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 2),  align);
 						}
 
 						ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Record.field_count, &type_info_member_index);
 
 						for (isize i = 0; i < t->Record.field_count; i++) {
 							ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_const_int(a, i));
-							ssaValue *name      = ssa_emit_struct_gep(proc, field, 0);
-							ssaValue *type_info = ssa_emit_struct_gep(proc, field, 1);
-							ssaValue *offset    = ssa_emit_struct_gep(proc, field, 2);
+							ssaValue *name      = ssa_emit_struct_ep(proc, field, 0);
+							ssaValue *type_info = ssa_emit_struct_ep(proc, field, 1);
+							ssaValue *offset    = ssa_emit_struct_ep(proc, field, 2);
 
 							Entity *f = t->Record.fields[i];
 							ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
@@ -519,12 +513,12 @@ void ssa_gen_tree(ssaGen *s) {
 
 						Type *slice_type = make_type_slice(a, t_type_info_member);
 						Type *slice_type_ptr = make_type_pointer(a, slice_type);
-						ssaValue *slice = ssa_emit_struct_gep(proc, tag, 0);
+						ssaValue *slice = ssa_emit_struct_ep(proc, tag, 0);
 						ssaValue *field_count = ssa_make_const_int(a, t->Record.field_count);
 
-						ssaValue *elem = ssa_emit_struct_gep(proc, slice, 0);
-						ssaValue *len  = ssa_emit_struct_gep(proc, slice, 1);
-						ssaValue *cap  = ssa_emit_struct_gep(proc, slice, 2);
+						ssaValue *elem = ssa_emit_struct_ep(proc, slice, 0);
+						ssaValue *len  = ssa_emit_struct_ep(proc, slice, 1);
+						ssaValue *cap  = ssa_emit_struct_ep(proc, slice, 2);
 
 						ssa_emit_store(proc, elem, memory);
 						ssa_emit_store(proc, len, field_count);
@@ -536,7 +530,7 @@ void ssa_gen_tree(ssaGen *s) {
 						if (enum_base == NULL) {
 							enum_base = t_int;
 						}
-						ssaValue *base = ssa_emit_struct_gep(proc, tag, 0);
+						ssaValue *base = ssa_emit_struct_ep(proc, tag, 0);
 						ssa_emit_store(proc, base, get_type_info_ptr(proc, type_info_data, enum_base));
 
 						if (t->Record.other_field_count > 0) {
@@ -576,8 +570,8 @@ void ssa_gen_tree(ssaGen *s) {
 							}
 
 							for (isize i = 0; i < count; i++) {
-								ssaValue *value_gep = ssa_emit_struct_gep(proc, value_array, i);
-								ssaValue *name_gep  = ssa_emit_struct_gep(proc, name_array, i);
+								ssaValue *value_gep = ssa_emit_struct_ep(proc, value_array, i);
+								ssaValue *name_gep  = ssa_emit_struct_ep(proc, name_array, i);
 
 								ssa_emit_store(proc, value_gep, ssa_make_const_i64(a, fields[i]->Constant.value.value_integer));
 								ssa_emit_store(proc, name_gep,  ssa_emit_global_string(proc, fields[i]->token.string));
@@ -586,18 +580,18 @@ void ssa_gen_tree(ssaGen *s) {
 							ssaValue *v_count = ssa_make_const_int(a, count);
 
 
-							ssaValue *values = ssa_emit_struct_gep(proc, tag, 1);
-							ssaValue *names  = ssa_emit_struct_gep(proc, tag, 2);
+							ssaValue *values = ssa_emit_struct_ep(proc, tag, 1);
+							ssaValue *names  = ssa_emit_struct_ep(proc, tag, 2);
 							ssaValue *value_slice = ssa_add_local_generated(proc, type_deref(t_i64_slice_ptr));
 							ssaValue *name_slice  = ssa_add_local_generated(proc, type_deref(t_string_slice_ptr));
 
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, value_slice, 0), ssa_array_elem(proc, value_array));
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, value_slice, 1), v_count);
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, value_slice, 2), v_count);
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, value_slice, 0), ssa_array_elem(proc, value_array));
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, value_slice, 1), v_count);
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, value_slice, 2), v_count);
 
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, name_slice, 0), ssa_array_elem(proc, name_array));
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, name_slice, 1), v_count);
-							ssa_emit_store(proc, ssa_emit_struct_gep(proc, name_slice, 2), v_count);
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, name_slice, 0), ssa_array_elem(proc, name_array));
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, name_slice, 1), v_count);
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, name_slice, 2), v_count);
 
 							ssa_emit_store(proc, values, ssa_emit_load(proc, value_slice));
 							ssa_emit_store(proc, names,  ssa_emit_load(proc, name_slice));
@@ -611,15 +605,15 @@ void ssa_gen_tree(ssaGen *s) {
 
 					{
 						ssaValue *align = ssa_make_const_int(a, type_align_of(m->sizes, a, t));
-						ssa_emit_store(proc, ssa_emit_struct_gep(proc, tag, 2), align);
+						ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 2), align);
 					}
 
 					ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Tuple.variable_count, &type_info_member_index);
 
 					for (isize i = 0; i < t->Tuple.variable_count; i++) {
 						ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_const_int(a, i));
-						ssaValue *name      = ssa_emit_struct_gep(proc, field, 0);
-						ssaValue *type_info = ssa_emit_struct_gep(proc, field, 1);
+						ssaValue *name      = ssa_emit_struct_ep(proc, field, 0);
+						ssaValue *type_info = ssa_emit_struct_ep(proc, field, 1);
 						// NOTE(bill): offset is not used for tuples
 
 						Entity *f = t->Tuple.variables[i];
@@ -633,12 +627,12 @@ void ssa_gen_tree(ssaGen *s) {
 
 					Type *slice_type = make_type_slice(a, t_type_info_member);
 					Type *slice_type_ptr = make_type_pointer(a, slice_type);
-					ssaValue *slice = ssa_emit_struct_gep(proc, tag, 0);
+					ssaValue *slice = ssa_emit_struct_ep(proc, tag, 0);
 					ssaValue *variable_count = ssa_make_const_int(a, t->Tuple.variable_count);
 
-					ssaValue *elem = ssa_emit_struct_gep(proc, slice, 0);
-					ssaValue *len  = ssa_emit_struct_gep(proc, slice, 1);
-					ssaValue *cap  = ssa_emit_struct_gep(proc, slice, 2);
+					ssaValue *elem = ssa_emit_struct_ep(proc, slice, 0);
+					ssaValue *len  = ssa_emit_struct_ep(proc, slice, 1);
+					ssaValue *cap  = ssa_emit_struct_ep(proc, slice, 2);
 
 					ssa_emit_store(proc, elem, memory);
 					ssa_emit_store(proc, len, variable_count);
@@ -648,9 +642,9 @@ void ssa_gen_tree(ssaGen *s) {
 				case Type_Proc: {
 					tag = ssa_add_local_generated(proc, t_type_info_procedure);
 
-					ssaValue *params   = ssa_emit_struct_gep(proc, tag, 0);
-					ssaValue *results  = ssa_emit_struct_gep(proc, tag, 1);
-					ssaValue *variadic = ssa_emit_struct_gep(proc, tag, 2);
+					ssaValue *params   = ssa_emit_struct_ep(proc, tag, 0);
+					ssaValue *results  = ssa_emit_struct_ep(proc, tag, 1);
+					ssaValue *variadic = ssa_emit_struct_ep(proc, tag, 2);
 
 					if (t->Proc.params) {
 						ssa_emit_store(proc, params, get_type_info_ptr(proc, type_info_data, t->Proc.params));

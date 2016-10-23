@@ -18,7 +18,7 @@ enum ParseFileError {
 typedef Array<AstNode *> AstNodeArray;
 
 struct AstFile {
-	u32            id;
+	i32            id;
 	gbArena        arena;
 	Tokenizer      tokenizer;
 	Array<Token>   tokens;

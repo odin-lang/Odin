@@ -1,7 +1,9 @@
 #import "fmt.odin"
 
 main :: proc() {
-	fmt.println("Hellope!")
+	v: {4}f32
+	v[0] = 123
+	fmt.println("Hellope!", v, v[0])
 }
 
 
