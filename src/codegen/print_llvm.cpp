@@ -208,11 +208,11 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 			}
 			break;
 		case TypeRecord_Union: {
-			i64 size_of_union = type_size_of(s, gb_heap_allocator(), t) - s.word_size;
+			i64 size_of_union = type_size_of(s, heap_allocator(), t) - s.word_size;
 			ssa_fprintf(f, "{[%lld x i8], i%lld}", size_of_union, word_bits);
 		} break;
 		case TypeRecord_RawUnion:
-			ssa_fprintf(f, "[%lld x i8]", type_size_of(s, gb_heap_allocator(), t));
+			ssa_fprintf(f, "[%lld x i8]", type_size_of(s, heap_allocator(), t));
 			break;
 		case TypeRecord_Enum:
 			ssa_print_type(f, m, t->Record.enum_base);

@@ -2863,7 +2863,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 	}
 	TokenizerInitError err = init_tokenizer(&f->tokenizer, fullpath);
 	if (err == TokenizerInit_None) {
-		array_init(&f->tokens, gb_heap_allocator());
+		array_init(&f->tokens, heap_allocator());
 		{
 			PROF_SCOPED("Tokenize file");
 			for (;;) {
@@ -2886,7 +2886,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 		// NOTE(bill): Is this big enough or too small?
 		isize arena_size = gb_size_of(AstNode);
 		arena_size *= 2*f->tokens.count;
-		gb_arena_init_from_allocator(&f->arena, gb_heap_allocator(), arena_size);
+		gb_arena_init_from_allocator(&f->arena, heap_allocator(), arena_size);
 
 		f->curr_proc = NULL;
 
@@ -2908,14 +2908,14 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 void destroy_ast_file(AstFile *f) {
 	gb_arena_free(&f->arena);
 	array_free(&f->tokens);
-	gb_free(gb_heap_allocator(), f->tokenizer.fullpath.text);
+	gb_free(heap_allocator(), f->tokenizer.fullpath.text);
 	destroy_tokenizer(&f->tokenizer);
 }
 
 b32 init_parser(Parser *p) {
-	array_init(&p->files, gb_heap_allocator());
-	array_init(&p->imports, gb_heap_allocator());
-	array_init(&p->system_libraries, gb_heap_allocator());
+	array_init(&p->files, heap_allocator());
+	array_init(&p->imports, heap_allocator());
+	array_init(&p->system_libraries, heap_allocator());
 	gb_mutex_init(&p->mutex);
 	return true;
 }
@@ -2927,7 +2927,7 @@ void destroy_parser(Parser *p) {
 	}
 #if 1
 	for_array(i, p->imports) {
-		// gb_free(gb_heap_allocator(), p->imports[i].text);
+		// gb_free(heap_allocator(), p->imports[i].text);
 	}
 #endif
 	array_free(&p->files);
@@ -2959,8 +2959,8 @@ b32 try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
 String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 	isize str_len = base_dir.len+path.len;
 
-	u8 *str = gb_alloc_array(gb_heap_allocator(), u8, str_len+1);
-	defer (gb_free(gb_heap_allocator(), str));
+	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
+	defer (gb_free(heap_allocator(), str));
 
 	isize i = 0;
 	gb_memmove(str+i, base_dir.text, base_dir.len); i += base_dir.len;
@@ -2976,8 +2976,8 @@ String get_fullpath_core(gbAllocator a, String path) {
 	isize core_len = gb_size_of(core)-1;
 
 	isize str_len = module_dir.len + core_len + path.len;
-	u8 *str = gb_alloc_array(gb_heap_allocator(), u8, str_len+1);
-	defer (gb_free(gb_heap_allocator(), str));
+	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
+	defer (gb_free(heap_allocator(), str));
 
 	gb_memmove(str, module_dir.text, module_dir.len);
 	gb_memmove(str+module_dir.len, core, core_len);
@@ -3101,7 +3101,7 @@ void parse_file(Parser *p, AstFile *f) {
 					continue;
 				}
 
-				gbAllocator allocator = gb_heap_allocator(); // TODO(bill): Change this allocator
+				gbAllocator allocator = heap_allocator(); // TODO(bill): Change this allocator
 
 				String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
 				String import_file = rel_path;
@@ -3135,7 +3135,7 @@ void parse_file(Parser *p, AstFile *f) {
 
 
 ParseFileError parse_files(Parser *p, char *init_filename) {
-	char *fullpath_str = gb_path_get_full_name(gb_heap_allocator(), init_filename);
+	char *fullpath_str = gb_path_get_full_name(heap_allocator(), init_filename);
 	String init_fullpath = make_string(fullpath_str);
 	TokenPos init_pos = {};
 	ImportedFile init_imported_file = {init_fullpath, init_fullpath, init_pos};
@@ -3143,7 +3143,7 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 	p->init_fullpath = init_fullpath;
 
 	{
-		String s = get_fullpath_core(gb_heap_allocator(), make_string("_preload.odin"));
+		String s = get_fullpath_core(heap_allocator(), make_string("_preload.odin"));
 		ImportedFile runtime_file = {s, s, init_pos};
 		array_add(&p->imports, runtime_file);
 	}

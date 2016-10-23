@@ -18,7 +18,7 @@ struct Array {
 	}
 };
 
-template <typename T> void     array_init        (Array<T> *array, gbAllocator a, isize init_capacity = 8);
+template <typename T> void     array_init        (Array<T> *array, gbAllocator a, isize init_capacity = ARRAY_GROW_FORMULA(0));
 template <typename T> Array<T> array_make        (T *data, isize count, isize capacity);
 template <typename T> void     array_free        (Array<T> *array);
 template <typename T> void     array_add         (Array<T> *array, T const &t);

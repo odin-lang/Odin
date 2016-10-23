@@ -159,7 +159,7 @@ struct Type {
 	};
 };
 
-gbString type_to_string(Type *type, gbAllocator a = gb_heap_allocator());
+gbString type_to_string(Type *type, gbAllocator a = heap_allocator());
 
 Type *base_type(Type *t) {
 	for (;;) {
@@ -358,6 +358,8 @@ gb_global Type *t_untyped_nil     = &basic_types[Basic_UntypedNil];
 gb_global Type *t_byte            = &basic_type_aliases[0];
 gb_global Type *t_rune            = &basic_type_aliases[1];
 
+
+gb_global Type *t_u8_ptr = NULL;
 
 gb_global Type *t_type_info            = NULL;
 gb_global Type *t_type_info_ptr        = NULL;
@@ -791,7 +793,7 @@ void selection_add_index(Selection *s, isize index) {
 	// IMPORTANT NOTE(bill): this requires a stretchy buffer/dynamic array so it requires some form
 	// of heap allocation
 	if (s->index.data == NULL) {
-		array_init(&s->index, gb_heap_allocator());
+		array_init(&s->index, heap_allocator());
 	}
 	array_add(&s->index, index);
 }

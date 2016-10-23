@@ -246,7 +246,7 @@ CycleChecker *cycle_checker_add(CycleChecker *cc, Entity *e) {
 		return NULL;
 	}
 	if (cc->path.data == NULL) {
-		array_init(&cc->path, gb_heap_allocator());
+		array_init(&cc->path, heap_allocator());
 	}
 	GB_ASSERT(e != NULL && e->kind == Entity_TypeName);
 	array_add(&cc->path, e);
@@ -262,7 +262,7 @@ void cycle_checker_destroy(CycleChecker *cc) {
 
 void init_declaration_info(DeclInfo *d, Scope *scope) {
 	d->scope = scope;
-	map_init(&d->deps, gb_heap_allocator());
+	map_init(&d->deps, heap_allocator());
 }
 
 DeclInfo *make_declaration_info(gbAllocator a, Scope *scope) {
@@ -296,10 +296,10 @@ b32 decl_info_has_init(DeclInfo *d) {
 Scope *make_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
-	map_init(&s->elements,   gb_heap_allocator());
-	map_init(&s->implicit,   gb_heap_allocator());
-	array_init(&s->shared,   gb_heap_allocator());
-	array_init(&s->imported, gb_heap_allocator());
+	map_init(&s->elements,   heap_allocator());
+	map_init(&s->implicit,   heap_allocator());
+	array_init(&s->shared,   heap_allocator());
+	array_init(&s->imported, heap_allocator());
 
 	if (parent != NULL && parent != universal_scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
@@ -506,7 +506,7 @@ void add_global_constant(gbAllocator a, String name, Type *type, ExactValue valu
 
 void init_universal_scope(void) {
 	// NOTE(bill): No need to free these
-	gbAllocator a = gb_heap_allocator();
+	gbAllocator a = heap_allocator();
 	universal_scope = make_scope(NULL, a);
 
 // Types
@@ -536,7 +536,7 @@ void init_universal_scope(void) {
 
 
 void init_checker_info(CheckerInfo *i) {
-	gbAllocator a = gb_heap_allocator();
+	gbAllocator a = heap_allocator();
 	map_init(&i->types,           a);
 	map_init(&i->definitions,     a);
 	map_init(&i->uses,            a);
@@ -566,7 +566,7 @@ void destroy_checker_info(CheckerInfo *i) {
 void init_checker(Checker *c, Parser *parser, BaseTypeSizes sizes) {
 	PROF_PROC();
 
-	gbAllocator a = gb_heap_allocator();
+	gbAllocator a = heap_allocator();
 
 	c->parser = parser;
 	init_checker_info(&c->info);
@@ -576,7 +576,7 @@ void init_checker(Checker *c, Parser *parser, BaseTypeSizes sizes) {
 	array_init(&c->procs, a);
 
 	// NOTE(bill): Is this big enough or too small?
-	isize item_size = gb_max(gb_max(gb_size_of(Entity), gb_size_of(Type)), gb_size_of(Scope));
+	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
 	isize total_token_count = 0;
 	for_array(i, c->parser->files) {
 		AstFile *f = &c->parser->files[i];
@@ -888,7 +888,7 @@ void add_dependency_to_map(Map<Entity *> *map, CheckerInfo *info, Entity *node) 
 
 Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) {
 	Map<Entity *> map = {}; // Key: Entity *
-	map_init(&map, gb_heap_allocator());
+	map_init(&map, heap_allocator());
 
 	for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
@@ -912,6 +912,10 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 
 void init_preload_types(Checker *c) {
 	PROF_PROC();
+
+	if (t_u8_ptr == NULL) {
+		t_u8_ptr = make_type_pointer(c->allocator, t_u8);
+	}
 
 	if (t_type_info == NULL) {
 		Entity *e = current_scope_lookup_entity(c->global_scope, make_string("Type_Info"));
@@ -983,11 +987,11 @@ void add_implicit_value(Checker *c, ImplicitValueId id, String name, String back
 
 void check_parsed_files(Checker *c) {
 	Array<AstNode *> import_decls;
-	array_init(&import_decls, gb_heap_allocator());
+	array_init(&import_decls, heap_allocator());
 	defer (array_free(&import_decls));
 
 	Map<Scope *> file_scopes; // Key: String (fullpath)
-	map_init(&file_scopes, gb_heap_allocator());
+	map_init(&file_scopes, heap_allocator());
 	defer (map_destroy(&file_scopes));
 
 	// Map full filepaths to Scopes
@@ -1069,7 +1073,7 @@ void check_parsed_files(Checker *c) {
 				Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
 				DeclInfo *di = NULL;
 				if (vd->values.count > 0) {
-					di = make_declaration_info(gb_heap_allocator(), file_scope);
+					di = make_declaration_info(heap_allocator(), file_scope);
 					di->entities = entities;
 					di->entity_count = entity_count;
 					di->type_expr = vd->type;
@@ -1089,7 +1093,7 @@ void check_parsed_files(Checker *c) {
 					DeclInfo *d = di;
 					if (d == NULL) {
 						AstNode *init_expr = value;
-						d = make_declaration_info(gb_heap_allocator(), file_scope);
+						d = make_declaration_info(heap_allocator(), file_scope);
 						d->type_expr = vd->type;
 						d->init_expr = init_expr;
 						d->var_decl_tags = vd->tags;

@@ -176,7 +176,7 @@ int main(int argc, char **argv) {
 	isize base_name_len = gb_path_extension(output_name)-1 - output_name;
 	String output = make_string(cast(u8 *)output_name, base_name_len);
 
-	int optimization_level = 0;
+	i32 optimization_level = 0;
 	optimization_level = gb_clamp(optimization_level, 0, 3);
 
 	i32 exit_code = 0;
@@ -212,7 +212,7 @@ int main(int argc, char **argv) {
 	}
 
 
-	gbString lib_str = gb_string_make(gb_heap_allocator(), "Kernel32.lib");
+	gbString lib_str = gb_string_make(heap_allocator(), "Kernel32.lib");
 	// defer (gb_string_free(lib_str));
 	char lib_str_buf[1024] = {};
 	for_array(i, parser.system_libraries) {
@@ -221,6 +221,7 @@ int main(int argc, char **argv) {
 		                        " %.*s.lib", LIT(lib));
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);
 	}
+
 	exit_code = win32_exec_command_line_app("msvc-link",
 		"link %.*s.obj -OUT:%.*s.exe %s "
 		"/defaultlib:libcmt "

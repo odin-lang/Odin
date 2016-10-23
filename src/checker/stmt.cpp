@@ -1180,7 +1180,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		};
 
 		Map<TypeAndToken> seen = {}; // Multimap
-		map_init(&seen, gb_heap_allocator());
+		map_init(&seen, heap_allocator());
 		defer (map_destroy(&seen));
 		for_array(i, bs->stmts) {
 			AstNode *stmt = bs->stmts[i];
@@ -1319,7 +1319,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 
 		Map<b32> seen = {};
-		map_init(&seen, gb_heap_allocator());
+		map_init(&seen, heap_allocator());
 		defer (map_destroy(&seen));
 
 

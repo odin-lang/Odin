@@ -249,7 +249,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 	PROF_PROC();
 
 	Map<Entity *> entity_map = {};
-	map_init(&entity_map, gb_heap_allocator());
+	map_init(&entity_map, heap_allocator());
 	defer (map_destroy(&entity_map));
 
 	isize other_field_index = 0;
@@ -662,7 +662,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	ast_node(et, EnumType, node);
 
 	Map<Entity *> entity_map = {};
-	map_init(&entity_map, gb_heap_allocator());
+	map_init(&entity_map, heap_allocator());
 	defer (map_destroy(&entity_map));
 
 	Type *base_type = t_int;
@@ -4458,5 +4458,5 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 }
 
 gbString expr_to_string(AstNode *expression) {
-	return write_expr_to_string(gb_string_make(gb_heap_allocator(), ""), expression);
+	return write_expr_to_string(gb_string_make(heap_allocator(), ""), expression);
 }

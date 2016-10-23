@@ -23,7 +23,7 @@ i64 prof_get_timestamp(void) {
 
 void prof_init(void) {
 #if defined(PROF_TIMINGS)
-	map_init(&global_profiler.info, gb_heap_allocator());
+	map_init(&global_profiler.info, heap_allocator());
 	global_profiler.start_time = prof_get_timestamp();
 #endif
 }
@@ -88,8 +88,8 @@ void prof_print_all(void) {
 	isize pad_len = gb_size_of(spaces)-1;
 
 	isize info_count = global_profiler.info.entries.count;
-	ProfInfo *info_data = gb_alloc_array(gb_heap_allocator(), ProfInfo, info_count);
-	defer (gb_free(gb_heap_allocator(), info_data));
+	ProfInfo *info_data = gb_alloc_array(heap_allocator(), ProfInfo, info_count);
+	defer (gb_free(heap_allocator(), info_data));
 	for (isize i = 0; i < info_count; i++) {
 		info_data[i] = global_profiler.info.entries[i].value;
 	}

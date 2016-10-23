@@ -348,15 +348,15 @@ void advance_to_next_rune(Tokenizer *t) {
 TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 	PROF_PROC();
 
-	char *c_str = gb_alloc_array(gb_heap_allocator(), char, fullpath.len+1);
+	char *c_str = gb_alloc_array(heap_allocator(), char, fullpath.len+1);
 	memcpy(c_str, fullpath.text, fullpath.len);
 	c_str[fullpath.len] = '\0';
 
-	defer (gb_free(gb_heap_allocator(), c_str));
+	defer (gb_free(heap_allocator(), c_str));
 
 
 	// TODO(bill): Memory map rather than copy contents
-	gbFileContents fc = gb_file_read_contents(gb_heap_allocator(), true, c_str);
+	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, c_str);
 	gb_zero_item(t);
 	if (fc.data != NULL) {
 		t->start = cast(u8 *)fc.data;
@@ -372,7 +372,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 			advance_to_next_rune(t); // Ignore BOM at file beginning
 		}
 
-		array_init(&t->allocated_strings, gb_heap_allocator());
+		array_init(&t->allocated_strings, heap_allocator());
 
 		return TokenizerInit_None;
 	}
@@ -399,10 +399,10 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 
 gb_inline void destroy_tokenizer(Tokenizer *t) {
 	if (t->start != NULL) {
-		gb_free(gb_heap_allocator(), t->start);
+		gb_free(heap_allocator(), t->start);
 	}
 	for_array(i, t->allocated_strings) {
-		gb_free(gb_heap_allocator(), t->allocated_strings[i].text);
+		gb_free(heap_allocator(), t->allocated_strings[i].text);
 	}
 	array_free(&t->allocated_strings);
 }
@@ -699,7 +699,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 				}
 			}
 			token.string.len = t->curr - token.string.text;
-			i32 success = unquote_string(gb_heap_allocator(), &token.string);
+			i32 success = unquote_string(heap_allocator(), &token.string);
 			if (success > 0) {
 				if (success == 2) {
 					array_add(&t->allocated_strings, token.string);

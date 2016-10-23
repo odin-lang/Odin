@@ -1,6 +1,10 @@
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
+gbAllocator heap_allocator(void) {
+	return gb_heap_allocator();
+}
+
 
 #include "string.cpp"
 #include "array.cpp"
@@ -14,7 +18,7 @@ String get_module_dir() {
 	}
 
 	Array<wchar_t> path_buf;
-	array_init(&path_buf, gb_heap_allocator(), 300);
+	array_init(&path_buf, heap_allocator(), 300);
 	defer (array_free(&path_buf));
 	array_resize(&path_buf, 300);
 
@@ -36,7 +40,7 @@ String get_module_dir() {
 	wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
 
 	GetModuleFileNameW(NULL, text, len);
-	String path = string16_to_string(gb_heap_allocator(), make_string16(text, len));
+	String path = string16_to_string(heap_allocator(), make_string16(text, len));
 	for (isize i = path.len-1; i >= 0; i--) {
 		u8 c = path.text[i];
 		if (c == '/' || c == '\\') {
