@@ -296,17 +296,17 @@ void ssa_gen_tree(ssaGen *s) {
 			Type *t_string_slice_ptr = make_type_pointer(a, make_type_slice(a, t_string));
 
 			auto get_type_info_ptr = [](ssaProcedure *proc, ssaValue *type_info_data, Type *type) -> ssaValue * {
-				return ssa_emit_array_gep(proc, type_info_data,
-				                          ssa_type_info_index(proc->module->info, type));
+				return ssa_emit_array_ep(proc, type_info_data, cast(i32)ssa_type_info_index(proc->module->info, type));
 			};
 
-			isize type_info_member_index = 0;
+			i32 type_info_member_index = 0;
 
-			auto type_info_member_offset = [](ssaProcedure *proc, ssaValue *data, isize count, isize *index) -> ssaValue * {
-				ssaValue *offset = ssa_emit_array_gep(proc, data, *index);
+			auto type_info_member_offset = [](ssaProcedure *proc, ssaValue *data, isize count, i32 *index) -> ssaValue * {
+				ssaValue *offset = ssa_emit_array_ep(proc, data, *index);
 				*index += count;
 				return offset;
 			};
+
 
 
 			for_array(type_info_map_index, info->type_info_map.entries) {
@@ -659,7 +659,7 @@ void ssa_gen_tree(ssaGen *s) {
 				}
 
 				if (tag != NULL) {
-					ssaValue *gep = ssa_emit_array_gep(proc, type_info_data, entry_index);
+					ssaValue *gep = ssa_emit_array_ep(proc, type_info_data, entry_index);
 					ssaValue *val = ssa_emit_conv(proc, ssa_emit_load(proc, tag), t_type_info);
 					ssa_emit_store(proc, gep, val);
 				}
@@ -672,6 +672,7 @@ void ssa_gen_tree(ssaGen *s) {
 	for_array(i, m->procs) {
 		ssa_build_proc(m->procs[i], m->procs[i]->Proc.parent);
 	}
+
 
 	// m->layout = make_string("e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64");
 }

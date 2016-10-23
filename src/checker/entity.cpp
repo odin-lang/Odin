@@ -5,26 +5,26 @@ enum BuiltinProcId;
 enum ImplicitValueId;
 
 #define ENTITY_KINDS \
-	ENTITY_KIND(Invalid), \
-	ENTITY_KIND(Constant), \
-	ENTITY_KIND(Variable), \
-	ENTITY_KIND(TypeName), \
-	ENTITY_KIND(Procedure), \
-	ENTITY_KIND(Builtin), \
-	ENTITY_KIND(ImportName), \
-	ENTITY_KIND(Nil), \
-	ENTITY_KIND(ImplicitValue), \
-	ENTITY_KIND(Count),
+	ENTITY_KIND(Invalid) \
+	ENTITY_KIND(Constant) \
+	ENTITY_KIND(Variable) \
+	ENTITY_KIND(TypeName) \
+	ENTITY_KIND(Procedure) \
+	ENTITY_KIND(Builtin) \
+	ENTITY_KIND(ImportName) \
+	ENTITY_KIND(Nil) \
+	ENTITY_KIND(ImplicitValue) \
+	ENTITY_KIND(Count)
 
 
 enum EntityKind {
-#define ENTITY_KIND(k) GB_JOIN2(Entity_, k)
+#define ENTITY_KIND(k) GB_JOIN2(Entity_, k),
 	ENTITY_KINDS
 #undef ENTITY_KIND
 };
 
 String const entity_strings[] = {
-#define ENTITY_KIND(k) {cast(u8 *)#k, gb_size_of(#k)-1}
+#define ENTITY_KIND(k) {cast(u8 *)#k, gb_size_of(#k)-1},
 	ENTITY_KINDS
 #undef ENTITY_KIND
 };

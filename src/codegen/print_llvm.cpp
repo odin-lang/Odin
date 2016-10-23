@@ -715,14 +715,24 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "\n");
 	} break;
 
-	case ssaInstr_ExtractValue: {
-		Type *et = instr->ExtractValue.elem_type;
+	case ssaInstr_ArrayExtractValue: {
+		Type *et = ssa_type(instr->ArrayExtractValue.address);
 		ssa_fprintf(f, "%%%d = extractvalue ", value->index);
 
 		ssa_print_type(f, m, et);
 		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, instr->ExtractValue.address, et);
-		ssa_fprintf(f, ", %d\n", instr->ExtractValue.index);
+		ssa_print_value(f, m, instr->ArrayExtractValue.address, et);
+		ssa_fprintf(f, ", %d\n", instr->ArrayExtractValue.index);
+	} break;
+
+	case ssaInstr_StructExtractValue: {
+		Type *et = ssa_type(instr->StructExtractValue.address);
+		ssa_fprintf(f, "%%%d = extractvalue ", value->index);
+
+		ssa_print_type(f, m, et);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, instr->StructExtractValue.address, et);
+		ssa_fprintf(f, ", %d\n", instr->StructExtractValue.index);
 	} break;
 
 	case ssaInstr_Jump: {;
@@ -731,14 +741,14 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "\n");
 	} break;
 
-	case ssaInstr_CondJump: {;
+	case ssaInstr_If: {;
 		ssa_fprintf(f, "br ");
 		ssa_print_type(f, m, t_bool);
 		ssa_fprintf(f, " ");
-		ssa_print_value(f, m, instr->CondJump.cond, t_bool);
-		ssa_fprintf(f, ", ", instr->CondJump.cond->index);
-		ssa_fprintf(f, "label %%");   ssa_print_block_name(f, instr->CondJump.true_block);
-		ssa_fprintf(f, ", label %%"); ssa_print_block_name(f, instr->CondJump.false_block);
+		ssa_print_value(f, m, instr->If.cond, t_bool);
+		ssa_fprintf(f, ", ", instr->If.cond->index);
+		ssa_fprintf(f, "label %%");   ssa_print_block_name(f, instr->If.true_block);
+		ssa_fprintf(f, ", label %%"); ssa_print_block_name(f, instr->If.false_block);
 		ssa_fprintf(f, "\n");
 	} break;
 

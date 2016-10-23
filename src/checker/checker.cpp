@@ -586,7 +586,8 @@ void init_checker(Checker *c, Parser *parser, BaseTypeSizes sizes) {
 	gb_arena_init_from_allocator(&c->arena, a, arena_size);
 	gb_arena_init_from_allocator(&c->tmp_arena, a, arena_size);
 
-	c->allocator = gb_arena_allocator(&c->arena);
+
+	c->allocator     = gb_arena_allocator(&c->arena);
 	c->tmp_allocator = gb_arena_allocator(&c->tmp_arena);
 
 	c->global_scope = make_scope(universal_scope, c->allocator);
@@ -742,7 +743,7 @@ void add_type_info_type(Checker *c, Type *t) {
 	isize ti_index = -1;
 	for_array(i, c->info.type_info_map.entries) {
 		auto *e = &c->info.type_info_map.entries[i];
-		Type *prev_type = cast(Type *)cast(uintptr)e->key.key;
+		Type *prev_type = cast(Type *)e->key.ptr;
 		if (are_types_identical(t, prev_type)) {
 			// Duplicate entry
 			ti_index = i;
@@ -769,14 +770,21 @@ void add_type_info_type(Checker *c, Type *t) {
 	Type *bt = base_type(t);
 	switch (bt->kind) {
 	case Type_Basic: {
-		if (bt->Basic.kind == Basic_string) {
-			add_type_info_type(c, make_type_pointer(c->allocator, t_u8));
+		switch (bt->Basic.kind) {
+		case Basic_string:
+			add_type_info_type(c, t_u8_ptr);
 			add_type_info_type(c, t_int);
+			break;
+		case Basic_any:
+			add_type_info_type(c, t_type_info_ptr);
+			add_type_info_type(c, t_rawptr);
+			break;
 		}
 	} break;
 
 	case Type_Maybe:
 		add_type_info_type(c, bt->Maybe.elem);
+		add_type_info_type(c, t_bool);
 		break;
 
 	case Type_Pointer:
@@ -803,6 +811,10 @@ void add_type_info_type(Checker *c, Type *t) {
 		case TypeRecord_Enum:
 			add_type_info_type(c, bt->Record.enum_base);
 			break;
+
+		case TypeRecord_Union:
+			add_type_info_type(c, t_int);
+			/* fallthrough */
 		default:
 			for (isize i = 0; i < bt->Record.field_count; i++) {
 				Entity *f = bt->Record.fields[i];
@@ -1320,6 +1332,30 @@ void check_parsed_files(Checker *c) {
 			add_type_and_value(&c->info, expr, info->mode, info->type, info->value);
 		}
 	}
+
+	// for_array(i, c->info.type_info_map.entries) {
+	// 	auto *e = &c->info.type_info_map.entries[i];
+	// 	Type *prev_type = cast(Type *)e->key.ptr;
+	// 	gb_printf("%td - %s\n", i, type_to_string(prev_type));
+	// }
+
+	// for_array(i, c->info.type_info_map.entries) {
+	// 	auto *p = &c->info.type_info_map.entries[i];
+	// 	for (isize j = 0; j < i-1; j++) {
+	// 		auto *q = &c->info.type_info_map.entries[j];
+	// 		Type *a = cast(Type *)p->key.ptr;
+	// 		Type *b = cast(Type *)q->key.ptr;
+	// 		p->value = i;
+	// 		// GB_ASSERT(!are_types_identical(a, b));
+	// 	}
+	// }
+
+	// for_array(i, c->info.type_info_map.entries) {
+	// 	auto *e = &c->info.type_info_map.entries[i];
+	// 	Type *prev_type = cast(Type *)e->key.ptr;
+	// 	gb_printf("%td - %s\n", e->value, type_to_string(prev_type));
+	// }
+
 }
 
 

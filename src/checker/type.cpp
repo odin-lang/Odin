@@ -97,7 +97,9 @@ struct Type {
 	u32 flags; // See parser.cpp `enum TypeFlag`
 	union {
 		BasicType Basic;
-		struct { Type *elem; } Pointer;
+		struct {
+			Type *elem;
+		} Pointer;
 		struct {
 			Type *elem;
 			i64 count;
@@ -121,19 +123,21 @@ struct Type {
 			isize    field_count; // == offset_count is struct
 			AstNode *node;
 
-			// enum only
-			Type *   enum_base; // Default is `int`
-			Entity * enum_count;
-			Entity * min_value;
-			Entity * max_value;
-
-			// struct only
-			i64 *    struct_offsets;
-			b32      struct_are_offsets_set;
-			b32      struct_is_packed;
-			b32      struct_is_ordered;
-			Entity **fields_in_src_order; // Entity_Variable
-
+			union { // NOTE(bill): Reduce size_of Type
+				struct { // enum only
+					Type *   enum_base; // Default is `int`
+					Entity * enum_count;
+					Entity * min_value;
+					Entity * max_value;
+				};
+				struct { // struct only
+					i64 *    struct_offsets;
+					b32      struct_are_offsets_set;
+					b32      struct_is_packed;
+					b32      struct_is_ordered;
+					Entity **fields_in_src_order; // Entity_Variable
+				};
+			};
 
 			// Entity_Constant or Entity_TypeName
 			Entity **other_fields;
@@ -645,23 +649,27 @@ b32 are_types_identical(Type *x, Type *y) {
 
 	switch (x->kind) {
 	case Type_Basic:
-		if (y->kind == Type_Basic)
+		if (y->kind == Type_Basic) {
 			return x->Basic.kind == y->Basic.kind;
+		}
 		break;
 
 	case Type_Array:
-		if (y->kind == Type_Array)
+		if (y->kind == Type_Array) {
 			return (x->Array.count == y->Array.count) && are_types_identical(x->Array.elem, y->Array.elem);
+		}
 		break;
 
 	case Type_Vector:
-		if (y->kind == Type_Vector)
+		if (y->kind == Type_Vector) {
 			return (x->Vector.count == y->Vector.count) && are_types_identical(x->Vector.elem, y->Vector.elem);
+		}
 		break;
 
 	case Type_Slice:
-		if (y->kind == Type_Slice)
+		if (y->kind == Type_Slice) {
 			return are_types_identical(x->Slice.elem, y->Slice.elem);
+		}
 		break;
 
 	case Type_Record:
@@ -678,6 +686,9 @@ b32 are_types_identical(Type *x, Type *y) {
 							if (!are_types_identical(x->Record.fields[i]->type, y->Record.fields[i]->type)) {
 								return false;
 							}
+							if (x->Record.fields[i]->token.string != y->Record.fields[i]->token.string) {
+								return false;
+							}
 						}
 						return true;
 					}
@@ -692,13 +703,15 @@ b32 are_types_identical(Type *x, Type *y) {
 		break;
 
 	case Type_Pointer:
-		if (y->kind == Type_Pointer)
+		if (y->kind == Type_Pointer) {
 			return are_types_identical(x->Pointer.elem, y->Pointer.elem);
+		}
 		break;
 
 	case Type_Maybe:
-		if (y->kind == Type_Maybe)
+		if (y->kind == Type_Maybe) {
 			return are_types_identical(x->Maybe.elem, y->Maybe.elem);
+		}
 		break;
 
 	case Type_Named:
@@ -711,8 +724,9 @@ b32 are_types_identical(Type *x, Type *y) {
 		if (y->kind == Type_Tuple) {
 			if (x->Tuple.variable_count == y->Tuple.variable_count) {
 				for (isize i = 0; i < x->Tuple.variable_count; i++) {
-					if (!are_types_identical(x->Tuple.variables[i]->type, y->Tuple.variables[i]->type))
+					if (!are_types_identical(x->Tuple.variables[i]->type, y->Tuple.variables[i]->type)) {
 						return false;
+					}
 				}
 				return true;
 			}
@@ -740,7 +754,6 @@ Type *default_type(Type *type) {
 		case Basic_UntypedFloat:   return t_f64;
 		case Basic_UntypedString:  return t_string;
 		case Basic_UntypedRune:    return t_rune;
-		// case Basic_UntypedPointer: return &basic_types[Basic_rawptr];
 		}
 	}
 	return type;
@@ -1031,6 +1044,17 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct:
 			if (t->Record.field_count > 0) {
+				if (!t->Record.struct_is_ordered) {
+					i64 max = s.word_size;
+					for (isize i = 1; i < t->Record.field_count; i++) {
+						// NOTE(bill): field zero is null
+						i64 align = type_align_of(s, allocator, t->Record.fields[i]->type);
+						if (max < align) {
+							max = align;
+						}
+					}
+					return max;
+				}
 				return type_align_of(s, allocator, t->Record.fields[0]->type);
 			}
 			break;
@@ -1297,7 +1321,14 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_Record: {
 		switch (type->Record.kind) {
 		case TypeRecord_Struct:
-			str = gb_string_appendc(str, "struct{");
+			str = gb_string_appendc(str, "struct");
+			if (type->Record.struct_is_packed) {
+				str = gb_string_appendc(str, " #packed");
+			}
+			if (type->Record.struct_is_ordered) {
+				str = gb_string_appendc(str, " #ordered");
+			}
+			str = gb_string_appendc(str, " {");
 			for (isize i = 0; i < type->Record.field_count; i++) {
 				Entity *f = type->Record.fields[i];
 				GB_ASSERT(f->kind == Entity_Variable);
@@ -1312,7 +1343,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 		case TypeRecord_Union:
 			str = gb_string_appendc(str, "union{");
-			for (isize i = 0; i < type->Record.field_count; i++) {
+			for (isize i = 1; i < type->Record.field_count; i++) {
 				Entity *f = type->Record.fields[i];
 				GB_ASSERT(f->kind == Entity_TypeName);
 				if (i > 0) {
@@ -1320,7 +1351,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 				}
 				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
 				str = gb_string_appendc(str, ": ");
-				str = write_type_to_string(str, f->type);
+				str = write_type_to_string(str, base_type(f->type));
 			}
 			str = gb_string_appendc(str, "}");
 			break;

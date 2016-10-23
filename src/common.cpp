@@ -5,12 +5,12 @@ gbAllocator heap_allocator(void) {
 	return gb_heap_allocator();
 }
 
-
 #include "string.cpp"
 #include "array.cpp"
 
 gb_global String global_module_path = {};
 gb_global b32 global_module_path_set = false;
+
 
 String get_module_dir() {
 	if (global_module_path_set) {
@@ -90,6 +90,7 @@ struct BlockTimer {
 enum HashKeyKind {
 	HashKey_Default,
 	HashKey_String,
+	HashKey_Pointer,
 };
 
 struct HashKey {
@@ -97,6 +98,7 @@ struct HashKey {
 	u64         key;
 	union {
 		String string; // if String, s.len > 0
+		void * ptr;
 	};
 };
 
@@ -118,6 +120,8 @@ gb_inline HashKey hash_string(String s) {
 gb_inline HashKey hash_pointer(void *ptr) {
 	HashKey h = {};
 	h.key = cast(u64)cast(uintptr)ptr;
+	h.ptr = ptr;
+	h.kind = HashKey_Default;
 	return h;
 }
 
