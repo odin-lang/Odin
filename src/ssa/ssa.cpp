@@ -169,7 +169,9 @@ struct ssaProcedure {
 	SSA_INSTR_KIND(VectorExtractElement), \
 	SSA_INSTR_KIND(VectorInsertElement), \
 	SSA_INSTR_KIND(VectorShuffle), \
-	SSA_INSTR_KIND(StartupRuntime),
+	SSA_INSTR_KIND(StartupRuntime), \
+	SSA_INSTR_KIND(BoundsCheck), \
+	SSA_INSTR_KIND(SliceBoundsCheck), \
 
 #define SSA_CONV_KINDS \
 	SSA_CONV_KIND(Invalid), \
@@ -319,6 +321,18 @@ struct ssaInstr {
 		} VectorShuffle;
 
 		struct {} StartupRuntime;
+		struct {
+			TokenPos  pos;
+			ssaValue *index;
+			ssaValue *len;
+		} BoundsCheck;
+		struct {
+			TokenPos  pos;
+			ssaValue *low;
+			ssaValue *high;
+			ssaValue *max;
+			b32       is_substring;
+		} SliceBoundsCheck;
 	};
 };
 
@@ -328,6 +342,7 @@ enum ssaValueKind {
 
 	ssaValue_Constant,
 	ssaValue_ConstantSlice,
+	ssaValue_ConstantString,
 	ssaValue_Nil,
 	ssaValue_TypeName,
 	ssaValue_Global,
@@ -349,10 +364,14 @@ struct ssaValue {
 			ExactValue value;
 		} Constant;
 		struct {
-			Type *type;
+			Type *    type;
 			ssaValue *backing_array;
-			i64 count;
+			i64       count;
 		} ConstantSlice;
+		struct {
+			Type * type;
+			String string;
+		} ConstantString;
 		struct {
 			Type *type;
 		} Nil;
@@ -361,18 +380,18 @@ struct ssaValue {
 			Type * type;
 		} TypeName;
 		struct {
-			b32 is_constant;
-			b32 is_private;
-			b32 is_thread_local;
-			Entity *  entity;
-			Type *    type;
-			ssaValue *value;
+			b32               is_constant;
+			b32               is_private;
+			b32               is_thread_local;
+			Entity *          entity;
+			Type *            type;
+			ssaValue *        value;
 			Array<ssaValue *> referrers;
 		} Global;
 		struct {
-			ssaProcedure *parent;
-			Entity *entity;
-			Type *  type;
+			ssaProcedure *    parent;
+			Entity *          entity;
+			Type *            type;
 			Array<ssaValue *> referrers;
 		} Param;
 		ssaProcedure Proc;
@@ -523,6 +542,8 @@ Type *ssa_type(ssaValue *value) {
 		return value->Constant.type;
 	case ssaValue_ConstantSlice:
 		return value->ConstantSlice.type;
+	case ssaValue_ConstantString:
+		return value->ConstantString.type;
 	case ssaValue_Nil:
 		return value->Nil.type;
 	case ssaValue_TypeName:

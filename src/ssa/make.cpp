@@ -1,4 +1,8 @@
 void ssa_module_add_value(ssaModule *m, Entity *e, ssaValue *v);
+ssaValue *ssa_emit_zero_init(ssaProcedure *p, ssaValue *address);
+ssaValue *ssa_emit_comment(ssaProcedure *p, String text);
+ssaValue *ssa_emit_store(ssaProcedure *p, ssaValue *address, ssaValue *value);
+ssaValue *ssa_emit_load(ssaProcedure *p, ssaValue *address);
 
 
 ssaValue *ssa_alloc_value(gbAllocator a, ssaValueKind kind) {
@@ -255,6 +259,23 @@ ssaValue *ssa_make_instr_comment(ssaProcedure *p, String text) {
 	return v;
 }
 
+ssaValue *ssa_make_instr_bounds_check(ssaProcedure *p, TokenPos pos, ssaValue *index, ssaValue *len) {
+	ssaValue *v = ssa_alloc_instr(p, ssaInstr_BoundsCheck);
+	v->Instr.BoundsCheck.pos   = pos;
+	v->Instr.BoundsCheck.index = index;
+	v->Instr.BoundsCheck.len   = len;
+	return v;
+}
+ssaValue *ssa_make_instr_slice_bounds_check(ssaProcedure *p, TokenPos pos, ssaValue *low, ssaValue *high, ssaValue *max, b32 is_substring) {
+	ssaValue *v = ssa_alloc_instr(p, ssaInstr_SliceBoundsCheck);
+	v->Instr.SliceBoundsCheck.pos  = pos;
+	v->Instr.SliceBoundsCheck.low  = low;
+	v->Instr.SliceBoundsCheck.high = high;
+	v->Instr.SliceBoundsCheck.max  = max;
+	v->Instr.SliceBoundsCheck.is_substring = is_substring;
+	return v;
+}
+
 
 
 ssaValue *ssa_make_value_constant(gbAllocator a, Type *type, ExactValue value) {
@@ -273,6 +294,14 @@ ssaValue *ssa_make_value_constant_slice(gbAllocator a, Type *type, ssaValue *bac
 	return v;
 }
 
+ssaValue *ssa_make_value_constant_string(gbAllocator a, Type *type, String string) {
+	ssaValue *v = ssa_alloc_value(a, ssaValue_ConstantString);
+	v->ConstantString.type   = type;
+	v->ConstantString.string = string;
+	return v;
+}
+
+
 ssaValue *ssa_make_const_int(gbAllocator a, i64 i) {
 	return ssa_make_value_constant(a, t_int, make_exact_value_integer(i));
 }
@@ -285,40 +314,9 @@ ssaValue *ssa_make_const_i64(gbAllocator a, i64 i) {
 ssaValue *ssa_make_const_bool(gbAllocator a, b32 b) {
 	return ssa_make_value_constant(a, t_bool, make_exact_value_bool(b != 0));
 }
-
-ssaValue *ssa_add_module_constant(ssaModule *m, Type *type, ExactValue value) {
-	if (is_type_slice(type)) {
-		ast_node(cl, CompoundLit, value.value_compound);
-		gbAllocator a = m->allocator;
-
-		isize count = cl->elems.count;
-		if (count > 0) {
-			Type *elem = base_type(type)->Slice.elem;
-			Type *t = make_type_array(a, elem, count);
-			ssaValue *backing_array = ssa_add_module_constant(m, t, value);
-
-
-			isize max_len = 7+8+1;
-			u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
-			isize len = gb_snprintf(cast(char *)str, max_len, "__csba$%x", m->global_array_index);
-			m->global_array_index++;
-
-			String name = make_string(str, len-1);
-
-			Entity *e = make_entity_constant(a, NULL, make_token_ident(name), t, value);
-			ssaValue *g = ssa_make_value_global(a, e, backing_array);
-			ssa_module_add_value(m, e, g);
-			map_set(&m->members, hash_string(name), g);
-
-			return ssa_make_value_constant_slice(a, type, g, count);
-		} else {
-			return ssa_make_value_constant_slice(a, type, NULL, 0);
-		}
-	}
-
-	return ssa_make_value_constant(m->allocator, type, value);
+ssaValue *ssa_make_const_string(gbAllocator a, String s) {
+	return ssa_make_value_constant(a, t_string, make_exact_value_string(s));
 }
-
 
 ssaValue *ssa_make_value_procedure(gbAllocator a, ssaModule *m, Entity *entity, Type *type, AstNode *type_expr, AstNode *body, String name) {
 	ssaValue *v = ssa_alloc_value(a, ssaValue_Proc);
@@ -390,5 +388,110 @@ ssaDefer ssa_add_defer_instr(ssaProcedure *proc, isize scope_index, ssaValue *in
 
 
 
+ssaValue *ssa_add_module_constant(ssaModule *m, Type *type, ExactValue value) {
+	if (is_type_slice(type)) {
+		ast_node(cl, CompoundLit, value.value_compound);
+		gbAllocator a = m->allocator;
+
+		isize count = cl->elems.count;
+		if (count == 0) {
+			return ssa_make_value_nil(a, type);
+		}
+		Type *elem = base_type(type)->Slice.elem;
+		Type *t = make_type_array(a, elem, count);
+		ssaValue *backing_array = ssa_add_module_constant(m, t, value);
 
 
+		isize max_len = 7+8+1;
+		u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
+		isize len = gb_snprintf(cast(char *)str, max_len, "__csba$%x", m->global_array_index);
+		m->global_array_index++;
+
+		String name = make_string(str, len-1);
+
+		Entity *e = make_entity_constant(a, NULL, make_token_ident(name), t, value);
+		ssaValue *g = ssa_make_value_global(a, e, backing_array);
+		ssa_module_add_value(m, e, g);
+		map_set(&m->members, hash_string(name), g);
+
+		return ssa_make_value_constant_slice(a, type, g, count);
+	}
+
+	return ssa_make_value_constant(m->allocator, type, value);
+}
+
+ssaValue *ssa_add_global_string_array(ssaModule *m, String string) {
+	gbAllocator a = m->allocator;
+
+	isize max_len = 6+8+1;
+	u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
+	isize len = gb_snprintf(cast(char *)str, max_len, "__str$%x", m->global_string_index);
+	m->global_string_index++;
+
+	String name = make_string(str, len-1);
+	Token token = {Token_String};
+	token.string = name;
+	Type *type = make_type_array(a, t_u8, string.len);
+	ExactValue ev = make_exact_value_string(string);
+	Entity *entity = make_entity_constant(a, NULL, token, type, ev);
+	ssaValue *g = ssa_make_value_global(a, entity, ssa_add_module_constant(m, type, ev));
+	g->Global.is_private  = true;
+	// g->Global.is_constant = true;
+
+	ssa_module_add_value(m, entity, g);
+	map_set(&m->members, hash_string(name), g);
+
+	return g;
+}
+
+
+
+
+ssaValue *ssa_add_local(ssaProcedure *proc, Entity *e, b32 zero_initialized = true) {
+	ssaBlock *b = proc->decl_block; // all variables must be in the first block
+	ssaValue *instr = ssa_make_instr_local(proc, e, zero_initialized);
+	instr->Instr.parent = b;
+	array_add(&b->instrs, instr);
+	array_add(&b->locals, instr);
+
+	// if (zero_initialized) {
+		ssa_emit_zero_init(proc, instr);
+	// }
+
+	return instr;
+}
+
+ssaValue *ssa_add_local_for_identifier(ssaProcedure *proc, AstNode *name, b32 zero_initialized) {
+	Entity **found = map_get(&proc->module->info->definitions, hash_pointer(name));
+	if (found) {
+		Entity *e = *found;
+		ssa_emit_comment(proc, e->token.string);
+		return ssa_add_local(proc, e, zero_initialized);
+	}
+	return NULL;
+}
+
+ssaValue *ssa_add_local_generated(ssaProcedure *proc, Type *type) {
+	GB_ASSERT(type != NULL);
+
+	Scope *scope = NULL;
+	if (proc->curr_block) {
+		scope = proc->curr_block->scope;
+	}
+	Entity *e = make_entity_variable(proc->module->allocator,
+	                                 scope,
+	                                 empty_token,
+	                                 type);
+	return ssa_add_local(proc, e, true);
+}
+
+ssaValue *ssa_add_param(ssaProcedure *proc, Entity *e) {
+	ssaValue *v = ssa_make_value_param(proc->module->allocator, proc, e);
+#if 1
+	ssaValue *l = ssa_add_local(proc, e);
+	ssa_emit_store(proc, l, v);
+#else
+	ssa_module_add_value(proc->module, e, v);
+#endif
+	return v;
+}

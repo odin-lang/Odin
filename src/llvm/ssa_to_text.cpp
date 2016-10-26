@@ -1,9 +1,11 @@
 b32 ssa_valid_char(u8 c) {
-	if (c >= 0x80)
+	if (c >= 0x80) {
 		return false;
+	}
 
-	if (gb_char_is_alphanumeric(c))
+	if (gb_char_is_alphanumeric(c)) {
 		return true;
+	}
 
 	switch (c) {
 	case '$':
@@ -20,8 +22,9 @@ void ssa_print_escape_string(ssaFileBuffer *f, String name, b32 print_quotes) {
 	isize extra = 0;
 	for (isize i = 0; i < name.len; i++) {
 		u8 c = name.text[i];
-		if (!ssa_valid_char(c))
+		if (!ssa_valid_char(c)) {
 			extra += 2;
+		}
 	}
 
 	if (extra == 0) {
@@ -185,7 +188,9 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 		} else {
 			ssa_fprintf(f, "{");
 			for (isize i = 0; i < t->Tuple.variable_count; i++) {
-				if (i > 0) ssa_fprintf(f, ", ");
+				if (i > 0) {
+					ssa_fprintf(f, ", ");
+				}
 				ssa_print_type(f, m, t->Tuple.variables[i]->type);
 			}
 			ssa_fprintf(f, "}");
@@ -225,23 +230,6 @@ void ssa_print_compound_element(ssaFileBuffer *f, ssaModule *m, ExactValue v, Ty
 
 	if (v.kind == ExactValue_Invalid || base_type(elem_type) == t_any) {
 		ssa_fprintf(f, "zeroinitializer");
-	} else if (v.kind == ExactValue_String) {
-		// HACK NOTE(bill): This is a hack but it works because strings are created at the very end
-		// of the .ll file
-		ssaValue *str_array = ssa_add_global_string_array(m, v.value_string);
-
-		ssa_fprintf(f, "{i8* getelementptr inbounds (");
-		ssa_print_type(f, m, str_array->Global.entity->type);
-		ssa_fprintf(f, ", ");
-		ssa_print_type(f, m, str_array->Global.entity->type);
-		ssa_fprintf(f, "* ");
-		ssa_print_encoded_global(f, str_array->Global.entity->token.string, false);
-		ssa_fprintf(f, ", ");
-		ssa_print_type(f, m, t_int);
-		ssa_fprintf(f, " 0, i32 0), ");
-		ssa_print_type(f, m, t_int);
-		ssa_fprintf(f, " %lld}", cast(i64)v.value_string.len);
-
 	} else {
 		ssa_print_exact_value(f, m, v, elem_type);
 	}
@@ -269,9 +257,33 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 		ssa_fprintf(f, "%s", (value.value_bool ? "true" : "false"));
 		break;
 	case ExactValue_String: {
-		ssa_fprintf(f, "c\"");
-		ssa_print_escape_string(f, value.value_string, false);
-		ssa_fprintf(f, "\"");
+		String str = value.value_string;
+		if (str.len == 0) {
+			ssa_fprintf(f, "zeroinitializer");
+			break;
+		}
+		if (!is_type_string(type)) {
+			GB_ASSERT(is_type_array(type));
+			ssa_fprintf(f, "c\"");
+			ssa_print_escape_string(f, str, false);
+			ssa_fprintf(f, "\"");
+		} else {
+			// HACK NOTE(bill): This is a hack but it works because strings are created at the very end
+			// of the .ll file
+			ssaValue *str_array = ssa_add_global_string_array(m, str);
+
+			ssa_fprintf(f, "{i8* getelementptr inbounds (");
+			ssa_print_type(f, m, str_array->Global.entity->type);
+			ssa_fprintf(f, ", ");
+			ssa_print_type(f, m, str_array->Global.entity->type);
+			ssa_fprintf(f, "* ");
+			ssa_print_encoded_global(f, str_array->Global.entity->token.string, false);
+			ssa_fprintf(f, ", ");
+			ssa_print_type(f, m, t_int);
+			ssa_fprintf(f, " 0, i32 0), ");
+			ssa_print_type(f, m, t_int);
+			ssa_fprintf(f, " %lld}", cast(i64)str.len);
+		}
 	} break;
 	case ExactValue_Integer: {
 		if (is_type_pointer(type)) {
@@ -952,6 +964,78 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		}
 		ssa_fprintf(f, ">");
 		ssa_fprintf(f, "\n");
+	} break;
+
+	case ssaInstr_BoundsCheck: {
+		auto *bc = &instr->BoundsCheck;
+		ssa_fprintf(f, "call void ");
+		ssa_print_encoded_global(f, make_string("__bounds_check_error"), false);
+		ssa_fprintf(f, "(");
+		ssa_print_compound_element(f, m, make_exact_value_string(bc->pos.file), t_string);
+		ssa_fprintf(f, ", ");
+
+		ssa_print_type(f, m, t_int);
+		ssa_fprintf(f, " ");
+		ssa_print_exact_value(f, m, make_exact_value_integer(bc->pos.line), t_int);
+		ssa_fprintf(f, ", ");
+
+		ssa_print_type(f, m, t_int);
+		ssa_fprintf(f, " ");
+		ssa_print_exact_value(f, m, make_exact_value_integer(bc->pos.column), t_int);
+		ssa_fprintf(f, ", ");
+
+		ssa_print_type(f, m, t_int);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, bc->index, t_int);
+		ssa_fprintf(f, ", ");
+
+		ssa_print_type(f, m, t_int);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, bc->len, t_int);
+
+		ssa_fprintf(f, ")\n");
+	} break;
+
+	case ssaInstr_SliceBoundsCheck: {
+		auto *bc = &instr->SliceBoundsCheck;
+		ssa_fprintf(f, "call void ");
+		if (bc->is_substring) {
+			ssa_print_encoded_global(f, make_string("__substring_expr_error"), false);
+		} else {
+			ssa_print_encoded_global(f, make_string("__slice_expr_error"), false);
+		}
+
+		ssa_fprintf(f, "(");
+		ssa_print_compound_element(f, m, make_exact_value_string(bc->pos.file), t_string);
+		ssa_fprintf(f, ", ");
+
+		ssa_print_type(f, m, t_int);
+		ssa_fprintf(f, " ");
+		ssa_print_exact_value(f, m, make_exact_value_integer(bc->pos.line), t_int);
+		ssa_fprintf(f, ", ");
+
+		ssa_print_type(f, m, t_int);
+		ssa_fprintf(f, " ");
+		ssa_print_exact_value(f, m, make_exact_value_integer(bc->pos.column), t_int);
+		ssa_fprintf(f, ", ");
+
+		ssa_print_type(f, m, t_int);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, bc->low, t_int);
+		ssa_fprintf(f, ", ");
+
+		ssa_print_type(f, m, t_int);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, bc->high, t_int);
+
+		if (!bc->is_substring) {
+			ssa_fprintf(f, ", ");
+			ssa_print_type(f, m, t_int);
+			ssa_fprintf(f, " ");
+			ssa_print_value(f, m, bc->max, t_int);
+		}
+
+		ssa_fprintf(f, ")\n");
 	} break;
 
 

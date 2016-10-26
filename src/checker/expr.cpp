@@ -248,16 +248,17 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
                   CycleChecker *cycle_checker, String context) {
 	PROF_PROC();
 
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
 	Map<Entity *> entity_map = {};
-	map_init(&entity_map, heap_allocator());
-	defer (map_destroy(&entity_map));
+	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*(field_count+other_field_count));
+	// defer (map_destroy(&entity_map));
 
 	isize other_field_index = 0;
 	Entity *using_index_expr = NULL;
 
 
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-	defer (gb_temp_arena_memory_end(tmp));
 	struct Delay {
 		Entity *e;
 		AstNode *t;
@@ -661,9 +662,13 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	GB_ASSERT(is_type_enum(enum_type));
 	ast_node(et, EnumType, node);
 
+
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
 	Map<Entity *> entity_map = {};
-	map_init(&entity_map, heap_allocator());
-	defer (map_destroy(&entity_map));
+	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*(et->fields.count));
+	// defer (map_destroy(&entity_map));
 
 	Type *base_type = t_int;
 	if (et->base_type != NULL) {

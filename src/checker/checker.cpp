@@ -200,7 +200,7 @@ struct CheckerInfo {
 	Map<Entity *>          foreign_procs;   // Key: String
 	Map<AstFile *>         files;           // Key: String (full path)
 	Map<isize>             type_info_map;   // Key: Type *
-	isize                  type_info_index;
+	isize                  type_info_count;
 	Entity *               implicit_values[ImplicitValue_Count];
 };
 
@@ -536,7 +536,7 @@ void init_checker_info(CheckerInfo *i) {
 	map_init(&i->foreign_procs,   a);
 	map_init(&i->type_info_map,   a);
 	map_init(&i->files,           a);
-	i->type_info_index = 0;
+	i->type_info_count = 0;
 
 }
 
@@ -736,17 +736,19 @@ void add_type_info_type(Checker *c, Type *t) {
 		Type *prev_type = cast(Type *)e->key.ptr;
 		if (are_types_identical(t, prev_type)) {
 			// Duplicate entry
-			ti_index = i;
+			ti_index = e->value;
 			break;
 		}
 	}
 	if (ti_index < 0) {
 		// Unique entry
 		// NOTE(bill): map entries grow linearly and in order
-		ti_index = c->info.type_info_index;
-		c->info.type_info_index++;
+		ti_index = c->info.type_info_count;
+		c->info.type_info_count++;
 	}
 	map_set(&c->info.type_info_map, hash_pointer(t), ti_index);
+
+
 
 
 	// Add nested types
@@ -758,6 +760,8 @@ void add_type_info_type(Checker *c, Type *t) {
 	}
 
 	Type *bt = base_type(t);
+	add_type_info_type(c, bt);
+
 	switch (bt->kind) {
 	case Type_Basic: {
 		switch (bt->Basic.kind) {

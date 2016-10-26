@@ -1347,7 +1347,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 			for (isize i = 1; i < type->Record.field_count; i++) {
 				Entity *f = type->Record.fields[i];
 				GB_ASSERT(f->kind == Entity_TypeName);
-				if (i > 0) {
+				if (i > 1) {
 					str = gb_string_appendc(str, "; ");
 				}
 				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
@@ -1362,8 +1362,9 @@ gbString write_type_to_string(gbString str, Type *type) {
 			for (isize i = 0; i < type->Record.field_count; i++) {
 				Entity *f = type->Record.fields[i];
 				GB_ASSERT(f->kind == Entity_Variable);
-				if (i > 0)
+				if (i > 0) {
 					str = gb_string_appendc(str, ", ");
+				}
 				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
 				str = gb_string_appendc(str, ": ");
 				str = write_type_to_string(str, f->type);

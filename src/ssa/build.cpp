@@ -85,42 +85,6 @@ void ssa_build_defer_stmt(ssaProcedure *proc, ssaDefer d) {
 }
 
 
-void ssa_array_bounds_check(ssaProcedure *proc, Token token, ssaValue *index, ssaValue *len) {
-	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
-		return;
-	}
-
-	gbAllocator a = proc->module->allocator;
-	ssaValue **args = gb_alloc_array(a, ssaValue *, 5);
-	args[0] = ssa_emit_global_string(proc, token.pos.file);
-	args[1] = ssa_make_const_int(a, token.pos.line);
-	args[2] = ssa_make_const_int(a, token.pos.column);
-	args[3] = ssa_emit_conv(proc, index, t_int);
-	args[4] = ssa_emit_conv(proc, len, t_int);
-
-	ssa_emit_global_call(proc, "__bounds_check_error", args, 5);
-}
-
-void ssa_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low, ssaValue *high, ssaValue *max, b32 is_substring) {
-	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
-		return;
-	}
-
-	gbAllocator a = proc->module->allocator;
-	ssaValue **args = gb_alloc_array(a, ssaValue *, 6);
-	args[0] = ssa_emit_global_string(proc, token.pos.file);
-	args[1] = ssa_make_const_int(a, token.pos.line);
-	args[2] = ssa_make_const_int(a, token.pos.column);
-	args[3] = ssa_emit_conv(proc, low, t_int);
-	args[4] = ssa_emit_conv(proc, high, t_int);
-	args[5] = ssa_emit_conv(proc, max, t_int);
-
-	if (!is_substring) {
-		ssa_emit_global_call(proc, "__slice_expr_error", args, 6);
-	} else {
-		ssa_emit_global_call(proc, "__substring_expr_error", args, 5);
-	}
-}
 
 ssaValue *ssa_find_global_variable(ssaProcedure *proc, String name) {
 	ssaValue **value = map_get(&proc->module->members, hash_string(name));
@@ -498,13 +462,13 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssaValue *elem_size  = ssa_make_const_int(allocator, s);
 					ssaValue *elem_align = ssa_make_const_int(allocator, a);
 
-					ssaValue *len =ssa_emit_conv(proc, ssa_build_expr(proc, ce->args[1]), t_int);
+					ssaValue *len = ssa_emit_conv(proc, ssa_build_expr(proc, ce->args[1]), t_int);
 					ssaValue *cap = len;
 					if (ce->args.count == 3) {
 						cap = ssa_emit_conv(proc, ssa_build_expr(proc, ce->args[2]), t_int);
 					}
 
-					ssa_slice_bounds_check(proc, ast_node_token(ce->args[1]), v_zero, len, cap, false);
+					ssa_emit_slice_bounds_check(proc, ast_node_token(ce->args[1]), v_zero, len, cap, false);
 
 					ssaValue *slice_size = ssa_emit_arith(proc, Token_Mul, elem_size, cap, t_int);
 
@@ -548,10 +512,10 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					expr_str.len = expr_len;
 
 					ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, 4);
-					args[0] = ssa_emit_global_string(proc, pos.file);
+					args[0] = ssa_make_const_string(proc->module->allocator, pos.file);
 					args[1] = ssa_make_const_int(proc->module->allocator, pos.line);
 					args[2] = ssa_make_const_int(proc->module->allocator, pos.column);
-					args[3] = ssa_emit_global_string(proc, expr_str);
+					args[3] = ssa_make_const_string(proc->module->allocator, expr_str);
 					ssa_emit_global_call(proc, "__assert", args, 4);
 
 					ssa_emit_jump(proc, done);
@@ -569,7 +533,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					TokenPos pos = token.pos;
 
 					ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, 4);
-					args[0] = ssa_emit_global_string(proc, pos.file);
+					args[0] = ssa_make_const_string(proc->module->allocator, pos.file);
 					args[1] = ssa_make_const_int(proc->module->allocator, pos.line);
 					args[2] = ssa_make_const_int(proc->module->allocator, pos.column);
 					args[3] = msg;
@@ -904,16 +868,6 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 	GB_ASSERT_NOT_NULL(tv);
 
 	if (tv->value.kind != ExactValue_Invalid) {
-		if (tv->value.kind == ExactValue_String) {
-			ssa_emit_comment(proc, make_string("Emit string constant"));
-			if (tv->value.value_string.len > 0) {
-				return ssa_emit_global_string(proc, tv->value.value_string);
-			} else {
-				ssaValue *null_string = ssa_add_local_generated(proc, t_string);
-				return ssa_emit_load(proc, null_string);
-			}
-		}
-
 		return ssa_add_module_constant(proc->module, tv->type, tv->value);
 	}
 
@@ -957,21 +911,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		Entity *e = entity_of_ident(proc->module->info, expr);
 		TypeAndValue *tv = map_get(&proc->module->info->types, hash_pointer(expr));
 
-		if (e->kind == Entity_Constant) {
-			if (base_type(e->type) == t_string) {
-				// HACK TODO(bill): This is lazy but it works
-				String str = e->Constant.value.value_string;
-				ssaValue *global_array = ssa_add_global_string_array(proc->module, str);
-				ssaValue *elem = ssa_array_elem(proc, global_array);
-				ssaValue *len =  ssa_make_const_int(proc->module->allocator, str.len);
-				ssaValue *v = ssa_add_local_generated(proc, e->type);
-				ssaValue *str_elem = ssa_emit_struct_ep(proc, v, 0);
-				ssaValue *str_len = ssa_emit_struct_ep(proc, v, 1);
-				ssa_emit_store(proc, str_elem, elem);
-				ssa_emit_store(proc, str_len, len);
-				return ssa_make_addr(v, expr);
-			}
-		}
+		GB_ASSERT(e->kind != Entity_Constant);
 
 		ssaValue *v = NULL;
 		ssaValue **found = map_get(&proc->module->values, hash_pointer(e));
@@ -1087,7 +1027,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			}
 			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
 			ssaValue *len = ssa_make_const_int(a, t->Vector.count);
-			ssa_array_bounds_check(proc, ast_node_token(ie->index), index, len);
+			ssa_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
 			return ssa_make_addr_vector(vector, index, expr);
 		} break;
 
@@ -1104,7 +1044,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
 			ssaValue *elem = ssa_emit_array_ep(proc, array, index);
 			ssaValue *len = ssa_make_const_int(a, t->Vector.count);
-			ssa_array_bounds_check(proc, ast_node_token(ie->index), index, len);
+			ssa_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
 			return ssa_make_addr(elem, expr);
 		} break;
 
@@ -1121,7 +1061,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			ssaValue *elem = ssa_slice_elem(proc, slice);
 			ssaValue *len = ssa_slice_len(proc, slice);
 			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
-			ssa_array_bounds_check(proc, ast_node_token(ie->index), index, len);
+			ssa_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
 			ssaValue *v = ssa_emit_ptr_offset(proc, elem, index);
 			return ssa_make_addr(v, expr);
 
@@ -1129,31 +1069,26 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 		case Type_Basic: { // Basic_string
 			TypeAndValue *tv = map_get(&proc->module->info->types, hash_pointer(ie->expr));
-			ssaValue *elem = NULL;
-			ssaValue *len = NULL;
-			if (tv != NULL && tv->mode == Addressing_Constant) {
-				ssaValue *array = ssa_add_global_string_array(proc->module, tv->value.value_string);
-				elem = ssa_array_elem(proc, array);
-				len = ssa_make_const_int(a, tv->value.value_string.len);
+			ssaValue *str;
+			ssaValue *elem;
+			ssaValue *len;
+			ssaValue *index;
+
+			if (using_addr != NULL) {
+				str = ssa_emit_load(proc, using_addr);
 			} else {
-				ssaValue *str = NULL;
-				if (using_addr != NULL) {
-					str = ssa_emit_load(proc, using_addr);
-				} else {
-					str = ssa_build_expr(proc, ie->expr);
-					if (deref) {
-						str = ssa_emit_load(proc, str);
-					}
+				str = ssa_build_expr(proc, ie->expr);
+				if (deref) {
+					str = ssa_emit_load(proc, str);
 				}
-				elem = ssa_string_elem(proc, str);
-				len = ssa_string_len(proc, str);
 			}
+			elem = ssa_string_elem(proc, str);
+			len = ssa_string_len(proc, str);
 
-			ssaValue *index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
-			ssa_array_bounds_check(proc, ast_node_token(ie->index), index, len);
+			index = ssa_emit_conv(proc, ssa_build_expr(proc, ie->index), t_int);
+			ssa_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
 
-			ssaValue *v = ssa_emit_ptr_offset(proc, elem, index);
-			return ssa_make_addr(v, expr);
+			return ssa_make_addr(ssa_emit_ptr_offset(proc, elem, index), expr);
 		} break;
 		}
 	case_end;
@@ -1188,7 +1123,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			if (max == NULL)  max  = ssa_slice_cap(proc, base);
 			GB_ASSERT(max != NULL);
 
-			ssa_slice_bounds_check(proc, se->open, low, high, max, false);
+			ssa_emit_slice_bounds_check(proc, se->open, low, high, max, false);
 
 			ssaValue *elem = ssa_slice_elem(proc, base);
 			ssaValue *len  = ssa_emit_arith(proc, Token_Sub, high, low, t_int);
@@ -1212,7 +1147,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			if (max == NULL)  max  = ssa_array_cap(proc, base);
 			GB_ASSERT(max != NULL);
 
-			ssa_slice_bounds_check(proc, se->open, low, high, max, false);
+			ssa_emit_slice_bounds_check(proc, se->open, low, high, max, false);
 
 			ssaValue *elem = ssa_array_elem(proc, addr);
 			ssaValue *len  = ssa_emit_arith(proc, Token_Sub, high, low, t_int);
@@ -1235,7 +1170,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 				high = ssa_string_len(proc, base);
 			}
 
-			ssa_slice_bounds_check(proc, se->open, low, high, high, true);
+			ssa_emit_slice_bounds_check(proc, se->open, low, high, high, true);
 
 			ssaValue *elem, *len;
 			len = ssa_emit_arith(proc, Token_Sub, high, low, t_int);
@@ -1258,7 +1193,8 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 	case_ast_node(de, DerefExpr, expr);
 		// TODO(bill): Is a ptr copy needed?
-		ssaValue *addr = ssa_emit_ptr_offset(proc, ssa_build_expr(proc, de->expr), v_zero);
+		ssaValue *addr = ssa_build_expr(proc, de->expr);
+		addr = ssa_emit_ptr_offset(proc, addr, v_zero);
 		return ssa_make_addr(addr, expr);
 	case_end;
 
@@ -1268,15 +1204,8 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		Type *t = default_type(type_of_expr(proc->module->info, expr));
 		GB_ASSERT(is_type_tuple(t));
 
-		Type *elem = ssa_type(maybe);
-		GB_ASSERT(is_type_maybe(elem));
-		elem = base_type(elem)->Maybe.elem;
-
 		ssaValue *result = ssa_add_local_generated(proc, t);
-		ssaValue *gep0 = ssa_emit_struct_ep(proc, result, 0);
-		ssaValue *gep1 = ssa_emit_struct_ep(proc, result, 1);
-		ssa_emit_store(proc, gep0, ssa_emit_struct_ev(proc, maybe, 0));
-		ssa_emit_store(proc, gep1, ssa_emit_struct_ev(proc, maybe, 1));
+		ssa_emit_store(proc, result, maybe);
 
 		return ssa_make_addr(result, expr);
 	case_end;

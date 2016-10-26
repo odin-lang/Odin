@@ -633,7 +633,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			Token token;
 		};
 
-		Map<TypeAndToken> seen = {}; // Multimap
+		Map<TypeAndToken> seen = {}; // NOTE(bill): Multimap
 		map_init(&seen, heap_allocator());
 		defer (map_destroy(&seen));
 		for_array(i, bs->stmts) {

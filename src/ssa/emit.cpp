@@ -37,56 +37,6 @@ ssaValue *ssa_emit_comment(ssaProcedure *p, String text) {
 }
 
 
-ssaValue *ssa_add_local(ssaProcedure *proc, Entity *e, b32 zero_initialized = true) {
-	ssaBlock *b = proc->decl_block; // all variables must be in the first block
-	ssaValue *instr = ssa_make_instr_local(proc, e, zero_initialized);
-	instr->Instr.parent = b;
-	array_add(&b->instrs, instr);
-	array_add(&b->locals, instr);
-
-	// if (zero_initialized) {
-		ssa_emit_zero_init(proc, instr);
-	// }
-
-	return instr;
-}
-
-ssaValue *ssa_add_local_for_identifier(ssaProcedure *proc, AstNode *name, b32 zero_initialized) {
-	Entity **found = map_get(&proc->module->info->definitions, hash_pointer(name));
-	if (found) {
-		Entity *e = *found;
-		ssa_emit_comment(proc, e->token.string);
-		return ssa_add_local(proc, e, zero_initialized);
-	}
-	return NULL;
-}
-
-ssaValue *ssa_add_local_generated(ssaProcedure *proc, Type *type) {
-	GB_ASSERT(type != NULL);
-
-	Scope *scope = NULL;
-	if (proc->curr_block) {
-		scope = proc->curr_block->scope;
-	}
-	Entity *e = make_entity_variable(proc->module->allocator,
-	                                 scope,
-	                                 empty_token,
-	                                 type);
-	return ssa_add_local(proc, e, true);
-}
-
-ssaValue *ssa_add_param(ssaProcedure *proc, Entity *e) {
-	ssaValue *v = ssa_make_value_param(proc->module->allocator, proc, e);
-#if 1
-	ssaValue *l = ssa_add_local(proc, e);
-	ssa_emit_store(proc, l, v);
-#else
-	ssa_module_add_value(proc->module, e, v);
-#endif
-	return v;
-}
-
-
 ssaValue *ssa_emit_call(ssaProcedure *p, ssaValue *value, ssaValue **args, isize arg_count) {
 	Type *pt = base_type(ssa_type(value));
 	GB_ASSERT(pt->kind == Type_Proc);
@@ -602,31 +552,6 @@ ssaValue *ssa_add_local_slice(ssaProcedure *proc, Type *slice_type, ssaValue *ba
 	return slice;
 }
 
-
-ssaValue *ssa_add_global_string_array(ssaModule *m, String string) {
-	gbAllocator a = m->allocator;
-
-	isize max_len = 6+8+1;
-	u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
-	isize len = gb_snprintf(cast(char *)str, max_len, "__str$%x", m->global_string_index);
-	m->global_string_index++;
-
-	String name = make_string(str, len-1);
-	Token token = {Token_String};
-	token.string = name;
-	Type *type = make_type_array(a, t_u8, string.len);
-	ExactValue ev = make_exact_value_string(string);
-	Entity *entity = make_entity_constant(a, NULL, token, type, ev);
-	ssaValue *g = ssa_make_value_global(a, entity, ssa_add_module_constant(m, type, ev));
-	g->Global.is_private  = true;
-	// g->Global.is_constant = true;
-
-	ssa_module_add_value(m, entity, g);
-	map_set(&m->members, hash_string(name), g);
-
-	return g;
-}
-
 ssaValue *ssa_emit_string(ssaProcedure *proc, ssaValue *elem, ssaValue *len) {
 	ssaValue *str = ssa_add_local_generated(proc, t_string);
 	ssaValue *str_elem = ssa_emit_struct_ep(proc, str, 0);
@@ -634,14 +559,6 @@ ssaValue *ssa_emit_string(ssaProcedure *proc, ssaValue *elem, ssaValue *len) {
 	ssa_emit_store(proc, str_elem, elem);
 	ssa_emit_store(proc, str_len, len);
 	return ssa_emit_load(proc, str);
-}
-
-
-ssaValue *ssa_emit_global_string(ssaProcedure *proc, String str) {
-	ssaValue *global_array = ssa_add_global_string_array(proc->module, str);
-	ssaValue *elem = ssa_array_elem(proc, global_array);
-	ssaValue *len =  ssa_make_const_int(proc->module->allocator, str.len);
-	return ssa_emit_string(proc, elem, len);
 }
 
 
@@ -1101,10 +1018,15 @@ ssaValue *ssa_type_info(ssaProcedure *proc, Type *type) {
 	ssaValue **found = map_get(&proc->module->members, hash_string(make_string(SSA_TYPE_INFO_DATA_NAME)));
 	GB_ASSERT(found != NULL);
 	ssaValue *type_info_data = *found;
-
 	CheckerInfo *info = proc->module->info;
-	ssaValue *entry_index = ssa_make_const_i32(proc->module->allocator, ssa_type_info_index(info, type));
-	return ssa_emit_array_ep(proc, type_info_data, entry_index);
+
+	type = default_type(type);
+
+	i32 entry_index = ssa_type_info_index(info, type);
+
+	// gb_printf_err("%d %s\n", entry_index, type_to_string(type));
+
+	return ssa_emit_array_ep(proc, type_info_data, ssa_make_const_i32(proc->module->allocator, entry_index));
 }
 
 
@@ -1170,6 +1092,57 @@ ssaValue *ssa_emit_logical_binary_expr(ssaProcedure *proc, AstNode *expr) {
 	return ssa_emit(proc, ssa_make_instr_phi(proc, edges, type));
 #endif
 }
+
+
+void ssa_emit_bounds_check(ssaProcedure *proc, Token token, ssaValue *index, ssaValue *len) {
+	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
+		return;
+	}
+
+	index = ssa_emit_conv(proc, index, t_int);
+	len = ssa_emit_conv(proc, len, t_int);
+
+	ssa_emit(proc, ssa_make_instr_bounds_check(proc, token.pos, index, len));
+
+	// gbAllocator a = proc->module->allocator;
+	// ssaValue **args = gb_alloc_array(a, ssaValue *, 5);
+	// args[0] = ssa_emit_global_string(proc, token.pos.file);
+	// args[1] = ssa_make_const_int(a, token.pos.line);
+	// args[2] = ssa_make_const_int(a, token.pos.column);
+	// args[3] = ssa_emit_conv(proc, index, t_int);
+	// args[4] = ssa_emit_conv(proc, len, t_int);
+
+	// ssa_emit_global_call(proc, "__bounds_check_error", args, 5);
+}
+
+void ssa_emit_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low, ssaValue *high, ssaValue *max, b32 is_substring) {
+	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
+		return;
+	}
+
+
+	low  = ssa_emit_conv(proc, low,  t_int);
+	high = ssa_emit_conv(proc, high, t_int);
+	max  = ssa_emit_conv(proc, max,  t_int);
+
+	ssa_emit(proc, ssa_make_instr_slice_bounds_check(proc, token.pos, low, high, max, is_substring));
+
+	// gbAllocator a = proc->module->allocator;
+	// ssaValue **args = gb_alloc_array(a, ssaValue *, 6);
+	// args[0] = ssa_emit_global_string(proc, token.pos.file);
+	// args[1] = ssa_make_const_int(a, token.pos.line);
+	// args[2] = ssa_make_const_int(a, token.pos.column);
+	// args[3] = ssa_emit_conv(proc, low, t_int);
+	// args[4] = ssa_emit_conv(proc, high, t_int);
+	// args[5] = ssa_emit_conv(proc, max, t_int);
+
+	// if (!is_substring) {
+	// 	ssa_emit_global_call(proc, "__slice_expr_error", args, 6);
+	// } else {
+	// 	ssa_emit_global_call(proc, "__substring_expr_error", args, 5);
+	// }
+}
+
 
 
 

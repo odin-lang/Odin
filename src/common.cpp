@@ -215,14 +215,15 @@ struct Map {
 	Array<MapEntry<T> > entries;
 };
 
-template <typename T> void map_init   (Map<T> *h, gbAllocator a);
-template <typename T> void map_destroy(Map<T> *h);
-template <typename T> T *  map_get    (Map<T> *h, HashKey key);
-template <typename T> void map_set    (Map<T> *h, HashKey key, T value);
-template <typename T> void map_remove (Map<T> *h, HashKey key);
-template <typename T> void map_clear  (Map<T> *h);
-template <typename T> void map_grow   (Map<T> *h);
-template <typename T> void map_rehash (Map<T> *h, isize new_count);
+template <typename T> void map_init             (Map<T> *h, gbAllocator a);
+template <typename T> void map_init_with_reserve(Map<T> *h, gbAllocator a, isize capacity);
+template <typename T> void map_destroy          (Map<T> *h);
+template <typename T> T *  map_get              (Map<T> *h, HashKey key);
+template <typename T> void map_set              (Map<T> *h, HashKey key, T value);
+template <typename T> void map_remove           (Map<T> *h, HashKey key);
+template <typename T> void map_clear            (Map<T> *h);
+template <typename T> void map_grow             (Map<T> *h);
+template <typename T> void map_rehash           (Map<T> *h, isize new_count);
 
 template <typename T> MapEntry<T> *multi_map_find_first(Map<T> *h, HashKey key);
 template <typename T> MapEntry<T> *multi_map_find_next (Map<T> *h, MapEntry<T> *e);
@@ -240,6 +241,12 @@ template <typename T>
 gb_inline void map_init(Map<T> *h, gbAllocator a) {
 	array_init(&h->hashes,  a);
 	array_init(&h->entries, a);
+}
+
+template <typename T>
+gb_inline void map_init_with_reserve(Map<T> *h, gbAllocator a, isize capacity) {
+	array_init(&h->hashes,  a, capacity);
+	array_init(&h->entries, a, capacity);
 }
 
 template <typename T>

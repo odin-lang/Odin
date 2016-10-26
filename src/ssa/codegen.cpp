@@ -149,9 +149,9 @@ void ssa_gen_tree(ssaGen *s) {
 				if (tav != NULL) {
 					if (tav->value.kind != ExactValue_Invalid) {
 						ExactValue v = tav->value;
-						if (v.kind != ExactValue_String) {
+						// if (v.kind != ExactValue_String) {
 							g->Global.value = ssa_add_module_constant(m, tav->type, v);
-						}
+						// }
 					}
 				}
 			}
@@ -293,7 +293,9 @@ void ssa_gen_tree(ssaGen *s) {
 			Type *t_string_slice_ptr = make_type_pointer(a, make_type_slice(a, t_string));
 
 			auto get_type_info_ptr = [](ssaProcedure *proc, ssaValue *type_info_data, Type *type) -> ssaValue * {
-				return ssa_emit_array_ep(proc, type_info_data, cast(i32)ssa_type_info_index(proc->module->info, type));
+				i32 index = cast(i32)ssa_type_info_index(proc->module->info, type);
+				// gb_printf_err("%d %s\n", index, type_to_string(type));
+				return ssa_emit_array_ep(proc, type_info_data, index);
 			};
 
 			i32 type_info_member_index = 0;
@@ -319,16 +321,11 @@ void ssa_gen_tree(ssaGen *s) {
 					tag = ssa_add_local_generated(proc, t_type_info_named);
 
 					// TODO(bill): Which is better? The mangled name or actual name?
-					// ssaValue *gsa  = ssa_add_global_string_array(proc, make_exact_value_string(t->Named.name));
-					ssaValue *gsa  = ssa_add_global_string_array(m, t->Named.type_name->token.string);
-					ssaValue *elem = ssa_array_elem(proc, gsa);
-					ssaValue *len  = ssa_array_len(proc, ssa_emit_load(proc, gsa));
-					ssaValue *name = ssa_emit_string(proc, elem, len);
-
-					ssaValue *gep  = get_type_info_ptr(proc, type_info_data, t->Named.base);
+					ssaValue *name = ssa_make_const_string(a, t->Named.type_name->token.string);
+					ssaValue *gtip = get_type_info_ptr(proc, type_info_data, t->Named.base);
 
 					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), name);
-					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 1), gep);
+					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 1), gtip);
 				} break;
 
 				case Type_Basic:
@@ -453,7 +450,7 @@ void ssa_gen_tree(ssaGen *s) {
 							ssaValue *offset    = ssa_emit_struct_ep(proc, field, 2);
 
 							if (f->token.string.len > 0) {
-								ssa_emit_store(proc, name, ssa_emit_global_string(proc, f->token.string));
+								ssa_emit_store(proc, name, ssa_make_const_string(a, f->token.string));
 							}
 							ssa_emit_store(proc, type_info, tip);
 							ssa_emit_store(proc, offset, ssa_make_const_int(a, foffset));
@@ -502,7 +499,7 @@ void ssa_gen_tree(ssaGen *s) {
 							ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
 
 							if (f->token.string.len > 0) {
-								ssa_emit_store(proc, name, ssa_emit_global_string(proc, f->token.string));
+								ssa_emit_store(proc, name, ssa_make_const_string(a, f->token.string));
 							}
 							ssa_emit_store(proc, type_info, tip);
 							ssa_emit_store(proc, offset, ssa_make_const_int(a, 0));
@@ -571,7 +568,7 @@ void ssa_gen_tree(ssaGen *s) {
 								ssaValue *name_gep  = ssa_emit_struct_ep(proc, name_array, i);
 
 								ssa_emit_store(proc, value_gep, ssa_make_const_i64(a, fields[i]->Constant.value.value_integer));
-								ssa_emit_store(proc, name_gep,  ssa_emit_global_string(proc, fields[i]->token.string));
+								ssa_emit_store(proc, name_gep,  ssa_make_const_string(a, fields[i]->token.string));
 							}
 
 							ssaValue *v_count = ssa_make_const_int(a, count);
@@ -617,7 +614,7 @@ void ssa_gen_tree(ssaGen *s) {
 						ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
 
 						if (f->token.string.len > 0) {
-							ssa_emit_store(proc, name, ssa_emit_global_string(proc, f->token.string));
+							ssa_emit_store(proc, name, ssa_make_const_string(a, f->token.string));
 						}
 						ssa_emit_store(proc, type_info, tip);
 					}
