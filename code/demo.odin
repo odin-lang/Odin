@@ -6,5 +6,3 @@ main :: proc() {
 	v[0] = 123
 	fmt.println("Hellope!", v, v[0], a)
 }
-
-

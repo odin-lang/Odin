@@ -753,10 +753,12 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		add_entity_use(c, f->field, e);
 	}
 
-	gb_sort_array(fields, et->fields.count, cmp_enum_order);
+	GB_ASSERT(field_index <= et->fields.count);
+
+	gb_sort_array(fields, field_index, cmp_enum_order);
 
 	enum_type->Record.other_fields = fields;
-	enum_type->Record.other_field_count = et->fields.count;
+	enum_type->Record.other_field_count = field_index;
 
 	enum_type->Record.enum_count = make_entity_constant(c->allocator, NULL,
 		make_token_ident(make_string("count")), t_int, make_exact_value_integer(enum_type->Record.other_field_count));
