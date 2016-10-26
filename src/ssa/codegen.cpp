@@ -1,6 +1,3 @@
-#include "ssa.cpp"
-#include "print_llvm.cpp"
-
 struct ssaGen {
 	ssaModule module;
 	gbFile output_file;
@@ -675,13 +672,4 @@ void ssa_gen_tree(ssaGen *s) {
 
 
 	// m->layout = make_string("e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64");
-}
-
-
-void ssa_gen_ir(ssaGen *s) {
-	ssaFileBuffer buf = {};
-	ssa_file_buffer_init(&buf, &s->output_file);
-	defer (ssa_file_buffer_destroy(&buf));
-
-	ssa_print_llvm_ir(&buf, &s->module);
 }

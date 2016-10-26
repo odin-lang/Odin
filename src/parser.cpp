@@ -1996,7 +1996,7 @@ AstNodeArray parse_struct_params(AstFile *f, isize *decl_count_, b32 using_allow
 
 		expect_semicolon_after_stmt(f, decl);
 
-		if (decl != NULL && is_ast_node_decl(decl)) {
+		if (is_ast_node_decl(decl)) {
 			array_add(&decls, decl);
 			if (decl->kind == AstNode_VarDecl) {
 				decl->VarDecl.is_using = is_using && using_allowed;
@@ -2157,13 +2157,8 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		return make_enum_type(f, token, base_type, fields);
 	}
 
-	case Token_proc: {
-		AstNode *curr_proc = f->curr_proc;
-		AstNode *type = parse_proc_type(f);
-		f->curr_proc = type;
-		f->curr_proc = curr_proc;
-		return type;
-	}
+	case Token_proc:
+		return parse_proc_type(f);
 
 	case Token_OpenParen: {
 		// NOTE(bill): Skip the paren expression
@@ -2527,11 +2522,9 @@ AstNode *parse_match_stmt(AstFile *f) {
 
 	Token token = expect_token(f, Token_match);
 	AstNode *init = NULL;
-	AstNode *tag = NULL;
+	AstNode *tag  = NULL;
 	AstNode *body = NULL;
 	Token open, close;
-
-
 
 	if (allow_token(f, Token_type)) {
 		isize prev_level = f->expr_level;

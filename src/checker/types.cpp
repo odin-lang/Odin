@@ -1264,9 +1264,10 @@ i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, isize index)
 }
 
 
-i64 type_offset_of_from_selection(BaseTypeSizes s, gbAllocator allocator, Type *t, Selection sel) {
+i64 type_offset_of_from_selection(BaseTypeSizes s, gbAllocator allocator, Type *type, Selection sel) {
 	GB_ASSERT(sel.indirect == false);
 
+	Type *t = type;
 	i64 offset = 0;
 	for_array(i, sel.index) {
 		isize index = sel.index[i];

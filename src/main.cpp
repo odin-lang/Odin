@@ -5,9 +5,10 @@
 #include "unicode.cpp"
 #include "tokenizer.cpp"
 #include "parser.cpp"
-#include "printer.cpp"
+// #include "printer.cpp"
 #include "checker/checker.cpp"
-#include "codegen/codegen.cpp"
+#include "ssa/ssa.cpp"
+#include "llvm/ssa_to_text.cpp"
 
 // NOTE(bill): `name` is used in debugging and profiling modes
 i32 win32_exec_command_line_app(char *name, char *fmt, ...) {
@@ -166,7 +167,13 @@ int main(int argc, char **argv) {
 	ssa_gen_tree(&ssa);
 
 	// TODO(bill): Speedup writing to file for IR code
-	ssa_gen_ir(&ssa);
+	{
+		ssaFileBuffer buf = {};
+		ssa_file_buffer_init(&buf, &ssa.output_file);
+		defer (ssa_file_buffer_destroy(&buf));
+
+		ssa_print_llvm_ir(&buf, &ssa.module);
+	}
 
 	prof_print_all();
 

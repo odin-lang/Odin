@@ -1,27 +1,16 @@
 #include "../exact_value.cpp"
 #include "entity.cpp"
-#include "type.cpp"
-
-#define ADDRESSING_KINDS \
-	ADDRESSING_MODE(Invalid), \
-	ADDRESSING_MODE(NoValue), \
-	ADDRESSING_MODE(Value), \
-	ADDRESSING_MODE(Variable), \
-	ADDRESSING_MODE(Constant), \
-	ADDRESSING_MODE(Type), \
-	ADDRESSING_MODE(Builtin), \
-	ADDRESSING_MODE(Count), \
+#include "types.cpp"
 
 enum AddressingMode {
-#define ADDRESSING_MODE(x) GB_JOIN2(Addressing_, x)
-	ADDRESSING_KINDS
-#undef ADDRESSING_MODE
-};
-
-String const addressing_mode_strings[] = {
-#define ADDRESSING_MODE(x) {cast(u8 *)#x, gb_size_of(#x)-1}
-	ADDRESSING_KINDS
-#undef ADDRESSING_MODE
+	Addressing_Invalid,
+	Addressing_NoValue,
+	Addressing_Value,
+	Addressing_Variable,
+	Addressing_Constant,
+	Addressing_Type,
+	Addressing_Builtin,
+	Addressing_Count,
 };
 
 struct Operand {
@@ -47,7 +36,7 @@ struct DeclInfo {
 	AstNode *type_expr;
 	AstNode *init_expr;
 	AstNode *proc_decl; // AstNode_ProcDecl
-	u32 var_decl_tags;
+	u32      var_decl_tags;
 
 	Map<b32> deps; // Key: Entity *
 };
@@ -74,19 +63,20 @@ struct ProcedureInfo {
 };
 
 struct Scope {
-	Scope *parent;
-	Scope *prev, *next;
-	Scope *first_child, *last_child;
-	Map<Entity *> elements; // Key: String
-	Map<Entity *> implicit; // Key: String
+	Scope *        parent;
+	Scope *        prev, *next;
+	Scope *        first_child;
+	Scope *        last_child;
+	Map<Entity *>  elements; // Key: String
+	Map<Entity *>  implicit; // Key: String
 
 	Array<Scope *> shared;
 	Array<Scope *> imported;
-	b32 is_proc;
-	b32 is_global;
-	b32 is_file;
-	b32 is_init;
-	AstFile *file;
+	b32            is_proc;
+	b32            is_global;
+	b32            is_file;
+	b32            is_init;
+	AstFile *      file;
 };
 gb_global Scope *universal_scope = NULL;
 
@@ -134,9 +124,9 @@ enum BuiltinProcId {
 	BuiltinProc_Count,
 };
 struct BuiltinProc {
-	String name;
-	isize arg_count;
-	b32 variadic;
+	String   name;
+	isize    arg_count;
+	b32      variadic;
 	ExprKind kind;
 };
 gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
@@ -194,9 +184,9 @@ gb_global ImplicitValueInfo implicit_value_infos[ImplicitValue_Count] = {};
 
 
 struct CheckerContext {
-	Scope *scope;
+	Scope *   scope;
 	DeclInfo *decl;
-	u32 stmt_state_flags;
+	u32       stmt_state_flags;
 };
 
 // NOTE(bill): Symbol tables
@@ -221,17 +211,17 @@ struct Checker {
 	AstFile *              curr_ast_file;
 	BaseTypeSizes          sizes;
 	Scope *                global_scope;
-	Array<ProcedureInfo> procs; // NOTE(bill): Procedures to check
+	Array<ProcedureInfo>   procs; // NOTE(bill): Procedures to check
 
-	gbArena     arena;
-	gbArena     tmp_arena;
-	gbAllocator allocator;
-	gbAllocator tmp_allocator;
+	gbArena                arena;
+	gbArena                tmp_arena;
+	gbAllocator            allocator;
+	gbAllocator            tmp_allocator;
 
-	CheckerContext context;
+	CheckerContext         context;
 
-	Array<Type *> proc_stack;
-	b32 in_defer; // TODO(bill): Actually handle correctly
+	Array<Type *>          proc_stack;
+	b32                    in_defer; // TODO(bill): Actually handle correctly
 };
 
 struct CycleChecker {
@@ -920,6 +910,7 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 
 
 #include "expr.cpp"
+#include "decl.cpp"
 #include "stmt.cpp"
 
 void init_preload_types(Checker *c) {

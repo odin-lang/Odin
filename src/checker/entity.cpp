@@ -16,7 +16,6 @@ enum ImplicitValueId;
 	ENTITY_KIND(ImplicitValue) \
 	ENTITY_KIND(Count)
 
-
 enum EntityKind {
 #define ENTITY_KIND(k) GB_JOIN2(Entity_, k),
 	ENTITY_KINDS
@@ -35,18 +34,21 @@ struct Entity {
 	Token      token;
 	Type *     type;
 	AstNode *  identifier; // Can be NULL
+
+	// TODO(bill): Cleanup how `using` works for entities
 	Entity *   using_parent;
 	AstNode *  using_expr;
+
 	union {
 		struct {
 			ExactValue value;
 		} Constant;
 		struct {
-			b8  visited;    // Cycle detection
-			b8  used;       // Variable is used
-			b8  anonymous;  // Variable is an anonymous
-			b8  field;      // Is Record field
-			b8  param;      // Is procedure parameter
+			b8  visited;
+			b8  used;
+			b8  anonymous;
+			b8  field;
+			b8  param;
 
 			i32 field_index;
 			i32 field_src_index;
@@ -68,6 +70,7 @@ struct Entity {
 		} ImportName;
 		struct {} Nil;
 		struct {
+			// TODO(bill): Should this be a user-level construct rather than compiler-level?
 			ImplicitValueId id;
 			Entity *        backing;
 		} ImplicitValue;
@@ -79,6 +82,7 @@ b32 is_entity_exported(Entity *e) {
 		return false;
 	}
 	// TODO(bill): Do I really want non-exported entities?
+	// TODO(bill): If we do, what should be the rules?
 	// if (e->token.string.len >= 1 &&
 	    // e->token.string.text[0] == '_') {
 		// return false;
@@ -105,7 +109,6 @@ Entity *make_entity_using_variable(gbAllocator a, Entity *parent, Token token, T
 	GB_ASSERT(parent != NULL);
 	Entity *entity = alloc_entity(a, Entity_Variable, parent->scope, token, type);
 	entity->using_parent = parent;
-	entity->Variable.anonymous = true;
 	entity->Variable.anonymous = true;
 	return entity;
 }
