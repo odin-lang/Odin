@@ -93,6 +93,7 @@ struct ssaProcedure {
 	AstNode *             body;
 	u64                   tags;
 
+	Array<ssaValue *>     params;
 	Array<ssaDefer>       defer_stmts;
 	Array<ssaBlock *>     blocks;
 	i32                   scope_index;
@@ -308,7 +309,6 @@ enum ssaValueKind {
 
 	ssaValue_Constant,
 	ssaValue_ConstantSlice,
-	ssaValue_ConstantString,
 	ssaValue_Nil,
 	ssaValue_TypeName,
 	ssaValue_Global,
@@ -334,10 +334,6 @@ struct ssaValue {
 			ssaValue *backing_array;
 			i64       count;
 		} ConstantSlice;
-		struct {
-			Type * type;
-			String string;
-		} ConstantString;
 		struct {
 			Type *type;
 		} Nil;
@@ -579,6 +575,13 @@ void ssa_file_write(ssaFileBuffer *f, void *data, isize len) {
 	ssa_file_buffer_write(f, data, len);
 }
 
+ssaValue *ssa_lookup_member(ssaModule *m, String name) {
+	ssaValue **v = map_get(&m->members, hash_string(name));
+	if (v != NULL) {
+		return *v;
+	}
+	return NULL;
+}
 
 
 Type *ssa_type(ssaValue *value);
@@ -636,8 +639,6 @@ Type *ssa_type(ssaValue *value) {
 		return value->Constant.type;
 	case ssaValue_ConstantSlice:
 		return value->ConstantSlice.type;
-	case ssaValue_ConstantString:
-		return value->ConstantString.type;
 	case ssaValue_Nil:
 		return value->Nil.type;
 	case ssaValue_TypeName:

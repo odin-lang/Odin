@@ -11,7 +11,8 @@ void ssa_begin_procedure_body(ssaProcedure *proc) {
 		auto *params = &proc->type->Proc.params->Tuple;
 		for (isize i = 0; i < params->variable_count; i++) {
 			Entity *e = params->variables[i];
-			ssa_add_param(proc, e);
+			ssaValue *param = ssa_add_param(proc, e);
+			array_add(&proc->params, param);
 		}
 	}
 }

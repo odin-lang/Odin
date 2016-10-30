@@ -295,14 +295,6 @@ ssaValue *ssa_make_value_constant_slice(gbAllocator a, Type *type, ssaValue *bac
 	return v;
 }
 
-ssaValue *ssa_make_value_constant_string(gbAllocator a, Type *type, String string) {
-	ssaValue *v = ssa_alloc_value(a, ssaValue_ConstantString);
-	v->ConstantString.type   = type;
-	v->ConstantString.string = string;
-	return v;
-}
-
-
 ssaValue *ssa_make_const_int(gbAllocator a, i64 i) {
 	return ssa_make_value_constant(a, t_int, make_exact_value_integer(i));
 }
@@ -328,6 +320,11 @@ ssaValue *ssa_make_value_procedure(gbAllocator a, ssaModule *m, Entity *entity, 
 	v->Proc.body   = body;
 	v->Proc.name   = name;
 	array_init(&v->Proc.referrers, heap_allocator(), 0); // TODO(bill): replace heap allocator
+
+	Type *t = base_type(type);
+	GB_ASSERT(is_type_proc(t));
+	array_init(&v->Proc.params, heap_allocator(), t->Proc.param_count);
+
 	return v;
 }
 

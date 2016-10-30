@@ -9,6 +9,7 @@
 #include "checker/checker.cpp"
 #include "ssa/ssa.cpp"
 #include "llvm/ssa_to_text.cpp"
+#include "vm/vm.cpp"
 
 // NOTE(bill): `name` is used in debugging and profiling modes
 i32 win32_exec_command_line_app(char *name, char *fmt, ...) {
@@ -165,7 +166,20 @@ int main(int argc, char **argv) {
 
 	ssa_gen_tree(&ssa);
 
-	// TODO(bill): Speedup writing to file for IR code
+	{
+		VirtualMachine vm = {};
+		vm_init(&vm, &ssa.module);
+		defer (vm_destroy(&vm));
+
+		String name = make_string("main");
+		ssaValue *main_proc_value = *map_get(&vm.module->members, hash_string(name));
+		GB_ASSERT(main_proc_value->kind == ssaValue_Proc);
+
+		ssaProcedure *start_proc = &main_proc_value->Proc;
+		Array<vmValue> args = {}; // Empty
+		vm_call_procedure(&vm, start_proc, args);
+	}
+
 	{
 		ssaFileBuffer buf = {};
 		ssa_file_buffer_init(&buf, &ssa.output_file);
