@@ -103,6 +103,7 @@ struct ssaProcedure {
 	ssaTargetList *       target_list;
 	Array<ssaValue *>     referrers;
 
+	i32                   local_count;
 	i32                   instr_count;
 	i32                   block_count;
 };

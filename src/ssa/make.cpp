@@ -450,6 +450,7 @@ ssaValue *ssa_add_local(ssaProcedure *proc, Entity *e, b32 zero_initialized = tr
 	instr->Instr.parent = b;
 	array_add(&b->instrs, instr);
 	array_add(&b->locals, instr);
+	proc->local_count++;
 
 	// if (zero_initialized) {
 		ssa_emit_zero_init(proc, instr);
