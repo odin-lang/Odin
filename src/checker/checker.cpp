@@ -887,7 +887,7 @@ void add_dependency_to_map(Map<Entity *> *map, CheckerInfo *info, Entity *node) 
 
 	DeclInfo *decl = *found;
 	for_array(i, decl->deps.entries) {
-		Entity *e = cast(Entity *)cast(uintptr)decl->deps.entries[i].key.key;
+		Entity *e = cast(Entity *)decl->deps.entries[i].key.ptr;
 		add_dependency_to_map(map, info, e);
 	}
 }

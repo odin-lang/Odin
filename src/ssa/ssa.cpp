@@ -18,10 +18,12 @@ struct ssaModule {
 	String layout;
 	// String triple;
 
-	Map<ssaValue *>     values;     // Key: Entity *
-	Map<ssaValue *>     members;    // Key: String
-	Map<String>         type_names; // Key: Type *
-	Map<ssaDebugInfo *> debug_info; // Key: Unique pointer
+
+	Map<Entity *>       min_dep_map; // Key: Entity *
+	Map<ssaValue *>     values;      // Key: Entity *
+	Map<ssaValue *>     members;     // Key: String
+	Map<String>         type_names;  // Key: Type *
+	Map<ssaDebugInfo *> debug_info;  // Key: Unique pointer
 	i32                 global_string_index;
 	i32                 global_array_index; // For ConstantSlice
 

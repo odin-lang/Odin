@@ -104,12 +104,11 @@ void ssa_gen_tree(ssaGen *s) {
 	Array<ssaGlobalVariable> global_variables;
 	array_init(&global_variables, m->tmp_allocator, global_variable_max_count);
 
-	auto min_dep_map = generate_minimum_dependency_map(info, entry_point);
-	defer (map_destroy(&min_dep_map));
+	m->min_dep_map = generate_minimum_dependency_map(info, entry_point);
 
 	for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
-		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
+		Entity *e = cast(Entity *)entry->key.ptr;
 		String name = e->token.string;
 		DeclInfo *decl = entry->value;
 		Scope *scope = e->scope;
@@ -118,7 +117,7 @@ void ssa_gen_tree(ssaGen *s) {
 			continue;
 		}
 
-		if (map_get(&min_dep_map, hash_pointer(e)) == NULL) {
+		if (map_get(&m->min_dep_map, hash_pointer(e)) == NULL) {
 			// NOTE(bill): Nothing depends upon it so doesn't need to be built
 			continue;
 		}

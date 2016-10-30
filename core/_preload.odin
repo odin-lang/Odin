@@ -4,6 +4,28 @@
 #import "fmt.odin"
 #import "mem.odin"
 
+Optimization_Level :: enum {
+	DEBUG,
+	RELEASE,
+}
+
+Bounds_Check_Mode :: enum {
+	ON,
+	OFF,
+}
+
+Build_Options :: struct {
+	optimization_level: Optimization_Level
+
+	bounds_check: Bounds_Check_Mode
+
+	output_name: string
+	output_path: string
+}
+
+build_options: Build_Options
+
+
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
 Type_Info :: union {

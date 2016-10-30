@@ -1377,6 +1377,12 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			GB_ASSERT_MSG(found != NULL, "Unable to find: %.*s", LIT(pd->name->Ident.string));
 			Entity *e = *found;
 
+
+			if (map_get(&proc->module->min_dep_map, hash_pointer(e)) == NULL) {
+				// NOTE(bill): Nothing depends upon it so doesn't need to be built
+				break;
+			}
+
 			// NOTE(bill): Generate a new name
 			// parent.name-guid
 			String original_name = pd->name->Ident.string;
