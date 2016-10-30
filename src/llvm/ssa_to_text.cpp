@@ -1177,6 +1177,8 @@ void ssa_print_llvm_ir(ssaFileBuffer *f, ssaModule *m) {
 		ssa_print_type_name(f, m, v);
 	}
 
+	ssa_fprintf(f, "\n");
+
 	for_array(member_index, m->members.entries) {
 		auto *entry = &m->members.entries[member_index];
 		ssaValue *v = entry->value;
@@ -1217,9 +1219,13 @@ void ssa_print_llvm_ir(ssaFileBuffer *f, ssaModule *m) {
 		if (g->is_thread_local) {
 			ssa_fprintf(f, "thread_local ");
 		}
+
+		if (g->is_private) {
+			ssa_fprintf(f, "private ");
+		}
 		if (g->is_constant) {
-			if (g->is_private) {
-				ssa_fprintf(f, "private ");
+			if (g->is_unnamed_addr) {
+				ssa_fprintf(f, "unnamed_addr ");
 			}
 			ssa_fprintf(f, "constant ");
 		} else {

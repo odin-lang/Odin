@@ -252,14 +252,16 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 		ast_node(i, Ident, node);
 		e = scope_lookup_entity(c->context.scope, i->string);
 		if (e != NULL && e->kind == Entity_Variable) {
-			used = e->Variable.used; // TODO(bill): Make backup just in case
+			used = (e->flags & EntityFlag_Used) != 0; // TODO(bill): Make backup just in case
 		}
 	}
 
 
 	Operand op_b = {Addressing_Invalid};
 	check_expr(c, &op_b, lhs);
-	if (e) e->Variable.used = used;
+	if (e) {
+		e->flags |= EntityFlag_Used*used;
+	}
 
 	if (op_b.mode == Addressing_Invalid ||
 	    op_b.type == t_invalid) {
@@ -829,7 +831,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				// NOTE(bill): Dummy type
 				Type *tag_ptr_type = make_type_pointer(c->allocator, tag_type);
 				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, ms->var->Ident, tag_ptr_type);
-				tag_var->Variable.used = true;
+				tag_var->flags |= EntityFlag_Used;
 				add_entity(c, c->context.scope, ms->var, tag_var);
 				add_entity_use(c, ms->var, tag_var);
 			}

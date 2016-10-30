@@ -1,44 +1,7 @@
 struct ssaProcedure;
 struct ssaBlock;
 struct ssaValue;
-
-enum ssaDebugInfoKind {
-	ssaDebugInfo_Invalid,
-
-	ssaDebugInfo_CompileUnit,
-	ssaDebugInfo_File,
-	ssaDebugInfo_Proc,
-	ssaDebugInfo_AllProcs,
-
-	ssaDebugInfo_Count,
-};
-
-struct ssaDebugInfo {
-	ssaDebugInfoKind kind;
-	i32 id;
-
-	union {
-		struct {
-			AstFile *     file;
-			String        producer;
-			ssaDebugInfo *all_procs;
-		} CompileUnit;
-		struct {
-			AstFile *file;
-			String   filename;
-			String   directory;
-		} File;
-		struct {
-			Entity *      entity;
-			String        name;
-			ssaDebugInfo *file;
-			TokenPos      pos;
-		} Proc;
-		struct {
-			Array<ssaDebugInfo *> procs;
-		} AllProcs;
-	};
-};
+struct ssaDebugInfo;
 
 struct ssaModule {
 	CheckerInfo * info;
@@ -130,14 +93,17 @@ struct ssaProcedure {
 	AstNode *             body;
 	u64                   tags;
 
-	isize                 scope_index;
 	Array<ssaDefer>       defer_stmts;
 	Array<ssaBlock *>     blocks;
+	i32                   scope_index;
 	ssaBlock *            decl_block;
 	ssaBlock *            entry_block;
 	ssaBlock *            curr_block;
 	ssaTargetList *       target_list;
 	Array<ssaValue *>     referrers;
+
+	i32                   instr_count;
+	i32                   block_count;
 };
 
 #define SSA_STARTUP_RUNTIME_PROC_NAME  "__$startup_runtime"
@@ -376,17 +342,18 @@ struct ssaValue {
 			Type *type;
 		} Nil;
 		struct {
-			String name;
 			Type * type;
+			String name;
 		} TypeName;
 		struct {
-			b32               is_constant;
-			b32               is_private;
-			b32               is_thread_local;
 			Entity *          entity;
 			Type *            type;
 			ssaValue *        value;
 			Array<ssaValue *> referrers;
+			b8                is_constant;
+			b8                is_private;
+			b8                is_thread_local;
+			b8                is_unnamed_addr;
 		} Global;
 		struct {
 			ssaProcedure *    parent;
@@ -432,6 +399,133 @@ ssaAddr ssa_make_addr_vector(ssaValue *addr, ssaValue *index, AstNode *expr) {
 	v.Vector.index = index;
 	return v;
 }
+
+
+
+enum ssaDebugEncoding {
+	ssaDebugBasicEncoding_Invalid       = 0,
+
+	ssaDebugBasicEncoding_address       = 1,
+	ssaDebugBasicEncoding_boolean       = 2,
+	ssaDebugBasicEncoding_float         = 3,
+	ssaDebugBasicEncoding_signed        = 4,
+	ssaDebugBasicEncoding_signed_char   = 5,
+	ssaDebugBasicEncoding_unsigned      = 6,
+	ssaDebugBasicEncoding_unsigned_char = 7,
+
+	ssaDebugBasicEncoding_member       = 13,
+	ssaDebugBasicEncoding_pointer_type = 15,
+	ssaDebugBasicEncoding_typedef      = 22,
+
+	ssaDebugBasicEncoding_array_type       = 1,
+	ssaDebugBasicEncoding_enumeration_type = 4,
+	ssaDebugBasicEncoding_structure_type   = 19,
+	ssaDebugBasicEncoding_union_type       = 23,
+
+};
+
+enum ssaDebugInfoKind {
+	ssaDebugInfo_Invalid,
+
+	ssaDebugInfo_CompileUnit,
+	ssaDebugInfo_File,
+	ssaDebugInfo_Scope,
+	ssaDebugInfo_Proc,
+	ssaDebugInfo_AllProcs,
+
+	ssaDebugInfo_BasicType,      // basic types
+	ssaDebugInfo_ProcType,
+	ssaDebugInfo_DerivedType,    // pointer, typedef
+	ssaDebugInfo_CompositeType,  // array, struct, enum, (raw_)union
+	ssaDebugInfo_Enumerator,     // For ssaDebugInfo_CompositeType if enum
+	ssaDebugInfo_GlobalVariable,
+	ssaDebugInfo_LocalVariable,
+
+
+	ssaDebugInfo_Count,
+};
+
+struct ssaDebugInfo {
+	ssaDebugInfoKind kind;
+	i32 id;
+
+	union {
+		struct {
+			AstFile *     file;
+			String        producer;
+			ssaDebugInfo *all_procs;
+		} CompileUnit;
+		struct {
+			AstFile *file;
+			String   filename;
+			String   directory;
+		} File;
+		struct {
+			ssaDebugInfo *parent;
+			ssaDebugInfo *file;
+			TokenPos      pos;
+			Scope *       scope; // Actual scope
+		} Scope;
+		struct {
+			Entity *      entity;
+			String        name;
+			ssaDebugInfo *file;
+			TokenPos      pos;
+		} Proc;
+		struct {
+			Array<ssaDebugInfo *> procs;
+		} AllProcs;
+
+
+		struct {
+			String           name;
+			i32              size;
+			i32              align;
+			ssaDebugEncoding encoding;
+		} BasicType;
+		struct {
+			ssaDebugInfo *        return_type;
+			Array<ssaDebugInfo *> param_types;
+		} ProcType;
+		struct {
+			ssaDebugInfo *   base_type;
+			ssaDebugEncoding encoding;
+		} DerivedType;
+		struct {
+			ssaDebugEncoding      encoding;
+			String                name;
+			String                identifier;
+			ssaDebugInfo *        file;
+			TokenPos              pos;
+			i32                   size;
+			i32                   align;
+			Array<ssaDebugInfo *> elements;
+		} CompositeType;
+		struct {
+			String name;
+			i64    value;
+		} Enumerator;
+		struct {
+			String        name;
+			String        linkage_name;
+			ssaDebugInfo *scope;
+			ssaDebugInfo *file;
+			TokenPos      pos;
+			ssaValue     *variable;
+			ssaDebugInfo *declaration;
+		} GlobalVariable;
+		struct {
+			String        name;
+			ssaDebugInfo *scope;
+			ssaDebugInfo *file;
+			TokenPos      pos;
+			i32           arg; // Non-zero if proc parameter
+			ssaDebugInfo *type;
+		} LocalVariable;
+	};
+};
+
+
 
 struct ssaFileBuffer {
 	gbVirtualMemory vm;

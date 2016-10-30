@@ -301,7 +301,7 @@ void destroy_scope(Scope *scope) {
 	for_array(i, scope->elements.entries) {
 		Entity *e =scope->elements.entries[i].value;
 		if (e->kind == Entity_Variable) {
-			if (!e->Variable.used) {
+			if (!(e->flags & EntityFlag_Used)) {
 #if 0
 				warning(e->token, "Unused variable `%.*s`", LIT(e->token.string));
 #endif

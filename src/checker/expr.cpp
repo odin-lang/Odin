@@ -26,7 +26,7 @@ b32 check_is_assignable_to_using_subtype(Type *dst, Type *src) {
 	if (is_type_struct(src)) {
 		for (isize i = 0; i < src->Record.field_count; i++) {
 			Entity *f = src->Record.fields[i];
-			if (f->kind == Entity_Variable && f->Variable.anonymous) {
+			if (f->kind == Entity_Variable && (f->flags & EntityFlag_Anonymous)) {
 				if (are_types_identical(dst, f->type)) {
 					return true;
 				}
@@ -231,7 +231,7 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 			} else {
 				map_set(entity_map, key, f);
 				add_entity(c, c->context.scope, NULL, f);
-				if (f->Variable.anonymous) {
+				if (f->flags & EntityFlag_Anonymous) {
 					populate_using_entity_map(c, node, f->type, entity_map);
 				}
 			}
@@ -435,7 +435,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 						b32 ok = true;
 						for_array(emi, entity_map.entries) {
 							Entity *e = entity_map.entries[emi].value;
-							if (e->kind == Entity_Variable && e->Variable.anonymous) {
+							if (e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous) {
 								if (is_type_indexable(e->type)) {
 									if (e->identifier != vd->names[0]) {
 										ok = false;
@@ -448,7 +448,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 						if (ok) {
 							using_index_expr = fields[field_index-1];
 						} else {
-							fields[field_index-1]->Variable.anonymous = false;
+							fields[field_index-1]->flags &= ~EntityFlag_Anonymous;
 							error(name_token, "Previous `using` for an index expression `%.*s`", LIT(name_token.string));
 						}
 					} else {
@@ -936,7 +936,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 		break;
 
 	case Entity_Variable:
-		e->Variable.used = true;
+		e->flags |= EntityFlag_Used;
 		if (type == t_invalid) {
 			o->type = t_invalid;
 			return;
@@ -1748,8 +1748,8 @@ String check_down_cast_name(Type *dst_, Type *src_) {
 	GB_ASSERT(is_type_struct(dst_s) || is_type_raw_union(dst_s));
 	for (isize i = 0; i < dst_s->Record.field_count; i++) {
 		Entity *f = dst_s->Record.fields[i];
-		GB_ASSERT(f->kind == Entity_Variable && f->Variable.field);
-		if (f->Variable.anonymous) {
+		GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
+		if (f->flags & EntityFlag_Anonymous) {
 			if (are_types_identical(f->type, src_)) {
 				return f->token.string;
 			}
@@ -3490,7 +3490,7 @@ Entity *find_using_index_expr(Type *t) {
 	for (isize i = 0; i < t->Record.field_count; i++) {
 		Entity *f = t->Record.fields[i];
 		if (f->kind == Entity_Variable &&
-		    f->Variable.field && f->Variable.anonymous) {
+		    f->flags & (EntityFlag_Anonymous|EntityFlag_Field)) {
 			if (is_type_indexable(f->type)) {
 				return f;
 			}

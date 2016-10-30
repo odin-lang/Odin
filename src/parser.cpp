@@ -226,34 +226,44 @@ AST_NODE_KIND(_StmtEnd,        "", struct{}) \
 AST_NODE_KIND(_DeclBegin,      "", struct{}) \
 	AST_NODE_KIND(BadDecl,  "bad declaration", struct { Token begin, end; }) \
 	AST_NODE_KIND(VarDecl,  "variable declaration", struct { \
-			u64      tags; \
-			b32      is_using; \
+			u64          tags; \
+			b32          is_using; \
 			AstNodeArray names; \
-			AstNode *type; \
+			AstNode *    type; \
 			AstNodeArray values; \
+			AstNode *    note; \
 	}) \
 	AST_NODE_KIND(ConstDecl,  "constant declaration", struct { \
-			u64      tags; \
+			u64          tags; \
 			AstNodeArray names; \
-			AstNode *type; \
+			AstNode *    type; \
 			AstNodeArray values; \
+			AstNode *    note; \
 	}) \
 	AST_NODE_KIND(ProcDecl, "procedure declaration", struct { \
-			AstNode *name;        \
-			AstNode *type;        \
-			AstNode *body;        \
-			u64     tags;         \
-			String  foreign_name; \
-			String  link_name;    \
+			AstNode *name;         \
+			AstNode *type;         \
+			AstNode *body;         \
+			u64      tags;         \
+			String   foreign_name; \
+			String   link_name;    \
+			AstNode *note;          \
 	}) \
-	AST_NODE_KIND(TypeDecl,   "type declaration",   struct { Token token; AstNode *name, *type; }) \
+	AST_NODE_KIND(TypeDecl,   "type declaration",   struct { \
+		Token token; \
+		AstNode *name, *type; \
+		AstNode *note; \
+	}) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
 		Token token, relpath; \
 		String fullpath;      \
 		Token import_name;    \
 		b32 is_load;          \
+		AstNode *note;        \
 	}) \
-	AST_NODE_KIND(ForeignSystemLibrary, "foreign system library", struct { Token token, filepath; }) \
+	AST_NODE_KIND(ForeignSystemLibrary, "foreign system library", struct { \
+		Token token, filepath; \
+	}) \
 AST_NODE_KIND(_DeclEnd,   "", struct{}) \
 AST_NODE_KIND(_TypeBegin, "", struct{}) \
 	AST_NODE_KIND(Parameter, "parameter", struct { \

@@ -28,10 +28,19 @@ String const entity_strings[] = {
 #undef ENTITY_KIND
 };
 
+enum EntityFlag : u32 {
+	EntityFlag_Visited   = 1<<0,
+	EntityFlag_Used      = 1<<1,
+	EntityFlag_Anonymous = 1<<2,
+	EntityFlag_Field     = 1<<3,
+	EntityFlag_Param     = 1<<4,
+};
+
 struct Entity {
 	EntityKind kind;
-	Scope *    scope;
+	u32        flags;
 	Token      token;
+	Scope *    scope;
 	Type *     type;
 	AstNode *  identifier; // Can be NULL
 
@@ -44,21 +53,11 @@ struct Entity {
 			ExactValue value;
 		} Constant;
 		struct {
-			b8  visited;
-			b8  used;
-			b8  anonymous;
-			b8  field;
-			b8  param;
-
 			i32 field_index;
 			i32 field_src_index;
 		} Variable;
-		struct {
-			b32 used;
-		} TypeName;
-		struct {
-			b32 used;
-		} Procedure;
+		struct {} TypeName;
+		struct {} Procedure;
 		struct {
 			BuiltinProcId id;
 		} Builtin;
@@ -109,7 +108,7 @@ Entity *make_entity_using_variable(gbAllocator a, Entity *parent, Token token, T
 	GB_ASSERT(parent != NULL);
 	Entity *entity = alloc_entity(a, Entity_Variable, parent->scope, token, type);
 	entity->using_parent = parent;
-	entity->Variable.anonymous = true;
+	entity->flags |= EntityFlag_Anonymous;
 	return entity;
 }
 
@@ -127,9 +126,9 @@ Entity *make_entity_type_name(gbAllocator a, Scope *scope, Token token, Type *ty
 
 Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, b32 anonymous) {
 	Entity *entity = make_entity_variable(a, scope, token, type);
-	entity->Variable.used = true;
-	entity->Variable.anonymous = cast(b8)anonymous;
-	entity->Variable.param = true;
+	entity->flags |= EntityFlag_Used;
+	entity->flags |= EntityFlag_Anonymous*(anonymous != 0);
+	entity->flags |= EntityFlag_Param;
 	return entity;
 }
 
@@ -137,8 +136,8 @@ Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, 
 	Entity *entity = make_entity_variable(a, scope, token, type);
 	entity->Variable.field_src_index = field_src_index;
 	entity->Variable.field_index = field_src_index;
-	entity->Variable.field  = true;
-	entity->Variable.anonymous = cast(b8)anonymous;
+	entity->flags |= EntityFlag_Field;
+	entity->flags |= EntityFlag_Anonymous*(anonymous != 0);
 	return entity;
 }
 

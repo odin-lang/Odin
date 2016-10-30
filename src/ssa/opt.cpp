@@ -1,4 +1,6 @@
-void ssa_add_operands(Array<ssaValue *> *ops, ssaInstr *i) {
+// Optimizations for the SSA code
+
+void ssa_opt_add_operands(Array<ssaValue *> *ops, ssaInstr *i) {
 	switch (i->kind) {
 	case ssaInstr_Comment:
 		break;
@@ -105,16 +107,6 @@ void ssa_block_replace_succ(ssaBlock *b, ssaBlock *from, ssaBlock *to) {
 b32 ssa_block_has_phi(ssaBlock *b) {
 	return b->instrs[0]->Instr.kind == ssaInstr_Phi;
 }
-
-
-
-
-
-void ssa_optimize_blocks(ssaProcedure *proc);
-void ssa_build_referrers(ssaProcedure *proc);
-void ssa_build_dom_tree (ssaProcedure *proc);
-void ssa_opt_mem2reg    (ssaProcedure *proc);
-
 
 
 
@@ -245,7 +237,7 @@ b32 ssa_opt_block_fusion(ssaProcedure *proc, ssaBlock *a) {
 	return true;
 }
 
-void ssa_optimize_blocks(ssaProcedure *proc) {
+void ssa_opt_blocks(ssaProcedure *proc) {
 	ssa_remove_unreachable_blocks(proc);
 
 #if 1
@@ -269,7 +261,7 @@ void ssa_optimize_blocks(ssaProcedure *proc) {
 
 	ssa_remove_dead_blocks(proc);
 }
-void ssa_build_referrers(ssaProcedure *proc) {
+void ssa_opt_build_referrers(ssaProcedure *proc) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
 	defer (gb_temp_arena_memory_end(tmp));
 
@@ -280,7 +272,7 @@ void ssa_build_referrers(ssaProcedure *proc) {
 		for_array(j, b->instrs) {
 			ssaValue *instr = b->instrs[j];
 			array_clear(&ops);
-			ssa_add_operands(&ops, &instr->Instr);
+			ssa_opt_add_operands(&ops, &instr->Instr);
 			for_array(k, ops) {
 				ssaValue *op = ops[k];
 				if (op == NULL) {
@@ -358,8 +350,8 @@ void ssa_number_dom_tree(ssaBlock *v, i32 pre, i32 post, i32 *pre_out, i32 *post
 }
 
 
-// NOTE(bill): Requires `ssa_optimize_blocks` to be called before this
-void ssa_build_dom_tree(ssaProcedure *proc) {
+// NOTE(bill): Requires `ssa_opt_blocks` to be called before this
+void ssa_opt_build_dom_tree(ssaProcedure *proc) {
 	// Based on this paper: http://jgaa.info/accepted/2006/GeorgiadisTarjanWerneck2006.10.1.pdf
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
@@ -448,5 +440,27 @@ void ssa_build_dom_tree(ssaProcedure *proc) {
 }
 
 void ssa_opt_mem2reg(ssaProcedure *proc) {
-	// TODO(bill):
+	// TODO(bill): ssa_opt_mem2reg
+}
+
+
+void ssa_opt_proc(ssaProcedure *proc) {
+	ssa_opt_blocks(proc);
+#if 1
+	ssa_opt_build_referrers(proc);
+	ssa_opt_build_dom_tree(proc);
+
+	// TODO(bill): ssa optimization
+	// [ ] cse (common-subexpression) elim
+	// [ ] copy elim
+	// [ ] dead code elim
+	// [ ] dead store/load elim
+	// [ ] phi elim
+	// [ ] short circuit elim
+	// [ ] bounds check elim
+	// [ ] lift/mem2reg
+	// [ ] lift/mem2reg
+
+	ssa_opt_mem2reg(proc);
+#endif
 }

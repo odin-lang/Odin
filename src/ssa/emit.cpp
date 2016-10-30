@@ -575,7 +575,7 @@ String lookup_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
 	GB_ASSERT(is_type_struct(src));
 	for (isize i = 0; i < src->Record.field_count; i++) {
 		Entity *f = src->Record.fields[i];
-		if (f->kind == Entity_Variable && f->Variable.anonymous) {
+		if (f->kind == Entity_Variable && f->flags & EntityFlag_Anonymous) {
 			if (are_types_identical(dst, f->type)) {
 				return f->token.string;
 			}
@@ -675,8 +675,8 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t, b32 is_arg
 
 	// float -> float
 	if (is_type_float(src) && is_type_float(dst)) {
-		i64 sz = basic_type_sizes[src->Basic.kind];
-		i64 dz = basic_type_sizes[dst->Basic.kind];
+		i64 sz = type_size_of(proc->module->sizes, proc->module->allocator, src);
+		i64 dz = type_size_of(proc->module->sizes, proc->module->allocator, dst);
 		ssaConvKind kind = ssaConv_fptrunc;
 		if (dz >= sz) {
 			kind = ssaConv_fpext;

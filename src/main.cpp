@@ -113,7 +113,6 @@ int main(int argc, char **argv) {
 	init_string_buffer_memory();
 	init_global_error_collector();
 
-
 	String module_dir = get_module_dir();
 
 	init_universal_scope();

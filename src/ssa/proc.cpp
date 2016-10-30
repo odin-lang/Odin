@@ -29,18 +29,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 	proc->curr_block = proc->decl_block;
 	ssa_emit_jump(proc, proc->entry_block);
 
-#if 0
-	ssa_optimize_blocks(proc);
-	ssa_build_referrers(proc);
-	ssa_build_dom_tree(proc);
-
-	// TODO(bill): mem2reg optimization
-	// [ ] Local never loaded? Eliminate
-	// [ ] Local never stored? Replace all loads with `Nil`
-	// [ ] Local stored once?  Replace loads with dominating store
-	// [ ] Convert to phi nodes
-	ssa_opt_mem2reg(proc);
-#endif
+	ssa_opt_proc(proc);
 
 // Number registers
 	i32 reg_index = 0;

@@ -13,6 +13,7 @@ ssaValue *ssa_alloc_value(gbAllocator a, ssaValueKind kind) {
 ssaValue *ssa_alloc_instr(ssaProcedure *proc, ssaInstrKind kind) {
 	ssaValue *v = ssa_alloc_value(proc->module->allocator, ssaValue_Instr);
 	v->Instr.kind = kind;
+	proc->instr_count++;
 	return v;
 }
 ssaDebugInfo *ssa_alloc_debug_info(gbAllocator a, ssaDebugInfoKind kind) {
@@ -330,22 +331,6 @@ ssaValue *ssa_make_value_procedure(gbAllocator a, ssaModule *m, Entity *entity, 
 	return v;
 }
 
-ssaValue *ssa_make_value_block(ssaProcedure *proc, AstNode *node, Scope *scope, String label) {
-	ssaValue *v = ssa_alloc_value(proc->module->allocator, ssaValue_Block);
-	v->Block.label  = label;
-	v->Block.node   = node;
-	v->Block.scope  = scope;
-	v->Block.parent = proc;
-
-	array_init(&v->Block.instrs, heap_allocator());
-	array_init(&v->Block.locals, heap_allocator());
-
-	array_init(&v->Block.preds,  heap_allocator());
-	array_init(&v->Block.succs,  heap_allocator());
-
-	return v;
-}
-
 ssaBlock *ssa_add_block(ssaProcedure *proc, AstNode *node, char *label) {
 	Scope *scope = NULL;
 	if (node != NULL) {
@@ -357,9 +342,23 @@ ssaBlock *ssa_add_block(ssaProcedure *proc, AstNode *node, char *label) {
 		}
 	}
 
-	ssaValue *value = ssa_make_value_block(proc, node, scope, make_string(label));
-	ssaBlock *block = &value->Block;
+	ssaValue *v = ssa_alloc_value(proc->module->allocator, ssaValue_Block);
+	v->Block.label  = make_string(label);
+	v->Block.node   = node;
+	v->Block.scope  = scope;
+	v->Block.parent = proc;
+
+	array_init(&v->Block.instrs, heap_allocator());
+	array_init(&v->Block.locals, heap_allocator());
+
+	array_init(&v->Block.preds,  heap_allocator());
+	array_init(&v->Block.succs,  heap_allocator());
+
+	ssaBlock *block = &v->Block;
+
 	array_add(&proc->blocks, block);
+	proc->block_count++;
+
 	return block;
 }
 
@@ -435,7 +434,8 @@ ssaValue *ssa_add_global_string_array(ssaModule *m, String string) {
 	ExactValue ev = make_exact_value_string(string);
 	Entity *entity = make_entity_constant(a, NULL, token, type, ev);
 	ssaValue *g = ssa_make_value_global(a, entity, ssa_add_module_constant(m, type, ev));
-	g->Global.is_private  = true;
+	g->Global.is_private      = true;
+	// g->Global.is_unnamed_addr = true;
 	// g->Global.is_constant = true;
 
 	ssa_module_add_value(m, entity, g);

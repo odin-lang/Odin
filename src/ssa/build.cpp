@@ -882,7 +882,7 @@ ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 }
 
 ssaValue *ssa_add_using_variable(ssaProcedure *proc, Entity *e) {
-	GB_ASSERT(e->kind == Entity_Variable && e->Variable.anonymous);
+	GB_ASSERT(e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous);
 	String name = e->token.string;
 	Entity *parent = e->using_parent;
 	Selection sel = lookup_field(proc->module->allocator, parent->type, name, false);
@@ -917,7 +917,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		ssaValue **found = map_get(&proc->module->values, hash_pointer(e));
 		if (found) {
 			v = *found;
-		} else if (e->kind == Entity_Variable && e->Variable.anonymous) {
+		} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous) {
 			v = ssa_add_using_variable(proc, e);
 		} else if (e->kind == Entity_ImplicitValue) {
 			// TODO(bill): Should a copy be made?

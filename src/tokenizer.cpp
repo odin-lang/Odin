@@ -128,7 +128,8 @@ String const token_strings[] = {
 
 struct TokenPos {
 	String file;
-	isize line, column;
+	isize  line;
+	isize  column;
 };
 
 i32 token_pos_cmp(TokenPos a, TokenPos b) {

@@ -198,11 +198,11 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 	for (isize i = 0; i < entity_count; i++) {
 		Entity *e = entities[i];
 		GB_ASSERT(e != NULL);
-		if (e->Variable.visited) {
+		if (e->flags & EntityFlag_Visited) {
 			e->type = t_invalid;
 			continue;
 		}
-		e->Variable.visited = true;
+		e->flags |= EntityFlag_Visited;
 
 		if (e->type == NULL)
 			e->type = init_type;
@@ -270,11 +270,11 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 
 	GB_ASSERT(e->type == NULL);
 
-	if (e->Variable.visited) {
+	if (e->flags & EntityFlag_Visited) {
 		e->type = t_invalid;
 		return;
 	}
-	e->Variable.visited = true;
+	e->flags |= EntityFlag_Visited;
 
 	if (type_expr) {
 		Type *t = check_type(c, type_expr);
@@ -463,11 +463,11 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	GB_ASSERT(e->type == NULL);
 	GB_ASSERT(e->kind == Entity_Variable);
 
-	if (e->Variable.visited) {
+	if (e->flags & EntityFlag_Visited) {
 		e->type = t_invalid;
 		return;
 	}
-	e->Variable.visited = true;
+	e->flags |= EntityFlag_Visited;
 
 	if (type_expr != NULL)
 		e->type = check_type(c, type_expr, NULL);
@@ -511,7 +511,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 		for (isize i = 0; i < params->variable_count; i++) {
 			Entity *e = params->variables[i];
 			GB_ASSERT(e->kind == Entity_Variable);
-			if (!e->Variable.anonymous) {
+			if (!(e->flags & EntityFlag_Anonymous)) {
 				continue;
 			}
 			String name = e->token.string;

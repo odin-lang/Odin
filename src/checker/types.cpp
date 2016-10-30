@@ -94,7 +94,6 @@ enum TypeRecordKind {
 
 struct Type {
 	TypeKind kind;
-	u32 flags; // See parser.cpp `enum TypeFlag`
 	union {
 		BasicType Basic;
 		struct {
@@ -120,7 +119,7 @@ struct Type {
 			// All record types
 			// Theses are arrays
 			Entity **fields;      // Entity_Variable (otherwise Entity_TypeName if union)
-			isize    field_count; // == offset_count is struct
+			i32      field_count; // == offset_count is struct
 			AstNode *node;
 
 			union { // NOTE(bill): Reduce size_of Type
@@ -141,7 +140,7 @@ struct Type {
 
 			// Entity_Constant or Entity_TypeName
 			Entity **other_fields;
-			isize    other_field_count;
+			i32      other_field_count;
 		} Record;
 		struct {
 			String  name;
@@ -150,14 +149,14 @@ struct Type {
 		} Named;
 		struct {
 			Entity **variables; // Entity_Variable
-			isize    variable_count;
+			i32      variable_count;
 		} Tuple;
 		struct {
 			Scope *scope;
 			Type * params;  // Type_Tuple
 			Type * results; // Type_Tuple
-			isize  param_count;
-			isize  result_count;
+			i32    param_count;
+			i32    result_count;
 			b32    variadic;
 		} Proc;
 	};
@@ -306,34 +305,34 @@ Type *type_deref(Type *t) {
 
 #define STR_LIT(x) {cast(u8 *)(x), gb_size_of(x)-1}
 gb_global Type basic_types[] = {
-	{Type_Basic, 0, {Basic_Invalid,        0,                                      STR_LIT("invalid type")}},
-	{Type_Basic, 0, {Basic_bool,           BasicFlag_Boolean,                      STR_LIT("bool")}},
-	{Type_Basic, 0, {Basic_i8,             BasicFlag_Integer,                      STR_LIT("i8")}},
-	{Type_Basic, 0, {Basic_u8,             BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u8")}},
-	{Type_Basic, 0, {Basic_i16,            BasicFlag_Integer,                      STR_LIT("i16")}},
-	{Type_Basic, 0, {Basic_u16,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u16")}},
-	{Type_Basic, 0, {Basic_i32,            BasicFlag_Integer,                      STR_LIT("i32")}},
-	{Type_Basic, 0, {Basic_u32,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u32")}},
-	{Type_Basic, 0, {Basic_i64,            BasicFlag_Integer,                      STR_LIT("i64")}},
-	{Type_Basic, 0, {Basic_u64,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u64")}},
-	{Type_Basic, 0, {Basic_f32,            BasicFlag_Float,                        STR_LIT("f32")}},
-	{Type_Basic, 0, {Basic_f64,            BasicFlag_Float,                        STR_LIT("f64")}},
-	{Type_Basic, 0, {Basic_int,            BasicFlag_Integer,                      STR_LIT("int")}},
-	{Type_Basic, 0, {Basic_uint,           BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("uint")}},
-	{Type_Basic, 0, {Basic_rawptr,         BasicFlag_Pointer,                      STR_LIT("rawptr")}},
-	{Type_Basic, 0, {Basic_string,         BasicFlag_String,                       STR_LIT("string")}},
-	{Type_Basic, 0, {Basic_any,            0,                                      STR_LIT("any")}},
-	{Type_Basic, 0, {Basic_UntypedBool,    BasicFlag_Boolean | BasicFlag_Untyped,  STR_LIT("untyped bool")}},
-	{Type_Basic, 0, {Basic_UntypedInteger, BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped integer")}},
-	{Type_Basic, 0, {Basic_UntypedFloat,   BasicFlag_Float   | BasicFlag_Untyped,  STR_LIT("untyped float")}},
-	{Type_Basic, 0, {Basic_UntypedString,  BasicFlag_String  | BasicFlag_Untyped,  STR_LIT("untyped string")}},
-	{Type_Basic, 0, {Basic_UntypedRune,    BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped rune")}},
-	{Type_Basic, 0, {Basic_UntypedNil,     BasicFlag_Untyped,                      STR_LIT("untyped nil")}},
+	{Type_Basic, {Basic_Invalid,        0,                                      STR_LIT("invalid type")}},
+	{Type_Basic, {Basic_bool,           BasicFlag_Boolean,                      STR_LIT("bool")}},
+	{Type_Basic, {Basic_i8,             BasicFlag_Integer,                      STR_LIT("i8")}},
+	{Type_Basic, {Basic_u8,             BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u8")}},
+	{Type_Basic, {Basic_i16,            BasicFlag_Integer,                      STR_LIT("i16")}},
+	{Type_Basic, {Basic_u16,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u16")}},
+	{Type_Basic, {Basic_i32,            BasicFlag_Integer,                      STR_LIT("i32")}},
+	{Type_Basic, {Basic_u32,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u32")}},
+	{Type_Basic, {Basic_i64,            BasicFlag_Integer,                      STR_LIT("i64")}},
+	{Type_Basic, {Basic_u64,            BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("u64")}},
+	{Type_Basic, {Basic_f32,            BasicFlag_Float,                        STR_LIT("f32")}},
+	{Type_Basic, {Basic_f64,            BasicFlag_Float,                        STR_LIT("f64")}},
+	{Type_Basic, {Basic_int,            BasicFlag_Integer,                      STR_LIT("int")}},
+	{Type_Basic, {Basic_uint,           BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("uint")}},
+	{Type_Basic, {Basic_rawptr,         BasicFlag_Pointer,                      STR_LIT("rawptr")}},
+	{Type_Basic, {Basic_string,         BasicFlag_String,                       STR_LIT("string")}},
+	{Type_Basic, {Basic_any,            0,                                      STR_LIT("any")}},
+	{Type_Basic, {Basic_UntypedBool,    BasicFlag_Boolean | BasicFlag_Untyped,  STR_LIT("untyped bool")}},
+	{Type_Basic, {Basic_UntypedInteger, BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped integer")}},
+	{Type_Basic, {Basic_UntypedFloat,   BasicFlag_Float   | BasicFlag_Untyped,  STR_LIT("untyped float")}},
+	{Type_Basic, {Basic_UntypedString,  BasicFlag_String  | BasicFlag_Untyped,  STR_LIT("untyped string")}},
+	{Type_Basic, {Basic_UntypedRune,    BasicFlag_Integer | BasicFlag_Untyped,  STR_LIT("untyped rune")}},
+	{Type_Basic, {Basic_UntypedNil,     BasicFlag_Untyped,                      STR_LIT("untyped nil")}},
 };
 
 gb_global Type basic_type_aliases[] = {
-	{Type_Basic, 0, {Basic_byte, BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("byte")}},
-	{Type_Basic, 0, {Basic_rune, BasicFlag_Integer,                      STR_LIT("rune")}},
+	{Type_Basic, {Basic_byte, BasicFlag_Integer | BasicFlag_Unsigned, STR_LIT("byte")}},
+	{Type_Basic, {Basic_rune, BasicFlag_Integer,                      STR_LIT("rune")}},
 };
 
 gb_global Type *t_invalid         = &basic_types[Basic_Invalid];
@@ -970,7 +969,7 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 	} else if (!is_type_enum(type) && !is_type_union(type)) {
 		for (isize i = 0; i < type->Record.field_count; i++) {
 			Entity *f = type->Record.fields[i];
-			GB_ASSERT(f->kind == Entity_Variable && f->Variable.field);
+			GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
 			String str = f->token.string;
 			if (field_name == str) {
 				selection_add_index(&sel, i);  // HACK(bill): Leaky memory
@@ -978,7 +977,7 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 				return sel;
 			}
 
-			if (f->Variable.anonymous) {
+			if (f->flags & EntityFlag_Anonymous) {
 				isize prev_count = sel.index.count;
 				selection_add_index(&sel, i); // HACK(bill): Leaky memory
 
@@ -1121,7 +1120,6 @@ b32 type_set_offsets(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 
 i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	t = base_type(t);
-
 	switch (t->kind) {
 	case Type_Basic: {
 		GB_ASSERT(is_type_typed(t));
