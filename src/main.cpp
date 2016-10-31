@@ -166,19 +166,17 @@ int main(int argc, char **argv) {
 
 	ssa_gen_tree(&ssa);
 
+#if 1
 	{
 		VirtualMachine vm = {};
 		vm_init(&vm, &ssa.module);
 		defer (vm_destroy(&vm));
 
-		String name = make_string("main");
-		ssaValue *main_proc_value = *map_get(&vm.module->members, hash_string(name));
-		GB_ASSERT(main_proc_value->kind == ssaValue_Proc);
-
-		ssaProcedure *start_proc = &main_proc_value->Proc;
+		ssaProcedure *start_proc = vm_lookup_procedure(&vm, make_string("main"));
 		Array<vmValue> args = {}; // Empty
 		vm_call_procedure(&vm, start_proc, args);
 	}
+#endif
 
 	{
 		ssaFileBuffer buf = {};

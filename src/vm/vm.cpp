@@ -566,6 +566,12 @@ vmValue vm_load(VirtualMachine *vm, void *ptr, Type *type) {
 	return result;
 }
 
+ssaProcedure *vm_lookup_procedure(VirtualMachine *vm, String name) {
+	ssaValue *v = ssa_lookup_member(vm->module, name);
+	GB_ASSERT(v->kind == ssaValue_Proc);
+	ssaProcedure *proc = &v->Proc;
+	return proc;
+}
 
 void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 	GB_ASSERT(value->kind == ssaValue_Instr);
@@ -581,9 +587,7 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 	switch (instr->kind) {
 	case ssaInstr_StartupRuntime: {
 #if 0
-		ssaValue *v = ssa_lookup_member(vm->module, make_string(SSA_STARTUP_RUNTIME_PROC_NAME));
-		GB_ASSERT(v->kind == ssaValue_Proc);
-		ssaProcedure *proc = &v->Proc;
+		ssaProcedure *proc = vm_lookup_procedure(vm, make_string(SSA_STARTUP_RUNTIME_PROC_NAME));
 		Array<vmValue> args = {}; // Empty
 		vm_call_procedure(vm, proc, args); // NOTE(bill): No return value
 #endif
@@ -639,8 +643,8 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 		i32 elem_index  = instr->StructElementPtr.elem_index;
 
 		Type *t = ssa_type(instr->StructElementPtr.address);
-		i64 offset_in_bytes = vm_type_offset_of(vm, type_deref(t), elem_index);
-		void *ptr = cast(u8 *)address.val_ptr + offset_in_bytes;
+		i64 offset = vm_type_offset_of(vm, type_deref(t), elem_index);
+		void *ptr = cast(u8 *)address.val_ptr + offset;
 		vm_set_value(f, value, vm_make_value_ptr(ptr));
 	} break;
 
@@ -788,7 +792,16 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 		}
 
 		if (gb_is_between(bo->op, Token__ComparisonBegin+1, Token__ComparisonEnd-1)) {
-			GB_PANIC("TODO(bill): Comparison operations");
+			switch (bo->op) {
+			case Token_CmpEq: break;
+			case Token_NotEq: break;
+			case Token_Lt:    break;
+			case Token_Gt:    break;
+			case Token_LtEq:  break;
+			case Token_GtEq:  break;
+			}
+			gb_printf_err("TODO(bill): Comparison operations %.*s\n", LIT(token_strings[bo->op]));
+			vm_set_value(f, value, vm_make_value_int(1)); // HACK(bill): always true
 		} else {
 			vmValue v = {};
 			vmValue l = vm_operand_value(vm, bo->left);
@@ -808,12 +821,31 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 
 				case Token_AndNot: v.val_int = l.val_int & (~r.val_int); break;
 
+				// TODO(bill): Take into account size of integer and signedness
 				case Token_Quo: GB_PANIC("TODO(bill): BinaryOp Integer Token_Quo"); break;
 				case Token_Mod: GB_PANIC("TODO(bill): BinaryOp Integer Token_Mod"); break;
 
 				}
 			} else if (is_type_float(t)) {
-				GB_PANIC("TODO(bill): Float BinaryOp");
+				if (t == t_f32) {
+					switch (bo->op) {
+					case Token_Add: v.val_f32 = l.val_f32 + r.val_f32;  break;
+					case Token_Sub: v.val_f32 = l.val_f32 - r.val_f32;  break;
+					case Token_Mul: v.val_f32 = l.val_f32 * r.val_f32;  break;
+					case Token_Quo: v.val_f32 = l.val_f32 / r.val_f32;  break;
+
+					case Token_Mod: GB_PANIC("TODO(bill): BinaryOp f32 Token_Mod"); break;
+					}
+				} else if (t == t_f64) {
+					switch (bo->op) {
+					case Token_Add: v.val_f64 = l.val_f64 + r.val_f64;  break;
+					case Token_Sub: v.val_f64 = l.val_f64 - r.val_f64;  break;
+					case Token_Mul: v.val_f64 = l.val_f64 * r.val_f64;  break;
+					case Token_Quo: v.val_f64 = l.val_f64 / r.val_f64;  break;
+
+					case Token_Mod: GB_PANIC("TODO(bill): BinaryOp f64 Token_Mod"); break;
+					}
+				}
 			} else {
 				GB_PANIC("TODO(bill): Vector BinaryOp");
 			}
@@ -863,13 +895,39 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 	} break;
 
 	case ssaInstr_BoundsCheck: {
+		auto *bc = &instr->BoundsCheck;
+		Array<vmValue> args = {};
+		array_init(&args, vm->stack_allocator, 5);
+		array_add(&args, vm_exact_value(vm, NULL, make_exact_value_string(bc->pos.file), t_string));
+		array_add(&args, vm_exact_value(vm, NULL, make_exact_value_integer(bc->pos.line), t_int));
+		array_add(&args, vm_exact_value(vm, NULL, make_exact_value_integer(bc->pos.column), t_int));
+		array_add(&args, vm_operand_value(vm, bc->index));
+		array_add(&args, vm_operand_value(vm, bc->len));
 
+		ssaProcedure *proc = vm_lookup_procedure(vm, make_string("__bounds_check_error"));
+		vm_call_procedure(vm, proc, args);
 	} break;
 
 	case ssaInstr_SliceBoundsCheck: {
+		auto *bc = &instr->SliceBoundsCheck;
+		Array<vmValue> args = {};
+		ssaProcedure *proc;
 
+		array_init(&args, vm->stack_allocator, 7);
+		array_add(&args, vm_exact_value(vm, NULL, make_exact_value_string(bc->pos.file), t_string));
+		array_add(&args, vm_exact_value(vm, NULL, make_exact_value_integer(bc->pos.line), t_int));
+		array_add(&args, vm_exact_value(vm, NULL, make_exact_value_integer(bc->pos.column), t_int));
+		array_add(&args, vm_operand_value(vm, bc->low));
+		array_add(&args, vm_operand_value(vm, bc->high));
+		if (!bc->is_substring) {
+			array_add(&args, vm_operand_value(vm, bc->max));
+			proc = vm_lookup_procedure(vm, make_string("__slice_expr_error"));
+		} else {
+			proc = vm_lookup_procedure(vm, make_string("__substring_expr_error"));
+		}
+
+		vm_call_procedure(vm, proc, args);
 	} break;
-
 
 	default: {
 		GB_PANIC("<unknown instr> %d\n", instr->kind);
