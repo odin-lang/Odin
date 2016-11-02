@@ -4,12 +4,24 @@ Vec2 :: struct {
 	x, y: i64
 }
 
+
 main :: proc() {
-	bar :: proc() -> i64 {
-		a := [3]i64{7, 4, 2}
-		v := Vec2{a[0], 2}
-		return v.x
+	foo :: proc() -> i64 {
+		bar :: proc() -> (i64, i64) {
+			a := [3]i64{7, 4, 2}
+			v := Vec2{a[0], 2}
+			return v.x, v.y
+		}
+
+		x, y := bar()
+
+		return x + y
 	}
 
-	bar()
+	test :: proc(s: string) -> string {
+		return s
+	}
+
+	foo()
+	x := test("Hello")
 }

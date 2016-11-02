@@ -7,9 +7,9 @@
 #include "parser.cpp"
 // #include "printer.cpp"
 #include "checker/checker.cpp"
-#include "ssa/ssa.cpp"
-#include "llvm/ssa_to_text.cpp"
-#include "vm/vm.cpp"
+#include "ssa.cpp"
+#include "ssa_to_llvm.cpp"
+#include "vm.cpp"
 
 // NOTE(bill): `name` is used in debugging and profiling modes
 i32 win32_exec_command_line_app(char *name, char *fmt, ...) {
@@ -172,9 +172,8 @@ int main(int argc, char **argv) {
 		vm_init(&vm, &ssa.module);
 		defer (vm_destroy(&vm));
 
-		ssaProcedure *start_proc = vm_lookup_procedure(&vm, make_string("main"));
 		Array<vmValue> args = {}; // Empty
-		vm_call_procedure(&vm, start_proc, args);
+		vm_call_proc_by_name(&vm, make_string("main"), args);
 	}
 #endif
 

@@ -79,6 +79,17 @@ void ssa_opt_add_operands(Array<ssaValue *> *ops, ssaInstr *i) {
 		break;
 	case ssaInstr_StartupRuntime:
 		break;
+	case ssaInstr_BoundsCheck:
+		array_add(ops, i->BoundsCheck.index);
+		array_add(ops, i->BoundsCheck.len);
+		break;
+	case ssaInstr_SliceBoundsCheck:
+		array_add(ops, i->SliceBoundsCheck.low);
+		array_add(ops, i->SliceBoundsCheck.high);
+		array_add(ops, i->SliceBoundsCheck.max);
+		break;
+
+
 	}
 }
 

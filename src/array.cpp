@@ -19,6 +19,7 @@ struct Array {
 };
 
 template <typename T> void     array_init        (Array<T> *array, gbAllocator a, isize init_capacity = ARRAY_GROW_FORMULA(0));
+template <typename T> void     array_init_count  (Array<T> *array, gbAllocator a, isize count);
 template <typename T> Array<T> array_make        (T *data, isize count, isize capacity);
 template <typename T> void     array_free        (Array<T> *array);
 template <typename T> void     array_add         (Array<T> *array, T const &t);
@@ -36,6 +37,15 @@ void array_init(Array<T> *array, gbAllocator a, isize init_capacity) {
 	array->count = 0;
 	array->capacity = init_capacity;
 }
+
+template <typename T>
+void array_init_count(Array<T> *array, gbAllocator a, isize count) {
+	array->allocator = a;
+	array->data = gb_alloc_array(a, T, count);
+	array->count = count;
+	array->capacity = count;
+}
+
 
 template <typename T>
 Array<T> array_make(T *data, isize count, isize capacity) {

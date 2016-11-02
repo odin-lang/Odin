@@ -1,3 +1,5 @@
+#include "dyncall/include/dyncall.h"
+
 struct VirtualMachine;
 
 struct vmValueProc {
@@ -37,8 +39,9 @@ struct vmFrame {
 	VirtualMachine *  vm;
 	vmFrame *         caller;
 	ssaProcedure *    curr_proc;
+	ssaBlock *        prev_block;
 	ssaBlock *        curr_block;
-	isize             instr_index; // For the current block
+	i32               instr_index; // For the current block
 
 	Map<vmValue>      values; // Key: ssaValue *
 	gbTempArenaMemory temp_arena_memory;
@@ -61,6 +64,14 @@ struct VirtualMachine {
 void    vm_exec_instr   (VirtualMachine *vm, ssaValue *value);
 vmValue vm_operand_value(VirtualMachine *vm, ssaValue *value);
 void    vm_store        (VirtualMachine *vm, void *dst, vmValue val, Type *type);
+void    vm_print_value  (vmValue value, Type *type);
+
+void vm_jump_block(vmFrame *f, ssaBlock *target) {
+	f->prev_block = f->curr_block;
+	f->curr_block = target;
+	f->instr_index = 0;
+}
+
 
 vmFrame *vm_back_frame(VirtualMachine *vm) {
 	if (vm->frame_stack.count > 0) {
@@ -123,6 +134,7 @@ void vm_destroy(VirtualMachine *vm) {
 
 void vm_set_value(vmFrame *f, ssaValue *v, vmValue val) {
 	if (v != NULL) {
+		GB_ASSERT(ssa_type(v) != NULL);
 		map_set(&f->values, hash_pointer(v), val);
 	}
 }
@@ -134,6 +146,7 @@ vmFrame *vm_push_frame(VirtualMachine *vm, ssaProcedure *proc) {
 
 	frame.vm          = vm;
 	frame.curr_proc   = proc;
+	frame.prev_block  = proc->blocks[0];
 	frame.curr_block  = proc->blocks[0];
 	frame.instr_index = 0;
 	frame.caller      = vm_back_frame(vm);
@@ -154,10 +167,10 @@ void vm_pop_frame(VirtualMachine *vm) {
 	map_destroy(&f->values);
 
 	array_pop(&vm->frame_stack);
-
 }
 
-vmValue vm_call_procedure(VirtualMachine *vm, ssaProcedure *proc, Array<vmValue> values) {
+
+vmValue vm_call_proc(VirtualMachine *vm, ssaProcedure *proc, Array<vmValue> values) {
 	Type *type = base_type(proc->type);
 	GB_ASSERT_MSG(type->Proc.param_count == values.count,
 	              "Incorrect number of arguments passed into procedure call!\n"
@@ -169,7 +182,8 @@ vmValue vm_call_procedure(VirtualMachine *vm, ssaProcedure *proc, Array<vmValue>
 	vmValue result = {};
 
 	if (proc->body == NULL) {
-		GB_PANIC("TODO(bill): external procedure");
+		// GB_PANIC("TODO(bill): external procedure");
+		gb_printf_err("TODO(bill): external procedure: %.*s\n", LIT(proc->name));
 		return result;
 	}
 	gb_printf("call: %.*s\n", LIT(proc->name));
@@ -177,6 +191,11 @@ vmValue vm_call_procedure(VirtualMachine *vm, ssaProcedure *proc, Array<vmValue>
 	vmFrame *f = vm_push_frame(vm, proc);
 	for_array(i, proc->params) {
 		vm_set_value(f, proc->params[i], values[i]);
+	}
+
+	if (proc->name == SSA_STARTUP_RUNTIME_PROC_NAME) {
+		ssaBlock *block = proc->curr_block;
+
 	}
 
 	while (f->curr_block != NULL) {
@@ -195,18 +214,26 @@ vmValue vm_call_procedure(VirtualMachine *vm, ssaProcedure *proc, Array<vmValue>
 			rt = base_type(rt->Tuple.variables[0]->type);
 		}
 
-		if (is_type_string(rt)) {
-			vmValue data  = result.val_comp[0];
-			vmValue count = result.val_comp[1];
-			gb_printf("String: %.*s\n", cast(isize)count.val_int, cast(u8 *)data.val_ptr);
-		} else if (is_type_integer(rt)) {
-			gb_printf("Integer: %lld\n", cast(i64)result.val_int);
-		}
-		// gb_printf("%lld\n", cast(i64)result.val_int);
+		gb_printf("%.*s -> ", LIT(proc->name));
+		vm_print_value(result, rt);
+		gb_printf("\n");
 	}
 
 	vm_pop_frame(vm);
 	return result;
+}
+
+
+ssaProcedure *vm_lookup_procedure(VirtualMachine *vm, String name) {
+	ssaValue *v = ssa_lookup_member(vm->module, name);
+	GB_ASSERT(v->kind == ssaValue_Proc);
+	ssaProcedure *proc = &v->Proc;
+	return proc;
+}
+
+vmValue vm_call_proc_by_name(VirtualMachine *vm, String name, Array<vmValue> args) {
+	ssaProcedure *proc = vm_lookup_procedure(vm, name);
+	return vm_call_proc(vm, proc, args);
 }
 
 vmValue vm_exact_value(VirtualMachine *vm, ssaValue *ptr, ExactValue value, Type *t) {
@@ -262,8 +289,7 @@ vmValue vm_exact_value(VirtualMachine *vm, ssaValue *ptr, ExactValue value, Type
 			}
 
 			Type *type = base_type(t);
-			array_init(&result.val_comp, vm->heap_allocator, type->Array.count);
-			array_resize(&result.val_comp, type->Array.count);
+			array_init_count(&result.val_comp, vm->heap_allocator, type->Array.count);
 			for (isize i = 0; i < elem_count; i++) {
 				TypeAndValue *tav = type_and_value_of_expression(vm->module->info, cl->elems[i]);
 				vmValue elem = vm_exact_value(vm, NULL, tav->value, tav->type);
@@ -283,8 +309,7 @@ vmValue vm_exact_value(VirtualMachine *vm, ssaValue *ptr, ExactValue value, Type
 			}
 
 			isize value_count = t->Record.field_count;
-			array_init(&result.val_comp, vm->heap_allocator, value_count);
-			array_resize(&result.val_comp, value_count);
+			array_init_count(&result.val_comp, vm->heap_allocator, value_count);
 
 			if (cl->elems[0]->kind == AstNode_FieldValue) {
 				isize elem_count = cl->elems.count;
@@ -379,6 +404,7 @@ void vm_store_integer(VirtualMachine *vm, void *dst, vmValue val, i64 store_byte
 
 void vm_store(VirtualMachine *vm, void *dst, vmValue val, Type *type) {
 	i64 size = vm_type_size_of(vm, type);
+	Type *original_type = type;
 	type = base_type(get_enum_base_type(type));
 
 	// TODO(bill): I assume little endian here
@@ -431,6 +457,10 @@ void vm_store(VirtualMachine *vm, void *dst, vmValue val, Type *type) {
 		}
 		break;
 
+	case Type_Pointer:
+		*cast(void **)dst = val.val_ptr;
+		break;
+
 	case Type_Record: {
 		if (is_type_struct(type)) {
 			u8 *mem = cast(u8 *)dst;
@@ -444,13 +474,41 @@ void vm_store(VirtualMachine *vm, void *dst, vmValue val, Type *type) {
 			for (isize i = 0; i < field_count; i++) {
 				Entity *f = type->Record.fields[i];
 				i64 offset = vm_type_offset_of(vm, type, i);
-				void *ptr = mem+offset;
-				vmValue member = val.val_comp[i];
-				vm_store(vm, ptr, member, f->type);
+				vm_store(vm, mem+offset, val.val_comp[i], f->type);
 			}
-
 		} else {
-			gb_printf_err("TODO(bill): records for `vm_store` %s\n", type_to_string(type));
+			// u8 *mem = cast(u8 *)dst;
+			// if (val.val_comp.count == 0) {
+			// 	gb_printf_err("%s\n", type_to_string(original_type));
+			// 	// gb_zero_size(mem, vm_type_size_of(vm, type));
+			// } else {
+			// 	GB_ASSERT(val.val_comp.count == 2);
+			// 	i64 word_size = vm_type_size_of(vm, t_int);
+			// 	i64 size_of_union = vm_type_size_of(vm, type) - word_size;
+			// 	for (isize i = 0; i < size_of_union; i++) {
+			// 		mem[i] = cast(u8)val.val_comp[0].val_comp[i].val_int;
+			// 	}
+			// 	vm_store_integer(vm, mem + size_of_union, val.val_comp[0], word_size);
+			// }
+
+			// gb_printf_err("TODO(bill): records for `vm_store` %s\n", type_to_string(original_type));
+		}
+	} break;
+
+	case Type_Tuple: {
+		u8 *mem = cast(u8 *)dst;
+
+		GB_ASSERT_MSG(type->Tuple.variable_count >= val.val_comp.count,
+		              "%td vs %td",
+		              type->Tuple.variable_count, val.val_comp.count);
+
+		isize variable_count = gb_min(val.val_comp.count, type->Tuple.variable_count);
+
+		for (isize i = 0; i < variable_count; i++) {
+			Entity *f = type->Tuple.variables[i];
+			void *ptr = mem + vm_type_offset_of(vm, type, i);
+			vmValue member = val.val_comp[i];
+			vm_store(vm, ptr, member, f->type);
 		}
 	} break;
 
@@ -463,11 +521,17 @@ void vm_store(VirtualMachine *vm, void *dst, vmValue val, Type *type) {
 		for (i64 i = 0; i < elem_count; i++) {
 			void *ptr = mem + (elem_size*i);
 			vmValue member = val.val_comp[i];
-			*cast(i64 *)ptr = 123;
 			vm_store(vm, ptr, member, elem_type);
 		}
-		gb_printf_err("%lld\n", *cast(i64 *)mem);
+	} break;
 
+	case Type_Slice: {
+		i64 word_size = vm_type_size_of(vm, t_int);
+
+		u8 *mem = cast(u8 *)dst;
+		vm_store(vm, mem+0*word_size, val.val_comp[0], t_rawptr);
+		vm_store(vm, mem+1*word_size, val.val_comp[1], t_int);
+		vm_store(vm, mem+2*word_size, val.val_comp[2], t_int);
 	} break;
 
 	default:
@@ -518,8 +582,8 @@ vmValue vm_load(VirtualMachine *vm, void *ptr, Type *type) {
 
 		case Basic_string: {
 			i64 word_size = vm_type_size_of(vm, t_int);
-			u8 *mem = *cast(u8 **)ptr;
-			array_init(&result.val_comp, vm->heap_allocator, 2);
+			u8 *mem = cast(u8 *)ptr;
+			array_init_count(&result.val_comp, vm->heap_allocator, 2);
 
 			i64 count = 0;
 			u8 *data = mem + 0*word_size;
@@ -530,8 +594,8 @@ vmValue vm_load(VirtualMachine *vm, void *ptr, Type *type) {
 			default: GB_PANIC("Unknown int size");  break;
 			}
 
-			array_add(&result.val_comp, vm_make_value_ptr(mem));
-			array_add(&result.val_comp, vm_make_value_int(count));
+			result.val_comp[0].val_ptr = mem;
+			result.val_comp[1].val_int = count;
 
 		} break;
 
@@ -541,12 +605,44 @@ vmValue vm_load(VirtualMachine *vm, void *ptr, Type *type) {
 		}
 		break;
 
+	case Type_Pointer:
+		result.val_ptr = *cast(void **)ptr;
+		break;
+
+	case Type_Array: {
+		i64 count = type->Array.count;
+		Type *elem_type = type->Array.elem;
+		i64 elem_size = vm_type_size_of(vm, elem_type);
+
+		array_init_count(&result.val_comp, vm->heap_allocator, count);
+
+		u8 *mem = cast(u8 *)ptr;
+		for (isize i = 0; i < count; i++) {
+			i64 offset = elem_size*i;
+			vmValue val = vm_load(vm, mem+offset, elem_type);
+			result.val_comp[i] = val;
+		}
+	} break;
+
+	case Type_Slice: {
+		Type *elem_type = type->Slice.elem;
+		i64 elem_size = vm_type_size_of(vm, elem_type);
+		i64 word_size = vm_type_size_of(vm, t_int);
+
+		array_init_count(&result.val_comp, vm->heap_allocator, 3);
+
+		u8 *mem = cast(u8 *)ptr;
+		result.val_comp[0] = vm_load(vm, mem+0*word_size, t_rawptr); // data
+		result.val_comp[1] = vm_load(vm, mem+1*word_size, t_int);    // count
+		result.val_comp[2] = vm_load(vm, mem+2*word_size, t_int);    // capacity
+		return result;
+	} break;
+
 	case Type_Record: {
 		if (is_type_struct(type)) {
 			isize field_count = type->Record.field_count;
 
-			array_init(&result.val_comp, vm->heap_allocator, field_count);
-			array_resize(&result.val_comp, field_count);
+			array_init_count(&result.val_comp, vm->heap_allocator, field_count);
 
 			u8 *mem = cast(u8 *)ptr;
 			for (isize i = 0; i < field_count; i++) {
@@ -558,6 +654,20 @@ vmValue vm_load(VirtualMachine *vm, void *ptr, Type *type) {
 		}
 	} break;
 
+	case Type_Tuple: {
+		isize count = type->Tuple.variable_count;
+
+		array_init_count(&result.val_comp, vm->heap_allocator, count);
+
+		u8 *mem = cast(u8 *)ptr;
+		for (isize i = 0; i < count; i++) {
+			Entity *f = type->Tuple.variables[i];
+			i64 offset = vm_type_offset_of(vm, type, i);
+			vmValue val = vm_load(vm, mem+offset, f->type);
+			result.val_comp[i] = val;
+		}
+	} break;
+
 	default:
 		GB_PANIC("TODO(bill): other types for `vm_load` %s", type_to_string(type));
 		break;
@@ -566,14 +676,8 @@ vmValue vm_load(VirtualMachine *vm, void *ptr, Type *type) {
 	return result;
 }
 
-ssaProcedure *vm_lookup_procedure(VirtualMachine *vm, String name) {
-	ssaValue *v = ssa_lookup_member(vm->module, name);
-	GB_ASSERT(v->kind == ssaValue_Proc);
-	ssaProcedure *proc = &v->Proc;
-	return proc;
-}
-
 void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
+	GB_ASSERT(value != NULL);
 	GB_ASSERT(value->kind == ssaValue_Instr);
 	ssaInstr *instr = &value->Instr;
 	vmFrame *f = vm_back_frame(vm);
@@ -586,10 +690,10 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 
 	switch (instr->kind) {
 	case ssaInstr_StartupRuntime: {
-#if 0
+#if 1
 		ssaProcedure *proc = vm_lookup_procedure(vm, make_string(SSA_STARTUP_RUNTIME_PROC_NAME));
 		Array<vmValue> args = {}; // Empty
-		vm_call_procedure(vm, proc, args); // NOTE(bill): No return value
+		vm_call_proc(vm, proc, args); // NOTE(bill): No return value
 #endif
 	} break;
 
@@ -659,7 +763,14 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 	} break;
 
 	case ssaInstr_Phi: {
-		GB_PANIC("TODO(bill): ssaInstr_Phi");
+		for_array(i, f->curr_block->preds) {
+			ssaBlock *pred = f->curr_block->preds[i];
+			if (f->prev_block == pred) {
+				vmValue edge = vm_operand_value(vm, instr->Phi.edges[i]);
+				vm_set_value(f, value, edge);
+				break;
+			}
+		}
 	} break;
 
 	case ssaInstr_ArrayExtractValue: {
@@ -675,18 +786,16 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 	} break;
 
 	case ssaInstr_Jump: {
-		f->curr_block = instr->Jump.block;
-		f->instr_index = 0;
+		vm_jump_block(f, instr->Jump.block);
 	} break;
 
 	case ssaInstr_If: {
 		vmValue cond = vm_operand_value(vm, instr->If.cond);
 		if (cond.val_int != 0) {
-			f->curr_block = instr->If.true_block;
+			vm_jump_block(f, instr->If.true_block);
 		} else {
-			f->curr_block = instr->If.false_block;
+			vm_jump_block(f, instr->If.false_block);
 		}
-		f->instr_index = 0;
 	} break;
 
 	case ssaInstr_Return: {
@@ -700,6 +809,7 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 
 		f->result = result;
 		f->curr_block = NULL;
+		f->instr_index = 0;
 		return;
 	} break;
 
@@ -732,20 +842,20 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 			Type *from = base_type(instr->Conv.from);
 			if (from == t_f64) {
 				u64 u = cast(u64)src.val_f64;
-				gb_memcopy(&dst, &u, to_size);
+				vm_store_integer(vm, &dst, vm_make_value_int(u), to_size);
 			} else {
 				u64 u = cast(u64)src.val_f32;
-				gb_memcopy(&dst, &u, to_size);
+				vm_store_integer(vm, &dst, vm_make_value_int(u), to_size);
 			}
 		} break;
 		case ssaConv_fptosi: {
 			Type *from = base_type(instr->Conv.from);
 			if (from == t_f64) {
 				i64 i = cast(i64)src.val_f64;
-				gb_memcopy(&dst, &i, to_size);
+				vm_store_integer(vm, &dst, vm_make_value_int(i), to_size);
 			} else {
 				i64 i = cast(i64)src.val_f32;
-				gb_memcopy(&dst, &i, to_size);
+				vm_store_integer(vm, &dst, vm_make_value_int(i), to_size);
 			}
 		} break;
 		case ssaConv_uitofp: {
@@ -792,16 +902,56 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 		}
 
 		if (gb_is_between(bo->op, Token__ComparisonBegin+1, Token__ComparisonEnd-1)) {
-			switch (bo->op) {
-			case Token_CmpEq: break;
-			case Token_NotEq: break;
-			case Token_Lt:    break;
-			case Token_Gt:    break;
-			case Token_LtEq:  break;
-			case Token_GtEq:  break;
+			vmValue v = {};
+			vmValue l = vm_operand_value(vm, bo->left);
+			vmValue r = vm_operand_value(vm, bo->right);
+
+			if (is_type_integer(t)) {
+				// TODO(bill): Do I need to take into account the size of the integer?
+				switch (bo->op) {
+				case Token_CmpEq: v.val_int = l.val_int == r.val_int; break;
+				case Token_NotEq: v.val_int = l.val_int != r.val_int; break;
+				case Token_Lt:    v.val_int = l.val_int <  r.val_int; break;
+				case Token_Gt:    v.val_int = l.val_int >  r.val_int; break;
+				case Token_LtEq:  v.val_int = l.val_int <= r.val_int; break;
+				case Token_GtEq:  v.val_int = l.val_int >= r.val_int; break;
+				}
+			} else if (t == t_f32) {
+				switch (bo->op) {
+				case Token_CmpEq: v.val_f32 = l.val_f32 == r.val_f32; break;
+				case Token_NotEq: v.val_f32 = l.val_f32 != r.val_f32; break;
+				case Token_Lt:    v.val_f32 = l.val_f32 <  r.val_f32; break;
+				case Token_Gt:    v.val_f32 = l.val_f32 >  r.val_f32; break;
+				case Token_LtEq:  v.val_f32 = l.val_f32 <= r.val_f32; break;
+				case Token_GtEq:  v.val_f32 = l.val_f32 >= r.val_f32; break;
+				}
+			} else if (t == t_f64) {
+				switch (bo->op) {
+				case Token_CmpEq: v.val_f64 = l.val_f64 == r.val_f64; break;
+				case Token_NotEq: v.val_f64 = l.val_f64 != r.val_f64; break;
+				case Token_Lt:    v.val_f64 = l.val_f64 <  r.val_f64; break;
+				case Token_Gt:    v.val_f64 = l.val_f64 >  r.val_f64; break;
+				case Token_LtEq:  v.val_f64 = l.val_f64 <= r.val_f64; break;
+				case Token_GtEq:  v.val_f64 = l.val_f64 >= r.val_f64; break;
+				}
+			} else if (is_type_string(t)) {
+				Array<vmValue> args = {};
+				array_init(&args, vm->stack_allocator, 2);
+				array_add(&args, l);
+				array_add(&args, r);
+				switch (bo->op) {
+				case Token_CmpEq: v = vm_call_proc_by_name(vm, make_string("__string_eq"), args); break;
+				case Token_NotEq: v = vm_call_proc_by_name(vm, make_string("__string_ne"), args); break;
+				case Token_Lt:    v = vm_call_proc_by_name(vm, make_string("__string_lt"), args); break;
+				case Token_Gt:    v = vm_call_proc_by_name(vm, make_string("__string_gt"), args); break;
+				case Token_LtEq:  v = vm_call_proc_by_name(vm, make_string("__string_le"), args); break;
+				case Token_GtEq:  v = vm_call_proc_by_name(vm, make_string("__string_ge"), args); break;
+				}
+			} else {
+				GB_PANIC("TODO(bill): Vector BinaryOp");
 			}
-			gb_printf_err("TODO(bill): Comparison operations %.*s\n", LIT(token_strings[bo->op]));
-			vm_set_value(f, value, vm_make_value_int(1)); // HACK(bill): always true
+
+			vm_set_value(f, value, v);
 		} else {
 			vmValue v = {};
 			vmValue l = vm_operand_value(vm, bo->left);
@@ -862,7 +1012,7 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 		}
 		vmValue proc = vm_operand_value(vm, instr->Call.value);
 		if (proc.val_proc.proc != NULL) {
-			vmValue result = vm_call_procedure(vm, proc.val_proc.proc, args);
+			vmValue result = vm_call_proc(vm, proc.val_proc.proc, args);
 			vm_set_value(f, value, result);
 		} else {
 			GB_PANIC("TODO(bill): external procedure calls");
@@ -883,15 +1033,30 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 	} break;
 
 	case ssaInstr_VectorExtractElement: {
-
+		vmValue vector = vm_operand_value(vm, instr->VectorExtractElement.vector);
+		vmValue index  = vm_operand_value(vm, instr->VectorExtractElement.index);
+		vmValue v = vector.val_comp[index.val_int];
+		vm_set_value(f, value, v);
 	} break;
 
 	case ssaInstr_VectorInsertElement: {
-
+		vmValue vector = vm_operand_value(vm, instr->VectorInsertElement.vector);
+		vmValue elem   = vm_operand_value(vm, instr->VectorInsertElement.elem);
+		vmValue index  = vm_operand_value(vm, instr->VectorInsertElement.index);
+		vector.val_comp[index.val_int] = elem;
 	} break;
 
 	case ssaInstr_VectorShuffle: {
+		auto *vs = &instr->VectorShuffle;
+		vmValue old_vector = vm_operand_value(vm, instr->VectorShuffle.vector);
+		vmValue new_vector = {};
+		array_init_count(&new_vector.val_comp, vm->stack_allocator, vs->index_count);
 
+		for (i32 i = 0; i < vs->index_count; i++) {
+			new_vector.val_comp[i] = old_vector.val_comp[vs->indices[i]];
+		}
+
+		vm_set_value(f, value, new_vector);
 	} break;
 
 	case ssaInstr_BoundsCheck: {
@@ -904,14 +1069,12 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 		array_add(&args, vm_operand_value(vm, bc->index));
 		array_add(&args, vm_operand_value(vm, bc->len));
 
-		ssaProcedure *proc = vm_lookup_procedure(vm, make_string("__bounds_check_error"));
-		vm_call_procedure(vm, proc, args);
+		vm_call_proc_by_name(vm, make_string("__bounds_check_error"), args);
 	} break;
 
 	case ssaInstr_SliceBoundsCheck: {
 		auto *bc = &instr->SliceBoundsCheck;
 		Array<vmValue> args = {};
-		ssaProcedure *proc;
 
 		array_init(&args, vm->stack_allocator, 7);
 		array_add(&args, vm_exact_value(vm, NULL, make_exact_value_string(bc->pos.file), t_string));
@@ -921,16 +1084,99 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 		array_add(&args, vm_operand_value(vm, bc->high));
 		if (!bc->is_substring) {
 			array_add(&args, vm_operand_value(vm, bc->max));
-			proc = vm_lookup_procedure(vm, make_string("__slice_expr_error"));
+			vm_call_proc_by_name(vm, make_string("__slice_expr_error"), args);
 		} else {
-			proc = vm_lookup_procedure(vm, make_string("__substring_expr_error"));
+			vm_call_proc_by_name(vm, make_string("__substring_expr_error"), args);
 		}
-
-		vm_call_procedure(vm, proc, args);
 	} break;
 
 	default: {
 		GB_PANIC("<unknown instr> %d\n", instr->kind);
 	} break;
+	}
+}
+
+
+
+void vm_print_value(vmValue value, Type *type) {
+	type = base_type(type);
+	if (is_type_string(type)) {
+		vmValue data  = value.val_comp[0];
+		vmValue count = value.val_comp[1];
+		gb_printf("`%.*s`", cast(isize)count.val_int, cast(u8 *)data.val_ptr);
+	} else if (is_type_boolean(type)) {
+		if (value.val_int != 0) {
+			gb_printf("true");
+		} else {
+			gb_printf("false");
+		}
+	} else if (is_type_integer(type)) {
+		gb_printf("%lld", cast(i64)value.val_int);
+	} else if (type == t_f32) {
+		gb_printf("%f", value.val_f32);
+	} else if (type == t_f64) {
+		gb_printf("%f", value.val_f64);
+	} else if (is_type_pointer(type)) {
+		gb_printf("0x%08x", value.val_ptr);
+	} else if (is_type_array(type)) {
+		gb_printf("[");
+		for_array(i, value.val_comp) {
+			if (i > 0) {
+				gb_printf(", ");
+			}
+			vm_print_value(value.val_comp[i], type->Array.elem);
+		}
+		gb_printf("]");
+	} else if (is_type_vector(type)) {
+		gb_printf("<");
+		for_array(i, value.val_comp) {
+			if (i > 0) {
+				gb_printf(", ");
+			}
+			vm_print_value(value.val_comp[i], type->Vector.elem);
+		}
+		gb_printf(">");
+	} else if (is_type_slice(type)) {
+		gb_printf("[");
+		for_array(i, value.val_comp) {
+			if (i > 0) {
+				gb_printf(", ");
+			}
+			vm_print_value(value.val_comp[i], type->Slice.elem);
+		}
+		gb_printf("]");
+	} else if (is_type_maybe(type)) {
+		if (value.val_comp[1].val_int != 0) {
+			gb_printf("?");
+			vm_print_value(value.val_comp[0], type->Maybe.elem);
+		} else {
+			gb_printf("nil");
+		}
+	} else if (is_type_struct(type)) {
+		if (value.val_comp.count == 0) {
+			gb_printf("nil");
+		} else {
+			gb_printf("{");
+			for_array(i, value.val_comp) {
+				if (i > 0) {
+					gb_printf(", ");
+				}
+				vm_print_value(value.val_comp[i], type->Record.fields[i]->type);
+			}
+			gb_printf("}");
+		}
+	} else if (is_type_tuple(type)) {
+		if (value.val_comp.count != 1) {
+			gb_printf("(");
+		}
+		for_array(i, value.val_comp) {
+			if (i > 0) {
+				gb_printf(", ");
+			}
+			vm_print_value(value.val_comp[i], type->Tuple.variables[i]->type);
+		}
+		if (value.val_comp.count != 1) {
+			gb_printf(")");
+		}
 	}
 }

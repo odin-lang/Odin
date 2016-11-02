@@ -150,6 +150,8 @@ struct Type {
 		struct {
 			Entity **variables; // Entity_Variable
 			i32      variable_count;
+			b32      are_offsets_set;
+			i64 *    offsets;
 		} Tuple;
 		struct {
 			Scope *scope;
@@ -1109,11 +1111,21 @@ i64 *type_set_offsets_of(BaseTypeSizes s, gbAllocator allocator, Entity **fields
 }
 
 b32 type_set_offsets(BaseTypeSizes s, gbAllocator allocator, Type *t) {
-	GB_ASSERT(is_type_struct(t));
-	if (!t->Record.struct_are_offsets_set) {
-		t->Record.struct_offsets = type_set_offsets_of(s, allocator, t->Record.fields, t->Record.field_count, t->Record.struct_is_packed);
-		t->Record.struct_are_offsets_set = true;
-		return true;
+	t = base_type(t);
+	if (is_type_struct(t)) {
+		if (!t->Record.struct_are_offsets_set) {
+			t->Record.struct_offsets = type_set_offsets_of(s, allocator, t->Record.fields, t->Record.field_count, t->Record.struct_is_packed);
+			t->Record.struct_are_offsets_set = true;
+			return true;
+		}
+	} else if (is_type_tuple(t)) {
+		if (!t->Tuple.are_offsets_set) {
+			t->Tuple.offsets = type_set_offsets_of(s, allocator, t->Tuple.variables, t->Tuple.variable_count, false);
+			t->Tuple.are_offsets_set = true;
+			return true;
+		}
+	} else {
+		GB_PANIC("Invalid type for setting offsets");
 	}
 	return false;
 }
@@ -1239,7 +1251,12 @@ i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, isize index)
 		if (gb_is_between(index, 0, t->Record.field_count-1)) {
 			return t->Record.struct_offsets[index];
 		}
-	} else if (t->kind == Type_Basic) {
+	} else if (t->kind == Type_Tuple) {
+		type_set_offsets(s, allocator, t);
+		if (gb_is_between(index, 0, t->Tuple.variable_count-1)) {
+			return t->Tuple.offsets[index];
+		}
+	}  else if (t->kind == Type_Basic) {
 		if (t->Basic.kind == Basic_string) {
 			switch (index) {
 			case 0: return 0;

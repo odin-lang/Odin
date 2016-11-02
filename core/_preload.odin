@@ -292,11 +292,11 @@ __string_cmp :: proc(a, b : string) -> int {
 	return mem.compare(a.data, b.data, min(a.count, b.count))
 }
 
-__string_ne :: proc(a, b : string) -> bool #inline { return !__string_eq(a, b) }
-__string_lt :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) < 0 }
-__string_gt :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) > 0 }
-__string_le :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) <= 0 }
-__string_ge :: proc(a, b : string) -> bool #inline { return __string_cmp(a, b) >= 0 }
+__string_ne :: proc(a, b: string) -> bool #inline { return !__string_eq(a, b) }
+__string_lt :: proc(a, b: string) -> bool #inline { return __string_cmp(a, b) < 0 }
+__string_gt :: proc(a, b: string) -> bool #inline { return __string_cmp(a, b) > 0 }
+__string_le :: proc(a, b: string) -> bool #inline { return __string_cmp(a, b) <= 0 }
+__string_ge :: proc(a, b: string) -> bool #inline { return __string_cmp(a, b) >= 0 }
 
 
 __assert :: proc(file: string, line, column: int, msg: string) #inline {
