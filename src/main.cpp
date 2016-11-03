@@ -166,15 +166,13 @@ int main(int argc, char **argv) {
 
 	ssa_gen_tree(&ssa);
 
-#if 1
-	{
-		VirtualMachine vm = {};
-		vm_init(&vm, &ssa.module);
-		defer (vm_destroy(&vm));
+#if 0
+	VirtualMachine vm = {};
+	vm_init(&vm, &ssa.module);
+	// defer (vm_destroy(&vm));
 
-		Array<vmValue> args = {}; // Empty
-		vm_call_proc_by_name(&vm, make_string("main"), args);
-	}
+	Array<vmValue> main_args = {}; // Empty
+	vm_call_proc_by_name(&vm, make_string("main"), main_args);
 #endif
 
 	{

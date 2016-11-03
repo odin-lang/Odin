@@ -1146,9 +1146,11 @@ ssaDefer ssa_add_defer_instr(ssaProcedure *proc, isize scope_index, ssaValue *in
 
 
 ssaValue *ssa_add_module_constant(ssaModule *m, Type *type, ExactValue value) {
+	gbAllocator a = m->allocator;
+	// gbAllocator a = gb_heap_allocator();
+
 	if (is_type_slice(type)) {
 		ast_node(cl, CompoundLit, value.value_compound);
-		gbAllocator a = m->allocator;
 
 		isize count = cl->elems.count;
 		if (count == 0) {
@@ -1174,11 +1176,14 @@ ssaValue *ssa_add_module_constant(ssaModule *m, Type *type, ExactValue value) {
 		return ssa_make_value_constant_slice(a, type, g, count);
 	}
 
-	return ssa_make_value_constant(m->allocator, type, value);
+	return ssa_make_value_constant(a, type, value);
 }
 
 ssaValue *ssa_add_global_string_array(ssaModule *m, String string) {
+	// TODO(bill): Should this use the arena allocator or the heap allocator?
+	// Strings could be huge!
 	gbAllocator a = m->allocator;
+	// gbAllocator a = gb_heap_allocator();
 
 	isize max_len = 6+8+1;
 	u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
@@ -5333,6 +5338,13 @@ void ssa_gen_tree(ssaGen *s) {
 	for_array(i, m->procs) {
 		ssa_build_proc(m->procs[i], m->procs[i]->Proc.parent);
 	}
+
+	// {
+	// 	DWORD old_protect = 0;
+	// 	DWORD new_protect = PAGE_READONLY;
+	// 	BOOL ok = VirtualProtect(m->arena.physical_start, m->arena.total_size, new_protect, &old_protect);
+	// }
+
 
 
 	// m->layout = make_string("e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64");

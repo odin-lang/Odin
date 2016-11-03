@@ -482,6 +482,20 @@ b32 is_type_float(Type *t) {
 	}
 	return false;
 }
+b32 is_type_f32(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
+		return t->Basic.kind == Basic_f32;
+	}
+	return false;
+}
+b32 is_type_f64(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Basic) {
+		return t->Basic.kind == Basic_f64;
+	}
+	return false;
+}
 b32 is_type_pointer(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Basic) {
@@ -1188,6 +1202,17 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		return align_formula(size, align);
 	}
 
+	case Type_Tuple: {
+		i64 count = t->Tuple.variable_count;
+		if (count == 0) {
+			return 0;
+		}
+		type_set_offsets(s, allocator, t);
+		i64 size = t->Tuple.offsets[count-1] + type_size_of(s, allocator, t->Tuple.variables[count-1]->type);
+		i64 align = type_align_of(s, allocator, t);
+		return align_formula(size, align);
+	} break;
+
 	case Type_Record: {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct: {
@@ -1196,7 +1221,6 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 				return 0;
 			}
 			type_set_offsets(s, allocator, t);
-			// TODO(bill): Is this how it should work?
 			i64 size = t->Record.struct_offsets[count-1] + type_size_of(s, allocator, t->Record.fields[count-1]->type);
 			i64 align = type_align_of(s, allocator, t);
 			return align_formula(size, align);

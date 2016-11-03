@@ -175,7 +175,7 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 	case Type_Named:
 		if (is_type_struct(t) || is_type_union(t)) {
 			String *name = map_get(&m->type_names, hash_pointer(t));
-			GB_ASSERT(name != NULL);
+			GB_ASSERT_MSG(name != NULL, "%.*s", LIT(t->Named.name));
 			ssa_print_encoded_local(f, *name);
 			// ssa_print_encoded_local(f, t->Named.name);
 		} else {

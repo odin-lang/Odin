@@ -23,5 +23,10 @@ main :: proc() {
 	}
 
 	foo()
-	x := test("Hello")
+	x = test("Hello").count as i64
+	xp := ^x
+	p := xp^
+
+	z := [..]i64{1, 2, 3, 4}
+	z[0] = p
 }
