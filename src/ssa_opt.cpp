@@ -97,7 +97,7 @@ void ssa_opt_add_operands(Array<ssaValue *> *ops, ssaInstr *i) {
 
 
 
-void ssa_block_replace_pred(ssaBlock *b, ssaBlock *from, ssaBlock *to) {
+void ssa_opt_block_replace_pred(ssaBlock *b, ssaBlock *from, ssaBlock *to) {
 	for_array(i, b->preds) {
 		ssaBlock *pred = b->preds[i];
 		if (pred == from) {
@@ -106,7 +106,7 @@ void ssa_block_replace_pred(ssaBlock *b, ssaBlock *from, ssaBlock *to) {
 	}
 }
 
-void ssa_block_replace_succ(ssaBlock *b, ssaBlock *from, ssaBlock *to) {
+void ssa_opt_block_replace_succ(ssaBlock *b, ssaBlock *from, ssaBlock *to) {
 	for_array(i, b->succs) {
 		ssaBlock *succ = b->succs[i];
 		if (succ == from) {
@@ -115,7 +115,7 @@ void ssa_block_replace_succ(ssaBlock *b, ssaBlock *from, ssaBlock *to) {
 	}
 }
 
-b32 ssa_block_has_phi(ssaBlock *b) {
+b32 ssa_opt_block_has_phi(ssaBlock *b) {
 	return b->instrs[0]->Instr.kind == ssaInstr_Phi;
 }
 
@@ -224,7 +224,7 @@ b32 ssa_opt_block_fusion(ssaProcedure *proc, ssaBlock *a) {
 		return false;
 	}
 
-	if (ssa_block_has_phi(b)) {
+	if (ssa_opt_block_has_phi(b)) {
 		return false;
 	}
 
@@ -241,7 +241,7 @@ b32 ssa_opt_block_fusion(ssaProcedure *proc, ssaBlock *a) {
 
 	// Fix preds links
 	for_array(i, b->succs) {
-		ssa_block_replace_pred(b->succs[i], b, a);
+		ssa_opt_block_replace_pred(b->succs[i], b, a);
 	}
 
 	proc->blocks[b->index] = NULL;
@@ -346,18 +346,22 @@ ssaBlock *ssa_lt_eval(ssaLTState *lt, ssaBlock *v) {
 	return u;
 }
 
-void ssa_number_dom_tree(ssaBlock *v, i32 pre, i32 post, i32 *pre_out, i32 *post_out) {
+struct ssaDomPrePost {
+	i32 pre, post;
+};
+
+ssaDomPrePost ssa_opt_number_dom_tree(ssaBlock *v, i32 pre, i32 post) {
+	ssaDomPrePost result = {pre, post};
+
 	v->dom.pre = pre++;
 	for_array(i, v->dom.children) {
-		ssaBlock *child = v->dom.children[i];
-		i32 new_pre = 0, new_post = 0;
-		ssa_number_dom_tree(child, pre, post, &new_pre, &new_post);
-		pre = new_pre;
-		post = new_post;
+		result = ssa_opt_number_dom_tree(v->dom.children[i], result.pre, result.post);
 	}
 	v->dom.post = post++;
-	*pre_out  = pre;
-	*post_out = post;
+
+	result.pre  = pre;
+	result.post = post;
+	return result;
 }
 
 
@@ -445,9 +449,7 @@ void ssa_opt_build_dom_tree(ssaProcedure *proc) {
 		}
 	}
 
-	i32 pre = 0;
-	i32 pos = 0;
-	ssa_number_dom_tree(root, 0, 0, &pre, &pos);
+	ssa_opt_number_dom_tree(root, 0, 0);
 }
 
 void ssa_opt_mem2reg(ssaProcedure *proc) {
@@ -455,23 +457,36 @@ void ssa_opt_mem2reg(ssaProcedure *proc) {
 }
 
 
-void ssa_opt_proc(ssaProcedure *proc) {
-	ssa_opt_blocks(proc);
-#if 1
-	ssa_opt_build_referrers(proc);
-	ssa_opt_build_dom_tree(proc);
 
-	// TODO(bill): ssa optimization
-	// [ ] cse (common-subexpression) elim
-	// [ ] copy elim
-	// [ ] dead code elim
-	// [ ] dead store/load elim
-	// [ ] phi elim
-	// [ ] short circuit elim
-	// [ ] bounds check elim
-	// [ ] lift/mem2reg
-	// [ ] lift/mem2reg
+void ssa_opt_tree(ssaGen *s) {
+	s->opt_called = true;
 
-	ssa_opt_mem2reg(proc);
-#endif
+	for_array(member_index, s->module.procs) {
+		ssaProcedure *proc = s->module.procs[member_index];
+		if (proc->blocks.count == 0) { // Prototype/external procedure
+			continue;
+		}
+
+		ssa_opt_blocks(proc);
+	#if 1
+		ssa_opt_build_referrers(proc);
+		ssa_opt_build_dom_tree(proc);
+
+		// TODO(bill): ssa optimization
+		// [ ] cse (common-subexpression) elim
+		// [ ] copy elim
+		// [ ] dead code elim
+		// [ ] dead store/load elim
+		// [ ] phi elim
+		// [ ] short circuit elim
+		// [ ] bounds check elim
+		// [ ] lift/mem2reg
+		// [ ] lift/mem2reg
+
+		ssa_opt_mem2reg(proc);
+	#endif
+
+		GB_ASSERT(proc->blocks.count > 0);
+		ssa_number_proc_registers(proc);
+	}
 }

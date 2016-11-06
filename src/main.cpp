@@ -2,14 +2,16 @@
 
 #include "common.cpp"
 #include "profiler.cpp"
+#include "timings.cpp"
 #include "unicode.cpp"
 #include "tokenizer.cpp"
 #include "parser.cpp"
 // #include "printer.cpp"
 #include "checker/checker.cpp"
 #include "ssa.cpp"
-#include "ssa_to_llvm.cpp"
-#include "vm.cpp"
+#include "ssa_opt.cpp"
+#include "ssa_print.cpp"
+// #include "vm.cpp"
 
 // NOTE(bill): `name` is used in debugging and profiling modes
 i32 win32_exec_command_line_app(char *name, char *fmt, ...) {
@@ -110,6 +112,10 @@ int main(int argc, char **argv) {
 	}
 	prof_init();
 
+	Timings timings = {};
+	timings_init(&timings, make_string("Total Time"), 128);
+	defer (timings_destroy(&timings));
+
 #if 1
 	init_string_buffer_memory();
 	init_global_error_collector();
@@ -136,6 +142,8 @@ int main(int argc, char **argv) {
 	Parser parser = {0};
 
 
+	timings_start_section(&timings, make_string("Parser"));
+
 	if (!init_parser(&parser)) {
 		return 1;
 	}
@@ -147,6 +155,8 @@ int main(int argc, char **argv) {
 
 
 #if 1
+	timings_start_section(&timings, make_string("Checker"));
+
 	Checker checker = {};
 	ArchData arch_data = make_arch_data(ArchKind_x64);
 
@@ -158,34 +168,26 @@ int main(int argc, char **argv) {
 
 #endif
 #if 1
+
 	ssaGen ssa = {};
 	if (!ssa_gen_init(&ssa, &checker)) {
 		return 1;
 	}
 	// defer (ssa_gen_destroy(&ssa));
 
+	timings_start_section(&timings, make_string("SSA gen"));
 	ssa_gen_tree(&ssa);
 
-#if 0
-	VirtualMachine vm = {};
-	vm_init(&vm, &ssa.module);
-	// defer (vm_destroy(&vm));
+	timings_start_section(&timings, make_string("SSA opt"));
+	ssa_opt_tree(&ssa);
 
-	Array<vmValue> main_args = {}; // Empty
-	vm_call_proc_by_name(&vm, make_string("main"), main_args);
-#endif
+	timings_start_section(&timings, make_string("SSA print"));
+	ssa_print_llvm_ir(&ssa);
 
-	{
-		ssaFileBuffer buf = {};
-		ssa_file_buffer_init(&buf, &ssa.output_file);
-		defer (ssa_file_buffer_destroy(&buf));
-
-		ssa_print_llvm_ir(&buf, &ssa.module);
-	}
-
-	prof_print_all();
+	// prof_print_all();
 
 #if 1
+	timings_start_section(&timings, make_string("llvm-opt"));
 
 	char const *output_name = ssa.output_file.filename;
 	isize base_name_len = gb_path_extension(output_name)-1 - output_name;
@@ -212,6 +214,7 @@ int main(int argc, char **argv) {
 	}
 
 	#if 1
+	timings_start_section(&timings, make_string("llvm-llc"));
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 	exit_code = win32_exec_command_line_app("llvm-llc",
 		"%.*sbin/llc %.*s.bc -filetype=obj -O%d "
@@ -226,6 +229,7 @@ int main(int argc, char **argv) {
 		return exit_code;
 	}
 
+	timings_start_section(&timings, make_string("msvc-link"));
 
 	gbString lib_str = gb_string_make(heap_allocator(), "Kernel32.lib");
 	// defer (gb_string_free(lib_str));
@@ -249,6 +253,8 @@ int main(int argc, char **argv) {
 		return exit_code;
 	}
 	// prof_print_all();
+
+	timings_print_all(&timings);
 
 	if (run_output) {
 		win32_exec_command_line_app("odin run", "%.*s.exe", cast(int)base_name_len, output_name);

@@ -19,15 +19,16 @@ struct ssaModule {
 	// String triple;
 
 
-	Map<Entity *>       min_dep_map; // Key: Entity *
-	Map<ssaValue *>     values;      // Key: Entity *
-	Map<ssaValue *>     members;     // Key: String
-	Map<String>         type_names;  // Key: Type *
-	Map<ssaDebugInfo *> debug_info;  // Key: Unique pointer
-	i32                 global_string_index;
-	i32                 global_array_index; // For ConstantSlice
+	Map<Entity *>         min_dep_map; // Key: Entity *
+	Map<ssaValue *>       values;      // Key: Entity *
+	Map<ssaValue *>       members;     // Key: String
+	Map<String>           type_names;  // Key: Type *
+	Map<ssaDebugInfo *>   debug_info;  // Key: Unique pointer
+	i32                   global_string_index;
+	i32                   global_array_index; // For ConstantSlice
 
-	Array<ssaValue *> procs; // NOTE(bill): Procedures to generate
+	Array<ssaProcedure *> procs;             // NOTE(bill): All procedures with bodies
+	Array<ssaValue *>     procs_to_generate; // NOTE(bill): Procedures to generate
 };
 
 // NOTE(bill): For more info, see https://en.wikipedia.org/wiki/Dominator_(graph_theory)
@@ -524,59 +525,11 @@ struct ssaDebugInfo {
 	};
 };
 
-
-
-struct ssaFileBuffer {
-	gbVirtualMemory vm;
-	isize offset;
-	gbFile *output;
+struct ssaGen {
+	ssaModule module;
+	gbFile    output_file;
+	b32       opt_called;
 };
-
-void ssa_file_buffer_init(ssaFileBuffer *f, gbFile *output) {
-	isize size = 8*gb_virtual_memory_page_size(NULL);
-	f->vm = gb_vm_alloc(NULL, size);
-	f->offset = 0;
-	f->output = output;
-}
-
-void ssa_file_buffer_destroy(ssaFileBuffer *f) {
-	if (f->offset > 0) {
-		// NOTE(bill): finish writing buffered data
-		gb_file_write(f->output, f->vm.data, f->offset);
-	}
-
-	gb_vm_free(f->vm);
-}
-
-void ssa_file_buffer_write(ssaFileBuffer *f, void *data, isize len) {
-	if (len > f->vm.size) {
-		gb_file_write(f->output, data, len);
-		return;
-	}
-
-	if ((f->vm.size - f->offset) < len) {
-		gb_file_write(f->output, f->vm.data, f->offset);
-		f->offset = 0;
-	}
-	u8 *cursor = cast(u8 *)f->vm.data + f->offset;
-	gb_memmove(cursor, data, len);
-	f->offset += len;
-}
-
-
-void ssa_fprintf(ssaFileBuffer *f, char *fmt, ...) {
-	va_list va;
-	va_start(va, fmt);
-	char buf[4096] = {};
-	isize len = gb_snprintf_va(buf, gb_size_of(buf), fmt, va);
-	ssa_file_buffer_write(f, buf, len-1);
-	va_end(va);
-}
-
-
-void ssa_file_write(ssaFileBuffer *f, void *data, isize len) {
-	ssa_file_buffer_write(f, data, len);
-}
 
 ssaValue *ssa_lookup_member(ssaModule *m, String name) {
 	ssaValue **v = map_get(&m->members, hash_string(name));
@@ -3867,7 +3820,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 			ssa_module_add_value(proc->module, e, value);
 			array_add(&proc->children, &value->Proc);
-			array_add(&proc->module->procs, value);
+			array_add(&proc->module->procs_to_generate, value);
 		} else {
 			auto *info = proc->module->info;
 
@@ -4429,24 +4382,33 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 
 
-
-////////////////////////////////////////////////////////////////
-//
-// @Optimizations
-//
-////////////////////////////////////////////////////////////////
-
-#include "ssa_opt.cpp"
-
-
-
 ////////////////////////////////////////////////////////////////
 //
 // @Procedure
 //
 ////////////////////////////////////////////////////////////////
 
+void ssa_number_proc_registers(ssaProcedure *proc) {
+	i32 reg_index = 0;
+	for_array(i, proc->blocks) {
+		ssaBlock *b = proc->blocks[i];
+		b->index = i;
+		for_array(j, b->instrs) {
+			ssaValue *value = b->instrs[j];
+			GB_ASSERT(value->kind == ssaValue_Instr);
+			ssaInstr *instr = &value->Instr;
+			if (ssa_instr_type(instr) == NULL) { // NOTE(bill): Ignore non-returning instructions
+				continue;
+			}
+			value->index = reg_index;
+			reg_index++;
+		}
+	}
+}
+
 void ssa_begin_procedure_body(ssaProcedure *proc) {
+	array_add(&proc->module->procs, proc);
+
 	array_init(&proc->blocks,      heap_allocator());
 	array_init(&proc->defer_stmts, heap_allocator());
 	array_init(&proc->children,    heap_allocator());
@@ -4478,24 +4440,7 @@ void ssa_end_procedure_body(ssaProcedure *proc) {
 	proc->curr_block = proc->decl_block;
 	ssa_emit_jump(proc, proc->entry_block);
 
-	ssa_opt_proc(proc);
-
-// Number registers
-	i32 reg_index = 0;
-	for_array(i, proc->blocks) {
-		ssaBlock *b = proc->blocks[i];
-		b->index = i;
-		for_array(j, b->instrs) {
-			ssaValue *value = b->instrs[j];
-			GB_ASSERT(value->kind == ssaValue_Instr);
-			ssaInstr *instr = &value->Instr;
-			if (ssa_instr_type(instr) == NULL) { // NOTE(bill): Ignore non-returning instructions
-				continue;
-			}
-			value->index = reg_index;
-			reg_index++;
-		}
-	}
+	ssa_number_proc_registers(proc);
 }
 
 
@@ -4592,7 +4537,8 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 	map_init(&m->members,    heap_allocator());
 	map_init(&m->debug_info, heap_allocator());
 	map_init(&m->type_names, heap_allocator());
-	array_init(&m->procs,  heap_allocator());
+	array_init(&m->procs,    heap_allocator());
+	array_init(&m->procs_to_generate, heap_allocator());
 
 	// Default states
 	m->stmt_state_flags = 0;
@@ -4656,7 +4602,7 @@ void ssa_destroy_module(ssaModule *m) {
 	map_destroy(&m->members);
 	map_destroy(&m->type_names);
 	map_destroy(&m->debug_info);
-	array_free(&m->procs);
+	array_free(&m->procs_to_generate);
 	gb_arena_free(&m->arena);
 }
 
@@ -4667,13 +4613,6 @@ void ssa_destroy_module(ssaModule *m) {
 // @Code Generation
 //
 ////////////////////////////////////////////////////////////////
-
-
-
-struct ssaGen {
-	ssaModule module;
-	gbFile output_file;
-};
 
 
 b32 ssa_gen_init(ssaGen *s, Checker *c) {
@@ -5335,8 +5274,8 @@ void ssa_gen_tree(ssaGen *s) {
 		ssa_end_procedure_body(proc);
 	}
 
-	for_array(i, m->procs) {
-		ssa_build_proc(m->procs[i], m->procs[i]->Proc.parent);
+	for_array(i, m->procs_to_generate) {
+		ssa_build_proc(m->procs_to_generate[i], m->procs_to_generate[i]->Proc.parent);
 	}
 
 	// {

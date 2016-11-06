@@ -3,9 +3,9 @@
 template <typename T>
 struct Array {
 	gbAllocator allocator;
-	T *data;
-	isize count;
-	isize capacity;
+	T *         data;
+	isize       count;
+	isize       capacity;
 
 	T &operator[](isize index) {
 		GB_ASSERT_MSG(0 <= index && index < count, "Index out of bounds");
