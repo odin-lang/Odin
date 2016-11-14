@@ -17,7 +17,7 @@
 i32 win32_exec_command_line_app(char *name, char *fmt, ...) {
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {};
-	char cmd_line[2048] = {};
+	char cmd_line[4096] = {};
 	isize cmd_len;
 	va_list va;
 	gbTempArenaMemory tmp;
@@ -142,7 +142,7 @@ int main(int argc, char **argv) {
 	Parser parser = {0};
 
 
-	timings_start_section(&timings, make_string("Parser"));
+	timings_start_section(&timings, make_string("parse files"));
 
 	if (!init_parser(&parser)) {
 		return 1;
@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
 
 
 #if 1
-	timings_start_section(&timings, make_string("Checker"));
+	timings_start_section(&timings, make_string("type check"));
 
 	Checker checker = {};
 	ArchData arch_data = make_arch_data(ArchKind_x64);
@@ -175,13 +175,13 @@ int main(int argc, char **argv) {
 	}
 	// defer (ssa_gen_destroy(&ssa));
 
-	timings_start_section(&timings, make_string("SSA gen"));
+	timings_start_section(&timings, make_string("ssa gen"));
 	ssa_gen_tree(&ssa);
 
-	timings_start_section(&timings, make_string("SSA opt"));
+	timings_start_section(&timings, make_string("ssa opt"));
 	ssa_opt_tree(&ssa);
 
-	timings_start_section(&timings, make_string("SSA print"));
+	timings_start_section(&timings, make_string("ssa print"));
 	ssa_print_llvm_ir(&ssa);
 
 	// prof_print_all();
@@ -252,12 +252,12 @@ int main(int argc, char **argv) {
 	if (exit_code != 0) {
 		return exit_code;
 	}
-	// prof_print_all();
 
-	timings_print_all(&timings);
+	// timings_print_all(&timings);
 
 	if (run_output) {
-		win32_exec_command_line_app("odin run", "%.*s.exe", cast(int)base_name_len, output_name);
+		win32_exec_command_line_app("odin run",
+			"%.*s.exe", cast(int)base_name_len, output_name);
 	}
 	#endif
 #endif
