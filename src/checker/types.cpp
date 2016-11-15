@@ -908,6 +908,28 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, make_exact_value_integer(type->Vector.count));
 			return sel;
 		}
+		if (type->Vector.count <= 4 && !is_type_boolean(type->Vector.elem)) {
+			// HACK(bill): Memory leak
+			switch (type->Vector.count) {
+			#define _VECTOR_FIELD(_name, length) \
+			case (length): \
+				if (field_name == _name) { \
+					selection_add_index(&sel, (length)-1); \
+					sel.entity = make_entity_field(a, NULL, make_token_ident(make_string(_name)), type->Vector.elem, false, (length)-1); \
+					return sel; \
+				} \
+				/*fallthrough*/
+
+			_VECTOR_FIELD("w", 4);
+			_VECTOR_FIELD("z", 3);
+			_VECTOR_FIELD("y", 2);
+			_VECTOR_FIELD("x", 1);
+			case 0: break;
+
+			#undef _VECTOR_FIELD
+			}
+		}
+
 	} else if (type->kind == Type_Slice) {
 		String data_str     = make_string("data");
 		String count_str    = make_string("count");
@@ -1059,7 +1081,8 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct:
 			if (t->Record.field_count > 0) {
-				if (!t->Record.struct_is_ordered) {
+				// TODO(bill): What is this supposed to be?
+				if (t->Record.struct_is_packed) {
 					i64 max = s.word_size;
 					for (isize i = 1; i < t->Record.field_count; i++) {
 						// NOTE(bill): field zero is null

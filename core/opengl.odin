@@ -47,3 +47,7 @@ TexParameterf  :: proc(target: i32, pname: i32, param: f32)      #foreign "glTex
 BindTexture    :: proc(target: i32, texture: u32)                #foreign "glBindTexture"
 TexImage2D     :: proc(target, level, internal_format, width, height, border, format, _type: i32, pixels: rawptr) #foreign "glTexImage2D"
 
+
+
+
+

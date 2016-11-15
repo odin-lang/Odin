@@ -438,8 +438,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			isize lhs_count = as->lhs.count;
 			isize rhs_count = operands.count;
 
-			isize operand_index = 0;
-			for_array(i, operands) {
+			isize operand_count = gb_min(as->lhs.count, operands.count);
+			for (isize i = 0; i < operand_count; i++) {
 				AstNode *lhs = as->lhs[i];
 				check_assignment_variable(c, &operands[i], lhs);
 			}

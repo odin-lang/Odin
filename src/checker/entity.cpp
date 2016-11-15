@@ -29,11 +29,12 @@ String const entity_strings[] = {
 };
 
 enum EntityFlag : u32 {
-	EntityFlag_Visited   = 1<<0,
-	EntityFlag_Used      = 1<<1,
-	EntityFlag_Anonymous = 1<<2,
-	EntityFlag_Field     = 1<<3,
-	EntityFlag_Param     = 1<<4,
+	EntityFlag_Visited    = 1<<0,
+	EntityFlag_Used       = 1<<1,
+	EntityFlag_Anonymous  = 1<<2,
+	EntityFlag_Field      = 1<<3,
+	EntityFlag_Param      = 1<<4,
+	EntityFlag_VectorElem = 1<<5,
 };
 
 struct Entity {
@@ -138,6 +139,15 @@ Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, 
 	entity->Variable.field_index = field_src_index;
 	entity->flags |= EntityFlag_Field;
 	entity->flags |= EntityFlag_Anonymous*(anonymous != 0);
+	return entity;
+}
+
+Entity *make_entity_vector_elem(gbAllocator a, Scope *scope, Token token, Type *type, i32 field_src_index) {
+	Entity *entity = make_entity_variable(a, scope, token, type);
+	entity->Variable.field_src_index = field_src_index;
+	entity->Variable.field_index = field_src_index;
+	entity->flags |= EntityFlag_Field;
+	entity->flags |= EntityFlag_VectorElem;
 	return entity;
 }
 

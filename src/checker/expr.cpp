@@ -1429,9 +1429,22 @@ b32 check_is_expr_vector_index(Checker *c, AstNode *expr) {
 	expr = unparen_expr(expr);
 	if (expr->kind == AstNode_IndexExpr) {
 		ast_node(ie, IndexExpr, expr);
-		Type *t = type_of_expr(&c->info, ie->expr);
+		Type *t = type_deref(type_of_expr(&c->info, ie->expr));
 		if (t != NULL) {
-			return is_type_vector(base_type(t));
+			return is_type_vector(t);
+		}
+	}
+	return false;
+}
+
+b32 check_is_vector_elem(Checker *c, AstNode *expr) {
+	// HACK(bill): Handle this correctly. Maybe with a custom AddressingMode
+	expr = unparen_expr(expr);
+	if (expr->kind == AstNode_SelectorExpr) {
+		ast_node(se, SelectorExpr, expr);
+		Type *t = type_deref(type_of_expr(&c->info, se->expr));
+		if (t != NULL && is_type_vector(t)) {
+			return true;
 		}
 	}
 	return false;
@@ -1443,7 +1456,8 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 	switch (op.kind) {
 	case Token_Pointer: { // Pointer address
 		if (o->mode != Addressing_Variable ||
-		    check_is_expr_vector_index(c, o->expr)) {
+		    check_is_expr_vector_index(c, o->expr) ||
+		    check_is_vector_elem(c, o->expr)) {
 			ast_node(ue, UnaryExpr, node);
 			gbString str = expr_to_string(ue->expr);
 			defer (gb_string_free(str));
@@ -3666,6 +3680,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		switch (t->kind) {
 		case Type_Record: {
 			if (!is_type_struct(t)) {
+				if (cl->elems.count != 0) {
+					error(ast_node_token(node), "Illegal compound literal");
+				}
 				break;
 			}
 			if (cl->elems.count == 0) {

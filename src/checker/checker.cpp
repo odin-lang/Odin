@@ -1047,7 +1047,7 @@ void check_parsed_files(Checker *c) {
 			case_ast_node(id, ImportDecl, decl);
 				// NOTE(bill): Handle later
 			case_end;
-			case_ast_node(fsl, ForeignSystemLibrary, decl);
+			case_ast_node(fsl, ForeignLibrary, decl);
 				// NOTE(bill): ignore
 			case_end;
 

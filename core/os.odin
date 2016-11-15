@@ -56,25 +56,25 @@ stderr := ^__std_files[File_Standard.ERROR]
 
 
 
-read_entire_file :: proc(name: string) -> (string, bool) {
+read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	buf: [300]byte
 	copy(buf[:], name as []byte)
 
 	f, file_ok := open(name)
 	if !file_ok {
-		return "", false
+		return nil, false
 	}
 	defer close(^f)
 
 	length: i64
 	file_size_ok := win32.GetFileSizeEx(f.handle as win32.HANDLE, ^length) != 0
 	if !file_size_ok {
-		return "", false
+		return nil, false
 	}
 
 	data := new_slice(u8, length)
 	if data.data == nil {
-		return "", false
+		return nil, false
 	}
 
 	single_read_length: i32
@@ -93,13 +93,13 @@ read_entire_file :: proc(name: string) -> (string, bool) {
 		win32.ReadFile(f.handle as win32.HANDLE, ^data[total_read], to_read, ^single_read_length, nil)
 		if single_read_length <= 0 {
 			free(data.data)
-			return "", false
+			return nil, false
 		}
 
 		total_read += single_read_length as i64
 	}
 
-	return data as string, true
+	return data, true
 }
 
 

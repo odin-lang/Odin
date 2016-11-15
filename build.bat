@@ -4,7 +4,7 @@
 set exe_name=odin.exe
 
 :: Debug = 0, Release = 1
-set release_mode=1
+set release_mode=0
 
 set compiler_flags= -nologo -Oi -TP -W4 -fp:fast -fp:except- -Gm- -MP -FC -GS- -EHsc- -GR-
 
@@ -48,7 +48,7 @@ rem pushd %build_dir%
 
 	cl %compiler_settings% "src\main.cpp" ^
 		/link %linker_settings% -OUT:%exe_name% ^
-	&& odin run code/demo.odin
+	&& odin run w:/Freyr/src/main.odin
 	rem odin run code/demo.odin
 
 

@@ -234,8 +234,8 @@ int main(int argc, char **argv) {
 	gbString lib_str = gb_string_make(heap_allocator(), "Kernel32.lib");
 	// defer (gb_string_free(lib_str));
 	char lib_str_buf[1024] = {};
-	for_array(i, parser.system_libraries) {
-		String lib = parser.system_libraries[i];
+	for_array(i, parser.foreign_libraries) {
+		String lib = parser.foreign_libraries[i];
 		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
 		                        " %.*s.lib", LIT(lib));
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);

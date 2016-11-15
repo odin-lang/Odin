@@ -56,7 +56,7 @@ struct Parser {
 	Array<AstFile>      files;
 	Array<ImportedFile> imports;
 	gbAtomic32          import_index;
-	Array<String>       system_libraries;
+	Array<String>       foreign_libraries;
 	isize               total_token_count;
 	gbMutex             mutex;
 };
@@ -261,8 +261,9 @@ AST_NODE_KIND(_DeclBegin,      "", struct{}) \
 		b32 is_load;          \
 		AstNode *note;        \
 	}) \
-	AST_NODE_KIND(ForeignSystemLibrary, "foreign system library", struct { \
+	AST_NODE_KIND(ForeignLibrary, "foreign library", struct { \
 		Token token, filepath; \
+		b32 is_system; \
 	}) \
 AST_NODE_KIND(_DeclEnd,   "", struct{}) \
 AST_NODE_KIND(_TypeBegin, "", struct{}) \
@@ -460,8 +461,8 @@ Token ast_node_token(AstNode *node) {
 		return node->TypeDecl.token;
 	case AstNode_ImportDecl:
 		return node->ImportDecl.token;
-	case AstNode_ForeignSystemLibrary:
-		return node->ForeignSystemLibrary.token;
+	case AstNode_ForeignLibrary:
+		return node->ForeignLibrary.token;
 	case AstNode_Parameter: {
 		if (node->Parameter.names.count > 0) {
 			return ast_node_token(node->Parameter.names[0]);
@@ -965,10 +966,11 @@ AstNode *make_import_decl(AstFile *f, Token token, Token relpath, Token import_n
 	return result;
 }
 
-AstNode *make_foreign_system_library(AstFile *f, Token token, Token filepath) {
-	AstNode *result = make_node(f, AstNode_ForeignSystemLibrary);
-	result->ForeignSystemLibrary.token = token;
-	result->ForeignSystemLibrary.filepath = filepath;
+AstNode *make_foreign_library(AstFile *f, Token token, Token filepath, b32 is_system) {
+	AstNode *result = make_node(f, AstNode_ForeignLibrary);
+	result->ForeignLibrary.token = token;
+	result->ForeignLibrary.filepath = filepath;
+	result->ForeignLibrary.is_system = is_system;
 	return result;
 }
 
@@ -2123,8 +2125,8 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 	}
 
 	case Token_raw_union: {
-		Token token = expect_token_after(f, Token_OpenBrace, "`raw_union`");
-		Token open = expect_token(f, Token_OpenBrace);
+		Token token = expect_token(f, Token_raw_union);
+		Token open = expect_token_after(f, Token_OpenBrace, "`raw_union`");
 		isize decl_count = 0;
 		AstNodeArray decls = parse_struct_params(f, &decl_count, true);
 		Token close = expect_token(f, Token_CloseBrace);
@@ -2791,9 +2793,16 @@ AstNode *parse_stmt(AstFile *f) {
 		} else if (tag == "foreign_system_library") {
 			Token file_path = expect_token(f, Token_String);
 			if (f->curr_proc == NULL) {
-				return make_foreign_system_library(f, s->TagStmt.token, file_path);
+				return make_foreign_library(f, s->TagStmt.token, file_path, true);
 			}
 			syntax_error(token, "You cannot use #foreign_system_library within a procedure. This must be done at the file scope");
+			return make_bad_decl(f, token, file_path);
+		} else if (tag == "foreign_library") {
+			Token file_path = expect_token(f, Token_String);
+			if (f->curr_proc == NULL) {
+				return make_foreign_library(f, s->TagStmt.token, file_path, false);
+			}
+			syntax_error(token, "You cannot use #foreign_library within a procedure. This must be done at the file scope");
 			return make_bad_decl(f, token, file_path);
 		} else if (tag == "thread_local") {
 			AstNode *var_decl = parse_simple_stmt(f);
@@ -2918,7 +2927,7 @@ void destroy_ast_file(AstFile *f) {
 b32 init_parser(Parser *p) {
 	array_init(&p->files, heap_allocator());
 	array_init(&p->imports, heap_allocator());
-	array_init(&p->system_libraries, heap_allocator());
+	array_init(&p->foreign_libraries, heap_allocator());
 	gb_mutex_init(&p->mutex);
 	return true;
 }
@@ -2935,7 +2944,7 @@ void destroy_parser(Parser *p) {
 #endif
 	array_free(&p->files);
 	array_free(&p->imports);
-	array_free(&p->system_libraries);
+	array_free(&p->foreign_libraries);
 	gb_mutex_destroy(&p->mutex);
 }
 
@@ -2991,17 +3000,17 @@ String get_fullpath_core(gbAllocator a, String path) {
 }
 
 // NOTE(bill): Returns true if it's added
-b32 try_add_foreign_system_library_path(Parser *p, String import_file) {
+b32 try_add_foreign_library_path(Parser *p, String import_file) {
 	gb_mutex_lock(&p->mutex);
 	defer (gb_mutex_unlock(&p->mutex));
 
-	for_array(i, p->system_libraries) {
-		String import = p->system_libraries[i];
+	for_array(i, p->foreign_libraries) {
+		String import = p->foreign_libraries[i];
 		if (import == import_file) {
 			return false;
 		}
 	}
-	array_add(&p->system_libraries, import_file);
+	array_add(&p->foreign_libraries, import_file);
 	return true;
 }
 
@@ -3118,18 +3127,36 @@ void parse_file(Parser *p, AstFile *f) {
 				id->fullpath = import_file;
 				try_add_import_path(p, import_file, file_str, ast_node_token(node).pos);
 
-			} else if (node->kind == AstNode_ForeignSystemLibrary) {
-				auto *id = &node->ForeignSystemLibrary;
+			} else if (node->kind == AstNode_ForeignLibrary) {
+				auto *id = &node->ForeignLibrary;
 				String file_str = id->filepath.string;
 
 				if (!is_import_path_valid(file_str)) {
-					syntax_error(ast_node_token(node), "Invalid `foreign_system_library` path");
+					if (id->is_system) {
+						syntax_error(ast_node_token(node), "Invalid `foreign_system_library` path");
+					} else {
+						syntax_error(ast_node_token(node), "Invalid `foreign_library` path");
+					}
 					// NOTE(bill): It's a naughty name
 					f->decls[i] = make_bad_decl(f, id->token, id->token);
 					continue;
 				}
 
-				try_add_foreign_system_library_path(p, file_str);
+				if (!id->is_system) {
+					gbAllocator allocator = heap_allocator(); // TODO(bill): Change this allocator
+
+					String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
+					String import_file = rel_path;
+					if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
+						String abs_path = get_fullpath_core(allocator, file_str);
+						if (gb_file_exists(cast(char *)abs_path.text)) {
+							import_file = abs_path;
+						}
+					}
+					file_str = import_file;
+				}
+
+				try_add_foreign_library_path(p, file_str);
 			}
 		}
 	}

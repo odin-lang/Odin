@@ -10,6 +10,7 @@ HCURSOR   :: type HANDLE
 HMENU     :: type HANDLE
 HBRUSH    :: type HANDLE
 HGDIOBJ   :: type HANDLE
+HMODULE   :: type HANDLE
 WPARAM    :: type uint
 LPARAM    :: type int
 LRESULT   :: type int
@@ -208,6 +209,9 @@ StretchDIBits :: proc(hdc: HDC,
 
 
 
+LoadLibraryA   :: proc(c_str: ^u8) -> HMODULE #foreign
+FreeLibrary    :: proc(h: HMODULE) #foreign
+GetProcAddress :: proc(h: HMODULE, c_str: ^u8) -> proc() #foreign
 
 
 
@@ -280,6 +284,7 @@ ReleaseDC         :: proc(wnd: HWND, hdc: HDC) -> i32 #foreign #dll_import
 WGL_CONTEXT_MAJOR_VERSION_ARB             :: 0x2091
 WGL_CONTEXT_MINOR_VERSION_ARB             :: 0x2092
 WGL_CONTEXT_PROFILE_MASK_ARB              :: 0x9126
+WGL_CONTEXT_CORE_PROFILE_BIT_ARB          :: 0x0001
 WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB :: 0x0002
 
 wglCreateContext  :: proc(hdc: HDC) -> HGLRC #foreign #dll_import
