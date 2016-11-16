@@ -233,6 +233,7 @@ default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
                                size, alignment: int,
                                old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
 	using Allocator.Mode
+/*
 	match mode {
 	case ALLOC:
 		total_size := size + alignment + size_of(mem.AllocationHeader)
@@ -256,6 +257,21 @@ default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
 		ptr = mem.align_forward(header+1, alignment)
 		mem.allocation_header_fill(header, ptr, size)
 		return mem.zero(ptr, size)
+	}
+*/
+	match mode {
+	case ALLOC:
+		return os.heap_alloc(size)
+
+	case FREE:
+		os.heap_free(old_memory)
+		return nil
+
+	case FREE_ALL:
+		// NOTE(bill): Does nothing
+
+	case RESIZE:
+		return os.heap_resize(old_memory, size)
 	}
 
 	return nil

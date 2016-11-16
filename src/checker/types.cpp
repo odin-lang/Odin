@@ -364,7 +364,8 @@ gb_global Type *t_byte            = &basic_type_aliases[0];
 gb_global Type *t_rune            = &basic_type_aliases[1];
 
 
-gb_global Type *t_u8_ptr = NULL;
+gb_global Type *t_u8_ptr  = NULL;
+gb_global Type *t_int_ptr = NULL;
 
 gb_global Type *t_type_info            = NULL;
 gb_global Type *t_type_info_ptr        = NULL;
@@ -908,25 +909,26 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, make_exact_value_integer(type->Vector.count));
 			return sel;
 		}
+
 		if (type->Vector.count <= 4 && !is_type_boolean(type->Vector.elem)) {
 			// HACK(bill): Memory leak
 			switch (type->Vector.count) {
-			#define _VECTOR_FIELD(_name, length) \
-			case (length): \
+			#define _VECTOR_FIELD_CASE(_length, _name) \
+			case (_length): \
 				if (field_name == _name) { \
-					selection_add_index(&sel, (length)-1); \
-					sel.entity = make_entity_field(a, NULL, make_token_ident(make_string(_name)), type->Vector.elem, false, (length)-1); \
+					selection_add_index(&sel, (_length)-1); \
+					sel.entity = make_entity_vector_elem(a, NULL, make_token_ident(make_string(_name)), type->Vector.elem, (_length)-1); \
 					return sel; \
 				} \
 				/*fallthrough*/
 
-			_VECTOR_FIELD("w", 4);
-			_VECTOR_FIELD("z", 3);
-			_VECTOR_FIELD("y", 2);
-			_VECTOR_FIELD("x", 1);
-			case 0: break;
+			_VECTOR_FIELD_CASE(4, "w");
+			_VECTOR_FIELD_CASE(3, "z");
+			_VECTOR_FIELD_CASE(2, "y");
+			_VECTOR_FIELD_CASE(1, "x");
+			default: break;
 
-			#undef _VECTOR_FIELD
+			#undef _VECTOR_FIELD_CASE
 			}
 		}
 
@@ -1057,10 +1059,9 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		return type_align_of(s, allocator, t->Array.elem);
 	case Type_Vector: {
 		i64 size = type_size_of(s, allocator, t->Vector.elem);
-		size *= t->Vector.count;
-		size = prev_pow2(size);
-		// TODO(bill): Type_Vector type_align_of
-		return gb_clamp(size, 1, s.max_align);
+		i64 count = gb_max(prev_pow2(size), 1);
+		i64 total = size * count;
+		return gb_clamp(total, 1, s.max_align);
 	} break;
 
 	case Type_Tuple: {
@@ -1097,7 +1098,7 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 			}
 			break;
 		case TypeRecord_Union: {
-			i64 max = s.word_size;
+			i64 max = 1;
 			for (isize i = 1; i < t->Record.field_count; i++) {
 				// NOTE(bill): field zero is null
 				i64 align = type_align_of(s, allocator, t->Record.fields[i]->type);

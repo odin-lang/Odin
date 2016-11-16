@@ -520,6 +520,9 @@ void init_universal_scope(void) {
 		entity->Builtin.id = id;
 		add_global_entity(entity);
 	}
+
+	t_u8_ptr = make_type_pointer(a, t_u8);
+	t_int_ptr = make_type_pointer(a, t_int);
 }
 
 
@@ -920,9 +923,6 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 void init_preload_types(Checker *c) {
 	PROF_PROC();
 
-	if (t_u8_ptr == NULL) {
-		t_u8_ptr = make_type_pointer(c->allocator, t_u8);
-	}
 
 	if (t_type_info == NULL) {
 		Entity *e = current_scope_lookup_entity(c->global_scope, make_string("Type_Info"));

@@ -820,10 +820,13 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, b32 *is_va
 		}
 	}
 
-	if (is_variadic && params.count > 0) {
+	variable_count = variable_index;
+
+	if (is_variadic) {
+		GB_ASSERT(params.count > 0);
 		// NOTE(bill): Change last variadic parameter to be a slice
 		// Custom Calling convention for variadic parameters
-		Entity *end = variables[params.count-1];
+		Entity *end = variables[variable_count-1];
 		end->type = make_type_slice(c->allocator, end->type);
 	}
 
@@ -3458,6 +3461,7 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 		defer (gb_string_free(proc_str));
 		error(ast_node_token(call), err_fmt, proc_str, param_count);
 		operand->mode = Addressing_Invalid;
+		return;
 	}
 
 	GB_ASSERT(proc_type->Proc.params != NULL);
@@ -3467,7 +3471,6 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 		Type *arg_type = sig_params[operand_index]->type;
 		Operand o = operands[operand_index];
 		if (variadic) {
-
 			o = operands[operand_index];
 		}
 		check_assignment(c, &o, arg_type, make_string("argument"), true);
@@ -3476,6 +3479,7 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	if (variadic) {
 		b32 variadic_expand = false;
 		Type *slice = sig_params[param_count]->type;
+		GB_ASSERT(is_type_slice(slice));
 		Type *elem = base_type(slice)->Slice.elem;
 		Type *t = elem;
 		for (; operand_index < operands.count; operand_index++) {

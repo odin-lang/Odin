@@ -128,6 +128,8 @@ struct ssaProcedure {
 	SSA_INSTR_KIND(StructElementPtr), \
 	SSA_INSTR_KIND(ArrayExtractValue), \
 	SSA_INSTR_KIND(StructExtractValue), \
+	SSA_INSTR_KIND(UnionTagPtr), \
+	SSA_INSTR_KIND(UnionTagValue), \
 	SSA_INSTR_KIND(Conv), \
 	SSA_INSTR_KIND(Jump), \
 	SSA_INSTR_KIND(If), \
@@ -233,6 +235,14 @@ struct ssaInstr {
 			Type *    result_type;
 			i32       index;
 		} StructExtractValue;
+		struct {
+			ssaValue *address;
+			Type     *type; // ^int
+		} UnionTagPtr;
+		struct {
+			ssaValue *address;
+			Type     *type; // int
+		} UnionTagValue;
 		struct {
 			ssaValue *value;
 			ssaValue *elem;
@@ -559,6 +569,10 @@ Type *ssa_instr_type(ssaInstr *instr) {
 		return instr->ArrayExtractValue.result_type;
 	case ssaInstr_StructExtractValue:
 		return instr->StructExtractValue.result_type;
+	case ssaInstr_UnionTagPtr:
+		return instr->UnionTagPtr.type;
+	case ssaInstr_UnionTagValue:
+		return instr->UnionTagValue.type;
 	case ssaInstr_BinaryOp:
 		return instr->BinaryOp.type;
 	case ssaInstr_Conv:
@@ -869,6 +883,23 @@ ssaValue *ssa_make_instr_struct_extract_value(ssaProcedure *p, ssaValue *address
 	i->StructExtractValue.result_type = result_type;
 	return v;
 }
+
+ssaValue *ssa_make_instr_union_tag_ptr(ssaProcedure *p, ssaValue *address) {
+	ssaValue *v = ssa_alloc_instr(p, ssaInstr_UnionTagPtr);
+	ssaInstr *i = &v->Instr;
+	i->UnionTagPtr.address = address;
+	i->UnionTagPtr.type = t_int_ptr;
+	return v;
+}
+
+ssaValue *ssa_make_instr_union_tag_value(ssaProcedure *p, ssaValue *address) {
+	ssaValue *v = ssa_alloc_instr(p, ssaInstr_UnionTagValue);
+	ssaInstr *i = &v->Instr;
+	i->UnionTagValue.address = address;
+	i->UnionTagValue.type = t_int_ptr;
+	return v;
+}
+
 
 ssaValue *ssa_make_instr_binary_op(ssaProcedure *p, TokenKind op, ssaValue *left, ssaValue *right, Type *type) {
 	ssaValue *v = ssa_alloc_instr(p, ssaInstr_BinaryOp);
@@ -1535,6 +1566,20 @@ ssaValue *ssa_emit_array_ep(ssaProcedure *proc, ssaValue *s, i32 index) {
 	return ssa_emit_array_ep(proc, s, ssa_make_const_i32(proc->module->allocator, index));
 }
 
+ssaValue *ssa_emit_union_tag_ptr(ssaProcedure *proc, ssaValue *u) {
+	Type *t = ssa_type(u);
+	GB_ASSERT(is_type_pointer(t) &&
+	          is_type_union(type_deref(t)));
+	return ssa_emit(proc, ssa_make_instr_union_tag_ptr(proc, u));
+}
+
+ssaValue *ssa_emit_union_tag_value(ssaProcedure *proc, ssaValue *u) {
+	Type *t = ssa_type(u);
+	GB_ASSERT(is_type_union(t));
+	return ssa_emit(proc, ssa_make_instr_union_tag_value(proc, u));
+}
+
+
 
 ssaValue *ssa_emit_struct_ep(ssaProcedure *proc, ssaValue *s, i32 index) {
 	gbAllocator a = proc->module->allocator;
@@ -1570,15 +1615,6 @@ ssaValue *ssa_emit_struct_ep(ssaProcedure *proc, ssaValue *s, i32 index) {
 		switch (index) {
 		case 0: result_type = make_type_pointer(a, t->Maybe.elem); break;
 		case 1: result_type = make_type_pointer(a, t_bool);        break;
-		}
-	} else if (is_type_union(t)) {
-		switch (index) {
-		case 1: result_type = make_type_pointer(a, t_int); break;
-
-		case 0:
-		default:
-			GB_PANIC("TODO(bill): struct_gep 0 for unions");
-			break;
 		}
 	} else {
 		GB_PANIC("TODO(bill): struct_gep type: %s, %d", type_to_string(ssa_type(s)), index);
@@ -1633,15 +1669,6 @@ ssaValue *ssa_emit_struct_ev(ssaProcedure *proc, ssaValue *s, i32 index) {
 		switch (index) {
 		case 0: result_type = t->Maybe.elem; break;
 		case 1: result_type = t_bool;        break;
-		}
-	} else if (is_type_union(t)) {
-		switch (index) {
-		case 1: result_type = t_int; break;
-
-		case 0:
-		default:
-			GB_PANIC("TODO(bill): struct_gep 0 for unions");
-			break;
 		}
 	} else {
 		GB_PANIC("TODO(bill): struct_ev type: %s, %d", type_to_string(ssa_type(s)), index);
@@ -1718,8 +1745,9 @@ ssaValue *ssa_emit_deep_field_ev(ssaProcedure *proc, Type *type, ssaValue *e, Se
 
 
 		if (is_type_raw_union(type)) {
+			GB_PANIC("TODO(bill): IS THIS EVEN CORRECT?");
 			type = type->Record.fields[index]->type;
-			e = ssa_emit_conv(proc, e, make_type_pointer(proc->module->allocator, type));
+			e = ssa_emit_conv(proc, e, type);
 		} else {
 			e = ssa_emit_struct_ev(proc, e, index);
 		}
@@ -1990,7 +2018,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 				gbAllocator allocator = proc->module->allocator;
 				ssaValue *parent = ssa_add_local_generated(proc, t);
 				ssaValue *tag = ssa_make_const_int(allocator, i);
-				ssa_emit_store(proc, ssa_emit_struct_ep(proc, parent, 1), tag);
+				ssa_emit_store(proc, ssa_emit_union_tag_ptr(proc, parent), tag);
 
 				ssaValue *data = ssa_emit_conv(proc, parent, t_rawptr);
 
@@ -2189,7 +2217,7 @@ ssaValue *ssa_emit_union_cast(ssaProcedure *proc, ssaValue *value, Type *tuple) 
 		Type *dst_ptr = tuple->Tuple.variables[0]->type;
 		Type *dst = type_deref(dst_ptr);
 
-		ssaValue *tag = ssa_emit_load(proc, ssa_emit_struct_ep(proc, value, 1));
+		ssaValue *tag = ssa_emit_load(proc, ssa_emit_union_tag_ptr(proc, value));
 		ssaValue *dst_tag = NULL;
 		for (isize i = 1; i < src->Record.field_count; i++) {
 			Entity *f = src->Record.fields[i];
@@ -2222,7 +2250,7 @@ ssaValue *ssa_emit_union_cast(ssaProcedure *proc, ssaValue *value, Type *tuple) 
 		Type *dst = tuple->Tuple.variables[0]->type;
 		Type *dst_ptr = make_type_pointer(a, dst);
 
-		ssaValue *tag = ssa_emit_struct_ev(proc, value, 1);
+		ssaValue *tag = ssa_emit_union_tag_value(proc, value);
 		ssaValue *dst_tag = NULL;
 		for (isize i = 1; i < src->Record.field_count; i++) {
 			Entity *f = src->Record.fields[i];
@@ -4228,7 +4256,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		GB_ASSERT(is_type_union(union_type));
 
 		ssa_emit_comment(proc, make_string("get union's tag"));
-		ssaValue *tag_index = ssa_emit_struct_ep(proc, parent, 1);
+		ssaValue *tag_index = ssa_emit_union_tag_ptr(proc, parent);
 		tag_index = ssa_emit_load(proc, tag_index);
 
 		ssaValue *data = ssa_emit_conv(proc, parent, t_rawptr);

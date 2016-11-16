@@ -212,12 +212,19 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 			}
 			break;
 		case TypeRecord_Union: {
-			i64 size_of_union = type_size_of(s, heap_allocator(), t) - s.word_size;
-			ssa_fprintf(f, "{[%lld x i8], i%lld}", size_of_union, word_bits);
+			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
+			// LLVM takes the first element's alignment as the entire alignment (like C)
+			i64 size_of_union  = type_size_of(s, heap_allocator(), t) - s.word_size;
+			i64 align_of_union = type_align_of(s, heap_allocator(), t);
+			ssa_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8], i%lld}", align_of_union, size_of_union, word_bits);
 		} break;
-		case TypeRecord_RawUnion:
-			ssa_fprintf(f, "[%lld x i8]", type_size_of(s, heap_allocator(), t));
-			break;
+		case TypeRecord_RawUnion: {
+			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
+			// LLVM takes the first element's alignment as the entire alignment (like C)
+			i64 size_of_union  = type_size_of(s, heap_allocator(), t);
+			i64 align_of_union = type_align_of(s, heap_allocator(), t);
+			ssa_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align_of_union, size_of_union);
+		} break;
 		case TypeRecord_Enum:
 			ssa_print_type(f, m, t->Record.enum_base);
 			break;
@@ -746,6 +753,33 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, " ");
 		ssa_print_value(f, m, instr->StructExtractValue.address, et);
 		ssa_fprintf(f, ", %d\n", instr->StructExtractValue.index);
+	} break;
+
+	case ssaInstr_UnionTagPtr: {
+		Type *et = ssa_type(instr->UnionTagPtr.address);
+		ssa_fprintf(f, "%%%d = getelementptr inbounds ", value->index);
+
+		ssa_print_type(f, m, type_deref(et));
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m, et);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, instr->UnionTagPtr.address, et);
+		ssa_fprintf(f, ", ");
+		ssa_print_type(f, m, t_int);
+		ssa_fprintf(f, " 0, ");
+		ssa_print_type(f, m, t_i32);
+		ssa_fprintf(f, " %d", 2);
+		ssa_fprintf(f, "\n");
+	} break;
+
+	case ssaInstr_UnionTagValue: {
+		Type *et = ssa_type(instr->UnionTagValue.address);
+		ssa_fprintf(f, "%%%d = extractvalue ", value->index);
+
+		ssa_print_type(f, m, et);
+		ssa_fprintf(f, " ");
+		ssa_print_value(f, m, instr->UnionTagValue.address, et);
+		ssa_fprintf(f, ", %d\n", 2);
 	} break;
 
 	case ssaInstr_Jump: {;
