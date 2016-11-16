@@ -1907,8 +1907,8 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 	}
 
 
-	Type *src = get_enum_base_type(base_type(src_type));
-	Type *dst = get_enum_base_type(base_type(t));
+	Type *src = base_type(get_enum_base_type(src_type));
+	Type *dst = base_type(get_enum_base_type(t));
 
 	if (value->kind == ssaValue_Constant) {
 		if (is_type_any(dst)) {
@@ -3021,13 +3021,43 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 				case BuiltinProc_abs: {
 					ssa_emit_comment(proc, make_string("abs"));
+					gbAllocator a = proc->module->allocator;
 
 					ssaValue *x = ssa_build_expr(proc, ce->args[0]);
-					Type *t = ssa_type(x);
+					Type *original_type = ssa_type(x);
+					Type *t = original_type;
+					i64 sz = type_size_of(proc->module->sizes, a, t);
+					GB_ASSERT(is_type_integer(t) || is_type_float(t));
+					if (is_type_float(t)) {
+						if (sz == 4) {
+							t = t_i32;
+						} else if (sz == 8) {
+							t = t_i64;
+						} else {
+							GB_PANIC("unknown float type for `abs`");
+						}
 
-					ssaValue *neg_x = ssa_emit_arith(proc, Token_Sub, v_zero, x, t);
-					ssaValue *cond = ssa_emit_comp(proc, Token_Lt, x, v_zero);
-					return ssa_emit_select(proc, cond, neg_x, x);
+						x = ssa_emit_bitcast(proc, x, t);
+					}
+
+					/*
+						NOTE(bill): See Hacker's Delight, section 2-4.
+						m := x >> (int_size-1)
+						b := x ^ m
+						return b - m
+					*/
+
+					ssaValue *m = ssa_emit_arith(proc, Token_Shr,
+					                             x,
+					                             ssa_make_value_constant(a, t, make_exact_value_integer(sz-1)),
+					                             t);
+					ssaValue *b = ssa_emit_arith(proc, Token_Xor, x, m, t);
+					ssaValue *v = ssa_emit_arith(proc, Token_Sub, b, m, t);
+
+					if (is_type_float(t)) {
+						v = ssa_emit_bitcast(proc, v, original_type);
+					}
+					return v;
 				} break;
 
 				case BuiltinProc_enum_to_string: {

@@ -1059,7 +1059,7 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		return type_align_of(s, allocator, t->Array.elem);
 	case Type_Vector: {
 		i64 size = type_size_of(s, allocator, t->Vector.elem);
-		i64 count = gb_max(prev_pow2(size), 1);
+		i64 count = gb_max(prev_pow2(t->Vector.count), 1);
 		i64 total = size * count;
 		return gb_clamp(total, 1, s.max_align);
 	} break;
