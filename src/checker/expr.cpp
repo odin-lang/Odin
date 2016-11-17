@@ -92,7 +92,7 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 
 	if (is_type_maybe(dst)) {
 		Type *elem = base_type(dst)->Maybe.elem;
-		return are_types_identical(elem, src);
+		return are_types_identical(elem, s);
 	}
 
 	if (is_type_untyped_nil(src)) {
@@ -2458,6 +2458,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 			GB_ASSERT(entity->type != NULL);
 			b32 is_not_exported = !is_entity_exported(entity);
 
+			// TODO(bill): Fix this for `#import "file.odin" as .`
 			if (is_not_exported) {
 				auto found = map_get(&e->ImportName.scope->implicit, hash_string(sel_name));
 				if (!found && e->ImportName.scope != entity->scope) {

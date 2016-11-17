@@ -107,9 +107,7 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 			0, // NOTE(bill): tells the proc that this is the end of attribs
 		}
 
-		wgl_string := "wglCreateContextAttribsARB\x00"
-		c_wgl_string := ^wgl_string[0]
-		wglCreateContextAttribsARB := wglGetProcAddress(c_wgl_string) as wglCreateContextAttribsARBType
+		wglCreateContextAttribsARB := wglGetProcAddress(("wglCreateContextAttribsARB\x00" as string).data) as wglCreateContextAttribsARBType
 		w.rc = wglCreateContextAttribsARB(w.dc, 0, ^attribs[0])
 		wglMakeCurrent(w.dc, w.rc)
 		SwapBuffers(w.dc)
@@ -145,6 +143,7 @@ run :: proc() {
 	}
 	defer destroy_window(^window)
 
+	gl.init()
 
 
 	prev_time := time_now()
@@ -205,7 +204,7 @@ run :: proc() {
 			gl.Color3f(1, 0, 0); gl.Vertex3f(x,   y,   0)
 		}
 
-		draw_rect(pos[0], pos[1], 50, 50)
+		draw_rect(pos.x, pos.y, 50, 50)
 
 		display_window(^window)
 		ms_to_sleep := (16 - 1000*dt) as i32

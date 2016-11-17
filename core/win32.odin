@@ -83,6 +83,35 @@ RECT :: struct #ordered {
 	bottom: i32
 }
 
+FILETIME :: struct #ordered {
+	low_date_time, high_date_time: u32
+}
+
+BY_HANDLE_FILE_INFORMATION :: struct #ordered {
+	file_attributes:      u32
+	creation_time,
+	last_access_time,
+	last_write_time:      FILETIME
+	volume_serial_number,
+	file_size_high,
+	file_size_low,
+	number_of_links,
+	file_index_high,
+	file_index_low:       u32
+}
+
+WIN32_FILE_ATTRIBUTE_DATA :: struct #ordered {
+	file_attributes:  u32
+	creation_time,
+	last_access_time,
+	last_write_time:  FILETIME
+	file_size_high,
+	file_size_low:    u32
+}
+
+GET_FILEEX_INFO_LEVELS :: type i32
+GetFileExInfoStandard : GET_FILEEX_INFO_LEVELS : 0
+GetFileExMaxInfoLevel : GET_FILEEX_INFO_LEVELS : 1
 
 GetLastError     :: proc() -> i32                           #foreign #dll_import
 ExitProcess      :: proc(exit_code: u32)                    #foreign #dll_import
@@ -142,7 +171,9 @@ CreateFileA  :: proc(filename: ^u8, desired_access, share_mode: u32,
 ReadFile     :: proc(h: HANDLE, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> BOOL #foreign #dll_import
 WriteFile    :: proc(h: HANDLE, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> i32 #foreign #dll_import
 
-GetFileSizeEx :: proc(file_handle: HANDLE, file_size: ^i64) -> BOOL #foreign #dll_import
+GetFileSizeEx              :: proc(file_handle: HANDLE, file_size: ^i64) -> BOOL #foreign #dll_import
+GetFileAttributesExA       :: proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> BOOL #foreign #dll_import
+GetFileInformationByHandle :: proc(file_handle: HANDLE, file_info: ^BY_HANDLE_FILE_INFORMATION) -> BOOL #foreign #dll_import
 
 FILE_SHARE_READ      :: 0x00000001
 FILE_SHARE_WRITE     :: 0x00000002
@@ -161,6 +192,9 @@ CREATE_ALWAYS     :: 2
 OPEN_EXISTING     :: 3
 OPEN_ALWAYS       :: 4
 TRUNCATE_EXISTING :: 5
+
+
+
 
 
 HeapAlloc   :: proc(h: HANDLE, flags: u32, bytes: int) -> rawptr                 #foreign #dll_import
@@ -212,6 +246,8 @@ StretchDIBits :: proc(hdc: HDC,
 LoadLibraryA   :: proc(c_str: ^u8) -> HMODULE #foreign
 FreeLibrary    :: proc(h: HMODULE) #foreign
 GetProcAddress :: proc(h: HMODULE, c_str: ^u8) -> proc() #foreign
+
+GetClientRect :: proc(hwnd: HWND, rect: ^RECT) -> BOOL #foreign
 
 
 

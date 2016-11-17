@@ -1722,6 +1722,8 @@ ssaValue *ssa_emit_deep_field_gep(ssaProcedure *proc, Type *type, ssaValue *e, S
 			e = ssa_emit_struct_ep(proc, e, index);
 		} else if (type->kind == Type_Vector) {
 			e = ssa_emit_array_ep(proc, e, index);
+		} else if (type->kind == Type_Array) {
+			e = ssa_emit_array_ep(proc, e, index);
 		} else {
 			GB_PANIC("un-gep-able type");
 		}
@@ -5098,6 +5100,9 @@ void ssa_gen_tree(ssaGen *s) {
 					ssaValue *count = ssa_emit_struct_ep(proc, tag, 2);
 					ssa_emit_store(proc, count, ssa_make_const_int(a, t->Vector.count));
 
+					ssaValue *align = ssa_emit_struct_ep(proc, tag, 3);
+					ssa_emit_store(proc, count, ssa_make_const_int(a, type_align_of(m->sizes, a, t)));
+
 				} break;
 				case Type_Record: {
 					switch (t->Record.kind) {
@@ -5245,8 +5250,8 @@ void ssa_gen_tree(ssaGen *s) {
 							}
 
 							for (isize i = 0; i < count; i++) {
-								ssaValue *value_gep = ssa_emit_struct_ep(proc, value_array, i);
-								ssaValue *name_gep  = ssa_emit_struct_ep(proc, name_array, i);
+								ssaValue *value_gep = ssa_emit_array_ep(proc, value_array, i);
+								ssaValue *name_gep  = ssa_emit_array_ep(proc, name_array, i);
 
 								ssa_emit_store(proc, value_gep, ssa_make_const_i64(a, fields[i]->Constant.value.value_integer));
 								ssa_emit_store(proc, name_gep,  ssa_make_const_string(a, fields[i]->token.string));

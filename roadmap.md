@@ -11,3 +11,7 @@ Not in any particular order
 * Improve SSA design to accommodate for lowering to a "bytecode"
 * SSA optimizations
 * Parametric Polymorphism
+* Documentation Generator for Entities
+* Linking Options
+	- Executable
+	- Static/Dynamic Library

@@ -4,6 +4,7 @@
 #import "fmt.odin"
 #import "mem.odin"
 
+/*
 Optimization_Level :: enum {
 	DEBUG,
 	RELEASE,
@@ -24,7 +25,7 @@ Build_Options :: struct {
 }
 
 build_options: Build_Options
-
+*/
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
@@ -80,6 +81,7 @@ Type_Info :: union {
 		elem:      ^Type_Info
 		elem_size: int
 		count:     int
+		align:     int
 	}
 	Tuple:     Record
 	Struct:    Record

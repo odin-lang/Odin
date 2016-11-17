@@ -38,6 +38,9 @@ TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
 	TOKEN_KIND(Token_Prime, "'"), \
 	TOKEN_KIND(Token_DoublePrime, "''"), \
 \
+	TOKEN_KIND(Token_CmpAnd, "&&"), \
+	TOKEN_KIND(Token_CmpOr, "||"), \
+\
 TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
 	TOKEN_KIND(Token_AddEq, "+="), \
 	TOKEN_KIND(Token_SubEq, "-="), \
@@ -50,16 +53,13 @@ TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
 	TOKEN_KIND(Token_AndNotEq, "&~="), \
 	TOKEN_KIND(Token_ShlEq, "<<="), \
 	TOKEN_KIND(Token_ShrEq, ">>="), \
+	TOKEN_KIND(Token_CmpAndEq, "&&="), \
+	TOKEN_KIND(Token_CmpOrEq, "||="), \
 TOKEN_KIND(Token__AssignOpEnd, "_AssignOpEnd"), \
 	TOKEN_KIND(Token_Increment, "++"), \
 	TOKEN_KIND(Token_Decrement, "--"), \
 	TOKEN_KIND(Token_ArrowRight, "->"), \
 	TOKEN_KIND(Token_ArrowLeft, "<-"), \
-\
-	TOKEN_KIND(Token_CmpAnd, "&&"), \
-	TOKEN_KIND(Token_CmpOr, "||"), \
-	TOKEN_KIND(Token_CmpAndEq, "&&="), \
-	TOKEN_KIND(Token_CmpOrEq, "||="), \
 \
 TOKEN_KIND(Token__ComparisonBegin, "_ComparisonBegin"), \
 	TOKEN_KIND(Token_CmpEq, "=="), \

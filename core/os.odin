@@ -1,17 +1,23 @@
 #import "win32.odin"
+#import "fmt.odin"
 
-File :: type struct {
+File_Time :: type u64
+
+File :: struct {
 	Handle :: type win32.HANDLE
-	handle: Handle
+	handle:          Handle
+	last_write_time: File_Time
 }
 
 open :: proc(name: string) -> (File, bool) {
 	using win32
 	buf: [300]byte
 	copy(buf[:], name as []byte)
-	f := File{CreateFileA(^buf[0], FILE_GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, 0, nil)}
+	f := File{
+		handle = CreateFileA(^buf[0], FILE_GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, 0, nil),
+	}
 	success := f.handle != INVALID_HANDLE_VALUE as File.Handle
-
+	f.last_write_time = last_write_time(^f)
 	return f, success
 }
 
@@ -23,6 +29,7 @@ create :: proc(name: string) -> (File, bool) {
 		handle = CreateFileA(^buf[0], FILE_GENERIC_WRITE, FILE_SHARE_READ, nil, CREATE_ALWAYS, 0, nil),
 	}
 	success := f.handle != INVALID_HANDLE_VALUE as File.Handle
+	f.last_write_time = last_write_time(^f)
 	return f, success
 }
 
@@ -35,19 +42,56 @@ write :: proc(using f: ^File, buf: []byte) -> bool {
 	return win32.WriteFile(handle, buf.data, buf.count as i32, ^bytes_written, nil) != 0
 }
 
+file_has_changed :: proc(f: ^File) -> bool {
+	last_write_time := last_write_time(f)
+	if f.last_write_time != last_write_time {
+		f.last_write_time = last_write_time
+		return true
+	}
+	return false
+}
+
+
+
+last_write_time :: proc(f: ^File) -> File_Time {
+	file_info: win32.BY_HANDLE_FILE_INFORMATION
+	win32.GetFileInformationByHandle(f.handle, ^file_info)
+	l := file_info.last_write_time.low_date_time as File_Time
+	h := file_info.last_write_time.high_date_time as File_Time
+	return l | h << 32
+}
+
+last_write_time_by_name :: proc(name: string) -> File_Time {
+	last_write_time: win32.FILETIME
+	data: win32.WIN32_FILE_ATTRIBUTE_DATA
+
+	buf: [1024]byte
+	path := buf[:0]
+	fmt.bprint(^path, name, "\x00")
+
+	if win32.GetFileAttributesExA(path.data, win32.GetFileExInfoStandard, ^data) != 0 {
+		last_write_time = data.last_write_time
+	}
+
+	l := last_write_time.low_date_time as File_Time
+	h := last_write_time.high_date_time as File_Time
+	return l | h << 32
+}
+
+
+
 
 File_Standard :: type enum {
 	INPUT,
 	OUTPUT,
 	ERROR,
-	COUNT,
 }
 
 // NOTE(bill): Uses startup to initialize it
-__std_files := [..]File{
-	File{handle = win32.GetStdHandle(win32.STD_INPUT_HANDLE)},
-	File{handle = win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)},
-	File{handle = win32.GetStdHandle(win32.STD_ERROR_HANDLE)},
+__std_files := [File_Standard.count]File{
+	{handle = win32.GetStdHandle(win32.STD_INPUT_HANDLE)},
+	{handle = win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)},
+	{handle = win32.GetStdHandle(win32.STD_ERROR_HANDLE)},
 }
 
 stdin  := ^__std_files[File_Standard.INPUT]
