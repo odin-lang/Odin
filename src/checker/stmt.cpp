@@ -302,6 +302,18 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	return op_a->type;
 }
 
+b32 check_valid_type_match_type(Type *type, b32 *is_union_ptr, b32 *is_any) {
+	if (is_type_pointer(type)) {
+		*is_union_ptr = is_type_union(type_deref(type));
+		return *is_union_ptr;
+	}
+	if (is_type_any(type)) {
+		*is_any = true;
+		return *is_any;
+	}
+	return false;
+}
+
 
 void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	u32 prev_stmt_state_flags = c->context.stmt_state_flags;
@@ -729,17 +741,18 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		check_open_scope(c, node);
 		defer (check_close_scope(c));
 
+		b32 is_union_ptr = false;
+		b32 is_any = false;
 
 		check_expr(c, &x, ms->tag);
 		check_assignment(c, &x, NULL, make_string("type match expression"));
-		if (!is_type_pointer(x.type) || !is_type_union(type_deref(x.type))) {
+		if (!check_valid_type_match_type(x.type, &is_union_ptr, &is_any)) {
 			gbString str = type_to_string(x.type);
 			defer (gb_string_free(str));
 			error(ast_node_token(x.expr),
-			      "Expected a pointer to a union for this type match expression, got `%s`", str);
+			      "Invalid type for this type match expression, got `%s`", str);
 			break;
 		}
-		Type *base_union = base_type(type_deref(x.type));
 
 
 		// NOTE(bill): Check for multiple defaults
@@ -787,27 +800,39 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			}
 			ast_node(cc, CaseClause, stmt);
 
+			// TODO(bill): Make robust
+			Type *bt = base_type(type_deref(x.type));
+
+
 			AstNode *type_expr = cc->list.count > 0 ? cc->list[0] : NULL;
-			Type *tag_type = NULL;
+			Type *case_type = NULL;
 			if (type_expr != NULL) { // Otherwise it's a default expression
 				Operand y = {};
 				check_expr_or_type(c, &y, type_expr);
-				b32 tag_type_found = false;
-				for (isize i = 0; i < base_union->Record.field_count; i++) {
-					Entity *f = base_union->Record.fields[i];
-					if (are_types_identical(f->type, y.type)) {
-						tag_type_found = true;
-						break;
+
+				if (is_union_ptr) {
+					GB_ASSERT(is_type_union(bt));
+					b32 tag_type_found = false;
+					for (isize i = 0; i < bt->Record.field_count; i++) {
+						Entity *f = bt->Record.fields[i];
+						if (are_types_identical(f->type, y.type)) {
+							tag_type_found = true;
+							break;
+						}
 					}
+					if (!tag_type_found) {
+						gbString type_str = type_to_string(y.type);
+						defer (gb_string_free(type_str));
+						error(ast_node_token(y.expr),
+						      "Unknown tag type, got `%s`", type_str);
+						continue;
+					}
+					case_type = y.type;
+				} else if (is_any) {
+					case_type = y.type;
+				} else {
+					GB_PANIC("Unknown type to type match statement");
 				}
-				if (!tag_type_found) {
-					gbString type_str = type_to_string(y.type);
-					defer (gb_string_free(type_str));
-					error(ast_node_token(y.expr),
-					      "Unknown tag type, got `%s`", type_str);
-					continue;
-				}
-				tag_type = y.type;
 
 				HashKey key = hash_pointer(y.type);
 				auto *found = map_get(&seen, key);
@@ -823,14 +848,19 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 					break;
 				}
 				map_set(&seen, key, cast(b32)true);
-
 			}
 
 			check_open_scope(c, stmt);
-			if (tag_type != NULL) {
+			if (case_type != NULL) {
+				add_type_info_type(c, case_type);
+
 				// NOTE(bill): Dummy type
-				Type *tag_ptr_type = make_type_pointer(c->allocator, tag_type);
-				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, ms->var->Ident, tag_ptr_type);
+				Type *tt = case_type;
+				if (is_union_ptr) {
+					tt = make_type_pointer(c->allocator, case_type);
+					add_type_info_type(c, tt);
+				}
+				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, ms->var->Ident, tt);
 				tag_var->flags |= EntityFlag_Used;
 				add_entity(c, c->context.scope, ms->var, tag_var);
 				add_entity_use(c, ms->var, tag_var);

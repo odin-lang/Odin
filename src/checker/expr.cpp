@@ -1543,22 +1543,32 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 
 	if (check_is_assignable_to(c, x, y->type) ||
 	    check_is_assignable_to(c, y, x->type)) {
+		Type *err_type = x->type;
 		b32 defined = false;
 		switch (op.kind) {
 		case Token_CmpEq:
 		case Token_NotEq:
-			defined = is_type_comparable(get_enum_base_type(base_type(x->type)));
+			defined = is_type_comparable(x->type);
 			break;
 		case Token_Lt:
 		case Token_Gt:
 		case Token_LtEq:
 		case Token_GtEq: {
-			defined = is_type_ordered(get_enum_base_type(base_type(x->type)));
+			defined = is_type_ordered(x->type);
 		} break;
 		}
 
+		// CLEANUP(bill) NOTE(bill): there is an auto assignment to `any` which needs to be checked
+		if (is_type_any(x->type) && !is_type_any(y->type)) {
+			err_type = x->type;
+			defined = false;
+		} else if (is_type_any(y->type) && !is_type_any(x->type)) {
+			err_type = y->type;
+			defined = false;
+		}
+
 		if (!defined) {
-			gbString type_string = type_to_string(x->type);
+			gbString type_string = type_to_string(err_type);
 			defer (gb_string_free(type_string));
 			err_str = gb_string_make(c->tmp_allocator,
 			                         gb_bprintf("operator `%.*s` not defined for type `%s`", LIT(op.string), type_string));

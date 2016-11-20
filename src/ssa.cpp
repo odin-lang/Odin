@@ -1908,7 +1908,6 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 		return value;
 	}
 
-
 	Type *src = base_type(get_enum_base_type(src_type));
 	Type *dst = base_type(get_enum_base_type(t));
 
@@ -2628,6 +2627,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 	case_end;
 
 	case_ast_node(be, BinaryExpr, expr);
+		ssaValue *left = ssa_build_expr(proc, be->left);
+		Type *type = default_type(tv->type);
+
 		switch (be->op.kind) {
 		case Token_Add:
 		case Token_Sub:
@@ -2639,11 +2641,10 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		case Token_Xor:
 		case Token_AndNot:
 		case Token_Shl:
-		case Token_Shr:
-			return ssa_emit_arith(proc, be->op.kind,
-			                      ssa_build_expr(proc, be->left),
-			                      ssa_build_expr(proc, be->right),
-			                      tv->type);
+		case Token_Shr: {
+			ssaValue *right = ssa_build_expr(proc, be->right);
+			return ssa_emit_arith(proc, be->op.kind, left, right, type);
+		}
 
 
 		case Token_CmpEq:
@@ -2652,11 +2653,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		case Token_LtEq:
 		case Token_Gt:
 		case Token_GtEq: {
-			ssaValue *left  = ssa_build_expr(proc, be->left);
 			ssaValue *right = ssa_build_expr(proc, be->right);
-
 			ssaValue *cmp = ssa_emit_comp(proc, be->op.kind, left, right);
-			return ssa_emit_conv(proc, cmp, default_type(tv->type));
+			return ssa_emit_conv(proc, cmp, type);
 		} break;
 
 		case Token_CmpAnd:
@@ -2665,19 +2664,19 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 		case Token_as:
 			ssa_emit_comment(proc, make_string("cast - as"));
-			return ssa_emit_conv(proc, ssa_build_expr(proc, be->left), tv->type);
+			return ssa_emit_conv(proc, left, type);
 
 		case Token_transmute:
 			ssa_emit_comment(proc, make_string("cast - transmute"));
-			return ssa_emit_transmute(proc, ssa_build_expr(proc, be->left), tv->type);
+			return ssa_emit_transmute(proc, left, type);
 
 		case Token_down_cast:
 			ssa_emit_comment(proc, make_string("cast - down_cast"));
-			return ssa_emit_down_cast(proc, ssa_build_expr(proc, be->left), tv->type);
+			return ssa_emit_down_cast(proc, left, type);
 
 		case Token_union_cast:
 			ssa_emit_comment(proc, make_string("cast - union_cast"));
-			return ssa_emit_union_cast(proc, ssa_build_expr(proc, be->left), tv->type);
+			return ssa_emit_union_cast(proc, left, type);
 
 		default:
 			GB_PANIC("Invalid binary expression");
@@ -4284,14 +4283,17 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		gbAllocator allocator = proc->module->allocator;
 
 		ssaValue *parent = ssa_build_expr(proc, ms->tag);
-		Type *union_type = type_deref(ssa_type(parent));
-		GB_ASSERT(is_type_union(union_type));
+		b32 is_union_ptr = false;
+		b32 is_any = false;
+		GB_ASSERT(check_valid_type_match_type(ssa_type(parent), &is_union_ptr, &is_any));
 
-		ssa_emit_comment(proc, make_string("get union's tag"));
-		ssaValue *tag_index = ssa_emit_union_tag_ptr(proc, parent);
-		tag_index = ssa_emit_load(proc, tag_index);
-
-		ssaValue *data = ssa_emit_conv(proc, parent, t_rawptr);
+		ssaValue *tag_index = NULL;
+		ssaValue *union_data = NULL;
+		if (is_union_ptr) {
+			ssa_emit_comment(proc, make_string("get union's tag"));
+			tag_index = ssa_emit_load(proc, ssa_emit_union_tag_ptr(proc, parent));
+			union_data = ssa_emit_conv(proc, parent, t_rawptr);
+		}
 
 		ssaBlock *start_block = ssa_add_block(proc, node, "type-match.case.first");
 		ssa_emit_jump(proc, start_block);
@@ -4301,11 +4303,11 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 
 		ast_node(body, BlockStmt, ms->body);
 
-
 		String tag_var_name = ms->var->Ident.string;
 
 		AstNodeArray default_stmts = {};
 		ssaBlock *default_block = NULL;
+
 
 		isize case_count = body->stmts.count;
 		for_array(i, body->stmts) {
@@ -4325,27 +4327,43 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 			Scope *scope = *map_get(&proc->module->info->scopes, hash_pointer(clause));
 			Entity *tag_var_entity = current_scope_lookup_entity(scope, tag_var_name);
 			GB_ASSERT_MSG(tag_var_entity != NULL, "%.*s", LIT(tag_var_name));
-			ssaValue *tag_var = ssa_add_local(proc, tag_var_entity);
-			ssaValue *data_ptr = ssa_emit_conv(proc, data, tag_var_entity->type);
-			ssa_emit_store(proc, tag_var, data_ptr);
 
+			ssaBlock *next_cond = NULL;
+			ssaValue *cond = NULL;
 
-
-			Type *bt = type_deref(tag_var_entity->type);
-			ssaValue *index = NULL;
-			Type *ut = base_type(union_type);
-			GB_ASSERT(ut->Record.kind == TypeRecord_Union);
-			for (isize field_index = 1; field_index < ut->Record.field_count; field_index++) {
-				Entity *f = base_type(union_type)->Record.fields[field_index];
-				if (are_types_identical(f->type, bt)) {
-					index = ssa_make_const_int(allocator, field_index);
-					break;
+			if (is_union_ptr) {
+				Type *bt = type_deref(tag_var_entity->type);
+				ssaValue *index = NULL;
+				Type *ut = base_type(type_deref(ssa_type(parent)));
+				GB_ASSERT(ut->Record.kind == TypeRecord_Union);
+				for (isize field_index = 1; field_index < ut->Record.field_count; field_index++) {
+					Entity *f = ut->Record.fields[field_index];
+					if (are_types_identical(f->type, bt)) {
+						index = ssa_make_const_int(allocator, field_index);
+						break;
+					}
 				}
-			}
-			GB_ASSERT(index != NULL);
+				GB_ASSERT(index != NULL);
 
-			ssaBlock *next_cond = ssa_add_block(proc, clause, "type-match.case.next");
-			ssaValue *cond = ssa_emit_comp(proc, Token_CmpEq, tag_index, index);
+				ssaValue *tag_var = ssa_add_local(proc, tag_var_entity);
+				ssaValue *data_ptr = ssa_emit_conv(proc, union_data, tag_var_entity->type);
+				ssa_emit_store(proc, tag_var, data_ptr);
+
+				cond = ssa_emit_comp(proc, Token_CmpEq, tag_index, index);
+			} else if (is_any) {
+				Type *type = tag_var_entity->type;
+				ssaValue *any_data = ssa_emit_struct_ev(proc, parent, 1);
+				ssaValue *data = ssa_emit_conv(proc, any_data, make_type_pointer(proc->module->allocator, type));
+				ssa_module_add_value(proc->module, tag_var_entity, data);
+
+				ssaValue *any_ti  = ssa_emit_struct_ev(proc, parent, 0);
+				ssaValue *case_ti = ssa_type_info(proc, type);
+				cond = ssa_emit_comp(proc, Token_CmpEq, any_ti, case_ti);
+			} else {
+				GB_PANIC("Invalid type for type match statement");
+			}
+
+			next_cond = ssa_add_block(proc, clause, "type-match.case.next");
 			ssa_emit_if(proc, cond, body, next_cond);
 			proc->curr_block = next_cond;
 

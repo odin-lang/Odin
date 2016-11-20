@@ -396,7 +396,14 @@ gb_global Type *t_context              = NULL;
 gb_global Type *t_context_ptr          = NULL;
 
 
-
+Type *get_enum_base_type(Type *t) {
+	Type *bt = base_type(t);
+	if (bt->kind == Type_Record && bt->Record.kind == TypeRecord_Enum) {
+		GB_ASSERT(bt->Record.enum_base != NULL);
+		return bt->Record.enum_base;
+	}
+	return t;
+}
 
 b32 is_type_named(Type *t) {
 	if (t->kind == Type_Basic) {
@@ -457,7 +464,7 @@ b32 is_type_untyped(Type *t) {
 	return false;
 }
 b32 is_type_ordered(Type *t) {
-	t = base_type(t);
+	t = base_type(get_enum_base_type(t));
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Ordered) != 0;
 	}
@@ -581,14 +588,6 @@ b32 is_type_raw_union(Type *t) {
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_RawUnion);
 }
 
-Type *get_enum_base_type(Type *t) {
-	Type *bt = base_type(t);
-	if (is_type_enum(bt)) {
-		return bt->Record.enum_base;
-	}
-	return t;
-}
-
 b32 is_type_any(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_any);
@@ -626,7 +625,7 @@ b32 type_has_nil(Type *t) {
 
 
 b32 is_type_comparable(Type *t) {
-	t = base_type(t);
+	t = base_type(get_enum_base_type(t));
 	switch (t->kind) {
 	case Type_Basic:
 		return t->kind != Basic_UntypedNil;

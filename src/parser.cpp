@@ -2514,7 +2514,7 @@ AstNode *parse_type_case_clause(AstFile *f) {
 	Token token = f->curr_token;
 	AstNodeArray clause = make_ast_node_array(f);
 	if (allow_token(f, Token_case)) {
-		array_add(&clause, parse_expr(f, false));
+		array_add(&clause, parse_type(f));
 	} else {
 		expect_token(f, Token_default);
 	}

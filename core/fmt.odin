@@ -288,6 +288,7 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 		print_string_to_buffer(buf, "<nil>")
 		return
 	}
+
 	using Type_Info
 	match type info : arg.type_info {
 	case Named:
@@ -314,60 +315,54 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 		}
 
 	case Integer:
-		if info.signed {
-			i: i64 = 0;
-			if arg.data != nil {
-				match info.size {
-				case 1:  i = (arg.data as ^i8)^   as i64
-				case 2:  i = (arg.data as ^i16)^  as i64
-				case 4:  i = (arg.data as ^i32)^  as i64
-				case 8:  i = (arg.data as ^i64)^  as i64
-				}
+		if arg.data != nil {
+			match type i : arg {
+			case i8:  print_i64_to_buffer(buf, i as i64)
+			case i16: print_i64_to_buffer(buf, i as i64)
+			case i32: print_i64_to_buffer(buf, i as i64)
+			case i64: print_i64_to_buffer(buf, i as i64)
+			case u8:  print_u64_to_buffer(buf, i as u64)
+			case u16: print_u64_to_buffer(buf, i as u64)
+			case u32: print_u64_to_buffer(buf, i as u64)
+			case u64: print_u64_to_buffer(buf, i as u64)
 			}
-			print_i64_to_buffer(buf, i)
 		} else {
-			i: u64 = 0;
-			if arg.data != nil {
-				match info.size {
-				case 1:  i = (arg.data as ^u8)^   as u64
-				case 2:  i = (arg.data as ^u16)^  as u64
-				case 4:  i = (arg.data as ^u32)^  as u64
-				case 8:  i = (arg.data as ^u64)^  as u64
-				}
-			}
-			print_u64_to_buffer(buf, i)
+			print_u64_to_buffer(buf, 0)
 		}
 
 	case Float:
-		f: f64 = 0
 		if arg.data != nil {
-			match info.size {
-			case 4: f = (arg.data as ^f32)^ as f64
-			case 8: f = (arg.data as ^f64)^ as f64
+			match type f : arg {
+			case f32: print_f64_to_buffer(buf, f as f64)
+			case f64: print_f64_to_buffer(buf, f as f64)
 			}
+		} else {
+			print_f64_to_buffer(buf, 0)
 		}
-		print_f64_to_buffer(buf, f)
 
 	case String:
-		s := ""
 		if arg.data != nil {
-			s = (arg.data as ^string)^
+			match type s : arg {
+			case string: print_string_to_buffer(buf, s)
+			}
+		} else {
+			print_string_to_buffer(buf, "")
 		}
-		print_string_to_buffer(buf, s)
 
 	case Boolean:
-		v := false;
 		if arg.data != nil {
-			v = (arg.data as ^bool)^
+			match type b : arg {
+			case bool: print_bool_to_buffer(buf, b)
+			}
+		} else {
+			print_bool_to_buffer(buf, false)
 		}
-		print_bool_to_buffer(buf, v)
 
 	case Pointer:
 		if arg.data != nil {
-			if arg.type_info == type_info(^Type_Info) {
-				print_type_to_buffer(buf, (arg.data as ^^Type_Info)^)
-			} else {
-				print_pointer_to_buffer(buf, (arg.data as ^rawptr)^)
+			match type p : arg {
+			case ^Type_Info: print_type_to_buffer(buf, p)
+			default:         print_pointer_to_buffer(buf, (arg.data as ^rawptr)^)
 			}
 		} else {
 			print_pointer_to_buffer(buf, nil)
@@ -384,35 +379,22 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 
 	case Enum:
 		value: i64 = 0
-		match type i : info.base {
-		case Integer:
-			if i.signed {
-				if arg.data != nil {
-					match i.size {
-					case 1:  value = (arg.data as ^i8)^   as i64
-					case 2:  value = (arg.data as ^i16)^  as i64
-					case 4:  value = (arg.data as ^i32)^  as i64
-					case 8:  value = (arg.data as ^i64)^  as i64
-					}
-				}
-			} else {
-				if arg.data != nil {
-					match i.size {
-					case 1:  value = (arg.data as ^u8)^   as i64
-					case 2:  value = (arg.data as ^u16)^  as i64
-					case 4:  value = (arg.data as ^u32)^  as i64
-					case 8:  value = (arg.data as ^u64)^  as i64
-					}
-				}
-			}
+
+		match type i : make_any(info.base, arg.data) {
+		case i8:  value = i as i64
+		case i16: value = i as i64
+		case i32: value = i as i64
+		case i64: value = i as i64
+		case u8:  value = i as i64
+		case u16: value = i as i64
+		case u32: value = i as i64
+		case u64: value = i as i64
 		}
 		print_string_to_buffer(buf, __enum_to_string(arg.type_info, value))
-
 
 	case Array:
 		bprintf(buf, "[%]%{", info.count, info.elem)
 		defer print_string_to_buffer(buf, "}")
-
 
 		for i := 0; i < info.count; i++ {
 			if i > 0 {
@@ -466,6 +448,11 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 
 
 	case Struct:
+		if arg.data == nil {
+			print_string_to_buffer(buf, "nil")
+			return
+		}
+
 		bprintf(buf, "%{", arg.type_info)
 		defer print_string_to_buffer(buf, "}")
 
