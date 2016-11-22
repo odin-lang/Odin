@@ -6,7 +6,7 @@ struct TimeStamp {
 
 struct Timings {
 	TimeStamp        total;
-	Array<TimeStamp> sections;
+	Array(TimeStamp) sections;
 	u64              freq;
 };
 
@@ -51,7 +51,7 @@ TimeStamp make_time_stamp(String label) {
 }
 
 void timings_init(Timings *t, String label, isize buffer_size) {
-	array_init(&t->sections, heap_allocator(), buffer_size);
+	array_init_reserve(&t->sections, heap_allocator(), buffer_size);
 	t->total = make_time_stamp(label);
 	t->freq  = time_stamp__freq();
 }
@@ -62,7 +62,7 @@ void timings_destroy(Timings *t) {
 
 void timings__stop_current_section(Timings *t) {
 	if (t->sections.count > 0) {
-		t->sections[t->sections.count-1].finish = time_stamp_time_now();
+		t->sections.e[t->sections.count-1].finish = time_stamp_time_now();
 	}
 }
 
@@ -84,7 +84,7 @@ void timings_print_all(Timings *t) {
 
 	isize max_len = t->total.label.len;
 	for_array(i, t->sections) {
-		TimeStamp ts = t->sections[i];
+		TimeStamp ts = t->sections.e[i];
 		max_len = gb_max(max_len, ts.label.len);
 	}
 
@@ -96,7 +96,7 @@ void timings_print_all(Timings *t) {
 	          time_stamp_as_ms(t->total, t->freq));
 
 	for_array(i, t->sections) {
-		TimeStamp ts = t->sections[i];
+		TimeStamp ts = t->sections.e[i];
 		gb_printf("%.*s%.*s - %.3f ms\n",
 		          LIT(ts.label),
 	              cast(int)(max_len-ts.label.len), SPACES,

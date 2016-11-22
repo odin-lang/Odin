@@ -23,16 +23,16 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 		Entity *e;
 		DeclInfo *d;
 	} Delay;
-	Array<Delay> delayed_const; array_init(&delayed_const, c->tmp_allocator, stmts.count);
-	Array<Delay> delayed_type;  array_init(&delayed_type,  c->tmp_allocator, stmts.count);
+	Array(Delay) delayed_const; array_init_reserve(&delayed_const, c->tmp_allocator, stmts.count);
+	Array(Delay) delayed_type;  array_init_reserve(&delayed_type,  c->tmp_allocator, stmts.count);
 
 	for_array(i, stmts) {
-		AstNode *node = stmts[i];
+		AstNode *node = stmts.e[i];
 		switch (node->kind) {
 		case_ast_node(cd, ConstDecl, node);
 			for_array(i, cd->values) {
-				AstNode *name = cd->names[i];
-				AstNode *value = cd->values[i];
+				AstNode *name = cd->names.e[i];
+				AstNode *value = cd->values.e[i];
 				ExactValue v = {ExactValue_Invalid};
 
 				Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
@@ -74,17 +74,17 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 	}
 
 	for_array(i, delayed_type) {
-		check_entity_decl(c, delayed_type[i].e, delayed_type[i].d, NULL);
+		check_entity_decl(c, delayed_type.e[i].e, delayed_type.e[i].d, NULL);
 	}
 	for_array(i, delayed_const) {
-		check_entity_decl(c, delayed_const[i].e, delayed_const[i].d, NULL);
+		check_entity_decl(c, delayed_const.e[i].e, delayed_const.e[i].d, NULL);
 	}
 
 	b32 ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
 	u32 f = flags & (~Stmt_FallthroughAllowed);
 
 	for_array(i, stmts) {
-		AstNode *n = stmts[i];
+		AstNode *n = stmts.e[i];
 		if (n->kind == AstNode_EmptyStmt) {
 			continue;
 		}
@@ -102,7 +102,7 @@ b32 check_is_terminating_list(AstNodeArray stmts) {
 
 	// Iterate backwards
 	for (isize n = stmts.count-1; n >= 0; n--) {
-		AstNode *stmt = stmts[n];
+		AstNode *stmt = stmts.e[n];
 		if (stmt->kind != AstNode_EmptyStmt) {
 			return check_is_terminating(stmt);
 		}
@@ -113,7 +113,7 @@ b32 check_is_terminating_list(AstNodeArray stmts) {
 
 b32 check_has_break_list(AstNodeArray stmts, b32 implicit) {
 	for_array(i, stmts) {
-		AstNode *stmt = stmts[i];
+		AstNode *stmt = stmts.e[i];
 		if (check_has_break(stmt, implicit)) {
 			return true;
 		}
@@ -187,7 +187,7 @@ b32 check_is_terminating(AstNode *node) {
 	case_ast_node(ms, MatchStmt, node);
 		b32 has_default = false;
 		for_array(i, ms->body->BlockStmt.stmts) {
-			AstNode *clause = ms->body->BlockStmt.stmts[i];
+			AstNode *clause = ms->body->BlockStmt.stmts.e[i];
 			ast_node(cc, CaseClause, clause);
 			if (cc->list.count == 0) {
 				has_default = true;
@@ -203,7 +203,7 @@ b32 check_is_terminating(AstNode *node) {
 	case_ast_node(ms, TypeMatchStmt, node);
 		b32 has_default = false;
 		for_array(i, ms->body->BlockStmt.stmts) {
-			AstNode *clause = ms->body->BlockStmt.stmts[i];
+			AstNode *clause = ms->body->BlockStmt.stmts.e[i];
 			ast_node(cc, CaseClause, clause);
 			if (cc->list.count == 0) {
 				has_default = true;
@@ -433,11 +433,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 			// an extra allocation
-			Array<Operand> operands;
-			array_init(&operands, c->tmp_allocator, 2 * as->lhs.count);
+			Array(Operand) operands;
+			array_init_reserve(&operands, c->tmp_allocator, 2 * as->lhs.count);
 
 			for_array(i, as->rhs) {
-				AstNode *rhs = as->rhs[i];
+				AstNode *rhs = as->rhs.e[i];
 				Operand o = {};
 				check_multi_expr(c, &o, rhs);
 				if (o.type->kind != Type_Tuple) {
@@ -456,11 +456,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			isize operand_count = gb_min(as->lhs.count, operands.count);
 			for (isize i = 0; i < operand_count; i++) {
-				AstNode *lhs = as->lhs[i];
-				check_assignment_variable(c, &operands[i], lhs);
+				AstNode *lhs = as->lhs.e[i];
+				check_assignment_variable(c, &operands.e[i], lhs);
 			}
 			if (lhs_count != rhs_count) {
-				error(ast_node_token(as->lhs[0]), "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
+				error(ast_node_token(as->lhs.e[0]), "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
 			}
 
 			gb_temp_arena_memory_end(tmp);
@@ -484,15 +484,15 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			be->op = op;
 			be->op.kind = cast(TokenKind)(cast(i32)be->op.kind - (Token_AddEq - Token_Add));
 			 // NOTE(bill): Only use the first one will be used
-			be->left  = as->lhs[0];
-			be->right = as->rhs[0];
+			be->left  = as->lhs.e[0];
+			be->right = as->rhs.e[0];
 
 			check_binary_expr(c, &operand, &binary_expr);
 			if (operand.mode == Addressing_Invalid) {
 				return;
 			}
 			// NOTE(bill): Only use the first one will be used
-			check_assignment_variable(c, &operand, as->lhs[0]);
+			check_assignment_variable(c, &operand, as->lhs.e[0]);
 		} break;
 		}
 	case_end;
@@ -550,7 +550,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 
 
-		Type *proc_type = c->proc_stack[c->proc_stack.count-1];
+		Type *proc_type = c->proc_stack.e[c->proc_stack.count-1];
 		isize result_count = 0;
 		if (proc_type->Proc.results) {
 			result_count = proc_type->Proc.results->Tuple.variable_count;
@@ -569,7 +569,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				                     rs->results, str_lit("return statement"));
 			}
 		} else if (rs->results.count > 0) {
-			error(ast_node_token(rs->results[0]), "No return values expected");
+			error(ast_node_token(rs->results.e[0]), "No return values expected");
 		}
 	case_end;
 
@@ -628,7 +628,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		AstNode *first_default = NULL;
 		ast_node(bs, BlockStmt, ms->body);
 		for_array(i, bs->stmts) {
-			AstNode *stmt = bs->stmts[i];
+			AstNode *stmt = bs->stmts.e[i];
 			AstNode *default_stmt = NULL;
 			if (stmt->kind == AstNode_CaseClause) {
 				ast_node(cc, CaseClause, stmt);
@@ -661,7 +661,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		map_init(&seen, heap_allocator());
 
 		for_array(i, bs->stmts) {
-			AstNode *stmt = bs->stmts[i];
+			AstNode *stmt = bs->stmts.e[i];
 			if (stmt->kind != AstNode_CaseClause) {
 				// NOTE(bill): error handled by above multiple default checker
 				continue;
@@ -670,7 +670,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 
 			for_array(j, cc->list) {
-				AstNode *expr = cc->list[j];
+				AstNode *expr = cc->list.e[j];
 				Operand y = {};
 				Operand z = {};
 				Token eq = {Token_CmpEq};
@@ -772,7 +772,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		AstNode *first_default = NULL;
 		ast_node(bs, BlockStmt, ms->body);
 		for_array(i, bs->stmts) {
-			AstNode *stmt = bs->stmts[i];
+			AstNode *stmt = bs->stmts.e[i];
 			AstNode *default_stmt = NULL;
 			if (stmt->kind == AstNode_CaseClause) {
 				ast_node(cc, CaseClause, stmt);
@@ -804,7 +804,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		map_init(&seen, heap_allocator());
 
 		for_array(i, bs->stmts) {
-			AstNode *stmt = bs->stmts[i];
+			AstNode *stmt = bs->stmts.e[i];
 			if (stmt->kind != AstNode_CaseClause) {
 				// NOTE(bill): error handled by above multiple default checker
 				continue;
@@ -815,7 +815,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			Type *bt = base_type(type_deref(x.type));
 
 
-			AstNode *type_expr = cc->list.count > 0 ? cc->list[0] : NULL;
+			AstNode *type_expr = cc->list.count > 0 ? cc->list.e[0] : NULL;
 			Type *case_type = NULL;
 			if (type_expr != NULL) { // Otherwise it's a default expression
 				Operand y = {};
@@ -988,7 +988,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			case Entity_ImportName: {
 				Scope *scope = e->ImportName.scope;
 				for_array(i, scope->elements.entries) {
-					Entity *decl = scope->elements.entries[i].value;
+					Entity *decl = scope->elements.entries.e[i].value;
 					Entity *found = scope_insert_entity(c->context.scope, decl);
 					if (found != NULL) {
 						gbString expr_str = expr_to_string(expr);
@@ -1012,7 +1012,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
 					GB_ASSERT(found != NULL);
 					for_array(i, (*found)->elements.entries) {
-						Entity *f = (*found)->elements.entries[i].value;
+						Entity *f = (*found)->elements.entries.e[i].value;
 						if (f->kind == Entity_Variable) {
 							Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
 							if (is_selector) {
@@ -1068,7 +1068,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			check_var_decl_node(c, us->node);
 
 			for_array(name_index, vd->names) {
-				AstNode *item = vd->names[name_index];
+				AstNode *item = vd->names.e[name_index];
 				ast_node(i, Ident, item);
 				String name = i->string;
 				Entity *e = scope_lookup_entity(c->context.scope, name);
@@ -1077,7 +1077,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
 					GB_ASSERT(found != NULL);
 					for_array(i, (*found)->elements.entries) {
-						Entity *f = (*found)->elements.entries[i].value;
+						Entity *f = (*found)->elements.entries.e[i].value;
 						if (f->kind == Entity_Variable) {
 							Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
 							Entity *prev = scope_insert_entity(c->context.scope, uvar);

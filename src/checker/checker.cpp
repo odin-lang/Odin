@@ -70,8 +70,8 @@ struct Scope {
 	Map<Entity *>  elements; // Key: String
 	Map<Entity *>  implicit; // Key: String
 
-	Array<Scope *> shared;
-	Array<Scope *> imported;
+	Array(Scope *) shared;
+	Array(Scope *) imported;
 	b32            is_proc;
 	b32            is_global;
 	b32            is_file;
@@ -211,7 +211,7 @@ struct Checker {
 	AstFile *              curr_ast_file;
 	BaseTypeSizes          sizes;
 	Scope *                global_scope;
-	Array<ProcedureInfo>   procs; // NOTE(bill): Procedures to check
+	Array(ProcedureInfo)   procs; // NOTE(bill): Procedures to check
 
 	gbArena                arena;
 	gbArena                tmp_arena;
@@ -220,12 +220,12 @@ struct Checker {
 
 	CheckerContext         context;
 
-	Array<Type *>          proc_stack;
+	Array(Type *)          proc_stack;
 	b32                    in_defer; // TODO(bill): Actually handle correctly
 };
 
 struct CycleChecker {
-	Array<Entity *> path; // Entity_TypeName
+	Array(Entity *) path; // Entity_TypeName
 };
 
 
@@ -235,7 +235,7 @@ CycleChecker *cycle_checker_add(CycleChecker *cc, Entity *e) {
 	if (cc == NULL) {
 		return NULL;
 	}
-	if (cc->path.data == NULL) {
+	if (cc->path.e == NULL) {
 		array_init(&cc->path, heap_allocator());
 	}
 	GB_ASSERT(e != NULL && e->kind == Entity_TypeName);
@@ -244,7 +244,7 @@ CycleChecker *cycle_checker_add(CycleChecker *cc, Entity *e) {
 }
 
 void cycle_checker_destroy(CycleChecker *cc) {
-	if (cc != NULL && cc->path.data != NULL)  {
+	if (cc != NULL && cc->path.e != NULL)  {
 		array_free(&cc->path);
 	}
 }
@@ -299,7 +299,7 @@ Scope *make_scope(Scope *parent, gbAllocator allocator) {
 
 void destroy_scope(Scope *scope) {
 	for_array(i, scope->elements.entries) {
-		Entity *e =scope->elements.entries[i].value;
+		Entity *e =scope->elements.entries.e[i].value;
 		if (e->kind == Entity_Variable) {
 			if (!(e->flags & EntityFlag_Used)) {
 #if 0
@@ -371,7 +371,7 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 		} else {
 			// Check shared scopes - i.e. other files @ global scope
 			for_array(i, s->shared) {
-				Scope *shared = s->shared[i];
+				Scope *shared = s->shared.e[i];
 				Entity **found = map_get(&shared->elements, key);
 				if (found) {
 					Entity *e = *found;
@@ -414,7 +414,7 @@ Entity *current_scope_lookup_entity(Scope *s, String name) {
 		return *found;
 	}
 	for_array(i, s->shared) {
-		Entity **found = map_get(&s->shared[i]->elements, key);
+		Entity **found = map_get(&s->shared.e[i]->elements, key);
 		if (found) {
 			return *found;
 		}
@@ -572,7 +572,7 @@ void init_checker(Checker *c, Parser *parser, BaseTypeSizes sizes) {
 	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
 	isize total_token_count = 0;
 	for_array(i, c->parser->files) {
-		AstFile *f = &c->parser->files[i];
+		AstFile *f = &c->parser->files.e[i];
 		total_token_count += f->tokens.count;
 	}
 	isize arena_size = 2 * item_size * total_token_count;
@@ -735,7 +735,7 @@ void add_type_info_type(Checker *c, Type *t) {
 
 	isize ti_index = -1;
 	for_array(i, c->info.type_info_map.entries) {
-		auto *e = &c->info.type_info_map.entries[i];
+		auto *e = &c->info.type_info_map.entries.e[i];
 		Type *prev_type = cast(Type *)e->key.ptr;
 		if (are_types_identical(t, prev_type)) {
 			// Duplicate entry
@@ -858,7 +858,7 @@ void pop_procedure(Checker *c) {
 Type *const curr_procedure(Checker *c) {
 	isize count = c->proc_stack.count;
 	if (count > 0) {
-		return c->proc_stack[count-1];
+		return c->proc_stack.e[count-1];
 	}
 	return NULL;
 }
@@ -890,7 +890,7 @@ void add_dependency_to_map(Map<Entity *> *map, CheckerInfo *info, Entity *node) 
 
 	DeclInfo *decl = *found;
 	for_array(i, decl->deps.entries) {
-		Entity *e = cast(Entity *)decl->deps.entries[i].key.ptr;
+		Entity *e = cast(Entity *)decl->deps.entries.e[i].key.ptr;
 		add_dependency_to_map(map, info, e);
 	}
 }
@@ -900,7 +900,7 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 	map_init(&map, heap_allocator());
 
 	for_array(i, info->entities.entries) {
-		auto *entry = &info->entities.entries[i];
+		auto *entry = &info->entities.entries.e[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		if (e->scope->is_global) {
 			// NOTE(bill): Require runtime stuff
@@ -996,7 +996,7 @@ void add_implicit_value(Checker *c, ImplicitValueId id, String name, String back
 void check_global_entity(Checker *c, EntityKind kind) {
 	PROF_SCOPED("check_global_entity");
 	for_array(i, c->info.entities.entries) {
-		auto *entry = &c->info.entities.entries[i];
+		auto *entry = &c->info.entities.entries.e[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		if (e->kind == kind) {
 			DeclInfo *d = entry->value;
@@ -1023,7 +1023,7 @@ void check_global_entity(Checker *c, EntityKind kind) {
 }
 
 void check_parsed_files(Checker *c) {
-	Array<AstNode *> import_decls;
+	AstNodeArray import_decls;
 	array_init(&import_decls, heap_allocator());
 
 	Map<Scope *> file_scopes; // Key: String (fullpath)
@@ -1031,7 +1031,7 @@ void check_parsed_files(Checker *c) {
 
 	// Map full filepaths to Scopes
 	for_array(i, c->parser->files) {
-		AstFile *f = &c->parser->files[i];
+		AstFile *f = &c->parser->files.e[i];
 		Scope *scope = NULL;
 		scope = make_scope(c->global_scope, c->allocator);
 		scope->is_global = f->is_global_scope;
@@ -1058,13 +1058,13 @@ void check_parsed_files(Checker *c) {
 	for_array(i, c->parser->files) {
 		PROF_SCOPED("Collect Entities");
 
-		AstFile *f = &c->parser->files[i];
+		AstFile *f = &c->parser->files.e[i];
 		add_curr_ast_file(c, f);
 
 		Scope *file_scope = f->scope;
 
 		for_array(decl_index, f->decls) {
-			AstNode *decl = f->decls[decl_index];
+			AstNode *decl = f->decls.e[decl_index];
 			if (!is_ast_node_decl(decl)) {
 				continue;
 			}
@@ -1081,8 +1081,8 @@ void check_parsed_files(Checker *c) {
 
 			case_ast_node(cd, ConstDecl, decl);
 				for_array(i, cd->values) {
-					AstNode *name = cd->names[i];
-					AstNode *value = cd->values[i];
+					AstNode *name = cd->names.e[i];
+					AstNode *value = cd->values.e[i];
 					ExactValue v = {ExactValue_Invalid};
 					Entity *e = make_entity_constant(c->allocator, file_scope, name->Ident, NULL, v);
 					e->identifier = name;
@@ -1112,14 +1112,14 @@ void check_parsed_files(Checker *c) {
 					di->entities = entities;
 					di->entity_count = entity_count;
 					di->type_expr = vd->type;
-					di->init_expr = vd->values[0];
+					di->init_expr = vd->values.e[0];
 				}
 
 				for_array(i, vd->names) {
-					AstNode *name = vd->names[i];
+					AstNode *name = vd->names.e[i];
 					AstNode *value = NULL;
 					if (i < vd->values.count) {
-						value = vd->values[i];
+						value = vd->values.e[i];
 					}
 					Entity *e = make_entity_variable(c->allocator, file_scope, name->Ident, NULL);
 					e->identifier = name;
@@ -1167,13 +1167,13 @@ void check_parsed_files(Checker *c) {
 	for_array(i, c->parser->files) {
 		PROF_SCOPED("Import Entities");
 
-		AstFile *f = &c->parser->files[i];
+		AstFile *f = &c->parser->files.e[i];
 		add_curr_ast_file(c, f);
 
 		Scope *file_scope = f->scope;
 
 		for_array(decl_index, f->decls) {
-			AstNode *decl = f->decls[decl_index];
+			AstNode *decl = f->decls.e[decl_index];
 			if (decl->kind != AstNode_ImportDecl) {
 				continue;
 			}
@@ -1191,7 +1191,7 @@ void check_parsed_files(Checker *c) {
 
 			b32 previously_added = false;
 			for_array(import_index, file_scope->imported) {
-				Scope *prev = file_scope->imported[import_index];
+				Scope *prev = file_scope->imported.e[import_index];
 				if (prev == scope) {
 					previously_added = true;
 					break;
@@ -1207,7 +1207,7 @@ void check_parsed_files(Checker *c) {
 			if (str_eq(id->import_name.string, str_lit("."))) {
 				// NOTE(bill): Add imported entities to this file's scope
 				for_array(elem_index, scope->elements.entries) {
-					Entity *e = scope->elements.entries[elem_index].value;
+					Entity *e = scope->elements.entries.e[elem_index].value;
 					if (e->scope == file_scope) {
 						continue;
 					}
@@ -1292,7 +1292,7 @@ void check_parsed_files(Checker *c) {
 
 	// Check procedure bodies
 	for_array(i, c->procs) {
-		ProcedureInfo *pi = &c->procs[i];
+		ProcedureInfo *pi = &c->procs.e[i];
 		add_curr_ast_file(c, pi->file);
 
 		b32 bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
@@ -1317,7 +1317,7 @@ void check_parsed_files(Checker *c) {
 	for_array(i, c->info.untyped.entries) {
 		PROF_SCOPED("Untyped expr values");
 
-		auto *entry = &c->info.untyped.entries[i];
+		auto *entry = &c->info.untyped.entries.e[i];
 		HashKey key = entry->key;
 		AstNode *expr = cast(AstNode *)cast(uintptr)key.key;
 		ExpressionInfo *info = &entry->value;

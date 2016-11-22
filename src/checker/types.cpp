@@ -805,14 +805,16 @@ struct BaseTypeSizes {
 	i64 max_align;
 };
 
+typedef Array(isize) Array_isize;
+
 struct Selection {
-	Entity *entity;
-	Array<isize> index;
-	b32 indirect; // Set if there was a pointer deref anywhere down the line
+	Entity *    entity;
+	Array_isize index;
+	b32         indirect; // Set if there was a pointer deref anywhere down the line
 };
 Selection empty_selection = {};
 
-Selection make_selection(Entity *entity, Array<isize> index, b32 indirect) {
+Selection make_selection(Entity *entity, Array_isize index, b32 indirect) {
 	Selection s = {entity, index, indirect};
 	return s;
 }
@@ -820,7 +822,7 @@ Selection make_selection(Entity *entity, Array<isize> index, b32 indirect) {
 void selection_add_index(Selection *s, isize index) {
 	// IMPORTANT NOTE(bill): this requires a stretchy buffer/dynamic array so it requires some form
 	// of heap allocation
-	if (s->index.data == NULL) {
+	if (s->index.e == NULL) {
 		array_init(&s->index, heap_allocator());
 	}
 	array_add(&s->index, index);
@@ -1334,7 +1336,7 @@ i64 type_offset_of_from_selection(BaseTypeSizes s, gbAllocator allocator, Type *
 	Type *t = type;
 	i64 offset = 0;
 	for_array(i, sel.index) {
-		isize index = sel.index[i];
+		isize index = sel.index.e[i];
 		t = base_type(t);
 		offset += type_offset_of(s, allocator, t, index);
 		if (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct) {

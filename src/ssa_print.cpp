@@ -435,7 +435,7 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 				if (i > 0) {
 					ssa_fprintf(f, ", ");
 				}
-				TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems[i]);
+				TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems.e[i]);
 				GB_ASSERT(tav != NULL);
 				ssa_print_compound_element(f, m, tav->value, elem_type);
 			}
@@ -460,7 +460,7 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 			Type *elem_type = type->Vector.elem;
 
 			if (elem_count == 1 && type->Vector.count > 1) {
-				TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems[0]);
+				TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems.e[0]);
 				GB_ASSERT(tav != NULL);
 
 				for (isize i = 0; i < type->Vector.count; i++) {
@@ -474,7 +474,7 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 					if (i > 0) {
 						ssa_fprintf(f, ", ");
 					}
-					TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems[i]);
+					TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems.e[i]);
 					GB_ASSERT(tav != NULL);
 					ssa_print_compound_element(f, m, tav->value, elem_type);
 				}
@@ -496,23 +496,23 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 			ExactValue *values = gb_alloc_array(m->tmp_allocator, ExactValue, value_count);
 
 
-			if (cl->elems[0]->kind == AstNode_FieldValue) {
+			if (cl->elems.e[0]->kind == AstNode_FieldValue) {
 				isize elem_count = cl->elems.count;
 				for (isize i = 0; i < elem_count; i++) {
-					ast_node(fv, FieldValue, cl->elems[i]);
+					ast_node(fv, FieldValue, cl->elems.e[i]);
 					String name = fv->field->Ident.string;
 
 					TypeAndValue *tav = type_and_value_of_expression(m->info, fv->value);
 					GB_ASSERT(tav != NULL);
 
 					Selection sel = lookup_field(m->allocator, type, name, false);
-					Entity *f = type->Record.fields[sel.index[0]];
+					Entity *f = type->Record.fields[sel.index.e[0]];
 
 					values[f->Variable.field_index] = tav->value;
 				}
 			} else {
 				for (isize i = 0; i < value_count; i++) {
-					TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems[i]);
+					TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems.e[i]);
 					GB_ASSERT(tav != NULL);
 
 					Entity *f = type->Record.fields_in_src_order[i];
@@ -754,11 +754,11 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 				ssa_fprintf(f, ", ");
 			}
 
-			ssaValue *edge = instr->Phi.edges[i];
+			ssaValue *edge = instr->Phi.edges.e[i];
 			ssaBlock *block = NULL;
 			if (instr->parent != NULL &&
 			    i < instr->parent->preds.count) {
-				block = instr->parent->preds[i];
+				block = instr->parent->preds.e[i];
 			}
 
 			ssa_fprintf(f, "[ ");
@@ -1238,14 +1238,14 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 
 		ssa_fprintf(f, "{\n");
 		for_array(i, proc->blocks) {
-			ssaBlock *block = proc->blocks[i];
+			ssaBlock *block = proc->blocks.e[i];
 
 			if (i > 0) ssa_fprintf(f, "\n");
 			ssa_print_block_name(f, block);
 			ssa_fprintf(f, ":\n");
 
 			for_array(j, block->instrs) {
-				ssaValue *value = block->instrs[j];
+				ssaValue *value = block->instrs.e[j];
 				ssa_print_instr(f, m, value);
 			}
 		}
@@ -1255,7 +1255,7 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 	}
 
 	for_array(i, proc->children) {
-		ssa_print_proc(f, m, proc->children[i]);
+		ssa_print_proc(f, m, proc->children.e[i]);
 	}
 }
 
@@ -1296,7 +1296,7 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 
 
 	for_array(member_index, m->members.entries) {
-		auto *entry = &m->members.entries[member_index];
+		auto *entry = &m->members.entries.e[member_index];
 		ssaValue *v = entry->value;
 		if (v->kind != ssaValue_TypeName) {
 			continue;
@@ -1307,7 +1307,7 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 	ssa_fprintf(f, "\n");
 
 	for_array(member_index, m->members.entries) {
-		auto *entry = &m->members.entries[member_index];
+		auto *entry = &m->members.entries.e[member_index];
 		ssaValue *v = entry->value;
 		if (v->kind != ssaValue_Proc) {
 			continue;
@@ -1318,7 +1318,7 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 	}
 
 	for_array(member_index, m->members.entries) {
-		auto *entry = &m->members.entries[member_index];
+		auto *entry = &m->members.entries.e[member_index];
 		ssaValue *v = entry->value;
 		if (v->kind != ssaValue_Proc) {
 			continue;
@@ -1330,7 +1330,7 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 
 
 	for_array(member_index, m->members.entries) {
-		auto *entry = &m->members.entries[member_index];
+		auto *entry = &m->members.entries.e[member_index];
 		ssaValue *v = entry->value;
 		if (v->kind != ssaValue_Global) {
 			continue;
@@ -1376,7 +1376,7 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 		ssa_fprintf(f, "!llvm.dbg.cu = !{!0}\n");
 
 		for_array(di_index, m->debug_info.entries) {
-			auto *entry = &m->debug_info.entries[di_index];
+			auto *entry = &m->debug_info.entries.e[di_index];
 			ssaDebugInfo *di = entry->value;
 			ssa_fprintf(f, "!%d = ", di->id);
 
@@ -1422,7 +1422,7 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 			case ssaDebugInfo_AllProcs:
 				ssa_fprintf(f, "!{");
 				for_array(proc_index, di->AllProcs.procs) {
-					ssaDebugInfo *p = di->AllProcs.procs[proc_index];
+					ssaDebugInfo *p = di->AllProcs.procs.e[proc_index];
 					if (proc_index > 0) {ssa_fprintf(f, ",");}
 					ssa_fprintf(f, "!%d", p->id);
 				}

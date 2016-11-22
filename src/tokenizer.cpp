@@ -296,7 +296,7 @@ struct Tokenizer {
 	isize line_count;
 
 	isize error_count;
-	Array<String> allocated_strings;
+	Array(String) allocated_strings;
 };
 
 
@@ -400,7 +400,7 @@ gb_inline void destroy_tokenizer(Tokenizer *t) {
 		gb_free(heap_allocator(), t->start);
 	}
 	for_array(i, t->allocated_strings) {
-		gb_free(heap_allocator(), t->allocated_strings[i].text);
+		gb_free(heap_allocator(), t->allocated_strings.e[i].text);
 	}
 	array_free(&t->allocated_strings);
 }

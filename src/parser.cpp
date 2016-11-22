@@ -15,13 +15,13 @@ enum ParseFileError {
 	ParseFile_Count,
 };
 
-typedef Array<AstNode *> AstNodeArray;
+typedef Array(AstNode *) AstNodeArray;
 
 struct AstFile {
 	i32            id;
 	gbArena        arena;
 	Tokenizer      tokenizer;
-	Array<Token>   tokens;
+	Array(Token)   tokens;
 	isize          curr_token_index;
 	Token          curr_token;
 	Token          prev_token; // previous non-comment
@@ -53,10 +53,10 @@ struct ImportedFile {
 
 struct Parser {
 	String              init_fullpath;
-	Array<AstFile>      files;
-	Array<ImportedFile> imports;
+	Array(AstFile)      files;
+	Array(ImportedFile) imports;
 	gbAtomic32          import_index;
-	Array<String>       foreign_libraries;
+	Array(String)       foreign_libraries;
 	isize               total_token_count;
 	gbMutex             mutex;
 };
@@ -452,9 +452,9 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_BadDecl:
 		return node->BadDecl.begin;
 	case AstNode_VarDecl:
-		return ast_node_token(node->VarDecl.names[0]);
+		return ast_node_token(node->VarDecl.names.e[0]);
 	case AstNode_ConstDecl:
-		return ast_node_token(node->ConstDecl.names[0]);
+		return ast_node_token(node->ConstDecl.names.e[0]);
 	case AstNode_ProcDecl:
 		return node->ProcDecl.name->Ident;
 	case AstNode_TypeDecl:
@@ -465,7 +465,7 @@ Token ast_node_token(AstNode *node) {
 		return node->ForeignLibrary.token;
 	case AstNode_Parameter: {
 		if (node->Parameter.names.count > 0) {
-			return ast_node_token(node->Parameter.names[0]);
+			return ast_node_token(node->Parameter.names.e[0]);
 		} else {
 			return ast_node_token(node->Parameter.type);
 		}
@@ -981,7 +981,7 @@ b32 next_token(AstFile *f) {
 		}
 
 		f->curr_token_index++;
-		f->curr_token = f->tokens[f->curr_token_index];
+		f->curr_token = f->tokens.e[f->curr_token_index];
 		if (f->curr_token.kind == Token_Comment) {
 			return next_token(f);
 		}
@@ -1518,8 +1518,8 @@ AstNode *parse_atom_expr(AstFile *f, b32 lhs) {
 				// TODO(bill): Handle this
 			}
 			AstNode *proc = parse_identifier(f);
-			Array<AstNode *> args;
-			array_init(&args, gb_arena_allocator(&f->arena), 1);
+			AstNodeArray args;
+			array_init_reserve(&args, gb_arena_allocator(&f->arena), 1);
 			array_add(&args, operand);
 			operand = make_call_expr(f, proc, args, ast_node_token(operand), op, empty_token);
 		} break;
@@ -1719,8 +1719,8 @@ AstNode *parse_binary_expr(AstFile *f, b32 lhs, i32 prec_in) {
 					expression = call;
 				} else  */{
 					right = parse_binary_expr(f, false, prec+1);
-					Array<AstNode *> args = {};
-					array_init(&args, gb_arena_allocator(&f->arena), 2);
+					AstNodeArray args = {};
+					array_init_reserve(&args, gb_arena_allocator(&f->arena), 2);
 					array_add(&args, expression);
 					array_add(&args, right);
 					expression = make_call_expr(f, proc, args, op, ast_node_token(right), empty_token);
@@ -1831,12 +1831,12 @@ AstNode *parse_simple_stmt(AstFile *f) {
 			syntax_error(f->curr_token, "You cannot use a simple statement in the file scope");
 			return make_bad_stmt(f, f->curr_token, f->curr_token);
 		}
-		statement = make_inc_dec_stmt(f, token, lhs[0]);
+		statement = make_inc_dec_stmt(f, token, lhs.e[0]);
 		next_token(f);
 		return statement;
 	}
 
-	return make_expr_stmt(f, lhs[0]);
+	return make_expr_stmt(f, lhs.e[0]);
 }
 
 
@@ -1858,7 +1858,7 @@ AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
 		return statement->ExprStmt.expr;
 
 	syntax_error(f->curr_token, "Expected `%.*s`, found a simple statement.", LIT(kind));
-	return make_bad_expr(f, f->curr_token, f->tokens[f->curr_token_index+1]);
+	return make_bad_expr(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
 }
 
 AstNodeArray parse_identfier_list(AstFile *f) {
@@ -1998,11 +1998,11 @@ AstNodeArray parse_struct_params(AstFile *f, isize *decl_count_, b32 using_allow
 
 			if (decl->kind == AstNode_ProcDecl) {
 				syntax_error(f->curr_token, "Procedure declarations are not allowed within a structure");
-				decl = make_bad_decl(f, ast_node_token(names[0]), f->curr_token);
+				decl = make_bad_decl(f, ast_node_token(names.e[0]), f->curr_token);
 			}
 		} else {
 			syntax_error(f->curr_token, "Illegal structure field");
-			decl = make_bad_decl(f, ast_node_token(names[0]), f->curr_token);
+			decl = make_bad_decl(f, ast_node_token(names.e[0]), f->curr_token);
 		}
 
 		expect_semicolon_after_stmt(f, decl);
@@ -2280,7 +2280,7 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 	AstNode *type = NULL;
 
 	for_array(i, names) {
-		AstNode *name = names[i];
+		AstNode *name = names.e[i];
 		if (name->kind == AstNode_Ident) {
 			String n = name->Ident.string;
 			// NOTE(bill): Check for reserved identifiers
@@ -2318,8 +2318,8 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 				next_token(f);
 			}
 			if (names.count != 1) {
-				syntax_error(ast_node_token(names[0]), "You can only declare one type at a time");
-				return make_bad_decl(f, names[0]->Ident, token);
+				syntax_error(ast_node_token(names.e[0]), "You can only declare one type at a time");
+				return make_bad_decl(f, names.e[0]->Ident, token);
 			}
 
 			if (type != NULL) {
@@ -2327,12 +2327,12 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 				// NOTE(bill): Do not fail though
 			}
 
-			return make_type_decl(f, token, names[0], parse_type(f));
+			return make_type_decl(f, token, names.e[0], parse_type(f));
 		} else if (f->curr_token.kind == Token_proc &&
 		    is_mutable == false) {
 		    // NOTE(bill): Procedure declarations
 			Token proc_token = f->curr_token;
-			AstNode *name = names[0];
+			AstNode *name = names.e[0];
 			if (names.count != 1) {
 				syntax_error(proc_token, "You can only declare one procedure at a time");
 				return make_bad_decl(f, name->Ident, proc_token);
@@ -2364,7 +2364,7 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 		}
 	}
 
-	if (values.data == NULL) {
+	if (values.e == NULL) {
 		values = make_ast_node_array(f);
 	}
 
@@ -2421,7 +2421,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 			break;
 		default:
 			syntax_error(f->curr_token, "Expected if statement block statement");
-			else_stmt = make_bad_stmt(f, f->curr_token, f->tokens[f->curr_token_index+1]);
+			else_stmt = make_bad_stmt(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
 			break;
 		}
 	}
@@ -2443,7 +2443,7 @@ AstNode *parse_return_stmt(AstFile *f) {
 		results = parse_rhs_expr_list(f);
 	}
 	if (f->curr_token.kind != Token_CloseBrace) {
-		expect_semicolon_after_stmt(f, results[0]);
+		expect_semicolon_after_stmt(f, results.e[0]);
 	}
 
 	return make_return_stmt(f, token, results);
@@ -2891,8 +2891,8 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 		}
 
 		f->curr_token_index = 0;
-		f->prev_token = f->tokens[f->curr_token_index];
-		f->curr_token = f->tokens[f->curr_token_index];
+		f->prev_token = f->tokens.e[f->curr_token_index];
+		f->curr_token = f->tokens.e[f->curr_token_index];
 
 		// NOTE(bill): Is this big enough or too small?
 		isize arena_size = gb_size_of(AstNode);
@@ -2934,7 +2934,7 @@ b32 init_parser(Parser *p) {
 void destroy_parser(Parser *p) {
 	// TODO(bill): Fix memory leak
 	for_array(i, p->files) {
-		destroy_ast_file(&p->files[i]);
+		destroy_ast_file(&p->files.e[i]);
 	}
 #if 1
 	for_array(i, p->imports) {
@@ -2952,7 +2952,7 @@ b32 try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
 	gb_mutex_lock(&p->mutex);
 
 	for_array(i, p->imports) {
-		String import = p->imports[i].path;
+		String import = p->imports.e[i].path;
 		if (str_eq(import, path)) {
 			return false;
 		}
@@ -3009,7 +3009,7 @@ b32 try_add_foreign_library_path(Parser *p, String import_file) {
 	gb_mutex_lock(&p->mutex);
 
 	for_array(i, p->foreign_libraries) {
-		String import = p->foreign_libraries[i];
+		String import = p->foreign_libraries.e[i];
 		if (str_eq(import, import_file)) {
 			return false;
 		}
@@ -3096,7 +3096,7 @@ void parse_file(Parser *p, AstFile *f) {
 	f->decls = parse_stmt_list(f);
 
 	for_array(i, f->decls) {
-		AstNode *node = f->decls[i];
+		AstNode *node = f->decls.e[i];
 		if (!is_ast_node_decl(node) &&
 		    node->kind != AstNode_BadStmt &&
 		    node->kind != AstNode_EmptyStmt) {
@@ -3114,7 +3114,7 @@ void parse_file(Parser *p, AstFile *f) {
 						syntax_error(ast_node_token(node), "Invalid #import path: `%.*s`", LIT(file_str));
 					}
 					// NOTE(bill): It's a naughty name
-					f->decls[i] = make_bad_decl(f, id->token, id->token);
+					f->decls.e[i] = make_bad_decl(f, id->token, id->token);
 					continue;
 				}
 
@@ -3143,7 +3143,7 @@ void parse_file(Parser *p, AstFile *f) {
 						syntax_error(ast_node_token(node), "Invalid `foreign_library` path");
 					}
 					// NOTE(bill): It's a naughty name
-					f->decls[i] = make_bad_decl(f, id->token, id->token);
+					f->decls.e[i] = make_bad_decl(f, id->token, id->token);
 					continue;
 				}
 
@@ -3189,7 +3189,7 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 	}
 
 	for_array(i, p->imports) {
-		ImportedFile imported_file = p->imports[i];
+		ImportedFile imported_file = p->imports.e[i];
 		String import_path = imported_file.path;
 		String import_rel_path = imported_file.rel_path;
 		TokenPos pos = imported_file.pos;
@@ -3235,7 +3235,7 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 	}
 
 	for_array(i, p->files) {
-		p->total_token_count += p->files[i].tokens.count;
+		p->total_token_count += p->files.e[i].tokens.count;
 	}
 
 
