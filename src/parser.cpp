@@ -1133,7 +1133,7 @@ AstNode *parse_identifier(AstFile *f) {
 	if (token.kind == Token_Identifier) {
 		next_token(f);
 	} else {
-		token.string = make_string("_");
+		token.string = str_lit("_");
 		expect_token(f, Token_Identifier);
 	}
 	return make_ident(f, token);
@@ -1274,11 +1274,11 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 		String tag_name = te->name.string;
 
 		#define ELSE_IF_ADD_TAG(name) \
-		else if (tag_name == #name) { \
+		else if (str_eq(tag_name, str_lit(#name))) { \
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_##name, tag_name); \
 		}
 
-		if (tag_name == "foreign") {
+		if (str_eq(tag_name, str_lit("foreign"))) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_foreign, tag_name);
 			if (f->curr_token.kind == Token_String) {
 				*foreign_name = f->curr_token.string;
@@ -1289,7 +1289,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 
 				next_token(f);
 			}
-		} else if (tag_name == "link_name") {
+		} else if (str_eq(tag_name, str_lit("link_name"))) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_link_name, tag_name);
 			if (f->curr_token.kind == Token_String) {
 				*link_name = f->curr_token.string;
@@ -1372,7 +1372,7 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 	case Token_Hash: {
 		Token token = expect_token(f, Token_Hash);
 		Token name  = expect_token(f, Token_Identifier);
-		if (name.string == "rune") {
+		if (str_eq(name.string, str_lit("rune"))) {
 			if (f->curr_token.kind == Token_String) {
 				Token *s = &f->curr_token;
 
@@ -1384,19 +1384,19 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 				expect_token(f, Token_String);
 			}
 			operand = parse_operand(f, lhs);
-		} else if (name.string == "file") {
+		} else if (str_eq(name.string, str_lit("file"))) {
 			Token token = name;
 			token.kind = Token_String;
 			token.string = token.pos.file;
 			return make_basic_lit(f, token);
-		} else if (name.string == "line") {
+		} else if (str_eq(name.string, str_lit("line"))) {
 			Token token = name;
 			token.kind = Token_Integer;
 			char *str = gb_alloc_array(gb_arena_allocator(&f->arena), char, 20);
 			gb_i64_to_str(token.pos.line, str, 10);
-			token.string = make_string(str);
+			token.string = make_string_c(str);
 			return make_basic_lit(f, token);
-		} else if (name.string == "run") {
+		} else if (str_eq(name.string, str_lit("run"))) {
 			AstNode *expr = parse_expr(f, false);
 			operand = make_run_expr(f, token, name, expr);
 			if (unparen_expr(expr)->kind != AstNode_CallExpr) {
@@ -1415,7 +1415,6 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 		AstNode *curr_proc = f->curr_proc;
 		AstNode *type = parse_proc_type(f);
 		f->curr_proc = type;
-		defer (f->curr_proc = curr_proc);
 
 		u64 tags = 0;
 		String foreign_name = {};
@@ -1428,17 +1427,17 @@ AstNode *parse_operand(AstFile *f, b32 lhs) {
 			syntax_error(f->curr_token, "#link_name cannot be applied to procedure literals");
 		}
 
-		if (f->curr_token.kind != Token_OpenBrace) {
-			return type;
-		} else {
+		if (f->curr_token.kind == Token_OpenBrace) {
 			AstNode *body;
 
 			f->expr_level++;
 			body = parse_body(f);
 			f->expr_level--;
 
-			return make_proc_lit(f, type, body, tags);
+			type = make_proc_lit(f, type, body, tags);
 		}
+		f->curr_proc = curr_proc;
+		return type;
 	}
 
 	default: {
@@ -2087,12 +2086,12 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		b32 is_ordered = false;
 		while (allow_token(f, Token_Hash)) {
 			Token tag = expect_token_after(f, Token_Identifier, "`#`");
-			if (tag.string == "packed") {
+			if (str_eq(tag.string, str_lit("packed"))) {
 				if (is_packed) {
 					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
 				}
 				is_packed = true;
-			} else if (tag.string == "ordered") {
+			} else if (str_eq(tag.string, str_lit("ordered"))) {
 				if (is_ordered) {
 					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
 				}
@@ -2264,7 +2263,6 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 
 	AstNode *curr_proc = f->curr_proc;
 	f->curr_proc = proc_type;
-	defer (f->curr_proc = curr_proc);
 
 	if (f->curr_token.kind == Token_OpenBrace) {
 		if ((tags & ProcTag_foreign) != 0) {
@@ -2273,6 +2271,7 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 		body = parse_body(f);
 	}
 
+	f->curr_proc = curr_proc;
 	return make_proc_decl(f, name, proc_type, body, tags, foreign_name, link_name);
 }
 
@@ -2285,7 +2284,7 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 		if (name->kind == AstNode_Ident) {
 			String n = name->Ident.string;
 			// NOTE(bill): Check for reserved identifiers
-			if (n == "context") {
+			if (str_eq(n, str_lit("context"))) {
 				syntax_error(ast_node_token(name), "`context` is a reserved identifier");
 				break;
 			}
@@ -2399,7 +2398,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 		if (allow_token(f, Token_Semicolon)) {
 			cond = parse_expr(f, false);
 		} else {
-			cond = convert_stmt_to_expr(f, init, make_string("boolean expression"));
+			cond = convert_stmt_to_expr(f, init, str_lit("boolean expression"));
 			init = NULL;
 		}
 	}
@@ -2489,7 +2488,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 	}
 	body = parse_block_stmt(f);
 
-	cond = convert_stmt_to_expr(f, cond, make_string("boolean expression"));
+	cond = convert_stmt_to_expr(f, cond, str_lit("boolean expression"));
 
 	return make_for_stmt(f, token, init, cond, end, body);
 }
@@ -2559,7 +2558,7 @@ AstNode *parse_match_stmt(AstFile *f) {
 		close = expect_token(f, Token_CloseBrace);
 		body = make_block_stmt(f, list, open, close);
 
-		tag = convert_stmt_to_expr(f, tag, make_string("type match expression"));
+		tag = convert_stmt_to_expr(f, tag, str_lit("type match expression"));
 		return make_type_match_stmt(f, token, tag, var, body);
 	} else {
 		if (f->curr_token.kind != Token_OpenBrace) {
@@ -2591,7 +2590,7 @@ AstNode *parse_match_stmt(AstFile *f) {
 
 		body = make_block_stmt(f, list, open, close);
 
-		tag = convert_stmt_to_expr(f, tag, make_string("match expression"));
+		tag = convert_stmt_to_expr(f, tag, str_lit("match expression"));
 		return make_match_stmt(f, token, init, tag, body);
 	}
 }
@@ -2747,14 +2746,14 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Hash: {
 		s = parse_tag_stmt(f, NULL);
 		String tag = s->TagStmt.name.string;
-		if (tag == "shared_global_scope") {
+		if (str_eq(tag, str_lit("shared_global_scope"))) {
 			if (f->curr_proc == NULL) {
 				f->is_global_scope = true;
 				return make_empty_stmt(f, f->curr_token);
 			}
 			syntax_error(token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope");
 			return make_bad_decl(f, token, f->curr_token);
-		} else if (tag == "import") {
+		} else if (str_eq(tag, str_lit("import"))) {
 			// TODO(bill): better error messages
 			Token import_name = {};
 			Token file_path = expect_token_after(f, Token_String, "#import");
@@ -2768,7 +2767,7 @@ AstNode *parse_stmt(AstFile *f) {
 					import_name = expect_token_after(f, Token_Identifier, "`as` for import declaration");
 				}
 
-				if (import_name.string == "_") {
+				if (str_eq(import_name.string, str_lit("_"))) {
 					syntax_error(token, "Illegal import name: `_`");
 					return make_bad_decl(f, token, f->curr_token);
 				}
@@ -2779,32 +2778,32 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			syntax_error(token, "You cannot use #import within a procedure. This must be done at the file scope");
 			return make_bad_decl(f, token, file_path);
-		} else if (tag == "load") {
+		} else if (str_eq(tag, str_lit("load"))) {
 			// TODO(bill): better error messages
 			Token file_path = expect_token(f, Token_String);
 			Token import_name = file_path;
-			import_name.string = make_string(".");
+			import_name.string = str_lit(".");
 
 			if (f->curr_proc == NULL) {
 				return make_import_decl(f, s->TagStmt.token, file_path, import_name, true);
 			}
 			syntax_error(token, "You cannot use #load within a procedure. This must be done at the file scope");
 			return make_bad_decl(f, token, file_path);
-		} else if (tag == "foreign_system_library") {
+		} else if (str_eq(tag, str_lit("foreign_system_library"))) {
 			Token file_path = expect_token(f, Token_String);
 			if (f->curr_proc == NULL) {
 				return make_foreign_library(f, s->TagStmt.token, file_path, true);
 			}
 			syntax_error(token, "You cannot use #foreign_system_library within a procedure. This must be done at the file scope");
 			return make_bad_decl(f, token, file_path);
-		} else if (tag == "foreign_library") {
+		} else if (str_eq(tag, str_lit("foreign_library"))) {
 			Token file_path = expect_token(f, Token_String);
 			if (f->curr_proc == NULL) {
 				return make_foreign_library(f, s->TagStmt.token, file_path, false);
 			}
 			syntax_error(token, "You cannot use #foreign_library within a procedure. This must be done at the file scope");
 			return make_bad_decl(f, token, file_path);
-		} else if (tag == "thread_local") {
+		} else if (str_eq(tag, str_lit("thread_local"))) {
 			AstNode *var_decl = parse_simple_stmt(f);
 			if (var_decl->kind != AstNode_VarDecl) {
 				syntax_error(token, "#thread_local may only be applied to variable declarations");
@@ -2816,14 +2815,14 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			var_decl->VarDecl.tags |= VarDeclTag_thread_local;
 			return var_decl;
-		} else if (tag == "bounds_check") {
+		} else if (str_eq(tag, str_lit("bounds_check"))) {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_bounds_check;
 			if ((s->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return s;
-		} else if (tag == "no_bounds_check") {
+		} else if (str_eq(tag, str_lit("no_bounds_check"))) {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_no_bounds_check;
 			if ((s->stmt_state_flags & StmtStateFlag_bounds_check) != 0) {
@@ -2870,7 +2869,7 @@ AstNodeArray parse_stmt_list(AstFile *f) {
 
 
 ParseFileError init_ast_file(AstFile *f, String fullpath) {
-	if (!string_has_extension(fullpath, make_string("odin"))) {
+	if (!string_has_extension(fullpath, str_lit("odin"))) {
 		return ParseFile_WrongExtension;
 	}
 	TokenizerInitError err = init_tokenizer(&f->tokenizer, fullpath);
@@ -2951,11 +2950,10 @@ void destroy_parser(Parser *p) {
 // NOTE(bill): Returns true if it's added
 b32 try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
 	gb_mutex_lock(&p->mutex);
-	defer (gb_mutex_unlock(&p->mutex));
 
 	for_array(i, p->imports) {
 		String import = p->imports[i].path;
-		if (import == path) {
+		if (str_eq(import, path)) {
 			return false;
 		}
 	}
@@ -2965,52 +2963,59 @@ b32 try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
 	item.rel_path = rel_path;
 	item.pos = pos;
 	array_add(&p->imports, item);
+
+	gb_mutex_unlock(&p->mutex);
+
 	return true;
 }
 
 String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
+	String res = {};
 	isize str_len = base_dir.len+path.len;
 
 	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
-	defer (gb_free(heap_allocator(), str));
 
 	isize i = 0;
 	gb_memmove(str+i, base_dir.text, base_dir.len); i += base_dir.len;
 	gb_memmove(str+i, path.text, path.len);
 	str[str_len] = '\0';
-	return path_to_fullpath(a, make_string(str, str_len));
+	res = path_to_fullpath(a, make_string(str, str_len));
+	gb_free(heap_allocator(), str);
+	return res;
 }
 
 String get_fullpath_core(gbAllocator a, String path) {
 	String module_dir = get_module_dir();
+	String res = {};
 
 	char core[] = "core/";
 	isize core_len = gb_size_of(core)-1;
 
 	isize str_len = module_dir.len + core_len + path.len;
 	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
-	defer (gb_free(heap_allocator(), str));
 
 	gb_memmove(str, module_dir.text, module_dir.len);
 	gb_memmove(str+module_dir.len, core, core_len);
 	gb_memmove(str+module_dir.len+core_len, path.text, path.len);
 	str[str_len] = '\0';
 
-	return path_to_fullpath(a, make_string(str, str_len));
+	res = path_to_fullpath(a, make_string(str, str_len));
+	gb_free(heap_allocator(), str);
+	return res;
 }
 
 // NOTE(bill): Returns true if it's added
 b32 try_add_foreign_library_path(Parser *p, String import_file) {
 	gb_mutex_lock(&p->mutex);
-	defer (gb_mutex_unlock(&p->mutex));
 
 	for_array(i, p->foreign_libraries) {
 		String import = p->foreign_libraries[i];
-		if (import == import_file) {
+		if (str_eq(import, import_file)) {
 			return false;
 		}
 	}
 	array_add(&p->foreign_libraries, import_file);
+	gb_mutex_unlock(&p->mutex);
 	return true;
 }
 
@@ -3064,7 +3069,7 @@ String get_filepath_extension(String path) {
 
 		if (c == '.') {
 			if (seen_slash) {
-				return make_string("");
+				return str_lit("");
 			}
 
 			dot = i;
@@ -3166,19 +3171,19 @@ void parse_file(Parser *p, AstFile *f) {
 
 ParseFileError parse_files(Parser *p, char *init_filename) {
 	char *fullpath_str = gb_path_get_full_name(heap_allocator(), init_filename);
-	String init_fullpath = make_string(fullpath_str);
+	String init_fullpath = make_string_c(fullpath_str);
 	TokenPos init_pos = {};
 	ImportedFile init_imported_file = {init_fullpath, init_fullpath, init_pos};
 	array_add(&p->imports, init_imported_file);
 	p->init_fullpath = init_fullpath;
 
 	{
-		String s = get_fullpath_core(heap_allocator(), make_string("_preload.odin"));
+		String s = get_fullpath_core(heap_allocator(), str_lit("_preload.odin"));
 		ImportedFile runtime_file = {s, s, init_pos};
 		array_add(&p->imports, runtime_file);
 	}
 	{
-		String s = get_fullpath_core(heap_allocator(), make_string("_soft_numbers.odin"));
+		String s = get_fullpath_core(heap_allocator(), str_lit("_soft_numbers.odin"));
 		ImportedFile runtime_file = {s, s, init_pos};
 		array_add(&p->imports, runtime_file);
 	}
@@ -3196,7 +3201,6 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 				gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
 			}
 			gb_printf_err("Failed to parse file: %.*s\n\t", LIT(import_rel_path));
-			defer (gb_printf_err("\n"));
 			switch (err) {
 			case ParseFile_WrongExtension:
 				gb_printf_err("Invalid file extension: File must have the extension `.odin`");
@@ -3217,16 +3221,16 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 				gb_printf_err("Invalid token found in file");
 				break;
 			}
+			gb_printf_err("\n");
 			return err;
 		}
 		parse_file(p, &file);
 
 		{
 			gb_mutex_lock(&p->mutex);
-			defer (gb_mutex_unlock(&p->mutex));
-
 			file.id = p->files.count;
 			array_add(&p->files, file);
+			gb_mutex_unlock(&p->mutex);
 		}
 	}
 

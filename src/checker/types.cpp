@@ -719,7 +719,7 @@ b32 are_types_identical(Type *x, Type *y) {
 							if (!are_types_identical(x->Record.fields[i]->type, y->Record.fields[i]->type)) {
 								return false;
 							}
-							if (x->Record.fields[i]->token.string != y->Record.fields[i]->token.string) {
+							if (str_ne(x->Record.fields[i]->token.string, y->Record.fields[i]->token.string)) {
 								return false;
 							}
 						}
@@ -836,7 +836,7 @@ gb_global Entity *entity__slice_capacity = NULL;
 Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_type, Selection sel = empty_selection) {
 	GB_ASSERT(type_ != NULL);
 
-	if (field_name == "_") {
+	if (str_eq(field_name, str_lit("_"))) {
 		return empty_selection;
 	}
 
@@ -849,8 +849,8 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 	if (type->kind == Type_Basic) {
 		switch (type->Basic.kind) {
 		case Basic_any: {
-			String type_info_str = make_string("type_info");
-			String data_str = make_string("data");
+			String type_info_str = str_lit("type_info");
+			String data_str = str_lit("data");
 			if (entity__any_type_info == NULL) {
 				entity__any_type_info = make_entity_field(a, NULL, make_token_ident(type_info_str), t_type_info_ptr, false, 0);
 			}
@@ -858,19 +858,19 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 				entity__any_data = make_entity_field(a, NULL, make_token_ident(data_str), t_rawptr, false, 1);
 			}
 
-			if (field_name == type_info_str) {
+			if (str_eq(field_name, type_info_str)) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__any_type_info;
 				return sel;
-			} else if (field_name == data_str) {
+			} else if (str_eq(field_name, data_str)) {
 				selection_add_index(&sel, 1);
 				sel.entity = entity__any_data;
 				return sel;
 			}
 		} break;
 		case Basic_string: {
-			String data_str = make_string("data");
-			String count_str = make_string("count");
+			String data_str = str_lit("data");
+			String count_str = str_lit("count");
 			if (entity__string_data == NULL) {
 				entity__string_data = make_entity_field(a, NULL, make_token_ident(data_str), make_type_pointer(a, t_u8), false, 0);
 			}
@@ -879,11 +879,11 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 				entity__string_count = make_entity_field(a, NULL, make_token_ident(count_str), t_int, false, 1);
 			}
 
-			if (field_name == data_str) {
+			if (str_eq(field_name, data_str)) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__string_data;
 				return sel;
-			} else if (field_name == count_str) {
+			} else if (str_eq(field_name, count_str)) {
 				selection_add_index(&sel, 1);
 				sel.entity = entity__string_count;
 				return sel;
@@ -893,17 +893,17 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 
 		return sel;
 	} else if (type->kind == Type_Array) {
-		String count_str = make_string("count");
+		String count_str = str_lit("count");
 		// NOTE(bill): Underlying memory address cannot be changed
-		if (field_name == count_str) {
+		if (str_eq(field_name, count_str)) {
 			// HACK(bill): Memory leak
 			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, make_exact_value_integer(type->Array.count));
 			return sel;
 		}
 	} else if (type->kind == Type_Vector) {
-		String count_str = make_string("count");
+		String count_str = str_lit("count");
 		// NOTE(bill): Vectors are not addressable
-		if (field_name == count_str) {
+		if (str_eq(field_name, count_str)) {
 			// HACK(bill): Memory leak
 			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, make_exact_value_integer(type->Vector.count));
 			return sel;
@@ -914,9 +914,9 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 			switch (type->Vector.count) {
 			#define _VECTOR_FIELD_CASE(_length, _name) \
 			case (_length): \
-				if (field_name == _name) { \
+				if (str_eq(field_name, str_lit(_name))) { \
 					selection_add_index(&sel, (_length)-1); \
-					sel.entity = make_entity_vector_elem(a, NULL, make_token_ident(make_string(_name)), type->Vector.elem, (_length)-1); \
+					sel.entity = make_entity_vector_elem(a, NULL, make_token_ident(str_lit(_name)), type->Vector.elem, (_length)-1); \
 					return sel; \
 				} \
 				/*fallthrough*/
@@ -932,16 +932,16 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 		}
 
 	} else if (type->kind == Type_Slice) {
-		String data_str     = make_string("data");
-		String count_str    = make_string("count");
-		String capacity_str = make_string("capacity");
+		String data_str     = str_lit("data");
+		String count_str    = str_lit("count");
+		String capacity_str = str_lit("capacity");
 
-		if (field_name == data_str) {
+		if (str_eq(field_name, data_str)) {
 			selection_add_index(&sel, 0);
 			// HACK(bill): Memory leak
 			sel.entity = make_entity_field(a, NULL, make_token_ident(data_str), make_type_pointer(a, type->Slice.elem), false, 0);
 			return sel;
-		} else if (field_name == count_str) {
+		} else if (str_eq(field_name, count_str)) {
 			selection_add_index(&sel, 1);
 			if (entity__slice_count == NULL) {
 				entity__slice_count = make_entity_field(a, NULL, make_token_ident(count_str), t_int, false, 1);
@@ -949,7 +949,7 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 
 			sel.entity = entity__slice_count;
 			return sel;
-		} else if (field_name == capacity_str) {
+		} else if (str_eq(field_name, capacity_str)) {
 			selection_add_index(&sel, 2);
 			if (entity__slice_capacity == NULL) {
 				entity__slice_capacity = make_entity_field(a, NULL, make_token_ident(capacity_str), t_int, false, 2);
@@ -972,7 +972,7 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 				GB_ASSERT(f->kind == Entity_TypeName);
 				String str = f->token.string;
 
-				if (field_name == str) {
+				if (str_eq(field_name, str)) {
 					sel.entity = f;
 					selection_add_index(&sel, i);
 					return sel;
@@ -985,7 +985,7 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 			GB_ASSERT(f->kind != Entity_Variable);
 			String str = f->token.string;
 
-			if (field_name == str) {
+			if (str_eq(field_name, str)) {
 				sel.entity = f;
 				selection_add_index(&sel, i);
 				return sel;
@@ -993,13 +993,13 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 		}
 
 		if (is_type_enum(type)) {
-			if (field_name == "count") {
+			if (str_eq(field_name, str_lit("count"))) {
 				sel.entity = type->Record.enum_count;
 				return sel;
-			} else if (field_name == "min_value") {
+			} else if (str_eq(field_name, str_lit("min_value"))) {
 				sel.entity = type->Record.min_value;
 				return sel;
-			} else if (field_name == "max_value") {
+			} else if (str_eq(field_name, str_lit("max_value"))) {
 				sel.entity = type->Record.max_value;
 				return sel;
 			}
@@ -1010,7 +1010,7 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 			Entity *f = type->Record.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
 			String str = f->token.string;
-			if (field_name == str) {
+			if (str_eq(field_name, str)) {
 				selection_add_index(&sel, i);  // HACK(bill): Leaky memory
 				sel.entity = f;
 				return sel;

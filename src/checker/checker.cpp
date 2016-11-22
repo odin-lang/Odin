@@ -508,10 +508,10 @@ void init_universal_scope(void) {
 	}
 
 // Constants
-	add_global_constant(a, make_string("true"),  t_untyped_bool, make_exact_value_bool(true));
-	add_global_constant(a, make_string("false"), t_untyped_bool, make_exact_value_bool(false));
+	add_global_constant(a, str_lit("true"),  t_untyped_bool, make_exact_value_bool(true));
+	add_global_constant(a, str_lit("false"), t_untyped_bool, make_exact_value_bool(false));
 
-	add_global_entity(make_entity_nil(a, make_string("nil"), t_untyped_nil));
+	add_global_entity(make_entity_nil(a, str_lit("nil"), t_untyped_nil));
 
 // Builtin Procedures
 	for (isize i = 0; i < gb_count_of(builtin_procs); i++) {
@@ -671,7 +671,7 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 }
 
 b32 add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
-	if (entity->token.string != make_string("_")) {
+	if (str_ne(entity->token.string, str_lit("_"))) {
 		Entity *insert_entity = scope_insert_entity(scope, entity);
 		if (insert_entity) {
 			Entity *up = insert_entity->using_parent;
@@ -714,7 +714,7 @@ void add_entity_use(Checker *c, AstNode *identifier, Entity *entity) {
 
 
 void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d) {
-	GB_ASSERT(identifier->Ident.string == e->token.string);
+	GB_ASSERT(str_eq(identifier->Ident.string, e->token.string));
 	add_entity(c, e->scope, identifier, e);
 	map_set(&c->info.entities, hash_pointer(e), d);
 }
@@ -925,7 +925,7 @@ void init_preload_types(Checker *c) {
 
 
 	if (t_type_info == NULL) {
-		Entity *e = current_scope_lookup_entity(c->global_scope, make_string("Type_Info"));
+		Entity *e = current_scope_lookup_entity(c->global_scope, str_lit("Type_Info"));
 		if (e == NULL) {
 			compiler_error("Could not find type declaration for `Type_Info`\n"
 			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
@@ -961,7 +961,7 @@ void init_preload_types(Checker *c) {
 	}
 
 	if (t_allocator == NULL) {
-		Entity *e = current_scope_lookup_entity(c->global_scope, make_string("Allocator"));
+		Entity *e = current_scope_lookup_entity(c->global_scope, str_lit("Allocator"));
 		if (e == NULL) {
 			compiler_error("Could not find type declaration for `Allocator`\n"
 			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
@@ -971,7 +971,7 @@ void init_preload_types(Checker *c) {
 	}
 
 	if (t_context == NULL) {
-		Entity *e = current_scope_lookup_entity(c->global_scope, make_string("Context"));
+		Entity *e = current_scope_lookup_entity(c->global_scope, str_lit("Context"));
 		if (e == NULL) {
 			compiler_error("Could not find type declaration for `Context`\n"
 			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
@@ -992,14 +992,42 @@ void add_implicit_value(Checker *c, ImplicitValueId id, String name, String back
 	c->info.implicit_values[id] = value;
 }
 
+
+void check_global_entity(Checker *c, EntityKind kind) {
+	PROF_SCOPED("check_global_entity");
+	for_array(i, c->info.entities.entries) {
+		auto *entry = &c->info.entities.entries[i];
+		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
+		if (e->kind == kind) {
+			DeclInfo *d = entry->value;
+
+			add_curr_ast_file(c, d->scope->file);
+
+			if (d->scope == e->scope) {
+				if (kind != Entity_Procedure && str_eq(e->token.string, str_lit("main"))) {
+					if (e->scope->is_init) {
+						error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
+						continue;
+					}
+				} else if (e->scope->is_global && str_eq(e->token.string, str_lit("main"))) {
+					error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
+					continue;
+				}
+
+				Scope *prev_scope = c->context.scope;
+				c->context.scope = d->scope;
+				check_entity_decl(c, e, d, NULL);
+			}
+		}
+	}
+}
+
 void check_parsed_files(Checker *c) {
 	Array<AstNode *> import_decls;
 	array_init(&import_decls, heap_allocator());
-	defer (array_free(&import_decls));
 
 	Map<Scope *> file_scopes; // Key: String (fullpath)
 	map_init(&file_scopes, heap_allocator());
-	defer (map_destroy(&file_scopes));
 
 	// Map full filepaths to Scopes
 	for_array(i, c->parser->files) {
@@ -1176,7 +1204,7 @@ void check_parsed_files(Checker *c) {
 				warning(id->token, "Multiple #import of the same file within this scope");
 			}
 
-			if (id->import_name.string == ".") {
+			if (str_eq(id->import_name.string, str_lit("."))) {
 				// NOTE(bill): Add imported entities to this file's scope
 				for_array(elem_index, scope->elements.entries) {
 					Entity *e = scope->elements.entries[elem_index].value;
@@ -1241,39 +1269,10 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
-	auto check_global_entity = [](Checker *c, EntityKind kind) {
-		PROF_SCOPED("check_global_entity");
-		for_array(i, c->info.entities.entries) {
-			auto *entry = &c->info.entities.entries[i];
-			Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
-			if (e->kind == kind) {
-				DeclInfo *d = entry->value;
-
-				add_curr_ast_file(c, d->scope->file);
-
-				if (d->scope == e->scope) {
-					if (kind != Entity_Procedure && e->token.string == "main") {
-						if (e->scope->is_init) {
-							error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
-							continue;
-						}
-					} else if (e->scope->is_global && e->token.string == "main") {
-						error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
-						continue;
-					}
-
-					Scope *prev_scope = c->context.scope;
-					c->context.scope = d->scope;
-					check_entity_decl(c, e, d, NULL);
-				}
-			}
-		}
-	};
-
 	check_global_entity(c, Entity_TypeName);
 
 	init_preload_types(c);
-	add_implicit_value(c, ImplicitValue_context, make_string("context"), make_string("__context"), t_context);
+	add_implicit_value(c, ImplicitValue_context, str_lit("context"), str_lit("__context"), t_context);
 
 	check_global_entity(c, Entity_Constant);
 	check_global_entity(c, Entity_Procedure);
@@ -1299,8 +1298,8 @@ void check_parsed_files(Checker *c) {
 		b32 bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
 		b32 no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
 
-		auto prev_context = c->context;
-		defer (c->context = prev_context);
+		CheckerContext prev_context = c->context;
+
 		if (bounds_check) {
 			c->context.stmt_state_flags |= StmtStateFlag_bounds_check;
 			c->context.stmt_state_flags &= ~StmtStateFlag_no_bounds_check;
@@ -1310,6 +1309,8 @@ void check_parsed_files(Checker *c) {
 		}
 
 		check_proc_body(c, pi->token, pi->decl, pi->type, pi->body);
+
+		c->context = prev_context;
 	}
 
 	// Add untyped expression values
@@ -1365,6 +1366,8 @@ void check_parsed_files(Checker *c) {
 	// 	gb_printf("%td - %s\n", e->value, type_to_string(prev_type));
 	// }
 
+	map_destroy(&file_scopes);
+	array_free(&import_decls);
 }
 
 

@@ -615,7 +615,7 @@ extern "C++" {
 //
 // NOTE: C++11 (and above) only!
 //
-#if defined(__cplusplus) && ((defined(_MSC_VER) && _MSC_VER >= 1400) || (__cplusplus >= 201103L))
+#if !defined(GB_NO_DEFER) && defined(__cplusplus) && ((defined(_MSC_VER) && _MSC_VER >= 1400) || (__cplusplus >= 201103L))
 extern "C++" {
 	// NOTE(bill): Stupid fucking templates
 	template <typename T> struct gbRemoveReference       { typedef T Type; };

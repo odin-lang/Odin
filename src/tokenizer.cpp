@@ -180,7 +180,6 @@ void init_global_error_collector(void) {
 
 void warning(Token token, char *fmt, ...) {
 	gb_mutex_lock(&global_error_collector.mutex);
-	defer (gb_mutex_unlock(&global_error_collector.mutex));
 
 	global_error_collector.warning_count++;
 	// NOTE(bill): Duplicate error, skip it
@@ -195,11 +194,12 @@ void warning(Token token, char *fmt, ...) {
 		              gb_bprintf_va(fmt, va));
 		va_end(va);
 	}
+
+	gb_mutex_unlock(&global_error_collector.mutex);
 }
 
 void error(Token token, char *fmt, ...) {
 	gb_mutex_lock(&global_error_collector.mutex);
-	defer (gb_mutex_unlock(&global_error_collector.mutex));
 
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
@@ -214,11 +214,12 @@ void error(Token token, char *fmt, ...) {
 		              gb_bprintf_va(fmt, va));
 		va_end(va);
 	}
+
+	gb_mutex_unlock(&global_error_collector.mutex);
 }
 
 void syntax_error(Token token, char *fmt, ...) {
 	gb_mutex_lock(&global_error_collector.mutex);
-	defer (gb_mutex_unlock(&global_error_collector.mutex));
 
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
@@ -233,6 +234,8 @@ void syntax_error(Token token, char *fmt, ...) {
 		              gb_bprintf_va(fmt, va));
 		va_end(va);
 	}
+
+	gb_mutex_unlock(&global_error_collector.mutex);
 }
 
 
@@ -349,12 +352,11 @@ void advance_to_next_rune(Tokenizer *t) {
 TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 	PROF_PROC();
 
+	TokenizerInitError err = TokenizerInit_None;
+
 	char *c_str = gb_alloc_array(heap_allocator(), char, fullpath.len+1);
 	memcpy(c_str, fullpath.text, fullpath.len);
 	c_str[fullpath.len] = '\0';
-
-	defer (gb_free(heap_allocator(), c_str));
-
 
 	// TODO(bill): Memory map rather than copy contents
 	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, c_str);
@@ -363,9 +365,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 		t->start = cast(u8 *)fc.data;
 		t->line = t->read_curr = t->curr = t->start;
 		t->end = t->start + fc.size;
-
 		t->fullpath = fullpath;
-
 		t->line_count = 1;
 
 		advance_to_next_rune(t);
@@ -374,28 +374,25 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 		}
 
 		array_init(&t->allocated_strings, heap_allocator());
+	} else {
+		gbFile f = {};
+		gbFileError file_err = gb_file_open(&f, c_str);
 
-		return TokenizerInit_None;
+		switch (file_err) {
+		case gbFileError_Invalid:    err = TokenizerInit_Invalid;    break;
+		case gbFileError_NotExists:  err = TokenizerInit_NotExists;  break;
+		case gbFileError_Permission: err = TokenizerInit_Permission; break;
+		}
+
+		if (err == TokenizerInit_None && gb_file_size(&f) == 0) {
+			err = TokenizerInit_Empty;
+		}
+
+		gb_file_close(&f);
 	}
 
-	gbFile f = {};
-	gbFileError err = gb_file_open(&f, c_str);
-	defer (gb_file_close(&f));
-
-	switch (err) {
-	case gbFileError_Invalid:
-		return TokenizerInit_Invalid;
-	case gbFileError_NotExists:
-		return TokenizerInit_NotExists;
-	case gbFileError_Permission:
-		return TokenizerInit_Permission;
-	}
-
-	if (gb_file_size(&f) == 0) {
-		return TokenizerInit_Empty;
-	}
-
-	return TokenizerInit_None;
+	gb_free(heap_allocator(), c_str);
+	return err;
 }
 
 gb_inline void destroy_tokenizer(Tokenizer *t) {
@@ -634,17 +631,17 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 		// NOTE(bill): All keywords are > 1
 		if (token.string.len > 1) {
-			if (token.string == token_strings[Token_as]) {
+			if (str_eq(token.string, token_strings[Token_as])) {
 				token.kind = Token_as;
-			} else if (token.string == token_strings[Token_transmute]) {
+			} else if (str_eq(token.string, token_strings[Token_transmute])) {
 				token.kind = Token_transmute;
-			} else if (token.string == token_strings[Token_down_cast]) {
+			} else if (str_eq(token.string, token_strings[Token_down_cast])) {
 				token.kind = Token_down_cast;
-			} else if (token.string == token_strings[Token_union_cast]) {
+			} else if (str_eq(token.string, token_strings[Token_union_cast])) {
 				token.kind = Token_union_cast;
 			} else {
 				for (i32 k = Token__KeywordBegin+1; k < Token__KeywordEnd; k++) {
-					if (token.string == token_strings[k]) {
+					if (str_eq(token.string, token_strings[k])) {
 						token.kind = cast(TokenKind)k;
 						break;
 					}

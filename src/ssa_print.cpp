@@ -90,7 +90,6 @@ void ssa_print_escape_string(ssaFileBuffer *f, String name, b32 print_quotes) {
 	isize buf_len = name.len + extra + 2;
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-	defer (gb_temp_arena_memory_end(tmp));
 
 	u8 *buf = gb_alloc_array(string_buffer_allocator, u8, buf_len);
 
@@ -117,6 +116,8 @@ void ssa_print_escape_string(ssaFileBuffer *f, String name, b32 print_quotes) {
 	}
 
 	ssa_file_write(f, buf, j);
+
+	gb_temp_arena_memory_end(tmp);
 }
 
 
@@ -128,7 +129,7 @@ void ssa_print_encoded_local(ssaFileBuffer *f, String name) {
 
 void ssa_print_encoded_global(ssaFileBuffer *f, String name, b32 global_scope) {
 	ssa_fprintf(f, "@");
-	if (!global_scope && name != make_string("main")) {
+	if (!global_scope && str_ne(name, str_lit("main"))) {
 		ssa_fprintf(f, ".");
 	}
 	ssa_print_escape_string(f, name, true);
@@ -482,7 +483,6 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 			ssa_fprintf(f, ">");
 		} else if (is_type_struct(type)) {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
-			defer (gb_temp_arena_memory_end(tmp));
 
 			ast_node(cl, CompoundLit, value.value_compound);
 
@@ -543,6 +543,8 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 			if (type->Record.struct_is_packed) {
 				ssa_fprintf(f, ">");
 			}
+
+			gb_temp_arena_memory_end(tmp);
 		} else {
 			ssa_fprintf(f, "zeroinitializer");
 		}
@@ -638,7 +640,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	switch (instr->kind) {
 	case ssaInstr_StartupRuntime: {
 		ssa_fprintf(f, "call void ");
-		ssa_print_encoded_global(f, make_string(SSA_STARTUP_RUNTIME_PROC_NAME), false);
+		ssa_print_encoded_global(f, str_lit(SSA_STARTUP_RUNTIME_PROC_NAME), false);
 		ssa_fprintf(f, "()\n");
 	} break;
 
@@ -889,7 +891,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 				}
 
 				ssa_fprintf(f, " ");
-				ssa_print_encoded_global(f, make_string(runtime_proc), false);
+				ssa_print_encoded_global(f, make_string_c(runtime_proc), false);
 				ssa_fprintf(f, "(");
 				ssa_print_type(f, m, type);
 				ssa_fprintf(f, " ");
@@ -1090,7 +1092,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	case ssaInstr_BoundsCheck: {
 		auto *bc = &instr->BoundsCheck;
 		ssa_fprintf(f, "call void ");
-		ssa_print_encoded_global(f, make_string("__bounds_check_error"), false);
+		ssa_print_encoded_global(f, str_lit("__bounds_check_error"), false);
 		ssa_fprintf(f, "(");
 		ssa_print_compound_element(f, m, make_exact_value_string(bc->pos.file), t_string);
 		ssa_fprintf(f, ", ");
@@ -1121,9 +1123,9 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		auto *bc = &instr->SliceBoundsCheck;
 		ssa_fprintf(f, "call void ");
 		if (bc->is_substring) {
-			ssa_print_encoded_global(f, make_string("__substring_expr_error"), false);
+			ssa_print_encoded_global(f, str_lit("__substring_expr_error"), false);
 		} else {
-			ssa_print_encoded_global(f, make_string("__slice_expr_error"), false);
+			ssa_print_encoded_global(f, str_lit("__slice_expr_error"), false);
 		}
 
 		ssa_fprintf(f, "(");
@@ -1273,21 +1275,19 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 	ssaModule *m = &ssa->module;
 	ssaFileBuffer buf = {}, *f = &buf;
 	ssa_file_buffer_init(f, &ssa->output_file);
-	defer (ssa_file_buffer_destroy(f));
-
 
 	if (m->layout.len > 0) {
 		ssa_fprintf(f, "target datalayout = \"%.*s\"\n", LIT(m->layout));
 	}
 
-	ssa_print_encoded_local(f, make_string("..string"));
+	ssa_print_encoded_local(f, str_lit("..string"));
 	ssa_fprintf(f, " = type {i8*, ");
 	ssa_print_type(f, m, t_int);
 	ssa_fprintf(f, "} ; Basic_string\n");
-	ssa_print_encoded_local(f, make_string("..rawptr"));
+	ssa_print_encoded_local(f, str_lit("..rawptr"));
 	ssa_fprintf(f, " = type i8* ; Basic_rawptr\n");
 
-	ssa_print_encoded_local(f, make_string("..any"));
+	ssa_print_encoded_local(f, str_lit("..any"));
 	ssa_fprintf(f, " = type {");
 	ssa_print_type(f, m, t_type_info_ptr);
 	ssa_fprintf(f, ", ");
@@ -1379,7 +1379,6 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 			auto *entry = &m->debug_info.entries[di_index];
 			ssaDebugInfo *di = entry->value;
 			ssa_fprintf(f, "!%d = ", di->id);
-			defer (ssa_fprintf(f, "\n"));
 
 			switch (di->kind) {
 			case ssaDebugInfo_CompileUnit: {
@@ -1430,6 +1429,10 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 				ssa_fprintf(f, "}");
 				break;
 			}
+
+			ssa_fprintf(f, "\n");
 		}
 	}
+
+	ssa_file_buffer_destroy(f);
 }

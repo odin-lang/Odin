@@ -18,12 +18,11 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 	}
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-	defer (gb_temp_arena_memory_end(tmp));
 
-	struct Delay {
+	typedef struct {
 		Entity *e;
 		DeclInfo *d;
-	};
+	} Delay;
 	Array<Delay> delayed_const; array_init(&delayed_const, c->tmp_allocator, stmts.count);
 	Array<Delay> delayed_type;  array_init(&delayed_type,  c->tmp_allocator, stmts.count);
 
@@ -95,6 +94,8 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 		}
 		check_stmt(c, n, new_flags);
 	}
+
+	gb_temp_arena_memory_end(tmp);
 }
 
 b32 check_is_terminating_list(AstNodeArray stmts) {
@@ -238,9 +239,9 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 
 	// NOTE(bill): Ignore assignments to `_`
 	if (node->kind == AstNode_Ident &&
-	    node->Ident.string == "_") {
+	    str_eq(node->Ident.string, str_lit("_"))) {
 		add_entity_definition(&c->info, node, NULL);
-		check_assignment(c, op_a, NULL, make_string("assignment to `_` identifier"));
+		check_assignment(c, op_a, NULL, str_lit("assignment to `_` identifier"));
 		if (op_a->mode == Addressing_Invalid)
 			return NULL;
 		return op_a->type;
@@ -282,7 +283,6 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 		}
 
 		gbString str = expr_to_string(op_b.expr);
-		defer (gb_string_free(str));
 		switch (op_b.mode) {
 		case Addressing_Value:
 			error(ast_node_token(op_b.expr), "Cannot assign to `%s`", str);
@@ -291,13 +291,14 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 			error(ast_node_token(op_b.expr), "Cannot assign to `%s`", str);
 			break;
 		}
-
+		gb_string_free(str);
 	} break;
 	}
 
-	check_assignment(c, op_a, op_b.type, make_string("assignment"));
-	if (op_a->mode == Addressing_Invalid)
+	check_assignment(c, op_a, op_b.type, str_lit("assignment"));
+	if (op_a->mode == Addressing_Invalid) {
 		return NULL;
+	}
 
 	return op_a->type;
 }
@@ -314,15 +315,13 @@ b32 check_valid_type_match_type(Type *type, b32 *is_union_ptr, b32 *is_any) {
 	return false;
 }
 
-
+void check_stmt_internal(Checker *c, AstNode *node, u32 flags);
 void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	u32 prev_stmt_state_flags = c->context.stmt_state_flags;
-	defer (c->context.stmt_state_flags = prev_stmt_state_flags);
 
 	if (node->stmt_state_flags != 0) {
 		u32 in = node->stmt_state_flags;
 		u32 out = c->context.stmt_state_flags;
-		defer (c->context.stmt_state_flags = out);
 
 		if (in & StmtStateFlag_bounds_check) {
 			out |= StmtStateFlag_bounds_check;
@@ -331,9 +330,16 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			out |= StmtStateFlag_no_bounds_check;
 			out &= ~StmtStateFlag_bounds_check;
 		}
+
+		c->context.stmt_state_flags = out;
 	}
 
+	check_stmt_internal(c, node, flags);
 
+	c->context.stmt_state_flags = prev_stmt_state_flags;
+}
+
+void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
 	case_ast_node(_, EmptyStmt, node); case_end;
@@ -352,16 +358,15 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		case Addressing_NoValue:
 			return;
 		default: {
-			gbString expr_str = expr_to_string(operand.expr);
-			defer (gb_string_free(expr_str));
 			if (kind == Expr_Stmt) {
 				return;
 			}
 			if (operand.expr->kind == AstNode_CallExpr) {
 				return;
 			}
-
+			gbString expr_str = expr_to_string(operand.expr);
 			error(ast_node_token(node), "Expression is not used: `%s`", expr_str);
+			gb_string_free(expr_str);
 		} break;
 		}
 	case_end;
@@ -403,7 +408,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		ast_node(bl, BasicLit, &basic_lit);
 		*bl = ids->op;
 		bl->kind = Token_Integer;
-		bl->string = make_string("1");
+		bl->string = str_lit("1");
 
 		AstNode binary_expr = {AstNode_BinaryExpr};
 		ast_node(be, BinaryExpr, &binary_expr);
@@ -425,7 +430,6 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			}
 
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-			defer (gb_temp_arena_memory_end(tmp));
 
 			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 			// an extra allocation
@@ -458,6 +462,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			if (lhs_count != rhs_count) {
 				error(ast_node_token(as->lhs[0]), "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
 			}
+
+			gb_temp_arena_memory_end(tmp);
 		} break;
 
 		default: {
@@ -501,10 +507,10 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		PROF_SCOPED("check_stmt - IfStmt");
 
 		check_open_scope(c, node);
-		defer (check_close_scope(c));
 
-		if (is->init != NULL)
+		if (is->init != NULL) {
 			check_stmt(c, is->init, 0);
+		}
 
 		Operand operand = {Addressing_Invalid};
 		check_expr(c, &operand, is->cond);
@@ -528,6 +534,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				break;
 			}
 		}
+
+		check_close_scope(c);
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);
@@ -558,7 +566,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				error(ast_node_token(node), "Expected %td return values, got 0", result_count);
 			} else {
 				check_init_variables(c, variables, result_count,
-				                     rs->results, make_string("return statement"));
+				                     rs->results, str_lit("return statement"));
 			}
 		} else if (rs->results.count > 0) {
 			error(ast_node_token(rs->results[0]), "No return values expected");
@@ -570,10 +578,10 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 		check_open_scope(c, node);
-		defer (check_close_scope(c));
 
-		if (fs->init != NULL)
+		if (fs->init != NULL) {
 			check_stmt(c, fs->init, 0);
+		}
 		if (fs->cond) {
 			Operand operand = {Addressing_Invalid};
 			check_expr(c, &operand, fs->cond);
@@ -583,9 +591,12 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				      "Non-boolean condition in `for` statement");
 			}
 		}
-		if (fs->post != NULL)
+		if (fs->post != NULL) {
 			check_stmt(c, fs->post, 0);
+		}
 		check_stmt(c, fs->body, new_flags);
+
+		check_close_scope(c);
 	case_end;
 
 	case_ast_node(ms, MatchStmt, node);
@@ -595,14 +606,13 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 		mod_flags |= Stmt_BreakAllowed;
 		check_open_scope(c, node);
-		defer (check_close_scope(c));
 
 		if (ms->init != NULL) {
 			check_stmt(c, ms->init, 0);
 		}
 		if (ms->tag != NULL) {
 			check_expr(c, &x, ms->tag);
-			check_assignment(c, &x, NULL, make_string("match expression"));
+			check_assignment(c, &x, NULL, str_lit("match expression"));
 		} else {
 			x.mode  = Addressing_Constant;
 			x.type  = t_bool;
@@ -610,7 +620,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 			Token token = {};
 			token.pos = ast_node_token(ms->body).pos;
-			token.string = make_string("true");
+			token.string = str_lit("true");
 			x.expr  = make_ident(c->curr_ast_file, token);
 		}
 
@@ -649,7 +659,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 		Map<TypeAndToken> seen = {}; // NOTE(bill): Multimap
 		map_init(&seen, heap_allocator());
-		defer (map_destroy(&seen));
+
 		for_array(i, bs->stmts) {
 			AstNode *stmt = bs->stmts[i];
 			if (stmt->kind != AstNode_CaseClause) {
@@ -689,8 +699,6 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 					auto *found = map_get(&seen, key);
 					if (found != NULL) {
 						gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-						defer (gb_temp_arena_memory_end(tmp));
-
 						isize count = multi_map_count(&seen, key);
 						TypeAndToken *taps = gb_alloc_array(c->tmp_allocator, TypeAndToken, count);
 
@@ -713,6 +721,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 							}
 						}
 
+						gb_temp_arena_memory_end(tmp);
+
 						if (continue_outer) {
 							continue;
 						}
@@ -730,6 +740,10 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			check_stmt_list(c, cc->stmts, ft_flags);
 			check_close_scope(c);
 		}
+
+		map_destroy(&seen);
+
+		check_close_scope(c);
 	case_end;
 
 	case_ast_node(ms, TypeMatchStmt, node);
@@ -739,18 +753,17 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 		mod_flags |= Stmt_BreakAllowed;
 		check_open_scope(c, node);
-		defer (check_close_scope(c));
 
 		b32 is_union_ptr = false;
 		b32 is_any = false;
 
 		check_expr(c, &x, ms->tag);
-		check_assignment(c, &x, NULL, make_string("type match expression"));
+		check_assignment(c, &x, NULL, str_lit("type match expression"));
 		if (!check_valid_type_match_type(x.type, &is_union_ptr, &is_any)) {
 			gbString str = type_to_string(x.type);
-			defer (gb_string_free(str));
 			error(ast_node_token(x.expr),
 			      "Invalid type for this type match expression, got `%s`", str);
+			gb_string_free(str);
 			break;
 		}
 
@@ -789,8 +802,6 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 		Map<b32> seen = {};
 		map_init(&seen, heap_allocator());
-		defer (map_destroy(&seen));
-
 
 		for_array(i, bs->stmts) {
 			AstNode *stmt = bs->stmts[i];
@@ -822,9 +833,9 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 					}
 					if (!tag_type_found) {
 						gbString type_str = type_to_string(y.type);
-						defer (gb_string_free(type_str));
 						error(ast_node_token(y.expr),
 						      "Unknown tag type, got `%s`", type_str);
+						gb_string_free(type_str);
 						continue;
 					}
 					case_type = y.type;
@@ -868,6 +879,9 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			check_stmt_list(c, cc->stmts, mod_flags);
 			check_close_scope(c);
 		}
+		map_destroy(&seen);
+
+		check_close_scope(c);
 	case_end;
 
 
@@ -930,9 +944,6 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 				return;
 			}
 
-			gbString expr_str = expr_to_string(expr);
-			defer (gb_string_free(expr_str));
-
 			switch (e->kind) {
 			case Entity_TypeName: {
 				Type *t = base_type(e->type);
@@ -941,7 +952,9 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 						Entity *f = t->Record.other_fields[i];
 						Entity *found = scope_insert_entity(c->context.scope, f);
 						if (found != NULL) {
+							gbString expr_str = expr_to_string(expr);
 							error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+							gb_string_free(expr_str);
 							return;
 						}
 						f->using_parent = e;
@@ -951,7 +964,9 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 						Entity *f = t->Record.fields[i];
 						Entity *found = scope_insert_entity(c->context.scope, f);
 						if (found != NULL) {
+							gbString expr_str = expr_to_string(expr);
 							error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+							gb_string_free(expr_str);
 							return;
 						}
 						f->using_parent = e;
@@ -960,7 +975,9 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 						Entity *f = t->Record.other_fields[i];
 						Entity *found = scope_insert_entity(c->context.scope, f);
 						if (found != NULL) {
+							gbString expr_str = expr_to_string(expr);
 							error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+							gb_string_free(expr_str);
 							return;
 						}
 						f->using_parent = e;
@@ -974,6 +991,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 					Entity *decl = scope->elements.entries[i].value;
 					Entity *found = scope_insert_entity(c->context.scope, decl);
 					if (found != NULL) {
+						gbString expr_str = expr_to_string(expr);
 						error(us->token,
 						      "Namespace collision while `using` `%s` of: %.*s\n"
 						      "\tat %.*s(%td:%td)\n"
@@ -982,6 +1000,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 						      LIT(found->token.pos.file), found->token.pos.line, found->token.pos.column,
 						      LIT(decl->token.pos.file), decl->token.pos.line, decl->token.pos.column
 						      );
+						gb_string_free(expr_str);
 						return;
 					}
 				}
@@ -1001,7 +1020,9 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 							}
 							Entity *prev = scope_insert_entity(c->context.scope, uvar);
 							if (prev != NULL) {
+								gbString expr_str = expr_to_string(expr);
 								error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(prev->token.string));
+								gb_string_free(expr_str);
 								return;
 							}
 						}
@@ -1085,7 +1106,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_ast_node(pa, PushAllocator, node);
 		Operand op = {};
 		check_expr(c, &op, pa->expr);
-		check_assignment(c, &op, t_allocator, make_string("argument to push_allocator"));
+		check_assignment(c, &op, t_allocator, str_lit("argument to push_allocator"));
 		check_stmt(c, pa->body, mod_flags);
 	case_end;
 
@@ -1093,7 +1114,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	case_ast_node(pa, PushContext, node);
 		Operand op = {};
 		check_expr(c, &op, pa->expr);
-		check_assignment(c, &op, t_context, make_string("argument to push_context"));
+		check_assignment(c, &op, t_context, str_lit("argument to push_context"));
 		check_stmt(c, pa->body, mod_flags);
 	case_end;
 
@@ -1128,7 +1149,5 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		add_entity_and_decl_info(c, pd->name, e, d);
 		check_entity_decl(c, e, d, NULL);
 	case_end;
-
-
 	}
 }

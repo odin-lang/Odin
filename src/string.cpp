@@ -1,5 +1,5 @@
-gb_global gbArena string_buffer_arena = {};
-gb_global gbAllocator string_buffer_allocator = {};
+gb_global gbArena string_buffer_arena = {0};
+gb_global gbAllocator string_buffer_allocator = {0};
 
 void init_string_buffer_memory(void) {
 	// NOTE(bill): This should be enough memory for file systems
@@ -42,14 +42,12 @@ gb_inline String16 make_string16(wchar_t *text, isize len) {
 }
 
 
-gb_inline String make_string(char *text) {
+gb_inline String make_string_c(char *text) {
 	return make_string(cast(u8 *)cast(void *)text, gb_strlen(text));
 }
 
-template <size_t N>
-gb_inline String make_string(char const (&text)[N]) {
-	return make_string(cast(u8 *)cast(void *)text, N-1);
-}
+#define str_lit(c_str) make_string(cast(u8 *)c_str, gb_size_of(c_str)-1)
+
 
 gb_inline b32 are_strings_equal(String a, String b) {
 	if (a.len == b.len) {
@@ -58,7 +56,7 @@ gb_inline b32 are_strings_equal(String a, String b) {
 	return false;
 }
 
-gb_inline b32 are_strings_equal_ignore_case(String a, String b) {
+gb_inline b32 str_eq_ignore_case(String a, String b) {
 	if (a.len == b.len) {
 		for (isize i = 0; i < a.len; i++) {
 			char x = cast(char)a.text[i];
@@ -115,18 +113,24 @@ GB_COMPARE_PROC(string_cmp_proc) {
 }
 
 
-gb_inline bool operator ==(String a, String b) { return are_strings_equal(a, b) != 0; }
-gb_inline bool operator !=(String a, String b) { return !operator==(a, b); }
-gb_inline bool operator < (String a, String b) { return string_compare(a, b) < 0; }
-gb_inline bool operator > (String a, String b) { return string_compare(a, b) > 0; }
-gb_inline bool operator <=(String a, String b) { return string_compare(a, b) <= 0; }
-gb_inline bool operator >=(String a, String b) { return string_compare(a, b) >= 0; }
+// gb_inline bool operator ==(String a, String b) { return are_strings_equal(a, b) != 0; }
+// gb_inline bool operator !=(String a, String b) { return !operator==(a, b); }
+// gb_inline bool operator < (String a, String b) { return string_compare(a, b) < 0; }
+// gb_inline bool operator > (String a, String b) { return string_compare(a, b) > 0; }
+// gb_inline bool operator <=(String a, String b) { return string_compare(a, b) <= 0; }
+// gb_inline bool operator >=(String a, String b) { return string_compare(a, b) >= 0; }
 
-template <size_t N> gb_inline bool operator ==(String a, char const (&b)[N]) { return a == make_string(cast(u8 *)b, N-1); }
-template <size_t N> gb_inline bool operator !=(String a, char const (&b)[N]) { return a != make_string(cast(u8 *)b, N-1); }
-template <size_t N> gb_inline bool operator ==(char const (&a)[N], String b) { return make_string(cast(u8 *)a, N-1) == b; }
-template <size_t N> gb_inline bool operator !=(char const (&a)[N], String b) { return make_string(cast(u8 *)a, N-1) != b; }
+// template <size_t N> gb_inline bool operator ==(String a, char const (&b)[N]) { return a == make_string(cast(u8 *)b, N-1); }
+// template <size_t N> gb_inline bool operator !=(String a, char const (&b)[N]) { return a != make_string(cast(u8 *)b, N-1); }
+// template <size_t N> gb_inline bool operator ==(char const (&a)[N], String b) { return make_string(cast(u8 *)a, N-1) == b; }
+// template <size_t N> gb_inline bool operator !=(char const (&a)[N], String b) { return make_string(cast(u8 *)a, N-1) != b; }
 
+gb_inline bool str_eq(String a, String b) { return are_strings_equal(a, b) != 0; }
+gb_inline bool str_ne(String a, String b) { return !str_eq(a, b);                }
+gb_inline bool str_lt(String a, String b) { return string_compare(a, b) < 0;     }
+gb_inline bool str_gt(String a, String b) { return string_compare(a, b) > 0;     }
+gb_inline bool str_le(String a, String b) { return string_compare(a, b) <= 0;    }
+gb_inline bool str_ge(String a, String b) { return string_compare(a, b) >= 0;    }
 
 
 
@@ -385,12 +389,12 @@ i32 unquote_string(gbAllocator a, String *s_) {
 	}
 
 
-	u8 rune_temp[4] = {};
+	u8 rune_temp[4] = {0};
 	isize buf_len = 3*s.len / 2;
 	u8 *buf = gb_alloc_array(a, u8, buf_len);
 	isize offset = 0;
 	while (s.len > 0) {
-		String tail_string = {};
+		String tail_string = {0};
 		Rune r = 0;
 		b32 multiple_bytes = false;
 		b32 success = unquote_char(s, quote, &r, &multiple_bytes, &tail_string);

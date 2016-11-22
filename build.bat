@@ -47,8 +47,8 @@ rem pushd %build_dir%
 	del *.ilk > NUL 2> NUL
 
 	cl %compiler_settings% "src\main.cpp" ^
-		/link %linker_settings% -OUT:%exe_name% ^
-	&& odin run code/demo.odin
+		/link %linker_settings% -OUT:%exe_name%
+	rem && odin run code/demo.odin
 	rem odin run code/demo.odin
 
 

@@ -274,7 +274,6 @@ void ssa_opt_blocks(ssaProcedure *proc) {
 }
 void ssa_opt_build_referrers(ssaProcedure *proc) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
-	defer (gb_temp_arena_memory_end(tmp));
 
 	Array<ssaValue *> ops = {}; // NOTE(bill): Act as a buffer
 	array_init(&ops, proc->module->tmp_allocator, 64); // HACK(bill): This _could_ overflow the temp arena
@@ -296,6 +295,8 @@ void ssa_opt_build_referrers(ssaProcedure *proc) {
 			}
 		}
 	}
+
+	gb_temp_arena_memory_end(tmp);
 }
 
 
@@ -370,7 +371,6 @@ void ssa_opt_build_dom_tree(ssaProcedure *proc) {
 	// Based on this paper: http://jgaa.info/accepted/2006/GeorgiadisTarjanWerneck2006.10.1.pdf
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
-	defer (gb_temp_arena_memory_end(tmp));
 
 	isize n = proc->blocks.count;
 	ssaBlock **buf = gb_alloc_array(proc->module->tmp_allocator, ssaBlock *, 5*n);
@@ -450,6 +450,8 @@ void ssa_opt_build_dom_tree(ssaProcedure *proc) {
 	}
 
 	ssa_opt_number_dom_tree(root, 0, 0);
+
+	gb_temp_arena_memory_end(tmp);
 }
 
 void ssa_opt_mem2reg(ssaProcedure *proc) {

@@ -1,3 +1,4 @@
+#define GB_NO_DEFER
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
@@ -8,7 +9,7 @@ gbAllocator heap_allocator(void) {
 #include "string.cpp"
 #include "array.cpp"
 
-gb_global String global_module_path = {};
+gb_global String global_module_path = {0};
 gb_global b32 global_module_path_set = false;
 
 
@@ -19,7 +20,6 @@ String get_module_dir() {
 
 	Array<wchar_t> path_buf;
 	array_init(&path_buf, heap_allocator(), 300);
-	defer (array_free(&path_buf));
 	array_resize(&path_buf, 300);
 
 	isize len = 0;
@@ -35,7 +35,6 @@ String get_module_dir() {
 	}
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-	defer (gb_temp_arena_memory_end(tmp));
 
 	wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
 
@@ -52,39 +51,28 @@ String get_module_dir() {
 	global_module_path = path;
 	global_module_path_set = true;
 
+	gb_temp_arena_memory_end(tmp);
+
+	array_free(&path_buf);
+
 	return path;
 }
 
 String path_to_fullpath(gbAllocator a, String s) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-	defer (gb_temp_arena_memory_end(tmp));
-
 	String16 string16 = string_to_string16(string_buffer_allocator, s);
+	String result = {0};
 
 	DWORD len = GetFullPathNameW(string16.text, 0, NULL, NULL);
-	if (len == 0) {
-		return make_string(NULL, 0);
+	if (len != 0) {
+		wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
+		GetFullPathNameW(string16.text, len, text, NULL);
+		text[len] = 0;
+		result = string16_to_string(a, make_string16(text, len));
 	}
-	wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
-	GetFullPathNameW(string16.text, len, text, NULL);
-	text[len] = 0;
-
-	return string16_to_string(a, make_string16(text, len));
+	gb_temp_arena_memory_end(tmp);
+	return result;
 }
-
-struct BlockTimer {
-	u64 start;
-	u64 finish;
-	char *msg;
-	BlockTimer(char *msg) : msg(msg) {
-		start = gb_utc_time_now();
-	}
-	~BlockTimer() {
-		finish = gb_utc_time_now();
-		gb_printf_err("%llu us\n", finish-start);
-	}
-};
-
 
 // Hasing
 enum HashKeyKind {
@@ -103,7 +91,7 @@ struct HashKey {
 };
 
 gb_inline HashKey hashing_proc(void const *data, isize len) {
-	HashKey h = {};
+	HashKey h = {HashKey_Default};
 	h.kind = HashKey_Default;
 	// h.key = gb_murmur64(data, len);
 	h.key = gb_fnv64a(data, len);
@@ -118,7 +106,7 @@ gb_inline HashKey hash_string(String s) {
 }
 
 gb_inline HashKey hash_pointer(void *ptr) {
-	HashKey h = {};
+	HashKey h = {HashKey_Default};
 	h.key = cast(u64)cast(uintptr)ptr;
 	h.ptr = ptr;
 	h.kind = HashKey_Default;
@@ -130,7 +118,7 @@ b32 hash_key_equal(HashKey a, HashKey b) {
 		// NOTE(bill): If two string's hashes collide, compare the strings themselves
 		if (a.kind == HashKey_String) {
 			if (b.kind == HashKey_String) {
-				return a.string == b.string;
+				return str_eq(a.string, b.string);
 			}
 			return false;
 		}
@@ -364,7 +352,7 @@ gb_inline void map_grow(Map<T> *h) {
 template <typename T>
 void map_rehash(Map<T> *h, isize new_count) {
 	isize i, j;
-	Map<T> nh = {};
+	Map<T> nh = {0};
 	map_init(&nh, h->hashes.allocator);
 	array_resize(&nh.hashes, new_count);
 	array_reserve(&nh.entries, h->entries.count);

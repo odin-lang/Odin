@@ -16,7 +16,6 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 
 		if (operand->mode == Addressing_Builtin) {
 			gbString expr_str = expr_to_string(operand->expr);
-			defer (gb_string_free(expr_str));
 
 			// TODO(bill): is this a good enough error message?
 			error(ast_node_token(operand->expr),
@@ -25,6 +24,8 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 			      LIT(context_name));
 
 			operand->mode = Addressing_Invalid;
+
+			gb_string_free(expr_str);
 		}
 
 
@@ -64,7 +65,6 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 	}
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-	defer (gb_temp_arena_memory_end(tmp));
 
 	// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 	// an extra allocation
@@ -102,6 +102,8 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 	if (rhs_count > 0 && lhs_count != rhs_count) {
 		error(lhs[0]->token, "Assignment count mismatch `%td` := `%td`", lhs_count, rhs_count);
 	}
+
+	gb_temp_arena_memory_end(tmp);
 }
 
 
@@ -129,10 +131,9 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 		check_proc_decl(c, e, d);
 		return;
 	}
-	auto prev = c->context;
+	CheckerContext prev = c->context;
 	c->context.scope = d->scope;
 	c->context.decl  = d;
-	defer (c->context = prev);
 
 	switch (e->kind) {
 	case Entity_Constant:
@@ -145,6 +146,8 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 		check_type_decl(c, e, d->type_expr, named_type, cycle_checker);
 		break;
 	}
+
+	c->context = prev;
 }
 
 
@@ -165,7 +168,7 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 			String str = token.string;
 			Entity *found = NULL;
 			// NOTE(bill): Ignore assignments to `_`
-			if (str != make_string("_")) {
+			if (str_ne(str, str_lit("_"))) {
 				found = current_scope_lookup_entity(c->context.scope, str);
 			}
 			if (found == NULL) {
@@ -208,7 +211,7 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 			e->type = init_type;
 	}
 
-	check_init_variables(c, entities, entity_count, vd->values, make_string("variable declaration"));
+	check_init_variables(c, entities, entity_count, vd->values, str_lit("variable declaration"));
 
 	for_array(i, vd->names) {
 		if (entities[i] != NULL) {
@@ -256,7 +259,7 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 		e->type = operand->type;
 	}
 
-	check_assignment(c, operand, e->type, make_string("constant declaration"));
+	check_assignment(c, operand, e->type, str_lit("constant declaration"));
 	if (operand->mode == Addressing_Invalid) {
 		return;
 	}
@@ -311,7 +314,6 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, Cycle
 	if (cycle_checker == NULL) {
 		cycle_checker = &local_cycle_checker;
 	}
-	defer (cycle_checker_destroy(&local_cycle_checker));
 
 	Type *bt = check_type(c, type_expr, named, cycle_checker_add(cycle_checker, e));
 	named->Named.base = bt;
@@ -319,6 +321,8 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, Cycle
 	if (named->Named.base == t_invalid) {
 		gb_printf("check_type_decl: %s\n", type_to_string(named));
 	}
+
+	cycle_checker_destroy(&local_cycle_checker);
 }
 
 
@@ -368,8 +372,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	Type *proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0, false);
 	e->type = proc_type;
 	ast_node(pd, ProcDecl, d->proc_decl);
+
 	check_open_scope(c, pd->type);
-	defer (check_close_scope(c));
 	check_procedure_type(c, proc_type, pd->type);
 
 	b32 is_foreign      = (pd->tags & ProcTag_foreign)   != 0;
@@ -378,16 +382,15 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	b32 is_no_inline    = (pd->tags & ProcTag_no_inline) != 0;
 
 	if ((d->scope->is_file || d->scope->is_global) &&
-	    e->token.string == "main") {
+	    str_eq(e->token.string, str_lit("main"))) {
 		if (proc_type != NULL) {
 			auto *pt = &proc_type->Proc;
 			if (pt->param_count != 0 ||
 			    pt->result_count) {
 				gbString str = type_to_string(proc_type);
-				defer (gb_string_free(str));
-
 				error(e->token,
 				      "Procedure type of `main` was expected to be `proc()`, got %s", str);
+				gb_string_free(str);
 			}
 		}
 	}
@@ -455,6 +458,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			map_set(fp, key, e);
 		}
 	}
+
+	check_close_scope(c);
 }
 
 void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, AstNode *init_expr) {
@@ -482,7 +487,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 		GB_ASSERT(entities == NULL || entities[0] == e);
 		Operand operand = {};
 		check_expr(c, &operand, init_expr);
-		check_init_variable(c, e, &operand, make_string("variable declaration"));
+		check_init_variable(c, e, &operand, str_lit("variable declaration"));
 	}
 
 	if (type_expr != NULL) {
@@ -493,7 +498,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	AstNodeArray inits;
 	array_init(&inits, c->allocator, 1);
 	array_add(&inits, init_expr);
-	check_init_variables(c, entities, entity_count, inits, make_string("variable declaration"));
+	check_init_variables(c, entities, entity_count, inits, str_lit("variable declaration"));
 }
 
 void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body) {
@@ -502,8 +507,6 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	CheckerContext old_context = c->context;
 	c->context.scope = decl->scope;
 	c->context.decl = decl;
-	defer (c->context = old_context);
-
 
 	GB_ASSERT(type->kind == Type_Proc);
 	if (type->Proc.param_count > 0) {
@@ -552,6 +555,8 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 
 
 	check_scope_usage(c, c->context.scope);
+
+	c->context = old_context;
 }
 
 
