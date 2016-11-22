@@ -146,15 +146,19 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 		switch (t->Basic.kind) {
 		case Basic_bool:   ssa_fprintf(f, "i1");                      break;
 		case Basic_i8:     ssa_fprintf(f, "i8");                      break;
-		case Basic_i16:    ssa_fprintf(f, "i16");                     break;
-		case Basic_i32:    ssa_fprintf(f, "i32");                     break;
-		case Basic_i64:    ssa_fprintf(f, "i64");                     break;
 		case Basic_u8:     ssa_fprintf(f, "i8");                      break;
+		case Basic_i16:    ssa_fprintf(f, "i16");                     break;
 		case Basic_u16:    ssa_fprintf(f, "i16");                     break;
+		case Basic_i32:    ssa_fprintf(f, "i32");                     break;
 		case Basic_u32:    ssa_fprintf(f, "i32");                     break;
+		case Basic_i64:    ssa_fprintf(f, "i64");                     break;
 		case Basic_u64:    ssa_fprintf(f, "i64");                     break;
+		case Basic_i128:   ssa_fprintf(f, "i128");                    break;
+		case Basic_u128:   ssa_fprintf(f, "i128");                    break;
+		// case Basic_f16:    ssa_fprintf(f, "half");                    break;
 		case Basic_f32:    ssa_fprintf(f, "float");                   break;
 		case Basic_f64:    ssa_fprintf(f, "double");                  break;
+		// case Basic_f128:   ssa_fprintf(f, "fp128");                   break;
 		case Basic_rawptr: ssa_fprintf(f, "%%..rawptr");              break;
 		case Basic_string: ssa_fprintf(f, "%%..string");              break;
 		case Basic_uint:   ssa_fprintf(f, "i%lld", word_bits);        break;
@@ -361,16 +365,45 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 		}
 	} break;
 	case ExactValue_Float: {
+		GB_ASSERT(is_type_float(type));
+		type = base_type(type);
 		u64 u = *cast(u64*)&value.value_float;
-		if (is_type_float(type) && type->Basic.kind == Basic_f32) {
+		switch (type->Basic.kind) {
+		case Basic_f32:
 			// IMPORTANT NOTE(bill): LLVM requires all floating point constants to be
 			// a 64 bit number if bits_of(float type) <= 64.
-			// For some bizarre reason, you need to clear the bottom 29 bits
 			// https://groups.google.com/forum/#!topic/llvm-dev/IlqV3TbSk6M
+			// 64 bit mantissa: 52 bits
+			// 32 bit mantissa: 23 bits
+			// 29 == 52-23
 			u >>= 29;
 			u <<= 29;
+			break;
 		}
-		ssa_fprintf(f, "0x%016llx", u);
+
+		switch (type->Basic.kind) {
+		case 0: break;
+#if 0
+		case Basic_f16:
+			ssa_fprintf(f, "bitcast (");
+			ssa_print_type(f, m, t_u16);
+			ssa_fprintf(f, " %u to ", cast(u16)f32_to_f16(cast(f32)value.value_float));
+			ssa_print_type(f, m, t_f16);
+			ssa_fprintf(f, ")");
+			break;
+		case Basic_f128:
+			ssa_fprintf(f, "bitcast (");
+			ssa_fprintf(f, "i128");
+			// TODO(bill): Actually support f128
+			ssa_fprintf(f, " %llu to ", u);
+			ssa_print_type(f, m, t_f128);
+			ssa_fprintf(f, ")");
+			break;
+#endif
+		default:
+			ssa_fprintf(f, "0x%016llx", u);
+			break;
+		}
 	} break;
 	case ExactValue_Pointer:
 		if (value.value_pointer == NULL) {

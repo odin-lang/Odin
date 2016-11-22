@@ -91,11 +91,12 @@ print_pointer_to_buffer :: proc(buffer: ^[]byte, p: rawptr) #inline {
 	print_u64_to_buffer(buffer, p as uint as u64)
 }
 
-print_f32_to_buffer :: proc(buffer: ^[]byte, f: f32) #inline { print__f64(buffer, f as f64, 7) }
-print_f64_to_buffer :: proc(buffer: ^[]byte, f: f64) #inline { print__f64(buffer, f, 10) }
+print_f16_to_buffer  :: proc(buffer: ^[]byte, f: f32)  #inline { print__f64(buffer, f as f64, 4) }
+print_f32_to_buffer  :: proc(buffer: ^[]byte, f: f32)  #inline { print__f64(buffer, f as f64, 7) }
+print_f64_to_buffer  :: proc(buffer: ^[]byte, f: f64)  #inline { print__f64(buffer, f as f64, 16) }
 print_u64_to_buffer :: proc(buffer: ^[]byte, value: u64) {
 	i := value
-	buf: [22]byte
+	buf: [20]byte
 	len := 0
 	if i == 0 {
 		buf[len] = #rune "0"
@@ -119,6 +120,25 @@ print_i64_to_buffer :: proc(buffer: ^[]byte, value: i64) {
 	print_u64_to_buffer(buffer, i as u64)
 }
 
+print_u128_to_buffer :: proc(buffer: ^[]byte, value: u128) {
+	a := value transmute [2]u64
+	if a[1] != 0 {
+		print_u64_to_buffer(buffer, a[1])
+	}
+	print_u64_to_buffer(buffer, a[0])
+}
+print_i128_to_buffer :: proc(buffer: ^[]byte, value: i128) {
+	i := value
+	neg := i < 0
+	if neg {
+		i = -i
+		print_rune_to_buffer(buffer, #rune "-")
+	}
+	print_u128_to_buffer(buffer, i as u128)
+}
+
+
+
 print__f64 :: proc(buffer: ^[]byte, value: f64, decimal_places: int) {
 	f := value
 	if f == 0 {
@@ -136,8 +156,8 @@ print__f64 :: proc(buffer: ^[]byte, value: f64, decimal_places: int) {
 
 	print_rune_to_buffer(buffer, #rune ".")
 
-	mult := 10.0
-	for decimal_places := 6; decimal_places >= 0; decimal_places-- {
+	mult: f64 = 10.0
+	for ; decimal_places >= 0; decimal_places-- {
 		i = (f * mult) as u64
 		print_u64_to_buffer(buffer, i as u64)
 		f -= i as f64 / mult
@@ -289,6 +309,11 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 		return
 	}
 
+	if arg.data == nil {
+		print_string_to_buffer(buf, "<nil>")
+		return
+	}
+
 	using Type_Info
 	match type info : arg.type_info {
 	case Named:
@@ -315,63 +340,50 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 		}
 
 	case Integer:
-		if arg.data != nil {
-			match type i : arg {
-			case i8:  print_i64_to_buffer(buf, i as i64)
-			case i16: print_i64_to_buffer(buf, i as i64)
-			case i32: print_i64_to_buffer(buf, i as i64)
-			case i64: print_i64_to_buffer(buf, i as i64)
-			case u8:  print_u64_to_buffer(buf, i as u64)
-			case u16: print_u64_to_buffer(buf, i as u64)
-			case u32: print_u64_to_buffer(buf, i as u64)
-			case u64: print_u64_to_buffer(buf, i as u64)
-			}
-		} else {
-			print_u64_to_buffer(buf, 0)
+		match type i : arg {
+		case i8:   print_i64_to_buffer(buf, i as i64)
+		case u8:   print_u64_to_buffer(buf, i as u64)
+		case i16:  print_i64_to_buffer(buf, i as i64)
+		case u16:  print_u64_to_buffer(buf, i as u64)
+		case i32:  print_i64_to_buffer(buf, i as i64)
+		case u32:  print_u64_to_buffer(buf, i as u64)
+		case i64:  print_i64_to_buffer(buf, i as i64)
+		case u64:  print_u64_to_buffer(buf, i as u64)
+		case i128: print_i128_to_buffer(buf, i)
+		case u128: print_u128_to_buffer(buf, i)
+
+		case int:  print_u64_to_buffer(buf, i as u64)
+		case uint: print_u64_to_buffer(buf, i as u64)
 		}
 
 	case Float:
-		if arg.data != nil {
-			match type f : arg {
-			case f32: print_f64_to_buffer(buf, f as f64)
-			case f64: print_f64_to_buffer(buf, f as f64)
-			}
-		} else {
-			print_f64_to_buffer(buf, 0)
+		match type f : arg {
+		// case f16:  print_f64_to_buffer(buf, f as f64)
+		case f32:  print_f64_to_buffer(buf, f as f64)
+		case f64:  print_f64_to_buffer(buf, f as f64)
+		// case f128: print_f64_to_buffer(buf, f as f64)
 		}
 
 	case String:
-		if arg.data != nil {
-			match type s : arg {
-			case string: print_string_to_buffer(buf, s)
-			}
-		} else {
-			print_string_to_buffer(buf, "")
+		match type s : arg {
+		case string: print_string_to_buffer(buf, s)
 		}
 
 	case Boolean:
-		if arg.data != nil {
-			match type b : arg {
-			case bool: print_bool_to_buffer(buf, b)
-			}
-		} else {
-			print_bool_to_buffer(buf, false)
+		match type b : arg {
+		case bool: print_bool_to_buffer(buf, b)
 		}
 
 	case Pointer:
-		if arg.data != nil {
-			match type p : arg {
-			case ^Type_Info: print_type_to_buffer(buf, p)
-			default:         print_pointer_to_buffer(buf, (arg.data as ^rawptr)^)
-			}
-		} else {
-			print_pointer_to_buffer(buf, nil)
+		match type p : arg {
+		case ^Type_Info: print_type_to_buffer(buf, p)
+		default:         print_pointer_to_buffer(buf, (arg.data as ^rawptr)^)
 		}
 
 	case Maybe:
 		size := mem.size_of_type_info(info.elem)
 		data := slice_ptr(arg.data as ^byte, size+1)
-		if data[size] != 0 && arg.data != nil {
+		if data[size] != 0 {
 			print_any_to_buffer(buf, make_any(info.elem, arg.data))
 		} else {
 			print_string_to_buffer(buf, "nil")
@@ -381,14 +393,14 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 		value: i64 = 0
 
 		match type i : make_any(info.base, arg.data) {
-		case i8:  value = i as i64
-		case i16: value = i as i64
-		case i32: value = i as i64
-		case i64: value = i as i64
-		case u8:  value = i as i64
-		case u16: value = i as i64
-		case u32: value = i as i64
-		case u64: value = i as i64
+		case i8:   value = i as i64
+		case i16:  value = i as i64
+		case i32:  value = i as i64
+		case i64:  value = i as i64
+		case u8:   value = i as i64
+		case u16:  value = i as i64
+		case u32:  value = i as i64
+		case u64:  value = i as i64
 		}
 		print_string_to_buffer(buf, __enum_to_string(arg.type_info, value))
 
@@ -448,11 +460,6 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 
 
 	case Struct:
-		if arg.data == nil {
-			print_string_to_buffer(buf, "nil")
-			return
-		}
-
 		bprintf(buf, "%{", arg.type_info)
 		defer print_string_to_buffer(buf, "}")
 

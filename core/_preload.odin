@@ -131,7 +131,6 @@ fmuladd64 :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
 
 
 
-
 Allocator :: struct #ordered {
 	Mode :: enum {
 		ALLOC,
@@ -364,3 +363,5 @@ __enum_to_string :: proc(info: ^Type_Info, value: i64) -> string {
 	}
 	return ""
 }
+
+

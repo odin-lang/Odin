@@ -1328,6 +1328,20 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
+	for (isize i = 0; i < gb_count_of(basic_types)-1; i++) {
+		Type *t = &basic_types[i];
+		if (t->Basic.size > 0) {
+			add_type_info_type(c, t);
+		}
+	}
+
+	for (isize i = 0; i < gb_count_of(basic_type_aliases)-1; i++) {
+		Type *t = &basic_type_aliases[i];
+		if (t->Basic.size > 0) {
+			add_type_info_type(c, t);
+		}
+	}
+
 	// for_array(i, c->info.type_info_map.entries) {
 	// 	auto *e = &c->info.type_info_map.entries[i];
 	// 	Type *prev_type = cast(Type *)e->key.ptr;

@@ -58,8 +58,6 @@ i32 win32_exec_command_line_app(char *name, char *fmt, ...) {
 	}
 }
 
-
-
 enum ArchKind {
 	ArchKind_x64,
 	ArchKind_x86,
@@ -139,11 +137,12 @@ int main(int argc, char **argv) {
 		usage(argv[0]);
 		return 1;
 	}
-	Parser parser = {0};
 
+	// TODO(bill): prevent compiling without a linker
 
 	timings_start_section(&timings, make_string("parse files"));
 
+	Parser parser = {0};
 	if (!init_parser(&parser)) {
 		return 1;
 	}
@@ -244,8 +243,8 @@ int main(int argc, char **argv) {
 	exit_code = win32_exec_command_line_app("msvc-link",
 		"link %.*s.obj -OUT:%.*s.exe %s "
 		"/defaultlib:libcmt "
-		"/nologo /incremental:no /opt:ref /subsystem:console "
-		"%.*s "
+		"/nologo /incremental:no /opt:ref /subsystem:console /debug "
+		" %.*s "
 		"",
 		LIT(output), LIT(output),
 		lib_str, LIT(arch_data.link_flags));

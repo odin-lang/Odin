@@ -3177,6 +3177,11 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 		ImportedFile runtime_file = {s, s, init_pos};
 		array_add(&p->imports, runtime_file);
 	}
+	{
+		String s = get_fullpath_core(heap_allocator(), make_string("_soft_numbers.odin"));
+		ImportedFile runtime_file = {s, s, init_pos};
+		array_add(&p->imports, runtime_file);
+	}
 
 	for_array(i, p->imports) {
 		ImportedFile imported_file = p->imports[i];

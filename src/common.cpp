@@ -167,6 +167,57 @@ i64 prev_pow2(i64 n) {
 	return n - (n >> 1);
 }
 
+i16 f32_to_f16(f32 value) {
+	union { u32 i; f32 f; } v;
+	i32 i, s, e, m;
+
+	v.f = value;
+	i = (i32)v.i;
+
+	s =  (i >> 16) & 0x00008000;
+	e = ((i >> 23) & 0x000000ff) - (127 - 15);
+	m =   i        & 0x007fffff;
+
+
+	if (e <= 0) {
+		if (e < -10) return cast(i16)s;
+		m = (m | 0x00800000) >> (1 - e);
+
+		if (m & 0x00001000)
+			m += 0x00002000;
+
+		return cast(i16)(s | (m >> 13));
+	} else if (e == 0xff - (127 - 15)) {
+		if (m == 0) {
+			return cast(i16)(s | 0x7c00); /* NOTE(bill): infinity */
+		} else {
+			/* NOTE(bill): NAN */
+			m >>= 13;
+			return cast(i16)(s | 0x7c00 | m | (m == 0));
+		}
+	} else {
+		if (m & 0x00001000) {
+			m += 0x00002000;
+			if (m & 0x00800000) {
+				m = 0;
+				e += 1;
+			}
+		}
+
+		if (e > 30) {
+			float volatile f = 1e12f;
+			int j;
+			for (j = 0; j < 10; j++)
+				f *= f; /* NOTE(bill): Cause overflow */
+
+			return cast(i16)(s | 0x7c00);
+		}
+
+		return cast(i16)(s | (e << 10) | (m >> 13));
+	}
+}
+
+
 
 #define for_array(index_, array_) for (isize index_ = 0; index_ < (array_).count; index_++)
 

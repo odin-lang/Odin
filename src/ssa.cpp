@@ -1526,6 +1526,8 @@ ssaValue *ssa_emit_arith(ssaProcedure *proc, TokenKind op, ssaValue *left, ssaVa
 	case Token_And:
 	case Token_Or:
 	case Token_Xor:
+	case Token_Shl:
+	case Token_Shr:
 		left  = ssa_emit_conv(proc, left, type);
 		right = ssa_emit_conv(proc, right, type);
 		break;
@@ -2160,6 +2162,34 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 	return NULL;
 }
 
+b32 ssa_is_type_aggregate(Type *t) {
+	t = base_type(get_enum_base_type(t));
+	switch (t->kind) {
+	case Type_Basic:
+		switch (t->Basic.kind) {
+		case Basic_string:
+		case Basic_any:
+			return true;
+		}
+		break;
+
+	case Type_Pointer:
+	case Type_Vector:
+		return false;
+
+	case Type_Array:
+	case Type_Slice:
+	case Type_Maybe:
+	case Type_Record:
+	case Type_Tuple:
+		return true;
+
+	case Type_Named:
+		return ssa_is_type_aggregate(t->Named.base);
+	}
+
+	return false;
+}
 
 ssaValue *ssa_emit_transmute(ssaProcedure *proc, ssaValue *value, Type *t) {
 	Type *src_type = ssa_type(value);
@@ -2173,17 +2203,24 @@ ssaValue *ssa_emit_transmute(ssaProcedure *proc, ssaValue *value, Type *t) {
 		return value;
 	}
 
-	i64 sz = type_size_of(proc->module->sizes, proc->module->allocator, src);
-	i64 dz = type_size_of(proc->module->sizes, proc->module->allocator, dst);
+	ssaModule *m = proc->module;
 
-	if (sz == dz) {
-		return ssa_emit_bitcast(proc, value, dst);
+	i64 sz = type_size_of(m->sizes, m->allocator, src);
+	i64 dz = type_size_of(m->sizes, m->allocator, dst);
+
+	GB_ASSERT_MSG(sz == dz, "Invalid transmute conversion: `%s` to `%s`", type_to_string(src_type), type_to_string(t));
+
+	if (ssa_is_type_aggregate(src) || ssa_is_type_aggregate(dst)) {
+		ssaValue *s = ssa_add_local_generated(proc, src);
+		ssa_emit_store(proc, s, value);
+
+		ssaValue *d = ssa_emit_bitcast(proc, s, make_type_pointer(m->allocator, dst));
+		return ssa_emit_load(proc, d);
 	}
 
+	// TODO(bill): Actually figure out what the conversion needs to be correctly 'cause LLVM
 
-	GB_PANIC("Invalid transmute conversion: `%s` to `%s`", type_to_string(src_type), type_to_string(t));
-
-	return NULL;
+	return ssa_emit_bitcast(proc, value, dst);
 }
 
 ssaValue *ssa_emit_down_cast(ssaProcedure *proc, ssaValue *value, Type *t) {
@@ -5035,13 +5072,15 @@ void ssa_gen_tree(ssaGen *s) {
 						tag = ssa_add_local_generated(proc, t_type_info_boolean);
 						break;
 					case Basic_i8:
-					case Basic_i16:
-					case Basic_i32:
-					case Basic_i64:
 					case Basic_u8:
+					case Basic_i16:
 					case Basic_u16:
+					case Basic_i32:
 					case Basic_u32:
+					case Basic_i64:
 					case Basic_u64:
+					case Basic_i128:
+					case Basic_u128:
 					case Basic_int:
 					case Basic_uint: {
 						tag = ssa_add_local_generated(proc, t_type_info_integer);
@@ -5052,8 +5091,11 @@ void ssa_gen_tree(ssaGen *s) {
 						ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 1), is_signed);
 					} break;
 
+					// case Basic_f16:
 					case Basic_f32:
-					case Basic_f64: {
+					case Basic_f64:
+					// case Basic_f128:
+					{
 						tag = ssa_add_local_generated(proc, t_type_info_float);
 						ssaValue *bits = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
 						ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), bits);

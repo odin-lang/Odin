@@ -1347,6 +1347,9 @@ b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exac
 		u64 umax = ~0ull;
 		if (s < 64) {
 			umax = (1ull << s) - 1ull;
+		} else {
+			// TODO(bill): I NEED A PROPER BIG NUMBER LIBRARY THAT CAN SUPPORT 128 bit integers and floats
+			s = 64;
 		}
 		i64 imax = (1ll << (s-1ll));
 
@@ -1356,6 +1359,7 @@ b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exac
 		case Basic_i16:
 		case Basic_i32:
 		case Basic_i64:
+		case Basic_i128:
 		case Basic_int:
 			return gb_is_between(i, -imax, imax-1);
 
@@ -1363,6 +1367,7 @@ b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exac
 		case Basic_u16:
 		case Basic_u32:
 		case Basic_u64:
+		case Basic_u128:
 		case Basic_uint:
 			return !(u < 0 || u > umax);
 
@@ -1378,11 +1383,10 @@ b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exac
 		}
 
 		switch (type->Basic.kind) {
+		// case Basic_f16:
 		case Basic_f32:
-			if (out_value) *out_value = v;
-			return true;
-
 		case Basic_f64:
+		// case Basic_f128:
 			if (out_value) *out_value = v;
 			return true;
 
@@ -2091,7 +2095,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		return;
 	}
 
-	if (op.kind == Token_Add   || op.kind == Token_Sub) {
+	if (op.kind == Token_Add || op.kind == Token_Sub) {
 		if (is_type_pointer(x->type) && is_type_integer(y->type)) {
 			*x = check_ptr_addition(c, op.kind, x, y, node);
 			return;
@@ -2668,7 +2672,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 	} break;
 
 	case BuiltinProc_size_of: {
-		// size_of :: proc(Type) -> int
+		// size_of :: proc(Type) -> untyped int
 		Type *type = check_type(c, ce->args[0]);
 		if (type == NULL || type == t_invalid) {
 			error(ast_node_token(ce->args[0]), "Expected a type for `size_of`");
@@ -2677,12 +2681,12 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		operand->mode = Addressing_Constant;
 		operand->value = make_exact_value_integer(type_size_of(c->sizes, c->allocator, type));
-		operand->type = t_int;
+		operand->type = t_untyped_integer;
 
 	} break;
 
 	case BuiltinProc_size_of_val:
-		// size_of_val :: proc(val: Type) -> int
+		// size_of_val :: proc(val: Type) -> untyped int
 		check_assignment(c, operand, NULL, make_string("argument of `size_of_val`"));
 		if (operand->mode == Addressing_Invalid) {
 			return false;
@@ -2690,11 +2694,11 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		operand->mode = Addressing_Constant;
 		operand->value = make_exact_value_integer(type_size_of(c->sizes, c->allocator, operand->type));
-		operand->type = t_int;
+		operand->type = t_untyped_integer;
 		break;
 
 	case BuiltinProc_align_of: {
-		// align_of :: proc(Type) -> int
+		// align_of :: proc(Type) -> untyped int
 		Type *type = check_type(c, ce->args[0]);
 		if (type == NULL || type == t_invalid) {
 			error(ast_node_token(ce->args[0]), "Expected a type for `align_of`");
@@ -2702,11 +2706,11 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		}
 		operand->mode = Addressing_Constant;
 		operand->value = make_exact_value_integer(type_align_of(c->sizes, c->allocator, type));
-		operand->type = t_int;
+		operand->type = t_untyped_integer;
 	} break;
 
 	case BuiltinProc_align_of_val:
-		// align_of_val :: proc(val: Type) -> int
+		// align_of_val :: proc(val: Type) -> untyped int
 		check_assignment(c, operand, NULL, make_string("argument of `align_of_val`"));
 		if (operand->mode == Addressing_Invalid) {
 			return false;
@@ -2714,11 +2718,11 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		operand->mode = Addressing_Constant;
 		operand->value = make_exact_value_integer(type_align_of(c->sizes, c->allocator, operand->type));
-		operand->type = t_int;
+		operand->type = t_untyped_integer;
 		break;
 
 	case BuiltinProc_offset_of: {
-		// offset_of :: proc(Type, field) -> int
+		// offset_of :: proc(Type, field) -> untyped int
 		Operand op = {};
 		Type *bt = check_type(c, ce->args[0]);
 		Type *type = base_type(bt);
@@ -2758,11 +2762,11 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 
 		operand->mode = Addressing_Constant;
 		operand->value = make_exact_value_integer(type_offset_of_from_selection(c->sizes, c->allocator, type, sel));
-		operand->type  = t_int;
+		operand->type  = t_untyped_integer;
 	} break;
 
 	case BuiltinProc_offset_of_val: {
-		// offset_of_val :: proc(val: expression) -> int
+		// offset_of_val :: proc(val: expression) -> untyped int
 		AstNode *arg = unparen_expr(ce->args[0]);
 		if (arg->kind != AstNode_SelectorExpr) {
 			gbString str = expr_to_string(arg);
@@ -2808,7 +2812,7 @@ b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id)
 		operand->mode = Addressing_Constant;
 		// IMPORTANT TODO(bill): Fix for anonymous fields
 		operand->value = make_exact_value_integer(type_offset_of_from_selection(c->sizes, c->allocator, type, sel));
-		operand->type  = t_int;
+		operand->type  = t_untyped_integer;
 	} break;
 
 	case BuiltinProc_type_of_val:
