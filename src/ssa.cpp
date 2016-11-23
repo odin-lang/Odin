@@ -5,6 +5,16 @@ typedef struct ssaDebugInfo ssaDebugInfo;
 
 typedef Array(ssaValue *) ssaValueArray;
 
+#define MAP_TYPE ssaValue *
+#define MAP_FUNC map_ssa_value_
+#define MAP_NAME MapSsaValue
+#include "map.c"
+
+#define MAP_TYPE ssaDebugInfo *
+#define MAP_FUNC map_ssa_debug_info_
+#define MAP_NAME MapSsaDebugInfo
+#include "map.c"
+
 struct ssaModule {
 	CheckerInfo * info;
 	BaseTypeSizes sizes;
@@ -12,7 +22,7 @@ struct ssaModule {
 	gbArena       tmp_arena;
 	gbAllocator   allocator;
 	gbAllocator   tmp_allocator;
-	b32 generate_debug_info;
+	bool generate_debug_info;
 
 	u32 stmt_state_flags;
 
@@ -21,13 +31,13 @@ struct ssaModule {
 	// String triple;
 
 
-	Map<Entity *>         min_dep_map; // Key: Entity *
-	Map<ssaValue *>       values;      // Key: Entity *
-	Map<ssaValue *>       members;     // Key: String
-	Map<String>           type_names;  // Key: Type *
-	Map<ssaDebugInfo *>   debug_info;  // Key: Unique pointer
-	i32                   global_string_index;
-	i32                   global_array_index; // For ConstantSlice
+	MapEntity       min_dep_map; // Key: Entity *
+	MapSsaValue     values;      // Key: Entity *
+	MapSsaValue     members;     // Key: String
+	MapString       type_names;  // Key: Type *
+	MapSsaDebugInfo debug_info;  // Key: Unique pointer
+	i32             global_string_index;
+	i32             global_array_index; // For ConstantSlice
 
 	Array(ssaProcedure *) procs;             // NOTE(bill): All procedures with bodies
 	ssaValueArray         procs_to_generate; // NOTE(bill): Procedures to generate
@@ -199,7 +209,7 @@ struct ssaInstr {
 		struct {
 			Entity *          entity;
 			Type *            type;
-			b32               zero_initialized;
+			bool               zero_initialized;
 			ssaValueArray referrers;
 		} Local;
 		struct {
@@ -314,7 +324,7 @@ struct ssaInstr {
 			ssaValue *low;
 			ssaValue *high;
 			ssaValue *max;
-			b32       is_substring;
+			bool       is_substring;
 		} SliceBoundsCheck;
 	};
 };
@@ -358,14 +368,14 @@ struct ssaValue {
 			String name;
 		} TypeName;
 		struct {
-			Entity *          entity;
-			Type *            type;
-			ssaValue *        value;
+			Entity *      entity;
+			Type *        type;
+			ssaValue *    value;
 			ssaValueArray referrers;
-			b8                is_constant;
-			b8                is_private;
-			b8                is_thread_local;
-			b8                is_unnamed_addr;
+			bool          is_constant;
+			bool          is_private;
+			bool          is_thread_local;
+			bool          is_unnamed_addr;
 		} Global;
 		struct {
 			ssaProcedure *    parent;
@@ -540,11 +550,11 @@ struct ssaDebugInfo {
 struct ssaGen {
 	ssaModule module;
 	gbFile    output_file;
-	b32       opt_called;
+	bool       opt_called;
 };
 
 ssaValue *ssa_lookup_member(ssaModule *m, String name) {
-	ssaValue **v = map_get(&m->members, hash_string(name));
+	ssaValue **v = map_ssa_value_get(&m->members, hash_string(name));
 	if (v != NULL) {
 		return *v;
 	}
@@ -638,7 +648,7 @@ Type *ssa_addr_type(ssaAddr lval) {
 
 
 
-b32 ssa_is_blank_ident(AstNode *node) {
+bool ssa_is_blank_ident(AstNode *node) {
 	if (node->kind == AstNode_Ident) {
 		ast_node(i, Ident, node);
 		return is_blank_ident(i->string);
@@ -660,7 +670,7 @@ ssaInstr *ssa_get_last_instr(ssaBlock *block) {
 
 }
 
-b32 ssa_is_instr_terminating(ssaInstr *i) {
+bool ssa_is_instr_terminating(ssaInstr *i) {
 	if (i != NULL) {
 		switch (i->kind) {
 		case ssaInstr_Return:
@@ -786,7 +796,7 @@ ssaValue *ssa_make_value_nil(gbAllocator a, Type *type) {
 
 
 
-ssaValue *ssa_make_instr_local(ssaProcedure *p, Entity *e, b32 zero_initialized) {
+ssaValue *ssa_make_instr_local(ssaProcedure *p, Entity *e, bool zero_initialized) {
 	ssaValue *v = ssa_alloc_instr(p, ssaInstr_Local);
 	ssaInstr *i = &v->Instr;
 	i->Local.entity = e;
@@ -1014,7 +1024,7 @@ ssaValue *ssa_make_instr_bounds_check(ssaProcedure *p, TokenPos pos, ssaValue *i
 	v->Instr.BoundsCheck.len   = len;
 	return v;
 }
-ssaValue *ssa_make_instr_slice_bounds_check(ssaProcedure *p, TokenPos pos, ssaValue *low, ssaValue *high, ssaValue *max, b32 is_substring) {
+ssaValue *ssa_make_instr_slice_bounds_check(ssaProcedure *p, TokenPos pos, ssaValue *low, ssaValue *high, ssaValue *max, bool is_substring) {
 	ssaValue *v = ssa_alloc_instr(p, ssaInstr_SliceBoundsCheck);
 	v->Instr.SliceBoundsCheck.pos  = pos;
 	v->Instr.SliceBoundsCheck.low  = low;
@@ -1051,7 +1061,7 @@ ssaValue *ssa_make_const_i32(gbAllocator a, i64 i) {
 ssaValue *ssa_make_const_i64(gbAllocator a, i64 i) {
 	return ssa_make_value_constant(a, t_i64, make_exact_value_integer(i));
 }
-ssaValue *ssa_make_const_bool(gbAllocator a, b32 b) {
+ssaValue *ssa_make_const_bool(gbAllocator a, bool b) {
 	return ssa_make_value_constant(a, t_bool, make_exact_value_bool(b != 0));
 }
 ssaValue *ssa_make_const_string(gbAllocator a, String s) {
@@ -1078,7 +1088,7 @@ ssaValue *ssa_make_value_procedure(gbAllocator a, ssaModule *m, Entity *entity, 
 ssaBlock *ssa_add_block(ssaProcedure *proc, AstNode *node, char *label) {
 	Scope *scope = NULL;
 	if (node != NULL) {
-		Scope **found = map_get(&proc->module->info->scopes, hash_pointer(node));
+		Scope **found = map_scope_get(&proc->module->info->scopes, hash_pointer(node));
 		if (found) {
 			scope = *found;
 		} else {
@@ -1157,7 +1167,7 @@ ssaValue *ssa_add_module_constant(ssaModule *m, Type *type, ExactValue value) {
 		Entity *e = make_entity_constant(a, NULL, make_token_ident(name), t, value);
 		ssaValue *g = ssa_make_value_global(a, e, backing_array);
 		ssa_module_add_value(m, e, g);
-		map_set(&m->members, hash_string(name), g);
+		map_ssa_value_set(&m->members, hash_string(name), g);
 
 		return ssa_make_value_constant_slice(a, type, g, count);
 	}
@@ -1188,7 +1198,7 @@ ssaValue *ssa_add_global_string_array(ssaModule *m, String string) {
 	// g->Global.is_constant = true;
 
 	ssa_module_add_value(m, entity, g);
-	map_set(&m->members, hash_string(name), g);
+	map_ssa_value_set(&m->members, hash_string(name), g);
 
 	return g;
 }
@@ -1196,7 +1206,7 @@ ssaValue *ssa_add_global_string_array(ssaModule *m, String string) {
 
 
 
-ssaValue *ssa_add_local(ssaProcedure *proc, Entity *e, b32 zero_initialized = true) {
+ssaValue *ssa_add_local(ssaProcedure *proc, Entity *e, bool zero_initialized = true) {
 	ssaBlock *b = proc->decl_block; // all variables must be in the first block
 	ssaValue *instr = ssa_make_instr_local(proc, e, zero_initialized);
 	instr->Instr.parent = b;
@@ -1211,8 +1221,8 @@ ssaValue *ssa_add_local(ssaProcedure *proc, Entity *e, b32 zero_initialized = tr
 	return instr;
 }
 
-ssaValue *ssa_add_local_for_identifier(ssaProcedure *proc, AstNode *name, b32 zero_initialized) {
-	Entity **found = map_get(&proc->module->info->definitions, hash_pointer(name));
+ssaValue *ssa_add_local_for_identifier(ssaProcedure *proc, AstNode *name, bool zero_initialized) {
+	Entity **found = map_entity_get(&proc->module->info->definitions, hash_pointer(name));
 	if (found) {
 		Entity *e = *found;
 		ssa_emit_comment(proc, e->token.string);
@@ -1281,7 +1291,7 @@ ssaDebugInfo *ssa_add_debug_info_file(ssaProcedure *proc, AstFile *file) {
 	di->File.filename = filename;
 	di->File.directory = directory;
 
-	map_set(&proc->module->debug_info, hash_pointer(file), di);
+	map_ssa_debug_info_set(&proc->module->debug_info, hash_pointer(file), di);
 	return di;
 }
 
@@ -1298,7 +1308,7 @@ ssaDebugInfo *ssa_add_debug_info_proc(ssaProcedure *proc, Entity *entity, String
 	di->Proc.file = file;
 	di->Proc.pos = entity->token.pos;
 
-	map_set(&proc->module->debug_info, hash_pointer(entity), di);
+	map_ssa_debug_info_set(&proc->module->debug_info, hash_pointer(entity), di);
 	return di;
 }
 
@@ -1349,7 +1359,7 @@ ssaValue *ssa_emit_call(ssaProcedure *p, ssaValue *value, ssaValue **args, isize
 
 ssaValue *ssa_emit_global_call(ssaProcedure *proc, char *name_, ssaValue **args, isize arg_count) {
 	String name = make_string_c(name_);
-	ssaValue **found = map_get(&proc->module->members, hash_string(name));
+	ssaValue **found = map_ssa_value_get(&proc->module->members, hash_string(name));
 	GB_ASSERT_MSG(found != NULL, "%.*s", LIT(name));
 	ssaValue *gp = *found;
 	return ssa_emit_call(proc, gp, args, arg_count);
@@ -1875,8 +1885,8 @@ String lookup_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
 	// Type *prev_dst = dst;
 	src = base_type(type_deref(src));
 	// dst = base_type(type_deref(dst));
-	b32 src_is_ptr = src != prev_src;
-	// b32 dst_is_ptr = dst != prev_dst;
+	bool src_is_ptr = src != prev_src;
+	// bool dst_is_ptr = dst != prev_dst;
 
 	GB_ASSERT(is_type_struct(src));
 	for (isize i = 0; i < src->Record.field_count; i++) {
@@ -2041,7 +2051,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 	// subtype polymorphism casting
 	{
 		Type *sb = base_type(type_deref(src));
-		b32 src_is_ptr = src != sb;
+		bool src_is_ptr = src != sb;
 		if (is_type_struct(sb)) {
 			String field_name = lookup_polymorphic_field(proc->module->info, t, src);
 			// gb_printf("field_name: %.*s\n", LIT(field_name));
@@ -2164,7 +2174,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 	return NULL;
 }
 
-b32 ssa_is_type_aggregate(Type *t) {
+bool ssa_is_type_aggregate(Type *t) {
 	t = base_type(get_enum_base_type(t));
 	switch (t->kind) {
 	case Type_Basic:
@@ -2245,7 +2255,7 @@ ssaValue *ssa_emit_union_cast(ssaProcedure *proc, ssaValue *value, Type *tuple) 
 	gbAllocator a = proc->module->allocator;
 
 	Type *src_type = ssa_type(value);
-	b32 is_ptr = is_type_pointer(src_type);
+	bool is_ptr = is_type_pointer(src_type);
 
 	ssaValue *v = ssa_add_local_generated(proc, tuple);
 
@@ -2330,7 +2340,7 @@ isize ssa_type_info_index(CheckerInfo *info, Type *type) {
 
 	isize entry_index = -1;
 	HashKey key = hash_pointer(type);
-	auto *found_entry_index = map_get(&info->type_info_map, key);
+	isize *found_entry_index = map_isize_get(&info->type_info_map, key);
 	if (found_entry_index) {
 		entry_index = *found_entry_index;
 	}
@@ -2343,7 +2353,7 @@ isize ssa_type_info_index(CheckerInfo *info, Type *type) {
 			if (are_types_identical(prev_type, type)) {
 				entry_index = e->value;
 				// NOTE(bill): Add it to the search map
-				map_set(&info->type_info_map, key, entry_index);
+				map_isize_set(&info->type_info_map, key, entry_index);
 				break;
 			}
 		}
@@ -2356,7 +2366,7 @@ isize ssa_type_info_index(CheckerInfo *info, Type *type) {
 }
 
 ssaValue *ssa_type_info(ssaProcedure *proc, Type *type) {
-	ssaValue **found = map_get(&proc->module->members, hash_string(str_lit(SSA_TYPE_INFO_DATA_NAME)));
+	ssaValue **found = map_ssa_value_get(&proc->module->members, hash_string(str_lit(SSA_TYPE_INFO_DATA_NAME)));
 	GB_ASSERT(found != NULL);
 	ssaValue *type_info_data = *found;
 	CheckerInfo *info = proc->module->info;
@@ -2456,7 +2466,7 @@ void ssa_emit_bounds_check(ssaProcedure *proc, Token token, ssaValue *index, ssa
 	// ssa_emit_global_call(proc, "__bounds_check_error", args, 5);
 }
 
-void ssa_emit_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low, ssaValue *high, ssaValue *max, b32 is_substring) {
+void ssa_emit_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low, ssaValue *high, ssaValue *max, bool is_substring) {
 	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
 		return;
 	}
@@ -2522,14 +2532,14 @@ void ssa_mangle_sub_type_name(ssaModule *m, Entity *field, String parent) {
 	child.text[i++] = '.';
 	gb_memmove(child.text+i, cn.text, cn.len);
 
-	map_set(&m->type_names, hash_pointer(field->type), child);
+	map_string_set(&m->type_names, hash_pointer(field->type), child);
 	ssa_gen_global_type_name(m, field, child);
 }
 
 void ssa_gen_global_type_name(ssaModule *m, Entity *e, String name) {
 	ssaValue *t = ssa_make_value_type_name(m->allocator, name, e->type);
 	ssa_module_add_value(m, e, t);
-	map_set(&m->members, hash_string(name), t);
+	map_ssa_value_set(&m->members, hash_string(name), t);
 
 	Type *bt = base_type(e->type);
 	if (bt->kind == Type_Record) {
@@ -2572,7 +2582,7 @@ void ssa_build_defer_stmt(ssaProcedure *proc, ssaDefer d) {
 
 
 ssaValue *ssa_find_global_variable(ssaProcedure *proc, String name) {
-	ssaValue **value = map_get(&proc->module->members, hash_string(name));
+	ssaValue **value = map_ssa_value_get(&proc->module->members, hash_string(name));
 	GB_ASSERT_MSG(value != NULL, "Unable to find global variable `%.*s`", LIT(name));
 	return *value;
 }
@@ -2581,7 +2591,7 @@ ssaValue *ssa_find_implicit_value_backing(ssaProcedure *proc, ImplicitValueId id
 	Entity *e = proc->module->info->implicit_values[id];
 	GB_ASSERT(e->kind == Entity_ImplicitValue);
 	Entity *backing = e->ImplicitValue.backing;
-	ssaValue **value = map_get(&proc->module->values, hash_pointer(backing));
+	ssaValue **value = map_ssa_value_get(&proc->module->values, hash_pointer(backing));
 	GB_ASSERT_MSG(value != NULL, "Unable to find implicit value backing `%.*s`", LIT(backing->token.string));
 	return *value;
 }
@@ -2596,7 +2606,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 	case_end;
 
 	case_ast_node(i, Ident, expr);
-		Entity *e = *map_get(&proc->module->info->uses, hash_pointer(expr));
+		Entity *e = *map_entity_get(&proc->module->info->uses, hash_pointer(expr));
 		if (e->kind == Entity_Builtin) {
 			Token token = ast_node_token(expr);
 			GB_PANIC("TODO(bill): ssa_build_single_expr Entity_Builtin `%.*s`\n"
@@ -2609,7 +2619,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			return ssa_emit_load(proc, ssa_find_implicit_value_backing(proc, e->ImplicitValue.id));
 		}
 
-		auto *found = map_get(&proc->module->values, hash_pointer(e));
+		ssaValue **found = map_ssa_value_get(&proc->module->values, hash_pointer(e));
 		if (found) {
 			ssaValue *v = *found;
 			if (v->kind == ssaValue_Proc) {
@@ -2633,7 +2643,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 	case_end;
 
 	case_ast_node(se, SelectorExpr, expr);
-		TypeAndValue *tav = map_get(&proc->module->info->types, hash_pointer(expr));
+		TypeAndValue *tav = map_tav_get(&proc->module->info->types, hash_pointer(expr));
 		GB_ASSERT(tav != NULL);
 		return ssa_addr_load(proc, ssa_build_addr(proc, expr));
 	case_end;
@@ -2751,7 +2761,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 	case_ast_node(ce, CallExpr, expr);
 		AstNode *p = unparen_expr(ce->proc);
 		if (p->kind == AstNode_Ident) {
-			Entity **found = map_get(&proc->module->info->uses, hash_pointer(p));
+			Entity **found = map_entity_get(&proc->module->info->uses, hash_pointer(p));
 			if (found && (*found)->kind == Entity_Builtin) {
 				Entity *e = *found;
 				switch (e->Builtin.id) {
@@ -3136,8 +3146,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			}
 		}
 		ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, arg_count);
-		b32 variadic = proc_type_->Proc.variadic;
-		b32 vari_expand = ce->ellipsis.pos.line != 0;
+		bool variadic = proc_type_->Proc.variadic;
+		bool vari_expand = ce->ellipsis.pos.line != 0;
 
 		for_array(i, ce->args) {
 			ssaValue *a = ssa_build_expr(proc, ce->args.e[i]);
@@ -3231,7 +3241,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 ssaValue *ssa_build_expr(ssaProcedure *proc, AstNode *expr) {
 	expr = unparen_expr(expr);
 
-	TypeAndValue *tv = map_get(&proc->module->info->types, hash_pointer(expr));
+	TypeAndValue *tv = map_tav_get(&proc->module->info->types, hash_pointer(expr));
 	GB_ASSERT_NOT_NULL(tv);
 
 	if (tv->value.kind != ExactValue_Invalid) {
@@ -3254,7 +3264,7 @@ ssaValue *ssa_add_using_variable(ssaProcedure *proc, Entity *e) {
 	Entity *parent = e->using_parent;
 	Selection sel = lookup_field(proc->module->allocator, parent->type, name, false);
 	GB_ASSERT(sel.entity != NULL);
-	ssaValue **pv = map_get(&proc->module->values, hash_pointer(parent));
+	ssaValue **pv = map_ssa_value_get(&proc->module->values, hash_pointer(parent));
 	ssaValue *v = NULL;
 	if (pv != NULL) {
 		v = *pv;
@@ -3263,7 +3273,7 @@ ssaValue *ssa_add_using_variable(ssaProcedure *proc, Entity *e) {
 	}
 	GB_ASSERT(v != NULL);
 	ssaValue *var = ssa_emit_deep_field_gep(proc, parent->type, v, sel);
-	map_set(&proc->module->values, hash_pointer(e), var);
+	map_ssa_value_set(&proc->module->values, hash_pointer(e), var);
 	return var;
 }
 
@@ -3276,12 +3286,12 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		}
 
 		Entity *e = entity_of_ident(proc->module->info, expr);
-		TypeAndValue *tv = map_get(&proc->module->info->types, hash_pointer(expr));
+		TypeAndValue *tv = map_tav_get(&proc->module->info->types, hash_pointer(expr));
 
 		GB_ASSERT(e->kind != Entity_Constant);
 
 		ssaValue *v = NULL;
-		ssaValue **found = map_get(&proc->module->values, hash_pointer(e));
+		ssaValue **found = map_ssa_value_get(&proc->module->values, hash_pointer(e));
 		if (found) {
 			v = *found;
 		} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous) {
@@ -3364,7 +3374,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		gbAllocator a = proc->module->allocator;
 
 
-		b32 deref = is_type_pointer(t);
+		bool deref = is_type_pointer(t);
 		t = type_deref(t);
 
 		ssaValue *using_addr = NULL;
@@ -3435,7 +3445,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		} break;
 
 		case Type_Basic: { // Basic_string
-			TypeAndValue *tv = map_get(&proc->module->info->types, hash_pointer(ie->expr));
+			TypeAndValue *tv = map_tav_get(&proc->module->info->types, hash_pointer(ie->expr));
 			ssaValue *str;
 			ssaValue *elem;
 			ssaValue *len;
@@ -3598,7 +3608,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		case Type_Slice:  et = bt->Slice.elem;  break;
 		}
 
-		auto is_elem_const = [](ssaModule *m, AstNode *elem, Type *elem_type) -> b32 {
+		auto is_elem_const = [](ssaModule *m, AstNode *elem, Type *elem_type) -> bool {
 			if (base_type(elem_type) == t_any) {
 				return false;
 			}
@@ -3903,12 +3913,12 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 		if (pd->body != NULL) {
 			auto *info = proc->module->info;
 
-			Entity **found = map_get(&info->definitions, hash_pointer(pd->name));
+			Entity **found = map_entity_get(&info->definitions, hash_pointer(pd->name));
 			GB_ASSERT_MSG(found != NULL, "Unable to find: %.*s", LIT(pd->name->Ident.string));
 			Entity *e = *found;
 
 
-			if (map_get(&proc->module->min_dep_map, hash_pointer(e)) == NULL) {
+			if (map_entity_get(&proc->module->min_dep_map, hash_pointer(e)) == NULL) {
 				// NOTE(bill): Nothing depends upon it so doesn't need to be built
 				break;
 			}
@@ -3940,7 +3950,7 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 		} else {
 			auto *info = proc->module->info;
 
-			Entity **found = map_get(&info->definitions, hash_pointer(pd->name));
+			Entity **found = map_entity_get(&info->definitions, hash_pointer(pd->name));
 			GB_ASSERT_MSG(found != NULL, "Unable to find: %.*s", LIT(pd->name->Ident.string));
 			Entity *e = *found;
 
@@ -3961,10 +3971,10 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 
 			if (value->Proc.tags & ProcTag_foreign) {
 				HashKey key = hash_string(name);
-				auto *prev_value = map_get(&proc->module->members, key);
+				ssaValue **prev_value = map_ssa_value_get(&proc->module->members, key);
 				if (prev_value == NULL) {
 					// NOTE(bill): Don't do mutliple declarations in the IR
-					map_set(&proc->module->members, key, value);
+					map_ssa_value_set(&proc->module->members, key, value);
 				}
 			} else {
 				array_add(&proc->children, &value->Proc);
@@ -3983,12 +3993,12 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 		name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(td_name), guid);
 		String name = make_string(name_text, name_len-1);
 
-		Entity **found = map_get(&proc->module->info->definitions, hash_pointer(td->name));
+		Entity **found = map_entity_get(&proc->module->info->definitions, hash_pointer(td->name));
 		GB_ASSERT(found != NULL);
 		Entity *e = *found;
 		ssaValue *value = ssa_make_value_type_name(proc->module->allocator,
 		                                           name, e->type);
-		map_set(&proc->module->type_names, hash_pointer(e->type), name);
+		map_string_set(&proc->module->type_names, hash_pointer(e->type), name);
 		ssa_gen_global_type_name(proc->module, e, name);
 	case_end;
 
@@ -4253,7 +4263,7 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 		ssaBlock *default_block = NULL;
 
 		ssaBlock *fall = NULL;
-		b32 append_fall = false;
+		bool append_fall = false;
 
 		isize case_count = body->stmts.count;
 		for_array(i, body->stmts) {
@@ -4329,8 +4339,8 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 		gbAllocator allocator = proc->module->allocator;
 
 		ssaValue *parent = ssa_build_expr(proc, ms->tag);
-		b32 is_union_ptr = false;
-		b32 is_any = false;
+		bool is_union_ptr = false;
+		bool is_any = false;
 		GB_ASSERT(check_valid_type_match_type(ssa_type(parent), &is_union_ptr, &is_any));
 
 		ssaValue *tag_index = NULL;
@@ -4370,7 +4380,7 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 
 			ssaBlock *body = ssa_add_block(proc, clause, "type-match.case.body");
 
-			Scope *scope = *map_get(&proc->module->info->scopes, hash_pointer(clause));
+			Scope *scope = *map_scope_get(&proc->module->info->scopes, hash_pointer(clause));
 			Entity *tag_var_entity = current_scope_lookup_entity(scope, tag_var_name);
 			GB_ASSERT_MSG(tag_var_entity != NULL, "%.*s", LIT(tag_var_name));
 
@@ -4599,12 +4609,12 @@ void ssa_build_proc(ssaValue *value, ssaProcedure *parent) {
 		CheckerInfo *info = m->info;
 		Entity *e = proc->entity;
 		String filename = e->token.pos.file;
-		AstFile **found = map_get(&info->files, hash_string(filename));
+		AstFile **found = map_ast_file_get(&info->files, hash_string(filename));
 		GB_ASSERT(found != NULL);
 		AstFile *f = *found;
 		ssaDebugInfo *di_file = NULL;
 
-		ssaDebugInfo **di_file_found = map_get(&m->debug_info, hash_pointer(f));
+		ssaDebugInfo **di_file_found = map_ssa_debug_info_get(&m->debug_info, hash_pointer(f));
 		if (di_file_found) {
 			di_file = *di_file_found;
 			GB_ASSERT(di_file->kind == ssaDebugInfo_File);
@@ -4656,7 +4666,7 @@ void ssa_build_proc(ssaValue *value, ssaProcedure *parent) {
 
 
 void ssa_module_add_value(ssaModule *m, Entity *e, ssaValue *v) {
-	map_set(&m->values, hash_pointer(e), v);
+	map_ssa_value_set(&m->values, hash_pointer(e), v);
 }
 
 void ssa_init_module(ssaModule *m, Checker *c) {
@@ -4670,10 +4680,10 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 	m->info = &c->info;
 	m->sizes = c->sizes;
 
-	map_init(&m->values,     heap_allocator());
-	map_init(&m->members,    heap_allocator());
-	map_init(&m->debug_info, heap_allocator());
-	map_init(&m->type_names, heap_allocator());
+	map_ssa_value_init(&m->values,  heap_allocator());
+	map_ssa_value_init(&m->members, heap_allocator());
+	map_ssa_debug_info_init(&m->debug_info, heap_allocator());
+	map_string_init(&m->type_names, heap_allocator());
 	array_init(&m->procs,    heap_allocator());
 	array_init(&m->procs_to_generate, heap_allocator());
 
@@ -4690,7 +4700,7 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 			ssaValue *g = ssa_make_value_global(m->allocator, e, NULL);
 			g->Global.is_private  = true;
 			ssa_module_add_value(m, e, g);
-			map_set(&m->members, hash_string(name), g);
+			map_ssa_value_set(&m->members, hash_string(name), g);
 		}
 
 		// Type info member buffer
@@ -4721,7 +4731,7 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 			                                 make_type_array(m->allocator, t_type_info_member, count));
 			ssaValue *g = ssa_make_value_global(m->allocator, e, NULL);
 			ssa_module_add_value(m, e, g);
-			map_set(&m->members, hash_string(name), g);
+			map_ssa_value_set(&m->members, hash_string(name), g);
 		}
 	}
 
@@ -4730,15 +4740,15 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 		di->CompileUnit.file = m->info->files.entries.e[0].value; // Zeroth is the init file
 		di->CompileUnit.producer = str_lit("odin");
 
-		map_set(&m->debug_info, hash_pointer(m), di);
+		map_ssa_debug_info_set(&m->debug_info, hash_pointer(m), di);
 	}
 }
 
 void ssa_destroy_module(ssaModule *m) {
-	map_destroy(&m->values);
-	map_destroy(&m->members);
-	map_destroy(&m->type_names);
-	map_destroy(&m->debug_info);
+	map_ssa_value_destroy(&m->values);
+	map_ssa_value_destroy(&m->members);
+	map_string_destroy(&m->type_names);
+	map_ssa_debug_info_destroy(&m->debug_info);
 	array_free(&m->procs_to_generate);
 	gb_arena_free(&m->arena);
 }
@@ -4752,7 +4762,7 @@ void ssa_destroy_module(ssaModule *m) {
 ////////////////////////////////////////////////////////////////
 
 
-b32 ssa_gen_init(ssaGen *s, Checker *c) {
+bool ssa_gen_init(ssaGen *s, Checker *c) {
 	if (global_error_collector.count != 0) {
 		return false;
 	}
@@ -4787,7 +4797,7 @@ String ssa_mangle_name(ssaGen *s, String path, String name) {
 	ssaModule *m = &s->module;
 	CheckerInfo *info = m->info;
 	gbAllocator a = m->allocator;
-	AstFile *file = *map_get(&info->files, hash_string(path));
+	AstFile *file = *map_ast_file_get(&info->files, hash_string(path));
 
 	char *str = gb_alloc_array(a, char, path.len+1);
 	gb_memmove(str, path.text, path.len);
@@ -4866,7 +4876,7 @@ void ssa_gen_tree(ssaGen *s) {
 			continue;
 		}
 
-		if (map_get(&m->min_dep_map, hash_pointer(e)) == NULL) {
+		if (map_entity_get(&m->min_dep_map, hash_pointer(e)) == NULL) {
 			// NOTE(bill): Nothing depends upon it so doesn't need to be built
 			continue;
 		}
@@ -4879,7 +4889,7 @@ void ssa_gen_tree(ssaGen *s) {
 		switch (e->kind) {
 		case Entity_TypeName:
 			GB_ASSERT(e->type->kind == Type_Named);
-			map_set(&m->type_names, hash_pointer(e->type), name);
+			map_string_set(&m->type_names, hash_pointer(e->type), name);
 			ssa_gen_global_type_name(m, e, name);
 			break;
 
@@ -4893,7 +4903,7 @@ void ssa_gen_tree(ssaGen *s) {
 			var.decl = decl;
 
 			if (decl->init_expr != NULL) {
-				TypeAndValue *tav = map_get(&info->types, hash_pointer(decl->init_expr));
+				TypeAndValue *tav = map_tav_get(&info->types, hash_pointer(decl->init_expr));
 				if (tav != NULL) {
 					if (tav->value.kind != ExactValue_Invalid) {
 						ExactValue v = tav->value;
@@ -4908,8 +4918,8 @@ void ssa_gen_tree(ssaGen *s) {
 				array_add(&global_variables, var);
 			}
 
-			map_set(&m->values, hash_pointer(e), g);
-			map_set(&m->members, hash_string(name), g);
+			map_ssa_value_set(&m->values,  hash_pointer(e), g);
+			map_ssa_value_set(&m->members, hash_string(name), g);
 		} break;
 
 		case Entity_Procedure: {
@@ -4928,10 +4938,10 @@ void ssa_gen_tree(ssaGen *s) {
 			ssaValue *p = ssa_make_value_procedure(a, m, e, e->type, decl->type_expr, body, name);
 			p->Proc.tags = pd->tags;
 
-			map_set(&m->values, hash_pointer(e), p);
+			map_ssa_value_set(&m->values, hash_pointer(e), p);
 			HashKey hash_name = hash_string(name);
-			if (map_get(&m->members, hash_name) == NULL) {
-				map_set(&m->members, hash_name, p);
+			if (map_ssa_value_get(&m->members, hash_name) == NULL) {
+				map_ssa_value_set(&m->members, hash_name, p);
 			}
 		} break;
 		}
@@ -4959,7 +4969,7 @@ void ssa_gen_tree(ssaGen *s) {
 	}
 
 	array_init_reserve(&all_procs->AllProcs.procs, m->allocator, all_proc_max_count);
-	map_set(&m->debug_info, hash_pointer(all_procs), all_procs); // NOTE(bill): This doesn't need to be mapped
+	map_ssa_debug_info_set(&m->debug_info, hash_pointer(all_procs), all_procs); // NOTE(bill): This doesn't need to be mapped
 	compile_unit->CompileUnit.all_procs = all_procs;
 
 
@@ -4985,8 +4995,8 @@ void ssa_gen_tree(ssaGen *s) {
 		token.string = name;
 		Entity *e = make_entity_procedure(a, NULL, token, proc_type);
 
-		map_set(&m->values, hash_pointer(e), p);
-		map_set(&m->members, hash_string(name), p);
+		map_ssa_value_set(&m->values, hash_pointer(e), p);
+		map_ssa_value_set(&m->members, hash_string(name), p);
 
 		ssaProcedure *proc = &p->Proc;
 		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
@@ -5026,11 +5036,11 @@ void ssa_gen_tree(ssaGen *s) {
 			ssaValue *type_info_member_data = NULL;
 
 			ssaValue **found = NULL;
-			found = map_get(&proc->module->members, hash_string(str_lit(SSA_TYPE_INFO_DATA_NAME)));
+			found = map_ssa_value_get(&proc->module->members, hash_string(str_lit(SSA_TYPE_INFO_DATA_NAME)));
 			GB_ASSERT(found != NULL);
 			type_info_data = *found;
 
-			found = map_get(&proc->module->members, hash_string(str_lit(SSA_TYPE_INFO_DATA_MEMBER_NAME)));
+			found = map_ssa_value_get(&proc->module->members, hash_string(str_lit(SSA_TYPE_INFO_DATA_MEMBER_NAME)));
 			GB_ASSERT(found != NULL);
 			type_info_member_data = *found;
 
@@ -5094,7 +5104,7 @@ void ssa_gen_tree(ssaGen *s) {
 					case Basic_int:
 					case Basic_uint: {
 						tag = ssa_add_local_generated(proc, t_type_info_integer);
-						b32 is_unsigned = (t->Basic.flags & BasicFlag_Unsigned) != 0;
+						bool is_unsigned = (t->Basic.flags & BasicFlag_Unsigned) != 0;
 						ssaValue *bits = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
 						ssaValue *is_signed = ssa_make_const_bool(a, !is_unsigned);
 						ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), bits);
@@ -5302,7 +5312,7 @@ void ssa_gen_tree(ssaGen *s) {
 								value_array = ssa_make_value_global(a, e, NULL);
 								value_array->Global.is_private = true;
 								ssa_module_add_value(m, e, value_array);
-								map_set(&m->members, hash_string(token.string), value_array);
+								map_ssa_value_set(&m->members, hash_string(token.string), value_array);
 							}
 							{
 								Token token = {Token_Identifier};
@@ -5316,7 +5326,7 @@ void ssa_gen_tree(ssaGen *s) {
 								name_array = ssa_make_value_global(a, e, NULL);
 								name_array->Global.is_private = true;
 								ssa_module_add_value(m, e, name_array);
-								map_set(&m->members, hash_string(token.string), name_array);
+								map_ssa_value_set(&m->members, hash_string(token.string), name_array);
 							}
 
 							for (isize i = 0; i < count; i++) {

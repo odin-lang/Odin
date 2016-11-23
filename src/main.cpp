@@ -1,7 +1,6 @@
 #define VERSION_STRING "v0.0.3"
 
 #include "common.cpp"
-#include "profiler.cpp"
 #include "timings.cpp"
 #include "unicode.cpp"
 #include "tokenizer.cpp"
@@ -107,7 +106,6 @@ int main(int argc, char **argv) {
 		usage(argv[0]);
 		return 1;
 	}
-	prof_init();
 
 	Timings timings = {0};
 	timings_init(&timings, str_lit("Total Time"), 128);
@@ -122,7 +120,7 @@ int main(int argc, char **argv) {
 	init_universal_scope();
 
 	char *init_filename = NULL;
-	b32 run_output = false;
+	bool run_output = false;
 	String arg1 = make_string_c(argv[1]);
 	if (str_eq(arg1, str_lit("run"))) {
 		run_output = true;

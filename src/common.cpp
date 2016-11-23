@@ -10,7 +10,7 @@ gbAllocator heap_allocator(void) {
 #include "array.cpp"
 
 gb_global String global_module_path = {0};
-gb_global b32 global_module_path_set = false;
+gb_global bool global_module_path_set = false;
 
 
 String get_module_dir() {
@@ -74,20 +74,20 @@ String path_to_fullpath(gbAllocator a, String s) {
 }
 
 // Hasing
-enum HashKeyKind {
+typedef enum HashKeyKind {
 	HashKey_Default,
 	HashKey_String,
 	HashKey_Pointer,
-};
+} HashKeyKind;
 
-struct HashKey {
+typedef struct HashKey {
 	HashKeyKind kind;
 	u64         key;
 	union {
 		String string; // if String, s.len > 0
 		void * ptr;
 	};
-};
+} HashKey;
 
 gb_inline HashKey hashing_proc(void const *data, isize len) {
 	HashKey h = {HashKey_Default};
@@ -112,7 +112,7 @@ gb_inline HashKey hash_pointer(void *ptr) {
 	return h;
 }
 
-b32 hash_key_equal(HashKey a, HashKey b) {
+bool hash_key_equal(HashKey a, HashKey b) {
 	if (a.key == b.key) {
 		// NOTE(bill): If two string's hashes collide, compare the strings themselves
 		if (a.kind == HashKey_String) {
@@ -232,13 +232,32 @@ i16 f32_to_f16(f32 value) {
 ////////////////////////////////////////////////////////////////
 
 
+#define MAP_TYPE String
+#define MAP_FUNC map_string_
+#define MAP_NAME MapString
+#include "map.c"
+
+#define MAP_TYPE bool
+#define MAP_FUNC map_bool_
+#define MAP_NAME MapBool
+#include "map.c"
+
+#define MAP_TYPE isize
+#define MAP_FUNC map_isize_
+#define MAP_NAME MapIsize
+#include "map.c"
 
 
-struct MapFindResult {
+#if 0
+#ifndef MAP_FIND_RESULT
+#define MAP_FIND_RESULT
+typedef struct MapFindResult {
 	isize hash_index;
 	isize entry_prev;
 	isize entry_index;
-};
+} MapFindResult;
+#endif
+
 
 template <typename T>
 struct MapEntry {
@@ -338,7 +357,7 @@ gb_internal MapFindResult map__find(Map<T> *h, MapEntry<T> *e) {
 
 
 template <typename T>
-gb_internal b32 map__full(Map<T> *h) {
+gb_internal bool map__full(Map<T> *h) {
 	return 0.75f * h->hashes.count <= h->entries.count;
 }
 
@@ -529,3 +548,4 @@ void multi_map_remove_all(Map<T> *h, HashKey key) {
 
 
 
+#endif

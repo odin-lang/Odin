@@ -66,7 +66,7 @@ struct Entity {
 			String path;
 			String name;
 			Scope *scope;
-			b32    used;
+			bool    used;
 		} ImportName;
 		struct {} Nil;
 		struct {
@@ -77,7 +77,7 @@ struct Entity {
 	};
 };
 
-b32 is_entity_exported(Entity *e) {
+bool is_entity_exported(Entity *e) {
 	if (e->kind == Entity_ImportName) {
 		return false;
 	}
@@ -125,7 +125,7 @@ Entity *make_entity_type_name(gbAllocator a, Scope *scope, Token token, Type *ty
 	return entity;
 }
 
-Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, b32 anonymous) {
+Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, bool anonymous) {
 	Entity *entity = make_entity_variable(a, scope, token, type);
 	entity->flags |= EntityFlag_Used;
 	entity->flags |= EntityFlag_Anonymous*(anonymous != 0);
@@ -133,7 +133,7 @@ Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, 
 	return entity;
 }
 
-Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, b32 anonymous, i32 field_src_index) {
+Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, bool anonymous, i32 field_src_index) {
 	Entity *entity = make_entity_variable(a, scope, token, type);
 	entity->Variable.field_src_index = field_src_index;
 	entity->Variable.field_index = field_src_index;

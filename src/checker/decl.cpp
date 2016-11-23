@@ -1,4 +1,4 @@
-b32 check_is_terminating(AstNode *node);
+bool check_is_terminating(AstNode *node);
 void check_stmt         (Checker *c, AstNode *node, u32 flags);
 void check_stmt_list    (Checker *c, AstNodeArray stmts, u32 flags);
 void check_type_decl    (Checker *c, Entity *e, AstNode *type_expr, Type *def, CycleChecker *cycle_checker);
@@ -8,8 +8,6 @@ void check_var_decl     (Checker *c, Entity *e, Entity **entities, isize entity_
 
 // NOTE(bill): `content_name` is for debugging and error messages
 Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String context_name) {
-	PROF_PROC();
-
 	if (operand->mode == Addressing_Invalid ||
 	    operand->type == t_invalid ||
 	    e->type == t_invalid) {
@@ -58,8 +56,6 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 }
 
 void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArray inits, String context_name) {
-	PROF_PROC();
-
 	if ((lhs == NULL || lhs_count == 0) && inits.count == 0) {
 		return;
 	}
@@ -109,14 +105,12 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 
 
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, CycleChecker *cycle_checker) {
-	PROF_PROC();
-
 	if (e->type != NULL) {
 		return;
 	}
 
 	if (d == NULL) {
-		DeclInfo **found = map_get(&c->info.entities, hash_pointer(e));
+		DeclInfo **found = map_decl_info_get(&c->info.entities, hash_pointer(e));
 		if (found) {
 			d = *found;
 		} else {
@@ -153,8 +147,6 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 
 
 void check_var_decl_node(Checker *c, AstNode *node) {
-	PROF_PROC();
-
 	ast_node(vd, VarDecl, node);
 	isize entity_count = vd->names.count;
 	isize entity_index = 0;
@@ -224,8 +216,6 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 
 
 void check_init_constant(Checker *c, Entity *e, Operand *operand) {
-	PROF_PROC();
-
 	if (operand->mode == Addressing_Invalid ||
 	    operand->type == t_invalid ||
 	    e->type == t_invalid) {
@@ -269,8 +259,6 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 
 
 void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr) {
-	PROF_PROC();
-
 	GB_ASSERT(e->type == NULL);
 
 	if (e->flags & EntityFlag_Visited) {
@@ -300,8 +288,6 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 }
 
 void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, CycleChecker *cycle_checker) {
-	PROF_PROC();
-
 	GB_ASSERT(e->type == NULL);
 	Type *named = make_type_named(c->allocator, e->token.string, NULL, e);
 	named->Named.type_name = e;
@@ -326,7 +312,7 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, Cycle
 }
 
 
-b32 are_signatures_similar_enough(Type *a_, Type *b_) {
+bool are_signatures_similar_enough(Type *a_, Type *b_) {
 	GB_ASSERT(a_->kind == Type_Proc);
 	GB_ASSERT(b_->kind == Type_Proc);
 	auto *a = &a_->Proc;
@@ -365,8 +351,6 @@ b32 are_signatures_similar_enough(Type *a_, Type *b_) {
 }
 
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
-	PROF_PROC();
-
 	GB_ASSERT(e->type == NULL);
 
 	Type *proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0, false);
@@ -376,10 +360,10 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	check_open_scope(c, pd->type);
 	check_procedure_type(c, proc_type, pd->type);
 
-	b32 is_foreign      = (pd->tags & ProcTag_foreign)   != 0;
-	b32 is_link_name    = (pd->tags & ProcTag_link_name) != 0;
-	b32 is_inline       = (pd->tags & ProcTag_inline)    != 0;
-	b32 is_no_inline    = (pd->tags & ProcTag_no_inline) != 0;
+	bool is_foreign      = (pd->tags & ProcTag_foreign)   != 0;
+	bool is_link_name    = (pd->tags & ProcTag_link_name) != 0;
+	bool is_inline       = (pd->tags & ProcTag_inline)    != 0;
+	bool is_no_inline    = (pd->tags & ProcTag_no_inline) != 0;
 
 	if ((d->scope->is_file || d->scope->is_global) &&
 	    str_eq(e->token.string, str_lit("main"))) {
@@ -425,7 +409,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			name = proc_decl->foreign_name;
 		}
 		HashKey key = hash_string(name);
-		auto *found = map_get(fp, key);
+		Entity **found = map_entity_get(fp, key);
 		if (found) {
 			Entity *f = *found;
 			TokenPos pos = f->token.pos;
@@ -438,7 +422,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 				      LIT(name), LIT(pos.file), pos.line, pos.column);
 			}
 		} else {
-			map_set(fp, key, e);
+			map_entity_set(fp, key, e);
 		}
 	} else if (is_link_name) {
 		auto *fp = &c->info.foreign_procs;
@@ -446,7 +430,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		String name = proc_decl->link_name;
 
 		HashKey key = hash_string(name);
-		auto *found = map_get(fp, key);
+		Entity **found = map_entity_get(fp, key);
 		if (found) {
 			Entity *f = *found;
 			TokenPos pos = f->token.pos;
@@ -455,7 +439,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			      "\tother at %.*s(%td:%td)",
 			      LIT(name), LIT(pos.file), pos.line, pos.column);
 		} else {
-			map_set(fp, key, e);
+			map_entity_set(fp, key, e);
 		}
 	}
 
@@ -463,8 +447,6 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 }
 
 void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, AstNode *init_expr) {
-	PROF_PROC();
-
 	GB_ASSERT(e->type == NULL);
 	GB_ASSERT(e->kind == Entity_Variable);
 
@@ -520,7 +502,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 			String name = e->token.string;
 			Type *t = base_type(type_deref(e->type));
 			if (is_type_struct(t) || is_type_raw_union(t)) {
-				Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
+				Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
 				GB_ASSERT(found != NULL);
 				for_array(i, (*found)->elements.entries) {
 					Entity *f = (*found)->elements.entries.e[i].value;

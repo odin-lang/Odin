@@ -49,14 +49,14 @@ gb_inline String make_string_c(char *text) {
 #define str_lit(c_str) make_string(cast(u8 *)c_str, gb_size_of(c_str)-1)
 
 
-gb_inline b32 are_strings_equal(String a, String b) {
+gb_inline bool are_strings_equal(String a, String b) {
 	if (a.len == b.len) {
 		return gb_memcompare(a.text, b.text, a.len) == 0;
 	}
 	return false;
 }
 
-gb_inline b32 str_eq_ignore_case(String a, String b) {
+gb_inline bool str_eq_ignore_case(String a, String b) {
 	if (a.len == b.len) {
 		for (isize i = 0; i < a.len; i++) {
 			char x = cast(char)a.text[i];
@@ -137,7 +137,7 @@ gb_inline bool str_ge(String a, String b) { return string_compare(a, b) >= 0;   
 gb_inline isize string_extension_position(String str) {
 	isize dot_pos = -1;
 	isize i = str.len;
-	b32 seen_dot = false;
+	bool seen_dot = false;
 	while (i --> 0) {
 		if (str.text[i] == GB_PATH_SEPARATOR)
 			break;
@@ -150,7 +150,7 @@ gb_inline isize string_extension_position(String str) {
 	return dot_pos;
 }
 
-gb_inline b32 string_has_extension(String str, String ext) {
+gb_inline bool string_has_extension(String str, String ext) {
 	if (str.len > ext.len+1) {
 		u8 *s = str.text+str.len - ext.len-1;
 		if (s[0] == '.') {
@@ -162,7 +162,7 @@ gb_inline b32 string_has_extension(String str, String ext) {
 	return false;
 }
 
-b32 string_contains_char(String s, u8 c) {
+bool string_contains_char(String s, u8 c) {
 	for (isize i = 0; i < s.len; i++) {
 		if (s.text[i] == c)
 			return true;
@@ -238,7 +238,7 @@ String string16_to_string(gbAllocator a, String16 s) {
 
 
 
-b32 unquote_char(String s, u8 quote, Rune *rune, b32 *multiple_bytes, String *tail_string) {
+bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *tail_string) {
 	if (s.text[0] == quote &&
 	    (quote == '$' || quote == '"')) {
 		return false;
@@ -396,8 +396,8 @@ i32 unquote_string(gbAllocator a, String *s_) {
 	while (s.len > 0) {
 		String tail_string = {0};
 		Rune r = 0;
-		b32 multiple_bytes = false;
-		b32 success = unquote_char(s, quote, &r, &multiple_bytes, &tail_string);
+		bool multiple_bytes = false;
+		bool success = unquote_char(s, quote, &r, &multiple_bytes, &tail_string);
 		if (!success) {
 			gb_free(a, buf);
 			return 0;

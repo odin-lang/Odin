@@ -136,9 +136,9 @@ struct Type {
 				};
 				struct { // struct only
 					i64 *    struct_offsets;
-					b32      struct_are_offsets_set;
-					b32      struct_is_packed;
-					b32      struct_is_ordered;
+					bool      struct_are_offsets_set;
+					bool      struct_is_packed;
+					bool      struct_is_ordered;
 					Entity **fields_in_src_order; // Entity_Variable
 				};
 			};
@@ -155,7 +155,7 @@ struct Type {
 		struct {
 			Entity **variables; // Entity_Variable
 			i32      variable_count;
-			b32      are_offsets_set;
+			bool      are_offsets_set;
 			i64 *    offsets;
 		} Tuple;
 		struct {
@@ -164,7 +164,7 @@ struct Type {
 			Type * results; // Type_Tuple
 			i32    param_count;
 			i32    result_count;
-			b32    variadic;
+			bool    variadic;
 		} Proc;
 	};
 };
@@ -378,7 +378,7 @@ Type *make_type_tuple(gbAllocator a) {
 	return t;
 }
 
-Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_count, Type *results, isize result_count, b32 variadic) {
+Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_count, Type *results, isize result_count, bool variadic) {
 	Type *t = alloc_type(a, Type_Proc);
 
 	if (variadic) {
@@ -423,34 +423,34 @@ Type *get_enum_base_type(Type *t) {
 	return t;
 }
 
-b32 is_type_named(Type *t) {
+bool is_type_named(Type *t) {
 	if (t->kind == Type_Basic) {
 		return true;
 	}
 	return t->kind == Type_Named;
 }
-b32 is_type_boolean(Type *t) {
+bool is_type_boolean(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Boolean) != 0;
 	}
 	return false;
 }
-b32 is_type_integer(Type *t) {
+bool is_type_integer(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Integer) != 0;
 	}
 	return false;
 }
-b32 is_type_unsigned(Type *t) {
+bool is_type_unsigned(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Unsigned) != 0;
 	}
 	return false;
 }
-b32 is_type_numeric(Type *t) {
+bool is_type_numeric(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Numeric) != 0;
@@ -460,28 +460,28 @@ b32 is_type_numeric(Type *t) {
 	}
 	return false;
 }
-b32 is_type_string(Type *t) {
+bool is_type_string(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_String) != 0;
 	}
 	return false;
 }
-b32 is_type_typed(Type *t) {
+bool is_type_typed(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Untyped) == 0;
 	}
 	return true;
 }
-b32 is_type_untyped(Type *t) {
+bool is_type_untyped(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Untyped) != 0;
 	}
 	return false;
 }
-b32 is_type_ordered(Type *t) {
+bool is_type_ordered(Type *t) {
 	t = base_type(get_enum_base_type(t));
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Ordered) != 0;
@@ -491,7 +491,7 @@ b32 is_type_ordered(Type *t) {
 	}
 	return false;
 }
-b32 is_type_constant_type(Type *t) {
+bool is_type_constant_type(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_ConstantType) != 0;
@@ -501,82 +501,82 @@ b32 is_type_constant_type(Type *t) {
 	}
 	return false;
 }
-b32 is_type_float(Type *t) {
+bool is_type_float(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Float) != 0;
 	}
 	return false;
 }
-b32 is_type_f32(Type *t) {
+bool is_type_f32(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_f32;
 	}
 	return false;
 }
-b32 is_type_f64(Type *t) {
+bool is_type_f64(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_f64;
 	}
 	return false;
 }
-b32 is_type_pointer(Type *t) {
+bool is_type_pointer(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Pointer) != 0;
 	}
 	return t->kind == Type_Pointer;
 }
-b32 is_type_maybe(Type *t) {
+bool is_type_maybe(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Maybe;
 }
-b32 is_type_tuple(Type *t) {
+bool is_type_tuple(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Tuple;
 }
 
 
-b32 is_type_int_or_uint(Type *t) {
+bool is_type_int_or_uint(Type *t) {
 	if (t->kind == Type_Basic) {
 		return (t->Basic.kind == Basic_int) || (t->Basic.kind == Basic_uint);
 	}
 	return false;
 }
-b32 is_type_rawptr(Type *t) {
+bool is_type_rawptr(Type *t) {
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_rawptr;
 	}
 	return false;
 }
-b32 is_type_u8(Type *t) {
+bool is_type_u8(Type *t) {
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_u8;
 	}
 	return false;
 }
-b32 is_type_array(Type *t) {
+bool is_type_array(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Array;
 }
-b32 is_type_slice(Type *t) {
+bool is_type_slice(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Slice;
 }
-b32 is_type_u8_slice(Type *t) {
+bool is_type_u8_slice(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Slice) {
 		return is_type_u8(t->Slice.elem);
 	}
 	return false;
 }
-b32 is_type_vector(Type *t) {
+bool is_type_vector(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Vector;
 }
-b32 is_type_proc(Type *t) {
+bool is_type_proc(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Proc;
 }
@@ -589,40 +589,40 @@ Type *base_vector_type(Type *t) {
 }
 
 
-b32 is_type_enum(Type *t) {
+bool is_type_enum(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_Enum);
 }
-b32 is_type_struct(Type *t) {
+bool is_type_struct(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct);
 }
-b32 is_type_union(Type *t) {
+bool is_type_union(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_Union);
 }
-b32 is_type_raw_union(Type *t) {
+bool is_type_raw_union(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_RawUnion);
 }
 
-b32 is_type_any(Type *t) {
+bool is_type_any(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_any);
 }
-b32 is_type_untyped_nil(Type *t) {
+bool is_type_untyped_nil(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_UntypedNil);
 }
 
 
 
-b32 is_type_indexable(Type *t) {
+bool is_type_indexable(Type *t) {
 	return is_type_array(t) || is_type_slice(t) || is_type_vector(t) || is_type_string(t);
 }
 
 
-b32 type_has_nil(Type *t) {
+bool type_has_nil(Type *t) {
 	t = base_type(t);
 	switch (t->kind) {
 	case Type_Basic:
@@ -642,7 +642,7 @@ b32 type_has_nil(Type *t) {
 }
 
 
-b32 is_type_comparable(Type *t) {
+bool is_type_comparable(Type *t) {
 	t = base_type(get_enum_base_type(t));
 	switch (t->kind) {
 	case Type_Basic:
@@ -671,7 +671,7 @@ b32 is_type_comparable(Type *t) {
 	return false;
 }
 
-b32 are_types_identical(Type *x, Type *y) {
+bool are_types_identical(Type *x, Type *y) {
 	if (x == y)
 		return true;
 
@@ -810,11 +810,11 @@ typedef Array(isize) Array_isize;
 struct Selection {
 	Entity *    entity;
 	Array_isize index;
-	b32         indirect; // Set if there was a pointer deref anywhere down the line
+	bool         indirect; // Set if there was a pointer deref anywhere down the line
 };
 Selection empty_selection = {};
 
-Selection make_selection(Entity *entity, Array_isize index, b32 indirect) {
+Selection make_selection(Entity *entity, Array_isize index, bool indirect) {
 	Selection s = {entity, index, indirect};
 	return s;
 }
@@ -835,7 +835,7 @@ gb_global Entity *entity__string_count   = NULL;
 gb_global Entity *entity__slice_count    = NULL;
 gb_global Entity *entity__slice_capacity = NULL;
 
-Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_type, Selection sel = empty_selection) {
+Selection lookup_field(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel = empty_selection) {
 	GB_ASSERT(type_ != NULL);
 
 	if (str_eq(field_name, str_lit("_"))) {
@@ -843,7 +843,7 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, b32 is_typ
 	}
 
 	Type *type = type_deref(type_);
-	b32 is_ptr = type != type_;
+	bool is_ptr = type != type_;
 	sel.indirect = sel.indirect || is_ptr;
 
 	type = base_type(type);
@@ -1131,7 +1131,7 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	return gb_clamp(next_pow2(type_size_of(s, allocator, t)), 1, s.word_size);
 }
 
-i64 *type_set_offsets_of(BaseTypeSizes s, gbAllocator allocator, Entity **fields, isize field_count, b32 is_packed) {
+i64 *type_set_offsets_of(BaseTypeSizes s, gbAllocator allocator, Entity **fields, isize field_count, bool is_packed) {
 	i64 *offsets = gb_alloc_array(allocator, i64, field_count);
 	i64 curr_offset = 0;
 	if (is_packed) {
@@ -1151,7 +1151,7 @@ i64 *type_set_offsets_of(BaseTypeSizes s, gbAllocator allocator, Entity **fields
 	return offsets;
 }
 
-b32 type_set_offsets(BaseTypeSizes s, gbAllocator allocator, Type *t) {
+bool type_set_offsets(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	t = base_type(t);
 	if (is_type_struct(t)) {
 		if (!t->Record.struct_are_offsets_set) {
