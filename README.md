@@ -1,3 +1,5 @@
+<img src="logo.png" alt="Odin logo" height="74">
+
 # The Odin Programming Language
 
 Odin is fast, concise, readable, pragmatic and open sourced. It is designed with the intent of replacing C with the following goals:
