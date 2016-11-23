@@ -1,4 +1,4 @@
-<img src="logo.png" alt="Odin logo" height="74">
+<img src="logo-slim.png" alt="Odin logo" height="74">
 
 # The Odin Programming Language
 
