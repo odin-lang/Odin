@@ -25,8 +25,8 @@ set compiler_warnings= ^
 
 set compiler_includes=
 set libs= ^
-	kernel32.lib ^
-	"src\dyncall\lib\*.lib"
+	kernel32.lib
+	rem "src\dyncall\lib\*.lib"
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console
 

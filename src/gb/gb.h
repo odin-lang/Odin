@@ -412,21 +412,20 @@ typedef i32 Rune; // NOTE(bill): Unicode codepoint
 #define GB_RUNE_EOF     cast(Rune)(-1)
 
 
-// NOTE(bill): I think C99 and C++ `bool` is stupid for numerous reasons but there are too many
-// to write in this small comment.
 typedef i8  b8;
 typedef i16 b16;
 typedef i32 b32; // NOTE(bill): Prefer this!!!
 
 // NOTE(bill): Get true and false
 #if !defined(__cplusplus)
-	#if (defined(_MSC_VER) && _MSC_VER <= 1800) || !defined(__STDC_VERSION__)
+	#if (defined(_MSC_VER) && _MSC_VER <= 1800) || (!defined(_MSC_VER) && !defined(__STDC_VERSION__))
 		#ifndef true
 		#define true  (0 == 0)
 		#endif
 		#ifndef false
 		#define false (0 != 0)
 		#endif
+		typedef b8 bool;
 	#else
 		#include <stdbool.h>
 	#endif
