@@ -3,9 +3,9 @@
 // TODO(bill): Big numbers
 // IMPORTANT TODO(bill): This needs to be completely fixed!!!!!!!!
 
-struct AstNode;
+typedef struct AstNode AstNode;
 
-enum ExactValueKind {
+typedef enum ExactValueKind {
 	ExactValue_Invalid,
 
 	ExactValue_Bool,
@@ -16,9 +16,9 @@ enum ExactValueKind {
 	ExactValue_Compound, // TODO(bill): Is this good enough?
 
 	ExactValue_Count,
-};
+} ExactValueKind;
 
-struct ExactValue {
+typedef struct ExactValue {
 	ExactValueKind kind;
 	union {
 		bool      value_bool;
@@ -28,7 +28,7 @@ struct ExactValue {
 		i64      value_pointer;
 		AstNode *value_compound;
 	};
-};
+} ExactValue;
 
 HashKey hash_exact_value(ExactValue v) {
 	return hashing_proc(&v, gb_size_of(ExactValue));

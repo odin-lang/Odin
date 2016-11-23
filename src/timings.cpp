@@ -1,14 +1,14 @@
-struct TimeStamp {
+typedef struct TimeStamp {
 	u64    start;
 	u64    finish;
 	String label;
-};
+} TimeStamp;
 
-struct Timings {
+typedef struct Timings {
 	TimeStamp        total;
 	Array(TimeStamp) sections;
 	u64              freq;
-};
+} Timings;
 
 
 u64 win32_time_stamp_time_now(void) {

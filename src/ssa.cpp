@@ -15,7 +15,7 @@ typedef Array(ssaValue *) ssaValueArray;
 #define MAP_NAME MapSsaDebugInfo
 #include "map.c"
 
-struct ssaModule {
+typedef struct ssaModule {
 	CheckerInfo * info;
 	BaseTypeSizes sizes;
 	gbArena       arena;
@@ -41,17 +41,17 @@ struct ssaModule {
 
 	Array(ssaProcedure *) procs;             // NOTE(bill): All procedures with bodies
 	ssaValueArray         procs_to_generate; // NOTE(bill): Procedures to generate
-};
+} ssaModule;
 
 // NOTE(bill): For more info, see https://en.wikipedia.org/wiki/Dominator_(graph_theory)
-struct ssaDomNode {
+typedef struct ssaDomNode {
 	ssaBlock *        idom; // Parent (Immediate Dominator)
 	Array(ssaBlock *) children;
 	i32               pre, post; // Ordering in tree
-};
+} ssaDomNode;
 
 
-struct ssaBlock {
+typedef struct ssaBlock {
 	i32           index;
 	String        label;
 	ssaProcedure *parent;
@@ -66,8 +66,9 @@ struct ssaBlock {
 
 	Array(ssaBlock *) preds;
 	Array(ssaBlock *) succs;
-};
+} ssaBlock;
 
+typedef struct ssaTargetList ssaTargetList;
 struct ssaTargetList {
 	ssaTargetList *prev;
 	ssaBlock *     break_;
@@ -75,17 +76,17 @@ struct ssaTargetList {
 	ssaBlock *     fallthrough_;
 };
 
-enum ssaDeferExitKind {
+typedef enum ssaDeferExitKind {
 	ssaDeferExit_Default,
 	ssaDeferExit_Return,
 	ssaDeferExit_Branch,
-};
-enum ssaDeferKind {
+} ssaDeferExitKind;
+typedef enum ssaDeferKind {
 	ssaDefer_Node,
 	ssaDefer_Instr,
-};
+} ssaDeferKind;
 
-struct ssaDefer {
+typedef struct ssaDefer {
 	ssaDeferKind kind;
 	isize        scope_index;
 	ssaBlock *   block;
@@ -94,8 +95,9 @@ struct ssaDefer {
 		// NOTE(bill): `instr` will be copied every time to create a new one
 		ssaValue *instr;
 	};
-};
+} ssaDefer;
 
+typedef struct ssaProcedure ssaProcedure;
 struct ssaProcedure {
 	ssaProcedure *        parent;
 	Array(ssaProcedure *) children;
@@ -172,11 +174,11 @@ struct ssaProcedure {
 	SSA_CONV_KIND(inttoptr), \
 	SSA_CONV_KIND(bitcast),
 
-enum ssaInstrKind {
+typedef enum ssaInstrKind {
 #define SSA_INSTR_KIND(x) GB_JOIN2(ssaInstr_, x)
 	SSA_INSTR_KINDS
 #undef SSA_INSTR_KIND
-};
+} ssaInstrKind;
 
 String const ssa_instr_strings[] = {
 #define SSA_INSTR_KIND(x) {cast(u8 *)#x, gb_size_of(#x)-1}
@@ -184,11 +186,11 @@ String const ssa_instr_strings[] = {
 #undef SSA_INSTR_KIND
 };
 
-enum ssaConvKind {
+typedef enum ssaConvKind {
 #define SSA_CONV_KIND(x) GB_JOIN2(ssaConv_, x)
 	SSA_CONV_KINDS
 #undef SSA_CONV_KIND
-};
+} ssaConvKind;
 
 String const ssa_conv_strings[] = {
 #define SSA_CONV_KIND(x) {cast(u8 *)#x, gb_size_of(#x)-1}
@@ -196,6 +198,7 @@ String const ssa_conv_strings[] = {
 #undef SSA_CONV_KIND
 };
 
+typedef struct ssaInstr ssaInstr;
 struct ssaInstr {
 	ssaInstrKind kind;
 
@@ -330,7 +333,7 @@ struct ssaInstr {
 };
 
 
-enum ssaValueKind {
+typedef enum ssaValueKind {
 	ssaValue_Invalid,
 
 	ssaValue_Constant,
@@ -345,9 +348,9 @@ enum ssaValueKind {
 	ssaValue_Instr,
 
 	ssaValue_Count,
-};
+} ssaValueKind;
 
-struct ssaValue {
+typedef struct ssaValue {
 	ssaValueKind kind;
 	i32 index;
 	union {
@@ -387,7 +390,7 @@ struct ssaValue {
 		ssaBlock     Block;
 		ssaInstr     Instr;
 	};
-};
+} ssaValue;
 
 gb_global ssaValue *v_zero    = NULL;
 gb_global ssaValue *v_one     = NULL;
@@ -397,19 +400,19 @@ gb_global ssaValue *v_two32   = NULL;
 gb_global ssaValue *v_false   = NULL;
 gb_global ssaValue *v_true    = NULL;
 
-enum ssaAddrKind {
+typedef enum ssaAddrKind {
 	ssaAddr_Default,
 	ssaAddr_Vector,
-};
+} ssaAddrKind;
 
-struct ssaAddr {
+typedef struct ssaAddr {
 	ssaValue *  addr;
 	AstNode *   expr; // NOTE(bill): Just for testing - probably remove later
 	ssaAddrKind kind;
 	union {
 		struct { ssaValue *index; } Vector;
 	};
-};
+} ssaAddr;
 
 ssaAddr ssa_make_addr(ssaValue *addr, AstNode *expr) {
 	ssaAddr v = {addr, expr};
@@ -424,7 +427,7 @@ ssaAddr ssa_make_addr_vector(ssaValue *addr, ssaValue *index, AstNode *expr) {
 
 
 
-enum ssaDebugEncoding {
+typedef enum ssaDebugEncoding {
 	ssaDebugBasicEncoding_Invalid       = 0,
 
 	ssaDebugBasicEncoding_address       = 1,
@@ -444,9 +447,9 @@ enum ssaDebugEncoding {
 	ssaDebugBasicEncoding_structure_type   = 19,
 	ssaDebugBasicEncoding_union_type       = 23,
 
-};
+} ssaDebugEncoding;
 
-enum ssaDebugInfoKind {
+typedef enum ssaDebugInfoKind {
 	ssaDebugInfo_Invalid,
 
 	ssaDebugInfo_CompileUnit,
@@ -465,8 +468,9 @@ enum ssaDebugInfoKind {
 
 
 	ssaDebugInfo_Count,
-};
+} ssaDebugInfoKind;
 
+typedef struct ssaDebugInfo ssaDebugInfo;
 struct ssaDebugInfo {
 	ssaDebugInfoKind kind;
 	i32 id;
@@ -547,11 +551,11 @@ struct ssaDebugInfo {
 	};
 };
 
-struct ssaGen {
+typedef struct ssaGen {
 	ssaModule module;
 	gbFile    output_file;
 	bool       opt_called;
-};
+} ssaGen;
 
 ssaValue *ssa_lookup_member(ssaModule *m, String name) {
 	ssaValue **v = map_ssa_value_get(&m->members, hash_string(name));
@@ -2348,7 +2352,7 @@ isize ssa_type_info_index(CheckerInfo *info, Type *type) {
 		// NOTE(bill): Do manual search
 		// TODO(bill): This is O(n) and can be very slow
 		for_array(i, info->type_info_map.entries){
-			auto *e = &info->type_info_map.entries.e[i];
+			MapIsizeEntry *e = &info->type_info_map.entries.e[i];
 			Type *prev_type = cast(Type *)e->key.ptr;
 			if (are_types_identical(prev_type, type)) {
 				entry_index = e->value;
@@ -3277,6 +3281,18 @@ ssaValue *ssa_add_using_variable(ssaProcedure *proc, Entity *e) {
 	return var;
 }
 
+bool ssa_is_elem_const(ssaModule *m, AstNode *elem, Type *elem_type) {
+	if (base_type(elem_type) == t_any) {
+		return false;
+	}
+	if (elem->kind == AstNode_FieldValue) {
+		elem = elem->FieldValue.value;
+	}
+	TypeAndValue *tav = type_and_value_of_expression(m->info, elem);
+	GB_ASSERT(tav != NULL);
+	return tav->value.kind != ExactValue_Invalid;
+}
+
 ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	switch (expr->kind) {
 	case_ast_node(i, Ident, expr);
@@ -3608,18 +3624,6 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		case Type_Slice:  et = bt->Slice.elem;  break;
 		}
 
-		auto is_elem_const = [](ssaModule *m, AstNode *elem, Type *elem_type) -> bool {
-			if (base_type(elem_type) == t_any) {
-				return false;
-			}
-			if (elem->kind == AstNode_FieldValue) {
-				elem = elem->FieldValue.value;
-			}
-			TypeAndValue *tav = type_and_value_of_expression(m->info, elem);
-			GB_ASSERT(tav != NULL);
-			return tav->value.kind != ExactValue_Invalid;
-		};
-
 		switch (bt->kind) {
 		default: GB_PANIC("Unknown CompoundLit type: %s", type_to_string(type)); break;
 
@@ -3627,7 +3631,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			ssaValue *result = ssa_add_module_constant(proc->module, type, make_exact_value_compound(expr));
 			for_array(index, cl->elems) {
 				AstNode *elem = cl->elems.e[index];
-				if (is_elem_const(proc->module, elem, et)) {
+				if (ssa_is_elem_const(proc->module, elem, et)) {
 					continue;
 				}
 				ssaValue *field_elem = ssa_build_expr(proc, elem);
@@ -3675,7 +3679,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 					}
 
 					field = st->fields[index];
-					if (is_elem_const(proc->module, elem, field->type)) {
+					if (ssa_is_elem_const(proc->module, elem, field->type)) {
 						continue;
 					}
 
@@ -3695,7 +3699,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 				ssa_emit_store(proc, v, ssa_add_module_constant(proc->module, type, make_exact_value_compound(expr)));
 				for_array(i, cl->elems) {
 					AstNode *elem = cl->elems.e[i];
-					if (is_elem_const(proc->module, elem, et)) {
+					if (ssa_is_elem_const(proc->module, elem, et)) {
 						continue;
 					}
 					ssaValue *field_expr = ssa_build_expr(proc, elem);
@@ -3719,7 +3723,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 				for_array(i, cl->elems) {
 					AstNode *elem = cl->elems.e[i];
-					if (is_elem_const(proc->module, elem, et)) {
+					if (ssa_is_elem_const(proc->module, elem, et)) {
 						continue;
 					}
 
@@ -3911,7 +3915,7 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 
 	case_ast_node(pd, ProcDecl, node);
 		if (pd->body != NULL) {
-			auto *info = proc->module->info;
+			CheckerInfo *info = proc->module->info;
 
 			Entity **found = map_entity_get(&info->definitions, hash_pointer(pd->name));
 			GB_ASSERT_MSG(found != NULL, "Unable to find: %.*s", LIT(pd->name->Ident.string));
@@ -3948,7 +3952,7 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 			array_add(&proc->children, &value->Proc);
 			array_add(&proc->module->procs_to_generate, value);
 		} else {
-			auto *info = proc->module->info;
+			CheckerInfo *info = proc->module->info;
 
 			Entity **found = map_entity_get(&info->definitions, hash_pointer(pd->name));
 			GB_ASSERT_MSG(found != NULL, "Unable to find: %.*s", LIT(pd->name->Ident.string));
@@ -4709,7 +4713,7 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 			isize count = 0;
 
 			for_array(entry_index, m->info->type_info_map.entries) {
-				auto *entry = &m->info->type_info_map.entries.e[entry_index];
+				MapIsizeEntry *entry = &m->info->type_info_map.entries.e[entry_index];
 				Type *t = cast(Type *)cast(uintptr)entry->key.key;
 
 				switch (t->kind) {
@@ -4824,6 +4828,17 @@ String ssa_mangle_name(ssaGen *s, String path, String name) {
 	return make_string(new_name, new_name_len-1);
 }
 
+ssaValue *ssa_get_type_info_ptr(ssaProcedure *proc, ssaValue *type_info_data, Type *type) {
+	i32 index = cast(i32)ssa_type_info_index(proc->module->info, type);
+	// gb_printf_err("%d %s\n", index, type_to_string(type));
+	return ssa_emit_array_ep(proc, type_info_data, index);
+}
+
+ssaValue *ssa_type_info_member_offset(ssaProcedure *proc, ssaValue *data, isize count, i32 *index) {
+	ssaValue *offset = ssa_emit_array_ep(proc, data, *index);
+	*index += count;
+	return offset;
+}
 
 void ssa_gen_tree(ssaGen *s) {
 	ssaModule *m = &s->module;
@@ -4844,7 +4859,7 @@ void ssa_gen_tree(ssaGen *s) {
 	Entity *entry_point = NULL;
 
 	for_array(i, info->entities.entries) {
-		auto *entry = &info->entities.entries.e[i];
+		MapDeclInfoEntry *entry = &info->entities.entries.e[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		String name = e->token.string;
 		if (e->kind == Entity_Variable) {
@@ -4866,7 +4881,7 @@ void ssa_gen_tree(ssaGen *s) {
 	m->min_dep_map = generate_minimum_dependency_map(info, entry_point);
 
 	for_array(i, info->entities.entries) {
-		auto *entry = &info->entities.entries.e[i];
+		MapDeclInfoEntry *entry = &info->entities.entries.e[i];
 		Entity *e = cast(Entity *)entry->key.ptr;
 		String name = e->token.string;
 		DeclInfo *decl = entry->value;
@@ -4948,7 +4963,7 @@ void ssa_gen_tree(ssaGen *s) {
 	}
 
 	for_array(i, m->members.entries) {
-		auto *entry = &m->members.entries.e[i];
+		MapSsaValueEntry *entry = &m->members.entries.e[i];
 		ssaValue *v = entry->value;
 		if (v->kind == ssaValue_Proc)
 			ssa_build_proc(v, NULL);
@@ -4960,7 +4975,7 @@ void ssa_gen_tree(ssaGen *s) {
 
 	isize all_proc_max_count = 0;
 	for_array(i, m->debug_info.entries) {
-		auto *entry = &m->debug_info.entries.e[i];
+		MapSsaDebugInfoEntry *entry = &m->debug_info.entries.e[i];
 		ssaDebugInfo *di = entry->value;
 		di->id = i;
 		if (di->kind == ssaDebugInfo_Proc) {
@@ -4974,7 +4989,7 @@ void ssa_gen_tree(ssaGen *s) {
 
 
 	for_array(i, m->debug_info.entries) {
-		auto *entry = &m->debug_info.entries.e[i];
+		MapSsaDebugInfoEntry *entry = &m->debug_info.entries.e[i];
 		ssaDebugInfo *di = entry->value;
 		di->id = i;
 		if (di->kind == ssaDebugInfo_Proc) {
@@ -5050,24 +5065,10 @@ void ssa_gen_tree(ssaGen *s) {
 			Type *t_i64_slice_ptr    = make_type_pointer(a, make_type_slice(a, t_i64));
 			Type *t_string_slice_ptr = make_type_pointer(a, make_type_slice(a, t_string));
 
-			auto get_type_info_ptr = [](ssaProcedure *proc, ssaValue *type_info_data, Type *type) -> ssaValue * {
-				i32 index = cast(i32)ssa_type_info_index(proc->module->info, type);
-				// gb_printf_err("%d %s\n", index, type_to_string(type));
-				return ssa_emit_array_ep(proc, type_info_data, index);
-			};
-
 			i32 type_info_member_index = 0;
 
-			auto type_info_member_offset = [](ssaProcedure *proc, ssaValue *data, isize count, i32 *index) -> ssaValue * {
-				ssaValue *offset = ssa_emit_array_ep(proc, data, *index);
-				*index += count;
-				return offset;
-			};
-
-
-
 			for_array(type_info_map_index, info->type_info_map.entries) {
-				auto *entry = &info->type_info_map.entries.e[type_info_map_index];
+				MapIsizeEntry *entry = &info->type_info_map.entries.e[type_info_map_index];
 				Type *t = cast(Type *)cast(uintptr)entry->key.key;
 				t = default_type(t);
 				isize entry_index = entry->value;
@@ -5080,7 +5081,7 @@ void ssa_gen_tree(ssaGen *s) {
 
 					// TODO(bill): Which is better? The mangled name or actual name?
 					ssaValue *name = ssa_make_const_string(a, t->Named.type_name->token.string);
-					ssaValue *gtip = get_type_info_ptr(proc, type_info_data, t->Named.base);
+					ssaValue *gtip = ssa_get_type_info_ptr(proc, type_info_data, t->Named.base);
 
 					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), name);
 					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 1), gtip);
@@ -5137,17 +5138,17 @@ void ssa_gen_tree(ssaGen *s) {
 
 				case Type_Pointer: {
 					tag = ssa_add_local_generated(proc, t_type_info_pointer);
-					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Pointer.elem);
+					ssaValue *gep = ssa_get_type_info_ptr(proc, type_info_data, t->Pointer.elem);
 					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), gep);
 				} break;
 				case Type_Maybe: {
 					tag = ssa_add_local_generated(proc, t_type_info_maybe);
-					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Maybe.elem);
+					ssaValue *gep = ssa_get_type_info_ptr(proc, type_info_data, t->Maybe.elem);
 					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), gep);
 				} break;
 				case Type_Array: {
 					tag = ssa_add_local_generated(proc, t_type_info_array);
-					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Array.elem);
+					ssaValue *gep = ssa_get_type_info_ptr(proc, type_info_data, t->Array.elem);
 					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), gep);
 
 					isize ez = type_size_of(m->sizes, a, t->Array.elem);
@@ -5160,7 +5161,7 @@ void ssa_gen_tree(ssaGen *s) {
 				} break;
 				case Type_Slice: {
 					tag = ssa_add_local_generated(proc, t_type_info_slice);
-					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Slice.elem);
+					ssaValue *gep = ssa_get_type_info_ptr(proc, type_info_data, t->Slice.elem);
 					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), gep);
 
 					isize ez = type_size_of(m->sizes, a, t->Slice.elem);
@@ -5170,7 +5171,7 @@ void ssa_gen_tree(ssaGen *s) {
 				} break;
 				case Type_Vector: {
 					tag = ssa_add_local_generated(proc, t_type_info_vector);
-					ssaValue *gep = get_type_info_ptr(proc, type_info_data, t->Vector.elem);
+					ssaValue *gep = ssa_get_type_info_ptr(proc, type_info_data, t->Vector.elem);
 					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), gep);
 
 					isize ez = type_size_of(m->sizes, a, t->Vector.elem);
@@ -5200,13 +5201,13 @@ void ssa_gen_tree(ssaGen *s) {
 							ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 4), ordered);
 						}
 
-						ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Record.field_count, &type_info_member_index);
+						ssaValue *memory = ssa_type_info_member_offset(proc, type_info_member_data, t->Record.field_count, &type_info_member_index);
 
 						type_set_offsets(m->sizes, a, t); // NOTE(bill): Just incase the offsets have not been set yet
 						for (isize source_index = 0; source_index < t->Record.field_count; source_index++) {
 							// TODO(bill): Order fields in source order not layout order
 							Entity *f = t->Record.fields_in_src_order[source_index];
-							ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
+							ssaValue *tip = ssa_get_type_info_ptr(proc, type_info_data, f->type);
 							i64 foffset = t->Record.struct_offsets[f->Variable.field_index];
 							GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
 
@@ -5253,7 +5254,7 @@ void ssa_gen_tree(ssaGen *s) {
 							ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 2),  align);
 						}
 
-						ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Record.field_count, &type_info_member_index);
+						ssaValue *memory = ssa_type_info_member_offset(proc, type_info_member_data, t->Record.field_count, &type_info_member_index);
 
 						for (isize i = 0; i < t->Record.field_count; i++) {
 							ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_const_int(a, i));
@@ -5262,7 +5263,7 @@ void ssa_gen_tree(ssaGen *s) {
 							ssaValue *offset    = ssa_emit_struct_ep(proc, field, 2);
 
 							Entity *f = t->Record.fields[i];
-							ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
+							ssaValue *tip = ssa_get_type_info_ptr(proc, type_info_data, f->type);
 
 							if (f->token.string.len > 0) {
 								ssa_emit_store(proc, name, ssa_make_const_string(a, f->token.string));
@@ -5291,7 +5292,7 @@ void ssa_gen_tree(ssaGen *s) {
 							enum_base = t_int;
 						}
 						ssaValue *base = ssa_emit_struct_ep(proc, tag, 0);
-						ssa_emit_store(proc, base, get_type_info_ptr(proc, type_info_data, enum_base));
+						ssa_emit_store(proc, base, ssa_get_type_info_ptr(proc, type_info_data, enum_base));
 
 						if (t->Record.other_field_count > 0) {
 							Entity **fields = t->Record.other_fields;
@@ -5368,7 +5369,7 @@ void ssa_gen_tree(ssaGen *s) {
 						ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 2), align);
 					}
 
-					ssaValue *memory = type_info_member_offset(proc, type_info_member_data, t->Tuple.variable_count, &type_info_member_index);
+					ssaValue *memory = ssa_type_info_member_offset(proc, type_info_member_data, t->Tuple.variable_count, &type_info_member_index);
 
 					for (isize i = 0; i < t->Tuple.variable_count; i++) {
 						ssaValue *field     = ssa_emit_ptr_offset(proc, memory, ssa_make_const_int(a, i));
@@ -5377,7 +5378,7 @@ void ssa_gen_tree(ssaGen *s) {
 						// NOTE(bill): offset is not used for tuples
 
 						Entity *f = t->Tuple.variables[i];
-						ssaValue *tip = get_type_info_ptr(proc, type_info_data, f->type);
+						ssaValue *tip = ssa_get_type_info_ptr(proc, type_info_data, f->type);
 
 						if (f->token.string.len > 0) {
 							ssa_emit_store(proc, name, ssa_make_const_string(a, f->token.string));
@@ -5407,10 +5408,10 @@ void ssa_gen_tree(ssaGen *s) {
 					ssaValue *variadic = ssa_emit_struct_ep(proc, tag, 2);
 
 					if (t->Proc.params) {
-						ssa_emit_store(proc, params, get_type_info_ptr(proc, type_info_data, t->Proc.params));
+						ssa_emit_store(proc, params, ssa_get_type_info_ptr(proc, type_info_data, t->Proc.params));
 					}
 					if (t->Proc.results) {
-						ssa_emit_store(proc, results, get_type_info_ptr(proc, type_info_data, t->Proc.results));
+						ssa_emit_store(proc, results, ssa_get_type_info_ptr(proc, type_info_data, t->Proc.results));
 					}
 					ssa_emit_store(proc, variadic, ssa_make_const_bool(a, t->Proc.variadic));
 

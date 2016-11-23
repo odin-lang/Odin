@@ -1,8 +1,8 @@
-struct Scope;
-struct Checker;
-struct Type;
-enum BuiltinProcId;
-enum ImplicitValueId;
+typedef struct Scope Scope;
+typedef struct Checker Checker;
+typedef struct Type Type;
+typedef enum BuiltinProcId BuiltinProcId;
+typedef enum ImplicitValueId ImplicitValueId;
 
 #define ENTITY_KINDS \
 	ENTITY_KIND(Invalid) \
@@ -16,11 +16,11 @@ enum ImplicitValueId;
 	ENTITY_KIND(ImplicitValue) \
 	ENTITY_KIND(Count)
 
-enum EntityKind {
+typedef enum EntityKind {
 #define ENTITY_KIND(k) GB_JOIN2(Entity_, k),
 	ENTITY_KINDS
 #undef ENTITY_KIND
-};
+} EntityKind;
 
 String const entity_strings[] = {
 #define ENTITY_KIND(k) {cast(u8 *)#k, gb_size_of(#k)-1},
@@ -28,16 +28,16 @@ String const entity_strings[] = {
 #undef ENTITY_KIND
 };
 
-enum EntityFlag : u32 {
+typedef enum EntityFlag {
 	EntityFlag_Visited    = 1<<0,
 	EntityFlag_Used       = 1<<1,
 	EntityFlag_Anonymous  = 1<<2,
 	EntityFlag_Field      = 1<<3,
 	EntityFlag_Param      = 1<<4,
 	EntityFlag_VectorElem = 1<<5,
-};
+} EntityFlag;
 
-struct Entity {
+typedef struct Entity {
 	EntityKind kind;
 	u32        flags;
 	Token      token;
@@ -75,7 +75,7 @@ struct Entity {
 			Entity *        backing;
 		} ImplicitValue;
 	};
-};
+} Entity;
 
 bool is_entity_exported(Entity *e) {
 	if (e->kind == Entity_ImportName) {

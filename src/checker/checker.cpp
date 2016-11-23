@@ -7,7 +7,7 @@
 #define MAP_NAME MapEntity
 #include "../map.c"
 
-enum AddressingMode {
+typedef enum AddressingMode {
 	Addressing_Invalid,
 	Addressing_NoValue,
 	Addressing_Value,
@@ -16,25 +16,25 @@ enum AddressingMode {
 	Addressing_Type,
 	Addressing_Builtin,
 	Addressing_Count,
-};
+} AddressingMode;
 
-struct Operand {
+typedef struct Operand {
 	AddressingMode mode;
 	Type *         type;
 	ExactValue     value;
 	AstNode *      expr;
 	BuiltinProcId  builtin_id;
-};
+} Operand;
 
-struct TypeAndValue {
+typedef struct TypeAndValue {
 	AddressingMode mode;
 	Type *         type;
 	ExactValue     value;
-};
+} TypeAndValue;
 
 
 
-struct DeclInfo {
+typedef struct DeclInfo {
 	Scope *scope;
 
 	Entity **entities;
@@ -46,30 +46,30 @@ struct DeclInfo {
 	u32      var_decl_tags;
 
 	MapBool deps; // Key: Entity *
-};
+} DeclInfo;
 
-struct ExprInfo {
+typedef struct ExprInfo {
 	bool           is_lhs; // Debug info
 	AddressingMode mode;
 	Type *         type; // Type_Basic
 	ExactValue     value;
-};
+} ExprInfo;
 
 ExprInfo make_expr_info(bool is_lhs, AddressingMode mode, Type *type, ExactValue value) {
 	ExprInfo ei = {is_lhs, mode, type, value};
 	return ei;
 }
 
-struct ProcedureInfo {
+typedef struct ProcedureInfo {
 	AstFile * file;
 	Token     token;
 	DeclInfo *decl;
 	Type *    type; // Type_Procedure
 	AstNode * body; // AstNode_BlockStatement
 	u32       tags;
-};
+} ProcedureInfo;
 
-struct Scope {
+typedef struct Scope {
 	Scope *        parent;
 	Scope *        prev, *next;
 	Scope *        first_child;
@@ -84,15 +84,15 @@ struct Scope {
 	bool           is_file;
 	bool           is_init;
 	AstFile *      file;
-};
+} Scope;
 gb_global Scope *universal_scope = NULL;
 
-enum ExprKind {
+typedef enum ExprKind {
 	Expr_Expr,
 	Expr_Stmt,
-};
+} ExprKind;
 
-enum BuiltinProcId {
+typedef enum BuiltinProcId {
 	BuiltinProc_Invalid,
 
 	BuiltinProc_new,
@@ -129,13 +129,13 @@ enum BuiltinProcId {
 	BuiltinProc_enum_to_string,
 
 	BuiltinProc_Count,
-};
-struct BuiltinProc {
+} BuiltinProcId;
+typedef struct BuiltinProc {
 	String   name;
 	isize    arg_count;
 	bool      variadic;
 	ExprKind kind;
-};
+} BuiltinProc;
 gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT(""),                 0, false, Expr_Stmt},
 
@@ -173,28 +173,28 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("enum_to_string"),   1, false, Expr_Expr},
 };
 
-enum ImplicitValueId {
+typedef enum ImplicitValueId {
 	ImplicitValue_Invalid,
 
 	ImplicitValue_context,
 
 	ImplicitValue_Count,
-};
-struct ImplicitValueInfo {
+} ImplicitValueId;
+typedef struct ImplicitValueInfo {
 	String  name;
 	String  backing_name;
 	Type *  type;
-};
+} ImplicitValueInfo;
 // NOTE(bill): This is initialized later
 gb_global ImplicitValueInfo implicit_value_infos[ImplicitValue_Count] = {};
 
 
 
-struct CheckerContext {
+typedef struct CheckerContext {
 	Scope *   scope;
 	DeclInfo *decl;
 	u32       stmt_state_flags;
-};
+} CheckerContext;
 
 #define MAP_TYPE TypeAndValue
 #define MAP_FUNC map_tav_
@@ -223,7 +223,7 @@ struct CheckerContext {
 
 
 // NOTE(bill): Symbol tables
-struct CheckerInfo {
+typedef struct CheckerInfo {
 	MapTypeAndValue     types;           // Key: AstNode * | Expression -> Type (and value)
 	MapEntity           definitions;     // Key: AstNode * | Identifier -> Entity
 	MapEntity           uses;            // Key: AstNode * | Identifier -> Entity
@@ -235,9 +235,9 @@ struct CheckerInfo {
 	MapIsize            type_info_map;   // Key: Type *
 	isize               type_info_count;
 	Entity *            implicit_values[ImplicitValue_Count];
-};
+} CheckerInfo;
 
-struct Checker {
+typedef struct Checker {
 	Parser *    parser;
 	CheckerInfo info;
 
@@ -255,11 +255,11 @@ struct Checker {
 
 	Array(Type *)          proc_stack;
 	bool                    in_defer; // TODO(bill): Actually handle correctly
-};
+} Checker;
 
-struct CycleChecker {
+typedef struct CycleChecker {
 	Array(Entity *) path; // Entity_TypeName
-};
+} CycleChecker;
 
 
 
@@ -766,7 +766,7 @@ void add_type_info_type(Checker *c, Type *t) {
 
 	isize ti_index = -1;
 	for_array(i, c->info.type_info_map.entries) {
-		auto *e = &c->info.type_info_map.entries.e[i];
+		MapIsizeEntry *e = &c->info.type_info_map.entries.e[i];
 		Type *prev_type = cast(Type *)e->key.ptr;
 		if (are_types_identical(t, prev_type)) {
 			// Duplicate entry
@@ -931,7 +931,7 @@ MapEntity generate_minimum_dependency_map(CheckerInfo *info, Entity *start) {
 	map_entity_init(&map, heap_allocator());
 
 	for_array(i, info->entities.entries) {
-		auto *entry = &info->entities.entries.e[i];
+		MapDeclInfoEntry *entry = &info->entities.entries.e[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		if (e->scope->is_global) {
 			// NOTE(bill): Require runtime stuff
@@ -1023,7 +1023,7 @@ void add_implicit_value(Checker *c, ImplicitValueId id, String name, String back
 
 void check_global_entity(Checker *c, EntityKind kind) {
 	for_array(i, c->info.entities.entries) {
-		auto *entry = &c->info.entities.entries.e[i];
+		MapDeclInfoEntry *entry = &c->info.entities.entries.e[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		if (e->kind == kind) {
 			DeclInfo *d = entry->value;
@@ -1203,7 +1203,7 @@ void check_parsed_files(Checker *c) {
 			ast_node(id, ImportDecl, decl);
 
 			HashKey key = hash_string(id->fullpath);
-			auto found = map_scope_get(&file_scopes, key);
+			Scope **found = map_scope_get(&file_scopes, key);
 			GB_ASSERT_MSG(found != NULL, "Unable to find scope for file: %.*s", LIT(id->fullpath));
 			Scope *scope = *found;
 
@@ -1338,7 +1338,7 @@ void check_parsed_files(Checker *c) {
 
 	// Add untyped expression values
 	for_array(i, c->info.untyped.entries) {
-		auto *entry = &c->info.untyped.entries.e[i];
+		MapExprInfoEntry *entry = &c->info.untyped.entries.e[i];
 		HashKey key = entry->key;
 		AstNode *expr = cast(AstNode *)cast(uintptr)key.key;
 		ExprInfo *info = &entry->value;
@@ -1363,29 +1363,6 @@ void check_parsed_files(Checker *c) {
 			add_type_info_type(c, t);
 		}
 	}
-
-	// for_array(i, c->info.type_info_map.entries) {
-	// 	auto *e = &c->info.type_info_map.entries[i];
-	// 	Type *prev_type = cast(Type *)e->key.ptr;
-	// 	gb_printf("%td - %s\n", i, type_to_string(prev_type));
-	// }
-
-	// for_array(i, c->info.type_info_map.entries) {
-	// 	auto *p = &c->info.type_info_map.entries[i];
-	// 	for (isize j = 0; j < i-1; j++) {
-	// 		auto *q = &c->info.type_info_map.entries[j];
-	// 		Type *a = cast(Type *)p->key.ptr;
-	// 		Type *b = cast(Type *)q->key.ptr;
-	// 		p->value = i;
-	// 		// GB_ASSERT(!are_types_identical(a, b));
-	// 	}
-	// }
-
-	// for_array(i, c->info.type_info_map.entries) {
-	// 	auto *e = &c->info.type_info_map.entries[i];
-	// 	Type *prev_type = cast(Type *)e->key.ptr;
-	// 	gb_printf("%td - %s\n", e->value, type_to_string(prev_type));
-	// }
 
 	map_scope_destroy(&file_scopes);
 	array_free(&import_decls);

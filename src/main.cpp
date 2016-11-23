@@ -56,12 +56,12 @@ i32 win32_exec_command_line_app(char *name, char *fmt, ...) {
 	return exit_code;
 }
 
-typedef enum {
+typedef enum ArchKind {
 	ArchKind_x64,
 	ArchKind_x86,
 } ArchKind;
 
-typedef struct  {
+typedef struct ArchData {
 	BaseTypeSizes sizes;
 	String llc_flags;
 	String link_flags;

@@ -113,11 +113,11 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 TOKEN_KIND(Token__KeywordEnd, "_KeywordEnd"), \
 	TOKEN_KIND(Token_Count, "")
 
-enum TokenKind {
+typedef enum TokenKind {
 #define TOKEN_KIND(e, s) e
 	TOKEN_KINDS
 #undef TOKEN_KIND
-};
+} TokenKind;
 
 String const token_strings[] = {
 #define TOKEN_KIND(e, s) {cast(u8 *)s, gb_size_of(s)-1}
@@ -126,11 +126,11 @@ String const token_strings[] = {
 };
 
 
-struct TokenPos {
+typedef struct TokenPos {
 	String file;
 	isize  line;
 	isize  column;
-};
+} TokenPos;
 
 i32 token_pos_cmp(TokenPos a, TokenPos b) {
 	if (a.line == b.line) {
@@ -149,11 +149,11 @@ bool token_pos_are_equal(TokenPos a, TokenPos b) {
 }
 
 // NOTE(bill): Text is UTF-8, thus why u8 and not char
-struct Token {
+typedef struct Token {
 	TokenKind kind;
 	String string;
 	TokenPos pos;
-};
+} Token;
 
 Token empty_token = {Token_Invalid};
 Token blank_token = {Token_Identifier, {cast(u8 *)"_", 1}};
@@ -164,12 +164,12 @@ Token make_token_ident(String s) {
 }
 
 
-struct ErrorCollector {
+typedef struct ErrorCollector {
 	TokenPos prev;
 	i64 count;
 	i64 warning_count;
 	gbMutex mutex;
-};
+} ErrorCollector;
 
 gb_global ErrorCollector global_error_collector;
 
@@ -272,7 +272,7 @@ gb_inline bool token_is_shift(Token t) {
 gb_inline void print_token(Token t) { gb_printf("%.*s\n", LIT(t.string)); }
 
 
-enum TokenizerInitError {
+typedef enum TokenizerInitError {
 	TokenizerInit_None,
 
 	TokenizerInit_Invalid,
@@ -281,10 +281,10 @@ enum TokenizerInitError {
 	TokenizerInit_Empty,
 
 	TokenizerInit_Count,
-};
+} TokenizerInitError;
 
 
-struct Tokenizer {
+typedef struct Tokenizer {
 	String fullpath;
 	u8 *start;
 	u8 *end;
@@ -297,7 +297,7 @@ struct Tokenizer {
 
 	isize error_count;
 	Array(String) allocated_strings;
-};
+} Tokenizer;
 
 
 void tokenizer_err(Tokenizer *t, char *msg, ...) {

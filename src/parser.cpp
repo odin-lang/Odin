@@ -1,8 +1,8 @@
-struct AstNode;
-struct Scope;
-struct DeclInfo;
+typedef struct AstNode AstNode;
+typedef struct Scope Scope;
+typedef struct DeclInfo DeclInfo;
 
-enum ParseFileError {
+typedef enum ParseFileError {
 	ParseFile_None,
 
 	ParseFile_WrongExtension,
@@ -13,11 +13,11 @@ enum ParseFileError {
 	ParseFile_InvalidToken,
 
 	ParseFile_Count,
-};
+} ParseFileError;
 
 typedef Array(AstNode *) AstNodeArray;
 
-struct AstFile {
+typedef struct AstFile {
 	i32            id;
 	gbArena        arena;
 	Tokenizer      tokenizer;
@@ -43,15 +43,15 @@ struct AstFile {
 #define PARSER_MAX_FIX_COUNT 6
 	isize    fix_count;
 	TokenPos fix_prev_pos;
-};
+} AstFile;
 
-struct ImportedFile {
+typedef struct ImportedFile {
 	String   path;
 	String   rel_path;
 	TokenPos pos; // #import
-};
+} ImportedFile;
 
-struct Parser {
+typedef struct Parser {
 	String              init_fullpath;
 	Array(AstFile)      files;
 	Array(ImportedFile) imports;
@@ -59,9 +59,9 @@ struct Parser {
 	Array(String)       foreign_libraries;
 	isize               total_token_count;
 	gbMutex             mutex;
-};
+} Parser;
 
-enum ProcTag : u64 {
+typedef enum ProcTag {
 	ProcTag_bounds_check    = GB_BIT(0),
 	ProcTag_no_bounds_check = GB_BIT(1),
 
@@ -75,23 +75,23 @@ enum ProcTag : u64 {
 	ProcTag_stdcall         = GB_BIT(16),
 	ProcTag_fastcall        = GB_BIT(17),
 	// ProcTag_cdecl           = GB_BIT(18),
-};
+} ProcTag;
 
-enum VarDeclTag {
+typedef enum VarDeclTag {
 	VarDeclTag_thread_local = GB_BIT(0),
-};
+} VarDeclTag;
 
-enum StmtStateFlag : u32 {
+typedef enum StmtStateFlag {
 	StmtStateFlag_bounds_check    = GB_BIT(0),
 	StmtStateFlag_no_bounds_check = GB_BIT(1),
-};
+} StmtStateFlag;
 
 
-enum CallExprKind {
+typedef enum CallExprKind {
 	CallExpr_Prefix,  // call(...)
 	CallExpr_Postfix, // a'call
 	CallExpr_Infix,   // a ''call b
-};
+} CallExprKind;
 
 AstNodeArray make_ast_node_array(AstFile *f) {
 	AstNodeArray a;
@@ -320,11 +320,11 @@ AST_NODE_KIND(_TypeBegin, "", struct{}) \
 AST_NODE_KIND(_TypeEnd,  "", struct{}) \
 	AST_NODE_KIND(Count, "", struct{})
 
-enum AstNodeKind {
+typedef enum AstNodeKind {
 #define AST_NODE_KIND(_kind_name_, ...) GB_JOIN2(AstNode_, _kind_name_),
 	AST_NODE_KINDS
 #undef AST_NODE_KIND
-};
+} AstNodeKind;
 
 String const ast_node_strings[] = {
 #define AST_NODE_KIND(_kind_name_, name, ...) {cast(u8 *)name, gb_size_of(name)-1},
@@ -336,7 +336,7 @@ String const ast_node_strings[] = {
 	AST_NODE_KINDS
 #undef AST_NODE_KIND
 
-struct AstNode {
+typedef struct AstNode {
 	AstNodeKind kind;
 	// AstNode *prev, *next; // NOTE(bill): allow for Linked list
 	u32 stmt_state_flags;
@@ -345,7 +345,7 @@ struct AstNode {
 	AST_NODE_KINDS
 #undef AST_NODE_KIND
 	};
-};
+} AstNode;
 
 
 #define ast_node(n_, Kind_, node_) GB_JOIN2(AstNode, Kind_) *n_ = &(node_)->Kind_; GB_ASSERT((node_)->kind == GB_JOIN2(AstNode_, Kind_))

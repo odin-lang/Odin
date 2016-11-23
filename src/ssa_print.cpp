@@ -1,8 +1,8 @@
-struct ssaFileBuffer {
+typedef struct ssaFileBuffer {
 	gbVirtualMemory vm;
 	isize           offset;
 	gbFile *        output;
-};
+} ssaFileBuffer;
 
 void ssa_file_buffer_init(ssaFileBuffer *f, gbFile *output) {
 	isize size = 8*gb_virtual_memory_page_size(NULL);

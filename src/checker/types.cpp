@@ -1,6 +1,6 @@
-struct Scope;
+typedef struct Scope Scope;
 
-enum BasicKind {
+typedef enum BasicKind {
 	Basic_Invalid,
 	Basic_bool,
 	Basic_i8,
@@ -34,9 +34,9 @@ enum BasicKind {
 
 	Basic_byte = Basic_u8,
 	Basic_rune = Basic_i32,
-};
+} BasicKind;
 
-enum BasicFlag : u32 {
+typedef enum BasicFlag {
 	BasicFlag_Boolean  = GB_BIT(0),
 	BasicFlag_Integer  = GB_BIT(1),
 	BasicFlag_Unsigned = GB_BIT(2),
@@ -49,14 +49,14 @@ enum BasicFlag : u32 {
 	BasicFlag_Numeric      = BasicFlag_Integer | BasicFlag_Float,
 	BasicFlag_Ordered      = BasicFlag_Numeric | BasicFlag_String  | BasicFlag_Pointer,
 	BasicFlag_ConstantType = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_Pointer | BasicFlag_String | BasicFlag_Rune,
-};
+} BasicFlag;
 
-struct BasicType {
+typedef struct BasicType {
 	BasicKind kind;
 	u32       flags;
 	i64       size; // -1 if arch. dep.
 	String    name;
-};
+} BasicType;
 
 
 
@@ -74,19 +74,19 @@ struct BasicType {
 	TYPE_KIND(Proc), \
 	TYPE_KIND(Count),
 
-enum TypeKind {
-#define TYPE_KIND(k) GB_JOIN2(Type_, k)
+typedef enum TypeKind {
+#define TYPE_KIND(k, ...) GB_JOIN2(Type_, k)
 	TYPE_KINDS
 #undef TYPE_KIND
-};
+} TypeKind;
 
 String const type_strings[] = {
-#define TYPE_KIND(k) {cast(u8 *)#k, gb_size_of(#k)-1}
+#define TYPE_KIND(k, ...) {cast(u8 *)#k, gb_size_of(#k)-1}
 	TYPE_KINDS
 #undef TYPE_KIND
 };
 
-enum TypeRecordKind {
+typedef enum TypeRecordKind {
 	TypeRecord_Invalid,
 
 	TypeRecord_Struct,
@@ -95,9 +95,9 @@ enum TypeRecordKind {
 	TypeRecord_Union, // Tagged
 
 	TypeRecord_Count,
-};
+} TypeRecordKind;
 
-struct Type {
+typedef struct Type {
 	TypeKind kind;
 	union {
 		BasicType Basic;
@@ -167,7 +167,42 @@ struct Type {
 			bool    variadic;
 		} Proc;
 	};
-};
+} Type;
+
+// NOTE(bill): Internal sizes of certain types
+// string: 2*word_size  (ptr+len)
+// slice:  3*word_size  (ptr+len+cap)
+// array:  count*size_of(elem) aligned
+
+// NOTE(bill): Alignment of structures and other types are to be compatible with C
+
+typedef struct BaseTypeSizes {
+	i64 word_size;
+	i64 max_align;
+} BaseTypeSizes;
+
+typedef Array(isize) Array_isize;
+
+typedef struct Selection {
+	Entity *    entity;
+	Array_isize index;
+	bool         indirect; // Set if there was a pointer deref anywhere down the line
+} Selection;
+Selection empty_selection = {};
+
+Selection make_selection(Entity *entity, Array_isize index, bool indirect) {
+	Selection s = {entity, index, indirect};
+	return s;
+}
+
+void selection_add_index(Selection *s, isize index) {
+	// IMPORTANT NOTE(bill): this requires a stretchy buffer/dynamic array so it requires some form
+	// of heap allocation
+	if (s->index.e == NULL) {
+		array_init(&s->index, heap_allocator());
+	}
+	array_add(&s->index, index);
+}
 
 
 
@@ -793,40 +828,7 @@ Type *default_type(Type *type) {
 }
 
 
-// NOTE(bill): Internal sizes of certain types
-// string: 2*word_size  (ptr+len)
-// slice:  3*word_size  (ptr+len+cap)
-// array:  count*size_of(elem) aligned
 
-// NOTE(bill): Alignment of structures and other types are to be compatible with C
-
-struct BaseTypeSizes {
-	i64 word_size;
-	i64 max_align;
-};
-
-typedef Array(isize) Array_isize;
-
-struct Selection {
-	Entity *    entity;
-	Array_isize index;
-	bool         indirect; // Set if there was a pointer deref anywhere down the line
-};
-Selection empty_selection = {};
-
-Selection make_selection(Entity *entity, Array_isize index, bool indirect) {
-	Selection s = {entity, index, indirect};
-	return s;
-}
-
-void selection_add_index(Selection *s, isize index) {
-	// IMPORTANT NOTE(bill): this requires a stretchy buffer/dynamic array so it requires some form
-	// of heap allocation
-	if (s->index.e == NULL) {
-		array_init(&s->index, heap_allocator());
-	}
-	array_add(&s->index, index);
-}
 
 gb_global Entity *entity__any_type_info  = NULL;
 gb_global Entity *entity__any_data       = NULL;

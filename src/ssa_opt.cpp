@@ -142,7 +142,7 @@ ssaValueArray ssa_get_block_phi_nodes(ssaBlock *b) {
 }
 
 void ssa_remove_pred(ssaBlock *b, ssaBlock *p) {
-	auto phis = ssa_get_block_phi_nodes(b);
+	ssaValueArray phis = ssa_get_block_phi_nodes(b);
 	isize i = 0;
 	for_array(j, b->preds) {
 		ssaBlock *pred = b->preds.e[j];
@@ -288,7 +288,7 @@ void ssa_opt_build_referrers(ssaProcedure *proc) {
 				if (op == NULL) {
 					continue;
 				}
-				auto *refs = ssa_value_referrers(op);
+				ssaValueArray *refs = ssa_value_referrers(op);
 				if (refs != NULL) {
 					array_add(refs, instr);
 				}
@@ -307,13 +307,13 @@ void ssa_opt_build_referrers(ssaProcedure *proc) {
 
 // State of Lengauer-Tarjan algorithm
 // Based on this paper: http://jgaa.info/accepted/2006/GeorgiadisTarjanWerneck2006.10.1.pdf
-struct ssaLTState {
+typedef struct ssaLTState {
 	isize count;
 	// NOTE(bill): These are arrays
 	ssaBlock **sdom;     // Semidominator
 	ssaBlock **parent;   // Parent in DFS traversal of CFG
 	ssaBlock **ancestor;
-};
+} ssaLTState;
 
 // §2.2 - bottom of page
 void ssa_lt_link(ssaLTState *lt, ssaBlock *p, ssaBlock *q) {
@@ -347,9 +347,9 @@ ssaBlock *ssa_lt_eval(ssaLTState *lt, ssaBlock *v) {
 	return u;
 }
 
-struct ssaDomPrePost {
+typedef struct ssaDomPrePost {
 	i32 pre, post;
-};
+} ssaDomPrePost;
 
 ssaDomPrePost ssa_opt_number_dom_tree(ssaBlock *v, i32 pre, i32 post) {
 	ssaDomPrePost result = {pre, post};
@@ -440,12 +440,11 @@ void ssa_opt_build_dom_tree(ssaProcedure *proc) {
 			}
 
 			// Calculate children relation as inverse of idom
-			auto *children = &w->dom.idom->dom.children;
-			if (children->e == NULL) {
+			if (w->dom.idom->dom.children.e == NULL) {
 				// TODO(bill): Is this good enough for memory allocations?
-				array_init(children, heap_allocator());
+				array_init(&w->dom.idom->dom.children, heap_allocator());
 			}
-			array_add(children, w);
+			array_add(&w->dom.idom->dom.children, w);
 		}
 	}
 

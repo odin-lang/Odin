@@ -3573,6 +3573,49 @@ void check_expr_with_type_hint(Checker *c, Operand *o, AstNode *e, Type *t) {
 	}
 }
 
+bool check_set_index_data(Operand *o, Type *t, i64 *max_count) {
+	t = base_type(type_deref(t));
+
+	switch (t->kind) {
+	case Type_Basic:
+		if (is_type_string(t)) {
+			if (o->mode == Addressing_Constant) {
+				*max_count = o->value.value_string.len;
+			}
+			if (o->mode != Addressing_Variable) {
+				o->mode = Addressing_Value;
+			}
+			o->type = t_u8;
+			return true;
+		}
+		break;
+
+	case Type_Array:
+		*max_count = t->Array.count;
+		if (o->mode != Addressing_Variable) {
+			o->mode = Addressing_Value;
+		}
+		o->type = t->Array.elem;
+		return true;
+
+	case Type_Vector:
+		*max_count = t->Vector.count;
+		if (o->mode != Addressing_Variable) {
+			o->mode = Addressing_Value;
+		}
+		o->type = t->Vector.elem;
+		return true;
+
+
+	case Type_Slice:
+		o->type = t->Slice.elem;
+		o->mode = Addressing_Variable;
+		return true;
+	}
+
+	return false;
+}
+
 ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint) {
 	ExprKind kind = Expr_Stmt;
 
@@ -3892,52 +3935,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		Type *t = base_type(type_deref(o->type));
 		bool is_const = o->mode == Addressing_Constant;
 
-
-		auto set_index_data = [](Operand *o, Type *t, i64 *max_count) -> bool {
-			t = base_type(type_deref(t));
-
-			switch (t->kind) {
-			case Type_Basic:
-				if (is_type_string(t)) {
-					if (o->mode == Addressing_Constant) {
-						*max_count = o->value.value_string.len;
-					}
-					if (o->mode != Addressing_Variable) {
-						o->mode = Addressing_Value;
-					}
-					o->type = t_u8;
-					return true;
-				}
-				break;
-
-			case Type_Array:
-				*max_count = t->Array.count;
-				if (o->mode != Addressing_Variable) {
-					o->mode = Addressing_Value;
-				}
-				o->type = t->Array.elem;
-				return true;
-
-			case Type_Vector:
-				*max_count = t->Vector.count;
-				if (o->mode != Addressing_Variable) {
-					o->mode = Addressing_Value;
-				}
-				o->type = t->Vector.elem;
-				return true;
-
-
-			case Type_Slice:
-				o->type = t->Slice.elem;
-				o->mode = Addressing_Variable;
-				return true;
-			}
-
-			return false;
-		};
-
 		i64 max_count = -1;
-		bool valid = set_index_data(o, t, &max_count);
+		bool valid = check_set_index_data(o, t, &max_count);
 
 		if (is_const) {
 			valid = false;
@@ -3946,7 +3945,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		if (!valid && (is_type_struct(t) || is_type_raw_union(t))) {
 			Entity *found = find_using_index_expr(t);
 			if (found != NULL) {
-				valid = set_index_data(o, found->type, &max_count);
+				valid = check_set_index_data(o, found->type, &max_count);
 			}
 		}
 
