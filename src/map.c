@@ -76,7 +76,7 @@ gb_inline void _J2(MAP_FUNC,destroy)(MAP_NAME *h) {
 }
 
 gb_internal isize _J2(MAP_FUNC,_add_entry)(MAP_NAME *h, HashKey key) {
-	MAP_ENTRY e = {};
+	MAP_ENTRY e = {0};
 	e.key = key;
 	e.next = -1;
 	array_add(&h->entries, e);
@@ -99,7 +99,7 @@ gb_internal MapFindResult _J2(MAP_FUNC,_find)(MAP_NAME *h, HashKey key) {
 	return fr;
 }
 
-gb_internal MapFindResult _J2(MAP_FUNC,_find)(MAP_NAME *h, MAP_ENTRY *e) {
+gb_internal MapFindResult _J2(MAP_FUNC,_find_from_entry)(MAP_NAME *h, MAP_ENTRY *e) {
 	MapFindResult fr = {-1, -1, -1};
 	if (h->hashes.count > 0) {
 		fr.hash_index  = e->key.key % h->hashes.count;
@@ -244,7 +244,7 @@ MAP_ENTRY *_J2(MAP_FUNC,multi_find_next)(MAP_NAME *h, MAP_ENTRY *e) {
 
 isize _J2(MAP_FUNC,multi_count)(MAP_NAME *h, HashKey key) {
 	isize count = 0;
-	auto *e = _J2(MAP_FUNC,multi_find_first)(h, key);
+	MAP_ENTRY *e = _J2(MAP_FUNC,multi_find_first)(h, key);
 	while (e != NULL) {
 		count++;
 		e = _J2(MAP_FUNC,multi_find_next)(h, e);
@@ -254,7 +254,7 @@ isize _J2(MAP_FUNC,multi_count)(MAP_NAME *h, HashKey key) {
 
 void _J2(MAP_FUNC,multi_get_all)(MAP_NAME *h, HashKey key, MAP_TYPE *items) {
 	isize i = 0;
-	auto *e = _J2(MAP_FUNC,multi_find_first)(h, key);
+	MAP_ENTRY *e = _J2(MAP_FUNC,multi_find_first)(h, key);
 	while (e != NULL) {
 		items[i++] = e->value;
 		e = _J2(MAP_FUNC,multi_find_next)(h, e);
@@ -280,7 +280,7 @@ void _J2(MAP_FUNC,multi_insert)(MAP_NAME *h, HashKey key, MAP_TYPE value) {
 }
 
 void _J2(MAP_FUNC,multi_remove)(MAP_NAME *h, HashKey key, MAP_ENTRY *e) {
-	MapFindResult fr = _J2(MAP_FUNC,_find)(h, e);
+	MapFindResult fr = _J2(MAP_FUNC,_find_from_entry)(h, e);
 	if (fr.entry_index >= 0) {
 		_J2(MAP_FUNC,_erase)(h, fr);
 	}

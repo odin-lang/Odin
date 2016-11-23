@@ -186,7 +186,7 @@ typedef struct ImplicitValueInfo {
 	Type *  type;
 } ImplicitValueInfo;
 // NOTE(bill): This is initialized later
-gb_global ImplicitValueInfo implicit_value_infos[ImplicitValue_Count] = {};
+gb_global ImplicitValueInfo implicit_value_infos[ImplicitValue_Count] = {0};
 
 
 
@@ -667,7 +667,7 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 		}
 	}
 
-	TypeAndValue tv = {};
+	TypeAndValue tv = {0};
 	tv.type  = type;
 	tv.value = value;
 	tv.mode  = mode;
@@ -852,7 +852,7 @@ void add_type_info_type(Checker *c, Type *t) {
 
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body, u32 tags) {
-	ProcedureInfo info = {};
+	ProcedureInfo info = {0};
 	info.file = file;
 	info.token = token;
 	info.decl  = decl;
@@ -879,7 +879,7 @@ Type *const curr_procedure(Checker *c) {
 }
 
 void add_curr_ast_file(Checker *c, AstFile *file) {
-	TokenPos zero_pos = {};
+	TokenPos zero_pos = {0};
 	global_error_collector.prev = zero_pos;
 	c->curr_ast_file = file;
 	c->context.decl = file->decl_info;
@@ -911,7 +911,7 @@ void add_dependency_to_map(MapEntity *map, CheckerInfo *info, Entity *node) {
 }
 
 MapEntity generate_minimum_dependency_map(CheckerInfo *info, Entity *start) {
-	MapEntity map = {}; // Key: Entity *
+	MapEntity map = {0}; // Key: Entity *
 	map_entity_init(&map, heap_allocator());
 
 	for_array(i, info->entities.entries) {
@@ -1027,7 +1027,7 @@ void check_global_entity(Checker *c, EntityKind kind) {
 
 				Scope *prev_scope = c->context.scope;
 				c->context.scope = d->scope;
-				check_entity_decl(c, e, d, NULL);
+				check_entity_decl(c, e, d, NULL, NULL);
 			}
 		}
 	}

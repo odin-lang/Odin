@@ -54,7 +54,7 @@ ExactValue make_exact_value_string(String string) {
 	return result;
 }
 
-ExactValue make_exact_value_integer(String string) {
+ExactValue make_exact_value_integer_from_string(String string) {
 	// TODO(bill): Allow for numbers with underscores in them
 	ExactValue result = {ExactValue_Integer};
 	i32 base = 10;
@@ -78,7 +78,7 @@ ExactValue make_exact_value_integer(i64 i) {
 	return result;
 }
 
-ExactValue make_exact_value_float(String string) {
+ExactValue make_exact_value_float_from_string(String string) {
 	// TODO(bill): Allow for numbers with underscores in them
 	ExactValue result = {ExactValue_Float};
 	result.value_float = gb_str_to_f64(cast(char *)string.text, NULL);
@@ -100,8 +100,8 @@ ExactValue make_exact_value_pointer(i64 ptr) {
 ExactValue make_exact_value_from_basic_literal(Token token) {
 	switch (token.kind) {
 	case Token_String:  return make_exact_value_string(token.string);
-	case Token_Integer: return make_exact_value_integer(token.string);
-	case Token_Float:   return make_exact_value_float(token.string);
+	case Token_Integer: return make_exact_value_integer_from_string(token.string);
+	case Token_Float:   return make_exact_value_float_from_string(token.string);
 	case Token_Rune: {
 		Rune r = GB_RUNE_INVALID;
 		gb_utf8_decode(token.string.text, token.string.len, &r);
@@ -209,7 +209,7 @@ ExactValue exact_unary_operator_value(Token op, ExactValue v, i32 precision) {
 failure:
 	GB_PANIC("Invalid unary operation, %.*s", LIT(token_strings[op.kind]));
 
-	ExactValue error_value = {};
+	ExactValue error_value = {0};
 	return error_value;
 }
 
@@ -323,7 +323,7 @@ ExactValue exact_binary_operator_value(Token op, ExactValue x, ExactValue y) {
 	}
 
 error:
-	ExactValue error_value = {};
+	ExactValue error_value = {0};
 	// gb_printf_err("Invalid binary operation: %s\n", token_kind_to_string(op.kind));
 	return error_value;
 }

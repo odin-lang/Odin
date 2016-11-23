@@ -373,7 +373,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 
 		array_init(&t->allocated_strings, heap_allocator());
 	} else {
-		gbFile f = {};
+		gbFile f = {0};
 		gbFileError file_err = gb_file_open(&f, c_str);
 
 		switch (file_err) {
@@ -431,7 +431,7 @@ gb_inline void scan_mantissa(Tokenizer *t, i32 base) {
 
 
 Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
-	Token token = {};
+	Token token = {0};
 	token.kind = Token_Integer;
 	token.string = make_string(t->curr, 1);
 	token.pos.file = t->fullpath;
@@ -609,7 +609,7 @@ gb_inline TokenKind token_kind_dub_eq(Tokenizer *t, Rune sing_rune, TokenKind si
 }
 
 Token tokenizer_get_token(Tokenizer *t) {
-	Token token = {};
+	Token token = {0};
 	Rune curr_rune;
 
 	tokenizer_skip_whitespace(t);
@@ -802,7 +802,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 		default:
 			if (curr_rune != GB_RUNE_BOM) {
-				u8 str[4] = {};
+				u8 str[4] = {0};
 				int len = cast(int)gb_utf8_encode_rune(str, curr_rune);
 				tokenizer_err(t, "Illegal character: %.*s (%d) ", len, str, curr_rune);
 			}

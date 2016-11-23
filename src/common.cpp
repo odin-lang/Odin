@@ -2,6 +2,8 @@
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
+typedef _Bool bool;
+
 gbAllocator heap_allocator(void) {
 	return gb_heap_allocator();
 }

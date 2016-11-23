@@ -129,7 +129,7 @@ bool ssa_opt_block_has_phi(ssaBlock *b) {
 
 
 ssaValueArray ssa_get_block_phi_nodes(ssaBlock *b) {
-	ssaValueArray phis = {};
+	ssaValueArray phis = {0};
 	for_array(i, b->instrs) {
 		ssaInstr *instr = &b->instrs.e[i]->Instr;
 		if (instr->kind != ssaInstr_Phi) {
@@ -275,7 +275,7 @@ void ssa_opt_blocks(ssaProcedure *proc) {
 void ssa_opt_build_referrers(ssaProcedure *proc) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
 
-	ssaValueArray ops = {}; // NOTE(bill): Act as a buffer
+	ssaValueArray ops = {0}; // NOTE(bill): Act as a buffer
 	array_init_reserve(&ops, proc->module->tmp_allocator, 64); // HACK(bill): This _could_ overflow the temp arena
 	for_array(i, proc->blocks) {
 		ssaBlock *b = proc->blocks.e[i];
@@ -375,7 +375,7 @@ void ssa_opt_build_dom_tree(ssaProcedure *proc) {
 	isize n = proc->blocks.count;
 	ssaBlock **buf = gb_alloc_array(proc->module->tmp_allocator, ssaBlock *, 5*n);
 
-	ssaLTState lt = {};
+	ssaLTState lt = {0};
 	lt.count    = n;
 	lt.sdom     = &buf[0*n];
 	lt.parent   = &buf[1*n];

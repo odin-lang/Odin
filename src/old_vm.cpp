@@ -25,7 +25,7 @@ struct vmValue {
 
 vmValue vm_make_value_ptr(Type *type, void *ptr) {
 	GB_ASSERT(is_type_pointer(type));
-	vmValue v = {};
+	vmValue v = {0};
 	v.type = default_type(type);
 	v.val_ptr = ptr;
 	return v;
@@ -34,21 +34,21 @@ vmValue vm_make_value_int(Type *type, i64 i) {
 	GB_ASSERT(is_type_integer(type) ||
 	          is_type_boolean(type) ||
 	          is_type_enum(type));
-	vmValue v = {};
+	vmValue v = {0};
 	v.type = default_type(type);
 	v.val_int = i;
 	return v;
 }
 vmValue vm_make_value_f32(Type *type, f32 f) {
 	GB_ASSERT(is_type_f32(type));
-	vmValue v = {};
+	vmValue v = {0};
 	v.type = default_type(type);
 	v.val_f32 = f;
 	return v;
 }
 vmValue vm_make_value_f64(Type *type, f64 f) {
 	GB_ASSERT(is_type_f64(type));
-	vmValue v = {};
+	vmValue v = {0};
 	v.type = default_type(type);
 	v.val_f64 = f;
 	return v;
@@ -65,7 +65,7 @@ vmValue vm_make_value_comp(Type *type, gbAllocator allocator, isize count) {
 	          is_type_raw_union(type) ||
 	          is_type_tuple (type)    ||
 	          is_type_proc  (type));
-	vmValue v = {};
+	vmValue v = {0};
 	v.type = default_type(type);
 	array_init_count(&v.val_comp, allocator, count);
 	return v;
@@ -183,7 +183,7 @@ void vm_set_value(vmFrame *f, ssaValue *v, vmValue val) {
 
 
 vmFrame *vm_push_frame(VirtualMachine *vm, ssaProcedure *proc) {
-	vmFrame frame = {};
+	vmFrame frame = {0};
 
 	frame.vm          = vm;
 	frame.curr_proc   = proc;
@@ -227,7 +227,7 @@ vmValue vm_call_proc(VirtualMachine *vm, ssaProcedure *proc, Array<vmValue> valu
 	if (proc->body == NULL) {
 		// GB_PANIC("TODO(bill): external procedure");
 		gb_printf_err("TODO(bill): external procedure: %.*s\n", LIT(proc->name));
-		vmValue result = {};
+		vmValue result = {0};
 		result.type = result_type;
 		return result;
 	}
@@ -269,7 +269,7 @@ vmValue vm_call_proc(VirtualMachine *vm, ssaProcedure *proc, Array<vmValue> valu
 		return vm_load(vm, result_mem, result_type);
 	}
 
-	vmValue void_result = {};
+	vmValue void_result = {0};
 	return void_result;
 }
 
@@ -323,7 +323,7 @@ vmValue vm_exact_value(VirtualMachine *vm, ssaValue *ptr, ExactValue value, Type
 		ast_node(cl, CompoundLit, value.value_compound);
 
 		if (is_type_array(t)) {
-			vmValue result = {};
+			vmValue result = {0};
 
 			isize elem_count = cl->elems.count;
 			if (elem_count == 0) {
@@ -347,7 +347,7 @@ vmValue vm_exact_value(VirtualMachine *vm, ssaValue *ptr, ExactValue value, Type
 
 			return result;
 		} else if (is_type_vector(t)) {
-			vmValue result = {};
+			vmValue result = {0};
 
 			isize elem_count = cl->elems.count;
 			if (elem_count == 0) {
@@ -409,7 +409,7 @@ vmValue vm_exact_value(VirtualMachine *vm, ssaValue *ptr, ExactValue value, Type
 		}
 
 	} else if (value.kind == ExactValue_Invalid) {
-		vmValue zero_result = {};
+		vmValue zero_result = {0};
 		zero_result.type = t;
 		return zero_result;
 	} else {
@@ -417,14 +417,14 @@ vmValue vm_exact_value(VirtualMachine *vm, ssaValue *ptr, ExactValue value, Type
 	}
 
 	GB_ASSERT_MSG(t == NULL, "%s - %d", type_to_string(t), value.kind);
-	vmValue void_result = {};
+	vmValue void_result = {0};
 	return void_result;
 }
 
 
 vmValue vm_operand_value(VirtualMachine *vm, ssaValue *value) {
 	vmFrame *f = vm_back_frame(vm);
-	vmValue v = {};
+	vmValue v = {0};
 	switch (value->kind) {
 	case ssaValue_Constant: {
 		v = vm_exact_value(vm, value, value->Constant.value, value->Constant.type);
@@ -637,7 +637,7 @@ void vm_store(VirtualMachine *vm, void *dst, vmValue val, Type *type) {
 
 vmValue vm_load_integer(VirtualMachine *vm, void *ptr, Type *type) {
 	// TODO(bill): I assume little endian here
-	vmValue v = {};
+	vmValue v = {0};
 	v.type = type;
 	GB_ASSERT(is_type_integer(type) || is_type_boolean(type));
 	// NOTE(bill): Only load the needed amount
@@ -647,7 +647,7 @@ vmValue vm_load_integer(VirtualMachine *vm, void *ptr, Type *type) {
 
 vmValue vm_load_pointer(VirtualMachine *vm, void *ptr, Type *type) {
 	// TODO(bill): I assume little endian here
-	vmValue v = {};
+	vmValue v = {0};
 	v.type = type;
 	GB_ASSERT(is_type_pointer(type));
 	// NOTE(bill): Only load the needed amount
@@ -783,12 +783,12 @@ vmValue vm_load(VirtualMachine *vm, void *ptr, Type *type) {
 	}
 
 	GB_ASSERT(type == NULL);
-	vmValue void_result = {};
+	vmValue void_result = {0};
 	return void_result;
 }
 
 vmValue vm_exec_binary_op(VirtualMachine *vm, Type *type, vmValue lhs, vmValue rhs, TokenKind op) {
-	vmValue result = {};
+	vmValue result = {0};
 
 	type = base_type(type);
 	if (is_type_vector(type)) {
@@ -834,7 +834,7 @@ vmValue vm_exec_binary_op(VirtualMachine *vm, Type *type, vmValue lhs, vmValue r
 			case Token_GtEq:  result.val_f64 = lhs.val_f64 >= rhs.val_f64; break;
 			}
 		} else if (is_type_string(type)) {
-			Array<vmValue> args = {};
+			Array<vmValue> args = {0};
 			array_init_count(&args, vm->stack_allocator, 2);
 			args[0] = lhs;
 			args[1] = rhs;
@@ -912,7 +912,7 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 	switch (instr->kind) {
 	case ssaInstr_StartupRuntime: {
 #if 1
-		Array<vmValue> args = {}; // Empty
+		Array<vmValue> args = {0}; // Empty
 		vm_call_proc_by_name(vm, make_string(SSA_STARTUP_RUNTIME_PROC_NAME), args); // NOTE(bill): No return value
 #endif
 	} break;
@@ -1025,7 +1025,7 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 
 	case ssaInstr_Return: {
 		Type *return_type = NULL;
-		vmValue result = {};
+		vmValue result = {0};
 
 		if (instr->Return.value != NULL) {
 			return_type = ssa_type(instr->Return.value);
@@ -1040,7 +1040,7 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 
 	case ssaInstr_Conv: {
 		// TODO(bill): Assuming little endian
-		vmValue dst = {};
+		vmValue dst = {0};
 		vmValue src = vm_operand_value(vm, instr->Conv.value);
 		i64 from_size = vm_type_size_of(vm, instr->Conv.from);
 		i64 to_size   = vm_type_size_of(vm, instr->Conv.to);
@@ -1129,7 +1129,7 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 	} break;
 
 	case ssaInstr_Call: {
-		Array<vmValue> args = {};
+		Array<vmValue> args = {0};
 		array_init(&args, f->stack_allocator, instr->Call.arg_count);
 		for (isize i = 0; i < instr->Call.arg_count; i++) {
 			array_add(&args, vm_operand_value(vm, instr->Call.args[i]));
@@ -1145,7 +1145,7 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 	} break;
 
 	case ssaInstr_Select: {
-		vmValue v = {};
+		vmValue v = {0};
 		vmValue cond = vm_operand_value(vm, instr->Select.cond);
 		if (cond.val_int != 0) {
 			v = vm_operand_value(vm, instr->Select.true_value);
@@ -1184,7 +1184,7 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 
 	case ssaInstr_BoundsCheck: {
 		ssaInstrBoundsCheck *bc = &instr->BoundsCheck;
-		Array<vmValue> args = {};
+		Array<vmValue> args = {0};
 		array_init(&args, vm->stack_allocator, 5);
 		array_add(&args, vm_exact_value(vm, NULL, make_exact_value_string(bc->pos.file), t_string));
 		array_add(&args, vm_exact_value(vm, NULL, make_exact_value_integer(bc->pos.line), t_int));
@@ -1197,7 +1197,7 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 
 	case ssaInstr_SliceBoundsCheck: {
 		ssaInstrSliceBoundsCheck *bc = &instr->SliceBoundsCheck;
-		Array<vmValue> args = {};
+		Array<vmValue> args = {0};
 
 		array_init(&args, vm->stack_allocator, 7);
 		array_add(&args, vm_exact_value(vm, NULL, make_exact_value_string(bc->pos.file), t_string));

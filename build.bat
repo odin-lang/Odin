@@ -6,7 +6,7 @@ set exe_name=odin.exe
 :: Debug = 0, Release = 1
 set release_mode=0
 
-set compiler_flags= -nologo -Oi -TP -W4 -fp:fast -fp:except- -Gm- -MP -FC -GS- -EHsc- -GR-
+set compiler_flags= -nologo -Oi -TC -W4 -fp:fast -fp:except- -Gm- -MP -FC -GS- -EHsc- -GR-
 
 if %release_mode% EQU 0 ( rem Debug
 	set compiler_flags=%compiler_flags% -Od -MDd -Z7
@@ -17,7 +17,7 @@ if %release_mode% EQU 0 ( rem Debug
 
 set compiler_warnings= ^
 	-we4013 -we4706 -we4002 ^
-	-wd4100 -wd4127 -wd4189 ^
+	-wd4100 -wd4101 -wd4127 -wd4189 ^
 	-wd4201 -wd4204 -wd4244 ^
 	-wd4306 ^
 	-wd4456 -wd4457 -wd4480 ^
@@ -47,8 +47,8 @@ rem pushd %build_dir%
 	del *.ilk > NUL 2> NUL
 
 	cl %compiler_settings% "src\main.cpp" ^
-		/link %linker_settings% -OUT:%exe_name%
-	rem && odin run code/demo.odin
+		/link %linker_settings% -OUT:%exe_name% ^
+	&& odin run code/demo.odin
 	rem odin run code/demo.odin
 
 

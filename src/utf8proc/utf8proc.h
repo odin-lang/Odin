@@ -94,7 +94,7 @@ typedef unsigned int utf8proc_size_t;
 #  endif
 #  ifndef __cplusplus
 typedef unsigned char utf8proc_bool;
-enum {false, true};
+// enum {false, true};
 #  else
 typedef bool utf8proc_bool;
 #  endif

@@ -44,7 +44,7 @@ u64 time_stamp__freq(void) {
 }
 
 TimeStamp make_time_stamp(String label) {
-	TimeStamp ts = {};
+	TimeStamp ts = {0};
 	ts.start = time_stamp_time_now();
 	ts.label = label;
 	return ts;

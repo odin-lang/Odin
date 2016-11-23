@@ -39,7 +39,7 @@ void ssa_file_buffer_write(ssaFileBuffer *f, void *data, isize len) {
 void ssa_fprintf(ssaFileBuffer *f, char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	char buf[4096] = {};
+	char buf[4096] = {0};
 	isize len = gb_snprintf_va(buf, gb_size_of(buf), fmt, va);
 	ssa_file_buffer_write(f, buf, len-1);
 	va_end(va);
@@ -407,7 +407,7 @@ void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Typ
 		}
 	} break;
 	case ExactValue_Pointer:
-		if (value.value_pointer == NULL) {
+		if (value.value_pointer == 0) {
 			ssa_fprintf(f, "null");
 		} else {
 			ssa_fprintf(f, "inttoptr (");
@@ -1273,7 +1273,7 @@ void ssa_print_type_name(ssaFileBuffer *f, ssaModule *m, ssaValue *v) {
 
 void ssa_print_llvm_ir(ssaGen *ssa) {
 	ssaModule *m = &ssa->module;
-	ssaFileBuffer buf = {}, *f = &buf;
+	ssaFileBuffer buf = {0}, *f = &buf;
 	ssa_file_buffer_init(f, &ssa->output_file);
 
 	if (m->layout.len > 0) {

@@ -148,7 +148,7 @@ void array_init_count(Array<T> *array, gbAllocator a, isize count) {
 
 template <typename T>
 Array<T> array_make(T *data, isize count, isize capacity) {
-	Array<T> a = {};
+	Array<T> a = {0};
 	a.data = data;
 	a.count = count;
 	a.capacity = capacity;

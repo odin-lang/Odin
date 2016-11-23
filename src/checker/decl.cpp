@@ -69,7 +69,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 
 	for_array(i, inits) {
 		AstNode *rhs = inits.e[i];
-		Operand o = {};
+		Operand o = {0};
 		check_multi_expr(c, &o, rhs);
 		if (o.type->kind != Type_Tuple) {
 			array_add(&operands, o);
@@ -185,7 +185,7 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 
 	Type *init_type = NULL;
 	if (vd->type) {
-		init_type = check_type(c, vd->type, NULL);
+		init_type = check_type_extra(c, vd->type, NULL, NULL);
 		if (init_type == NULL)
 			init_type = t_invalid;
 	}
@@ -280,7 +280,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 		e->type = t;
 	}
 
-	Operand operand = {};
+	Operand operand = {0};
 	if (init_expr) {
 		check_expr(c, &operand, init_expr);
 	}
@@ -296,12 +296,12 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, Cycle
 	}
 	e->type = named;
 
-	CycleChecker local_cycle_checker = {};
+	CycleChecker local_cycle_checker = {0};
 	if (cycle_checker == NULL) {
 		cycle_checker = &local_cycle_checker;
 	}
 
-	Type *bt = check_type(c, type_expr, named, cycle_checker_add(cycle_checker, e));
+	Type *bt = check_type_extra(c, type_expr, named, cycle_checker_add(cycle_checker, e));
 	named->Named.base = bt;
 	named->Named.base = base_type(named->Named.base);
 	if (named->Named.base == t_invalid) {
@@ -457,7 +457,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	e->flags |= EntityFlag_Visited;
 
 	if (type_expr != NULL)
-		e->type = check_type(c, type_expr, NULL);
+		e->type = check_type_extra(c, type_expr, NULL, NULL);
 
 	if (init_expr == NULL) {
 		if (type_expr == NULL)
@@ -467,7 +467,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 
 	if (entities == NULL || entity_count == 1) {
 		GB_ASSERT(entities == NULL || entities[0] == e);
-		Operand operand = {};
+		Operand operand = {0};
 		check_expr(c, &operand, init_expr);
 		check_init_variable(c, e, &operand, str_lit("variable declaration"));
 	}

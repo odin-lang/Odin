@@ -117,7 +117,7 @@ AstNodeArray make_ast_node_array(AstFile *f) {
 		AstNodeArray elems; \
 		Token open, close; \
 	}) \
-AST_NODE_KIND(_ExprBegin,  "",  struct{}) \
+AST_NODE_KIND(_ExprBegin,  "",  i32) \
 	AST_NODE_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
 	AST_NODE_KIND(TagExpr,      "tag expression",         struct { Token token, name; AstNode *expr; }) \
 	AST_NODE_KIND(RunExpr,      "run expression",         struct { Token token, name; AstNode *expr; }) \
@@ -142,8 +142,8 @@ AST_NODE_KIND(_ExprBegin,  "",  struct{}) \
 		bool triple_indexed; \
 	}) \
 	AST_NODE_KIND(FieldValue, "field value", struct { Token eq; AstNode *field, *value; }) \
-AST_NODE_KIND(_ExprEnd,       "", struct{}) \
-AST_NODE_KIND(_StmtBegin,     "", struct{}) \
+AST_NODE_KIND(_ExprEnd,       "", i32) \
+AST_NODE_KIND(_StmtBegin,     "", i32) \
 	AST_NODE_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
 	AST_NODE_KIND(EmptyStmt,  "empty statement",               struct { Token token; }) \
 	AST_NODE_KIND(ExprStmt,   "expression statement",          struct { AstNode *expr; } ) \
@@ -157,7 +157,7 @@ AST_NODE_KIND(_StmtBegin,     "", struct{}) \
 		Token op; \
 		AstNodeArray lhs, rhs; \
 	}) \
-AST_NODE_KIND(_ComplexStmtBegin, "", struct{}) \
+AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 	AST_NODE_KIND(BlockStmt, "block statement", struct { \
 		AstNodeArray stmts; \
 		Token open, close; \
@@ -220,9 +220,9 @@ AST_NODE_KIND(_ComplexStmtBegin, "", struct{}) \
 		AstNode *body; \
 	}) \
 \
-AST_NODE_KIND(_ComplexStmtEnd, "", struct{}) \
-AST_NODE_KIND(_StmtEnd,        "", struct{}) \
-AST_NODE_KIND(_DeclBegin,      "", struct{}) \
+AST_NODE_KIND(_ComplexStmtEnd, "", i32) \
+AST_NODE_KIND(_StmtEnd,        "", i32) \
+AST_NODE_KIND(_DeclBegin,      "", i32) \
 	AST_NODE_KIND(BadDecl,  "bad declaration", struct { Token begin, end; }) \
 	AST_NODE_KIND(VarDecl,  "variable declaration", struct { \
 			u64          tags; \
@@ -264,8 +264,8 @@ AST_NODE_KIND(_DeclBegin,      "", struct{}) \
 		Token token, filepath; \
 		bool is_system; \
 	}) \
-AST_NODE_KIND(_DeclEnd,   "", struct{}) \
-AST_NODE_KIND(_TypeBegin, "", struct{}) \
+AST_NODE_KIND(_DeclEnd,   "", i32) \
+AST_NODE_KIND(_TypeBegin, "", i32) \
 	AST_NODE_KIND(Parameter, "parameter", struct { \
 		AstNodeArray names; \
 		AstNode *type; \
@@ -316,7 +316,7 @@ AST_NODE_KIND(_TypeBegin, "", struct{}) \
 		AstNode *base_type; \
 		AstNodeArray fields; \
 	}) \
-AST_NODE_KIND(_TypeEnd,  "", struct{})
+AST_NODE_KIND(_TypeEnd,  "", i32)
 
 typedef enum AstNodeKind {
 	AstNode_Invalid,
@@ -1186,7 +1186,7 @@ AstNodeArray parse_element_list(AstFile *f) {
 }
 
 AstNode *parse_literal_value(AstFile *f, AstNode *type) {
-	AstNodeArray elems = {};
+	AstNodeArray elems = {0};
 	Token open = expect_token(f, Token_OpenBrace);
 	f->expr_level++;
 	if (f->curr_token.kind != Token_CloseBrace) {
@@ -1206,7 +1206,7 @@ AstNode *parse_value(AstFile *f) {
 	return value;
 }
 
-AstNode *parse_identifier_or_type(AstFile *f, u32 flags = 0);
+AstNode *parse_identifier_or_type(AstFile *f, u32 flags);
 
 
 void check_proc_add_tag(AstFile *f, AstNode *tag_expr, u64 *tags, ProcTag tag, String tag_name) {
@@ -1418,8 +1418,8 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		f->curr_proc = type;
 
 		u64 tags = 0;
-		String foreign_name = {};
-		String link_name = {};
+		String foreign_name = {0};
+		String link_name = {0};
 		parse_proc_tags(f, &tags, &foreign_name, &link_name);
 		if (tags & ProcTag_foreign) {
 			syntax_error(f->curr_token, "#foreign cannot be applied to procedure literals");
@@ -1442,7 +1442,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	}
 
 	default: {
-		AstNode *type = parse_identifier_or_type(f);
+		AstNode *type = parse_identifier_or_type(f, 0);
 		if (type != NULL) {
 			// NOTE(bill): Sanity check as identifiers should be handled already
 			GB_ASSERT_MSG(type->kind != AstNode_Ident, "Type Cannot be identifier");
@@ -1473,7 +1473,7 @@ bool is_literal_type(AstNode *node) {
 AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 	AstNodeArray args = make_ast_node_array(f);
 	Token open_paren, close_paren;
-	Token ellipsis = {};
+	Token ellipsis = {0};
 
 	f->expr_level++;
 	open_paren = expect_token(f, Token_OpenParen);
@@ -1555,7 +1555,7 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 				// TODO(bill): Handle this
 			}
 			Token open, close;
-			AstNode *indices[3] = {};
+			AstNode *indices[3] = {0};
 
 			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
@@ -1563,7 +1563,7 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			if (f->curr_token.kind != Token_Colon)
 				indices[0] = parse_expr(f, false);
 			isize colon_count = 0;
-			Token colons[2] = {};
+			Token colons[2] = {0};
 
 			while (f->curr_token.kind == Token_Colon && colon_count < 2) {
 				colons[colon_count++] = f->curr_token;
@@ -1720,7 +1720,7 @@ AstNode *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 					expression = call;
 				} else  */{
 					right = parse_binary_expr(f, false, prec+1);
-					AstNodeArray args = {};
+					AstNodeArray args = {0};
 					array_init_reserve(&args, gb_arena_allocator(&f->arena), 2);
 					array_add(&args, expression);
 					array_add(&args, right);
@@ -1880,7 +1880,7 @@ AstNodeArray parse_identfier_list(AstFile *f) {
 
 
 AstNode *parse_type_attempt(AstFile *f) {
-	AstNode *type = parse_identifier_or_type(f);
+	AstNode *type = parse_identifier_or_type(f, 0);
 	if (type != NULL) {
 		// TODO(bill): Handle?
 	}
@@ -1903,8 +1903,8 @@ Token parse_procedure_signature(AstFile *f,
                                 AstNodeArray *params, AstNodeArray *results);
 
 AstNode *parse_proc_type(AstFile *f) {
-	AstNodeArray params = {};
-	AstNodeArray results = {};
+	AstNodeArray params = {0};
+	AstNodeArray results = {0};
 
 	Token proc_token = parse_procedure_signature(f, &params, &results);
 
@@ -2237,7 +2237,7 @@ Token parse_procedure_signature(AstFile *f,
 }
 
 AstNode *parse_body(AstFile *f) {
-	AstNodeArray stmts = {};
+	AstNodeArray stmts = {0};
 	Token open, close;
 	open = expect_token(f, Token_OpenBrace);
 	stmts = parse_stmt_list(f);
@@ -2249,16 +2249,16 @@ AstNode *parse_body(AstFile *f) {
 
 
 AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
-	AstNodeArray params = {};
-	AstNodeArray results = {};
+	AstNodeArray params = {0};
+	AstNodeArray results = {0};
 
 	parse_procedure_signature(f, &params, &results);
 	AstNode *proc_type = make_proc_type(f, proc_token, params, results);
 
 	AstNode *body = NULL;
 	u64 tags = 0;
-	String foreign_name = {};
-	String link_name = {};
+	String foreign_name = {0};
+	String link_name = {0};
 
 	parse_proc_tags(f, &tags, &foreign_name, &link_name);
 
@@ -2277,7 +2277,7 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 }
 
 AstNode *parse_decl(AstFile *f, AstNodeArray names) {
-	AstNodeArray values = {};
+	AstNodeArray values = {0};
 	AstNode *type = NULL;
 
 	for_array(i, names) {
@@ -2294,7 +2294,7 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 
 	if (allow_token(f, Token_Colon)) {
 		if (!allow_token(f, Token_type)) {
-			type = parse_identifier_or_type(f);
+			type = parse_identifier_or_type(f, 0);
 		}
 	} else if (f->curr_token.kind != Token_Eq && f->curr_token.kind != Token_Semicolon) {
 		syntax_error(f->curr_token, "Expected type separator `:` or `=`");
@@ -2756,7 +2756,7 @@ AstNode *parse_stmt(AstFile *f) {
 			return make_bad_decl(f, token, f->curr_token);
 		} else if (str_eq(tag, str_lit("import"))) {
 			// TODO(bill): better error messages
-			Token import_name = {};
+			Token import_name = {0};
 			Token file_path = expect_token_after(f, Token_String, "#import");
 			if (allow_token(f, Token_as)) {
 				// NOTE(bill): Custom import name
@@ -2970,7 +2970,7 @@ bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) 
 }
 
 String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
-	String res = {};
+	String res = {0};
 	isize str_len = base_dir.len+path.len;
 
 	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
@@ -2986,7 +2986,7 @@ String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 
 String get_fullpath_core(gbAllocator a, String path) {
 	String module_dir = get_module_dir();
-	String res = {};
+	String res = {0};
 
 	char core[] = "core/";
 	isize core_len = gb_size_of(core)-1;
@@ -3170,7 +3170,7 @@ void parse_file(Parser *p, AstFile *f) {
 ParseFileError parse_files(Parser *p, char *init_filename) {
 	char *fullpath_str = gb_path_get_full_name(heap_allocator(), init_filename);
 	String init_fullpath = make_string_c(fullpath_str);
-	TokenPos init_pos = {};
+	TokenPos init_pos = {0};
 	ImportedFile init_imported_file = {init_fullpath, init_fullpath, init_pos};
 	array_add(&p->imports, init_imported_file);
 	p->init_fullpath = init_fullpath;
@@ -3191,7 +3191,7 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 		String import_path = imported_file.path;
 		String import_rel_path = imported_file.rel_path;
 		TokenPos pos = imported_file.pos;
-		AstFile file = {};
+		AstFile file = {0};
 		ParseFileError err = init_ast_file(&file, import_path);
 
 		if (err != ParseFile_None) {

@@ -37,7 +37,8 @@ typedef enum EntityFlag {
 	EntityFlag_VectorElem = 1<<5,
 } EntityFlag;
 
-typedef struct Entity {
+typedef struct Entity Entity;
+struct Entity {
 	EntityKind kind;
 	u32        flags;
 	Token      token;
@@ -57,8 +58,8 @@ typedef struct Entity {
 			i32 field_index;
 			i32 field_src_index;
 		} Variable;
-		struct {} TypeName;
-		struct {} Procedure;
+		i32 TypeName;
+		i32 Procedure;
 		struct {
 			BuiltinProcId id;
 		} Builtin;
@@ -68,14 +69,14 @@ typedef struct Entity {
 			Scope *scope;
 			bool    used;
 		} ImportName;
-		struct {} Nil;
+		i32 Nil;
 		struct {
 			// TODO(bill): Should this be a user-level construct rather than compiler-level?
 			ImplicitValueId id;
 			Entity *        backing;
 		} ImplicitValue;
 	};
-} Entity;
+};
 
 bool is_entity_exported(Entity *e) {
 	if (e->kind == Entity_ImportName) {

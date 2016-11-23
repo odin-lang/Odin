@@ -1,14 +1,14 @@
-bool  check_is_terminating(AstNode *node);
-bool  check_has_break     (AstNode *stmt, bool implicit);
+bool check_is_terminating(AstNode *node);
+bool check_has_break     (AstNode *stmt, bool implicit);
 void check_stmt          (Checker *c, AstNode *node, u32 flags);
 
 
 // Statements and Declarations
-enum StmtFlag : u32 {
+typedef enum StmtFlag {
 	Stmt_BreakAllowed       = GB_BIT(0),
 	Stmt_ContinueAllowed    = GB_BIT(1),
 	Stmt_FallthroughAllowed = GB_BIT(2), // TODO(bill): fallthrough
-};
+} StmtFlag;
 
 
 
@@ -74,10 +74,10 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 	}
 
 	for_array(i, delayed_type) {
-		check_entity_decl(c, delayed_type.e[i].e, delayed_type.e[i].d, NULL);
+		check_entity_decl(c, delayed_type.e[i].e, delayed_type.e[i].d, NULL, NULL);
 	}
 	for_array(i, delayed_const) {
-		check_entity_decl(c, delayed_const.e[i].e, delayed_const.e[i].d, NULL);
+		check_entity_decl(c, delayed_const.e[i].e, delayed_const.e[i].d, NULL, NULL);
 	}
 
 	bool ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
@@ -352,7 +352,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(es, ExprStmt, node)
 		Operand operand = {Addressing_Invalid};
-		ExprKind kind = check_expr_base(c, &operand, es->expr);
+		ExprKind kind = check_expr_base(c, &operand, es->expr, NULL);
 		switch (operand.mode) {
 		case Addressing_Type:
 			error(ast_node_token(node), "Is not an expression");
@@ -436,7 +436,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			for_array(i, as->rhs) {
 				AstNode *rhs = as->rhs.e[i];
-				Operand o = {};
+				Operand o = {0};
 				check_multi_expr(c, &o, rhs);
 				if (o.type->kind != Type_Tuple) {
 					array_add(&operands, o);
@@ -592,7 +592,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(ms, MatchStmt, node);
-		Operand x = {};
+		Operand x = {0};
 
 		mod_flags |= Stmt_BreakAllowed;
 		check_open_scope(c, node);
@@ -608,7 +608,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			x.type  = t_bool;
 			x.value = make_exact_value_bool(true);
 
-			Token token = {};
+			Token token = {0};
 			token.pos = ast_node_token(ms->body).pos;
 			token.string = str_lit("true");
 			x.expr  = make_ident(c->curr_ast_file, token);
@@ -642,7 +642,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 ;
 
-		MapTypeAndToken seen = {}; // NOTE(bill): Multimap
+		MapTypeAndToken seen = {0}; // NOTE(bill): Multimap
 		map_type_and_token_init(&seen, heap_allocator());
 
 		for_array(i, bs->stmts) {
@@ -656,8 +656,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			for_array(j, cc->list) {
 				AstNode *expr = cc->list.e[j];
-				Operand y = {};
-				Operand z = {};
+				Operand y = {0};
+				Operand z = {0};
 				Token eq = {Token_CmpEq};
 
 				check_expr(c, &y, expr);
@@ -665,7 +665,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				    y.mode == Addressing_Invalid) {
 					continue;
 				}
-				convert_to_typed(c, &y, x.type);
+				convert_to_typed(c, &y, x.type, 0);
 				if (y.mode == Addressing_Invalid) {
 					continue;
 				}
@@ -732,7 +732,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(ms, TypeMatchStmt, node);
-		Operand x = {};
+		Operand x = {0};
 
 		mod_flags |= Stmt_BreakAllowed;
 		check_open_scope(c, node);
@@ -783,7 +783,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 
 
-		MapBool seen = {};
+		MapBool seen = {0};
 		map_bool_init(&seen, heap_allocator());
 
 		for_array(i, bs->stmts) {
@@ -801,7 +801,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			AstNode *type_expr = cc->list.count > 0 ? cc->list.e[0] : NULL;
 			Type *case_type = NULL;
 			if (type_expr != NULL) { // Otherwise it's a default expression
-				Operand y = {};
+				Operand y = {0};
 				check_expr_or_type(c, &y, type_expr);
 
 				if (is_union_ptr) {
@@ -915,7 +915,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				String name = expr->Ident.string;
 				e = scope_lookup_entity(c->context.scope, name);
 			} else if (expr->kind == AstNode_SelectorExpr) {
-				Operand o = {};
+				Operand o = {0};
 				e = check_selector(c, &o, expr);
 				is_selector = true;
 			}
@@ -1083,7 +1083,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 
 	case_ast_node(pa, PushAllocator, node);
-		Operand op = {};
+		Operand op = {0};
 		check_expr(c, &op, pa->expr);
 		check_assignment(c, &op, t_allocator, str_lit("argument to push_allocator"));
 		check_stmt(c, pa->body, mod_flags);
@@ -1091,7 +1091,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 
 	case_ast_node(pa, PushContext, node);
-		Operand op = {};
+		Operand op = {0};
 		check_expr(c, &op, pa->expr);
 		check_assignment(c, &op, t_context, str_lit("argument to push_context"));
 		check_stmt(c, pa->body, mod_flags);
@@ -1124,7 +1124,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		d->proc_decl = node;
 
 		add_entity_and_decl_info(c, pd->name, e, d);
-		check_entity_decl(c, e, d, NULL);
+		check_entity_decl(c, e, d, NULL, NULL);
 	case_end;
 	}
 }

@@ -295,7 +295,7 @@ gb_global Type *t_context_ptr          = NULL;
 
 
 
-gbString type_to_string(Type *type, gbAllocator a = heap_allocator());
+gbString type_to_string(Type *type);
 
 Type *base_type(Type *t) {
 	for (;;) {
@@ -823,7 +823,13 @@ gb_global Entity *entity__string_count   = NULL;
 gb_global Entity *entity__slice_count    = NULL;
 gb_global Entity *entity__slice_capacity = NULL;
 
-Selection lookup_field(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel = empty_selection) {
+Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel);
+
+Selection lookup_field(gbAllocator a, Type *type_, String field_name, bool is_type) {
+	return lookup_field_with_selection(a, type_, field_name, is_type, empty_selection);
+}
+
+Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel) {
 	GB_ASSERT(type_ != NULL);
 
 	if (str_eq(field_name, str_lit("_"))) {
@@ -1010,7 +1016,7 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, bool is_ty
 				isize prev_count = sel.index.count;
 				selection_add_index(&sel, i); // HACK(bill): Leaky memory
 
-				sel = lookup_field(a, f->type, field_name, is_type, sel);
+				sel = lookup_field_with_selection(a, f->type, field_name, is_type, sel);
 
 				if (sel.entity != NULL) {
 					if (is_type_pointer(f->type)) {
@@ -1473,8 +1479,8 @@ gbString write_type_to_string(gbString str, Type *type) {
 }
 
 
-gbString type_to_string(Type *type, gbAllocator a) {
-	gbString str = gb_string_make(a, "");
+gbString type_to_string(Type *type) {
+	gbString str = gb_string_make(gb_heap_allocator(), "");
 	return write_type_to_string(str, type);
 }
 
