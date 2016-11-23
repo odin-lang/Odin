@@ -6,22 +6,22 @@ Type *   check_type                (Checker *c, AstNode *expression, Type *named
 void     check_type_decl           (Checker *c, Entity *e, AstNode *type_expr, Type *def, CycleChecker *cycle_checker);
 Entity * check_selector            (Checker *c, Operand *operand, AstNode *node);
 void     check_not_tuple           (Checker *c, Operand *operand);
-b32      check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
+bool      check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
 void     convert_to_typed          (Checker *c, Operand *operand, Type *target_type, i32 level = 0);
 gbString expr_to_string            (AstNode *expression);
 void     check_entity_decl         (Checker *c, Entity *e, DeclInfo *decl, Type *named_type, CycleChecker *cycle_checker = NULL);
 void     check_proc_body           (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
-void     update_expr_type          (Checker *c, AstNode *e, Type *type, b32 final);
+void     update_expr_type          (Checker *c, AstNode *e, Type *type, bool final);
 
 
 
-b32 check_is_assignable_to_using_subtype(Type *dst, Type *src) {
+bool check_is_assignable_to_using_subtype(Type *dst, Type *src) {
 	Type *prev_src = src;
 	// Type *prev_dst = dst;
 	src = base_type(type_deref(src));
 	// dst = base_type(type_deref(dst));
-	b32 src_is_ptr = src != prev_src;
-	// b32 dst_is_ptr = dst != prev_dst;
+	bool src_is_ptr = src != prev_src;
+	// bool dst_is_ptr = dst != prev_dst;
 
 	if (is_type_struct(src)) {
 		for (isize i = 0; i < src->Record.field_count; i++) {
@@ -35,7 +35,7 @@ b32 check_is_assignable_to_using_subtype(Type *dst, Type *src) {
 						return true;
 					}
 				}
-				b32 ok = check_is_assignable_to_using_subtype(dst, f->type);
+				bool ok = check_is_assignable_to_using_subtype(dst, f->type);
 				if (ok) {
 					return true;
 				}
@@ -46,7 +46,7 @@ b32 check_is_assignable_to_using_subtype(Type *dst, Type *src) {
 }
 
 
-b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argument = false) {
+bool check_is_assignable_to(Checker *c, Operand *operand, Type *type, bool is_argument = false) {
 	PROF_PROC();
 
 	if (operand->mode == Addressing_Invalid ||
@@ -152,7 +152,7 @@ b32 check_is_assignable_to(Checker *c, Operand *operand, Type *type, b32 is_argu
 
 
 // NOTE(bill): `content_name` is for debugging and error messages
-void check_assignment(Checker *c, Operand *operand, Type *type, String context_name, b32 is_argument = false) {
+void check_assignment(Checker *c, Operand *operand, Type *type, String context_name, bool is_argument = false) {
 	PROF_PROC();
 
 	check_not_tuple(c, operand);
@@ -432,7 +432,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 				if (!is_type_struct(t) && !is_type_raw_union(t)) {
 					Token name_token = vd->names[0]->Ident;
 					if (is_type_indexable(t)) {
-						b32 ok = true;
+						bool ok = true;
 						for_array(emi, entity_map.entries) {
 							Entity *e = entity_map.entries[emi].value;
 							if (e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous) {
@@ -773,14 +773,14 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		make_token_ident(make_string("max_value")), constant_type, make_exact_value_integer(max_value));
 }
 
-Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, b32 *is_variadic_) {
+Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_variadic_) {
 	PROF_PROC();
 
 	if (params.count == 0) {
 		return NULL;
 	}
 
-	b32 is_variadic = false;
+	bool is_variadic = false;
 
 	Type *tuple = make_type_tuple(c->allocator);
 
@@ -870,7 +870,7 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 
 	ast_node(pt, ProcType, proc_type_node);
 
-	b32 variadic = false;
+	bool variadic = false;
 	Type *params  = check_get_params(c, c->context.scope, pt->params, &variadic);
 	Type *results = check_get_results(c, c->context.scope, pt->results);
 
@@ -1214,7 +1214,7 @@ end:
 }
 
 
-b32 check_unary_op(Checker *c, Operand *o, Token op) {
+bool check_unary_op(Checker *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
 	Type *type = base_type(base_vector_type(o->type));
 	gbString str = NULL;
@@ -1249,7 +1249,7 @@ b32 check_unary_op(Checker *c, Operand *o, Token op) {
 	return true;
 }
 
-b32 check_binary_op(Checker *c, Operand *o, Token op) {
+bool check_binary_op(Checker *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
 	Type *type = base_type(base_vector_type(o->type));
 	switch (op.kind) {
@@ -1323,7 +1323,7 @@ b32 check_binary_op(Checker *c, Operand *o, Token op) {
 	return true;
 
 }
-b32 check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value) {
+bool check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value) {
 	PROF_PROC();
 
 	if (in_value.kind == ExactValue_Invalid) {
@@ -1431,7 +1431,7 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 	}
 }
 
-b32 check_is_expr_vector_index(Checker *c, AstNode *expr) {
+bool check_is_expr_vector_index(Checker *c, AstNode *expr) {
 	// HACK(bill): Handle this correctly. Maybe with a custom AddressingMode
 	expr = unparen_expr(expr);
 	if (expr->kind == AstNode_IndexExpr) {
@@ -1444,7 +1444,7 @@ b32 check_is_expr_vector_index(Checker *c, AstNode *expr) {
 	return false;
 }
 
-b32 check_is_vector_elem(Checker *c, AstNode *expr) {
+bool check_is_vector_elem(Checker *c, AstNode *expr) {
 	// HACK(bill): Handle this correctly. Maybe with a custom AddressingMode
 	expr = unparen_expr(expr);
 	if (expr->kind == AstNode_SelectorExpr) {
@@ -1479,7 +1479,7 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 
 	case Token_Maybe: { // Make maybe
 		Type *t = default_type(o->type);
-		b32 is_value =
+		bool is_value =
 			o->mode == Addressing_Variable ||
 			o->mode == Addressing_Value ||
 			o->mode == Addressing_Constant;
@@ -1548,7 +1548,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 	if (check_is_assignable_to(c, x, y->type) ||
 	    check_is_assignable_to(c, y, x->type)) {
 		Type *err_type = x->type;
-		b32 defined = false;
+		bool defined = false;
 		switch (op.kind) {
 		case Token_CmpEq:
 		case Token_NotEq:
@@ -1620,7 +1620,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 		x_val = exact_value_to_integer(x->value);
 	}
 
-	b32 x_is_untyped = is_type_untyped(x->type);
+	bool x_is_untyped = is_type_untyped(x->type);
 	if (!(is_type_integer(x->type) || (x_is_untyped && x_val.kind == ExactValue_Integer))) {
 		gbString err_str = expr_to_string(x->expr);
 		defer (gb_string_free(err_str));
@@ -1704,7 +1704,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 	x->mode = Addressing_Value;
 }
 
-b32 check_is_castable_to(Checker *c, Operand *operand, Type *y) {
+bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 	PROF_PROC();
 
 	if (check_is_assignable_to(c, operand, y)) {
@@ -1856,8 +1856,8 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			return;
 		}
 
-		b32 is_const_expr = x->mode == Addressing_Constant;
-		b32 can_convert = false;
+		bool is_const_expr = x->mode == Addressing_Constant;
+		bool can_convert = false;
 
 		Type *bt = base_type(type);
 		if (is_const_expr && is_type_constant_type(bt)) {
@@ -2021,8 +2021,8 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			return;
 		}
 
-		b32 src_is_ptr = is_type_pointer(x->type);
-		b32 dst_is_ptr = is_type_pointer(type);
+		bool src_is_ptr = is_type_pointer(x->type);
+		bool dst_is_ptr = is_type_pointer(type);
 		Type *src = type_deref(x->type);
 		Type *dst = type_deref(type);
 		Type *bsrc = base_type(src);
@@ -2044,7 +2044,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			return;
 		}
 
-		b32 ok = false;
+		bool ok = false;
 		for (isize i = 1; i < bsrc->Record.field_count; i++) {
 			Entity *f = bsrc->Record.fields[i];
 			if (are_types_identical(f->type, dst)) {
@@ -2156,7 +2156,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	case Token_ModEq:
 		if ((x->mode == Addressing_Constant || is_type_integer(x->type)) &&
 		    y->mode == Addressing_Constant) {
-			b32 fail = false;
+			bool fail = false;
 			switch (y->value.kind) {
 			case ExactValue_Integer:
 				if (y->value.value_integer == 0) {
@@ -2218,7 +2218,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 }
 
 
-void update_expr_type(Checker *c, AstNode *e, Type *type, b32 final) {
+void update_expr_type(Checker *c, AstNode *e, Type *type, bool final) {
 	PROF_PROC();
 
 	HashKey key = hash_pointer(e);
@@ -2378,7 +2378,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 	operand->type = target_type;
 }
 
-b32 check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *value) {
+bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *value) {
 	PROF_PROC();
 
 	Operand operand = {Addressing_Invalid};
@@ -2439,7 +2439,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 
 	ast_node(se, SelectorExpr, node);
 
-	b32 check_op_expr = true;
+	bool check_op_expr = true;
 	Entity *expr_entity = NULL;
 	Entity *entity = NULL;
 	Selection sel = {}; // NOTE(bill): Not used if it's an import name
@@ -2470,7 +2470,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 				check_entity_decl(c, entity, NULL, NULL);
 			}
 			GB_ASSERT(entity->type != NULL);
-			b32 is_not_exported = !is_entity_exported(entity);
+			bool is_not_exported = !is_entity_exported(entity);
 
 			// TODO(bill): Fix this for `#import "file.odin" as .`
 			if (is_not_exported) {
@@ -2569,7 +2569,7 @@ error:
 	return NULL;
 }
 
-b32 check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id) {
+bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id) {
 	PROF_PROC();
 
 	GB_ASSERT(call->kind == AstNode_CallExpr);
@@ -3413,8 +3413,8 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	ast_node(ce, CallExpr, call);
 
 	isize param_count = 0;
-	b32 variadic = proc_type->Proc.variadic;
-	b32 vari_expand = (ce->ellipsis.pos.line != 0);
+	bool variadic = proc_type->Proc.variadic;
+	bool vari_expand = (ce->ellipsis.pos.line != 0);
 
 	if (proc_type->Proc.params != NULL) {
 		param_count = proc_type->Proc.params->Tuple.variable_count;
@@ -3492,7 +3492,7 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	}
 
 	if (variadic) {
-		b32 variadic_expand = false;
+		bool variadic_expand = false;
 		Type *slice = sig_params[param_count]->type;
 		GB_ASSERT(is_type_slice(slice));
 		Type *elem = base_type(slice)->Slice.elem;
@@ -3672,8 +3672,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		PROF_SCOPED("check__expr_base - CompoundLit");
 
 		Type *type = type_hint;
-		b32 ellipsis_array = false;
-		b32 is_constant = true;
+		bool ellipsis_array = false;
+		bool is_constant = true;
 		if (cl->type != NULL) {
 			type = NULL;
 
@@ -3710,7 +3710,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			{ // Checker values
 				isize field_count = t->Record.field_count;
 				if (cl->elems[0]->kind == AstNode_FieldValue) {
-					b32 *fields_visited = gb_alloc_array(c->allocator, b32, field_count);
+					bool *fields_visited = gb_alloc_array(c->allocator, bool, field_count);
 
 					for_array(i, cl->elems) {
 						AstNode *elem = cl->elems[i];
@@ -3938,10 +3938,10 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		}
 
 		Type *t = base_type(type_deref(o->type));
-		b32 is_const = o->mode == Addressing_Constant;
+		bool is_const = o->mode == Addressing_Constant;
 
 
-		auto set_index_data = [](Operand *o, Type *t, i64 *max_count) -> b32 {
+		auto set_index_data = [](Operand *o, Type *t, i64 *max_count) -> bool {
 			t = base_type(type_deref(t));
 
 			switch (t->kind) {
@@ -3985,7 +3985,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		};
 
 		i64 max_count = -1;
-		b32 valid = set_index_data(o, t, &max_count);
+		bool valid = set_index_data(o, t, &max_count);
 
 		if (is_const) {
 			valid = false;
@@ -4017,7 +4017,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		}
 
 		i64 index = 0;
-		b32 ok = check_index_value(c, ie->index, max_count, &index);
+		bool ok = check_index_value(c, ie->index, max_count, &index);
 
 	case_end;
 
@@ -4031,7 +4031,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			goto error;
 		}
 
-		b32 valid = false;
+		bool valid = false;
 		i64 max_count = -1;
 		Type *t = base_type(type_deref(o->type));
 		switch (t->kind) {

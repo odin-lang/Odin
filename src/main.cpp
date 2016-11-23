@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
 	init_universal_scope();
 
 	char *init_filename = NULL;
-	b32 run_output = false;
+	bool run_output = false;
 	String arg1 = make_string(argv[1]);
 	if (arg1 == "run") {
 		run_output = true;
@@ -243,7 +243,7 @@ int main(int argc, char **argv) {
 	exit_code = win32_exec_command_line_app("msvc-link",
 		"link %.*s.obj -OUT:%.*s.exe %s "
 		"/defaultlib:libcmt "
-		"/nologo /incremental:no /opt:ref /subsystem:console /debug "
+		"/nologo /incremental:no /opt:ref /subsystem:console "
 		" %.*s "
 		"",
 		LIT(output), LIT(output),

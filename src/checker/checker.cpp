@@ -38,17 +38,17 @@ struct DeclInfo {
 	AstNode *proc_decl; // AstNode_ProcDecl
 	u32      var_decl_tags;
 
-	Map<b32> deps; // Key: Entity *
+	Map<bool> deps; // Key: Entity *
 };
 
 struct ExpressionInfo {
-	b32            is_lhs; // Debug info
+	bool            is_lhs; // Debug info
 	AddressingMode mode;
 	Type *         type; // Type_Basic
 	ExactValue     value;
 };
 
-ExpressionInfo make_expression_info(b32 is_lhs, AddressingMode mode, Type *type, ExactValue value) {
+ExpressionInfo make_expression_info(bool is_lhs, AddressingMode mode, Type *type, ExactValue value) {
 	ExpressionInfo ei = {is_lhs, mode, type, value};
 	return ei;
 }
@@ -72,10 +72,10 @@ struct Scope {
 
 	Array<Scope *> shared;
 	Array<Scope *> imported;
-	b32            is_proc;
-	b32            is_global;
-	b32            is_file;
-	b32            is_init;
+	bool            is_proc;
+	bool            is_global;
+	bool            is_file;
+	bool            is_init;
 	AstFile *      file;
 };
 gb_global Scope *universal_scope = NULL;
@@ -126,7 +126,7 @@ enum BuiltinProcId {
 struct BuiltinProc {
 	String   name;
 	isize    arg_count;
-	b32      variadic;
+	bool      variadic;
 	ExprKind kind;
 };
 gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
@@ -221,7 +221,7 @@ struct Checker {
 	CheckerContext         context;
 
 	Array<Type *>          proc_stack;
-	b32                    in_defer; // TODO(bill): Actually handle correctly
+	bool                    in_defer; // TODO(bill): Actually handle correctly
 };
 
 struct CycleChecker {
@@ -265,7 +265,7 @@ void destroy_declaration_info(DeclInfo *d) {
 	map_destroy(&d->deps);
 }
 
-b32 decl_info_has_init(DeclInfo *d) {
+bool decl_info_has_init(DeclInfo *d) {
 	if (d->init_expr != NULL) {
 		return true;
 	}
@@ -347,7 +347,7 @@ void check_close_scope(Checker *c) {
 }
 
 void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entity **entity_) {
-	b32 gone_thru_proc = false;
+	bool gone_thru_proc = false;
 	HashKey key = hash_string(name);
 	for (Scope *s = scope; s != NULL; s = s->parent) {
 		Entity **found = map_get(&s->elements, key);
@@ -460,7 +460,7 @@ void check_scope_usage(Checker *c, Scope *scope) {
 
 
 void add_dependency(DeclInfo *d, Entity *e) {
-	map_set(&d->deps, hash_pointer(e), cast(b32)true);
+	map_set(&d->deps, hash_pointer(e), true);
 }
 
 void add_declaration_dependency(Checker *c, Entity *e) {
@@ -633,7 +633,7 @@ Type *type_of_expr(CheckerInfo *i, AstNode *expression) {
 }
 
 
-void add_untyped(CheckerInfo *i, AstNode *expression, b32 lhs, AddressingMode mode, Type *basic_type, ExactValue value) {
+void add_untyped(CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value) {
 	map_set(&i->untyped, hash_pointer(expression), make_expression_info(lhs, mode, basic_type, value));
 }
 
@@ -670,7 +670,7 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 	}
 }
 
-b32 add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
+bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 	if (entity->token.string != make_string("_")) {
 		Entity *insert_entity = scope_insert_entity(scope, entity);
 		if (insert_entity) {
@@ -1161,7 +1161,7 @@ void check_parsed_files(Checker *c) {
 				continue;
 			}
 
-			b32 previously_added = false;
+			bool previously_added = false;
 			for_array(import_index, file_scope->imported) {
 				Scope *prev = file_scope->imported[import_index];
 				if (prev == scope) {
@@ -1296,8 +1296,8 @@ void check_parsed_files(Checker *c) {
 		ProcedureInfo *pi = &c->procs[i];
 		add_curr_ast_file(c, pi->file);
 
-		b32 bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
-		b32 no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
+		bool bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
+		bool no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
 
 		auto prev_context = c->context;
 		defer (c->context = prev_context);

@@ -1,5 +1,5 @@
-b32  check_is_terminating(AstNode *node);
-b32  check_has_break     (AstNode *stmt, b32 implicit);
+bool  check_is_terminating(AstNode *node);
+bool  check_has_break     (AstNode *stmt, bool implicit);
 void check_stmt          (Checker *c, AstNode *node, u32 flags);
 
 
@@ -81,7 +81,7 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 		check_entity_decl(c, delayed_const[i].e, delayed_const[i].d, NULL);
 	}
 
-	b32 ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
+	bool ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
 	u32 f = flags & (~Stmt_FallthroughAllowed);
 
 	for_array(i, stmts) {
@@ -97,7 +97,7 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 	}
 }
 
-b32 check_is_terminating_list(AstNodeArray stmts) {
+bool check_is_terminating_list(AstNodeArray stmts) {
 
 	// Iterate backwards
 	for (isize n = stmts.count-1; n >= 0; n--) {
@@ -110,7 +110,7 @@ b32 check_is_terminating_list(AstNodeArray stmts) {
 	return false;
 }
 
-b32 check_has_break_list(AstNodeArray stmts, b32 implicit) {
+bool check_has_break_list(AstNodeArray stmts, bool implicit) {
 	for_array(i, stmts) {
 		AstNode *stmt = stmts[i];
 		if (check_has_break(stmt, implicit)) {
@@ -121,7 +121,7 @@ b32 check_has_break_list(AstNodeArray stmts, b32 implicit) {
 }
 
 
-b32 check_has_break(AstNode *stmt, b32 implicit) {
+bool check_has_break(AstNode *stmt, bool implicit) {
 	PROF_PROC();
 
 	switch (stmt->kind) {
@@ -152,7 +152,7 @@ b32 check_has_break(AstNode *stmt, b32 implicit) {
 // NOTE(bill): The last expression has to be a `return` statement
 // TODO(bill): This is a mild hack and should be probably handled properly
 // TODO(bill): Warn/err against code after `return` that it won't be executed
-b32 check_is_terminating(AstNode *node) {
+bool check_is_terminating(AstNode *node) {
 	PROF_PROC();
 
 	switch (node->kind) {
@@ -184,7 +184,7 @@ b32 check_is_terminating(AstNode *node) {
 	case_end;
 
 	case_ast_node(ms, MatchStmt, node);
-		b32 has_default = false;
+		bool has_default = false;
 		for_array(i, ms->body->BlockStmt.stmts) {
 			AstNode *clause = ms->body->BlockStmt.stmts[i];
 			ast_node(cc, CaseClause, clause);
@@ -200,7 +200,7 @@ b32 check_is_terminating(AstNode *node) {
 	case_end;
 
 	case_ast_node(ms, TypeMatchStmt, node);
-		b32 has_default = false;
+		bool has_default = false;
 		for_array(i, ms->body->BlockStmt.stmts) {
 			AstNode *clause = ms->body->BlockStmt.stmts[i];
 			ast_node(cc, CaseClause, clause);
@@ -247,7 +247,7 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	}
 
 	Entity *e = NULL;
-	b32 used = false;
+	bool used = false;
 	if (node->kind == AstNode_Ident) {
 		ast_node(i, Ident, node);
 		e = scope_lookup_entity(c->context.scope, i->string);
@@ -302,7 +302,7 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	return op_a->type;
 }
 
-b32 check_valid_type_match_type(Type *type, b32 *is_union_ptr, b32 *is_any) {
+bool check_valid_type_match_type(Type *type, bool *is_union_ptr, bool *is_any) {
 	if (is_type_pointer(type)) {
 		*is_union_ptr = is_type_union(type_deref(type));
 		return *is_union_ptr;
@@ -695,7 +695,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 						TypeAndToken *taps = gb_alloc_array(c->tmp_allocator, TypeAndToken, count);
 
 						multi_map_get_all(&seen, key, taps);
-						b32 continue_outer = false;
+						bool continue_outer = false;
 
 						for (isize i = 0; i < count; i++) {
 							TypeAndToken tap = taps[i];
@@ -741,8 +741,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		check_open_scope(c, node);
 		defer (check_close_scope(c));
 
-		b32 is_union_ptr = false;
-		b32 is_any = false;
+		bool is_union_ptr = false;
+		bool is_any = false;
 
 		check_expr(c, &x, ms->tag);
 		check_assignment(c, &x, NULL, make_string("type match expression"));
@@ -787,7 +787,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		}
 
 
-		Map<b32> seen = {};
+		Map<bool> seen = {};
 		map_init(&seen, heap_allocator());
 		defer (map_destroy(&seen));
 
@@ -812,7 +812,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 				if (is_union_ptr) {
 					GB_ASSERT(is_type_union(bt));
-					b32 tag_type_found = false;
+					bool tag_type_found = false;
 					for (isize i = 0; i < bt->Record.field_count; i++) {
 						Entity *f = bt->Record.fields[i];
 						if (are_types_identical(f->type, y.type)) {
@@ -847,7 +847,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 					gb_string_free(expr_str);
 					break;
 				}
-				map_set(&seen, key, cast(b32)true);
+				map_set(&seen, key, true);
 			}
 
 			check_open_scope(c, stmt);
@@ -875,7 +875,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		if (is_ast_node_decl(ds->stmt)) {
 			error(ds->token, "You cannot defer a declaration");
 		} else {
-			b32 out_in_defer = c->in_defer;
+			bool out_in_defer = c->in_defer;
 			c->in_defer = true;
 			check_stmt(c, ds->stmt, 0);
 			c->in_defer = out_in_defer;
@@ -914,7 +914,7 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 			// TODO(bill): Allow for just a LHS expression list rather than this silly code
 			Entity *e = NULL;
 
-			b32 is_selector = false;
+			bool is_selector = false;
 			AstNode *expr = unparen_expr(es->expr);
 			if (expr->kind == AstNode_Ident) {
 				String name = expr->Ident.string;

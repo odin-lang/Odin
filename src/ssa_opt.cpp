@@ -115,7 +115,7 @@ void ssa_opt_block_replace_succ(ssaBlock *b, ssaBlock *from, ssaBlock *to) {
 	}
 }
 
-b32 ssa_opt_block_has_phi(ssaBlock *b) {
+bool ssa_opt_block_has_phi(ssaBlock *b) {
 	return b->instrs[0]->Instr.kind == ssaInstr_Phi;
 }
 
@@ -215,7 +215,7 @@ void ssa_remove_unreachable_blocks(ssaProcedure *proc) {
 	ssa_remove_dead_blocks(proc);
 }
 
-b32 ssa_opt_block_fusion(ssaProcedure *proc, ssaBlock *a) {
+bool ssa_opt_block_fusion(ssaProcedure *proc, ssaBlock *a) {
 	if (a->succs.count != 1) {
 		return false;
 	}
@@ -252,7 +252,7 @@ void ssa_opt_blocks(ssaProcedure *proc) {
 	ssa_remove_unreachable_blocks(proc);
 
 #if 1
-	b32 changed = true;
+	bool changed = true;
 	while (changed) {
 		changed = false;
 		for_array(i, proc->blocks) {

@@ -144,7 +144,7 @@ i32 token_pos_cmp(TokenPos a, TokenPos b) {
 	return (a.line < b.line) ? -1 : +1;
 }
 
-b32 token_pos_are_equal(TokenPos a, TokenPos b) {
+bool token_pos_are_equal(TokenPos a, TokenPos b) {
 	return token_pos_cmp(a, b) == 0;
 }
 
@@ -250,19 +250,19 @@ void compiler_error(char *fmt, ...) {
 
 
 
-gb_inline b32 token_is_literal(Token t) {
+gb_inline bool token_is_literal(Token t) {
 	return gb_is_between(t.kind, Token__LiteralBegin+1, Token__LiteralEnd-1);
 }
-gb_inline b32 token_is_operator(Token t) {
+gb_inline bool token_is_operator(Token t) {
 	return gb_is_between(t.kind, Token__OperatorBegin+1, Token__OperatorEnd-1);
 }
-gb_inline b32 token_is_keyword(Token t) {
+gb_inline bool token_is_keyword(Token t) {
 	return gb_is_between(t.kind, Token__KeywordBegin+1, Token__KeywordEnd-1);
 }
-gb_inline b32 token_is_comparison(Token t) {
+gb_inline bool token_is_comparison(Token t) {
 	return gb_is_between(t.kind, Token__ComparisonBegin+1, Token__ComparisonEnd-1);
 }
-gb_inline b32 token_is_shift(Token t) {
+gb_inline bool token_is_shift(Token t) {
 	return t.kind == Token_Shl || t.kind == Token_Shr;
 }
 
@@ -435,7 +435,7 @@ gb_inline void scan_mantissa(Tokenizer *t, i32 base) {
 }
 
 
-Token scan_number_to_token(Tokenizer *t, b32 seen_decimal_point) {
+Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 	Token token = {};
 	token.kind = Token_Integer;
 	token.string = make_string(t->curr, 1);
@@ -510,7 +510,7 @@ exponent:
 }
 
 // Quote == " for string
-b32 scan_escape(Tokenizer *t, Rune quote) {
+bool scan_escape(Tokenizer *t, Rune quote) {
 	isize len = 0;
 	u32 base = 0, max = 0, x = 0;
 

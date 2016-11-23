@@ -15,8 +15,6 @@ variadic :: proc(args: ..any) {
 main :: proc() {
 	fmt.println("Hellope, everybody!")
 
-
-
 	variadic(1 as u128,
 	         1 as i128,
 	         )
@@ -38,8 +36,8 @@ main :: proc() {
 	z = x | y; fmt.println("x | y", z)
 	z = x &~ y; fmt.println("x &~ y", z)
 
-	z = -x
-	z = ~x
+	z = -x; fmt.println("-z", z)
+	z = ~x; fmt.println("~z", z)
 
 	b: bool
 	b = x == y; fmt.println("x == y", b)

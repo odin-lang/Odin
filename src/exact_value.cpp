@@ -21,7 +21,7 @@ enum ExactValueKind {
 struct ExactValue {
 	ExactValueKind kind;
 	union {
-		b32      value_bool;
+		bool      value_bool;
 		String   value_string;
 		i64      value_integer; // NOTE(bill): This must be an integer and not a pointer
 		f64      value_float;
@@ -41,7 +41,7 @@ ExactValue make_exact_value_compound(AstNode *node) {
 	return result;
 }
 
-ExactValue make_exact_value_bool(b32 b) {
+ExactValue make_exact_value_bool(bool b) {
 	ExactValue result = {ExactValue_Bool};
 	result.value_bool = (b != 0);
 	return result;
@@ -339,7 +339,7 @@ i32 cmp_f64(f64 a, f64 b) {
 	return (a > b) - (a < b);
 }
 
-b32 compare_exact_values(Token op, ExactValue x, ExactValue y) {
+bool compare_exact_values(Token op, ExactValue x, ExactValue y) {
 	match_exact_values(&x, &y);
 
 	switch (x.kind) {

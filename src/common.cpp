@@ -9,7 +9,7 @@ gbAllocator heap_allocator(void) {
 #include "array.cpp"
 
 gb_global String global_module_path = {};
-gb_global b32 global_module_path_set = false;
+gb_global bool global_module_path_set = false;
 
 
 String get_module_dir() {
@@ -125,7 +125,7 @@ gb_inline HashKey hash_pointer(void *ptr) {
 	return h;
 }
 
-b32 hash_key_equal(HashKey a, HashKey b) {
+bool hash_key_equal(HashKey a, HashKey b) {
 	if (a.key == b.key) {
 		// NOTE(bill): If two string's hashes collide, compare the strings themselves
 		if (a.kind == HashKey_String) {
@@ -351,7 +351,7 @@ gb_internal MapFindResult map__find(Map<T> *h, MapEntry<T> *e) {
 
 
 template <typename T>
-gb_internal b32 map__full(Map<T> *h) {
+gb_internal bool map__full(Map<T> *h) {
 	return 0.75f * h->hashes.count <= h->entries.count;
 }
 

@@ -10,7 +10,7 @@ struct ssaModule {
 	gbArena       tmp_arena;
 	gbAllocator   allocator;
 	gbAllocator   tmp_allocator;
-	b32 generate_debug_info;
+	bool generate_debug_info;
 
 	u32 stmt_state_flags;
 
@@ -197,7 +197,7 @@ struct ssaInstr {
 		struct {
 			Entity *          entity;
 			Type *            type;
-			b32               zero_initialized;
+			bool               zero_initialized;
 			Array<ssaValue *> referrers;
 		} Local;
 		struct {
@@ -312,7 +312,7 @@ struct ssaInstr {
 			ssaValue *low;
 			ssaValue *high;
 			ssaValue *max;
-			b32       is_substring;
+			bool       is_substring;
 		} SliceBoundsCheck;
 	};
 };
@@ -360,10 +360,10 @@ struct ssaValue {
 			Type *            type;
 			ssaValue *        value;
 			Array<ssaValue *> referrers;
-			b8                is_constant;
-			b8                is_private;
-			b8                is_thread_local;
-			b8                is_unnamed_addr;
+			bool              is_constant;
+			bool              is_private;
+			bool              is_thread_local;
+			bool              is_unnamed_addr;
 		} Global;
 		struct {
 			ssaProcedure *    parent;
@@ -538,7 +538,7 @@ struct ssaDebugInfo {
 struct ssaGen {
 	ssaModule module;
 	gbFile    output_file;
-	b32       opt_called;
+	bool       opt_called;
 };
 
 ssaValue *ssa_lookup_member(ssaModule *m, String name) {
@@ -636,7 +636,7 @@ Type *ssa_addr_type(ssaAddr lval) {
 
 
 
-b32 ssa_is_blank_ident(AstNode *node) {
+bool ssa_is_blank_ident(AstNode *node) {
 	if (node->kind == AstNode_Ident) {
 		ast_node(i, Ident, node);
 		return is_blank_ident(i->string);
@@ -658,7 +658,7 @@ ssaInstr *ssa_get_last_instr(ssaBlock *block) {
 
 }
 
-b32 ssa_is_instr_terminating(ssaInstr *i) {
+bool ssa_is_instr_terminating(ssaInstr *i) {
 	if (i != NULL) {
 		switch (i->kind) {
 		case ssaInstr_Return:
@@ -784,7 +784,7 @@ ssaValue *ssa_make_value_nil(gbAllocator a, Type *type) {
 
 
 
-ssaValue *ssa_make_instr_local(ssaProcedure *p, Entity *e, b32 zero_initialized) {
+ssaValue *ssa_make_instr_local(ssaProcedure *p, Entity *e, bool zero_initialized) {
 	ssaValue *v = ssa_alloc_instr(p, ssaInstr_Local);
 	ssaInstr *i = &v->Instr;
 	i->Local.entity = e;
@@ -1012,7 +1012,7 @@ ssaValue *ssa_make_instr_bounds_check(ssaProcedure *p, TokenPos pos, ssaValue *i
 	v->Instr.BoundsCheck.len   = len;
 	return v;
 }
-ssaValue *ssa_make_instr_slice_bounds_check(ssaProcedure *p, TokenPos pos, ssaValue *low, ssaValue *high, ssaValue *max, b32 is_substring) {
+ssaValue *ssa_make_instr_slice_bounds_check(ssaProcedure *p, TokenPos pos, ssaValue *low, ssaValue *high, ssaValue *max, bool is_substring) {
 	ssaValue *v = ssa_alloc_instr(p, ssaInstr_SliceBoundsCheck);
 	v->Instr.SliceBoundsCheck.pos  = pos;
 	v->Instr.SliceBoundsCheck.low  = low;
@@ -1049,7 +1049,7 @@ ssaValue *ssa_make_const_i32(gbAllocator a, i64 i) {
 ssaValue *ssa_make_const_i64(gbAllocator a, i64 i) {
 	return ssa_make_value_constant(a, t_i64, make_exact_value_integer(i));
 }
-ssaValue *ssa_make_const_bool(gbAllocator a, b32 b) {
+ssaValue *ssa_make_const_bool(gbAllocator a, bool b) {
 	return ssa_make_value_constant(a, t_bool, make_exact_value_bool(b != 0));
 }
 ssaValue *ssa_make_const_string(gbAllocator a, String s) {
@@ -1194,7 +1194,7 @@ ssaValue *ssa_add_global_string_array(ssaModule *m, String string) {
 
 
 
-ssaValue *ssa_add_local(ssaProcedure *proc, Entity *e, b32 zero_initialized = true) {
+ssaValue *ssa_add_local(ssaProcedure *proc, Entity *e, bool zero_initialized = true) {
 	ssaBlock *b = proc->decl_block; // all variables must be in the first block
 	ssaValue *instr = ssa_make_instr_local(proc, e, zero_initialized);
 	instr->Instr.parent = b;
@@ -1209,7 +1209,7 @@ ssaValue *ssa_add_local(ssaProcedure *proc, Entity *e, b32 zero_initialized = tr
 	return instr;
 }
 
-ssaValue *ssa_add_local_for_identifier(ssaProcedure *proc, AstNode *name, b32 zero_initialized) {
+ssaValue *ssa_add_local_for_identifier(ssaProcedure *proc, AstNode *name, bool zero_initialized) {
 	Entity **found = map_get(&proc->module->info->definitions, hash_pointer(name));
 	if (found) {
 		Entity *e = *found;
@@ -1873,8 +1873,8 @@ String lookup_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
 	// Type *prev_dst = dst;
 	src = base_type(type_deref(src));
 	// dst = base_type(type_deref(dst));
-	b32 src_is_ptr = src != prev_src;
-	// b32 dst_is_ptr = dst != prev_dst;
+	bool src_is_ptr = src != prev_src;
+	// bool dst_is_ptr = dst != prev_dst;
 
 	GB_ASSERT(is_type_struct(src));
 	for (isize i = 0; i < src->Record.field_count; i++) {
@@ -2039,7 +2039,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 	// subtype polymorphism casting
 	{
 		Type *sb = base_type(type_deref(src));
-		b32 src_is_ptr = src != sb;
+		bool src_is_ptr = src != sb;
 		if (is_type_struct(sb)) {
 			String field_name = lookup_polymorphic_field(proc->module->info, t, src);
 			// gb_printf("field_name: %.*s\n", LIT(field_name));
@@ -2162,7 +2162,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 	return NULL;
 }
 
-b32 ssa_is_type_aggregate(Type *t) {
+bool ssa_is_type_aggregate(Type *t) {
 	t = base_type(get_enum_base_type(t));
 	switch (t->kind) {
 	case Type_Basic:
@@ -2230,7 +2230,6 @@ ssaValue *ssa_emit_down_cast(ssaProcedure *proc, ssaValue *value, Type *t) {
 	String field_name = check_down_cast_name(t, type_deref(ssa_type(value)));
 	GB_ASSERT(field_name.len > 0);
 	Selection sel = lookup_field(proc->module->allocator, t, field_name, false);
-	Type *t_u8_ptr = make_type_pointer(allocator, t_u8);
 	ssaValue *bytes = ssa_emit_conv(proc, value, t_u8_ptr);
 
 	i64 offset_ = type_offset_of_from_selection(proc->module->sizes, allocator, type_deref(t), sel);
@@ -2244,7 +2243,7 @@ ssaValue *ssa_emit_union_cast(ssaProcedure *proc, ssaValue *value, Type *tuple) 
 	gbAllocator a = proc->module->allocator;
 
 	Type *src_type = ssa_type(value);
-	b32 is_ptr = is_type_pointer(src_type);
+	bool is_ptr = is_type_pointer(src_type);
 
 	ssaValue *v = ssa_add_local_generated(proc, tuple);
 
@@ -2455,7 +2454,7 @@ void ssa_emit_bounds_check(ssaProcedure *proc, Token token, ssaValue *index, ssa
 	// ssa_emit_global_call(proc, "__bounds_check_error", args, 5);
 }
 
-void ssa_emit_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low, ssaValue *high, ssaValue *max, b32 is_substring) {
+void ssa_emit_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low, ssaValue *high, ssaValue *max, bool is_substring) {
 	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
 		return;
 	}
@@ -3134,8 +3133,8 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			}
 		}
 		ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, arg_count);
-		b32 variadic = proc_type_->Proc.variadic;
-		b32 vari_expand = ce->ellipsis.pos.line != 0;
+		bool variadic = proc_type_->Proc.variadic;
+		bool vari_expand = ce->ellipsis.pos.line != 0;
 
 		for_array(i, ce->args) {
 			ssaValue *a = ssa_build_expr(proc, ce->args[i]);
@@ -3362,7 +3361,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		gbAllocator a = proc->module->allocator;
 
 
-		b32 deref = is_type_pointer(t);
+		bool deref = is_type_pointer(t);
 		t = type_deref(t);
 
 		ssaValue *using_addr = NULL;
@@ -3596,7 +3595,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		case Type_Slice:  et = bt->Slice.elem;  break;
 		}
 
-		auto is_elem_const = [](ssaModule *m, AstNode *elem, Type *elem_type) -> b32 {
+		auto is_elem_const = [](ssaModule *m, AstNode *elem, Type *elem_type) -> bool {
 			if (base_type(elem_type) == t_any) {
 				return false;
 			}
@@ -3700,7 +3699,6 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 				Type *elem_type = bt->Slice.elem;
 				Type *elem_ptr_type = make_type_pointer(proc->module->allocator, elem_type);
 				Type *elem_ptr_ptr_type = make_type_pointer(proc->module->allocator, elem_ptr_type);
-				Type *t_int_ptr = make_type_pointer(proc->module->allocator, t_int);
 				ssaValue *slice = ssa_add_module_constant(proc->module, type, make_exact_value_compound(expr));
 				GB_ASSERT(slice->kind == ssaValue_ConstantSlice);
 
@@ -4244,7 +4242,7 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		ssaBlock *default_block = NULL;
 
 		ssaBlock *fall = NULL;
-		b32 append_fall = false;
+		bool append_fall = false;
 
 		isize case_count = body->stmts.count;
 		for_array(i, body->stmts) {
@@ -4320,8 +4318,8 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 		gbAllocator allocator = proc->module->allocator;
 
 		ssaValue *parent = ssa_build_expr(proc, ms->tag);
-		b32 is_union_ptr = false;
-		b32 is_any = false;
+		bool is_union_ptr = false;
+		bool is_any = false;
 		GB_ASSERT(check_valid_type_match_type(ssa_type(parent), &is_union_ptr, &is_any));
 
 		ssaValue *tag_index = NULL;
@@ -4742,7 +4740,7 @@ void ssa_destroy_module(ssaModule *m) {
 ////////////////////////////////////////////////////////////////
 
 
-b32 ssa_gen_init(ssaGen *s, Checker *c) {
+bool ssa_gen_init(ssaGen *s, Checker *c) {
 	if (global_error_collector.count != 0) {
 		return false;
 	}
@@ -5084,7 +5082,7 @@ void ssa_gen_tree(ssaGen *s) {
 					case Basic_int:
 					case Basic_uint: {
 						tag = ssa_add_local_generated(proc, t_type_info_integer);
-						b32 is_unsigned = (t->Basic.flags & BasicFlag_Unsigned) != 0;
+						bool is_unsigned = (t->Basic.flags & BasicFlag_Unsigned) != 0;
 						ssaValue *bits = ssa_make_const_int(a, type_size_of(m->sizes, a, t));
 						ssaValue *is_signed = ssa_make_const_bool(a, !is_unsigned);
 						ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), bits);

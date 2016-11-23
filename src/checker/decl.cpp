@@ -1,4 +1,4 @@
-b32 check_is_terminating(AstNode *node);
+bool check_is_terminating(AstNode *node);
 void check_stmt         (Checker *c, AstNode *node, u32 flags);
 void check_stmt_list    (Checker *c, AstNodeArray stmts, u32 flags);
 void check_type_decl    (Checker *c, Entity *e, AstNode *type_expr, Type *def, CycleChecker *cycle_checker);
@@ -322,7 +322,7 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, Cycle
 }
 
 
-b32 are_signatures_similar_enough(Type *a_, Type *b_) {
+bool are_signatures_similar_enough(Type *a_, Type *b_) {
 	GB_ASSERT(a_->kind == Type_Proc);
 	GB_ASSERT(b_->kind == Type_Proc);
 	auto *a = &a_->Proc;
@@ -372,10 +372,10 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	defer (check_close_scope(c));
 	check_procedure_type(c, proc_type, pd->type);
 
-	b32 is_foreign      = (pd->tags & ProcTag_foreign)   != 0;
-	b32 is_link_name    = (pd->tags & ProcTag_link_name) != 0;
-	b32 is_inline       = (pd->tags & ProcTag_inline)    != 0;
-	b32 is_no_inline    = (pd->tags & ProcTag_no_inline) != 0;
+	bool is_foreign      = (pd->tags & ProcTag_foreign)   != 0;
+	bool is_link_name    = (pd->tags & ProcTag_link_name) != 0;
+	bool is_inline       = (pd->tags & ProcTag_inline)    != 0;
+	bool is_no_inline    = (pd->tags & ProcTag_no_inline) != 0;
 
 	if ((d->scope->is_file || d->scope->is_global) &&
 	    e->token.string == "main") {

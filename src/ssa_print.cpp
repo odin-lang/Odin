@@ -51,7 +51,7 @@ void ssa_file_write(ssaFileBuffer *f, void *data, isize len) {
 }
 
 
-b32 ssa_valid_char(u8 c) {
+bool ssa_valid_char(u8 c) {
 	if (c >= 0x80) {
 		return false;
 	}
@@ -71,7 +71,7 @@ b32 ssa_valid_char(u8 c) {
 	return false;
 }
 
-void ssa_print_escape_string(ssaFileBuffer *f, String name, b32 print_quotes) {
+void ssa_print_escape_string(ssaFileBuffer *f, String name, bool print_quotes) {
 	isize extra = 0;
 	for (isize i = 0; i < name.len; i++) {
 		u8 c = name.text[i];
@@ -126,7 +126,7 @@ void ssa_print_encoded_local(ssaFileBuffer *f, String name) {
 	ssa_print_escape_string(f, name, true);
 }
 
-void ssa_print_encoded_global(ssaFileBuffer *f, String name, b32 global_scope) {
+void ssa_print_encoded_global(ssaFileBuffer *f, String name, bool global_scope) {
 	ssa_fprintf(f, "@");
 	if (!global_scope && name != make_string("main")) {
 		ssa_fprintf(f, ".");
@@ -611,7 +611,7 @@ void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type
 		break;
 	case ssaValue_Global: {
 		Scope *scope = value->Global.entity->scope;
-		b32 in_global_scope = false;
+		bool in_global_scope = false;
 		if (scope != NULL) {
 			in_global_scope = scope->is_global || scope->is_init;
 		}
@@ -1337,7 +1337,7 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 		}
 		auto *g = &v->Global;
 		Scope *scope = g->entity->scope;
-		b32 in_global_scope = false;
+		bool in_global_scope = false;
 		if (scope != NULL) {
 			in_global_scope = scope->is_global || scope->is_init;
 		}

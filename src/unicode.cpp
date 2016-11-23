@@ -6,7 +6,7 @@
 
 #pragma warning(pop)
 
-b32 rune_is_letter(Rune r) {
+bool rune_is_letter(Rune r) {
 	if ((r < 0x80 && gb_char_is_alpha(cast(char)r)) ||
 	    r == '_') {
 		return true;
@@ -22,14 +22,14 @@ b32 rune_is_letter(Rune r) {
 	return false;
 }
 
-b32 rune_is_digit(Rune r) {
+bool rune_is_digit(Rune r) {
 	if (r < 0x80 && gb_is_between(r, '0', '9')) {
 		return true;
 	}
 	return utf8proc_category(r) == UTF8PROC_CATEGORY_ND;
 }
 
-b32 rune_is_whitespace(Rune r) {
+bool rune_is_whitespace(Rune r) {
 	switch (r) {
 	case ' ':
 	case '\t':
@@ -41,13 +41,13 @@ b32 rune_is_whitespace(Rune r) {
 }
 
 
-b32 is_string_an_identifier(String s) {
+bool is_string_an_identifier(String s) {
 	if (s.len < 1) {
 		return false;
 	}
 	isize offset = 0;
 	while (offset < s.len) {
-		b32 ok = false;
+		bool ok = false;
 		Rune r = -1;
 		isize size = gb_utf8_decode(s.text+offset, s.len-offset, &r);
 		if (offset == 0) {
