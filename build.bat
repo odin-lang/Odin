@@ -4,7 +4,7 @@
 set exe_name=odin.exe
 
 :: Debug = 0, Release = 1
-set release_mode=0
+set release_mode=1
 
 set compiler_flags= -nologo -Oi -TC -W4 -fp:fast -fp:except- -Gm- -MP -FC -GS- -EHsc- -GR-
 

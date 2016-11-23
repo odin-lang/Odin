@@ -6,14 +6,13 @@ Odin in an open source programming language that is simple to read, comprehend a
 
 * x86-64
 * Windows
-* MSVC installed
+* MSVC 2015 installed (C99 support)
 * call `vcvarsall.bat` to setup the path
 
 ## Warnings
 
 * This is still highly in development and the language's design is quite volatile.
 * Syntax is not fixed.
-* The language's name, Odin, is not final.
 
 ## Goals
 
