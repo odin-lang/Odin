@@ -131,72 +131,151 @@ struct ssaProcedure {
 
 
 #define SSA_INSTR_KINDS \
-	SSA_INSTR_KIND(Invalid), \
-	SSA_INSTR_KIND(Comment), \
-	SSA_INSTR_KIND(Local), \
-	SSA_INSTR_KIND(ZeroInit), \
-	SSA_INSTR_KIND(Store), \
-	SSA_INSTR_KIND(Load), \
-	SSA_INSTR_KIND(PtrOffset), \
-	SSA_INSTR_KIND(ArrayElementPtr), \
-	SSA_INSTR_KIND(StructElementPtr), \
-	SSA_INSTR_KIND(ArrayExtractValue), \
-	SSA_INSTR_KIND(StructExtractValue), \
-	SSA_INSTR_KIND(UnionTagPtr), \
-	SSA_INSTR_KIND(UnionTagValue), \
-	SSA_INSTR_KIND(Conv), \
-	SSA_INSTR_KIND(Jump), \
-	SSA_INSTR_KIND(If), \
-	SSA_INSTR_KIND(Return), \
-	SSA_INSTR_KIND(Select), \
-	SSA_INSTR_KIND(Phi), \
-	SSA_INSTR_KIND(Unreachable), \
-	SSA_INSTR_KIND(BinaryOp), \
-	SSA_INSTR_KIND(Call), \
-	SSA_INSTR_KIND(VectorExtractElement), \
-	SSA_INSTR_KIND(VectorInsertElement), \
-	SSA_INSTR_KIND(VectorShuffle), \
-	SSA_INSTR_KIND(StartupRuntime), \
-	SSA_INSTR_KIND(BoundsCheck), \
-	SSA_INSTR_KIND(SliceBoundsCheck), \
+	SSA_INSTR_KIND(Comment, struct { String text; }) \
+	SSA_INSTR_KIND(Local,   struct { \
+		Entity *      entity; \
+		Type *        type; \
+		bool          zero_initialized; \
+		ssaValueArray referrers; \
+	}) \
+	SSA_INSTR_KIND(ZeroInit, struct { ssaValue *address; }) \
+	SSA_INSTR_KIND(Store,    struct { ssaValue *address, *value; }) \
+	SSA_INSTR_KIND(Load,     struct { Type *type; ssaValue *address; }) \
+	SSA_INSTR_KIND(PtrOffset, struct { \
+		ssaValue *address; \
+		ssaValue *offset; \
+	}) \
+	SSA_INSTR_KIND(ArrayElementPtr, struct { \
+		ssaValue *address; \
+		Type *    result_type; \
+		ssaValue *elem_index; \
+	}) \
+	SSA_INSTR_KIND(StructElementPtr, struct {  \
+		ssaValue *address; \
+		Type *    result_type; \
+		i32       elem_index; \
+	}) \
+	SSA_INSTR_KIND(ArrayExtractValue, struct { \
+		ssaValue *address; \
+		Type *    result_type; \
+		i32       index; \
+	}) \
+	SSA_INSTR_KIND(StructExtractValue, struct { \
+		ssaValue *address; \
+		Type *    result_type; \
+		i32       index; \
+	}) \
+	SSA_INSTR_KIND(UnionTagPtr, struct { \
+		ssaValue *address; \
+		Type     *type; /* ^int */  \
+	}) \
+	SSA_INSTR_KIND(UnionTagValue, struct { \
+		ssaValue *address; \
+		Type     *type; /* int */ \
+	}) \
+	SSA_INSTR_KIND(Conv, struct { \
+		ssaConvKind kind; \
+		ssaValue *value; \
+		Type *from, *to; \
+	}) \
+	SSA_INSTR_KIND(Jump, struct { ssaBlock *block; }) \
+	SSA_INSTR_KIND(If, struct { \
+		ssaValue *cond; \
+		ssaBlock *true_block; \
+		ssaBlock *false_block; \
+	}) \
+	SSA_INSTR_KIND(Return, struct { ssaValue *value; }) \
+	SSA_INSTR_KIND(Select, struct { \
+		ssaValue *cond; \
+		ssaValue *true_value; \
+		ssaValue *false_value; \
+	}) \
+	SSA_INSTR_KIND(Phi, struct { ssaValueArray edges; Type *type; }) \
+	SSA_INSTR_KIND(Unreachable, struct {}) \
+	SSA_INSTR_KIND(BinaryOp, struct { \
+		Type *    type; \
+		TokenKind op; \
+		ssaValue *left, *right; \
+	}) \
+	SSA_INSTR_KIND(Call, struct { \
+		Type *    type; /* return type */  \
+		ssaValue *value; \
+		ssaValue **args; \
+		isize      arg_count; \
+	}) \
+	SSA_INSTR_KIND(VectorExtractElement, struct { \
+		ssaValue *vector; \
+		ssaValue *index; \
+	}) \
+	SSA_INSTR_KIND(VectorInsertElement, struct { \
+		ssaValue *vector; \
+		ssaValue *elem; \
+		ssaValue *index; \
+	}) \
+	SSA_INSTR_KIND(VectorShuffle, struct { \
+		ssaValue *vector; \
+		i32 *     indices; \
+		i32       index_count; \
+		Type *    type; \
+	}) \
+	SSA_INSTR_KIND(StartupRuntime, struct {}) \
+	SSA_INSTR_KIND(BoundsCheck, struct { \
+		TokenPos  pos; \
+		ssaValue *index; \
+		ssaValue *len; \
+	}) \
+	SSA_INSTR_KIND(SliceBoundsCheck, struct { \
+		TokenPos  pos; \
+		ssaValue *low; \
+		ssaValue *high; \
+		ssaValue *max; \
+		bool      is_substring; \
+	})
 
 #define SSA_CONV_KINDS \
-	SSA_CONV_KIND(Invalid), \
-	SSA_CONV_KIND(trunc), \
-	SSA_CONV_KIND(zext), \
-	SSA_CONV_KIND(fptrunc), \
-	SSA_CONV_KIND(fpext), \
-	SSA_CONV_KIND(fptoui), \
-	SSA_CONV_KIND(fptosi), \
-	SSA_CONV_KIND(uitofp), \
-	SSA_CONV_KIND(sitofp), \
-	SSA_CONV_KIND(ptrtoint), \
-	SSA_CONV_KIND(inttoptr), \
-	SSA_CONV_KIND(bitcast),
+	SSA_CONV_KIND(trunc) \
+	SSA_CONV_KIND(zext) \
+	SSA_CONV_KIND(fptrunc) \
+	SSA_CONV_KIND(fpext) \
+	SSA_CONV_KIND(fptoui) \
+	SSA_CONV_KIND(fptosi) \
+	SSA_CONV_KIND(uitofp) \
+	SSA_CONV_KIND(sitofp) \
+	SSA_CONV_KIND(ptrtoint) \
+	SSA_CONV_KIND(inttoptr) \
+	SSA_CONV_KIND(bitcast)
 
 typedef enum ssaInstrKind {
-#define SSA_INSTR_KIND(x) GB_JOIN2(ssaInstr_, x)
+	ssaInstr_Invalid,
+#define SSA_INSTR_KIND(x, ...) GB_JOIN2(ssaInstr_, x),
 	SSA_INSTR_KINDS
 #undef SSA_INSTR_KIND
 } ssaInstrKind;
 
 String const ssa_instr_strings[] = {
-#define SSA_INSTR_KIND(x) {cast(u8 *)#x, gb_size_of(#x)-1}
+	{cast(u8 *)"Invalid", gb_size_of("Invalid")-1},
+#define SSA_INSTR_KIND(x, ...) {cast(u8 *)#x, gb_size_of(#x)-1},
 	SSA_INSTR_KINDS
 #undef SSA_INSTR_KIND
 };
 
 typedef enum ssaConvKind {
-#define SSA_CONV_KIND(x) GB_JOIN2(ssaConv_, x)
+	ssaConv_Invalid,
+#define SSA_CONV_KIND(x) GB_JOIN2(ssaConv_, x),
 	SSA_CONV_KINDS
 #undef SSA_CONV_KIND
 } ssaConvKind;
 
 String const ssa_conv_strings[] = {
-#define SSA_CONV_KIND(x) {cast(u8 *)#x, gb_size_of(#x)-1}
+	{cast(u8 *)"Invalid", gb_size_of("Invalid")-1},
+#define SSA_CONV_KIND(x) {cast(u8 *)#x, gb_size_of(#x)-1},
 	SSA_CONV_KINDS
 #undef SSA_CONV_KIND
 };
+
+#define SSA_INSTR_KIND(k, ...) typedef __VA_ARGS__ GB_JOIN2(ssaInstr, k);
+	SSA_INSTR_KINDS
+#undef SSA_INSTR_KIND
 
 typedef struct ssaInstr ssaInstr;
 struct ssaInstr {
@@ -206,129 +285,9 @@ struct ssaInstr {
 	Type *type;
 
 	union {
-		struct {
-			String text;
-		} Comment;
-		struct {
-			Entity *          entity;
-			Type *            type;
-			bool               zero_initialized;
-			ssaValueArray referrers;
-		} Local;
-		struct {
-			ssaValue *address;
-		} ZeroInit;
-		struct {
-			ssaValue *address;
-			ssaValue *value;
-		} Store;
-		struct {
-			Type *type;
-			ssaValue *address;
-		} Load;
-		struct {
-			ssaValue *address;
-			Type *    result_type;
-			ssaValue *elem_index;
-		} ArrayElementPtr;
-		struct {
-			ssaValue *address;
-			Type *    result_type;
-			i32       elem_index;
-		} StructElementPtr;
-		struct {
-			ssaValue *address;
-			ssaValue *offset;
-		} PtrOffset;
-		struct {
-			ssaValue *address;
-			Type *    result_type;
-			i32       index;
-		} ArrayExtractValue;
-		struct {
-			ssaValue *address;
-			Type *    result_type;
-			i32       index;
-		} StructExtractValue;
-		struct {
-			ssaValue *address;
-			Type     *type; // ^int
-		} UnionTagPtr;
-		struct {
-			ssaValue *address;
-			Type     *type; // int
-		} UnionTagValue;
-		struct {
-			ssaValue *value;
-			ssaValue *elem;
-			i32       index;
-		} InsertValue;
-		struct {
-			ssaConvKind kind;
-			ssaValue *value;
-			Type *from, *to;
-		} Conv;
-		struct {
-			ssaBlock *block;
-		} Jump;
-		struct {
-			ssaValue *cond;
-			ssaBlock *true_block;
-			ssaBlock *false_block;
-		} If;
-		struct {
-			ssaValue *value;
-		} Return;
-		struct {} Unreachable;
-		struct {
-			ssaValue *cond;
-			ssaValue *true_value;
-			ssaValue *false_value;
-		} Select;
-		struct {
-			ssaValueArray edges;
-			Type *type;
-		} Phi;
-		struct {
-			Type *type;
-			TokenKind op;
-			ssaValue *left, *right;
-		} BinaryOp;
-		struct {
-			Type *type; // return type
-			ssaValue *value;
-			ssaValue **args;
-			isize arg_count;
-		} Call;
-		struct {
-			ssaValue *vector;
-			ssaValue *index;
-		} VectorExtractElement;
-		struct {
-			ssaValue *vector;
-			ssaValue *elem;
-			ssaValue *index;
-		} VectorInsertElement;
-		struct {
-			ssaValue *vector;
-			i32 *indices;
-			i32 index_count;
-			Type *type;
-		} VectorShuffle;
-
-		struct {} StartupRuntime;
-		struct {
-			TokenPos  pos;
-			ssaValue *index;
-			ssaValue *len;
-		} BoundsCheck;
-		struct {
-			TokenPos  pos;
-			ssaValue *low;
-			ssaValue *high;
-			ssaValue *max;
-			bool       is_substring;
-		} SliceBoundsCheck;
+#define SSA_INSTR_KIND(k, ...) GB_JOIN2(ssaInstr, k) k;
+	SSA_INSTR_KINDS
+#undef SSA_INSTR_KIND
 	};
 };
 
@@ -350,45 +309,57 @@ typedef enum ssaValueKind {
 	ssaValue_Count,
 } ssaValueKind;
 
+typedef struct ssaValueConstant {
+	Type *     type;
+	ExactValue value;
+} ssaValueConstant;
+
+typedef struct ssaValueConstantSlice {
+	Type *    type;
+	ssaValue *backing_array;
+	i64       count;
+} ssaValueConstantSlice;
+
+typedef struct ssaValueNil {
+	Type *type;
+} ssaValueNil;
+
+typedef struct ssaValueTypeName {
+	Type * type;
+	String name;
+} ssaValueTypeName;
+
+typedef struct ssaValueGlobal {
+	Entity *      entity;
+	Type *        type;
+	ssaValue *    value;
+	ssaValueArray referrers;
+	bool          is_constant;
+	bool          is_private;
+	bool          is_thread_local;
+	bool          is_unnamed_addr;
+} ssaValueGlobal;
+
+typedef struct ssaValueParam {
+	ssaProcedure *parent;
+	Entity *      entity;
+	Type *        type;
+	ssaValueArray referrers;
+} ssaValueParam;
+
 typedef struct ssaValue {
 	ssaValueKind kind;
 	i32 index;
 	union {
-		struct {
-			Type *     type;
-			ExactValue value;
-		} Constant;
-		struct {
-			Type *    type;
-			ssaValue *backing_array;
-			i64       count;
-		} ConstantSlice;
-		struct {
-			Type *type;
-		} Nil;
-		struct {
-			Type * type;
-			String name;
-		} TypeName;
-		struct {
-			Entity *      entity;
-			Type *        type;
-			ssaValue *    value;
-			ssaValueArray referrers;
-			bool          is_constant;
-			bool          is_private;
-			bool          is_thread_local;
-			bool          is_unnamed_addr;
-		} Global;
-		struct {
-			ssaProcedure *    parent;
-			Entity *          entity;
-			Type *            type;
-			ssaValueArray referrers;
-		} Param;
-		ssaProcedure Proc;
-		ssaBlock     Block;
-		ssaInstr     Instr;
+		ssaValueConstant      Constant;
+		ssaValueConstantSlice ConstantSlice;
+		ssaValueNil           Nil;
+		ssaValueTypeName      TypeName;
+		ssaValueGlobal        Global;
+		ssaValueParam         Param;
+		ssaProcedure          Proc;
+		ssaBlock              Block;
+		ssaInstr              Instr;
 	};
 } ssaValue;
 
@@ -2547,14 +2518,14 @@ void ssa_gen_global_type_name(ssaModule *m, Entity *e, String name) {
 
 	Type *bt = base_type(e->type);
 	if (bt->kind == Type_Record) {
-		auto *s = &bt->Record;
+		TypeRecord *s = &bt->Record;
 		for (isize j = 0; j < s->other_field_count; j++) {
 			ssa_mangle_sub_type_name(m, s->other_fields[j], name);
 		}
 	}
 
 	if (is_type_union(bt)) {
-		auto *s = &bt->Record;
+		TypeRecord *s = &bt->Record;
 		// NOTE(bill): Zeroth entry is null (for `match type` stmts)
 		for (isize j = 1; j < s->field_count; j++) {
 			ssa_mangle_sub_type_name(m, s->fields[j], name);
@@ -3135,7 +3106,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		ssaValue *value = ssa_build_expr(proc, ce->proc);
 		Type *proc_type_ = base_type(ssa_type(value));
 		GB_ASSERT(proc_type_->kind == Type_Proc);
-		auto *type = &proc_type_->Proc;
+		TypeProc *type = &proc_type_->Proc;
 
 		isize arg_index = 0;
 
@@ -3167,7 +3138,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			}
 		}
 
-		auto *pt = &type->params->Tuple;
+		TypeTuple *pt = &type->params->Tuple;
 
 		if (variadic) {
 			isize i = 0;
@@ -3213,7 +3184,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			}
 
 			if (args[0]->kind == ssaValue_Constant) {
-				auto *c = &args[0]->Constant;
+				ssaValueConstant *c = &args[0]->Constant;
 				gb_printf_err("%s %d\n", type_to_string(c->type), c->value.kind);
 			}
 
@@ -3657,7 +3628,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 		case Type_Record: {
 			GB_ASSERT(is_type_struct(bt));
-			auto *st = &bt->Record;
+			TypeRecord *st = &bt->Record;
 			if (cl->elems.count > 0) {
 				ssa_emit_store(proc, v, ssa_add_module_constant(proc->module, type, make_exact_value_compound(expr)));
 				for_array(field_index, cl->elems) {
@@ -4121,7 +4092,7 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 	case_ast_node(rs, ReturnStmt, node);
 		ssa_emit_comment(proc, str_lit("ReturnStmt"));
 		ssaValue *v = NULL;
-		auto *return_type_tuple  = &proc->type->Proc.results->Tuple;
+		TypeTuple *return_type_tuple  = &proc->type->Proc.results->Tuple;
 		isize return_count = proc->type->Proc.result_count;
 		if (return_count == 0) {
 			// No return values
@@ -4569,7 +4540,7 @@ void ssa_begin_procedure_body(ssaProcedure *proc) {
 	proc->curr_block  = proc->entry_block;
 
 	if (proc->type->Proc.params != NULL) {
-		auto *params = &proc->type->Proc.params->Tuple;
+		TypeTuple *params = &proc->type->Proc.params->Tuple;
 		for (isize i = 0; i < params->variable_count; i++) {
 			Entity *e = params->variables[i];
 			ssaValue *param = ssa_add_param(proc, e);
@@ -4938,7 +4909,7 @@ void ssa_gen_tree(ssaGen *s) {
 		} break;
 
 		case Entity_Procedure: {
-			auto *pd = &decl->proc_decl->ProcDecl;
+			AstNodeProcDecl *pd = &decl->proc_decl->ProcDecl;
 			String original_name = name;
 			AstNode *body = pd->body;
 			if (pd->tags & ProcTag_foreign) {

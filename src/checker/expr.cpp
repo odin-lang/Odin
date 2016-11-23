@@ -3401,7 +3401,7 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 		if (o.type->kind != Type_Tuple) {
 			array_add(&operands, o);
 		} else {
-			auto *tuple = &o.type->Tuple;
+			TypeTuple *tuple = &o.type->Tuple;
 			if (variadic && i >= param_count) {
 				error(ast_node_token(ce->args.e[i]),
 				      "`..` in a variadic procedure cannot be applied to a %td-valued expression", tuple->variable_count);

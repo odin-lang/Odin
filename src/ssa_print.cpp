@@ -268,7 +268,7 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 			ssa_print_type(f, m, t->Proc.results);
 		}
 		ssa_fprintf(f, " (");
-		auto *params = &t->Proc.params->Tuple;
+		TypeTuple *params = &t->Proc.params->Tuple;
 		for (isize i = 0; i < t->Proc.param_count; i++) {
 			if (i > 0) {
 				ssa_fprintf(f, ", ");
@@ -580,7 +580,7 @@ void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type
 		break;
 
 	case ssaValue_ConstantSlice: {
-		auto *cs = &value->ConstantSlice;
+		ssaValueConstantSlice *cs = &value->ConstantSlice;
 		if (cs->backing_array == NULL || cs->count == 0) {
 			ssa_fprintf(f, "zeroinitializer");
 		} else {
@@ -835,7 +835,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_Return: {
-		auto *ret = &instr->Return;
+		ssaInstrReturn *ret = &instr->Return;
 		ssa_fprintf(f, "ret ");
 		if (ret->value == NULL) {
 			ssa_fprintf(f, "void");
@@ -851,7 +851,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_Conv: {
-		auto *c = &instr->Conv;
+		ssaInstrConv *c = &instr->Conv;
 		ssa_fprintf(f, "%%%d = %.*s ", value->index, LIT(ssa_conv_strings[c->kind]));
 		ssa_print_type(f, m, c->from);
 		ssa_fprintf(f, " ");
@@ -867,7 +867,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_BinaryOp: {
-		auto *bo = &value->Instr.BinaryOp;
+		ssaInstrBinaryOp *bo = &value->Instr.BinaryOp;
 		Type *type = base_type(ssa_type(bo->left));
 		Type *elem_type = type;
 		while (elem_type->kind == Type_Vector) {
@@ -975,7 +975,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_Call: {
-		auto *call = &instr->Call;
+		ssaInstrCall *call = &instr->Call;
 		Type *result_type = call->type;
 		if (result_type) {
 			ssa_fprintf(f, "%%%d = ", value->index);
@@ -994,7 +994,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		if (call->arg_count > 0) {
 			Type *proc_type = base_type(ssa_type(call->value));
 			GB_ASSERT(proc_type->kind == Type_Proc);
-			auto *params = &proc_type->Proc.params->Tuple;
+			TypeTuple *params = &proc_type->Proc.params->Tuple;
 			for (isize i = 0; i < call->arg_count; i++) {
 				Entity *e = params->variables[i];
 				GB_ASSERT(e != NULL);
@@ -1042,7 +1042,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_VectorInsertElement: {
-		auto *ie = &instr->VectorInsertElement;
+		ssaInstrVectorInsertElement *ie = &instr->VectorInsertElement;
 		Type *vt = ssa_type(ie->vector);
 		ssa_fprintf(f, "%%%d = insertelement ", value->index);
 
@@ -1064,7 +1064,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_VectorShuffle: {
-		auto *sv = &instr->VectorShuffle;
+		ssaInstrVectorShuffle *sv = &instr->VectorShuffle;
 		Type *vt = ssa_type(sv->vector);
 		ssa_fprintf(f, "%%%d = shufflevector ", value->index);
 
@@ -1090,7 +1090,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_BoundsCheck: {
-		auto *bc = &instr->BoundsCheck;
+		ssaInstrBoundsCheck *bc = &instr->BoundsCheck;
 		ssa_fprintf(f, "call void ");
 		ssa_print_encoded_global(f, str_lit("__bounds_check_error"), false);
 		ssa_fprintf(f, "(");
@@ -1120,7 +1120,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	} break;
 
 	case ssaInstr_SliceBoundsCheck: {
-		auto *bc = &instr->SliceBoundsCheck;
+		ssaInstrSliceBoundsCheck *bc = &instr->SliceBoundsCheck;
 		ssa_fprintf(f, "call void ");
 		if (bc->is_substring) {
 			ssa_print_encoded_global(f, str_lit("__substring_expr_error"), false);
@@ -1188,7 +1188,7 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 		ssa_fprintf(f, "cc 65 ");
 	}
 
-	auto *proc_type = &proc->type->Proc;
+	TypeProc *proc_type = &proc->type->Proc;
 
 	if (proc_type->result_count == 0) {
 		ssa_fprintf(f, "void");
@@ -1201,7 +1201,7 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 	ssa_fprintf(f, "(");
 
 	if (proc_type->param_count > 0) {
-		auto *params = &proc_type->params->Tuple;
+		TypeTuple *params = &proc_type->params->Tuple;
 		for (isize i = 0; i < params->variable_count; i++) {
 			Entity *e = params->variables[i];
 			if (i > 0) {
@@ -1296,7 +1296,7 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 
 
 	for_array(member_index, m->members.entries) {
-		auto *entry = &m->members.entries.e[member_index];
+		MapSsaValueEntry *entry = &m->members.entries.e[member_index];
 		ssaValue *v = entry->value;
 		if (v->kind != ssaValue_TypeName) {
 			continue;
@@ -1307,7 +1307,7 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 	ssa_fprintf(f, "\n");
 
 	for_array(member_index, m->members.entries) {
-		auto *entry = &m->members.entries.e[member_index];
+		MapSsaValueEntry *entry = &m->members.entries.e[member_index];
 		ssaValue *v = entry->value;
 		if (v->kind != ssaValue_Proc) {
 			continue;
@@ -1318,7 +1318,7 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 	}
 
 	for_array(member_index, m->members.entries) {
-		auto *entry = &m->members.entries.e[member_index];
+		MapSsaValueEntry *entry = &m->members.entries.e[member_index];
 		ssaValue *v = entry->value;
 		if (v->kind != ssaValue_Proc) {
 			continue;
@@ -1330,12 +1330,12 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 
 
 	for_array(member_index, m->members.entries) {
-		auto *entry = &m->members.entries.e[member_index];
+		MapSsaValueEntry *entry = &m->members.entries.e[member_index];
 		ssaValue *v = entry->value;
 		if (v->kind != ssaValue_Global) {
 			continue;
 		}
-		auto *g = &v->Global;
+		ssaValueGlobal *g = &v->Global;
 		Scope *scope = g->entity->scope;
 		bool in_global_scope = false;
 		if (scope != NULL) {
@@ -1371,12 +1371,13 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 	}
 
 
+#if 0
 	if (m->generate_debug_info) {
 		ssa_fprintf(f, "\n");
 		ssa_fprintf(f, "!llvm.dbg.cu = !{!0}\n");
 
 		for_array(di_index, m->debug_info.entries) {
-			auto *entry = &m->debug_info.entries.e[di_index];
+			MapSsaDebugInfoEntry *entry = &m->debug_info.entries.e[di_index];
 			ssaDebugInfo *di = entry->value;
 			ssa_fprintf(f, "!%d = ", di->id);
 
@@ -1433,6 +1434,6 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 			ssa_fprintf(f, "\n");
 		}
 	}
-
+#endif
 	ssa_file_buffer_destroy(f);
 }

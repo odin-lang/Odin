@@ -101,7 +101,6 @@ AstNodeArray make_ast_node_array(AstFile *f) {
 
 
 #define AST_NODE_KINDS \
-	AST_NODE_KIND(Invalid,  "invalid node",  struct{}) \
 	AST_NODE_KIND(BasicLit, "basic literal", Token) \
 	AST_NODE_KIND(Ident,    "identifier",    Token) \
 	AST_NODE_KIND(Ellipsis, "ellipsis", struct { \
@@ -317,16 +316,18 @@ AST_NODE_KIND(_TypeBegin, "", struct{}) \
 		AstNode *base_type; \
 		AstNodeArray fields; \
 	}) \
-AST_NODE_KIND(_TypeEnd,  "", struct{}) \
-	AST_NODE_KIND(Count, "", struct{})
+AST_NODE_KIND(_TypeEnd,  "", struct{})
 
 typedef enum AstNodeKind {
+	AstNode_Invalid,
 #define AST_NODE_KIND(_kind_name_, ...) GB_JOIN2(AstNode_, _kind_name_),
 	AST_NODE_KINDS
 #undef AST_NODE_KIND
+	AstNode_Count,
 } AstNodeKind;
 
 String const ast_node_strings[] = {
+	{cast(u8 *)"invalid node", gb_size_of("invalid node")},
 #define AST_NODE_KIND(_kind_name_, name, ...) {cast(u8 *)name, gb_size_of(name)-1},
 	AST_NODE_KINDS
 #undef AST_NODE_KIND
@@ -3101,7 +3102,7 @@ void parse_file(Parser *p, AstFile *f) {
 			syntax_error(ast_node_token(node), "Only declarations are allowed at file scope");
 		} else {
 			if (node->kind == AstNode_ImportDecl) {
-				auto *id = &node->ImportDecl;
+				AstNodeImportDecl *id = &node->ImportDecl;
 				String file_str = id->relpath.string;
 
 				if (!is_import_path_valid(file_str)) {
@@ -3130,7 +3131,7 @@ void parse_file(Parser *p, AstFile *f) {
 				try_add_import_path(p, import_file, file_str, ast_node_token(node).pos);
 
 			} else if (node->kind == AstNode_ForeignLibrary) {
-				auto *id = &node->ForeignLibrary;
+				AstNodeForeignLibrary *id = &node->ForeignLibrary;
 				String file_str = id->filepath.string;
 
 				if (!is_import_path_valid(file_str)) {

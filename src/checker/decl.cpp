@@ -74,7 +74,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 		if (o.type->kind != Type_Tuple) {
 			array_add(&operands, o);
 		} else {
-			auto *tuple = &o.type->Tuple;
+			TypeTuple *tuple = &o.type->Tuple;
 			for (isize j = 0; j < tuple->variable_count; j++) {
 				o.type = tuple->variables[j]->type;
 				array_add(&operands, o);
@@ -315,8 +315,8 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, Cycle
 bool are_signatures_similar_enough(Type *a_, Type *b_) {
 	GB_ASSERT(a_->kind == Type_Proc);
 	GB_ASSERT(b_->kind == Type_Proc);
-	auto *a = &a_->Proc;
-	auto *b = &b_->Proc;
+	TypeProc *a = &a_->Proc;
+	TypeProc *b = &b_->Proc;
 
 	if (a->param_count != b->param_count) {
 		return false;
@@ -368,7 +368,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	if ((d->scope->is_file || d->scope->is_global) &&
 	    str_eq(e->token.string, str_lit("main"))) {
 		if (proc_type != NULL) {
-			auto *pt = &proc_type->Proc;
+			TypeProc *pt = &proc_type->Proc;
 			if (pt->param_count != 0 ||
 			    pt->result_count) {
 				gbString str = type_to_string(proc_type);
@@ -402,8 +402,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 	if (is_foreign) {
-		auto *fp = &c->info.foreign_procs;
-		auto *proc_decl = &d->proc_decl->ProcDecl;
+		MapEntity *fp = &c->info.foreign_procs;
+		AstNodeProcDecl *proc_decl = &d->proc_decl->ProcDecl;
 		String name = proc_decl->name->Ident.string;
 		if (proc_decl->foreign_name.len > 0) {
 			name = proc_decl->foreign_name;
@@ -425,8 +425,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			map_entity_set(fp, key, e);
 		}
 	} else if (is_link_name) {
-		auto *fp = &c->info.foreign_procs;
-		auto *proc_decl = &d->proc_decl->ProcDecl;
+		MapEntity *fp = &c->info.foreign_procs;
+		AstNodeProcDecl *proc_decl = &d->proc_decl->ProcDecl;
 		String name = proc_decl->link_name;
 
 		HashKey key = hash_string(name);
@@ -492,7 +492,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 
 	GB_ASSERT(type->kind == Type_Proc);
 	if (type->Proc.param_count > 0) {
-		auto *params = &type->Proc.params->Tuple;
+		TypeTuple *params = &type->Proc.params->Tuple;
 		for (isize i = 0; i < params->variable_count; i++) {
 			Entity *e = params->variables[i];
 			GB_ASSERT(e->kind == Entity_Variable);

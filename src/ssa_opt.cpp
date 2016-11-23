@@ -149,7 +149,7 @@ void ssa_remove_pred(ssaBlock *b, ssaBlock *p) {
 		if (pred != p) {
 			b->preds.e[i] = b->preds.e[j];
 			for_array(k, phis) {
-				auto *phi = &phis.e[k]->Instr.Phi;
+				ssaInstrPhi *phi = &phis.e[k]->Instr.Phi;
 				phi->edges.e[i] = phi->edges.e[j];
 			}
 			i++;
@@ -157,7 +157,7 @@ void ssa_remove_pred(ssaBlock *b, ssaBlock *p) {
 	}
 	b->preds.count = i;
 	for_array(k, phis) {
-		auto *phi = &phis.e[k]->Instr.Phi;
+		ssaInstrPhi *phi = &phis.e[k]->Instr.Phi;
 		phi->edges.count = i;
 	}
 

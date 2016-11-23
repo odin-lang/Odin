@@ -430,7 +430,7 @@ vmValue vm_operand_value(VirtualMachine *vm, ssaValue *value) {
 		v = vm_exact_value(vm, value, value->Constant.value, value->Constant.type);
 	} break;
 	case ssaValue_ConstantSlice: {
-		auto *cs = &value->ConstantSlice;
+		ssaValueConstant *cs = &value->ConstantSlice;
 		v = vm_make_value_comp(ssa_type(value), vm->stack_allocator, 3);
 		v.val_comp[0] = vm_operand_value(vm, cs->backing_array);
 		v.val_comp[1] = vm_make_value_int(t_int, cs->count);
@@ -1120,7 +1120,7 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 	} break;
 
 	case ssaInstr_BinaryOp: {
-		auto *bo = &instr->BinaryOp;
+		ssaInstrBinaryOp *bo = &instr->BinaryOp;
 		Type *type = ssa_type(bo->left);
 		vmValue lhs = vm_operand_value(vm, bo->left);
 		vmValue rhs = vm_operand_value(vm, bo->right);
@@ -1171,7 +1171,7 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 	} break;
 
 	case ssaInstr_VectorShuffle: {
-		auto *vs = &instr->VectorShuffle;
+		ssaValueVectorShuffle *vs = &instr->VectorShuffle;
 		vmValue old_vector = vm_operand_value(vm, instr->VectorShuffle.vector);
 		vmValue new_vector = vm_make_value_comp(ssa_type(value), vm->stack_allocator, vs->index_count);
 
@@ -1183,7 +1183,7 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 	} break;
 
 	case ssaInstr_BoundsCheck: {
-		auto *bc = &instr->BoundsCheck;
+		ssaInstrBoundsCheck *bc = &instr->BoundsCheck;
 		Array<vmValue> args = {};
 		array_init(&args, vm->stack_allocator, 5);
 		array_add(&args, vm_exact_value(vm, NULL, make_exact_value_string(bc->pos.file), t_string));
@@ -1196,7 +1196,7 @@ void vm_exec_instr(VirtualMachine *vm, ssaValue *value) {
 	} break;
 
 	case ssaInstr_SliceBoundsCheck: {
-		auto *bc = &instr->SliceBoundsCheck;
+		ssaInstrSliceBoundsCheck *bc = &instr->SliceBoundsCheck;
 		Array<vmValue> args = {};
 
 		array_init(&args, vm->stack_allocator, 7);

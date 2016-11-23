@@ -58,34 +58,6 @@ typedef struct BasicType {
 	String    name;
 } BasicType;
 
-
-
-#define TYPE_KINDS \
-	TYPE_KIND(Invalid), \
-	TYPE_KIND(Basic), \
-	TYPE_KIND(Pointer), \
-	TYPE_KIND(Array), \
-	TYPE_KIND(Vector), \
-	TYPE_KIND(Slice), \
-	TYPE_KIND(Maybe), \
-	TYPE_KIND(Record), \
-	TYPE_KIND(Named), \
-	TYPE_KIND(Tuple), \
-	TYPE_KIND(Proc), \
-	TYPE_KIND(Count),
-
-typedef enum TypeKind {
-#define TYPE_KIND(k, ...) GB_JOIN2(Type_, k)
-	TYPE_KINDS
-#undef TYPE_KIND
-} TypeKind;
-
-String const type_strings[] = {
-#define TYPE_KIND(k, ...) {cast(u8 *)#k, gb_size_of(#k)-1}
-	TYPE_KINDS
-#undef TYPE_KIND
-};
-
 typedef enum TypeRecordKind {
 	TypeRecord_Invalid,
 
@@ -97,75 +69,89 @@ typedef enum TypeRecordKind {
 	TypeRecord_Count,
 } TypeRecordKind;
 
+typedef struct TypeRecord {
+	TypeRecordKind kind;
+
+	// All record types
+	// Theses are arrays
+	Entity **fields;      // Entity_Variable (otherwise Entity_TypeName if union)
+	i32      field_count; // == offset_count is struct
+	AstNode *node;
+
+	union { // NOTE(bill): Reduce size_of Type
+		struct { // enum only
+			Type *   enum_base; // Default is `int`
+			Entity * enum_count;
+			Entity * min_value;
+			Entity * max_value;
+		};
+		struct { // struct only
+			i64 *    struct_offsets;
+			bool      struct_are_offsets_set;
+			bool      struct_is_packed;
+			bool      struct_is_ordered;
+			Entity **fields_in_src_order; // Entity_Variable
+		};
+	};
+
+	// Entity_Constant or Entity_TypeName
+	Entity **other_fields;
+	i32      other_field_count;
+} TypeRecord;
+
+#define TYPE_KINDS \
+	TYPE_KIND(Basic,   BasicType) \
+	TYPE_KIND(Pointer, struct { Type *elem; }) \
+	TYPE_KIND(Array,   struct { Type *elem; i64 count; }) \
+	TYPE_KIND(Vector,  struct { Type *elem; i64 count; }) \
+	TYPE_KIND(Slice,   struct { Type *elem; }) \
+	TYPE_KIND(Maybe,   struct { Type *elem; }) \
+	TYPE_KIND(Record,  TypeRecord) \
+	TYPE_KIND(Named, struct { \
+		String  name; \
+		Type *  base; \
+		Entity *type_name; /* Entity_TypeName */ \
+	}) \
+	TYPE_KIND(Tuple, struct { \
+		Entity **variables; /* Entity_Variable */ \
+		i32      variable_count; \
+		bool     are_offsets_set; \
+		i64 *    offsets; \
+	}) \
+	TYPE_KIND(Proc, struct { \
+		Scope *scope; \
+		Type * params;  /* Type_Tuple */ \
+		Type * results; /* Type_Tuple */ \
+		i32    param_count; \
+		i32    result_count; \
+		bool   variadic; \
+	})
+
+typedef enum TypeKind {
+	Type_Invalid,
+#define TYPE_KIND(k, ...) GB_JOIN2(Type_, k),
+	TYPE_KINDS
+#undef TYPE_KIND
+	Type_Count,
+} TypeKind;
+
+String const type_strings[] = {
+	{cast(u8 *)"Invalid", gb_size_of("Invalid")},
+#define TYPE_KIND(k, ...) {cast(u8 *)#k, gb_size_of(#k)-1},
+	TYPE_KINDS
+#undef TYPE_KIND
+};
+
+#define TYPE_KIND(k, ...) typedef __VA_ARGS__ GB_JOIN2(Type, k);
+	TYPE_KINDS
+#undef TYPE_KIND
+
 typedef struct Type {
 	TypeKind kind;
 	union {
-		BasicType Basic;
-		struct {
-			Type *elem;
-		} Pointer;
-		struct {
-			Type *elem;
-			i64 count;
-		} Array;
-		struct {
-			Type *elem;
-			i64 count;
-		} Vector;
-		struct {
-			Type *elem;
-		} Slice;
-		struct {
-			Type *elem;
-		} Maybe;
-		struct {
-			TypeRecordKind kind;
-
-			// All record types
-			// Theses are arrays
-			Entity **fields;      // Entity_Variable (otherwise Entity_TypeName if union)
-			i32      field_count; // == offset_count is struct
-			AstNode *node;
-
-			union { // NOTE(bill): Reduce size_of Type
-				struct { // enum only
-					Type *   enum_base; // Default is `int`
-					Entity * enum_count;
-					Entity * min_value;
-					Entity * max_value;
-				};
-				struct { // struct only
-					i64 *    struct_offsets;
-					bool      struct_are_offsets_set;
-					bool      struct_is_packed;
-					bool      struct_is_ordered;
-					Entity **fields_in_src_order; // Entity_Variable
-				};
-			};
-
-			// Entity_Constant or Entity_TypeName
-			Entity **other_fields;
-			i32      other_field_count;
-		} Record;
-		struct {
-			String  name;
-			Type *  base;
-			Entity *type_name; // Entity_TypeName
-		} Named;
-		struct {
-			Entity **variables; // Entity_Variable
-			i32      variable_count;
-			bool      are_offsets_set;
-			i64 *    offsets;
-		} Tuple;
-		struct {
-			Scope *scope;
-			Type * params;  // Type_Tuple
-			Type * results; // Type_Tuple
-			i32    param_count;
-			i32    result_count;
-			bool    variadic;
-		} Proc;
+#define TYPE_KIND(k, ...) GB_JOIN2(Type, k) k;
+	TYPE_KINDS
+#undef TYPE_KIND
 	};
 } Type;
 
@@ -186,9 +172,9 @@ typedef Array(isize) Array_isize;
 typedef struct Selection {
 	Entity *    entity;
 	Array_isize index;
-	bool         indirect; // Set if there was a pointer deref anywhere down the line
+	bool        indirect; // Set if there was a pointer deref anywhere down the line
 } Selection;
-Selection empty_selection = {};
+Selection empty_selection = {0};
 
 Selection make_selection(Entity *entity, Array_isize index, bool indirect) {
 	Selection s = {entity, index, indirect};

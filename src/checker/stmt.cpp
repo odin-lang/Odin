@@ -441,7 +441,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				if (o.type->kind != Type_Tuple) {
 					array_add(&operands, o);
 				} else {
-					auto *tuple = &o.type->Tuple;
+					TypeTuple *tuple = &o.type->Tuple;
 					for (isize j = 0; j < tuple->variable_count; j++) {
 						o.type = tuple->variables[j]->type;
 						array_add(&operands, o);
@@ -553,7 +553,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		if (result_count > 0) {
 			Entity **variables = NULL;
 			if (proc_type->Proc.results != NULL) {
-				auto *tuple = &proc_type->Proc.results->Tuple;
+				TypeTuple *tuple = &proc_type->Proc.results->Tuple;
 				variables = tuple->variables;
 			}
 			if (rs->results.count == 0) {

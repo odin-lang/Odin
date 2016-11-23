@@ -473,22 +473,6 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 
 void check_scope_usage(Checker *c, Scope *scope) {
 	// TODO(bill): Use this?
-#if 0
-	for_array(i, scope->elements.entries) {
-		auto *entry = scope->elements.entries + i;
-		Entity *e = entry->value;
-		if (e->kind == Entity_Variable) {
-			auto *v = &e->Variable;
-			if (!v->is_field && !v->used) {
-				warning(e->token, "Unused variable: %.*s", LIT(e->token.string));
-			}
-		}
-	}
-
-	for (Scope *child = scope->first_child; child != NULL; child = child->next) {
-		check_scope_usage(c, child);
-	}
-#endif
 }
 
 
@@ -961,7 +945,7 @@ void init_preload_types(Checker *c) {
 		t_type_info = e->type;
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
 		GB_ASSERT(is_type_union(e->type));
-		auto *record = &base_type(e->type)->Record;
+		TypeRecord *record = &base_type(e->type)->Record;
 
 		t_type_info_member = record->other_fields[0]->type;
 		t_type_info_member_ptr = make_type_pointer(c->allocator, t_type_info_member);
