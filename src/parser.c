@@ -100,6 +100,7 @@ AstNodeArray make_ast_node_array(AstFile *f) {
 }
 
 
+
 #define AST_NODE_KINDS \
 	AST_NODE_KIND(BasicLit, "basic literal", Token) \
 	AST_NODE_KIND(Ident,    "identifier",    Token) \
@@ -2656,10 +2657,6 @@ AstNode *parse_stmt(AstFile *f) {
 	AstNode *s = NULL;
 	Token token = f->curr_token;
 	switch (token.kind) {
-	case Token_Comment:
-		next_token(f);
-		return parse_stmt(f);
-
 	// Operands
 	case Token_Identifier:
 	case Token_Integer:
@@ -2886,9 +2883,6 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 				if (token.kind == Token_Invalid) {
 					return ParseFile_InvalidToken;
 				}
-				if (token.kind == Token_Comment) {
-					continue;
-				}
 				array_add(&f->tokens, token);
 
 				if (token.kind == Token_EOF) {
@@ -3097,6 +3091,9 @@ void parse_file(Parser *p, AstFile *f) {
 		base_dir.len--;
 	}
 
+	while (f->curr_token.kind == Token_Comment) {
+		next_token(f);
+	}
 
 	f->decls = parse_stmt_list(f);
 

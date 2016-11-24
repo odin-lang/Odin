@@ -528,6 +528,11 @@ void init_universal_scope(void) {
 
 	add_global_entity(make_entity_nil(a, str_lit("nil"), t_untyped_nil));
 
+	add_global_constant(a, str_lit("ODIN_OS"),      t_untyped_string, make_exact_value_string(str_lit("windows")));
+	add_global_constant(a, str_lit("ODIN_ARCH"),    t_untyped_string, make_exact_value_string(str_lit("amd64")));
+	add_global_constant(a, str_lit("ODIN_VERSION"), t_untyped_string, make_exact_value_string(str_lit(VERSION_STRING)));
+
+
 // Builtin Procedures
 	for (isize i = 0; i < gb_count_of(builtin_procs); i++) {
 		BuiltinProcId id = cast(BuiltinProcId)i;

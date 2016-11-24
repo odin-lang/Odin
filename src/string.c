@@ -49,12 +49,6 @@ gb_inline String make_string_c(char *text) {
 #define str_lit(c_str) make_string(cast(u8 *)c_str, gb_size_of(c_str)-1)
 
 
-gb_inline bool are_strings_equal(String a, String b) {
-	if (a.len == b.len) {
-		return gb_memcompare(a.text, b.text, a.len) == 0;
-	}
-	return false;
-}
 
 gb_inline bool str_eq_ignore_case(String a, String b) {
 	if (a.len == b.len) {
@@ -125,7 +119,7 @@ GB_COMPARE_PROC(string_cmp_proc) {
 // template <size_t N> gb_inline bool operator ==(char const (&a)[N], String b) { return make_string(cast(u8 *)a, N-1) == b; }
 // template <size_t N> gb_inline bool operator !=(char const (&a)[N], String b) { return make_string(cast(u8 *)a, N-1) != b; }
 
-gb_inline bool str_eq(String a, String b) { return are_strings_equal(a, b) != 0; }
+gb_inline bool str_eq(String a, String b) { return a.len == b.len ? gb_memcompare(a.text, b.text, a.len) == 0 : false; }
 gb_inline bool str_ne(String a, String b) { return !str_eq(a, b);                }
 gb_inline bool str_lt(String a, String b) { return string_compare(a, b) < 0;     }
 gb_inline bool str_gt(String a, String b) { return string_compare(a, b) > 0;     }
