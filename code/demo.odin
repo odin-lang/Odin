@@ -23,12 +23,10 @@ main :: proc() {
 	offset = 0
 	for i := 0; i < count; i++ {
 		data, len := utf8.encode_rune(runes[i])
-		for j := 0; j < len; j++ {
-			backing[offset+j] = data[j]
-		}
+		copy(backing[offset:], data[:len])
 		offset += len
 	}
 
-	reverse := backing[:count] as string
-	fmt.println(reverse)
+	reverse := backing[:offset] as string
+	fmt.println(reverse) // olleH
 }
