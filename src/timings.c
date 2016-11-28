@@ -77,12 +77,13 @@ f64 time_stamp_as_ms(TimeStamp ts, u64 freq) {
 }
 
 void timings_print_all(Timings *t) {
+	char const SPACES[] = "                                                                ";
+	isize max_len, i;
+
 	timings__stop_current_section(t);
 	t->total.finish = time_stamp_time_now();
 
-	char const SPACES[] = "                                                                ";
-
-	isize max_len = t->total.label.len;
+	max_len = t->total.label.len;
 	for_array(i, t->sections) {
 		TimeStamp ts = t->sections.e[i];
 		max_len = gb_max(max_len, ts.label.len);

@@ -683,7 +683,8 @@ bool is_type_comparable(Type *t) {
 		return false;
 	} break;
 	case Type_Array:
-		return is_type_comparable(t->Array.elem);
+		return false;
+		// return is_type_comparable(t->Array.elem);
 	case Type_Vector:
 		return is_type_comparable(t->Vector.elem);
 	case Type_Proc:

@@ -52,7 +52,8 @@ gb_inline String make_string_c(char *text) {
 
 gb_inline bool str_eq_ignore_case(String a, String b) {
 	if (a.len == b.len) {
-		for (isize i = 0; i < a.len; i++) {
+		isize i;
+		for (i = 0; i < a.len; i++) {
 			char x = cast(char)a.text[i];
 			char y = cast(char)b.text[i];
 			if (gb_char_to_lower(x) != gb_char_to_lower(y))
@@ -64,39 +65,40 @@ gb_inline bool str_eq_ignore_case(String a, String b) {
 }
 
 int string_compare(String x, String y) {
-	if (x.len == y.len &&
-	    x.text == y.text) {
-		return 0;
-	}
+	if (!(x.len == y.len &&
+	      x.text == y.text)) {
+		isize n, fast, offset, curr_block;
+		isize *la, *lb;
+		isize pos;
 
-	isize n = gb_min(x.len, y.len);
+		n = gb_min(x.len, y.len);
 
-	isize fast = n/gb_size_of(isize) + 1;
-	isize offset = (fast-1)*gb_size_of(isize);
-	isize curr_block = 0;
-	if (n <= gb_size_of(isize)) {
-		fast = 0;
-	}
+		fast = n/gb_size_of(isize) + 1;
+		offset = (fast-1)*gb_size_of(isize);
+		curr_block = 0;
+		if (n <= gb_size_of(isize)) {
+			fast = 0;
+		}
 
-	isize *la = cast(isize *)x.text;
-	isize *lb = cast(isize *)y.text;
+		la = cast(isize *)x.text;
+		lb = cast(isize *)y.text;
 
-	for (; curr_block < fast; curr_block++) {
-		if (la[curr_block] ^ lb[curr_block]) {
-			for (isize pos = curr_block*gb_size_of(isize); pos < n; pos++) {
-				if (x.text[pos] ^ y.text[pos]) {
-					return cast(int)x.text[pos] - cast(int)y.text[pos];
+		for (; curr_block < fast; curr_block++) {
+			if (la[curr_block] ^ lb[curr_block]) {
+				for (pos = curr_block*gb_size_of(isize); pos < n; pos++) {
+					if (x.text[pos] ^ y.text[pos]) {
+						return cast(int)x.text[pos] - cast(int)y.text[pos];
+					}
 				}
 			}
 		}
-	}
 
-	for (; offset < n; offset++) {
-		if (x.text[offset] ^ y.text[offset]) {
-			return cast(int)x.text[offset] - cast(int)y.text[offset];
+		for (; offset < n; offset++) {
+			if (x.text[offset] ^ y.text[offset]) {
+				return cast(int)x.text[offset] - cast(int)y.text[offset];
+			}
 		}
 	}
-
 	return 0;
 }
 
@@ -126,7 +128,18 @@ gb_inline bool str_gt(String a, String b) { return string_compare(a, b) > 0;    
 gb_inline bool str_le(String a, String b) { return string_compare(a, b) <= 0;    }
 gb_inline bool str_ge(String a, String b) { return string_compare(a, b) >= 0;    }
 
-
+gb_inline bool str_has_prefix(String s, String prefix) {
+	isize i;
+	if (prefix.len < s.len) {
+		return false;
+	}
+	for (i = 0; i < prefix.len; i++) {
+		if (s.text[i] != prefix.text[i]) {
+			return false;
+		}
+	}
+	return true;
+}
 
 gb_inline isize string_extension_position(String str) {
 	isize dot_pos = -1;
@@ -157,7 +170,8 @@ gb_inline bool string_has_extension(String str, String ext) {
 }
 
 bool string_contains_char(String s, u8 c) {
-	for (isize i = 0; i < s.len; i++) {
+	isize i;
+	for (i = 0; i < s.len; i++) {
 		if (s.text[i] == c)
 			return true;
 	}
@@ -166,20 +180,23 @@ bool string_contains_char(String s, u8 c) {
 
 // TODO(bill): Make this non-windows specific
 String16 string_to_string16(gbAllocator a, String s) {
+	int len, len1;
+	wchar_t *text;
+
 	if (s.len < 1) {
 		return make_string16(NULL, 0);
 	}
 
-	int len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-	                              cast(char *)s.text, s.len, NULL, 0);
+	len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+	                          cast(char *)s.text, s.len, NULL, 0);
 	if (len == 0) {
 		return make_string16(NULL, 0);
 	}
 
-	wchar_t *text = gb_alloc_array(a, wchar_t, len+1);
+	text = gb_alloc_array(a, wchar_t, len+1);
 
-	int len1 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-	                               cast(char *)s.text, s.len, text, len);
+	len1 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+	                           cast(char *)s.text, s.len, text, len);
 	if (len1 == 0) {
 		gb_free(a, text);
 		return make_string16(NULL, 0);
@@ -190,22 +207,23 @@ String16 string_to_string16(gbAllocator a, String s) {
 }
 
 String string16_to_string(gbAllocator a, String16 s) {
+	int len, len1;
+	u8 *text;
+
 	if (s.len < 1) {
 		return make_string(NULL, 0);
 	}
 
-	int len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
-	                              s.text, s.len, NULL, 0,
-	                              NULL, NULL);
+	len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+	                          s.text, s.len, NULL, 0, NULL, NULL);
 	if (len == 0) {
 		return make_string(NULL, 0);
 	}
 
-	u8 *text = gb_alloc_array(a, u8, len+1);
+	text = gb_alloc_array(a, u8, len+1);
 
-	int len1 = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
-	                               s.text, s.len, cast(char *)text, len,
-	                               NULL, NULL);
+	len1 = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+	                           s.text, s.len, cast(char *)text, len, NULL, NULL);
 	if (len1 == 0) {
 		gb_free(a, text);
 		return make_string(NULL, 0);
@@ -233,8 +251,10 @@ String string16_to_string(gbAllocator a, String16 s) {
 
 
 bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *tail_string) {
+	u8 c;
+
 	if (s.text[0] == quote &&
-	    (quote == '$' || quote == '"')) {
+	    (quote == '\'' || quote == '"')) {
 		return false;
 	} else if (s.text[0] >= 0x80) {
 		Rune r = -1;
@@ -252,7 +272,7 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 	if (s.len <= 1) {
 		return false;
 	}
-	u8 c = s.text[1];
+	c = s.text[1];
 	s = make_string(s.text+2, s.len-2);
 
 	switch (c) {
@@ -268,7 +288,7 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 	case '\\': *rune = '\\'; break;
 
 
-	case '$':
+	case '\'':
 	case '"':
 		if (c != quote) {
 			return false;
@@ -284,11 +304,12 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 	case '5':
 	case '6':
 	case '7': {
+		isize i;
 		i32 r = gb_digit_to_int(c);
 		if (s.len < 2) {
 			return false;
 		}
-		for (isize i = 0; i < 2; i++) {
+		for (i = 0; i < 2; i++) {
 			i32 d = gb_digit_to_int(s.text[i]);
 			if (d < 0 || d > 7) {
 				return false;
@@ -305,18 +326,18 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 	case 'x':
 	case 'u':
 	case 'U': {
-		isize count = 0;
+		Rune r = 0;
+		isize i, count = 0;
 		switch (c) {
 		case 'x': count = 2; break;
 		case 'u': count = 4; break;
 		case 'U': count = 8; break;
 		}
 
-		Rune r = 0;
 		if (s.len < count) {
 			return false;
 		}
-		for (isize i = 0; i < count; i++) {
+		for (i = 0; i < count; i++) {
 			i32 d = gb_hex_digit_to_int(s.text[i]);
 			if (d < 0) {
 				return false;
@@ -344,14 +365,16 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 // 1 == original memory
 // 2 == new allocation
 i32 unquote_string(gbAllocator a, String *s_) {
-	GB_ASSERT(s_ != NULL);
 	String s = *s_;
 	isize n = s.len;
-	if (n < 2)
+	u8 quote;
+	if (n < 2) {
 		return 0;
-	u8 quote = s.text[0];
-	if (quote != s.text[n-1])
+	}
+	quote = s.text[0];
+	if (quote != s.text[n-1]) {
 		return 0;
+	}
 	s.text += 1;
 	s.len -= 2;
 
@@ -362,17 +385,19 @@ i32 unquote_string(gbAllocator a, String *s_) {
 		*s_ = s;
 		return 1;
 	}
-	if (quote != '"' && quote != '$')
+	if (quote != '"' && quote != '\'') {
 		return 0;
+	}
 
-	if (string_contains_char(s, '\n'))
+	if (string_contains_char(s, '\n')) {
 		return 0;
+	}
 
 	if (!string_contains_char(s, '\\') && !string_contains_char(s, quote)) {
 		if (quote == '"') {
 			*s_ = s;
 			return 1;
-		} else if (quote == '$') {
+		} else if (quote == '\'') {
 			Rune r = GB_RUNE_INVALID;
 			isize size = gb_utf8_decode(s.text, s.len, &r);
 			if ((size == s.len) && (r != -1 || size != 1)) {
@@ -383,34 +408,36 @@ i32 unquote_string(gbAllocator a, String *s_) {
 	}
 
 
-	u8 rune_temp[4] = {0};
-	isize buf_len = 3*s.len / 2;
-	u8 *buf = gb_alloc_array(a, u8, buf_len);
-	isize offset = 0;
-	while (s.len > 0) {
-		String tail_string = {0};
-		Rune r = 0;
-		bool multiple_bytes = false;
-		bool success = unquote_char(s, quote, &r, &multiple_bytes, &tail_string);
-		if (!success) {
-			gb_free(a, buf);
-			return 0;
-		}
-		s = tail_string;
+	{
+		u8 rune_temp[4] = {0};
+		isize buf_len = 3*s.len / 2;
+		u8 *buf = gb_alloc_array(a, u8, buf_len);
+		isize offset = 0;
+		while (s.len > 0) {
+			String tail_string = {0};
+			Rune r = 0;
+			bool multiple_bytes = false;
+			bool success = unquote_char(s, quote, &r, &multiple_bytes, &tail_string);
+			if (!success) {
+				gb_free(a, buf);
+				return 0;
+			}
+			s = tail_string;
 
-		if (r < 0x80 || !multiple_bytes) {
-			buf[offset++] = cast(u8)r;
-		} else {
-			isize size = gb_utf8_encode_rune(rune_temp, r);
-			gb_memmove(buf+offset, rune_temp, size);
-			offset += size;
-		}
+			if (r < 0x80 || !multiple_bytes) {
+				buf[offset++] = cast(u8)r;
+			} else {
+				isize size = gb_utf8_encode_rune(rune_temp, r);
+				gb_memmove(buf+offset, rune_temp, size);
+				offset += size;
+			}
 
-		if (quote == '$' && s.len != 0) {
-			gb_free(a, buf);
-			return 0;
+			if (quote == '\'' && s.len != 0) {
+				gb_free(a, buf);
+				return 0;
+			}
 		}
+		*s_ = make_string(buf, offset);
 	}
-	*s_ = make_string(buf, offset);
 	return 2;
 }

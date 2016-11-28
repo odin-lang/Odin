@@ -76,8 +76,8 @@ print_rune_to_buffer :: proc(buf: ^[]byte, r: rune) {
 	print_string_to_buffer(buf, b[:n] as string)
 }
 
-print_space_to_buffer :: proc(buf: ^[]byte) { print_rune_to_buffer(buf, #rune " ") }
-print_nl_to_buffer    :: proc(buf: ^[]byte) { print_rune_to_buffer(buf, #rune "\n") }
+print_space_to_buffer :: proc(buf: ^[]byte) { print_rune_to_buffer(buf, ' ') }
+print_nl_to_buffer    :: proc(buf: ^[]byte) { print_rune_to_buffer(buf, '\n') }
 
 __NUM_TO_CHAR_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$"
 
@@ -99,7 +99,7 @@ print_u64_to_buffer :: proc(buffer: ^[]byte, value: u64) {
 	buf: [20]byte
 	len := 0
 	if i == 0 {
-		buf[len] = #rune "0"
+		buf[len] = '0'
 		len++
 	}
 	for i > 0 {
@@ -115,7 +115,7 @@ print_i64_to_buffer :: proc(buffer: ^[]byte, value: i64) {
 	neg := i < 0
 	if neg {
 		i = -i
-		print_rune_to_buffer(buffer, #rune "-")
+		print_rune_to_buffer(buffer, '-')
 	}
 	print_u64_to_buffer(buffer, i as u64)
 }
@@ -132,7 +132,7 @@ print_i128_to_buffer :: proc(buffer: ^[]byte, value: i128) {
 	neg := i < 0
 	if neg {
 		i = -i
-		print_rune_to_buffer(buffer, #rune "-")
+		print_rune_to_buffer(buffer, '-')
 	}
 	print_u128_to_buffer(buffer, i as u128)
 }
@@ -142,11 +142,11 @@ print_i128_to_buffer :: proc(buffer: ^[]byte, value: i128) {
 print__f64 :: proc(buffer: ^[]byte, value: f64, decimal_places: int) {
 	f := value
 	if f == 0 {
-		print_rune_to_buffer(buffer, #rune "0")
+		print_rune_to_buffer(buffer, '0')
 		return
 	}
 	if f < 0 {
-		print_rune_to_buffer(buffer, #rune "-")
+		print_rune_to_buffer(buffer, '-')
 		f = -f
 	}
 
@@ -154,7 +154,7 @@ print__f64 :: proc(buffer: ^[]byte, value: f64, decimal_places: int) {
 	print_u64_to_buffer(buffer, i)
 	f -= i as f64
 
-	print_rune_to_buffer(buffer, #rune ".")
+	print_rune_to_buffer(buffer, '.')
 
 	mult: f64 = 10.0
 	for ; decimal_places >= 0; decimal_places-- {
@@ -488,7 +488,7 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 
 bprintf :: proc(buf: ^[]byte, fmt: string, args: ..any) -> int {
 	is_digit :: proc(r: rune) -> bool #inline {
-		return r >= #rune "0" && r <= #rune "9"
+		return '0' <= r && r <= '9'
 	}
 
 	parse_int :: proc(s: string, offset: int) -> (int, int) {
@@ -501,7 +501,7 @@ bprintf :: proc(buf: ^[]byte, fmt: string, args: ..any) -> int {
 			}
 
 			result *= 10
-			result += (c - #rune "0") as int
+			result += (c - '0') as int
 		}
 
 		return result, offset
@@ -514,7 +514,7 @@ bprintf :: proc(buf: ^[]byte, fmt: string, args: ..any) -> int {
 		r := fmt[i] as rune
 		index := implicit_index
 
-		if r != #rune "%" {
+		if r != '%' {
 			continue
 		}
 
@@ -523,7 +523,7 @@ bprintf :: proc(buf: ^[]byte, fmt: string, args: ..any) -> int {
 		if i < fmt.count {
 			next := fmt[i] as rune
 
-			if next == #rune "%" {
+			if next == '%' {
 				print_string_to_buffer(buf, "%")
 				i++
 				prev = i
@@ -582,7 +582,7 @@ bprint :: proc(buf: ^[]byte, args: ..any) -> int {
 bprintln :: proc(buf: ^[]byte, args: ..any) -> int {
 	for i := 0; i < args.count; i++ {
 		if i > 0 {
-			append(buf, #rune " ")
+			append(buf, ' ')
 		}
 		print_any_to_buffer(buf, args[i])
 	}

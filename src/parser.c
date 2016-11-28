@@ -32,7 +32,7 @@ typedef struct AstFile {
 	isize          expr_level;
 
 	AstNodeArray   decls;
-	bool            is_global_scope;
+	bool           is_global_scope;
 
 	AstNode *      curr_proc;
 	isize          scope_level;
@@ -86,13 +86,6 @@ typedef enum StmtStateFlag {
 	StmtStateFlag_no_bounds_check = GB_BIT(1),
 } StmtStateFlag;
 
-
-typedef enum CallExprKind {
-	CallExpr_Prefix,  // call(...)
-	CallExpr_Postfix, // a'call
-	CallExpr_Infix,   // a ''call b
-} CallExprKind;
-
 AstNodeArray make_ast_node_array(AstFile *f) {
 	AstNodeArray a;
 	array_init(&a, gb_arena_allocator(&f->arena));
@@ -134,7 +127,6 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 		AstNodeArray args; \
 		Token open, close; \
 		Token ellipsis; \
-		CallExprKind kind; \
 	}) \
 	AST_NODE_KIND(SliceExpr, "slice expression", struct { \
 		AstNode *expr; \
@@ -256,9 +248,10 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 	}) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
 		Token token, relpath; \
+		String os, arch;      \
 		String fullpath;      \
 		Token import_name;    \
-		bool is_load;          \
+		bool is_load;         \
 		AstNode *note;        \
 	}) \
 	AST_NODE_KIND(ForeignLibrary, "foreign library", struct { \
@@ -959,11 +952,15 @@ AstNode *make_type_decl(AstFile *f, Token token, AstNode *name, AstNode *type) {
 	return result;
 }
 
-AstNode *make_import_decl(AstFile *f, Token token, Token relpath, Token import_name, bool is_load) {
+AstNode *make_import_decl(AstFile *f, Token token, Token relpath, Token import_name,
+                          String os, String arch,
+                          bool is_load) {
 	AstNode *result = make_node(f, AstNode_ImportDecl);
 	result->ImportDecl.token = token;
 	result->ImportDecl.relpath = relpath;
 	result->ImportDecl.import_name = import_name;
+	result->ImportDecl.os = os;
+	result->ImportDecl.arch = arch;
 	result->ImportDecl.is_load = is_load;
 	return result;
 }
@@ -1374,19 +1371,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	case Token_Hash: {
 		Token token = expect_token(f, Token_Hash);
 		Token name  = expect_token(f, Token_Identifier);
-		if (str_eq(name.string, str_lit("rune"))) {
-			if (f->curr_token.kind == Token_String) {
-				Token *s = &f->curr_token;
-
-				if (gb_utf8_strnlen(s->string.text, s->string.len) != 1) {
-					syntax_error(*s, "Invalid rune literal %.*s", LIT(s->string));
-				}
-				s->kind = Token_Rune; // NOTE(bill): Change it
-			} else {
-				expect_token(f, Token_String);
-			}
-			operand = parse_operand(f, lhs);
-		} else if (str_eq(name.string, str_lit("file"))) {
+		if (str_eq(name.string, str_lit("file"))) {
 			Token token = name;
 			token.kind = Token_String;
 			token.string = token.pos.file;
@@ -1513,19 +1498,6 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 	bool loop = true;
 	while (loop) {
 		switch (f->curr_token.kind) {
-
-		case Token_Prime: {
-			Token op = expect_token(f, Token_Prime);
-			if (lhs) {
-				// TODO(bill): Handle this
-			}
-			AstNode *proc = parse_identifier(f);
-			AstNodeArray args;
-			array_init_reserve(&args, gb_arena_allocator(&f->arena), 1);
-			array_add(&args, operand);
-			operand = make_call_expr(f, proc, args, ast_node_token(operand), op, empty_token);
-		} break;
-
 		case Token_OpenParen: {
 			if (lhs) {
 				// TODO(bill): Handle this shit! Is this even allowed in this language?!
@@ -1680,13 +1652,11 @@ i32 token_precedence(Token t) {
 	case Token_Shl:
 	case Token_Shr:
 		return 5;
-	case Token_DoublePrime:
-		return 6;
 	case Token_as:
 	case Token_transmute:
 	case Token_down_cast:
 	case Token_union_cast:
-		return 7;
+		return 6;
 	}
 
 	return 0;
@@ -1708,28 +1678,6 @@ AstNode *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 			}
 
 			switch (op.kind) {
-			case Token_DoublePrime: {
-				// TODO(bill): Properly define semantic for in-fix and post-fix calls
-				AstNode *proc = parse_identifier(f);
-				/* if (f->curr_token.kind == Token_OpenParen) {
-					AstNode *call = parse_call_expr(f, proc);
-					array_add(&call->CallExpr.args, expression);
-					for (isize i = gb_array_count(call->CallExpr.args)-1; i > 0; i--) {
-						gb_swap(AstNode *, call->CallExpr.args[i], call->CallExpr.args[i-1]);
-					}
-
-					expression = call;
-				} else  */{
-					right = parse_binary_expr(f, false, prec+1);
-					AstNodeArray args = {0};
-					array_init_reserve(&args, gb_arena_allocator(&f->arena), 2);
-					array_add(&args, expression);
-					array_add(&args, right);
-					expression = make_call_expr(f, proc, args, op, ast_node_token(right), empty_token);
-				}
-				continue;
-			} break;
-
 			case Token_as:
 			case Token_transmute:
 			case Token_down_cast:
@@ -2755,42 +2703,6 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			syntax_error(token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope");
 			return make_bad_decl(f, token, f->curr_token);
-		} else if (str_eq(tag, str_lit("import"))) {
-			// TODO(bill): better error messages
-			Token import_name = {0};
-			Token file_path = expect_token_after(f, Token_String, "#import");
-			if (allow_token(f, Token_as)) {
-				// NOTE(bill): Custom import name
-				if (f->curr_token.kind == Token_Period) {
-					import_name = f->curr_token;
-					import_name.kind = Token_Identifier;
-					next_token(f);
-				} else {
-					import_name = expect_token_after(f, Token_Identifier, "`as` for import declaration");
-				}
-
-				if (str_eq(import_name.string, str_lit("_"))) {
-					syntax_error(token, "Illegal import name: `_`");
-					return make_bad_decl(f, token, f->curr_token);
-				}
-			}
-
-			if (f->curr_proc == NULL) {
-				return make_import_decl(f, s->TagStmt.token, file_path, import_name, false);
-			}
-			syntax_error(token, "You cannot use #import within a procedure. This must be done at the file scope");
-			return make_bad_decl(f, token, file_path);
-		} else if (str_eq(tag, str_lit("load"))) {
-			// TODO(bill): better error messages
-			Token file_path = expect_token(f, Token_String);
-			Token import_name = file_path;
-			import_name.string = str_lit(".");
-
-			if (f->curr_proc == NULL) {
-				return make_import_decl(f, s->TagStmt.token, file_path, import_name, true);
-			}
-			syntax_error(token, "You cannot use #load within a procedure. This must be done at the file scope");
-			return make_bad_decl(f, token, file_path);
 		} else if (str_eq(tag, str_lit("foreign_system_library"))) {
 			Token file_path = expect_token(f, Token_String);
 			if (f->curr_proc == NULL) {
@@ -2831,6 +2743,54 @@ AstNode *parse_stmt(AstFile *f) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return s;
+		} else if (str_eq(tag, str_lit("import"))) {
+			String os = {0};
+			String arch = {0};
+
+			// if (tag.len > 6) {
+			// 	String sub = make_string(tag.text+6, tag.len-6);
+			// }
+
+			// TODO(bill): better error messages
+			Token import_name = {0};
+			Token file_path = expect_token_after(f, Token_String, "#import");
+			if (allow_token(f, Token_as)) {
+				// NOTE(bill): Custom import name
+				if (f->curr_token.kind == Token_Period) {
+					import_name = f->curr_token;
+					import_name.kind = Token_Identifier;
+					next_token(f);
+				} else {
+					import_name = expect_token_after(f, Token_Identifier, "`as` for import declaration");
+				}
+
+				if (str_eq(import_name.string, str_lit("_"))) {
+					syntax_error(token, "Illegal import name: `_`");
+					return make_bad_decl(f, token, f->curr_token);
+				}
+			}
+
+			if (f->curr_proc != NULL) {
+				syntax_error(token, "You cannot use #import within a procedure. This must be done at the file scope");
+				return make_bad_decl(f, token, file_path);
+			}
+
+			return make_import_decl(f, s->TagStmt.token, file_path, import_name, os, arch, false);
+		} else if (str_eq(tag, str_lit("load"))) {
+			String os = {0};
+			String arch = {0};
+			// TODO(bill): better error messages
+			Token file_path = expect_token(f, Token_String);
+			Token import_name = file_path;
+			import_name.string = str_lit(".");
+
+			if (f->curr_proc == NULL) {
+				return make_import_decl(f, s->TagStmt.token, file_path, import_name, os, arch, true);
+			}
+			syntax_error(token, "You cannot use #load within a procedure. This must be done at the file scope");
+			return make_bad_decl(f, token, file_path);
+		} else {
+
 		}
 
 		s->TagStmt.stmt = parse_stmt(f); // TODO(bill): Find out why this doesn't work as an argument

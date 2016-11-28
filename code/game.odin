@@ -4,7 +4,7 @@
 #import "os.odin"
 #import "opengl.odin" as gl
 
-TWO_HEARTS :: #rune "💕"
+TWO_HEARTS :: '💕'
 
 win32_perf_count_freq := win32.GetQueryPerformanceFrequency()
 time_now :: proc() -> f64 {

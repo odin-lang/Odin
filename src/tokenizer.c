@@ -35,9 +35,6 @@ TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
 	TOKEN_KIND(Token_down_cast,  "down_cast"), \
 	TOKEN_KIND(Token_union_cast, "union_cast"), \
 \
-	TOKEN_KIND(Token_Prime, "'"), \
-	TOKEN_KIND(Token_DoublePrime, "''"), \
-\
 	TOKEN_KIND(Token_CmpAnd, "&&"), \
 	TOKEN_KIND(Token_CmpOr, "||"), \
 \
@@ -656,17 +653,50 @@ Token tokenizer_get_token(Tokenizer *t) {
 			token.kind = Token_EOF;
 			break;
 
-		case '\'':
-			token.kind = Token_Prime;
-			if (t->curr_rune == '\'') {
+		case '\'': // Rune Literal
+		{
+			token.kind = Token_Rune;
+			Rune quote = curr_rune;
+			bool valid = true;
+			i32 n = 0, success;
+			for (;;) {
+				Rune r = t->curr_rune;
+				if (r == '\n' || r < 0) {
+					tokenizer_err(t, "Rune literal not terminated");
+					break;
+				}
 				advance_to_next_rune(t);
-				token.kind = Token_DoublePrime;
+				if (r == quote) {
+					break;
+				}
+				n++;
+				if (r == '\\') {
+					if (!scan_escape(t, quote)) {
+						valid = false;
+					}
+				}
 			}
-			break;
+
+			// TODO(bill): Better Error Handling
+			if (valid && n != 1) {
+				tokenizer_err(t, "Invalid rune literal");
+			}
+			token.string.len = t->curr - token.string.text;
+			success = unquote_string(heap_allocator(), &token.string);
+			if (success > 0) {
+				if (success == 2) {
+					array_add(&t->allocated_strings, token.string);
+				}
+				return token;
+			} else {
+				tokenizer_err(t, "Invalid rune literal");
+			}
+		} break;
 
 		case '`': // Raw String Literal
 		case '"': // String Literal
 		{
+			i32 success;
 			Rune quote = curr_rune;
 			token.kind = Token_String;
 			if (curr_rune == '"') {
@@ -677,10 +707,12 @@ Token tokenizer_get_token(Tokenizer *t) {
 						break;
 					}
 					advance_to_next_rune(t);
-					if (r == quote)
+					if (r == quote) {
 						break;
-					if (r == '\\')
-						scan_escape(t, '"');
+					}
+					if (r == '\\') {
+						scan_escape(t, quote);
+					}
 				}
 			} else {
 				for (;;) {
@@ -690,12 +722,13 @@ Token tokenizer_get_token(Tokenizer *t) {
 						break;
 					}
 					advance_to_next_rune(t);
-					if (r == quote)
+					if (r == quote) {
 						break;
+					}
 				}
 			}
 			token.string.len = t->curr - token.string.text;
-			i32 success = unquote_string(heap_allocator(), &token.string);
+			success = unquote_string(heap_allocator(), &token.string);
 			if (success > 0) {
 				if (success == 2) {
 					array_add(&t->allocated_strings, token.string);

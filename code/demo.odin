@@ -1,5 +1,34 @@
 #import "fmt.odin"
+#import "utf8.odin"
 
 main :: proc() {
-	fmt.println("Hellope, World!")
+	MAX :: 64
+	buf:     [MAX]rune
+	backing: [MAX]byte
+	offset:  int
+
+	msg := "Hello"
+	count := utf8.rune_count(msg)
+	assert(count <= MAX)
+	runes := buf[:count]
+
+	offset = 0
+	for i := 0; i < count; i++ {
+		s := msg[offset:]
+		r, len := utf8.decode_rune(s)
+		runes[count-i-1] = r
+		offset += len
+	}
+
+	offset = 0
+	for i := 0; i < count; i++ {
+		data, len := utf8.encode_rune(runes[i])
+		for j := 0; j < len; j++ {
+			backing[offset+j] = data[j]
+		}
+		offset += len
+	}
+
+	reverse := backing[:count] as string
+	fmt.println(reverse)
 }

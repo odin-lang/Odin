@@ -148,8 +148,8 @@ ExactValue exact_value_to_float(ExactValue v) {
 }
 
 
-ExactValue exact_unary_operator_value(Token op, ExactValue v, i32 precision) {
-	switch (op.kind) {
+ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision) {
+	switch (op) {
 	case Token_Add:	{
 		switch (v.kind) {
 		case ExactValue_Invalid:
@@ -207,7 +207,7 @@ ExactValue exact_unary_operator_value(Token op, ExactValue v, i32 precision) {
 	}
 
 failure:
-	GB_PANIC("Invalid unary operation, %.*s", LIT(token_strings[op.kind]));
+	GB_PANIC("Invalid unary operation, %.*s", LIT(token_strings[op]));
 
 	ExactValue error_value = {0};
 	return error_value;
@@ -270,7 +270,7 @@ void match_exact_values(ExactValue *x, ExactValue *y) {
 }
 
 // TODO(bill): Allow for pointer arithmetic? Or are pointer slices good enough?
-ExactValue exact_binary_operator_value(Token op, ExactValue x, ExactValue y) {
+ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y) {
 	match_exact_values(&x, &y);
 
 	switch (x.kind) {
@@ -278,7 +278,7 @@ ExactValue exact_binary_operator_value(Token op, ExactValue x, ExactValue y) {
 		return x;
 
 	case ExactValue_Bool:
-		switch (op.kind) {
+		switch (op) {
 		case Token_CmpAnd: return make_exact_value_bool(x.value_bool && y.value_bool);
 		case Token_CmpOr:  return make_exact_value_bool(x.value_bool || y.value_bool);
 		case Token_And:    return make_exact_value_bool(x.value_bool & y.value_bool);
@@ -291,7 +291,7 @@ ExactValue exact_binary_operator_value(Token op, ExactValue x, ExactValue y) {
 		i64 a = x.value_integer;
 		i64 b = y.value_integer;
 		i64 c = 0;
-		switch (op.kind) {
+		switch (op) {
 		case Token_Add:    c = a + b;  break;
 		case Token_Sub:    c = a - b;  break;
 		case Token_Mul:    c = a * b;  break;
@@ -312,7 +312,7 @@ ExactValue exact_binary_operator_value(Token op, ExactValue x, ExactValue y) {
 	case ExactValue_Float: {
 		f64 a = x.value_float;
 		f64 b = y.value_float;
-		switch (op.kind) {
+		switch (op) {
 		case Token_Add: return make_exact_value_float(a + b);
 		case Token_Sub: return make_exact_value_float(a - b);
 		case Token_Mul: return make_exact_value_float(a * b);
@@ -324,22 +324,22 @@ ExactValue exact_binary_operator_value(Token op, ExactValue x, ExactValue y) {
 
 error:
 	ExactValue error_value = {0};
-	// gb_printf_err("Invalid binary operation: %s\n", token_kind_to_string(op.kind));
+	// gb_printf_err("Invalid binary operation: %s\n", token_kind_to_string(op));
 	return error_value;
 }
 
-gb_inline ExactValue exact_value_add(ExactValue x, ExactValue y) { Token op = {Token_Add};        return exact_binary_operator_value(op, x, y); }
-gb_inline ExactValue exact_value_sub(ExactValue x, ExactValue y) { Token op = {Token_Sub};        return exact_binary_operator_value(op, x, y); }
-gb_inline ExactValue exact_value_mul(ExactValue x, ExactValue y) { Token op = {Token_Mul};        return exact_binary_operator_value(op, x, y); }
-gb_inline ExactValue exact_value_quo(ExactValue x, ExactValue y) { Token op = {Token_Quo};        return exact_binary_operator_value(op, x, y); }
-gb_inline ExactValue exact_value_shift(Token op, ExactValue x, ExactValue y) { return exact_binary_operator_value(op, x, y); }
+gb_inline ExactValue exact_value_add(ExactValue x, ExactValue y) { return exact_binary_operator_value(Token_Add, x, y); }
+gb_inline ExactValue exact_value_sub(ExactValue x, ExactValue y) { return exact_binary_operator_value(Token_Sub, x, y); }
+gb_inline ExactValue exact_value_mul(ExactValue x, ExactValue y) { return exact_binary_operator_value(Token_Mul, x, y); }
+gb_inline ExactValue exact_value_quo(ExactValue x, ExactValue y) { return exact_binary_operator_value(Token_Quo, x, y); }
+gb_inline ExactValue exact_value_shift(TokenKind op, ExactValue x, ExactValue y) { return exact_binary_operator_value(op, x, y); }
 
 
 i32 cmp_f64(f64 a, f64 b) {
 	return (a > b) - (a < b);
 }
 
-bool compare_exact_values(Token op, ExactValue x, ExactValue y) {
+bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 	match_exact_values(&x, &y);
 
 	switch (x.kind) {
@@ -347,7 +347,7 @@ bool compare_exact_values(Token op, ExactValue x, ExactValue y) {
 		return false;
 
 	case ExactValue_Bool:
-		switch (op.kind) {
+		switch (op) {
 		case Token_CmpEq: return x.value_bool == y.value_bool;
 		case Token_NotEq: return x.value_bool != y.value_bool;
 		}
@@ -356,7 +356,7 @@ bool compare_exact_values(Token op, ExactValue x, ExactValue y) {
 	case ExactValue_Integer: {
 		i64 a = x.value_integer;
 		i64 b = y.value_integer;
-		switch (op.kind) {
+		switch (op) {
 		case Token_CmpEq: return a == b;
 		case Token_NotEq: return a != b;
 		case Token_Lt:    return a <  b;
@@ -369,7 +369,7 @@ bool compare_exact_values(Token op, ExactValue x, ExactValue y) {
 	case ExactValue_Float: {
 		f64 a = x.value_float;
 		f64 b = y.value_float;
-		switch (op.kind) {
+		switch (op) {
 		case Token_CmpEq: return cmp_f64(a, b) == 0;
 		case Token_NotEq: return cmp_f64(a, b) != 0;
 		case Token_Lt:    return cmp_f64(a, b) <  0;
@@ -384,7 +384,7 @@ bool compare_exact_values(Token op, ExactValue x, ExactValue y) {
 		String b = y.value_string;
 		isize len = gb_min(a.len, b.len);
 		// TODO(bill): gb_memcompare is used because the strings are UTF-8
-		switch (op.kind) {
+		switch (op) {
 		case Token_CmpEq: return gb_memcompare(a.text, b.text, len) == 0;
 		case Token_NotEq: return gb_memcompare(a.text, b.text, len) != 0;
 		case Token_Lt:    return gb_memcompare(a.text, b.text, len) <  0;

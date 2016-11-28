@@ -271,8 +271,9 @@ CycleChecker *cycle_checker_add(CycleChecker *cc, Entity *e) {
 	if (cc->path.e == NULL) {
 		array_init(&cc->path, heap_allocator());
 	}
-	GB_ASSERT(e != NULL && e->kind == Entity_TypeName);
-	array_add(&cc->path, e);
+	if (e != NULL && e->kind == Entity_TypeName) {
+		array_add(&cc->path, e);
+	}
 	return cc;
 }
 
@@ -508,6 +509,11 @@ void add_global_constant(gbAllocator a, String name, Type *type, ExactValue valu
 }
 
 
+void add_global_string_constant(gbAllocator a, String name, String value) {
+	add_global_constant(a, name, t_untyped_string, make_exact_value_string(value));
+
+}
+
 
 void init_universal_scope(void) {
 	// NOTE(bill): No need to free these
@@ -528,9 +534,11 @@ void init_universal_scope(void) {
 
 	add_global_entity(make_entity_nil(a, str_lit("nil"), t_untyped_nil));
 
-	add_global_constant(a, str_lit("ODIN_OS"),      t_untyped_string, make_exact_value_string(str_lit("windows")));
-	add_global_constant(a, str_lit("ODIN_ARCH"),    t_untyped_string, make_exact_value_string(str_lit("amd64")));
-	add_global_constant(a, str_lit("ODIN_VERSION"), t_untyped_string, make_exact_value_string(str_lit(VERSION_STRING)));
+	add_global_string_constant(a, str_lit("ODIN_OS"),      str_lit("windows"));
+	add_global_string_constant(a, str_lit("ODIN_ARCH"),    str_lit("amd64"));
+	add_global_string_constant(a, str_lit("ODIN_VENDOR"),  str_lit("odin"));
+	add_global_string_constant(a, str_lit("ODIN_VERSION"), str_lit(VERSION_STRING));
+	add_global_string_constant(a, str_lit("ODIN_ENDIAN"),  str_lit("little"));
 
 
 // Builtin Procedures

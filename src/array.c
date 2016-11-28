@@ -11,8 +11,8 @@ GB_STATIC_ASSERT(ARRAY_GROW_FORMULA(0) > 0);
 typedef Array(void) ArrayVoid;
 
 #define array_init_reserve(x_, allocator_, init_capacity_) do { \
-	GB_ASSERT((x_) != NULL); \
 	void **e = cast(void **)&((x_)->e); \
+	GB_ASSERT((x_) != NULL); \
 	(x_)->allocator = (allocator_); \
 	(x_)->count = 0; \
 	(x_)->capacity = (init_capacity_); \
@@ -20,8 +20,8 @@ typedef Array(void) ArrayVoid;
 } while (0)
 
 #define array_init_count(x_, allocator_, init_count_) do { \
-	GB_ASSERT((x_) != NULL); \
 	void **e = cast(void **)&((x_)->e); \
+	GB_ASSERT((x_) != NULL); \
 	(x_)->allocator = (allocator_); \
 	(x_)->count = (init_count_); \
 	(x_)->capacity = (init_count_); \
@@ -67,8 +67,8 @@ typedef Array(void) ArrayVoid;
 
 
 void array__set_capacity(void *ptr, isize capacity, isize element_size) {
-	GB_ASSERT(ptr != NULL);
 	ArrayVoid *x = cast(ArrayVoid *)ptr;
+	GB_ASSERT(ptr != NULL);
 
 	GB_ASSERT(element_size > 0);
 

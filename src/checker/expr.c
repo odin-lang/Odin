@@ -713,12 +713,10 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 			if (o.mode != Addressing_Invalid) {
 				iota = o.value;
 			} else {
-				Token add_token = {Token_Add};
-				iota = exact_binary_operator_value(add_token, iota, make_exact_value_integer(1));
+				iota = exact_binary_operator_value(Token_Add, iota, make_exact_value_integer(1));
 			}
 		} else {
-			Token add_token = {Token_Add};
-			iota = exact_binary_operator_value(add_token, iota, make_exact_value_integer(1));
+			iota = exact_binary_operator_value(Token_Add, iota, make_exact_value_integer(1));
 		}
 
 
@@ -1492,7 +1490,7 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 		if (is_type_unsigned(type)) {
 			precision = cast(i32)(8 * type_size_of(c->sizes, c->allocator, type));
 		}
-		o->value = exact_unary_operator_value(op, o->value, precision);
+		o->value = exact_unary_operator_value(op.kind, o->value, precision);
 
 		if (is_type_typed(type)) {
 			if (node != NULL) {
@@ -1558,7 +1556,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, Token op) {
 	} else {
 		if (x->mode == Addressing_Constant &&
 		    y->mode == Addressing_Constant) {
-			x->value = make_exact_value_bool(compare_exact_values(op, x->value, y->value));
+			x->value = make_exact_value_bool(compare_exact_values(op.kind, x->value, y->value));
 		} else {
 			x->mode = Addressing_Value;
 
@@ -1645,7 +1643,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 				x->type = t_untyped_integer;
 			}
 
-			x->value = exact_value_shift(be->op, x_val, make_exact_value_integer(amount));
+			x->value = exact_value_shift(be->op.kind, x_val, make_exact_value_integer(amount));
 
 			if (is_type_typed(x->type)) {
 				check_is_expressible(c, x, base_type(x->type));
@@ -2168,7 +2166,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		if (op.kind == Token_Quo && is_type_integer(type)) {
 			op.kind = Token_QuoEq; // NOTE(bill): Hack to get division of integers
 		}
-		x->value = exact_binary_operator_value(op, a, b);
+		x->value = exact_binary_operator_value(op.kind, a, b);
 		if (is_type_typed(type)) {
 			if (node != NULL) {
 				x->expr = node;
@@ -3166,7 +3164,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	case BuiltinProc_min: {
 		// min :: proc(a, b: comparable) -> comparable
 		Type *type = base_type(operand->type);
-		if (!is_type_comparable(type) || !is_type_numeric(type)) {
+		if (!is_type_comparable(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
 			error(ast_node_token(call),
 			      "Expected a comparable numeric type to `min`, got `%s`",
@@ -3182,7 +3180,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (b.mode == Addressing_Invalid) {
 			return false;
 		}
-		if (!is_type_comparable(b.type) || !is_type_numeric(type)) {
+		if (!is_type_comparable(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
 			gbString type_str = type_to_string(b.type);
 			error(ast_node_token(call),
 			      "Expected a comparable numeric type to `min`, got `%s`",
@@ -3195,10 +3193,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		    b.mode == Addressing_Constant) {
 			ExactValue x = a.value;
 			ExactValue y = b.value;
-			Token lt = {Token_Lt};
 
 			operand->mode = Addressing_Constant;
-			if (compare_exact_values(lt, x, y)) {
+			if (compare_exact_values(Token_Lt, x, y)) {
 				operand->value = x;
 				operand->type = a.type;
 			} else {
@@ -3235,10 +3232,10 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	case BuiltinProc_max: {
 		// min :: proc(a, b: comparable) -> comparable
 		Type *type = base_type(operand->type);
-		if (!is_type_comparable(type) || !is_type_numeric(type)) {
+		if (!is_type_comparable(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
 			error(ast_node_token(call),
-			      "Expected a comparable numeric type to `max`, got `%s`",
+			      "Expected a comparable numeric or string type to `max`, got `%s`",
 			      type_str);
 			gb_string_free(type_str);
 			return false;
@@ -3251,10 +3248,10 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (b.mode == Addressing_Invalid) {
 			return false;
 		}
-		if (!is_type_comparable(b.type) || !is_type_numeric(type)) {
+		if (!is_type_comparable(b.type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(b.type);
 			error(ast_node_token(call),
-			      "Expected a comparable numeric type to `max`, got `%s`",
+			      "Expected a comparable numeric or string type to `max`, got `%s`",
 			      type_str);
 			gb_string_free(type_str);
 			return false;
@@ -3264,10 +3261,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		    b.mode == Addressing_Constant) {
 			ExactValue x = a.value;
 			ExactValue y = b.value;
-			Token gt = {Token_Gt};
 
 			operand->mode = Addressing_Constant;
-			if (compare_exact_values(gt, x, y)) {
+			if (compare_exact_values(Token_Gt, x, y)) {
 				operand->value = x;
 				operand->type = a.type;
 			} else {

@@ -42,10 +42,10 @@ bool rune_is_whitespace(Rune r) {
 
 
 bool is_string_an_identifier(String s) {
+	isize offset = 0;
 	if (s.len < 1) {
 		return false;
 	}
-	isize offset = 0;
 	while (offset < s.len) {
 		bool ok = false;
 		Rune r = -1;

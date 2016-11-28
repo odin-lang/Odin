@@ -2447,27 +2447,11 @@ void ssa_emit_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low,
 		return;
 	}
 
-
 	low  = ssa_emit_conv(proc, low,  t_int);
 	high = ssa_emit_conv(proc, high, t_int);
 	max  = ssa_emit_conv(proc, max,  t_int);
 
 	ssa_emit(proc, ssa_make_instr_slice_bounds_check(proc, token.pos, low, high, max, is_substring));
-
-	// gbAllocator a = proc->module->allocator;
-	// ssaValue **args = gb_alloc_array(a, ssaValue *, 6);
-	// args[0] = ssa_emit_global_string(proc, token.pos.file);
-	// args[1] = ssa_make_const_int(a, token.pos.line);
-	// args[2] = ssa_make_const_int(a, token.pos.column);
-	// args[3] = ssa_emit_conv(proc, low, t_int);
-	// args[4] = ssa_emit_conv(proc, high, t_int);
-	// args[5] = ssa_emit_conv(proc, max, t_int);
-
-	// if (!is_substring) {
-	// 	ssa_emit_global_call(proc, "__slice_expr_error", args, 6);
-	// } else {
-	// 	ssa_emit_global_call(proc, "__substring_expr_error", args, 5);
-	// }
 }
 
 
@@ -2878,7 +2862,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					Type *elem_type = slice_type->Slice.elem;
 					i64 size_of_elem = type_size_of(proc->module->sizes, proc->module->allocator, elem_type);
 
-
 					ssaValue *dst = ssa_emit_conv(proc, ssa_slice_elem(proc, dst_slice), t_rawptr);
 					ssaValue *src = ssa_emit_conv(proc, ssa_slice_elem(proc, src_slice), t_rawptr);
 
@@ -3031,7 +3014,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssa_emit_comment(proc, str_lit("min"));
 					ssaValue *x = ssa_build_expr(proc, ce->args.e[0]);
 					ssaValue *y = ssa_build_expr(proc, ce->args.e[1]);
-					Type *t = base_type(ssa_type(x));
 					ssaValue *cond = ssa_emit_comp(proc, Token_Lt, x, y);
 					return ssa_emit_select(proc, cond, x, y);
 				} break;
@@ -3040,7 +3022,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					ssa_emit_comment(proc, str_lit("max"));
 					ssaValue *x = ssa_build_expr(proc, ce->args.e[0]);
 					ssaValue *y = ssa_build_expr(proc, ce->args.e[1]);
-					Type *t = base_type(ssa_type(x));
 					ssaValue *cond = ssa_emit_comp(proc, Token_Gt, x, y);
 					return ssa_emit_select(proc, cond, x, y);
 				} break;

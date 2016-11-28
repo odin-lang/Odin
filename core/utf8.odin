@@ -1,8 +1,8 @@
-RUNE_ERROR :: #rune "\ufffd"
+RUNE_ERROR :: '\ufffd'
 RUNE_SELF  :: 0x80
 RUNE_BOM   :: 0xfeff
 RUNE_EOF   :: ~(0 as rune)
-MAX_RUNE   :: #rune "\U0010ffff"
+MAX_RUNE   :: '\U0010ffff'
 UTF_MAX    :: 4
 
 

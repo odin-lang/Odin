@@ -243,6 +243,7 @@ void _J2(MAP_PROC,set)(MAP_NAME *h, HashKey key, MAP_TYPE value) {
 
 
 void _J2(MAP_PROC,_erase)(MAP_NAME *h, MapFindResult fr) {
+	MapFindResult last;
 	if (fr.entry_prev < 0) {
 		h->hashes.e[fr.hash_index] = h->entries.e[fr.entry_index].next;
 	} else {
@@ -253,7 +254,7 @@ void _J2(MAP_PROC,_erase)(MAP_NAME *h, MapFindResult fr) {
 		return;
 	}
 	h->entries.e[fr.entry_index] = h->entries.e[h->entries.count-1];
-	MapFindResult last = _J2(MAP_PROC,_find)(h, h->entries.e[fr.entry_index].key);
+	last = _J2(MAP_PROC,_find)(h, h->entries.e[fr.entry_index].key);
 	if (last.entry_prev >= 0) {
 		h->entries.e[last.entry_prev].next = fr.entry_index;
 	} else {
@@ -314,11 +315,13 @@ void _J2(MAP_PROC,multi_get_all)(MAP_NAME *h, HashKey key, MAP_TYPE *items) {
 }
 
 void _J2(MAP_PROC,multi_insert)(MAP_NAME *h, HashKey key, MAP_TYPE value) {
+	MapFindResult fr;
+	isize i;
 	if (h->hashes.count == 0) {
 		_J2(MAP_PROC,grow)(h);
 	}
-	MapFindResult fr = _J2(MAP_PROC,_find)(h, key);
-	isize i = _J2(MAP_PROC,_add_entry)(h, key);
+	fr = _J2(MAP_PROC,_find)(h, key);
+	i = _J2(MAP_PROC,_add_entry)(h, key);
 	if (fr.entry_prev < 0) {
 		h->hashes.e[fr.hash_index] = i;
 	} else {

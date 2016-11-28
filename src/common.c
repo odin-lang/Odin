@@ -14,14 +14,19 @@ gb_global bool global_module_path_set = false;
 
 
 String get_module_dir() {
+	String path = global_module_path;
+	Array(wchar_t) path_buf;
+	isize len, i;
+	gbTempArenaMemory tmp;
+	wchar_t *text;
+
 	if (global_module_path_set) {
 		return global_module_path;
 	}
 
-	Array(wchar_t) path_buf;
 	array_init_count(&path_buf, heap_allocator(), 300);
 
-	isize len = 0;
+	len = 0;
 	for (;;) {
 		len = GetModuleFileNameW(NULL, &path_buf.e[0], path_buf.count);
 		if (len == 0) {
@@ -33,13 +38,13 @@ String get_module_dir() {
 		array_resize(&path_buf, 2*path_buf.count + 300);
 	}
 
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 
-	wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
+	text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
 
 	GetModuleFileNameW(NULL, text, len);
-	String path = string16_to_string(heap_allocator(), make_string16(text, len));
-	for (isize i = path.len-1; i >= 0; i--) {
+	path = string16_to_string(heap_allocator(), make_string16(text, len));
+	for (i = path.len-1; i >= 0; i--) {
 		u8 c = path.text[i];
 		if (c == '/' || c == '\\') {
 			break;
@@ -141,8 +146,9 @@ i16 f32_to_f16(f32 value) {
 		if (e > 30) {
 			float volatile f = 1e12f;
 			int j;
-			for (j = 0; j < 10; j++)
+			for (j = 0; j < 10; j++) {
 				f *= f; /* NOTE(bill): Cause overflow */
+			}
 
 			return cast(i16)(s | 0x7c00);
 		}
