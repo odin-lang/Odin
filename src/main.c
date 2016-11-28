@@ -1,7 +1,7 @@
 #if defined(__cplusplus)
 extern "C" {
 #endif
-#define VERSION_STRING "v0.0.3c"
+#define VERSION_STRING "v0.0.3d"
 
 #include "common.c"
 #include "timings.c"
