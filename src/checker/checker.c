@@ -125,6 +125,7 @@ typedef enum BuiltinProcId {
 	BuiltinProc_min,
 	BuiltinProc_max,
 	BuiltinProc_abs,
+	BuiltinProc_clamp,
 
 	BuiltinProc_enum_to_string,
 
@@ -133,7 +134,7 @@ typedef enum BuiltinProcId {
 typedef struct BuiltinProc {
 	String   name;
 	isize    arg_count;
-	bool      variadic;
+	bool     variadic;
 	ExprKind kind;
 } BuiltinProc;
 gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
@@ -169,6 +170,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("min"),              2, false, Expr_Expr},
 	{STR_LIT("max"),              2, false, Expr_Expr},
 	{STR_LIT("abs"),              1, false, Expr_Expr},
+	{STR_LIT("clamp"),            3, false, Expr_Expr},
 
 	{STR_LIT("enum_to_string"),   1, false, Expr_Expr},
 };

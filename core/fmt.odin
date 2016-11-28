@@ -359,8 +359,8 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 	case Float:
 		match type f : arg {
 		// case f16:  print_f64_to_buffer(buf, f as f64)
-		case f32:  print_f64_to_buffer(buf, f as f64)
-		case f64:  print_f64_to_buffer(buf, f as f64)
+		case f32:  print_f32_to_buffer(buf, f)
+		case f64:  print_f64_to_buffer(buf, f)
 		// case f128: print_f64_to_buffer(buf, f as f64)
 		}
 

@@ -3012,16 +3012,18 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 				case BuiltinProc_min: {
 					ssa_emit_comment(proc, str_lit("min"));
-					ssaValue *x = ssa_build_expr(proc, ce->args.e[0]);
-					ssaValue *y = ssa_build_expr(proc, ce->args.e[1]);
+					Type *t = type_of_expr(proc->module->info, expr);
+					ssaValue *x = ssa_emit_conv(proc, ssa_build_expr(proc, ce->args.e[0]), t);
+					ssaValue *y = ssa_emit_conv(proc, ssa_build_expr(proc, ce->args.e[1]), t);
 					ssaValue *cond = ssa_emit_comp(proc, Token_Lt, x, y);
 					return ssa_emit_select(proc, cond, x, y);
 				} break;
 
 				case BuiltinProc_max: {
 					ssa_emit_comment(proc, str_lit("max"));
-					ssaValue *x = ssa_build_expr(proc, ce->args.e[0]);
-					ssaValue *y = ssa_build_expr(proc, ce->args.e[1]);
+					Type *t = type_of_expr(proc->module->info, expr);
+					ssaValue *x = ssa_emit_conv(proc, ssa_build_expr(proc, ce->args.e[0]), t);
+					ssaValue *y = ssa_emit_conv(proc, ssa_build_expr(proc, ce->args.e[1]), t);
 					ssaValue *cond = ssa_emit_comp(proc, Token_Gt, x, y);
 					return ssa_emit_select(proc, cond, x, y);
 				} break;
@@ -3065,6 +3067,20 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 						v = ssa_emit_bitcast(proc, v, original_type);
 					}
 					return v;
+				} break;
+
+				case BuiltinProc_clamp: {
+					ssa_emit_comment(proc, str_lit("clamp"));
+					Type *t = type_of_expr(proc->module->info, expr);
+					ssaValue *x   = ssa_emit_conv(proc, ssa_build_expr(proc, ce->args.e[0]), t);
+					ssaValue *min = ssa_emit_conv(proc, ssa_build_expr(proc, ce->args.e[1]), t);
+					ssaValue *max = ssa_emit_conv(proc, ssa_build_expr(proc, ce->args.e[2]), t);
+					ssaValue *cond;
+					cond = ssa_emit_comp(proc, Token_Gt, min, x);
+					x    = ssa_emit_select(proc, cond,   min, x);
+					cond = ssa_emit_comp(proc, Token_Lt, max, x);
+					x    = ssa_emit_select(proc, cond,   max, x);
+					return x;
 				} break;
 
 				case BuiltinProc_enum_to_string: {
@@ -3471,9 +3487,9 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 			ssa_emit_slice_bounds_check(proc, se->open, low, high, max, false);
 
-			ssaValue *elem = ssa_slice_elem(proc, base);
-			ssaValue *len  = ssa_emit_arith(proc, Token_Sub, high, low, t_int);
-			ssaValue *cap  = ssa_emit_arith(proc, Token_Sub, max,  low, t_int);
+			ssaValue *elem  = ssa_emit_ptr_offset(proc, ssa_slice_elem(proc, base), low);
+			ssaValue *len   = ssa_emit_arith(proc, Token_Sub, high, low, t_int);
+			ssaValue *cap   = ssa_emit_arith(proc, Token_Sub, max,  low, t_int);
 			ssaValue *slice = ssa_add_local_generated(proc, slice_type);
 
 			ssaValue *gep0 = ssa_emit_struct_ep(proc, slice, 0);
@@ -3495,7 +3511,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 			ssa_emit_slice_bounds_check(proc, se->open, low, high, max, false);
 
-			ssaValue *elem = ssa_array_elem(proc, addr);
+			ssaValue *elem = ssa_emit_ptr_offset(proc, ssa_array_elem(proc, addr), low);
 			ssaValue *len  = ssa_emit_arith(proc, Token_Sub, high, low, t_int);
 			ssaValue *cap  = ssa_emit_arith(proc, Token_Sub, max,  low, t_int);
 			ssaValue *slice = ssa_add_local_generated(proc, slice_type);
@@ -5128,14 +5144,9 @@ void ssa_gen_tree(ssaGen *s) {
 					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), gep);
 
 					isize ez = type_size_of(m->sizes, a, t->Vector.elem);
-					ssaValue *elem_size = ssa_emit_struct_ep(proc, tag, 1);
-					ssa_emit_store(proc, elem_size, ssa_make_const_int(a, ez));
-
-					ssaValue *count = ssa_emit_struct_ep(proc, tag, 2);
-					ssa_emit_store(proc, count, ssa_make_const_int(a, t->Vector.count));
-
-					ssaValue *align = ssa_emit_struct_ep(proc, tag, 3);
-					ssa_emit_store(proc, count, ssa_make_const_int(a, type_align_of(m->sizes, a, t)));
+					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 1), ssa_make_const_int(a, ez));
+					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 2), ssa_make_const_int(a, t->Vector.count));
+					ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 3), ssa_make_const_int(a, type_align_of(m->sizes, a, t)));
 
 				} break;
 				case Type_Record: {

@@ -2572,6 +2572,10 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	}
 
 	switch (id) {
+	default:
+		GB_PANIC("Implement builtin procedure: %.*s", LIT(builtin_procs[id].name));
+		break;
+
 	case BuiltinProc_new: {
 		// new :: proc(Type) -> ^Type
 		Operand op = {0};
@@ -3248,7 +3252,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (b.mode == Addressing_Invalid) {
 			return false;
 		}
-		if (!is_type_comparable(b.type) || !(is_type_numeric(type) || is_type_string(type))) {
+		if (!is_type_comparable(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
 			gbString type_str = type_to_string(b.type);
 			error(ast_node_token(call),
 			      "Expected a comparable numeric or string type to `max`, got `%s`",
@@ -3326,6 +3330,100 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->type = type;
+	} break;
+
+	case BuiltinProc_clamp: {
+		// clamp :: proc(a, min, max: comparable) -> comparable
+		Type *type = base_type(operand->type);
+		if (!is_type_comparable(type) || !(is_type_numeric(type) || is_type_string(type))) {
+			gbString type_str = type_to_string(operand->type);
+			error(ast_node_token(call),
+			      "Expected a comparable numeric or string type to `clamp`, got `%s`",
+			      type_str);
+			gb_string_free(type_str);
+			return false;
+		}
+
+		AstNode *min_arg = ce->args.e[1];
+		AstNode *max_arg = ce->args.e[2];
+		Operand x = *operand;
+		Operand y = {0};
+		Operand z = {0};
+
+		check_expr(c, &y, min_arg);
+		if (y.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!is_type_comparable(y.type) || !(is_type_numeric(y.type) || is_type_string(y.type))) {
+			gbString type_str = type_to_string(y.type);
+			error(ast_node_token(call),
+			      "Expected a comparable numeric or string type to `clamp`, got `%s`",
+			      type_str);
+			gb_string_free(type_str);
+			return false;
+		}
+
+		check_expr(c, &z, max_arg);
+		if (z.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!is_type_comparable(z.type) || !(is_type_numeric(z.type) || is_type_string(z.type))) {
+			gbString type_str = type_to_string(z.type);
+			error(ast_node_token(call),
+			      "Expected a comparable numeric or string type to `clamp`, got `%s`",
+			      type_str);
+			gb_string_free(type_str);
+			return false;
+		}
+
+		if (x.mode == Addressing_Constant &&
+		    y.mode == Addressing_Constant &&
+		    z.mode == Addressing_Constant) {
+			ExactValue a = x.value;
+			ExactValue b = y.value;
+			ExactValue c = z.value;
+
+			operand->mode = Addressing_Constant;
+			if (compare_exact_values(Token_Lt, a, b)) {
+				operand->value = b;
+				operand->type = y.type;
+			} else if (compare_exact_values(Token_Gt, a, c)) {
+				operand->value = c;
+				operand->type = z.type;
+			} else {
+				operand->value = a;
+				operand->type = x.type;
+			}
+		} else {
+			operand->mode = Addressing_Value;
+			operand->type = type;
+
+			convert_to_typed(c, &x, y.type, 0);
+			if (x.mode == Addressing_Invalid) { return false; }
+			convert_to_typed(c, &y, x.type, 0);
+			if (y.mode == Addressing_Invalid) { return false; }
+			convert_to_typed(c, &x, z.type, 0);
+			if (x.mode == Addressing_Invalid) { return false; }
+			convert_to_typed(c, &z, x.type, 0);
+			if (z.mode == Addressing_Invalid) { return false; }
+			convert_to_typed(c, &y, z.type, 0);
+			if (y.mode == Addressing_Invalid) { return false; }
+			convert_to_typed(c, &z, y.type, 0);
+			if (z.mode == Addressing_Invalid) { return false; }
+
+			if (!are_types_identical(x.type, y.type) || !are_types_identical(x.type, z.type)) {
+				gbString type_x = type_to_string(x.type);
+				gbString type_y = type_to_string(y.type);
+				gbString type_z = type_to_string(z.type);
+				error(ast_node_token(call),
+				      "Mismatched types to `clamp`, `%s`, `%s`, `%s`",
+				      type_x, type_y, type_z);
+				gb_string_free(type_z);
+				gb_string_free(type_y);
+				gb_string_free(type_x);
+				return false;
+			}
+		}
 	} break;
 
 	case BuiltinProc_enum_to_string: {
