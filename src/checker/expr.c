@@ -901,6 +901,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 		return;
 	}
 
+
 	Type *type = e->type;
 
 	switch (e->kind) {
@@ -1179,6 +1180,12 @@ end:
 		type = t_invalid;
 	}
 
+	if (is_type_named(type)) {
+		if (type->Named.base == NULL) {
+			type->Named.base = t_invalid;
+		}
+	}
+
 	set_base_type(named_type, type);
 	GB_ASSERT(is_type_typed(type));
 
@@ -1282,7 +1289,6 @@ bool check_binary_op(Checker *c, Operand *o, Token op) {
 
 	case Token_CmpAnd:
 	case Token_CmpOr:
-
 	case Token_CmpAndEq:
 	case Token_CmpOrEq:
 		if (!is_type_boolean(type)) {
@@ -2024,9 +2030,8 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		}
 
 		Entity **variables = gb_alloc_array(c->allocator, Entity *, 2);
-		Token tok = make_token_ident(str_lit(""));
-		variables[0] = make_entity_param(c->allocator, NULL, tok, type, false);
-		variables[1] = make_entity_param(c->allocator, NULL, tok, t_bool, false);
+		variables[0] = make_entity_param(c->allocator, NULL, empty_token, type, false);
+		variables[1] = make_entity_param(c->allocator, NULL, empty_token, t_bool, false);
 
 		Type *tuple = make_type_tuple(c->allocator);
 		tuple->Tuple.variables = variables;
@@ -2353,8 +2358,7 @@ bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *val
 
 	if (!is_type_integer(get_enum_base_type(operand.type))) {
 		gbString expr_str = expr_to_string(operand.expr);
-		error(ast_node_token(operand.expr),
-		            "Index `%s` must be an integer", expr_str);
+		error(ast_node_token(operand.expr), "Index `%s` must be an integer", expr_str);
 		gb_string_free(expr_str);
 		if (value) *value = 0;
 		return false;
@@ -2365,8 +2369,7 @@ bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *val
 		i64 i = exact_value_to_integer(operand.value).value_integer;
 		if (i < 0) {
 			gbString expr_str = expr_to_string(operand.expr);
-			error(ast_node_token(operand.expr),
-			            "Index `%s` cannot be a negative value", expr_str);
+			error(ast_node_token(operand.expr), "Index `%s` cannot be a negative value", expr_str);
 			gb_string_free(expr_str);
 			if (value) *value = 0;
 			return false;
@@ -2376,8 +2379,7 @@ bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *val
 			if (value) *value = i;
 			if (i >= max_count) {
 				gbString expr_str = expr_to_string(operand.expr);
-				error(ast_node_token(operand.expr),
-				            "Index `%s` is out of bounds range 0..<%lld", expr_str, max_count);
+				error(ast_node_token(operand.expr), "Index `%s` is out of bounds range 0..<%lld", expr_str, max_count);
 				gb_string_free(expr_str);
 				return false;
 			}
@@ -2425,12 +2427,10 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 				check_entity_decl(c, entity, NULL, NULL, NULL);
 			}
 			GB_ASSERT(entity->type != NULL);
-			// bool is_not_exported = !is_entity_exported(entity);
 
 			b32 is_not_exported = true;
-
 			Entity **found = map_entity_get(&e->ImportName.scope->implicit, hash_string(sel_name));
-			if (!found) {
+			if (found == NULL) {
 				is_not_exported = false;
 			} else {
 				Entity *f = *found;
@@ -2438,15 +2438,6 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 					is_not_exported = true;
 				}
 			}
-
-			// // TODO(bill): Fix this for `#import "file.odin" as .`
-			// if (true || is_not_exported) {
-			// 	Entity **found =
-			// 	if (!found && e->ImportName.scope != entity->scope) {
-			// 		is_not_exported = false;
-			// 	}
-			// 	gb_printf("%.*s\n", LIT(entity->token.string));
-			// }
 
 			if (is_not_exported) {
 				gbString sel_str = expr_to_string(selector);
@@ -2777,7 +2768,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			gb_string_free(type_str);
 			return false;
 		}
-
 
 		operand->mode = Addressing_Constant;
 		// IMPORTANT TODO(bill): Fix for anonymous fields
@@ -4461,9 +4451,9 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_end;
 
 	case_ast_node(vt, VectorType, node);
-		str = gb_string_appendc(str, "{");
+		str = gb_string_appendc(str, "[vector ");
 		str = write_expr_to_string(str, vt->count);
-		str = gb_string_appendc(str, "}");
+		str = gb_string_appendc(str, "]");
 		str = write_expr_to_string(str, vt->elem);
 	case_end;
 

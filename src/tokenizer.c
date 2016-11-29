@@ -94,6 +94,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_if,             "if"), \
 	TOKEN_KIND(Token_else,           "else"), \
 	TOKEN_KIND(Token_for,            "for"), \
+	TOKEN_KIND(Token_when,           "when"), \
 	TOKEN_KIND(Token_range,          "range"), \
 	TOKEN_KIND(Token_defer,          "defer"), \
 	TOKEN_KIND(Token_return,         "return"), \
@@ -101,6 +102,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_union,          "union"), \
 	TOKEN_KIND(Token_raw_union,      "raw_union"), \
 	TOKEN_KIND(Token_enum,           "enum"), \
+	TOKEN_KIND(Token_vector,         "vector"), \
 	TOKEN_KIND(Token_using,          "using"), \
 	TOKEN_KIND(Token_asm,            "asm"), \
 	TOKEN_KIND(Token_volatile,       "volatile"), \

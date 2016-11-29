@@ -4,7 +4,7 @@
 set exe_name=odin.exe
 
 :: Debug = 0, Release = 1
-set release_mode=1
+set release_mode=0
 
 set compiler_flags= -nologo -Oi -TC -W4 -fp:fast -fp:except- -Gm- -MP -FC -GS- -EHsc- -GR-
 
@@ -16,7 +16,7 @@ if %release_mode% EQU 0 ( rem Debug
 )
 
 set compiler_warnings= ^
-	-we4013 -we4706 -we4002 -we4133 ^
+	-we4013 -we4706 -we4002 -we4133 -we4047 -we4024 ^
 	-wd4100 -wd4101 -wd4127 -wd4189 ^
 	-wd4201 -wd4204 -wd4244 ^
 	-wd4306 ^

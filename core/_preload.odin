@@ -160,7 +160,7 @@ Context :: struct #ordered {
 #thread_local __context: Context
 
 
-DEFAULT_ALIGNMENT :: align_of({4}f32)
+DEFAULT_ALIGNMENT :: align_of([vector 4]f32)
 
 
 __check_context :: proc() {

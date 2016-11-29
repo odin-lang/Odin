@@ -3815,6 +3815,29 @@ void ssa_build_stmt(ssaProcedure *proc, AstNode *node) {
 	proc->module->stmt_state_flags = prev_stmt_state_flags;
 }
 
+void ssa_build_when_stmt(ssaProcedure *proc, AstNodeWhenStmt *ws) {
+	ssaValue *cond = ssa_build_expr(proc, ws->cond);
+	GB_ASSERT(cond->kind == ssaValue_Constant &&
+	          is_type_boolean(ssa_type(cond)));
+
+	GB_ASSERT(cond->Constant.value.kind == ExactValue_Bool);
+	if (cond->Constant.value.value_bool) {
+		ssa_build_stmt_list(proc, ws->body->BlockStmt.stmts);
+	} else if (ws->else_stmt) {
+		switch (ws->else_stmt->kind) {
+		case AstNode_BlockStmt:
+			ssa_build_stmt_list(proc, ws->else_stmt->BlockStmt.stmts);
+			break;
+		case AstNode_WhenStmt:
+			ssa_build_when_stmt(proc, &ws->else_stmt->WhenStmt);
+			break;
+		default:
+			GB_PANIC("Invalid `else` statement in `when` statement");
+			break;
+		}
+	}
+}
+
 void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 	switch (node->kind) {
 	case_ast_node(bs, EmptyStmt, node);
@@ -3825,6 +3848,10 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 		if (decl->kind == AstNode_VarDecl) {
 			ssa_build_stmt(proc, decl);
 		}
+	case_end;
+
+	case_ast_node(ws, WhenStmt, node);
+		ssa_build_when_stmt(proc, ws);
 	case_end;
 
 	case_ast_node(vd, VarDecl, node);

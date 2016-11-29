@@ -21,7 +21,7 @@ typedef enum ExactValueKind {
 typedef struct ExactValue {
 	ExactValueKind kind;
 	union {
-		bool      value_bool;
+		bool     value_bool;
 		String   value_string;
 		i64      value_integer; // NOTE(bill): This must be an integer and not a pointer
 		f64      value_float;

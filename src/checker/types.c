@@ -1371,7 +1371,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_Vector:
-		str = gb_string_appendc(str, gb_bprintf("{%td}", type->Vector.count));
+		str = gb_string_appendc(str, gb_bprintf("[vector %td]", type->Vector.count));
 		str = write_type_to_string(str, type->Vector.elem);
 		break;
 

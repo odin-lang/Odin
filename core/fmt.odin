@@ -244,9 +244,9 @@ print_type_to_buffer :: proc(buf: ^[]byte, ti: ^Type_Info) {
 		print_string_to_buffer(buf, "]")
 		print_type_to_buffer(buf, info.elem)
 	case Vector:
-		print_string_to_buffer(buf, "{")
+		print_string_to_buffer(buf, "[vector ")
 		print_i64_to_buffer(buf, info.count as i64)
-		print_string_to_buffer(buf, "}")
+		print_string_to_buffer(buf, "]")
 		print_type_to_buffer(buf, info.elem)
 
 	case Struct:
@@ -442,7 +442,7 @@ print_any_to_buffer :: proc(buf: ^[]byte, arg: any) {
 			return false
 		}
 
-		bprintf(buf, "{%}%{", info.count, info.elem)
+		bprintf(buf, "[vector %]%{", info.count, info.elem)
 		defer print_string_to_buffer(buf, "}")
 
 		if is_bool(info.elem) {

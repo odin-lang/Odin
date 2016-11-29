@@ -162,6 +162,12 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 		AstNode *body; \
 		AstNode *else_stmt; \
 	}) \
+	AST_NODE_KIND(WhenStmt, "when statement", struct { \
+		Token token; \
+		AstNode *cond; \
+		AstNode *body; \
+		AstNode *else_stmt; \
+	}) \
 	AST_NODE_KIND(ReturnStmt, "return statement", struct { \
 		Token token; \
 		AstNodeArray results; \
@@ -256,6 +262,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 	}) \
 	AST_NODE_KIND(ForeignLibrary, "foreign library", struct { \
 		Token token, filepath; \
+		String base_dir; \
 		bool is_system; \
 	}) \
 AST_NODE_KIND(_DeclEnd,   "", i32) \
@@ -365,6 +372,9 @@ gb_inline bool is_ast_node_decl(AstNode *node) {
 gb_inline bool is_ast_node_type(AstNode *node) {
 	return gb_is_between(node->kind, AstNode__TypeBegin+1, AstNode__TypeEnd-1);
 }
+gb_inline bool is_ast_node_when_stmt(AstNode *node) {
+	return node->kind == AstNode_WhenStmt;
+}
 
 
 Token ast_node_token(AstNode *node) {
@@ -424,6 +434,8 @@ Token ast_node_token(AstNode *node) {
 		return node->BlockStmt.open;
 	case AstNode_IfStmt:
 		return node->IfStmt.token;
+	case AstNode_WhenStmt:
+		return node->WhenStmt.token;
 	case AstNode_ReturnStmt:
 		return node->ReturnStmt.token;
 	case AstNode_ForStmt:
@@ -716,6 +728,16 @@ AstNode *make_if_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, Ast
 	result->IfStmt.else_stmt = else_stmt;
 	return result;
 }
+
+AstNode *make_when_stmt(AstFile *f, Token token, AstNode *cond, AstNode *body, AstNode *else_stmt) {
+	AstNode *result = make_node(f, AstNode_WhenStmt);
+	result->WhenStmt.token = token;
+	result->WhenStmt.cond = cond;
+	result->WhenStmt.body = body;
+	result->WhenStmt.else_stmt = else_stmt;
+	return result;
+}
+
 
 AstNode *make_return_stmt(AstFile *f, Token token, AstNodeArray results) {
 	AstNode *result = make_node(f, AstNode_ReturnStmt);
@@ -1351,11 +1373,38 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_Integer:
 	case Token_Float:
-	case Token_String:
 	case Token_Rune:
 		operand = make_basic_lit(f, f->curr_token);
 		next_token(f);
 		return operand;
+
+	case Token_String: {
+		Token token = f->curr_token;
+		next_token(f);
+		if (f->curr_token.kind == Token_String) {
+			// NOTE(bill): Allow neighbouring string literals to be merge together to
+			// become one big string
+			String s = f->curr_token.string;
+			Array(u8) data;
+			array_init_reserve(&data, heap_allocator(), token.string.len+s.len);
+			gb_memmove(data.e, token.string.text, token.string.len);
+			data.count += token.string.len;
+
+			while (f->curr_token.kind == Token_String) {
+				String s = f->curr_token.string;
+				isize old_count = data.count;
+				array_resize(&data, data.count + s.len);
+				gb_memmove(data.e+old_count, s.text, s.len);
+				next_token(f);
+			}
+
+			token.string = make_string(data.e, data.count);
+			array_add(&f->tokenizer.allocated_strings, token.string);
+		}
+
+		return make_basic_lit(f, token);
+	}
+
 
 	case Token_OpenParen: {
 		Token open, close;
@@ -1614,11 +1663,9 @@ AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 	case Token_Sub:
 	case Token_Not:
 	case Token_Xor: {
-		AstNode *operand;
 		Token op = f->curr_token;
 		next_token(f);
-		operand = parse_unary_expr(f, lhs);
-		return make_unary_expr(f, op, operand);
+		return make_unary_expr(f, op, parse_unary_expr(f, lhs));
 	} break;
 	}
 
@@ -1658,7 +1705,6 @@ i32 token_precedence(Token t) {
 	case Token_union_cast:
 		return 6;
 	}
-
 	return 0;
 }
 
@@ -1669,8 +1715,9 @@ AstNode *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 			AstNode *right;
 			Token op = f->curr_token;
 			i32 op_prec = token_precedence(op);
-			if (op_prec != prec)
+			if (op_prec != prec) {
 				break;
+			}
 			expect_operator(f); // NOTE(bill): error checks too
 			if (lhs) {
 				// TODO(bill): error checking
@@ -1791,21 +1838,22 @@ AstNode *parse_simple_stmt(AstFile *f) {
 
 
 
-AstNode *parse_block_stmt(AstFile *f) {
-	if (f->curr_proc == NULL) {
+AstNode *parse_block_stmt(AstFile *f, b32 is_when) {
+	if (!is_when && f->curr_proc == NULL) {
 		syntax_error(f->curr_token, "You cannot use a block statement in the file scope");
 		return make_bad_stmt(f, f->curr_token, f->curr_token);
 	}
-	AstNode *block_stmt = parse_body(f);
-	return block_stmt;
+	return parse_body(f);
 }
 
 AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
-	if (statement == NULL)
+	if (statement == NULL) {
 		return NULL;
+	}
 
-	if (statement->kind == AstNode_ExprStmt)
+	if (statement->kind == AstNode_ExprStmt) {
 		return statement->ExprStmt.expr;
+	}
 
 	syntax_error(f->curr_token, "Expected `%.*s`, found a simple statement.", LIT(kind));
 	return make_bad_expr(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
@@ -2008,27 +2056,34 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		f->expr_level++;
 		Token token = expect_token(f, Token_OpenBracket);
 		AstNode *count_expr = NULL;
+		bool is_vector = false;
 
 		if (f->curr_token.kind == Token_Ellipsis) {
 			count_expr = make_ellipsis(f, f->curr_token, NULL);
 			next_token(f);
+		} else if (f->curr_token.kind == Token_vector) {
+			next_token(f);
+			count_expr = parse_expr(f, false);
+			is_vector = true;
 		} else if (f->curr_token.kind != Token_CloseBracket) {
 			count_expr = parse_expr(f, false);
 		}
 		expect_token(f, Token_CloseBracket);
 		f->expr_level--;
-		AstNode *e = make_array_type(f, token, count_expr, parse_type(f));
-		return e;
+		if (is_vector) {
+			return make_vector_type(f, token, count_expr, parse_type(f));
+		}
+		return make_array_type(f, token, count_expr, parse_type(f));
 	}
 
-	case Token_OpenBrace: {
-		f->expr_level++;
-		Token token = expect_token(f, Token_OpenBrace);
-		AstNode *count_expr = parse_expr(f, false);
-		expect_token(f, Token_CloseBrace);
-		f->expr_level--;
-		return make_vector_type(f, token, count_expr, parse_type(f));
-	}
+	// case Token_OpenBrace: {
+	// 	f->expr_level++;
+	// 	Token token = expect_token(f, Token_OpenBrace);
+	// 	AstNode *count_expr = parse_expr(f, false);
+	// 	expect_token(f, Token_CloseBrace);
+	// 	f->expr_level--;
+	// 	return make_vector_type(f, token, count_expr, parse_type(f));
+	// }
 
 	case Token_struct: {
 		Token token = expect_token(f, Token_struct);
@@ -2359,7 +2414,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 		syntax_error(f->curr_token, "Expected condition for if statement");
 	}
 
-	body = parse_block_stmt(f);
+	body = parse_block_stmt(f, false);
 
 	if (allow_token(f, Token_else)) {
 		switch (f->curr_token.kind) {
@@ -2367,7 +2422,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 			else_stmt = parse_if_stmt(f);
 			break;
 		case Token_OpenBrace:
-			else_stmt = parse_block_stmt(f);
+			else_stmt = parse_block_stmt(f, false);
 			break;
 		default:
 			syntax_error(f->curr_token, "Expected if statement block statement");
@@ -2378,6 +2433,44 @@ AstNode *parse_if_stmt(AstFile *f) {
 
 	return make_if_stmt(f, token, init, cond, body, else_stmt);
 }
+
+AstNode *parse_when_stmt(AstFile *f) {
+	Token token = expect_token(f, Token_when);
+	AstNode *cond = NULL;
+	AstNode *body = NULL;
+	AstNode *else_stmt = NULL;
+
+	isize prev_level = f->expr_level;
+	f->expr_level = -1;
+
+	cond = parse_expr(f, false);
+
+	f->expr_level = prev_level;
+
+	if (cond == NULL) {
+		syntax_error(f->curr_token, "Expected condition for when statement");
+	}
+
+	body = parse_block_stmt(f, true);
+
+	if (allow_token(f, Token_else)) {
+		switch (f->curr_token.kind) {
+		case Token_when:
+			else_stmt = parse_when_stmt(f);
+			break;
+		case Token_OpenBrace:
+			else_stmt = parse_block_stmt(f, true);
+			break;
+		default:
+			syntax_error(f->curr_token, "Expected when statement block statement");
+			else_stmt = make_bad_stmt(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
+			break;
+		}
+	}
+
+	return make_when_stmt(f, token, cond, body, else_stmt);
+}
+
 
 AstNode *parse_return_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
@@ -2436,7 +2529,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 		}
 		f->expr_level = prev_level;
 	}
-	body = parse_block_stmt(f);
+	body = parse_block_stmt(f, false);
 
 	cond = convert_stmt_to_expr(f, cond, str_lit("boolean expression"));
 
@@ -2624,6 +2717,7 @@ AstNode *parse_stmt(AstFile *f) {
 
 	// TODO(bill): other keywords
 	case Token_if:     return parse_if_stmt(f);
+	case Token_when:   return parse_when_stmt(f);
 	case Token_return: return parse_return_stmt(f);
 	case Token_for:    return parse_for_stmt(f);
 	case Token_match:  return parse_match_stmt(f);
@@ -2678,7 +2772,7 @@ AstNode *parse_stmt(AstFile *f) {
 		AstNode *expr = parse_expr(f, false);
 		f->expr_level = prev_level;
 
-		AstNode *body = parse_block_stmt(f);
+		AstNode *body = parse_block_stmt(f, false);
 		return make_push_allocator(f, token, expr, body);
 	} break;
 
@@ -2689,7 +2783,7 @@ AstNode *parse_stmt(AstFile *f) {
 		AstNode *expr = parse_expr(f, false);
 		f->expr_level = prev_level;
 
-		AstNode *body = parse_block_stmt(f);
+		AstNode *body = parse_block_stmt(f, false);
 		return make_push_context(f, token, expr, body);
 	} break;
 
@@ -2798,7 +2892,7 @@ AstNode *parse_stmt(AstFile *f) {
 	} break;
 
 	case Token_OpenBrace:
-		return parse_block_stmt(f);
+		return parse_block_stmt(f, false);
 
 	case Token_Semicolon:
 		s = make_empty_stmt(f, token);
@@ -2965,20 +3059,20 @@ String get_fullpath_core(gbAllocator a, String path) {
 	return res;
 }
 
-// NOTE(bill): Returns true if it's added
-bool try_add_foreign_library_path(Parser *p, String import_file) {
-	gb_mutex_lock(&p->mutex);
+// // NOTE(bill): Returns true if it's added
+// bool try_add_foreign_library_path(Parser *p, String import_file) {
+// 	gb_mutex_lock(&p->mutex);
 
-	for_array(i, p->foreign_libraries) {
-		String import = p->foreign_libraries.e[i];
-		if (str_eq(import, import_file)) {
-			return false;
-		}
-	}
-	array_add(&p->foreign_libraries, import_file);
-	gb_mutex_unlock(&p->mutex);
-	return true;
-}
+// 	for_array(i, p->foreign_libraries) {
+// 		String import = p->foreign_libraries.e[i];
+// 		if (str_eq(import, import_file)) {
+// 			return false;
+// 		}
+// 	}
+// 	array_add(&p->foreign_libraries, import_file);
+// 	gb_mutex_unlock(&p->mutex);
+// 	return true;
+// }
 
 gb_global Rune illegal_import_runes[] = {
 	'"', '\'', '`', ' ', '\t', '\r', '\n', '\v', '\f',
@@ -3040,6 +3134,85 @@ String get_filepath_extension(String path) {
 	return make_string(path.text, dot);
 }
 
+void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, AstNodeArray decls);
+
+void parse_setup_file_when_stmt(Parser *p, AstFile *f, String base_dir, AstNodeWhenStmt *ws) {
+	if (ws->body != NULL && ws->body->kind == AstNode_BlockStmt) {
+		parse_setup_file_decls(p, f, base_dir, ws->body->BlockStmt.stmts);
+	}
+	if (ws->else_stmt) {
+		switch (ws->else_stmt->kind) {
+		case AstNode_BlockStmt:
+			parse_setup_file_decls(p, f, base_dir, ws->else_stmt->BlockStmt.stmts);
+			break;
+		case AstNode_WhenStmt:
+			parse_setup_file_when_stmt(p, f, base_dir, &ws->else_stmt->WhenStmt);
+			break;
+		}
+	}
+}
+
+void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, AstNodeArray decls) {
+	for_array(i, decls) {
+		AstNode *node = decls.e[i];
+
+		if (!is_ast_node_decl(node) &&
+		    !is_ast_node_when_stmt(node) &&
+		    node->kind != AstNode_BadStmt &&
+		    node->kind != AstNode_EmptyStmt) {
+			// NOTE(bill): Sanity check
+			syntax_error(ast_node_token(node), "Only declarations are allowed at file scope");
+		} else if (node->kind == AstNode_WhenStmt) {
+			parse_setup_file_when_stmt(p, f, base_dir, &node->WhenStmt);
+		} else if (node->kind == AstNode_ImportDecl) {
+			AstNodeImportDecl *id = &node->ImportDecl;
+			String file_str = id->relpath.string;
+
+			if (!is_import_path_valid(file_str)) {
+				if (id->is_load) {
+					syntax_error(ast_node_token(node), "Invalid #load path: `%.*s`", LIT(file_str));
+				} else {
+					syntax_error(ast_node_token(node), "Invalid #import path: `%.*s`", LIT(file_str));
+				}
+				// NOTE(bill): It's a naughty name
+				decls.e[i] = make_bad_decl(f, id->token, id->token);
+				continue;
+			}
+
+			gbAllocator allocator = heap_allocator(); // TODO(bill): Change this allocator
+
+			String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
+			String import_file = rel_path;
+			if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
+				String abs_path = get_fullpath_core(allocator, file_str);
+				if (gb_file_exists(cast(char *)abs_path.text)) {
+					import_file = abs_path;
+				}
+			}
+
+			id->fullpath = import_file;
+			try_add_import_path(p, import_file, file_str, ast_node_token(node).pos);
+
+		} else if (node->kind == AstNode_ForeignLibrary) {
+			AstNodeForeignLibrary *fl = &node->ForeignLibrary;
+			String file_str = fl->filepath.string;
+
+			if (!is_import_path_valid(file_str)) {
+				if (fl->is_system) {
+					syntax_error(ast_node_token(node), "Invalid `foreign_system_library` path");
+				} else {
+					syntax_error(ast_node_token(node), "Invalid `foreign_library` path");
+				}
+				// NOTE(bill): It's a naughty name
+				f->decls.e[i] = make_bad_decl(f, fl->token, fl->token);
+				continue;
+			}
+
+			fl->base_dir = base_dir;
+		}
+	}
+}
+
 void parse_file(Parser *p, AstFile *f) {
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = filepath;
@@ -3056,77 +3229,7 @@ void parse_file(Parser *p, AstFile *f) {
 	}
 
 	f->decls = parse_stmt_list(f);
-
-	for_array(i, f->decls) {
-		AstNode *node = f->decls.e[i];
-		if (!is_ast_node_decl(node) &&
-		    node->kind != AstNode_BadStmt &&
-		    node->kind != AstNode_EmptyStmt) {
-			// NOTE(bill): Sanity check
-			syntax_error(ast_node_token(node), "Only declarations are allowed at file scope");
-		} else {
-			if (node->kind == AstNode_ImportDecl) {
-				AstNodeImportDecl *id = &node->ImportDecl;
-				String file_str = id->relpath.string;
-
-				if (!is_import_path_valid(file_str)) {
-					if (id->is_load) {
-						syntax_error(ast_node_token(node), "Invalid #load path: `%.*s`", LIT(file_str));
-					} else {
-						syntax_error(ast_node_token(node), "Invalid #import path: `%.*s`", LIT(file_str));
-					}
-					// NOTE(bill): It's a naughty name
-					f->decls.e[i] = make_bad_decl(f, id->token, id->token);
-					continue;
-				}
-
-				gbAllocator allocator = heap_allocator(); // TODO(bill): Change this allocator
-
-				String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
-				String import_file = rel_path;
-				if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
-					String abs_path = get_fullpath_core(allocator, file_str);
-					if (gb_file_exists(cast(char *)abs_path.text)) {
-						import_file = abs_path;
-					}
-				}
-
-				id->fullpath = import_file;
-				try_add_import_path(p, import_file, file_str, ast_node_token(node).pos);
-
-			} else if (node->kind == AstNode_ForeignLibrary) {
-				AstNodeForeignLibrary *id = &node->ForeignLibrary;
-				String file_str = id->filepath.string;
-
-				if (!is_import_path_valid(file_str)) {
-					if (id->is_system) {
-						syntax_error(ast_node_token(node), "Invalid `foreign_system_library` path");
-					} else {
-						syntax_error(ast_node_token(node), "Invalid `foreign_library` path");
-					}
-					// NOTE(bill): It's a naughty name
-					f->decls.e[i] = make_bad_decl(f, id->token, id->token);
-					continue;
-				}
-
-				if (!id->is_system) {
-					gbAllocator allocator = heap_allocator(); // TODO(bill): Change this allocator
-
-					String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
-					String import_file = rel_path;
-					if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
-						String abs_path = get_fullpath_core(allocator, file_str);
-						if (gb_file_exists(cast(char *)abs_path.text)) {
-							import_file = abs_path;
-						}
-					}
-					file_str = import_file;
-				}
-
-				try_add_foreign_library_path(p, file_str);
-			}
-		}
-	}
+	parse_setup_file_decls(p, f, base_dir, f->decls);
 }
 
 

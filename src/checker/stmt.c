@@ -343,6 +343,37 @@ typedef struct TypeAndToken {
 #define MAP_NAME MapTypeAndToken
 #include "../map.c"
 
+void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
+	Operand operand = {Addressing_Invalid};
+	check_expr(c, &operand, ws->cond);
+	if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
+		error(ast_node_token(ws->cond), "Non-boolean condition in `when` statement");
+	}
+	if (operand.mode != Addressing_Constant) {
+		error(ast_node_token(ws->cond), "Non-constant condition in `when` statement");
+	}
+	if (ws->body == NULL || ws->body->kind != AstNode_BlockStmt) {
+		error(ast_node_token(ws->cond), "Invalid body for `when` statement");
+	} else {
+		if (operand.value.kind == ExactValue_Bool &&
+		    operand.value.value_bool) {
+			check_stmt_list(c, ws->body->BlockStmt.stmts, flags);
+		} else if (ws->else_stmt) {
+			switch (ws->else_stmt->kind) {
+			case AstNode_BlockStmt:
+				check_stmt_list(c, ws->else_stmt->BlockStmt.stmts, flags);
+				break;
+			case AstNode_WhenStmt:
+				check_when_stmt(c, &ws->else_stmt->WhenStmt, flags);
+				break;
+			default:
+				error(ast_node_token(ws->else_stmt), "Invalid `else` statement in `when` statement");
+				break;
+			}
+		}
+	}
+}
+
 void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
@@ -510,10 +541,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		Operand operand = {Addressing_Invalid};
 		check_expr(c, &operand, is->cond);
-		if (operand.mode != Addressing_Invalid &&
-		    !is_type_boolean(operand.type)) {
-			error(ast_node_token(is->cond),
-			            "Non-boolean condition in `if` statement");
+		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
+			error(ast_node_token(is->cond), "Non-boolean condition in `if` statement");
 		}
 
 		check_stmt(c, is->body, mod_flags);
@@ -525,13 +554,16 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				check_stmt(c, is->else_stmt, mod_flags);
 				break;
 			default:
-				error(ast_node_token(is->else_stmt),
-				            "Invalid `else` statement in `if` statement");
+				error(ast_node_token(is->else_stmt), "Invalid `else` statement in `if` statement");
 				break;
 			}
 		}
 
 		check_close_scope(c);
+	case_end;
+
+	case_ast_node(ws, WhenStmt, node);
+		check_when_stmt(c, ws, flags);
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);
