@@ -1086,6 +1086,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 			return;
 
 		case Token_if:
+		case Token_when:
 		case Token_return:
 		case Token_for:
 		case Token_match:
@@ -1966,55 +1967,61 @@ AstNodeArray parse_parameter_list(AstFile *f) {
 }
 
 
-AstNodeArray parse_struct_params(AstFile *f, isize *decl_count_, bool using_allowed) {
+AstNodeArray parse_record_params(AstFile *f, isize *decl_count_, bool using_allowed, String context) {
 	AstNodeArray decls = make_ast_node_array(f);
 	isize decl_count = 0;
 
-	while (f->curr_token.kind == Token_Identifier ||
-	       f->curr_token.kind == Token_using) {
-		bool is_using = false;
-		if (allow_token(f, Token_using)) {
-			is_using = true;
-		}
-		AstNodeArray names = parse_lhs_expr_list(f);
-		if (names.count == 0) {
-			syntax_error(f->curr_token, "Empty field declaration");
-		}
+	while (f->curr_token.kind != Token_CloseBrace &&
+	       f->curr_token.kind != Token_EOF) {
+		AstNode *decl = parse_stmt(f);
+		if (is_ast_node_decl(decl) ||
+		    decl->kind == AstNode_UsingStmt ||
+		    decl->kind == AstNode_EmptyStmt) {
+			switch (decl->kind) {
+			case AstNode_EmptyStmt:
+				break;
 
-		if (!using_allowed && is_using) {
-			syntax_error(f->curr_token, "Cannot apply `using` to members of a union");
-			is_using = false;
-		}
-		if (names.count > 1 && is_using) {
-			syntax_error(f->curr_token, "Cannot apply `using` to more than one of the same type");
-		}
+			case AstNode_ProcDecl:
+				syntax_error(f->curr_token, "Procedure declarations are not allowed within a %.*s", LIT(context));
+				break;
 
-		AstNode *decl = NULL;
+			case AstNode_UsingStmt: {
+				bool is_using = true;
+				if (!using_allowed) {
+					syntax_error(f->curr_token, "Cannot apply `using` to members of a %.*s", LIT(context));
+					is_using = false;
+				}
+				if (decl->UsingStmt.node->kind == AstNode_VarDecl) {
+					AstNode *vd = decl->UsingStmt.node;
+					vd->VarDecl.is_using = is_using && using_allowed;
+					if (vd->VarDecl.values.count > 0) {
+						syntax_error(f->curr_token, "Default variable assignments within a %.*s will be ignored", LIT(context));
+					}
+					array_add(&decls, vd);
+				} else {
+					syntax_error(ast_node_token(decl), "Illegal %.*s field", LIT(context));
+				}
+			} break;
 
-		if (f->curr_token.kind == Token_Colon) {
-			decl = parse_decl(f, names);
+			case AstNode_VarDecl: {
+				if (decl->VarDecl.values.count > 0) {
+					syntax_error(f->curr_token, "Default variable assignments within a %.*s will be ignored", LIT(context));
+				}
+				array_add(&decls, decl);
+			}
 
-			if (decl->kind == AstNode_ProcDecl) {
-				syntax_error(f->curr_token, "Procedure declarations are not allowed within a structure");
-				decl = make_bad_decl(f, ast_node_token(names.e[0]), f->curr_token);
+			case AstNode_BadDecl:
+				break;
+
+			case AstNode_ConstDecl:
+			case AstNode_TypeDecl:
+			default:
+				decl_count += 1;
+				array_add(&decls, decl);
+				break;
 			}
 		} else {
-			syntax_error(f->curr_token, "Illegal structure field");
-			decl = make_bad_decl(f, ast_node_token(names.e[0]), f->curr_token);
-		}
-
-		expect_semicolon_after_stmt(f, decl);
-
-		if (is_ast_node_decl(decl)) {
-			array_add(&decls, decl);
-			if (decl->kind == AstNode_VarDecl) {
-				decl->VarDecl.is_using = is_using && using_allowed;
-				if (decl->VarDecl.values.count > 0) {
-					syntax_error(f->curr_token, "Default variable assignments within a structure will be ignored (at the moment)");
-				}
-			} else {
-				decl_count += 1;
-			}
+			syntax_error(ast_node_token(decl), "Illegal record field: %.*s", LIT(ast_node_strings[decl->kind]));
 		}
 	}
 
@@ -2063,7 +2070,11 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 			next_token(f);
 		} else if (f->curr_token.kind == Token_vector) {
 			next_token(f);
-			count_expr = parse_expr(f, false);
+			if (f->curr_token.kind != Token_CloseBracket) {
+				count_expr = parse_expr(f, false);
+			} else {
+				syntax_error(f->curr_token, "Vector type missing count");
+			}
 			is_vector = true;
 		} else if (f->curr_token.kind != Token_CloseBracket) {
 			count_expr = parse_expr(f, false);
@@ -2075,15 +2086,6 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		}
 		return make_array_type(f, token, count_expr, parse_type(f));
 	}
-
-	// case Token_OpenBrace: {
-	// 	f->expr_level++;
-	// 	Token token = expect_token(f, Token_OpenBrace);
-	// 	AstNode *count_expr = parse_expr(f, false);
-	// 	expect_token(f, Token_CloseBrace);
-	// 	f->expr_level--;
-	// 	return make_vector_type(f, token, count_expr, parse_type(f));
-	// }
 
 	case Token_struct: {
 		Token token = expect_token(f, Token_struct);
@@ -2112,7 +2114,7 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 
 		Token open = expect_token_after(f, Token_OpenBrace, "`struct`");
 		isize decl_count = 0;
-		AstNodeArray decls = parse_struct_params(f, &decl_count, true);
+		AstNodeArray decls = parse_record_params(f, &decl_count, true, str_lit("struct"));
 		Token close = expect_token(f, Token_CloseBrace);
 
 		return make_struct_type(f, token, decls, decl_count, is_packed, is_ordered);
@@ -2122,7 +2124,7 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		Token token = expect_token(f, Token_union);
 		Token open = expect_token_after(f, Token_OpenBrace, "`union`");
 		isize decl_count = 0;
-		AstNodeArray decls = parse_struct_params(f, &decl_count, false);
+		AstNodeArray decls = parse_record_params(f, &decl_count, false, str_lit("union"));
 		Token close = expect_token(f, Token_CloseBrace);
 
 		return make_union_type(f, token, decls, decl_count);
@@ -2132,7 +2134,7 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		Token token = expect_token(f, Token_raw_union);
 		Token open = expect_token_after(f, Token_OpenBrace, "`raw_union`");
 		isize decl_count = 0;
-		AstNodeArray decls = parse_struct_params(f, &decl_count, true);
+		AstNodeArray decls = parse_record_params(f, &decl_count, true, str_lit("raw_union"));
 		Token close = expect_token(f, Token_CloseBrace);
 
 		return make_raw_union_type(f, token, decls, decl_count);
@@ -2192,8 +2194,9 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		break;
 
 	case Token_Eq:
-		if (f->prev_token.kind == Token_Colon)
+		if (f->prev_token.kind == Token_Colon) {
 			break;
+		}
 		// fallthrough
 	default:
 		syntax_error(f->curr_token,

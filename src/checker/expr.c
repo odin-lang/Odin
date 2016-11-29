@@ -20,6 +20,206 @@ gb_inline Type *check_type(Checker *c, AstNode *expression) {
 
 
 
+
+typedef struct DelayedEntity {
+	Entity *entity;
+	DeclInfo *decl;
+} DelayedEntity;
+
+typedef struct DelayedOtherFields {
+	Entity **other_fields;
+	isize other_field_count;
+	isize other_field_index;
+
+	MapEntity *entity_map;
+} DelayedOtherFields;
+
+typedef Array(DelayedEntity) DelayedEntities;
+
+void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntities *delayed_entities, DelayedOtherFields *dof);
+
+void check_local_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, DelayedEntities *delayed_entities, DelayedOtherFields *dof) {
+	Operand operand = {Addressing_Invalid};
+	check_expr(c, &operand, ws->cond);
+	if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
+		error(ast_node_token(ws->cond), "Non-boolean condition in `when` statement");
+	}
+	if (operand.mode != Addressing_Constant) {
+		error(ast_node_token(ws->cond), "Non-constant condition in `when` statement");
+	}
+	if (ws->body == NULL || ws->body->kind != AstNode_BlockStmt) {
+		error(ast_node_token(ws->cond), "Invalid body for `when` statement");
+	} else {
+		if (operand.value.kind == ExactValue_Bool &&
+		    operand.value.value_bool) {
+			check_local_collect_entities(c, ws->body->BlockStmt.stmts, delayed_entities, dof);
+		} else if (ws->else_stmt) {
+			switch (ws->else_stmt->kind) {
+			case AstNode_BlockStmt:
+				check_local_collect_entities(c, ws->else_stmt->BlockStmt.stmts, delayed_entities, dof);
+				break;
+			case AstNode_WhenStmt:
+				check_local_collect_entities_from_when_stmt(c, &ws->else_stmt->WhenStmt, delayed_entities, dof);
+				break;
+			default:
+				error(ast_node_token(ws->else_stmt), "Invalid `else` statement in `when` statement");
+				break;
+			}
+		}
+	}
+}
+
+// NOTE(bill): The `dof` is for use within records
+void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntities *delayed_entities, DelayedOtherFields *dof) {
+	for_array(i, nodes) {
+		AstNode *node = nodes.e[i];
+		switch (node->kind) {
+		case_ast_node(ws, WhenStmt, node);
+			// Will be handled later
+		case_end;
+		case_ast_node(cd, ConstDecl, node);
+			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+
+			isize entity_count = cd->names.count;
+			isize entity_index = 0;
+			Entity **entities = gb_alloc_array(c->tmp_allocator, Entity *, entity_count);
+
+			for_array(i, cd->values) {
+				AstNode *name = cd->names.e[i];
+				AstNode *value = cd->values.e[i];
+				ExactValue v = {ExactValue_Invalid};
+
+				Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
+				e->identifier = name;
+				entities[entity_index++] = e;
+
+				DeclInfo *d = make_declaration_info(c->allocator, e->scope);
+				d->type_expr = cd->type;
+				d->init_expr = value;
+
+				add_entity_and_decl_info(c, name, e, d);
+
+				DelayedEntity delay = {e, d};
+				array_add(delayed_entities, delay);
+			}
+
+			isize lhs_count = cd->names.count;
+			isize rhs_count = cd->values.count;
+
+			// TODO(bill): Better error messages or is this good enough?
+			if (rhs_count == 0 && cd->type == NULL) {
+				error(ast_node_token(node), "Missing type or initial expression");
+			} else if (lhs_count < rhs_count) {
+				error(ast_node_token(node), "Extra initial expression");
+			}
+
+			if (dof != NULL) {
+				// NOTE(bill): Within a record
+				for_array(i, cd->names) {
+					AstNode *name = cd->names.e[i];
+					Entity *e = entities[i];
+					Token name_token = name->Ident;
+					if (str_eq(name_token.string, str_lit("_"))) {
+						dof->other_fields[dof->other_field_index++] = e;
+					} else {
+						HashKey key = hash_string(name_token.string);
+						if (map_entity_get(dof->entity_map, key) != NULL) {
+							// TODO(bill): Scope checking already checks the declaration
+							error(name_token, "`%.*s` is already declared in this record", LIT(name_token.string));
+						} else {
+							map_entity_set(dof->entity_map, key, e);
+							dof->other_fields[dof->other_field_index++] = e;
+						}
+						add_entity(c, c->context.scope, name, e);
+					}
+				}
+			}
+
+			gb_temp_arena_memory_end(tmp);
+		case_end;
+
+		case_ast_node(pd, ProcDecl, node);
+			// NOTE(bill): This must be handled here so it has access to the parent scope stuff
+			// e.g. using
+			Entity *e = make_entity_procedure(c->allocator, c->context.scope, pd->name->Ident, NULL);
+			e->identifier = pd->name;
+
+			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
+			d->proc_decl = node;
+
+			add_entity_and_decl_info(c, pd->name, e, d);
+			check_entity_decl(c, e, d, NULL, NULL);
+		case_end;
+
+		case_ast_node(td, TypeDecl, node);
+			Token name_token = td->name->Ident;
+
+			Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, NULL);
+			e->identifier = td->name;
+
+			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
+			d->type_expr = td->type;
+
+			add_entity_and_decl_info(c, td->name, e, d);
+
+			DelayedEntity delay = {e, d};
+			array_add(delayed_entities, delay);
+
+
+			if (dof != NULL) {
+				if (str_eq(name_token.string, str_lit("_"))) {
+					dof->other_fields[dof->other_field_index++] = e;
+				} else {
+					HashKey key = hash_string(name_token.string);
+					if (map_entity_get(dof->entity_map, key) != NULL) {
+						// TODO(bill): Scope checking already checks the declaration
+						error(name_token, "`%.*s` is already declared in this record", LIT(name_token.string));
+					} else {
+						map_entity_set(dof->entity_map, key, e);
+						dof->other_fields[dof->other_field_index++] = e;
+					}
+					add_entity(c, c->context.scope, td->name, e);
+					add_entity_use(c, td->name, e);
+				}
+			}
+		case_end;
+		}
+	}
+
+	// NOTE(bill): `when` stmts need to be handled after the other as the condition may refer to something
+	// declared after this stmt in source
+	for_array(i, nodes) {
+		AstNode *node = nodes.e[i];
+		switch (node->kind) {
+		case_ast_node(ws, WhenStmt, node);
+			check_local_collect_entities_from_when_stmt(c, ws, delayed_entities, dof);
+		case_end;
+		}
+	}
+}
+
+void check_scope_decls(Checker *c, AstNodeArray nodes, isize reserve_size, DelayedOtherFields *dof) {
+	DelayedEntities delayed_entities;
+	array_init_reserve(&delayed_entities, heap_allocator(), reserve_size);
+	check_local_collect_entities(c, nodes, &delayed_entities, dof);
+
+	for_array(i, delayed_entities) {
+		DelayedEntity delayed = delayed_entities.e[i];
+		if (delayed.entity->kind == Entity_TypeName) {
+			check_entity_decl(c, delayed.entity, delayed.decl, NULL, NULL);
+		}
+	}
+	for_array(i, delayed_entities) {
+		DelayedEntity delayed = delayed_entities.e[i];
+		if (delayed.entity->kind == Entity_Constant) {
+			check_entity_decl(c, delayed.entity, delayed.decl, NULL, NULL);
+		}
+	}
+
+	array_free(&delayed_entities);
+}
+
+
 bool check_is_assignable_to_using_subtype(Type *dst, Type *src) {
 	Type *prev_src = src;
 	// Type *prev_dst = dst;
@@ -247,96 +447,12 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 	isize other_field_index = 0;
 	Entity *using_index_expr = NULL;
 
+	DelayedOtherFields dof = {0};
+	dof.other_fields = other_fields;
+	dof.other_field_count = other_field_count;
+	dof.entity_map = &entity_map;
 
-	typedef struct {
-		Entity *e;
-		AstNode *t;
-	} Delay;
-	Array(Delay) delayed_const; array_init_reserve(&delayed_const, c->tmp_allocator, other_field_count);
-	Array(Delay) delayed_type;  array_init_reserve(&delayed_type,  c->tmp_allocator, other_field_count);
-
-	for_array(decl_index, decls) {
-		AstNode *decl = decls.e[decl_index];
-		if (decl->kind == AstNode_ConstDecl) {
-			ast_node(cd, ConstDecl, decl);
-
-			isize entity_count = cd->names.count;
-			isize entity_index = 0;
-			Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
-
-			for_array(i, cd->values) {
-				AstNode *name = cd->names.e[i];
-				AstNode *value = cd->values.e[i];
-
-				GB_ASSERT(name->kind == AstNode_Ident);
-				ExactValue v = {ExactValue_Invalid};
-				Token name_token = name->Ident;
-				Entity *e = make_entity_constant(c->allocator, c->context.scope, name_token, NULL, v);
-				entities[entity_index++] = e;
-
-				Delay delay = {e, cd->type};
-				array_add(&delayed_const, delay);
-			}
-
-			isize lhs_count = cd->names.count;
-			isize rhs_count = cd->values.count;
-
-			// TODO(bill): Better error messages or is this good enough?
-			if (rhs_count == 0 && cd->type == NULL) {
-				error(ast_node_token(node), "Missing type or initial expression");
-			} else if (lhs_count < rhs_count) {
-				error(ast_node_token(node), "Extra initial expression");
-			}
-
-			for_array(i, cd->names) {
-				AstNode *name = cd->names.e[i];
-				Entity *e = entities[i];
-				Token name_token = name->Ident;
-				if (str_eq(name_token.string, str_lit("_"))) {
-					other_fields[other_field_index++] = e;
-				} else {
-					HashKey key = hash_string(name_token.string);
-					if (map_entity_get(&entity_map, key) != NULL) {
-						// TODO(bill): Scope checking already checks the declaration
-						error(name_token, "`%.*s` is already declared in this structure", LIT(name_token.string));
-					} else {
-						map_entity_set(&entity_map, key, e);
-						other_fields[other_field_index++] = e;
-					}
-					add_entity(c, c->context.scope, name, e);
-				}
-			}
-		} else if (decl->kind == AstNode_TypeDecl) {
-			ast_node(td, TypeDecl, decl);
-			Token name_token = td->name->Ident;
-
-			Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, NULL);
-			Delay delay = {e, td->type};
-			array_add(&delayed_type, delay);
-
-			if (str_eq(name_token.string, str_lit("_"))) {
-				other_fields[other_field_index++] = e;
-			} else {
-				HashKey key = hash_string(name_token.string);
-				if (map_entity_get(&entity_map, key) != NULL) {
-					// TODO(bill): Scope checking already checks the declaration
-					error(name_token, "`%.*s` is already declared in this structure", LIT(name_token.string));
-				} else {
-					map_entity_set(&entity_map, key, e);
-					other_fields[other_field_index++] = e;
-				}
-				add_entity(c, c->context.scope, td->name, e);
-				add_entity_use(c, td->name, e);
-			}
-		}
-	}
-
-	for_array(i, delayed_type) {
-		check_const_decl(c, delayed_type.e[i].e, delayed_type.e[i].t, NULL);
-	}
-	for_array(i, delayed_const) {
-		check_type_decl(c, delayed_const.e[i].e, delayed_const.e[i].t, NULL, NULL);
-	}
+	check_scope_decls(c, decls, 1.2*other_field_count, &dof);
 
 	if (node->kind == AstNode_UnionType) {
 		isize field_index = 0;

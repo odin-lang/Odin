@@ -1,7 +1,7 @@
-#foreign_system_library "user32"
-#foreign_system_library "gdi32"
-
-_:= compile_assert(ODIN_OS == "windows")
+when ODIN_OS == "windows" {
+	#foreign_system_library "user32"
+	#foreign_system_library "gdi32"
+}
 
 HANDLE    :: type rawptr
 HWND      :: type HANDLE

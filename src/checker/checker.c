@@ -917,10 +917,12 @@ Type *const curr_procedure(Checker *c) {
 }
 
 void add_curr_ast_file(Checker *c, AstFile *file) {
-	TokenPos zero_pos = {0};
-	global_error_collector.prev = zero_pos;
-	c->curr_ast_file = file;
-	c->context.decl = file->decl_info;
+	if (file != NULL) {
+		TokenPos zero_pos = {0};
+		global_error_collector.prev = zero_pos;
+		c->curr_ast_file = file;
+		c->context.decl = file->decl_info;
+	}
 }
 
 
@@ -965,9 +967,6 @@ MapEntity generate_minimum_dependency_map(CheckerInfo *info, Entity *start) {
 
 	return map;
 }
-
-void check_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray nodes, MapScope *file_scopes);
-
 
 
 #include "expr.c"
@@ -1072,6 +1071,7 @@ void check_global_entities_by_kind(Checker *c, EntityKind kind) {
 	}
 }
 
+void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray nodes, MapScope *file_scopes);
 
 void check_global_when_stmt(Checker *c, Scope *parent_scope, AstNodeWhenStmt *ws, MapScope *file_scopes) {
 	Operand operand = {Addressing_Invalid};
@@ -1088,11 +1088,11 @@ void check_global_when_stmt(Checker *c, Scope *parent_scope, AstNodeWhenStmt *ws
 		if (operand.value.kind == ExactValue_Bool &&
 		    operand.value.value_bool == true) {
 			ast_node(body, BlockStmt, ws->body);
-			check_collect_entities(c, parent_scope, body->stmts, file_scopes);
+			check_global_collect_entities(c, parent_scope, body->stmts, file_scopes);
 		} else if (ws->else_stmt) {
 			switch (ws->else_stmt->kind) {
 			case AstNode_BlockStmt:
-				check_collect_entities(c, parent_scope, ws->else_stmt->BlockStmt.stmts, file_scopes);
+				check_global_collect_entities(c, parent_scope, ws->else_stmt->BlockStmt.stmts, file_scopes);
 				break;
 			case AstNode_WhenStmt:
 				check_global_when_stmt(c, parent_scope, &ws->else_stmt->WhenStmt, file_scopes);
@@ -1104,7 +1104,7 @@ void check_global_when_stmt(Checker *c, Scope *parent_scope, AstNodeWhenStmt *ws
 		}
 	}
 }
-void check_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray nodes, MapScope *file_scopes) {
+void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray nodes, MapScope *file_scopes) {
 	for_array(decl_index, nodes) {
 		AstNode *decl = nodes.e[decl_index];
 		if (!is_ast_node_decl(decl) && !is_ast_node_when_stmt(decl)) {
@@ -1242,9 +1242,8 @@ void check_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray nodes,
 			try_add_foreign_library_path(c, file_str);
 		case_end;
 		case_ast_node(ws, WhenStmt, decl);
-			check_global_when_stmt(c, parent_scope, ws, file_scopes);
+			// Will be handled later
 		case_end;
-
 		case_ast_node(cd, ConstDecl, decl);
 			for_array(i, cd->values) {
 				AstNode *name = cd->names.e[i];
@@ -1267,7 +1266,6 @@ void check_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray nodes,
 				error(ast_node_token(decl), "Extra initial expression");
 			}
 		case_end;
-
 		case_ast_node(vd, VarDecl, decl);
 			if (!parent_scope->is_file) {
 				// NOTE(bill): Within a procedure, variables must be in order
@@ -1308,7 +1306,6 @@ void check_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray nodes,
 				add_entity_and_decl_info(c, name, e, d);
 			}
 		case_end;
-
 		case_ast_node(td, TypeDecl, decl);
 			ast_node(n, Ident, td->name);
 			Entity *e = make_entity_type_name(c->allocator, parent_scope, *n, NULL);
@@ -1317,7 +1314,6 @@ void check_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray nodes,
 			d->type_expr = td->type;
 			add_entity_and_decl_info(c, td->name, e, d);
 		case_end;
-
 		case_ast_node(pd, ProcDecl, decl);
 			ast_node(n, Ident, pd->name);
 			Token token = *n;
@@ -1333,6 +1329,17 @@ void check_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray nodes,
 				error(ast_node_token(decl), "Only declarations are allowed at file scope");
 			}
 			break;
+		}
+	}
+
+	// NOTE(bill): `when` stmts need to be handled after the other as the condition may refer to something
+	// declared after this stmt in source
+	for_array(decl_index, nodes) {
+		AstNode *decl = nodes.e[decl_index];
+		switch (decl->kind) {
+		case_ast_node(ws, WhenStmt, decl);
+			check_global_when_stmt(c, parent_scope, ws, file_scopes);
+		case_end;
 		}
 	}
 }
@@ -1371,7 +1378,7 @@ void check_parsed_files(Checker *c) {
 	for_array(i, c->parser->files) {
 		AstFile *f = &c->parser->files.e[i];
 		add_curr_ast_file(c, f);
-		check_collect_entities(c, f->scope, f->decls, &file_scopes);
+		check_global_collect_entities(c, f->scope, f->decls, &file_scopes);
 	}
 
 	check_global_entities_by_kind(c, Entity_TypeName);

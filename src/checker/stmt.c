@@ -11,74 +11,12 @@ typedef enum StmtFlag {
 } StmtFlag;
 
 
-
 void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 	if (stmts.count == 0) {
 		return;
 	}
 
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-
-	typedef struct {
-		Entity *e;
-		DeclInfo *d;
-	} Delay;
-	Array(Delay) delayed_const; array_init_reserve(&delayed_const, c->tmp_allocator, stmts.count);
-	Array(Delay) delayed_type;  array_init_reserve(&delayed_type,  c->tmp_allocator, stmts.count);
-
-	for_array(i, stmts) {
-		AstNode *node = stmts.e[i];
-		switch (node->kind) {
-		case_ast_node(cd, ConstDecl, node);
-			for_array(i, cd->values) {
-				AstNode *name = cd->names.e[i];
-				AstNode *value = cd->values.e[i];
-				ExactValue v = {ExactValue_Invalid};
-
-				Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
-				e->identifier = name;
-
-				DeclInfo *d = make_declaration_info(c->allocator, e->scope);
-				d->type_expr = cd->type;
-				d->init_expr = value;
-
-				add_entity_and_decl_info(c, name, e, d);
-
-				Delay delay = {e, d};
-				array_add(&delayed_const, delay);
-			}
-
-			isize lhs_count = cd->names.count;
-			isize rhs_count = cd->values.count;
-
-			if (rhs_count == 0 && cd->type == NULL) {
-				error(ast_node_token(node), "Missing type or initial expression");
-			} else if (lhs_count < rhs_count) {
-				error(ast_node_token(node), "Extra initial expression");
-			}
-		case_end;
-
-		case_ast_node(td, TypeDecl, node);
-			Entity *e = make_entity_type_name(c->allocator, c->context.scope, td->name->Ident, NULL);
-			e->identifier = td->name;
-
-			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
-			d->type_expr = td->type;
-
-			add_entity_and_decl_info(c, td->name, e, d);
-
-			Delay delay = {e, d};
-			array_add(&delayed_type, delay);
-		case_end;
-		}
-	}
-
-	for_array(i, delayed_type) {
-		check_entity_decl(c, delayed_type.e[i].e, delayed_type.e[i].d, NULL, NULL);
-	}
-	for_array(i, delayed_const) {
-		check_entity_decl(c, delayed_const.e[i].e, delayed_const.e[i].d, NULL, NULL);
-	}
+	check_scope_decls(c, stmts, 1.2*stmts.count, NULL);
 
 	bool ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
 	u32 f = flags & (~Stmt_FallthroughAllowed);
@@ -95,7 +33,6 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 		check_stmt(c, n, new_flags);
 	}
 
-	gb_temp_arena_memory_end(tmp);
 }
 
 bool check_is_terminating_list(AstNodeArray stmts) {
@@ -1147,6 +1084,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(pd, ProcDecl, node);
+		// NOTE(bill): Handled elsewhere
+	#if 0
 		// NOTE(bill): This must be handled here so it has access to the parent scope stuff
 		// e.g. using
 		Entity *e = make_entity_procedure(c->allocator, c->context.scope, pd->name->Ident, NULL);
@@ -1157,6 +1096,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		add_entity_and_decl_info(c, pd->name, e, d);
 		check_entity_decl(c, e, d, NULL, NULL);
+	#endif
 	case_end;
 	}
 }

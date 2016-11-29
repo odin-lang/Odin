@@ -1,4 +1,6 @@
-#import "win32.odin"
+when ODIN_OS == "windows" {
+	#import "win32.odin"
+}
 #import "fmt.odin"
 
 File_Time :: type u64

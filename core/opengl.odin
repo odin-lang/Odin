@@ -1,4 +1,6 @@
-#foreign_system_library "opengl32"
+when ODIN_OS == "windows" {
+	#foreign_system_library "opengl32"
+}
 #import "win32.odin"
 #load "opengl_constants.odin"
 
