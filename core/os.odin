@@ -6,7 +6,10 @@ when ODIN_OS == "windows" {
 File_Time :: type u64
 
 File :: struct {
-	Handle :: type win32.HANDLE
+	Handle :: raw_union {
+		p: rawptr
+		i: int
+	}
 	handle:          Handle
 	last_write_time: File_Time
 }
@@ -15,10 +18,9 @@ open :: proc(name: string) -> (File, bool) {
 	using win32
 	buf: [300]byte
 	copy(buf[:], name as []byte)
-	f := File{
-		handle = CreateFileA(^buf[0], FILE_GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, 0, nil),
-	}
-	success := f.handle != INVALID_HANDLE_VALUE as File.Handle
+	f: File
+	f.handle.p = CreateFileA(^buf[0], FILE_GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, 0, nil) as rawptr
+	success := f.handle.p != INVALID_HANDLE_VALUE
 	f.last_write_time = last_write_time(^f)
 	return f, success
 }
@@ -27,21 +29,20 @@ create :: proc(name: string) -> (File, bool) {
 	using win32
 	buf: [300]byte
 	copy(buf[:], name as []byte)
-	f := File{
-		handle = CreateFileA(^buf[0], FILE_GENERIC_WRITE, FILE_SHARE_READ, nil, CREATE_ALWAYS, 0, nil),
-	}
-	success := f.handle != INVALID_HANDLE_VALUE as File.Handle
+	f: File
+	f.handle.p = CreateFileA(^buf[0], FILE_GENERIC_WRITE, FILE_SHARE_READ, nil, CREATE_ALWAYS, 0, nil) as rawptr
+	success := f.handle.p != INVALID_HANDLE_VALUE
 	f.last_write_time = last_write_time(^f)
 	return f, success
 }
 
 close :: proc(using f: ^File) {
-	win32.CloseHandle(handle)
+	win32.CloseHandle(handle.p as win32.HANDLE)
 }
 
 write :: proc(using f: ^File, buf: []byte) -> bool {
 	bytes_written: i32
-	return win32.WriteFile(handle, buf.data, buf.count as i32, ^bytes_written, nil) != 0
+	return win32.WriteFile(handle.p as win32.HANDLE, buf.data, buf.count as i32, ^bytes_written, nil) != 0
 }
 
 file_has_changed :: proc(f: ^File) -> bool {
@@ -57,7 +58,7 @@ file_has_changed :: proc(f: ^File) -> bool {
 
 last_write_time :: proc(f: ^File) -> File_Time {
 	file_info: win32.BY_HANDLE_FILE_INFORMATION
-	win32.GetFileInformationByHandle(f.handle, ^file_info)
+	win32.GetFileInformationByHandle(f.handle.p as win32.HANDLE, ^file_info)
 	l := file_info.last_write_time.low_date_time as File_Time
 	h := file_info.last_write_time.high_date_time as File_Time
 	return l | h << 32
@@ -91,9 +92,9 @@ File_Standard :: type enum {
 
 // NOTE(bill): Uses startup to initialize it
 __std_files := [File_Standard.count]File{
-	{handle = win32.GetStdHandle(win32.STD_INPUT_HANDLE)},
-	{handle = win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)},
-	{handle = win32.GetStdHandle(win32.STD_ERROR_HANDLE)},
+	{handle = win32.GetStdHandle(win32.STD_INPUT_HANDLE)  transmute File.Handle },
+	{handle = win32.GetStdHandle(win32.STD_OUTPUT_HANDLE) transmute File.Handle },
+	{handle = win32.GetStdHandle(win32.STD_ERROR_HANDLE)  transmute File.Handle },
 }
 
 stdin  := ^__std_files[File_Standard.INPUT]
@@ -113,7 +114,7 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	defer close(^f)
 
 	length: i64
-	file_size_ok := win32.GetFileSizeEx(f.handle as win32.HANDLE, ^length) != 0
+	file_size_ok := win32.GetFileSizeEx(f.handle.p as win32.HANDLE, ^length) != 0
 	if !file_size_ok {
 		return nil, false
 	}
@@ -136,7 +137,7 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 			to_read = MAX
 		}
 
-		win32.ReadFile(f.handle as win32.HANDLE, ^data[total_read], to_read, ^single_read_length, nil)
+		win32.ReadFile(f.handle.p as win32.HANDLE, ^data[total_read], to_read, ^single_read_length, nil)
 		if single_read_length <= 0 {
 			free(data.data)
 			return nil, false

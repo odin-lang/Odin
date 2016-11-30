@@ -177,64 +177,71 @@ void init_global_error_collector(void) {
 }
 
 
-void warning(Token token, char *fmt, ...) {
+void warning_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 
 	global_error_collector.warning_count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (!token_pos_are_equal(global_error_collector.prev, token.pos)) {
-		va_list va;
-
 		global_error_collector.prev = token.pos;
-
-		va_start(va, fmt);
 		gb_printf_err("%.*s(%td:%td) Warning: %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
 		              gb_bprintf_va(fmt, va));
-		va_end(va);
 	}
 
 	gb_mutex_unlock(&global_error_collector.mutex);
 }
 
-void error(Token token, char *fmt, ...) {
+void error_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (!token_pos_are_equal(global_error_collector.prev, token.pos)) {
-		va_list va;
-
 		global_error_collector.prev = token.pos;
-
-		va_start(va, fmt);
 		gb_printf_err("%.*s(%td:%td) %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
 		              gb_bprintf_va(fmt, va));
-		va_end(va);
 	}
 
 	gb_mutex_unlock(&global_error_collector.mutex);
 }
 
-void syntax_error(Token token, char *fmt, ...) {
+void syntax_error_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
 
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (!token_pos_are_equal(global_error_collector.prev, token.pos)) {
-		va_list va;
-
 		global_error_collector.prev = token.pos;
-
-		va_start(va, fmt);
 		gb_printf_err("%.*s(%td:%td) Syntax Error: %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
 		              gb_bprintf_va(fmt, va));
-		va_end(va);
 	}
 
 	gb_mutex_unlock(&global_error_collector.mutex);
+}
+
+
+void warning(Token token, char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	warning_va(token, fmt, va);
+	va_end(va);
+}
+
+void error(Token token, char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	error_va(token, fmt, va);
+	va_end(va);
+}
+
+void syntax_error(Token token, char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	syntax_error_va(token, fmt, va);
+	va_end(va);
 }
 
 

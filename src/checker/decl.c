@@ -16,7 +16,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 			gbString expr_str = expr_to_string(operand->expr);
 
 			// TODO(bill): is this a good enough error message?
-			error(ast_node_token(operand->expr),
+			error_node(operand->expr,
 			      "Cannot assign builtin procedure `%s` in %.*s",
 			      expr_str,
 			      LIT(context_name));
@@ -175,7 +175,7 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 				entity = found;
 			}
 		} else {
-			error(ast_node_token(name), "A variable declaration must be an identifier");
+			error_node(name, "A variable declaration must be an identifier");
 		}
 		if (entity == NULL) {
 			entity = make_entity_dummy_variable(c->allocator, c->global_scope, ast_node_token(name));
@@ -227,7 +227,7 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 
 	if (operand->mode != Addressing_Constant) {
 		// TODO(bill): better error
-		error(ast_node_token(operand->expr),
+		error_node(operand->expr,
 		      "`%.*s` is not a constant", LIT(ast_node_token(operand->expr).string));
 		if (e->type == NULL) {
 			e->type = t_invalid;
@@ -237,7 +237,7 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	// if (!is_type_constant_type(operand->type)) {
 	// 	gbString type_str = type_to_string(operand->type);
 	// 	defer (gb_string_free(type_str));
-	// 	error(ast_node_token(operand->expr),
+	// 	error_node(operand->expr,
 	// 	      "Invalid constant type: `%s`", type_str);
 	// 	if (e->type == NULL) {
 	// 		e->type = t_invalid;
@@ -272,7 +272,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 		// if (!is_type_constant_type(t)) {
 		// 	gbString str = type_to_string(t);
 		// 	defer (gb_string_free(str));
-		// 	error(ast_node_token(type_expr),
+		// 	error_node(type_expr),
 		// 	      "Invalid constant type `%s`", str);
 		// 	e->type = t_invalid;
 		// 	return;
@@ -380,19 +380,16 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 	if (is_inline && is_no_inline) {
-		error(ast_node_token(pd->type),
-		      "You cannot apply both `inline` and `no_inline` to a procedure");
+		error_node(pd->type, "You cannot apply both `inline` and `no_inline` to a procedure");
 	}
 
 	if (is_foreign && is_link_name) {
-		error(ast_node_token(pd->type),
-		      "You cannot apply both `foreign` and `link_name` to a procedure");
+		error_node(pd->type, "You cannot apply both `foreign` and `link_name` to a procedure");
 	}
 
 	if (pd->body != NULL) {
 		if (is_foreign) {
-			error(ast_node_token(pd->body),
-			      "A procedure tagged as `#foreign` cannot have a body");
+			error_node(pd->body, "A procedure tagged as `#foreign` cannot have a body");
 		}
 
 		d->scope = c->context.scope;
@@ -416,10 +413,10 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			Type *this_type = base_type(e->type);
 			Type *other_type = base_type(f->type);
 			if (!are_signatures_similar_enough(this_type, other_type)) {
-				error(ast_node_token(d->proc_decl),
-				      "Redeclaration of #foreign procedure `%.*s` with different type signatures\n"
-				      "\tat %.*s(%td:%td)",
-				      LIT(name), LIT(pos.file), pos.line, pos.column);
+				error_node(d->proc_decl,
+				           "Redeclaration of #foreign procedure `%.*s` with different type signatures\n"
+				           "\tat %.*s(%td:%td)",
+				           LIT(name), LIT(pos.file), pos.line, pos.column);
 			}
 		} else {
 			map_entity_set(fp, key, e);
@@ -434,10 +431,10 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		if (found) {
 			Entity *f = *found;
 			TokenPos pos = f->token.pos;
-			error(ast_node_token(d->proc_decl),
-			      "Non unique #link_name for procedure `%.*s`\n"
-			      "\tother at %.*s(%td:%td)",
-			      LIT(name), LIT(pos.file), pos.line, pos.column);
+			error_node(d->proc_decl,
+			           "Non unique #link_name for procedure `%.*s`\n"
+			           "\tother at %.*s(%td:%td)",
+			           LIT(name), LIT(pos.file), pos.line, pos.column);
 		} else {
 			map_entity_set(fp, key, e);
 		}

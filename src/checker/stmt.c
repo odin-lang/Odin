@@ -216,10 +216,10 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 		gbString str = expr_to_string(op_b.expr);
 		switch (op_b.mode) {
 		case Addressing_Value:
-			error(ast_node_token(op_b.expr), "Cannot assign to `%s`", str);
+			error_node(op_b.expr, "Cannot assign to `%s`", str);
 			break;
 		default:
-			error(ast_node_token(op_b.expr), "Cannot assign to `%s`", str);
+			error_node(op_b.expr, "Cannot assign to `%s`", str);
 			break;
 		}
 		gb_string_free(str);
@@ -284,13 +284,13 @@ void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
 	Operand operand = {Addressing_Invalid};
 	check_expr(c, &operand, ws->cond);
 	if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-		error(ast_node_token(ws->cond), "Non-boolean condition in `when` statement");
+		error_node(ws->cond, "Non-boolean condition in `when` statement");
 	}
 	if (operand.mode != Addressing_Constant) {
-		error(ast_node_token(ws->cond), "Non-constant condition in `when` statement");
+		error_node(ws->cond, "Non-constant condition in `when` statement");
 	}
 	if (ws->body == NULL || ws->body->kind != AstNode_BlockStmt) {
-		error(ast_node_token(ws->cond), "Invalid body for `when` statement");
+		error_node(ws->cond, "Invalid body for `when` statement");
 	} else {
 		if (operand.value.kind == ExactValue_Bool &&
 		    operand.value.value_bool) {
@@ -304,7 +304,7 @@ void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
 				check_when_stmt(c, &ws->else_stmt->WhenStmt, flags);
 				break;
 			default:
-				error(ast_node_token(ws->else_stmt), "Invalid `else` statement in `when` statement");
+				error_node(ws->else_stmt, "Invalid `else` statement in `when` statement");
 				break;
 			}
 		}
@@ -323,7 +323,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		ExprKind kind = check_expr_base(c, &operand, es->expr, NULL);
 		switch (operand.mode) {
 		case Addressing_Type:
-			error(ast_node_token(node), "Is not an expression");
+			error_node(node, "Is not an expression");
 			break;
 		case Addressing_NoValue:
 			return;
@@ -335,7 +335,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				return;
 			}
 			gbString expr_str = expr_to_string(operand.expr);
-			error(ast_node_token(node), "Expression is not used: `%s`", expr_str);
+			error_node(node, "Expression is not used: `%s`", expr_str);
 			gb_string_free(expr_str);
 		} break;
 		}
@@ -343,7 +343,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(ts, TagStmt, node);
 		// TODO(bill): Tag Statements
-		error(ast_node_token(node), "Tag statements are not supported yet");
+		error_node(node, "Tag statements are not supported yet");
 		check_stmt(c, ts->stmt, flags);
 	case_end;
 
@@ -426,7 +426,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				check_assignment_variable(c, &operands.e[i], lhs);
 			}
 			if (lhs_count != rhs_count) {
-				error(ast_node_token(as->lhs.e[0]), "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
+				error_node(as->lhs.e[0], "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
 			}
 
 			gb_temp_arena_memory_end(tmp);
@@ -479,7 +479,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		Operand operand = {Addressing_Invalid};
 		check_expr(c, &operand, is->cond);
 		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-			error(ast_node_token(is->cond), "Non-boolean condition in `if` statement");
+			error_node(is->cond, "Non-boolean condition in `if` statement");
 		}
 
 		check_stmt(c, is->body, mod_flags);
@@ -491,7 +491,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				check_stmt(c, is->else_stmt, mod_flags);
 				break;
 			default:
-				error(ast_node_token(is->else_stmt), "Invalid `else` statement in `if` statement");
+				error_node(is->else_stmt, "Invalid `else` statement in `if` statement");
 				break;
 			}
 		}
@@ -526,13 +526,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				variables = tuple->variables;
 			}
 			if (rs->results.count == 0) {
-				error(ast_node_token(node), "Expected %td return values, got 0", result_count);
+				error_node(node, "Expected %td return values, got 0", result_count);
 			} else {
 				check_init_variables(c, variables, result_count,
 				                     rs->results, str_lit("return statement"));
 			}
 		} else if (rs->results.count > 0) {
-			error(ast_node_token(rs->results.e[0]), "No return values expected");
+			error_node(rs->results.e[0], "No return values expected");
 		}
 	case_end;
 
@@ -548,8 +548,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			check_expr(c, &operand, fs->cond);
 			if (operand.mode != Addressing_Invalid &&
 			    !is_type_boolean(operand.type)) {
-				error(ast_node_token(fs->cond),
-				      "Non-boolean condition in `for` statement");
+				error_node(fs->cond, "Non-boolean condition in `for` statement");
 			}
 		}
 		if (fs->post != NULL) {
@@ -595,15 +594,16 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					default_stmt = stmt;
 				}
 			} else {
-				error(ast_node_token(stmt), "Invalid AST - expected case clause");
+				error_node(stmt, "Invalid AST - expected case clause");
 			}
 
 			if (default_stmt != NULL) {
 				if (first_default != NULL) {
 					TokenPos pos = ast_node_token(first_default).pos;
-					error(ast_node_token(stmt),
-					      "multiple `default` clauses\n"
-					      "\tfirst at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
+					error_node(stmt,
+					           "multiple `default` clauses\n"
+					           "\tfirst at %.*s(%td:%td)",
+					           LIT(pos.file), pos.line, pos.column);
 				} else {
 					first_default = default_stmt;
 				}
@@ -664,11 +664,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 							if (are_types_identical(y.type, tap.type)) {
 								TokenPos pos = tap.token.pos;
 								gbString expr_str = expr_to_string(y.expr);
-								error(ast_node_token(y.expr),
-								      "Duplicate case `%s`\n"
-								      "\tprevious case at %.*s(%td:%td)",
-								      expr_str,
-								      LIT(pos.file), pos.line, pos.column);
+								error_node(y.expr,
+								           "Duplicate case `%s`\n"
+								           "\tprevious case at %.*s(%td:%td)",
+								           expr_str,
+								           LIT(pos.file), pos.line, pos.column);
 								gb_string_free(expr_str);
 								continue_outer = true;
 								break;
@@ -713,8 +713,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		check_assignment(c, &x, NULL, str_lit("type match expression"));
 		if (!check_valid_type_match_type(x.type, &is_union_ptr, &is_any)) {
 			gbString str = type_to_string(x.type);
-			error(ast_node_token(x.expr),
-			      "Invalid type for this type match expression, got `%s`", str);
+			error_node(x.expr,
+			           "Invalid type for this type match expression, got `%s`", str);
 			gb_string_free(str);
 			break;
 		}
@@ -732,15 +732,15 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					default_stmt = stmt;
 				}
 			} else {
-				error(ast_node_token(stmt), "Invalid AST - expected case clause");
+				error_node(stmt, "Invalid AST - expected case clause");
 			}
 
 			if (default_stmt != NULL) {
 				if (first_default != NULL) {
 					TokenPos pos = ast_node_token(first_default).pos;
-					error(ast_node_token(stmt),
-					      "multiple `default` clauses\n"
-					      "\tfirst at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
+					error_node(stmt,
+					           "Multiple `default` clauses\n"
+					           "\tfirst at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
 				} else {
 					first_default = default_stmt;
 				}
@@ -785,8 +785,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					}
 					if (!tag_type_found) {
 						gbString type_str = type_to_string(y.type);
-						error(ast_node_token(y.expr),
-						      "Unknown tag type, got `%s`", type_str);
+						error_node(y.expr,
+						           "Unknown tag type, got `%s`", type_str);
 						gb_string_free(type_str);
 						continue;
 					}
@@ -802,11 +802,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				if (found) {
 					TokenPos pos = cc->token.pos;
 					gbString expr_str = expr_to_string(y.expr);
-					error(ast_node_token(y.expr),
-					      "Duplicate type case `%s`\n"
-					      "\tprevious type case at %.*s(%td:%td)",
-					      expr_str,
-					      LIT(pos.file), pos.line, pos.column);
+					error_node(y.expr,
+					           "Duplicate type case `%s`\n"
+					           "\tprevious type case at %.*s(%td:%td)",
+					           expr_str,
+					           LIT(pos.file), pos.line, pos.column);
 					gb_string_free(expr_str);
 					break;
 				}

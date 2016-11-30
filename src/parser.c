@@ -355,8 +355,6 @@ typedef struct AstNode {
 #define case_end } break;
 
 
-
-
 gb_inline bool is_ast_node_expr(AstNode *node) {
 	return gb_is_between(node->kind, AstNode__ExprBegin+1, AstNode__ExprEnd-1);
 }
@@ -499,6 +497,38 @@ Token ast_node_token(AstNode *node) {
 
 	return empty_token;
 }
+
+
+void error_node(AstNode *node, char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	error_va(ast_node_token(node), fmt, va);
+	va_end(va);
+}
+
+void warning_node(AstNode *node, char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	warning_va(ast_node_token(node), fmt, va);
+	va_end(va);
+}
+
+void syntax_error_node(AstNode *node, char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	syntax_error_va(ast_node_token(node), fmt, va);
+	va_end(va);
+}
+
+
+bool ast_node_expect(AstNode *node, AstNodeKind kind) {
+	if (node->kind != kind) {
+		error_node(node, "Expected %.*s, got %.*s", LIT(ast_node_strings[node->kind]));
+		return false;
+	}
+	return true;
+}
+
 
 // NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
 AstNode *make_node(AstFile *f, AstNodeKind kind) {
@@ -1232,7 +1262,7 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags);
 
 void check_proc_add_tag(AstFile *f, AstNode *tag_expr, u64 *tags, ProcTag tag, String tag_name) {
 	if (*tags & tag) {
-		syntax_error(ast_node_token(tag_expr), "Procedure tag already used: %.*s", LIT(tag_name));
+		syntax_error_node(tag_expr, "Procedure tag already used: %.*s", LIT(tag_name));
 	}
 	*tags |= tag;
 }
@@ -1306,7 +1336,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 				*foreign_name = f->curr_token.string;
 				// TODO(bill): Check if valid string
 				if (!is_foreign_name_valid(*foreign_name)) {
-					syntax_error(ast_node_token(tag_expr), "Invalid alternative foreign procedure name: `%.*s`", LIT(*foreign_name));
+					syntax_error_node(tag_expr, "Invalid alternative foreign procedure name: `%.*s`", LIT(*foreign_name));
 				}
 
 				next_token(f);
@@ -1317,7 +1347,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 				*link_name = f->curr_token.string;
 				// TODO(bill): Check if valid string
 				if (!is_foreign_name_valid(*link_name)) {
-					syntax_error(ast_node_token(tag_expr), "Invalid alternative link procedure name `%.*s`", LIT(*link_name));
+					syntax_error_node(tag_expr, "Invalid alternative link procedure name `%.*s`", LIT(*link_name));
 				}
 
 				next_token(f);
@@ -1335,7 +1365,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 		ELSE_IF_ADD_TAG(fastcall)
 		// ELSE_IF_ADD_TAG(cdecl)
 		else {
-			syntax_error(ast_node_token(tag_expr), "Unknown procedure tag");
+			syntax_error_node(tag_expr, "Unknown procedure tag");
 		}
 
 		#undef ELSE_IF_ADD_TAG
@@ -1437,7 +1467,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			AstNode *expr = parse_expr(f, false);
 			operand = make_run_expr(f, token, name, expr);
 			if (unparen_expr(expr)->kind != AstNode_CallExpr) {
-				error(ast_node_token(expr), "#run can only be applied to procedure calls");
+				error_node(expr, "#run can only be applied to procedure calls");
 				operand = make_bad_expr(f, token, f->curr_token);
 			}
 			warning(token, "#run is not yet implemented");
@@ -1999,7 +2029,7 @@ AstNodeArray parse_record_params(AstFile *f, isize *decl_count_, bool using_allo
 					}
 					array_add(&decls, vd);
 				} else {
-					syntax_error(ast_node_token(decl), "Illegal %.*s field", LIT(context));
+					syntax_error_node(decl, "Illegal %.*s field", LIT(context));
 				}
 			} break;
 
@@ -2021,7 +2051,7 @@ AstNodeArray parse_record_params(AstFile *f, isize *decl_count_, bool using_allo
 				break;
 			}
 		} else {
-			syntax_error(ast_node_token(decl), "Illegal record field: %.*s", LIT(ast_node_strings[decl->kind]));
+			syntax_error_node(decl, "Illegal record field: %.*s", LIT(ast_node_strings[decl->kind]));
 		}
 	}
 
@@ -2293,7 +2323,7 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 			String n = name->Ident.string;
 			// NOTE(bill): Check for reserved identifiers
 			if (str_eq(n, str_lit("context"))) {
-				syntax_error(ast_node_token(name), "`context` is a reserved identifier");
+				syntax_error_node(name, "`context` is a reserved identifier");
 				break;
 			}
 		}
@@ -2326,7 +2356,7 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 				next_token(f);
 			}
 			if (names.count != 1) {
-				syntax_error(ast_node_token(names.e[0]), "You can only declare one type at a time");
+				syntax_error_node(names.e[0], "You can only declare one type at a time");
 				return make_bad_decl(f, names.e[0]->Ident, token);
 			}
 
@@ -3164,7 +3194,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, AstNodeArray
 		    node->kind != AstNode_BadStmt &&
 		    node->kind != AstNode_EmptyStmt) {
 			// NOTE(bill): Sanity check
-			syntax_error(ast_node_token(node), "Only declarations are allowed at file scope");
+			syntax_error_node(node, "Only declarations are allowed at file scope");
 		} else if (node->kind == AstNode_WhenStmt) {
 			parse_setup_file_when_stmt(p, f, base_dir, &node->WhenStmt);
 		} else if (node->kind == AstNode_ImportDecl) {
@@ -3173,9 +3203,9 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, AstNodeArray
 
 			if (!is_import_path_valid(file_str)) {
 				if (id->is_load) {
-					syntax_error(ast_node_token(node), "Invalid #load path: `%.*s`", LIT(file_str));
+					syntax_error_node(node, "Invalid #load path: `%.*s`", LIT(file_str));
 				} else {
-					syntax_error(ast_node_token(node), "Invalid #import path: `%.*s`", LIT(file_str));
+					syntax_error_node(node, "Invalid #import path: `%.*s`", LIT(file_str));
 				}
 				// NOTE(bill): It's a naughty name
 				decls.e[i] = make_bad_decl(f, id->token, id->token);
@@ -3202,9 +3232,9 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, AstNodeArray
 
 			if (!is_import_path_valid(file_str)) {
 				if (fl->is_system) {
-					syntax_error(ast_node_token(node), "Invalid `foreign_system_library` path");
+					syntax_error_node(node, "Invalid `foreign_system_library` path");
 				} else {
-					syntax_error(ast_node_token(node), "Invalid `foreign_library` path");
+					syntax_error_node(node, "Invalid `foreign_library` path");
 				}
 				// NOTE(bill): It's a naughty name
 				f->decls.e[i] = make_bad_decl(f, fl->token, fl->token);

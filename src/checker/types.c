@@ -667,9 +667,24 @@ bool is_type_comparable(Type *t) {
 	t = base_type(get_enum_base_type(t));
 	switch (t->kind) {
 	case Type_Basic:
-		return t->kind != Basic_UntypedNil && t->kind != Basic_any;
+		return t->kind != Basic_UntypedNil;
 	case Type_Pointer:
 		return true;
+	case Type_Record: {
+		if (false && is_type_struct(t)) {
+			// TODO(bill): Should I even allow this?
+			for (isize i = 0; i < t->Record.field_count; i++) {
+				if (!is_type_comparable(t->Record.fields[i]->type))
+					return false;
+			}
+		} else if (is_type_enum(t)) {
+			return is_type_comparable(t->Record.enum_base);
+		}
+		return false;
+	} break;
+	case Type_Array:
+		return false;
+		// return is_type_comparable(t->Array.elem);
 	case Type_Vector:
 		return is_type_comparable(t->Vector.elem);
 	case Type_Proc:

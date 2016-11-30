@@ -546,6 +546,7 @@ void init_universal_scope(void) {
 
 	add_global_entity(make_entity_nil(a, str_lit("nil"), t_untyped_nil));
 
+	// TODO(bill): Set through flags in the compiler
 	add_global_string_constant(a, str_lit("ODIN_OS"),      str_lit("windows"));
 	add_global_string_constant(a, str_lit("ODIN_ARCH"),    str_lit("amd64"));
 	add_global_string_constant(a, str_lit("ODIN_VENDOR"),  str_lit("odin"));
@@ -702,7 +703,6 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier != NULL);
 	if (identifier->kind == AstNode_Ident) {
-		GB_ASSERT(identifier->kind == AstNode_Ident);
 		HashKey key = hash_pointer(identifier);
 		map_entity_set(&i->definitions, key, entity);
 	} else {
@@ -754,6 +754,7 @@ void add_entity_use(Checker *c, AstNode *identifier, Entity *entity) {
 
 
 void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d) {
+	GB_ASSERT(identifier->kind == AstNode_Ident);
 	GB_ASSERT(str_eq(identifier->Ident.string, e->token.string));
 	add_entity(c, e->scope, identifier, e);
 	map_decl_info_set(&c->info.entities, hash_pointer(e), d);
@@ -1077,13 +1078,13 @@ void check_global_when_stmt(Checker *c, Scope *parent_scope, AstNodeWhenStmt *ws
 	Operand operand = {Addressing_Invalid};
 	check_expr(c, &operand, ws->cond);
 	if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-		error(ast_node_token(ws->cond), "Non-boolean condition in `when` statement");
+		error_node(ws->cond, "Non-boolean condition in `when` statement");
 	}
 	if (operand.mode != Addressing_Constant) {
-		error(ast_node_token(ws->cond), "Non-constant condition in `when` statement");
+		error_node(ws->cond, "Non-constant condition in `when` statement");
 	}
 	if (ws->body == NULL || ws->body->kind != AstNode_BlockStmt) {
-		error(ast_node_token(ws->cond), "Invalid body for `when` statement");
+		error_node(ws->cond, "Invalid body for `when` statement");
 	} else {
 		if (operand.value.kind == ExactValue_Bool &&
 		    operand.value.value_bool == true) {
@@ -1098,7 +1099,7 @@ void check_global_when_stmt(Checker *c, Scope *parent_scope, AstNodeWhenStmt *ws
 				check_global_when_stmt(c, parent_scope, &ws->else_stmt->WhenStmt, file_scopes);
 				break;
 			default:
-				error(ast_node_token(ws->else_stmt), "Invalid `else` statement in `when` statement");
+				error_node(ws->else_stmt, "Invalid `else` statement in `when` statement");
 				break;
 			}
 		}
@@ -1200,9 +1201,9 @@ void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray
 					if (is_string_an_identifier(filename)) {
 						import_name = filename;
 					} else {
-						error(ast_node_token(decl),
-						      "File name, %.*s, cannot be as an import name as it is not a valid identifier",
-						      LIT(filename));
+						error_node(decl,
+						           "File name, %.*s, cannot be as an import name as it is not a valid identifier",
+						           LIT(filename));
 					}
 				}
 
@@ -1261,9 +1262,9 @@ void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray
 			isize rhs_count = cd->values.count;
 
 			if (rhs_count == 0 && cd->type == NULL) {
-				error(ast_node_token(decl), "Missing type or initial expression");
+				error_node(decl, "Missing type or initial expression");
 			} else if (lhs_count < rhs_count) {
-				error(ast_node_token(decl), "Extra initial expression");
+				error_node(decl, "Extra initial expression");
 			}
 		case_end;
 		case_ast_node(vd, VarDecl, decl);
@@ -1326,7 +1327,7 @@ void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray
 
 		default:
 			if (parent_scope->is_file) {
-				error(ast_node_token(decl), "Only declarations are allowed at file scope");
+				error_node(decl, "Only declarations are allowed at file scope");
 			}
 			break;
 		}
