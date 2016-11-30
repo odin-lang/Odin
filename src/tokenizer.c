@@ -83,6 +83,8 @@ TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_type,           "type"), \
+	/* TOKEN_KIND(Token_import,         "import"), */ \
+	/* TOKEN_KIND(Token_include,         "include"), */ \
 	TOKEN_KIND(Token_proc,           "proc"), \
 	TOKEN_KIND(Token_match,          "match"), \
 	TOKEN_KIND(Token_break,          "break"), \
@@ -143,7 +145,7 @@ i32 token_pos_cmp(TokenPos a, TokenPos b) {
 	return (a.line < b.line) ? -1 : +1;
 }
 
-bool token_pos_are_equal(TokenPos a, TokenPos b) {
+bool token_pos_eq(TokenPos a, TokenPos b) {
 	return token_pos_cmp(a, b) == 0;
 }
 
@@ -182,7 +184,7 @@ void warning_va(Token token, char *fmt, va_list va) {
 
 	global_error_collector.warning_count++;
 	// NOTE(bill): Duplicate error, skip it
-	if (!token_pos_are_equal(global_error_collector.prev, token.pos)) {
+	if (!token_pos_eq(global_error_collector.prev, token.pos)) {
 		global_error_collector.prev = token.pos;
 		gb_printf_err("%.*s(%td:%td) Warning: %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
@@ -197,7 +199,7 @@ void error_va(Token token, char *fmt, va_list va) {
 
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
-	if (!token_pos_are_equal(global_error_collector.prev, token.pos)) {
+	if (!token_pos_eq(global_error_collector.prev, token.pos)) {
 		global_error_collector.prev = token.pos;
 		gb_printf_err("%.*s(%td:%td) %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
@@ -212,7 +214,7 @@ void syntax_error_va(Token token, char *fmt, va_list va) {
 
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
-	if (!token_pos_are_equal(global_error_collector.prev, token.pos)) {
+	if (!token_pos_eq(global_error_collector.prev, token.pos)) {
 		global_error_collector.prev = token.pos;
 		gb_printf_err("%.*s(%td:%td) Syntax Error: %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,

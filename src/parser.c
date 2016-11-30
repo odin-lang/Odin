@@ -1133,7 +1133,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 
 		case Token_Hash:
 		{
-			if (token_pos_are_equal(t.pos, f->fix_prev_pos) &&
+			if (token_pos_eq(t.pos, f->fix_prev_pos) &&
 			    f->fix_count < PARSER_MAX_FIX_COUNT) {
 				f->fix_count++;
 				return;
@@ -2304,9 +2304,11 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 
 	if (f->curr_token.kind == Token_OpenBrace) {
 		if ((tags & ProcTag_foreign) != 0) {
-			syntax_error(f->curr_token, "A procedure tagged as `#foreign` cannot have a body");
+			syntax_error_node(name, "A procedure tagged as `#foreign` cannot have a body");
 		}
 		body = parse_body(f);
+	} else if ((tags & ProcTag_foreign) == 0) {
+		syntax_error_node(name, "Only a procedure tagged as `#foreign` cannot have a body");
 	}
 
 	f->curr_proc = curr_proc;
@@ -2339,8 +2341,7 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 
 	bool is_mutable = true;
 
-	if (f->curr_token.kind == Token_Eq ||
-	    f->curr_token.kind == Token_Colon) {
+	if (f->curr_token.kind == Token_Eq || f->curr_token.kind == Token_Colon) {
 		if (f->curr_token.kind == Token_Colon) {
 			is_mutable = false;
 		}
@@ -2903,7 +2904,7 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 
 			return make_import_decl(f, s->TagStmt.token, file_path, import_name, os, arch, false);
-		} else if (str_eq(tag, str_lit("load"))) {
+		} else if (str_eq(tag, str_lit("include"))) {
 			String os = {0};
 			String arch = {0};
 			// TODO(bill): better error messages
@@ -2914,7 +2915,7 @@ AstNode *parse_stmt(AstFile *f) {
 			if (f->curr_proc == NULL) {
 				return make_import_decl(f, s->TagStmt.token, file_path, import_name, os, arch, true);
 			}
-			syntax_error(token, "You cannot use #load within a procedure. This must be done at the file scope");
+			syntax_error(token, "You cannot use #include within a procedure. This must be done at the file scope");
 			return make_bad_decl(f, token, file_path);
 		} else {
 

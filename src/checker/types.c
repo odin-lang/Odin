@@ -490,6 +490,9 @@ bool is_type_string(Type *t) {
 }
 bool is_type_typed(Type *t) {
 	t = base_type(t);
+	if (t == NULL) {
+		return false;
+	}
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Untyped) == 0;
 	}

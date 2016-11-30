@@ -724,7 +724,7 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 				return false;
 			} else {
 				TokenPos pos = insert_entity->token.pos;
-				if (token_pos_are_equal(pos, entity->token.pos)) {
+				if (token_pos_eq(pos, entity->token.pos)) {
 					// NOTE(bill): Error should have been handled already
 					return false;
 				}
@@ -1048,27 +1048,29 @@ void check_global_entities_by_kind(Checker *c, EntityKind kind) {
 	for_array(i, c->info.entities.entries) {
 		MapDeclInfoEntry *entry = &c->info.entities.entries.e[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
-		if (e->kind == kind) {
-			DeclInfo *d = entry->value;
-			if (d->scope != e->scope) {
-				continue;
-			}
+		DeclInfo *d = entry->value;
 
-			add_curr_ast_file(c, d->scope->file);
-			if (kind != Entity_Procedure && str_eq(e->token.string, str_lit("main"))) {
-				if (e->scope->is_init) {
-					error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
-					continue;
-				}
-			} else if (e->scope->is_global && str_eq(e->token.string, str_lit("main"))) {
+		if (e->kind != kind) {
+			continue;
+		}
+		if (d->scope != e->scope) {
+			continue;
+		}
+
+		add_curr_ast_file(c, d->scope->file);
+		if (e->kind != Entity_Procedure && str_eq(e->token.string, str_lit("main"))) {
+			if (e->scope->is_init) {
 				error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
 				continue;
 			}
-
-			Scope *prev_scope = c->context.scope;
-			c->context.scope = d->scope;
-			check_entity_decl(c, e, d, NULL, NULL);
+		} else if (e->scope->is_global && str_eq(e->token.string, str_lit("main"))) {
+			error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
+			continue;
 		}
+
+		Scope *prev_scope = c->context.scope;
+		c->context.scope = d->scope;
+		check_entity_decl(c, e, d, NULL, NULL);
 	}
 }
 
@@ -1383,13 +1385,12 @@ void check_parsed_files(Checker *c) {
 	}
 
 	check_global_entities_by_kind(c, Entity_TypeName);
-
 	init_preload_types(c);
 	add_implicit_value(c, ImplicitValue_context, str_lit("context"), str_lit("__context"), t_context);
-
 	check_global_entities_by_kind(c, Entity_Constant);
 	check_global_entities_by_kind(c, Entity_Procedure);
 	check_global_entities_by_kind(c, Entity_Variable);
+
 
 	for (isize i = 1; i < ImplicitValue_Count; i++) {
 		// NOTE(bill): First is invalid

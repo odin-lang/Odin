@@ -1329,14 +1329,19 @@ end:
 
 	if (is_type_named(type)) {
 		if (type->Named.base == NULL) {
+			error_node(e, "Invalid type definition");
 			type->Named.base = t_invalid;
 		}
 	}
 
+	if (is_type_typed(type)) {
+		add_type_and_value(&c->info, e, Addressing_Type, type, null_value);
+	} else {
+		error_node(e, "Invalid type definition");
+		type = t_invalid;
+	}
 	set_base_type(named_type, type);
-	GB_ASSERT(is_type_typed(type));
 
-	add_type_and_value(&c->info, e, Addressing_Type, type, null_value);
 
 
 	return type;
@@ -3755,7 +3760,8 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	}
 
 	Type *proc_type = base_type(operand->type);
-	if (proc_type == NULL || proc_type->kind != Type_Proc) {
+	if (proc_type == NULL || proc_type->kind != Type_Proc ||
+	    !(operand->mode == Addressing_Value || operand->mode == Addressing_Variable)) {
 		AstNode *e = operand->expr;
 		gbString str = expr_to_string(e);
 		error_node(e, "Cannot call a non-procedure: `%s`", str);

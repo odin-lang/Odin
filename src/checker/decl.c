@@ -305,7 +305,7 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, Cycle
 	named->Named.base = bt;
 	named->Named.base = base_type(named->Named.base);
 	if (named->Named.base == t_invalid) {
-		gb_printf("check_type_decl: %s\n", type_to_string(named));
+		// gb_printf("check_type_decl: %s\n", type_to_string(named));
 	}
 
 	cycle_checker_destroy(&local_cycle_checker);
