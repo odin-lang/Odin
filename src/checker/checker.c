@@ -223,21 +223,26 @@ typedef struct CheckerContext {
 #define MAP_NAME MapExprInfo
 #include "../map.c"
 
+typedef struct DelayedImport {
+	Scope *            parent;
+	AstNodeImportDecl *decl;
+} DelayedImport;
+
 
 // NOTE(bill): Symbol tables
 typedef struct CheckerInfo {
-	MapTypeAndValue     types;           // Key: AstNode * | Expression -> Type (and value)
-	MapEntity           definitions;     // Key: AstNode * | Identifier -> Entity
-	MapEntity           uses;            // Key: AstNode * | Identifier -> Entity
-	MapScope            scopes;          // Key: AstNode * | Node       -> Scope
-	MapExprInfo         untyped;         // Key: AstNode * | Expression -> ExprInfo
-	MapDeclInfo         entities;        // Key: Entity *
-	MapEntity           foreign_procs;   // Key: String
-	MapAstFile          files;           // Key: String (full path)
-	MapIsize            type_info_map;   // Key: Type *
-	isize               type_info_count;
-	Entity *            implicit_values[ImplicitValue_Count];
-	Array(String)       foreign_libraries; // For the linker
+	MapTypeAndValue      types;           // Key: AstNode * | Expression -> Type (and value)
+	MapEntity            definitions;     // Key: AstNode * | Identifier -> Entity
+	MapEntity            uses;            // Key: AstNode * | Identifier -> Entity
+	MapScope             scopes;          // Key: AstNode * | Node       -> Scope
+	MapExprInfo          untyped;         // Key: AstNode * | Expression -> ExprInfo
+	MapDeclInfo          entities;        // Key: Entity *
+	MapEntity            foreign_procs;   // Key: String
+	MapAstFile           files;           // Key: String (full path)
+	MapIsize             type_info_map;   // Key: Type *
+	isize                type_info_count;
+	Entity *             implicit_values[ImplicitValue_Count];
+	Array(String)        foreign_libraries; // For the linker
 } CheckerInfo;
 
 typedef struct Checker {
@@ -248,6 +253,8 @@ typedef struct Checker {
 	BaseTypeSizes          sizes;
 	Scope *                global_scope;
 	Array(ProcedureInfo)   procs; // NOTE(bill): Procedures to check
+	Array(DelayedImport)   delayed_imports;
+
 
 	gbArena                arena;
 	gbArena                tmp_arena;
@@ -608,6 +615,7 @@ void init_checker(Checker *c, Parser *parser, BaseTypeSizes sizes) {
 
 	array_init(&c->proc_stack, a);
 	array_init(&c->procs, a);
+	array_init(&c->delayed_imports, a);
 
 	// NOTE(bill): Is this big enough or too small?
 	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
@@ -633,6 +641,7 @@ void destroy_checker(Checker *c) {
 	destroy_scope(c->global_scope);
 	array_free(&c->proc_stack);
 	array_free(&c->procs);
+	array_free(&c->delayed_imports);
 
 	gb_arena_free(&c->arena);
 }
@@ -1117,106 +1126,17 @@ void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray
 		switch (decl->kind) {
 		case_ast_node(bd, BadDecl, decl);
 		case_end;
+		case_ast_node(ws, WhenStmt, decl);
+			// Will be handled later
+		case_end;
 		case_ast_node(id, ImportDecl, decl);
 			if (!parent_scope->is_file) {
 				// NOTE(bill): _Should_ be caught by the parser
 				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
-
-			HashKey key = hash_string(id->fullpath);
-			Scope **found = map_scope_get(file_scopes, key);
-			if (found == NULL) {
-				for_array(scope_index, file_scopes->entries) {
-					Scope *scope = file_scopes->entries.e[scope_index].value;
-					gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
-				}
-				gb_printf_err("%.*s(%td:%td)\n", LIT(id->token.pos.file), id->token.pos.line, id->token.pos.column);
-				GB_PANIC("Unable to find scope for file: %.*s", LIT(id->fullpath));
-			}
-			Scope *scope = *found;
-
-			if (scope->is_global) {
-				error(id->token, "Importing a #shared_global_scope is disallowed and unnecessary");
-				continue;
-			}
-
-			bool previously_added = false;
-			for_array(import_index, parent_scope->imported) {
-				Scope *prev = parent_scope->imported.e[import_index];
-				if (prev == scope) {
-					previously_added = true;
-					break;
-				}
-			}
-
-			if (!previously_added) {
-				array_add(&parent_scope->imported, scope);
-			} else {
-				warning(id->token, "Multiple #import of the same file within this scope");
-			}
-
-			if (str_eq(id->import_name.string, str_lit("."))) {
-				// NOTE(bill): Add imported entities to this file's scope
-				for_array(elem_index, scope->elements.entries) {
-					Entity *e = scope->elements.entries.e[elem_index].value;
-					if (e->scope == parent_scope) {
-						continue;
-					}
-
-					// NOTE(bill): Do not add other imported entities
-					add_entity(c, parent_scope, NULL, e);
-					if (!id->is_load) { // `#import`ed entities don't get exported
-						HashKey key = hash_string(e->token.string);
-						map_entity_set(&parent_scope->implicit, key, e);
-					}
-				}
-			} else {
-				String import_name = id->import_name.string;
-				if (import_name.len == 0) {
-					// NOTE(bill): use file name (without extension) as the identifier
-					// If it is a valid identifier
-					String filename = id->fullpath;
-					isize slash = 0;
-					isize dot = 0;
-					for (isize i = filename.len-1; i >= 0; i--) {
-						u8 c = filename.text[i];
-						if (c == '/' || c == '\\') {
-							break;
-						}
-						slash = i;
-					}
-
-					filename.text += slash;
-					filename.len -= slash;
-
-					dot = filename.len;
-					while (dot --> 0) {
-						u8 c = filename.text[dot];
-						if (c == '.') {
-							break;
-						}
-					}
-
-					filename.len = dot;
-
-					if (is_string_an_identifier(filename)) {
-						import_name = filename;
-					} else {
-						error_node(decl,
-						           "File name, %.*s, cannot be as an import name as it is not a valid identifier",
-						           LIT(filename));
-					}
-				}
-
-				if (import_name.len > 0) {
-					id->import_name.string = import_name;
-					Entity *e = make_entity_import_name(c->allocator, parent_scope, id->import_name, t_invalid,
-					                                    id->fullpath, id->import_name.string,
-					                                    scope);
-					add_entity(c, parent_scope, NULL, e);
-				}
-			}
+			DelayedImport di = {parent_scope, id};
+			array_add(&c->delayed_imports, di);
 		case_end;
 		case_ast_node(fl, ForeignLibrary, decl);
 			if (!parent_scope->is_file) {
@@ -1243,9 +1163,6 @@ void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray
 			}
 
 			try_add_foreign_library_path(c, file_str);
-		case_end;
-		case_ast_node(ws, WhenStmt, decl);
-			// Will be handled later
 		case_end;
 		case_ast_node(cd, ConstDecl, decl);
 			for_array(i, cd->values) {
@@ -1347,6 +1264,110 @@ void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray
 	}
 }
 
+void check_import_entities(Checker *c, MapScope *file_scopes) {
+	for_array(i, c->delayed_imports) {
+		AstNodeImportDecl *id = c->delayed_imports.e[i].decl;
+		Scope *parent_scope = c->delayed_imports.e[i].parent;
+
+		HashKey key = hash_string(id->fullpath);
+		Scope **found = map_scope_get(file_scopes, key);
+		if (found == NULL) {
+			for_array(scope_index, file_scopes->entries) {
+				Scope *scope = file_scopes->entries.e[scope_index].value;
+				gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
+			}
+			gb_printf_err("%.*s(%td:%td)\n", LIT(id->token.pos.file), id->token.pos.line, id->token.pos.column);
+			GB_PANIC("Unable to find scope for file: %.*s", LIT(id->fullpath));
+		}
+		Scope *scope = *found;
+
+		if (scope->is_global) {
+			error(id->token, "Importing a #shared_global_scope is disallowed and unnecessary");
+			continue;
+		}
+
+		bool previously_added = false;
+		for_array(import_index, parent_scope->imported) {
+			Scope *prev = parent_scope->imported.e[import_index];
+			if (prev == scope) {
+				previously_added = true;
+				break;
+			}
+		}
+
+
+		if (!previously_added) {
+			array_add(&parent_scope->imported, scope);
+		} else {
+			warning(id->token, "Multiple #import of the same file within this scope");
+		}
+
+		if (str_eq(id->import_name.string, str_lit("."))) {
+			// NOTE(bill): Add imported entities to this file's scope
+			for_array(elem_index, scope->elements.entries) {
+				Entity *e = scope->elements.entries.e[elem_index].value;
+				if (e->scope == parent_scope) {
+					continue;
+				}
+
+
+
+				// NOTE(bill): Do not add other imported entities
+				add_entity(c, parent_scope, NULL, e);
+				if (!id->is_load) { // `#import`ed entities don't get exported
+					HashKey key = hash_string(e->token.string);
+					map_entity_set(&parent_scope->implicit, key, e);
+				}
+			}
+		} else {
+			String import_name = id->import_name.string;
+			if (import_name.len == 0) {
+				// NOTE(bill): use file name (without extension) as the identifier
+				// If it is a valid identifier
+				String filename = id->fullpath;
+				isize slash = 0;
+				isize dot = 0;
+				for (isize i = filename.len-1; i >= 0; i--) {
+					u8 c = filename.text[i];
+					if (c == '/' || c == '\\') {
+						break;
+					}
+					slash = i;
+				}
+
+				filename.text += slash;
+				filename.len -= slash;
+
+				dot = filename.len;
+				while (dot --> 0) {
+					u8 c = filename.text[dot];
+					if (c == '.') {
+						break;
+					}
+				}
+
+				filename.len = dot;
+
+				if (is_string_an_identifier(filename)) {
+					import_name = filename;
+				} else {
+					error(id->token,
+					      "File name, %.*s, cannot be as an import name as it is not a valid identifier",
+					      LIT(filename));
+				}
+			}
+
+			if (import_name.len > 0) {
+				id->import_name.string = import_name;
+				Entity *e = make_entity_import_name(c->allocator, parent_scope, id->import_name, t_invalid,
+				                                    id->fullpath, id->import_name.string,
+				                                    scope);
+				add_entity(c, parent_scope, NULL, e);
+			}
+		}
+	}
+}
+
 
 void check_parsed_files(Checker *c) {
 	MapScope file_scopes; // Key: String (fullpath)
@@ -1383,6 +1404,8 @@ void check_parsed_files(Checker *c) {
 		add_curr_ast_file(c, f);
 		check_global_collect_entities(c, f->scope, f->decls, &file_scopes);
 	}
+
+	check_import_entities(c, &file_scopes);
 
 	check_global_entities_by_kind(c, Entity_TypeName);
 	init_preload_types(c);

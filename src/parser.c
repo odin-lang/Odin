@@ -2367,8 +2367,7 @@ AstNode *parse_decl(AstFile *f, AstNodeArray names) {
 			}
 
 			return make_type_decl(f, token, names.e[0], parse_type(f));
-		} else if (f->curr_token.kind == Token_proc &&
-		    is_mutable == false) {
+		} else if (f->curr_token.kind == Token_proc && is_mutable == false) {
 		    // NOTE(bill): Procedure declarations
 			Token proc_token = f->curr_token;
 			AstNode *name = names.e[0];
@@ -2904,7 +2903,7 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 
 			return make_import_decl(f, s->TagStmt.token, file_path, import_name, os, arch, false);
-		} else if (str_eq(tag, str_lit("include"))) {
+		} else if (str_eq(tag, str_lit("load"))) {
 			String os = {0};
 			String arch = {0};
 			// TODO(bill): better error messages
@@ -2912,10 +2911,12 @@ AstNode *parse_stmt(AstFile *f) {
 			Token import_name = file_path;
 			import_name.string = str_lit(".");
 
+
+
 			if (f->curr_proc == NULL) {
 				return make_import_decl(f, s->TagStmt.token, file_path, import_name, os, arch, true);
 			}
-			syntax_error(token, "You cannot use #include within a procedure. This must be done at the file scope");
+			syntax_error(token, "You cannot use #load within a procedure. This must be done at the file scope");
 			return make_bad_decl(f, token, file_path);
 		} else {
 
@@ -3195,7 +3196,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, AstNodeArray
 		    node->kind != AstNode_BadStmt &&
 		    node->kind != AstNode_EmptyStmt) {
 			// NOTE(bill): Sanity check
-			syntax_error_node(node, "Only declarations are allowed at file scope");
+			syntax_error_node(node, "Only declarations are allowed at file scope %.*s", LIT(ast_node_strings[node->kind]));
 		} else if (node->kind == AstNode_WhenStmt) {
 			parse_setup_file_when_stmt(p, f, base_dir, &node->WhenStmt);
 		} else if (node->kind == AstNode_ImportDecl) {

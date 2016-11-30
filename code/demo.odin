@@ -2,16 +2,12 @@
 #import "utf8.odin"
 
 main :: proc() {
-
+	MAX :: 64
 	buf:     [MAX]rune
 	backing: [MAX]byte
 	offset:  int
 
-	when MAX > 0 {
-		msg := "Hello"
-	}
-
-	MAX :: 64
+	msg := "Hello"
 
 	count := utf8.rune_count(msg)
 	assert(count <= MAX)
