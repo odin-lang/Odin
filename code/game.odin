@@ -1,60 +1,60 @@
-#import "win32.odin"
-#import "fmt.odin"
-#import "math.odin"
-#import "os.odin"
-#import "opengl.odin" as gl
+#import "win32.odin" when ODIN_OS == "windows";
+#import "fmt.odin";
+#import "math.odin";
+#import "os.odin";
+#import gl "opengl.odin";
 
-TWO_HEARTS :: '💕'
+TWO_HEARTS :: '💕';
 
-win32_perf_count_freq := win32.GetQueryPerformanceFrequency()
+win32_perf_count_freq := win32.GetQueryPerformanceFrequency();
 time_now :: proc() -> f64 {
-	assert(win32_perf_count_freq != 0)
+	assert(win32_perf_count_freq != 0);
 
-	counter: i64
-	win32.QueryPerformanceCounter(^counter)
-	result := counter as f64 / win32_perf_count_freq as f64
-	return result
+	counter: i64;
+	win32.QueryPerformanceCounter(^counter);
+	result := counter as f64 / win32_perf_count_freq as f64;
+	return result;
 }
 win32_print_last_error :: proc() {
-	err_code := win32.GetLastError() as int
+	err_code := win32.GetLastError() as int;
 	if err_code != 0 {
-		fmt.println("GetLastError: %", err_code)
+		fmt.println("GetLastError: %", err_code);
 	}
 }
 
 // Yuk!
 to_c_string :: proc(s: string) -> []u8 {
-	c_str := new_slice(u8, s.count+1)
-	copy(c_str, s as []byte)
-	c_str[s.count] = 0
-	return c_str
+	c_str := new_slice(u8, s.count+1);
+	copy(c_str, s as []byte);
+	c_str[s.count] = 0;
+	return c_str;
 }
 
 
 Window :: struct {
-	width, height:      int
-	wc:                 win32.WNDCLASSEXA
-	dc:                 win32.HDC
-	hwnd:               win32.HWND
-	opengl_context, rc: win32.HGLRC
-	c_title:            []u8
+	width, height:      int;
+	wc:                 win32.WNDCLASSEXA;
+	dc:                 win32.HDC;
+	hwnd:               win32.HWND;
+	opengl_context, rc: win32.HGLRC;
+	c_title:            []u8;
 }
 
 make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC) -> (Window, bool) {
-	using win32
+	using win32;
 
-	w: Window
-	w.width, w.height = msg, height
+	w: Window;
+	w.width, w.height = msg, height;
 
-	class_name := "Win32-Odin-Window\x00"
-	c_class_name := class_name.data
+	class_name := "Win32-Odin-Window\x00";
+	c_class_name := class_name.data;
 	if title[title.count-1] != 0 {
-		w.c_title = to_c_string(title)
+		w.c_title = to_c_string(title);
 	} else {
-		w.c_title = title as []u8
+		w.c_title = title as []u8;
 	}
 
-	instance := GetModuleHandleA(nil)
+	instance := GetModuleHandleA(nil);
 
 	w.wc = WNDCLASSEXA{
 		size       = size_of(WNDCLASSEXA) as u32,
@@ -65,8 +65,8 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 	};
 
 	if RegisterClassExA(^w.wc) == 0 {
-		win32_print_last_error()
-		return w, false
+		win32_print_last_error();
+		return w, false;
 	}
 
 	w.hwnd = CreateWindowExA(0,
@@ -74,14 +74,14 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 	                         WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
 	                         CW_USEDEFAULT, CW_USEDEFAULT,
 	                         w.width as i32, w.height as i32,
-	                         nil, nil, instance, nil)
+	                         nil, nil, instance, nil);
 
 	if w.hwnd == nil {
-		win32_print_last_error()
-		return w, false
+		win32_print_last_error();
+		return w, false;
 	}
 
-	w.dc = GetDC(w.hwnd)
+	w.dc = GetDC(w.hwnd);
 
 	{
 		pfd := PIXELFORMATDESCRIPTOR{
@@ -94,122 +94,122 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 			depth_bits   = 24,
 			stencil_bits = 8,
 			layer_type   = PFD_MAIN_PLANE,
-		}
+		};
 
-		SetPixelFormat(w.dc, ChoosePixelFormat(w.dc, ^pfd), nil)
-		w.opengl_context = wglCreateContext(w.dc)
-		wglMakeCurrent(w.dc, w.opengl_context)
+		SetPixelFormat(w.dc, ChoosePixelFormat(w.dc, ^pfd), nil);
+		w.opengl_context = wglCreateContext(w.dc);
+		wglMakeCurrent(w.dc, w.opengl_context);
 
 		attribs := [8]i32{
 			WGL_CONTEXT_MAJOR_VERSION_ARB, 2,
 			WGL_CONTEXT_MINOR_VERSION_ARB, 1,
 			WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
 			0, // NOTE(bill): tells the proc that this is the end of attribs
-		}
+		};
 
-		wglCreateContextAttribsARB := wglGetProcAddress(("wglCreateContextAttribsARB\x00" as string).data) as wglCreateContextAttribsARBType
-		w.rc = wglCreateContextAttribsARB(w.dc, 0, ^attribs[0])
-		wglMakeCurrent(w.dc, w.rc)
-		SwapBuffers(w.dc)
+		wglCreateContextAttribsARB := wglGetProcAddress(("wglCreateContextAttribsARB\x00" as string).data) as wglCreateContextAttribsARBType;
+		w.rc = wglCreateContextAttribsARB(w.dc, 0, ^attribs[0]);
+		wglMakeCurrent(w.dc, w.rc);
+		SwapBuffers(w.dc);
 	}
 
-	return w, true
+	return w, true;
 }
 
 destroy_window :: proc(w: ^Window) {
-	free(w.c_title.data)
+	free(w.c_title.data);
 }
 
 display_window :: proc(w: ^Window) {
-	win32.SwapBuffers(w.dc)
+	win32.SwapBuffers(w.dc);
 }
 
 
 run :: proc() {
-	using win32
-	using math
+	using win32;
+	using math;
 
 	win32_proc :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #no_inline {
 		if msg == WM_DESTROY || msg == WM_CLOSE || msg == WM_QUIT {
-			os.exit(0)
-			return 0
+			os.exit(0);
+			return 0;
 		}
-		return DefWindowProcA(hwnd, msg, wparam, lparam)
+		return DefWindowProcA(hwnd, msg, wparam, lparam);
 	}
 
-	window, window_success := make_window("Odin Language Demo", 854, 480, win32_proc)
+	window, window_success := make_window("Odin Language Demo", 854, 480, win32_proc);
 	if !window_success {
-		return
+		return;
 	}
-	defer destroy_window(^window)
+	defer destroy_window(^window);
 
-	gl.init()
+	gl.init();
 
 
-	prev_time := time_now()
-	running := true
+	prev_time := time_now();
+	running := true;
 
-	pos := Vec2{100, 100}
+	pos := Vec2{100, 100};
 
 	for running {
-		curr_time := time_now()
-		dt := (curr_time - prev_time) as f32
-		prev_time = curr_time
+		curr_time := time_now();
+		dt := (curr_time - prev_time) as f32;
+		prev_time = curr_time;
 
-		msg: MSG
+		msg: MSG;
 		for PeekMessageA(^msg, nil, 0, 0, PM_REMOVE) > 0 {
 			if msg.message == WM_QUIT {
-				running = false
+				running = false;
 			}
-			TranslateMessage(^msg)
-			DispatchMessageA(^msg)
+			TranslateMessage(^msg);
+			DispatchMessageA(^msg);
 		}
 
 		if is_key_down(Key_Code.ESCAPE) {
-			running = false
+			running = false;
 		}
 
 		{
-			SPEED :: 500
-			v: Vec2
+			SPEED :: 500;
+			v: Vec2;
 
-			if is_key_down(Key_Code.RIGHT) { v[0] += 1 }
-			if is_key_down(Key_Code.LEFT)  { v[0] -= 1 }
-			if is_key_down(Key_Code.UP)    { v[1] += 1 }
-			if is_key_down(Key_Code.DOWN)  { v[1] -= 1 }
+			if is_key_down(Key_Code.RIGHT) { v[0] += 1; }
+			if is_key_down(Key_Code.LEFT)  { v[0] -= 1; }
+			if is_key_down(Key_Code.UP)    { v[1] += 1; }
+			if is_key_down(Key_Code.DOWN)  { v[1] -= 1; }
 
-			v = vec2_norm0(v)
+			v = vec2_norm0(v);
 
-			pos += v * Vec2{SPEED * dt}
+			pos += v * Vec2{SPEED * dt};
 		}
 
 
-		gl.ClearColor(0.5, 0.7, 1.0, 1.0)
-		gl.Clear(gl.COLOR_BUFFER_BIT)
+		gl.ClearColor(0.5, 0.7, 1.0, 1.0);
+		gl.Clear(gl.COLOR_BUFFER_BIT);
 
-		gl.LoadIdentity()
+		gl.LoadIdentity();
 		gl.Ortho(0, window.width as f64,
-		         0, window.height as f64, 0, 1)
+		         0, window.height as f64, 0, 1);
 
 		draw_rect :: proc(x, y, w, h: f32) {
-			gl.Begin(gl.TRIANGLES)
-			defer gl.End()
+			gl.Begin(gl.TRIANGLES);
+			defer gl.End();
 
-			gl.Color3f(1, 0, 0); gl.Vertex3f(x,   y,   0)
-			gl.Color3f(0, 1, 0); gl.Vertex3f(x+w, y,   0)
-			gl.Color3f(0, 0, 1); gl.Vertex3f(x+w, y+h, 0)
+			gl.Color3f(1, 0, 0); gl.Vertex3f(x,   y,   0);
+			gl.Color3f(0, 1, 0); gl.Vertex3f(x+w, y,   0);
+			gl.Color3f(0, 0, 1); gl.Vertex3f(x+w, y+h, 0);
 
-			gl.Color3f(0, 0, 1); gl.Vertex3f(x+w, y+h, 0)
-			gl.Color3f(1, 1, 0); gl.Vertex3f(x,   y+h, 0)
-			gl.Color3f(1, 0, 0); gl.Vertex3f(x,   y,   0)
+			gl.Color3f(0, 0, 1); gl.Vertex3f(x+w, y+h, 0);
+			gl.Color3f(1, 1, 0); gl.Vertex3f(x,   y+h, 0);
+			gl.Color3f(1, 0, 0); gl.Vertex3f(x,   y,   0);
 		}
 
-		draw_rect(pos.x, pos.y, 50, 50)
+		draw_rect(pos.x, pos.y, 50, 50);
 
-		display_window(^window)
-		ms_to_sleep := (16 - 1000*dt) as i32
+		display_window(^window);
+		ms_to_sleep := (16 - 1000*dt) as i32;
 		if ms_to_sleep > 0 {
-			win32.Sleep(ms_to_sleep)
+			win32.Sleep(ms_to_sleep);
 		}
 	}
 }

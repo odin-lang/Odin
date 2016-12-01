@@ -866,6 +866,55 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, "unreachable\n");
 	} break;
 
+	case ssaInstr_UnaryOp: {
+		ssaInstrUnaryOp *uo = &value->Instr.UnaryOp;
+		Type *type = base_type(ssa_type(uo->expr));
+		Type *elem_type = type;
+		while (elem_type->kind == Type_Vector) {
+			elem_type = base_type(elem_type->Vector.elem);
+		}
+
+		ssa_fprintf(f, "%%%d = ", value->index);
+		switch (uo->op) {
+		case Token_Sub:
+			if (is_type_float(elem_type)) {
+				ssa_fprintf(f, "fsub");
+			} else {
+				ssa_fprintf(f, "sub");
+			}
+			break;
+		case Token_Xor:
+		case Token_Not:
+			GB_ASSERT(is_type_integer(type) || is_type_boolean(type));
+			ssa_fprintf(f, "xor");
+			break;
+		default:
+			GB_PANIC("Unknown unary operator");
+			break;
+		}
+
+		ssa_fprintf(f, " ");
+		ssa_print_type(f, m, type);
+		ssa_fprintf(f, " ");
+		switch (uo->op) {
+		case Token_Sub:
+			if (is_type_float(elem_type)) {
+				ssa_print_exact_value(f, m, make_exact_value_float(0), type);
+			} else {
+				ssa_fprintf(f, "0");
+			}
+			break;
+		case Token_Xor:
+		case Token_Not:
+			GB_ASSERT(is_type_integer(type) || is_type_boolean(type));
+			ssa_fprintf(f, "-1");
+			break;
+		}
+		ssa_fprintf(f, ", ");
+		ssa_print_value(f, m, uo->expr, type);
+		ssa_fprintf(f, "\n");
+	} break;
+
 	case ssaInstr_BinaryOp: {
 		ssaInstrBinaryOp *bo = &value->Instr.BinaryOp;
 		Type *type = base_type(ssa_type(bo->left));
@@ -971,7 +1020,6 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, ", ");
 		ssa_print_value(f, m, bo->right, type);
 		ssa_fprintf(f, "\n");
-
 	} break;
 
 	case ssaInstr_Call: {

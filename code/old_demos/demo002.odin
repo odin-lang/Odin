@@ -1,7 +1,7 @@
 // Demo 002
-#load "basic.odin"
-#load "math.odin"
-// #load "game.odin"
+#include "basic.odin"
+#include "math.odin"
+// #include "game.odin"
 
 #thread_local tls_int: int
 

@@ -1,3 +1,2 @@
-when ODIN_OS == "windows" {
-	#load "os_windows.odin"
-}
+#include "os_windows.odin" when ODIN_OS == "windows";
+

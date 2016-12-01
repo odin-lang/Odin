@@ -1,10 +1,10 @@
-#import "fmt.odin" as fmt
+#import "fmt.odin";
 
-#foreign_system_library "Ws2_32"
+#foreign_system_library "Ws2_32" when ODIN_OS == "windows";
 
 
-SOCKET :: type uint
-INVALID_SOCKET :: ~(0 as SOCKET)
+SOCKET :: type uint;
+INVALID_SOCKET :: ~(0 as SOCKET);
 
 AF :: enum i32 {
 	UNSPEC    = 0,       // unspecified
@@ -37,45 +37,45 @@ AF :: enum i32 {
 	MAX       = 26,
 }
 
-SOCK_STREAM  :: 1
-SOCKET_ERROR :: -1
-IPPROTO_TCP  :: 6
-AI_PASSIVE   :: 0x0020
-SOMAXCONN    :: 128
+SOCK_STREAM  :: 1;
+SOCKET_ERROR :: -1;
+IPPROTO_TCP  :: 6;
+AI_PASSIVE   :: 0x0020;
+SOMAXCONN    :: 128;
 
-SD_RECEIVE :: 0
-SD_SEND    :: 1
-SD_BOTH    :: 2
+SD_RECEIVE :: 0;
+SD_SEND    :: 1;
+SD_BOTH    :: 2;
 
-WSADESCRIPTION_LEN :: 256
-WSASYS_STATUS_LEN  :: 128
+WSADESCRIPTION_LEN :: 256;
+WSASYS_STATUS_LEN  :: 128;
 WSADATA :: struct #ordered {
-	version:       i16
-	high_version:  i16
+	version:       i16;
+	high_version:  i16;
 
 
 // NOTE(bill): This is x64 ordering
-	max_sockets:   u16
-	max_udp_dg:    u16
-	vendor_info:   ^byte
-	description:   [WSADESCRIPTION_LEN+1]byte
-	system_status: [WSASYS_STATUS_LEN+1]byte
+	max_sockets:   u16;
+	max_udp_dg:    u16;
+	vendor_info:   ^byte;
+	description:   [WSADESCRIPTION_LEN+1]byte;
+	system_status: [WSASYS_STATUS_LEN+1]byte;
 }
 
 addrinfo :: struct #ordered {
-	flags:     i32
-	family:    i32
-	socktype:  i32
-	protocol:  i32
-	addrlen:   uint
-	canonname: ^u8
-	addr:      ^sockaddr
-	next:      ^addrinfo
+	flags:     i32;
+	family:    i32;
+	socktype:  i32;
+	protocol:  i32;
+	addrlen:   uint;
+	canonname: ^u8;
+	addr:      ^sockaddr;
+	next:      ^addrinfo;
 }
 
 sockaddr :: struct #ordered {
-	family: u16
-	data:   [14]byte
+	family: u16;
+	data:   [14]byte;
 }
 
 
@@ -94,52 +94,52 @@ shutdown        :: proc(s: SOCKET, how: i32) -> i32                             
 WSAGetLastError :: proc() -> i32                                                                   #foreign #dll_import
 
 to_c_string :: proc(s: string) -> ^byte {
-	c_str := new_slice(byte, s.count+1)
-	assert(c_str.data != null)
-	copy(c_str, s as []byte)
-	c_str[s.count] = 0
-	return c_str.data
+	c_str := new_slice(byte, s.count+1);
+	assert(c_str.data != nil);
+	copy(c_str, s as []byte);
+	c_str[s.count] = 0;
+	return c_str.data;
 }
 
 run :: proc() {
-	wsa: WSADATA
-	res:  ^addrinfo = null
-	hints: addrinfo
-	s, client: SOCKET
+	wsa: WSADATA;
+	res:  ^addrinfo = nil;
+	hints: addrinfo;
+	s, client: SOCKET;
 
 	if WSAStartup(2 | (2 << 8), ^wsa) != 0 {
-		fmt.println("WSAStartup failed: ", WSAGetLastError())
-		return
+		fmt.println("WSAStartup failed: ", WSAGetLastError());
+		return;
 	}
-	defer WSACleanup()
+	defer WSACleanup();
 
-	hints.family   = AF.INET as i32
-	hints.socktype = SOCK_STREAM
-	hints.protocol = IPPROTO_TCP
-	hints.flags    = AI_PASSIVE
+	hints.family   = AF.INET as i32;
+	hints.socktype = SOCK_STREAM;
+	hints.protocol = IPPROTO_TCP;
+	hints.flags    = AI_PASSIVE;
 
-	if getaddrinfo(null, to_c_string("8080"), ^hints, ^res) != 0 {
-		fmt.println("getaddrinfo failed: ", WSAGetLastError())
-		return
+	if getaddrinfo(nil, to_c_string("8080"), ^hints, ^res) != 0 {
+		fmt.println("getaddrinfo failed: ", WSAGetLastError());
+		return;
 	}
-	defer freeaddrinfo(res)
+	defer freeaddrinfo(res);
 
-	s = socket(res.family, res.socktype, res.protocol)
+	s = socket(res.family, res.socktype, res.protocol);
 	if s == INVALID_SOCKET {
-		fmt.println("socket failed: ", WSAGetLastError())
-		return
+		fmt.println("socket failed: ", WSAGetLastError());
+		return;
 	}
-	defer closesocket(s)
+	defer closesocket(s);
 
-	bind(s, res.addr, res.addrlen as i32)
-	listen(s, SOMAXCONN)
+	bind(s, res.addr, res.addrlen as i32);
+	listen(s, SOMAXCONN);
 
-	client = accept(s, null, null)
+	client = accept(s, nil, 0);
 	if client == INVALID_SOCKET {
-		fmt.println("socket failed: ", WSAGetLastError())
-		return
+		fmt.println("socket failed: ", WSAGetLastError());
+		return;
 	}
-	defer closesocket(client)
+	defer closesocket(client);
 
 	html :=
 `HTTP/1.1 200 OK
@@ -154,27 +154,27 @@ Content-type: text/html
 	<h1 style="color: orange;">Odin Server Demo</h1>
 </body>
 </html>
-`
+`;
 
-	buf: [1024]byte
+	buf: [1024]byte;
 	for {
-		bytes := recv(client, ^buf[0], buf.count as i32, 0)
+		bytes := recv(client, ^buf[0], buf.count as i32, 0);
 		if bytes > 0 {
-			// fmt.println(buf[:bytes] as string)
-			bytes_sent := send(client, html.data, (html.count-1) as i32, 0)
+			// fmt.println(buf[:bytes] as string);
+			bytes_sent := send(client, html.data, (html.count-1) as i32, 0);
 			if bytes_sent == SOCKET_ERROR {
-				fmt.println("send failed: ", WSAGetLastError())
-				return
+				fmt.println("send failed: ", WSAGetLastError());
+				return;
 			}
-			break
+			break;
 		} else if bytes == 0 {
-			fmt.println("Connection closing...")
-			break
+			fmt.println("Connection closing...");
+			break;
 		} else {
-			fmt.println("recv failed: ", WSAGetLastError())
-			return
+			fmt.println("recv failed: ", WSAGetLastError());
+			return;
 		}
 	}
 
-	shutdown(client, SD_SEND)
+	shutdown(client, SD_SEND);
 }

@@ -1,4 +1,4 @@
-#load "win32.odin"
+#include "win32.odin"
 
 assume :: proc(cond: bool) #foreign "llvm.assume"
 

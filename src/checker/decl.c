@@ -1,10 +1,10 @@
 bool check_is_terminating(AstNode *node);
-void check_stmt         (Checker *c, AstNode *node, u32 flags);
-void check_stmt_list    (Checker *c, AstNodeArray stmts, u32 flags);
-void check_type_decl    (Checker *c, Entity *e, AstNode *type_expr, Type *def, CycleChecker *cycle_checker);
-void check_const_decl   (Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr);
-void check_proc_decl    (Checker *c, Entity *e, DeclInfo *d);
-void check_var_decl     (Checker *c, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, AstNode *init_expr);
+void check_stmt          (Checker *c, AstNode *node, u32 flags);
+void check_stmt_list     (Checker *c, AstNodeArray stmts, u32 flags);
+void check_type_decl     (Checker *c, Entity *e, AstNode *type_expr, Type *def, CycleChecker *cycle_checker);
+void check_const_decl    (Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr);
+void check_proc_decl     (Checker *c, Entity *e, DeclInfo *d);
+void check_var_decl      (Checker *c, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, AstNode *init_expr);
 
 // NOTE(bill): `content_name` is for debugging and error messages
 Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String context_name) {
@@ -227,23 +227,21 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 
 	if (operand->mode != Addressing_Constant) {
 		// TODO(bill): better error
-		error_node(operand->expr,
-		      "`%.*s` is not a constant", LIT(ast_node_token(operand->expr).string));
+		error_node(operand->expr, "`%.*s` is not a constant", LIT(ast_node_token(operand->expr).string));
 		if (e->type == NULL) {
 			e->type = t_invalid;
 		}
 		return;
 	}
-	// if (!is_type_constant_type(operand->type)) {
-	// 	gbString type_str = type_to_string(operand->type);
-	// 	defer (gb_string_free(type_str));
-	// 	error_node(operand->expr,
-	// 	      "Invalid constant type: `%s`", type_str);
-	// 	if (e->type == NULL) {
-	// 		e->type = t_invalid;
-	// 	}
-	// 	return;
-	// }
+	if (!is_type_constant_type(operand->type)) {
+		gbString type_str = type_to_string(operand->type);
+		error_node(operand->expr, "Invalid constant type: `%s`", type_str);
+		gb_string_free(type_str);
+		if (e->type == NULL) {
+			e->type = t_invalid;
+		}
+		return;
+	}
 
 	if (e->type == NULL) { // NOTE(bill): type inference
 		e->type = operand->type;
@@ -269,14 +267,13 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 
 	if (type_expr) {
 		Type *t = check_type(c, type_expr);
-		// if (!is_type_constant_type(t)) {
-		// 	gbString str = type_to_string(t);
-		// 	defer (gb_string_free(str));
-		// 	error_node(type_expr),
-		// 	      "Invalid constant type `%s`", str);
-		// 	e->type = t_invalid;
-		// 	return;
-		// }
+		if (!is_type_constant_type(t)) {
+			gbString str = type_to_string(t);
+			error_node(type_expr, "Invalid constant type `%s`", str);
+			gb_string_free(str);
+			e->type = t_invalid;
+			return;
+		}
 		e->type = t;
 	}
 

@@ -30,7 +30,6 @@ typedef struct ssaModule {
 	String layout;
 	// String triple;
 
-
 	MapEntity       min_dep_map; // Key: Entity *
 	MapSsaValue     values;      // Key: Entity *
 	MapSsaValue     members;     // Key: String
@@ -192,6 +191,11 @@ struct ssaProcedure {
 	}) \
 	SSA_INSTR_KIND(Phi, struct { ssaValueArray edges; Type *type; }) \
 	SSA_INSTR_KIND(Unreachable, i32) \
+	SSA_INSTR_KIND(UnaryOp, struct { \
+		Type *    type; \
+		TokenKind op; \
+		ssaValue *expr; \
+	}) \
 	SSA_INSTR_KIND(BinaryOp, struct { \
 		Type *    type; \
 		TokenKind op; \
@@ -560,6 +564,8 @@ Type *ssa_instr_type(ssaInstr *instr) {
 		return instr->UnionTagPtr.type;
 	case ssaInstr_UnionTagValue:
 		return instr->UnionTagValue.type;
+	case ssaInstr_UnaryOp:
+		return instr->UnaryOp.type;
 	case ssaInstr_BinaryOp:
 		return instr->BinaryOp.type;
 	case ssaInstr_Conv:
@@ -884,6 +890,15 @@ ssaValue *ssa_make_instr_union_tag_value(ssaProcedure *p, ssaValue *address) {
 	ssaInstr *i = &v->Instr;
 	i->UnionTagValue.address = address;
 	i->UnionTagValue.type = t_int_ptr;
+	return v;
+}
+
+ssaValue *ssa_make_instr_unary_op(ssaProcedure *p, TokenKind op, ssaValue *expr, Type *type) {
+	ssaValue *v = ssa_alloc_instr(p, ssaInstr_UnaryOp);
+	ssaInstr *i = &v->Instr;
+	i->UnaryOp.op = op;
+	i->UnaryOp.expr = expr;
+	i->UnaryOp.type = type;
 	return v;
 }
 
@@ -2619,18 +2634,10 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		case Token_Add:
 			return ssa_build_expr(proc, ue->expr);
 
-		case Token_Sub: // NOTE(bill): -`x` == 0 - `x`
-			return ssa_emit_arith(proc, ue->op.kind, v_zero, ssa_build_expr(proc, ue->expr), tv->type);
-
-		case Token_Not:   // Boolean not
-		case Token_Xor: { // Bitwise not
-			// NOTE(bill): "not" `x` == `x` "xor" `-1`
-			ssaValue *left = ssa_build_expr(proc, ue->expr);
-			ssaValue *right = ssa_add_module_constant(proc->module, tv->type, make_exact_value_integer(-1));
-			return ssa_emit_arith(proc, ue->op.kind,
-			                      left, right,
-			                      tv->type);
-		} break;
+		case Token_Not: // Boolean not
+		case Token_Xor: // Bitwise not
+		case Token_Sub: // Bitwise not
+			return ssa_emit(proc, ssa_make_instr_unary_op(proc, ue->op.kind, ssa_build_expr(proc, ue->expr), tv->type));
 		}
 	case_end;
 

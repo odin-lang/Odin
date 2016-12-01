@@ -56,7 +56,6 @@ typedef struct Parser {
 	Array(AstFile)      files;
 	Array(ImportedFile) imports;
 	gbAtomic32          import_index;
-	Array(String)       foreign_libraries;
 	isize               total_token_count;
 	gbMutex             mutex;
 } Parser;
@@ -88,7 +87,8 @@ typedef enum StmtStateFlag {
 
 AstNodeArray make_ast_node_array(AstFile *f) {
 	AstNodeArray a;
-	array_init(&a, gb_arena_allocator(&f->arena));
+	// array_init(&a, gb_arena_allocator(&f->arena));
+	array_init(&a, heap_allocator());
 	return a;
 }
 
@@ -254,16 +254,17 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 	}) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
 		Token token, relpath; \
-		String os, arch;      \
 		String fullpath;      \
 		Token import_name;    \
 		bool is_load;         \
+		AstNode *cond;        \
 		AstNode *note;        \
 	}) \
 	AST_NODE_KIND(ForeignLibrary, "foreign library", struct { \
 		Token token, filepath; \
-		String base_dir; \
-		bool is_system; \
+		String base_dir;       \
+		AstNode *cond;         \
+		bool is_system;        \
 	}) \
 AST_NODE_KIND(_DeclEnd,   "", i32) \
 AST_NODE_KIND(_TypeBegin, "", i32) \
@@ -1005,22 +1006,22 @@ AstNode *make_type_decl(AstFile *f, Token token, AstNode *name, AstNode *type) {
 }
 
 AstNode *make_import_decl(AstFile *f, Token token, Token relpath, Token import_name,
-                          String os, String arch,
+                          AstNode *cond,
                           bool is_load) {
 	AstNode *result = make_node(f, AstNode_ImportDecl);
 	result->ImportDecl.token = token;
 	result->ImportDecl.relpath = relpath;
 	result->ImportDecl.import_name = import_name;
-	result->ImportDecl.os = os;
-	result->ImportDecl.arch = arch;
+	result->ImportDecl.cond = cond;
 	result->ImportDecl.is_load = is_load;
 	return result;
 }
 
-AstNode *make_foreign_library(AstFile *f, Token token, Token filepath, bool is_system) {
+AstNode *make_foreign_library(AstFile *f, Token token, Token filepath, AstNode *cond, bool is_system) {
 	AstNode *result = make_node(f, AstNode_ForeignLibrary);
 	result->ForeignLibrary.token = token;
 	result->ForeignLibrary.filepath = filepath;
+	result->ForeignLibrary.cond = cond;
 	result->ForeignLibrary.is_system = is_system;
 	return result;
 }
@@ -1156,19 +1157,30 @@ bool expect_semicolon_after_stmt(AstFile *f, AstNode *s) {
 		return true;
 	}
 
-	if (f->curr_token.pos.line != f->prev_token.pos.line) {
-		return true;
+	if (s != NULL) {
+		switch (s->kind) {
+		case AstNode_ProcDecl:
+		case AstNode_TypeDecl:
+			return true;
+		}
 	}
 
-	switch (f->curr_token.kind) {
-	case Token_EOF:
-	case Token_CloseBrace:
-		return true;
-	}
+	// if (f->curr_token.pos.line != f->prev_token.pos.line) {
+		// return true;
+	// }
 
-	syntax_error(f->curr_token,
-	             "Expected `;` after %.*s, got `%.*s`",
-	             LIT(ast_node_strings[s->kind]), LIT(token_strings[f->curr_token.kind]));
+	// switch (f->curr_token.kind) {
+	// case Token_EOF:
+	// case Token_CloseBrace:
+		// return true;
+	// }
+
+	if (s != NULL) {
+		syntax_error(f->prev_token, "Expected `;` after %.*s, got `%.*s`",
+		             LIT(ast_node_strings[s->kind]), LIT(token_strings[f->prev_token.kind]));
+	} else {
+		syntax_error(f->prev_token, "Expected `;`");
+	}
 	fix_advance_to_next_stmt(f);
 	return false;
 }
@@ -1195,12 +1207,6 @@ AstNode *parse_tag_expr(AstFile *f, AstNode *expression) {
 	Token token = expect_token(f, Token_Hash);
 	Token name  = expect_token(f, Token_Identifier);
 	return make_tag_expr(f, token, name, expression);
-}
-
-AstNode *parse_tag_stmt(AstFile *f, AstNode *statement) {
-	Token token = expect_token(f, Token_Hash);
-	Token name  = expect_token(f, Token_Identifier);
-	return make_tag_stmt(f, token, name, statement);
 }
 
 AstNode *unparen_expr(AstNode *node) {
@@ -2518,10 +2524,8 @@ AstNode *parse_return_stmt(AstFile *f) {
 	    f->curr_token.pos.line == token.pos.line) {
 		results = parse_rhs_expr_list(f);
 	}
-	if (f->curr_token.kind != Token_CloseBrace) {
-		expect_semicolon_after_stmt(f, results.e[0]);
-	}
 
+	expect_semicolon_after_stmt(f, results.e[0]);
 	return make_return_stmt(f, token, results);
 }
 
@@ -2751,11 +2755,11 @@ AstNode *parse_stmt(AstFile *f) {
 	// TODO(bill): other keywords
 	case Token_if:     return parse_if_stmt(f);
 	case Token_when:   return parse_when_stmt(f);
-	case Token_return: return parse_return_stmt(f);
 	case Token_for:    return parse_for_stmt(f);
 	case Token_match:  return parse_match_stmt(f);
 	case Token_defer:  return parse_defer_stmt(f);
 	case Token_asm:    return parse_asm_stmt(f);
+	case Token_return: return parse_return_stmt(f);
 
 	case Token_break:
 	case Token_continue:
@@ -2821,29 +2825,103 @@ AstNode *parse_stmt(AstFile *f) {
 	} break;
 
 	case Token_Hash: {
-		s = parse_tag_stmt(f, NULL);
-		String tag = s->TagStmt.name.string;
+		AstNode *s = NULL;
+		Token hash_token = expect_token(f, Token_Hash);
+		Token name = expect_token(f, Token_Identifier);
+		String tag = name.string;
 		if (str_eq(tag, str_lit("shared_global_scope"))) {
 			if (f->curr_proc == NULL) {
 				f->is_global_scope = true;
-				return make_empty_stmt(f, f->curr_token);
+				s = make_empty_stmt(f, f->curr_token);
+			} else {
+				syntax_error(token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope");
+				s = make_bad_decl(f, token, f->curr_token);
 			}
-			syntax_error(token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope");
-			return make_bad_decl(f, token, f->curr_token);
+			expect_semicolon_after_stmt(f, s);
+			return s;
 		} else if (str_eq(tag, str_lit("foreign_system_library"))) {
+			AstNode *cond = NULL;
 			Token file_path = expect_token(f, Token_String);
-			if (f->curr_proc == NULL) {
-				return make_foreign_library(f, s->TagStmt.token, file_path, true);
+
+			if (allow_token(f, Token_when)) {
+				cond = parse_expr(f, false);
 			}
-			syntax_error(token, "You cannot use #foreign_system_library within a procedure. This must be done at the file scope");
-			return make_bad_decl(f, token, file_path);
+
+			if (f->curr_proc == NULL) {
+				s = make_foreign_library(f, hash_token, file_path, cond, true);
+			} else {
+				syntax_error(token, "You cannot use #foreign_system_library within a procedure. This must be done at the file scope");
+				s = make_bad_decl(f, token, file_path);
+			}
+			expect_semicolon_after_stmt(f, s);
+			return s;
 		} else if (str_eq(tag, str_lit("foreign_library"))) {
+			AstNode *cond = NULL;
 			Token file_path = expect_token(f, Token_String);
-			if (f->curr_proc == NULL) {
-				return make_foreign_library(f, s->TagStmt.token, file_path, false);
+
+			if (allow_token(f, Token_when)) {
+				cond = parse_expr(f, false);
 			}
-			syntax_error(token, "You cannot use #foreign_library within a procedure. This must be done at the file scope");
-			return make_bad_decl(f, token, file_path);
+
+			if (f->curr_proc == NULL) {
+				s = make_foreign_library(f, hash_token, file_path, cond, false);
+			} else {
+				syntax_error(token, "You cannot use #foreign_library within a procedure. This must be done at the file scope");
+				s = make_bad_decl(f, token, file_path);
+			}
+			expect_semicolon_after_stmt(f, s);
+			return s;
+		}  else if (str_eq(tag, str_lit("import"))) {
+			AstNode *cond = NULL;
+			Token import_name = {0};
+
+			switch (f->curr_token.kind) {
+			case Token_Period:
+				import_name = f->curr_token;
+				import_name.kind = Token_Identifier;
+				next_token(f);
+				break;
+			case Token_Identifier:
+				import_name = f->curr_token;
+				next_token(f);
+				break;
+			}
+
+			if (str_eq(import_name.string, str_lit("_"))) {
+				syntax_error(token, "Illegal import name: `_`");
+			}
+
+			Token file_path = expect_token_after(f, Token_String, "#import");
+			if (allow_token(f, Token_when)) {
+				cond = parse_expr(f, false);
+			}
+
+			if (f->curr_proc != NULL) {
+				syntax_error(token, "You cannot use #import within a procedure. This must be done at the file scope");
+				s = make_bad_decl(f, token, file_path);
+			} else {
+				s = make_import_decl(f, hash_token, file_path, import_name, cond, false);
+				expect_semicolon_after_stmt(f, s);
+			}
+			return s;
+		} else if (str_eq(tag, str_lit("include"))) {
+			AstNode *cond = NULL;
+			Token file_path = expect_token(f, Token_String);
+			Token import_name = file_path;
+			import_name.string = str_lit(".");
+
+			if (allow_token(f, Token_when)) {
+				cond = parse_expr(f, false);
+			}
+
+			if (f->curr_proc == NULL) {
+				s = make_import_decl(f, hash_token, file_path, import_name, cond, true);
+			} else {
+				syntax_error(token, "You cannot use #include within a procedure. This must be done at the file scope");
+				s = make_bad_decl(f, token, file_path);
+			}
+			expect_semicolon_after_stmt(f, s);
+			return s;
 		} else if (str_eq(tag, str_lit("thread_local"))) {
 			AstNode *var_decl = parse_simple_stmt(f);
 			if (var_decl->kind != AstNode_VarDecl) {
@@ -2870,60 +2948,9 @@ AstNode *parse_stmt(AstFile *f) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return s;
-		} else if (str_eq(tag, str_lit("import"))) {
-			String os = {0};
-			String arch = {0};
-
-			// if (tag.len > 6) {
-			// 	String sub = make_string(tag.text+6, tag.len-6);
-			// }
-
-			// TODO(bill): better error messages
-			Token import_name = {0};
-			Token file_path = expect_token_after(f, Token_String, "#import");
-			if (allow_token(f, Token_as)) {
-				// NOTE(bill): Custom import name
-				if (f->curr_token.kind == Token_Period) {
-					import_name = f->curr_token;
-					import_name.kind = Token_Identifier;
-					next_token(f);
-				} else {
-					import_name = expect_token_after(f, Token_Identifier, "`as` for import declaration");
-				}
-
-				if (str_eq(import_name.string, str_lit("_"))) {
-					syntax_error(token, "Illegal import name: `_`");
-					return make_bad_decl(f, token, f->curr_token);
-				}
-			}
-
-			if (f->curr_proc != NULL) {
-				syntax_error(token, "You cannot use #import within a procedure. This must be done at the file scope");
-				return make_bad_decl(f, token, file_path);
-			}
-
-			return make_import_decl(f, s->TagStmt.token, file_path, import_name, os, arch, false);
-		} else if (str_eq(tag, str_lit("load"))) {
-			String os = {0};
-			String arch = {0};
-			// TODO(bill): better error messages
-			Token file_path = expect_token(f, Token_String);
-			Token import_name = file_path;
-			import_name.string = str_lit(".");
-
-
-
-			if (f->curr_proc == NULL) {
-				return make_import_decl(f, s->TagStmt.token, file_path, import_name, os, arch, true);
-			}
-			syntax_error(token, "You cannot use #load within a procedure. This must be done at the file scope");
-			return make_bad_decl(f, token, file_path);
-		} else {
-
 		}
 
-		s->TagStmt.stmt = parse_stmt(f); // TODO(bill): Find out why this doesn't work as an argument
-		return s;
+		return make_tag_stmt(f, hash_token, name, parse_stmt(f));
 	} break;
 
 	case Token_OpenBrace:
@@ -3016,7 +3043,6 @@ void destroy_ast_file(AstFile *f) {
 bool init_parser(Parser *p) {
 	array_init(&p->files, heap_allocator());
 	array_init(&p->imports, heap_allocator());
-	array_init(&p->foreign_libraries, heap_allocator());
 	gb_mutex_init(&p->mutex);
 	return true;
 }
@@ -3033,7 +3059,6 @@ void destroy_parser(Parser *p) {
 #endif
 	array_free(&p->files);
 	array_free(&p->imports);
-	array_free(&p->foreign_libraries);
 	gb_mutex_destroy(&p->mutex);
 }
 
@@ -3169,43 +3194,21 @@ String get_filepath_extension(String path) {
 	return make_string(path.text, dot);
 }
 
-void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, AstNodeArray decls);
-
-void parse_setup_file_when_stmt(Parser *p, AstFile *f, String base_dir, AstNodeWhenStmt *ws) {
-	if (ws->body != NULL && ws->body->kind == AstNode_BlockStmt) {
-		parse_setup_file_decls(p, f, base_dir, ws->body->BlockStmt.stmts);
-	}
-	if (ws->else_stmt) {
-		switch (ws->else_stmt->kind) {
-		case AstNode_BlockStmt:
-			parse_setup_file_decls(p, f, base_dir, ws->else_stmt->BlockStmt.stmts);
-			break;
-		case AstNode_WhenStmt:
-			parse_setup_file_when_stmt(p, f, base_dir, &ws->else_stmt->WhenStmt);
-			break;
-		}
-	}
-}
-
 void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, AstNodeArray decls) {
 	for_array(i, decls) {
 		AstNode *node = decls.e[i];
-
 		if (!is_ast_node_decl(node) &&
-		    !is_ast_node_when_stmt(node) &&
 		    node->kind != AstNode_BadStmt &&
 		    node->kind != AstNode_EmptyStmt) {
 			// NOTE(bill): Sanity check
 			syntax_error_node(node, "Only declarations are allowed at file scope %.*s", LIT(ast_node_strings[node->kind]));
-		} else if (node->kind == AstNode_WhenStmt) {
-			parse_setup_file_when_stmt(p, f, base_dir, &node->WhenStmt);
 		} else if (node->kind == AstNode_ImportDecl) {
 			AstNodeImportDecl *id = &node->ImportDecl;
 			String file_str = id->relpath.string;
 
 			if (!is_import_path_valid(file_str)) {
 				if (id->is_load) {
-					syntax_error_node(node, "Invalid #load path: `%.*s`", LIT(file_str));
+					syntax_error_node(node, "Invalid #include path: `%.*s`", LIT(file_str));
 				} else {
 					syntax_error_node(node, "Invalid #import path: `%.*s`", LIT(file_str));
 				}

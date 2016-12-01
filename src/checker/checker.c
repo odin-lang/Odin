@@ -223,10 +223,10 @@ typedef struct CheckerContext {
 #define MAP_NAME MapExprInfo
 #include "../map.c"
 
-typedef struct DelayedImport {
-	Scope *            parent;
-	AstNodeImportDecl *decl;
-} DelayedImport;
+typedef struct DelayedDecl {
+	Scope *  parent;
+	AstNode *decl;
+} DelayedDecl;
 
 
 // NOTE(bill): Symbol tables
@@ -253,7 +253,8 @@ typedef struct Checker {
 	BaseTypeSizes          sizes;
 	Scope *                global_scope;
 	Array(ProcedureInfo)   procs; // NOTE(bill): Procedures to check
-	Array(DelayedImport)   delayed_imports;
+	Array(DelayedDecl)   delayed_imports;
+	Array(DelayedDecl)   delayed_foreign_libraries;
 
 
 	gbArena                arena;
@@ -427,7 +428,7 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 					}
 
 					if (e->scope != shared) {
-						// Do not return imported entities even #load ones
+						// Do not return imported entities even #include ones
 						continue;
 					}
 
@@ -616,6 +617,7 @@ void init_checker(Checker *c, Parser *parser, BaseTypeSizes sizes) {
 	array_init(&c->proc_stack, a);
 	array_init(&c->procs, a);
 	array_init(&c->delayed_imports, a);
+	array_init(&c->delayed_foreign_libraries, a);
 
 	// NOTE(bill): Is this big enough or too small?
 	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
@@ -642,6 +644,7 @@ void destroy_checker(Checker *c) {
 	array_free(&c->proc_stack);
 	array_free(&c->procs);
 	array_free(&c->delayed_imports);
+	array_free(&c->delayed_foreign_libraries);
 
 	gb_arena_free(&c->arena);
 }
@@ -1083,39 +1086,6 @@ void check_global_entities_by_kind(Checker *c, EntityKind kind) {
 	}
 }
 
-void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray nodes, MapScope *file_scopes);
-
-void check_global_when_stmt(Checker *c, Scope *parent_scope, AstNodeWhenStmt *ws, MapScope *file_scopes) {
-	Operand operand = {Addressing_Invalid};
-	check_expr(c, &operand, ws->cond);
-	if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-		error_node(ws->cond, "Non-boolean condition in `when` statement");
-	}
-	if (operand.mode != Addressing_Constant) {
-		error_node(ws->cond, "Non-constant condition in `when` statement");
-	}
-	if (ws->body == NULL || ws->body->kind != AstNode_BlockStmt) {
-		error_node(ws->cond, "Invalid body for `when` statement");
-	} else {
-		if (operand.value.kind == ExactValue_Bool &&
-		    operand.value.value_bool == true) {
-			ast_node(body, BlockStmt, ws->body);
-			check_global_collect_entities(c, parent_scope, body->stmts, file_scopes);
-		} else if (ws->else_stmt) {
-			switch (ws->else_stmt->kind) {
-			case AstNode_BlockStmt:
-				check_global_collect_entities(c, parent_scope, ws->else_stmt->BlockStmt.stmts, file_scopes);
-				break;
-			case AstNode_WhenStmt:
-				check_global_when_stmt(c, parent_scope, &ws->else_stmt->WhenStmt, file_scopes);
-				break;
-			default:
-				error_node(ws->else_stmt, "Invalid `else` statement in `when` statement");
-				break;
-			}
-		}
-	}
-}
 void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray nodes, MapScope *file_scopes) {
 	for_array(decl_index, nodes) {
 		AstNode *decl = nodes.e[decl_index];
@@ -1126,16 +1096,13 @@ void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray
 		switch (decl->kind) {
 		case_ast_node(bd, BadDecl, decl);
 		case_end;
-		case_ast_node(ws, WhenStmt, decl);
-			// Will be handled later
-		case_end;
 		case_ast_node(id, ImportDecl, decl);
 			if (!parent_scope->is_file) {
 				// NOTE(bill): _Should_ be caught by the parser
 				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
-			DelayedImport di = {parent_scope, id};
+			DelayedDecl di = {parent_scope, decl};
 			array_add(&c->delayed_imports, di);
 		case_end;
 		case_ast_node(fl, ForeignLibrary, decl);
@@ -1145,24 +1112,8 @@ void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray
 				continue;
 			}
 
-			String file_str = fl->filepath.string;
-			String base_dir = fl->base_dir;
-
-			if (!fl->is_system) {
-				gbAllocator a = heap_allocator(); // TODO(bill): Change this allocator
-
-				String rel_path = get_fullpath_relative(a, base_dir, file_str);
-				String import_file = rel_path;
-				if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
-					String abs_path = get_fullpath_core(a, file_str);
-					if (gb_file_exists(cast(char *)abs_path.text)) {
-						import_file = abs_path;
-					}
-				}
-				file_str = import_file;
-			}
-
-			try_add_foreign_library_path(c, file_str);
+			DelayedDecl di = {parent_scope, decl};
+			array_add(&c->delayed_foreign_libraries, di);
 		case_end;
 		case_ast_node(cd, ConstDecl, decl);
 			for_array(i, cd->values) {
@@ -1251,23 +1202,13 @@ void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray
 			break;
 		}
 	}
-
-	// NOTE(bill): `when` stmts need to be handled after the other as the condition may refer to something
-	// declared after this stmt in source
-	for_array(decl_index, nodes) {
-		AstNode *decl = nodes.e[decl_index];
-		switch (decl->kind) {
-		case_ast_node(ws, WhenStmt, decl);
-			check_global_when_stmt(c, parent_scope, ws, file_scopes);
-		case_end;
-		}
-	}
 }
 
 void check_import_entities(Checker *c, MapScope *file_scopes) {
 	for_array(i, c->delayed_imports) {
-		AstNodeImportDecl *id = c->delayed_imports.e[i].decl;
 		Scope *parent_scope = c->delayed_imports.e[i].parent;
+		AstNode *decl = c->delayed_imports.e[i].decl;
+		ast_node(id, ImportDecl, decl);
 
 		HashKey key = hash_string(id->fullpath);
 		Scope **found = map_scope_get(file_scopes, key);
@@ -1284,6 +1225,19 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 		if (scope->is_global) {
 			error(id->token, "Importing a #shared_global_scope is disallowed and unnecessary");
 			continue;
+		}
+
+		if (id->cond != NULL) {
+			Operand operand = {Addressing_Invalid};
+			check_expr(c, &operand, id->cond);
+			if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
+				error_node(id->cond, "Non-constant boolean `when` condition");
+				continue;
+			}
+			if (operand.value.kind == ExactValue_Bool &&
+			    !operand.value.value_bool) {
+				continue;
+			}
 		}
 
 		bool previously_added = false;
@@ -1365,6 +1319,31 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 				add_entity(c, parent_scope, NULL, e);
 			}
 		}
+	}
+
+	for_array(i, c->delayed_foreign_libraries) {
+		Scope *parent_scope = c->delayed_foreign_libraries.e[i].parent;
+		AstNode *decl = c->delayed_foreign_libraries.e[i].decl;
+		ast_node(fl, ForeignLibrary, decl);
+
+		String file_str = fl->filepath.string;
+		String base_dir = fl->base_dir;
+
+		if (!fl->is_system) {
+			gbAllocator a = heap_allocator(); // TODO(bill): Change this allocator
+
+			String rel_path = get_fullpath_relative(a, base_dir, file_str);
+			String import_file = rel_path;
+			if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
+				String abs_path = get_fullpath_core(a, file_str);
+				if (gb_file_exists(cast(char *)abs_path.text)) {
+					import_file = abs_path;
+				}
+			}
+			file_str = import_file;
+		}
+
+		try_add_foreign_library_path(c, file_str);
 	}
 }
 

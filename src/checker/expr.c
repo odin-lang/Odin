@@ -149,6 +149,7 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 			gb_temp_arena_memory_end(tmp);
 		case_end;
 
+#if 0
 		case_ast_node(pd, ProcDecl, node);
 			if (!ast_node_expect(pd->name, AstNode_Ident)) {
 				break;
@@ -163,6 +164,7 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 			add_entity_and_decl_info(c, pd->name, e, d);
 			check_entity_decl(c, e, d, NULL, NULL);
 		case_end;
+#endif
 
 		case_ast_node(td, TypeDecl, node);
 			if (!ast_node_expect(td->name, AstNode_Ident)) {

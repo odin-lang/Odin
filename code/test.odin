@@ -28,7 +28,7 @@ thing :: proc() {
 */
 
 /*
-#load "fmt.odin"
+#include "fmt.odin"
 
 thing :: proc() {
 	println("Hello5!")

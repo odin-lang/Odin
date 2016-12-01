@@ -111,6 +111,15 @@ bool check_is_terminating(AstNode *node) {
 		}
 	case_end;
 
+	case_ast_node(ws, WhenStmt, node);
+		if (ws->else_stmt != NULL) {
+			if (check_is_terminating(ws->body) &&
+			    check_is_terminating(ws->else_stmt)) {
+			    return true;
+		    }
+		}
+	case_end;
+
 	case_ast_node(fs, ForStmt, node);
 		if (fs->cond == NULL && !check_has_break(fs->body, true)) {
 			return true;
@@ -283,30 +292,28 @@ typedef struct TypeAndToken {
 void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
 	Operand operand = {Addressing_Invalid};
 	check_expr(c, &operand, ws->cond);
-	if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-		error_node(ws->cond, "Non-boolean condition in `when` statement");
-	}
-	if (operand.mode != Addressing_Constant) {
-		error_node(ws->cond, "Non-constant condition in `when` statement");
+	if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
+		error_node(ws->cond, "Non-constant boolean `when` condition");
+		return;
 	}
 	if (ws->body == NULL || ws->body->kind != AstNode_BlockStmt) {
 		error_node(ws->cond, "Invalid body for `when` statement");
-	} else {
-		if (operand.value.kind == ExactValue_Bool &&
-		    operand.value.value_bool) {
-			check_stmt_list(c, ws->body->BlockStmt.stmts, flags);
-		} else if (ws->else_stmt) {
-			switch (ws->else_stmt->kind) {
-			case AstNode_BlockStmt:
-				check_stmt_list(c, ws->else_stmt->BlockStmt.stmts, flags);
-				break;
-			case AstNode_WhenStmt:
-				check_when_stmt(c, &ws->else_stmt->WhenStmt, flags);
-				break;
-			default:
-				error_node(ws->else_stmt, "Invalid `else` statement in `when` statement");
-				break;
-			}
+		return;
+	}
+	if (operand.value.kind == ExactValue_Bool &&
+	    operand.value.value_bool) {
+		check_stmt_list(c, ws->body->BlockStmt.stmts, flags);
+	} else if (ws->else_stmt) {
+		switch (ws->else_stmt->kind) {
+		case AstNode_BlockStmt:
+			check_stmt_list(c, ws->else_stmt->BlockStmt.stmts, flags);
+			break;
+		case AstNode_WhenStmt:
+			check_when_stmt(c, &ws->else_stmt->WhenStmt, flags);
+			break;
+		default:
+			error_node(ws->else_stmt, "Invalid `else` statement in `when` statement");
+			break;
 		}
 	}
 }
@@ -1085,7 +1092,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(pd, ProcDecl, node);
 		// NOTE(bill): Handled elsewhere
-	#if 0
+	#if 1
 		// NOTE(bill): This must be handled here so it has access to the parent scope stuff
 		// e.g. using
 		Entity *e = make_entity_procedure(c->allocator, c->context.scope, pd->name->Ident, NULL);

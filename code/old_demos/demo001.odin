@@ -301,7 +301,7 @@ namespaces_and_files :: proc() {
 		#import "file.odin" as _
 
 		// Exporting import
-		#load "file.odin"
+		#include "file.odin"
 	*/
 
 	// Talk about scope rules and diagram
