@@ -1,11 +1,11 @@
 #if defined(__cplusplus)
 extern "C" {
 #endif
-#define VERSION_STRING "v0.0.3d"
 
 #include "common.c"
 #include "timings.c"
 #include "unicode.c"
+#include "build.c"
 #include "tokenizer.c"
 #include "parser.c"
 // #include "printer.c"
@@ -59,39 +59,6 @@ i32 win32_exec_command_line_app(char *name, char *fmt, ...) {
 	return exit_code;
 }
 
-typedef enum ArchKind {
-	ArchKind_x64,
-	ArchKind_x86,
-} ArchKind;
-
-typedef struct ArchData {
-	BaseTypeSizes sizes;
-	String llc_flags;
-	String link_flags;
-} ArchData;
-
-ArchData make_arch_data(ArchKind kind) {
-	ArchData data = {0};
-
-	switch (kind) {
-	case ArchKind_x64:
-	default:
-		data.sizes.word_size = 8;
-		data.sizes.max_align = 16;
-		data.llc_flags = str_lit("-march=x86-64 ");
-		data.link_flags = str_lit("/machine:x64 ");
-		break;
-
-	case ArchKind_x86:
-		data.sizes.word_size = 4;
-		data.sizes.max_align = 8;
-		data.llc_flags = str_lit("-march=x86 ");
-		data.link_flags = str_lit("/machine:x86 ");
-		break;
-	}
-
-	return data;
-}
 
 void usage(char *argv0) {
 	gb_printf_err("%s is a tool for managing Odin source code\n", argv0);
@@ -118,9 +85,10 @@ int main(int argc, char **argv) {
 	init_string_buffer_memory();
 	init_global_error_collector();
 
-	String module_dir = get_module_dir();
+	BuildContext build_context = {0};
+	init_build_context(&build_context);
 
-	init_universal_scope();
+	init_universal_scope(&build_context);
 
 	char *init_filename = NULL;
 	bool run_output = false;
@@ -131,7 +99,7 @@ int main(int argc, char **argv) {
 	} else if (str_eq(arg1, str_lit("build"))) {
 		init_filename = argv[2];
 	} else if (str_eq(arg1, str_lit("version"))) {
-		gb_printf("%s version %s", argv[0], VERSION_STRING);
+		gb_printf("%s version %.*s", argv[0], LIT(build_context.ODIN_VERSION));
 		return 0;
 	} else {
 		usage(argv[0]);
@@ -157,9 +125,8 @@ int main(int argc, char **argv) {
 	timings_start_section(&timings, str_lit("type check"));
 
 	Checker checker = {0};
-	ArchData arch_data = make_arch_data(ArchKind_x64);
 
-	init_checker(&checker, &parser, arch_data.sizes);
+	init_checker(&checker, &parser, &build_context);
 	// defer (destroy_checker(&checker));
 
 	check_parsed_files(&checker);
@@ -206,7 +173,7 @@ int main(int argc, char **argv) {
 		// "-dce "
 		// "-S "
 		"",
-		LIT(module_dir),
+		LIT(build_context.ODIN_ROOT),
 		output_name, LIT(output));
 	if (exit_code != 0) {
 		return exit_code;
@@ -220,10 +187,10 @@ int main(int argc, char **argv) {
 		"%.*s "
 		// "-debug-pass=Arguments "
 		"",
-		LIT(module_dir),
+		LIT(build_context.ODIN_ROOT),
 		LIT(output),
 		optimization_level,
-		LIT(arch_data.llc_flags));
+		LIT(build_context.llc_flags));
 	if (exit_code != 0) {
 		return exit_code;
 	}
@@ -247,7 +214,7 @@ int main(int argc, char **argv) {
 		" %.*s "
 		"",
 		LIT(output), LIT(output),
-		lib_str, LIT(arch_data.link_flags));
+		lib_str, LIT(build_context.link_flags));
 	if (exit_code != 0) {
 		return exit_code;
 	}

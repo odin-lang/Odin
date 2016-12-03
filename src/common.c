@@ -13,55 +13,6 @@ gb_global String global_module_path = {0};
 gb_global bool global_module_path_set = false;
 
 
-String get_module_dir() {
-	String path = global_module_path;
-	Array(wchar_t) path_buf;
-	isize len, i;
-	gbTempArenaMemory tmp;
-	wchar_t *text;
-
-	if (global_module_path_set) {
-		return global_module_path;
-	}
-
-	array_init_count(&path_buf, heap_allocator(), 300);
-
-	len = 0;
-	for (;;) {
-		len = GetModuleFileNameW(NULL, &path_buf.e[0], path_buf.count);
-		if (len == 0) {
-			return make_string(NULL, 0);
-		}
-		if (len < path_buf.count) {
-			break;
-		}
-		array_resize(&path_buf, 2*path_buf.count + 300);
-	}
-
-	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-
-	text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
-
-	GetModuleFileNameW(NULL, text, len);
-	path = string16_to_string(heap_allocator(), make_string16(text, len));
-	for (i = path.len-1; i >= 0; i--) {
-		u8 c = path.text[i];
-		if (c == '/' || c == '\\') {
-			break;
-		}
-		path.len--;
-	}
-
-	global_module_path = path;
-	global_module_path_set = true;
-
-	gb_temp_arena_memory_end(tmp);
-
-	array_free(&path_buf);
-
-	return path;
-}
-
 String path_to_fullpath(gbAllocator a, String s) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	String16 string16 = string_to_string16(string_buffer_allocator, s);

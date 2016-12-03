@@ -1001,8 +1001,11 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 
 			default: {
 				if (!is_type_float(elem_type)) {
-					if (is_type_unsigned(elem_type)) ssa_fprintf(f, "u");
-					else                             ssa_fprintf(f, "s");
+					if (is_type_unsigned(elem_type)) {
+						ssa_fprintf(f, "u");
+					} else {
+						ssa_fprintf(f, "s");
+					}
 				}
 
 				switch (bo->op) {

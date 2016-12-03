@@ -1169,11 +1169,13 @@ bool expect_semicolon_after_stmt(AstFile *f, AstNode *s) {
 		// return true;
 	// }
 
-	// switch (f->curr_token.kind) {
-	// case Token_EOF:
-	// case Token_CloseBrace:
-		// return true;
-	// }
+	if (f->curr_token.pos.line == f->prev_token.pos.line) {
+		switch (f->curr_token.kind) {
+		case Token_EOF:
+		case Token_CloseBrace:
+			return true;
+		}
+	}
 
 	if (s != NULL) {
 		syntax_error(f->prev_token, "Expected `;` after %.*s, got `%.*s`",
@@ -1194,18 +1196,18 @@ AstNode *    parse_body(AstFile *f);
 
 AstNode *parse_identifier(AstFile *f) {
 	Token token = f->curr_token;
-	if (token.kind == Token_Identifier) {
+	if (token.kind == Token_Ident) {
 		next_token(f);
 	} else {
 		token.string = str_lit("_");
-		expect_token(f, Token_Identifier);
+		expect_token(f, Token_Ident);
 	}
 	return make_ident(f, token);
 }
 
 AstNode *parse_tag_expr(AstFile *f, AstNode *expression) {
 	Token token = expect_token(f, Token_Hash);
-	Token name  = expect_token(f, Token_Identifier);
+	Token name  = expect_token(f, Token_Ident);
 	return make_tag_expr(f, token, name, expression);
 }
 
@@ -1401,7 +1403,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 AstNode *parse_operand(AstFile *f, bool lhs) {
 	AstNode *operand = NULL; // Operand
 	switch (f->curr_token.kind) {
-	case Token_Identifier:
+	case Token_Ident:
 		operand = parse_identifier(f);
 		if (!lhs) {
 			// TODO(bill): Handle?
@@ -1456,7 +1458,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_Hash: {
 		Token token = expect_token(f, Token_Hash);
-		Token name  = expect_token(f, Token_Identifier);
+		Token name  = expect_token(f, Token_Ident);
 		if (str_eq(name.string, str_lit("file"))) {
 			Token token = name;
 			token.kind = Token_String;
@@ -1584,21 +1586,15 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 	bool loop = true;
 	while (loop) {
 		switch (f->curr_token.kind) {
-		case Token_OpenParen: {
-			if (lhs) {
-				// TODO(bill): Handle this shit! Is this even allowed in this language?!
-			}
+		case Token_OpenParen:
 			operand = parse_call_expr(f, operand);
-		} break;
+			break;
 
 		case Token_Period: {
 			Token token = f->curr_token;
 			next_token(f);
-			if (lhs) {
-				// TODO(bill): handle this
-			}
 			switch (f->curr_token.kind) {
-			case Token_Identifier:
+			case Token_Ident:
 				operand = make_selector_expr(f, token, operand, parse_identifier(f));
 				break;
 			default: {
@@ -1664,20 +1660,13 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			operand = make_demaybe_expr(f, operand, expect_token(f, Token_Maybe));
 			break;
 
-		case Token_OpenBrace: {
+		case Token_OpenBrace:
 			if (!lhs && is_literal_type(operand) && f->expr_level >= 0) {
-				if (f->curr_token.pos.line == f->prev_token.pos.line) {
-					// TODO(bill): This is a hack due to optional semicolons
-					// TODO(bill): It's probably much better to solve this by changing
-					// the syntax for struct literals and array literals
-					operand = parse_literal_value(f, operand);
-				} else {
-					loop = false;
-				}
+				operand = parse_literal_value(f, operand);
 			} else {
 				loop = false;
 			}
-		} break;
+			break;
 
 		default:
 			loop = false;
@@ -1933,14 +1922,13 @@ AstNode *parse_type(AstFile *f) {
 }
 
 
-Token parse_procedure_signature(AstFile *f,
-                                AstNodeArray *params, AstNodeArray *results);
+Token parse_proc_signature(AstFile *f, AstNodeArray *params, AstNodeArray *results);
 
 AstNode *parse_proc_type(AstFile *f) {
 	AstNodeArray params = {0};
 	AstNodeArray results = {0};
 
-	Token proc_token = parse_procedure_signature(f, &params, &results);
+	Token proc_token = parse_proc_signature(f, &params, &results);
 
 	return make_proc_type(f, proc_token, params, results);
 }
@@ -1949,7 +1937,7 @@ AstNode *parse_proc_type(AstFile *f) {
 AstNodeArray parse_parameter_list(AstFile *f) {
 	AstNodeArray params = make_ast_node_array(f);
 
-	while (f->curr_token.kind == Token_Identifier ||
+	while (f->curr_token.kind == Token_Ident ||
 	       f->curr_token.kind == Token_using) {
 		bool is_using = false;
 		if (allow_token(f, Token_using)) {
@@ -2068,7 +2056,7 @@ AstNodeArray parse_record_params(AstFile *f, isize *decl_count_, bool using_allo
 
 AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 	switch (f->curr_token.kind) {
-	case Token_Identifier: {
+	case Token_Ident: {
 		AstNode *e = parse_identifier(f);
 		while (f->curr_token.kind == Token_Period) {
 			Token token = f->curr_token;
@@ -2128,7 +2116,7 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		bool is_packed = false;
 		bool is_ordered = false;
 		while (allow_token(f, Token_Hash)) {
-			Token tag = expect_token_after(f, Token_Identifier, "`#`");
+			Token tag = expect_token_after(f, Token_Ident, "`#`");
 			if (str_eq(tag.string, str_lit("packed"))) {
 				if (is_packed) {
 					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
@@ -2268,9 +2256,9 @@ AstNodeArray parse_results(AstFile *f) {
 	return results;
 }
 
-Token parse_procedure_signature(AstFile *f,
-                               AstNodeArray *params,
-                               AstNodeArray *results) {
+Token parse_proc_signature(AstFile *f,
+                           AstNodeArray *params,
+                           AstNodeArray *results) {
 	Token proc_token = expect_token(f, Token_proc);
 	expect_token(f, Token_OpenParen);
 	*params = parse_parameter_list(f);
@@ -2292,11 +2280,7 @@ AstNode *parse_body(AstFile *f) {
 
 
 AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
-	AstNodeArray params = {0};
-	AstNodeArray results = {0};
-
-	parse_procedure_signature(f, &params, &results);
-	AstNode *proc_type = make_proc_type(f, proc_token, params, results);
+	AstNode *proc_type = parse_proc_type(f);
 
 	AstNode *body = NULL;
 	u64 tags = 0;
@@ -2736,7 +2720,7 @@ AstNode *parse_stmt(AstFile *f) {
 	Token token = f->curr_token;
 	switch (token.kind) {
 	// Operands
-	case Token_Identifier:
+	case Token_Ident:
 	case Token_Integer:
 	case Token_Float:
 	case Token_Rune:
@@ -2827,7 +2811,7 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Hash: {
 		AstNode *s = NULL;
 		Token hash_token = expect_token(f, Token_Hash);
-		Token name = expect_token(f, Token_Identifier);
+		Token name = expect_token(f, Token_Ident);
 		String tag = name.string;
 		if (str_eq(tag, str_lit("shared_global_scope"))) {
 			if (f->curr_proc == NULL) {
@@ -2878,10 +2862,10 @@ AstNode *parse_stmt(AstFile *f) {
 			switch (f->curr_token.kind) {
 			case Token_Period:
 				import_name = f->curr_token;
-				import_name.kind = Token_Identifier;
+				import_name.kind = Token_Ident;
 				next_token(f);
 				break;
-			case Token_Identifier:
+			case Token_Ident:
 				import_name = f->curr_token;
 				next_token(f);
 				break;
@@ -3100,7 +3084,7 @@ String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 }
 
 String get_fullpath_core(gbAllocator a, String path) {
-	String module_dir = get_module_dir();
+	String module_dir = odin_root_dir();
 	String res = {0};
 
 	char core[] = "core/";

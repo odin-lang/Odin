@@ -5300,7 +5300,7 @@ void ssa_gen_tree(ssaGen *s) {
 
 
 							{
-								Token token = {Token_Identifier};
+								Token token = {Token_Ident};
 								i32 id = cast(i32)entry_index;
 								char name_base[] = "__$enum_values";
 								isize name_len = gb_size_of(name_base) + 10;
@@ -5314,7 +5314,7 @@ void ssa_gen_tree(ssaGen *s) {
 								map_ssa_value_set(&m->members, hash_string(token.string), value_array);
 							}
 							{
-								Token token = {Token_Identifier};
+								Token token = {Token_Ident};
 								i32 id = cast(i32)entry_index;
 								char name_base[] = "__$enum_names";
 								isize name_len = gb_size_of(name_base) + 10;

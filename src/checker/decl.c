@@ -121,10 +121,12 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 		}
 	}
 
+#if 0
 	if (e->kind == Entity_Procedure) {
 		check_proc_decl(c, e, d);
 		return;
 	}
+#endif
 	CheckerContext prev = c->context;
 	c->context.scope = d->scope;
 	c->context.decl  = d;
@@ -139,6 +141,11 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, Cyc
 	case Entity_TypeName:
 		check_type_decl(c, e, d->type_expr, named_type, cycle_checker);
 		break;
+#if 1
+	case Entity_Procedure:
+		check_proc_decl(c, e, d);
+		break;
+#endif
 	}
 
 	c->context = prev;
@@ -279,6 +286,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 
 	Operand operand = {0};
 	if (init_expr) {
+		// check_expr_or_type(c, &operand, init_expr);
 		check_expr(c, &operand, init_expr);
 	}
 	check_init_constant(c, e, &operand);

@@ -1060,7 +1060,9 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 			return;
 		}
 		o->value = e->Constant.value;
-		GB_ASSERT(o->value.kind != ExactValue_Invalid);
+		if (o->value.kind == ExactValue_Invalid) {
+			return;
+		}
 		o->mode = Addressing_Constant;
 		break;
 

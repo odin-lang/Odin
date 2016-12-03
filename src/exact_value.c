@@ -306,6 +306,7 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		case Token_Shr:    c = a >> b; break;
 		default: goto error;
 		}
+
 		return make_exact_value_integer(c);
 	} break;
 

@@ -4,7 +4,7 @@
 	TOKEN_KIND(Token_Comment, "Comment"), \
 \
 TOKEN_KIND(Token__LiteralBegin, "_LiteralBegin"), \
-	TOKEN_KIND(Token_Identifier, "Identifier"), \
+	TOKEN_KIND(Token_Ident, "Identifier"), \
 	TOKEN_KIND(Token_Integer, "Integer"), \
 	TOKEN_KIND(Token_Float, "Float"), \
 	TOKEN_KIND(Token_Rune, "Rune"), \
@@ -157,10 +157,10 @@ typedef struct Token {
 } Token;
 
 Token empty_token = {Token_Invalid};
-Token blank_token = {Token_Identifier, {cast(u8 *)"_", 1}};
+Token blank_token = {Token_Ident, {cast(u8 *)"_", 1}};
 
 Token make_token_ident(String s) {
-	Token t = {Token_Identifier, s};
+	Token t = {Token_Ident, s};
 	return t;
 }
 
@@ -311,8 +311,9 @@ typedef struct Tokenizer {
 void tokenizer_err(Tokenizer *t, char *msg, ...) {
 	va_list va;
 	isize column = t->read_curr - t->line+1;
-	if (column < 1)
+	if (column < 1) {
 		column = 1;
+	}
 
 	gb_printf_err("%.*s(%td:%td) Syntax error: ", LIT(t->fullpath), t->line_count, column);
 
@@ -628,7 +629,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 	curr_rune = t->curr_rune;
 	if (rune_is_letter(curr_rune)) {
-		token.kind = Token_Identifier;
+		token.kind = Token_Ident;
 		while (rune_is_letter(t->curr_rune) || rune_is_digit(t->curr_rune)) {
 			advance_to_next_rune(t);
 		}

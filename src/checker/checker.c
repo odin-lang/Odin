@@ -535,7 +535,7 @@ void add_global_string_constant(gbAllocator a, String name, String value) {
 }
 
 
-void init_universal_scope(void) {
+void init_universal_scope(BuildContext *bc) {
 	// NOTE(bill): No need to free these
 	gbAllocator a = heap_allocator();
 	universal_scope = make_scope(NULL, a);
@@ -555,11 +555,11 @@ void init_universal_scope(void) {
 	add_global_entity(make_entity_nil(a, str_lit("nil"), t_untyped_nil));
 
 	// TODO(bill): Set through flags in the compiler
-	add_global_string_constant(a, str_lit("ODIN_OS"),      str_lit("windows"));
-	add_global_string_constant(a, str_lit("ODIN_ARCH"),    str_lit("amd64"));
-	add_global_string_constant(a, str_lit("ODIN_VENDOR"),  str_lit("odin"));
-	add_global_string_constant(a, str_lit("ODIN_VERSION"), str_lit(VERSION_STRING));
-	add_global_string_constant(a, str_lit("ODIN_ENDIAN"),  str_lit("little"));
+	add_global_string_constant(a, str_lit("ODIN_OS"),      bc->ODIN_OS);
+	add_global_string_constant(a, str_lit("ODIN_ARCH"),    bc->ODIN_ARCH);
+	add_global_string_constant(a, str_lit("ODIN_VENDOR"),  bc->ODIN_VENDOR);
+	add_global_string_constant(a, str_lit("ODIN_VERSION"), bc->ODIN_VERSION);
+	add_global_string_constant(a, str_lit("ODIN_ROOT"),    bc->ODIN_ROOT);
 
 
 // Builtin Procedures
@@ -607,12 +607,13 @@ void destroy_checker_info(CheckerInfo *i) {
 }
 
 
-void init_checker(Checker *c, Parser *parser, BaseTypeSizes sizes) {
+void init_checker(Checker *c, Parser *parser, BuildContext *bc) {
 	gbAllocator a = heap_allocator();
 
 	c->parser = parser;
 	init_checker_info(&c->info);
-	c->sizes = sizes;
+	c->sizes.word_size = bc->word_size;
+	c->sizes.max_align = bc->max_align;
 
 	array_init(&c->proc_stack, a);
 	array_init(&c->procs, a);
@@ -698,7 +699,10 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 
 	if (mode == Addressing_Constant) {
 		if (is_type_constant_type(type)) {
-			GB_ASSERT(value.kind != ExactValue_Invalid);
+			// if (value.kind == ExactValue_Invalid) {
+				// TODO(bill): Is this correct?
+				// return;
+			// }
 			if (!(type != t_invalid || is_type_constant_type(type))) {
 				compiler_error("add_type_and_value - invalid type: %s", type_to_string(type));
 			}
@@ -1086,6 +1090,35 @@ void check_global_entities_by_kind(Checker *c, EntityKind kind) {
 	}
 }
 
+
+
+void check_all_global_entities(Checker *c) {
+	for_array(i, c->info.entities.entries) {
+		MapDeclInfoEntry *entry = &c->info.entities.entries.e[i];
+		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
+		DeclInfo *d = entry->value;
+
+		if (d->scope != e->scope) {
+			continue;
+		}
+
+		add_curr_ast_file(c, d->scope->file);
+		if (e->kind != Entity_Procedure && str_eq(e->token.string, str_lit("main"))) {
+			if (e->scope->is_init) {
+				error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
+				continue;
+			}
+		} else if (e->scope->is_global && str_eq(e->token.string, str_lit("main"))) {
+			error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
+			continue;
+		}
+
+		Scope *prev_scope = c->context.scope;
+		c->context.scope = d->scope;
+		check_entity_decl(c, e, d, NULL, NULL);
+	}
+}
+
 void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray nodes, MapScope *file_scopes) {
 	for_array(decl_index, nodes) {
 		AstNode *decl = nodes.e[decl_index];
@@ -1120,6 +1153,9 @@ void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray
 				AstNode *name = cd->names.e[i];
 				AstNode *value = cd->values.e[i];
 				ExactValue v = {ExactValue_Invalid};
+				if (name->kind != AstNode_Ident) {
+					error_node(name, "A declaration's name but be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+				}
 				Entity *e = make_entity_constant(c->allocator, parent_scope, name->Ident, NULL, v);
 				e->identifier = name;
 				DeclInfo *di = make_declaration_info(c->allocator, parent_scope);
@@ -1160,6 +1196,9 @@ void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray
 				AstNode *value = NULL;
 				if (i < vd->values.count) {
 					value = vd->values.e[i];
+				}
+				if (name->kind != AstNode_Ident) {
+					error_node(name, "A declaration's name but be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 				}
 				Entity *e = make_entity_variable(c->allocator, parent_scope, name->Ident, NULL);
 				e->identifier = name;
@@ -1386,13 +1425,18 @@ void check_parsed_files(Checker *c) {
 
 	check_import_entities(c, &file_scopes);
 
+#if 0
 	check_global_entities_by_kind(c, Entity_TypeName);
+	check_global_entities_by_kind(c, Entity_Constant);
 	init_preload_types(c);
 	add_implicit_value(c, ImplicitValue_context, str_lit("context"), str_lit("__context"), t_context);
-	check_global_entities_by_kind(c, Entity_Constant);
 	check_global_entities_by_kind(c, Entity_Procedure);
 	check_global_entities_by_kind(c, Entity_Variable);
-
+#else
+	check_all_global_entities(c);
+	init_preload_types(c);
+	add_implicit_value(c, ImplicitValue_context, str_lit("context"), str_lit("__context"), t_context);
+#endif
 
 	for (isize i = 1; i < ImplicitValue_Count; i++) {
 		// NOTE(bill): First is invalid
