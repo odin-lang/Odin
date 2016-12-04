@@ -1465,11 +1465,12 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
+	// NOTE(bill): Check for illegal cyclic type declarations
 	for_array(i, c->info.definitions.entries) {
 		Entity *e = c->info.definitions.entries.e[i].value;
 		if (e->kind == Entity_TypeName) {
+			// i64 size  = type_size_of(c->sizes, c->allocator, e->type);
 			i64 align = type_align_of(c->sizes, c->allocator, e->type);
-			GB_ASSERT(align > 0);
 		}
 	}
 }
