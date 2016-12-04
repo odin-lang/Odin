@@ -266,6 +266,7 @@ typedef struct Checker {
 
 	Array(Type *)          proc_stack;
 	bool                   in_defer; // TODO(bill): Actually handle correctly
+	bool                   done_preload;
 } Checker;
 
 typedef struct CycleChecker {
@@ -569,6 +570,7 @@ void init_universal_scope(BuildContext *bc) {
 		entity->Builtin.id = id;
 		add_global_entity(entity);
 	}
+
 
 	t_u8_ptr = make_type_pointer(a, t_u8);
 	t_int_ptr = make_type_pointer(a, t_int);
@@ -986,11 +988,21 @@ MapEntity generate_minimum_dependency_map(CheckerInfo *info, Entity *start) {
 }
 
 
-#include "expr.c"
-#include "decl.c"
-#include "stmt.c"
+void add_implicit_value(Checker *c, ImplicitValueId id, String name, String backing_name, Type *type) {
+	ImplicitValueInfo info = {name, backing_name, type};
+	Entity *value = make_entity_implicit_value(c->allocator, info.name, info.type, id);
+	Entity *prev = scope_insert_entity(c->global_scope, value);
+	GB_ASSERT(prev == NULL);
+	implicit_value_infos[id] = info;
+	c->info.implicit_values[id] = value;
+}
 
-void init_preload_types(Checker *c) {
+
+void init_preload(Checker *c) {
+	if (c->done_preload) {
+		return;
+	}
+
 	if (t_type_info == NULL) {
 		Entity *e = current_scope_lookup_entity(c->global_scope, str_lit("Type_Info"));
 		if (e == NULL) {
@@ -1045,54 +1057,22 @@ void init_preload_types(Checker *c) {
 		}
 		t_context = e->type;
 		t_context_ptr = make_type_pointer(c->allocator, t_context);
-
 	}
 
-}
-
-void add_implicit_value(Checker *c, ImplicitValueId id, String name, String backing_name, Type *type) {
-	ImplicitValueInfo info = {name, backing_name, type};
-	Entity *value = make_entity_implicit_value(c->allocator, info.name, info.type, id);
-	Entity *prev = scope_insert_entity(c->global_scope, value);
-	GB_ASSERT(prev == NULL);
-	implicit_value_infos[id] = info;
-	c->info.implicit_values[id] = value;
+	c->done_preload = true;
 }
 
 
-void check_global_entities_by_kind(Checker *c, EntityKind kind) {
-	for_array(i, c->info.entities.entries) {
-		MapDeclInfoEntry *entry = &c->info.entities.entries.e[i];
-		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
-		DeclInfo *d = entry->value;
-
-		if (e->kind != kind) {
-			continue;
-		}
-		if (d->scope != e->scope) {
-			continue;
-		}
-
-		add_curr_ast_file(c, d->scope->file);
-		if (e->kind != Entity_Procedure && str_eq(e->token.string, str_lit("main"))) {
-			if (e->scope->is_init) {
-				error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
-				continue;
-			}
-		} else if (e->scope->is_global && str_eq(e->token.string, str_lit("main"))) {
-			error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
-			continue;
-		}
-
-		Scope *prev_scope = c->context.scope;
-		c->context.scope = d->scope;
-		check_entity_decl(c, e, d, NULL, NULL);
-	}
-}
 
 
+
+#include "expr.c"
+#include "decl.c"
+#include "stmt.c"
 
 void check_all_global_entities(Checker *c) {
+	Scope *prev_file = {0};
+
 	for_array(i, c->info.entities.entries) {
 		MapDeclInfoEntry *entry = &c->info.entities.entries.e[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
@@ -1101,8 +1081,8 @@ void check_all_global_entities(Checker *c) {
 		if (d->scope != e->scope) {
 			continue;
 		}
-
 		add_curr_ast_file(c, d->scope->file);
+
 		if (e->kind != Entity_Procedure && str_eq(e->token.string, str_lit("main"))) {
 			if (e->scope->is_init) {
 				error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
@@ -1116,10 +1096,15 @@ void check_all_global_entities(Checker *c) {
 		Scope *prev_scope = c->context.scope;
 		c->context.scope = d->scope;
 		check_entity_decl(c, e, d, NULL, NULL);
+
+
+		if (d->scope->is_init && !c->done_preload) {
+			init_preload(c);
+		}
 	}
 }
 
-void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray nodes, MapScope *file_scopes) {
+void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, AstNodeArray nodes, MapScope *file_scopes) {
 	for_array(decl_index, nodes) {
 		AstNode *decl = nodes.e[decl_index];
 		if (!is_ast_node_decl(decl) && !is_ast_node_when_stmt(decl)) {
@@ -1179,6 +1164,7 @@ void check_global_collect_entities(Checker *c, Scope *parent_scope, AstNodeArray
 				continue;
 			}
 
+			// NOTE(bill): You need to store the entity information here unline a constant declaration
 			isize entity_count = vd->names.count;
 			isize entity_index = 0;
 			Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
@@ -1351,6 +1337,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 			}
 
 			if (import_name.len > 0) {
+				GB_ASSERT(id->import_name.pos.line != 0);
 				id->import_name.string = import_name;
 				Entity *e = make_entity_import_name(c->allocator, parent_scope, id->import_name, t_invalid,
 				                                    id->fullpath, id->import_name.string,
@@ -1399,9 +1386,7 @@ void check_parsed_files(Checker *c) {
 		scope->is_global = f->is_global_scope;
 		scope->is_file   = true;
 		scope->file      = f;
-		if (i == 0) {
-			// NOTE(bill): First file is always the initial file
-			// thus it must contain main
+		if (str_eq(f->tokenizer.fullpath, c->parser->init_fullpath)) {
 			scope->is_init = true;
 		}
 
@@ -1420,26 +1405,23 @@ void check_parsed_files(Checker *c) {
 	for_array(i, c->parser->files) {
 		AstFile *f = &c->parser->files.e[i];
 		add_curr_ast_file(c, f);
-		check_global_collect_entities(c, f->scope, f->decls, &file_scopes);
+		check_global_collect_entities_from_file(c, f->scope, f->decls, &file_scopes);
 	}
 
 	check_import_entities(c, &file_scopes);
 
-#if 0
-	check_global_entities_by_kind(c, Entity_TypeName);
-	check_global_entities_by_kind(c, Entity_Constant);
-	init_preload_types(c);
-	add_implicit_value(c, ImplicitValue_context, str_lit("context"), str_lit("__context"), t_context);
-	check_global_entities_by_kind(c, Entity_Procedure);
-	check_global_entities_by_kind(c, Entity_Variable);
-#else
-	check_all_global_entities(c);
-	init_preload_types(c);
-	add_implicit_value(c, ImplicitValue_context, str_lit("context"), str_lit("__context"), t_context);
-#endif
+	map_scope_destroy(&file_scopes);
 
+	check_all_global_entities(c);
+	init_preload(c); // NOTE(bill): This could be setup previously through the use of `type_info(_of_val)`
+	// NOTE(bill): Nothing is the global scope _should_ depend on this implicit value as implicit
+	// values are only useful within procedures
+	add_implicit_value(c, ImplicitValue_context, str_lit("context"), str_lit("__context"), t_context);
+
+	// Initialize implicit values with backing variables
+	// TODO(bill): Are implicit values "too implicit"?
 	for (isize i = 1; i < ImplicitValue_Count; i++) {
-		// NOTE(bill): First is invalid
+		// NOTE(bill): 0th is invalid
 		Entity *e = c->info.implicit_values[i];
 		GB_ASSERT(e->kind == Entity_ImplicitValue);
 
@@ -1451,6 +1433,7 @@ void check_parsed_files(Checker *c) {
 
 
 	// Check procedure bodies
+	// NOTE(bill): Nested procedures bodies will be added to this "queue"
 	for_array(i, c->procs) {
 		ProcedureInfo *pi = &c->procs.e[i];
 		add_curr_ast_file(c, pi->file);
@@ -1487,6 +1470,11 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
+	// TODO(bill): Check for unused imports (and remove) or even warn/err
+	// TODO(bill): Any other checks?
+
+
+	// Add "Basic" type information
 	for (isize i = 0; i < gb_count_of(basic_types)-1; i++) {
 		Type *t = &basic_types[i];
 		if (t->Basic.size > 0) {
@@ -1500,8 +1488,6 @@ void check_parsed_files(Checker *c) {
 			add_type_info_type(c, t);
 		}
 	}
-
-	map_scope_destroy(&file_scopes);
 }
 
 

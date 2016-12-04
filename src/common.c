@@ -13,22 +13,6 @@ gb_global String global_module_path = {0};
 gb_global bool global_module_path_set = false;
 
 
-String path_to_fullpath(gbAllocator a, String s) {
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
-	String16 string16 = string_to_string16(string_buffer_allocator, s);
-	String result = {0};
-
-	DWORD len = GetFullPathNameW(string16.text, 0, NULL, NULL);
-	if (len != 0) {
-		wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
-		GetFullPathNameW(string16.text, len, text, NULL);
-		text[len] = 0;
-		result = string16_to_string(a, make_string16(text, len));
-	}
-	gb_temp_arena_memory_end(tmp);
-	return result;
-}
-
 i64 next_pow2(i64 n) {
 	if (n <= 0) {
 		return 0;

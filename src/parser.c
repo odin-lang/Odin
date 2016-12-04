@@ -2869,6 +2869,9 @@ AstNode *parse_stmt(AstFile *f) {
 				import_name = f->curr_token;
 				next_token(f);
 				break;
+			default:
+				import_name.pos = hash_token.pos;
+				break;
 			}
 
 			if (str_eq(import_name.string, str_lit("_"))) {
@@ -3068,40 +3071,6 @@ bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) 
 	return true;
 }
 
-String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
-	String res = {0};
-	isize str_len = base_dir.len+path.len;
-
-	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
-
-	isize i = 0;
-	gb_memmove(str+i, base_dir.text, base_dir.len); i += base_dir.len;
-	gb_memmove(str+i, path.text, path.len);
-	str[str_len] = '\0';
-	res = path_to_fullpath(a, make_string(str, str_len));
-	gb_free(heap_allocator(), str);
-	return res;
-}
-
-String get_fullpath_core(gbAllocator a, String path) {
-	String module_dir = odin_root_dir();
-	String res = {0};
-
-	char core[] = "core/";
-	isize core_len = gb_size_of(core)-1;
-
-	isize str_len = module_dir.len + core_len + path.len;
-	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
-
-	gb_memmove(str, module_dir.text, module_dir.len);
-	gb_memmove(str+module_dir.len, core, core_len);
-	gb_memmove(str+module_dir.len+core_len, path.text, path.len);
-	str[str_len] = '\0';
-
-	res = path_to_fullpath(a, make_string(str, str_len));
-	gb_free(heap_allocator(), str);
-	return res;
-}
 
 // // NOTE(bill): Returns true if it's added
 // bool try_add_foreign_library_path(Parser *p, String import_file) {
@@ -3155,27 +3124,6 @@ bool is_import_path_valid(String path) {
 		return true;
 	}
 	return false;
-}
-
-String get_filepath_extension(String path) {
-	isize dot = 0;
-	bool seen_slash = false;
-	for (isize i = path.len-1; i >= 0; i--) {
-		u8 c = path.text[i];
-		if (c == '/' || c == '\\') {
-			seen_slash = true;
-		}
-
-		if (c == '.') {
-			if (seen_slash) {
-				return str_lit("");
-			}
-
-			dot = i;
-			break;
-		}
-	}
-	return make_string(path.text, dot);
 }
 
 void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, AstNodeArray decls) {
@@ -3261,8 +3209,7 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 	String init_fullpath = make_string_c(fullpath_str);
 	TokenPos init_pos = {0};
 	ImportedFile init_imported_file = {init_fullpath, init_fullpath, init_pos};
-	array_add(&p->imports, init_imported_file);
-	p->init_fullpath = init_fullpath;
+
 
 	{
 		String s = get_fullpath_core(heap_allocator(), str_lit("_preload.odin"));
@@ -3274,6 +3221,9 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 		ImportedFile runtime_file = {s, s, init_pos};
 		array_add(&p->imports, runtime_file);
 	}
+
+	array_add(&p->imports, init_imported_file);
+	p->init_fullpath = init_fullpath;
 
 	for_array(i, p->imports) {
 		ImportedFile imported_file = p->imports.e[i];

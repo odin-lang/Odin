@@ -2939,6 +2939,12 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	case BuiltinProc_type_info: {
 		// type_info :: proc(Type) -> ^Type_Info
+		if (c->context.scope->is_global) {
+			compiler_error("`type_info` Cannot be declared within a #shared_global_scope due to how the internals of the compiler works");
+		}
+
+		// NOTE(bill): The type information may not be setup yet
+		init_preload(c);
 		AstNode *expr = ce->args.e[0];
 		Type *type = check_type(c, expr);
 		if (type == NULL || type == t_invalid) {
@@ -2954,8 +2960,13 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	case BuiltinProc_type_info_of_val: {
 		// type_info_of_val :: proc(val: Type) -> ^Type_Info
-		AstNode *expr = ce->args.e[0];
+		if (c->context.scope->is_global) {
+			compiler_error("`type_info` Cannot be declared within a #shared_global_scope due to how the internals of the compiler works");
+		}
 
+		// NOTE(bill): The type information may not be setup yet
+		init_preload(c);
+		AstNode *expr = ce->args.e[0];
 		check_assignment(c, operand, NULL, str_lit("argument of `type_info_of_val`"));
 		if (operand->mode == Addressing_Invalid || operand->mode == Addressing_Builtin)
 			return false;

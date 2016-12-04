@@ -67,7 +67,7 @@ struct Entity {
 			String path;
 			String name;
 			Scope *scope;
-			bool    used;
+			bool   used;
 		} ImportName;
 		i32 Nil;
 		struct {

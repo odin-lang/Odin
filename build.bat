@@ -16,7 +16,7 @@ if %release_mode% EQU 0 ( rem Debug
 )
 
 set compiler_warnings= ^
-	-we4013 -we4706 -we4002 -we4133 -we4047 -we4024 ^
+	-we4002 -we4013 -we4024 -we4047 -we4133 -we4706 ^
 	-wd4100 -wd4101 -wd4127 -wd4189 ^
 	-wd4201 -wd4204 -wd4244 ^
 	-wd4306 ^

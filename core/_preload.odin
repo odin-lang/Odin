@@ -4,10 +4,16 @@
 #import "fmt.odin";
 #import "mem.odin";
 
+// IMPORTANT NOTE(bill): `type_info` & `type_info_val` cannot be used within a
+// #shared_global_scope due to  the internals of the compiler.
+// This could change at a later date if the all these data structures are
+// implemented within the compiler rather than in this "preload" file
+
+
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
 Type_Info :: union {
-	Member :: struct #ordered {
+	Member :: type struct #ordered {
 		name:      string;     // can be empty if tuple
 		type_info: ^Type_Info;
 		offset:    int;        // offsets are not used in tuples

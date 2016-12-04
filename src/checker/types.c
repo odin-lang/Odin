@@ -87,9 +87,9 @@ typedef struct TypeRecord {
 		};
 		struct { // struct only
 			i64 *    struct_offsets;
-			bool      struct_are_offsets_set;
-			bool      struct_is_packed;
-			bool      struct_is_ordered;
+			bool     struct_are_offsets_set;
+			bool     struct_is_packed;
+			bool     struct_is_ordered;
 			Entity **fields_in_src_order; // Entity_Variable
 		};
 	};

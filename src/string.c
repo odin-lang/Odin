@@ -108,19 +108,6 @@ GB_COMPARE_PROC(string_cmp_proc) {
 	return string_compare(x, y);
 }
 
-
-// gb_inline bool operator ==(String a, String b) { return are_strings_equal(a, b) != 0; }
-// gb_inline bool operator !=(String a, String b) { return !operator==(a, b); }
-// gb_inline bool operator < (String a, String b) { return string_compare(a, b) < 0; }
-// gb_inline bool operator > (String a, String b) { return string_compare(a, b) > 0; }
-// gb_inline bool operator <=(String a, String b) { return string_compare(a, b) <= 0; }
-// gb_inline bool operator >=(String a, String b) { return string_compare(a, b) >= 0; }
-
-// template <size_t N> gb_inline bool operator ==(String a, char const (&b)[N]) { return a == make_string(cast(u8 *)b, N-1); }
-// template <size_t N> gb_inline bool operator !=(String a, char const (&b)[N]) { return a != make_string(cast(u8 *)b, N-1); }
-// template <size_t N> gb_inline bool operator ==(char const (&a)[N], String b) { return make_string(cast(u8 *)a, N-1) == b; }
-// template <size_t N> gb_inline bool operator !=(char const (&a)[N], String b) { return make_string(cast(u8 *)a, N-1) != b; }
-
 gb_inline bool str_eq(String a, String b) { return a.len == b.len ? gb_memcompare(a.text, b.text, a.len) == 0 : false; }
 gb_inline bool str_ne(String a, String b) { return !str_eq(a, b);                }
 gb_inline bool str_lt(String a, String b) { return string_compare(a, b) < 0;     }

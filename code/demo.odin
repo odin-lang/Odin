@@ -1,6 +1,9 @@
-#import "game.odin";
+// #import "game.odin";
+#import "fmt.odin";
+
+x := type_info(int);
 
 main :: proc() {
-	game.run();
+	fmt.println(123);
 }
 
