@@ -1,10 +1,6 @@
 bool check_is_terminating(AstNode *node);
 void check_stmt          (Checker *c, AstNode *node, u32 flags);
 void check_stmt_list     (Checker *c, AstNodeArray stmts, u32 flags);
-void check_type_decl     (Checker *c, Entity *e, AstNode *type_expr, Type *def, CycleChecker *cycle_checker);
-void check_const_decl    (Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr);
-void check_proc_decl     (Checker *c, Entity *e, DeclInfo *d);
-void check_var_decl      (Checker *c, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, AstNode *init_expr);
 
 // NOTE(bill): `content_name` is for debugging and error messages
 Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String context_name) {
@@ -103,56 +99,6 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 }
 
 
-
-void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type, CycleChecker *cycle_checker) {
-	if (e->type != NULL) {
-		return;
-	}
-
-	if (d == NULL) {
-		DeclInfo **found = map_decl_info_get(&c->info.entities, hash_pointer(e));
-		if (found) {
-			d = *found;
-		} else {
-			e->type = t_invalid;
-			set_base_type(named_type, t_invalid);
-			return;
-			// GB_PANIC("`%.*s` should been declared!", LIT(e->token.string));
-		}
-	}
-
-#if 0
-	if (e->kind == Entity_Procedure) {
-		check_proc_decl(c, e, d);
-		return;
-	}
-#endif
-	CheckerContext prev = c->context;
-	c->context.scope = d->scope;
-	c->context.decl  = d;
-
-	switch (e->kind) {
-	case Entity_Constant:
-		check_const_decl(c, e, d->type_expr, d->init_expr);
-		break;
-	case Entity_Variable:
-		check_var_decl(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr);
-		break;
-	case Entity_TypeName:
-		check_type_decl(c, e, d->type_expr, named_type, cycle_checker);
-		break;
-#if 1
-	case Entity_Procedure:
-		check_proc_decl(c, e, d);
-		break;
-#endif
-	}
-
-	c->context = prev;
-}
-
-
-
 void check_var_decl_node(Checker *c, AstNode *node) {
 	ast_node(vd, VarDecl, node);
 	isize entity_count = vd->names.count;
@@ -192,7 +138,7 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 
 	Type *init_type = NULL;
 	if (vd->type) {
-		init_type = check_type_extra(c, vd->type, NULL, NULL);
+		init_type = check_type_extra(c, vd->type, NULL);
 		if (init_type == NULL)
 			init_type = t_invalid;
 	}
@@ -292,7 +238,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 	check_init_constant(c, e, &operand);
 }
 
-void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, CycleChecker *cycle_checker) {
+void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
 	GB_ASSERT(e->type == NULL);
 	Type *named = make_type_named(c->allocator, e->token.string, NULL, e);
 	named->Named.type_name = e;
@@ -301,19 +247,13 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def, Cycle
 	}
 	e->type = named;
 
-	CycleChecker local_cycle_checker = {0};
-	if (cycle_checker == NULL) {
-		cycle_checker = &local_cycle_checker;
-	}
+	// gb_printf_err("%.*s %p\n", LIT(e->token.string), e);
 
-	Type *bt = check_type_extra(c, type_expr, named, cycle_checker_add(cycle_checker, e));
-	named->Named.base = bt;
-	named->Named.base = base_type(named->Named.base);
+	Type *bt = check_type_extra(c, type_expr, named);
+	named->Named.base = base_type(bt);
 	if (named->Named.base == t_invalid) {
 		// gb_printf("check_type_decl: %s\n", type_to_string(named));
 	}
-
-	cycle_checker_destroy(&local_cycle_checker);
 }
 
 
@@ -458,12 +398,14 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	}
 	e->flags |= EntityFlag_Visited;
 
-	if (type_expr != NULL)
-		e->type = check_type_extra(c, type_expr, NULL, NULL);
+	if (type_expr != NULL) {
+		e->type = check_type_extra(c, type_expr, NULL);
+	}
 
 	if (init_expr == NULL) {
-		if (type_expr == NULL)
+		if (type_expr == NULL) {
 			e->type = t_invalid;
+		}
 		return;
 	}
 
@@ -475,8 +417,9 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	}
 
 	if (type_expr != NULL) {
-		for (isize i = 0; i < entity_count; i++)
+		for (isize i = 0; i < entity_count; i++) {
 			entities[i]->type = e->type;
+		}
 	}
 
 	AstNodeArray inits;
@@ -484,6 +427,48 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	array_add(&inits, init_expr);
 	check_init_variables(c, entities, entity_count, inits, str_lit("variable declaration"));
 }
+
+
+void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
+	if (e->type != NULL) {
+		return;
+	}
+
+	if (d == NULL) {
+		DeclInfo **found = map_decl_info_get(&c->info.entities, hash_pointer(e));
+		if (found) {
+			d = *found;
+		} else {
+			e->type = t_invalid;
+			set_base_type(named_type, t_invalid);
+			return;
+			// GB_PANIC("`%.*s` should been declared!", LIT(e->token.string));
+		}
+	}
+
+	CheckerContext prev = c->context;
+	c->context.scope = d->scope;
+	c->context.decl  = d;
+
+	switch (e->kind) {
+	case Entity_Constant:
+		check_const_decl(c, e, d->type_expr, d->init_expr);
+		break;
+	case Entity_Variable:
+		check_var_decl(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr);
+		break;
+	case Entity_TypeName:
+		check_type_decl(c, e, d->type_expr, named_type);
+		break;
+	case Entity_Procedure:
+		check_proc_decl(c, e, d);
+		break;
+	}
+
+	c->context = prev;
+}
+
+
 
 void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body) {
 	GB_ASSERT(body->kind == AstNode_BlockStmt);

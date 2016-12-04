@@ -1102,7 +1102,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		d->proc_decl = node;
 
 		add_entity_and_decl_info(c, pd->name, e, d);
-		check_entity_decl(c, e, d, NULL, NULL);
+		check_entity_decl(c, e, d, NULL);
 	#endif
 	case_end;
 	}

@@ -2,20 +2,20 @@ void     check_expr                (Checker *c, Operand *operand, AstNode *expre
 void     check_multi_expr          (Checker *c, Operand *operand, AstNode *expression);
 void     check_expr_or_type        (Checker *c, Operand *operand, AstNode *expression);
 ExprKind check_expr_base           (Checker *c, Operand *operand, AstNode *expression, Type *type_hint);
-Type *   check_type_extra          (Checker *c, AstNode *expression, Type *named_type, CycleChecker *cycle_checker);
+Type *   check_type_extra          (Checker *c, AstNode *expression, Type *named_type);
 Type *   check_type                (Checker *c, AstNode *expression);
-void     check_type_decl           (Checker *c, Entity *e, AstNode *type_expr, Type *def, CycleChecker *cycle_checker);
+void     check_type_decl           (Checker *c, Entity *e, AstNode *type_expr, Type *def);
 Entity * check_selector            (Checker *c, Operand *operand, AstNode *node);
 void     check_not_tuple           (Checker *c, Operand *operand);
 bool     check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
 void     convert_to_typed          (Checker *c, Operand *operand, Type *target_type, i32 level);
 gbString expr_to_string            (AstNode *expression);
-void     check_entity_decl         (Checker *c, Entity *e, DeclInfo *decl, Type *named_type, CycleChecker *cycle_checker);
+void     check_entity_decl         (Checker *c, Entity *e, DeclInfo *decl, Type *named_type);
 void     check_proc_body           (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
 void     update_expr_type          (Checker *c, AstNode *e, Type *type, bool final);
 
 gb_inline Type *check_type(Checker *c, AstNode *expression) {
-	return check_type_extra(c, expression, NULL, NULL);
+	return check_type_extra(c, expression, NULL);
 }
 
 
@@ -225,13 +225,13 @@ void check_scope_decls(Checker *c, AstNodeArray nodes, isize reserve_size, Delay
 	for_array(i, delayed_entities) {
 		DelayedEntity delayed = delayed_entities.e[i];
 		if (delayed.entity->kind == Entity_TypeName) {
-			check_entity_decl(c, delayed.entity, delayed.decl, NULL, NULL);
+			check_entity_decl(c, delayed.entity, delayed.decl, NULL);
 		}
 	}
 	for_array(i, delayed_entities) {
 		DelayedEntity delayed = delayed_entities.e[i];
 		if (delayed.entity->kind == Entity_Constant) {
-			check_entity_decl(c, delayed.entity, delayed.decl, NULL, NULL);
+			check_entity_decl(c, delayed.entity, delayed.decl, NULL);
 		}
 	}
 
@@ -460,7 +460,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
                   Entity **fields, isize field_count,
                   Entity **other_fields, isize other_field_count,
-                  CycleChecker *cycle_checker, String context) {
+                  String context) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
 	MapEntity entity_map = {0};
@@ -486,7 +486,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 			}
 
 			ast_node(vd, VarDecl, decl);
-			Type *base_type = check_type_extra(c, vd->type, NULL, cycle_checker);
+			Type *base_type = check_type_extra(c, vd->type, NULL);
 
 			for_array(name_index, vd->names) {
 				AstNode *name = vd->names.e[name_index];
@@ -526,7 +526,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 			}
 			ast_node(vd, VarDecl, decl);
 
-			Type *type = check_type_extra(c, vd->type, NULL, cycle_checker);
+			Type *type = check_type_extra(c, vd->type, NULL);
 
 			if (vd->is_using) {
 				if (vd->names.count > 1) {
@@ -633,7 +633,7 @@ GB_COMPARE_PROC(cmp_struct_entity_size) {
 	return xa > ya ? -1 : xa < ya;
 }
 
-void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecker *cycle_checker) {
+void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
 
@@ -659,7 +659,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecke
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
 	Entity **other_fields = gb_alloc_array(c->allocator, Entity *, other_field_count);
 
-	check_fields(c, node, st->decls, fields, field_count, other_fields, other_field_count, cycle_checker, str_lit("struct"));
+	check_fields(c, node, st->decls, fields, field_count, other_fields, other_field_count, str_lit("struct"));
 
 	struct_type->Record.struct_is_packed    = st->is_packed;
 	struct_type->Record.struct_is_ordered   = st->is_ordered;
@@ -694,7 +694,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, CycleChecke
 	type_set_offsets(c->sizes, c->allocator, struct_type);
 }
 
-void check_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker *cycle_checker) {
+void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
 
@@ -720,7 +720,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker 
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
 	Entity **other_fields = gb_alloc_array(c->allocator, Entity *, other_field_count);
 
-	check_fields(c, node, ut->decls, fields, field_count, other_fields, other_field_count, cycle_checker, str_lit("union"));
+	check_fields(c, node, ut->decls, fields, field_count, other_fields, other_field_count, str_lit("union"));
 
 	union_type->Record.fields            = fields;
 	union_type->Record.field_count       = field_count;
@@ -728,7 +728,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker 
 	union_type->Record.other_field_count = other_field_count;
 }
 
-void check_raw_union_type(Checker *c, Type *union_type, AstNode *node, CycleChecker *cycle_checker) {
+void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_RawUnionType);
 	GB_ASSERT(is_type_raw_union(union_type));
 	ast_node(ut, RawUnionType, node);
@@ -755,7 +755,7 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node, CycleChec
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
 	Entity **other_fields = gb_alloc_array(c->allocator, Entity *, other_field_count);
 
-	check_fields(c, node, ut->decls, fields, field_count, other_fields, other_field_count, cycle_checker, str_lit("raw union"));
+	check_fields(c, node, ut->decls, fields, field_count, other_fields, other_field_count, str_lit("raw union"));
 
 	union_type->Record.fields = fields;
 	union_type->Record.field_count = field_count;
@@ -1017,7 +1017,7 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 }
 
 
-void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, CycleChecker *cycle_checker) {
+void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 	GB_ASSERT(n->kind == AstNode_Ident);
 	o->mode = Addressing_Invalid;
 	o->expr = n;
@@ -1037,13 +1037,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 	}
 	add_entity_use(c, n, e);
 
-	// CycleChecker local_cycle_checker = {0};
-	// if (cycle_checker == NULL) {
-	// 	cycle_checker = &local_cycle_checker;
-	// }
-	// defer (cycle_checker_destroy(&local_cycle_checker));
-
-	check_entity_decl(c, e, NULL, named_type, cycle_checker);
+	check_entity_decl(c, e, NULL, named_type);
 
 	if (e->type == NULL) {
 		compiler_error("Compiler error: How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(n->Ident.string));
@@ -1085,23 +1079,8 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Cycl
 
 	case Entity_TypeName: {
 		o->mode = Addressing_Type;
-#if 0
+#if 1
 	// TODO(bill): Fix cyclical dependancy checker
-		if (cycle_checker != NULL) {
-			for_array(i, cycle_checker->path) {
-				Entity *prev = cycle_checker->path[i];
-				if (prev == e) {
-					error(e->token, "Illegal declaration cycle for %.*s", LIT(e->token.string));
-					for (isize j = i; j < gb_array_count(cycle_checker->path); j++) {
-						Entity *ref = cycle_checker->path[j];
-						error(ref->token, "\t%.*s refers to", LIT(ref->token.string));
-					}
-					error(e->token, "\t%.*s", LIT(e->token.string));
-					type = t_invalid;
-					break;
-				}
-			}
-		}
 #endif
 	} break;
 
@@ -1161,7 +1140,7 @@ i64 check_array_count(Checker *c, AstNode *e) {
 	return 0;
 }
 
-Type *check_type_extra(Checker *c, AstNode *e, Type *named_type, CycleChecker *cycle_checker) {
+Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 	ExactValue null_value = {ExactValue_Invalid};
 	Type *type = NULL;
 	gbString err_str = NULL;
@@ -1169,7 +1148,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type, CycleChecker *c
 	switch (e->kind) {
 	case_ast_node(i, Ident, e);
 		Operand o = {0};
-		check_identifier(c, &o, e, named_type, cycle_checker);
+		check_identifier(c, &o, e, named_type);
 
 		switch (o.mode) {
 		case Addressing_Invalid:
@@ -1212,7 +1191,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type, CycleChecker *c
 	case_end;
 
 	case_ast_node(pe, ParenExpr, e);
-		type = check_type_extra(c, pe->expr, named_type, cycle_checker);
+		type = check_type_extra(c, pe->expr, named_type);
 		goto end;
 	case_end;
 
@@ -1240,7 +1219,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type, CycleChecker *c
 
 	case_ast_node(at, ArrayType, e);
 		if (at->count != NULL) {
-			Type *elem = check_type_extra(c, at->elem, NULL, cycle_checker);
+			Type *elem = check_type_extra(c, at->elem, NULL);
 			type = make_type_array(c->allocator, elem, check_array_count(c, at->count));
 		} else {
 			Type *elem = check_type(c, at->elem);
@@ -1266,7 +1245,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type, CycleChecker *c
 		type = make_type_struct(c->allocator);
 		set_base_type(named_type, type);
 		check_open_scope(c, e);
-		check_struct_type(c, type, e, cycle_checker);
+		check_struct_type(c, type, e);
 		check_close_scope(c);
 		type->Record.node = e;
 		goto end;
@@ -1276,7 +1255,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type, CycleChecker *c
 		type = make_type_union(c->allocator);
 		set_base_type(named_type, type);
 		check_open_scope(c, e);
-		check_union_type(c, type, e, cycle_checker);
+		check_union_type(c, type, e);
 		check_close_scope(c);
 		type->Record.node = e;
 		goto end;
@@ -1286,7 +1265,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type, CycleChecker *c
 		type = make_type_raw_union(c->allocator);
 		set_base_type(named_type, type);
 		check_open_scope(c, e);
-		check_raw_union_type(c, type, e, cycle_checker);
+		check_raw_union_type(c, type, e);
 		check_close_scope(c);
 		type->Record.node = e;
 		goto end;
@@ -1333,7 +1312,9 @@ end:
 
 	if (is_type_named(type)) {
 		if (type->Named.base == NULL) {
-			error_node(e, "Invalid type definition");
+			gbString name = type_to_string(type);
+			error_node(e, "Invalid type definition of %s", name);
+			gb_string_free(name);
 			type->Named.base = t_invalid;
 		}
 	}
@@ -1341,7 +1322,9 @@ end:
 	if (is_type_typed(type)) {
 		add_type_and_value(&c->info, e, Addressing_Type, type, null_value);
 	} else {
-		error_node(e, "Invalid type definition");
+		gbString name = type_to_string(type);
+		error_node(e, "Invalid type definition of %s", name);
+		gb_string_free(name);
 		type = t_invalid;
 	}
 	set_base_type(named_type, type);
@@ -2581,7 +2564,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 				goto error;
 			}
 			if (entity->type == NULL) { // Not setup yet
-				check_entity_decl(c, entity, NULL, NULL, NULL);
+				check_entity_decl(c, entity, NULL, NULL);
 			}
 			GB_ASSERT(entity->type != NULL);
 
@@ -3890,7 +3873,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case_end;
 
 	case_ast_node(i, Ident, node);
-		check_identifier(c, o, node, type_hint, NULL);
+		check_identifier(c, o, node, type_hint);
 	case_end;
 
 	case_ast_node(bl, BasicLit, node);

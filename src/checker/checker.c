@@ -269,31 +269,7 @@ typedef struct Checker {
 	bool                   done_preload;
 } Checker;
 
-typedef struct CycleChecker {
-	Array(Entity *) path; // Entity_TypeName
-} CycleChecker;
 
-
-
-
-CycleChecker *cycle_checker_add(CycleChecker *cc, Entity *e) {
-	if (cc == NULL) {
-		return NULL;
-	}
-	if (cc->path.e == NULL) {
-		array_init(&cc->path, heap_allocator());
-	}
-	if (e != NULL && e->kind == Entity_TypeName) {
-		array_add(&cc->path, e);
-	}
-	return cc;
-}
-
-void cycle_checker_destroy(CycleChecker *cc) {
-	if (cc != NULL && cc->path.e != NULL)  {
-		array_free(&cc->path);
-	}
-}
 
 
 void init_declaration_info(DeclInfo *d, Scope *scope) {
@@ -1095,7 +1071,7 @@ void check_all_global_entities(Checker *c) {
 
 		Scope *prev_scope = c->context.scope;
 		c->context.scope = d->scope;
-		check_entity_decl(c, e, d, NULL, NULL);
+		check_entity_decl(c, e, d, NULL);
 
 
 		if (d->scope->is_init && !c->done_preload) {
@@ -1486,6 +1462,14 @@ void check_parsed_files(Checker *c) {
 		Type *t = &basic_type_aliases[i];
 		if (t->Basic.size > 0) {
 			add_type_info_type(c, t);
+		}
+	}
+
+	for_array(i, c->info.definitions.entries) {
+		Entity *e = c->info.definitions.entries.e[i].value;
+		if (e->kind == Entity_TypeName) {
+			i64 align = type_align_of(c->sizes, c->allocator, e->type);
+			GB_ASSERT(align > 0);
 		}
 	}
 }

@@ -58,7 +58,7 @@ ExactValue make_exact_value_integer_from_string(String string) {
 	// TODO(bill): Allow for numbers with underscores in them
 	ExactValue result = {ExactValue_Integer};
 	i32 base = 10;
-	if (string.text[0] == '0') {
+	if (string.len > 2 && string.text[0] == '0') {
 		switch (string.text[1]) {
 		case 'b': base = 2;  break;
 		case 'o': base = 8;  break;

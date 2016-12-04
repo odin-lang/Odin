@@ -302,6 +302,9 @@ Type *base_type(Type *t) {
 		if (t == NULL || t->kind != Type_Named) {
 			break;
 		}
+		if (t == t->Named.base) {
+			return t_invalid;
+		}
 		t = t->Named.base;
 	}
 	return t;
@@ -1037,10 +1040,65 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 }
 
 
+typedef struct TypePath {
+	Array(Type *) path; // Entity_TypeName;
+	bool failure;
+} TypePath;
+
+void type_path_init(TypePath *tp) {
+	// TODO(bill): Use an allocator that uses a backing array if it can and then use alternative allocator when exhausted
+	array_init(&tp->path, heap_allocator());
+}
+
+void type_path_free(TypePath *tp) {
+	array_free(&tp->path);
+}
+
+TypePath *type_path_push(TypePath *tp, Type *t) {
+	GB_ASSERT(tp != NULL);
+
+	for_array(i, tp->path) {
+		if (tp->path.e[i] == t) {
+			// TODO(bill):
+			GB_ASSERT(is_type_named(t));
+			Entity *e = t->Named.type_name;
+			error(e->token, "Illegal declaration cycle of `%.*s`", LIT(t->Named.name));
+			// NOTE(bill): Print cycle, if it's deep enough
+			for (isize j = 0; j < tp->path.count; j++) {
+				Type *t = tp->path.e[j];
+				GB_ASSERT(is_type_named(t));
+				Entity *e = t->Named.type_name;
+				error(e->token, "\t%.*s refers to", LIT(t->Named.name));
+			}
+			// NOTE(bill): This will only print if the path count > 1
+			error(e->token, "\t%.*s", LIT(t->Named.name));
+			tp->failure = true;
+
+			// NOTE(bill): Just quit immediately
+			// TODO(bill): Try and solve this gracefully
+			gb_exit(1);
+		}
+	}
+
+	if (!tp->failure) {
+		array_add(&tp->path, t);
+	}
+	return tp;
+}
+
+void type_path_pop(TypePath *tp) {
+	if (tp != NULL) {
+		array_pop(&tp->path);
+	}
+}
+
+
 
 i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
 i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
 i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, i64 index);
+
+i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypePath *path);
 
 i64 align_formula(i64 size, i64 align) {
 	if (align > 0) {
@@ -1050,12 +1108,25 @@ i64 align_formula(i64 size, i64 align) {
 	return size;
 }
 
+
+
 i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
+	i64 align;
+	TypePath path = {0};
+	type_path_init(&path);
+	align = type_align_of_internal(s, allocator, t, &path);
+	type_path_free(&path);
+	return align;
+}
+
+#define FAILURE_ALIGNMENT (-1)
+
+i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypePath *path) {
 	t = base_type(t);
 
 	switch (t->kind) {
 	case Type_Array:
-		return type_align_of(s, allocator, t->Array.elem);
+		return type_align_of_internal(s, allocator, t->Array.elem, path);
 	case Type_Vector: {
 		i64 size = type_size_of(s, allocator, t->Vector.elem);
 		i64 count = gb_max(prev_pow2(t->Vector.count), 1);
@@ -1066,7 +1137,7 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	case Type_Tuple: {
 		i64 max = 1;
 		for (isize i = 0; i < t->Tuple.variable_count; i++) {
-			i64 align = type_align_of(s, allocator, t->Tuple.variables[i]->type);
+			i64 align = type_align_of_internal(s, allocator, t->Tuple.variables[i]->type, path);
 			if (max < align) {
 				max = align;
 			}
@@ -1075,7 +1146,7 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	} break;
 
 	case Type_Maybe:
-		return gb_max(type_align_of(s, allocator, t->Maybe.elem), type_align_of(s, allocator, t_bool));
+		return gb_max(type_align_of_internal(s, allocator, t->Maybe.elem, path), type_align_of_internal(s, allocator, t_bool, path));
 
 	case Type_Record: {
 		switch (t->Record.kind) {
@@ -1084,23 +1155,41 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 				// TODO(bill): What is this supposed to be?
 				if (t->Record.struct_is_packed) {
 					i64 max = s.word_size;
-					for (isize i = 1; i < t->Record.field_count; i++) {
-						// NOTE(bill): field zero is null
-						i64 align = type_align_of(s, allocator, t->Record.fields[i]->type);
+					for (isize i = 0; i < t->Record.field_count; i++) {
+						Type *field_type = t->Record.fields[i]->type;
+						type_path_push(path, field_type);
+						if (path->failure) {
+							return FAILURE_ALIGNMENT;
+						}
+						i64 align = type_align_of_internal(s, allocator, field_type, path);
+						type_path_pop(path);
 						if (max < align) {
 							max = align;
 						}
 					}
 					return max;
 				}
-				return type_align_of(s, allocator, t->Record.fields[0]->type);
+				Type *field_type = t->Record.fields[0]->type;
+				type_path_push(path, field_type);
+				if (path->failure) {
+					return FAILURE_ALIGNMENT;
+				}
+				i64 align = type_align_of_internal(s, allocator, field_type, path);
+				type_path_pop(path);
+				return align;
 			}
 			break;
 		case TypeRecord_Union: {
 			i64 max = 1;
+			// NOTE(bill): field zero is null
 			for (isize i = 1; i < t->Record.field_count; i++) {
-				// NOTE(bill): field zero is null
-				i64 align = type_align_of(s, allocator, t->Record.fields[i]->type);
+				Type *field_type = t->Record.fields[i]->type;
+				type_path_push(path, field_type);
+				if (path->failure) {
+					return FAILURE_ALIGNMENT;
+				}
+				i64 align = type_align_of_internal(s, allocator, field_type, path);
+				type_path_pop(path);
 				if (max < align) {
 					max = align;
 				}
@@ -1110,7 +1199,13 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		case TypeRecord_RawUnion: {
 			i64 max = 1;
 			for (isize i = 0; i < t->Record.field_count; i++) {
-				i64 align = type_align_of(s, allocator, t->Record.fields[i]->type);
+				Type *field_type = t->Record.fields[i]->type;
+				type_path_push(path, field_type);
+				if (path->failure) {
+					return FAILURE_ALIGNMENT;
+				}
+				i64 align = type_align_of_internal(s, allocator, field_type, path);
+				type_path_pop(path);
 				if (max < align) {
 					max = align;
 				}
@@ -1118,7 +1213,7 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 			return max;
 		} break;
 		case TypeRecord_Enum:
-			return type_align_of(s, allocator, t->Record.enum_base);
+			return type_align_of_internal(s, allocator, t->Record.enum_base, path);
 		}
 	} break;
 	}
@@ -1232,9 +1327,9 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 		if (count == 0) {
 			return 0;
 		}
+		i64 align = type_align_of(s, allocator, t);
 		type_set_offsets(s, allocator, t);
 		i64 size = t->Tuple.offsets[count-1] + type_size_of(s, allocator, t->Tuple.variables[count-1]->type);
-		i64 align = type_align_of(s, allocator, t);
 		return align_formula(size, align);
 	} break;
 
@@ -1245,14 +1340,15 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 			if (count == 0) {
 				return 0;
 			}
+			i64 align = type_align_of(s, allocator, t);
 			type_set_offsets(s, allocator, t);
 			i64 size = t->Record.struct_offsets[count-1] + type_size_of(s, allocator, t->Record.fields[count-1]->type);
-			i64 align = type_align_of(s, allocator, t);
 			return align_formula(size, align);
 		} break;
 
 		case TypeRecord_Union: {
 			i64 count = t->Record.field_count;
+			i64 align = type_align_of(s, allocator, t);
 			i64 max = 0;
 			// NOTE(bill): Zeroth field is invalid
 			for (isize i = 1; i < count; i++) {
@@ -1262,7 +1358,6 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 				}
 			}
 			// NOTE(bill): Align to int
-			i64 align = type_align_of(s, allocator, t);
 			isize size =  align_formula(max, s.word_size);
 			size += type_size_of(s, allocator, t_int);
 			return align_formula(size, align);
@@ -1270,6 +1365,7 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 
 		case TypeRecord_RawUnion: {
 			i64 count = t->Record.field_count;
+			i64 align = type_align_of(s, allocator, t);
 			i64 max = 0;
 			for (isize i = 0; i < count; i++) {
 				i64 size = type_size_of(s, allocator, t->Record.fields[i]->type);
@@ -1278,7 +1374,6 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 				}
 			}
 			// TODO(bill): Is this how it should work?
-			i64 align = type_align_of(s, allocator, t);
 			return align_formula(max, align);
 		} break;
 
