@@ -1158,26 +1158,6 @@ bool expect_semicolon_after_stmt(AstFile *f, AstNode *s) {
 	}
 
 	if (s != NULL) {
-		switch (s->kind) {
-		case AstNode_ProcDecl:
-		case AstNode_TypeDecl:
-			return true;
-		}
-	}
-
-	// if (f->curr_token.pos.line != f->prev_token.pos.line) {
-		// return true;
-	// }
-
-	if (f->curr_token.pos.line == f->prev_token.pos.line) {
-		switch (f->curr_token.kind) {
-		case Token_EOF:
-		case Token_CloseBrace:
-			return true;
-		}
-	}
-
-	if (s != NULL) {
 		syntax_error(f->prev_token, "Expected `;` after %.*s, got `%.*s`",
 		             LIT(ast_node_strings[s->kind]), LIT(token_strings[f->prev_token.kind]));
 	} else {
@@ -2222,10 +2202,14 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 			break;
 		}
 		// fallthrough
-	default:
+	default: {
+		String prev = str_lit("newline");
+		if (str_ne(f->prev_token.string, str_lit("\n"))) {
+			prev = f->prev_token.string;
+		}
 		syntax_error(f->curr_token,
-		             "Expected a type or identifier after `%.*s`, got `%.*s`", LIT(f->prev_token.string), LIT(f->curr_token.string));
-		break;
+		             "Expected a type or identifier after %.*s, got %.*s", LIT(prev), LIT(f->curr_token.string));
+	} break;
 	}
 
 	return NULL;

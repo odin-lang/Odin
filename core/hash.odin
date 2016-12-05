@@ -1,164 +1,164 @@
 crc32 :: proc(data: rawptr, len: int) -> u32 {
-	result := ~(0 as u32);
-	s := slice_ptr(data as ^u8, len);
+	result := ~(0 as u32)
+	s := slice_ptr(data as ^u8, len)
 	for i := 0; i < len; i++ {
-		b := s[i] as u32;
-		result = result>>8 ~ __CRC32_TABLE[(result ~ b) & 0xff];
+		b := s[i] as u32
+		result = result>>8 ~ __CRC32_TABLE[(result ~ b) & 0xff]
 	}
-	return ~result;
+	return ~result
 }
 crc64 :: proc(data: rawptr, len: int) -> u64 {
-	result := ~(0 as u64);
-	s := slice_ptr(data as ^u8, len);
+	result := ~(0 as u64)
+	s := slice_ptr(data as ^u8, len)
 	for i := 0; i < len; i++ {
-		b := s[i] as u64;
-		result = result>>8 ~ __CRC64_TABLE[(result ~ b) & 0xff];
+		b := s[i] as u64
+		result = result>>8 ~ __CRC64_TABLE[(result ~ b) & 0xff]
 	}
-	return ~result;
+	return ~result
 }
 
 fnv32 :: proc(data: rawptr, len: int) -> u32 {
-	s := slice_ptr(data as ^u8, len);
+	s := slice_ptr(data as ^u8, len)
 
-	h: u32 = 0x811c9dc5;
+	h: u32 = 0x811c9dc5
 	for i := 0; i < len; i++ {
-		h = (h * 0x01000193) ~ s[i] as u32;
+		h = (h * 0x01000193) ~ s[i] as u32
 	}
-	return h;
+	return h
 }
 
 fnv64 :: proc(data: rawptr, len: int) -> u64 {
-	s := slice_ptr(data as ^u8, len);
+	s := slice_ptr(data as ^u8, len)
 
-	h: u64 = 0xcbf29ce484222325;
+	h: u64 = 0xcbf29ce484222325
 	for i := 0; i < len; i++ {
-		h = (h * 0x100000001b3) ~ s[i] as u64;
+		h = (h * 0x100000001b3) ~ s[i] as u64
 	}
-	return h;
+	return h
 }
 
 fnv32a :: proc(data: rawptr, len: int) -> u32 {
-	s := slice_ptr(data as ^u8, len);
+	s := slice_ptr(data as ^u8, len)
 
-	h: u32 = 0x811c9dc5;
+	h: u32 = 0x811c9dc5
 	for i := 0; i < len; i++ {
-		h = (h ~ s[i] as u32) * 0x01000193;
+		h = (h ~ s[i] as u32) * 0x01000193
 	}
-	return h;
+	return h
 }
 
 fnv64a :: proc(data: rawptr, len: int) -> u64 {
-	s := slice_ptr(data as ^u8, len);
+	s := slice_ptr(data as ^u8, len)
 
-	h: u64 = 0xcbf29ce484222325;
+	h: u64 = 0xcbf29ce484222325
 	for i := 0; i < len; i++ {
-		h = (h ~ s[i] as u64) * 0x100000001b3;
+		h = (h ~ s[i] as u64) * 0x100000001b3
 	}
-	return h;
+	return h
 }
 
 
 murmur64 :: proc(data_: rawptr, len: int) -> u64 {
-	SEED :: 0x9747b28c;
+	SEED :: 0x9747b28c
 
 	if size_of(int) == 8 {
-		m :: 0xc6a4a7935bd1e995;
-		r :: 47;
+		m :: 0xc6a4a7935bd1e995
+		r :: 47
 
-		h: u64 = SEED ~ (len as u64 * m);
+		h: u64 = SEED ~ (len as u64 * m)
 
-		data := slice_ptr(data_ as ^u64, len/size_of(u64));
-		data2 := slice_ptr(data_ as ^u8, len);
+		data := slice_ptr(data_ as ^u64, len/size_of(u64))
+		data2 := slice_ptr(data_ as ^u8, len)
 
 		for i := 0; i < data.count; i++ {
-			k := data[i];
+			k := data[i]
 
-			k *= m;
-			k ~= k>>r;
-			k *= m;
+			k *= m
+			k ~= k>>r
+			k *= m
 
-			h ~= k;
-			h *= m;
+			h ~= k
+			h *= m
 		}
 
 		match len & 7 {
-		case 7: h ~= data2[6] as u64 << 48; fallthrough;
-		case 6: h ~= data2[5] as u64 << 40; fallthrough;
-		case 5: h ~= data2[4] as u64 << 32; fallthrough;
-		case 4: h ~= data2[3] as u64 << 24; fallthrough;
-		case 3: h ~= data2[2] as u64 << 16; fallthrough;
-		case 2: h ~= data2[1] as u64 << 8;  fallthrough;
+		case 7: h ~= data2[6] as u64 << 48; fallthrough
+		case 6: h ~= data2[5] as u64 << 40; fallthrough
+		case 5: h ~= data2[4] as u64 << 32; fallthrough
+		case 4: h ~= data2[3] as u64 << 24; fallthrough
+		case 3: h ~= data2[2] as u64 << 16; fallthrough
+		case 2: h ~= data2[1] as u64 << 8;  fallthrough
 		case 1:
-			h ~= data2[0] as u64;
-			h *= m;
+			h ~= data2[0] as u64
+			h *= m
 		}
 
-		h ~= h>>r;
-		h *= m;
-		h ~= h>>r;
+		h ~= h>>r
+		h *= m
+		h ~= h>>r
 
-		return h;
+		return h
 	} else {
-		m :: 0x5bd1e995;
-		r :: 24;
+		m :: 0x5bd1e995
+		r :: 24
 
-		h1: u32 = SEED as u32 ~ len as u32;
-		h2: u32 = SEED >> 32;
+		h1: u32 = SEED as u32 ~ len as u32
+		h2: u32 = SEED >> 32
 
-		data := slice_ptr(data_ as ^u32, len/size_of(u32));
+		data := slice_ptr(data_ as ^u32, len/size_of(u32))
 
-		i := 0;
+		i := 0
 		for len >= 8 {
-			k1, k2: u32;
-			k1 = data[i]; i++;
-			k1 *= m;
-			k1 ~= k1>>r;
-			k1 *= m;
-			h1 *= m;
-			h1 ~= k1;
-			len -= 4;
+			k1, k2: u32
+			k1 = data[i]; i++
+			k1 *= m
+			k1 ~= k1>>r
+			k1 *= m
+			h1 *= m
+			h1 ~= k1
+			len -= 4
 
-			k2 = data[i]; i++;
-			k2 *= m;
-			k2 ~= k2>>r;
-			k2 *= m;
-			h2 *= m;
-			h2 ~= k2;
-			len -= 4;
+			k2 = data[i]; i++
+			k2 *= m
+			k2 ~= k2>>r
+			k2 *= m
+			h2 *= m
+			h2 ~= k2
+			len -= 4
 		}
 
 		if (len >= 4) {
-			k1: u32;
-			k1 = data[i]; i++;
-			k1 *= m;
-			k1 ~= k1>>r;
-			k1 *= m;
-			h1 *= m;
-			h1 ~= k1;
-			len -= 4;
+			k1: u32
+			k1 = data[i]; i++
+			k1 *= m
+			k1 ~= k1>>r
+			k1 *= m
+			h1 *= m
+			h1 ~= k1
+			len -= 4
 		}
 
 		data8 := slice_ptr((data.data+i) as ^u8, 3); // NOTE(bill): This is unsafe
 
 		match len {
-		case 3: h2 ~= data8[2] as u32 << 16; fallthrough;
-		case 2: h2 ~= data8[1] as u32 << 8;  fallthrough;
+		case 3: h2 ~= data8[2] as u32 << 16; fallthrough
+		case 2: h2 ~= data8[1] as u32 << 8;  fallthrough
 		case 1:
-			h2 ~= data8[0] as u32;
-			h2 *= m;
+			h2 ~= data8[0] as u32
+			h2 *= m
 		}
 
-		h1 ~= h2>>18;
-		h1 *= m;
-		h2 ~= h1>>22;
-		h2 *= m;
-		h1 ~= h2>>17;
-		h1 *= m;
-		h2 ~= h1>>19;
-		h2 *= m;
+		h1 ~= h2>>18
+		h1 *= m
+		h2 ~= h1>>22
+		h2 *= m
+		h1 ~= h2>>17
+		h1 *= m
+		h2 ~= h1>>19
+		h2 *= m
 
-		h := (h1 as u64)<<32 | h2 as u64;
-		return h;
+		h := (h1 as u64)<<32 | h2 as u64
+		return h
 	}
 }
 
@@ -229,7 +229,7 @@ __CRC32_TABLE := [256]u32{
 	0xbad03605, 0xcdd70693, 0x54de5729, 0x23d967bf,
 	0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94,
 	0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d,
-};
+}
 __CRC64_TABLE := [256]u64{
 	0x0000000000000000, 0x42f0e1eba9ea3693, 0x85e1c3d753d46d26, 0xc711223cfa3e5bb5,
 	0x493366450e42ecdf, 0x0bc387aea7a8da4c, 0xccd2a5925d9681f9, 0x8e224479f47cb76a,
@@ -295,4 +295,4 @@ __CRC64_TABLE := [256]u64{
 	0xcf8b0890283e370c, 0x8d7be97b81d4019f, 0x4a6acb477bea5a2a, 0x089a2aacd2006cb9,
 	0x14dea25f3af9026d, 0x562e43b4931334fe, 0x913f6188692d6f4b, 0xd3cf8063c0c759d8,
 	0x5dedc41a34bbeeb2, 0x1f1d25f19d51d821, 0xd80c07cd676f8394, 0x9afce626ce85b507,
-};
+}
