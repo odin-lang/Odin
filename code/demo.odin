@@ -1,4 +1,3 @@
-// #import "game.odin";
 #import "fmt.odin";
 
 A :: type struct {
@@ -11,8 +10,9 @@ C :: type struct {
 	a: A;
 };
 
-
 main :: proc() {
-	fmt.println(123);
+	fmt.println(size_of(A));
+	fmt.println(size_of(B));
+	fmt.println(size_of(C));
 }
 

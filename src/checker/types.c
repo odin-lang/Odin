@@ -153,6 +153,7 @@ typedef struct Type {
 	TYPE_KINDS
 #undef TYPE_KIND
 	};
+	bool failure;
 } Type;
 
 // NOTE(bill): Internal sizes of certain types
@@ -1073,10 +1074,11 @@ TypePath *type_path_push(TypePath *tp, Type *t) {
 			// NOTE(bill): This will only print if the path count > 1
 			error(e->token, "\t%.*s", LIT(t->Named.name));
 			tp->failure = true;
+			t->failure = true;
 
 			// NOTE(bill): Just quit immediately
 			// TODO(bill): Try and solve this gracefully
-			gb_exit(1);
+			// gb_exit(1);
 		}
 	}
 
@@ -1113,12 +1115,12 @@ i64 align_formula(i64 size, i64 align) {
 }
 
 i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
-	i64 align;
+	i64 size;
 	TypePath path = {0};
 	type_path_init(&path);
-	align = type_size_of_internal(s, allocator, t, &path);
+	size = type_size_of_internal(s, allocator, t, &path);
 	type_path_free(&path);
-	return align;
+	return size;
 }
 
 i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
@@ -1132,6 +1134,9 @@ i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 
 
 i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypePath *path) {
+	if (t->failure) {
+		return FAILURE_ALIGNMENT;
+	}
 	t = base_type(t);
 
 	switch (t->kind) {
@@ -1297,6 +1302,9 @@ bool type_set_offsets(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 }
 
 i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypePath *path) {
+	if (t->failure) {
+		return FAILURE_SIZE;
+	}
 	t = base_type(t);
 	switch (t->kind) {
 	case Type_Basic: {
