@@ -668,10 +668,9 @@ bool tokenizer_find_line_end(Tokenizer *t) {
 }
 
 Token tokenizer_get_token(Tokenizer *t) {
-	Token token = {0};
-	Rune curr_rune;
-
 	tokenizer_skip_whitespace(t);
+
+	Token token = {0};
 	token.string = make_string(t->curr, 1);
 	token.pos.file = t->fullpath;
 	token.pos.line = t->line_count;
@@ -679,7 +678,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 	bool insert_semicolon = false;
 
-	curr_rune = t->curr_rune;
+	Rune curr_rune = t->curr_rune;
 	if (rune_is_letter(curr_rune)) {
 		token.kind = Token_Ident;
 		while (rune_is_letter(t->curr_rune) || rune_is_digit(t->curr_rune)) {

@@ -1046,9 +1046,17 @@ bool next_token(AstFile *f) {
 Token expect_token(AstFile *f, TokenKind kind) {
 	Token prev = f->curr_token;
 	if (prev.kind != kind) {
-		syntax_error(f->curr_token, "Expected `%.*s`, got `%.*s`",
-		             LIT(token_strings[kind]),
-		             LIT(token_strings[prev.kind]));
+		String p = token_strings[prev.kind];
+		if (prev.kind == Token_Semicolon &&
+		    str_eq(prev.string, str_lit("\n"))) {
+			syntax_error(f->curr_token, "Expected `%.*s`, got newline",
+			             LIT(token_strings[kind]),
+			             LIT(p));
+		} else {
+			syntax_error(f->curr_token, "Expected `%.*s`, got `%.*s`",
+			             LIT(token_strings[kind]),
+			             LIT(token_strings[prev.kind]));
+		}
 	}
 	next_token(f);
 	return prev;
@@ -1057,10 +1065,15 @@ Token expect_token(AstFile *f, TokenKind kind) {
 Token expect_token_after(AstFile *f, TokenKind kind, char *msg) {
 	Token prev = f->curr_token;
 	if (prev.kind != kind) {
+		String p = token_strings[prev.kind];
+		if (prev.kind == Token_Semicolon &&
+		    str_eq(prev.string, str_lit("\n"))) {
+			p = str_lit("newline");
+		}
 		syntax_error(f->curr_token, "Expected `%.*s` after %s, got `%.*s`",
 		             LIT(token_strings[kind]),
 		             msg,
-		             LIT(token_strings[prev.kind]));
+		             LIT(p));
 	}
 	next_token(f);
 	return prev;
@@ -1152,20 +1165,56 @@ void fix_advance_to_next_stmt(AstFile *f) {
 #endif
 }
 
-bool expect_semicolon_after_stmt(AstFile *f, AstNode *s) {
-	if (allow_token(f, Token_Semicolon)) {
-		return true;
+Token expect_closing(AstFile *f, TokenKind kind, String context) {
+	if (f->curr_token.kind != kind &&
+	    f->curr_token.kind == Token_Semicolon &&
+	    str_eq(f->curr_token.string, str_lit("\n"))) {
+		error(f->curr_token, "Missing `,` before newline in %.*s", LIT(context));
+		next_token(f);
+	}
+	return expect_token(f, kind);
+}
+
+void expect_semicolon(AstFile *f, AstNode *s) {
+	if (f->curr_token.kind != Token_CloseParen &&
+	    f->curr_token.kind != Token_CloseBrace) {
+		switch (f->curr_token.kind) {
+		case Token_Comma:
+			expect_token(f, Token_Semicolon);
+			/*fallthrough*/
+		case Token_Semicolon:
+			next_token(f);
+			break;
+		default:
+			expect_token(f, Token_Semicolon);
+			fix_advance_to_next_stmt(f);
+		}
 	}
 
-	if (s != NULL) {
-		syntax_error(f->prev_token, "Expected `;` after %.*s, got `%.*s`",
-		             LIT(ast_node_strings[s->kind]), LIT(token_strings[f->prev_token.kind]));
-	} else {
-		syntax_error(f->prev_token, "Expected `;`");
+	// if (s != NULL) {
+	// 	syntax_error(f->prev_token, "Expected `;` after %.*s, got `%.*s`",
+	// 	             LIT(ast_node_strings[s->kind]), LIT(token_strings[f->prev_token.kind]));
+	// } else {
+	// 	syntax_error(f->prev_token, "Expected `;`");
+	// }
+	// fix_advance_to_next_stmt(f);
+}
+
+bool parse_at_comma(AstFile *f, String context, TokenKind follow) {
+	if (f->curr_token.kind == Token_Comma) {
+		return true;
 	}
-	fix_advance_to_next_stmt(f);
+	if (f->curr_token.kind != follow) {
+		if (f->curr_token.kind == Token_Semicolon &&
+		    str_eq(f->curr_token.string, str_lit("\n"))) {
+			error(f->curr_token, "Missing `,` before new line in %.*s", LIT(context));
+		}
+		error(f->curr_token, "Missing `,` in %.*s", LIT(context));
+		return true;
+	}
 	return false;
 }
+
 
 
 AstNode *    parse_expr(AstFile *f, bool lhs);
@@ -1215,7 +1264,7 @@ AstNodeArray parse_element_list(AstFile *f) {
 
 		array_add(&elems, elem);
 
-		if (f->curr_token.kind != Token_Comma) {
+		if (!parse_at_comma(f, str_lit("compound literal"), Token_CloseBrace)) {
 			break;
 		}
 		next_token(f);
@@ -1232,14 +1281,15 @@ AstNode *parse_literal_value(AstFile *f, AstNode *type) {
 		elems = parse_element_list(f);
 	}
 	f->expr_level--;
-	Token close = expect_token(f, Token_CloseBrace);
+	Token close = expect_closing(f, Token_CloseBrace, str_lit("compound literal"));
 
 	return make_compound_lit(f, type, elems, open, close);
 }
 
 AstNode *parse_value(AstFile *f) {
-	if (f->curr_token.kind == Token_OpenBrace)
+	if (f->curr_token.kind == Token_OpenBrace) {
 		return parse_literal_value(f, NULL);
+	}
 
 	AstNode *value = parse_expr(f, false);
 	return value;
@@ -1546,16 +1596,14 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 		AstNode *arg = parse_expr(f, false);
 		array_add(&args, arg);
 
-		if (f->curr_token.kind != Token_Comma) {
-			if (f->curr_token.kind == Token_CloseParen)
-				break;
+		if (!parse_at_comma(f, str_lit("argument list"), Token_CloseParen)) {
+			break;
 		}
-
 		next_token(f);
 	}
 
 	f->expr_level--;
-	close_paren = expect_token(f, Token_CloseParen);
+	close_paren = expect_closing(f, Token_CloseParen, str_lit("argument list"));
 
 	return make_call_expr(f, operand, args, open_paren, close_paren, ellipsis);
 }
@@ -1961,7 +2009,7 @@ AstNodeArray parse_parameter_list(AstFile *f) {
 		}
 
 		array_add(&params, make_parameter(f, names, type, is_using));
-		if (f->curr_token.kind != Token_Comma) {
+		if (!parse_at_comma(f, str_lit("parameter list"), Token_CloseParen)) {
 			break;
 		}
 		next_token(f);
@@ -2402,7 +2450,6 @@ AstNode *parse_if_stmt(AstFile *f) {
 	isize prev_level = f->expr_level;
 	f->expr_level = -1;
 
-
 	if (allow_token(f, Token_Semicolon)) {
 		cond = parse_expr(f, false);
 	} else {
@@ -2436,6 +2483,8 @@ AstNode *parse_if_stmt(AstFile *f) {
 			else_stmt = make_bad_stmt(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
 			break;
 		}
+	} else {
+		expect_semicolon(f, body);
 	}
 
 	return make_if_stmt(f, token, init, cond, body, else_stmt);
@@ -2493,7 +2542,7 @@ AstNode *parse_return_stmt(AstFile *f) {
 		results = parse_rhs_expr_list(f);
 	}
 
-	expect_semicolon_after_stmt(f, results.e[0]);
+	expect_semicolon(f, results.e[0]);
 	return make_return_stmt(f, token, results);
 }
 
@@ -2717,7 +2766,7 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Xor:
 	case Token_Not:
 		s = parse_simple_stmt(f);
-		expect_semicolon_after_stmt(f, s);
+		expect_semicolon(f, s);
 		return s;
 
 	// TODO(bill): other keywords
@@ -2734,7 +2783,7 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_fallthrough:
 		next_token(f);
 		s = make_branch_stmt(f, token);
-		expect_semicolon_after_stmt(f, s);
+		expect_semicolon(f, s);
 		return s;
 
 
@@ -2805,7 +2854,7 @@ AstNode *parse_stmt(AstFile *f) {
 				syntax_error(token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope");
 				s = make_bad_decl(f, token, f->curr_token);
 			}
-			expect_semicolon_after_stmt(f, s);
+			expect_semicolon(f, s);
 			return s;
 		} else if (str_eq(tag, str_lit("foreign_system_library"))) {
 			AstNode *cond = NULL;
@@ -2821,7 +2870,7 @@ AstNode *parse_stmt(AstFile *f) {
 				syntax_error(token, "You cannot use #foreign_system_library within a procedure. This must be done at the file scope");
 				s = make_bad_decl(f, token, file_path);
 			}
-			expect_semicolon_after_stmt(f, s);
+			expect_semicolon(f, s);
 			return s;
 		} else if (str_eq(tag, str_lit("foreign_library"))) {
 			AstNode *cond = NULL;
@@ -2837,7 +2886,7 @@ AstNode *parse_stmt(AstFile *f) {
 				syntax_error(token, "You cannot use #foreign_library within a procedure. This must be done at the file scope");
 				s = make_bad_decl(f, token, file_path);
 			}
-			expect_semicolon_after_stmt(f, s);
+			expect_semicolon(f, s);
 			return s;
 		}  else if (str_eq(tag, str_lit("import"))) {
 			AstNode *cond = NULL;
@@ -2872,7 +2921,7 @@ AstNode *parse_stmt(AstFile *f) {
 				s = make_bad_decl(f, token, file_path);
 			} else {
 				s = make_import_decl(f, hash_token, file_path, import_name, cond, false);
-				expect_semicolon_after_stmt(f, s);
+				expect_semicolon(f, s);
 			}
 			return s;
 		} else if (str_eq(tag, str_lit("include"))) {
@@ -2891,7 +2940,7 @@ AstNode *parse_stmt(AstFile *f) {
 				syntax_error(token, "You cannot use #include within a procedure. This must be done at the file scope");
 				s = make_bad_decl(f, token, file_path);
 			}
-			expect_semicolon_after_stmt(f, s);
+			expect_semicolon(f, s);
 			return s;
 		} else if (str_eq(tag, str_lit("thread_local"))) {
 			AstNode *var_decl = parse_simple_stmt(f);
