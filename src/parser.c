@@ -1176,6 +1176,11 @@ Token expect_closing(AstFile *f, TokenKind kind, String context) {
 }
 
 void expect_semicolon(AstFile *f, AstNode *s) {
+	if (f->prev_token.kind == Token_CloseBrace ||
+	    f->prev_token.kind == Token_CloseBrace) {
+		return;
+	}
+
 	if (f->curr_token.kind != Token_CloseParen &&
 	    f->curr_token.kind != Token_CloseBrace) {
 		switch (f->curr_token.kind) {
@@ -3267,6 +3272,10 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 		ParseFileError err = init_ast_file(&file, import_path);
 
 		if (err != ParseFile_None) {
+			if (err == ParseFile_EmptyFile) {
+				return ParseFile_None;
+			}
+
 			if (pos.line != 0) {
 				gb_printf_err("%.*s(%td:%td) ", LIT(pos.file), pos.line, pos.column);
 			}
@@ -3277,9 +3286,6 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 				break;
 			case ParseFile_InvalidFile:
 				gb_printf_err("Invalid file");
-				break;
-			case ParseFile_EmptyFile:
-				gb_printf_err("File is empty");
 				break;
 			case ParseFile_Permission:
 				gb_printf_err("File permissions problem");

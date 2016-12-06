@@ -850,7 +850,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		if (f->value != NULL) {
 			check_expr(c, &o, f->value);
 			if (o.mode != Addressing_Constant) {
-				error_node(f->value, "Enumeration value must be a constant integer");
+				error_node(f->value, "Enumeration value must be a constant integer %d");
 				o.mode = Addressing_Invalid;
 			}
 			if (o.mode != Addressing_Invalid) {
@@ -1337,7 +1337,7 @@ end:
 
 bool check_unary_op(Checker *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
-	Type *type = base_type(base_vector_type(o->type));
+	Type *type = base_type(get_enum_base_type(base_vector_type(o->type)));
 	gbString str = NULL;
 	switch (op.kind) {
 	case Token_Add:
@@ -1373,7 +1373,7 @@ bool check_unary_op(Checker *c, Operand *o, Token op) {
 
 bool check_binary_op(Checker *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
-	Type *type = base_type(base_vector_type(o->type));
+	Type *type = base_type(get_enum_base_type(base_vector_type(o->type)));
 	switch (op.kind) {
 	case Token_Sub:
 	case Token_SubEq:
@@ -1449,6 +1449,8 @@ bool check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exa
 		// NOTE(bill): There's already been an error
 		return true;
 	}
+
+	type = get_enum_base_type(type);
 
 	if (is_type_boolean(type)) {
 		return in_value.kind == ExactValue_Bool;
@@ -1527,13 +1529,13 @@ bool check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exa
 }
 
 void check_is_expressible(Checker *c, Operand *o, Type *type) {
-	GB_ASSERT(type->kind == Type_Basic);
+	GB_ASSERT(is_type_constant_type(type));
 	GB_ASSERT(o->mode == Addressing_Constant);
 	if (!check_value_is_expressible(c, o->value, type, &o->value)) {
 		gbString a = expr_to_string(o->expr);
 		gbString b = type_to_string(type);
-		if (is_type_numeric(o->type) && is_type_numeric(type)) {
-			if (!is_type_integer(o->type) && is_type_integer(type)) {
+		if (is_type_numeric(get_enum_base_type(o->type)) && is_type_numeric(get_enum_base_type(type))) {
+			if (!is_type_integer(get_enum_base_type(o->type)) && is_type_integer(get_enum_base_type(type))) {
 				error_node(o->expr, "`%s` truncated to `%s`", a, b);
 			} else {
 				error_node(o->expr, "`%s = %lld` overflows `%s`", a, o->value.value_integer, b);
@@ -1624,7 +1626,7 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 
 	if (o->mode == Addressing_Constant) {
 		Type *type = base_type(o->type);
-		if (type->kind != Type_Basic) {
+		if (!is_type_constant_type(o->type)) {
 			gbString xt = type_to_string(o->type);
 			gbString err_str = expr_to_string(node);
 			error(op, "Invalid type, `%s`, for constant unary expression `%s`", xt, err_str);
@@ -2296,7 +2298,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			return;
 		}
 
-		if (type->kind != Type_Basic) {
+		if (!is_type_constant_type(type)) {
 			gbString xt = type_to_string(x->type);
 			gbString err_str = expr_to_string(node);
 			error(op, "Invalid type, `%s`, for constant binary expression `%s`", xt, err_str);
