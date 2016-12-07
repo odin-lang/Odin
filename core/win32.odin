@@ -110,8 +110,8 @@ WIN32_FILE_ATTRIBUTE_DATA :: struct #ordered {
 }
 
 GET_FILEEX_INFO_LEVELS :: type i32
-GetFileExInfoStandard : GET_FILEEX_INFO_LEVELS : 0
-GetFileExMaxInfoLevel : GET_FILEEX_INFO_LEVELS : 1
+GetFileExInfoStandard :: 0 as GET_FILEEX_INFO_LEVELS
+GetFileExMaxInfoLevel :: 1 as GET_FILEEX_INFO_LEVELS
 
 GetLastError     :: proc() -> i32                           #foreign #dll_import
 ExitProcess      :: proc(exit_code: u32)                    #foreign #dll_import
@@ -232,7 +232,7 @@ RGBQUAD :: struct #ordered {
 
 BI_RGB         :: 0
 DIB_RGB_COLORS :: 0x00
-SRCCOPY        : u32 : 0x00cc0020
+SRCCOPY        :: 0x00cc0020 as u32
 
 StretchDIBits :: proc(hdc: HDC,
                       x_dst, y_dst, width_dst, height_dst: i32,

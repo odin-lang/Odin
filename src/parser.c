@@ -102,9 +102,11 @@ AstNodeArray make_ast_node_array(AstFile *f) {
 		AstNode *expr; \
 	}) \
 	AST_NODE_KIND(ProcLit, "procedure literal", struct { \
-		AstNode *type; \
-		AstNode *body; \
-		u64 tags;      \
+		AstNode *type;         \
+		AstNode *body;         \
+		u64      tags;         \
+		String   foreign_name; \
+		String   link_name;    \
 	}) \
 	AST_NODE_KIND(CompoundLit, "compound literal", struct { \
 		AstNode *type; \
@@ -245,7 +247,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 			u64      tags;         \
 			String   foreign_name; \
 			String   link_name;    \
-			AstNode *note;          \
+			AstNode *note;         \
 	}) \
 	AST_NODE_KIND(TypeDecl,   "type declaration",   struct { \
 		Token token; \
@@ -277,6 +279,7 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		Token token;          \
 		AstNodeArray params;  \
 		AstNodeArray results; \
+		u64          tags;    \
 	}) \
 	AST_NODE_KIND(PointerType, "pointer type", struct { \
 		Token token; \
@@ -683,11 +686,13 @@ AstNode *make_ellipsis(AstFile *f, Token token, AstNode *expr) {
 }
 
 
-AstNode *make_proc_lit(AstFile *f, AstNode *type, AstNode *body, u64 tags) {
+AstNode *make_proc_lit(AstFile *f, AstNode *type, AstNode *body, u64 tags, String foreign_name, String link_name) {
 	AstNode *result = make_node(f, AstNode_ProcLit);
 	result->ProcLit.type = type;
 	result->ProcLit.body = body;
 	result->ProcLit.tags = tags;
+	result->ProcLit.foreign_name = foreign_name;
+	result->ProcLit.link_name = link_name;
 	return result;
 }
 
@@ -912,11 +917,12 @@ AstNode *make_parameter(AstFile *f, AstNodeArray names, AstNode *type, bool is_u
 	return result;
 }
 
-AstNode *make_proc_type(AstFile *f, Token token, AstNodeArray params, AstNodeArray results) {
+AstNode *make_proc_type(AstFile *f, Token token, AstNodeArray params, AstNodeArray results, u64 tags) {
 	AstNode *result = make_node(f, AstNode_ProcType);
 	result->ProcType.token = token;
 	result->ProcType.params = params;
 	result->ProcType.results = results;
+	result->ProcType.tags = tags;
 	return result;
 }
 
@@ -1300,7 +1306,7 @@ AstNode *parse_value(AstFile *f) {
 	return value;
 }
 
-AstNode *parse_identifier_or_type(AstFile *f, u32 flags);
+AstNode *parse_identifier_or_type(AstFile *f);
 
 
 void check_proc_add_tag(AstFile *f, AstNode *tag_expr, u64 *tags, ProcTag tag, String tag_name) {
@@ -1544,14 +1550,17 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			body = parse_body(f);
 			f->expr_level--;
 
-			type = make_proc_lit(f, type, body, tags);
+			type = make_proc_lit(f, type, body, tags, foreign_name, link_name);
+		} else if (type != NULL && type->kind == AstNode_ProcType) {
+			type->ProcType.tags = tags;
 		}
+
 		f->curr_proc = curr_proc;
 		return type;
 	}
 
 	default: {
-		AstNode *type = parse_identifier_or_type(f, 0);
+		AstNode *type = parse_identifier_or_type(f);
 		if (type != NULL) {
 			// NOTE(bill): Sanity check as identifiers should be handled already
 			GB_ASSERT_MSG(type->kind != AstNode_Ident, "Type Cannot be identifier");
@@ -1832,7 +1841,22 @@ AstNodeArray parse_rhs_expr_list(AstFile *f) {
 	return parse_expr_list(f, false);
 }
 
-AstNode *parse_decl(AstFile *f, AstNodeArray names);
+void parse_check_name_list_for_reserves(AstFile *f, AstNodeArray names) {
+	for_array(i, names) {
+		AstNode *name = names.e[i];
+		if (name->kind == AstNode_Ident) {
+			String n = name->Ident.string;
+			// NOTE(bill): Check for reserved identifiers
+			if (str_eq(n, str_lit("context"))) {
+				syntax_error_node(name, "`context` is a reserved identifier");
+				break;
+			}
+		}
+	}
+}
+
+AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name);
+
 
 AstNode *parse_simple_stmt(AstFile *f) {
 	isize lhs_count = 0, rhs_count = 0;
@@ -1870,8 +1894,83 @@ AstNode *parse_simple_stmt(AstFile *f) {
 		return make_assign_stmt(f, token, lhs, rhs);
 	} break;
 
-	case Token_Colon: // Declare
-		return parse_decl(f, lhs);
+	case Token_Colon: { // Declare
+		AstNodeArray names = lhs;
+		parse_check_name_list_for_reserves(f, names);
+
+		Token colon = expect_token(f, Token_Colon);
+		AstNode *type = parse_identifier_or_type(f);
+		AstNodeArray values = {0};
+
+		if (allow_token(f, Token_Eq)) {
+			values = parse_rhs_expr_list(f);
+			if (values.count > names.count) {
+				syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
+			} else if (values.count == 0) {
+				syntax_error(f->curr_token, "Expected an expression for this declaration");
+			}
+			if (type == NULL && values.count == 0) {
+				syntax_error(f->curr_token, "Missing variable type or initialization");
+				return make_bad_decl(f, f->curr_token, f->curr_token);
+			}
+		}
+
+		if (values.e == NULL) {
+			values = make_ast_node_array(f);
+		}
+
+		return make_var_decl(f, names, type, values);
+	} break;
+
+	case Token_ColonColon: {
+		AstNodeArray names = lhs;
+		parse_check_name_list_for_reserves(f, names);
+
+		Token colon_colon = expect_token(f, Token_ColonColon);
+
+		if (f->curr_token.kind == Token_type ||
+		    f->curr_token.kind == Token_struct ||
+		    f->curr_token.kind == Token_enum ||
+		    f->curr_token.kind == Token_union ||
+		    f->curr_token.kind == Token_raw_union) {
+			Token token = f->curr_token;
+			if (token.kind == Token_type) {
+				next_token(f);
+			}
+			if (names.count != 1) {
+				syntax_error_node(names.e[0], "You can only declare one type at a time");
+				return make_bad_decl(f, names.e[0]->Ident, token);
+			}
+
+			return make_type_decl(f, token, names.e[0], parse_type(f));
+		} else if (f->curr_token.kind == Token_proc) {
+		    // NOTE(bill): Procedure declarations
+			Token proc_token = f->curr_token;
+			AstNode *name = names.e[0];
+			if (names.count != 1) {
+				syntax_error(proc_token, "You can only declare one procedure at a time");
+				return make_bad_decl(f, name->Ident, proc_token);
+			}
+
+			return parse_proc_decl(f, proc_token, name);
+		}
+
+		AstNodeArray values = parse_rhs_expr_list(f);
+		if (values.count > names.count) {
+			syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
+		} else if (values.count < names.count) {
+			syntax_error(f->curr_token, "All constant declarations must be defined");
+		} else if (values.count == 0) {
+			syntax_error(f->curr_token, "Expected an expression for this declaration");
+		}
+
+		if (values.count == 0 && names.count > 0) {
+			syntax_error(f->curr_token, "Missing constant value");
+			return make_bad_decl(f, f->curr_token, f->curr_token);
+		}
+
+		return make_const_decl(f, names, NULL, values);
+	} break;
 	}
 
 	if (lhs_count > 1) {
@@ -1936,7 +2035,7 @@ AstNodeArray parse_identfier_list(AstFile *f) {
 
 
 AstNode *parse_type_attempt(AstFile *f) {
-	AstNode *type = parse_identifier_or_type(f, 0);
+	AstNode *type = parse_identifier_or_type(f);
 	if (type != NULL) {
 		// TODO(bill): Handle?
 	}
@@ -1963,7 +2062,7 @@ AstNode *parse_proc_type(AstFile *f) {
 
 	Token proc_token = parse_proc_signature(f, &params, &results);
 
-	return make_proc_type(f, proc_token, params, results);
+	return make_proc_type(f, proc_token, params, results, 0);
 }
 
 
@@ -2087,7 +2186,7 @@ AstNodeArray parse_record_params(AstFile *f, isize *decl_count_, bool using_allo
 	return decls;
 }
 
-AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
+AstNode *parse_identifier_or_type(AstFile *f) {
 	switch (f->curr_token.kind) {
 	case Token_Ident: {
 		AstNode *e = parse_identifier(f);
@@ -2103,6 +2202,10 @@ AstNode *parse_identifier_or_type(AstFile *f, u32 flags) {
 		}
 		return e;
 	}
+
+	case Token_type:
+		expect_token(f, Token_type);
+		return parse_identifier_or_type(f);
 
 	case Token_Pointer: {
 		Token token = expect_token(f, Token_Pointer);
@@ -2341,104 +2444,6 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 	f->curr_proc = curr_proc;
 	return make_proc_decl(f, name, proc_type, body, tags, foreign_name, link_name);
 }
-
-AstNode *parse_decl(AstFile *f, AstNodeArray names) {
-	AstNodeArray values = {0};
-	AstNode *type = NULL;
-
-	for_array(i, names) {
-		AstNode *name = names.e[i];
-		if (name->kind == AstNode_Ident) {
-			String n = name->Ident.string;
-			// NOTE(bill): Check for reserved identifiers
-			if (str_eq(n, str_lit("context"))) {
-				syntax_error_node(name, "`context` is a reserved identifier");
-				break;
-			}
-		}
-	}
-
-	if (allow_token(f, Token_Colon)) {
-		if (!allow_token(f, Token_type)) {
-			type = parse_identifier_or_type(f, 0);
-		}
-	} else if (f->curr_token.kind != Token_Eq && f->curr_token.kind != Token_Semicolon) {
-		syntax_error(f->curr_token, "Expected type separator `:` or `=`");
-	}
-
-	bool is_mutable = true;
-
-	if (f->curr_token.kind == Token_Eq || f->curr_token.kind == Token_Colon) {
-		if (f->curr_token.kind == Token_Colon) {
-			is_mutable = false;
-		}
-		next_token(f);
-
-		if (f->curr_token.kind == Token_type ||
-		    f->curr_token.kind == Token_struct ||
-		    f->curr_token.kind == Token_enum ||
-		    f->curr_token.kind == Token_union ||
-		    f->curr_token.kind == Token_raw_union) {
-			Token token = f->curr_token;
-			if (token.kind == Token_type) {
-				next_token(f);
-			}
-			if (names.count != 1) {
-				syntax_error_node(names.e[0], "You can only declare one type at a time");
-				return make_bad_decl(f, names.e[0]->Ident, token);
-			}
-
-			if (type != NULL) {
-				syntax_error(f->prev_token, "Expected either `type` or nothing between : and :");
-				// NOTE(bill): Do not fail though
-			}
-
-			return make_type_decl(f, token, names.e[0], parse_type(f));
-		} else if (f->curr_token.kind == Token_proc && is_mutable == false) {
-		    // NOTE(bill): Procedure declarations
-			Token proc_token = f->curr_token;
-			AstNode *name = names.e[0];
-			if (names.count != 1) {
-				syntax_error(proc_token, "You can only declare one procedure at a time");
-				return make_bad_decl(f, name->Ident, proc_token);
-			}
-
-			return parse_proc_decl(f, proc_token, name);
-
-		} else {
-			values = parse_rhs_expr_list(f);
-			if (values.count > names.count) {
-				syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
-			} else if (values.count < names.count && !is_mutable) {
-				syntax_error(f->curr_token, "All constant declarations must be defined");
-			} else if (values.count == 0) {
-				syntax_error(f->curr_token, "Expected an expression for this declaration");
-			}
-		}
-	}
-
-	if (is_mutable) {
-		if (type == NULL && values.count == 0) {
-			syntax_error(f->curr_token, "Missing variable type or initialization");
-			return make_bad_decl(f, f->curr_token, f->curr_token);
-		}
-	} else {
-		if (type == NULL && values.count == 0 && names.count > 0) {
-			syntax_error(f->curr_token, "Missing constant value");
-			return make_bad_decl(f, f->curr_token, f->curr_token);
-		}
-	}
-
-	if (values.e == NULL) {
-		values = make_ast_node_array(f);
-	}
-
-	if (is_mutable) {
-		return make_var_decl(f, names, type, values);
-	}
-	return make_const_decl(f, names, type, values);
-}
-
 
 AstNode *parse_if_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {

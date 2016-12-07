@@ -46,7 +46,7 @@ encode_rune :: proc(r_: rune) -> ([4]byte, int) {
 	r := r_
 	buf: [4]byte
 	i := r as u32
-	mask: byte : 0x3f
+	mask :: 0x3f as byte
 	if i <= 1<<7-1 {
 		buf[0] = r as byte
 		return buf, 1

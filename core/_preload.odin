@@ -13,7 +13,7 @@
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
 Type_Info :: union {
-	Member :: type struct #ordered {
+	Member :: struct #ordered {
 		name:      string;     // can be empty if tuple
 		type_info: ^Type_Info
 		offset:    int;        // offsets are not used in tuples
