@@ -139,8 +139,9 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 	Type *init_type = NULL;
 	if (vd->type) {
 		init_type = check_type_extra(c, vd->type, NULL);
-		if (init_type == NULL)
+		if (init_type == NULL) {
 			init_type = t_invalid;
+		}
 	}
 
 	for (isize i = 0; i < entity_count; i++) {
@@ -180,7 +181,9 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 
 	if (operand->mode != Addressing_Constant) {
 		// TODO(bill): better error
-		error_node(operand->expr, "`%.*s` is not a constant", LIT(ast_node_token(operand->expr).string));
+		gbString str = expr_to_string(operand->expr);
+		error_node(operand->expr, "`%s` is not a constant", str);
+		gb_string_free(str);
 		if (e->type == NULL) {
 			e->type = t_invalid;
 		}
@@ -306,7 +309,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	check_procedure_type(c, proc_type, pd->type);
 
 	bool is_foreign      = (pd->tags & ProcTag_foreign)   != 0;
-	bool is_link_name    = (pd->tags & ProcTag_link_name) != 0;
+	bool is_export  = (pd->tags & ProcTag_export) != 0;
 	bool is_inline       = (pd->tags & ProcTag_inline)    != 0;
 	bool is_no_inline    = (pd->tags & ProcTag_no_inline) != 0;
 
@@ -315,10 +318,9 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		if (proc_type != NULL) {
 			TypeProc *pt = &proc_type->Proc;
 			if (pt->param_count != 0 ||
-			    pt->result_count) {
+			    pt->result_count != 0) {
 				gbString str = type_to_string(proc_type);
-				error(e->token,
-				      "Procedure type of `main` was expected to be `proc()`, got %s", str);
+				error(e->token, "Procedure type of `main` was expected to be `proc()`, got %s", str);
 				gb_string_free(str);
 			}
 		}
@@ -328,8 +330,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		error_node(pd->type, "You cannot apply both `inline` and `no_inline` to a procedure");
 	}
 
-	if (is_foreign && is_link_name) {
-		error_node(pd->type, "You cannot apply both `foreign` and `link_name` to a procedure");
+	if (is_foreign && is_export) {
+		error_node(pd->type, "You cannot apply both `foreign` and `export_name` to a procedure");
 	}
 
 	if (pd->body != NULL) {
@@ -350,6 +352,10 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		if (proc_decl->foreign_name.len > 0) {
 			name = proc_decl->foreign_name;
 		}
+
+		e->Procedure.is_foreign = true;
+		e->Procedure.foreign_name = name;
+
 		HashKey key = hash_string(name);
 		Entity **found = map_entity_get(fp, key);
 		if (found) {
@@ -366,10 +372,12 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		} else {
 			map_entity_set(fp, key, e);
 		}
-	} else if (is_link_name) {
+	} else if (is_export) {
 		MapEntity *fp = &c->info.foreign_procs;
 		AstNodeProcDecl *proc_decl = &d->proc_decl->ProcDecl;
-		String name = proc_decl->link_name;
+		String name = proc_decl->export_name;
+
+		e->Procedure.export_name = name;
 
 		HashKey key = hash_string(name);
 		Entity **found = map_entity_get(fp, key);
@@ -377,7 +385,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			Entity *f = *found;
 			TokenPos pos = f->token.pos;
 			error_node(d->proc_decl,
-			           "Non unique #link_name for procedure `%.*s`\n"
+			           "Non unique #export name for procedure `%.*s`\n"
 			           "\tother at %.*s(%td:%td)",
 			           LIT(name), LIT(pos.file), pos.line, pos.column);
 		} else {

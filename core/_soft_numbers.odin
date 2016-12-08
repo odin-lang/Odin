@@ -1,5 +1,6 @@
 #shared_global_scope
 
+/*
 #import "fmt.odin"
 
 __u128_mod :: proc(a, b: u128) -> u128 #link_name "__umodti3" {
@@ -154,3 +155,4 @@ __u128_quo_mod :: proc(a, b: u128) -> (u128, u128) #link_name "__udivmodti4" {
 	q.all = (q.all << 1) | (carry as u128)
 	return q.all, r.all
 }
+*/

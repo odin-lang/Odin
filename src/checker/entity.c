@@ -59,7 +59,12 @@ struct Entity {
 			i32 field_src_index;
 		} Variable;
 		i32 TypeName;
-		i32 Procedure;
+		struct {
+			bool   is_foreign;
+			String foreign_name;
+			String export_name;
+			u64    tags;
+		} Procedure;
 		struct {
 			BuiltinProcId id;
 		} Builtin;
@@ -138,8 +143,9 @@ Entity *make_entity_vector_elem(gbAllocator a, Scope *scope, Token token, Type *
 	return entity;
 }
 
-Entity *make_entity_procedure(gbAllocator a, Scope *scope, Token token, Type *signature_type) {
+Entity *make_entity_procedure(gbAllocator a, Scope *scope, Token token, Type *signature_type, u64 tags) {
 	Entity *entity = alloc_entity(a, Entity_Procedure, scope, token, signature_type);
+	entity->Procedure.tags = tags;
 	return entity;
 }
 

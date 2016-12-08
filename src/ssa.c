@@ -17,6 +17,7 @@ typedef Array(ssaValue *) ssaValueArray;
 
 typedef struct ssaModule {
 	CheckerInfo * info;
+	BuildContext *build_context;
 	BaseTypeSizes sizes;
 	gbArena       arena;
 	gbArena       tmp_arena;
@@ -3188,11 +3189,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 				ssa_emit_store(proc, ssa_emit_struct_ep(proc, slice, 2), len);
 			}
 
-			if (args[0]->kind == ssaValue_Constant) {
-				ssaValueConstant *c = &args[0]->Constant;
-				gb_printf_err("%s %d\n", type_to_string(c->type), c->value.kind);
-			}
-
 			arg_count = type->param_count;
 			args[arg_count-1] = ssa_emit_load(proc, slice);
 		}
@@ -3934,8 +3930,8 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 			// parent.name-guid
 			String original_name = pd->name->Ident.string;
 			String pd_name = original_name;
-			if (pd->link_name.len > 0) {
-				pd_name = pd->link_name;
+			if (pd->export_name.len > 0) {
+				pd_name = pd->export_name;
 			}
 
 			isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
@@ -4676,7 +4672,7 @@ void ssa_module_add_value(ssaModule *m, Entity *e, ssaValue *v) {
 	map_ssa_value_set(&m->values, hash_pointer(e), v);
 }
 
-void ssa_init_module(ssaModule *m, Checker *c) {
+void ssa_init_module(ssaModule *m, Checker *c, BuildContext *build_context) {
 	// TODO(bill): Determine a decent size for the arena
 	isize token_count = c->parser->total_token_count;
 	isize arena_size = 4 * token_count * gb_size_of(ssaValue);
@@ -4686,6 +4682,7 @@ void ssa_init_module(ssaModule *m, Checker *c) {
 	m->tmp_allocator = gb_arena_allocator(&m->tmp_arena);
 	m->info = &c->info;
 	m->sizes = c->sizes;
+	m->build_context = build_context;
 
 	map_ssa_value_init(&m->values,  heap_allocator());
 	map_ssa_value_init(&m->members, heap_allocator());
@@ -4769,7 +4766,7 @@ void ssa_destroy_module(ssaModule *m) {
 ////////////////////////////////////////////////////////////////
 
 
-bool ssa_gen_init(ssaGen *s, Checker *c) {
+bool ssa_gen_init(ssaGen *s, Checker *c, BuildContext *build_context) {
 	if (global_error_collector.count != 0) {
 		return false;
 	}
@@ -4779,7 +4776,7 @@ bool ssa_gen_init(ssaGen *s, Checker *c) {
 		return false;
 	}
 
-	ssa_init_module(&s->module, c);
+	ssa_init_module(&s->module, c, build_context);
 	s->module.generate_debug_info = false;
 
 	// TODO(bill): generate appropriate output name
@@ -4870,6 +4867,7 @@ void ssa_gen_tree(ssaGen *s) {
 		} else if (e->kind == Entity_Procedure) {
 			if (e->scope->is_init && str_eq(name, str_lit("main"))) {
 				entry_point = e;
+				break;
 			}
 		}
 	}
@@ -4944,13 +4942,13 @@ void ssa_gen_tree(ssaGen *s) {
 			AstNodeProcDecl *pd = &decl->proc_decl->ProcDecl;
 			String original_name = name;
 			AstNode *body = pd->body;
-			if (pd->tags & ProcTag_foreign) {
-				name = pd->name->Ident.string;
+			if (e->Procedure.is_foreign) {
+				name = e->token.string; // NOTE(bill): Don't use the mangled name
 			}
 			if (pd->foreign_name.len > 0) {
 				name = pd->foreign_name;
-			} else if (pd->link_name.len > 0) {
-				name = pd->link_name;
+			} else if (pd->export_name.len > 0) {
+				name = pd->export_name;
 			}
 
 			ssaValue *p = ssa_make_value_procedure(a, m, e, e->type, decl->type_expr, body, name);
@@ -4968,8 +4966,9 @@ void ssa_gen_tree(ssaGen *s) {
 	for_array(i, m->members.entries) {
 		MapSsaValueEntry *entry = &m->members.entries.e[i];
 		ssaValue *v = entry->value;
-		if (v->kind == ssaValue_Proc)
+		if (v->kind == ssaValue_Proc) {
 			ssa_build_proc(v, NULL);
+		}
 	}
 
 	ssaDebugInfo *compile_unit = m->debug_info.entries.e[0].value;
@@ -5011,7 +5010,7 @@ void ssa_gen_tree(ssaGen *s) {
 		ssaValue *p = ssa_make_value_procedure(a, m, NULL, proc_type, NULL, body, name);
 		Token token = {0};
 		token.string = name;
-		Entity *e = make_entity_procedure(a, NULL, token, proc_type);
+		Entity *e = make_entity_procedure(a, NULL, token, proc_type, 0);
 
 		map_ssa_value_set(&m->values, hash_pointer(e), p);
 		map_ssa_value_set(&m->members, hash_string(name), p);
@@ -5103,8 +5102,8 @@ void ssa_gen_tree(ssaGen *s) {
 					case Basic_u32:
 					case Basic_i64:
 					case Basic_u64:
-					case Basic_i128:
-					case Basic_u128:
+					// case Basic_i128:
+					// case Basic_u128:
 					case Basic_int:
 					case Basic_uint: {
 						tag = ssa_add_local_generated(proc, t_type_info_integer);

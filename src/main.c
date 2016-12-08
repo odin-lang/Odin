@@ -16,7 +16,7 @@ extern "C" {
 // #include "vm.c"
 
 // NOTE(bill): `name` is used in debugging and profiling modes
-i32 win32_exec_command_line_app(char *name, char *fmt, ...) {
+i32 win32_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {0};
 	char cmd_line[4096] = {0};
@@ -29,8 +29,8 @@ i32 win32_exec_command_line_app(char *name, char *fmt, ...) {
 	start_info.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
 	start_info.wShowWindow = SW_SHOW;
 	start_info.hStdInput   = GetStdHandle(STD_INPUT_HANDLE);
-	start_info.hStdOutput  = GetStdHandle(STD_OUTPUT_HANDLE);
-	start_info.hStdError   = GetStdHandle(STD_ERROR_HANDLE);
+	start_info.hStdOutput  = is_silent ? NULL : GetStdHandle(STD_OUTPUT_HANDLE);
+	start_info.hStdError   = is_silent ? NULL : GetStdHandle(STD_ERROR_HANDLE);
 
 	va_start(va, fmt);
 	cmd_len = gb_snprintf_va(cmd_line, gb_size_of(cmd_line), fmt, va);
@@ -80,10 +80,10 @@ int main(int argc, char **argv) {
 	Timings timings = {0};
 	timings_init(&timings, str_lit("Total Time"), 128);
 	// defer (timings_destroy(&timings));
-
-#if 1
 	init_string_buffer_memory();
 	init_global_error_collector();
+
+#if 1
 
 	BuildContext build_context = {0};
 	init_build_context(&build_context);
@@ -94,9 +94,24 @@ int main(int argc, char **argv) {
 	bool run_output = false;
 	String arg1 = make_string_c(argv[1]);
 	if (str_eq(arg1, str_lit("run"))) {
-		run_output = true;
+		if (argc != 3) {
+			usage(argv[0]);
+			return 1;
+		}
 		init_filename = argv[2];
+		run_output = true;
+	} else if (str_eq(arg1, str_lit("build_dll"))) {
+		if (argc != 3) {
+			usage(argv[0]);
+			return 1;
+		}
+		init_filename = argv[2];
+		build_context.is_dll = true;
 	} else if (str_eq(arg1, str_lit("build"))) {
+		if (argc != 3) {
+			usage(argv[0]);
+			return 1;
+		}
 		init_filename = argv[2];
 	} else if (str_eq(arg1, str_lit("version"))) {
 		gb_printf("%s version %.*s", argv[0], LIT(build_context.ODIN_VERSION));
@@ -136,7 +151,7 @@ int main(int argc, char **argv) {
 #if 1
 
 	ssaGen ssa = {0};
-	if (!ssa_gen_init(&ssa, &checker)) {
+	if (!ssa_gen_init(&ssa, &checker, &build_context)) {
 		return 1;
 	}
 	// defer (ssa_gen_destroy(&ssa));
@@ -164,7 +179,7 @@ int main(int argc, char **argv) {
 
 	i32 exit_code = 0;
 	// For more passes arguments: http://llvm.org/docs/Passes.html
-	exit_code = win32_exec_command_line_app("llvm-opt",
+	exit_code = win32_exec_command_line_app("llvm-opt", false,
 		"%.*sbin/opt %s -o %.*s.bc "
 		"-mem2reg "
 		"-memcpyopt "
@@ -182,7 +197,7 @@ int main(int argc, char **argv) {
 	#if 1
 	timings_start_section(&timings, str_lit("llvm-llc"));
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
-	exit_code = win32_exec_command_line_app("llvm-llc",
+	exit_code = win32_exec_command_line_app("llvm-llc", false,
 		"%.*sbin/llc %.*s.bc -filetype=obj -O%d "
 		"%.*s "
 		// "-debug-pass=Arguments "
@@ -207,14 +222,24 @@ int main(int argc, char **argv) {
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);
 	}
 
-	exit_code = win32_exec_command_line_app("msvc-link",
-		"link %.*s.obj -OUT:%.*s.exe %s "
+	char *output_ext = "exe";
+	char *link_settings = "";
+	if (build_context.is_dll) {
+		output_ext = "dll";
+		link_settings = "/DLL";
+	}
+
+	exit_code = win32_exec_command_line_app("msvc-link", true,
+		"link %.*s.obj -OUT:%.*s.%s %s "
 		"/defaultlib:libcmt "
 		"/nologo /incremental:no /opt:ref /subsystem:console "
 		" %.*s "
+		" %s "
 		"",
-		LIT(output), LIT(output),
-		lib_str, LIT(build_context.link_flags));
+		LIT(output), LIT(output), output_ext,
+		lib_str, LIT(build_context.link_flags),
+		link_settings
+		);
 	if (exit_code != 0) {
 		return exit_code;
 	}
@@ -222,7 +247,7 @@ int main(int argc, char **argv) {
 	// timings_print_all(&timings);
 
 	if (run_output) {
-		win32_exec_command_line_app("odin run", "%.*s.exe", cast(int)base_name_len, output_name);
+		win32_exec_command_line_app("odin run", false, "%.*s.exe", cast(int)base_name_len, output_name);
 	}
 	#endif
 #endif

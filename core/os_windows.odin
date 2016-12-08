@@ -65,12 +65,13 @@ last_write_time :: proc(f: ^File) -> File_Time {
 last_write_time_by_name :: proc(name: string) -> File_Time {
 	last_write_time: win32.FILETIME
 	data: win32.WIN32_FILE_ATTRIBUTE_DATA
-
 	buf: [1024]byte
-	path := buf[:0]
-	fmt.bprint(^path, name, "\x00")
 
-	if win32.GetFileAttributesExA(path.data, win32.GetFileExInfoStandard, ^data) != 0 {
+	assert(buf.count > name.count)
+
+	copy(buf[:], name as []byte)
+
+	if win32.GetFileAttributesExA(^buf[0], win32.GetFileExInfoStandard, ^data) != 0 {
 		last_write_time = data.last_write_time
 	}
 

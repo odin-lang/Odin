@@ -292,9 +292,17 @@ bool decl_info_has_init(DeclInfo *d) {
 		return true;
 	}
 	if (d->proc_decl != NULL) {
-		ast_node(pd, ProcDecl, d->proc_decl);
-		if (pd->body != NULL) {
-			return true;
+		switch (d->proc_decl->kind) {
+		case_ast_node(pd, ProcDecl, d->proc_decl);
+			if (pd->body != NULL) {
+				return true;
+			}
+		case_end;
+		case_ast_node(pd, ProcLit, d->proc_decl);
+			if (pd->body != NULL) {
+				return true;
+			}
+		case_end;
 		}
 	}
 
@@ -949,12 +957,15 @@ MapEntity generate_minimum_dependency_map(CheckerInfo *info, Entity *start) {
 	MapEntity map = {0}; // Key: Entity *
 	map_entity_init(&map, heap_allocator());
 
-	for_array(i, info->entities.entries) {
-		MapDeclInfoEntry *entry = &info->entities.entries.e[i];
-		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
+	for_array(i, info->definitions.entries) {
+		Entity *e = info->definitions.entries.e[i].value;
 		if (e->scope->is_global) {
 			// NOTE(bill): Require runtime stuff
 			add_dependency_to_map(&map, info, e);
+		} else if (e->kind == Entity_Procedure) {
+			if ((e->Procedure.tags & ProcTag_export) != 0) {
+				add_dependency_to_map(&map, info, e);
+			}
 		}
 	}
 
@@ -1189,7 +1200,7 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 		case_ast_node(pd, ProcDecl, decl);
 			ast_node(n, Ident, pd->name);
 			Token token = *n;
-			Entity *e = make_entity_procedure(c->allocator, parent_scope, token, NULL);
+			Entity *e = make_entity_procedure(c->allocator, parent_scope, token, NULL, pd->tags);
 			e->identifier = pd->name;
 			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
 			d->proc_decl = decl;
@@ -1386,7 +1397,6 @@ void check_parsed_files(Checker *c) {
 
 	check_import_entities(c, &file_scopes);
 
-	map_scope_destroy(&file_scopes);
 
 	check_all_global_entities(c);
 	init_preload(c); // NOTE(bill): This could be setup previously through the use of `type_info(_of_val)`
@@ -1473,6 +1483,30 @@ void check_parsed_files(Checker *c) {
 			i64 align = type_align_of(c->sizes, c->allocator, e->type);
 		}
 	}
+
+	for_array(i, file_scopes.entries) {
+		Scope *s = file_scopes.entries.e[i].value;
+		if (s->is_init) {
+			Entity *e = current_scope_lookup_entity(s, str_lit("main"));
+			if (e == NULL) {
+				Token token = {0};
+				if (s->file->tokens.count > 0) {
+					token = s->file->tokens.e[0];
+				} else {
+					token.pos.file = s->file->tokenizer.fullpath;
+					token.pos.line = 1;
+					token.pos.column = 1;
+				}
+
+				error(token, "Undefined entry point procedure `main`");
+			}
+
+			break;
+		}
+	}
+
+	map_scope_destroy(&file_scopes);
+
 }
 
 

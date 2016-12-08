@@ -1095,7 +1095,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	#if 1
 		// NOTE(bill): This must be handled here so it has access to the parent scope stuff
 		// e.g. using
-		Entity *e = make_entity_procedure(c->allocator, c->context.scope, pd->name->Ident, NULL);
+		Entity *e = make_entity_procedure(c->allocator, c->context.scope, pd->name->Ident, NULL, pd->tags);
 		e->identifier = pd->name;
 
 		DeclInfo *d = make_declaration_info(c->allocator, e->scope);

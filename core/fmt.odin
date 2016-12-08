@@ -123,6 +123,7 @@ bprint_i64 :: proc(buffer: ^[]byte, value: i64) {
 	bprint_u64(buffer, i as u64)
 }
 
+/*
 bprint_u128 :: proc(buffer: ^[]byte, value: u128) {
 	a := value transmute [2]u64
 	if a[1] != 0 {
@@ -138,7 +139,7 @@ bprint_i128 :: proc(buffer: ^[]byte, value: i128) {
 	}
 	bprint_u128(buffer, i as u128)
 }
-
+*/
 
 
 print__f64 :: proc(buffer: ^[]byte, value: f64, decimal_places: int) {
@@ -353,8 +354,8 @@ bprint_any :: proc(buf: ^[]byte, arg: any) {
 		case u32:  bprint_u64(buf, i as u64)
 		case i64:  bprint_i64(buf, i)
 		case u64:  bprint_u64(buf, i)
-		case i128: bprint_i128(buf, i)
-		case u128: bprint_u128(buf, i)
+		// case i128: bprint_i128(buf, i)
+		// case u128: bprint_u128(buf, i)
 
 		case int:  bprint_i64(buf, i as i64)
 		case uint: bprint_u64(buf, i as u64)
@@ -484,7 +485,7 @@ bprint_any :: proc(buf: ^[]byte, arg: any) {
 		bprint_string(buf, "(raw_union)")
 	case Procedure:
 		bprint_type(buf, arg.type_info)
-		bprint_string(buf, " @ 0x")
+		bprint_string(buf, " @ ")
 		bprint_pointer(buf, (arg.data as ^rawptr)^)
 	}
 }

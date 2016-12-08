@@ -9,6 +9,7 @@ typedef struct BuildContext {
 	i64    max_align;
 	String llc_flags;
 	String link_flags;
+	bool   is_dll;
 } BuildContext;
 
 // TODO(bill): OS dependent versions for the BuildContext

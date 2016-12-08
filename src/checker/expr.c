@@ -22,8 +22,9 @@ gb_inline Type *check_type(Checker *c, AstNode *expression) {
 
 
 typedef struct DelayedEntity {
-	Entity *entity;
-	DeclInfo *decl;
+	AstNode *   ident;
+	Entity *    entity;
+	DeclInfo *  decl;
 } DelayedEntity;
 
 typedef struct DelayedOtherFields {
@@ -104,7 +105,7 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 
 				add_entity_and_decl_info(c, name, e, d);
 
-				DelayedEntity delay = {e, d};
+				DelayedEntity delay = {name, e, d};
 				array_add(delayed_entities, delay);
 			}
 
@@ -181,7 +182,7 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 
 			add_entity_and_decl_info(c, td->name, e, d);
 
-			DelayedEntity delay = {e, d};
+			DelayedEntity delay = {td->name, e, d};
 			array_add(delayed_entities, delay);
 
 
@@ -231,6 +232,7 @@ void check_scope_decls(Checker *c, AstNodeArray nodes, isize reserve_size, Delay
 	for_array(i, delayed_entities) {
 		DelayedEntity delayed = delayed_entities.e[i];
 		if (delayed.entity->kind == Entity_Constant) {
+			add_entity_and_decl_info(c, delayed.ident, delayed.entity, delayed.decl);
 			check_entity_decl(c, delayed.entity, delayed.decl, NULL);
 		}
 	}
@@ -1480,7 +1482,7 @@ bool check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exa
 		case Basic_i16:
 		case Basic_i32:
 		case Basic_i64:
-		case Basic_i128:
+		// case Basic_i128:
 		case Basic_int:
 			return gb_is_between(i, -imax, imax-1);
 
@@ -1488,7 +1490,7 @@ bool check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exa
 		case Basic_u16:
 		case Basic_u32:
 		case Basic_u64:
-		case Basic_u128:
+		// case Basic_u128:
 		case Basic_uint:
 			return !(u < 0 || u > umax);
 
