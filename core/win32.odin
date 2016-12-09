@@ -245,7 +245,7 @@ StretchDIBits :: proc(hdc: HDC,
 
 LoadLibraryA   :: proc(c_str: ^u8) -> HMODULE #foreign
 FreeLibrary    :: proc(h: HMODULE) #foreign
-GetProcAddress :: proc(h: HMODULE, c_str: ^u8) -> proc() #foreign
+GetProcAddress :: proc(h: HMODULE, c_str: ^u8) -> rawptr #foreign
 
 GetClientRect :: proc(hwnd: HWND, rect: ^RECT) -> BOOL #foreign
 

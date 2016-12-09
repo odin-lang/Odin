@@ -1880,6 +1880,10 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 	if (is_type_proc(xb) && is_type_rawptr(yb)) {
 		return true;
 	}
+	// rawptr -> proc
+	if (is_type_rawptr(xb) && is_type_proc(yb)) {
+		return true;
+	}
 
 	return false;
 }

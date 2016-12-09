@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
 	exit_code = win32_exec_command_line_app("msvc-link", true,
 		"link %.*s.obj -OUT:%.*s.%s %s "
 		"/defaultlib:libcmt "
-		"/nologo /incremental:no /opt:ref /subsystem:WINDOWS "
+		"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
 		" %.*s "
 		" %s "
 		"",
