@@ -127,9 +127,9 @@ void ssa_print_encoded_local(ssaFileBuffer *f, String name) {
 	ssa_print_escape_string(f, name, true);
 }
 
-void ssa_print_encoded_global(ssaFileBuffer *f, String name, bool global_scope) {
+void ssa_print_encoded_global(ssaFileBuffer *f, String name, bool remove_prefix) {
 	ssa_fprintf(f, "@");
-	if (!global_scope && str_ne(name, str_lit("main"))) {
+	if (!remove_prefix) {
 		ssa_fprintf(f, ".");
 	}
 	ssa_print_escape_string(f, name, true);
@@ -567,6 +567,20 @@ void ssa_print_block_name(ssaFileBuffer *f, ssaBlock *b) {
 	}
 }
 
+bool ssa_print_is_proc_global(ssaModule *m, ssaProcedure *proc) {
+	if (proc->entity != NULL &&
+	    proc->entity->kind == Entity_Procedure) {
+		if (m->entry_point_entity == proc->entity) {
+			// TODO(bill): This may not be needed during windows
+			return true;
+		}
+		if (proc->entity->Procedure.link_name.len > 0) {
+		    return true;
+		}
+	}
+	return (proc->tags & (ProcTag_foreign|ProcTag_export)) != 0;
+}
+
 void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type_hint) {
 	if (value == NULL) {
 		ssa_fprintf(f, "!!!NULL_VALUE");
@@ -623,7 +637,7 @@ void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type
 		ssa_print_encoded_local(f, value->Param.entity->token.string);
 		break;
 	case ssaValue_Proc:
-		ssa_print_encoded_global(f, value->Proc.name, (value->Proc.tags & (ProcTag_foreign|ProcTag_export)) != 0);
+		ssa_print_encoded_global(f, value->Proc.name, ssa_print_is_proc_global(m, &value->Proc));
 		break;
 	case ssaValue_Instr:
 		ssa_fprintf(f, "%%%d", value->index);
@@ -1229,10 +1243,11 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 	} else {
 		ssa_fprintf(f, "\n");
 		ssa_fprintf(f, "define ");
-		if (proc->tags & ProcTag_export) {
-			ssa_fprintf(f, "dllexport ");
-		} else if (proc->tags & ProcTag_dll_export) {
-			ssa_fprintf(f, "dllexport ");
+		if (m->build_context->is_dll) {
+			// if (proc->tags & (ProcTag_export|ProcTag_dll_export)) {
+			if (proc->tags & (ProcTag_export)) {
+				ssa_fprintf(f, "dllexport ");
+			}
 		}
 	}
 
@@ -1251,7 +1266,7 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 	}
 
 	ssa_fprintf(f, " ");
-	ssa_print_encoded_global(f, proc->name, (proc->tags & (ProcTag_foreign|ProcTag_export)) != 0);
+	ssa_print_encoded_global(f, proc->name, ssa_print_is_proc_global(m, proc));
 	ssa_fprintf(f, "(");
 
 	if (proc_type->param_count > 0) {
@@ -1263,7 +1278,10 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 			}
 			ssa_print_type(f, m, e->type);
 			if (proc->body != NULL) {
-				ssa_fprintf(f, " %%%.*s", LIT(e->token.string));
+				if (!str_eq(e->token.string, str_lit("")) &&
+				    !str_eq(e->token.string, str_lit("_"))) {
+					ssa_fprintf(f, " %%%.*s", LIT(e->token.string));
+				}
 			}
 		}
 	}
@@ -1369,12 +1387,6 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 			continue;
 		}
 
-#if defined(GB_SYSTEM_WINDOWS)
-		if (str_eq(v->Proc.name, str_lit("DllMain"))) {
-			dll_main_found = true;
-		}
-#endif
-
 		if (v->Proc.body == NULL) {
 			ssa_print_proc(f, m, &v->Proc);
 		}
@@ -1387,33 +1399,10 @@ void ssa_print_llvm_ir(ssaGen *ssa) {
 			continue;
 		}
 
-#if defined(GB_SYSTEM_WINDOWS)
-		if (str_eq(v->Proc.name, str_lit("DllMain"))) {
-			dll_main_found = true;
-		}
-#endif
-
 		if (v->Proc.body != NULL) {
 			ssa_print_proc(f, m, &v->Proc);
 		}
 	}
-
-	if (m->build_context->is_dll) {
-#if !defined(GB_SYSTEM_WINDOWS)
-#error Setup dll initialization on linux if appropriate
-#else
-		if (!dll_main_found) {
-			ssa_fprintf(f,
-			"define i32 @DllMain(%%..rawptr %%inst, i32 %%reason, %%..rawptr %%reserved) {\n"
-			"entry:\n"
-			"	call void @main()\n"
-			"	ret i32 1\n"
-			"}\n"
-			);
-		}
-#endif
-	}
-
 
 	for_array(member_index, m->members.entries) {
 		MapSsaValueEntry *entry = &m->members.entries.e[member_index];

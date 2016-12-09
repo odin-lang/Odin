@@ -309,7 +309,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	check_procedure_type(c, proc_type, pd->type);
 
 	bool is_foreign      = (pd->tags & ProcTag_foreign)   != 0;
-	bool is_export  = (pd->tags & ProcTag_export) != 0;
+	bool is_link_name    = (pd->tags & ProcTag_link_name) != 0;
+	bool is_export       = (pd->tags & ProcTag_export)    != 0;
 	bool is_inline       = (pd->tags & ProcTag_inline)    != 0;
 	bool is_no_inline    = (pd->tags & ProcTag_no_inline) != 0;
 
@@ -330,9 +331,12 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		error_node(pd->type, "You cannot apply both `inline` and `no_inline` to a procedure");
 	}
 
-	if (is_foreign && is_export) {
-		error_node(pd->type, "You cannot apply both `foreign` and `export_name` to a procedure");
+	if (is_foreign && is_link_name) {
+		error_node(pd->type, "You cannot apply both `foreign` and `link_name` to a procedure");
+	} else if (is_foreign && is_export) {
+		error_node(pd->type, "You cannot apply both `foreign` and `export` to a procedure");
 	}
+
 
 	if (pd->body != NULL) {
 		if (is_foreign) {
@@ -372,24 +376,31 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		} else {
 			map_entity_set(fp, key, e);
 		}
-	} else if (is_export) {
-		MapEntity *fp = &c->info.foreign_procs;
-		AstNodeProcDecl *proc_decl = &d->proc_decl->ProcDecl;
-		String name = proc_decl->export_name;
+	} else {
+		String name = e->token.string;
+		if (is_link_name) {
+			AstNodeProcDecl *proc_decl = &d->proc_decl->ProcDecl;
+			name = proc_decl->link_name;
+		}
 
-		e->Procedure.export_name = name;
+		if (is_link_name || is_export) {
+			MapEntity *fp = &c->info.foreign_procs;
 
-		HashKey key = hash_string(name);
-		Entity **found = map_entity_get(fp, key);
-		if (found) {
-			Entity *f = *found;
-			TokenPos pos = f->token.pos;
-			error_node(d->proc_decl,
-			           "Non unique #export name for procedure `%.*s`\n"
-			           "\tother at %.*s(%td:%td)",
-			           LIT(name), LIT(pos.file), pos.line, pos.column);
-		} else {
-			map_entity_set(fp, key, e);
+			e->Procedure.link_name = name;
+
+			HashKey key = hash_string(name);
+			Entity **found = map_entity_get(fp, key);
+			if (found) {
+				Entity *f = *found;
+				TokenPos pos = f->token.pos;
+				// TODO(bill): Better error message?
+				error_node(d->proc_decl,
+				           "Non unique linking name for procedure `%.*s`\n"
+				           "\tother at %.*s(%td:%td)",
+				           LIT(name), LIT(pos.file), pos.line, pos.column);
+			} else {
+				map_entity_set(fp, key, e);
+			}
 		}
 	}
 

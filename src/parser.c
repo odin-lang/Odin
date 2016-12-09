@@ -66,10 +66,11 @@ typedef enum ProcTag {
 
 	ProcTag_foreign         = GB_BIT(10),
 	ProcTag_export          = GB_BIT(11),
-	ProcTag_inline          = GB_BIT(12),
-	ProcTag_no_inline       = GB_BIT(13),
-	ProcTag_dll_import      = GB_BIT(14),
-	ProcTag_dll_export      = GB_BIT(15),
+	ProcTag_link_name       = GB_BIT(12),
+	ProcTag_inline          = GB_BIT(13),
+	ProcTag_no_inline       = GB_BIT(14),
+	ProcTag_dll_import      = GB_BIT(15),
+	// ProcTag_dll_export      = GB_BIT(16),
 
 	ProcTag_stdcall         = GB_BIT(20),
 	ProcTag_fastcall        = GB_BIT(21),
@@ -106,7 +107,7 @@ AstNodeArray make_ast_node_array(AstFile *f) {
 		AstNode *body;         \
 		u64      tags;         \
 		String   foreign_name; \
-		String   export_name;    \
+		String   link_name;    \
 	}) \
 	AST_NODE_KIND(CompoundLit, "compound literal", struct { \
 		AstNode *type; \
@@ -246,7 +247,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 			AstNode *body;         \
 			u64      tags;         \
 			String   foreign_name; \
-			String   export_name;    \
+			String   link_name;    \
 			AstNode *note;         \
 	}) \
 	AST_NODE_KIND(TypeDecl,   "type declaration",   struct { \
@@ -686,13 +687,13 @@ AstNode *make_ellipsis(AstFile *f, Token token, AstNode *expr) {
 }
 
 
-AstNode *make_proc_lit(AstFile *f, AstNode *type, AstNode *body, u64 tags, String foreign_name, String export_name) {
+AstNode *make_proc_lit(AstFile *f, AstNode *type, AstNode *body, u64 tags, String foreign_name, String link_name) {
 	AstNode *result = make_node(f, AstNode_ProcLit);
 	result->ProcLit.type = type;
 	result->ProcLit.body = body;
 	result->ProcLit.tags = tags;
 	result->ProcLit.foreign_name = foreign_name;
-	result->ProcLit.export_name = export_name;
+	result->ProcLit.link_name = link_name;
 	return result;
 }
 
@@ -926,14 +927,14 @@ AstNode *make_proc_type(AstFile *f, Token token, AstNodeArray params, AstNodeArr
 	return result;
 }
 
-AstNode *make_proc_decl(AstFile *f, AstNode *name, AstNode *proc_type, AstNode *body, u64 tags, String foreign_name, String export_name) {
+AstNode *make_proc_decl(AstFile *f, AstNode *name, AstNode *proc_type, AstNode *body, u64 tags, String foreign_name, String link_name) {
 	AstNode *result = make_node(f, AstNode_ProcDecl);
 	result->ProcDecl.name = name;
 	result->ProcDecl.type = proc_type;
 	result->ProcDecl.body = body;
 	result->ProcDecl.tags = tags;
 	result->ProcDecl.foreign_name = foreign_name;
-	result->ProcDecl.export_name = export_name;
+	result->ProcDecl.link_name = link_name;
 	return result;
 }
 
@@ -1364,10 +1365,10 @@ bool is_foreign_name_valid(String name) {
 	return true;
 }
 
-void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *export_name) {
+void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_name) {
 	// TODO(bill): Add this to procedure literals too
 	GB_ASSERT(foreign_name != NULL);
-	GB_ASSERT(export_name    != NULL);
+	GB_ASSERT(link_name    != NULL);
 
 	while (f->curr_token.kind == Token_Hash) {
 		AstNode *tag_expr = parse_tag_expr(f, NULL);
@@ -1390,13 +1391,13 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *export
 
 				next_token(f);
 			}
-		} else if (str_eq(tag_name, str_lit("export"))) {
-			check_proc_add_tag(f, tag_expr, tags, ProcTag_export, tag_name);
+		} else if (str_eq(tag_name, str_lit("link_name"))) {
+			check_proc_add_tag(f, tag_expr, tags, ProcTag_link_name, tag_name);
 			if (f->curr_token.kind == Token_String) {
-				*export_name = f->curr_token.string;
+				*link_name = f->curr_token.string;
 				// TODO(bill): Check if valid string
-				if (!is_foreign_name_valid(*export_name)) {
-					syntax_error_node(tag_expr, "Invalid alternative link procedure name `%.*s`", LIT(*export_name));
+				if (!is_foreign_name_valid(*link_name)) {
+					syntax_error_node(tag_expr, "Invalid alternative link procedure name `%.*s`", LIT(*link_name));
 				}
 
 				next_token(f);
@@ -1404,12 +1405,13 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *export
 				expect_token(f, Token_String);
 			}
 		}
+		ELSE_IF_ADD_TAG(export)
 		ELSE_IF_ADD_TAG(bounds_check)
 		ELSE_IF_ADD_TAG(no_bounds_check)
 		ELSE_IF_ADD_TAG(inline)
 		ELSE_IF_ADD_TAG(no_inline)
 		ELSE_IF_ADD_TAG(dll_import)
-		ELSE_IF_ADD_TAG(dll_export)
+		// ELSE_IF_ADD_TAG(dll_export)
 		ELSE_IF_ADD_TAG(stdcall)
 		ELSE_IF_ADD_TAG(fastcall)
 		// ELSE_IF_ADD_TAG(cdecl)
@@ -1534,8 +1536,8 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 		u64 tags = 0;
 		String foreign_name = {0};
-		String export_name = {0};
-		parse_proc_tags(f, &tags, &foreign_name, &export_name);
+		String link_name = {0};
+		parse_proc_tags(f, &tags, &foreign_name, &link_name);
 		if (tags & ProcTag_foreign) {
 			syntax_error(f->curr_token, "#foreign cannot be applied to procedure literals");
 		}
@@ -1551,7 +1553,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			}
 
 			body = parse_body(f);
-			type = make_proc_lit(f, type, body, tags, foreign_name, export_name);
+			type = make_proc_lit(f, type, body, tags, foreign_name, link_name);
 		} else if (type != NULL && type->kind == AstNode_ProcType) {
 			type->ProcType.tags = tags;
 		}
@@ -2426,9 +2428,9 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 	AstNode *body = NULL;
 	u64 tags = 0;
 	String foreign_name = {0};
-	String export_name = {0};
+	String link_name = {0};
 
-	parse_proc_tags(f, &tags, &foreign_name, &export_name);
+	parse_proc_tags(f, &tags, &foreign_name, &link_name);
 
 	AstNode *curr_proc = f->curr_proc;
 	f->curr_proc = proc_type;
@@ -2443,7 +2445,7 @@ AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
 	}
 
 	f->curr_proc = curr_proc;
-	return make_proc_decl(f, name, proc_type, body, tags, foreign_name, export_name);
+	return make_proc_decl(f, name, proc_type, body, tags, foreign_name, link_name);
 }
 
 AstNode *parse_if_stmt(AstFile *f) {

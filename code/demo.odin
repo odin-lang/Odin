@@ -18,6 +18,7 @@ main :: proc() {
 	}
 	defer win32.FreeLibrary(lib)
 
+
 	proc_handle := get_proc(lib, "some_thing")
 	if proc_handle == nil {
 		fmt.println("Could not load 'some_thing'")
@@ -25,5 +26,6 @@ main :: proc() {
 	}
 
 	some_thing := (proc_handle as proc())
+	fmt.println(some_thing)
 	some_thing()
 }

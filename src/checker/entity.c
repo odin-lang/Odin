@@ -62,7 +62,7 @@ struct Entity {
 		struct {
 			bool   is_foreign;
 			String foreign_name;
-			String export_name;
+			String link_name;
 			u64    tags;
 		} Procedure;
 		struct {

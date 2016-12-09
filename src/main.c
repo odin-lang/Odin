@@ -29,8 +29,8 @@ i32 win32_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	start_info.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
 	start_info.wShowWindow = SW_SHOW;
 	start_info.hStdInput   = GetStdHandle(STD_INPUT_HANDLE);
-	start_info.hStdOutput  = is_silent ? NULL : GetStdHandle(STD_OUTPUT_HANDLE);
-	start_info.hStdError   = is_silent ? NULL : GetStdHandle(STD_ERROR_HANDLE);
+	start_info.hStdOutput  = GetStdHandle(STD_OUTPUT_HANDLE);
+	start_info.hStdError   = GetStdHandle(STD_ERROR_HANDLE);
 
 	va_start(va, fmt);
 	cmd_len = gb_snprintf_va(cmd_line, gb_size_of(cmd_line), fmt, va);
@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
 	exit_code = win32_exec_command_line_app("msvc-link", true,
 		"link %.*s.obj -OUT:%.*s.%s %s "
 		"/defaultlib:libcmt "
-		"/nologo /incremental:no /opt:ref /subsystem:console "
+		"/nologo /incremental:no /opt:ref /subsystem:WINDOWS "
 		" %.*s "
 		" %s "
 		"",

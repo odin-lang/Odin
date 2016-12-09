@@ -48,8 +48,8 @@ rem pushd %build_dir%
 
 	cl %compiler_settings% "src\main.c" ^
 		/link %linker_settings% -OUT:%exe_name% ^
+	&& odin build_dll code/example.odin ^
 	&& odin run code/demo.odin
-	rem && odin build_dll code/example.odin ^
 	rem && odin run code/demo.odin
 
 

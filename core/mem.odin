@@ -1,7 +1,7 @@
 #import "fmt.odin"
 #import "os.odin"
 
-set :: proc(data: rawptr, value: i32, len: int) -> rawptr #export "__mem_set" {
+set :: proc(data: rawptr, value: i32, len: int) -> rawptr #link_name "__mem_set" {
 	llvm_memset_64bit :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) #foreign "llvm.memset.p0i8.i64"
 	llvm_memset_64bit(data, value as byte, len, 1, false)
 	return data
@@ -11,14 +11,14 @@ zero :: proc(data: rawptr, len: int) -> rawptr {
 	return set(data, 0, len)
 }
 
-copy :: proc(dst, src: rawptr, len: int) -> rawptr #export "__mem_copy" {
+copy :: proc(dst, src: rawptr, len: int) -> rawptr #link_name "__mem_copy" {
 	// NOTE(bill): This _must_ implemented like C's memmove
 	llvm_memmove_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memmove.p0i8.p0i8.i64"
 	llvm_memmove_64bit(dst, src, len, 1, false)
 	return dst
 }
 
-copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #export "__mem_copy_non_overlapping" {
+copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #link_name "__mem_copy_non_overlapping" {
 	// NOTE(bill): This _must_ implemented like C's memcpy
 	llvm_memcpy_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memcpy.p0i8.p0i8.i64"
 	llvm_memcpy_64bit(dst, src, len, 1, false)
@@ -26,7 +26,7 @@ copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #export "__me
 }
 
 
-compare :: proc(dst, src: rawptr, n: int) -> int #export "__mem_compare" {
+compare :: proc(dst, src: rawptr, n: int) -> int #link_name "__mem_compare" {
 	// Translation of http://mgronhol.github.io/fast-strcmp/
 	a := slice_ptr(dst as ^byte, n)
 	b := slice_ptr(src as ^byte, n)

@@ -39,6 +39,8 @@ typedef struct ssaModule {
 	i32             global_string_index;
 	i32             global_array_index; // For ConstantSlice
 
+	Entity *        entry_point_entity;
+
 	Array(ssaProcedure *) procs;             // NOTE(bill): All procedures with bodies
 	ssaValueArray         procs_to_generate; // NOTE(bill): Procedures to generate
 } ssaModule;
@@ -97,7 +99,6 @@ typedef struct ssaDefer {
 	};
 } ssaDefer;
 
-typedef struct ssaProcedure ssaProcedure;
 struct ssaProcedure {
 	ssaProcedure *        parent;
 	Array(ssaProcedure *) children;
@@ -110,7 +111,7 @@ struct ssaProcedure {
 	AstNode *             body;
 	u64                   tags;
 
-	ssaValueArray     params;
+	ssaValueArray         params;
 	Array(ssaDefer)       defer_stmts;
 	Array(ssaBlock *)     blocks;
 	i32                   scope_index;
@@ -118,7 +119,7 @@ struct ssaProcedure {
 	ssaBlock *            entry_block;
 	ssaBlock *            curr_block;
 	ssaTargetList *       target_list;
-	ssaValueArray     referrers;
+	ssaValueArray         referrers;
 
 	i32                   local_count;
 	i32                   instr_count;
@@ -3930,8 +3931,8 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 			// parent.name-guid
 			String original_name = pd->name->Ident.string;
 			String pd_name = original_name;
-			if (pd->export_name.len > 0) {
-				pd_name = pd->export_name;
+			if (pd->link_name.len > 0) {
+				pd_name = pd->link_name;
 			}
 
 			isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
@@ -4571,8 +4572,11 @@ void ssa_begin_procedure_body(ssaProcedure *proc) {
 		TypeTuple *params = &proc->type->Proc.params->Tuple;
 		for (isize i = 0; i < params->variable_count; i++) {
 			Entity *e = params->variables[i];
-			ssaValue *param = ssa_add_param(proc, e);
-			array_add(&proc->params, param);
+			if (!str_eq(e->token.string, str_lit("")) &&
+			    !str_eq(e->token.string, str_lit("_"))) {
+				ssaValue *param = ssa_add_param(proc, e);
+				array_add(&proc->params, param);
+			}
 		}
 	}
 }
@@ -4857,6 +4861,8 @@ void ssa_gen_tree(ssaGen *s) {
 
 	isize global_variable_max_count = 0;
 	Entity *entry_point = NULL;
+	bool has_dll_main = false;
+	bool has_win_main = false;
 
 	for_array(i, info->entities.entries) {
 		MapDeclInfoEntry *entry = &info->entities.entries.e[i];
@@ -4864,10 +4870,18 @@ void ssa_gen_tree(ssaGen *s) {
 		String name = e->token.string;
 		if (e->kind == Entity_Variable) {
 			global_variable_max_count++;
-		} else if (e->kind == Entity_Procedure) {
+		} else if (e->kind == Entity_Procedure && !e->scope->is_global) {
 			if (e->scope->is_init && str_eq(name, str_lit("main"))) {
 				entry_point = e;
-				break;
+			}
+			if ((e->Procedure.tags & ProcTag_export) != 0 ||
+			    (e->Procedure.link_name.len > 0) ||
+			    (e->scope->is_file && e->Procedure.link_name.len > 0)) {
+				if (!has_dll_main && str_eq(name, str_lit("DllMain"))) {
+					has_dll_main = true;
+				} else if (!has_win_main && str_eq(name, str_lit("WinMain"))) {
+					has_win_main = true;
+				}
 			}
 		}
 	}
@@ -4879,6 +4893,7 @@ void ssa_gen_tree(ssaGen *s) {
 	Array(ssaGlobalVariable) global_variables;
 	array_init_reserve(&global_variables, m->tmp_allocator, global_variable_max_count);
 
+	m->entry_point_entity = entry_point;
 	m->min_dep_map = generate_minimum_dependency_map(info, entry_point);
 
 	for_array(i, info->entities.entries) {
@@ -4897,8 +4912,13 @@ void ssa_gen_tree(ssaGen *s) {
 			continue;
 		}
 
-		if (!scope->is_global && !scope->is_init) {
-			name = ssa_mangle_name(s, e->token.pos.file, name);
+		if (!scope->is_global) {
+			if (e->kind == Entity_Procedure && (e->Procedure.tags & ProcTag_export) != 0) {
+			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
+			} else if (scope->is_init && e->kind == Entity_Procedure && str_eq(name, str_lit("main"))) {
+			} else {
+				name = ssa_mangle_name(s, e->token.pos.file, name);
+			}
 		}
 
 
@@ -4947,8 +4967,8 @@ void ssa_gen_tree(ssaGen *s) {
 			}
 			if (pd->foreign_name.len > 0) {
 				name = pd->foreign_name;
-			} else if (pd->export_name.len > 0) {
-				name = pd->export_name;
+			} else if (pd->link_name.len > 0) {
+				name = pd->link_name;
 			}
 
 			ssaValue *p = ssa_make_value_procedure(a, m, e, e->type, decl->type_expr, body, name);
@@ -4999,7 +5019,93 @@ void ssa_gen_tree(ssaGen *s) {
 		}
 	}
 
+#if defined(GB_SYSTEM_WINDOWS)
+	if (m->build_context->is_dll && !has_dll_main) {
+		// DllMain :: proc(inst: rawptr, reason: u32, reserved: rawptr) -> i32
+		String name = str_lit("DllMain");
+		Type *proc_params = make_type_tuple(a);
+		Type *proc_results = make_type_tuple(a);
 
+		Scope *proc_scope = gb_alloc_item(a, Scope);
+
+		proc_params->Tuple.variables = gb_alloc_array(a, Entity *, 3);
+		proc_params->Tuple.variable_count = 3;
+
+		proc_results->Tuple.variables = gb_alloc_array(a, Entity *, 1);
+		proc_results->Tuple.variable_count = 1;
+
+		proc_params->Tuple.variables[0] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false);
+		proc_params->Tuple.variables[1] = make_entity_param(a, proc_scope, blank_token, t_u32,    false);
+		proc_params->Tuple.variables[2] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false);
+
+		proc_results->Tuple.variables[0] = make_entity_param(a, proc_scope, empty_token, t_i32, false);
+
+
+		Type *proc_type = make_type_proc(a, proc_scope,
+		                                 proc_params, 3,
+		                                 proc_results, 1, false);
+
+		AstNode *body = gb_alloc_item(a, AstNode);
+		Entity *e = make_entity_procedure(a, NULL, make_token_ident(name), proc_type, 0);
+		ssaValue *p = ssa_make_value_procedure(a, m, e, proc_type, NULL, body, name);
+
+		map_ssa_value_set(&m->values, hash_pointer(e), p);
+		map_ssa_value_set(&m->members, hash_string(name), p);
+
+		ssaProcedure *proc = &p->Proc;
+		proc->tags = ProcTag_no_inline | ProcTag_stdcall; // TODO(bill): is no_inline a good idea?
+		e->Procedure.link_name = name;
+
+		ssa_begin_procedure_body(proc);
+		ssa_emit_global_call(proc, "main", NULL, 0);
+		ssa_emit_return(proc, v_one32);
+		ssa_end_procedure_body(proc);
+	}
+#endif
+#if defined(GB_SYSTEM_WINDOWS)
+	if (!m->build_context->is_dll && !has_win_main) {
+		// WinMain :: proc(inst, prev: rawptr, cmd_line: ^byte, cmd_show: i32) -> i32
+		String name = str_lit("WinMain");
+		Type *proc_params = make_type_tuple(a);
+		Type *proc_results = make_type_tuple(a);
+
+		Scope *proc_scope = gb_alloc_item(a, Scope);
+
+		proc_params->Tuple.variables = gb_alloc_array(a, Entity *, 4);
+		proc_params->Tuple.variable_count = 4;
+
+		proc_results->Tuple.variables = gb_alloc_array(a, Entity *, 1);
+		proc_results->Tuple.variable_count = 1;
+
+		proc_params->Tuple.variables[0] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false);
+		proc_params->Tuple.variables[1] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false);
+		proc_params->Tuple.variables[2] = make_entity_param(a, proc_scope, blank_token, t_u8_ptr, false);
+		proc_params->Tuple.variables[3] = make_entity_param(a, proc_scope, blank_token, t_i32,    false);
+
+		proc_results->Tuple.variables[0] = make_entity_param(a, proc_scope, empty_token, t_i32, false);
+
+
+		Type *proc_type = make_type_proc(a, proc_scope,
+		                                 proc_params, 4,
+		                                 proc_results, 1, false);
+
+		AstNode *body = gb_alloc_item(a, AstNode);
+		Entity *e = make_entity_procedure(a, NULL, make_token_ident(name), proc_type, 0);
+		ssaValue *p = ssa_make_value_procedure(a, m, e, proc_type, NULL, body, name);
+
+		map_ssa_value_set(&m->values, hash_pointer(e), p);
+		map_ssa_value_set(&m->members, hash_string(name), p);
+
+		ssaProcedure *proc = &p->Proc;
+		proc->tags = ProcTag_no_inline | ProcTag_stdcall; // TODO(bill): is no_inline a good idea?
+		e->Procedure.link_name = name;
+
+		ssa_begin_procedure_body(proc);
+		ssa_emit_global_call(proc, "main", NULL, 0);
+		ssa_emit_return(proc, v_one32);
+		ssa_end_procedure_body(proc);
+	}
+#endif
 	{ // Startup Runtime
 		// Cleanup(bill): probably better way of doing code insertion
 		String name = str_lit(SSA_STARTUP_RUNTIME_PROC_NAME);
@@ -5007,10 +5113,8 @@ void ssa_gen_tree(ssaGen *s) {
 		                                 NULL, 0,
 		                                 NULL, 0, false);
 		AstNode *body = gb_alloc_item(a, AstNode);
-		ssaValue *p = ssa_make_value_procedure(a, m, NULL, proc_type, NULL, body, name);
-		Token token = {0};
-		token.string = name;
-		Entity *e = make_entity_procedure(a, NULL, token, proc_type, 0);
+		Entity *e = make_entity_procedure(a, NULL, make_token_ident(name), proc_type, 0);
+		ssaValue *p = ssa_make_value_procedure(a, m, e, proc_type, NULL, body, name);
 
 		map_ssa_value_set(&m->values, hash_pointer(e), p);
 		map_ssa_value_set(&m->members, hash_string(name), p);
@@ -5430,13 +5534,6 @@ void ssa_gen_tree(ssaGen *s) {
 	for_array(i, m->procs_to_generate) {
 		ssa_build_proc(m->procs_to_generate.e[i], m->procs_to_generate.e[i]->Proc.parent);
 	}
-
-	// {
-	// 	DWORD old_protect = 0;
-	// 	DWORD new_protect = PAGE_READONLY;
-	// 	BOOL ok = VirtualProtect(m->arena.physical_start, m->arena.total_size, new_protect, &old_protect);
-	// }
-
 
 
 	// m->layout = str_lit("e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64");
