@@ -1544,6 +1544,8 @@ ssaValue *ssa_emit_comp(ssaProcedure *proc, TokenKind op_kind, ssaValue *left, s
 	Type *a = base_type(ssa_type(left));
 	Type *b = base_type(ssa_type(right));
 
+	GB_ASSERT(gb_is_between(op_kind, Token__ComparisonBegin+1, Token__ComparisonEnd-1));
+
 	if (are_types_identical(a, b)) {
 		// NOTE(bill): No need for a conversion
 	} else if (left->kind == ssaValue_Constant || left->kind == ssaValue_Nil) {
@@ -3266,6 +3268,28 @@ bool ssa_is_elem_const(ssaModule *m, AstNode *elem, Type *elem_type) {
 	return tav->value.kind != ExactValue_Invalid;
 }
 
+ssaAddr ssa_build_addr_from_entity(ssaProcedure *proc, Entity *e, AstNode *expr) {
+	GB_ASSERT(e != NULL);
+	GB_ASSERT(e->kind != Entity_Constant);
+
+	ssaValue *v = NULL;
+	ssaValue **found = map_ssa_value_get(&proc->module->values, hash_pointer(e));
+	if (found) {
+		v = *found;
+	} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous) {
+		v = ssa_add_using_variable(proc, e);
+	} else if (e->kind == Entity_ImplicitValue) {
+		// TODO(bill): Should a copy be made?
+		v = ssa_find_implicit_value_backing(proc, e->ImplicitValue.id);
+	}
+
+	if (v == NULL) {
+		GB_PANIC("Unknown value: %s, entity: %p %.*s\n", expr_to_string(expr), e, LIT(entity_strings[e->kind]));
+	}
+
+	return ssa_make_addr(v, expr);
+}
+
 ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 	switch (expr->kind) {
 	case_ast_node(i, Ident, expr);
@@ -3275,26 +3299,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		}
 
 		Entity *e = entity_of_ident(proc->module->info, expr);
-		TypeAndValue *tv = map_tav_get(&proc->module->info->types, hash_pointer(expr));
-
-		GB_ASSERT(e->kind != Entity_Constant);
-
-		ssaValue *v = NULL;
-		ssaValue **found = map_ssa_value_get(&proc->module->values, hash_pointer(e));
-		if (found) {
-			v = *found;
-		} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous) {
-			v = ssa_add_using_variable(proc, e);
-		} else if (e->kind == Entity_ImplicitValue) {
-			// TODO(bill): Should a copy be made?
-			v = ssa_find_implicit_value_backing(proc, e->ImplicitValue.id);
-		}
-
-		if (v == NULL) {
-			GB_PANIC("Unknown value: %s, entity: %p %.*s\n", expr_to_string(expr), e, LIT(entity_strings[e->kind]));
-		}
-
-		return ssa_make_addr(v, expr);
+		return ssa_build_addr_from_entity(proc, e, expr);
 	case_end;
 
 	case_ast_node(pe, ParenExpr, expr);
@@ -5035,7 +5040,7 @@ void ssa_gen_tree(ssaGen *s) {
 		proc_results->Tuple.variable_count = 1;
 
 		proc_params->Tuple.variables[0] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false);
-		proc_params->Tuple.variables[1] = make_entity_param(a, proc_scope, blank_token, t_u32,    false);
+		proc_params->Tuple.variables[1] = make_entity_param(a, proc_scope, make_token_ident(str_lit("reason")), t_i32, false);
 		proc_params->Tuple.variables[2] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false);
 
 		proc_results->Tuple.variables[0] = make_entity_param(a, proc_scope, empty_token, t_i32, false);
@@ -5057,8 +5062,23 @@ void ssa_gen_tree(ssaGen *s) {
 		e->Procedure.link_name = name;
 
 		ssa_begin_procedure_body(proc);
+
+		// NOTE(bill): https://msdn.microsoft.com/en-us/library/windows/desktop/ms682583(v=vs.85).aspx
+		// DLL_PROCESS_ATTACH == 1
+
+		ssaAddr reason_addr = ssa_build_addr_from_entity(proc, proc_params->Tuple.variables[1], NULL);
+		ssaValue *cond = ssa_emit_comp(proc, Token_CmpEq, ssa_addr_load(proc, reason_addr), v_one32);
+		ssaBlock *then = ssa_add_block(proc, NULL, "if.then");
+		ssaBlock *done = ssa_add_block(proc, NULL, "if.done"); // NOTE(bill): Append later
+		ssa_emit_if(proc, cond, then, done);
+		proc->curr_block = then;
 		ssa_emit_global_call(proc, "main", NULL, 0);
+		ssa_emit_jump(proc, done);
+		proc->curr_block = done;
+
 		ssa_emit_return(proc, v_one32);
+
+
 		ssa_end_procedure_body(proc);
 	}
 #endif

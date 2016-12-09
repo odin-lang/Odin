@@ -993,6 +993,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 				case Token_Gt:    ssa_fprintf(f, "gt"); break;
 				case Token_LtEq:  ssa_fprintf(f, "le"); break;
 				case Token_GtEq:  ssa_fprintf(f, "ge"); break;
+				default: GB_PANIC("invalid comparison");break;
 				}
 			}
 		} else {
@@ -1281,6 +1282,8 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 				if (!str_eq(e->token.string, str_lit("")) &&
 				    !str_eq(e->token.string, str_lit("_"))) {
 					ssa_fprintf(f, " %%%.*s", LIT(e->token.string));
+				} else {
+					ssa_fprintf(f, " %%_.param_%td", i);
 				}
 			}
 		}
