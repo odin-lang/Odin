@@ -1936,6 +1936,7 @@ AstNode *parse_simple_stmt(AstFile *f) {
 		    f->curr_token.kind == Token_enum ||
 		    f->curr_token.kind == Token_union ||
 		    f->curr_token.kind == Token_raw_union) {
+		// if (f->curr_token.kind == Token_type) {
 			Token token = f->curr_token;
 			if (token.kind == Token_type) {
 				next_token(f);

@@ -4112,7 +4112,7 @@ gb_inline i64 gb_atomic64_fetch_and(gbAtomic64 volatile *a, i64 operand) {
 
 gb_inline i64 gb_atomic64_fetch_or(gbAtomic64 volatile *a, i64 operand) {
 #if defined(GB_ARCH_64_BIT)
-	return _InterlockedAnd64(cast(i64 volatile *)a, operand);
+	return _InterlockedOr64(cast(i64 volatile *)a, operand);
 #elif GB_CPU_X86
 	i64 expected = a->value;
 	for (;;) {

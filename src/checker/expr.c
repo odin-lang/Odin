@@ -11,8 +11,10 @@ bool     check_value_is_expressible(Checker *c, ExactValue in_value, Type *type,
 void     convert_to_typed          (Checker *c, Operand *operand, Type *target_type, i32 level);
 gbString expr_to_string            (AstNode *expression);
 void     check_entity_decl         (Checker *c, Entity *e, DeclInfo *decl, Type *named_type);
+void     check_const_decl          (Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr, Type *named_type);
 void     check_proc_body           (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
 void     update_expr_type          (Checker *c, AstNode *e, Type *type, bool final);
+
 
 gb_inline Type *check_type(Checker *c, AstNode *expression) {
 	return check_type_extra(c, expression, NULL);
@@ -87,22 +89,20 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 
 			for_array(i, cd->values) {
 				AstNode *name = cd->names.e[i];
-				AstNode *value = cd->values.e[i];
-				ExactValue v = {ExactValue_Invalid};
-
-				if (!ast_node_expect(name, AstNode_Ident)) {
+				AstNode *value = unparen_expr(cd->values.e[i]);
+				if (name->kind != AstNode_Ident) {
+					error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 					entities[entity_index++] = NULL;
 					continue;
 				}
 
+				ExactValue v = {ExactValue_Invalid};
 				Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
 				e->identifier = name;
 				entities[entity_index++] = e;
-
 				DeclInfo *d = make_declaration_info(c->allocator, e->scope);
 				d->type_expr = cd->type;
 				d->init_expr = value;
-
 				add_entity_and_decl_info(c, name, e, d);
 
 				DelayedEntity delay = {name, e, d};
@@ -170,6 +170,10 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 		case_ast_node(td, TypeDecl, node);
 			if (!ast_node_expect(td->name, AstNode_Ident)) {
 				break;
+			}
+			if (td->name->kind != AstNode_Ident) {
+				error_node(td->name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[td->name->kind]));
+				continue;
 			}
 
 			Token name_token = td->name->Ident;
@@ -457,7 +461,6 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, MapEntity *en
 	gb_string_free(str);
 }
 
-void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr);
 
 void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
                   Entity **fields, isize field_count,
@@ -1581,6 +1584,11 @@ bool check_is_vector_elem(Checker *c, AstNode *expr) {
 void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 	switch (op.kind) {
 	case Token_Pointer: { // Pointer address
+		if (o->mode == Addressing_Type) {
+			o->type = make_type_pointer(c->allocator, o->type);
+			return;
+		}
+
 		if (o->mode != Addressing_Variable ||
 		    check_is_expr_vector_index(c, o->expr) ||
 		    check_is_vector_elem(c, o->expr)) {
@@ -1600,6 +1608,12 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 
 	case Token_Maybe: { // Make maybe
 		Type *t = default_type(o->type);
+
+		if (o->mode == Addressing_Type) {
+			o->type = make_type_pointer(c->allocator, t);
+			return;
+		}
+
 		bool is_value =
 			o->mode == Addressing_Variable ||
 			o->mode == Addressing_Value ||

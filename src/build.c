@@ -149,7 +149,7 @@ String get_filepath_extension(String path) {
 
 void init_build_context(BuildContext *bc) {
 	bc->ODIN_VENDOR  = str_lit("odin");
-	bc->ODIN_VERSION = str_lit("0.0.3d");
+	bc->ODIN_VERSION = str_lit("0.0.4");
 	bc->ODIN_ROOT    = odin_root_dir();
 
 #if defined(GB_SYSTEM_WINDOWS)

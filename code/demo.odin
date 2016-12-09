@@ -1,5 +1,6 @@
 #import "win32.odin"
 #import "fmt.odin"
+#import "sync.odin"
 
 Dll :: struct {
 	Handle :: type rawptr
@@ -50,6 +51,5 @@ main :: proc() {
 	}
 
 	some_thing := (proc_addr as proc())
-	fmt.println(some_thing)
 	some_thing()
 }

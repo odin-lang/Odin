@@ -205,6 +205,37 @@ GetProcessHeap :: proc() -> HANDLE #foreign #dll_import
 
 HEAP_ZERO_MEMORY :: 0x00000008
 
+// Synchronization
+
+SECURITY_ATTRIBUTES :: struct #ordered {
+	length:              u32
+	security_descriptor: rawptr
+	inherit_handle:      BOOL
+}
+
+INFINITE :: 0xffffffff
+
+CreateSemaphoreA    :: proc(attributes: ^SECURITY_ATTRIBUTES, initial_count, maximum_count: i32, name: ^byte) -> HANDLE #foreign #dll_import
+ReleaseSemaphore    :: proc(semaphore: HANDLE, release_count: i32, previous_count: ^i32) -> BOOL #foreign #dll_import
+WaitForSingleObject :: proc(handle: HANDLE, milliseconds: u32) -> u32 #foreign #dll_import
+
+
+InterlockedCompareExchange :: proc(dst: ^i32, exchange, comparand: i32) -> i32 #foreign
+InterlockedExchange        :: proc(dst: ^i32, desired: i32) -> i32 #foreign
+InterlockedExchangeAdd     :: proc(dst: ^i32, desired: i32) -> i32 #foreign
+InterlockedAnd             :: proc(dst: ^i32, desired: i32) -> i32 #foreign
+InterlockedOr              :: proc(dst: ^i32, desired: i32) -> i32 #foreign
+
+InterlockedCompareExchange64 :: proc(dst: ^i64, exchange, comparand: i64) -> i64 #foreign
+InterlockedExchange64        :: proc(dst: ^i64, desired: i64) -> i64 #foreign
+InterlockedExchangeAdd64     :: proc(dst: ^i64, desired: i64) -> i64 #foreign
+InterlockedAnd64             :: proc(dst: ^i64, desired: i64) -> i64 #foreign
+InterlockedOr64              :: proc(dst: ^i64, desired: i64) -> i64 #foreign
+
+_mm_pause        :: proc() #foreign
+ReadWriteBarrier :: proc() #foreign
+WriteBarrier     :: proc() #foreign
+ReadBarrier      :: proc() #foreign
 
 
 // GDI

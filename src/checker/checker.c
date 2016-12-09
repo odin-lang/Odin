@@ -1120,31 +1120,6 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 			DelayedDecl di = {parent_scope, decl};
 			array_add(&c->delayed_foreign_libraries, di);
 		case_end;
-		case_ast_node(cd, ConstDecl, decl);
-			for_array(i, cd->values) {
-				AstNode *name = cd->names.e[i];
-				AstNode *value = cd->values.e[i];
-				ExactValue v = {ExactValue_Invalid};
-				if (name->kind != AstNode_Ident) {
-					error_node(name, "A declaration's name but be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-				}
-				Entity *e = make_entity_constant(c->allocator, parent_scope, name->Ident, NULL, v);
-				e->identifier = name;
-				DeclInfo *di = make_declaration_info(c->allocator, parent_scope);
-				di->type_expr = cd->type;
-				di->init_expr = value;
-				add_entity_and_decl_info(c, name, e, di);
-			}
-
-			isize lhs_count = cd->names.count;
-			isize rhs_count = cd->values.count;
-
-			if (rhs_count == 0 && cd->type == NULL) {
-				error_node(decl, "Missing type or initial expression");
-			} else if (lhs_count < rhs_count) {
-				error_node(decl, "Extra initial expression");
-			}
-		case_end;
 		case_ast_node(vd, VarDecl, decl);
 			if (!parent_scope->is_file) {
 				// NOTE(bill): Within a procedure, variables must be in order
@@ -1171,7 +1146,8 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 					value = vd->values.e[i];
 				}
 				if (name->kind != AstNode_Ident) {
-					error_node(name, "A declaration's name but be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+					error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+					continue;
 				}
 				Entity *e = make_entity_variable(c->allocator, parent_scope, name->Ident, NULL);
 				e->identifier = name;
@@ -1180,7 +1156,7 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 				DeclInfo *d = di;
 				if (d == NULL) {
 					AstNode *init_expr = value;
-					d = make_declaration_info(heap_allocator(), parent_scope);
+					d = make_declaration_info(heap_allocator(), e->scope);
 					d->type_expr = vd->type;
 					d->init_expr = init_expr;
 					d->var_decl_tags = vd->tags;
@@ -1189,15 +1165,52 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 				add_entity_and_decl_info(c, name, e, d);
 			}
 		case_end;
+		case_ast_node(cd, ConstDecl, decl);
+			for_array(i, cd->values) {
+				AstNode *name = cd->names.e[i];
+				AstNode *value = unparen_expr(cd->values.e[i]);
+				if (name->kind != AstNode_Ident) {
+					error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+					continue;
+				}
+
+				ExactValue v = {ExactValue_Invalid};
+				Entity *e = make_entity_constant(c->allocator, parent_scope, name->Ident, NULL, v);
+				e->identifier = name;
+				DeclInfo *di = make_declaration_info(c->allocator, e->scope);
+				di->type_expr = cd->type;
+				di->init_expr = value;
+				add_entity_and_decl_info(c, name, e, di);
+			}
+
+			isize lhs_count = cd->names.count;
+			isize rhs_count = cd->values.count;
+
+			if (rhs_count == 0 && cd->type == NULL) {
+				error_node(decl, "Missing type or initial expression");
+			} else if (lhs_count < rhs_count) {
+				error_node(decl, "Extra initial expression");
+			}
+		case_end;
 		case_ast_node(td, TypeDecl, decl);
+			if (td->name->kind != AstNode_Ident) {
+				error_node(td->name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[td->name->kind]));
+				continue;
+			}
 			ast_node(n, Ident, td->name);
+
 			Entity *e = make_entity_type_name(c->allocator, parent_scope, *n, NULL);
 			e->identifier = td->name;
 			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
 			d->type_expr = td->type;
+			d->init_expr = td->type;
 			add_entity_and_decl_info(c, td->name, e, d);
 		case_end;
 		case_ast_node(pd, ProcDecl, decl);
+			if (pd->name->kind != AstNode_Ident) {
+				error_node(pd->name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[pd->name->kind]));
+				continue;
+			}
 			ast_node(n, Ident, pd->name);
 			Token token = *n;
 			Entity *e = make_entity_procedure(c->allocator, parent_scope, token, NULL, pd->tags);
@@ -1275,9 +1288,6 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 				if (e->scope == parent_scope) {
 					continue;
 				}
-
-
-
 				// NOTE(bill): Do not add other imported entities
 				add_entity(c, parent_scope, NULL, e);
 				if (!id->is_load) { // `#import`ed entities don't get exported

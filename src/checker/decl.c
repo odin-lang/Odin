@@ -211,8 +211,25 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	e->Constant.value = operand->value;
 }
 
+void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
+	GB_ASSERT(e->type == NULL);
+	Type *named = make_type_named(c->allocator, e->token.string, NULL, e);
+	named->Named.type_name = e;
+	if (def != NULL && def->kind == Type_Named) {
+		def->Named.base = named;
+	}
+	e->type = named;
 
-void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr) {
+	// gb_printf_err("%.*s %p\n", LIT(e->token.string), e);
+
+	Type *bt = check_type_extra(c, type_expr, named);
+	named->Named.base = base_type(bt);
+	if (named->Named.base == t_invalid) {
+		// gb_printf("check_type_decl: %s\n", type_to_string(named));
+	}
+}
+
+void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr, Type *named_type) {
 	GB_ASSERT(e->type == NULL);
 
 	if (e->flags & EntityFlag_Visited) {
@@ -238,26 +255,10 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 		// check_expr_or_type(c, &operand, init_expr);
 		check_expr(c, &operand, init_expr);
 	}
+
 	check_init_constant(c, e, &operand);
 }
 
-void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
-	GB_ASSERT(e->type == NULL);
-	Type *named = make_type_named(c->allocator, e->token.string, NULL, e);
-	named->Named.type_name = e;
-	if (def != NULL && def->kind == Type_Named) {
-		def->Named.base = named;
-	}
-	e->type = named;
-
-	// gb_printf_err("%.*s %p\n", LIT(e->token.string), e);
-
-	Type *bt = check_type_extra(c, type_expr, named);
-	named->Named.base = base_type(bt);
-	if (named->Named.base == t_invalid) {
-		// gb_printf("check_type_decl: %s\n", type_to_string(named));
-	}
-}
 
 
 bool are_signatures_similar_enough(Type *a_, Type *b_) {
@@ -458,6 +459,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 		if (found) {
 			d = *found;
 		} else {
+			// TODO(bill): Err here?
 			e->type = t_invalid;
 			set_base_type(named_type, t_invalid);
 			return;
@@ -471,7 +473,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 
 	switch (e->kind) {
 	case Entity_Constant:
-		check_const_decl(c, e, d->type_expr, d->init_expr);
+		check_const_decl(c, e, d->type_expr, d->init_expr, named_type);
 		break;
 	case Entity_Variable:
 		check_var_decl(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr);

@@ -109,7 +109,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_using,          "using"), \
 	TOKEN_KIND(Token_asm,            "asm"), \
 	TOKEN_KIND(Token_volatile,       "volatile"), \
-	TOKEN_KIND(Token_atomic,         "atomic"), \
+/* 	TOKEN_KIND(Token_atomic,         "atomic"),  */\
 	TOKEN_KIND(Token_push_allocator, "push_allocator"), \
 	TOKEN_KIND(Token_push_context,   "push_context"), \
 TOKEN_KIND(Token__KeywordEnd, "_KeywordEnd"), \

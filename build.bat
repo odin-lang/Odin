@@ -4,7 +4,7 @@
 set exe_name=odin.exe
 
 :: Debug = 0, Release = 1
-set release_mode=0
+set release_mode=1
 
 set compiler_flags= -nologo -Oi -TC -W4 -fp:fast -fp:except- -Gm- -MP -FC -GS- -EHsc- -GR-
 
@@ -48,8 +48,8 @@ rem pushd %build_dir%
 
 	cl %compiler_settings% "src\main.c" ^
 		/link %linker_settings% -OUT:%exe_name% ^
-	&& odin build_dll code/example.odin ^
 	&& odin run code/demo.odin
+	rem && odin build_dll code/example.odin ^
 	rem && odin run code/demo.odin
 
 

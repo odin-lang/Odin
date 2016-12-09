@@ -1095,6 +1095,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	#if 1
 		// NOTE(bill): This must be handled here so it has access to the parent scope stuff
 		// e.g. using
+		if (pd->name->kind != AstNode_Ident) {
+			error_node(pd->name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[pd->name->kind]));
+			break;
+		}
+
 		Entity *e = make_entity_procedure(c->allocator, c->context.scope, pd->name->Ident, NULL, pd->tags);
 		e->identifier = pd->name;
 
