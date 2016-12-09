@@ -65,9 +65,10 @@ void usage(char *argv0) {
 	gb_printf_err("Usage:");
 	gb_printf_err("\n\t%s command [arguments]\n", argv0);
 	gb_printf_err("Commands:");
-	gb_printf_err("\n\tbuild   compile .odin file");
-	gb_printf_err("\n\trun     compile and run .odin file");
-	gb_printf_err("\n\tversion print Odin version");
+	gb_printf_err("\n\tbuild     compile .odin file");
+	gb_printf_err("\n\tbuild_dll compile .odin file as dll");
+	gb_printf_err("\n\trun       compile and run .odin file");
+	gb_printf_err("\n\tversion   print Odin version");
 	gb_printf_err("\n\n");
 }
 

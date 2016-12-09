@@ -48,13 +48,9 @@ Not in any particular order
 * Documentation Generator for "Entities"
 * Multiple Architecture support
 * Language level atomics and concurrency support
-* Linking Options
-	- Executable
-	- Static/Dynamic Library
 * Debug Information
 	- pdb format too
 * Command Line Tooling
 * Compiler Internals:
 	- Big numbers library
-	- Cyclic Type Checking (at the moment will cause compiler to go into an infinite loop)
 	- Multithreading for performance increase
