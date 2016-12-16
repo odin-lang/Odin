@@ -193,9 +193,9 @@ gb_global ImplicitValueInfo implicit_value_infos[ImplicitValue_Count] = {0};
 
 
 typedef struct CheckerContext {
-	Scope *   scope;
-	DeclInfo *decl;
-	u32       stmt_state_flags;
+	Scope *    scope;
+	DeclInfo * decl;
+	u32        stmt_state_flags;
 } CheckerContext;
 
 #define MAP_TYPE TypeAndValue

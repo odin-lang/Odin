@@ -4,11 +4,11 @@
 	TOKEN_KIND(Token_Comment, "Comment"), \
 \
 TOKEN_KIND(Token__LiteralBegin, "_LiteralBegin"), \
-	TOKEN_KIND(Token_Ident, "Identifier"), \
-	TOKEN_KIND(Token_Integer, "Integer"), \
-	TOKEN_KIND(Token_Float, "Float"), \
-	TOKEN_KIND(Token_Rune, "Rune"), \
-	TOKEN_KIND(Token_String, "String"), \
+	TOKEN_KIND(Token_Ident, "identifier"), \
+	TOKEN_KIND(Token_Integer, "integer"), \
+	TOKEN_KIND(Token_Float, "float"), \
+	TOKEN_KIND(Token_Rune, "rune"), \
+	TOKEN_KIND(Token_String, "string"), \
 TOKEN_KIND(Token__LiteralEnd, "_LiteralEnd"), \
 \
 TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
@@ -87,6 +87,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	/* TOKEN_KIND(Token_import,         "import"),  */\
 	/* TOKEN_KIND(Token_include,        "include"),  */\
 	TOKEN_KIND(Token_proc,           "proc"), \
+	TOKEN_KIND(Token_macro,          "macro"), \
 	TOKEN_KIND(Token_match,          "match"), \
 	TOKEN_KIND(Token_break,          "break"), \
 	TOKEN_KIND(Token_continue,       "continue"), \

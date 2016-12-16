@@ -2070,7 +2070,7 @@ AstNode *parse_proc_type(AstFile *f) {
 }
 
 
-AstNodeArray parse_parameter_list(AstFile *f) {
+AstNodeArray parse_parameter_list(AstFile *f, bool allow_using) {
 	AstNodeArray params = make_ast_node_array(f);
 
 	while (f->curr_token.kind == Token_Ident ||
@@ -2087,6 +2087,11 @@ AstNodeArray parse_parameter_list(AstFile *f) {
 
 		if (names.count > 1 && is_using) {
 			syntax_error(f->curr_token, "Cannot apply `using` to more than one of the same type");
+			is_using = false;
+		}
+
+		if (!allow_using && is_using) {
+			syntax_error(f->curr_token, "`using` is not allowed within this parameter list");
 			is_using = false;
 		}
 
@@ -2405,7 +2410,7 @@ Token parse_proc_signature(AstFile *f,
                            AstNodeArray *results) {
 	Token proc_token = expect_token(f, Token_proc);
 	expect_token(f, Token_OpenParen);
-	*params = parse_parameter_list(f);
+	*params = parse_parameter_list(f, true);
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	*results = parse_results(f);
 	return proc_token;

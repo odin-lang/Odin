@@ -35,11 +35,6 @@ semaphore_wait :: proc(s: ^Semaphore) {
 	win32.WaitForSingleObject(s.handle, win32.INFINITE);
 }
 
-mutex_make :: proc() -> Mutex {
-	m: Mutex
-	mutex_init(^m)
-	return m
-}
 
 mutex_init :: proc(m: ^Mutex) {
 	atomic.store32(^m.counter, 0);
