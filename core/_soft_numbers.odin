@@ -1,4 +1,4 @@
-#shared_global_scope
+#shared_global_scope;
 
 /*
 #import "fmt.odin"

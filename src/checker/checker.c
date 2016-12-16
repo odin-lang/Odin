@@ -991,17 +991,22 @@ void init_preload(Checker *c) {
 	}
 
 	if (t_type_info == NULL) {
-		Entity *e = current_scope_lookup_entity(c->global_scope, str_lit("Type_Info"));
-		if (e == NULL) {
+		Entity *type_info_entity = current_scope_lookup_entity(c->global_scope, str_lit("Type_Info"));
+		if (type_info_entity == NULL) {
 			compiler_error("Could not find type declaration for `Type_Info`\n"
 			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
 		}
-		t_type_info = e->type;
+		Entity *type_info_member_entity = current_scope_lookup_entity(c->global_scope, str_lit("Type_Info_Member"));
+		if (type_info_entity == NULL) {
+			compiler_error("Could not find type declaration for `Type_Info_Member`\n"
+			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
+		}
+		t_type_info = type_info_entity->type;
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
-		GB_ASSERT(is_type_union(e->type));
-		TypeRecord *record = &base_type(e->type)->Record;
+		GB_ASSERT(is_type_union(type_info_entity->type));
+		TypeRecord *record = &base_type(type_info_entity->type)->Record;
 
-		t_type_info_member = record->other_fields[0]->type;
+		t_type_info_member = type_info_member_entity->type;
 		t_type_info_member_ptr = make_type_pointer(c->allocator, t_type_info_member);
 
 		if (record->field_count != 18) {

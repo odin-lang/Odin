@@ -30,27 +30,27 @@ Odin is fast, concise, readable, pragmatic and open sourced. It is designed with
 ## Warnings
 
 * This is still highly in development and the language's design is quite volatile.
-* Syntax is not fixed.
+* Syntax is definitely not fixed
 
 ## Roadmap
 
 Not in any particular order
 
-* Compile Time Execution (CTE)
-	- More metaprogramming madness
-	- Compiler as a library
-	- AST inspection and modification
-* CTE-based build system
-* Replace LLVM backend with my own custom backend
-* Improve SSA design to accommodate for lowering to a "bytecode"
-* SSA optimizations
-* Parametric Polymorphism ("Generics")
-* Documentation Generator for "Entities"
-* Multiple Architecture support
-* Language level atomics and concurrency support
-* Debug Information
+* Custom backend to replace LLVM
+	- Improve SSA design to accommodate for lowering to a "bytecode"
+	- SSA optimizations
+	- COFF generation
+	- linker
+* Type safe "macros"
+* Documentation generator for "Entities"
+* Multiple architecture support
+* Inline assembly
+* Linking options
+	- Executable
+	- Static/Dynamic Library
+* Debug information
 	- pdb format too
-* Command Line Tooling
-* Compiler Internals:
+* Command line tooling
+* Compiler internals:
 	- Big numbers library
-	- Multithreading for performance increase
+

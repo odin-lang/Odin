@@ -372,10 +372,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		Operand operand = {Addressing_Invalid};
 		check_expr(c, &operand, ids->expr);
-		if (operand.mode == Addressing_Invalid)
+		if (operand.mode == Addressing_Invalid) {
 			return;
-		if (!is_type_numeric(operand.type)) {
-			error(ids->op, "Non numeric type");
+		}
+		if (!is_type_numeric(operand.type) && !is_type_pointer(operand.type)) {
+			gbString type_str = type_to_string(operand.type);
+			error(ids->op, "Non numeric type `%s`", type_str);
+			gb_string_free(type_str);
 			return;
 		}
 

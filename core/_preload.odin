@@ -1,8 +1,8 @@
-#shared_global_scope
+#shared_global_scope;
 
-#import "os.odin"
-#import "fmt.odin"
-#import "mem.odin"
+#import "os.odin";
+#import "fmt.odin";
+#import "mem.odin";
 
 // IMPORTANT NOTE(bill): `type_info` & `type_info_val` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
@@ -12,81 +12,81 @@
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
-Type_Info :: union {
-	Member :: struct #ordered {
-		name:      string;     // can be empty if tuple
-		type_info: ^Type_Info
-		offset:    int;        // offsets are not used in tuples
-	}
-	Record :: struct #ordered {
-		fields:  []Member
-		size:    int; // in bytes
-		align:   int; // in bytes
-		packed:  bool
-		ordered: bool
-	}
+Type_Info_Member :: struct #ordered {
+	name:      string;     // can be empty if tuple
+	type_info: ^Type_Info;
+	offset:    int;        // offsets are not used in tuples
+};
+Type_Info_Record :: struct #ordered {
+	fields:  []Type_Info_Member;
+	size:    int; // in bytes
+	align:   int; // in bytes
+	packed:  bool;
+	ordered: bool;
+};
 
+Type_Info :: union {
 	Named: struct #ordered {
-		name: string
+		name: string;
 		base: ^Type_Info; // This will _not_ be a Type_Info.Named
-	}
+	};
 	Integer: struct #ordered {
 		size:   int; // in bytes
-		signed: bool
-	}
+		signed: bool;
+	};
 	Float: struct #ordered {
 		size: int; // in bytes
-	}
-	Any:     struct #ordered {}
-	String:  struct #ordered {}
-	Boolean: struct #ordered {}
+	};
+	Any:     struct #ordered {};
+	String:  struct #ordered {};
+	Boolean: struct #ordered {};
 	Pointer: struct #ordered {
 		elem: ^Type_Info; // nil -> rawptr
-	}
+	};
 	Maybe: struct #ordered {
-		elem: ^Type_Info
-	}
+		elem: ^Type_Info;
+	};
 	Procedure: struct #ordered {
 		params:   ^Type_Info; // Type_Info.Tuple
 		results:  ^Type_Info; // Type_Info.Tuple
-		variadic: bool
-	}
+		variadic: bool;
+	};
 	Array: struct #ordered {
-		elem:      ^Type_Info
-		elem_size: int
-		count:     int
-	}
+		elem:      ^Type_Info;
+		elem_size: int;
+		count:     int;
+	};
 	Slice: struct #ordered {
-		elem:      ^Type_Info
-		elem_size: int
-	}
+		elem:      ^Type_Info;
+		elem_size: int;
+	};
 	Vector: struct #ordered {
-		elem:      ^Type_Info
-		elem_size: int
-		count:     int
-		align:     int
-	}
-	Tuple:     Record
-	Struct:    Record
-	Union:     Record
-	Raw_Union: Record
+		elem:      ^Type_Info;
+		elem_size: int;
+		count:     int;
+		align:     int;
+	};
+	Tuple:     Type_Info_Record;
+	Struct:    Type_Info_Record;
+	Union:     Type_Info_Record;
+	Raw_Union: Type_Info_Record;
 	Enum: struct #ordered {
-		base:   ^Type_Info
-		values: []i64
-		names:  []string
-	}
-}
+		base:   ^Type_Info;
+		values: []i64;
+		names:  []string;
+	};
+};
 
 type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 	if info == nil {
-		return nil
+		return nil;
 	}
-	base := info
+	base := info;
 	match type i : base {
 	case Type_Info.Named:
-		base = i.base
+		base = i.base;
 	}
-	return base
+	return base;
 }
 
 
@@ -113,160 +113,160 @@ fmuladd64 :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
 
 
 
+Allocator_Mode :: enum {
+	ALLOC,
+	FREE,
+	FREE_ALL,
+	RESIZE,
+}
+Allocator_Proc :: type proc(allocator_data: rawptr, mode: Allocator_Mode,
+                            size, alignment: int,
+                            old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
+
+
 
 Allocator :: struct #ordered {
-	Mode :: enum {
-		ALLOC,
-		FREE,
-		FREE_ALL,
-		RESIZE,
-	}
-	Proc :: type proc(allocator_data: rawptr, mode: Mode,
-	                  size, alignment: int,
-	                  old_memory: rawptr, old_size: int, flags: u64) -> rawptr
-
-
-	procedure: Proc
-	data:      rawptr
+	procedure: Allocator_Proc;
+	data:      rawptr;
 }
 
 
 Context :: struct #ordered {
-	thread_id: int
+	thread_id: int;
 
-	allocator: Allocator
+	allocator: Allocator;
 
-	user_data:  rawptr
-	user_index: int
+	user_data:  rawptr;
+	user_index: int;
 }
 
-#thread_local __context: Context
+#thread_local __context: Context;
 
 
-DEFAULT_ALIGNMENT :: align_of([vector 4]f32)
+DEFAULT_ALIGNMENT :: align_of([vector 4]f32);
 
 
 __check_context :: proc() {
-	c := ^__context
+	c := ^__context;
 
 	if c.allocator.procedure == nil {
-		c.allocator = default_allocator()
+		c.allocator = default_allocator();
 	}
 	if c.thread_id == 0 {
-		c.thread_id = os.current_thread_id()
+		c.thread_id = os.current_thread_id();
 	}
 }
 
 alloc :: proc(size: int) -> rawptr #inline { return alloc_align(size, DEFAULT_ALIGNMENT); }
 
 alloc_align :: proc(size, alignment: int) -> rawptr #inline {
-	__check_context()
-	a := context.allocator
-	return a.procedure(a.data, Allocator.Mode.ALLOC, size, alignment, nil, 0, 0)
+	__check_context();
+	a := context.allocator;
+	return a.procedure(a.data, Allocator_Mode.ALLOC, size, alignment, nil, 0, 0);
 }
 
 free :: proc(ptr: rawptr) #inline {
-	__check_context()
-	a := context.allocator
+	__check_context();
+	a := context.allocator;
 	if ptr != nil {
-		a.procedure(a.data, Allocator.Mode.FREE, 0, 0, ptr, 0, 0)
+		a.procedure(a.data, Allocator_Mode.FREE, 0, 0, ptr, 0, 0);
 	}
 }
 free_all :: proc() #inline {
-	__check_context()
-	a := context.allocator
-	a.procedure(a.data, Allocator.Mode.FREE_ALL, 0, 0, nil, 0, 0)
+	__check_context();
+	a := context.allocator;
+	a.procedure(a.data, Allocator_Mode.FREE_ALL, 0, 0, nil, 0, 0);
 }
 
 
 resize       :: proc(ptr: rawptr, old_size, new_size: int) -> rawptr #inline { return resize_align(ptr, old_size, new_size, DEFAULT_ALIGNMENT); }
 resize_align :: proc(ptr: rawptr, old_size, new_size, alignment: int) -> rawptr #inline {
-	__check_context()
-	a := context.allocator
-	return a.procedure(a.data, Allocator.Mode.RESIZE, new_size, alignment, ptr, old_size, 0)
+	__check_context();
+	a := context.allocator;
+	return a.procedure(a.data, Allocator_Mode.RESIZE, new_size, alignment, ptr, old_size, 0);
 }
 
 
 
 default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: int) -> rawptr {
 	if old_memory == nil {
-		return alloc_align(new_size, alignment)
+		return alloc_align(new_size, alignment);
 	}
 
 	if new_size == 0 {
-		free(old_memory)
-		return nil
+		free(old_memory);
+		return nil;
 	}
 
 	if new_size == old_size {
-		return old_memory
+		return old_memory;
 	}
 
-	new_memory := alloc_align(new_size, alignment)
+	new_memory := alloc_align(new_size, alignment);
 	if new_memory == nil {
-		return nil
+		return nil;
 	}
 
-	mem.copy(new_memory, old_memory, min(old_size, new_size));
-	free(old_memory)
-	return new_memory
+	mem.copy(new_memory, old_memory, min(old_size, new_size));;
+	free(old_memory);
+	return new_memory;
 }
 
 
-default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
+default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                size, alignment: int,
                                old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
-	using Allocator.Mode
+	using Allocator_Mode;
 	when false {
 		match mode {
 		case ALLOC:
-			total_size := size + alignment + size_of(mem.AllocationHeader)
-			ptr := os.heap_alloc(total_size)
-			header := ptr as ^mem.AllocationHeader
-			ptr = mem.align_forward(header+1, alignment)
-			mem.allocation_header_fill(header, ptr, size)
-			return mem.zero(ptr, size)
+			total_size := size + alignment + size_of(mem.AllocationHeader);
+			ptr := os.heap_alloc(total_size);
+			header := ptr as ^mem.AllocationHeader;
+			ptr = mem.align_forward(header+1, alignment);
+			mem.allocation_header_fill(header, ptr, size);
+			return mem.zero(ptr, size);
 
 		case FREE:
-			os.heap_free(mem.allocation_header(old_memory))
-			return nil
+			os.heap_free(mem.allocation_header(old_memory));
+			return nil;
 
 		case FREE_ALL:
 			// NOTE(bill): Does nothing
 
 		case RESIZE:
-			total_size := size + alignment + size_of(mem.AllocationHeader)
-			ptr := os.heap_resize(mem.allocation_header(old_memory), total_size)
-			header := ptr as ^mem.AllocationHeader
-			ptr = mem.align_forward(header+1, alignment)
-			mem.allocation_header_fill(header, ptr, size)
-			return mem.zero(ptr, size)
+			total_size := size + alignment + size_of(mem.AllocationHeader);
+			ptr := os.heap_resize(mem.allocation_header(old_memory), total_size);
+			header := ptr as ^mem.AllocationHeader;
+			ptr = mem.align_forward(header+1, alignment);
+			mem.allocation_header_fill(header, ptr, size);
+			return mem.zero(ptr, size);
 		}
 	} else {
 		match mode {
 		case ALLOC:
-			return os.heap_alloc(size)
+			return os.heap_alloc(size);
 
 		case FREE:
-			os.heap_free(old_memory)
-			return nil
+			os.heap_free(old_memory);
+			return nil;
 
 		case FREE_ALL:
 			// NOTE(bill): Does nothing
 
 		case RESIZE:
-			return os.heap_resize(old_memory, size)
+			return os.heap_resize(old_memory, size);
 		}
 	}
 
-	return nil
+	return nil;
 }
 
 default_allocator :: proc() -> Allocator {
 	return Allocator{
 		procedure = default_allocator_proc,
 		data = nil,
-	}
+	};
 }
 
 
@@ -281,16 +281,16 @@ default_allocator :: proc() -> Allocator {
 
 __string_eq :: proc(a, b: string) -> bool {
 	if a.count != b.count {
-		return false
+		return false;
 	}
 	if a.data == b.data {
-		return true
+		return true;
 	}
-	return mem.compare(a.data, b.data, a.count) == 0
+	return mem.compare(a.data, b.data, a.count) == 0;
 }
 
 __string_cmp :: proc(a, b : string) -> int {
-	return mem.compare(a.data, b.data, min(a.count, b.count))
+	return mem.compare(a.data, b.data, min(a.count, b.count));
 }
 
 __string_ne :: proc(a, b: string) -> bool #inline { return !__string_eq(a, b); }
@@ -302,37 +302,37 @@ __string_ge :: proc(a, b: string) -> bool #inline { return __string_cmp(a, b) >=
 
 __assert :: proc(file: string, line, column: int, msg: string) #inline {
 	fmt.fprintf(os.stderr, "%(%:%) Runtime assertion: %\n",
-	            file, line, column, msg)
-	__debug_trap()
+	            file, line, column, msg);
+	__debug_trap();
 }
 
 __bounds_check_error :: proc(file: string, line, column: int,
                              index, count: int) {
 	if 0 <= index && index < count {
-		return
+		return;
 	}
 	fmt.fprintf(os.stderr, "%(%:%) Index % is out of bounds range [0, %)\n",
-	            file, line, column, index, count)
-	__debug_trap()
+	            file, line, column, index, count);
+	__debug_trap();
 }
 
 __slice_expr_error :: proc(file: string, line, column: int,
                            low, high, max: int) {
 	if 0 <= low && low <= high && high <= max {
-		return
+		return;
 	}
 	fmt.fprintf(os.stderr, "%(%:%) Invalid slice indices: [%:%:%]\n",
-	            file, line, column, low, high, max)
-	__debug_trap()
+	            file, line, column, low, high, max);
+	__debug_trap();
 }
 __substring_expr_error :: proc(file: string, line, column: int,
                                low, high: int) {
 	if 0 <= low && low <= high {
-		return
+		return;
 	}
 	fmt.fprintf(os.stderr, "%(%:%) Invalid substring indices: [%:%:%]\n",
-	            file, line, column, low, high)
-	__debug_trap()
+	            file, line, column, low, high);
+	__debug_trap();
 }
 
 __enum_to_string :: proc(info: ^Type_Info, value: i64) -> string {
@@ -341,11 +341,11 @@ __enum_to_string :: proc(info: ^Type_Info, value: i64) -> string {
 		// TODO(bill): Search faster than linearly
 		for i := 0; i < ti.values.count; i++ {
 			if ti.values[i] == value {
-				return ti.names[i]
+				return ti.names[i];
 			}
 		}
 	}
-	return ""
+	return "";
 }
 
 

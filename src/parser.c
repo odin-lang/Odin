@@ -1183,33 +1183,33 @@ Token expect_closing(AstFile *f, TokenKind kind, String context) {
 }
 
 void expect_semicolon(AstFile *f, AstNode *s) {
-	if (f->prev_token.kind == Token_CloseBrace ||
-	    f->prev_token.kind == Token_CloseBrace) {
+	if (allow_token(f, Token_Semicolon)) {
+		return;
+	}
+	Token prev_token = f->prev_token;
+
+	switch (f->curr_token.kind) {
+	case Token_EOF:
 		return;
 	}
 
-	if (f->curr_token.kind != Token_CloseParen &&
-	    f->curr_token.kind != Token_CloseBrace) {
-		switch (f->curr_token.kind) {
-		case Token_Comma:
-			expect_token(f, Token_Semicolon);
-			/*fallthrough*/
-		case Token_Semicolon:
-			next_token(f);
+	if (s != NULL) {
+		switch (s->kind) {
+		case AstNode_ProcDecl:
+			return;
+		case AstNode_TypeDecl:
+			if (f->prev_token.kind == Token_CloseBrace) {
+				return;
+			}
 			break;
-		default:
-			expect_token(f, Token_Semicolon);
-			fix_advance_to_next_stmt(f);
 		}
-	}
 
-	// if (s != NULL) {
-	// 	syntax_error(f->prev_token, "Expected `;` after %.*s, got `%.*s`",
-	// 	             LIT(ast_node_strings[s->kind]), LIT(token_strings[f->prev_token.kind]));
-	// } else {
-	// 	syntax_error(f->prev_token, "Expected `;`");
-	// }
-	// fix_advance_to_next_stmt(f);
+		syntax_error(prev_token, "Expected `;` after %.*s, got %.*s",
+		             LIT(ast_node_strings[s->kind]), LIT(token_strings[prev_token.kind]));
+	} else {
+		syntax_error(prev_token, "Expected `;`");
+	}
+	fix_advance_to_next_stmt(f);
 }
 
 bool parse_at_comma(AstFile *f, String context, TokenKind follow) {
@@ -2497,8 +2497,6 @@ AstNode *parse_if_stmt(AstFile *f) {
 			else_stmt = make_bad_stmt(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
 			break;
 		}
-	} else {
-		expect_semicolon(f, body);
 	}
 
 	return make_if_stmt(f, token, init, cond, body, else_stmt);
@@ -2935,8 +2933,8 @@ AstNode *parse_stmt(AstFile *f) {
 				s = make_bad_decl(f, token, file_path);
 			} else {
 				s = make_import_decl(f, hash_token, file_path, import_name, cond, false);
-				expect_semicolon(f, s);
 			}
+			expect_semicolon(f, s);
 			return s;
 		} else if (str_eq(tag, str_lit("include"))) {
 			AstNode *cond = NULL;
@@ -2984,6 +2982,7 @@ AstNode *parse_stmt(AstFile *f) {
 			return s;
 		}
 
+		expect_semicolon(f, s);
 		return make_tag_stmt(f, hash_token, name, parse_stmt(f));
 	} break;
 
