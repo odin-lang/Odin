@@ -1579,12 +1579,14 @@ ssaValue *ssa_emit_union_tag_ptr(ssaProcedure *proc, ssaValue *u) {
 	Type *t = ssa_type(u);
 	GB_ASSERT(is_type_pointer(t) &&
 	          is_type_union(type_deref(t)));
+	GB_ASSERT(are_types_identical(t, ssa_type(u)));
 	return ssa_emit(proc, ssa_make_instr_union_tag_ptr(proc, u));
 }
 
 ssaValue *ssa_emit_union_tag_value(ssaProcedure *proc, ssaValue *u) {
 	Type *t = ssa_type(u);
 	GB_ASSERT(is_type_union(t));
+	GB_ASSERT(are_types_identical(t, ssa_type(u)));
 	return ssa_emit(proc, ssa_make_instr_union_tag_value(proc, u));
 }
 

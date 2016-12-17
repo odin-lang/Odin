@@ -54,7 +54,11 @@ void ssa_opt_add_operands(ssaValueArray *ops, ssaInstr *i) {
 			array_add(ops, i->Phi.edges.e[j]);
 		}
 		break;
-	case ssaInstr_Unreachable: break;
+	case ssaInstr_Unreachable:
+		break;
+	case ssaInstr_UnaryOp:
+		array_add(ops, i->UnaryOp.expr);
+		break;
 	case ssaInstr_BinaryOp:
 		array_add(ops, i->BinaryOp.left);
 		array_add(ops, i->BinaryOp.right);
@@ -88,8 +92,6 @@ void ssa_opt_add_operands(ssaValueArray *ops, ssaInstr *i) {
 		array_add(ops, i->SliceBoundsCheck.high);
 		array_add(ops, i->SliceBoundsCheck.max);
 		break;
-
-
 	}
 }
 

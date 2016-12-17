@@ -206,7 +206,7 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 				}
 				Type *ft = t->Record.fields[i]->type;
 				Type *bft = base_type(ft);
-				if (!is_type_struct(bft)) {
+				if (!is_type_struct(bft) && !is_type_union(bft)) {
 					ft = bft;
 				}
 				ssa_print_type(f, m, ft);
@@ -242,7 +242,6 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 			String *name = map_string_get(&m->type_names, hash_pointer(t));
 			GB_ASSERT_MSG(name != NULL, "%.*s", LIT(t->Named.name));
 			ssa_print_encoded_local(f, *name);
-			// ssa_print_encoded_local(f, t->Named.name);
 		} else {
 			ssa_print_type(f, m, base_type(t));
 		}
