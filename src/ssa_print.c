@@ -204,12 +204,7 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 				if (i > 0) {
 					ssa_fprintf(f, ", ");
 				}
-				Type *ft = t->Record.fields[i]->type;
-				Type *bft = base_type(ft);
-				if (!is_type_struct(bft)) {
-					ft = bft;
-				}
-				ssa_print_type(f, m, ft);
+				ssa_print_type(f, m, t->Record.fields[i]->type);
 			}
 			ssa_fprintf(f, "}");
 			if (t->Record.struct_is_packed) {
@@ -242,7 +237,6 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 			String *name = map_string_get(&m->type_names, hash_pointer(t));
 			GB_ASSERT_MSG(name != NULL, "%.*s", LIT(t->Named.name));
 			ssa_print_encoded_local(f, *name);
-			// ssa_print_encoded_local(f, t->Named.name);
 		} else {
 			ssa_print_type(f, m, base_type(t));
 		}
