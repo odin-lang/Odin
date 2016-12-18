@@ -81,7 +81,7 @@ proc type_info_base(info ^Type_Info) -> ^Type_Info {
 	if info == nil {
 		return nil;
 	}
-	base := info;
+	var base = info;
 	match type i : base {
 	case Type_Info.Named:
 		base = i.base;
@@ -147,7 +147,7 @@ const DEFAULT_ALIGNMENT = align_of([vector 4]f32);
 
 
 proc __check_context() {
-	c := ^__context;
+	var c = ^__context;
 
 	if c.allocator.procedure == nil {
 		c.allocator = default_allocator();
@@ -161,20 +161,20 @@ proc alloc(size int) -> rawptr #inline { return alloc_align(size, DEFAULT_ALIGNM
 
 proc alloc_align(size, alignment int) -> rawptr #inline {
 	__check_context();
-	a := context.allocator;
+	var a = context.allocator;
 	return a.procedure(a.data, Allocator_Mode.ALLOC, size, alignment, nil, 0, 0);
 }
 
 proc free(ptr rawptr) #inline {
 	__check_context();
-	a := context.allocator;
+	var a = context.allocator;
 	if ptr != nil {
 		a.procedure(a.data, Allocator_Mode.FREE, 0, 0, ptr, 0, 0);
 	}
 }
 proc free_all() #inline {
 	__check_context();
-	a := context.allocator;
+	var a = context.allocator;
 	a.procedure(a.data, Allocator_Mode.FREE_ALL, 0, 0, nil, 0, 0);
 }
 
@@ -182,7 +182,7 @@ proc free_all() #inline {
 proc resize      (ptr rawptr, old_size, new_size int) -> rawptr #inline { return resize_align(ptr, old_size, new_size, DEFAULT_ALIGNMENT); }
 proc resize_align(ptr rawptr, old_size, new_size, alignment int) -> rawptr #inline {
 	__check_context();
-	a := context.allocator;
+	var a = context.allocator;
 	return a.procedure(a.data, Allocator_Mode.RESIZE, new_size, alignment, ptr, old_size, 0);
 }
 
@@ -202,7 +202,7 @@ proc default_resize_align(old_memory rawptr, old_size, new_size, alignment int) 
 		return old_memory;
 	}
 
-	new_memory := alloc_align(new_size, alignment);
+	var new_memory = alloc_align(new_size, alignment);
 	if new_memory == nil {
 		return nil;
 	}
@@ -220,9 +220,9 @@ proc default_allocator_proc(allocator_data rawptr, mode Allocator_Mode,
 	when false {
 		match mode {
 		case ALLOC:
-			total_size := size + alignment + size_of(mem.AllocationHeader);
-			ptr := os.heap_alloc(total_size);
-			header := ptr as ^mem.AllocationHeader;
+			var total_size = size + alignment + size_of(mem.AllocationHeader);
+			var ptr = os.heap_alloc(total_size);
+			var header = ptr as ^mem.AllocationHeader;
 			ptr = mem.align_forward(header+1, alignment);
 			mem.allocation_header_fill(header, ptr, size);
 			return mem.zero(ptr, size);
@@ -235,9 +235,9 @@ proc default_allocator_proc(allocator_data rawptr, mode Allocator_Mode,
 			// NOTE(bill): Does nothing
 
 		case RESIZE:
-			total_size := size + alignment + size_of(mem.AllocationHeader);
-			ptr := os.heap_resize(mem.allocation_header(old_memory), total_size);
-			header := ptr as ^mem.AllocationHeader;
+			var total_size = size + alignment + size_of(mem.AllocationHeader);
+			var ptr = os.heap_resize(mem.allocation_header(old_memory), total_size);
+			var header = ptr as ^mem.AllocationHeader;
 			ptr = mem.align_forward(header+1, alignment);
 			mem.allocation_header_fill(header, ptr, size);
 			return mem.zero(ptr, size);
@@ -336,7 +336,7 @@ proc __enum_to_string(info ^Type_Info, value i64) -> string {
 	match type ti : type_info_base(info) {
 	case Type_Info.Enum:
 		// TODO(bill): Search faster than linearly
-		for i := 0; i < ti.values.count; i++ {
+		for var i = 0; i < ti.values.count; i++ {
 			if ti.values[i] == value {
 				return ti.names[i];
 			}

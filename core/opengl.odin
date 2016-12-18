@@ -30,11 +30,11 @@ proc GetIntegerv(name i32, v ^i32) #foreign "glGetIntegerv"
 
 
 
-_libgl := win32.LoadLibraryA(("opengl32.dll\x00" as string).data);
+var _libgl = win32.LoadLibraryA(("opengl32.dll\x00" as string).data);
 
 proc GetProcAddress(name string) -> proc() {
 	assert(name[name.count-1] == 0);
-	res := win32.wglGetProcAddress(name.data);
+	var res = win32.wglGetProcAddress(name.data);
 	if res == nil {
 		res = win32.GetProcAddress(_libgl, name.data);
 	}
@@ -42,63 +42,63 @@ proc GetProcAddress(name string) -> proc() {
 }
 
 
-GenBuffers:      proc(count i32, buffers ^u32);
-GenVertexArrays: proc(count i32, buffers ^u32);
-GenSamplers:     proc(count i32, buffers ^u32);
-BindBuffer:      proc(target i32, buffer u32);
-BindVertexArray: proc(buffer u32);
-BindSampler:     proc(position i32, sampler u32);
-BufferData:      proc(target i32, size int, data rawptr, usage i32);
-BufferSubData:   proc(target i32, offset, size int, data rawptr);
+var GenBuffers      proc(count i32, buffers ^u32);
+var GenVertexArrays proc(count i32, buffers ^u32);
+var GenSamplers     proc(count i32, buffers ^u32);
+var BindBuffer      proc(target i32, buffer u32);
+var BindVertexArray proc(buffer u32);
+var BindSampler     proc(position i32, sampler u32);
+var BufferData      proc(target i32, size int, data rawptr, usage i32);
+var BufferSubData   proc(target i32, offset, size int, data rawptr);
 
-DrawArrays:      proc(mode, first i32, count u32);
-DrawElements:    proc(mode i32, count u32, type_ i32, indices rawptr);
+var DrawArrays      proc(mode, first i32, count u32);
+var DrawElements    proc(mode i32, count u32, type_ i32, indices rawptr);
 
-MapBuffer:       proc(target, access i32) -> rawptr;
-UnmapBuffer:     proc(target i32);
+var MapBuffer       proc(target, access i32) -> rawptr;
+var UnmapBuffer     proc(target i32);
 
-VertexAttribPointer: proc(index u32, size, type_ i32, normalized i32, stride u32, pointer rawptr);
-EnableVertexAttribArray: proc(index u32);
+var VertexAttribPointer proc(index u32, size, type_ i32, normalized i32, stride u32, pointer rawptr);
+var EnableVertexAttribArray proc(index u32);
 
-CreateShader:  proc(shader_type i32) -> u32;
-ShaderSource:  proc(shader u32, count u32, str ^^byte, length ^i32);
-CompileShader: proc(shader u32);
-CreateProgram: proc() -> u32;
-AttachShader:  proc(program, shader u32);
-DetachShader:  proc(program, shader u32);
-DeleteShader:  proc(shader u32);
-LinkProgram:   proc(program u32);
-UseProgram:    proc(program u32);
-DeleteProgram: proc(program u32);
-
-
-GetShaderiv:       proc(shader  u32, pname i32, params ^i32);
-GetProgramiv:      proc(program u32, pname i32, params ^i32);
-GetShaderInfoLog:  proc(shader  u32, max_length u32, length ^u32, info_long ^byte);
-GetProgramInfoLog: proc(program u32, max_length u32, length ^u32, info_long ^byte);
-
-ActiveTexture:  proc(texture i32);
-GenerateMipmap: proc(target i32);
-
-SamplerParameteri:    proc(sampler u32, pname i32, param i32);
-SamplerParameterf:    proc(sampler u32, pname i32, param f32);
-SamplerParameteriv:   proc(sampler u32, pname i32, params ^i32);
-SamplerParameterfv:   proc(sampler u32, pname i32, params ^f32);
-SamplerParameterIiv:  proc(sampler u32, pname i32, params ^i32);
-SamplerParameterIuiv: proc(sampler u32, pname i32, params ^u32);
+var CreateShader  proc(shader_type i32) -> u32;
+var ShaderSource  proc(shader u32, count u32, str ^^byte, length ^i32);
+var CompileShader proc(shader u32);
+var CreateProgram proc() -> u32;
+var AttachShader  proc(program, shader u32);
+var DetachShader  proc(program, shader u32);
+var DeleteShader  proc(shader u32);
+var LinkProgram   proc(program u32);
+var UseProgram    proc(program u32);
+var DeleteProgram proc(program u32);
 
 
-Uniform1i:        proc(loc i32, v0 i32);
-Uniform2i:        proc(loc i32, v0, v1 i32);
-Uniform3i:        proc(loc i32, v0, v1, v2 i32);
-Uniform4i:        proc(loc i32, v0, v1, v2, v3 i32);
-Uniform1f:        proc(loc i32, v0 f32);
-Uniform2f:        proc(loc i32, v0, v1 f32);
-Uniform3f:        proc(loc i32, v0, v1, v2 f32);
-Uniform4f:        proc(loc i32, v0, v1, v2, v3 f32);
-UniformMatrix4fv: proc(loc i32, count u32, transpose i32, value ^f32);
+var GetShaderiv       proc(shader  u32, pname i32, params ^i32);
+var GetProgramiv      proc(program u32, pname i32, params ^i32);
+var GetShaderInfoLog  proc(shader  u32, max_length u32, length ^u32, info_long ^byte);
+var GetProgramInfoLog proc(program u32, max_length u32, length ^u32, info_long ^byte);
 
-GetUniformLocation: proc(program u32, name ^byte) -> i32;
+var ActiveTexture  proc(texture i32);
+var GenerateMipmap proc(target i32);
+
+var SamplerParameteri    proc(sampler u32, pname i32, param i32);
+var SamplerParameterf    proc(sampler u32, pname i32, param f32);
+var SamplerParameteriv   proc(sampler u32, pname i32, params ^i32);
+var SamplerParameterfv   proc(sampler u32, pname i32, params ^f32);
+var SamplerParameterIiv  proc(sampler u32, pname i32, params ^i32);
+var SamplerParameterIuiv proc(sampler u32, pname i32, params ^u32);
+
+
+var Uniform1i        proc(loc i32, v0 i32);
+var Uniform2i        proc(loc i32, v0, v1 i32);
+var Uniform3i        proc(loc i32, v0, v1, v2 i32);
+var Uniform4i        proc(loc i32, v0, v1, v2, v3 i32);
+var Uniform1f        proc(loc i32, v0 f32);
+var Uniform2f        proc(loc i32, v0, v1 f32);
+var Uniform3f        proc(loc i32, v0, v1, v2 f32);
+var Uniform4f        proc(loc i32, v0, v1, v2, v3 f32);
+var UniformMatrix4fv proc(loc i32, count u32, transpose i32, value ^f32);
+
+var GetUniformLocation proc(program u32, name ^byte) -> i32;
 
 proc init() {
 	proc set_proc_address(p rawptr, name string) #inline { (p as ^proc())^ = GetProcAddress(name); }

@@ -47,8 +47,8 @@ proc sign64(x f64) -> f64 { if x >= 0 { return +1; } return -1; }
 
 
 proc copy_sign32(x, y f32) -> f32 {
-	ix := x transmute u32;
-	iy := y transmute u32;
+	var ix = x transmute u32;
+	var iy = y transmute u32;
 	ix &= 0x7fffffff;
 	ix |= iy & 0x80000000;
 	return ix transmute f32;
@@ -78,7 +78,7 @@ proc remainder32(x, y f32) -> f32 {
 
 proc fmod32(x, y f32) -> f32 {
 	y = abs(y);
-	result := remainder32(abs(x), y);
+	var result = remainder32(abs(x), y);
 	if sign32(result) < 0 {
 		result += y;
 	}
@@ -92,13 +92,13 @@ proc to_degrees(radians f32) -> f32 { return radians * 360 / TAU; }
 
 
 
-proc dot2(a, b Vec2) -> f32 { c := a*b; return c.x + c.y; }
-proc dot3(a, b Vec3) -> f32 { c := a*b; return c.x + c.y + c.z; }
-proc dot4(a, b Vec4) -> f32 { c := a*b; return c.x + c.y + c.z + c.w; }
+proc dot2(a, b Vec2) -> f32 { var c = a*b; return c.x + c.y; }
+proc dot3(a, b Vec3) -> f32 { var c = a*b; return c.x + c.y + c.z; }
+proc dot4(a, b Vec4) -> f32 { var c = a*b; return c.x + c.y + c.z + c.w; }
 
 proc cross3(x, y Vec3) -> Vec3 {
-	a := swizzle(x, 1, 2, 0) * swizzle(y, 2, 0, 1);
-	b := swizzle(x, 2, 0, 1) * swizzle(y, 1, 2, 0);
+	var a = swizzle(x, 1, 2, 0) * swizzle(y, 2, 0, 1);
+	var b = swizzle(x, 2, 0, 1) * swizzle(y, 1, 2, 0);
 	return a - b;
 }
 
@@ -112,7 +112,7 @@ proc vec3_norm(v Vec3) -> Vec3 { return v / Vec3{vec3_mag(v)}; }
 proc vec4_norm(v Vec4) -> Vec4 { return v / Vec4{vec4_mag(v)}; }
 
 proc vec2_norm0(v Vec2) -> Vec2 {
-	m := vec2_mag(v);
+	var m = vec2_mag(v);
 	if m == 0 {
 		return Vec2{0};
 	}
@@ -120,7 +120,7 @@ proc vec2_norm0(v Vec2) -> Vec2 {
 }
 
 proc vec3_norm0(v Vec3) -> Vec3 {
-	m := vec3_mag(v);
+	var m = vec3_mag(v);
 	if m == 0 {
 		return Vec3{0};
 	}
@@ -128,7 +128,7 @@ proc vec3_norm0(v Vec3) -> Vec3 {
 }
 
 proc vec4_norm0(v Vec4) -> Vec4 {
-	m := vec4_mag(v);
+	var m = vec4_mag(v);
 	if m == 0 {
 		return Vec4{0};
 	}
@@ -147,8 +147,8 @@ proc mat4_identity() -> Mat4 {
 }
 
 proc mat4_transpose(m Mat4) -> Mat4 {
-	for j := 0; j < 4; j++ {
-		for i := 0; i < 4; i++ {
+	for var j = 0; j < 4; j++ {
+		for var i = 0; i < 4; i++ {
 			m[i][j], m[j][i] = m[j][i], m[i][j];
 		}
 	}
@@ -156,9 +156,9 @@ proc mat4_transpose(m Mat4) -> Mat4 {
 }
 
 proc mat4_mul(a, b Mat4) -> Mat4 {
-	c: Mat4;
-	for j := 0; j < 4; j++ {
-		for i := 0; i < 4; i++ {
+	var c Mat4;
+	for var j = 0; j < 4; j++ {
+		for var i = 0; i < 4; i++ {
 			c[j][i] = a[0][i]*b[j][0] +
 			          a[1][i]*b[j][1] +
 			          a[2][i]*b[j][2] +
@@ -178,27 +178,27 @@ proc mat4_mul_vec4(m Mat4, v Vec4) -> Vec4 {
 }
 
 proc mat4_inverse(m Mat4) -> Mat4 {
-	o: Mat4;
+	var o Mat4;
 
-	sf00 := m[2][2] * m[3][3] - m[3][2] * m[2][3];
-	sf01 := m[2][1] * m[3][3] - m[3][1] * m[2][3];
-	sf02 := m[2][1] * m[3][2] - m[3][1] * m[2][2];
-	sf03 := m[2][0] * m[3][3] - m[3][0] * m[2][3];
-	sf04 := m[2][0] * m[3][2] - m[3][0] * m[2][2];
-	sf05 := m[2][0] * m[3][1] - m[3][0] * m[2][1];
-	sf06 := m[1][2] * m[3][3] - m[3][2] * m[1][3];
-	sf07 := m[1][1] * m[3][3] - m[3][1] * m[1][3];
-	sf08 := m[1][1] * m[3][2] - m[3][1] * m[1][2];
-	sf09 := m[1][0] * m[3][3] - m[3][0] * m[1][3];
-	sf10 := m[1][0] * m[3][2] - m[3][0] * m[1][2];
-	sf11 := m[1][1] * m[3][3] - m[3][1] * m[1][3];
-	sf12 := m[1][0] * m[3][1] - m[3][0] * m[1][1];
-	sf13 := m[1][2] * m[2][3] - m[2][2] * m[1][3];
-	sf14 := m[1][1] * m[2][3] - m[2][1] * m[1][3];
-	sf15 := m[1][1] * m[2][2] - m[2][1] * m[1][2];
-	sf16 := m[1][0] * m[2][3] - m[2][0] * m[1][3];
-	sf17 := m[1][0] * m[2][2] - m[2][0] * m[1][2];
-	sf18 := m[1][0] * m[2][1] - m[2][0] * m[1][1];
+	var sf00 = m[2][2] * m[3][3] - m[3][2] * m[2][3];
+	var sf01 = m[2][1] * m[3][3] - m[3][1] * m[2][3];
+	var sf02 = m[2][1] * m[3][2] - m[3][1] * m[2][2];
+	var sf03 = m[2][0] * m[3][3] - m[3][0] * m[2][3];
+	var sf04 = m[2][0] * m[3][2] - m[3][0] * m[2][2];
+	var sf05 = m[2][0] * m[3][1] - m[3][0] * m[2][1];
+	var sf06 = m[1][2] * m[3][3] - m[3][2] * m[1][3];
+	var sf07 = m[1][1] * m[3][3] - m[3][1] * m[1][3];
+	var sf08 = m[1][1] * m[3][2] - m[3][1] * m[1][2];
+	var sf09 = m[1][0] * m[3][3] - m[3][0] * m[1][3];
+	var sf10 = m[1][0] * m[3][2] - m[3][0] * m[1][2];
+	var sf11 = m[1][1] * m[3][3] - m[3][1] * m[1][3];
+	var sf12 = m[1][0] * m[3][1] - m[3][0] * m[1][1];
+	var sf13 = m[1][2] * m[2][3] - m[2][2] * m[1][3];
+	var sf14 = m[1][1] * m[2][3] - m[2][1] * m[1][3];
+	var sf15 = m[1][1] * m[2][2] - m[2][1] * m[1][2];
+	var sf16 = m[1][0] * m[2][3] - m[2][0] * m[1][3];
+	var sf17 = m[1][0] * m[2][2] - m[2][0] * m[1][2];
+	var sf18 = m[1][0] * m[2][1] - m[2][0] * m[1][1];
 
 	o[0][0] = +(m[1][1] * sf00 - m[1][2] * sf01 + m[1][3] * sf02);
 	o[0][1] = -(m[1][0] * sf00 - m[1][2] * sf03 + m[1][3] * sf04);
@@ -220,7 +220,7 @@ proc mat4_inverse(m Mat4) -> Mat4 {
 	o[3][2] = -(m[0][0] * sf14 - m[0][1] * sf16 + m[0][3] * sf18);
 	o[3][3] = +(m[0][0] * sf15 - m[0][1] * sf17 + m[0][2] * sf18);
 
-	ood := 1.0 / (m[0][0] * o[0][0] +
+	var ood = 1.0 / (m[0][0] * o[0][0] +
 	              m[0][1] * o[0][1] +
 	              m[0][2] * o[0][2] +
 	              m[0][3] * o[0][3]);
@@ -247,7 +247,7 @@ proc mat4_inverse(m Mat4) -> Mat4 {
 
 
 proc mat4_translate(v Vec3) -> Mat4 {
-	m := mat4_identity();
+	var m = mat4_identity();
 	m[3][0] = v.x;
 	m[3][1] = v.y;
 	m[3][2] = v.z;
@@ -256,13 +256,13 @@ proc mat4_translate(v Vec3) -> Mat4 {
 }
 
 proc mat4_rotate(v Vec3, angle_radians f32) -> Mat4 {
-	c := cos32(angle_radians);
-	s := sin32(angle_radians);
+	var c = cos32(angle_radians);
+	var s = sin32(angle_radians);
 
-	a := vec3_norm(v);
-	t := a * Vec3{1-c};
+	var a = vec3_norm(v);
+	var t = a * Vec3{1-c};
 
-	rot := mat4_identity();
+	var rot = mat4_identity();
 
 	rot[0][0] = c + t.x*a.x;
 	rot[0][1] = 0 + t.x*a.y + s*a.z;
@@ -298,11 +298,11 @@ proc mat4_scalef(m Mat4, s f32) -> Mat4 {
 
 
 proc mat4_look_at(eye, centre, up Vec3) -> Mat4 {
-	f := vec3_norm(centre - eye);
-	s := vec3_norm(cross3(f, up));
-	u := cross3(s, f);
+	var f = vec3_norm(centre - eye);
+	var s = vec3_norm(cross3(f, up));
+	var u = cross3(s, f);
 
-	m: Mat4;
+	var m Mat4;
 
 	m[0] = Vec4{+s.x, +s.y, +s.z, 0};
 	m[1] = Vec4{+u.x, +u.y, +u.z, 0};
@@ -312,8 +312,8 @@ proc mat4_look_at(eye, centre, up Vec3) -> Mat4 {
 	return m;
 }
 proc mat4_perspective(fovy, aspect, near, far f32) -> Mat4 {
-	m: Mat4;
-	tan_half_fovy := tan32(0.5 * fovy);
+	var m Mat4;
+	var tan_half_fovy = tan32(0.5 * fovy);
 	m[0][0] = 1.0 / (aspect*tan_half_fovy);
 	m[1][1] = 1.0 / (tan_half_fovy);
 	m[2][2] = -(far + near) / (far - near);
@@ -324,7 +324,7 @@ proc mat4_perspective(fovy, aspect, near, far f32) -> Mat4 {
 
 
 proc mat4_ortho3d(left, right, bottom, top, near, far f32) -> Mat4 {
-	m := mat4_identity();
+	var m = mat4_identity();
 	m[0][0] = +2.0 / (right - left);
 	m[1][1] = +2.0 / (top - bottom);
 	m[2][2] = -2.0 / (far - near);

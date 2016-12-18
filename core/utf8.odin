@@ -14,7 +14,7 @@ type Accept_Range struct {
 	lo, hi u8;
 };
 
-accept_ranges := [5]Accept_Range{
+var accept_ranges = [5]Accept_Range{
 	{0x80, 0xbf},
 	{0xa0, 0xbf},
 	{0x80, 0x9f},
@@ -22,7 +22,7 @@ accept_ranges := [5]Accept_Range{
 	{0x80, 0x8f},
 };
 
-accept_sizes := [256]byte{
+var accept_sizes = [256]byte{
 	0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x00-0x0f
 	0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x10-0x1f
 	0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x20-0x2f
@@ -43,8 +43,8 @@ accept_sizes := [256]byte{
 };
 
 proc encode_rune(r rune) -> ([4]byte, int) {
-	buf: [4]byte;
-	i := r as u32;
+	var buf [4]byte;
+	var i = r as u32;
 	const mask = 0x3f as byte;
 	if i <= 1<<7-1 {
 		buf[0] = r as byte;
@@ -77,22 +77,22 @@ proc encode_rune(r rune) -> ([4]byte, int) {
 }
 
 proc decode_rune(s string) -> (rune, int) {
-	n := s.count;
+	var n = s.count;
 	if n < 1 {
 		return RUNE_ERROR, 0;
 	}
-	b0 := s[0];
-	x := accept_sizes[b0];
+	var b0 = s[0];
+	var x = accept_sizes[b0];
 	if x >= 0xf0 {
-		mask := (x as rune << 31) >> 31; // all zeros or all ones
+		var mask = (x as rune << 31) >> 31; // all zeros or all ones
 		return (b0 as rune) &~ mask | RUNE_ERROR&mask, 1;
 	}
-	size := x & 7;
-	ar := accept_ranges[x>>4];
+	var size = x & 7;
+	var ar = accept_ranges[x>>4];
 	if n < size as int {
 		return RUNE_ERROR, 1;
 	}
-	b1 := s[1];
+	var b1 = s[1];
 	if b1 < ar.lo || ar.hi < b1 {
 		return RUNE_ERROR, 1;
 	}
@@ -105,14 +105,14 @@ proc decode_rune(s string) -> (rune, int) {
 	if size == 2 {
 		return (b0&MASK_2) as rune <<6 | (b1&MASK_X) as rune, 2;
 	}
-	b2 := s[2];
+	var b2 = s[2];
 	if b2 < 0x80 || 0xbf < b2 {
 		return RUNE_ERROR, 1;
 	}
 	if size == 3 {
 		return (b0&MASK_3) as rune <<12 | (b1&MASK_X) as rune <<6 | (b2&MASK_X) as rune, 3;
 	}
-	b3 := s[3];
+	var b3 = s[3];
 	if b3 < 0x80 || 0xbf < b3 {
 		return RUNE_ERROR, 1;
 	}
@@ -133,31 +133,31 @@ proc valid_rune(r rune) -> bool {
 }
 
 proc valid_string(s string) -> bool {
-	n := s.count;
-	for i := 0; i < n; {
-		si := s[i];
+	var n = s.count;
+	for var i = 0; i < n; {
+		var si = s[i];
 		if si < RUNE_SELF { // ascii
 			i++;
 			continue;
 		}
-		x := accept_sizes[si];
+		var x = accept_sizes[si];
 		if x == 0xf1 {
 			return false;
 		}
-		size := (x & 7) as int;
+		var size = (x & 7) as int;
 		if i+size > n {
 			return false;
 		}
-		ar := accept_ranges[x>>4];
-		if b := s[i+1]; b < ar.lo || ar.hi < b {
+		var ar = accept_ranges[x>>4];
+		if var b = s[i+1]; b < ar.lo || ar.hi < b {
 			return false;
 		} else if size == 2 {
 			// Okay
-		} else if b := s[i+2]; b < 0x80 || 0xbf < b {
+		} else if var b = s[i+2]; b < 0x80 || 0xbf < b {
 			return false;
 		} else if size == 3 {
 			// Okay
-		} else if b := s[i+3]; b < 0x80 || 0xbf < b {
+		} else if var b = s[i+3]; b < 0x80 || 0xbf < b {
 			return false;
 		}
 		i += size;
@@ -166,34 +166,34 @@ proc valid_string(s string) -> bool {
 }
 
 proc rune_count(s string) -> int {
-	count := 0;
-	n := s.count;
-	for i := 0; i < n; count++ {
-		si := s[i];
+	var count = 0;
+	var n = s.count;
+	for var i = 0; i < n; count++ {
+		var si = s[i];
 		if si < RUNE_SELF { // ascii
 			i++;
 			continue;
 		}
-		x := accept_sizes[si];
+		var x = accept_sizes[si];
 		if x == 0xf1 {
 			i++;
 			continue;
 		}
-		size := (x & 7) as int;
+		var size = (x & 7) as int;
 		if i+size > n {
 			i++;
 			continue;
 		}
-		ar := accept_ranges[x>>4];
-		if b := s[i+1]; b < ar.lo || ar.hi < b {
+		var ar = accept_ranges[x>>4];
+		if var b = s[i+1]; b < ar.lo || ar.hi < b {
 			size = 1;
 		} else if size == 2 {
 			// Okay
-		} else if b := s[i+2]; b < 0x80 || 0xbf < b {
+		} else if var b = s[i+2]; b < 0x80 || 0xbf < b {
 			size = 1;
 		} else if size == 3 {
 			// Okay
-		} else if b := s[i+3]; b < 0x80 || 0xbf < b {
+		} else if var b = s[i+3]; b < 0x80 || 0xbf < b {
 			size = 1;
 		}
 		i += size;

@@ -28,22 +28,22 @@ proc copy_non_overlapping(dst, src rawptr, len int) -> rawptr #link_name "__mem_
 
 proc compare(dst, src rawptr, n int) -> int #link_name "__mem_compare" {
 	// Translation of http://mgronhol.github.io/fast-strcmp/
-	a := slice_ptr(dst as ^byte, n);
-	b := slice_ptr(src as ^byte, n);
+	var a = slice_ptr(dst as ^byte, n);
+	var b = slice_ptr(src as ^byte, n);
 
-	fast := n/size_of(int) + 1;
-	offset := (fast-1)*size_of(int);
-	curr_block := 0;
+	var fast = n/size_of(int) + 1;
+	var offset = (fast-1)*size_of(int);
+	var curr_block = 0;
 	if n <= size_of(int) {
 		fast = 0;
 	}
 
-	la := slice_ptr(^a[0] as ^int, fast);
-	lb := slice_ptr(^b[0] as ^int, fast);
+	var la = slice_ptr(^a[0] as ^int, fast);
+	var lb = slice_ptr(^b[0] as ^int, fast);
 
 	for ; curr_block < fast; curr_block++ {
 		if (la[curr_block] ~ lb[curr_block]) != 0 {
-			for pos := curr_block*size_of(int); pos < n; pos++ {
+			for var pos = curr_block*size_of(int); pos < n; pos++ {
 				if (a[pos] ~ b[pos]) != 0 {
 					return a[pos] as int - b[pos] as int;
 				}
@@ -78,9 +78,9 @@ proc is_power_of_two(x int) -> bool {
 proc align_forward(ptr rawptr, align int) -> rawptr {
 	assert(is_power_of_two(align));
 
-	a := align as uint;
-	p := ptr as uint;
-	modulo := p & (a-1);
+	var a = align as uint;
+	var p = ptr as uint;
+	var modulo = p & (a-1);
 	if modulo != 0 {
 		p += a - modulo;
 	}
@@ -94,14 +94,14 @@ type Allocation_Header struct {
 }
 proc allocation_header_fill(header ^Allocation_Header, data rawptr, size int) {
 	header.size = size;
-	ptr := (header+1) as ^int;
+	var ptr = (header+1) as ^int;
 
-	for i := 0; ptr as rawptr < data; i++ {
+	for var i = 0; ptr as rawptr < data; i++ {
 		(ptr+i)^ = -1;
 	}
 }
 proc allocation_header(data rawptr) -> ^Allocation_Header {
-	p := data as ^int;
+	var p = data as ^int;
 	for (p-1)^ == -1 {
 		p = (p-1);
 	}
@@ -160,21 +160,21 @@ proc arena_allocator(arena ^Arena) -> Allocator {
 proc arena_allocator_proc(allocator_data rawptr, mode Allocator_Mode,
                           size, alignment int,
                           old_memory rawptr, old_size int, flags u64) -> rawptr {
-	arena := allocator_data as ^Arena;
+	var arena = allocator_data as ^Arena;
 
 	using Allocator_Mode;
 	match mode {
 	case ALLOC:
-		total_size := size + alignment;
+		var total_size = size + alignment;
 
 		if arena.memory.count + total_size > arena.memory.capacity {
 			fmt.fprintln(os.stderr, "Arena out of memory");
 			return nil;
 		}
 
-		#no_bounds_check end := ^arena.memory[arena.memory.count];
+		#no_bounds_check var end = ^arena.memory[arena.memory.count];
 
-		ptr := align_forward(end, alignment);
+		var ptr = align_forward(end, alignment);
 		arena.memory.count += total_size;
 		return zero(ptr, size);
 
@@ -193,7 +193,7 @@ proc arena_allocator_proc(allocator_data rawptr, mode Allocator_Mode,
 }
 
 proc begin_arena_temp_memory(a ^Arena) -> Arena_Temp_Memory {
-	tmp: Arena_Temp_Memory;
+	var tmp Arena_Temp_Memory;
 	tmp.arena = a;
 	tmp.original_count = a.memory.count;
 	a.temp_count++;
@@ -253,9 +253,9 @@ proc align_of_type_info(type_info ^Type_Info) -> int {
 	case Slice:
 		return WORD_SIZE;
 	case Vector:
-		size := size_of_type_info(info.elem);
-		count := max(prev_pow2(info.count as i64), 1) as int;
-		total := size * count;
+		var size = size_of_type_info(info.elem);
+		var count = max(prev_pow2(info.count as i64), 1) as int;
+		var total = size * count;
 		return clamp(total, 1, MAX_ALIGN);
 	case Struct:
 		return info.align;
@@ -271,7 +271,7 @@ proc align_of_type_info(type_info ^Type_Info) -> int {
 }
 
 proc align_formula(size, align int) -> int {
-	result := size + align-1;
+	var result = size + align-1;
 	return result - result%align;
 };
 
@@ -298,13 +298,13 @@ proc size_of_type_info(type_info ^Type_Info) -> int {
 	case Procedure:
 		return WORD_SIZE;
 	case Array:
-		count := info.count;
+		var count = info.count;
 		if count == 0 {
 			return 0;
 		}
-		size      := size_of_type_info(info.elem);
-		align     := align_of_type_info(info.elem);
-		alignment := align_formula(size, align);
+		var size      = size_of_type_info(info.elem);
+		var align     = align_of_type_info(info.elem);
+		var alignment = align_formula(size, align);
 		return alignment*(count-1) + size;
 	case Slice:
 		return 3*WORD_SIZE;
@@ -319,18 +319,18 @@ proc size_of_type_info(type_info ^Type_Info) -> int {
 			return false;
 		}
 
-		count := info.count;
+		var count = info.count;
 		if count == 0 {
 			return 0;
 		}
-		bit_size := 8*size_of_type_info(info.elem);
+		var bit_size = 8*size_of_type_info(info.elem);
 		if is_bool(info.elem) {
 			// NOTE(bill): LLVM can store booleans as 1 bit because a boolean _is_ an `i1`
 			// Silly LLVM spec
 			bit_size = 1;
 		}
-		total_size_in_bits := bit_size * count;
-		total_size := (total_size_in_bits+7)/8;
+		var total_size_in_bits = bit_size * count;
+		var total_size = (total_size_in_bits+7)/8;
 		return total_size;
 
 	case Struct:

@@ -1,57 +1,57 @@
 proc crc32(data rawptr, len int) -> u32 {
-	result := ~(0 as u32);
-	s := slice_ptr(data as ^u8, len);
-	for i := 0; i < len; i++ {
-		b := s[i] as u32;
+	var result = ~(0 as u32);
+	var s = slice_ptr(data as ^u8, len);
+	for var i = 0; i < len; i++ {
+		var b = s[i] as u32;
 		result = result>>8 ~ __CRC32_TABLE[(result ~ b) & 0xff];
 	}
 	return ~result;
 }
 proc crc64(data rawptr, len int) -> u64 {
-	result := ~(0 as u64);
-	s := slice_ptr(data as ^u8, len);
-	for i := 0; i < len; i++ {
-		b := s[i] as u64;
+	var result = ~(0 as u64);
+	var s = slice_ptr(data as ^u8, len);
+	for var i = 0; i < len; i++ {
+		var b = s[i] as u64;
 		result = result>>8 ~ __CRC64_TABLE[(result ~ b) & 0xff];
 	}
 	return ~result;
 }
 
 proc fnv32(data rawptr, len int) -> u32 {
-	s := slice_ptr(data as ^u8, len);
+	var s = slice_ptr(data as ^u8, len);
 
-	h: u32 = 0x811c9dc5;
-	for i := 0; i < len; i++ {
+	var h u32 = 0x811c9dc5;
+	for var i = 0; i < len; i++ {
 		h = (h * 0x01000193) ~ s[i] as u32;
 	}
 	return h;
 }
 
 proc fnv64(data rawptr, len int) -> u64 {
-	s := slice_ptr(data as ^u8, len);
+	var s = slice_ptr(data as ^u8, len);
 
-	h: u64 = 0xcbf29ce484222325;
-	for i := 0; i < len; i++ {
+	var h u64 = 0xcbf29ce484222325;
+	for var i = 0; i < len; i++ {
 		h = (h * 0x100000001b3) ~ s[i] as u64;
 	}
 	return h;
 }
 
 proc fnv32a(data rawptr, len int) -> u32 {
-	s := slice_ptr(data as ^u8, len);
+	var s = slice_ptr(data as ^u8, len);
 
-	h: u32 = 0x811c9dc5;
-	for i := 0; i < len; i++ {
+	var h u32 = 0x811c9dc5;
+	for var i = 0; i < len; i++ {
 		h = (h ~ s[i] as u32) * 0x01000193;
 	}
 	return h;
 }
 
 proc fnv64a(data rawptr, len int) -> u64 {
-	s := slice_ptr(data as ^u8, len);
+	var s = slice_ptr(data as ^u8, len);
 
-	h: u64 = 0xcbf29ce484222325;
-	for i := 0; i < len; i++ {
+	var h u64 = 0xcbf29ce484222325;
+	for var i = 0; i < len; i++ {
 		h = (h ~ s[i] as u64) * 0x100000001b3;
 	}
 	return h;
@@ -65,13 +65,13 @@ proc murmur64(data_ rawptr, len int) -> u64 {
 		const m = 0xc6a4a7935bd1e995;
 		const r = 47;
 
-		h: u64 = SEED ~ (len as u64 * m);
+		var h u64 = SEED ~ (len as u64 * m);
 
-		data := slice_ptr(data_ as ^u64, len/size_of(u64));
-		data2 := slice_ptr(data_ as ^u8, len);
+		var data = slice_ptr(data_ as ^u64, len/size_of(u64));
+		var data2 = slice_ptr(data_ as ^u8, len);
 
-		for i := 0; i < data.count; i++ {
-			k := data[i];
+		for var i = 0; i < data.count; i++ {
+			var k = data[i];
 
 			k *= m;
 			k ~= k>>r;
@@ -102,14 +102,14 @@ proc murmur64(data_ rawptr, len int) -> u64 {
 		const m = 0x5bd1e995;
 		const r = 24;
 
-		h1: u32 = SEED as u32 ~ len as u32;
-		h2: u32 = SEED >> 32;
+		var h1 u32 = SEED as u32 ~ len as u32;
+		var h2 u32 = SEED >> 32;
 
-		data := slice_ptr(data_ as ^u32, len/size_of(u32));
+		var data = slice_ptr(data_ as ^u32, len/size_of(u32));
 
-		i := 0;
+		var i = 0;
 		for len >= 8 {
-			k1, k2: u32;
+			var k1, k2 u32;
 			k1 = data[i]; i++;
 			k1 *= m;
 			k1 ~= k1>>r;
@@ -128,7 +128,7 @@ proc murmur64(data_ rawptr, len int) -> u64 {
 		}
 
 		if (len >= 4) {
-			k1: u32;
+			var k1 u32;
 			k1 = data[i]; i++;
 			k1 *= m;
 			k1 ~= k1>>r;
@@ -138,7 +138,7 @@ proc murmur64(data_ rawptr, len int) -> u64 {
 			len -= 4;
 		}
 
-		data8 := slice_ptr((data.data+i) as ^u8, 3); // NOTE(bill): This is unsafe
+		var data8 = slice_ptr((data.data+i) as ^u8, 3); // NOTE(bill): This is unsafe
 
 		match len {
 		case 3: h2 ~= data8[2] as u32 << 16; fallthrough;
@@ -157,14 +157,14 @@ proc murmur64(data_ rawptr, len int) -> u64 {
 		h2 ~= h1>>19;
 		h2 *= m;
 
-		h := (h1 as u64)<<32 | h2 as u64;
+		var h = (h1 as u64)<<32 | h2 as u64;
 		return h;
 	}
 }
 
 
 
-__CRC32_TABLE := [256]u32{
+var __CRC32_TABLE = [256]u32{
 	0x00000000, 0x77073096, 0xee0e612c, 0x990951ba,
 	0x076dc419, 0x706af48f, 0xe963a535, 0x9e6495a3,
 	0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
@@ -230,7 +230,7 @@ __CRC32_TABLE := [256]u32{
 	0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94,
 	0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d,
 };
-__CRC64_TABLE := [256]u64{
+var __CRC64_TABLE = [256]u64{
 	0x0000000000000000, 0x42f0e1eba9ea3693, 0x85e1c3d753d46d26, 0xc711223cfa3e5bb5,
 	0x493366450e42ecdf, 0x0bc387aea7a8da4c, 0xccd2a5925d9681f9, 0x8e224479f47cb76a,
 	0x9266cc8a1c85d9be, 0xd0962d61b56fef2d, 0x17870f5d4f51b498, 0x5577eeb6e6bb820b,

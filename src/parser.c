@@ -1889,33 +1889,33 @@ AstNode *parse_simple_stmt(AstFile *f) {
 		return make_assign_stmt(f, token, lhs, rhs);
 	} break;
 
-	case Token_Colon: { // Declare
-		AstNodeArray names = lhs;
-		parse_check_name_list_for_reserves(f, names);
+	// case Token_Colon: { // Declare
+	// 	AstNodeArray names = lhs;
+	// 	parse_check_name_list_for_reserves(f, names);
 
-		Token colon = expect_token(f, Token_Colon);
-		AstNode *type = parse_identifier_or_type(f);
-		AstNodeArray values = {0};
+	// 	Token colon = expect_token(f, Token_Colon);
+	// 	AstNode *type = parse_identifier_or_type(f);
+	// 	AstNodeArray values = {0};
 
-		if (allow_token(f, Token_Eq)) {
-			values = parse_rhs_expr_list(f);
-			if (values.count > names.count) {
-				syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
-			} else if (values.count == 0) {
-				syntax_error(f->curr_token, "Expected an expression for this declaration");
-			}
-			if (type == NULL && values.count == 0) {
-				syntax_error(f->curr_token, "Missing variable type or initialization");
-				return make_bad_decl(f, f->curr_token, f->curr_token);
-			}
-		}
+	// 	if (allow_token(f, Token_Eq)) {
+	// 		values = parse_rhs_expr_list(f);
+	// 		if (values.count > names.count) {
+	// 			syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
+	// 		} else if (values.count == 0) {
+	// 			syntax_error(f->curr_token, "Expected an expression for this declaration");
+	// 		}
+	// 		if (type == NULL && values.count == 0) {
+	// 			syntax_error(f->curr_token, "Missing variable type or initialization");
+	// 			return make_bad_decl(f, f->curr_token, f->curr_token);
+	// 		}
+	// 	}
 
-		if (values.e == NULL) {
-			values = make_ast_node_array(f);
-		}
+	// 	if (values.e == NULL) {
+	// 		values = make_ast_node_array(f);
+	// 	}
 
-		return make_var_decl(f, names, type, values);
-	} break;
+	// 	return make_var_decl(f, names, type, values);
+	// } break;
 
 	// case Token_ColonColon: {
 	// 	AstNodeArray names = lhs;
@@ -2695,9 +2695,7 @@ AstNode *parse_type_decl(AstFile *f) {
 	Token   token = expect_token(f, Token_type);
 	AstNode *name = parse_identifier(f);
 	AstNode *type = parse_type(f);
-	AstNode *decl = make_type_decl(f, token, name, type);
-	expect_semicolon(f, decl);
-	return decl;
+	return make_type_decl(f, token, name, type);
 }
 
 AstNode *parse_value_decl(AstFile *f) {
@@ -2714,7 +2712,7 @@ AstNode *parse_value_decl(AstFile *f) {
 		return make_bad_decl(f, token, f->curr_token);
 	}
 
-	AstNodeArray names = parse_lhs_expr_list(f);
+	AstNodeArray names = parse_identfier_list(f);
 	parse_check_name_list_for_reserves(f, names);
 	AstNode *type = parse_type_attempt(f);
 	AstNodeArray values = {0};
@@ -2754,7 +2752,6 @@ AstNode *parse_value_decl(AstFile *f) {
 		decl = make_const_decl(f, names, type, values);
 		break;
 	}
-	expect_semicolon(f, decl);
 	return decl;
 }
 
@@ -2798,10 +2795,14 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_proc:
 		return parse_proc_decl(f);
 	case Token_type:
-		return parse_type_decl(f);
+		s = parse_type_decl(f);
+		expect_semicolon(f, s);
+		return s;
 	case Token_var:
 	case Token_const:
-		return parse_value_decl(f);
+		s = parse_value_decl(f);
+		expect_semicolon(f, s);
+		return s;
 
 
 	case Token_using: {

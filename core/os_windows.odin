@@ -15,22 +15,22 @@ type File struct {
 
 proc open(name string) -> (File, bool) {
 	using win32;
-	buf: [300]byte;
+	var buf [300]byte;
+	var f File;
 	copy(buf[:], name as []byte);
-	f: File;
 	f.handle.p = CreateFileA(^buf[0], FILE_GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, 0, nil) as rawptr;
-	success := f.handle.p != INVALID_HANDLE_VALUE;
+	var success = f.handle.p != INVALID_HANDLE_VALUE;
 	f.last_write_time = last_write_time(^f);
 	return f, success;
 }
 
 proc create(name string) -> (File, bool) {
 	using win32;
-	buf: [300]byte;
+	var buf [300]byte;
+	var f File;
 	copy(buf[:], name as []byte);
-	f: File;
 	f.handle.p = CreateFileA(^buf[0], FILE_GENERIC_WRITE, FILE_SHARE_READ, nil, CREATE_ALWAYS, 0, nil) as rawptr;
-	success := f.handle.p != INVALID_HANDLE_VALUE;
+	var success = f.handle.p != INVALID_HANDLE_VALUE;
 	f.last_write_time = last_write_time(^f);
 	return f, success;
 }
@@ -40,12 +40,12 @@ proc close(using f ^File) {
 }
 
 proc write(using f ^File, buf []byte) -> bool {
-	bytes_written: i32;
+	var bytes_written i32;
 	return win32.WriteFile(handle.p as win32.HANDLE, buf.data, buf.count as i32, ^bytes_written, nil) != 0;
 }
 
 proc file_has_changed(f ^File) -> bool {
-	last_write_time := last_write_time(f);
+	var last_write_time = last_write_time(f);
 	if f.last_write_time != last_write_time {
 		f.last_write_time = last_write_time;
 		return true;
@@ -56,17 +56,17 @@ proc file_has_changed(f ^File) -> bool {
 
 
 proc last_write_time(f ^File) -> File_Time {
-	file_info: win32.BY_HANDLE_FILE_INFORMATION;
+	var file_info win32.BY_HANDLE_FILE_INFORMATION;
 	win32.GetFileInformationByHandle(f.handle.p as win32.HANDLE, ^file_info);
-	l := file_info.last_write_time.low_date_time as File_Time;
-	h := file_info.last_write_time.high_date_time as File_Time;
+	var l = file_info.last_write_time.low_date_time as File_Time;
+	var h = file_info.last_write_time.high_date_time as File_Time;
 	return l | h << 32;
 }
 
 proc last_write_time_by_name(name string) -> File_Time {
-	last_write_time: win32.FILETIME;
-	data: win32.WIN32_FILE_ATTRIBUTE_DATA;
-	buf: [1024]byte;
+	var last_write_time win32.FILETIME;
+	var data win32.WIN32_FILE_ATTRIBUTE_DATA;
+	var buf [1024]byte;
 
 	assert(buf.count > name.count);
 
@@ -76,8 +76,8 @@ proc last_write_time_by_name(name string) -> File_Time {
 		last_write_time = data.last_write_time;
 	}
 
-	l := last_write_time.low_date_time as File_Time;
-	h := last_write_time.high_date_time as File_Time;
+	var l = last_write_time.low_date_time as File_Time;
+	var h = last_write_time.high_date_time as File_Time;
 	return l | h << 32;
 }
 
@@ -91,45 +91,45 @@ type File_Standard enum {
 }
 
 // NOTE(bill): Uses startup to initialize it
-__std_files := [File_Standard.count]File{
+var __std_files = [File_Standard.count]File{
 	{handle = win32.GetStdHandle(win32.STD_INPUT_HANDLE)  transmute File_Handle },
 	{handle = win32.GetStdHandle(win32.STD_OUTPUT_HANDLE) transmute File_Handle },
 	{handle = win32.GetStdHandle(win32.STD_ERROR_HANDLE)  transmute File_Handle },
 };
 
-stdin  := ^__std_files[File_Standard.INPUT];
-stdout := ^__std_files[File_Standard.OUTPUT];
-stderr := ^__std_files[File_Standard.ERROR];
+var stdin  = ^__std_files[File_Standard.INPUT];
+var stdout = ^__std_files[File_Standard.OUTPUT];
+var stderr = ^__std_files[File_Standard.ERROR];
 
 
 
 proc read_entire_file(name string) -> ([]byte, bool) {
-	buf: [300]byte;
+	var buf [300]byte;
 	copy(buf[:], name as []byte);
 
-	f, file_ok := open(name);
+	var f, file_ok = open(name);
 	if !file_ok {
 		return nil, false;
 	}
 	defer close(^f);
 
-	length: i64;
-	file_size_ok := win32.GetFileSizeEx(f.handle.p as win32.HANDLE, ^length) != 0;
+	var length i64;
+	var file_size_ok = win32.GetFileSizeEx(f.handle.p as win32.HANDLE, ^length) != 0;
 	if !file_size_ok {
 		return nil, false;
 	}
 
-	data := new_slice(u8, length);
+	var data = new_slice(u8, length);
 	if data.data == nil {
 		return nil, false;
 	}
 
-	single_read_length: i32;
-	total_read: i64;
+	var single_read_length i32;
+	var total_read i64;
 
 	for total_read < length {
-		remaining := length - total_read;
-		to_read: u32;
+		var remaining = length - total_read;
+		var to_read u32;
 		const MAX = 1<<32-1;
 		if remaining <= MAX {
 			to_read = remaining as u32;
