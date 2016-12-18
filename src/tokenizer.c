@@ -74,7 +74,6 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 	TOKEN_KIND(Token_OpenBrace, "{"), \
 	TOKEN_KIND(Token_CloseBrace, "}"), \
 	TOKEN_KIND(Token_Colon, ":"), \
-	TOKEN_KIND(Token_ColonColon, "::"), \
 	TOKEN_KIND(Token_Semicolon, ";"), \
 	TOKEN_KIND(Token_Period, "."), \
 	TOKEN_KIND(Token_Comma, ","), \
@@ -835,10 +834,6 @@ Token tokenizer_get_token(Tokenizer *t) {
 			break;
 		case ':':
 			token.kind = Token_Colon;
-			if (t->curr_rune == ':') {
-				advance_to_next_rune(t);
-				token.kind = Token_ColonColon;
-			}
 			break;
 		case '(':
 			token.kind = Token_OpenParen;

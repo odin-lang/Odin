@@ -1,32 +1,32 @@
 #import "fmt.odin";
 #import "os.odin";
 
-proc set(data: rawptr, value: i32, len: int) -> rawptr #link_name "__mem_set" {
-	proc llvm_memset_64bit(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) #foreign "llvm.memset.p0i8.i64"
+proc set(data rawptr, value i32, len int) -> rawptr #link_name "__mem_set" {
+	proc llvm_memset_64bit(dst rawptr, val byte, len int, align i32, is_volatile bool) #foreign "llvm.memset.p0i8.i64"
 	llvm_memset_64bit(data, value as byte, len, 1, false);
 	return data;
 }
 
-proc zero(data: rawptr, len: int) -> rawptr #link_name "__mem_zero" {
+proc zero(data rawptr, len int) -> rawptr #link_name "__mem_zero" {
 	return set(data, 0, len);
 }
 
-proc copy(dst, src: rawptr, len: int) -> rawptr #link_name "__mem_copy" {
+proc copy(dst, src rawptr, len int) -> rawptr #link_name "__mem_copy" {
 	// NOTE(bill): This _must_ implemented like C's memmove
-	proc llvm_memmove_64bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memmove.p0i8.p0i8.i64"
+	proc llvm_memmove_64bit(dst, src rawptr, len int, align i32, is_volatile bool) #foreign "llvm.memmove.p0i8.p0i8.i64"
 	llvm_memmove_64bit(dst, src, len, 1, false);
 	return dst;
 }
 
-proc copy_non_overlapping(dst, src: rawptr, len: int) -> rawptr #link_name "__mem_copy_non_overlapping" {
+proc copy_non_overlapping(dst, src rawptr, len int) -> rawptr #link_name "__mem_copy_non_overlapping" {
 	// NOTE(bill): This _must_ implemented like C's memcpy
-	proc llvm_memcpy_64bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memcpy.p0i8.p0i8.i64"
+	proc llvm_memcpy_64bit(dst, src rawptr, len int, align i32, is_volatile bool) #foreign "llvm.memcpy.p0i8.p0i8.i64"
 	llvm_memcpy_64bit(dst, src, len, 1, false);
 	return dst;
 }
 
 
-proc compare(dst, src: rawptr, n: int) -> int #link_name "__mem_compare" {
+proc compare(dst, src rawptr, n int) -> int #link_name "__mem_compare" {
 	// Translation of http://mgronhol.github.io/fast-strcmp/
 	a := slice_ptr(dst as ^byte, n);
 	b := slice_ptr(src as ^byte, n);
@@ -63,19 +63,19 @@ proc compare(dst, src: rawptr, n: int) -> int #link_name "__mem_compare" {
 
 
 
-proc kilobytes(x: int) -> int #inline { return          (x) * 1024; }
-proc megabytes(x: int) -> int #inline { return kilobytes(x) * 1024; }
-proc gigabytes(x: int) -> int #inline { return gigabytes(x) * 1024; }
-proc terabytes(x: int) -> int #inline { return terabytes(x) * 1024; }
+proc kilobytes(x int) -> int #inline { return          (x) * 1024; }
+proc megabytes(x int) -> int #inline { return kilobytes(x) * 1024; }
+proc gigabytes(x int) -> int #inline { return gigabytes(x) * 1024; }
+proc terabytes(x int) -> int #inline { return terabytes(x) * 1024; }
 
-proc is_power_of_two(x: int) -> bool {
+proc is_power_of_two(x int) -> bool {
 	if x <= 0 {
 		return false;
 	}
 	return (x & (x-1)) == 0;
 }
 
-proc align_forward(ptr: rawptr, align: int) -> rawptr {
+proc align_forward(ptr rawptr, align int) -> rawptr {
 	assert(is_power_of_two(align));
 
 	a := align as uint;
@@ -92,7 +92,7 @@ proc align_forward(ptr: rawptr, align: int) -> rawptr {
 type Allocation_Header struct {
 	size: int;
 }
-proc allocation_header_fill(header: ^Allocation_Header, data: rawptr, size: int) {
+proc allocation_header_fill(header ^Allocation_Header, data rawptr, size int) {
 	header.size = size;
 	ptr := (header+1) as ^int;
 
@@ -100,7 +100,7 @@ proc allocation_header_fill(header: ^Allocation_Header, data: rawptr, size: int)
 		(ptr+i)^ = -1;
 	}
 }
-proc allocation_header(data: rawptr) -> ^Allocation_Header {
+proc allocation_header(data rawptr) -> ^Allocation_Header {
 	p := data as ^int;
 	for (p-1)^ == -1 {
 		p = (p-1);
@@ -129,19 +129,19 @@ type Arena_Temp_Memory struct {
 
 
 
-proc init_arena_from_memory(using a: ^Arena, data: []byte) {
+proc init_arena_from_memory(using a ^Arena, data []byte) {
 	backing    = Allocator{};
 	memory     = data[:0];
 	temp_count = 0;
 }
 
-proc init_arena_from_context(using a: ^Arena, size: int) {
+proc init_arena_from_context(using a ^Arena, size int) {
 	backing = context.allocator;
 	memory = new_slice(byte, 0, size);
 	temp_count = 0;
 }
 
-proc free_arena(using a: ^Arena) {
+proc free_arena(using a ^Arena) {
 	if backing.procedure != nil {
 		push_allocator backing {
 			free(memory.data);
@@ -150,16 +150,16 @@ proc free_arena(using a: ^Arena) {
 	}
 }
 
-proc arena_allocator(arena: ^Arena) -> Allocator {
+proc arena_allocator(arena ^Arena) -> Allocator {
 	return Allocator{
 		procedure = arena_allocator_proc,
 		data = arena,
 	};
 }
 
-proc arena_allocator_proc(allocator_data: rawptr, mode: Allocator_Mode,
-                             size, alignment: int,
-                             old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
+proc arena_allocator_proc(allocator_data rawptr, mode Allocator_Mode,
+                          size, alignment int,
+                          old_memory rawptr, old_size int, flags u64) -> rawptr {
 	arena := allocator_data as ^Arena;
 
 	using Allocator_Mode;
@@ -192,7 +192,7 @@ proc arena_allocator_proc(allocator_data: rawptr, mode: Allocator_Mode,
 	return nil;
 }
 
-proc begin_arena_temp_memory(a: ^Arena) -> Arena_Temp_Memory {
+proc begin_arena_temp_memory(a ^Arena) -> Arena_Temp_Memory {
 	tmp: Arena_Temp_Memory;
 	tmp.arena = a;
 	tmp.original_count = a.memory.count;
@@ -200,7 +200,7 @@ proc begin_arena_temp_memory(a: ^Arena) -> Arena_Temp_Memory {
 	return tmp;
 }
 
-proc end_arena_temp_memory(using tmp: Arena_Temp_Memory) {
+proc end_arena_temp_memory(using tmp Arena_Temp_Memory) {
 	assert(arena.memory.count >= original_count);
 	assert(arena.temp_count > 0);
 	arena.memory.count = original_count;
@@ -213,8 +213,8 @@ proc end_arena_temp_memory(using tmp: Arena_Temp_Memory) {
 
 
 
-proc align_of_type_info(type_info: ^Type_Info) -> int {
-	proc prev_pow2(n: i64) -> i64 {
+proc align_of_type_info(type_info ^Type_Info) -> int {
+	proc prev_pow2(n i64) -> i64 {
 		if n <= 0 {
 			return 0;
 		}
@@ -227,8 +227,8 @@ proc align_of_type_info(type_info: ^Type_Info) -> int {
 		return n - (n >> 1);
 	}
 
-	WORD_SIZE :: size_of(int);
-	MAX_ALIGN :: size_of([vector 64]f64); // TODO(bill): Should these constants be builtin constants?
+	const WORD_SIZE = size_of(int);
+	const MAX_ALIGN = size_of([vector 64]f64); // TODO(bill): Should these constants be builtin constants?
 	using Type_Info;
 
 	match type info : type_info {
@@ -270,13 +270,13 @@ proc align_of_type_info(type_info: ^Type_Info) -> int {
 	return 0;
 }
 
-proc align_formula(size, align: int) -> int {
+proc align_formula(size, align int) -> int {
 	result := size + align-1;
 	return result - result%align;
 };
 
-proc size_of_type_info(type_info: ^Type_Info) -> int {
-	WORD_SIZE :: size_of(int);
+proc size_of_type_info(type_info ^Type_Info) -> int {
+	const WORD_SIZE = size_of(int);
 	using Type_Info;
 	match type info : type_info {
 	case Named:
@@ -309,7 +309,7 @@ proc size_of_type_info(type_info: ^Type_Info) -> int {
 	case Slice:
 		return 3*WORD_SIZE;
 	case Vector:
-		proc is_bool(type_info: ^Type_Info) -> bool {
+		proc is_bool(type_info ^Type_Info) -> bool {
 			match type info : type_info {
 			case Named:
 				return is_bool(info.base);

@@ -77,7 +77,7 @@ type Type_Info union {
 	};
 };
 
-proc type_info_base(info: ^Type_Info) -> ^Type_Info {
+proc type_info_base(info ^Type_Info) -> ^Type_Info {
 	if info == nil {
 		return nil;
 	}
@@ -91,22 +91,22 @@ proc type_info_base(info: ^Type_Info) -> ^Type_Info {
 
 
 
-proc assume(cond: bool) #foreign "llvm.assume"
+proc assume(cond bool) #foreign "llvm.assume"
 
 proc __debug_trap      ()        #foreign "llvm.debugtrap"
 proc __trap            ()        #foreign "llvm.trap"
 proc read_cycle_counter() -> u64 #foreign "llvm.readcyclecounter"
 
-proc bit_reverse16(b: u16) -> u16 #foreign "llvm.bitreverse.i16"
-proc bit_reverse32(b: u32) -> u32 #foreign "llvm.bitreverse.i32"
-proc bit_reverse64(b: u64) -> u64 #foreign "llvm.bitreverse.i64"
+proc bit_reverse16(b u16) -> u16 #foreign "llvm.bitreverse.i16"
+proc bit_reverse32(b u32) -> u32 #foreign "llvm.bitreverse.i32"
+proc bit_reverse64(b u64) -> u64 #foreign "llvm.bitreverse.i64"
 
-proc byte_swap16(b: u16) -> u16 #foreign "llvm.bswap.i16"
-proc byte_swap32(b: u32) -> u32 #foreign "llvm.bswap.i32"
-proc byte_swap64(b: u64) -> u64 #foreign "llvm.bswap.i64"
+proc byte_swap16(b u16) -> u16 #foreign "llvm.bswap.i16"
+proc byte_swap32(b u32) -> u32 #foreign "llvm.bswap.i32"
+proc byte_swap64(b u64) -> u64 #foreign "llvm.bswap.i64"
 
-proc fmuladd32(a, b, c: f32) -> f32 #foreign "llvm.fmuladd.f32"
-proc fmuladd64(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
+proc fmuladd32(a, b, c f32) -> f32 #foreign "llvm.fmuladd.f32"
+proc fmuladd64(a, b, c f64) -> f64 #foreign "llvm.fmuladd.f64"
 
 
 
@@ -119,9 +119,9 @@ type Allocator_Mode enum {
 	FREE_ALL,
 	RESIZE,
 }
-type Allocator_Proc proc(allocator_data: rawptr, mode: Allocator_Mode,
-                         size, alignment: int,
-                         old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
+type Allocator_Proc proc(allocator_data rawptr, mode Allocator_Mode,
+                         size, alignment int,
+                         old_memory rawptr, old_size int, flags u64) -> rawptr;
 
 
 
@@ -140,10 +140,10 @@ type Context struct #ordered {
 	user_index: int;
 }
 
-#thread_local __context: Context;
+#thread_local var __context Context;
 
 
-DEFAULT_ALIGNMENT :: align_of([vector 4]f32);
+const DEFAULT_ALIGNMENT = align_of([vector 4]f32);
 
 
 proc __check_context() {
@@ -157,15 +157,15 @@ proc __check_context() {
 	}
 }
 
-proc alloc(size: int) -> rawptr #inline { return alloc_align(size, DEFAULT_ALIGNMENT); }
+proc alloc(size int) -> rawptr #inline { return alloc_align(size, DEFAULT_ALIGNMENT); }
 
-proc alloc_align(size, alignment: int) -> rawptr #inline {
+proc alloc_align(size, alignment int) -> rawptr #inline {
 	__check_context();
 	a := context.allocator;
 	return a.procedure(a.data, Allocator_Mode.ALLOC, size, alignment, nil, 0, 0);
 }
 
-proc free(ptr: rawptr) #inline {
+proc free(ptr rawptr) #inline {
 	__check_context();
 	a := context.allocator;
 	if ptr != nil {
@@ -179,8 +179,8 @@ proc free_all() #inline {
 }
 
 
-proc resize      (ptr: rawptr, old_size, new_size: int) -> rawptr #inline { return resize_align(ptr, old_size, new_size, DEFAULT_ALIGNMENT); }
-proc resize_align(ptr: rawptr, old_size, new_size, alignment: int) -> rawptr #inline {
+proc resize      (ptr rawptr, old_size, new_size int) -> rawptr #inline { return resize_align(ptr, old_size, new_size, DEFAULT_ALIGNMENT); }
+proc resize_align(ptr rawptr, old_size, new_size, alignment int) -> rawptr #inline {
 	__check_context();
 	a := context.allocator;
 	return a.procedure(a.data, Allocator_Mode.RESIZE, new_size, alignment, ptr, old_size, 0);
@@ -188,7 +188,7 @@ proc resize_align(ptr: rawptr, old_size, new_size, alignment: int) -> rawptr #in
 
 
 
-proc default_resize_align(old_memory: rawptr, old_size, new_size, alignment: int) -> rawptr {
+proc default_resize_align(old_memory rawptr, old_size, new_size, alignment int) -> rawptr {
 	if old_memory == nil {
 		return alloc_align(new_size, alignment);
 	}
@@ -213,9 +213,9 @@ proc default_resize_align(old_memory: rawptr, old_size, new_size, alignment: int
 }
 
 
-proc default_allocator_proc(allocator_data: rawptr, mode: Allocator_Mode,
-                               size, alignment: int,
-                               old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
+proc default_allocator_proc(allocator_data rawptr, mode Allocator_Mode,
+                            size, alignment int,
+                            old_memory rawptr, old_size int, flags u64) -> rawptr {
 	using Allocator_Mode;
 	when false {
 		match mode {
@@ -279,7 +279,7 @@ proc default_allocator() -> Allocator {
 
 
 
-proc __string_eq(a, b: string) -> bool {
+proc __string_eq(a, b string) -> bool {
 	if a.count != b.count {
 		return false;
 	}
@@ -289,25 +289,24 @@ proc __string_eq(a, b: string) -> bool {
 	return mem.compare(a.data, b.data, a.count) == 0;
 }
 
-proc __string_cmp(a, b : string) -> int {
+proc __string_cmp(a, b string) -> int {
 	return mem.compare(a.data, b.data, min(a.count, b.count));
 }
 
-proc __string_ne(a, b: string) -> bool #inline { return !__string_eq(a, b); }
-proc __string_lt(a, b: string) -> bool #inline { return __string_cmp(a, b) < 0; }
-proc __string_gt(a, b: string) -> bool #inline { return __string_cmp(a, b) > 0; }
-proc __string_le(a, b: string) -> bool #inline { return __string_cmp(a, b) <= 0; }
-proc __string_ge(a, b: string) -> bool #inline { return __string_cmp(a, b) >= 0; }
+proc __string_ne(a, b string) -> bool #inline { return !__string_eq(a, b); }
+proc __string_lt(a, b string) -> bool #inline { return __string_cmp(a, b) < 0; }
+proc __string_gt(a, b string) -> bool #inline { return __string_cmp(a, b) > 0; }
+proc __string_le(a, b string) -> bool #inline { return __string_cmp(a, b) <= 0; }
+proc __string_ge(a, b string) -> bool #inline { return __string_cmp(a, b) >= 0; }
 
 
-proc __assert(file: string, line, column: int, msg: string) #inline {
+proc __assert(file string, line, column int, msg string) #inline {
 	fmt.fprintf(os.stderr, "%(%:%) Runtime assertion: %\n",
 	            file, line, column, msg);
 	__debug_trap();
 }
 
-proc __bounds_check_error(file: string, line, column: int,
-                             index, count: int) {
+proc __bounds_check_error(file string, line, column int, index, count int) {
 	if 0 <= index && index < count {
 		return;
 	}
@@ -316,8 +315,7 @@ proc __bounds_check_error(file: string, line, column: int,
 	__debug_trap();
 }
 
-proc __slice_expr_error(file: string, line, column: int,
-                           low, high, max: int) {
+proc __slice_expr_error(file string, line, column int, low, high, max int) {
 	if 0 <= low && low <= high && high <= max {
 		return;
 	}
@@ -325,8 +323,7 @@ proc __slice_expr_error(file: string, line, column: int,
 	            file, line, column, low, high, max);
 	__debug_trap();
 }
-proc __substring_expr_error(file: string, line, column: int,
-                               low, high: int) {
+proc __substring_expr_error(file string, line, column int, low, high int) {
 	if 0 <= low && low <= high {
 		return;
 	}
@@ -335,7 +332,7 @@ proc __substring_expr_error(file: string, line, column: int,
 	__debug_trap();
 }
 
-proc __enum_to_string(info: ^Type_Info, value: i64) -> string {
+proc __enum_to_string(info ^Type_Info, value i64) -> string {
 	match type ti : type_info_base(info) {
 	case Type_Info.Enum:
 		// TODO(bill): Search faster than linearly

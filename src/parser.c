@@ -302,20 +302,20 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 	}) \
 	AST_NODE_KIND(StructType, "struct type", struct { \
 		Token token; \
-		AstNodeArray decls; \
-		isize decl_count; \
+		AstNodeArray fields; \
+		isize field_count; \
 		bool is_packed; \
 		bool is_ordered; \
 	}) \
 	AST_NODE_KIND(UnionType, "union type", struct { \
 		Token token; \
-		AstNodeArray decls; \
-		isize decl_count; \
+		AstNodeArray fields; \
+		isize field_count; \
 	}) \
 	AST_NODE_KIND(RawUnionType, "raw union type", struct { \
 		Token token; \
-		AstNodeArray decls; \
-		isize decl_count; \
+		AstNodeArray fields; \
+		isize field_count; \
 	}) \
 	AST_NODE_KIND(EnumType, "enum type", struct { \
 		Token token; \
@@ -968,30 +968,30 @@ AstNode *make_vector_type(AstFile *f, Token token, AstNode *count, AstNode *elem
 	return result;
 }
 
-AstNode *make_struct_type(AstFile *f, Token token, AstNodeArray decls, isize decl_count, bool is_packed, bool is_ordered) {
+AstNode *make_struct_type(AstFile *f, Token token, AstNodeArray fields, isize field_count, bool is_packed, bool is_ordered) {
 	AstNode *result = make_node(f, AstNode_StructType);
 	result->StructType.token = token;
-	result->StructType.decls = decls;
-	result->StructType.decl_count = decl_count;
+	result->StructType.fields = fields;
+	result->StructType.field_count = field_count;
 	result->StructType.is_packed = is_packed;
 	result->StructType.is_ordered = is_ordered;
 	return result;
 }
 
 
-AstNode *make_union_type(AstFile *f, Token token, AstNodeArray decls, isize decl_count) {
+AstNode *make_union_type(AstFile *f, Token token, AstNodeArray fields, isize field_count) {
 	AstNode *result = make_node(f, AstNode_UnionType);
 	result->UnionType.token = token;
-	result->UnionType.decls = decls;
-	result->UnionType.decl_count = decl_count;
+	result->UnionType.fields = fields;
+	result->UnionType.field_count = field_count;
 	return result;
 }
 
-AstNode *make_raw_union_type(AstFile *f, Token token, AstNodeArray decls, isize decl_count) {
+AstNode *make_raw_union_type(AstFile *f, Token token, AstNodeArray fields, isize field_count) {
 	AstNode *result = make_node(f, AstNode_RawUnionType);
 	result->RawUnionType.token = token;
-	result->RawUnionType.decls = decls;
-	result->RawUnionType.decl_count = decl_count;
+	result->RawUnionType.fields = fields;
+	result->RawUnionType.field_count = field_count;
 	return result;
 }
 
@@ -1212,22 +1212,6 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 	fix_advance_to_next_stmt(f);
 }
 
-bool parse_at_comma(AstFile *f, String context, TokenKind follow) {
-	if (f->curr_token.kind == Token_Comma) {
-		return true;
-	}
-	if (f->curr_token.kind != follow) {
-		if (f->curr_token.kind == Token_Semicolon &&
-		    str_eq(f->curr_token.string, str_lit("\n"))) {
-			error(f->curr_token, "Missing `,` before new line in %.*s", LIT(context));
-		}
-		error(f->curr_token, "Missing `,` in %.*s", LIT(context));
-		return true;
-	}
-	return false;
-}
-
-
 
 AstNode *    parse_expr(AstFile *f, bool lhs);
 AstNode *    parse_proc_type(AstFile *f);
@@ -1276,10 +1260,9 @@ AstNodeArray parse_element_list(AstFile *f) {
 
 		array_add(&elems, elem);
 
-		if (!parse_at_comma(f, str_lit("compound literal"), Token_CloseBrace)) {
+		if (!allow_token(f, Token_Comma)) {
 			break;
 		}
-		next_token(f);
 	}
 
 	return elems;
@@ -1617,10 +1600,9 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 		AstNode *arg = parse_expr(f, false);
 		array_add(&args, arg);
 
-		if (!parse_at_comma(f, str_lit("argument list"), Token_CloseParen)) {
+		if (!allow_token(f, Token_Comma)) {
 			break;
 		}
-		next_token(f);
 	}
 
 	f->expr_level--;
@@ -1862,7 +1844,15 @@ void parse_check_name_list_for_reserves(AstFile *f, AstNodeArray names) {
 	}
 }
 
+AstNode *parse_value_decl(AstFile *f);
+
 AstNode *parse_simple_stmt(AstFile *f) {
+	switch (f->curr_token.kind) {
+	case Token_var:
+	case Token_const:
+		return parse_value_decl(f);
+	}
+
 	isize lhs_count = 0, rhs_count = 0;
 	AstNodeArray lhs = parse_lhs_expr_list(f);
 
@@ -1926,56 +1916,56 @@ AstNode *parse_simple_stmt(AstFile *f) {
 		return make_var_decl(f, names, type, values);
 	} break;
 
-	case Token_ColonColon: {
-		AstNodeArray names = lhs;
-		parse_check_name_list_for_reserves(f, names);
+	// case Token_ColonColon: {
+	// 	AstNodeArray names = lhs;
+	// 	parse_check_name_list_for_reserves(f, names);
 
-		Token colon_colon = expect_token(f, Token_ColonColon);
+	// 	Token colon_colon = expect_token(f, Token_ColonColon);
 
-		// if (f->curr_token.kind == Token_type ||
-		//     f->curr_token.kind == Token_struct ||
-		//     f->curr_token.kind == Token_enum ||
-		//     f->curr_token.kind == Token_union ||
-		//     f->curr_token.kind == Token_raw_union) {
-		// // if (f->curr_token.kind == Token_type) {
-		// 	Token token = f->curr_token;
-		// 	if (token.kind == Token_type) {
-		// 		next_token(f);
-		// 	}
-		// 	if (names.count != 1) {
-		// 		syntax_error_node(names.e[0], "You can only declare one type at a time");
-		// 		return make_bad_decl(f, names.e[0]->Ident, token);
-		// 	}
+	// 	// if (f->curr_token.kind == Token_type ||
+	// 	//     f->curr_token.kind == Token_struct ||
+	// 	//     f->curr_token.kind == Token_enum ||
+	// 	//     f->curr_token.kind == Token_union ||
+	// 	//     f->curr_token.kind == Token_raw_union) {
+	// 	// // if (f->curr_token.kind == Token_type) {
+	// 	// 	Token token = f->curr_token;
+	// 	// 	if (token.kind == Token_type) {
+	// 	// 		next_token(f);
+	// 	// 	}
+	// 	// 	if (names.count != 1) {
+	// 	// 		syntax_error_node(names.e[0], "You can only declare one type at a time");
+	// 	// 		return make_bad_decl(f, names.e[0]->Ident, token);
+	// 	// 	}
 
-		// 	return make_type_decl(f, token, names.e[0], parse_type(f));
-		// } else if (f->curr_token.kind == Token_proc) {
-		//     // NOTE(bill): Procedure declarations
-		// 	Token proc_token = f->curr_token;
-		// 	AstNode *name = names.e[0];
-		// 	if (names.count != 1) {
-		// 		syntax_error(proc_token, "You can only declare one procedure at a time");
-		// 		return make_bad_decl(f, name->Ident, proc_token);
-		// 	}
+	// 	// 	return make_type_decl(f, token, names.e[0], parse_type(f));
+	// 	// } else if (f->curr_token.kind == Token_proc) {
+	// 	//     // NOTE(bill): Procedure declarations
+	// 	// 	Token proc_token = f->curr_token;
+	// 	// 	AstNode *name = names.e[0];
+	// 	// 	if (names.count != 1) {
+	// 	// 		syntax_error(proc_token, "You can only declare one procedure at a time");
+	// 	// 		return make_bad_decl(f, name->Ident, proc_token);
+	// 	// 	}
 
-		// 	return parse_proc_decl(f, proc_token, name);
-		// }
+	// 	// 	return parse_proc_decl(f, proc_token, name);
+	// 	// }
 
-		AstNodeArray values = parse_rhs_expr_list(f);
-		if (values.count > names.count) {
-			syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
-		} else if (values.count < names.count) {
-			syntax_error(f->curr_token, "All constant declarations must be defined");
-		} else if (values.count == 0) {
-			syntax_error(f->curr_token, "Expected an expression for this declaration");
-		}
+	// 	AstNodeArray values = parse_rhs_expr_list(f);
+	// 	if (values.count > names.count) {
+	// 		syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
+	// 	} else if (values.count < names.count) {
+	// 		syntax_error(f->curr_token, "All constant declarations must be defined");
+	// 	} else if (values.count == 0) {
+	// 		syntax_error(f->curr_token, "Expected an expression for this declaration");
+	// 	}
 
-		if (values.count == 0 && names.count > 0) {
-			syntax_error(f->curr_token, "Missing constant value");
-			return make_bad_decl(f, f->curr_token, f->curr_token);
-		}
+	// 	if (values.count == 0 && names.count > 0) {
+	// 		syntax_error(f->curr_token, "Missing constant value");
+	// 		return make_bad_decl(f, f->curr_token, f->curr_token);
+	// 	}
 
-		return make_const_decl(f, names, NULL, values);
-	} break;
+	// 	return make_const_decl(f, names, NULL, values);
+	// } break;
 	}
 
 	if (lhs_count > 1) {
@@ -2072,19 +2062,20 @@ AstNode *parse_proc_type(AstFile *f) {
 }
 
 
-AstNodeArray parse_parameter_list(AstFile *f, bool allow_using) {
+AstNodeArray parse_parameter_list(AstFile *f, bool allow_using, TokenKind follow) {
 	AstNodeArray params = make_ast_node_array(f);
 
-	while (f->curr_token.kind == Token_Ident ||
-	       f->curr_token.kind == Token_using) {
+	while (f->curr_token.kind != follow &&
+	       f->curr_token.kind != Token_EOF) {
 		bool is_using = false;
 		if (allow_token(f, Token_using)) {
 			is_using = true;
 		}
 
-		AstNodeArray names = parse_lhs_expr_list(f);
+		AstNodeArray names = parse_identfier_list(f);
 		if (names.count == 0) {
 			syntax_error(f->curr_token, "Empty parameter declaration");
+			break;
 		}
 
 		if (names.count > 1 && is_using) {
@@ -2097,7 +2088,7 @@ AstNodeArray parse_parameter_list(AstFile *f, bool allow_using) {
 			is_using = false;
 		}
 
-		expect_token_after(f, Token_Colon, "parameter list");
+		// expect_token_after(f, Token_Colon, "parameter list");
 
 		AstNode *type = NULL;
 		if (f->curr_token.kind == Token_Ellipsis) {
@@ -2124,17 +2115,16 @@ AstNodeArray parse_parameter_list(AstFile *f, bool allow_using) {
 		}
 
 		array_add(&params, make_parameter(f, names, type, is_using));
-		if (!parse_at_comma(f, str_lit("parameter list"), Token_CloseParen)) {
+		if (!allow_token(f, Token_Comma)) {
 			break;
 		}
-		next_token(f);
 	}
 
 	return params;
 }
 
 
-AstNodeArray parse_record_params(AstFile *f, isize *decl_count_, bool using_allowed, String context) {
+AstNodeArray parse_record_params(AstFile *f, isize *decl_count_, bool allow_using, String context) {
 	AstNodeArray decls = make_ast_node_array(f);
 	isize decl_count = 0;
 
@@ -2154,13 +2144,13 @@ AstNodeArray parse_record_params(AstFile *f, isize *decl_count_, bool using_allo
 
 			case AstNode_UsingStmt: {
 				bool is_using = true;
-				if (!using_allowed) {
+				if (!allow_using) {
 					syntax_error(f->curr_token, "Cannot apply `using` to members of a %.*s", LIT(context));
 					is_using = false;
 				}
 				if (decl->UsingStmt.node->kind == AstNode_VarDecl) {
 					AstNode *vd = decl->UsingStmt.node;
-					vd->VarDecl.is_using = is_using && using_allowed;
+					vd->VarDecl.is_using = is_using && allow_using;
 					if (vd->VarDecl.values.count > 0) {
 						syntax_error(f->curr_token, "Default variable assignments within a %.*s will be ignored", LIT(context));
 					}
@@ -2213,10 +2203,6 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		}
 		return e;
 	}
-
-	case Token_type:
-		expect_token(f, Token_type);
-		return parse_identifier_or_type(f);
 
 	case Token_Pointer: {
 		Token token = expect_token(f, Token_Pointer);
@@ -2358,27 +2344,10 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		close = expect_token(f, Token_CloseParen);
 		return type;
 		// return make_paren_expr(f, type, open, close);
-	}
-
-	// TODO(bill): Why is this even allowed? Is this a parsing error?
-	case Token_Colon:
-		break;
-
-	case Token_Eq:
-		if (f->prev_token.kind == Token_Colon) {
-			break;
-		}
-		// fallthrough
-	default: {
-		String prev = str_lit("newline");
-		if (str_ne(f->prev_token.string, str_lit("\n"))) {
-			prev = f->prev_token.string;
-		}
-		syntax_error(f->curr_token,
-		             "Expected a type or identifier after %.*s, got %.*s", LIT(prev), LIT(f->curr_token.string));
 	} break;
 	}
 
+	// No type found
 	return NULL;
 }
 
@@ -2411,7 +2380,7 @@ void parse_proc_signature(AstFile *f,
                           AstNodeArray *params,
                           AstNodeArray *results) {
 	expect_token(f, Token_OpenParen);
-	*params = parse_parameter_list(f, true);
+	*params = parse_parameter_list(f, true, Token_CloseParen);
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	*results = parse_results(f);
 }
@@ -2777,6 +2746,64 @@ AstNode *parse_type_decl(AstFile *f) {
 	return decl;
 }
 
+AstNode *parse_value_decl(AstFile *f) {
+	Token token = f->curr_token;
+	switch (token.kind) {
+	case Token_var:
+	case Token_const:
+		next_token(f);
+		break;
+	default:
+		next_token(f);
+		syntax_error(token, "Expected a variable or constant declaration");
+		fix_advance_to_next_stmt(f);
+		return make_bad_decl(f, token, f->curr_token);
+	}
+
+	AstNodeArray names = parse_lhs_expr_list(f);
+	parse_check_name_list_for_reserves(f, names);
+	AstNode *type = parse_type_attempt(f);
+	AstNodeArray values = {0};
+
+	if (allow_token(f, Token_Eq)) {
+		values = parse_rhs_expr_list(f);
+	}
+
+	if (values.count > names.count) {
+		syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
+	} else if (token.kind == Token_const) {
+		if (values.count < names.count) {
+			syntax_error(f->curr_token, "All constant declarations must be defined");
+		} else if (values.count == 0) {
+			syntax_error(f->curr_token, "Expected an expression for this declaration");
+		}
+	}
+
+	if (type == NULL && values.count == 0 && names.count > 0) {
+		syntax_error(f->curr_token, "Missing type or initialization");
+		return make_bad_decl(f, f->curr_token, f->curr_token);
+	}
+
+	// TODO(bill): Fix this so it does not require it
+	if (values.e == NULL) {
+		values = make_ast_node_array(f);
+	}
+
+
+	AstNode *decl = NULL;
+
+	switch (token.kind) {
+	case Token_var:
+		decl = make_var_decl(f, names, type, values);
+		break;
+	case Token_const:
+		decl = make_const_decl(f, names, type, values);
+		break;
+	}
+	expect_semicolon(f, decl);
+	return decl;
+}
+
 AstNode *parse_stmt(AstFile *f) {
 	AstNode *s = NULL;
 	Token token = f->curr_token;
@@ -2816,9 +2843,11 @@ AstNode *parse_stmt(AstFile *f) {
 
 	case Token_proc:
 		return parse_proc_decl(f);
-
 	case Token_type:
 		return parse_type_decl(f);
+	case Token_var:
+	case Token_const:
+		return parse_value_decl(f);
 
 
 	case Token_using: {

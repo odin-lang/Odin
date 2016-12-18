@@ -644,18 +644,18 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 
 	isize field_count = 0;
 	isize other_field_count = 0;
-	for_array(decl_index, st->decls) {
-		AstNode *decl = st->decls.e[decl_index];
-		switch (decl->kind) {
-		case_ast_node(vd, VarDecl, decl);
+	for_array(field_index, st->fields) {
+		AstNode *field = st->fields.e[field_index];
+		switch (field->kind) {
+		case_ast_node(vd, VarDecl, field);
 			field_count += vd->names.count;
 		case_end;
 
-		case_ast_node(cd, ConstDecl, decl);
+		case_ast_node(cd, ConstDecl, field);
 			other_field_count += cd->names.count;
 		case_end;
 
-		case_ast_node(td, TypeDecl, decl);
+		case_ast_node(td, TypeDecl, field);
 			other_field_count += 1;
 		case_end;
 		}
@@ -664,7 +664,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
 	Entity **other_fields = gb_alloc_array(c->allocator, Entity *, other_field_count);
 
-	check_fields(c, node, st->decls, fields, field_count, other_fields, other_field_count, str_lit("struct"));
+	check_fields(c, node, st->fields, fields, field_count, other_fields, other_field_count, str_lit("struct"));
 
 	struct_type->Record.struct_is_packed    = st->is_packed;
 	struct_type->Record.struct_is_ordered   = st->is_ordered;
@@ -705,18 +705,18 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	isize field_count = 1;
 	isize other_field_count = 0;
-	for_array(decl_index, ut->decls) {
-		AstNode *decl = ut->decls.e[decl_index];
-		switch (decl->kind) {
-		case_ast_node(vd, VarDecl, decl);
+	for_array(field_index, ut->fields) {
+		AstNode *field = ut->fields.e[field_index];
+		switch (field->kind) {
+		case_ast_node(vd, VarDecl, field);
 			field_count += vd->names.count;
 		case_end;
 
-		case_ast_node(cd, ConstDecl, decl);
+		case_ast_node(cd, ConstDecl, field);
 			other_field_count += cd->names.count;
 		case_end;
 
-		case_ast_node(td, TypeDecl, decl);
+		case_ast_node(td, TypeDecl, field);
 			other_field_count += 1;
 		case_end;
 		}
@@ -725,7 +725,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
 	Entity **other_fields = gb_alloc_array(c->allocator, Entity *, other_field_count);
 
-	check_fields(c, node, ut->decls, fields, field_count, other_fields, other_field_count, str_lit("union"));
+	check_fields(c, node, ut->fields, fields, field_count, other_fields, other_field_count, str_lit("union"));
 
 	union_type->Record.fields            = fields;
 	union_type->Record.field_count       = field_count;
@@ -740,18 +740,18 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	isize field_count = 0;
 	isize other_field_count = 0;
-	for_array(decl_index, ut->decls) {
-		AstNode *decl = ut->decls.e[decl_index];
-		switch (decl->kind) {
-		case_ast_node(vd, VarDecl, decl);
+	for_array(field_index, ut->fields) {
+		AstNode *field = ut->fields.e[field_index];
+		switch (field->kind) {
+		case_ast_node(vd, VarDecl, field);
 			field_count += vd->names.count;
 		case_end;
 
-		case_ast_node(cd, ConstDecl, decl);
+		case_ast_node(cd, ConstDecl, field);
 			other_field_count += cd->names.count;
 		case_end;
 
-		case_ast_node(td, TypeDecl, decl);
+		case_ast_node(td, TypeDecl, field);
 			other_field_count += 1;
 		case_end;
 		}
@@ -760,7 +760,7 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
 	Entity **other_fields = gb_alloc_array(c->allocator, Entity *, other_field_count);
 
-	check_fields(c, node, ut->decls, fields, field_count, other_fields, other_field_count, str_lit("raw union"));
+	check_fields(c, node, ut->fields, fields, field_count, other_fields, other_field_count, str_lit("raw union"));
 
 	union_type->Record.fields = fields;
 	union_type->Record.field_count = field_count;
@@ -4655,11 +4655,11 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, "struct ");
 		if (st->is_packed)  str = gb_string_appendc(str, "#packed ");
 		if (st->is_ordered) str = gb_string_appendc(str, "#ordered ");
-		for_array(i, st->decls) {
+		for_array(i, st->fields) {
 			if (i > 0) {
 				str = gb_string_appendc(str, "; ");
 			}
-			str = write_expr_to_string(str, st->decls.e[i]);
+			str = write_expr_to_string(str, st->fields.e[i]);
 		}
 		// str = write_params_to_string(str, st->decl_list, ", ");
 		str = gb_string_appendc(str, "}");
@@ -4667,11 +4667,11 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(st, RawUnionType, node);
 		str = gb_string_appendc(str, "raw_union {");
-		for_array(i, st->decls) {
+		for_array(i, st->fields) {
 			if (i > 0) {
 				str = gb_string_appendc(str, "; ");
 			}
-			str = write_expr_to_string(str, st->decls.e[i]);
+			str = write_expr_to_string(str, st->fields.e[i]);
 		}
 		// str = write_params_to_string(str, st->decl_list, ", ");
 		str = gb_string_appendc(str, "}");
@@ -4679,11 +4679,11 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(st, UnionType, node);
 		str = gb_string_appendc(str, "union {");
-		for_array(i, st->decls) {
+		for_array(i, st->fields) {
 			if (i > 0) {
 				str = gb_string_appendc(str, "; ");
 			}
-			str = write_expr_to_string(str, st->decls.e[i]);
+			str = write_expr_to_string(str, st->fields.e[i]);
 		}
 		// str = write_params_to_string(str, st->decl_list, ", ");
 		str = gb_string_appendc(str, "}");

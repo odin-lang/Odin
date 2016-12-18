@@ -1,4 +1,4 @@
-proc crc32(data: rawptr, len: int) -> u32 {
+proc crc32(data rawptr, len int) -> u32 {
 	result := ~(0 as u32);
 	s := slice_ptr(data as ^u8, len);
 	for i := 0; i < len; i++ {
@@ -7,7 +7,7 @@ proc crc32(data: rawptr, len: int) -> u32 {
 	}
 	return ~result;
 }
-proc crc64(data: rawptr, len: int) -> u64 {
+proc crc64(data rawptr, len int) -> u64 {
 	result := ~(0 as u64);
 	s := slice_ptr(data as ^u8, len);
 	for i := 0; i < len; i++ {
@@ -17,7 +17,7 @@ proc crc64(data: rawptr, len: int) -> u64 {
 	return ~result;
 }
 
-proc fnv32(data: rawptr, len: int) -> u32 {
+proc fnv32(data rawptr, len int) -> u32 {
 	s := slice_ptr(data as ^u8, len);
 
 	h: u32 = 0x811c9dc5;
@@ -27,7 +27,7 @@ proc fnv32(data: rawptr, len: int) -> u32 {
 	return h;
 }
 
-proc fnv64(data: rawptr, len: int) -> u64 {
+proc fnv64(data rawptr, len int) -> u64 {
 	s := slice_ptr(data as ^u8, len);
 
 	h: u64 = 0xcbf29ce484222325;
@@ -37,7 +37,7 @@ proc fnv64(data: rawptr, len: int) -> u64 {
 	return h;
 }
 
-proc fnv32a(data: rawptr, len: int) -> u32 {
+proc fnv32a(data rawptr, len int) -> u32 {
 	s := slice_ptr(data as ^u8, len);
 
 	h: u32 = 0x811c9dc5;
@@ -47,7 +47,7 @@ proc fnv32a(data: rawptr, len: int) -> u32 {
 	return h;
 }
 
-proc fnv64a(data: rawptr, len: int) -> u64 {
+proc fnv64a(data rawptr, len int) -> u64 {
 	s := slice_ptr(data as ^u8, len);
 
 	h: u64 = 0xcbf29ce484222325;
@@ -58,12 +58,12 @@ proc fnv64a(data: rawptr, len: int) -> u64 {
 }
 
 
-proc murmur64(data_: rawptr, len: int) -> u64 {
-	SEED :: 0x9747b28c;
+proc murmur64(data_ rawptr, len int) -> u64 {
+	const SEED = 0x9747b28c;
 
 	when size_of(int) == 8 {
-		m :: 0xc6a4a7935bd1e995;
-		r :: 47;
+		const m = 0xc6a4a7935bd1e995;
+		const r = 47;
 
 		h: u64 = SEED ~ (len as u64 * m);
 
@@ -99,8 +99,8 @@ proc murmur64(data_: rawptr, len: int) -> u64 {
 
 		return h;
 	} else {
-		m :: 0x5bd1e995;
-		r :: 24;
+		const m = 0x5bd1e995;
+		const r = 24;
 
 		h1: u32 = SEED as u32 ~ len as u32;
 		h2: u32 = SEED >> 32;

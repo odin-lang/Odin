@@ -1,13 +1,13 @@
-RUNE_ERROR :: '\ufffd';
-RUNE_SELF  :: 0x80;
-RUNE_BOM   :: 0xfeff;
-RUNE_EOF   :: ~(0 as rune);
-MAX_RUNE   :: '\U0010ffff';
-UTF_MAX    :: 4;
+const RUNE_ERROR = '\ufffd';
+const RUNE_SELF  = 0x80;
+const RUNE_BOM   = 0xfeff;
+const RUNE_EOF   = ~(0 as rune);
+const MAX_RUNE   = '\U0010ffff';
+const UTF_MAX    = 4;
 
 
-SURROGATE_MIN :: 0xd800;
-SURROGATE_MAX :: 0xdfff;
+const SURROGATE_MIN = 0xd800;
+const SURROGATE_MAX = 0xdfff;
 
 
 type Accept_Range struct {
@@ -42,11 +42,10 @@ accept_sizes := [256]byte{
 	0x34, 0x04, 0x04, 0x04, 0x44, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, // 0xf0-0xff
 };
 
-proc encode_rune(r_: rune) -> ([4]byte, int) {
-	r := r_;
+proc encode_rune(r rune) -> ([4]byte, int) {
 	buf: [4]byte;
 	i := r as u32;
-	mask :: 0x3f as byte;
+	const mask = 0x3f as byte;
 	if i <= 1<<7-1 {
 		buf[0] = r as byte;
 		return buf, 1;
@@ -77,7 +76,7 @@ proc encode_rune(r_: rune) -> ([4]byte, int) {
 	return buf, 4;
 }
 
-proc decode_rune(s: string) -> (rune, int) {
+proc decode_rune(s string) -> (rune, int) {
 	n := s.count;
 	if n < 1 {
 		return RUNE_ERROR, 0;
@@ -98,10 +97,10 @@ proc decode_rune(s: string) -> (rune, int) {
 		return RUNE_ERROR, 1;
 	}
 
-	MASK_X :: 0b00111111;
-	MASK_2 :: 0b00011111;
-	MASK_3 :: 0b00001111;
-	MASK_4 :: 0b00000111;
+	const MASK_X = 0b00111111;
+	const MASK_2 = 0b00011111;
+	const MASK_3 = 0b00001111;
+	const MASK_4 = 0b00000111;
 
 	if size == 2 {
 		return (b0&MASK_2) as rune <<6 | (b1&MASK_X) as rune, 2;
@@ -122,7 +121,7 @@ proc decode_rune(s: string) -> (rune, int) {
 }
 
 
-proc valid_rune(r: rune) -> bool {
+proc valid_rune(r rune) -> bool {
 	if r < 0 {
 		return false;
 	} else if SURROGATE_MIN <= r && r <= SURROGATE_MAX {
@@ -133,7 +132,7 @@ proc valid_rune(r: rune) -> bool {
 	return true;
 }
 
-proc valid_string(s: string) -> bool {
+proc valid_string(s string) -> bool {
 	n := s.count;
 	for i := 0; i < n; {
 		si := s[i];
@@ -166,7 +165,7 @@ proc valid_string(s: string) -> bool {
 	return true;
 }
 
-proc rune_count(s: string) -> int {
+proc rune_count(s string) -> int {
 	count := 0;
 	n := s.count;
 	for i := 0; i < n; count++ {
@@ -203,7 +202,7 @@ proc rune_count(s: string) -> int {
 }
 
 
-proc rune_size(r: rune) -> int {
+proc rune_size(r rune) -> int {
 	match {
 	case r < 0:          return -1;
 	case r <= 1<<7  - 1: return 1;

@@ -1,20 +1,20 @@
-TAU          :: 6.28318530717958647692528676655900576;
-PI           :: 3.14159265358979323846264338327950288;
-ONE_OVER_TAU :: 0.636619772367581343075535053490057448;
-ONE_OVER_PI  :: 0.159154943091895335768883763372514362;
+const TAU          = 6.28318530717958647692528676655900576;
+const PI           = 3.14159265358979323846264338327950288;
+const ONE_OVER_TAU = 0.636619772367581343075535053490057448;
+const ONE_OVER_PI  = 0.159154943091895335768883763372514362;
 
-E            :: 2.71828182845904523536;
-SQRT_TWO     :: 1.41421356237309504880168872420969808;
-SQRT_THREE   :: 1.73205080756887729352744634150587236;
-SQRT_FIVE    :: 2.23606797749978969640917366873127623;
+const E            = 2.71828182845904523536;
+const SQRT_TWO     = 1.41421356237309504880168872420969808;
+const SQRT_THREE   = 1.73205080756887729352744634150587236;
+const SQRT_FIVE    = 2.23606797749978969640917366873127623;
 
-LOG_TWO      :: 0.693147180559945309417232121458176568;
-LOG_TEN      :: 2.30258509299404568401799145468436421;
+const LOG_TWO      = 0.693147180559945309417232121458176568;
+const LOG_TEN      = 2.30258509299404568401799145468436421;
 
-EPSILON      :: 1.19209290e-7;
+const EPSILON      = 1.19209290e-7;
 
-τ :: TAU;
-π :: PI;
+const τ = TAU;
+const π = PI;
 
 
 type Vec2 [vector 2]f32;
@@ -26,57 +26,57 @@ type Mat3 [3]Vec3;
 type Mat4 [4]Vec4;
 
 
-proc sqrt32(x: f32) -> f32 #foreign "llvm.sqrt.f32"
-proc sqrt64(x: f64) -> f64 #foreign "llvm.sqrt.f64"
+proc sqrt32(x f32) -> f32 #foreign "llvm.sqrt.f32"
+proc sqrt64(x f64) -> f64 #foreign "llvm.sqrt.f64"
 
-proc sin32(x: f32) -> f32 #foreign "llvm.sin.f32"
-proc sin64(x: f64) -> f64 #foreign "llvm.sin.f64"
+proc sin32(x f32) -> f32 #foreign "llvm.sin.f32"
+proc sin64(x f64) -> f64 #foreign "llvm.sin.f64"
 
-proc cos32(x: f32) -> f32 #foreign "llvm.cos.f32"
-proc cos64(x: f64) -> f64 #foreign "llvm.cos.f64"
+proc cos32(x f32) -> f32 #foreign "llvm.cos.f32"
+proc cos64(x f64) -> f64 #foreign "llvm.cos.f64"
 
-proc tan32(x: f32) -> f32 #inline { return sin32(x)/cos32(x); }
-proc tan64(x: f64) -> f64 #inline { return sin64(x)/cos64(x); }
+proc tan32(x f32) -> f32 #inline { return sin32(x)/cos32(x); }
+proc tan64(x f64) -> f64 #inline { return sin64(x)/cos64(x); }
 
-proc lerp32(a, b, t: f32) -> f32 { return a*(1-t) + b*t; }
-proc lerp64(a, b, t: f64) -> f64 { return a*(1-t) + b*t; }
+proc lerp32(a, b, t f32) -> f32 { return a*(1-t) + b*t; }
+proc lerp64(a, b, t f64) -> f64 { return a*(1-t) + b*t; }
 
-proc sign32(x: f32) -> f32 { if x >= 0 { return +1; } return -1; }
-proc sign64(x: f64) -> f64 { if x >= 0 { return +1; } return -1; }
+proc sign32(x f32) -> f32 { if x >= 0 { return +1; } return -1; }
+proc sign64(x f64) -> f64 { if x >= 0 { return +1; } return -1; }
 
 
 
-proc copy_sign32(x, y: f32) -> f32 {
+proc copy_sign32(x, y f32) -> f32 {
 	ix := x transmute u32;
 	iy := y transmute u32;
 	ix &= 0x7fffffff;
 	ix |= iy & 0x80000000;
 	return ix transmute f32;
 }
-proc round32(x: f32) -> f32 {
+proc round32(x f32) -> f32 {
 	if x >= 0 {
 		return floor32(x + 0.5);
 	}
 	return ceil32(x - 0.5);
 }
-proc floor32(x: f32) -> f32 {
+proc floor32(x f32) -> f32 {
 	if x >= 0 {
 		return x as int as f32;
 	}
 	return (x-0.5) as int as f32;
 }
-proc ceil32(x: f32) -> f32 {
+proc ceil32(x f32) -> f32 {
 	if x < 0 {
 		return x as int as f32;
 	}
 	return ((x as int)+1) as f32;
 }
 
-proc remainder32(x, y: f32) -> f32 {
+proc remainder32(x, y f32) -> f32 {
 	return x - round32(x/y) * y;
 }
 
-proc fmod32(x, y: f32) -> f32 {
+proc fmod32(x, y f32) -> f32 {
 	y = abs(y);
 	result := remainder32(abs(x), y);
 	if sign32(result) < 0 {
@@ -86,32 +86,32 @@ proc fmod32(x, y: f32) -> f32 {
 }
 
 
-proc to_radians(degrees: f32) -> f32 { return degrees * TAU / 360; }
-proc to_degrees(radians: f32) -> f32 { return radians * 360 / TAU; }
+proc to_radians(degrees f32) -> f32 { return degrees * TAU / 360; }
+proc to_degrees(radians f32) -> f32 { return radians * 360 / TAU; }
 
 
 
 
-proc dot2(a, b: Vec2) -> f32 { c := a*b; return c.x + c.y; }
-proc dot3(a, b: Vec3) -> f32 { c := a*b; return c.x + c.y + c.z; }
-proc dot4(a, b: Vec4) -> f32 { c := a*b; return c.x + c.y + c.z + c.w; }
+proc dot2(a, b Vec2) -> f32 { c := a*b; return c.x + c.y; }
+proc dot3(a, b Vec3) -> f32 { c := a*b; return c.x + c.y + c.z; }
+proc dot4(a, b Vec4) -> f32 { c := a*b; return c.x + c.y + c.z + c.w; }
 
-proc cross3(x, y: Vec3) -> Vec3 {
+proc cross3(x, y Vec3) -> Vec3 {
 	a := swizzle(x, 1, 2, 0) * swizzle(y, 2, 0, 1);
 	b := swizzle(x, 2, 0, 1) * swizzle(y, 1, 2, 0);
 	return a - b;
 }
 
 
-proc vec2_mag(v: Vec2) -> f32 { return sqrt32(dot2(v, v)); }
-proc vec3_mag(v: Vec3) -> f32 { return sqrt32(dot3(v, v)); }
-proc vec4_mag(v: Vec4) -> f32 { return sqrt32(dot4(v, v)); }
+proc vec2_mag(v Vec2) -> f32 { return sqrt32(dot2(v, v)); }
+proc vec3_mag(v Vec3) -> f32 { return sqrt32(dot3(v, v)); }
+proc vec4_mag(v Vec4) -> f32 { return sqrt32(dot4(v, v)); }
 
-proc vec2_norm(v: Vec2) -> Vec2 { return v / Vec2{vec2_mag(v)}; }
-proc vec3_norm(v: Vec3) -> Vec3 { return v / Vec3{vec3_mag(v)}; }
-proc vec4_norm(v: Vec4) -> Vec4 { return v / Vec4{vec4_mag(v)}; }
+proc vec2_norm(v Vec2) -> Vec2 { return v / Vec2{vec2_mag(v)}; }
+proc vec3_norm(v Vec3) -> Vec3 { return v / Vec3{vec3_mag(v)}; }
+proc vec4_norm(v Vec4) -> Vec4 { return v / Vec4{vec4_mag(v)}; }
 
-proc vec2_norm0(v: Vec2) -> Vec2 {
+proc vec2_norm0(v Vec2) -> Vec2 {
 	m := vec2_mag(v);
 	if m == 0 {
 		return Vec2{0};
@@ -119,7 +119,7 @@ proc vec2_norm0(v: Vec2) -> Vec2 {
 	return v / Vec2{m};
 }
 
-proc vec3_norm0(v: Vec3) -> Vec3 {
+proc vec3_norm0(v Vec3) -> Vec3 {
 	m := vec3_mag(v);
 	if m == 0 {
 		return Vec3{0};
@@ -127,7 +127,7 @@ proc vec3_norm0(v: Vec3) -> Vec3 {
 	return v / Vec3{m};
 }
 
-proc vec4_norm0(v: Vec4) -> Vec4 {
+proc vec4_norm0(v Vec4) -> Vec4 {
 	m := vec4_mag(v);
 	if m == 0 {
 		return Vec4{0};
@@ -146,7 +146,7 @@ proc mat4_identity() -> Mat4 {
 	};
 }
 
-proc mat4_transpose(m: Mat4) -> Mat4 {
+proc mat4_transpose(m Mat4) -> Mat4 {
 	for j := 0; j < 4; j++ {
 		for i := 0; i < 4; i++ {
 			m[i][j], m[j][i] = m[j][i], m[i][j];
@@ -155,7 +155,7 @@ proc mat4_transpose(m: Mat4) -> Mat4 {
 	return m;
 }
 
-proc mat4_mul(a, b: Mat4) -> Mat4 {
+proc mat4_mul(a, b Mat4) -> Mat4 {
 	c: Mat4;
 	for j := 0; j < 4; j++ {
 		for i := 0; i < 4; i++ {
@@ -168,7 +168,7 @@ proc mat4_mul(a, b: Mat4) -> Mat4 {
 	return c;
 }
 
-proc mat4_mul_vec4(m: Mat4, v: Vec4) -> Vec4 {
+proc mat4_mul_vec4(m Mat4, v Vec4) -> Vec4 {
 	return Vec4{
 		m[0][0]*v.x + m[1][0]*v.y + m[2][0]*v.z + m[3][0]*v.w,
 		m[0][1]*v.x + m[1][1]*v.y + m[2][1]*v.z + m[3][1]*v.w,
@@ -177,7 +177,7 @@ proc mat4_mul_vec4(m: Mat4, v: Vec4) -> Vec4 {
 	};
 }
 
-proc mat4_inverse(m: Mat4) -> Mat4 {
+proc mat4_inverse(m Mat4) -> Mat4 {
 	o: Mat4;
 
 	sf00 := m[2][2] * m[3][3] - m[3][2] * m[2][3];
@@ -246,7 +246,7 @@ proc mat4_inverse(m: Mat4) -> Mat4 {
 }
 
 
-proc mat4_translate(v: Vec3) -> Mat4 {
+proc mat4_translate(v Vec3) -> Mat4 {
 	m := mat4_identity();
 	m[3][0] = v.x;
 	m[3][1] = v.y;
@@ -255,7 +255,7 @@ proc mat4_translate(v: Vec3) -> Mat4 {
 	return m;
 }
 
-proc mat4_rotate(v: Vec3, angle_radians: f32) -> Mat4 {
+proc mat4_rotate(v Vec3, angle_radians f32) -> Mat4 {
 	c := cos32(angle_radians);
 	s := sin32(angle_radians);
 
@@ -282,14 +282,14 @@ proc mat4_rotate(v: Vec3, angle_radians: f32) -> Mat4 {
 	return rot;
 }
 
-proc mat4_scale(m: Mat4, v: Vec3) -> Mat4 {
+proc mat4_scale(m Mat4, v Vec3) -> Mat4 {
 	m[0][0] *= v.x;
 	m[1][1] *= v.y;
 	m[2][2] *= v.z;
 	return m;
 }
 
-proc mat4_scalef(m: Mat4, s: f32) -> Mat4 {
+proc mat4_scalef(m Mat4, s f32) -> Mat4 {
 	m[0][0] *= s;
 	m[1][1] *= s;
 	m[2][2] *= s;
@@ -297,7 +297,7 @@ proc mat4_scalef(m: Mat4, s: f32) -> Mat4 {
 }
 
 
-proc mat4_look_at(eye, centre, up: Vec3) -> Mat4 {
+proc mat4_look_at(eye, centre, up Vec3) -> Mat4 {
 	f := vec3_norm(centre - eye);
 	s := vec3_norm(cross3(f, up));
 	u := cross3(s, f);
@@ -311,7 +311,7 @@ proc mat4_look_at(eye, centre, up: Vec3) -> Mat4 {
 
 	return m;
 }
-proc mat4_perspective(fovy, aspect, near, far: f32) -> Mat4 {
+proc mat4_perspective(fovy, aspect, near, far f32) -> Mat4 {
 	m: Mat4;
 	tan_half_fovy := tan32(0.5 * fovy);
 	m[0][0] = 1.0 / (aspect*tan_half_fovy);
@@ -323,7 +323,7 @@ proc mat4_perspective(fovy, aspect, near, far: f32) -> Mat4 {
 }
 
 
-proc mat4_ortho3d(left, right, bottom, top, near, far: f32) -> Mat4 {
+proc mat4_ortho3d(left, right, bottom, top, near, far f32) -> Mat4 {
 	m := mat4_identity();
 	m[0][0] = +2.0 / (right - left);
 	m[1][1] = +2.0 / (top - bottom);
@@ -338,31 +338,31 @@ proc mat4_ortho3d(left, right, bottom, top, near, far: f32) -> Mat4 {
 
 
 
-F32_DIG        :: 6;
-F32_EPSILON    :: 1.192092896e-07;
-F32_GUARD      :: 0;
-F32_MANT_DIG   :: 24;
-F32_MAX        :: 3.402823466e+38;
-F32_MAX_10_EXP :: 38;
-F32_MAX_EXP    :: 128;
-F32_MIN        :: 1.175494351e-38;
-F32_MIN_10_EXP :: -37;
-F32_MIN_EXP    :: -125;
-F32_NORMALIZE  :: 0;
-F32_RADIX      :: 2;
-F32_ROUNDS     :: 1;
+const F32_DIG        = 6;
+const F32_EPSILON    = 1.192092896e-07;
+const F32_GUARD      = 0;
+const F32_MANT_DIG   = 24;
+const F32_MAX        = 3.402823466e+38;
+const F32_MAX_10_EXP = 38;
+const F32_MAX_EXP    = 128;
+const F32_MIN        = 1.175494351e-38;
+const F32_MIN_10_EXP = -37;
+const F32_MIN_EXP    = -125;
+const F32_NORMALIZE  = 0;
+const F32_RADIX      = 2;
+const F32_ROUNDS     = 1;
 
-F64_DIG        :: 15;                       // # of decimal digits of precision
-F64_EPSILON    :: 2.2204460492503131e-016;  // smallest such that 1.0+F64_EPSILON != 1.0
-F64_MANT_DIG   :: 53;                       // # of bits in mantissa
-F64_MAX        :: 1.7976931348623158e+308;  // max value
-F64_MAX_10_EXP :: 308;                      // max decimal exponent
-F64_MAX_EXP    :: 1024;                     // max binary exponent
-F64_MIN        :: 2.2250738585072014e-308;  // min positive value
-F64_MIN_10_EXP :: -307;                     // min decimal exponent
-F64_MIN_EXP    :: -1021;                    // min binary exponent
-F64_RADIX      :: 2;                        // exponent radix
-F64_ROUNDS     :: 1;                        // addition rounding: near
+const F64_DIG        = 15;                       // # of decimal digits of precision
+const F64_EPSILON    = 2.2204460492503131e-016;  // smallest such that 1.0+F64_EPSILON != 1.0
+const F64_MANT_DIG   = 53;                       // # of bits in mantissa
+const F64_MAX        = 1.7976931348623158e+308;  // max value
+const F64_MAX_10_EXP = 308;                      // max decimal exponent
+const F64_MAX_EXP    = 1024;                     // max binary exponent
+const F64_MIN        = 2.2250738585072014e-308;  // min positive value
+const F64_MIN_10_EXP = -307;                     // min decimal exponent
+const F64_MIN_EXP    = -1021;                    // min binary exponent
+const F64_RADIX      = 2;                        // exponent radix
+const F64_ROUNDS     = 1;                        // addition rounding: near
 
 
 
