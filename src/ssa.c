@@ -4842,7 +4842,8 @@ String ssa_mangle_name(ssaGen *s, String path, String name) {
 ssaValue *ssa_get_type_info_ptr(ssaProcedure *proc, ssaValue *type_info_data, Type *type) {
 	i32 index = cast(i32)ssa_type_info_index(proc->module->info, type);
 	// gb_printf_err("%d %s\n", index, type_to_string(type));
-	return ssa_emit_array_epi(proc, type_info_data, index);
+	ssaValue *ptr = ssa_emit_array_epi(proc, type_info_data, index);
+	return ssa_emit_bitcast(proc, ptr, t_type_info_ptr);
 }
 
 ssaValue *ssa_type_info_member_offset(ssaProcedure *proc, ssaValue *data, isize count, i32 *index) {

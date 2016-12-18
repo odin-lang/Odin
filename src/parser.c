@@ -1602,8 +1602,9 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 	while (f->curr_token.kind != Token_CloseParen &&
 	       f->curr_token.kind != Token_EOF &&
 	       ellipsis.pos.line == 0) {
-		if (f->curr_token.kind == Token_Comma)
+		if (f->curr_token.kind == Token_Comma) {
 			syntax_error(f->curr_token, "Expected an expression not a ,");
+		}
 
 		if (f->curr_token.kind == Token_Ellipsis) {
 			ellipsis = f->curr_token;

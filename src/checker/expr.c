@@ -4455,10 +4455,9 @@ void check_expr_or_type(Checker *c, Operand *o, AstNode *e) {
 	check_not_tuple(c, o);
 	if (o->mode == Addressing_NoValue) {
 		gbString str = expr_to_string(o->expr);
-		error_node(o->expr,
-		      "`%s` used as value or type", str);
-		o->mode = Addressing_Invalid;
+		error_node(o->expr, "`%s` used as value or type", str);
 		gb_string_free(str);
+		o->mode = Addressing_Invalid;
 	}
 }
 
