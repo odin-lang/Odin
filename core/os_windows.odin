@@ -1,19 +1,19 @@
 #import win32 "sys/windows.odin";
 #import "fmt.odin";
 
-File_Time :: type u64;
+type File_Time u64;
 
-File_Handle :: raw_union {
+type File_Handle raw_union {
 	p: rawptr;
 	i: int;
 }
 
-File :: struct {
+type File struct {
 	handle:          File_Handle;
 	last_write_time: File_Time;
 }
 
-open :: proc(name: string) -> (File, bool) {
+proc open(name: string) -> (File, bool) {
 	using win32;
 	buf: [300]byte;
 	copy(buf[:], name as []byte);
@@ -24,7 +24,7 @@ open :: proc(name: string) -> (File, bool) {
 	return f, success;
 }
 
-create :: proc(name: string) -> (File, bool) {
+proc create(name: string) -> (File, bool) {
 	using win32;
 	buf: [300]byte;
 	copy(buf[:], name as []byte);
@@ -35,16 +35,16 @@ create :: proc(name: string) -> (File, bool) {
 	return f, success;
 }
 
-close :: proc(using f: ^File) {
+proc close(using f: ^File) {
 	win32.CloseHandle(handle.p as win32.HANDLE);
 }
 
-write :: proc(using f: ^File, buf: []byte) -> bool {
+proc write(using f: ^File, buf: []byte) -> bool {
 	bytes_written: i32;
 	return win32.WriteFile(handle.p as win32.HANDLE, buf.data, buf.count as i32, ^bytes_written, nil) != 0;
 }
 
-file_has_changed :: proc(f: ^File) -> bool {
+proc file_has_changed(f: ^File) -> bool {
 	last_write_time := last_write_time(f);
 	if f.last_write_time != last_write_time {
 		f.last_write_time = last_write_time;
@@ -55,7 +55,7 @@ file_has_changed :: proc(f: ^File) -> bool {
 
 
 
-last_write_time :: proc(f: ^File) -> File_Time {
+proc last_write_time(f: ^File) -> File_Time {
 	file_info: win32.BY_HANDLE_FILE_INFORMATION;
 	win32.GetFileInformationByHandle(f.handle.p as win32.HANDLE, ^file_info);
 	l := file_info.last_write_time.low_date_time as File_Time;
@@ -63,7 +63,7 @@ last_write_time :: proc(f: ^File) -> File_Time {
 	return l | h << 32;
 }
 
-last_write_time_by_name :: proc(name: string) -> File_Time {
+proc last_write_time_by_name(name: string) -> File_Time {
 	last_write_time: win32.FILETIME;
 	data: win32.WIN32_FILE_ATTRIBUTE_DATA;
 	buf: [1024]byte;
@@ -84,7 +84,7 @@ last_write_time_by_name :: proc(name: string) -> File_Time {
 
 
 
-File_Standard :: enum {
+type File_Standard enum {
 	INPUT,
 	OUTPUT,
 	ERROR,
@@ -103,7 +103,7 @@ stderr := ^__std_files[File_Standard.ERROR];
 
 
 
-read_entire_file :: proc(name: string) -> ([]byte, bool) {
+proc read_entire_file(name: string) -> ([]byte, bool) {
 	buf: [300]byte;
 	copy(buf[:], name as []byte);
 
@@ -151,25 +151,25 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 
 
 
-heap_alloc :: proc(size: int) -> rawptr {
+proc heap_alloc(size: int) -> rawptr {
 	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, size);
 }
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
+proc heap_resize(ptr: rawptr, new_size: int) -> rawptr {
 	return win32.HeapReAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, ptr, new_size);
 }
-heap_free :: proc(ptr: rawptr) {
+proc heap_free(ptr: rawptr) {
 	win32.HeapFree(win32.GetProcessHeap(), 0, ptr);
 }
 
 
-exit :: proc(code: int) {
+proc exit(code: int) {
 	win32.ExitProcess(code as u32);
 }
 
 
 
-current_thread_id :: proc() -> int {
-	GetCurrentThreadId :: proc() -> u32 #foreign #dll_import
+proc current_thread_id() -> int {
+	proc GetCurrentThreadId() -> u32 #foreign #dll_import
 	return GetCurrentThreadId() as int;
 }
 

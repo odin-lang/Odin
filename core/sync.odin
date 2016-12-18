@@ -1,11 +1,11 @@
 #import win32 "sys/windows.odin" when ODIN_OS == "windows";
 #import "atomic.odin";
 
-Semaphore :: struct {
+type Semaphore struct {
 	handle: win32.HANDLE;
 }
 
-Mutex :: struct {
+type Mutex struct {
 	semaphore: Semaphore;
 	counter:   i32;
 	owner:     i32;
@@ -13,39 +13,39 @@ Mutex :: struct {
 }
 
 
-current_thread_id :: proc() -> i32 {
+proc current_thread_id() -> i32 {
 	return win32.GetCurrentThreadId() as i32;
 }
 
-semaphore_init :: proc(s: ^Semaphore) {
+proc semaphore_init(s: ^Semaphore) {
 	s.handle = win32.CreateSemaphoreA(nil, 0, 1<<31-1, nil);
 }
 
-semaphore_destroy :: proc(s: ^Semaphore) {
+proc semaphore_destroy(s: ^Semaphore) {
 	win32.CloseHandle(s.handle);
 }
 
-semaphore_post :: proc(s: ^Semaphore, count: int) {
+proc semaphore_post(s: ^Semaphore, count: int) {
 	win32.ReleaseSemaphore(s.handle, count as i32, nil);
 }
 
-semaphore_release :: proc(s: ^Semaphore) #inline { semaphore_post(s, 1); }
+proc semaphore_release(s: ^Semaphore) #inline { semaphore_post(s, 1); }
 
-semaphore_wait :: proc(s: ^Semaphore) {
+proc semaphore_wait(s: ^Semaphore) {
 	win32.WaitForSingleObject(s.handle, win32.INFINITE);
 }
 
 
-mutex_init :: proc(m: ^Mutex) {
+proc mutex_init(m: ^Mutex) {
 	atomic.store32(^m.counter, 0);
 	atomic.store32(^m.owner, current_thread_id());
 	semaphore_init(^m.semaphore);
 	m.recursion = 0;
 }
-mutex_destroy :: proc(m: ^Mutex) {
+proc mutex_destroy(m: ^Mutex) {
 	semaphore_destroy(^m.semaphore);
 }
-mutex_lock :: proc(m: ^Mutex) {
+proc mutex_lock(m: ^Mutex) {
 	thread_id := current_thread_id();
 	if atomic.fetch_add32(^m.counter, 1) > 0 {
 		if thread_id != atomic.load32(^m.owner) {
@@ -55,7 +55,7 @@ mutex_lock :: proc(m: ^Mutex) {
 	atomic.store32(^m.owner, thread_id);
 	m.recursion++;
 }
-mutex_try_lock :: proc(m: ^Mutex) -> bool {
+proc mutex_try_lock(m: ^Mutex) -> bool {
 	thread_id := current_thread_id();
 	if atomic.load32(^m.owner) == thread_id {
 		atomic.fetch_add32(^m.counter, 1);
@@ -72,7 +72,7 @@ mutex_try_lock :: proc(m: ^Mutex) -> bool {
 	m.recursion++;
 	return true;
 }
-mutex_unlock :: proc(m: ^Mutex) {
+proc mutex_unlock(m: ^Mutex) {
 	recursion: i32;
 	thread_id := current_thread_id();
 	assert(thread_id == atomic.load32(^m.owner));

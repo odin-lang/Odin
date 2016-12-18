@@ -1,14 +1,14 @@
-Test1 :: type union {
-	A: int;
-	B: int;
-};
+#import "atomic.odin";
+#import "fmt.odin";
+#import "hash.odin";
+#import "math.odin";
+#import "mem.odin";
+#import "opengl.odin";
+#import "os.odin";
+#import "sync.odin";
+#import "utf8.odin";
 
-Test :: type struct {
-	a: Test1;
-};
+proc main() {
+	fmt.println("Here");
 
-main :: proc() {
-	test: Test;
-	match type x : ^test.a {
-	}
-};
+}

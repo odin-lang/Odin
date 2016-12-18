@@ -1565,10 +1565,13 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	default: {
 		AstNode *type = parse_identifier_or_type(f);
 		if (type != NULL) {
+			// TODO(bill): Is this correct???
 			// NOTE(bill): Sanity check as identifiers should be handled already
-			GB_ASSERT_MSG(type->kind != AstNode_Ident, "Type Cannot be identifier");
+			// TokenPos pos = ast_node_token(type).pos;
+			// GB_ASSERT_MSG(type->kind != AstNode_Ident, "Type Cannot be identifier %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
 			return type;
 		}
+		break;
 	}
 	}
 
@@ -1859,9 +1862,6 @@ void parse_check_name_list_for_reserves(AstFile *f, AstNodeArray names) {
 	}
 }
 
-AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name);
-
-
 AstNode *parse_simple_stmt(AstFile *f) {
 	isize lhs_count = 0, rhs_count = 0;
 	AstNodeArray lhs = parse_lhs_expr_list(f);
@@ -1932,33 +1932,33 @@ AstNode *parse_simple_stmt(AstFile *f) {
 
 		Token colon_colon = expect_token(f, Token_ColonColon);
 
-		if (f->curr_token.kind == Token_type ||
-		    f->curr_token.kind == Token_struct ||
-		    f->curr_token.kind == Token_enum ||
-		    f->curr_token.kind == Token_union ||
-		    f->curr_token.kind == Token_raw_union) {
-		// if (f->curr_token.kind == Token_type) {
-			Token token = f->curr_token;
-			if (token.kind == Token_type) {
-				next_token(f);
-			}
-			if (names.count != 1) {
-				syntax_error_node(names.e[0], "You can only declare one type at a time");
-				return make_bad_decl(f, names.e[0]->Ident, token);
-			}
+		// if (f->curr_token.kind == Token_type ||
+		//     f->curr_token.kind == Token_struct ||
+		//     f->curr_token.kind == Token_enum ||
+		//     f->curr_token.kind == Token_union ||
+		//     f->curr_token.kind == Token_raw_union) {
+		// // if (f->curr_token.kind == Token_type) {
+		// 	Token token = f->curr_token;
+		// 	if (token.kind == Token_type) {
+		// 		next_token(f);
+		// 	}
+		// 	if (names.count != 1) {
+		// 		syntax_error_node(names.e[0], "You can only declare one type at a time");
+		// 		return make_bad_decl(f, names.e[0]->Ident, token);
+		// 	}
 
-			return make_type_decl(f, token, names.e[0], parse_type(f));
-		} else if (f->curr_token.kind == Token_proc) {
-		    // NOTE(bill): Procedure declarations
-			Token proc_token = f->curr_token;
-			AstNode *name = names.e[0];
-			if (names.count != 1) {
-				syntax_error(proc_token, "You can only declare one procedure at a time");
-				return make_bad_decl(f, name->Ident, proc_token);
-			}
+		// 	return make_type_decl(f, token, names.e[0], parse_type(f));
+		// } else if (f->curr_token.kind == Token_proc) {
+		//     // NOTE(bill): Procedure declarations
+		// 	Token proc_token = f->curr_token;
+		// 	AstNode *name = names.e[0];
+		// 	if (names.count != 1) {
+		// 		syntax_error(proc_token, "You can only declare one procedure at a time");
+		// 		return make_bad_decl(f, name->Ident, proc_token);
+		// 	}
 
-			return parse_proc_decl(f, proc_token, name);
-		}
+		// 	return parse_proc_decl(f, proc_token, name);
+		// }
 
 		AstNodeArray values = parse_rhs_expr_list(f);
 		if (values.count > names.count) {
@@ -2059,13 +2059,14 @@ AstNode *parse_type(AstFile *f) {
 }
 
 
-Token parse_proc_signature(AstFile *f, AstNodeArray *params, AstNodeArray *results);
+void parse_proc_signature(AstFile *f, AstNodeArray *params, AstNodeArray *results);
 
 AstNode *parse_proc_type(AstFile *f) {
 	AstNodeArray params = {0};
 	AstNodeArray results = {0};
 
-	Token proc_token = parse_proc_signature(f, &params, &results);
+	Token proc_token = expect_token(f, Token_proc);
+	parse_proc_signature(f, &params, &results);
 
 	return make_proc_type(f, proc_token, params, results, 0);
 }
@@ -2406,15 +2407,13 @@ AstNodeArray parse_results(AstFile *f) {
 	return results;
 }
 
-Token parse_proc_signature(AstFile *f,
-                           AstNodeArray *params,
-                           AstNodeArray *results) {
-	Token proc_token = expect_token(f, Token_proc);
+void parse_proc_signature(AstFile *f,
+                          AstNodeArray *params,
+                          AstNodeArray *results) {
 	expect_token(f, Token_OpenParen);
 	*params = parse_parameter_list(f, true);
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	*results = parse_results(f);
-	return proc_token;
 }
 
 AstNode *parse_body(AstFile *f) {
@@ -2429,8 +2428,16 @@ AstNode *parse_body(AstFile *f) {
 
 
 
-AstNode *parse_proc_decl(AstFile *f, Token proc_token, AstNode *name) {
-	AstNode *proc_type = parse_proc_type(f);
+AstNode *parse_proc_decl(AstFile *f) {
+	Token proc_token = expect_token(f, Token_proc);
+
+	AstNode *name = parse_identifier(f);
+
+	AstNodeArray params = {0};
+	AstNodeArray results = {0};
+	parse_proc_signature(f, &params, &results);
+
+	AstNode *proc_type = make_proc_type(f, proc_token, params, results, 0);
 
 	AstNode *body = NULL;
 	u64 tags = 0;
@@ -2737,9 +2744,6 @@ AstNode *parse_defer_stmt(AstFile *f) {
 AstNode *parse_asm_stmt(AstFile *f) {
 	Token token = expect_token(f, Token_asm);
 	bool is_volatile = false;
-	if (allow_token(f, Token_volatile)) {
-		is_volatile = true;
-	}
 	Token open, close, code_string;
 	open = expect_token(f, Token_OpenBrace);
 	code_string = expect_token(f, Token_String);
@@ -2764,7 +2768,14 @@ AstNode *parse_asm_stmt(AstFile *f) {
 
 }
 
-
+AstNode *parse_type_decl(AstFile *f) {
+	Token   token = expect_token(f, Token_type);
+	AstNode *name = parse_identifier(f);
+	AstNode *type = parse_type(f);
+	AstNode *decl = make_type_decl(f, token, name, type);
+	expect_semicolon(f, decl);
+	return decl;
+}
 
 AstNode *parse_stmt(AstFile *f) {
 	AstNode *s = NULL;
@@ -2777,7 +2788,6 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Rune:
 	case Token_String:
 	case Token_OpenParen:
-	case Token_proc:
 	// Unary Operators
 	case Token_Add:
 	case Token_Sub:
@@ -2803,6 +2813,12 @@ AstNode *parse_stmt(AstFile *f) {
 		s = make_branch_stmt(f, token);
 		expect_semicolon(f, s);
 		return s;
+
+	case Token_proc:
+		return parse_proc_decl(f);
+
+	case Token_type:
+		return parse_type_decl(f);
 
 
 	case Token_using: {

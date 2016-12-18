@@ -10,7 +10,7 @@ SURROGATE_MIN :: 0xd800;
 SURROGATE_MAX :: 0xdfff;
 
 
-Accept_Range :: struct {
+type Accept_Range struct {
 	lo, hi: u8;
 };
 
@@ -42,7 +42,7 @@ accept_sizes := [256]byte{
 	0x34, 0x04, 0x04, 0x04, 0x44, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, // 0xf0-0xff
 };
 
-encode_rune :: proc(r_: rune) -> ([4]byte, int) {
+proc encode_rune(r_: rune) -> ([4]byte, int) {
 	r := r_;
 	buf: [4]byte;
 	i := r as u32;
@@ -77,7 +77,7 @@ encode_rune :: proc(r_: rune) -> ([4]byte, int) {
 	return buf, 4;
 }
 
-decode_rune :: proc(s: string) -> (rune, int) {
+proc decode_rune(s: string) -> (rune, int) {
 	n := s.count;
 	if n < 1 {
 		return RUNE_ERROR, 0;
@@ -122,7 +122,7 @@ decode_rune :: proc(s: string) -> (rune, int) {
 }
 
 
-valid_rune :: proc(r: rune) -> bool {
+proc valid_rune(r: rune) -> bool {
 	if r < 0 {
 		return false;
 	} else if SURROGATE_MIN <= r && r <= SURROGATE_MAX {
@@ -133,7 +133,7 @@ valid_rune :: proc(r: rune) -> bool {
 	return true;
 }
 
-valid_string :: proc(s: string) -> bool {
+proc valid_string(s: string) -> bool {
 	n := s.count;
 	for i := 0; i < n; {
 		si := s[i];
@@ -166,7 +166,7 @@ valid_string :: proc(s: string) -> bool {
 	return true;
 }
 
-rune_count :: proc(s: string) -> int {
+proc rune_count(s: string) -> int {
 	count := 0;
 	n := s.count;
 	for i := 0; i < n; count++ {
@@ -203,7 +203,7 @@ rune_count :: proc(s: string) -> int {
 }
 
 
-rune_size :: proc(r: rune) -> int {
+proc rune_size(r: rune) -> int {
 	match {
 	case r < 0:          return -1;
 	case r <= 1<<7  - 1: return 1;
