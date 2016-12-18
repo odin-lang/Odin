@@ -2,14 +2,14 @@
 #import "atomic.odin";
 
 type Semaphore struct {
-	handle: win32.HANDLE;
+	handle win32.HANDLE;
 }
 
 type Mutex struct {
-	semaphore: Semaphore;
-	counter:   i32;
-	owner:     i32;
-	recursion: i32;
+	semaphore Semaphore;
+	counter   i32;
+	owner     i32;
+	recursion i32;
 }
 
 

@@ -4,13 +4,13 @@
 type File_Time u64;
 
 type File_Handle raw_union {
-	p: rawptr;
-	i: int;
+	p rawptr;
+	i int;
 }
 
 type File struct {
-	handle:          File_Handle;
-	last_write_time: File_Time;
+	handle          File_Handle;
+	last_write_time File_Time;
 }
 
 proc open(name string) -> (File, bool) {

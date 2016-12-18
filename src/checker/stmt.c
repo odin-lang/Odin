@@ -907,9 +907,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			switch (e->kind) {
 			case Entity_TypeName: {
 				Type *t = base_type(e->type);
-				if (is_type_struct(t) || is_type_enum(t)) {
-					for (isize i = 0; i < t->Record.other_field_count; i++) {
-						Entity *f = t->Record.other_fields[i];
+				if (is_type_enum(t)) {
+					for (isize i = 0; i < t->Record.enum_value_count; i++) {
+						Entity *f = t->Record.enum_values[i];
 						Entity *found = scope_insert_entity(c->context.scope, f);
 						if (found != NULL) {
 							gbString expr_str = expr_to_string(expr);
@@ -922,17 +922,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				} else if (is_type_union(t)) {
 					for (isize i = 0; i < t->Record.field_count; i++) {
 						Entity *f = t->Record.fields[i];
-						Entity *found = scope_insert_entity(c->context.scope, f);
-						if (found != NULL) {
-							gbString expr_str = expr_to_string(expr);
-							error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
-							gb_string_free(expr_str);
-							return;
-						}
-						f->using_parent = e;
-					}
-					for (isize i = 0; i < t->Record.other_field_count; i++) {
-						Entity *f = t->Record.other_fields[i];
 						Entity *found = scope_insert_entity(c->context.scope, f);
 						if (found != NULL) {
 							gbString expr_str = expr_to_string(expr);

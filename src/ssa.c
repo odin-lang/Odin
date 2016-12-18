@@ -2522,15 +2522,8 @@ void ssa_gen_global_type_name(ssaModule *m, Entity *e, String name) {
 	ssa_module_add_value(m, e, t);
 	map_ssa_value_set(&m->members, hash_string(name), t);
 
-	Type *bt = base_type(e->type);
-	if (bt->kind == Type_Record) {
-		TypeRecord *s = &bt->Record;
-		for (isize j = 0; j < s->other_field_count; j++) {
-			ssa_mangle_sub_type_name(m, s->other_fields[j], name);
-		}
-	}
-
-	if (is_type_union(bt)) {
+	if (is_type_union(e->type)) {
+		Type *bt = base_type(e->type);
 		TypeRecord *s = &bt->Record;
 		// NOTE(bill): Zeroth entry is null (for `match type` stmts)
 		for (isize j = 1; j < s->field_count; j++) {
@@ -5418,12 +5411,11 @@ void ssa_gen_tree(ssaGen *s) {
 						ssaValue *base = ssa_emit_struct_ep(proc, tag, 0);
 						ssa_emit_store(proc, base, ssa_get_type_info_ptr(proc, type_info_data, enum_base));
 
-						if (t->Record.other_field_count > 0) {
-							Entity **fields = t->Record.other_fields;
-							isize count = t->Record.other_field_count;
+						if (t->Record.enum_value_count > 0) {
+							Entity **fields = t->Record.enum_values;
+							isize count = t->Record.enum_value_count;
 							ssaValue *value_array = NULL;
 							ssaValue *name_array = NULL;
-
 
 							{
 								Token token = {Token_Ident};

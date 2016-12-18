@@ -1646,8 +1646,9 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
 
-			if (f->curr_token.kind != Token_Colon)
+			if (f->curr_token.kind != Token_Colon) {
 				indices[0] = parse_expr(f, false);
+			}
 			isize colon_count = 0;
 			Token colons[2] = {0};
 
@@ -2062,8 +2063,9 @@ AstNode *parse_proc_type(AstFile *f) {
 }
 
 
-AstNodeArray parse_parameter_list(AstFile *f, bool allow_using, TokenKind follow) {
+AstNodeArray parse_parameter_list(AstFile *f, isize *name_count_, bool allow_using, TokenKind separator, TokenKind follow) {
 	AstNodeArray params = make_ast_node_array(f);
+	isize name_count = 0;
 
 	while (f->curr_token.kind != follow &&
 	       f->curr_token.kind != Token_EOF) {
@@ -2087,6 +2089,8 @@ AstNodeArray parse_parameter_list(AstFile *f, bool allow_using, TokenKind follow
 			syntax_error(f->curr_token, "`using` is not allowed within this parameter list");
 			is_using = false;
 		}
+
+		name_count += names.count;
 
 		// expect_token_after(f, Token_Colon, "parameter list");
 
@@ -2114,77 +2118,27 @@ AstNodeArray parse_parameter_list(AstFile *f, bool allow_using, TokenKind follow
 			syntax_error(f->curr_token, "Expected a type for this parameter declaration");
 		}
 
-		array_add(&params, make_parameter(f, names, type, is_using));
-		if (!allow_token(f, Token_Comma)) {
-			break;
+		AstNode *param = make_parameter(f, names, type, is_using);
+		array_add(&params, param);
+
+
+		if (separator == Token_Semicolon) {
+			expect_semicolon(f, param);
+		} else {
+			if (!allow_token(f, separator)) {
+				break;
+			}
 		}
 	}
+
+	if (name_count_) *name_count_ = name_count;
 
 	return params;
 }
 
 
-AstNodeArray parse_record_params(AstFile *f, isize *decl_count_, bool allow_using, String context) {
-	AstNodeArray decls = make_ast_node_array(f);
-	isize decl_count = 0;
-
-	while (f->curr_token.kind != Token_CloseBrace &&
-	       f->curr_token.kind != Token_EOF) {
-		AstNode *decl = parse_stmt(f);
-		if (is_ast_node_decl(decl) ||
-		    decl->kind == AstNode_UsingStmt ||
-		    decl->kind == AstNode_EmptyStmt) {
-			switch (decl->kind) {
-			case AstNode_EmptyStmt:
-				break;
-
-			case AstNode_ProcDecl:
-				syntax_error(f->curr_token, "Procedure declarations are not allowed within a %.*s", LIT(context));
-				break;
-
-			case AstNode_UsingStmt: {
-				bool is_using = true;
-				if (!allow_using) {
-					syntax_error(f->curr_token, "Cannot apply `using` to members of a %.*s", LIT(context));
-					is_using = false;
-				}
-				if (decl->UsingStmt.node->kind == AstNode_VarDecl) {
-					AstNode *vd = decl->UsingStmt.node;
-					vd->VarDecl.is_using = is_using && allow_using;
-					if (vd->VarDecl.values.count > 0) {
-						syntax_error(f->curr_token, "Default variable assignments within a %.*s will be ignored", LIT(context));
-					}
-					array_add(&decls, vd);
-				} else {
-					syntax_error_node(decl, "Illegal %.*s field", LIT(context));
-				}
-			} break;
-
-			case AstNode_VarDecl: {
-				if (decl->VarDecl.values.count > 0) {
-					syntax_error(f->curr_token, "Default variable assignments within a %.*s will be ignored", LIT(context));
-				}
-				array_add(&decls, decl);
-			}
-
-			case AstNode_BadDecl:
-				break;
-
-			case AstNode_ConstDecl:
-			case AstNode_TypeDecl:
-			default:
-				decl_count += 1;
-				array_add(&decls, decl);
-				break;
-			}
-		} else {
-			syntax_error_node(decl, "Illegal record field: %.*s", LIT(ast_node_strings[decl->kind]));
-		}
-	}
-
-	if (decl_count_) *decl_count_ = decl_count;
-
-	return decls;
+AstNodeArray parse_record_params(AstFile *f, isize *field_count_, bool allow_using, String context) {
+	return parse_parameter_list(f, field_count_, allow_using, Token_Semicolon, Token_CloseBrace);
 }
 
 AstNode *parse_identifier_or_type(AstFile *f) {
@@ -2380,7 +2334,7 @@ void parse_proc_signature(AstFile *f,
                           AstNodeArray *params,
                           AstNodeArray *results) {
 	expect_token(f, Token_OpenParen);
-	*params = parse_parameter_list(f, true, Token_CloseParen);
+	*params = parse_parameter_list(f, NULL, true, Token_Comma, Token_CloseParen);
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	*results = parse_results(f);
 }

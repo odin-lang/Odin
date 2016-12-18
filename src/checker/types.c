@@ -84,6 +84,8 @@ typedef struct TypeRecord {
 			Entity * enum_count;
 			Entity * min_value;
 			Entity * max_value;
+			Entity **enum_values;
+			i32      enum_value_count;
 		};
 		struct { // struct only
 			i64 *    struct_offsets;
@@ -93,10 +95,6 @@ typedef struct TypeRecord {
 			Entity **fields_in_src_order; // Entity_Variable
 		};
 	};
-
-	// Entity_Constant or Entity_TypeName
-	Entity **other_fields;
-	i32      other_field_count;
 } TypeRecord;
 
 #define TYPE_KINDS \
@@ -984,19 +982,19 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			}
 		}
 
-		for (isize i = 0; i < type->Record.other_field_count; i++) {
-			Entity *f = type->Record.other_fields[i];
-			GB_ASSERT(f->kind != Entity_Variable);
-			String str = f->token.string;
-
-			if (str_eq(field_name, str)) {
-				sel.entity = f;
-				selection_add_index(&sel, i);
-				return sel;
-			}
-		}
-
 		if (is_type_enum(type)) {
+			for (isize i = 0; i < type->Record.enum_value_count; i++) {
+				Entity *f = type->Record.enum_values[i];
+				GB_ASSERT(f->kind != Entity_Variable);
+				String str = f->token.string;
+
+				if (str_eq(field_name, str)) {
+					sel.entity = f;
+					selection_add_index(&sel, i);
+					return sel;
+				}
+			}
+
 			if (str_eq(field_name, str_lit("count"))) {
 				sel.entity = type->Record.enum_count;
 				return sel;

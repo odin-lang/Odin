@@ -11,7 +11,7 @@ const SURROGATE_MAX = 0xdfff;
 
 
 type Accept_Range struct {
-	lo, hi: u8;
+	lo, hi u8;
 };
 
 accept_ranges := [5]Accept_Range{

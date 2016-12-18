@@ -90,7 +90,7 @@ proc align_forward(ptr rawptr, align int) -> rawptr {
 
 
 type Allocation_Header struct {
-	size: int;
+	size int;
 }
 proc allocation_header_fill(header ^Allocation_Header, data rawptr, size int) {
 	header.size = size;
@@ -115,14 +115,14 @@ proc allocation_header(data rawptr) -> ^Allocation_Header {
 // Custom allocators
 
 type Arena struct {
-	backing:    Allocator;
-	memory:     []byte;
-	temp_count: int;
+	backing    Allocator;
+	memory     []byte;
+	temp_count int;
 }
 
 type Arena_Temp_Memory struct {
-	arena:          ^Arena;
-	original_count: int;
+	arena          ^Arena;
+	original_count int;
 }
 
 
