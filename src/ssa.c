@@ -1919,8 +1919,8 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 		return value;
 	}
 
-	Type *src = base_type(get_enum_base_type(src_type));
-	Type *dst = base_type(get_enum_base_type(t));
+	Type *src = base_type(src_type);
+	Type *dst = base_type(t);
 
 	if (value->kind == ssaValue_Constant) {
 		if (is_type_any(dst)) {
@@ -2172,7 +2172,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 }
 
 bool ssa_is_type_aggregate(Type *t) {
-	t = base_type(get_enum_base_type(t));
+	t = base_type(t);
 	switch (t->kind) {
 	case Type_Basic:
 		switch (t->Basic.kind) {
@@ -3088,19 +3088,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 					x    = ssa_emit_select(proc, cond,   max, x);
 					return x;
 				} break;
-
-				case BuiltinProc_enum_to_string: {
-					ssa_emit_comment(proc, str_lit("enum_to_string"));
-					ssaValue *x = ssa_build_expr(proc, ce->args.e[0]);
-					Type *t = ssa_type(x);
-					ssaValue *ti = ssa_type_info(proc, t);
-
-
-					ssaValue **args = gb_alloc_array(proc->module->allocator, ssaValue *, 2);
-					args[0] = ti;
-					args[1] = ssa_emit_conv(proc, x, t_i64);
-					return ssa_emit_global_call(proc, "__enum_to_string", args, 2);
-				} break;
 				}
 			}
 		}
@@ -3849,8 +3836,7 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 
 	case_ast_node(us, UsingStmt, node);
 		AstNode *decl = unparen_expr(us->node);
-		if (decl->kind == AstNode_VarDecl &&
-		    decl->kind == AstNode_GenericDecl) {
+		if (decl->kind == AstNode_GenericDecl) {
 			ssa_build_stmt(proc, decl);
 		}
 	case_end;
@@ -3926,61 +3912,6 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 			case_end;
 			}
 		}
-	case_end;
-
-	case_ast_node(vd, VarDecl, node);
-		ssaModule *m = proc->module;
-		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
-
-		if (vd->values.count == 0) { // declared and zero-initialized
-			for_array(i, vd->names) {
-				AstNode *name = vd->names.e[i];
-				if (!ssa_is_blank_ident(name)) {
-					ssa_add_local_for_identifier(proc, name, true);
-				}
-			}
-		} else { // Tuple(s)
-			Array(ssaAddr) lvals;
-			ssaValueArray  inits;
-			array_init_reserve(&lvals, m->tmp_allocator, vd->names.count);
-			array_init_reserve(&inits, m->tmp_allocator, vd->names.count);
-
-			for_array(i, vd->names) {
-				AstNode *name = vd->names.e[i];
-				ssaAddr lval = ssa_make_addr(NULL, NULL);
-				if (!ssa_is_blank_ident(name)) {
-					ssa_add_local_for_identifier(proc, name, false);
-					lval = ssa_build_addr(proc, name);
-				}
-
-				array_add(&lvals, lval);
-			}
-
-			for_array(i, vd->values) {
-				ssaValue *init = ssa_build_expr(proc, vd->values.e[i]);
-				Type *t = ssa_type(init);
-				if (t->kind == Type_Tuple) {
-					for (isize i = 0; i < t->Tuple.variable_count; i++) {
-						Entity *e = t->Tuple.variables[i];
-						ssaValue *v = ssa_emit_struct_ev(proc, init, i);
-						array_add(&inits, v);
-					}
-				} else {
-					array_add(&inits, init);
-				}
-			}
-
-
-			for_array(i, inits) {
-				if (lvals.e[i].addr == NULL) {
-					continue;
-				}
-				ssaValue *v = ssa_emit_conv(proc, inits.e[i], ssa_addr_type(lvals.e[i]));
-				ssa_addr_store(proc, lvals.e[i], v);
-			}
-		}
-
-		gb_temp_arena_memory_end(tmp);
 	case_end;
 
 	case_ast_node(pd, ProcDecl, node);
@@ -5471,78 +5402,6 @@ void ssa_gen_tree(ssaGen *s) {
 						ssa_emit_store(proc, elem, memory);
 						ssa_emit_store(proc, len, field_count);
 						ssa_emit_store(proc, cap, field_count);
-					} break;
-					case TypeRecord_Enum: {
-						tag = ssa_add_local_generated(proc, t_type_info_enum);
-						Type *enum_base = t->Record.enum_base;
-						if (enum_base == NULL) {
-							enum_base = t_int;
-						}
-						ssaValue *base = ssa_emit_struct_ep(proc, tag, 0);
-						ssa_emit_store(proc, base, ssa_get_type_info_ptr(proc, type_info_data, enum_base));
-
-						if (t->Record.enum_value_count > 0) {
-							Entity **fields = t->Record.enum_values;
-							isize count = t->Record.enum_value_count;
-							ssaValue *value_array = NULL;
-							ssaValue *name_array = NULL;
-
-							{
-								Token token = {Token_Ident};
-								i32 id = cast(i32)entry_index;
-								char name_base[] = "__$enum_values";
-								isize name_len = gb_size_of(name_base) + 10;
-								token.string.text = gb_alloc_array(a, u8, name_len);
-								token.string.len = gb_snprintf(cast(char *)token.string.text, name_len,
-								                               "%s-%d", name_base, id)-1;
-								Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, t_i64, count));
-								value_array = ssa_make_value_global(a, e, NULL);
-								value_array->Global.is_private = true;
-								ssa_module_add_value(m, e, value_array);
-								map_ssa_value_set(&m->members, hash_string(token.string), value_array);
-							}
-							{
-								Token token = {Token_Ident};
-								i32 id = cast(i32)entry_index;
-								char name_base[] = "__$enum_names";
-								isize name_len = gb_size_of(name_base) + 10;
-								token.string.text = gb_alloc_array(a, u8, name_len);
-								token.string.len = gb_snprintf(cast(char *)token.string.text, name_len,
-								                               "%s-%d", name_base, id)-1;
-								Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, t_string, count));
-								name_array = ssa_make_value_global(a, e, NULL);
-								name_array->Global.is_private = true;
-								ssa_module_add_value(m, e, name_array);
-								map_ssa_value_set(&m->members, hash_string(token.string), name_array);
-							}
-
-							for (isize i = 0; i < count; i++) {
-								ssaValue *value_gep = ssa_emit_array_epi(proc, value_array, i);
-								ssaValue *name_gep  = ssa_emit_array_epi(proc, name_array, i);
-
-								ssa_emit_store(proc, value_gep, ssa_make_const_i64(a, fields[i]->Constant.value.value_integer));
-								ssa_emit_store(proc, name_gep,  ssa_make_const_string(a, fields[i]->token.string));
-							}
-
-							ssaValue *v_count = ssa_make_const_int(a, count);
-
-
-							ssaValue *values = ssa_emit_struct_ep(proc, tag, 1);
-							ssaValue *names  = ssa_emit_struct_ep(proc, tag, 2);
-							ssaValue *value_slice = ssa_add_local_generated(proc, type_deref(t_i64_slice_ptr));
-							ssaValue *name_slice  = ssa_add_local_generated(proc, type_deref(t_string_slice_ptr));
-
-							ssa_emit_store(proc, ssa_emit_struct_ep(proc, value_slice, 0), ssa_array_elem(proc, value_array));
-							ssa_emit_store(proc, ssa_emit_struct_ep(proc, value_slice, 1), v_count);
-							ssa_emit_store(proc, ssa_emit_struct_ep(proc, value_slice, 2), v_count);
-
-							ssa_emit_store(proc, ssa_emit_struct_ep(proc, name_slice, 0), ssa_array_elem(proc, name_array));
-							ssa_emit_store(proc, ssa_emit_struct_ep(proc, name_slice, 1), v_count);
-							ssa_emit_store(proc, ssa_emit_struct_ep(proc, name_slice, 2), v_count);
-
-							ssa_emit_store(proc, values, ssa_emit_load(proc, value_slice));
-							ssa_emit_store(proc, names,  ssa_emit_load(proc, name_slice));
-						}
 					} break;
 					}
 				} break;

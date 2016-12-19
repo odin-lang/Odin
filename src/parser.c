@@ -241,21 +241,6 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		u64          tags;        \
 		bool         is_using;    \
 	}) \
-	AST_NODE_KIND(VarDecl,  "variable declaration", struct { \
-		u64          tags;     \
-		bool         is_using; \
-		AstNodeArray names;    \
-		AstNode *    type;     \
-		AstNodeArray values;   \
-		AstNode *    note;     \
-	}) \
-	AST_NODE_KIND(ConstDecl,  "constant declaration", struct { \
-		u64          tags;   \
-		AstNodeArray names;  \
-		AstNode *    type;   \
-		AstNodeArray values; \
-		AstNode *    note;   \
-	}) \
 	AST_NODE_KIND(TypeDecl,   "type declaration",   struct { \
 		Token token;   \
 		AstNode *name; \
@@ -480,10 +465,6 @@ Token ast_node_token(AstNode *node) {
 		return node->BadDecl.begin;
 	case AstNode_GenericDecl:
 		return node->GenericDecl.token;
-	case AstNode_VarDecl:
-		return ast_node_token(node->VarDecl.names.e[0]);
-	case AstNode_ConstDecl:
-		return ast_node_token(node->ConstDecl.names.e[0]);
 	case AstNode_ProcDecl:
 		return ast_node_token(node->ProcDecl.name);
 	case AstNode_TypeDecl:
@@ -914,22 +895,6 @@ AstNode *make_bad_decl(AstFile *f, Token begin, Token end) {
 	AstNode *result = make_node(f, AstNode_BadDecl);
 	result->BadDecl.begin = begin;
 	result->BadDecl.end = end;
-	return result;
-}
-
-AstNode *make_var_decl(AstFile *f, AstNodeArray names, AstNode *type, AstNodeArray values) {
-	AstNode *result = make_node(f, AstNode_VarDecl);
-	result->VarDecl.names = names;
-	result->VarDecl.type = type;
-	result->VarDecl.values = values;
-	return result;
-}
-
-AstNode *make_const_decl(AstFile *f, AstNodeArray names, AstNode *type, AstNodeArray values) {
-	AstNode *result = make_node(f, AstNode_ConstDecl);
-	result->ConstDecl.names = names;
-	result->ConstDecl.type = type;
-	result->ConstDecl.values = values;
 	return result;
 }
 
@@ -2814,8 +2779,8 @@ AstNode *parse_stmt(AstFile *f) {
 				valid = true;
 			}
 		} break;
-		case AstNode_VarDecl:
-			valid = true;
+		case AstNode_GenericDecl:
+			valid = node->GenericDecl.token.kind == Token_var;
 			break;
 		}
 
@@ -2952,9 +2917,8 @@ AstNode *parse_stmt(AstFile *f) {
 			return s;
 		} else if (str_eq(tag, str_lit("thread_local"))) {
 			AstNode *decl = parse_simple_stmt(f);
-			if (decl->kind != AstNode_VarDecl &&
-			    (decl->kind == AstNode_GenericDecl &&
-			     decl->GenericDecl.token.kind != Token_var)) {
+			if (decl->kind == AstNode_GenericDecl &&
+			    decl->GenericDecl.token.kind != Token_var) {
 				syntax_error(token, "#thread_local may only be applied to variable declarations");
 				return make_bad_decl(f, token, ast_node_token(decl));
 			}
@@ -2962,11 +2926,8 @@ AstNode *parse_stmt(AstFile *f) {
 				syntax_error(token, "#thread_local is only allowed at the file scope");
 				return make_bad_decl(f, token, ast_node_token(decl));
 			}
-			if (decl->kind == AstNode_VarDecl) {
-				decl->VarDecl.tags |= VarDeclTag_thread_local;
-			} else if (decl->kind == AstNode_GenericDecl) {
-				decl->GenericDecl.tags |= VarDeclTag_thread_local;
-			}
+			GB_ASSERT(decl->kind == AstNode_GenericDecl);
+			decl->GenericDecl.tags |= VarDeclTag_thread_local;
 			return decl;
 		} else if (str_eq(tag, str_lit("bounds_check"))) {
 			s = parse_stmt(f);

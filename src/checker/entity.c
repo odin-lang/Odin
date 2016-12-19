@@ -55,6 +55,7 @@ struct Entity {
 			ExactValue value;
 		} Constant;
 		struct {
+			b32 is_let;
 			i32 field_index;
 			i32 field_src_index;
 		} Variable;

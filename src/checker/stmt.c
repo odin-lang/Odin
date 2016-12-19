@@ -279,6 +279,8 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 	c->context.stmt_state_flags = prev_stmt_state_flags;
 }
 
+
+
 typedef struct TypeAndToken {
 	Type *type;
 	Token token;
@@ -907,19 +909,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			switch (e->kind) {
 			case Entity_TypeName: {
 				Type *t = base_type(e->type);
-				if (is_type_enum(t)) {
-					for (isize i = 0; i < t->Record.enum_value_count; i++) {
-						Entity *f = t->Record.enum_values[i];
-						Entity *found = scope_insert_entity(c->context.scope, f);
-						if (found != NULL) {
-							gbString expr_str = expr_to_string(expr);
-							error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
-							gb_string_free(expr_str);
-							return;
-						}
-						f->using_parent = e;
-					}
-				} else if (is_type_union(t)) {
+				if (is_type_union(t)) {
 					for (isize i = 0; i < t->Record.field_count; i++) {
 						Entity *f = t->Record.fields[i];
 						Entity *found = scope_insert_entity(c->context.scope, f);
@@ -931,6 +921,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						}
 						f->using_parent = e;
 					}
+				} else {
+					error(us->token, "`using` can be only applied to `union` type entities");
 				}
 			} break;
 
@@ -1008,39 +1000,51 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 		case_end;
 
-		case_ast_node(vd, VarDecl, us->node);
-			if (vd->names.count > 1 && vd->type != NULL) {
-				error(us->token, "`using` can only be applied to one variable of the same type");
-			}
-			check_var_decl_node(c, us->node);
+		case_ast_node(gd, GenericDecl, us->node);
+			for_array(spec_index, gd->specs) {
+				AstNode *spec = gd->specs.e[spec_index];
+				switch (spec->kind) {
+				case_ast_node(vs, ValueSpec, spec);
+					if (vs->keyword != Token_var) {
+						error_node(spec, "`using` can only be applied to a variable declaration");
+						return;
+					}
 
-			for_array(name_index, vd->names) {
-				AstNode *item = vd->names.e[name_index];
-				ast_node(i, Ident, item);
-				String name = i->string;
-				Entity *e = scope_lookup_entity(c->context.scope, name);
-				Type *t = base_type(type_deref(e->type));
-				if (is_type_struct(t) || is_type_raw_union(t)) {
-					Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
-					GB_ASSERT(found != NULL);
-					for_array(i, (*found)->elements.entries) {
-						Entity *f = (*found)->elements.entries.e[i].value;
-						if (f->kind == Entity_Variable) {
-							Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
-							Entity *prev = scope_insert_entity(c->context.scope, uvar);
-							if (prev != NULL) {
-								error(us->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
-								return;
+					if (vs->names.count > 1 && vs->type != NULL) {
+						error(us->token, "`using` can only be applied to one variable of the same type");
+					}
+
+					check_var_spec_node(c, vs);
+
+					for_array(name_index, vs->names) {
+						AstNode *item = vs->names.e[name_index];
+						ast_node(i, Ident, item);
+						String name = i->string;
+						Entity *e = scope_lookup_entity(c->context.scope, name);
+						Type *t = base_type(type_deref(e->type));
+						if (is_type_struct(t) || is_type_raw_union(t)) {
+							Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
+							GB_ASSERT(found != NULL);
+							for_array(i, (*found)->elements.entries) {
+								Entity *f = (*found)->elements.entries.e[i].value;
+								if (f->kind == Entity_Variable) {
+									Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
+									Entity *prev = scope_insert_entity(c->context.scope, uvar);
+									if (prev != NULL) {
+										error(us->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
+										return;
+									}
+								}
 							}
+						} else {
+							error(us->token, "`using` can only be applied to variables of type struct or raw_union");
+							return;
 						}
 					}
-				} else {
-					error(us->token, "`using` can only be applied to variables of type struct or raw_union");
-					return;
+				case_end;
 				}
 			}
 		case_end;
-
 
 		default:
 			error(us->token, "Invalid AST: Using Statement");
@@ -1067,12 +1071,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 
 
-
-
-
-	case_ast_node(vd, VarDecl, node);
-		check_var_decl_node(c, node);
-	case_end;
 
 	case_ast_node(gd, GenericDecl, node);
 		for_array(spec_index, gd->specs) {
@@ -1136,6 +1134,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						if (e->type == NULL)
 							e->type = init_type;
 					}
+					check_arity_match(c, vs, NULL);
 
 					check_init_variables(c, entities, entity_count, vs->values, str_lit("variable declaration"));
 
@@ -1156,10 +1155,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				break;
 			}
 		}
-	case_end;
-
-	case_ast_node(cd, ConstDecl, node);
-		// NOTE(bill): Handled elsewhere
 	case_end;
 
 	case_ast_node(td, TypeDecl, node);

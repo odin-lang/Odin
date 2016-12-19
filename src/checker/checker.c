@@ -127,8 +127,6 @@ typedef enum BuiltinProcId {
 	BuiltinProc_abs,
 	BuiltinProc_clamp,
 
-	BuiltinProc_enum_to_string,
-
 	BuiltinProc_Count,
 } BuiltinProcId;
 typedef struct BuiltinProc {
@@ -171,8 +169,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("max"),              2, false, Expr_Expr},
 	{STR_LIT("abs"),              1, false, Expr_Expr},
 	{STR_LIT("clamp"),            3, false, Expr_Expr},
-
-	{STR_LIT("enum_to_string"),   1, false, Expr_Expr},
 };
 
 typedef enum ImplicitValueId {
@@ -681,7 +677,9 @@ void add_untyped(CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode m
 }
 
 void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode, Type *type, ExactValue value) {
-	GB_ASSERT(expression != NULL);
+	if (expression == NULL) {
+		return;
+	}
 	if (mode == Addressing_Invalid) {
 		return;
 	}
@@ -864,10 +862,6 @@ void add_type_info_type(Checker *c, Type *t) {
 
 	case Type_Record: {
 		switch (bt->Record.kind) {
-		case TypeRecord_Enum:
-			add_type_info_type(c, bt->Record.enum_base);
-			break;
-
 		case TypeRecord_Union:
 			add_type_info_type(c, t_int);
 			/* fallthrough */
@@ -1012,7 +1006,7 @@ void init_preload(Checker *c) {
 		t_type_info_member = type_info_member_entity->type;
 		t_type_info_member_ptr = make_type_pointer(c->allocator, t_type_info_member);
 
-		if (record->field_count != 18) {
+		if (record->field_count != 17) {
 			compiler_error("Invalid `Type_Info` layout");
 		}
 		t_type_info_named     = record->fields[ 1]->type;
@@ -1031,7 +1025,6 @@ void init_preload(Checker *c) {
 		t_type_info_struct    = record->fields[14]->type;
 		t_type_info_union     = record->fields[15]->type;
 		t_type_info_raw_union = record->fields[16]->type;
-		t_type_info_enum      = record->fields[17]->type;
 	}
 
 	if (t_allocator == NULL) {
@@ -1252,78 +1245,6 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 
 			DelayedDecl di = {parent_scope, decl};
 			array_add(&c->delayed_foreign_libraries, di);
-		case_end;
-		case_ast_node(vd, VarDecl, decl);
-			if (!parent_scope->is_file) {
-				// NOTE(bill): Within a procedure, variables must be in order
-				continue;
-			}
-
-			// NOTE(bill): You need to store the entity information here unline a constant declaration
-			isize entity_count = vd->names.count;
-			isize entity_index = 0;
-			Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
-			DeclInfo *di = NULL;
-			if (vd->values.count > 0) {
-				di = make_declaration_info(heap_allocator(), parent_scope);
-				di->entities = entities;
-				di->entity_count = entity_count;
-				di->type_expr = vd->type;
-				di->init_expr = vd->values.e[0];
-			}
-
-			for_array(i, vd->names) {
-				AstNode *name = vd->names.e[i];
-				AstNode *value = NULL;
-				if (i < vd->values.count) {
-					value = vd->values.e[i];
-				}
-				if (name->kind != AstNode_Ident) {
-					error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-					continue;
-				}
-				Entity *e = make_entity_variable(c->allocator, parent_scope, name->Ident, NULL);
-				e->identifier = name;
-				entities[entity_index++] = e;
-
-				DeclInfo *d = di;
-				if (d == NULL) {
-					AstNode *init_expr = value;
-					d = make_declaration_info(heap_allocator(), e->scope);
-					d->type_expr = vd->type;
-					d->init_expr = init_expr;
-					d->var_decl_tags = vd->tags;
-				}
-
-				add_entity_and_decl_info(c, name, e, d);
-			}
-		case_end;
-		case_ast_node(cd, ConstDecl, decl);
-			for_array(i, cd->values) {
-				AstNode *name = cd->names.e[i];
-				AstNode *value = unparen_expr(cd->values.e[i]);
-				if (name->kind != AstNode_Ident) {
-					error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-					continue;
-				}
-
-				ExactValue v = {ExactValue_Invalid};
-				Entity *e = make_entity_constant(c->allocator, parent_scope, name->Ident, NULL, v);
-				e->identifier = name;
-				DeclInfo *di = make_declaration_info(c->allocator, e->scope);
-				di->type_expr = cd->type;
-				di->init_expr = value;
-				add_entity_and_decl_info(c, name, e, di);
-			}
-
-			isize lhs_count = cd->names.count;
-			isize rhs_count = cd->values.count;
-
-			if (rhs_count == 0 && cd->type == NULL) {
-				error_node(decl, "Missing type or initial expression");
-			} else if (lhs_count < rhs_count) {
-				error_node(decl, "Extra initial expression");
-			}
 		case_end;
 		case_ast_node(td, TypeDecl, decl);
 			if (td->name->kind != AstNode_Ident) {

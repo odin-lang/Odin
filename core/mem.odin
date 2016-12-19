@@ -162,9 +162,8 @@ proc arena_allocator_proc(allocator_data rawptr, mode Allocator_Mode,
                           old_memory rawptr, old_size int, flags u64) -> rawptr {
 	var arena = allocator_data as ^Arena;
 
-	using Allocator_Mode;
 	match mode {
-	case ALLOC:
+	case ALLOCATOR_ALLOC:
 		var total_size = size + alignment;
 
 		if arena.memory.count + total_size > arena.memory.capacity {
@@ -178,14 +177,14 @@ proc arena_allocator_proc(allocator_data rawptr, mode Allocator_Mode,
 		arena.memory.count += total_size;
 		return zero(ptr, size);
 
-	case FREE:
+	case ALLOCATOR_FREE:
 		// NOTE(bill): Free all at once
 		// Use Arena_Temp_Memory if you want to free a block
 
-	case FREE_ALL:
+	case ALLOCATOR_FREE_ALL:
 		arena.memory.count = 0;
 
-	case RESIZE:
+	case ALLOCATOR_RESIZE:
 		return default_resize_align(old_memory, old_size, size, alignment);
 	}
 
@@ -263,8 +262,6 @@ proc align_of_type_info(type_info ^Type_Info) -> int {
 		return info.align;
 	case Raw_Union:
 		return info.align;
-	case Enum:
-		return align_of_type_info(info.base);
 	}
 
 	return 0;
@@ -339,8 +336,6 @@ proc size_of_type_info(type_info ^Type_Info) -> int {
 		return info.size;
 	case Raw_Union:
 		return info.size;
-	case Enum:
-		return size_of_type_info(info.base);
 	}
 
 	return 0;

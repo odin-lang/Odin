@@ -83,23 +83,24 @@ proc last_write_time_by_name(name string) -> File_Time {
 
 
 
+const (
+	FILE_STANDARD_INPUT = iota;
+	FILE_STANDARD_OUTPUT;
+	FILE_STANDARD_ERROR;
 
-type File_Standard enum {
-	INPUT,
-	OUTPUT,
-	ERROR,
-}
+	FILE_STANDARD_COUNT;
+);
 
 // NOTE(bill): Uses startup to initialize it
-var __std_files = [File_Standard.count]File{
+var __std_files = [FILE_STANDARD_COUNT]File{
 	{handle = win32.GetStdHandle(win32.STD_INPUT_HANDLE)  transmute File_Handle },
 	{handle = win32.GetStdHandle(win32.STD_OUTPUT_HANDLE) transmute File_Handle },
 	{handle = win32.GetStdHandle(win32.STD_ERROR_HANDLE)  transmute File_Handle },
 };
 
-var stdin  = ^__std_files[File_Standard.INPUT];
-var stdout = ^__std_files[File_Standard.OUTPUT];
-var stderr = ^__std_files[File_Standard.ERROR];
+var stdin  = ^__std_files[FILE_STANDARD_INPUT];
+var stdout = ^__std_files[FILE_STANDARD_OUTPUT];
+var stderr = ^__std_files[FILE_STANDARD_ERROR];
 
 
 

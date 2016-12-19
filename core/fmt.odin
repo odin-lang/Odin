@@ -290,11 +290,6 @@ proc bprint_type(buf ^[]byte, ti ^Type_Info) {
 			bprint_type(buf, info.fields[i].type_info);
 		}
 		bprint_string(buf, "}");
-
-	case Enum:
-		bprint_string(buf, "enum ");
-		bprint_type(buf, info.base);
-		bprint_string(buf, "{}");
 	}
 }
 
@@ -391,21 +386,6 @@ proc bprint_any(buf ^[]byte, arg any) {
 		} else {
 			bprint_string(buf, "nil");
 		}
-
-	case Enum:
-		var value i64 = 0;
-
-		match type i : make_any(info.base, arg.data) {
-		case i8:   value = i as i64;
-		case i16:  value = i as i64;
-		case i32:  value = i as i64;
-		case i64:  value = i as i64;
-		case u8:   value = i as i64;
-		case u16:  value = i as i64;
-		case u32:  value = i as i64;
-		case u64:  value = i as i64;
-		}
-		bprint_string(buf, __enum_to_string(arg.type_info, value));
 
 	case Array:
 		bprintf(buf, "[%]%{", info.count, info.elem);

@@ -29,8 +29,8 @@ const (
 	EB;
 );
 
+
 proc main() {
-	fmt.println(X, Y, Z);
-	fmt.println(A, B, C);
-	fmt.println(KB, MB, GB, TB, PB, EB);
+	var x = 123;
+	fmt.println(x);
 }

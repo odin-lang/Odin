@@ -225,9 +225,6 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 			i64 align_of_union = type_align_of(s, heap_allocator(), t);
 			ssa_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align_of_union, size_of_union);
 		} break;
-		case TypeRecord_Enum:
-			ssa_print_type(f, m, t->Record.enum_base);
-			break;
 		}
 	} break;
 

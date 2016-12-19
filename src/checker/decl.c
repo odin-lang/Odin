@@ -98,15 +98,14 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 	gb_temp_arena_memory_end(tmp);
 }
 
-
-void check_var_decl_node(Checker *c, AstNode *node) {
-	ast_node(vd, VarDecl, node);
-	isize entity_count = vd->names.count;
+void check_var_spec_node(Checker *c, AstNodeValueSpec *vs) {
+	GB_ASSERT(vs->keyword == Token_var);
+	isize entity_count = vs->names.count;
 	isize entity_index = 0;
 	Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
 
-	for_array(i, vd->names) {
-		AstNode *name = vd->names.e[i];
+	for_array(i, vs->names) {
+		AstNode *name = vs->names.e[i];
 		Entity *entity = NULL;
 		if (name->kind == AstNode_Ident) {
 			Token token = name->Ident;
@@ -137,8 +136,8 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 	}
 
 	Type *init_type = NULL;
-	if (vd->type) {
-		init_type = check_type_extra(c, vd->type, NULL);
+	if (vs->type) {
+		init_type = check_type_extra(c, vs->type, NULL);
 		if (init_type == NULL) {
 			init_type = t_invalid;
 		}
@@ -157,11 +156,12 @@ void check_var_decl_node(Checker *c, AstNode *node) {
 			e->type = init_type;
 	}
 
-	check_init_variables(c, entities, entity_count, vd->values, str_lit("variable declaration"));
 
-	for_array(i, vd->names) {
+	check_init_variables(c, entities, entity_count, vs->values, str_lit("variable declaration"));
+
+	for_array(i, vs->names) {
 		if (entities[i] != NULL) {
-			add_entity(c, c->context.scope, vd->names.e[i], entities[i]);
+			add_entity(c, c->context.scope, vs->names.e[i], entities[i]);
 		}
 	}
 

@@ -131,76 +131,6 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 				}
 			}
 		case_end;
-		case_ast_node(cd, ConstDecl, node);
-			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-
-			isize entity_count = cd->names.count;
-			isize entity_index = 0;
-			Entity **entities = gb_alloc_array(c->tmp_allocator, Entity *, entity_count);
-
-			for_array(i, cd->values) {
-				AstNode *name = cd->names.e[i];
-				AstNode *value = unparen_expr(cd->values.e[i]);
-				if (name->kind != AstNode_Ident) {
-					error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-					entities[entity_index++] = NULL;
-					continue;
-				}
-
-				ExactValue v = {ExactValue_Invalid};
-				Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
-				e->identifier = name;
-				entities[entity_index++] = e;
-				DeclInfo *d = make_declaration_info(c->allocator, e->scope);
-				d->type_expr = cd->type;
-				d->init_expr = value;
-				add_entity_and_decl_info(c, name, e, d);
-
-				DelayedEntity delay = {name, e, d};
-				array_add(delayed_entities, delay);
-			}
-
-			isize lhs_count = cd->names.count;
-			isize rhs_count = cd->values.count;
-
-			// TODO(bill): Better error messages or is this good enough?
-			if (rhs_count == 0 && cd->type == NULL) {
-				error_node(node, "Missing type or initial expression");
-			} else if (lhs_count < rhs_count) {
-				error_node(node, "Extra initial expression");
-			}
-
-			if (dof != NULL) {
-				// NOTE(bill): Within a record
-				for_array(i, cd->names) {
-					Entity *e = entities[i];
-					if (e == NULL) {
-						continue;
-					}
-					AstNode *name = cd->names.e[i];
-					if (name->kind != AstNode_Ident) {
-						continue;
-					}
-					Token name_token = name->Ident;
-					if (str_eq(name_token.string, str_lit("_"))) {
-						dof->other_fields[dof->other_field_index++] = e;
-					} else {
-						HashKey key = hash_string(name_token.string);
-						if (map_entity_get(dof->entity_map, key) != NULL) {
-							// TODO(bill): Scope checking already checks the declaration
-							error(name_token, "`%.*s` is already declared in this record", LIT(name_token.string));
-						} else {
-							map_entity_set(dof->entity_map, key, e);
-							dof->other_fields[dof->other_field_index++] = e;
-						}
-						add_entity(c, c->context.scope, name, e);
-					}
-				}
-			}
-
-			gb_temp_arena_memory_end(tmp);
-		case_end;
-
 #if 0
 		case_ast_node(pd, ProcDecl, node);
 			if (!ast_node_expect(pd->name, AstNode_Ident)) {
@@ -362,9 +292,6 @@ bool check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
 	}
 
 	if (are_types_identical(dst, src) && (!is_type_named(dst) || !is_type_named(src))) {
-		if (is_type_enum(dst) && is_type_enum(src))  {
-			return are_types_identical(s, type);
-		}
 		return true;
 	}
 
@@ -794,127 +721,6 @@ GB_COMPARE_PROC(cmp_enum_order) {
 	return i < j ? -1 : i > j;
 }
 
-
-
-void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *node) {
-	GB_ASSERT(node->kind == AstNode_EnumType);
-	GB_ASSERT(is_type_enum(enum_type));
-	ast_node(et, EnumType, node);
-
-	Type *base_type = t_int;
-	if (et->base_type != NULL) {
-		base_type = check_type(c, et->base_type);
-	}
-
-	if (base_type == NULL || !is_type_integer(base_type)) {
-		error(et->token, "Base type for enumeration must be an integer");
-		return;
-	} else
-	if (base_type == NULL) {
-		base_type = t_int;
-	}
-	enum_type->Record.enum_base = base_type;
-
-	Entity **fields = gb_alloc_array(c->allocator, Entity *, et->fields.count);
-	isize field_index = 0;
-	ExactValue iota = make_exact_value_integer(-1);
-	i64 min_value = 0;
-	i64 max_value = 0;
-
-	Type *constant_type = enum_type;
-	if (named_type != NULL) {
-		constant_type = named_type;
-	}
-
-
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-
-	MapEntity entity_map = {0};
-	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*(et->fields.count));
-
-	Entity *blank_entity = make_entity_constant(c->allocator, c->context.scope, blank_token, constant_type, make_exact_value_integer(0));;
-
-	for_array(i, et->fields) {
-		AstNode *field = et->fields.e[i];
-
-		if (!ast_node_expect(field, AstNode_FieldValue)) {
-			continue;
-		}
-
-		ast_node(f, FieldValue, field);
-		Token name_token = f->field->Ident;
-
-		if (str_eq(name_token.string, str_lit("count"))) {
-			error(name_token, "`count` is a reserved identifier for enumerations");
-			fields[field_index++] = blank_entity;
-			continue;
-		} else if (str_eq(name_token.string, str_lit("min_value"))) {
-			error(name_token, "`min_value` is a reserved identifier for enumerations");
-			fields[field_index++] = blank_entity;
-			continue;
-		} else if (str_eq(name_token.string, str_lit("max_value"))) {
-			error(name_token, "`max_value` is a reserved identifier for enumerations");
-			fields[field_index++] = blank_entity;
-			continue;
-		}
-
-		Operand o = {0};
-		if (f->value != NULL) {
-			check_expr(c, &o, f->value);
-			if (o.mode != Addressing_Constant) {
-				error_node(f->value, "Enumeration value must be a constant integer %d");
-				o.mode = Addressing_Invalid;
-			}
-			if (o.mode != Addressing_Invalid) {
-				check_assignment(c, &o, constant_type, str_lit("enumeration"));
-			}
-			if (o.mode != Addressing_Invalid) {
-				iota = o.value;
-			} else {
-				iota = exact_binary_operator_value(Token_Add, iota, make_exact_value_integer(1));
-			}
-		} else {
-			iota = exact_binary_operator_value(Token_Add, iota, make_exact_value_integer(1));
-		}
-
-
-		Entity *e = make_entity_constant(c->allocator, c->context.scope, name_token, constant_type, iota);
-		if (min_value > iota.value_integer) {
-			min_value = iota.value_integer;
-		}
-		if (max_value < iota.value_integer) {
-			max_value = iota.value_integer;
-		}
-
-		HashKey key = hash_string(name_token.string);
-		if (map_entity_get(&entity_map, key)) {
-			// TODO(bill): Scope checking already checks the declaration
-			error(name_token, "`%.*s` is already declared in this enumeration", LIT(name_token.string));
-		} else {
-			map_entity_set(&entity_map, key, e);
-			add_entity(c, c->context.scope, NULL, e);
-			fields[field_index++] = e;
-		}
-		add_entity_use(c, f->field, e);
-	}
-
-	GB_ASSERT(field_index <= et->fields.count);
-
-	gb_sort_array(fields, field_index, cmp_enum_order);
-
-	enum_type->Record.enum_values = fields;
-	enum_type->Record.enum_value_count = field_index;
-
-	enum_type->Record.enum_count = make_entity_constant(c->allocator, NULL,
-		make_token_ident(str_lit("count")), t_int, make_exact_value_integer(enum_type->Record.enum_value_count));
-	enum_type->Record.min_value  = make_entity_constant(c->allocator, NULL,
-		make_token_ident(str_lit("min_value")), constant_type, make_exact_value_integer(min_value));
-	enum_type->Record.max_value  = make_entity_constant(c->allocator, NULL,
-		make_token_ident(str_lit("max_value")), constant_type, make_exact_value_integer(max_value));
-
-	gb_temp_arena_memory_end(tmp);
-}
-
 Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_variadic_) {
 	if (params.count == 0) {
 		return NULL;
@@ -1165,6 +971,11 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 	Type *type = NULL;
 	gbString err_str = NULL;
 
+	if (e == NULL) {
+		type = t_invalid;
+		goto end;
+	}
+
 	switch (e->kind) {
 	case_ast_node(i, Ident, e);
 		Operand o = {0};
@@ -1291,16 +1102,6 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 		goto end;
 	case_end;
 
-	case_ast_node(et, EnumType, e);
-		type = make_type_enum(c->allocator);
-		set_base_type(named_type, type);
-		check_open_scope(c, e);
-		check_enum_type(c, type, named_type, e);
-		check_close_scope(c);
-		type->Record.node = e;
-		goto end;
-	case_end;
-
 	case_ast_node(pt, ProcType, e);
 		type = alloc_type(c->allocator, Type_Proc);
 		set_base_type(named_type, type);
@@ -1357,7 +1158,7 @@ end:
 
 bool check_unary_op(Checker *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
-	Type *type = base_type(get_enum_base_type(base_vector_type(o->type)));
+	Type *type = base_type(base_vector_type(o->type));
 	gbString str = NULL;
 	switch (op.kind) {
 	case Token_Add:
@@ -1393,7 +1194,7 @@ bool check_unary_op(Checker *c, Operand *o, Token op) {
 
 bool check_binary_op(Checker *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
-	Type *type = base_type(get_enum_base_type(base_vector_type(o->type)));
+	Type *type = base_type(base_vector_type(o->type));
 	switch (op.kind) {
 	case Token_Sub:
 	case Token_SubEq:
@@ -1469,8 +1270,6 @@ bool check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exa
 		// NOTE(bill): There's already been an error
 		return true;
 	}
-
-	type = get_enum_base_type(type);
 
 	if (is_type_boolean(type)) {
 		return in_value.kind == ExactValue_Bool;
@@ -1554,8 +1353,8 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 	if (!check_value_is_expressible(c, o->value, type, &o->value)) {
 		gbString a = expr_to_string(o->expr);
 		gbString b = type_to_string(type);
-		if (is_type_numeric(get_enum_base_type(o->type)) && is_type_numeric(get_enum_base_type(type))) {
-			if (!is_type_integer(get_enum_base_type(o->type)) && is_type_integer(get_enum_base_type(type))) {
+		if (is_type_numeric(o->type) && is_type_numeric(type)) {
+			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error_node(o->expr, "`%s` truncated to `%s`", a, b);
 			} else {
 				error_node(o->expr, "`%s = %lld` overflows `%s`", a, o->value.value_integer, b);
@@ -1859,8 +1658,6 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 	if (are_types_identical(xb, yb)) {
 		return true;
 	}
-	xb = get_enum_base_type(x);
-	yb = get_enum_base_type(y);
 
 
 	// Cast between booleans and integers
@@ -2460,7 +2257,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 		return;
 	}
 
-	Type *t = get_enum_base_type(base_type(target_type));
+	Type *t = base_type(target_type);
 	switch (t->kind) {
 	case Type_Basic:
 		if (operand->mode == Addressing_Constant) {
@@ -2531,7 +2328,7 @@ bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *val
 		return false;
 	}
 
-	if (!is_type_integer(get_enum_base_type(operand.type))) {
+	if (!is_type_integer(operand.type)) {
 		gbString expr_str = expr_to_string(operand.expr);
 		error_node(operand.expr, "Index `%s` must be an integer", expr_str);
 		gb_string_free(expr_str);
@@ -3597,44 +3394,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 				return false;
 			}
 		}
-	} break;
-
-	case BuiltinProc_enum_to_string: {
-		Type *type = base_type(operand->type);
-		if (!is_type_enum(type)) {
-			gbString type_str = type_to_string(operand->type);
-			gb_string_free(type_str);
-			error_node(call,
-			      "Expected an enum to `enum_to_string`, got `%s`",
-			      type_str);
-			return false;
-		}
-
-		if (operand->mode == Addressing_Constant) {
-			ExactValue value = make_exact_value_string(str_lit(""));
-			if (operand->value.kind == ExactValue_Integer) {
-				i64 index = operand->value.value_integer;
-				for (isize i = 0; i < type->Record.enum_value_count; i++) {
-					Entity *f = type->Record.enum_values[i];
-					if (f->kind == Entity_Constant && f->Constant.value.kind == ExactValue_Integer) {
-						i64 fv = f->Constant.value.value_integer;
-						if (index == fv) {
-							value = make_exact_value_string(f->token.string);
-							break;
-						}
-					}
-				}
-			}
-
-			operand->value = value;
-			operand->type = t_string;
-			return true;
-		}
-
-		add_type_info_type(c, operand->type);
-
-		operand->mode = Addressing_Value;
-		operand->type = t_string;
 	} break;
 	}
 
