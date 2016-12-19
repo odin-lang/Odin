@@ -1074,6 +1074,90 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		check_var_decl_node(c, node);
 	case_end;
 
+	case_ast_node(gd, GenericDecl, node);
+		for_array(spec_index, gd->specs) {
+			AstNode *spec = gd->specs.e[spec_index];
+			switch (spec->kind) {
+			case_ast_node(vs, ValueSpec, spec);
+				switch (vs->keyword) {
+				case Token_var: {
+					isize entity_count = vs->names.count;
+					isize entity_index = 0;
+					Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
+
+					for_array(i, vs->names) {
+						AstNode *name = vs->names.e[i];
+						Entity *entity = NULL;
+						if (name->kind == AstNode_Ident) {
+							Token token = name->Ident;
+							String str = token.string;
+							Entity *found = NULL;
+							// NOTE(bill): Ignore assignments to `_`
+							if (str_ne(str, str_lit("_"))) {
+								found = current_scope_lookup_entity(c->context.scope, str);
+							}
+							if (found == NULL) {
+								entity = make_entity_variable(c->allocator, c->context.scope, token, NULL);
+								add_entity_definition(&c->info, name, entity);
+							} else {
+								TokenPos pos = found->token.pos;
+								error(token,
+								      "Redeclaration of `%.*s` in this scope\n"
+								      "\tat %.*s(%td:%td)",
+								      LIT(str), LIT(pos.file), pos.line, pos.column);
+								entity = found;
+							}
+						} else {
+							error_node(name, "A variable declaration must be an identifier");
+						}
+						if (entity == NULL) {
+							entity = make_entity_dummy_variable(c->allocator, c->global_scope, ast_node_token(name));
+						}
+						entities[entity_index++] = entity;
+					}
+
+					Type *init_type = NULL;
+					if (vs->type) {
+						init_type = check_type_extra(c, vs->type, NULL);
+						if (init_type == NULL) {
+							init_type = t_invalid;
+						}
+					}
+
+					for (isize i = 0; i < entity_count; i++) {
+						Entity *e = entities[i];
+						GB_ASSERT(e != NULL);
+						if (e->flags & EntityFlag_Visited) {
+							e->type = t_invalid;
+							continue;
+						}
+						e->flags |= EntityFlag_Visited;
+
+						if (e->type == NULL)
+							e->type = init_type;
+					}
+
+					check_init_variables(c, entities, entity_count, vs->values, str_lit("variable declaration"));
+
+					for_array(i, vs->names) {
+						if (entities[i] != NULL) {
+							add_entity(c, c->context.scope, vs->names.e[i], entities[i]);
+						}
+					}
+				} break;
+
+				case Token_const:
+					break;
+				}
+			case_end;
+
+			default:
+				error(ast_node_token(spec), "Invalid specification in declaration: `%.*s`", LIT(ast_node_strings[spec->kind]));
+				break;
+			}
+		}
+	case_end;
+
 	case_ast_node(cd, ConstDecl, node);
 		// NOTE(bill): Handled elsewhere
 	case_end;

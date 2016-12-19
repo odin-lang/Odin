@@ -1106,6 +1106,94 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 		switch (decl->kind) {
 		case_ast_node(bd, BadDecl, decl);
 		case_end;
+		case_ast_node(gd, GenericDecl, decl);
+			if (!parent_scope->is_file) {
+				// NOTE(bill): Within a procedure, variables must be in order
+				continue;
+			}
+
+			for_array(spec_index, gd->specs) {
+				AstNode *spec = gd->specs.e[spec_index];
+				switch (spec->kind) {
+				case_ast_node(vs, ValueSpec, spec);
+					switch (vs->keyword) {
+					case Token_var: {
+						// NOTE(bill): You need to store the entity information here unline a constant declaration
+						isize entity_count = vs->names.count;
+						isize entity_index = 0;
+						Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
+						DeclInfo *di = NULL;
+						if (vs->values.count > 0) {
+							di = make_declaration_info(heap_allocator(), parent_scope);
+							di->entities = entities;
+							di->entity_count = entity_count;
+							di->type_expr = vs->type;
+							di->init_expr = vs->values.e[0];
+						}
+
+						for_array(i, vs->names) {
+							AstNode *name = vs->names.e[i];
+							AstNode *value = NULL;
+							if (i < vs->values.count) {
+								value = vs->values.e[i];
+							}
+							if (name->kind != AstNode_Ident) {
+								error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+								continue;
+							}
+							Entity *e = make_entity_variable(c->allocator, parent_scope, name->Ident, NULL);
+							e->identifier = name;
+							entities[entity_index++] = e;
+
+							DeclInfo *d = di;
+							if (d == NULL) {
+								AstNode *init_expr = value;
+								d = make_declaration_info(heap_allocator(), e->scope);
+								d->type_expr = vs->type;
+								d->init_expr = init_expr;
+								d->var_decl_tags = gd->tags;
+							}
+
+							add_entity_and_decl_info(c, name, e, d);
+						}
+					} break;
+
+					case Token_const: {
+						for_array(i, vs->values) {
+							AstNode *name = vs->names.e[i];
+							AstNode *value = unparen_expr(vs->values.e[i]);
+							if (name->kind != AstNode_Ident) {
+								error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+								continue;
+							}
+
+							ExactValue v = {ExactValue_Invalid};
+							Entity *e = make_entity_constant(c->allocator, parent_scope, name->Ident, NULL, v);
+							e->identifier = name;
+							DeclInfo *di = make_declaration_info(c->allocator, e->scope);
+							di->type_expr = vs->type;
+							di->init_expr = value;
+							add_entity_and_decl_info(c, name, e, di);
+						}
+
+						isize lhs_count = vs->names.count;
+						isize rhs_count = vs->values.count;
+
+						if (rhs_count == 0 && vs->type == NULL) {
+							error_node(decl, "Missing type or initial expression");
+						} else if (lhs_count < rhs_count) {
+							error_node(decl, "Extra initial expression");
+						}
+					} break;
+					}
+				case_end;
+
+				default:
+					error(ast_node_token(spec), "Invalid specification in declaration: `%.*s`", LIT(ast_node_strings[spec->kind]));
+					break;
+				}
+			}
+		case_end;
 		case_ast_node(id, ImportDecl, decl);
 			if (!parent_scope->is_file) {
 				// NOTE(bill): _Should_ be caught by the parser
@@ -1428,7 +1516,10 @@ void check_parsed_files(Checker *c) {
 
 		ImplicitValueInfo *ivi = &implicit_value_infos[i];
 		Entity *backing = scope_lookup_entity(e->scope, ivi->backing_name);
-		GB_ASSERT(backing != NULL);
+		// GB_ASSERT(backing != NULL);
+		if (backing == NULL) {
+			gb_exit(1);
+		}
 		e->ImplicitValue.backing = backing;
 	}
 

@@ -1,14 +1,14 @@
-const RUNE_ERROR = '\ufffd';
-const RUNE_SELF  = 0x80;
-const RUNE_BOM   = 0xfeff;
-const RUNE_EOF   = ~(0 as rune);
-const MAX_RUNE   = '\U0010ffff';
-const UTF_MAX    = 4;
+const (
+	RUNE_ERROR = '\ufffd';
+	RUNE_SELF  = 0x80;
+	RUNE_BOM   = 0xfeff;
+	RUNE_EOF   = ~(0 as rune);
+	MAX_RUNE   = '\U0010ffff';
+	UTF_MAX    = 4;
 
-
-const SURROGATE_MIN = 0xd800;
-const SURROGATE_MAX = 0xdfff;
-
+	SURROGATE_MIN = 0xd800;
+	SURROGATE_MAX = 0xdfff;
+);
 
 type Accept_Range struct {
 	lo, hi u8;

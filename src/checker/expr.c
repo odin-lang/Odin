@@ -80,6 +80,89 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 		case_ast_node(ws, WhenStmt, node);
 			// Will be handled later
 		case_end;
+		case_ast_node(gd, GenericDecl, node);
+			for_array(spec_index, gd->specs) {
+				AstNode *spec = gd->specs.e[spec_index];
+				switch (spec->kind) {
+				case_ast_node(vs, ValueSpec, spec);
+					switch (vs->keyword) {
+					case Token_var:
+						break;
+
+					case Token_const: {
+						gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+
+						isize entity_count = vs->names.count;
+						isize entity_index = 0;
+						Entity **entities = gb_alloc_array(c->tmp_allocator, Entity *, entity_count);
+
+						for_array(i, vs->values) {
+							AstNode *name = vs->names.e[i];
+							AstNode *value = unparen_expr(vs->values.e[i]);
+							if (name->kind != AstNode_Ident) {
+								error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+								entities[entity_index++] = NULL;
+								continue;
+							}
+
+							ExactValue v = {ExactValue_Invalid};
+							Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
+							e->identifier = name;
+							entities[entity_index++] = e;
+							DeclInfo *d = make_declaration_info(c->allocator, e->scope);
+							d->type_expr = vs->type;
+							d->init_expr = value;
+							add_entity_and_decl_info(c, name, e, d);
+
+							DelayedEntity delay = {name, e, d};
+							array_add(delayed_entities, delay);
+						}
+
+						isize lhs_count = vs->names.count;
+						isize rhs_count = vs->values.count;
+
+						// TODO(bill): Better error messages or is this good enough?
+						if (rhs_count == 0 && vs->type == NULL) {
+							error_node(node, "Missing type or initial expression");
+						} else if (lhs_count < rhs_count) {
+							error_node(node, "Extra initial expression");
+						}
+
+						if (dof != NULL) {
+							// NOTE(bill): Within a record
+							for_array(i, vs->names) {
+								Entity *e = entities[i];
+								if (e == NULL) {
+									continue;
+								}
+								AstNode *name = vs->names.e[i];
+								if (name->kind != AstNode_Ident) {
+									continue;
+								}
+								Token name_token = name->Ident;
+								if (str_eq(name_token.string, str_lit("_"))) {
+									dof->other_fields[dof->other_field_index++] = e;
+								} else {
+									HashKey key = hash_string(name_token.string);
+									if (map_entity_get(dof->entity_map, key) != NULL) {
+										// TODO(bill): Scope checking already checks the declaration
+										error(name_token, "`%.*s` is already declared in this record", LIT(name_token.string));
+									} else {
+										map_entity_set(dof->entity_map, key, e);
+										dof->other_fields[dof->other_field_index++] = e;
+									}
+									add_entity(c, c->context.scope, name, e);
+								}
+							}
+						}
+
+						gb_temp_arena_memory_end(tmp);
+					} break;
+					}
+				case_end;
+				}
+			}
+		case_end;
 		case_ast_node(cd, ConstDecl, node);
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
