@@ -1921,7 +1921,7 @@ AstNode *parse_type(AstFile *f) {
 }
 
 
-#define PARSE_SPEC_PROC(name) AstNode *(name)(AstFile *f, TokenKind keyword)
+#define PARSE_SPEC_PROC(name) AstNode *(name)(AstFile *f, TokenKind keyword, isize index)
 typedef PARSE_SPEC_PROC(*ParserSpecProc);
 
 
@@ -1933,9 +1933,12 @@ AstNode *parse_generic_decl(AstFile *f, TokenKind keyword, ParserSpecProc spec_p
 		open = expect_token(f, Token_OpenParen);
 		array_init(&specs, heap_allocator());
 
-		while (f->curr_token.kind != Token_CloseParen &&
-		       f->curr_token.kind != Token_EOF) {
-			AstNode *spec = spec_proc(f, keyword);
+
+		for (isize index = 0;
+		     f->curr_token.kind != Token_CloseParen &&
+		     f->curr_token.kind != Token_EOF;
+		     index++) {
+			AstNode *spec = spec_proc(f, keyword, index);
 			array_add(&specs, spec);
 			expect_semicolon(f, spec);
 		}
@@ -1943,7 +1946,7 @@ AstNode *parse_generic_decl(AstFile *f, TokenKind keyword, ParserSpecProc spec_p
 		close = expect_token(f, Token_CloseParen);
 	} else {
 		array_init_reserve(&specs, heap_allocator(), 1);
-		array_add(&specs, spec_proc(f, keyword));
+		array_add(&specs, spec_proc(f, keyword, 0));
 	}
 
 	return make_generic_decl(f, token, open, close, specs, 0, false);
@@ -1963,17 +1966,19 @@ PARSE_SPEC_PROC(parse_value_spec) {
 		syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
 	}
 
-	if (keyword == Token_const) {
-		if (values.count < names.count) {
-			syntax_error(f->curr_token, "All constant declarations must be defined");
-		} else if (values.count == 0) {
-			syntax_error(f->curr_token, "Expected an expression for this declaration");
+	switch (keyword) {
+	case Token_var:
+		if (type == NULL && values.count == 0 && names.count > 0) {
+			syntax_error(f->curr_token, "Missing type or initialization");
+			return make_bad_decl(f, f->curr_token, f->curr_token);
 		}
-	}
-
-	if (type == NULL && values.count == 0 && names.count > 0) {
-		syntax_error(f->curr_token, "Missing type or initialization");
-		return make_bad_decl(f, f->curr_token, f->curr_token);
+		break;
+	case Token_const:
+		if (values.count == 0 && (index == 0 || type != NULL)) {
+			syntax_error(f->curr_token, "Missing constant value");
+			return make_bad_decl(f, f->curr_token, f->curr_token);
+		}
+		break;
 	}
 
 	// TODO(bill): Fix this so it does not require it

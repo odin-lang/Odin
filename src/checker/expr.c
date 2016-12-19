@@ -81,8 +81,11 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 			// Will be handled later
 		case_end;
 		case_ast_node(gd, GenericDecl, node);
-			for_array(spec_index, gd->specs) {
-				AstNode *spec = gd->specs.e[spec_index];
+			AstNodeValueSpec empty_spec_ = {0}, *empty_spec = &empty_spec_;
+			AstNodeValueSpec *last = NULL;
+
+			for_array(iota, gd->specs) {
+				AstNode *spec = gd->specs.e[iota];
 				switch (spec->kind) {
 				case_ast_node(vs, ValueSpec, spec);
 					switch (vs->keyword) {
@@ -90,73 +93,38 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 						break;
 
 					case Token_const: {
-						gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+						if (vs->type != NULL || vs->values.count > 0) {
+							last = vs;
+						} else if (last == NULL) {
+							last = empty_spec;
+						}
 
-						isize entity_count = vs->names.count;
-						isize entity_index = 0;
-						Entity **entities = gb_alloc_array(c->tmp_allocator, Entity *, entity_count);
-
-						for_array(i, vs->values) {
+						for_array(i, vs->names) {
 							AstNode *name = vs->names.e[i];
-							AstNode *value = unparen_expr(vs->values.e[i]);
 							if (name->kind != AstNode_Ident) {
 								error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-								entities[entity_index++] = NULL;
 								continue;
 							}
 
-							ExactValue v = {ExactValue_Invalid};
+							ExactValue v = make_exact_value_integer(iota);
 							Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
 							e->identifier = name;
-							entities[entity_index++] = e;
-							DeclInfo *d = make_declaration_info(c->allocator, e->scope);
-							d->type_expr = vs->type;
-							d->init_expr = value;
-							add_entity_and_decl_info(c, name, e, d);
 
-							DelayedEntity delay = {name, e, d};
+							AstNode *init = NULL;
+							if (i < last->values.count) {
+								init = last->values.e[i];
+							}
+
+							DeclInfo *di = make_declaration_info(c->allocator, e->scope);
+							di->type_expr = last->type;
+							di->init_expr = init;
+							add_entity_and_decl_info(c, name, e, di);
+
+							DelayedEntity delay = {name, e, di};
 							array_add(delayed_entities, delay);
 						}
 
-						isize lhs_count = vs->names.count;
-						isize rhs_count = vs->values.count;
-
-						// TODO(bill): Better error messages or is this good enough?
-						if (rhs_count == 0 && vs->type == NULL) {
-							error_node(node, "Missing type or initial expression");
-						} else if (lhs_count < rhs_count) {
-							error_node(node, "Extra initial expression");
-						}
-
-						if (dof != NULL) {
-							// NOTE(bill): Within a record
-							for_array(i, vs->names) {
-								Entity *e = entities[i];
-								if (e == NULL) {
-									continue;
-								}
-								AstNode *name = vs->names.e[i];
-								if (name->kind != AstNode_Ident) {
-									continue;
-								}
-								Token name_token = name->Ident;
-								if (str_eq(name_token.string, str_lit("_"))) {
-									dof->other_fields[dof->other_field_index++] = e;
-								} else {
-									HashKey key = hash_string(name_token.string);
-									if (map_entity_get(dof->entity_map, key) != NULL) {
-										// TODO(bill): Scope checking already checks the declaration
-										error(name_token, "`%.*s` is already declared in this record", LIT(name_token.string));
-									} else {
-										map_entity_set(dof->entity_map, key, e);
-										dof->other_fields[dof->other_field_index++] = e;
-									}
-									add_entity(c, c->context.scope, name, e);
-								}
-							}
-						}
-
-						gb_temp_arena_memory_end(tmp);
+						check_arity_match(c, vs, last);
 					} break;
 					}
 				case_end;
@@ -1097,7 +1065,15 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 			o->type = t_invalid;
 			return;
 		}
-		o->value = e->Constant.value;
+		if (e == e_iota) {
+			if (c->context.iota.kind == ExactValue_Invalid) {
+				error(e->token, "Use of `iota` outside a constant declaration is not allowed");
+				return;
+			}
+			o->value = c->context.iota;
+		} else {
+			o->value = e->Constant.value;
+		}
 		if (o->value.kind == ExactValue_Invalid) {
 			return;
 		}

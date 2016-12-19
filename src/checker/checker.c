@@ -196,6 +196,7 @@ typedef struct CheckerContext {
 	Scope *    scope;
 	DeclInfo * decl;
 	u32        stmt_state_flags;
+	ExactValue iota; // Value of `iota` in a constant declaration; Invalid otherwise
 } CheckerContext;
 
 #define MAP_TYPE TypeAndValue
@@ -534,8 +535,9 @@ void init_universal_scope(BuildContext *bc) {
 	}
 
 // Constants
-	add_global_constant(a, str_lit("true"),  t_untyped_bool, make_exact_value_bool(true));
-	add_global_constant(a, str_lit("false"), t_untyped_bool, make_exact_value_bool(false));
+	add_global_constant(a, str_lit("true"),  t_untyped_bool,    make_exact_value_bool(true));
+	add_global_constant(a, str_lit("false"), t_untyped_bool,    make_exact_value_bool(false));
+	add_global_constant(a, str_lit("iota"),  t_untyped_integer, make_exact_value_integer(0));
 
 	add_global_entity(make_entity_nil(a, str_lit("nil"), t_untyped_nil));
 
@@ -558,6 +560,7 @@ void init_universal_scope(BuildContext *bc) {
 
 	t_u8_ptr = make_type_pointer(a, t_u8);
 	t_int_ptr = make_type_pointer(a, t_int);
+	e_iota = scope_lookup_entity(universal_scope, str_lit("iota"));
 }
 
 
@@ -1054,13 +1057,41 @@ void init_preload(Checker *c) {
 	c->done_preload = true;
 }
 
-
-
-
+void check_arity_match(Checker *c, AstNodeValueSpec *s, AstNodeValueSpec *init);
 
 #include "expr.c"
 #include "decl.c"
 #include "stmt.c"
+
+void check_arity_match(Checker *c, AstNodeValueSpec *s, AstNodeValueSpec *init) {
+	isize lhs = s->names.count;
+	isize rhs = s->values.count;
+	if (init != NULL) {
+		rhs = init->values.count;
+	}
+
+	if (init == NULL && rhs == 0) {
+		if (s->type == NULL) {
+			error_node(s->names.e[0], "Missing type or initial expression");
+		}
+	} else if (lhs < rhs) {
+		if (lhs < s->values.count) {
+			AstNode *n = s->values.e[lhs];
+			gbString str = expr_to_string(n);
+			error_node(n, "Extra initial expression `%s`", str);
+			gb_string_free(str);
+		} else {
+			error_node(s->names.e[0], "Extra initial expression");
+		}
+	} else if (lhs > rhs && (init != NULL || rhs != 1)) {
+		AstNode *n = s->names.e[rhs];
+		gbString str = expr_to_string(n);
+		error_node(n, "Missing expression for `%s`", str);
+		gb_string_free(str);
+	}
+}
+
+
 
 void check_all_global_entities(Checker *c) {
 	Scope *prev_file = {0};
@@ -1112,8 +1143,11 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 				continue;
 			}
 
-			for_array(spec_index, gd->specs) {
-				AstNode *spec = gd->specs.e[spec_index];
+			AstNodeValueSpec empty_spec_ = {0}, *empty_spec = &empty_spec_;
+			AstNodeValueSpec *last = NULL;
+
+			for_array(iota, gd->specs) {
+				AstNode *spec = gd->specs.e[iota];
 				switch (spec->kind) {
 				case_ast_node(vs, ValueSpec, spec);
 					switch (vs->keyword) {
@@ -1156,34 +1190,40 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 
 							add_entity_and_decl_info(c, name, e, d);
 						}
+
+						check_arity_match(c, vs, NULL);
 					} break;
 
 					case Token_const: {
-						for_array(i, vs->values) {
+						if (vs->type != NULL || vs->values.count > 0) {
+							last = vs;
+						} else if (last == NULL) {
+							last = empty_spec;
+						}
+
+						for_array(i, vs->names) {
 							AstNode *name = vs->names.e[i];
-							AstNode *value = unparen_expr(vs->values.e[i]);
 							if (name->kind != AstNode_Ident) {
 								error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 								continue;
 							}
 
-							ExactValue v = {ExactValue_Invalid};
+							ExactValue v = make_exact_value_integer(iota);
 							Entity *e = make_entity_constant(c->allocator, parent_scope, name->Ident, NULL, v);
 							e->identifier = name;
+
+							AstNode *init = NULL;
+							if (i < last->values.count) {
+								init = last->values.e[i];
+							}
+
 							DeclInfo *di = make_declaration_info(c->allocator, e->scope);
-							di->type_expr = vs->type;
-							di->init_expr = value;
+							di->type_expr = last->type;
+							di->init_expr = init;
 							add_entity_and_decl_info(c, name, e, di);
 						}
 
-						isize lhs_count = vs->names.count;
-						isize rhs_count = vs->values.count;
-
-						if (rhs_count == 0 && vs->type == NULL) {
-							error_node(decl, "Missing type or initial expression");
-						} else if (lhs_count < rhs_count) {
-							error_node(decl, "Extra initial expression");
-						}
+						check_arity_match(c, vs, last);
 					} break;
 					}
 				case_end;

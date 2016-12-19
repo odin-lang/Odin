@@ -229,14 +229,19 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
 	}
 }
 
-void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr, Type *named_type) {
+void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, Type *named_type) {
 	GB_ASSERT(e->type == NULL);
+	GB_ASSERT(e->kind == Entity_Constant);
 
 	if (e->flags & EntityFlag_Visited) {
 		e->type = t_invalid;
 		return;
 	}
 	e->flags |= EntityFlag_Visited;
+
+	GB_ASSERT(c->context.iota.kind == ExactValue_Invalid);
+	c->context.iota = e->Constant.value;
+	e->Constant.value = (ExactValue){0};
 
 	if (type_expr) {
 		Type *t = check_type(c, type_expr);
@@ -245,18 +250,19 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init_e
 			error_node(type_expr, "Invalid constant type `%s`", str);
 			gb_string_free(str);
 			e->type = t_invalid;
+			c->context.iota = (ExactValue){0};
 			return;
 		}
 		e->type = t;
 	}
 
 	Operand operand = {0};
-	if (init_expr) {
-		// check_expr_or_type(c, &operand, init_expr);
-		check_expr(c, &operand, init_expr);
+	if (init != NULL) {
+		check_expr(c, &operand, init);
 	}
 
 	check_init_constant(c, e, &operand);
+	c->context.iota = (ExactValue){0};
 }
 
 
