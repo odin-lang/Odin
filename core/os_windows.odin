@@ -1,17 +1,21 @@
-#import win32 "sys/windows.odin";
-#import "fmt.odin";
+import (
+	win32 "sys/windows.odin";
+	"fmt.odin";
+)
 
-type File_Time u64;
+type (
+	File_Time u64;
 
-type File_Handle raw_union {
-	p rawptr;
-	i int;
-}
+	File_Handle raw_union {
+		p rawptr;
+		i int;
+	}
 
-type File struct {
-	handle          File_Handle;
-	last_write_time File_Time;
-}
+	File struct {
+		handle          File_Handle;
+		last_write_time File_Time;
+	}
+)
 
 proc open(name string) -> (File, bool) {
 	using win32;
@@ -92,16 +96,17 @@ const (
 );
 
 // NOTE(bill): Uses startup to initialize it
-var __std_files = [FILE_STANDARD_COUNT]File{
-	{handle = win32.GetStdHandle(win32.STD_INPUT_HANDLE)  transmute File_Handle },
-	{handle = win32.GetStdHandle(win32.STD_OUTPUT_HANDLE) transmute File_Handle },
-	{handle = win32.GetStdHandle(win32.STD_ERROR_HANDLE)  transmute File_Handle },
-};
+var (
+	__std_files = [FILE_STANDARD_COUNT]File{
+		{handle = win32.GetStdHandle(win32.STD_INPUT_HANDLE)  transmute File_Handle },
+		{handle = win32.GetStdHandle(win32.STD_OUTPUT_HANDLE) transmute File_Handle },
+		{handle = win32.GetStdHandle(win32.STD_ERROR_HANDLE)  transmute File_Handle },
+	};
 
-var stdin  = ^__std_files[FILE_STANDARD_INPUT];
-var stdout = ^__std_files[FILE_STANDARD_OUTPUT];
-var stderr = ^__std_files[FILE_STANDARD_ERROR];
-
+	stdin  = ^__std_files[FILE_STANDARD_INPUT];
+	stdout = ^__std_files[FILE_STANDARD_OUTPUT];
+	stderr = ^__std_files[FILE_STANDARD_ERROR];
+)
 
 
 proc read_entire_file(name string) -> ([]byte, bool) {

@@ -1,8 +1,10 @@
 #shared_global_scope;
 
-#import "os.odin";
-#import "fmt.odin";
-#import "mem.odin";
+import (
+	"os.odin";
+	"fmt.odin";
+	"mem.odin";
+)
 
 // IMPORTANT NOTE(bill): `type_info` & `type_info_val` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
@@ -12,65 +14,67 @@
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
-type Type_Info_Member struct #ordered {
-	name      string;     // can be empty if tuple
-	type_info ^Type_Info;
-	offset    int;        // offsets are not used in tuples
-}
-type Type_Info_Record struct #ordered {
-	fields  []Type_Info_Member;
-	size    int; // in bytes
-	align   int; // in bytes
-	packed  bool;
-	ordered bool;
-}
+type (
+	Type_Info_Member struct #ordered {
+		name      string;     // can be empty if tuple
+		type_info ^Type_Info;
+		offset    int;        // offsets are not used in tuples
+	}
+	Type_Info_Record struct #ordered {
+		fields  []Type_Info_Member;
+		size    int; // in bytes
+		align   int; // in bytes
+		packed  bool;
+		ordered bool;
+	}
 
-type Type_Info union {
-	Named struct #ordered {
-		name string;
-		base ^Type_Info; // This will _not_ be a Type_Info.Named
-	};
-	Integer struct #ordered {
-		size   int; // in bytes
-		signed bool;
-	};
-	Float struct #ordered {
-		size int; // in bytes
-	};
-	Any     struct #ordered {};
-	String  struct #ordered {};
-	Boolean struct #ordered {};
-	Pointer struct #ordered {
-		elem ^Type_Info; // nil -> rawptr
-	};
-	Maybe struct #ordered {
-		elem ^Type_Info;
-	};
-	Procedure struct #ordered {
-		params   ^Type_Info; // Type_Info.Tuple
-		results  ^Type_Info; // Type_Info.Tuple
-		variadic bool;
-	};
-	Array struct #ordered {
-		elem      ^Type_Info;
-		elem_size int;
-		count     int;
-	};
-	Slice struct #ordered {
-		elem      ^Type_Info;
-		elem_size int;
-	};
-	Vector struct #ordered {
-		elem      ^Type_Info;
-		elem_size int;
-		count     int;
-		align     int;
-	};
-	Tuple     Type_Info_Record;
-	Struct    Type_Info_Record;
-	Union     Type_Info_Record;
-	Raw_Union Type_Info_Record;
-};
+	Type_Info union {
+		Named struct #ordered {
+			name string;
+			base ^Type_Info; // This will _not_ be a Type_Info.Named
+		};
+		Integer struct #ordered {
+			size   int; // in bytes
+			signed bool;
+		};
+		Float struct #ordered {
+			size int; // in bytes
+		};
+		Any     struct #ordered {};
+		String  struct #ordered {};
+		Boolean struct #ordered {};
+		Pointer struct #ordered {
+			elem ^Type_Info; // nil -> rawptr
+		};
+		Maybe struct #ordered {
+			elem ^Type_Info;
+		};
+		Procedure struct #ordered {
+			params   ^Type_Info; // Type_Info.Tuple
+			results  ^Type_Info; // Type_Info.Tuple
+			variadic bool;
+		};
+		Array struct #ordered {
+			elem      ^Type_Info;
+			elem_size int;
+			count     int;
+		};
+		Slice struct #ordered {
+			elem      ^Type_Info;
+			elem_size int;
+		};
+		Vector struct #ordered {
+			elem      ^Type_Info;
+			elem_size int;
+			count     int;
+			align     int;
+		};
+		Tuple     Type_Info_Record;
+		Struct    Type_Info_Record;
+		Union     Type_Info_Record;
+		Raw_Union Type_Info_Record;
+	}
+)
 
 proc type_info_base(info ^Type_Info) -> ^Type_Info {
 	if info == nil {
@@ -115,26 +119,24 @@ const (
 	ALLOCATOR_FREE_ALL;
 	ALLOCATOR_RESIZE;
 );
-type Allocator_Proc proc(allocator_data rawptr, mode Allocator_Mode,
-                         size, alignment int,
-                         old_memory rawptr, old_size int, flags u64) -> rawptr;
+type (
+	Allocator_Proc proc(allocator_data rawptr, mode Allocator_Mode,
+	                    size, alignment int,
+	                    old_memory rawptr, old_size int, flags u64) -> rawptr;
+	Allocator struct #ordered {
+		procedure Allocator_Proc;
+		data      rawptr;
+	}
 
+	Context struct #ordered {
+		thread_id int;
 
+		allocator Allocator;
 
-type Allocator struct #ordered {
-	procedure Allocator_Proc;
-	data      rawptr;
-}
-
-
-type Context struct #ordered {
-	thread_id int;
-
-	allocator Allocator;
-
-	user_data  rawptr;
-	user_index int;
-}
+		user_data  rawptr;
+		user_index int;
+	}
+);
 
 #thread_local var __context Context;
 

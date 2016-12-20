@@ -1,117 +1,124 @@
 #foreign_system_library "user32" when ODIN_OS == "windows";
 #foreign_system_library "gdi32"  when ODIN_OS == "windows";
 
-type HANDLE    rawptr;
-type HWND      HANDLE;
-type HDC       HANDLE;
-type HINSTANCE HANDLE;
-type HICON     HANDLE;
-type HCURSOR   HANDLE;
-type HMENU     HANDLE;
-type HBRUSH    HANDLE;
-type HGDIOBJ   HANDLE;
-type HMODULE   HANDLE;
-type WPARAM    uint;
-type LPARAM    int;
-type LRESULT   int;
-type ATOM      i16;
-type BOOL      i32;
-type WNDPROC   proc(hwnd HWND, msg u32, wparam WPARAM, lparam LPARAM) -> LRESULT;
+type (
+	HANDLE    rawptr;
+	HWND      HANDLE;
+	HDC       HANDLE;
+	HINSTANCE HANDLE;
+	HICON     HANDLE;
+	HCURSOR   HANDLE;
+	HMENU     HANDLE;
+	HBRUSH    HANDLE;
+	HGDIOBJ   HANDLE;
+	HMODULE   HANDLE;
+	WPARAM    uint;
+	LPARAM    int;
+	LRESULT   int;
+	ATOM      i16;
+	BOOL      i32;
+	WNDPROC   proc(hwnd HWND, msg u32, wparam WPARAM, lparam LPARAM) -> LRESULT;
+)
 
-const INVALID_HANDLE_VALUE = (-1 as int) as HANDLE;
+const (
+	INVALID_HANDLE_VALUE = (-1 as int) as HANDLE;
 
-const CS_VREDRAW    = 0x0001;
-const CS_HREDRAW    = 0x0002;
-const CS_OWNDC      = 0x0020;
-const CW_USEDEFAULT = -0x80000000;
+	CS_VREDRAW    = 0x0001;
+	CS_HREDRAW    = 0x0002;
+	CS_OWNDC      = 0x0020;
+	CW_USEDEFAULT = -0x80000000;
 
-const WS_OVERLAPPED       = 0;
-const WS_MAXIMIZEBOX      = 0x00010000;
-const WS_MINIMIZEBOX      = 0x00020000;
-const WS_THICKFRAME       = 0x00040000;
-const WS_SYSMENU          = 0x00080000;
-const WS_CAPTION          = 0x00C00000;
-const WS_VISIBLE          = 0x10000000;
-const WS_OVERLAPPEDWINDOW = WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
+	WS_OVERLAPPED       = 0;
+	WS_MAXIMIZEBOX      = 0x00010000;
+	WS_MINIMIZEBOX      = 0x00020000;
+	WS_THICKFRAME       = 0x00040000;
+	WS_SYSMENU          = 0x00080000;
+	WS_CAPTION          = 0x00C00000;
+	WS_VISIBLE          = 0x10000000;
+	WS_OVERLAPPEDWINDOW = WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
 
-const WM_DESTROY = 0x0002;
-const WM_CLOSE   = 0x0010;
-const WM_QUIT    = 0x0012;
-const WM_KEYDOWN = 0x0100;
-const WM_KEYUP   = 0x0101;
+	WM_DESTROY = 0x0002;
+	WM_CLOSE   = 0x0010;
+	WM_QUIT    = 0x0012;
+	WM_KEYDOWN = 0x0100;
+	WM_KEYUP   = 0x0101;
 
-const PM_REMOVE = 1;
+	PM_REMOVE = 1;
 
-const COLOR_BACKGROUND = 1 as HBRUSH;
-const BLACK_BRUSH = 4;
+	COLOR_BACKGROUND = 1 as HBRUSH;
+	BLACK_BRUSH = 4;
 
-const SM_CXSCREEN = 0;
-const SM_CYSCREEN = 1;
+	SM_CXSCREEN = 0;
+	SM_CYSCREEN = 1;
 
-const SW_SHOW = 5;
+	SW_SHOW = 5;
+)
 
-type POINT struct #ordered {
-	x, y i32;
-}
+type (
+	POINT struct #ordered {
+		x, y i32;
+	}
 
+	WNDCLASSEXA struct #ordered {
+		size, style           u32;
+		wnd_proc              WNDPROC;
+		cls_extra, wnd_extra  i32;
+		instance              HINSTANCE;
+		icon                  HICON;
+		cursor                HCURSOR;
+		background            HBRUSH;
+		menu_name, class_name ^u8;
+		sm                    HICON;
+	}
 
-type WNDCLASSEXA struct #ordered {
-	size, style           u32;
-	wnd_proc              WNDPROC;
-	cls_extra, wnd_extra  i32;
-	instance              HINSTANCE;
-	icon                  HICON;
-	cursor                HCURSOR;
-	background            HBRUSH;
-	menu_name, class_name ^u8;
-	sm                    HICON;
-}
+	MSG struct #ordered {
+		hwnd    HWND;
+		message u32;
+		wparam  WPARAM;
+		lparam  LPARAM;
+		time    u32;
+		pt      POINT;
+	}
 
-type MSG struct #ordered {
-	hwnd    HWND;
-	message u32;
-	wparam  WPARAM;
-	lparam  LPARAM;
-	time    u32;
-	pt      POINT;
-}
+	RECT struct #ordered {
+		left   i32;
+		top    i32;
+		right  i32;
+		bottom i32;
+	}
 
-type RECT struct #ordered {
-	left   i32;
-	top    i32;
-	right  i32;
-	bottom i32;
-}
+	FILETIME struct #ordered {
+		low_date_time, high_date_time u32;
+	}
 
-type FILETIME struct #ordered {
-	low_date_time, high_date_time u32;
-}
+	BY_HANDLE_FILE_INFORMATION struct #ordered {
+		file_attributes      u32;
+		creation_time,
+		last_access_time,
+		last_write_time      FILETIME;
+		volume_serial_number,
+		file_size_high,
+		file_size_low,
+		number_of_links,
+		file_index_high,
+		file_index_low       u32;
+	}
 
-type BY_HANDLE_FILE_INFORMATION struct #ordered {
-	file_attributes      u32;
-	creation_time,
-	last_access_time,
-	last_write_time      FILETIME;
-	volume_serial_number,
-	file_size_high,
-	file_size_low,
-	number_of_links,
-	file_index_high,
-	file_index_low       u32;
-}
+	WIN32_FILE_ATTRIBUTE_DATA struct #ordered {
+		file_attributes  u32;
+		creation_time,
+		last_access_time,
+		last_write_time  FILETIME;
+		file_size_high,
+		file_size_low    u32;
+	}
 
-type WIN32_FILE_ATTRIBUTE_DATA struct #ordered {
-	file_attributes  u32;
-	creation_time,
-	last_access_time,
-	last_write_time  FILETIME;
-	file_size_high,
-	file_size_low    u32;
-}
-
-type GET_FILEEX_INFO_LEVELS i32;
-const GetFileExInfoStandard = 0 as GET_FILEEX_INFO_LEVELS;
-const GetFileExMaxInfoLevel = 1 as GET_FILEEX_INFO_LEVELS;
+	GET_FILEEX_INFO_LEVELS i32;
+)
+const (
+	GetFileExInfoStandard = 0 as GET_FILEEX_INFO_LEVELS;
+	GetFileExMaxInfoLevel = 1 as GET_FILEEX_INFO_LEVELS;
+)
 
 proc GetLastError    () -> i32                           #foreign #dll_import
 proc ExitProcess     (exit_code u32)                    #foreign #dll_import
@@ -176,24 +183,25 @@ proc GetFileSizeEx             (file_handle HANDLE, file_size ^i64) -> BOOL #for
 proc GetFileAttributesExA      (filename ^u8, info_level_id GET_FILEEX_INFO_LEVELS, file_info rawptr) -> BOOL #foreign #dll_import
 proc GetFileInformationByHandle(file_handle HANDLE, file_info ^BY_HANDLE_FILE_INFORMATION) -> BOOL #foreign #dll_import
 
-const FILE_SHARE_READ      = 0x00000001;
-const FILE_SHARE_WRITE     = 0x00000002;
-const FILE_SHARE_DELETE    = 0x00000004;
-const FILE_GENERIC_ALL     = 0x10000000;
-const FILE_GENERIC_EXECUTE = 0x20000000;
-const FILE_GENERIC_WRITE   = 0x40000000;
-const FILE_GENERIC_READ    = 0x80000000;
+const (
+	FILE_SHARE_READ      = 0x00000001;
+	FILE_SHARE_WRITE     = 0x00000002;
+	FILE_SHARE_DELETE    = 0x00000004;
+	FILE_GENERIC_ALL     = 0x10000000;
+	FILE_GENERIC_EXECUTE = 0x20000000;
+	FILE_GENERIC_WRITE   = 0x40000000;
+	FILE_GENERIC_READ    = 0x80000000;
 
-const STD_INPUT_HANDLE  = -10;
-const STD_OUTPUT_HANDLE = -11;
-const STD_ERROR_HANDLE  = -12;
+	STD_INPUT_HANDLE  = -10;
+	STD_OUTPUT_HANDLE = -11;
+	STD_ERROR_HANDLE  = -12;
 
-const CREATE_NEW        = 1;
-const CREATE_ALWAYS     = 2;
-const OPEN_EXISTING     = 3;
-const OPEN_ALWAYS       = 4;
-const TRUNCATE_EXISTING = 5;
-
+	CREATE_NEW        = 1;
+	CREATE_ALWAYS     = 2;
+	OPEN_EXISTING     = 3;
+	OPEN_ALWAYS       = 4;
+	TRUNCATE_EXISTING = 5;
+)
 
 
 
@@ -240,31 +248,34 @@ proc ReadBarrier     () #foreign
 
 
 // GDI
+type (
+	BITMAPINFOHEADER struct #ordered {
+		size              u32;
+		width, height     i32;
+		planes, bit_count i16;
+		compression       u32;
+		size_image        u32;
+		x_pels_per_meter  i32;
+		y_pels_per_meter  i32;
+		clr_used          u32;
+		clr_important     u32;
+	}
+	BITMAPINFO struct #ordered {
+		using header BITMAPINFOHEADER;
+		colors       [1]RGBQUAD;
+	}
 
-type BITMAPINFOHEADER struct #ordered {
-	size              u32;
-	width, height     i32;
-	planes, bit_count i16;
-	compression       u32;
-	size_image        u32;
-	x_pels_per_meter  i32;
-	y_pels_per_meter  i32;
-	clr_used          u32;
-	clr_important     u32;
-}
-type BITMAPINFO struct #ordered {
-	using header BITMAPINFOHEADER;
-	colors       [1]RGBQUAD;
-}
 
+	RGBQUAD struct #ordered {
+		blue, green, red, reserved byte;
+	}
+)
 
-type RGBQUAD struct #ordered {
-	blue, green, red, reserved byte;
-}
-
-const BI_RGB         = 0;
-const DIB_RGB_COLORS = 0x00;
-const SRCCOPY        = 0x00cc0020 as u32;
+const (
+	BI_RGB         = 0;
+	DIB_RGB_COLORS = 0x00;
+	SRCCOPY        = 0x00cc0020 as u32;
+)
 
 proc StretchDIBits(hdc HDC,
                    x_dst, y_dst, width_dst, height_dst i32,
@@ -284,64 +295,67 @@ proc GetClientRect(hwnd HWND, rect ^RECT) -> BOOL #foreign
 
 
 // Windows OpenGL
+const (
+	PFD_TYPE_RGBA             = 0;
+	PFD_TYPE_COLORINDEX       = 1;
+	PFD_MAIN_PLANE            = 0;
+	PFD_OVERLAY_PLANE         = 1;
+	PFD_UNDERLAY_PLANE        = -1;
+	PFD_DOUBLEBUFFER          = 1;
+	PFD_STEREO                = 2;
+	PFD_DRAW_TO_WINDOW        = 4;
+	PFD_DRAW_TO_BITMAP        = 8;
+	PFD_SUPPORT_GDI           = 16;
+	PFD_SUPPORT_OPENGL        = 32;
+	PFD_GENERIC_FORMAT        = 64;
+	PFD_NEED_PALETTE          = 128;
+	PFD_NEED_SYSTEM_PALETTE   = 0x00000100;
+	PFD_SWAP_EXCHANGE         = 0x00000200;
+	PFD_SWAP_COPY             = 0x00000400;
+	PFD_SWAP_LAYER_BUFFERS    = 0x00000800;
+	PFD_GENERIC_ACCELERATED   = 0x00001000;
+	PFD_DEPTH_DONTCARE        = 0x20000000;
+	PFD_DOUBLEBUFFER_DONTCARE = 0x40000000;
+	PFD_STEREO_DONTCARE       = 0x80000000;
+)
 
-const PFD_TYPE_RGBA             = 0;
-const PFD_TYPE_COLORINDEX       = 1;
-const PFD_MAIN_PLANE            = 0;
-const PFD_OVERLAY_PLANE         = 1;
-const PFD_UNDERLAY_PLANE        = -1;
-const PFD_DOUBLEBUFFER          = 1;
-const PFD_STEREO                = 2;
-const PFD_DRAW_TO_WINDOW        = 4;
-const PFD_DRAW_TO_BITMAP        = 8;
-const PFD_SUPPORT_GDI           = 16;
-const PFD_SUPPORT_OPENGL        = 32;
-const PFD_GENERIC_FORMAT        = 64;
-const PFD_NEED_PALETTE          = 128;
-const PFD_NEED_SYSTEM_PALETTE   = 0x00000100;
-const PFD_SWAP_EXCHANGE         = 0x00000200;
-const PFD_SWAP_COPY             = 0x00000400;
-const PFD_SWAP_LAYER_BUFFERS    = 0x00000800;
-const PFD_GENERIC_ACCELERATED   = 0x00001000;
-const PFD_DEPTH_DONTCARE        = 0x20000000;
-const PFD_DOUBLEBUFFER_DONTCARE = 0x40000000;
-const PFD_STEREO_DONTCARE       = 0x80000000;
-
-type HGLRC HANDLE;
-type PROC  proc();
-type wglCreateContextAttribsARBType proc(hdc HDC, hshareContext rawptr, attribList ^i32) -> HGLRC;
+type (
+	HGLRC HANDLE;
+	PROC  proc();
+	wglCreateContextAttribsARBType proc(hdc HDC, hshareContext rawptr, attribList ^i32) -> HGLRC;
 
 
-type PIXELFORMATDESCRIPTOR struct #ordered {
-	size,
-	version,
-	flags u32;
+	PIXELFORMATDESCRIPTOR struct #ordered {
+		size,
+		version,
+		flags u32;
 
-	pixel_type,
-	color_bits,
-	red_bits,
-	red_shift,
-	green_bits,
-	green_shift,
-	blue_bits,
-	blue_shift,
-	alpha_bits,
-	alpha_shift,
-	accum_bits,
-	accum_red_bits,
-	accum_green_bits,
-	accum_blue_bits,
-	accum_alpha_bits,
-	depth_bits,
-	stencil_bits,
-	aux_buffers,
-	layer_type,
-	reserved byte;
+		pixel_type,
+		color_bits,
+		red_bits,
+		red_shift,
+		green_bits,
+		green_shift,
+		blue_bits,
+		blue_shift,
+		alpha_bits,
+		alpha_shift,
+		accum_bits,
+		accum_red_bits,
+		accum_green_bits,
+		accum_blue_bits,
+		accum_alpha_bits,
+		depth_bits,
+		stencil_bits,
+		aux_buffers,
+		layer_type,
+		reserved byte;
 
-	layer_mask,
-	visible_mask,
-	damage_mask u32;
-}
+		layer_mask,
+		visible_mask,
+		damage_mask u32;
+	}
+)
 
 proc GetDC            (h HANDLE) -> HDC #foreign
 proc SetPixelFormat   (hdc HDC, pixel_format i32, pfd ^PIXELFORMATDESCRIPTOR ) -> BOOL #foreign #dll_import
@@ -349,11 +363,13 @@ proc ChoosePixelFormat(hdc HDC, pfd ^PIXELFORMATDESCRIPTOR) -> i32 #foreign #dll
 proc SwapBuffers      (hdc HDC) -> BOOL #foreign #dll_import
 proc ReleaseDC        (wnd HWND, hdc HDC) -> i32 #foreign #dll_import
 
-const WGL_CONTEXT_MAJOR_VERSION_ARB             = 0x2091;
-const WGL_CONTEXT_MINOR_VERSION_ARB             = 0x2092;
-const WGL_CONTEXT_PROFILE_MASK_ARB              = 0x9126;
-const WGL_CONTEXT_CORE_PROFILE_BIT_ARB          = 0x0001;
-const WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB = 0x0002;
+const (
+	WGL_CONTEXT_MAJOR_VERSION_ARB             = 0x2091;
+	WGL_CONTEXT_MINOR_VERSION_ARB             = 0x2092;
+	WGL_CONTEXT_PROFILE_MASK_ARB              = 0x9126;
+	WGL_CONTEXT_CORE_PROFILE_BIT_ARB          = 0x0001;
+	WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB = 0x0002;
+)
 
 proc wglCreateContext (hdc HDC) -> HGLRC #foreign #dll_import
 proc wglMakeCurrent   (hdc HDC, hglrc HGLRC) -> BOOL #foreign #dll_import
@@ -365,60 +381,57 @@ proc wglDeleteContext (hglrc HGLRC) -> BOOL #foreign #dll_import
 proc GetKeyState     (v_key i32) -> i16 #foreign #dll_import
 proc GetAsyncKeyState(v_key i32) -> i16 #foreign #dll_import
 
-proc is_key_down(key Key_Code) -> bool {
-	return GetAsyncKeyState(key as i32) < 0;
-}
+proc is_key_down(key i32) -> bool #inline { return GetAsyncKeyState(key) < 0; }
 
-type Key_Code i32;
 const (
-	KEY_LBUTTON Key_Code = 0x01;
-	KEY_RBUTTON          = 0x02;
-	KEY_CANCEL           = 0x03;
-	KEY_MBUTTON          = 0x04;
+	KEY_LBUTTON    = 0x01;
+	KEY_RBUTTON    = 0x02;
+	KEY_CANCEL     = 0x03;
+	KEY_MBUTTON    = 0x04;
 
-	KEY_BACK             = 0x08;
-	KEY_TAB              = 0x09;
+	KEY_BACK       = 0x08;
+	KEY_TAB        = 0x09;
 
-	KEY_CLEAR            = 0x0C;
-	KEY_RETURN           = 0x0D;
+	KEY_CLEAR      = 0x0C;
+	KEY_RETURN     = 0x0D;
 
-	KEY_SHIFT            = 0x10;
-	KEY_CONTROL          = 0x11;
-	KEY_MENU             = 0x12;
-	KEY_PAUSE            = 0x13;
-	KEY_CAPITAL          = 0x14;
+	KEY_SHIFT      = 0x10;
+	KEY_CONTROL    = 0x11;
+	KEY_MENU       = 0x12;
+	KEY_PAUSE      = 0x13;
+	KEY_CAPITAL    = 0x14;
 
-	KEY_KANA             = 0x15;
-	KEY_HANGEUL          = 0x15;
-	KEY_HANGUL           = 0x15;
-	KEY_JUNJA            = 0x17;
-	KEY_FINAL            = 0x18;
-	KEY_HANJA            = 0x19;
-	KEY_KANJI            = 0x19;
+	KEY_KANA       = 0x15;
+	KEY_HANGEUL    = 0x15;
+	KEY_HANGUL     = 0x15;
+	KEY_JUNJA      = 0x17;
+	KEY_FINAL      = 0x18;
+	KEY_HANJA      = 0x19;
+	KEY_KANJI      = 0x19;
 
-	KEY_ESCAPE           = 0x1B;
+	KEY_ESCAPE     = 0x1B;
 
-	KEY_CONVERT          = 0x1C;
-	KEY_NONCONVERT       = 0x1D;
-	KEY_ACCEPT           = 0x1E;
-	KEY_MODECHANGE       = 0x1F;
+	KEY_CONVERT    = 0x1C;
+	KEY_NONCONVERT = 0x1D;
+	KEY_ACCEPT     = 0x1E;
+	KEY_MODECHANGE = 0x1F;
 
-	KEY_SPACE            = 0x20;
-	KEY_PRIOR            = 0x21;
-	KEY_NEXT             = 0x22;
-	KEY_END              = 0x23;
-	KEY_HOME             = 0x24;
-	KEY_LEFT             = 0x25;
-	KEY_UP               = 0x26;
-	KEY_RIGHT            = 0x27;
-	KEY_DOWN             = 0x28;
-	KEY_SELECT           = 0x29;
-	KEY_PRINT            = 0x2A;
-	KEY_EXECUTE          = 0x2B;
-	KEY_SNAPSHOT         = 0x2C;
-	KEY_INSERT           = 0x2D;
-	KEY_DELETE           = 0x2E;
-	KEY_HELP             = 0x2F;
+	KEY_SPACE      = 0x20;
+	KEY_PRIOR      = 0x21;
+	KEY_NEXT       = 0x22;
+	KEY_END        = 0x23;
+	KEY_HOME       = 0x24;
+	KEY_LEFT       = 0x25;
+	KEY_UP         = 0x26;
+	KEY_RIGHT      = 0x27;
+	KEY_DOWN       = 0x28;
+	KEY_SELECT     = 0x29;
+	KEY_PRINT      = 0x2A;
+	KEY_EXECUTE    = 0x2B;
+	KEY_SNAPSHOT   = 0x2C;
+	KEY_INSERT     = 0x2D;
+	KEY_DELETE     = 0x2E;
+	KEY_HELP       = 0x2F;
 
 	KEY_NUM0 = '0';
 	KEY_NUM1 = '1';
@@ -522,5 +535,5 @@ const (
 	KEY_NONAME     = 0xFC;
 	KEY_PA1        = 0xFD;
 	KEY_OEM_CLEAR  = 0xFE;
-);
+)
 

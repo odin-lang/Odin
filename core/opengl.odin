@@ -1,6 +1,6 @@
 #foreign_system_library "opengl32" when ODIN_OS == "windows";
-#import win32 "sys/windows.odin" when ODIN_OS == "windows";
-#include "opengl_constants.odin";
+import win32 "sys/windows.odin" when ODIN_OS == "windows";
+include "opengl_constants.odin";
 
 proc Clear         (mask u32)                                #foreign "glClear"
 proc ClearColor    (r, g, b, a f32)                          #foreign "glClearColor"

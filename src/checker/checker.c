@@ -1137,13 +1137,23 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 			}
 
 			AstNodeValueSpec empty_spec_ = {0}, *empty_spec = &empty_spec_;
-			AstNodeValueSpec *last = NULL;
+			AstNodeValueSpec *prev_spec = NULL;
 
 			for_array(iota, gd->specs) {
 				AstNode *spec = gd->specs.e[iota];
 				switch (spec->kind) {
+				case_ast_node(is, ImportSpec, spec);
+					if (!parent_scope->is_file) {
+						// NOTE(bill): _Should_ be caught by the parser
+						// TODO(bill): Better error handling if it isn't
+						continue;
+					}
+					DelayedDecl di = {parent_scope, spec};
+					array_add(&c->delayed_imports, di);
+				case_end;
 				case_ast_node(vs, ValueSpec, spec);
 					switch (vs->keyword) {
+					case Token_let:
 					case Token_var: {
 						// NOTE(bill): You need to store the entity information here unline a constant declaration
 						isize entity_count = vs->names.count;
@@ -1168,7 +1178,7 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 								error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 								continue;
 							}
-							Entity *e = make_entity_variable(c->allocator, parent_scope, name->Ident, NULL);
+							Entity *e = make_entity_variable(c->allocator, parent_scope, name->Ident, NULL, vs->keyword == Token_let);
 							e->identifier = name;
 							entities[entity_index++] = e;
 
@@ -1189,9 +1199,9 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 
 					case Token_const: {
 						if (vs->type != NULL || vs->values.count > 0) {
-							last = vs;
-						} else if (last == NULL) {
-							last = empty_spec;
+							prev_spec = vs;
+						} else if (prev_spec == NULL) {
+							prev_spec = empty_spec;
 						}
 
 						for_array(i, vs->names) {
@@ -1206,19 +1216,34 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 							e->identifier = name;
 
 							AstNode *init = NULL;
-							if (i < last->values.count) {
-								init = last->values.e[i];
+							if (i < prev_spec->values.count) {
+								init = prev_spec->values.e[i];
 							}
 
 							DeclInfo *di = make_declaration_info(c->allocator, e->scope);
-							di->type_expr = last->type;
+							di->type_expr = prev_spec->type;
 							di->init_expr = init;
 							add_entity_and_decl_info(c, name, e, di);
 						}
 
-						check_arity_match(c, vs, last);
+						check_arity_match(c, vs, prev_spec);
 					} break;
 					}
+				case_end;
+
+				case_ast_node(ts, TypeSpec, spec);
+					if (ts->name->kind != AstNode_Ident) {
+						error_node(ts->name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[ts->name->kind]));
+						continue;
+					}
+					ast_node(n, Ident, ts->name);
+
+					Entity *e = make_entity_type_name(c->allocator, parent_scope, *n, NULL);
+					e->identifier = ts->name;
+					DeclInfo *d = make_declaration_info(c->allocator, e->scope);
+					d->type_expr = ts->type;
+					d->init_expr = ts->type;
+					add_entity_and_decl_info(c, ts->name, e, d);
 				case_end;
 
 				default:
@@ -1226,15 +1251,6 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 					break;
 				}
 			}
-		case_end;
-		case_ast_node(id, ImportDecl, decl);
-			if (!parent_scope->is_file) {
-				// NOTE(bill): _Should_ be caught by the parser
-				// TODO(bill): Better error handling if it isn't
-				continue;
-			}
-			DelayedDecl di = {parent_scope, decl};
-			array_add(&c->delayed_imports, di);
 		case_end;
 		case_ast_node(fl, ForeignLibrary, decl);
 			if (!parent_scope->is_file) {
@@ -1245,20 +1261,6 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 
 			DelayedDecl di = {parent_scope, decl};
 			array_add(&c->delayed_foreign_libraries, di);
-		case_end;
-		case_ast_node(td, TypeDecl, decl);
-			if (td->name->kind != AstNode_Ident) {
-				error_node(td->name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[td->name->kind]));
-				continue;
-			}
-			ast_node(n, Ident, td->name);
-
-			Entity *e = make_entity_type_name(c->allocator, parent_scope, *n, NULL);
-			e->identifier = td->name;
-			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
-			d->type_expr = td->type;
-			d->init_expr = td->type;
-			add_entity_and_decl_info(c, td->name, e, d);
 		case_end;
 		case_ast_node(pd, ProcDecl, decl);
 			if (pd->name->kind != AstNode_Ident) {
@@ -1286,8 +1288,9 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 void check_import_entities(Checker *c, MapScope *file_scopes) {
 	for_array(i, c->delayed_imports) {
 		Scope *parent_scope = c->delayed_imports.e[i].parent;
-		AstNode *decl = c->delayed_imports.e[i].decl;
-		ast_node(id, ImportDecl, decl);
+		AstNode *spec = c->delayed_imports.e[i].decl;
+		ast_node(id, ImportSpec, spec);
+		Token token = id->relpath;
 
 		HashKey key = hash_string(id->fullpath);
 		Scope **found = map_scope_get(file_scopes, key);
@@ -1296,13 +1299,13 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 				Scope *scope = file_scopes->entries.e[scope_index].value;
 				gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
 			}
-			gb_printf_err("%.*s(%td:%td)\n", LIT(id->token.pos.file), id->token.pos.line, id->token.pos.column);
+			gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
 			GB_PANIC("Unable to find scope for file: %.*s", LIT(id->fullpath));
 		}
 		Scope *scope = *found;
 
 		if (scope->is_global) {
-			error(id->token, "Importing a #shared_global_scope is disallowed and unnecessary");
+			error(token, "Importing a #shared_global_scope is disallowed and unnecessary");
 			continue;
 		}
 
@@ -1332,7 +1335,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 		if (!previously_added) {
 			array_add(&parent_scope->imported, scope);
 		} else {
-			warning(id->token, "Multiple #import of the same file within this scope");
+			warning(token, "Multiple #import of the same file within this scope");
 		}
 
 		if (str_eq(id->import_name.string, str_lit("."))) {
@@ -1381,9 +1384,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 				if (is_string_an_identifier(filename)) {
 					import_name = filename;
 				} else {
-					error(id->token,
-					      "File name, %.*s, cannot be as an import name as it is not a valid identifier",
-					      LIT(filename));
+					error(token, "File name, %.*s, cannot be as an import name as it is not a valid identifier", LIT(filename));
 				}
 			}
 

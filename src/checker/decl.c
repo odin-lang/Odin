@@ -99,7 +99,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 }
 
 void check_var_spec_node(Checker *c, AstNodeValueSpec *vs) {
-	GB_ASSERT(vs->keyword == Token_var);
+	GB_ASSERT(vs->keyword == Token_var || vs->keyword == Token_let);
 	isize entity_count = vs->names.count;
 	isize entity_index = 0;
 	Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
@@ -116,7 +116,7 @@ void check_var_spec_node(Checker *c, AstNodeValueSpec *vs) {
 				found = current_scope_lookup_entity(c->context.scope, str);
 			}
 			if (found == NULL) {
-				entity = make_entity_variable(c->allocator, c->context.scope, token, NULL);
+				entity = make_entity_variable(c->allocator, c->context.scope, token, NULL, vs->keyword == Token_let);
 				add_entity_definition(&c->info, name, entity);
 			} else {
 				TokenPos pos = found->token.pos;
@@ -156,7 +156,7 @@ void check_var_spec_node(Checker *c, AstNodeValueSpec *vs) {
 			e->type = init_type;
 	}
 
-
+	check_arity_match(c, vs, NULL);
 	check_init_variables(c, entities, entity_count, vs->values, str_lit("variable declaration"));
 
 	for_array(i, vs->names) {

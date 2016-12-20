@@ -1,5 +1,7 @@
-#import "fmt.odin";
-#import "os.odin";
+import (
+	"fmt.odin";
+	"os.odin";
+)
 
 proc set(data rawptr, value i32, len int) -> rawptr #link_name "__mem_set" {
 	proc llvm_memset_64bit(dst rawptr, val byte, len int, align i32, is_volatile bool) #foreign "llvm.memset.p0i8.i64"
@@ -92,6 +94,7 @@ proc align_forward(ptr rawptr, align int) -> rawptr {
 type Allocation_Header struct {
 	size int;
 }
+
 proc allocation_header_fill(header ^Allocation_Header, data rawptr, size int) {
 	header.size = size;
 	var ptr = (header+1) as ^int;
@@ -113,18 +116,18 @@ proc allocation_header(data rawptr) -> ^Allocation_Header {
 
 
 // Custom allocators
+type (
+	Arena struct {
+		backing    Allocator;
+		memory     []byte;
+		temp_count int;
+	}
 
-type Arena struct {
-	backing    Allocator;
-	memory     []byte;
-	temp_count int;
-}
-
-type Arena_Temp_Memory struct {
-	arena          ^Arena;
-	original_count int;
-}
-
+	Arena_Temp_Memory struct {
+		arena          ^Arena;
+		original_count int;
+	}
+)
 
 
 
@@ -270,7 +273,7 @@ proc align_of_type_info(type_info ^Type_Info) -> int {
 proc align_formula(size, align int) -> int {
 	var result = size + align-1;
 	return result - result%align;
-};
+}
 
 proc size_of_type_info(type_info ^Type_Info) -> int {
 	const WORD_SIZE = size_of(int);

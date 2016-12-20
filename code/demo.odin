@@ -1,36 +1,31 @@
-#import "atomic.odin";
-#import "fmt.odin";
-#import "hash.odin";
-#import "math.odin";
-#import "mem.odin";
-#import "opengl.odin";
-#import "os.odin";
-#import "sync.odin";
-#import "utf8.odin";
-
-type float32 f32;
-const (
-	X = iota;
-	Y;
-	Z;
-	A = iota+1;
-	B;
-	C;
-);
+import (
+	"atomic.odin";
+	"fmt.odin";
+	"hash.odin";
+	"math.odin";
+	"mem.odin";
+	"opengl.odin";
+	"os.odin";
+	"sync.odin";
+	"utf8.odin";
+)
 
 type Byte_Size f64;
 const (
 	_            = iota; // ignore first value by assigning to blank identifier
 	KB Byte_Size = 1 << (10 * iota);
+	// Because there is no type or expression, the previous one is used but
+	// with `iota` incremented by one
 	MB;
 	GB;
 	TB;
 	PB;
 	EB;
-);
+)
 
 
 proc main() {
-	var x = 123;
-	fmt.println(x);
+	fmt.println("Here");
+
 }
+

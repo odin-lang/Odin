@@ -21,15 +21,27 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 	bool ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
 	u32 f = flags & (~Stmt_FallthroughAllowed);
 
-	for_array(i, stmts) {
+	isize max = stmts.count;
+	for (isize i = stmts.count-1; i >= 0; i--) {
+		if (stmts.e[i]->kind != AstNode_EmptyStmt) {
+			break;
+		}
+		max--;
+	}
+	for (isize i = 0; i < max; i++) {
 		AstNode *n = stmts.e[i];
 		if (n->kind == AstNode_EmptyStmt) {
 			continue;
 		}
 		u32 new_flags = f;
-		if (ft_ok && i+1 == stmts.count) {
+		if (ft_ok && i+1 == max) {
 			new_flags |= Stmt_FallthroughAllowed;
 		}
+
+		if (n->kind == AstNode_ReturnStmt && i+1 < max) {
+			error_node(n, "Statements after this `return` are never executed");
+		}
+
 		check_stmt(c, n, new_flags);
 	}
 
@@ -835,7 +847,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					tt = make_type_pointer(c->allocator, case_type);
 					add_type_info_type(c, tt);
 				}
-				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, ms->var->Ident, tt);
+				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, ms->var->Ident, tt, false);
 				tag_var->flags |= EntityFlag_Used;
 				add_entity(c, c->context.scope, ms->var, tag_var);
 				add_entity_use(c, ms->var, tag_var);
@@ -1078,6 +1090,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			switch (spec->kind) {
 			case_ast_node(vs, ValueSpec, spec);
 				switch (vs->keyword) {
+				case Token_let:
 				case Token_var: {
 					isize entity_count = vs->names.count;
 					isize entity_index = 0;
@@ -1095,7 +1108,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 								found = current_scope_lookup_entity(c->context.scope, str);
 							}
 							if (found == NULL) {
-								entity = make_entity_variable(c->allocator, c->context.scope, token, NULL);
+								entity = make_entity_variable(c->allocator, c->context.scope, token, NULL, vs->keyword == Token_let);
 								add_entity_definition(&c->info, name, entity);
 							} else {
 								TokenPos pos = found->token.pos;
@@ -1146,8 +1159,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				} break;
 
 				case Token_const:
+					// NOTE(bill): Handled elsewhere
 					break;
 				}
+			case_end;
+
+			case_ast_node(ts, TypeSpec, spec);
+				// NOTE(bill): Handled elsewhere
 			case_end;
 
 			default:
@@ -1155,10 +1173,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				break;
 			}
 		}
-	case_end;
-
-	case_ast_node(td, TypeDecl, node);
-		// NOTE(bill): Handled elsewhere
 	case_end;
 
 	case_ast_node(pd, ProcDecl, node);

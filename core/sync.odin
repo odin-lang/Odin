@@ -1,17 +1,20 @@
-#import win32 "sys/windows.odin" when ODIN_OS == "windows";
-#import "atomic.odin";
+import (
+	win32 "sys/windows.odin" when ODIN_OS == "windows";
+	"atomic.odin";
+)
 
-type Semaphore struct {
-	handle win32.HANDLE;
-}
+type (
+	Semaphore struct {
+		handle win32.HANDLE;
+	}
 
-type Mutex struct {
-	semaphore Semaphore;
-	counter   i32;
-	owner     i32;
-	recursion i32;
-}
-
+	Mutex struct {
+		semaphore Semaphore;
+		counter   i32;
+		owner     i32;
+		recursion i32;
+	}
+)
 
 proc current_thread_id() -> i32 {
 	return win32.GetCurrentThreadId() as i32;

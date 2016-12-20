@@ -16,16 +16,17 @@ const (
 
 	τ = TAU;
 	π = PI;
-);
+)
 
-type Vec2 [vector 2]f32;
-type Vec3 [vector 3]f32;
-type Vec4 [vector 4]f32;
+type (
+	Vec2 [vector 2]f32;
+	Vec3 [vector 3]f32;
+	Vec4 [vector 4]f32;
 
-type Mat2 [2]Vec2;
-type Mat3 [3]Vec3;
-type Mat4 [4]Vec4;
-
+	Mat2 [2]Vec2;
+	Mat3 [3]Vec3;
+	Mat4 [4]Vec4;
+)
 
 proc sqrt32(x f32) -> f32 #foreign "llvm.sqrt.f32"
 proc sqrt64(x f64) -> f64 #foreign "llvm.sqrt.f64"

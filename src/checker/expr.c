@@ -128,6 +128,44 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 					} break;
 					}
 				case_end;
+
+				case_ast_node(ts, TypeSpec, spec);
+					if (ts->name->kind != AstNode_Ident) {
+						error_node(ts->name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[ts->name->kind]));
+						break;
+					}
+
+					Token name_token = ts->name->Ident;
+
+					Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, NULL);
+					e->identifier = ts->name;
+
+					DeclInfo *d = make_declaration_info(c->allocator, e->scope);
+					d->type_expr = ts->type;
+
+					add_entity_and_decl_info(c, ts->name, e, d);
+
+					DelayedEntity delay = {ts->name, e, d};
+					array_add(delayed_entities, delay);
+
+
+					if (dof != NULL) {
+						if (str_eq(name_token.string, str_lit("_"))) {
+							dof->other_fields[dof->other_field_index++] = e;
+						} else {
+							HashKey key = hash_string(name_token.string);
+							if (map_entity_get(dof->entity_map, key) != NULL) {
+								// TODO(bill): Scope checking already checks the declaration
+								error(name_token, "`%.*s` is already declared in this record", LIT(name_token.string));
+							} else {
+								map_entity_set(dof->entity_map, key, e);
+								dof->other_fields[dof->other_field_index++] = e;
+							}
+							add_entity(c, c->context.scope, ts->name, e);
+							add_entity_use(c, ts->name, e);
+						}
+					}
+				case_end;
 				}
 			}
 		case_end;
@@ -147,47 +185,6 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 			check_entity_decl(c, e, d, NULL, NULL);
 		case_end;
 #endif
-
-		case_ast_node(td, TypeDecl, node);
-			if (!ast_node_expect(td->name, AstNode_Ident)) {
-				break;
-			}
-			if (td->name->kind != AstNode_Ident) {
-				error_node(td->name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[td->name->kind]));
-				continue;
-			}
-
-			Token name_token = td->name->Ident;
-
-			Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, NULL);
-			e->identifier = td->name;
-
-			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
-			d->type_expr = td->type;
-
-			add_entity_and_decl_info(c, td->name, e, d);
-
-			DelayedEntity delay = {td->name, e, d};
-			array_add(delayed_entities, delay);
-
-
-			if (dof != NULL) {
-				if (str_eq(name_token.string, str_lit("_"))) {
-					dof->other_fields[dof->other_field_index++] = e;
-				} else {
-					HashKey key = hash_string(name_token.string);
-					if (map_entity_get(dof->entity_map, key) != NULL) {
-						// TODO(bill): Scope checking already checks the declaration
-						error(name_token, "`%.*s` is already declared in this record", LIT(name_token.string));
-					} else {
-						map_entity_set(dof->entity_map, key, e);
-						dof->other_fields[dof->other_field_index++] = e;
-					}
-					add_entity(c, c->context.scope, td->name, e);
-					add_entity_use(c, td->name, e);
-				}
-			}
-		case_end;
 		}
 	}
 
@@ -900,6 +897,9 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 		}
 	#else
 		o->mode = Addressing_Variable;
+		if (e->Variable.is_let) {
+			o->mode = Addressing_Value;
+		}
 	#endif
 		break;
 
