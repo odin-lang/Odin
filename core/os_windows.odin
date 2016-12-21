@@ -93,8 +93,7 @@ const (
 	FILE_STANDARD_ERROR;
 
 	FILE_STANDARD_COUNT;
-);
-
+)
 // NOTE(bill): Uses startup to initialize it
 var (
 	__std_files = [FILE_STANDARD_COUNT]File{

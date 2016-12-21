@@ -1088,6 +1088,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		for_array(spec_index, gd->specs) {
 			AstNode *spec = gd->specs.e[spec_index];
 			switch (spec->kind) {
+			case_ast_node(bd, BadDecl, spec);
+			case_end;
 			case_ast_node(vs, ValueSpec, spec);
 				switch (vs->keyword) {
 				case Token_let:

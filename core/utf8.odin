@@ -8,11 +8,11 @@ const (
 
 	SURROGATE_MIN = 0xd800;
 	SURROGATE_MAX = 0xdfff;
-);
+)
 
 type Accept_Range struct {
 	lo, hi u8;
-};
+}
 
 var (
 	accept_ranges = [5]Accept_Range{
@@ -99,10 +99,12 @@ proc decode_rune(s string) -> (rune, int) {
 		return RUNE_ERROR, 1;
 	}
 
-	const MASK_X = 0b00111111;
-	const MASK_2 = 0b00011111;
-	const MASK_3 = 0b00001111;
-	const MASK_4 = 0b00000111;
+	const (
+		MASK_X = 0b00111111;
+		MASK_2 = 0b00011111;
+		MASK_3 = 0b00001111;
+		MASK_4 = 0b00000111;
+	)
 
 	if size == 2 {
 		return (b0&MASK_2) as rune <<6 | (b1&MASK_X) as rune, 2;

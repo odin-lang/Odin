@@ -2607,6 +2607,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		} else if (e != NULL && e->kind == Entity_Variable) {
 			return ssa_addr_load(proc, ssa_build_addr(proc, expr));
 		}
+		GB_PANIC("nil value for expression from identifier: %.*s", LIT(i->string));
 		return NULL;
 	case_end;
 
@@ -2714,9 +2715,10 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		                                           proc->module, NULL, type, pl->type, pl->body, name);
 
 		value->Proc.tags = pl->tags;
+		value->Proc.parent = proc;
 
 		array_add(&proc->children, &value->Proc);
-		ssa_build_proc(value, proc);
+		array_add(&proc->module->procs_to_generate, value);
 
 		return value;
 	case_end;
@@ -2971,32 +2973,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 				} break;
 
-#if 0
-				case BuiltinProc_ptr_offset: {
-					ssa_emit_comment(proc, str_lit("ptr_offset"));
-					ssaValue *ptr = ssa_build_expr(proc, ce->args.e[0]);
-					ssaValue *offset = ssa_build_expr(proc, ce->args.e[1]);
-					return ssa_emit_ptr_offset(proc, ptr, offset);
-				} break;
-
-				case BuiltinProc_ptr_sub: {
-					ssa_emit_comment(proc, str_lit("ptr_sub"));
-					ssaValue *ptr_a = ssa_build_expr(proc, ce->args.e[0]);
-					ssaValue *ptr_b = ssa_build_expr(proc, ce->args.e[1]);
-					Type *ptr_type = base_type(ssa_type(ptr_a));
-					GB_ASSERT(ptr_type->kind == Type_Pointer);
-					isize elem_size = type_size_of(proc->module->sizes, proc->module->allocator, ptr_type->Pointer.elem);
-
-					ssaValue *v = ssa_emit_arith(proc, Token_Sub, ptr_a, ptr_b, t_int);
-					if (elem_size > 1) {
-						ssaValue *ez = ssa_make_const_int(proc->module->allocator, elem_size);
-						v = ssa_emit_arith(proc, Token_Quo, v, ez, t_int);
-					}
-
-					return v;
-				} break;
-#endif
-
 				case BuiltinProc_slice_ptr: {
 					ssa_emit_comment(proc, str_lit("slice_ptr"));
 					ssaValue *ptr = ssa_build_expr(proc, ce->args.e[0]);
@@ -3095,9 +3071,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			}
 		}
 
-
 		// NOTE(bill): Regular call
 		ssaValue *value = ssa_build_expr(proc, ce->proc);
+		GB_ASSERT(value != NULL);
 		Type *proc_type_ = base_type(ssa_type(value));
 		GB_ASSERT(proc_type_->kind == Type_Proc);
 		TypeProc *type = &proc_type_->Proc;
@@ -3269,7 +3245,7 @@ ssaAddr ssa_build_addr_from_entity(ssaProcedure *proc, Entity *e, AstNode *expr)
 	}
 
 	if (v == NULL) {
-		GB_PANIC("Unknown value: %s, entity: %p %.*s\n", expr_to_string(expr), e, LIT(entity_strings[e->kind]));
+		GB_PANIC("Unknown value: %.*s, entity: %p %.*s\n", LIT(e->token.string), e, LIT(entity_strings[e->kind]));
 	}
 
 	return ssa_make_addr(v, expr);
@@ -3293,7 +3269,9 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 
 	case_ast_node(se, SelectorExpr, expr);
 		ssa_emit_comment(proc, str_lit("SelectorExpr"));
-		String selector = unparen_expr(se->selector)->Ident.string;
+		AstNode *sel = unparen_expr(se->selector);
+		GB_ASSERT(sel->kind == AstNode_Ident);
+		String selector = sel->Ident.string;
 		Type *type = base_type(type_of_expr(proc->module->info, se->expr));
 
 		if (type == t_invalid) {
@@ -4958,7 +4936,7 @@ void ssa_gen_tree(ssaGen *s) {
 				array_add(&global_variables, var);
 			}
 
-			map_ssa_value_set(&m->values,  hash_pointer(e), g);
+			ssa_module_add_value(m, e, g);
 			map_ssa_value_set(&m->members, hash_string(name), g);
 		} break;
 
@@ -4978,7 +4956,7 @@ void ssa_gen_tree(ssaGen *s) {
 			ssaValue *p = ssa_make_value_procedure(a, m, e, e->type, decl->type_expr, body, name);
 			p->Proc.tags = pd->tags;
 
-			map_ssa_value_set(&m->values, hash_pointer(e), p);
+			ssa_module_add_value(m, e, p);
 			HashKey hash_name = hash_string(name);
 			if (map_ssa_value_get(&m->members, hash_name) == NULL) {
 				map_ssa_value_set(&m->members, hash_name, p);

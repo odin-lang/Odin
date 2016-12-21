@@ -59,17 +59,26 @@ i32 win32_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	return exit_code;
 }
 
+void print_usage_line(i32 indent, char *fmt, ...) {
+	while (indent --> 0) {
+		gb_printf_err("\t");
+	}
+	va_list va;
+	va_start(va, fmt);
+	gb_printf_err_va(fmt, va);
+	va_end(va);
+	gb_printf_err("\n");
+}
 
 void usage(char *argv0) {
-	gb_printf_err("%s is a tool for managing Odin source code\n", argv0);
-	gb_printf_err("Usage:");
-	gb_printf_err("\n\t%s command [arguments]\n", argv0);
-	gb_printf_err("Commands:");
-	gb_printf_err("\n\tbuild     compile .odin file");
-	gb_printf_err("\n\tbuild_dll compile .odin file as dll");
-	gb_printf_err("\n\trun       compile and run .odin file");
-	gb_printf_err("\n\tversion   print Odin version");
-	gb_printf_err("\n\n");
+	print_usage_line(0, "%s is a tool for managing Odin source code", argv0);
+	print_usage_line(0, "Usage:");
+	print_usage_line(1, "%s command [arguments]", argv0);
+	print_usage_line(0, "Commands:");
+	print_usage_line(1, "build        compile .odin file as executable");
+	print_usage_line(1, "build_dll    compile .odin file as dll");
+	print_usage_line(1, "run          compile and run .odin file");
+	print_usage_line(1, "version      print version");
 }
 
 int main(int argc, char **argv) {

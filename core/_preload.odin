@@ -112,7 +112,7 @@ proc fmuladd64(a, b, c f64) -> f64 #foreign "llvm.fmuladd.f64"
 
 
 
-type Allocator_Mode int;
+type Allocator_Mode u8;
 const (
 	ALLOCATOR_ALLOC Allocator_Mode = iota;
 	ALLOCATOR_FREE;

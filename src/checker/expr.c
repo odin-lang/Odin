@@ -87,6 +87,8 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 			for_array(iota, gd->specs) {
 				AstNode *spec = gd->specs.e[iota];
 				switch (spec->kind) {
+				case_ast_node(bd, BadDecl, spec);
+				case_end;
 				case_ast_node(vs, ValueSpec, spec);
 					switch (vs->keyword) {
 					case Token_var:
@@ -453,15 +455,15 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 		fields[field_index++] = make_entity_type_name(c->allocator, c->context.scope, empty_token, NULL);
 		for_array(decl_index, decls) {
 			AstNode *decl = decls.e[decl_index];
-			if (decl->kind != AstNode_Parameter) {
+			if (decl->kind != AstNode_Field) {
 				continue;
 			}
 
-			ast_node(p, Parameter, decl);
-			Type *base_type = check_type_extra(c, p->type, NULL);
+			ast_node(f, Field, decl);
+			Type *base_type = check_type_extra(c, f->type, NULL);
 
-			for_array(name_index, p->names) {
-				AstNode *name = p->names.e[name_index];
+			for_array(name_index, f->names) {
+				AstNode *name = f->names.e[name_index];
 				if (!ast_node_expect(name, AstNode_Ident)) {
 					continue;
 				}
@@ -493,28 +495,28 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 		isize field_index = 0;
 		for_array(decl_index, decls) {
 			AstNode *decl = decls.e[decl_index];
-			if (decl->kind != AstNode_Parameter) {
+			if (decl->kind != AstNode_Field) {
 				continue;
 			}
-			ast_node(param, Parameter, decl);
+			ast_node(f, Field, decl);
 
-			Type *type = check_type_extra(c, param->type, NULL);
+			Type *type = check_type_extra(c, f->type, NULL);
 
-			if (param->is_using) {
-				if (param->names.count > 1) {
-					error_node(param->names.e[0], "Cannot apply `using` to more than one of the same type");
+			if (f->is_using) {
+				if (f->names.count > 1) {
+					error_node(f->names.e[0], "Cannot apply `using` to more than one of the same type");
 				}
 			}
 
-			for_array(name_index, param->names) {
-				AstNode *name = param->names.e[name_index];
+			for_array(name_index, f->names) {
+				AstNode *name = f->names.e[name_index];
 				if (!ast_node_expect(name, AstNode_Ident)) {
 					continue;
 				}
 
 				Token name_token = name->Ident;
 
-				Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, param->is_using, cast(i32)field_index);
+				Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, f->is_using, cast(i32)field_index);
 				e->identifier = name;
 				if (str_eq(name_token.string, str_lit("_"))) {
 					fields[field_index++] = e;
@@ -533,19 +535,19 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 			}
 
 
-			if (param->is_using) {
+			if (f->is_using) {
 				Type *t = base_type(type_deref(type));
 				if (!is_type_struct(t) && !is_type_raw_union(t) &&
-				    param->names.count >= 1 &&
-				    param->names.e[0]->kind == AstNode_Ident) {
-					Token name_token = param->names.e[0]->Ident;
+				    f->names.count >= 1 &&
+				    f->names.e[0]->kind == AstNode_Ident) {
+					Token name_token = f->names.e[0]->Ident;
 					if (is_type_indexable(t)) {
 						bool ok = true;
 						for_array(emi, entity_map.entries) {
 							Entity *e = entity_map.entries.e[emi].value;
 							if (e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous) {
 								if (is_type_indexable(e->type)) {
-									if (e->identifier != param->names.e[0]) {
+									if (e->identifier != f->names.e[0]) {
 										ok = false;
 										using_index_expr = e;
 										break;
@@ -613,8 +615,8 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	for_array(field_index, st->fields) {
 		AstNode *field = st->fields.e[field_index];
 		switch (field->kind) {
-		case_ast_node(p, Parameter, field);
-			field_count += p->names.count;
+		case_ast_node(f, Field, field);
+			field_count += f->names.count;
 		case_end;
 		}
 	}
@@ -662,8 +664,8 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	for_array(field_index, ut->fields) {
 		AstNode *field = ut->fields.e[field_index];
 		switch (field->kind) {
-		case_ast_node(p, Parameter, field);
-			field_count += p->names.count;
+		case_ast_node(f, Field, field);
+			field_count += f->names.count;
 		case_end;
 		}
 	}
@@ -685,8 +687,8 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
 	for_array(field_index, ut->fields) {
 		AstNode *field = ut->fields.e[field_index];
 		switch (field->kind) {
-		case_ast_node(p, Parameter, field);
-			field_count += p->names.count;
+		case_ast_node(f, Field, field);
+			field_count += f->names.count;
 		case_end;
 		}
 	}
@@ -699,51 +701,47 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
 	union_type->Record.field_count = field_count;
 }
 
-GB_COMPARE_PROC(cmp_enum_order) {
-	// Rule:
-	// Biggest to smallest alignment
-	// if same alignment: biggest to smallest size
-	// if same size: order by source order
-	Entity *x = *(Entity **)a;
-	Entity *y = *(Entity **)b;
-	GB_ASSERT(x != NULL);
-	GB_ASSERT(y != NULL);
-	GB_ASSERT(x->kind == Entity_Constant);
-	GB_ASSERT(y->kind == Entity_Constant);
-	GB_ASSERT(x->Constant.value.kind == ExactValue_Integer);
-	GB_ASSERT(y->Constant.value.kind == ExactValue_Integer);
-	i64 i = x->Constant.value.value_integer;
-	i64 j = y->Constant.value.value_integer;
+// GB_COMPARE_PROC(cmp_enum_order) {
+// 	// Rule:
+// 	// Biggest to smallest alignment
+// 	// if same alignment: biggest to smallest size
+// 	// if same size: order by source order
+// 	Entity *x = *(Entity **)a;
+// 	Entity *y = *(Entity **)b;
+// 	GB_ASSERT(x != NULL);
+// 	GB_ASSERT(y != NULL);
+// 	GB_ASSERT(x->kind == Entity_Constant);
+// 	GB_ASSERT(y->kind == Entity_Constant);
+// 	GB_ASSERT(x->Constant.value.kind == ExactValue_Integer);
+// 	GB_ASSERT(y->Constant.value.kind == ExactValue_Integer);
+// 	i64 i = x->Constant.value.value_integer;
+// 	i64 j = y->Constant.value.value_integer;
 
-	return i < j ? -1 : i > j;
-}
+// 	return i < j ? -1 : i > j;
+// }
 
 Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_variadic_) {
 	if (params.count == 0) {
 		return NULL;
 	}
 
-	bool is_variadic = false;
-
-	Type *tuple = make_type_tuple(c->allocator);
-
 	isize variable_count = 0;
 	for_array(i, params) {
 		AstNode *field = params.e[i];
-		if (!ast_node_expect(field, AstNode_Parameter)) {
-			continue;
+		if (ast_node_expect(field, AstNode_Field)) {
+			ast_node(f, Field, field);
+			variable_count += f->names.count;
 		}
-		ast_node(p, Parameter, field);
-		variable_count += p->names.count;
 	}
 
+	bool is_variadic = false;
 	Entity **variables = gb_alloc_array(c->allocator, Entity *, variable_count);
 	isize variable_index = 0;
 	for_array(i, params) {
-		if (params.e[i]->kind != AstNode_Parameter) {
+		if (params.e[i]->kind != AstNode_Field) {
 			continue;
 		}
-		ast_node(p, Parameter, params.e[i]);
+		ast_node(p, Field, params.e[i]);
 		AstNode *type_expr = p->type;
 		if (type_expr) {
 			if (type_expr->kind == AstNode_Ellipsis) {
@@ -777,6 +775,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_v
 		end->type = make_type_slice(c->allocator, end->type);
 	}
 
+	Type *tuple = make_type_tuple(c->allocator);
 	tuple->Tuple.variables = variables;
 	tuple->Tuple.variable_count = variable_count;
 
@@ -3687,21 +3686,21 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);
-		check_open_scope(c, pl->type);
-		c->context.decl = make_declaration_info(c->allocator, c->context.scope);
 		Type *proc_type = check_type(c, pl->type);
-		if (proc_type != NULL) {
-			check_proc_body(c, empty_token, c->context.decl, proc_type, pl->body);
-			o->mode = Addressing_Value;
-			o->type = proc_type;
-			check_close_scope(c);
-		} else {
+		if (proc_type == NULL) {
 			gbString str = expr_to_string(node);
 			error_node(node, "Invalid procedure literal `%s`", str);
 			gb_string_free(str);
 			check_close_scope(c);
 			goto error;
 		}
+		check_open_scope(c, pl->type);
+		check_proc_body(c, empty_token, c->context.decl, proc_type, pl->body);
+		check_close_scope(c);
+
+		o->mode = Addressing_Value;
+		o->type = proc_type;
+
 	case_end;
 
 	case_ast_node(cl, CompoundLit, node);
@@ -4240,7 +4239,7 @@ gbString write_expr_to_string(gbString str, AstNode *node);
 
 gbString write_params_to_string(gbString str, AstNodeArray params, char *sep) {
 	for_array(i, params) {
-		ast_node(p, Parameter, params.e[i]);
+		ast_node(p, Field, params.e[i]);
 		if (i > 0) {
 			str = gb_string_appendc(str, sep);
 		}
@@ -4390,14 +4389,15 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, vt->elem);
 	case_end;
 
-	case_ast_node(p, Parameter, node);
+	case_ast_node(p, Field, node);
 		if (p->is_using) {
 			str = gb_string_appendc(str, "using ");
 		}
 		for_array(i, p->names) {
 			AstNode *name = p->names.e[i];
-			if (i > 0)
+			if (i > 0) {
 				str = gb_string_appendc(str, ", ");
+			}
 			str = write_expr_to_string(str, name);
 		}
 
