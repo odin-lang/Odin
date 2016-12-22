@@ -110,6 +110,7 @@ typedef struct TypeRecord {
 		i32    param_count; \
 		i32    result_count; \
 		bool   variadic; \
+		ProcCallingConvention calling_convention; \
 	})
 
 typedef enum TypeKind {
@@ -382,7 +383,7 @@ Type *make_type_tuple(gbAllocator a) {
 	return t;
 }
 
-Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_count, Type *results, isize result_count, bool variadic) {
+Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_count, Type *results, isize result_count, bool variadic, ProcCallingConvention calling_convention) {
 	Type *t = alloc_type(a, Type_Proc);
 
 	if (variadic) {
@@ -403,6 +404,7 @@ Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_coun
 	t->Proc.results      = results;
 	t->Proc.result_count = result_count;
 	t->Proc.variadic     = variadic;
+	t->Proc.calling_convention = calling_convention;
 	return t;
 }
 
@@ -655,8 +657,9 @@ bool is_type_comparable(Type *t) {
 }
 
 bool are_types_identical(Type *x, Type *y) {
-	if (x == y)
+	if (x == y) {
 		return true;
+	}
 
 	if ((x == NULL && y != NULL) ||
 	    (x != NULL && y == NULL)) {
@@ -747,7 +750,8 @@ bool are_types_identical(Type *x, Type *y) {
 
 	case Type_Proc:
 		if (y->kind == Type_Proc) {
-			return are_types_identical(x->Proc.params, y->Proc.params) &&
+			return x->Proc.calling_convention == y->Proc.calling_convention &&
+			       are_types_identical(x->Proc.params, y->Proc.params) &&
 			       are_types_identical(x->Proc.results, y->Proc.results);
 		}
 		break;
@@ -1546,6 +1550,20 @@ gbString write_type_to_string(gbString str, Type *type) {
 		if (type->Proc.results) {
 			str = gb_string_appendc(str, " -> ");
 			str = write_type_to_string(str, type->Proc.results);
+		}
+		switch (type->Proc.calling_convention) {
+		case ProcCC_Odin:
+			// str = gb_string_appendc(str, " #cc_odin");
+			break;
+		case ProcCC_C:
+			str = gb_string_appendc(str, " #cc_c");
+			break;
+		case ProcCC_Std:
+			str = gb_string_appendc(str, " #cc_std");
+			break;
+		case ProcCC_Fast:
+			str = gb_string_appendc(str, " #cc_fast");
+			break;
 		}
 		break;
 	}

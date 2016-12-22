@@ -1,10 +1,10 @@
 #shared_global_scope;
 
-import (
+import {
 	"os.odin";
 	"fmt.odin";
 	"mem.odin";
-)
+}
 
 // IMPORTANT NOTE(bill): `type_info` & `type_info_val` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
@@ -14,7 +14,7 @@ import (
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
-type (
+type {
 	Type_Info_Member struct #ordered {
 		name      string;     // can be empty if tuple
 		type_info ^Type_Info;
@@ -74,7 +74,7 @@ type (
 		Union     Type_Info_Record;
 		Raw_Union Type_Info_Record;
 	}
-)
+}
 
 proc type_info_base(info ^Type_Info) -> ^Type_Info {
 	if info == nil {
@@ -113,13 +113,13 @@ proc fmuladd64(a, b, c f64) -> f64 #foreign "llvm.fmuladd.f64"
 
 
 type Allocator_Mode u8;
-const (
+const {
 	ALLOCATOR_ALLOC Allocator_Mode = iota;
 	ALLOCATOR_FREE;
 	ALLOCATOR_FREE_ALL;
 	ALLOCATOR_RESIZE;
-);
-type (
+}
+type {
 	Allocator_Proc proc(allocator_data rawptr, mode Allocator_Mode,
 	                    size, alignment int,
 	                    old_memory rawptr, old_size int, flags u64) -> rawptr;
@@ -136,7 +136,7 @@ type (
 		user_data  rawptr;
 		user_index int;
 	}
-);
+}
 
 #thread_local var __context Context;
 

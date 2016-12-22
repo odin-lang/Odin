@@ -1,7 +1,7 @@
 #foreign_system_library "user32" when ODIN_OS == "windows";
 #foreign_system_library "gdi32"  when ODIN_OS == "windows";
 
-type (
+type {
 	HANDLE    rawptr;
 	HWND      HANDLE;
 	HDC       HANDLE;
@@ -18,9 +18,9 @@ type (
 	ATOM      i16;
 	BOOL      i32;
 	WNDPROC   proc(hwnd HWND, msg u32, wparam WPARAM, lparam LPARAM) -> LRESULT;
-)
+}
 
-const (
+const {
 	INVALID_HANDLE_VALUE = (-1 as int) as HANDLE;
 
 	CS_VREDRAW    = 0x0001;
@@ -52,9 +52,9 @@ const (
 	SM_CYSCREEN = 1;
 
 	SW_SHOW = 5;
-)
+}
 
-type (
+type {
 	POINT struct #ordered {
 		x, y i32;
 	}
@@ -114,11 +114,11 @@ type (
 	}
 
 	GET_FILEEX_INFO_LEVELS i32;
-)
-const (
+}
+const {
 	GetFileExInfoStandard = 0 as GET_FILEEX_INFO_LEVELS;
 	GetFileExMaxInfoLevel = 1 as GET_FILEEX_INFO_LEVELS;
-)
+}
 
 proc GetLastError    () -> i32                           #foreign #dll_import
 proc ExitProcess     (exit_code u32)                    #foreign #dll_import
@@ -183,7 +183,7 @@ proc GetFileSizeEx             (file_handle HANDLE, file_size ^i64) -> BOOL #for
 proc GetFileAttributesExA      (filename ^u8, info_level_id GET_FILEEX_INFO_LEVELS, file_info rawptr) -> BOOL #foreign #dll_import
 proc GetFileInformationByHandle(file_handle HANDLE, file_info ^BY_HANDLE_FILE_INFORMATION) -> BOOL #foreign #dll_import
 
-const (
+const {
 	FILE_SHARE_READ      = 0x00000001;
 	FILE_SHARE_WRITE     = 0x00000002;
 	FILE_SHARE_DELETE    = 0x00000004;
@@ -201,7 +201,7 @@ const (
 	OPEN_EXISTING     = 3;
 	OPEN_ALWAYS       = 4;
 	TRUNCATE_EXISTING = 5;
-)
+}
 
 
 
@@ -248,7 +248,7 @@ proc ReadBarrier     () #foreign
 
 
 // GDI
-type (
+type {
 	BITMAPINFOHEADER struct #ordered {
 		size              u32;
 		width, height     i32;
@@ -269,13 +269,13 @@ type (
 	RGBQUAD struct #ordered {
 		blue, green, red, reserved byte;
 	}
-)
+}
 
-const (
+const {
 	BI_RGB         = 0;
 	DIB_RGB_COLORS = 0x00;
 	SRCCOPY        = 0x00cc0020 as u32;
-)
+}
 
 proc StretchDIBits(hdc HDC,
                    x_dst, y_dst, width_dst, height_dst i32,
@@ -295,7 +295,7 @@ proc GetClientRect(hwnd HWND, rect ^RECT) -> BOOL #foreign
 
 
 // Windows OpenGL
-const (
+const {
 	PFD_TYPE_RGBA             = 0;
 	PFD_TYPE_COLORINDEX       = 1;
 	PFD_MAIN_PLANE            = 0;
@@ -317,11 +317,11 @@ const (
 	PFD_DEPTH_DONTCARE        = 0x20000000;
 	PFD_DOUBLEBUFFER_DONTCARE = 0x40000000;
 	PFD_STEREO_DONTCARE       = 0x80000000;
-)
+}
 
-type (
+type {
 	HGLRC HANDLE;
-	PROC  proc();
+	PROC  proc() #cc_c;
 	wglCreateContextAttribsARBType proc(hdc HDC, hshareContext rawptr, attribList ^i32) -> HGLRC;
 
 
@@ -355,7 +355,7 @@ type (
 		visible_mask,
 		damage_mask u32;
 	}
-)
+}
 
 proc GetDC            (h HANDLE) -> HDC #foreign
 proc SetPixelFormat   (hdc HDC, pixel_format i32, pfd ^PIXELFORMATDESCRIPTOR ) -> BOOL #foreign #dll_import
@@ -363,13 +363,13 @@ proc ChoosePixelFormat(hdc HDC, pfd ^PIXELFORMATDESCRIPTOR) -> i32 #foreign #dll
 proc SwapBuffers      (hdc HDC) -> BOOL #foreign #dll_import
 proc ReleaseDC        (wnd HWND, hdc HDC) -> i32 #foreign #dll_import
 
-const (
+const {
 	WGL_CONTEXT_MAJOR_VERSION_ARB             = 0x2091;
 	WGL_CONTEXT_MINOR_VERSION_ARB             = 0x2092;
 	WGL_CONTEXT_PROFILE_MASK_ARB              = 0x9126;
 	WGL_CONTEXT_CORE_PROFILE_BIT_ARB          = 0x0001;
 	WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB = 0x0002;
-)
+}
 
 proc wglCreateContext (hdc HDC) -> HGLRC #foreign #dll_import
 proc wglMakeCurrent   (hdc HDC, hglrc HGLRC) -> BOOL #foreign #dll_import
@@ -383,7 +383,7 @@ proc GetAsyncKeyState(v_key i32) -> i16 #foreign #dll_import
 
 proc is_key_down(key i32) -> bool #inline { return GetAsyncKeyState(key) < 0; }
 
-const (
+const {
 	KEY_LBUTTON    = 0x01;
 	KEY_RBUTTON    = 0x02;
 	KEY_CANCEL     = 0x03;
@@ -535,5 +535,5 @@ const (
 	KEY_NONAME     = 0xFC;
 	KEY_PA1        = 0xFD;
 	KEY_OEM_CLEAR  = 0xFE;
-)
+}
 

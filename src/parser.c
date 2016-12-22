@@ -72,11 +72,16 @@ typedef enum ProcTag {
 	ProcTag_no_inline       = GB_BIT(14),
 	ProcTag_dll_import      = GB_BIT(15),
 	// ProcTag_dll_export      = GB_BIT(16),
-
-	ProcTag_stdcall         = GB_BIT(20),
-	ProcTag_fastcall        = GB_BIT(21),
-	// ProcTag_cdecl           = GB_BIT(22),
 } ProcTag;
+
+typedef enum ProcCallingConvention {
+	ProcCC_Odin = 0,
+	ProcCC_C,
+	ProcCC_Std,
+	ProcCC_Fast,
+
+	ProcCC_Invalid,
+} ProcCallingConvention;
 
 typedef enum VarDeclTag {
 	VarDeclTag_thread_local = GB_BIT(0),
@@ -286,6 +291,7 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		AstNodeArray params;  \
 		AstNodeArray results; \
 		u64          tags;    \
+		ProcCallingConvention calling_convention; \
 	}) \
 	AST_NODE_KIND(PointerType, "pointer type", struct { \
 		Token token; \
@@ -911,12 +917,13 @@ AstNode *make_field(AstFile *f, AstNodeArray names, AstNode *type, bool is_using
 	return result;
 }
 
-AstNode *make_proc_type(AstFile *f, Token token, AstNodeArray params, AstNodeArray results, u64 tags) {
+AstNode *make_proc_type(AstFile *f, Token token, AstNodeArray params, AstNodeArray results, u64 tags, ProcCallingConvention calling_convention) {
 	AstNode *result = make_node(f, AstNode_ProcType);
 	result->ProcType.token = token;
 	result->ProcType.params = params;
 	result->ProcType.results = results;
 	result->ProcType.tags = tags;
+	result->ProcType.calling_convention = calling_convention;
 	return result;
 }
 
@@ -1157,6 +1164,8 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_const:
 		case Token_type:
 		case Token_proc:
+		case Token_import:
+		case Token_include:
 
 		case Token_if:
 		case Token_when:
@@ -1220,7 +1229,7 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 		case AstNode_ProcDecl:
 			return;
 		case AstNode_GenericDecl:
-			if (s->GenericDecl.close.kind == Token_CloseParen) {
+			if (s->GenericDecl.close.kind == Token_CloseBrace) {
 				return;
 			} else if (s->GenericDecl.token.kind == Token_type) {
 				if (f->prev_token.kind == Token_CloseBrace) {
@@ -1246,10 +1255,15 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 
 
 AstNode *    parse_expr(AstFile *f, bool lhs);
-AstNode *    parse_proc_type(AstFile *f);
+AstNode *    parse_proc_type(AstFile *f, String *foreign_name_, String *link_name_);
 AstNodeArray parse_stmt_list(AstFile *f);
 AstNode *    parse_stmt(AstFile *f);
 AstNode *    parse_body(AstFile *f);
+AstNode *    parse_proc_decl(AstFile *f);
+void         parse_proc_signature(AstFile *f, AstNodeArray *params, AstNodeArray *results);
+
+
+
 
 AstNode *parse_identifier(AstFile *f) {
 	Token token = f->curr_token;
@@ -1270,8 +1284,12 @@ AstNode *parse_tag_expr(AstFile *f, AstNode *expression) {
 
 AstNode *unparen_expr(AstNode *node) {
 	for (;;) {
-		if (node->kind != AstNode_ParenExpr)
+		if (node == NULL) {
+			return NULL;
+		}
+		if (node->kind != AstNode_ParenExpr) {
 			return node;
+		}
 		node = node->ParenExpr.expr;
 	}
 }
@@ -1380,10 +1398,13 @@ bool is_foreign_name_valid(String name) {
 	return true;
 }
 
-void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_name) {
+void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_name, ProcCallingConvention *calling_convention) {
 	// TODO(bill): Add this to procedure literals too
-	GB_ASSERT(foreign_name != NULL);
+	GB_ASSERT(tags         != NULL);
 	GB_ASSERT(link_name    != NULL);
+	GB_ASSERT(link_name    != NULL);
+
+	ProcCallingConvention cc = ProcCC_Invalid;
 
 	while (f->curr_token.kind == Token_Hash) {
 		AstNode *tag_expr = parse_tag_expr(f, NULL);
@@ -1427,14 +1448,47 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 		ELSE_IF_ADD_TAG(no_inline)
 		ELSE_IF_ADD_TAG(dll_import)
 		// ELSE_IF_ADD_TAG(dll_export)
-		ELSE_IF_ADD_TAG(stdcall)
-		ELSE_IF_ADD_TAG(fastcall)
-		// ELSE_IF_ADD_TAG(cdecl)
-		else {
+		else if (str_eq(tag_name, str_lit("cc_odin"))) {
+			if (cc == ProcCC_Invalid) {
+				cc = ProcCC_Odin;
+			} else {
+				syntax_error_node(tag_expr, "Multiple calling conventions for procedure type");
+			}
+		} else if (str_eq(tag_name, str_lit("cc_c"))) {
+			if (cc == ProcCC_Invalid) {
+				cc = ProcCC_C;
+			} else {
+				syntax_error_node(tag_expr, "Multiple calling conventions for procedure type");
+			}
+		} else if (str_eq(tag_name, str_lit("cc_std"))) {
+			if (cc == ProcCC_Invalid) {
+				cc = ProcCC_Std;
+			} else {
+				syntax_error_node(tag_expr, "Multiple calling conventions for procedure type");
+			}
+		} else if (str_eq(tag_name, str_lit("cc_fast"))) {
+			if (cc == ProcCC_Invalid) {
+				cc = ProcCC_Fast;
+			} else {
+				syntax_error_node(tag_expr, "Multiple calling conventions for procedure type");
+			}
+		} else {
 			syntax_error_node(tag_expr, "Unknown procedure tag");
 		}
 
 		#undef ELSE_IF_ADD_TAG
+	}
+
+	if (cc == ProcCC_Invalid) {
+		if ((*tags) & ProcTag_foreign) {
+			cc = ProcCC_C;
+		} else {
+			cc = ProcCC_Odin;
+		}
+	}
+
+	if (calling_convention) {
+		*calling_convention = cc;
 	}
 
 	if ((*tags & ProcTag_foreign) && (*tags & ProcTag_export)) {
@@ -1451,10 +1505,6 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 
 	if (((*tags & ProcTag_bounds_check) || (*tags & ProcTag_no_bounds_check)) && (*tags & ProcTag_foreign)) {
 		syntax_error(f->curr_token, "You cannot apply both #bounds_check or #no_bounds_check to a procedure without a body");
-	}
-
-	if ((*tags & ProcTag_stdcall) && (*tags & ProcTag_fastcall)) {
-		syntax_error(f->curr_token, "You cannot apply one calling convention to a procedure");
 	}
 }
 
@@ -1545,32 +1595,28 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 	// Parse Procedure Type or Literal
 	case Token_proc: {
-		AstNode *curr_proc = f->curr_proc;
-		AstNode *type = parse_proc_type(f);
-		f->curr_proc = type;
-
-		u64 tags = 0;
 		String foreign_name = {0};
 		String link_name = {0};
-		parse_proc_tags(f, &tags, &foreign_name, &link_name);
-		if (tags & ProcTag_foreign) {
+		AstNode *curr_proc = f->curr_proc;
+		AstNode *type = parse_proc_type(f, &foreign_name, &link_name);
+		f->curr_proc = type;
+
+		if (type->ProcType.tags & ProcTag_foreign) {
 			syntax_error(f->curr_token, "#foreign cannot be applied to procedure literals");
 		}
-		if (tags & ProcTag_export) {
+		if (type->ProcType.tags & ProcTag_export) {
 			syntax_error(f->curr_token, "#export cannot be applied to procedure literals");
 		}
 
 		if (f->curr_token.kind == Token_OpenBrace) {
 			AstNode *body;
 
-			if ((tags & ProcTag_foreign) != 0) {
+			if ((type->ProcType.tags & ProcTag_foreign) != 0) {
 				syntax_error(f->curr_token, "A procedure tagged as `#foreign` cannot have a body");
 			}
 
 			body = parse_body(f);
-			type = make_proc_lit(f, type, body, tags, foreign_name, link_name);
-		} else if (type != NULL && type->kind == AstNode_ProcType) {
-			type->ProcType.tags = tags;
+			type = make_proc_lit(f, type, body, type->ProcType.tags, foreign_name, link_name);
 		}
 
 		f->curr_proc = curr_proc;
@@ -1920,13 +1966,13 @@ AstNode *parse_generic_decl(AstFile *f, TokenKind keyword, ParserSpecProc spec_p
 	Token token = expect_token(f, keyword);
 	Token open = {0}, close = {0};
 	AstNodeArray specs = {0};
-	if (f->curr_token.kind == Token_OpenParen) {
-		open = expect_token(f, Token_OpenParen);
+	if (f->curr_token.kind == Token_OpenBrace) {
+		open = expect_token(f, Token_OpenBrace);
 		array_init(&specs, heap_allocator());
 
 
 		for (isize index = 0;
-		     f->curr_token.kind != Token_CloseParen &&
+		     f->curr_token.kind != Token_CloseBrace &&
 		     f->curr_token.kind != Token_EOF;
 		     index++) {
 			AstNode *spec = spec_proc(f, keyword, index);
@@ -1934,7 +1980,7 @@ AstNode *parse_generic_decl(AstFile *f, TokenKind keyword, ParserSpecProc spec_p
 			expect_semicolon(f, spec);
 		}
 
-		close = expect_token(f, Token_CloseParen);
+		close = expect_token(f, Token_CloseBrace);
 	} else {
 		array_init_reserve(&specs, heap_allocator(), 1);
 		array_add(&specs, spec_proc(f, keyword, 0));
@@ -2042,8 +2088,6 @@ PARSE_SPEC_PROC(parse_include_spec) {
 	return spec;
 }
 
-AstNode *parse_proc_decl(AstFile *f);
-
 AstNode *parse_decl(AstFile *f) {
 	switch (f->curr_token.kind) {
 	case Token_var:
@@ -2055,6 +2099,7 @@ AstNode *parse_decl(AstFile *f) {
 		return parse_generic_decl(f, f->curr_token.kind, parse_type_spec);
 
 	case Token_proc:
+		// TODO(bill): Should I allow procedures to use the generic declaration syntax?
 		return parse_proc_decl(f);
 
 	case Token_import:
@@ -2158,20 +2203,29 @@ AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
 
 
 
-void parse_proc_signature(AstFile *f, AstNodeArray *params, AstNodeArray *results);
 
-AstNode *parse_proc_type(AstFile *f) {
+AstNode *parse_proc_type(AstFile *f, String *foreign_name_, String *link_name_) {
 	AstNodeArray params = {0};
 	AstNodeArray results = {0};
 
 	Token proc_token = expect_token(f, Token_proc);
 	parse_proc_signature(f, &params, &results);
 
-	return make_proc_type(f, proc_token, params, results, 0);
+	u64 tags = 0;
+	String foreign_name = {0};
+	String link_name = {0};
+	ProcCallingConvention cc = ProcCC_Odin;
+
+	parse_proc_tags(f, &tags, &foreign_name, &link_name, &cc);
+
+	if (foreign_name_) *foreign_name_ = foreign_name;
+	if (link_name_)    *link_name_    = link_name;
+
+	return make_proc_type(f, proc_token, params, results, tags, cc);
 }
 
-
-AstNodeArray parse_field_list(AstFile *f, isize *name_count_, bool allow_using, TokenKind separator, TokenKind follow) {
+AstNodeArray parse_field_list(AstFile *f, isize *name_count_, bool allow_using, bool ellipsis_ok,
+                              TokenKind separator, TokenKind follow) {
 	AstNodeArray params = make_ast_node_array(f);
 	isize name_count = 0;
 
@@ -2203,7 +2257,7 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, bool allow_using, 
 		// expect_token_after(f, Token_Colon, "parameter list");
 
 		AstNode *type = NULL;
-		if (f->curr_token.kind == Token_Ellipsis) {
+		if (ellipsis_ok && f->curr_token.kind == Token_Ellipsis) {
 			Token ellipsis = f->curr_token;
 			next_token(f);
 			type = parse_type_attempt(f);
@@ -2245,7 +2299,7 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, bool allow_using, 
 
 
 AstNodeArray parse_record_fields(AstFile *f, isize *field_count_, bool allow_using, String context) {
-	return parse_field_list(f, field_count_, allow_using, Token_Semicolon, Token_CloseBrace);
+	return parse_field_list(f, field_count_, allow_using, false, Token_Semicolon, Token_CloseBrace);
 }
 
 AstNode *parse_identifier_or_type(AstFile *f) {
@@ -2358,8 +2412,14 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		return make_raw_union_type(f, token, decls, decl_count);
 	}
 
-	case Token_proc:
-		return parse_proc_type(f);
+	case Token_proc: {
+		Token token = f->curr_token;
+		AstNode *pt = parse_proc_type(f, NULL, NULL);
+		if (pt->ProcType.tags != 0) {
+			syntax_error(token, "A procedure type cannot have tags");
+		}
+		return pt;
+	}
 
 	case Token_OpenParen: {
 		// NOTE(bill): Skip the paren expression
@@ -2406,7 +2466,7 @@ void parse_proc_signature(AstFile *f,
                           AstNodeArray *params,
                           AstNodeArray *results) {
 	expect_token(f, Token_OpenParen);
-	*params = parse_field_list(f, NULL, true, Token_Comma, Token_CloseParen);
+	*params = parse_field_list(f, NULL, true, true, Token_Comma, Token_CloseParen);
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	*results = parse_results(f);
 }
@@ -2431,21 +2491,22 @@ AstNode *parse_proc_decl(AstFile *f) {
 		return make_expr_stmt(f, parse_expr(f, true));
 	}
 
-	Token proc_token = expect_token(f, Token_proc);
-	AstNode *name = parse_identifier(f);
-
 	AstNodeArray params = {0};
 	AstNodeArray results = {0};
+
+	Token proc_token = expect_token(f, Token_proc);
+	AstNode *name = parse_identifier(f);
 	parse_proc_signature(f, &params, &results);
 
-	AstNode *proc_type = make_proc_type(f, proc_token, params, results, 0);
-
-	AstNode *body = NULL;
 	u64 tags = 0;
 	String foreign_name = {0};
 	String link_name = {0};
+	ProcCallingConvention cc = ProcCC_Odin;
 
-	parse_proc_tags(f, &tags, &foreign_name, &link_name);
+	parse_proc_tags(f, &tags, &foreign_name, &link_name, &cc);
+
+	AstNode *proc_type = make_proc_type(f, proc_token, params, results, tags, cc);
+	AstNode *body = NULL;
 
 	if (f->curr_token.kind == Token_OpenBrace) {
 		if ((tags & ProcTag_foreign) != 0) {

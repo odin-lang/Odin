@@ -308,7 +308,7 @@ bool are_signatures_similar_enough(Type *a_, Type *b_) {
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e->type == NULL);
 
-	Type *proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0, false);
+	Type *proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0, false, ProcCC_Odin);
 	e->type = proc_type;
 	ast_node(pd, ProcDecl, d->proc_decl);
 

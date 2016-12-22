@@ -1142,8 +1142,8 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 			for_array(iota, gd->specs) {
 				AstNode *spec = gd->specs.e[iota];
 				switch (spec->kind) {
-				case_ast_node(bd, BadDecl, decl);
-				case_end;
+				case AstNode_BadDecl:
+					break;
 				case_ast_node(is, ImportSpec, spec);
 					if (!parent_scope->is_file) {
 						// NOTE(bill): _Should_ be caught by the parser

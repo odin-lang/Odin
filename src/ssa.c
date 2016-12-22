@@ -2607,7 +2607,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		} else if (e != NULL && e->kind == Entity_Variable) {
 			return ssa_addr_load(proc, ssa_build_addr(proc, expr));
 		}
-		GB_PANIC("nil value for expression from identifier: %.*s", LIT(i->string));
+		GB_PANIC("NULL value for expression from identifier: %.*s", LIT(i->string));
 		return NULL;
 	case_end;
 
@@ -5025,7 +5025,7 @@ void ssa_gen_tree(ssaGen *s) {
 
 		Type *proc_type = make_type_proc(a, proc_scope,
 		                                 proc_params, 3,
-		                                 proc_results, 1, false);
+		                                 proc_results, 1, false, ProcCC_Std);
 
 		AstNode *body = gb_alloc_item(a, AstNode);
 		Entity *e = make_entity_procedure(a, NULL, make_token_ident(name), proc_type, 0);
@@ -5035,7 +5035,7 @@ void ssa_gen_tree(ssaGen *s) {
 		map_ssa_value_set(&m->members, hash_string(name), p);
 
 		ssaProcedure *proc = &p->Proc;
-		proc->tags = ProcTag_no_inline | ProcTag_stdcall; // TODO(bill): is no_inline a good idea?
+		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
 		e->Procedure.link_name = name;
 
 		ssa_begin_procedure_body(proc);
@@ -5084,17 +5084,19 @@ void ssa_gen_tree(ssaGen *s) {
 
 		Type *proc_type = make_type_proc(a, proc_scope,
 		                                 proc_params, 4,
-		                                 proc_results, 1, false);
+		                                 proc_results, 1, false, ProcCC_Std);
 
 		AstNode *body = gb_alloc_item(a, AstNode);
 		Entity *e = make_entity_procedure(a, NULL, make_token_ident(name), proc_type, 0);
 		ssaValue *p = ssa_make_value_procedure(a, m, e, proc_type, NULL, body, name);
 
+		m->entry_point_entity = e;
+
 		map_ssa_value_set(&m->values, hash_pointer(e), p);
 		map_ssa_value_set(&m->members, hash_string(name), p);
 
 		ssaProcedure *proc = &p->Proc;
-		proc->tags = ProcTag_no_inline | ProcTag_stdcall; // TODO(bill): is no_inline a good idea?
+		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
 		e->Procedure.link_name = name;
 
 		ssa_begin_procedure_body(proc);
@@ -5108,7 +5110,7 @@ void ssa_gen_tree(ssaGen *s) {
 		String name = str_lit(SSA_STARTUP_RUNTIME_PROC_NAME);
 		Type *proc_type = make_type_proc(a, gb_alloc_item(a, Scope),
 		                                 NULL, 0,
-		                                 NULL, 0, false);
+		                                 NULL, 0, false, ProcCC_Odin);
 		AstNode *body = gb_alloc_item(a, AstNode);
 		Entity *e = make_entity_procedure(a, NULL, make_token_ident(name), proc_type, 0);
 		ssaValue *p = ssa_make_value_procedure(a, m, e, proc_type, NULL, body, name);

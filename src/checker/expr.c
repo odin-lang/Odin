@@ -821,13 +821,13 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 	if (params)  param_count  = params ->Tuple.variable_count;
 	if (results) result_count = results->Tuple.variable_count;
 
-	type->Proc.scope            = c->context.scope;
-	type->Proc.params           = params;
-	type->Proc.param_count      = param_count;
-	type->Proc.results          = results;
-	type->Proc.result_count     = result_count;
-	type->Proc.variadic         = variadic;
-	// type->Proc.implicit_context = implicit_context;
+	type->Proc.scope              = c->context.scope;
+	type->Proc.params             = params;
+	type->Proc.param_count        = param_count;
+	type->Proc.results            = results;
+	type->Proc.result_count       = result_count;
+	type->Proc.variadic           = variadic;
+	type->Proc.calling_convention = pt->calling_convention;
 }
 
 

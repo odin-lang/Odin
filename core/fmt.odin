@@ -1,8 +1,8 @@
-import (
+import {
 	"os.odin";
 	"mem.odin";
 	"utf8.odin";
-)
+}
 
 const PRINT_BUF_SIZE = 1<<12;
 

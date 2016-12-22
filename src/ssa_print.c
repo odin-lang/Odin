@@ -636,6 +636,16 @@ void ssa_print_value(ssaFileBuffer *f, ssaModule *m, ssaValue *value, Type *type
 	}
 }
 
+void ssa_print_calling_convention(ssaFileBuffer *f, ssaModule *m, ProcCallingConvention cc) {
+	switch (cc) {
+	case ProcCC_Odin: ssa_fprintf(f, "");       break;
+	case ProcCC_C:    ssa_fprintf(f, "ccc ");   break;
+	case ProcCC_Std:  ssa_fprintf(f, "cc 64 "); break;
+	case ProcCC_Fast: ssa_fprintf(f, "cc 65 "); break;
+	default: GB_PANIC("unknown calling convention: %d", cc);
+	}
+}
+
 void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	GB_ASSERT(value->kind == ssaValue_Instr);
 	ssaInstr *instr = &value->Instr;
@@ -933,6 +943,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		if (gb_is_between(bo->op, Token__ComparisonBegin+1, Token__ComparisonEnd-1)) {
 			if (is_type_string(elem_type)) {
 				ssa_fprintf(f, "call ");
+				ssa_print_calling_convention(f, m, ProcCC_Odin);
 				ssa_print_type(f, m, t_bool);
 				char *runtime_proc = "";
 				switch (bo->op) {
@@ -1033,11 +1044,14 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 
 	case ssaInstr_Call: {
 		ssaInstrCall *call = &instr->Call;
+		Type *proc_type = base_type(ssa_type(call->value));
+		GB_ASSERT(is_type_proc(proc_type));
 		Type *result_type = call->type;
 		if (result_type) {
 			ssa_fprintf(f, "%%%d = ", value->index);
 		}
 		ssa_fprintf(f, "call ");
+		ssa_print_calling_convention(f, m, proc_type->Proc.calling_convention);
 		if (result_type) {
 			ssa_print_type(f, m, result_type);
 		} else {
@@ -1226,6 +1240,7 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 	}
 }
 
+
 void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 	if (proc->body == NULL) {
 		ssa_fprintf(f, "declare ");
@@ -1243,13 +1258,9 @@ void ssa_print_proc(ssaFileBuffer *f, ssaModule *m, ssaProcedure *proc) {
 		}
 	}
 
-	if (proc->tags & ProcTag_stdcall) {
-		ssa_fprintf(f, "cc 64 ");
-	} else if (proc->tags & ProcTag_fastcall) {
-		ssa_fprintf(f, "cc 65 ");
-	}
-
 	TypeProc *proc_type = &proc->type->Proc;
+
+	ssa_print_calling_convention(f, m, proc_type->calling_convention);
 
 	if (proc_type->result_count == 0) {
 		ssa_fprintf(f, "void");

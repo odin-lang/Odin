@@ -1,7 +1,7 @@
-import (
+import {
 	"fmt.odin";
 	"os.odin";
-)
+}
 
 proc set(data rawptr, value i32, len int) -> rawptr #link_name "__mem_set" {
 	proc llvm_memset_64bit(dst rawptr, val byte, len int, align i32, is_volatile bool) #foreign "llvm.memset.p0i8.i64"
@@ -116,7 +116,7 @@ proc allocation_header(data rawptr) -> ^Allocation_Header {
 
 
 // Custom allocators
-type (
+type {
 	Arena struct {
 		backing    Allocator;
 		memory     []byte;
@@ -127,7 +127,7 @@ type (
 		arena          ^Arena;
 		original_count int;
 	}
-)
+}
 
 
 

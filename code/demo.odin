@@ -1,4 +1,4 @@
-import (
+import {
 	"atomic.odin";
 	"fmt.odin";
 	"hash.odin";
@@ -8,17 +8,12 @@ import (
 	"os.odin";
 	"sync.odin";
 	"utf8.odin";
-)
+	win32 "sys/windows.odin";
+}
 
 proc main() {
-	var x = proc() -> int {
-		proc print_here() {
-			fmt.println("Here");
-		}
-
-		print_here();
-		return 1;
-	};
-	fmt.println(x());
+	var x = ~(0 as u32);
+	var y = x << 32;
+	fmt.println(y);
 }
 

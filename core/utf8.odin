@@ -1,4 +1,4 @@
-const (
+const {
 	RUNE_ERROR = '\ufffd';
 	RUNE_SELF  = 0x80;
 	RUNE_BOM   = 0xfeff;
@@ -8,13 +8,13 @@ const (
 
 	SURROGATE_MIN = 0xd800;
 	SURROGATE_MAX = 0xdfff;
-)
+}
 
 type Accept_Range struct {
 	lo, hi u8;
 }
 
-var (
+var {
 	accept_ranges = [5]Accept_Range{
 		{0x80, 0xbf},
 		{0xa0, 0xbf},
@@ -42,7 +42,7 @@ var (
 		0x13, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x23, 0x03, 0x03, // 0xe0-0xef
 		0x34, 0x04, 0x04, 0x04, 0x44, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, // 0xf0-0xff
 	};
-)
+}
 
 proc encode_rune(r rune) -> ([4]byte, int) {
 	var buf [4]byte;
@@ -99,12 +99,12 @@ proc decode_rune(s string) -> (rune, int) {
 		return RUNE_ERROR, 1;
 	}
 
-	const (
+	const {
 		MASK_X = 0b00111111;
 		MASK_2 = 0b00011111;
 		MASK_3 = 0b00001111;
 		MASK_4 = 0b00000111;
-	)
+	}
 
 	if size == 2 {
 		return (b0&MASK_2) as rune <<6 | (b1&MASK_X) as rune, 2;

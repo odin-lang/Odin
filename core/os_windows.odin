@@ -1,9 +1,9 @@
-import (
+import {
 	win32 "sys/windows.odin";
 	"fmt.odin";
-)
+}
 
-type (
+type {
 	File_Time u64;
 
 	File_Handle raw_union {
@@ -15,7 +15,7 @@ type (
 		handle          File_Handle;
 		last_write_time File_Time;
 	}
-)
+}
 
 proc open(name string) -> (File, bool) {
 	using win32;
@@ -87,15 +87,15 @@ proc last_write_time_by_name(name string) -> File_Time {
 
 
 
-const (
+const {
 	FILE_STANDARD_INPUT = iota;
 	FILE_STANDARD_OUTPUT;
 	FILE_STANDARD_ERROR;
 
 	FILE_STANDARD_COUNT;
-)
+}
 // NOTE(bill): Uses startup to initialize it
-var (
+var {
 	__std_files = [FILE_STANDARD_COUNT]File{
 		{handle = win32.GetStdHandle(win32.STD_INPUT_HANDLE)  transmute File_Handle },
 		{handle = win32.GetStdHandle(win32.STD_OUTPUT_HANDLE) transmute File_Handle },
@@ -105,7 +105,7 @@ var (
 	stdin  = ^__std_files[FILE_STANDARD_INPUT];
 	stdout = ^__std_files[FILE_STANDARD_OUTPUT];
 	stderr = ^__std_files[FILE_STANDARD_ERROR];
-)
+}
 
 
 proc read_entire_file(name string) -> ([]byte, bool) {
