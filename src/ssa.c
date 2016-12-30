@@ -2654,6 +2654,9 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 			ssa_build_stmt(proc, ie->init);
 		}
 
+		ssaValueArray edges = {0};
+		array_init_reserve(&edges, proc->module->allocator, 2);
+
 		GB_ASSERT(ie->else_expr != NULL);
 		ssaBlock *then  = ssa_add_block(proc, expr, "if.then");
 		ssaBlock *done  = ssa_add_block(proc, expr, "if.done"); // NOTE(bill): Append later
@@ -2662,24 +2665,24 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		ssaValue *cond = ssa_build_cond(proc, ie->cond, then, else_);
 		proc->curr_block = then;
 
-		ssaValue *iv = NULL;
-		ssaValue *ev = NULL;
 
 		ssa_open_scope(proc);
-		iv = ssa_build_expr(proc, ie->body);
+		array_add(&edges, ssa_build_expr(proc, ie->body));
 		ssa_close_scope(proc, ssaDeferExit_Default, NULL);
 
 		ssa_emit_jump(proc, done);
 		proc->curr_block = else_;
 
 		ssa_open_scope(proc);
-		ev = ssa_build_expr(proc, ie->else_expr);
+		array_add(&edges, ssa_build_expr(proc, ie->else_expr));
 		ssa_close_scope(proc, ssaDeferExit_Default, NULL);
 
 		ssa_emit_jump(proc, done);
 		proc->curr_block = done;
 
-		return ssa_emit_select(proc, cond, iv, ev);
+		Type *type = type_of_expr(proc->module->info, expr);
+
+		return ssa_emit(proc, ssa_make_instr_phi(proc, edges, type));
 	case_end;
 
 	case_ast_node(ge, GiveExpr, expr);
