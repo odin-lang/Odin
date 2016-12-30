@@ -23,6 +23,9 @@ type {
 const {
 	INVALID_HANDLE_VALUE = (-1 as int) as HANDLE;
 
+	FALSE BOOL = 0;
+	TRUE  BOOL = 1;
+
 	CS_VREDRAW    = 0x0001;
 	CS_HREDRAW    = 0x0002;
 	CS_OWNDC      = 0x0020;
@@ -88,7 +91,7 @@ type {
 	}
 
 	FILETIME struct #ordered {
-		low_date_time, high_date_time u32;
+		lo, hi u32;
 	}
 
 	BY_HANDLE_FILE_INFORMATION struct #ordered {
@@ -104,7 +107,7 @@ type {
 		file_index_low       u32;
 	}
 
-	WIN32_FILE_ATTRIBUTE_DATA struct #ordered {
+	FILE_ATTRIBUTE_DATA struct #ordered {
 		file_attributes  u32;
 		creation_time,
 		last_access_time,
@@ -174,14 +177,31 @@ proc GetCurrentThreadId() -> u32 #foreign #dll_import
 proc CloseHandle (h HANDLE) -> i32 #foreign #dll_import
 proc GetStdHandle(h i32) -> HANDLE #foreign #dll_import
 proc CreateFileA (filename ^u8, desired_access, share_mode u32,
-                     security rawptr,
-                     creation, flags_and_attribs u32, template_file HANDLE) -> HANDLE #foreign #dll_import
+                  security rawptr,
+                  creation, flags_and_attribs u32, template_file HANDLE) -> HANDLE #foreign #dll_import
 proc ReadFile    (h HANDLE, buf rawptr, to_read u32, bytes_read ^i32, overlapped rawptr) -> BOOL #foreign #dll_import
 proc WriteFile   (h HANDLE, buf rawptr, len i32, written_result ^i32, overlapped rawptr) -> i32 #foreign #dll_import
 
 proc GetFileSizeEx             (file_handle HANDLE, file_size ^i64) -> BOOL #foreign #dll_import
 proc GetFileAttributesExA      (filename ^u8, info_level_id GET_FILEEX_INFO_LEVELS, file_info rawptr) -> BOOL #foreign #dll_import
 proc GetFileInformationByHandle(file_handle HANDLE, file_info ^BY_HANDLE_FILE_INFORMATION) -> BOOL #foreign #dll_import
+
+proc GetFileType(file_handle HANDLE) -> u32 #foreign #dll_import
+proc SetFilePointer(file_handle HANDLE, distance_to_move i32, distance_to_move_high ^i32, move_method u32) -> u32 #foreign #dll_import
+
+proc SetHandleInformation(obj HANDLE, mask, flags u32) -> BOOL #foreign #dll_import
+
+const {
+	HANDLE_FLAG_INHERIT = 1;
+	HANDLE_FLAG_PROTECT_FROM_CLOSE = 2;
+}
+
+
+const {
+	FILE_BEGIN   = 0;
+	FILE_CURRENT = 1;
+	FILE_END     = 2;
+}
 
 const {
 	FILE_SHARE_READ      = 0x00000001;
@@ -192,6 +212,8 @@ const {
 	FILE_GENERIC_WRITE   = 0x40000000;
 	FILE_GENERIC_READ    = 0x80000000;
 
+	FILE_APPEND_DATA = 0x0004;
+
 	STD_INPUT_HANDLE  = -10;
 	STD_OUTPUT_HANDLE = -11;
 	STD_ERROR_HANDLE  = -12;
@@ -201,6 +223,27 @@ const {
 	OPEN_EXISTING     = 3;
 	OPEN_ALWAYS       = 4;
 	TRUNCATE_EXISTING = 5;
+
+	FILE_ATTRIBUTE_READONLY             = 0x00000001;
+	FILE_ATTRIBUTE_HIDDEN               = 0x00000002;
+	FILE_ATTRIBUTE_SYSTEM               = 0x00000004;
+	FILE_ATTRIBUTE_DIRECTORY            = 0x00000010;
+	FILE_ATTRIBUTE_ARCHIVE              = 0x00000020;
+	FILE_ATTRIBUTE_DEVICE               = 0x00000040;
+	FILE_ATTRIBUTE_NORMAL               = 0x00000080;
+	FILE_ATTRIBUTE_TEMPORARY            = 0x00000100;
+	FILE_ATTRIBUTE_SPARSE_FILE          = 0x00000200;
+	FILE_ATTRIBUTE_REPARSE_POINT        = 0x00000400;
+	FILE_ATTRIBUTE_COMPRESSED           = 0x00000800;
+	FILE_ATTRIBUTE_OFFLINE              = 0x00001000;
+	FILE_ATTRIBUTE_NOT_CONTENT_INDEXED  = 0x00002000;
+	FILE_ATTRIBUTE_ENCRYPTED            = 0x00004000;
+
+	FILE_TYPE_DISK = 0x0001;
+	FILE_TYPE_CHAR = 0x0002;
+	FILE_TYPE_PIPE = 0x0003;
+
+	INVALID_SET_FILE_POINTER = ~(0 as u32);
 }
 
 

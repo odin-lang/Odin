@@ -92,7 +92,14 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 	}
 
 	if (rhs_count > 0 && lhs_count != rhs_count) {
-		error(lhs[0]->token, "Assignment count mismatch `%td` := `%td`", lhs_count, rhs_count);
+		error(lhs[0]->token, "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
+	}
+
+	if (lhs[0]->kind == Entity_Variable &&
+	    lhs[0]->Variable.is_let) {
+		if (lhs_count != rhs_count) {
+			error(lhs[0]->token, "`let` variables must be initialized, `%td` = `%td`", lhs_count, rhs_count);
+		}
 	}
 
 	gb_temp_arena_memory_end(tmp);
@@ -348,6 +355,11 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	if (pd->body != NULL) {
 		if (is_foreign) {
 			error_node(pd->body, "A procedure tagged as `#foreign` cannot have a body");
+		}
+
+		if (proc_type->Proc.calling_convention != ProcCC_Odin) {
+			error_node(d->proc_decl, "An internal procedure may only have the Odin calling convention");
+			proc_type->Proc.calling_convention = ProcCC_Odin;
 		}
 
 		d->scope = c->context.scope;

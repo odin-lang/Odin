@@ -6,26 +6,26 @@ import {
 
 const PRINT_BUF_SIZE = 1<<12;
 
-proc fprint(f ^os.File, args ..any) -> int {
+proc fprint(fd os.Handle, args ..any) -> int {
 	var data [PRINT_BUF_SIZE]byte;
 	var buf = data[:0];
 	bprint(^buf, ..args);
-	os.write(f, buf);
+	os.write(fd, buf);
 	return buf.count;
 }
 
-proc fprintln(f ^os.File, args ..any) -> int {
+proc fprintln(fd os.Handle, args ..any) -> int {
 	var data [PRINT_BUF_SIZE]byte;
 	var buf = data[:0];
 	bprintln(^buf, ..args);
-	os.write(f, buf);
+	os.write(fd, buf);
 	return buf.count;
 }
-proc fprintf(f ^os.File, fmt string, args ..any) -> int {
+proc fprintf(fd os.Handle, fmt string, args ..any) -> int {
 	var data [PRINT_BUF_SIZE]byte;
 	var buf = data[:0];
 	bprintf(^buf, fmt, ..args);
-	os.write(f, buf);
+	os.write(fd, buf);
 	return buf.count;
 }
 
@@ -42,11 +42,11 @@ proc printf(fmt string, args ..any) -> int {
 
 
 
-proc fprint_type(f ^os.File, info ^Type_Info) {
+proc fprint_type(fd os.Handle, info ^Type_Info) {
 	var data [PRINT_BUF_SIZE]byte;
 	var buf = data[:0];
 	bprint_type(^buf, info);
-	os.write(f, buf);
+	os.write(fd, buf);
 }
 
 

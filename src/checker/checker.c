@@ -32,6 +32,16 @@ typedef struct TypeAndValue {
 	ExactValue     value;
 } TypeAndValue;
 
+bool is_operand_value(Operand o) {
+	switch (o.mode) {
+	case Addressing_Value:
+	case Addressing_Variable:
+	case Addressing_Constant:
+		return true;
+	}
+	return false;
+}
+
 
 
 typedef struct DeclInfo {
@@ -91,6 +101,14 @@ typedef enum ExprKind {
 	Expr_Expr,
 	Expr_Stmt,
 } ExprKind;
+
+// Statements and Declarations
+typedef enum StmtFlag {
+	Stmt_BreakAllowed       = 1<<0,
+	Stmt_ContinueAllowed    = 1<<1,
+	Stmt_FallthroughAllowed = 1<<2,
+	Stmt_GiveAllowed        = 1<<3,
+} StmtFlag;
 
 typedef enum BuiltinProcId {
 	BuiltinProc_Invalid,
@@ -357,9 +375,11 @@ void add_scope(Checker *c, AstNode *node, Scope *scope) {
 
 void check_open_scope(Checker *c, AstNode *node) {
 	GB_ASSERT(node != NULL);
+	node = unparen_expr(node);
 	GB_ASSERT(node->kind == AstNode_Invalid ||
 	          is_ast_node_stmt(node) ||
-	          is_ast_node_type(node));
+	          is_ast_node_type(node) ||
+	          node->kind == AstNode_BlockExpr);
 	Scope *scope = make_scope(c->context.scope, c->allocator);
 	add_scope(c, node, scope);
 	if (node->kind == AstNode_ProcType) {

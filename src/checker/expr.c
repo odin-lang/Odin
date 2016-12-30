@@ -14,6 +14,10 @@ void     check_entity_decl         (Checker *c, Entity *e, DeclInfo *decl, Type 
 void     check_const_decl          (Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr, Type *named_type);
 void     check_proc_body           (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
 void     update_expr_type          (Checker *c, AstNode *e, Type *type, bool final);
+bool     check_is_terminating      (AstNode *node);
+bool     check_has_break           (AstNode *stmt, bool implicit);
+void     check_stmt                (Checker *c, AstNode *node, u32 flags);
+void     check_stmt_list           (Checker *c, AstNodeArray stmts, u32 flags);
 
 
 gb_inline Type *check_type(Checker *c, AstNode *expression) {
@@ -3652,6 +3656,42 @@ bool check_set_index_data(Operand *o, Type *t, i64 *max_count) {
 	return false;
 }
 
+
+bool check_is_giving(AstNode *node, AstNode **give_expr);
+
+bool check_giving_list(AstNodeArray stmts, AstNode **give_expr) {
+	// Iterate backwards
+	for (isize n = stmts.count-1; n >= 0; n--) {
+		AstNode *stmt = stmts.e[n];
+		if (stmt->kind != AstNode_EmptyStmt) {
+			return check_is_giving(stmt, give_expr);
+		}
+	}
+
+	if (give_expr) *give_expr = NULL;
+	return false;
+}
+
+bool check_is_giving(AstNode *node, AstNode **give_expr) {
+	switch (node->kind) {
+	case_ast_node(es, ExprStmt, node);
+		return check_is_giving(es->expr, give_expr);
+	case_end;
+
+	case_ast_node(ye, GiveExpr, node);
+		if (give_expr) *give_expr = node;
+		return true;
+	case_end;
+
+	case_ast_node(be, BlockExpr, node);
+		return check_giving_list(be->stmts, give_expr);
+	case_end;
+	}
+
+	if (give_expr) *give_expr = NULL;
+	return false;
+}
+
 ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint) {
 	ExprKind kind = Expr_Stmt;
 
@@ -3700,7 +3740,105 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 		o->mode = Addressing_Value;
 		o->type = proc_type;
+	case_end;
 
+	case_ast_node(be, BlockExpr, node);
+		if (c->proc_stack.count == 0) {
+			error_node(node, "A block expression is only allowed withing a procedure");
+			goto error;
+		}
+
+		for (isize i = be->stmts.count-1; i >= 0; i--) {
+			if (be->stmts.e[i]->kind != AstNode_EmptyStmt) {
+				break;
+			}
+			be->stmts.count--;
+		}
+
+		check_open_scope(c, node);
+		check_stmt_list(c, be->stmts, Stmt_GiveAllowed);
+		check_close_scope(c);
+
+
+		if (be->stmts.count == 0) {
+			error_node(node, "Empty block expression");
+			goto error;
+		}
+		AstNode *give_node = NULL;
+		if (!check_is_giving(node, &give_node) || give_node == NULL) {
+			error_node(node, "Missing give statement at");
+			goto error;
+		}
+
+		GB_ASSERT(give_node != NULL && give_node->kind == AstNode_GiveExpr);
+		be->give_node = give_node;
+
+		o->type = type_of_expr(&c->info, give_node);
+		o->mode = Addressing_Value;
+	case_end;
+
+	case_ast_node(ye, GiveExpr, node);
+		if (c->proc_stack.count == 0) {
+			error_node(node, "A give expression is only allowed withing a procedure");
+			goto error;
+		}
+
+		if (ye->results.count == 0) {
+			error_node(node, "No give values");
+			goto error;
+		}
+
+		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+
+		Array(Operand) operands;
+		array_init_reserve(&operands, c->tmp_allocator, 2*ye->results.count);
+
+		for_array(i, ye->results) {
+			AstNode *rhs = ye->results.e[i];
+			Operand o = {0};
+			check_multi_expr(c, &o, rhs);
+			if (!is_operand_value(o)) {
+				error_node(rhs, "Expected a value for a `give`");
+				continue;
+			}
+			if (o.type->kind != Type_Tuple) {
+				array_add(&operands, o);
+			} else {
+				TypeTuple *tuple = &o.type->Tuple;
+				for (isize j = 0; j < tuple->variable_count; j++) {
+					o.type = tuple->variables[j]->type;
+					array_add(&operands, o);
+				}
+			}
+		}
+
+		Type *give_type = NULL;
+
+		if (operands.count == 0) {
+			error_node(node, "`give` has no type");
+			gb_temp_arena_memory_end(tmp);
+			goto error;
+		} else if (operands.count == 1) {
+			give_type = default_type(operands.e[0].type);
+		} else {
+			Type *tuple = make_type_tuple(c->allocator);
+
+			Entity **variables = gb_alloc_array(c->allocator, Entity *, operands.count);
+			isize variable_index = 0;
+			for_array(i, operands) {
+				Type *type = default_type(operands.e[i].type);
+				variables[variable_index++] = make_entity_param(c->allocator, NULL, empty_token, type, false);
+			}
+			tuple->Tuple.variables = variables;
+			tuple->Tuple.variable_count = operands.count;
+
+			give_type = tuple;
+		}
+		gb_temp_arena_memory_end(tmp);
+
+
+		o->type = give_type;
+		o->mode = Addressing_Value;
 	case_end;
 
 	case_ast_node(cl, CompoundLit, node);

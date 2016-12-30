@@ -144,6 +144,15 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 		bool triple_indexed; \
 	}) \
 	AST_NODE_KIND(FieldValue, "field value", struct { Token eq; AstNode *field, *value; }) \
+	AST_NODE_KIND(BlockExpr, "block expr", struct { \
+		AstNodeArray stmts; \
+		Token open, close; \
+		AstNode *give_node; \
+	}) \
+	AST_NODE_KIND(GiveExpr, "give expression", struct { \
+		Token token; \
+		AstNodeArray results; \
+	}) \
 AST_NODE_KIND(_ExprEnd,       "", i32) \
 AST_NODE_KIND(_StmtBegin,     "", i32) \
 	AST_NODE_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
@@ -432,6 +441,10 @@ Token ast_node_token(AstNode *node) {
 		return node->DerefExpr.op;
 	case AstNode_DemaybeExpr:
 		return node->DemaybeExpr.op;
+	case AstNode_BlockExpr:
+		return node->BlockExpr.open;
+	case AstNode_GiveExpr:
+		return node->GiveExpr.token;
 	case AstNode_BadStmt:
 		return node->BadStmt.begin;
 	case AstNode_EmptyStmt:
@@ -728,6 +741,24 @@ AstNode *make_compound_lit(AstFile *f, AstNode *type, AstNodeArray elems, Token 
 	result->CompoundLit.close = close;
 	return result;
 }
+
+
+AstNode *make_block_expr(AstFile *f, AstNodeArray stmts, Token open, Token close) {
+	AstNode *result = make_node(f, AstNode_BlockExpr);
+	result->BlockExpr.stmts = stmts;
+	result->BlockExpr.open = open;
+	result->BlockExpr.close = close;
+	return result;
+}
+
+AstNode *make_give_expr(AstFile *f, Token token, AstNodeArray results) {
+	AstNode *result = make_node(f, AstNode_GiveExpr);
+	result->GiveExpr.token = token;
+	result->GiveExpr.results = results;
+	return result;
+}
+
+
 
 AstNode *make_bad_stmt(AstFile *f, Token begin, Token end) {
 	AstNode *result = make_node(f, AstNode_BadStmt);
@@ -1508,6 +1539,9 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 	}
 }
 
+AstNodeArray parse_lhs_expr_list(AstFile *f);
+AstNodeArray parse_rhs_expr_list(AstFile *f);
+
 AstNode *parse_operand(AstFile *f, bool lhs) {
 	AstNode *operand = NULL; // Operand
 	switch (f->curr_token.kind) {
@@ -1621,6 +1655,17 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 		f->curr_proc = curr_proc;
 		return type;
+	}
+
+	case Token_OpenBrace: {
+		AstNodeArray stmts = {0};
+		Token open, close;
+		open = expect_token(f, Token_OpenBrace);
+		f->expr_level++;
+		stmts = parse_stmt_list(f);
+		f->expr_level--;
+		close = expect_token(f, Token_CloseBrace);
+		return make_block_expr(f, stmts, open, close);
 	}
 
 	default: {
@@ -2619,17 +2664,37 @@ AstNode *parse_return_stmt(AstFile *f) {
 		syntax_error(f->curr_token, "You cannot use a return statement in the file scope");
 		return make_bad_stmt(f, f->curr_token, f->curr_token);
 	}
+	if (f->expr_level > 0) {
+		syntax_error(f->curr_token, "You cannot use a return statement within an expression");
+		return make_bad_stmt(f, f->curr_token, f->curr_token);
+	}
 
 	Token token = expect_token(f, Token_return);
 	AstNodeArray results = make_ast_node_array(f);
 
-	if (f->curr_token.kind != Token_Semicolon && f->curr_token.kind != Token_CloseBrace &&
-	    f->curr_token.pos.line == token.pos.line) {
+	if (f->curr_token.kind != Token_Semicolon && f->curr_token.kind != Token_CloseBrace) {
 		results = parse_rhs_expr_list(f);
 	}
 
 	expect_semicolon(f, results.e[0]);
 	return make_return_stmt(f, token, results);
+}
+
+
+AstNode *parse_give_stmt(AstFile *f) {
+	if (f->curr_proc == NULL) {
+		syntax_error(f->curr_token, "You cannot use a give statement in the file scope");
+		return make_bad_stmt(f, f->curr_token, f->curr_token);
+	}
+	if (f->expr_level == 0) {
+		syntax_error(f->curr_token, "A give statement must be used within an expression");
+		return make_bad_stmt(f, f->curr_token, f->curr_token);
+	}
+
+	Token token = expect_token(f, Token_give);
+	AstNodeArray results = parse_rhs_expr_list(f);
+	expect_semicolon(f, results.e[0]);
+	return make_expr_stmt(f, make_give_expr(f, token, results));
 }
 
 AstNode *parse_for_stmt(AstFile *f) {
@@ -2861,7 +2926,6 @@ AstNode *parse_stmt(AstFile *f) {
 		expect_semicolon(f, s);
 		return s;
 
-	// TODO(bill): other keywords
 	case Token_if:     return parse_if_stmt(f);
 	case Token_when:   return parse_when_stmt(f);
 	case Token_for:    return parse_for_stmt(f);
@@ -2869,6 +2933,7 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_defer:  return parse_defer_stmt(f);
 	case Token_asm:    return parse_asm_stmt(f);
 	case Token_return: return parse_return_stmt(f);
+	case Token_give:   return parse_give_stmt(f);
 
 	case Token_break:
 	case Token_continue:

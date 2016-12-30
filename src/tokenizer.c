@@ -104,6 +104,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_range,          "range"), \
 	TOKEN_KIND(Token_defer,          "defer"), \
 	TOKEN_KIND(Token_return,         "return"), \
+	TOKEN_KIND(Token_give,           "give"), \
 	TOKEN_KIND(Token_struct,         "struct"), \
 	TOKEN_KIND(Token_union,          "union"), \
 	TOKEN_KIND(Token_raw_union,      "raw_union"), \

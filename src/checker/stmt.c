@@ -1,16 +1,3 @@
-bool check_is_terminating(AstNode *node);
-bool check_has_break     (AstNode *stmt, bool implicit);
-void check_stmt          (Checker *c, AstNode *node, u32 flags);
-
-
-// Statements and Declarations
-typedef enum StmtFlag {
-	Stmt_BreakAllowed       = GB_BIT(0),
-	Stmt_ContinueAllowed    = GB_BIT(1),
-	Stmt_FallthroughAllowed = GB_BIT(2), // TODO(bill): fallthrough
-} StmtFlag;
-
-
 void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 	if (stmts.count == 0) {
 		return;
@@ -40,6 +27,10 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 
 		if (n->kind == AstNode_ReturnStmt && i+1 < max) {
 			error_node(n, "Statements after this `return` are never executed");
+		} else if (n->kind == AstNode_ExprStmt && i+1 < max) {
+			if (n->ExprStmt.expr->kind == AstNode_GiveExpr) {
+				error_node(n, "A `give` must be the last statement in a block");
+			}
 		}
 
 		check_stmt(c, n, new_flags);
@@ -48,7 +39,6 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 }
 
 bool check_is_terminating_list(AstNodeArray stmts) {
-
 	// Iterate backwards
 	for (isize n = stmts.count-1; n >= 0; n--) {
 		AstNode *stmt = stmts.e[n];
@@ -354,6 +344,12 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 			if (operand.expr->kind == AstNode_CallExpr) {
 				return;
+			}
+			if (operand.expr->kind == AstNode_GiveExpr) {
+				if ((flags&Stmt_GiveAllowed) != 0) {
+					return;
+				}
+				error_node(node, "Illegal use of `give`");
 			}
 			gbString expr_str = expr_to_string(operand.expr);
 			error_node(node, "Expression is not used: `%s`", expr_str);

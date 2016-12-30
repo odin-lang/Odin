@@ -12,8 +12,8 @@ import {
 }
 
 proc main() {
-	var x = ~(0 as u32);
-	var y = x << 32;
-	fmt.println(y);
+	var a, b, c = {
+		give 1, 2, 123*321;
+	};
+	fmt.println(a, b, c);
 }
-

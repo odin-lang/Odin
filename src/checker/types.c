@@ -775,6 +775,65 @@ Type *default_type(Type *type) {
 	return type;
 }
 
+// NOTE(bill): Valid Compile time execution #run type
+bool is_type_cte_safe(Type *type) {
+	type = default_type(base_type(type));
+	switch (type->kind) {
+	case Type_Basic:
+		switch (type->Basic.kind) {
+		case Basic_rawptr:
+		case Basic_any:
+			return false;
+		}
+		return true;
+
+	case Type_Pointer:
+		return false;
+
+	case Type_Array:
+		return is_type_cte_safe(type->Array.elem);
+
+	case Type_Vector: // NOTE(bill): This should always to be true but this is for sanity reasons
+		return is_type_cte_safe(type->Vector.elem);
+
+	case Type_Slice:
+		return false;
+
+	case Type_Maybe:
+		return is_type_cte_safe(type->Maybe.elem);
+
+	case Type_Record: {
+		if (type->Record.kind != TypeRecord_Struct) {
+			return false;
+		}
+		for (isize i = 0; i < type->Record.field_count; i++) {
+			Entity *v = type->Record.fields[i];
+			if (!is_type_cte_safe(v->type)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	case Type_Tuple: {
+		for (isize i = 0; i < type->Tuple.variable_count; i++) {
+			Entity *v = type->Tuple.variables[i];
+			if (!is_type_cte_safe(v->type)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	case Type_Proc:
+		// TODO(bill): How should I handle procedures in the CTE stage?
+		// return type->Proc.calling_convention == ProcCC_Odin;
+		return false;
+	}
+
+	return false;
+}
+
 
 
 

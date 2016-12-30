@@ -2571,7 +2571,7 @@ ssaValue *ssa_find_implicit_value_backing(ssaProcedure *proc, ImplicitValueId id
 	return *value;
 }
 
-
+void ssa_build_stmt_list(ssaProcedure *proc, AstNodeArray stmts);
 
 ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue *tv) {
 	expr = unparen_expr(expr);
@@ -2624,6 +2624,70 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		TypeAndValue *tav = map_tav_get(&proc->module->info->types, hash_pointer(expr));
 		GB_ASSERT(tav != NULL);
 		return ssa_addr_load(proc, ssa_build_addr(proc, expr));
+	case_end;
+
+	case_ast_node(be, BlockExpr, expr);
+		ssa_emit_comment(proc, str_lit("BlockExpr"));
+		ssa_open_scope(proc);
+
+		AstNodeArray stmts = be->stmts;
+		stmts.count--;
+		ssa_build_stmt_list(proc, stmts);
+
+		AstNode *give_stmt = be->stmts.e[be->stmts.count-1];
+		GB_ASSERT(give_stmt->kind == AstNode_ExprStmt);
+		AstNode *give_expr = give_stmt->ExprStmt.expr;
+		GB_ASSERT(give_expr->kind == AstNode_GiveExpr);
+		ssaValue *value = ssa_build_expr(proc, give_expr);
+
+		ssa_close_scope(proc, ssaDeferExit_Default, NULL);
+
+		return value;
+	case_end;
+
+	case_ast_node(ge, GiveExpr, expr);
+		ssa_emit_comment(proc, str_lit("GiveExpr"));
+
+		ssaValue *v = NULL;
+		Type *give_type = type_of_expr(proc->module->info, expr);
+		GB_ASSERT(give_type != NULL);
+		if (give_type->kind != Type_Tuple) {
+			v = ssa_emit_conv(proc, ssa_build_expr(proc, ge->results.e[0]), give_type);
+		} else {
+			TypeTuple *tuple = &give_type->Tuple;
+			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
+
+			ssaValueArray results;
+			array_init_reserve(&results, proc->module->tmp_allocator, tuple->variable_count);
+
+			for_array(res_index, ge->results) {
+				ssaValue *res = ssa_build_expr(proc, ge->results.e[res_index]);
+				Type *t = ssa_type(res);
+				if (t->kind == Type_Tuple) {
+					for (isize i = 0; i < t->Tuple.variable_count; i++) {
+						Entity *e = t->Tuple.variables[i];
+						ssaValue *v = ssa_emit_struct_ev(proc, res, i);
+						array_add(&results, v);
+					}
+				} else {
+					array_add(&results, res);
+				}
+			}
+
+			v = ssa_add_local_generated(proc, give_type);
+			for_array(i, results) {
+				Entity *e = tuple->variables[i];
+				ssaValue *res = ssa_emit_conv(proc, results.e[i], e->type);
+				ssaValue *field = ssa_emit_struct_ep(proc, v, i);
+				ssa_emit_store(proc, field, res);
+			}
+
+			v = ssa_emit_load(proc, v);
+
+			gb_temp_arena_memory_end(tmp);
+		}
+
+		return v;
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, expr);
