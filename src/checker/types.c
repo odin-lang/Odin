@@ -763,6 +763,9 @@ bool are_types_identical(Type *x, Type *y) {
 
 
 Type *default_type(Type *type) {
+	if (type == NULL) {
+		return t_invalid;
+	}
 	if (type->kind == Type_Basic) {
 		switch (type->Basic.kind) {
 		case Basic_UntypedBool:    return t_bool;

@@ -12,11 +12,10 @@ import {
 }
 
 proc main() {
-	var cond = true;
-	var msg = if cond {
-		give "hello";
+	var x = if false {
+		give 123;
 	} else {
-		give "goodbye";
+		give 321;
 	};
-	fmt.println(msg);
+	fmt.println(x);
 }

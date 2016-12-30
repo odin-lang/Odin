@@ -6,7 +6,7 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 	check_scope_decls(c, stmts, 1.2*stmts.count, NULL);
 
 	bool ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
-	u32 f = flags & (~Stmt_FallthroughAllowed);
+	flags &= ~Stmt_FallthroughAllowed;
 
 	isize max = stmts.count;
 	for (isize i = stmts.count-1; i >= 0; i--) {
@@ -20,16 +20,21 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 		if (n->kind == AstNode_EmptyStmt) {
 			continue;
 		}
-		u32 new_flags = f;
+		u32 new_flags = flags;
 		if (ft_ok && i+1 == max) {
 			new_flags |= Stmt_FallthroughAllowed;
 		}
 
-		if (n->kind == AstNode_ReturnStmt && i+1 < max) {
-			error_node(n, "Statements after this `return` are never executed");
-		} else if (n->kind == AstNode_ExprStmt && i+1 < max) {
-			if (n->ExprStmt.expr->kind == AstNode_GiveExpr) {
-				error_node(n, "A `give` must be the last statement in a block");
+		if (i+1 < max) {
+			switch (n->kind) {
+			case AstNode_ReturnStmt:
+				error_node(n, "Statements after this `return` are never executed");
+				break;
+			case AstNode_ExprStmt:
+				if (n->ExprStmt.expr->kind == AstNode_GiveExpr) {
+					error_node(n, "A `give` must be the last statement in a block");
+				}
+				break;
 			}
 		}
 

@@ -2665,7 +2665,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		ssaValue *cond = ssa_build_cond(proc, ie->cond, then, else_);
 		proc->curr_block = then;
 
-
 		ssa_open_scope(proc);
 		array_add(&edges, ssa_build_expr(proc, ie->body));
 		ssa_close_scope(proc, ssaDeferExit_Default, NULL);
@@ -2721,7 +2720,6 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 				ssaValue *field = ssa_emit_struct_ep(proc, v, i);
 				ssa_emit_store(proc, field, res);
 			}
-
 			v = ssa_emit_load(proc, v);
 
 			gb_temp_arena_memory_end(tmp);

@@ -180,10 +180,8 @@ void init_global_error_collector(void) {
 	gb_mutex_init(&global_error_collector.mutex);
 }
 
-
 void warning_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
-
 	global_error_collector.warning_count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (!token_pos_eq(global_error_collector.prev, token.pos)) {
@@ -198,7 +196,6 @@ void warning_va(Token token, char *fmt, va_list va) {
 
 void error_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
-
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (!token_pos_eq(global_error_collector.prev, token.pos)) {
@@ -213,7 +210,6 @@ void error_va(Token token, char *fmt, va_list va) {
 
 void syntax_error_va(Token token, char *fmt, va_list va) {
 	gb_mutex_lock(&global_error_collector.mutex);
-
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
 	if (!token_pos_eq(global_error_collector.prev, token.pos)) {

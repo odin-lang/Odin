@@ -1275,27 +1275,36 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 		return;
 	}
 
-	if (s != NULL && prev_token.pos.line != f->curr_token.pos.line) {
-		switch (s->kind) {
-		case AstNode_ProcDecl:
-			return;
-		case AstNode_GenericDecl:
-			if (s->GenericDecl.close.kind == Token_CloseBrace) {
+	if (s != NULL) {
+		if (prev_token.pos.line != f->curr_token.pos.line) {
+			switch (s->kind) {
+			case AstNode_ProcDecl:
 				return;
-			} else if (s->GenericDecl.token.kind == Token_type) {
+			case AstNode_GenericDecl:
+				if (s->GenericDecl.close.kind == Token_CloseBrace) {
+					return;
+				} else if (s->GenericDecl.token.kind == Token_type) {
+					if (f->prev_token.kind == Token_CloseBrace) {
+						return;
+					}
+				}
+				break;
+
+			case AstNode_TypeSpec:
 				if (f->prev_token.kind == Token_CloseBrace) {
 					return;
 				}
+				break;
 			}
-			break;
-
-		case AstNode_TypeSpec:
-			if (f->prev_token.kind == Token_CloseBrace) {
-				return;
+		} else {
+			switch (s->kind) {
+			case AstNode_GiveExpr:
+				if (f->curr_token.kind == Token_CloseBrace) {
+					return;
+				}
+				break;
 			}
-			break;
 		}
-
 		syntax_error(prev_token, "Expected `;` after %.*s, got %.*s",
 		             LIT(ast_node_strings[s->kind]), LIT(token_strings[prev_token.kind]));
 	} else {
@@ -2752,10 +2761,11 @@ AstNode *parse_return_stmt(AstFile *f) {
 	}
 
 	Token token = expect_token(f, Token_return);
-	AstNodeArray results = make_ast_node_array(f);
-
+	AstNodeArray results;
 	if (f->curr_token.kind != Token_Semicolon && f->curr_token.kind != Token_CloseBrace) {
 		results = parse_rhs_expr_list(f);
+	} else {
+		results = make_ast_node_array(f);
 	}
 
 	expect_semicolon(f, results.e[0]);
@@ -2774,9 +2784,15 @@ AstNode *parse_give_stmt(AstFile *f) {
 	}
 
 	Token token = expect_token(f, Token_give);
-	AstNodeArray results = parse_rhs_expr_list(f);
-	expect_semicolon(f, results.e[0]);
-	return make_expr_stmt(f, make_give_expr(f, token, results));
+	AstNodeArray results;
+	if (f->curr_token.kind != Token_Semicolon && f->curr_token.kind != Token_CloseBrace) {
+		results = parse_rhs_expr_list(f);
+	} else {
+		results = make_ast_node_array(f);
+	}
+	AstNode *ge = make_give_expr(f, token, results);
+	expect_semicolon(f, ge);
+	return make_expr_stmt(f, ge);
 }
 
 AstNode *parse_for_stmt(AstFile *f) {
