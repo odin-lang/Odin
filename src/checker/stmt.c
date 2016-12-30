@@ -504,7 +504,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		check_stmt(c, is->body, mod_flags);
 
-		if (is->else_stmt) {
+		if (is->else_stmt != NULL) {
 			switch (is->else_stmt->kind) {
 			case AstNode_IfStmt:
 			case AstNode_BlockStmt:

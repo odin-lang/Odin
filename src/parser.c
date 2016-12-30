@@ -153,6 +153,13 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 		Token token; \
 		AstNodeArray results; \
 	}) \
+	AST_NODE_KIND(IfExpr, "if expression", struct { \
+		Token token; \
+		AstNode *init; \
+		AstNode *cond; \
+		AstNode *body; \
+		AstNode *else_expr; \
+	}) \
 AST_NODE_KIND(_ExprEnd,       "", i32) \
 AST_NODE_KIND(_StmtBegin,     "", i32) \
 	AST_NODE_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
@@ -445,6 +452,9 @@ Token ast_node_token(AstNode *node) {
 		return node->BlockExpr.open;
 	case AstNode_GiveExpr:
 		return node->GiveExpr.token;
+	case AstNode_IfExpr:
+		return node->IfExpr.token;
+
 	case AstNode_BadStmt:
 		return node->BadStmt.begin;
 	case AstNode_EmptyStmt:
@@ -755,6 +765,16 @@ AstNode *make_give_expr(AstFile *f, Token token, AstNodeArray results) {
 	AstNode *result = make_node(f, AstNode_GiveExpr);
 	result->GiveExpr.token = token;
 	result->GiveExpr.results = results;
+	return result;
+}
+
+AstNode *make_if_expr(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *body, AstNode *else_expr) {
+	AstNode *result = make_node(f, AstNode_IfExpr);
+	result->IfExpr.token = token;
+	result->IfExpr.init = init;
+	result->IfExpr.cond = cond;
+	result->IfExpr.body = body;
+	result->IfExpr.else_expr = else_expr;
 	return result;
 }
 
@@ -1541,6 +1561,89 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 
 AstNodeArray parse_lhs_expr_list(AstFile *f);
 AstNodeArray parse_rhs_expr_list(AstFile *f);
+AstNode *    parse_simple_stmt  (AstFile *f);
+
+AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
+	if (statement == NULL) {
+		return NULL;
+	}
+
+	if (statement->kind == AstNode_ExprStmt) {
+		return statement->ExprStmt.expr;
+	}
+
+	syntax_error(f->curr_token, "Expected `%.*s`, found a simple statement.", LIT(kind));
+	return make_bad_expr(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
+}
+
+
+
+AstNode *parse_block_expr(AstFile *f) {
+	AstNodeArray stmts = {0};
+	Token open, close;
+	open = expect_token(f, Token_OpenBrace);
+	f->expr_level++;
+	stmts = parse_stmt_list(f);
+	f->expr_level--;
+	close = expect_token(f, Token_CloseBrace);
+	return make_block_expr(f, stmts, open, close);
+}
+
+AstNode *parse_if_expr(AstFile *f) {
+	if (f->curr_proc == NULL) {
+		syntax_error(f->curr_token, "You cannot use an if expression in the file scope");
+		return make_bad_stmt(f, f->curr_token, f->curr_token);
+	}
+
+	Token token = expect_token(f, Token_if);
+	AstNode *init = NULL;
+	AstNode *cond = NULL;
+	AstNode *body = NULL;
+	AstNode *else_expr = NULL;
+
+	isize prev_level = f->expr_level;
+	f->expr_level = -1;
+
+	if (allow_token(f, Token_Semicolon)) {
+		cond = parse_expr(f, false);
+	} else {
+		init = parse_simple_stmt(f);
+		if (allow_token(f, Token_Semicolon)) {
+			cond = parse_expr(f, false);
+		} else {
+			cond = convert_stmt_to_expr(f, init, str_lit("boolean expression"));
+			init = NULL;
+		}
+	}
+
+	f->expr_level = prev_level;
+
+	if (cond == NULL) {
+		syntax_error(f->curr_token, "Expected condition for if statement");
+	}
+
+	body = parse_block_expr(f);
+
+	if (allow_token(f, Token_else)) {
+		switch (f->curr_token.kind) {
+		case Token_if:
+			else_expr = parse_if_expr(f);
+			break;
+		case Token_OpenBrace:
+			else_expr = parse_block_expr(f);
+			break;
+		default:
+			syntax_error(f->curr_token, "Expected if expression block statement");
+			else_expr = make_bad_expr(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
+			break;
+		}
+	} else {
+		syntax_error(f->curr_token, "An if expression must have an else clause");
+		return make_bad_stmt(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
+	}
+
+	return make_if_expr(f, token, init, cond, body, else_expr);
+}
 
 AstNode *parse_operand(AstFile *f, bool lhs) {
 	AstNode *operand = NULL; // Operand
@@ -1657,16 +1760,8 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		return type;
 	}
 
-	case Token_OpenBrace: {
-		AstNodeArray stmts = {0};
-		Token open, close;
-		open = expect_token(f, Token_OpenBrace);
-		f->expr_level++;
-		stmts = parse_stmt_list(f);
-		f->expr_level--;
-		close = expect_token(f, Token_CloseBrace);
-		return make_block_expr(f, stmts, open, close);
-	}
+	case Token_OpenBrace: return parse_block_expr(f);
+	case Token_if:        return parse_if_expr(f);
 
 	default: {
 		AstNode *type = parse_identifier_or_type(f);
@@ -2231,19 +2326,6 @@ AstNode *parse_block_stmt(AstFile *f, b32 is_when) {
 		return make_bad_stmt(f, f->curr_token, f->curr_token);
 	}
 	return parse_body(f);
-}
-
-AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
-	if (statement == NULL) {
-		return NULL;
-	}
-
-	if (statement->kind == AstNode_ExprStmt) {
-		return statement->ExprStmt.expr;
-	}
-
-	syntax_error(f->curr_token, "Expected `%.*s`, found a simple statement.", LIT(kind));
-	return make_bad_expr(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
 }
 
 

@@ -3744,7 +3744,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 	case_ast_node(be, BlockExpr, node);
 		if (c->proc_stack.count == 0) {
-			error_node(node, "A block expression is only allowed withing a procedure");
+			error_node(node, "A block expression is only allowed within a procedure");
 			goto error;
 		}
 
@@ -3777,9 +3777,68 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		o->mode = Addressing_Value;
 	case_end;
 
+	case_ast_node(ie, IfExpr, node);
+		if (c->proc_stack.count == 0) {
+			error_node(node, "An if expression is only allowed within a procedure");
+			goto error;
+		}
+
+		check_open_scope(c, node);
+
+		if (ie->init != NULL) {
+			check_stmt(c, ie->init, 0);
+		}
+
+		Operand operand = {Addressing_Invalid};
+		check_expr(c, &operand, ie->cond);
+		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
+			error_node(ie->cond, "Non-boolean condition in if expression");
+		}
+
+		Type *if_type = NULL;
+		Type *else_type = NULL;
+		check_expr(c, &operand, ie->body);
+		if_type = operand.type;
+
+		if (ie->else_expr != NULL) {
+			switch (ie->else_expr->kind) {
+			case AstNode_IfExpr:
+			case AstNode_BlockExpr:
+				check_expr(c, &operand, ie->else_expr);
+				else_type = operand.type;
+				break;
+			default:
+				error_node(ie->else_expr, "Invalid else expression in if expression");
+				break;
+			}
+		} else {
+			error_node(ie->else_expr, "An if expression must have an else expression");
+			check_close_scope(c);
+			goto error;
+		}
+
+		check_close_scope(c);
+
+		GB_ASSERT(if_type != NULL &&
+		          else_type != NULL);
+
+		if (!are_types_identical(if_type, else_type)) {
+			gbString its = type_to_string(if_type);
+			gbString ets = type_to_string(else_type);
+			error_node(node, "if expression type and else expression type do not match, %s != %s", its, ets);
+			gb_string_free(ets);
+			gb_string_free(its);
+			goto error;
+		}
+
+
+		o->type = if_type;
+		o->mode = Addressing_Value;
+	case_end;
+
 	case_ast_node(ye, GiveExpr, node);
 		if (c->proc_stack.count == 0) {
-			error_node(node, "A give expression is only allowed withing a procedure");
+			error_node(node, "A give expression is only allowed within a procedure");
 			goto error;
 		}
 

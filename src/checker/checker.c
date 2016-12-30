@@ -379,7 +379,8 @@ void check_open_scope(Checker *c, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_Invalid ||
 	          is_ast_node_stmt(node) ||
 	          is_ast_node_type(node) ||
-	          node->kind == AstNode_BlockExpr);
+	          node->kind == AstNode_BlockExpr ||
+	          node->kind == AstNode_IfExpr );
 	Scope *scope = make_scope(c->context.scope, c->allocator);
 	add_scope(c, node, scope);
 	if (node->kind == AstNode_ProcType) {

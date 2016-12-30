@@ -719,7 +719,7 @@ ssaValue *ssa_emit_conv           (ssaProcedure *proc, ssaValue *value, Type *t)
 ssaValue *ssa_type_info           (ssaProcedure *proc, Type *type);
 ssaValue *ssa_build_expr          (ssaProcedure *proc, AstNode *expr);
 void      ssa_build_stmt          (ssaProcedure *proc, AstNode *node);
-void      ssa_build_cond          (ssaProcedure *proc, AstNode *cond, ssaBlock *true_block, ssaBlock *false_block);
+ssaValue *ssa_build_cond          (ssaProcedure *proc, AstNode *cond, ssaBlock *true_block, ssaBlock *false_block);
 void      ssa_build_defer_stmt    (ssaProcedure *proc, ssaDefer d);
 ssaAddr   ssa_build_addr          (ssaProcedure *proc, AstNode *expr);
 void      ssa_build_proc          (ssaValue *value, ssaProcedure *parent);
@@ -2645,6 +2645,43 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 		return value;
 	case_end;
 
+	case_ast_node(ie, IfExpr, expr);
+		ssa_emit_comment(proc, str_lit("IfExpr"));
+		if (ie->init != NULL) {
+			ssaBlock *init = ssa_add_block(proc, expr, "if.init");
+			ssa_emit_jump(proc, init);
+			proc->curr_block = init;
+			ssa_build_stmt(proc, ie->init);
+		}
+
+		GB_ASSERT(ie->else_expr != NULL);
+		ssaBlock *then  = ssa_add_block(proc, expr, "if.then");
+		ssaBlock *done  = ssa_add_block(proc, expr, "if.done"); // NOTE(bill): Append later
+		ssaBlock *else_ = ssa_add_block(proc, ie->else_expr, "if.else");
+
+		ssaValue *cond = ssa_build_cond(proc, ie->cond, then, else_);
+		proc->curr_block = then;
+
+		ssaValue *iv = NULL;
+		ssaValue *ev = NULL;
+
+		ssa_open_scope(proc);
+		iv = ssa_build_expr(proc, ie->body);
+		ssa_close_scope(proc, ssaDeferExit_Default, NULL);
+
+		ssa_emit_jump(proc, done);
+		proc->curr_block = else_;
+
+		ssa_open_scope(proc);
+		ev = ssa_build_expr(proc, ie->else_expr);
+		ssa_close_scope(proc, ssaDeferExit_Default, NULL);
+
+		ssa_emit_jump(proc, done);
+		proc->curr_block = done;
+
+		return ssa_emit_select(proc, cond, iv, ev);
+	case_end;
+
 	case_ast_node(ge, GiveExpr, expr);
 		ssa_emit_comment(proc, str_lit("GiveExpr"));
 
@@ -3782,17 +3819,15 @@ void ssa_build_assign_op(ssaProcedure *proc, ssaAddr lhs, ssaValue *value, Token
 	ssa_addr_store(proc, lhs, new_value);
 }
 
-void ssa_build_cond(ssaProcedure *proc, AstNode *cond, ssaBlock *true_block, ssaBlock *false_block) {
+ssaValue *ssa_build_cond(ssaProcedure *proc, AstNode *cond, ssaBlock *true_block, ssaBlock *false_block) {
 	switch (cond->kind) {
 	case_ast_node(pe, ParenExpr, cond);
-		ssa_build_cond(proc, pe->expr, true_block, false_block);
-		return;
+		return ssa_build_cond(proc, pe->expr, true_block, false_block);
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, cond);
 		if (ue->op.kind == Token_Not) {
-			ssa_build_cond(proc, ue->expr, false_block, true_block);
-			return;
+			return ssa_build_cond(proc, ue->expr, false_block, true_block);
 		}
 	case_end;
 
@@ -3801,21 +3836,20 @@ void ssa_build_cond(ssaProcedure *proc, AstNode *cond, ssaBlock *true_block, ssa
 			ssaBlock *block = ssa_add_block(proc, NULL, "cmp.and");
 			ssa_build_cond(proc, be->left, block, false_block);
 			proc->curr_block = block;
-			ssa_build_cond(proc, be->right, true_block, false_block);
-			return;
+			return ssa_build_cond(proc, be->right, true_block, false_block);
 		} else if (be->op.kind == Token_CmpOr) {
 			ssaBlock *block = ssa_add_block(proc, NULL, "cmp.or");
 			ssa_build_cond(proc, be->left, true_block, block);
 			proc->curr_block = block;
-			ssa_build_cond(proc, be->right, true_block, false_block);
-			return;
+			return ssa_build_cond(proc, be->right, true_block, false_block);
 		}
 	case_end;
 	}
 
-	ssaValue *expr = ssa_build_expr(proc, cond);
-	expr = ssa_emit_conv(proc, expr, t_bool);
-	ssa_emit_if(proc, expr, true_block, false_block);
+	ssaValue *v = ssa_build_expr(proc, cond);
+	v = ssa_emit_conv(proc, v, t_bool);
+	ssa_emit_if(proc, v, true_block, false_block);
+	return v;
 }
 
 
