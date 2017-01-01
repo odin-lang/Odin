@@ -137,43 +137,6 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 				switch (spec->kind) {
 				case_ast_node(bd, BadDecl, spec);
 				case_end;
-				case_ast_node(ts, TypeSpec, spec);
-					if (ts->name->kind != AstNode_Ident) {
-						error_node(ts->name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[ts->name->kind]));
-						break;
-					}
-
-					Token name_token = ts->name->Ident;
-
-					Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, NULL);
-					e->identifier = ts->name;
-
-					DeclInfo *d = make_declaration_info(c->allocator, e->scope);
-					d->type_expr = ts->type;
-
-					add_entity_and_decl_info(c, ts->name, e, d);
-
-					DelayedEntity delay = {ts->name, e, d};
-					array_add(delayed_entities, delay);
-
-
-					if (dof != NULL) {
-						if (str_eq(name_token.string, str_lit("_"))) {
-							dof->other_fields[dof->other_field_index++] = e;
-						} else {
-							HashKey key = hash_string(name_token.string);
-							if (map_entity_get(dof->entity_map, key) != NULL) {
-								// TODO(bill): Scope checking already checks the declaration
-								error(name_token, "`%.*s` is already declared in this record", LIT(name_token.string));
-							} else {
-								map_entity_set(dof->entity_map, key, e);
-								dof->other_fields[dof->other_field_index++] = e;
-							}
-							add_entity(c, c->context.scope, ts->name, e);
-							add_entity_use(c, ts->name, e);
-						}
-					}
-				case_end;
 				}
 			}
 		case_end;
@@ -975,7 +938,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 		}
 		if (e == e_iota) {
 			if (c->context.iota.kind == ExactValue_Invalid) {
-				error(e->token, "Use of `iota` outside a constant declaration is not allowed");
+				error(e->token, "Use of `iota` outside a enumeration is not allowed");
 				return;
 			}
 			o->value = c->context.iota;
@@ -1139,6 +1102,11 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 			type = make_type_maybe(c->allocator, check_type(c, ue->expr));
 			goto end;
 		}
+	case_end;
+
+	case_ast_node(ht, HelperType, e);
+		type = check_type(c, ht->type);
+		goto end;
 	case_end;
 
 	case_ast_node(pt, PointerType, e);
@@ -4824,6 +4792,11 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		}
 		str = gb_string_appendc(str, "{");
 		str = gb_string_appendc(str, "}");
+	case_end;
+
+	case_ast_node(ht, HelperType, node);
+		str = gb_string_appendc(str, "type ");
+		str = write_expr_to_string(str, ht->type);
 	case_end;
 	}
 

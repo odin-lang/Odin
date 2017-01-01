@@ -281,15 +281,6 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		AstNodeArray values; \
 		u64          tags;   \
 	}) \
-	AST_NODE_KIND(ProcDecl, "procedure declaration", struct { \
-		AstNode *name;         \
-		AstNode *type;         \
-		AstNode *body;         \
-		u64      tags;         \
-		String   foreign_name; \
-		String   link_name;    \
-		AstNode *note;         \
-	}) \
 	AST_NODE_KIND(ForeignLibrary, "foreign library", struct { \
 		Token token, filepath; \
 		String base_dir;       \
@@ -303,6 +294,10 @@ AST_NODE_KIND(_DeclEnd,   "", i32) \
 		bool         is_using; \
 	}) \
 AST_NODE_KIND(_TypeBegin, "", i32) \
+	AST_NODE_KIND(HelperType, "type", struct { \
+		Token token; \
+		AstNode *type; \
+	}) \
 	AST_NODE_KIND(ProcType, "procedure type", struct { \
 		Token token;          \
 		AstNodeArray params;  \
@@ -501,8 +496,6 @@ Token ast_node_token(AstNode *node) {
 		return node->GenericDecl.token;
 	case AstNode_ValueDecl:
 		return ast_node_token(node->ValueDecl.names.e[0]);
-	case AstNode_ProcDecl:
-		return ast_node_token(node->ProcDecl.name);
 
 	case AstNode_ForeignLibrary:
 		return node->ForeignLibrary.token;
@@ -519,6 +512,10 @@ Token ast_node_token(AstNode *node) {
 			return ast_node_token(node->Field.type);
 		}
 	}
+
+
+	case AstNode_HelperType:
+		return node->HelperType.token;
 	case AstNode_ProcType:
 		return node->ProcType.token;
 	case AstNode_PointerType:
@@ -969,6 +966,15 @@ AstNode *make_field(AstFile *f, AstNodeArray names, AstNode *type, bool is_using
 	return result;
 }
 
+
+AstNode *make_helper_type(AstFile *f, Token token, AstNode *type) {
+	AstNode *result = make_node(f, AstNode_HelperType);
+	result->HelperType.token = token;
+	result->HelperType.type = type;
+	return result;
+}
+
+
 AstNode *make_proc_type(AstFile *f, Token token, AstNodeArray params, AstNodeArray results, u64 tags, ProcCallingConvention calling_convention) {
 	AstNode *result = make_node(f, AstNode_ProcType);
 	result->ProcType.token = token;
@@ -976,17 +982,6 @@ AstNode *make_proc_type(AstFile *f, Token token, AstNodeArray params, AstNodeArr
 	result->ProcType.results = results;
 	result->ProcType.tags = tags;
 	result->ProcType.calling_convention = calling_convention;
-	return result;
-}
-
-AstNode *make_proc_decl(AstFile *f, AstNode *name, AstNode *proc_type, AstNode *body, u64 tags, String foreign_name, String link_name) {
-	AstNode *result = make_node(f, AstNode_ProcDecl);
-	result->ProcDecl.name = name;
-	result->ProcDecl.type = proc_type;
-	result->ProcDecl.body = body;
-	result->ProcDecl.tags = tags;
-	result->ProcDecl.foreign_name = foreign_name;
-	result->ProcDecl.link_name = link_name;
 	return result;
 }
 
@@ -1264,6 +1259,52 @@ Token expect_closing(AstFile *f, TokenKind kind, String context) {
 	return expect_token(f, kind);
 }
 
+bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
+	if (s == NULL) {
+		return false;
+	}
+
+	switch (s->kind) {
+	case AstNode_HelperType:
+		return is_semicolon_optional_for_node(f, s->HelperType.type);
+
+	case AstNode_StructType:
+	case AstNode_UnionType:
+	case AstNode_RawUnionType:
+	case AstNode_EnumType:
+		return true;
+	case AstNode_ProcLit:
+		return true;
+
+	case AstNode_ValueDecl:
+		if (!s->ValueDecl.is_var) {
+			if (s->ValueDecl.values.count > 0) {
+				AstNode *last = s->ValueDecl.values.e[s->ValueDecl.values.count-1];
+				return is_semicolon_optional_for_node(f, last);
+			}
+		}
+		break;
+
+	case AstNode_GenericDecl:
+		if (s->GenericDecl.close.kind == Token_CloseBrace) {
+			return true;
+		} else if (s->GenericDecl.token.kind == Token_type) {
+			if (f->prev_token.kind == Token_CloseBrace) {
+				return true;
+			}
+		}
+		break;
+
+	case AstNode_TypeSpec:
+		if (f->prev_token.kind == Token_CloseBrace) {
+			return true;
+		}
+		break;
+	}
+
+	return false;
+}
+
 void expect_semicolon(AstFile *f, AstNode *s) {
 	if (allow_token(f, Token_Semicolon)) {
 		return;
@@ -1277,24 +1318,8 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 
 	if (s != NULL) {
 		if (prev_token.pos.line != f->curr_token.pos.line) {
-			switch (s->kind) {
-			case AstNode_ProcDecl:
+			if (is_semicolon_optional_for_node(f, s)) {
 				return;
-			case AstNode_GenericDecl:
-				if (s->GenericDecl.close.kind == Token_CloseBrace) {
-					return;
-				} else if (s->GenericDecl.token.kind == Token_type) {
-					if (f->prev_token.kind == Token_CloseBrace) {
-						return;
-					}
-				}
-				break;
-
-			case AstNode_TypeSpec:
-				if (f->prev_token.kind == Token_CloseBrace) {
-					return;
-				}
-				break;
 			}
 		} else {
 			switch (s->kind) {
@@ -1319,7 +1344,6 @@ AstNode *    parse_proc_type(AstFile *f, String *foreign_name_, String *link_nam
 AstNodeArray parse_stmt_list(AstFile *f);
 AstNode *    parse_stmt(AstFile *f);
 AstNode *    parse_body(AstFile *f);
-AstNode *    parse_proc_decl(AstFile *f);
 void         parse_proc_signature(AstFile *f, AstNodeArray *params, AstNodeArray *results);
 
 
@@ -1571,6 +1595,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 AstNodeArray parse_lhs_expr_list(AstFile *f);
 AstNodeArray parse_rhs_expr_list(AstFile *f);
 AstNode *    parse_simple_stmt  (AstFile *f);
+AstNode *    parse_type         (AstFile *f);
 
 AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
 	if (statement == NULL) {
@@ -1745,10 +1770,9 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		String foreign_name = {0};
 		String link_name = {0};
 		AstNode *type = parse_proc_type(f, &foreign_name, &link_name);
+		u64 tags = type->ProcType.tags;
 
 		if (f->curr_token.kind == Token_OpenBrace) {
-			u64 tags = type->ProcType.tags;
-
 			if ((tags & ProcTag_foreign) != 0) {
 				syntax_error(token, "A procedure tagged as `#foreign` cannot have a body");
 			}
@@ -1758,6 +1782,13 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			f->curr_proc = curr_proc;
 
 			return make_proc_lit(f, type, body, tags, foreign_name, link_name);
+		}
+
+		if ((tags & ProcTag_foreign) != 0) {
+			return make_proc_lit(f, type, NULL, tags, foreign_name, link_name);
+		}
+		if ((tags & ProcTag_link_name) != 0) {
+			syntax_error(token, "A procedure typed cannot be tagged with `#link_name`");
 		}
 
 		return type;
@@ -1932,7 +1963,6 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 	return operand;
 }
 
-AstNode *parse_type(AstFile *f);
 
 AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 	switch (f->curr_token.kind) {
@@ -2240,17 +2270,6 @@ PARSE_SPEC_PROC(parse_include_spec) {
 
 AstNode *parse_decl(AstFile *f) {
 	switch (f->curr_token.kind) {
-	// case Token_var:
-	// case Token_const:
-		// return parse_generic_decl(f, f->curr_token.kind, parse_value_spec);
-
-	case Token_type:
-		return parse_generic_decl(f, f->curr_token.kind, parse_type_spec);
-
-	case Token_proc:
-		// TODO(bill): Should I allow procedures to use the generic declaration syntax?
-		return parse_proc_decl(f);
-
 	case Token_import:
 		return parse_generic_decl(f, f->curr_token.kind, parse_import_spec);
 	case Token_include:
@@ -2504,6 +2523,12 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		return e;
 	}
 
+	case Token_type: {
+		Token token = expect_token(f, Token_type);
+		AstNode *type = parse_type(f);
+		return make_helper_type(f, token, type);
+	}
+
 	case Token_Pointer: {
 		Token token = expect_token(f, Token_Pointer);
 		AstNode *elem = parse_type(f);
@@ -2681,7 +2706,7 @@ AstNode *parse_body(AstFile *f) {
 }
 
 
-
+/*
 AstNode *parse_proc_decl(AstFile *f) {
 	if (look_ahead_token_kind(f, 1) == Token_OpenParen) {
 		// NOTE(bill): It's an anonymous procedure
@@ -2720,7 +2745,7 @@ AstNode *parse_proc_decl(AstFile *f) {
 	}
 
 	return make_proc_decl(f, name, proc_type, body, tags, foreign_name, link_name);
-}
+} */
 
 AstNode *parse_if_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {

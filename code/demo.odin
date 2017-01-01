@@ -1,15 +1,13 @@
-import {
-	"atomic.odin";
-	"fmt.odin";
-	"hash.odin";
-	"math.odin";
-	"mem.odin";
-	"opengl.odin";
-	"os.odin";
-	"sync.odin";
-	"utf8.odin";
-	win32 "sys/windows.odin";
-}
+import "atomic.odin";
+import "fmt.odin";
+import "hash.odin";
+import "math.odin";
+import "mem.odin";
+import "opengl.odin";
+import "os.odin";
+import "sync.odin";
+import "utf8.odin";
+import win32 "sys/windows.odin";
 
 Thing :: enum f64 {
 	_, // Ignore first value

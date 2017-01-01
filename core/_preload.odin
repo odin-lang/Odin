@@ -12,74 +12,72 @@ import "mem.odin";
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
-type {
-	Type_Info_Member struct #ordered {
-		name      string;     // can be empty if tuple
-		type_info ^Type_Info;
-		offset    int;        // offsets are not used in tuples
-	}
-	Type_Info_Record struct #ordered {
-		fields  []Type_Info_Member;
-		size    int; // in bytes
-		align   int; // in bytes
-		packed  bool;
-		ordered bool;
-	}
-
-	Type_Info union {
-		Named struct #ordered {
-			name string;
-			base ^Type_Info; // This will _not_ be a Type_Info.Named
-		};
-		Integer struct #ordered {
-			size   int; // in bytes
-			signed bool;
-		};
-		Float struct #ordered {
-			size int; // in bytes
-		};
-		Any     struct #ordered {};
-		String  struct #ordered {};
-		Boolean struct #ordered {};
-		Pointer struct #ordered {
-			elem ^Type_Info; // nil -> rawptr
-		};
-		Maybe struct #ordered {
-			elem ^Type_Info;
-		};
-		Procedure struct #ordered {
-			params   ^Type_Info; // Type_Info.Tuple
-			results  ^Type_Info; // Type_Info.Tuple
-			variadic bool;
-		};
-		Array struct #ordered {
-			elem      ^Type_Info;
-			elem_size int;
-			count     int;
-		};
-		Slice struct #ordered {
-			elem      ^Type_Info;
-			elem_size int;
-		};
-		Vector struct #ordered {
-			elem      ^Type_Info;
-			elem_size int;
-			count     int;
-			align     int;
-		};
-		Tuple     Type_Info_Record;
-		Struct    Type_Info_Record;
-		Union     Type_Info_Record;
-		Raw_Union Type_Info_Record;
-		Enum struct #ordered {
-			base  ^Type_Info;
-			names []string;
-			// TODO(bill): store values some how. Maybe using a raw_union
-		};
-	}
+Type_Info_Member :: struct #ordered {
+	name      string;     // can be empty if tuple
+	type_info ^Type_Info;
+	offset    int;        // offsets are not used in tuples
+}
+Type_Info_Record :: struct #ordered {
+	fields  []Type_Info_Member;
+	size    int; // in bytes
+	align   int; // in bytes
+	packed  bool;
+	ordered bool;
 }
 
-proc type_info_base(info ^Type_Info) -> ^Type_Info {
+Type_Info :: union {
+	Named struct #ordered {
+		name string;
+		base ^Type_Info; // This will _not_ be a Type_Info.Named
+	};
+	Integer struct #ordered {
+		size   int; // in bytes
+		signed bool;
+	};
+	Float struct #ordered {
+		size int; // in bytes
+	};
+	Any     struct #ordered {};
+	String  struct #ordered {};
+	Boolean struct #ordered {};
+	Pointer struct #ordered {
+		elem ^Type_Info; // nil -> rawptr
+	};
+	Maybe struct #ordered {
+		elem ^Type_Info;
+	};
+	Procedure struct #ordered {
+		params   ^Type_Info; // Type_Info.Tuple
+		results  ^Type_Info; // Type_Info.Tuple
+		variadic bool;
+	};
+	Array struct #ordered {
+		elem      ^Type_Info;
+		elem_size int;
+		count     int;
+	};
+	Slice struct #ordered {
+		elem      ^Type_Info;
+		elem_size int;
+	};
+	Vector struct #ordered {
+		elem      ^Type_Info;
+		elem_size int;
+		count     int;
+		align     int;
+	};
+	Tuple     Type_Info_Record;
+	Struct    Type_Info_Record;
+	Union     Type_Info_Record;
+	Raw_Union Type_Info_Record;
+	Enum struct #ordered {
+		base  ^Type_Info;
+		names []string;
+		// TODO(bill): store values some how. Maybe using a raw_union
+	};
+}
+
+type_info_base :: proc(info ^Type_Info) -> ^Type_Info {
 	if info == nil {
 		return nil;
 	}
@@ -93,51 +91,49 @@ proc type_info_base(info ^Type_Info) -> ^Type_Info {
 
 
 
-proc assume(cond bool) #foreign "llvm.assume"
+assume :: proc(cond bool) #foreign "llvm.assume"
 
-proc __debug_trap      ()        #foreign "llvm.debugtrap"
-proc __trap            ()        #foreign "llvm.trap"
-proc read_cycle_counter() -> u64 #foreign "llvm.readcyclecounter"
+__debug_trap       :: proc()        #foreign "llvm.debugtrap"
+__trap             :: proc()        #foreign "llvm.trap"
+read_cycle_counter :: proc() -> u64 #foreign "llvm.readcyclecounter"
 
-proc bit_reverse16(b u16) -> u16 #foreign "llvm.bitreverse.i16"
-proc bit_reverse32(b u32) -> u32 #foreign "llvm.bitreverse.i32"
-proc bit_reverse64(b u64) -> u64 #foreign "llvm.bitreverse.i64"
+bit_reverse16 :: proc(b u16) -> u16 #foreign "llvm.bitreverse.i16"
+bit_reverse32 :: proc(b u32) -> u32 #foreign "llvm.bitreverse.i32"
+bit_reverse64 :: proc(b u64) -> u64 #foreign "llvm.bitreverse.i64"
 
-proc byte_swap16(b u16) -> u16 #foreign "llvm.bswap.i16"
-proc byte_swap32(b u32) -> u32 #foreign "llvm.bswap.i32"
-proc byte_swap64(b u64) -> u64 #foreign "llvm.bswap.i64"
+byte_swap16 :: proc(b u16) -> u16 #foreign "llvm.bswap.i16"
+byte_swap32 :: proc(b u32) -> u32 #foreign "llvm.bswap.i32"
+byte_swap64 :: proc(b u64) -> u64 #foreign "llvm.bswap.i64"
 
-proc fmuladd32(a, b, c f32) -> f32 #foreign "llvm.fmuladd.f32"
-proc fmuladd64(a, b, c f64) -> f64 #foreign "llvm.fmuladd.f64"
-
-
+fmuladd32 :: proc(a, b, c f32) -> f32 #foreign "llvm.fmuladd.f32"
+fmuladd64 :: proc(a, b, c f64) -> f64 #foreign "llvm.fmuladd.f64"
 
 
 
 
-type Allocator_Mode enum u8 {
+
+
+Allocator_Mode :: enum u8 {
 	ALLOC = iota,
 	FREE,
 	FREE_ALL,
 	RESIZE,
 }
-type {
-	Allocator_Proc proc(allocator_data rawptr, mode Allocator_Mode,
-	                    size, alignment int,
-	                    old_memory rawptr, old_size int, flags u64) -> rawptr;
-	Allocator struct #ordered {
-		procedure Allocator_Proc;
-		data      rawptr;
-	}
+Allocator_Proc :: type proc(allocator_data rawptr, mode Allocator_Mode,
+                            size, alignment int,
+                            old_memory rawptr, old_size int, flags u64) -> rawptr;
+Allocator :: struct #ordered {
+	procedure Allocator_Proc;
+	data      rawptr;
+}
 
-	Context struct #ordered {
-		thread_id int;
+Context :: struct #ordered {
+	thread_id int;
 
-		allocator Allocator;
+	allocator Allocator;
 
-		user_data  rawptr;
-		user_index int;
-	}
+	user_data  rawptr;
+	user_index int;
 }
 
 #thread_local __context: Context;
@@ -146,7 +142,7 @@ type {
 DEFAULT_ALIGNMENT :: align_of([vector 4]f32);
 
 
-proc __check_context() {
+__check_context:: proc() {
 	c := ^__context;
 
 	if c.allocator.procedure == nil {
@@ -157,30 +153,30 @@ proc __check_context() {
 	}
 }
 
-proc alloc(size int) -> rawptr #inline { return alloc_align(size, DEFAULT_ALIGNMENT); }
+alloc:: proc(size int) -> rawptr #inline { return alloc_align(size, DEFAULT_ALIGNMENT); }
 
-proc alloc_align(size, alignment int) -> rawptr #inline {
+alloc_align:: proc(size, alignment int) -> rawptr #inline {
 	__check_context();
 	a := context.allocator;
 	return a.procedure(a.data, Allocator_Mode.ALLOC, size, alignment, nil, 0, 0);
 }
 
-proc free(ptr rawptr) #inline {
+free:: proc(ptr rawptr) #inline {
 	__check_context();
 	a := context.allocator;
 	if ptr != nil {
 		a.procedure(a.data, Allocator_Mode.FREE, 0, 0, ptr, 0, 0);
 	}
 }
-proc free_all() #inline {
+free_all:: proc() #inline {
 	__check_context();
 	a := context.allocator;
 	a.procedure(a.data, Allocator_Mode.FREE_ALL, 0, 0, nil, 0, 0);
 }
 
 
-proc resize      (ptr rawptr, old_size, new_size int) -> rawptr #inline { return resize_align(ptr, old_size, new_size, DEFAULT_ALIGNMENT); }
-proc resize_align(ptr rawptr, old_size, new_size, alignment int) -> rawptr #inline {
+resize:: proc      (ptr rawptr, old_size, new_size int) -> rawptr #inline { return resize_align(ptr, old_size, new_size, DEFAULT_ALIGNMENT); }
+resize_align:: proc(ptr rawptr, old_size, new_size, alignment int) -> rawptr #inline {
 	__check_context();
 	a := context.allocator;
 	return a.procedure(a.data, Allocator_Mode.RESIZE, new_size, alignment, ptr, old_size, 0);
@@ -188,7 +184,7 @@ proc resize_align(ptr rawptr, old_size, new_size, alignment int) -> rawptr #inli
 
 
 
-proc default_resize_align(old_memory rawptr, old_size, new_size, alignment int) -> rawptr {
+default_resize_align:: proc(old_memory rawptr, old_size, new_size, alignment int) -> rawptr {
 	if old_memory == nil {
 		return alloc_align(new_size, alignment);
 	}
@@ -213,7 +209,7 @@ proc default_resize_align(old_memory rawptr, old_size, new_size, alignment int) 
 }
 
 
-proc default_allocator_proc(allocator_data rawptr, mode Allocator_Mode,
+default_allocator_proc:: proc(allocator_data rawptr, mode Allocator_Mode,
                             size, alignment int,
                             old_memory rawptr, old_size int, flags u64) -> rawptr {
 	using Allocator_Mode;
@@ -263,7 +259,7 @@ proc default_allocator_proc(allocator_data rawptr, mode Allocator_Mode,
 	return nil;
 }
 
-proc default_allocator() -> Allocator {
+default_allocator:: proc() -> Allocator {
 	return Allocator{
 		procedure = default_allocator_proc,
 		data = nil,
@@ -280,7 +276,7 @@ proc default_allocator() -> Allocator {
 
 
 
-proc __string_eq(a, b string) -> bool {
+__string_eq:: proc(a, b string) -> bool {
 	if a.count != b.count {
 		return false;
 	}
@@ -290,24 +286,24 @@ proc __string_eq(a, b string) -> bool {
 	return mem.compare(a.data, b.data, a.count) == 0;
 }
 
-proc __string_cmp(a, b string) -> int {
+__string_cmp:: proc(a, b string) -> int {
 	return mem.compare(a.data, b.data, min(a.count, b.count));
 }
 
-proc __string_ne(a, b string) -> bool #inline { return !__string_eq(a, b); }
-proc __string_lt(a, b string) -> bool #inline { return __string_cmp(a, b) < 0; }
-proc __string_gt(a, b string) -> bool #inline { return __string_cmp(a, b) > 0; }
-proc __string_le(a, b string) -> bool #inline { return __string_cmp(a, b) <= 0; }
-proc __string_ge(a, b string) -> bool #inline { return __string_cmp(a, b) >= 0; }
+__string_ne:: proc(a, b string) -> bool #inline { return !__string_eq(a, b); }
+__string_lt:: proc(a, b string) -> bool #inline { return __string_cmp(a, b) < 0; }
+__string_gt:: proc(a, b string) -> bool #inline { return __string_cmp(a, b) > 0; }
+__string_le:: proc(a, b string) -> bool #inline { return __string_cmp(a, b) <= 0; }
+__string_ge:: proc(a, b string) -> bool #inline { return __string_cmp(a, b) >= 0; }
 
 
-proc __assert(file string, line, column int, msg string) #inline {
+__assert:: proc(file string, line, column int, msg string) #inline {
 	fmt.fprintf(os.stderr, "%(%:%) Runtime assertion: %\n",
 	            file, line, column, msg);
 	__debug_trap();
 }
 
-proc __bounds_check_error(file string, line, column int, index, count int) {
+__bounds_check_error:: proc(file string, line, column int, index, count int) {
 	if 0 <= index && index < count {
 		return;
 	}
@@ -316,7 +312,7 @@ proc __bounds_check_error(file string, line, column int, index, count int) {
 	__debug_trap();
 }
 
-proc __slice_expr_error(file string, line, column int, low, high, max int) {
+__slice_expr_error:: proc(file string, line, column int, low, high, max int) {
 	if 0 <= low && low <= high && high <= max {
 		return;
 	}
@@ -324,7 +320,7 @@ proc __slice_expr_error(file string, line, column int, low, high, max int) {
 	            file, line, column, low, high, max);
 	__debug_trap();
 }
-proc __substring_expr_error(file string, line, column int, low, high int) {
+__substring_expr_error:: proc(file string, line, column int, low, high int) {
 	if 0 <= low && low <= high {
 		return;
 	}

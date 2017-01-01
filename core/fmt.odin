@@ -6,23 +6,23 @@ import {
 
 PRINT_BUF_SIZE :: 1<<12;
 
-proc fprint(fd os.Handle, args ..any) -> int {
-	data :[PRINT_BUF_SIZE]byte;
+fprint :: proc(fd os.Handle, args ..any) -> int {
+	data: [PRINT_BUF_SIZE]byte;
 	buf := data[:0];
 	bprint(^buf, ..args);
 	os.write(fd, buf);
 	return buf.count;
 }
 
-proc fprintln(fd os.Handle, args ..any) -> int {
-	data :[PRINT_BUF_SIZE]byte;
+fprintln :: proc(fd os.Handle, args ..any) -> int {
+	data: [PRINT_BUF_SIZE]byte;
 	buf := data[:0];
 	bprintln(^buf, ..args);
 	os.write(fd, buf);
 	return buf.count;
 }
-proc fprintf(fd os.Handle, fmt string, args ..any) -> int {
-	data :[PRINT_BUF_SIZE]byte;
+fprintf :: proc(fd os.Handle, fmt string, args ..any) -> int {
+	data: [PRINT_BUF_SIZE]byte;
 	buf := data[:0];
 	bprintf(^buf, fmt, ..args);
 	os.write(fd, buf);
@@ -30,20 +30,20 @@ proc fprintf(fd os.Handle, fmt string, args ..any) -> int {
 }
 
 
-proc print(args ..any) -> int {
+print :: proc(args ..any) -> int {
 	return fprint(os.stdout, ..args);
 }
-proc println(args ..any) -> int {
+println :: proc(args ..any) -> int {
 	return fprintln(os.stdout, ..args);
 }
-proc printf(fmt string, args ..any) -> int {
+printf :: proc(fmt string, args ..any) -> int {
 	return fprintf(os.stdout, fmt, ..args);
 }
 
 
 
-proc fprint_type(fd os.Handle, info ^Type_Info) {
-	data :[PRINT_BUF_SIZE]byte;
+fprint_type :: proc(fd os.Handle, info ^Type_Info) {
+	data: [PRINT_BUF_SIZE]byte;
 	buf := data[:0];
 	bprint_type(^buf, info);
 	os.write(fd, buf);
@@ -51,7 +51,7 @@ proc fprint_type(fd os.Handle, info ^Type_Info) {
 
 
 
-proc print_byte_buffer(buf ^[]byte, b []byte) {
+print_byte_buffer :: proc(buf ^[]byte, b []byte) {
 	if buf.count < buf.capacity {
 		n := min(buf.capacity-buf.count, b.count);
 		if n > 0 {
@@ -61,29 +61,29 @@ proc print_byte_buffer(buf ^[]byte, b []byte) {
 	}
 }
 
-proc bprint_string(buf ^[]byte, s string) {
+bprint_string :: proc(buf ^[]byte, s string) {
 	print_byte_buffer(buf, s as []byte);
 }
 
 
-proc byte_reverse(b []byte) {
+byte_reverse :: proc(b []byte) {
 	n := b.count;
 	for i := 0; i < n/2; i++ {
 		b[i], b[n-1-i] = b[n-1-i], b[i];
 	}
 }
 
-proc bprint_rune(buf ^[]byte, r rune) {
+bprint_rune :: proc(buf ^[]byte, r rune) {
 	b, n := utf8.encode_rune(r);
 	bprint_string(buf, b[:n] as string);
 }
 
-proc bprint_space(buf ^[]byte) { bprint_rune(buf, ' '); }
-proc bprint_nl   (buf ^[]byte) { bprint_rune(buf, '\n'); }
+bprint_space :: proc(buf ^[]byte) { bprint_rune(buf, ' '); }
+bprint_nl :: proc   (buf ^[]byte) { bprint_rune(buf, '\n'); }
 
 __NUM_TO_CHAR_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$";
 
-proc bprint_bool(buffer ^[]byte, b bool) {
+bprint_bool :: proc(buffer ^[]byte, b bool) {
 	if b {
 		bprint_string(buffer, "true");
 	} else {
@@ -91,15 +91,15 @@ proc bprint_bool(buffer ^[]byte, b bool) {
 	}
 }
 
-proc bprint_pointer(buffer ^[]byte, p rawptr) #inline {
+bprint_pointer :: proc(buffer ^[]byte, p rawptr) #inline {
 	bprint_string(buffer, "0x");
 	bprint_u64(buffer, p as uint as u64);
 }
 
-proc bprint_f16 (buffer ^[]byte, f f32)  #inline { print__f64(buffer, f as f64, 4); }
-proc bprint_f32 (buffer ^[]byte, f f32)  #inline { print__f64(buffer, f as f64, 7); }
-proc bprint_f64 (buffer ^[]byte, f f64)  #inline { print__f64(buffer, f as f64, 16); }
-proc bprint_u64(buffer ^[]byte, value u64) {
+bprint_f16 :: proc (buffer ^[]byte, f f32)  #inline { print__f64(buffer, f as f64, 4); }
+bprint_f32 :: proc (buffer ^[]byte, f f32)  #inline { print__f64(buffer, f as f64, 7); }
+bprint_f64 :: proc (buffer ^[]byte, f f64)  #inline { print__f64(buffer, f as f64, 16); }
+bprint_u64 :: proc(buffer ^[]byte, value u64) {
 	i := value;
 	buf :[20]byte;
 	len := 0;
@@ -115,7 +115,7 @@ proc bprint_u64(buffer ^[]byte, value u64) {
 	byte_reverse(buf[:len]);
 	bprint_string(buffer, buf[:len] as string);
 }
-proc bprint_i64(buffer ^[]byte, value i64) {
+bprint_i64 :: proc(buffer ^[]byte, value i64) {
 	// TODO(bill): Cleanup printing
 	i := value;
 	if i < 0 {
@@ -126,14 +126,14 @@ proc bprint_i64(buffer ^[]byte, value i64) {
 }
 
 /*
-proc bprint_u128(buffer ^[]byte, value u128) {
+bprint_u128 :: proc(buffer ^[]byte, value u128) {
 	a := value transmute [2]u64;
 	if a[1] != 0 {
 		bprint_u64(buffer, a[1]);
 	}
 	bprint_u64(buffer, a[0]);
 }
-proc bprint_i128(buffer ^[]byte, value i128) {
+bprint_i128 :: proc(buffer ^[]byte, value i128) {
 	i := value;
 	if i < 0 {
 		i = -i;
@@ -144,7 +144,7 @@ proc bprint_i128(buffer ^[]byte, value i128) {
 */
 
 
-proc print__f64(buffer ^[]byte, value f64, decimal_places int) {
+print__f64 :: proc(buffer ^[]byte, value f64, decimal_places int) {
 	f := value;
 	if f == 0 {
 		bprint_rune(buffer, '0');
@@ -170,7 +170,7 @@ proc print__f64(buffer ^[]byte, value f64, decimal_places int) {
 	}
 }
 
-proc bprint_type(buf ^[]byte, ti ^Type_Info) {
+bprint_type :: proc(buf ^[]byte, ti ^Type_Info) {
 	if ti == nil {
 		return;
 	}
@@ -302,14 +302,14 @@ proc bprint_type(buf ^[]byte, ti ^Type_Info) {
 }
 
 
-proc make_any(type_info ^Type_Info, data rawptr) -> any {
+make_any :: proc(type_info ^Type_Info, data rawptr) -> any {
 	a :any;
 	a.type_info = type_info;
 	a.data = data;
 	return a;
 }
 
-proc bprint_any(buf ^[]byte, arg any) {
+bprint_any :: proc(buf ^[]byte, arg any) {
 	if arg.type_info == nil {
 		bprint_string(buf, "<nil>");
 		return;
@@ -423,7 +423,7 @@ proc bprint_any(buf ^[]byte, arg any) {
 		}
 
 	case Vector:
-		proc is_bool(type_info ^Type_Info) -> bool {
+		is_bool :: proc(type_info ^Type_Info) -> bool {
 			match type info : type_info {
 			case Named:
 				return is_bool(info.base);
@@ -481,12 +481,12 @@ proc bprint_any(buf ^[]byte, arg any) {
 }
 
 
-proc bprintf(buf ^[]byte, fmt string, args ..any) -> int {
-	proc is_digit(r rune) -> bool #inline {
+bprintf :: proc(buf ^[]byte, fmt string, args ..any) -> int {
+	is_digit :: proc(r rune) -> bool #inline {
 		return '0' <= r && r <= '9';
 	}
 
-	proc parse_int(s string, offset int) -> (int, int) {
+	parse_int :: proc(s string, offset int) -> (int, int) {
 		result := 0;
 
 		for ; offset < s.count; offset++ {
@@ -546,8 +546,8 @@ proc bprintf(buf ^[]byte, fmt string, args ..any) -> int {
 }
 
 
-proc bprint(buf ^[]byte, args ..any) -> int {
-	proc is_type_string(info ^Type_Info) -> bool {
+bprint :: proc(buf ^[]byte, args ..any) -> int {
+	is_type_string :: proc(info ^Type_Info) -> bool {
 		using Type_Info;
 		if info == nil {
 			return false;
@@ -574,7 +574,7 @@ proc bprint(buf ^[]byte, args ..any) -> int {
 	return buf.count;
 }
 
-proc bprintln(buf ^[]byte, args ..any) -> int {
+bprintln :: proc(buf ^[]byte, args ..any) -> int {
 	for i := 0; i < args.count; i++ {
 		if i > 0 {
 			append(buf, ' ');

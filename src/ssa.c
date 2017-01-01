@@ -3978,104 +3978,96 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 			}
 
 			gb_temp_arena_memory_end(tmp);
-		}
-	case_end;
-
-	case_ast_node(gd, GenericDecl, node);
-		for_array(spec_index, gd->specs) {
-			AstNode *spec = gd->specs.e[spec_index];
-			switch (spec->kind) {
-			case_ast_node(ts, TypeSpec, spec);
-				// NOTE(bill): Generate a new name
-				// parent_proc.name-guid
-				String ts_name = ts->name->Ident.string;
-				isize name_len = proc->name.len + 1 + ts_name.len + 1 + 10 + 1;
-				u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-				i32 guid = cast(i32)proc->module->members.entries.count;
-				name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(ts_name), guid);
-				String name = make_string(name_text, name_len-1);
-
-				Entity **found = map_entity_get(&proc->module->info->definitions, hash_pointer(ts->name));
-				GB_ASSERT(found != NULL);
-				Entity *e = *found;
-				ssaValue *value = ssa_make_value_type_name(proc->module->allocator,
-				                                           name, e->type);
-				map_string_set(&proc->module->type_names, hash_pointer(e->type), name);
-				ssa_gen_global_type_name(proc->module, e, name);
-			case_end;
-			}
-		}
-	case_end;
-
-	case_ast_node(pd, ProcDecl, node);
-		if (pd->body != NULL) {
-			CheckerInfo *info = proc->module->info;
-
-			Entity **found = map_entity_get(&info->definitions, hash_pointer(pd->name));
-			GB_ASSERT_MSG(found != NULL, "Unable to find: %.*s", LIT(pd->name->Ident.string));
-			Entity *e = *found;
-
-
-			if (map_entity_get(&proc->module->min_dep_map, hash_pointer(e)) == NULL) {
-				// NOTE(bill): Nothing depends upon it so doesn't need to be built
-				break;
-			}
-
-			// NOTE(bill): Generate a new name
-			// parent.name-guid
-			String original_name = pd->name->Ident.string;
-			String pd_name = original_name;
-			if (pd->link_name.len > 0) {
-				pd_name = pd->link_name;
-			}
-
-			isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
-			u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-			i32 guid = cast(i32)proc->children.count;
-			name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
-			String name = make_string(name_text, name_len-1);
-
-
-			ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
-			                                           proc->module, e, e->type, pd->type, pd->body, name);
-
-			value->Proc.tags = pd->tags;
-			value->Proc.parent = proc;
-
-			ssa_module_add_value(proc->module, e, value);
-			array_add(&proc->children, &value->Proc);
-			array_add(&proc->module->procs_to_generate, value);
 		} else {
-			CheckerInfo *info = proc->module->info;
+			for_array(i, vd->names) {
+				AstNode *ident = vd->names.e[i];
+				GB_ASSERT(ident->kind == AstNode_Ident);
+				Entity *e = entity_of_ident(proc->module->info, ident);
+				GB_ASSERT(e != NULL);
+				switch (e->kind) {
+				case Entity_TypeName: {
+					// NOTE(bill): Generate a new name
+					// parent_proc.name-guid
+					String ts_name = e->token.string;
+					isize name_len = proc->name.len + 1 + ts_name.len + 1 + 10 + 1;
+					u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
+					i32 guid = cast(i32)proc->module->members.entries.count;
+					name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(ts_name), guid);
+					String name = make_string(name_text, name_len-1);
 
-			Entity **found = map_entity_get(&info->definitions, hash_pointer(pd->name));
-			GB_ASSERT_MSG(found != NULL, "Unable to find: %.*s", LIT(pd->name->Ident.string));
-			Entity *e = *found;
+					ssaValue *value = ssa_make_value_type_name(proc->module->allocator,
+					                                           name, e->type);
+					map_string_set(&proc->module->type_names, hash_pointer(e->type), name);
+					ssa_gen_global_type_name(proc->module, e, name);
+				} break;
+				case Entity_Procedure: {
+					DeclInfo **decl_info = map_decl_info_get(&proc->module->info->entities, hash_pointer(e));
+					GB_ASSERT(decl_info != NULL);
+					DeclInfo *dl = *decl_info;
+					ast_node(pd, ProcLit, dl->proc_decl);
+					if (pd->body != NULL) {
+						CheckerInfo *info = proc->module->info;
 
-			// FFI - Foreign function interace
-			String original_name = pd->name->Ident.string;
-			String name = original_name;
-			if (pd->foreign_name.len > 0) {
-				name = pd->foreign_name;
-			}
+						if (map_entity_get(&proc->module->min_dep_map, hash_pointer(e)) == NULL) {
+							// NOTE(bill): Nothing depends upon it so doesn't need to be built
+							break;
+						}
 
-			ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
-			                                           proc->module, e, e->type, pd->type, pd->body, name);
+						// NOTE(bill): Generate a new name
+						// parent.name-guid
+						String original_name = e->token.string;
+						String pd_name = original_name;
+						if (pd->link_name.len > 0) {
+							pd_name = pd->link_name;
+						}
 
-			value->Proc.tags = pd->tags;
+						isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
+						u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
+						i32 guid = cast(i32)proc->children.count;
+						name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
+						String name = make_string(name_text, name_len-1);
 
-			ssa_module_add_value(proc->module, e, value);
-			ssa_build_proc(value, proc);
 
-			if (value->Proc.tags & ProcTag_foreign) {
-				HashKey key = hash_string(name);
-				ssaValue **prev_value = map_ssa_value_get(&proc->module->members, key);
-				if (prev_value == NULL) {
-					// NOTE(bill): Don't do mutliple declarations in the IR
-					map_ssa_value_set(&proc->module->members, key, value);
+						ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
+						                                           proc->module, e, e->type, pd->type, pd->body, name);
+
+						value->Proc.tags = pd->tags;
+						value->Proc.parent = proc;
+
+						ssa_module_add_value(proc->module, e, value);
+						array_add(&proc->children, &value->Proc);
+						array_add(&proc->module->procs_to_generate, value);
+					} else {
+						CheckerInfo *info = proc->module->info;
+
+						// FFI - Foreign function interace
+						String original_name = e->token.string;
+						String name = original_name;
+						if (pd->foreign_name.len > 0) {
+							name = pd->foreign_name;
+						}
+
+						ssaValue *value = ssa_make_value_procedure(proc->module->allocator,
+						                                           proc->module, e, e->type, pd->type, pd->body, name);
+
+						value->Proc.tags = pd->tags;
+
+						ssa_module_add_value(proc->module, e, value);
+						ssa_build_proc(value, proc);
+
+						if (value->Proc.tags & ProcTag_foreign) {
+							HashKey key = hash_string(name);
+							ssaValue **prev_value = map_ssa_value_get(&proc->module->members, key);
+							if (prev_value == NULL) {
+								// NOTE(bill): Don't do mutliple declarations in the IR
+								map_ssa_value_set(&proc->module->members, key, value);
+							}
+						} else {
+							array_add(&proc->children, &value->Proc);
+						}
+					}
+				} break;
 				}
-			} else {
-				array_add(&proc->children, &value->Proc);
 			}
 		}
 	case_end;
@@ -5034,48 +5026,25 @@ void ssa_gen_tree(ssaGen *s) {
 		} break;
 
 		case Entity_Procedure: {
-			if (decl->proc_decl->kind == AstNode_ProcDecl) {
-				AstNodeProcDecl *pd = &decl->proc_decl->ProcDecl;
-				String original_name = name;
-				AstNode *body = pd->body;
-				if (e->Procedure.is_foreign) {
-					name = e->token.string; // NOTE(bill): Don't use the mangled name
-				}
-				if (pd->foreign_name.len > 0) {
-					name = pd->foreign_name;
-				} else if (pd->link_name.len > 0) {
-					name = pd->link_name;
-				}
+			ast_node(pd, ProcLit, decl->proc_decl);
+			String original_name = name;
+			AstNode *body = pd->body;
+			if (e->Procedure.is_foreign) {
+				name = e->token.string; // NOTE(bill): Don't use the mangled name
+			}
+			if (pd->foreign_name.len > 0) {
+				name = pd->foreign_name;
+			} else if (pd->link_name.len > 0) {
+				name = pd->link_name;
+			}
 
-				ssaValue *p = ssa_make_value_procedure(a, m, e, e->type, decl->type_expr, body, name);
-				p->Proc.tags = pd->tags;
+			ssaValue *p = ssa_make_value_procedure(a, m, e, e->type, decl->type_expr, body, name);
+			p->Proc.tags = pd->tags;
 
-				ssa_module_add_value(m, e, p);
-				HashKey hash_name = hash_string(name);
-				if (map_ssa_value_get(&m->members, hash_name) == NULL) {
-					map_ssa_value_set(&m->members, hash_name, p);
-				}
-			} else if (decl->proc_decl->kind == AstNode_ProcLit) {
-				AstNodeProcLit *pd = &decl->proc_decl->ProcLit;
-				String original_name = name;
-				AstNode *body = pd->body;
-				if (e->Procedure.is_foreign) {
-					name = e->token.string; // NOTE(bill): Don't use the mangled name
-				}
-				if (pd->foreign_name.len > 0) {
-					name = pd->foreign_name;
-				} else if (pd->link_name.len > 0) {
-					name = pd->link_name;
-				}
-
-				ssaValue *p = ssa_make_value_procedure(a, m, e, e->type, decl->type_expr, body, name);
-				p->Proc.tags = pd->tags;
-
-				ssa_module_add_value(m, e, p);
-				HashKey hash_name = hash_string(name);
-				if (map_ssa_value_get(&m->members, hash_name) == NULL) {
-					map_ssa_value_set(&m->members, hash_name, p);
-				}
+			ssa_module_add_value(m, e, p);
+			HashKey hash_name = hash_string(name);
+			if (map_ssa_value_get(&m->members, hash_name) == NULL) {
+				map_ssa_value_set(&m->members, hash_name, p);
 			}
 		} break;
 		}

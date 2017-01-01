@@ -1170,36 +1170,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			switch (spec->kind) {
 			case_ast_node(bd, BadDecl, spec);
 			case_end;
-			case_ast_node(ts, TypeSpec, spec);
-				// NOTE(bill): Handled elsewhere
-			case_end;
-
 			default:
 				error(ast_node_token(spec), "Invalid specification in declaration: `%.*s`", LIT(ast_node_strings[spec->kind]));
 				break;
 			}
 		}
-	case_end;
-
-	case_ast_node(pd, ProcDecl, node);
-		// NOTE(bill): Handled elsewhere
-	#if 1
-		// NOTE(bill): This must be handled here so it has access to the parent scope stuff
-		// e.g. using
-		if (pd->name->kind != AstNode_Ident) {
-			error_node(pd->name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[pd->name->kind]));
-			break;
-		}
-
-		Entity *e = make_entity_procedure(c->allocator, c->context.scope, pd->name->Ident, NULL, pd->tags);
-		e->identifier = pd->name;
-
-		DeclInfo *d = make_declaration_info(c->allocator, e->scope);
-		d->proc_decl = node;
-
-		add_entity_and_decl_info(c, pd->name, e, d);
-		check_entity_decl(c, e, d, NULL);
-	#endif
 	case_end;
 	}
 }

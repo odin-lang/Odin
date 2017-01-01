@@ -308,11 +308,6 @@ bool decl_info_has_init(DeclInfo *d) {
 	}
 	if (d->proc_decl != NULL) {
 		switch (d->proc_decl->kind) {
-		case_ast_node(pd, ProcDecl, d->proc_decl);
-			if (pd->body != NULL) {
-				return true;
-			}
-		case_end;
 		case_ast_node(pd, ProcLit, d->proc_decl);
 			if (pd->body != NULL) {
 				return true;
@@ -1260,23 +1255,6 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 					DelayedDecl di = {parent_scope, spec};
 					array_add(&c->delayed_imports, di);
 				case_end;
-
-				case_ast_node(ts, TypeSpec, spec);
-					if (ts->name->kind != AstNode_Ident) {
-						error_node(ts->name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[ts->name->kind]));
-						continue;
-					}
-					ast_node(n, Ident, ts->name);
-
-					Entity *e = make_entity_type_name(c->allocator, parent_scope, *n, NULL);
-					e->identifier = ts->name;
-
-					DeclInfo *d = make_declaration_info(c->allocator, e->scope);
-					d->type_expr = ts->type;
-					d->init_expr = ts->type;
-					add_entity_and_decl_info(c, ts->name, e, d);
-				case_end;
-
 				default:
 					error(ast_node_token(spec), "Invalid specification in declaration: `%.*s`", LIT(ast_node_strings[spec->kind]));
 					break;
@@ -1293,20 +1271,6 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 			DelayedDecl di = {parent_scope, decl};
 			array_add(&c->delayed_foreign_libraries, di);
 		case_end;
-		case_ast_node(pd, ProcDecl, decl);
-			if (pd->name->kind != AstNode_Ident) {
-				error_node(pd->name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[pd->name->kind]));
-				continue;
-			}
-			ast_node(n, Ident, pd->name);
-			Token token = *n;
-			Entity *e = make_entity_procedure(c->allocator, parent_scope, token, NULL, pd->tags);
-			e->identifier = pd->name;
-			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
-			d->proc_decl = decl;
-			add_entity_and_decl_info(c, pd->name, e, d);
-		case_end;
-
 		default:
 			if (parent_scope->is_file) {
 				error_node(decl, "Only declarations are allowed at file scope");
