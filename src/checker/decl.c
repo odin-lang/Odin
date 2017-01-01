@@ -248,7 +248,6 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 	}
 	e->flags |= EntityFlag_Visited;
 
-	GB_ASSERT(c->context.iota.kind == ExactValue_Invalid);
 	c->context.iota = e->Constant.value;
 	e->Constant.value = (ExactValue){0};
 
@@ -267,7 +266,18 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 
 	Operand operand = {0};
 	if (init != NULL) {
-		check_expr(c, &operand, init);
+		check_expr_or_type(c, &operand, init);
+	}
+	if (operand.mode == Addressing_Type) {
+		c->context.iota = (ExactValue){0};
+
+		e->Constant.value = (ExactValue){0};
+		e->kind = Entity_TypeName;
+
+		DeclInfo *d = c->context.decl;
+		d->type_expr = d->init_expr;
+		check_type_decl(c, e, d->type_expr, named_type);
+		return;
 	}
 
 	check_init_constant(c, e, &operand);
@@ -319,113 +329,221 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 	Type *proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0, false, ProcCC_Odin);
 	e->type = proc_type;
-	ast_node(pd, ProcDecl, d->proc_decl);
+	if (d->proc_decl->kind == AstNode_ProcDecl) {
+		ast_node(pd, ProcDecl, d->proc_decl);
 
-	check_open_scope(c, pd->type);
-	check_procedure_type(c, proc_type, pd->type);
+		check_open_scope(c, pd->type);
+		check_procedure_type(c, proc_type, pd->type);
 
-	bool is_foreign      = (pd->tags & ProcTag_foreign)   != 0;
-	bool is_link_name    = (pd->tags & ProcTag_link_name) != 0;
-	bool is_export       = (pd->tags & ProcTag_export)    != 0;
-	bool is_inline       = (pd->tags & ProcTag_inline)    != 0;
-	bool is_no_inline    = (pd->tags & ProcTag_no_inline) != 0;
+		bool is_foreign      = (pd->tags & ProcTag_foreign)   != 0;
+		bool is_link_name    = (pd->tags & ProcTag_link_name) != 0;
+		bool is_export       = (pd->tags & ProcTag_export)    != 0;
+		bool is_inline       = (pd->tags & ProcTag_inline)    != 0;
+		bool is_no_inline    = (pd->tags & ProcTag_no_inline) != 0;
 
-	if ((d->scope->is_file || d->scope->is_global) &&
-	    str_eq(e->token.string, str_lit("main"))) {
-		if (proc_type != NULL) {
-			TypeProc *pt = &proc_type->Proc;
-			if (pt->param_count != 0 ||
-			    pt->result_count != 0) {
-				gbString str = type_to_string(proc_type);
-				error(e->token, "Procedure type of `main` was expected to be `proc()`, got %s", str);
-				gb_string_free(str);
+		if ((d->scope->is_file || d->scope->is_global) &&
+		    str_eq(e->token.string, str_lit("main"))) {
+			if (proc_type != NULL) {
+				TypeProc *pt = &proc_type->Proc;
+				if (pt->param_count != 0 ||
+				    pt->result_count != 0) {
+					gbString str = type_to_string(proc_type);
+					error(e->token, "Procedure type of `main` was expected to be `proc()`, got %s", str);
+					gb_string_free(str);
+				}
 			}
 		}
-	}
 
-	if (is_inline && is_no_inline) {
-		error_node(pd->type, "You cannot apply both `inline` and `no_inline` to a procedure");
-	}
+		if (is_inline && is_no_inline) {
+			error_node(pd->type, "You cannot apply both `inline` and `no_inline` to a procedure");
+		}
 
-	if (is_foreign && is_link_name) {
-		error_node(pd->type, "You cannot apply both `foreign` and `link_name` to a procedure");
-	} else if (is_foreign && is_export) {
-		error_node(pd->type, "You cannot apply both `foreign` and `export` to a procedure");
-	}
+		if (is_foreign && is_link_name) {
+			error_node(pd->type, "You cannot apply both `foreign` and `link_name` to a procedure");
+		} else if (is_foreign && is_export) {
+			error_node(pd->type, "You cannot apply both `foreign` and `export` to a procedure");
+		}
 
 
-	if (pd->body != NULL) {
+		if (pd->body != NULL) {
+			if (is_foreign) {
+				error_node(pd->body, "A procedure tagged as `#foreign` cannot have a body");
+			}
+
+			if (proc_type->Proc.calling_convention != ProcCC_Odin) {
+				error_node(d->proc_decl, "An internal procedure may only have the Odin calling convention");
+				proc_type->Proc.calling_convention = ProcCC_Odin;
+			}
+
+			d->scope = c->context.scope;
+
+			GB_ASSERT(pd->body->kind == AstNode_BlockStmt);
+			check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pd->body, pd->tags);
+		}
+
 		if (is_foreign) {
-			error_node(pd->body, "A procedure tagged as `#foreign` cannot have a body");
-		}
-
-		if (proc_type->Proc.calling_convention != ProcCC_Odin) {
-			error_node(d->proc_decl, "An internal procedure may only have the Odin calling convention");
-			proc_type->Proc.calling_convention = ProcCC_Odin;
-		}
-
-		d->scope = c->context.scope;
-
-		GB_ASSERT(pd->body->kind == AstNode_BlockStmt);
-		check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pd->body, pd->tags);
-	}
-
-	if (is_foreign) {
-		MapEntity *fp = &c->info.foreign_procs;
-		AstNodeProcDecl *proc_decl = &d->proc_decl->ProcDecl;
-		String name = proc_decl->name->Ident.string;
-		if (proc_decl->foreign_name.len > 0) {
-			name = proc_decl->foreign_name;
-		}
-
-		e->Procedure.is_foreign = true;
-		e->Procedure.foreign_name = name;
-
-		HashKey key = hash_string(name);
-		Entity **found = map_entity_get(fp, key);
-		if (found) {
-			Entity *f = *found;
-			TokenPos pos = f->token.pos;
-			Type *this_type = base_type(e->type);
-			Type *other_type = base_type(f->type);
-			if (!are_signatures_similar_enough(this_type, other_type)) {
-				error_node(d->proc_decl,
-				           "Redeclaration of #foreign procedure `%.*s` with different type signatures\n"
-				           "\tat %.*s(%td:%td)",
-				           LIT(name), LIT(pos.file), pos.line, pos.column);
-			}
-		} else {
-			map_entity_set(fp, key, e);
-		}
-	} else {
-		String name = e->token.string;
-		if (is_link_name) {
-			AstNodeProcDecl *proc_decl = &d->proc_decl->ProcDecl;
-			name = proc_decl->link_name;
-		}
-
-		if (is_link_name || is_export) {
 			MapEntity *fp = &c->info.foreign_procs;
+			AstNodeProcDecl *proc_decl = &d->proc_decl->ProcDecl;
+			String name = proc_decl->name->Ident.string;
+			if (proc_decl->foreign_name.len > 0) {
+				name = proc_decl->foreign_name;
+			}
 
-			e->Procedure.link_name = name;
+			e->Procedure.is_foreign = true;
+			e->Procedure.foreign_name = name;
 
 			HashKey key = hash_string(name);
 			Entity **found = map_entity_get(fp, key);
 			if (found) {
 				Entity *f = *found;
 				TokenPos pos = f->token.pos;
-				// TODO(bill): Better error message?
-				error_node(d->proc_decl,
-				           "Non unique linking name for procedure `%.*s`\n"
-				           "\tother at %.*s(%td:%td)",
-				           LIT(name), LIT(pos.file), pos.line, pos.column);
+				Type *this_type = base_type(e->type);
+				Type *other_type = base_type(f->type);
+				if (!are_signatures_similar_enough(this_type, other_type)) {
+					error_node(d->proc_decl,
+					           "Redeclaration of #foreign procedure `%.*s` with different type signatures\n"
+					           "\tat %.*s(%td:%td)",
+					           LIT(name), LIT(pos.file), pos.line, pos.column);
+				}
 			} else {
 				map_entity_set(fp, key, e);
 			}
-		}
-	}
+		} else {
+			String name = e->token.string;
+			if (is_link_name) {
+				AstNodeProcDecl *proc_decl = &d->proc_decl->ProcDecl;
+				name = proc_decl->link_name;
+			}
 
-	check_close_scope(c);
+			if (is_link_name || is_export) {
+				MapEntity *fp = &c->info.foreign_procs;
+
+				e->Procedure.link_name = name;
+
+				HashKey key = hash_string(name);
+				Entity **found = map_entity_get(fp, key);
+				if (found) {
+					Entity *f = *found;
+					TokenPos pos = f->token.pos;
+					// TODO(bill): Better error message?
+					error_node(d->proc_decl,
+					           "Non unique linking name for procedure `%.*s`\n"
+					           "\tother at %.*s(%td:%td)",
+					           LIT(name), LIT(pos.file), pos.line, pos.column);
+				} else {
+					map_entity_set(fp, key, e);
+				}
+			}
+		}
+
+		check_close_scope(c);
+	} else if (d->proc_decl->kind == AstNode_ProcLit) {
+		ast_node(pd, ProcLit, d->proc_decl);
+
+		check_open_scope(c, pd->type);
+		check_procedure_type(c, proc_type, pd->type);
+
+		bool is_foreign      = (pd->tags & ProcTag_foreign)   != 0;
+		bool is_link_name    = (pd->tags & ProcTag_link_name) != 0;
+		bool is_export       = (pd->tags & ProcTag_export)    != 0;
+		bool is_inline       = (pd->tags & ProcTag_inline)    != 0;
+		bool is_no_inline    = (pd->tags & ProcTag_no_inline) != 0;
+
+		if ((d->scope->is_file || d->scope->is_global) &&
+		    str_eq(e->token.string, str_lit("main"))) {
+			if (proc_type != NULL) {
+				TypeProc *pt = &proc_type->Proc;
+				if (pt->param_count != 0 ||
+				    pt->result_count != 0) {
+					gbString str = type_to_string(proc_type);
+					error(e->token, "Procedure type of `main` was expected to be `proc()`, got %s", str);
+					gb_string_free(str);
+				}
+			}
+		}
+
+		if (is_inline && is_no_inline) {
+			error_node(pd->type, "You cannot apply both `inline` and `no_inline` to a procedure");
+		}
+
+		if (is_foreign && is_link_name) {
+			error_node(pd->type, "You cannot apply both `foreign` and `link_name` to a procedure");
+		} else if (is_foreign && is_export) {
+			error_node(pd->type, "You cannot apply both `foreign` and `export` to a procedure");
+		}
+
+
+		if (pd->body != NULL) {
+			if (is_foreign) {
+				error_node(pd->body, "A procedure tagged as `#foreign` cannot have a body");
+			}
+
+			if (proc_type->Proc.calling_convention != ProcCC_Odin) {
+				error_node(d->proc_decl, "An internal procedure may only have the Odin calling convention");
+				proc_type->Proc.calling_convention = ProcCC_Odin;
+			}
+
+			d->scope = c->context.scope;
+
+			GB_ASSERT(pd->body->kind == AstNode_BlockStmt);
+			check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pd->body, pd->tags);
+		}
+
+		if (is_foreign) {
+			MapEntity *fp = &c->info.foreign_procs;
+			String name = e->token.string;
+			if (pd->foreign_name.len > 0) {
+				name = pd->foreign_name;
+			}
+
+			e->Procedure.is_foreign = true;
+			e->Procedure.foreign_name = name;
+
+			HashKey key = hash_string(name);
+			Entity **found = map_entity_get(fp, key);
+			if (found) {
+				Entity *f = *found;
+				TokenPos pos = f->token.pos;
+				Type *this_type = base_type(e->type);
+				Type *other_type = base_type(f->type);
+				if (!are_signatures_similar_enough(this_type, other_type)) {
+					error_node(d->proc_decl,
+					           "Redeclaration of #foreign procedure `%.*s` with different type signatures\n"
+					           "\tat %.*s(%td:%td)",
+					           LIT(name), LIT(pos.file), pos.line, pos.column);
+				}
+			} else {
+				map_entity_set(fp, key, e);
+			}
+		} else {
+			String name = e->token.string;
+			if (is_link_name) {
+				name = pd->link_name;
+			}
+
+			if (is_link_name || is_export) {
+				MapEntity *fp = &c->info.foreign_procs;
+
+				e->Procedure.link_name = name;
+
+				HashKey key = hash_string(name);
+				Entity **found = map_entity_get(fp, key);
+				if (found) {
+					Entity *f = *found;
+					TokenPos pos = f->token.pos;
+					// TODO(bill): Better error message?
+					error_node(d->proc_decl,
+					           "Non unique linking name for procedure `%.*s`\n"
+					           "\tother at %.*s(%td:%td)",
+					           LIT(name), LIT(pos.file), pos.line, pos.column);
+				} else {
+					map_entity_set(fp, key, e);
+				}
+			}
+		}
+
+		check_close_scope(c);
+	}
 }
 
 void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, AstNode *init_expr) {

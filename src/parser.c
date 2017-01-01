@@ -1740,31 +1740,25 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 	// Parse Procedure Type or Literal
 	case Token_proc: {
+		Token token = f->curr_token;
 		String foreign_name = {0};
 		String link_name = {0};
-		AstNode *curr_proc = f->curr_proc;
 		AstNode *type = parse_proc_type(f, &foreign_name, &link_name);
-		f->curr_proc = type;
-
-		if (type->ProcType.tags & ProcTag_foreign) {
-			syntax_error(f->curr_token, "#foreign cannot be applied to procedure literals");
-		}
-		if (type->ProcType.tags & ProcTag_export) {
-			syntax_error(f->curr_token, "#export cannot be applied to procedure literals");
-		}
 
 		if (f->curr_token.kind == Token_OpenBrace) {
-			AstNode *body;
+			u64 tags = type->ProcType.tags;
 
-			if ((type->ProcType.tags & ProcTag_foreign) != 0) {
-				syntax_error(f->curr_token, "A procedure tagged as `#foreign` cannot have a body");
+			if ((tags & ProcTag_foreign) != 0) {
+				syntax_error(token, "A procedure tagged as `#foreign` cannot have a body");
 			}
+			AstNode *curr_proc = f->curr_proc;
+			f->curr_proc = type;
+			AstNode *body = parse_body(f);
+			f->curr_proc = curr_proc;
 
-			body = parse_body(f);
-			type = make_proc_lit(f, type, body, type->ProcType.tags, foreign_name, link_name);
+			return make_proc_lit(f, type, body, tags, foreign_name, link_name);
 		}
 
-		f->curr_proc = curr_proc;
 		return type;
 	}
 
@@ -1941,7 +1935,15 @@ AstNode *parse_type(AstFile *f);
 
 AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 	switch (f->curr_token.kind) {
-	case Token_Pointer:
+	case Token_Pointer: {
+		Token op = f->curr_token;
+		next_token(f);
+		AstNode *expr = parse_unary_expr(f, lhs);
+		if (is_ast_node_type(expr)) {
+			return make_pointer_type(f, op, expr);
+		}
+		return make_unary_expr(f, op, expr);
+	} break;
 	case Token_Maybe:
 	case Token_Add:
 	case Token_Sub:

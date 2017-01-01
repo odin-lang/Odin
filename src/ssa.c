@@ -5038,25 +5038,48 @@ void ssa_gen_tree(ssaGen *s) {
 		} break;
 
 		case Entity_Procedure: {
-			AstNodeProcDecl *pd = &decl->proc_decl->ProcDecl;
-			String original_name = name;
-			AstNode *body = pd->body;
-			if (e->Procedure.is_foreign) {
-				name = e->token.string; // NOTE(bill): Don't use the mangled name
-			}
-			if (pd->foreign_name.len > 0) {
-				name = pd->foreign_name;
-			} else if (pd->link_name.len > 0) {
-				name = pd->link_name;
-			}
+			if (decl->proc_decl->kind == AstNode_ProcDecl) {
+				AstNodeProcDecl *pd = &decl->proc_decl->ProcDecl;
+				String original_name = name;
+				AstNode *body = pd->body;
+				if (e->Procedure.is_foreign) {
+					name = e->token.string; // NOTE(bill): Don't use the mangled name
+				}
+				if (pd->foreign_name.len > 0) {
+					name = pd->foreign_name;
+				} else if (pd->link_name.len > 0) {
+					name = pd->link_name;
+				}
 
-			ssaValue *p = ssa_make_value_procedure(a, m, e, e->type, decl->type_expr, body, name);
-			p->Proc.tags = pd->tags;
+				ssaValue *p = ssa_make_value_procedure(a, m, e, e->type, decl->type_expr, body, name);
+				p->Proc.tags = pd->tags;
 
-			ssa_module_add_value(m, e, p);
-			HashKey hash_name = hash_string(name);
-			if (map_ssa_value_get(&m->members, hash_name) == NULL) {
-				map_ssa_value_set(&m->members, hash_name, p);
+				ssa_module_add_value(m, e, p);
+				HashKey hash_name = hash_string(name);
+				if (map_ssa_value_get(&m->members, hash_name) == NULL) {
+					map_ssa_value_set(&m->members, hash_name, p);
+				}
+			} else if (decl->proc_decl->kind == AstNode_ProcLit) {
+				AstNodeProcLit *pd = &decl->proc_decl->ProcLit;
+				String original_name = name;
+				AstNode *body = pd->body;
+				if (e->Procedure.is_foreign) {
+					name = e->token.string; // NOTE(bill): Don't use the mangled name
+				}
+				if (pd->foreign_name.len > 0) {
+					name = pd->foreign_name;
+				} else if (pd->link_name.len > 0) {
+					name = pd->link_name;
+				}
+
+				ssaValue *p = ssa_make_value_procedure(a, m, e, e->type, decl->type_expr, body, name);
+				p->Proc.tags = pd->tags;
+
+				ssa_module_add_value(m, e, p);
+				HashKey hash_name = hash_string(name);
+				if (map_ssa_value_get(&m->members, hash_name) == NULL) {
+					map_ssa_value_set(&m->members, hash_name, p);
+				}
 			}
 		} break;
 		}

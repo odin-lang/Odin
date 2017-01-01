@@ -11,8 +11,7 @@ import {
 	win32 "sys/windows.odin";
 }
 
-
-type Thing enum f64 {
+const Thing = enum f64 {
 	_, // Ignore first value
 	A = 1<<(10*iota),
 	B,
@@ -20,21 +19,6 @@ type Thing enum f64 {
 	D,
 };
 
-proc main() {
-	var ti = type_info(Thing);
-	match type info : type_info_base(ti) {
-	case Type_Info.Enum:
-		for var i = 0; i < info.names.count; i++ {
-			if i > 0 {
-				fmt.print(", ");
-			}
-			fmt.print(info.names[i]);
-		}
-		fmt.println();
-	}
-
-	var x Thing = Thing.A;
-
-	fmt.println(x, Thing.B, Thing.C, Thing.D);
-
+const main = proc() {
+	fmt.println(Thing.A, Thing.B, Thing.C, Thing.D);
 }

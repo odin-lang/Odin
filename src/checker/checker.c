@@ -883,6 +883,9 @@ void add_type_info_type(Checker *c, Type *t) {
 
 	case Type_Record: {
 		switch (bt->Record.kind) {
+		case TypeRecord_Enum:
+			add_type_info_type(c, bt->Record.enum_base_type);
+			break;
 		case TypeRecord_Union:
 			add_type_info_type(c, t_int);
 			/* fallthrough */
@@ -1072,13 +1075,13 @@ void init_preload(Checker *c) {
 	c->done_preload = true;
 }
 
-void check_arity_match(Checker *c, AstNodeValueSpec *s, AstNodeValueSpec *init);
+bool check_arity_match(Checker *c, AstNodeValueSpec *s, AstNodeValueSpec *init);
 
 #include "expr.c"
 #include "decl.c"
 #include "stmt.c"
 
-void check_arity_match(Checker *c, AstNodeValueSpec *s, AstNodeValueSpec *init) {
+bool check_arity_match(Checker *c, AstNodeValueSpec *s, AstNodeValueSpec *init) {
 	isize lhs = s->names.count;
 	isize rhs = s->values.count;
 	if (init != NULL) {
@@ -1088,6 +1091,7 @@ void check_arity_match(Checker *c, AstNodeValueSpec *s, AstNodeValueSpec *init) 
 	if (init == NULL && rhs == 0) {
 		if (s->type == NULL) {
 			error_node(s->names.e[0], "Missing type or initial expression");
+			return false;
 		}
 	} else if (lhs < rhs) {
 		if (lhs < s->values.count) {
@@ -1098,12 +1102,16 @@ void check_arity_match(Checker *c, AstNodeValueSpec *s, AstNodeValueSpec *init) 
 		} else {
 			error_node(s->names.e[0], "Extra initial expression");
 		}
+		return false;
 	} else if (lhs > rhs && (init != NULL || rhs != 1)) {
 		AstNode *n = s->names.e[rhs];
 		gbString str = expr_to_string(n);
 		error_node(n, "Missing expression for `%s`", str);
 		gb_string_free(str);
+		return false;
 	}
+
+	return true;
 }
 
 
@@ -1234,19 +1242,34 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 								continue;
 							}
 
-							ExactValue v = make_exact_value_integer(iota);
-							Entity *e = make_entity_constant(c->allocator, parent_scope, name->Ident, NULL, v);
-							e->identifier = name;
 
 							AstNode *init = NULL;
 							if (i < prev_spec->values.count) {
 								init = prev_spec->values.e[i];
 							}
 
-							DeclInfo *di = make_declaration_info(c->allocator, e->scope);
-							di->type_expr = prev_spec->type;
-							di->init_expr = init;
-							add_entity_and_decl_info(c, name, e, di);
+							DeclInfo *d = make_declaration_info(c->allocator, parent_scope);
+							Entity *e = NULL;
+
+							ExactValue v_iota = make_exact_value_integer(iota);
+
+							AstNode *up_init = unparen_expr(init);
+							if (init != NULL && is_ast_node_type(up_init)) {
+								e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
+								d->type_expr = init;
+								d->init_expr = init;
+							} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
+								e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
+								d->proc_decl = init;
+							} else {
+								e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, v_iota);
+								d->type_expr = prev_spec->type;
+								d->init_expr = init;
+							}
+							GB_ASSERT(e != NULL);
+							e->identifier = name;
+
+							add_entity_and_decl_info(c, name, e, d);
 						}
 
 						check_arity_match(c, vs, prev_spec);
@@ -1263,6 +1286,7 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 
 					Entity *e = make_entity_type_name(c->allocator, parent_scope, *n, NULL);
 					e->identifier = ts->name;
+
 					DeclInfo *d = make_declaration_info(c->allocator, e->scope);
 					d->type_expr = ts->type;
 					d->init_expr = ts->type;

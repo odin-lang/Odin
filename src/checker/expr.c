@@ -113,21 +113,35 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 								continue;
 							}
 
-							ExactValue v = make_exact_value_integer(iota);
-							Entity *e = make_entity_constant(c->allocator, c->context.scope, name->Ident, NULL, v);
-							e->identifier = name;
-
 							AstNode *init = NULL;
-							if (i < last->values.count) {
-								init = last->values.e[i];
+							if (i < vs->values.count) {
+								init = vs->values.e[i];
 							}
 
-							DeclInfo *di = make_declaration_info(c->allocator, e->scope);
-							di->type_expr = last->type;
-							di->init_expr = init;
-							add_entity_and_decl_info(c, name, e, di);
+							DeclInfo *d = make_declaration_info(c->allocator, c->context.scope);
+							Entity *e = NULL;
 
-							DelayedEntity delay = {name, e, di};
+							ExactValue v_iota = make_exact_value_integer(iota);
+
+							AstNode *up_init = unparen_expr(init);
+							if (init != NULL && is_ast_node_type(up_init)) {
+								e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
+								d->type_expr = init;
+								d->init_expr = init;
+							} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
+								e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
+								d->proc_decl = init;
+							} else {
+								e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, v_iota);
+								d->type_expr = vs->type;
+								d->init_expr = init;
+							}
+							GB_ASSERT(e != NULL);
+							e->identifier = name;
+
+							add_entity_and_decl_info(c, name, e, d);
+
+							DelayedEntity delay = {name, e, d};
 							array_add(delayed_entities, delay);
 						}
 
