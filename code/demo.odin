@@ -11,7 +11,7 @@ import {
 	win32 "sys/windows.odin";
 }
 
-const Thing = enum f64 {
+Thing :: enum f64 {
 	_, // Ignore first value
 	A = 1<<(10*iota),
 	B,
@@ -19,6 +19,9 @@ const Thing = enum f64 {
 	D,
 };
 
-const main = proc() {
+main :: proc() {
 	fmt.println(Thing.A, Thing.B, Thing.C, Thing.D);
+
+	x := 123;
+	fmt.println(x);
 }

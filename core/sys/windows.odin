@@ -20,42 +20,42 @@ type {
 	WNDPROC   proc(hwnd HWND, msg u32, wparam WPARAM, lparam LPARAM) -> LRESULT;
 }
 
-const {
-	INVALID_HANDLE_VALUE = (-1 as int) as HANDLE;
 
-	FALSE BOOL = 0;
-	TRUE  BOOL = 1;
+INVALID_HANDLE_VALUE :: (-1 as int) as HANDLE;
 
-	CS_VREDRAW    = 0x0001;
-	CS_HREDRAW    = 0x0002;
-	CS_OWNDC      = 0x0020;
-	CW_USEDEFAULT = -0x80000000;
+FALSE: BOOL : 0;
+TRUE:  BOOL : 1;
 
-	WS_OVERLAPPED       = 0;
-	WS_MAXIMIZEBOX      = 0x00010000;
-	WS_MINIMIZEBOX      = 0x00020000;
-	WS_THICKFRAME       = 0x00040000;
-	WS_SYSMENU          = 0x00080000;
-	WS_CAPTION          = 0x00C00000;
-	WS_VISIBLE          = 0x10000000;
-	WS_OVERLAPPEDWINDOW = WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
+CS_VREDRAW    :: 0x0001;
+CS_HREDRAW    :: 0x0002;
+CS_OWNDC      :: 0x0020;
+CW_USEDEFAULT :: -0x80000000;
 
-	WM_DESTROY = 0x0002;
-	WM_CLOSE   = 0x0010;
-	WM_QUIT    = 0x0012;
-	WM_KEYDOWN = 0x0100;
-	WM_KEYUP   = 0x0101;
+WS_OVERLAPPED       :: 0;
+WS_MAXIMIZEBOX      :: 0x00010000;
+WS_MINIMIZEBOX      :: 0x00020000;
+WS_THICKFRAME       :: 0x00040000;
+WS_SYSMENU          :: 0x00080000;
+WS_CAPTION          :: 0x00C00000;
+WS_VISIBLE          :: 0x10000000;
+WS_OVERLAPPEDWINDOW :: WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
 
-	PM_REMOVE = 1;
+WM_DESTROY :: 0x0002;
+WM_CLOSE   :: 0x0010;
+WM_QUIT    :: 0x0012;
+WM_KEYDOWN :: 0x0100;
+WM_KEYUP   :: 0x0101;
 
-	COLOR_BACKGROUND = 1 as HBRUSH;
-	BLACK_BRUSH = 4;
+PM_REMOVE :: 1;
 
-	SM_CXSCREEN = 0;
-	SM_CYSCREEN = 1;
+COLOR_BACKGROUND :: 1 as HBRUSH;
+BLACK_BRUSH :: 4;
 
-	SW_SHOW = 5;
-}
+SM_CXSCREEN :: 0;
+SM_CYSCREEN :: 1;
+
+SW_SHOW :: 5;
+
 
 type {
 	POINT struct #ordered {
@@ -118,10 +118,8 @@ type {
 
 	GET_FILEEX_INFO_LEVELS i32;
 }
-const {
-	GetFileExInfoStandard = 0 as GET_FILEEX_INFO_LEVELS;
-	GetFileExMaxInfoLevel = 1 as GET_FILEEX_INFO_LEVELS;
-}
+GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0;
+GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1;
 
 proc GetLastError    () -> i32                           #foreign #dll_import
 proc ExitProcess     (exit_code u32)                    #foreign #dll_import
@@ -163,7 +161,7 @@ proc GetActiveWindow () -> HWND #foreign #dll_import
 
 
 proc GetQueryPerformanceFrequency() -> i64 {
-	var r i64;
+	r: i64;
 	QueryPerformanceFrequency(^r);
 	return r;
 }
@@ -191,60 +189,54 @@ proc SetFilePointer(file_handle HANDLE, distance_to_move i32, distance_to_move_h
 
 proc SetHandleInformation(obj HANDLE, mask, flags u32) -> BOOL #foreign #dll_import
 
-const {
-	HANDLE_FLAG_INHERIT = 1;
-	HANDLE_FLAG_PROTECT_FROM_CLOSE = 2;
-}
+HANDLE_FLAG_INHERIT :: 1;
+HANDLE_FLAG_PROTECT_FROM_CLOSE :: 2;
 
 
-const {
-	FILE_BEGIN   = 0;
-	FILE_CURRENT = 1;
-	FILE_END     = 2;
-}
+FILE_BEGIN   :: 0;
+FILE_CURRENT :: 1;
+FILE_END     :: 2;
 
-const {
-	FILE_SHARE_READ      = 0x00000001;
-	FILE_SHARE_WRITE     = 0x00000002;
-	FILE_SHARE_DELETE    = 0x00000004;
-	FILE_GENERIC_ALL     = 0x10000000;
-	FILE_GENERIC_EXECUTE = 0x20000000;
-	FILE_GENERIC_WRITE   = 0x40000000;
-	FILE_GENERIC_READ    = 0x80000000;
+FILE_SHARE_READ      :: 0x00000001;
+FILE_SHARE_WRITE     :: 0x00000002;
+FILE_SHARE_DELETE    :: 0x00000004;
+FILE_GENERIC_ALL     :: 0x10000000;
+FILE_GENERIC_EXECUTE :: 0x20000000;
+FILE_GENERIC_WRITE   :: 0x40000000;
+FILE_GENERIC_READ    :: 0x80000000;
 
-	FILE_APPEND_DATA = 0x0004;
+FILE_APPEND_DATA :: 0x0004;
 
-	STD_INPUT_HANDLE  = -10;
-	STD_OUTPUT_HANDLE = -11;
-	STD_ERROR_HANDLE  = -12;
+STD_INPUT_HANDLE  :: -10;
+STD_OUTPUT_HANDLE :: -11;
+STD_ERROR_HANDLE  :: -12;
 
-	CREATE_NEW        = 1;
-	CREATE_ALWAYS     = 2;
-	OPEN_EXISTING     = 3;
-	OPEN_ALWAYS       = 4;
-	TRUNCATE_EXISTING = 5;
+CREATE_NEW        :: 1;
+CREATE_ALWAYS     :: 2;
+OPEN_EXISTING     :: 3;
+OPEN_ALWAYS       :: 4;
+TRUNCATE_EXISTING :: 5;
 
-	FILE_ATTRIBUTE_READONLY             = 0x00000001;
-	FILE_ATTRIBUTE_HIDDEN               = 0x00000002;
-	FILE_ATTRIBUTE_SYSTEM               = 0x00000004;
-	FILE_ATTRIBUTE_DIRECTORY            = 0x00000010;
-	FILE_ATTRIBUTE_ARCHIVE              = 0x00000020;
-	FILE_ATTRIBUTE_DEVICE               = 0x00000040;
-	FILE_ATTRIBUTE_NORMAL               = 0x00000080;
-	FILE_ATTRIBUTE_TEMPORARY            = 0x00000100;
-	FILE_ATTRIBUTE_SPARSE_FILE          = 0x00000200;
-	FILE_ATTRIBUTE_REPARSE_POINT        = 0x00000400;
-	FILE_ATTRIBUTE_COMPRESSED           = 0x00000800;
-	FILE_ATTRIBUTE_OFFLINE              = 0x00001000;
-	FILE_ATTRIBUTE_NOT_CONTENT_INDEXED  = 0x00002000;
-	FILE_ATTRIBUTE_ENCRYPTED            = 0x00004000;
+FILE_ATTRIBUTE_READONLY             :: 0x00000001;
+FILE_ATTRIBUTE_HIDDEN               :: 0x00000002;
+FILE_ATTRIBUTE_SYSTEM               :: 0x00000004;
+FILE_ATTRIBUTE_DIRECTORY            :: 0x00000010;
+FILE_ATTRIBUTE_ARCHIVE              :: 0x00000020;
+FILE_ATTRIBUTE_DEVICE               :: 0x00000040;
+FILE_ATTRIBUTE_NORMAL               :: 0x00000080;
+FILE_ATTRIBUTE_TEMPORARY            :: 0x00000100;
+FILE_ATTRIBUTE_SPARSE_FILE          :: 0x00000200;
+FILE_ATTRIBUTE_REPARSE_POINT        :: 0x00000400;
+FILE_ATTRIBUTE_COMPRESSED           :: 0x00000800;
+FILE_ATTRIBUTE_OFFLINE              :: 0x00001000;
+FILE_ATTRIBUTE_NOT_CONTENT_INDEXED  :: 0x00002000;
+FILE_ATTRIBUTE_ENCRYPTED            :: 0x00004000;
 
-	FILE_TYPE_DISK = 0x0001;
-	FILE_TYPE_CHAR = 0x0002;
-	FILE_TYPE_PIPE = 0x0003;
+FILE_TYPE_DISK :: 0x0001;
+FILE_TYPE_CHAR :: 0x0002;
+FILE_TYPE_PIPE :: 0x0003;
 
-	INVALID_SET_FILE_POINTER = ~(0 as u32);
-}
+INVALID_SET_FILE_POINTER :: ~(0 as u32);
 
 
 
@@ -255,7 +247,7 @@ proc HeapFree      (h HANDLE, flags u32, memory rawptr) -> BOOL               #f
 proc GetProcessHeap() -> HANDLE #foreign #dll_import
 
 
-const HEAP_ZERO_MEMORY = 0x00000008;
+HEAP_ZERO_MEMORY :: 0x00000008;
 
 // Synchronization
 
@@ -265,7 +257,7 @@ type SECURITY_ATTRIBUTES struct #ordered {
 	inherit_handle      BOOL;
 }
 
-const INFINITE = 0xffffffff;
+INFINITE :: 0xffffffff;
 
 proc CreateSemaphoreA   (attributes ^SECURITY_ATTRIBUTES, initial_count, maximum_count i32, name ^byte) -> HANDLE #foreign #dll_import
 proc ReleaseSemaphore   (semaphore HANDLE, release_count i32, previous_count ^i32) -> BOOL #foreign #dll_import
@@ -314,11 +306,10 @@ type {
 	}
 }
 
-const {
-	BI_RGB         = 0;
-	DIB_RGB_COLORS = 0x00;
-	SRCCOPY        = 0x00cc0020 as u32;
-}
+BI_RGB         :: 0;
+DIB_RGB_COLORS :: 0x00;
+SRCCOPY: u32    : 0x00cc0020;
+
 
 proc StretchDIBits(hdc HDC,
                    x_dst, y_dst, width_dst, height_dst i32,
@@ -338,29 +329,27 @@ proc GetClientRect(hwnd HWND, rect ^RECT) -> BOOL #foreign
 
 
 // Windows OpenGL
-const {
-	PFD_TYPE_RGBA             = 0;
-	PFD_TYPE_COLORINDEX       = 1;
-	PFD_MAIN_PLANE            = 0;
-	PFD_OVERLAY_PLANE         = 1;
-	PFD_UNDERLAY_PLANE        = -1;
-	PFD_DOUBLEBUFFER          = 1;
-	PFD_STEREO                = 2;
-	PFD_DRAW_TO_WINDOW        = 4;
-	PFD_DRAW_TO_BITMAP        = 8;
-	PFD_SUPPORT_GDI           = 16;
-	PFD_SUPPORT_OPENGL        = 32;
-	PFD_GENERIC_FORMAT        = 64;
-	PFD_NEED_PALETTE          = 128;
-	PFD_NEED_SYSTEM_PALETTE   = 0x00000100;
-	PFD_SWAP_EXCHANGE         = 0x00000200;
-	PFD_SWAP_COPY             = 0x00000400;
-	PFD_SWAP_LAYER_BUFFERS    = 0x00000800;
-	PFD_GENERIC_ACCELERATED   = 0x00001000;
-	PFD_DEPTH_DONTCARE        = 0x20000000;
-	PFD_DOUBLEBUFFER_DONTCARE = 0x40000000;
-	PFD_STEREO_DONTCARE       = 0x80000000;
-}
+PFD_TYPE_RGBA             :: 0;
+PFD_TYPE_COLORINDEX       :: 1;
+PFD_MAIN_PLANE            :: 0;
+PFD_OVERLAY_PLANE         :: 1;
+PFD_UNDERLAY_PLANE        :: -1;
+PFD_DOUBLEBUFFER          :: 1;
+PFD_STEREO                :: 2;
+PFD_DRAW_TO_WINDOW        :: 4;
+PFD_DRAW_TO_BITMAP        :: 8;
+PFD_SUPPORT_GDI           :: 16;
+PFD_SUPPORT_OPENGL        :: 32;
+PFD_GENERIC_FORMAT        :: 64;
+PFD_NEED_PALETTE          :: 128;
+PFD_NEED_SYSTEM_PALETTE   :: 0x00000100;
+PFD_SWAP_EXCHANGE         :: 0x00000200;
+PFD_SWAP_COPY             :: 0x00000400;
+PFD_SWAP_LAYER_BUFFERS    :: 0x00000800;
+PFD_GENERIC_ACCELERATED   :: 0x00001000;
+PFD_DEPTH_DONTCARE        :: 0x20000000;
+PFD_DOUBLEBUFFER_DONTCARE :: 0x40000000;
+PFD_STEREO_DONTCARE       :: 0x80000000;
 
 type {
 	HGLRC HANDLE;
@@ -406,13 +395,11 @@ proc ChoosePixelFormat(hdc HDC, pfd ^PIXELFORMATDESCRIPTOR) -> i32 #foreign #dll
 proc SwapBuffers      (hdc HDC) -> BOOL #foreign #dll_import
 proc ReleaseDC        (wnd HWND, hdc HDC) -> i32 #foreign #dll_import
 
-const {
-	WGL_CONTEXT_MAJOR_VERSION_ARB             = 0x2091;
-	WGL_CONTEXT_MINOR_VERSION_ARB             = 0x2092;
-	WGL_CONTEXT_PROFILE_MASK_ARB              = 0x9126;
-	WGL_CONTEXT_CORE_PROFILE_BIT_ARB          = 0x0001;
-	WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB = 0x0002;
-}
+WGL_CONTEXT_MAJOR_VERSION_ARB             :: 0x2091;
+WGL_CONTEXT_MINOR_VERSION_ARB             :: 0x2092;
+WGL_CONTEXT_PROFILE_MASK_ARB              :: 0x9126;
+WGL_CONTEXT_CORE_PROFILE_BIT_ARB          :: 0x0001;
+WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB :: 0x0002;
 
 proc wglCreateContext (hdc HDC) -> HGLRC #foreign #dll_import
 proc wglMakeCurrent   (hdc HDC, hglrc HGLRC) -> BOOL #foreign #dll_import

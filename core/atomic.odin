@@ -2,7 +2,7 @@
 // Inline vs external file?
 
 import win32 "sys/windows.odin" when ODIN_OS == "windows";
-var _ = compile_assert(ODIN_ARCH == "amd64"); // TODO(bill): x86 version
+_ := compile_assert(ODIN_ARCH == "amd64"); // TODO(bill): x86 version
 
 
 proc yield_thread() { win32._mm_pause(); }
@@ -35,8 +35,8 @@ proc fetch_or32(a ^i32, operand i32) -> i32 {
 	return win32.InterlockedOr(a, operand);
 }
 proc spin_lock32(a ^i32, time_out int) -> bool { // NOTE(bill) time_out = -1 as default
-	var old_value = compare_exchange32(a, 1, 0);
-	var counter = 0;
+	old_value := compare_exchange32(a, 1, 0);
+	counter := 0;
 	for old_value != 0 && (time_out < 0 || counter < time_out) {
 		counter++;
 		yield_thread();
@@ -51,7 +51,7 @@ proc spin_unlock32(a ^i32) {
 }
 proc try_acquire_lock32(a ^i32) -> bool {
 	yield_thread();
-	var old_value = compare_exchange32(a, 1, 0);
+	old_value := compare_exchange32(a, 1, 0);
 	mfence();
 	return old_value == 0;
 }
@@ -79,8 +79,8 @@ proc fetch_or64(a ^i64, operand i64) -> i64 {
 	return win32.InterlockedOr64(a, operand);
 }
 proc spin_lock64(a ^i64, time_out int) -> bool { // NOTE(bill) time_out = -1 as default
-	var old_value = compare_exchange64(a, 1, 0);
-	var counter = 0;
+	old_value := compare_exchange64(a, 1, 0);
+	counter := 0;
 	for old_value != 0 && (time_out < 0 || counter < time_out) {
 		counter++;
 		yield_thread();
@@ -95,7 +95,7 @@ proc spin_unlock64(a ^i64) {
 }
 proc try_acquire_lock64(a ^i64) -> bool {
 	yield_thread();
-	var old_value = compare_exchange64(a, 1, 0);
+	old_value := compare_exchange64(a, 1, 0);
 	mfence();
 	return old_value == 0;
 }

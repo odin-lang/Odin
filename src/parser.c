@@ -251,12 +251,6 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 AST_NODE_KIND(_ComplexStmtEnd, "", i32) \
 AST_NODE_KIND(_StmtEnd,        "", i32) \
 AST_NODE_KIND(_SpecBegin, "", i32) \
-	AST_NODE_KIND(ValueSpec, "value specification", struct { \
-		TokenKind    keyword; \
-		AstNodeArray names;   \
-		AstNode *    type;    \
-		AstNodeArray values;  \
-	}) \
 	AST_NODE_KIND(TypeSpec,   "type specification", struct { \
 		AstNode *name; \
 		AstNode *type; \
@@ -279,6 +273,13 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		AstNodeArray specs;       \
 		u64          tags;        \
 		bool         is_using;    \
+	}) \
+	AST_NODE_KIND(ValueDecl, "value declaration", struct { \
+		bool         is_var; \
+		AstNodeArray names;  \
+		AstNode *    type;   \
+		AstNodeArray values; \
+		u64          tags;   \
 	}) \
 	AST_NODE_KIND(ProcDecl, "procedure declaration", struct { \
 		AstNode *name;         \
@@ -498,14 +499,14 @@ Token ast_node_token(AstNode *node) {
 		return node->BadDecl.begin;
 	case AstNode_GenericDecl:
 		return node->GenericDecl.token;
+	case AstNode_ValueDecl:
+		return ast_node_token(node->ValueDecl.names.e[0]);
 	case AstNode_ProcDecl:
 		return ast_node_token(node->ProcDecl.name);
 
 	case AstNode_ForeignLibrary:
 		return node->ForeignLibrary.token;
 
-	case AstNode_ValueSpec:
-		return ast_node_token(node->ValueSpec.names.e[0]);
 	case AstNode_TypeSpec:
 		return ast_node_token(node->TypeSpec.name);
 	case AstNode_ImportSpec:
@@ -1076,12 +1077,12 @@ AstNode *make_generic_decl(AstFile *f, Token token, Token open, Token close, Ast
 	return result;
 }
 
-AstNode *make_value_spec(AstFile *f, TokenKind keyword, AstNodeArray names, AstNode *type, AstNodeArray values) {
-	AstNode *result = make_node(f, AstNode_ValueSpec);
-	result->ValueSpec.keyword = keyword;
-	result->ValueSpec.names = names;
-	result->ValueSpec.type = type;
-	result->ValueSpec.values = values;
+AstNode *make_value_decl(AstFile *f, bool is_var, AstNodeArray names, AstNode *type, AstNodeArray values) {
+	AstNode *result = make_node(f, AstNode_ValueDecl);
+	result->ValueDecl.is_var = is_var;
+	result->ValueDecl.names  = names;
+	result->ValueDecl.type   = type;
+	result->ValueDecl.values = values;
 	return result;
 }
 
@@ -1210,8 +1211,8 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_Semicolon:
 			return;
 
-		case Token_var:
-		case Token_const:
+		// case Token_var:
+		// case Token_const:
 		case Token_type:
 		case Token_proc:
 		case Token_import:
@@ -2139,42 +2140,42 @@ AstNode *parse_generic_decl(AstFile *f, TokenKind keyword, ParserSpecProc spec_p
 	return make_generic_decl(f, token, open, close, specs, 0, false);
 }
 
-PARSE_SPEC_PROC(parse_value_spec) {
-	AstNodeArray names = parse_identfier_list(f);
-	parse_check_name_list_for_reserves(f, names);
-	AstNode *type = parse_type_attempt(f);
-	AstNodeArray values = {0};
+// PARSE_SPEC_PROC(parse_value_spec) {
+// 	AstNodeArray names = parse_identfier_list(f);
+// 	parse_check_name_list_for_reserves(f, names);
+// 	AstNode *type = parse_type_attempt(f);
+// 	AstNodeArray values = {0};
 
-	if (allow_token(f, Token_Eq)) {
-		values = parse_rhs_expr_list(f);
-	}
+// 	if (allow_token(f, Token_Eq)) {
+// 		values = parse_rhs_expr_list(f);
+// 	}
 
-	if (values.count > names.count) {
-		syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
-	}
+// 	if (values.count > names.count) {
+// 		syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
+// 	}
 
-	switch (keyword) {
-	case Token_var:
-		if (type == NULL && values.count == 0 && names.count > 0) {
-			syntax_error(f->curr_token, "Missing type or initialization");
-			return make_bad_decl(f, f->curr_token, f->curr_token);
-		}
-		break;
-	case Token_const:
-		if (values.count == 0 && (index == 0 || type != NULL)) {
-			syntax_error(f->curr_token, "Missing constant value");
-			return make_bad_decl(f, f->curr_token, f->curr_token);
-		}
-		break;
-	}
+// 	switch (keyword) {
+// 	case Token_var:
+// 		if (type == NULL && values.count == 0 && names.count > 0) {
+// 			syntax_error(f->curr_token, "Missing type or initialization");
+// 			return make_bad_decl(f, f->curr_token, f->curr_token);
+// 		}
+// 		break;
+// 	case Token_const:
+// 		if (values.count == 0 && (index == 0 || type != NULL)) {
+// 			syntax_error(f->curr_token, "Missing constant value");
+// 			return make_bad_decl(f, f->curr_token, f->curr_token);
+// 		}
+// 		break;
+// 	}
 
-	// TODO(bill): Fix this so it does not require it
-	if (values.e == NULL) {
-		values = make_ast_node_array(f);
-	}
+// 	// TODO(bill): Fix this so it does not require it
+// 	if (values.e == NULL) {
+// 		values = make_ast_node_array(f);
+// 	}
 
-	return make_value_spec(f, keyword, names, type, values);
-}
+// 	return make_value_spec(f, keyword, names, type, values);
+// }
 PARSE_SPEC_PROC(parse_type_spec) {
 	AstNode *name = parse_identifier(f);
 	AstNode *type = parse_type(f);
@@ -2239,9 +2240,9 @@ PARSE_SPEC_PROC(parse_include_spec) {
 
 AstNode *parse_decl(AstFile *f) {
 	switch (f->curr_token.kind) {
-	case Token_var:
-	case Token_const:
-		return parse_generic_decl(f, f->curr_token.kind, parse_value_spec);
+	// case Token_var:
+	// case Token_const:
+		// return parse_generic_decl(f, f->curr_token.kind, parse_value_spec);
 
 	case Token_type:
 		return parse_generic_decl(f, f->curr_token.kind, parse_type_spec);
@@ -2266,12 +2267,7 @@ AstNode *parse_decl(AstFile *f) {
 
 
 AstNode *parse_simple_stmt(AstFile *f) {
-	switch (f->curr_token.kind) {
-	case Token_var:
-	case Token_const:
-		return parse_decl(f);
-	}
-
+	Token start_token = f->curr_token;
 	AstNodeArray lhs = parse_lhs_expr_list(f);
 	Token token = f->curr_token;
 	switch (token.kind) {
@@ -2301,6 +2297,61 @@ AstNode *parse_simple_stmt(AstFile *f) {
 			return make_bad_stmt(f, token, f->curr_token);
 		}
 		return make_assign_stmt(f, token, lhs, rhs);
+	} break;
+
+	case Token_Colon: {
+		parse_check_name_list_for_reserves(f, lhs);
+
+		AstNode *type = NULL;
+		AstNodeArray values = {0};
+		bool is_mutable = true;
+
+		if (allow_token(f, Token_Colon)) {
+			if (!allow_token(f, Token_type)) {
+				type = parse_type_attempt(f);
+			}
+		} else if (f->curr_token.kind != Token_Eq &&
+		           f->curr_token.kind != Token_Semicolon) {
+			syntax_error(f->curr_token, "Expected a type separator `:` or `=`");
+		}
+
+
+		switch (f->curr_token.kind) {
+		case Token_Colon:
+			is_mutable = false;
+			/*fallthrough*/
+		case Token_Eq:
+			next_token(f);
+			values = parse_rhs_expr_list(f);
+			if (values.count > lhs.count) {
+				syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
+			} else if (values.count < lhs.count && !is_mutable) {
+				syntax_error(f->curr_token, "All constant declarations must be defined");
+			} else if (values.count == 0) {
+				syntax_error(f->curr_token, "Expected an expression for this declaration");
+			}
+			break;
+		}
+
+		if (is_mutable) {
+			if (type == NULL && values.count == 0) {
+				syntax_error(f->curr_token, "Missing variable type or initialization");
+				return make_bad_decl(f, f->curr_token, f->curr_token);
+			}
+		} else {
+			if (type == NULL && values.count == 0 && lhs.count > 0) {
+				syntax_error(f->curr_token, "Missing constant value");
+				return make_bad_decl(f, f->curr_token, f->curr_token);
+			}
+		}
+
+		if (values.e == NULL) {
+			values = make_ast_node_array(f);
+		}
+
+		AstNodeArray specs = {0};
+		array_init_reserve(&specs, heap_allocator(), 1);
+		return make_value_decl(f, is_mutable, lhs, type, values);
 	} break;
 	}
 
@@ -3025,8 +3076,8 @@ AstNode *parse_stmt(AstFile *f) {
 		expect_semicolon(f, s);
 		return s;
 
-	case Token_var:
-	case Token_const:
+	// case Token_var:
+	// case Token_const:
 	case Token_proc:
 	case Token_type:
 	case Token_import:
@@ -3063,14 +3114,12 @@ AstNode *parse_stmt(AstFile *f) {
 			while (e->kind == AstNode_SelectorExpr) {
 				e = unparen_expr(e->SelectorExpr.selector);
 			}
-		if (e->kind == AstNode_Ident) {
+			if (e->kind == AstNode_Ident) {
 				valid = true;
 			}
 		} break;
-		case AstNode_GenericDecl:
-			if (node->GenericDecl.token.kind == Token_var) {
-				valid = true;
-			}
+		case AstNode_ValueDecl:
+			valid = node->ValueDecl.is_var;
 			break;
 		}
 
@@ -3153,8 +3202,8 @@ AstNode *parse_stmt(AstFile *f) {
 			return s;
 		} else if (str_eq(tag, str_lit("thread_local"))) {
 			AstNode *decl = parse_simple_stmt(f);
-			if (decl->kind == AstNode_GenericDecl &&
-			    decl->GenericDecl.token.kind != Token_var) {
+			if (decl->kind != AstNode_ValueDecl &&
+			    !decl->ValueDecl.is_var) {
 				syntax_error(token, "#thread_local may only be applied to variable declarations");
 				return make_bad_decl(f, token, ast_node_token(decl));
 			}
@@ -3162,8 +3211,9 @@ AstNode *parse_stmt(AstFile *f) {
 				syntax_error(token, "#thread_local is only allowed at the file scope");
 				return make_bad_decl(f, token, ast_node_token(decl));
 			}
-			GB_ASSERT(decl->kind == AstNode_GenericDecl);
-			decl->GenericDecl.tags |= VarDeclTag_thread_local;
+
+			GB_ASSERT(decl->kind == AstNode_ValueDecl);
+			decl->ValueDecl.tags |= VarDeclTag_thread_local;
 			return decl;
 		} else if (str_eq(tag, str_lit("bounds_check"))) {
 			s = parse_stmt(f);

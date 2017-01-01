@@ -3924,71 +3924,67 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 		ssa_build_when_stmt(proc, ws);
 	case_end;
 
+	case_ast_node(vd, ValueDecl, node);
+		if (vd->is_var) {
+			ssaModule *m = proc->module;
+			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
+
+			if (vd->values.count == 0) { // declared and zero-initialized
+				for_array(i, vd->names) {
+					AstNode *name = vd->names.e[i];
+					if (!ssa_is_blank_ident(name)) {
+						ssa_add_local_for_identifier(proc, name, true);
+					}
+				}
+			} else { // Tuple(s)
+				Array(ssaAddr) lvals;
+				ssaValueArray  inits;
+				array_init_reserve(&lvals, m->tmp_allocator, vd->names.count);
+				array_init_reserve(&inits, m->tmp_allocator, vd->names.count);
+
+				for_array(i, vd->names) {
+					AstNode *name = vd->names.e[i];
+					ssaAddr lval = ssa_make_addr(NULL, NULL);
+					if (!ssa_is_blank_ident(name)) {
+						ssa_add_local_for_identifier(proc, name, false);
+						lval = ssa_build_addr(proc, name);
+					}
+
+					array_add(&lvals, lval);
+				}
+
+				for_array(i, vd->values) {
+					ssaValue *init = ssa_build_expr(proc, vd->values.e[i]);
+					Type *t = ssa_type(init);
+					if (t->kind == Type_Tuple) {
+						for (isize i = 0; i < t->Tuple.variable_count; i++) {
+							Entity *e = t->Tuple.variables[i];
+							ssaValue *v = ssa_emit_struct_ev(proc, init, i);
+							array_add(&inits, v);
+						}
+					} else {
+						array_add(&inits, init);
+					}
+				}
+
+
+				for_array(i, inits) {
+					if (lvals.e[i].addr == NULL) {
+						continue;
+					}
+					ssaValue *v = ssa_emit_conv(proc, inits.e[i], ssa_addr_type(lvals.e[i]));
+					ssa_addr_store(proc, lvals.e[i], v);
+				}
+			}
+
+			gb_temp_arena_memory_end(tmp);
+		}
+	case_end;
 
 	case_ast_node(gd, GenericDecl, node);
 		for_array(spec_index, gd->specs) {
 			AstNode *spec = gd->specs.e[spec_index];
 			switch (spec->kind) {
-			case_ast_node(vs, ValueSpec, spec);
-				switch (vs->keyword) {
-				case Token_const:
-					break;
-				case Token_var: {
-					ssaModule *m = proc->module;
-					gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
-
-					if (vs->values.count == 0) { // declared and zero-initialized
-						for_array(i, vs->names) {
-							AstNode *name = vs->names.e[i];
-							if (!ssa_is_blank_ident(name)) {
-								ssa_add_local_for_identifier(proc, name, true);
-							}
-						}
-					} else { // Tuple(s)
-						Array(ssaAddr) lvals;
-						ssaValueArray  inits;
-						array_init_reserve(&lvals, m->tmp_allocator, vs->names.count);
-						array_init_reserve(&inits, m->tmp_allocator, vs->names.count);
-
-						for_array(i, vs->names) {
-							AstNode *name = vs->names.e[i];
-							ssaAddr lval = ssa_make_addr(NULL, NULL);
-							if (!ssa_is_blank_ident(name)) {
-								ssa_add_local_for_identifier(proc, name, false);
-								lval = ssa_build_addr(proc, name);
-							}
-
-							array_add(&lvals, lval);
-						}
-
-						for_array(i, vs->values) {
-							ssaValue *init = ssa_build_expr(proc, vs->values.e[i]);
-							Type *t = ssa_type(init);
-							if (t->kind == Type_Tuple) {
-								for (isize i = 0; i < t->Tuple.variable_count; i++) {
-									Entity *e = t->Tuple.variables[i];
-									ssaValue *v = ssa_emit_struct_ev(proc, init, i);
-									array_add(&inits, v);
-								}
-							} else {
-								array_add(&inits, init);
-							}
-						}
-
-
-						for_array(i, inits) {
-							if (lvals.e[i].addr == NULL) {
-								continue;
-							}
-							ssaValue *v = ssa_emit_conv(proc, inits.e[i], ssa_addr_type(lvals.e[i]));
-							ssa_addr_store(proc, lvals.e[i], v);
-						}
-					}
-
-					gb_temp_arena_memory_end(tmp);
-				} break;
-				}
-			case_end;
 			case_ast_node(ts, TypeSpec, spec);
 				// NOTE(bill): Generate a new name
 				// parent_proc.name-guid

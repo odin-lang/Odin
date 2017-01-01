@@ -49,7 +49,7 @@ proc mutex_destroy(m ^Mutex) {
 	semaphore_destroy(^m.semaphore);
 }
 proc mutex_lock(m ^Mutex) {
-	var thread_id = current_thread_id();
+	thread_id := current_thread_id();
 	if atomic.fetch_add32(^m.counter, 1) > 0 {
 		if thread_id != atomic.load32(^m.owner) {
 			semaphore_wait(^m.semaphore);
@@ -59,11 +59,11 @@ proc mutex_lock(m ^Mutex) {
 	m.recursion++;
 }
 proc mutex_try_lock(m ^Mutex) -> bool {
-	var thread_id = current_thread_id();
+	thread_id := current_thread_id();
 	if atomic.load32(^m.owner) == thread_id {
 		atomic.fetch_add32(^m.counter, 1);
 	} else {
-		var expected i32 = 0;
+		expected: i32 = 0;
 		if atomic.load32(^m.counter) != 0 {
 			return false;
 		}
@@ -76,8 +76,8 @@ proc mutex_try_lock(m ^Mutex) -> bool {
 	return true;
 }
 proc mutex_unlock(m ^Mutex) {
-	var recursion i32;
-	var thread_id = current_thread_id();
+	recursion: i32;
+	thread_id := current_thread_id();
 	assert(thread_id == atomic.load32(^m.owner));
 
 	m.recursion--;

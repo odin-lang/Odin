@@ -84,8 +84,8 @@ TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_type,           "type"), \
 	TOKEN_KIND(Token_proc,           "proc"), \
-	TOKEN_KIND(Token_var,            "var"), \
-	TOKEN_KIND(Token_const,          "const"), \
+	/* TOKEN_KIND(Token_var,            "var"),  */\
+	/* TOKEN_KIND(Token_const,          "const"),  */\
 	TOKEN_KIND(Token_import,         "import"), \
 	TOKEN_KIND(Token_include,        "include"), \
 	TOKEN_KIND(Token_macro,          "macro"), \

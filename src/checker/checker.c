@@ -1075,36 +1075,33 @@ void init_preload(Checker *c) {
 	c->done_preload = true;
 }
 
-bool check_arity_match(Checker *c, AstNodeValueSpec *s, AstNodeValueSpec *init);
+bool check_arity_match(Checker *c, AstNodeValueDecl *d);
 
 #include "expr.c"
 #include "decl.c"
 #include "stmt.c"
 
-bool check_arity_match(Checker *c, AstNodeValueSpec *s, AstNodeValueSpec *init) {
-	isize lhs = s->names.count;
-	isize rhs = s->values.count;
-	if (init != NULL) {
-		rhs = init->values.count;
-	}
+bool check_arity_match(Checker *c, AstNodeValueDecl *d) {
+	isize lhs = d->names.count;
+	isize rhs = d->values.count;
 
-	if (init == NULL && rhs == 0) {
-		if (s->type == NULL) {
-			error_node(s->names.e[0], "Missing type or initial expression");
+	if (rhs == 0) {
+		if (d->type == NULL) {
+			error_node(d->names.e[0], "Missing type or initial expression");
 			return false;
 		}
 	} else if (lhs < rhs) {
-		if (lhs < s->values.count) {
-			AstNode *n = s->values.e[lhs];
+		if (lhs < d->values.count) {
+			AstNode *n = d->values.e[lhs];
 			gbString str = expr_to_string(n);
 			error_node(n, "Extra initial expression `%s`", str);
 			gb_string_free(str);
 		} else {
-			error_node(s->names.e[0], "Extra initial expression");
+			error_node(d->names.e[0], "Extra initial expression");
 		}
 		return false;
-	} else if (lhs > rhs && (init != NULL || rhs != 1)) {
-		AstNode *n = s->names.e[rhs];
+	} else if (lhs > rhs && rhs != 1) {
+		AstNode *n = d->names.e[rhs];
 		gbString str = expr_to_string(n);
 		error_node(n, "Missing expression for `%s`", str);
 		gb_string_free(str);
@@ -1160,14 +1157,94 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 		switch (decl->kind) {
 		case_ast_node(bd, BadDecl, decl);
 		case_end;
+
+		case_ast_node(vd, ValueDecl, decl);
+			if (vd->is_var) {
+				// NOTE(bill): You need to store the entity information here unline a constant declaration
+				isize entity_count = vd->names.count;
+				isize entity_index = 0;
+				Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
+				DeclInfo *di = NULL;
+				if (vd->values.count > 0) {
+					di = make_declaration_info(heap_allocator(), parent_scope);
+					di->entities = entities;
+					di->entity_count = entity_count;
+					di->type_expr = vd->type;
+					di->init_expr = vd->values.e[0];
+				}
+
+				for_array(i, vd->names) {
+					AstNode *name = vd->names.e[i];
+					AstNode *value = NULL;
+					if (i < vd->values.count) {
+						value = vd->values.e[i];
+					}
+					if (name->kind != AstNode_Ident) {
+						error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+						continue;
+					}
+					Entity *e = make_entity_variable(c->allocator, parent_scope, name->Ident, NULL);
+					e->identifier = name;
+					entities[entity_index++] = e;
+
+					DeclInfo *d = di;
+					if (d == NULL) {
+						AstNode *init_expr = value;
+						d = make_declaration_info(heap_allocator(), e->scope);
+						d->type_expr = vd->type;
+						d->init_expr = init_expr;
+						d->var_decl_tags = vd->tags;
+					}
+
+					add_entity_and_decl_info(c, name, e, d);
+				}
+
+				check_arity_match(c, vd);
+			} else {
+				for_array(i, vd->names) {
+					AstNode *name = vd->names.e[i];
+					if (name->kind != AstNode_Ident) {
+						error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+						continue;
+					}
+
+
+					AstNode *init = NULL;
+					if (i < vd->values.count) {
+						init = vd->values.e[i];
+					}
+
+					DeclInfo *d = make_declaration_info(c->allocator, parent_scope);
+					Entity *e = NULL;
+
+					AstNode *up_init = unparen_expr(init);
+					if (init != NULL && is_ast_node_type(up_init)) {
+						e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
+						d->type_expr = init;
+						d->init_expr = init;
+					} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
+						e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
+						d->proc_decl = init;
+					} else {
+						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, (ExactValue){0});
+						d->type_expr = vd->type;
+						d->init_expr = init;
+					}
+					GB_ASSERT(e != NULL);
+					e->identifier = name;
+
+					add_entity_and_decl_info(c, name, e, d);
+				}
+
+				check_arity_match(c, vd);
+			}
+		case_end;
+
 		case_ast_node(gd, GenericDecl, decl);
 			if (!parent_scope->is_file) {
 				// NOTE(bill): Within a procedure, variables must be in order
 				continue;
 			}
-
-			AstNodeValueSpec empty_spec_ = {0}, *empty_spec = &empty_spec_;
-			AstNodeValueSpec *prev_spec = NULL;
 
 			for_array(iota, gd->specs) {
 				AstNode *spec = gd->specs.e[iota];
@@ -1182,99 +1259,6 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 					}
 					DelayedDecl di = {parent_scope, spec};
 					array_add(&c->delayed_imports, di);
-				case_end;
-				case_ast_node(vs, ValueSpec, spec);
-					switch (vs->keyword) {
-					case Token_var: {
-						// NOTE(bill): You need to store the entity information here unline a constant declaration
-						isize entity_count = vs->names.count;
-						isize entity_index = 0;
-						Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
-						DeclInfo *di = NULL;
-						if (vs->values.count > 0) {
-							di = make_declaration_info(heap_allocator(), parent_scope);
-							di->entities = entities;
-							di->entity_count = entity_count;
-							di->type_expr = vs->type;
-							di->init_expr = vs->values.e[0];
-						}
-
-						for_array(i, vs->names) {
-							AstNode *name = vs->names.e[i];
-							AstNode *value = NULL;
-							if (i < vs->values.count) {
-								value = vs->values.e[i];
-							}
-							if (name->kind != AstNode_Ident) {
-								error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-								continue;
-							}
-							Entity *e = make_entity_variable(c->allocator, parent_scope, name->Ident, NULL);
-							e->identifier = name;
-							entities[entity_index++] = e;
-
-							DeclInfo *d = di;
-							if (d == NULL) {
-								AstNode *init_expr = value;
-								d = make_declaration_info(heap_allocator(), e->scope);
-								d->type_expr = vs->type;
-								d->init_expr = init_expr;
-								d->var_decl_tags = gd->tags;
-							}
-
-							add_entity_and_decl_info(c, name, e, d);
-						}
-
-						check_arity_match(c, vs, NULL);
-					} break;
-
-					case Token_const: {
-						if (vs->type != NULL || vs->values.count > 0) {
-							prev_spec = vs;
-						} else if (prev_spec == NULL) {
-							prev_spec = empty_spec;
-						}
-
-						for_array(i, vs->names) {
-							AstNode *name = vs->names.e[i];
-							if (name->kind != AstNode_Ident) {
-								error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-								continue;
-							}
-
-
-							AstNode *init = NULL;
-							if (i < prev_spec->values.count) {
-								init = prev_spec->values.e[i];
-							}
-
-							DeclInfo *d = make_declaration_info(c->allocator, parent_scope);
-							Entity *e = NULL;
-
-							ExactValue v_iota = make_exact_value_integer(iota);
-
-							AstNode *up_init = unparen_expr(init);
-							if (init != NULL && is_ast_node_type(up_init)) {
-								e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
-								d->type_expr = init;
-								d->init_expr = init;
-							} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
-								e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
-								d->proc_decl = init;
-							} else {
-								e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, v_iota);
-								d->type_expr = prev_spec->type;
-								d->init_expr = init;
-							}
-							GB_ASSERT(e != NULL);
-							e->identifier = name;
-
-							add_entity_and_decl_info(c, name, e, d);
-						}
-
-						check_arity_match(c, vs, prev_spec);
-					} break;
-					}
 				case_end;
 
 				case_ast_node(ts, TypeSpec, spec);

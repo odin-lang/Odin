@@ -30,76 +30,74 @@ proc GetIntegerv(name i32, v ^i32) #foreign "glGetIntegerv"
 
 
 
-var _libgl = win32.LoadLibraryA(("opengl32.dll\x00" as string).data);
+_libgl := win32.LoadLibraryA(("opengl32.dll\x00" as string).data);
 
 proc GetProcAddress(name string) -> proc() #cc_c {
 	assert(name[name.count-1] == 0);
-	var res = win32.wglGetProcAddress(name.data);
+	res := win32.wglGetProcAddress(name.data);
 	if res == nil {
 		res = win32.GetProcAddress(_libgl, name.data);
 	}
 	return res;
 }
 
-var {
-	GenBuffers      proc(count i32, buffers ^u32) #cc_c;
-	GenVertexArrays proc(count i32, buffers ^u32) #cc_c;
-	GenSamplers     proc(count i32, buffers ^u32) #cc_c;
-	BindBuffer      proc(target i32, buffer u32) #cc_c;
-	BindVertexArray proc(buffer u32) #cc_c;
-	BindSampler     proc(position i32, sampler u32) #cc_c;
-	BufferData      proc(target i32, size int, data rawptr, usage i32) #cc_c;
-	BufferSubData   proc(target i32, offset, size int, data rawptr) #cc_c;
+GenBuffers:       proc(count i32, buffers ^u32) #cc_c;
+GenVertexArrays:  proc(count i32, buffers ^u32) #cc_c;
+GenSamplers:      proc(count i32, buffers ^u32) #cc_c;
+BindBuffer:       proc(target i32, buffer u32) #cc_c;
+BindVertexArray:  proc(buffer u32) #cc_c;
+BindSampler:      proc(position i32, sampler u32) #cc_c;
+BufferData:       proc(target i32, size int, data rawptr, usage i32) #cc_c;
+BufferSubData:    proc(target i32, offset, size int, data rawptr) #cc_c;
 
-	DrawArrays      proc(mode, first i32, count u32) #cc_c;
-	DrawElements    proc(mode i32, count u32, type_ i32, indices rawptr) #cc_c;
+DrawArrays:       proc(mode, first i32, count u32) #cc_c;
+DrawElements:     proc(mode i32, count u32, type_ i32, indices rawptr) #cc_c;
 
-	MapBuffer       proc(target, access i32) -> rawptr #cc_c;
-	UnmapBuffer     proc(target i32) #cc_c;
+MapBuffer:        proc(target, access i32) -> rawptr #cc_c;
+UnmapBuffer:      proc(target i32) #cc_c;
 
-	VertexAttribPointer proc(index u32, size, type_ i32, normalized i32, stride u32, pointer rawptr) #cc_c;
-	EnableVertexAttribArray proc(index u32) #cc_c;
+VertexAttribPointer:  proc(index u32, size, type_ i32, normalized i32, stride u32, pointer rawptr) #cc_c;
+EnableVertexAttribArray:  proc(index u32) #cc_c;
 
-	CreateShader  proc(shader_type i32) -> u32 #cc_c;
-	ShaderSource  proc(shader u32, count u32, str ^^byte, length ^i32) #cc_c;
-	CompileShader proc(shader u32) #cc_c;
-	CreateProgram proc() -> u32 #cc_c;
-	AttachShader  proc(program, shader u32) #cc_c;
-	DetachShader  proc(program, shader u32) #cc_c;
-	DeleteShader  proc(shader u32) #cc_c;
-	LinkProgram   proc(program u32) #cc_c;
-	UseProgram    proc(program u32) #cc_c;
-	DeleteProgram proc(program u32) #cc_c;
-
-
-	GetShaderiv       proc(shader  u32, pname i32, params ^i32) #cc_c;
-	GetProgramiv      proc(program u32, pname i32, params ^i32) #cc_c;
-	GetShaderInfoLog  proc(shader  u32, max_length u32, length ^u32, info_long ^byte) #cc_c;
-	GetProgramInfoLog proc(program u32, max_length u32, length ^u32, info_long ^byte) #cc_c;
-
-	ActiveTexture  proc(texture i32) #cc_c;
-	GenerateMipmap proc(target i32) #cc_c;
-
-	SamplerParameteri    proc(sampler u32, pname i32, param i32) #cc_c;
-	SamplerParameterf    proc(sampler u32, pname i32, param f32) #cc_c;
-	SamplerParameteriv   proc(sampler u32, pname i32, params ^i32) #cc_c;
-	SamplerParameterfv   proc(sampler u32, pname i32, params ^f32) #cc_c;
-	SamplerParameterIiv  proc(sampler u32, pname i32, params ^i32) #cc_c;
-	SamplerParameterIuiv proc(sampler u32, pname i32, params ^u32) #cc_c;
+CreateShader:   proc(shader_type i32) -> u32 #cc_c;
+ShaderSource:   proc(shader u32, count u32, str ^^byte, length ^i32) #cc_c;
+CompileShader:  proc(shader u32) #cc_c;
+CreateProgram:  proc() -> u32 #cc_c;
+AttachShader:   proc(program, shader u32) #cc_c;
+DetachShader:   proc(program, shader u32) #cc_c;
+DeleteShader:   proc(shader u32) #cc_c;
+LinkProgram:    proc(program u32) #cc_c;
+UseProgram:     proc(program u32) #cc_c;
+DeleteProgram:  proc(program u32) #cc_c;
 
 
-	Uniform1i        proc(loc i32, v0 i32) #cc_c;
-	Uniform2i        proc(loc i32, v0, v1 i32) #cc_c;
-	Uniform3i        proc(loc i32, v0, v1, v2 i32) #cc_c;
-	Uniform4i        proc(loc i32, v0, v1, v2, v3 i32) #cc_c;
-	Uniform1f        proc(loc i32, v0 f32) #cc_c;
-	Uniform2f        proc(loc i32, v0, v1 f32) #cc_c;
-	Uniform3f        proc(loc i32, v0, v1, v2 f32) #cc_c;
-	Uniform4f        proc(loc i32, v0, v1, v2, v3 f32) #cc_c;
-	UniformMatrix4fv proc(loc i32, count u32, transpose i32, value ^f32) #cc_c;
+GetShaderiv:        proc(shader  u32, pname i32, params ^i32) #cc_c;
+GetProgramiv:       proc(program u32, pname i32, params ^i32) #cc_c;
+GetShaderInfoLog:   proc(shader  u32, max_length u32, length ^u32, info_long ^byte) #cc_c;
+GetProgramInfoLog:  proc(program u32, max_length u32, length ^u32, info_long ^byte) #cc_c;
 
-	GetUniformLocation proc(program u32, name ^byte) -> i32 #cc_c;
-}
+ActiveTexture:   proc(texture i32) #cc_c;
+GenerateMipmap:  proc(target i32) #cc_c;
+
+SamplerParameteri:     proc(sampler u32, pname i32, param i32) #cc_c;
+SamplerParameterf:     proc(sampler u32, pname i32, param f32) #cc_c;
+SamplerParameteriv:    proc(sampler u32, pname i32, params ^i32) #cc_c;
+SamplerParameterfv:    proc(sampler u32, pname i32, params ^f32) #cc_c;
+SamplerParameterIiv:   proc(sampler u32, pname i32, params ^i32) #cc_c;
+SamplerParameterIuiv:  proc(sampler u32, pname i32, params ^u32) #cc_c;
+
+
+Uniform1i:         proc(loc i32, v0 i32) #cc_c;
+Uniform2i:         proc(loc i32, v0, v1 i32) #cc_c;
+Uniform3i:         proc(loc i32, v0, v1, v2 i32) #cc_c;
+Uniform4i:         proc(loc i32, v0, v1, v2, v3 i32) #cc_c;
+Uniform1f:         proc(loc i32, v0 f32) #cc_c;
+Uniform2f:         proc(loc i32, v0, v1 f32) #cc_c;
+Uniform3f:         proc(loc i32, v0, v1, v2 f32) #cc_c;
+Uniform4f:         proc(loc i32, v0, v1, v2, v3 f32) #cc_c;
+UniformMatrix4fv:  proc(loc i32, count u32, transpose i32, value ^f32) #cc_c;
+
+GetUniformLocation:  proc(program u32, name ^byte) -> i32 #cc_c;
 
 proc init() {
 	proc set_proc_address(p rawptr, name string) #inline { (p as ^(proc() #cc_c))^ = GetProcAddress(name); }

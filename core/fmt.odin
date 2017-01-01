@@ -4,26 +4,26 @@ import {
 	"utf8.odin";
 }
 
-const PRINT_BUF_SIZE = 1<<12;
+PRINT_BUF_SIZE :: 1<<12;
 
 proc fprint(fd os.Handle, args ..any) -> int {
-	var data [PRINT_BUF_SIZE]byte;
-	var buf = data[:0];
+	data :[PRINT_BUF_SIZE]byte;
+	buf := data[:0];
 	bprint(^buf, ..args);
 	os.write(fd, buf);
 	return buf.count;
 }
 
 proc fprintln(fd os.Handle, args ..any) -> int {
-	var data [PRINT_BUF_SIZE]byte;
-	var buf = data[:0];
+	data :[PRINT_BUF_SIZE]byte;
+	buf := data[:0];
 	bprintln(^buf, ..args);
 	os.write(fd, buf);
 	return buf.count;
 }
 proc fprintf(fd os.Handle, fmt string, args ..any) -> int {
-	var data [PRINT_BUF_SIZE]byte;
-	var buf = data[:0];
+	data :[PRINT_BUF_SIZE]byte;
+	buf := data[:0];
 	bprintf(^buf, fmt, ..args);
 	os.write(fd, buf);
 	return buf.count;
@@ -43,8 +43,8 @@ proc printf(fmt string, args ..any) -> int {
 
 
 proc fprint_type(fd os.Handle, info ^Type_Info) {
-	var data [PRINT_BUF_SIZE]byte;
-	var buf = data[:0];
+	data :[PRINT_BUF_SIZE]byte;
+	buf := data[:0];
 	bprint_type(^buf, info);
 	os.write(fd, buf);
 }
@@ -53,7 +53,7 @@ proc fprint_type(fd os.Handle, info ^Type_Info) {
 
 proc print_byte_buffer(buf ^[]byte, b []byte) {
 	if buf.count < buf.capacity {
-		var n = min(buf.capacity-buf.count, b.count);
+		n := min(buf.capacity-buf.count, b.count);
 		if n > 0 {
 			mem.copy(buf.data + buf.count, b.data, n);
 			buf.count += n;
@@ -67,21 +67,21 @@ proc bprint_string(buf ^[]byte, s string) {
 
 
 proc byte_reverse(b []byte) {
-	var n = b.count;
-	for var i = 0; i < n/2; i++ {
+	n := b.count;
+	for i := 0; i < n/2; i++ {
 		b[i], b[n-1-i] = b[n-1-i], b[i];
 	}
 }
 
 proc bprint_rune(buf ^[]byte, r rune) {
-	var b, n = utf8.encode_rune(r);
+	b, n := utf8.encode_rune(r);
 	bprint_string(buf, b[:n] as string);
 }
 
 proc bprint_space(buf ^[]byte) { bprint_rune(buf, ' '); }
 proc bprint_nl   (buf ^[]byte) { bprint_rune(buf, '\n'); }
 
-var __NUM_TO_CHAR_TABLE = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$";
+__NUM_TO_CHAR_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$";
 
 proc bprint_bool(buffer ^[]byte, b bool) {
 	if b {
@@ -100,9 +100,9 @@ proc bprint_f16 (buffer ^[]byte, f f32)  #inline { print__f64(buffer, f as f64, 
 proc bprint_f32 (buffer ^[]byte, f f32)  #inline { print__f64(buffer, f as f64, 7); }
 proc bprint_f64 (buffer ^[]byte, f f64)  #inline { print__f64(buffer, f as f64, 16); }
 proc bprint_u64(buffer ^[]byte, value u64) {
-	var i = value;
-	var buf [20]byte;
-	var len = 0;
+	i := value;
+	buf :[20]byte;
+	len := 0;
 	if i == 0 {
 		buf[len] = '0';
 		len++;
@@ -117,7 +117,7 @@ proc bprint_u64(buffer ^[]byte, value u64) {
 }
 proc bprint_i64(buffer ^[]byte, value i64) {
 	// TODO(bill): Cleanup printing
-	var i = value;
+	i := value;
 	if i < 0 {
 		i = -i;
 		bprint_rune(buffer, '-');
@@ -127,14 +127,14 @@ proc bprint_i64(buffer ^[]byte, value i64) {
 
 /*
 proc bprint_u128(buffer ^[]byte, value u128) {
-	var a = value transmute [2]u64;
+	a := value transmute [2]u64;
 	if a[1] != 0 {
 		bprint_u64(buffer, a[1]);
 	}
 	bprint_u64(buffer, a[0]);
 }
 proc bprint_i128(buffer ^[]byte, value i128) {
-	var i = value;
+	i := value;
 	if i < 0 {
 		i = -i;
 		bprint_rune(buffer, '-');
@@ -145,7 +145,7 @@ proc bprint_i128(buffer ^[]byte, value i128) {
 
 
 proc print__f64(buffer ^[]byte, value f64, decimal_places int) {
-	var f = value;
+	f := value;
 	if f == 0 {
 		bprint_rune(buffer, '0');
 		return;
@@ -155,13 +155,13 @@ proc print__f64(buffer ^[]byte, value f64, decimal_places int) {
 		f = -f;
 	}
 
-	var i = f as u64;
+	i := f as u64;
 	bprint_u64(buffer, i);
 	f -= i as f64;
 
 	bprint_rune(buffer, '.');
 
-	var mult f64 = 10.0;
+	mult :f64 = 10.0;
 	for ; decimal_places >= 0; decimal_places-- {
 		i = (f * mult) as u64;
 		bprint_u64(buffer, i as u64);
@@ -214,7 +214,7 @@ proc bprint_type(buf ^[]byte, ti ^Type_Info) {
 		if info.params == nil {
 			bprint_string(buf, "()");
 		} else {
-			var count = (info.params as ^Tuple).fields.count;
+			count := (info.params as ^Tuple).fields.count;
 			if count == 1 { bprint_string(buf, "("); }
 			bprint_type(buf, info.params);
 			if count == 1 { bprint_string(buf, ")"); }
@@ -224,12 +224,12 @@ proc bprint_type(buf ^[]byte, ti ^Type_Info) {
 			bprint_type(buf, info.results);
 		}
 	case Tuple:
-		var count = info.fields.count;
+		count := info.fields.count;
 		if count != 1 { bprint_string(buf, "("); }
-		for var i = 0; i < count; i++ {
+		for i := 0; i < count; i++ {
 			if i > 0 { bprint_string(buf, ", "); }
 
-			var f = info.fields[i];
+			f := info.fields[i];
 
 			if f.name.count > 0 {
 				bprint_string(buf, f.name);
@@ -259,7 +259,7 @@ proc bprint_type(buf ^[]byte, ti ^Type_Info) {
 		if info.packed  { bprint_string(buf, "#packed "); }
 		if info.ordered { bprint_string(buf, "#ordered "); }
 		bprint_string(buf, "{");
-		for var i = 0; i < info.fields.count; i++ {
+		for i := 0; i < info.fields.count; i++ {
 			if i > 0 {
 				bprint_string(buf, ", ");
 			}
@@ -271,7 +271,7 @@ proc bprint_type(buf ^[]byte, ti ^Type_Info) {
 
 	case Union:
 		bprint_string(buf, "union {");
-		for var i = 0; i < info.fields.count; i++ {
+		for i := 0; i < info.fields.count; i++ {
 			if i > 0 {
 				bprint_string(buf, ", ");
 			}
@@ -283,7 +283,7 @@ proc bprint_type(buf ^[]byte, ti ^Type_Info) {
 
 	case Raw_Union:
 		bprint_string(buf, "raw_union {");
-		for var i = 0; i < info.fields.count; i++ {
+		for i := 0; i < info.fields.count; i++ {
 			if i > 0 {
 				bprint_string(buf, ", ");
 			}
@@ -303,7 +303,7 @@ proc bprint_type(buf ^[]byte, ti ^Type_Info) {
 
 
 proc make_any(type_info ^Type_Info, data rawptr) -> any {
-	var a any;
+	a :any;
 	a.type_info = type_info;
 	a.data = data;
 	return a;
@@ -323,20 +323,20 @@ proc bprint_any(buf ^[]byte, arg any) {
 	using Type_Info;
 	match type info : arg.type_info {
 	case Named:
-		var a = make_any(info.base, arg.data);
+		a := make_any(info.base, arg.data);
 		match type b : info.base {
 		case Struct:
 			bprint_string(buf, info.name);
 			bprint_string(buf, "{");
-			for var i = 0; i < b.fields.count; i++ {
-				var f = b.fields[i];
+			for i := 0; i < b.fields.count; i++ {
+				f := b.fields[i];
 				if i > 0 {
 					bprint_string(buf, ", ");
 				}
 				bprint_string(buf, f.name);
 				// bprint_any(buf, f.offset);
 				bprint_string(buf, " = ");
-				var data = arg.data as ^byte + f.offset;
+				data := arg.data as ^byte + f.offset;
 				bprint_any(buf, make_any(f.type_info, data));
 			}
 			bprint_string(buf, "}");
@@ -387,8 +387,8 @@ proc bprint_any(buf ^[]byte, arg any) {
 		}
 
 	case Maybe:
-		var size = mem.size_of_type_info(info.elem);
-		var data = slice_ptr(arg.data as ^byte, size+1);
+		size := mem.size_of_type_info(info.elem);
+		data := slice_ptr(arg.data as ^byte, size+1);
 		if data[size] != 0 {
 			bprint_any(buf, make_any(info.elem, arg.data));
 		} else {
@@ -399,26 +399,26 @@ proc bprint_any(buf ^[]byte, arg any) {
 		bprintf(buf, "[%]%{", info.count, info.elem);
 		defer bprint_string(buf, "}");
 
-		for var i = 0; i < info.count; i++ {
+		for i := 0; i < info.count; i++ {
 			if i > 0 {
 				bprint_string(buf, ", ");
 			}
 
-			var data = arg.data as ^byte + i*info.elem_size;
+			data := arg.data as ^byte + i*info.elem_size;
 			bprint_any(buf, make_any(info.elem, data));
 		}
 
 	case Slice:
-		var slice = arg.data as ^[]byte;
+		slice := arg.data as ^[]byte;
 		bprintf(buf, "[]%{", info.elem);
 		defer bprint_string(buf, "}");
 
-		for var i = 0; i < slice.count; i++ {
+		for i := 0; i < slice.count; i++ {
 			if i > 0 {
 				bprint_string(buf, ", ");
 			}
 
-			var data = slice.data + i*info.elem_size;
+			data := slice.data + i*info.elem_size;
 			bprint_any(buf, make_any(info.elem, data));
 		}
 
@@ -440,12 +440,12 @@ proc bprint_any(buf ^[]byte, arg any) {
 			return;
 		}
 
-		for var i = 0; i < info.count; i++ {
+		for i := 0; i < info.count; i++ {
 			if i > 0 {
 				bprint_string(buf, ", ");
 			}
 
-			var data = arg.data as ^byte + i*info.elem_size;
+			data := arg.data as ^byte + i*info.elem_size;
 			bprint_any(buf, make_any(info.elem, data));
 		}
 
@@ -454,14 +454,14 @@ proc bprint_any(buf ^[]byte, arg any) {
 		bprintf(buf, "%{", arg.type_info);
 		defer bprint_string(buf, "}");
 
-		for var i = 0; i < info.fields.count; i++ {
+		for i := 0; i < info.fields.count; i++ {
 			if i > 0 {
 				bprint_string(buf, ", ");
 			}
 			bprint_string(buf, info.fields[i].name);
 			bprint_string(buf, " = ");
-			var data = arg.data as ^byte + info.fields[i].offset;
-			var ti = info.fields[i].type_info;
+			data := arg.data as ^byte + info.fields[i].offset;
+			ti := info.fields[i].type_info;
 			bprint_any(buf, make_any(ti, data));
 		}
 
@@ -487,10 +487,10 @@ proc bprintf(buf ^[]byte, fmt string, args ..any) -> int {
 	}
 
 	proc parse_int(s string, offset int) -> (int, int) {
-		var result = 0;
+		result := 0;
 
 		for ; offset < s.count; offset++ {
-			var c = s[offset] as rune;
+			c := s[offset] as rune;
 			if !is_digit(c) {
 				break;
 			}
@@ -502,12 +502,12 @@ proc bprintf(buf ^[]byte, fmt string, args ..any) -> int {
 		return result, offset;
 	}
 
-	var prev = 0;
-	var implicit_index = 0;
+	prev := 0;
+	implicit_index := 0;
 
-	for var i = 0; i < fmt.count; i++ {
-		var r = fmt[i] as rune;
-		var index = implicit_index;
+	for i := 0; i < fmt.count; i++ {
+		r := fmt[i] as rune;
+		index := implicit_index;
 
 		if r != '%' {
 			continue;
@@ -516,7 +516,7 @@ proc bprintf(buf ^[]byte, fmt string, args ..any) -> int {
 		bprint_string(buf, fmt[prev:i]);
 		i++; // Skip %
 		if i < fmt.count {
-			var next = fmt[i] as rune;
+			next := fmt[i] as rune;
 
 			if next == '%' {
 				bprint_string(buf, "%");
@@ -561,10 +561,10 @@ proc bprint(buf ^[]byte, args ..any) -> int {
 	}
 
 
-	var prev_string = false;
-	for var i = 0; i < args.count; i++ {
-		var arg = args[i];
-		var is_string = arg.data != nil && is_type_string(arg.type_info);
+	prev_string := false;
+	for i := 0; i < args.count; i++ {
+		arg := args[i];
+		is_string := arg.data != nil && is_type_string(arg.type_info);
 		if i > 0 && !is_string && !prev_string {
 			bprint_space(buf);
 		}
@@ -575,7 +575,7 @@ proc bprint(buf ^[]byte, args ..any) -> int {
 }
 
 proc bprintln(buf ^[]byte, args ..any) -> int {
-	for var i = 0; i < args.count; i++ {
+	for i := 0; i < args.count; i++ {
 		if i > 0 {
 			append(buf, ' ');
 		}

@@ -85,71 +85,58 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 		case_ast_node(ws, WhenStmt, node);
 			// Will be handled later
 		case_end;
-		case_ast_node(gd, GenericDecl, node);
-			AstNodeValueSpec empty_spec_ = {0}, *empty_spec = &empty_spec_;
-			AstNodeValueSpec *last = NULL;
 
+		case_ast_node(vd, ValueDecl, node);
+			if (vd->is_var) {
+				// NOTE(bill): Handled later
+			} else {
+				for_array(i, vd->names) {
+					AstNode *name = vd->names.e[i];
+					if (name->kind != AstNode_Ident) {
+						error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+						continue;
+					}
+
+					AstNode *init = NULL;
+					if (i < vd->values.count) {
+						init = vd->values.e[i];
+					}
+
+					DeclInfo *d = make_declaration_info(c->allocator, c->context.scope);
+					Entity *e = NULL;
+
+					AstNode *up_init = unparen_expr(init);
+					if (init != NULL && is_ast_node_type(up_init)) {
+						e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
+						d->type_expr = init;
+						d->init_expr = init;
+					} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
+						e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
+						d->proc_decl = init;
+					} else {
+						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, (ExactValue){0});
+						d->type_expr = vd->type;
+						d->init_expr = init;
+					}
+					GB_ASSERT(e != NULL);
+					e->identifier = name;
+
+					add_entity_and_decl_info(c, name, e, d);
+
+					DelayedEntity delay = {name, e, d};
+					array_add(delayed_entities, delay);
+				}
+
+				check_arity_match(c, vd);
+			}
+		case_end;
+
+		case_ast_node(gd, GenericDecl, node);
 			for_array(iota, gd->specs) {
 				AstNode *spec = gd->specs.e[iota];
 				switch (spec->kind) {
 				case_ast_node(bd, BadDecl, spec);
 				case_end;
-				case_ast_node(vs, ValueSpec, spec);
-					switch (vs->keyword) {
-					case Token_var:
-						break;
-
-					case Token_const: {
-						if (vs->type != NULL || vs->values.count > 0) {
-							last = vs;
-						} else if (last == NULL) {
-							last = empty_spec;
-						}
-
-						for_array(i, vs->names) {
-							AstNode *name = vs->names.e[i];
-							if (name->kind != AstNode_Ident) {
-								error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-								continue;
-							}
-
-							AstNode *init = NULL;
-							if (i < vs->values.count) {
-								init = vs->values.e[i];
-							}
-
-							DeclInfo *d = make_declaration_info(c->allocator, c->context.scope);
-							Entity *e = NULL;
-
-							ExactValue v_iota = make_exact_value_integer(iota);
-
-							AstNode *up_init = unparen_expr(init);
-							if (init != NULL && is_ast_node_type(up_init)) {
-								e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
-								d->type_expr = init;
-								d->init_expr = init;
-							} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
-								e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
-								d->proc_decl = init;
-							} else {
-								e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, v_iota);
-								d->type_expr = vs->type;
-								d->init_expr = init;
-							}
-							GB_ASSERT(e != NULL);
-							e->identifier = name;
-
-							add_entity_and_decl_info(c, name, e, d);
-
-							DelayedEntity delay = {name, e, d};
-							array_add(delayed_entities, delay);
-						}
-
-						check_arity_match(c, vs, last);
-					} break;
-					}
-				case_end;
-
 				case_ast_node(ts, TypeSpec, spec);
 					if (ts->name->kind != AstNode_Ident) {
 						error_node(ts->name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[ts->name->kind]));
