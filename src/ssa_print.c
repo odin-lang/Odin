@@ -225,6 +225,9 @@ void ssa_print_type(ssaFileBuffer *f, ssaModule *m, Type *t) {
 			i64 align_of_union = type_align_of(s, heap_allocator(), t);
 			ssa_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align_of_union, size_of_union);
 		} break;
+		case TypeRecord_Enum:
+			ssa_print_type(f, m, base_enum_type(t));
+			break;
 		}
 	} break;
 
@@ -299,7 +302,7 @@ void ssa_print_compound_element(ssaFileBuffer *f, ssaModule *m, ExactValue v, Ty
 }
 
 void ssa_print_exact_value(ssaFileBuffer *f, ssaModule *m, ExactValue value, Type *type) {
-	type = base_type(type);
+	type = base_type(base_enum_type(type));
 	if (is_type_float(type)) {
 		value = exact_value_to_float(value);
 	} else if (is_type_integer(type)) {

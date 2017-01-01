@@ -18,6 +18,7 @@ bool     check_is_terminating      (AstNode *node);
 bool     check_has_break           (AstNode *stmt, bool implicit);
 void     check_stmt                (Checker *c, AstNode *node, u32 flags);
 void     check_stmt_list           (Checker *c, AstNodeArray stmts, u32 flags);
+void     check_init_constant       (Checker *c, Entity *e, Operand *operand);
 
 
 gb_inline Type *check_type(Checker *c, AstNode *expression) {
@@ -724,6 +725,106 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
 // 	return i < j ? -1 : i > j;
 // }
 
+void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *node) {
+	ast_node(et, EnumType, node);
+	GB_ASSERT(is_type_enum(enum_type));
+
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+
+	Type *base_type = t_int;
+	if (et->base_type != NULL) {
+		base_type = check_type(c, et->base_type);
+	}
+
+	if (base_type == NULL || !(is_type_integer(base_type) || is_type_float(base_type))) {
+		error_node(node, "Base type for enumeration must be numeric");
+		return;
+	}
+
+	// NOTE(bill): Must be up here for the `check_init_constant` system
+	enum_type->Record.enum_base_type = base_type;
+
+	MapEntity entity_map = {0}; // Key: String
+	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*(et->fields.count));
+
+	Entity **fields = gb_alloc_array(c->allocator, Entity *, et->fields.count);
+	isize field_index = 0;
+
+	Type *constant_type = enum_type;
+	if (named_type != NULL) {
+		constant_type = named_type;
+	}
+
+	AstNode *prev_expr = NULL;
+
+	i64 iota = 0;
+
+	for_array(i, et->fields) {
+		AstNode *field = et->fields.e[i];
+		AstNode *ident = NULL;
+		if (field->kind == AstNode_FieldValue) {
+			ast_node(fv, FieldValue, field);
+			if (fv->field == NULL || fv->field->kind != AstNode_Ident) {
+				error_node(field, "An enum field's name must be an identifier");
+				continue;
+			}
+			ident = fv->field;
+			prev_expr = fv->value;
+		} else if (field->kind == AstNode_Ident) {
+			ident = field;
+		} else {
+			error_node(field, "An enum field's name must be an identifier");
+			continue;
+		}
+		String name = ident->Ident.string;
+
+		if (str_ne(name, str_lit("_"))) {
+			ExactValue v = make_exact_value_integer(iota);
+			Entity *e = make_entity_constant(c->allocator, c->context.scope, ident->Ident, constant_type, v);
+			e->identifier = ident;
+			e->flags |= EntityFlag_Visited;
+
+
+			AstNode *init = prev_expr;
+			if (init == NULL) {
+				error_node(field, "Missing initial expression for enumeration, e.g. iota");
+				continue;
+			}
+
+			GB_ASSERT(c->context.iota.kind == ExactValue_Invalid);
+			c->context.iota = e->Constant.value;
+			e->Constant.value = (ExactValue){0};
+
+			Operand operand = {0};
+			check_expr(c, &operand, init);
+
+			check_init_constant(c, e, &operand);
+			c->context.iota = (ExactValue){0};
+
+			if (operand.mode == Addressing_Constant) {
+				HashKey key = hash_string(name);
+				if (map_entity_get(&entity_map, key) != NULL) {
+					error_node(ident, "`%.*s` is already declared in this enumeration", LIT(name));
+				} else {
+					map_entity_set(&entity_map, key, e);
+					add_entity(c, c->context.scope, NULL, e);
+					fields[field_index++] = e;
+					add_entity_use(c, field, e);
+				}
+			}
+		}
+		iota++;
+	}
+
+	GB_ASSERT(field_index <= et->fields.count);
+
+	enum_type->Record.fields = fields;
+	enum_type->Record.field_count = field_index;
+
+	gb_temp_arena_memory_end(tmp);
+}
+
+
 Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_variadic_) {
 	if (params.count == 0) {
 		return NULL;
@@ -1105,6 +1206,16 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 		goto end;
 	case_end;
 
+	case_ast_node(et, EnumType, e);
+		type = make_type_enum(c->allocator);
+		set_base_type(named_type, type);
+		check_open_scope(c, e);
+		check_enum_type(c, type, named_type, e);
+		check_close_scope(c);
+		type->Record.node = e;
+		goto end;
+	case_end;
+
 	case_ast_node(pt, ProcType, e);
 		type = alloc_type(c->allocator, Type_Proc);
 		set_base_type(named_type, type);
@@ -1113,6 +1224,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 		check_close_scope(c);
 		goto end;
 	case_end;
+
 
 	case_ast_node(ce, CallExpr, e);
 		Operand o = {0};
@@ -1161,7 +1273,7 @@ end:
 
 bool check_unary_op(Checker *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
-	Type *type = base_type(base_vector_type(o->type));
+	Type *type = base_type(base_enum_type(base_vector_type(o->type)));
 	gbString str = NULL;
 	switch (op.kind) {
 	case Token_Add:
@@ -1197,7 +1309,7 @@ bool check_unary_op(Checker *c, Operand *o, Token op) {
 
 bool check_binary_op(Checker *c, Operand *o, Token op) {
 	// TODO(bill): Handle errors correctly
-	Type *type = base_type(base_vector_type(o->type));
+	Type *type = base_type(base_enum_type(base_vector_type(o->type)));
 	switch (op.kind) {
 	case Token_Sub:
 	case Token_SubEq:
@@ -1273,6 +1385,8 @@ bool check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exa
 		// NOTE(bill): There's already been an error
 		return true;
 	}
+
+	type = base_type(base_enum_type(type));
 
 	if (is_type_boolean(type)) {
 		return in_value.kind == ExactValue_Bool;
@@ -1363,7 +1477,7 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 				error_node(o->expr, "`%s = %lld` overflows `%s`", a, o->value.value_integer, b);
 			}
 		} else {
-			error_node(o->expr, "Cannot convert `%s`  to `%s`", a, b);
+			error_node(o->expr, "Cannot convert `%s` to `%s`", a, b);
 		}
 
 		gb_string_free(b);
@@ -2036,10 +2150,10 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	}
 
 	if (op.kind == Token_Add || op.kind == Token_Sub) {
-		if (is_type_pointer(x->type) && is_type_integer(y->type)) {
+		if (is_type_pointer(x->type) && is_type_integer(base_enum_type(y->type))) {
 			*x = check_ptr_addition(c, op.kind, x, y, node);
 			return;
-		} else if (is_type_integer(x->type) && is_type_pointer(y->type)) {
+		} else if (is_type_integer(base_enum_type(x->type)) && is_type_pointer(y->type)) {
 			if (op.kind == Token_Sub) {
 				gbString lhs = expr_to_string(x->expr);
 				gbString rhs = expr_to_string(y->expr);
@@ -2247,20 +2361,22 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 	}
 
 	if (is_type_untyped(target_type)) {
-		Type *x = operand->type;
-		Type *y = target_type;
-		if (is_type_numeric(x) && is_type_numeric(y)) {
-			if (x < y) {
+		GB_ASSERT(operand->type->kind == Type_Basic);
+		GB_ASSERT(target_type->kind == Type_Basic);
+		BasicKind x_kind = operand->type->Basic.kind;
+		BasicKind y_kind = target_type->Basic.kind;
+		if (is_type_numeric(operand->type) && is_type_numeric(target_type)) {
+			if (x_kind < y_kind) {
 				operand->type = target_type;
 				update_expr_type(c, operand->expr, target_type, false);
 			}
-		} else if (x != y) {
+		} else if (x_kind != y_kind) {
 			convert_untyped_error(c, operand, target_type);
 		}
 		return;
 	}
 
-	Type *t = base_type(target_type);
+	Type *t = base_type(base_enum_type(target_type));
 	switch (t->kind) {
 	case Type_Basic:
 		if (operand->mode == Addressing_Constant) {
@@ -4366,7 +4482,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case AstNode_ArrayType:
 	case AstNode_VectorType:
 	case AstNode_StructType:
+	case AstNode_UnionType:
 	case AstNode_RawUnionType:
+	case AstNode_EnumType:
 		o->mode = Addressing_Type;
 		o->type = check_type(c, node);
 		break;

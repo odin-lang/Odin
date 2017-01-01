@@ -64,6 +64,7 @@ typedef enum TypeRecordKind {
 	TypeRecord_Struct,
 	TypeRecord_RawUnion,
 	TypeRecord_Union, // Tagged
+	TypeRecord_Enum,
 
 	TypeRecord_Count,
 } TypeRecordKind;
@@ -82,6 +83,8 @@ typedef struct TypeRecord {
 	bool     struct_is_packed;
 	bool     struct_is_ordered;
 	Entity **fields_in_src_order; // Entity_Variable
+
+	Type *   enum_base_type;
 } TypeRecord;
 
 #define TYPE_KINDS \
@@ -270,6 +273,7 @@ gb_global Type *t_type_info_tuple      = NULL;
 gb_global Type *t_type_info_struct     = NULL;
 gb_global Type *t_type_info_union      = NULL;
 gb_global Type *t_type_info_raw_union  = NULL;
+gb_global Type *t_type_info_enum       = NULL;
 
 gb_global Type *t_allocator            = NULL;
 gb_global Type *t_allocator_ptr        = NULL;
@@ -285,13 +289,26 @@ gbString type_to_string(Type *type);
 
 Type *base_type(Type *t) {
 	for (;;) {
-		if (t == NULL || t->kind != Type_Named) {
+		if (t == NULL) {
+			break;
+		}
+		if (t->kind != Type_Named) {
 			break;
 		}
 		if (t == t->Named.base) {
 			return t_invalid;
 		}
 		t = t->Named.base;
+	}
+	return t;
+}
+
+Type *base_enum_type(Type *t) {
+	Type *bt = base_type(t);
+	if (bt != NULL &&
+	    bt->kind == Type_Record &&
+	    bt->Record.kind == TypeRecord_Enum) {
+		return bt->Record.enum_base_type;
 	}
 	return t;
 }
@@ -366,6 +383,13 @@ Type *make_type_raw_union(gbAllocator a) {
 	t->Record.kind = TypeRecord_RawUnion;
 	return t;
 }
+
+Type *make_type_enum(gbAllocator a) {
+	Type *t = alloc_type(a, Type_Record);
+	t->Record.kind = TypeRecord_Enum;
+	return t;
+}
+
 
 
 
@@ -492,7 +516,7 @@ bool is_type_ordered(Type *t) {
 	return false;
 }
 bool is_type_constant_type(Type *t) {
-	t = base_type(t);
+	t = base_type(base_enum_type(t));
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_ConstantType) != 0;
 	}
@@ -598,6 +622,11 @@ bool is_type_raw_union(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_RawUnion);
 }
+bool is_type_enum(Type *t) {
+	t = base_type(t);
+	return (t->kind == Type_Record && t->Record.kind == TypeRecord_Enum);
+}
+
 
 bool is_type_any(Type *t) {
 	t = base_type(t);
@@ -642,6 +671,8 @@ bool is_type_comparable(Type *t) {
 				if (!is_type_comparable(t->Record.fields[i]->type))
 					return false;
 			}
+		} else if (is_type_enum(t)) {
+			return is_type_comparable(base_enum_type(t));
 		}
 		return false;
 	} break;
@@ -712,6 +743,8 @@ bool are_types_identical(Type *x, Type *y) {
 						return true;
 					}
 					break;
+				case TypeRecord_Enum:
+					return x == y; // NOTE(bill): All enums are unique
 				}
 			}
 		}
@@ -990,6 +1023,18 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			for (isize i = 0; i < type->Record.field_count; i++) {
 				Entity *f = type->Record.fields[i];
 				GB_ASSERT(f->kind == Entity_TypeName);
+				String str = f->token.string;
+
+				if (str_eq(field_name, str)) {
+					sel.entity = f;
+					selection_add_index(&sel, i);
+					return sel;
+				}
+			}
+		} else if (is_type_enum(type)) {
+			for (isize i = 0; i < type->Record.field_count; i++) {
+				Entity *f = type->Record.fields[i];
+				GB_ASSERT(f->kind == Entity_Constant);
 				String str = f->token.string;
 
 				if (str_eq(field_name, str)) {

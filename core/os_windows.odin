@@ -54,7 +54,7 @@ const {
 }
 
 const { // Windows reserves errors >= 1<<29 for application use
-	ERROR_FILE_IS_PIPE Error = 1<<29 + iota;
+	ERROR_FILE_IS_PIPE Error = 1<<29 + 0;
 }
 
 

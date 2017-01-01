@@ -5484,6 +5484,49 @@ void ssa_gen_tree(ssaGen *s) {
 						ssa_emit_store(proc, len, field_count);
 						ssa_emit_store(proc, cap, field_count);
 					} break;
+					case TypeRecord_Enum:
+						tag = ssa_add_local_generated(proc, t_type_info_enum);
+						{
+							GB_ASSERT(t->Record.enum_base_type != NULL);
+							ssaValue *base = ssa_type_info(proc, t->Record.enum_base_type);
+							ssa_emit_store(proc, ssa_emit_struct_ep(proc, tag, 0), base);
+
+							if (t->Record.field_count > 0) {
+								Entity **fields = t->Record.fields;
+								isize count = t->Record.field_count;
+								ssaValue *name_array = NULL;
+
+								{
+									Token token = {Token_Ident};
+									i32 id = cast(i32)entry_index;
+									char name_base[] = "__$enum_names";
+									isize name_len = gb_size_of(name_base) + 10;
+									token.string.text = gb_alloc_array(a, u8, name_len);
+									token.string.len = gb_snprintf(cast(char *)token.string.text, name_len,
+									                               "%s-%d", name_base, id)-1;
+									Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, t_string, count), false);
+									name_array = ssa_make_value_global(a, e, NULL);
+									name_array->Global.is_private = true;
+									ssa_module_add_value(m, e, name_array);
+									map_ssa_value_set(&m->members, hash_string(token.string), name_array);
+								}
+
+								for (isize i = 0; i < count; i++) {
+									ssaValue *name_ep = ssa_emit_array_epi(proc, name_array, i);
+									ssa_emit_store(proc, name_ep, ssa_make_const_string(a, fields[i]->token.string));
+								}
+
+								ssaValue *v_count = ssa_make_const_int(a, count);
+
+								ssaValue *names = ssa_emit_struct_ep(proc, tag, 1);
+								ssaValue *name_array_elem = ssa_array_elem(proc, name_array);
+
+								ssa_emit_store(proc, ssa_emit_struct_ep(proc, names, 0), name_array_elem);
+								ssa_emit_store(proc, ssa_emit_struct_ep(proc, names, 1), v_count);
+								ssa_emit_store(proc, ssa_emit_struct_ep(proc, names, 2), v_count);
+							}
+						}
+						break;
 					}
 				} break;
 

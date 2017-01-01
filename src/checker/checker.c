@@ -1027,7 +1027,7 @@ void init_preload(Checker *c) {
 		t_type_info_member = type_info_member_entity->type;
 		t_type_info_member_ptr = make_type_pointer(c->allocator, t_type_info_member);
 
-		if (record->field_count != 17) {
+		if (record->field_count != 18) {
 			compiler_error("Invalid `Type_Info` layout");
 		}
 		t_type_info_named     = record->fields[ 1]->type;
@@ -1046,6 +1046,7 @@ void init_preload(Checker *c) {
 		t_type_info_struct    = record->fields[14]->type;
 		t_type_info_union     = record->fields[15]->type;
 		t_type_info_raw_union = record->fields[16]->type;
+		t_type_info_enum      = record->fields[17]->type;
 	}
 
 	if (t_allocator == NULL) {

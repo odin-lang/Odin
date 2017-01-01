@@ -347,7 +347,7 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 	AST_NODE_KIND(EnumType, "enum type", struct { \
 		Token token; \
 		AstNode *base_type; \
-		AstNodeArray fields; \
+		AstNodeArray fields; /* FieldValue */ \
 	}) \
 AST_NODE_KIND(_TypeEnd,  "", i32)
 
@@ -2546,6 +2546,18 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		Token close = expect_token(f, Token_CloseBrace);
 
 		return make_raw_union_type(f, token, decls, decl_count);
+	}
+
+	case Token_enum: {
+		Token token = expect_token(f, Token_enum);
+		AstNode *base_type = NULL;
+		if (f->curr_token.kind != Token_OpenBrace) {
+			base_type = parse_type(f);
+		}
+		Token open = expect_token(f, Token_OpenBrace);
+		AstNodeArray fields = parse_element_list(f);
+		Token close = expect_token(f, Token_CloseBrace);
+		return make_enum_type(f, token, base_type, fields);
 	}
 
 	case Token_proc: {

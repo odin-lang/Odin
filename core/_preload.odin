@@ -73,6 +73,10 @@ type {
 		Struct    Type_Info_Record;
 		Union     Type_Info_Record;
 		Raw_Union Type_Info_Record;
+		Enum struct #ordered {
+			base  ^Type_Info;
+			names []string;
+		};
 	}
 }
 
@@ -112,12 +116,11 @@ proc fmuladd64(a, b, c f64) -> f64 #foreign "llvm.fmuladd.f64"
 
 
 
-type Allocator_Mode u8;
-const {
-	ALLOCATOR_ALLOC Allocator_Mode = iota;
-	ALLOCATOR_FREE;
-	ALLOCATOR_FREE_ALL;
-	ALLOCATOR_RESIZE;
+type Allocator_Mode enum u8 {
+	ALLOC = iota,
+	FREE,
+	FREE_ALL,
+	RESIZE,
 }
 type {
 	Allocator_Proc proc(allocator_data rawptr, mode Allocator_Mode,
@@ -160,20 +163,20 @@ proc alloc(size int) -> rawptr #inline { return alloc_align(size, DEFAULT_ALIGNM
 proc alloc_align(size, alignment int) -> rawptr #inline {
 	__check_context();
 	var a = context.allocator;
-	return a.procedure(a.data, ALLOCATOR_ALLOC, size, alignment, nil, 0, 0);
+	return a.procedure(a.data, Allocator_Mode.ALLOC, size, alignment, nil, 0, 0);
 }
 
 proc free(ptr rawptr) #inline {
 	__check_context();
 	var a = context.allocator;
 	if ptr != nil {
-		a.procedure(a.data, ALLOCATOR_FREE, 0, 0, ptr, 0, 0);
+		a.procedure(a.data, Allocator_Mode.FREE, 0, 0, ptr, 0, 0);
 	}
 }
 proc free_all() #inline {
 	__check_context();
 	var a = context.allocator;
-	a.procedure(a.data, ALLOCATOR_FREE_ALL, 0, 0, nil, 0, 0);
+	a.procedure(a.data, Allocator_Mode.FREE_ALL, 0, 0, nil, 0, 0);
 }
 
 
@@ -181,7 +184,7 @@ proc resize      (ptr rawptr, old_size, new_size int) -> rawptr #inline { return
 proc resize_align(ptr rawptr, old_size, new_size, alignment int) -> rawptr #inline {
 	__check_context();
 	var a = context.allocator;
-	return a.procedure(a.data, ALLOCATOR_RESIZE, new_size, alignment, ptr, old_size, 0);
+	return a.procedure(a.data, Allocator_Mode.RESIZE, new_size, alignment, ptr, old_size, 0);
 }
 
 
@@ -214,9 +217,11 @@ proc default_resize_align(old_memory rawptr, old_size, new_size, alignment int) 
 proc default_allocator_proc(allocator_data rawptr, mode Allocator_Mode,
                             size, alignment int,
                             old_memory rawptr, old_size int, flags u64) -> rawptr {
+	using Allocator_Mode;
+
 	when false {
 		match mode {
-		case ALLOCATOR_ALLOC:
+		case ALLOC:
 			var total_size = size + alignment + size_of(mem.AllocationHeader);
 			var ptr = os.heap_alloc(total_size);
 			var header = ptr as ^mem.AllocationHeader;
@@ -224,14 +229,14 @@ proc default_allocator_proc(allocator_data rawptr, mode Allocator_Mode,
 			mem.allocation_header_fill(header, ptr, size);
 			return mem.zero(ptr, size);
 
-		case ALLOCATOR_FREE:
+		case FREE:
 			os.heap_free(mem.allocation_header(old_memory));
 			return nil;
 
-		case ALLOCATOR_FREE_ALL:
+		case FREE_ALL:
 			// NOTE(bill): Does nothing
 
-		case ALLOCATOR_RESIZE:
+		case RESIZE:
 			var total_size = size + alignment + size_of(mem.AllocationHeader);
 			var ptr = os.heap_resize(mem.allocation_header(old_memory), total_size);
 			var header = ptr as ^mem.AllocationHeader;
@@ -241,17 +246,17 @@ proc default_allocator_proc(allocator_data rawptr, mode Allocator_Mode,
 		}
 	} else {
 		match mode {
-		case ALLOCATOR_ALLOC:
+		case ALLOC:
 			return os.heap_alloc(size);
 
-		case ALLOCATOR_FREE:
+		case FREE:
 			os.heap_free(old_memory);
 			return nil;
 
-		case ALLOCATOR_FREE_ALL:
+		case FREE_ALL:
 			// NOTE(bill): Does nothing
 
-		case ALLOCATOR_RESIZE:
+		case RESIZE:
 			return os.heap_resize(old_memory, size);
 		}
 	}

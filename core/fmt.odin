@@ -292,6 +292,12 @@ proc bprint_type(buf ^[]byte, ti ^Type_Info) {
 			bprint_type(buf, info.fields[i].type_info);
 		}
 		bprint_string(buf, "}");
+
+	case Enum:
+		bprint_string(buf, "enum ");
+		bprint_type(buf, info.base);
+		bprint_string(buf, " {}");
+
 	}
 }
 
@@ -463,6 +469,10 @@ proc bprint_any(buf ^[]byte, arg any) {
 		bprint_string(buf, "(union)");
 	case Raw_Union:
 		bprint_string(buf, "(raw_union)");
+
+	case Enum:
+		bprint_any(buf, make_any(info.base, arg.data));
+
 	case Procedure:
 		bprint_type(buf, arg.type_info);
 		bprint_string(buf, " @ ");

@@ -108,6 +108,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_struct,         "struct"), \
 	TOKEN_KIND(Token_union,          "union"), \
 	TOKEN_KIND(Token_raw_union,      "raw_union"), \
+	TOKEN_KIND(Token_enum,           "enum"), \
 	TOKEN_KIND(Token_vector,         "vector"), \
 	TOKEN_KIND(Token_using,          "using"), \
 	TOKEN_KIND(Token_asm,            "asm"), \

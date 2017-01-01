@@ -934,8 +934,21 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						}
 						f->using_parent = e;
 					}
+				} else if (is_type_enum(t)) {
+					for (isize i = 0; i < t->Record.field_count; i++) {
+						Entity *f = t->Record.fields[i];
+						Entity *found = scope_insert_entity(c->context.scope, f);
+						if (found != NULL) {
+							gbString expr_str = expr_to_string(expr);
+							error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+							gb_string_free(expr_str);
+							return;
+						}
+						f->using_parent = e;
+					}
+
 				} else {
-					error(us->token, "`using` can be only applied to `union` type entities");
+					error(us->token, "`using` can be only applied to `union` or `enum` type entities");
 				}
 			} break;
 
