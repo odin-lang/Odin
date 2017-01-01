@@ -95,18 +95,20 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 		error(lhs[0]->token, "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
 	}
 
+#if 0
 	if (lhs[0]->kind == Entity_Variable &&
 	    lhs[0]->Variable.is_let) {
 		if (lhs_count != rhs_count) {
 			error(lhs[0]->token, "`let` variables must be initialized, `%td` = `%td`", lhs_count, rhs_count);
 		}
 	}
+#endif
 
 	gb_temp_arena_memory_end(tmp);
 }
 
 void check_var_spec_node(Checker *c, AstNodeValueSpec *vs) {
-	GB_ASSERT(vs->keyword == Token_var || vs->keyword == Token_let);
+	GB_ASSERT(vs->keyword == Token_var);
 	isize entity_count = vs->names.count;
 	isize entity_index = 0;
 	Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
@@ -123,7 +125,7 @@ void check_var_spec_node(Checker *c, AstNodeValueSpec *vs) {
 				found = current_scope_lookup_entity(c->context.scope, str);
 			}
 			if (found == NULL) {
-				entity = make_entity_variable(c->allocator, c->context.scope, token, NULL, vs->keyword == Token_let);
+				entity = make_entity_variable(c->allocator, c->context.scope, token, NULL);
 				add_entity_definition(&c->info, name, entity);
 			} else {
 				TokenPos pos = found->token.pos;

@@ -1211,7 +1211,6 @@ void fix_advance_to_next_stmt(AstFile *f) {
 			return;
 
 		case Token_var:
-		case Token_let:
 		case Token_const:
 		case Token_type:
 		case Token_proc:
@@ -2154,7 +2153,6 @@ PARSE_SPEC_PROC(parse_value_spec) {
 
 	switch (keyword) {
 	case Token_var:
-	case Token_let:
 		if (type == NULL && values.count == 0 && names.count > 0) {
 			syntax_error(f->curr_token, "Missing type or initialization");
 			return make_bad_decl(f, f->curr_token, f->curr_token);
@@ -2240,7 +2238,6 @@ PARSE_SPEC_PROC(parse_include_spec) {
 AstNode *parse_decl(AstFile *f) {
 	switch (f->curr_token.kind) {
 	case Token_var:
-	case Token_let:
 	case Token_const:
 		return parse_generic_decl(f, f->curr_token.kind, parse_value_spec);
 
@@ -2269,7 +2266,6 @@ AstNode *parse_decl(AstFile *f) {
 AstNode *parse_simple_stmt(AstFile *f) {
 	switch (f->curr_token.kind) {
 	case Token_var:
-	case Token_let:
 	case Token_const:
 		return parse_decl(f);
 	}
@@ -2555,9 +2551,11 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 			base_type = parse_type(f);
 		}
 		Token open = expect_token(f, Token_OpenBrace);
-		AstNodeArray fields = parse_element_list(f);
+
+		AstNodeArray values = parse_element_list(f);
 		Token close = expect_token(f, Token_CloseBrace);
-		return make_enum_type(f, token, base_type, fields);
+
+		return make_enum_type(f, token, base_type, values);
 	}
 
 	case Token_proc: {
@@ -3026,7 +3024,6 @@ AstNode *parse_stmt(AstFile *f) {
 		return s;
 
 	case Token_var:
-	case Token_let:
 	case Token_const:
 	case Token_proc:
 	case Token_type:
@@ -3070,8 +3067,6 @@ AstNode *parse_stmt(AstFile *f) {
 		} break;
 		case AstNode_GenericDecl:
 			if (node->GenericDecl.token.kind == Token_var) {
-				valid = true;
-			} else if (node->GenericDecl.token.kind == Token_let) {
 				valid = true;
 			}
 			break;

@@ -791,7 +791,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 				continue;
 			}
 
-			GB_ASSERT(c->context.iota.kind == ExactValue_Invalid);
+			ExactValue context_iota = c->context.iota;
 			c->context.iota = e->Constant.value;
 			e->Constant.value = (ExactValue){0};
 
@@ -799,7 +799,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 			check_expr(c, &operand, init);
 
 			check_init_constant(c, e, &operand);
-			c->context.iota = (ExactValue){0};
+			c->context.iota = context_iota;
 
 			if (operand.mode == Addressing_Constant) {
 				HashKey key = hash_string(name);
@@ -1001,9 +1001,9 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 		}
 	#else
 		o->mode = Addressing_Variable;
-		if (e->Variable.is_let) {
-			o->mode = Addressing_Value;
-		}
+		// if (e->Variable.is_let) {
+			// o->mode = Addressing_Value;
+		// }
 	#endif
 		break;
 
@@ -1770,8 +1770,8 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 	}
 
 	Type *x = operand->type;
-	Type *xb = base_type(x);
-	Type *yb = base_type(y);
+	Type *xb = base_type(base_enum_type(x));
+	Type *yb = base_type(base_enum_type(y));
 	if (are_types_identical(xb, yb)) {
 		return true;
 	}

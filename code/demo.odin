@@ -11,13 +11,14 @@ import {
 	win32 "sys/windows.odin";
 }
 
+
 type Thing enum f64 {
 	_, // Ignore first value
 	A = 1<<(10*iota),
 	B,
 	C,
 	D,
-}
+};
 
 proc main() {
 	var ti = type_info(Thing);
@@ -32,6 +33,8 @@ proc main() {
 		fmt.println();
 	}
 
-	fmt.println(Thing.A, Thing.B, Thing.C, Thing.D);
+	var x Thing = Thing.A;
+
+	fmt.println(x, Thing.B, Thing.C, Thing.D);
 
 }

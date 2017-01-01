@@ -1233,8 +1233,7 @@ ssaValue *ssa_add_local_generated(ssaProcedure *proc, Type *type) {
 	Entity *e = make_entity_variable(proc->module->allocator,
 	                                 scope,
 	                                 empty_token,
-	                                 type,
-	                                 false);
+	                                 type);
 	return ssa_add_local(proc, e);
 }
 
@@ -1920,8 +1919,8 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 		return value;
 	}
 
-	Type *src = base_type(src_type);
-	Type *dst = base_type(t);
+	Type *src = base_type(base_enum_type(src_type));
+	Type *dst = base_type(base_enum_type(t));
 
 	if (value->kind == ssaValue_Constant) {
 		if (is_type_any(dst)) {
@@ -3934,7 +3933,6 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 				switch (vs->keyword) {
 				case Token_const:
 					break;
-				case Token_let:
 				case Token_var: {
 					ssaModule *m = proc->module;
 					gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
@@ -4784,7 +4782,7 @@ void ssa_init_module(ssaModule *m, Checker *c, BuildContext *build_context) {
 		{
 			String name = str_lit(SSA_TYPE_INFO_DATA_NAME);
 			isize count = c->info.type_info_map.entries.count;
-			Entity *e = make_entity_variable(m->allocator, NULL, make_token_ident(name), make_type_array(m->allocator, t_type_info, count), false);
+			Entity *e = make_entity_variable(m->allocator, NULL, make_token_ident(name), make_type_array(m->allocator, t_type_info, count));
 			ssaValue *g = ssa_make_value_global(m->allocator, e, NULL);
 			g->Global.is_private  = true;
 			ssa_module_add_value(m, e, g);
@@ -4816,7 +4814,7 @@ void ssa_init_module(ssaModule *m, Checker *c, BuildContext *build_context) {
 
 			String name = str_lit(SSA_TYPE_INFO_DATA_MEMBER_NAME);
 			Entity *e = make_entity_variable(m->allocator, NULL, make_token_ident(name),
-			                                 make_type_array(m->allocator, t_type_info_member, count), false);
+			                                 make_type_array(m->allocator, t_type_info_member, count));
 			ssaValue *g = ssa_make_value_global(m->allocator, e, NULL);
 			ssa_module_add_value(m, e, g);
 			map_ssa_value_set(&m->members, hash_string(name), g);
@@ -5504,7 +5502,7 @@ void ssa_gen_tree(ssaGen *s) {
 									token.string.text = gb_alloc_array(a, u8, name_len);
 									token.string.len = gb_snprintf(cast(char *)token.string.text, name_len,
 									                               "%s-%d", name_base, id)-1;
-									Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, t_string, count), false);
+									Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, t_string, count));
 									name_array = ssa_make_value_global(a, e, NULL);
 									name_array->Global.is_private = true;
 									ssa_module_add_value(m, e, name_array);

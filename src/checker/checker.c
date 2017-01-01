@@ -1177,7 +1177,6 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 				case_end;
 				case_ast_node(vs, ValueSpec, spec);
 					switch (vs->keyword) {
-					case Token_let:
 					case Token_var: {
 						// NOTE(bill): You need to store the entity information here unline a constant declaration
 						isize entity_count = vs->names.count;
@@ -1202,7 +1201,7 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 								error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 								continue;
 							}
-							Entity *e = make_entity_variable(c->allocator, parent_scope, name->Ident, NULL, vs->keyword == Token_let);
+							Entity *e = make_entity_variable(c->allocator, parent_scope, name->Ident, NULL);
 							e->identifier = name;
 							entities[entity_index++] = e;
 

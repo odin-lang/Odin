@@ -57,7 +57,6 @@ struct Entity {
 		struct {
 			i32  field_index;
 			i32  field_src_index;
-			bool is_let;
 		} Variable;
 		i32 TypeName;
 		struct {
@@ -97,9 +96,8 @@ Entity *alloc_entity(gbAllocator a, EntityKind kind, Scope *scope, Token token, 
 	return entity;
 }
 
-Entity *make_entity_variable(gbAllocator a, Scope *scope, Token token, Type *type, bool is_let) {
+Entity *make_entity_variable(gbAllocator a, Scope *scope, Token token, Type *type) {
 	Entity *entity = alloc_entity(a, Entity_Variable, scope, token, type);
-	entity->Variable.is_let = is_let;
 	return entity;
 }
 
@@ -124,7 +122,7 @@ Entity *make_entity_type_name(gbAllocator a, Scope *scope, Token token, Type *ty
 }
 
 Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, bool anonymous) {
-	Entity *entity = make_entity_variable(a, scope, token, type, false);
+	Entity *entity = make_entity_variable(a, scope, token, type);
 	entity->flags |= EntityFlag_Used;
 	entity->flags |= EntityFlag_Anonymous*(anonymous != 0);
 	entity->flags |= EntityFlag_Param;
@@ -132,7 +130,7 @@ Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, 
 }
 
 Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, bool anonymous, i32 field_src_index) {
-	Entity *entity = make_entity_variable(a, scope, token, type, false);
+	Entity *entity = make_entity_variable(a, scope, token, type);
 	entity->Variable.field_src_index = field_src_index;
 	entity->Variable.field_index = field_src_index;
 	entity->flags |= EntityFlag_Field;
@@ -141,7 +139,7 @@ Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, 
 }
 
 Entity *make_entity_vector_elem(gbAllocator a, Scope *scope, Token token, Type *type, i32 field_src_index) {
-	Entity *entity = make_entity_variable(a, scope, token, type, false);
+	Entity *entity = make_entity_variable(a, scope, token, type);
 	entity->Variable.field_src_index = field_src_index;
 	entity->Variable.field_index = field_src_index;
 	entity->flags |= EntityFlag_Field;
@@ -186,6 +184,6 @@ Entity *make_entity_implicit_value(gbAllocator a, String name, Type *type, Impli
 
 Entity *make_entity_dummy_variable(gbAllocator a, Scope *file_scope, Token token) {
 	token.string = str_lit("_");
-	return make_entity_variable(a, file_scope, token, NULL, false);
+	return make_entity_variable(a, file_scope, token, NULL);
 }
 

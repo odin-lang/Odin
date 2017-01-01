@@ -1,10 +1,8 @@
 #shared_global_scope;
 
-import {
-	"os.odin";
-	"fmt.odin";
-	"mem.odin";
-}
+import "os.odin";
+import "fmt.odin";
+import "mem.odin";
 
 // IMPORTANT NOTE(bill): `type_info` & `type_info_val` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
@@ -76,6 +74,7 @@ type {
 		Enum struct #ordered {
 			base  ^Type_Info;
 			names []string;
+			// TODO(bill): store values some how. Maybe using a raw_union
 		};
 	}
 }
