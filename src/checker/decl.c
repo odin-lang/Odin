@@ -283,7 +283,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 	check_init_constant(c, e, &operand);
 	c->context.iota = (ExactValue){0};
 
-	if (e->type == t_invalid) {
+	if (operand.mode == Addressing_Invalid) {
 		error(e->token, "Illegal cyclic declaration");
 	}
 }

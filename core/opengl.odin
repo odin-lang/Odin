@@ -1,38 +1,38 @@
 #foreign_system_library "opengl32" when ODIN_OS == "windows";
-import win32 "sys/windows.odin" when ODIN_OS == "windows";
-include "opengl_constants.odin";
+#import win32 "sys/windows.odin" when ODIN_OS == "windows";
+#include "opengl_constants.odin";
 
-Clear         :: proc(mask u32)                                #foreign "glClear"
-ClearColor    :: proc(r, g, b, a f32)                          #foreign "glClearColor"
-Begin         :: proc(mode i32)                                #foreign "glBegin"
-End           :: proc()                                        #foreign "glEnd"
-Finish        :: proc()                                        #foreign "glFinish"
-BlendFunc     :: proc(sfactor, dfactor i32)                    #foreign "glBlendFunc"
-Enable        :: proc(cap i32)                                 #foreign "glEnable"
-Disable       :: proc(cap i32)                                 #foreign "glDisable"
-GenTextures   :: proc(count i32, result ^u32)                  #foreign "glGenTextures"
-DeleteTextures:: proc(count i32, result ^u32)                  #foreign "glDeleteTextures"
-TexParameteri :: proc(target, pname, param i32)                #foreign "glTexParameteri"
-TexParameterf :: proc(target i32, pname i32, param f32)        #foreign "glTexParameterf"
-BindTexture   :: proc(target i32, texture u32)                 #foreign "glBindTexture"
-LoadIdentity  :: proc()                                        #foreign "glLoadIdentity"
-Viewport      :: proc(x, y, width, height i32)                 #foreign "glViewport"
-Ortho         :: proc(left, right, bottom, top, near, far f64) #foreign "glOrtho"
-Color3f       :: proc(r, g, b f32)                             #foreign "glColor3f"
-Vertex3f      :: proc(x, y, z f32)                             #foreign "glVertex3f"
+Clear         :: proc(mask: u32)                                #foreign "glClear"
+ClearColor    :: proc(r, g, b, a: f32)                          #foreign "glClearColor"
+Begin         :: proc(mode: i32)                                #foreign "glBegin"
+End           :: proc()                                         #foreign "glEnd"
+Finish        :: proc()                                         #foreign "glFinish"
+BlendFunc     :: proc(sfactor, dfactor: i32)                    #foreign "glBlendFunc"
+Enable        :: proc(cap: i32)                                 #foreign "glEnable"
+Disable       :: proc(cap: i32)                                 #foreign "glDisable"
+GenTextures   :: proc(count: i32, result: ^u32)                 #foreign "glGenTextures"
+DeleteTextures:: proc(count: i32, result: ^u32)                 #foreign "glDeleteTextures"
+TexParameteri :: proc(target, pname, param: i32)                #foreign "glTexParameteri"
+TexParameterf :: proc(target: i32, pname: i32, param: f32)      #foreign "glTexParameterf"
+BindTexture   :: proc(target: i32, texture: u32)                #foreign "glBindTexture"
+LoadIdentity  :: proc()                                         #foreign "glLoadIdentity"
+Viewport      :: proc(x, y, width, height: i32)                 #foreign "glViewport"
+Ortho         :: proc(left, right, bottom, top, near, far: f64) #foreign "glOrtho"
+Color3f       :: proc(r, g, b: f32)                             #foreign "glColor3f"
+Vertex3f      :: proc(x, y, z: f32)                             #foreign "glVertex3f"
 TexImage2D    :: proc(target, level, internal_format,
                       width, height, border,
-                      format, _type i32, pixels rawptr) #foreign "glTexImage2D"
+                      format, _type: i32, pixels: rawptr) #foreign "glTexImage2D"
 
 GetError    :: proc() -> i32            #foreign "glGetError"
-GetString   :: proc(name i32) -> ^byte #foreign "glGetString"
-GetIntegerv :: proc(name i32, v ^i32) #foreign "glGetIntegerv"
+GetString   :: proc(name: i32) -> ^byte #foreign "glGetString"
+GetIntegerv :: proc(name: i32, v: ^i32) #foreign "glGetIntegerv"
 
 
 
 _libgl := win32.LoadLibraryA(("opengl32.dll\x00" as string).data);
 
-GetProcAddress :: proc(name string) -> proc() #cc_c {
+GetProcAddress :: proc(name: string) -> proc() #cc_c {
 	assert(name[name.count-1] == 0);
 	res := win32.wglGetProcAddress(name.data);
 	if res == nil {
@@ -41,66 +41,66 @@ GetProcAddress :: proc(name string) -> proc() #cc_c {
 	return res;
 }
 
-GenBuffers:       proc(count i32, buffers ^u32) #cc_c;
-GenVertexArrays:  proc(count i32, buffers ^u32) #cc_c;
-GenSamplers:      proc(count i32, buffers ^u32) #cc_c;
-BindBuffer:       proc(target i32, buffer u32) #cc_c;
-BindVertexArray:  proc(buffer u32) #cc_c;
-BindSampler:      proc(position i32, sampler u32) #cc_c;
-BufferData:       proc(target i32, size int, data rawptr, usage i32) #cc_c;
-BufferSubData:    proc(target i32, offset, size int, data rawptr) #cc_c;
+GenBuffers:       proc(count: i32, buffers: ^u32) #cc_c;
+GenVertexArrays:  proc(count: i32, buffers: ^u32) #cc_c;
+GenSamplers:      proc(count: i32, buffers: ^u32) #cc_c;
+BindBuffer:       proc(target: i32, buffer: u32) #cc_c;
+BindVertexArray:  proc(buffer: u32) #cc_c;
+BindSampler:      proc(position: i32, sampler: u32) #cc_c;
+BufferData:       proc(target: i32, size: int, data: rawptr, usage: i32) #cc_c;
+BufferSubData:    proc(target: i32, offset, size: int, data: rawptr) #cc_c;
 
-DrawArrays:       proc(mode, first i32, count u32) #cc_c;
-DrawElements:     proc(mode i32, count u32, type_ i32, indices rawptr) #cc_c;
+DrawArrays:       proc(mode, first: i32, count: u32) #cc_c;
+DrawElements:     proc(mode: i32, count: u32, type_: i32, indices: rawptr) #cc_c;
 
-MapBuffer:        proc(target, access i32) -> rawptr #cc_c;
-UnmapBuffer:      proc(target i32) #cc_c;
+MapBuffer:        proc(target, access: i32) -> rawptr #cc_c;
+UnmapBuffer:      proc(target: i32) #cc_c;
 
-VertexAttribPointer:  proc(index u32, size, type_ i32, normalized i32, stride u32, pointer rawptr) #cc_c;
-EnableVertexAttribArray:  proc(index u32) #cc_c;
+VertexAttribPointer:  proc(index: u32, size, type_: i32, normalized: i32, stride: u32, pointer: rawptr) #cc_c;
+EnableVertexAttribArray:  proc(index: u32) #cc_c;
 
-CreateShader:   proc(shader_type i32) -> u32 #cc_c;
-ShaderSource:   proc(shader u32, count u32, str ^^byte, length ^i32) #cc_c;
-CompileShader:  proc(shader u32) #cc_c;
+CreateShader:   proc(shader_type: i32) -> u32 #cc_c;
+ShaderSource:   proc(shader: u32, count: u32, str: ^^byte, length: ^i32) #cc_c;
+CompileShader:  proc(shader: u32) #cc_c;
 CreateProgram:  proc() -> u32 #cc_c;
-AttachShader:   proc(program, shader u32) #cc_c;
-DetachShader:   proc(program, shader u32) #cc_c;
-DeleteShader:   proc(shader u32) #cc_c;
-LinkProgram:    proc(program u32) #cc_c;
-UseProgram:     proc(program u32) #cc_c;
-DeleteProgram:  proc(program u32) #cc_c;
+AttachShader:   proc(program, shader: u32) #cc_c;
+DetachShader:   proc(program, shader: u32) #cc_c;
+DeleteShader:   proc(shader:  u32) #cc_c;
+LinkProgram:    proc(program: u32) #cc_c;
+UseProgram:     proc(program: u32) #cc_c;
+DeleteProgram:  proc(program: u32) #cc_c;
 
 
-GetShaderiv:        proc(shader  u32, pname i32, params ^i32) #cc_c;
-GetProgramiv:       proc(program u32, pname i32, params ^i32) #cc_c;
-GetShaderInfoLog:   proc(shader  u32, max_length u32, length ^u32, info_long ^byte) #cc_c;
-GetProgramInfoLog:  proc(program u32, max_length u32, length ^u32, info_long ^byte) #cc_c;
+GetShaderiv:        proc(shader:  u32, pname: i32, params: ^i32) #cc_c;
+GetProgramiv:       proc(program: u32, pname: i32, params: ^i32) #cc_c;
+GetShaderInfoLog:   proc(shader:  u32, max_length: u32, length: ^u32, info_long: ^byte) #cc_c;
+GetProgramInfoLog:  proc(program: u32, max_length: u32, length: ^u32, info_long: ^byte) #cc_c;
 
-ActiveTexture:   proc(texture i32) #cc_c;
-GenerateMipmap:  proc(target i32) #cc_c;
+ActiveTexture:   proc(texture: i32) #cc_c;
+GenerateMipmap:  proc(target:  i32) #cc_c;
 
-SamplerParameteri:     proc(sampler u32, pname i32, param i32) #cc_c;
-SamplerParameterf:     proc(sampler u32, pname i32, param f32) #cc_c;
-SamplerParameteriv:    proc(sampler u32, pname i32, params ^i32) #cc_c;
-SamplerParameterfv:    proc(sampler u32, pname i32, params ^f32) #cc_c;
-SamplerParameterIiv:   proc(sampler u32, pname i32, params ^i32) #cc_c;
-SamplerParameterIuiv:  proc(sampler u32, pname i32, params ^u32) #cc_c;
+SamplerParameteri:     proc(sampler: u32, pname: i32, param: i32) #cc_c;
+SamplerParameterf:     proc(sampler: u32, pname: i32, param: f32) #cc_c;
+SamplerParameteriv:    proc(sampler: u32, pname: i32, params: ^i32) #cc_c;
+SamplerParameterfv:    proc(sampler: u32, pname: i32, params: ^f32) #cc_c;
+SamplerParameterIiv:   proc(sampler: u32, pname: i32, params: ^i32) #cc_c;
+SamplerParameterIuiv:  proc(sampler: u32, pname: i32, params: ^u32) #cc_c;
 
 
-Uniform1i:         proc(loc i32, v0 i32) #cc_c;
-Uniform2i:         proc(loc i32, v0, v1 i32) #cc_c;
-Uniform3i:         proc(loc i32, v0, v1, v2 i32) #cc_c;
-Uniform4i:         proc(loc i32, v0, v1, v2, v3 i32) #cc_c;
-Uniform1f:         proc(loc i32, v0 f32) #cc_c;
-Uniform2f:         proc(loc i32, v0, v1 f32) #cc_c;
-Uniform3f:         proc(loc i32, v0, v1, v2 f32) #cc_c;
-Uniform4f:         proc(loc i32, v0, v1, v2, v3 f32) #cc_c;
-UniformMatrix4fv:  proc(loc i32, count u32, transpose i32, value ^f32) #cc_c;
+Uniform1i:         proc(loc: i32, v0: i32) #cc_c;
+Uniform2i:         proc(loc: i32, v0, v1: i32) #cc_c;
+Uniform3i:         proc(loc: i32, v0, v1, v2: i32) #cc_c;
+Uniform4i:         proc(loc: i32, v0, v1, v2, v3: i32) #cc_c;
+Uniform1f:         proc(loc: i32, v0: f32) #cc_c;
+Uniform2f:         proc(loc: i32, v0, v1: f32) #cc_c;
+Uniform3f:         proc(loc: i32, v0, v1, v2: f32) #cc_c;
+Uniform4f:         proc(loc: i32, v0, v1, v2, v3: f32) #cc_c;
+UniformMatrix4fv:  proc(loc: i32, count: u32, transpose: i32, value: ^f32) #cc_c;
 
-GetUniformLocation:  proc(program u32, name ^byte) -> i32 #cc_c;
+GetUniformLocation:  proc(program: u32, name: ^byte) -> i32 #cc_c;
 
 init :: proc() {
-	set_proc_address :: proc(p rawptr, name string) #inline { (p as ^(proc() #cc_c))^ = GetProcAddress(name); }
+	set_proc_address :: proc(p: rawptr, name: string) #inline { (p as ^(proc() #cc_c))^ = GetProcAddress(name); }
 
 	set_proc_address(^GenBuffers,      "glGenBuffers\x00");
 	set_proc_address(^GenVertexArrays, "glGenVertexArrays\x00");

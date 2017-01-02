@@ -1235,31 +1235,14 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 			}
 		case_end;
 
-		case_ast_node(gd, GenericDecl, decl);
+		case_ast_node(id, ImportDecl, decl);
 			if (!parent_scope->is_file) {
-				// NOTE(bill): Within a procedure, variables must be in order
+				// NOTE(bill): _Should_ be caught by the parser
+				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
-
-			for_array(iota, gd->specs) {
-				AstNode *spec = gd->specs.e[iota];
-				switch (spec->kind) {
-				case AstNode_BadDecl:
-					break;
-				case_ast_node(is, ImportSpec, spec);
-					if (!parent_scope->is_file) {
-						// NOTE(bill): _Should_ be caught by the parser
-						// TODO(bill): Better error handling if it isn't
-						continue;
-					}
-					DelayedDecl di = {parent_scope, spec};
-					array_add(&c->delayed_imports, di);
-				case_end;
-				default:
-					error(ast_node_token(spec), "Invalid specification in declaration: `%.*s`", LIT(ast_node_strings[spec->kind]));
-					break;
-				}
-			}
+			DelayedDecl di = {parent_scope, decl};
+			array_add(&c->delayed_imports, di);
 		case_end;
 		case_ast_node(fl, ForeignLibrary, decl);
 			if (!parent_scope->is_file) {
@@ -1283,8 +1266,8 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 void check_import_entities(Checker *c, MapScope *file_scopes) {
 	for_array(i, c->delayed_imports) {
 		Scope *parent_scope = c->delayed_imports.e[i].parent;
-		AstNode *spec = c->delayed_imports.e[i].decl;
-		ast_node(id, ImportSpec, spec);
+		AstNode *decl = c->delayed_imports.e[i].decl;
+		ast_node(id, ImportDecl, decl);
 		Token token = id->relpath;
 
 		HashKey key = hash_string(id->fullpath);
@@ -1342,7 +1325,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 				}
 				// NOTE(bill): Do not add other imported entities
 				add_entity(c, parent_scope, NULL, e);
-				if (id->keyword == Token_import) { // `#import`ed entities don't get exported
+				if (id->is_import) { // `#import`ed entities don't get exported
 					HashKey key = hash_string(e->token.string);
 					map_entity_set(&parent_scope->implicit, key, e);
 				}

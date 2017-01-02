@@ -1,7 +1,5 @@
-import {
-	win32 "sys/windows.odin";
-	"fmt.odin";
-}
+#import win32 "sys/windows.odin";
+#import "fmt.odin";
 
 
 Handle    :: uint;
@@ -24,37 +22,37 @@ O_SYNC     :: 0x01000;
 O_ASYNC    :: 0x02000;
 O_CLOEXEC  :: 0x80000;
 
-ERROR_NONE                 : Error : 0;
-ERROR_FILE_NOT_FOUND       : Error : 2;
-ERROR_PATH_NOT_FOUND       : Error : 3;
-ERROR_ACCESS_DENIED        : Error : 5;
-ERROR_NO_MORE_FILES        : Error : 18;
-ERROR_HANDLE_EOF           : Error : 38;
-ERROR_NETNAME_DELETED      : Error : 64;
-ERROR_FILE_EXISTS          : Error : 80;
-ERROR_BROKEN_PIPE          : Error : 109;
-ERROR_BUFFER_OVERFLOW      : Error : 111;
-ERROR_INSUFFICIENT_BUFFER  : Error : 122;
-ERROR_MOD_NOT_FOUND        : Error : 126;
-ERROR_PROC_NOT_FOUND       : Error : 127;
-ERROR_DIR_NOT_EMPTY        : Error : 145;
-ERROR_ALREADY_EXISTS       : Error : 183;
-ERROR_ENVVAR_NOT_FOUND     : Error : 203;
-ERROR_MORE_DATA            : Error : 234;
-ERROR_OPERATION_ABORTED    : Error : 995;
-ERROR_IO_PENDING           : Error : 997;
-ERROR_NOT_FOUND            : Error : 1168;
-ERROR_PRIVILEGE_NOT_HELD   : Error : 1314;
-WSAEACCES                  : Error : 10013;
-WSAECONNRESET              : Error : 10054;
+ERROR_NONE:                Error : 0;
+ERROR_FILE_NOT_FOUND:      Error : 2;
+ERROR_PATH_NOT_FOUND:      Error : 3;
+ERROR_ACCESS_DENIED:       Error : 5;
+ERROR_NO_MORE_FILES:       Error : 18;
+ERROR_HANDLE_EOF:          Error : 38;
+ERROR_NETNAME_DELETED:     Error : 64;
+ERROR_FILE_EXISTS:         Error : 80;
+ERROR_BROKEN_PIPE:         Error : 109;
+ERROR_BUFFER_OVERFLOW:     Error : 111;
+ERROR_INSUFFICIENT_BUFFER: Error : 122;
+ERROR_MOD_NOT_FOUND:       Error : 126;
+ERROR_PROC_NOT_FOUND:      Error : 127;
+ERROR_DIR_NOT_EMPTY:       Error : 145;
+ERROR_ALREADY_EXISTS:      Error : 183;
+ERROR_ENVVAR_NOT_FOUND:    Error : 203;
+ERROR_MORE_DATA:           Error : 234;
+ERROR_OPERATION_ABORTED:   Error : 995;
+ERROR_IO_PENDING:          Error : 997;
+ERROR_NOT_FOUND:           Error : 1168;
+ERROR_PRIVILEGE_NOT_HELD:  Error : 1314;
+WSAEACCES:                 Error : 10013;
+WSAECONNRESET:             Error : 10054;
 
 // Windows reserves errors >= 1<<29 for application use
-ERROR_FILE_IS_PIPE : Error : 1<<29 + 0;
+ERROR_FILE_IS_PIPE: Error : 1<<29 + 0;
 
 
 
 
-open :: proc(path string, mode int, perm u32) -> (Handle, Error) {
+open :: proc(path: string, mode: int, perm: u32) -> (Handle, Error) {
 	using win32;
 	if path.count == 0 {
 		return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
@@ -107,11 +105,11 @@ open :: proc(path string, mode int, perm u32) -> (Handle, Error) {
 	return INVALID_HANDLE, err as Error;
 }
 
-close :: proc(fd Handle) {
+close :: proc(fd: Handle) {
 	win32.CloseHandle(fd as win32.HANDLE);
 }
 
-write :: proc(fd Handle, data []byte) -> (int, Error) {
+write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	bytes_written: i32;
 	e := win32.WriteFile(fd as win32.HANDLE, data.data, data.count as i32, ^bytes_written, nil);
 	if e != 0 {
@@ -120,7 +118,7 @@ write :: proc(fd Handle, data []byte) -> (int, Error) {
 	return bytes_written as int, ERROR_NONE;
 }
 
-read :: proc(fd Handle, data []byte) -> (int, Error) {
+read :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	bytes_read: i32;
 	e := win32.ReadFile(fd as win32.HANDLE, data.data, data.count as u32, ^bytes_read, nil);
 	if e != win32.FALSE {
@@ -130,7 +128,7 @@ read :: proc(fd Handle, data []byte) -> (int, Error) {
 	return bytes_read as int, ERROR_NONE;
 }
 
-seek :: proc(fd Handle, offset i64, whence int) -> (i64, Error) {
+seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	using win32;
 	w: u32;
 	match whence {
@@ -159,7 +157,7 @@ stdout := get_std_handle(win32.STD_OUTPUT_HANDLE);
 stderr := get_std_handle(win32.STD_ERROR_HANDLE);
 
 
-get_std_handle :: proc(h int) -> Handle {
+get_std_handle :: proc(h: int) -> Handle {
 	fd := win32.GetStdHandle(h as i32);
 	win32.SetHandleInformation(fd, win32.HANDLE_FLAG_INHERIT, 0);
 	return fd as Handle;
@@ -170,7 +168,7 @@ get_std_handle :: proc(h int) -> Handle {
 
 
 
-last_write_time :: proc(fd Handle) -> File_Time {
+last_write_time :: proc(fd: Handle) -> File_Time {
 	file_info: win32.BY_HANDLE_FILE_INFORMATION;
 	win32.GetFileInformationByHandle(fd as win32.HANDLE, ^file_info);
 	lo := file_info.last_write_time.lo as File_Time;
@@ -178,7 +176,7 @@ last_write_time :: proc(fd Handle) -> File_Time {
 	return lo | hi << 32;
 }
 
-last_write_time_by_name :: proc(name string) -> File_Time {
+last_write_time_by_name :: proc(name: string) -> File_Time {
 	last_write_time: win32.FILETIME;
 	data: win32.FILE_ATTRIBUTE_DATA;
 	buf: [1024]byte;
@@ -200,7 +198,7 @@ last_write_time_by_name :: proc(name string) -> File_Time {
 
 
 
-read_entire_file :: proc(name string) -> ([]byte, bool) {
+read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	buf: [300]byte;
 	copy(buf[:], name as []byte);
 
@@ -248,18 +246,18 @@ read_entire_file :: proc(name string) -> ([]byte, bool) {
 
 
 
-heap_alloc :: proc(size int) -> rawptr {
+heap_alloc :: proc(size: int) -> rawptr {
 	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, size);
 }
-heap_resize :: proc(ptr rawptr, new_size int) -> rawptr {
+heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	return win32.HeapReAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, ptr, new_size);
 }
-heap_free :: proc(ptr rawptr) {
+heap_free :: proc(ptr: rawptr) {
 	win32.HeapFree(win32.GetProcessHeap(), 0, ptr);
 }
 
 
-exit :: proc(code int) {
+exit :: proc(code: int) {
 	win32.ExitProcess(code as u32);
 }
 
