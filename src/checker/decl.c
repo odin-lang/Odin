@@ -161,8 +161,9 @@ void check_var_decl_node(Checker *c, AstNodeValueDecl *vd) {
 		}
 		e->flags |= EntityFlag_Visited;
 
-		if (e->type == NULL)
+		if (e->type == NULL) {
 			e->type = init_type;
+		}
 	}
 
 	check_arity_match(c, vd);

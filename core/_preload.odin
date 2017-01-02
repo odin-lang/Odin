@@ -3,6 +3,7 @@
 #import "os.odin";
 #import "fmt.odin";
 #import "mem.odin";
+#import "utf8.odin";
 
 // IMPORTANT NOTE(bill): `type_info` & `type_info_val` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
@@ -329,4 +330,7 @@ __substring_expr_error :: proc(file: string, line, column: int, low, high: int) 
 	__debug_trap();
 }
 
+__string_decode_rune :: proc(s: string) -> (rune, int) #inline {
+	return utf8.decode_rune(s);
+}
 

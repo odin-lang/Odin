@@ -182,8 +182,8 @@ Entity *make_entity_implicit_value(gbAllocator a, String name, Type *type, Impli
 }
 
 
-Entity *make_entity_dummy_variable(gbAllocator a, Scope *file_scope, Token token) {
+Entity *make_entity_dummy_variable(gbAllocator a, Scope *scope, Token token) {
 	token.string = str_lit("_");
-	return make_entity_variable(a, file_scope, token, NULL);
+	return make_entity_variable(a, scope, token, NULL);
 }
 

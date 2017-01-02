@@ -3809,20 +3809,26 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);
-		Type *proc_type = check_type(c, pl->type);
-		if (proc_type == NULL) {
+		Type *type = check_type(c, pl->type);
+		if (type == NULL || !is_type_proc(type)) {
 			gbString str = expr_to_string(node);
 			error_node(node, "Invalid procedure literal `%s`", str);
 			gb_string_free(str);
 			check_close_scope(c);
 			goto error;
 		}
+		if (pl->tags != 0) {
+			error_node(node, "A procedure literal cannot have tags");
+			pl->tags = 0; // TODO(bill): Should I zero this?!
+		}
+
 		check_open_scope(c, pl->type);
-		check_proc_body(c, empty_token, c->context.decl, proc_type, pl->body);
+		check_procedure_later(c, c->curr_ast_file, empty_token, c->context.decl, type, pl->body, pl->tags);
+		// check_proc_body(c, empty_token, c->context.decl, type, pl->body);
 		check_close_scope(c);
 
 		o->mode = Addressing_Value;
-		o->type = proc_type;
+		o->type = type;
 	case_end;
 
 	case_ast_node(ge, GiveExpr, node);

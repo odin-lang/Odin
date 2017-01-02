@@ -133,6 +133,12 @@ bool check_is_terminating(AstNode *node) {
 		}
 	case_end;
 
+	case_ast_node(rs, RangeStmt, node);
+		if (!check_has_break(rs->body, true)) {
+			return true;
+		}
+	case_end;
+
 	case_ast_node(ms, MatchStmt, node);
 		bool has_default = false;
 		for_array(i, ms->body->BlockStmt.stmts) {
@@ -580,6 +586,99 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			check_stmt(c, fs->post, 0);
 		}
 		check_stmt(c, fs->body, new_flags);
+
+		check_close_scope(c);
+	case_end;
+
+	case_ast_node(rs, RangeStmt, node);
+		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
+		check_open_scope(c, node);
+
+
+		Operand operand = {Addressing_Invalid};
+		check_expr(c, &operand, rs->expr);
+
+		Type *key = NULL;
+		Type *val = NULL;
+		if (operand.mode != Addressing_Invalid) {
+			Type *t = base_type(type_deref(operand.type));
+			switch (t->kind) {
+			case Type_Basic:
+				if (is_type_string(t)) {
+					key = t_int;
+					val = t_rune;
+				}
+				break;
+			case Type_Array:
+				key = t_int;
+				val = t->Array.elem;
+				break;
+			case Type_Slice:
+				key = t_int;
+				val = t->Array.elem;
+				break;
+			}
+		}
+
+		if (key == NULL) {
+			gbString s = expr_to_string(operand.expr);
+			error_node(operand.expr, "Cannot iterate over %s", s);
+			gb_string_free(s);
+		}
+
+		Entity *entities[2] = {0};
+		isize entity_count = 0;
+		AstNode *lhs[2] = {rs->key, rs->value};
+		Type *   rhs[2] = {key, val};
+
+		for (isize i = 0; i < 2; i++) {
+			if (lhs[i] == NULL) {
+				continue;
+			}
+			AstNode *name = lhs[i];
+			Type *   type = rhs[i];
+
+			Entity *entity = NULL;
+			if (name->kind == AstNode_Ident) {
+				Token token = name->Ident;
+				String str = token.string;
+				Entity *found = NULL;
+
+				if (str_ne(str, str_lit("_"))) {
+					found = current_scope_lookup_entity(c->context.scope, str);
+				}
+				if (found == NULL) {
+					entity = make_entity_variable(c->allocator, c->context.scope, token, type);
+					add_entity_definition(&c->info, name, entity);
+				} else {
+					TokenPos pos = found->token.pos;
+					error(token,
+					      "Redeclaration of `%.*s` in this scope\n"
+					      "\tat %.*s(%td:%td)",
+					      LIT(str), LIT(pos.file), pos.line, pos.column);
+					entity = found;
+				}
+			} else {
+				error_node(name, "A variable declaration must be an identifier");
+			}
+
+			if (entity == NULL) {
+				entity = make_entity_dummy_variable(c->allocator, c->global_scope, ast_node_token(name));
+			}
+
+			entities[entity_count++] = entity;
+
+			if (type == NULL) {
+				entity->type = t_invalid;
+				entity->flags |= EntityFlag_Used;
+			}
+		}
+
+		for (isize i = 0; i < entity_count; i++) {
+			add_entity(c, c->context.scope, entities[i]->identifier, entities[i]);
+		}
+
+		check_stmt(c, rs->body, new_flags);
 
 		check_close_scope(c);
 	case_end;

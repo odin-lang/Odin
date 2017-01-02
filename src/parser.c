@@ -204,6 +204,13 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 		AstNode *post; \
 		AstNode *body; \
 	}) \
+	AST_NODE_KIND(RangeStmt, "range statement", struct { \
+		Token        token; \
+		AstNode *    key; \
+		AstNode *    value; \
+		AstNode *    expr; \
+		AstNode *    body; \
+	}) \
 	AST_NODE_KIND(CaseClause, "case clause", struct { \
 		Token token;        \
 		AstNodeArray list;  \
@@ -847,7 +854,15 @@ AstNode *make_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, As
 	result->ForStmt.body  = body;
 	return result;
 }
-
+AstNode *make_range_stmt(AstFile *f, Token token, AstNode *key, AstNode *value, AstNode *expr, AstNode *body) {
+	AstNode *result = make_node(f, AstNode_RangeStmt);
+	result->RangeStmt.token = token;
+	result->RangeStmt.key = key;
+	result->RangeStmt.value = value;
+	result->RangeStmt.expr = expr;
+	result->RangeStmt.body  = body;
+	return result;
+}
 
 AstNode *make_match_stmt(AstFile *f, Token token, AstNode *init, AstNode *tag, AstNode *body) {
 	AstNode *result = make_node(f, AstNode_MatchStmt);
@@ -1195,6 +1210,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_when:
 		case Token_return:
 		case Token_for:
+		case Token_range:
 		case Token_match:
 		case Token_defer:
 		case Token_asm:
@@ -1749,8 +1765,9 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 				syntax_error(token, "A procedure tagged as `#foreign` cannot have a body");
 			}
 			AstNode *curr_proc = f->curr_proc;
+			AstNode *body = NULL;
 			f->curr_proc = type;
-			AstNode *body = parse_body(f);
+			body = parse_body(f);
 			f->curr_proc = curr_proc;
 
 			return make_proc_lit(f, type, body, tags, foreign_name, link_name);
@@ -2062,7 +2079,7 @@ AstNodeArray parse_rhs_expr_list(AstFile *f) {
 	return parse_expr_list(f, false);
 }
 
-AstNodeArray parse_identfier_list(AstFile *f) {
+AstNodeArray parse_identifier_list(AstFile *f) {
 	AstNodeArray list = make_ast_node_array(f);
 
 	do {
@@ -2110,8 +2127,63 @@ AstNode *parse_type(AstFile *f) {
 	return type;
 }
 
+
+AstNode *parse_value_decl(AstFile *f, AstNodeArray lhs) {
+	parse_check_name_list_for_reserves(f, lhs);
+
+	AstNode *type = NULL;
+	AstNodeArray values = {0};
+	bool is_mutable = true;
+
+	if (allow_token(f, Token_Colon)) {
+		if (!allow_token(f, Token_type)) {
+			type = parse_type_attempt(f);
+		}
+	} else if (f->curr_token.kind != Token_Eq &&
+	           f->curr_token.kind != Token_Semicolon) {
+		syntax_error(f->curr_token, "Expected a type separator `:` or `=`");
+	}
+
+
+	switch (f->curr_token.kind) {
+	case Token_Colon:
+		is_mutable = false;
+		/*fallthrough*/
+	case Token_Eq:
+		next_token(f);
+		values = parse_rhs_expr_list(f);
+		if (values.count > lhs.count) {
+			syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
+		} else if (values.count < lhs.count && !is_mutable) {
+			syntax_error(f->curr_token, "All constant declarations must be defined");
+		} else if (values.count == 0) {
+			syntax_error(f->curr_token, "Expected an expression for this declaration");
+		}
+		break;
+	}
+
+	if (is_mutable) {
+		if (type == NULL && values.count == 0) {
+			syntax_error(f->curr_token, "Missing variable type or initialization");
+			return make_bad_decl(f, f->curr_token, f->curr_token);
+		}
+	} else {
+		if (type == NULL && values.count == 0 && lhs.count > 0) {
+			syntax_error(f->curr_token, "Missing constant value");
+			return make_bad_decl(f, f->curr_token, f->curr_token);
+		}
+	}
+
+	if (values.e == NULL) {
+		values = make_ast_node_array(f);
+	}
+
+	AstNodeArray specs = {0};
+	array_init_reserve(&specs, heap_allocator(), 1);
+	return make_value_decl(f, is_mutable, lhs, type, values);
+}
+
 AstNode *parse_simple_stmt(AstFile *f) {
-	Token start_token = f->curr_token;
 	AstNodeArray lhs = parse_lhs_expr_list(f);
 	Token token = f->curr_token;
 	switch (token.kind) {
@@ -2143,60 +2215,8 @@ AstNode *parse_simple_stmt(AstFile *f) {
 		return make_assign_stmt(f, token, lhs, rhs);
 	} break;
 
-	case Token_Colon: {
-		parse_check_name_list_for_reserves(f, lhs);
-
-		AstNode *type = NULL;
-		AstNodeArray values = {0};
-		bool is_mutable = true;
-
-		if (allow_token(f, Token_Colon)) {
-			if (!allow_token(f, Token_type)) {
-				type = parse_type_attempt(f);
-			}
-		} else if (f->curr_token.kind != Token_Eq &&
-		           f->curr_token.kind != Token_Semicolon) {
-			syntax_error(f->curr_token, "Expected a type separator `:` or `=`");
-		}
-
-
-		switch (f->curr_token.kind) {
-		case Token_Colon:
-			is_mutable = false;
-			/*fallthrough*/
-		case Token_Eq:
-			next_token(f);
-			values = parse_rhs_expr_list(f);
-			if (values.count > lhs.count) {
-				syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
-			} else if (values.count < lhs.count && !is_mutable) {
-				syntax_error(f->curr_token, "All constant declarations must be defined");
-			} else if (values.count == 0) {
-				syntax_error(f->curr_token, "Expected an expression for this declaration");
-			}
-			break;
-		}
-
-		if (is_mutable) {
-			if (type == NULL && values.count == 0) {
-				syntax_error(f->curr_token, "Missing variable type or initialization");
-				return make_bad_decl(f, f->curr_token, f->curr_token);
-			}
-		} else {
-			if (type == NULL && values.count == 0 && lhs.count > 0) {
-				syntax_error(f->curr_token, "Missing constant value");
-				return make_bad_decl(f, f->curr_token, f->curr_token);
-			}
-		}
-
-		if (values.e == NULL) {
-			values = make_ast_node_array(f);
-		}
-
-		AstNodeArray specs = {0};
-		array_init_reserve(&specs, heap_allocator(), 1);
-		return make_value_decl(f, is_mutable, lhs, type, values);
-	} break;
+	case Token_Colon:
+		return parse_value_decl(f, lhs);
 	}
 
 	if (lhs.count > 1) {
@@ -2265,7 +2285,7 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, bool allow_using, 
 			is_using = true;
 		}
 
-		AstNodeArray names = parse_identfier_list(f);
+		AstNodeArray names = parse_identifier_list(f);
 		if (names.count == 0) {
 			syntax_error(f->curr_token, "Empty parameter declaration");
 			break;
@@ -2523,9 +2543,14 @@ void parse_proc_signature(AstFile *f,
 AstNode *parse_body(AstFile *f) {
 	AstNodeArray stmts = {0};
 	Token open, close;
+	isize prev_expr_level = f->expr_level;
+
+	// NOTE(bill): The body may be within an expression so reset to zero
+	f->expr_level = 0;
 	open = expect_token(f, Token_OpenBrace);
 	stmts = parse_stmt_list(f);
 	close = expect_token(f, Token_CloseBrace);
+	f->expr_level = prev_expr_level;
 
 	return make_block_stmt(f, stmts, open, close);
 }
@@ -2727,8 +2752,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 		if (f->curr_token.kind != Token_Semicolon) {
 			cond = parse_simple_stmt(f);
 			if (is_ast_node_complex_stmt(cond)) {
-				syntax_error(f->curr_token,
-				             "You are not allowed that type of statement in a for statement, it is too complex!");
+				syntax_error(f->curr_token, "You are not allowed that type of statement in a for statement, it is too complex!");
 			}
 		}
 
@@ -2750,6 +2774,45 @@ AstNode *parse_for_stmt(AstFile *f) {
 	cond = convert_stmt_to_expr(f, cond, str_lit("boolean expression"));
 
 	return make_for_stmt(f, token, init, cond, end, body);
+}
+
+
+AstNode *parse_range_stmt(AstFile *f) {
+	if (f->curr_proc == NULL) {
+		syntax_error(f->curr_token, "You cannot use a range statement in the file scope");
+		return make_bad_stmt(f, f->curr_token, f->curr_token);
+	}
+
+	Token token = expect_token(f, Token_range);
+	AstNodeArray names = parse_identifier_list(f);
+	parse_check_name_list_for_reserves(f, names);
+	Token colon = expect_token_after(f, Token_Colon, "range name list");
+
+	isize prev_level = f->expr_level;
+	f->expr_level = -1;
+	AstNode *expr = parse_expr(f, false);
+	f->expr_level = prev_level;
+
+	AstNode *key   = NULL;
+	AstNode *value = NULL;
+	AstNode *body = parse_block_stmt(f, false);
+
+	switch (names.count) {
+	case 0:
+		break;
+	case 1:
+		key = names.e[0];
+		break;
+	case 2:
+		key = names.e[0];
+		value = names.e[1];
+		break;
+	default:
+		error_node(names.e[names.count-1], "Expected at most 2 expressions");
+		return make_bad_stmt(f, token, f->curr_token);
+	}
+
+	return make_range_stmt(f, token, key, value, expr, body);
 }
 
 AstNode *parse_case_clause(AstFile *f) {
@@ -2929,6 +2992,7 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_if:     return parse_if_stmt(f);
 	case Token_when:   return parse_when_stmt(f);
 	case Token_for:    return parse_for_stmt(f);
+	case Token_range:  return parse_range_stmt(f);
 	case Token_match:  return parse_match_stmt(f);
 	case Token_defer:  return parse_defer_stmt(f);
 	case Token_asm:    return parse_asm_stmt(f);
@@ -2944,7 +3008,8 @@ AstNode *parse_stmt(AstFile *f) {
 		return s;
 
 	case Token_using: {
-		next_token(f);
+		// TODO(bill): Make using statements better
+		Token token = expect_token(f, Token_using);
 		AstNode *node = parse_stmt(f);
 		bool valid = false;
 

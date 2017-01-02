@@ -18,5 +18,12 @@ Thing :: enum f64 {
 }
 
 main :: proc() {
-	fmt.println(Thing.A, Thing.B, Thing.C, Thing.D);
+	msg := "Hello";
+	range index, value : msg {
+		fmt.println(index, value);
+	}
+	list := []int{1, 4, 7, 3, 7, 2, 1};
+	range index, value : list {
+		fmt.println(index, value);
+	}
 }

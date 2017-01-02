@@ -1807,7 +1807,7 @@ ssaValue *ssa_string_elem(ssaProcedure *proc, ssaValue *string) {
 }
 ssaValue *ssa_string_len(ssaProcedure *proc, ssaValue *string) {
 	Type *t = ssa_type(string);
-	GB_ASSERT(t->kind == Type_Basic && t->Basic.kind == Basic_string);
+	GB_ASSERT_MSG(t->kind == Type_Basic && t->Basic.kind == Basic_string, "%s", type_to_string(t));
 	return ssa_emit_struct_ev(proc, string, 1);
 }
 
@@ -3908,6 +3908,129 @@ void ssa_build_when_stmt(ssaProcedure *proc, AstNodeWhenStmt *ws) {
 	}
 }
 
+void ssa_build_range_indexed(ssaProcedure *proc, ssaValue *expr, Type *val_type,
+                             ssaValue **key_, ssaValue **val_, ssaBlock **loop_, ssaBlock **done_) {
+	ssaValue *count = NULL;
+	Type *expr_type = base_type(ssa_type(expr));
+	switch (expr_type->kind) {
+	case Type_Array:
+		count = ssa_make_const_int(proc->module->allocator, expr_type->Array.count);
+		break;
+	case Type_Slice:
+		count = ssa_slice_len(proc, expr);
+		break;
+	default:
+		GB_PANIC("Cannot do range_indexed of %s", type_to_string(expr_type));
+		break;
+	}
+
+	ssaValue *idx = NULL;
+	ssaValue *val = NULL;
+	ssaBlock *loop = NULL;
+	ssaBlock *done = NULL;
+	ssaBlock *body = NULL;
+
+	ssaValue *index = ssa_add_local_generated(proc, t_int);
+	ssa_emit_store(proc, index, ssa_make_const_int(proc->module->allocator, -1));
+
+	loop = ssa_add_block(proc, NULL, "rangeindex.loop");
+	ssa_emit_jump(proc, loop);
+	proc->curr_block = loop;
+
+	ssaValue *incr = ssa_emit_arith(proc, Token_Add, ssa_emit_load(proc, index), v_one, t_int);
+	ssa_emit_store(proc, index, incr);
+
+	body = ssa_add_block(proc, NULL, "rangeindex.body");
+	done = ssa_add_block(proc, NULL, "rangeindex.done");
+	ssaValue *cond = ssa_emit_comp(proc, Token_Lt, incr, count);
+	ssa_emit_if(proc, cond, body, done);
+	proc->curr_block = body;
+
+	idx = ssa_emit_load(proc, index);
+	if (val_type != NULL) {
+		switch (expr_type->kind) {
+		case Type_Array: {
+			val = ssa_emit_load(proc, ssa_emit_array_ep(proc, expr, idx));
+		} break;
+		case Type_Slice: {
+			ssaValue *elem = ssa_slice_elem(proc, expr);
+			val = ssa_emit_load(proc, ssa_emit_ptr_offset(proc, elem, idx));
+		} break;
+		default:
+			GB_PANIC("Cannot do range_indexed of %s", type_to_string(expr_type));
+			break;
+		}
+	}
+
+	if (key_)  *key_  = idx;
+	if (val_)  *val_  = val;
+	if (loop_) *loop_ = loop;
+	if (done_) *done_ = done;
+}
+
+
+void ssa_build_range_string(ssaProcedure *proc, ssaValue *expr, Type *val_type,
+                             ssaValue **key_, ssaValue **val_, ssaBlock **loop_, ssaBlock **done_) {
+	ssaValue *count = v_zero;
+	Type *expr_type = base_type(ssa_type(expr));
+	switch (expr_type->kind) {
+	case Type_Basic:
+		count = ssa_string_len(proc, expr);
+		break;
+	default:
+		GB_PANIC("Cannot do range_string of %s", type_to_string(expr_type));
+		break;
+	}
+
+	ssaValue *idx = NULL;
+	ssaValue *val = NULL;
+	ssaBlock *loop = NULL;
+	ssaBlock *done = NULL;
+	ssaBlock *body = NULL;
+
+	ssaValue *index = ssa_add_local_generated(proc, t_int);
+	ssa_emit_store(proc, index, v_zero);
+
+	ssaValue *offset_ = ssa_add_local_generated(proc, t_int);
+	ssa_emit_store(proc, index, v_zero);
+
+	loop = ssa_add_block(proc, NULL, "rangestring.loop");
+	ssa_emit_jump(proc, loop);
+	proc->curr_block = loop;
+
+
+
+	body = ssa_add_block(proc, NULL, "rangestring.body");
+	done = ssa_add_block(proc, NULL, "rangestring.done");
+
+	ssaValue *offset = ssa_emit_load(proc, offset_);
+
+	ssaValue *cond = ssa_emit_comp(proc, Token_Lt, offset, count);
+	ssa_emit_if(proc, cond, body, done);
+	proc->curr_block = body;
+
+
+	ssaValue *str_elem = ssa_emit_ptr_offset(proc, ssa_string_elem(proc, expr), offset);
+	ssaValue *str_len  = ssa_emit_arith(proc, Token_Sub, count, offset, t_int);
+	ssaValue **args    = gb_alloc_array(proc->module->allocator, ssaValue *, 1);
+	args[0] = ssa_emit_string(proc, str_elem, str_len);
+	ssaValue *rune_and_len = ssa_emit_global_call(proc, "__string_decode_rune", args, 1);
+	ssaValue *len  = ssa_emit_struct_ev(proc, rune_and_len, 1);
+	ssa_emit_store(proc, offset_, ssa_emit_arith(proc, Token_Add, offset, len, t_int));
+
+
+	idx = ssa_emit_load(proc, index);
+	if (val_type != NULL) {
+		val = ssa_emit_struct_ev(proc, rune_and_len, 0);
+	}
+	ssa_emit_store(proc, index, ssa_emit_arith(proc, Token_Add, ssa_emit_load(proc, index), v_one, t_int));
+
+	if (key_)  *key_  = idx;
+	if (val_)  *val_  = val;
+	if (loop_) *loop_ = loop;
+	if (done_) *done_ = done;
+}
+
 void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 	switch (node->kind) {
 	case_ast_node(bs, EmptyStmt, node);
@@ -4312,7 +4435,93 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 
 
 		proc->curr_block = done;
+	case_end;
 
+
+	case_ast_node(rs, RangeStmt, node);
+		ssa_emit_comment(proc, str_lit("RangeStmt"));
+
+		Type *key_type = NULL;
+		Type *val_type = NULL;
+		if (rs->key != NULL && !ssa_is_blank_ident(rs->key)) {
+			key_type = type_of_expr(proc->module->info, rs->key);
+		}
+		if (rs->value != NULL && !ssa_is_blank_ident(rs->value)) {
+			val_type = type_of_expr(proc->module->info, rs->value);
+		}
+
+		if (key_type != NULL) {
+			ssa_add_local_for_identifier(proc, rs->key, true);
+		}
+		if (val_type != NULL) {
+			ssa_add_local_for_identifier(proc, rs->value, true);
+		}
+
+		ssaValue *key = NULL;
+		ssaValue *val = NULL;
+		ssaBlock *loop = NULL;
+		ssaBlock *done = NULL;
+
+		Type *expr_type = type_of_expr(proc->module->info, rs->expr);
+		Type *et = base_type(type_deref(expr_type));
+		bool deref = is_type_pointer(expr_type);
+		switch (et->kind) {
+		case Type_Array: {
+			ssaValue *array = ssa_build_addr(proc, rs->expr).addr;
+			if (deref) {
+				array = ssa_emit_load(proc, array);
+			}
+			ssa_build_range_indexed(proc, array, val_type, &key, &val, &loop, &done);
+		} break;
+		case Type_Slice: {
+			ssaValue *slice = ssa_build_expr(proc, rs->expr);
+			if (deref) {
+				slice = ssa_emit_load(proc, slice);
+			}
+			ssa_build_range_indexed(proc, slice, val_type, &key, &val, &loop, &done);
+		} break;
+		case Type_Basic: {
+			ssaValue *string = ssa_build_expr(proc, rs->expr);
+			if (deref) {
+				string = ssa_emit_load(proc, string);
+			}
+			if (is_type_untyped(expr_type)) {
+				ssaValue *s = ssa_add_local_generated(proc, t_string);
+				ssa_emit_store(proc, s, string);
+				string = ssa_emit_load(proc, s);
+			}
+			ssa_build_range_string(proc, string, val_type, &key, &val, &loop, &done);
+		} break;
+		default:
+			GB_PANIC("Cannot range over %s", type_to_string(expr_type));
+			break;
+		}
+
+
+		ssaAddr key_addr = {0};
+		ssaAddr val_addr = {0};
+		if (key_type != NULL) {
+			key_addr = ssa_build_addr(proc, rs->key);
+		}
+		if (val_type != NULL) {
+			val_addr = ssa_build_addr(proc, rs->value);
+		}
+		if (key_type != NULL) {
+			ssa_addr_store(proc, key_addr, key);
+		}
+		if (val_type != NULL) {
+			ssa_addr_store(proc, val_addr, val);
+		}
+
+		ssa_push_target_list(proc, done, loop, NULL);
+
+		ssa_open_scope(proc);
+		ssa_build_stmt(proc, rs->body);
+		ssa_close_scope(proc, ssaDeferExit_Default, NULL);
+
+		ssa_pop_target_list(proc);
+		ssa_emit_jump(proc, loop);
+		proc->curr_block = done;
 	case_end;
 
 	case_ast_node(ms, MatchStmt, node);
