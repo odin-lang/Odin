@@ -3910,15 +3910,15 @@ void ssa_build_range_indexed(ssaProcedure *proc, ssaValue *expr, Type *val_type,
 	ssaValue *index = ssa_add_local_generated(proc, t_int);
 	ssa_emit_store(proc, index, ssa_make_const_int(proc->module->allocator, -1));
 
-	loop = ssa_add_block(proc, NULL, "range.index.loop");
+	loop = ssa_add_block(proc, NULL, "for.index.loop");
 	ssa_emit_jump(proc, loop);
 	proc->curr_block = loop;
 
 	ssaValue *incr = ssa_emit_arith(proc, Token_Add, ssa_emit_load(proc, index), v_one, t_int);
 	ssa_emit_store(proc, index, incr);
 
-	body = ssa_add_block(proc, NULL, "range.index.body");
-	done = ssa_add_block(proc, NULL, "range.index.done");
+	body = ssa_add_block(proc, NULL, "for.index.body");
+	done = ssa_add_block(proc, NULL, "for.index.done");
 	ssaValue *cond = ssa_emit_comp(proc, Token_Lt, incr, count);
 	ssa_emit_if(proc, cond, body, done);
 	proc->curr_block = body;
@@ -3971,14 +3971,14 @@ void ssa_build_range_string(ssaProcedure *proc, ssaValue *expr, Type *val_type,
 	ssaValue *offset_ = ssa_add_local_generated(proc, t_int);
 	ssa_emit_store(proc, index, v_zero);
 
-	loop = ssa_add_block(proc, NULL, "range.string.loop");
+	loop = ssa_add_block(proc, NULL, "for.string.loop");
 	ssa_emit_jump(proc, loop);
 	proc->curr_block = loop;
 
 
 
-	body = ssa_add_block(proc, NULL, "range.string.body");
-	done = ssa_add_block(proc, NULL, "range.string.done");
+	body = ssa_add_block(proc, NULL, "for.string.body");
+	done = ssa_add_block(proc, NULL, "for.string.done");
 
 	ssaValue *offset = ssa_emit_load(proc, offset_);
 
@@ -4012,7 +4012,7 @@ void ssa_build_range_interval(ssaProcedure *proc, AstNodeIntervalExpr *node, Typ
                               ssaValue **val_, ssaValue **idx_, ssaBlock **loop_, ssaBlock **done_) {
 
 	ssaValue *lower = ssa_build_expr(proc, node->left);
-	ssaValue *upper = ssa_build_expr(proc, node->right);
+	ssaValue *upper = NULL;
 
 	ssaValue *val = NULL;
 	ssaValue *idx = NULL;
@@ -4029,12 +4029,14 @@ void ssa_build_range_interval(ssaProcedure *proc, AstNodeIntervalExpr *node, Typ
 	ssaValue *index = ssa_add_local_generated(proc, t_int);
 	ssa_emit_store(proc, index, ssa_make_const_int(proc->module->allocator, 0));
 
-	loop = ssa_add_block(proc, NULL, "range.interval.loop");
+	loop = ssa_add_block(proc, NULL, "for.interval.loop");
 	ssa_emit_jump(proc, loop);
 	proc->curr_block = loop;
 
-	body = ssa_add_block(proc, NULL, "range.interval.body");
-	done = ssa_add_block(proc, NULL, "range.interval.done");
+	body = ssa_add_block(proc, NULL, "for.interval.body");
+	done = ssa_add_block(proc, NULL, "for.interval.done");
+
+	upper = ssa_build_expr(proc, node->right);
 
 	ssaValue *cond = ssa_emit_comp(proc, Token_Lt, ssa_emit_load(proc, value), upper);
 	ssa_emit_if(proc, cond, body, done);
