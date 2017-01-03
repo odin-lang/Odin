@@ -140,8 +140,7 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 	AST_NODE_KIND(SliceExpr, "slice expression", struct { \
 		AstNode *expr; \
 		Token open, close; \
-		AstNode *low, *high, *max; \
-		bool triple_indexed; \
+		AstNode *low, *high; \
 	}) \
 	AST_NODE_KIND(FieldValue, "field value", struct { Token eq; AstNode *field, *value; }) \
 	AST_NODE_KIND(BlockExpr, "block expr", struct { \
@@ -166,7 +165,6 @@ AST_NODE_KIND(_StmtBegin,     "", i32) \
 	AST_NODE_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
 	AST_NODE_KIND(EmptyStmt,  "empty statement",               struct { Token token; }) \
 	AST_NODE_KIND(ExprStmt,   "expression statement",          struct { AstNode *expr; } ) \
-	AST_NODE_KIND(IncDecStmt, "increment/decrement statement", struct { Token op; AstNode *expr; }) \
 	AST_NODE_KIND(TagStmt,    "tag statement", struct { \
 		Token token; \
 		Token name; \
@@ -198,14 +196,13 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 		Token token; \
 		AstNodeArray results; \
 	}) \
-	AST_NODE_KIND(ForStmt, "for statement", struct { \
+	AST_NODE_KIND(WhileStmt, "while statement", struct { \
 		Token    token; \
 		AstNode *init; \
 		AstNode *cond; \
-		AstNode *post; \
 		AstNode *body; \
 	}) \
-	AST_NODE_KIND(RangeStmt, "range statement", struct { \
+	AST_NODE_KIND(ForStmt, "range statement", struct { \
 		Token    token; \
 		AstNode *value; \
 		AstNode *index; \
@@ -463,8 +460,6 @@ Token ast_node_token(AstNode *node) {
 		return ast_node_token(node->ExprStmt.expr);
 	case AstNode_TagStmt:
 		return node->TagStmt.token;
-	case AstNode_IncDecStmt:
-		return node->IncDecStmt.op;
 	case AstNode_AssignStmt:
 		return node->AssignStmt.op;
 	case AstNode_BlockStmt:
@@ -475,8 +470,8 @@ Token ast_node_token(AstNode *node) {
 		return node->WhenStmt.token;
 	case AstNode_ReturnStmt:
 		return node->ReturnStmt.token;
-	case AstNode_ForStmt:
-		return node->ForStmt.token;
+	case AstNode_WhileStmt:
+		return node->WhileStmt.token;
 	case AstNode_MatchStmt:
 		return node->MatchStmt.token;
 	case AstNode_CaseClause:
@@ -677,15 +672,13 @@ AstNode *make_index_expr(AstFile *f, AstNode *expr, AstNode *index, Token open, 
 }
 
 
-AstNode *make_slice_expr(AstFile *f, AstNode *expr, Token open, Token close, AstNode *low, AstNode *high, AstNode *max, bool triple_indexed) {
+AstNode *make_slice_expr(AstFile *f, AstNode *expr, Token open, Token close, AstNode *low, AstNode *high) {
 	AstNode *result = make_node(f, AstNode_SliceExpr);
 	result->SliceExpr.expr = expr;
 	result->SliceExpr.open = open;
 	result->SliceExpr.close = close;
 	result->SliceExpr.low = low;
 	result->SliceExpr.high = high;
-	result->SliceExpr.max = max;
-	result->SliceExpr.triple_indexed = triple_indexed;
 	return result;
 }
 
@@ -810,13 +803,6 @@ AstNode *make_expr_stmt(AstFile *f, AstNode *expr) {
 	return result;
 }
 
-AstNode *make_inc_dec_stmt(AstFile *f, Token op, AstNode *expr) {
-	AstNode *result = make_node(f, AstNode_IncDecStmt);
-	result->IncDecStmt.op = op;
-	result->IncDecStmt.expr = expr;
-	return result;
-}
-
 AstNode *make_assign_stmt(AstFile *f, Token op, AstNodeArray lhs, AstNodeArray rhs) {
 	AstNode *result = make_node(f, AstNode_AssignStmt);
 	result->AssignStmt.op = op;
@@ -860,22 +846,21 @@ AstNode *make_return_stmt(AstFile *f, Token token, AstNodeArray results) {
 	return result;
 }
 
-AstNode *make_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *post, AstNode *body) {
-	AstNode *result = make_node(f, AstNode_ForStmt);
-	result->ForStmt.token = token;
-	result->ForStmt.init  = init;
-	result->ForStmt.cond  = cond;
-	result->ForStmt.post  = post;
-	result->ForStmt.body  = body;
+AstNode *make_while_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *body) {
+	AstNode *result = make_node(f, AstNode_WhileStmt);
+	result->WhileStmt.token = token;
+	result->WhileStmt.init  = init;
+	result->WhileStmt.cond  = cond;
+	result->WhileStmt.body  = body;
 	return result;
 }
-AstNode *make_range_stmt(AstFile *f, Token token, AstNode *value, AstNode *index, AstNode *expr, AstNode *body) {
-	AstNode *result = make_node(f, AstNode_RangeStmt);
-	result->RangeStmt.token = token;
-	result->RangeStmt.value = value;
-	result->RangeStmt.index = index;
-	result->RangeStmt.expr  = expr;
-	result->RangeStmt.body  = body;
+AstNode *make_for_stmt(AstFile *f, Token token, AstNode *value, AstNode *index, AstNode *expr, AstNode *body) {
+	AstNode *result = make_node(f, AstNode_ForStmt);
+	result->ForStmt.token = token;
+	result->ForStmt.value = value;
+	result->ForStmt.index = index;
+	result->ForStmt.expr  = expr;
+	result->ForStmt.body  = body;
 	return result;
 }
 
@@ -1224,7 +1209,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_if:
 		case Token_when:
 		case Token_return:
-		case Token_for:
+		case Token_while:
 		case Token_range:
 		case Token_match:
 		case Token_defer:
@@ -1908,7 +1893,7 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			isize colon_count = 0;
 			Token colons[2] = {0};
 
-			while (f->curr_token.kind == Token_Colon && colon_count < 2) {
+			while (f->curr_token.kind == Token_Colon && colon_count < 1) {
 				colons[colon_count++] = f->curr_token;
 				next_token(f);
 				if (f->curr_token.kind != Token_Colon &&
@@ -1924,19 +1909,7 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			if (colon_count == 0) {
 				operand = make_index_expr(f, operand, indices[0], open, close);
 			} else {
-				bool triple_indexed = false;
-				if (colon_count == 2) {
-					triple_indexed = true;
-					if (indices[1] == NULL) {
-						syntax_error(colons[0], "Second index is required in a triple indexed slice");
-						indices[1] = make_bad_expr(f, colons[0], colons[1]);
-					}
-					if (indices[2] == NULL) {
-						syntax_error(colons[1], "Third index is required in a triple indexed slice");
-						indices[2] = make_bad_expr(f, colons[1], close);
-					}
-				}
-				operand = make_slice_expr(f, operand, open, close, indices[0], indices[1], indices[2], triple_indexed);
+				operand = make_slice_expr(f, operand, open, close, indices[0], indices[1]);
 			}
 		} break;
 
@@ -2237,19 +2210,6 @@ AstNode *parse_simple_stmt(AstFile *f) {
 	if (lhs.count > 1) {
 		syntax_error(token, "Expected 1 expression");
 		return make_bad_stmt(f, token, f->curr_token);
-	}
-
-	token = f->curr_token;
-	switch (token.kind) {
-	case Token_Increment:
-	case Token_Decrement:
-		if (f->curr_proc == NULL) {
-			syntax_error(f->curr_token, "You cannot use a simple statement in the file scope");
-			return make_bad_stmt(f, f->curr_token, f->curr_token);
-		}
-		AstNode *stmt = make_inc_dec_stmt(f, token, lhs.e[0]);
-		next_token(f);
-		return stmt;
 	}
 
 	return make_expr_stmt(f, lhs.e[0]);
@@ -2748,6 +2708,41 @@ AstNode *parse_give_stmt(AstFile *f) {
 	return make_expr_stmt(f, ge);
 }
 
+AstNode *parse_while_stmt(AstFile *f) {
+	if (f->curr_proc == NULL) {
+		syntax_error(f->curr_token, "You cannot use a while statement in the file scope");
+		return make_bad_stmt(f, f->curr_token, f->curr_token);
+	}
+
+	Token token = expect_token(f, Token_while);
+
+	AstNode *init = NULL;
+	AstNode *cond = NULL;
+	AstNode *body = NULL;
+
+	isize prev_level = f->expr_level;
+	f->expr_level = -1;
+
+
+	cond = parse_simple_stmt(f);
+	if (is_ast_node_complex_stmt(cond)) {
+		syntax_error(f->curr_token, "You are not allowed that type of statement in a while statement, it is too complex!");
+	}
+
+	if (allow_token(f, Token_Semicolon)) {
+		init = cond;
+		cond = parse_simple_stmt(f);
+	}
+	f->expr_level = prev_level;
+
+	body = parse_block_stmt(f, false);
+
+	cond = convert_stmt_to_expr(f, cond, str_lit("boolean expression"));
+
+	return make_while_stmt(f, token, init, cond, body);
+}
+
+
 AstNode *parse_for_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
 		syntax_error(f->curr_token, "You cannot use a for statement in the file scope");
@@ -2755,53 +2750,9 @@ AstNode *parse_for_stmt(AstFile *f) {
 	}
 
 	Token token = expect_token(f, Token_for);
-
-	AstNode *init = NULL;
-	AstNode *cond = NULL;
-	AstNode *end  = NULL;
-	AstNode *body = NULL;
-
-	if (f->curr_token.kind != Token_OpenBrace) {
-		isize prev_level = f->expr_level;
-		f->expr_level = -1;
-		if (f->curr_token.kind != Token_Semicolon) {
-			cond = parse_simple_stmt(f);
-			if (is_ast_node_complex_stmt(cond)) {
-				syntax_error(f->curr_token, "You are not allowed that type of statement in a for statement, it is too complex!");
-			}
-		}
-
-		if (allow_token(f, Token_Semicolon)) {
-			init = cond;
-			cond = NULL;
-			if (f->curr_token.kind != Token_Semicolon) {
-				cond = parse_simple_stmt(f);
-			}
-			expect_token(f, Token_Semicolon);
-			if (f->curr_token.kind != Token_OpenBrace) {
-				end = parse_simple_stmt(f);
-			}
-		}
-		f->expr_level = prev_level;
-	}
-	body = parse_block_stmt(f, false);
-
-	cond = convert_stmt_to_expr(f, cond, str_lit("boolean expression"));
-
-	return make_for_stmt(f, token, init, cond, end, body);
-}
-
-
-AstNode *parse_range_stmt(AstFile *f) {
-	if (f->curr_proc == NULL) {
-		syntax_error(f->curr_token, "You cannot use a range statement in the file scope");
-		return make_bad_stmt(f, f->curr_token, f->curr_token);
-	}
-
-	Token token = expect_token(f, Token_range);
 	AstNodeArray names = parse_identifier_list(f);
 	parse_check_name_list_for_reserves(f, names);
-	Token colon = expect_token_after(f, Token_Colon, "range name list");
+	Token colon = expect_token_after(f, Token_Colon, "for name list");
 
 	isize prev_level = f->expr_level;
 	f->expr_level = -1;
@@ -2830,7 +2781,7 @@ AstNode *parse_range_stmt(AstFile *f) {
 		return make_bad_stmt(f, token, f->curr_token);
 	}
 
-	return make_range_stmt(f, token, value, index, expr, body);
+	return make_for_stmt(f, token, value, index, expr, body);
 }
 
 AstNode *parse_case_clause(AstFile *f) {
@@ -3009,8 +2960,8 @@ AstNode *parse_stmt(AstFile *f) {
 
 	case Token_if:     return parse_if_stmt(f);
 	case Token_when:   return parse_when_stmt(f);
+	case Token_while:  return parse_while_stmt(f);
 	case Token_for:    return parse_for_stmt(f);
-	case Token_range:  return parse_range_stmt(f);
 	case Token_match:  return parse_match_stmt(f);
 	case Token_defer:  return parse_defer_stmt(f);
 	case Token_asm:    return parse_asm_stmt(f);

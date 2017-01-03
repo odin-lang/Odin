@@ -127,13 +127,13 @@ bool check_is_terminating(AstNode *node) {
 		}
 	case_end;
 
-	case_ast_node(fs, ForStmt, node);
-		if (fs->cond == NULL && !check_has_break(fs->body, true)) {
+	case_ast_node(ws, WhileStmt, node);
+		if (ws->cond == NULL && !check_has_break(ws->body, true)) {
 			return true;
 		}
 	case_end;
 
-	case_ast_node(rs, RangeStmt, node);
+	case_ast_node(rs, ForStmt, node);
 		if (!check_has_break(rs->body, true)) {
 			return true;
 		}
@@ -375,48 +375,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		check_stmt(c, ts->stmt, flags);
 	case_end;
 
-	case_ast_node(ids, IncDecStmt, node);
-		Token op = ids->op;
-		switch (ids->op.kind) {
-		case Token_Increment:
-			op.kind = Token_Add;
-			op.string.len = 1;
-			break;
-		case Token_Decrement:
-			op.kind = Token_Sub;
-			op.string.len = 1;
-			break;
-		default:
-			error(ids->op, "Unknown inc/dec operation %.*s", LIT(ids->op.string));
-			return;
-		}
-
-		Operand operand = {Addressing_Invalid};
-		check_expr(c, &operand, ids->expr);
-		if (operand.mode == Addressing_Invalid) {
-			return;
-		}
-		if (!is_type_numeric(operand.type) && !is_type_pointer(operand.type)) {
-			gbString type_str = type_to_string(operand.type);
-			error(ids->op, "Non numeric type `%s`", type_str);
-			gb_string_free(type_str);
-			return;
-		}
-
-		AstNode basic_lit = {AstNode_BasicLit};
-		ast_node(bl, BasicLit, &basic_lit);
-		*bl = ids->op;
-		bl->kind = Token_Integer;
-		bl->string = str_lit("1");
-
-		AstNode binary_expr = {AstNode_BinaryExpr};
-		ast_node(be, BinaryExpr, &binary_expr);
-		be->op = op;
-		be->left = ids->expr;
-		be->right = &basic_lit;
-		check_binary_expr(c, &operand, &binary_expr);
-	case_end;
-
 	case_ast_node(as, AssignStmt, node);
 		switch (as->op.kind) {
 		case Token_Eq: {
@@ -567,30 +525,27 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 	case_end;
 
-	case_ast_node(fs, ForStmt, node);
+	case_ast_node(ws, WhileStmt, node);
 		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 		check_open_scope(c, node);
 
-		if (fs->init != NULL) {
-			check_stmt(c, fs->init, 0);
+		if (ws->init != NULL) {
+			check_stmt(c, ws->init, 0);
 		}
-		if (fs->cond) {
+		if (ws->cond) {
 			Operand operand = {Addressing_Invalid};
-			check_expr(c, &operand, fs->cond);
+			check_expr(c, &operand, ws->cond);
 			if (operand.mode != Addressing_Invalid &&
 			    !is_type_boolean(operand.type)) {
-				error_node(fs->cond, "Non-boolean condition in `for` statement");
+				error_node(ws->cond, "Non-boolean condition in `while` statement");
 			}
 		}
-		if (fs->post != NULL) {
-			check_stmt(c, fs->post, 0);
-		}
-		check_stmt(c, fs->body, new_flags);
+		check_stmt(c, ws->body, new_flags);
 
 		check_close_scope(c);
 	case_end;
 
-	case_ast_node(rs, RangeStmt, node);
+	case_ast_node(rs, ForStmt, node);
 		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 		check_open_scope(c, node);
 
@@ -646,8 +601,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				goto skip_expr;
 			}
 
-			if (!is_type_integer(x.type) && !is_type_float(x.type)) {
-				error(ie->op, "Only numerical types are allowed within interval expressions");
+			if (!is_type_integer(x.type) && !is_type_float(x.type) && !is_type_pointer(x.type)) {
+				error(ie->op, "Only numerical and pointer types are allowed within interval expressions");
 				goto skip_expr;
 			}
 
@@ -661,7 +616,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				bool ok = compare_exact_values(Token_Lt, a, b);
 				if (!ok) {
 					// TODO(bill): Better error message
-					error(ie->op, "Invalid interval expression");
+					error(ie->op, "Invalid interval range");
 					goto skip_expr;
 				}
 			}
@@ -723,6 +678,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				}
 				if (found == NULL) {
 					entity = make_entity_variable(c->allocator, c->context.scope, token, type);
+					entity->Variable.is_immutable = true;
 					add_entity_definition(&c->info, name, entity);
 				} else {
 					TokenPos pos = found->token.pos;
@@ -1051,12 +1007,12 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		switch (token.kind) {
 		case Token_break:
 			if ((flags & Stmt_BreakAllowed) == 0) {
-				error(token, "`break` only allowed in `for` or `match` statements");
+				error(token, "`break` only allowed in loops or `match` statements");
 			}
 			break;
 		case Token_continue:
 			if ((flags & Stmt_ContinueAllowed) == 0) {
-				error(token, "`continue` only allowed in `for` statements");
+				error(token, "`continue` only allowed in loops");
 			}
 			break;
 		case Token_fallthrough:

@@ -90,7 +90,6 @@ void ssa_opt_add_operands(ssaValueArray *ops, ssaInstr *i) {
 	case ssaInstr_SliceBoundsCheck:
 		array_add(ops, i->SliceBoundsCheck.low);
 		array_add(ops, i->SliceBoundsCheck.high);
-		array_add(ops, i->SliceBoundsCheck.max);
 		break;
 	}
 }

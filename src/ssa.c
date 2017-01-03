@@ -234,7 +234,6 @@ struct ssaProcedure {
 		TokenPos  pos; \
 		ssaValue *low; \
 		ssaValue *high; \
-		ssaValue *max; \
 		bool      is_substring; \
 	})
 
@@ -1016,12 +1015,11 @@ ssaValue *ssa_make_instr_bounds_check(ssaProcedure *p, TokenPos pos, ssaValue *i
 	v->Instr.BoundsCheck.len   = len;
 	return v;
 }
-ssaValue *ssa_make_instr_slice_bounds_check(ssaProcedure *p, TokenPos pos, ssaValue *low, ssaValue *high, ssaValue *max, bool is_substring) {
+ssaValue *ssa_make_instr_slice_bounds_check(ssaProcedure *p, TokenPos pos, ssaValue *low, ssaValue *high, bool is_substring) {
 	ssaValue *v = ssa_alloc_instr(p, ssaInstr_SliceBoundsCheck);
 	v->Instr.SliceBoundsCheck.pos  = pos;
 	v->Instr.SliceBoundsCheck.low  = low;
 	v->Instr.SliceBoundsCheck.high = high;
-	v->Instr.SliceBoundsCheck.max  = max;
 	v->Instr.SliceBoundsCheck.is_substring = is_substring;
 	return v;
 }
@@ -1794,11 +1792,6 @@ ssaValue *ssa_slice_len(ssaProcedure *proc, ssaValue *slice) {
 	GB_ASSERT(t->kind == Type_Slice);
 	return ssa_emit_struct_ev(proc, slice, 1);
 }
-ssaValue *ssa_slice_cap(ssaProcedure *proc, ssaValue *slice) {
-	Type *t = ssa_type(slice);
-	GB_ASSERT(t->kind == Type_Slice);
-	return ssa_emit_struct_ev(proc, slice, 2);
-}
 
 ssaValue *ssa_string_elem(ssaProcedure *proc, ssaValue *string) {
 	Type *t = ssa_type(string);
@@ -1813,7 +1806,7 @@ ssaValue *ssa_string_len(ssaProcedure *proc, ssaValue *string) {
 
 
 
-ssaValue *ssa_add_local_slice(ssaProcedure *proc, Type *slice_type, ssaValue *base, ssaValue *low, ssaValue *high, ssaValue *max) {
+ssaValue *ssa_add_local_slice(ssaProcedure *proc, Type *slice_type, ssaValue *base, ssaValue *low, ssaValue *high) {
 	// TODO(bill): array bounds checking for slice creation
 	// TODO(bill): check that low < high <= max
 	gbAllocator a = proc->module->allocator;
@@ -1829,17 +1822,8 @@ ssaValue *ssa_add_local_slice(ssaProcedure *proc, Type *slice_type, ssaValue *ba
 		case Type_Pointer: high = v_one;                     break;
 		}
 	}
-	if (max == NULL) {
-		switch (bt->kind) {
-		case Type_Array:   max = ssa_array_cap(proc, base); break;
-		case Type_Slice:   max = ssa_slice_cap(proc, base); break;
-		case Type_Pointer: max = high;                      break;
-		}
-	}
-	GB_ASSERT(max != NULL);
 
 	ssaValue *len = ssa_emit_arith(proc, Token_Sub, high, low, t_int);
-	ssaValue *cap = ssa_emit_arith(proc, Token_Sub, max,  low, t_int);
 
 	ssaValue *elem = NULL;
 	switch (bt->kind) {
@@ -1858,9 +1842,6 @@ ssaValue *ssa_add_local_slice(ssaProcedure *proc, Type *slice_type, ssaValue *ba
 
 	gep = ssa_emit_struct_ep(proc, slice, 1);
 	ssa_emit_store(proc, gep, len);
-
-	gep = ssa_emit_struct_ep(proc, slice, 2);
-	ssa_emit_store(proc, gep, cap);
 
 	return slice;
 }
@@ -2103,7 +2084,7 @@ ssaValue *ssa_emit_conv(ssaProcedure *proc, ssaValue *value, Type *t) {
 		ssa_emit_store(proc, elem_ptr, elem);
 
 		ssaValue *len  = ssa_string_len(proc, value);
-		ssaValue *slice = ssa_add_local_slice(proc, dst, elem_ptr, v_zero, len, len);
+		ssaValue *slice = ssa_add_local_slice(proc, dst, elem_ptr, v_zero, len);
 		return ssa_emit_load(proc, slice);
 	}
 
@@ -2463,16 +2444,15 @@ void ssa_emit_bounds_check(ssaProcedure *proc, Token token, ssaValue *index, ssa
 	// ssa_emit_global_call(proc, "__bounds_check_error", args, 5);
 }
 
-void ssa_emit_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low, ssaValue *high, ssaValue *max, bool is_substring) {
+void ssa_emit_slice_bounds_check(ssaProcedure *proc, Token token, ssaValue *low, ssaValue *high, bool is_substring) {
 	if ((proc->module->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
 		return;
 	}
 
 	low  = ssa_emit_conv(proc, low,  t_int);
 	high = ssa_emit_conv(proc, high, t_int);
-	max  = ssa_emit_conv(proc, max,  t_int);
 
-	ssa_emit(proc, ssa_make_instr_slice_bounds_check(proc, token.pos, low, high, max, is_substring));
+	ssa_emit(proc, ssa_make_instr_slice_bounds_check(proc, token.pos, low, high, is_substring));
 }
 
 
@@ -2886,7 +2866,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 						cap = ssa_emit_conv(proc, ssa_build_expr(proc, ce->args.e[2]), t_int);
 					}
 
-					ssa_emit_slice_bounds_check(proc, ast_node_token(ce->args.e[1]), v_zero, len, cap, false);
+					ssa_emit_slice_bounds_check(proc, ast_node_token(ce->args.e[1]), v_zero, len, false);
 
 					ssaValue *slice_size = ssa_emit_arith(proc, Token_Mul, elem_size, cap, t_int);
 
@@ -2995,6 +2975,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					return len;
 				} break;
+				#if 0
 				case BuiltinProc_append: {
 					ssa_emit_comment(proc, str_lit("append"));
 					// append :: proc(s: ^[]Type, item: Type) -> bool
@@ -3051,6 +3032,7 @@ ssaValue *ssa_build_single_expr(ssaProcedure *proc, AstNode *expr, TypeAndValue 
 
 					return ssa_emit_conv(proc, cond, t_bool);
 				} break;
+				#endif
 
 				case BuiltinProc_swizzle: {
 					ssa_emit_comment(proc, str_lit("swizzle"));
@@ -3533,11 +3515,9 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 		gbAllocator a = proc->module->allocator;
 		ssaValue *low  = v_zero;
 		ssaValue *high = NULL;
-		ssaValue *max  = NULL;
 
 		if (se->low  != NULL)    low  = ssa_build_expr(proc, se->low);
 		if (se->high != NULL)    high = ssa_build_expr(proc, se->high);
-		if (se->triple_indexed)  max  = ssa_build_expr(proc, se->max);
 		ssaValue *addr = ssa_build_addr(proc, se->expr).addr;
 		ssaValue *base = ssa_emit_load(proc, addr);
 		Type *type = base_type(ssa_type(base));
@@ -3555,22 +3535,17 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			Type *slice_type = type;
 
 			if (high == NULL) high = ssa_slice_len(proc, base);
-			if (max == NULL)  max  = ssa_slice_cap(proc, base);
-			GB_ASSERT(max != NULL);
 
-			ssa_emit_slice_bounds_check(proc, se->open, low, high, max, false);
+			ssa_emit_slice_bounds_check(proc, se->open, low, high, false);
 
 			ssaValue *elem  = ssa_emit_ptr_offset(proc, ssa_slice_elem(proc, base), low);
 			ssaValue *len   = ssa_emit_arith(proc, Token_Sub, high, low, t_int);
-			ssaValue *cap   = ssa_emit_arith(proc, Token_Sub, max,  low, t_int);
 			ssaValue *slice = ssa_add_local_generated(proc, slice_type);
 
 			ssaValue *gep0 = ssa_emit_struct_ep(proc, slice, 0);
 			ssaValue *gep1 = ssa_emit_struct_ep(proc, slice, 1);
-			ssaValue *gep2 = ssa_emit_struct_ep(proc, slice, 2);
 			ssa_emit_store(proc, gep0, elem);
 			ssa_emit_store(proc, gep1, len);
-			ssa_emit_store(proc, gep2, cap);
 
 			return ssa_make_addr(slice, expr);
 		}
@@ -3579,22 +3554,17 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 			Type *slice_type = make_type_slice(a, type->Array.elem);
 
 			if (high == NULL) high = ssa_array_len(proc, base);
-			if (max == NULL)  max  = ssa_array_cap(proc, base);
-			GB_ASSERT(max != NULL);
 
-			ssa_emit_slice_bounds_check(proc, se->open, low, high, max, false);
+			ssa_emit_slice_bounds_check(proc, se->open, low, high, false);
 
 			ssaValue *elem = ssa_emit_ptr_offset(proc, ssa_array_elem(proc, addr), low);
 			ssaValue *len  = ssa_emit_arith(proc, Token_Sub, high, low, t_int);
-			ssaValue *cap  = ssa_emit_arith(proc, Token_Sub, max,  low, t_int);
 			ssaValue *slice = ssa_add_local_generated(proc, slice_type);
 
 			ssaValue *gep0 = ssa_emit_struct_ep(proc, slice, 0);
 			ssaValue *gep1 = ssa_emit_struct_ep(proc, slice, 1);
-			ssaValue *gep2 = ssa_emit_struct_ep(proc, slice, 2);
 			ssa_emit_store(proc, gep0, elem);
 			ssa_emit_store(proc, gep1, len);
-			ssa_emit_store(proc, gep2, cap);
 
 			return ssa_make_addr(slice, expr);
 		}
@@ -3605,7 +3575,7 @@ ssaAddr ssa_build_addr(ssaProcedure *proc, AstNode *expr) {
 				high = ssa_string_len(proc, base);
 			}
 
-			ssa_emit_slice_bounds_check(proc, se->open, low, high, high, true);
+			ssa_emit_slice_bounds_check(proc, se->open, low, high, true);
 
 			ssaValue *elem, *len;
 			len = ssa_emit_arith(proc, Token_Sub, high, low, t_int);
@@ -4249,20 +4219,6 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 		}
 	case_end;
 
-	case_ast_node(ids, IncDecStmt, node);
-		ssa_emit_comment(proc, str_lit("IncDecStmt"));
-		TokenKind op = ids->op.kind;
-		if (op == Token_Increment) {
-			op = Token_Add;
-		} else if (op == Token_Decrement) {
-			op = Token_Sub;
-		}
-		ssaAddr lval = ssa_build_addr(proc, ids->expr);
-		ssaValue *one = ssa_emit_conv(proc, v_one, ssa_addr_type(lval));
-		ssa_build_assign_op(proc, lval, one, op);
-
-	case_end;
-
 	case_ast_node(as, AssignStmt, node);
 		ssa_emit_comment(proc, str_lit("AssignStmt"));
 
@@ -4444,56 +4400,44 @@ void ssa_build_stmt_internal(ssaProcedure *proc, AstNode *node) {
 		proc->curr_block = done;
 	case_end;
 
-	case_ast_node(fs, ForStmt, node);
-		ssa_emit_comment(proc, str_lit("ForStmt"));
-		if (fs->init != NULL) {
-			ssaBlock *init = ssa_add_block(proc, node, "for.init");
+	case_ast_node(ws, WhileStmt, node);
+		ssa_emit_comment(proc, str_lit("WhileStmt"));
+		if (ws->init != NULL) {
+			ssaBlock *init = ssa_add_block(proc, node, "while.init");
 			ssa_emit_jump(proc, init);
 			proc->curr_block = init;
-			ssa_build_stmt(proc, fs->init);
+			ssa_build_stmt(proc, ws->init);
 		}
-		ssaBlock *body = ssa_add_block(proc, node, "for.body");
-		ssaBlock *done = ssa_add_block(proc, node, "for.done"); // NOTE(bill): Append later
+		ssaBlock *body = ssa_add_block(proc, node, "while.body");
+		ssaBlock *done = ssa_add_block(proc, node, "while.done"); // NOTE(bill): Append later
 
 		ssaBlock *loop = body;
 
-		if (fs->cond != NULL) {
-			loop = ssa_add_block(proc, node, "for.loop");
-		}
-		ssaBlock *cont = loop;
-		if (fs->post != NULL) {
-			cont = ssa_add_block(proc, node, "for.post");
-
+		if (ws->cond != NULL) {
+			loop = ssa_add_block(proc, node, "while.loop");
 		}
 		ssa_emit_jump(proc, loop);
 		proc->curr_block = loop;
 		if (loop != body) {
-			ssa_build_cond(proc, fs->cond, body, done);
+			ssa_build_cond(proc, ws->cond, body, done);
 			proc->curr_block = body;
 		}
 
-		ssa_push_target_list(proc, done, cont, NULL);
+		ssa_push_target_list(proc, done, loop, NULL);
 
 		ssa_open_scope(proc);
-		ssa_build_stmt(proc, fs->body);
+		ssa_build_stmt(proc, ws->body);
 		ssa_close_scope(proc, ssaDeferExit_Default, NULL);
 
 		ssa_pop_target_list(proc);
-		ssa_emit_jump(proc, cont);
-
-		if (fs->post != NULL) {
-			proc->curr_block = cont;
-			ssa_build_stmt(proc, fs->post);
-			ssa_emit_jump(proc, loop);
-		}
-
+		ssa_emit_jump(proc, loop);
 
 		proc->curr_block = done;
 	case_end;
 
 
-	case_ast_node(rs, RangeStmt, node);
-		ssa_emit_comment(proc, str_lit("RangeStmt"));
+	case_ast_node(rs, ForStmt, node);
+		ssa_emit_comment(proc, str_lit("ForStmt"));
 
 		Type *val_type = NULL;
 		Type *idx_type = NULL;

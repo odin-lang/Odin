@@ -4,84 +4,90 @@
 
 PRINT_BUF_SIZE :: 1<<12;
 
-fprint :: proc(fd: os.Handle, args: ..any) -> int {
-	data: [PRINT_BUF_SIZE]byte;
-	buf := data[:0];
-	bprint(^buf, ..args);
-	os.write(fd, buf);
-	return buf.count;
-}
-
-fprintln :: proc(fd: os.Handle, args: ..any) -> int {
-	data: [PRINT_BUF_SIZE]byte;
-	buf := data[:0];
-	bprintln(^buf, ..args);
-	os.write(fd, buf);
-	return buf.count;
-}
-fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
-	data: [PRINT_BUF_SIZE]byte;
-	buf := data[:0];
-	bprintf(^buf, fmt, ..args);
-	os.write(fd, buf);
-	return buf.count;
+Buffer :: struct {
+	data:   []byte;
+	length: int;
 }
 
 
-print :: proc(args: ..any) -> int {
-	return fprint(os.stdout, ..args);
+fprint :: proc(fd: os.Handle, args: ...any) -> int {
+	data: [PRINT_BUF_SIZE]byte;
+	buf := Buffer{data[:], 0};
+	bprint(^buf, ...args);
+	os.write(fd, buf.data[:buf.length]);
+	return buf.length;
 }
-println :: proc(args: ..any) -> int {
-	return fprintln(os.stdout, ..args);
+
+fprintln :: proc(fd: os.Handle, args: ...any) -> int {
+	data: [PRINT_BUF_SIZE]byte;
+	buf := Buffer{data[:], 0};
+	bprintln(^buf, ...args);
+	os.write(fd, buf.data[:buf.length]);
+	return buf.length;
 }
-printf :: proc(fmt: string, args: ..any) -> int {
-	return fprintf(os.stdout, fmt, ..args);
+fprintf :: proc(fd: os.Handle, fmt: string, args: ...any) -> int {
+	data: [PRINT_BUF_SIZE]byte;
+	buf := Buffer{data[:], 0};
+	bprintf(^buf, fmt, ...args);
+	os.write(fd, buf.data[:buf.length]);
+	return buf.length;
+}
+
+
+print :: proc(args: ...any) -> int {
+	return fprint(os.stdout, ...args);
+}
+println :: proc(args: ...any) -> int {
+	return fprintln(os.stdout, ...args);
+}
+printf :: proc(fmt: string, args: ...any) -> int {
+	return fprintf(os.stdout, fmt, ...args);
 }
 
 
 
 fprint_type :: proc(fd: os.Handle, info: ^Type_Info) {
 	data: [PRINT_BUF_SIZE]byte;
-	buf := data[:0];
+	buf := Buffer{data[:], 0};
 	bprint_type(^buf, info);
-	os.write(fd, buf);
+	os.write(fd, buf.data[:buf.length]);
 }
 
 
 
-print_byte_buffer :: proc(buf: ^[]byte, b: []byte) {
-	if buf.count < buf.capacity {
-		n := min(buf.capacity-buf.count, b.count);
+print_byte_buffer :: proc(buf: ^Buffer, b: []byte) {
+	if buf.length < buf.data.count {
+		n := min(buf.data.count-buf.length, b.count);
 		if n > 0 {
-			mem.copy(buf.data + buf.count, b.data, n);
-			buf.count += n;
+			copy(buf.data[buf.length:], b[:n]);
+			buf.length += n;
 		}
 	}
 }
 
-bprint_string :: proc(buf: ^[]byte, s: string) {
+bprint_string :: proc(buf: ^Buffer, s: string) {
 	print_byte_buffer(buf, s as []byte);
 }
 
 
 byte_reverse :: proc(b: []byte) {
 	n := b.count;
-	for i := 0; i < n/2; i++ {
+	for i : 0..<n/2 {
 		b[i], b[n-1-i] = b[n-1-i], b[i];
 	}
 }
 
-bprint_rune :: proc(buf: ^[]byte, r: rune) {
+bprint_rune :: proc(buf: ^Buffer, r: rune) {
 	b, n := utf8.encode_rune(r);
 	bprint_string(buf, b[:n] as string);
 }
 
-bprint_space :: proc(buf: ^[]byte) { bprint_rune(buf, ' '); }
-bprint_nl :: proc   (buf: ^[]byte) { bprint_rune(buf, '\n'); }
+bprint_space :: proc(buf: ^Buffer) { bprint_rune(buf, ' '); }
+bprint_nl :: proc   (buf: ^Buffer) { bprint_rune(buf, '\n'); }
 
 __NUM_TO_CHAR_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$";
 
-bprint_bool :: proc(buffer: ^[]byte, b: bool) {
+bprint_bool :: proc(buffer: ^Buffer, b: bool) {
 	if b {
 		bprint_string(buffer, "true");
 	} else {
@@ -89,31 +95,31 @@ bprint_bool :: proc(buffer: ^[]byte, b: bool) {
 	}
 }
 
-bprint_pointer :: proc(buffer: ^[]byte, p: rawptr) #inline {
+bprint_pointer :: proc(buffer: ^Buffer, p: rawptr) #inline {
 	bprint_string(buffer, "0x");
 	bprint_u64(buffer, p as uint as u64);
 }
 
-// bprint_f16 :: proc (buffer: ^[]byte, f: f32)  #inline { print__f64(buffer, f as f64, 4); }
-bprint_f32 :: proc (buffer: ^[]byte, f: f32)  #inline { print__f64(buffer, f as f64, 7); }
-bprint_f64 :: proc (buffer: ^[]byte, f: f64)  #inline { print__f64(buffer, f as f64, 16); }
-bprint_u64 :: proc(buffer: ^[]byte, value: u64) {
+// bprint_f16 :: proc (buffer: ^Buffer, f: f32)  #inline { print__f64(buffer, f as f64, 4); }
+bprint_f32 :: proc (buffer: ^Buffer, f: f32)  #inline { print__f64(buffer, f as f64, 7); }
+bprint_f64 :: proc (buffer: ^Buffer, f: f64)  #inline { print__f64(buffer, f as f64, 16); }
+bprint_u64 :: proc(buffer: ^Buffer, value: u64) {
 	i := value;
 	buf :[20]byte;
 	len := 0;
 	if i == 0 {
 		buf[len] = '0';
-		len++;
+		len += 1;
 	}
-	for i > 0 {
+	while i > 0 {
 		buf[len] = __NUM_TO_CHAR_TABLE[i % 10];
-		len++;
+		len += 1;
 		i /= 10;
 	}
 	byte_reverse(buf[:len]);
 	bprint_string(buffer, buf[:len] as string);
 }
-bprint_i64 :: proc(buffer: ^[]byte, value: i64) {
+bprint_i64 :: proc(buffer: ^Buffer, value: i64) {
 	// TODO(bill): Cleanup printing
 	i := value;
 	if i < 0 {
@@ -124,14 +130,14 @@ bprint_i64 :: proc(buffer: ^[]byte, value: i64) {
 }
 
 /*
-bprint_u128 :: proc(buffer: ^[]byte, value u128) {
+bprint_u128 :: proc(buffer: ^Buffer, value u128) {
 	a := value transmute [2]u64;
 	if a[1] != 0 {
 		bprint_u64(buffer, a[1]);
 	}
 	bprint_u64(buffer, a[0]);
 }
-bprint_i128 :: proc(buffer: ^[]byte, value i128) {
+bprint_i128 :: proc(buffer: ^Buffer, value i128) {
 	i := value;
 	if i < 0 {
 		i = -i;
@@ -142,7 +148,7 @@ bprint_i128 :: proc(buffer: ^[]byte, value i128) {
 */
 
 
-print__f64 :: proc(buffer: ^[]byte, value: f64, decimal_places: int) {
+print__f64 :: proc(buffer: ^Buffer, value: f64, decimal_places: int) {
 	f := value;
 	if f == 0 {
 		bprint_rune(buffer, '0');
@@ -159,16 +165,17 @@ print__f64 :: proc(buffer: ^[]byte, value: f64, decimal_places: int) {
 
 	bprint_rune(buffer, '.');
 
-	mult :f64 = 10.0;
-	for ; decimal_places >= 0; decimal_places-- {
+	mult: f64 = 10.0;
+	while decimal_places >= 0 {
 		i = (f * mult) as u64;
 		bprint_u64(buffer, i as u64);
 		f -= i as f64 / mult;
 		mult *= 10;
+		decimal_places -= 1;
 	}
 }
 
-bprint_type :: proc(buf: ^[]byte, ti: ^Type_Info) {
+bprint_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 	if ti == nil {
 		return;
 	}
@@ -224,7 +231,7 @@ bprint_type :: proc(buf: ^[]byte, ti: ^Type_Info) {
 	case Tuple:
 		count := info.fields.count;
 		if count != 1 { bprint_string(buf, "("); }
-		for i := 0; i < count; i++ {
+		for i : 0..<count {
 			if i > 0 { bprint_string(buf, ", "); }
 
 			f := info.fields[i];
@@ -257,37 +264,37 @@ bprint_type :: proc(buf: ^[]byte, ti: ^Type_Info) {
 		if info.packed  { bprint_string(buf, "#packed "); }
 		if info.ordered { bprint_string(buf, "#ordered "); }
 		bprint_string(buf, "{");
-		for i := 0; i < info.fields.count; i++ {
+		for field, i : info.fields {
 			if i > 0 {
 				bprint_string(buf, ", ");
 			}
-			bprint_any(buf, info.fields[i].name);
+			bprint_any(buf, field.name);
 			bprint_string(buf, ": ");
-			bprint_type(buf, info.fields[i].type_info);
+			bprint_type(buf, field.type_info);
 		}
 		bprint_string(buf, "}");
 
 	case Union:
 		bprint_string(buf, "union {");
-		for i := 0; i < info.fields.count; i++ {
+		for field, i : info.fields {
 			if i > 0 {
 				bprint_string(buf, ", ");
 			}
-			bprint_any(buf, info.fields[i].name);
+			bprint_any(buf, field.name);
 			bprint_string(buf, ": ");
-			bprint_type(buf, info.fields[i].type_info);
+			bprint_type(buf, field.type_info);
 		}
 		bprint_string(buf, "}");
 
 	case Raw_Union:
 		bprint_string(buf, "raw_union {");
-		for i := 0; i < info.fields.count; i++ {
+		for field, i : info.fields {
 			if i > 0 {
 				bprint_string(buf, ", ");
 			}
-			bprint_any(buf, info.fields[i].name);
+			bprint_any(buf, field.name);
 			bprint_string(buf, ": ");
-			bprint_type(buf, info.fields[i].type_info);
+			bprint_type(buf, field.type_info);
 		}
 		bprint_string(buf, "}");
 
@@ -307,7 +314,7 @@ make_any :: proc(type_info: ^Type_Info, data: rawptr) -> any {
 	return a;
 }
 
-bprint_any :: proc(buf: ^[]byte, arg: any) {
+bprint_any :: proc(buf: ^Buffer, arg: any) {
 	if arg.type_info == nil {
 		bprint_string(buf, "<nil>");
 		return;
@@ -326,8 +333,7 @@ bprint_any :: proc(buf: ^[]byte, arg: any) {
 		case Struct:
 			bprint_string(buf, info.name);
 			bprint_string(buf, "{");
-			for i := 0; i < b.fields.count; i++ {
-				f := b.fields[i];
+			for f, i : b.fields {
 				if i > 0 {
 					bprint_string(buf, ", ");
 				}
@@ -397,7 +403,7 @@ bprint_any :: proc(buf: ^[]byte, arg: any) {
 		bprintf(buf, "[%]%{", info.count, info.elem);
 		defer bprint_string(buf, "}");
 
-		for i := 0; i < info.count; i++ {
+		for i : 0..<info.count {
 			if i > 0 {
 				bprint_string(buf, ", ");
 			}
@@ -411,7 +417,7 @@ bprint_any :: proc(buf: ^[]byte, arg: any) {
 		bprintf(buf, "[]%{", info.elem);
 		defer bprint_string(buf, "}");
 
-		for i := 0; i < slice.count; i++ {
+		for i : 0..<slice.count {
 			if i > 0 {
 				bprint_string(buf, ", ");
 			}
@@ -438,7 +444,7 @@ bprint_any :: proc(buf: ^[]byte, arg: any) {
 			return;
 		}
 
-		for i := 0; i < info.count; i++ {
+		for i : 0..<info.count {
 			if i > 0 {
 				bprint_string(buf, ", ");
 			}
@@ -452,14 +458,14 @@ bprint_any :: proc(buf: ^[]byte, arg: any) {
 		bprintf(buf, "%{", arg.type_info);
 		defer bprint_string(buf, "}");
 
-		for i := 0; i < info.fields.count; i++ {
+		for f, i : info.fields {
 			if i > 0 {
 				bprint_string(buf, ", ");
 			}
-			bprint_string(buf, info.fields[i].name);
+			bprint_string(buf, f.name);
 			bprint_string(buf, " = ");
-			data := arg.data as ^byte + info.fields[i].offset;
-			ti := info.fields[i].type_info;
+			data := arg.data as ^byte + f.offset;
+			ti := f.type_info;
 			bprint_any(buf, make_any(ti, data));
 		}
 
@@ -479,7 +485,7 @@ bprint_any :: proc(buf: ^[]byte, arg: any) {
 }
 
 
-bprintf :: proc(buf: ^[]byte, fmt: string, args: ..any) -> int {
+bprintf :: proc(buf: ^Buffer, fmt: string, args: ...any) -> int {
 	is_digit :: proc(r: rune) -> bool #inline {
 		return '0' <= r && r <= '9';
 	}
@@ -487,7 +493,7 @@ bprintf :: proc(buf: ^[]byte, fmt: string, args: ..any) -> int {
 	parse_int :: proc(s: string, offset: int) -> (int, int) {
 		result := 0;
 
-		for ; offset < s.count; offset++ {
+		for _ : offset..<s.count {
 			c := s[offset] as rune;
 			if !is_digit(c) {
 				break;
@@ -503,7 +509,7 @@ bprintf :: proc(buf: ^[]byte, fmt: string, args: ..any) -> int {
 	prev := 0;
 	implicit_index := 0;
 
-	for i := 0; i < fmt.count; i++ {
+	while i := 0; i < fmt.count { defer i += 1;
 		r := fmt[i] as rune;
 		index := implicit_index;
 
@@ -512,13 +518,13 @@ bprintf :: proc(buf: ^[]byte, fmt: string, args: ..any) -> int {
 		}
 
 		bprint_string(buf, fmt[prev:i]);
-		i++; // Skip %
+		i += 1; // Skip %
 		if i < fmt.count {
 			next := fmt[i] as rune;
 
 			if next == '%' {
 				bprint_string(buf, "%");
-				i++;
+				i += 1;
 				prev = i;
 				continue;
 			}
@@ -540,11 +546,11 @@ bprintf :: proc(buf: ^[]byte, fmt: string, args: ..any) -> int {
 	}
 
 	bprint_string(buf, fmt[prev:]);
-	return buf.count;
+	return buf.length;
 }
 
 
-bprint :: proc(buf: ^[]byte, args: ..any) -> int {
+bprint :: proc(buf: ^Buffer, args: ...any) -> int {
 	is_type_string :: proc(info: ^Type_Info) -> bool {
 		using Type_Info;
 		if info == nil {
@@ -560,8 +566,7 @@ bprint :: proc(buf: ^[]byte, args: ..any) -> int {
 
 
 	prev_string := false;
-	for i := 0; i < args.count; i++ {
-		arg := args[i];
+	for arg, i : args {
 		is_string := arg.data != nil && is_type_string(arg.type_info);
 		if i > 0 && !is_string && !prev_string {
 			bprint_space(buf);
@@ -569,16 +574,16 @@ bprint :: proc(buf: ^[]byte, args: ..any) -> int {
 		bprint_any(buf, arg);
 		prev_string = is_string;
 	}
-	return buf.count;
+	return buf.length;
 }
 
-bprintln :: proc(buf: ^[]byte, args: ..any) -> int {
-	for i := 0; i < args.count; i++ {
+bprintln :: proc(buf: ^Buffer, args: ...any) -> int {
+	for arg, i : args {
 		if i > 0 {
-			append(buf, ' ');
+			bprint_space(buf);
 		}
-		bprint_any(buf, args[i]);
+		bprint_any(buf, arg);
 	}
 	bprint_nl(buf);
-	return buf.count;
+	return buf.length;
 }

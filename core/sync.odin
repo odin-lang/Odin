@@ -52,7 +52,7 @@ mutex_lock :: proc(m: ^Mutex) {
 		}
 	}
 	atomic.store32(^m.owner, thread_id);
-	m.recursion++;
+	m.recursion += 1;
 }
 mutex_try_lock :: proc(m: ^Mutex) -> bool {
 	thread_id := current_thread_id();
@@ -68,7 +68,7 @@ mutex_try_lock :: proc(m: ^Mutex) -> bool {
 		}
 		atomic.store32(^m.owner, thread_id);
 	}
-	m.recursion++;
+	m.recursion += 1;
 	return true;
 }
 mutex_unlock :: proc(m: ^Mutex) {
@@ -76,7 +76,7 @@ mutex_unlock :: proc(m: ^Mutex) {
 	thread_id := current_thread_id();
 	assert(thread_id == atomic.load32(^m.owner));
 
-	m.recursion--;
+	m.recursion -= 1;
 	recursion = m.recursion;
 	if recursion == 0 {
 		atomic.store32(^m.owner, thread_id);

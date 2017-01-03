@@ -1,7 +1,7 @@
 crc32 :: proc(data: rawptr, len: int) -> u32 {
 	result := ~(0 as u32);
 	s := slice_ptr(data as ^u8, len);
-	for i := 0; i < len; i++ {
+	for i : 0..<len {
 		b := s[i] as u32;
 		result = result>>8 ~ __CRC32_TABLE[(result ~ b) & 0xff];
 	}
@@ -10,7 +10,7 @@ crc32 :: proc(data: rawptr, len: int) -> u32 {
 crc64 :: proc(data: rawptr, len: int) -> u64 {
 	result := ~(0 as u64);
 	s := slice_ptr(data as ^u8, len);
-	for i := 0; i < len; i++ {
+	for i : 0..<len {
 		b := s[i] as u64;
 		result = result>>8 ~ __CRC64_TABLE[(result ~ b) & 0xff];
 	}
@@ -20,8 +20,8 @@ crc64 :: proc(data: rawptr, len: int) -> u64 {
 fnv32 :: proc(data: rawptr, len: int) -> u32 {
 	s := slice_ptr(data as ^u8, len);
 
-	h :u32 = 0x811c9dc5;
-	for i := 0; i < len; i++ {
+	h: u32 = 0x811c9dc5;
+	for i : 0..<len {
 		h = (h * 0x01000193) ~ s[i] as u32;
 	}
 	return h;
@@ -30,8 +30,8 @@ fnv32 :: proc(data: rawptr, len: int) -> u32 {
 fnv64 :: proc(data: rawptr, len: int) -> u64 {
 	s := slice_ptr(data as ^u8, len);
 
-	h :u64 = 0xcbf29ce484222325;
-	for i := 0; i < len; i++ {
+	h: u64 = 0xcbf29ce484222325;
+	for i : 0..<len {
 		h = (h * 0x100000001b3) ~ s[i] as u64;
 	}
 	return h;
@@ -40,8 +40,8 @@ fnv64 :: proc(data: rawptr, len: int) -> u64 {
 fnv32a :: proc(data: rawptr, len: int) -> u32 {
 	s := slice_ptr(data as ^u8, len);
 
-	h :u32 = 0x811c9dc5;
-	for i := 0; i < len; i++ {
+	h: u32 = 0x811c9dc5;
+	for i : 0..<len {
 		h = (h ~ s[i] as u32) * 0x01000193;
 	}
 	return h;
@@ -51,7 +51,7 @@ fnv64a :: proc(data: rawptr, len: int) -> u64 {
 	s := slice_ptr(data as ^u8, len);
 
 	h :u64 = 0xcbf29ce484222325;
-	for i := 0; i < len; i++ {
+	for i : 0..<len {
 		h = (h ~ s[i] as u64) * 0x100000001b3;
 	}
 	return h;
@@ -70,7 +70,7 @@ murmur64 :: proc(data_: rawptr, len: int) -> u64 {
 		data := slice_ptr(data_ as ^u64, len/size_of(u64));
 		data2 := slice_ptr(data_ as ^u8, len);
 
-		for i := 0; i < data.count; i++ {
+		for i : 0 ..< data.count {
 			k := data[i];
 
 			k *= m;
@@ -108,9 +108,9 @@ murmur64 :: proc(data_: rawptr, len: int) -> u64 {
 		data := slice_ptr(data_ as ^u32, len/size_of(u32));
 
 		i := 0;
-		for len >= 8 {
+		while len >= 8 {
 			k1, k2: u32;
-			k1 = data[i]; i++;
+			k1 = data[i]; i += 1;
 			k1 *= m;
 			k1 ~= k1>>r;
 			k1 *= m;
@@ -118,7 +118,7 @@ murmur64 :: proc(data_: rawptr, len: int) -> u64 {
 			h1 ~= k1;
 			len -= 4;
 
-			k2 = data[i]; i++;
+			k2 = data[i]; i += 1;
 			k2 *= m;
 			k2 ~= k2>>r;
 			k2 *= m;
@@ -127,9 +127,9 @@ murmur64 :: proc(data_: rawptr, len: int) -> u64 {
 			len -= 4;
 		}
 
-		if (len >= 4) {
+		if len >= 4 {
 			k1: u32;
-			k1 = data[i]; i++;
+			k1 = data[i]; i += 1;
 			k1 *= m;
 			k1 ~= k1>>r;
 			k1 *= m;

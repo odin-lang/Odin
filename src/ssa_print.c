@@ -1225,13 +1225,6 @@ void ssa_print_instr(ssaFileBuffer *f, ssaModule *m, ssaValue *value) {
 		ssa_fprintf(f, " ");
 		ssa_print_value(f, m, bc->high, t_int);
 
-		if (!bc->is_substring) {
-			ssa_fprintf(f, ", ");
-			ssa_print_type(f, m, t_int);
-			ssa_fprintf(f, " ");
-			ssa_print_value(f, m, bc->max, t_int);
-		}
-
 		ssa_fprintf(f, ")\n");
 	} break;
 

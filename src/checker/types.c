@@ -116,6 +116,8 @@ typedef struct TypeRecord {
 		ProcCallingConvention calling_convention; \
 	})
 
+
+
 typedef enum TypeKind {
 	Type_Invalid,
 #define TYPE_KIND(k, ...) GB_JOIN2(Type_, k),
@@ -987,7 +989,6 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 	} else if (type->kind == Type_Slice) {
 		String data_str     = str_lit("data");
 		String count_str    = str_lit("count");
-		String capacity_str = str_lit("capacity");
 
 		if (str_eq(field_name, data_str)) {
 			selection_add_index(&sel, 0);
@@ -1001,14 +1002,6 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			}
 
 			sel.entity = entity__slice_count;
-			return sel;
-		} else if (str_eq(field_name, capacity_str)) {
-			selection_add_index(&sel, 2);
-			if (entity__slice_capacity == NULL) {
-				entity__slice_capacity = make_entity_field(a, NULL, make_token_ident(capacity_str), t_int, false, 2);
-			}
-
-			sel.entity = entity__slice_capacity;
 			return sel;
 		}
 	}
@@ -1393,8 +1386,8 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 	} break;
 
 
-	case Type_Slice: // ptr + len + cap
-		return 3 * s.word_size;
+	case Type_Slice: // ptr + count
+		return 2 * s.word_size;
 
 	case Type_Maybe: { // value + bool
 		i64 align, size;

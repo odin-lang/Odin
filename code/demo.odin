@@ -21,13 +21,13 @@ main :: proc() {
 	msg := "Hellope";
 	list := []int{1, 4, 7, 3, 7, 2, 1};
 
-	range value : msg {
+	for value : msg {
 		fmt.println(value);
 	}
-	range value : list {
+	for value : list {
 		fmt.println(value);
 	}
-	range x : 0 ..< 5 {
-		fmt.println(x);
+	for val, idx : 12 ..< 17 {
+		fmt.println(val, idx);
 	}
 }

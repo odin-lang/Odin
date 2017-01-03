@@ -53,8 +53,6 @@ TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
 	TOKEN_KIND(Token_CmpAndEq, "&&="), \
 	TOKEN_KIND(Token_CmpOrEq, "||="), \
 TOKEN_KIND(Token__AssignOpEnd, "_AssignOpEnd"), \
-	TOKEN_KIND(Token_Increment, "++"), \
-	TOKEN_KIND(Token_Decrement, "--"), \
 	TOKEN_KIND(Token_ArrowRight, "->"), \
 	TOKEN_KIND(Token_ArrowLeft, "<-"), \
 \
@@ -77,7 +75,7 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 	TOKEN_KIND(Token_Semicolon, ";"), \
 	TOKEN_KIND(Token_Period, "."), \
 	TOKEN_KIND(Token_Comma, ","), \
-	TOKEN_KIND(Token_Ellipsis, ".."), \
+	TOKEN_KIND(Token_Ellipsis, "..."), \
 	TOKEN_KIND(Token_Interval, "..<"), \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
@@ -94,6 +92,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_then,           "then"), \
 	TOKEN_KIND(Token_if,             "if"), \
 	TOKEN_KIND(Token_else,           "else"), \
+	TOKEN_KIND(Token_while,          "while"), \
 	TOKEN_KIND(Token_for,            "for"), \
 	TOKEN_KIND(Token_when,           "when"), \
 	TOKEN_KIND(Token_range,          "range"), \
@@ -837,8 +836,10 @@ Token tokenizer_get_token(Tokenizer *t) {
 				token = scan_number_to_token(t, true);
 			} else if (t->curr_rune == '.') { // Could be an ellipsis
 				advance_to_next_rune(t);
-				token.kind = Token_Ellipsis;
-				if (t->curr_rune == '<') {
+				if (t->curr_rune == '.') {
+					advance_to_next_rune(t);
+					token.kind = Token_Ellipsis;
+				} else if (t->curr_rune == '<') {
 					advance_to_next_rune(t);
 					token.kind = Token_Interval;
 				}
@@ -891,10 +892,10 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '~': token.kind = token_kind_variant2(t, Token_Xor,   Token_XorEq);     break;
 		case '!': token.kind = token_kind_variant2(t, Token_Not,   Token_NotEq);     break;
 		case '+':
-			token.kind = token_kind_variant3(t, Token_Add, Token_AddEq, '+', Token_Increment);
+			token.kind = token_kind_variant2(t, Token_Add, Token_AddEq);
 			break;
 		case '-':
-			token.kind = token_kind_variant4(t, Token_Sub,   Token_SubEq, '-', Token_Decrement, '>', Token_ArrowRight);
+			token.kind = token_kind_variant3(t, Token_Sub, Token_SubEq, '>', Token_ArrowRight);
 			break;
 		case '/': {
 			if (t->curr_rune == '/') {

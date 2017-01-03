@@ -132,7 +132,7 @@ typedef enum BuiltinProcId {
 	BuiltinProc_panic,
 
 	BuiltinProc_copy,
-	BuiltinProc_append,
+	// BuiltinProc_append,
 
 	BuiltinProc_swizzle,
 
@@ -175,7 +175,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("panic"),            1, false, Expr_Stmt},
 
 	{STR_LIT("copy"),             2, false, Expr_Expr},
-	{STR_LIT("append"),           2, false, Expr_Expr},
+	// {STR_LIT("append"),           2, false, Expr_Expr},
 
 	{STR_LIT("swizzle"),          1, true,  Expr_Expr},
 

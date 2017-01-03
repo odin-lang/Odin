@@ -57,6 +57,7 @@ struct Entity {
 		struct {
 			i32  field_index;
 			i32  field_src_index;
+			bool is_immutable;
 		} Variable;
 		i32 TypeName;
 		struct {

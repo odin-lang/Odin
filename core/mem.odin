@@ -40,9 +40,9 @@ compare :: proc(dst, src: rawptr, n: int) -> int #link_name "__mem_compare" {
 	la := slice_ptr(^a[0] as ^int, fast);
 	lb := slice_ptr(^b[0] as ^int, fast);
 
-	for ; curr_block < fast; curr_block++ {
+	for _ : curr_block ..< fast {
 		if (la[curr_block] ~ lb[curr_block]) != 0 {
-			for pos := curr_block*size_of(int); pos < n; pos++ {
+			for pos : curr_block*size_of(int) ..< n {
 				if (a[pos] ~ b[pos]) != 0 {
 					return a[pos] as int - b[pos] as int;
 				}
@@ -51,7 +51,7 @@ compare :: proc(dst, src: rawptr, n: int) -> int #link_name "__mem_compare" {
 
 	}
 
-	for ; offset < n; offset++ {
+	for _ : offset ..< n {
 		if (a[offset] ~ b[offset]) != 0 {
 			return a[offset] as int - b[offset] as int;
 		}
@@ -96,13 +96,14 @@ allocation_header_fill :: proc(header: ^Allocation_Header, data: rawptr, size: i
 	header.size = size;
 	ptr := (header+1) as ^int;
 
-	for i := 0; ptr as rawptr < data; i++ {
+	while i := 0; ptr as rawptr < data {
 		(ptr+i)^ = -1;
+		i += 1;
 	}
 }
 allocation_header :: proc(data: rawptr) -> ^Allocation_Header {
 	p := data as ^int;
-	for (p-1)^ == -1 {
+	while (p-1)^ == -1 {
 		p = (p-1);
 	}
 	return (p as ^Allocation_Header)-1;
@@ -115,6 +116,7 @@ allocation_header :: proc(data: rawptr) -> ^Allocation_Header {
 // Custom allocators
 Arena :: struct {
 	backing:    Allocator;
+	offset:     int;
 	memory:     []byte;
 	temp_count: int;
 }
@@ -144,7 +146,8 @@ free_arena :: proc(using a: ^Arena) {
 	if backing.procedure != nil {
 		push_allocator backing {
 			free(memory.data);
-			memory = memory[0:0:0];
+			memory = memory[0:0];
+			offset = 0;
 		}
 	}
 }
@@ -166,15 +169,15 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	case ALLOC:
 		total_size := size + alignment;
 
-		if arena.memory.count + total_size > arena.memory.capacity {
+		if arena.offset + total_size > arena.memory.count {
 			fmt.fprintln(os.stderr, "Arena out of memory");
 			return nil;
 		}
 
-		#no_bounds_check end := ^arena.memory[arena.memory.count];
+		#no_bounds_check end := ^arena.memory[arena.offset];
 
 		ptr := align_forward(end, alignment);
-		arena.memory.count += total_size;
+		arena.offset += total_size;
 		return zero(ptr, size);
 
 	case FREE:
@@ -182,7 +185,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		// Use Arena_Temp_Memory if you want to free a block
 
 	case FREE_ALL:
-		arena.memory.count = 0;
+		arena.offset = 0;
 
 	case RESIZE:
 		return default_resize_align(old_memory, old_size, size, alignment);
@@ -195,7 +198,7 @@ begin_arena_temp_memory :: proc(a: ^Arena) -> Arena_Temp_Memory {
 	tmp: Arena_Temp_Memory;
 	tmp.arena = a;
 	tmp.original_count = a.memory.count;
-	a.temp_count++;
+	a.temp_count += 1;
 	return tmp;
 }
 
@@ -203,7 +206,7 @@ end_arena_temp_memory :: proc(using tmp: Arena_Temp_Memory) {
 	assert(arena.memory.count >= original_count);
 	assert(arena.temp_count > 0);
 	arena.memory.count = original_count;
-	arena.temp_count--;
+	arena.temp_count -= 1;
 }
 
 

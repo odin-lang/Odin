@@ -37,8 +37,8 @@ fetch_or32 :: proc(a: ^i32, operand: i32) -> i32 {
 spin_lock32 :: proc(a: ^i32, time_out: int) -> bool { // NOTE(bill) time_out = -1 as default
 	old_value := compare_exchange32(a, 1, 0);
 	counter := 0;
-	for old_value != 0 && (time_out < 0 || counter < time_out) {
-		counter++;
+	while old_value != 0 && (time_out < 0 || counter < time_out) {
+		counter += 1;
 		yield_thread();
 		old_value = compare_exchange32(a, 1, 0);
 		mfence();
@@ -81,8 +81,8 @@ fetch_or64 :: proc(a: ^i64, operand: i64) -> i64 {
 spin_lock64 :: proc(a: ^i64, time_out: int) -> bool { // NOTE(bill) time_out = -1 as default
 	old_value := compare_exchange64(a, 1, 0);
 	counter := 0;
-	for old_value != 0 && (time_out < 0 || counter < time_out) {
-		counter++;
+	while old_value != 0 && (time_out < 0 || counter < time_out) {
+		counter += 1;
 		yield_thread();
 		old_value = compare_exchange64(a, 1, 0);
 		mfence();

@@ -965,9 +965,9 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 		}
 	#else
 		o->mode = Addressing_Variable;
-		// if (e->Variable.is_let) {
-			// o->mode = Addressing_Value;
-		// }
+		if (e->Variable.is_immutable) {
+			o->mode = Addressing_Value;
+		}
 	#endif
 		break;
 
@@ -2967,6 +2967,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_Value;
 	} break;
 
+	#if 0
 	case BuiltinProc_append: {
 		// append :: proc(x : ^[]Type, y : Type) -> bool
 		Type *x_type = NULL, *y_type = NULL;
@@ -3003,6 +3004,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->type = t_bool; // Returns if it was successful
 		operand->mode = Addressing_Value;
 	} break;
+	#endif
 
 	case BuiltinProc_swizzle: {
 		// swizzle :: proc(v: {N}T, T...) -> {M}T
@@ -4342,9 +4344,6 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 				if (o->mode == Addressing_Constant) {
 					max_count = o->value.value_string.len;
 				}
-				if (se->max != NULL) {
-					error_node(se->max, "Max (3rd) index not needed in substring expression");
-				}
 				o->type = t_string;
 			}
 			break;
@@ -4375,8 +4374,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 		o->mode = Addressing_Value;
 
-		i64 indices[3] = {0};
-		AstNode *nodes[3] = {se->low, se->high, se->max};
+		i64 indices[2] = {0};
+		AstNode *nodes[2] = {se->low, se->high};
 		for (isize i = 0; i < gb_count_of(nodes); i++) {
 			i64 index = max_count;
 			if (nodes[i] != NULL) {
@@ -4680,10 +4679,6 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, se->low);
 		str = gb_string_appendc(str, ":");
 		str = write_expr_to_string(str, se->high);
-		if (se->triple_indexed) {
-			str = gb_string_appendc(str, ":");
-			str = write_expr_to_string(str, se->max);
-		}
 		str = gb_string_appendc(str, "]");
 	case_end;
 

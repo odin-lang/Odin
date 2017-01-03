@@ -313,19 +313,19 @@ __bounds_check_error :: proc(file: string, line, column: int, index, count: int)
 	__debug_trap();
 }
 
-__slice_expr_error :: proc(file: string, line, column: int, low, high, max: int) {
-	if 0 <= low && low <= high && high <= max {
+__slice_expr_error :: proc(file: string, line, column: int, low, high: int) {
+	if 0 <= low && low <= high {
 		return;
 	}
-	fmt.fprintf(os.stderr, "%(%:%) Invalid slice indices: [%:%:%]\n",
-	            file, line, column, low, high, max);
+	fmt.fprintf(os.stderr, "%(%:%) Invalid slice indices: [%:%]\n",
+	            file, line, column, low, high);
 	__debug_trap();
 }
 __substring_expr_error :: proc(file: string, line, column: int, low, high: int) {
 	if 0 <= low && low <= high {
 		return;
 	}
-	fmt.fprintf(os.stderr, "%(%:%) Invalid substring indices: [%:%:%]\n",
+	fmt.fprintf(os.stderr, "%(%:%) Invalid substring indices: [%:%]\n",
 	            file, line, column, low, high);
 	__debug_trap();
 }
