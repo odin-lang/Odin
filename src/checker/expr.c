@@ -2643,7 +2643,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->type = make_type_pointer(c->allocator, type);
 	} break;
 	case BuiltinProc_new_slice: {
-		// new_slice :: proc(Type, len: int[, cap: int]) -> []Type
+		// new_slice :: proc(Type, len: int) -> []Type
 		Operand op = {0};
 		check_expr_or_type(c, &op, ce->args.e[0]);
 		Type *type = op.type;
@@ -2653,10 +2653,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		AstNode *len = ce->args.e[1];
-		AstNode *cap = NULL;
-		if (ce->args.count > 2) {
-			cap = ce->args.e[2];
-		}
 
 		check_expr(c, &op, len);
 		if (op.mode == Addressing_Invalid) {
@@ -2667,23 +2663,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			error_node(call, "Length for `new_slice` must be an integer, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
-		}
-
-		if (cap != NULL) {
-			check_expr(c, &op, cap);
-			if (op.mode == Addressing_Invalid) {
-				return false;
-			}
-			if (!is_type_integer(op.type)) {
-				gbString type_str = type_to_string(operand->type);
-				error_node(call, "Capacity for `new_slice` must be an integer, got `%s`", type_str);
-				gb_string_free(type_str);
-				return false;
-			}
-			if (ce->args.count > 3) {
-				error_node(call, "Too many arguments to `new_slice`, expected either 2 or 3");
-				return false;
-			}
 		}
 
 		operand->mode = Addressing_Value;
@@ -3166,7 +3145,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 #endif
 
 	case BuiltinProc_slice_ptr: {
-		// slice_ptr :: proc(a: ^T, len: int[, cap: int]) -> []T
+		// slice_ptr :: proc(a: ^T, len: int) -> []T
 		// ^T cannot be rawptr
 		Type *ptr_type = base_type(operand->type);
 		if (!is_type_pointer(ptr_type)) {
@@ -3185,10 +3164,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		AstNode *len = ce->args.e[1];
-		AstNode *cap = NULL;
-		if (ce->args.count > 2) {
-			cap = ce->args.e[2];
-		}
 
 		Operand op = {0};
 		check_expr(c, &op, len);
@@ -3201,25 +3176,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			      type_str);
 			gb_string_free(type_str);
 			return false;
-		}
-
-		if (cap != NULL) {
-			check_expr(c, &op, cap);
-			if (op.mode == Addressing_Invalid)
-				return false;
-			if (!is_type_integer(op.type)) {
-				gbString type_str = type_to_string(operand->type);
-				error_node(call,
-				      "Capacity for `slice_ptr` must be an integer, got `%s`",
-				      type_str);
-				gb_string_free(type_str);
-				return false;
-			}
-			if (ce->args.count > 3) {
-				error_node(call,
-				      "Too many arguments to `slice_ptr`, expected either 2 or 3");
-				return false;
-			}
 		}
 
 		operand->type = make_type_slice(c->allocator, ptr_type->Pointer.elem);

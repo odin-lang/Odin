@@ -157,7 +157,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT(""),                 0, false, Expr_Stmt},
 
 	{STR_LIT("new"),              1, false, Expr_Expr},
-	{STR_LIT("new_slice"),        2, true,  Expr_Expr},
+	{STR_LIT("new_slice"),        2, false,  Expr_Expr},
 
 	{STR_LIT("size_of"),          1, false, Expr_Expr},
 	{STR_LIT("size_of_val"),      1, false, Expr_Expr},
@@ -181,7 +181,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 
 	// {STR_LIT("ptr_offset"),       2, false, Expr_Expr},
 	// {STR_LIT("ptr_sub"),          2, false, Expr_Expr},
-	{STR_LIT("slice_ptr"),        2, true,  Expr_Expr},
+	{STR_LIT("slice_ptr"),        2, false,  Expr_Expr},
 
 	{STR_LIT("min"),              2, false, Expr_Expr},
 	{STR_LIT("max"),              2, false, Expr_Expr},

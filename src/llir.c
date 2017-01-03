@@ -2860,15 +2860,11 @@ llirValue *llir_build_single_expr(llirProcedure *proc, AstNode *expr, TypeAndVal
 					llirValue *elem_size  = llir_make_const_int(allocator, s);
 					llirValue *elem_align = llir_make_const_int(allocator, a);
 
-					llirValue *len = llir_emit_conv(proc, llir_build_expr(proc, ce->args.e[1]), t_int);
-					llirValue *cap = len;
-					if (ce->args.count == 3) {
-						cap = llir_emit_conv(proc, llir_build_expr(proc, ce->args.e[2]), t_int);
-					}
+					llirValue *count = llir_emit_conv(proc, llir_build_expr(proc, ce->args.e[1]), t_int);
 
-					llir_emit_slice_bounds_check(proc, ast_node_token(ce->args.e[1]), v_zero, len, false);
+					llir_emit_slice_bounds_check(proc, ast_node_token(ce->args.e[1]), v_zero, count, false);
 
-					llirValue *slice_size = llir_emit_arith(proc, Token_Mul, elem_size, cap, t_int);
+					llirValue *slice_size = llir_emit_arith(proc, Token_Mul, elem_size, count, t_int);
 
 					llirValue **args = gb_alloc_array(allocator, llirValue *, 2);
 					args[0] = slice_size;
@@ -2880,10 +2876,8 @@ llirValue *llir_build_single_expr(llirProcedure *proc, AstNode *expr, TypeAndVal
 
 					llirValue *gep0 = llir_emit_struct_ep(proc, slice, 0);
 					llirValue *gep1 = llir_emit_struct_ep(proc, slice, 1);
-					llirValue *gep2 = llir_emit_struct_ep(proc, slice, 2);
 					llir_emit_store(proc, gep0, ptr);
-					llir_emit_store(proc, gep1, len);
-					llir_emit_store(proc, gep2, cap);
+					llir_emit_store(proc, gep1, count);
 					return llir_emit_load(proc, slice);
 				} break;
 
@@ -3059,22 +3053,13 @@ llirValue *llir_build_single_expr(llirProcedure *proc, AstNode *expr, TypeAndVal
 				case BuiltinProc_slice_ptr: {
 					llir_emit_comment(proc, str_lit("slice_ptr"));
 					llirValue *ptr = llir_build_expr(proc, ce->args.e[0]);
-					llirValue *len = llir_build_expr(proc, ce->args.e[1]);
-					llirValue *cap = len;
-
-					len = llir_emit_conv(proc, len, t_int);
-
-					if (ce->args.count == 3) {
-						cap = llir_build_expr(proc, ce->args.e[2]);
-						cap = llir_emit_conv(proc, cap, t_int);
-					}
-
+					llirValue *count = llir_build_expr(proc, ce->args.e[1]);
+					count = llir_emit_conv(proc, count, t_int);
 
 					Type *slice_type = make_type_slice(proc->module->allocator, type_deref(llir_type(ptr)));
 					llirValue *slice = llir_add_local_generated(proc, slice_type);
 					llir_emit_store(proc, llir_emit_struct_ep(proc, slice, 0), ptr);
-					llir_emit_store(proc, llir_emit_struct_ep(proc, slice, 1), len);
-					llir_emit_store(proc, llir_emit_struct_ep(proc, slice, 2), cap);
+					llir_emit_store(proc, llir_emit_struct_ep(proc, slice, 1), count);
 					return llir_emit_load(proc, slice);
 				} break;
 
