@@ -138,7 +138,7 @@ init_arena_from_memory :: proc(using a: ^Arena, data: []byte) {
 
 init_arena_from_context :: proc(using a: ^Arena, size: int) {
 	backing = context.allocator;
-	memory = new_slice(byte, 0, size);
+	memory = new_slice(byte, size);
 	temp_count = 0;
 }
 
