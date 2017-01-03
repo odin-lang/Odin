@@ -3790,6 +3790,11 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		goto error;
 	case_end;
 
+	case_ast_node(i, IntervalExpr, node);
+		error_node(node, "Invalid use of an interval expression");
+		goto error;
+	case_end;
+
 	case_ast_node(i, Ident, node);
 		check_identifier(c, o, node, type_hint);
 	case_end;

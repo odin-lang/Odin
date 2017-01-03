@@ -594,42 +594,116 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 		check_open_scope(c, node);
 
-
-		Operand operand = {Addressing_Invalid};
-		check_expr(c, &operand, rs->expr);
-
-		Type *key = NULL;
 		Type *val = NULL;
-		if (operand.mode != Addressing_Invalid) {
-			Type *t = base_type(type_deref(operand.type));
-			switch (t->kind) {
-			case Type_Basic:
-				if (is_type_string(t)) {
-					key = t_int;
-					val = t_rune;
+		Type *idx = NULL;
+		Entity *entities[2] = {0};
+		isize entity_count = 0;
+
+
+		if (rs->expr != NULL && rs->expr->kind == AstNode_IntervalExpr) {
+			ast_node(ie, IntervalExpr, rs->expr);
+			Operand x = {Addressing_Invalid};
+			Operand y = {Addressing_Invalid};
+
+			check_expr(c, &x, ie->left);
+			if (x.mode == Addressing_Invalid) {
+				goto skip_expr;
+			}
+			check_expr(c, &y, ie->right);
+			if (y.mode == Addressing_Invalid) {
+				goto skip_expr;
+			}
+
+			convert_to_typed(c, &x, y.type, 0);
+			if (x.mode == Addressing_Invalid) {
+				goto skip_expr;
+			}
+			convert_to_typed(c, &y, x.type, 0);
+			if (y.mode == Addressing_Invalid) {
+				goto skip_expr;
+			}
+
+			convert_to_typed(c, &x, default_type(y.type), 0);
+			if (x.mode == Addressing_Invalid) {
+				goto skip_expr;
+			}
+			convert_to_typed(c, &y, default_type(x.type), 0);
+			if (y.mode == Addressing_Invalid) {
+				goto skip_expr;
+			}
+
+			if (!are_types_identical(x.type, y.type)) {
+				if (x.type != t_invalid &&
+				    y.type != t_invalid) {
+					gbString xt = type_to_string(x.type);
+					gbString yt = type_to_string(y.type);
+					gbString expr_str = expr_to_string(x.expr);
+					error(ie->op, "Mismatched types in interval expression `%s` : `%s` vs `%s`", expr_str, xt, yt);
+					gb_string_free(expr_str);
+					gb_string_free(yt);
+					gb_string_free(xt);
 				}
-				break;
-			case Type_Array:
-				key = t_int;
-				val = t->Array.elem;
-				break;
-			case Type_Slice:
-				key = t_int;
-				val = t->Array.elem;
-				break;
+				goto skip_expr;
+			}
+
+			if (!is_type_integer(x.type) && !is_type_float(x.type)) {
+				error(ie->op, "Only numerical types are allowed within interval expressions");
+				goto skip_expr;
+			}
+
+			if (x.mode == Addressing_Constant &&
+			    y.mode == Addressing_Constant) {
+				ExactValue a = x.value;
+				ExactValue b = y.value;
+
+				GB_ASSERT(are_types_identical(x.type, y.type));
+
+				bool ok = compare_exact_values(Token_Lt, a, b);
+				if (!ok) {
+					// TODO(bill): Better error message
+					error(ie->op, "Invalid interval expression");
+					goto skip_expr;
+				}
+			}
+
+			add_type_and_value(&c->info, ie->left,  x.mode, x.type, x.value);
+			add_type_and_value(&c->info, ie->right, y.mode, y.type, y.value);
+			val = x.type;
+			idx = t_int;
+		} else {
+			Operand operand = {Addressing_Invalid};
+			check_expr(c, &operand, rs->expr);
+
+			if (operand.mode != Addressing_Invalid) {
+				Type *t = base_type(type_deref(operand.type));
+				switch (t->kind) {
+				case Type_Basic:
+					if (is_type_string(t)) {
+						val = t_rune;
+						idx = t_int;
+					}
+					break;
+				case Type_Array:
+					val = t->Array.elem;
+					idx = t_int;
+					break;
+				case Type_Slice:
+					val = t->Array.elem;
+					idx = t_int;
+					break;
+				}
+			}
+
+			if (val == NULL) {
+				gbString s = expr_to_string(operand.expr);
+				error_node(node, "Cannot iterate over %s", s);
+				gb_string_free(s);
 			}
 		}
 
-		if (key == NULL) {
-			gbString s = expr_to_string(operand.expr);
-			error_node(operand.expr, "Cannot iterate over %s", s);
-			gb_string_free(s);
-		}
-
-		Entity *entities[2] = {0};
-		isize entity_count = 0;
-		AstNode *lhs[2] = {rs->key, rs->value};
-		Type *   rhs[2] = {key, val};
+	skip_expr:
+		AstNode *lhs[2] = {rs->value, rs->index};
+		Type *   rhs[2] = {val, idx};
 
 		for (isize i = 0; i < 2; i++) {
 			if (lhs[i] == NULL) {

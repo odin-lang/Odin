@@ -78,7 +78,7 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 	TOKEN_KIND(Token_Period, "."), \
 	TOKEN_KIND(Token_Comma, ","), \
 	TOKEN_KIND(Token_Ellipsis, ".."), \
-	TOKEN_KIND(Token_RangeExclusive, "..<"), \
+	TOKEN_KIND(Token_Interval, "..<"), \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
@@ -286,6 +286,14 @@ typedef enum TokenizerInitError {
 } TokenizerInitError;
 
 
+typedef struct TokenizerState {
+	Rune  curr_rune;   // current character
+	u8 *  curr;        // character pos
+	u8 *  read_curr;   // pos from start
+	u8 *  line;        // current line pos
+	isize line_count;
+} TokenizerState;
+
 typedef struct Tokenizer {
 	String fullpath;
 	u8 *start;
@@ -300,6 +308,25 @@ typedef struct Tokenizer {
 	isize error_count;
 	Array(String) allocated_strings;
 } Tokenizer;
+
+
+TokenizerState save_tokenizer_state(Tokenizer *t) {
+	TokenizerState state = {0};
+	state.curr_rune  = t->curr_rune;
+	state.curr       = t->curr;
+	state.read_curr  = t->read_curr;
+	state.line       = t->line;
+	state.line_count = t->line_count;
+	return state;
+}
+
+void restore_tokenizer_state(Tokenizer *t, TokenizerState *state) {
+	 t->curr_rune  = state->curr_rune;
+	 t->curr       = state->curr;
+	 t->read_curr  = state->read_curr;
+	 t->line       = state->line;
+	 t->line_count = state->line_count;
+}
 
 
 void tokenizer_err(Tokenizer *t, char *msg, ...) {
@@ -456,23 +483,27 @@ Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 		if (t->curr_rune == 'b') { // Binary
 			advance_to_next_rune(t);
 			scan_mantissa(t, 2);
-			if (t->curr - prev <= 2)
+			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
+			}
 		} else if (t->curr_rune == 'o') { // Octal
 			advance_to_next_rune(t);
 			scan_mantissa(t, 8);
-			if (t->curr - prev <= 2)
+			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
+			}
 		} else if (t->curr_rune == 'd') { // Decimal
 			advance_to_next_rune(t);
 			scan_mantissa(t, 10);
-			if (t->curr - prev <= 2)
+			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
+			}
 		} else if (t->curr_rune == 'x') { // Hexadecimal
 			advance_to_next_rune(t);
 			scan_mantissa(t, 16);
-			if (t->curr - prev <= 2)
+			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
+			}
 		} else {
 			seen_decimal_point = false;
 			scan_mantissa(t, 10);
@@ -491,8 +522,15 @@ Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 
 fraction:
 	if (t->curr_rune == '.') {
-		token.kind = Token_Float;
+		// HACK(bill): This may be inefficient
+		TokenizerState state = save_tokenizer_state(t);
 		advance_to_next_rune(t);
+		if (t->curr_rune == '.') {
+			// TODO(bill): Clean up this shit
+			restore_tokenizer_state(t, &state);
+			goto end;
+		}
+		token.kind = Token_Float;
 		scan_mantissa(t, 10);
 	}
 
@@ -506,6 +544,7 @@ exponent:
 		scan_mantissa(t, 10);
 	}
 
+end:
 	token.string.len = t->curr - token.string.text;
 	return token;
 }
@@ -801,7 +840,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 				token.kind = Token_Ellipsis;
 				if (t->curr_rune == '<') {
 					advance_to_next_rune(t);
-					token.kind = Token_RangeExclusive;
+					token.kind = Token_Interval;
 				}
 			}
 			break;

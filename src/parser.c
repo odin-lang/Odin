@@ -160,6 +160,7 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 		AstNode *body; \
 		AstNode *else_expr; \
 	}) \
+	AST_NODE_KIND(IntervalExpr, "interval expression", struct { Token op; AstNode *left, *right; }) \
 AST_NODE_KIND(_ExprEnd,       "", i32) \
 AST_NODE_KIND(_StmtBegin,     "", i32) \
 	AST_NODE_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
@@ -205,11 +206,11 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 		AstNode *body; \
 	}) \
 	AST_NODE_KIND(RangeStmt, "range statement", struct { \
-		Token        token; \
-		AstNode *    key; \
-		AstNode *    value; \
-		AstNode *    expr; \
-		AstNode *    body; \
+		Token    token; \
+		AstNode *value; \
+		AstNode *index; \
+		AstNode *expr; \
+		AstNode *body; \
 	}) \
 	AST_NODE_KIND(CaseClause, "case clause", struct { \
 		Token token;        \
@@ -451,6 +452,8 @@ Token ast_node_token(AstNode *node) {
 		return node->GiveExpr.token;
 	case AstNode_IfExpr:
 		return node->IfExpr.token;
+	case AstNode_IntervalExpr:
+		return ast_node_token(node->IntervalExpr.left);
 
 	case AstNode_BadStmt:
 		return node->BadStmt.begin;
@@ -700,6 +703,18 @@ AstNode *make_demaybe_expr(AstFile *f, AstNode *expr, Token op) {
 	return result;
 }
 
+AstNode *make_interval_expr(AstFile *f, Token op, AstNode *left, AstNode *right) {
+	AstNode *result = make_node(f, AstNode_IntervalExpr);
+
+	result->IntervalExpr.op = op;
+	result->IntervalExpr.left = left;
+	result->IntervalExpr.right = right;
+
+	return result;
+}
+
+
+
 
 AstNode *make_basic_lit(AstFile *f, Token basic_lit) {
 	AstNode *result = make_node(f, AstNode_BasicLit);
@@ -854,12 +869,12 @@ AstNode *make_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, As
 	result->ForStmt.body  = body;
 	return result;
 }
-AstNode *make_range_stmt(AstFile *f, Token token, AstNode *key, AstNode *value, AstNode *expr, AstNode *body) {
+AstNode *make_range_stmt(AstFile *f, Token token, AstNode *value, AstNode *index, AstNode *expr, AstNode *body) {
 	AstNode *result = make_node(f, AstNode_RangeStmt);
 	result->RangeStmt.token = token;
-	result->RangeStmt.key = key;
 	result->RangeStmt.value = value;
-	result->RangeStmt.expr = expr;
+	result->RangeStmt.index = index;
+	result->RangeStmt.expr  = expr;
 	result->RangeStmt.body  = body;
 	return result;
 }
@@ -2791,28 +2806,31 @@ AstNode *parse_range_stmt(AstFile *f) {
 	isize prev_level = f->expr_level;
 	f->expr_level = -1;
 	AstNode *expr = parse_expr(f, false);
+	if (f->curr_token.kind == Token_Interval) {
+		Token op = expect_token(f, Token_Interval);
+		AstNode *right = parse_expr(f, false);
+		expr = make_interval_expr(f, op, expr, right);
+	}
 	f->expr_level = prev_level;
 
-	AstNode *key   = NULL;
 	AstNode *value = NULL;
-	AstNode *body = parse_block_stmt(f, false);
+	AstNode *index = NULL;
+	AstNode *body  = parse_block_stmt(f, false);
 
 	switch (names.count) {
-	case 0:
-		break;
 	case 1:
-		key = names.e[0];
+		value = names.e[0];
 		break;
 	case 2:
-		key = names.e[0];
-		value = names.e[1];
+		value = names.e[0];
+		index = names.e[1];
 		break;
 	default:
-		error_node(names.e[names.count-1], "Expected at most 2 expressions");
+		error(token, "Expected at 1 or 2 identifiers");
 		return make_bad_stmt(f, token, f->curr_token);
 	}
 
-	return make_range_stmt(f, token, key, value, expr, body);
+	return make_range_stmt(f, token, value, index, expr, body);
 }
 
 AstNode *parse_case_clause(AstFile *f) {

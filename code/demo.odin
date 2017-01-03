@@ -18,12 +18,16 @@ Thing :: enum f64 {
 }
 
 main :: proc() {
-	msg := "Hello";
-	range index, value : msg {
-		fmt.println(index, value);
-	}
+	msg := "Hellope";
 	list := []int{1, 4, 7, 3, 7, 2, 1};
-	range index, value : list {
-		fmt.println(index, value);
+
+	range value : msg {
+		fmt.println(value);
+	}
+	range value : list {
+		fmt.println(value);
+	}
+	range x : 0 ..< 5 {
+		fmt.println(x);
 	}
 }
