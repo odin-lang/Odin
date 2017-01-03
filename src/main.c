@@ -10,9 +10,8 @@ extern "C" {
 #include "parser.c"
 // #include "printer.c"
 #include "checker/checker.c"
-#include "ssa.c"
-#include "ssa_opt.c"
-#include "ssa_print.c"
+#include "llir.c"
+#include "llir_print.c"
 // #include "vm.c"
 
 // NOTE(bill): `name` is used in debugging and profiling modes
@@ -160,27 +159,24 @@ int main(int argc, char **argv) {
 #endif
 #if 1
 
-	ssaGen ssa = {0};
-	if (!ssa_gen_init(&ssa, &checker, &build_context)) {
+	llirGen llir = {0};
+	if (!llir_gen_init(&llir, &checker, &build_context)) {
 		return 1;
 	}
-	// defer (ssa_gen_destroy(&ssa));
+	// defer (ssa_gen_destroy(&llir));
 
-	timings_start_section(&timings, str_lit("ssa gen"));
-	ssa_gen_tree(&ssa);
+	timings_start_section(&timings, str_lit("llvm ir gen"));
+	llir_gen_tree(&llir);
 
-	timings_start_section(&timings, str_lit("ssa opt"));
-	ssa_opt_tree(&ssa);
-
-	timings_start_section(&timings, str_lit("ssa print"));
-	ssa_print_llvm_ir(&ssa);
+	timings_start_section(&timings, str_lit("llvm ir print"));
+	print_llvm_ir(&llir);
 
 	// prof_print_all();
 
 #if 1
 	timings_start_section(&timings, str_lit("llvm-opt"));
 
-	char const *output_name = ssa.output_file.filename;
+	char const *output_name = llir.output_file.filename;
 	isize base_name_len = gb_path_extension(output_name)-1 - output_name;
 	String output = make_string(cast(u8 *)output_name, base_name_len);
 

@@ -763,7 +763,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				}
 			}
 		}
-;
 
 		MapTypeAndToken seen = {0}; // NOTE(bill): Multimap
 		map_type_and_token_init(&seen, heap_allocator());
@@ -979,6 +978,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				}
 				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, ms->var->Ident, tt);
 				tag_var->flags |= EntityFlag_Used;
+				tag_var->Variable.is_immutable = true;
 				add_entity(c, c->context.scope, ms->var, tag_var);
 				add_entity_use(c, ms->var, tag_var);
 			}
