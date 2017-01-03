@@ -601,7 +601,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				goto skip_expr;
 			}
 
-			if (!is_type_integer(x.type) && !is_type_float(x.type) && !is_type_pointer(x.type)) {
+			Type *type = x.type;
+			Type *bt = base_type(base_enum_type(type));
+
+			if (!is_type_integer(bt) && !is_type_float(bt) && !is_type_pointer(bt)) {
 				error(ie->op, "Only numerical and pointer types are allowed within interval expressions");
 				goto skip_expr;
 			}
@@ -623,7 +626,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			add_type_and_value(&c->info, ie->left,  x.mode, x.type, x.value);
 			add_type_and_value(&c->info, ie->right, y.mode, y.type, y.value);
-			val = x.type;
+			val = type;
 			idx = t_int;
 		} else {
 			Operand operand = {Addressing_Invalid};

@@ -1262,6 +1262,9 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 	case AstNode_HelperType:
 		return is_semicolon_optional_for_node(f, s->HelperType.type);
 
+	case AstNode_PointerType:
+		return is_semicolon_optional_for_node(f, s->PointerType.type);
+
 	case AstNode_StructType:
 	case AstNode_UnionType:
 	case AstNode_RawUnionType:

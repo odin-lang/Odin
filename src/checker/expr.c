@@ -1019,7 +1019,8 @@ i64 check_array_count(Checker *c, AstNode *e) {
 		}
 		return 0;
 	}
-	if (is_type_untyped(o.type) || is_type_integer(o.type)) {
+	Type *type = base_type(base_enum_type(o.type));
+	if (is_type_untyped(type) || is_type_integer(type)) {
 		if (o.value.kind == ExactValue_Integer) {
 			i64 count = o.value.value_integer;
 			if (count >= 0) {
@@ -1655,7 +1656,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 	}
 
 	bool x_is_untyped = is_type_untyped(x->type);
-	if (!(is_type_integer(x->type) || (x_is_untyped && x_val.kind == ExactValue_Integer))) {
+	if (!(is_type_integer(base_enum_type(x->type)) || (x_is_untyped && x_val.kind == ExactValue_Integer))) {
 		gbString err_str = expr_to_string(x->expr);
 		error_node(node, "Shifted operand `%s` must be an integer", err_str);
 		gb_string_free(err_str);
@@ -1663,7 +1664,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 		return;
 	}
 
-	if (is_type_unsigned(y->type)) {
+	if (is_type_unsigned(base_enum_type(y->type))) {
 
 	} else if (is_type_untyped(y->type)) {
 		convert_to_typed(c, y, t_untyped_integer, 0);
@@ -1700,7 +1701,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 				return;
 			}
 
-			if (!is_type_integer(x->type)) {
+			if (!is_type_integer(base_enum_type(x->type))) {
 				// NOTE(bill): It could be an untyped float but still representable
 				// as an integer
 				x->type = t_untyped_integer;
@@ -1709,7 +1710,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 			x->value = exact_value_shift(be->op.kind, x_val, make_exact_value_integer(amount));
 
 			if (is_type_typed(x->type)) {
-				check_is_expressible(c, x, base_type(x->type));
+				check_is_expressible(c, x, base_type(base_enum_type(x->type)));
 			}
 			return;
 		}
@@ -2416,7 +2417,7 @@ bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *val
 		return false;
 	}
 
-	if (!is_type_integer(operand.type)) {
+	if (!is_type_integer(base_enum_type(operand.type))) {
 		gbString expr_str = expr_to_string(operand.expr);
 		error_node(operand.expr, "Index `%s` must be an integer", expr_str);
 		gb_string_free(expr_str);

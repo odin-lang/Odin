@@ -1,33 +1,60 @@
-#import "atomic.odin";
 #import "fmt.odin";
-#import "hash.odin";
-#import "math.odin";
-#import "mem.odin";
-#import "opengl.odin";
-#import "os.odin";
-#import "sync.odin";
-#import "utf8.odin";
-#import win32 "sys/windows.odin";
 
-Thing :: enum f64 {
-	_, // Ignore first value
-	A = 1<<(10*iota),
-	B,
-	C,
-	D,
-}
+
 
 main :: proc() {
-	msg := "Hellope";
-	list := []int{1, 4, 7, 3, 7, 2, 1};
+	{
+		Byte_Size :: enum f64 {
+			_, // Ignore first value
+			KB = 1<<(10*iota),
+			MB,
+			GB,
+			TB,
+			PB,
+		}
 
-	for value : msg {
-		fmt.println(value);
+		using Byte_Size;
+		fmt.println(KB, MB, GB, TB, PB);
 	}
-	for value : list {
-		fmt.println(value);
+	{
+		x := if 1 < 2 {
+			y := 123;
+			give y-2;
+		} else {
+			give 0;
+		};
+
+		x += {
+			x := 2;
+			give x;
+		};
+
+		fmt.println("x =", x);
 	}
-	for val, idx : 12 ..< 17 {
-		fmt.println(val, idx);
+	{
+		list := []int{1, 4, 7, 3, 7, 2, 1};
+		for value : list {
+			fmt.println(value);
+		}
+		for val, idx : 12 ..< 17 {
+			fmt.println(val, idx);
+		}
+		msg := "Hellope";
+		for value : msg {
+			fmt.println(value);
+		}
+	}
+	{
+		i := 0;
+		while i < 2 {
+			i += 1;
+		}
+
+		// Idiom to emulate C-style for loops
+		while x := 0; x < 2 {
+			defer x += 1;
+			// Body of code
+			// ++ and -- have been removed
+		}
 	}
 }

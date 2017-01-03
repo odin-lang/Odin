@@ -11,6 +11,7 @@ extern "C" {
 // #include "printer.c"
 #include "checker/checker.c"
 #include "llir.c"
+#include "llir_opt.c"
 #include "llir_print.c"
 // #include "vm.c"
 
@@ -167,6 +168,9 @@ int main(int argc, char **argv) {
 
 	timings_start_section(&timings, str_lit("llvm ir gen"));
 	llir_gen_tree(&llir);
+
+	timings_start_section(&timings, str_lit("llvm ir opt tree"));
+	llir_opt_tree(&llir);
 
 	timings_start_section(&timings, str_lit("llvm ir print"));
 	print_llvm_ir(&llir);
