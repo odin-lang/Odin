@@ -4,7 +4,7 @@
 set exe_name=odin.exe
 
 :: Debug = 0, Release = 1
-set release_mode=1
+set release_mode=0
 
 set compiler_flags= -nologo -Oi -TC -fp:fast -fp:except- -Gm- -MP -FC -GS- -EHsc- -GR-
 
@@ -48,6 +48,12 @@ cl %compiler_settings% "src\main.c" ^
 	&& odin run code/demo.odin
 	rem && odin build_dll code/example.odin ^
 	rem && odin run code/demo.odin
+
+rem pushd src\asm
+rem 	nasm hellope.asm -fwin64 -o hellope.obj ^
+rem 	&& cl /nologo hellope.obj /link kernel32.lib /entry:main  ^
+rem 	&& hellope.exe
+rem popd
 
 :end_of_build
 

@@ -88,11 +88,7 @@ bprint_nl :: proc   (buf: ^Buffer) { bprint_rune(buf, '\n'); }
 __NUM_TO_CHAR_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@$";
 
 bprint_bool :: proc(buffer: ^Buffer, b: bool) {
-	if b {
-		bprint_string(buffer, "true");
-	} else {
-		bprint_string(buffer, "false");
-	}
+	bprint_string(buffer, if b { give "true" } else { give "false" });
 }
 
 bprint_pointer :: proc(buffer: ^Buffer, p: rawptr) #inline {
@@ -100,9 +96,9 @@ bprint_pointer :: proc(buffer: ^Buffer, p: rawptr) #inline {
 	bprint_u64(buffer, p as uint as u64);
 }
 
-// bprint_f16 :: proc (buffer: ^Buffer, f: f32)  #inline { print__f64(buffer, f as f64, 4); }
-bprint_f32 :: proc (buffer: ^Buffer, f: f32)  #inline { print__f64(buffer, f as f64, 7); }
-bprint_f64 :: proc (buffer: ^Buffer, f: f64)  #inline { print__f64(buffer, f as f64, 16); }
+// bprint_f16 :: proc(buffer: ^Buffer, f: f32)  #inline { print__f64(buffer, f as f64, 4); }
+bprint_f32 :: proc(buffer: ^Buffer, f: f32)  #inline { print__f64(buffer, f as f64, 7); }
+bprint_f64 :: proc(buffer: ^Buffer, f: f64)  #inline { print__f64(buffer, f as f64, 16); }
 bprint_u64 :: proc(buffer: ^Buffer, value: u64) {
 	i := value;
 	buf :[20]byte;
@@ -189,11 +185,7 @@ bprint_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		case ti == type_info(int):  bprint_string(buf, "int");
 		case ti == type_info(uint): bprint_string(buf, "uint");
 		default:
-			if info.signed {
-				bprint_string(buf, "i");
-			} else {
-				bprint_string(buf, "u");
-			}
+			bprint_string(buf, if info.signed { give "i" } else { give "u"});
 			bprint_u64(buf, 8*info.size as u64);
 		}
 

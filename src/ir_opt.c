@@ -1,93 +1,93 @@
-// Optimizations for the LLIR code
+// Optimizations for the IR code
 
-void llir_opt_add_operands(llirValueArray *ops, llirInstr *i) {
+void ir_opt_add_operands(irValueArray *ops, irInstr *i) {
 	switch (i->kind) {
-	case llirInstr_Comment:
+	case irInstr_Comment:
 		break;
-	case llirInstr_Local:
+	case irInstr_Local:
 		break;
-	case llirInstr_ZeroInit:
+	case irInstr_ZeroInit:
 		array_add(ops, i->ZeroInit.address);
 		break;
-	case llirInstr_Store:
+	case irInstr_Store:
 		array_add(ops, i->Store.address);
 		array_add(ops, i->Store.value);
 		break;
-	case llirInstr_Load:
+	case irInstr_Load:
 		array_add(ops, i->Load.address);
 		break;
-	case llirInstr_ArrayElementPtr:
+	case irInstr_ArrayElementPtr:
 		array_add(ops, i->ArrayElementPtr.address);
 		array_add(ops, i->ArrayElementPtr.elem_index);
 		break;
-	case llirInstr_StructElementPtr:
+	case irInstr_StructElementPtr:
 		array_add(ops, i->StructElementPtr.address);
 		break;
-	case llirInstr_PtrOffset:
+	case irInstr_PtrOffset:
 		array_add(ops, i->PtrOffset.address);
 		array_add(ops, i->PtrOffset.offset);
 		break;
-	case llirInstr_ArrayExtractValue:
+	case irInstr_ArrayExtractValue:
 		array_add(ops, i->ArrayExtractValue.address);
 		break;
-	case llirInstr_StructExtractValue:
+	case irInstr_StructExtractValue:
 		array_add(ops, i->StructExtractValue.address);
 		break;
-	case llirInstr_Conv:
+	case irInstr_Conv:
 		array_add(ops, i->Conv.value);
 		break;
-	case llirInstr_Jump:
+	case irInstr_Jump:
 		break;
-	case llirInstr_If:
+	case irInstr_If:
 		array_add(ops, i->If.cond);
 		break;
-	case llirInstr_Return:
+	case irInstr_Return:
 		if (i->Return.value != NULL) {
 			array_add(ops, i->Return.value);
 		}
 		break;
-	case llirInstr_Select:
+	case irInstr_Select:
 		array_add(ops, i->Select.cond);
 		break;
-	case llirInstr_Phi:
+	case irInstr_Phi:
 		for_array(j, i->Phi.edges) {
 			array_add(ops, i->Phi.edges.e[j]);
 		}
 		break;
-	case llirInstr_Unreachable:
+	case irInstr_Unreachable:
 		break;
-	case llirInstr_UnaryOp:
+	case irInstr_UnaryOp:
 		array_add(ops, i->UnaryOp.expr);
 		break;
-	case llirInstr_BinaryOp:
+	case irInstr_BinaryOp:
 		array_add(ops, i->BinaryOp.left);
 		array_add(ops, i->BinaryOp.right);
 		break;
-	case llirInstr_Call:
+	case irInstr_Call:
 		array_add(ops, i->Call.value);
 		for (isize j = 0; j < i->Call.arg_count; j++) {
 			array_add(ops, i->Call.args[j]);
 		}
 		break;
-	case llirInstr_VectorExtractElement:
+	case irInstr_VectorExtractElement:
 		array_add(ops, i->VectorExtractElement.vector);
 		array_add(ops, i->VectorExtractElement.index);
 		break;
-	case llirInstr_VectorInsertElement:
+	case irInstr_VectorInsertElement:
 		array_add(ops, i->VectorInsertElement.vector);
 		array_add(ops, i->VectorInsertElement.elem);
 		array_add(ops, i->VectorInsertElement.index);
 		break;
-	case llirInstr_VectorShuffle:
+	case irInstr_VectorShuffle:
 		array_add(ops, i->VectorShuffle.vector);
 		break;
-	case llirInstr_StartupRuntime:
+	case irInstr_StartupRuntime:
 		break;
-	case llirInstr_BoundsCheck:
+	case irInstr_BoundsCheck:
 		array_add(ops, i->BoundsCheck.index);
 		array_add(ops, i->BoundsCheck.len);
 		break;
-	case llirInstr_SliceBoundsCheck:
+	case irInstr_SliceBoundsCheck:
 		array_add(ops, i->SliceBoundsCheck.low);
 		array_add(ops, i->SliceBoundsCheck.high);
 		break;
@@ -98,26 +98,26 @@ void llir_opt_add_operands(llirValueArray *ops, llirInstr *i) {
 
 
 
-void llir_opt_block_replace_pred(llirBlock *b, llirBlock *from, llirBlock *to) {
+void ir_opt_block_replace_pred(irBlock *b, irBlock *from, irBlock *to) {
 	for_array(i, b->preds) {
-		llirBlock *pred = b->preds.e[i];
+		irBlock *pred = b->preds.e[i];
 		if (pred == from) {
 			b->preds.e[i] = to;
 		}
 	}
 }
 
-void llir_opt_block_replace_succ(llirBlock *b, llirBlock *from, llirBlock *to) {
+void ir_opt_block_replace_succ(irBlock *b, irBlock *from, irBlock *to) {
 	for_array(i, b->succs) {
-		llirBlock *succ = b->succs.e[i];
+		irBlock *succ = b->succs.e[i];
 		if (succ == from) {
 			b->succs.e[i] = to;
 		}
 	}
 }
 
-bool llir_opt_block_has_phi(llirBlock *b) {
-	return b->instrs.e[0]->Instr.kind == llirInstr_Phi;
+bool ir_opt_block_has_phi(irBlock *b) {
+	return b->instrs.e[0]->Instr.kind == irInstr_Phi;
 }
 
 
@@ -129,11 +129,11 @@ bool llir_opt_block_has_phi(llirBlock *b) {
 
 
 
-llirValueArray llir_get_block_phi_nodes(llirBlock *b) {
-	llirValueArray phis = {0};
+irValueArray ir_get_block_phi_nodes(irBlock *b) {
+	irValueArray phis = {0};
 	for_array(i, b->instrs) {
-		llirInstr *instr = &b->instrs.e[i]->Instr;
-		if (instr->kind != llirInstr_Phi) {
+		irInstr *instr = &b->instrs.e[i]->Instr;
+		if (instr->kind != irInstr_Phi) {
 			phis = b->instrs;
 			phis.count = i;
 			return phis;
@@ -142,15 +142,15 @@ llirValueArray llir_get_block_phi_nodes(llirBlock *b) {
 	return phis;
 }
 
-void llir_remove_pred(llirBlock *b, llirBlock *p) {
-	llirValueArray phis = llir_get_block_phi_nodes(b);
+void ir_remove_pred(irBlock *b, irBlock *p) {
+	irValueArray phis = ir_get_block_phi_nodes(b);
 	isize i = 0;
 	for_array(j, b->preds) {
-		llirBlock *pred = b->preds.e[j];
+		irBlock *pred = b->preds.e[j];
 		if (pred != p) {
 			b->preds.e[i] = b->preds.e[j];
 			for_array(k, phis) {
-				llirInstrPhi *phi = &phis.e[k]->Instr.Phi;
+				irInstrPhi *phi = &phis.e[k]->Instr.Phi;
 				phi->edges.e[i] = phi->edges.e[j];
 			}
 			i++;
@@ -158,16 +158,16 @@ void llir_remove_pred(llirBlock *b, llirBlock *p) {
 	}
 	b->preds.count = i;
 	for_array(k, phis) {
-		llirInstrPhi *phi = &phis.e[k]->Instr.Phi;
+		irInstrPhi *phi = &phis.e[k]->Instr.Phi;
 		phi->edges.count = i;
 	}
 
 }
 
-void llir_remove_dead_blocks(llirProcedure *proc) {
+void ir_remove_dead_blocks(irProcedure *proc) {
 	isize j = 0;
 	for_array(i, proc->blocks) {
-		llirBlock *b = proc->blocks.e[i];
+		irBlock *b = proc->blocks.e[i];
 		if (b == NULL) {
 			continue;
 		}
@@ -178,34 +178,34 @@ void llir_remove_dead_blocks(llirProcedure *proc) {
 	proc->blocks.count = j;
 }
 
-void llir_mark_reachable(llirBlock *b) {
+void ir_mark_reachable(irBlock *b) {
 	isize const WHITE =  0;
 	isize const BLACK = -1;
 	b->index = BLACK;
 	for_array(i, b->succs) {
-		llirBlock *succ = b->succs.e[i];
+		irBlock *succ = b->succs.e[i];
 		if (succ->index == WHITE) {
-			llir_mark_reachable(succ);
+			ir_mark_reachable(succ);
 		}
 	}
 }
 
-void llir_remove_unreachable_blocks(llirProcedure *proc) {
+void ir_remove_unreachable_blocks(irProcedure *proc) {
 	isize const WHITE =  0;
 	isize const BLACK = -1;
 	for_array(i, proc->blocks) {
 		proc->blocks.e[i]->index = WHITE;
 	}
 
-	llir_mark_reachable(proc->blocks.e[0]);
+	ir_mark_reachable(proc->blocks.e[0]);
 
 	for_array(i, proc->blocks) {
-		llirBlock *b = proc->blocks.e[i];
+		irBlock *b = proc->blocks.e[i];
 		if (b->index == WHITE) {
 			for_array(j, b->succs) {
-				llirBlock *c = b->succs.e[j];
+				irBlock *c = b->succs.e[j];
 				if (c->index == BLACK) {
-					llir_remove_pred(c, b);
+					ir_remove_pred(c, b);
 				}
 			}
 			// NOTE(bill): Mark as empty but don't actually free it
@@ -213,26 +213,26 @@ void llir_remove_unreachable_blocks(llirProcedure *proc) {
 			proc->blocks.e[i] = NULL;
 		}
 	}
-	llir_remove_dead_blocks(proc);
+	ir_remove_dead_blocks(proc);
 }
 
-bool llir_opt_block_fusion(llirProcedure *proc, llirBlock *a) {
+bool ir_opt_block_fusion(irProcedure *proc, irBlock *a) {
 	if (a->succs.count != 1) {
 		return false;
 	}
-	llirBlock *b = a->succs.e[0];
+	irBlock *b = a->succs.e[0];
 	if (b->preds.count != 1) {
 		return false;
 	}
 
-	if (llir_opt_block_has_phi(b)) {
+	if (ir_opt_block_has_phi(b)) {
 		return false;
 	}
 
 	array_pop(&a->instrs); // Remove branch at end
 	for_array(i, b->instrs) {
 		array_add(&a->instrs, b->instrs.e[i]);
-		llir_set_instr_parent(b->instrs.e[i], a);
+		ir_set_instr_parent(b->instrs.e[i], a);
 	}
 
 	array_clear(&a->succs);
@@ -242,28 +242,28 @@ bool llir_opt_block_fusion(llirProcedure *proc, llirBlock *a) {
 
 	// Fix preds links
 	for_array(i, b->succs) {
-		llir_opt_block_replace_pred(b->succs.e[i], b, a);
+		ir_opt_block_replace_pred(b->succs.e[i], b, a);
 	}
 
 	proc->blocks.e[b->index] = NULL;
 	return true;
 }
 
-void llir_opt_blocks(llirProcedure *proc) {
-	llir_remove_unreachable_blocks(proc);
+void ir_opt_blocks(irProcedure *proc) {
+	ir_remove_unreachable_blocks(proc);
 
 #if 1
 	bool changed = true;
 	while (changed) {
 		changed = false;
 		for_array(i, proc->blocks) {
-			llirBlock *b = proc->blocks.e[i];
+			irBlock *b = proc->blocks.e[i];
 			if (b == NULL) {
 				continue;
 			}
 			GB_ASSERT(b->index == i);
 
-			if (llir_opt_block_fusion(proc, b)) {
+			if (ir_opt_block_fusion(proc, b)) {
 				changed = true;
 			}
 			// TODO(bill): other simple block optimizations
@@ -271,25 +271,25 @@ void llir_opt_blocks(llirProcedure *proc) {
 	}
 #endif
 
-	llir_remove_dead_blocks(proc);
+	ir_remove_dead_blocks(proc);
 }
-void llir_opt_build_referrers(llirProcedure *proc) {
+void ir_opt_build_referrers(irProcedure *proc) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
 
-	llirValueArray ops = {0}; // NOTE(bill): Act as a buffer
+	irValueArray ops = {0}; // NOTE(bill): Act as a buffer
 	array_init_reserve(&ops, proc->module->tmp_allocator, 64); // HACK(bill): This _could_ overflow the temp arena
 	for_array(i, proc->blocks) {
-		llirBlock *b = proc->blocks.e[i];
+		irBlock *b = proc->blocks.e[i];
 		for_array(j, b->instrs) {
-			llirValue *instr = b->instrs.e[j];
+			irValue *instr = b->instrs.e[j];
 			array_clear(&ops);
-			llir_opt_add_operands(&ops, &instr->Instr);
+			ir_opt_add_operands(&ops, &instr->Instr);
 			for_array(k, ops) {
-				llirValue *op = ops.e[k];
+				irValue *op = ops.e[k];
 				if (op == NULL) {
 					continue;
 				}
-				llirValueArray *refs = llir_value_referrers(op);
+				irValueArray *refs = ir_value_referrers(op);
 				if (refs != NULL) {
 					array_add(refs, instr);
 				}
@@ -308,36 +308,36 @@ void llir_opt_build_referrers(llirProcedure *proc) {
 
 // State of Lengauer-Tarjan algorithm
 // Based on this paper: http://jgaa.info/accepted/2006/GeorgiadisTarjanWerneck2006.10.1.pdf
-typedef struct llirLTState {
+typedef struct irLTState {
 	isize count;
 	// NOTE(bill): These are arrays
-	llirBlock **sdom;     // Semidominator
-	llirBlock **parent;   // Parent in DFS traversal of CFG
-	llirBlock **ancestor;
-} llirLTState;
+	irBlock **sdom;     // Semidominator
+	irBlock **parent;   // Parent in DFS traversal of CFG
+	irBlock **ancestor;
+} irLTState;
 
 // §2.2 - bottom of page
-void llir_lt_link(llirLTState *lt, llirBlock *p, llirBlock *q) {
+void ir_lt_link(irLTState *lt, irBlock *p, irBlock *q) {
 	lt->ancestor[q->index] = p;
 }
 
-i32 llir_lt_depth_first_search(llirLTState *lt, llirBlock *p, i32 i, llirBlock **preorder) {
+i32 ir_lt_depth_first_search(irLTState *lt, irBlock *p, i32 i, irBlock **preorder) {
 	preorder[i] = p;
 	p->dom.pre = i++;
 	lt->sdom[p->index] = p;
-	llir_lt_link(lt, NULL, p);
+	ir_lt_link(lt, NULL, p);
 	for_array(index, p->succs) {
-		llirBlock *q = p->succs.e[index];
+		irBlock *q = p->succs.e[index];
 		if (lt->sdom[q->index] == NULL) {
 			lt->parent[q->index] = p;
-			i = llir_lt_depth_first_search(lt, q, i, preorder);
+			i = ir_lt_depth_first_search(lt, q, i, preorder);
 		}
 	}
 	return i;
 }
 
-llirBlock *llir_lt_eval(llirLTState *lt, llirBlock *v) {
-	llirBlock *u = v;
+irBlock *ir_lt_eval(irLTState *lt, irBlock *v) {
+	irBlock *u = v;
 	for (;
 	     lt->ancestor[v->index] != NULL;
 	     v = lt->ancestor[v->index]) {
@@ -348,16 +348,16 @@ llirBlock *llir_lt_eval(llirLTState *lt, llirBlock *v) {
 	return u;
 }
 
-typedef struct llirDomPrePost {
+typedef struct irDomPrePost {
 	i32 pre, post;
-} llirDomPrePost;
+} irDomPrePost;
 
-llirDomPrePost llir_opt_number_dom_tree(llirBlock *v, i32 pre, i32 post) {
-	llirDomPrePost result = {pre, post};
+irDomPrePost ir_opt_number_dom_tree(irBlock *v, i32 pre, i32 post) {
+	irDomPrePost result = {pre, post};
 
 	v->dom.pre = pre++;
 	for_array(i, v->dom.children) {
-		result = llir_opt_number_dom_tree(v->dom.children.e[i], result.pre, result.post);
+		result = ir_opt_number_dom_tree(v->dom.children.e[i], result.pre, result.post);
 	}
 	v->dom.post = post++;
 
@@ -367,35 +367,35 @@ llirDomPrePost llir_opt_number_dom_tree(llirBlock *v, i32 pre, i32 post) {
 }
 
 
-// NOTE(bill): Requires `llir_opt_blocks` to be called before this
-void llir_opt_build_dom_tree(llirProcedure *proc) {
+// NOTE(bill): Requires `ir_opt_blocks` to be called before this
+void ir_opt_build_dom_tree(irProcedure *proc) {
 	// Based on this paper: http://jgaa.info/accepted/2006/GeorgiadisTarjanWerneck2006.10.1.pdf
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
 
 	isize n = proc->blocks.count;
-	llirBlock **buf = gb_alloc_array(proc->module->tmp_allocator, llirBlock *, 5*n);
+	irBlock **buf = gb_alloc_array(proc->module->tmp_allocator, irBlock *, 5*n);
 
-	llirLTState lt = {0};
+	irLTState lt = {0};
 	lt.count    = n;
 	lt.sdom     = &buf[0*n];
 	lt.parent   = &buf[1*n];
 	lt.ancestor = &buf[2*n];
 
-	llirBlock **preorder = &buf[3*n];
-	llirBlock **buckets  = &buf[4*n];
-	llirBlock *root = proc->blocks.e[0];
+	irBlock **preorder = &buf[3*n];
+	irBlock **buckets  = &buf[4*n];
+	irBlock *root = proc->blocks.e[0];
 
 	// Step 1 - number vertices
-	i32 pre_num = llir_lt_depth_first_search(&lt, root, 0, preorder);
+	i32 pre_num = ir_lt_depth_first_search(&lt, root, 0, preorder);
 	gb_memmove(buckets, preorder, n*gb_size_of(preorder[0]));
 
 	for (i32 i = n-1; i > 0; i--) {
-		llirBlock *w = preorder[i];
+		irBlock *w = preorder[i];
 
 		// Step 3 - Implicitly define idom for nodes
-		for (llirBlock *v = buckets[i]; v != w; v = buckets[v->dom.pre]) {
-			llirBlock *u = llir_lt_eval(&lt, v);
+		for (irBlock *v = buckets[i]; v != w; v = buckets[v->dom.pre]) {
+			irBlock *u = ir_lt_eval(&lt, v);
 			if (lt.sdom[u->index]->dom.pre < i) {
 				v->dom.idom = u;
 			} else {
@@ -406,14 +406,14 @@ void llir_opt_build_dom_tree(llirProcedure *proc) {
 		// Step 2 - Compute all sdoms
 		lt.sdom[w->index] = lt.parent[w->index];
 		for_array(pred_index, w->preds) {
-			llirBlock *v = w->preds.e[pred_index];
-			llirBlock *u = llir_lt_eval(&lt, v);
+			irBlock *v = w->preds.e[pred_index];
+			irBlock *u = ir_lt_eval(&lt, v);
 			if (lt.sdom[u->index]->dom.pre < lt.sdom[w->index]->dom.pre) {
 				lt.sdom[w->index] = lt.sdom[u->index];
 			}
 		}
 
-		llir_lt_link(&lt, lt.parent[w->index], w);
+		ir_lt_link(&lt, lt.parent[w->index], w);
 
 		if (lt.parent[w->index] == lt.sdom[w->index]) {
 			w->dom.idom = lt.parent[w->index];
@@ -424,13 +424,13 @@ void llir_opt_build_dom_tree(llirProcedure *proc) {
 	}
 
 	// The rest of Step 3
-	for (llirBlock *v = buckets[0]; v != root; v = buckets[v->dom.pre]) {
+	for (irBlock *v = buckets[0]; v != root; v = buckets[v->dom.pre]) {
 		v->dom.idom = root;
 	}
 
 	// Step 4 - Explicitly define idom for nodes (in preorder)
 	for (isize i = 1; i < n; i++) {
-		llirBlock *w = preorder[i];
+		irBlock *w = preorder[i];
 		if (w == root) {
 			w->dom.idom = NULL;
 		} else {
@@ -449,32 +449,32 @@ void llir_opt_build_dom_tree(llirProcedure *proc) {
 		}
 	}
 
-	llir_opt_number_dom_tree(root, 0, 0);
+	ir_opt_number_dom_tree(root, 0, 0);
 
 	gb_temp_arena_memory_end(tmp);
 }
 
-void llir_opt_mem2reg(llirProcedure *proc) {
-	// TODO(bill): llir_opt_mem2reg
+void ir_opt_mem2reg(irProcedure *proc) {
+	// TODO(bill): ir_opt_mem2reg
 }
 
 
 
-void llir_opt_tree(llirGen *s) {
+void ir_opt_tree(irGen *s) {
 	s->opt_called = true;
 
 	for_array(member_index, s->module.procs) {
-		llirProcedure *proc = s->module.procs.e[member_index];
+		irProcedure *proc = s->module.procs.e[member_index];
 		if (proc->blocks.count == 0) { // Prototype/external procedure
 			continue;
 		}
 
-		llir_opt_blocks(proc);
+		ir_opt_blocks(proc);
 	#if 1
-		llir_opt_build_referrers(proc);
-		llir_opt_build_dom_tree(proc);
+		ir_opt_build_referrers(proc);
+		ir_opt_build_dom_tree(proc);
 
-		// TODO(bill): llir optimization
+		// TODO(bill): ir optimization
 		// [ ] cse (common-subexpression) elim
 		// [ ] copy elim
 		// [ ] dead code elim
@@ -485,10 +485,10 @@ void llir_opt_tree(llirGen *s) {
 		// [ ] lift/mem2reg
 		// [ ] lift/mem2reg
 
-		llir_opt_mem2reg(proc);
+		ir_opt_mem2reg(proc);
 	#endif
 
 		GB_ASSERT(proc->blocks.count > 0);
-		llir_number_proc_registers(proc);
+		ir_number_proc_registers(proc);
 	}
 }

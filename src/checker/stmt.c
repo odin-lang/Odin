@@ -1295,18 +1295,5 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			// NOTE(bill): Handled elsewhere
 		}
 	case_end;
-
-	case_ast_node(gd, GenericDecl, node);
-		for_array(spec_index, gd->specs) {
-			AstNode *spec = gd->specs.e[spec_index];
-			switch (spec->kind) {
-			case_ast_node(bd, BadDecl, spec);
-			case_end;
-			default:
-				error(ast_node_token(spec), "Invalid specification in declaration: `%.*s`", LIT(ast_node_strings[spec->kind]));
-				break;
-			}
-		}
-	case_end;
 	}
 }

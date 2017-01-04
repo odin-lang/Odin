@@ -257,13 +257,6 @@ AST_NODE_KIND(_ComplexStmtEnd, "", i32) \
 AST_NODE_KIND(_StmtEnd,        "", i32) \
 AST_NODE_KIND(_DeclBegin,      "", i32) \
 	AST_NODE_KIND(BadDecl,     "bad declaration",     struct { Token begin, end; }) \
-	AST_NODE_KIND(GenericDecl, "declaration", struct { \
-		Token        token;       \
-		Token        open, close; \
-		AstNodeArray specs;       \
-		u64          tags;        \
-		bool         is_using;    \
-	}) \
 	AST_NODE_KIND(ValueDecl, "value declaration", struct { \
 		bool         is_var; \
 		AstNodeArray names;  \
@@ -491,8 +484,6 @@ Token ast_node_token(AstNode *node) {
 
 	case AstNode_BadDecl:
 		return node->BadDecl.begin;
-	case AstNode_GenericDecl:
-		return node->GenericDecl.token;
 	case AstNode_ValueDecl:
 		return ast_node_token(node->ValueDecl.names.e[0]);
 	case AstNode_ImportDecl:
@@ -1066,18 +1057,6 @@ AstNode *make_foreign_library(AstFile *f, Token token, Token filepath, AstNode *
 	return result;
 }
 
-
-AstNode *make_generic_decl(AstFile *f, Token token, Token open, Token close, AstNodeArray specs, u64 tags, bool is_using) {
-	AstNode *result = make_node(f, AstNode_GenericDecl);
-	result->GenericDecl.token = token;
-	result->GenericDecl.open = open;
-	result->GenericDecl.close = close;
-	result->GenericDecl.specs = specs;
-	result->GenericDecl.tags = tags;
-	result->GenericDecl.is_using = is_using;
-	return result;
-}
-
 AstNode *make_value_decl(AstFile *f, bool is_var, AstNodeArray names, AstNode *type, AstNodeArray values) {
 	AstNode *result = make_node(f, AstNode_ValueDecl);
 	result->ValueDecl.is_var = is_var;
@@ -1278,16 +1257,6 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 			if (s->ValueDecl.values.count > 0) {
 				AstNode *last = s->ValueDecl.values.e[s->ValueDecl.values.count-1];
 				return is_semicolon_optional_for_node(f, last);
-			}
-		}
-		break;
-
-	case AstNode_GenericDecl:
-		if (s->GenericDecl.close.kind == Token_CloseBrace) {
-			return true;
-		} else if (s->GenericDecl.token.kind == Token_type) {
-			if (f->prev_token.kind == Token_CloseBrace) {
-				return true;
 			}
 		}
 		break;

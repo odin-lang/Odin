@@ -112,7 +112,7 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 						d->init_expr = init;
 					} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
 						e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
-						d->proc_decl = init;
+						d->proc_lit = init;
 					} else {
 						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, (ExactValue){0});
 						d->type_expr = vd->type;
@@ -130,16 +130,6 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 				check_arity_match(c, vd);
 			}
 		case_end;
-
-		case_ast_node(gd, GenericDecl, node);
-			for_array(iota, gd->specs) {
-				AstNode *spec = gd->specs.e[iota];
-				switch (spec->kind) {
-				case_ast_node(bd, BadDecl, spec);
-				case_end;
-				}
-			}
-		case_end;
 #if 0
 		case_ast_node(pd, ProcDecl, node);
 			if (!ast_node_expect(pd->name, AstNode_Ident)) {
@@ -150,7 +140,7 @@ void check_local_collect_entities(Checker *c, AstNodeArray nodes, DelayedEntitie
 			e->identifier = pd->name;
 
 			DeclInfo *d = make_declaration_info(c->allocator, e->scope);
-			d->proc_decl = node;
+			d->proc_lit = node;
 
 			add_entity_and_decl_info(c, pd->name, e, d);
 			check_entity_decl(c, e, d, NULL, NULL);

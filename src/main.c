@@ -10,9 +10,10 @@ extern "C" {
 #include "parser.c"
 // #include "printer.c"
 #include "checker/checker.c"
-#include "llir.c"
-#include "llir_opt.c"
-#include "llir_print.c"
+// #include "ssa.c"
+#include "ir.c"
+#include "ir_opt.c"
+#include "ir_print.c"
 // #include "vm.c"
 
 // NOTE(bill): `name` is used in debugging and profiling modes
@@ -158,29 +159,39 @@ int main(int argc, char **argv) {
 
 
 #endif
+	// if (global_error_collector.count != 0) {
+	// 	return 1;
+	// }
+
+	// if (checker.parser->total_token_count < 2) {
+	// 	return 1;
+	// }
+
+	// ssa_generate(&checker.info, &build_context);
+
 #if 1
 
-	llirGen llir = {0};
-	if (!llir_gen_init(&llir, &checker, &build_context)) {
+	irGen ir_gen = {0};
+	if (!ir_gen_init(&ir_gen, &checker, &build_context)) {
 		return 1;
 	}
-	// defer (ssa_gen_destroy(&llir));
+	// defer (ssa_gen_destroy(&ir_gen));
 
 	timings_start_section(&timings, str_lit("llvm ir gen"));
-	llir_gen_tree(&llir);
+	ir_gen_tree(&ir_gen);
 
 	timings_start_section(&timings, str_lit("llvm ir opt tree"));
-	llir_opt_tree(&llir);
+	ir_opt_tree(&ir_gen);
 
 	timings_start_section(&timings, str_lit("llvm ir print"));
-	print_llvm_ir(&llir);
+	print_llvm_ir(&ir_gen);
 
 	// prof_print_all();
 
 #if 1
 	timings_start_section(&timings, str_lit("llvm-opt"));
 
-	char const *output_name = llir.output_file.filename;
+	char const *output_name = ir_gen.output_file.filename;
 	isize base_name_len = gb_path_extension(output_name)-1 - output_name;
 	String output = make_string(cast(u8 *)output_name, base_name_len);
 

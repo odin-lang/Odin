@@ -1,7 +1,5 @@
 #import "fmt.odin";
 
-
-
 main :: proc() {
 	{
 		Byte_Size :: enum f64 {
@@ -58,3 +56,4 @@ main :: proc() {
 		}
 	}
 }
+

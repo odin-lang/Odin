@@ -52,7 +52,7 @@ typedef struct DeclInfo {
 
 	AstNode *type_expr;
 	AstNode *init_expr;
-	AstNode *proc_decl; // AstNode_ProcDecl
+	AstNode *proc_lit; // AstNode_ProcLit
 	u32      var_decl_tags;
 
 	MapBool deps; // Key: Entity *
@@ -306,9 +306,9 @@ bool decl_info_has_init(DeclInfo *d) {
 	if (d->init_expr != NULL) {
 		return true;
 	}
-	if (d->proc_decl != NULL) {
-		switch (d->proc_decl->kind) {
-		case_ast_node(pd, ProcLit, d->proc_decl);
+	if (d->proc_lit != NULL) {
+		switch (d->proc_lit->kind) {
+		case_ast_node(pd, ProcLit, d->proc_lit);
 			if (pd->body != NULL) {
 				return true;
 			}
@@ -1219,7 +1219,7 @@ void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, As
 						d->init_expr = init;
 					} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
 						e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
-						d->proc_decl = init;
+						d->proc_lit = init;
 					} else {
 						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, (ExactValue){0});
 						d->type_expr = vd->type;
