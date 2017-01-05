@@ -128,14 +128,14 @@ bool check_is_terminating(AstNode *node) {
 	case_end;
 
 	case_ast_node(ws, WhileStmt, node);
-		if (ws->cond == NULL && !check_has_break(ws->body, true)) {
-			return true;
+		if (ws->cond != NULL && !check_has_break(ws->body, true)) {
+			return check_is_terminating(ws->body);
 		}
 	case_end;
 
 	case_ast_node(rs, ForStmt, node);
 		if (!check_has_break(rs->body, true)) {
-			return true;
+			return check_is_terminating(rs->body);
 		}
 	case_end;
 
