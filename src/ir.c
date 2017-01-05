@@ -5343,7 +5343,7 @@ void ir_gen_tree(irGen *s) {
 		ir_end_procedure_body(proc);
 	}
 #endif
-#if defined(GB_SYSTEM_WINDOWS)
+#if 0 && defined(GB_SYSTEM_WINDOWS)
 	if (!m->build_context->is_dll && !has_win_main) {
 		// WinMain :: proc(inst, prev: rawptr, cmd_line: ^byte, cmd_show: i32) -> i32
 		String name = str_lit("WinMain");

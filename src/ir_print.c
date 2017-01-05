@@ -565,6 +565,7 @@ bool ir_print_is_proc_global(irModule *m, irProcedure *proc) {
 	if (proc->entity != NULL &&
 	    proc->entity->kind == Entity_Procedure) {
 		if (m->entry_point_entity == proc->entity) {
+			// gb_printf("%.*s\n", LIT(proc->entity->token.string));
 			// TODO(bill): This may not be needed during windows
 			return true;
 		}
