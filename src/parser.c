@@ -1854,7 +1854,7 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 				// TODO(bill): Handle this
 			}
 			Token open, close;
-			AstNode *indices[3] = {0};
+			AstNode *indices[2] = {0};
 
 			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
@@ -1862,23 +1862,20 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			if (f->curr_token.kind != Token_Colon) {
 				indices[0] = parse_expr(f, false);
 			}
-			isize colon_count = 0;
-			Token colons[2] = {0};
+			bool is_index = true;
 
-			while (f->curr_token.kind == Token_Colon && colon_count < 1) {
-				colons[colon_count++] = f->curr_token;
-				next_token(f);
-				if (f->curr_token.kind != Token_Colon &&
-				    f->curr_token.kind != Token_CloseBracket &&
+			if (allow_token(f, Token_Colon)) {
+				is_index = false;
+				if (f->curr_token.kind != Token_CloseBracket &&
 				    f->curr_token.kind != Token_EOF) {
-					indices[colon_count] = parse_expr(f, false);
+					indices[1] = parse_expr(f, false);
 				}
 			}
 
 			f->expr_level--;
 			close = expect_token(f, Token_CloseBracket);
 
-			if (colon_count == 0) {
+			if (is_index) {
 				operand = make_index_expr(f, operand, indices[0], open, close);
 			} else {
 				operand = make_slice_expr(f, operand, open, close, indices[0], indices[1]);

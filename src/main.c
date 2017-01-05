@@ -159,16 +159,17 @@ int main(int argc, char **argv) {
 
 
 #endif
-	// if (global_error_collector.count != 0) {
-	// 	return 1;
-	// }
+#if 0
+	if (global_error_collector.count != 0) {
+		return 1;
+	}
 
-	// if (checker.parser->total_token_count < 2) {
-	// 	return 1;
-	// }
+	if (checker.parser->total_token_count < 2) {
+		return 1;
+	}
 
-	// ssa_generate(&checker.info, &build_context);
-
+	ssa_generate(&checker.info, &build_context);
+#endif
 #if 1
 
 	irGen ir_gen = {0};

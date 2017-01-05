@@ -2642,14 +2642,12 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 
-		AstNode *len = ce->args.e[1];
-
-		check_expr(c, &op, len);
+		check_expr(c, &op, ce->args.e[1]);
 		if (op.mode == Addressing_Invalid) {
 			return false;
 		}
-		if (!is_type_integer(op.type)) {
-			gbString type_str = type_to_string(operand->type);
+		if (!is_type_integer(base_enum_type(op.type))) {
+			gbString type_str = type_to_string(op.type);
 			error_node(call, "Length for `new_slice` must be an integer, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;

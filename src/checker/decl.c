@@ -510,11 +510,11 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 	c->context.decl  = d;
 
 	switch (e->kind) {
-	case Entity_Constant:
-		check_const_decl(c, e, d->type_expr, d->init_expr, named_type);
-		break;
 	case Entity_Variable:
 		check_var_decl(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr);
+		break;
+	case Entity_Constant:
+		check_const_decl(c, e, d->type_expr, d->init_expr, named_type);
 		break;
 	case Entity_TypeName:
 		check_type_decl(c, e, d->type_expr, named_type);
@@ -571,11 +571,14 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	push_procedure(c, type);
 	{
 		ast_node(bs, BlockStmt, body);
-		// TODO(bill): Check declarations first (except mutable variable declarations)
 		check_stmt_list(c, bs->stmts, 0);
 		if (type->Proc.result_count > 0) {
 			if (!check_is_terminating(body)) {
-				error(bs->close, "Missing return statement at the end of the procedure");
+				if (token.kind == Token_Ident) {
+					error(bs->close, "Missing return statement at the end of the procedure `%.*s`", LIT(token.string));
+				} else {
+					error(bs->close, "Missing return statement at the end of the procedure");
+				}
 			}
 		}
 	}

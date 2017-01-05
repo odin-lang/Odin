@@ -651,11 +651,13 @@ bool type_has_nil(Type *t) {
 	switch (t->kind) {
 	case Type_Basic:
 		return is_type_rawptr(t);
-
-	case Type_Tuple:
-		return false;
+	case Type_Slice:
+	case Type_Proc:
+	case Type_Pointer:
+	case Type_Maybe:
+		return true;
 	}
-	return true;
+	return false;
 }
 
 
