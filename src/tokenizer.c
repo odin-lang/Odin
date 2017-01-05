@@ -899,7 +899,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 			break;
 		case '/': {
 			if (t->curr_rune == '/') {
-				while (t->curr_rune != '\n') {
+				while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
 					advance_to_next_rune(t);
 				}
 				token.kind = Token_Comment;
