@@ -654,7 +654,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			if (val == NULL) {
 				gbString s = expr_to_string(operand.expr);
-				error_node(node, "Cannot iterate over %s", s);
+				gbString t = type_to_string(operand.type);
+				error_node(operand.expr, "Cannot iterate over `%s` of type `%s`", s, t);
+				gb_string_free(t);
 				gb_string_free(s);
 			}
 		}

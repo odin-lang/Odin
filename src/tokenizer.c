@@ -198,6 +198,8 @@ void error_va(Token token, char *fmt, va_list va) {
 		gb_printf_err("%.*s(%td:%td) %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
 		              gb_bprintf_va(fmt, va));
+	} else if (token.pos.line == 0) {
+		gb_printf_err("Error: %s\n", gb_bprintf_va(fmt, va));
 	}
 
 	gb_mutex_unlock(&global_error_collector.mutex);
@@ -212,6 +214,8 @@ void syntax_error_va(Token token, char *fmt, va_list va) {
 		gb_printf_err("%.*s(%td:%td) Syntax Error: %s\n",
 		              LIT(token.pos.file), token.pos.line, token.pos.column,
 		              gb_bprintf_va(fmt, va));
+	} else if (token.pos.line == 0) {
+		gb_printf_err("Error: %s\n", gb_bprintf_va(fmt, va));
 	}
 
 	gb_mutex_unlock(&global_error_collector.mutex);
