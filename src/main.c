@@ -249,6 +249,8 @@ int main(int argc, char **argv) {
 	if (build_context.is_dll) {
 		output_ext = "dll";
 		link_settings = "/DLL";
+	} else {
+		link_settings = "/ENTRY:mainCRTStartup";
 	}
 
 	exit_code = win32_exec_command_line_app("msvc-link", true,

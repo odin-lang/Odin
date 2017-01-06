@@ -277,6 +277,27 @@ gb_global Type *t_type_info_union      = NULL;
 gb_global Type *t_type_info_raw_union  = NULL;
 gb_global Type *t_type_info_enum       = NULL;
 
+
+gb_global Type *t_type_info_named_ptr      = NULL;
+gb_global Type *t_type_info_integer_ptr    = NULL;
+gb_global Type *t_type_info_float_ptr      = NULL;
+gb_global Type *t_type_info_any_ptr        = NULL;
+gb_global Type *t_type_info_string_ptr     = NULL;
+gb_global Type *t_type_info_boolean_ptr    = NULL;
+gb_global Type *t_type_info_pointer_ptr    = NULL;
+gb_global Type *t_type_info_maybe_ptr      = NULL;
+gb_global Type *t_type_info_procedure_ptr  = NULL;
+gb_global Type *t_type_info_array_ptr      = NULL;
+gb_global Type *t_type_info_slice_ptr      = NULL;
+gb_global Type *t_type_info_vector_ptr     = NULL;
+gb_global Type *t_type_info_tuple_ptr      = NULL;
+gb_global Type *t_type_info_struct_ptr     = NULL;
+gb_global Type *t_type_info_union_ptr      = NULL;
+gb_global Type *t_type_info_raw_union_ptr  = NULL;
+gb_global Type *t_type_info_enum_ptr       = NULL;
+
+
+
 gb_global Type *t_allocator            = NULL;
 gb_global Type *t_allocator_ptr        = NULL;
 gb_global Type *t_context              = NULL;
