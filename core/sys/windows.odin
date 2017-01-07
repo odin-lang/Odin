@@ -175,7 +175,7 @@ CreateFileA  :: proc(filename: ^u8, desired_access, share_mode: u32,
                      security: rawptr,
                      creation, flags_and_attribs: u32, template_file: HANDLE) -> HANDLE #foreign #dll_import
 ReadFile  :: proc(h: HANDLE, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> BOOL #foreign #dll_import
-WriteFile :: proc(h: HANDLE, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> i32 #foreign #dll_import
+WriteFile :: proc(h: HANDLE, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> BOOL #foreign #dll_import
 
 GetFileSizeEx              :: proc(file_handle: HANDLE, file_size: ^i64) -> BOOL #foreign #dll_import
 GetFileAttributesExA       :: proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> BOOL #foreign #dll_import

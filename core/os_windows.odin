@@ -2,7 +2,7 @@
 #import "fmt.odin";
 
 
-Handle    :: uint;
+Handle    :: int;
 File_Time :: u64;
 Error     :: int;
 
@@ -96,9 +96,8 @@ open :: proc(path: string, mode: int, perm: u32) -> (Handle, Error) {
 
 	buf: [300]byte;
 	copy(buf[:], path as []byte);
-
 	handle := CreateFileA(^buf[0], access, share_mode, sa, create_mode, FILE_ATTRIBUTE_NORMAL, nil) as Handle;
-	if handle == INVALID_HANDLE {
+	if handle != INVALID_HANDLE {
 		return handle, ERROR_NONE;
 	}
 	err := GetLastError();
@@ -112,8 +111,9 @@ close :: proc(fd: Handle) {
 write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	bytes_written: i32;
 	e := win32.WriteFile(fd as win32.HANDLE, data.data, data.count as i32, ^bytes_written, nil);
-	if e != 0 {
-		return 0, e as Error;
+	if e == win32.FALSE {
+		err := win32.GetLastError();
+		return 0, err as Error;
 	}
 	return bytes_written as int, ERROR_NONE;
 }
@@ -121,7 +121,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Error) {
 read :: proc(fd: Handle, data: []byte) -> (int, Error) {
 	bytes_read: i32;
 	e := win32.ReadFile(fd as win32.HANDLE, data.data, data.count as u32, ^bytes_read, nil);
-	if e != win32.FALSE {
+	if e == win32.FALSE {
 		err := win32.GetLastError();
 		return 0, err as Error;
 	}
