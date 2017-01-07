@@ -2,11 +2,11 @@
 #import "fmt.odin";
 
 
-Handle    :: uint;
+Handle    :: int;
 File_Time :: u64;
-Error     :: int;
+Errno     :: int;
 
-INVALID_HANDLE: Handle : ~(0 as Handle);
+INVALID_HANDLE: Handle : -1;
 
 
 O_RDONLY   :: 0x00000;
@@ -22,37 +22,37 @@ O_SYNC     :: 0x01000;
 O_ASYNC    :: 0x02000;
 O_CLOEXEC  :: 0x80000;
 
-ERROR_NONE:                Error : 0;
-ERROR_FILE_NOT_FOUND:      Error : 2;
-ERROR_PATH_NOT_FOUND:      Error : 3;
-ERROR_ACCESS_DENIED:       Error : 5;
-ERROR_NO_MORE_FILES:       Error : 18;
-ERROR_HANDLE_EOF:          Error : 38;
-ERROR_NETNAME_DELETED:     Error : 64;
-ERROR_FILE_EXISTS:         Error : 80;
-ERROR_BROKEN_PIPE:         Error : 109;
-ERROR_BUFFER_OVERFLOW:     Error : 111;
-ERROR_INSUFFICIENT_BUFFER: Error : 122;
-ERROR_MOD_NOT_FOUND:       Error : 126;
-ERROR_PROC_NOT_FOUND:      Error : 127;
-ERROR_DIR_NOT_EMPTY:       Error : 145;
-ERROR_ALREADY_EXISTS:      Error : 183;
-ERROR_ENVVAR_NOT_FOUND:    Error : 203;
-ERROR_MORE_DATA:           Error : 234;
-ERROR_OPERATION_ABORTED:   Error : 995;
-ERROR_IO_PENDING:          Error : 997;
-ERROR_NOT_FOUND:           Error : 1168;
-ERROR_PRIVILEGE_NOT_HELD:  Error : 1314;
-WSAEACCES:                 Error : 10013;
-WSAECONNRESET:             Error : 10054;
+ERROR_NONE:                Errno : 0;
+ERROR_FILE_NOT_FOUND:      Errno : 2;
+ERROR_PATH_NOT_FOUND:      Errno : 3;
+ERROR_ACCESS_DENIED:       Errno : 5;
+ERROR_NO_MORE_FILES:       Errno : 18;
+ERROR_HANDLE_EOF:          Errno : 38;
+ERROR_NETNAME_DELETED:     Errno : 64;
+ERROR_FILE_EXISTS:         Errno : 80;
+ERROR_BROKEN_PIPE:         Errno : 109;
+ERROR_BUFFER_OVERFLOW:     Errno : 111;
+ERROR_INSUFFICIENT_BUFFER: Errno : 122;
+ERROR_MOD_NOT_FOUND:       Errno : 126;
+ERROR_PROC_NOT_FOUND:      Errno : 127;
+ERROR_DIR_NOT_EMPTY:       Errno : 145;
+ERROR_ALREADY_EXISTS:      Errno : 183;
+ERROR_ENVVAR_NOT_FOUND:    Errno : 203;
+ERROR_MORE_DATA:           Errno : 234;
+ERROR_OPERATION_ABORTED:   Errno : 995;
+ERROR_IO_PENDING:          Errno : 997;
+ERROR_NOT_FOUND:           Errno : 1168;
+ERROR_PRIVILEGE_NOT_HELD:  Errno : 1314;
+WSAEACCES:                 Errno : 10013;
+WSAECONNRESET:             Errno : 10054;
 
 // Windows reserves errors >= 1<<29 for application use
-ERROR_FILE_IS_PIPE: Error : 1<<29 + 0;
+ERROR_FILE_IS_PIPE: Errno : 1<<29 + 0;
 
 
 
 
-open :: proc(path: string, mode: int, perm: u32) -> (Handle, Error) {
+open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 	using win32;
 	if path.count == 0 {
 		return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
@@ -98,37 +98,38 @@ open :: proc(path: string, mode: int, perm: u32) -> (Handle, Error) {
 	copy(buf[:], path as []byte);
 
 	handle := CreateFileA(^buf[0], access, share_mode, sa, create_mode, FILE_ATTRIBUTE_NORMAL, nil) as Handle;
-	if handle == INVALID_HANDLE {
+	if handle != INVALID_HANDLE {
 		return handle, ERROR_NONE;
 	}
 	err := GetLastError();
-	return INVALID_HANDLE, err as Error;
+	return INVALID_HANDLE, err as Errno;
 }
 
 close :: proc(fd: Handle) {
 	win32.CloseHandle(fd as win32.HANDLE);
 }
 
-write :: proc(fd: Handle, data: []byte) -> (int, Error) {
+write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	bytes_written: i32;
 	e := win32.WriteFile(fd as win32.HANDLE, data.data, data.count as i32, ^bytes_written, nil);
-	if e != 0 {
-		return 0, e as Error;
+	if e == win32.FALSE {
+		err := win32.GetLastError();
+		return 0, err as Errno;
 	}
 	return bytes_written as int, ERROR_NONE;
 }
 
-read :: proc(fd: Handle, data: []byte) -> (int, Error) {
+read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	bytes_read: i32;
 	e := win32.ReadFile(fd as win32.HANDLE, data.data, data.count as u32, ^bytes_read, nil);
-	if e != win32.FALSE {
+	if e == win32.FALSE {
 		err := win32.GetLastError();
-		return 0, err as Error;
+		return 0, err as Errno;
 	}
 	return bytes_read as int, ERROR_NONE;
 }
 
-seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
+seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	using win32;
 	w: u32;
 	match whence {
@@ -145,7 +146,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Error) {
 	dw_ptr := SetFilePointer(fd as HANDLE, lo, ^hi, w);
 	if dw_ptr == INVALID_SET_FILE_POINTER {
 		err := GetLastError();
-		return 0, err as Error;
+		return 0, err as Errno;
 	}
 	return (hi as i64)<<32 + (dw_ptr as i64), ERROR_NONE;
 }

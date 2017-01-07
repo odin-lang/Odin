@@ -26,37 +26,16 @@ copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #link_name "_
 }
 
 compare :: proc(dst, src: rawptr, n: int) -> int #link_name "__mem_compare" {
-	// Translation of http://mgronhol.github.io/fast-strcmp/
 	a := slice_ptr(dst as ^byte, n);
 	b := slice_ptr(src as ^byte, n);
-
-	fast := n/size_of(int) + 1;
-	offset := (fast-1)*size_of(int);
-	curr_block := 0;
-	if n <= size_of(int) {
-		fast = 0;
-	}
-
-	la := slice_ptr(^a[0] as ^int, fast);
-	lb := slice_ptr(^b[0] as ^int, fast);
-
-	for _ : curr_block ..< fast {
-		if (la[curr_block] ~ lb[curr_block]) != 0 {
-			for pos : curr_block*size_of(int) ..< n {
-				if (a[pos] ~ b[pos]) != 0 {
-					return a[pos] as int - b[pos] as int;
-				}
-			}
-		}
-
-	}
-
-	for _ : offset ..< n {
-		if (a[offset] ~ b[offset]) != 0 {
-			return a[offset] as int - b[offset] as int;
+	for i : 0..<n {
+		match {
+		case a[i] < b[i]:
+			return -1;
+		case a[i] > b[i]:
+			return +1;
 		}
 	}
-
 	return 0;
 }
 

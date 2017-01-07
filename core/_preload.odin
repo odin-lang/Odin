@@ -308,7 +308,7 @@ __bounds_check_error :: proc(file: string, line, column: int, index, count: int)
 	if 0 <= index && index < count {
 		return;
 	}
-	fmt.fprintf(os.stderr, "%(%:%) Index % is out of bounds range [0, %)\n",
+	fmt.fprintf(os.stderr, "%(%:%) Index % is out of bounds range 0..<%\n",
 	            file, line, column, index, count);
 	__debug_trap();
 }
