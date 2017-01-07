@@ -302,7 +302,7 @@ typedef struct TypeAndToken {
 #define MAP_TYPE TypeAndToken
 #define MAP_PROC map_type_and_token_
 #define MAP_NAME MapTypeAndToken
-#include "../map.c"
+#include "map.c"
 
 void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
 	Operand operand = {Addressing_Invalid};

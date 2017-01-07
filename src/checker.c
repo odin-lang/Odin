@@ -1,11 +1,11 @@
-#include "../exact_value.c"
+#include "exact_value.c"
 #include "entity.c"
 #include "types.c"
 
 #define MAP_TYPE Entity *
 #define MAP_PROC map_entity_
 #define MAP_NAME MapEntity
-#include "../map.c"
+#include "map.c"
 
 typedef enum AddressingMode {
 	Addressing_Invalid,
@@ -216,27 +216,27 @@ typedef struct CheckerContext {
 #define MAP_TYPE TypeAndValue
 #define MAP_PROC map_tav_
 #define MAP_NAME MapTypeAndValue
-#include "../map.c"
+#include "map.c"
 
 #define MAP_TYPE Scope *
 #define MAP_PROC map_scope_
 #define MAP_NAME MapScope
-#include "../map.c"
+#include "map.c"
 
 #define MAP_TYPE DeclInfo *
 #define MAP_PROC map_decl_info_
 #define MAP_NAME MapDeclInfo
-#include "../map.c"
+#include "map.c"
 
 #define MAP_TYPE AstFile *
 #define MAP_PROC map_ast_file_
 #define MAP_NAME MapAstFile
-#include "../map.c"
+#include "map.c"
 
 #define MAP_TYPE ExprInfo
 #define MAP_PROC map_expr_info_
 #define MAP_NAME MapExprInfo
-#include "../map.c"
+#include "map.c"
 
 typedef struct DelayedDecl {
 	Scope *  parent;
@@ -1093,9 +1093,9 @@ void init_preload(Checker *c) {
 
 bool check_arity_match(Checker *c, AstNodeValueDecl *d);
 
-#include "expr.c"
-#include "decl.c"
-#include "stmt.c"
+#include "check_expr.c"
+#include "check_decl.c"
+#include "check_stmt.c"
 
 bool check_arity_match(Checker *c, AstNodeValueDecl *d) {
 	isize lhs = d->names.count;

@@ -9,7 +9,7 @@ extern "C" {
 #include "tokenizer.c"
 #include "parser.c"
 // #include "printer.c"
-#include "checker/checker.c"
+#include "checker.c"
 // #include "ssa.c"
 #include "ir.c"
 #include "ir_opt.c"
