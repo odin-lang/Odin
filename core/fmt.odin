@@ -227,19 +227,6 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 
 
 bprint :: proc(buf: ^Buffer, args: ...any) -> int {
-	is_type_string :: proc(info: ^Type_Info) -> bool {
-		using Type_Info;
-		if info == nil {
-			return false;
-		}
-
-		match type i : type_info_base(info) {
-		case String:
-			return true;
-		}
-		return false;
-	}
-
 	fi: Fmt_Info;
 	fi.buf = buf;
 
@@ -270,6 +257,42 @@ bprintln :: proc(buf: ^Buffer, args: ...any) -> int {
 }
 
 
+is_type_string :: proc(info: ^Type_Info) -> bool {
+	using Type_Info;
+	if info == nil {
+		return false;
+	}
+
+	match type i : type_info_base(info) {
+	case String:
+		return true;
+	}
+	return false;
+}
+is_type_integer :: proc(info: ^Type_Info) -> bool {
+	using Type_Info;
+	if info == nil {
+		return false;
+	}
+
+	match type i : type_info_base(info) {
+	case Integer:
+		return true;
+	}
+	return false;
+}
+is_type_float :: proc(info: ^Type_Info) -> bool {
+	using Type_Info;
+	if info == nil {
+		return false;
+	}
+
+	match type i : type_info_base(info) {
+	case Float:
+		return true;
+	}
+	return false;
+}
 
 
 
@@ -356,6 +379,7 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 
 
 fmt_bad_verb :: proc(using fi: ^Fmt_Info, verb: rune) {
+	assert(verb != 'v');
 	buffer_write_string(buf, "%!");
 	buffer_write_rune(buf, verb);
 	buffer_write_byte(buf, '(');
@@ -527,9 +551,8 @@ fmt_int :: proc(fi: ^Fmt_Info, u: u64, signed: bool, verb: rune) {
 fmt_float :: proc(fi: ^Fmt_Info, v: f64, bits: int, verb: rune) {
 	// TODO(bill): Actually print a float correctly
 	// THIS IS FUCKING SHIT!
-
 	match verb {
-	case 'e', 'E', 'f', 'F', 'g', 'G':
+	case 'e', 'E', 'f', 'F', 'g', 'G', 'v':
 		break;
 	default:
 		fmt_bad_verb(fi, verb);
@@ -553,8 +576,9 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bits: int, verb: rune) {
 	buffer_write_byte(fi.buf, '.');
 
 	decimal_places := 5;
-	if bits == 64 {
-		decimal_places = 9;
+	match bits {
+	case 32: decimal_places = 7;
+	case 64: decimal_places = 15;
 	}
 	if fi.prec_set {
 		decimal_places = fi.prec;
@@ -570,7 +594,7 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bits: int, verb: rune) {
 }
 fmt_string :: proc(fi: ^Fmt_Info, s: string, verb: rune) {
 	match verb {
-	case 'v', 's':
+	case 's', 'v':
 		buffer_write_string(fi.buf, s);
 	default:
 		fmt_bad_verb(fi, verb);
@@ -589,6 +613,69 @@ fmt_pointer :: proc(fi: ^Fmt_Info, p: rawptr, verb: rune) {
 		buffer_write_string(fi.buf, "0x");
 	}
 	fmt_integer(fi, u, 16, false, __DIGITS_UPPER);
+}
+
+fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
+	if v.type_info == nil || v.data == nil {
+		buffer_write_string(fi.buf, "<nil>");
+		return;
+	}
+
+	using Type_Info;
+	match type e : v.type_info {
+	default:
+		fmt_bad_verb(fi, verb);
+		return;
+	case Enum:
+		match verb {
+		case 'd', 'f':
+			fmt_arg(fi, any{type_info_base(e.base), v.data}, verb);
+		case 's', 'v':
+			i: i64;
+			f: f64;
+			ok := false;
+			a := any{type_info_base(e.base), v.data};
+			match type v : a {
+			case i8:   i = v as i64;
+			case i16:  i = v as i64;
+			case i32:  i = v as i64;
+			case i64:  i = v as i64;
+			case int:  i = v as i64;
+			case u8:   i = v as i64;
+			case u16:  i = v as i64;
+			case u32:  i = v as i64;
+			case u64:  i = v as i64;
+			case uint: i = v as i64;
+			case f32:  f = v as f64;
+			case f64:  f = v as f64;
+			}
+
+			if is_type_integer(e.base) {
+				for val, idx : e.values {
+					if val.i == i {
+						buffer_write_string(fi.buf, e.names[idx]);
+						ok = true;
+						break;
+					}
+				}
+			} else {
+				for val, idx : e.values {
+					if val.f == f {
+						buffer_write_string(fi.buf, e.names[idx]);
+						ok = true;
+						break;
+					}
+				}
+			}
+
+			if !ok {
+				buffer_write_string(fi.buf, "!%(BAD ENUM VALUE)");
+			}
+		default:
+			fmt_bad_verb(fi, verb);
+			return;
+		}
+	}
 }
 
 
@@ -728,7 +815,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		buffer_write_string(fi.buf, "(raw_union)");
 
 	case Enum:
-		fmt_arg(fi, any{info.base, v.data}, verb);
+		fmt_enum(fi, v, verb);
 
 	case Procedure:
 		buffer_write_type(fi.buf, v.type_info);

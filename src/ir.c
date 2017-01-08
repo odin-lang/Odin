@@ -1616,7 +1616,6 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 		switch (index) {
 		case 0: result_type = make_type_pointer(a, make_type_pointer(a, t->Slice.elem)); break;
 		case 1: result_type = make_type_pointer(a, t_int); break;
-		case 2: result_type = make_type_pointer(a, t_int); break;
 		}
 	} else if (is_type_string(t)) {
 		switch (index) {
@@ -1785,9 +1784,6 @@ irValue *ir_array_len(irProcedure *proc, irValue *array) {
 	Type *t = ir_type(array);
 	GB_ASSERT(t->kind == Type_Array);
 	return ir_make_const_int(proc->module->allocator, t->Array.count);
-}
-irValue *ir_array_cap(irProcedure *proc, irValue *array) {
-	return ir_array_len(proc, array);
 }
 
 irValue *ir_slice_elem(irProcedure *proc, irValue *slice) {
@@ -2855,7 +2851,7 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 
 				case BuiltinProc_new_slice: {
 					ir_emit_comment(proc, str_lit("new_slice"));
-					// new_slice :: proc(Type, len: int[, cap: int]) -> ^Type
+					// new_slice :: proc(Type, len: int) -> ^Type
 					gbAllocator allocator = proc->module->allocator;
 
 					Type *type = type_of_expr(proc->module->info, ce->args.e[0]);
@@ -3226,7 +3222,6 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 				ir_emit_store(proc, slice_elem, base_elem);
 				irValue *len = ir_make_const_int(allocator, slice_len);
 				ir_emit_store(proc, ir_emit_struct_ep(proc, slice, 1), len);
-				ir_emit_store(proc, ir_emit_struct_ep(proc, slice, 2), len);
 			}
 
 			arg_count = type->param_count;
@@ -5664,11 +5659,9 @@ void ir_gen_tree(irGen *s) {
 
 						irValue *elem = ir_emit_struct_ep(proc, slice, 0);
 						irValue *len  = ir_emit_struct_ep(proc, slice, 1);
-						irValue *cap  = ir_emit_struct_ep(proc, slice, 2);
 
 						ir_emit_store(proc, elem, memory);
 						ir_emit_store(proc, len, field_count);
-						ir_emit_store(proc, cap, field_count);
 					} break;
 					case TypeRecord_Union:
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_union_ptr);
@@ -5713,11 +5706,9 @@ void ir_gen_tree(irGen *s) {
 
 						irValue *elem = ir_emit_struct_ep(proc, slice, 0);
 						irValue *len  = ir_emit_struct_ep(proc, slice, 1);
-						irValue *cap  = ir_emit_struct_ep(proc, slice, 2);
 
 						ir_emit_store(proc, elem, memory);
 						ir_emit_store(proc, len, field_count);
-						ir_emit_store(proc, cap, field_count);
 					} break;
 					case TypeRecord_Enum:
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_enum_ptr);
@@ -5791,14 +5782,12 @@ void ir_gen_tree(irGen *s) {
 
 								ir_emit_store(proc, ir_emit_struct_ep(proc, names, 0), name_array_elem);
 								ir_emit_store(proc, ir_emit_struct_ep(proc, names, 1), v_count);
-								ir_emit_store(proc, ir_emit_struct_ep(proc, names, 2), v_count);
 
 								irValue *values = ir_emit_struct_ep(proc, tag, 2);
 								irValue *value_array_elem = ir_array_elem(proc, value_array);
 
 								ir_emit_store(proc, ir_emit_struct_ep(proc, values, 0), value_array_elem);
 								ir_emit_store(proc, ir_emit_struct_ep(proc, values, 1), v_count);
-								ir_emit_store(proc, ir_emit_struct_ep(proc, values, 2), v_count);
 							}
 						}
 						break;
@@ -5837,11 +5826,9 @@ void ir_gen_tree(irGen *s) {
 
 					irValue *elem = ir_emit_struct_ep(proc, slice, 0);
 					irValue *len  = ir_emit_struct_ep(proc, slice, 1);
-					irValue *cap  = ir_emit_struct_ep(proc, slice, 2);
 
 					ir_emit_store(proc, elem, memory);
 					ir_emit_store(proc, len, variable_count);
-					ir_emit_store(proc, cap, variable_count);
 				} break;
 
 				case Type_Proc: {
