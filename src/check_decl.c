@@ -249,9 +249,6 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 	}
 	e->flags |= EntityFlag_Visited;
 
-	c->context.iota = e->Constant.value;
-	e->Constant.value = (ExactValue){0};
-
 	if (type_expr) {
 		Type *t = check_type(c, type_expr);
 		if (!is_type_constant_type(t)) {
@@ -259,7 +256,6 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 			error_node(type_expr, "Invalid constant type `%s`", str);
 			gb_string_free(str);
 			e->type = t_invalid;
-			c->context.iota = (ExactValue){0};
 			return;
 		}
 		e->type = t;
@@ -270,9 +266,6 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 		check_expr_or_type(c, &operand, init);
 	}
 	if (operand.mode == Addressing_Type) {
-		c->context.iota = (ExactValue){0};
-
-		e->Constant.value = (ExactValue){0};
 		e->kind = Entity_TypeName;
 
 		DeclInfo *d = c->context.decl;
@@ -282,7 +275,6 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 	}
 
 	check_init_constant(c, e, &operand);
-	c->context.iota = (ExactValue){0};
 
 	if (operand.mode == Addressing_Invalid) {
 		error(e->token, "Illegal cyclic declaration");

@@ -25,6 +25,10 @@ Type_Info_Record :: struct #ordered {
 	packed:  bool;
 	ordered: bool;
 }
+Type_Info_Enum_Value :: raw_union {
+	f: f64;
+	i: i64;
+}
 
 Type_Info :: union {
 	Named: struct #ordered {
@@ -74,7 +78,7 @@ Type_Info :: union {
 	Enum: struct #ordered {
 		base:  ^Type_Info;
 		names: []string;
-		// TODO(bill): store values some how. Maybe using a raw_union
+		values: []Type_Info_Enum_Value;
 	};
 }
 
@@ -115,7 +119,7 @@ fmuladd64 :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
 
 
 Allocator_Mode :: enum u8 {
-	ALLOC = iota,
+	ALLOC,
 	FREE,
 	FREE_ALL,
 	RESIZE,

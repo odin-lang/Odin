@@ -84,7 +84,10 @@ typedef struct TypeRecord {
 	bool     struct_is_ordered;
 	Entity **fields_in_src_order; // Entity_Variable
 
-	Type *   enum_base_type;
+	Type *  enum_base_type;
+	Entity *enum_count;
+	Entity *enum_min_value;
+	Entity *enum_max_value;
 } TypeRecord;
 
 #define TYPE_KINDS \
@@ -253,11 +256,15 @@ gb_global Type *t_rune            = &basic_type_aliases[1];
 
 gb_global Type *t_u8_ptr  = NULL;
 gb_global Type *t_int_ptr = NULL;
+gb_global Type *t_i64_ptr = NULL;
+gb_global Type *t_f64_ptr = NULL;
 
-gb_global Type *t_type_info            = NULL;
-gb_global Type *t_type_info_ptr        = NULL;
-gb_global Type *t_type_info_member     = NULL;
-gb_global Type *t_type_info_member_ptr = NULL;
+gb_global Type *t_type_info                = NULL;
+gb_global Type *t_type_info_member         = NULL;
+gb_global Type *t_type_info_enum_value     = NULL;
+gb_global Type *t_type_info_ptr            = NULL;
+gb_global Type *t_type_info_member_ptr     = NULL;
+gb_global Type *t_type_info_enum_value_ptr = NULL;
 
 gb_global Type *t_type_info_named      = NULL;
 gb_global Type *t_type_info_integer    = NULL;
@@ -1043,11 +1050,27 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 
 				if (str_eq(field_name, str)) {
 					sel.entity = f;
-					selection_add_index(&sel, i);
+					// selection_add_index(&sel, i);
 					return sel;
 				}
 			}
 		} else if (is_type_enum(type)) {
+			// NOTE(bill): These may not have been added yet, so check in case
+			if (type->Record.enum_count != NULL) {
+				if (str_eq(field_name, str_lit("count"))) {
+					sel.entity = type->Record.enum_count;
+					return sel;
+				}
+				if (str_eq(field_name, str_lit("min_value"))) {
+					sel.entity = type->Record.enum_min_value;
+					return sel;
+				}
+				if (str_eq(field_name, str_lit("max_value"))) {
+					sel.entity = type->Record.enum_max_value;
+					return sel;
+				}
+			}
+
 			for (isize i = 0; i < type->Record.field_count; i++) {
 				Entity *f = type->Record.fields[i];
 				GB_ASSERT(f->kind == Entity_Constant);
@@ -1055,7 +1078,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 
 				if (str_eq(field_name, str)) {
 					sel.entity = f;
-					selection_add_index(&sel, i);
+					// selection_add_index(&sel, i);
 					return sel;
 				}
 			}

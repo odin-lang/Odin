@@ -190,36 +190,30 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		if info.ordered { buffer_write_string(buf, "#ordered "); }
 		buffer_write_string(buf, "{");
 		for field, i : info.fields {
-			if i > 0 {
-				buffer_write_string(buf, ", ");
-			}
 			buffer_write_string(buf, field.name);
 			buffer_write_string(buf, ": ");
 			buffer_write_type(buf, field.type_info);
+			buffer_write_byte(buf, ';');
 		}
 		buffer_write_string(buf, "}");
 
 	case Union:
 		buffer_write_string(buf, "union {");
 		for field, i : info.fields {
-			if i > 0 {
-				buffer_write_string(buf, ", ");
-			}
 			buffer_write_string(buf, field.name);
 			buffer_write_string(buf, ": ");
 			buffer_write_type(buf, field.type_info);
+			buffer_write_byte(buf, ';');
 		}
 		buffer_write_string(buf, "}");
 
 	case Raw_Union:
 		buffer_write_string(buf, "raw_union {");
 		for field, i : info.fields {
-			if i > 0 {
-				buffer_write_string(buf, ", ");
-			}
 			buffer_write_string(buf, field.name);
 			buffer_write_string(buf, ": ");
 			buffer_write_type(buf, field.type_info);
+			buffer_write_byte(buf, ';');
 		}
 		buffer_write_string(buf, "}");
 
@@ -229,14 +223,6 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		buffer_write_string(buf, " {}");
 
 	}
-}
-
-
-make_any :: proc(type_info: ^Type_Info, data: rawptr) -> any {
-	a: any;
-	a.type_info = type_info;
-	a.data = data;
-	return a;
 }
 
 
@@ -411,7 +397,8 @@ fmt_write_padding :: proc(fi: ^Fmt_Info, width: int) {
 }
 
 fmt_integer :: proc(fi: ^Fmt_Info, u: u64, base: int, signed: bool, digits: string) {
-	negative := signed && (u as i64) < 0;
+	u_i64 := u as i64;
+	negative := signed && u_i64 < 0;
 	if negative {
 		u = -u;
 	}
@@ -591,12 +578,14 @@ fmt_string :: proc(fi: ^Fmt_Info, s: string, verb: rune) {
 }
 
 fmt_pointer :: proc(fi: ^Fmt_Info, p: rawptr, verb: rune) {
-	if verb != 'p' {
+	match verb {
+	case 'p', 'v':
+	default:
 		fmt_bad_verb(fi, verb);
 		return;
 	}
 	u := p as uint as u64;
-	if !fi.hash {
+	if !fi.hash || verb == 'v' {
 		buffer_write_string(fi.buf, "0x");
 	}
 	fmt_integer(fi, u, 16, false, __DIGITS_UPPER);
@@ -612,14 +601,12 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	using Type_Info;
 	match type info : v.type_info {
 	case Named:
-		if verb != 'v' {
-			fmt_bad_verb(fi, verb);
-			return;
-		}
-
-		a := make_any(info.base, v.data);
 		match type b : info.base {
 		case Struct:
+			if verb != 'v' {
+				fmt_bad_verb(fi, verb);
+				return;
+			}
 			buffer_write_string(fi.buf, info.name);
 			buffer_write_byte(fi.buf, '{');
 			for f, i : b.fields {
@@ -630,12 +617,12 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				// bprint_any(fi.buf, f.offset);
 				buffer_write_string(fi.buf, " = ");
 				data := v.data as ^byte + f.offset;
-				fmt_arg(fi, make_any(f.type_info, data), 'v');
+				fmt_arg(fi, any{f.type_info, data as rawptr}, 'v');
 			}
 			buffer_write_byte(fi.buf, '}');
 
 		default:
-			fmt_value(fi, a, verb);
+			fmt_value(fi, any{info.base, v.data}, verb);
 		}
 
 	case Boolean: fmt_arg(fi, v, verb);
@@ -644,14 +631,18 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	case String:  fmt_arg(fi, v, verb);
 
 	case Pointer:
-		fmt_pointer(fi, (v.data as ^rawptr)^, verb);
+		if v.type_info == type_info(^Type_Info) {
+			buffer_write_type(fi.buf, (v.data as ^^Type_Info)^);
+		} else {
+			fmt_pointer(fi, (v.data as ^rawptr)^, verb);
+		}
 
 	case Maybe:
 		// TODO(bill): Correct verbs for Maybe types?
 		size := mem.size_of_type_info(info.elem);
 		data := slice_ptr(v.data as ^byte, size+1);
 		if data[size] != 0 {
-			fmt_arg(fi, make_any(info.elem, v.data), verb);
+			fmt_arg(fi, any{info.elem, v.data}, verb);
 		} else {
 			buffer_write_string(fi.buf, "nil");
 		}
@@ -669,7 +660,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				buffer_write_string(fi.buf, ", ");
 			}
 			data := v.data as ^byte + i*info.elem_size;
-			fmt_arg(fi, make_any(info.elem, data), 'v');
+			fmt_arg(fi, any{info.elem, data as rawptr}, 'v');
 		}
 
 	case Slice:
@@ -686,7 +677,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				buffer_write_string(fi.buf, ", ");
 			}
 			data := slice.data + i*info.elem_size;
-			fmt_arg(fi, make_any(info.elem, data), 'v');
+			fmt_arg(fi, any{info.elem, data as rawptr}, 'v');
 		}
 
 	case Vector:
@@ -713,7 +704,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			}
 
 			data := v.data as ^byte + i*info.elem_size;
-			fmt_value(fi, make_any(info.elem, data), 'v');
+			fmt_value(fi, any{info.elem, data as rawptr}, 'v');
 		}
 
 	case Struct:
@@ -728,7 +719,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			buffer_write_string(fi.buf, " = ");
 			data := v.data as ^byte + f.offset;
 			ti := f.type_info;
-			fmt_value(fi, make_any(ti, data), 'v');
+			fmt_value(fi, any{ti, data as rawptr}, 'v');
 		}
 
 	case Union:
@@ -737,7 +728,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		buffer_write_string(fi.buf, "(raw_union)");
 
 	case Enum:
-		fmt_value(fi, make_any(info.base, v.data), verb);
+		fmt_arg(fi, any{info.base, v.data}, verb);
 
 	case Procedure:
 		buffer_write_type(fi.buf, v.type_info);
@@ -753,10 +744,15 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	}
 	fi.arg = arg;
 
-	if verb == 'T' { // Type Info
-		buffer_write_type(fi.buf, arg.type_info);
+	if verb == 'T' {
+		ti := arg.type_info;
+		if ti == type_info(^Type_Info) {
+			ti = (arg.data as ^^Type_Info)^;
+		}
+		buffer_write_type(fi.buf, ti);
 		return;
 	}
+
 
 	base_arg := arg;
 	base_arg.type_info = type_info_base(base_arg.type_info);

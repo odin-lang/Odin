@@ -263,11 +263,13 @@ bool check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
 	}
 
 	// ^T <- rawptr
+#if 0
 	// TODO(bill): Should C-style (not C++) pointer cast be allowed?
-	// if (is_type_pointer(dst) && is_type_rawptr(src)) {
-	    // return true;
-	// }
-
+	if (is_type_pointer(dst) && is_type_rawptr(src)) {
+	    return true;
+	}
+#endif
+#if 1
 	// rawptr <- ^T
 	if (is_type_rawptr(dst) && is_type_pointer(src)) {
 		// TODO(bill): Handle this properly
@@ -276,8 +278,7 @@ bool check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
 		}
 	    return true;
 	}
-
-
+#endif
 
 	if (dst->kind == Type_Array && src->kind == Type_Array) {
 		if (are_types_identical(dst->Array.elem, src->Array.elem)) {
@@ -702,20 +703,21 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*(et->fields.count));
 
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, et->fields.count);
-	isize field_index = 0;
+	isize field_count = 0;
 
 	Type *constant_type = enum_type;
 	if (named_type != NULL) {
 		constant_type = named_type;
 	}
 
-	AstNode *prev_expr = NULL;
-
-	i64 iota = 0;
+	ExactValue iota = make_exact_value_integer(-1);
+	ExactValue min_value = make_exact_value_integer(0);
+	ExactValue max_value = make_exact_value_integer(0);
 
 	for_array(i, et->fields) {
 		AstNode *field = et->fields.e[i];
 		AstNode *ident = NULL;
+		AstNode *init = NULL;
 		if (field->kind == AstNode_FieldValue) {
 			ast_node(fv, FieldValue, field);
 			if (fv->field == NULL || fv->field->kind != AstNode_Ident) {
@@ -723,7 +725,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 				continue;
 			}
 			ident = fv->field;
-			prev_expr = fv->value;
+			init = fv->value;
 		} else if (field->kind == AstNode_Ident) {
 			ident = field;
 		} else {
@@ -732,48 +734,73 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		}
 		String name = ident->Ident.string;
 
-		if (str_ne(name, str_lit("_"))) {
-			ExactValue v = make_exact_value_integer(iota);
-			Entity *e = make_entity_constant(c->allocator, c->context.scope, ident->Ident, constant_type, v);
-			e->identifier = ident;
-			e->flags |= EntityFlag_Visited;
-
-
-			AstNode *init = prev_expr;
-			if (init == NULL) {
-				error_node(field, "Missing initial expression for enumeration, e.g. iota");
-				continue;
+		if (init != NULL) {
+			Operand o = {0};
+			check_expr(c, &o, init);
+			if (o.mode != Addressing_Constant) {
+				error_node(init, "Enumeration value must be a constant");
+				o.mode = Addressing_Invalid;
 			}
-
-			ExactValue context_iota = c->context.iota;
-			c->context.iota = e->Constant.value;
-			e->Constant.value = (ExactValue){0};
-
-			Operand operand = {0};
-			check_expr(c, &operand, init);
-
-			check_init_constant(c, e, &operand);
-			c->context.iota = context_iota;
-
-			if (operand.mode == Addressing_Constant) {
-				HashKey key = hash_string(name);
-				if (map_entity_get(&entity_map, key) != NULL) {
-					error_node(ident, "`%.*s` is already declared in this enumeration", LIT(name));
-				} else {
-					map_entity_set(&entity_map, key, e);
-					add_entity(c, c->context.scope, NULL, e);
-					fields[field_index++] = e;
-					add_entity_use(c, field, e);
-				}
+			if (o.mode != Addressing_Invalid) {
+				check_assignment(c, &o, constant_type, str_lit("enumeration"));
 			}
+			if (o.mode != Addressing_Invalid) {
+				iota = o.value;
+			} else {
+				iota = exact_binary_operator_value(Token_Add, iota, make_exact_value_integer(1));
+			}
+		} else {
+			iota = exact_binary_operator_value(Token_Add, iota, make_exact_value_integer(1));
 		}
-		iota++;
+
+
+		// NOTE(bill): Skip blank identifiers
+		if (str_eq(name, str_lit("_"))) {
+			continue;
+		} else if (str_eq(name, str_lit("count"))) {
+			error_node(field, "`count` is a reserved identifier for enumerations");
+			continue;
+		} else if (str_eq(name, str_lit("min_value"))) {
+			error_node(field, "`min_value` is a reserved identifier for enumerations");
+			continue;
+		} else if (str_eq(name, str_lit("max_value"))) {
+			error_node(field, "`max_value` is a reserved identifier for enumerations");
+			continue;
+		}
+
+		if (compare_exact_values(Token_Gt, min_value, iota)) {
+			min_value = iota;
+		}
+		if (compare_exact_values(Token_Lt, max_value, iota)) {
+			max_value = iota;
+		}
+
+		Entity *e = make_entity_constant(c->allocator, c->context.scope, ident->Ident, constant_type, iota);
+		e->identifier = ident;
+		e->flags |= EntityFlag_Visited;
+
+		HashKey key = hash_string(name);
+		if (map_entity_get(&entity_map, key) != NULL) {
+			error_node(ident, "`%.*s` is already declared in this enumeration", LIT(name));
+		} else {
+			map_entity_set(&entity_map, key, e);
+			add_entity(c, c->context.scope, NULL, e);
+			fields[field_count++] = e;
+			add_entity_use(c, field, e);
+		}
 	}
 
-	GB_ASSERT(field_index <= et->fields.count);
+	GB_ASSERT(field_count <= et->fields.count);
 
 	enum_type->Record.fields = fields;
-	enum_type->Record.field_count = field_index;
+	enum_type->Record.field_count = field_count;
+
+	enum_type->Record.enum_count = make_entity_constant(c->allocator, c->context.scope,
+		make_token_ident(str_lit("count")), t_int, make_exact_value_integer(field_count));
+	enum_type->Record.enum_min_value = make_entity_constant(c->allocator, c->context.scope,
+		make_token_ident(str_lit("min_value")), constant_type, min_value);
+	enum_type->Record.enum_max_value = make_entity_constant(c->allocator, c->context.scope,
+		make_token_ident(str_lit("max_value")), constant_type, max_value);
 
 	gb_temp_arena_memory_end(tmp);
 }
@@ -926,15 +953,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 			o->type = t_invalid;
 			return;
 		}
-		if (e == e_iota) {
-			if (c->context.iota.kind == ExactValue_Invalid) {
-				error(e->token, "Use of `iota` outside a enumeration is not allowed");
-				return;
-			}
-			o->value = c->context.iota;
-		} else {
-			o->value = e->Constant.value;
-		}
+		o->value = e->Constant.value;
 		if (o->value.kind == ExactValue_Invalid) {
 			return;
 		}
@@ -4091,7 +4110,6 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 					}
 				}
 			}
-
 		} break;
 
 		case Type_Slice:
@@ -4159,6 +4177,85 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 			if (t->kind == Type_Array && ellipsis_array) {
 				t->Array.count = max;
+			}
+		} break;
+
+		case Type_Basic: {
+			if (!is_type_any(t)) {
+				if (cl->elems.count != 0) {
+					error_node(node, "Illegal compound literal");
+				}
+				break;
+			}
+			if (cl->elems.count == 0) {
+				break; // NOTE(bill): No need to init
+			}
+			{ // Checker values
+				Type *field_types[2] = {t_type_info_ptr, t_rawptr};
+				isize field_count = 2;
+				if (cl->elems.e[0]->kind == AstNode_FieldValue) {
+					bool fields_visited[2] = {0};
+
+					for_array(i, cl->elems) {
+						AstNode *elem = cl->elems.e[i];
+						if (elem->kind != AstNode_FieldValue) {
+							error_node(elem, "Mixture of `field = value` and value elements in a `any` literal is not allowed");
+							continue;
+						}
+						ast_node(fv, FieldValue, elem);
+						if (fv->field->kind != AstNode_Ident) {
+							gbString expr_str = expr_to_string(fv->field);
+							error_node(elem, "Invalid field name `%s` in `any` literal", expr_str);
+							gb_string_free(expr_str);
+							continue;
+						}
+						String name = fv->field->Ident.string;
+
+						Selection sel = lookup_field(c->allocator, type, name, o->mode == Addressing_Type);
+						if (sel.entity == NULL) {
+							error_node(elem, "Unknown field `%.*s` in `any` literal", LIT(name));
+							continue;
+						}
+
+						isize index = sel.index.e[0];
+
+						if (fields_visited[index]) {
+							error_node(elem, "Duplicate field `%.*s` in `any` literal", LIT(name));
+							continue;
+						}
+
+						fields_visited[index] = true;
+						check_expr(c, o, fv->value);
+
+						// NOTE(bill): `any` literals can never be constant
+						is_constant = false;
+
+						check_assignment(c, o, field_types[index], str_lit("`any` literal"));
+					}
+				} else {
+					for_array(index, cl->elems) {
+						AstNode *elem = cl->elems.e[index];
+						if (elem->kind == AstNode_FieldValue) {
+							error_node(elem, "Mixture of `field = value` and value elements in a `any` literal is not allowed");
+							continue;
+						}
+
+
+						check_expr(c, o, elem);
+						if (index >= field_count) {
+							error_node(o->expr, "Too many values in `any` literal, expected %td", field_count);
+							break;
+						}
+
+						// NOTE(bill): `any` literals can never be constant
+						is_constant = false;
+
+						check_assignment(c, o, field_types[index], str_lit("`any` literal"));
+					}
+					if (cl->elems.count < field_count) {
+						error(cl->close, "Too few values in `any` literal, expected %td, got %td", field_count, cl->elems.count);
+					}
+				}
 			}
 		} break;
 

@@ -210,7 +210,6 @@ typedef struct CheckerContext {
 	Scope *    scope;
 	DeclInfo * decl;
 	u32        stmt_state_flags;
-	ExactValue iota; // Value of `iota` in a constant declaration; Invalid otherwise
 } CheckerContext;
 
 #define MAP_TYPE TypeAndValue
@@ -549,7 +548,6 @@ void init_universal_scope(BuildContext *bc) {
 // Constants
 	add_global_constant(a, str_lit("true"),  t_untyped_bool,    make_exact_value_bool(true));
 	add_global_constant(a, str_lit("false"), t_untyped_bool,    make_exact_value_bool(false));
-	add_global_constant(a, str_lit("iota"),  t_untyped_integer, make_exact_value_integer(0));
 
 	add_global_entity(make_entity_nil(a, str_lit("nil"), t_untyped_nil));
 
@@ -570,9 +568,10 @@ void init_universal_scope(BuildContext *bc) {
 	}
 
 
-	t_u8_ptr = make_type_pointer(a, t_u8);
+	t_u8_ptr  = make_type_pointer(a, t_u8);
 	t_int_ptr = make_type_pointer(a, t_int);
-	e_iota = scope_lookup_entity(universal_scope, str_lit("iota"));
+	t_i64_ptr = make_type_pointer(a, t_i64);
+	t_f64_ptr = make_type_pointer(a, t_f64);
 }
 
 
@@ -1020,6 +1019,11 @@ void init_preload(Checker *c) {
 			compiler_error("Could not find type declaration for `Type_Info_Member`\n"
 			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
 		}
+		Entity *type_info_enum_value_entity = current_scope_lookup_entity(c->global_scope, str_lit("Type_Info_Enum_Value"));
+		if (type_info_entity == NULL) {
+			compiler_error("Could not find type declaration for `Type_Info_Enum_Value`\n"
+			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
+		}
 		t_type_info = type_info_entity->type;
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
 		GB_ASSERT(is_type_union(type_info_entity->type));
@@ -1027,6 +1031,10 @@ void init_preload(Checker *c) {
 
 		t_type_info_member = type_info_member_entity->type;
 		t_type_info_member_ptr = make_type_pointer(c->allocator, t_type_info_member);
+
+		t_type_info_enum_value = type_info_enum_value_entity->type;
+		t_type_info_enum_value_ptr = make_type_pointer(c->allocator, t_type_info_enum_value);
+
 
 		if (record->field_count != 18) {
 			compiler_error("Invalid `Type_Info` layout");

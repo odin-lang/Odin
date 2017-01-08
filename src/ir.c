@@ -1051,6 +1051,12 @@ irValue *ir_make_const_i32(gbAllocator a, i64 i) {
 irValue *ir_make_const_i64(gbAllocator a, i64 i) {
 	return ir_make_value_constant(a, t_i64, make_exact_value_integer(i));
 }
+irValue *ir_make_const_f32(gbAllocator a, f32 f) {
+	return ir_make_value_constant(a, t_f32, make_exact_value_float(f));
+}
+irValue *ir_make_const_f64(gbAllocator a, f64 f) {
+	return ir_make_value_constant(a, t_f64, make_exact_value_float(f));
+}
 irValue *ir_make_const_bool(gbAllocator a, bool b) {
 	return ir_make_value_constant(a, t_bool, make_exact_value_bool(b != 0));
 }
@@ -3743,6 +3749,48 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 				ir_emit_store(proc, gep2, ir_make_const_int(proc->module->allocator, slice->ConstantSlice.count));
 			}
 		} break;
+
+		case Type_Basic: {
+			GB_ASSERT(is_type_any(bt));
+			if (cl->elems.count > 0) {
+				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, make_exact_value_compound(expr)));
+				String field_names[2] = {
+					str_lit("type_info"),
+					str_lit("data"),
+				};
+				Type *field_types[2] = {
+					t_type_info_ptr,
+					t_rawptr,
+				};
+
+				for_array(field_index, cl->elems) {
+					AstNode *elem = cl->elems.e[field_index];
+
+					irValue *field_expr = NULL;
+					isize index = field_index;
+
+					if (elem->kind == AstNode_FieldValue) {
+						ast_node(fv, FieldValue, elem);
+						Selection sel = lookup_field(proc->module->allocator, bt, fv->field->Ident.string, false);
+						index = sel.index.e[0];
+						elem = fv->value;
+					} else {
+						TypeAndValue *tav = type_and_value_of_expression(proc->module->info, elem);
+						Selection sel = lookup_field(proc->module->allocator, bt, field_names[field_index], false);
+						index = sel.index.e[0];
+					}
+
+					field_expr = ir_build_expr(proc, elem);
+
+					GB_ASSERT(ir_type(field_expr)->kind != Type_Tuple);
+
+					Type *ft = field_types[index];
+					irValue *fv = ir_emit_conv(proc, field_expr, ft);
+					irValue *gep = ir_emit_struct_ep(proc, v, index);
+					ir_emit_store(proc, gep, fv);
+				}
+			}
+		}
 		}
 
 		return ir_make_addr(v, expr);
@@ -5682,6 +5730,7 @@ void ir_gen_tree(irGen *s) {
 								Entity **fields = t->Record.fields;
 								isize count = t->Record.field_count;
 								irValue *name_array = NULL;
+								irValue *value_array = NULL;
 
 								{
 									Token token = {Token_Ident};
@@ -5698,8 +5747,40 @@ void ir_gen_tree(irGen *s) {
 									map_ir_value_set(&m->members, hash_string(token.string), name_array);
 								}
 
+								{
+									Token token = {Token_Ident};
+									i32 id = cast(i32)entry_index;
+									char name_base[] = "__$enum_values";
+									isize name_len = gb_size_of(name_base) + 10;
+									token.string.text = gb_alloc_array(a, u8, name_len);
+									token.string.len = gb_snprintf(cast(char *)token.string.text, name_len,
+									                               "%s-%d", name_base, id)-1;
+									Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, t_type_info_enum_value, count));
+									value_array = ir_make_value_global(a, e, NULL);
+									value_array->Global.is_private = true;
+									ir_module_add_value(m, e, value_array);
+									map_ir_value_set(&m->members, hash_string(token.string), value_array);
+								}
+
+								bool is_value_int = is_type_integer(t->Record.enum_base_type);
+
 								for (isize i = 0; i < count; i++) {
-									irValue *name_ep = ir_emit_array_epi(proc, name_array, i);
+									irValue *name_ep  = ir_emit_array_epi(proc, name_array, i);
+									irValue *value_ep = ir_emit_array_epi(proc, value_array, i);
+
+									ExactValue value = fields[i]->Constant.value;
+
+									if (is_value_int) {
+										i64 i = value.value_integer;
+										value_ep = ir_emit_conv(proc, value_ep, t_i64_ptr);
+										ir_emit_store(proc, value_ep, ir_make_const_i64(a, i));
+									} else {
+										GB_ASSERT(is_type_float(t->Record.enum_base_type));
+										f64 f = value.value_float;
+										value_ep = ir_emit_conv(proc, value_ep, t_f64_ptr);
+										ir_emit_store(proc, value_ep, ir_make_const_f64(a, f));
+									}
+
 									ir_emit_store(proc, name_ep, ir_make_const_string(a, fields[i]->token.string));
 								}
 
@@ -5711,6 +5792,13 @@ void ir_gen_tree(irGen *s) {
 								ir_emit_store(proc, ir_emit_struct_ep(proc, names, 0), name_array_elem);
 								ir_emit_store(proc, ir_emit_struct_ep(proc, names, 1), v_count);
 								ir_emit_store(proc, ir_emit_struct_ep(proc, names, 2), v_count);
+
+								irValue *values = ir_emit_struct_ep(proc, tag, 2);
+								irValue *value_array_elem = ir_array_elem(proc, value_array);
+
+								ir_emit_store(proc, ir_emit_struct_ep(proc, values, 0), value_array_elem);
+								ir_emit_store(proc, ir_emit_struct_ep(proc, values, 1), v_count);
+								ir_emit_store(proc, ir_emit_struct_ep(proc, values, 2), v_count);
 							}
 						}
 						break;
