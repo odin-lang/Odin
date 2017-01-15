@@ -74,8 +74,11 @@ typedef struct TypeRecord {
 
 	// All record types
 	// Theses are arrays
-	Entity **fields;      // Entity_Variable (otherwise Entity_TypeName if union)
-	i32      field_count; // == offset_count is struct
+	// Entity_Variable - struct/raw_union
+	// Entity_TypeName - union
+	// Entity_Constant - enum
+	Entity **fields;
+	i32      field_count; // == struct_offsets count
 	AstNode *node;
 
 	i64 *    struct_offsets;
@@ -84,10 +87,10 @@ typedef struct TypeRecord {
 	bool     struct_is_ordered;
 	Entity **fields_in_src_order; // Entity_Variable
 
-	Type *  enum_base_type;
-	Entity *enum_count;
-	Entity *enum_min_value;
-	Entity *enum_max_value;
+	Type *   enum_base_type;
+	Entity * enum_count;
+	Entity * enum_min_value;
+	Entity * enum_max_value;
 } TypeRecord;
 
 #define TYPE_KINDS \
@@ -481,28 +484,28 @@ bool is_type_named(Type *t) {
 	return t->kind == Type_Named;
 }
 bool is_type_boolean(Type *t) {
-	t = base_type(t);
+	t = base_type(base_enum_type(t));
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Boolean) != 0;
 	}
 	return false;
 }
 bool is_type_integer(Type *t) {
-	t = base_type(t);
+	t = base_type(base_enum_type(t));
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Integer) != 0;
 	}
 	return false;
 }
 bool is_type_unsigned(Type *t) {
-	t = base_type(t);
+	t = base_type(base_enum_type(t));
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Unsigned) != 0;
 	}
 	return false;
 }
 bool is_type_numeric(Type *t) {
-	t = base_type(t);
+	t = base_type(base_enum_type(t));
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Numeric) != 0;
 	}
@@ -536,7 +539,7 @@ bool is_type_untyped(Type *t) {
 	return false;
 }
 bool is_type_ordered(Type *t) {
-	t = base_type(t);
+	t = base_type(base_enum_type(t));
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Ordered) != 0;
 	}
@@ -553,21 +556,21 @@ bool is_type_constant_type(Type *t) {
 	return false;
 }
 bool is_type_float(Type *t) {
-	t = base_type(t);
+	t = base_type(base_enum_type(t));
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Float) != 0;
 	}
 	return false;
 }
 bool is_type_f32(Type *t) {
-	t = base_type(t);
+	t = base_type(base_enum_type(t));
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_f32;
 	}
 	return false;
 }
 bool is_type_f64(Type *t) {
-	t = base_type(t);
+	t = base_type(base_enum_type(t));
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_f64;
 	}
@@ -677,8 +680,13 @@ bool is_type_indexable(Type *t) {
 bool type_has_nil(Type *t) {
 	t = base_type(t);
 	switch (t->kind) {
-	case Type_Basic:
-		return is_type_rawptr(t);
+	case Type_Basic: {
+		switch (t->Basic.kind) {
+		case Basic_rawptr:
+		case Basic_any:
+			return true;
+		}
+	}
 	case Type_Slice:
 	case Type_Proc:
 	case Type_Pointer:
@@ -693,24 +701,22 @@ bool is_type_comparable(Type *t) {
 	t = base_type(t);
 	switch (t->kind) {
 	case Type_Basic:
-		return t->kind != Basic_UntypedNil;
+		switch (t->Basic.kind) {
+		case Basic_UntypedNil:
+		case Basic_any:
+			return false;
+		}
+		return true;
 	case Type_Pointer:
 		return true;
 	case Type_Record: {
-		if (false && is_type_struct(t)) {
-			// TODO(bill): Should I even allow this?
-			for (isize i = 0; i < t->Record.field_count; i++) {
-				if (!is_type_comparable(t->Record.fields[i]->type))
-					return false;
-			}
-		} else if (is_type_enum(t)) {
+		if (is_type_enum(t)) {
 			return is_type_comparable(base_enum_type(t));
 		}
 		return false;
 	} break;
 	case Type_Array:
 		return false;
-		// return is_type_comparable(t->Array.elem);
 	case Type_Vector:
 		return is_type_comparable(t->Vector.elem);
 	case Type_Proc:
@@ -1189,6 +1195,9 @@ i64 align_formula(i64 size, i64 align) {
 }
 
 i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
+	if (t == NULL) {
+		return 0;
+	}
 	i64 size;
 	TypePath path = {0};
 	type_path_init(&path);
@@ -1198,6 +1207,9 @@ i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 }
 
 i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
+	if (t == NULL) {
+		return 1;
+	}
 	i64 align;
 	TypePath path = {0};
 	type_path_init(&path);
@@ -1214,6 +1226,17 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 	t = base_type(t);
 
 	switch (t->kind) {
+	case Type_Basic: {
+		GB_ASSERT(is_type_typed(t));
+		switch (t->kind) {
+		case Basic_string: return s.word_size;
+		case Basic_any:    return s.word_size;
+
+		case Basic_int: case Basic_uint: case Basic_rawptr:
+			return s.word_size;
+		}
+	} break;
+
 	case Type_Array: {
 		Type *elem = t->Array.elem;
 		type_path_push(path, elem);

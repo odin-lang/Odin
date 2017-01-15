@@ -1,10 +1,9 @@
 #import "fmt.odin";
 
 main :: proc() {
-	Fruit :: enum f32 {
-		Apple = 123,
-		Pear = 321,
-		Tomato,
-	}
-	fmt.printf("%s = %f\n", Fruit.Apple, Fruit.Apple);
+	fmt.printf("%f\n", 0.0);
+	fmt.printf("%f\n", 1.0);
+	fmt.printf("%f\n", -0.5);
+	fmt.printf("%+f\n", 1334.67);
+	fmt.printf("%f\n", 789.789);
 }

@@ -30,6 +30,14 @@ Type_Info_Enum_Value :: raw_union {
 	i: i64;
 }
 
+// NOTE(bill): This much the same as the compiler's
+Calling_Convention :: enum {
+	ODIN = 0,
+	C    = 1,
+	STD  = 2,
+	FAST = 3,
+}
+
 Type_Info :: union {
 	Named: struct #ordered {
 		name: string;
@@ -52,9 +60,10 @@ Type_Info :: union {
 		elem: ^Type_Info;
 	};
 	Procedure: struct #ordered {
-		params:   ^Type_Info; // Type_Info.Tuple
-		results:  ^Type_Info; // Type_Info.Tuple
-		variadic: bool;
+		params:     ^Type_Info; // Type_Info.Tuple
+		results:    ^Type_Info; // Type_Info.Tuple
+		variadic:   bool;
+		convention: Calling_Convention;
 	};
 	Array: struct #ordered {
 		elem:      ^Type_Info;

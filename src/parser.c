@@ -62,35 +62,40 @@ typedef struct Parser {
 } Parser;
 
 typedef enum ProcTag {
-	ProcTag_bounds_check    = GB_BIT(0),
-	ProcTag_no_bounds_check = GB_BIT(1),
+	ProcTag_bounds_check    = 1<<0,
+	ProcTag_no_bounds_check = 1<<1,
 
-	ProcTag_foreign         = GB_BIT(10),
-	ProcTag_export          = GB_BIT(11),
-	ProcTag_link_name       = GB_BIT(12),
-	ProcTag_inline          = GB_BIT(13),
-	ProcTag_no_inline       = GB_BIT(14),
-	ProcTag_dll_import      = GB_BIT(15),
-	// ProcTag_dll_export      = GB_BIT(16),
+	ProcTag_foreign         = 1<<10,
+	ProcTag_export          = 1<<11,
+	ProcTag_link_name       = 1<<12,
+	ProcTag_inline          = 1<<13,
+	ProcTag_no_inline       = 1<<14,
+	ProcTag_dll_import      = 1<<15,
+	// ProcTag_dll_export      = 1<<16,
 } ProcTag;
 
 typedef enum ProcCallingConvention {
 	ProcCC_Odin = 0,
-	ProcCC_C,
-	ProcCC_Std,
-	ProcCC_Fast,
+	ProcCC_C    = 1,
+	ProcCC_Std  = 2,
+	ProcCC_Fast = 3,
 
 	ProcCC_Invalid,
 } ProcCallingConvention;
 
 typedef enum VarDeclTag {
-	VarDeclTag_thread_local = GB_BIT(0),
+	VarDeclTag_thread_local = 1<<0,
 } VarDeclTag;
 
 typedef enum StmtStateFlag {
-	StmtStateFlag_bounds_check    = GB_BIT(0),
-	StmtStateFlag_no_bounds_check = GB_BIT(1),
+	StmtStateFlag_bounds_check    = 1<<0,
+	StmtStateFlag_no_bounds_check = 1<<1,
 } StmtStateFlag;
+
+typedef enum FieldFlag {
+	FieldFlag_using    = 1<<0,
+	FieldFlag_ellipsis = 1<<1,
+} FieldListTag;
 
 AstNodeArray make_ast_node_array(AstFile *f) {
 	AstNodeArray a;
@@ -228,7 +233,10 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 	}) \
 	AST_NODE_KIND(DeferStmt,  "defer statement",  struct { Token token; AstNode *stmt; }) \
 	AST_NODE_KIND(BranchStmt, "branch statement", struct { Token token; }) \
-	AST_NODE_KIND(UsingStmt,  "using statement",  struct { Token token; AstNode *node; }) \
+	AST_NODE_KIND(UsingStmt,  "using statement",  struct { \
+		Token token;   \
+		AstNode *node; \
+	}) \
 	AST_NODE_KIND(AsmOperand, "assembly operand", struct { \
 		Token string;     \
 		AstNode *operand; \
@@ -283,7 +291,7 @@ AST_NODE_KIND(_DeclEnd,   "", i32) \
 	AST_NODE_KIND(Field, "field", struct { \
 		AstNodeArray names;    \
 		AstNode *    type;     \
-		bool         is_using; \
+		u32          flags;    \
 	}) \
 AST_NODE_KIND(_TypeBegin, "", i32) \
 	AST_NODE_KIND(HelperType, "type", struct { \
@@ -955,11 +963,11 @@ AstNode *make_bad_decl(AstFile *f, Token begin, Token end) {
 	return result;
 }
 
-AstNode *make_field(AstFile *f, AstNodeArray names, AstNode *type, bool is_using) {
+AstNode *make_field(AstFile *f, AstNodeArray names, AstNode *type, u32 flags) {
 	AstNode *result = make_node(f, AstNode_Field);
 	result->Field.names = names;
 	result->Field.type = type;
-	result->Field.is_using = is_using;
+	result->Field.flags = flags;
 	return result;
 }
 
@@ -2217,7 +2225,7 @@ AstNode *parse_proc_type(AstFile *f, String *foreign_name_, String *link_name_) 
 	return make_proc_type(f, proc_token, params, results, tags, cc);
 }
 
-AstNodeArray parse_field_list(AstFile *f, isize *name_count_, bool allow_using, bool ellipsis_ok,
+AstNodeArray parse_field_list(AstFile *f, isize *name_count_, u32 flags,
                               TokenKind separator, TokenKind follow) {
 	AstNodeArray params = make_ast_node_array(f);
 	isize name_count = 0;
@@ -2240,7 +2248,7 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, bool allow_using, 
 			is_using = false;
 		}
 
-		if (!allow_using && is_using) {
+		if ((flags&FieldFlag_using) == 0 && is_using) {
 			syntax_error(f->curr_token, "`using` is not allowed within this parameter list");
 			is_using = false;
 		}
@@ -2250,7 +2258,7 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, bool allow_using, 
 		expect_token_after(f, Token_Colon, "parameter list");
 
 		AstNode *type = NULL;
-		if (ellipsis_ok && f->curr_token.kind == Token_Ellipsis) {
+		if ((flags&FieldFlag_ellipsis) != 0 && f->curr_token.kind == Token_Ellipsis) {
 			Token ellipsis = f->curr_token;
 			next_token(f);
 			type = parse_type_attempt(f);
@@ -2273,7 +2281,11 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, bool allow_using, 
 			syntax_error(f->curr_token, "Expected a type for this parameter declaration");
 		}
 
-		AstNode *param = make_field(f, names, type, is_using);
+		u32 flags = 0;
+		if (is_using) {
+			flags |= FieldFlag_using;
+		}
+		AstNode *param = make_field(f, names, type, flags);
 		array_add(&params, param);
 
 		if (separator == Token_Semicolon) {
@@ -2291,8 +2303,8 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, bool allow_using, 
 }
 
 
-AstNodeArray parse_record_fields(AstFile *f, isize *field_count_, bool allow_using, String context) {
-	return parse_field_list(f, field_count_, allow_using, false, Token_Semicolon, Token_CloseBrace);
+AstNodeArray parse_record_fields(AstFile *f, isize *field_count_, u32 flags, String context) {
+	return parse_field_list(f, field_count_, flags, Token_Semicolon, Token_CloseBrace);
 }
 
 AstNode *parse_identifier_or_type(AstFile *f) {
@@ -2385,7 +2397,7 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 
 		Token open = expect_token_after(f, Token_OpenBrace, "struct");
 		isize decl_count = 0;
-		AstNodeArray decls = parse_record_fields(f, &decl_count, true, str_lit("struct"));
+		AstNodeArray decls = parse_record_fields(f, &decl_count, FieldFlag_using, str_lit("struct"));
 		Token close = expect_token(f, Token_CloseBrace);
 
 		return make_struct_type(f, token, decls, decl_count, is_packed, is_ordered);
@@ -2395,7 +2407,7 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		Token token = expect_token(f, Token_union);
 		Token open = expect_token_after(f, Token_OpenBrace, "union");
 		isize decl_count = 0;
-		AstNodeArray decls = parse_record_fields(f, &decl_count, false, str_lit("union"));
+		AstNodeArray decls = parse_record_fields(f, &decl_count, 0, str_lit("union"));
 		Token close = expect_token(f, Token_CloseBrace);
 
 		return make_union_type(f, token, decls, decl_count);
@@ -2405,7 +2417,7 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		Token token = expect_token(f, Token_raw_union);
 		Token open = expect_token_after(f, Token_OpenBrace, "raw_union");
 		isize decl_count = 0;
-		AstNodeArray decls = parse_record_fields(f, &decl_count, true, str_lit("raw_union"));
+		AstNodeArray decls = parse_record_fields(f, &decl_count, FieldFlag_using, str_lit("raw_union"));
 		Token close = expect_token(f, Token_CloseBrace);
 
 		return make_raw_union_type(f, token, decls, decl_count);
@@ -2479,7 +2491,7 @@ void parse_proc_signature(AstFile *f,
                           AstNodeArray *params,
                           AstNodeArray *results) {
 	expect_token(f, Token_OpenParen);
-	*params = parse_field_list(f, NULL, true, true, Token_Comma, Token_CloseParen);
+	*params = parse_field_list(f, NULL, FieldFlag_using|FieldFlag_ellipsis, Token_Comma, Token_CloseParen);
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	*results = parse_results(f);
 }

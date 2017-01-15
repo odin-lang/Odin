@@ -206,11 +206,7 @@ gb_global ImplicitValueInfo implicit_value_infos[ImplicitValue_Count] = {0};
 
 
 
-typedef struct CheckerContext {
-	Scope *    scope;
-	DeclInfo * decl;
-	u32        stmt_state_flags;
-} CheckerContext;
+
 
 #define MAP_TYPE TypeAndValue
 #define MAP_PROC map_tav_
@@ -242,6 +238,11 @@ typedef struct DelayedDecl {
 	AstNode *decl;
 } DelayedDecl;
 
+typedef struct CheckerContext {
+	Scope *    scope;
+	DeclInfo * decl;
+	u32        stmt_state_flags;
+} CheckerContext;
 
 // NOTE(bill): Symbol tables
 typedef struct CheckerInfo {
@@ -282,6 +283,15 @@ typedef struct Checker {
 	bool                   in_defer; // TODO(bill): Actually handle correctly
 	bool                   done_preload;
 } Checker;
+
+
+typedef struct DelayedEntity {
+	AstNode *   ident;
+	Entity *    entity;
+	DeclInfo *  decl;
+} DelayedEntity;
+
+typedef Array(DelayedEntity) DelayedEntities;
 
 
 
@@ -388,6 +398,35 @@ void check_close_scope(Checker *c) {
 	c->context.scope = c->context.scope->parent;
 }
 
+
+Entity *current_scope_lookup_entity(Scope *s, String name) {
+	HashKey key = hash_string(name);
+	Entity **found = map_entity_get(&s->elements, key);
+	if (found) {
+		return *found;
+	}
+	for_array(i, s->shared) {
+		Scope *shared = s->shared.e[i];
+		Entity **found = map_entity_get(&shared->elements, key);
+		if (found) {
+			Entity *e = *found;
+			if (e->kind == Entity_Variable &&
+			    !e->scope->is_file &&
+			    !e->scope->is_global) {
+				continue;
+			}
+
+			if (e->scope != shared) {
+				// Do not return imported entities even #include ones
+				continue;
+			}
+
+			return e;
+		}
+	}
+	return NULL;
+}
+
 void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entity **entity_) {
 	bool gone_thru_proc = false;
 	bool gone_thru_file = false;
@@ -454,21 +493,6 @@ Entity *scope_lookup_entity(Scope *s, String name) {
 	Entity *entity = NULL;
 	scope_lookup_parent_entity(s, name, NULL, &entity);
 	return entity;
-}
-
-Entity *current_scope_lookup_entity(Scope *s, String name) {
-	HashKey key = hash_string(name);
-	Entity **found = map_entity_get(&s->elements, key);
-	if (found) {
-		return *found;
-	}
-	for_array(i, s->shared) {
-		Entity **found = map_entity_get(&s->shared.e[i]->elements, key);
-		if (found) {
-			return *found;
-		}
-	}
-	return NULL;
 }
 
 
@@ -769,7 +793,8 @@ void add_entity_use(Checker *c, AstNode *identifier, Entity *entity) {
 	if (identifier->kind != AstNode_Ident) {
 		return;
 	}
-	map_entity_set(&c->info.uses, hash_pointer(identifier), entity);
+	HashKey key = hash_pointer(identifier);
+	map_entity_set(&c->info.uses, key, entity);
 	add_declaration_dependency(c, entity); // TODO(bill): Should this be here?
 }
 
@@ -942,7 +967,8 @@ void add_curr_ast_file(Checker *c, AstFile *file) {
 		TokenPos zero_pos = {0};
 		global_error_collector.prev = zero_pos;
 		c->curr_ast_file = file;
-		c->context.decl = file->decl_info;
+		c->context.decl  = file->decl_info;
+		c->context.scope = file->scope;
 	}
 }
 
@@ -1099,11 +1125,19 @@ void init_preload(Checker *c) {
 	c->done_preload = true;
 }
 
+
+
+
 bool check_arity_match(Checker *c, AstNodeValueDecl *d);
+void check_collect_entities(Checker *c, AstNodeArray nodes, MapScope *file_scopes, DelayedEntities *delayed_entities);
+void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, MapScope *file_scopes, DelayedEntities *delayed_entities);
 
 #include "check_expr.c"
 #include "check_decl.c"
 #include "check_stmt.c"
+
+
+
 
 bool check_arity_match(Checker *c, AstNodeValueDecl *d) {
 	isize lhs = d->names.count;
@@ -1135,6 +1169,202 @@ bool check_arity_match(Checker *c, AstNodeValueDecl *d) {
 	return true;
 }
 
+void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, MapScope *file_scopes, DelayedEntities *delayed_entities) {
+	// NOTE(bill): File scope and local scope are different kinds of scopes
+	GB_ASSERT(file_scopes == NULL || delayed_entities == NULL);
+
+	Operand operand = {Addressing_Invalid};
+	check_expr(c, &operand, ws->cond);
+	if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
+		error_node(ws->cond, "Non-boolean condition in `when` statement");
+	}
+	if (operand.mode != Addressing_Constant) {
+		error_node(ws->cond, "Non-constant condition in `when` statement");
+	}
+	if (ws->body == NULL || ws->body->kind != AstNode_BlockStmt) {
+		error_node(ws->cond, "Invalid body for `when` statement");
+	} else {
+		if (operand.value.kind == ExactValue_Bool &&
+		    operand.value.value_bool) {
+			check_collect_entities(c, ws->body->BlockStmt.stmts, file_scopes, delayed_entities);
+		} else if (ws->else_stmt) {
+			switch (ws->else_stmt->kind) {
+			case AstNode_BlockStmt:
+				check_collect_entities(c, ws->else_stmt->BlockStmt.stmts, file_scopes, delayed_entities);
+				break;
+			case AstNode_WhenStmt:
+				check_collect_entities_from_when_stmt(c, &ws->else_stmt->WhenStmt, file_scopes, delayed_entities);
+				break;
+			default:
+				error_node(ws->else_stmt, "Invalid `else` statement in `when` statement");
+				break;
+			}
+		}
+	}
+}
+
+// NOTE(bill): If file_scopes == NULL, this will act like a local scope
+void check_collect_entities(Checker *c, AstNodeArray nodes, MapScope *file_scopes, DelayedEntities *delayed_entities) {
+	// NOTE(bill): File scope and local scope are different kinds of scopes
+	GB_ASSERT(file_scopes == NULL || delayed_entities == NULL);
+	if (file_scopes != NULL) {
+		GB_ASSERT(c->context.scope->is_file);
+	}
+	if (delayed_entities != NULL) {
+		GB_ASSERT(!c->context.scope->is_file);
+	}
+
+	for_array(decl_index, nodes) {
+		AstNode *decl = nodes.e[decl_index];
+		if (!is_ast_node_decl(decl) && !is_ast_node_when_stmt(decl)) {
+			continue;
+		}
+
+		switch (decl->kind) {
+		case_ast_node(bd, BadDecl, decl);
+		case_end;
+
+		case_ast_node(ws, WhenStmt, decl);
+			if (c->context.scope->is_file) {
+				error_node(decl, "`when` statements are not allowed at file scope");
+			} else {
+				// Will be handled later
+			}
+		case_end;
+
+		case_ast_node(vd, ValueDecl, decl);
+			if (vd->is_var) {
+				if (!c->context.scope->is_file) {
+					// NOTE(bill): local scope -> handle later and in order
+					break;
+				}
+				// NOTE(bill): You need to store the entity information here unline a constant declaration
+				isize entity_count = vd->names.count;
+				isize entity_index = 0;
+				Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
+				DeclInfo *di = NULL;
+				if (vd->values.count > 0) {
+					di = make_declaration_info(heap_allocator(), c->context.scope);
+					di->entities = entities;
+					di->entity_count = entity_count;
+					di->type_expr = vd->type;
+					di->init_expr = vd->values.e[0];
+				}
+
+				for_array(i, vd->names) {
+					AstNode *name = vd->names.e[i];
+					AstNode *value = NULL;
+					if (i < vd->values.count) {
+						value = vd->values.e[i];
+					}
+					if (name->kind != AstNode_Ident) {
+						error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+						continue;
+					}
+					Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL);
+					e->identifier = name;
+					entities[entity_index++] = e;
+
+					DeclInfo *d = di;
+					if (d == NULL) {
+						AstNode *init_expr = value;
+						d = make_declaration_info(heap_allocator(), e->scope);
+						d->type_expr = vd->type;
+						d->init_expr = init_expr;
+						d->var_decl_tags = vd->tags;
+					}
+
+					add_entity_and_decl_info(c, name, e, d);
+				}
+
+				check_arity_match(c, vd);
+			} else {
+				for_array(i, vd->names) {
+					AstNode *name = vd->names.e[i];
+					if (name->kind != AstNode_Ident) {
+						error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+						continue;
+					}
+
+					AstNode *init = NULL;
+					if (i < vd->values.count) {
+						init = vd->values.e[i];
+					}
+
+					DeclInfo *d = make_declaration_info(c->allocator, c->context.scope);
+					Entity *e = NULL;
+
+					AstNode *up_init = unparen_expr(init);
+					if (init != NULL && is_ast_node_type(up_init)) {
+						e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
+						// TODO(bill): What if vd->type != NULL??? How to handle this case?
+						d->type_expr = init;
+						d->init_expr = init;
+					} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
+						e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
+						d->proc_lit = init;
+						d->type_expr = vd->type;
+					} else {
+						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, (ExactValue){0});
+						d->type_expr = vd->type;
+						d->init_expr = init;
+					}
+					GB_ASSERT(e != NULL);
+					e->identifier = name;
+
+					add_entity_and_decl_info(c, name, e, d);
+				}
+
+				check_arity_match(c, vd);
+			}
+		case_end;
+
+		case_ast_node(id, ImportDecl, decl);
+			if (!c->context.scope->is_file) {
+				if (id->is_import) {
+					error_node(decl, "#import declarations are only allowed in the file scope");
+				} else {
+					error_node(decl, "#include declarations are only allowed in the file scope");
+				}
+				// NOTE(bill): _Should_ be caught by the parser
+				// TODO(bill): Better error handling if it isn't
+				continue;
+			}
+			DelayedDecl di = {c->context.scope, decl};
+			array_add(&c->delayed_imports, di);
+		case_end;
+		case_ast_node(fl, ForeignLibrary, decl);
+			if (!c->context.scope->is_file) {
+				error_node(decl, "#foreign_library declarations are only allowed in the file scope");
+				// NOTE(bill): _Should_ be caught by the parser
+				// TODO(bill): Better error handling if it isn't
+				continue;
+			}
+
+			DelayedDecl di = {c->context.scope, decl};
+			array_add(&c->delayed_foreign_libraries, di);
+		case_end;
+		default:
+			if (c->context.scope->is_file) {
+				error_node(decl, "Only declarations are allowed at file scope");
+			}
+			break;
+		}
+	}
+
+	if (!c->context.scope->is_file) {
+		// NOTE(bill): `when` stmts need to be handled after the other as the condition may refer to something
+		// declared after this stmt in source
+		for_array(i, nodes) {
+			AstNode *node = nodes.e[i];
+			switch (node->kind) {
+			case_ast_node(ws, WhenStmt, node);
+				check_collect_entities_from_when_stmt(c, ws, file_scopes, delayed_entities);
+			case_end;
+			}
+		}
+	}
+}
 
 
 void check_all_global_entities(Checker *c) {
@@ -1171,126 +1401,6 @@ void check_all_global_entities(Checker *c) {
 	}
 }
 
-void check_global_collect_entities_from_file(Checker *c, Scope *parent_scope, AstNodeArray nodes, MapScope *file_scopes) {
-	for_array(decl_index, nodes) {
-		AstNode *decl = nodes.e[decl_index];
-		if (!is_ast_node_decl(decl) && !is_ast_node_when_stmt(decl)) {
-			continue;
-		}
-
-		switch (decl->kind) {
-		case_ast_node(bd, BadDecl, decl);
-		case_end;
-
-		case_ast_node(vd, ValueDecl, decl);
-			if (vd->is_var) {
-				// NOTE(bill): You need to store the entity information here unline a constant declaration
-				isize entity_count = vd->names.count;
-				isize entity_index = 0;
-				Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
-				DeclInfo *di = NULL;
-				if (vd->values.count > 0) {
-					di = make_declaration_info(heap_allocator(), parent_scope);
-					di->entities = entities;
-					di->entity_count = entity_count;
-					di->type_expr = vd->type;
-					di->init_expr = vd->values.e[0];
-				}
-
-				for_array(i, vd->names) {
-					AstNode *name = vd->names.e[i];
-					AstNode *value = NULL;
-					if (i < vd->values.count) {
-						value = vd->values.e[i];
-					}
-					if (name->kind != AstNode_Ident) {
-						error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-						continue;
-					}
-					Entity *e = make_entity_variable(c->allocator, parent_scope, name->Ident, NULL);
-					e->identifier = name;
-					entities[entity_index++] = e;
-
-					DeclInfo *d = di;
-					if (d == NULL) {
-						AstNode *init_expr = value;
-						d = make_declaration_info(heap_allocator(), e->scope);
-						d->type_expr = vd->type;
-						d->init_expr = init_expr;
-						d->var_decl_tags = vd->tags;
-					}
-
-					add_entity_and_decl_info(c, name, e, d);
-				}
-
-				check_arity_match(c, vd);
-			} else {
-				for_array(i, vd->names) {
-					AstNode *name = vd->names.e[i];
-					if (name->kind != AstNode_Ident) {
-						error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-						continue;
-					}
-
-
-					AstNode *init = NULL;
-					if (i < vd->values.count) {
-						init = vd->values.e[i];
-					}
-
-					DeclInfo *d = make_declaration_info(c->allocator, parent_scope);
-					Entity *e = NULL;
-
-					AstNode *up_init = unparen_expr(init);
-					if (init != NULL && is_ast_node_type(up_init)) {
-						e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
-						d->type_expr = init;
-						d->init_expr = init;
-					} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
-						e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
-						d->proc_lit = init;
-					} else {
-						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, (ExactValue){0});
-						d->type_expr = vd->type;
-						d->init_expr = init;
-					}
-					GB_ASSERT(e != NULL);
-					e->identifier = name;
-
-					add_entity_and_decl_info(c, name, e, d);
-				}
-
-				check_arity_match(c, vd);
-			}
-		case_end;
-
-		case_ast_node(id, ImportDecl, decl);
-			if (!parent_scope->is_file) {
-				// NOTE(bill): _Should_ be caught by the parser
-				// TODO(bill): Better error handling if it isn't
-				continue;
-			}
-			DelayedDecl di = {parent_scope, decl};
-			array_add(&c->delayed_imports, di);
-		case_end;
-		case_ast_node(fl, ForeignLibrary, decl);
-			if (!parent_scope->is_file) {
-				// NOTE(bill): _Should_ be caught by the parser
-				// TODO(bill): Better error handling if it isn't
-				continue;
-			}
-
-			DelayedDecl di = {parent_scope, decl};
-			array_add(&c->delayed_foreign_libraries, di);
-		case_end;
-		default:
-			if (parent_scope->is_file) {
-				error_node(decl, "Only declarations are allowed at file scope");
-			}
-			break;
-		}
-	}
-}
 
 void check_import_entities(Checker *c, MapScope *file_scopes) {
 	for_array(i, c->delayed_imports) {
@@ -1463,8 +1573,10 @@ void check_parsed_files(Checker *c) {
 	// Collect Entities
 	for_array(i, c->parser->files) {
 		AstFile *f = &c->parser->files.e[i];
+		CheckerContext prev_context = c->context;
 		add_curr_ast_file(c, f);
-		check_global_collect_entities_from_file(c, f->scope, f->decls, &file_scopes);
+		check_collect_entities(c, f->decls, &file_scopes, NULL);
+		c->context = prev_context;
 	}
 
 	check_import_entities(c, &file_scopes);
@@ -1472,7 +1584,7 @@ void check_parsed_files(Checker *c) {
 
 	check_all_global_entities(c);
 	init_preload(c); // NOTE(bill): This could be setup previously through the use of `type_info(_of_val)`
-	// NOTE(bill): Nothing is the global scope _should_ depend on this implicit value as implicit
+	// NOTE(bill): Nothing in the global scope _should_ depend on this implicit value as implicit
 	// values are only useful within procedures
 	add_implicit_value(c, ImplicitValue_context, str_lit("context"), str_lit("__context"), t_context);
 
@@ -1497,12 +1609,12 @@ void check_parsed_files(Checker *c) {
 	// NOTE(bill): Nested procedures bodies will be added to this "queue"
 	for_array(i, c->procs) {
 		ProcedureInfo *pi = &c->procs.e[i];
+		CheckerContext prev_context = c->context;
 		add_curr_ast_file(c, pi->file);
 
 		bool bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
 		bool no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
 
-		CheckerContext prev_context = c->context;
 
 		if (bounds_check) {
 			c->context.stmt_state_flags |= StmtStateFlag_bounds_check;
@@ -1554,8 +1666,10 @@ void check_parsed_files(Checker *c) {
 	for_array(i, c->info.definitions.entries) {
 		Entity *e = c->info.definitions.entries.e[i].value;
 		if (e->kind == Entity_TypeName) {
-			// i64 size  = type_size_of(c->sizes, c->allocator, e->type);
-			i64 align = type_align_of(c->sizes, c->allocator, e->type);
+			if (e->type != NULL) {
+				// i64 size  = type_size_of(c->sizes, c->allocator, e->type);
+				i64 align = type_align_of(c->sizes, c->allocator, e->type);
+			}
 		}
 	}
 

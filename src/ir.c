@@ -1516,6 +1516,18 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 
 
 	switch (op) {
+	case Token_Shl:
+	case Token_Shr:
+		left = ir_emit_conv(proc, left, type);
+		if (!is_type_unsigned(ir_type(right))) {
+			Type *t = t_u64;
+			if (proc->module->sizes.word_size == 32) {
+				t = t_u32;
+			}
+			right = ir_emit_conv(proc, right, t);
+		}
+		break;
+
 	case Token_AndNot: {
 		// NOTE(bill): x &~ y == x & (~y) == x & (y ~ -1)
 		// NOTE(bill): "not" `x` == `x` "xor" `-1`
@@ -1534,8 +1546,6 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	case Token_And:
 	case Token_Or:
 	case Token_Xor:
-	case Token_Shl:
-	case Token_Shr:
 		left  = ir_emit_conv(proc, left, type);
 		right = ir_emit_conv(proc, right, type);
 		break;
@@ -1949,15 +1959,15 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		          dst->kind == Type_Basic);
 		i64 sz = type_size_of(proc->module->sizes, proc->module->allocator, src);
 		i64 dz = type_size_of(proc->module->sizes, proc->module->allocator, dst);
+		irConvKind kind = irConv_trunc;
 		if (sz == dz) {
 			// NOTE(bill): In LLVM, all integers are signed and rely upon 2's compliment
-			return value;
-		}
-
-		irConvKind kind = irConv_trunc;
-		if (dz >= sz) {
+			// NOTE(bill): Copy the value just for type correctness
+			kind = irConv_bitcast;
+		} else if (dz > sz) {
 			kind = irConv_zext;
 		}
+
 		return ir_emit(proc, ir_make_instr_conv(proc, kind, value, src, dst));
 	}
 
@@ -2560,7 +2570,8 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
 	case_ast_node(bl, BasicLit, expr);
-		GB_PANIC("Non-constant basic literal");
+		TokenPos pos = bl->pos;
+		GB_PANIC("Non-constant basic literal %.*s(%td:%td) - %.*s", LIT(pos.file), pos.line, pos.column, LIT(token_strings[bl->kind]));
 	case_end;
 
 	case_ast_node(i, Ident, expr);
@@ -2596,7 +2607,7 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 
 	case_ast_node(re, RunExpr, expr);
 		// TODO(bill): Run Expression
-		return ir_build_single_expr(proc, re->expr, tv);
+		return ir_build_expr(proc, re->expr);
 	case_end;
 
 	case_ast_node(de, DerefExpr, expr);
@@ -5834,9 +5845,10 @@ void ir_gen_tree(irGen *s) {
 				case Type_Proc: {
 					tag = ir_emit_conv(proc, ti_ptr, t_type_info_procedure_ptr);
 
-					irValue *params   = ir_emit_struct_ep(proc, tag, 0);
-					irValue *results  = ir_emit_struct_ep(proc, tag, 1);
-					irValue *variadic = ir_emit_struct_ep(proc, tag, 2);
+					irValue *params     = ir_emit_struct_ep(proc, tag, 0);
+					irValue *results    = ir_emit_struct_ep(proc, tag, 1);
+					irValue *variadic   = ir_emit_struct_ep(proc, tag, 2);
+					irValue *convention = ir_emit_struct_ep(proc, tag, 3);
 
 					if (t->Proc.params) {
 						ir_emit_store(proc, params, ir_get_type_info_ptr(proc, type_info_data, t->Proc.params));
@@ -5845,6 +5857,7 @@ void ir_gen_tree(irGen *s) {
 						ir_emit_store(proc, results, ir_get_type_info_ptr(proc, type_info_data, t->Proc.results));
 					}
 					ir_emit_store(proc, variadic, ir_make_const_bool(a, t->Proc.variadic));
+					ir_emit_store(proc, convention, ir_make_const_int(a, t->Proc.calling_convention));
 
 					// TODO(bill): Type_Info for procedures
 				} break;

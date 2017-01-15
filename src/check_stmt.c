@@ -3,7 +3,7 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 		return;
 	}
 
-	check_scope_decls(c, stmts, 1.2*stmts.count, NULL);
+	check_scope_decls(c, stmts, 1.2*stmts.count);
 
 	bool ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
 	flags &= ~Stmt_FallthroughAllowed;
@@ -602,9 +602,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 
 			Type *type = x.type;
-			Type *bt = base_type(base_enum_type(type));
-
-			if (!is_type_integer(bt) && !is_type_float(bt) && !is_type_pointer(bt)) {
+			if (!is_type_integer(type) && !is_type_float(type) && !is_type_pointer(type)) {
 				error(ie->op, "Only numerical and pointer types are allowed within interval expressions");
 				goto skip_expr;
 			}
@@ -784,27 +782,28 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			for_array(j, cc->list) {
 				AstNode *expr = cc->list.e[j];
 				Operand y = {0};
-				Operand z = {0};
-				Token eq = {Token_CmpEq};
 
 				check_expr(c, &y, expr);
 				if (x.mode == Addressing_Invalid ||
 				    y.mode == Addressing_Invalid) {
 					continue;
 				}
+
 				convert_to_typed(c, &y, x.type, 0);
 				if (y.mode == Addressing_Invalid) {
 					continue;
 				}
 
-				z = y;
-				check_comparison(c, &z, &x, eq);
+				// NOTE(bill): the ordering here matters
+				Operand z = y;
+				check_comparison(c, &z, &x, Token_CmpEq);
 				if (z.mode == Addressing_Invalid) {
 					continue;
 				}
 				if (y.mode != Addressing_Constant) {
 					continue;
 				}
+
 
 				if (y.value.kind != ExactValue_Invalid) {
 					HashKey key = hash_exact_value(y.value);
