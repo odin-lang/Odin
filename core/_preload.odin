@@ -111,16 +111,16 @@ __debug_trap       :: proc()        #foreign "llvm.debugtrap"
 __trap             :: proc()        #foreign "llvm.trap"
 read_cycle_counter :: proc() -> u64 #foreign "llvm.readcyclecounter"
 
-bit_reverse16 :: proc(b: u16) -> u16 #foreign "llvm.bitreverse.i16"
-bit_reverse32 :: proc(b: u32) -> u32 #foreign "llvm.bitreverse.i32"
-bit_reverse64 :: proc(b: u64) -> u64 #foreign "llvm.bitreverse.i64"
+bit_reverse :: proc(b: u16) -> u16 #foreign "llvm.bitreverse.i16"
+bit_reverse :: proc(b: u32) -> u32 #foreign "llvm.bitreverse.i32"
+bit_reverse :: proc(b: u64) -> u64 #foreign "llvm.bitreverse.i64"
 
-byte_swap16 :: proc(b: u16) -> u16 #foreign "llvm.bswap.i16"
-byte_swap32 :: proc(b: u32) -> u32 #foreign "llvm.bswap.i32"
-byte_swap64 :: proc(b: u64) -> u64 #foreign "llvm.bswap.i64"
+byte_swap :: proc(b: u16) -> u16 #foreign "llvm.bswap.i16"
+byte_swap :: proc(b: u32) -> u32 #foreign "llvm.bswap.i32"
+byte_swap :: proc(b: u64) -> u64 #foreign "llvm.bswap.i64"
 
-fmuladd32 :: proc(a, b, c: f32) -> f32 #foreign "llvm.fmuladd.f32"
-fmuladd64 :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
+fmuladd :: proc(a, b, c: f32) -> f32 #foreign "llvm.fmuladd.f32"
+fmuladd :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
 
 
 

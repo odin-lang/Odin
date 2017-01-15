@@ -505,6 +505,9 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	String name = entity->token.string;
 	HashKey key = hash_string(name);
 	Entity **found = map_entity_get(&s->elements, key);
+
+#if 1
+	// IMPORTANT NOTE(bill): Procedure overloading code
 	Entity *prev = NULL;
 	if (found) {
 		prev = *found;
@@ -517,15 +520,16 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	}
 
 	if (prev != NULL && entity->kind == Entity_Procedure) {
-		// TODO(bill): Remove from final release
-		isize prev_count, next_count;
-		prev_count = map_entity_multi_count(&s->elements, key);
 		map_entity_multi_insert(&s->elements, key, entity);
-		next_count = map_entity_multi_count(&s->elements, key);
-		GB_ASSERT(prev_count < next_count);
 	} else {
 		map_entity_set(&s->elements, key, entity);
 	}
+#else
+	if (found) {
+		return *found;
+	}
+	map_entity_set(&s->elements, key, entity);
+#endif
 	if (entity->scope == NULL) {
 		entity->scope = s;
 	}

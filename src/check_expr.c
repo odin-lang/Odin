@@ -91,19 +91,24 @@ bool check_is_assignable_to_using_subtype(Type *dst, Type *src) {
 }
 
 
-bool check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
+
+bool check_is_assignable_to_with_score(Checker *c, Operand *operand, Type *type, i64 *score) {
+	// IMPORTANT TODO(bill): Determine score for assignments with use with overloaded procedures
 	if (operand->mode == Addressing_Invalid ||
 	    type == t_invalid) {
+		if (score) *score = 0;
 		return true;
 	}
 
 	if (operand->mode == Addressing_Builtin) {
+		if (score) *score = 0;
 		return false;
 	}
 
 	Type *s = operand->type;
 
 	if (are_types_identical(s, type)) {
+		if (score) *score = 10;
 		return true;
 	}
 
@@ -111,15 +116,13 @@ bool check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
 	Type *dst = base_type(type);
 
 	if (is_type_untyped(src)) {
-		switch (dst->kind) {
-		case Type_Basic:
+		if (dst->kind == Type_Basic) {
 			if (operand->mode == Addressing_Constant) {
 				return check_value_is_expressible(c, operand->value, dst, NULL);
 			}
 			if (src->kind == Type_Basic && src->Basic.kind == Basic_UntypedBool) {
 				return is_type_boolean(dst);
 			}
-			break;
 		}
 		if (type_has_nil(dst)) {
 			return operand->mode == Addressing_Value && operand->type == t_untyped_nil;
@@ -132,7 +135,8 @@ bool check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
 
 	if (is_type_maybe(dst)) {
 		Type *elem = base_type(dst)->Maybe.elem;
-		return are_types_identical(elem, s);
+		bool ok = are_types_identical(elem, s);
+		return ok;
 	}
 
 	if (is_type_untyped_nil(src)) {
@@ -186,6 +190,12 @@ bool check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
 	}
 
 	return false;
+}
+
+
+bool check_is_assignable_to(Checker *c, Operand *operand, Type *type) {
+	i64 score = 0;
+	return check_is_assignable_to_with_score(c, operand, type, &score);
 }
 
 
@@ -3407,11 +3417,13 @@ typedef enum CallArgumentError {
 	CallArgumentError_TooManyArguments,
 } CallArgumentError;
 
-CallArgumentError check_call_arguments_internal(Checker *c, AstNode *call, Type *proc_type, Operand *operands, isize operand_count, bool show_error, i64 *score) {
+CallArgumentError check_call_arguments_internal(Checker *c, AstNode *call, Type *proc_type, Operand *operands, isize operand_count,
+                                                bool show_error, i64 *score_) {
 	ast_node(ce, CallExpr, call);
 	isize param_count = 0;
 	bool variadic = proc_type->Proc.variadic;
 	bool vari_expand = (ce->ellipsis.pos.line != 0);
+	i64 score = 0;
 
 	if (proc_type->Proc.params != NULL) {
 		param_count = proc_type->Proc.params->Tuple.variable_count;
@@ -3426,10 +3438,12 @@ CallArgumentError check_call_arguments_internal(Checker *c, AstNode *call, Type 
 			      "Cannot use `..` in call to a non-variadic procedure: `%.*s`",
 			      LIT(ce->proc->Ident.string));
 		}
+		if (score_) *score_ = score;
 		return CallArgumentError_NonVariadicExpand;
 	}
 
 	if (operand_count == 0 && param_count == 0) {
+		if (score_) *score_ = score;
 		return CallArgumentError_None;
 	}
 
@@ -3452,6 +3466,7 @@ CallArgumentError check_call_arguments_internal(Checker *c, AstNode *call, Type 
 			error_node(call, err_fmt, proc_str, param_count);
 			gb_string_free(proc_str);
 		}
+		if (score_) *score_ = score;
 		return err;
 	}
 
@@ -3466,12 +3481,14 @@ CallArgumentError check_call_arguments_internal(Checker *c, AstNode *call, Type 
 		if (variadic) {
 			o = operands[operand_index];
 		}
-		if (!check_is_assignable_to(c, &o, t)) {
+		i64 s = 0;
+		if (!check_is_assignable_to_with_score(c, &o, t, &s)) {
 			if (show_error) {
 				check_assignment(c, &o, t, str_lit("argument"));
 			}
 			err = CallArgumentError_WrongTypes;
 		}
+		score += s;
 	}
 
 	if (variadic) {
@@ -3489,18 +3506,22 @@ CallArgumentError check_call_arguments_internal(Checker *c, AstNode *call, Type 
 					if (show_error) {
 						error_node(o.expr, "`..` in a variadic procedure can only have one variadic argument at the end");
 					}
+					if (score_) *score_ = score;
 					return CallArgumentError_MultipleVariadicExpand;
 				}
 			}
-			if (!check_is_assignable_to(c, &o, t)) {
+			i64 s = 0;
+			if (!check_is_assignable_to_with_score(c, &o, t, &s)) {
 				if (show_error) {
 					check_assignment(c, &o, t, str_lit("argument"));
 				}
 				err = CallArgumentError_WrongTypes;
 			}
+			score += s;
 		}
 	}
 
+	if (score_) *score_ = score;
 	return err;
 }
 
@@ -3532,10 +3553,11 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 		String name = operand->initial_overload_entity->token.string;
 		HashKey key = hash_string(name);
 
-		isize overload_count = operand->overload_count;
-		Entity **procs = gb_alloc_array(heap_allocator(), Entity *, overload_count);
-		isize *valid_procs = gb_alloc_array(heap_allocator(), isize, overload_count);
-		isize valid_proc_count = 0;
+		isize    overload_count = operand->overload_count;
+		Entity **procs          = gb_alloc_array(heap_allocator(), Entity *, overload_count);
+		isize *  valid_procs    = gb_alloc_array(heap_allocator(), isize, overload_count);
+		i64 *    valid_scores   = gb_alloc_array(heap_allocator(), i64, overload_count);
+		isize    valid_count    = 0;
 
 		map_entity_multi_get_all(&s->elements, key, procs);
 
@@ -3554,18 +3576,36 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 				i64 score = 0;
 				CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.e, operands.count, false, &score);
 				if (err == CallArgumentError_None) {
-					valid_procs[valid_proc_count++] = i;
+					valid_procs[valid_count] = i;
+					valid_scores[valid_count] = score;
+					valid_count++;
 				}
 			}
 		}
 
+		// IMPORTANT TODO(bill): Get the best proc by its score
+		// i64 best_score = 0;
+		// isize best_index = 0;
+		// for (isize i = 0; i < valid_count; i++) {
+		// 	if (best_score < valid_scores[i]) {
+		// 		best_score = valid_scores[i];
+		// 		best_index = i;
+		// 	}
+		// }
 
-		if (valid_proc_count == 0) {
+
+		if (valid_count == 0) {
 			error_node(operand->expr, "No overloads for `%.*s` that match the specified arguments", LIT(name));
+			proc_type = t_invalid;
+		} else if (valid_count > 1) {
+			error_node(operand->expr, "Ambiguous procedure call `%.*s`, could be:", LIT(name));
+			for (isize i = 0; i < valid_count; i++) {
+				TokenPos pos = procs[valid_procs[i]]->token.pos;
+				gb_printf_err("\t`%.*s` at %.*s(%td:%td)\n", LIT(name), LIT(pos.file), pos.line, pos.column);
+			}
 			proc_type = t_invalid;
 		} else {
 			GB_ASSERT(operand->expr->kind == AstNode_Ident);
-			// IMPORTANT TODO(bill): Get the best proc by its score
 			Entity *e = procs[valid_procs[0]];
 			add_entity_use(c, operand->expr, e);
 			proc_type = e->type;
@@ -3581,62 +3621,6 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 		array_free(&operands);
 	}
 	return proc_type;
-
-/*
-	i32 error_code = 0;
-	if (operands.count < param_count) {
-		error_code = -1;
-	} else if (!variadic && operands.count > param_count) {
-		error_code = +1;
-	}
-	if (error_code != 0) {
-		char *err_fmt = "Too many arguments for `%s`, expected %td arguments";
-		if (error_code < 0) {
-			err_fmt = "Too few arguments for `%s`, expected %td arguments";
-		}
-
-		gbString proc_str = expr_to_string(ce->proc);
-		error_node(call, err_fmt, proc_str, param_count);
-		gb_string_free(proc_str);
-		operand->mode = Addressing_Invalid;
-		goto end;
-	}
-
-	GB_ASSERT(proc_type->Proc.params != NULL);
-	Entity **sig_params = proc_type->Proc.params->Tuple.variables;
-	isize operand_index = 0;
-	for (; operand_index < param_count; operand_index++) {
-		Type *arg_type = sig_params[operand_index]->type;
-		Operand o = operands.e[operand_index];
-		if (variadic) {
-			o = operands.e[operand_index];
-		}
-		check_assignment(c, &o, arg_type, str_lit("argument"));
-	}
-
-	if (variadic) {
-		bool variadic_expand = false;
-		Type *slice = sig_params[param_count]->type;
-		GB_ASSERT(is_type_slice(slice));
-		Type *elem = base_type(slice)->Slice.elem;
-		Type *t = elem;
-		for (; operand_index < operands.count; operand_index++) {
-			Operand o = operands.e[operand_index];
-			if (vari_expand) {
-				variadic_expand = true;
-				t = slice;
-				if (operand_index != param_count) {
-					error_node(o.expr, "`..` in a variadic procedure can only have one variadic argument at the end");
-					break;
-				}
-			}
-			check_assignment(c, &o, t, str_lit("argument"));
-		}
-	}
-end:
-
-	return proc_type;
-*/
 }
 
 

@@ -24,46 +24,46 @@ Mat2 :: [2]Vec2;
 Mat3 :: [3]Vec3;
 Mat4 :: [4]Vec4;
 
-sqrt32 :: proc(x: f32) -> f32 #foreign "llvm.sqrt.f32"
-sqrt64 :: proc(x: f64) -> f64 #foreign "llvm.sqrt.f64"
+sqrt :: proc(x: f32) -> f32 #foreign "llvm.sqrt.f32"
+sqrt :: proc(x: f64) -> f64 #foreign "llvm.sqrt.f64"
 
-sin32 :: proc(x: f32) -> f32 #foreign "llvm.sin.f32"
-sin64 :: proc(x: f64) -> f64 #foreign "llvm.sin.f64"
+sin :: proc(x: f32) -> f32 #foreign "llvm.sin.f32"
+sin :: proc(x: f64) -> f64 #foreign "llvm.sin.f64"
 
-cos32 :: proc(x: f32) -> f32 #foreign "llvm.cos.f32"
-cos64 :: proc(x: f64) -> f64 #foreign "llvm.cos.f64"
+cos :: proc(x: f32) -> f32 #foreign "llvm.cos.f32"
+cos :: proc(x: f64) -> f64 #foreign "llvm.cos.f64"
 
-tan32 :: proc(x: f32) -> f32 #inline { return sin32(x)/cos32(x); }
-tan64 :: proc(x: f64) -> f64 #inline { return sin64(x)/cos64(x); }
+tan :: proc(x: f32) -> f32 #inline { return sin(x)/cos(x); }
+tan :: proc(x: f64) -> f64 #inline { return sin(x)/cos(x); }
 
-lerp32 :: proc(a, b, t: f32) -> f32 { return a*(1-t) + b*t; }
-lerp64 :: proc(a, b, t: f64) -> f64 { return a*(1-t) + b*t; }
+lerp :: proc(a, b, t: f32) -> f32 { return a*(1-t) + b*t; }
+lerp :: proc(a, b, t: f64) -> f64 { return a*(1-t) + b*t; }
 
-sign32 :: proc(x: f32) -> f32 { if x >= 0 { return +1; } return -1; }
-sign64 :: proc(x: f64) -> f64 { if x >= 0 { return +1; } return -1; }
+sign :: proc(x: f32) -> f32 { if x >= 0 { return +1; } return -1; }
+sign :: proc(x: f64) -> f64 { if x >= 0 { return +1; } return -1; }
 
 
 
-copy_sign32 :: proc(x, y: f32) -> f32 {
+copy_sign :: proc(x, y: f32) -> f32 {
 	ix := x transmute u32;
 	iy := y transmute u32;
 	ix &= 0x7fffffff;
 	ix |= iy & 0x80000000;
 	return ix transmute f32;
 }
-round32 :: proc(x: f32) -> f32 {
+round :: proc(x: f32) -> f32 {
 	if x >= 0 {
-		return floor32(x + 0.5);
+		return floor(x + 0.5);
 	}
-	return ceil32(x - 0.5);
+	return ceil(x - 0.5);
 }
-floor32 :: proc(x: f32) -> f32 {
+floor :: proc(x: f32) -> f32 {
 	if x >= 0 {
 		return x as int as f32;
 	}
 	return (x-0.5) as int as f32;
 }
-ceil32 :: proc(x: f32) -> f32 {
+ceil :: proc(x: f32) -> f32 {
 	if x < 0 {
 		return x as int as f32;
 	}
@@ -71,16 +71,16 @@ ceil32 :: proc(x: f32) -> f32 {
 }
 
 remainder32 :: proc(x, y: f32) -> f32 {
-	return x - round32(x/y) * y;
+	return x - round(x/y) * y;
 }
 
 fmod32 :: proc(x, y: f32) -> f32 {
 	y = abs(y);
 	result := remainder32(abs(x), y);
-	if sign32(result) < 0 {
+	if sign(result) < 0 {
 		result += y;
 	}
-	return copy_sign32(result, x);
+	return copy_sign(result, x);
 }
 
 
@@ -90,43 +90,43 @@ to_degrees :: proc(radians: f32) -> f32 { return radians * 360 / TAU; }
 
 
 
-dot2 :: proc(a, b: Vec2) -> f32 { c := a*b; return c.x + c.y; }
-dot3 :: proc(a, b: Vec3) -> f32 { c := a*b; return c.x + c.y + c.z; }
-dot4 :: proc(a, b: Vec4) -> f32 { c := a*b; return c.x + c.y + c.z + c.w; }
+dot :: proc(a, b: Vec2) -> f32 { c := a*b; return c.x + c.y; }
+dot :: proc(a, b: Vec3) -> f32 { c := a*b; return c.x + c.y + c.z; }
+dot :: proc(a, b: Vec4) -> f32 { c := a*b; return c.x + c.y + c.z + c.w; }
 
-cross3 :: proc(x, y: Vec3) -> Vec3 {
+cross :: proc(x, y: Vec3) -> Vec3 {
 	a := swizzle(x, 1, 2, 0) * swizzle(y, 2, 0, 1);
 	b := swizzle(x, 2, 0, 1) * swizzle(y, 1, 2, 0);
 	return a - b;
 }
 
 
-vec2_mag :: proc(v: Vec2) -> f32 { return sqrt32(dot2(v, v)); }
-vec3_mag :: proc(v: Vec3) -> f32 { return sqrt32(dot3(v, v)); }
-vec4_mag :: proc(v: Vec4) -> f32 { return sqrt32(dot4(v, v)); }
+mag :: proc(v: Vec2) -> f32 { return sqrt(dot(v, v)); }
+mag :: proc(v: Vec3) -> f32 { return sqrt(dot(v, v)); }
+mag :: proc(v: Vec4) -> f32 { return sqrt(dot(v, v)); }
 
-vec2_norm :: proc(v: Vec2) -> Vec2 { return v / Vec2{vec2_mag(v)}; }
-vec3_norm :: proc(v: Vec3) -> Vec3 { return v / Vec3{vec3_mag(v)}; }
-vec4_norm :: proc(v: Vec4) -> Vec4 { return v / Vec4{vec4_mag(v)}; }
+norm :: proc(v: Vec2) -> Vec2 { return v / Vec2{mag(v)}; }
+norm :: proc(v: Vec3) -> Vec3 { return v / Vec3{mag(v)}; }
+norm :: proc(v: Vec4) -> Vec4 { return v / Vec4{mag(v)}; }
 
-vec2_norm0 :: proc(v: Vec2) -> Vec2 {
-	m := vec2_mag(v);
+norm0 :: proc(v: Vec2) -> Vec2 {
+	m := mag(v);
 	if m == 0 {
 		return Vec2{0};
 	}
 	return v / Vec2{m};
 }
 
-vec3_norm0 :: proc(v: Vec3) -> Vec3 {
-	m := vec3_mag(v);
+norm0 :: proc(v: Vec3) -> Vec3 {
+	m := mag(v);
 	if m == 0 {
 		return Vec3{0};
 	}
 	return v / Vec3{m};
 }
 
-vec4_norm0 :: proc(v: Vec4) -> Vec4 {
-	m := vec4_mag(v);
+norm0 :: proc(v: Vec4) -> Vec4 {
+	m := mag(v);
 	if m == 0 {
 		return Vec4{0};
 	}
@@ -153,7 +153,7 @@ mat4_transpose :: proc(m: Mat4) -> Mat4 {
 	return m;
 }
 
-mat4_mul :: proc(a, b: Mat4) -> Mat4 {
+mul :: proc(a, b: Mat4) -> Mat4 {
 	c: Mat4;
 	for j : 0..<4 {
 		for i : 0..<4 {
@@ -166,7 +166,7 @@ mat4_mul :: proc(a, b: Mat4) -> Mat4 {
 	return c;
 }
 
-mat4_mul_vec4 :: proc(m: Mat4, v: Vec4) -> Vec4 {
+mul_vec4 :: proc(m: Mat4, v: Vec4) -> Vec4 {
 	return Vec4{
 		m[0][0]*v.x + m[1][0]*v.y + m[2][0]*v.z + m[3][0]*v.w,
 		m[0][1]*v.x + m[1][1]*v.y + m[2][1]*v.z + m[3][1]*v.w,
@@ -175,7 +175,7 @@ mat4_mul_vec4 :: proc(m: Mat4, v: Vec4) -> Vec4 {
 	};
 }
 
-mat4_inverse :: proc(m: Mat4) -> Mat4 {
+inverse :: proc(m: Mat4) -> Mat4 {
 	o: Mat4;
 
 	sf00 := m[2][2] * m[3][3] - m[3][2] * m[2][3];
@@ -254,10 +254,10 @@ mat4_translate :: proc(v: Vec3) -> Mat4 {
 }
 
 mat4_rotate :: proc(v: Vec3, angle_radians: f32) -> Mat4 {
-	c := cos32(angle_radians);
-	s := sin32(angle_radians);
+	c := cos(angle_radians);
+	s := sin(angle_radians);
 
-	a := vec3_norm(v);
+	a := norm(v);
 	t := a * Vec3{1-c};
 
 	rot := mat4_identity();
@@ -280,14 +280,14 @@ mat4_rotate :: proc(v: Vec3, angle_radians: f32) -> Mat4 {
 	return rot;
 }
 
-mat4_scale :: proc(m: Mat4, v: Vec3) -> Mat4 {
+scale :: proc(m: Mat4, v: Vec3) -> Mat4 {
 	m[0][0] *= v.x;
 	m[1][1] *= v.y;
 	m[2][2] *= v.z;
 	return m;
 }
 
-mat4_scalef :: proc(m: Mat4, s: f32) -> Mat4 {
+scale :: proc(m: Mat4, s: f32) -> Mat4 {
 	m[0][0] *= s;
 	m[1][1] *= s;
 	m[2][2] *= s;
@@ -295,23 +295,23 @@ mat4_scalef :: proc(m: Mat4, s: f32) -> Mat4 {
 }
 
 
-mat4_look_at :: proc(eye, centre, up: Vec3) -> Mat4 {
-	f := vec3_norm(centre - eye);
-	s := vec3_norm(cross3(f, up));
-	u := cross3(s, f);
+look_at :: proc(eye, centre, up: Vec3) -> Mat4 {
+	f := norm(centre - eye);
+	s := norm(cross(f, up));
+	u := cross(s, f);
 
 	m: Mat4;
 
 	m[0] = Vec4{+s.x, +s.y, +s.z, 0};
 	m[1] = Vec4{+u.x, +u.y, +u.z, 0};
 	m[2] = Vec4{-f.x, -f.y, -f.z, 0};
-	m[3] = Vec4{dot3(s, eye), dot3(u, eye), dot3(f, eye), 1};
+	m[3] = Vec4{dot(s, eye), dot(u, eye), dot(f, eye), 1};
 
 	return m;
 }
-mat4_perspective :: proc(fovy, aspect, near, far: f32) -> Mat4 {
+perspective :: proc(fovy, aspect, near, far: f32) -> Mat4 {
 	m: Mat4;
-	tan_half_fovy := tan32(0.5 * fovy);
+	tan_half_fovy := tan(0.5 * fovy);
 	m[0][0] = 1.0 / (aspect*tan_half_fovy);
 	m[1][1] = 1.0 / (tan_half_fovy);
 	m[2][2] = -(far + near) / (far - near);
@@ -321,7 +321,7 @@ mat4_perspective :: proc(fovy, aspect, near, far: f32) -> Mat4 {
 }
 
 
-mat4_ortho3d :: proc(left, right, bottom, top, near, far: f32) -> Mat4 {
+ortho3d :: proc(left, right, bottom, top, near, far: f32) -> Mat4 {
 	m := mat4_identity();
 	m[0][0] = +2.0 / (right - left);
 	m[1][1] = +2.0 / (top - bottom);
