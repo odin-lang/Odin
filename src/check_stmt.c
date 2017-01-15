@@ -184,7 +184,7 @@ bool check_is_terminating(AstNode *node) {
 
 Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	if (op_a->mode == Addressing_Invalid ||
-	    op_a->type == t_invalid) {
+	    (op_a->type == t_invalid && op_a->mode != Addressing_Overload)) {
 		return NULL;
 	}
 
@@ -195,31 +195,71 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	    str_eq(node->Ident.string, str_lit("_"))) {
 		add_entity_definition(&c->info, node, NULL);
 		check_assignment(c, op_a, NULL, str_lit("assignment to `_` identifier"));
-		if (op_a->mode == Addressing_Invalid)
+		if (op_a->mode == Addressing_Invalid) {
 			return NULL;
+		}
 		return op_a->type;
 	}
 
 	Entity *e = NULL;
 	bool used = false;
-	if (node->kind == AstNode_Ident) {
-		ast_node(i, Ident, node);
-		e = scope_lookup_entity(c->context.scope, i->string);
-		if (e != NULL && e->kind == Entity_Variable) {
-			used = (e->flags & EntityFlag_Used) != 0; // TODO(bill): Make backup just in case
-		}
-	}
-
-
 	Operand op_b = {Addressing_Invalid};
-	check_expr(c, &op_b, lhs);
-	if (e) {
-		e->flags |= EntityFlag_Used*used;
-	}
 
+
+	check_expr(c, &op_b, lhs);
 	if (op_b.mode == Addressing_Invalid ||
 	    op_b.type == t_invalid) {
 		return NULL;
+	}
+
+
+	if (op_a->mode == Addressing_Overload) {
+		isize overload_count = op_a->overload_count;
+		Entity *entity = op_a->initial_overload_entity;
+		String name = entity->token.string;
+		Scope *s = entity->scope;
+		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+		Entity **procs = gb_alloc_array(c->tmp_allocator, Entity *, overload_count);
+
+		HashKey key = hash_string(name);
+		map_entity_multi_get_all(&s->elements, key, procs);
+		// NOTE(bill): These should be done
+		for (isize i = 0; i < overload_count; i++) {
+			Type *t = base_type(procs[i]->type);
+			if (t == t_invalid) {
+				continue;
+			}
+			Operand x = {0};
+			x.mode = Addressing_Value;
+			x.type = t;
+			if (check_is_assignable_to(c, &x, op_b.type)) {
+				e = procs[i];
+				add_entity_use(c, op_a->expr, e);
+				break;
+			}
+		}
+		gb_temp_arena_memory_end(tmp);
+
+		if (e != NULL) {
+			op_a->mode = Addressing_Value;
+			op_a->type = e->type;
+			op_a->overload_count = 0;
+			op_a->initial_overload_entity = NULL;
+		}
+
+	} else {
+		if (node->kind == AstNode_Ident) {
+			ast_node(i, Ident, node);
+			e = scope_lookup_entity(c->context.scope, i->string);
+			if (e != NULL && e->kind == Entity_Variable) {
+				used = (e->flags & EntityFlag_Used) != 0; // TODO(bill): Make backup just in case
+			}
+		}
+
+	}
+
+	if (e != NULL && used) {
+		e->flags |= EntityFlag_Used;
 	}
 
 	switch (op_b.mode) {

@@ -822,6 +822,7 @@ bool are_types_identical(Type *x, Type *y) {
 	case Type_Proc:
 		if (y->kind == Type_Proc) {
 			return x->Proc.calling_convention == y->Proc.calling_convention &&
+			       x->Proc.variadic == y->Proc.variadic &&
 			       are_types_identical(x->Proc.params, y->Proc.params) &&
 			       are_types_identical(x->Proc.results, y->Proc.results);
 		}
@@ -906,6 +907,60 @@ bool is_type_cte_safe(Type *type) {
 	}
 
 	return false;
+}
+
+typedef enum ProcTypeOverloadKind {
+	ProcOverload_Identical, // The types are identical
+
+	ProcOverload_CallingConvention,
+	ProcOverload_ParamCount,
+	ProcOverload_ParamVariadic,
+	ProcOverload_ParamTypes,
+	ProcOverload_ResultCount,
+	ProcOverload_ResultTypes,
+
+} ProcTypeOverloadKind;
+
+
+ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
+	GB_ASSERT(is_type_proc(x));
+	GB_ASSERT(is_type_proc(y));
+	TypeProc *px = &base_type(x)->Proc;
+	TypeProc *py = &base_type(y)->Proc;
+
+	if (px->calling_convention != py->calling_convention) {
+		return ProcOverload_CallingConvention;
+	}
+
+	if (px->param_count != py->param_count) {
+		return ProcOverload_ParamCount;
+	}
+
+	for (isize i = 0; i < px->param_count; i++) {
+		Entity *ex = px->params->Tuple.variables[i];
+		Entity *ey = py->params->Tuple.variables[i];
+		if (!are_types_identical(ex->type, ey->type)) {
+			return ProcOverload_ParamTypes;
+		}
+	}
+	// IMPORTANT TODO(bill): Determine the rules for overloading procedures with variadic parameters
+	if (px->variadic != py->variadic) {
+		return ProcOverload_ParamVariadic;
+	}
+
+	if (px->result_count != py->result_count) {
+		return ProcOverload_ResultCount;
+	}
+
+	for (isize i = 0; i < px->result_count; i++) {
+		Entity *ex = px->results->Tuple.variables[i];
+		Entity *ey = py->results->Tuple.variables[i];
+		if (!are_types_identical(ex->type, ey->type)) {
+			return ProcOverload_ResultTypes;
+		}
+	}
+
+	return ProcOverload_Identical;
 }
 
 

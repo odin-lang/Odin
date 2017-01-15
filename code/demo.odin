@@ -1,9 +1,19 @@
 #import "fmt.odin";
 
 main :: proc() {
-	fmt.printf("%f\n", 0.0);
-	fmt.printf("%f\n", 1.0);
-	fmt.printf("%f\n", -0.5);
-	fmt.printf("%+f\n", 1334.67);
-	fmt.printf("%f\n", 789.789);
+	foo :: proc() {
+		fmt.printf("Zero args\n");
+	}
+	foo :: proc(i: int) {
+		fmt.printf("One arg, i=%d\n", i);
+	}
+	THING :: 14451;
+
+	foo();
+	foo(THING);
+	fmt.println(THING);
+
+	x: proc();
+	x = foo;
+	x();
 }

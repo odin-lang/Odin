@@ -29,26 +29,35 @@ gb_inline Type *check_type(Checker *c, AstNode *expression) {
 
 
 void check_scope_decls(Checker *c, AstNodeArray nodes, isize reserve_size) {
-	GB_ASSERT(!c->context.scope->is_file);
-	DelayedEntities delayed_entities;
-	array_init_reserve(&delayed_entities, heap_allocator(), reserve_size);
-	check_collect_entities(c, nodes, NULL, &delayed_entities);
+	Scope *s = c->context.scope;
+	GB_ASSERT(!s->is_file);
 
-	for_array(i, delayed_entities) {
-		DelayedEntity delayed = delayed_entities.e[i];
-		if (delayed.entity->kind == Entity_TypeName) {
-			check_entity_decl(c, delayed.entity, delayed.decl, NULL);
+	check_collect_entities(c, nodes, false);
+
+	for_array(i, s->elements.entries) {
+		Entity *e = s->elements.entries.e[i].value;
+		switch (e->kind) {
+		case Entity_Constant:
+		case Entity_TypeName:
+		case Entity_Procedure:
+			break;
+		default:
+			continue;
+		}
+		DeclInfo **found = map_decl_info_get(&c->info.entities, hash_pointer(e));
+		if (found != NULL) {
+			DeclInfo *d = *found;
+			check_entity_decl(c, e, d, NULL);
 		}
 	}
-	for_array(i, delayed_entities) {
-		DelayedEntity delayed = delayed_entities.e[i];
-		if (delayed.entity->kind == Entity_Constant) {
-			add_entity_and_decl_info(c, delayed.ident, delayed.entity, delayed.decl);
-			check_entity_decl(c, delayed.entity, delayed.decl, NULL);
-		}
-	}
 
-	array_free(&delayed_entities);
+	for_array(i, s->elements.entries) {
+		Entity *e = s->elements.entries.e[i].value;
+		if (e->kind != Entity_Procedure) {
+			continue;
+		}
+		check_procedure_overloading(c, e);
+	}
 }
 
 
@@ -785,16 +794,17 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 }
 
 
-void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
+void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint) {
 	GB_ASSERT(n->kind == AstNode_Ident);
 	o->mode = Addressing_Invalid;
 	o->expr = n;
-	Entity *e = scope_lookup_entity(c->context.scope, n->Ident.string);
+	String name = n->Ident.string;
+	Entity *e = scope_lookup_entity(c->context.scope, name);
 	if (e == NULL) {
-		if (str_eq(n->Ident.string, str_lit("_"))) {
+		if (str_eq(name, str_lit("_"))) {
 			error(n->Ident, "`_` cannot be used as a value type");
 		} else {
-			error(n->Ident, "Undeclared name: %.*s", LIT(n->Ident.string));
+			error(n->Ident, "Undeclared name: %.*s", LIT(name));
 		}
 		o->type = t_invalid;
 		o->mode = Addressing_Invalid;
@@ -803,15 +813,65 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type) {
 		}
 		return;
 	}
-	add_entity_use(c, n, e);
 
-	check_entity_decl(c, e, NULL, named_type);
+	bool is_overloaded = false;
+	isize overload_count = 0;
+	HashKey key = hash_string(name);
 
-	if (e->type == NULL) {
-		compiler_error("Compiler error: How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(n->Ident.string));
-		return;
+	if (e->kind == Entity_Procedure) {
+		// NOTE(bill): Overloads are only allowed with the same scope
+		Scope *s = e->scope;
+		overload_count = map_entity_multi_count(&s->elements, key);
+		if (overload_count > 1) {
+			is_overloaded = true;
+		}
 	}
 
+	if (is_overloaded) {
+		Scope *s = e->scope;
+		bool skip = false;
+
+		if (type_hint != NULL) {
+			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+			Entity **procs = gb_alloc_array(c->tmp_allocator, Entity *, overload_count);
+			map_entity_multi_get_all(&s->elements, key, procs);
+			// NOTE(bill): These should be done
+			for (isize i = 0; i < overload_count; i++) {
+				Type *t = base_type(procs[i]->type);
+				if (t == t_invalid) {
+					continue;
+				}
+				Operand x = {0};
+				x.mode = Addressing_Value;
+				x.type = t;
+				if (check_is_assignable_to(c, &x, type_hint)) {
+					e = procs[i];
+					add_entity_use(c, n, e);
+					skip = true;
+					break;
+				}
+			}
+			gb_temp_arena_memory_end(tmp);
+
+		}
+
+		if (!skip) {
+			o->mode                    = Addressing_Overload;
+			o->type                    = t_invalid;
+			o->overload_count          = overload_count;
+			o->initial_overload_entity = e;
+			return;
+		}
+	}
+
+	add_entity_use(c, n, e);
+	check_entity_decl(c, e, NULL, named_type);
+
+
+	if (e->type == NULL) {
+		compiler_error("Compiler error: How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(name));
+		return;
+	}
 
 	Type *type = e->type;
 
@@ -915,7 +975,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 	switch (e->kind) {
 	case_ast_node(i, Ident, e);
 		Operand o = {0};
-		check_identifier(c, &o, e, named_type);
+		check_identifier(c, &o, e, named_type, NULL);
 
 		switch (o.mode) {
 		case Addressing_Invalid:
@@ -1743,13 +1803,15 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 	return operand;
 }
 
+
 void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_BinaryExpr);
 	Operand y_ = {0}, *y = &y_;
 
 	ast_node(be, BinaryExpr, node);
 
-	if (be->op.kind == Token_as) {
+	switch (be->op.kind) {
+	case Token_as: {
 		check_expr(c, x, be->left);
 		Type *type = check_type(c, be->right);
 		if (x->mode == Addressing_Invalid) {
@@ -1796,7 +1858,8 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 
 		x->type = type;
 		return;
-	} else if (be->op.kind == Token_transmute) {
+	} break;
+	case Token_transmute: {
 		check_expr(c, x, be->left);
 		Type *type = check_type(c, be->right);
 		if (x->mode == Addressing_Invalid) {
@@ -1834,7 +1897,8 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		x->type = type;
 
 		return;
-	} else if (be->op.kind == Token_down_cast) {
+	} break;
+	case Token_down_cast: {
 		check_expr(c, x, be->left);
 		Type *type = check_type(c, be->right);
 		if (x->mode == Addressing_Invalid) {
@@ -1898,7 +1962,8 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		x->mode = Addressing_Value;
 		x->type = type;
 		return;
-	} else if (be->op.kind == Token_union_cast) {
+	} break;
+	case Token_union_cast: {
 		check_expr(c, x, be->left);
 		Type *type = check_type(c, be->right);
 		if (x->mode == Addressing_Invalid) {
@@ -1974,6 +2039,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		x->type = tuple;
 		x->mode = Addressing_Value;
 		return;
+	} break;
 	}
 
 	check_expr(c, x, be->left);
@@ -3330,12 +3396,19 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	return true;
 }
 
+typedef enum CallArgumentError {
+	CallArgumentError_None,
+	CallArgumentError_WrongTypes,
+	CallArgumentError_NonVariadicExpand,
+	CallArgumentError_VariadicTuple,
+	CallArgumentError_MultipleVariadicExpand,
+	CallArgumentError_ArgumentCount,
+	CallArgumentError_TooFewArguments,
+	CallArgumentError_TooManyArguments,
+} CallArgumentError;
 
-void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
-	GB_ASSERT(call->kind == AstNode_CallExpr);
-	GB_ASSERT(proc_type->kind == Type_Proc);
+CallArgumentError check_call_arguments_internal(Checker *c, AstNode *call, Type *proc_type, Operand *operands, isize operand_count, bool show_error, i64 *score) {
 	ast_node(ce, CallExpr, call);
-
 	isize param_count = 0;
 	bool variadic = proc_type->Proc.variadic;
 	bool vari_expand = (ce->ellipsis.pos.line != 0);
@@ -3348,20 +3421,96 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 	}
 
 	if (vari_expand && !variadic) {
-		error(ce->ellipsis,
-		      "Cannot use `..` in call to a non-variadic procedure: `%.*s`",
-		      LIT(ce->proc->Ident.string));
-		return;
+		if (show_error) {
+			error(ce->ellipsis,
+			      "Cannot use `..` in call to a non-variadic procedure: `%.*s`",
+			      LIT(ce->proc->Ident.string));
+		}
+		return CallArgumentError_NonVariadicExpand;
 	}
 
-	if (ce->args.count == 0 && param_count == 0) {
-		return;
+	if (operand_count == 0 && param_count == 0) {
+		return CallArgumentError_None;
 	}
 
-	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	i32 error_code = 0;
+	if (operand_count < param_count) {
+		error_code = -1;
+	} else if (!variadic && operand_count > param_count) {
+		error_code = +1;
+	}
+	if (error_code != 0) {
+		CallArgumentError err = CallArgumentError_TooManyArguments;
+		char *err_fmt = "Too many arguments for `%s`, expected %td arguments";
+		if (error_code < 0) {
+			err = CallArgumentError_TooFewArguments;
+			err_fmt = "Too few arguments for `%s`, expected %td arguments";
+		}
+
+		if (show_error) {
+			gbString proc_str = expr_to_string(ce->proc);
+			error_node(call, err_fmt, proc_str, param_count);
+			gb_string_free(proc_str);
+		}
+		return err;
+	}
+
+	bool err = CallArgumentError_None;
+
+	GB_ASSERT(proc_type->Proc.params != NULL);
+	Entity **sig_params = proc_type->Proc.params->Tuple.variables;
+	isize operand_index = 0;
+	for (; operand_index < param_count; operand_index++) {
+		Type *t = sig_params[operand_index]->type;
+		Operand o = operands[operand_index];
+		if (variadic) {
+			o = operands[operand_index];
+		}
+		if (!check_is_assignable_to(c, &o, t)) {
+			if (show_error) {
+				check_assignment(c, &o, t, str_lit("argument"));
+			}
+			err = CallArgumentError_WrongTypes;
+		}
+	}
+
+	if (variadic) {
+		bool variadic_expand = false;
+		Type *slice = sig_params[param_count]->type;
+		GB_ASSERT(is_type_slice(slice));
+		Type *elem = base_type(slice)->Slice.elem;
+		Type *t = elem;
+		for (; operand_index < operand_count; operand_index++) {
+			Operand o = operands[operand_index];
+			if (vari_expand) {
+				variadic_expand = true;
+				t = slice;
+				if (operand_index != param_count) {
+					if (show_error) {
+						error_node(o.expr, "`..` in a variadic procedure can only have one variadic argument at the end");
+					}
+					return CallArgumentError_MultipleVariadicExpand;
+				}
+			}
+			if (!check_is_assignable_to(c, &o, t)) {
+				if (show_error) {
+					check_assignment(c, &o, t, str_lit("argument"));
+				}
+				err = CallArgumentError_WrongTypes;
+			}
+		}
+	}
+
+	return err;
+}
+
+Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
+	GB_ASSERT(call->kind == AstNode_CallExpr);
+
+	ast_node(ce, CallExpr, call);
 
 	Array(Operand) operands;
-	array_init_reserve(&operands, c->tmp_allocator, 2*param_count);
+	array_init_reserve(&operands, heap_allocator(), 2*ce->args.count);
 
 	for_array(i, ce->args) {
 		Operand o = {0};
@@ -3370,11 +3519,6 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 			array_add(&operands, o);
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
-			if (variadic && i >= param_count) {
-				error_node(ce->args.e[i], "`..` in a variadic procedure cannot be applied to a %td-valued expression", tuple->variable_count);
-				operand->mode = Addressing_Invalid;
-				goto end;
-			}
 			for (isize j = 0; j < tuple->variable_count; j++) {
 				o.type = tuple->variables[j]->type;
 				array_add(&operands, o);
@@ -3382,6 +3526,63 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 		}
 	}
 
+
+	if (operand->mode == Addressing_Overload) {
+		Scope *s = operand->initial_overload_entity->scope;
+		String name = operand->initial_overload_entity->token.string;
+		HashKey key = hash_string(name);
+
+		isize overload_count = operand->overload_count;
+		Entity **procs = gb_alloc_array(heap_allocator(), Entity *, overload_count);
+		isize *valid_procs = gb_alloc_array(heap_allocator(), isize, overload_count);
+		isize valid_proc_count = 0;
+
+		map_entity_multi_get_all(&s->elements, key, procs);
+
+		for (isize i = 0; i < overload_count; i++) {
+			Entity *e = procs[i];
+			DeclInfo **found = map_decl_info_get(&c->info.entities, hash_pointer(e));
+			GB_ASSERT(found != NULL);
+			DeclInfo *d = *found;
+			check_entity_decl(c, e, d, NULL);
+		}
+
+		for (isize i = 0; i < overload_count; i++) {
+			Entity *p = procs[i];
+			Type *proc_type = base_type(p->type);
+			if (proc_type != NULL && is_type_proc(proc_type)) {
+				i64 score = 0;
+				CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.e, operands.count, false, &score);
+				if (err == CallArgumentError_None) {
+					valid_procs[valid_proc_count++] = i;
+				}
+			}
+		}
+
+
+		if (valid_proc_count == 0) {
+			error_node(operand->expr, "No overloads for `%.*s` that match the specified arguments", LIT(name));
+			proc_type = t_invalid;
+		} else {
+			GB_ASSERT(operand->expr->kind == AstNode_Ident);
+			// IMPORTANT TODO(bill): Get the best proc by its score
+			Entity *e = procs[valid_procs[0]];
+			add_entity_use(c, operand->expr, e);
+			proc_type = e->type;
+			i64 score = 0;
+			CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.e, operands.count, true, &score);
+		}
+
+		gb_free(heap_allocator(), valid_procs);
+		gb_free(heap_allocator(), procs);
+	} else {
+		i64 score = 0;
+		CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.e, operands.count, true, &score);
+		array_free(&operands);
+	}
+	return proc_type;
+
+/*
 	i32 error_code = 0;
 	if (operands.count < param_count) {
 		error_code = -1;
@@ -3433,7 +3634,9 @@ void check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode
 		}
 	}
 end:
-	gb_temp_arena_memory_end(tmp);
+
+	return proc_type;
+*/
 }
 
 
@@ -3484,32 +3687,44 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	}
 
 	Type *proc_type = base_type(operand->type);
-	if (proc_type == NULL || proc_type->kind != Type_Proc ||
-	    !(operand->mode == Addressing_Value || operand->mode == Addressing_Variable)) {
-		AstNode *e = operand->expr;
-		gbString str = expr_to_string(e);
-		error_node(e, "Cannot call a non-procedure: `%s`", str);
-		gb_string_free(str);
+	if (operand->mode != Addressing_Overload) {
+		bool valid_type = (proc_type != NULL) && is_type_proc(proc_type);
+		bool valid_mode = (operand->mode == Addressing_Value) || (operand->mode == Addressing_Variable);
+		if (!valid_type || !valid_mode) {
+			AstNode *e = operand->expr;
+			gbString str = expr_to_string(e);
+			error_node(e, "Cannot call a non-procedure: `%s` %d", str, operand->mode);
+			gb_string_free(str);
 
-		operand->mode = Addressing_Invalid;
-		operand->expr = call;
+			operand->mode = Addressing_Invalid;
+			operand->expr = call;
 
-		return Expr_Stmt;
+			return Expr_Stmt;
+		}
 	}
 
-	check_call_arguments(c, operand, proc_type, call);
+	proc_type = check_call_arguments(c, operand, proc_type, call);
 
-	switch (proc_type->Proc.result_count) {
+	gb_zero_item(operand);
+
+	Type *pt = base_type(proc_type);
+	if (pt == NULL || !is_type_proc(pt)) {
+		operand->mode = Addressing_Invalid;
+		operand->type = t_invalid;
+		operand->expr = call;
+		return Expr_Stmt;
+	}
+	switch (pt->Proc.result_count) {
 	case 0:
 		operand->mode = Addressing_NoValue;
 		break;
 	case 1:
 		operand->mode = Addressing_Value;
-		operand->type = proc_type->Proc.results->Tuple.variables[0]->type;
+		operand->type = pt->Proc.results->Tuple.variables[0]->type;
 		break;
 	default:
 		operand->mode = Addressing_Value;
-		operand->type = proc_type->Proc.results;
+		operand->type = pt->Proc.results;
 		break;
 	}
 
@@ -3638,7 +3853,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case_end;
 
 	case_ast_node(i, Ident, node);
-		check_identifier(c, o, node, type_hint);
+		check_identifier(c, o, node, NULL, type_hint);
 	case_end;
 
 	case_ast_node(bl, BasicLit, node);

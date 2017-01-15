@@ -320,6 +320,7 @@ void _J2(MAP_PROC,multi_insert)(MAP_NAME *h, HashKey key, MAP_TYPE value) {
 	if (h->hashes.count == 0) {
 		_J2(MAP_PROC,grow)(h);
 	}
+	// Make
 	fr = _J2(MAP_PROC,_find)(h, key);
 	i = _J2(MAP_PROC,_add_entry)(h, key);
 	if (fr.entry_prev < 0) {
@@ -329,6 +330,7 @@ void _J2(MAP_PROC,multi_insert)(MAP_NAME *h, HashKey key, MAP_TYPE value) {
 	}
 	h->entries.e[i].next = fr.entry_index;
 	h->entries.e[i].value = value;
+	// Grow if needed
 	if (_J2(MAP_PROC,_full)(h)) {
 		_J2(MAP_PROC,grow)(h);
 	}

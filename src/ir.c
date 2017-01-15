@@ -32,10 +32,10 @@ typedef struct irModule {
 	// String triple;
 
 	MapEntity       min_dep_map; // Key: Entity *
-	MapIrValue     values;      // Key: Entity *
-	MapIrValue     members;     // Key: String
+	MapIrValue      values;      // Key: Entity *
+	MapIrValue      members;     // Key: String
 	MapString       type_names;  // Key: Type *
-	MapIrDebugInfo debug_info;  // Key: Unique pointer
+	MapIrDebugInfo  debug_info;  // Key: Unique pointer
 	i32             global_string_index;
 	i32             global_array_index; // For ConstantSlice
 
@@ -54,14 +54,14 @@ typedef struct irDomNode {
 
 
 typedef struct irBlock {
-	i32           index;
-	String        label;
+	i32          index;
+	String       label;
 	irProcedure *parent;
-	AstNode *     node; // Can be NULL
-	Scope *       scope;
-	isize         scope_index;
-	irDomNode   dom;
-	i32           gaps;
+	AstNode *    node; // Can be NULL
+	Scope *      scope;
+	isize        scope_index;
+	irDomNode    dom;
+	i32          gaps;
 
 	irValueArray instrs;
 	irValueArray locals;
@@ -103,27 +103,27 @@ struct irProcedure {
 	irProcedure *        parent;
 	Array(irProcedure *) children;
 
-	Entity *               entity;
+	Entity *             entity;
 	irModule *           module;
-	String                 name;
-	Type *                 type;
-	AstNode *              type_expr;
-	AstNode *              body;
-	u64                    tags;
+	String               name;
+	Type *               type;
+	AstNode *            type_expr;
+	AstNode *            body;
+	u64                  tags;
 
 	irValueArray         params;
 	Array(irDefer)       defer_stmts;
 	Array(irBlock *)     blocks;
-	i32                    scope_index;
+	i32                  scope_index;
 	irBlock *            decl_block;
 	irBlock *            entry_block;
 	irBlock *            curr_block;
 	irTargetList *       target_list;
 	irValueArray         referrers;
 
-	i32                    local_count;
-	i32                    instr_count;
-	i32                    block_count;
+	i32                  local_count;
+	i32                  instr_count;
+	i32                  block_count;
 };
 
 #define IR_STARTUP_RUNTIME_PROC_NAME  "__$startup_runtime"
@@ -533,13 +533,6 @@ typedef struct irGen {
 	bool       opt_called;
 } irGen;
 
-irValue *ir_lookup_member(irModule *m, String name) {
-	irValue **v = map_ir_value_get(&m->members, hash_string(name));
-	if (v != NULL) {
-		return *v;
-	}
-	return NULL;
-}
 
 
 Type *ir_type(irValue *value);
@@ -3340,7 +3333,6 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			irAddr val = {0};
 			return val;
 		}
-
 		Entity *e = entity_of_ident(proc->module->info, expr);
 		return ir_build_addr_from_entity(proc, e, expr);
 	case_end;
@@ -5118,10 +5110,10 @@ void ir_gen_destroy(irGen *s) {
 	gb_file_close(&s->output_file);
 }
 
-String ir_mangle_name(irGen *s, String path, String name) {
+String ir_mangle_name(irGen *s, String path, Entity *e) {
 	// NOTE(bill): prefix names not in the init scope
 	// TODO(bill): make robust and not just rely on the file's name
-
+	String name = e->token.string;
 	irModule *m = &s->module;
 	CheckerInfo *info = m->info;
 	gbAllocator a = m->allocator;
@@ -5141,6 +5133,11 @@ String ir_mangle_name(irGen *s, String path, String name) {
 	isize base_len = ext-1-base;
 
 	isize max_len = base_len + 1 + 10 + 1 + name.len;
+	bool is_overloaded = check_is_entity_overloaded(e);
+	if (is_overloaded) {
+		max_len += 21;
+	}
+
 	u8 *new_name = gb_alloc_array(a, u8, max_len);
 	isize new_name_len = gb_snprintf(
 		cast(char *)new_name, max_len,
@@ -5148,6 +5145,12 @@ String ir_mangle_name(irGen *s, String path, String name) {
 		cast(int)base_len, base,
 		file->id,
 		LIT(name));
+	if (is_overloaded) {
+		char *str = cast(char *)new_name + new_name_len-1;
+		isize len = max_len-new_name_len;
+		isize extra = gb_snprintf(str, len, "-%tu", cast(usize)cast(uintptr)e);
+		new_name_len += extra-1;
+	}
 
 	return make_string(new_name, new_name_len-1);
 }
@@ -5238,7 +5241,7 @@ void ir_gen_tree(irGen *s) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 			} else if (scope->is_init && e->kind == Entity_Procedure && str_eq(name, str_lit("main"))) {
 			} else {
-				name = ir_mangle_name(s, e->token.pos.file, name);
+				name = ir_mangle_name(s, e->token.pos.file, e);
 			}
 		}
 
@@ -5298,7 +5301,7 @@ void ir_gen_tree(irGen *s) {
 			ir_module_add_value(m, e, p);
 			HashKey hash_name = hash_string(name);
 			if (map_ir_value_get(&m->members, hash_name) == NULL) {
-				map_ir_value_set(&m->members, hash_name, p);
+				map_ir_value_multi_insert(&m->members, hash_name, p);
 			}
 		} break;
 		}

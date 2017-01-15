@@ -9,12 +9,14 @@
 
 typedef enum AddressingMode {
 	Addressing_Invalid,
+
 	Addressing_NoValue,
 	Addressing_Value,
 	Addressing_Variable,
 	Addressing_Constant,
 	Addressing_Type,
 	Addressing_Builtin,
+	Addressing_Overload,
 	Addressing_Count,
 } AddressingMode;
 
@@ -24,6 +26,8 @@ typedef struct Operand {
 	ExactValue     value;
 	AstNode *      expr;
 	BuiltinProcId  builtin_id;
+	isize          overload_count;
+	Entity *       initial_overload_entity;
 } Operand;
 
 typedef struct TypeAndValue {
@@ -501,10 +505,27 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	String name = entity->token.string;
 	HashKey key = hash_string(name);
 	Entity **found = map_entity_get(&s->elements, key);
+	Entity *prev = NULL;
 	if (found) {
-		return *found;
+		prev = *found;
+		GB_ASSERT(prev != entity);
+
+		if (prev->kind != Entity_Procedure &&
+		    entity->kind != Entity_Procedure) {
+			return prev;
+		}
 	}
-	map_entity_set(&s->elements, key, entity);
+
+	if (prev != NULL && entity->kind == Entity_Procedure) {
+		// TODO(bill): Remove from final release
+		isize prev_count, next_count;
+		prev_count = map_entity_multi_count(&s->elements, key);
+		map_entity_multi_insert(&s->elements, key, entity);
+		next_count = map_entity_multi_count(&s->elements, key);
+		GB_ASSERT(prev_count < next_count);
+	} else {
+		map_entity_set(&s->elements, key, entity);
+	}
 	if (entity->scope == NULL) {
 		entity->scope = s;
 	}
@@ -756,7 +777,8 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 }
 
 bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
-	if (str_ne(entity->token.string, str_lit("_"))) {
+	String name = entity->token.string;
+	if (!str_eq(name, str_lit("_"))) {
 		Entity *insert_entity = scope_insert_entity(scope, entity);
 		if (insert_entity) {
 			Entity *up = insert_entity->using_parent;
@@ -764,7 +786,7 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 				error(entity->token,
 				      "Redeclararation of `%.*s` in this scope through `using`\n"
 				      "\tat %.*s(%td:%td)",
-				      LIT(entity->token.string),
+				      LIT(name),
 				      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
 				return false;
 			} else {
@@ -776,7 +798,7 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 				error(entity->token,
 				      "Redeclararation of `%.*s` in this scope\n"
 				      "\tat %.*s(%td:%td)",
-				      LIT(entity->token.string),
+				      LIT(name),
 				      LIT(pos.file), pos.line, pos.column);
 				return false;
 			}
@@ -801,6 +823,7 @@ void add_entity_use(Checker *c, AstNode *identifier, Entity *entity) {
 
 void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d) {
 	GB_ASSERT(identifier->kind == AstNode_Ident);
+	GB_ASSERT(e != NULL && d != NULL);
 	GB_ASSERT(str_eq(identifier->Ident.string, e->token.string));
 	add_entity(c, e->scope, identifier, e);
 	map_decl_info_set(&c->info.entities, hash_pointer(e), d);
@@ -1129,8 +1152,107 @@ void init_preload(Checker *c) {
 
 
 bool check_arity_match(Checker *c, AstNodeValueDecl *d);
-void check_collect_entities(Checker *c, AstNodeArray nodes, MapScope *file_scopes, DelayedEntities *delayed_entities);
-void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, MapScope *file_scopes, DelayedEntities *delayed_entities);
+void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope);
+void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, bool is_file_scope);
+
+bool check_is_entity_overloaded(Entity *e) {
+	if (e->kind != Entity_Procedure) {
+		return false;
+	}
+	Scope *s = e->scope;
+	HashKey key = hash_string(e->token.string);
+	isize overload_count = map_entity_multi_count(&s->elements, key);
+	return overload_count > 1;
+}
+
+void check_procedure_overloading(Checker *c, Entity *e) {
+	GB_ASSERT(e->kind == Entity_Procedure);
+	if (e->type == t_invalid) {
+		return;
+	}
+	if (e->Procedure.overload_kind != Overload_Unknown) {
+		// NOTE(bill): The overloading has already been handled
+		return;
+	}
+
+
+	// NOTE(bill): Procedures call only overload other procedures in the same scope
+
+	String name = e->token.string;
+	HashKey key = hash_string(name);
+	Scope *s = e->scope;
+	isize overload_count = map_entity_multi_count(&s->elements, key);
+	GB_ASSERT(overload_count >= 1);
+	if (overload_count == 1) {
+		e->Procedure.overload_kind = Overload_No;
+		return;
+	}
+	GB_ASSERT(overload_count > 1);
+
+
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	Entity **procs = gb_alloc_array(c->tmp_allocator, Entity *, overload_count);
+	map_entity_multi_get_all(&s->elements, key, procs);
+
+	for (isize j = 0; j < overload_count; j++) {
+		Entity *p = procs[j];
+		if (p->type == t_invalid) {
+			// NOTE(bill): This invalid overload has already been handled
+			continue;
+		}
+
+
+		String name = p->token.string;
+
+		GB_ASSERT(p->kind == Entity_Procedure);
+		for (isize k = j+1; k < overload_count; k++) {
+			Entity *q = procs[k];
+			GB_ASSERT(p != q);
+
+			bool is_invalid = false;
+			GB_ASSERT(q->kind == Entity_Procedure);
+
+			TokenPos pos = q->token.pos;
+
+			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
+			switch (kind) {
+			case ProcOverload_Identical:
+			case ProcOverload_CallingConvention:
+				error(p->token, "Overloaded procedure `%.*s` as the same type as another procedure in this scope", LIT(name));
+				is_invalid = true;
+				break;
+			case ProcOverload_ParamVariadic:
+				error(p->token, "Overloaded procedure `%.*s` as the same type as another procedure in this scope", LIT(name));
+				is_invalid = true;
+				break;
+			case ProcOverload_ResultCount:
+			case ProcOverload_ResultTypes:
+				error(p->token, "Overloaded procedure `%.*s` as the same parameters but different results in this scope", LIT(name));
+				is_invalid = true;
+				break;
+			case ProcOverload_ParamCount:
+			case ProcOverload_ParamTypes:
+				// This is okay :)
+				break;
+			}
+
+			if (is_invalid) {
+				gb_printf_err("\tprevious procedure at %.*s(%td:%td)\n", LIT(pos.file), pos.line, pos.column);
+				q->type = t_invalid;
+			}
+		}
+	}
+
+	for (isize j = 0; j < overload_count; j++) {
+		Entity *p = procs[j];
+		if (p->type != t_invalid) {
+			p->Procedure.overload_kind = Overload_Yes;
+		}
+	}
+
+	gb_temp_arena_memory_end(tmp);
+}
+
 
 #include "check_expr.c"
 #include "check_decl.c"
@@ -1169,10 +1291,7 @@ bool check_arity_match(Checker *c, AstNodeValueDecl *d) {
 	return true;
 }
 
-void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, MapScope *file_scopes, DelayedEntities *delayed_entities) {
-	// NOTE(bill): File scope and local scope are different kinds of scopes
-	GB_ASSERT(file_scopes == NULL || delayed_entities == NULL);
-
+void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, bool is_file_scope) {
 	Operand operand = {Addressing_Invalid};
 	check_expr(c, &operand, ws->cond);
 	if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
@@ -1186,14 +1305,14 @@ void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, MapS
 	} else {
 		if (operand.value.kind == ExactValue_Bool &&
 		    operand.value.value_bool) {
-			check_collect_entities(c, ws->body->BlockStmt.stmts, file_scopes, delayed_entities);
+			check_collect_entities(c, ws->body->BlockStmt.stmts, is_file_scope);
 		} else if (ws->else_stmt) {
 			switch (ws->else_stmt->kind) {
 			case AstNode_BlockStmt:
-				check_collect_entities(c, ws->else_stmt->BlockStmt.stmts, file_scopes, delayed_entities);
+				check_collect_entities(c, ws->else_stmt->BlockStmt.stmts, is_file_scope);
 				break;
 			case AstNode_WhenStmt:
-				check_collect_entities_from_when_stmt(c, &ws->else_stmt->WhenStmt, file_scopes, delayed_entities);
+				check_collect_entities_from_when_stmt(c, &ws->else_stmt->WhenStmt, is_file_scope);
 				break;
 			default:
 				error_node(ws->else_stmt, "Invalid `else` statement in `when` statement");
@@ -1204,13 +1323,11 @@ void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, MapS
 }
 
 // NOTE(bill): If file_scopes == NULL, this will act like a local scope
-void check_collect_entities(Checker *c, AstNodeArray nodes, MapScope *file_scopes, DelayedEntities *delayed_entities) {
+void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) {
 	// NOTE(bill): File scope and local scope are different kinds of scopes
-	GB_ASSERT(file_scopes == NULL || delayed_entities == NULL);
-	if (file_scopes != NULL) {
+	if (is_file_scope) {
 		GB_ASSERT(c->context.scope->is_file);
-	}
-	if (delayed_entities != NULL) {
+	} else {
 		GB_ASSERT(!c->context.scope->is_file);
 	}
 
@@ -1359,7 +1476,7 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, MapScope *file_scope
 			AstNode *node = nodes.e[i];
 			switch (node->kind) {
 			case_ast_node(ws, WhenStmt, node);
-				check_collect_entities_from_when_stmt(c, ws, file_scopes, delayed_entities);
+				check_collect_entities_from_when_stmt(c, ws, is_file_scope);
 			case_end;
 			}
 		}
@@ -1390,14 +1507,25 @@ void check_all_global_entities(Checker *c) {
 			continue;
 		}
 
-		Scope *prev_scope = c->context.scope;
+		CheckerContext prev_context = c->context;
+		c->context.decl = d;
 		c->context.scope = d->scope;
 		check_entity_decl(c, e, d, NULL);
+		c->context = prev_context;
 
 
 		if (d->scope->is_init && !c->done_preload) {
 			init_preload(c);
 		}
+	}
+
+	for_array(i, c->info.entities.entries) {
+		MapDeclInfoEntry *entry = &c->info.entities.entries.e[i];
+		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
+		if (e->kind != Entity_Procedure) {
+			continue;
+		}
+		check_procedure_overloading(c, e);
 	}
 }
 
@@ -1463,8 +1591,8 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 					continue;
 				}
 				// NOTE(bill): Do not add other imported entities
-				add_entity(c, parent_scope, NULL, e);
-				if (id->is_import) { // `#import`ed entities don't get exported
+				bool ok = add_entity(c, parent_scope, NULL, e);
+				if (ok && id->is_import) { // `#import`ed entities don't get exported
 					HashKey key = hash_string(e->token.string);
 					map_entity_set(&parent_scope->implicit, key, e);
 				}
@@ -1575,12 +1703,11 @@ void check_parsed_files(Checker *c) {
 		AstFile *f = &c->parser->files.e[i];
 		CheckerContext prev_context = c->context;
 		add_curr_ast_file(c, f);
-		check_collect_entities(c, f->decls, &file_scopes, NULL);
+		check_collect_entities(c, f->decls, true);
 		c->context = prev_context;
 	}
 
 	check_import_entities(c, &file_scopes);
-
 
 	check_all_global_entities(c);
 	init_preload(c); // NOTE(bill): This could be setup previously through the use of `type_info(_of_val)`

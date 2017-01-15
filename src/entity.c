@@ -37,6 +37,12 @@ typedef enum EntityFlag {
 	EntityFlag_VectorElem = 1<<5,
 } EntityFlag;
 
+typedef enum OverloadKind {
+	Overload_No      = -1,
+	Overload_Unknown = 0,
+	Overload_Yes     = +1,
+} OverloadKind;
+
 typedef struct Entity Entity;
 struct Entity {
 	EntityKind kind;
@@ -61,10 +67,11 @@ struct Entity {
 		} Variable;
 		i32 TypeName;
 		struct {
-			bool   is_foreign;
-			String foreign_name;
-			String link_name;
-			u64    tags;
+			bool         is_foreign;
+			String       foreign_name;
+			String       link_name;
+			u64          tags;
+			OverloadKind overload_kind;
 		} Procedure;
 		struct {
 			BuiltinProcId id;
