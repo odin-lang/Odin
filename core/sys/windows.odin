@@ -19,7 +19,7 @@ BOOL      :: i32;
 WNDPROC   :: type proc(HWND, u32, WPARAM, LPARAM) -> LRESULT #cc_c;
 
 
-INVALID_HANDLE_VALUE :: ~int(0) as HANDLE;
+INVALID_HANDLE_VALUE :: HANDLE(~int(0));
 
 FALSE: BOOL : 0;
 TRUE:  BOOL : 1;
@@ -233,7 +233,7 @@ FILE_TYPE_DISK :: 0x0001;
 FILE_TYPE_CHAR :: 0x0002;
 FILE_TYPE_PIPE :: 0x0003;
 
-INVALID_SET_FILE_POINTER :: ~(0 as u32);
+INVALID_SET_FILE_POINTER :: ~u32(0);
 
 
 
@@ -402,7 +402,7 @@ wglDeleteContext  :: proc(hglrc: HGLRC) -> BOOL #foreign #dll_import
 GetKeyState      :: proc(v_key: i32) -> i16 #foreign #dll_import
 GetAsyncKeyState :: proc(v_key: i32) -> i16 #foreign #dll_import
 
-is_key_down :: proc(key: Key_Code) -> bool #inline { return GetAsyncKeyState(key as i32) < 0; }
+is_key_down :: proc(key: Key_Code) -> bool #inline { return GetAsyncKeyState(i32(key)) < 0; }
 
 Key_Code :: enum i32 {
 	LBUTTON    = 0x01,

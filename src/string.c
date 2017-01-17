@@ -46,7 +46,7 @@ gb_inline String make_string_c(char *text) {
 	return make_string(cast(u8 *)cast(void *)text, gb_strlen(text));
 }
 
-#define str_lit(c_str) make_string(cast(u8 *)c_str, gb_size_of(c_str)-1)
+#define str_lit(c_str) (String){cast(u8 *)c_str, gb_size_of(c_str)-1}
 
 
 

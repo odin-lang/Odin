@@ -45,11 +45,11 @@ sign :: proc(x: f64) -> f64 { if x >= 0 { return +1; } return -1; }
 
 
 copy_sign :: proc(x, y: f32) -> f32 {
-	ix := x transmute u32;
-	iy := y transmute u32;
+	ix := transmute(u32, x);
+	iy := transmute(u32, y);
 	ix &= 0x7fffffff;
 	ix |= iy & 0x80000000;
-	return ix transmute f32;
+	return transmute(f32, ix);
 }
 round :: proc(x: f32) -> f32 {
 	if x >= 0 {
@@ -59,15 +59,15 @@ round :: proc(x: f32) -> f32 {
 }
 floor :: proc(x: f32) -> f32 {
 	if x >= 0 {
-		return x as int as f32;
+		return f32(int(x));
 	}
-	return (x-0.5) as int as f32;
+	return f32(int(x-0.5));
 }
 ceil :: proc(x: f32) -> f32 {
 	if x < 0 {
-		return x as int as f32;
+		return f32(int(x));
 	}
-	return ((x as int)+1) as f32;
+	return f32(int(x)+1);
 }
 
 remainder32 :: proc(x, y: f32) -> f32 {

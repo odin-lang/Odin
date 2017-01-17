@@ -233,7 +233,7 @@ default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		case ALLOC:
 			total_size := size + alignment + size_of(mem.AllocationHeader);
 			ptr := os.heap_alloc(total_size);
-			header := ptr as ^mem.AllocationHeader;
+			header := (^mem.AllocationHeader)(ptr);
 			ptr = mem.align_forward(header+1, alignment);
 			mem.allocation_header_fill(header, ptr, size);
 			return mem.zero(ptr, size);
@@ -248,7 +248,7 @@ default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		case RESIZE:
 			total_size := size + alignment + size_of(mem.AllocationHeader);
 			ptr := os.heap_resize(mem.allocation_header(old_memory), total_size);
-			header := ptr as ^mem.AllocationHeader;
+			header := (^mem.AllocationHeader)(ptr);
 			ptr = mem.align_forward(header+1, alignment);
 			mem.allocation_header_fill(header, ptr, size);
 			return mem.zero(ptr, size);
@@ -297,11 +297,11 @@ __string_eq :: proc(a, b: string) -> bool {
 	if a.data == b.data {
 		return true;
 	}
-	return mem.compare(a.data as rawptr, b.data as rawptr, a.count) == 0;
+	return mem.compare(rawptr(a.data), rawptr(b.data), a.count) == 0;
 }
 
 __string_cmp :: proc(a, b: string) -> int {
-	return mem.compare(a.data as rawptr, b.data as rawptr, min(a.count, b.count));
+	return mem.compare(rawptr(a.data), rawptr(b.data), min(a.count, b.count));
 }
 
 __string_ne :: proc(a, b: string) -> bool #inline { return !__string_eq(a, b); }

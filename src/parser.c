@@ -1979,11 +1979,11 @@ i32 token_precedence(Token t) {
 	case Token_Shl:
 	case Token_Shr:
 		return 5;
-	case Token_as:
-	case Token_transmute:
-	case Token_down_cast:
-	case Token_union_cast:
-		return 6;
+	// case Token_as:
+	// case Token_transmute:
+	// case Token_down_cast:
+	// case Token_union_cast:
+		// return 6;
 	}
 	return 0;
 }
@@ -2005,12 +2005,12 @@ AstNode *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 			}
 
 			switch (op.kind) {
-			case Token_as:
+			/* case Token_as:
 			case Token_transmute:
 			case Token_down_cast:
 			case Token_union_cast:
 				right = parse_type(f);
-				break;
+				break; */
 
 			default:
 				right = parse_binary_expr(f, false, prec+1);
@@ -2429,10 +2429,10 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 			AstNode *sel = parse_identifier(f);
 			e = make_selector_expr(f, token, e, sel);
 		}
-		if (f->curr_token.kind == Token_OpenParen) {
-			// HACK NOTE(bill): For type_of_val(expr)
-			e = parse_call_expr(f, e);
-		}
+		// if (f->curr_token.kind == Token_OpenParen) {
+		// 	// HACK NOTE(bill): For type_of_val(expr)
+		// 	e = parse_call_expr(f, e);
+		// }
 		return e;
 	}
 
@@ -2560,11 +2560,9 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 
 	case Token_OpenParen: {
 		// NOTE(bill): Skip the paren expression
-		AstNode *type;
-		Token open, close;
-		open = expect_token(f, Token_OpenParen);
-		type = parse_type(f);
-		close = expect_token(f, Token_CloseParen);
+		Token    open  = expect_token(f, Token_OpenParen);
+		AstNode *type  = parse_type(f);
+		Token    close = expect_token(f, Token_CloseParen);
 		return type;
 		// return make_paren_expr(f, type, open, close);
 	} break;

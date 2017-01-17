@@ -1,7 +1,7 @@
 RUNE_ERROR :: '\ufffd';
 RUNE_SELF  :: 0x80;
 RUNE_BOM   :: 0xfeff;
-RUNE_EOF   :: ~(0 as rune);
+RUNE_EOF   :: ~rune(0);
 MAX_RUNE   :: '\U0010ffff';
 UTF_MAX    :: 4;
 
@@ -40,15 +40,15 @@ accept_sizes := [256]byte{
 
 encode_rune :: proc(r: rune) -> ([4]byte, int) {
 	buf: [4]byte;
-	i := r as u32;
+	i := u32(r);
 	mask: byte : 0x3f;
 	if i <= 1<<7-1 {
-		buf[0] = r as byte;
+		buf[0] = byte(r);
 		return buf, 1;
 	}
 	if i <= 1<<11-1 {
-		buf[0] = 0xc0 | (r>>6) as byte;
-		buf[1] = 0x80 | (r)    as byte & mask;
+		buf[0] = 0xc0 | byte(r>>6);
+		buf[1] = 0x80 | byte(r) & mask;
 		return buf, 2;
 	}
 
@@ -59,16 +59,16 @@ encode_rune :: proc(r: rune) -> ([4]byte, int) {
 	}
 
 	if i <= 1<<16-1 {
-		buf[0] = 0xe0 | (r>>12) as byte;
-		buf[1] = 0x80 | (r>>6)  as byte & mask;
-		buf[2] = 0x80 | (r)     as byte & mask;
+		buf[0] = 0xe0 | byte(r>>12);
+		buf[1] = 0x80 | byte(r>>6) & mask;
+		buf[2] = 0x80 | byte(r)    & mask;
 		return buf, 3;
 	}
 
-	buf[0] = 0xf0 | (r>>18) as byte;
-	buf[1] = 0x80 | (r>>12) as byte & mask;
-	buf[2] = 0x80 | (r>>6)  as byte & mask;
-	buf[3] = 0x80 | (r)     as byte & mask;
+	buf[0] = 0xf0 | byte(r>>18);
+	buf[1] = 0x80 | byte(r>>12) & mask;
+	buf[2] = 0x80 | byte(r>>6)  & mask;
+	buf[3] = 0x80 | byte(r)     & mask;
 	return buf, 4;
 }
 
@@ -80,12 +80,12 @@ decode_rune :: proc(s: string) -> (rune, int) {
 	b0 := s[0];
 	x := accept_sizes[b0];
 	if x >= 0xf0 {
-		mask := (x as rune << 31) >> 31; // all zeros or all ones
-		return (b0 as rune) &~ mask | RUNE_ERROR&mask, 1;
+		mask := (rune(x) << 31) >> 31; // all zeros or all ones
+		return rune(b0) &~ mask | RUNE_ERROR&mask, 1;
 	}
 	size := x & 7;
 	ar := accept_ranges[x>>4];
-	if n < size as int {
+	if n < int(size) {
 		return RUNE_ERROR, 1;
 	}
 	b1 := s[1];
@@ -99,20 +99,20 @@ decode_rune :: proc(s: string) -> (rune, int) {
 	MASK_4 :: 0b00000111;
 
 	if size == 2 {
-		return (b0&MASK_2) as rune <<6 | (b1&MASK_X) as rune, 2;
+		return rune(b0&MASK_2)<<6 | rune(b1&MASK_X), 2;
 	}
 	b2 := s[2];
 	if b2 < 0x80 || 0xbf < b2 {
 		return RUNE_ERROR, 1;
 	}
 	if size == 3 {
-		return (b0&MASK_3) as rune <<12 | (b1&MASK_X) as rune <<6 | (b2&MASK_X) as rune, 3;
+		return rune(b0&MASK_3)<<12 | rune(b1&MASK_X)<<6 | rune(b2&MASK_X), 3;
 	}
 	b3 := s[3];
 	if b3 < 0x80 || 0xbf < b3 {
 		return RUNE_ERROR, 1;
 	}
-	return (b0&MASK_4) as rune <<18 | (b1&MASK_X) as rune <<12 | (b3&MASK_X) as rune <<6 | (b3&MASK_X) as rune, 4;
+	return rune(b0&MASK_4)<<18 | rune(b1&MASK_X)<<12 | rune(b3&MASK_X)<<6 | rune(b3&MASK_X), 4;
 
 }
 
@@ -141,7 +141,7 @@ valid_string :: proc(s: string) -> bool {
 		if x == 0xf1 {
 			return false;
 		}
-		size := (x & 7) as int;
+		size := int(x & 7);
 		if i+size > n {
 			return false;
 		}
@@ -178,7 +178,7 @@ rune_count :: proc(s: string) -> int {
 			i += 1;
 			continue;
 		}
-		size := (x & 7) as int;
+		size := int(x & 7);
 		if i+size > n {
 			i += 1;
 			continue;

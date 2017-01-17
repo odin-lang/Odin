@@ -2772,21 +2772,21 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 		case Token_CmpOr:
 			return ir_emit_logical_binary_expr(proc, expr);
 
-		case Token_as:
-			ir_emit_comment(proc, str_lit("cast - as"));
-			return ir_emit_conv(proc, left, type);
+		// case Token_as:
+		// 	ir_emit_comment(proc, str_lit("cast - as"));
+		// 	return ir_emit_conv(proc, left, type);
 
-		case Token_transmute:
-			ir_emit_comment(proc, str_lit("cast - transmute"));
-			return ir_emit_transmute(proc, left, type);
+		// case Token_transmute:
+		// 	ir_emit_comment(proc, str_lit("cast - transmute"));
+		// 	return ir_emit_transmute(proc, left, type);
 
-		case Token_down_cast:
-			ir_emit_comment(proc, str_lit("cast - down_cast"));
-			return ir_emit_down_cast(proc, left, type);
+		// case Token_down_cast:
+		// 	ir_emit_comment(proc, str_lit("cast - down_cast"));
+		// 	return ir_emit_down_cast(proc, left, type);
 
-		case Token_union_cast:
-			ir_emit_comment(proc, str_lit("cast - union_cast"));
-			return ir_emit_union_cast(proc, left, type);
+		// case Token_union_cast:
+		// 	ir_emit_comment(proc, str_lit("cast - union_cast"));
+		// 	return ir_emit_union_cast(proc, left, type);
 
 		default:
 			GB_PANIC("Invalid binary expression");
@@ -2843,6 +2843,24 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 					Type *t = default_type(type_of_expr(proc->module->info, ce->args.e[0]));
 					return ir_type_info(proc, t);
 				} break;
+
+				case BuiltinProc_transmute: {
+					irValue *val = ir_build_expr(proc, ce->args.e[1]);
+					ir_emit_comment(proc, str_lit("cast - transmute"));
+					return ir_emit_transmute(proc, val, type_of_expr(proc->module->info, ce->args.e[0]));
+				}
+
+				case BuiltinProc_down_cast: {
+					irValue *val = ir_build_expr(proc, ce->args.e[1]);
+					ir_emit_comment(proc, str_lit("cast - down_cast"));
+					return ir_emit_down_cast(proc, val, type_of_expr(proc->module->info, ce->args.e[0]));
+				}
+
+				case BuiltinProc_union_cast: {
+					irValue *val = ir_build_expr(proc, ce->args.e[1]);
+					ir_emit_comment(proc, str_lit("cast - union_cast"));
+					return ir_emit_union_cast(proc, val, type_of_expr(proc->module->info, ce->args.e[0]));
+				}
 
 				case BuiltinProc_new: {
 					ir_emit_comment(proc, str_lit("new"));
@@ -3399,22 +3417,22 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 	case_ast_node(be, BinaryExpr, expr);
 		switch (be->op.kind) {
-		case Token_as: {
-			ir_emit_comment(proc, str_lit("Cast - as"));
-			// NOTE(bill): Needed for dereference of pointer conversion
-			Type *type = type_of_expr(proc->module->info, expr);
-			irValue *v = ir_add_local_generated(proc, type);
-			ir_emit_store(proc, v, ir_emit_conv(proc, ir_build_expr(proc, be->left), type));
-			return ir_make_addr(v, expr);
-		}
-		case Token_transmute: {
-			ir_emit_comment(proc, str_lit("Cast - transmute"));
-			// NOTE(bill): Needed for dereference of pointer conversion
-			Type *type = type_of_expr(proc->module->info, expr);
-			irValue *v = ir_add_local_generated(proc, type);
-			ir_emit_store(proc, v, ir_emit_transmute(proc, ir_build_expr(proc, be->left), type));
-			return ir_make_addr(v, expr);
-		}
+		// case Token_as: {
+		// 	ir_emit_comment(proc, str_lit("Cast - as"));
+		// 	// NOTE(bill): Needed for dereference of pointer conversion
+		// 	Type *type = type_of_expr(proc->module->info, expr);
+		// 	irValue *v = ir_add_local_generated(proc, type);
+		// 	ir_emit_store(proc, v, ir_emit_conv(proc, ir_build_expr(proc, be->left), type));
+		// 	return ir_make_addr(v, expr);
+		// }
+		// case Token_transmute: {
+		// 	ir_emit_comment(proc, str_lit("Cast - transmute"));
+		// 	// NOTE(bill): Needed for dereference of pointer conversion
+		// 	Type *type = type_of_expr(proc->module->info, expr);
+		// 	irValue *v = ir_add_local_generated(proc, type);
+		// 	ir_emit_store(proc, v, ir_emit_transmute(proc, ir_build_expr(proc, be->left), type));
+		// 	return ir_make_addr(v, expr);
+		// }
 		default:
 			GB_PANIC("Invalid binary expression for ir_build_addr: %.*s\n", LIT(be->op.string));
 			break;

@@ -1911,6 +1911,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 
 	ast_node(be, BinaryExpr, node);
 
+#if 0
 	switch (be->op.kind) {
 	case Token_as: {
 		check_expr(c, x, be->left);
@@ -2103,7 +2104,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		return;
 	} break;
 	}
-
+#endif
 	check_expr(c, x, be->left);
 	check_expr(c, y, be->right);
 	if (x->mode == Addressing_Invalid) {
@@ -2728,6 +2729,10 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	case BuiltinProc_align_of:
 	case BuiltinProc_offset_of:
 	case BuiltinProc_type_info:
+
+	case BuiltinProc_transmute:
+	case BuiltinProc_union_cast:
+	case BuiltinProc_down_cast:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 	default:
@@ -2925,6 +2930,10 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (operand->mode == Addressing_Invalid || operand->mode == Addressing_Builtin) {
 			return false;
 		}
+		if (operand->type == NULL || operand->type == t_invalid) {
+			error_node(operand->expr, "Invalid argument to `type_of_val`");
+			return false;
+		}
 		operand->mode = Addressing_Type;
 		break;
 
@@ -2968,6 +2977,184 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->type = t_type_info_ptr;
 	} break;
 
+
+	case BuiltinProc_transmute: {
+		Type *type = check_type(c, ce->args.e[0]);
+		check_expr(c, operand, ce->args.e[1]);
+		if (operand->mode == Addressing_Invalid) {
+			return false;
+		}
+
+		if (operand->mode == Addressing_Constant) {
+			gbString expr_str = expr_to_string(operand->expr);
+			error_node(operand->expr, "Cannot transmute constant expression: `%s`", expr_str);
+			gb_string_free(expr_str);
+			operand->mode = Addressing_Invalid;
+			return false;
+		}
+
+		if (is_type_untyped(operand->type)) {
+			gbString expr_str = expr_to_string(operand->expr);
+			error_node(operand->expr, "Cannot transmute untyped expression: `%s`", expr_str);
+			gb_string_free(expr_str);
+			operand->mode = Addressing_Invalid;
+			return false;
+		}
+
+		i64 srcz = type_size_of(c->sizes, c->allocator, operand->type);
+		i64 dstz = type_size_of(c->sizes, c->allocator, type);
+		if (srcz != dstz) {
+			gbString expr_str = expr_to_string(operand->expr);
+			gbString type_str = type_to_string(type);
+			error_node(operand->expr, "Cannot transmute `%s` to `%s`, %lld vs %lld bytes", expr_str, type_str, srcz, dstz);
+			gb_string_free(type_str);
+			gb_string_free(expr_str);
+			operand->mode = Addressing_Invalid;
+			return false;
+		}
+
+		operand->type = type;
+	} break;
+	case BuiltinProc_union_cast: {
+		Type *type = check_type(c, ce->args.e[0]);
+		check_expr(c, operand, ce->args.e[1]);
+		if (operand->mode == Addressing_Invalid) {
+			return false;
+		}
+
+		if (operand->mode == Addressing_Constant) {
+			gbString expr_str = expr_to_string(operand->expr);
+			error_node(operand->expr, "Cannot `union_cast` a constant expression: `%s`", expr_str);
+			gb_string_free(expr_str);
+			operand->mode = Addressing_Invalid;
+			return false;
+		}
+
+		if (is_type_untyped(operand->type)) {
+			gbString expr_str = expr_to_string(operand->expr);
+			error_node(operand->expr, "Cannot `union_cast` an untyped expression: `%s`", expr_str);
+			gb_string_free(expr_str);
+			operand->mode = Addressing_Invalid;
+			return false;
+		}
+
+		bool src_is_ptr = is_type_pointer(operand->type);
+		bool dst_is_ptr = is_type_pointer(type);
+		Type *src = type_deref(operand->type);
+		Type *dst = type_deref(type);
+		Type *bsrc = base_type(src);
+		Type *bdst = base_type(dst);
+
+		if (src_is_ptr != dst_is_ptr) {
+			gbString src_type_str = type_to_string(operand->type);
+			gbString dst_type_str = type_to_string(type);
+			error_node(operand->expr, "Invalid `union_cast` types: `%s` and `%s`", src_type_str, dst_type_str);
+			gb_string_free(dst_type_str);
+			gb_string_free(src_type_str);
+			operand->mode = Addressing_Invalid;
+			return false;
+		}
+
+		if (!is_type_union(src)) {
+			error_node(operand->expr, "`union_cast` can only operate on unions");
+			operand->mode = Addressing_Invalid;
+			return false;
+		}
+
+		bool ok = false;
+		for (isize i = 1; i < bsrc->Record.field_count; i++) {
+			Entity *f = bsrc->Record.fields[i];
+			if (are_types_identical(f->type, dst)) {
+				ok = true;
+				break;
+			}
+		}
+
+		if (!ok) {
+			gbString expr_str = expr_to_string(operand->expr);
+			gbString dst_type_str = type_to_string(type);
+			error_node(operand->expr, "Cannot `union_cast` `%s` to `%s`", expr_str, dst_type_str);
+			gb_string_free(dst_type_str);
+			gb_string_free(expr_str);
+			operand->mode = Addressing_Invalid;
+			return false;
+		}
+
+		Entity **variables = gb_alloc_array(c->allocator, Entity *, 2);
+		variables[0] = make_entity_param(c->allocator, NULL, empty_token, type, false);
+		variables[1] = make_entity_param(c->allocator, NULL, empty_token, t_bool, false);
+
+		Type *tuple = make_type_tuple(c->allocator);
+		tuple->Tuple.variables = variables;
+		tuple->Tuple.variable_count = 2;
+
+		operand->type = tuple;
+		operand->mode = Addressing_Value;
+	} break;
+	case BuiltinProc_down_cast: {
+		Type *type = check_type(c, ce->args.e[0]);
+		check_expr(c, operand, ce->args.e[1]);
+		if (operand->mode == Addressing_Invalid) {
+			return false;
+		}
+
+		if (operand->mode == Addressing_Constant) {
+			gbString expr_str = expr_to_string(operand->expr);
+			error_node(operand->expr, "Cannot `down_cast` a constant expression: `%s`", expr_str);
+			gb_string_free(expr_str);
+			operand->mode = Addressing_Invalid;
+			return false;
+		}
+
+		if (is_type_untyped(operand->type)) {
+			gbString expr_str = expr_to_string(operand->expr);
+			error_node(operand->expr, "Cannot `down_cast` an untyped expression: `%s`", expr_str);
+			gb_string_free(expr_str);
+			operand->mode = Addressing_Invalid;
+			return false;
+		}
+
+		if (!(is_type_pointer(operand->type) && is_type_pointer(type))) {
+			gbString expr_str = expr_to_string(operand->expr);
+			error_node(operand->expr, "Can only `down_cast` pointers: `%s`", expr_str);
+			gb_string_free(expr_str);
+			operand->mode = Addressing_Invalid;
+			return false;
+		}
+
+		Type *src = type_deref(operand->type);
+		Type *dst = type_deref(type);
+		Type *bsrc = base_type(src);
+		Type *bdst = base_type(dst);
+
+		if (!(is_type_struct(bsrc) || is_type_raw_union(bsrc))) {
+			gbString expr_str = expr_to_string(operand->expr);
+			error_node(operand->expr, "Can only `down_cast` pointer from structs or unions: `%s`", expr_str);
+			gb_string_free(expr_str);
+			operand->mode = Addressing_Invalid;
+			return false;
+		}
+
+		if (!(is_type_struct(bdst) || is_type_raw_union(bdst))) {
+			gbString expr_str = expr_to_string(operand->expr);
+			error_node(operand->expr, "Can only `down_cast` pointer to structs or unions: `%s`", expr_str);
+			gb_string_free(expr_str);
+			operand->mode = Addressing_Invalid;
+			return false;
+		}
+
+		String param_name = check_down_cast_name(dst, src);
+		if (param_name.len == 0) {
+			gbString expr_str = expr_to_string(operand->expr);
+			error_node(operand->expr, "Illegal `down_cast`: `%s`", expr_str);
+			gb_string_free(expr_str);
+			operand->mode = Addressing_Invalid;
+			return false;
+		}
+
+		operand->mode = Addressing_Value;
+		operand->type = type;
+	} break;
 
 
 	case BuiltinProc_compile_assert:
@@ -3053,45 +3240,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->type = t_int; // Returns number of elems copied
 		operand->mode = Addressing_Value;
 	} break;
-
-	#if 0
-	case BuiltinProc_append: {
-		// append :: proc(x : ^[]Type, y : Type) -> bool
-		Type *x_type = NULL, *y_type = NULL;
-		x_type = base_type(operand->type);
-
-		Operand op = {0};
-		check_expr(c, &op, ce->args.e[1]);
-		if (op.mode == Addressing_Invalid) {
-			return false;
-		}
-		y_type = base_type(op.type);
-
-		if (!(is_type_pointer(x_type) && is_type_slice(x_type->Pointer.elem))) {
-			error_node(call, "First argument to `append` must be a pointer to a slice");
-			return false;
-		}
-
-		Type *elem_type = x_type->Pointer.elem->Slice.elem;
-		if (!check_is_assignable_to(c, &op, elem_type)) {
-			gbString d_arg = expr_to_string(ce->args.e[0]);
-			gbString s_arg = expr_to_string(ce->args.e[1]);
-			gbString d_str = type_to_string(elem_type);
-			gbString s_str = type_to_string(y_type);
-			error_node(call,
-			      "Arguments to `append`, %s, %s, have different element types: %s vs %s",
-			      d_arg, s_arg, d_str, s_str);
-			gb_string_free(s_str);
-			gb_string_free(d_str);
-			gb_string_free(s_arg);
-			gb_string_free(d_arg);
-			return false;
-		}
-
-		operand->type = t_bool; // Returns if it was successful
-		operand->mode = Addressing_Value;
-	} break;
-	#endif
 
 	case BuiltinProc_swizzle: {
 		// swizzle :: proc(v: {N}T, T...) -> {M}T
@@ -4557,7 +4705,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 
 	case_ast_node(ue, UnaryExpr, node);
-		check_expr(c, o, ue->expr);
+		check_expr_base(c, o, ue->expr, type_hint);
 		if (o->mode == Addressing_Invalid) {
 			goto error;
 		}

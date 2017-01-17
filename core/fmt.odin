@@ -19,7 +19,7 @@ buffer_write :: proc(buf: ^Buffer, b: []byte) {
 	}
 }
 buffer_write_string :: proc(buf: ^Buffer, s: string) {
-	buffer_write(buf, s as []byte);
+	buffer_write(buf, []byte(s));
 }
 buffer_write_byte :: proc(buf: ^Buffer, b: byte) {
 	if buf.length < buf.data.count {
@@ -29,7 +29,7 @@ buffer_write_byte :: proc(buf: ^Buffer, b: byte) {
 }
 buffer_write_rune :: proc(buf: ^Buffer, r: rune) {
 	if r < utf8.RUNE_SELF {
-		buffer_write_byte(buf, r as byte);
+		buffer_write_byte(buf, byte(r));
 		return;
 	}
 
@@ -117,7 +117,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		default:
 			buffer_write_string(buf, if info.signed { give "i" } else { give "u"});
 			fi := Fmt_Info{buf = buf};
-			fmt_int(^fi, 8*info.size as u64, false, 'd');
+			fmt_int(^fi, u64(8*info.size), false, 'd');
 		}
 
 	case Float:
@@ -142,7 +142,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		if info.params == nil {
 			buffer_write_string(buf, "()");
 		} else {
-			count := (info.params as ^Tuple).fields.count;
+			count := (^Tuple)(info.params).fields.count;
 			if count == 1 { buffer_write_string(buf, "("); }
 			buffer_write_type(buf, info.params);
 			if count == 1 { buffer_write_string(buf, ")"); }
@@ -170,7 +170,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 	case Array:
 		buffer_write_string(buf, "[");
 		fi := Fmt_Info{buf = buf};
-		fmt_int(^fi, info.count as u64, false, 'd');
+		fmt_int(^fi, u64(info.count), false, 'd');
 		buffer_write_string(buf, "]");
 		buffer_write_type(buf, info.elem);
 	case Slice:
@@ -180,7 +180,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 	case Vector:
 		buffer_write_string(buf, "[vector ");
 		fi := Fmt_Info{buf = buf};
-		fmt_int(^fi, info.count as u64, false, 'd');
+		fmt_int(^fi, u64(info.count), false, 'd');
 		buffer_write_string(buf, "]");
 		buffer_write_type(buf, info.elem);
 
@@ -307,14 +307,14 @@ parse_int :: proc(s: string, offset: int) -> (int, int, bool) {
 
 	i := 0;
 	for _ : offset..<s.count {
-		c := s[offset] as rune;
+		c := rune(s[offset]);
 		if !is_digit(c) {
 			break;
 		}
 		i += 1;
 
 		result *= 10;
-		result += (c - '0') as int;
+		result += int(c - '0');
 	}
 
 	return result, offset, i != 0;
@@ -361,14 +361,14 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 		arg.type_info = type_info_base(arg.type_info);
 		match type i : arg {
 		case int:  num = i;
-		case i8:   num = i as int;
-		case i16:  num = i as int;
-		case i32:  num = i as int;
-		case i64:  num = i as int;
-		case u8:   num = i as int;
-		case u16:  num = i as int;
-		case u32:  num = i as int;
-		case u64:  num = i as int;
+		case i8:   num = int(i);
+		case i16:  num = int(i);
+		case i32:  num = int(i);
+		case i64:  num = int(i);
+		case u8:   num = int(i);
+		case u16:  num = int(i);
+		case u32:  num = int(i);
+		case u64:  num = int(i);
 		default:
 			ok = false;
 		}
@@ -421,7 +421,7 @@ fmt_write_padding :: proc(fi: ^Fmt_Info, width: int) {
 }
 
 fmt_integer :: proc(fi: ^Fmt_Info, u: u64, base: int, signed: bool, digits: string) {
-	negative := signed && u as i64 < 0;
+	negative := signed && i64(u) < 0;
 	if negative {
 		u = -u;
 	}
@@ -461,7 +461,7 @@ fmt_integer :: proc(fi: ^Fmt_Info, u: u64, base: int, signed: bool, digits: stri
 		panic("fmt_integer: unknown base, whoops");
 	}
 
-	while b := base as u64; u >= b {
+	while b := u64(base); u >= b {
 		i -= 1;
 		next := u / b;
 		buf[i] = digits[u%b];
@@ -504,7 +504,7 @@ fmt_integer :: proc(fi: ^Fmt_Info, u: u64, base: int, signed: bool, digits: stri
 	if !fi.width_set || fi.width == 0 {
 		buffer_write(fi.buf, buf[i:]);
 	} else {
-		width := fi.width - utf8.rune_count(buf[i:] as string);
+		width := fi.width - utf8.rune_count(string(buf[i:]));
 		if fi.minus {
 			// Right pad
 			buffer_write(fi.buf, buf[i:]);
@@ -533,9 +533,9 @@ fmt_int :: proc(fi: ^Fmt_Info, u: u64, signed: bool, verb: rune) {
 	case 'd': fmt_integer(fi, u, 10, signed, __DIGITS_LOWER);
 	case 'x': fmt_integer(fi, u, 16, signed, __DIGITS_LOWER);
 	case 'X': fmt_integer(fi, u, 16, signed, __DIGITS_UPPER);
-	case 'c': fmt_rune(fi, u as rune);
+	case 'c': fmt_rune(fi, rune(u));
 	case 'U':
-		r := u as rune;
+		r := rune(u);
 		if r < 0 || r > utf8.MAX_RUNE {
 			fmt_bad_verb(fi, verb);
 		} else {
@@ -566,24 +566,24 @@ __TEN_TO_19TH :: 1000000000000000000;
 __ddmulthi :: proc(ol: f64, xh, yh: f64) -> f64 {
 	bt: i64;
 	oh := xh * yh;
-	bt = xh transmute i64;
-	bt &= (~(0 as u64)<<27) as i64;
-	ahi := bt transmute f64;
+	bt = transmute(i64, xh);
+	bt &= i64(~u64(0)<<27);
+	ahi := transmute(f64, bt);
 	alo := xh-ahi;
-	bt = yh transmute i64;
-	bt &= (~(0 as u64)<<27) as i64;
-	bhi := bt transmute f64;
+	bt = transmute(i64, yh);
+	bt &= i64(~u64(0)<<27);
+	bhi := transmute(f64, bt);
 	blo := yh-bhi;
 	return ((ahi*bhi-oh)+ahi*blo+alo*bhi)+alo*blo;
 }
 
 __ddtoi64 :: proc(xh, xl: f64) -> i64 {
-	ob := xh as i64;
-	vh := ob as f64;
+	ob := i64(xh);
+	vh := f64(ob);
 	ahi := xh-vh;
 	t := ahi-xh;
 	alo := (xh-(ahi-t)) - (vh+t);
-	ob += (ahi+alo+xl) as i64;
+	ob += i64(ahi+alo+xl);
 	return ob;
 }
 
@@ -670,9 +670,9 @@ __real_to_string :: proc(start: ^string, out: []byte, decimal_pos: ^i32, val: f6
 	e, tens: i32;
 	d: f64 = val;
 
-	bits := d transmute i64;
-	expo := (bits>>52 & 2047) as i32;
-	neg := (bits>>63) as i32 != 0;
+	bits := transmute(i64, d);
+	expo := i32(bits>>52 & 2047);
+	neg := i32(bits>>63) != 0;
 	if neg {
 		d = -d;
 	}
@@ -692,7 +692,7 @@ __real_to_string :: proc(start: ^string, out: []byte, decimal_pos: ^i32, val: f6
 		if bits<<1 == 0 {
 			decimal_pos^ = 1;
 			out[0] = '0';
-			start^ = out[:1] as string;
+			start^ = string(out[:1]);
 			return neg;
 		}
 		// find the right expo for denormals
@@ -721,7 +721,7 @@ __real_to_string :: proc(start: ^string, out: []byte, decimal_pos: ^i32, val: f6
 		bits = __ddtoi64(ph, pl);
 
 		// check if we undershot
-		if bits as u64 >= __TEN_TO_19TH {
+		if f64(bits) >= __TEN_TO_19TH {
 			tens += 1;
 		}
 	}
@@ -737,10 +737,10 @@ __real_to_string :: proc(start: ^string, out: []byte, decimal_pos: ^i32, val: f6
 	if frac_digits < 24 {
 		skip := false;
 		dg: u32 = 1;
-		if bits as u64 >= __powten[9] {
+		if u64(bits) >= __powten[9] {
 			dg = 10;
 		}
-		while bits as u64 >= __powten[dg] {
+		while u64(bits) >= __powten[dg] {
 			dg += 1;
 			if dg == 20 {
 				skip = true;
@@ -751,14 +751,14 @@ __real_to_string :: proc(start: ^string, out: []byte, decimal_pos: ^i32, val: f6
 		if (!skip) {
 			r: u64;
 			// add 0.5 at the right position and round
-			e = dg as i32 - frac_digits;
-			if e as u32 < 24 {
+			e = i32(dg) - frac_digits;
+			if u32(e) < 24 {
 				r = __powten[e];
-				bits += (r/2) as i64;
-				if bits as u64 >= __powten[dg] {
+				bits += i64(r/2);
+				if u64(bits) >= __powten[dg] {
 					tens += 1;
 				}
-				bits /= r as i64;
+				bits /= i64(r);
 			}
 		}
 	}
@@ -777,11 +777,11 @@ __real_to_string :: proc(start: ^string, out: []byte, decimal_pos: ^i32, val: f6
 			bits /= 1000;
 		}
 		if !skip {
-			n := bits as u32;
+			n := u32(bits);
 			while n%1000 == 0 {
 				n /= 1000;
 			}
-			bits = n as i64;
+			bits = i64(n);
 		}
 	}
 
@@ -793,15 +793,15 @@ __real_to_string :: proc(start: ^string, out: []byte, decimal_pos: ^i32, val: f6
 		o := outp-8;
 		// do the conversion in chunks of u32s (avoid most 64-bit divides, worth it, constant denomiators be damned)
 		if bits >= 100000000 {
-			n = (bits%100000000) as u32;
+			n = u32(bits%100000000);
 			bits /= 100000000;
 		} else {
-			n = bits as u32;
+			n = u32(bits);
 			bits = 0;
 		}
 		while n != 0 {
 			outp -= 2;
-			(outp as ^u16)^ = (^__digitpair[(n%100)*2] as ^u16)^;
+			(^u16)(outp)^ = (^u16)(^__digitpair[(n%100)*2])^;
 			n /= 100;
 			e += 2;
 		}
@@ -820,7 +820,7 @@ __real_to_string :: proc(start: ^string, out: []byte, decimal_pos: ^i32, val: f6
 	}
 
 	decimal_pos^ = tens;
-	start^ = slice_ptr(outp, e) as string;
+	start^ = string(slice_ptr(outp, e));
 	return neg;
 }
 
@@ -839,18 +839,18 @@ generic_ftoa :: proc(buf: []byte, val: f64, verb: rune, prec, bit_size: int) -> 
 	flt: ^Float_Info;
 	match bit_size {
 	case 32:
-		bits = ((val as f32) transmute u32) as u64;
+		bits = u64(transmute(u32, f32(val)));
 		flt = ^f32info;
 	case 64:
-		bits = val transmute u64;
+		bits = u64(val);
 		flt = ^f64info;
 	default:
 		panic("illegal float bit_size");
 	}
 
 	neg := bits>>(flt.expbits+flt.mantbits) != 0;
-	exp := (bits>>flt.mantbits) as int & (1<<flt.expbits - 1);
-	mant := bits & ((1 as u64)<<flt.mantbits - 1);
+	exp := int(bits>>flt.mantbits) & (1<<flt.expbits - 1);
+	mant := bits & (u64(1)<<flt.mantbits - 1);
 
 	match exp {
 	case 1<<flt.expbits-1:
@@ -860,13 +860,13 @@ generic_ftoa :: proc(buf: []byte, val: f64, verb: rune, prec, bit_size: int) -> 
 		case neg:     s = "-Inf";
 		default:      s = "+Inf";
 		}
-		copy(buf, s as []byte);
+		copy(buf, []byte(s));
 		return buf[:s.count];
 
 	case 0: // denormalized
 		exp+=1;
 	default: // add implicit top bit
-		mant |= (1 as u64)<<flt.mantbits;
+		mant |= u64(1)<<flt.mantbits;
 	}
 
 
@@ -924,7 +924,7 @@ fmt_pointer :: proc(fi: ^Fmt_Info, p: rawptr, verb: rune) {
 		fmt_bad_verb(fi, verb);
 		return;
 	}
-	u := p as uint as u64;
+	u := u64(uint(p));
 	if !fi.hash || verb == 'v' {
 		buffer_write_string(fi.buf, "0x");
 	}
@@ -952,18 +952,18 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			ok := false;
 			a := any{type_info_base(e.base), v.data};
 			match type v : a {
-			case i8:   i = v as i64;
-			case i16:  i = v as i64;
-			case i32:  i = v as i64;
-			case i64:  i = v as i64;
-			case int:  i = v as i64;
-			case u8:   i = v as i64;
-			case u16:  i = v as i64;
-			case u32:  i = v as i64;
-			case u64:  i = v as i64;
-			case uint: i = v as i64;
-			case f32:  f = v as f64;
-			case f64:  f = v as f64;
+			case i8:   i = i64(v);
+			case i16:  i = i64(v);
+			case i32:  i = i64(v);
+			case i64:  i = i64(v);
+			case int:  i = i64(v);
+			case u8:   i = i64(v);
+			case u16:  i = i64(v);
+			case u32:  i = i64(v);
+			case u64:  i = i64(v);
+			case uint: i = i64(v);
+			case f32:  f = f64(v);
+			case f64:  f = f64(v);
 			}
 
 			if is_type_integer(e.base) {
@@ -1019,8 +1019,8 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				buffer_write_string(fi.buf, f.name);
 				// bprint_any(fi.buf, f.offset);
 				buffer_write_string(fi.buf, " = ");
-				data := v.data as ^byte + f.offset;
-				fmt_arg(fi, any{f.type_info, data as rawptr}, 'v');
+				data := (^byte)(v.data) + f.offset;
+				fmt_arg(fi, any{f.type_info, rawptr(data)}, 'v');
 			}
 			buffer_write_byte(fi.buf, '}');
 
@@ -1035,15 +1035,15 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 	case Pointer:
 		if v.type_info == type_info(^Type_Info) {
-			buffer_write_type(fi.buf, (v.data as ^^Type_Info)^);
+			buffer_write_type(fi.buf, (^^Type_Info)(v.data)^);
 		} else {
-			fmt_pointer(fi, (v.data as ^rawptr)^, verb);
+			fmt_pointer(fi, (^rawptr)(v.data)^, verb);
 		}
 
 	case Maybe:
 		// TODO(bill): Correct verbs for Maybe types?
 		size := mem.size_of_type_info(info.elem);
-		data := slice_ptr(v.data as ^byte, size+1);
+		data := slice_ptr((^byte)(v.data), size+1);
 		if data[size] != 0 {
 			fmt_arg(fi, any{info.elem, v.data}, verb);
 		} else {
@@ -1062,8 +1062,8 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			if i > 0 {
 				buffer_write_string(fi.buf, ", ");
 			}
-			data := v.data as ^byte + i*info.elem_size;
-			fmt_arg(fi, any{info.elem, data as rawptr}, 'v');
+			data := (^byte)(v.data) + i*info.elem_size;
+			fmt_arg(fi, any{info.elem, rawptr(data)}, 'v');
 		}
 
 	case Slice:
@@ -1074,13 +1074,13 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 		buffer_write_byte(fi.buf, '[');
 		defer buffer_write_byte(fi.buf, ']');
-		slice := v.data as ^[]byte;
+		slice := (^[]byte)(v.data);
 		for i : 0..<slice.count {
 			if i > 0 {
 				buffer_write_string(fi.buf, ", ");
 			}
 			data := slice.data + i*info.elem_size;
-			fmt_arg(fi, any{info.elem, data as rawptr}, 'v');
+			fmt_arg(fi, any{info.elem, rawptr(data)}, 'v');
 		}
 
 	case Vector:
@@ -1106,8 +1106,8 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				buffer_write_string(fi.buf, ", ");
 			}
 
-			data := v.data as ^byte + i*info.elem_size;
-			fmt_value(fi, any{info.elem, data as rawptr}, 'v');
+			data := (^byte)(v.data) + i*info.elem_size;
+			fmt_value(fi, any{info.elem, rawptr(data)}, 'v');
 		}
 
 	case Struct:
@@ -1120,9 +1120,9 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			}
 			buffer_write_string(fi.buf, f.name);
 			buffer_write_string(fi.buf, " = ");
-			data := v.data as ^byte + f.offset;
+			data := (^byte)(v.data) + f.offset;
 			ti := f.type_info;
-			fmt_value(fi, any{ti, data as rawptr}, 'v');
+			fmt_value(fi, any{ti, rawptr(data)}, 'v');
 		}
 
 	case Union:
@@ -1136,7 +1136,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	case Procedure:
 		buffer_write_type(fi.buf, v.type_info);
 		buffer_write_string(fi.buf, " @ ");
-		fmt_pointer(fi, (v.data as ^rawptr)^, 'p');
+		fmt_pointer(fi, (^rawptr)(v.data)^, 'p');
 	}
 }
 
@@ -1161,19 +1161,19 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	base_arg.type_info = type_info_base(base_arg.type_info);
 	match type a : base_arg {
 	case bool:    fmt_bool(fi, a, verb);
-	case f32:     fmt_float(fi, a as f64, 32, verb);
+	case f32:     fmt_float(fi, f64(a), 32, verb);
 	case f64:     fmt_float(fi, a, 64, verb);
 
-	case int:     fmt_int(fi, a as u64, true, verb);
-	case i8:      fmt_int(fi, a as u64, true, verb);
-	case i16:     fmt_int(fi, a as u64, true, verb);
-	case i32:     fmt_int(fi, a as u64, true, verb);
-	case i64:     fmt_int(fi, a as u64, true, verb);
-	case uint:    fmt_int(fi, a as u64, false, verb);
-	case u8:      fmt_int(fi, a as u64, false, verb);
-	case u16:     fmt_int(fi, a as u64, false, verb);
-	case u32:     fmt_int(fi, a as u64, false, verb);
-	case u64:     fmt_int(fi, a as u64, false, verb);
+	case int:     fmt_int(fi, u64(a), true, verb);
+	case i8:      fmt_int(fi, u64(a), true, verb);
+	case i16:     fmt_int(fi, u64(a), true, verb);
+	case i32:     fmt_int(fi, u64(a), true, verb);
+	case i64:     fmt_int(fi, u64(a), true, verb);
+	case uint:    fmt_int(fi, u64(a), false, verb);
+	case u8:      fmt_int(fi, u64(a), false, verb);
+	case u16:     fmt_int(fi, u64(a), false, verb);
+	case u32:     fmt_int(fi, u64(a), false, verb);
+	case u64:     fmt_int(fi, u64(a), false, verb);
 	case string:  fmt_string(fi, a, verb);
 	default:      fmt_value(fi, arg, verb);
 	}

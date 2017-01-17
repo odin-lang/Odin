@@ -10,20 +10,22 @@
 #import "utf8.odin";
 
 main :: proc() {
-	foo :: proc(x: ^i32) {
+	foo :: proc(x: ^i32) -> (int, int) {
 		fmt.println("^int");
+		return 123, int(x^);
 	}
 	foo :: proc(x: rawptr) {
 		fmt.println("rawptr");
 	}
 
+
 	THINGI :: 14451;
 	THINGF :: 14451.1;
 
-	a: i32;
+	a: i32 = 111111;
 	b: f32;
 	c: rawptr;
-	foo(^a);
+	fmt.println(foo(^a));
 	foo(^b);
 	foo(c);
 	// foo(nil);
@@ -36,12 +38,11 @@ main :: proc() {
 		fmt.printf("int arg, i=%d\n", i);
 	}
 	foo :: proc(f: f64) {
-		i := f as int;
+		i := int(f);
 		fmt.printf("f64 arg, f=%d\n", i);
 	}
 
 	foo();
-	foo(THINGI as int);
 	foo(int(THINGI));
 	// foo(THINGI);
 	foo(THINGF);

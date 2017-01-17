@@ -3,7 +3,7 @@
 
 set :: proc(data: rawptr, value: i32, len: int) -> rawptr #link_name "__mem_set" {
 	llvm_memset_64bit :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) #foreign "llvm.memset.p0i8.i64"
-	llvm_memset_64bit(data, value as byte, len, 1, false);
+	llvm_memset_64bit(data, byte(value), len, 1, false);
 	return data;
 }
 
@@ -26,8 +26,8 @@ copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #link_name "_
 }
 
 compare :: proc(dst, src: rawptr, n: int) -> int #link_name "__mem_compare" {
-	a := slice_ptr(dst as ^byte, n);
-	b := slice_ptr(src as ^byte, n);
+	a := slice_ptr((^byte)(dst), n);
+	b := slice_ptr((^byte)(src), n);
 	for i : 0..<n {
 		match {
 		case a[i] < b[i]:
@@ -56,13 +56,13 @@ is_power_of_two :: proc(x: int) -> bool {
 align_forward :: proc(ptr: rawptr, align: int) -> rawptr {
 	assert(is_power_of_two(align));
 
-	a := align as uint;
-	p := ptr as uint;
+	a := uint(align);
+	p := uint(ptr);
 	modulo := p & (a-1);
 	if modulo != 0 {
 		p += a - modulo;
 	}
-	return p as rawptr;
+	return rawptr(p);
 }
 
 
@@ -73,19 +73,19 @@ Allocation_Header :: struct {
 
 allocation_header_fill :: proc(header: ^Allocation_Header, data: rawptr, size: int) {
 	header.size = size;
-	ptr := (header+1) as ^int;
+	ptr := (^int)(header+1);
 
-	while i := 0; ptr as rawptr < data {
+	while i := 0; rawptr(ptr) < data {
 		(ptr+i)^ = -1;
 		i += 1;
 	}
 }
 allocation_header :: proc(data: rawptr) -> ^Allocation_Header {
-	p := data as ^int;
+	p := (^int)(data);
 	while (p-1)^ == -1 {
 		p = (p-1);
 	}
-	return (p as ^Allocation_Header)-1;
+	return (^Allocation_Header)(p)-1;
 }
 
 
@@ -142,7 +142,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                           size, alignment: int,
                           old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
 	using Allocator_Mode;
-	arena := allocator_data as ^Arena;
+	arena := (^Arena)(allocator_data);
 
 	match mode {
 	case ALLOC:
@@ -235,7 +235,7 @@ align_of_type_info :: proc(type_info: ^Type_Info) -> int {
 		return WORD_SIZE;
 	case Vector:
 		size := size_of_type_info(info.elem);
-		count := max(prev_pow2(info.count as i64), 1) as int;
+		count := int(max(prev_pow2(i64(info.count)), 1));
 		total := size * count;
 		return clamp(total, 1, MAX_ALIGN);
 	case Struct:
