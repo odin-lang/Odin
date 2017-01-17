@@ -980,6 +980,51 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, bool is_ty
 	return lookup_field_with_selection(a, type_, field_name, is_type, empty_selection);
 }
 
+Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
+	GB_ASSERT(is_type_struct(type) || is_type_tuple(type));
+	type = base_type(type);
+
+	i64 max_count = 0;
+	switch (type->kind) {
+	case Type_Record: max_count = type->Record.field_count;   break;
+	case Type_Tuple:  max_count = type->Tuple.variable_count; break;
+	}
+
+	if (index >= max_count) {
+		return empty_selection;
+	}
+
+	switch (type->kind) {
+	case Type_Record:
+		for (isize i = 0; i < max_count; i++) {
+			Entity *f = type->Record.fields[i];
+			if (f->kind == Entity_Variable) {
+				if (f->Variable.field_src_index == index) {
+					Array_isize sel_array = {0};
+					array_init_count(&sel_array, a, 1);
+					sel_array.e[0] = i;
+					return make_selection(f, sel_array, false);
+				}
+			}
+		}
+		break;
+	case Type_Tuple:
+		for (isize i = 0; i < max_count; i++) {
+			Entity *f = type->Tuple.variables[i];
+			if (i == index) {
+				Array_isize sel_array = {0};
+				array_init_count(&sel_array, a, 1);
+				sel_array.e[0] = i;
+				return make_selection(f, sel_array, false);
+			}
+		}
+		break;
+	}
+
+	GB_PANIC("Illegal index");
+	return empty_selection;
+}
+
 Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel) {
 	GB_ASSERT(type_ != NULL);
 

@@ -29,7 +29,6 @@ fetch_add :: proc(a: ^i32, operand: i32) -> i32 {
 }
 fetch_and :: proc(a: ^i32, operand: i32) -> i32 {
 	return win32.InterlockedAnd(a, operand);
-
 }
 fetch_or :: proc(a: ^i32, operand: i32) -> i32 {
 	return win32.InterlockedOr(a, operand);

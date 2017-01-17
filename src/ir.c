@@ -1718,7 +1718,10 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, Type *type, irValue *e, Selec
 		} else if (type->kind == Type_Record) {
 			type = type->Record.fields[index]->type;
 			e = ir_emit_struct_ep(proc, e, index);
-		} else if (type->kind == Type_Basic) {
+		} else if (type->kind == Type_Tuple) {
+			type = type->Tuple.variables[index]->type;
+			e = ir_emit_struct_ep(proc, e, index);
+		}else if (type->kind == Type_Basic) {
 			switch (type->Basic.kind) {
 			case Basic_any: {
 				if (index == 0) {
@@ -3351,19 +3354,31 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 	case_ast_node(se, SelectorExpr, expr);
 		ir_emit_comment(proc, str_lit("SelectorExpr"));
 		AstNode *sel = unparen_expr(se->selector);
-		GB_ASSERT(sel->kind == AstNode_Ident);
-		String selector = sel->Ident.string;
-		Type *type = base_type(type_of_expr(proc->module->info, se->expr));
+		if (sel->kind == AstNode_Ident) {
+			String selector = sel->Ident.string;
+			Type *type = base_type(type_of_expr(proc->module->info, se->expr));
 
-		if (type == t_invalid) {
-			// NOTE(bill): Imports
-			Entity *imp = entity_of_ident(proc->module->info, se->expr);
-			if (imp != NULL) {
-				GB_ASSERT(imp->kind == Entity_ImportName);
+			if (type == t_invalid) {
+				// NOTE(bill): Imports
+				Entity *imp = entity_of_ident(proc->module->info, se->expr);
+				if (imp != NULL) {
+					GB_ASSERT(imp->kind == Entity_ImportName);
+				}
+				return ir_build_addr(proc, unparen_expr(se->selector));
+			} else {
+				Selection sel = lookup_field(proc->module->allocator, type, selector, false);
+				GB_ASSERT(sel.entity != NULL);
+
+				irValue *a = ir_build_addr(proc, se->expr).addr;
+				a = ir_emit_deep_field_gep(proc, type, a, sel);
+				return ir_make_addr(a, expr);
 			}
-			return ir_build_addr(proc, unparen_expr(se->selector));
 		} else {
-			Selection sel = lookup_field(proc->module->allocator, type, selector, false);
+			Type *type = base_type(type_of_expr(proc->module->info, se->expr));
+			ExactValue val = type_and_value_of_expression(proc->module->info, sel)->value;
+			i64 index = val.value_integer;
+
+			Selection sel = lookup_field_from_index(proc->module->allocator, type, index);
 			GB_ASSERT(sel.entity != NULL);
 
 			irValue *a = ir_build_addr(proc, se->expr).addr;

@@ -1398,7 +1398,8 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 			return true;
 		}
 		if (in_value.kind == ExactValue_Integer) {
-			return true;
+			return false;
+			// return true;
 		}
 		if (out_value) *out_value = in_value;
 	}
@@ -1727,6 +1728,7 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+
 	if (dst->kind == Type_Array && src->kind == Type_Array) {
 		if (are_types_identical(dst->Array.elem, src->Array.elem)) {
 			return dst->Array.count == src->Array.count;
@@ -1867,6 +1869,8 @@ void check_conversion(Checker *c, Operand *x, Type *type) {
 	if (is_const_expr && is_type_constant_type(bt)) {
 		if (bt->kind == Type_Basic) {
 			if (check_representable_as_constant(c, x->value, bt, &x->value)) {
+				can_convert = true;
+			} else if (is_type_pointer(type) && check_is_castable_to(c, x, type)) {
 				can_convert = true;
 			}
 		}
@@ -2478,8 +2482,10 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		goto error;
 	}
 
-	if (ast_node_expect(selector, AstNode_Ident)) {
-
+	// if (selector->kind != AstNode_Ident && selector->kind != AstNode_BasicLit) {
+	if (selector->kind != AstNode_Ident) {
+		error_node(selector, "Illegal selector kind: `%.*s`", LIT(ast_node_strings[selector->kind]));
+		goto error;
 	}
 
 	if (op_expr->kind == AstNode_Ident) {
@@ -2577,6 +2583,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			}
 		}
 	}
+
 	if (check_op_expr) {
 		check_expr_base(c, operand, op_expr, NULL);
 		if (operand->mode == Addressing_Invalid) {
@@ -2588,6 +2595,43 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	if (entity == NULL && selector->kind == AstNode_Ident) {
 		sel = lookup_field(c->allocator, operand->type, selector->Ident.string, operand->mode == Addressing_Type);
 		entity = sel.entity;
+	}
+	if (entity == NULL && selector->kind == AstNode_BasicLit) {
+		if (is_type_struct(operand->type) || is_type_tuple(operand->type)) {
+			Type *type = base_type(operand->type);
+			Operand o = {0};
+			check_expr(c, &o, selector);
+			if (o.mode != Addressing_Constant ||
+			    !is_type_integer(o.type)) {
+				error_node(op_expr, "Indexed based selectors must be a constant integer %s");
+				goto error;
+			}
+			i64 index = o.value.value_integer;
+			if (index < 0) {
+				error_node(o.expr, "Index %lld cannot be a negative value", index);
+				goto error;
+			}
+
+			i64 max_count = 0;
+			switch (type->kind) {
+			case Type_Record: max_count = type->Record.field_count;   break;
+			case Type_Tuple:  max_count = type->Tuple.variable_count; break;
+			}
+
+			if (index >= max_count) {
+				error_node(o.expr, "Index %lld is out of bounds range 0..<%lld", index, max_count);
+				goto error;
+			}
+
+			sel = lookup_field_from_index(heap_allocator(), type, index);
+			entity = sel.entity;
+
+			GB_ASSERT(entity != NULL);
+
+		} else {
+			error_node(op_expr, "Indexed based selectors may only be used on structs or tuples");
+			goto error;
+		}
 	}
 	if (entity == NULL) {
 		gbString op_str   = expr_to_string(op_expr);

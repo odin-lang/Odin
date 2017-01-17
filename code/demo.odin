@@ -5,6 +5,7 @@
 #import "mem.odin";
 #import "opengl.odin";
 #import "os.odin";
+#import win32 "sys/windows.odin";
 #import "sync.odin";
 #import "utf8.odin";
 
@@ -15,6 +16,9 @@ main :: proc() {
 	foo :: proc(x: rawptr) {
 		fmt.println("rawptr");
 	}
+
+	THINGI :: 14451;
+	THINGF :: 14451.1;
 
 	a: i32;
 	b: f32;
@@ -35,8 +39,6 @@ main :: proc() {
 		i := f as int;
 		fmt.printf("f64 arg, f=%d\n", i);
 	}
-	THINGI :: 14451;
-	THINGF :: 14451.1;
 
 	foo();
 	foo(THINGI as int);

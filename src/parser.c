@@ -1854,15 +1854,15 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			case Token_Ident:
 				operand = make_selector_expr(f, token, operand, parse_identifier(f));
 				break;
-			case Token_Integer:
-				operand = make_selector_expr(f, token, operand, parse_expr(f, lhs));
-				break;
-			default: {
+			// case Token_Integer:
+				// operand = make_selector_expr(f, token, operand, parse_expr(f, lhs));
+				// break;
+			default:
 				syntax_error(f->curr_token, "Expected a selector");
 				next_token(f);
 				operand = make_bad_expr(f, ast_node_token(operand), f->curr_token);
 				// operand = make_selector_expr(f, f->curr_token, operand, NULL);
-			} break;
+				break;
 			}
 		} break;
 
