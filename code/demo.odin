@@ -1,23 +1,29 @@
 #import "atomic.odin";
 #import "fmt.odin";
+#import "hash.odin";
 #import "math.odin";
 #import "mem.odin";
+#import "opengl.odin";
+#import "os.odin";
+#import "sync.odin";
+#import "utf8.odin";
 
 main :: proc() {
-	foo :: proc(x: ^int) {
+	foo :: proc(x: ^i32) {
 		fmt.println("^int");
 	}
 	foo :: proc(x: rawptr) {
 		fmt.println("rawptr");
 	}
 
-	a: ^int;
-	b: ^f32;
+	a: i32;
+	b: f32;
 	c: rawptr;
-	foo(a);
-	foo(b);
+	foo(^a);
+	foo(^b);
 	foo(c);
 	// foo(nil);
+	atomic.store(^a, 1);
 
 	foo :: proc() {
 		fmt.printf("Zero args\n");
@@ -31,7 +37,6 @@ main :: proc() {
 	}
 	THINGI :: 14451;
 	THINGF :: 14451.1;
-
 
 	foo();
 	foo(THINGI as int);

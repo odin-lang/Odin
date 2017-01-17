@@ -14,20 +14,20 @@
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
 Type_Info_Member :: struct #ordered {
-	name:      string;     // can be empty if tuple
-	type_info: ^Type_Info;
-	offset:    int;        // offsets are not used in tuples
+	name:      string,     // can be empty if tuple
+	type_info: ^Type_Info,
+	offset:    int,        // offsets are not used in tuples
 }
 Type_Info_Record :: struct #ordered {
-	fields:  []Type_Info_Member;
-	size:    int; // in bytes
-	align:   int; // in bytes
-	packed:  bool;
-	ordered: bool;
+	fields:  []Type_Info_Member,
+	size:    int, // in bytes
+	align:   int, // in bytes
+	packed:  bool,
+	ordered: bool,
 }
 Type_Info_Enum_Value :: raw_union {
-	f: f64;
-	i: i64;
+	f: f64,
+	i: i64,
 }
 
 // NOTE(bill): This much the same as the compiler's
@@ -40,55 +40,55 @@ Calling_Convention :: enum {
 
 Type_Info :: union {
 	Named: struct #ordered {
-		name: string;
-		base: ^Type_Info; // This will _not_ be a Type_Info.Named
-	};
+		name: string,
+		base: ^Type_Info, // This will _not_ be a Type_Info.Named
+	},
 	Integer: struct #ordered {
-		size:   int; // in bytes
-		signed: bool;
-	};
+		size:   int, // in bytes
+		signed: bool,
+	},
 	Float: struct #ordered {
-		size: int; // in bytes
-	};
-	Any:     struct #ordered {};
-	String:  struct #ordered {};
-	Boolean: struct #ordered {};
+		size: int, // in bytes
+	},
+	Any:     struct #ordered {},
+	String:  struct #ordered {},
+	Boolean: struct #ordered {},
 	Pointer: struct #ordered {
-		elem: ^Type_Info; // nil -> rawptr
-	};
+		elem: ^Type_Info, // nil -> rawptr
+	},
 	Maybe: struct #ordered {
-		elem: ^Type_Info;
-	};
+		elem: ^Type_Info,
+	},
 	Procedure: struct #ordered {
-		params:     ^Type_Info; // Type_Info.Tuple
-		results:    ^Type_Info; // Type_Info.Tuple
-		variadic:   bool;
-		convention: Calling_Convention;
-	};
+		params:     ^Type_Info, // Type_Info.Tuple
+		results:    ^Type_Info, // Type_Info.Tuple
+		variadic:   bool,
+		convention: Calling_Convention,
+	},
 	Array: struct #ordered {
-		elem:      ^Type_Info;
-		elem_size: int;
-		count:     int;
-	};
+		elem:      ^Type_Info,
+		elem_size: int,
+		count:     int,
+	},
 	Slice: struct #ordered {
-		elem:      ^Type_Info;
-		elem_size: int;
-	};
+		elem:      ^Type_Info,
+		elem_size: int,
+	},
 	Vector: struct #ordered {
-		elem:      ^Type_Info;
-		elem_size: int;
-		count:     int;
-		align:     int;
-	};
-	Tuple:     Type_Info_Record;
-	Struct:    Type_Info_Record;
-	Union:     Type_Info_Record;
-	Raw_Union: Type_Info_Record;
+		elem:      ^Type_Info,
+		elem_size: int,
+		count:     int,
+		align:     int,
+	},
+	Tuple:     Type_Info_Record,
+	Struct:    Type_Info_Record,
+	Union:     Type_Info_Record,
+	Raw_Union: Type_Info_Record,
 	Enum: struct #ordered {
-		base:  ^Type_Info;
-		names: []string;
-		values: []Type_Info_Enum_Value;
-	};
+		base:  ^Type_Info,
+		names: []string,
+		values: []Type_Info_Enum_Value,
+	},
 }
 
 type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
@@ -137,17 +137,17 @@ Allocator_Proc :: type proc(allocator_data: rawptr, mode: Allocator_Mode,
                             size, alignment: int,
                             old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
 Allocator :: struct #ordered {
-	procedure: Allocator_Proc;
-	data:      rawptr;
+	procedure: Allocator_Proc,
+	data:      rawptr,
 }
 
 Context :: struct #ordered {
-	thread_id: int;
+	thread_id: int,
 
-	allocator: Allocator;
+	allocator: Allocator,
 
-	user_data:  rawptr;
-	user_index: int;
+	user_data:  rawptr,
+	user_index: int,
 }
 
 #thread_local __context: Context;

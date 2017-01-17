@@ -5,8 +5,8 @@
 DEFAULT_BUFFER_SIZE :: 1<<12;
 
 Buffer :: struct {
-	data:   []byte;
-	length: int;
+	data:   []byte,
+	length: int,
 }
 
 buffer_write :: proc(buf: ^Buffer, b: []byte) {
@@ -38,22 +38,22 @@ buffer_write_rune :: proc(buf: ^Buffer, r: rune) {
 }
 
 Fmt_Info :: struct {
-	minus:     bool;
-	plus:      bool;
-	space:     bool;
-	zero:      bool;
-	hash:      bool;
-	width_set: bool;
-	prec_set:  bool;
+	minus:     bool,
+	plus:      bool,
+	space:     bool,
+	zero:      bool,
+	hash:      bool,
+	width_set: bool,
+	prec_set:  bool,
 
-	width:     int;
-	prec:      int;
+	width:     int,
+	prec:      int,
 
-	reordered:      bool;
-	good_arg_index: bool;
+	reordered:      bool,
+	good_arg_index: bool,
 
-	buf: ^Buffer;
-	arg: any; // Temporary
+	buf: ^Buffer,
+	arg: any, // Temporary
 }
 
 
@@ -827,9 +827,9 @@ __real_to_string :: proc(start: ^string, out: []byte, decimal_pos: ^i32, val: f6
 
 generic_ftoa :: proc(buf: []byte, val: f64, verb: rune, prec, bit_size: int) -> []byte {
 	Float_Info :: struct {
-		mantbits: uint;
-		expbits:  uint;
-		bias:     int;
+		mantbits: uint,
+		expbits:  uint,
+		bias:     int,
 	};
 	f32info := Float_Info{23,  8,  -127};
 	f64info := Float_Info{52, 11, -1023};

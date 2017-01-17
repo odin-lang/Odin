@@ -529,7 +529,7 @@ fraction:
 		// HACK(bill): This may be inefficient
 		TokenizerState state = save_tokenizer_state(t);
 		advance_to_next_rune(t);
-		if (t->curr_rune == '.') {
+		if (digit_value(t->curr_rune) >= 10) {
 			// TODO(bill): Clean up this shit
 			restore_tokenizer_state(t, &state);
 			goto end;
@@ -837,9 +837,9 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 		case '.':
 			token.kind = Token_Period; // Default
-			if (gb_is_between(t->curr_rune, '0', '9')) { // Might be a number
+			/* if (gb_is_between(t->curr_rune, '0', '9')) { // Might be a number
 				token = scan_number_to_token(t, true);
-			} else if (t->curr_rune == '.') { // Could be an ellipsis
+			} else */ if (t->curr_rune == '.') { // Could be an ellipsis
 				advance_to_next_rune(t);
 				if (t->curr_rune == '.') {
 					advance_to_next_rune(t);

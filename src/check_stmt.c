@@ -215,14 +215,9 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 
 	if (op_a->mode == Addressing_Overload) {
 		isize overload_count = op_a->overload_count;
-		Entity *entity = op_a->initial_overload_entity;
-		String name = entity->token.string;
-		Scope *s = entity->scope;
-		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-		Entity **procs = gb_alloc_array(c->tmp_allocator, Entity *, overload_count);
+		Entity **procs = op_a->overload_entities;
+		GB_ASSERT(procs != NULL && overload_count > 0);
 
-		HashKey key = hash_string(name);
-		map_entity_multi_get_all(&s->elements, key, procs);
 		// NOTE(bill): These should be done
 		for (isize i = 0; i < overload_count; i++) {
 			Type *t = base_type(procs[i]->type);
@@ -238,15 +233,14 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 				break;
 			}
 		}
-		gb_temp_arena_memory_end(tmp);
 
 		if (e != NULL) {
+			// HACK TODO(bill): Should the entities be freed as it's technically a leak
 			op_a->mode = Addressing_Value;
 			op_a->type = e->type;
 			op_a->overload_count = 0;
-			op_a->initial_overload_entity = NULL;
+			op_a->overload_entities = NULL;
 		}
-
 	} else {
 		if (node->kind == AstNode_Ident) {
 			ast_node(i, Ident, node);
@@ -1085,7 +1079,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				e = scope_lookup_entity(c->context.scope, name);
 			} else if (expr->kind == AstNode_SelectorExpr) {
 				Operand o = {0};
-				e = check_selector(c, &o, expr);
+				e = check_selector(c, &o, expr, NULL);
 				is_selector = true;
 			}
 

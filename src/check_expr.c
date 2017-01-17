@@ -5,7 +5,7 @@ ExprKind check_expr_base                (Checker *c, Operand *operand, AstNode *
 Type *   check_type_extra               (Checker *c, AstNode *expression, Type *named_type);
 Type *   check_type                     (Checker *c, AstNode *expression);
 void     check_type_decl                (Checker *c, Entity *e, AstNode *type_expr, Type *def);
-Entity * check_selector                 (Checker *c, Operand *operand, AstNode *node);
+Entity * check_selector                 (Checker *c, Operand *operand, AstNode *node, Type *type_hint);
 void     check_not_tuple                (Checker *c, Operand *operand);
 void     convert_to_typed               (Checker *c, Operand *operand, Type *target_type, i32 level);
 gbString expr_to_string                 (AstNode *expression);
@@ -757,6 +757,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_v
 					p->flags &= ~FieldFlag_no_alias; // Remove the flag
 				}
 			}
+
 			for_array(j, p->names) {
 				AstNode *name = p->names.e[j];
 				if (ast_node_expect(name, AstNode_Ident)) {
@@ -779,6 +780,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_v
 		// Custom Calling convention for variadic parameters
 		Entity *end = variables[variable_count-1];
 		end->type = make_type_slice(c->allocator, end->type);
+		end->flags |= EntityFlag_Ellipsis;
 	}
 
 	Type *tuple = make_type_tuple(c->allocator);
@@ -874,10 +876,10 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Type
 		Scope *s = e->scope;
 		bool skip = false;
 
+		Entity **procs = gb_alloc_array(heap_allocator(), Entity *, overload_count);
+		map_entity_multi_get_all(&s->elements, key, procs);
 		if (type_hint != NULL) {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-			Entity **procs = gb_alloc_array(c->tmp_allocator, Entity *, overload_count);
-			map_entity_multi_get_all(&s->elements, key, procs);
 			// NOTE(bill): These should be done
 			for (isize i = 0; i < overload_count; i++) {
 				Type *t = base_type(procs[i]->type);
@@ -899,12 +901,13 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Type
 		}
 
 		if (!skip) {
-			o->mode                    = Addressing_Overload;
-			o->type                    = t_invalid;
-			o->overload_count          = overload_count;
-			o->initial_overload_entity = e;
+			o->mode              = Addressing_Overload;
+			o->type              = t_invalid;
+			o->overload_count    = overload_count;
+			o->overload_entities = procs;
 			return;
 		}
+		gb_free(heap_allocator(), procs);
 	}
 
 	add_entity_use(c, n, e);
@@ -1040,7 +1043,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 
 	case_ast_node(se, SelectorExpr, e);
 		Operand o = {0};
-		check_selector(c, &o, e);
+		check_selector(c, &o, e, NULL);
 
 		switch (o.mode) {
 		case Addressing_Invalid:
@@ -2461,7 +2464,7 @@ bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *val
 	return true;
 }
 
-Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
+Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_hint) {
 	ast_node(se, SelectorExpr, node);
 
 	bool check_op_expr = true;
@@ -2480,31 +2483,88 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 	}
 
 	if (op_expr->kind == AstNode_Ident) {
+		b32 is_not_exported = true;
 		String name = op_expr->Ident.string;
 		Entity *e = scope_lookup_entity(c->context.scope, name);
+
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
+
 		if (e != NULL && e->kind == Entity_ImportName &&
 		    selector->kind == AstNode_Ident) {
 			String sel_name = selector->Ident.string;
+
 			check_op_expr = false;
 			entity = scope_lookup_entity(e->ImportName.scope, sel_name);
 			if (entity == NULL) {
 				error_node(op_expr, "`%.*s` is not declared by `%.*s`", LIT(sel_name), LIT(name));
 				goto error;
 			}
-			if (entity->type == NULL) { // Not setup yet
-				check_entity_decl(c, entity, NULL, NULL);
-			}
+			check_entity_decl(c, entity, NULL, NULL);
 			GB_ASSERT(entity->type != NULL);
 
-			b32 is_not_exported = true;
-			Entity **found = map_entity_get(&e->ImportName.scope->implicit, hash_string(sel_name));
-			if (found == NULL) {
+			bool is_overloaded = false;
+			isize overload_count = 0;
+			HashKey key = {0};
+			if (entity->kind == Entity_Procedure) {
+				key = hash_string(entity->token.string);
+				// NOTE(bill): Overloads are only allowed with the same scope
+				Scope *s = entity->scope;
+				overload_count = map_entity_multi_count(&s->elements, key);
+				if (overload_count > 1) {
+					is_overloaded = true;
+				}
+			}
+
+			if (is_overloaded) {
+				Scope *s = entity->scope;
+				bool skip = false;
+
+				Entity **procs = gb_alloc_array(heap_allocator(), Entity *, overload_count);
+				map_entity_multi_get_all(&s->elements, key, procs);
+				for (isize i = 0; i < overload_count; /**/) {
+					Type *t = base_type(procs[i]->type);
+					if (t == t_invalid) {
+						continue;
+					}
+
+					// NOTE(bill): Check to see if it's imported
+					if (map_bool_get(&e->ImportName.scope->implicit, hash_pointer(procs[i]))) {
+						gb_swap(Entity *, procs[i], procs[overload_count-1]);
+						overload_count--;
+						continue;
+					}
+
+					Operand x = {0};
+					x.mode = Addressing_Value;
+					x.type = t;
+					if (type_hint != NULL) {
+						if (check_is_assignable_to(c, &x, type_hint)) {
+							entity = procs[i];
+							skip = true;
+							break;
+						}
+					}
+
+					i++;
+				}
+
+				if (overload_count > 0 && !skip) {
+					operand->mode              = Addressing_Overload;
+					operand->type              = t_invalid;
+					operand->expr              = node;
+					operand->overload_count    = overload_count;
+					operand->overload_entities = procs;
+					return procs[0];
+				}
+			}
+
+			bool *found = map_bool_get(&e->ImportName.scope->implicit, hash_pointer(entity));
+
+			if (!found) {
 				is_not_exported = false;
 			} else {
-				Entity *f = *found;
-				if (f->kind == Entity_ImportName) {
+				if (entity->kind == Entity_ImportName) {
 					is_not_exported = true;
 				}
 			}
@@ -2515,8 +2575,6 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node) {
 				gb_string_free(sel_str);
 				// NOTE(bill): Not really an error so don't goto error
 			}
-
-			add_entity_use(c, selector, entity);
 		}
 	}
 	if (check_op_expr) {
@@ -3606,16 +3664,15 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 
 
 	if (operand->mode == Addressing_Overload) {
-		Scope *s = operand->initial_overload_entity->scope;
-		String name = operand->initial_overload_entity->token.string;
-		HashKey key = hash_string(name);
+		GB_ASSERT(operand->overload_entities != NULL &&
+		          operand->overload_count > 0);
 
 		isize              overload_count = operand->overload_count;
-		Entity **          procs          = gb_alloc_array(heap_allocator(), Entity *, overload_count);
+		Entity **          procs          = operand->overload_entities;
 		ValidProcAndScore *valids         = gb_alloc_array(heap_allocator(), ValidProcAndScore, overload_count);
 		isize              valid_count    = 0;
 
-		map_entity_multi_get_all(&s->elements, key, procs);
+		String name = procs[0]->token.string;
 
 		for (isize i = 0; i < overload_count; i++) {
 			Entity *e = procs[i];
@@ -3666,9 +3723,13 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 			}
 			proc_type = t_invalid;
 		} else {
-			GB_ASSERT(operand->expr->kind == AstNode_Ident);
+			AstNode *expr = operand->expr;
+			while (expr->kind == AstNode_SelectorExpr) {
+				expr = expr->SelectorExpr.selector;
+			}
+			GB_ASSERT(expr->kind == AstNode_Ident);
 			Entity *e = procs[valids[0].index];
-			add_entity_use(c, operand->expr, e);
+			add_entity_use(c, expr, e);
 			proc_type = e->type;
 			i64 score = 0;
 			CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.e, operands.count, true, &score);
@@ -4473,7 +4534,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 
 	case_ast_node(se, SelectorExpr, node);
-		check_selector(c, o, node);
+		check_selector(c, o, node, type_hint);
 	case_end;
 
 
@@ -4763,7 +4824,6 @@ gbString write_params_to_string(gbString str, AstNodeArray params, char *sep) {
 		if (i > 0) {
 			str = gb_string_appendc(str, sep);
 		}
-
 		str = write_expr_to_string(str, params.e[i]);
 	}
 	return str;

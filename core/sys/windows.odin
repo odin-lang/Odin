@@ -16,7 +16,7 @@ LPARAM    :: int;
 LRESULT   :: int;
 ATOM      :: i16;
 BOOL      :: i32;
-WNDPROC   :: type proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT;
+WNDPROC   :: type proc(HWND, u32, WPARAM, LPARAM) -> LRESULT #cc_c;
 
 
 INVALID_HANDLE_VALUE :: (-1 as int) as HANDLE;
@@ -56,61 +56,61 @@ SW_SHOW :: 5;
 
 
 POINT :: struct #ordered {
-	x, y: i32;
+	x, y: i32,
 }
 
 WNDCLASSEXA :: struct #ordered {
-	size, style:           u32;
-	wnd_proc:              WNDPROC;
-	cls_extra, wnd_extra:  i32;
-	instance:              HINSTANCE;
-	icon:                  HICON;
-	cursor:                HCURSOR;
-	background:            HBRUSH;
-	menu_name, class_name: ^u8;
-	sm:                    HICON;
+	size, style:           u32,
+	wnd_proc:              WNDPROC,
+	cls_extra, wnd_extra:  i32,
+	instance:              HINSTANCE,
+	icon:                  HICON,
+	cursor:                HCURSOR,
+	background:            HBRUSH,
+	menu_name, class_name: ^u8,
+	sm:                    HICON,
 }
 
 MSG :: struct #ordered {
-	hwnd:    HWND;
-	message: u32;
-	wparam:  WPARAM;
-	lparam:  LPARAM;
-	time:    u32;
-	pt:      POINT;
+	hwnd:    HWND,
+	message: u32,
+	wparam:  WPARAM,
+	lparam:  LPARAM,
+	time:    u32,
+	pt:      POINT,
 }
 
 RECT :: struct #ordered {
-	left:   i32;
-	top:    i32;
-	right:  i32;
-	bottom: i32;
+	left:   i32,
+	top:    i32,
+	right:  i32,
+	bottom: i32,
 }
 
 FILETIME :: struct #ordered {
-	lo, hi: u32;
+	lo, hi: u32,
 }
 
 BY_HANDLE_FILE_INFORMATION :: struct #ordered {
-	file_attributes:      u32;
+	file_attributes:      u32,
 	creation_time,
 	last_access_time,
-	last_write_time:      FILETIME;
+	last_write_time:      FILETIME,
 	volume_serial_number,
 	file_size_high,
 	file_size_low,
 	number_of_links,
 	file_index_high,
-	file_index_low:       u32;
+	file_index_low:       u32,
 }
 
 FILE_ATTRIBUTE_DATA :: struct #ordered {
-	file_attributes:  u32;
+	file_attributes:  u32,
 	creation_time,
 	last_access_time,
-	last_write_time:  FILETIME;
+	last_write_time:  FILETIME,
 	file_size_high,
-	file_size_low:    u32;
+	file_size_low:    u32,
 }
 
 GET_FILEEX_INFO_LEVELS :: i32;
@@ -249,9 +249,9 @@ HEAP_ZERO_MEMORY :: 0x00000008;
 // Synchronization
 
 SECURITY_ATTRIBUTES :: struct #ordered {
-	length:              u32;
-	security_descriptor: rawptr;
-	inherit_handle:      BOOL;
+	length:              u32,
+	security_descriptor: rawptr,
+	inherit_handle:      BOOL,
 }
 
 INFINITE :: 0xffffffff;
@@ -281,25 +281,23 @@ ReadBarrier      :: proc() #foreign
 
 // GDI
 BITMAPINFOHEADER :: struct #ordered {
-	size:              u32;
-	width, height:     i32;
-	planes, bit_count: i16;
-	compression:       u32;
-	size_image:        u32;
-	x_pels_per_meter:  i32;
-	y_pels_per_meter:  i32;
-	clr_used:          u32;
-	clr_important:     u32;
+	size:              u32,
+	width, height:     i32,
+	planes, bit_count: i16,
+	compression:       u32,
+	size_image:        u32,
+	x_pels_per_meter:  i32,
+	y_pels_per_meter:  i32,
+	clr_used:          u32,
+	clr_important:     u32,
 }
 BITMAPINFO :: struct #ordered {
-	using header: BITMAPINFOHEADER;
-	colors:       [1]RGBQUAD;
+	using header: BITMAPINFOHEADER,
+	colors:       [1]RGBQUAD,
 }
 
 
-RGBQUAD :: struct #ordered {
-	blue, green, red, reserved: byte;
-}
+RGBQUAD :: struct #ordered { blue, green, red, reserved: byte }
 
 BI_RGB         :: 0;
 DIB_RGB_COLORS :: 0x00;
@@ -354,7 +352,7 @@ wglCreateContextAttribsARBType :: proc(hdc: HDC, hshareContext: rawptr, attribLi
 PIXELFORMATDESCRIPTOR :: struct #ordered {
 	size,
 	version,
-	flags: u32;
+	flags: u32,
 
 	pixel_type,
 	color_bits,
@@ -375,11 +373,11 @@ PIXELFORMATDESCRIPTOR :: struct #ordered {
 	stencil_bits,
 	aux_buffers,
 	layer_type,
-	reserved: byte;
+	reserved: byte,
 
 	layer_mask,
 	visible_mask,
-	damage_mask: u32;
+	damage_mask: u32,
 }
 
 GetDC             :: proc(h: HANDLE) -> HDC #foreign

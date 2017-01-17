@@ -8,9 +8,7 @@ UTF_MAX    :: 4;
 SURROGATE_MIN :: 0xd800;
 SURROGATE_MAX :: 0xdfff;
 
-Accept_Range :: struct {
-	lo, hi: u8;
-}
+Accept_Range :: struct { lo, hi: u8 }
 
 accept_ranges := [5]Accept_Range{
 	{0x80, 0xbf},

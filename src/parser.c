@@ -432,7 +432,10 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_CallExpr:
 		return ast_node_token(node->CallExpr.proc);
 	case AstNode_SelectorExpr:
-		return ast_node_token(node->SelectorExpr.selector);
+		if (node->SelectorExpr.selector != NULL) {
+			return ast_node_token(node->SelectorExpr.selector);
+		}
+		return node->SelectorExpr.token;
 	case AstNode_IndexExpr:
 		return node->IndexExpr.open;
 	case AstNode_SliceExpr:
@@ -1851,10 +1854,14 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			case Token_Ident:
 				operand = make_selector_expr(f, token, operand, parse_identifier(f));
 				break;
+			case Token_Integer:
+				operand = make_selector_expr(f, token, operand, parse_expr(f, lhs));
+				break;
 			default: {
 				syntax_error(f->curr_token, "Expected a selector");
 				next_token(f);
-				operand = make_selector_expr(f, f->curr_token, operand, NULL);
+				operand = make_bad_expr(f, ast_node_token(operand), f->curr_token);
+				// operand = make_selector_expr(f, f->curr_token, operand, NULL);
 			} break;
 			}
 		} break;
@@ -2046,7 +2053,7 @@ AstNodeArray parse_rhs_expr_list(AstFile *f) {
 	return parse_expr_list(f, false);
 }
 
-AstNodeArray parse_identifier_list(AstFile *f) {
+AstNodeArray parse_ident_list(AstFile *f) {
 	AstNodeArray list = make_ast_node_array(f);
 
 	do {
@@ -2227,106 +2234,189 @@ AstNode *parse_proc_type(AstFile *f, String *foreign_name_, String *link_name_) 
 	return make_proc_type(f, proc_token, params, results, tags, cc);
 }
 
+void parse_field_prefixes(AstFile *f, u32 flags, i32 *using_count, i32 *no_alias_count) {
+	while (f->curr_token.kind == Token_using ||
+	       f->curr_token.kind == Token_no_alias) {
+		if (allow_token(f, Token_using)) {
+			*using_count += 1;
+		}
+		if (allow_token(f, Token_no_alias)) {
+			*no_alias_count += 1;
+		}
+	}
+	if (*using_count > 1) {
+		syntax_error(f->curr_token, "Multiple `using` in this field list");
+		*using_count = 1;
+	}
+	if (*no_alias_count > 1) {
+		syntax_error(f->curr_token, "Multiple `no_alias` in this field list");
+		*no_alias_count = 1;
+	}
+}
+
+bool parse_expect_separator(AstFile *f, TokenKind separator, AstNode *param) {
+	if (separator == Token_Semicolon) {
+		expect_semicolon(f, param);
+	} else {
+		if (!allow_token(f, separator)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+AstNodeArray convert_to_ident_list(AstFile *f, AstNodeArray list) {
+	AstNodeArray idents = {0};
+	array_init_reserve(&idents, heap_allocator(), list.count);
+	// Convert to ident list
+	for_array(i, list) {
+		AstNode *ident = list.e[i];
+		switch (ident->kind) {
+		case AstNode_Ident:
+		case AstNode_BadExpr:
+			break;
+		default:
+			error_node(ident, "Expected an identifier");
+			ident = make_ident(f, blank_token);
+			break;
+		}
+		array_add(&idents, ident);
+	}
+	return idents;
+}
+
+AstNode *parse_var_type(AstFile *f, bool allow_ellipsis) {
+	if (allow_ellipsis && f->curr_token.kind == Token_Ellipsis) {
+		Token tok = f->curr_token;
+		next_token(f);
+		AstNode *type = parse_identifier_or_type(f);
+		if (type == NULL) {
+			error(tok, "variadic field missing type after `...`");
+			type = make_bad_expr(f, tok, f->curr_token);
+		}
+		return make_ellipsis(f, tok, type);
+	}
+	AstNode *type = parse_type_attempt(f);
+	if (type == NULL) {
+		Token tok = f->curr_token;
+		error(tok, "Expected a type");
+		type = make_bad_expr(f, tok, f->curr_token);
+	}
+	return type;
+}
+
+void check_field_prefixes(AstFile *f, AstNodeArray names, u32 flags, i32 *using_count, i32 *no_alias_count) {
+	if (names.count > 1 && *using_count > 0) {
+		syntax_error(f->curr_token, "Cannot apply `using` to more than one of the same type");
+		*using_count = 0;
+	}
+
+	if ((flags&FieldFlag_using) == 0 && *using_count > 0) {
+		syntax_error(f->curr_token, "`using` is not allowed within this field list");
+		*using_count = 0;
+	}
+	if ((flags&FieldFlag_no_alias) == 0 && *no_alias_count > 0) {
+		syntax_error(f->curr_token, "`no_alias` is not allowed within this field list");
+		*no_alias_count = 0;
+	}
+
+}
+
+u32 field_prefixes_to_flags(i32 using_count, i32 no_alias_count) {
+	u32 field_flags = 0;
+	if (using_count    > 0) field_flags |= FieldFlag_using;
+	if (no_alias_count > 0) field_flags |= FieldFlag_no_alias;
+	return field_flags;
+}
+
 AstNodeArray parse_field_list(AstFile *f, isize *name_count_, u32 flags,
                               TokenKind separator, TokenKind follow) {
 	AstNodeArray params = make_ast_node_array(f);
-	isize name_count = 0;
+	AstNodeArray list   = make_ast_node_array(f);
+	isize name_count    = 0;
+	bool allow_ellipsis = flags&FieldFlag_ellipsis;
 
+	// TODO(bill): Allow for just a list of types
+	i32 using_count    = 0;
+	i32 no_alias_count = 0;
+	parse_field_prefixes(f, flags, &using_count, &no_alias_count);
 	while (f->curr_token.kind != follow &&
+	       f->curr_token.kind != Token_Colon &&
 	       f->curr_token.kind != Token_EOF) {
-		i32 using_count    = 0;
-		i32 no_alias_count = 0;
-		while (f->curr_token.kind == Token_using ||
-		       f->curr_token.kind == Token_no_alias) {
-			if (allow_token(f, Token_using)) {
-				using_count++;
-			}
-			if (allow_token(f, Token_no_alias)) {
-				no_alias_count++;
-			}
-		}
-
-
-		AstNodeArray names = parse_identifier_list(f);
-		if (names.count == 0) {
-			syntax_error(f->curr_token, "Empty field declaration");
+		AstNode *param = parse_var_type(f, allow_ellipsis);
+		array_add(&list, param);
+		if (f->curr_token.kind != Token_Comma) {
 			break;
 		}
+		next_token(f);
+	}
 
-		if (names.count > 1 && using_count > 0) {
-			syntax_error(f->curr_token, "Cannot apply `using` to more than one of the same type");
-			using_count = 0;
+	if (f->curr_token.kind == Token_Colon) {
+		AstNodeArray names = convert_to_ident_list(f, list); // Copy for semantic reasons
+		if (names.count == 0) {
+			syntax_error(f->curr_token, "Empty field declaration");
 		}
-
-		if ((flags&FieldFlag_using) == 0 && using_count > 0) {
-			syntax_error(f->curr_token, "`using` is not allowed within this field list");
-			using_count = 0;
-		}
-		if ((flags&FieldFlag_no_alias) == 0 && no_alias_count > 0) {
-			syntax_error(f->curr_token, "`no_alias` is not allowed within this field list");
-			no_alias_count = 0;
-		}
-		if (using_count > 1) {
-			syntax_error(f->curr_token, "Multiple `using` in this field list");
-			using_count = 1;
-		}
-		if (no_alias_count > 1) {
-			syntax_error(f->curr_token, "Multiple `no_alias` in this field list");
-			no_alias_count = 1;
-		}
-
+		check_field_prefixes(f, names, flags, &using_count, &no_alias_count);
 
 		name_count += names.count;
 
 		expect_token_after(f, Token_Colon, "field list");
-
-		AstNode *type = NULL;
-		if ((flags&FieldFlag_ellipsis) != 0 && f->curr_token.kind == Token_Ellipsis) {
-			Token ellipsis = f->curr_token;
-			next_token(f);
-			type = parse_type_attempt(f);
-			if (type == NULL) {
-				syntax_error(f->curr_token, "variadic field is missing a type after `..`");
-				type = make_bad_expr(f, ellipsis, f->curr_token);
-			} else {
-				if (names.count > 1) {
-					syntax_error(f->curr_token, "mutliple variadic fields, only  `..`");
-				} else {
-					type = make_ellipsis(f, ellipsis, type);
-				}
-			}
-		} else {
-			type = parse_type_attempt(f);
-		}
-
-
-		if (type == NULL) {
-			syntax_error(f->curr_token, "Expected a type for this field declaration");
-		}
-
-		u32 flags = 0;
-		if (using_count    > 0) flags |= FieldFlag_using;
-		if (no_alias_count > 0) flags |= FieldFlag_no_alias;
-		AstNode *param = make_field(f, names, type, flags);
+		AstNode *type = parse_var_type(f, allow_ellipsis);
+		AstNode *param = make_field(f, names, type, field_prefixes_to_flags(using_count, no_alias_count));
 		array_add(&params, param);
 
-		if (separator == Token_Semicolon) {
-			expect_semicolon(f, param);
-		} else {
-			if (!allow_token(f, separator)) {
+		parse_expect_separator(f, separator, type);
+
+		while (f->curr_token.kind != follow &&
+		       f->curr_token.kind != Token_EOF) {
+			i32 using_count    = 0;
+			i32 no_alias_count = 0;
+			parse_field_prefixes(f, flags, &using_count, &no_alias_count);
+
+			AstNodeArray names = parse_ident_list(f);
+			if (names.count == 0) {
+				syntax_error(f->curr_token, "Empty field declaration");
+				break;
+			}
+			check_field_prefixes(f, names, flags, &using_count, &no_alias_count);
+			name_count += names.count;
+
+			expect_token_after(f, Token_Colon, "field list");
+			AstNode *type = parse_var_type(f, allow_ellipsis);
+
+			AstNode *param = make_field(f, names, type, field_prefixes_to_flags(using_count, no_alias_count));
+			array_add(&params, param);
+
+			if (parse_expect_separator(f, separator, param)) {
 				break;
 			}
 		}
+
+		if (name_count_) *name_count_ = name_count;
+		return params;
+	}
+
+	check_field_prefixes(f, list, flags, &using_count, &no_alias_count);
+	for_array(i, list) {
+		AstNodeArray names = {0};
+		AstNode *type = list.e[i];
+		Token token = blank_token;
+
+		array_init_count(&names, heap_allocator(), 1);
+		token.pos = ast_node_token(type).pos;
+		names.e[0] = make_ident(f, token);
+
+		AstNode *param = make_field(f, names, list.e[i], field_prefixes_to_flags(using_count, no_alias_count));
+		array_add(&params, param);
 	}
 
 	if (name_count_) *name_count_ = name_count;
-
 	return params;
 }
 
 
 AstNodeArray parse_record_fields(AstFile *f, isize *field_count_, u32 flags, String context) {
-	return parse_field_list(f, field_count_, flags, Token_Semicolon, Token_CloseBrace);
+	return parse_field_list(f, field_count_, flags, Token_Comma, Token_CloseBrace);
 }
 
 AstNode *parse_identifier_or_type(AstFile *f) {
@@ -2753,7 +2843,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 	}
 
 	Token token = expect_token(f, Token_for);
-	AstNodeArray names = parse_identifier_list(f);
+	AstNodeArray names = parse_ident_list(f);
 	parse_check_name_list_for_reserves(f, names);
 	Token colon = expect_token_after(f, Token_Colon, "for name list");
 

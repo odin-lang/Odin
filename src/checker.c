@@ -28,7 +28,7 @@ typedef struct Operand {
 	AstNode *      expr;
 	BuiltinProcId  builtin_id;
 	isize          overload_count;
-	Entity *       initial_overload_entity;
+	Entity **      overload_entities;
 } Operand;
 
 typedef struct TypeAndValue {
@@ -93,7 +93,7 @@ typedef struct Scope {
 	Scope *        first_child;
 	Scope *        last_child;
 	MapEntity      elements; // Key: String
-	MapEntity      implicit; // Key: String
+	MapBool        implicit; // Key: Entity *
 
 	Array(Scope *) shared;
 	Array(Scope *) imported;
@@ -344,7 +344,7 @@ Scope *make_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
 	map_entity_init(&s->elements,   heap_allocator());
-	map_entity_init(&s->implicit,   heap_allocator());
+	map_bool_init(&s->implicit,   heap_allocator());
 	array_init(&s->shared,   heap_allocator());
 	array_init(&s->imported, heap_allocator());
 
@@ -371,7 +371,7 @@ void destroy_scope(Scope *scope) {
 	}
 
 	map_entity_destroy(&scope->elements);
-	map_entity_destroy(&scope->implicit);
+	map_bool_destroy(&scope->implicit);
 	array_free(&scope->shared);
 	array_free(&scope->imported);
 
@@ -539,6 +539,7 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	}
 	return NULL;
 }
+
 
 void check_scope_usage(Checker *c, Scope *scope) {
 	// TODO(bill): Use this?
@@ -1601,8 +1602,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 				// NOTE(bill): Do not add other imported entities
 				bool ok = add_entity(c, parent_scope, NULL, e);
 				if (ok && id->is_import) { // `#import`ed entities don't get exported
-					HashKey key = hash_string(e->token.string);
-					map_entity_set(&parent_scope->implicit, key, e);
+					map_bool_set(&parent_scope->implicit, hash_pointer(e), true);
 				}
 			}
 		} else {

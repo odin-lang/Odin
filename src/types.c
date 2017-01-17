@@ -1759,9 +1759,17 @@ gbString write_type_to_string(gbString str, Type *type) {
 				Entity *var = type->Tuple.variables[i];
 				if (var != NULL) {
 					GB_ASSERT(var->kind == Entity_Variable);
-					if (i > 0)
+					if (i > 0) {
 						str = gb_string_appendc(str, ", ");
-					str = write_type_to_string(str, var->type);
+					}
+					if (var->flags&EntityFlag_Ellipsis) {
+						Type *slice = base_type(var->type);
+						str = gb_string_appendc(str, "...");
+						GB_ASSERT(is_type_slice(var->type));
+						str = write_type_to_string(str, slice->Slice.elem);
+					} else {
+						str = write_type_to_string(str, var->type);
+					}
 				}
 			}
 		}
