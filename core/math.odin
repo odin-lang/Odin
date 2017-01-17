@@ -166,7 +166,7 @@ mul :: proc(a, b: Mat4) -> Mat4 {
 	return c;
 }
 
-mul_vec4 :: proc(m: Mat4, v: Vec4) -> Vec4 {
+mul :: proc(m: Mat4, v: Vec4) -> Vec4 {
 	return Vec4{
 		m[0][0]*v.x + m[1][0]*v.y + m[2][0]*v.z + m[3][0]*v.w,
 		m[0][1]*v.x + m[1][1]*v.y + m[2][1]*v.z + m[3][1]*v.w,

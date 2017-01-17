@@ -686,7 +686,8 @@ bool type_has_nil(Type *t) {
 		case Basic_any:
 			return true;
 		}
-	}
+		return false;
+	} break;
 	case Type_Slice:
 	case Type_Proc:
 	case Type_Pointer:

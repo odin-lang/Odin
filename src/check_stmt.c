@@ -680,11 +680,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					}
 					break;
 				case Type_Array:
+					// val = make_type_pointer(c->allocator, t->Array.elem);
 					val = t->Array.elem;
 					idx = t_int;
 					break;
 				case Type_Slice:
-					val = t->Array.elem;
+					// val = make_type_pointer(c->allocator, t->Slice.elem);
+					val = t->Slice.elem;
 					idx = t_int;
 					break;
 				}

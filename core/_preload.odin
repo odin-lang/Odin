@@ -297,11 +297,11 @@ __string_eq :: proc(a, b: string) -> bool {
 	if a.data == b.data {
 		return true;
 	}
-	return mem.compare(a.data, b.data, a.count) == 0;
+	return mem.compare(a.data as rawptr, b.data as rawptr, a.count) == 0;
 }
 
 __string_cmp :: proc(a, b: string) -> int {
-	return mem.compare(a.data, b.data, min(a.count, b.count));
+	return mem.compare(a.data as rawptr, b.data as rawptr, min(a.count, b.count));
 }
 
 __string_ne :: proc(a, b: string) -> bool #inline { return !__string_eq(a, b); }

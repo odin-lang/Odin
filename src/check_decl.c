@@ -276,8 +276,9 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 
 	check_init_constant(c, e, &operand);
 
-	if (operand.mode == Addressing_Invalid) {
-		error(e->token, "Illegal cyclic declaration");
+	if (operand.mode == Addressing_Invalid ||
+	    base_type(operand.type) == t_invalid) {
+		error(e->token, "Invalid declaration type");
 	}
 }
 

@@ -236,7 +236,7 @@ bprint :: proc(buf: ^Buffer, args: ...any) -> int {
 		if i > 0 && !is_string && !prev_string {
 			buffer_write_rune(buf, ' ');
 		}
-		fmt_value(^fi, arg, 'v');
+		fmt_value(^fi, args[i], 'v');
 		prev_string = is_string;
 	}
 	return buf.length;
@@ -250,7 +250,7 @@ bprintln :: proc(buf: ^Buffer, args: ...any) -> int {
 		if i > 0 {
 			buffer_write_rune(buf, ' ');
 		}
-		fmt_value(^fi, arg, 'v');
+		fmt_value(^fi, args[i], 'v');
 	}
 	buffer_write_rune(buf, '\n');
 	return buf.length;
@@ -967,16 +967,16 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			}
 
 			if is_type_integer(e.base) {
-				for val, idx : e.values {
-					if val.i == i {
+				for it, idx : e.values {
+					if it.i == i {
 						buffer_write_string(fi.buf, e.names[idx]);
 						ok = true;
 						break;
 					}
 				}
 			} else {
-				for val, idx : e.values {
-					if val.f == f {
+				for it, idx : e.values {
+					if it.f == f {
 						buffer_write_string(fi.buf, e.names[idx]);
 						ok = true;
 						break;
@@ -1312,7 +1312,7 @@ bprintf :: proc(b: ^Buffer, fmt: string, args: ...any) -> int {
 			if arg.data == nil || arg.type_info == nil {
 				buffer_write_string(b, "<nil>");
 			} else {
-				fmt_arg(^fi, arg, 'v');
+				fmt_arg(^fi, args[index], 'v');
 			}
 		}
 		buffer_write_string(b, ")");

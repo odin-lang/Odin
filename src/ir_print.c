@@ -1078,6 +1078,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					ir_fprintf(f, ", ");
 				}
 				ir_print_type(f, m, t);
+				if (e->flags&EntityFlag_NoAlias) {
+					ir_fprintf(f, " noalias");
+				}
 				ir_fprintf(f, " ");
 				irValue *arg = call->args[i];
 				ir_print_value(f, m, arg, t);
@@ -1277,6 +1280,9 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 				ir_fprintf(f, ", ");
 			}
 			ir_print_type(f, m, e->type);
+			if (e->flags&EntityFlag_NoAlias) {
+				ir_fprintf(f, " noalias");
+			}
 			if (proc->body != NULL) {
 				if (!str_eq(e->token.string, str_lit("")) &&
 				    !str_eq(e->token.string, str_lit("_"))) {

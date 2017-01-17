@@ -2819,6 +2819,13 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 
 
 	case_ast_node(ce, CallExpr, expr);
+		if (map_tav_get(&proc->module->info->types, hash_pointer(ce->proc))->mode == Addressing_Type) {
+			GB_ASSERT(ce->args.count == 1);
+			irValue *x = ir_build_expr(proc, ce->args.e[0]);
+			irValue *y = ir_emit_conv(proc, x, tv->type);
+			return y;
+		}
+
 		AstNode *p = unparen_expr(ce->proc);
 		if (p->kind == AstNode_Ident) {
 			Entity **found = map_entity_get(&proc->module->info->uses, hash_pointer(p));
@@ -3960,10 +3967,12 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type,
 	if (val_type != NULL) {
 		switch (expr_type->kind) {
 		case Type_Array: {
+			// val = ir_emit_array_ep(proc, expr, idx);
 			val = ir_emit_load(proc, ir_emit_array_ep(proc, expr, idx));
 		} break;
 		case Type_Slice: {
 			irValue *elem = ir_slice_elem(proc, expr);
+			// val = ir_emit_ptr_offset(proc, elem, idx);
 			val = ir_emit_load(proc, ir_emit_ptr_offset(proc, elem, idx));
 		} break;
 		default:

@@ -1,11 +1,5 @@
 #include "exact_value.c"
 #include "entity.c"
-#include "types.c"
-
-#define MAP_TYPE Entity *
-#define MAP_PROC map_entity_
-#define MAP_NAME MapEntity
-#include "map.c"
 
 typedef enum AddressingMode {
 	Addressing_Invalid,
@@ -19,6 +13,13 @@ typedef enum AddressingMode {
 	Addressing_Overload,
 	Addressing_Count,
 } AddressingMode;
+
+#include "types.c"
+
+#define MAP_TYPE Entity *
+#define MAP_PROC map_entity_
+#define MAP_NAME MapEntity
+#include "map.c"
 
 typedef struct Operand {
 	AddressingMode mode;
@@ -44,6 +45,9 @@ bool is_operand_value(Operand o) {
 		return true;
 	}
 	return false;
+}
+bool is_operand_nil(Operand o) {
+	return o.mode == Addressing_Value && o.type == t_untyped_nil;
 }
 
 

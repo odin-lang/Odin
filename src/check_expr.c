@@ -1,24 +1,24 @@
-void     check_expr                (Checker *c, Operand *operand, AstNode *expression);
-void     check_multi_expr          (Checker *c, Operand *operand, AstNode *expression);
-void     check_expr_or_type        (Checker *c, Operand *operand, AstNode *expression);
-ExprKind check_expr_base           (Checker *c, Operand *operand, AstNode *expression, Type *type_hint);
-Type *   check_type_extra          (Checker *c, AstNode *expression, Type *named_type);
-Type *   check_type                (Checker *c, AstNode *expression);
-void     check_type_decl           (Checker *c, Entity *e, AstNode *type_expr, Type *def);
-Entity * check_selector            (Checker *c, Operand *operand, AstNode *node);
-void     check_not_tuple           (Checker *c, Operand *operand);
-bool     check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
-void     convert_to_typed          (Checker *c, Operand *operand, Type *target_type, i32 level);
-gbString expr_to_string            (AstNode *expression);
-void     check_entity_decl         (Checker *c, Entity *e, DeclInfo *decl, Type *named_type);
-void     check_const_decl          (Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr, Type *named_type);
-void     check_proc_body           (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
-void     update_expr_type          (Checker *c, AstNode *e, Type *type, bool final);
-bool     check_is_terminating      (AstNode *node);
-bool     check_has_break           (AstNode *stmt, bool implicit);
-void     check_stmt                (Checker *c, AstNode *node, u32 flags);
-void     check_stmt_list           (Checker *c, AstNodeArray stmts, u32 flags);
-void     check_init_constant       (Checker *c, Entity *e, Operand *operand);
+void     check_expr                     (Checker *c, Operand *operand, AstNode *expression);
+void     check_multi_expr               (Checker *c, Operand *operand, AstNode *expression);
+void     check_expr_or_type             (Checker *c, Operand *operand, AstNode *expression);
+ExprKind check_expr_base                (Checker *c, Operand *operand, AstNode *expression, Type *type_hint);
+Type *   check_type_extra               (Checker *c, AstNode *expression, Type *named_type);
+Type *   check_type                     (Checker *c, AstNode *expression);
+void     check_type_decl                (Checker *c, Entity *e, AstNode *type_expr, Type *def);
+Entity * check_selector                 (Checker *c, Operand *operand, AstNode *node);
+void     check_not_tuple                (Checker *c, Operand *operand);
+void     convert_to_typed               (Checker *c, Operand *operand, Type *target_type, i32 level);
+gbString expr_to_string                 (AstNode *expression);
+void     check_entity_decl              (Checker *c, Entity *e, DeclInfo *decl, Type *named_type);
+void     check_const_decl               (Checker *c, Entity *e, AstNode *type_expr, AstNode *init_expr, Type *named_type);
+void     check_proc_body                (Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body);
+void     update_expr_type               (Checker *c, AstNode *e, Type *type, bool final);
+bool     check_is_terminating           (AstNode *node);
+bool     check_has_break                (AstNode *stmt, bool implicit);
+void     check_stmt                     (Checker *c, AstNode *node, u32 flags);
+void     check_stmt_list                (Checker *c, AstNodeArray stmts, u32 flags);
+void     check_init_constant            (Checker *c, Entity *e, Operand *operand);
+bool     check_representable_as_constant(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
 
 
 gb_inline Type *check_type(Checker *c, AstNode *expression) {
@@ -91,56 +91,70 @@ bool check_is_assignable_to_using_subtype(Type *dst, Type *src) {
 }
 
 
-
-bool check_is_assignable_to_with_score(Checker *c, Operand *operand, Type *type, i64 *score) {
-	// IMPORTANT TODO(bill): Determine score for assignments with use with overloaded procedures
+// IMPORTANT TODO(bill): figure out the exact distance rules
+// -1 is not convertable
+// 0 is exact
+// >0 is convertable
+i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 	if (operand->mode == Addressing_Invalid ||
 	    type == t_invalid) {
-		if (score) *score = 0;
-		return true;
+		return 0;
 	}
 
 	if (operand->mode == Addressing_Builtin) {
-		if (score) *score = 0;
-		return false;
+		return -1;
 	}
 
 	Type *s = operand->type;
 
 	if (are_types_identical(s, type)) {
-		if (score) *score = 10;
-		return true;
+		return 0;
 	}
 
 	Type *src = base_type(s);
 	Type *dst = base_type(type);
 
+	if (is_type_untyped_nil(src)) {
+		if (type_has_nil(dst)) {
+			return 1;
+		}
+		return -1;
+	}
 	if (is_type_untyped(src)) {
 		if (dst->kind == Type_Basic) {
 			if (operand->mode == Addressing_Constant) {
-				return check_value_is_expressible(c, operand->value, dst, NULL);
+				if (check_representable_as_constant(c, operand->value, dst, NULL)) {
+					return 1;
+				} else {
+					return -1;
+				}
 			}
 			if (src->kind == Type_Basic && src->Basic.kind == Basic_UntypedBool) {
-				return is_type_boolean(dst);
+				if (is_type_boolean(dst)) {
+					if (is_type_typed(type)) {
+						return 2;
+					}
+					return 1;
+				}
+				return -1;
 			}
-		}
-		if (type_has_nil(dst)) {
-			return operand->mode == Addressing_Value && operand->type == t_untyped_nil;
 		}
 	}
 
 	if (are_types_identical(dst, src) && (!is_type_named(dst) || !is_type_named(src))) {
-		return true;
+		return 1;
 	}
 
 	if (is_type_maybe(dst)) {
 		Type *elem = base_type(dst)->Maybe.elem;
-		bool ok = are_types_identical(elem, s);
-		return ok;
+		if (are_types_identical(elem, s)) {
+			return 1;
+		}
+		return -1;
 	}
 
-	if (is_type_untyped_nil(src)) {
-		return type_has_nil(dst);
+	if (check_is_assignable_to_using_subtype(operand->type, type)) {
+		return 4;
 	}
 
 	// ^T <- rawptr
@@ -151,33 +165,23 @@ bool check_is_assignable_to_with_score(Checker *c, Operand *operand, Type *type,
 	}
 #endif
 #if 1
+
+
+	// TODO(bill): Should I allow this implicit conversion at all?!
 	// rawptr <- ^T
 	if (is_type_rawptr(dst) && is_type_pointer(src)) {
-		// TODO(bill): Handle this properly
 		if (dst != type) {
-			return false;
+			return -1;
 		}
-	    return true;
+	    return 5;
 	}
 #endif
-
-	if (dst->kind == Type_Array && src->kind == Type_Array) {
-		if (are_types_identical(dst->Array.elem, src->Array.elem)) {
-			return dst->Array.count == src->Array.count;
-		}
-	}
-
-	if (dst->kind == Type_Slice && src->kind == Type_Slice) {
-		if (are_types_identical(dst->Slice.elem, src->Slice.elem)) {
-			return true;
-		}
-	}
 
 	if (is_type_union(dst)) {
 		for (isize i = 0; i < dst->Record.field_count; i++) {
 			Entity *f = dst->Record.fields[i];
 			if (are_types_identical(f->type, s)) {
-				return true;
+				return 1;
 			}
 		}
 	}
@@ -186,10 +190,25 @@ bool check_is_assignable_to_with_score(Checker *c, Operand *operand, Type *type,
 	if (is_type_any(dst)) {
 		// NOTE(bill): Anything can cast to `Any`
 		add_type_info_type(c, s);
-		return true;
+		return 10;
 	}
 
-	return false;
+
+
+	return -1;
+}
+
+
+bool check_is_assignable_to_with_score(Checker *c, Operand *operand, Type *type, i64 *score_) {
+	i64 score = 0;
+	i64 distance = check_distance_between_types(c, operand, type);
+	bool ok = distance >= 0;
+	if (ok) {
+		// TODO(bill): A decent score function
+		score = max(1000000 - distance*distance, 0);
+	}
+	if (score_) *score_ = score;
+	return ok;
 }
 
 
@@ -206,53 +225,58 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 		return;
 	}
 
+
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
-
-		if (type == NULL || is_type_any(type) || is_type_untyped_nil(type)) {
-			if (type == NULL && base_type(operand->type) == t_untyped_nil) {
+		if (type == NULL || is_type_any(type)) {
+			if (type == NULL && is_type_untyped_nil(operand->type)) {
 				error_node(operand->expr, "Use of untyped nil in %.*s", LIT(context_name));
 				operand->mode = Addressing_Invalid;
 				return;
 			}
-
-			add_type_info_type(c, type);
 			target_type = default_type(operand->type);
+			add_type_info_type(c, type);
+			add_type_info_type(c, target_type);
 		}
+
 		convert_to_typed(c, operand, target_type, 0);
 		if (operand->mode == Addressing_Invalid) {
 			return;
 		}
 	}
 
-	if (type != NULL) {
-		if (!check_is_assignable_to(c, operand, type)) {
-			gbString type_str    = type_to_string(type);
-			gbString op_type_str = type_to_string(operand->type);
-			gbString expr_str    = expr_to_string(operand->expr);
 
-			if (operand->mode == Addressing_Builtin) {
-				// TODO(bill): is this a good enough error message?
-				error_node(operand->expr,
-				           "Cannot assign builtin procedure `%s` in %.*s",
-				           expr_str,
-				           LIT(context_name));
-			} else {
-				// TODO(bill): is this a good enough error message?
-				error_node(operand->expr,
-				           "Cannot assign value `%s` of type `%s` to `%s` in %.*s",
-				           expr_str,
-				           op_type_str,
-				           type_str,
-				           LIT(context_name));
-			}
-			operand->mode = Addressing_Invalid;
 
-			gb_string_free(expr_str);
-			gb_string_free(op_type_str);
-			gb_string_free(type_str);
-			return;
+
+	if (type == NULL) {
+		return;
+	}
+	if (!check_is_assignable_to(c, operand, type)) {
+		gbString type_str    = type_to_string(type);
+		gbString op_type_str = type_to_string(operand->type);
+		gbString expr_str    = expr_to_string(operand->expr);
+
+		if (operand->mode == Addressing_Builtin) {
+			// TODO(bill): is this a good enough error message?
+			error_node(operand->expr,
+			           "Cannot assign builtin procedure `%s` in %.*s",
+			           expr_str,
+			           LIT(context_name));
+		} else {
+			// TODO(bill): is this a good enough error message?
+			error_node(operand->expr,
+			           "Cannot assign value `%s` of type `%s` to `%s` in %.*s",
+			           expr_str,
+			           op_type_str,
+			           type_str,
+			           LIT(context_name));
 		}
+		operand->mode = Addressing_Invalid;
+
+		gb_string_free(expr_str);
+		gb_string_free(op_type_str);
+		gb_string_free(type_str);
+		return;
 	}
 }
 
@@ -727,10 +751,19 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_v
 			}
 
 			Type *type = check_type(c, type_expr);
+			if (p->flags&FieldFlag_no_alias) {
+				if (!is_type_pointer(type)) {
+					error_node(params.e[i], "`no_alias` can only be applied to fields of pointer type");
+					p->flags &= ~FieldFlag_no_alias; // Remove the flag
+				}
+			}
 			for_array(j, p->names) {
 				AstNode *name = p->names.e[j];
 				if (ast_node_expect(name, AstNode_Ident)) {
 					Entity *param = make_entity_param(c->allocator, scope, name->Ident, type, p->flags&FieldFlag_using);
+					if (p->flags&FieldFlag_no_alias) {
+						param->flags |= EntityFlag_NoAlias;
+					}
 					add_entity(c, scope, name, param);
 					variables[variable_index++] = param;
 				}
@@ -1288,7 +1321,7 @@ bool check_binary_op(Checker *c, Operand *o, Token op) {
 
 }
 
-bool check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value) {
+bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value) {
 	if (in_value.kind == ExactValue_Invalid) {
 		// NOTE(bill): There's already been an error
 		return true;
@@ -1374,7 +1407,7 @@ bool check_value_is_expressible(Checker *c, ExactValue in_value, Type *type, Exa
 void check_is_expressible(Checker *c, Operand *o, Type *type) {
 	GB_ASSERT(is_type_constant_type(type));
 	GB_ASSERT(o->mode == Addressing_Constant);
-	if (!check_value_is_expressible(c, o->value, type, &o->value)) {
+	if (!check_representable_as_constant(c, o->value, type, &o->value)) {
 		gbString a = expr_to_string(o->expr);
 		gbString b = type_to_string(type);
 		if (is_type_numeric(o->type) && is_type_numeric(type)) {
@@ -1685,61 +1718,70 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 	}
 
 	Type *x = operand->type;
-	Type *xb = base_type(base_enum_type(x));
-	Type *yb = base_type(base_enum_type(y));
-	if (are_types_identical(xb, yb)) {
+	Type *src = base_type(base_enum_type(x));
+	Type *dst = base_type(base_enum_type(y));
+	if (are_types_identical(src, dst)) {
 		return true;
 	}
 
+	if (dst->kind == Type_Array && src->kind == Type_Array) {
+		if (are_types_identical(dst->Array.elem, src->Array.elem)) {
+			return dst->Array.count == src->Array.count;
+		}
+	}
+
+	if (dst->kind == Type_Slice && src->kind == Type_Slice) {
+		return are_types_identical(dst->Slice.elem, src->Slice.elem);
+	}
 
 	// Cast between booleans and integers
-	if (is_type_boolean(xb) || is_type_integer(xb)) {
-		if (is_type_boolean(yb) || is_type_integer(yb)) {
+	if (is_type_boolean(src) || is_type_integer(src)) {
+		if (is_type_boolean(dst) || is_type_integer(dst)) {
 			return true;
 		}
 	}
 
 	// Cast between numbers
-	if (is_type_integer(xb) || is_type_float(xb)) {
-		if (is_type_integer(yb) || is_type_float(yb)) {
+	if (is_type_integer(src) || is_type_float(src)) {
+		if (is_type_integer(dst) || is_type_float(dst)) {
 			return true;
 		}
 	}
 
 	// Cast between pointers
-	if (is_type_pointer(xb) && is_type_pointer(yb)) {
+	if (is_type_pointer(src) && is_type_pointer(dst)) {
 		return true;
 	}
 
 	// (u)int <-> pointer
-	if (is_type_int_or_uint(xb) && is_type_rawptr(yb)) {
+	if (is_type_int_or_uint(src) && is_type_rawptr(dst)) {
 		return true;
 	}
-	if (is_type_rawptr(xb) && is_type_int_or_uint(yb)) {
+	if (is_type_rawptr(src) && is_type_int_or_uint(dst)) {
 		return true;
 	}
 
 	// []byte/[]u8 <-> string
-	if (is_type_u8_slice(xb) && is_type_string(yb)) {
+	if (is_type_u8_slice(src) && is_type_string(dst)) {
 		return true;
 	}
-	if (is_type_string(xb) && is_type_u8_slice(yb)) {
-		if (is_type_typed(xb)) {
+	if (is_type_string(src) && is_type_u8_slice(dst)) {
+		if (is_type_typed(src)) {
 			return true;
 		}
 	}
 
 	// proc <-> proc
-	if (is_type_proc(xb) && is_type_proc(yb)) {
+	if (is_type_proc(src) && is_type_proc(dst)) {
 		return true;
 	}
 
 	// proc -> rawptr
-	if (is_type_proc(xb) && is_type_rawptr(yb)) {
+	if (is_type_proc(src) && is_type_rawptr(dst)) {
 		return true;
 	}
 	// rawptr -> proc
-	if (is_type_rawptr(xb) && is_type_proc(yb)) {
+	if (is_type_rawptr(src) && is_type_proc(dst)) {
 		return true;
 	}
 
@@ -1814,6 +1856,48 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 }
 
 
+void check_conversion(Checker *c, Operand *x, Type *type) {
+	bool is_const_expr = x->mode == Addressing_Constant;
+	bool can_convert = false;
+
+	Type *bt = base_type(type);
+	if (is_const_expr && is_type_constant_type(bt)) {
+		if (bt->kind == Type_Basic) {
+			if (check_representable_as_constant(c, x->value, bt, &x->value)) {
+				can_convert = true;
+			}
+		}
+	} else if (check_is_castable_to(c, x, type)) {
+		if (x->mode != Addressing_Constant) {
+			x->mode = Addressing_Value;
+		}
+		can_convert = true;
+	}
+
+	if (!can_convert) {
+		gbString expr_str = expr_to_string(x->expr);
+		gbString to_type  = type_to_string(type);
+		gbString from_type = type_to_string(x->type);
+		error_node(x->expr, "Cannot cast `%s` as `%s` from `%s`", expr_str, to_type, from_type);
+		gb_string_free(from_type);
+		gb_string_free(to_type);
+		gb_string_free(expr_str);
+
+		x->mode = Addressing_Invalid;
+		return;
+	}
+
+	if (is_type_untyped(x->type)) {
+		Type *final_type = type;
+		if (is_const_expr && !is_type_constant_type(type)) {
+			final_type = default_type(x->type);
+		}
+		update_expr_type(c, x->expr, final_type, true);
+	}
+
+	x->type = type;
+}
+
 void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_BinaryExpr);
 	Operand y_ = {0}, *y = &y_;
@@ -1827,46 +1911,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		if (x->mode == Addressing_Invalid) {
 			return;
 		}
-
-		bool is_const_expr = x->mode == Addressing_Constant;
-		bool can_convert = false;
-
-		Type *bt = base_type(type);
-		if (is_const_expr && is_type_constant_type(bt)) {
-			if (bt->kind == Type_Basic) {
-				if (check_value_is_expressible(c, x->value, bt, &x->value)) {
-					can_convert = true;
-				}
-			}
-		} else if (check_is_castable_to(c, x, type)) {
-			if (x->mode != Addressing_Constant) {
-				x->mode = Addressing_Value;
-			}
-			can_convert = true;
-		}
-
-		if (!can_convert) {
-			gbString expr_str = expr_to_string(x->expr);
-			gbString to_type  = type_to_string(type);
-			gbString from_type = type_to_string(x->type);
-			error_node(x->expr, "Cannot cast `%s` as `%s` from `%s`", expr_str, to_type, from_type);
-			gb_string_free(from_type);
-			gb_string_free(to_type);
-			gb_string_free(expr_str);
-
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		if (is_type_untyped(x->type)) {
-			Type *final_type = type;
-			if (is_const_expr && !is_type_constant_type(type)) {
-				final_type = default_type(x->type);
-			}
-			update_expr_type(c, x->expr, final_type, true);
-		}
-
-		x->type = type;
+		check_conversion(c, x, type);
 		return;
 	} break;
 	case Token_transmute: {
@@ -2291,6 +2336,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 		return;
 	}
 
+
 	if (is_type_untyped(target_type)) {
 		GB_ASSERT(operand->type->kind == Type_Basic);
 		GB_ASSERT(target_type->kind == Type_Basic);
@@ -2302,7 +2348,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 				update_expr_type(c, operand->expr, target_type, false);
 			}
 		} else if (x_kind != y_kind) {
-			convert_untyped_error(c, operand, target_type);
+			goto error;
 		}
 		return;
 	}
@@ -2320,23 +2366,20 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 			switch (operand->type->Basic.kind) {
 			case Basic_UntypedBool:
 				if (!is_type_boolean(target_type)) {
-					convert_untyped_error(c, operand, target_type);
-					return;
+					goto error;
 				}
 				break;
 			case Basic_UntypedInteger:
 			case Basic_UntypedFloat:
 			case Basic_UntypedRune:
 				if (!is_type_numeric(target_type)) {
-					convert_untyped_error(c, operand, target_type);
-					return;
+					goto error;
 				}
 				break;
 
 			case Basic_UntypedNil:
 				if (!type_has_nil(target_type)) {
-					convert_untyped_error(c, operand, target_type);
-					return;
+					goto error;
 				}
 				break;
 			}
@@ -2347,21 +2390,24 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 		if (is_type_untyped_nil(operand->type)) {
 			// Okay
 		} else if (level == 0) {
-			convert_to_typed(c, operand, t->Maybe.elem, level+1);
-			return;
+			goto error;
 		}
 
 	default:
 		if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
-			convert_untyped_error(c, operand, target_type);
-			return;
+			goto error;
 		}
+		target_type = t_untyped_nil;
 		break;
 	}
 
-
-
 	operand->type = target_type;
+	update_expr_type(c, operand->expr, target_type, true);
+	return;
+
+error:
+	operand->mode = Addressing_Invalid;
+	convert_untyped_error(c, operand, target_type);
 }
 
 bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *value) {
@@ -3525,6 +3571,17 @@ CallArgumentError check_call_arguments_internal(Checker *c, AstNode *call, Type 
 	return err;
 }
 
+typedef struct ValidProcAndScore {
+	isize index;
+	i64   score;
+} ValidProcAndScore;
+
+int valid_proc_and_score_cmp(void const *a, void const *b) {
+	i64 si = (cast(ValidProcAndScore const *)a)->score;
+	i64 sj = (cast(ValidProcAndScore const *)b)->score;
+	return sj < si ? -1 : sj > si;
+}
+
 Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
 	GB_ASSERT(call->kind == AstNode_CallExpr);
 
@@ -3553,11 +3610,10 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 		String name = operand->initial_overload_entity->token.string;
 		HashKey key = hash_string(name);
 
-		isize    overload_count = operand->overload_count;
-		Entity **procs          = gb_alloc_array(heap_allocator(), Entity *, overload_count);
-		isize *  valid_procs    = gb_alloc_array(heap_allocator(), isize, overload_count);
-		i64 *    valid_scores   = gb_alloc_array(heap_allocator(), i64, overload_count);
-		isize    valid_count    = 0;
+		isize              overload_count = operand->overload_count;
+		Entity **          procs          = gb_alloc_array(heap_allocator(), Entity *, overload_count);
+		ValidProcAndScore *valids         = gb_alloc_array(heap_allocator(), ValidProcAndScore, overload_count);
+		isize              valid_count    = 0;
 
 		map_entity_multi_get_all(&s->elements, key, procs);
 
@@ -3576,44 +3632,49 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 				i64 score = 0;
 				CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.e, operands.count, false, &score);
 				if (err == CallArgumentError_None) {
-					valid_procs[valid_count] = i;
-					valid_scores[valid_count] = score;
+					valids[valid_count].index = i;
+					valids[valid_count].score = score;
 					valid_count++;
 				}
 			}
 		}
 
-		// IMPORTANT TODO(bill): Get the best proc by its score
-		// i64 best_score = 0;
-		// isize best_index = 0;
-		// for (isize i = 0; i < valid_count; i++) {
-		// 	if (best_score < valid_scores[i]) {
-		// 		best_score = valid_scores[i];
-		// 		best_index = i;
-		// 	}
-		// }
+		if (valid_count > 1) {
+			gb_sort_array(valids, valid_count, valid_proc_and_score_cmp);
+			i64 best_score = valids[0].score;
+			for (isize i = 0; i < valid_count; i++) {
+				if (best_score > valids[i].score) {
+					valid_count = i;
+					break;
+				}
+				best_score = valids[i].score;
+			}
+		}
 
 
 		if (valid_count == 0) {
-			error_node(operand->expr, "No overloads for `%.*s` that match the specified arguments", LIT(name));
+			error_node(operand->expr, "No overloads for `%.*s` that match with the given arguments", LIT(name));
 			proc_type = t_invalid;
 		} else if (valid_count > 1) {
 			error_node(operand->expr, "Ambiguous procedure call `%.*s`, could be:", LIT(name));
 			for (isize i = 0; i < valid_count; i++) {
-				TokenPos pos = procs[valid_procs[i]]->token.pos;
-				gb_printf_err("\t`%.*s` at %.*s(%td:%td)\n", LIT(name), LIT(pos.file), pos.line, pos.column);
+				Entity *proc = procs[valids[i].index];
+				TokenPos pos = proc->token.pos;
+				gbString pt = type_to_string(proc->type);
+				gb_printf_err("\t%.*s :: %s at %.*s(%td:%td)\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column);
+				gb_string_free(pt);
 			}
 			proc_type = t_invalid;
 		} else {
 			GB_ASSERT(operand->expr->kind == AstNode_Ident);
-			Entity *e = procs[valid_procs[0]];
+			Entity *e = procs[valids[0].index];
 			add_entity_use(c, operand->expr, e);
 			proc_type = e->type;
 			i64 score = 0;
 			CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.e, operands.count, true, &score);
 		}
 
-		gb_free(heap_allocator(), valid_procs);
+		gb_free(heap_allocator(), valids);
 		gb_free(heap_allocator(), procs);
 	} else {
 		i64 score = 0;
@@ -3660,6 +3721,25 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		return Expr_Stmt;
 	}
 
+	if (operand->mode == Addressing_Type) {
+		Type *t = operand->type;
+		gbString str = type_to_string(t);
+		operand->mode = Addressing_Invalid;
+		isize arg_count = ce->args.count;
+		switch (arg_count) {
+		case 0:  error_node(call, "Missing argument in convertion to `%s`", str);   break;
+		default: error_node(call, "Too many arguments in convertion to `%s`", str); break;
+		case 1:
+			check_expr(c, operand, ce->args.e[0]);
+			if (operand->mode != Addressing_Invalid) {
+				check_conversion(c, operand, t);
+			}
+			break;
+		}
+
+		gb_string_free(str);
+		return Expr_Expr;
+	}
 
 	if (operand->mode == Addressing_Builtin) {
 		i32 id = operand->builtin_id;

@@ -35,6 +35,7 @@ typedef enum EntityFlag {
 	EntityFlag_Field      = 1<<3,
 	EntityFlag_Param      = 1<<4,
 	EntityFlag_VectorElem = 1<<5,
+	EntityFlag_NoAlias    = 1<<6,
 } EntityFlag;
 
 typedef enum OverloadKind {

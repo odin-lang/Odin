@@ -94,7 +94,8 @@ typedef enum StmtStateFlag {
 
 typedef enum FieldFlag {
 	FieldFlag_using    = 1<<0,
-	FieldFlag_ellipsis = 1<<1,
+	FieldFlag_no_alias = 1<<1,
+	FieldFlag_ellipsis = 1<<2,
 } FieldListTag;
 
 AstNodeArray make_ast_node_array(AstFile *f) {
@@ -1786,6 +1787,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 }
 
 bool is_literal_type(AstNode *node) {
+	node = unparen_expr(node);
 	switch (node->kind) {
 	case AstNode_BadExpr:
 	case AstNode_Ident:
@@ -2232,30 +2234,51 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, u32 flags,
 
 	while (f->curr_token.kind != follow &&
 	       f->curr_token.kind != Token_EOF) {
-		bool is_using = false;
-		if (allow_token(f, Token_using)) {
-			is_using = true;
+		i32 using_count    = 0;
+		i32 no_alias_count = 0;
+		while (f->curr_token.kind == Token_using ||
+		       f->curr_token.kind == Token_no_alias) {
+			if (allow_token(f, Token_using)) {
+				using_count++;
+			}
+			if (allow_token(f, Token_no_alias)) {
+				no_alias_count++;
+			}
 		}
+
 
 		AstNodeArray names = parse_identifier_list(f);
 		if (names.count == 0) {
-			syntax_error(f->curr_token, "Empty parameter declaration");
+			syntax_error(f->curr_token, "Empty field declaration");
 			break;
 		}
 
-		if (names.count > 1 && is_using) {
+		if (names.count > 1 && using_count > 0) {
 			syntax_error(f->curr_token, "Cannot apply `using` to more than one of the same type");
-			is_using = false;
+			using_count = 0;
 		}
 
-		if ((flags&FieldFlag_using) == 0 && is_using) {
-			syntax_error(f->curr_token, "`using` is not allowed within this parameter list");
-			is_using = false;
+		if ((flags&FieldFlag_using) == 0 && using_count > 0) {
+			syntax_error(f->curr_token, "`using` is not allowed within this field list");
+			using_count = 0;
 		}
+		if ((flags&FieldFlag_no_alias) == 0 && no_alias_count > 0) {
+			syntax_error(f->curr_token, "`no_alias` is not allowed within this field list");
+			no_alias_count = 0;
+		}
+		if (using_count > 1) {
+			syntax_error(f->curr_token, "Multiple `using` in this field list");
+			using_count = 1;
+		}
+		if (no_alias_count > 1) {
+			syntax_error(f->curr_token, "Multiple `no_alias` in this field list");
+			no_alias_count = 1;
+		}
+
 
 		name_count += names.count;
 
-		expect_token_after(f, Token_Colon, "parameter list");
+		expect_token_after(f, Token_Colon, "field list");
 
 		AstNode *type = NULL;
 		if ((flags&FieldFlag_ellipsis) != 0 && f->curr_token.kind == Token_Ellipsis) {
@@ -2263,11 +2286,11 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, u32 flags,
 			next_token(f);
 			type = parse_type_attempt(f);
 			if (type == NULL) {
-				syntax_error(f->curr_token, "variadic parameter is missing a type after `..`");
+				syntax_error(f->curr_token, "variadic field is missing a type after `..`");
 				type = make_bad_expr(f, ellipsis, f->curr_token);
 			} else {
 				if (names.count > 1) {
-					syntax_error(f->curr_token, "mutliple variadic parameters, only  `..`");
+					syntax_error(f->curr_token, "mutliple variadic fields, only  `..`");
 				} else {
 					type = make_ellipsis(f, ellipsis, type);
 				}
@@ -2278,13 +2301,12 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, u32 flags,
 
 
 		if (type == NULL) {
-			syntax_error(f->curr_token, "Expected a type for this parameter declaration");
+			syntax_error(f->curr_token, "Expected a type for this field declaration");
 		}
 
 		u32 flags = 0;
-		if (is_using) {
-			flags |= FieldFlag_using;
-		}
+		if (using_count    > 0) flags |= FieldFlag_using;
+		if (no_alias_count > 0) flags |= FieldFlag_no_alias;
 		AstNode *param = make_field(f, names, type, flags);
 		array_add(&params, param);
 
@@ -2491,7 +2513,7 @@ void parse_proc_signature(AstFile *f,
                           AstNodeArray *params,
                           AstNodeArray *results) {
 	expect_token(f, Token_OpenParen);
-	*params = parse_field_list(f, NULL, FieldFlag_using|FieldFlag_ellipsis, Token_Comma, Token_CloseParen);
+	*params = parse_field_list(f, NULL, FieldFlag_using|FieldFlag_no_alias|FieldFlag_ellipsis, Token_Comma, Token_CloseParen);
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	*results = parse_results(f);
 }
