@@ -538,6 +538,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 			if (!(e->flags & EntityFlag_Anonymous)) {
 				continue;
 			}
+			bool is_immutable = e->Variable.is_immutable;
 			String name = e->token.string;
 			Type *t = base_type(type_deref(e->type));
 			if (is_type_struct(t) || is_type_raw_union(t)) {
@@ -547,6 +548,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 					Entity *f = (*found)->elements.entries.e[i].value;
 					if (f->kind == Entity_Variable) {
 						Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
+						uvar->Variable.is_immutable = is_immutable;
 						Entity *prev = scope_insert_entity(c->context.scope, uvar);
 						if (prev != NULL) {
 							error(e->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));

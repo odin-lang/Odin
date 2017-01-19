@@ -10,6 +10,13 @@
 #import "utf8.odin";
 
 main :: proc() {
+	T :: struct { x, y: int }
+	foo :: proc(using immutable t: T) {
+		a0 := t.x;
+		a1 := x;
+		x = 123; // Error: Cannot assign to an immutable: `x`
+	}
+
 	// foo :: proc(x: ^i32) -> (int, int) {
 	// 	fmt.println("^int");
 	// 	return 123, int(x^);

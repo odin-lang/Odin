@@ -34,8 +34,8 @@ typedef enum EntityFlag {
 	EntityFlag_Anonymous  = 1<<2,
 	EntityFlag_Field      = 1<<3,
 	EntityFlag_Param      = 1<<4,
-	EntityFlag_Ellipsis   = 1<<5,
-	EntityFlag_VectorElem = 1<<6,
+	EntityFlag_VectorElem = 1<<5,
+	EntityFlag_Ellipsis   = 1<<6,
 	EntityFlag_NoAlias    = 1<<7,
 } EntityFlag;
 

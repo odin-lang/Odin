@@ -782,6 +782,9 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_v
 					if (p->flags&FieldFlag_no_alias) {
 						param->flags |= EntityFlag_NoAlias;
 					}
+					if (p->flags&FieldFlag_immutable) {
+						param->Variable.is_immutable = true;
+					}
 					add_entity(c, scope, name, param);
 					variables[variable_index++] = param;
 				}

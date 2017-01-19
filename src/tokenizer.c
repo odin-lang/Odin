@@ -106,6 +106,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_vector,         "vector"), \
 	TOKEN_KIND(Token_using,          "using"), \
 	TOKEN_KIND(Token_no_alias,       "no_alias"), \
+	TOKEN_KIND(Token_immutable,      "immutable"), \
 	TOKEN_KIND(Token_asm,            "asm"), \
 	TOKEN_KIND(Token_push_allocator, "push_allocator"), \
 	TOKEN_KIND(Token_push_context,   "push_context"), \

@@ -270,13 +270,10 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 		}
 
 		gbString str = expr_to_string(op_b.expr);
-		switch (op_b.mode) {
-		case Addressing_Value:
+		if (e != NULL && e->kind == Entity_Variable && e->Variable.is_immutable) {
+			error_node(op_b.expr, "Cannot assign to an immutable: `%s`", str);
+		} else {
 			error_node(op_b.expr, "Cannot assign to `%s`", str);
-			break;
-		default:
-			error_node(op_b.expr, "Cannot assign to `%s`", str);
-			break;
 		}
 		gb_string_free(str);
 	} break;
