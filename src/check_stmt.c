@@ -720,8 +720,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					found = current_scope_lookup_entity(c->context.scope, str);
 				}
 				if (found == NULL) {
-					entity = make_entity_variable(c->allocator, c->context.scope, token, type);
-					entity->Variable.is_immutable = true;
+					entity = make_entity_variable(c->allocator, c->context.scope, token, type, true);
 					add_entity_definition(&c->info, name, entity);
 				} else {
 					TokenPos pos = found->token.pos;
@@ -1020,9 +1019,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					tt = make_type_pointer(c->allocator, case_type);
 					add_type_info_type(c, tt);
 				}
-				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, ms->var->Ident, tt);
+				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, ms->var->Ident, tt, true);
 				tag_var->flags |= EntityFlag_Used;
-				tag_var->Variable.is_immutable = true;
 				add_entity(c, c->context.scope, ms->var, tag_var);
 				add_entity_use(c, ms->var, tag_var);
 			}
@@ -1072,6 +1070,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(us, UsingStmt, node);
 		switch (us->node->kind) {
+		default:
+			// TODO(bill): Better error message for invalid using statement
+			error(us->token, "Invalid `using` statement");
+			break;
 		case_ast_node(es, ExprStmt, us->node);
 			// TODO(bill): Allow for just a LHS expression list rather than this silly code
 			Entity *e = NULL;
@@ -1199,52 +1201,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 		case_end;
 
-		case_ast_node(vd, ValueDecl, us->node);
-			if (!vd->is_var) {
-				error_node(us->node, "`using` can only be applied to a variable declaration");
-				return;
-			}
-
-			if (vd->names.count > 1 && vd->type != NULL) {
-				error(us->token, "`using` can only be applied to one variable of the same type");
-			}
-
-			check_var_decl_node(c, vd);
-
-			for_array(name_index, vd->names) {
-				AstNode *item = vd->names.e[name_index];
-				if (item->kind != AstNode_Ident) {
-					// TODO(bill): Handle error here???
-					continue;
-				}
-				ast_node(i, Ident, item);
-				String name = i->string;
-				Entity *e = scope_lookup_entity(c->context.scope, name);
-				Type *t = base_type(type_deref(e->type));
-				if (is_type_struct(t) || is_type_raw_union(t)) {
-					Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
-					GB_ASSERT(found != NULL);
-					for_array(i, (*found)->elements.entries) {
-						Entity *f = (*found)->elements.entries.e[i].value;
-						if (f->kind == Entity_Variable) {
-							Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
-							Entity *prev = scope_insert_entity(c->context.scope, uvar);
-							if (prev != NULL) {
-								error(us->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
-								return;
-							}
-						}
-					}
-				} else {
-					error(us->token, "`using` can only be applied to variables of type struct or raw_union");
-					return;
-				}
-			}
-		case_end;
-
-		default:
-			error(us->token, "Invalid AST: Using Statement");
-			break;
 		}
 	case_end;
 
@@ -1268,14 +1224,20 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(vd, ValueDecl, node);
 		if (vd->is_var) {
-			isize entity_count = vd->names.count;
-			isize entity_index = 0;
-			Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
+			Entity **entities = gb_alloc_array(c->allocator, Entity *, vd->names.count);
+			isize entity_count = 0;
+
+			if (vd->flags&VarDeclFlag_thread_local &&
+			    !c->context.scope->is_file) {
+				error_node(node, "`thread_local` may only be applied to a variable declaration");
+			}
 
 			for_array(i, vd->names) {
 				AstNode *name = vd->names.e[i];
 				Entity *entity = NULL;
-				if (name->kind == AstNode_Ident) {
+				if (name->kind != AstNode_Ident) {
+					error_node(name, "A variable declaration must be an identifier");
+				} else {
 					Token token = name->Ident;
 					String str = token.string;
 					Entity *found = NULL;
@@ -1284,7 +1246,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						found = current_scope_lookup_entity(c->context.scope, str);
 					}
 					if (found == NULL) {
-						entity = make_entity_variable(c->allocator, c->context.scope, token, NULL);
+						entity = make_entity_variable(c->allocator, c->context.scope, token, NULL, vd->flags&VarDeclFlag_immutable);
 						add_entity_definition(&c->info, name, entity);
 					} else {
 						TokenPos pos = found->token.pos;
@@ -1294,13 +1256,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						      LIT(str), LIT(pos.file), pos.line, pos.column);
 						entity = found;
 					}
-				} else {
-					error_node(name, "A variable declaration must be an identifier");
 				}
 				if (entity == NULL) {
 					entity = make_entity_dummy_variable(c->allocator, c->global_scope, ast_node_token(name));
 				}
-				entities[entity_index++] = entity;
+				entities[entity_count++] = entity;
 			}
 
 			Type *init_type = NULL;
@@ -1320,11 +1280,12 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				}
 				e->flags |= EntityFlag_Visited;
 
-				if (e->type == NULL)
+				if (e->type == NULL) {
 					e->type = init_type;
+				}
 			}
-			check_arity_match(c, vd);
 
+			check_arity_match(c, vd);
 			check_init_variables(c, entities, entity_count, vd->values, str_lit("variable declaration"));
 
 			for_array(i, vd->names) {
@@ -1332,6 +1293,49 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					add_entity(c, c->context.scope, vd->names.e[i], entities[i]);
 				}
 			}
+
+			if ((vd->flags & VarDeclFlag_using) != 0) {
+				Token token = ast_node_token(node);
+				if (vd->type != NULL && entity_count > 1) {
+					error(token, "`using` can only be applied to one variable of the same type");
+					// TODO(bill): Should a `continue` happen here?
+				}
+
+				for (isize entity_index = 0; entity_index < entity_count; entity_index++) {
+					Entity *e = entities[entity_index];
+					if (e == NULL) {
+						continue;
+					}
+					bool is_immutable = false;
+					if (e->kind == Entity_Variable) {
+						is_immutable = e->Variable.is_immutable;
+					}
+
+					String name = e->token.string;
+					Type *t = base_type(type_deref(e->type));
+					if (is_type_struct(t) || is_type_raw_union(t)) {
+						Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
+						GB_ASSERT(found != NULL);
+						for_array(i, (*found)->elements.entries) {
+							Entity *f = (*found)->elements.entries.e[i].value;
+							if (f->kind == Entity_Variable) {
+								Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
+								uvar->Variable.is_immutable = is_immutable;
+								Entity *prev = scope_insert_entity(c->context.scope, uvar);
+								if (prev != NULL) {
+									error(token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
+									return;
+								}
+							}
+						}
+					} else {
+						// NOTE(bill): skip the rest to remove extra errors
+						error(token, "`using` can only be applied to variables of type struct or raw_union");
+						return;
+					}
+				}
+			}
+
 		} else {
 			// NOTE(bill): Handled elsewhere
 		}

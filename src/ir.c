@@ -1230,7 +1230,7 @@ irValue *ir_add_local_generated(irProcedure *proc, Type *type) {
 	Entity *e = make_entity_variable(proc->module->allocator,
 	                                 scope,
 	                                 empty_token,
-	                                 type);
+	                                 type, false);
 	return ir_add_local(proc, e);
 }
 
@@ -5064,7 +5064,7 @@ void ir_init_module(irModule *m, Checker *c, BuildContext *build_context) {
 		{
 			String name = str_lit(IR_TYPE_INFO_DATA_NAME);
 			isize count = c->info.type_info_map.entries.count;
-			Entity *e = make_entity_variable(m->allocator, NULL, make_token_ident(name), make_type_array(m->allocator, t_type_info, count));
+			Entity *e = make_entity_variable(m->allocator, NULL, make_token_ident(name), make_type_array(m->allocator, t_type_info, count), false);
 			irValue *g = ir_make_value_global(m->allocator, e, NULL);
 			g->Global.is_private  = true;
 			ir_module_add_value(m, e, g);
@@ -5096,7 +5096,7 @@ void ir_init_module(irModule *m, Checker *c, BuildContext *build_context) {
 
 			String name = str_lit(IR_TYPE_INFO_DATA_MEMBER_NAME);
 			Entity *e = make_entity_variable(m->allocator, NULL, make_token_ident(name),
-			                                 make_type_array(m->allocator, t_type_info_member, count));
+			                                 make_type_array(m->allocator, t_type_info_member, count), false);
 			irValue *g = ir_make_value_global(m->allocator, e, NULL);
 			ir_module_add_value(m, e, g);
 			map_ir_value_set(&m->members, hash_string(name), g);
@@ -5303,7 +5303,7 @@ void ir_gen_tree(irGen *s) {
 
 		case Entity_Variable: {
 			irValue *g = ir_make_value_global(a, e, NULL);
-			if (decl->var_decl_tags & VarDeclTag_thread_local) {
+			if (decl->var_decl_flags & VarDeclFlag_thread_local) {
 				g->Global.is_thread_local = true;
 			}
 			irGlobalVariable var = {0};
@@ -5406,11 +5406,11 @@ void ir_gen_tree(irGen *s) {
 		proc_results->Tuple.variables = gb_alloc_array(a, Entity *, 1);
 		proc_results->Tuple.variable_count = 1;
 
-		proc_params->Tuple.variables[0] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false);
-		proc_params->Tuple.variables[1] = make_entity_param(a, proc_scope, make_token_ident(str_lit("reason")), t_i32, false);
-		proc_params->Tuple.variables[2] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false);
+		proc_params->Tuple.variables[0] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false, false);
+		proc_params->Tuple.variables[1] = make_entity_param(a, proc_scope, make_token_ident(str_lit("reason")), t_i32, false, false);
+		proc_params->Tuple.variables[2] = make_entity_param(a, proc_scope, blank_token, t_rawptr, false, false);
 
-		proc_results->Tuple.variables[0] = make_entity_param(a, proc_scope, empty_token, t_i32, false);
+		proc_results->Tuple.variables[0] = make_entity_param(a, proc_scope, empty_token, t_i32, false, false);
 
 
 		Type *proc_type = make_type_proc(a, proc_scope,
@@ -5793,7 +5793,7 @@ void ir_gen_tree(irGen *s) {
 									token.string.text = gb_alloc_array(a, u8, name_len);
 									token.string.len = gb_snprintf(cast(char *)token.string.text, name_len,
 									                               "%s-%d", name_base, id)-1;
-									Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, t_string, count));
+									Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, t_string, count), false);
 									name_array = ir_make_value_global(a, e, NULL);
 									name_array->Global.is_private = true;
 									ir_module_add_value(m, e, name_array);
@@ -5808,7 +5808,7 @@ void ir_gen_tree(irGen *s) {
 									token.string.text = gb_alloc_array(a, u8, name_len);
 									token.string.len = gb_snprintf(cast(char *)token.string.text, name_len,
 									                               "%s-%d", name_base, id)-1;
-									Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, t_type_info_enum_value, count));
+									Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, t_type_info_enum_value, count), false);
 									value_array = ir_make_value_global(a, e, NULL);
 									value_array->Global.is_private = true;
 									ir_module_add_value(m, e, value_array);

@@ -83,9 +83,11 @@ typedef enum ProcCallingConvention {
 	ProcCC_Invalid,
 } ProcCallingConvention;
 
-typedef enum VarDeclTag {
-	VarDeclTag_thread_local = 1<<0,
-} VarDeclTag;
+typedef enum VarDeclFlag {
+	VarDeclFlag_thread_local = 1<<0,
+	VarDeclFlag_using        = 1<<1,
+	VarDeclFlag_immutable    = 1<<2,
+} VarDeclFlag;
 
 typedef enum StmtStateFlag {
 	StmtStateFlag_bounds_check    = 1<<0,
@@ -274,7 +276,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		AstNodeArray names;  \
 		AstNode *    type;   \
 		AstNodeArray values; \
-		u64          tags;   \
+		u32          flags;  \
 	}) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
 		Token     token;        \
@@ -1209,6 +1211,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_defer:
 		case Token_asm:
 		case Token_using:
+		case Token_immutable:
 
 		case Token_break:
 		case Token_continue:
@@ -3087,30 +3090,72 @@ AstNode *parse_stmt(AstFile *f) {
 		// TODO(bill): Make using statements better
 		Token token = expect_token(f, Token_using);
 		AstNode *node = parse_stmt(f);
-		bool valid = false;
 
 		switch (node->kind) {
+		case AstNode_ValueDecl:
+			if (!node->ValueDecl.is_var) {
+				syntax_error(token, "`using` may not be applied to constant declarations");
+				return make_bad_stmt(f, token, f->curr_token);
+			} else {
+				if (f->curr_proc == NULL) {
+					syntax_error(token, "`using` is not allowed at the file scope");
+				} else {
+					node->ValueDecl.flags |= VarDeclFlag_using;
+				}
+				return node;
+			}
+			break;
 		case AstNode_ExprStmt: {
 			AstNode *e = unparen_expr(node->ExprStmt.expr);
 			while (e->kind == AstNode_SelectorExpr) {
 				e = unparen_expr(e->SelectorExpr.selector);
 			}
 			if (e->kind == AstNode_Ident) {
-				valid = true;
+				return make_using_stmt(f, token, node);
 			}
 		} break;
-		case AstNode_ValueDecl:
-			valid = node->ValueDecl.is_var;
-			break;
 		}
 
-		if (!valid) {
-			syntax_error(token, "Illegal use of `using` statement.");
-			return make_bad_stmt(f, token, f->curr_token);
-		}
-
-		return make_using_stmt(f, token, node);
+		syntax_error(token, "Illegal use of `using` statement");
+		return make_bad_stmt(f, token, f->curr_token);
 	} break;
+
+	case Token_immutable: {
+		Token token = expect_token(f, Token_immutable);
+		AstNode *node = parse_stmt(f);
+
+		if (node->kind == AstNode_ValueDecl) {
+			if (!node->ValueDecl.is_var) {
+				syntax_error(token, "`immutable` may not be applied to constant declarations");
+				return make_bad_stmt(f, token, f->curr_token);
+			} else {
+				node->ValueDecl.flags |= VarDeclFlag_immutable;
+				return node;
+			}
+		}
+		syntax_error(token, "`immutable` may only be applied to a variable declaration");
+		return make_bad_stmt(f, token, f->curr_token);
+	} break;
+
+	case Token_thread_local: {
+		Token token = expect_token(f, Token_thread_local);
+		AstNode *node = parse_stmt(f);
+
+		if (node->kind == AstNode_ValueDecl) {
+			if (!node->ValueDecl.is_var) {
+				syntax_error(token, "`thread_local` may not be applied to constant declarations");
+				return make_bad_stmt(f, token, f->curr_token);
+			}
+			if (f->curr_proc != NULL) {
+				syntax_error(token, "`thread_local` is only allowed at the file scope");
+			} else {
+				node->ValueDecl.flags |= VarDeclFlag_thread_local;
+			}
+			return node;
+		}
+		syntax_error(token, "`thread_local` may only be applied to a variable declaration");
+		return make_bad_stmt(f, token, f->curr_token);
+	}
 
 	case Token_push_allocator: {
 		next_token(f);
@@ -3237,21 +3282,6 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			expect_semicolon(f, s);
 			return s;
-		} else if (str_eq(tag, str_lit("thread_local"))) {
-			AstNode *decl = parse_simple_stmt(f);
-			if (decl->kind != AstNode_ValueDecl &&
-			    !decl->ValueDecl.is_var) {
-				syntax_error(token, "#thread_local may only be applied to variable declarations");
-				return make_bad_decl(f, token, ast_node_token(decl));
-			}
-			if (f->curr_proc != NULL) {
-				syntax_error(token, "#thread_local is only allowed at the file scope");
-				return make_bad_decl(f, token, ast_node_token(decl));
-			}
-
-			GB_ASSERT(decl->kind == AstNode_ValueDecl);
-			decl->ValueDecl.tags |= VarDeclTag_thread_local;
-			return decl;
 		} else if (str_eq(tag, str_lit("bounds_check"))) {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_bounds_check;

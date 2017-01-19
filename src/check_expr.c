@@ -778,7 +778,8 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_v
 			for_array(j, p->names) {
 				AstNode *name = p->names.e[j];
 				if (ast_node_expect(name, AstNode_Ident)) {
-					Entity *param = make_entity_param(c->allocator, scope, name->Ident, type, p->flags&FieldFlag_using);
+					Entity *param = make_entity_param(c->allocator, scope, name->Ident, type,
+					                                  p->flags&FieldFlag_using, p->flags&FieldFlag_immutable);
 					if (p->flags&FieldFlag_no_alias) {
 						param->flags |= EntityFlag_NoAlias;
 					}
@@ -826,7 +827,7 @@ Type *check_get_results(Checker *c, Scope *scope, AstNodeArray results) {
 		Token token = ast_node_token(item);
 		token.string = str_lit(""); // NOTE(bill): results are not named
 		// TODO(bill): Should I have named results?
-		Entity *param = make_entity_param(c->allocator, scope, token, type, false);
+		Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
 		// NOTE(bill): No need to record
 		variables[variable_index++] = param;
 	}
@@ -2939,8 +2940,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		Entity **variables = gb_alloc_array(c->allocator, Entity *, 2);
-		variables[0] = make_entity_param(c->allocator, NULL, empty_token, type, false);
-		variables[1] = make_entity_param(c->allocator, NULL, empty_token, t_bool, false);
+		variables[0] = make_entity_param(c->allocator, NULL, empty_token, type, false, true);
+		variables[1] = make_entity_param(c->allocator, NULL, empty_token, t_bool, false, true);
 
 		Type *tuple = make_type_tuple(c->allocator);
 		tuple->Tuple.variables = variables;
@@ -4128,7 +4129,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 					variables[variable_index++] = make_entity_constant(c->allocator, NULL, empty_token, type, operand.value);
 					break;
 				default:
-					variables[variable_index++] = make_entity_param(c->allocator, NULL, empty_token, type, false);
+					variables[variable_index++] = make_entity_param(c->allocator, NULL, empty_token, type, false, true);
 					break;
 				}
 			}
@@ -4745,8 +4746,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 				Entity **variables = gb_alloc_array(c->allocator, Entity *, 2);
 				Type *elem = t->Maybe.elem;
 				Token tok = make_token_ident(str_lit(""));
-				variables[0] = make_entity_param(c->allocator, NULL, tok, elem, false);
-				variables[1] = make_entity_param(c->allocator, NULL, tok, t_bool, false);
+				variables[0] = make_entity_param(c->allocator, NULL, tok, elem, false, true);
+				variables[1] = make_entity_param(c->allocator, NULL, tok, t_bool, false, true);
 
 				Type *tuple = make_type_tuple(c->allocator);
 				tuple->Tuple.variables = variables;

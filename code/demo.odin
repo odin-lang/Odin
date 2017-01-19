@@ -9,13 +9,13 @@
 #import "sync.odin";
 #import "utf8.odin";
 
+T :: struct { x, y: int };
+thread_local t: T;
+
 main :: proc() {
-	T :: struct { x, y: int }
-	foo :: proc(using immutable t: T) {
-		a0 := t.x;
-		a1 := x;
-		x = 123; // Error: Cannot assign to an immutable: `x`
-	}
+	immutable using t := T{123, 321};
+	fmt.println(t);
+
 
 	// foo :: proc(x: ^i32) -> (int, int) {
 	// 	fmt.println("^int");

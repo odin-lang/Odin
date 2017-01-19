@@ -150,7 +150,7 @@ Context :: struct #ordered {
 	user_index: int,
 }
 
-#thread_local __context: Context;
+thread_local __context: Context;
 
 
 DEFAULT_ALIGNMENT :: align_of([vector 4]f32);

@@ -61,7 +61,7 @@ typedef struct DeclInfo {
 	AstNode *type_expr;
 	AstNode *init_expr;
 	AstNode *proc_lit; // AstNode_ProcLit
-	u32      var_decl_tags;
+	u32      var_decl_flags;
 
 	MapBool deps; // Key: Entity *
 } DeclInfo;
@@ -1395,8 +1395,12 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 						error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 						continue;
 					}
-					Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL);
+					Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL, vd->flags&VarDeclFlag_immutable);
 					e->identifier = name;
+					if (vd->flags&VarDeclFlag_using) {
+						vd->flags &= ~VarDeclFlag_using; // NOTE(bill): This error will be only caught once
+						error_node(name, "`using` is not allowed at the file scope");
+					}
 					entities[entity_index++] = e;
 
 					DeclInfo *d = di;
@@ -1405,7 +1409,7 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 						d = make_declaration_info(heap_allocator(), e->scope);
 						d->type_expr = vd->type;
 						d->init_expr = init_expr;
-						d->var_decl_tags = vd->tags;
+						d->var_decl_flags = vd->flags;
 					}
 
 					add_entity_and_decl_info(c, name, e, d);

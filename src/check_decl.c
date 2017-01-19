@@ -107,78 +107,6 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 	gb_temp_arena_memory_end(tmp);
 }
 
-void check_var_decl_node(Checker *c, AstNodeValueDecl *vd) {
-	GB_ASSERT(vd->is_var == true);
-	isize entity_count = vd->names.count;
-	isize entity_index = 0;
-	Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
-
-	for_array(i, vd->names) {
-		AstNode *name = vd->names.e[i];
-		Entity *entity = NULL;
-		if (name->kind == AstNode_Ident) {
-			Token token = name->Ident;
-			String str = token.string;
-			Entity *found = NULL;
-			// NOTE(bill): Ignore assignments to `_`
-			if (str_ne(str, str_lit("_"))) {
-				found = current_scope_lookup_entity(c->context.scope, str);
-			}
-			if (found == NULL) {
-				entity = make_entity_variable(c->allocator, c->context.scope, token, NULL);
-				add_entity_definition(&c->info, name, entity);
-			} else {
-				TokenPos pos = found->token.pos;
-				error(token,
-				      "Redeclaration of `%.*s` in this scope\n"
-				      "\tat %.*s(%td:%td)",
-				      LIT(str), LIT(pos.file), pos.line, pos.column);
-				entity = found;
-			}
-		} else {
-			error_node(name, "A variable declaration must be an identifier");
-		}
-		if (entity == NULL) {
-			entity = make_entity_dummy_variable(c->allocator, c->global_scope, ast_node_token(name));
-		}
-		entities[entity_index++] = entity;
-	}
-
-	Type *init_type = NULL;
-	if (vd->type) {
-		init_type = check_type_extra(c, vd->type, NULL);
-		if (init_type == NULL) {
-			init_type = t_invalid;
-		}
-	}
-
-	for (isize i = 0; i < entity_count; i++) {
-		Entity *e = entities[i];
-		GB_ASSERT(e != NULL);
-		if (e->flags & EntityFlag_Visited) {
-			e->type = t_invalid;
-			continue;
-		}
-		e->flags |= EntityFlag_Visited;
-
-		if (e->type == NULL) {
-			e->type = init_type;
-		}
-	}
-
-	check_arity_match(c, vd);
-	check_init_variables(c, entities, entity_count, vd->values, str_lit("variable declaration"));
-
-	for_array(i, vd->names) {
-		if (entities[i] != NULL) {
-			add_entity(c, c->context.scope, vd->names.e[i], entities[i]);
-		}
-	}
-
-}
-
-
-
 void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	if (operand->mode == Addressing_Invalid ||
 	    operand->type == t_invalid ||
@@ -442,6 +370,8 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, AstNode *init_expr) {
 	GB_ASSERT(e->type == NULL);
 	GB_ASSERT(e->kind == Entity_Variable);
+
+	u32 flags = c->context.decl->var_decl_flags;
 
 	if (e->flags & EntityFlag_Visited) {
 		e->type = t_invalid;
