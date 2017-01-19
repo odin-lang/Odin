@@ -26,6 +26,23 @@ gb_inline Type *check_type(Checker *c, AstNode *expression) {
 }
 
 
+void error_operand_not_expression(Operand *o) {
+	if (o->mode == Addressing_Type) {
+		gbString err = expr_to_string(o->expr);
+		error_node(o->expr, "`%s` is not an expression", err);
+		gb_string_free(err);
+		o->mode = Addressing_Invalid;
+	}
+}
+
+void error_operand_no_value(Operand *o) {
+	if (o->mode == Addressing_NoValue) {
+		gbString err = expr_to_string(o->expr);
+		error_node(o->expr, "`%s` used as value", err);
+		gb_string_free(err);
+		o->mode = Addressing_Invalid;
+	}
+}
 
 
 void check_scope_decls(Checker *c, AstNodeArray nodes, isize reserve_size) {
@@ -1547,8 +1564,19 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 }
 
 void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
-	gbString err_str = NULL;
+	if (x->mode == Addressing_Type && y->mode == Addressing_Type) {
+		bool comp = are_types_identical(x->type, y->type);
+		switch (op) {
+		case Token_CmpEq: comp = comp;  break;
+		case Token_NotEq: comp = !comp; break;
+		}
+		x->mode  = Addressing_Constant;
+		x->type  = t_untyped_bool;
+		x->value = make_exact_value_bool(comp);
+		return;
+	}
 
+	gbString err_str = NULL;
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 	if (check_is_assignable_to(c, x, y->type) ||
 	    check_is_assignable_to(c, y, x->type)) {
@@ -1905,208 +1933,36 @@ void check_conversion(Checker *c, Operand *x, Type *type) {
 	x->type = type;
 }
 
+
+
 void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_BinaryExpr);
 	Operand y_ = {0}, *y = &y_;
 
 	ast_node(be, BinaryExpr, node);
 
-#if 0
-	switch (be->op.kind) {
-	case Token_as: {
-		check_expr(c, x, be->left);
-		Type *type = check_type(c, be->right);
-		if (x->mode == Addressing_Invalid) {
-			return;
+	Token op = be->op;
+	switch (op.kind) {
+	case Token_CmpEq:
+	case Token_NotEq: {
+		// NOTE(bill): Allow comparisons between types
+		check_expr_or_type(c, x, be->left);
+		check_expr_or_type(c, y, be->right);
+		bool xt = x->mode == Addressing_Type;
+		bool yt = y->mode == Addressing_Type;
+		// If only one is a type, this is an error
+		if (xt ^ yt) {
+			GB_ASSERT(xt != yt);
+			if (xt) error_operand_not_expression(x);
+			if (yt) error_operand_not_expression(y);
 		}
-		check_conversion(c, x, type);
-		return;
 	} break;
-	case Token_transmute: {
+
+	default:
 		check_expr(c, x, be->left);
-		Type *type = check_type(c, be->right);
-		if (x->mode == Addressing_Invalid) {
-			return;
-		}
-
-		if (x->mode == Addressing_Constant) {
-			gbString expr_str = expr_to_string(x->expr);
-			error_node(x->expr, "Cannot transmute constant expression: `%s`", expr_str);
-			gb_string_free(expr_str);
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		if (is_type_untyped(x->type)) {
-			gbString expr_str = expr_to_string(x->expr);
-			error_node(x->expr, "Cannot transmute untyped expression: `%s`", expr_str);
-			gb_string_free(expr_str);
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		i64 srcz = type_size_of(c->sizes, c->allocator, x->type);
-		i64 dstz = type_size_of(c->sizes, c->allocator, type);
-		if (srcz != dstz) {
-			gbString expr_str = expr_to_string(x->expr);
-			gbString type_str = type_to_string(type);
-			error_node(x->expr, "Cannot transmute `%s` to `%s`, %lld vs %lld bytes", expr_str, type_str, srcz, dstz);
-			gb_string_free(type_str);
-			gb_string_free(expr_str);
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		x->type = type;
-
-		return;
-	} break;
-	case Token_down_cast: {
-		check_expr(c, x, be->left);
-		Type *type = check_type(c, be->right);
-		if (x->mode == Addressing_Invalid) {
-			return;
-		}
-
-		if (x->mode == Addressing_Constant) {
-			gbString expr_str = expr_to_string(node);
-			error_node(node, "Cannot `down_cast` a constant expression: `%s`", expr_str);
-			gb_string_free(expr_str);
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		if (is_type_untyped(x->type)) {
-			gbString expr_str = expr_to_string(node);
-			error_node(node, "Cannot `down_cast` an untyped expression: `%s`", expr_str);
-			gb_string_free(expr_str);
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		if (!(is_type_pointer(x->type) && is_type_pointer(type))) {
-			gbString expr_str = expr_to_string(node);
-			error_node(node, "Can only `down_cast` pointers: `%s`", expr_str);
-			gb_string_free(expr_str);
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		Type *src = type_deref(x->type);
-		Type *dst = type_deref(type);
-		Type *bsrc = base_type(src);
-		Type *bdst = base_type(dst);
-
-		if (!(is_type_struct(bsrc) || is_type_raw_union(bsrc))) {
-			gbString expr_str = expr_to_string(node);
-			error_node(node, "Can only `down_cast` pointer from structs or unions: `%s`", expr_str);
-			gb_string_free(expr_str);
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		if (!(is_type_struct(bdst) || is_type_raw_union(bdst))) {
-			gbString expr_str = expr_to_string(node);
-			error_node(node, "Can only `down_cast` pointer to structs or unions: `%s`", expr_str);
-			gb_string_free(expr_str);
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		String param_name = check_down_cast_name(dst, src);
-		if (param_name.len == 0) {
-			gbString expr_str = expr_to_string(node);
-			error_node(node, "Illegal `down_cast`: `%s`", expr_str);
-			gb_string_free(expr_str);
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		x->mode = Addressing_Value;
-		x->type = type;
-		return;
-	} break;
-	case Token_union_cast: {
-		check_expr(c, x, be->left);
-		Type *type = check_type(c, be->right);
-		if (x->mode == Addressing_Invalid) {
-			return;
-		}
-
-		if (x->mode == Addressing_Constant) {
-			gbString expr_str = expr_to_string(node);
-			error_node(node, "Cannot `union_cast` a constant expression: `%s`", expr_str);
-			gb_string_free(expr_str);
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		if (is_type_untyped(x->type)) {
-			gbString expr_str = expr_to_string(node);
-			error_node(node, "Cannot `union_cast` an untyped expression: `%s`", expr_str);
-			gb_string_free(expr_str);
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		bool src_is_ptr = is_type_pointer(x->type);
-		bool dst_is_ptr = is_type_pointer(type);
-		Type *src = type_deref(x->type);
-		Type *dst = type_deref(type);
-		Type *bsrc = base_type(src);
-		Type *bdst = base_type(dst);
-
-		if (src_is_ptr != dst_is_ptr) {
-			gbString src_type_str = type_to_string(x->type);
-			gbString dst_type_str = type_to_string(type);
-			error_node(node, "Invalid `union_cast` types: `%s` and `%s`", src_type_str, dst_type_str);
-			gb_string_free(dst_type_str);
-			gb_string_free(src_type_str);
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		if (!is_type_union(src)) {
-			error_node(node, "`union_cast` can only operate on unions");
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		bool ok = false;
-		for (isize i = 1; i < bsrc->Record.field_count; i++) {
-			Entity *f = bsrc->Record.fields[i];
-			if (are_types_identical(f->type, dst)) {
-				ok = true;
-				break;
-			}
-		}
-
-		if (!ok) {
-			gbString expr_str = expr_to_string(node);
-			gbString dst_type_str = type_to_string(type);
-			error_node(node, "Cannot `union_cast` `%s` to `%s`", expr_str, dst_type_str);
-			gb_string_free(dst_type_str);
-			gb_string_free(expr_str);
-			x->mode = Addressing_Invalid;
-			return;
-		}
-
-		Entity **variables = gb_alloc_array(c->allocator, Entity *, 2);
-		variables[0] = make_entity_param(c->allocator, NULL, empty_token, type, false);
-		variables[1] = make_entity_param(c->allocator, NULL, empty_token, t_bool, false);
-
-		Type *tuple = make_type_tuple(c->allocator);
-		tuple->Tuple.variables = variables;
-		tuple->Tuple.variable_count = 2;
-
-		x->type = tuple;
-		x->mode = Addressing_Value;
-		return;
-	} break;
+		check_expr(c, y, be->right);
+		break;
 	}
-#endif
-	check_expr(c, x, be->left);
-	check_expr(c, y, be->right);
 	if (x->mode == Addressing_Invalid) {
 		return;
 	}
@@ -2115,8 +1971,6 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		x->expr = y->expr;
 		return;
 	}
-
-	Token op = be->op;
 
 	if (token_is_shift(op)) {
 		check_shift(c, x, y, node);
@@ -2339,6 +2193,7 @@ void convert_untyped_error(Checker *c, Operand *operand, Type *target_type) {
 void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level) {
 	GB_ASSERT_NOT_NULL(target_type);
 	if (operand->mode == Addressing_Invalid ||
+	    operand->mode == Addressing_Type ||
 	    is_type_typed(operand->type) ||
 	    target_type == t_invalid) {
 		return;
@@ -2441,7 +2296,7 @@ bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *val
 	}
 
 	if (operand.mode == Addressing_Constant &&
-	    (c->context.stmt_state_flags & StmtStateFlag_bounds_check) != 0) {
+	    (c->context.stmt_state_flags & StmtStateFlag_no_bounds_check) == 0) {
 		i64 i = exact_value_to_integer(operand.value).value_integer;
 		if (i < 0) {
 			gbString expr_str = expr_to_string(operand.expr);
@@ -4958,23 +4813,19 @@ ExprKind check_expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint)
 }
 
 
+
 void check_multi_expr(Checker *c, Operand *o, AstNode *e) {
-	gbString err_str = NULL;
 	check_expr_base(c, o, e, NULL);
 	switch (o->mode) {
 	default:
 		return; // NOTE(bill): Valid
-
 	case Addressing_NoValue:
-		err_str = expr_to_string(e);
-		error_node(e, "`%s` used as value", err_str);
+		error_operand_no_value(o);
 		break;
 	case Addressing_Type:
-		err_str = expr_to_string(e);
-		error_node(e, "`%s` is not an expression", err_str);
+		error_operand_not_expression(o);
 		break;
 	}
-	gb_string_free(err_str);
 	o->mode = Addressing_Invalid;
 }
 
@@ -5000,12 +4851,7 @@ void check_expr(Checker *c, Operand *o, AstNode *e) {
 void check_expr_or_type(Checker *c, Operand *o, AstNode *e) {
 	check_expr_base(c, o, e, NULL);
 	check_not_tuple(c, o);
-	if (o->mode == Addressing_NoValue) {
-		gbString str = expr_to_string(o->expr);
-		error_node(o->expr, "`%s` used as value or type", str);
-		gb_string_free(str);
-		o->mode = Addressing_Invalid;
-	}
+	error_operand_no_value(o);
 }
 
 

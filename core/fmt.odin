@@ -890,7 +890,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, verb: rune, prec, bit_size: int) -> 
 
 	}
 
-	return buf[:0];
+	return buf[:i];
 }
 
 fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {

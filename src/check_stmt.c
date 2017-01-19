@@ -310,12 +310,13 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 		u32 in = node->stmt_state_flags;
 		u32 out = c->context.stmt_state_flags;
 
-		if (in & StmtStateFlag_bounds_check) {
-			out |= StmtStateFlag_bounds_check;
-			out &= ~StmtStateFlag_no_bounds_check;
-		} else if (in & StmtStateFlag_no_bounds_check) {
+		if (in & StmtStateFlag_no_bounds_check) {
 			out |= StmtStateFlag_no_bounds_check;
 			out &= ~StmtStateFlag_bounds_check;
+		} else {
+		// if (in & StmtStateFlag_bounds_check) {
+			out |= StmtStateFlag_bounds_check;
+			out &= ~StmtStateFlag_no_bounds_check;
 		}
 
 		c->context.stmt_state_flags = out;
@@ -648,6 +649,12 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 				GB_ASSERT(are_types_identical(x.type, y.type));
 
+				TokenKind op = Token_Lt;
+				switch (ie->op.kind) {
+				case Token_HalfOpenRange: op = Token_Lt;   break;
+				case Token_Ellipsis:      op = Token_LtEq; break;
+				default: error(ie->op, "Invalid range operator"); break;
+				}
 				bool ok = compare_exact_values(Token_Lt, a, b);
 				if (!ok) {
 					// TODO(bill): Better error message

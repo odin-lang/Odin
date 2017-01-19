@@ -2848,10 +2848,14 @@ AstNode *parse_for_stmt(AstFile *f) {
 	isize prev_level = f->expr_level;
 	f->expr_level = -1;
 	AstNode *expr = parse_expr(f, false);
-	if (f->curr_token.kind == Token_Interval) {
-		Token op = expect_token(f, Token_Interval);
+	switch (f->curr_token.kind) {
+	case Token_HalfOpenRange:
+	case Token_Ellipsis: {
+		Token op = f->curr_token;
+		next_token(f);
 		AstNode *right = parse_expr(f, false);
 		expr = make_interval_expr(f, op, expr, right);
+	} break;
 	}
 	f->expr_level = prev_level;
 
