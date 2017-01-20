@@ -549,8 +549,17 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			if (rs->results.count == 0) {
 				error_node(node, "Expected %td return values, got 0", result_count);
 			} else {
+				// TokenPos pos = rs->token.pos;
+				// if (pos.line == 10) {
+				// 	gb_printf_err("%s\n", type_to_string(variables[0]->type));
+				// }
 				check_init_variables(c, variables, result_count,
 				                     rs->results, str_lit("return statement"));
+				// if (pos.line == 10) {
+				// 	AstNode *x = rs->results.e[0];
+				// 	gb_printf_err("%s\n", expr_to_string(x));
+				// 	gb_printf_err("%s\n", type_to_string(type_of_expr(&c->info, x)));
+				// }
 			}
 		} else if (rs->results.count > 0) {
 			error_node(rs->results.e[0], "No return values expected");

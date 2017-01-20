@@ -4411,7 +4411,8 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			// No return values
 		} else if (return_count == 1) {
 			Entity *e = return_type_tuple->variables[0];
-			v = ir_emit_conv(proc, ir_build_expr(proc, rs->results.e[0]), e->type);
+			v = ir_build_expr(proc, rs->results.e[0]);
+			v = ir_emit_conv(proc, v, e->type);
 		} else {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
 

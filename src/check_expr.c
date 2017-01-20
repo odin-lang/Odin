@@ -252,6 +252,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 				return;
 			}
 			target_type = default_type(operand->type);
+			GB_ASSERT(is_type_typed(target_type));
 			add_type_info_type(c, type);
 			add_type_info_type(c, target_type);
 		}

@@ -141,58 +141,59 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 	i64 word_bits = 8*s.word_size;
 	GB_ASSERT_NOT_NULL(t);
 	t = default_type(t);
+	// GB_ASSERT(is_type_typed(t));
 
 	switch (t->kind) {
 	case Type_Basic:
 		switch (t->Basic.kind) {
-		case Basic_bool:   ir_fprintf(f, "i1");                      break;
-		case Basic_i8:     ir_fprintf(f, "i8");                      break;
-		case Basic_u8:     ir_fprintf(f, "i8");                      break;
-		case Basic_i16:    ir_fprintf(f, "i16");                     break;
-		case Basic_u16:    ir_fprintf(f, "i16");                     break;
-		case Basic_i32:    ir_fprintf(f, "i32");                     break;
-		case Basic_u32:    ir_fprintf(f, "i32");                     break;
-		case Basic_i64:    ir_fprintf(f, "i64");                     break;
-		case Basic_u64:    ir_fprintf(f, "i64");                     break;
-		// case Basic_i128:   ir_fprintf(f, "i128");                    break;
-		// case Basic_u128:   ir_fprintf(f, "i128");                    break;
-		// case Basic_f16:    ir_fprintf(f, "half");                    break;
-		case Basic_f32:    ir_fprintf(f, "float");                   break;
-		case Basic_f64:    ir_fprintf(f, "double");                  break;
-		// case Basic_f128:   ir_fprintf(f, "fp128");                   break;
-		case Basic_rawptr: ir_fprintf(f, "%%..rawptr");              break;
-		case Basic_string: ir_fprintf(f, "%%..string");              break;
-		case Basic_uint:   ir_fprintf(f, "i%lld", word_bits);        break;
-		case Basic_int:    ir_fprintf(f, "i%lld", word_bits);        break;
-		case Basic_any:    ir_fprintf(f, "%%..any");                 break;
+		case Basic_bool:   ir_fprintf(f, "i1");                      return;
+		case Basic_i8:     ir_fprintf(f, "i8");                      return;
+		case Basic_u8:     ir_fprintf(f, "i8");                      return;
+		case Basic_i16:    ir_fprintf(f, "i16");                     return;
+		case Basic_u16:    ir_fprintf(f, "i16");                     return;
+		case Basic_i32:    ir_fprintf(f, "i32");                     return;
+		case Basic_u32:    ir_fprintf(f, "i32");                     return;
+		case Basic_i64:    ir_fprintf(f, "i64");                     return;
+		case Basic_u64:    ir_fprintf(f, "i64");                     return;
+		// case Basic_i128:   ir_fprintf(f, "i128");                    return;
+		// case Basic_u128:   ir_fprintf(f, "i128");                    return;
+		// case Basic_f16:    ir_fprintf(f, "half");                    return;
+		case Basic_f32:    ir_fprintf(f, "float");                   return;
+		case Basic_f64:    ir_fprintf(f, "double");                  return;
+		// case Basic_f128:   ir_fprintf(f, "fp128");                   return;
+		case Basic_rawptr: ir_fprintf(f, "%%..rawptr");              return;
+		case Basic_string: ir_fprintf(f, "%%..string");              return;
+		case Basic_uint:   ir_fprintf(f, "i%lld", word_bits);        return;
+		case Basic_int:    ir_fprintf(f, "i%lld", word_bits);        return;
+		case Basic_any:    ir_fprintf(f, "%%..any");                 return;
 		}
 		break;
 	case Type_Pointer:
 		ir_print_type(f, m, t->Pointer.elem);
 		ir_fprintf(f, "*");
-		break;
+		return;
 	case Type_Maybe:
 		ir_fprintf(f, "{");
 		ir_print_type(f, m, t->Maybe.elem);
 		ir_fprintf(f, ", ");
 		ir_print_type(f, m, t_bool);
 		ir_fprintf(f, "}");
-		break;
+		return;
 	case Type_Array:
 		ir_fprintf(f, "[%lld x ", t->Array.count);
 		ir_print_type(f, m, t->Array.elem);
 		ir_fprintf(f, "]");
-		break;
+		return;
 	case Type_Vector:
 		ir_fprintf(f, "<%lld x ", t->Vector.count);
 		ir_print_type(f, m, t->Vector.elem);
 		ir_fprintf(f, ">");
-		break;
+		return;
 	case Type_Slice:
 		ir_fprintf(f, "{");
 		ir_print_type(f, m, t->Slice.elem);
 		ir_fprintf(f, "*, i%lld, i%lld}", word_bits, word_bits);
-		break;
+		return;
 	case Type_Record: {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct:
@@ -210,24 +211,24 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 			if (t->Record.struct_is_packed) {
 				ir_fprintf(f, ">");
 			}
-			break;
+			return;
 		case TypeRecord_Union: {
 			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
 			// LLVM takes the first element's alignment as the entire alignment (like C)
 			i64 size_of_union  = type_size_of(s, heap_allocator(), t) - s.word_size;
 			i64 align_of_union = type_align_of(s, heap_allocator(), t);
 			ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8], i%lld}", align_of_union, size_of_union, word_bits);
-		} break;
+		} return;
 		case TypeRecord_RawUnion: {
 			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
 			// LLVM takes the first element's alignment as the entire alignment (like C)
 			i64 size_of_union  = type_size_of(s, heap_allocator(), t);
 			i64 align_of_union = type_align_of(s, heap_allocator(), t);
 			ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align_of_union, size_of_union);
-		} break;
+		} return;
 		case TypeRecord_Enum:
 			ir_print_type(f, m, base_enum_type(t));
-			break;
+			return;
 		}
 	} break;
 
@@ -240,7 +241,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		} else {
 			ir_print_type(f, m, base_type(t));
 		}
-		break;
+		return;
 	case Type_Tuple:
 		if (t->Tuple.variable_count == 1) {
 			ir_print_type(f, m, t->Tuple.variables[0]->type);
@@ -254,7 +255,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 			}
 			ir_fprintf(f, "}");
 		}
-		break;
+		return;
 	case Type_Proc: {
 		if (t->Proc.result_count == 0) {
 			ir_fprintf(f, "void");
@@ -270,7 +271,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 			ir_print_type(f, m, params->variables[i]->type);
 		}
 		ir_fprintf(f, ")*");
-	} break;
+	} return;
 	}
 }
 
@@ -684,7 +685,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	} break;
 
 	case irInstr_Store: {
-		Type *type = ir_type(instr->Store.value);
+		Type *type = type_deref(ir_type(instr->Store.address));
 		ir_fprintf(f, "store ");
 		ir_print_type(f, m, type);
 		ir_fprintf(f, " ");

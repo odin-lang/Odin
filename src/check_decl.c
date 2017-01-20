@@ -40,6 +40,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 			}
 			t = default_type(t);
 		}
+		GB_ASSERT(is_type_typed(t));
 		e->type = t;
 	}
 

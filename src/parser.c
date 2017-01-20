@@ -1096,6 +1096,7 @@ AstNode *make_import_decl(AstFile *f, Token token, bool is_import, Token relpath
 
 
 bool next_token(AstFile *f) {
+	Token prev = f->curr_token;
 	if (f->curr_token_index+1 < f->tokens.count) {
 		if (f->curr_token.kind != Token_Comment) {
 			f->prev_token = f->curr_token;
@@ -1959,8 +1960,8 @@ AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 }
 
 // NOTE(bill): result == priority
-i32 token_precedence(Token t) {
-	switch (t.kind) {
+i32 token_precedence(TokenKind t) {
+	switch (t) {
 	case Token_CmpOr:
 		return 1;
 	case Token_CmpAnd:
@@ -1996,11 +1997,11 @@ i32 token_precedence(Token t) {
 
 AstNode *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 	AstNode *expression = parse_unary_expr(f, lhs);
-	for (i32 prec = token_precedence(f->curr_token); prec >= prec_in; prec--) {
+	for (i32 prec = token_precedence(f->curr_token.kind); prec >= prec_in; prec--) {
 		for (;;) {
 			AstNode *right;
 			Token op = f->curr_token;
-			i32 op_prec = token_precedence(op);
+			i32 op_prec = token_precedence(op.kind);
 			if (op_prec != prec) {
 				break;
 			}
@@ -2293,35 +2294,22 @@ AstNode *parse_var_type(AstFile *f, bool allow_ellipsis) {
 
 
 u32 parse_field_prefixes(AstFile *f) {
-	i32 using_count = 0;
-	i32 no_alias_count = 0;
+	i32 using_count     = 0;
+	i32 no_alias_count  = 0;
 	i32 immutable_count = 0;
 
-	while (f->curr_token.kind == Token_using ||
-	       f->curr_token.kind == Token_no_alias ||
-	       f->curr_token.kind == Token_immutable) {
-		if (allow_token(f, Token_using)) {
-			using_count += 1;
-		}
-		if (allow_token(f, Token_no_alias)) {
-			no_alias_count += 1;
-		}
-		if (allow_token(f, Token_immutable)) {
-			immutable_count += 1;
+	bool loop = true;
+	while (loop) {
+		switch (f->curr_token.kind) {
+		default: loop = false; break;
+		case Token_using:     using_count     += 1; next_token(f); break;
+		case Token_no_alias:  no_alias_count  += 1; next_token(f); break;
+		case Token_immutable: immutable_count += 1; next_token(f); break;
 		}
 	}
-	if (using_count > 1) {
-		syntax_error(f->curr_token, "Multiple `using` in this field list");
-		using_count = 1;
-	}
-	if (no_alias_count > 1) {
-		syntax_error(f->curr_token, "Multiple `no_alias` in this field list");
-		no_alias_count = 1;
-	}
-	if (immutable_count > 1) {
-		syntax_error(f->curr_token, "Multiple `immutable` in this field list");
-		immutable_count = 1;
-	}
+	if (using_count     > 1) syntax_error(f->curr_token, "Multiple `using` in this field list");
+	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple `no_alias` in this field list");
+	if (immutable_count > 1) syntax_error(f->curr_token, "Multiple `immutable` in this field list");
 
 
 	u32 field_flags = 0;
@@ -3095,16 +3083,14 @@ AstNode *parse_stmt(AstFile *f) {
 		case AstNode_ValueDecl:
 			if (!node->ValueDecl.is_var) {
 				syntax_error(token, "`using` may not be applied to constant declarations");
-				return make_bad_stmt(f, token, f->curr_token);
 			} else {
 				if (f->curr_proc == NULL) {
 					syntax_error(token, "`using` is not allowed at the file scope");
 				} else {
 					node->ValueDecl.flags |= VarDeclFlag_using;
 				}
-				return node;
 			}
-			break;
+			return node;
 		case AstNode_ExprStmt: {
 			AstNode *e = unparen_expr(node->ExprStmt.expr);
 			while (e->kind == AstNode_SelectorExpr) {
@@ -3127,11 +3113,10 @@ AstNode *parse_stmt(AstFile *f) {
 		if (node->kind == AstNode_ValueDecl) {
 			if (!node->ValueDecl.is_var) {
 				syntax_error(token, "`immutable` may not be applied to constant declarations");
-				return make_bad_stmt(f, token, f->curr_token);
 			} else {
 				node->ValueDecl.flags |= VarDeclFlag_immutable;
-				return node;
 			}
+			return node;
 		}
 		syntax_error(token, "`immutable` may only be applied to a variable declaration");
 		return make_bad_stmt(f, token, f->curr_token);
@@ -3144,7 +3129,6 @@ AstNode *parse_stmt(AstFile *f) {
 		if (node->kind == AstNode_ValueDecl) {
 			if (!node->ValueDecl.is_var) {
 				syntax_error(token, "`thread_local` may not be applied to constant declarations");
-				return make_bad_stmt(f, token, f->curr_token);
 			}
 			if (f->curr_proc != NULL) {
 				syntax_error(token, "`thread_local` is only allowed at the file scope");
