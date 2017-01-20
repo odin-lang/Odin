@@ -202,7 +202,7 @@ int main(int argc, char **argv) {
 	i32 exit_code = 0;
 	// For more passes arguments: http://llvm.org/docs/Passes.html
 	exit_code = win32_exec_command_line_app("llvm-opt", false,
-		"%.*sbin/opt %s -o %.*s.bc "
+		"\"%.*sbin/opt\" \"%s\" -o \"%.*s\".bc "
 		"-mem2reg "
 		"-memcpyopt "
 		"-die "
@@ -220,7 +220,7 @@ int main(int argc, char **argv) {
 	timings_start_section(&timings, str_lit("llvm-llc"));
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 	exit_code = win32_exec_command_line_app("llvm-llc", false,
-		"%.*sbin/llc %.*s.bc -filetype=obj -O%d "
+		"\"%.*sbin/llc\" \"%.*s.bc\" -filetype=obj -O%d "
 		"%.*s "
 		// "-debug-pass=Arguments "
 		"",
@@ -240,7 +240,7 @@ int main(int argc, char **argv) {
 	for_array(i, checker.info.foreign_libraries) {
 		String lib = checker.info.foreign_libraries.e[i];
 		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-		                        " %.*s.lib", LIT(lib));
+		                        " \"%.*s.lib\"", LIT(lib));
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);
 	}
 
@@ -254,7 +254,7 @@ int main(int argc, char **argv) {
 	}
 
 	exit_code = win32_exec_command_line_app("msvc-link", true,
-		"link %.*s.obj -OUT:%.*s.%s %s "
+		"link \"%.*s\".obj -OUT:\"%.*s.%s\" %s "
 		"/defaultlib:libcmt "
 		"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
 		" %.*s "

@@ -141,7 +141,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 	i64 word_bits = 8*s.word_size;
 	GB_ASSERT_NOT_NULL(t);
 	t = default_type(t);
-	// GB_ASSERT(is_type_typed(t));
+	GB_ASSERT(is_type_typed(t));
 
 	switch (t->kind) {
 	case Type_Basic:

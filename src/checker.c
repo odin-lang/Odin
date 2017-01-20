@@ -5,12 +5,13 @@ typedef enum AddressingMode {
 	Addressing_Invalid,
 
 	Addressing_NoValue,
-	Addressing_Value,
-	Addressing_Variable,
+	Addressing_Value,    // R-value
+	Addressing_Variable, // L-value
 	Addressing_Constant,
 	Addressing_Type,
 	Addressing_Builtin,
 	Addressing_Overload,
+
 	Addressing_Count,
 } AddressingMode;
 
