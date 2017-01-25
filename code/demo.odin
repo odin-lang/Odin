@@ -9,14 +9,8 @@
 #import "sync.odin";
 #import "utf8.odin";
 
-T :: struct { x, y: int };
-thread_local t: T;
 
 main :: proc() {
-	immutable using t := T{123, 321};
-	fmt.println(t);
-
-
 	// foo :: proc(x: ^i32) -> (int, int) {
 	// 	fmt.println("^int");
 	// 	return 123, int(x^);

@@ -156,11 +156,6 @@ struct irProcedure {
 		Type *    result_type; \
 		i32       elem_index; \
 	}) \
-	IR_INSTR_KIND(ArrayExtractValue, struct { \
-		irValue *address; \
-		Type *    result_type; \
-		i32       index; \
-	}) \
 	IR_INSTR_KIND(StructExtractValue, struct { \
 		irValue *address; \
 		Type *    result_type; \
@@ -550,8 +545,6 @@ Type *ir_instr_type(irInstr *instr) {
 		return ir_type(instr->PtrOffset.address);
 	case irInstr_Phi:
 		return instr->Phi.type;
-	case irInstr_ArrayExtractValue:
-		return instr->ArrayExtractValue.result_type;
 	case irInstr_StructExtractValue:
 		return instr->StructExtractValue.result_type;
 	case irInstr_UnionTagPtr:
@@ -850,17 +843,6 @@ irValue *ir_make_instr_ptr_offset(irProcedure *p, irValue *address, irValue *off
 }
 
 
-
-irValue *ir_make_instr_array_extract_value(irProcedure *p, irValue *address, i32 index) {
-	irValue *v = ir_alloc_instr(p, irInstr_ArrayExtractValue);
-	irInstr *i = &v->Instr;
-	i->ArrayExtractValue.address = address;
-	i->ArrayExtractValue.index = index;
-	Type *t = base_type(ir_type(address));
-	GB_ASSERT(is_type_array(t));
-	i->ArrayExtractValue.result_type = t->Array.elem;
-	return v;
-}
 
 irValue *ir_make_instr_struct_extract_value(irProcedure *p, irValue *address, i32 index, Type *result_type) {
 	irValue *v = ir_alloc_instr(p, irInstr_StructExtractValue);
@@ -1646,13 +1628,6 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 }
 
 
-
-irValue *ir_emit_array_ev(irProcedure *proc, irValue *s, i32 index) {
-	Type *st = base_type(ir_type(s));
-	GB_ASSERT(is_type_array(st));
-	return ir_emit(proc, ir_make_instr_array_extract_value(proc, s, index));
-}
-
 irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 	// NOTE(bill): For some weird legacy reason in LLVM, structure elements must be accessed as an i32
 
@@ -1913,6 +1888,12 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	Type *src = base_type(base_enum_type(src_type));
 	Type *dst = base_type(base_enum_type(t));
 
+
+	// if (is_type_untyped_nil(src) && type_has_nil(dst)) {
+	if (is_type_untyped_nil(src)) {
+		return ir_make_value_nil(proc->module->allocator, t);
+	}
+
 	if (value->kind == irValue_Constant) {
 		if (is_type_any(dst)) {
 			irValue *default_value = ir_add_local_generated(proc, default_type(src_type));
@@ -2145,10 +2126,6 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		ir_emit_store(proc, gep1, data);
 
 		return ir_emit_load(proc, result);
-	}
-
-	if (is_type_untyped_nil(src) && type_has_nil(dst)) {
-		return ir_make_value_nil(proc->module->allocator, t);
 	}
 
 
@@ -2718,13 +2695,38 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 		return v;
 	case_end;
 
+	case_ast_node(ce, CastExpr, expr);
+		Type *type = tv->type;
+		irValue *expr = ir_build_expr(proc, ce->expr);
+		switch (ce->token.kind) {
+		case Token_cast:
+			ir_emit_comment(proc, str_lit("cast - cast"));
+			return ir_emit_conv(proc, expr, type);
+
+		case Token_transmute:
+			ir_emit_comment(proc, str_lit("cast - transmute"));
+			return ir_emit_transmute(proc, expr, type);
+
+		case Token_down_cast:
+			ir_emit_comment(proc, str_lit("cast - down_cast"));
+			return ir_emit_down_cast(proc, expr, type);
+
+		case Token_union_cast:
+			ir_emit_comment(proc, str_lit("cast - union_cast"));
+			return ir_emit_union_cast(proc, expr, type);
+
+		default:
+			GB_PANIC("Unknown cast expression");
+		}
+	case_end;
+
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
 		case Token_Pointer:
 			return ir_emit_ptr_offset(proc, ir_build_addr(proc, ue->expr).addr, v_zero); // Make a copy of the pointer
 
-		case Token_Maybe:
-			return ir_emit_conv(proc, ir_build_expr(proc, ue->expr), type_of_expr(proc->module->info, expr));
+		// case Token_Maybe:
+			// return ir_emit_conv(proc, ir_build_expr(proc, ue->expr), type_of_expr(proc->module->info, expr));
 
 		case Token_Add:
 			return ir_build_expr(proc, ue->expr);
@@ -2843,24 +2845,6 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 					Type *t = default_type(type_of_expr(proc->module->info, ce->args.e[0]));
 					return ir_type_info(proc, t);
 				} break;
-
-				case BuiltinProc_transmute: {
-					irValue *val = ir_build_expr(proc, ce->args.e[1]);
-					ir_emit_comment(proc, str_lit("cast - transmute"));
-					return ir_emit_transmute(proc, val, type_of_expr(proc->module->info, ce->args.e[0]));
-				}
-
-				case BuiltinProc_down_cast: {
-					irValue *val = ir_build_expr(proc, ce->args.e[1]);
-					ir_emit_comment(proc, str_lit("cast - down_cast"));
-					return ir_emit_down_cast(proc, val, type_of_expr(proc->module->info, ce->args.e[0]));
-				}
-
-				case BuiltinProc_union_cast: {
-					irValue *val = ir_build_expr(proc, ce->args.e[1]);
-					ir_emit_comment(proc, str_lit("cast - union_cast"));
-					return ir_emit_union_cast(proc, val, type_of_expr(proc->module->info, ce->args.e[0]));
-				}
 
 				case BuiltinProc_new: {
 					ir_emit_comment(proc, str_lit("new"));
@@ -3402,6 +3386,29 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			irValue *a = ir_build_addr(proc, se->expr).addr;
 			a = ir_emit_deep_field_gep(proc, type, a, sel);
 			return ir_make_addr(a, expr);
+		}
+	case_end;
+
+	case_ast_node(ce, CastExpr, expr);
+		switch (ce->token.kind) {
+		case Token_cast: {
+			ir_emit_comment(proc, str_lit("Cast - cast"));
+			// NOTE(bill): Needed for dereference of pointer conversion
+			Type *type = type_of_expr(proc->module->info, expr);
+			irValue *v = ir_add_local_generated(proc, type);
+			ir_emit_store(proc, v, ir_emit_conv(proc, ir_build_expr(proc, ce->expr), type));
+			return ir_make_addr(v, expr);
+		}
+		case Token_transmute: {
+			ir_emit_comment(proc, str_lit("Cast - transmute"));
+			// NOTE(bill): Needed for dereference of pointer conversion
+			Type *type = type_of_expr(proc->module->info, expr);
+			irValue *v = ir_add_local_generated(proc, type);
+			ir_emit_store(proc, v, ir_emit_transmute(proc, ir_build_expr(proc, ce->expr), type));
+			return ir_make_addr(v, expr);
+		}
+		default:
+			GB_PANIC("Unknown cast expression");
 		}
 	case_end;
 
@@ -5304,9 +5311,8 @@ void ir_gen_tree(irGen *s) {
 
 		case Entity_Variable: {
 			irValue *g = ir_make_value_global(a, e, NULL);
-			if (decl->var_decl_flags & VarDeclFlag_thread_local) {
-				g->Global.is_thread_local = true;
-			}
+			g->Global.is_thread_local = e->Variable.is_thread_local;
+
 			irGlobalVariable var = {0};
 			var.var = g;
 			var.decl = decl;
@@ -5509,6 +5515,7 @@ void ir_gen_tree(irGen *s) {
 		map_ir_value_set(&m->values, hash_pointer(e), p);
 		map_ir_value_set(&m->members, hash_string(name), p);
 
+
 		irProcedure *proc = &p->Proc;
 		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
 
@@ -5556,6 +5563,18 @@ void ir_gen_tree(irGen *s) {
 			type_info_member_data = *found;
 
 			CheckerInfo *info = proc->module->info;
+
+			if (false) {
+				irValue *global_type_infos = ir_find_global_variable(proc, str_lit("__type_infos"));
+				Type *type = base_type(type_deref(ir_type(type_info_data)));
+				GB_ASSERT(is_type_array(type));
+				irValue *array_data  = ir_emit_array_epi(proc, type_info_data, 0);
+				irValue *array_count = ir_make_const_int(proc->module->allocator, type->Array.count);
+
+				ir_emit_store(proc, ir_emit_struct_ep(proc, global_type_infos, 0), array_data);
+				ir_emit_store(proc, ir_emit_struct_ep(proc, global_type_infos, 1), array_count);
+			}
+
 
 			// Useful types
 			Type *t_i64_slice_ptr    = make_type_pointer(a, make_type_slice(a, t_i64));

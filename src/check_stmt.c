@@ -1232,12 +1232,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 
 	case_ast_node(vd, ValueDecl, node);
+		GB_ASSERT(!c->context.scope->is_file);
 		if (vd->is_var) {
 			Entity **entities = gb_alloc_array(c->allocator, Entity *, vd->names.count);
 			isize entity_count = 0;
 
-			if (vd->flags&VarDeclFlag_thread_local &&
-			    !c->context.scope->is_file) {
+			if (vd->flags & VarDeclFlag_thread_local) {
+				vd->flags &= ~VarDeclFlag_thread_local;
 				error_node(node, "`thread_local` may only be applied to a variable declaration");
 			}
 
@@ -1256,7 +1257,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					}
 					if (found == NULL) {
 						entity = make_entity_variable(c->allocator, c->context.scope, token, NULL, vd->flags&VarDeclFlag_immutable);
-						add_entity_definition(&c->info, name, entity);
+						entity->identifier = name;
 					} else {
 						TokenPos pos = found->token.pos;
 						error(token,
@@ -1297,10 +1298,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			check_arity_match(c, vd);
 			check_init_variables(c, entities, entity_count, vd->values, str_lit("variable declaration"));
 
-			for_array(i, vd->names) {
-				if (entities[i] != NULL) {
-					add_entity(c, c->context.scope, vd->names.e[i], entities[i]);
-				}
+			for (isize i = 0; i < entity_count; i++) {
+				add_entity(c, c->context.scope, entities[i]->identifier, entities[i]);
 			}
 
 			if ((vd->flags & VarDeclFlag_using) != 0) {
@@ -1315,13 +1314,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					if (e == NULL) {
 						continue;
 					}
-					bool is_immutable = false;
-					if (e->kind == Entity_Variable) {
-						is_immutable = e->Variable.is_immutable;
+					if (e->kind != Entity_Variable) {
+						continue;
 					}
-
+					bool is_immutable = e->Variable.is_immutable;
 					String name = e->token.string;
 					Type *t = base_type(type_deref(e->type));
+
 					if (is_type_struct(t) || is_type_raw_union(t)) {
 						Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
 						GB_ASSERT(found != NULL);

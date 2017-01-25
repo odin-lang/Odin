@@ -66,6 +66,7 @@ struct Entity {
 			i32  field_index;
 			i32  field_src_index;
 			bool is_immutable;
+			bool is_thread_local;
 		} Variable;
 		i32 TypeName;
 		struct {
@@ -111,6 +112,7 @@ Entity *make_entity_variable(gbAllocator a, Scope *scope, Token token, Type *typ
 
 Entity *make_entity_using_variable(gbAllocator a, Entity *parent, Token token, Type *type) {
 	GB_ASSERT(parent != NULL);
+	token.pos = parent->token.pos;
 	Entity *entity = alloc_entity(a, Entity_Variable, parent->scope, token, type);
 	entity->using_parent = parent;
 	entity->flags |= EntityFlag_Anonymous;
@@ -132,7 +134,7 @@ Entity *make_entity_type_name(gbAllocator a, Scope *scope, Token token, Type *ty
 Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, bool anonymous, bool is_immutable) {
 	Entity *entity = make_entity_variable(a, scope, token, type, is_immutable);
 	entity->flags |= EntityFlag_Used;
-	entity->flags |= EntityFlag_Anonymous*(anonymous != 0);
+	if (anonymous) entity->flags |= EntityFlag_Anonymous;
 	entity->flags |= EntityFlag_Param;
 	return entity;
 }

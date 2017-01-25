@@ -42,14 +42,24 @@ lerp :: proc(a, b, t: f64) -> f64 { return a*(1-t) + b*t; }
 sign :: proc(x: f32) -> f32 { if x >= 0 { return +1; } return -1; }
 sign :: proc(x: f64) -> f64 { if x >= 0 { return +1; } return -1; }
 
+bit_reverse :: proc(b: u16) -> u16 #foreign "llvm.bitreverse.i16"
+bit_reverse :: proc(b: u32) -> u32 #foreign "llvm.bitreverse.i32"
+bit_reverse :: proc(b: u64) -> u64 #foreign "llvm.bitreverse.i64"
+
+byte_swap :: proc(b: u16) -> u16 #foreign "llvm.bswap.i16"
+byte_swap :: proc(b: u32) -> u32 #foreign "llvm.bswap.i32"
+byte_swap :: proc(b: u64) -> u64 #foreign "llvm.bswap.i64"
+
+fmuladd :: proc(a, b, c: f32) -> f32 #foreign "llvm.fmuladd.f32"
+fmuladd :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
 
 
 copy_sign :: proc(x, y: f32) -> f32 {
-	ix := transmute(u32, x);
-	iy := transmute(u32, y);
+	ix := transmute(u32)x;
+	iy := transmute(u32)y;
 	ix &= 0x7fffffff;
 	ix |= iy & 0x80000000;
-	return transmute(f32, ix);
+	return transmute(f32)ix;
 }
 round :: proc(x: f32) -> f32 {
 	if x >= 0 {
@@ -59,15 +69,15 @@ round :: proc(x: f32) -> f32 {
 }
 floor :: proc(x: f32) -> f32 {
 	if x >= 0 {
-		return f32(int(x));
+		return cast(f32)cast(int)x;
 	}
-	return f32(int(x-0.5));
+	return cast(f32)cast(int)(x-0.5);
 }
 ceil :: proc(x: f32) -> f32 {
 	if x < 0 {
-		return f32(int(x));
+		return cast(f32)cast(int)x;
 	}
-	return f32(int(x)+1);
+	return cast(f32)cast(int)(x+1);
 }
 
 remainder32 :: proc(x, y: f32) -> f32 {

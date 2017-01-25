@@ -790,16 +790,6 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_fprintf(f, "\n");
 	} break;
 
-	case irInstr_ArrayExtractValue: {
-		Type *et = ir_type(instr->ArrayExtractValue.address);
-		ir_fprintf(f, "%%%d = extractvalue ", value->index);
-
-		ir_print_type(f, m, et);
-		ir_fprintf(f, " ");
-		ir_print_value(f, m, instr->ArrayExtractValue.address, et);
-		ir_fprintf(f, ", %d\n", instr->ArrayExtractValue.index);
-	} break;
-
 	case irInstr_StructExtractValue: {
 		Type *et = ir_type(instr->StructExtractValue.address);
 		ir_fprintf(f, "%%%d = extractvalue ", value->index);

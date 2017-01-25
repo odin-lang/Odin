@@ -142,17 +142,26 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 	AST_NODE_KIND(IndexExpr,    "index expression",       struct { AstNode *expr, *index; Token open, close; }) \
 	AST_NODE_KIND(DerefExpr,    "dereference expression", struct { Token op; AstNode *expr; }) \
 	AST_NODE_KIND(DemaybeExpr,  "demaybe expression",     struct { Token op; AstNode *expr; }) \
-	AST_NODE_KIND(CallExpr,     "call expression", struct { \
-		AstNode *proc; \
-		AstNodeArray args; \
-		Token open, close; \
-		Token ellipsis; \
-	}) \
 	AST_NODE_KIND(SliceExpr, "slice expression", struct { \
 		AstNode *expr; \
 		Token open, close; \
 		AstNode *low, *high; \
 	}) \
+	AST_NODE_KIND(CallExpr,     "call expression", struct { \
+		AstNode *    proc; \
+		AstNodeArray args; \
+		Token        open; \
+		Token        close; \
+		Token        ellipsis; \
+	}) \
+	AST_NODE_KIND(MacroCallExpr, "macro call expression", struct { \
+		AstNode *    macro; \
+		Token        bang; \
+		AstNodeArray args; \
+		Token        open; \
+		Token        close; \
+	}) \
+	AST_NODE_KIND(CastExpr, "cast expression", struct { Token token; AstNode *type, *expr; Token open, close; }) \
 	AST_NODE_KIND(FieldValue, "field value", struct { Token eq; AstNode *field, *value; }) \
 	AST_NODE_KIND(BlockExpr, "block expr", struct { \
 		AstNodeArray stmts; \
@@ -436,6 +445,8 @@ Token ast_node_token(AstNode *node) {
 		return node->ParenExpr.open;
 	case AstNode_CallExpr:
 		return ast_node_token(node->CallExpr.proc);
+	case AstNode_MacroCallExpr:
+		return ast_node_token(node->MacroCallExpr.macro);
 	case AstNode_SelectorExpr:
 		if (node->SelectorExpr.selector != NULL) {
 			return ast_node_token(node->SelectorExpr.selector);
@@ -447,6 +458,8 @@ Token ast_node_token(AstNode *node) {
 		return node->SliceExpr.open;
 	case AstNode_Ellipsis:
 		return node->Ellipsis.token;
+	case AstNode_CastExpr:
+		return node->CastExpr.token;
 	case AstNode_FieldValue:
 		return node->FieldValue.eq;
 	case AstNode_DerefExpr:
@@ -655,13 +668,24 @@ AstNode *make_paren_expr(AstFile *f, AstNode *expr, Token open, Token close) {
 
 AstNode *make_call_expr(AstFile *f, AstNode *proc, AstNodeArray args, Token open, Token close, Token ellipsis) {
 	AstNode *result = make_node(f, AstNode_CallExpr);
-	result->CallExpr.proc = proc;
-	result->CallExpr.args = args;
+	result->CallExpr.proc     = proc;
+	result->CallExpr.args     = args;
 	result->CallExpr.open     = open;
 	result->CallExpr.close    = close;
 	result->CallExpr.ellipsis = ellipsis;
 	return result;
 }
+
+AstNode *make_macro_call_expr(AstFile *f, AstNode *macro, Token bang, AstNodeArray args, Token open, Token close) {
+	AstNode *result = make_node(f, AstNode_MacroCallExpr);
+	result->MacroCallExpr.macro = macro;
+	result->MacroCallExpr.bang  = bang;
+	result->MacroCallExpr.args  = args;
+	result->MacroCallExpr.open  = open;
+	result->MacroCallExpr.close = close;
+	return result;
+}
+
 
 AstNode *make_selector_expr(AstFile *f, Token token, AstNode *expr, AstNode *selector) {
 	AstNode *result = make_node(f, AstNode_SelectorExpr);
@@ -752,6 +776,16 @@ AstNode *make_field_value(AstFile *f, AstNode *field, AstNode *value, Token eq) 
 	result->FieldValue.field = field;
 	result->FieldValue.value = value;
 	result->FieldValue.eq = eq;
+	return result;
+}
+
+AstNode *make_cast_expr(AstFile *f, Token token, AstNode *type, AstNode *expr, Token open, Token close) {
+	AstNode *result = make_node(f, AstNode_CastExpr);
+	result->CastExpr.token = token;
+	result->CastExpr.type = type;
+	result->CastExpr.expr = expr;
+	result->CastExpr.open = open;
+	result->CastExpr.close = close;
 	return result;
 }
 
@@ -1774,8 +1808,12 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		return type;
 	}
 
-	case Token_OpenBrace: return parse_block_expr(f);
-	case Token_if:        return parse_if_expr(f);
+	case Token_if:
+		if (lhs) goto error;
+		return parse_if_expr(f);
+	case Token_OpenBrace:
+		if (lhs) goto error;
+		return parse_block_expr(f);
 
 	default: {
 		AstNode *type = parse_identifier_or_type(f);
@@ -1790,6 +1828,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	}
 	}
 
+error:
 	Token begin = f->curr_token;
 	syntax_error(begin, "Expected an operand");
 	fix_advance_to_next_stmt(f);
@@ -1844,6 +1883,36 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 	return make_call_expr(f, operand, args, open_paren, close_paren, ellipsis);
 }
 
+
+AstNode *parse_macro_call_expr(AstFile *f, AstNode *operand) {
+	AstNodeArray args = make_ast_node_array(f);
+	Token bang, open_paren, close_paren;
+
+	bang = expect_token(f, Token_Not);
+
+	f->expr_level++;
+	open_paren = expect_token(f, Token_OpenParen);
+
+	while (f->curr_token.kind != Token_CloseParen &&
+	       f->curr_token.kind != Token_EOF) {
+		if (f->curr_token.kind == Token_Comma) {
+			syntax_error(f->curr_token, "Expected an expression not a ,");
+		}
+
+		AstNode *arg = parse_expr(f, false);
+		array_add(&args, arg);
+
+		if (!allow_token(f, Token_Comma)) {
+			break;
+		}
+	}
+
+	f->expr_level--;
+	close_paren = expect_closing(f, Token_CloseParen, str_lit("argument list"));
+
+	return make_macro_call_expr(f, operand, bang, args, open_paren, close_paren);
+}
+
 AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 	AstNode *operand = parse_operand(f, lhs);
 
@@ -1852,6 +1921,9 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 		switch (f->curr_token.kind) {
 		case Token_OpenParen:
 			operand = parse_call_expr(f, operand);
+			break;
+		case Token_Not:
+			operand = parse_macro_call_expr(f, operand);
 			break;
 
 		case Token_Period: {
@@ -1936,6 +2008,20 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 
 AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 	switch (f->curr_token.kind) {
+
+	case Token_cast:
+	case Token_transmute:
+	case Token_down_cast:
+	case Token_union_cast:
+	{
+		Token token = f->curr_token; next_token(f);
+		Token open = expect_token(f, Token_OpenParen);
+		AstNode *type = parse_type(f);
+		Token close = expect_token(f, Token_CloseParen);
+		AstNode *expr = parse_unary_expr(f, lhs);
+		return make_cast_expr(f, token, type, expr, open, close);
+	} break;
+
 	case Token_Pointer: {
 		Token op = f->curr_token;
 		next_token(f);
@@ -1945,7 +2031,7 @@ AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 		}
 		return make_unary_expr(f, op, expr);
 	} break;
-	case Token_Maybe:
+	// case Token_Maybe:
 	case Token_Add:
 	case Token_Sub:
 	case Token_Not:
@@ -2432,10 +2518,10 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 			AstNode *sel = parse_identifier(f);
 			e = make_selector_expr(f, token, e, sel);
 		}
-		// if (f->curr_token.kind == Token_OpenParen) {
-		// 	// HACK NOTE(bill): For type_of_val(expr)
-		// 	e = parse_call_expr(f, e);
-		// }
+		if (f->curr_token.kind == Token_OpenParen) {
+			// HACK NOTE(bill): For type_of_val(expr) et al.
+			e = parse_call_expr(f, e);
+		}
 		return e;
 	}
 
@@ -2464,8 +2550,7 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		bool is_vector = false;
 
 		if (f->curr_token.kind == Token_Ellipsis) {
-			count_expr = make_ellipsis(f, f->curr_token, NULL);
-			next_token(f);
+			count_expr = make_ellipsis(f, expect_token(f, Token_Ellipsis), NULL);
 		} else if (f->curr_token.kind == Token_vector) {
 			next_token(f);
 			if (f->curr_token.kind != Token_CloseBracket) {

@@ -92,6 +92,7 @@ int main(int argc, char **argv) {
 	timings_init(&timings, str_lit("Total Time"), 128);
 	// defer (timings_destroy(&timings));
 	init_string_buffer_memory();
+	init_scratch_memory(gb_megabytes(10));
 	init_global_error_collector();
 
 #if 1
@@ -234,7 +235,7 @@ int main(int argc, char **argv) {
 
 	timings_start_section(&timings, str_lit("msvc-link"));
 
-	gbString lib_str = gb_string_make(heap_allocator(), "Kernel32.lib");
+	gbString lib_str = gb_string_make(heap_allocator(), "\"Kernel32.lib\"");
 	// defer (gb_string_free(lib_str));
 	char lib_str_buf[1024] = {0};
 	for_array(i, checker.info.foreign_libraries) {

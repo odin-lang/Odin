@@ -91,6 +91,10 @@ Type_Info :: union {
 	},
 }
 
+// // NOTE(bill): only the ones that are needed (not all types)
+// // This will be set by the compiler
+// immutable __type_infos: []Type_Info;
+
 type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 	if info == nil {
 		return nil;
@@ -110,21 +114,6 @@ assume :: proc(cond: bool) #foreign "llvm.assume"
 __debug_trap       :: proc()        #foreign "llvm.debugtrap"
 __trap             :: proc()        #foreign "llvm.trap"
 read_cycle_counter :: proc() -> u64 #foreign "llvm.readcyclecounter"
-
-bit_reverse :: proc(b: u16) -> u16 #foreign "llvm.bitreverse.i16"
-bit_reverse :: proc(b: u32) -> u32 #foreign "llvm.bitreverse.i32"
-bit_reverse :: proc(b: u64) -> u64 #foreign "llvm.bitreverse.i64"
-
-byte_swap :: proc(b: u16) -> u16 #foreign "llvm.bswap.i16"
-byte_swap :: proc(b: u32) -> u32 #foreign "llvm.bswap.i32"
-byte_swap :: proc(b: u64) -> u64 #foreign "llvm.bswap.i64"
-
-fmuladd :: proc(a, b, c: f32) -> f32 #foreign "llvm.fmuladd.f32"
-fmuladd :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
-
-
-
-
 
 
 Allocator_Mode :: enum u8 {
@@ -297,11 +286,11 @@ __string_eq :: proc(a, b: string) -> bool {
 	if a.data == b.data {
 		return true;
 	}
-	return mem.compare(rawptr(a.data), rawptr(b.data), a.count) == 0;
+	return mem.compare(cast(rawptr)a.data, cast(rawptr)b.data, a.count) == 0;
 }
 
 __string_cmp :: proc(a, b: string) -> int {
-	return mem.compare(rawptr(a.data), rawptr(b.data), min(a.count, b.count));
+	return mem.compare(cast(rawptr)a.data, cast(rawptr)b.data, min(a.count, b.count));
 }
 
 __string_ne :: proc(a, b: string) -> bool #inline { return !__string_eq(a, b); }

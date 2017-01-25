@@ -27,9 +27,6 @@ void ir_opt_add_operands(irValueArray *ops, irInstr *i) {
 		array_add(ops, i->PtrOffset.address);
 		array_add(ops, i->PtrOffset.offset);
 		break;
-	case irInstr_ArrayExtractValue:
-		array_add(ops, i->ArrayExtractValue.address);
-		break;
 	case irInstr_StructExtractValue:
 		array_add(ops, i->StructExtractValue.address);
 		break;

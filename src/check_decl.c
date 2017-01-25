@@ -372,8 +372,6 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	GB_ASSERT(e->type == NULL);
 	GB_ASSERT(e->kind == Entity_Variable);
 
-	u32 flags = c->context.decl->var_decl_flags;
-
 	if (e->flags & EntityFlag_Visited) {
 		e->type = t_invalid;
 		return;

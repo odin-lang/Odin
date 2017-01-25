@@ -62,7 +62,6 @@ typedef struct DeclInfo {
 	AstNode *type_expr;
 	AstNode *init_expr;
 	AstNode *proc_lit; // AstNode_ProcLit
-	u32      var_decl_flags;
 
 	MapBool deps; // Key: Entity *
 } DeclInfo;
@@ -136,10 +135,6 @@ typedef enum BuiltinProcId {
 	BuiltinProc_type_info,
 	BuiltinProc_type_info_of_val,
 
-	BuiltinProc_transmute,
-	BuiltinProc_union_cast,
-	BuiltinProc_down_cast,
-
 	BuiltinProc_compile_assert,
 	BuiltinProc_assert,
 	BuiltinProc_panic,
@@ -182,10 +177,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 
 	{STR_LIT("type_info"),        1, false, Expr_Expr},
 	{STR_LIT("type_info_of_val"), 1, false, Expr_Expr},
-
-	{STR_LIT("transmute"),        2, false, Expr_Expr},
-	{STR_LIT("union_cast"),       2, false, Expr_Expr},
-	{STR_LIT("down_cast"),        2, false, Expr_Expr},
 
 	{STR_LIT("compile_assert"),   1, false, Expr_Stmt},
 	{STR_LIT("assert"),           1, false, Expr_Stmt},
@@ -524,8 +515,6 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	Entity *prev = NULL;
 	if (found) {
 		prev = *found;
-		GB_ASSERT(prev != entity);
-
 		if (prev->kind != Entity_Procedure &&
 		    entity->kind != Entity_Procedure) {
 			return prev;
@@ -533,6 +522,9 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	}
 
 	if (prev != NULL && entity->kind == Entity_Procedure) {
+		if (s->is_global) {
+			return prev;
+		}
 		map_entity_multi_insert(&s->elements, key, entity);
 	} else {
 		map_entity_set(&s->elements, key, entity);
@@ -797,10 +789,15 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 	String name = entity->token.string;
 	if (!str_eq(name, str_lit("_"))) {
-		Entity *insert_entity = scope_insert_entity(scope, entity);
-		if (insert_entity) {
-			Entity *up = insert_entity->using_parent;
+		Entity *ie = scope_insert_entity(scope, entity);
+		if (ie) {
+			TokenPos pos = ie->token.pos;
+			Entity *up = ie->using_parent;
 			if (up != NULL) {
+				if (token_pos_eq(pos, up->token.pos)) {
+					// NOTE(bill): Error should have been handled already
+					return false;
+				}
 				error(entity->token,
 				      "Redeclararation of `%.*s` in this scope through `using`\n"
 				      "\tat %.*s(%td:%td)",
@@ -808,7 +805,6 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 				      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
 				return false;
 			} else {
-				TokenPos pos = insert_entity->token.pos;
 				if (token_pos_eq(pos, entity->token.pos)) {
 					// NOTE(bill): Error should have been handled already
 					return false;
@@ -1374,14 +1370,13 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 					break;
 				}
 				// NOTE(bill): You need to store the entity information here unline a constant declaration
-				isize entity_count = vd->names.count;
-				isize entity_index = 0;
-				Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_count);
+				isize entity_cap = vd->names.count;
+				isize entity_count = 0;
+				Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_cap);
 				DeclInfo *di = NULL;
 				if (vd->values.count > 0) {
 					di = make_declaration_info(heap_allocator(), c->context.scope);
 					di->entities = entities;
-					di->entity_count = entity_count;
 					di->type_expr = vd->type;
 					di->init_expr = vd->values.e[0];
 				}
@@ -1396,13 +1391,14 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 						error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 						continue;
 					}
-					Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL, vd->flags&VarDeclFlag_immutable);
+					Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL, vd->flags & VarDeclFlag_immutable);
+					e->Variable.is_thread_local = vd->flags & VarDeclFlag_thread_local;
 					e->identifier = name;
-					if (vd->flags&VarDeclFlag_using) {
+					if (vd->flags & VarDeclFlag_using) {
 						vd->flags &= ~VarDeclFlag_using; // NOTE(bill): This error will be only caught once
 						error_node(name, "`using` is not allowed at the file scope");
 					}
-					entities[entity_index++] = e;
+					entities[entity_count++] = e;
 
 					DeclInfo *d = di;
 					if (d == NULL) {
@@ -1410,10 +1406,13 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 						d = make_declaration_info(heap_allocator(), e->scope);
 						d->type_expr = vd->type;
 						d->init_expr = init_expr;
-						d->var_decl_flags = vd->flags;
 					}
 
 					add_entity_and_decl_info(c, name, e, d);
+				}
+
+				if (di != NULL) {
+					di->entity_count = entity_count;
 				}
 
 				check_arity_match(c, vd);
@@ -1434,14 +1433,14 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 					Entity *e = NULL;
 
 					AstNode *up_init = unparen_expr(init);
-					if (init != NULL && is_ast_node_type(up_init)) {
+					if (up_init != NULL && is_ast_node_type(up_init)) {
 						e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
 						// TODO(bill): What if vd->type != NULL??? How to handle this case?
 						d->type_expr = init;
 						d->init_expr = init;
 					} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
 						e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
-						d->proc_lit = init;
+						d->proc_lit = up_init;
 						d->type_expr = vd->type;
 					} else {
 						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, (ExactValue){0});
@@ -1474,7 +1473,11 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 		case_end;
 		case_ast_node(fl, ForeignLibrary, decl);
 			if (!c->context.scope->is_file) {
-				error_node(decl, "#foreign_library declarations are only allowed in the file scope");
+				if (fl->is_system) {
+					error_node(decl, "#foreign_system_library declarations are only allowed in the file scope");
+				} else {
+					error_node(decl, "#foreign_library declarations are only allowed in the file scope");
+				}
 				// NOTE(bill): _Should_ be caught by the parser
 				// TODO(bill): Better error handling if it isn't
 				continue;

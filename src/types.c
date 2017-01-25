@@ -509,6 +509,7 @@ bool is_type_numeric(Type *t) {
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Numeric) != 0;
 	}
+	// TODO(bill): Should this be here?
 	if (t->kind == Type_Vector) {
 		return is_type_numeric(t->Vector.elem);
 	}
@@ -1851,8 +1852,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 
 gbString type_to_string(Type *type) {
-	gbString str = gb_string_make(gb_heap_allocator(), "");
-	return write_type_to_string(str, type);
+	return write_type_to_string(gb_string_make(heap_allocator(), ""), type);
 }
 
 

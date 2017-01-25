@@ -111,6 +111,10 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_asm,            "asm"), \
 	TOKEN_KIND(Token_push_allocator, "push_allocator"), \
 	TOKEN_KIND(Token_push_context,   "push_context"), \
+	TOKEN_KIND(Token_cast,           "cast"), \
+	TOKEN_KIND(Token_transmute,      "transmute"), \
+	TOKEN_KIND(Token_down_cast,      "down_cast"), \
+	TOKEN_KIND(Token_union_cast,     "union_cast"), \
 TOKEN_KIND(Token__KeywordEnd, "_KeywordEnd"), \
 	TOKEN_KIND(Token_Count, "")
 
@@ -149,7 +153,6 @@ bool token_pos_eq(TokenPos a, TokenPos b) {
 	return token_pos_cmp(a, b) == 0;
 }
 
-// NOTE(bill): Text is UTF-8, thus why u8 and not char
 typedef struct Token {
 	TokenKind kind;
 	String string;

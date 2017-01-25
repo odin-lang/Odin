@@ -1,58 +1,58 @@
 crc32 :: proc(data: rawptr, len: int) -> u32 {
-	result := ~u32(0);
-	s := slice_ptr((^u8)(data), len);
+	result := ~cast(u32)0;
+	s := slice_ptr(cast(^u8)data, len);
 	for i : 0..<len {
-		b := u32(s[i]);
+		b := cast(u32)s[i];
 		result = result>>8 ~ __CRC32_TABLE[(result ~ b) & 0xff];
 	}
 	return ~result;
 }
 crc64 :: proc(data: rawptr, len: int) -> u64 {
-	result := ~u64(0);
-	s := slice_ptr((^u8)(data), len);
+	result := ~cast(u64)0;
+	s := slice_ptr(cast(^u8)data, len);
 	for i : 0..<len {
-		b := u64(s[i]);
+		b := cast(u64)s[i];
 		result = result>>8 ~ __CRC64_TABLE[(result ~ b) & 0xff];
 	}
 	return ~result;
 }
 
 fnv32 :: proc(data: rawptr, len: int) -> u32 {
-	s := slice_ptr((^u8)(data), len);
+	s := slice_ptr(cast(^u8)data, len);
 
 	h: u32 = 0x811c9dc5;
 	for i : 0..<len {
-		h = (h * 0x01000193) ~ u32(s[i]);
+		h = (h * 0x01000193) ~ cast(u32)s[i];
 	}
 	return h;
 }
 
 fnv64 :: proc(data: rawptr, len: int) -> u64 {
-	s := slice_ptr((^u8)(data), len);
+	s := slice_ptr(cast(^u8)data, len);
 
 	h: u64 = 0xcbf29ce484222325;
 	for i : 0..<len {
-		h = (h * 0x100000001b3) ~ u64(s[i]);
+		h = (h * 0x100000001b3) ~ cast(u64)s[i];
 	}
 	return h;
 }
 
 fnv32a :: proc(data: rawptr, len: int) -> u32 {
-	s := slice_ptr((^u8)(data), len);
+	s := slice_ptr(cast(^u8)data, len);
 
 	h: u32 = 0x811c9dc5;
 	for i : 0..<len {
-		h = (h ~ u32(s[i])) * 0x01000193;
+		h = (h ~ cast(u32)s[i]) * 0x01000193;
 	}
 	return h;
 }
 
 fnv64a :: proc(data: rawptr, len: int) -> u64 {
-	s := slice_ptr((^u8)(data), len);
+	s := slice_ptr(cast(^u8)data, len);
 
 	h :u64 = 0xcbf29ce484222325;
 	for i : 0..<len {
-		h = (h ~ u64(s[i])) * 0x100000001b3;
+		h = (h ~ cast(u64)s[i]) * 0x100000001b3;
 	}
 	return h;
 }
@@ -65,10 +65,10 @@ murmur64 :: proc(data_: rawptr, len: int) -> u64 {
 		m :: 0xc6a4a7935bd1e995;
 		r :: 47;
 
-		h: u64 = SEED ~ (u64(len) * m);
+		h: u64 = SEED ~ (cast(u64)len * m);
 
-		data := slice_ptr((^u64)(data_), len/size_of(u64));
-		data2 := slice_ptr((^u8)(data_), len);
+		data := slice_ptr(cast(^u64)data_, len/size_of(u64));
+		data2 := slice_ptr(cast(^u8)data_, len);
 
 		for i : 0 ..< data.count {
 			k := data[i];
@@ -82,14 +82,14 @@ murmur64 :: proc(data_: rawptr, len: int) -> u64 {
 		}
 
 		match len & 7 {
-		case 7: h ~= u64(data2[6]) << 48; fallthrough;
-		case 6: h ~= u64(data2[5]) << 40; fallthrough;
-		case 5: h ~= u64(data2[4]) << 32; fallthrough;
-		case 4: h ~= u64(data2[3]) << 24; fallthrough;
-		case 3: h ~= u64(data2[2]) << 16; fallthrough;
-		case 2: h ~= u64(data2[1]) << 8;  fallthrough;
+		case 7: h ~= cast(u64)data2[6] << 48; fallthrough;
+		case 6: h ~= cast(u64)data2[5] << 40; fallthrough;
+		case 5: h ~= cast(u64)data2[4] << 32; fallthrough;
+		case 4: h ~= cast(u64)data2[3] << 24; fallthrough;
+		case 3: h ~= cast(u64)data2[2] << 16; fallthrough;
+		case 2: h ~= cast(u64)data2[1] << 8;  fallthrough;
 		case 1:
-			h ~= u64(data2[0]);
+			h ~= cast(u64)data2[0];
 			h *= m;
 		}
 
@@ -102,10 +102,10 @@ murmur64 :: proc(data_: rawptr, len: int) -> u64 {
 		m :: 0x5bd1e995;
 		r :: 24;
 
-		h1: u32 = u32(SEED) ~ u32(len);
+		h1: u32 = cast(u32)SEED ~ cast(u32)len;
 		h2: u32 = SEED >> 32;
 
-		data := slice_ptr((^u32)(data_), len/size_of(u32));
+		data := slice_ptr(cast(^u32)data_, len/size_of(u32));
 
 		i := 0;
 		while len >= 8 {
@@ -138,13 +138,13 @@ murmur64 :: proc(data_: rawptr, len: int) -> u64 {
 			len -= 4;
 		}
 
-		data8 := slice_ptr((^u8)(data.data+i), 3); // NOTE(bill): This is unsafe
+		data8 := slice_ptr(cast(^u8)(data.data+i), 3); // NOTE(bill): This is unsafe
 
 		match len {
-		case 3: h2 ~= u32(data8[2]) << 16; fallthrough;
-		case 2: h2 ~= u32(data8[1]) << 8;  fallthrough;
+		case 3: h2 ~= cast(u32)data8[2] << 16; fallthrough;
+		case 2: h2 ~= cast(u32)data8[1] << 8;  fallthrough;
 		case 1:
-			h2 ~= u32(data8[0]);
+			h2 ~= cast(u32)data8[0];
 			h2 *= m;
 		}
 
@@ -157,7 +157,7 @@ murmur64 :: proc(data_: rawptr, len: int) -> u64 {
 		h2 ~= h1>>19;
 		h2 *= m;
 
-		h := u64(h1)<<32 | u64(h2);
+		h := cast(u64)(h1)<<32 | cast(u64)(h2);
 		return h;
 	}
 }

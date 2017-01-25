@@ -13,7 +13,7 @@ Mutex :: struct {
 }
 
 current_thread_id :: proc() -> i32 {
-	return i32(win32.GetCurrentThreadId());
+	return cast(i32)win32.GetCurrentThreadId();
 }
 
 semaphore_init :: proc(s: ^Semaphore) {
@@ -25,7 +25,7 @@ semaphore_destroy :: proc(s: ^Semaphore) {
 }
 
 semaphore_post :: proc(s: ^Semaphore, count: int) {
-	win32.ReleaseSemaphore(s.handle, i32(count), nil);
+	win32.ReleaseSemaphore(s.handle, cast(i32)count, nil);
 }
 
 semaphore_release :: proc(s: ^Semaphore) #inline { semaphore_post(s, 1); }

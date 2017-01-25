@@ -12,6 +12,17 @@ gbAllocator heap_allocator(void) {
 gb_global String global_module_path = {0};
 gb_global bool global_module_path_set = false;
 
+gb_global gbScratchMemory scratch_memory = {0};
+
+void init_scratch_memory(isize size) {
+	void *memory = gb_alloc(heap_allocator(), size);
+	gb_scratch_memory_init(&scratch_memory, memory, size);
+}
+
+gbAllocator scratch_allocator(void) {
+	return gb_scratch_allocator(&scratch_memory);
+}
+
 
 i64 next_pow2(i64 n) {
 	if (n <= 0) {

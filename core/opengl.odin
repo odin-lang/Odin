@@ -30,7 +30,7 @@ GetIntegerv :: proc(name: i32, v: ^i32) #foreign "glGetIntegerv"
 
 
 
-_libgl := win32.LoadLibraryA(string("opengl32.dll\x00").data);
+_libgl := win32.LoadLibraryA((cast(string)"opengl32.dll\x00").data);
 
 GetProcAddress :: proc(name: string) -> proc() #cc_c {
 	assert(name[name.count-1] == 0);
@@ -100,7 +100,7 @@ UniformMatrix4fv:  proc(loc: i32, count: u32, transpose: i32, value: ^f32) #cc_c
 GetUniformLocation:  proc(program: u32, name: ^byte) -> i32 #cc_c;
 
 init :: proc() {
-	set_proc_address :: proc(p: rawptr, name: string) #inline { (^(proc() #cc_c))(p)^ = GetProcAddress(name); }
+	set_proc_address :: proc(p: rawptr, name: string) #inline { (cast(^(proc() #cc_c))p)^ = GetProcAddress(name); }
 
 	set_proc_address(^GenBuffers,      "glGenBuffers\x00");
 	set_proc_address(^GenVertexArrays, "glGenVertexArrays\x00");
