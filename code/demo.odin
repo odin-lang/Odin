@@ -10,10 +10,6 @@
 #import "utf8.odin";
 
 main :: proc() {
-	fmt.println("GOOGOLPLEX");
-}
-
-/*
 	foo :: proc(x: ^i32) -> (int, int) {
 		fmt.println("^int");
 		return 123, cast(int)(x^);
@@ -56,4 +52,3 @@ main :: proc() {
 	f = foo;
 	f();
 }
-*/

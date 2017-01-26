@@ -294,7 +294,7 @@ WriteBarrier     :: proc() #foreign kernel32;
 ReadBarrier      :: proc() #foreign kernel32;
 
 
-// GDI
+
 BITMAPINFOHEADER :: struct #ordered {
 	size:              u32,
 	width, height:     i32,
@@ -405,10 +405,10 @@ WGL_CONTEXT_PROFILE_MASK_ARB              :: 0x9126;
 WGL_CONTEXT_CORE_PROFILE_BIT_ARB          :: 0x0001;
 WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB :: 0x0002;
 
-wglCreateContext  :: proc(hdc: HDC) -> HGLRC #foreign opengl32;
+wglCreateContext  :: proc(hdc: HDC) -> HGLRC              #foreign opengl32;
 wglMakeCurrent    :: proc(hdc: HDC, hglrc: HGLRC) -> BOOL #foreign opengl32;
-wglGetProcAddress :: proc(c_str: ^u8) -> PROC #foreign opengl32;
-wglDeleteContext  :: proc(hglrc: HGLRC) -> BOOL #foreign opengl32;
+wglGetProcAddress :: proc(c_str: ^u8) -> PROC             #foreign opengl32;
+wglDeleteContext  :: proc(hglrc: HGLRC) -> BOOL           #foreign opengl32;
 
 
 

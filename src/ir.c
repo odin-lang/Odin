@@ -5213,7 +5213,11 @@ void ir_add_foreign_library_path(irModule *m, Entity *e) {
 
 	for_array(path_index, m->foreign_library_paths) {
 		String path = m->foreign_library_paths.e[path_index];
+#if defined(GB_SYSTEM_WINDOWS)
+		if (str_eq_ignore_case(path, library_path)) {
+#else
 		if (str_eq(path, library_path)) {
+#endif
 			return;
 		}
 	}
