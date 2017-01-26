@@ -124,11 +124,12 @@ AstNodeArray make_ast_node_array(AstFile *f) {
 		AstNode *expr; \
 	}) \
 	AST_NODE_KIND(ProcLit, "procedure literal", struct { \
-		AstNode *type;         \
-		AstNode *body;         \
-		u64      tags;         \
-		String   foreign_name; \
-		String   link_name;    \
+		AstNode *type;            \
+		AstNode *body;            \
+		u64      tags;            \
+		AstNode *foreign_library; \
+		String   foreign_name;    \
+		String   link_name;       \
 	}) \
 	AST_NODE_KIND(CompoundLit, "compound literal", struct { \
 		AstNode *type; \
@@ -302,6 +303,7 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 	}) \
 	AST_NODE_KIND(ForeignLibrary, "foreign library", struct { \
 		Token token, filepath; \
+		Token library_name;     \
 		String base_dir;       \
 		AstNode *cond;         \
 		bool is_system;        \
@@ -774,11 +776,12 @@ AstNode *make_ellipsis(AstFile *f, Token token, AstNode *expr) {
 }
 
 
-AstNode *make_proc_lit(AstFile *f, AstNode *type, AstNode *body, u64 tags, String foreign_name, String link_name) {
+AstNode *make_proc_lit(AstFile *f, AstNode *type, AstNode *body, u64 tags, AstNode *foreign_library, String foreign_name, String link_name) {
 	AstNode *result = make_node(f, AstNode_ProcLit);
 	result->ProcLit.type = type;
 	result->ProcLit.body = body;
 	result->ProcLit.tags = tags;
+	result->ProcLit.foreign_library = foreign_library;
 	result->ProcLit.foreign_name = foreign_name;
 	result->ProcLit.link_name = link_name;
 	return result;
@@ -1112,14 +1115,6 @@ AstNode *make_enum_type(AstFile *f, Token token, AstNode *base_type, AstNodeArra
 	return result;
 }
 
-AstNode *make_foreign_library(AstFile *f, Token token, Token filepath, AstNode *cond, bool is_system) {
-	AstNode *result = make_node(f, AstNode_ForeignLibrary);
-	result->ForeignLibrary.token = token;
-	result->ForeignLibrary.filepath = filepath;
-	result->ForeignLibrary.cond = cond;
-	result->ForeignLibrary.is_system = is_system;
-	return result;
-}
 
 AstNode *make_value_decl(AstFile *f, bool is_var, AstNodeArray names, AstNode *type, AstNodeArray values) {
 	AstNode *result = make_node(f, AstNode_ValueDecl);
@@ -1138,6 +1133,16 @@ AstNode *make_import_decl(AstFile *f, Token token, bool is_import, Token relpath
 	result->ImportDecl.relpath = relpath;
 	result->ImportDecl.import_name = import_name;
 	result->ImportDecl.cond = cond;
+	return result;
+}
+
+AstNode *make_foreign_library(AstFile *f, Token token, Token filepath, Token library_name, AstNode *cond, bool is_system) {
+	AstNode *result = make_node(f, AstNode_ForeignLibrary);
+	result->ForeignLibrary.token = token;
+	result->ForeignLibrary.filepath = filepath;
+	result->ForeignLibrary.library_name = library_name;
+	result->ForeignLibrary.cond = cond;
+	result->ForeignLibrary.is_system = is_system;
 	return result;
 }
 
@@ -1316,7 +1321,7 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 	case AstNode_EnumType:
 		return true;
 	case AstNode_ProcLit:
-		return true;
+		return s->ProcLit.body != NULL;
 
 	case AstNode_ValueDecl:
 		if (!s->ValueDecl.is_var) {
@@ -1366,7 +1371,7 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 
 
 AstNode *    parse_expr(AstFile *f, bool lhs);
-AstNode *    parse_proc_type(AstFile *f, String *foreign_name_, String *link_name_);
+AstNode *    parse_proc_type(AstFile *f, AstNode **foreign_library, String *foreign_name, String *link_name);
 AstNodeArray parse_stmt_list(AstFile *f);
 AstNode *    parse_stmt(AstFile *f);
 AstNode *    parse_body(AstFile *f);
@@ -1508,7 +1513,7 @@ bool is_foreign_name_valid(String name) {
 	return true;
 }
 
-void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_name, ProcCallingConvention *calling_convention) {
+void parse_proc_tags(AstFile *f, u64 *tags, AstNode **foreign_library_token, String *foreign_name, String *link_name, ProcCallingConvention *calling_convention) {
 	// TODO(bill): Add this to procedure literals too
 	GB_ASSERT(tags         != NULL);
 	GB_ASSERT(link_name    != NULL);
@@ -1528,6 +1533,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 
 		if (str_eq(tag_name, str_lit("foreign"))) {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_foreign, tag_name);
+			*foreign_library_token = parse_identifier(f);
 			if (f->curr_token.kind == Token_String) {
 				*foreign_name = f->curr_token.string;
 				// TODO(bill): Check if valid string
@@ -1785,9 +1791,10 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	// Parse Procedure Type or Literal
 	case Token_proc: {
 		Token token = f->curr_token;
+		AstNode *foreign_library = NULL;
 		String foreign_name = {0};
 		String link_name = {0};
-		AstNode *type = parse_proc_type(f, &foreign_name, &link_name);
+		AstNode *type = parse_proc_type(f, &foreign_library, &foreign_name, &link_name);
 		u64 tags = type->ProcType.tags;
 
 		if (f->curr_token.kind == Token_OpenBrace) {
@@ -1800,11 +1807,11 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			body = parse_body(f);
 			f->curr_proc = curr_proc;
 
-			return make_proc_lit(f, type, body, tags, foreign_name, link_name);
+			return make_proc_lit(f, type, body, tags, foreign_library, foreign_name, link_name);
 		}
 
 		if ((tags & ProcTag_foreign) != 0) {
-			return make_proc_lit(f, type, NULL, tags, foreign_name, link_name);
+			return make_proc_lit(f, type, NULL, tags, foreign_library, foreign_name, link_name);
 		}
 		if (tags != 0) {
 			syntax_error(token, "A procedure type cannot have tags");
@@ -2312,7 +2319,7 @@ AstNode *parse_block_stmt(AstFile *f, b32 is_when) {
 
 
 
-AstNode *parse_proc_type(AstFile *f, String *foreign_name_, String *link_name_) {
+AstNode *parse_proc_type(AstFile *f, AstNode **foreign_library_, String *foreign_name_, String *link_name_) {
 	AstNodeArray params = {0};
 	AstNodeArray results = {0};
 
@@ -2322,12 +2329,14 @@ AstNode *parse_proc_type(AstFile *f, String *foreign_name_, String *link_name_) 
 	u64 tags = 0;
 	String foreign_name = {0};
 	String link_name = {0};
+	AstNode *foreign_library = NULL;
 	ProcCallingConvention cc = ProcCC_Odin;
 
-	parse_proc_tags(f, &tags, &foreign_name, &link_name, &cc);
+	parse_proc_tags(f, &tags, &foreign_library, &foreign_name, &link_name, &cc);
 
-	if (foreign_name_) *foreign_name_ = foreign_name;
-	if (link_name_)    *link_name_    = link_name;
+	if (foreign_library_) *foreign_library_ = foreign_library;
+	if (foreign_name_)    *foreign_name_    = foreign_name;
+	if (link_name_)       *link_name_       = link_name;
 
 	return make_proc_type(f, proc_token, params, results, tags, cc);
 }
@@ -2644,7 +2653,7 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 
 	case Token_proc: {
 		Token token = f->curr_token;
-		AstNode *pt = parse_proc_type(f, NULL, NULL);
+		AstNode *pt = parse_proc_type(f, NULL, NULL, NULL);
 		if (pt->ProcType.tags != 0) {
 			syntax_error(token, "A procedure type cannot have tags");
 		}
@@ -3327,6 +3336,21 @@ AstNode *parse_stmt(AstFile *f) {
 			return s;
 		} else if (str_eq(tag, str_lit("foreign_system_library"))) {
 			AstNode *cond = NULL;
+			Token lib_name = {0};
+
+			switch (f->curr_token.kind) {
+			case Token_Ident:
+				lib_name = f->curr_token;
+				next_token(f);
+				break;
+			default:
+				lib_name.pos = f->curr_token.pos;
+				break;
+			}
+
+			if (str_eq(lib_name.string, str_lit("_"))) {
+				syntax_error(lib_name, "Illegal #foreign_library name: `_`");
+			}
 			Token file_path = expect_token(f, Token_String);
 
 			if (allow_token(f, Token_when)) {
@@ -3334,7 +3358,7 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 
 			if (f->curr_proc == NULL) {
-				s = make_foreign_library(f, hash_token, file_path, cond, true);
+				s = make_foreign_library(f, hash_token, file_path, lib_name, cond, true);
 			} else {
 				syntax_error(token, "You cannot use #foreign_system_library within a procedure. This must be done at the file scope");
 				s = make_bad_decl(f, token, file_path);
@@ -3343,6 +3367,21 @@ AstNode *parse_stmt(AstFile *f) {
 			return s;
 		} else if (str_eq(tag, str_lit("foreign_library"))) {
 			AstNode *cond = NULL;
+			Token lib_name = {0};
+
+			switch (f->curr_token.kind) {
+			case Token_Ident:
+				lib_name = f->curr_token;
+				next_token(f);
+				break;
+			default:
+				lib_name.pos = f->curr_token.pos;
+				break;
+			}
+
+			if (str_eq(lib_name.string, str_lit("_"))) {
+				syntax_error(lib_name, "Illegal #foreign_library name: `_`");
+			}
 			Token file_path = expect_token(f, Token_String);
 
 			if (allow_token(f, Token_when)) {
@@ -3350,7 +3389,7 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 
 			if (f->curr_proc == NULL) {
-				s = make_foreign_library(f, hash_token, file_path, cond, false);
+				s = make_foreign_library(f, hash_token, file_path, lib_name, cond, false);
 			} else {
 				syntax_error(token, "You cannot use #foreign_library within a procedure. This must be done at the file scope");
 				s = make_bad_decl(f, token, file_path);
@@ -3512,22 +3551,6 @@ bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) 
 
 	return true;
 }
-
-
-// // NOTE(bill): Returns true if it's added
-// bool try_add_foreign_library_path(Parser *p, String import_file) {
-// 	gb_mutex_lock(&p->mutex);
-
-// 	for_array(i, p->foreign_libraries) {
-// 		String import = p->foreign_libraries.e[i];
-// 		if (str_eq(import, import_file)) {
-// 			return false;
-// 		}
-// 	}
-// 	array_add(&p->foreign_libraries, import_file);
-// 	gb_mutex_unlock(&p->mutex);
-// 	return true;
-// }
 
 gb_global Rune illegal_import_runes[] = {
 	'"', '\'', '`', ' ', '\t', '\r', '\n', '\v', '\f',

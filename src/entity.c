@@ -12,6 +12,7 @@ typedef enum ImplicitValueId ImplicitValueId;
 	ENTITY_KIND(Procedure) \
 	ENTITY_KIND(Builtin) \
 	ENTITY_KIND(ImportName) \
+	ENTITY_KIND(LibraryName) \
 	ENTITY_KIND(Nil) \
 	ENTITY_KIND(ImplicitValue) \
 	ENTITY_KIND(Count)
@@ -72,6 +73,7 @@ struct Entity {
 		struct {
 			bool         is_foreign;
 			String       foreign_name;
+			Entity *     foreign_library;
 			String       link_name;
 			u64          tags;
 			OverloadKind overload_kind;
@@ -85,6 +87,11 @@ struct Entity {
 			Scope *scope;
 			bool   used;
 		} ImportName;
+		struct {
+			String path;
+			String name;
+			bool   used;
+		} LibraryName;
 		i32 Nil;
 		struct {
 			// TODO(bill): Should this be a user-level construct rather than compiler-level?
@@ -175,6 +182,14 @@ Entity *make_entity_import_name(gbAllocator a, Scope *scope, Token token, Type *
 	entity->ImportName.path = path;
 	entity->ImportName.name = name;
 	entity->ImportName.scope = import_scope;
+	return entity;
+}
+
+Entity *make_entity_library_name(gbAllocator a, Scope *scope, Token token, Type *type,
+                                 String path, String name) {
+	Entity *entity = alloc_entity(a, Entity_LibraryName, scope, token, type);
+	entity->LibraryName.path = path;
+	entity->LibraryName.name = name;
 	return entity;
 }
 

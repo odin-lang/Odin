@@ -266,7 +266,6 @@ typedef struct CheckerInfo {
 	MapIsize             type_info_map;   // Key: Type *
 	isize                type_info_count;
 	Entity *             implicit_values[ImplicitValue_Count];
-	Array(String)        foreign_libraries; // For the linker
 } CheckerInfo;
 
 typedef struct Checker {
@@ -476,7 +475,9 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 						continue;
 					}
 
-					if (e->kind == Entity_ImportName && gone_thru_file) {
+					if ((e->kind == Entity_ImportName ||
+					     e->kind == Entity_LibraryName)
+					     && gone_thru_file) {
 						continue;
 					}
 
@@ -515,13 +516,14 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	Entity *prev = NULL;
 	if (found) {
 		prev = *found;
-		if (prev->kind != Entity_Procedure &&
+		if (prev->kind != Entity_Procedure ||
 		    entity->kind != Entity_Procedure) {
 			return prev;
 		}
 	}
 
-	if (prev != NULL && entity->kind == Entity_Procedure) {
+	if (prev != NULL &&
+	    entity->kind == Entity_Procedure) {
 		if (s->is_global) {
 			return prev;
 		}
@@ -605,6 +607,9 @@ void init_universal_scope(BuildContext *bc) {
 	add_global_constant(a, str_lit("false"), t_untyped_bool,    make_exact_value_bool(false));
 
 	add_global_entity(make_entity_nil(a, str_lit("nil"), t_untyped_nil));
+	add_global_entity(make_entity_library_name(a,  universal_scope,
+	                                           make_token_ident(str_lit("__llvm_core")), t_invalid,
+	                                           str_lit(""), str_lit("__llvm_core")));
 
 	// TODO(bill): Set through flags in the compiler
 	add_global_string_constant(a, str_lit("ODIN_OS"),      bc->ODIN_OS);
@@ -643,7 +648,6 @@ void init_checker_info(CheckerInfo *i) {
 	map_entity_init(&i->foreign_procs, a);
 	map_isize_init(&i->type_info_map,  a);
 	map_ast_file_init(&i->files,       a);
-	array_init(&i->foreign_libraries,  a);
 	i->type_info_count = 0;
 
 }
@@ -658,7 +662,6 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_entity_destroy(&i->foreign_procs);
 	map_isize_destroy(&i->type_info_map);
 	map_ast_file_destroy(&i->files);
-	array_free(&i->foreign_libraries);
 }
 
 
@@ -843,17 +846,6 @@ void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclIn
 	map_decl_info_set(&c->info.entities, hash_pointer(e), d);
 }
 
-// NOTE(bill): Returns true if it's added
-bool try_add_foreign_library_path(Checker *c, String import_file) {
-	for_array(i, c->info.foreign_libraries) {
-		String import = c->info.foreign_libraries.e[i];
-		if (str_eq(import, import_file)) {
-			return false;
-		}
-	}
-	array_add(&c->info.foreign_libraries, import_file);
-	return true;
-}
 
 
 void add_type_info_type(Checker *c, Type *t) {
@@ -1046,6 +1038,9 @@ MapEntity generate_minimum_dependency_map(CheckerInfo *info, Entity *start) {
 		} else if (e->kind == Entity_Procedure) {
 			if ((e->Procedure.tags & ProcTag_export) != 0) {
 				add_dependency_to_map(&map, info, e);
+			}
+			if (e->Procedure.is_foreign) {
+				add_dependency_to_map(&map, info, e->Procedure.foreign_library);
 			}
 		}
 	}
@@ -1555,6 +1550,43 @@ void check_all_global_entities(Checker *c) {
 }
 
 
+String path_to_entity_name(String name, String fullpath) {
+	if (name.len != 0) {
+		return name;
+	}
+	// NOTE(bill): use file name (without extension) as the identifier
+	// If it is a valid identifier
+	String filename = fullpath;
+	isize slash = 0;
+	isize dot = 0;
+	for (isize i = filename.len-1; i >= 0; i--) {
+		u8 c = filename.text[i];
+		if (c == '/' || c == '\\') {
+			break;
+		}
+		slash = i;
+	}
+
+	filename.text += slash;
+	filename.len -= slash;
+
+	dot = filename.len;
+	while (dot --> 0) {
+		u8 c = filename.text[dot];
+		if (c == '.') {
+			break;
+		}
+	}
+
+	filename.len = dot;
+
+	if (is_string_an_identifier(filename)) {
+		return filename;
+	} else {
+		return str_lit("_");
+	}
+}
+
 void check_import_entities(Checker *c, MapScope *file_scopes) {
 	for_array(i, c->delayed_imports) {
 		Scope *parent_scope = c->delayed_imports.e[i].parent;
@@ -1615,49 +1647,23 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 				if (e->scope == parent_scope) {
 					continue;
 				}
-				// NOTE(bill): Do not add other imported entities
-				bool ok = add_entity(c, parent_scope, NULL, e);
-				if (ok && id->is_import) { // `#import`ed entities don't get exported
-					map_bool_set(&parent_scope->implicit, hash_pointer(e), true);
+				switch (e->kind) {
+				case Entity_ImportName:
+				case Entity_LibraryName:
+					break;
+				default: {
+					bool ok = add_entity(c, parent_scope, NULL, e);
+					if (ok && id->is_import) { // `#import`ed entities don't get exported
+						map_bool_set(&parent_scope->implicit, hash_pointer(e), true);
+					}
+				} break;
 				}
 			}
 		} else {
-			String import_name = id->import_name.string;
-			if (import_name.len == 0) {
-				// NOTE(bill): use file name (without extension) as the identifier
-				// If it is a valid identifier
-				String filename = id->fullpath;
-				isize slash = 0;
-				isize dot = 0;
-				for (isize i = filename.len-1; i >= 0; i--) {
-					u8 c = filename.text[i];
-					if (c == '/' || c == '\\') {
-						break;
-					}
-					slash = i;
-				}
-
-				filename.text += slash;
-				filename.len -= slash;
-
-				dot = filename.len;
-				while (dot --> 0) {
-					u8 c = filename.text[dot];
-					if (c == '.') {
-						break;
-					}
-				}
-
-				filename.len = dot;
-
-				if (is_string_an_identifier(filename)) {
-					import_name = filename;
-				} else {
-					error(token, "File name, %.*s, cannot be as an import name as it is not a valid identifier", LIT(filename));
-				}
-			}
-
-			if (import_name.len > 0) {
+			String import_name = path_to_entity_name(id->import_name.string, id->fullpath);
+			if (str_eq(import_name, str_lit("_"))) {
+				error(token, "File name, %.*s, cannot be as an import name as it is not a valid identifier", LIT(id->import_name.string));
+			} else {
 				GB_ASSERT(id->import_name.pos.line != 0);
 				id->import_name.string = import_name;
 				Entity *e = make_entity_import_name(c->allocator, parent_scope, id->import_name, t_invalid,
@@ -1690,7 +1696,16 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 			file_str = import_file;
 		}
 
-		try_add_foreign_library_path(c, file_str);
+		String library_name = path_to_entity_name(fl->library_name.string, file_str);
+		if (str_eq(library_name, str_lit("_"))) {
+			error(fl->token, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
+		} else {
+			GB_ASSERT(fl->library_name.pos.line != 0);
+			fl->library_name.string = library_name;
+			Entity *e = make_entity_library_name(c->allocator, parent_scope, fl->library_name, t_invalid,
+			                                     file_str, library_name);
+			add_entity(c, parent_scope, NULL, e);
+		}
 	}
 }
 

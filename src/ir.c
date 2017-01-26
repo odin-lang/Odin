@@ -43,13 +43,15 @@ typedef struct irModule {
 
 	Array(irProcedure *) procs;             // NOTE(bill): All procedures with bodies
 	irValueArray         procs_to_generate; // NOTE(bill): Procedures to generate
+
+	Array(String) foreign_library_paths; // Only the ones that were used
 } irModule;
 
 // NOTE(bill): For more info, see https://en.wikipedia.org/wiki/Dominator_(graph_theory)
 typedef struct irDomNode {
 	irBlock *        idom; // Parent (Immediate Dominator)
 	Array(irBlock *) children;
-	i32               pre, post; // Ordering in tree
+	i32              pre, post; // Ordering in tree
 } irDomNode;
 
 
@@ -5037,6 +5039,7 @@ void ir_init_module(irModule *m, Checker *c, BuildContext *build_context) {
 	map_string_init(&m->type_names, heap_allocator());
 	array_init(&m->procs,    heap_allocator());
 	array_init(&m->procs_to_generate, heap_allocator());
+	array_init(&m->foreign_library_paths, heap_allocator());
 
 	// Default states
 	m->stmt_state_flags = 0;
@@ -5100,7 +5103,9 @@ void ir_destroy_module(irModule *m) {
 	map_ir_value_destroy(&m->members);
 	map_string_destroy(&m->type_names);
 	map_ir_debug_info_destroy(&m->debug_info);
+	array_free(&m->procs);
 	array_free(&m->procs_to_generate);
+	array_free(&m->foreign_library_paths);
 	gb_arena_free(&m->arena);
 }
 
@@ -5197,6 +5202,22 @@ irValue *ir_type_info_member_offset(irProcedure *proc, irValue *data, isize coun
 	irValue *offset = ir_emit_array_epi(proc, data, *index);
 	*index += count;
 	return offset;
+}
+
+void ir_add_foreign_library_path(irModule *m, Entity *e) {
+	GB_ASSERT(e != NULL);
+	String library_path = e->LibraryName.path;
+	if (library_path.len == 0) {
+		return;
+	}
+
+	for_array(path_index, m->foreign_library_paths) {
+		String path = m->foreign_library_paths.e[path_index];
+		if (str_eq(path, library_path)) {
+			return;
+		}
+	}
+	array_add(&m->foreign_library_paths, library_path);
 }
 
 void ir_gen_tree(irGen *s) {
@@ -5318,6 +5339,7 @@ void ir_gen_tree(irGen *s) {
 			AstNode *body = pd->body;
 			if (e->Procedure.is_foreign) {
 				name = e->token.string; // NOTE(bill): Don't use the mangled name
+				ir_add_foreign_library_path(m, e->Procedure.foreign_library);
 			}
 			if (pd->foreign_name.len > 0) {
 				name = pd->foreign_name;

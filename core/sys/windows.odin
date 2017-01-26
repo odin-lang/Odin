@@ -1,5 +1,8 @@
-#foreign_system_library "user32" when ODIN_OS == "windows";
-#foreign_system_library "gdi32"  when ODIN_OS == "windows";
+#foreign_system_library "kernel32.lib";
+#foreign_system_library "user32.lib";
+#foreign_system_library "gdi32.lib";
+#foreign_system_library "winmm.lib";
+#foreign_system_library "opengl32.lib";
 
 HANDLE    :: rawptr;
 HWND      :: HANDLE;
@@ -124,43 +127,43 @@ GET_FILEEX_INFO_LEVELS :: i32;
 GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0;
 GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1;
 
-GetLastError     :: proc() -> i32                            #foreign
-ExitProcess      :: proc(exit_code: u32)                     #foreign
-GetDesktopWindow :: proc() -> HWND                           #foreign
-GetCursorPos     :: proc(p: ^POINT) -> i32                   #foreign
-ScreenToClient   :: proc(h: HWND, p: ^POINT) -> i32          #foreign
-GetModuleHandleA :: proc(module_name: ^u8) -> HINSTANCE      #foreign
-GetStockObject   :: proc(fn_object: i32) -> HGDIOBJ          #foreign
-PostQuitMessage  :: proc(exit_code: i32)                     #foreign
-SetWindowTextA   :: proc(hwnd: HWND, c_string: ^u8) -> BOOL  #foreign
+GetLastError     :: proc() -> i32                            #foreign kernel32;
+ExitProcess      :: proc(exit_code: u32)                     #foreign kernel32;
+GetDesktopWindow :: proc() -> HWND                           #foreign user32;
+GetCursorPos     :: proc(p: ^POINT) -> i32                   #foreign user32;
+ScreenToClient   :: proc(h: HWND, p: ^POINT) -> i32          #foreign user32;
+GetModuleHandleA :: proc(module_name: ^u8) -> HINSTANCE      #foreign kernel32;
+GetStockObject   :: proc(fn_object: i32) -> HGDIOBJ          #foreign gdi32;
+PostQuitMessage  :: proc(exit_code: i32)                     #foreign user32;
+SetWindowTextA   :: proc(hwnd: HWND, c_string: ^u8) -> BOOL  #foreign user32;
 
-QueryPerformanceFrequency :: proc(result: ^i64) -> i32 #foreign
-QueryPerformanceCounter   :: proc(result: ^i64) -> i32 #foreign
+QueryPerformanceFrequency :: proc(result: ^i64) -> i32 #foreign kernel32;
+QueryPerformanceCounter   :: proc(result: ^i64) -> i32 #foreign kernel32;
 
-Sleep :: proc(ms: i32) -> i32 #foreign
+Sleep :: proc(ms: i32) -> i32 #foreign kernel32;
 
-OutputDebugStringA :: proc(c_str: ^u8) #foreign
+OutputDebugStringA :: proc(c_str: ^u8) #foreign kernel32;
 
 
-RegisterClassExA :: proc(wc: ^WNDCLASSEXA) -> ATOM #foreign
+RegisterClassExA :: proc(wc: ^WNDCLASSEXA) -> ATOM #foreign user32;
 CreateWindowExA  :: proc(ex_style: u32,
                          class_name, title: ^u8,
                          style: u32,
                          x, y, w, h: i32,
                          parent: HWND, menu: HMENU, instance: HINSTANCE,
-                         param: rawptr) -> HWND #foreign
+                         param: rawptr) -> HWND #foreign user32;
 
-ShowWindow       :: proc(hwnd: HWND, cmd_show: i32) -> BOOL #foreign
-TranslateMessage :: proc(msg: ^MSG) -> BOOL                 #foreign
-DispatchMessageA :: proc(msg: ^MSG) -> LRESULT              #foreign
-UpdateWindow     :: proc(hwnd: HWND) -> BOOL                #foreign
+ShowWindow       :: proc(hwnd: HWND, cmd_show: i32) -> BOOL #foreign user32;
+TranslateMessage :: proc(msg: ^MSG) -> BOOL                 #foreign user32;
+DispatchMessageA :: proc(msg: ^MSG) -> LRESULT              #foreign user32;
+UpdateWindow     :: proc(hwnd: HWND) -> BOOL                #foreign user32;
 PeekMessageA     :: proc(msg: ^MSG, hwnd: HWND,
-                         msg_filter_min, msg_filter_max, remove_msg: u32) -> BOOL #foreign
+                         msg_filter_min, msg_filter_max, remove_msg: u32) -> BOOL #foreign user32;
 
-DefWindowProcA :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #foreign
+DefWindowProcA :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #foreign user32;
 
-AdjustWindowRect :: proc(rect: ^RECT, style: u32, menu: BOOL) -> BOOL #foreign
-GetActiveWindow  :: proc() -> HWND #foreign
+AdjustWindowRect :: proc(rect: ^RECT, style: u32, menu: BOOL) -> BOOL #foreign user32;
+GetActiveWindow  :: proc() -> HWND #foreign user32;
 
 
 GetQueryPerformanceFrequency :: proc() -> i64 {
@@ -169,34 +172,34 @@ GetQueryPerformanceFrequency :: proc() -> i64 {
 	return r;
 }
 
-GetCommandLineA    :: proc() -> ^u8 #foreign
-GetSystemMetrics   :: proc(index: i32) -> i32 #foreign
-GetCurrentThreadId :: proc() -> u32 #foreign
+GetCommandLineA    :: proc() -> ^u8 #foreign kernel32;
+GetSystemMetrics   :: proc(index: i32) -> i32 #foreign kernel32;
+GetCurrentThreadId :: proc() -> u32 #foreign kernel32;
 
-timeGetTime             :: proc() -> u32 #foreign
-GetSystemTimeAsFileTime :: proc(system_time_as_file_time: ^FILETIME) #foreign
-FileTimeToLocalFileTime :: proc(file_time: ^FILETIME, local_file_time: ^FILETIME) -> BOOL #foreign
-FileTimeToSystemTime    :: proc(file_time: ^FILETIME, system_time: ^SYSTEMTIME) -> BOOL #foreign
-SystemTimeToFileTime    :: proc(system_time: ^SYSTEMTIME, file_time: ^FILETIME) -> BOOL #foreign
+timeGetTime             :: proc() -> u32 #foreign winmm;
+GetSystemTimeAsFileTime :: proc(system_time_as_file_time: ^FILETIME) #foreign kernel32;
+FileTimeToLocalFileTime :: proc(file_time: ^FILETIME, local_file_time: ^FILETIME) -> BOOL #foreign kernel32;
+FileTimeToSystemTime    :: proc(file_time: ^FILETIME, system_time: ^SYSTEMTIME) -> BOOL #foreign kernel32;
+SystemTimeToFileTime    :: proc(system_time: ^SYSTEMTIME, file_time: ^FILETIME) -> BOOL #foreign kernel32;
 
 // File Stuff
 
-CloseHandle  :: proc(h: HANDLE) -> i32 #foreign
-GetStdHandle :: proc(h: i32) -> HANDLE #foreign
+CloseHandle  :: proc(h: HANDLE) -> i32 #foreign kernel32;
+GetStdHandle :: proc(h: i32) -> HANDLE #foreign kernel32;
 CreateFileA  :: proc(filename: ^u8, desired_access, share_mode: u32,
                      security: rawptr,
-                     creation, flags_and_attribs: u32, template_file: HANDLE) -> HANDLE #foreign
-ReadFile  :: proc(h: HANDLE, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> BOOL #foreign
-WriteFile :: proc(h: HANDLE, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> BOOL #foreign
+                     creation, flags_and_attribs: u32, template_file: HANDLE) -> HANDLE #foreign kernel32;
+ReadFile  :: proc(h: HANDLE, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> BOOL #foreign kernel32;
+WriteFile :: proc(h: HANDLE, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> BOOL #foreign kernel32;
 
-GetFileSizeEx              :: proc(file_handle: HANDLE, file_size: ^i64) -> BOOL #foreign
-GetFileAttributesExA       :: proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> BOOL #foreign
-GetFileInformationByHandle :: proc(file_handle: HANDLE, file_info: ^BY_HANDLE_FILE_INFORMATION) -> BOOL #foreign
+GetFileSizeEx              :: proc(file_handle: HANDLE, file_size: ^i64) -> BOOL #foreign kernel32;
+GetFileAttributesExA       :: proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> BOOL #foreign kernel32;
+GetFileInformationByHandle :: proc(file_handle: HANDLE, file_info: ^BY_HANDLE_FILE_INFORMATION) -> BOOL #foreign kernel32;
 
-GetFileType    :: proc(file_handle: HANDLE) -> u32 #foreign
-SetFilePointer :: proc(file_handle: HANDLE, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 #foreign
+GetFileType    :: proc(file_handle: HANDLE) -> u32 #foreign kernel32;
+SetFilePointer :: proc(file_handle: HANDLE, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 #foreign kernel32;
 
-SetHandleInformation :: proc(obj: HANDLE, mask, flags: u32) -> BOOL #foreign
+SetHandleInformation :: proc(obj: HANDLE, mask, flags: u32) -> BOOL #foreign kernel32;
 
 HANDLE_FLAG_INHERIT :: 1;
 HANDLE_FLAG_PROTECT_FROM_CLOSE :: 2;
@@ -250,10 +253,10 @@ INVALID_SET_FILE_POINTER :: ~cast(u32)0;
 
 
 
-HeapAlloc      :: proc (h: HANDLE, flags: u32, bytes: int) -> rawptr                 #foreign
-HeapReAlloc    :: proc (h: HANDLE, flags: u32, memory: rawptr, bytes: int) -> rawptr #foreign
-HeapFree       :: proc (h: HANDLE, flags: u32, memory: rawptr) -> BOOL               #foreign
-GetProcessHeap :: proc () -> HANDLE #foreign
+HeapAlloc      :: proc (h: HANDLE, flags: u32, bytes: int) -> rawptr                 #foreign kernel32;
+HeapReAlloc    :: proc (h: HANDLE, flags: u32, memory: rawptr, bytes: int) -> rawptr #foreign kernel32;
+HeapFree       :: proc (h: HANDLE, flags: u32, memory: rawptr) -> BOOL               #foreign kernel32;
+GetProcessHeap :: proc () -> HANDLE #foreign kernel32;
 
 
 HEAP_ZERO_MEMORY :: 0x00000008;
@@ -268,27 +271,27 @@ SECURITY_ATTRIBUTES :: struct #ordered {
 
 INFINITE :: 0xffffffff;
 
-CreateSemaphoreA    :: proc(attributes: ^SECURITY_ATTRIBUTES, initial_count, maximum_count: i32, name: ^byte) -> HANDLE #foreign
-ReleaseSemaphore    :: proc(semaphore: HANDLE, release_count: i32, previous_count: ^i32) -> BOOL #foreign
-WaitForSingleObject :: proc(handle: HANDLE, milliseconds: u32) -> u32 #foreign
+CreateSemaphoreA    :: proc(attributes: ^SECURITY_ATTRIBUTES, initial_count, maximum_count: i32, name: ^byte) -> HANDLE #foreign kernel32;
+ReleaseSemaphore    :: proc(semaphore: HANDLE, release_count: i32, previous_count: ^i32) -> BOOL #foreign kernel32;
+WaitForSingleObject :: proc(handle: HANDLE, milliseconds: u32) -> u32 #foreign kernel32;
 
 
-InterlockedCompareExchange :: proc(dst: ^i32, exchange, comparand: i32) -> i32 #foreign
-InterlockedExchange        :: proc(dst: ^i32, desired: i32) -> i32 #foreign
-InterlockedExchangeAdd     :: proc(dst: ^i32, desired: i32) -> i32 #foreign
-InterlockedAnd             :: proc(dst: ^i32, desired: i32) -> i32 #foreign
-InterlockedOr              :: proc(dst: ^i32, desired: i32) -> i32 #foreign
+InterlockedCompareExchange :: proc(dst: ^i32, exchange, comparand: i32) -> i32 #foreign kernel32;
+InterlockedExchange        :: proc(dst: ^i32, desired: i32) -> i32 #foreign kernel32;
+InterlockedExchangeAdd     :: proc(dst: ^i32, desired: i32) -> i32 #foreign kernel32;
+InterlockedAnd             :: proc(dst: ^i32, desired: i32) -> i32 #foreign kernel32;
+InterlockedOr              :: proc(dst: ^i32, desired: i32) -> i32 #foreign kernel32;
 
-InterlockedCompareExchange64 :: proc(dst: ^i64, exchange, comparand: i64) -> i64 #foreign
-InterlockedExchange64        :: proc(dst: ^i64, desired: i64) -> i64 #foreign
-InterlockedExchangeAdd64     :: proc(dst: ^i64, desired: i64) -> i64 #foreign
-InterlockedAnd64             :: proc(dst: ^i64, desired: i64) -> i64 #foreign
-InterlockedOr64              :: proc(dst: ^i64, desired: i64) -> i64 #foreign
+InterlockedCompareExchange64 :: proc(dst: ^i64, exchange, comparand: i64) -> i64 #foreign kernel32;
+InterlockedExchange64        :: proc(dst: ^i64, desired: i64) -> i64 #foreign kernel32;
+InterlockedExchangeAdd64     :: proc(dst: ^i64, desired: i64) -> i64 #foreign kernel32;
+InterlockedAnd64             :: proc(dst: ^i64, desired: i64) -> i64 #foreign kernel32;
+InterlockedOr64              :: proc(dst: ^i64, desired: i64) -> i64 #foreign kernel32;
 
-_mm_pause        :: proc() #foreign
-ReadWriteBarrier :: proc() #foreign
-WriteBarrier     :: proc() #foreign
-ReadBarrier      :: proc() #foreign
+_mm_pause        :: proc() #foreign kernel32;
+ReadWriteBarrier :: proc() #foreign kernel32;
+WriteBarrier     :: proc() #foreign kernel32;
+ReadBarrier      :: proc() #foreign kernel32;
 
 
 // GDI
@@ -321,17 +324,15 @@ StretchDIBits :: proc (hdc: HDC,
                        x_src, y_src, width_src, header_src: i32,
                        bits: rawptr, bits_info: ^BITMAPINFO,
                        usage: u32,
-                       rop: u32) -> i32 #foreign
+                       rop: u32) -> i32 #foreign gdi32;
 
 
 
-LoadLibraryA   :: proc (c_str: ^u8) -> HMODULE #foreign
-FreeLibrary    :: proc (h: HMODULE) #foreign
-GetProcAddress :: proc (h: HMODULE, c_str: ^u8) -> PROC #foreign
+LoadLibraryA   :: proc (c_str: ^u8) -> HMODULE #foreign kernel32;
+FreeLibrary    :: proc (h: HMODULE) #foreign kernel32;
+GetProcAddress :: proc (h: HMODULE, c_str: ^u8) -> PROC #foreign kernel32;
 
-GetClientRect :: proc(hwnd: HWND, rect: ^RECT) -> BOOL #foreign
-
-
+GetClientRect :: proc(hwnd: HWND, rect: ^RECT) -> BOOL #foreign user32;
 
 // Windows OpenGL
 PFD_TYPE_RGBA             :: 0;
@@ -358,7 +359,7 @@ PFD_STEREO_DONTCARE       :: 0x80000000;
 
 HGLRC :: HANDLE;
 PROC  :: type proc() #cc_c;
-wglCreateContextAttribsARBType :: proc(hdc: HDC, hshareContext: rawptr, attribList: ^i32) -> HGLRC;
+wglCreateContextAttribsARBType :: type proc(hdc: HDC, hshareContext: rawptr, attribList: ^i32) -> HGLRC;
 
 
 PIXELFORMATDESCRIPTOR :: struct #ordered {
@@ -392,11 +393,11 @@ PIXELFORMATDESCRIPTOR :: struct #ordered {
 	damage_mask: u32,
 }
 
-GetDC             :: proc(h: HANDLE) -> HDC #foreign
-SetPixelFormat    :: proc(hdc: HDC, pixel_format: i32, pfd: ^PIXELFORMATDESCRIPTOR ) -> BOOL #foreign
-ChoosePixelFormat :: proc(hdc: HDC, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 #foreign
-SwapBuffers       :: proc(hdc: HDC) -> BOOL #foreign
-ReleaseDC         :: proc(wnd: HWND, hdc: HDC) -> i32 #foreign
+GetDC             :: proc(h: HANDLE) -> HDC #foreign user32;
+SetPixelFormat    :: proc(hdc: HDC, pixel_format: i32, pfd: ^PIXELFORMATDESCRIPTOR ) -> BOOL #foreign user32;
+ChoosePixelFormat :: proc(hdc: HDC, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 #foreign user32;
+SwapBuffers       :: proc(hdc: HDC) -> BOOL #foreign user32;
+ReleaseDC         :: proc(wnd: HWND, hdc: HDC) -> i32 #foreign user32;
 
 WGL_CONTEXT_MAJOR_VERSION_ARB             :: 0x2091;
 WGL_CONTEXT_MINOR_VERSION_ARB             :: 0x2092;
@@ -404,15 +405,15 @@ WGL_CONTEXT_PROFILE_MASK_ARB              :: 0x9126;
 WGL_CONTEXT_CORE_PROFILE_BIT_ARB          :: 0x0001;
 WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB :: 0x0002;
 
-wglCreateContext  :: proc(hdc: HDC) -> HGLRC #foreign
-wglMakeCurrent    :: proc(hdc: HDC, hglrc: HGLRC) -> BOOL #foreign
-wglGetProcAddress :: proc(c_str: ^u8) -> PROC #foreign
-wglDeleteContext  :: proc(hglrc: HGLRC) -> BOOL #foreign
+wglCreateContext  :: proc(hdc: HDC) -> HGLRC #foreign opengl32;
+wglMakeCurrent    :: proc(hdc: HDC, hglrc: HGLRC) -> BOOL #foreign opengl32;
+wglGetProcAddress :: proc(c_str: ^u8) -> PROC #foreign opengl32;
+wglDeleteContext  :: proc(hglrc: HGLRC) -> BOOL #foreign opengl32;
 
 
 
-GetKeyState      :: proc(v_key: i32) -> i16 #foreign
-GetAsyncKeyState :: proc(v_key: i32) -> i16 #foreign
+GetKeyState      :: proc(v_key: i32) -> i16 #foreign user32;
+GetAsyncKeyState :: proc(v_key: i32) -> i16 #foreign user32;
 
 is_key_down :: proc(key: Key_Code) -> bool #inline { return GetAsyncKeyState(cast(i32)key) < 0; }
 

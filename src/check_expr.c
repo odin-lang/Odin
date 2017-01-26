@@ -985,6 +985,9 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Type
 	case Entity_ImportName:
 		error_node(n, "Use of import `%.*s` not in selector", LIT(e->ImportName.name));
 		return;
+	case Entity_LibraryName:
+		error_node(n, "Use of library `%.*s` not in #foreign tag", LIT(e->LibraryName.name));
+		return;
 
 	case Entity_Nil:
 		o->mode = Addressing_Value;

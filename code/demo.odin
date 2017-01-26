@@ -9,21 +9,8 @@
 #import "sync.odin";
 #import "utf8.odin";
 
-
 main :: proc() {
-	b : [1000]byte;
-
-	using fmt;
-
-	println();
-	println("Pointer of Address 0");
-	println(^b[0]);
-	println();
-	println("Pointer of Address 50");
-	println(^b[50]);
-	println();
-	println("Difference between 50 and 0");
-	println(^b[50] - ^b[0]);
+	fmt.println("GOOGOLPLEX");
 }
 
 /*

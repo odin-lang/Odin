@@ -24,14 +24,14 @@ Mat2 :: [2]Vec2;
 Mat3 :: [3]Vec3;
 Mat4 :: [4]Vec4;
 
-sqrt :: proc(x: f32) -> f32 #foreign "llvm.sqrt.f32"
-sqrt :: proc(x: f64) -> f64 #foreign "llvm.sqrt.f64"
+sqrt :: proc(x: f32) -> f32 #foreign __llvm_core "llvm.sqrt.f32";
+sqrt :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.sqrt.f64";
 
-sin :: proc(x: f32) -> f32 #foreign "llvm.sin.f32"
-sin :: proc(x: f64) -> f64 #foreign "llvm.sin.f64"
+sin :: proc(x: f32) -> f32 #foreign __llvm_core "llvm.sin.f32";
+sin :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.sin.f64";
 
-cos :: proc(x: f32) -> f32 #foreign "llvm.cos.f32"
-cos :: proc(x: f64) -> f64 #foreign "llvm.cos.f64"
+cos :: proc(x: f32) -> f32 #foreign __llvm_core "llvm.cos.f32";
+cos :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.cos.f64";
 
 tan :: proc(x: f32) -> f32 #inline { return sin(x)/cos(x); }
 tan :: proc(x: f64) -> f64 #inline { return sin(x)/cos(x); }
@@ -42,16 +42,16 @@ lerp :: proc(a, b, t: f64) -> f64 { return a*(1-t) + b*t; }
 sign :: proc(x: f32) -> f32 { if x >= 0 { return +1; } return -1; }
 sign :: proc(x: f64) -> f64 { if x >= 0 { return +1; } return -1; }
 
-bit_reverse :: proc(b: u16) -> u16 #foreign "llvm.bitreverse.i16"
-bit_reverse :: proc(b: u32) -> u32 #foreign "llvm.bitreverse.i32"
-bit_reverse :: proc(b: u64) -> u64 #foreign "llvm.bitreverse.i64"
+bit_reverse :: proc(b: u16) -> u16 #foreign __llvm_core "llvm.bitreverse.i16";
+bit_reverse :: proc(b: u32) -> u32 #foreign __llvm_core "llvm.bitreverse.i32";
+bit_reverse :: proc(b: u64) -> u64 #foreign __llvm_core "llvm.bitreverse.i64";
 
-byte_swap :: proc(b: u16) -> u16 #foreign "llvm.bswap.i16"
-byte_swap :: proc(b: u32) -> u32 #foreign "llvm.bswap.i32"
-byte_swap :: proc(b: u64) -> u64 #foreign "llvm.bswap.i64"
+byte_swap :: proc(b: u16) -> u16 #foreign __llvm_core "llvm.bswap.i16";
+byte_swap :: proc(b: u32) -> u32 #foreign __llvm_core "llvm.bswap.i32";
+byte_swap :: proc(b: u64) -> u64 #foreign __llvm_core "llvm.bswap.i64";
 
-fmuladd :: proc(a, b, c: f32) -> f32 #foreign "llvm.fmuladd.f32"
-fmuladd :: proc(a, b, c: f64) -> f64 #foreign "llvm.fmuladd.f64"
+fmuladd :: proc(a, b, c: f32) -> f32 #foreign __llvm_core "llvm.fmuladd.f32";
+fmuladd :: proc(a, b, c: f64) -> f64 #foreign __llvm_core "llvm.fmuladd.f64";
 
 
 copy_sign :: proc(x, y: f32) -> f32 {

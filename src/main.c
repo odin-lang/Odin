@@ -235,13 +235,14 @@ int main(int argc, char **argv) {
 
 	timings_start_section(&timings, str_lit("msvc-link"));
 
-	gbString lib_str = gb_string_make(heap_allocator(), "\"Kernel32.lib\"");
+	gbString lib_str = gb_string_make(heap_allocator(), "");
 	// defer (gb_string_free(lib_str));
 	char lib_str_buf[1024] = {0};
-	for_array(i, checker.info.foreign_libraries) {
-		String lib = checker.info.foreign_libraries.e[i];
+	for_array(i, ir_gen.module.foreign_library_paths) {
+		String lib = ir_gen.module.foreign_library_paths.e[i];
+		gb_printf_err("Linking lib: %.*s\n", LIT(lib));
 		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-		                        " \"%.*s.lib\"", LIT(lib));
+		                        " \"%.*s\"", LIT(lib));
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);
 	}
 

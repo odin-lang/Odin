@@ -2,7 +2,7 @@
 #import "os.odin";
 
 set :: proc(data: rawptr, value: i32, len: int) -> rawptr #link_name "__mem_set" {
-	llvm_memset_64bit :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) #foreign "llvm.memset.p0i8.i64"
+	llvm_memset_64bit :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memset.p0i8.i64";
 	llvm_memset_64bit(data, cast(byte)value, len, 1, false);
 	return data;
 }
@@ -13,14 +13,14 @@ zero :: proc(data: rawptr, len: int) -> rawptr #link_name "__mem_zero" {
 
 copy :: proc(dst, src: rawptr, len: int) -> rawptr #link_name "__mem_copy" {
 	// NOTE(bill): This _must_ implemented like C's memmove
-	llvm_memmove_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memmove.p0i8.p0i8.i64"
+	llvm_memmove_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memmove.p0i8.p0i8.i64";
 	llvm_memmove_64bit(dst, src, len, 1, false);
 	return dst;
 }
 
 copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #link_name "__mem_copy_non_overlapping" {
 	// NOTE(bill): This _must_ implemented like C's memcpy
-	llvm_memcpy_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign "llvm.memcpy.p0i8.p0i8.i64"
+	llvm_memcpy_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memcpy.p0i8.p0i8.i64";
 	llvm_memcpy_64bit(dst, src, len, 1, false);
 	return dst;
 }

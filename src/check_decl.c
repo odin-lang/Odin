@@ -319,6 +319,29 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 			name = pd->foreign_name;
 		}
 
+		AstNode *foreign_library = d->proc_lit->ProcLit.foreign_library;
+		if (foreign_library == NULL) {
+			error(e->token, "#foreign procedures must declare which library they are from");
+		} else if (foreign_library->kind != AstNode_Ident) {
+			error_node(foreign_library, "#foreign library names must be an identifier");
+		} else {
+			String name = foreign_library->Ident.string;
+			Entity *found = scope_lookup_entity(c->context.scope, name);
+			if (found == NULL) {
+				if (str_eq(name, str_lit("_"))) {
+					error_node(foreign_library, "`_` cannot be used as a value type");
+				} else {
+					error_node(foreign_library, "Undeclared name: %.*s", LIT(name));
+				}
+			} else if (found->kind != Entity_LibraryName) {
+				error_node(foreign_library, "`_` cannot be used as a library name");
+			} else {
+				// TODO(bill): Extra stuff to do with library names?
+				e->Procedure.foreign_library = found;
+				add_entity_use(c, foreign_library, found);
+			}
+		}
+
 		e->Procedure.is_foreign = true;
 		e->Procedure.foreign_name = name;
 

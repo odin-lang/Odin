@@ -265,8 +265,7 @@ exit :: proc(code: int) {
 
 
 current_thread_id :: proc() -> int {
-	GetCurrentThreadId :: proc() -> u32 #foreign
-	return cast(int)GetCurrentThreadId();
+	return cast(int)win32.GetCurrentThreadId();
 }
 
 

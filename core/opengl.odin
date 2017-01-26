@@ -1,36 +1,37 @@
-#foreign_system_library "opengl32" when ODIN_OS == "windows";
+#foreign_system_library "opengl32.lib" when ODIN_OS == "windows";
 #import win32 "sys/windows.odin" when ODIN_OS == "windows";
 #include "opengl_constants.odin";
 
-Clear         :: proc(mask: u32)                                #foreign "glClear"
-ClearColor    :: proc(r, g, b, a: f32)                          #foreign "glClearColor"
-Begin         :: proc(mode: i32)                                #foreign "glBegin"
-End           :: proc()                                         #foreign "glEnd"
-Finish        :: proc()                                         #foreign "glFinish"
-BlendFunc     :: proc(sfactor, dfactor: i32)                    #foreign "glBlendFunc"
-Enable        :: proc(cap: i32)                                 #foreign "glEnable"
-Disable       :: proc(cap: i32)                                 #foreign "glDisable"
-GenTextures   :: proc(count: i32, result: ^u32)                 #foreign "glGenTextures"
-DeleteTextures:: proc(count: i32, result: ^u32)                 #foreign "glDeleteTextures"
-TexParameteri :: proc(target, pname, param: i32)                #foreign "glTexParameteri"
-TexParameterf :: proc(target: i32, pname: i32, param: f32)      #foreign "glTexParameterf"
-BindTexture   :: proc(target: i32, texture: u32)                #foreign "glBindTexture"
-LoadIdentity  :: proc()                                         #foreign "glLoadIdentity"
-Viewport      :: proc(x, y, width, height: i32)                 #foreign "glViewport"
-Ortho         :: proc(left, right, bottom, top, near, far: f64) #foreign "glOrtho"
-Color3f       :: proc(r, g, b: f32)                             #foreign "glColor3f"
-Vertex3f      :: proc(x, y, z: f32)                             #foreign "glVertex3f"
+Clear         :: proc(mask: u32)                                #foreign opengl32 "glClear";
+ClearColor    :: proc(r, g, b, a: f32)                          #foreign opengl32 "glClearColor";
+Begin         :: proc(mode: i32)                                #foreign opengl32 "glBegin";
+End           :: proc()                                         #foreign opengl32 "glEnd";
+Finish        :: proc()                                         #foreign opengl32 "glFinish";
+BlendFunc     :: proc(sfactor, dfactor: i32)                    #foreign opengl32 "glBlendFunc";
+Enable        :: proc(cap: i32)                                 #foreign opengl32 "glEnable";
+Disable       :: proc(cap: i32)                                 #foreign opengl32 "glDisable";
+GenTextures   :: proc(count: i32, result: ^u32)                 #foreign opengl32 "glGenTextures";
+DeleteTextures:: proc(count: i32, result: ^u32)                 #foreign opengl32 "glDeleteTextures";
+TexParameteri :: proc(target, pname, param: i32)                #foreign opengl32 "glTexParameteri";
+TexParameterf :: proc(target: i32, pname: i32, param: f32)      #foreign opengl32 "glTexParameterf";
+BindTexture   :: proc(target: i32, texture: u32)                #foreign opengl32 "glBindTexture";
+LoadIdentity  :: proc()                                         #foreign opengl32 "glLoadIdentity";
+Viewport      :: proc(x, y, width, height: i32)                 #foreign opengl32 "glViewport";
+Ortho         :: proc(left, right, bottom, top, near, far: f64) #foreign opengl32 "glOrtho";
+Color3f       :: proc(r, g, b: f32)                             #foreign opengl32 "glColor3f";
+Vertex3f      :: proc(x, y, z: f32)                             #foreign opengl32 "glVertex3f";
 TexImage2D    :: proc(target, level, internal_format,
                       width, height, border,
-                      format, _type: i32, pixels: rawptr) #foreign "glTexImage2D"
+                      format, _type: i32, pixels: rawptr) #foreign opengl32 "glTexImage2D";
 
-GetError    :: proc() -> i32            #foreign "glGetError"
-GetString   :: proc(name: i32) -> ^byte #foreign "glGetString"
-GetIntegerv :: proc(name: i32, v: ^i32) #foreign "glGetIntegerv"
+GetError    :: proc() -> i32            #foreign opengl32 "glGetError";
+GetString   :: proc(name: i32) -> ^byte #foreign opengl32 "glGetString";
+GetIntegerv :: proc(name: i32, v: ^i32) #foreign opengl32 "glGetIntegerv";
 
 
+string_data :: proc(s: string) -> ^u8 #inline { return ^s[0]; }
 
-_libgl := win32.LoadLibraryA((cast(string)"opengl32.dll\x00").data);
+_libgl := win32.LoadLibraryA(string_data("opengl32.dll\x00"));
 
 GetProcAddress :: proc(name: string) -> proc() #cc_c {
 	assert(name[name.count-1] == 0);

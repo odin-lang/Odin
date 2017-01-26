@@ -109,11 +109,11 @@ type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 
 
 
-assume :: proc(cond: bool) #foreign "llvm.assume"
+assume :: proc(cond: bool) #foreign __llvm_core "llvm.assume";
 
-__debug_trap       :: proc()        #foreign "llvm.debugtrap"
-__trap             :: proc()        #foreign "llvm.trap"
-read_cycle_counter :: proc() -> u64 #foreign "llvm.readcyclecounter"
+__debug_trap       :: proc()        #foreign __llvm_core "llvm.debugtrap";
+__trap             :: proc()        #foreign __llvm_core "llvm.trap";
+read_cycle_counter :: proc() -> u64 #foreign __llvm_core "llvm.readcyclecounter";
 
 
 Allocator_Mode :: enum u8 {
