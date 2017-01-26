@@ -250,6 +250,7 @@ typedef struct CheckerContext {
 	Scope *    scope;
 	DeclInfo * decl;
 	u32        stmt_state_flags;
+	bool       in_defer; // TODO(bill): Actually handle correctly
 } CheckerContext;
 
 // NOTE(bill): Symbol tables
@@ -288,7 +289,6 @@ typedef struct Checker {
 	CheckerContext         context;
 
 	Array(Type *)          proc_stack;
-	bool                   in_defer; // TODO(bill): Actually handle correctly
 	bool                   done_preload;
 } Checker;
 

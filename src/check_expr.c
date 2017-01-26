@@ -3882,6 +3882,19 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		o->value = make_exact_value_from_basic_literal(*bl);
 	case_end;
 
+	case_ast_node(bd, BasicDirective, node);
+		if (str_eq(bd->name, str_lit("file"))) {
+			o->type = t_untyped_string;
+			o->value = make_exact_value_string(bd->token.pos.file);
+		} else if (str_eq(bd->name, str_lit("line"))) {
+			o->type = t_untyped_integer;
+			o->value = make_exact_value_integer(bd->token.pos.line);
+		} else {
+			GB_PANIC("Unknown basic basic directive");
+		}
+		o->mode = Addressing_Constant;
+	case_end;
+
 	case_ast_node(pl, ProcLit, node);
 		Type *type = check_type(c, pl->type);
 		if (type == NULL || !is_type_proc(type)) {

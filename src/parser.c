@@ -70,7 +70,7 @@ typedef enum ProcTag {
 	ProcTag_link_name       = 1<<12,
 	ProcTag_inline          = 1<<13,
 	ProcTag_no_inline       = 1<<14,
-	ProcTag_dll_import      = 1<<15,
+	// ProcTag_dll_import      = 1<<15,
 	// ProcTag_dll_export      = 1<<16,
 } ProcTag;
 
@@ -113,9 +113,13 @@ AstNodeArray make_ast_node_array(AstFile *f) {
 
 
 #define AST_NODE_KINDS \
-	AST_NODE_KIND(BasicLit, "basic literal", Token) \
-	AST_NODE_KIND(Ident,    "identifier",    Token) \
-	AST_NODE_KIND(Ellipsis, "ellipsis", struct { \
+	AST_NODE_KIND(Ident,          "identifier",      Token) \
+	AST_NODE_KIND(BasicLit,       "basic literal",   Token) \
+	AST_NODE_KIND(BasicDirective, "basic directive", struct { \
+		Token token; \
+		String name; \
+	}) \
+	AST_NODE_KIND(Ellipsis,       "ellipsis", struct { \
 		Token token; \
 		AstNode *expr; \
 	}) \
@@ -420,10 +424,12 @@ gb_inline bool is_ast_node_when_stmt(AstNode *node) {
 
 Token ast_node_token(AstNode *node) {
 	switch (node->kind) {
-	case AstNode_BasicLit:
-		return node->BasicLit;
 	case AstNode_Ident:
 		return node->Ident;
+	case AstNode_BasicLit:
+		return node->BasicLit;
+	case AstNode_BasicDirective:
+		return node->BasicDirective.token;
 	case AstNode_ProcLit:
 		return ast_node_token(node->ProcLit.type);
 	case AstNode_CompoundLit:
@@ -741,15 +747,22 @@ AstNode *make_interval_expr(AstFile *f, Token op, AstNode *left, AstNode *right)
 
 
 
+AstNode *make_ident(AstFile *f, Token token) {
+	AstNode *result = make_node(f, AstNode_Ident);
+	result->Ident = token;
+	return result;
+}
+
 AstNode *make_basic_lit(AstFile *f, Token basic_lit) {
 	AstNode *result = make_node(f, AstNode_BasicLit);
 	result->BasicLit = basic_lit;
 	return result;
 }
 
-AstNode *make_ident(AstFile *f, Token token) {
-	AstNode *result = make_node(f, AstNode_Ident);
-	result->Ident = token;
+AstNode *make_basic_directive(AstFile *f, Token token, String name) {
+	AstNode *result = make_node(f, AstNode_BasicDirective);
+	result->BasicDirective.token = token;
+	result->BasicDirective.name = name;
 	return result;
 }
 
@@ -1543,7 +1556,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 		ELSE_IF_ADD_TAG(no_bounds_check)
 		ELSE_IF_ADD_TAG(inline)
 		ELSE_IF_ADD_TAG(no_inline)
-		ELSE_IF_ADD_TAG(dll_import)
+		// ELSE_IF_ADD_TAG(dll_import)
 		// ELSE_IF_ADD_TAG(dll_export)
 		else if (str_eq(tag_name, str_lit("cc_odin"))) {
 			if (cc == ProcCC_Invalid) {
@@ -1570,7 +1583,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *foreign_name, String *link_n
 				syntax_error_node(tag_expr, "Multiple calling conventions for procedure type");
 			}
 		} else {
-			syntax_error_node(tag_expr, "Unknown procedure tag");
+			syntax_error_node(tag_expr, "Unknown procedure tag #%.*s\n", LIT(tag_name));
 		}
 
 		#undef ELSE_IF_ADD_TAG
@@ -1752,17 +1765,9 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		Token token = expect_token(f, Token_Hash);
 		Token name  = expect_token(f, Token_Ident);
 		if (str_eq(name.string, str_lit("file"))) {
-			Token token = name;
-			token.kind = Token_String;
-			token.string = token.pos.file;
-			return make_basic_lit(f, token);
+			return make_basic_directive(f, token, name.string);
 		} else if (str_eq(name.string, str_lit("line"))) {
-			Token token = name;
-			token.kind = Token_Integer;
-			char *str = gb_alloc_array(gb_arena_allocator(&f->arena), char, 20);
-			gb_i64_to_str(token.pos.line, str, 10);
-			token.string = make_string_c(str);
-			return make_basic_lit(f, token);
+			return make_basic_directive(f, token, name.string);
 		} else if (str_eq(name.string, str_lit("run"))) {
 			AstNode *expr = parse_expr(f, false);
 			operand = make_run_expr(f, token, name, expr);
@@ -3077,20 +3082,21 @@ AstNode *parse_defer_stmt(AstFile *f) {
 	}
 
 	Token token = expect_token(f, Token_defer);
-	AstNode *statement = parse_stmt(f);
-	switch (statement->kind) {
+	AstNode *stmt = parse_stmt(f);
+	switch (stmt->kind) {
 	case AstNode_EmptyStmt:
 		syntax_error(token, "Empty statement after defer (e.g. `;`)");
 		break;
 	case AstNode_DeferStmt:
 		syntax_error(token, "You cannot defer a defer statement");
+		stmt = stmt->DeferStmt.stmt;
 		break;
 	case AstNode_ReturnStmt:
 		syntax_error(token, "You cannot a return statement");
 		break;
 	}
 
-	return make_defer_stmt(f, token, statement);
+	return make_defer_stmt(f, token, stmt);
 }
 
 AstNode *parse_asm_stmt(AstFile *f) {

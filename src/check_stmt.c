@@ -527,7 +527,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	case_ast_node(rs, ReturnStmt, node);
 		GB_ASSERT(c->proc_stack.count > 0);
 
-		if (c->in_defer) {
+		if (c->context.in_defer) {
 			error(rs->token, "You cannot `return` within a defer statement");
 			// TODO(bill): Should I break here?
 			break;
@@ -1046,10 +1046,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		if (is_ast_node_decl(ds->stmt)) {
 			error(ds->token, "You cannot defer a declaration");
 		} else {
-			bool out_in_defer = c->in_defer;
-			c->in_defer = true;
+			bool out_in_defer = c->context.in_defer;
+			c->context.in_defer = true;
 			check_stmt(c, ds->stmt, 0);
-			c->in_defer = out_in_defer;
+			c->context.in_defer = out_in_defer;
 		}
 	case_end;
 

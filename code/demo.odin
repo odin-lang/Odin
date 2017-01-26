@@ -11,6 +11,22 @@
 
 
 main :: proc() {
+	b : [1000]byte;
+
+	using fmt;
+
+	println();
+	println("Pointer of Address 0");
+	println(^b[0]);
+	println();
+	println("Pointer of Address 50");
+	println(^b[50]);
+	println();
+	println("Difference between 50 and 0");
+	println(^b[50] - ^b[0]);
+}
+
+/*
 	foo :: proc(x: ^i32) -> (int, int) {
 		fmt.println("^int");
 		return 123, cast(int)(x^);
@@ -22,7 +38,7 @@ main :: proc() {
 	THINGI :: 14451;
 	THINGF :: 14451.1;
 
-	a: i32 = 111111;
+	a: i32 = #line;
 	b: f32;
 	c: rawptr;
 	fmt.println(foo(^a));
@@ -53,3 +69,4 @@ main :: proc() {
 	f = foo;
 	f();
 }
+*/

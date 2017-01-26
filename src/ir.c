@@ -1479,12 +1479,13 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 			return ir_emit_ptr_offset(proc, ptr, offset);
 		} else if (is_type_pointer(t_left) && is_type_pointer(t_right)) {
 			GB_ASSERT(is_type_integer(type));
-			Type *ptr_type = t_left;
 			irModule *m = proc->module;
+			Type *ptr_type = base_type(t_left);
+			GB_ASSERT(!is_type_rawptr(ptr_type));
+			irValue *elem_size = ir_make_const_int(m->allocator, type_size_of(m->sizes, m->allocator, ptr_type->Pointer.elem));
 			irValue *x = ir_emit_conv(proc, left, type);
 			irValue *y = ir_emit_conv(proc, right, type);
 			irValue *diff = ir_emit_arith(proc, op, x, y, type);
-			irValue *elem_size = ir_make_const_int(m->allocator, type_size_of(m->sizes, m->allocator, ptr_type));
 			return ir_emit_arith(proc, Token_Quo, diff, elem_size, type);
 		}
 	}
@@ -2545,6 +2546,11 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 	case_ast_node(bl, BasicLit, expr);
 		TokenPos pos = bl->pos;
 		GB_PANIC("Non-constant basic literal %.*s(%td:%td) - %.*s", LIT(pos.file), pos.line, pos.column, LIT(token_strings[bl->kind]));
+	case_end;
+
+	case_ast_node(bd, BasicDirective, expr);
+		TokenPos pos = bd->token.pos;
+		GB_PANIC("Non-constant basic literal %.*s(%td:%td) - %.*s", LIT(pos.file), pos.line, pos.column, LIT(bd->name));
 	case_end;
 
 	case_ast_node(i, Ident, expr);

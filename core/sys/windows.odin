@@ -91,6 +91,12 @@ FILETIME :: struct #ordered {
 	lo, hi: u32,
 }
 
+SYSTEMTIME :: struct #ordered {
+	year, month: u16,
+	day_of_week, day: u16,
+	hour, minute, second, millisecond: u16,
+}
+
 BY_HANDLE_FILE_INFORMATION :: struct #ordered {
 	file_attributes:      u32,
 	creation_time,
@@ -118,43 +124,43 @@ GET_FILEEX_INFO_LEVELS :: i32;
 GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0;
 GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1;
 
-GetLastError     :: proc() -> i32                            #foreign #dll_import
-ExitProcess      :: proc(exit_code: u32)                     #foreign #dll_import
-GetDesktopWindow :: proc() -> HWND                           #foreign #dll_import
-GetCursorPos     :: proc(p: ^POINT) -> i32                   #foreign #dll_import
-ScreenToClient   :: proc(h: HWND, p: ^POINT) -> i32          #foreign #dll_import
-GetModuleHandleA :: proc(module_name: ^u8) -> HINSTANCE      #foreign #dll_import
-GetStockObject   :: proc(fn_object: i32) -> HGDIOBJ          #foreign #dll_import
-PostQuitMessage  :: proc(exit_code: i32)                     #foreign #dll_import
-SetWindowTextA   :: proc(hwnd: HWND, c_string: ^u8) -> BOOL  #foreign #dll_import
+GetLastError     :: proc() -> i32                            #foreign
+ExitProcess      :: proc(exit_code: u32)                     #foreign
+GetDesktopWindow :: proc() -> HWND                           #foreign
+GetCursorPos     :: proc(p: ^POINT) -> i32                   #foreign
+ScreenToClient   :: proc(h: HWND, p: ^POINT) -> i32          #foreign
+GetModuleHandleA :: proc(module_name: ^u8) -> HINSTANCE      #foreign
+GetStockObject   :: proc(fn_object: i32) -> HGDIOBJ          #foreign
+PostQuitMessage  :: proc(exit_code: i32)                     #foreign
+SetWindowTextA   :: proc(hwnd: HWND, c_string: ^u8) -> BOOL  #foreign
 
-QueryPerformanceFrequency :: proc(result: ^i64) -> i32 #foreign #dll_import
-QueryPerformanceCounter   :: proc(result: ^i64) -> i32 #foreign #dll_import
+QueryPerformanceFrequency :: proc(result: ^i64) -> i32 #foreign
+QueryPerformanceCounter   :: proc(result: ^i64) -> i32 #foreign
 
-Sleep :: proc(ms: i32) -> i32 #foreign #dll_import
+Sleep :: proc(ms: i32) -> i32 #foreign
 
-OutputDebugStringA :: proc(c_str: ^u8) #foreign #dll_import
+OutputDebugStringA :: proc(c_str: ^u8) #foreign
 
 
-RegisterClassExA :: proc(wc: ^WNDCLASSEXA) -> ATOM #foreign #dll_import
+RegisterClassExA :: proc(wc: ^WNDCLASSEXA) -> ATOM #foreign
 CreateWindowExA  :: proc(ex_style: u32,
                          class_name, title: ^u8,
                          style: u32,
                          x, y, w, h: i32,
                          parent: HWND, menu: HMENU, instance: HINSTANCE,
-                         param: rawptr) -> HWND #foreign #dll_import
+                         param: rawptr) -> HWND #foreign
 
-ShowWindow       :: proc(hwnd: HWND, cmd_show: i32) -> BOOL #foreign #dll_import
-TranslateMessage :: proc(msg: ^MSG) -> BOOL                 #foreign #dll_import
-DispatchMessageA :: proc(msg: ^MSG) -> LRESULT              #foreign #dll_import
-UpdateWindow     :: proc(hwnd: HWND) -> BOOL                #foreign #dll_import
+ShowWindow       :: proc(hwnd: HWND, cmd_show: i32) -> BOOL #foreign
+TranslateMessage :: proc(msg: ^MSG) -> BOOL                 #foreign
+DispatchMessageA :: proc(msg: ^MSG) -> LRESULT              #foreign
+UpdateWindow     :: proc(hwnd: HWND) -> BOOL                #foreign
 PeekMessageA     :: proc(msg: ^MSG, hwnd: HWND,
-                         msg_filter_min, msg_filter_max, remove_msg: u32) -> BOOL #foreign #dll_import
+                         msg_filter_min, msg_filter_max, remove_msg: u32) -> BOOL #foreign
 
-DefWindowProcA :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #foreign #dll_import
+DefWindowProcA :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #foreign
 
-AdjustWindowRect :: proc(rect: ^RECT, style: u32, menu: BOOL) -> BOOL #foreign #dll_import
-GetActiveWindow  :: proc() -> HWND #foreign #dll_import
+AdjustWindowRect :: proc(rect: ^RECT, style: u32, menu: BOOL) -> BOOL #foreign
+GetActiveWindow  :: proc() -> HWND #foreign
 
 
 GetQueryPerformanceFrequency :: proc() -> i64 {
@@ -163,28 +169,34 @@ GetQueryPerformanceFrequency :: proc() -> i64 {
 	return r;
 }
 
-GetCommandLineA    :: proc() -> ^u8 #foreign #dll_import
-GetSystemMetrics   :: proc(index: i32) -> i32 #foreign #dll_import
-GetCurrentThreadId :: proc() -> u32 #foreign #dll_import
+GetCommandLineA    :: proc() -> ^u8 #foreign
+GetSystemMetrics   :: proc(index: i32) -> i32 #foreign
+GetCurrentThreadId :: proc() -> u32 #foreign
+
+timeGetTime             :: proc() -> u32 #foreign
+GetSystemTimeAsFileTime :: proc(system_time_as_file_time: ^FILETIME) #foreign
+FileTimeToLocalFileTime :: proc(file_time: ^FILETIME, local_file_time: ^FILETIME) -> BOOL #foreign
+FileTimeToSystemTime    :: proc(file_time: ^FILETIME, system_time: ^SYSTEMTIME) -> BOOL #foreign
+SystemTimeToFileTime    :: proc(system_time: ^SYSTEMTIME, file_time: ^FILETIME) -> BOOL #foreign
 
 // File Stuff
 
-CloseHandle  :: proc(h: HANDLE) -> i32 #foreign #dll_import
-GetStdHandle :: proc(h: i32) -> HANDLE #foreign #dll_import
+CloseHandle  :: proc(h: HANDLE) -> i32 #foreign
+GetStdHandle :: proc(h: i32) -> HANDLE #foreign
 CreateFileA  :: proc(filename: ^u8, desired_access, share_mode: u32,
                      security: rawptr,
-                     creation, flags_and_attribs: u32, template_file: HANDLE) -> HANDLE #foreign #dll_import
-ReadFile  :: proc(h: HANDLE, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> BOOL #foreign #dll_import
-WriteFile :: proc(h: HANDLE, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> BOOL #foreign #dll_import
+                     creation, flags_and_attribs: u32, template_file: HANDLE) -> HANDLE #foreign
+ReadFile  :: proc(h: HANDLE, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> BOOL #foreign
+WriteFile :: proc(h: HANDLE, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> BOOL #foreign
 
-GetFileSizeEx              :: proc(file_handle: HANDLE, file_size: ^i64) -> BOOL #foreign #dll_import
-GetFileAttributesExA       :: proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> BOOL #foreign #dll_import
-GetFileInformationByHandle :: proc(file_handle: HANDLE, file_info: ^BY_HANDLE_FILE_INFORMATION) -> BOOL #foreign #dll_import
+GetFileSizeEx              :: proc(file_handle: HANDLE, file_size: ^i64) -> BOOL #foreign
+GetFileAttributesExA       :: proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> BOOL #foreign
+GetFileInformationByHandle :: proc(file_handle: HANDLE, file_info: ^BY_HANDLE_FILE_INFORMATION) -> BOOL #foreign
 
-GetFileType    :: proc(file_handle: HANDLE) -> u32 #foreign #dll_import
-SetFilePointer :: proc(file_handle: HANDLE, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 #foreign #dll_import
+GetFileType    :: proc(file_handle: HANDLE) -> u32 #foreign
+SetFilePointer :: proc(file_handle: HANDLE, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 #foreign
 
-SetHandleInformation :: proc(obj: HANDLE, mask, flags: u32) -> BOOL #foreign #dll_import
+SetHandleInformation :: proc(obj: HANDLE, mask, flags: u32) -> BOOL #foreign
 
 HANDLE_FLAG_INHERIT :: 1;
 HANDLE_FLAG_PROTECT_FROM_CLOSE :: 2;
@@ -238,10 +250,10 @@ INVALID_SET_FILE_POINTER :: ~cast(u32)0;
 
 
 
-HeapAlloc      :: proc (h: HANDLE, flags: u32, bytes: int) -> rawptr                 #foreign #dll_import
-HeapReAlloc    :: proc (h: HANDLE, flags: u32, memory: rawptr, bytes: int) -> rawptr #foreign #dll_import
-HeapFree       :: proc (h: HANDLE, flags: u32, memory: rawptr) -> BOOL               #foreign #dll_import
-GetProcessHeap :: proc () -> HANDLE #foreign #dll_import
+HeapAlloc      :: proc (h: HANDLE, flags: u32, bytes: int) -> rawptr                 #foreign
+HeapReAlloc    :: proc (h: HANDLE, flags: u32, memory: rawptr, bytes: int) -> rawptr #foreign
+HeapFree       :: proc (h: HANDLE, flags: u32, memory: rawptr) -> BOOL               #foreign
+GetProcessHeap :: proc () -> HANDLE #foreign
 
 
 HEAP_ZERO_MEMORY :: 0x00000008;
@@ -256,9 +268,9 @@ SECURITY_ATTRIBUTES :: struct #ordered {
 
 INFINITE :: 0xffffffff;
 
-CreateSemaphoreA    :: proc(attributes: ^SECURITY_ATTRIBUTES, initial_count, maximum_count: i32, name: ^byte) -> HANDLE #foreign #dll_import
-ReleaseSemaphore    :: proc(semaphore: HANDLE, release_count: i32, previous_count: ^i32) -> BOOL #foreign #dll_import
-WaitForSingleObject :: proc(handle: HANDLE, milliseconds: u32) -> u32 #foreign #dll_import
+CreateSemaphoreA    :: proc(attributes: ^SECURITY_ATTRIBUTES, initial_count, maximum_count: i32, name: ^byte) -> HANDLE #foreign
+ReleaseSemaphore    :: proc(semaphore: HANDLE, release_count: i32, previous_count: ^i32) -> BOOL #foreign
+WaitForSingleObject :: proc(handle: HANDLE, milliseconds: u32) -> u32 #foreign
 
 
 InterlockedCompareExchange :: proc(dst: ^i32, exchange, comparand: i32) -> i32 #foreign
@@ -309,7 +321,7 @@ StretchDIBits :: proc (hdc: HDC,
                        x_src, y_src, width_src, header_src: i32,
                        bits: rawptr, bits_info: ^BITMAPINFO,
                        usage: u32,
-                       rop: u32) -> i32 #foreign #dll_import
+                       rop: u32) -> i32 #foreign
 
 
 
@@ -381,10 +393,10 @@ PIXELFORMATDESCRIPTOR :: struct #ordered {
 }
 
 GetDC             :: proc(h: HANDLE) -> HDC #foreign
-SetPixelFormat    :: proc(hdc: HDC, pixel_format: i32, pfd: ^PIXELFORMATDESCRIPTOR ) -> BOOL #foreign #dll_import
-ChoosePixelFormat :: proc(hdc: HDC, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 #foreign #dll_import
-SwapBuffers       :: proc(hdc: HDC) -> BOOL #foreign #dll_import
-ReleaseDC         :: proc(wnd: HWND, hdc: HDC) -> i32 #foreign #dll_import
+SetPixelFormat    :: proc(hdc: HDC, pixel_format: i32, pfd: ^PIXELFORMATDESCRIPTOR ) -> BOOL #foreign
+ChoosePixelFormat :: proc(hdc: HDC, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 #foreign
+SwapBuffers       :: proc(hdc: HDC) -> BOOL #foreign
+ReleaseDC         :: proc(wnd: HWND, hdc: HDC) -> i32 #foreign
 
 WGL_CONTEXT_MAJOR_VERSION_ARB             :: 0x2091;
 WGL_CONTEXT_MINOR_VERSION_ARB             :: 0x2092;
@@ -392,15 +404,15 @@ WGL_CONTEXT_PROFILE_MASK_ARB              :: 0x9126;
 WGL_CONTEXT_CORE_PROFILE_BIT_ARB          :: 0x0001;
 WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB :: 0x0002;
 
-wglCreateContext  :: proc(hdc: HDC) -> HGLRC #foreign #dll_import
-wglMakeCurrent    :: proc(hdc: HDC, hglrc: HGLRC) -> BOOL #foreign #dll_import
-wglGetProcAddress :: proc(c_str: ^u8) -> PROC #foreign #dll_import
-wglDeleteContext  :: proc(hglrc: HGLRC) -> BOOL #foreign #dll_import
+wglCreateContext  :: proc(hdc: HDC) -> HGLRC #foreign
+wglMakeCurrent    :: proc(hdc: HDC, hglrc: HGLRC) -> BOOL #foreign
+wglGetProcAddress :: proc(c_str: ^u8) -> PROC #foreign
+wglDeleteContext  :: proc(hglrc: HGLRC) -> BOOL #foreign
 
 
 
-GetKeyState      :: proc(v_key: i32) -> i16 #foreign #dll_import
-GetAsyncKeyState :: proc(v_key: i32) -> i16 #foreign #dll_import
+GetKeyState      :: proc(v_key: i32) -> i16 #foreign
+GetAsyncKeyState :: proc(v_key: i32) -> i16 #foreign
 
 is_key_down :: proc(key: Key_Code) -> bool #inline { return GetAsyncKeyState(cast(i32)key) < 0; }
 

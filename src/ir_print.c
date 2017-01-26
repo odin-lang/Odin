@@ -1235,9 +1235,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	if (proc->body == NULL) {
 		ir_fprintf(f, "declare ");
-		if (proc->tags & ProcTag_dll_import) {
-			ir_fprintf(f, "dllimport ");
-		}
+		// if (proc->tags & ProcTag_dll_import) {
+			// ir_fprintf(f, "dllimport ");
+		// }
 	} else {
 		ir_fprintf(f, "\n");
 		ir_fprintf(f, "define ");
