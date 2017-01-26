@@ -305,8 +305,8 @@ parse_int :: proc(s: string, offset: int) -> (int, int, bool) {
 	ok := true;
 
 	i := 0;
-	for _ : offset..<s.count {
-		c := cast(rune)s[offset];
+	for o : offset..<s.count {
+		c := cast(rune)s[offset+i];
 		if !is_digit(c) {
 			break;
 		}
@@ -316,7 +316,7 @@ parse_int :: proc(s: string, offset: int) -> (int, int, bool) {
 		result += cast(int)(c - '0');
 	}
 
-	return result, offset, i != 0;
+	return result, offset+i, i != 0;
 }
 
 arg_number :: proc(fi: ^Fmt_Info, arg_index: int, format: string, offset: int, arg_count: int) -> (int, int, bool) {
@@ -547,361 +547,61 @@ fmt_int :: proc(fi: ^Fmt_Info, u: u64, signed: bool, verb: rune) {
 	}
 }
 
-__bot       := [23]f64{1e+000,1e+001,1e+002,1e+003,1e+004,1e+005,1e+006,1e+007,1e+008,1e+009,1e+010,1e+011,1e+012,1e+013,1e+014,1e+015,1e+016,1e+017,1e+018,1e+019,1e+020,1e+021,1e+022};
-__negbot    := [22]f64{1e-001,1e-002,1e-003,1e-004,1e-005,1e-006,1e-007,1e-008,1e-009,1e-010,1e-011,1e-012,1e-013,1e-014,1e-015,1e-016,1e-017,1e-018,1e-019,1e-020,1e-021,1e-022};
-__negboterr := [22]f64{-5.551115123125783e-018,-2.0816681711721684e-019,-2.0816681711721686e-020,-4.7921736023859299e-021,-8.1803053914031305e-022,4.5251888174113741e-023,4.5251888174113739e-024,-2.0922560830128471e-025,-6.2281591457779853e-026,-3.6432197315497743e-027,6.0503030718060191e-028,2.0113352370744385e-029,-3.0373745563400371e-030,1.1806906454401013e-032,-7.7705399876661076e-032,2.0902213275965398e-033,-7.1542424054621921e-034,-7.1542424054621926e-035,2.4754073164739869e-036,5.4846728545790429e-037,9.2462547772103625e-038,-4.8596774326570872e-039};
-__top       := [13]f64{1e+023,1e+046,1e+069,1e+092,1e+115,1e+138,1e+161,1e+184,1e+207,1e+230,1e+253,1e+276,1e+299};
-__negtop    := [13]f64{1e-023,1e-046,1e-069,1e-092,1e-115,1e-138,1e-161,1e-184,1e-207,1e-230,1e-253,1e-276,1e-299};
-__toperr    := [13]f64{8388608,6.8601809640529717e+028,-7.253143638152921e+052,-4.3377296974619174e+075,-1.5559416129466825e+098,-3.2841562489204913e+121,-3.7745893248228135e+144,-1.7356668416969134e+167,-3.8893577551088374e+190,-9.9566444326005119e+213,6.3641293062232429e+236,-5.2069140800249813e+259,-5.2504760255204387e+282};
-__negtoperr := [13]f64{3.9565301985100693e-040,-2.299904345391321e-063,3.6506201437945798e-086,1.1875228833981544e-109,-5.0644902316928607e-132,-6.7156837247865426e-155,-2.812077463003139e-178,-5.7778912386589953e-201,7.4997100559334532e-224,-4.6439668915134491e-247,-6.3691100762962136e-270,-9.436808465446358e-293,8.0970921678014997e-317};
-
-__digitpair := "00010203040506070809101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899";
-
-
-__powten := [20]u64{1,10,100,1000, 10000,100000,1000000,10000000, 100000000,1000000000,10000000000,100000000000,  1000000000000,10000000000000,100000000000000,1000000000000000,  10000000000000000,100000000000000000,1000000000000000000,10000000000000000000 };
-
-__TEN_TO_19TH :: 1000000000000000000;
-
-__ddmulthi :: proc(ol: f64, xh, yh: f64) -> f64 {
-	bt: i64;
-	oh := xh * yh;
-	bt = transmute(i64)xh;
-	bt &= cast(i64)(~cast(u64)0<<27);
-	ahi := transmute(f64)bt;
-	alo := xh-ahi;
-	bt = transmute(i64)yh;
-	bt &= cast(i64)(~cast(u64)0<<27);
-	bhi := transmute(f64)bt;
-	blo := yh-bhi;
-	return ((ahi*bhi-oh)+ahi*blo+alo*bhi)+alo*blo;
-}
-
-__ddtoi64 :: proc(xh, xl: f64) -> i64 {
-	ob := cast(i64)xh;
-	vh := cast(f64)ob;
-	ahi := xh-vh;
-	t := ahi-xh;
-	alo := (xh-(ahi-t)) - (vh+t);
-	ob += cast(i64)(ahi+alo+xl);
-	return ob;
-}
-
-__ddrenorm :: proc(oh, ol: f64) -> f64 {
-	s := oh + ol;
-	ol = ol - (s-oh);
-	return s;
-}
-
-__ddmultlo :: proc(oh, ol, xh, xl, yh, yl: f64) -> f64 {
-	return ol + (xh*yl + xl*yh);
-}
-
-__ddmutlos :: proc(oh, ol, xh, yl: f64) -> f64 {
-	return ol + (xh*yl);
-}
-
-__raise_to_power10 :: proc(ohi, olo: ^f64, d: f64, power: i32) { // power can be -323 to +350
-	ph, pl: f64;
-
-	if 0<=power&&power<=22 {
-		ph = __ddmulthi(pl, d, __bot[power]);
-	} else {
-		p2h, p2l: f64;
-
-		e := power; if power<0 { e = -e; }
-		et := (e*0x2c9)>>14;
-		if et>13 {
-			et = 13;
-		}
-		eb := e-(et*23);
-
-		ph = d;
-		pl = 0.0;
-		if power<0 {
-			if eb != 0 {
-				eb -= 1;
-				ph = __ddmulthi(pl, d, __negbot[eb]);
-				ph = __ddmutlos(ph, pl, d, __negboterr[eb]);
-			}
-			if et != 0 {
-				ph = __ddrenorm(ph, pl);
-				et -= 1;
-				p2h = __ddmulthi(p2l, ph, __negtop[et]);
-				p2h = __ddmultlo(p2h, p2l, ph, pl, __negtop[et], __negtoperr[et]);
-				ph = p2h;
-				pl = p2l;
-			}
-		} else {
-			if eb != 0 {
-				e = eb;
-				if eb > 22 {
-					eb = 22;
-				}
-				e -= eb;
-				ph = __ddmulthi(pl, d, __bot[eb]);
-				if e != 0 {
-					ph = __ddrenorm(ph, pl);
-					p2h = __ddmulthi(p2l, ph, __bot[e]);
-					p2h = __ddmutlos(p2h, p2l, __bot[e], pl);
-					ph = p2h;
-					pl = p2l;
-				}
-			}
-			if et != 0 {
-				ph = __ddrenorm(ph, pl);
-				et -= 1;
-				p2h = __ddmulthi(p2l, ph, __top[et]);
-				p2h = __ddmultlo(p2h, p2l, ph, pl, __top[et], __toperr[et]);
-				ph = p2h;
-				pl = p2l;
-			}
-		}
-	}
-
-	ph = __ddrenorm(ph, pl);
-	ohi^ = ph;
-	olo^ = pl;
-}
-
-__SPECIAL :: 0x7000;
-
-__real_to_string :: proc(start: ^string, out: []byte, decimal_pos: ^i32, val: f64, frac_digits: i32, verb: rune) -> bool {
-	e, tens: i32;
-	d: f64 = val;
-
-	bits := transmute(i64)d;
-	expo := cast(i32)(bits>>52 & 2047);
-	neg := cast(i32)(bits>>63) != 0;
-	if neg {
-		d = -d;
-	}
-
-	if expo == 2047 {
-		x: i64 = 1<<52-1;
-		if bits&x != 0 {
-			start^ = "NaN";
-		} else {
-			start^ = "Inf";
-		}
-		decimal_pos^ = __SPECIAL;
-		return neg;
-	}
-
-	if expo == 0 { // is zero or denormal
-		if bits<<1 == 0 {
-			decimal_pos^ = 1;
-			out[0] = '0';
-			start^ = cast(string)out[:1];
-			return neg;
-		}
-		// find the right expo for denormals
-		v: i64 = 1<<51;
-		while bits&v == 0 {
-			expo -=1;
-			v >>= 1;
-		}
-	}
-
-	// find the decimal exponent as well as the decimal bits of the value
-	{
-		// log10 estimate - very specifically tweaked to hit or undershoot by no more than 1 of log10 of all expos 1..2046
-		ph, pl: f64;
-		tens = expo-1023;
-		if tens < 0 {
-			tens = (tens*617)/2048;
-		} else {
-			tens = ((tens*1233)/4096) + 1;
-		}
-
-		// move the significant bits into position and stick them into an int
-		__raise_to_power10(^ph, ^pl, d, 18-tens);
-
-		// get full as much precision from double-double as possible
-		bits = __ddtoi64(ph, pl);
-
-		// check if we undershot
-		if cast(f64)bits >= __TEN_TO_19TH {
-			tens += 1;
-		}
-	}
-
-	// now do the rounding in integer land
-	match verb {
-	case 'e', 'E', 'g', 'G':
-		frac_digits += 1;
-	default:
-		frac_digits += tens;
-	}
-
-	if frac_digits < 24 {
-		skip := false;
-		dg: u32 = 1;
-		if cast(u64)bits >= __powten[9] {
-			dg = 10;
-		}
-		while cast(u64)bits >= __powten[dg] {
-			dg += 1;
-			if dg == 20 {
-				skip = true;
-				break;
-			}
-		}
-
-		if (!skip) {
-			r: u64;
-			// add 0.5 at the right position and round
-			e = cast(i32)dg - frac_digits;
-			if cast(u32)e < 24 {
-				r = __powten[e];
-				bits += cast(i64)(r/2);
-				if cast(u64)bits >= __powten[dg] {
-					tens += 1;
-				}
-				bits /= cast(i64)(r);
-			}
-		}
-	}
-
-	// kill long trailing runs of zeros
-	if bits != 0 {
-		skip := false;
-		while true {
-			if bits <= 0xffffffff {
-				break;
-			}
-			if bits%1000 != 0 {
-				skip = true;
-				break;
-			}
-			bits /= 1000;
-		}
-		if !skip {
-			n := cast(u32)bits;
-			while n%1000 == 0 {
-				n /= 1000;
-			}
-			bits = cast(i64)n;
-		}
-	}
-
-
-	e = 0;
-	outp := ^out[64];
-	while true {
-		n: u32;
-		o := outp-8;
-		// do the conversion in chunks of u32s (avoid most 64-bit divides, worth it, constant denomiators be damned)
-		if bits >= 100000000 {
-			n = cast(u32)(bits%100000000);
-			bits /= 100000000;
-		} else {
-			n = cast(u32)bits;
-			bits = 0;
-		}
-		while n != 0 {
-			outp -= 2;
-			(cast(^u16)outp)^ = (cast(^u16)^__digitpair[(n%100)*2])^;
-			n /= 100;
-			e += 2;
-		}
-		if bits == 0 {
-			if e != 0 && outp^ == '0' {
-				outp += 1;
-				e -= 1;
-			}
-			break;
-		}
-		while outp != o {
-			outp -= 1;
-			outp^ = '0';
-			e += 1;
-		}
-	}
-
-	decimal_pos^ = tens;
-	start^ = cast(string)slice_ptr(outp, e);
-	return neg;
-}
-
-
-generic_ftoa :: proc(buf: []byte, val: f64, verb: rune, prec, bit_size: int) -> []byte {
-	Float_Info :: struct {
-		mantbits: uint,
-		expbits:  uint,
-		bias:     int,
-	};
-	f32info := Float_Info{23,  8,  -127};
-	f64info := Float_Info{52, 11, -1023};
-
-
-	bits: u64;
-	flt: ^Float_Info;
-	match bit_size {
-	case 32:
-		bits = cast(u64)transmute(u32)cast(f32)val;
-		flt = ^f32info;
-	case 64:
-		bits = cast(u64)val;
-		flt = ^f64info;
-	default:
-		panic("illegal float bit_size");
-	}
-
-	neg := bits>>(flt.expbits+flt.mantbits) != 0;
-	exp := cast(int)(bits>>flt.mantbits) & (1<<flt.expbits - 1);
-	mant := bits & (cast(u64)1<<flt.mantbits - 1);
-
-	match exp {
-	case 1<<flt.expbits-1:
-		s: string;
-		match {
-		case mant!=0: s = "NaN";
-		case neg:     s = "-Inf";
-		default:      s = "+Inf";
-		}
-		copy(buf, cast([]byte)s);
-		return buf[:s.count];
-
-	case 0: // denormalized
-		exp+=1;
-	default: // add implicit top bit
-		mant |= cast(u64)1<<flt.mantbits;
-	}
-
-
-	i := 0;
-	match verb {
-	case 'e', 'E':
-
-	case 'v', 'f', 'F':
-		if neg {
-			buf[i] = '-'; i+=1;
-		}
-		buf[i] = '0'; i+=1;
-		if prec > 0 {
-			buf[i] = '.'; i+=1;
-			for j : 0..<prec {
-				ch: byte = '0';
-			}
-		}
-
-	case 'g', 'G':
-
-	}
-
-	return buf[:i];
-}
 
 fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
-	buf: [512]byte;
-
 	match verb {
 	// case 'e', 'E', 'f', 'F', 'g', 'G', 'v':
 	// case 'f', 'F', 'v':
 
+	// TODO(bill): This is a shit copy from gb.h and I really need a decent implementation
 	case 'f', 'F', 'v':
-		b := generic_ftoa(buf[:], v, verb, fi.prec, bit_size);
-		buffer_write(fi.buf, b);
+		width := 0;
+		if fi.width_set {
+			width = max(fi.width, 0);
+		}
+		prec := 3;
+		if fi.prec_set {
+			prec = max(fi.prec, 0);
+		}
+
+		if v == 0 {
+			buffer_write_byte(fi.buf, '0');
+			if fi.hash && width > 0 {
+				buffer_write_byte(fi.buf, '.');
+			}
+		} else {
+			signed := v < 0;
+			v = abs(v);
+
+			val := cast(u64)v;
+			fmt_integer(fi, val, 10, signed, __DIGITS_LOWER);
+
+			if fi.hash || prec > 0 {
+				arg := v - cast(f64)val;
+				mult: f64 = 10;
+				buffer_write_byte(fi.buf, '.');
+				for _ : 0..<prec {
+					val := cast(u64)(arg*mult);
+					buffer_write_byte(fi.buf, __DIGITS_LOWER[cast(u64)val]);
+					arg -= cast(f64)val / mult;
+					mult *= 10;
+				}
+			}
+		}
+
+
+		if width > 0 {
+			fill: byte = ' ';
+			match {
+			case fi.zero:  fill = '0';
+			case fi.space: fill = ' ';
+			}
+
+			while width > 0 {
+				width -= 1;
+				buffer_write_byte(fi.buf, fill);
+			}
+		}
 	default:
 		fmt_bad_verb(fi, verb);
 		return;
@@ -1256,8 +956,8 @@ bprintf :: proc(b: ^Buffer, fmt: string, args: ...any) -> int {
 			if was_prev_index { // %[6].2d
 				fi.good_arg_index = false;
 			}
-			arg_index, i, was_prev_index = arg_number(^fi, arg_index, fmt, i, args.count);
 			if i < end && fmt[i] == '*' {
+				arg_index, i, was_prev_index = arg_number(^fi, arg_index, fmt, i, args.count);
 				i += 1;
 				fi.prec, arg_index, fi.prec_set = int_from_arg(args, arg_index);
 				if fi.prec < 0 {

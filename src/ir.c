@@ -3103,43 +3103,12 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 
 				case BuiltinProc_abs: {
 					ir_emit_comment(proc, str_lit("abs"));
-					gbAllocator a = proc->module->allocator;
-
 					irValue *x = ir_build_expr(proc, ce->args.e[0]);
-					Type *original_type = ir_type(x);
-					Type *t = original_type;
-					i64 sz = type_size_of(proc->module->sizes, a, t);
-					GB_ASSERT(is_type_integer(t) || is_type_float(t));
-					if (is_type_float(t)) {
-						if (sz == 4) {
-							t = t_i32;
-						} else if (sz == 8) {
-							t = t_i64;
-						} else {
-							GB_PANIC("unknown float type for `abs`");
-						}
-
-						x = ir_emit_bitcast(proc, x, t);
-					}
-
-					/*
-						NOTE(bill): See Hacker's Delight, section 2-4.
-						m := x >> (int_size-1)
-						b := x ^ m
-						return b - m
-					*/
-
-					irValue *m = ir_emit_arith(proc, Token_Shr,
-					                             x,
-					                             ir_make_value_constant(a, t, make_exact_value_integer(sz-1)),
-					                             t);
-					irValue *b = ir_emit_arith(proc, Token_Xor, x, m, t);
-					irValue *v = ir_emit_arith(proc, Token_Sub, b, m, t);
-
-					if (is_type_float(t)) {
-						v = ir_emit_bitcast(proc, v, original_type);
-					}
-					return v;
+					Type *t = ir_type(x);
+					irValue *zero = ir_emit_conv(proc, v_zero, t);
+					irValue *cond = ir_emit_comp(proc, Token_Lt, x, zero);
+					irValue *neg = ir_emit(proc, ir_make_instr_unary_op(proc, Token_Sub, x, t));
+					return ir_emit_select(proc, cond, neg, x);
 				} break;
 
 				case BuiltinProc_clamp: {
