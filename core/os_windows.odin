@@ -223,7 +223,7 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	single_read_length: i32;
 	total_read: i64;
 
-	while total_read < length {
+	for total_read < length {
 		remaining := length - total_read;
 		to_read: u32;
 		MAX :: 1<<32-1;

@@ -108,7 +108,7 @@ murmur64 :: proc(data_: rawptr, len: int) -> u64 {
 		data := slice_ptr(cast(^u32)data_, len/size_of(u32));
 
 		i := 0;
-		while len >= 8 {
+		for len >= 8 {
 			k1, k2: u32;
 			k1 = data[i]; i += 1;
 			k1 *= m;

@@ -36,7 +36,7 @@ fetch_or :: proc(a: ^i32, operand: i32) -> i32 {
 spin_lock :: proc(a: ^i32, time_out: int) -> bool { // NOTE(bill) time_out = -1 as default
 	old_value := compare_exchange(a, 1, 0);
 	counter := 0;
-	while old_value != 0 && (time_out < 0 || counter < time_out) {
+	for old_value != 0 && (time_out < 0 || counter < time_out) {
 		counter += 1;
 		yield_thread();
 		old_value = compare_exchange(a, 1, 0);
@@ -80,7 +80,7 @@ fetch_or :: proc(a: ^i64, operand: i64) -> i64 {
 spin_lock :: proc(a: ^i64, time_out: int) -> bool { // NOTE(bill) time_out = -1 as default
 	old_value := compare_exchange(a, 1, 0);
 	counter := 0;
-	while old_value != 0 && (time_out < 0 || counter < time_out) {
+	for old_value != 0 && (time_out < 0 || counter < time_out) {
 		counter += 1;
 		yield_thread();
 		old_value = compare_exchange(a, 1, 0);

@@ -143,8 +143,7 @@ valid_rune :: proc(r: rune) -> bool {
 
 valid_string :: proc(s: string) -> bool {
 	n := s.count;
-	i := 0;
-	while i < n {
+	for i := 0; i < n; {
 		si := s[i];
 		if si < RUNE_SELF { // ascii
 			i += 1;
@@ -178,8 +177,8 @@ valid_string :: proc(s: string) -> bool {
 rune_count :: proc(s: string) -> int {
 	count := 0;
 	n := s.count;
-	i := 0;
-	while i < n {
+
+	for i := 0; i < n; {
 		defer count += 1;
 		si := s[i];
 		if si < RUNE_SELF { // ascii

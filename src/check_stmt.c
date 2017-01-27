@@ -127,13 +127,13 @@ bool check_is_terminating(AstNode *node) {
 		}
 	case_end;
 
-	case_ast_node(ws, WhileStmt, node);
-		if (ws->cond != NULL && !check_has_break(ws->body, true)) {
-			return check_is_terminating(ws->body);
+	case_ast_node(fs, ForStmt, node);
+		if (!check_has_break(fs->body, true)) {
+			return check_is_terminating(fs->body);
 		}
 	case_end;
 
-	case_ast_node(rs, ForStmt, node);
+	case_ast_node(rs, RangeStmt, node);
 		if (!check_has_break(rs->body, true)) {
 			return check_is_terminating(rs->body);
 		}
@@ -566,27 +566,33 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 	case_end;
 
-	case_ast_node(ws, WhileStmt, node);
+	case_ast_node(fs, ForStmt, node);
 		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 		check_open_scope(c, node);
 
-		if (ws->init != NULL) {
-			check_stmt(c, ws->init, 0);
+		if (fs->init != NULL) {
+			check_stmt(c, fs->init, 0);
 		}
-		if (ws->cond) {
-			Operand operand = {Addressing_Invalid};
-			check_expr(c, &operand, ws->cond);
-			if (operand.mode != Addressing_Invalid &&
-			    !is_type_boolean(operand.type)) {
-				error_node(ws->cond, "Non-boolean condition in `while` statement");
+		if (fs->cond != NULL) {
+			Operand o = {Addressing_Invalid};
+			check_expr(c, &o, fs->cond);
+			if (o.mode != Addressing_Invalid && !is_type_boolean(o.type)) {
+				error_node(fs->cond, "Non-boolean condition in `for` statement");
 			}
 		}
-		check_stmt(c, ws->body, new_flags);
+		if (fs->post != NULL) {
+			check_stmt(c, fs->post, 0);
+
+			if (fs->post->kind != AstNode_AssignStmt) {
+				error_node(fs->post, "`for` statement post statement must be an assignment");
+			}
+		}
+		check_stmt(c, fs->body, new_flags);
 
 		check_close_scope(c);
 	case_end;
 
-	case_ast_node(rs, ForStmt, node);
+	case_ast_node(rs, RangeStmt, node);
 		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 		check_open_scope(c, node);
 

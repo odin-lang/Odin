@@ -92,7 +92,6 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_then,           "then"), \
 	TOKEN_KIND(Token_if,             "if"), \
 	TOKEN_KIND(Token_else,           "else"), \
-	TOKEN_KIND(Token_while,          "while"), \
 	TOKEN_KIND(Token_for,            "for"), \
 	TOKEN_KIND(Token_in,             "in"), \
 	TOKEN_KIND(Token_when,           "when"), \

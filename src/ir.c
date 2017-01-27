@@ -4470,44 +4470,54 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		proc->curr_block = done;
 	case_end;
 
-	case_ast_node(ws, WhileStmt, node);
-		ir_emit_comment(proc, str_lit("WhileStmt"));
-		if (ws->init != NULL) {
-			irBlock *init = ir_add_block(proc, node, "while.init");
+	case_ast_node(fs, ForStmt, node);
+		ir_emit_comment(proc, str_lit("ForStmt"));
+		if (fs->init != NULL) {
+			irBlock *init = ir_add_block(proc, node, "for.init");
 			ir_emit_jump(proc, init);
 			proc->curr_block = init;
-			ir_build_stmt(proc, ws->init);
+			ir_build_stmt(proc, fs->init);
 		}
-		irBlock *body = ir_add_block(proc, node, "while.body");
-		irBlock *done = ir_add_block(proc, node, "while.done"); // NOTE(bill): Append later
-
+		irBlock *body = ir_add_block(proc, node, "for.body");
+		irBlock *done = ir_add_block(proc, node, "for.done"); // NOTE(bill): Append later
 		irBlock *loop = body;
-
-		if (ws->cond != NULL) {
-			loop = ir_add_block(proc, node, "while.loop");
+		if (fs->cond != NULL) {
+			loop = ir_add_block(proc, node, "for.loop");
+		}
+		irBlock *cont = loop;
+		if (fs->post != NULL) {
+			cont = ir_add_block(proc, node, "for.post");
 		}
 		ir_emit_jump(proc, loop);
 		proc->curr_block = loop;
+
 		if (loop != body) {
-			ir_build_cond(proc, ws->cond, body, done);
+			ir_build_cond(proc, fs->cond, body, done);
 			proc->curr_block = body;
 		}
 
-		ir_push_target_list(proc, done, loop, NULL);
+		ir_push_target_list(proc, done, cont, NULL);
 
 		ir_open_scope(proc);
-		ir_build_stmt(proc, ws->body);
+		ir_build_stmt(proc, fs->body);
 		ir_close_scope(proc, irDeferExit_Default, NULL);
 
 		ir_pop_target_list(proc);
-		ir_emit_jump(proc, loop);
+
+		ir_emit_jump(proc, cont);
+
+		if (fs->post != NULL) {
+			proc->curr_block = cont;
+			ir_build_stmt(proc, fs->post);
+			ir_emit_jump(proc, loop);
+		}
 
 		proc->curr_block = done;
 	case_end;
 
 
-	case_ast_node(rs, ForStmt, node);
-		ir_emit_comment(proc, str_lit("ForStmt"));
+	case_ast_node(rs, RangeStmt, node);
+		ir_emit_comment(proc, str_lit("RangeStmt"));
 
 		Type *val_type = NULL;
 		Type *idx_type = NULL;

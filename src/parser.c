@@ -221,16 +221,18 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 		Token token; \
 		AstNodeArray results; \
 	}) \
-	AST_NODE_KIND(WhileStmt, "while statement", struct { \
+	AST_NODE_KIND(ForStmt, "for statement", struct { \
 		Token    token; \
 		AstNode *init; \
 		AstNode *cond; \
+		AstNode *post; \
 		AstNode *body; \
 	}) \
-	AST_NODE_KIND(ForStmt, "range statement", struct { \
+	AST_NODE_KIND(RangeStmt, "range statement", struct { \
 		Token    token; \
 		AstNode *value; \
 		AstNode *index; \
+		Token    in_token; \
 		AstNode *expr; \
 		AstNode *body; \
 	}) \
@@ -501,8 +503,10 @@ Token ast_node_token(AstNode *node) {
 		return node->WhenStmt.token;
 	case AstNode_ReturnStmt:
 		return node->ReturnStmt.token;
-	case AstNode_WhileStmt:
-		return node->WhileStmt.token;
+	case AstNode_ForStmt:
+		return node->ForStmt.token;
+	case AstNode_RangeStmt:
+		return node->RangeStmt.token;
 	case AstNode_MatchStmt:
 		return node->MatchStmt.token;
 	case AstNode_CaseClause:
@@ -904,21 +908,25 @@ AstNode *make_return_stmt(AstFile *f, Token token, AstNodeArray results) {
 	return result;
 }
 
-AstNode *make_while_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *body) {
-	AstNode *result = make_node(f, AstNode_WhileStmt);
-	result->WhileStmt.token = token;
-	result->WhileStmt.init  = init;
-	result->WhileStmt.cond  = cond;
-	result->WhileStmt.body  = body;
-	return result;
-}
-AstNode *make_for_stmt(AstFile *f, Token token, AstNode *value, AstNode *index, AstNode *expr, AstNode *body) {
+
+AstNode *make_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *post, AstNode *body) {
 	AstNode *result = make_node(f, AstNode_ForStmt);
 	result->ForStmt.token = token;
-	result->ForStmt.value = value;
-	result->ForStmt.index = index;
-	result->ForStmt.expr  = expr;
+	result->ForStmt.init  = init;
+	result->ForStmt.cond  = cond;
+	result->ForStmt.post  = post;
 	result->ForStmt.body  = body;
+	return result;
+}
+
+AstNode *make_range_stmt(AstFile *f, Token token, AstNode *value, AstNode *index, Token in_token, AstNode *expr, AstNode *body) {
+	AstNode *result = make_node(f, AstNode_RangeStmt);
+	result->RangeStmt.token = token;
+	result->RangeStmt.value = value;
+	result->RangeStmt.index = index;
+	result->RangeStmt.in_token = in_token;
+	result->RangeStmt.expr  = expr;
+	result->RangeStmt.body  = body;
 	return result;
 }
 
@@ -1258,7 +1266,6 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_if:
 		case Token_when:
 		case Token_return:
-		case Token_while:
 		case Token_range:
 		case Token_match:
 		case Token_defer:
@@ -1626,7 +1633,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, AstNode **foreign_library_token, Str
 
 AstNodeArray parse_lhs_expr_list(AstFile *f);
 AstNodeArray parse_rhs_expr_list(AstFile *f);
-AstNode *    parse_simple_stmt  (AstFile *f);
+AstNode *    parse_simple_stmt  (AstFile *f, bool in_stmt_ok);
 AstNode *    parse_type         (AstFile *f);
 
 AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
@@ -1673,7 +1680,7 @@ AstNode *parse_if_expr(AstFile *f) {
 	if (allow_token(f, Token_Semicolon)) {
 		cond = parse_expr(f, false);
 	} else {
-		init = parse_simple_stmt(f);
+		init = parse_simple_stmt(f, false);
 		if (allow_token(f, Token_Semicolon)) {
 			cond = parse_expr(f, false);
 		} else {
@@ -2261,7 +2268,8 @@ AstNode *parse_value_decl(AstFile *f, AstNodeArray lhs) {
 	return make_value_decl(f, is_mutable, lhs, type, values);
 }
 
-AstNode *parse_simple_stmt(AstFile *f) {
+
+AstNode *parse_simple_stmt(AstFile *f, bool in_stmt_ok) {
 	AstNodeArray lhs = parse_lhs_expr_list(f);
 	Token token = f->curr_token;
 	switch (token.kind) {
@@ -2292,6 +2300,28 @@ AstNode *parse_simple_stmt(AstFile *f) {
 		}
 		return make_assign_stmt(f, token, lhs, rhs);
 	} break;
+
+	case Token_in:
+		if (in_stmt_ok) {
+			allow_token(f, Token_in);
+			AstNode *expr = parse_expr(f, false);
+			switch (f->curr_token.kind) {
+			case Token_HalfOpenRange:
+			case Token_Ellipsis: {
+				Token op = f->curr_token;
+				next_token(f);
+				AstNode *right = parse_expr(f, false);
+				expr = make_interval_expr(f, op, expr, right);
+			} break;
+			}
+
+			AstNodeArray rhs = {0};
+			array_init_count(&rhs, heap_allocator(), 1);
+			rhs.e[0] = expr;
+
+			return make_assign_stmt(f, token, lhs, rhs);
+		}
+		break;
 
 	case Token_Colon:
 		return parse_value_decl(f, lhs);
@@ -2782,7 +2812,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 	if (allow_token(f, Token_Semicolon)) {
 		cond = parse_expr(f, false);
 	} else {
-		init = parse_simple_stmt(f);
+		init = parse_simple_stmt(f, false);
 		if (allow_token(f, Token_Semicolon)) {
 			cond = parse_expr(f, false);
 		} else {
@@ -2900,47 +2930,78 @@ AstNode *parse_give_stmt(AstFile *f) {
 	return make_expr_stmt(f, ge);
 }
 
-AstNode *parse_while_stmt(AstFile *f) {
-	if (f->curr_proc == NULL) {
-		syntax_error(f->curr_token, "You cannot use a while statement in the file scope");
-		return make_bad_stmt(f, f->curr_token, f->curr_token);
-	}
-
-	Token token = expect_token(f, Token_while);
-
-	AstNode *init = NULL;
-	AstNode *cond = NULL;
-	AstNode *body = NULL;
-
-	isize prev_level = f->expr_level;
-	f->expr_level = -1;
-
-
-	cond = parse_simple_stmt(f);
-	if (is_ast_node_complex_stmt(cond)) {
-		syntax_error(f->curr_token, "You are not allowed that type of statement in a while statement, it is too complex!");
-	}
-
-	if (allow_token(f, Token_Semicolon)) {
-		init = cond;
-		cond = parse_simple_stmt(f);
-	}
-	f->expr_level = prev_level;
-
-	body = parse_block_stmt(f, false);
-
-	cond = convert_stmt_to_expr(f, cond, str_lit("boolean expression"));
-
-	return make_while_stmt(f, token, init, cond, body);
-}
-
-
 AstNode *parse_for_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
 		syntax_error(f->curr_token, "You cannot use a for statement in the file scope");
 		return make_bad_stmt(f, f->curr_token, f->curr_token);
 	}
 
+	Token token = expect_token(f, Token_for);
+
+	AstNode *init = NULL;
+	AstNode *cond = NULL;
+	AstNode *post = NULL;
+	AstNode *body = NULL;
+	bool is_range = false;
+
+	if (f->curr_token.kind != Token_OpenBrace) {
+		isize prev_level = f->expr_level;
+		f->expr_level = -1;
+		if (f->curr_token.kind != Token_Semicolon) {
+			cond = parse_simple_stmt(f, true);
+			if (cond->kind == AstNode_AssignStmt &&
+			    cond->AssignStmt.op.kind == Token_in) {
+				is_range = true;
+			}
+		}
+
+		if (!is_range && f->curr_token.kind == Token_Semicolon) {
+			next_token(f);
+			init = cond;
+			cond = NULL;
+			if (f->curr_token.kind != Token_Semicolon) {
+				cond = parse_simple_stmt(f, false);
+			}
+			expect_semicolon(f, cond);
+			if (f->curr_token.kind != Token_OpenBrace) {
+				post = parse_simple_stmt(f, false);
+			}
+		}
+
+		f->expr_level = prev_level;
+	}
+
+	body = parse_block_stmt(f, false);
+
+	if (is_range) {
+		GB_ASSERT(cond->kind == AstNode_AssignStmt);
+		Token in_token = cond->AssignStmt.op;
+		AstNode *value = NULL;
+		AstNode *index = NULL;
+		switch (cond->AssignStmt.lhs.count) {
+		case 1:
+			value = cond->AssignStmt.lhs.e[0];
+			break;
+		case 2:
+			value = cond->AssignStmt.lhs.e[0];
+			index = cond->AssignStmt.lhs.e[1];
+			break;
+		default:
+			error_node(cond, "Expected at 1 or 2 identifiers");
+			return make_bad_stmt(f, token, f->curr_token);
+		}
+
+		AstNode *rhs = NULL;
+		if (cond->AssignStmt.rhs.count > 0) {
+			rhs = cond->AssignStmt.rhs.e[0];
+		}
+		return make_range_stmt(f, token, value, index, in_token, rhs, body);
+	}
+
+	cond = convert_stmt_to_expr(f, cond, str_lit("boolean expression"));
+	return make_for_stmt(f, token, init, cond, post, body);
+
+#if 0
 	Token token = expect_token(f, Token_for);
 	AstNodeArray names = parse_ident_list(f);
 	parse_check_name_list_for_reserves(f, names);
@@ -2977,7 +3038,8 @@ AstNode *parse_for_stmt(AstFile *f) {
 		return make_bad_stmt(f, token, f->curr_token);
 	}
 
-	return make_for_stmt(f, token, value, index, expr, body);
+	return make_range_stmt(f, token, value, index, expr, body);
+#endif
 }
 
 AstNode *parse_case_clause(AstFile *f) {
@@ -3030,7 +3092,7 @@ AstNode *parse_match_stmt(AstFile *f) {
 
 		AstNode *var = parse_identifier(f);
 		expect_token_after(f, Token_in, "match type name");
-		tag = parse_simple_stmt(f);
+		tag = parse_simple_stmt(f, false);
 
 		f->expr_level = prev_level;
 
@@ -3052,13 +3114,13 @@ AstNode *parse_match_stmt(AstFile *f) {
 			isize prev_level = f->expr_level;
 			f->expr_level = -1;
 			if (f->curr_token.kind != Token_Semicolon) {
-				tag = parse_simple_stmt(f);
+				tag = parse_simple_stmt(f, false);
 			}
 			if (allow_token(f, Token_Semicolon)) {
 				init = tag;
 				tag = NULL;
 				if (f->curr_token.kind != Token_OpenBrace) {
-					tag = parse_simple_stmt(f);
+					tag = parse_simple_stmt(f, false);
 				}
 			}
 
@@ -3151,13 +3213,12 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Sub:
 	case Token_Xor:
 	case Token_Not:
-		s = parse_simple_stmt(f);
+		s = parse_simple_stmt(f, false);
 		expect_semicolon(f, s);
 		return s;
 
 	case Token_if:     return parse_if_stmt(f);
 	case Token_when:   return parse_when_stmt(f);
-	case Token_while:  return parse_while_stmt(f);
 	case Token_for:    return parse_for_stmt(f);
 	case Token_match:  return parse_match_stmt(f);
 	case Token_defer:  return parse_defer_stmt(f);

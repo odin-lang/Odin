@@ -460,7 +460,7 @@ fmt_integer :: proc(fi: ^Fmt_Info, u: u64, base: int, signed: bool, digits: stri
 		panic("fmt_integer: unknown base, whoops");
 	}
 
-	while b := cast(u64)base; u >= b {
+	for b := cast(u64)base; u >= b;  {
 		i -= 1;
 		next := u / b;
 		buf[i] = digits[u%b];
@@ -468,7 +468,7 @@ fmt_integer :: proc(fi: ^Fmt_Info, u: u64, base: int, signed: bool, digits: stri
 	}
 	i -= 1;
 	buf[i] = digits[u];
-	while i > 0 && prec > buf.count-i {
+	for i > 0 && prec > buf.count-i {
 		i -= 1;
 		buf[i] = '0';
 	}
@@ -598,7 +598,7 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
 			case fi.space: fill = ' ';
 			}
 
-			while width > 0 {
+			for width > 0 {
 				width -= 1;
 				buffer_write_byte(fi.buf, fill);
 			}
@@ -885,11 +885,11 @@ bprintf :: proc(b: ^Buffer, fmt: string, args: ..any) -> int {
 	end := fmt.count;
 	arg_index := 0;
 	was_prev_index := false;
-	while i := 0; i < end {
+	for i := 0; i < end;  {
 		fi = Fmt_Info{buf = b, good_arg_index = true};
 
 		prev_i := i;
-		while i < end && fmt[i] != '%' {
+		for i < end && fmt[i] != '%' {
 			i += 1;
 		}
 		if i > prev_i {
@@ -903,7 +903,7 @@ bprintf :: proc(b: ^Buffer, fmt: string, args: ..any) -> int {
 		i += 1;
 
 
-		while i < end {
+		for ; i < end; i += 1 {
 			skip_loop := false;
 			c := fmt[i];
 			match c {
@@ -925,7 +925,6 @@ bprintf :: proc(b: ^Buffer, fmt: string, args: ..any) -> int {
 			if skip_loop {
 				break;
 			}
-			i += 1;
 		}
 
 		arg_index, i, was_prev_index = arg_number(^fi, arg_index, fmt, i, args.count);

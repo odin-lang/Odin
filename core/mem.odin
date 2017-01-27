@@ -75,14 +75,13 @@ allocation_header_fill :: proc(header: ^Allocation_Header, data: rawptr, size: i
 	header.size = size;
 	ptr := cast(^int)(header+1);
 
-	while i := 0; cast(rawptr)ptr < data {
+	for i := 0; cast(rawptr)ptr < data; i += 1 {
 		(ptr+i)^ = -1;
-		i += 1;
 	}
 }
 allocation_header :: proc(data: rawptr) -> ^Allocation_Header {
 	p := cast(^int)data;
-	while (p-1)^ == -1 {
+	for (p-1)^ == -1 {
 		p = (p-1);
 	}
 	return cast(^Allocation_Header)p-1;

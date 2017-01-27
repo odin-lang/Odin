@@ -168,25 +168,25 @@ special_expressions :: proc() {
 
 loops :: proc() {
 
-	// while loops
-	while true {
+	// The C-style for loop
+	for i := 0; i < 123; i += 1 {
 		break;
 	}
-	while x := 123; x < 124 {
-		x += 2;
+	for i := 0; i < 123; {
+		break;
+	}
+	for false {
+		break;
+	}
+	for {
+		break;
 	}
 
 
-/*
-	This only C-style for loop has now been removed
-
-	for i := 0; i < 123; i += 1 {
-	}
-*/
-	for i in 0..<123 {
+	for i in 0..<123 { // 123 exclusive
 	}
 
-	for i in 0..122 {
+	for i in 0..122 { // 122 inclusive
 	}
 
 	for val, idx in 12..<16 {
@@ -214,22 +214,11 @@ loops :: proc() {
 	}
 
 	when false {
-		while i := 0; i < name.count {
-			r, size := utf8.decode_rune(name[i:]);
-			i += size;
+		for i, size := 0; i < name.count; i += size {
+			r: rune;
+			r, size = utf8.decode_rune(name[i:]);
 			fmt.printf("%r\n", r);
 		}
-	}
-
-
-
-	// Emulate a C-style loop (not exactly the same though)
-	while x := 0; x < 10 {
-		defer x += 2;
-
-		/* rest of the code */
-		// If `break` is used, the `defer` is still called so it's not the same
-		// as a C-style for loop
 	}
 
 
