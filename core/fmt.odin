@@ -58,38 +58,38 @@ Fmt_Info :: struct {
 
 
 
-fprint :: proc(fd: os.Handle, args: ...any) -> int {
+fprint :: proc(fd: os.Handle, args: ..any) -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := Buffer{data[:], 0};
-	bprint(^buf, ...args);
+	bprint(^buf, ..args);
 	os.write(fd, buf.data[:buf.length]);
 	return buf.length;
 }
 
-fprintln :: proc(fd: os.Handle, args: ...any) -> int {
+fprintln :: proc(fd: os.Handle, args: ..any) -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := Buffer{data[:], 0};
-	bprintln(^buf, ...args);
+	bprintln(^buf, ..args);
 	os.write(fd, buf.data[:buf.length]);
 	return buf.length;
 }
-fprintf :: proc(fd: os.Handle, fmt: string, args: ...any) -> int {
+fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := Buffer{data[:], 0};
-	bprintf(^buf, fmt, ...args);
+	bprintf(^buf, fmt, ..args);
 	os.write(fd, buf.data[:buf.length]);
 	return buf.length;
 }
 
 
-print :: proc(args: ...any) -> int {
-	return fprint(os.stdout, ...args);
+print :: proc(args: ..any) -> int {
+	return fprint(os.stdout, ..args);
 }
-println :: proc(args: ...any) -> int {
-	return fprintln(os.stdout, ...args);
+println :: proc(args: ..any) -> int {
+	return fprintln(os.stdout, ..args);
 }
-printf :: proc(fmt: string, args: ...any) -> int {
-	return fprintf(os.stdout, fmt, ...args);
+printf :: proc(fmt: string, args: ..any) -> int {
+	return fprintf(os.stdout, fmt, ..args);
 }
 
 
@@ -107,7 +107,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 	}
 
 	using Type_Info;
-	match type info : ti {
+	match type info in ti {
 	case Named:
 		buffer_write_string(buf, info.name);
 	case Integer:
@@ -154,7 +154,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 	case Tuple:
 		count := info.fields.count;
 		if count != 1 { buffer_write_string(buf, "("); }
-		for i : 0..<count {
+		for i in 0..<count {
 			if i > 0 { buffer_write_string(buf, ", "); }
 
 			f := info.fields[i];
@@ -189,7 +189,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		if info.packed  { buffer_write_string(buf, "#packed "); }
 		if info.ordered { buffer_write_string(buf, "#ordered "); }
 		buffer_write_string(buf, "{");
-		for field, i : info.fields {
+		for field, i in info.fields {
 			buffer_write_string(buf, field.name);
 			buffer_write_string(buf, ": ");
 			buffer_write_type(buf, field.type_info);
@@ -199,7 +199,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 
 	case Union:
 		buffer_write_string(buf, "union {");
-		for field, i : info.fields {
+		for field, i in info.fields {
 			buffer_write_string(buf, field.name);
 			buffer_write_string(buf, ": ");
 			buffer_write_type(buf, field.type_info);
@@ -209,7 +209,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 
 	case Raw_Union:
 		buffer_write_string(buf, "raw_union {");
-		for field, i : info.fields {
+		for field, i in info.fields {
 			buffer_write_string(buf, field.name);
 			buffer_write_string(buf, ": ");
 			buffer_write_type(buf, field.type_info);
@@ -225,12 +225,12 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 }
 
 
-bprint :: proc(buf: ^Buffer, args: ...any) -> int {
+bprint :: proc(buf: ^Buffer, args: ..any) -> int {
 	fi: Fmt_Info;
 	fi.buf = buf;
 
 	prev_string := false;
-	for arg, i : args {
+	for arg, i in args {
 		is_string := arg.data != nil && is_type_string(arg.type_info);
 		if i > 0 && !is_string && !prev_string {
 			buffer_write_byte(buf, ' ');
@@ -241,11 +241,11 @@ bprint :: proc(buf: ^Buffer, args: ...any) -> int {
 	return buf.length;
 }
 
-bprintln :: proc(buf: ^Buffer, args: ...any) -> int {
+bprintln :: proc(buf: ^Buffer, args: ..any) -> int {
 	fi: Fmt_Info;
 	fi.buf = buf;
 
-	for arg, i : args {
+	for arg, i in args {
 		if i > 0 {
 			buffer_write_byte(buf, ' ');
 		}
@@ -262,7 +262,7 @@ is_type_string :: proc(info: ^Type_Info) -> bool {
 		return false;
 	}
 
-	match type i : type_info_base(info) {
+	match type i in type_info_base(info) {
 	case String:
 		return true;
 	}
@@ -274,7 +274,7 @@ is_type_integer :: proc(info: ^Type_Info) -> bool {
 		return false;
 	}
 
-	match type i : type_info_base(info) {
+	match type i in type_info_base(info) {
 	case Integer:
 		return true;
 	}
@@ -286,7 +286,7 @@ is_type_float :: proc(info: ^Type_Info) -> bool {
 		return false;
 	}
 
-	match type i : type_info_base(info) {
+	match type i in type_info_base(info) {
 	case Float:
 		return true;
 	}
@@ -305,7 +305,7 @@ parse_int :: proc(s: string, offset: int) -> (int, int, bool) {
 	ok := true;
 
 	i := 0;
-	for o : offset..<s.count {
+	for o in offset..<s.count {
 		c := cast(rune)s[offset+i];
 		if !is_digit(c) {
 			break;
@@ -325,7 +325,7 @@ arg_number :: proc(fi: ^Fmt_Info, arg_index: int, format: string, offset: int, a
 			return 0, 1, false;
 		}
 
-		for i : 1..<format.count {
+		for i in 1..<format.count {
 			if format[i] == ']' {
 				width, new_index, ok := parse_int(format, 1);
 				if !ok || new_index != i {
@@ -358,7 +358,7 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 	if arg_index < args.count {
 		arg := args[arg_index];
 		arg.type_info = type_info_base(arg.type_info);
-		match type i : arg {
+		match type i in arg {
 		case int:  num = i;
 		case i8:   num = cast(int)i;
 		case i16:  num = cast(int)i;
@@ -413,7 +413,7 @@ fmt_write_padding :: proc(fi: ^Fmt_Info, width: int) {
 
 	count := min(width, fi.buf.data.count-fi.buf.length);
 	start := fi.buf.length;
-	for i : start..<count {
+	for i in start..<count {
 		fi.buf.data[i] = pad_byte;
 	}
 	fi.buf.length += count;
@@ -581,7 +581,7 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
 				arg := v - cast(f64)val;
 				mult: f64 = 10;
 				buffer_write_byte(fi.buf, '.');
-				for _ : 0..<prec {
+				for _ in 0..<prec {
 					val := cast(u64)(arg*mult);
 					buffer_write_byte(fi.buf, __DIGITS_LOWER[cast(u64)val]);
 					arg -= cast(f64)val / mult;
@@ -638,7 +638,7 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	}
 
 	using Type_Info;
-	match type e : v.type_info {
+	match type e in v.type_info {
 	default:
 		fmt_bad_verb(fi, verb);
 		return;
@@ -651,7 +651,7 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			f: f64;
 			ok := false;
 			a := any{type_info_base(e.base), v.data};
-			match type v : a {
+			match type v in a {
 			case i8:   i = cast(i64)v;
 			case i16:  i = cast(i64)v;
 			case i32:  i = cast(i64)v;
@@ -667,7 +667,7 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			}
 
 			if is_type_integer(e.base) {
-				for it, idx : e.values {
+				for it, idx in e.values {
 					if it.i == i {
 						buffer_write_string(fi.buf, e.names[idx]);
 						ok = true;
@@ -675,7 +675,7 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 					}
 				}
 			} else {
-				for it, idx : e.values {
+				for it, idx in e.values {
 					if it.f == f {
 						buffer_write_string(fi.buf, e.names[idx]);
 						ok = true;
@@ -702,9 +702,9 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	}
 
 	using Type_Info;
-	match type info : v.type_info {
+	match type info in v.type_info {
 	case Named:
-		match type b : info.base {
+		match type b in info.base {
 		case Struct:
 			if verb != 'v' {
 				fmt_bad_verb(fi, verb);
@@ -712,7 +712,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			}
 			buffer_write_string(fi.buf, info.name);
 			buffer_write_byte(fi.buf, '{');
-			for f, i : b.fields {
+			for f, i in b.fields {
 				if i > 0 {
 					buffer_write_string(fi.buf, ", ");
 				}
@@ -757,7 +757,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 		buffer_write_byte(fi.buf, '[');
 		defer buffer_write_byte(fi.buf, ']');
-		for i : 0..<info.count {
+		for i in 0..<info.count {
 			if i > 0 {
 				buffer_write_string(fi.buf, ", ");
 			}
@@ -774,7 +774,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		buffer_write_byte(fi.buf, '[');
 		defer buffer_write_byte(fi.buf, ']');
 		slice := cast(^[]byte)v.data;
-		for i : 0..<slice.count {
+		for i in 0..<slice.count {
 			if i > 0 {
 				buffer_write_string(fi.buf, ", ");
 			}
@@ -784,7 +784,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 	case Vector:
 		is_bool :: proc(type_info: ^Type_Info) -> bool {
-			match type info : type_info {
+			match type info in type_info {
 			case Named:
 				return is_bool(info.base);
 			case Boolean:
@@ -800,7 +800,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			return;
 		}
 
-		for i : 0..<info.count {
+		for i in 0..<info.count {
 			if i > 0 {
 				buffer_write_string(fi.buf, ", ");
 			}
@@ -813,7 +813,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		buffer_write_byte(fi.buf, '{');
 		defer buffer_write_byte(fi.buf, '}');
 
-		for f, i : info.fields {
+		for f, i in info.fields {
 			if i > 0 {
 				buffer_write_string(fi.buf, ", ");
 			}
@@ -848,7 +848,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 
 	if verb == 'T' {
 		ti := arg.type_info;
-		match type a : arg {
+		match type a in arg {
 		case ^Type_Info: ti = a;
 		}
 		buffer_write_type(fi.buf, ti);
@@ -858,7 +858,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 
 	base_arg := arg;
 	base_arg.type_info = type_info_base(base_arg.type_info);
-	match type a : base_arg {
+	match type a in base_arg {
 	case bool:    fmt_bool(fi, a, verb);
 	case f32:     fmt_float(fi, cast(f64)a, 32, verb);
 	case f64:     fmt_float(fi, a, 64, verb);
@@ -880,7 +880,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 }
 
 
-bprintf :: proc(b: ^Buffer, fmt: string, args: ...any) -> int {
+bprintf :: proc(b: ^Buffer, fmt: string, args: ..any) -> int {
 	fi := Fmt_Info{};
 	end := fmt.count;
 	arg_index := 0;
@@ -1004,7 +1004,7 @@ bprintf :: proc(b: ^Buffer, fmt: string, args: ...any) -> int {
 
 	if !fi.reordered && arg_index < args.count {
 		buffer_write_string(b, "%!(EXTRA ");
-		for arg, index : args[arg_index:] {
+		for arg, index in args[arg_index:] {
 			if index > 0 {
 				buffer_write_string(b, ", ");
 			}

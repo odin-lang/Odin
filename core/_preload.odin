@@ -100,7 +100,7 @@ type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 		return nil;
 	}
 	base := info;
-	match type i : base {
+	match type i in base {
 	case Type_Info.Named:
 		base = i.base;
 	}

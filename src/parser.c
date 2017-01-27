@@ -2944,7 +2944,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 	Token token = expect_token(f, Token_for);
 	AstNodeArray names = parse_ident_list(f);
 	parse_check_name_list_for_reserves(f, names);
-	Token colon = expect_token_after(f, Token_Colon, "for name list");
+	Token colon = expect_token_after(f, Token_in, "for name list");
 
 	isize prev_level = f->expr_level;
 	f->expr_level = -1;
@@ -3029,7 +3029,7 @@ AstNode *parse_match_stmt(AstFile *f) {
 		f->expr_level = -1;
 
 		AstNode *var = parse_identifier(f);
-		expect_token(f, Token_Colon);
+		expect_token_after(f, Token_in, "match type name");
 		tag = parse_simple_stmt(f);
 
 		f->expr_level = prev_level;

@@ -1,7 +1,7 @@
 crc32 :: proc(data: rawptr, len: int) -> u32 {
 	result := ~cast(u32)0;
 	s := slice_ptr(cast(^u8)data, len);
-	for i : 0..<len {
+	for i in 0..<len {
 		b := cast(u32)s[i];
 		result = result>>8 ~ __CRC32_TABLE[(result ~ b) & 0xff];
 	}
@@ -10,7 +10,7 @@ crc32 :: proc(data: rawptr, len: int) -> u32 {
 crc64 :: proc(data: rawptr, len: int) -> u64 {
 	result := ~cast(u64)0;
 	s := slice_ptr(cast(^u8)data, len);
-	for i : 0..<len {
+	for i in 0..<len {
 		b := cast(u64)s[i];
 		result = result>>8 ~ __CRC64_TABLE[(result ~ b) & 0xff];
 	}
@@ -21,7 +21,7 @@ fnv32 :: proc(data: rawptr, len: int) -> u32 {
 	s := slice_ptr(cast(^u8)data, len);
 
 	h: u32 = 0x811c9dc5;
-	for i : 0..<len {
+	for i in 0..<len {
 		h = (h * 0x01000193) ~ cast(u32)s[i];
 	}
 	return h;
@@ -31,7 +31,7 @@ fnv64 :: proc(data: rawptr, len: int) -> u64 {
 	s := slice_ptr(cast(^u8)data, len);
 
 	h: u64 = 0xcbf29ce484222325;
-	for i : 0..<len {
+	for i in 0..<len {
 		h = (h * 0x100000001b3) ~ cast(u64)s[i];
 	}
 	return h;
@@ -41,7 +41,7 @@ fnv32a :: proc(data: rawptr, len: int) -> u32 {
 	s := slice_ptr(cast(^u8)data, len);
 
 	h: u32 = 0x811c9dc5;
-	for i : 0..<len {
+	for i in 0..<len {
 		h = (h ~ cast(u32)s[i]) * 0x01000193;
 	}
 	return h;
@@ -51,7 +51,7 @@ fnv64a :: proc(data: rawptr, len: int) -> u64 {
 	s := slice_ptr(cast(^u8)data, len);
 
 	h :u64 = 0xcbf29ce484222325;
-	for i : 0..<len {
+	for i in 0..<len {
 		h = (h ~ cast(u64)s[i]) * 0x100000001b3;
 	}
 	return h;
@@ -70,7 +70,7 @@ murmur64 :: proc(data_: rawptr, len: int) -> u64 {
 		data := slice_ptr(cast(^u64)data_, len/size_of(u64));
 		data2 := slice_ptr(cast(^u8)data_, len);
 
-		for i : 0 ..< data.count {
+		for i in 0 ..< data.count {
 			k := data[i];
 
 			k *= m;

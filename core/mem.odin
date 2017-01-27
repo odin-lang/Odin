@@ -28,7 +28,7 @@ copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #link_name "_
 compare :: proc(dst, src: rawptr, n: int) -> int #link_name "__mem_compare" {
 	a := slice_ptr(cast(^byte)dst, n);
 	b := slice_ptr(cast(^byte)src, n);
-	for i : 0..<n {
+	for i in 0..<n {
 		match {
 		case a[i] < b[i]:
 			return -1;
@@ -212,7 +212,7 @@ align_of_type_info :: proc(type_info: ^Type_Info) -> int {
 	MAX_ALIGN :: size_of([vector 64]f64); // TODO(bill): Should these constants be builtin constants?
 	using Type_Info;
 
-	match type info : type_info {
+	match type info in type_info {
 	case Named:
 		return align_of_type_info(info.base);
 	case Integer:
@@ -257,7 +257,7 @@ align_formula :: proc(size, align: int) -> int {
 size_of_type_info :: proc(type_info: ^Type_Info) -> int {
 	WORD_SIZE :: size_of(int);
 	using Type_Info;
-	match type info : type_info {
+	match type info in type_info {
 	case Named:
 		return size_of_type_info(info.base);
 	case Integer:
@@ -289,7 +289,7 @@ size_of_type_info :: proc(type_info: ^Type_Info) -> int {
 		return 3*WORD_SIZE;
 	case Vector:
 		is_bool :: proc(type_info: ^Type_Info) -> bool {
-			match type info : type_info {
+			match type info in type_info {
 			case Named:
 				return is_bool(info.base);
 			case Boolean:

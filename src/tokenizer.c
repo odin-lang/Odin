@@ -75,7 +75,7 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 	TOKEN_KIND(Token_Semicolon,     ";"), \
 	TOKEN_KIND(Token_Period,        "."), \
 	TOKEN_KIND(Token_Comma,         ","), \
-	TOKEN_KIND(Token_Ellipsis,      "..."), \
+	TOKEN_KIND(Token_Ellipsis,      ".."), \
 	TOKEN_KIND(Token_HalfOpenRange, "..<"), \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
@@ -94,6 +94,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_else,           "else"), \
 	TOKEN_KIND(Token_while,          "while"), \
 	TOKEN_KIND(Token_for,            "for"), \
+	TOKEN_KIND(Token_in,             "in"), \
 	TOKEN_KIND(Token_when,           "when"), \
 	TOKEN_KIND(Token_range,          "range"), \
 	TOKEN_KIND(Token_defer,          "defer"), \
@@ -845,14 +846,10 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 		case '.':
 			token.kind = Token_Period; // Default
-			/* if (gb_is_between(t->curr_rune, '0', '9')) { // Might be a number
-				token = scan_number_to_token(t, true);
-			} else */ if (t->curr_rune == '.') { // Could be an ellipsis
+			if (t->curr_rune == '.') { // Could be an ellipsis
 				advance_to_next_rune(t);
-				if (t->curr_rune == '.') {
-					advance_to_next_rune(t);
-					token.kind = Token_Ellipsis;
-				} else if (t->curr_rune == '<') {
+				token.kind = Token_Ellipsis;
+				if (t->curr_rune == '<') {
 					advance_to_next_rune(t);
 					token.kind = Token_HalfOpenRange;
 				}

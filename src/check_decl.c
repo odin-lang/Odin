@@ -64,6 +64,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 	Array(Operand) operands;
 	array_init_reserve(&operands, c->tmp_allocator, 2*lhs_count);
 
+	// TODO(bill): Allow for type hints from the entities
 	for_array(i, inits) {
 		AstNode *rhs = inits.e[i];
 		Operand o = {0};

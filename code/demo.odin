@@ -1,5 +1,12 @@
 #import "fmt.odin";
 #import "utf8.odin";
+#import "atomic.odin";
+#import "hash.odin";
+#import "math.odin";
+#import "mem.odin";
+#import "opengl.odin";
+#import "os.odin";
+#import "sync.odin";
 
 main :: proc() {
 	syntax();
@@ -120,7 +127,6 @@ when_statements :: proc() {
 	foreign_procedures();
 }
 
-#import "atomic.odin" when ODIN_OS == "windows";
 #foreign_system_library win32_user "user32.lib" when ODIN_OS == "windows";
 // NOTE: This is done on purpose for two reasons:
 // * Makes it clear where the platform specific stuff is
@@ -131,6 +137,8 @@ foreign_procedures :: proc() {
 	show_window :: proc(hwnd: rawptr, cmd_show: i32) -> i32 #foreign win32_user "ShowWindow";
 	// NOTE: If that library doesn't get used, it doesn't get linked with
 	// NOTE: There is not link checking yet to see if that procedure does come from that library
+
+	// See sys/windows.odin for more examples
 
 	special_expressions();
 }
@@ -148,8 +156,7 @@ special_expressions :: proc() {
 		give x;
 	} else {
 		// TODO: Type cohesion is not yet finished
-		// E.g. this constant "number" should be able to be cast to a `f32` automatically
-		give cast(f32)123;
+		give 123;
 	}; // semicolon is required as it's an expression
 
 
@@ -176,24 +183,24 @@ loops :: proc() {
 	for i := 0; i < 123; i += 1 {
 	}
 */
-	for i : 0..<123 {
+	for i in 0..<123 {
 	}
 
-	for i : 0...122 {
+	for i in 0..122 {
 	}
 
-	for val, idx : 12..<16 {
+	for val, idx in 12..<16 {
 		fmt.println(val, idx);
 	}
 
-	primes := [...]int{2, 3, 5, 7, 11, 13, 17, 19};
+	primes := [..]int{2, 3, 5, 7, 11, 13, 17, 19};
 
-	for p : primes {
+	for p in primes {
 		fmt.println(p);
 	}
 
 	// Pointers to arrays, slices, or strings are allowed
-	for _ : ^primes {
+	for _ in ^primes {
 		// ignore the value and just iterate across it
 	}
 
@@ -201,7 +208,7 @@ loops :: proc() {
 
 	name := "你好，世界";
 	fmt.println(name);
-	for r : name {
+	for r in name {
 		compile_assert(type_of_val(r) == rune);
 		fmt.printf("%r\n", r);
 	}
@@ -210,11 +217,9 @@ loops :: proc() {
 		while i := 0; i < name.count {
 			r, size := utf8.decode_rune(name[i:]);
 			i += size;
-			fmt.printf("%c\n", r);
+			fmt.printf("%r\n", r);
 		}
 	}
-
-
 
 
 
@@ -250,10 +255,8 @@ procedure_overloading :: proc() {
 
 	foo();
 	foo(THINGF);
-	// foo(THINGI);
+	// foo(THINGI); // 14451 is just a number so it could go to either procedures
 	foo(cast(int)THINGI);
-	fmt.println(THINGF);
-	fmt.println(THINGI);
 
 
 
@@ -273,11 +276,12 @@ procedure_overloading :: proc() {
 	fmt.println(foo(^a));
 	foo(^b);
 	foo(c);
-	// foo(nil);
-	atomic.store(^a, 1);
-
+	// foo(nil); // nil could go to numerous types thus the ambiguity
 
 	f: proc();
-	f = foo;
+	f = foo; // The correct `foo` to chosen
 	f();
+
+
+	// See math.odin and atomic.odin for more examples
 }

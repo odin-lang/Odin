@@ -4071,19 +4071,21 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			error_node(ie->cond, "Non-boolean condition in if expression");
 		}
 
-
 		Operand x = {Addressing_Invalid};
 		Operand y = {Addressing_Invalid};
 		Type *if_type = NULL;
 		Type *else_type = NULL;
-		check_expr(c, &x, ie->body);
+		if (type_hint) {
+			gb_printf_err("here\n");
+		}
+		check_expr_with_type_hint(c, &x, ie->body, type_hint);
 		if_type = x.type;
 
 		if (ie->else_expr != NULL) {
 			switch (ie->else_expr->kind) {
 			case AstNode_IfExpr:
 			case AstNode_BlockExpr:
-				check_expr(c, &y, ie->else_expr);
+				check_expr_with_type_hint(c, &y, ie->else_expr, if_type);
 				else_type = y.type;
 				break;
 			default:
