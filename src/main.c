@@ -240,7 +240,7 @@ int main(int argc, char **argv) {
 	char lib_str_buf[1024] = {0};
 	for_array(i, ir_gen.module.foreign_library_paths) {
 		String lib = ir_gen.module.foreign_library_paths.e[i];
-		gb_printf_err("Linking lib: %.*s\n", LIT(lib));
+		// gb_printf_err("Linking lib: %.*s\n", LIT(lib));
 		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
 		                        " \"%.*s\"", LIT(lib));
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);

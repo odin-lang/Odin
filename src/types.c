@@ -1194,7 +1194,9 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 	} else if (!is_type_union(type)) {
 		for (isize i = 0; i < type->Record.field_count; i++) {
 			Entity *f = type->Record.fields[i];
-			GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
+			if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
+				continue;
+			}
 			String str = f->token.string;
 			if (str_eq(field_name, str)) {
 				selection_add_index(&sel, i);  // HACK(bill): Leaky memory

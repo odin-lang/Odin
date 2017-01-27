@@ -1,12 +1,13 @@
 #import "fmt.odin";
 #import "utf8.odin";
-#import "atomic.odin";
-#import "hash.odin";
-#import "math.odin";
-#import "mem.odin";
-#import "opengl.odin";
-#import "os.odin";
-#import "sync.odin";
+// #import "atomic.odin";
+// #import "hash.odin";
+// #import "math.odin";
+// #import "mem.odin";
+// #import "opengl.odin";
+// #import "os.odin";
+// #import "sync.odin";
+// #import win32 "sys/windows.odin";
 
 main :: proc() {
 	syntax();
@@ -15,8 +16,8 @@ main :: proc() {
 syntax :: proc() {
 	// Cyclic type checking
 	// Uncomment to see the error
-	// A :: struct { b: B };
-	// B :: struct { a: A };
+	// A :: struct {b: B};
+	// B :: struct {a: A};
 
 	x: int;
 	y := cast(f32)x;
@@ -40,10 +41,10 @@ syntax :: proc() {
 	};
 	Thing2 :: struct {x: f32, y: int, z: ^[]int};
 
-	// Slice interals are not just a `ptr+count`
+	// Slice interals are now just a `ptr+count`
 	slice: []int; compile_assert(size_of_val(slice) == 2*size_of(int));
 
-	// Helper type - Help the reader understand that it is quicker
+	// Helper type - Help the reader understand what it is quicker
 	My_Int  :: type int;
 	My_Proc :: type proc(int) -> f32;
 
@@ -62,6 +63,9 @@ syntax :: proc() {
 	// ++ and -- have been removed
 	// x++;
 	// x--;
+	// Question: Should they be added again?
+	// They were removed as they are redundant and statements, not expressions
+	// like in C/C++
 
 
 	// You can now build files as a `.dll`
@@ -167,7 +171,6 @@ special_expressions :: proc() {
 }
 
 loops :: proc() {
-
 	// The C-style for loop
 	for i := 0; i < 123; i += 1 {
 		break;
@@ -259,7 +262,7 @@ procedure_overloading :: proc() {
 	}
 
 
-	a: i32 = #line;
+	a: i32 = 123;
 	b: f32;
 	c: rawptr;
 	fmt.println(foo(^a));

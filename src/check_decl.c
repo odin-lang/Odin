@@ -302,10 +302,11 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 			error_node(pd->body, "A procedure tagged as `#foreign` cannot have a body");
 		}
 
-		if (proc_type->Proc.calling_convention != ProcCC_Odin) {
-			error_node(d->proc_lit, "An internal procedure may only have the Odin calling convention");
-			proc_type->Proc.calling_convention = ProcCC_Odin;
-		}
+		// TODO(bill): Is this the best option? What about passing to external shit?!
+		// if (proc_type->Proc.calling_convention != ProcCC_Odin) {
+		// 	error_node(d->proc_lit, "An internal procedure may only have the Odin calling convention");
+		// 	proc_type->Proc.calling_convention = ProcCC_Odin;
+		// }
 
 		d->scope = c->context.scope;
 

@@ -1,9 +1,9 @@
-#import "fmt.odin"
-#import "os.odin"
-#import "mem.odin"
-// #import "http_test.odin" as ht
-// #import "game.odin" as game
-// #import "punity.odin" as pn
+#import "fmt.odin";
+#import "os.odin";
+#import "mem.odin";
+// #import "http_test.odin" as ht;
+// #import "game.odin" as game;
+// #import "punity.odin" as pn;
 
 main :: proc() {
 	// struct_padding()
@@ -26,58 +26,58 @@ main :: proc() {
 struct_padding :: proc() {
 	{
 		A :: struct {
-			a: u8
-			b: u32
-			c: u16
+			a: u8,
+			b: u32,
+			c: u16,
 		}
 
 		B :: struct {
-			a: [7]u8
-			b: [3]u16
-			c: u8
-			d: u16
+			a: [7]u8,
+			b: [3]u16,
+			c: u8,
+			d: u16,
 		}
 
-		fmt.println("size_of(A):", size_of(A))
-		fmt.println("size_of(B):", size_of(B))
+		fmt.println("size_of(A):", size_of(A));
+		fmt.println("size_of(B):", size_of(B));
 
 		// n.b. http://cbloomrants.blogspot.co.uk/2012/07/07-23-12-structs-are-not-what-you-want.html
 	}
 	{
 		A :: struct #ordered {
-			a: u8
-			b: u32
-			c: u16
+			a: u8,
+			b: u32,
+			c: u16,
 		}
 
 		B :: struct #ordered {
-			a: [7]u8
-			b: [3]u16
-			c: u8
-			d: u16
+			a: [7]u8,
+			b: [3]u16,
+			c: u8,
+			d: u16,
 		}
 
-		fmt.println("size_of(A):", size_of(A))
-		fmt.println("size_of(B):", size_of(B))
+		fmt.println("size_of(A):", size_of(A));
+		fmt.println("size_of(B):", size_of(B));
 
 		// C-style structure layout
 	}
 	{
 		A :: struct #packed {
-			a: u8
-			b: u32
-			c: u16
+			a: u8,
+			b: u32,
+			c: u16,
 		}
 
 		B :: struct #packed {
-			a: [7]u8
-			b: [3]u16
-			c: u8
-			d: u16
+			a: [7]u8,
+			b: [3]u16,
+			c: u8,
+			d: u16,
 		}
 
-		fmt.println("size_of(A):", size_of(A))
-		fmt.println("size_of(B):", size_of(B))
+		fmt.println("size_of(A):", size_of(A));
+		fmt.println("size_of(B):", size_of(B));
 
 		// Useful for explicit layout
 	}
@@ -119,7 +119,7 @@ struct_padding :: proc() {
 }
 
 bounds_checking :: proc() {
-	x: [4]int
+	x: [4]int;
 	// x[-1] = 0; // Compile Time
 	// x[4]  = 0; // Compile Time
 
@@ -132,9 +132,9 @@ bounds_checking :: proc() {
 	// Works for arrays, strings, slices, and related procedures & operations
 
 	{
-		base: [10]int
-		s := base[2:6]
-		a, b := -1, 6
+		base: [10]int;
+		s := base[2:6];
+		a, b := -1, 6;
 
 		#no_bounds_check {
 			s[a] = 0;
@@ -154,69 +154,69 @@ bounds_checking :: proc() {
 
 type_introspection :: proc() {
 	{
-		info: ^Type_Info
-		x: int
+		info: ^Type_Info;
+		x: int;
 
-		info = type_info(int) // by type
-		info = type_info_of_val(x) // by value
+		info = type_info(int); // by type
+		info = type_info_of_val(x); // by value
 		// See: runtime.odin
 
-		match type i : info {
+		match type i in info {
 		case Type_Info.Integer:
-			fmt.println("integer!")
+			fmt.println("integer!");
 		case Type_Info.Float:
-			fmt.println("float!")
+			fmt.println("float!");
 		default:
-			fmt.println("potato!")
+			fmt.println("potato!");
 		}
 
 		// Unsafe cast
-		integer_info := info as ^Type_Info.Integer
+		integer_info := cast(^Type_Info.Integer)info;
 	}
 
 	{
 		Vector2 :: struct { x, y: f32 }
 		Vector3 :: struct { x, y, z: f32 }
 
-		v1: Vector2
-		v2: Vector3
-		v3: Vector3
+		v1: Vector2;
+		v2: Vector3;
+		v3: Vector3;
 
-		t1 := type_info_of_val(v1)
-		t2 := type_info_of_val(v2)
-		t3 := type_info_of_val(v3)
+		t1 := type_info_of_val(v1);
+		t2 := type_info_of_val(v2);
+		t3 := type_info_of_val(v3);
 
-		fmt.println()
-		fmt.print("Type of v1 is:\n\t", t1)
+		fmt.println();
+		fmt.print("Type of v1 is:\n\t", t1);
 
-		fmt.println()
-		fmt.print("Type of v2 is:\n\t", t2)
+		fmt.println();
+		fmt.print("Type of v2 is:\n\t", t2);
 
-		fmt.println("\n")
-		fmt.println("t1 == t2:", t1 == t2)
-		fmt.println("t2 == t3:", t2 == t3)
+		fmt.println("\n");
+		fmt.println("t1 == t2:", t1 == t2);
+		fmt.println("t2 == t3:", t2 == t3);
 	}
 }
 
 any_type :: proc() {
-	a: any
+	a: any;
 
-	x: int = 123
-	y: f64 = 6.28
-	z: string = "Yo-Yo Ma"
+	x: int = 123;
+	y: f64 = 6.28;
+	z: string = "Yo-Yo Ma";
 	// All types can be implicit cast to `any`
-	a = x
-	a = y
-	a = z
-	a = a // This the "identity" type, it doesn't get converted
+	a = x;
+	a = y;
+	a = z;
+	a = a; // This the "identity" type, it doesn't get converted
 
-	a = 123 // Literals are copied onto the stack first
+	a = 123; // Literals are copied onto the stack first
 
 	// any has two members
 	// data      - rawptr to the data
 	// type_info - pointer to the type info
 
-	fmt.println(x, y, z)
+	fmt.println(x, y, z);
 	// See: fmt.odin
 	// For variadic any procedures in action
 }
@@ -232,15 +232,15 @@ crazy_introspection :: proc() {
 			TOMATO,
 		}
 
-		s: string
-		s = enum_to_string(Fruit.PEACH)
-		fmt.println(s)
+		s: string;
+		// s = enum_to_string(Fruit.PEACH);
+		fmt.println(s);
 
-		f := Fruit.GRAPE
-		s = enum_to_string(f)
-		fmt.println(s)
+		f := Fruit.GRAPE;
+		// s = enum_to_string(f);
+		fmt.println(s);
 
-		fmt.println(f)
+		fmt.println(f);
 		// See: runtime.odin
 	}
 
@@ -259,15 +259,15 @@ crazy_introspection :: proc() {
 			TOMATO,
 		}
 
-		fruit_ti := type_info(Fruit)
-		name := (fruit_ti as ^Type_Info.Named).name // Unsafe casts
-		info := type_info_base(fruit_ti) as ^Type_Info.Enum // Unsafe casts
+		fruit_ti := type_info(Fruit);
+		name := (cast(^Type_Info.Named)fruit_ti).name; // Unsafe casts
+		info := cast(^Type_Info.Enum)type_info_base(fruit_ti); // Unsafe casts
 
 		fmt.printf("% :: enum % {\n", name, info.base);
-		for i := 0; i < info.values.count; i++ {
-			fmt.printf("\t%\t= %,\n", info.names[i], info.values[i])
+		for i := 0; i < info.values.count; i += 1 {
+			fmt.printf("\t%\t= %,\n", info.names[i], info.values[i]);
 		}
-		fmt.printf("}\n")
+		fmt.printf("}\n");
 
 		// NOTE(bill): look at that type-safe printf!
 	}
@@ -275,10 +275,10 @@ crazy_introspection :: proc() {
 	{
 		Vector3 :: struct {x, y, z: f32}
 
-		a := Vector3{x = 1, y = 4, z = 9}
-		fmt.println(a)
-		b := Vector3{x = 9, y = 3, z = 1}
-		fmt.println(b)
+		a := Vector3{x = 1, y = 4, z = 9};
+		fmt.println(a);
+		b := Vector3{x = 9, y = 3, z = 1};
+		fmt.println(b);
 
 		// NOTE(bill): See fmt.odin
 	}

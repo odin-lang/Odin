@@ -1,34 +1,35 @@
-#import "win32.odin"
-#import "fmt.odin"
-#import "os.odin"
+#import win32 "sys/windows.odin";
+#import "fmt.odin";
+#import "os.odin";
+#import "mem.odin";
 
-CANVAS_WIDTH  :: 128
-CANVAS_HEIGHT :: 128
-CANVAS_SCALE  :: 3
-FRAME_TIME    :: 1.0/30.0
-WINDOW_TITLE  :: "Punity\x00"
+CANVAS_WIDTH  :: 128;
+CANVAS_HEIGHT :: 128;
+CANVAS_SCALE  :: 3;
+FRAME_TIME    :: 1.0/30.0;
+WINDOW_TITLE  :: "Punity\x00";
 
-_ := compile_assert(CANVAS_WIDTH % 16 == 0)
+_ := compile_assert(CANVAS_WIDTH % 16 == 0);
 
-WINDOW_WIDTH  :: CANVAS_WIDTH  * CANVAS_SCALE
-WINDOW_HEIGHT :: CANVAS_HEIGHT * CANVAS_SCALE
+WINDOW_WIDTH  :: CANVAS_WIDTH  * CANVAS_SCALE;
+WINDOW_HEIGHT :: CANVAS_HEIGHT * CANVAS_SCALE;
 
 
-STACK_CAPACITY   :: 1<<20
-STORAGE_CAPACITY :: 1<<20
+STACK_CAPACITY   :: 1<<20;
+STORAGE_CAPACITY :: 1<<20;
 
-DRAW_LIST_RESERVE :: 128
+DRAW_LIST_RESERVE :: 128;
 
-MAX_KEYS :: 256
+MAX_KEYS :: 256;
 
 Core :: struct {
-	stack:   ^Bank
-	storage: ^Bank
+	stack:   ^Bank,
+	storage: ^Bank,
 
-	running:       bool
-	key_modifiers: u32
-	key_states:    [MAX_KEYS]byte
-	key_deltas:    [MAX_KEYS]byte
+	running:       bool,
+	key_modifiers: u32,
+	key_states:    [MAX_KEYS]byte,
+	key_deltas:    [MAX_KEYS]byte,
 
 	perf_frame,
 	perf_frame_inner,
@@ -36,70 +37,66 @@ Core :: struct {
 	perf_audio,
 	perf_blit,
 	perf_blit_cvt,
-	perf_blit_gdi: Perf_Span
+	perf_blit_gdi: Perf_Span,
 
-	frame: i64
+	frame: i64,
 
-	canvas:    Canvas
-	draw_list: ^Draw_List
+	canvas:    Canvas,
+	draw_list: ^Draw_List,
 }
 
 Perf_Span :: struct {
-	stamp: f64
-	delta: f32
+	stamp: f64,
+	delta: f32,
 }
 
 Bank :: struct {
-	memory: []byte
-	cursor: int
+	memory: []byte,
+	cursor: int,
 }
 
 Bank_State :: struct {
-	state: Bank
-	bank: ^Bank
+	state: Bank,
+	bank: ^Bank,
 }
 
 
 Color :: raw_union {
-	using channels: struct{ a, b, g, r: byte; }
-	rgba: u32
+	using channels: struct{a, b, g, r: byte},
+	rgba: u32,
 }
 
 Palette :: struct {
-	colors: [256]Color
-	colors_count: byte
+	colors: [256]Color,
+	colors_count: byte,
 }
 
 
 Rect :: raw_union {
-	using minmax: struct {
-		min_x, min_y, max_x, max_y: int
-	}
-	using pos: struct {
-		left, top, right, bottom: int
-	}
-	e: [4]int
+	using minmax: struct {min_x, min_y, max_x, max_y: int},
+	using pos: struct {left, top, right, bottom: int},
+	e: [4]int,
 }
 
 Bitmap :: struct {
-	pixels: []byte
-	width:  int
-	height: int
+	pixels: []byte,
+	width:  int,
+	height: int,
 }
 
 Font :: struct {
-	using bitmap: Bitmap
-	char_width:   int
-	char_height:  int
+	using bitmap: Bitmap,
+	char_width:   int,
+	char_height:  int,
 }
 
 Canvas :: struct {
-	using bitmap: ^Bitmap
-	palette:      Palette
-	translate_x:  int
-	translate_y:  int
-	clip:         Rect
-	font:         ^Font
+	using bitmap: ^Bitmap,
+	palette:      Palette,
+	translate_x:  int,
+	translate_y:  int,
+	clip:         Rect,
+	font:         ^Font,
 }
 
 DrawFlag :: enum {
@@ -109,12 +106,9 @@ DrawFlag :: enum {
 	MASK   = 1<<2,
 }
 
-
+Draw_Item :: struct {}
 Draw_List :: struct {
-	Item :: struct {
-
-	}
-	items: []Item
+	items: []Draw_Item,
 }
 
 Key :: enum {
@@ -268,112 +262,112 @@ Key :: enum {
 	BACKSLASH          = 92,  /* \ */
 	RIGHT_BRACKET      = 93,  /* ] */
 	GRAVE_ACCENT       = 96,  /* ` */
-}
+};
 
 
 key_down :: proc(k: Key) -> bool {
-	return _core.key_states[k] != 0
+	return _core.key_states[k] != 0;
 }
 
 key_pressed :: proc(k: Key) -> bool {
-	return (_core.key_deltas[k] != 0) && key_down(k)
+	return (_core.key_deltas[k] != 0) && key_down(k);
 }
 
 
 
 
-win32_perf_count_freq := win32.GetQueryPerformanceFrequency()
+win32_perf_count_freq := win32.GetQueryPerformanceFrequency();
 time_now :: proc() -> f64 {
-	assert(win32_perf_count_freq != 0)
+	assert(win32_perf_count_freq != 0);
 
-	counter: i64
-	win32.QueryPerformanceCounter(^counter)
-	result := counter as f64 / win32_perf_count_freq as f64
-	return result
+	counter: i64;
+	win32.QueryPerformanceCounter(^counter);
+	result := cast(f64)counter / cast(f64)win32_perf_count_freq;
+	return result;
 }
 
-_core: Core
+_core: Core;
 
 run :: proc(user_init, user_step: proc(c: ^Core)) {
-	using win32
+	using win32;
 
-	_core.running = true
+	_core.running = true;
 
-	win32_proc :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #no_inline #stdcall {
+	win32_proc :: proc(hwnd: win32.HWND, msg: u32, wparam: win32.WPARAM, lparam: win32.LPARAM) -> win32.LRESULT #no_inline #cc_c {
 		win32_app_key_mods :: proc() -> u32 {
-			mods: u32 = 0
+			mods: u32 = 0;
 
 			if is_key_down(Key_Code.SHIFT) {
-				mods |= Key.MOD_SHIFT as u32
+				mods |= cast(u32)Key.MOD_SHIFT;
 			}
 			if is_key_down(Key_Code.CONTROL) {
-				mods |= Key.MOD_CONTROL as u32
+				mods |= cast(u32)Key.MOD_CONTROL;
 			}
 			if is_key_down(Key_Code.MENU) {
-				mods |= Key.MOD_ALT as u32
+				mods |= cast(u32)Key.MOD_ALT;
 			}
 			if is_key_down(Key_Code.LWIN) || is_key_down(Key_Code.RWIN) {
-				mods |= Key.MOD_SUPER as u32
+				mods |= cast(u32)Key.MOD_SUPER;
 			}
 
-			return mods
+			return mods;
 		}
 
 		match msg {
 		case WM_KEYDOWN:
-			_core.key_modifiers = win32_app_key_mods()
+			_core.key_modifiers = win32_app_key_mods();
 			if wparam < MAX_KEYS {
-				_core.key_states[wparam] = 1
-				_core.key_deltas[wparam] = 1
+				_core.key_states[wparam] = 1;
+				_core.key_deltas[wparam] = 1;
 			}
-			return 0
+			return 0;
 
 		case WM_KEYUP:
-			_core.key_modifiers = win32_app_key_mods()
+			_core.key_modifiers = win32_app_key_mods();
 			if wparam < MAX_KEYS {
-				_core.key_states[wparam] = 0
-				_core.key_deltas[wparam] = 1
+				_core.key_states[wparam] = 0;
+				_core.key_deltas[wparam] = 1;
 			}
-			return 0
+			return 0;
 
 		case WM_CLOSE:
-			PostQuitMessage(0)
-			_core.running = false
-			return 0
+			PostQuitMessage(0);
+			_core.running = false;
+			return 0;
 		}
 
-		return DefWindowProcA(hwnd, msg, wparam, lparam)
+		return DefWindowProcA(hwnd, msg, wparam, lparam);
 	}
 
 
 	window_class := WNDCLASSEXA{
-		class_name = ("Punity\x00" as string).data, // C-style string
-		size       = size_of(WNDCLASSEXA) as u32,
+		class_name = (cast(string)"Punity\x00").data, // C-style string
+		size       = size_of(WNDCLASSEXA),
 		style      = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
-		instance   = GetModuleHandleA(nil) as HINSTANCE,
+		instance   = cast(HINSTANCE)GetModuleHandleA(nil),
 		wnd_proc   = win32_proc,
 		// wnd_proc   = DefWindowProcA,
-		background = GetStockObject(BLACK_BRUSH) as HBRUSH,
-	}
+		background = cast(HBRUSH)GetStockObject(BLACK_BRUSH),
+	};
 
 	if RegisterClassExA(^window_class) == 0 {
-		fmt.fprintln(os.stderr, "RegisterClassExA failed")
-		return
+		fmt.fprintln(os.stderr, "RegisterClassExA failed");
+		return;
 	}
 
-	screen_width  := GetSystemMetrics(SM_CXSCREEN)
-	screen_height := GetSystemMetrics(SM_CYSCREEN)
+	screen_width  := GetSystemMetrics(SM_CXSCREEN);
+	screen_height := GetSystemMetrics(SM_CYSCREEN);
 
-	rc: RECT
-	rc.left   = (screen_width - WINDOW_WIDTH)   / 2
-	rc.top    = (screen_height - WINDOW_HEIGHT) / 2
-	rc.right  = rc.left + WINDOW_WIDTH
-	rc.bottom = rc.top + WINDOW_HEIGHT
+	rc: RECT;
+	rc.left   = (screen_width - WINDOW_WIDTH)   / 2;
+	rc.top    = (screen_height - WINDOW_HEIGHT) / 2;
+	rc.right  = rc.left + WINDOW_WIDTH;
+	rc.bottom = rc.top + WINDOW_HEIGHT;
 
-	style: u32 = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
-	assert(AdjustWindowRect(^rc, style, 0) != 0)
+	style: u32 = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+	assert(AdjustWindowRect(^rc, style, 0) != 0);
 
-	wt := WINDOW_TITLE
+	wt := WINDOW_TITLE;
 
 	win32_window := CreateWindowExA(0,
 	                                window_class.class_name,
@@ -382,101 +376,115 @@ run :: proc(user_init, user_step: proc(c: ^Core)) {
 	                                rc.left, rc.top,
 	                                rc.right-rc.left, rc.bottom-rc.top,
 	                                nil, nil, window_class.instance,
-	                                nil)
+	                                nil);
 
 	if win32_window == nil {
-		fmt.fprintln(os.stderr, "CreateWindowExA failed")
-		return
+		fmt.fprintln(os.stderr, "CreateWindowExA failed");
+		return;
 	}
 
 
-	window_bmi: BITMAPINFO
-	window_bmi.size        = size_of(BITMAPINFO.HEADER) as u32
-	window_bmi.width       = CANVAS_WIDTH
-	window_bmi.height      = CANVAS_HEIGHT
-	window_bmi.planes      = 1
-	window_bmi.bit_count   = 32
-	window_bmi.compression = BI_RGB
+	window_bmi: BITMAPINFO;
+	window_bmi.size        = size_of(BITMAPINFOHEADER);
+	window_bmi.width       = CANVAS_WIDTH;
+	window_bmi.height      = CANVAS_HEIGHT;
+	window_bmi.planes      = 1;
+	window_bmi.bit_count   = 32;
+	window_bmi.compression = BI_RGB;
 
 
-	user_init(^_core)
+	user_init(^_core);
+
+	ShowWindow(win32_window, SW_SHOW);
+
+	window_buffer := new_slice(u32, CANVAS_WIDTH * CANVAS_HEIGHT);
+	assert(window_buffer.data != nil);
+	defer free(window_buffer.data);
 
 
-	ShowWindow(win32_window, SW_SHOW)
-
-	window_buffer := new_slice(u32, CANVAS_WIDTH * CANVAS_HEIGHT)
-	assert(window_buffer.data != nil)
-	defer free(window_buffer.data)
-
-	for i := 0; i < window_buffer.count; i++ {
-		window_buffer[i] = 0xff00ff
+	for i := 0; i < window_buffer.count; i += 1 {
+		window_buffer[i] = 0xff00ff;
 	}
 
 
-	prev_time, curr_time,dt: f64
-	prev_time = time_now()
-	curr_time = time_now()
-	total_time : f64 = 0
-	offset_x := 0
-	offset_y := 0
+	dt: f64;
+	prev_time := time_now();
+	curr_time := time_now();
+	total_time : f64 = 0;
+	offset_x := 0;
+	offset_y := 0;
 
-	message: MSG
+	message: MSG;
 	for _core.running {
-		curr_time = time_now()
-		dt = curr_time - prev_time
-		prev_time = curr_time
-		total_time += dt
+		curr_time = time_now();
+		dt = curr_time - prev_time;
+		prev_time = curr_time;
+		total_time += dt;
 
-		offset_x += 1
-		offset_y += 2
+		offset_x += 1;
+		offset_y += 2;
 
 		{
-			data: [128]byte
-			buf := data[:0]
-			fmt.bprintf(^buf, "Punity: % ms\x00", dt*1000)
-			win32.SetWindowTextA(win32_window, buf.data)
+			data: [128]byte;
+			buf: fmt.Buffer;
+			buf.data = data[:];
+			fmt.bprintf(^buf, "Punity: %.4f ms\x00", dt*1000);
+			win32.SetWindowTextA(win32_window, ^buf[0]);
 		}
 
 
-		for y := 0; y < CANVAS_HEIGHT; y++ {
-			for x := 0; x < CANVAS_WIDTH; x++ {
-				g := (x % 32) * 8
-				b := (y % 32) * 8
-				window_buffer[x + y*CANVAS_WIDTH] = (g << 8 | b) as u32
+		for y := 0; y < CANVAS_HEIGHT; y += 1 {
+			for x := 0; x < CANVAS_WIDTH; x += 1 {
+				g := (x % 32) * 8;
+				b := (y % 32) * 8;
+				window_buffer[x + y*CANVAS_WIDTH] = cast(u32)(g << 8 | b);
 			}
 		}
 
-		_core.key_deltas = nil
+		mem.zero(^_core.key_deltas[0], size_of_val(_core.key_deltas));
 
 		for PeekMessageA(^message, nil, 0, 0, PM_REMOVE) != 0 {
 			if message.message == WM_QUIT {
-				_core.running = false
+				_core.running = false;
 			}
-			TranslateMessage(^message)
-			DispatchMessageA(^message)
+			TranslateMessage(^message);
+			DispatchMessageA(^message);
 		}
 
-		user_step(^_core)
+		user_step(^_core);
 
-		dc := GetDC(win32_window)
+		dc := GetDC(win32_window);
 		StretchDIBits(dc,
 		              0, 0, CANVAS_WIDTH * CANVAS_SCALE, CANVAS_HEIGHT * CANVAS_SCALE,
 		              0, 0, CANVAS_WIDTH, CANVAS_HEIGHT,
 		              window_buffer.data,
 		              ^window_bmi,
 		              DIB_RGB_COLORS,
-		              SRCCOPY)
-		ReleaseDC(win32_window, dc)
+		              SRCCOPY);
+		ReleaseDC(win32_window, dc);
 
 
 		{
-			delta := time_now() - prev_time
-			ms := ((FRAME_TIME - delta) * 1000) as i32
+			delta := time_now() - prev_time;
+			ms := cast(i32)((FRAME_TIME - delta) * 1000);
 			if ms > 0 {
-				win32.Sleep(ms)
+				win32.Sleep(ms);
 			}
 		}
 
-		_core.frame++
+		_core.frame += 1;
 	}
+}
+
+
+main :: proc() {
+	user_init :: proc(c: ^Core) {
+
+	}
+
+	user_step :: proc(c: ^Core) {
+
+	}
+
+	run(user_init, user_step);
 }

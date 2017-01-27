@@ -1827,11 +1827,15 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	}
 
 	case Token_if:
-		if (lhs) goto error;
-		return parse_if_expr(f);
+		if (!lhs && f->expr_level >= 0) {
+			return parse_if_expr(f);
+		}
+		break;
 	case Token_OpenBrace:
-		if (lhs) goto error;
-		return parse_block_expr(f);
+		if (!lhs && f->expr_level >= 0) {
+			return parse_block_expr(f);
+		}
+		break;
 
 	default: {
 		AstNode *type = parse_identifier_or_type(f);
@@ -1846,7 +1850,6 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	}
 	}
 
-error:
 	Token begin = f->curr_token;
 	syntax_error(begin, "Expected an operand");
 	fix_advance_to_next_stmt(f);

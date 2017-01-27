@@ -203,6 +203,11 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		}
 	}
 
+	// if (is_type_proc(dst)) {
+	// 	if (are_types_identical(src, dst)) {
+	// 		return 1;
+	// 	}
+	// }
 
 	if (is_type_any(dst)) {
 		// NOTE(bill): Anything can cast to `Any`

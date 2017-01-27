@@ -421,9 +421,7 @@ fmt_write_padding :: proc(fi: ^Fmt_Info, width: int) {
 
 fmt_integer :: proc(fi: ^Fmt_Info, u: u64, base: int, signed: bool, digits: string) {
 	negative := signed && cast(i64)u < 0;
-	if negative {
-		u = -u;
-	}
+	u = abs(u);
 	buf: [256]byte;
 	if fi.width_set || fi.prec_set {
 		width := fi.width + fi.prec + 3;
@@ -504,14 +502,16 @@ fmt_integer :: proc(fi: ^Fmt_Info, u: u64, base: int, signed: bool, digits: stri
 		buffer_write(fi.buf, buf[i:]);
 	} else {
 		width := fi.width - utf8.rune_count(cast(string)buf[i:]);
-		if fi.minus {
-			// Right pad
-			buffer_write(fi.buf, buf[i:]);
-			fmt_write_padding(fi, width);
-		} else {
-			// Left pad
-			fmt_write_padding(fi, width);
-			buffer_write(fi.buf, buf[i:]);
+			if width > 0 {
+			if fi.minus {
+				// Right pad
+				buffer_write(fi.buf, buf[i:]);
+				fmt_write_padding(fi, width);
+			} else {
+				// Left pad
+				fmt_write_padding(fi, width);
+				buffer_write(fi.buf, buf[i:]);
+			}
 		}
 	}
 
@@ -574,8 +574,16 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
 			signed := v < 0;
 			v = abs(v);
 
+			if signed {
+				buffer_write_byte(fi.buf, '-');
+			}
+
 			val := cast(u64)v;
-			fmt_integer(fi, val, 10, signed, __DIGITS_LOWER);
+			fi.minus = false;
+			fi.width = 0;
+			fi.prec = 0;
+			// TODO(bill): Write integer to buffer than use this crap
+			fmt_integer(fi, val, 10, false, __DIGITS_LOWER);
 
 			if fi.hash || prec > 0 {
 				arg := v - cast(f64)val;
