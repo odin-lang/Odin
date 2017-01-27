@@ -251,6 +251,8 @@ typedef struct CheckerContext {
 	DeclInfo * decl;
 	u32        stmt_state_flags;
 	bool       in_defer; // TODO(bill): Actually handle correctly
+	String     proc_name;
+	Type *     type_hint;
 } CheckerContext;
 
 // NOTE(bill): Symbol tables
@@ -276,8 +278,8 @@ typedef struct Checker {
 	BaseTypeSizes          sizes;
 	Scope *                global_scope;
 	Array(ProcedureInfo)   procs; // NOTE(bill): Procedures to check
-	Array(DelayedDecl)   delayed_imports;
-	Array(DelayedDecl)   delayed_foreign_libraries;
+	Array(DelayedDecl)     delayed_imports;
+	Array(DelayedDecl)     delayed_foreign_libraries;
 
 
 	gbArena                arena;

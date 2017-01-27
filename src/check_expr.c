@@ -3892,6 +3892,16 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		} else if (str_eq(bd->name, str_lit("line"))) {
 			o->type = t_untyped_integer;
 			o->value = make_exact_value_integer(bd->token.pos.line);
+		} else if (str_eq(bd->name, str_lit("procedure"))) {
+			if (c->proc_stack.count == 0) {
+				error_node(node, "#procedure may only be used within procedures");
+				o->type = t_untyped_string;
+				o->value = make_exact_value_string(str_lit(""));
+			} else {
+				o->type = t_untyped_string;
+				o->value = make_exact_value_string(c->context.proc_name);
+			}
+
 		} else {
 			GB_PANIC("Unknown basic basic directive");
 		}
@@ -3962,9 +3972,11 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			goto error;
 		} else if (operands.count == 1) {
 			Operand operand = operands.e[0];
-			if (type_hint != NULL) {
-				convert_to_typed(c, &operand, type_hint, 0);
+			Type *th = type_hint != NULL ? type_hint : c->context.type_hint;
+			if (th != NULL) {
+				convert_to_typed(c, &operand, th, 0);
 			}
+			// IMPORTANT NOTE(bill): This type could be untyped!!!
 			o->type = default_type(operand.type);
 			o->mode = Addressing_Value;
 		} else {
@@ -4012,9 +4024,13 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			goto error;
 		}
 
+		CheckerContext prev_context = c->context;
+		c->context.type_hint = type_hint;
 		check_open_scope(c, node);
 		check_stmt_list(c, be->stmts, Stmt_GiveAllowed);
 		check_close_scope(c);
+
+		c->context = prev_context;
 
 		AstNode *give_node = NULL;
 		if (!check_is_giving(node, &give_node) || give_node == NULL) {

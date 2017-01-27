@@ -8,9 +8,29 @@ UTF_MAX    :: 4;
 SURROGATE_MIN :: 0xd800;
 SURROGATE_MAX :: 0xdfff;
 
+T1 :: 0b0000_0000;
+TX :: 0b1000_0000;
+T2 :: 0b1100_0000;
+T3 :: 0b1110_0000;
+T4 :: 0b1111_0000;
+T5 :: 0b1111_1000;
+
+MASKX :: 0b0011_1111;
+MASK2 :: 0b0001_1111;
+MASK3 :: 0b0000_1111;
+MASK4 :: 0b0000_0111;
+
+RUNE1_MAX :: 1<<7 - 1;
+RUNE2_MAX :: 1<<11 - 1;
+RUNE3_MAX :: 1<<16 - 1;
+
+// The default lowest and highest continuation byte.
+LOCB :: 0b1000_0000;
+HICB :: 0b1011_1111;
+
 Accept_Range :: struct { lo, hi: u8 }
 
-accept_ranges := [5]Accept_Range{
+immutable accept_ranges := [5]Accept_Range{
 	{0x80, 0xbf},
 	{0xa0, 0xbf},
 	{0x80, 0x9f},
@@ -18,7 +38,7 @@ accept_ranges := [5]Accept_Range{
 	{0x80, 0x8f},
 };
 
-accept_sizes := [256]byte{
+immutable accept_sizes := [256]byte{
 	0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x00-0x0f
 	0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x10-0x1f
 	0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x20-0x2f
@@ -68,7 +88,7 @@ encode_rune :: proc(r: rune) -> ([4]byte, int) {
 	buf[0] = 0xf0 | cast(byte)(r>>18);
 	buf[1] = 0x80 | cast(byte)(r>>12) & mask;
 	buf[2] = 0x80 | cast(byte)(r>>6)  & mask;
-	buf[3] = 0x80 | cast(byte)r     & mask;
+	buf[3] = 0x80 | cast(byte)r       & mask;
 	return buf, 4;
 }
 
@@ -77,43 +97,36 @@ decode_rune :: proc(s: string) -> (rune, int) {
 	if n < 1 {
 		return RUNE_ERROR, 0;
 	}
-	b0 := s[0];
-	x := accept_sizes[b0];
-	if x >= 0xf0 {
-		mask := (cast(rune)x << 31) >> 31; // all zeros or all ones
-		return cast(rune)b0 &~ mask | RUNE_ERROR&mask, 1;
+	s0 := s[0];
+	x := accept_sizes[s0];
+	if x >= 0xF0 {
+		mask := cast(rune)(x) << 31 >> 31; // NOTE(bill): Create 0x0000 or 0xffff.
+		return cast(rune)(s[0])&~mask | RUNE_ERROR&mask, 1;
 	}
-	size := x & 7;
-	ar := accept_ranges[x>>4];
-	if n < cast(int)size {
+	sz := x & 7;
+	accept := accept_ranges[x>>4];
+	if n < cast(int)sz {
 		return RUNE_ERROR, 1;
 	}
 	b1 := s[1];
-	if b1 < ar.lo || ar.hi < b1 {
+	if b1 < accept.lo || accept.hi < b1 {
 		return RUNE_ERROR, 1;
 	}
-
-	MASK_X :: 0b00111111;
-	MASK_2 :: 0b00011111;
-	MASK_3 :: 0b00001111;
-	MASK_4 :: 0b00000111;
-
-	if size == 2 {
-		return cast(rune)(b0&MASK_2)<<6 | cast(rune)(b1&MASK_X), 2;
+	if sz == 2 {
+		return cast(rune)(s0&MASK2)<<6 | cast(rune)(b1&MASKX), 2;
 	}
 	b2 := s[2];
-	if b2 < 0x80 || 0xbf < b2 {
+	if b2 < LOCB || HICB < b2 {
 		return RUNE_ERROR, 1;
 	}
-	if size == 3 {
-		return cast(rune)(b0&MASK_3)<<12 | cast(rune)(b1&MASK_X)<<6 | cast(rune)(b2&MASK_X), 3;
+	if sz == 3 {
+		return cast(rune)(s0&MASK3)<<12 | cast(rune)(b1&MASKX)<<6 | cast(rune)(b2&MASKX), 3;
 	}
 	b3 := s[3];
-	if b3 < 0x80 || 0xbf < b3 {
+	if b3 < LOCB || HICB < b3 {
 		return RUNE_ERROR, 1;
 	}
-	return cast(rune)(b0&MASK_4)<<18 | cast(rune)(b1&MASK_X)<<12 | cast(rune)(b3&MASK_X)<<6 | cast(rune)(b3&MASK_X), 4;
-
+	return cast(rune)(s0&MASK4)<<18 | cast(rune)(b1&MASKX)<<12 | cast(rune)(b2&MASKX)<<6 | cast(rune)(b3&MASKX), 4;
 }
 
 

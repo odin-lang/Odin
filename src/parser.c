@@ -1770,11 +1770,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	case Token_Hash: {
 		Token token = expect_token(f, Token_Hash);
 		Token name  = expect_token(f, Token_Ident);
-		if (str_eq(name.string, str_lit("file"))) {
-			return make_basic_directive(f, token, name.string);
-		} else if (str_eq(name.string, str_lit("line"))) {
-			return make_basic_directive(f, token, name.string);
-		} else if (str_eq(name.string, str_lit("run"))) {
+		if (str_eq(name.string, str_lit("run"))) {
 			AstNode *expr = parse_expr(f, false);
 			operand = make_run_expr(f, token, name, expr);
 			if (unparen_expr(expr)->kind != AstNode_CallExpr) {
@@ -1782,6 +1778,9 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 				operand = make_bad_expr(f, token, f->curr_token);
 			}
 			warning(token, "#run is not yet implemented");
+		} else if (str_eq(name.string, str_lit("file"))) { return make_basic_directive(f, token, name.string);
+		} else if (str_eq(name.string, str_lit("line"))) { return make_basic_directive(f, token, name.string);
+		} else if (str_eq(name.string, str_lit("procedure"))) { return make_basic_directive(f, token, name.string);
 		} else {
 			operand = make_tag_expr(f, token, name, parse_expr(f, false));
 		}

@@ -54,29 +54,56 @@ ExactValue make_exact_value_string(String string) {
 	return result;
 }
 
-ExactValue make_exact_value_integer_from_string(String string) {
-	// TODO(bill): Allow for numbers with underscores in them
-	ExactValue result = {ExactValue_Integer};
-	i32 base = 10;
-	if (string.len > 2 && string.text[0] == '0') {
-		switch (string.text[1]) {
-		case 'b': base = 2;  break;
-		case 'o': base = 8;  break;
-		case 'd': base = 10; break;
-		case 'x': base = 16; break;
-		}
-	}
-
-	result.value_integer = gb_str_to_i64(cast(char *)string.text, NULL, base);
-
-	return result;
-}
-
 ExactValue make_exact_value_integer(i64 i) {
 	ExactValue result = {ExactValue_Integer};
 	result.value_integer = i;
 	return result;
 }
+
+ExactValue make_exact_value_integer_from_string(String string) {
+	// TODO(bill): Allow for numbers with underscores in them
+	i32 base = 10;
+	bool has_prefix = false;
+	if (string.len > 2 && string.text[0] == '0') {
+		switch (string.text[1]) {
+		case 'b': base = 2;  has_prefix = true; break;
+		case 'o': base = 8;  has_prefix = true; break;
+		case 'd': base = 10; has_prefix = true; break;
+		case 'x': base = 16; has_prefix = true; break;
+		}
+	}
+
+	u8 *text = string.text;
+	isize len = string.len;
+	if (has_prefix) {
+		text += 2;
+		len -= 2;
+	}
+
+	i64 result = 0;
+	for (isize i = 0; i < len; i++) {
+		Rune r = cast(Rune)text[i];
+		if (r == '_') {
+			continue;
+		}
+		i64 v = 0;
+		if (gb_char_is_digit(r)) {
+			v = r - '0';
+		} else if (gb_char_is_hex_digit(r)) {
+			v = gb_hex_digit_to_int(r);
+		} else {
+			break;
+		}
+
+		result *= base;
+		result += v;
+	}
+
+
+	return make_exact_value_integer(result);
+}
+
+
 
 ExactValue make_exact_value_float_from_string(String string) {
 	// TODO(bill): Allow for numbers with underscores in them

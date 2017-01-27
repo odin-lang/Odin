@@ -233,7 +233,7 @@ bprint :: proc(buf: ^Buffer, args: ...any) -> int {
 	for arg, i : args {
 		is_string := arg.data != nil && is_type_string(arg.type_info);
 		if i > 0 && !is_string && !prev_string {
-			buffer_write_rune(buf, ' ');
+			buffer_write_byte(buf, ' ');
 		}
 		fmt_value(^fi, args[i], 'v');
 		prev_string = is_string;
@@ -247,11 +247,11 @@ bprintln :: proc(buf: ^Buffer, args: ...any) -> int {
 
 	for arg, i : args {
 		if i > 0 {
-			buffer_write_rune(buf, ' ');
+			buffer_write_byte(buf, ' ');
 		}
 		fmt_value(^fi, args[i], 'v');
 	}
-	buffer_write_rune(buf, '\n');
+	buffer_write_byte(buf, '\n');
 	return buf.length;
 }
 
@@ -532,7 +532,8 @@ fmt_int :: proc(fi: ^Fmt_Info, u: u64, signed: bool, verb: rune) {
 	case 'd': fmt_integer(fi, u, 10, signed, __DIGITS_LOWER);
 	case 'x': fmt_integer(fi, u, 16, signed, __DIGITS_LOWER);
 	case 'X': fmt_integer(fi, u, 16, signed, __DIGITS_UPPER);
-	case 'c': fmt_rune(fi, cast(rune)u);
+	case 'c', 'r':
+		fmt_rune(fi, cast(rune)u);
 	case 'U':
 		r := cast(rune)u;
 		if r < 0 || r > utf8.MAX_RUNE {

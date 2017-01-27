@@ -477,9 +477,19 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body) {
 	GB_ASSERT(body->kind == AstNode_BlockStmt);
 
+	String proc_name = {0};
+	if (token.kind == Token_Ident) {
+		proc_name = token.string;
+	} else {
+		// TODO(bill): Better name
+		proc_name = str_lit("(anonymous-procedure)");
+	}
+
 	CheckerContext old_context = c->context;
 	c->context.scope = decl->scope;
 	c->context.decl = decl;
+	c->context.proc_name = proc_name;
+
 
 	GB_ASSERT(type->kind == Type_Proc);
 	if (type->Proc.param_count > 0) {
