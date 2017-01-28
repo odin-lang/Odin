@@ -394,9 +394,9 @@ PIXELFORMATDESCRIPTOR :: struct #ordered {
 }
 
 GetDC             :: proc(h: HANDLE) -> HDC #foreign user32;
-SetPixelFormat    :: proc(hdc: HDC, pixel_format: i32, pfd: ^PIXELFORMATDESCRIPTOR ) -> BOOL #foreign user32;
-ChoosePixelFormat :: proc(hdc: HDC, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 #foreign user32;
-SwapBuffers       :: proc(hdc: HDC) -> BOOL #foreign user32;
+SetPixelFormat    :: proc(hdc: HDC, pixel_format: i32, pfd: ^PIXELFORMATDESCRIPTOR ) -> BOOL #foreign gdi32;
+ChoosePixelFormat :: proc(hdc: HDC, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 #foreign gdi32;
+SwapBuffers       :: proc(hdc: HDC) -> BOOL #foreign gdi32;
 ReleaseDC         :: proc(wnd: HWND, hdc: HDC) -> i32 #foreign user32;
 
 WGL_CONTEXT_MAJOR_VERSION_ARB             :: 0x2091;
