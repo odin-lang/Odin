@@ -123,8 +123,8 @@ init_arena_from_context :: proc(using a: ^Arena, size: int) {
 free_arena :: proc(using a: ^Arena) {
 	if backing.procedure != nil {
 		push_allocator backing {
-			free(memory.data);
-			memory = memory[0:0];
+			free(memory);
+			memory = nil;
 			offset = 0;
 		}
 	}

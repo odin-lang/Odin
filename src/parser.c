@@ -149,7 +149,7 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 	AST_NODE_KIND(DemaybeExpr,  "demaybe expression",     struct { Token op; AstNode *expr; }) \
 	AST_NODE_KIND(SliceExpr, "slice expression", struct { \
 		AstNode *expr; \
-		Token open, close; \
+		Token open, close, interval; \
 		AstNode *low, *high; \
 	}) \
 	AST_NODE_KIND(CallExpr,     "call expression", struct { \
@@ -716,11 +716,12 @@ AstNode *make_index_expr(AstFile *f, AstNode *expr, AstNode *index, Token open, 
 }
 
 
-AstNode *make_slice_expr(AstFile *f, AstNode *expr, Token open, Token close, AstNode *low, AstNode *high) {
+AstNode *make_slice_expr(AstFile *f, AstNode *expr, Token open, Token close, Token interval, AstNode *low, AstNode *high) {
 	AstNode *result = make_node(f, AstNode_SliceExpr);
 	result->SliceExpr.expr = expr;
 	result->SliceExpr.open = open;
 	result->SliceExpr.close = close;
+	result->SliceExpr.interval = interval;
 	result->SliceExpr.low = low;
 	result->SliceExpr.high = high;
 	return result;
@@ -1970,19 +1971,25 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			if (lhs) {
 				// TODO(bill): Handle this
 			}
-			Token open, close;
+			Token open = {0}, close = {0}, interval = {0};
 			AstNode *indices[2] = {0};
 
 			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
 
+			// if (f->curr_token.kind != Token_Ellipsis &&
+			    // f->curr_token.kind != Token_HalfOpenRange) {
 			if (f->curr_token.kind != Token_Colon) {
 				indices[0] = parse_expr(f, false);
 			}
 			bool is_index = true;
 
-			if (allow_token(f, Token_Colon)) {
+			// if (f->curr_token.kind == Token_Ellipsis ||
+			    // f->curr_token.kind == Token_HalfOpenRange) {
+			if (f->curr_token.kind == Token_Colon) {
 				is_index = false;
+				interval = f->curr_token;
+				next_token(f);
 				if (f->curr_token.kind != Token_CloseBracket &&
 				    f->curr_token.kind != Token_EOF) {
 					indices[1] = parse_expr(f, false);
@@ -1995,7 +2002,7 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			if (is_index) {
 				operand = make_index_expr(f, operand, indices[0], open, close);
 			} else {
-				operand = make_slice_expr(f, operand, open, close, indices[0], indices[1]);
+				operand = make_slice_expr(f, operand, open, close, interval, indices[0], indices[1]);
 			}
 		} break;
 

@@ -2909,6 +2909,37 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 					return ir_emit_load(proc, slice);
 				} break;
 
+				case BuiltinProc_free: {
+					ir_emit_comment(proc, str_lit("free"));
+
+					gbAllocator allocator = proc->module->allocator;
+
+					AstNode *node = ce->args.e[0];
+					TypeAndValue tav = *type_and_value_of_expression(proc->module->info, node);
+					Type *type = base_type(tav.type);
+					irValue *val = ir_build_expr(proc, node);
+					irValue *ptr = NULL;
+					if (is_type_pointer(type)) {
+						ptr = val;
+					} else if (is_type_slice(type)) {
+						ptr = ir_slice_elem(proc, val);
+					} else if (is_type_string(type)) {
+						ptr = ir_string_elem(proc, val);
+					} else {
+						GB_PANIC("Invalid type to `free`");
+					}
+
+					if (ptr == NULL) {
+						return NULL;
+					}
+
+					ptr = ir_emit_conv(proc, ptr, t_rawptr);
+
+					irValue **args = gb_alloc_array(allocator, irValue *, 1);
+					args[0] = ptr;
+					return ir_emit_global_call(proc, "free_ptr", args, 1);
+				} break;
+
 				case BuiltinProc_assert: {
 					ir_emit_comment(proc, str_lit("assert"));
 					irValue *cond = ir_build_expr(proc, ce->args.e[0]);

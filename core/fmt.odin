@@ -58,38 +58,38 @@ Fmt_Info :: struct {
 
 
 
-fprint :: proc(fd: os.Handle, args: ..any) -> int {
+fprint :: proc(fd: os.Handle, args: ...any) -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := Buffer{data[:], 0};
-	bprint(^buf, ..args);
+	bprint(^buf, ...args);
 	os.write(fd, buf.data[:buf.length]);
 	return buf.length;
 }
 
-fprintln :: proc(fd: os.Handle, args: ..any) -> int {
+fprintln :: proc(fd: os.Handle, args: ...any) -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := Buffer{data[:], 0};
-	bprintln(^buf, ..args);
+	bprintln(^buf, ...args);
 	os.write(fd, buf.data[:buf.length]);
 	return buf.length;
 }
-fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
+fprintf :: proc(fd: os.Handle, fmt: string, args: ...any) -> int {
 	data: [DEFAULT_BUFFER_SIZE]byte;
 	buf := Buffer{data[:], 0};
-	bprintf(^buf, fmt, ..args);
+	bprintf(^buf, fmt, ...args);
 	os.write(fd, buf.data[:buf.length]);
 	return buf.length;
 }
 
 
-print :: proc(args: ..any) -> int {
-	return fprint(os.stdout, ..args);
+print :: proc(args: ...any) -> int {
+	return fprint(os.stdout, ...args);
 }
-println :: proc(args: ..any) -> int {
-	return fprintln(os.stdout, ..args);
+println :: proc(args: ...any) -> int {
+	return fprintln(os.stdout, ...args);
 }
-printf :: proc(fmt: string, args: ..any) -> int {
-	return fprintf(os.stdout, fmt, ..args);
+printf :: proc(fmt: string, args: ...any) -> int {
+	return fprintf(os.stdout, fmt, ...args);
 }
 
 
@@ -225,7 +225,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 }
 
 
-bprint :: proc(buf: ^Buffer, args: ..any) -> int {
+bprint :: proc(buf: ^Buffer, args: ...any) -> int {
 	fi: Fmt_Info;
 	fi.buf = buf;
 
@@ -241,7 +241,7 @@ bprint :: proc(buf: ^Buffer, args: ..any) -> int {
 	return buf.length;
 }
 
-bprintln :: proc(buf: ^Buffer, args: ..any) -> int {
+bprintln :: proc(buf: ^Buffer, args: ...any) -> int {
 	fi: Fmt_Info;
 	fi.buf = buf;
 
@@ -888,7 +888,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 }
 
 
-bprintf :: proc(b: ^Buffer, fmt: string, args: ..any) -> int {
+bprintf :: proc(b: ^Buffer, fmt: string, args: ...any) -> int {
 	fi := Fmt_Info{};
 	end := fmt.count;
 	arg_index := 0;

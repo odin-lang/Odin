@@ -1519,12 +1519,7 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 			return;
 		}
 
-		bool is_value =
-			o->mode == Addressing_Variable ||
-			o->mode == Addressing_Value ||
-			o->mode == Addressing_Constant;
-
-		if (!is_value || is_type_untyped(t)) {
+		if (!is_operand_value(*o) || is_type_untyped(t)) {
 			if (ast_node_expect(node, AstNode_UnaryExpr)) {
 				ast_node(ue, UnaryExpr, node);
 				gbString str = expr_to_string(ue->expr);
@@ -2536,6 +2531,8 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		// TODO(bill): This is the rule I need?
 		if (sel.indirect || operand->mode != Addressing_Value) {
 			operand->mode = Addressing_Variable;
+		} else {
+			operand->mode = Addressing_Value;
 		}
 		break;
 	case Entity_TypeName:
@@ -2643,6 +2640,31 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->mode = Addressing_Value;
 		operand->type = make_type_slice(c->allocator, type);
+	} break;
+
+	case BuiltinProc_free: {
+		// free :: proc(^Type)
+		// free :: proc([]Type)
+		// free :: proc(string)
+		Type *type = operand->type;
+		bool ok = false;
+		if (is_type_pointer(type)) {
+			ok = true;
+		} else if (is_type_slice(type)) {
+			ok = true;
+		} else if (is_type_string(type)) {
+			ok = true;
+		}
+
+		if (!ok) {
+			gbString type_str = type_to_string(type);
+			error_node(operand->expr, "You can only free pointers, slices, and strings, got `%s`", type_str);
+			gb_string_free(type_str);
+			return false;
+		}
+
+
+		operand->mode = Addressing_NoValue;
 	} break;
 
 	case BuiltinProc_size_of: {

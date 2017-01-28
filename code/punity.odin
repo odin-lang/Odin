@@ -398,8 +398,7 @@ run :: proc(user_init, user_step: proc(c: ^Core)) {
 	ShowWindow(win32_window, SW_SHOW);
 
 	window_buffer := new_slice(u32, CANVAS_WIDTH * CANVAS_HEIGHT);
-	assert(window_buffer.data != nil);
-	defer free(window_buffer.data);
+	defer free(window_buffer);
 
 
 	for i := 0; i < window_buffer.count; i += 1 {

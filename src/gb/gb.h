@@ -4819,14 +4819,10 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 #else
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {
-		gbAllocationHeader *header;
-		isize total_size = size + alignment + gb_size_of(gbAllocationHeader);
-		ptr = malloc(total_size);
-		header = cast(gbAllocationHeader *)ptr;
-		ptr = gb_align_forward(header+1, alignment);
-		gb_allocation_header_fill(header, ptr, size);
-		if (flags & gbAllocatorFlag_ClearToZero)
+		ptr = aligned_alloc(alignment, size);
+		if (flags & gbAllocatorFlag_ClearToZero) {
 			gb_zero_size(ptr, size);
+		}
 	} break;
 
 	case gbAllocation_Free: {

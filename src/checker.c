@@ -5,8 +5,8 @@ typedef enum AddressingMode {
 	Addressing_Invalid,
 
 	Addressing_NoValue,
-	Addressing_Value,    // R-value
-	Addressing_Variable, // L-value
+	Addressing_Value,
+	Addressing_Variable,
 	Addressing_Constant,
 	Addressing_Type,
 	Addressing_Builtin,
@@ -123,6 +123,7 @@ typedef enum BuiltinProcId {
 
 	BuiltinProc_new,
 	BuiltinProc_new_slice,
+	BuiltinProc_free,
 
 	BuiltinProc_size_of,
 	BuiltinProc_size_of_val,
@@ -165,7 +166,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT(""),                 0, false, Expr_Stmt},
 
 	{STR_LIT("new"),              1, false, Expr_Expr},
-	{STR_LIT("new_slice"),        2, false,  Expr_Expr},
+	{STR_LIT("new_slice"),        2, false, Expr_Expr},
+	{STR_LIT("free"),             1, false, Expr_Stmt},
 
 	{STR_LIT("size_of"),          1, false, Expr_Expr},
 	{STR_LIT("size_of_val"),      1, false, Expr_Expr},

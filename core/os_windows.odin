@@ -235,7 +235,7 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 
 		win32.ReadFile(cast(win32.HANDLE)fd, ^data[total_read], to_read, ^single_read_length, nil);
 		if single_read_length <= 0 {
-			free(data.data);
+			free(data);
 			return nil, false;
 		}
 

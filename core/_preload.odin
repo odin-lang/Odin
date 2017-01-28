@@ -164,7 +164,7 @@ alloc_align :: proc(size, alignment: int) -> rawptr #inline {
 	return a.procedure(a.data, Allocator_Mode.ALLOC, size, alignment, nil, 0, 0);
 }
 
-free :: proc(ptr: rawptr) #inline {
+free_ptr :: proc(ptr: rawptr) #inline {
 	__check_context();
 	a := context.allocator;
 	if ptr != nil {

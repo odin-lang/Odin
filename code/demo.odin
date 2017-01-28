@@ -72,6 +72,12 @@ syntax :: proc() {
 	// `odin build_dll demo.odin`
 
 
+	// New vector syntax
+	v: [vector 3]f32;
+	v[0] = 123;
+	v.x  = 123; // valid for all vectors with count 1 to 4
+
+
 	// Next part
 	prefixes();
 }
@@ -189,14 +195,14 @@ loops :: proc() {
 	for i in 0..<123 { // 123 exclusive
 	}
 
-	for i in 0..122 { // 122 inclusive
+	for i in 0...122 { // 122 inclusive
 	}
 
 	for val, idx in 12..<16 {
 		fmt.println(val, idx);
 	}
 
-	primes := [..]int{2, 3, 5, 7, 11, 13, 17, 19};
+	primes := [...]int{2, 3, 5, 7, 11, 13, 17, 19};
 
 	for p in primes {
 		fmt.println(p);
@@ -223,8 +229,6 @@ loops :: proc() {
 			fmt.printf("%r\n", r);
 		}
 	}
-
-
 
 	procedure_overloading();
 }
