@@ -60,6 +60,19 @@ ExactValue make_exact_value_integer(i64 i) {
 	return result;
 }
 
+ExactValue make_exact_value_float(f64 f) {
+	ExactValue result = {ExactValue_Float};
+	result.value_float = f;
+	return result;
+}
+
+ExactValue make_exact_value_pointer(i64 ptr) {
+	ExactValue result = {ExactValue_Pointer};
+	result.value_pointer = ptr;
+	return result;
+}
+
+
 ExactValue make_exact_value_integer_from_string(String string) {
 	// TODO(bill): Allow for numbers with underscores in them
 	i32 base = 10;
@@ -106,23 +119,75 @@ ExactValue make_exact_value_integer_from_string(String string) {
 
 
 ExactValue make_exact_value_float_from_string(String string) {
-	// TODO(bill): Allow for numbers with underscores in them
-	ExactValue result = {ExactValue_Float};
-	result.value_float = gb_str_to_f64(cast(char *)string.text, NULL);
-	return result;
+	isize i = 0;
+	u8 *str = string.text;
+	isize len = string.len;
+
+	f64 sign = 1.0;
+	if (str[i] == '-') {
+		sign = -1.0;
+		i++;
+	} else if (*str == '+') {
+		i++;
+	}
+
+	f64 value = 0.0;
+	for (; i < len; i++) {
+		Rune r = cast(Rune)str[i];
+		if (r == '_') {
+			continue;
+		}
+		if (!gb_char_is_digit(r)) {
+			break;
+		}
+		i64 v = r - '0';
+		value *= 10.0;
+		value += v;
+	}
+
+	if (str[i] == '.') {
+		f64 pow10 = 10.0;
+		i++;
+		for (; i < string.len; i++) {
+			Rune r = cast(Rune)str[i];
+			if (r == '_') {
+				continue;
+			}
+			if (!gb_char_is_digit(r)) {
+				break;
+			}
+			value += (r-'0')/pow10;
+			pow10 *= 10.0;
+		}
+	}
+
+	f64 frac = 0;
+	f64 scale = 1.0;
+	if ((str[i] == 'e') || (str[i] == 'E')) {
+		i++;
+
+		if (str[i] == '-') {
+			frac = 1;
+			i++;
+		} else if (str[i] == '+') {
+			i++;
+		}
+
+		u32 exp;
+		for (exp = 0; gb_char_is_digit(str[i]); i++) {
+			exp = exp * 10 + (str[i]-'0');
+		}
+		if (exp > 308) exp = 308;
+
+		while (exp >= 50) { scale *= 1e50; exp -= 50; }
+		while (exp >=  8) { scale *= 1e8;  exp -=  8; }
+		while (exp >   0) { scale *= 10.0; exp -=  1; }
+	}
+
+	f64 result = sign * (frac ? (value / scale) : (value * scale));
+	return make_exact_value_float(result);
 }
 
-ExactValue make_exact_value_float(f64 f) {
-	ExactValue result = {ExactValue_Float};
-	result.value_float = f;
-	return result;
-}
-
-ExactValue make_exact_value_pointer(i64 ptr) {
-	ExactValue result = {ExactValue_Pointer};
-	result.value_pointer = ptr;
-	return result;
-}
 
 ExactValue make_exact_value_from_basic_literal(Token token) {
 	switch (token.kind) {

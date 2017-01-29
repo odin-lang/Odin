@@ -357,9 +357,9 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 	array := cast(^Raw_Dynamic_Array)array_;
 
 	ok := true;
-	if array.data == nil || array.capacity <= array.count+item_count {
+	if array.capacity <= array.count+item_count {
 		capacity := 2 * array.capacity + max(8, item_count);
-		ok := __dynamic_array_reserve(array, elem_size, elem_align, capacity);
+		ok = __dynamic_array_reserve(array, elem_size, elem_align, capacity);
 	}
 	if !ok {
 		// TODO(bill): Better error handling for failed reservation

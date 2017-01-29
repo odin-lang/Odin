@@ -1734,6 +1734,8 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, Type *type, irValue *e, Selec
 			}
 		} else if (type->kind == Type_Slice) {
 			e = ir_emit_struct_ep(proc, e, index);
+		} else if (type->kind == Type_DynamicArray) {
+			e = ir_emit_struct_ep(proc, e, index);
 		} else if (type->kind == Type_Vector) {
 			e = ir_emit_array_epi(proc, e, index);
 		} else if (type->kind == Type_Array) {
@@ -3551,6 +3553,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			}
 		} else {
 			Type *type = base_type(type_of_expr(proc->module->info, se->expr));
+			GB_ASSERT(is_type_integer(type));
 			ExactValue val = type_and_value_of_expression(proc->module->info, sel)->value;
 			i64 index = val.value_integer;
 
@@ -3579,6 +3582,14 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			Type *type = type_of_expr(proc->module->info, expr);
 			irValue *v = ir_add_local_generated(proc, type);
 			ir_emit_store(proc, v, ir_emit_transmute(proc, ir_build_expr(proc, ce->expr), type));
+			return ir_make_addr(v, expr);
+		}
+		case Token_down_cast: {
+			ir_emit_comment(proc, str_lit("Cast - down_cast"));
+			// NOTE(bill): Needed for dereference of pointer conversion
+			Type *type = type_of_expr(proc->module->info, expr);
+			irValue *v = ir_add_local_generated(proc, type);
+			ir_emit_store(proc, v, ir_emit_down_cast(proc, ir_build_expr(proc, ce->expr), type));
 			return ir_make_addr(v, expr);
 		}
 		default:
@@ -3860,12 +3871,12 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(ce, CallExpr, expr);
+		// NOTE(bill): This is make sure you never need to have an `array_ev`
 		irValue *e = ir_build_expr(proc, expr);
 		irValue *v = ir_add_local_generated(proc, ir_type(e));
 		ir_emit_store(proc, v, e);
 		return ir_make_addr(v, expr);
 	case_end;
-
 
 	case_ast_node(cl, CompoundLit, expr);
 		ir_emit_comment(proc, str_lit("CompoundLit"));
@@ -4046,8 +4057,6 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 		return ir_make_addr(v, expr);
 	case_end;
-
-
 	}
 
 	TokenPos token_pos = ast_node_token(expr).pos;
