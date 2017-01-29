@@ -138,13 +138,17 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		return -1;
 	}
 	if (is_type_untyped(src)) {
+		if (is_type_any(dst)) {
+			// NOTE(bill): Anything can cast to `Any`
+			add_type_info_type(c, s);
+			return 10;
+		}
 		if (dst->kind == Type_Basic) {
 			if (operand->mode == Addressing_Constant) {
 				if (check_representable_as_constant(c, operand->value, dst, NULL)) {
 					return 1;
-				} else {
-					return -1;
 				}
+				return -1;
 			}
 			if (src->kind == Type_Basic && src->Basic.kind == Basic_UntypedBool) {
 				if (is_type_boolean(dst)) {
@@ -3549,7 +3553,7 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 	for_array(i, ce->args) {
 		Operand o = {0};
 		check_multi_expr(c, &o, ce->args.e[i]);
-		if (o.type->kind != Type_Tuple) {
+		if (o.type == NULL || o.type->kind != Type_Tuple) {
 			array_add(&operands, o);
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;

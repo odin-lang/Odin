@@ -46,7 +46,7 @@ cl %compiler_settings% "src\main.c" ^
 	/link %linker_settings% -OUT:%exe_name% ^
 	&& odin run code/demo.odin
 	rem && odin build_dll code/example.odin ^
-	rem odin run code/punity.odin
+	rem odin run code/demo.odin
 
 rem pushd src\asm
 rem 	nasm hellope.asm -fwin64 -o hellope.obj ^
