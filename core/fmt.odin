@@ -255,6 +255,25 @@ bprintln :: proc(buf: ^Buffer, args: ...any) -> int {
 	return buf.length;
 }
 
+sprint :: proc(buf: []byte, args: ...any) -> string {
+	b: Buffer;
+	b.data = buf;
+	count := bprint(^b, ...args);
+	return cast(string)b.data[:b.length];
+}
+sprintln :: proc(buf: []byte, args: ...any) -> string {
+	b: Buffer;
+	b.data = buf;
+	count := bprintln(^b, ...args);
+	return cast(string)b.data[:b.length];
+}
+sprintf :: proc(buf: []byte, fmt: string, args: ...any) -> string {
+	b: Buffer;
+	b.data = buf;
+	count := bprintf(^b, fmt, ...args);
+	return cast(string)b.data[:b.length];
+}
+
 
 is_type_string :: proc(info: ^Type_Info) -> bool {
 	using Type_Info;

@@ -3035,9 +3035,6 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 					isize arg_index = 0;
 					isize arg_count = 0;
 					for_array(i, ce->args) {
-						if (i == 0) {
-							continue;
-						}
 						AstNode *a = ce->args.e[i];
 						Type *at = base_type(type_of_expr(proc->module->info, a));
 						if (at->kind == Type_Tuple) {
@@ -3046,6 +3043,7 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 							arg_count++;
 						}
 					}
+
 					irValue **args = gb_alloc_array(proc->module->allocator, irValue *, arg_count);
 					bool vari_expand = ce->ellipsis.pos.line != 0;
 
@@ -3078,8 +3076,8 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 						if (slice_len > 0) {
 							irValue *base_array = ir_add_local_generated(proc, make_type_array(a, elem_type, slice_len));
 
-							for (isize i = 1, j = 0; i < arg_count; i++, j++) {
-								irValue *addr = ir_emit_array_epi(proc, base_array, j);
+							for (isize i = 1; i < arg_count; i++) {
+								irValue *addr = ir_emit_array_epi(proc, base_array, i-1);
 								ir_emit_store(proc, addr, args[i]);
 							}
 
@@ -4220,7 +4218,8 @@ void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, ir
 			val = ir_emit_load(proc, ir_emit_ptr_offset(proc, elem, idx));
 		} break;
 		case Type_DynamicArray: {
-			irValue *elem = ir_dynamic_array_elem(proc, expr);
+			irValue *elem = ir_emit_struct_ep(proc, expr, 0);
+			elem = ir_emit_load(proc, elem);
 			val = ir_emit_load(proc, ir_emit_ptr_offset(proc, elem, idx));
 		} break;
 		default:
@@ -4789,14 +4788,11 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			} break;
 			case Type_DynamicArray: {
 				irValue *count_ptr = NULL;
-				irValue *array = ir_build_expr(proc, rs->expr);
+				irValue *array = ir_build_addr(proc, rs->expr).addr;
 				if (is_type_pointer(type_deref(ir_type(array)))) {
-					count_ptr = ir_emit_struct_ep(proc, array, 1);
 					array = ir_emit_load(proc, array);
-				}  else {
-					count_ptr = ir_add_local_generated(proc, t_int);
-					ir_emit_store(proc, count_ptr, ir_dynamic_array_count(proc, array));
 				}
+				count_ptr = ir_emit_struct_ep(proc, array, 1);
 				ir_build_range_indexed(proc, array, val_type, count_ptr, &val, &index, &loop, &done);
 			} break;
 			case Type_Slice: {
