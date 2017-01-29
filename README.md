@@ -2,7 +2,7 @@
 
 # The Odin Programming Language
 
-Odin is fast, concise, readable, pragmatic and open sourced. It is designed with the intent of replacing C with the following goals:
+The Odin programming language is fast, concise, readable, pragmatic and open sourced. It is designed with the intent of replacing C with the following goals:
 * simplicity
 * high performance
 * built for modern systems
@@ -18,6 +18,7 @@ Odin is fast, concise, readable, pragmatic and open sourced. It is designed with
 * [Composition & Refactorability](https://www.youtube.com/watch?v=n1wemZfcbXM)
 * [Introspection, Modules, and Record Layout](https://www.youtube.com/watch?v=UFq8rhWhx4s)
 * [push_allocator & Minimal Dependency Building](https://www.youtube.com/watch?v=f_LGVOAMb78)
+* [when, for, & procedure overloading](https://www.youtube.com/watch?v=OzeOekzyZK8)
 
 ## Requirements to build and run
 
@@ -30,27 +31,27 @@ Odin is fast, concise, readable, pragmatic and open sourced. It is designed with
 ## Warnings
 
 * This is still highly in development and the language's design is quite volatile.
-* Syntax is definitely not fixed
+* Syntax is not fixed.
 
 ## Roadmap
 
 Not in any particular order
 
-* Custom backend to replace LLVM
-	- Improve SSA design to accommodate for lowering to a "bytecode"
-	- SSA optimizations
-	- COFF generation
-	- linker
-* Type safe "macros"
-* Documentation generator for "Entities"
-* Multiple architecture support
-* Inline assembly
-* Linking options
-	- Executable
-	- Static/Dynamic Library
-* Debug information
+* Compile Time Execution (CTE)
+	- More metaprogramming madness
+	- Compiler as a library
+	- AST inspection and modification
+* CTE-based build system
+* Replace LLVM backend with my own custom backend
+* Improve SSA design to accommodate for lowering to a "bytecode"
+* SSA optimizations
+* Parametric Polymorphism ("Generics")
+* Documentation Generator for "Entities"
+* Multiple Architecture support
+* Language level atomics and concurrency support
+* Debug Information
 	- pdb format too
-* Command line tooling
-* Compiler internals:
+* Command Line Tooling
+* Compiler Internals:
 	- Big numbers library
-
+	- Multithreading for performance increase
