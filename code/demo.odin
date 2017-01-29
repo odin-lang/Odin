@@ -14,12 +14,7 @@ main :: proc() {
 	defer free(array);
 	reserve(^array, 10);
 
-	append(^array, 2);
-	append(^array, 3);
-	append(^array, 5);
-	append(^array, 7);
-	append(^array, 11);
-	append(^array, 13);
+	append(^array, 2, 3, 5, 7, 11, 13);
 	for val, idx in array {
 		fmt.println(val, idx);
 	}

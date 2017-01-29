@@ -19,6 +19,7 @@ void     check_stmt                     (Checker *c, AstNode *node, u32 flags);
 void     check_stmt_list                (Checker *c, AstNodeArray stmts, u32 flags);
 void     check_init_constant            (Checker *c, Entity *e, Operand *operand);
 bool     check_representable_as_constant(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
+Type *   check_call_arguments           (Checker *c, Operand *operand, Type *proc_type, AstNode *call);
 
 
 gb_inline Type *check_type(Checker *c, AstNode *expression) {
@@ -2598,6 +2599,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 	}
 
+	Operand prev_operand = *operand;
+
 	switch (id) {
 	case BuiltinProc_new:
 	case BuiltinProc_new_slice:
@@ -2715,7 +2718,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_append: {
-		// append :: proc(^[dynamic]Type, item: Type) {
+		// append :: proc(^[dynamic]Type, item: ...Type) {
 		Type *type = operand->type;
 		if (!is_type_pointer(type)) {
 			gbString str = type_to_string(type);
@@ -2730,27 +2733,25 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			gb_string_free(str);
 			return false;
 		}
+
+		// TODO(bill): Semi-memory leaks
 		Type *elem = type->DynamicArray.elem;
+		Type *slice_elem = make_type_slice(c->allocator, elem);
 
+		Type *proc_type_params = make_type_tuple(c->allocator);
+		proc_type_params->Tuple.variables = gb_alloc_array(c->allocator, Entity *, 2);
+		proc_type_params->Tuple.variable_count = 2;
+		proc_type_params->Tuple.variables[0] = make_entity_param(c->allocator, NULL, blank_token, operand->type, false, false);
+		proc_type_params->Tuple.variables[1] = make_entity_param(c->allocator, NULL, blank_token, slice_elem, false, false);
+		Type *proc_type = make_type_proc(c->allocator, NULL, proc_type_params, 2, NULL, false, true, ProcCC_Odin);
 
-		AstNode *item = ce->args.e[1];
-		Operand op = {0};
-		check_expr(c, &op, item);
-		if (op.mode == Addressing_Invalid) {
+		check_call_arguments(c, &prev_operand, proc_type, call);
+
+		if (prev_operand.mode == Addressing_Invalid) {
 			return false;
 		}
-		Type *arg_type = op.type;
-		if (!check_is_assignable_to(c, &op, elem)) {
-			gbString elem_str = type_to_string(elem);
-			gbString str = type_to_string(arg_type);
-			error_node(operand->expr, "Expected `%s` for `append` item, got `%s`", elem_str, str);
-			gb_string_free(str);
-			gb_string_free(elem_str);
-			return false;
-		}
-
-		operand->type = NULL;
-		operand->mode = Addressing_NoValue;
+		operand->mode = Addressing_Value;
+		operand->type = t_int;
 	} break;
 
 
@@ -3284,7 +3285,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 				return false;
 			}
 
-			if (!are_types_identical(operand->type, b.type)) {
+			if (!are_types_identical(a.type, b.type)) {
 				gbString type_a = type_to_string(a.type);
 				gbString type_b = type_to_string(b.type);
 				error_node(call,
@@ -3352,7 +3353,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 				return false;
 			}
 
-			if (!are_types_identical(operand->type, b.type)) {
+			if (!are_types_identical(a.type, b.type)) {
 				gbString type_a = type_to_string(a.type);
 				gbString type_b = type_to_string(b.type);
 				error_node(call,

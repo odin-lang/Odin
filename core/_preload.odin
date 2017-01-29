@@ -352,20 +352,22 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, capa
 }
 
 
-__dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int, item_ptr: rawptr) {
+__dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
+                               items: rawptr, item_count: int) -> int {
 	array := cast(^Raw_Dynamic_Array)array_;
 
 	ok := true;
-	if array.data == nil || array.capacity <= array.count {
-		capacity := 2 * array.capacity + 8;
+	if array.data == nil || array.capacity <= array.count+item_count {
+		capacity := 2 * array.capacity + max(8, item_count);
 		ok := __dynamic_array_reserve(array, elem_size, elem_align, capacity);
 	}
 	if !ok {
 		// TODO(bill): Better error handling for failed reservation
-		return;
+		return array.count;
 	}
 	data := cast(^byte)array.data;
 	assert(data != nil);
-	mem.copy(data + (elem_size*array.count), item_ptr, elem_size);
-	array.count += 1;
+	mem.copy(data + (elem_size*array.count), items, elem_size * item_count);
+	array.count += item_count;
+	return array.count;
 }

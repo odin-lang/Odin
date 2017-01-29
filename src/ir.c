@@ -3025,23 +3025,86 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 					GB_ASSERT(is_type_pointer(type));
 					type = base_type(type_deref(type));
 					GB_ASSERT(is_type_dynamic_array(type));
-					Type *elem = type->DynamicArray.elem;
+					Type *elem_type = type->DynamicArray.elem;
 
-					irValue *elem_size  = ir_make_const_int(a, type_size_of(proc->module->sizes, a, elem));
-					irValue *elem_align = ir_make_const_int(a, type_align_of(proc->module->sizes, a, elem));
+					irValue *elem_size  = ir_make_const_int(a, type_size_of(proc->module->sizes, a, elem_type));
+					irValue *elem_align = ir_make_const_int(a, type_align_of(proc->module->sizes, a, elem_type));
 
 					array_ptr = ir_emit_conv(proc, array_ptr, t_rawptr);
 
-					irValue *item_ptr = ir_add_local_generated(proc, elem);
-					irValue *item = ir_build_expr(proc, ce->args.e[1]);
-					ir_emit_store(proc, item_ptr, item);
+					isize arg_index = 0;
+					isize arg_count = 0;
+					for_array(i, ce->args) {
+						if (i == 0) {
+							continue;
+						}
+						AstNode *a = ce->args.e[i];
+						Type *at = base_type(type_of_expr(proc->module->info, a));
+						if (at->kind == Type_Tuple) {
+							arg_count += at->Tuple.variable_count;
+						} else {
+							arg_count++;
+						}
+					}
+					irValue **args = gb_alloc_array(proc->module->allocator, irValue *, arg_count);
+					bool vari_expand = ce->ellipsis.pos.line != 0;
 
-					irValue **args = gb_alloc_array(a, irValue *, 4);
-					args[0] = array_ptr;
-					args[1] = elem_size;
-					args[2] = elem_align;
-					args[3] = ir_emit_conv(proc, item_ptr, t_rawptr);
-					return ir_emit_global_call(proc, "__dynamic_array_append", args, 4);
+					for_array(i, ce->args) {
+						irValue *a = ir_build_expr(proc, ce->args.e[i]);
+						Type *at = ir_type(a);
+						if (at->kind == Type_Tuple) {
+							for (isize i = 0; i < at->Tuple.variable_count; i++) {
+								Entity *e = at->Tuple.variables[i];
+								irValue *v = ir_emit_struct_ev(proc, a, i);
+								args[arg_index++] = v;
+							}
+						} else {
+							args[arg_index++] = a;
+						}
+					}
+
+					if (!vari_expand) {
+						for (isize i = 1; i < arg_count; i++) {
+							args[i] = ir_emit_conv(proc, args[i], elem_type);
+						}
+					}
+
+					if (!vari_expand) {
+						ir_emit_comment(proc, str_lit("variadic call argument generation"));
+						Type *slice_type = make_type_slice(a, elem_type);
+						irValue *slice = ir_add_local_generated(proc, slice_type);
+						isize slice_len = arg_count-1;
+
+						if (slice_len > 0) {
+							irValue *base_array = ir_add_local_generated(proc, make_type_array(a, elem_type, slice_len));
+
+							for (isize i = 1, j = 0; i < arg_count; i++, j++) {
+								irValue *addr = ir_emit_array_epi(proc, base_array, j);
+								ir_emit_store(proc, addr, args[i]);
+							}
+
+							irValue *base_elem  = ir_emit_array_epi(proc, base_array, 0);
+							irValue *slice_elem = ir_emit_struct_ep(proc, slice,      0);
+							ir_emit_store(proc, slice_elem, base_elem);
+							irValue *len = ir_make_const_int(a, slice_len);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, slice, 1), len);
+						}
+
+						arg_count = 2;
+						args[arg_count-1] = ir_emit_load(proc, slice);
+					}
+
+					irValue *item_slice = args[1];
+					irValue *items = ir_slice_elem(proc, item_slice);
+					irValue *item_count = ir_slice_count(proc, item_slice);
+
+					irValue **daa_args = gb_alloc_array(a, irValue *, 5);
+					daa_args[0] = array_ptr;
+					daa_args[1] = elem_size;
+					daa_args[2] = elem_align;
+					daa_args[3] = ir_emit_conv(proc, items, t_rawptr);
+					daa_args[4] = ir_emit_conv(proc, item_count, t_int);
+					return ir_emit_global_call(proc, "__dynamic_array_append", daa_args, 5);
 				} break;
 
 

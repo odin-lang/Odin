@@ -173,7 +173,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("free"),             1, false, Expr_Stmt},
 
 	{STR_LIT("reserve"),          2, false, Expr_Stmt},
-	{STR_LIT("append"),           2, false, Expr_Stmt},
+	{STR_LIT("append"),           1, true,  Expr_Expr},
 
 	{STR_LIT("size_of"),          1, false, Expr_Expr},
 	{STR_LIT("size_of_val"),      1, false, Expr_Expr},
