@@ -341,6 +341,10 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		AstNode *count; \
 		AstNode *elem; \
 	}) \
+	AST_NODE_KIND(DynamicArrayType, "dynamic array type", struct { \
+		Token token; \
+		AstNode *elem; \
+	}) \
 	AST_NODE_KIND(VectorType, "vector type", struct { \
 		Token token; \
 		AstNode *count; \
@@ -553,6 +557,8 @@ Token ast_node_token(AstNode *node) {
 		return node->MaybeType.token;
 	case AstNode_ArrayType:
 		return node->ArrayType.token;
+	case AstNode_DynamicArrayType:
+		return node->DynamicArrayType.token;
 	case AstNode_VectorType:
 		return node->VectorType.token;
 	case AstNode_StructType:
@@ -1080,6 +1086,13 @@ AstNode *make_array_type(AstFile *f, Token token, AstNode *count, AstNode *elem)
 	return result;
 }
 
+AstNode *make_dynamic_array_type(AstFile *f, Token token, AstNode *elem) {
+	AstNode *result = make_node(f, AstNode_DynamicArrayType);
+	result->DynamicArrayType.token = token;
+	result->DynamicArrayType.elem  = elem;
+	return result;
+}
+
 AstNode *make_vector_type(AstFile *f, Token token, AstNode *count, AstNode *elem) {
 	AstNode *result = make_node(f, AstNode_VectorType);
 	result->VectorType.token = token;
@@ -1267,7 +1280,6 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_if:
 		case Token_when:
 		case Token_return:
-		case Token_range:
 		case Token_match:
 		case Token_defer:
 		case Token_asm:
@@ -1463,7 +1475,7 @@ AstNode *parse_value(AstFile *f) {
 	return value;
 }
 
-AstNode *parse_identifier_or_type(AstFile *f);
+AstNode *parse_type_or_ident(AstFile *f);
 
 
 void check_proc_add_tag(AstFile *f, AstNode *tag_expr, u64 *tags, ProcTag tag, String tag_name) {
@@ -1839,7 +1851,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		break;
 
 	default: {
-		AstNode *type = parse_identifier_or_type(f);
+		AstNode *type = parse_type_or_ident(f);
 		if (type != NULL) {
 			// TODO(bill): Is this correct???
 			// NOTE(bill): Sanity check as identifiers should be handled already
@@ -2204,7 +2216,7 @@ void parse_check_name_list_for_reserves(AstFile *f, AstNodeArray names) {
 }
 
 AstNode *parse_type_attempt(AstFile *f) {
-	AstNode *type = parse_identifier_or_type(f);
+	AstNode *type = parse_type_or_ident(f);
 	if (type != NULL) {
 		// TODO(bill): Handle?
 	}
@@ -2415,7 +2427,7 @@ AstNode *parse_var_type(AstFile *f, bool allow_ellipsis) {
 	if (allow_ellipsis && f->curr_token.kind == Token_Ellipsis) {
 		Token tok = f->curr_token;
 		next_token(f);
-		AstNode *type = parse_identifier_or_type(f);
+		AstNode *type = parse_type_or_ident(f);
 		if (type == NULL) {
 			error(tok, "variadic field missing type after `...`");
 			type = make_bad_expr(f, tok, f->curr_token);
@@ -2561,7 +2573,7 @@ AstNodeArray parse_record_fields(AstFile *f, isize *field_count_, u32 flags, Str
 	return parse_field_list(f, field_count_, flags, Token_Comma, Token_CloseBrace);
 }
 
-AstNode *parse_identifier_or_type(AstFile *f) {
+AstNode *parse_type_or_ident(AstFile *f) {
 	switch (f->curr_token.kind) {
 	case Token_Ident: {
 		AstNode *e = parse_identifier(f);
@@ -2597,7 +2609,6 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 	}
 
 	case Token_OpenBracket: {
-		f->expr_level++;
 		Token token = expect_token(f, Token_OpenBracket);
 		AstNode *count_expr = NULL;
 		bool is_vector = false;
@@ -2607,16 +2618,23 @@ AstNode *parse_identifier_or_type(AstFile *f) {
 		} else if (f->curr_token.kind == Token_vector) {
 			next_token(f);
 			if (f->curr_token.kind != Token_CloseBracket) {
+				f->expr_level++;
 				count_expr = parse_expr(f, false);
+				f->expr_level--;
 			} else {
 				syntax_error(f->curr_token, "Vector type missing count");
 			}
 			is_vector = true;
+		} else if (f->curr_token.kind == Token_dynamic) {
+			next_token(f);
+			expect_token(f, Token_CloseBracket);
+			return make_dynamic_array_type(f, token, parse_type(f));
 		} else if (f->curr_token.kind != Token_CloseBracket) {
+			f->expr_level++;
 			count_expr = parse_expr(f, false);
+			f->expr_level--;
 		}
 		expect_token(f, Token_CloseBracket);
-		f->expr_level--;
 		if (is_vector) {
 			return make_vector_type(f, token, count_expr, parse_type(f));
 		}

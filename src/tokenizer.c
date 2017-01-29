@@ -80,41 +80,40 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
-	TOKEN_KIND(Token_type,           "type"), \
-	TOKEN_KIND(Token_proc,           "proc"), \
-	TOKEN_KIND(Token_macro,          "macro"), \
-	TOKEN_KIND(Token_match,          "match"), \
-	TOKEN_KIND(Token_break,          "break"), \
-	TOKEN_KIND(Token_continue,       "continue"), \
-	TOKEN_KIND(Token_fallthrough,    "fallthrough"), \
-	TOKEN_KIND(Token_case,           "case"), \
-	TOKEN_KIND(Token_default,        "default"), \
-	TOKEN_KIND(Token_then,           "then"), \
+	TOKEN_KIND(Token_when,           "when"), \
 	TOKEN_KIND(Token_if,             "if"), \
 	TOKEN_KIND(Token_else,           "else"), \
 	TOKEN_KIND(Token_for,            "for"), \
 	TOKEN_KIND(Token_in,             "in"), \
-	TOKEN_KIND(Token_when,           "when"), \
-	TOKEN_KIND(Token_range,          "range"), \
+	TOKEN_KIND(Token_break,          "break"), \
+	TOKEN_KIND(Token_continue,       "continue"), \
+	TOKEN_KIND(Token_fallthrough,    "fallthrough"), \
+	TOKEN_KIND(Token_match,          "match"), \
+	TOKEN_KIND(Token_type,           "type"), \
+	TOKEN_KIND(Token_default,        "default"), \
+	TOKEN_KIND(Token_case,           "case"), \
 	TOKEN_KIND(Token_defer,          "defer"), \
 	TOKEN_KIND(Token_return,         "return"), \
 	TOKEN_KIND(Token_give,           "give"), \
+	TOKEN_KIND(Token_proc,           "proc"), \
+	TOKEN_KIND(Token_macro,          "macro"), \
 	TOKEN_KIND(Token_struct,         "struct"), \
 	TOKEN_KIND(Token_union,          "union"), \
 	TOKEN_KIND(Token_raw_union,      "raw_union"), \
 	TOKEN_KIND(Token_enum,           "enum"), \
 	TOKEN_KIND(Token_vector,         "vector"), \
+	TOKEN_KIND(Token_dynamic,        "dynamic"), \
 	TOKEN_KIND(Token_using,          "using"), \
 	TOKEN_KIND(Token_no_alias,       "no_alias"), \
 	TOKEN_KIND(Token_immutable,      "immutable"), \
 	TOKEN_KIND(Token_thread_local,   "thread_local"), \
-	TOKEN_KIND(Token_asm,            "asm"), \
-	TOKEN_KIND(Token_push_allocator, "push_allocator"), \
-	TOKEN_KIND(Token_push_context,   "push_context"), \
 	TOKEN_KIND(Token_cast,           "cast"), \
 	TOKEN_KIND(Token_transmute,      "transmute"), \
 	TOKEN_KIND(Token_down_cast,      "down_cast"), \
 	TOKEN_KIND(Token_union_cast,     "union_cast"), \
+	TOKEN_KIND(Token_push_allocator, "push_allocator"), \
+	TOKEN_KIND(Token_push_context,   "push_context"), \
+	TOKEN_KIND(Token_asm,            "asm"), \
 TOKEN_KIND(Token__KeywordEnd, "_KeywordEnd"), \
 	TOKEN_KIND(Token_Count, "")
 
@@ -264,20 +263,20 @@ void compiler_error(char *fmt, ...) {
 
 
 
-gb_inline bool token_is_literal(Token t) {
-	return gb_is_between(t.kind, Token__LiteralBegin+1, Token__LiteralEnd-1);
+gb_inline bool token_is_literal(TokenKind t) {
+	return gb_is_between(t, Token__LiteralBegin+1, Token__LiteralEnd-1);
 }
-gb_inline bool token_is_operator(Token t) {
-	return gb_is_between(t.kind, Token__OperatorBegin+1, Token__OperatorEnd-1);
+gb_inline bool token_is_operator(TokenKind t) {
+	return gb_is_between(t, Token__OperatorBegin+1, Token__OperatorEnd-1);
 }
-gb_inline bool token_is_keyword(Token t) {
-	return gb_is_between(t.kind, Token__KeywordBegin+1, Token__KeywordEnd-1);
+gb_inline bool token_is_keyword(TokenKind t) {
+	return gb_is_between(t, Token__KeywordBegin+1, Token__KeywordEnd-1);
 }
-gb_inline bool token_is_comparison(Token t) {
-	return gb_is_between(t.kind, Token__ComparisonBegin+1, Token__ComparisonEnd-1);
+gb_inline bool token_is_comparison(TokenKind t) {
+	return gb_is_between(t, Token__ComparisonBegin+1, Token__ComparisonEnd-1);
 }
-gb_inline bool token_is_shift(Token t) {
-	return t.kind == Token_Shl || t.kind == Token_Shr;
+gb_inline bool token_is_shift(TokenKind t) {
+	return t == Token_Shl || t == Token_Shr;
 }
 
 gb_inline void print_token(Token t) { gb_printf("%.*s\n", LIT(t.string)); }

@@ -248,12 +248,23 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 
 
 heap_alloc :: proc(size: int) -> rawptr {
+	assert(size > 0);
 	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, size);
 }
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
+	if new_size == 0 {
+		heap_free(ptr);
+		return nil;
+	}
+	if ptr == nil {
+		return heap_alloc(new_size);
+	}
 	return win32.HeapReAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, ptr, new_size);
 }
 heap_free :: proc(ptr: rawptr) {
+	if ptr == nil {
+		return;
+	}
 	win32.HeapFree(win32.GetProcessHeap(), 0, ptr);
 }
 

@@ -97,6 +97,7 @@ typedef struct TypeRecord {
 	TYPE_KIND(Basic,   BasicType) \
 	TYPE_KIND(Pointer, struct { Type *elem; }) \
 	TYPE_KIND(Array,   struct { Type *elem; i64 count; }) \
+	TYPE_KIND(DynamicArray, struct { Type *elem; }) \
 	TYPE_KIND(Vector,  struct { Type *elem; i64 count; }) \
 	TYPE_KIND(Slice,   struct { Type *elem; }) \
 	TYPE_KIND(Maybe,   struct { Type *elem; }) \
@@ -385,6 +386,12 @@ Type *make_type_array(gbAllocator a, Type *elem, i64 count) {
 	return t;
 }
 
+Type *make_type_dynamic_array(gbAllocator a, Type *elem) {
+	Type *t = alloc_type(a, Type_DynamicArray);
+	t->DynamicArray.elem = elem;
+	return t;
+}
+
 Type *make_type_vector(gbAllocator a, Type *elem, i64 count) {
 	Type *t = alloc_type(a, Type_Vector);
 	t->Vector.elem = elem;
@@ -616,6 +623,10 @@ bool is_type_array(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Array;
 }
+bool is_type_dynamic_array(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_DynamicArray;
+}
 bool is_type_slice(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Slice;
@@ -690,6 +701,7 @@ bool type_has_nil(Type *t) {
 		return false;
 	} break;
 	case Type_Slice:
+	case Type_DynamicArray:
 	case Type_Proc:
 	case Type_Pointer:
 	case Type_Maybe:
@@ -747,6 +759,12 @@ bool are_types_identical(Type *x, Type *y) {
 	case Type_Array:
 		if (y->kind == Type_Array) {
 			return (x->Array.count == y->Array.count) && are_types_identical(x->Array.elem, y->Array.elem);
+		}
+		break;
+
+	case Type_DynamicArray:
+		if (y->kind == Type_DynamicArray) {
+			return are_types_identical(x->DynamicArray.elem, y->DynamicArray.elem);
 		}
 		break;
 
@@ -973,7 +991,10 @@ gb_global Entity *entity__any_data       = NULL;
 gb_global Entity *entity__string_data    = NULL;
 gb_global Entity *entity__string_count   = NULL;
 gb_global Entity *entity__slice_count    = NULL;
-gb_global Entity *entity__slice_capacity = NULL;
+
+gb_global Entity *entity__dynamic_array_count     = NULL;
+gb_global Entity *entity__dynamic_array_capacity  = NULL;
+gb_global Entity *entity__dynamic_array_allocator = NULL;
 
 Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel);
 
@@ -1140,6 +1161,39 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			}
 
 			sel.entity = entity__slice_count;
+			return sel;
+		}
+	}  else if (type->kind == Type_DynamicArray) {
+		String data_str      = str_lit("data");
+		String count_str     = str_lit("count");
+		String capacity_str  = str_lit("capacity");
+		String allocator_str = str_lit("allocator");
+
+		if (str_eq(field_name, data_str)) {
+			selection_add_index(&sel, 0);
+			// HACK(bill): Memory leak
+			sel.entity = make_entity_field(a, NULL, make_token_ident(data_str), make_type_pointer(a, type->DynamicArray.elem), false, 0);
+			return sel;
+		} else if (str_eq(field_name, count_str)) {
+			selection_add_index(&sel, 1);
+			if (entity__dynamic_array_count == NULL) {
+				entity__dynamic_array_count = make_entity_field(a, NULL, make_token_ident(count_str), t_int, false, 1);
+			}
+			sel.entity = entity__dynamic_array_count;
+			return sel;
+		} else if (str_eq(field_name, capacity_str)) {
+			selection_add_index(&sel, 2);
+			if (entity__dynamic_array_capacity == NULL) {
+				entity__dynamic_array_capacity = make_entity_field(a, NULL, make_token_ident(capacity_str), t_int, false, 2);
+			}
+			sel.entity = entity__dynamic_array_capacity;
+			return sel;
+		} else if (str_eq(field_name, allocator_str)) {
+			selection_add_index(&sel, 3);
+			if (entity__dynamic_array_allocator == NULL) {
+				entity__dynamic_array_allocator = make_entity_field(a, NULL, make_token_ident(allocator_str), t_allocator, false, 3);
+			}
+			sel.entity = entity__dynamic_array_allocator;
 			return sel;
 		}
 	}
@@ -1351,6 +1405,14 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 		type_path_pop(path);
 		return align;
 	}
+
+	case Type_DynamicArray:
+		// data, count, capacity, allocator
+		return s.word_size;
+
+	case Type_Slice:
+		return s.word_size;
+
 	case Type_Vector: {
 		Type *elem = t->Vector.elem;
 		type_path_push(path, elem);
@@ -1536,6 +1598,9 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 		alignment = align_formula(size, align);
 		return alignment*(count-1) + size;
 	} break;
+
+	case Type_DynamicArray:
+		return 3*s.word_size + type_size_of(s, allocator, t_allocator);
 
 	case Type_Vector: {
 		i64 count, bit_size, total_size_in_bits, total_size;
@@ -1734,6 +1799,11 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_Slice:
 		str = gb_string_appendc(str, "[]");
 		str = write_type_to_string(str, type->Array.elem);
+		break;
+
+	case Type_DynamicArray:
+		str = gb_string_appendc(str, "[dynamic]");
+		str = write_type_to_string(str, type->DynamicArray.elem);
 		break;
 
 	case Type_Record: {

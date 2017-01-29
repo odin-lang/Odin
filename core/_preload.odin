@@ -116,6 +116,7 @@ __trap             :: proc()        #foreign __llvm_core "llvm.trap";
 read_cycle_counter :: proc() -> u64 #foreign __llvm_core "llvm.readcyclecounter";
 
 
+// IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
 Allocator_Mode :: enum u8 {
 	ALLOC,
 	FREE,
@@ -164,12 +165,16 @@ alloc_align :: proc(size, alignment: int) -> rawptr #inline {
 	return a.procedure(a.data, Allocator_Mode.ALLOC, size, alignment, nil, 0, 0);
 }
 
+free_ptr_with_allocator :: proc(a: Allocator, ptr: rawptr) #inline {
+	if ptr == nil {
+		return;
+	}
+	a.procedure(a.data, Allocator_Mode.FREE, 0, 0, ptr, 0, 0);
+}
+
 free_ptr :: proc(ptr: rawptr) #inline {
 	__check_context();
-	a := context.allocator;
-	if ptr != nil {
-		a.procedure(a.data, Allocator_Mode.FREE, 0, 0, ptr, 0, 0);
-	}
+	free_ptr_with_allocator(context.allocator, ptr);
 }
 free_all :: proc() #inline {
 	__check_context();
@@ -217,46 +222,21 @@ default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
 	using Allocator_Mode;
 
-	when false {
-		match mode {
-		case ALLOC:
-			total_size := size + alignment + size_of(mem.AllocationHeader);
-			ptr := os.heap_alloc(total_size);
-			header := (^mem.AllocationHeader)(ptr);
-			ptr = mem.align_forward(header+1, alignment);
-			mem.allocation_header_fill(header, ptr, size);
-			return mem.zero(ptr, size);
+	match mode {
+	case ALLOC:
+		return os.heap_alloc(size);
 
-		case FREE:
-			os.heap_free(mem.allocation_header(old_memory));
-			return nil;
+	case FREE:
+		os.heap_free(old_memory);
+		return nil;
 
-		case FREE_ALL:
-			// NOTE(bill): Does nothing
+	case FREE_ALL:
+		// NOTE(bill): Does nothing
 
-		case RESIZE:
-			total_size := size + alignment + size_of(mem.AllocationHeader);
-			ptr := os.heap_resize(mem.allocation_header(old_memory), total_size);
-			header := (^mem.AllocationHeader)(ptr);
-			ptr = mem.align_forward(header+1, alignment);
-			mem.allocation_header_fill(header, ptr, size);
-			return mem.zero(ptr, size);
-		}
-	} else {
-		match mode {
-		case ALLOC:
-			return os.heap_alloc(size);
-
-		case FREE:
-			os.heap_free(old_memory);
-			return nil;
-
-		case FREE_ALL:
-			// NOTE(bill): Does nothing
-
-		case RESIZE:
-			return os.heap_resize(old_memory, size);
-		}
+	case RESIZE:
+		ptr := os.heap_resize(old_memory, size);
+		assert(ptr != nil);
+		return ptr;
 	}
 
 	return nil;
@@ -336,3 +316,56 @@ __string_decode_rune :: proc(s: string) -> (rune, int) #inline {
 	return utf8.decode_rune(s);
 }
 
+
+Raw_Dynamic_Array :: struct #ordered {
+	data:      rawptr,
+	count:     int,
+	capacity:  int,
+	allocator: Allocator,
+};
+
+__dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, capacity: int) -> bool {
+	array := cast(^Raw_Dynamic_Array)array_;
+
+	if capacity <= array.capacity {
+		return true;
+	}
+
+	__check_context();
+	if array.allocator.procedure == nil {
+		array.allocator = context.allocator;
+	}
+	assert(array.allocator.procedure != nil);
+
+	old_size  := array.capacity * elem_size;
+	new_size  := capacity * elem_size;
+	allocator := array.allocator;
+
+	new_data := allocator.procedure(allocator.data, Allocator_Mode.RESIZE, new_size, elem_align, array.data, old_size, 0);
+	if new_data == nil {
+		return false;
+	}
+
+	array.data = new_data;
+	array.capacity = capacity;
+	return true;
+}
+
+
+__dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int, item_ptr: rawptr) {
+	array := cast(^Raw_Dynamic_Array)array_;
+
+	ok := true;
+	if array.data == nil || array.capacity <= array.count {
+		capacity := 2 * array.capacity + 8;
+		ok := __dynamic_array_reserve(array, elem_size, elem_align, capacity);
+	}
+	if !ok {
+		// TODO(bill): Better error handling for failed reservation
+		return;
+	}
+	data := cast(^byte)array.data;
+	assert(data != nil);
+	mem.copy(data + (elem_size*array.count), item_ptr, elem_size);
+	array.count += 1;
+}

@@ -194,6 +194,13 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		ir_print_type(f, m, t->Slice.elem);
 		ir_fprintf(f, "*, i%lld, i%lld}", word_bits, word_bits);
 		return;
+	case Type_DynamicArray:
+		ir_fprintf(f, "{");
+		ir_print_type(f, m, t->Slice.elem);
+		ir_fprintf(f, "*, i%lld, i%lld,", word_bits, word_bits);
+		ir_print_type(f, m, t_allocator);
+		ir_fprintf(f, "}");
+		return;
 	case Type_Record: {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct:

@@ -80,6 +80,9 @@ allocation_header_fill :: proc(header: ^Allocation_Header, data: rawptr, size: i
 	}
 }
 allocation_header :: proc(data: rawptr) -> ^Allocation_Header {
+	if data == nil {
+		return nil;
+	}
 	p := cast(^int)data;
 	for (p-1)^ == -1 {
 		p = (p-1);

@@ -1140,6 +1140,13 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 		goto end;
 	case_end;
 
+	case_ast_node(dat, DynamicArrayType, e);
+		Type *elem = check_type_extra(c, dat->elem, NULL);
+		type = make_type_dynamic_array(c->allocator, elem);
+		goto end;
+	case_end;
+
+
 
 	case_ast_node(vt, VectorType, e);
 		Type *elem = check_type(c, vt->elem);
@@ -1984,7 +1991,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		return;
 	}
 
-	if (token_is_shift(op)) {
+	if (token_is_shift(op.kind)) {
 		check_shift(c, x, y, node);
 		return;
 	}
@@ -2019,7 +2026,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		return;
 	}
 
-	if (token_is_comparison(op)) {
+	if (token_is_comparison(op.kind)) {
 		check_comparison(c, x, y, op.kind);
 		return;
 	}
@@ -2138,9 +2145,9 @@ void update_expr_type(Checker *c, AstNode *e, Type *type, bool final) {
 			// See above note in UnaryExpr case
 			break;
 		}
-		if (token_is_comparison(be->op)) {
-		}
-		else if (token_is_shift(be->op)) {
+		if (token_is_comparison(be->op.kind)) {
+			// NOTE(bill): Do nothing as the types are fine
+		} else if (token_is_shift(be->op.kind)) {
 			update_expr_type(c, be->left,  type, final);
 		} else {
 			update_expr_type(c, be->left,  type, final);
@@ -2658,11 +2665,13 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			ok = true;
 		} else if (is_type_string(type)) {
 			ok = true;
+		} else if (is_type_dynamic_array(type)) {
+			ok = true;
 		}
 
 		if (!ok) {
 			gbString type_str = type_to_string(type);
-			error_node(operand->expr, "You can only free pointers, slices, and strings, got `%s`", type_str);
+			error_node(operand->expr, "Invalid type for `free`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -2670,6 +2679,80 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->mode = Addressing_NoValue;
 	} break;
+
+
+	case BuiltinProc_reserve: {
+		// reserve :: proc(^[dynamic]Type, count: int) {
+		Type *type = operand->type;
+		if (!is_type_pointer(type)) {
+			gbString str = type_to_string(type);
+			error_node(operand->expr, "Expected a pointer to a dynamic array, got `%s`", str);
+			gb_string_free(str);
+			return false;
+		}
+		type = type_deref(type);
+		if (!is_type_dynamic_array(type)) {
+			gbString str = type_to_string(type);
+			error_node(operand->expr, "Expected a pointer to a dynamic array, got `%s`", str);
+			gb_string_free(str);
+			return false;
+		}
+
+		AstNode *capacity = ce->args.e[1];
+		Operand op = {0};
+		check_expr(c, &op, capacity);
+		if (op.mode == Addressing_Invalid) {
+			return false;
+		}
+		Type *arg_type = base_type(op.type);
+		if (!is_type_integer(arg_type)) {
+			error_node(operand->expr, "`reserve` capacities must be an integer");
+			return false;
+		}
+
+		operand->type = NULL;
+		operand->mode = Addressing_NoValue;
+	} break;
+
+	case BuiltinProc_append: {
+		// append :: proc(^[dynamic]Type, item: Type) {
+		Type *type = operand->type;
+		if (!is_type_pointer(type)) {
+			gbString str = type_to_string(type);
+			error_node(operand->expr, "Expected a pointer to a dynamic array, got `%s`", str);
+			gb_string_free(str);
+			return false;
+		}
+		type = base_type(type_deref(type));
+		if (!is_type_dynamic_array(type)) {
+			gbString str = type_to_string(type);
+			error_node(operand->expr, "Expected a pointer to a dynamic array, got `%s`", str);
+			gb_string_free(str);
+			return false;
+		}
+		Type *elem = type->DynamicArray.elem;
+
+
+		AstNode *item = ce->args.e[1];
+		Operand op = {0};
+		check_expr(c, &op, item);
+		if (op.mode == Addressing_Invalid) {
+			return false;
+		}
+		Type *arg_type = op.type;
+		if (!check_is_assignable_to(c, &op, elem)) {
+			gbString elem_str = type_to_string(elem);
+			gbString str = type_to_string(arg_type);
+			error_node(operand->expr, "Expected `%s` for `append` item, got `%s`", elem_str, str);
+			gb_string_free(str);
+			gb_string_free(elem_str);
+			return false;
+		}
+
+		operand->type = NULL;
+		operand->mode = Addressing_NoValue;
+	} break;
+
 
 	case BuiltinProc_size_of: {
 		// size_of :: proc(Type) -> untyped int
@@ -3839,6 +3922,11 @@ bool check_set_index_data(Operand *o, Type *t, i64 *max_count) {
 		o->type = t->Slice.elem;
 		o->mode = Addressing_Variable;
 		return true;
+
+	case Type_DynamicArray:
+		o->type = t->DynamicArray.elem;
+		o->mode = Addressing_Variable;
+		return true;
 	}
 
 	return false;
@@ -4750,6 +4838,10 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		case Type_Slice:
 			valid = true;
 			break;
+
+		case Type_DynamicArray:
+			valid = true;
+			break;
 		}
 
 		if (!valid) {
@@ -5098,6 +5190,11 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, "[");
 		str = write_expr_to_string(str, at->count);
 		str = gb_string_appendc(str, "]");
+		str = write_expr_to_string(str, at->elem);
+	case_end;
+
+	case_ast_node(at, DynamicArrayType, node);
+		str = gb_string_appendc(str, "[dynamic]");
 		str = write_expr_to_string(str, at->elem);
 	case_end;
 

@@ -10,8 +10,19 @@
 // #import win32 "sys/windows.odin";
 
 main :: proc() {
-	// syntax();
-	procedure_overloading();
+	array: [dynamic]int;
+	defer free(array);
+	reserve(^array, 10);
+
+	append(^array, 2);
+	append(^array, 3);
+	append(^array, 5);
+	append(^array, 7);
+	append(^array, 11);
+	append(^array, 13);
+	for val, idx in array {
+		fmt.println(val, idx);
+	}
 }
 
 syntax :: proc() {

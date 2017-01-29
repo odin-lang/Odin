@@ -697,6 +697,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					val = t->Array.elem;
 					idx = t_int;
 					break;
+
+				case Type_DynamicArray:
+					// val = make_type_pointer(c->allocator, t->DynamicArray.elem);
+					val = t->DynamicArray.elem;
+					idx = t_int;
+					break;
+
 				case Type_Slice:
 					// val = make_type_pointer(c->allocator, t->Slice.elem);
 					val = t->Slice.elem;

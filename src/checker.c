@@ -125,6 +125,9 @@ typedef enum BuiltinProcId {
 	BuiltinProc_new_slice,
 	BuiltinProc_free,
 
+	BuiltinProc_reserve,
+	BuiltinProc_append,
+
 	BuiltinProc_size_of,
 	BuiltinProc_size_of_val,
 	BuiltinProc_align_of,
@@ -168,6 +171,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("new"),              1, false, Expr_Expr},
 	{STR_LIT("new_slice"),        2, false, Expr_Expr},
 	{STR_LIT("free"),             1, false, Expr_Stmt},
+
+	{STR_LIT("reserve"),          2, false, Expr_Stmt},
+	{STR_LIT("append"),           2, false, Expr_Stmt},
 
 	{STR_LIT("size_of"),          1, false, Expr_Expr},
 	{STR_LIT("size_of_val"),      1, false, Expr_Expr},
