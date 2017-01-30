@@ -206,21 +206,6 @@ struct irProcedure {
 		irValue **args; \
 		isize      arg_count; \
 	}) \
-	/* IR_INSTR_KIND(VectorExtractElement, struct { \
-		irValue *vector; \
-		irValue *index; \
-	}) \
-	IR_INSTR_KIND(VectorInsertElement, struct { \
-		irValue *vector; \
-		irValue *elem; \
-		irValue *index; \
-	}) \
-	IR_INSTR_KIND(VectorShuffle, struct { \
-		irValue *vector; \
-		i32 *     indices; \
-		i32       index_count; \
-		Type *    type; \
-	})  */\
 	IR_INSTR_KIND(StartupRuntime, i32) \
 	IR_INSTR_KIND(BoundsCheck, struct { \
 		TokenPos  pos; \
@@ -572,17 +557,6 @@ Type *ir_instr_type(irInstr *instr) {
 		}
 		return NULL;
 	} break;
-/* 	case irInstr_VectorExtractElement: {
-		Type *vt = ir_type(instr->VectorExtractElement.vector);
-		Type *bt = base_vector_type(vt);
-		GB_ASSERT(!is_type_vector(bt));
-		return bt;
-	} break;
-	case irInstr_VectorInsertElement:
-		return ir_type(instr->VectorInsertElement.vector);
-	case irInstr_VectorShuffle:
-		return instr->VectorShuffle.type;
- */
 	}
 	return NULL;
 }
@@ -954,34 +928,6 @@ irValue *ir_make_instr_conv(irProcedure *p, irConvKind kind, irValue *value, Typ
 	return v;
 }
 
-/*
-irValue *ir_make_instr_extract_element(irProcedure *p, irValue *vector, irValue *index) {
-	irValue *v = ir_alloc_instr(p, irInstr_VectorExtractElement);
-	v->Instr.VectorExtractElement.vector = vector;
-	v->Instr.VectorExtractElement.index = index;
-	return v;
-}
-
-irValue *ir_make_instr_insert_element(irProcedure *p, irValue *vector, irValue *elem, irValue *index) {
-	irValue *v = ir_alloc_instr(p, irInstr_VectorInsertElement);
-	v->Instr.VectorInsertElement.vector = vector;
-	v->Instr.VectorInsertElement.elem   = elem;
-	v->Instr.VectorInsertElement.index  = index;
-	return v;
-}
-
-irValue *ir_make_instr_vector_shuffle(irProcedure *p, irValue *vector, i32 *indices, isize index_count) {
-	irValue *v = ir_alloc_instr(p, irInstr_VectorShuffle);
-	v->Instr.VectorShuffle.vector      = vector;
-	v->Instr.VectorShuffle.indices     = indices;
-	v->Instr.VectorShuffle.index_count = index_count;
-
-	Type *vt = base_type(ir_type(vector));
-	v->Instr.VectorShuffle.type = make_type_vector(p->module->allocator, vt->Vector.elem, index_count);
-
-	return v;
-}
-*/
 irValue *ir_make_instr_comment(irProcedure *p, String text) {
 	irValue *v = ir_alloc_instr(p, irInstr_Comment);
 	v->Instr.Comment.text = text;
@@ -2373,7 +2319,6 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *tuple) {
 		}
 		GB_ASSERT(dst_tag != NULL);
 
-		// HACK(bill): This is probably not very efficient
 		irValue *union_ptr = ir_address_from_load_or_generate_local(proc, value);
 
 		irBlock *ok_block = ir_add_block(proc, NULL, "union_cast.ok");
@@ -2516,16 +2461,6 @@ void ir_emit_bounds_check(irProcedure *proc, Token token, irValue *index, irValu
 	len = ir_emit_conv(proc, len, t_int);
 
 	ir_emit(proc, ir_make_instr_bounds_check(proc, token.pos, index, len));
-
-	// gbAllocator a = proc->module->allocator;
-	// irValue **args = gb_alloc_array(a, irValue *, 5);
-	// args[0] = ir_emit_global_string(proc, token.pos.file);
-	// args[1] = ir_make_const_int(a, token.pos.line);
-	// args[2] = ir_make_const_int(a, token.pos.column);
-	// args[3] = ir_emit_conv(proc, index, t_int);
-	// args[4] = ir_emit_conv(proc, len, t_int);
-
-	// ir_emit_global_call(proc, "__bounds_check_error", args, 5);
 }
 
 void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, irValue *high, bool is_substring) {
@@ -2875,22 +2810,6 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 		case Token_CmpAnd:
 		case Token_CmpOr:
 			return ir_emit_logical_binary_expr(proc, expr);
-
-		// case Token_as:
-		// 	ir_emit_comment(proc, str_lit("cast - as"));
-		// 	return ir_emit_conv(proc, left, type);
-
-		// case Token_transmute:
-		// 	ir_emit_comment(proc, str_lit("cast - transmute"));
-		// 	return ir_emit_transmute(proc, left, type);
-
-		// case Token_down_cast:
-		// 	ir_emit_comment(proc, str_lit("cast - down_cast"));
-		// 	return ir_emit_down_cast(proc, left, type);
-
-		// case Token_union_cast:
-		// 	ir_emit_comment(proc, str_lit("cast - union_cast"));
-		// 	return ir_emit_union_cast(proc, left, type);
 
 		default:
 			GB_PANIC("Invalid binary expression");
@@ -3658,20 +3577,6 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 		switch (t->kind) {
 		case Type_Vector: {
-			/* irValue *vector = NULL;
-			if (using_addr != NULL) {
-				vector = using_addr;
-			} else {
-				vector = ir_build_addr(proc, ie->expr).addr;
-				if (deref) {
-					vector = ir_emit_load(proc, vector);
-				}
-			}
-			irValue *index = ir_emit_conv(proc, ir_build_expr(proc, ie->index), t_int);
-			irValue *len = ir_make_const_int(a, t->Vector.count);
-			ir_emit_bounds_check(proc, ast_node_token(ie->index), index, len);
-			return ir_make_addr_vector(vector, index, expr); */
-
 			irValue *vector = NULL;
 			if (using_addr != NULL) {
 				vector = using_addr;
