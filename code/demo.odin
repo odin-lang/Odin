@@ -10,4 +10,20 @@ main :: proc() {
 		fmt.print(p);
 	}
 	fmt.println();
+
+	{
+		Vec3 :: [vector 3]f32;
+
+		x := Vec3{1, 2, 3};
+		y := Vec3{4, 5, 6};
+		fmt.println(x < y);
+		fmt.println(x + y);
+		fmt.println(x - y);
+		fmt.println(x * y);
+		fmt.println(x / y);
+
+		for i in x {
+			fmt.println(i);
+		}
+	}
 }

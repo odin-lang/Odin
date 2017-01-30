@@ -70,6 +70,10 @@ Type_Info :: union {
 		elem_size: int,
 		count:     int,
 	},
+	Dynamic_Array: struct #ordered {
+		elem:      ^Type_Info,
+		elem_size: int,
+	},
 	Slice: struct #ordered {
 		elem:      ^Type_Info,
 		elem_size: int,

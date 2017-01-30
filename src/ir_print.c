@@ -184,11 +184,18 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		ir_print_type(f, m, t->Array.elem);
 		ir_fprintf(f, "]");
 		return;
-	case Type_Vector:
-		ir_fprintf(f, "<%lld x ", t->Vector.count);
+	case Type_Vector: {
+		i64 align = type_align_of(s, heap_allocator(), t);
+		i64 count = t->Vector.count;
+		ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x ", align, count);
+		ir_print_type(f, m, t->Vector.elem);
+		ir_fprintf(f, "]}");
+		return;
+	}
+/* 		ir_fprintf(f, "<%lld x ", t->Vector.count);
 		ir_print_type(f, m, t->Vector.elem);
 		ir_fprintf(f, ">");
-		return;
+		return; */
 	case Type_Slice:
 		ir_fprintf(f, "{");
 		ir_print_type(f, m, t->Slice.elem);
@@ -458,8 +465,13 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				break;
 			}
 
-			ir_fprintf(f, "<");
+			i64 align = type_align_of(m->sizes, m->allocator, type);
+			i64 count = type->Vector.count;
 			Type *elem_type = type->Vector.elem;
+
+			ir_fprintf(f, "{[0 x <%lld x i8>] zeroinitializer, [%lld x ", align, count);
+			ir_print_type(f, m, elem_type);
+			ir_fprintf(f, "][");
 
 			if (elem_count == 1 && type->Vector.count > 1) {
 				TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems.e[0]);
@@ -482,7 +494,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				}
 			}
 
-			ir_fprintf(f, ">");
+			ir_fprintf(f, "]}");
 		} else if (is_type_struct(type)) {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
 
@@ -727,6 +739,10 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_fprintf(f, ", ");
 		ir_print_type(f, m, t_int);
 		ir_fprintf(f, " 0, ");
+		if (is_type_vector(type_deref(et))) {
+			ir_print_type(f, m, t_i32);
+			ir_fprintf(f, " 1, ");
+		}
 
 		irValue *index =instr->ArrayElementPtr.elem_index;
 		Type *t = ir_type(index);
@@ -936,6 +952,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		irInstrBinaryOp *bo = &value->Instr.BinaryOp;
 		Type *type = base_type(ir_type(bo->left));
 		Type *elem_type = type;
+		GB_ASSERT(!is_type_vector(elem_type));
 		while (elem_type->kind == Type_Vector) {
 			elem_type = base_type(elem_type->Vector.elem);
 		}
@@ -1102,68 +1119,68 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_fprintf(f, "\n");
 	} break;
 
-	case irInstr_VectorExtractElement: {
-		Type *vt = ir_type(instr->VectorExtractElement.vector);
-		Type *it = ir_type(instr->VectorExtractElement.index);
-		ir_fprintf(f, "%%%d = extractelement ", value->index);
+	// case irInstr_VectorExtractElement: {
+		// Type *vt = ir_type(instr->VectorExtractElement.vector);
+		// Type *it = ir_type(instr->VectorExtractElement.index);
+		// ir_fprintf(f, "%%%d = extractelement ", value->index);
 
-		ir_print_type(f, m, vt);
-		ir_fprintf(f, " ");
-		ir_print_value(f, m, instr->VectorExtractElement.vector, vt);
-		ir_fprintf(f, ", ");
-		ir_print_type(f, m, it);
-		ir_fprintf(f, " ");
-		ir_print_value(f, m, instr->VectorExtractElement.index, it);
-		ir_fprintf(f, "\n");
-	} break;
+		// ir_print_type(f, m, vt);
+		// ir_fprintf(f, " ");
+		// ir_print_value(f, m, instr->VectorExtractElement.vector, vt);
+		// ir_fprintf(f, ", ");
+		// ir_print_type(f, m, it);
+		// ir_fprintf(f, " ");
+		// ir_print_value(f, m, instr->VectorExtractElement.index, it);
+		// ir_fprintf(f, "\n");
+	// } break;
 
-	case irInstr_VectorInsertElement: {
-		irInstrVectorInsertElement *ie = &instr->VectorInsertElement;
-		Type *vt = ir_type(ie->vector);
-		ir_fprintf(f, "%%%d = insertelement ", value->index);
+	// case irInstr_VectorInsertElement: {
+	// 	irInstrVectorInsertElement *ie = &instr->VectorInsertElement;
+	// 	Type *vt = ir_type(ie->vector);
+	// 	ir_fprintf(f, "%%%d = insertelement ", value->index);
 
-		ir_print_type(f, m, vt);
-		ir_fprintf(f, " ");
-		ir_print_value(f, m, ie->vector, vt);
-		ir_fprintf(f, ", ");
+	// 	ir_print_type(f, m, vt);
+	// 	ir_fprintf(f, " ");
+	// 	ir_print_value(f, m, ie->vector, vt);
+	// 	ir_fprintf(f, ", ");
 
-		ir_print_type(f, m, ir_type(ie->elem));
-		ir_fprintf(f, " ");
-		ir_print_value(f, m, ie->elem, ir_type(ie->elem));
-		ir_fprintf(f, ", ");
+	// 	ir_print_type(f, m, ir_type(ie->elem));
+	// 	ir_fprintf(f, " ");
+	// 	ir_print_value(f, m, ie->elem, ir_type(ie->elem));
+	// 	ir_fprintf(f, ", ");
 
-		ir_print_type(f, m, ir_type(ie->index));
-		ir_fprintf(f, " ");
-		ir_print_value(f, m, ie->index, ir_type(ie->index));
+	// 	ir_print_type(f, m, ir_type(ie->index));
+	// 	ir_fprintf(f, " ");
+	// 	ir_print_value(f, m, ie->index, ir_type(ie->index));
 
-		ir_fprintf(f, "\n");
-	} break;
+	// 	ir_fprintf(f, "\n");
+	// } break;
 
-	case irInstr_VectorShuffle: {
-		irInstrVectorShuffle *sv = &instr->VectorShuffle;
-		Type *vt = ir_type(sv->vector);
-		ir_fprintf(f, "%%%d = shufflevector ", value->index);
+	// case irInstr_VectorShuffle: {
+	// 	irInstrVectorShuffle *sv = &instr->VectorShuffle;
+	// 	Type *vt = ir_type(sv->vector);
+	// 	ir_fprintf(f, "%%%d = shufflevector ", value->index);
 
-		ir_print_type(f, m, vt);
-		ir_fprintf(f, " ");
-		ir_print_value(f, m, sv->vector, vt);
-		ir_fprintf(f, ", ");
+	// 	ir_print_type(f, m, vt);
+	// 	ir_fprintf(f, " ");
+	// 	ir_print_value(f, m, sv->vector, vt);
+	// 	ir_fprintf(f, ", ");
 
-		ir_print_type(f, m, vt);
-		ir_fprintf(f, " ");
-		ir_print_value(f, m, sv->vector, vt);
-		ir_fprintf(f, ", ");
+	// 	ir_print_type(f, m, vt);
+	// 	ir_fprintf(f, " ");
+	// 	ir_print_value(f, m, sv->vector, vt);
+	// 	ir_fprintf(f, ", ");
 
-		ir_fprintf(f, "<%td x i32> <", sv->index_count);
-		for (isize i = 0; i < sv->index_count; i++) {
-			if (i > 0) {
-				ir_fprintf(f, ", ");
-			}
-			ir_fprintf(f, "i32 %d", sv->indices[i]);
-		}
-		ir_fprintf(f, ">");
-		ir_fprintf(f, "\n");
-	} break;
+	// 	ir_fprintf(f, "<%td x i32> <", sv->index_count);
+	// 	for (isize i = 0; i < sv->index_count; i++) {
+	// 		if (i > 0) {
+	// 			ir_fprintf(f, ", ");
+	// 		}
+	// 		ir_fprintf(f, "i32 %d", sv->indices[i]);
+	// 	}
+	// 	ir_fprintf(f, ">");
+	// 	ir_fprintf(f, "\n");
+	// } break;
 
 	case irInstr_BoundsCheck: {
 		irInstrBoundsCheck *bc = &instr->BoundsCheck;

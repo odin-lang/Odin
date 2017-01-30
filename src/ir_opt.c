@@ -66,18 +66,18 @@ void ir_opt_add_operands(irValueArray *ops, irInstr *i) {
 			array_add(ops, i->Call.args[j]);
 		}
 		break;
-	case irInstr_VectorExtractElement:
-		array_add(ops, i->VectorExtractElement.vector);
-		array_add(ops, i->VectorExtractElement.index);
-		break;
-	case irInstr_VectorInsertElement:
-		array_add(ops, i->VectorInsertElement.vector);
-		array_add(ops, i->VectorInsertElement.elem);
-		array_add(ops, i->VectorInsertElement.index);
-		break;
-	case irInstr_VectorShuffle:
-		array_add(ops, i->VectorShuffle.vector);
-		break;
+	// case irInstr_VectorExtractElement:
+		// array_add(ops, i->VectorExtractElement.vector);
+		// array_add(ops, i->VectorExtractElement.index);
+		// break;
+	// case irInstr_VectorInsertElement:
+		// array_add(ops, i->VectorInsertElement.vector);
+		// array_add(ops, i->VectorInsertElement.elem);
+		// array_add(ops, i->VectorInsertElement.index);
+		// break;
+	// case irInstr_VectorShuffle:
+		// array_add(ops, i->VectorShuffle.vector);
+		// break;
 	case irInstr_StartupRuntime:
 		break;
 	case irInstr_BoundsCheck:

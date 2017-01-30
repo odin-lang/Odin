@@ -932,6 +932,12 @@ void add_type_info_type(Checker *c, Type *t) {
 		add_type_info_type(c, make_type_pointer(c->allocator, bt->Array.elem));
 		add_type_info_type(c, t_int);
 		break;
+	case Type_DynamicArray:
+		add_type_info_type(c, bt->DynamicArray.elem);
+		add_type_info_type(c, make_type_pointer(c->allocator, bt->DynamicArray.elem));
+		add_type_info_type(c, t_int);
+		add_type_info_type(c, t_allocator);
+		break;
 	case Type_Slice:
 		add_type_info_type(c, bt->Slice.elem);
 		add_type_info_type(c, make_type_pointer(c->allocator, bt->Slice.elem));
@@ -1104,44 +1110,46 @@ void init_preload(Checker *c) {
 		t_type_info_enum_value_ptr = make_type_pointer(c->allocator, t_type_info_enum_value);
 
 
-		if (record->field_count != 18) {
+		if (record->field_count != 19) {
 			compiler_error("Invalid `Type_Info` layout");
 		}
-		t_type_info_named     = record->fields[ 1]->type;
-		t_type_info_integer   = record->fields[ 2]->type;
-		t_type_info_float     = record->fields[ 3]->type;
-		t_type_info_any       = record->fields[ 4]->type;
-		t_type_info_string    = record->fields[ 5]->type;
-		t_type_info_boolean   = record->fields[ 6]->type;
-		t_type_info_pointer   = record->fields[ 7]->type;
-		t_type_info_maybe     = record->fields[ 8]->type;
-		t_type_info_procedure = record->fields[ 9]->type;
-		t_type_info_array     = record->fields[10]->type;
-		t_type_info_slice     = record->fields[11]->type;
-		t_type_info_vector    = record->fields[12]->type;
-		t_type_info_tuple     = record->fields[13]->type;
-		t_type_info_struct    = record->fields[14]->type;
-		t_type_info_union     = record->fields[15]->type;
-		t_type_info_raw_union = record->fields[16]->type;
-		t_type_info_enum      = record->fields[17]->type;
+		t_type_info_named         = record->fields[ 1]->type;
+		t_type_info_integer       = record->fields[ 2]->type;
+		t_type_info_float         = record->fields[ 3]->type;
+		t_type_info_any           = record->fields[ 4]->type;
+		t_type_info_string        = record->fields[ 5]->type;
+		t_type_info_boolean       = record->fields[ 6]->type;
+		t_type_info_pointer       = record->fields[ 7]->type;
+		t_type_info_maybe         = record->fields[ 8]->type;
+		t_type_info_procedure     = record->fields[ 9]->type;
+		t_type_info_array         = record->fields[10]->type;
+		t_type_info_dynamic_array = record->fields[11]->type;
+		t_type_info_slice         = record->fields[12]->type;
+		t_type_info_vector        = record->fields[13]->type;
+		t_type_info_tuple         = record->fields[14]->type;
+		t_type_info_struct        = record->fields[15]->type;
+		t_type_info_union         = record->fields[16]->type;
+		t_type_info_raw_union     = record->fields[17]->type;
+		t_type_info_enum          = record->fields[18]->type;
 
-		t_type_info_named_ptr     = make_type_pointer(heap_allocator(), t_type_info_named);
-		t_type_info_integer_ptr   = make_type_pointer(heap_allocator(), t_type_info_integer);
-		t_type_info_float_ptr     = make_type_pointer(heap_allocator(), t_type_info_float);
-		t_type_info_any_ptr       = make_type_pointer(heap_allocator(), t_type_info_any);
-		t_type_info_string_ptr    = make_type_pointer(heap_allocator(), t_type_info_string);
-		t_type_info_boolean_ptr   = make_type_pointer(heap_allocator(), t_type_info_boolean);
-		t_type_info_pointer_ptr   = make_type_pointer(heap_allocator(), t_type_info_pointer);
-		t_type_info_maybe_ptr     = make_type_pointer(heap_allocator(), t_type_info_maybe);
-		t_type_info_procedure_ptr = make_type_pointer(heap_allocator(), t_type_info_procedure);
-		t_type_info_array_ptr     = make_type_pointer(heap_allocator(), t_type_info_array);
-		t_type_info_slice_ptr     = make_type_pointer(heap_allocator(), t_type_info_slice);
-		t_type_info_vector_ptr    = make_type_pointer(heap_allocator(), t_type_info_vector);
-		t_type_info_tuple_ptr     = make_type_pointer(heap_allocator(), t_type_info_tuple);
-		t_type_info_struct_ptr    = make_type_pointer(heap_allocator(), t_type_info_struct);
-		t_type_info_union_ptr     = make_type_pointer(heap_allocator(), t_type_info_union);
-		t_type_info_raw_union_ptr = make_type_pointer(heap_allocator(), t_type_info_raw_union);
-		t_type_info_enum_ptr      = make_type_pointer(heap_allocator(), t_type_info_enum);
+		t_type_info_named_ptr         = make_type_pointer(heap_allocator(), t_type_info_named);
+		t_type_info_integer_ptr       = make_type_pointer(heap_allocator(), t_type_info_integer);
+		t_type_info_float_ptr         = make_type_pointer(heap_allocator(), t_type_info_float);
+		t_type_info_any_ptr           = make_type_pointer(heap_allocator(), t_type_info_any);
+		t_type_info_string_ptr        = make_type_pointer(heap_allocator(), t_type_info_string);
+		t_type_info_boolean_ptr       = make_type_pointer(heap_allocator(), t_type_info_boolean);
+		t_type_info_pointer_ptr       = make_type_pointer(heap_allocator(), t_type_info_pointer);
+		t_type_info_maybe_ptr         = make_type_pointer(heap_allocator(), t_type_info_maybe);
+		t_type_info_procedure_ptr     = make_type_pointer(heap_allocator(), t_type_info_procedure);
+		t_type_info_array_ptr         = make_type_pointer(heap_allocator(), t_type_info_array);
+		t_type_info_dynamic_array_ptr = make_type_pointer(heap_allocator(), t_type_info_dynamic_array);
+		t_type_info_slice_ptr         = make_type_pointer(heap_allocator(), t_type_info_slice);
+		t_type_info_vector_ptr        = make_type_pointer(heap_allocator(), t_type_info_vector);
+		t_type_info_tuple_ptr         = make_type_pointer(heap_allocator(), t_type_info_tuple);
+		t_type_info_struct_ptr        = make_type_pointer(heap_allocator(), t_type_info_struct);
+		t_type_info_union_ptr         = make_type_pointer(heap_allocator(), t_type_info_union);
+		t_type_info_raw_union_ptr     = make_type_pointer(heap_allocator(), t_type_info_raw_union);
+		t_type_info_enum_ptr          = make_type_pointer(heap_allocator(), t_type_info_enum);
 	}
 
 	if (t_allocator == NULL) {

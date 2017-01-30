@@ -173,6 +173,10 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		fmt_int(^fi, cast(u64)info.count, false, 'd');
 		buffer_write_string(buf, "]");
 		buffer_write_type(buf, info.elem);
+	case Dynamic_Array:
+		buffer_write_string(buf, "[dynamic");
+		buffer_write_string(buf, "]");
+		buffer_write_type(buf, info.elem);
 	case Slice:
 		buffer_write_string(buf, "[");
 		buffer_write_string(buf, "]");
@@ -792,6 +796,23 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			fmt_arg(fi, any{info.elem, cast(rawptr)data}, 'v');
 		}
 
+	case Dynamic_Array:
+		if verb != 'v' {
+			fmt_bad_verb(fi, verb);
+			return;
+		}
+
+		buffer_write_byte(fi.buf, '[');
+		defer buffer_write_byte(fi.buf, ']');
+		array := cast(^Raw_Dynamic_Array)v.data;
+		for i in 0..<array.count {
+			if i > 0 {
+				buffer_write_string(fi.buf, ", ");
+			}
+			data := cast(^byte)array.data + i*info.elem_size;
+			fmt_arg(fi, any{info.elem, cast(rawptr)data}, 'v');
+		}
+
 	case Slice:
 		if verb != 'v' {
 			fmt_bad_verb(fi, verb);
@@ -810,22 +831,8 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		}
 
 	case Vector:
-		is_bool :: proc(type_info: ^Type_Info) -> bool {
-			match type info in type_info {
-			case Named:
-				return is_bool(info.base);
-			case Boolean:
-				return true;
-			}
-			return false;
-		}
-
 		buffer_write_byte(fi.buf, '<');
 		defer buffer_write_byte(fi.buf, '>');
-
-		if is_bool(info.elem) {
-			return;
-		}
 
 		for i in 0..<info.count {
 			if i > 0 {

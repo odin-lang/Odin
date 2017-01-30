@@ -270,42 +270,44 @@ gb_global Type *t_type_info_ptr            = NULL;
 gb_global Type *t_type_info_member_ptr     = NULL;
 gb_global Type *t_type_info_enum_value_ptr = NULL;
 
-gb_global Type *t_type_info_named      = NULL;
-gb_global Type *t_type_info_integer    = NULL;
-gb_global Type *t_type_info_float      = NULL;
-gb_global Type *t_type_info_any        = NULL;
-gb_global Type *t_type_info_string     = NULL;
-gb_global Type *t_type_info_boolean    = NULL;
-gb_global Type *t_type_info_pointer    = NULL;
-gb_global Type *t_type_info_maybe      = NULL;
-gb_global Type *t_type_info_procedure  = NULL;
-gb_global Type *t_type_info_array      = NULL;
-gb_global Type *t_type_info_slice      = NULL;
-gb_global Type *t_type_info_vector     = NULL;
-gb_global Type *t_type_info_tuple      = NULL;
-gb_global Type *t_type_info_struct     = NULL;
-gb_global Type *t_type_info_union      = NULL;
-gb_global Type *t_type_info_raw_union  = NULL;
-gb_global Type *t_type_info_enum       = NULL;
+gb_global Type *t_type_info_named         = NULL;
+gb_global Type *t_type_info_integer       = NULL;
+gb_global Type *t_type_info_float         = NULL;
+gb_global Type *t_type_info_any           = NULL;
+gb_global Type *t_type_info_string        = NULL;
+gb_global Type *t_type_info_boolean       = NULL;
+gb_global Type *t_type_info_pointer       = NULL;
+gb_global Type *t_type_info_maybe         = NULL;
+gb_global Type *t_type_info_procedure     = NULL;
+gb_global Type *t_type_info_array         = NULL;
+gb_global Type *t_type_info_dynamic_array = NULL;
+gb_global Type *t_type_info_slice         = NULL;
+gb_global Type *t_type_info_vector        = NULL;
+gb_global Type *t_type_info_tuple         = NULL;
+gb_global Type *t_type_info_struct        = NULL;
+gb_global Type *t_type_info_union         = NULL;
+gb_global Type *t_type_info_raw_union     = NULL;
+gb_global Type *t_type_info_enum          = NULL;
 
 
-gb_global Type *t_type_info_named_ptr      = NULL;
-gb_global Type *t_type_info_integer_ptr    = NULL;
-gb_global Type *t_type_info_float_ptr      = NULL;
-gb_global Type *t_type_info_any_ptr        = NULL;
-gb_global Type *t_type_info_string_ptr     = NULL;
-gb_global Type *t_type_info_boolean_ptr    = NULL;
-gb_global Type *t_type_info_pointer_ptr    = NULL;
-gb_global Type *t_type_info_maybe_ptr      = NULL;
-gb_global Type *t_type_info_procedure_ptr  = NULL;
-gb_global Type *t_type_info_array_ptr      = NULL;
-gb_global Type *t_type_info_slice_ptr      = NULL;
-gb_global Type *t_type_info_vector_ptr     = NULL;
-gb_global Type *t_type_info_tuple_ptr      = NULL;
-gb_global Type *t_type_info_struct_ptr     = NULL;
-gb_global Type *t_type_info_union_ptr      = NULL;
-gb_global Type *t_type_info_raw_union_ptr  = NULL;
-gb_global Type *t_type_info_enum_ptr       = NULL;
+gb_global Type *t_type_info_named_ptr         = NULL;
+gb_global Type *t_type_info_integer_ptr       = NULL;
+gb_global Type *t_type_info_float_ptr         = NULL;
+gb_global Type *t_type_info_any_ptr           = NULL;
+gb_global Type *t_type_info_string_ptr        = NULL;
+gb_global Type *t_type_info_boolean_ptr       = NULL;
+gb_global Type *t_type_info_pointer_ptr       = NULL;
+gb_global Type *t_type_info_maybe_ptr         = NULL;
+gb_global Type *t_type_info_procedure_ptr     = NULL;
+gb_global Type *t_type_info_array_ptr         = NULL;
+gb_global Type *t_type_info_dynamic_array_ptr = NULL;
+gb_global Type *t_type_info_slice_ptr         = NULL;
+gb_global Type *t_type_info_vector_ptr        = NULL;
+gb_global Type *t_type_info_tuple_ptr         = NULL;
+gb_global Type *t_type_info_struct_ptr        = NULL;
+gb_global Type *t_type_info_union_ptr         = NULL;
+gb_global Type *t_type_info_raw_union_ptr     = NULL;
+gb_global Type *t_type_info_enum_ptr          = NULL;
 
 
 
@@ -548,11 +550,13 @@ bool is_type_untyped(Type *t) {
 }
 bool is_type_ordered(Type *t) {
 	t = base_type(base_enum_type(t));
-	if (t->kind == Type_Basic) {
+	switch (t->kind) {
+	case Type_Basic:
 		return (t->Basic.flags & BasicFlag_Ordered) != 0;
-	}
-	if (t->kind == Type_Pointer) {
+	case Type_Pointer:
 		return true;
+	case Type_Vector:
+		return is_type_ordered(t->Vector.elem);
 	}
 	return false;
 }
@@ -1603,6 +1607,7 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 		return 3*s.word_size + type_size_of(s, allocator, t_allocator);
 
 	case Type_Vector: {
+#if 0
 		i64 count, bit_size, total_size_in_bits, total_size;
 		count = t->Vector.count;
 		if (count == 0) {
@@ -1621,6 +1626,20 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 		total_size_in_bits = bit_size * count;
 		total_size = (total_size_in_bits+7)/8;
 		return total_size;
+#else
+		i64 count, align, size, alignment;
+		count = t->Vector.count;
+		if (count == 0) {
+			return 0;
+		}
+		align = type_align_of_internal(s, allocator, t->Vector.elem, path);
+		if (path->failure) {
+			return FAILURE_SIZE;
+		}
+		size  = type_size_of_internal(s,  allocator, t->Vector.elem, path);
+		alignment = align_formula(size, align);
+		return alignment*(count-1) + size;
+#endif
 	} break;
 
 
