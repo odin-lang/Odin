@@ -266,7 +266,7 @@ int main(int argc, char **argv) {
 		return exit_code;
 	}
 
-	#if 1
+	#if defined(GB_SYSTEM_WINDOWS)
 	timings_start_section(&timings, str_lit("llvm-llc"));
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 	exit_code = system_exec_command_line_app("llvm-llc", false,
@@ -324,6 +324,9 @@ int main(int argc, char **argv) {
 	if (run_output) {
 		system_exec_command_line_app("odin run", false, "%.*s.exe", cast(int)base_name_len, output_name);
 	}
+
+	#else
+	#error Implement build stuff for this platform
 	#endif
 #endif
 #endif
