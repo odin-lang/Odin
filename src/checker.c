@@ -118,47 +118,6 @@ typedef enum StmtFlag {
 	Stmt_GiveAllowed        = 1<<3,
 } StmtFlag;
 
-typedef enum BuiltinProcId {
-	BuiltinProc_Invalid,
-
-	BuiltinProc_new,
-	BuiltinProc_new_slice,
-	BuiltinProc_free,
-
-	BuiltinProc_reserve,
-	BuiltinProc_append,
-
-	BuiltinProc_size_of,
-	BuiltinProc_size_of_val,
-	BuiltinProc_align_of,
-	BuiltinProc_align_of_val,
-	BuiltinProc_offset_of,
-	BuiltinProc_offset_of_val,
-	BuiltinProc_type_of_val,
-
-	BuiltinProc_type_info,
-	BuiltinProc_type_info_of_val,
-
-	BuiltinProc_compile_assert,
-	BuiltinProc_assert,
-	BuiltinProc_panic,
-
-	BuiltinProc_copy,
-	// BuiltinProc_append,
-
-	BuiltinProc_swizzle,
-
-	// BuiltinProc_ptr_offset,
-	// BuiltinProc_ptr_sub,
-	BuiltinProc_slice_ptr,
-
-	BuiltinProc_min,
-	BuiltinProc_max,
-	BuiltinProc_abs,
-	BuiltinProc_clamp,
-
-	BuiltinProc_Count,
-} BuiltinProcId;
 typedef struct BuiltinProc {
 	String   name;
 	isize    arg_count;
@@ -205,13 +164,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("clamp"),            3, false, Expr_Expr},
 };
 
-typedef enum ImplicitValueId {
-	ImplicitValue_Invalid,
-
-	ImplicitValue_context,
-
-	ImplicitValue_Count,
-} ImplicitValueId;
 typedef struct ImplicitValueInfo {
 	String  name;
 	String  backing_name;

@@ -22,6 +22,7 @@ typedef struct BuildContext {
 String const WIN32_SEPARATOR_STRING = {cast(u8 *)"\\", 1};
 String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
 
+#if defined(WINDOWS)
 String odin_root_dir(void) {
 	String path = global_module_path;
 	Array(wchar_t) path_buf;
@@ -71,6 +72,83 @@ String odin_root_dir(void) {
 	return path;
 }
 
+#elif defined(GB_SYSTEM_OSX)
+
+#include <mach-o/dyld.h>
+
+String odin_root_dir(void) {
+	String path = global_module_path;
+	Array(char) path_buf;
+	isize len, i;
+	gbTempArenaMemory tmp;
+	wchar_t *text;
+
+	if (global_module_path_set) {
+		return global_module_path;
+	}
+
+	array_init_count(&path_buf, heap_allocator(), 300);
+
+	len = 0;
+	for (;;) {
+		int sz = path_buf.count;
+		int res = _NSGetExecutablePath(&path_buf.e[0], &sz);
+		if(res == 0) {
+			len = sz;
+			break;
+		} else {
+			array_resize(&path_buf, sz + 1);
+		}
+	}
+
+
+	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+	text = gb_alloc_array(string_buffer_allocator, u8, len + 1);
+	gb_memmove(text, &path_buf.e[0], len);
+
+	path = make_string(text, len);
+	for (i = path.len-1; i >= 0; i--) {
+		u8 c = path.text[i];
+		if (c == '/' || c == '\\') {
+			break;
+		}
+		path.len--;
+	}
+
+	global_module_path = path;
+	global_module_path_set = true;
+
+	gb_temp_arena_memory_end(tmp);
+
+	// array_free(&path_buf);
+
+	return path;
+}
+#else
+#error Implement system
+#endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#if defined(GB_SYSTEM_WINDOWS)
 String path_to_fullpath(gbAllocator a, String s) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	String16 string16 = string_to_string16(string_buffer_allocator, s);
@@ -86,6 +164,17 @@ String path_to_fullpath(gbAllocator a, String s) {
 	gb_temp_arena_memory_end(tmp);
 	return result;
 }
+#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+String path_to_fullpath(gbAllocator a, String s) {
+	char* p = realpath(s.text, 0);
+	// GB_ASSERT(p && "file does not exist");
+	if(!p) return make_string_c("");
+
+	return make_string(p, strlen(p));
+}
+#else
+#error Implement system
+#endif
 
 
 String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
@@ -153,6 +242,9 @@ void init_build_context(BuildContext *bc) {
 
 #if defined(GB_SYSTEM_WINDOWS)
 	bc->ODIN_OS      = str_lit("windows");
+	bc->ODIN_ARCH    = str_lit("amd64");
+#elif defined(GB_SYSTEM_OSX)
+	bc->ODIN_OS      = str_lit("osx");
 	bc->ODIN_ARCH    = str_lit("amd64");
 #else
 #error Implement system

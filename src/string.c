@@ -165,6 +165,54 @@ bool string_contains_char(String s, u8 c) {
 	return false;
 }
 
+
+
+
+
+
+
+
+
+#if defined(GB_SYSTEM_WINDOWS)
+
+	int convert_multibyte_to_widechar(char* multibyte_input, int input_length, wchar_t* output, int output_size)
+	{
+		return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, multibyte_input, input_length, output, output_size);
+	}
+
+	int convert_widechar_to_multibyte(wchar_t* widechar_input, int input_length, char* output, int output_size)
+	{
+		return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, widechar_input, input_length, output, output_size, NULL, NULL);
+	}
+}
+#elif defined(GB_SYSTEM_UNIX) || defined(GB_SYSTEM_OSX)
+
+	#include <iconv.h>
+
+	int convert_multibyte_to_widechar(char* multibyte_input, int input_length, wchar_t* output, int output_size)
+	{
+		iconv_t conv = iconv_open("WCHAR_T", "UTF-8");
+		size_t result = iconv(conv, (char**) &multibyte_input, &input_length, (char**) &output, &output_size);
+		iconv_close(conv);
+
+		return (int) result;
+	}
+
+	int convert_widechar_to_multibyte(wchar_t* widechar_input, int input_length, char* output, int output_size)
+	{
+		iconv_t conv = iconv_open("UTF-8", "WCHAR_T");
+		size_t result = iconv(conv, (char**) &widechar_input, &input_length, (char**) &output, &output_size);
+		iconv_close(conv);
+
+		return (int) result;
+	}
+#else
+#error Implement system
+#endif
+
+
+
+
 // TODO(bill): Make this non-windows specific
 String16 string_to_string16(gbAllocator a, String s) {
 	int len, len1;
@@ -174,16 +222,14 @@ String16 string_to_string16(gbAllocator a, String s) {
 		return make_string16(NULL, 0);
 	}
 
-	len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-	                          cast(char *)s.text, s.len, NULL, 0);
+	len = convert_multibyte_to_widechar(cast(char *)s.text, s.len, NULL, 0);
 	if (len == 0) {
 		return make_string16(NULL, 0);
 	}
 
 	text = gb_alloc_array(a, wchar_t, len+1);
 
-	len1 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-	                           cast(char *)s.text, s.len, text, len);
+	len1 = convert_multibyte_to_widechar(cast(char *)s.text, s.len, text, len);
 	if (len1 == 0) {
 		gb_free(a, text);
 		return make_string16(NULL, 0);
@@ -201,16 +247,14 @@ String string16_to_string(gbAllocator a, String16 s) {
 		return make_string(NULL, 0);
 	}
 
-	len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
-	                          s.text, s.len, NULL, 0, NULL, NULL);
+	len = convert_widechar_to_multibyte(s.text, s.len, NULL, 0);
 	if (len == 0) {
 		return make_string(NULL, 0);
 	}
 
 	text = gb_alloc_array(a, u8, len+1);
 
-	len1 = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
-	                           s.text, s.len, cast(char *)text, len, NULL, NULL);
+	len1 = convert_widechar_to_multibyte(s.text, s.len, cast(char *)text, len);
 	if (len1 == 0) {
 		gb_free(a, text);
 		return make_string(NULL, 0);
@@ -219,7 +263,6 @@ String string16_to_string(gbAllocator a, String16 s) {
 
 	return make_string(text, len-1);
 }
-
 
 
 

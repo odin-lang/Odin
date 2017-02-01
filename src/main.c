@@ -16,8 +16,10 @@ extern "C" {
 #include "ir_print.c"
 // #include "vm.c"
 
+#if defined(GB_SYSTEM_WINDOWS)
+
 // NOTE(bill): `name` is used in debugging and profiling modes
-i32 win32_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
+i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {0};
 	char cmd_line[4096] = {0};
@@ -59,6 +61,53 @@ i32 win32_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	gb_temp_arena_memory_end(tmp);
 	return exit_code;
 }
+#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
+
+	char cmd_line[4096] = {0};
+	isize cmd_len;
+	va_list va;
+	String cmd;
+	i32 exit_code = 0;
+
+	va_start(va, fmt);
+	cmd_len = gb_snprintf_va(cmd_line, gb_size_of(cmd_line), fmt, va);
+	va_end(va);
+
+	exit_code = system(cmd.text);
+
+	// pid_t pid = fork();
+	// int status = 0;
+
+	// if(pid == 0) {
+	// 	// in child, pid == 0.
+	// 	int ret = execvp(cmd.text, (char* const*) cmd.text);
+
+	// 	if(ret == -1) {
+	// 		gb_printf_err("Failed to execute command:\n\t%s\n", cmd_line);
+
+	// 		// we're in the child, so returning won't do us any good -- just quit.
+	// 		exit(-1);
+	// 	}
+
+	// 	// unreachable
+	// 	abort();
+	// } else {
+	// 	// wait for child to finish, then we can continue cleanup
+
+	// 	int s = 0;
+	// 	waitpid(pid, &s, 0);
+
+	// 	status = WEXITSTATUS(s);
+	// }
+
+	// exit_code = status;
+}
+#endif
+
+
+
+
 
 void print_usage_line(i32 indent, char *fmt, ...) {
 	while (indent --> 0) {
@@ -190,7 +239,7 @@ int main(int argc, char **argv) {
 
 	// prof_print_all();
 
-#if 1
+	#if 1
 	timings_start_section(&timings, str_lit("llvm-opt"));
 
 	char const *output_name = ir_gen.output_file.filename;
@@ -202,7 +251,7 @@ int main(int argc, char **argv) {
 
 	i32 exit_code = 0;
 	// For more passes arguments: http://llvm.org/docs/Passes.html
-	exit_code = win32_exec_command_line_app("llvm-opt", false,
+	exit_code = system_exec_command_line_app("llvm-opt", false,
 		"\"%.*sbin/opt\" \"%s\" -o \"%.*s\".bc "
 		"-mem2reg "
 		"-memcpyopt "
@@ -217,10 +266,10 @@ int main(int argc, char **argv) {
 		return exit_code;
 	}
 
-	#if 1
+	#if 0
 	timings_start_section(&timings, str_lit("llvm-llc"));
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
-	exit_code = win32_exec_command_line_app("llvm-llc", false,
+	exit_code = system_exec_command_line_app("llvm-llc", false,
 		"\"%.*sbin/llc\" \"%.*s.bc\" -filetype=obj -O%d "
 		"%.*s "
 		// "-debug-pass=Arguments "
@@ -255,7 +304,7 @@ int main(int argc, char **argv) {
 		link_settings = "/ENTRY:mainCRTStartup";
 	}
 
-	exit_code = win32_exec_command_line_app("msvc-link", true,
+	exit_code = system_exec_command_line_app("msvc-link", true,
 		"link \"%.*s\".obj -OUT:\"%.*s.%s\" %s "
 		"/defaultlib:libcmt "
 		"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
@@ -273,7 +322,7 @@ int main(int argc, char **argv) {
 	// timings_print_all(&timings);
 
 	if (run_output) {
-		win32_exec_command_line_app("odin run", false, "%.*s.exe", cast(int)base_name_len, output_name);
+		system_exec_command_line_app("odin run", false, "%.*s.exe", cast(int)base_name_len, output_name);
 	}
 	#endif
 #endif

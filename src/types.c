@@ -1343,7 +1343,7 @@ void type_path_pop(TypePath *tp) {
 
 i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
 i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
-i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, i64 index);
+i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, isize index);
 
 i64 type_size_of_internal (BaseTypeSizes s, gbAllocator allocator, Type *t, TypePath *path);
 i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypePath *path);

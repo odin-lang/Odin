@@ -1,8 +1,65 @@
 typedef struct Scope Scope;
 typedef struct Checker Checker;
 typedef struct Type Type;
-typedef enum BuiltinProcId BuiltinProcId;
-typedef enum ImplicitValueId ImplicitValueId;
+// typedef enum BuiltinProcId BuiltinProcId;
+// typedef enum ImplicitValueId ImplicitValueId;
+
+
+
+typedef enum BuiltinProcId {
+	BuiltinProc_Invalid,
+
+	BuiltinProc_new,
+	BuiltinProc_new_slice,
+	BuiltinProc_free,
+
+	BuiltinProc_reserve,
+	BuiltinProc_append,
+
+	BuiltinProc_size_of,
+	BuiltinProc_size_of_val,
+	BuiltinProc_align_of,
+	BuiltinProc_align_of_val,
+	BuiltinProc_offset_of,
+	BuiltinProc_offset_of_val,
+	BuiltinProc_type_of_val,
+
+	BuiltinProc_type_info,
+	BuiltinProc_type_info_of_val,
+
+	BuiltinProc_compile_assert,
+	BuiltinProc_assert,
+	BuiltinProc_panic,
+
+	BuiltinProc_copy,
+	// BuiltinProc_append,
+
+	BuiltinProc_swizzle,
+
+	// BuiltinProc_ptr_offset,
+	// BuiltinProc_ptr_sub,
+	BuiltinProc_slice_ptr,
+
+	BuiltinProc_min,
+	BuiltinProc_max,
+	BuiltinProc_abs,
+	BuiltinProc_clamp,
+
+	BuiltinProc_Count,
+} BuiltinProcId;
+
+
+typedef enum ImplicitValueId {
+	ImplicitValue_Invalid,
+
+	ImplicitValue_context,
+
+	ImplicitValue_Count,
+} ImplicitValueId;
+
+
+
+
 
 #define ENTITY_KINDS \
 	ENTITY_KIND(Invalid) \

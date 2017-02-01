@@ -3785,6 +3785,7 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 		String import_rel_path = imported_file.rel_path;
 		TokenPos pos = imported_file.pos;
 		AstFile file = {0};
+
 		ParseFileError err = init_ast_file(&file, import_path);
 
 		if (err != ParseFile_None) {
