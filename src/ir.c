@@ -1425,6 +1425,7 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	Type *t_right = ir_type(right);
 
 	if (is_type_vector(t_left)) {
+		ir_emit_comment(proc, str_lit("vector.arith.begin"));
 		// IMPORTANT TODO(bill): This is very wasteful with regards to stack memory
 		Type *tl = base_type(t_left);
 		irValue *lhs = ir_address_from_load_or_generate_local(proc, left);
@@ -1439,7 +1440,7 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 			irValue *z = ir_emit_arith(proc, op, x, y, elem_type);
 			ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
 		}
-
+		ir_emit_comment(proc, str_lit("vector.arith.end"));
 		return ir_emit_load(proc, res);
 	}
 
@@ -1533,7 +1534,7 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 	}
 
 	if (is_type_vector(a)) {
-		// IMPORTANT TODO(bill): This is very wasteful with regards to stack memory
+		ir_emit_comment(proc, str_lit("vector.comp.begin"));
 		Type *tl = base_type(a);
 		irValue *lhs = ir_address_from_load_or_generate_local(proc, left);
 		irValue *rhs = ir_address_from_load_or_generate_local(proc, right);
@@ -1549,6 +1550,7 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 			ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
 		}
 
+		ir_emit_comment(proc, str_lit("vector.comp.end"));
 		return ir_emit_load(proc, res);
 	}
 
@@ -2560,15 +2562,6 @@ irValue *ir_find_global_variable(irProcedure *proc, String name) {
 	return *value;
 }
 
-irValue *ir_find_implicit_value_backing(irProcedure *proc, ImplicitValueId id) {
-	Entity *e = proc->module->info->implicit_values[id];
-	GB_ASSERT(e->kind == Entity_ImplicitValue);
-	Entity *backing = e->ImplicitValue.backing;
-	irValue **value = map_ir_value_get(&proc->module->values, hash_pointer(backing));
-	GB_ASSERT_MSG(value != NULL, "Unable to find implicit value backing `%.*s`", LIT(backing->token.string));
-	return *value;
-}
-
 void ir_build_stmt_list(irProcedure *proc, AstNodeArray stmts);
 
 irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv) {
@@ -2584,6 +2577,10 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 		GB_PANIC("Non-constant basic literal %.*s(%td:%td) - %.*s", LIT(pos.file), pos.line, pos.column, LIT(bd->name));
 	case_end;
 
+	case_ast_node(i, Implicit, expr);
+		return ir_addr_load(proc, ir_build_addr(proc, expr));
+	case_end;
+
 	case_ast_node(i, Ident, expr);
 		Entity *e = *map_entity_get(&proc->module->info->uses, hash_pointer(expr));
 		if (e->kind == Entity_Builtin) {
@@ -2595,7 +2592,7 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 		} else if (e->kind == Entity_Nil) {
 			return ir_make_value_nil(proc->module->allocator, tv->type);
 		} else if (e->kind == Entity_ImplicitValue) {
-			return ir_emit_load(proc, ir_find_implicit_value_backing(proc, e->ImplicitValue.id));
+			GB_PANIC("Illegal use of implicit value");
 		}
 
 		irValue **found = map_ir_value_get(&proc->module->values, hash_pointer(e));
@@ -3171,7 +3168,7 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 					return len;
 				} break;
 				case BuiltinProc_swizzle: {
-					ir_emit_comment(proc, str_lit("swizzle"));
+					ir_emit_comment(proc, str_lit("swizzle.begin"));
 					irAddr vector_addr = ir_build_addr(proc, ce->args.e[0]);
 					isize index_count = ce->args.count-1;
 					if (index_count == 0) {
@@ -3193,7 +3190,7 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 
 						ir_emit_store(proc, dst_elem, ir_emit_load(proc, src_elem));
 					}
-
+					ir_emit_comment(proc, str_lit("swizzle.end"));
 					return ir_emit_load(proc, dst);
 					// return ir_emit(proc, ir_make_instr_vector_shuffle(proc, vector, indices, index_count));
 				} break;
@@ -3423,9 +3420,6 @@ irAddr ir_build_addr_from_entity(irProcedure *proc, Entity *e, AstNode *expr) {
 		v = *found;
 	} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous) {
 		v = ir_add_using_variable(proc, e);
-	} else if (e->kind == Entity_ImplicitValue) {
-		// TODO(bill): Should a copy be made?
-		v = ir_find_implicit_value_backing(proc, e->ImplicitValue.id);
 	}
 
 	if (v == NULL) {
@@ -3437,6 +3431,18 @@ irAddr ir_build_addr_from_entity(irProcedure *proc, Entity *e, AstNode *expr) {
 
 irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 	switch (expr->kind) {
+	case_ast_node(i, Implicit, expr);
+		irValue *v = NULL;
+		switch (i->kind) {
+		case Token_context:
+			v = ir_find_global_variable(proc, str_lit("__context"));
+			break;
+		}
+
+		GB_ASSERT(v != NULL);
+		return ir_make_addr(v, expr);
+	case_end;
+
 	case_ast_node(i, Ident, expr);
 		if (ir_is_blank_ident(expr)) {
 			irAddr val = {0};
@@ -5063,7 +5069,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		ir_emit_comment(proc, str_lit("PushAllocator"));
 		ir_open_scope(proc);
 
-		irValue *context_ptr = ir_find_implicit_value_backing(proc, ImplicitValue_context);
+		irValue *context_ptr = ir_find_global_variable(proc, str_lit("__context"));
 		irValue *prev_context = ir_add_local_generated(proc, t_context);
 		ir_emit_store(proc, prev_context, ir_emit_load(proc, context_ptr));
 
@@ -5082,7 +5088,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		ir_emit_comment(proc, str_lit("PushContext"));
 		ir_open_scope(proc);
 
-		irValue *context_ptr = ir_find_implicit_value_backing(proc, ImplicitValue_context);
+		irValue *context_ptr = ir_find_global_variable(proc, str_lit("__context"));
 		irValue *prev_context = ir_add_local_generated(proc, t_context);
 		ir_emit_store(proc, prev_context, ir_emit_load(proc, context_ptr));
 

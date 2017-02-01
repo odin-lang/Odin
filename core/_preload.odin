@@ -321,6 +321,21 @@ __string_decode_rune :: proc(s: string) -> (rune, int) #inline {
 }
 
 
+Raw_Any :: struct #ordered {
+	type_info: ^Type_Info,
+	data:      rawptr,
+}
+
+Raw_String :: struct #ordered {
+	data:  ^byte,
+	count: int,
+};
+
+Raw_Slice :: struct #ordered {
+	data:  rawptr,
+	count: int,
+};
+
 Raw_Dynamic_Array :: struct #ordered {
 	data:      rawptr,
 	count:     int,
@@ -359,6 +374,11 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, capa
 __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
                                items: rawptr, item_count: int) -> int {
 	array := cast(^Raw_Dynamic_Array)array_;
+
+	if item_count <= 0 || items == nil {
+		return array.count;
+	}
+
 
 	ok := true;
 	if array.capacity <= array.count+item_count {

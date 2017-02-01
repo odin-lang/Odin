@@ -80,6 +80,7 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
+	/* TODO(bill): So of these keywords are not used but "reserved", why not remove them? */ \
 	TOKEN_KIND(Token_when,           "when"), \
 	TOKEN_KIND(Token_if,             "if"), \
 	TOKEN_KIND(Token_else,           "else"), \
@@ -102,17 +103,20 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_raw_union,      "raw_union"), \
 	TOKEN_KIND(Token_enum,           "enum"), \
 	TOKEN_KIND(Token_vector,         "vector"), \
+	TOKEN_KIND(Token_static,         "static"), \
 	TOKEN_KIND(Token_dynamic,        "dynamic"), \
 	TOKEN_KIND(Token_using,          "using"), \
 	TOKEN_KIND(Token_no_alias,       "no_alias"), \
-	TOKEN_KIND(Token_immutable,      "immutable"), \
+	/* TOKEN_KIND(Token_mutable,        "mutable"),  */\
+	/* TOKEN_KIND(Token_immutable,      "immutable"),  */\
 	TOKEN_KIND(Token_thread_local,   "thread_local"), \
 	TOKEN_KIND(Token_cast,           "cast"), \
 	TOKEN_KIND(Token_transmute,      "transmute"), \
 	TOKEN_KIND(Token_down_cast,      "down_cast"), \
 	TOKEN_KIND(Token_union_cast,     "union_cast"), \
-	TOKEN_KIND(Token_push_allocator, "push_allocator"), \
+	TOKEN_KIND(Token_context,        "context"), \
 	TOKEN_KIND(Token_push_context,   "push_context"), \
+	TOKEN_KIND(Token_push_allocator, "push_allocator"), \
 	TOKEN_KIND(Token_asm,            "asm"), \
 TOKEN_KIND(Token__KeywordEnd, "_KeywordEnd"), \
 	TOKEN_KIND(Token_Count, "")

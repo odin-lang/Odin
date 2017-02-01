@@ -101,6 +101,8 @@ struct Entity {
 	};
 };
 
+gb_global Entity *e_context = NULL;
+
 
 Entity *alloc_entity(gbAllocator a, EntityKind kind, Scope *scope, Token token, Type *type) {
 	Entity *entity = gb_alloc_item(a, Entity);
