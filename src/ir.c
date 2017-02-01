@@ -2591,8 +2591,6 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 			return NULL;
 		} else if (e->kind == Entity_Nil) {
 			return ir_make_value_nil(proc->module->allocator, tv->type);
-		} else if (e->kind == Entity_ImplicitValue) {
-			GB_PANIC("Illegal use of implicit value");
 		}
 
 		irValue **found = map_ir_value_get(&proc->module->values, hash_pointer(e));

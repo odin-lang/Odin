@@ -22,7 +22,7 @@ typedef struct BuildContext {
 String const WIN32_SEPARATOR_STRING = {cast(u8 *)"\\", 1};
 String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
 
-#if defined(WINDOWS)
+#if defined(GB_SYSTEM_WINDOWS)
 String odin_root_dir(void) {
 	String path = global_module_path;
 	Array(wchar_t) path_buf;

@@ -1,4 +1,4 @@
-/* gb.h - v0.26d - Ginger Bill's C Helper Library - public domain
+/* gb.h - v0.27  - Ginger Bill's C Helper Library - public domain
                  - no warranty implied; use at your own risk
 
 	This is a single header file with a bunch of useful stuff
@@ -298,7 +298,9 @@ extern "C" {
 	#include <errno.h>
 	#include <fcntl.h>
 	#include <pthread.h>
+	#ifndef _IOSC11_SOURCE
 	#define _IOSC11_SOURCE
+	#endif
 	#include <stdlib.h> // NOTE(bill): malloc on linux
 	#include <sys/mman.h>
 	#if !defined(GB_SYSTEM_OSX)
@@ -312,18 +314,18 @@ extern "C" {
 #endif
 
 #if defined(GB_SYSTEM_OSX)
-#include <mach/mach.h>
-#include <mach/mach_init.h>
-#include <mach/mach_time.h>
-#include <mach/thread_act.h>
-#include <mach/thread_policy.h>
-#include <sys/sysctl.h>
-#include <copyfile.h>
-#include <mach/clock.h>
+	#include <mach/mach.h>
+	#include <mach/mach_init.h>
+	#include <mach/mach_time.h>
+	#include <mach/thread_act.h>
+	#include <mach/thread_policy.h>
+	#include <sys/sysctl.h>
+	#include <copyfile.h>
+	#include <mach/clock.h>
 #endif
 
 #if defined(GB_SYSTEM_UNIX)
-#include <semaphore.h>
+	#include <semaphore.h>
 #endif
 
 
@@ -4822,8 +4824,6 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 #else
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {
-		// ptr = aligned_alloc(alignment, size);
-
 		posix_memalign(&ptr, alignment, size);
 
 		if (flags & gbAllocatorFlag_ClearToZero) {
@@ -4832,7 +4832,7 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 	} break;
 
 	case gbAllocation_Free: {
-		// free(old_memory);
+		free(old_memory);
 	} break;
 
 	case gbAllocation_Resize: {
@@ -4929,7 +4929,7 @@ isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
 void gb_affinity_init(gbAffinity *a) {
 	usize count, count_size = gb_size_of(count);
 
-	a->is_accurate               = false;
+	a->is_accurate      = false;
 	a->thread_count     = 1;
 	a->core_count       = 1;
 	a->threads_per_core = 1;

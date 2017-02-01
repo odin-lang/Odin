@@ -27,7 +27,9 @@ u64 win32_time_stamp__freq(void) {
 
 	return win32_perf_count_freq.QuadPart;
 }
+
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+
 #include <time.h>
 
 u64 unix_time_stamp_time_now(void) {

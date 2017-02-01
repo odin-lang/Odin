@@ -225,9 +225,6 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 	return -1;
 }
 
-#ifndef _MAX
-#define _MAX(x, y) ((x) > (y) ? (x) : (y))
-#endif
 
 bool check_is_assignable_to_with_score(Checker *c, Operand *operand, Type *type, i64 *score_) {
 	i64 score = 0;
@@ -235,8 +232,7 @@ bool check_is_assignable_to_with_score(Checker *c, Operand *operand, Type *type,
 	bool ok = distance >= 0;
 	if (ok) {
 		// TODO(bill): A decent score function
-		// score = max(1000000 - distance*distance, 0);
-		score = _MAX(1000000 - distance*distance, 0);
+		score = gb_max(1000000 - distance*distance, 0);
 	}
 	if (score_) *score_ = score;
 	return ok;
@@ -1005,10 +1001,6 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Type
 		return;
 
 	case Entity_Nil:
-		o->mode = Addressing_Value;
-		break;
-
-	case Entity_ImplicitValue:
 		o->mode = Addressing_Value;
 		break;
 
@@ -2565,9 +2557,6 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 	// NOTE(bill): These cases should never be hit but are here for sanity reasons
 	case Entity_Nil:
-		operand->mode = Addressing_Value;
-		break;
-	case Entity_ImplicitValue:
 		operand->mode = Addressing_Value;
 		break;
 	}
@@ -5102,6 +5091,10 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		break;
 
 	case_ast_node(i, Ident, node);
+		str = string_append_token(str, *i);
+	case_end;
+
+	case_ast_node(i, Implicit, node);
 		str = string_append_token(str, *i);
 	case_end;
 

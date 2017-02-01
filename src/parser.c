@@ -3230,8 +3230,13 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			if (e->kind == AstNode_Ident) {
 				return make_using_stmt(f, token, node);
+			} else if (e->kind == AstNode_Implicit) {
+				syntax_error(token, "Illegal use of `using` statement with implicit value `%.*s`", LIT(e->Implicit.string));
+				return make_bad_stmt(f, token, f->curr_token);
 			}
 		} break;
+
+
 		}
 
 		syntax_error(token, "Illegal use of `using` statement");

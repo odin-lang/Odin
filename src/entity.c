@@ -2,63 +2,6 @@ typedef struct Scope Scope;
 typedef struct Checker Checker;
 typedef struct Type Type;
 // typedef enum BuiltinProcId BuiltinProcId;
-// typedef enum ImplicitValueId ImplicitValueId;
-
-
-
-typedef enum BuiltinProcId {
-	BuiltinProc_Invalid,
-
-	BuiltinProc_new,
-	BuiltinProc_new_slice,
-	BuiltinProc_free,
-
-	BuiltinProc_reserve,
-	BuiltinProc_append,
-
-	BuiltinProc_size_of,
-	BuiltinProc_size_of_val,
-	BuiltinProc_align_of,
-	BuiltinProc_align_of_val,
-	BuiltinProc_offset_of,
-	BuiltinProc_offset_of_val,
-	BuiltinProc_type_of_val,
-
-	BuiltinProc_type_info,
-	BuiltinProc_type_info_of_val,
-
-	BuiltinProc_compile_assert,
-	BuiltinProc_assert,
-	BuiltinProc_panic,
-
-	BuiltinProc_copy,
-	// BuiltinProc_append,
-
-	BuiltinProc_swizzle,
-
-	// BuiltinProc_ptr_offset,
-	// BuiltinProc_ptr_sub,
-	BuiltinProc_slice_ptr,
-
-	BuiltinProc_min,
-	BuiltinProc_max,
-	BuiltinProc_abs,
-	BuiltinProc_clamp,
-
-	BuiltinProc_Count,
-} BuiltinProcId;
-
-
-typedef enum ImplicitValueId {
-	ImplicitValue_Invalid,
-
-	ImplicitValue_context,
-
-	ImplicitValue_Count,
-} ImplicitValueId;
-
-
-
 
 
 #define ENTITY_KINDS \
@@ -71,7 +14,6 @@ typedef enum ImplicitValueId {
 	ENTITY_KIND(ImportName) \
 	ENTITY_KIND(LibraryName) \
 	ENTITY_KIND(Nil) \
-	ENTITY_KIND(ImplicitValue) \
 	ENTITY_KIND(Count)
 
 typedef enum EntityKind {
@@ -136,7 +78,7 @@ struct Entity {
 			OverloadKind overload_kind;
 		} Procedure;
 		struct {
-			BuiltinProcId id;
+			i32 id;
 		} Builtin;
 		struct {
 			String path;
@@ -150,11 +92,6 @@ struct Entity {
 			bool   used;
 		} LibraryName;
 		i32 Nil;
-		struct {
-			// TODO(bill): Should this be a user-level construct rather than compiler-level?
-			ImplicitValueId id;
-			Entity *        backing;
-		} ImplicitValue;
 	};
 };
 
@@ -229,7 +166,7 @@ Entity *make_entity_procedure(gbAllocator a, Scope *scope, Token token, Type *si
 	return entity;
 }
 
-Entity *make_entity_builtin(gbAllocator a, Scope *scope, Token token, Type *type, BuiltinProcId id) {
+Entity *make_entity_builtin(gbAllocator a, Scope *scope, Token token, Type *type, i32 id) {
 	Entity *entity = alloc_entity(a, Entity_Builtin, scope, token, type);
 	entity->Builtin.id = id;
 	return entity;
@@ -257,14 +194,6 @@ Entity *make_entity_nil(gbAllocator a, String name, Type *type) {
 	Entity *entity = alloc_entity(a, Entity_Nil, NULL, token, type);
 	return entity;
 }
-
-Entity *make_entity_implicit_value(gbAllocator a, String name, Type *type, ImplicitValueId id) {
-	Token token = make_token_ident(name);
-	Entity *entity = alloc_entity(a, Entity_ImplicitValue, NULL, token, type);
-	entity->ImplicitValue.id = id;
-	return entity;
-}
-
 
 Entity *make_entity_dummy_variable(gbAllocator a, Scope *scope, Token token) {
 	token.string = str_lit("_");

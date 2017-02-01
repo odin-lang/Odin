@@ -15,6 +15,8 @@ typedef struct String {
 } String;
 // NOTE(bill): used for printf style arguments
 #define LIT(x) ((int)(x).len), (x).text
+#define STR_LIT(c_str) {cast(u8 *)c_str, gb_size_of(c_str)-1}
+#define str_lit(c_str) (String){cast(u8 *)c_str, gb_size_of(c_str)-1}
 
 
 typedef struct String16 {
@@ -46,7 +48,6 @@ gb_inline String make_string_c(char *text) {
 	return make_string(cast(u8 *)cast(void *)text, gb_strlen(text));
 }
 
-#define str_lit(c_str) (String){cast(u8 *)c_str, gb_size_of(c_str)-1}
 
 
 
@@ -174,32 +175,25 @@ bool string_contains_char(String s, u8 c) {
 
 
 #if defined(GB_SYSTEM_WINDOWS)
-
-	int convert_multibyte_to_widechar(char* multibyte_input, int input_length, wchar_t* output, int output_size)
-	{
+	int convert_multibyte_to_widechar(char *multibyte_input, int input_length, wchar_t *output, int output_size) {
 		return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, multibyte_input, input_length, output, output_size);
 	}
-
-	int convert_widechar_to_multibyte(wchar_t* widechar_input, int input_length, char* output, int output_size)
-	{
+	int convert_widechar_to_multibyte(wchar_t *widechar_input, int input_length, char *output, int output_size) {
 		return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, widechar_input, input_length, output, output_size, NULL, NULL);
 	}
-}
 #elif defined(GB_SYSTEM_UNIX) || defined(GB_SYSTEM_OSX)
 
 	#include <iconv.h>
 
-	int convert_multibyte_to_widechar(char* multibyte_input, int input_length, wchar_t* output, int output_size)
-	{
+	int convert_multibyte_to_widechar(char *multibyte_input, int input_length, wchar_t *output, int output_size) {
 		iconv_t conv = iconv_open("WCHAR_T", "UTF-8");
-		size_t result = iconv(conv, (char**) &multibyte_input, &input_length, (char**) &output, &output_size);
+		size_t result = iconv(conv, cast(char **)&multibyte_input, &input_length, cast(char **)&output, &output_size);
 		iconv_close(conv);
 
 		return (int) result;
 	}
 
-	int convert_widechar_to_multibyte(wchar_t* widechar_input, int input_length, char* output, int output_size)
-	{
+	int convert_widechar_to_multibyte(wchar_t* widechar_input, int input_length, char* output, int output_size) {
 		iconv_t conv = iconv_open("UTF-8", "WCHAR_T");
 		size_t result = iconv(conv, (char**) &widechar_input, &input_length, (char**) &output, &output_size);
 		iconv_close(conv);

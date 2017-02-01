@@ -17,7 +17,6 @@ extern "C" {
 // #include "vm.c"
 
 #if defined(GB_SYSTEM_WINDOWS)
-
 // NOTE(bill): `name` is used in debugging and profiling modes
 i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
@@ -73,8 +72,9 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	va_start(va, fmt);
 	cmd_len = gb_snprintf_va(cmd_line, gb_size_of(cmd_line), fmt, va);
 	va_end(va);
+	cmd = make_string(cast(u8 *)&cmd_line, cmd_len-1);
 
-	exit_code = system(cmd.text);
+	exit_code = system(&cmd_line[0]);
 
 	// pid_t pid = fork();
 	// int status = 0;
@@ -266,7 +266,7 @@ int main(int argc, char **argv) {
 		return exit_code;
 	}
 
-	#if 0
+	#if 1
 	timings_start_section(&timings, str_lit("llvm-llc"));
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 	exit_code = system_exec_command_line_app("llvm-llc", false,
@@ -328,7 +328,6 @@ int main(int argc, char **argv) {
 #endif
 #endif
 #endif
-
 
 	return 0;
 }

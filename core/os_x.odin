@@ -49,17 +49,17 @@ O_CLOEXEC  :: 0x80000;
 
 #foreign_system_library libc "c";
 
-unix_open :: proc(path: ^u8, mode: int, perm: u32) -> Handle          #foreign libc "open";
-unix_close :: proc(handle: Handle)                                    #foreign libc "close";
-unix_read :: proc(handle: Handle, buffer: rawptr, count: int) -> int  #foreign libc "read";
-unix_write :: proc(handle: Handle, buffer: rawptr, count: int) -> int #foreign libc "write";
-unix_gettid :: proc() -> u64                                          #foreign libc "gettid";
+unix_open   :: proc(path: ^u8, mode: int, perm: u32) -> Handle           #foreign libc "open";
+unix_close  :: proc(handle: Handle)                                      #foreign libc "close";
+unix_read   :: proc(handle: Handle, buffer: rawptr, count: int) -> int   #foreign libc "read";
+unix_write  :: proc(handle: Handle, buffer: rawptr, count: int) -> int   #foreign libc "write";
+unix_gettid :: proc() -> u64                                             #foreign libc "gettid";
 
-unix_malloc :: proc(size: int) -> rawptr                              #foreign libc "malloc";
-unix_free :: proc(ptr: rawptr)                                        #foreign libc "free";
-unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr                #foreign libc "realloc";
+unix_malloc  :: proc(size: int) -> rawptr                                #foreign libc "malloc";
+unix_free    :: proc(ptr: rawptr)                                        #foreign libc "free";
+unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr                   #foreign libc "realloc";
 
-unix_exit :: proc(status: int)                                        #foreign libc "exit";
+unix_exit :: proc(status: int)                                           #foreign libc "exit";
 
 
 
@@ -108,7 +108,7 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 
 
 // NOTE(bill): Uses startup to initialize it
-stdin: Handle  = 0; // get_std_handle(win32.STD_INPUT_HANDLE);
+stdin:  Handle = 0; // get_std_handle(win32.STD_INPUT_HANDLE);
 stdout: Handle = 1; // get_std_handle(win32.STD_OUTPUT_HANDLE);
 stderr: Handle = 2; // get_std_handle(win32.STD_ERROR_HANDLE);
 

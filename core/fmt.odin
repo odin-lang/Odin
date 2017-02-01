@@ -1,6 +1,7 @@
 #import "os.odin";
 #import "mem.odin";
 #import "utf8.odin";
+#import "types.odin";
 
 DEFAULT_BUFFER_SIZE :: 1<<12;
 
@@ -100,7 +101,6 @@ fprint_type :: proc(fd: os.Handle, info: ^Type_Info) {
 	os.write(fd, buf.data[:buf.length]);
 }
 
-
 buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 	if ti == nil {
 		return;
@@ -197,7 +197,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 			buffer_write_string(buf, field.name);
 			buffer_write_string(buf, ": ");
 			buffer_write_type(buf, field.type_info);
-			buffer_write_byte(buf, ';');
+			buffer_write_byte(buf, ',');
 		}
 		buffer_write_string(buf, "}");
 
@@ -207,7 +207,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 			buffer_write_string(buf, field.name);
 			buffer_write_string(buf, ": ");
 			buffer_write_type(buf, field.type_info);
-			buffer_write_byte(buf, ';');
+			buffer_write_byte(buf, ',');
 		}
 		buffer_write_string(buf, "}");
 
@@ -217,7 +217,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 			buffer_write_string(buf, field.name);
 			buffer_write_string(buf, ": ");
 			buffer_write_type(buf, field.type_info);
-			buffer_write_byte(buf, ';');
+			buffer_write_byte(buf, ',');
 		}
 		buffer_write_string(buf, "}");
 
@@ -235,7 +235,7 @@ bprint :: proc(buf: ^Buffer, args: ...any) -> int {
 
 	prev_string := false;
 	for arg, i in args {
-		is_string := arg.data != nil && is_type_string(arg.type_info);
+		is_string := arg.data != nil && types.is_string(arg.type_info);
 		if i > 0 && !is_string && !prev_string {
 			buffer_write_byte(buf, ' ');
 		}
@@ -276,44 +276,6 @@ sprintf :: proc(buf: []byte, fmt: string, args: ...any) -> string {
 	b.data = buf;
 	count := bprintf(^b, fmt, ...args);
 	return cast(string)b.data[:b.length];
-}
-
-
-is_type_string :: proc(info: ^Type_Info) -> bool {
-	using Type_Info;
-	if info == nil {
-		return false;
-	}
-
-	match type i in type_info_base(info) {
-	case String:
-		return true;
-	}
-	return false;
-}
-is_type_integer :: proc(info: ^Type_Info) -> bool {
-	using Type_Info;
-	if info == nil {
-		return false;
-	}
-
-	match type i in type_info_base(info) {
-	case Integer:
-		return true;
-	}
-	return false;
-}
-is_type_float :: proc(info: ^Type_Info) -> bool {
-	using Type_Info;
-	if info == nil {
-		return false;
-	}
-
-	match type i in type_info_base(info) {
-	case Float:
-		return true;
-	}
-	return false;
 }
 
 
@@ -697,7 +659,7 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			case f64:  f = cast(f64)v;
 			}
 
-			if is_type_integer(e.base) {
+			if types.is_string(e.base) {
 				for it, idx in e.values {
 					if it.i == i {
 						buffer_write_string(fi.buf, e.names[idx]);

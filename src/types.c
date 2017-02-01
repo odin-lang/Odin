@@ -192,7 +192,6 @@ void selection_add_index(Selection *s, isize index) {
 
 
 
-#define STR_LIT(x) {cast(u8 *)(x), gb_size_of(x)-1}
 gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_Invalid,        0,                                       0, STR_LIT("invalid type")}},
 	{Type_Basic, {Basic_bool,           BasicFlag_Boolean,                       1, STR_LIT("bool")}},
@@ -1348,7 +1347,7 @@ void type_path_pop(TypePath *tp) {
 
 i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
 i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
-i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, isize index);
+i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, i32 index);
 
 i64 type_size_of_internal (BaseTypeSizes s, gbAllocator allocator, Type *t, TypePath *path);
 i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypePath *path);
@@ -1735,7 +1734,7 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 	return s.word_size;
 }
 
-i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, isize index) {
+i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, i32 index) {
 	t = base_type(t);
 	if (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct) {
 		type_set_offsets(s, allocator, t);

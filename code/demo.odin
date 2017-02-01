@@ -11,6 +11,8 @@
 main :: proc() {
 	i: int;
 
+	fmt.println("Hellope!");
+
 	x: [dynamic]f64;
 	defer free(x);
 	append(^x, 2_000_000.500_000, 3, 5, 7);

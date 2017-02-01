@@ -1,6 +1,108 @@
 #include "exact_value.c"
 #include "entity.c"
 
+typedef enum ExprKind {
+	Expr_Expr,
+	Expr_Stmt,
+} ExprKind;
+
+// Statements and Declarations
+typedef enum StmtFlag {
+	Stmt_BreakAllowed       = 1<<0,
+	Stmt_ContinueAllowed    = 1<<1,
+	Stmt_FallthroughAllowed = 1<<2,
+	Stmt_GiveAllowed        = 1<<3,
+} StmtFlag;
+
+typedef struct BuiltinProc {
+	String   name;
+	isize    arg_count;
+	bool     variadic;
+	ExprKind kind;
+} BuiltinProc;
+typedef enum BuiltinProcId {
+	BuiltinProc_Invalid,
+
+	BuiltinProc_new,
+	BuiltinProc_new_slice,
+	BuiltinProc_free,
+
+	BuiltinProc_reserve,
+	BuiltinProc_append,
+
+	BuiltinProc_size_of,
+	BuiltinProc_size_of_val,
+	BuiltinProc_align_of,
+	BuiltinProc_align_of_val,
+	BuiltinProc_offset_of,
+	BuiltinProc_offset_of_val,
+	BuiltinProc_type_of_val,
+
+	BuiltinProc_type_info,
+	BuiltinProc_type_info_of_val,
+
+	BuiltinProc_compile_assert,
+	BuiltinProc_assert,
+	BuiltinProc_panic,
+
+	BuiltinProc_copy,
+	// BuiltinProc_append,
+
+	BuiltinProc_swizzle,
+
+	// BuiltinProc_ptr_offset,
+	// BuiltinProc_ptr_sub,
+	BuiltinProc_slice_ptr,
+
+	BuiltinProc_min,
+	BuiltinProc_max,
+	BuiltinProc_abs,
+	BuiltinProc_clamp,
+
+	BuiltinProc_Count,
+} BuiltinProcId;
+gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
+	{STR_LIT(""),                 0, false, Expr_Stmt},
+
+	{STR_LIT("new"),              1, false, Expr_Expr},
+	{STR_LIT("new_slice"),        2, false, Expr_Expr},
+	{STR_LIT("free"),             1, false, Expr_Stmt},
+
+	{STR_LIT("reserve"),          2, false, Expr_Stmt},
+	{STR_LIT("append"),           1, true,  Expr_Expr},
+
+	{STR_LIT("size_of"),          1, false, Expr_Expr},
+	{STR_LIT("size_of_val"),      1, false, Expr_Expr},
+	{STR_LIT("align_of"),         1, false, Expr_Expr},
+	{STR_LIT("align_of_val"),     1, false, Expr_Expr},
+	{STR_LIT("offset_of"),        2, false, Expr_Expr},
+	{STR_LIT("offset_of_val"),    1, false, Expr_Expr},
+	{STR_LIT("type_of_val"),      1, false, Expr_Expr},
+
+	{STR_LIT("type_info"),        1, false, Expr_Expr},
+	{STR_LIT("type_info_of_val"), 1, false, Expr_Expr},
+
+	{STR_LIT("compile_assert"),   1, false, Expr_Stmt},
+	{STR_LIT("assert"),           1, false, Expr_Stmt},
+	{STR_LIT("panic"),            1, false, Expr_Stmt},
+
+	{STR_LIT("copy"),             2, false, Expr_Expr},
+	// {STR_LIT("append"),           2, false, Expr_Expr},
+
+	{STR_LIT("swizzle"),          1, true,  Expr_Expr},
+
+	// {STR_LIT("ptr_offset"),       2, false, Expr_Expr},
+	// {STR_LIT("ptr_sub"),          2, false, Expr_Expr},
+	{STR_LIT("slice_ptr"),        2, false,  Expr_Expr},
+
+	{STR_LIT("min"),              2, false, Expr_Expr},
+	{STR_LIT("max"),              2, false, Expr_Expr},
+	{STR_LIT("abs"),              1, false, Expr_Expr},
+	{STR_LIT("clamp"),            3, false, Expr_Expr},
+};
+
+
+
 typedef enum AddressingMode {
 	Addressing_Invalid,
 
@@ -104,73 +206,6 @@ typedef struct Scope {
 	AstFile *      file;
 } Scope;
 gb_global Scope *universal_scope = NULL;
-
-typedef enum ExprKind {
-	Expr_Expr,
-	Expr_Stmt,
-} ExprKind;
-
-// Statements and Declarations
-typedef enum StmtFlag {
-	Stmt_BreakAllowed       = 1<<0,
-	Stmt_ContinueAllowed    = 1<<1,
-	Stmt_FallthroughAllowed = 1<<2,
-	Stmt_GiveAllowed        = 1<<3,
-} StmtFlag;
-
-typedef struct BuiltinProc {
-	String   name;
-	isize    arg_count;
-	bool     variadic;
-	ExprKind kind;
-} BuiltinProc;
-gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
-	{STR_LIT(""),                 0, false, Expr_Stmt},
-
-	{STR_LIT("new"),              1, false, Expr_Expr},
-	{STR_LIT("new_slice"),        2, false, Expr_Expr},
-	{STR_LIT("free"),             1, false, Expr_Stmt},
-
-	{STR_LIT("reserve"),          2, false, Expr_Stmt},
-	{STR_LIT("append"),           1, true,  Expr_Expr},
-
-	{STR_LIT("size_of"),          1, false, Expr_Expr},
-	{STR_LIT("size_of_val"),      1, false, Expr_Expr},
-	{STR_LIT("align_of"),         1, false, Expr_Expr},
-	{STR_LIT("align_of_val"),     1, false, Expr_Expr},
-	{STR_LIT("offset_of"),        2, false, Expr_Expr},
-	{STR_LIT("offset_of_val"),    1, false, Expr_Expr},
-	{STR_LIT("type_of_val"),      1, false, Expr_Expr},
-
-	{STR_LIT("type_info"),        1, false, Expr_Expr},
-	{STR_LIT("type_info_of_val"), 1, false, Expr_Expr},
-
-	{STR_LIT("compile_assert"),   1, false, Expr_Stmt},
-	{STR_LIT("assert"),           1, false, Expr_Stmt},
-	{STR_LIT("panic"),            1, false, Expr_Stmt},
-
-	{STR_LIT("copy"),             2, false, Expr_Expr},
-	// {STR_LIT("append"),           2, false, Expr_Expr},
-
-	{STR_LIT("swizzle"),          1, true,  Expr_Expr},
-
-	// {STR_LIT("ptr_offset"),       2, false, Expr_Expr},
-	// {STR_LIT("ptr_sub"),          2, false, Expr_Expr},
-	{STR_LIT("slice_ptr"),        2, false,  Expr_Expr},
-
-	{STR_LIT("min"),              2, false, Expr_Expr},
-	{STR_LIT("max"),              2, false, Expr_Expr},
-	{STR_LIT("abs"),              1, false, Expr_Expr},
-	{STR_LIT("clamp"),            3, false, Expr_Expr},
-};
-
-typedef struct ImplicitValueInfo {
-	String  name;
-	String  backing_name;
-	Type *  type;
-} ImplicitValueInfo;
-// NOTE(bill): This is initialized later
-gb_global ImplicitValueInfo implicit_value_infos[ImplicitValue_Count] = {0};
 
 
 
