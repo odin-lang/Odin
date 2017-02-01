@@ -724,6 +724,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 
 	skip_expr:
+		;		// again, declaring a variable immediately after a label... weird.
 		AstNode *lhs[2] = {rs->value, rs->index};
 		Type *   rhs[2] = {val, idx};
 

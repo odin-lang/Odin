@@ -11,6 +11,7 @@ typedef struct Timings {
 } Timings;
 
 
+#if defined(GB_SYSTEM_WINDOWS)
 u64 win32_time_stamp_time_now(void) {
 	LARGE_INTEGER counter;
 	QueryPerformanceCounter(&counter);
@@ -26,10 +27,43 @@ u64 win32_time_stamp__freq(void) {
 
 	return win32_perf_count_freq.QuadPart;
 }
+#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+#include <time.h>
+
+u64 unix_time_stamp_time_now(void) {
+	struct timespec ts;
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+
+	return (ts.tv_sec * 1000000000) + ts.tv_nsec;
+}
+
+u64 unix_time_stamp__freq(void) {
+	gb_local_persist u64 freq = 0;
+
+	if (freq == 0) {
+		struct timespec ts;
+		clock_getres(CLOCK_PROCESS_CPUTIME_ID, &ts);
+
+		// that would be an absurd resolution (or lack thereof)
+		GB_ASSERT(ts.tv_sec == 0);
+
+		freq = cast(u64) ((1.0 / ts.tv_nsec) * 1000000000.0);
+
+		GB_ASSERT(freq != 0);
+	}
+
+	return freq;
+}
+
+#else
+#error Implement system
+#endif
 
 u64 time_stamp_time_now(void) {
 #if defined(GB_SYSTEM_WINDOWS)
 	return win32_time_stamp_time_now();
+#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+	return unix_time_stamp_time_now();
 #else
 #error time_stamp_time_now
 #endif
@@ -38,6 +72,8 @@ u64 time_stamp_time_now(void) {
 u64 time_stamp__freq(void) {
 #if defined(GB_SYSTEM_WINDOWS)
 	return win32_time_stamp__freq();
+#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+	return unix_time_stamp__freq();
 #else
 #error time_stamp__freq
 #endif

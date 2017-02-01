@@ -6,21 +6,24 @@
 // #import "punity.odin" as pn;
 
 main :: proc() {
-	// struct_padding()
-	// bounds_checking()
-	// type_introspection()
-	// any_type()
-	// crazy_introspection()
-	// namespaces_and_files()
-	// miscellany()
-	// ht.run()
-	// game.run()
-	// {
-	// 	init :: proc(c: ^pn.Core) {}
-	// 	step :: proc(c: ^pn.Core) {}
+	struct_padding();
+	bounds_checking();
+	type_introspection();
+	any_type();
+	crazy_introspection();
+	namespaces_and_files();
+	miscellany();
 
-	// 	pn.run(init, step)
-	// }
+	/*
+	ht.run();
+	game.run();
+	{
+		init :: proc(c: ^pn.Core) {}
+		step :: proc(c: ^pn.Core) {}
+
+		pn.run(init, step);
+	}
+	*/
 }
 
 struct_padding :: proc() {

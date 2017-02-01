@@ -225,6 +225,9 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 	return -1;
 }
 
+#ifndef _MAX
+#define _MAX(x, y) ((x) > (y) ? (x) : (y))
+#endif
 
 bool check_is_assignable_to_with_score(Checker *c, Operand *operand, Type *type, i64 *score_) {
 	i64 score = 0;
@@ -232,7 +235,8 @@ bool check_is_assignable_to_with_score(Checker *c, Operand *operand, Type *type,
 	bool ok = distance >= 0;
 	if (ok) {
 		// TODO(bill): A decent score function
-		score = max(1000000 - distance*distance, 0);
+		// score = max(1000000 - distance*distance, 0);
+		score = _MAX(1000000 - distance*distance, 0);
 	}
 	if (score_) *score_ = score;
 	return ok;

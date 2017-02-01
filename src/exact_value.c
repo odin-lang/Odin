@@ -416,6 +416,7 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 	}
 
 error:
+	;		// MSVC accepts this??? apparently you cannot declare variables immediately after labels...
 	ExactValue error_value = {0};
 	// gb_printf_err("Invalid binary operation: %s\n", token_kind_to_string(op));
 	return error_value;

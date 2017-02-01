@@ -69,7 +69,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 		AstNode *rhs = inits.e[i];
 		Operand o = {0};
 		check_multi_expr(c, &o, rhs);
-		if (o.type->kind != Type_Tuple) {
+		if (o.type == NULL || o.type->kind != Type_Tuple) {
 			array_add(&operands, o);
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;

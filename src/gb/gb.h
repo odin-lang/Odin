@@ -276,6 +276,8 @@ extern "C" {
 #include <stdarg.h>
 #include <stddef.h>
 
+
+
 #if defined(GB_SYSTEM_WINDOWS)
 	#if !defined(GB_NO_WINDOWS_H)
 		#define NOMINMAX            1
@@ -296,6 +298,7 @@ extern "C" {
 	#include <errno.h>
 	#include <fcntl.h>
 	#include <pthread.h>
+	#define _IOSC11_SOURCE
 	#include <stdlib.h> // NOTE(bill): malloc on linux
 	#include <sys/mman.h>
 	#if !defined(GB_SYSTEM_OSX)
@@ -4819,14 +4822,17 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 #else
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {
-		ptr = aligned_alloc(alignment, size);
+		// ptr = aligned_alloc(alignment, size);
+
+		posix_memalign(&ptr, alignment, size);
+
 		if (flags & gbAllocatorFlag_ClearToZero) {
 			gb_zero_size(ptr, size);
 		}
 	} break;
 
 	case gbAllocation_Free: {
-		free(gb_allocation_header(old_memory));
+		// free(old_memory);
 	} break;
 
 	case gbAllocation_Resize: {
@@ -7754,7 +7760,18 @@ char *gb_path_get_full_name(gbAllocator a, char const *path) {
 	return gb_alloc_str_len(a, buf, len+1);
 #else
 // TODO(bill): Make work on *nix, etc.
-	return gb_alloc_str_len(a, path, gb_strlen(path));
+	char* p = realpath(path, 0);
+	GB_ASSERT(p && "file does not exist");
+
+	isize len = gb_strlen(p);
+
+	// bill... gb_alloc_str_len refused to work for this...
+	char* ret = gb_alloc(a, sizeof(char) * len + 1);
+	gb_memmove(ret, p, len);
+	ret[len] = 0;
+	free(p);
+
+	return ret;
 #endif
 }
 
