@@ -1,6 +1,16 @@
 #import "fmt.odin";
+#import "atomic.odin";
+#import "hash.odin";
+#import "math.odin";
+#import "mem.odin";
+#import "opengl.odin";
+#import "os.odin";
+#import "sync.odin";
+#import "utf8.odin";
 
 main :: proc() {
+	i: int;
+
 	x: [dynamic]f64;
 	defer free(x);
 	append(^x, 2_000_000.500_000, 3, 5, 7);

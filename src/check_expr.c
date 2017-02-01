@@ -880,6 +880,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Type
 	o->mode = Addressing_Invalid;
 	o->expr = n;
 	String name = n->Ident.string;
+
 	Entity *e = scope_lookup_entity(c->context.scope, name);
 	if (e == NULL) {
 		if (str_eq(name, str_lit("_"))) {
@@ -3989,6 +3990,23 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case_ast_node(i, IntervalExpr, node);
 		error_node(node, "Invalid use of an interval expression");
 		goto error;
+	case_end;
+
+	case_ast_node(i, Implicit, node)
+		switch (i->kind) {
+		case Token_context:
+			if (c->context.proc_name.len == 0) {
+				error_node(node, "`context` is only allowed within procedures");
+				goto error;
+			}
+
+			o->mode = Addressing_Value;
+			o->type = t_context;
+			break;
+		default:
+			error_node(node, "Illegal implicit name `%.*s`", LIT(i->string));
+			goto error;
+		}
 	case_end;
 
 	case_ast_node(i, Ident, node);

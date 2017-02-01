@@ -227,7 +227,6 @@ typedef struct CheckerInfo {
 	MapAstFile           files;           // Key: String (full path)
 	MapIsize             type_info_map;   // Key: Type *
 	isize                type_info_count;
-	Entity *             implicit_values[ImplicitValue_Count];
 } CheckerInfo;
 
 typedef struct Checker {
@@ -1019,15 +1018,15 @@ MapEntity generate_minimum_dependency_map(CheckerInfo *info, Entity *start) {
 }
 
 
-void add_implicit_value(Checker *c, ImplicitValueId id, String name, String backing_name, Type *type) {
-	ImplicitValueInfo info = {name, backing_name, type};
-	Entity *value = make_entity_implicit_value(c->allocator, info.name, info.type, id);
-	Entity *prev = scope_insert_entity(c->global_scope, value);
-	GB_ASSERT(prev == NULL);
-	implicit_value_infos[id] = info;
-	c->info.implicit_values[id] = value;
+Entity *find_core_entity(Checker *c, String name) {
+	Entity *e = current_scope_lookup_entity(c->global_scope, name);
+	if (e == NULL) {
+		compiler_error("Could not find type declaration for `%.*s`\n"
+		               "Is `_preload.odin` missing from the `core` directory relative to odin.exe?", LIT(name));
+		// NOTE(bill): This will exit the program as it's cannot continue without it!
+	}
+	return e;
 }
-
 
 void init_preload(Checker *c) {
 	if (c->done_preload) {
@@ -1035,21 +1034,10 @@ void init_preload(Checker *c) {
 	}
 
 	if (t_type_info == NULL) {
-		Entity *type_info_entity = current_scope_lookup_entity(c->global_scope, str_lit("Type_Info"));
-		if (type_info_entity == NULL) {
-			compiler_error("Could not find type declaration for `Type_Info`\n"
-			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
-		}
-		Entity *type_info_member_entity = current_scope_lookup_entity(c->global_scope, str_lit("Type_Info_Member"));
-		if (type_info_entity == NULL) {
-			compiler_error("Could not find type declaration for `Type_Info_Member`\n"
-			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
-		}
-		Entity *type_info_enum_value_entity = current_scope_lookup_entity(c->global_scope, str_lit("Type_Info_Enum_Value"));
-		if (type_info_entity == NULL) {
-			compiler_error("Could not find type declaration for `Type_Info_Enum_Value`\n"
-			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
-		}
+		Entity *type_info_entity            = find_core_entity(c, str_lit("Type_Info"));
+		Entity *type_info_member_entity     = find_core_entity(c, str_lit("Type_Info_Member"));
+		Entity *type_info_enum_value_entity = find_core_entity(c, str_lit("Type_Info_Enum_Value"));
+
 		t_type_info = type_info_entity->type;
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
 		GB_ASSERT(is_type_union(type_info_entity->type));
@@ -1060,6 +1048,7 @@ void init_preload(Checker *c) {
 
 		t_type_info_enum_value = type_info_enum_value_entity->type;
 		t_type_info_enum_value_ptr = make_type_pointer(c->allocator, t_type_info_enum_value);
+
 
 
 		if (record->field_count != 19) {
@@ -1105,21 +1094,14 @@ void init_preload(Checker *c) {
 	}
 
 	if (t_allocator == NULL) {
-		Entity *e = current_scope_lookup_entity(c->global_scope, str_lit("Allocator"));
-		if (e == NULL) {
-			compiler_error("Could not find type declaration for `Allocator`\n"
-			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
-		}
+		Entity *e = find_core_entity(c, str_lit("Allocator"));
 		t_allocator = e->type;
 		t_allocator_ptr = make_type_pointer(c->allocator, t_allocator);
 	}
 
 	if (t_context == NULL) {
-		Entity *e = current_scope_lookup_entity(c->global_scope, str_lit("Context"));
-		if (e == NULL) {
-			compiler_error("Could not find type declaration for `Context`\n"
-			               "Is `runtime.odin` missing from the `core` directory relative to odin.exe?");
-		}
+		Entity *e = find_core_entity(c, str_lit("Context"));
+		e_context = e;
 		t_context = e->type;
 		t_context_ptr = make_type_pointer(c->allocator, t_context);
 	}
@@ -1720,26 +1702,6 @@ void check_parsed_files(Checker *c) {
 
 	check_all_global_entities(c);
 	init_preload(c); // NOTE(bill): This could be setup previously through the use of `type_info(_of_val)`
-	// NOTE(bill): Nothing in the global scope _should_ depend on this implicit value as implicit
-	// values are only useful within procedures
-	add_implicit_value(c, ImplicitValue_context, str_lit("context"), str_lit("__context"), t_context);
-
-	// Initialize implicit values with backing variables
-	// TODO(bill): Are implicit values "too implicit"?
-	for (isize i = 1; i < ImplicitValue_Count; i++) {
-		// NOTE(bill): 0th is invalid
-		Entity *e = c->info.implicit_values[i];
-		GB_ASSERT(e->kind == Entity_ImplicitValue);
-
-		ImplicitValueInfo *ivi = &implicit_value_infos[i];
-		Entity *backing = scope_lookup_entity(e->scope, ivi->backing_name);
-		// GB_ASSERT(backing != NULL);
-		if (backing == NULL) {
-			gb_exit(1);
-		}
-		e->ImplicitValue.backing = backing;
-	}
-
 
 	// Check procedure bodies
 	// NOTE(bill): Nested procedures bodies will be added to this "queue"

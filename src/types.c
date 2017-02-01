@@ -166,6 +166,7 @@ typedef struct BaseTypeSizes {
 	i64 max_align;
 } BaseTypeSizes;
 
+
 typedef Array(isize) Array_isize;
 
 typedef struct Selection {
@@ -262,6 +263,7 @@ gb_global Type *t_u8_ptr  = NULL;
 gb_global Type *t_int_ptr = NULL;
 gb_global Type *t_i64_ptr = NULL;
 gb_global Type *t_f64_ptr = NULL;
+
 
 gb_global Type *t_type_info                = NULL;
 gb_global Type *t_type_info_member         = NULL;
@@ -891,6 +893,9 @@ bool is_type_cte_safe(Type *type) {
 
 	case Type_Array:
 		return is_type_cte_safe(type->Array.elem);
+
+	case Type_DynamicArray:
+		return false;
 
 	case Type_Vector: // NOTE(bill): This should always to be true but this is for sanity reasons
 		return is_type_cte_safe(type->Vector.elem);
@@ -1745,20 +1750,26 @@ i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, isize index)
 	}  else if (t->kind == Type_Basic) {
 		if (t->Basic.kind == Basic_string) {
 			switch (index) {
-			case 0: return 0;
-			case 1: return s.word_size;
+			case 0: return 0;           // data
+			case 1: return s.word_size; // count
 			}
 		} else if (t->Basic.kind == Basic_any) {
 			switch (index) {
-			case 0: return 0;
-			case 1: return s.word_size;
+			case 0: return 0;           // type_info
+			case 1: return s.word_size; // data
 			}
 		}
 	} else if (t->kind == Type_Slice) {
 		switch (index) {
-		case 0: return 0;
-		case 1: return 1*s.word_size;
-		case 2: return 2*s.word_size;
+		case 0: return 0;             // data
+		case 1: return 1*s.word_size; // count
+		}
+	} else if (t->kind == Type_DynamicArray) {
+		switch (index) {
+		case 0: return 0;             // data
+		case 1: return 1*s.word_size; // count
+		case 2: return 2*s.word_size; // capacity
+		case 3: return 3*s.word_size; // allocator
 		}
 	}
 	return 0;
@@ -1777,7 +1788,36 @@ i64 type_offset_of_from_selection(BaseTypeSizes s, gbAllocator allocator, Type *
 		if (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct) {
 			t = t->Record.fields[index]->type;
 		} else {
-			// NOTE(bill): string/any/slices don't have record fields so this case doesn't need to be handled
+			// NOTE(bill): No need to worry about custom types, just need the alignment
+			switch (t->kind) {
+			case Type_Basic:
+				if (t->Basic.kind == Basic_string) {
+					switch (index) {
+					case 0: t = t_rawptr; break;
+					case 1: t = t_int;    break;
+					}
+				} else if (t->Basic.kind == Basic_any) {
+					switch (index) {
+					case 0: t = t_type_info_ptr; break;
+					case 1: t = t_rawptr;        break;
+					}
+				}
+				break;
+			case Type_DynamicArray:
+				switch (index) {
+				case 0: t = t_rawptr;    break;
+				case 1: t = t_int;       break;
+				case 2: t = t_int;       break;
+				case 3: t = t_allocator; break;
+				}
+				break;
+			case Type_Slice:
+				switch (index) {
+				case 0: t = t_rawptr; break;
+				case 1: t = t_int;    break;
+				}
+				break;
+			}
 		}
 	}
 	return offset;
@@ -1806,12 +1846,12 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_Array:
-		str = gb_string_appendc(str, gb_bprintf("[%td]", type->Array.count));
+		str = gb_string_appendc(str, gb_bprintf("[%lld]", type->Array.count));
 		str = write_type_to_string(str, type->Array.elem);
 		break;
 
 	case Type_Vector:
-		str = gb_string_appendc(str, gb_bprintf("[vector %td]", type->Vector.count));
+		str = gb_string_appendc(str, gb_bprintf("[vector %lld]", type->Vector.count));
 		str = write_type_to_string(str, type->Vector.elem);
 		break;
 
