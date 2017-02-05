@@ -128,6 +128,9 @@ typedef struct TypeRecord {
 		i64   count; /* 0 if dynamic */                   \
 		Type *key;                                        \
 		Type *value;                                      \
+		Type *entry_type;                                 \
+		Type *generated_struct_type;                      \
+		Type *lookup_result_type;                         \
 	})                                                    \
 
 
@@ -269,6 +272,7 @@ gb_global Type *t_u8_ptr  = NULL;
 gb_global Type *t_int_ptr = NULL;
 gb_global Type *t_i64_ptr = NULL;
 gb_global Type *t_f64_ptr = NULL;
+gb_global Type *t_byte_slice = NULL;
 
 
 gb_global Type *t_type_info                = NULL;

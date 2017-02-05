@@ -61,24 +61,9 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 
 	// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 	// an extra allocation
-	Array(Operand) operands;
+	ArrayOperand operands = {0};
 	array_init_reserve(&operands, c->tmp_allocator, 2*lhs_count);
-
-	// TODO(bill): Allow for type hints from the entities
-	for_array(i, inits) {
-		AstNode *rhs = inits.e[i];
-		Operand o = {0};
-		check_multi_expr(c, &o, rhs);
-		if (o.type == NULL || o.type->kind != Type_Tuple) {
-			array_add(&operands, o);
-		} else {
-			TypeTuple *tuple = &o.type->Tuple;
-			for (isize j = 0; j < tuple->variable_count; j++) {
-				o.type = tuple->variables[j]->type;
-				array_add(&operands, o);
-			}
-		}
-	}
+	check_unpack_arguments(c, &operands, inits);
 
 	isize rhs_count = operands.count;
 	for_array(i, operands) {

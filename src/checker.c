@@ -54,6 +54,7 @@ typedef enum BuiltinProcId {
 	// BuiltinProc_ptr_offset,
 	// BuiltinProc_ptr_sub,
 	BuiltinProc_slice_ptr,
+	BuiltinProc_slice_to_bytes,
 
 	BuiltinProc_min,
 	BuiltinProc_max,
@@ -96,6 +97,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	// {STR_LIT("ptr_offset"),       2, false, Expr_Expr},
 	// {STR_LIT("ptr_sub"),          2, false, Expr_Expr},
 	{STR_LIT("slice_ptr"),        2, false,  Expr_Expr},
+	{STR_LIT("slice_to_bytes"),   1, false,  Expr_Stmt},
 
 	{STR_LIT("min"),              2, false, Expr_Expr},
 	{STR_LIT("max"),              2, false, Expr_Expr},
@@ -115,6 +117,7 @@ typedef enum AddressingMode {
 	Addressing_Type,
 	Addressing_Builtin,
 	Addressing_Overload,
+	Addressing_MapIndex,
 
 	Addressing_Count,
 } AddressingMode;
@@ -631,6 +634,7 @@ void init_universal_scope(BuildContext *bc) {
 	t_int_ptr = make_type_pointer(a, t_int);
 	t_i64_ptr = make_type_pointer(a, t_i64);
 	t_f64_ptr = make_type_pointer(a, t_f64);
+	t_byte_slice = make_type_slice(a, t_byte);
 }
 
 

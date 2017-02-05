@@ -258,7 +258,7 @@ void ir_opt_blocks(irProcedure *proc) {
 			if (b == NULL) {
 				continue;
 			}
-			GB_ASSERT(b->index == i);
+			GB_ASSERT_MSG(b->index == i, "%d, %td", b->index, i);
 
 			if (ir_opt_block_fusion(proc, b)) {
 				changed = true;
@@ -467,7 +467,7 @@ void ir_opt_tree(irGen *s) {
 		}
 
 		ir_opt_blocks(proc);
-	#if 1
+	#if 0
 		ir_opt_build_referrers(proc);
 		ir_opt_build_dom_tree(proc);
 

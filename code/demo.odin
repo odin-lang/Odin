@@ -12,9 +12,14 @@
 
 main :: proc() {
 	Value :: type f32;
-	m0: map[int]Value;
-	m1: map[string]Value;
-	m2: map[f32]Value;
+	m: map[int]Value;
+	m[123] = 345.0;
+	x, ok := m[123];
+	if ok {
+		fmt.println(x);
+	}
+
+
 	// fm: map[128, int]f32;
 
 /*

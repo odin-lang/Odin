@@ -252,7 +252,6 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 		return;
 	}
 
-
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
 		if (type == NULL || is_type_any(type)) {
@@ -1094,6 +1093,15 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 	return 0;
 }
 
+Type *make_map_tuple_type(gbAllocator a, Type *value) {
+	Type *t = make_type_tuple(a);
+	t->Tuple.variables = gb_alloc_array(a, Entity *, 2);
+	t->Tuple.variable_count = 2;
+	t->Tuple.variables[0] = make_entity_param(a, NULL, blank_token, value,  false, false);
+	t->Tuple.variables[1] = make_entity_param(a, NULL, blank_token, t_bool, false, false);
+	return t;
+}
+
 void check_map_type(Checker *c, Type *type, AstNode *node) {
 	GB_ASSERT(type->kind == Type_Map);
 	ast_node(mt, MapType, node);
@@ -1120,6 +1128,75 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 	type->Map.count = count;
 	type->Map.key   = key;
 	type->Map.value = value;
+
+	gbAllocator a = c->allocator;
+
+	{
+		Type *entry_type = make_type_struct(a);
+
+		/*
+		struct {
+			hash:  u64,
+			next:  int,
+			key:   Key_Type,
+			value: Value_Type,
+		}
+		*/
+		AstNode *dummy_node = gb_alloc_item(a, AstNode);
+		dummy_node->kind = AstNode_Invalid;
+		check_open_scope(c, dummy_node);
+
+		isize field_count = 4;
+		Entity **fields = gb_alloc_array(a, Entity *, field_count);
+		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("hash")),  t_u64, false, false);
+		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("next")),  t_int, false, false);
+		fields[2] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("key")),   key,   false, false);
+		fields[3] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("value")), value, false, false);
+
+		check_close_scope(c);
+
+		entry_type->Record.fields              = fields;
+		entry_type->Record.fields_in_src_order = fields;
+		entry_type->Record.field_count         = field_count;
+
+		type_set_offsets(c->sizes, a, entry_type);
+
+		type->Map.entry_type = entry_type;
+	}
+
+	{
+		Type *generated_struct_type = make_type_struct(a);
+
+		/*
+		struct {
+			hashes:  [dynamic]int,
+			entries; [dynamic]Entry_Type,
+		}
+		*/
+		AstNode *dummy_node = gb_alloc_item(a, AstNode);
+		dummy_node->kind = AstNode_Invalid;
+		check_open_scope(c, dummy_node);
+
+		Type *hashes_type  = make_type_dynamic_array(a, t_int);
+		Type *entries_type = make_type_dynamic_array(a, type->Map.entry_type);
+
+		isize field_count = 2;
+		Entity **fields = gb_alloc_array(a, Entity *, field_count);
+		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("hashes")),  hashes_type,  false, false);
+		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("entries")), entries_type, false, false);
+
+		check_close_scope(c);
+
+		generated_struct_type->Record.fields              = fields;
+		generated_struct_type->Record.fields_in_src_order = fields;
+		generated_struct_type->Record.field_count         = field_count;
+
+		type_set_offsets(c->sizes, a, generated_struct_type);
+
+		type->Map.generated_struct_type = generated_struct_type;
+	}
+
+	type->Map.lookup_result_type = make_map_tuple_type(a, value);
 
 	// error_node(node, "`map` types are not yet implemented");
 }
@@ -3335,14 +3412,26 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_Value;
 	} break;
 
+	case BuiltinProc_slice_to_bytes: {
+		// slice_to_bytes :: proc(a: []T) -> []byte
+		Type *slice_type = base_type(operand->type);
+		if (!is_type_slice(slice_type)) {
+			gbString type_str = type_to_string(operand->type);
+			error_node(call, "Expected a slice type, got `%s`", type_str);
+			gb_string_free(type_str);
+			return false;
+		}
+
+		operand->type = t_byte_slice;
+		operand->mode = Addressing_Value;
+	} break;
+
 	case BuiltinProc_min: {
 		// min :: proc(a, b: comparable) -> comparable
 		Type *type = base_type(operand->type);
 		if (!is_type_comparable(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
-			error_node(call,
-			      "Expected a comparable numeric type to `min`, got `%s`",
-			      type_str);
+			error_node(call, "Expected a comparable numeric type to `min`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -3730,28 +3819,39 @@ int valid_proc_and_score_cmp(void const *a, void const *b) {
 	return sj < si ? -1 : sj > si;
 }
 
+typedef Array(Operand) ArrayOperand;
+
+void check_unpack_arguments(Checker *c, ArrayOperand *operands, AstNodeArray args) {
+	for_array(i, args) {
+		Operand o = {0};
+		check_multi_expr(c, &o, args.e[i]);
+
+		if (o.mode == Addressing_MapIndex) {
+			Type *tuple_type = make_map_tuple_type(c->allocator, o.type);
+			add_type_and_value(&c->info, o.expr, o.mode, tuple_type, (ExactValue){0});
+			o.type = tuple_type;
+		}
+
+		if (o.type == NULL || o.type->kind != Type_Tuple) {
+			array_add(operands, o);
+		} else {
+			TypeTuple *tuple = &o.type->Tuple;
+			for (isize j = 0; j < tuple->variable_count; j++) {
+				o.type = tuple->variables[j]->type;
+				array_add(operands, o);
+			}
+		}
+	}
+}
+
 Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
 	GB_ASSERT(call->kind == AstNode_CallExpr);
 
 	ast_node(ce, CallExpr, call);
 
-	Array(Operand) operands;
+	ArrayOperand operands;
 	array_init_reserve(&operands, heap_allocator(), 2*ce->args.count);
-
-	for_array(i, ce->args) {
-		Operand o = {0};
-		check_multi_expr(c, &o, ce->args.e[i]);
-		if (o.type == NULL || o.type->kind != Type_Tuple) {
-			array_add(&operands, o);
-		} else {
-			TypeTuple *tuple = &o.type->Tuple;
-			for (isize j = 0; j < tuple->variable_count; j++) {
-				o.type = tuple->variables[j]->type;
-				array_add(&operands, o);
-			}
-		}
-	}
-
+	check_unpack_arguments(c, &operands, ce->args);
 
 	if (operand->mode == Addressing_Overload) {
 		GB_ASSERT(operand->overload_entities != NULL &&
@@ -4885,6 +4985,19 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 		Type *t = base_type(type_deref(o->type));
 		bool is_const = o->mode == Addressing_Constant;
+
+		if (is_type_map(t)) {
+			Operand key = {0};
+			check_expr(c, &key, ie->index);
+			check_assignment(c, &key, t->Map.key, str_lit("map index"));
+			if (key.mode == Addressing_Invalid) {
+				goto error;
+			}
+			o->mode = Addressing_MapIndex;
+			o->type = t->Map.value;
+			o->expr = node;
+			return Expr_Expr;
+		}
 
 		i64 max_count = -1;
 		bool valid = check_set_index_data(o, t, &max_count);

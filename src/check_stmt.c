@@ -261,12 +261,20 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 		return NULL;
 	case Addressing_Variable:
 		break;
+	case Addressing_MapIndex:
+		break;
 	default: {
 		if (op_b.expr->kind == AstNode_SelectorExpr) {
 			// NOTE(bill): Extra error checks
 			Operand op_c = {Addressing_Invalid};
 			ast_node(se, SelectorExpr, op_b.expr);
 			check_expr(c, &op_c, se->expr);
+			if (op_c.mode == Addressing_MapIndex) {
+				gbString str = expr_to_string(op_b.expr);
+				error_node(op_b.expr, "Cannot assign to record field `%s` in map", str);
+				gb_string_free(str);
+				return NULL;
+			}
 		}
 
 		gbString str = expr_to_string(op_b.expr);
