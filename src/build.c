@@ -1,6 +1,7 @@
 typedef struct BuildContext {
 	String ODIN_OS;      // target operating system
 	String ODIN_ARCH;    // target architecture
+	String ODIN_ENDIAN;  // target endian
 	String ODIN_VENDOR;  // compiler vendor
 	String ODIN_VERSION; // compiler version
 	String ODIN_ROOT;    // Odin ROOT
@@ -243,9 +244,11 @@ void init_build_context(BuildContext *bc) {
 #if defined(GB_SYSTEM_WINDOWS)
 	bc->ODIN_OS      = str_lit("windows");
 	bc->ODIN_ARCH    = str_lit("amd64");
+	bc->ODIN_ENDIAN  = str_lit("little");
 #elif defined(GB_SYSTEM_OSX)
 	bc->ODIN_OS      = str_lit("osx");
 	bc->ODIN_ARCH    = str_lit("amd64");
+	bc->ODIN_ENDIAN  = str_lit("little");
 #else
 #error Implement system
 #endif

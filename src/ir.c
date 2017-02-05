@@ -2987,6 +2987,14 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 					return ir_emit_global_call(proc, "__dynamic_array_reserve", args, 4);
 				} break;
 
+				case BuiltinProc_clear: {
+					ir_emit_comment(proc, str_lit("reserve"));
+					irValue *array_ptr = ir_build_expr(proc, ce->args.e[0]);
+					irValue *count_ptr = ir_emit_struct_ep(proc, array_ptr, 1);
+					ir_emit_store(proc, count_ptr, v_zero);
+					return NULL;
+				} break;
+
 				case BuiltinProc_append: {
 					ir_emit_comment(proc, str_lit("append"));
 					gbAllocator a = proc->module->allocator;

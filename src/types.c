@@ -95,35 +95,40 @@ typedef struct TypeRecord {
 	Entity * enum_max_value;
 } TypeRecord;
 
-#define TYPE_KINDS \
-	TYPE_KIND(Basic,   BasicType) \
-	TYPE_KIND(Pointer, struct { Type *elem; }) \
+#define TYPE_KINDS                                        \
+	TYPE_KIND(Basic,   BasicType)                         \
+	TYPE_KIND(Pointer, struct { Type *elem; })            \
 	TYPE_KIND(Array,   struct { Type *elem; i64 count; }) \
-	TYPE_KIND(DynamicArray, struct { Type *elem; }) \
+	TYPE_KIND(DynamicArray, struct { Type *elem; })       \
 	TYPE_KIND(Vector,  struct { Type *elem; i64 count; }) \
-	TYPE_KIND(Slice,   struct { Type *elem; }) \
-	TYPE_KIND(Maybe,   struct { Type *elem; }) \
-	TYPE_KIND(Record,  TypeRecord) \
-	TYPE_KIND(Named, struct { \
-		String  name; \
-		Type *  base; \
-		Entity *type_name; /* Entity_TypeName */ \
-	}) \
-	TYPE_KIND(Tuple, struct { \
-		Entity **variables; /* Entity_Variable */ \
-		i32      variable_count; \
-		bool     are_offsets_set; \
-		i64 *    offsets; \
-	}) \
-	TYPE_KIND(Proc, struct { \
-		Scope *scope; \
-		Type * params;  /* Type_Tuple */ \
-		Type * results; /* Type_Tuple */ \
-		i32    param_count; \
-		i32    result_count; \
-		bool   variadic; \
-		ProcCallingConvention calling_convention; \
-	})
+	TYPE_KIND(Slice,   struct { Type *elem; })            \
+	TYPE_KIND(Maybe,   struct { Type *elem; })            \
+	TYPE_KIND(Record,  TypeRecord)                        \
+	TYPE_KIND(Named, struct {                             \
+		String  name;                                     \
+		Type *  base;                                     \
+		Entity *type_name; /* Entity_TypeName */          \
+	})                                                    \
+	TYPE_KIND(Tuple, struct {                             \
+		Entity **variables; /* Entity_Variable */         \
+		i32      variable_count;                          \
+		bool     are_offsets_set;                         \
+		i64 *    offsets;                                 \
+	})                                                    \
+	TYPE_KIND(Proc, struct {                              \
+		Scope *scope;                                     \
+		Type * params;  /* Type_Tuple */                  \
+		Type * results; /* Type_Tuple */                  \
+		i32    param_count;                               \
+		i32    result_count;                              \
+		bool   variadic;                                  \
+		ProcCallingConvention calling_convention;         \
+	})                                                    \
+	TYPE_KIND(Map, struct {                               \
+		i64   count; /* 0 if dynamic */                   \
+		Type *key;                                        \
+		Type *value;                                      \
+	})                                                    \
 
 
 
@@ -319,6 +324,7 @@ gb_global Type *t_allocator_ptr        = NULL;
 gb_global Type *t_context              = NULL;
 gb_global Type *t_context_ptr          = NULL;
 
+gb_global Type *t_raw_dynamic_array    = NULL;
 
 
 
@@ -476,6 +482,23 @@ Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_coun
 	t->Proc.calling_convention = calling_convention;
 	return t;
 }
+
+bool is_type_valid_for_keys(Type *t);
+
+Type *make_type_map(gbAllocator a, i64 count, Type *key, Type *value) {
+	Type *t = alloc_type(a, Type_Map);
+	if (key != NULL) {
+		GB_ASSERT(is_type_valid_for_keys(key));
+	}
+	t->Map.count = count;
+	t->Map.key   = key;
+	t->Map.value = value;
+	return t;
+}
+
+
+
+
 
 
 Type *type_deref(Type *t) {
@@ -679,6 +702,21 @@ bool is_type_enum(Type *t) {
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_Enum);
 }
 
+bool is_type_map(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_Map;
+}
+
+bool is_type_fixed_map(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_Map && t->Map.count > 0;
+}
+bool is_type_dynamic_map(Type *t) {
+	t = base_type(t);	return t->kind == Type_Map && t->Map.count == 0;
+}
+
+
+
 
 bool is_type_any(Type *t) {
 	t = base_type(t);
@@ -689,6 +727,28 @@ bool is_type_untyped_nil(Type *t) {
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_UntypedNil);
 }
 
+
+
+bool is_type_valid_for_keys(Type *t) {
+	t = base_type(base_enum_type(t));
+	if (is_type_untyped(t)) {
+		return false;
+	}
+	if (is_type_integer(t)) {
+		return true;
+	}
+	if (is_type_float(t)) {
+		return true;
+	}
+	if (is_type_string(t)) {
+		return true;
+	}
+	if (is_type_pointer(t)) {
+		return true;
+	}
+
+	return false;
+}
 
 
 bool is_type_indexable(Type *t) {
@@ -1458,6 +1518,14 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 		return align;
 	}
 
+	case Type_Map: {
+		if (t->Map.count == 0) { // Dynamic
+			// NOTE(bill): same as a dynamic array
+			return s.word_size;
+		}
+		GB_PANIC("TODO(bill): Fixed map alignment");
+	} break;
+
 	case Type_Record: {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct:
@@ -1665,6 +1733,14 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 		size = align_formula(type_size_of_internal(s, allocator, elem, path), align);
 		size += type_size_of_internal(s, allocator, t_bool, path);
 		return align_formula(size, align);
+	}
+
+	case Type_Map: {
+		if (t->Map.count == 0) { // Dynamic
+			// NOTE(bill): same as a two dynamic arrays
+			return 2 * type_size_of_internal(s, allocator, t_raw_dynamic_array, path);
+		}
+		GB_PANIC("TODO(bill): Fixed map size");
 	}
 
 	case Type_Tuple: {
@@ -1924,6 +2000,15 @@ gbString write_type_to_string(gbString str, Type *type) {
 		}
 	} break;
 
+	case Type_Map: {
+		str = gb_string_appendc(str, "map[");
+		if (type->Map.count > 0) {
+			str = gb_string_appendc(str, gb_bprintf("%lld, ", type->Map.count));
+		}
+		str = write_type_to_string(str, type->Map.key);
+		str = gb_string_appendc(str, "]");
+		str = write_type_to_string(str, type->Map.value);
+	} break;
 
 	case Type_Named:
 		if (type->Named.type_name != NULL) {

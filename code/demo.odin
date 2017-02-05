@@ -11,7 +11,11 @@
 
 
 main :: proc() {
-	T0 :: struct #align 8 {};
+	Value :: type f32;
+	m0: map[int]Value;
+	m1: map[string]Value;
+	m2: map[f32]Value;
+	// fm: map[128, int]f32;
 
 /*
 	{

@@ -292,6 +292,18 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		}
 		ir_fprintf(f, ")*");
 	} return;
+
+	case Type_Map: {
+		if (t->Map.count > 0) {
+			// ir_fprintf(f, "void");
+		} else {
+			ir_fprintf(f, "{");
+			ir_print_type(f, m, t_raw_dynamic_array);
+			ir_fprintf(f, ", ");
+			ir_print_type(f, m, t_raw_dynamic_array);
+			ir_fprintf(f, "}");
+		}
+	} break;
 	}
 }
 

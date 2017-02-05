@@ -4,6 +4,7 @@
 #import "fmt.odin";
 #import "mem.odin";
 #import "utf8.odin";
+#import "hash.odin";
 
 // IMPORTANT NOTE(bill): `type_info` & `type_info_val` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
@@ -346,6 +347,16 @@ Raw_Dynamic_Array :: struct #ordered {
 	allocator: Allocator,
 };
 
+Raw_Dynamic_Map :: struct #ordered {
+	hashes:  [dynamic]int,
+	entries: Raw_Dynamic_Array,
+};
+
+__default_hash :: proc(data: rawptr, len: int) -> u64 {
+	return hash.murmur64(data, len);
+}
+
+
 __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, capacity: int) -> bool {
 	array := cast(^Raw_Dynamic_Array)array_;
 
@@ -398,3 +409,4 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 	array.count += item_count;
 	return array.count;
 }
+

@@ -50,13 +50,66 @@ fnv32a :: proc(data: rawptr, len: int) -> u32 {
 fnv64a :: proc(data: rawptr, len: int) -> u64 {
 	s := slice_ptr(cast(^u8)data, len);
 
-	h :u64 = 0xcbf29ce484222325;
+	h: u64 = 0xcbf29ce484222325;
 	for i in 0..<len {
 		h = (h ~ cast(u64)s[i]) * 0x100000001b3;
 	}
 	return h;
 }
 
+murmur32 :: proc(data: rawptr, len: int) -> u32 {
+	compile_assert(ODIN_ENDIAN == "little");
+
+	SEED :: 0x9747b28c;
+
+	key := cast(^u8)data;
+	h: u32 = SEED;
+
+	if len > 3 {
+		key_x4 := cast(^u32)key;
+		i := len>>2;
+		for {
+			k := key_x4^; key_x4 += 1;
+			k *= 0xcc9e2d51;
+			k = (k << 15) | (k >> 17);
+			k *= 0x1b873593;
+			h ~= k;
+			h = (h << 13) | (h >> 19);
+			h += (h << 2) + 0xe6546b64;
+			i -= 1;
+			if i == 0 {
+				break;
+			}
+		}
+		key = cast(^u8)key_x4;
+	}
+	if len&3 != 0 {
+		i := len&3;
+		k: u32 = 0;
+		key += i-1;
+		for {
+			k <<= 8;
+			k |= cast(u32)key^;
+			key -= 1;
+			i -= 1;
+			if i == 0 {
+				break;
+			}
+		}
+		k *= 0xcc9e2d51;
+		k = (k << 15) | (k >> 17);
+		k *= 0x1b873593;
+		h ~= k;
+	}
+
+	h ~= cast(u32)len;
+	h ~= h >> 16;
+	h *= 0x85ebca6b;
+	h ~= h >> 13;
+	h *= 0xc2b2ae35;
+	h ~= h >> 16;
+	return h;
+}
 
 murmur64 :: proc(data_: rawptr, len: int) -> u64 {
 	SEED :: 0x9747b28c;

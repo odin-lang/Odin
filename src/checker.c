@@ -28,6 +28,7 @@ typedef enum BuiltinProcId {
 	BuiltinProc_free,
 
 	BuiltinProc_reserve,
+	BuiltinProc_clear,
 	BuiltinProc_append,
 
 	BuiltinProc_size_of,
@@ -69,6 +70,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("free"),             1, false, Expr_Stmt},
 
 	{STR_LIT("reserve"),          2, false, Expr_Stmt},
+	{STR_LIT("clear"),            1, false, Expr_Stmt},
 	{STR_LIT("append"),           1, true,  Expr_Expr},
 
 	{STR_LIT("size_of"),          1, false, Expr_Expr},
@@ -610,6 +612,7 @@ void init_universal_scope(BuildContext *bc) {
 	// TODO(bill): Set through flags in the compiler
 	add_global_string_constant(a, str_lit("ODIN_OS"),      bc->ODIN_OS);
 	add_global_string_constant(a, str_lit("ODIN_ARCH"),    bc->ODIN_ARCH);
+	add_global_string_constant(a, str_lit("ODIN_ENDIAN"),  bc->ODIN_ENDIAN);
 	add_global_string_constant(a, str_lit("ODIN_VENDOR"),  bc->ODIN_VENDOR);
 	add_global_string_constant(a, str_lit("ODIN_VERSION"), bc->ODIN_VERSION);
 	add_global_string_constant(a, str_lit("ODIN_ROOT"),    bc->ODIN_ROOT);
@@ -1139,6 +1142,11 @@ void init_preload(Checker *c) {
 		e_context = e;
 		t_context = e->type;
 		t_context_ptr = make_type_pointer(c->allocator, t_context);
+	}
+
+	if (t_raw_dynamic_array == NULL) {
+		Entity *e = find_core_entity(c, str_lit("Raw_Dynamic_Array"));
+		t_raw_dynamic_array = e->type;
 	}
 
 	c->done_preload = true;

@@ -910,7 +910,7 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 }
 
 
-void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint) {
+void check_ident                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   (Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint) {
 	GB_ASSERT(n->kind == AstNode_Ident);
 	o->mode = Addressing_Invalid;
 	o->expr = n;
@@ -1051,7 +1051,7 @@ void check_identifier(Checker *c, Operand *o, AstNode *n, Type *named_type, Type
 	o->type = type;
 }
 
-i64 check_array_count(Checker *c, AstNode *e) {
+i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 	if (e == NULL) {
 		return 0;
 	}
@@ -1059,7 +1059,11 @@ i64 check_array_count(Checker *c, AstNode *e) {
 	check_expr(c, &o, e);
 	if (o.mode != Addressing_Constant) {
 		if (o.mode != Addressing_Invalid) {
-			error_node(e, "Array count must be a constant");
+			if (is_map) {
+				error_node(e, "Fixed map count must be a constant");
+			} else {
+				error_node(e, "Array count must be a constant");
+			}
 		}
 		return 0;
 	}
@@ -1067,16 +1071,57 @@ i64 check_array_count(Checker *c, AstNode *e) {
 	if (is_type_untyped(type) || is_type_integer(type)) {
 		if (o.value.kind == ExactValue_Integer) {
 			i64 count = o.value.value_integer;
-			if (count >= 0) {
-				return count;
+			if (is_map) {
+				if (count > 0) {
+					return count;
+				}
+				error_node(e, "Invalid fixed map count");
+			} else {
+				if (count >= 0) {
+					return count;
+				}
+				error_node(e, "Invalid array count");
 			}
-			error_node(e, "Invalid array count");
 			return 0;
 		}
 	}
 
-	error_node(e, "Array count must be an integer");
+	if (is_map) {
+		error_node(e, "Fixed map count must be an integer");
+	} else {
+		error_node(e, "Array count must be an integer");
+	}
 	return 0;
+}
+
+void check_map_type(Checker *c, Type *type, AstNode *node) {
+	GB_ASSERT(type->kind == Type_Map);
+	ast_node(mt, MapType, node);
+
+	i64 count   = check_array_or_map_count(c, mt->count, true);
+	Type *key   = check_type_extra(c, mt->key, NULL);
+	Type *value = check_type_extra(c, mt->value, NULL);
+
+	if (!is_type_valid_for_keys(key)) {
+		if (is_type_boolean(key)) {
+			error_node(node, "A boolean cannot be used as a key for a map");
+		} else {
+			gbString str = type_to_string(key);
+			error_node(node, "Invalid type of a key for a map, got `%s`", str);
+			gb_string_free(str);
+		}
+	}
+
+	if (count > 0) {
+		count = 0;
+		error_node(node, "Fixed map types are not yet implemented");
+	}
+
+	type->Map.count = count;
+	type->Map.key   = key;
+	type->Map.value = value;
+
+	// error_node(node, "`map` types are not yet implemented");
 }
 
 Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
@@ -1092,7 +1137,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 	switch (e->kind) {
 	case_ast_node(i, Ident, e);
 		Operand o = {0};
-		check_identifier(c, &o, e, named_type, NULL);
+		check_ident(c, &o, e, named_type, NULL);
 
 		switch (o.mode) {
 		case Addressing_Invalid:
@@ -1169,7 +1214,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 	case_ast_node(at, ArrayType, e);
 		if (at->count != NULL) {
 			Type *elem = check_type_extra(c, at->elem, NULL);
-			type = make_type_array(c->allocator, elem, check_array_count(c, at->count));
+			type = make_type_array(c->allocator, elem, check_array_or_map_count(c, at->count, false));
 		} else {
 			Type *elem = check_type(c, at->elem);
 			type = make_type_slice(c->allocator, elem);
@@ -1188,7 +1233,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 	case_ast_node(vt, VectorType, e);
 		Type *elem = check_type(c, vt->elem);
 		Type *be = base_type(elem);
-		i64 count = check_array_count(c, vt->count);
+		i64 count = check_array_or_map_count(c, vt->count, false);
 		if (is_type_vector(be) || (!is_type_boolean(be) && !is_type_numeric(be))) {
 			err_str = type_to_string(elem);
 			error_node(vt->elem, "Vector element type must be numerical or a boolean, got `%s`", err_str);
@@ -1246,6 +1291,12 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 		goto end;
 	case_end;
 
+	case_ast_node(mt, MapType, e);
+		type = alloc_type(c->allocator, Type_Map);
+		set_base_type(named_type, type);
+		check_map_type(c, type, e);
+		goto end;
+	case_end;
 
 	case_ast_node(ce, CallExpr, e);
 		Operand o = {0};
@@ -2750,6 +2801,26 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_NoValue;
 	} break;
 
+	case BuiltinProc_clear: {
+		Type *type = operand->type;
+		if (!is_type_pointer(type)) {
+			gbString str = type_to_string(type);
+			error_node(operand->expr, "Expected a pointer to a dynamic array, got `%s`", str);
+			gb_string_free(str);
+			return false;
+		}
+		type = type_deref(type);
+		if (!is_type_dynamic_array(type)) {
+			gbString str = type_to_string(type);
+			error_node(operand->expr, "Expected a pointer to a dynamic array, got `%s`", str);
+			gb_string_free(str);
+			return false;
+		}
+
+		operand->type = NULL;
+		operand->mode = Addressing_NoValue;
+	} break;
+
 	case BuiltinProc_append: {
 		// append :: proc(^[dynamic]Type, item: ...Type) {
 		Type *type = operand->type;
@@ -4038,7 +4109,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case_end;
 
 	case_ast_node(i, Ident, node);
-		check_identifier(c, o, node, NULL, type_hint);
+		check_ident(c, o, node, NULL, type_hint);
 	case_end;
 
 	case_ast_node(bl, BasicLit, node);
