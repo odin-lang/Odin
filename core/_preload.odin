@@ -119,6 +119,9 @@ __debug_trap       :: proc()        #foreign __llvm_core "llvm.debugtrap";
 __trap             :: proc()        #foreign __llvm_core "llvm.trap";
 read_cycle_counter :: proc() -> u64 #foreign __llvm_core "llvm.readcyclecounter";
 
+__cpuid :: proc(level: u32, sig: ^u32) -> i32 #foreign __llvm_core "__get_cpuid";
+
+
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
 Allocator_Mode :: enum u8 {

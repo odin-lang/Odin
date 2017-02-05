@@ -553,6 +553,45 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	}
 
 	type_set_offsets(c->sizes, c->allocator, struct_type);
+
+	if (st->align != NULL) {
+		if (st->is_packed) {
+			syntax_error_node(st->align, "`#align` cannot be applied with `#packed`");
+			return;
+		}
+
+		Operand o = {0};
+		check_expr(c, &o, st->align);
+		if (o.mode != Addressing_Constant) {
+			if (o.mode != Addressing_Invalid) {
+				error_node(st->align, "#align must be a constant");
+			}
+			return;
+		}
+
+		Type *type = base_type(o.type);
+		if (is_type_untyped(type) || is_type_integer(type)) {
+			if (o.value.kind == ExactValue_Integer) {
+				i64 align = o.value.value_integer;
+				if (align < 1 || !gb_is_power_of_two(align)) {
+					error_node(st->align, "#align must be a power of 2, got %lld", align);
+					return;
+				}
+
+				// NOTE(bill): Success!!!
+				i64 custom_align = gb_clamp(align, 1, c->sizes.max_align);
+				if (custom_align < align) {
+					warning_node(st->align, "Custom alignment has been clamped to %lld from %lld", align, custom_align);
+				}
+				struct_type->Record.custom_align = custom_align;
+				return;
+			}
+		}
+
+		error_node(st->align, "#align must be an integer");
+		return;
+	}
+
 }
 
 void check_union_type(Checker *c, Type *union_type, AstNode *node) {

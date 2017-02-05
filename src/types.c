@@ -87,6 +87,8 @@ typedef struct TypeRecord {
 	bool     struct_is_ordered;
 	Entity **fields_in_src_order; // Entity_Variable
 
+	i64      custom_align; // NOTE(bill): Only used in structs at the moment
+
 	Type *   enum_base_type;
 	Entity * enum_count;
 	Entity * enum_min_value;
@@ -1459,6 +1461,9 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 	case Type_Record: {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct:
+			if (t->Record.custom_align > 0) {
+				return gb_clamp(t->Record.custom_align, 1, s.max_align);
+			}
 			if (t->Record.field_count > 0) {
 				// TODO(bill): What is this supposed to be?
 				if (t->Record.struct_is_packed) {

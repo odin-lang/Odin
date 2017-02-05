@@ -799,7 +799,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			Token token = {0};
 			token.pos = ast_node_token(ms->body).pos;
 			token.string = str_lit("true");
-			x.expr  = make_ident(c->curr_ast_file, token);
+			x.expr       = ast_ident(c->curr_ast_file, token);
 		}
 
 		// NOTE(bill): Check for multiple defaults

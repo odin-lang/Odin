@@ -215,6 +215,12 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 				ir_fprintf(f, "<");
 			}
 			ir_fprintf(f, "{");
+			if (t->Record.custom_align > 0) {
+				ir_fprintf(f, "[0 x <%lld x i8>]", t->Record.custom_align);
+				if (t->Record.field_count > 0) {
+					ir_fprintf(f, ", ");
+				}
+			}
 			for (isize i = 0; i < t->Record.field_count; i++) {
 				if (i > 0) {
 					ir_fprintf(f, ", ");
@@ -755,6 +761,13 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	case irInstr_StructElementPtr: {
 		Type *et = ir_type(instr->StructElementPtr.address);
 		ir_fprintf(f, "%%%d = getelementptr inbounds ", value->index);
+		i32 index = instr->StructElementPtr.elem_index;
+		Type *st = base_type(type_deref(et));
+		if (is_type_struct(st)) {
+			if (st->Record.custom_align > 0) {
+				index += 1;
+			}
+		}
 
 		ir_print_type(f, m, type_deref(et));
 		ir_fprintf(f, ", ");
@@ -765,7 +778,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, t_int);
 		ir_fprintf(f, " 0, ");
 		ir_print_type(f, m, t_i32);
-		ir_fprintf(f, " %d", instr->StructElementPtr.elem_index);
+		ir_fprintf(f, " %d", index);
 		ir_fprintf(f, "\n");
 	} break;
 
@@ -816,11 +829,19 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	case irInstr_StructExtractValue: {
 		Type *et = ir_type(instr->StructExtractValue.address);
 		ir_fprintf(f, "%%%d = extractvalue ", value->index);
+		i32 index = instr->StructExtractValue.index;
+		Type *st = base_type(et);
+		if (is_type_struct(st)) {
+			if (st->Record.custom_align > 0) {
+				index += 1;
+			}
+		}
+
 
 		ir_print_type(f, m, et);
 		ir_fprintf(f, " ");
 		ir_print_value(f, m, instr->StructExtractValue.address, et);
-		ir_fprintf(f, ", %d\n", instr->StructExtractValue.index);
+		ir_fprintf(f, ", %d\n", index);
 	} break;
 
 	case irInstr_UnionTagPtr: {

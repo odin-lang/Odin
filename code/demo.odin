@@ -7,8 +7,21 @@
 #import "os.odin";
 #import "sync.odin";
 #import "utf8.odin";
+#import ht "http_test.odin";
+
 
 main :: proc() {
+	T0 :: struct #align 8 {};
+
+/*
+	{
+		sig: u32;
+		x := __cpuid(0, ^sig);
+		fmt.println(sig, x);
+	}
+
+
+
 	i: int;
 
 	fmt.println("Hellope!");
@@ -38,4 +51,6 @@ main :: proc() {
 			fmt.println(i);
 		}
 	}
+*/
 }
+
