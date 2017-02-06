@@ -2885,14 +2885,14 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *type = operand->type;
 		if (!is_type_pointer(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a pointer to a dynamic array, got `%s`", str);
+			error_node(operand->expr, "Expected a pointer, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
 		type = type_deref(type);
-		if (!is_type_dynamic_array(type)) {
+		if (!is_type_dynamic_array(type) && !is_type_map(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a pointer to a dynamic array, got `%s`", str);
+			error_node(operand->expr, "Expected a pointer to a map or dynamic array, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
@@ -4746,6 +4746,31 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 					if (cl->elems.count < field_count) {
 						error(cl->close, "Too few values in `any` literal, expected %td, got %td", field_count, cl->elems.count);
 					}
+				}
+			}
+		} break;
+
+		case Type_Map: {
+			if (cl->elems.count == 0) {
+				break;
+			}
+			is_constant = false;
+			{ // Checker values
+				for_array(i, cl->elems) {
+					AstNode *elem = cl->elems.e[i];
+					if (elem->kind != AstNode_FieldValue) {
+						error_node(elem, "Only `field = value` elements are allowed in a map literal");
+						continue;
+					}
+					ast_node(fv, FieldValue, elem);
+					check_expr_with_type_hint(c, o, fv->field, t->Map.key);
+					check_assignment(c, o, t->Map.key, str_lit("map literal"));
+					if (o->mode == Addressing_Invalid) {
+						continue;
+					}
+
+					check_expr_with_type_hint(c, o, fv->value, t->Map.value);
+					check_assignment(c, o, t->Map.value, str_lit("map literal"));
 				}
 			}
 		} break;
