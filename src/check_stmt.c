@@ -723,6 +723,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					val = t->Vector.elem;
 					idx = t_int;
 					break;
+
+				case Type_Map:
+					val = t->Map.value;
+					idx = t->Map.key;
+					break;
 				}
 			}
 

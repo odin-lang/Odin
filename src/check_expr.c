@@ -1136,7 +1136,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 
 		/*
 		struct {
-			hash:  u64,
+			hash:  Map_Key,
 			next:  int,
 			key:   Key_Type,
 			value: Value_Type,
@@ -1148,9 +1148,9 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 
 		isize field_count = 3;
 		Entity **fields = gb_alloc_array(a, Entity *, field_count);
-		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("key")),   t_u64, false, false);
-		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("next")),  t_int, false, false);
-		fields[2] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("value")), value, false, false);
+		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("key")),   t_map_key, false, false);
+		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("next")),  t_int,     false, false);
+		fields[2] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("value")), value,     false, false);
 
 		check_close_scope(c);
 

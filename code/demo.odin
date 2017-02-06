@@ -11,14 +11,18 @@
 
 
 main :: proc() {
-	m: map[int]u32;
+	m: map[string]u32;
 	reserve(^m, 16);
 	defer free(m);
 
-	m[123] = 345;
-	fmt.println(m[123]);
-	if x, ok := m[123]; ok {
-		fmt.println(x);
+	m["a"] = 56;
+	m["b"] = 13453;
+	m["c"] = 7654;
+	c, ok := m["c"];
+	assert(ok && c == 7654);
+
+	for val, key in m {
+		fmt.printf("m[\"%s\"] == %v\n", key, val);
 	}
 
 

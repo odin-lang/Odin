@@ -438,7 +438,10 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 
 
 __default_hash :: proc(data: []byte) -> u64 {
-	return hash.murmur64(data);
+	return hash.fnv64a(data);
+}
+__default_hash_string :: proc(s: string) -> u64 {
+	return __default_hash(cast([]byte)s);
 }
 
 Map_Key :: struct #ordered {
