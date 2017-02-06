@@ -1151,6 +1151,17 @@ void init_preload(Checker *c) {
 	if (t_raw_dynamic_array == NULL) {
 		Entity *e = find_core_entity(c, str_lit("Raw_Dynamic_Array"));
 		t_raw_dynamic_array = e->type;
+		t_raw_dynamic_array = make_type_pointer(c->allocator, t_raw_dynamic_array);
+	}
+
+	if (t_map_key == NULL) {
+		Entity *e = find_core_entity(c, str_lit("Map_Key"));
+		t_map_key = e->type;
+	}
+
+	if (t_map_header == NULL) {
+		Entity *e = find_core_entity(c, str_lit("Map_Header"));
+		t_map_header = e->type;
 	}
 
 	c->done_preload = true;

@@ -180,6 +180,16 @@ free_ptr_with_allocator :: proc(a: Allocator, ptr: rawptr) #inline {
 	a.procedure(a.data, Allocator_Mode.FREE, 0, 0, ptr, 0, 0);
 }
 
+__free_raw_dynamic_array :: proc(a: ^Raw_Dynamic_Array) {
+	if a.allocator.procedure == nil {
+		return;
+	}
+	if a.data == nil {
+		return;
+	}
+	free_ptr_with_allocator(a.allocator, a.data);
+}
+
 free_ptr :: proc(ptr: rawptr) #inline {
 	__check_context();
 	free_ptr_with_allocator(context.allocator, ptr);
@@ -407,35 +417,55 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 	return array.count;
 }
 
+__dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: int) -> int {
+	array := cast(^Raw_Dynamic_Array)array_;
+
+	ok := true;
+	if array.capacity <= array.count+1 {
+		capacity := 2 * array.capacity + max(8, 1);
+		ok = __dynamic_array_reserve(array, elem_size, elem_align, capacity);
+	}
+	if !ok {
+		// TODO(bill): Better error handling for failed reservation
+		return array.count;
+	}
+	data := cast(^byte)array.data;
+	assert(data != nil);
+	mem.zero(data + (elem_size*array.count), elem_size);
+	array.count += 1;
+	return array.count;
+}
+
 
 __default_hash :: proc(data: []byte) -> u64 {
 	return hash.murmur64(data);
 }
 
-Map_Find_Result :: struct {
+Map_Key :: struct #ordered {
+	hash: u64,
+	str:  string,
+}
+
+Map_Find_Result :: struct #ordered {
 	hash_index:  int,
 	entry_prev:  int,
 	entry_index: int,
 }
 
-Map_Entry_Header :: struct {
-	hash: u64,
+Map_Entry_Header :: struct #ordered {
+	key:  Map_Key,
 	next: int,
 /*
-	key:   Key_Type,
 	value: Value_Type,
 */
 }
 
-Map_Header :: struct {
-	m:            ^Raw_Dynamic_Map,
-	is_string:    bool,
-	entry_size:   int,
-	entry_align:  int,
-	key_size:     int,
-	key_align:    int,
-	key_offset:   int,
-	value_offset: int,
+Map_Header :: struct #ordered {
+	m:             ^Raw_Dynamic_Map,
+	is_key_string: bool,
+	entry_size:    int,
+	entry_align:   int,
+	value_offset:  int,
 }
 
 __dynamic_map_reserve :: proc(using header: Map_Header, capacity: int) -> bool {
@@ -457,26 +487,25 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int) {
 	}
 
 	for i := 0; i < nm.entries.count; i += 1 {
-		data := cast(^byte)nm.entries.data + i*entry_size;
-		entry_header := cast(^Map_Entry_Header)data;
+		entry_header := __dynamic_map_get_entry(new_header, i);
+		data := cast(^byte)entry_header;
 
 		if nm.hashes.count == 0 {
 			__dynamic_map_grow(new_header);
 		}
 
-		fr := __dynamic_map_find(new_header, entry_header);
-		j := __dynamic_map_add_entry(new_header, entry_header);
+		fr := __dynamic_map_find(new_header, entry_header.key);
+		j := __dynamic_map_add_entry(new_header, entry_header.key);
 		if fr.entry_prev < 0 {
 			nm.hashes[fr.hash_index] = j;
 		} else {
-			e := cast(^byte)nm.entries.data + fr.entry_prev*entry_size;
-			eh := cast(^Map_Entry_Header)e;
-			eh.next = j;
+			e := __dynamic_map_get_entry(new_header, fr.entry_prev);
+			e.next = j;
 		}
 
-		ndata := cast(^byte)nm.entries.data + j*entry_size;
-		e := cast(^Map_Entry_Header)ndata;
+		e := __dynamic_map_get_entry(new_header, j);
 		e.next = fr.entry_index;
+		ndata := cast(^byte)e;
 		mem.copy(ndata+value_offset, data+value_offset, entry_size-value_offset);
 		if __dynamic_map_full(new_header) {
 			__dynamic_map_grow(new_header);
@@ -484,36 +513,37 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int) {
 	}
 	free(header.m);
 	header.m^ = nm;
+
 }
 
-__dynamic_map_get :: proc(h: Map_Header, entry_header: ^Map_Entry_Header) -> rawptr {
-	index := __dynamic_map_find(h, entry_header).entry_index;
+__dynamic_map_get :: proc(h: Map_Header, key: Map_Key) -> rawptr {
+	index := __dynamic_map_find(h, key).entry_index;
 	if index >= 0 {
-		data := cast(^byte)h.m.entries.data + index*h.entry_size;
+		data := cast(^byte)__dynamic_map_get_entry(h, index);
 		return data + h.value_offset;
 	}
 	return nil;
 }
 
-__dynamic_map_set :: proc(using h: Map_Header, entry_header: ^Map_Entry_Header, value: rawptr) {
+__dynamic_map_set :: proc(using h: Map_Header, key: Map_Key, value: rawptr) {
 	if m.hashes.count == 0 {
 		__dynamic_map_grow(h);
 	}
 	index: int;
-	fr := __dynamic_map_find(h, entry_header);
+	fr := __dynamic_map_find(h, key);
 	if fr.entry_index >= 0 {
 		index = fr.entry_index;
 	} else {
-		index = __dynamic_map_add_entry(h, entry_header);
+		index = __dynamic_map_add_entry(h, key);
 		if fr.entry_prev >= 0 {
-			entry := cast(^Map_Entry_Header)(cast(^byte)m.entries.data + fr.entry_prev*entry_size);
+			entry := __dynamic_map_get_entry(h, fr.entry_prev);
 			entry.next = index;
 		} else {
 			m.hashes[fr.hash_index] = index;
 		}
 	}
 	{
-		data := cast(^byte)m.entries.data + index*entry_size;
+		data := cast(^byte)__dynamic_map_get_entry(h, index);
 		mem.copy(data+value_offset, value, entry_size-value_offset);
 	}
 
@@ -523,18 +553,82 @@ __dynamic_map_set :: proc(using h: Map_Header, entry_header: ^Map_Entry_Header, 
 }
 
 
-__dynamic_map_grow :: proc(using header: Map_Header) {
+__dynamic_map_grow :: proc(using h: Map_Header) {
+	new_count := 2*m.entries.count + 8;
+	__dynamic_map_rehash(h, new_count);
 }
 
-__dynamic_map_full :: proc(using header: Map_Header) -> bool {
+__dynamic_map_full :: proc(using h: Map_Header) -> bool {
+	return cast(int)(0.75 * cast(f64)m.hashes.count) <= m.entries.count;
+}
+
+
+__dynamic_map_hash_equal :: proc(h: Map_Header, a, b: Map_Key) -> bool {
+	if a.hash == b.hash {
+		if h.is_key_string {
+			return a.str == b.str;
+		}
+		return true;
+	}
 	return false;
 }
 
-
-__dynamic_map_find :: proc(using header: Map_Header, entry_header: ^Map_Entry_Header) -> Map_Find_Result {
-	return Map_Find_Result{-1, -1, -1};
+__dynamic_map_find :: proc(using h: Map_Header, key: Map_Key) -> Map_Find_Result {
+	fr := Map_Find_Result{-1, -1, -1};
+	if m.hashes.count > 0 {
+		fr.hash_index = cast(int)(key.hash % cast(u64)m.hashes.count);
+		fr.entry_index = m.hashes[fr.hash_index];
+		for fr.entry_index >= 0 {
+			entry := __dynamic_map_get_entry(h, fr.entry_index);
+			if __dynamic_map_hash_equal(h, entry.key, key) {
+				return fr;
+			}
+			fr.entry_prev = fr.entry_index;
+			fr.entry_index = entry.next;
+		}
+	}
+	return fr;
 }
 
-__dynamic_map_add_entry :: proc(using header: Map_Header, entry_header: ^Map_Entry_Header) -> int {
-	return 0;
+__dynamic_map_add_entry :: proc(using h: Map_Header, key: Map_Key) -> int {
+	prev := m.entries.count;
+	c := __dynamic_array_append_nothing(^m.entries, entry_size, entry_align);
+	if c != prev {
+		end := __dynamic_map_get_entry(h, c-1);
+		end.key = key;
+		end.next = -1;
+	}
+	return c;
+}
+
+
+__dynamic_map_remove :: proc(using h: Map_Header, key: Map_Key) {
+	fr := __dynamic_map_find(h, key);
+	if fr.entry_index >= 0 {
+		__dynamic_map_erase(h, fr);
+	}
+}
+
+__dynamic_map_get_entry :: proc(using h: Map_Header, index: int) -> ^Map_Entry_Header {
+	data := cast(^byte)m.entries.data + index*entry_size;
+	return cast(^Map_Entry_Header)data;
+}
+
+__dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) {
+	if fr.entry_prev < 0 {
+		m.hashes[fr.hash_index] = __dynamic_map_get_entry(h, fr.entry_index).next;
+	} else {
+		__dynamic_map_get_entry(h, fr.entry_prev).next = __dynamic_map_get_entry(h, fr.entry_index).next;
+	}
+
+	if fr.entry_index == m.entries.count-1 {
+		m.entries.count -= 1;
+	}
+	mem.copy(__dynamic_map_get_entry(h, fr.entry_index), __dynamic_map_get_entry(h, m.entries.count-1), entry_size);
+	last := __dynamic_map_find(h, __dynamic_map_get_entry(h, fr.entry_index).key);
+	if last.entry_prev >= 0 {
+		__dynamic_map_get_entry(h, last.entry_prev).next = fr.entry_index;
+	} else {
+		m.hashes[last.hash_index] = fr.entry_index;
+	}
 }

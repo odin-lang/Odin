@@ -1146,12 +1146,11 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 		dummy_node->kind = AstNode_Invalid;
 		check_open_scope(c, dummy_node);
 
-		isize field_count = 4;
+		isize field_count = 3;
 		Entity **fields = gb_alloc_array(a, Entity *, field_count);
-		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("hash")),  t_u64, false, false);
+		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("key")),   t_u64, false, false);
 		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("next")),  t_int, false, false);
-		fields[2] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("key")),   key,   false, false);
-		fields[3] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("value")), value, false, false);
+		fields[2] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("value")), value, false, false);
 
 		check_close_scope(c);
 
@@ -2821,6 +2820,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		// free :: proc(^Type)
 		// free :: proc([]Type)
 		// free :: proc(string)
+		// free :: proc(map[K]T)
 		Type *type = operand->type;
 		bool ok = false;
 		if (is_type_pointer(type)) {
@@ -2830,6 +2830,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		} else if (is_type_string(type)) {
 			ok = true;
 		} else if (is_type_dynamic_array(type)) {
+			ok = true;
+		} else if (is_type_dynamic_map(type)) {
 			ok = true;
 		}
 
@@ -2847,17 +2849,18 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	case BuiltinProc_reserve: {
 		// reserve :: proc(^[dynamic]Type, count: int) {
+		// reserve :: proc(^map[Key]Type, count: int) {
 		Type *type = operand->type;
 		if (!is_type_pointer(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a pointer to a dynamic array, got `%s`", str);
+			error_node(operand->expr, "Expected a pointer, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
 		type = type_deref(type);
-		if (!is_type_dynamic_array(type)) {
+		if (!is_type_dynamic_array(type) && !is_type_dynamic_map(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a pointer to a dynamic array, got `%s`", str);
+			error_node(operand->expr, "Expected a pointer to a dynamic array or dynamic map, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}

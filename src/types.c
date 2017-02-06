@@ -328,7 +328,10 @@ gb_global Type *t_allocator_ptr        = NULL;
 gb_global Type *t_context              = NULL;
 gb_global Type *t_context_ptr          = NULL;
 
-gb_global Type *t_raw_dynamic_array    = NULL;
+gb_global Type *t_raw_dynamic_array     = NULL;
+gb_global Type *t_raw_dynamic_array_ptr = NULL;
+gb_global Type *t_map_key               = NULL;
+gb_global Type *t_map_header            = NULL;
 
 
 

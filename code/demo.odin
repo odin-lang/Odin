@@ -13,9 +13,10 @@
 main :: proc() {
 	Value :: type f32;
 	m: map[int]Value;
-	m[123] = 345.0;
-	x, ok := m[123];
-	if ok {
+	reserve(^m, 16);
+	defer free(m);
+	// m[123] = 345.0;
+	if x, ok := m[123]; ok {
 		fmt.println(x);
 	}
 
