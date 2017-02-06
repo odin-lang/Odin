@@ -372,6 +372,7 @@ typedef struct irAddr {
 		struct {
 			irValue *map_key;
 			Type *   map_type;
+			Type *   map_result;
 		};
 	};
 	// union {
@@ -384,10 +385,11 @@ irAddr ir_make_addr(irValue *addr) {
 	return v;
 }
 
-irAddr ir_make_addr_map(irValue *addr, irValue *map_key, Type *map_type) {
+irAddr ir_make_addr_map(irValue *addr, irValue *map_key, Type *map_type, Type *map_result) {
 	irAddr v = {irAddr_Map, addr};
-	v.map_key  = map_key;
-	v.map_type = map_type;
+	v.map_key    = map_key;
+	v.map_type   = map_type;
+	v.map_result = map_result;
 	return v;
 }
 
@@ -588,23 +590,6 @@ Type *ir_type(irValue *value) {
 	}
 	return NULL;
 }
-
-Type *ir_addr_type(irAddr addr) {
-	if (addr.addr == NULL) {
-		return NULL;
-	}
-
-	if (addr.kind == irAddr_Map) {
-		Type *t = base_type(addr.map_type);
-		GB_ASSERT(is_type_map(t));
-		return t->Map.value;
-	}
-
-	Type *t = ir_type(addr.addr);
-	GB_ASSERT(is_type_pointer(t));
-	return type_deref(t);
-}
-
 
 
 bool ir_is_blank_ident(AstNode *node) {
@@ -1461,6 +1446,23 @@ irValue *ir_address_from_load_or_generate_local(irProcedure *proc, irValue *val)
 }
 
 
+Type *ir_addr_type(irAddr addr) {
+	if (addr.addr == NULL) {
+		return NULL;
+	}
+
+	if (addr.kind == irAddr_Map) {
+		Type *t = base_type(addr.map_type);
+		GB_ASSERT(is_type_map(t));
+		return t->Map.value;
+	}
+
+	Type *t = ir_type(addr.addr);
+	GB_ASSERT(is_type_pointer(t));
+	return type_deref(t);
+}
+
+
 irValue *ir_addr_store(irProcedure *proc, irAddr addr, irValue *value) {
 	if (addr.addr == NULL) {
 		return NULL;
@@ -1469,7 +1471,8 @@ irValue *ir_addr_store(irProcedure *proc, irAddr addr, irValue *value) {
 		Type *map_type = base_type(addr.map_type);
 		irValue *h = ir_gen_map_header(proc, addr.addr, map_type);
 		irValue *key = ir_gen_map_key(proc, addr.map_key);
-		irValue *ptr =ir_address_from_load_or_generate_local(proc, value);
+		irValue *v = ir_emit_conv(proc, value, map_type->Map.value);
+		irValue *ptr = ir_address_from_load_or_generate_local(proc, v);
 		ptr = ir_emit_conv(proc, ptr, t_rawptr);
 
 		irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 3);
@@ -1487,7 +1490,7 @@ irValue *ir_addr_store(irProcedure *proc, irAddr addr, irValue *value) {
 		// irValue *out = ir_emit(proc, ir_make_instr_insert_element(proc, v, elem, addr.Vector.index));
 		// return ir_emit_store(proc, addr.addr, out);
 	// } else {
-		irValue *v = ir_emit_conv(proc, value, ir_addr_type(addr));
+			irValue *v = ir_emit_conv(proc, value, ir_addr_type(addr));
 		return ir_emit_store(proc, addr.addr, v);
 	// }
 }
@@ -1527,7 +1530,12 @@ irValue *ir_addr_load(irProcedure *proc, irAddr addr) {
 		ir_start_block(proc, done);
 
 
-		return ir_emit_load(proc, v);
+		if (is_type_tuple(addr.map_result)) {
+			return ir_emit_load(proc, v);
+		} else {
+			irValue *single = ir_emit_struct_ep(proc, v, 0);
+			return ir_emit_load(proc, single);
+		}
 	}
 
 	// if (addr.kind == irAddr_Vector) {
@@ -3778,7 +3786,8 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			irValue *key = ir_build_expr(proc, ie->index);
 			key = ir_emit_conv(proc, key, t->Map.key);
 
-			return ir_make_addr_map(map_val, key, t);
+			Type *result_type = type_of_expr(proc->module->info, expr);
+			return ir_make_addr_map(map_val, key, t, result_type);
 		}
 
 		irValue *using_addr = NULL;
@@ -4598,8 +4607,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					if (lvals.e[i].addr == NULL) {
 						continue;
 					}
-					irValue *v = ir_emit_conv(proc, inits.e[i], ir_addr_type(lvals.e[i]));
-					ir_addr_store(proc, lvals.e[i], v);
+					ir_addr_store(proc, lvals.e[i], inits.e[i]);
 				}
 			}
 

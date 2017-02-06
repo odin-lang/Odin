@@ -256,13 +256,17 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 		e->flags |= EntityFlag_Used;
 	}
 
+	Type *assignment_type = op_b.type;
 	switch (op_b.mode) {
 	case Addressing_Invalid:
 		return NULL;
 	case Addressing_Variable:
 		break;
-	case Addressing_MapIndex:
-		break;
+	case Addressing_MapIndex: {
+		Type *t = base_type(assignment_type); GB_ASSERT(is_type_tuple(t));
+		t = t->Tuple.variables[0]->type;
+		assignment_type = t;
+	} break;
 	default: {
 		if (op_b.expr->kind == AstNode_SelectorExpr) {
 			// NOTE(bill): Extra error checks
@@ -287,7 +291,7 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	} break;
 	}
 
-	check_assignment(c, op_a, op_b.type, str_lit("assignment"));
+	check_assignment(c, op_a, assignment_type, str_lit("assignment"));
 	if (op_a->mode == Addressing_Invalid) {
 		return NULL;
 	}

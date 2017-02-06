@@ -11,11 +11,12 @@
 
 
 main :: proc() {
-	Value :: type f32;
-	m: map[int]Value;
+	m: map[int]u32;
 	reserve(^m, 16);
 	defer free(m);
-	// m[123] = 345.0;
+
+	m[123] = 345;
+	fmt.println(m[123]);
 	if x, ok := m[123]; ok {
 		fmt.println(x);
 	}

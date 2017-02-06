@@ -3829,12 +3829,6 @@ void check_unpack_arguments(Checker *c, ArrayOperand *operands, AstNodeArray arg
 		Operand o = {0};
 		check_multi_expr(c, &o, args.e[i]);
 
-		if (o.mode == Addressing_MapIndex) {
-			Type *tuple_type = make_map_tuple_type(c->allocator, o.type);
-			add_type_and_value(&c->info, o.expr, o.mode, tuple_type, (ExactValue){0});
-			o.type = tuple_type;
-		}
-
 		if (o.type == NULL || o.type->kind != Type_Tuple) {
 			array_add(operands, o);
 		} else {
@@ -4997,7 +4991,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 				goto error;
 			}
 			o->mode = Addressing_MapIndex;
-			o->type = t->Map.value;
+			o->type = make_map_tuple_type(c->allocator, t->Map.value);
 			o->expr = node;
 			return Expr_Expr;
 		}

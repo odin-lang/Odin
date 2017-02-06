@@ -511,25 +511,27 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int) {
 			__dynamic_map_grow(new_header);
 		}
 	}
-	free(header.m);
+	free_ptr_with_allocator(header.m.hashes.allocator,  header.m.hashes.data);
+	free_ptr_with_allocator(header.m.entries.allocator, header.m.entries.data);
 	header.m^ = nm;
-
 }
 
 __dynamic_map_get :: proc(h: Map_Header, key: Map_Key) -> rawptr {
 	index := __dynamic_map_find(h, key).entry_index;
 	if index >= 0 {
 		data := cast(^byte)__dynamic_map_get_entry(h, index);
-		return data + h.value_offset;
+		val := data + h.value_offset;
+		return val;
 	}
 	return nil;
 }
 
 __dynamic_map_set :: proc(using h: Map_Header, key: Map_Key, value: rawptr) {
+	index: int;
+
 	if m.hashes.count == 0 {
 		__dynamic_map_grow(h);
 	}
-	index: int;
 	fr := __dynamic_map_find(h, key);
 	if fr.entry_index >= 0 {
 		index = fr.entry_index;
@@ -544,7 +546,8 @@ __dynamic_map_set :: proc(using h: Map_Header, key: Map_Key, value: rawptr) {
 	}
 	{
 		data := cast(^byte)__dynamic_map_get_entry(h, index);
-		mem.copy(data+value_offset, value, entry_size-value_offset);
+		val := data+value_offset;
+		mem.copy(val, value, entry_size-value_offset);
 	}
 
 	if __dynamic_map_full(h) {
@@ -598,7 +601,7 @@ __dynamic_map_add_entry :: proc(using h: Map_Header, key: Map_Key) -> int {
 		end.key = key;
 		end.next = -1;
 	}
-	return c;
+	return prev;
 }
 
 
