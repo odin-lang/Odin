@@ -18,13 +18,13 @@ main :: proc() {
 	m["a"] = 56;
 	m["b"] = 13453;
 	m["c"] = 7654;
-	c, ok := m["c"];
+	c := m["c"];
+	_, ok := m["c"];
 	assert(ok && c == 7654);
 
 	for val, key in m {
 		fmt.printf("m[\"%s\"] == %v\n", key, val);
 	}
-
 
 	// fm: map[128, int]f32;
 

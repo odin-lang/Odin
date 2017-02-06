@@ -2676,7 +2676,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		gbString op_str   = expr_to_string(op_expr);
 		gbString type_str = type_to_string(operand->type);
 		gbString sel_str  = expr_to_string(selector);
-		error_node(op_expr, "`%s` (`%s`) has no field `%s`", op_str, type_str, sel_str);
+		error_node(op_expr, "`%s` of type `%s` has no field `%s`", op_str, type_str, sel_str);
 		gb_string_free(sel_str);
 		gb_string_free(type_str);
 		gb_string_free(op_str);
@@ -3824,12 +3824,28 @@ int valid_proc_and_score_cmp(void const *a, void const *b) {
 
 typedef Array(Operand) ArrayOperand;
 
-void check_unpack_arguments(Checker *c, ArrayOperand *operands, AstNodeArray args) {
+void check_unpack_arguments(Checker *c, isize lhs_count, ArrayOperand *operands, AstNodeArray args, bool allow_map_ok) {
 	for_array(i, args) {
 		Operand o = {0};
 		check_multi_expr(c, &o, args.e[i]);
 
 		if (o.type == NULL || o.type->kind != Type_Tuple) {
+			if (o.mode == Addressing_MapIndex &&
+			    allow_map_ok &&
+			    lhs_count == 2 &&
+			    args.count == 1) {
+				Type *tuple = make_map_tuple_type(c->allocator, o.type);
+				add_type_and_value(&c->info, o.expr, o.mode, tuple, o.value);
+
+				Operand val = o;
+				Operand ok = o;
+				val.mode = Addressing_Value;
+				ok.mode  = Addressing_Value;
+				ok.type  = t_bool;
+				array_add(operands, val);
+				array_add(operands, ok);
+				continue;
+			}
 			array_add(operands, o);
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
@@ -3848,7 +3864,7 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 
 	ArrayOperand operands;
 	array_init_reserve(&operands, heap_allocator(), 2*ce->args.count);
-	check_unpack_arguments(c, &operands, ce->args);
+	check_unpack_arguments(c, -1, &operands, ce->args, false);
 
 	if (operand->mode == Addressing_Overload) {
 		GB_ASSERT(operand->overload_entities != NULL &&
@@ -4991,7 +5007,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 				goto error;
 			}
 			o->mode = Addressing_MapIndex;
-			o->type = make_map_tuple_type(c->allocator, t->Map.value);
+			o->type = t->Map.value;
 			o->expr = node;
 			return Expr_Expr;
 		}

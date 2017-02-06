@@ -262,11 +262,8 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 		return NULL;
 	case Addressing_Variable:
 		break;
-	case Addressing_MapIndex: {
-		Type *t = base_type(assignment_type); GB_ASSERT(is_type_tuple(t));
-		t = t->Tuple.variables[0]->type;
-		assignment_type = t;
-	} break;
+	case Addressing_MapIndex:
+		break;
 	default: {
 		if (op_b.expr->kind == AstNode_SelectorExpr) {
 			// NOTE(bill): Extra error checks
