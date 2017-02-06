@@ -1495,7 +1495,7 @@ Type *ir_addr_type(irAddr addr) {
 	return type_deref(t);
 }
 
-irValue *ir_insert_map_key_and_value(irProcedure *proc, irValue *addr, Type *map_type,
+irValue *ir_insert_dynamic_map_key_and_value(irProcedure *proc, irValue *addr, Type *map_type,
                                      irValue *map_key, irValue *map_value) {
 	map_type = base_type(map_type);
 
@@ -1519,7 +1519,7 @@ irValue *ir_addr_store(irProcedure *proc, irAddr addr, irValue *value) {
 		return NULL;
 	}
 	if (addr.kind == irAddr_Map) {
-		return ir_insert_map_key_and_value(proc, addr.addr, addr.map_type, addr.map_key, value);
+		return ir_insert_dynamic_map_key_and_value(proc, addr.addr, addr.map_type, addr.map_key, value);
 	}
 
 	irValue *v = ir_emit_conv(proc, value, ir_addr_type(addr));
@@ -1925,6 +1925,13 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, Type *type, irValue *e, Selec
 			e = ir_emit_array_epi(proc, e, index);
 		} else if (type->kind == Type_Array) {
 			e = ir_emit_array_epi(proc, e, index);
+		} else if (type->kind == Type_Map) {
+			e = ir_emit_struct_ep(proc, e, 1);
+			switch (index) {
+			case 0: e = ir_emit_struct_ep(proc, e, 1); break; // count
+			case 1: e = ir_emit_struct_ep(proc, e, 2); break; // capacity
+			case 2: e = ir_emit_struct_ep(proc, e, 3); break; // allocator
+			}
 		} else {
 			GB_PANIC("un-gep-able type");
 		}
@@ -1951,6 +1958,13 @@ irValue *ir_emit_deep_field_ev(irProcedure *proc, Type *type, irValue *e, Select
 			GB_PANIC("TODO(bill): IS THIS EVEN CORRECT?");
 			type = type->Record.fields[index]->type;
 			e = ir_emit_conv(proc, e, type);
+		} else if (type->kind == Type_Map) {
+			e = ir_emit_struct_ev(proc, e, 1);
+			switch (index) {
+			case 0: e = ir_emit_struct_ev(proc, e, 1); break; // count
+			case 1: e = ir_emit_struct_ev(proc, e, 2); break; // capacity
+			case 2: e = ir_emit_struct_ev(proc, e, 3); break; // allocator
+			}
 		} else {
 			e = ir_emit_struct_ev(proc, e, index);
 		}
@@ -4192,7 +4206,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 				irValue *key   = ir_build_expr(proc, fv->field);
 				irValue *value = ir_build_expr(proc, fv->value);
-				ir_insert_map_key_and_value(proc, v, type, key, value);
+				ir_insert_dynamic_map_key_and_value(proc, v, type, key, value);
 			}
 		} break;
 

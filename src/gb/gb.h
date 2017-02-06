@@ -58,6 +58,7 @@ TODOS
 	- More date & time functions
 
 VERSION HISTORY
+	0.27  - OSX fixes and Linux gbAffinity
 	0.26d - Minor changes to how gbFile works
 	0.26c - gb_str_to_f* fix
 	0.26b - Minor fixes
@@ -1008,7 +1009,12 @@ typedef struct gbAffinity {
 } gbAffinity;
 
 #elif defined(GB_SYSTEM_LINUX)
-#error TODO(bill): Implement gbAffinity for linux
+typedef struct gbAffinity {
+	b32   is_accurate;
+	isize core_count;
+	isize thread_count;
+	isize threads_per_core;
+} gbAffinity;
 #else
 #error TODO(bill): Unknown system
 #endif
@@ -4979,7 +4985,83 @@ isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
 }
 
 #elif defined(GB_SYSTEM_LINUX)
-#error TODO(bill): Implement gbAffinity for linux
+// IMPORTANT TODO(bill): This gbAffinity stuff for linux needs be improved a lot!
+// NOTE(zangent): I have to read /proc/cpuinfo to get the number of threads per core.
+#include <stdio.h>
+
+void gb_affinity_init(gbAffinity *a) {
+	b32   accurate = true;
+	isize threads = 0;
+
+	a->thread_count     = 1;
+	a->core_count       = sysconf(_SC_NPROCESSORS_ONLN);
+	a->threads_per_core = 1;
+
+
+	if(a->core_count <= 0) {
+		a->core_count = 1;
+		accurate = false;
+	}
+
+	// Parsing /proc/cpuinfo to get the number of threads per core.
+	// NOTE(zangent): This calls the CPU's threads "cores", although the wording
+	// is kind of weird. This should be right, though.
+	if (fopen("/proc/cpuinfo", "r") != NULL) {
+		for (;;) {
+			// The 'temporary char'. Everything goes into this char,
+			// so that we can check against EOF at the end of this loop.
+			char c;
+
+#define AF__CHECK(letter) ((c = getc(cpu_info)) == letter)
+			if (AF__CHECK('c') && AF__CHECK('p') && AF__CHECK('u') && AF__CHECK(' ') &&
+			    AF__CHECK('c') && AF__CHECK('o') && AF__CHECK('r') && AF__CHECK('e') && AF__CHECK('s')) {
+				// We're on a CPU info line.
+				while (!AF__CHECK(EOF)) {
+					if (c == '\n') {
+						break;
+					} else if (c < '0' || '9' > c) {
+						continue;
+					}
+					threads = threads * 10 + (c - '0');
+				}
+				break;
+			} else {
+				while (!AF__CHECK('\n')) {
+					if (c==EOF) {
+						break;
+					}
+				}
+			}
+			if (c == EOF) {
+				break;
+			}
+#undef AF__CHECK
+		}
+	}
+
+	if (threads == 0) {
+		threads  = 1;
+		accurate = false;
+	}
+
+	a->threads_per_core = threads;
+	a->thread_count = a->threads_per_core * a->core_count;
+	a->is_accurate = accurate;
+
+}
+
+void gb_affinity_destroy(gbAffinity *a) {
+	gb_unused(a);
+}
+
+b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
+	return true;
+}
+
+isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
+	GB_ASSERT(0 <= core && core < a->core_count);
+	return a->threads_per_core;
+}
 #else
 #error TODO(bill): Unknown system
 #endif

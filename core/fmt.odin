@@ -142,10 +142,13 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		if info.params == nil {
 			buffer_write_string(buf, "()");
 		} else {
-			count := (cast(^Tuple)info.params).fields.count;
-			if count == 1 { buffer_write_string(buf, "("); }
-			buffer_write_type(buf, info.params);
-			if count == 1 { buffer_write_string(buf, ")"); }
+			fields := (cast(^Tuple)info.params).fields;
+			buffer_write_string(buf, "(");
+			for f, i in fields {
+				if i > 0 { buffer_write_string(buf, ", "); }
+				buffer_write_type(buf, f.type_info);
+			}
+			buffer_write_string(buf, ")");
 		}
 		if info.results != nil {
 			buffer_write_string(buf, " -> ");
