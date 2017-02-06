@@ -126,7 +126,64 @@ String odin_root_dir(void) {
 	return path;
 }
 #else
-#error Implement system
+
+// NOTE: Linux / Unix is unfinished and not tested very well.
+#include <sys/stat.h>
+
+String odin_root_dir(void) {
+	String path = global_module_path;
+	Array(char) path_buf;
+	isize len, i;
+	gbTempArenaMemory tmp;
+	wchar_t *text;
+
+	if (global_module_path_set) {
+		return global_module_path;
+	}
+
+	array_init_count(&path_buf, heap_allocator(), 300);
+
+	len = 0;
+	for (;;) {
+		// This is not a 100% reliable system, but for the purposes
+		// of this compiler, it should be _good enough_.
+		// That said, there's no solid 100% method on Linux to get the program's
+		// path without checking this link. Sorry.
+		len = readlink("/proc/self/exe", &path_buf.e[0], path_buf.count);
+		if(len == 0) {
+			return make_string(NULL, 0);
+		}
+		printf("build.c:155 | Link value: \"%s\"\n", &path_buf.e[0]);
+		exit(1);
+		if (len < path_buf.count) {
+			break;
+		}
+		array_resize(&path_buf, 2*path_buf.count + 300);
+	}
+
+
+	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+	text = gb_alloc_array(string_buffer_allocator, u8, len + 1);
+	gb_memmove(text, &path_buf.e[0], len);
+
+	path = make_string(text, len);
+	for (i = path.len-1; i >= 0; i--) {
+		u8 c = path.text[i];
+		if (c == '/' || c == '\\') {
+			break;
+		}
+		path.len--;
+	}
+
+	global_module_path = path;
+	global_module_path_set = true;
+
+	gb_temp_arena_memory_end(tmp);
+
+	array_free(&path_buf);
+
+	return path;
+}
 #endif
 
 
@@ -250,18 +307,35 @@ void init_build_context(BuildContext *bc) {
 	bc->ODIN_ARCH    = str_lit("amd64");
 	bc->ODIN_ENDIAN  = str_lit("little");
 #else
-#error Implement system
+	bc->ODIN_OS      = str_lit("linux");
+	bc->ODIN_ARCH    = str_lit("amd64");
+	bc->ODIN_ENDIAN  = str_lit("little");
 #endif
+
+
+
+	// The linker flags to set the build architecture are different
+	// across OSs. It doesn't make sense to allocate extra data on the heap
+	// here, so I just #defined the linker flags to keep things concise.
+	#if defined(GB_SYSTEM_WINDOWS)
+	#define linker_flag_x64 "/machine:x64"
+	#define linker_flag_x86 "/machine:x86"
+	#elif defined(GB_SYSTEM_OSX)
+	#error Run "ld -V" to find out what to build programs as. It may be the same as Linux...?
+	#else
+	#define linker_flag_x64 "-m elf_x86_64"
+	#define linker_flag_x86 "-m elf_i386"
+	#endif
 
 	if (str_eq(bc->ODIN_ARCH, str_lit("amd64"))) {
 		bc->word_size = 8;
 		bc->max_align = 16;
 		bc->llc_flags = str_lit("-march=x86-64 ");
-		bc->link_flags = str_lit("/machine:x64 ");
+		bc->link_flags = str_lit(linker_flag_x64 " ");
 	} else if (str_eq(bc->ODIN_ARCH, str_lit("x86"))) {
 		bc->word_size = 4;
 		bc->max_align = 8;
 		bc->llc_flags = str_lit("-march=x86 ");
-		bc->link_flags = str_lit("/machine:x86 ");
+		bc->link_flags = str_lit(linker_flag_x86 " ");
 	}
 }

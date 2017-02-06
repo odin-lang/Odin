@@ -1,4 +1,4 @@
-/* gb.h - v0.27  - Ginger Bill's C Helper Library - public domain
+/* gb.h - v0.26d - Ginger Bill's C Helper Library - public domain
                  - no warranty implied; use at your own risk
 
 	This is a single header file with a bunch of useful stuff
@@ -276,8 +276,6 @@ extern "C" {
 #include <stdarg.h>
 #include <stddef.h>
 
-
-
 #if defined(GB_SYSTEM_WINDOWS)
 	#if !defined(GB_NO_WINDOWS_H)
 		#define NOMINMAX            1
@@ -298,9 +296,6 @@ extern "C" {
 	#include <errno.h>
 	#include <fcntl.h>
 	#include <pthread.h>
-	#ifndef _IOSC11_SOURCE
-	#define _IOSC11_SOURCE
-	#endif
 	#include <stdlib.h> // NOTE(bill): malloc on linux
 	#include <sys/mman.h>
 	#if !defined(GB_SYSTEM_OSX)
@@ -314,18 +309,18 @@ extern "C" {
 #endif
 
 #if defined(GB_SYSTEM_OSX)
-	#include <mach/mach.h>
-	#include <mach/mach_init.h>
-	#include <mach/mach_time.h>
-	#include <mach/thread_act.h>
-	#include <mach/thread_policy.h>
-	#include <sys/sysctl.h>
-	#include <copyfile.h>
-	#include <mach/clock.h>
+#include <mach/mach.h>
+#include <mach/mach_init.h>
+#include <mach/mach_time.h>
+#include <mach/thread_act.h>
+#include <mach/thread_policy.h>
+#include <sys/sysctl.h>
+#include <copyfile.h>
+#include <mach/clock.h>
 #endif
 
 #if defined(GB_SYSTEM_UNIX)
-	#include <semaphore.h>
+#include <semaphore.h>
 #endif
 
 
@@ -417,20 +412,21 @@ typedef i32 Rune; // NOTE(bill): Unicode codepoint
 #define GB_RUNE_EOF     cast(Rune)(-1)
 
 
+// NOTE(bill): I think C99 and C++ `bool` is stupid for numerous reasons but there are too many
+// to write in this small comment.
 typedef i8  b8;
 typedef i16 b16;
 typedef i32 b32; // NOTE(bill): Prefer this!!!
 
 // NOTE(bill): Get true and false
 #if !defined(__cplusplus)
-	#if (defined(_MSC_VER) && _MSC_VER <= 1800) || (!defined(_MSC_VER) && !defined(__STDC_VERSION__))
+	#if (defined(_MSC_VER) && _MSC_VER <= 1800) || !defined(__STDC_VERSION__)
 		#ifndef true
 		#define true  (0 == 0)
 		#endif
 		#ifndef false
 		#define false (0 != 0)
 		#endif
-		typedef b8 bool;
 	#else
 		#include <stdbool.h>
 	#endif
@@ -619,7 +615,7 @@ extern "C++" {
 //
 // NOTE: C++11 (and above) only!
 //
-#if !defined(GB_NO_DEFER) && defined(__cplusplus) && ((defined(_MSC_VER) && _MSC_VER >= 1400) || (__cplusplus >= 201103L))
+#if defined(__cplusplus) && ((defined(_MSC_VER) && _MSC_VER >= 1400) || (__cplusplus >= 201103L))
 extern "C++" {
 	// NOTE(bill): Stupid fucking templates
 	template <typename T> struct gbRemoveReference       { typedef T Type; };
@@ -1008,7 +1004,12 @@ typedef struct gbAffinity {
 } gbAffinity;
 
 #elif defined(GB_SYSTEM_LINUX)
-#error TODO(bill): Implement gbAffinity for linux
+typedef struct gbAffinity {
+	b32   is_accurate;
+	isize core_count;
+	isize thread_count;
+	isize threads_per_core;
+} gbAffinity;
 #else
 #error TODO(bill): Unknown system
 #endif
@@ -4117,7 +4118,7 @@ gb_inline i64 gb_atomic64_fetch_and(gbAtomic64 volatile *a, i64 operand) {
 
 gb_inline i64 gb_atomic64_fetch_or(gbAtomic64 volatile *a, i64 operand) {
 #if defined(GB_ARCH_64_BIT)
-	return _InterlockedOr64(cast(i64 volatile *)a, operand);
+	return _InterlockedAnd64(cast(i64 volatile *)a, operand);
 #elif GB_CPU_X86
 	i64 expected = a->value;
 	for (;;) {
@@ -4824,15 +4825,18 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 #else
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {
-		posix_memalign(&ptr, alignment, size);
-
-		if (flags & gbAllocatorFlag_ClearToZero) {
+		gbAllocationHeader *header;
+		isize total_size = size + alignment + gb_size_of(gbAllocationHeader);
+		ptr = malloc(total_size);
+		header = cast(gbAllocationHeader *)ptr;
+		ptr = gb_align_forward(header+1, alignment);
+		gb_allocation_header_fill(header, ptr, size);
+		if (flags & gbAllocatorFlag_ClearToZero)
 			gb_zero_size(ptr, size);
-		}
 	} break;
 
 	case gbAllocation_Free: {
-		free(old_memory);
+		free(gb_allocation_header(old_memory));
 	} break;
 
 	case gbAllocation_Resize: {
@@ -4929,7 +4933,7 @@ isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
 void gb_affinity_init(gbAffinity *a) {
 	usize count, count_size = gb_size_of(count);
 
-	a->is_accurate      = false;
+	a->is_accurate               = false;
 	a->thread_count     = 1;
 	a->core_count       = 1;
 	a->threads_per_core = 1;
@@ -4960,6 +4964,7 @@ void gb_affinity_destroy(gbAffinity *a) {
 b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
 	isize index;
 	thread_t thread;
+	GB_ASSERT(thread < gb_affinity_thread_count
 	thread_affinity_policy_data_t info;
 	kern_return_t result;
 
@@ -4979,7 +4984,81 @@ isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
 }
 
 #elif defined(GB_SYSTEM_LINUX)
-#error TODO(bill): Implement gbAffinity for linux
+#warning gbAffinity is mostly mostly untested on Linux. All I know is that it compiles and runs.
+#warning TODO(bill): gb_affinity_set on Linux is a stub
+
+// I have to read /proc/cpuinfo to get the number of threads per core.
+#include <stdio.h>
+
+void gb_affinity_init(gbAffinity *a) {
+	usize count, count_size = gb_size_of(count);
+
+	b32 accurate = true;
+
+	a->thread_count     = 1;
+	a->core_count       = sysconf(_SC_NPROCESSORS_ONLN);
+	a->threads_per_core = 1;
+
+
+	if(a->core_count <= 0) {
+		a->core_count = 1;
+		accurate = false;
+	}
+
+	// Parsing /proc/cpuinfo to get the number of threads per core.
+	// NOTE: This calls the CPU's threads "cores", although the wording
+	//   is kind of weird. This should be right, though.
+	FILE* cpu_info = fopen("/proc/cpuinfo", "r");
+
+	int threads = 0;
+
+	if(cpu_info) {
+		while(1) {
+			// The 'temporary char'. Everything goes into this char,
+			// so that we can check against EOF at the end of this loop.
+			char c;
+
+			#define check(letter) ((c = getc(cpu_info)) == letter)
+			if(check('c') && check('p') && check('u') && check(' ') &&
+				check('c') && check('o') && check('r') && check('e') && check('s')) {
+				// We're on a CPU info line.
+				while(!check(EOF)) {
+					if(c == '\n') break;
+					else if(c < '0' || c > '9') continue;
+					threads = threads * 10 + (c - '0');
+				}
+				break;
+			} else {
+				while(!check('\n')) {if(c==EOF) break;}
+			}
+			if(c == EOF) break;
+		}
+	}
+
+	if(threads == 0) {
+		threads = 1;
+		accurate = false;
+	}
+
+	a->threads_per_core = threads;
+	a->thread_count = a->threads_per_core * a->core_count;
+
+	a->is_accurate = accurate;
+
+}
+
+void gb_affinity_destroy(gbAffinity *a) {
+	gb_unused(a);
+}
+
+b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
+	return true;
+}
+
+isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
+	GB_ASSERT(core >= 0 && core < a->core_count);
+	return a->threads_per_core;
+}
 #else
 #error TODO(bill): Unknown system
 #endif
@@ -7760,18 +7839,7 @@ char *gb_path_get_full_name(gbAllocator a, char const *path) {
 	return gb_alloc_str_len(a, buf, len+1);
 #else
 // TODO(bill): Make work on *nix, etc.
-	char* p = realpath(path, 0);
-	GB_ASSERT(p && "file does not exist");
-
-	isize len = gb_strlen(p);
-
-	// bill... gb_alloc_str_len refused to work for this...
-	char* ret = gb_alloc(a, sizeof(char) * len + 1);
-	gb_memmove(ret, p, len);
-	ret[len] = 0;
-	free(p);
-
-	return ret;
+	return gb_alloc_str_len(a, path, gb_strlen(path));
 #endif
 }
 
@@ -10385,4 +10453,3 @@ GB_COMPARE_PROC(gb_video_mode_dsc_cmp) {
 #endif
 
 #endif // GB_IMPLEMENTATION
-

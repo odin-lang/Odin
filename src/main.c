@@ -16,6 +16,11 @@ extern "C" {
 #include "ir_print.c"
 // #include "vm.c"
 
+#if defined(GB_SYSTEM_UNIX)
+// Required for intrinsics on GCC
+#include <xmmintrin.h>
+#endif
+
 #if defined(GB_SYSTEM_WINDOWS)
 // NOTE(bill): `name` is used in debugging and profiling modes
 i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
@@ -326,7 +331,75 @@ int main(int argc, char **argv) {
 	}
 
 	#else
-	#error Implement build stuff for this platform
+
+	// NOTE: Linux / Unix is unfinished and not tested very well.
+
+
+	timings_start_section(&timings, str_lit("llvm-llc"));
+	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
+	exit_code = system_exec_command_line_app("llc", false,
+		"llc \"%.*s.bc\" -filetype=obj -O%d "
+		"%.*s "
+		// "-debug-pass=Arguments "
+		"",
+		LIT(output),
+		optimization_level,
+		LIT(build_context.llc_flags));
+	if (exit_code != 0) {
+		return exit_code;
+	}
+
+	timings_start_section(&timings, str_lit("ld-link"));
+
+	gbString lib_str = gb_string_make(heap_allocator(), "");
+	// defer (gb_string_free(lib_str));
+	char lib_str_buf[1024] = {0};
+	for_array(i, ir_gen.module.foreign_library_paths) {
+		String lib = ir_gen.module.foreign_library_paths.e[i];
+		// gb_printf_err("Linking lib: %.*s\n", LIT(lib));
+		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+		                        " \"%.*s\"", LIT(lib));
+		lib_str = gb_string_appendc(lib_str, lib_str_buf);
+	}
+
+	// Unlike the Win32 linker code, the output_ext includes the dot, because
+	// typically executable files on *NIX systems don't have extensions.
+	char *output_ext = "";
+	char *link_settings = "";
+	if (build_context.is_dll) {
+		// Shared libraries are .dylib on MacOS and .so on Linux.
+		#if defined(GB_SYSTEM_OSX)
+		output_ext = ".dylib";
+		#else
+		output_ext = ".so";
+		#endif
+
+		link_settings = "-shared";
+	} else {
+		// TODO: Do I need anything here?
+		link_settings = "";
+	}
+
+	exit_code = system_exec_command_line_app("msvc-link", true,
+		"ld \"%.*s\".obj -o \"%.*s.%s\" %s "
+		"-lc "
+		" %.*s "
+		" %s "
+		"",
+		LIT(output), LIT(output), output_ext,
+		lib_str, LIT(build_context.link_flags),
+		link_settings
+		);
+	if (exit_code != 0) {
+		return exit_code;
+	}
+
+	// timings_print_all(&timings);
+
+	if (run_output) {
+		system_exec_command_line_app("odin run", false, "%.*s", cast(int)base_name_len, output_name);
+	}
+
 	#endif
 #endif
 #endif

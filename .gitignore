@@ -251,7 +251,12 @@ paket-files/
 
 
 # Project Specific
+
+# - Windows
 *.sln
 !misc/llvm-bim/lli.exe
 !misc/llvm-bim/opt.exe
 builds
+
+# - Linux/MacOS
+odin
