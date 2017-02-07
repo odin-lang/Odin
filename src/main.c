@@ -383,14 +383,15 @@ int main(int argc, char **argv) {
 
 	// Unlike the Win32 linker code, the output_ext includes the dot, because
 	// typically executable files on *NIX systems don't have extensions.
-	char *output_ext = ".bin";
+	char *output_ext = "";
 	char *link_settings = "";
+	char *linker;
 	if (build_context.is_dll) {
 		// Shared libraries are .dylib on MacOS and .so on Linux.
 		#if defined(GB_SYSTEM_OSX)
-		output_ext = ".dylib";
+			output_ext = ".dylib";
 		#else
-		output_ext = ".so";
+			output_ext = ".so";
 		#endif
 
 		link_settings = "-shared";
@@ -399,16 +400,26 @@ int main(int argc, char **argv) {
 		link_settings = "";
 	}
 
+	#if defined(GB_SYSTEM_OSX)
+		linker = "ld";
+	#else
+		// TODO(zangent): Figure out how to make ld work on Linux.
+		//   It probably has to do with including the entire CRT, but
+		//   that's quite a complicated issue to solve while remaining distro-agnostic.
+		//   Clang can figure out linker flags for us, and that's good enough _for now_.
+		linker = "clang";
+	#endif
+
 	printf("Libs: %s\n", lib_str);
 
 	// TODO(zangent): I'm not sure what to do with lib_str.
 	//   I'll have to look at the format that the libraries are listed to determine what to do.
 	lib_str = "";
 
-	
+
 
 	exit_code = system_exec_command_line_app("ld-link", true,
-		"ld \"%.*s\".o -o \"%.*s%s\" %s "
+		"%s \"%.*s\".o -o \"%.*s%s\" %s "
 		"-lc "
 		" %.*s "
 		" %s "
@@ -416,11 +427,8 @@ int main(int argc, char **argv) {
 			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 			" -macosx_version_min 10.8.0 "
 			" -e _main "
-		#else
-			" -e main -dynamic-linker /lib64/ld-linux-x86-64.so.2 "
 		#endif
-		,
-		LIT(output), LIT(output), output_ext,
+		, linker, LIT(output), LIT(output), output_ext,
 		lib_str, LIT(build_context.link_flags),
 		link_settings
 		);

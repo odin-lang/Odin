@@ -330,8 +330,15 @@ void init_build_context(BuildContext *bc) {
 	#define linker_flag_x86 ""
 	#else
 	// Linux, but also BSDs and the like.
-	#define linker_flag_x64 "-m elf_x86_64"
-	#define linker_flag_x86 "-m elf_i386"
+	// NOTE(zangent): When clang is swapped out with ld as the linker,
+	//   the commented flags here should be used. Until then, we'll have
+	//   to use alternative build flags made for clang.
+	/*
+		#define linker_flag_x64 "-m elf_x86_64"
+		#define linker_flag_x86 "-m elf_i386"
+	*/
+	#define linker_flag_x64 "-arch x86-64"
+	#define linker_flag_x86 "-arch x86"
 	#endif
 
 	if (str_eq(bc->ODIN_ARCH, str_lit("amd64"))) {
