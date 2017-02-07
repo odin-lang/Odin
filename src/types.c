@@ -923,6 +923,14 @@ bool are_types_identical(Type *x, Type *y) {
 			       are_types_identical(x->Proc.results, y->Proc.results);
 		}
 		break;
+
+	case Type_Map:
+		if (y->kind == Type_Map) {
+			return x->Map.count == y->Map.count &&
+			       are_types_identical(x->Map.key,   y->Map.key) &&
+			       are_types_identical(x->Map.value, y->Map.value);
+		}
+		break;
 	}
 
 

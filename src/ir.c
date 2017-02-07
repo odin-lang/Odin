@@ -1395,7 +1395,7 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index);
 irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irValue *right);
 
 irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val, Type *map_type) {
-	GB_ASSERT(is_type_pointer(ir_type(map_val)));
+	GB_ASSERT_MSG(is_type_pointer(ir_type(map_val)), "%s", type_to_string(ir_type(map_val)));
 	gbAllocator a = proc->module->allocator;
 	irValue *h = ir_add_local_generated(proc, t_map_header);
 
@@ -3027,7 +3027,7 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 
 
 	case_ast_node(cl, CompoundLit, expr);
-		return ir_emit_load(proc, ir_build_addr(proc, expr).addr);
+		return ir_addr_load(proc, ir_build_addr(proc, expr));
 	case_end;
 
 
@@ -3597,11 +3597,11 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 	case_end;
 
 	case_ast_node(de, DemaybeExpr, expr);
-		return ir_emit_load(proc, ir_build_addr(proc, expr).addr);
+		return ir_addr_load(proc, ir_build_addr(proc, expr));
 	case_end;
 
 	case_ast_node(se, SliceExpr, expr);
-		return ir_emit_load(proc, ir_build_addr(proc, expr).addr);
+		return ir_addr_load(proc, ir_build_addr(proc, expr));
 	case_end;
 
 	case_ast_node(ie, IndexExpr, expr);
@@ -3824,17 +3824,12 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		Type *t = base_type(type_of_expr(proc->module->info, ie->expr));
 		gbAllocator a = proc->module->allocator;
 
-
 		bool deref = is_type_pointer(t);
 		t = base_type(type_deref(t));
 
 		if (is_type_map(t)) {
 			irAddr map_addr = ir_build_addr(proc, ie->expr);
 			irValue *map_val = map_addr.addr;
-			if (deref) {
-				map_val = ir_addr_load(proc, map_addr);
-			}
-
 			irValue *key = ir_build_expr(proc, ie->index);
 			key = ir_emit_conv(proc, key, t->Map.key);
 

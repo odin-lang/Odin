@@ -1132,6 +1132,12 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 	gbAllocator a = c->allocator;
 
 	{
+		// NOTE(bill): The preload types may have not been set yet
+		if (t_map_key == NULL) {
+			init_preload(c);
+		}
+		GB_ASSERT(t_map_key != NULL);
+
 		Type *entry_type = make_type_struct(a);
 
 		/*

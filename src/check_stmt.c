@@ -261,7 +261,6 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	case Addressing_Invalid:
 		return NULL;
 	case Addressing_Variable:
-		break;
 	case Addressing_MapIndex:
 		break;
 	default: {

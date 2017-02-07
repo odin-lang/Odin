@@ -9,7 +9,6 @@
 #import "utf8.odin";
 #import ht "http_test.odin";
 
-
 main :: proc() {
 	{
 		m: map[f32]int;
@@ -21,11 +20,18 @@ main :: proc() {
 		m[3.0] = 564;
 		c := m[3.0];
 		_, ok := m[3.0];
-		assert(ok && c == 564);
+		// assert(ok && c == 564);
 
+		fmt.print("map[");
+		i := 0;
 		for val, key in m {
-			fmt.printf("m[%f] == %v\n", key, val);
+			if i > 0 {
+				fmt.print(", ");
+			}
+			fmt.printf("%f=%v", key, val);
+			i += 1;
 		}
+		fmt.println("]");
 	}
 	{
 		m := map[string]u32{
