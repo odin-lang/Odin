@@ -3627,7 +3627,7 @@ gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 #if defined(_MSC_VER)
 	// TODO(bill): Is this good enough?
 	__movsb(cast(u8 *)dest, cast(u8 *)source, n);
-#elif defined(GB_SYSTEM_OSX)
+#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
 	// NOTE(zangent): I assume there's a reason this isn't being used elsewhere,
 	//  but I don't see it and I can't seem to get this working any other way.
 	memcpy(dest, source, n);
@@ -4676,7 +4676,8 @@ gb_inline u32 gb_thread_current_id(void) {
 	#else
 		thread_id = GetCurrentThreadId();
 	#endif
-
+#elif defined(GB_SYSTEM_LINUX)
+	thread_id = pthread_self();
 #elif defined(GB_SYSTEM_OSX) && defined(GB_ARCH_64_BIT)
 	thread_id = pthread_mach_thread_np(pthread_self());
 #elif defined(GB_ARCH_32_BIT) && defined(GB_CPU_X86)

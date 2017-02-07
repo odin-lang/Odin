@@ -399,9 +399,13 @@ int main(int argc, char **argv) {
 		link_settings = "";
 	}
 
+	printf("Libs: %s\n", lib_str);
+
 	// TODO(zangent): I'm not sure what to do with lib_str.
 	//   I'll have to look at the format that the libraries are listed to determine what to do.
 	lib_str = "";
+
+	
 
 	exit_code = system_exec_command_line_app("ld-link", true,
 		"ld \"%.*s\".o -o \"%.*s%s\" %s "
@@ -411,8 +415,11 @@ int main(int argc, char **argv) {
 		#if defined(GB_SYSTEM_OSX)
 			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 			" -macosx_version_min 10.8.0 "
+			" -e _main "
+		#else
+			" -e main -dynamic-linker /lib64/ld-linux-x86-64.so.2 "
 		#endif
-		" -e _main ",
+		,
 		LIT(output), LIT(output), output_ext,
 		lib_str, LIT(build_context.link_flags),
 		link_settings

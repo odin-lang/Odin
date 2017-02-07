@@ -5,10 +5,10 @@ thing :: proc() {
 }*/
 
 
-#import "fmt.odin";
+//#import "fmt.odin";
 
 main :: proc() {
-	fmt.println("hello, world!");
+	//fmt.println("hello, world!");
 }
 
 

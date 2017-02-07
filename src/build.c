@@ -153,8 +153,6 @@ String odin_root_dir(void) {
 		if(len == 0) {
 			return make_string(NULL, 0);
 		}
-		printf("build.c:155 | Link value: \"%s\"\n", &path_buf.e[0]);
-		exit(1);
 		if (len < path_buf.count) {
 			break;
 		}
