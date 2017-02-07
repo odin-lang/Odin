@@ -1097,8 +1097,8 @@ Type *make_map_tuple_type(gbAllocator a, Type *value) {
 	Type *t = make_type_tuple(a);
 	t->Tuple.variables = gb_alloc_array(a, Entity *, 2);
 	t->Tuple.variable_count = 2;
-	t->Tuple.variables[0] = make_entity_param(a, NULL, blank_token, value,  false, false);
-	t->Tuple.variables[1] = make_entity_param(a, NULL, blank_token, t_bool, false, false);
+	t->Tuple.variables[0] = make_entity_field(a, NULL, blank_token, value,  false, 0);
+	t->Tuple.variables[1] = make_entity_field(a, NULL, blank_token, t_bool, false, 1);
 	return t;
 }
 
@@ -1148,9 +1148,9 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 
 		isize field_count = 3;
 		Entity **fields = gb_alloc_array(a, Entity *, field_count);
-		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("key")),   t_map_key, false, false);
-		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("next")),  t_int,     false, false);
-		fields[2] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("value")), value,     false, false);
+		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("key")),   t_map_key, false, 0);
+		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("next")),  t_int,     false, 1);
+		fields[2] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("value")), value,     false, 2);
 
 		check_close_scope(c);
 
@@ -1159,7 +1159,6 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 		entry_type->Record.field_count         = field_count;
 
 		type_set_offsets(c->sizes, a, entry_type);
-
 		type->Map.entry_type = entry_type;
 	}
 
@@ -1181,8 +1180,8 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 
 		isize field_count = 2;
 		Entity **fields = gb_alloc_array(a, Entity *, field_count);
-		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("hashes")),  hashes_type,  false, false);
-		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("entries")), entries_type, false, false);
+		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0);
+		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("entries")), entries_type, false, 1);
 
 		check_close_scope(c);
 
@@ -1191,7 +1190,6 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 		generated_struct_type->Record.field_count         = field_count;
 
 		type_set_offsets(c->sizes, a, generated_struct_type);
-
 		type->Map.generated_struct_type = generated_struct_type;
 	}
 

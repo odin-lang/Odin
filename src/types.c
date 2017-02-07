@@ -300,6 +300,7 @@ gb_global Type *t_type_info_struct        = NULL;
 gb_global Type *t_type_info_union         = NULL;
 gb_global Type *t_type_info_raw_union     = NULL;
 gb_global Type *t_type_info_enum          = NULL;
+gb_global Type *t_type_info_map           = NULL;
 
 
 gb_global Type *t_type_info_named_ptr         = NULL;
@@ -320,6 +321,7 @@ gb_global Type *t_type_info_struct_ptr        = NULL;
 gb_global Type *t_type_info_union_ptr         = NULL;
 gb_global Type *t_type_info_raw_union_ptr     = NULL;
 gb_global Type *t_type_info_enum_ptr          = NULL;
+gb_global Type *t_type_info_map_ptr           = NULL;
 
 
 
@@ -1561,8 +1563,7 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 
 	case Type_Map: {
 		if (t->Map.count == 0) { // Dynamic
-			// NOTE(bill): same as a dynamic array
-			return s.word_size;
+			return type_align_of_internal(s, allocator, t->Map.generated_struct_type, path);
 		}
 		GB_PANIC("TODO(bill): Fixed map alignment");
 	} break;
@@ -1778,8 +1779,7 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 
 	case Type_Map: {
 		if (t->Map.count == 0) { // Dynamic
-			// NOTE(bill): same as a two dynamic arrays
-			return 2 * type_size_of_internal(s, allocator, t_raw_dynamic_array, path);
+			return type_size_of_internal(s, allocator, t->Map.generated_struct_type, path);
 		}
 		GB_PANIC("TODO(bill): Fixed map size");
 	}

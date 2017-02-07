@@ -12,7 +12,7 @@
 
 main :: proc() {
 	{
-		m := map[f32]int{};
+		m: map[f32]int;
 		reserve(^m, 16);
 		defer free(m);
 
@@ -39,9 +39,7 @@ main :: proc() {
 		_, ok := m["c"];
 		assert(ok && c == 7654);
 
-		for val, key in m {
-			fmt.printf("m[\"%s\"] == %v\n", key, val);
-		}
+		fmt.println(m);
 	}
 
 

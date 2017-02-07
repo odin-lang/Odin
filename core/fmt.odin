@@ -191,18 +191,30 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		buffer_write_string(buf, "]");
 		buffer_write_type(buf, info.elem);
 
+	case Map:
+		buffer_write_string(buf, "map[");
+		buffer_write_type(buf, info.key);
+		buffer_write_byte(buf, ']');
+		buffer_write_type(buf, info.value);
+
 	case Struct:
 		buffer_write_string(buf, "struct ");
 		if info.packed  { buffer_write_string(buf, "#packed "); }
 		if info.ordered { buffer_write_string(buf, "#ordered "); }
-		buffer_write_string(buf, "{");
+		if info.custom_align {
+			buffer_write_string(buf, "#align ");
+			fi := Fmt_Info{buf = buf};
+			fmt_int(^fi, cast(u64)info.align, false, 'd');
+			buffer_write_byte(buf, ' ');
+		}
+		buffer_write_byte(buf, '{');
 		for field, i in info.fields {
 			buffer_write_string(buf, field.name);
 			buffer_write_string(buf, ": ");
 			buffer_write_type(buf, field.type_info);
 			buffer_write_byte(buf, ',');
 		}
-		buffer_write_string(buf, "}");
+		buffer_write_byte(buf, '}');
 
 	case Union:
 		buffer_write_string(buf, "union {");
@@ -776,6 +788,39 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			}
 			data := cast(^byte)array.data + i*info.elem_size;
 			fmt_arg(fi, any{info.elem, cast(rawptr)data}, 'v');
+		}
+
+	case Map:
+		if verb != 'v' {
+			fmt_bad_verb(fi, verb);
+			return;
+		}
+
+		buffer_write_string(fi.buf, "map[");
+		defer buffer_write_byte(fi.buf, ']');
+		entries := ^(cast(^Raw_Dynamic_Map)v.data).entries;
+		gs, _ := union_cast(^Struct)info.generated_struct;
+		ed, _ := union_cast(^Dynamic_Array)gs.fields[1].type_info;
+		entry_type, _ := union_cast(^Struct)ed.elem;
+		entry_size := ed.elem_size;
+		for i in 0..<entries.count {
+			if i > 0 {
+				buffer_write_string(fi.buf, ", ");
+			}
+			data := cast(^byte)entries.data + i*entry_size;
+
+			header := cast(^__Map_Entry_Header)data;
+			if types.is_string(info.key) {
+				buffer_write_string(fi.buf, header.key.str);
+			} else {
+				fi := Fmt_Info{buf = fi.buf};
+				fmt_arg(^fi, any{info.key, cast(rawptr)^header.key.hash}, 'v');
+			}
+
+			buffer_write_string(fi.buf, "=");
+
+			value := data + entry_type.fields[2].offset;
+			fmt_arg(fi, any{info.value, cast(rawptr)value}, 'v');
 		}
 
 	case Slice:

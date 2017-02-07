@@ -958,6 +958,12 @@ void add_type_info_type(Checker *c, Type *t) {
 		}
 	} break;
 
+	case Type_Map: {
+		add_type_info_type(c, bt->Map.key);
+		add_type_info_type(c, bt->Map.value);
+		add_type_info_type(c, bt->Map.generated_struct_type);
+	} break;
+
 	case Type_Tuple:
 		for (isize i = 0; i < bt->Tuple.variable_count; i++) {
 			Entity *var = bt->Tuple.variables[i];
@@ -1093,7 +1099,7 @@ void init_preload(Checker *c) {
 
 
 
-		if (record->field_count != 19) {
+		if (record->field_count != 20) {
 			compiler_error("Invalid `Type_Info` layout");
 		}
 		t_type_info_named         = record->fields[ 1]->type;
@@ -1114,6 +1120,7 @@ void init_preload(Checker *c) {
 		t_type_info_union         = record->fields[16]->type;
 		t_type_info_raw_union     = record->fields[17]->type;
 		t_type_info_enum          = record->fields[18]->type;
+		t_type_info_map           = record->fields[19]->type;
 
 		t_type_info_named_ptr         = make_type_pointer(heap_allocator(), t_type_info_named);
 		t_type_info_integer_ptr       = make_type_pointer(heap_allocator(), t_type_info_integer);
@@ -1133,6 +1140,7 @@ void init_preload(Checker *c) {
 		t_type_info_union_ptr         = make_type_pointer(heap_allocator(), t_type_info_union);
 		t_type_info_raw_union_ptr     = make_type_pointer(heap_allocator(), t_type_info_raw_union);
 		t_type_info_enum_ptr          = make_type_pointer(heap_allocator(), t_type_info_enum);
+		t_type_info_map_ptr           = make_type_pointer(heap_allocator(), t_type_info_map);
 	}
 
 	if (t_allocator == NULL) {
@@ -1155,12 +1163,12 @@ void init_preload(Checker *c) {
 	}
 
 	if (t_map_key == NULL) {
-		Entity *e = find_core_entity(c, str_lit("Map_Key"));
+		Entity *e = find_core_entity(c, str_lit("__Map_Key"));
 		t_map_key = e->type;
 	}
 
 	if (t_map_header == NULL) {
-		Entity *e = find_core_entity(c, str_lit("Map_Header"));
+		Entity *e = find_core_entity(c, str_lit("__Map_Header"));
 		t_map_header = e->type;
 	}
 

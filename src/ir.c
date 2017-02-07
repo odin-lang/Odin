@@ -6286,14 +6286,16 @@ void ir_gen_tree(irGen *s) {
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_struct_ptr);
 
 						{
-							irValue *packed  = ir_make_const_bool(a, t->Record.struct_is_packed);
-							irValue *ordered = ir_make_const_bool(a, t->Record.struct_is_ordered);
-							irValue *size    = ir_make_const_int(a, type_size_of(m->sizes, a, t));
-							irValue *align   = ir_make_const_int(a, type_align_of(m->sizes, a, t));
+							irValue *size         = ir_make_const_int(a,  type_size_of(m->sizes, a, t));
+							irValue *align        = ir_make_const_int(a,  type_align_of(m->sizes, a, t));
+							irValue *packed       = ir_make_const_bool(a, t->Record.struct_is_packed);
+							irValue *ordered      = ir_make_const_bool(a, t->Record.struct_is_ordered);
+							irValue *custom_align = ir_make_const_bool(a, t->Record.custom_align);
 							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), size);
 							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), align);
 							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3), packed);
 							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 4), ordered);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 5), custom_align);
 						}
 
 						irValue *memory = ir_type_info_member_offset(proc, type_info_member_data, t->Record.field_count, &type_info_member_index);
@@ -6515,6 +6517,20 @@ void ir_gen_tree(irGen *s) {
 					ir_emit_store(proc, convention, ir_make_const_int(a, t->Proc.calling_convention));
 
 					// TODO(bill): Type_Info for procedures
+				} break;
+
+				case Type_Map: {
+					tag = ir_emit_conv(proc, ti_ptr, t_type_info_map_ptr);
+
+					irValue *key              = ir_emit_struct_ep(proc, tag, 0);
+					irValue *value            = ir_emit_struct_ep(proc, tag, 1);
+					irValue *generated_struct = ir_emit_struct_ep(proc, tag, 2);
+					irValue *count            = ir_emit_struct_ep(proc, tag, 3);
+
+					ir_emit_store(proc, key,              ir_get_type_info_ptr(proc, type_info_data, t->Map.key));
+					ir_emit_store(proc, value,            ir_get_type_info_ptr(proc, type_info_data, t->Map.value));
+					ir_emit_store(proc, generated_struct, ir_get_type_info_ptr(proc, type_info_data, t->Map.generated_struct_type));
+					ir_emit_store(proc, count,            ir_make_const_int(a, t->Map.count));
 				} break;
 				}
 
