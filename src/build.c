@@ -314,15 +314,24 @@ void init_build_context(BuildContext *bc) {
 
 
 
-	// The linker flags to set the build architecture are different
+	// NOTE(zangent): The linker flags to set the build architecture are different
 	// across OSs. It doesn't make sense to allocate extra data on the heap
 	// here, so I just #defined the linker flags to keep things concise.
 	#if defined(GB_SYSTEM_WINDOWS)
+
 	#define linker_flag_x64 "/machine:x64"
 	#define linker_flag_x86 "/machine:x86"
+
 	#elif defined(GB_SYSTEM_OSX)
-	#error Run "ld -V" to find out what to build programs as. It may be the same as Linux...?
+
+	// NOTE(zangent): MacOS systems are x64 only, so ld doesn't have
+	// an architecture option. All compilation done on MacOS must be x64.
+	GB_ASSERT(str_eq(bc->ODIN_ARCH, str_lit("amd64")));
+
+	#define linker_flag_x64 ""
+	#define linker_flag_x86 ""
 	#else
+	// Linux, but also BSDs and the like.
 	#define linker_flag_x64 "-m elf_x86_64"
 	#define linker_flag_x86 "-m elf_i386"
 	#endif

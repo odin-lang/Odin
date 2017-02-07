@@ -255,6 +255,8 @@ int main(int argc, char **argv) {
 	optimization_level = gb_clamp(optimization_level, 0, 3);
 
 	i32 exit_code = 0;
+
+	#if defined(GB_SYSTEM_WINDOWS)
 	// For more passes arguments: http://llvm.org/docs/Passes.html
 	exit_code = system_exec_command_line_app("llvm-opt", false,
 		"\"%.*sbin/opt\" \"%s\" -o \"%.*s\".bc "
@@ -270,6 +272,23 @@ int main(int argc, char **argv) {
 	if (exit_code != 0) {
 		return exit_code;
 	}
+	#else
+	// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
+	//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
+	exit_code = system_exec_command_line_app("llvm-opt", false,
+		"opt \"%s\" -o \"%.*s\".bc "
+		"-mem2reg "
+		"-memcpyopt "
+		"-die "
+		// "-dse "
+		// "-dce "
+		// "-S "
+		"",
+		output_name, LIT(output));
+	if (exit_code != 0) {
+		return exit_code;
+	}
+	#endif
 
 	#if defined(GB_SYSTEM_WINDOWS)
 	timings_start_section(&timings, str_lit("llvm-llc"));
@@ -332,7 +351,7 @@ int main(int argc, char **argv) {
 
 	#else
 
-	// NOTE: Linux / Unix is unfinished and not tested very well.
+	// NOTE(zangent): Linux / Unix is unfinished and not tested very well.
 
 
 	timings_start_section(&timings, str_lit("llvm-llc"));
@@ -364,7 +383,7 @@ int main(int argc, char **argv) {
 
 	// Unlike the Win32 linker code, the output_ext includes the dot, because
 	// typically executable files on *NIX systems don't have extensions.
-	char *output_ext = "";
+	char *output_ext = ".bin";
 	char *link_settings = "";
 	if (build_context.is_dll) {
 		// Shared libraries are .dylib on MacOS and .so on Linux.
@@ -380,12 +399,20 @@ int main(int argc, char **argv) {
 		link_settings = "";
 	}
 
-	exit_code = system_exec_command_line_app("msvc-link", true,
-		"ld \"%.*s\".obj -o \"%.*s.%s\" %s "
+	// TODO(zangent): I'm not sure what to do with lib_str.
+	//   I'll have to look at the format that the libraries are listed to determine what to do.
+	lib_str = "";
+
+	exit_code = system_exec_command_line_app("ld-link", true,
+		"ld \"%.*s\".o -o \"%.*s%s\" %s "
 		"-lc "
 		" %.*s "
 		" %s "
-		"",
+		#if defined(GB_SYSTEM_OSX)
+			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
+			" -macosx_version_min 10.8.0 "
+		#endif
+		" -e _main ",
 		LIT(output), LIT(output), output_ext,
 		lib_str, LIT(build_context.link_flags),
 		link_settings

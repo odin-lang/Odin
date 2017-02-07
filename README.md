@@ -22,11 +22,22 @@ The Odin programming language is fast, concise, readable, pragmatic and open sou
 
 ## Requirements to build and run
 
-* Windows
-* x86-64
-* MSVC 2015 installed (C99 support)
-* Requires MSVC's link.exe as the linker
-	- run `vcvarsall.bat` to setup the path
+- Windows
+	* x86-64
+	* MSVC 2015 installed (C99 support)
+	* LLVM installed
+	* Requires MSVC's link.exe as the linker
+		* run `vcvarsall.bat` to setup the path
+
+- MacOS
+	* x86-64
+	* LLVM explicitly installed (`brew install llvm`)
+	* XCode installed (for the linker)
+
+- GNU/Linux
+	* x86-64
+	* Build tools (ld)
+	* LLVM installed
 
 ## Warnings
 

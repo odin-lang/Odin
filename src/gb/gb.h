@@ -3627,7 +3627,12 @@ gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 #if defined(_MSC_VER)
 	// TODO(bill): Is this good enough?
 	__movsb(cast(u8 *)dest, cast(u8 *)source, n);
+#elif defined(GB_SYSTEM_OSX)
+	// NOTE(zangent): I assume there's a reason this isn't being used elsewhere,
+	//  but I don't see it and I can't seem to get this working any other way.
+	memcpy(dest, source, n);
 #elif defined(GB_CPU_X86)
+
 	__asm__ __volatile__("rep movsb" : "+D"(cast(u8 *)dest), "+S"(cast(u8 *)source), "+c"(n) : : "memory");
 #else
 	u8 *d = cast(u8 *)dest;
@@ -4964,7 +4969,7 @@ void gb_affinity_destroy(gbAffinity *a) {
 b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
 	isize index;
 	thread_t thread;
-	GB_ASSERT(thread < gb_affinity_thread_count
+	GB_ASSERT(thread < a->thread_count);
 	thread_affinity_policy_data_t info;
 	kern_return_t result;
 
