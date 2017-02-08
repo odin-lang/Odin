@@ -38,6 +38,7 @@ The Odin programming language is fast, concise, readable, pragmatic and open sou
 	* x86-64
 	* Build tools (ld)
 	* LLVM installed
+	* Clang installed (temporary - this is calling the linker for now)
 
 ## Warnings
 
