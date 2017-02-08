@@ -256,11 +256,11 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 		e->flags |= EntityFlag_Used;
 	}
 
+	Type *assignment_type = op_b.type;
 	switch (op_b.mode) {
 	case Addressing_Invalid:
 		return NULL;
 	case Addressing_Variable:
-		break;
 	case Addressing_MapIndex:
 		break;
 	default: {
@@ -287,7 +287,7 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 	} break;
 	}
 
-	check_assignment(c, op_a, op_b.type, str_lit("assignment"));
+	check_assignment(c, op_a, assignment_type, str_lit("assignment"));
 	if (op_a->mode == Addressing_Invalid) {
 		return NULL;
 	}
@@ -718,6 +718,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				case Type_Vector:
 					val = t->Vector.elem;
 					idx = t_int;
+					break;
+
+				case Type_Map:
+					val = t->Map.value;
+					idx = t->Map.key;
 					break;
 				}
 			}

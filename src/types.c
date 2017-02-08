@@ -300,6 +300,7 @@ gb_global Type *t_type_info_struct        = NULL;
 gb_global Type *t_type_info_union         = NULL;
 gb_global Type *t_type_info_raw_union     = NULL;
 gb_global Type *t_type_info_enum          = NULL;
+gb_global Type *t_type_info_map           = NULL;
 
 
 gb_global Type *t_type_info_named_ptr         = NULL;
@@ -320,6 +321,7 @@ gb_global Type *t_type_info_struct_ptr        = NULL;
 gb_global Type *t_type_info_union_ptr         = NULL;
 gb_global Type *t_type_info_raw_union_ptr     = NULL;
 gb_global Type *t_type_info_enum_ptr          = NULL;
+gb_global Type *t_type_info_map_ptr           = NULL;
 
 
 
@@ -921,6 +923,14 @@ bool are_types_identical(Type *x, Type *y) {
 			       are_types_identical(x->Proc.results, y->Proc.results);
 		}
 		break;
+
+	case Type_Map:
+		if (y->kind == Type_Map) {
+			return x->Map.count == y->Map.count &&
+			       are_types_identical(x->Map.key,   y->Map.key) &&
+			       are_types_identical(x->Map.value, y->Map.value);
+		}
+		break;
 	}
 
 
@@ -1072,6 +1082,10 @@ gb_global Entity *entity__slice_count    = NULL;
 gb_global Entity *entity__dynamic_array_count     = NULL;
 gb_global Entity *entity__dynamic_array_capacity  = NULL;
 gb_global Entity *entity__dynamic_array_allocator = NULL;
+
+gb_global Entity *entity__dynamic_map_count     = NULL;
+gb_global Entity *entity__dynamic_map_capacity  = NULL;
+gb_global Entity *entity__dynamic_map_allocator = NULL;
 
 Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel);
 
@@ -1240,7 +1254,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			sel.entity = entity__slice_count;
 			return sel;
 		}
-	}  else if (type->kind == Type_DynamicArray) {
+	} else if (type->kind == Type_DynamicArray) {
 		String data_str      = str_lit("data");
 		String count_str     = str_lit("count");
 		String capacity_str  = str_lit("capacity");
@@ -1271,6 +1285,36 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				entity__dynamic_array_allocator = make_entity_field(a, NULL, make_token_ident(allocator_str), t_allocator, false, 3);
 			}
 			sel.entity = entity__dynamic_array_allocator;
+			return sel;
+		}
+	} else if (type->kind == Type_Map) {
+		String count_str     = str_lit("count");
+		String capacity_str  = str_lit("capacity");
+		String allocator_str = str_lit("allocator");
+
+		if (str_eq(field_name, count_str)) {
+			selection_add_index(&sel, 0);
+			if (entity__dynamic_map_count == NULL) {
+				entity__dynamic_map_count = make_entity_field(a, NULL, make_token_ident(count_str), t_int, false, 0);
+				entity__dynamic_map_count->Variable.is_immutable = true;
+			}
+			sel.entity = entity__dynamic_map_count;
+			return sel;
+		} else if (str_eq(field_name, capacity_str)) {
+			selection_add_index(&sel, 1);
+			if (entity__dynamic_map_capacity == NULL) {
+				entity__dynamic_map_capacity = make_entity_field(a, NULL, make_token_ident(capacity_str), t_int, false, 1);
+				entity__dynamic_map_capacity->Variable.is_immutable = true;
+			}
+			sel.entity = entity__dynamic_map_capacity;
+			return sel;
+		} else if (str_eq(field_name, allocator_str)) {
+			selection_add_index(&sel, 2);
+			if (entity__dynamic_map_allocator == NULL) {
+				entity__dynamic_map_allocator = make_entity_field(a, NULL, make_token_ident(allocator_str), t_allocator, false, 2);
+				entity__dynamic_map_allocator->Variable.is_immutable = true;
+			}
+			sel.entity = entity__dynamic_map_allocator;
 			return sel;
 		}
 	}
@@ -1527,8 +1571,7 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 
 	case Type_Map: {
 		if (t->Map.count == 0) { // Dynamic
-			// NOTE(bill): same as a dynamic array
-			return s.word_size;
+			return type_align_of_internal(s, allocator, t->Map.generated_struct_type, path);
 		}
 		GB_PANIC("TODO(bill): Fixed map alignment");
 	} break;
@@ -1744,8 +1787,7 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 
 	case Type_Map: {
 		if (t->Map.count == 0) { // Dynamic
-			// NOTE(bill): same as a two dynamic arrays
-			return 2 * type_size_of_internal(s, allocator, t_raw_dynamic_array, path);
+			return type_size_of_internal(s, allocator, t->Map.generated_struct_type, path);
 		}
 		GB_PANIC("TODO(bill): Fixed map size");
 	}

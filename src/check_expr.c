@@ -1097,8 +1097,8 @@ Type *make_map_tuple_type(gbAllocator a, Type *value) {
 	Type *t = make_type_tuple(a);
 	t->Tuple.variables = gb_alloc_array(a, Entity *, 2);
 	t->Tuple.variable_count = 2;
-	t->Tuple.variables[0] = make_entity_param(a, NULL, blank_token, value,  false, false);
-	t->Tuple.variables[1] = make_entity_param(a, NULL, blank_token, t_bool, false, false);
+	t->Tuple.variables[0] = make_entity_field(a, NULL, blank_token, value,  false, 0);
+	t->Tuple.variables[1] = make_entity_field(a, NULL, blank_token, t_bool, false, 1);
 	return t;
 }
 
@@ -1132,11 +1132,17 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 	gbAllocator a = c->allocator;
 
 	{
+		// NOTE(bill): The preload types may have not been set yet
+		if (t_map_key == NULL) {
+			init_preload(c);
+		}
+		GB_ASSERT(t_map_key != NULL);
+
 		Type *entry_type = make_type_struct(a);
 
 		/*
 		struct {
-			hash:  u64,
+			hash:  Map_Key,
 			next:  int,
 			key:   Key_Type,
 			value: Value_Type,
@@ -1148,9 +1154,9 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 
 		isize field_count = 3;
 		Entity **fields = gb_alloc_array(a, Entity *, field_count);
-		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("key")),   t_u64, false, false);
-		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("next")),  t_int, false, false);
-		fields[2] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("value")), value, false, false);
+		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("key")),   t_map_key, false, 0);
+		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("next")),  t_int,     false, 1);
+		fields[2] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("value")), value,     false, 2);
 
 		check_close_scope(c);
 
@@ -1159,7 +1165,6 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 		entry_type->Record.field_count         = field_count;
 
 		type_set_offsets(c->sizes, a, entry_type);
-
 		type->Map.entry_type = entry_type;
 	}
 
@@ -1181,8 +1186,8 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 
 		isize field_count = 2;
 		Entity **fields = gb_alloc_array(a, Entity *, field_count);
-		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("hashes")),  hashes_type,  false, false);
-		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("entries")), entries_type, false, false);
+		fields[0] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0);
+		fields[1] = make_entity_field(a, c->context.scope, make_token_ident(str_lit("entries")), entries_type, false, 1);
 
 		check_close_scope(c);
 
@@ -1191,7 +1196,6 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 		generated_struct_type->Record.field_count         = field_count;
 
 		type_set_offsets(c->sizes, a, generated_struct_type);
-
 		type->Map.generated_struct_type = generated_struct_type;
 	}
 
@@ -2676,7 +2680,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		gbString op_str   = expr_to_string(op_expr);
 		gbString type_str = type_to_string(operand->type);
 		gbString sel_str  = expr_to_string(selector);
-		error_node(op_expr, "`%s` (`%s`) has no field `%s`", op_str, type_str, sel_str);
+		error_node(op_expr, "`%s` of type `%s` has no field `%s`", op_str, type_str, sel_str);
 		gb_string_free(sel_str);
 		gb_string_free(type_str);
 		gb_string_free(op_str);
@@ -2885,14 +2889,14 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *type = operand->type;
 		if (!is_type_pointer(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a pointer to a dynamic array, got `%s`", str);
+			error_node(operand->expr, "Expected a pointer, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
 		type = type_deref(type);
-		if (!is_type_dynamic_array(type)) {
+		if (!is_type_dynamic_array(type) && !is_type_map(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a pointer to a dynamic array, got `%s`", str);
+			error_node(operand->expr, "Expected a pointer to a map or dynamic array, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
@@ -3824,18 +3828,28 @@ int valid_proc_and_score_cmp(void const *a, void const *b) {
 
 typedef Array(Operand) ArrayOperand;
 
-void check_unpack_arguments(Checker *c, ArrayOperand *operands, AstNodeArray args) {
+void check_unpack_arguments(Checker *c, isize lhs_count, ArrayOperand *operands, AstNodeArray args, bool allow_map_ok) {
 	for_array(i, args) {
 		Operand o = {0};
 		check_multi_expr(c, &o, args.e[i]);
 
-		if (o.mode == Addressing_MapIndex) {
-			Type *tuple_type = make_map_tuple_type(c->allocator, o.type);
-			add_type_and_value(&c->info, o.expr, o.mode, tuple_type, (ExactValue){0});
-			o.type = tuple_type;
-		}
-
 		if (o.type == NULL || o.type->kind != Type_Tuple) {
+			if (o.mode == Addressing_MapIndex &&
+			    allow_map_ok &&
+			    lhs_count == 2 &&
+			    args.count == 1) {
+				Type *tuple = make_map_tuple_type(c->allocator, o.type);
+				add_type_and_value(&c->info, o.expr, o.mode, tuple, o.value);
+
+				Operand val = o;
+				Operand ok = o;
+				val.mode = Addressing_Value;
+				ok.mode  = Addressing_Value;
+				ok.type  = t_bool;
+				array_add(operands, val);
+				array_add(operands, ok);
+				continue;
+			}
 			array_add(operands, o);
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
@@ -3854,7 +3868,7 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 
 	ArrayOperand operands;
 	array_init_reserve(&operands, heap_allocator(), 2*ce->args.count);
-	check_unpack_arguments(c, &operands, ce->args);
+	check_unpack_arguments(c, -1, &operands, ce->args, false);
 
 	if (operand->mode == Addressing_Overload) {
 		GB_ASSERT(operand->overload_entities != NULL &&
@@ -4736,6 +4750,31 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 					if (cl->elems.count < field_count) {
 						error(cl->close, "Too few values in `any` literal, expected %td, got %td", field_count, cl->elems.count);
 					}
+				}
+			}
+		} break;
+
+		case Type_Map: {
+			if (cl->elems.count == 0) {
+				break;
+			}
+			is_constant = false;
+			{ // Checker values
+				for_array(i, cl->elems) {
+					AstNode *elem = cl->elems.e[i];
+					if (elem->kind != AstNode_FieldValue) {
+						error_node(elem, "Only `field = value` elements are allowed in a map literal");
+						continue;
+					}
+					ast_node(fv, FieldValue, elem);
+					check_expr_with_type_hint(c, o, fv->field, t->Map.key);
+					check_assignment(c, o, t->Map.key, str_lit("map literal"));
+					if (o->mode == Addressing_Invalid) {
+						continue;
+					}
+
+					check_expr_with_type_hint(c, o, fv->value, t->Map.value);
+					check_assignment(c, o, t->Map.value, str_lit("map literal"));
 				}
 			}
 		} break;

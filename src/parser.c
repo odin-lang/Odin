@@ -1854,6 +1854,7 @@ bool is_literal_type(AstNode *node) {
 	case AstNode_ArrayType:
 	case AstNode_VectorType:
 	case AstNode_StructType:
+	case AstNode_MapType:
 		return true;
 	}
 	return false;

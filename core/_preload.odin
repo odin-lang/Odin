@@ -20,11 +20,12 @@ Type_Info_Member :: struct #ordered {
 	offset:    int,        // offsets are not used in tuples
 }
 Type_Info_Record :: struct #ordered {
-	fields:  []Type_Info_Member,
-	size:    int, // in bytes
-	align:   int, // in bytes
-	packed:  bool,
-	ordered: bool,
+	fields:       []Type_Info_Member,
+	size:         int, // in bytes
+	align:        int, // in bytes
+	packed:       bool,
+	ordered:      bool,
+	custom_align: bool,
 }
 Type_Info_Enum_Value :: raw_union {
 	f: f64,
@@ -90,9 +91,15 @@ Type_Info :: union {
 	Union:     Type_Info_Record,
 	Raw_Union: Type_Info_Record,
 	Enum: struct #ordered {
-		base:  ^Type_Info,
-		names: []string,
+		base:   ^Type_Info,
+		names:  []string,
 		values: []Type_Info_Enum_Value,
+	},
+	Map: struct #ordered {
+		key:              ^Type_Info,
+		value:            ^Type_Info,
+		generated_struct: ^Type_Info,
+		count:            int, // == 0 if dynamic
 	},
 }
 
@@ -107,6 +114,21 @@ type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 	base := info;
 	match type i in base {
 	case Type_Info.Named:
+		base = i.base;
+	}
+	return base;
+}
+
+
+type_info_base_without_enum :: proc(info: ^Type_Info) -> ^Type_Info {
+	if info == nil {
+		return nil;
+	}
+	base := info;
+	match type i in base {
+	case Type_Info.Named:
+		base = i.base;
+	case Type_Info.Enum:
 		base = i.base;
 	}
 	return base;
@@ -438,29 +460,32 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 
 
 __default_hash :: proc(data: []byte) -> u64 {
-	return hash.murmur64(data);
+	return hash.fnv64a(data);
+}
+__default_hash_string :: proc(s: string) -> u64 {
+	return __default_hash(cast([]byte)s);
 }
 
-Map_Key :: struct #ordered {
+__Map_Key :: struct #ordered {
 	hash: u64,
 	str:  string,
 }
 
-Map_Find_Result :: struct #ordered {
+__Map_Find_Result :: struct #ordered {
 	hash_index:  int,
 	entry_prev:  int,
 	entry_index: int,
 }
 
-Map_Entry_Header :: struct #ordered {
-	key:  Map_Key,
+__Map_Entry_Header :: struct #ordered {
+	key:  __Map_Key,
 	next: int,
 /*
 	value: Value_Type,
 */
 }
 
-Map_Header :: struct #ordered {
+__Map_Header :: struct #ordered {
 	m:             ^Raw_Dynamic_Map,
 	is_key_string: bool,
 	entry_size:    int,
@@ -468,13 +493,13 @@ Map_Header :: struct #ordered {
 	value_offset:  int,
 }
 
-__dynamic_map_reserve :: proc(using header: Map_Header, capacity: int) -> bool {
+__dynamic_map_reserve :: proc(using header: __Map_Header, capacity: int) -> bool {
 	h := __dynamic_array_reserve(^m.hashes, size_of(int), align_of(int), capacity);
 	e := __dynamic_array_reserve(^m.entries, entry_size, entry_align,    capacity);
 	return h && e;
 }
 
-__dynamic_map_rehash :: proc(using header: Map_Header, new_count: int) {
+__dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
 	new_header := header;
 	nm: Raw_Dynamic_Map;
 	new_header.m = ^nm;
@@ -511,25 +536,27 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int) {
 			__dynamic_map_grow(new_header);
 		}
 	}
-	free(header.m);
+	free_ptr_with_allocator(header.m.hashes.allocator,  header.m.hashes.data);
+	free_ptr_with_allocator(header.m.entries.allocator, header.m.entries.data);
 	header.m^ = nm;
-
 }
 
-__dynamic_map_get :: proc(h: Map_Header, key: Map_Key) -> rawptr {
+__dynamic_map_get :: proc(h: __Map_Header, key: __Map_Key) -> rawptr {
 	index := __dynamic_map_find(h, key).entry_index;
 	if index >= 0 {
 		data := cast(^byte)__dynamic_map_get_entry(h, index);
-		return data + h.value_offset;
+		val := data + h.value_offset;
+		return val;
 	}
 	return nil;
 }
 
-__dynamic_map_set :: proc(using h: Map_Header, key: Map_Key, value: rawptr) {
+__dynamic_map_set :: proc(using h: __Map_Header, key: __Map_Key, value: rawptr) {
+	index: int;
+
 	if m.hashes.count == 0 {
 		__dynamic_map_grow(h);
 	}
-	index: int;
 	fr := __dynamic_map_find(h, key);
 	if fr.entry_index >= 0 {
 		index = fr.entry_index;
@@ -544,7 +571,8 @@ __dynamic_map_set :: proc(using h: Map_Header, key: Map_Key, value: rawptr) {
 	}
 	{
 		data := cast(^byte)__dynamic_map_get_entry(h, index);
-		mem.copy(data+value_offset, value, entry_size-value_offset);
+		val := data+value_offset;
+		mem.copy(val, value, entry_size-value_offset);
 	}
 
 	if __dynamic_map_full(h) {
@@ -553,17 +581,17 @@ __dynamic_map_set :: proc(using h: Map_Header, key: Map_Key, value: rawptr) {
 }
 
 
-__dynamic_map_grow :: proc(using h: Map_Header) {
+__dynamic_map_grow :: proc(using h: __Map_Header) {
 	new_count := 2*m.entries.count + 8;
 	__dynamic_map_rehash(h, new_count);
 }
 
-__dynamic_map_full :: proc(using h: Map_Header) -> bool {
+__dynamic_map_full :: proc(using h: __Map_Header) -> bool {
 	return cast(int)(0.75 * cast(f64)m.hashes.count) <= m.entries.count;
 }
 
 
-__dynamic_map_hash_equal :: proc(h: Map_Header, a, b: Map_Key) -> bool {
+__dynamic_map_hash_equal :: proc(h: __Map_Header, a, b: __Map_Key) -> bool {
 	if a.hash == b.hash {
 		if h.is_key_string {
 			return a.str == b.str;
@@ -573,8 +601,8 @@ __dynamic_map_hash_equal :: proc(h: Map_Header, a, b: Map_Key) -> bool {
 	return false;
 }
 
-__dynamic_map_find :: proc(using h: Map_Header, key: Map_Key) -> Map_Find_Result {
-	fr := Map_Find_Result{-1, -1, -1};
+__dynamic_map_find :: proc(using h: __Map_Header, key: __Map_Key) -> __Map_Find_Result {
+	fr := __Map_Find_Result{-1, -1, -1};
 	if m.hashes.count > 0 {
 		fr.hash_index = cast(int)(key.hash % cast(u64)m.hashes.count);
 		fr.entry_index = m.hashes[fr.hash_index];
@@ -590,7 +618,7 @@ __dynamic_map_find :: proc(using h: Map_Header, key: Map_Key) -> Map_Find_Result
 	return fr;
 }
 
-__dynamic_map_add_entry :: proc(using h: Map_Header, key: Map_Key) -> int {
+__dynamic_map_add_entry :: proc(using h: __Map_Header, key: __Map_Key) -> int {
 	prev := m.entries.count;
 	c := __dynamic_array_append_nothing(^m.entries, entry_size, entry_align);
 	if c != prev {
@@ -598,23 +626,23 @@ __dynamic_map_add_entry :: proc(using h: Map_Header, key: Map_Key) -> int {
 		end.key = key;
 		end.next = -1;
 	}
-	return c;
+	return prev;
 }
 
 
-__dynamic_map_remove :: proc(using h: Map_Header, key: Map_Key) {
+__dynamic_map_remove :: proc(using h: __Map_Header, key: __Map_Key) {
 	fr := __dynamic_map_find(h, key);
 	if fr.entry_index >= 0 {
 		__dynamic_map_erase(h, fr);
 	}
 }
 
-__dynamic_map_get_entry :: proc(using h: Map_Header, index: int) -> ^Map_Entry_Header {
+__dynamic_map_get_entry :: proc(using h: __Map_Header, index: int) -> ^__Map_Entry_Header {
 	data := cast(^byte)m.entries.data + index*entry_size;
-	return cast(^Map_Entry_Header)data;
+	return cast(^__Map_Entry_Header)data;
 }
 
-__dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) {
+__dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
 	if fr.entry_prev < 0 {
 		m.hashes[fr.hash_index] = __dynamic_map_get_entry(h, fr.entry_index).next;
 	} else {

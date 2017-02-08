@@ -63,7 +63,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 	// an extra allocation
 	ArrayOperand operands = {0};
 	array_init_reserve(&operands, c->tmp_allocator, 2*lhs_count);
-	check_unpack_arguments(c, &operands, inits);
+	check_unpack_arguments(c, lhs_count, &operands, inits, true);
 
 	isize rhs_count = operands.count;
 	for_array(i, operands) {

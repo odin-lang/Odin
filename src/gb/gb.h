@@ -58,6 +58,7 @@ TODOS
 	- More date & time functions
 
 VERSION HISTORY
+	0.27  - OSX fixes and Linux gbAffinity
 	0.26d - Minor changes to how gbFile works
 	0.26c - gb_str_to_f* fix
 	0.26b - Minor fixes
@@ -4990,16 +4991,13 @@ isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
 }
 
 #elif defined(GB_SYSTEM_LINUX)
-#warning gbAffinity is mostly mostly untested on Linux. All I know is that it compiles and runs.
-#warning TODO(bill): gb_affinity_set on Linux is a stub
-
-// I have to read /proc/cpuinfo to get the number of threads per core.
+// IMPORTANT TODO(bill): This gbAffinity stuff for linux needs be improved a lot!
+// NOTE(zangent): I have to read /proc/cpuinfo to get the number of threads per core.
 #include <stdio.h>
 
 void gb_affinity_init(gbAffinity *a) {
-	usize count, count_size = gb_size_of(count);
-
-	b32 accurate = true;
+	b32   accurate = true;
+	isize threads = 0;
 
 	a->thread_count     = 1;
 	a->core_count       = sysconf(_SC_NPROCESSORS_ONLN);
@@ -5012,37 +5010,43 @@ void gb_affinity_init(gbAffinity *a) {
 	}
 
 	// Parsing /proc/cpuinfo to get the number of threads per core.
-	// NOTE: This calls the CPU's threads "cores", although the wording
-	//   is kind of weird. This should be right, though.
-	FILE* cpu_info = fopen("/proc/cpuinfo", "r");
-
-	int threads = 0;
-
-	if(cpu_info) {
-		while(1) {
+	// NOTE(zangent): This calls the CPU's threads "cores", although the wording
+	// is kind of weird. This should be right, though.
+	if (fopen("/proc/cpuinfo", "r") != NULL) {
+		for (;;) {
 			// The 'temporary char'. Everything goes into this char,
 			// so that we can check against EOF at the end of this loop.
 			char c;
 
-			#define check(letter) ((c = getc(cpu_info)) == letter)
-			if(check('c') && check('p') && check('u') && check(' ') &&
-				check('c') && check('o') && check('r') && check('e') && check('s')) {
+#define AF__CHECK(letter) ((c = getc(cpu_info)) == letter)
+			if (AF__CHECK('c') && AF__CHECK('p') && AF__CHECK('u') && AF__CHECK(' ') &&
+			    AF__CHECK('c') && AF__CHECK('o') && AF__CHECK('r') && AF__CHECK('e') && AF__CHECK('s')) {
 				// We're on a CPU info line.
-				while(!check(EOF)) {
-					if(c == '\n') break;
-					else if(c < '0' || c > '9') continue;
+				while (!AF__CHECK(EOF)) {
+					if (c == '\n') {
+						break;
+					} else if (c < '0' || '9' > c) {
+						continue;
+					}
 					threads = threads * 10 + (c - '0');
 				}
 				break;
 			} else {
-				while(!check('\n')) {if(c==EOF) break;}
+				while (!AF__CHECK('\n')) {
+					if (c==EOF) {
+						break;
+					}
+				}
 			}
-			if(c == EOF) break;
+			if (c == EOF) {
+				break;
+			}
+#undef AF__CHECK
 		}
 	}
 
-	if(threads == 0) {
-		threads = 1;
+	if (threads == 0) {
+		threads  = 1;
 		accurate = false;
 	}
 
@@ -5062,7 +5066,8 @@ b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
 }
 
 isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
-	GB_ASSERT(core >= 0 && core < a->core_count);
+
+	GB_ASSERT(0 <= core && core < a->core_count);
 	return a->threads_per_core;
 }
 #else
