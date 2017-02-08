@@ -5012,7 +5012,10 @@ void gb_affinity_init(gbAffinity *a) {
 	// Parsing /proc/cpuinfo to get the number of threads per core.
 	// NOTE(zangent): This calls the CPU's threads "cores", although the wording
 	// is kind of weird. This should be right, though.
-	if (fopen("/proc/cpuinfo", "r") != NULL) {
+
+	FILE* cpu_info = fopen("/proc/cpuinfo", "r");
+
+	if (cpu_info != NULL) {
 		for (;;) {
 			// The 'temporary char'. Everything goes into this char,
 			// so that we can check against EOF at the end of this loop.
@@ -5043,6 +5046,7 @@ void gb_affinity_init(gbAffinity *a) {
 			}
 #undef AF__CHECK
 		}
+		fclose(cpu_info);
 	}
 
 	if (threads == 0) {
