@@ -1488,6 +1488,19 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 				continue;
 			}
 
+			if (fl->cond != NULL) {
+				Operand operand = {Addressing_Invalid};
+				check_expr(c, &operand, fl->cond);
+				if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
+					error_node(fl->cond, "Non-constant boolean `when` condition");
+					continue;
+				}
+				if (operand.value.kind == ExactValue_Bool &&
+					!operand.value.value_bool) {
+					continue;
+				}
+			}
+
 			DelayedDecl di = {c->context.scope, decl};
 			array_add(&c->delayed_foreign_libraries, di);
 		case_end;
@@ -1853,6 +1866,3 @@ void check_parsed_files(Checker *c) {
 	map_scope_destroy(&file_scopes);
 
 }
-
-
-

@@ -375,9 +375,8 @@ int main(int argc, char **argv) {
 	char lib_str_buf[1024] = {0};
 	for_array(i, ir_gen.module.foreign_library_paths) {
 		String lib = ir_gen.module.foreign_library_paths.e[i];
-		// gb_printf_err("Linking lib: %.*s\n", LIT(lib));
 		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-		                        " \"%.*s\"", LIT(lib));
+		                        " -l%.*s ", LIT(lib));
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);
 	}
 
@@ -409,14 +408,6 @@ int main(int argc, char **argv) {
 		//   Clang can figure out linker flags for us, and that's good enough _for now_.
 		linker = "clang";
 	#endif
-
-	printf("Libs: %s\n", lib_str);
-
-	// TODO(zangent): I'm not sure what to do with lib_str.
-	//   I'll have to look at the format that the libraries are listed to determine what to do.
-	lib_str = "";
-
-
 
 	exit_code = system_exec_command_line_app("ld-link", true,
 		"%s \"%.*s\".o -o \"%.*s%s\" %s "
