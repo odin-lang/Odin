@@ -317,8 +317,8 @@ void init_build_context(BuildContext *bc) {
 	// here, so I just #defined the linker flags to keep things concise.
 	#if defined(GB_SYSTEM_WINDOWS)
 
-	#define linker_flag_x64 "/machine:x64"
-	#define linker_flag_x86 "/machine:x86"
+	#define LINK_FLAG_X64 "/machine:x64"
+	#define LINK_FLAG_X86 "/machine:x86"
 
 	#elif defined(GB_SYSTEM_OSX)
 
@@ -326,30 +326,33 @@ void init_build_context(BuildContext *bc) {
 	// an architecture option. All compilation done on MacOS must be x64.
 	GB_ASSERT(str_eq(bc->ODIN_ARCH, str_lit("amd64")));
 
-	#define linker_flag_x64 ""
-	#define linker_flag_x86 ""
+	#define LINK_FLAG_X64 ""
+	#define LINK_FLAG_X86 ""
 	#else
 	// Linux, but also BSDs and the like.
 	// NOTE(zangent): When clang is swapped out with ld as the linker,
 	//   the commented flags here should be used. Until then, we'll have
 	//   to use alternative build flags made for clang.
 	/*
-		#define linker_flag_x64 "-m elf_x86_64"
-		#define linker_flag_x86 "-m elf_i386"
+		#define LINK_FLAG_X64 "-m elf_x86_64"
+		#define LINK_FLAG_X86 "-m elf_i386"
 	*/
-	#define linker_flag_x64 "-arch x86-64"
-	#define linker_flag_x86 "-arch x86"
+	#define LINK_FLAG_X64 "-arch x86-64"
+	#define LINK_FLAG_X86 "-arch x86"
 	#endif
 
 	if (str_eq(bc->ODIN_ARCH, str_lit("amd64"))) {
 		bc->word_size = 8;
 		bc->max_align = 16;
 		bc->llc_flags = str_lit("-march=x86-64 ");
-		bc->link_flags = str_lit(linker_flag_x64 " ");
+		bc->link_flags = str_lit(LINK_FLAG_X64 " ");
 	} else if (str_eq(bc->ODIN_ARCH, str_lit("x86"))) {
 		bc->word_size = 4;
 		bc->max_align = 8;
 		bc->llc_flags = str_lit("-march=x86 ");
-		bc->link_flags = str_lit(linker_flag_x86 " ");
+		bc->link_flags = str_lit(LINK_FLAG_X86 " ");
 	}
+
+	#undef LINK_FLAG_X64
+	#undef LINK_FLAG_X86
 }
