@@ -134,9 +134,6 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 			buffer_write_string(buf, "^");
 			buffer_write_type(buf, info.elem);
 		}
-	case Maybe:
-		buffer_write_string(buf, "?");
-		buffer_write_type(buf, info.elem);
 	case Procedure:
 		buffer_write_string(buf, "proc");
 		if info.params == nil {
@@ -420,8 +417,9 @@ fmt_write_padding :: proc(fi: ^Fmt_Info, width: int) {
 }
 
 fmt_integer :: proc(fi: ^Fmt_Info, u: u64, base: int, signed: bool, digits: string) {
-	negative := signed && cast(i64)u < 0;
-	u = abs(u);
+	s := cast(i64)u;
+	negative := signed && s < 0;
+	u = cast(u64)abs(s);
 	buf: [256]byte;
 	if fi.width_set || fi.prec_set {
 		width := fi.width + fi.prec + 3;
@@ -628,6 +626,7 @@ fmt_string :: proc(fi: ^Fmt_Info, s: string, verb: rune) {
 fmt_pointer :: proc(fi: ^Fmt_Info, p: rawptr, verb: rune) {
 	match verb {
 	case 'p', 'v':
+		// Okay
 	default:
 		fmt_bad_verb(fi, verb);
 		return;
@@ -747,16 +746,6 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			fmt_pointer(fi, (cast(^rawptr)v.data)^, verb);
 		}
 
-	case Maybe:
-		// TODO(bill): Correct verbs for Maybe types?
-		size := mem.size_of_type_info(info.elem);
-		data := slice_ptr(cast(^byte)v.data, size+1);
-		if data[size] != 0 {
-			fmt_arg(fi, any{info.elem, v.data}, verb);
-		} else {
-			buffer_write_string(fi.buf, "nil");
-		}
-
 	case Array:
 		if verb != 'v' {
 			fmt_bad_verb(fi, verb);
@@ -799,9 +788,10 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		buffer_write_string(fi.buf, "map[");
 		defer buffer_write_byte(fi.buf, ']');
 		entries := ^(cast(^Raw_Dynamic_Map)v.data).entries;
-		gs, _ := union_cast(^Struct)info.generated_struct;
-		ed, _ := union_cast(^Dynamic_Array)gs.fields[1].type_info;
-		entry_type, _ := union_cast(^Struct)ed.elem;
+		gs, gs_ok := union_cast(^Struct)type_info_base(info.generated_struct);         assert(gs_ok);
+		ed, ed_ok := union_cast(^Dynamic_Array)type_info_base(gs.fields[1].type_info); assert(ed_ok);
+
+		entry_type, et_ok := union_cast(^Struct)ed.elem; assert(et_ok);
 		entry_size := ed.elem_size;
 		for i in 0..<entries.count {
 			if i > 0 {

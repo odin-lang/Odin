@@ -11,16 +11,27 @@
 
 main :: proc() {
 	{
+		Fruit :: enum {
+			APPLE,
+			BANANA,
+			COCONUT,
+		}
+
+		fmt.println(Fruit.names);
+	}
+
+when false {
+	{
 		m: map[f32]int;
-		reserve(^m, 16);
+		reserve(m, 16);
 		defer free(m);
 
 		m[1.0] = 1278;
 		m[2.0] = 7643;
 		m[3.0] = 564;
-		c := m[3.0];
 		_, ok := m[3.0];
-		// assert(ok && c == 564);
+		c := m[3.0];
+		assert(ok && c == 564);
 
 		fmt.print("map[");
 		i := 0;
@@ -28,7 +39,7 @@ main :: proc() {
 			if i > 0 {
 				fmt.print(", ");
 			}
-			fmt.printf("%f=%v", key, val);
+			fmt.printf("%v=%v", key, val);
 			i += 1;
 		}
 		fmt.println("]");
@@ -48,48 +59,36 @@ main :: proc() {
 		fmt.println(m);
 	}
 
-
-
-	// fm: map[128, int]f32;
-
-/*
 	{
-		sig: u32;
-		x := __cpuid(0, ^sig);
-		fmt.println(sig, x);
-	}
+		fmt.println("Hellope!");
 
+		x: [dynamic]f64;
+		reserve(x, 16);
+		defer free(x);
+		append(x, 2_000_000.500_000, 3, 5, 7);
 
+		for p, i in x {
+			if i > 0 { fmt.print(", "); }
+			fmt.print(p);
+		}
+		fmt.println();
 
-	i: int;
+		{
+			Vec3 :: [vector 3]f32;
 
-	fmt.println("Hellope!");
+			x := Vec3{1, 2, 3};
+			y := Vec3{4, 5, 6};
+			fmt.println(x < y);
+			fmt.println(x + y);
+			fmt.println(x - y);
+			fmt.println(x * y);
+			fmt.println(x / y);
 
-	x: [dynamic]f64;
-	defer free(x);
-	append(^x, 2_000_000.500_000, 3, 5, 7);
-
-	for p, i in x {
-		if i > 0 { fmt.print(", "); }
-		fmt.print(p);
-	}
-	fmt.println();
-
-	{
-		Vec3 :: [vector 3]f32;
-
-		x := Vec3{1, 2, 3};
-		y := Vec3{4, 5, 6};
-		fmt.println(x < y);
-		fmt.println(x + y);
-		fmt.println(x - y);
-		fmt.println(x * y);
-		fmt.println(x / y);
-
-		for i in x {
-			fmt.println(i);
+			for i in x {
+				fmt.println(i);
+			}
 		}
 	}
-*/
+}
 }
 

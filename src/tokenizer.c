@@ -17,7 +17,7 @@ TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
 	TOKEN_KIND(Token_Hash,    "#"), \
 	TOKEN_KIND(Token_At,      "@"), \
 	TOKEN_KIND(Token_Pointer, "^"), \
-	TOKEN_KIND(Token_Maybe,   "?"), \
+	/* TOKEN_KIND(Token_Maybe,   "?"), */ \
 	TOKEN_KIND(Token_Add,     "+"), \
 	TOKEN_KIND(Token_Sub,     "-"), \
 	TOKEN_KIND(Token_Mul,     "*"), \
@@ -55,6 +55,8 @@ TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
 TOKEN_KIND(Token__AssignOpEnd,   "_AssignOpEnd"), \
 	TOKEN_KIND(Token_ArrowRight, "->"), \
 	TOKEN_KIND(Token_ArrowLeft,  "<-"), \
+	TOKEN_KIND(Token_Increment,  "++"), \
+	TOKEN_KIND(Token_Decrement,  "--"), \
 \
 TOKEN_KIND(Token__ComparisonBegin, "_ComparisonBegin"), \
 	TOKEN_KIND(Token_CmpEq, "=="), \
@@ -80,7 +82,7 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
-	/* TODO(bill): So of these keywords are not used but "reserved", why not remove them? */ \
+	/* TODO(bill): Of these keywords are not used but "reserved", why not remove them? */ \
 	TOKEN_KIND(Token_when,           "when"), \
 	TOKEN_KIND(Token_if,             "if"), \
 	TOKEN_KIND(Token_else,           "else"), \
@@ -870,9 +872,9 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '^':
 			token.kind = Token_Pointer;
 			break;
-		case '?':
-			token.kind = Token_Maybe;
-			break;
+		// case '?':
+			// token.kind = Token_Maybe;
+			// break;
 		case ';':
 			token.kind = Token_Semicolon;
 			break;
@@ -907,10 +909,10 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '~': token.kind = token_kind_variant2(t, Token_Xor,   Token_XorEq);     break;
 		case '!': token.kind = token_kind_variant2(t, Token_Not,   Token_NotEq);     break;
 		case '+':
-			token.kind = token_kind_variant2(t, Token_Add, Token_AddEq);
+			token.kind = token_kind_variant3(t, Token_Add, Token_AddEq, '+', Token_Increment);
 			break;
 		case '-':
-			token.kind = token_kind_variant3(t, Token_Sub, Token_SubEq, '>', Token_ArrowRight);
+			token.kind = token_kind_variant4(t, Token_Sub, Token_SubEq, '-', Token_Decrement, '>', Token_ArrowRight);
 			break;
 		case '/': {
 			if (t->curr_rune == '/') {

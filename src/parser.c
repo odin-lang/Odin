@@ -147,7 +147,6 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 	AST_NODE_KIND(SelectorExpr, "selector expression",    struct { Token token; AstNode *expr, *selector; }) \
 	AST_NODE_KIND(IndexExpr,    "index expression",       struct { AstNode *expr, *index; Token open, close; }) \
 	AST_NODE_KIND(DerefExpr,    "dereference expression", struct { Token op; AstNode *expr; }) \
-	AST_NODE_KIND(DemaybeExpr,  "demaybe expression",     struct { Token op; AstNode *expr; }) \
 	AST_NODE_KIND(SliceExpr, "slice expression", struct { \
 		AstNode *expr; \
 		Token open, close, interval; \
@@ -333,10 +332,6 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		Token token; \
 		AstNode *type; \
 	}) \
-	AST_NODE_KIND(MaybeType, "maybe type", struct { \
-		Token token; \
-		AstNode *type; \
-	}) \
 	AST_NODE_KIND(ArrayType, "array type", struct { \
 		Token token; \
 		AstNode *count; \
@@ -469,7 +464,6 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_CastExpr:     return node->CastExpr.token;
 	case AstNode_FieldValue:   return node->FieldValue.eq;
 	case AstNode_DerefExpr:    return node->DerefExpr.op;
-	case AstNode_DemaybeExpr:  return node->DemaybeExpr.op;
 	case AstNode_BlockExpr:    return node->BlockExpr.open;
 	case AstNode_GiveExpr:     return node->GiveExpr.token;
 	case AstNode_IfExpr:       return node->IfExpr.token;
@@ -513,7 +507,6 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_HelperType:       return node->HelperType.token;
 	case AstNode_ProcType:         return node->ProcType.token;
 	case AstNode_PointerType:      return node->PointerType.token;
-	case AstNode_MaybeType:        return node->MaybeType.token;
 	case AstNode_ArrayType:        return node->ArrayType.token;
 	case AstNode_DynamicArrayType: return node->DynamicArrayType.token;
 	case AstNode_VectorType:       return node->VectorType.token;
@@ -690,13 +683,6 @@ AstNode *ast_deref_expr(AstFile *f, AstNode *expr, Token op) {
 	AstNode *result = make_ast_node(f, AstNode_DerefExpr);
 	result->DerefExpr.expr = expr;
 	result->DerefExpr.op = op;
-	return result;
-}
-
-AstNode *ast_demaybe_expr(AstFile *f, AstNode *expr, Token op) {
-	AstNode *result = make_ast_node(f, AstNode_DemaybeExpr);
-	result->DemaybeExpr.expr = expr;
-	result->DemaybeExpr.op = op;
 	return result;
 }
 
@@ -1028,13 +1014,6 @@ AstNode *ast_pointer_type(AstFile *f, Token token, AstNode *type) {
 	AstNode *result = make_ast_node(f, AstNode_PointerType);
 	result->PointerType.token = token;
 	result->PointerType.type = type;
-	return result;
-}
-
-AstNode *ast_maybe_type(AstFile *f, Token token, AstNode *type) {
-	AstNode *result = make_ast_node(f, AstNode_MaybeType);
-	result->MaybeType.token = token;
-	result->MaybeType.type = type;
 	return result;
 }
 
@@ -1999,10 +1978,6 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			operand = ast_deref_expr(f, operand, expect_token(f, Token_Pointer));
 			break;
 
-		case Token_Maybe: // Demaybe
-			operand = ast_demaybe_expr(f, operand, expect_token(f, Token_Maybe));
-			break;
-
 		case Token_OpenBrace:
 			if (!lhs && is_literal_type(operand) && f->expr_level >= 0) {
 				operand = parse_literal_value(f, operand);
@@ -2563,12 +2538,6 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		Token token = expect_token(f, Token_Pointer);
 		AstNode *elem = parse_type(f);
 		return ast_pointer_type(f, token, elem);
-	}
-
-	case Token_Maybe: {
-		Token token = expect_token(f, Token_Maybe);
-		AstNode *elem = parse_type(f);
-		return ast_maybe_type(f, token, elem);
 	}
 
 	case Token_OpenBracket: {

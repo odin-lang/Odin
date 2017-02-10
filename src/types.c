@@ -11,6 +11,20 @@ typedef enum BasicKind {
 	Basic_u32,
 	Basic_i64,
 	Basic_u64,
+
+/* 	Basic_i16le,
+	Basic_i16be,
+	Basic_u16le,
+	Basic_u16be,
+	Basic_i32le,
+	Basic_i32be,
+	Basic_u32le,
+	Basic_u32be,
+	Basic_i64le,
+	Basic_i64be,
+	Basic_u64le,
+	Basic_u64be, */
+
 	// Basic_i128,
 	// Basic_u128,
 	// Basic_f16,
@@ -93,6 +107,7 @@ typedef struct TypeRecord {
 	Entity * enum_count;
 	Entity * enum_min_value;
 	Entity * enum_max_value;
+	Entity * enum_names;
 } TypeRecord;
 
 #define TYPE_KINDS                                        \
@@ -102,7 +117,6 @@ typedef struct TypeRecord {
 	TYPE_KIND(DynamicArray, struct { Type *elem; })       \
 	TYPE_KIND(Vector,  struct { Type *elem; i64 count; }) \
 	TYPE_KIND(Slice,   struct { Type *elem; })            \
-	TYPE_KIND(Maybe,   struct { Type *elem; })            \
 	TYPE_KIND(Record,  TypeRecord)                        \
 	TYPE_KIND(Named, struct {                             \
 		String  name;                                     \
@@ -177,16 +191,16 @@ typedef struct BaseTypeSizes {
 } BaseTypeSizes;
 
 
-typedef Array(isize) Array_isize;
+typedef Array(i32) Array_i32;
 
 typedef struct Selection {
-	Entity *    entity;
-	Array_isize index;
-	bool        indirect; // Set if there was a pointer deref anywhere down the line
+	Entity *  entity;
+	Array_i32 index;
+	bool      indirect; // Set if there was a pointer deref anywhere down the line
 } Selection;
 Selection empty_selection = {0};
 
-Selection make_selection(Entity *entity, Array_isize index, bool indirect) {
+Selection make_selection(Entity *entity, Array_i32 index, bool indirect) {
 	Selection s = {entity, index, indirect};
 	return s;
 }
@@ -273,6 +287,7 @@ gb_global Type *t_int_ptr = NULL;
 gb_global Type *t_i64_ptr = NULL;
 gb_global Type *t_f64_ptr = NULL;
 gb_global Type *t_byte_slice = NULL;
+gb_global Type *t_string_slice = NULL;
 
 
 gb_global Type *t_type_info                = NULL;
@@ -289,7 +304,6 @@ gb_global Type *t_type_info_any           = NULL;
 gb_global Type *t_type_info_string        = NULL;
 gb_global Type *t_type_info_boolean       = NULL;
 gb_global Type *t_type_info_pointer       = NULL;
-gb_global Type *t_type_info_maybe         = NULL;
 gb_global Type *t_type_info_procedure     = NULL;
 gb_global Type *t_type_info_array         = NULL;
 gb_global Type *t_type_info_dynamic_array = NULL;
@@ -310,7 +324,6 @@ gb_global Type *t_type_info_any_ptr           = NULL;
 gb_global Type *t_type_info_string_ptr        = NULL;
 gb_global Type *t_type_info_boolean_ptr       = NULL;
 gb_global Type *t_type_info_pointer_ptr       = NULL;
-gb_global Type *t_type_info_maybe_ptr         = NULL;
 gb_global Type *t_type_info_procedure_ptr     = NULL;
 gb_global Type *t_type_info_array_ptr         = NULL;
 gb_global Type *t_type_info_dynamic_array_ptr = NULL;
@@ -390,12 +403,6 @@ Type *make_type_basic(gbAllocator a, BasicType basic) {
 Type *make_type_pointer(gbAllocator a, Type *elem) {
 	Type *t = alloc_type(a, Type_Pointer);
 	t->Pointer.elem = elem;
-	return t;
-}
-
-Type *make_type_maybe(gbAllocator a, Type *elem) {
-	Type *t = alloc_type(a, Type_Maybe);
-	t->Maybe.elem = elem;
 	return t;
 }
 
@@ -630,10 +637,6 @@ bool is_type_pointer(Type *t) {
 	}
 	return t->kind == Type_Pointer;
 }
-bool is_type_maybe(Type *t) {
-	t = base_type(t);
-	return t->kind == Type_Maybe;
-}
 bool is_type_tuple(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Tuple;
@@ -780,7 +783,6 @@ bool type_has_nil(Type *t) {
 	case Type_DynamicArray:
 	case Type_Proc:
 	case Type_Pointer:
-	case Type_Maybe:
 		return true;
 	}
 	return false;
@@ -890,12 +892,6 @@ bool are_types_identical(Type *x, Type *y) {
 		}
 		break;
 
-	case Type_Maybe:
-		if (y->kind == Type_Maybe) {
-			return are_types_identical(x->Maybe.elem, y->Maybe.elem);
-		}
-		break;
-
 	case Type_Named:
 		if (y->kind == Type_Named) {
 			return x->Named.base == y->Named.base;
@@ -981,9 +977,6 @@ bool is_type_cte_safe(Type *type) {
 	case Type_Slice:
 		return false;
 
-	case Type_Maybe:
-		return is_type_cte_safe(type->Maybe.elem);
-
 	case Type_Record: {
 		if (type->Record.kind != TypeRecord_Struct) {
 			return false;
@@ -1026,12 +1019,14 @@ typedef enum ProcTypeOverloadKind {
 	ProcOverload_ResultCount,
 	ProcOverload_ResultTypes,
 
+	ProcOverload_NotProcedure,
+
 } ProcTypeOverloadKind;
 
 
 ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
-	GB_ASSERT(is_type_proc(x));
-	GB_ASSERT(is_type_proc(y));
+ 	if (!is_type_proc(x)) return ProcOverload_NotProcedure;
+ 	if (!is_type_proc(y)) return ProcOverload_NotProcedure;
 	TypeProc *px = &base_type(x)->Proc;
 	TypeProc *py = &base_type(y)->Proc;
 
@@ -1113,7 +1108,7 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 			Entity *f = type->Record.fields[i];
 			if (f->kind == Entity_Variable) {
 				if (f->Variable.field_src_index == index) {
-					Array_isize sel_array = {0};
+					Array_i32 sel_array = {0};
 					array_init_count(&sel_array, a, 1);
 					sel_array.e[0] = i;
 					return make_selection(f, sel_array, false);
@@ -1125,7 +1120,7 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 		for (isize i = 0; i < max_count; i++) {
 			Entity *f = type->Tuple.variables[i];
 			if (i == index) {
-				Array_isize sel_array = {0};
+				Array_i32 sel_array = {0};
 				array_init_count(&sel_array, a, 1);
 				sel_array.e[0] = i;
 				return make_selection(f, sel_array, false);
@@ -1352,6 +1347,10 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 					sel.entity = type->Record.enum_max_value;
 					return sel;
 				}
+				if (str_eq(field_name, str_lit("names"))) {
+					sel.entity = type->Record.enum_names;
+					return sel;
+				}
 			}
 
 			for (isize i = 0; i < type->Record.field_count; i++) {
@@ -1558,17 +1557,6 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 		return max;
 	} break;
 
-	case Type_Maybe: {
-		Type *elem = t->Maybe.elem;
-		type_path_push(path, elem);
-		if (path->failure) {
-			return FAILURE_ALIGNMENT;
-		}
-		i64 align = gb_max(type_align_of_internal(s, allocator, t->Maybe.elem, path), type_align_of_internal(s, allocator, t_bool, path));
-		type_path_pop(path);
-		return align;
-	}
-
 	case Type_Map: {
 		if (t->Map.count == 0) { // Dynamic
 			return type_align_of_internal(s, allocator, t->Map.generated_struct_type, path);
@@ -1773,18 +1761,6 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 	case Type_Slice: // ptr + count
 		return 2 * s.word_size;
 
-	case Type_Maybe: { // value + bool
-		i64 align, size;
-		Type *elem = t->Maybe.elem;
-		align = type_align_of_internal(s, allocator, elem, path);
-		if (path->failure) {
-			return FAILURE_SIZE;
-		}
-		size = align_formula(type_size_of_internal(s, allocator, elem, path), align);
-		size += type_size_of_internal(s, allocator, t_bool, path);
-		return align_formula(size, align);
-	}
-
 	case Type_Map: {
 		if (t->Map.count == 0) { // Dynamic
 			return type_size_of_internal(s, allocator, t->Map.generated_struct_type, path);
@@ -1967,11 +1943,6 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_Pointer:
 		str = gb_string_appendc(str, "^");
 		str = write_type_to_string(str, type->Pointer.elem);
-		break;
-
-	case Type_Maybe:
-		str = gb_string_appendc(str, "?");
-		str = write_type_to_string(str, type->Maybe.elem);
 		break;
 
 	case Type_Array:

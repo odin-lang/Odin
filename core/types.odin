@@ -56,14 +56,6 @@ is_pointer :: proc(info: ^Type_Info) -> bool {
 	}
 	return false;
 }
-is_maybe :: proc(info: ^Type_Info) -> bool {
-	if info == nil { return false; }
-
-	match type i in type_info_base(info) {
-	case Type_Info.Maybe: return true;
-	}
-	return false;
-}
 is_procedure :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false; }
 
@@ -85,6 +77,14 @@ is_dynamic_array :: proc(info: ^Type_Info) -> bool {
 
 	match type i in type_info_base(info) {
 	case Type_Info.Dynamic_Array: return true;
+	}
+	return false;
+}
+is_dynamic_map :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false; }
+
+	match type i in type_info_base(info) {
+	case Type_Info.Map: return i.count == 0;
 	}
 	return false;
 }

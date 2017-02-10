@@ -52,14 +52,11 @@ Type_Info :: union {
 	Float: struct #ordered {
 		size: int, // in bytes
 	},
-	Any:     struct #ordered {},
 	String:  struct #ordered {},
 	Boolean: struct #ordered {},
+	Any:     struct #ordered {},
 	Pointer: struct #ordered {
 		elem: ^Type_Info, // nil -> rawptr
-	},
-	Maybe: struct #ordered {
-		elem: ^Type_Info,
 	},
 	Procedure: struct #ordered {
 		params:     ^Type_Info, // Type_Info.Tuple
@@ -146,6 +143,8 @@ __cpuid :: proc(level: u32, sig: ^u32) -> i32 #foreign __llvm_core "__get_cpuid"
 
 
 
+
+
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
 Allocator_Mode :: enum u8 {
 	ALLOC,
@@ -199,23 +198,17 @@ free_ptr_with_allocator :: proc(a: Allocator, ptr: rawptr) #inline {
 	if ptr == nil {
 		return;
 	}
+	if a.procedure == nil {
+		return;
+	}
 	a.procedure(a.data, Allocator_Mode.FREE, 0, 0, ptr, 0, 0);
-}
-
-__free_raw_dynamic_array :: proc(a: ^Raw_Dynamic_Array) {
-	if a.allocator.procedure == nil {
-		return;
-	}
-	if a.data == nil {
-		return;
-	}
-	free_ptr_with_allocator(a.allocator, a.data);
 }
 
 free_ptr :: proc(ptr: rawptr) #inline {
 	__check_context();
 	free_ptr_with_allocator(context.allocator, ptr);
 }
+
 free_all :: proc() #inline {
 	__check_context();
 	a := context.allocator;
@@ -306,11 +299,11 @@ __string_eq :: proc(a, b: string) -> bool {
 	if a.data == b.data {
 		return true;
 	}
-	return mem.compare(cast(rawptr)a.data, cast(rawptr)b.data, a.count) == 0;
+	return __string_cmp(a, b) == 0;
 }
 
 __string_cmp :: proc(a, b: string) -> int {
-	return mem.compare(cast(rawptr)a.data, cast(rawptr)b.data, min(a.count, b.count));
+	return mem.compare(cast([]byte)a, cast([]byte)b);
 }
 
 __string_ne :: proc(a, b: string) -> bool #inline { return !__string_eq(a, b); }
@@ -504,7 +497,7 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
 	nm: Raw_Dynamic_Map;
 	new_header.m = ^nm;
 
-	reserve(^nm.hashes, new_count);
+	reserve(nm.hashes, new_count);
 	nm.hashes.count = nm.hashes.capacity;
 	__dynamic_array_reserve(^nm.entries, entry_size, entry_align, m.entries.count);
 	for _, i in nm.hashes {
@@ -660,3 +653,13 @@ __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
 		m.hashes[last.hash_index] = fr.entry_index;
 	}
 }
+
+
+__print_ti_ptr :: proc(ti: ^Type_Info) {
+	fmt.println(ti);
+	match type e in ti {
+	case Type_Info.Enum:
+		fmt.println(e.names);
+	}
+}
+
