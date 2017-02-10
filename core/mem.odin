@@ -217,7 +217,7 @@ align_of_type_info :: proc(type_info: ^Type_Info) -> int {
 	WORD_SIZE :: size_of(int);
 	MAX_ALIGN :: size_of([vector 64]f64); // TODO(bill): Should these constants be builtin constants?
 	using Type_Info;
-	match type info in type_info {
+	match info in type_info {
 	case Named:
 		return align_of_type_info(info.base);
 	case Integer:
@@ -270,7 +270,7 @@ align_formula :: proc(size, align: int) -> int {
 size_of_type_info :: proc(type_info: ^Type_Info) -> int {
 	WORD_SIZE :: size_of(int);
 	using Type_Info;
-	match type info in type_info {
+	match info in type_info {
 	case Named:
 		return size_of_type_info(info.base);
 	case Integer:

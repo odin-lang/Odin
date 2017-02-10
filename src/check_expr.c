@@ -4766,11 +4766,12 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		o->expr = node;
 	case_end;
 
-
 	case_ast_node(te, TagExpr, node);
-		// TODO(bill): Tag expressions
-		error_node(node, "Tag expressions are not supported yet");
-		kind = check_expr_base(c, o, te->expr, type_hint);
+		String name = te->name.string;
+		error_node(node, "Unknown tag expression, #%.*s", LIT(name));
+		if (te->expr) {
+			kind = check_expr_base(c, o, te->expr, type_hint);
+		}
 		o->expr = node;
 	case_end;
 

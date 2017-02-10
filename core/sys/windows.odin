@@ -20,7 +20,7 @@ LPARAM    :: int;
 LRESULT   :: int;
 ATOM      :: i16;
 BOOL      :: i32;
-WNDPROC   :: type proc(HWND, u32, WPARAM, LPARAM) -> LRESULT #cc_c;
+WNDPROC   :: #type proc(HWND, u32, WPARAM, LPARAM) -> LRESULT #cc_c;
 
 
 INVALID_HANDLE_VALUE :: cast(HANDLE)(~cast(int)0);
@@ -359,8 +359,8 @@ PFD_DOUBLEBUFFER_DONTCARE :: 0x40000000;
 PFD_STEREO_DONTCARE       :: 0x80000000;
 
 HGLRC :: HANDLE;
-PROC  :: type proc() #cc_c;
-wglCreateContextAttribsARBType :: type proc(hdc: HDC, hshareContext: rawptr, attribList: ^i32) -> HGLRC;
+PROC  :: #type proc() #cc_c;
+wglCreateContextAttribsARBType :: #type proc(hdc: HDC, hshareContext: rawptr, attribList: ^i32) -> HGLRC;
 
 
 PIXELFORMATDESCRIPTOR :: struct #ordered {

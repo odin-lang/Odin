@@ -942,7 +942,25 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		bool is_union_ptr = false;
 		bool is_any = false;
 
-		check_expr(c, &x, ms->tag);
+		if (ms->tag->kind != AstNode_AssignStmt) {
+			error_node(ms->tag, "Expected an `in` assignment for this type match statement");
+			break;
+		}
+
+		ast_node(as, AssignStmt, ms->tag);
+		Token as_token = ast_node_token(ms->tag);
+		if (as->lhs.count != 1) {
+			syntax_error(as_token, "Expected 1 name before `in`");
+			break;
+		}
+		if (as->rhs.count != 1) {
+			syntax_error(as_token, "Expected 1 expression after `in`");
+			break;
+		}
+		AstNode *lhs = as->lhs.e[0];
+		AstNode *rhs = as->rhs.e[0];
+
+		check_expr(c, &x, rhs);
 		check_assignment(c, &x, NULL, str_lit("type match expression"));
 		if (!check_valid_type_match_type(x.type, &is_union_ptr, &is_any)) {
 			gbString str = type_to_string(x.type);
@@ -980,7 +998,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 		}
 
-		if (ms->var->kind != AstNode_Ident) {
+
+		if (unparen_expr(lhs)->kind != AstNode_Ident) {
+			error_node(rhs, "Expected an identifier, got `%.*s`", LIT(ast_node_strings[rhs->kind]));
 			break;
 		}
 
@@ -1056,10 +1076,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					tt = make_type_pointer(c->allocator, case_type);
 					add_type_info_type(c, tt);
 				}
-				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, ms->var->Ident, tt, true);
+				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, lhs->Ident, tt, true);
 				tag_var->flags |= EntityFlag_Used;
-				add_entity(c, c->context.scope, ms->var, tag_var);
-				add_entity_use(c, ms->var, tag_var);
+				add_entity(c, c->context.scope, lhs, tag_var);
+				add_entity_use(c, lhs, tag_var);
 			}
 			check_stmt_list(c, cc->stmts, mod_flags);
 			check_close_scope(c);

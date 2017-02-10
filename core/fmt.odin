@@ -107,7 +107,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 	}
 
 	using Type_Info;
-	match type info in ti {
+	match info in ti {
 	case Named:
 		buffer_write_string(buf, info.name);
 	case Integer:
@@ -355,7 +355,7 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 	if arg_index < args.count {
 		arg := args[arg_index];
 		arg.type_info = type_info_base(arg.type_info);
-		match type i in arg {
+		match i in arg {
 		case int:  num = i;
 		case i8:   num = cast(int)i;
 		case i16:  num = cast(int)i;
@@ -645,7 +645,7 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	}
 
 	using Type_Info;
-	match type e in v.type_info {
+	match e in v.type_info {
 	default:
 		fmt_bad_verb(fi, verb);
 		return;
@@ -658,7 +658,7 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			f: f64;
 			ok := false;
 			a := any{type_info_base(e.base), v.data};
-			match type v in a {
+			match v in a {
 			case i8:   i = cast(i64)v;
 			case i16:  i = cast(i64)v;
 			case i32:  i = cast(i64)v;
@@ -709,9 +709,9 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	}
 
 	using Type_Info;
-	match type info in v.type_info {
+	match info in v.type_info {
 	case Named:
-		match type b in info.base {
+		match b in info.base {
 		case Struct:
 			if verb != 'v' {
 				fmt_bad_verb(fi, verb);
@@ -882,7 +882,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 
 	if verb == 'T' {
 		ti := arg.type_info;
-		match type a in arg {
+		match a in arg {
 		case ^Type_Info: ti = a;
 		}
 		buffer_write_type(fi.buf, ti);
@@ -892,7 +892,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 
 	base_arg := arg;
 	base_arg.type_info = type_info_base(base_arg.type_info);
-	match type a in base_arg {
+	match a in base_arg {
 	case bool:    fmt_bool(fi, a, verb);
 	case f32:     fmt_float(fi, cast(f64)a, 32, verb);
 	case f64:     fmt_float(fi, a, 64, verb);

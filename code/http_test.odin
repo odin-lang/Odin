@@ -3,7 +3,7 @@
 #foreign_system_library ws2 "Ws2_32.lib" when ODIN_OS == "windows";
 
 
-SOCKET :: type uint;
+SOCKET :: #type uint;
 INVALID_SOCKET :: ~(cast(SOCKET)0);
 
 AF :: enum i32 {

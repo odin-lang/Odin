@@ -5255,7 +5255,13 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		ir_emit_comment(proc, str_lit("TypeMatchStmt"));
 		gbAllocator allocator = proc->module->allocator;
 
-		irValue *parent = ir_build_expr(proc, ms->tag);
+		ast_node(as, AssignStmt, ms->tag);
+		GB_ASSERT(as->lhs.count == 1);
+		GB_ASSERT(as->rhs.count == 1);
+		AstNode *lhs = as->lhs.e[0];
+		AstNode *rhs = as->rhs.e[0];
+
+		irValue *parent = ir_build_expr(proc, rhs);
 		bool is_union_ptr = false;
 		bool is_any = false;
 		GB_ASSERT(check_valid_type_match_type(ir_type(parent), &is_union_ptr, &is_any));
@@ -5276,7 +5282,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 		ast_node(body, BlockStmt, ms->body);
 
-		String tag_var_name = ms->var->Ident.string;
+		String tag_var_name = lhs->Ident.string;
 
 
 		AstNodeArray default_stmts = {0};

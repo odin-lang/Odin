@@ -109,7 +109,7 @@ type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 		return nil;
 	}
 	base := info;
-	match type i in base {
+	match i in base {
 	case Type_Info.Named:
 		base = i.base;
 	}
@@ -122,7 +122,7 @@ type_info_base_without_enum :: proc(info: ^Type_Info) -> ^Type_Info {
 		return nil;
 	}
 	base := info;
-	match type i in base {
+	match i in base {
 	case Type_Info.Named:
 		base = i.base;
 	case Type_Info.Enum:
@@ -152,9 +152,9 @@ Allocator_Mode :: enum u8 {
 	FREE_ALL,
 	RESIZE,
 }
-Allocator_Proc :: type proc(allocator_data: rawptr, mode: Allocator_Mode,
-                            size, alignment: int,
-                            old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
+Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
+                             size, alignment: int,
+                             old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
 Allocator :: struct #ordered {
 	procedure: Allocator_Proc,
 	data:      rawptr,
@@ -657,7 +657,7 @@ __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
 
 __print_ti_ptr :: proc(ti: ^Type_Info) {
 	fmt.println(ti);
-	match type e in ti {
+	match e in ti {
 	case Type_Info.Enum:
 		fmt.println(e.names);
 	}
