@@ -20,6 +20,13 @@ O_SYNC     :: 0x01000;
 O_ASYNC    :: 0x02000;
 O_CLOEXEC  :: 0x80000;
 
+// NOTE(zangent): These are OS specific!
+// Do not mix these up!
+RTLD_LAZY         :: 0x001;
+RTLD_NOW          :: 0x002;
+RTLD_BINDING_MASK :: 0x3;
+RTLD_GLOBAL       :: 0x100;
+
 // ERROR_NONE:                Errno : 0;
 // ERROR_FILE_NOT_FOUND:      Errno : 2;
 // ERROR_PATH_NOT_FOUND:      Errno : 3;
@@ -60,6 +67,11 @@ unix_free    :: proc(ptr: rawptr)                                        #foreig
 unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr                   #foreign libc "realloc";
 
 unix_exit :: proc(status: int)                                           #foreign libc "exit";
+
+unix_dlopen :: proc(filename: ^u8, flags: int) -> rawptr                 #foreign dl   "dlopen";
+unix_dlsym :: proc(handle: rawptr, symbol: ^u8) ->  (proc() #cc_c)       #foreign dl   "dlsym";
+unix_dlclose :: proc(handle: rawptr) -> int                              #foreign dl   "dlclose";
+unix_dlerror :: proc() -> ^u8                                            #foreign dl   "dlerror";
 
 
 
@@ -227,5 +239,23 @@ current_thread_id :: proc() -> int {
 	return 0;
 }
 
-
-
+dlopen :: proc(filename: string, flags: int) -> rawptr #inline {
+	return unix_dlopen(filename.data, flags);
+}
+dlsym :: proc(handle: rawptr, symbol: string) -> (proc() #cc_c) #inline {
+	assert(handle != nil);
+	return unix_dlsym(handle, symbol.data);
+}
+dlclose :: proc(handle: rawptr) -> bool #inline {
+	assert(handle != nil);
+	return unix_dlclose(handle) == 0;
+}
+dlerror :: proc() -> string {
+	// TODO(zangent): Should this be split out into a from_c_string()?
+	c_str := unix_dlerror();
+	len := 0;
+	for s := c_str; s^ != 0; s += 1 {
+		len += 1;
+	}
+	return cast(string)slice_ptr(c_str, len);
+}

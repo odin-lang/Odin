@@ -20,33 +20,19 @@ O_SYNC     :: 0x01000;
 O_ASYNC    :: 0x02000;
 O_CLOEXEC  :: 0x80000;
 
-// ERROR_NONE:                Errno : 0;
-// ERROR_FILE_NOT_FOUND:      Errno : 2;
-// ERROR_PATH_NOT_FOUND:      Errno : 3;
-// ERROR_ACCESS_DENIED:       Errno : 5;
-// ERROR_NO_MORE_FILES:       Errno : 18;
-// ERROR_HANDLE_EOF:          Errno : 38;
-// ERROR_NETNAME_DELETED:     Errno : 64;
-// ERROR_FILE_EXISTS:         Errno : 80;
-// ERROR_BROKEN_PIPE:         Errno : 109;
-// ERROR_BUFFER_OVERFLOW:     Errno : 111;
-// ERROR_INSUFFICIENT_BUFFER: Errno : 122;
-// ERROR_MOD_NOT_FOUND:       Errno : 126;
-// ERROR_PROC_NOT_FOUND:      Errno : 127;
-// ERROR_DIR_NOT_EMPTY:       Errno : 145;
-// ERROR_ALREADY_EXISTS:      Errno : 183;
-// ERROR_ENVVAR_NOT_FOUND:    Errno : 203;
-// ERROR_MORE_DATA:           Errno : 234;
-// ERROR_OPERATION_ABORTED:   Errno : 995;
-// ERROR_IO_PENDING:          Errno : 997;
-// ERROR_NOT_FOUND:           Errno : 1168;
-// ERROR_PRIVILEGE_NOT_HELD:  Errno : 1314;
-// WSAEACCES:                 Errno : 10013;
-// WSAECONNRESET:             Errno : 10054;
+// NOTE(zangent): These are OS specific!
+// Do not mix these up!
+RTLD_LAZY  :: 0x1;
+RTLD_NOW   :: 0x2;
+RTLD_LOCAL :: 0x4;
+RTLD_GLOBAL:: 0x8;
+RTLD_NODELETE :: 0x80;
+RTLD_NOLOAD :: 0x10;
+RTLD_FIRST :: 0x100;
 
-// Windows reserves errors >= 1<<29 for application use
-// ERROR_FILE_IS_PIPE: Errno : 1<<29 + 0;
 
+
+#foreign_system_library dl   "dl";
 #foreign_system_library libc "c";
 
 unix_open   :: proc(path: ^u8, mode: int, perm: u32) -> Handle           #foreign libc "open";
@@ -61,8 +47,10 @@ unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr                   #foreig
 
 unix_exit :: proc(status: int)                                           #foreign libc "exit";
 
-
-
+unix_dlopen :: proc(filename: ^u8, flags: int) -> rawptr                 #foreign dl   "dlopen";
+unix_dlsym :: proc(handle: rawptr, symbol: ^u8) ->  (proc() #cc_c)       #foreign dl   "dlsym";
+unix_dlclose :: proc(handle: rawptr) -> int                              #foreign dl   "dlclose";
+unix_dlerror :: proc() -> ^u8                                            #foreign dl   "dlerror";
 
 open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 	return unix_open(path.data, mode, perm), 0;
@@ -204,19 +192,19 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 
 */
 
-heap_alloc :: proc(size: int) -> rawptr {
+heap_alloc :: proc(size: int) -> rawptr #inline {
 	assert(size > 0);
 	return unix_malloc(size);
 }
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
+heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr #inline {
 	return unix_realloc(ptr, new_size);
 }
-heap_free :: proc(ptr: rawptr) {
+heap_free :: proc(ptr: rawptr) #inline {
 	unix_free(ptr);
 }
 
 
-exit :: proc(code: int) {
+exit :: proc(code: int) #inline {
 	unix_exit(code);
 }
 
@@ -226,5 +214,23 @@ current_thread_id :: proc() -> int {
 	return 0;
 }
 
-
-
+dlopen :: proc(filename: string, flags: int) -> rawptr #inline {
+	return unix_dlopen(filename.data, flags);
+}
+dlsym :: proc(handle: rawptr, symbol: string) -> (proc() #cc_c) #inline {
+	assert(handle != nil);
+	return unix_dlsym(handle, symbol.data);
+}
+dlclose :: proc(handle: rawptr) -> bool #inline {
+	assert(handle != nil);
+	return unix_dlclose(handle) == 0;
+}
+dlerror :: proc() -> string {
+	// TODO(zangent): Should this be split out into a from_c_string()?
+	c_str := unix_dlerror();
+	len := 0;
+	for s := c_str; s^ != 0; s += 1 {
+		len += 1;
+	}
+	return cast(string)slice_ptr(c_str, len);
+}

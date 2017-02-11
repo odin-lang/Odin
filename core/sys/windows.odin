@@ -563,4 +563,3 @@ Key_Code :: enum i32 {
 	PA1        = 0xFD,
 	OEM_CLEAR  = 0xFE,
 }
-
