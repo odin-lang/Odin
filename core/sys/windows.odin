@@ -22,7 +22,7 @@ BOOL      :: i32;
 WNDPROC   :: #type proc(HWND, u32, WPARAM, LPARAM) -> LRESULT #cc_c;
 
 
-INVALID_HANDLE_VALUE :: cast(HANDLE)(~cast(int)0);
+INVALID_HANDLE_VALUE :: cast(HANDLE)~cast(int)0;
 
 FALSE: BOOL : 0;
 TRUE:  BOOL : 1;
@@ -288,7 +288,7 @@ InterlockedExchangeAdd64     :: proc(dst: ^i64, desired: i64) -> i64 #foreign ke
 InterlockedAnd64             :: proc(dst: ^i64, desired: i64) -> i64 #foreign kernel32;
 InterlockedOr64              :: proc(dst: ^i64, desired: i64) -> i64 #foreign kernel32;
 
-_mm_pause        :: proc() #foreign kernel32;
+mm_pause         :: proc() #foreign kernel32 "_mm_pause";
 ReadWriteBarrier :: proc() #foreign kernel32;
 WriteBarrier     :: proc() #foreign kernel32;
 ReadBarrier      :: proc() #foreign kernel32;

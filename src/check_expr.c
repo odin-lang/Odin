@@ -1081,6 +1081,11 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 		return 0;
 	}
 	Operand o = {0};
+	if (e->kind == AstNode_UnaryExpr &&
+	    e->UnaryExpr.op.kind == Token_Question) {
+		return -1;
+	}
+
 	check_expr(c, &o, e);
 	if (o.mode != Addressing_Constant) {
 		if (o.mode != Addressing_Invalid) {
@@ -1314,7 +1319,12 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 	case_ast_node(at, ArrayType, e);
 		if (at->count != NULL) {
 			Type *elem = check_type_extra(c, at->elem, NULL);
-			type = make_type_array(c->allocator, elem, check_array_or_map_count(c, at->count, false));
+			i64 count = check_array_or_map_count(c, at->count, false);
+			if (count < 0) {
+				error_node(at->count, "? can only be used in conjuction with compound literals");
+				count = 0;
+			}
+			type = make_type_array(c->allocator, elem, count);
 		} else {
 			Type *elem = check_type(c, at->elem);
 			type = make_type_slice(c->allocator, elem);
@@ -2529,8 +2539,11 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
 
-		if (e != NULL && e->kind == Entity_ImportName &&
-		    selector->kind == AstNode_Ident) {
+		if (e != NULL && e->kind == Entity_ImportName && selector->kind == AstNode_Ident) {
+			// IMPORTANT NOTE(bill): This is very sloppy code but it's also very fragile
+			// It pretty much needs to be in this order and this way
+			// If you can clean this up, please do but be really careful
+
 			String sel_name = selector->Ident.string;
 
 			check_op_expr = false;
@@ -2539,8 +2552,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			if (is_declared) {
 				if (entity->kind == Entity_Builtin) {
 					is_declared = false;
-				}
-				if (entity->scope->is_global && !e->ImportName.scope->is_global) {
+				} else if (entity->scope->is_global && !e->ImportName.scope->is_global) {
 					is_declared = false;
 				}
 			}
@@ -2562,6 +2574,17 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 				if (overload_count > 1) {
 					is_overloaded = true;
 				}
+			}
+
+
+			is_not_exported = !is_entity_name_exported(entity);
+
+			if (is_not_exported) {
+				gbString sel_str = expr_to_string(selector);
+				error_node(op_expr, "`%s` is not exported by `%.*s`", sel_str, LIT(name));
+				gb_string_free(sel_str);
+				// NOTE(bill): We will have to cause an error his even though it exists
+				goto error;
 			}
 
 			if (is_overloaded) {
@@ -2608,7 +2631,6 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			}
 
 			bool *found = map_bool_get(&e->ImportName.scope->implicit, hash_pointer(entity));
-
 			if (!found) {
 				is_not_exported = false;
 			} else {
@@ -4479,16 +4501,18 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 	case_ast_node(cl, CompoundLit, node);
 		Type *type = type_hint;
-		bool ellipsis_array = false;
+		bool is_to_be_determined_array_count = false;
 		bool is_constant = true;
 		if (cl->type != NULL) {
 			type = NULL;
 
 			// [..]Type
 			if (cl->type->kind == AstNode_ArrayType && cl->type->ArrayType.count != NULL) {
-				if (cl->type->ArrayType.count->kind == AstNode_Ellipsis) {
+				AstNode *count = cl->type->ArrayType.count;
+				if (count->kind == AstNode_UnaryExpr &&
+				    count->UnaryExpr.op.kind == Token_Question) {
 					type = make_type_array(c->allocator, check_type(c, cl->type->ArrayType.elem), -1);
-					ellipsis_array = true;
+					is_to_be_determined_array_count = true;
 				}
 			}
 
@@ -4663,7 +4687,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 				}
 			}
 
-			if (t->kind == Type_Array && ellipsis_array) {
+			if (t->kind == Type_Array && is_to_be_determined_array_count) {
 				t->Array.count = max;
 			}
 		} break;
@@ -5185,11 +5209,13 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case AstNode_ProcType:
 	case AstNode_PointerType:
 	case AstNode_ArrayType:
+	case AstNode_DynamicArrayType:
 	case AstNode_VectorType:
 	case AstNode_StructType:
 	case AstNode_UnionType:
 	case AstNode_RawUnionType:
 	case AstNode_EnumType:
+	case AstNode_MapType:
 		o->mode = Addressing_Type;
 		o->type = check_type(c, node);
 		break;
@@ -5417,7 +5443,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_end;
 
 	case_ast_node(e, Ellipsis, node);
-		str = gb_string_appendc(str, "..");
+		str = gb_string_appendc(str, "...");
 	case_end;
 
 	case_ast_node(fv, FieldValue, node);
@@ -5433,13 +5459,18 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(at, ArrayType, node);
 		str = gb_string_appendc(str, "[");
-		str = write_expr_to_string(str, at->count);
+		if (at->count->kind == AstNode_UnaryExpr &&
+		    at->count->UnaryExpr.op.kind == Token_Hash) {
+			str = gb_string_appendc(str, "#");
+		} else {
+			str = write_expr_to_string(str, at->count);
+		}
 		str = gb_string_appendc(str, "]");
 		str = write_expr_to_string(str, at->elem);
 	case_end;
 
 	case_ast_node(at, DynamicArrayType, node);
-		str = gb_string_appendc(str, "[dynamic]");
+		str = gb_string_appendc(str, "[...]");
 		str = write_expr_to_string(str, at->elem);
 	case_end;
 

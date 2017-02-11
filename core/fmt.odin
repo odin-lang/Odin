@@ -3,7 +3,8 @@
 #import "utf8.odin";
 #import "types.odin";
 
-DEFAULT_BUFFER_SIZE :: 1<<12;
+
+_BUFFER_SIZE :: 1<<12;
 
 Buffer :: struct {
 	data:   []byte,
@@ -60,7 +61,7 @@ Fmt_Info :: struct {
 
 
 fprint :: proc(fd: os.Handle, args: ...any) -> int {
-	data: [DEFAULT_BUFFER_SIZE]byte;
+	data: [_BUFFER_SIZE]byte;
 	buf := Buffer{data[:], 0};
 	bprint(^buf, ...args);
 	os.write(fd, buf.data[:buf.length]);
@@ -68,14 +69,14 @@ fprint :: proc(fd: os.Handle, args: ...any) -> int {
 }
 
 fprintln :: proc(fd: os.Handle, args: ...any) -> int {
-	data: [DEFAULT_BUFFER_SIZE]byte;
+	data: [_BUFFER_SIZE]byte;
 	buf := Buffer{data[:], 0};
 	bprintln(^buf, ...args);
 	os.write(fd, buf.data[:buf.length]);
 	return buf.length;
 }
 fprintf :: proc(fd: os.Handle, fmt: string, args: ...any) -> int {
-	data: [DEFAULT_BUFFER_SIZE]byte;
+	data: [_BUFFER_SIZE]byte;
 	buf := Buffer{data[:], 0};
 	bprintf(^buf, fmt, ...args);
 	os.write(fd, buf.data[:buf.length]);
@@ -95,7 +96,7 @@ printf :: proc(fmt: string, args: ...any) -> int {
 
 
 fprint_type :: proc(fd: os.Handle, info: ^Type_Info) {
-	data: [DEFAULT_BUFFER_SIZE]byte;
+	data: [_BUFFER_SIZE]byte;
 	buf := Buffer{data[:], 0};
 	buffer_write_type(^buf, info);
 	os.write(fd, buf.data[:buf.length]);
@@ -174,8 +175,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		buffer_write_string(buf, "]");
 		buffer_write_type(buf, info.elem);
 	case Dynamic_Array:
-		buffer_write_string(buf, "[dynamic");
-		buffer_write_string(buf, "]");
+		buffer_write_string(buf, "[...]");
 		buffer_write_type(buf, info.elem);
 	case Slice:
 		buffer_write_string(buf, "[");
@@ -316,7 +316,7 @@ parse_int :: proc(s: string, offset: int) -> (int, int, bool) {
 	return result, offset+i, i != 0;
 }
 
-arg_number :: proc(fi: ^Fmt_Info, arg_index: int, format: string, offset: int, arg_count: int) -> (int, int, bool) {
+_arg_number :: proc(fi: ^Fmt_Info, arg_index: int, format: string, offset: int, arg_count: int) -> (int, int, bool) {
 	parse_arg_number :: proc(format: string) -> (int, int, bool) {
 		if format.count < 3 {
 			return 0, 1, false;
@@ -961,7 +961,7 @@ bprintf :: proc(b: ^Buffer, fmt: string, args: ...any) -> int {
 			}
 		}
 
-		arg_index, i, was_prev_index = arg_number(^fi, arg_index, fmt, i, args.count);
+		arg_index, i, was_prev_index = _arg_number(^fi, arg_index, fmt, i, args.count);
 
 		// Width
 		if i < end && fmt[i] == '*' {
@@ -991,7 +991,7 @@ bprintf :: proc(b: ^Buffer, fmt: string, args: ...any) -> int {
 				fi.good_arg_index = false;
 			}
 			if i < end && fmt[i] == '*' {
-				arg_index, i, was_prev_index = arg_number(^fi, arg_index, fmt, i, args.count);
+				arg_index, i, was_prev_index = _arg_number(^fi, arg_index, fmt, i, args.count);
 				i += 1;
 				fi.prec, arg_index, fi.prec_set = int_from_arg(args, arg_index);
 				if fi.prec < 0 {
@@ -1012,7 +1012,7 @@ bprintf :: proc(b: ^Buffer, fmt: string, args: ...any) -> int {
 		}
 
 		if !was_prev_index {
-			arg_index, i, was_prev_index = arg_number(^fi, arg_index, fmt, i, args.count);
+			arg_index, i, was_prev_index = _arg_number(^fi, arg_index, fmt, i, args.count);
 		}
 
 		if i >= end {

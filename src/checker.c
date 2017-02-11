@@ -1531,6 +1531,8 @@ void check_all_global_entities(Checker *c) {
 		add_curr_ast_file(c, d->scope->file);
 
 		if (!d->scope->has_been_imported) {
+			// NOTE(bill): All of these unchecked entities could mean a lot of unused allocations
+			// TODO(bill): Should this be worried about?
 			continue;
 		}
 
@@ -1566,6 +1568,30 @@ void check_all_global_entities(Checker *c) {
 	}
 }
 
+
+bool is_string_an_identifier(String s) {
+	isize offset = 0;
+	if (s.len < 1) {
+		return false;
+	}
+	while (offset < s.len) {
+		bool ok = false;
+		Rune r = -1;
+		isize size = gb_utf8_decode(s.text+offset, s.len-offset, &r);
+		if (offset == 0) {
+			ok = rune_is_letter(r);
+		} else {
+			ok = rune_is_letter(r) || rune_is_digit(r);
+		}
+
+		if (!ok) {
+			return false;
+		}
+		offset += size;
+	}
+
+	return offset == s.len;
+}
 
 String path_to_entity_name(String name, String fullpath) {
 	if (name.len != 0) {
@@ -1677,9 +1703,17 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 				case Entity_LibraryName:
 					break;
 				default: {
-					bool ok = add_entity(c, parent_scope, NULL, e);
-					if (ok && id->is_import) { // `#import`ed entities don't get exported
-						map_bool_set(&parent_scope->implicit, hash_pointer(e), true);
+
+					if (id->is_import) {
+						if (is_entity_name_exported(e)) {
+							// TODO(bill): Should these entities be imported but cause an error when used?
+							bool ok = add_entity(c, parent_scope, NULL, e);
+							if (ok) {
+								map_bool_set(&parent_scope->implicit, hash_pointer(e), true);
+							}
+						}
+					} else {
+						/* bool ok =  */add_entity(c, parent_scope, NULL, e);
 					}
 				} break;
 				}

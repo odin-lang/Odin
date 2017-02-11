@@ -5,7 +5,7 @@
 _ := compile_assert(ODIN_ARCH == "amd64"); // TODO(bill): x86 version
 
 
-yield_thread :: proc() { win32._mm_pause(); }
+yield_thread :: proc() { win32.mm_pause(); }
 mfence       :: proc() { win32.ReadWriteBarrier(); }
 sfence       :: proc() { win32.WriteBarrier(); }
 lfence       :: proc() { win32.ReadBarrier(); }

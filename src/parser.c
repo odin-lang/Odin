@@ -1832,6 +1832,7 @@ bool is_literal_type(AstNode *node) {
 	case AstNode_ArrayType:
 	case AstNode_VectorType:
 	case AstNode_StructType:
+	case AstNode_DynamicArrayType:
 	case AstNode_MapType:
 		return true;
 	}
@@ -2575,8 +2576,8 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		AstNode *count_expr = NULL;
 		bool is_vector = false;
 
-		if (f->curr_token.kind == Token_Ellipsis) {
-			count_expr = ast_ellipsis(f, expect_token(f, Token_Ellipsis), NULL);
+		if (f->curr_token.kind == Token_Question) {
+			count_expr = ast_unary_expr(f, expect_token(f, Token_Question), NULL);
 		} else if (f->curr_token.kind == Token_vector) {
 			next_token(f);
 			if (f->curr_token.kind != Token_CloseBracket) {
@@ -2587,7 +2588,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 				syntax_error(f->curr_token, "Vector type missing count");
 			}
 			is_vector = true;
-		} else if (f->curr_token.kind == Token_dynamic) {
+		} else if (f->curr_token.kind == Token_Ellipsis) {
 			next_token(f);
 			expect_token(f, Token_CloseBracket);
 			return ast_dynamic_array_type(f, token, parse_type(f));
@@ -3527,6 +3528,7 @@ AstNodeArray parse_stmt_list(AstFile *f) {
 
 
 ParseFileError init_ast_file(AstFile *f, String fullpath) {
+	fullpath = string_trim_whitespace(fullpath); // Just in case
 	if (!string_has_extension(fullpath, str_lit("odin"))) {
 		return ParseFile_WrongExtension;
 	}
@@ -3605,6 +3607,9 @@ void destroy_parser(Parser *p) {
 // NOTE(bill): Returns true if it's added
 bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) {
 	gb_mutex_lock(&p->mutex);
+
+	path = string_trim_whitespace(path);
+	rel_path = string_trim_whitespace(rel_path);
 
 	for_array(i, p->imports) {
 		String import = p->imports.e[i].path;
@@ -3786,7 +3791,7 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 				gb_printf_err("Invalid file extension: File must have the extension `.odin`");
 				break;
 			case ParseFile_InvalidFile:
-				gb_printf_err("Invalid file");
+				gb_printf_err("Invalid file or cannot be found");
 				break;
 			case ParseFile_Permission:
 				gb_printf_err("File permissions problem");

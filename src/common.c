@@ -6,6 +6,7 @@ gbAllocator heap_allocator(void) {
 	return gb_heap_allocator();
 }
 
+#include "unicode.c"
 #include "string.c"
 #include "array.c"
 
