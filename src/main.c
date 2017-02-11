@@ -401,6 +401,7 @@ int main(int argc, char **argv) {
 	char *linker;
 	if (build_context.is_dll) {
 		// Shared libraries are .dylib on MacOS and .so on Linux.
+		// TODO(zangent): Is that statement entirely truthful?
 		#if defined(GB_SYSTEM_OSX)
 			output_ext = ".dylib";
 		#else
