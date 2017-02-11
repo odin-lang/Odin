@@ -1232,7 +1232,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_defer:
 		case Token_asm:
 		case Token_using:
-		case Token_thread_local:
+		// case Token_thread_local:
 		case Token_no_alias:
 		// case Token_immutable:
 
@@ -3294,25 +3294,6 @@ AstNode *parse_stmt(AstFile *f) {
 	} break;
 #endif
 
-	case Token_thread_local: {
-		Token token = expect_token(f, Token_thread_local);
-		AstNode *node = parse_stmt(f);
-
-		if (node->kind == AstNode_ValueDecl) {
-			if (!node->ValueDecl.is_var) {
-				syntax_error(token, "`thread_local` may not be applied to constant declarations");
-			}
-			if (f->curr_proc != NULL) {
-				syntax_error(token, "`thread_local` is only allowed at the file scope");
-			} else {
-				node->ValueDecl.flags |= VarDeclFlag_thread_local;
-			}
-			return node;
-		}
-		syntax_error(token, "`thread_local` may only be applied to a variable declaration");
-		return ast_bad_stmt(f, token, f->curr_token);
-	}
-
 	case Token_push_allocator: {
 		next_token(f);
 		isize prev_level = f->expr_level;
@@ -3378,9 +3359,9 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			expect_semicolon(f, decl);
 			return decl;
-		} else if (str_eq(tag, str_lit("include"))) {
+		} else if (str_eq(tag, str_lit("load"))) {
 			AstNode *cond = NULL;
-			Token file_path = expect_token_after(f, Token_String, "#include");
+			Token file_path = expect_token_after(f, Token_String, "#load");
 			Token import_name = file_path;
 			import_name.string = str_lit(".");
 
@@ -3390,7 +3371,7 @@ AstNode *parse_stmt(AstFile *f) {
 
 			AstNode *decl = NULL;
 			if (f->curr_proc != NULL) {
-				syntax_error(import_name, "You cannot use `#include` within a procedure. This must be done at the file scope");
+				syntax_error(import_name, "You cannot use `#load` within a procedure. This must be done at the file scope");
 				decl = ast_bad_decl(f, import_name, file_path);
 			} else {
 				decl = ast_import_decl(f, hash_token, false, file_path, import_name, cond);
@@ -3469,6 +3450,22 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			expect_semicolon(f, s);
 			return s;
+		} else if (str_eq(tag, str_lit("thread_local"))) {
+			AstNode *s = parse_stmt(f);
+
+			if (s->kind == AstNode_ValueDecl) {
+				if (!s->ValueDecl.is_var) {
+					syntax_error(token, "`thread_local` may not be applied to constant declarations");
+				}
+				if (f->curr_proc != NULL) {
+					syntax_error(token, "`thread_local` is only allowed at the file scope");
+				} else {
+					s->ValueDecl.flags |= VarDeclFlag_thread_local;
+				}
+				return s;
+			}
+			syntax_error(token, "`thread_local` may only be applied to a variable declaration");
+			return ast_bad_stmt(f, token, f->curr_token);
 		} else if (str_eq(tag, str_lit("bounds_check"))) {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_bounds_check;

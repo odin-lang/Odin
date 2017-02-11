@@ -1470,7 +1470,7 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 				if (id->is_import) {
 					error_node(decl, "#import declarations are only allowed in the file scope");
 				} else {
-					error_node(decl, "#include declarations are only allowed in the file scope");
+					error_node(decl, "#load declarations are only allowed in the file scope");
 				}
 				// NOTE(bill): _Should_ be caught by the parser
 				// TODO(bill): Better error handling if it isn't
@@ -1686,7 +1686,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 		if (!previously_added) {
 			array_add(&parent_scope->imported, scope);
 		} else {
-			warning(token, "Multiple #import of the same file within this scope");
+			warning(token, "Multiple import of the same file within this scope");
 		}
 
 		scope->has_been_imported = true;
@@ -1698,24 +1698,19 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 				if (e->scope == parent_scope) {
 					continue;
 				}
-				switch (e->kind) {
-				case Entity_ImportName:
-				case Entity_LibraryName:
-					break;
-				default: {
-
-					if (id->is_import) {
-						if (is_entity_name_exported(e)) {
-							// TODO(bill): Should these entities be imported but cause an error when used?
-							bool ok = add_entity(c, parent_scope, NULL, e);
-							if (ok) {
-								map_bool_set(&parent_scope->implicit, hash_pointer(e), true);
-							}
+				if (!is_entity_kind_exported(e->kind)) {
+					continue;
+				}
+				if (id->is_import) {
+					if (is_entity_exported(e)) {
+						// TODO(bill): Should these entities be imported but cause an error when used?
+						bool ok = add_entity(c, parent_scope, NULL, e);
+						if (ok) {
+							map_bool_set(&parent_scope->implicit, hash_pointer(e), true);
 						}
-					} else {
-						/* bool ok =  */add_entity(c, parent_scope, NULL, e);
 					}
-				} break;
+				} else {
+					add_entity(c, parent_scope, NULL, e);
 				}
 			}
 		} else {

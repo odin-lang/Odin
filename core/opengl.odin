@@ -1,6 +1,6 @@
 #foreign_system_library lib "opengl32.lib" when ODIN_OS == "windows";
 #import win32 "sys/windows.odin" when ODIN_OS == "windows";
-#include "opengl_constants.odin";
+#load "opengl_constants.odin";
 
 Clear         :: proc(mask: u32)                                #foreign lib "glClear";
 ClearColor    :: proc(r, g, b, a: f32)                          #foreign lib "glClearColor";

@@ -213,26 +213,6 @@ String get_fullpath_core(gbAllocator a, String path) {
 	return res;
 }
 
-String get_filepath_extension(String path) {
-	isize dot = 0;
-	bool seen_slash = false;
-	for (isize i = path.len-1; i >= 0; i--) {
-		u8 c = path.text[i];
-		if (c == '/' || c == '\\') {
-			seen_slash = true;
-		}
-
-		if (c == '.') {
-			if (seen_slash) {
-				return str_lit("");
-			}
-
-			dot = i;
-			break;
-		}
-	}
-	return make_string(path.text, dot);
-}
 
 
 
