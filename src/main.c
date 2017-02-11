@@ -375,8 +375,22 @@ int main(int argc, char **argv) {
 	char lib_str_buf[1024] = {0};
 	for_array(i, ir_gen.module.foreign_library_paths) {
 		String lib = ir_gen.module.foreign_library_paths.e[i];
-		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-		                        " -l%.*s ", LIT(lib));
+
+		// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
+		//   This allows you to specify '-f' in a #foreign_system_library,
+		//   without having to implement any new syntax specifically for MacOS.
+		#if defined(GB_SYSTEM_OSX)
+			if(lib.len > 2 && lib.text[0] == '-' && lib.text[1] == 'f') {
+				isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+				                        " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
+			} else {
+				isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+				                        " -l%.*s ", LIT(lib));
+			}
+		#else
+			isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+			                        " -l%.*s ", LIT(lib));
+		#endif
 		lib_str = gb_string_appendc(lib_str, lib_str_buf);
 	}
 
