@@ -46,6 +46,10 @@ bit_reverse :: proc(b: u16) -> u16 #foreign __llvm_core "llvm.bitreverse.i16";
 bit_reverse :: proc(b: u32) -> u32 #foreign __llvm_core "llvm.bitreverse.i32";
 bit_reverse :: proc(b: u64) -> u64 #foreign __llvm_core "llvm.bitreverse.i64";
 
+byte_swap :: proc(b: u16) -> u16 #foreign __llvm_core "llvm.bswap.i16";
+byte_swap :: proc(b: u32) -> u32 #foreign __llvm_core "llvm.bswap.i32";
+byte_swap :: proc(b: u64) -> u64 #foreign __llvm_core "llvm.bswap.i64";
+
 fmuladd :: proc(a, b, c: f32) -> f32 #foreign __llvm_core "llvm.fmuladd.f32";
 fmuladd :: proc(a, b, c: f64) -> f64 #foreign __llvm_core "llvm.fmuladd.f64";
 
@@ -367,6 +371,3 @@ F64_MIN_10_EXP :: -307;                     // min decimal exponent
 F64_MIN_EXP    :: -1021;                    // min binary exponent
 F64_RADIX      :: 2;                        // exponent radix
 F64_ROUNDS     :: 1;                        // addition rounding: near
-
-
-
