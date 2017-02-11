@@ -145,16 +145,37 @@ gb_inline isize string_extension_position(String str) {
 	return dot_pos;
 }
 
+String string_trim_whitespace(String str) {
+	while (str.len > 0 && rune_is_whitespace(str.text[str.len-1])) {
+		str.len--;
+	}
+
+	while (str.len > 0 && rune_is_whitespace(str.text[0])) {
+		str.text++;
+		str.len--;
+	}
+
+	return str;
+}
+
 gb_inline bool string_has_extension(String str, String ext) {
-	if (str.len > ext.len+1) {
-		u8 *s = str.text+str.len - ext.len-1;
-		if (s[0] == '.') {
-			s++;
-			return gb_memcompare(s, ext.text, ext.len) == 0;
-		}
+	str = string_trim_whitespace(str);
+	if (str.len <= ext.len+1) {
 		return false;
 	}
-	return false;
+	isize len = str.len;
+	for (isize i = len-1; i >= 0; i--) {
+		if (str.text[i] == '.') {
+			break;
+		}
+		len--;
+	}
+	if (len == 0) {
+		return false;
+	}
+
+	u8 *s = str.text + len;
+	return gb_memcompare(s, ext.text, ext.len) == 0;
 }
 
 bool string_contains_char(String s, u8 c) {

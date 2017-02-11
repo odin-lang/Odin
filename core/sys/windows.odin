@@ -1,9 +1,8 @@
-_ := compile_assert(ODIN_OS == "windows");
-#foreign_system_library "kernel32.lib";
-#foreign_system_library "user32.lib";
-#foreign_system_library "gdi32.lib";
-#foreign_system_library "winmm.lib";
-#foreign_system_library "opengl32.lib";
+#foreign_system_library "kernel32.lib" when ODIN_OS == "windows";
+#foreign_system_library "user32.lib"   when ODIN_OS == "windows";
+#foreign_system_library "gdi32.lib"    when ODIN_OS == "windows";
+#foreign_system_library "winmm.lib"    when ODIN_OS == "windows";
+#foreign_system_library "opengl32.lib" when ODIN_OS == "windows";
 
 HANDLE    :: rawptr;
 HWND      :: HANDLE;
@@ -23,7 +22,7 @@ BOOL      :: i32;
 WNDPROC   :: #type proc(HWND, u32, WPARAM, LPARAM) -> LRESULT #cc_c;
 
 
-INVALID_HANDLE_VALUE :: cast(HANDLE)(~cast(int)0);
+INVALID_HANDLE_VALUE :: cast(HANDLE)~cast(int)0;
 
 FALSE: BOOL : 0;
 TRUE:  BOOL : 1;
@@ -289,7 +288,7 @@ InterlockedExchangeAdd64     :: proc(dst: ^i64, desired: i64) -> i64 #foreign ke
 InterlockedAnd64             :: proc(dst: ^i64, desired: i64) -> i64 #foreign kernel32;
 InterlockedOr64              :: proc(dst: ^i64, desired: i64) -> i64 #foreign kernel32;
 
-_mm_pause        :: proc() #foreign kernel32;
+mm_pause         :: proc() #foreign kernel32 "_mm_pause";
 ReadWriteBarrier :: proc() #foreign kernel32;
 WriteBarrier     :: proc() #foreign kernel32;
 ReadBarrier      :: proc() #foreign kernel32;

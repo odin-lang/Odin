@@ -208,6 +208,7 @@ typedef struct Scope {
 	bool           is_global;
 	bool           is_file;
 	bool           is_init;
+	bool           has_been_imported; // This is only applicable to file scopes
 	AstFile *      file;
 } Scope;
 gb_global Scope *universal_scope = NULL;
@@ -1542,6 +1543,12 @@ void check_all_global_entities(Checker *c) {
 		}
 		add_curr_ast_file(c, d->scope->file);
 
+		if (!d->scope->has_been_imported) {
+			// NOTE(bill): All of these unchecked entities could mean a lot of unused allocations
+			// TODO(bill): Should this be worried about?
+			continue;
+		}
+
 		if (e->kind != Entity_Procedure && str_eq(e->token.string, str_lit("main"))) {
 			if (e->scope->is_init) {
 				error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
@@ -1574,6 +1581,30 @@ void check_all_global_entities(Checker *c) {
 	}
 }
 
+
+bool is_string_an_identifier(String s) {
+	isize offset = 0;
+	if (s.len < 1) {
+		return false;
+	}
+	while (offset < s.len) {
+		bool ok = false;
+		Rune r = -1;
+		isize size = gb_utf8_decode(s.text+offset, s.len-offset, &r);
+		if (offset == 0) {
+			ok = rune_is_letter(r);
+		} else {
+			ok = rune_is_letter(r) || rune_is_digit(r);
+		}
+
+		if (!ok) {
+			return false;
+		}
+		offset += size;
+	}
+
+	return offset == s.len;
+}
 
 String path_to_entity_name(String name, String fullpath) {
 	if (name.len != 0) {
@@ -1618,6 +1649,12 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 		AstNode *decl = c->delayed_imports.e[i].decl;
 		ast_node(id, ImportDecl, decl);
 		Token token = id->relpath;
+
+		GB_ASSERT(parent_scope->is_file);
+
+		if (!parent_scope->has_been_imported) {
+			continue;
+		}
 
 		HashKey key = hash_string(id->fullpath);
 		Scope **found = map_scope_get(file_scopes, key);
@@ -1665,6 +1702,8 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 			warning(token, "Multiple #import of the same file within this scope");
 		}
 
+		scope->has_been_imported = true;
+
 		if (str_eq(id->import_name.string, str_lit("."))) {
 			// NOTE(bill): Add imported entities to this file's scope
 			for_array(elem_index, scope->elements.entries) {
@@ -1677,9 +1716,17 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 				case Entity_LibraryName:
 					break;
 				default: {
-					bool ok = add_entity(c, parent_scope, NULL, e);
-					if (ok && id->is_import) { // `#import`ed entities don't get exported
-						map_bool_set(&parent_scope->implicit, hash_pointer(e), true);
+
+					if (id->is_import) {
+						if (is_entity_name_exported(e)) {
+							// TODO(bill): Should these entities be imported but cause an error when used?
+							bool ok = add_entity(c, parent_scope, NULL, e);
+							if (ok) {
+								map_bool_set(&parent_scope->implicit, hash_pointer(e), true);
+							}
+						}
+					} else {
+						/* bool ok =  */add_entity(c, parent_scope, NULL, e);
 					}
 				} break;
 				}
@@ -1734,6 +1781,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 			}
 		}
 
+
 		String library_name = path_to_entity_name(fl->library_name.string, file_str);
 		if (str_eq(library_name, str_lit("_"))) {
 			error(fl->token, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
@@ -1766,6 +1814,10 @@ void check_parsed_files(Checker *c) {
 
 		if (scope->is_global) {
 			array_add(&c->global_scope->shared, scope);
+		}
+
+		if (scope->is_init || scope->is_global) {
+			scope->has_been_imported = true;
 		}
 
 		f->scope = scope;

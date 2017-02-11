@@ -37,7 +37,7 @@ typedef enum EntityFlag {
 	EntityFlag_VectorElem = 1<<5,
 	EntityFlag_Ellipsis   = 1<<6,
 	EntityFlag_NoAlias    = 1<<7,
-	EntityFlag_EnumField  = 1<<8,
+	EntityFlag_TypeField  = 1<<8,
 } EntityFlag;
 
 typedef enum OverloadKind {
@@ -97,6 +97,15 @@ struct Entity {
 };
 
 gb_global Entity *e_context = NULL;
+
+bool is_entity_name_exported(Entity *e) {
+	GB_ASSERT(e != NULL);
+	String name = e->token.string;
+	if (name.len == 0) {
+		return false;
+	}
+	return name.text[0] != '_';
+}
 
 
 Entity *alloc_entity(gbAllocator a, EntityKind kind, Scope *scope, Token token, Type *type) {

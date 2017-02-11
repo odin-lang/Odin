@@ -1,4 +1,4 @@
-#import "fmt.odin";
+#import . "fmt.odin";
 #import "atomic.odin";
 #import "hash.odin";
 #import "math.odin";
@@ -6,18 +6,18 @@
 #import "opengl.odin";
 #import "os.odin";
 #import "sync.odin";
+#import "types.odin";
 #import "utf8.odin";
-#import ht "http_test.odin";
 
 main :: proc() {
+
 	{
 		Fruit :: enum {
 			APPLE,
 			BANANA,
 			COCONUT,
 		}
-
-		fmt.println(Fruit.names);
+		println(x, Fruit.names);
 	}
 
 when false {
@@ -33,16 +33,16 @@ when false {
 		c := m[3.0];
 		assert(ok && c == 564);
 
-		fmt.print("map[");
+		print("map[");
 		i := 0;
 		for val, key in m {
 			if i > 0 {
-				fmt.print(", ");
+				print(", ");
 			}
-			fmt.printf("%v=%v", key, val);
+			printf("%v=%v", key, val);
 			i += 1;
 		}
-		fmt.println("]");
+		println("]");
 	}
 	{
 		m := map[string]u32{
@@ -56,11 +56,11 @@ when false {
 		_, ok := m["c"];
 		assert(ok && c == 7654);
 
-		fmt.println(m);
+		println(m);
 	}
 
 	{
-		fmt.println("Hellope!");
+		println("Hellope!");
 
 		x: [dynamic]f64;
 		reserve(x, 16);
@@ -68,24 +68,24 @@ when false {
 		append(x, 2_000_000.500_000, 3, 5, 7);
 
 		for p, i in x {
-			if i > 0 { fmt.print(", "); }
-			fmt.print(p);
+			if i > 0 { print(", "); }
+			print(p);
 		}
-		fmt.println();
+		println();
 
 		{
 			Vec3 :: [vector 3]f32;
 
 			x := Vec3{1, 2, 3};
 			y := Vec3{4, 5, 6};
-			fmt.println(x < y);
-			fmt.println(x + y);
-			fmt.println(x - y);
-			fmt.println(x * y);
-			fmt.println(x / y);
+			println(x < y);
+			println(x + y);
+			println(x - y);
+			println(x * y);
+			println(x / y);
 
 			for i in x {
-				fmt.println(i);
+				println(i);
 			}
 		}
 	}

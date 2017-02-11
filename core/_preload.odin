@@ -17,7 +17,7 @@
 Type_Info_Member :: struct #ordered {
 	name:      string,     // can be empty if tuple
 	type_info: ^Type_Info,
-	offset:    int,        // offsets are not used in tuples
+	offset:    int,        // offsets may not be used in tuples
 }
 Type_Info_Record :: struct #ordered {
 	fields:       []Type_Info_Member,
@@ -83,7 +83,7 @@ Type_Info :: union {
 		count:     int,
 		align:     int,
 	},
-	Tuple:     Type_Info_Record,
+	Tuple:     Type_Info_Record, // Only really used for procedures
 	Struct:    Type_Info_Record,
 	Union:     Type_Info_Record,
 	Raw_Union: Type_Info_Record,
@@ -373,7 +373,7 @@ Raw_Dynamic_Array :: struct #ordered {
 };
 
 Raw_Dynamic_Map :: struct #ordered {
-	hashes:  [dynamic]int,
+	hashes:  [...]int,
 	entries: Raw_Dynamic_Array,
 };
 

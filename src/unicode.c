@@ -39,28 +39,3 @@ bool rune_is_whitespace(Rune r) {
 	}
 	return false;
 }
-
-
-bool is_string_an_identifier(String s) {
-	isize offset = 0;
-	if (s.len < 1) {
-		return false;
-	}
-	while (offset < s.len) {
-		bool ok = false;
-		Rune r = -1;
-		isize size = gb_utf8_decode(s.text+offset, s.len-offset, &r);
-		if (offset == 0) {
-			ok = rune_is_letter(r);
-		} else {
-			ok = rune_is_letter(r) || rune_is_digit(r);
-		}
-
-		if (!ok) {
-			return false;
-		}
-		offset += size;
-	}
-
-	return offset == s.len;
-}

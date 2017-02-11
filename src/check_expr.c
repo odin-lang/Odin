@@ -360,6 +360,11 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 
 				Token name_token = name->Ident;
 
+				if (str_eq(name_token.string, str_lit(""))) {
+					error(name_token, "`names` is a reserved identifier for unions");
+					continue;
+				}
+
 				Type *type = make_type_named(c->allocator, name_token.string, base_type, NULL);
 				Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, type);
 				type->Named.type_name = e;
@@ -521,6 +526,11 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	struct_type->Record.fields_in_src_order = fields;
 	struct_type->Record.field_count         = field_count;
 
+	// struct_type->Record.names = make_entity_field(c->allocator, c->context.scope,
+	// 	make_token_ident(str_lit("names")), t_string_slice, false, 0);
+	// struct_type->Record.names->Variable.is_immutable = true;
+	// struct_type->Record.names->flags |= EntityFlag_TypeField;
+
 	if (!st->is_packed && !st->is_ordered) {
 		// NOTE(bill): Reorder fields for reduced size/performance
 
@@ -605,6 +615,11 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	union_type->Record.fields            = fields;
 	union_type->Record.field_count       = field_count;
+
+	// union_type->Record.names = make_entity_field(c->allocator, c->context.scope,
+	// 	make_token_ident(str_lit("names")), t_string_slice, false, 0);
+	// union_type->Record.names->Variable.is_immutable = true;
+	// union_type->Record.names->flags |= EntityFlag_TypeField;
 }
 
 void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
@@ -628,6 +643,11 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	union_type->Record.fields = fields;
 	union_type->Record.field_count = field_count;
+
+// 	union_type->Record.names = make_entity_field(c->allocator, c->context.scope,
+// 		make_token_ident(str_lit("names")), t_string_slice, false, 0);
+// 	union_type->Record.names->Variable.is_immutable = true;
+// 	union_type->Record.names->flags |= EntityFlag_TypeField;
 }
 
 // GB_COMPARE_PROC(cmp_enum_order) {
@@ -662,6 +682,10 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 
 	if (base_type == NULL || !(is_type_integer(base_type) || is_type_float(base_type))) {
 		error_node(node, "Base type for enumeration must be numeric");
+		return;
+	}
+	if (is_type_enum(base_type)) {
+		error_node(node, "Base type for enumeration cannot be another enumeration");
 		return;
 	}
 
@@ -764,8 +788,9 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 			add_entity_use(c, field, e);
 		}
 	}
-
 	GB_ASSERT(field_count <= et->fields.count);
+	gb_temp_arena_memory_end(tmp);
+
 
 	enum_type->Record.fields = fields;
 	enum_type->Record.field_count = field_count;
@@ -777,12 +802,10 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	enum_type->Record.enum_max_value = make_entity_constant(c->allocator, c->context.scope,
 		make_token_ident(str_lit("max_value")), constant_type, max_value);
 
-	enum_type->Record.enum_names = make_entity_field(c->allocator, c->context.scope,
+	enum_type->Record.names = make_entity_field(c->allocator, c->context.scope,
 		make_token_ident(str_lit("names")), t_string_slice, false, 0);
-	enum_type->Record.enum_names->Variable.is_immutable = true;
-	enum_type->Record.enum_names->flags |= EntityFlag_EnumField;
-
-	gb_temp_arena_memory_end(tmp);
+	enum_type->Record.names->Variable.is_immutable = true;
+	enum_type->Record.names->flags |= EntityFlag_TypeField;
 }
 
 
@@ -1058,6 +1081,11 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 		return 0;
 	}
 	Operand o = {0};
+	if (e->kind == AstNode_UnaryExpr &&
+	    e->UnaryExpr.op.kind == Token_Question) {
+		return -1;
+	}
+
 	check_expr(c, &o, e);
 	if (o.mode != Addressing_Constant) {
 		if (o.mode != Addressing_Invalid) {
@@ -1291,7 +1319,12 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 	case_ast_node(at, ArrayType, e);
 		if (at->count != NULL) {
 			Type *elem = check_type_extra(c, at->elem, NULL);
-			type = make_type_array(c->allocator, elem, check_array_or_map_count(c, at->count, false));
+			i64 count = check_array_or_map_count(c, at->count, false);
+			if (count < 0) {
+				error_node(at->count, "? can only be used in conjuction with compound literals");
+				count = 0;
+			}
+			type = make_type_array(c->allocator, elem, count);
 		} else {
 			Type *elem = check_type(c, at->elem);
 			type = make_type_slice(c->allocator, elem);
@@ -2506,18 +2539,22 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
 
-		if (e != NULL && e->kind == Entity_ImportName &&
-		    selector->kind == AstNode_Ident) {
+		if (e != NULL && e->kind == Entity_ImportName && selector->kind == AstNode_Ident) {
+			// IMPORTANT NOTE(bill): This is very sloppy code but it's also very fragile
+			// It pretty much needs to be in this order and this way
+			// If you can clean this up, please do but be really careful
+
 			String sel_name = selector->Ident.string;
 
 			check_op_expr = false;
 			entity = scope_lookup_entity(e->ImportName.scope, sel_name);
 			bool is_declared = entity != NULL;
-			if (entity->kind == Entity_Builtin) {
-				is_declared = false;
-			}
-			if (entity->scope->is_global && !e->ImportName.scope->is_global) {
-				is_declared = false;
+			if (is_declared) {
+				if (entity->kind == Entity_Builtin) {
+					is_declared = false;
+				} else if (entity->scope->is_global && !e->ImportName.scope->is_global) {
+					is_declared = false;
+				}
 			}
 			if (!is_declared) {
 				error_node(op_expr, "`%.*s` is not declared by `%.*s`", LIT(sel_name), LIT(name));
@@ -2537,6 +2574,17 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 				if (overload_count > 1) {
 					is_overloaded = true;
 				}
+			}
+
+
+			is_not_exported = !is_entity_name_exported(entity);
+
+			if (is_not_exported) {
+				gbString sel_str = expr_to_string(selector);
+				error_node(op_expr, "`%s` is not exported by `%.*s`", sel_str, LIT(name));
+				gb_string_free(sel_str);
+				// NOTE(bill): We will have to cause an error his even though it exists
+				goto error;
 			}
 
 			if (is_overloaded) {
@@ -2583,7 +2631,6 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			}
 
 			bool *found = map_bool_get(&e->ImportName.scope->implicit, hash_pointer(entity));
-
 			if (!found) {
 				is_not_exported = false;
 			} else {
@@ -2613,8 +2660,8 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		sel = lookup_field(c->allocator, operand->type, selector->Ident.string, operand->mode == Addressing_Type);
 		entity = sel.entity;
 
-		// NOTE(bill): Add enum type info needed for fields like `names`
-		if (entity != NULL && (entity->flags&EntityFlag_EnumField)) {
+		// NOTE(bill): Add type info needed for fields like `names`
+		if (entity != NULL && (entity->flags&EntityFlag_TypeField)) {
 			add_type_info_type(c, operand->type);
 		}
 	}
@@ -4454,16 +4501,18 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 	case_ast_node(cl, CompoundLit, node);
 		Type *type = type_hint;
-		bool ellipsis_array = false;
+		bool is_to_be_determined_array_count = false;
 		bool is_constant = true;
 		if (cl->type != NULL) {
 			type = NULL;
 
 			// [..]Type
 			if (cl->type->kind == AstNode_ArrayType && cl->type->ArrayType.count != NULL) {
-				if (cl->type->ArrayType.count->kind == AstNode_Ellipsis) {
+				AstNode *count = cl->type->ArrayType.count;
+				if (count->kind == AstNode_UnaryExpr &&
+				    count->UnaryExpr.op.kind == Token_Question) {
 					type = make_type_array(c->allocator, check_type(c, cl->type->ArrayType.elem), -1);
-					ellipsis_array = true;
+					is_to_be_determined_array_count = true;
 				}
 			}
 
@@ -4575,18 +4624,28 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		case Type_Slice:
 		case Type_Array:
 		case Type_Vector:
+		case Type_DynamicArray:
 		{
 			Type *elem_type = NULL;
 			String context_name = {0};
+			i64 max_type_count = -1;
 			if (t->kind == Type_Slice) {
 				elem_type = t->Slice.elem;
 				context_name = str_lit("slice literal");
 			} else if (t->kind == Type_Vector) {
 				elem_type = t->Vector.elem;
 				context_name = str_lit("vector literal");
-			} else {
+				max_type_count = t->Vector.count;
+			} else if (t->kind == Type_Array) {
 				elem_type = t->Array.elem;
 				context_name = str_lit("array literal");
+				max_type_count = t->Array.count;
+			} else if (t->kind == Type_DynamicArray) {
+				elem_type = t->DynamicArray.elem;
+				context_name = str_lit("dynamic array literal");
+				is_constant = false;
+			} else {
+				GB_PANIC("unreachable");
 			}
 
 
@@ -4606,15 +4665,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 					continue;
 				}
 
-				if (t->kind == Type_Array &&
-				    t->Array.count >= 0 &&
-				    index >= t->Array.count) {
-					error_node(e, "Index %lld is out of bounds (>= %lld) for array literal", index, t->Array.count);
-				}
-				if (t->kind == Type_Vector &&
-				    t->Vector.count >= 0 &&
-				    index >= t->Vector.count) {
-					error_node(e, "Index %lld is out of bounds (>= %lld) for vector literal", index, t->Vector.count);
+				if (0 <= max_type_count && max_type_count <= index) {
+					error_node(e, "Index %lld is out of bounds (>= %lld) for %.*s", index, max_type_count, LIT(context_name));
 				}
 
 				Operand operand = {0};
@@ -4635,7 +4687,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 				}
 			}
 
-			if (t->kind == Type_Array && ellipsis_array) {
+			if (t->kind == Type_Array && is_to_be_determined_array_count) {
 				t->Array.count = max;
 			}
 		} break;
@@ -5153,14 +5205,17 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		}
 	case_end;
 
+	case AstNode_HelperType:
 	case AstNode_ProcType:
 	case AstNode_PointerType:
 	case AstNode_ArrayType:
+	case AstNode_DynamicArrayType:
 	case AstNode_VectorType:
 	case AstNode_StructType:
 	case AstNode_UnionType:
 	case AstNode_RawUnionType:
 	case AstNode_EnumType:
+	case AstNode_MapType:
 		o->mode = Addressing_Type;
 		o->type = check_type(c, node);
 		break;
@@ -5388,7 +5443,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_end;
 
 	case_ast_node(e, Ellipsis, node);
-		str = gb_string_appendc(str, "..");
+		str = gb_string_appendc(str, "...");
 	case_end;
 
 	case_ast_node(fv, FieldValue, node);
@@ -5404,13 +5459,18 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(at, ArrayType, node);
 		str = gb_string_appendc(str, "[");
-		str = write_expr_to_string(str, at->count);
+		if (at->count->kind == AstNode_UnaryExpr &&
+		    at->count->UnaryExpr.op.kind == Token_Hash) {
+			str = gb_string_appendc(str, "#");
+		} else {
+			str = write_expr_to_string(str, at->count);
+		}
 		str = gb_string_appendc(str, "]");
 		str = write_expr_to_string(str, at->elem);
 	case_end;
 
 	case_ast_node(at, DynamicArrayType, node);
-		str = gb_string_appendc(str, "[dynamic]");
+		str = gb_string_appendc(str, "[...]");
 		str = write_expr_to_string(str, at->elem);
 	case_end;
 

@@ -4,7 +4,6 @@ extern "C" {
 
 #include "common.c"
 #include "timings.c"
-#include "unicode.c"
 #include "build.c"
 #include "tokenizer.c"
 #include "parser.c"

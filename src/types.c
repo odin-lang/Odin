@@ -102,12 +102,12 @@ typedef struct TypeRecord {
 	Entity **fields_in_src_order; // Entity_Variable
 
 	i64      custom_align; // NOTE(bill): Only used in structs at the moment
+	Entity * names;
 
 	Type *   enum_base_type;
 	Entity * enum_count;
 	Entity * enum_min_value;
 	Entity * enum_max_value;
-	Entity * enum_names;
 } TypeRecord;
 
 #define TYPE_KINDS                                        \
@@ -1318,6 +1318,14 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		return sel;
 	}
 	if (is_type) {
+		if (type->kind == Type_Record) {
+			if (type->Record.names != NULL &&
+			    str_eq(field_name, str_lit("names"))) {
+				sel.entity = type->Record.names;
+				return sel;
+			}
+		}
+
 		if (is_type_union(type)) {
 			// NOTE(bill): The subtype for a union are stored in the fields
 			// as they are "kind of" like variables but not
@@ -1345,10 +1353,6 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				}
 				if (str_eq(field_name, str_lit("max_value"))) {
 					sel.entity = type->Record.enum_max_value;
-					return sel;
-				}
-				if (str_eq(field_name, str_lit("names"))) {
-					sel.entity = type->Record.enum_names;
 					return sel;
 				}
 			}

@@ -999,7 +999,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 
 
-		if (unparen_expr(lhs)->kind != AstNode_Ident) {
+		if (lhs->kind != AstNode_Ident) {
 			error_node(rhs, "Expected an identifier, got `%.*s`", LIT(ast_node_strings[rhs->kind]));
 			break;
 		}
@@ -1067,9 +1067,17 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 
 			check_open_scope(c, stmt);
-			if (case_type != NULL) {
-				add_type_info_type(c, case_type);
+			if (case_type == NULL) {
+				if (is_union_ptr) {
+					case_type = type_deref(x.type);
+				} else {
+					case_type = x.type;
+				}
+			}
 
+			add_type_info_type(c, case_type);
+
+			{
 				// NOTE(bill): Dummy type
 				Type *tt = case_type;
 				if (is_union_ptr) {
