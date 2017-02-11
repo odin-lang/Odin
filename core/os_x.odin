@@ -4,6 +4,9 @@ Handle    :: i32;
 File_Time :: u64;
 Errno     :: int;
 
+// TODO(zangent): Find out how to make this work on x64 and x32.
+AddressSize :: i64;
+
 // INVALID_HANDLE: Handle : -1;
 
 
@@ -19,79 +22,104 @@ O_APPEND   :: 0x00400;
 O_SYNC     :: 0x01000;
 O_ASYNC    :: 0x02000;
 O_CLOEXEC  :: 0x80000;
+SEEK_SET   :: 0;
+SEEK_CUR   :: 1;
+SEEK_END   :: 2;
+SEEK_DATA  :: 3;
+SEEK_HOLE  :: 4;
+SEEK_MAX   :: SEEK_HOLE;
 
 // NOTE(zangent): These are OS specific!
 // Do not mix these up!
-RTLD_LAZY  :: 0x1;
-RTLD_NOW   :: 0x2;
-RTLD_LOCAL :: 0x4;
-RTLD_GLOBAL:: 0x8;
+RTLD_LAZY     :: 0x1;
+RTLD_NOW      :: 0x2;
+RTLD_LOCAL    :: 0x4;
+RTLD_GLOBAL   :: 0x8;
 RTLD_NODELETE :: 0x80;
-RTLD_NOLOAD :: 0x10;
-RTLD_FIRST :: 0x100;
-
-
+RTLD_NOLOAD   :: 0x10;
+RTLD_FIRST    :: 0x100;
 
 #foreign_system_library dl   "dl";
 #foreign_system_library libc "c";
 
-unix_open   :: proc(path: ^u8, mode: int, perm: u32) -> Handle           #foreign libc "open";
-unix_close  :: proc(handle: Handle)                                      #foreign libc "close";
-unix_read   :: proc(handle: Handle, buffer: rawptr, count: int) -> int   #foreign libc "read";
-unix_write  :: proc(handle: Handle, buffer: rawptr, count: int) -> int   #foreign libc "write";
-unix_gettid :: proc() -> u64                                             #foreign libc "gettid";
+unix_open   :: proc(path: ^u8, mode: int) -> Handle                               #foreign libc "open";
+unix_close  :: proc(handle: Handle)                                               #foreign libc "close";
+unix_read   :: proc(handle: Handle, buffer: rawptr, count: int) -> AddressSize    #foreign libc "read";
+unix_write  :: proc(handle: Handle, buffer: rawptr, count: int) -> AddressSize    #foreign libc "write";
+unix_lseek  :: proc(fs: Handle, offset: AddressSize, whence: int) -> AddressSize  #foreign libc "lseek";
+unix_gettid :: proc() -> u64                                                      #foreign libc "gettid";
 
-unix_malloc  :: proc(size: int) -> rawptr                                #foreign libc "malloc";
-unix_free    :: proc(ptr: rawptr)                                        #foreign libc "free";
-unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr                   #foreign libc "realloc";
+unix_malloc  :: proc(size: int) -> rawptr                                         #foreign libc "malloc";
+unix_free    :: proc(ptr: rawptr)                                                 #foreign libc "free";
+unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr                            #foreign libc "realloc";
 
-unix_exit :: proc(status: int)                                           #foreign libc "exit";
+unix_exit :: proc(status: int)                                                    #foreign libc "exit";
 
-unix_dlopen :: proc(filename: ^u8, flags: int) -> rawptr                 #foreign dl   "dlopen";
-unix_dlsym :: proc(handle: rawptr, symbol: ^u8) ->  (proc() #cc_c)       #foreign dl   "dlsym";
-unix_dlclose :: proc(handle: rawptr) -> int                              #foreign dl   "dlclose";
-unix_dlerror :: proc() -> ^u8                                            #foreign dl   "dlerror";
+unix_dlopen  :: proc(filename: ^u8, flags: int) -> rawptr                         #foreign dl   "dlopen";
+unix_dlsym   :: proc(handle: rawptr, symbol: ^u8) ->  (proc() #cc_c)              #foreign dl   "dlsym";
+unix_dlclose :: proc(handle: rawptr) -> int                                       #foreign dl   "dlclose";
+unix_dlerror :: proc() -> ^u8                                                     #foreign dl   "dlerror";
 
+to_c_str :: proc(str: string) -> ^u8 {
+	cstr := new_slice(byte, str.count+1);
+	copy(cstr, cast([]byte)str);
+	cstr[str.count] = 0;
+	return cstr.data;
+}
+
+from_c_str :: proc(c_str: ^u8) -> string {
+	len := 0;
+	for s := c_str; s^ != 0; s += 1 {
+		len += 1;
+	}
+	return cast(string)slice_ptr(c_str, len);
+}
+
+open :: proc(path: string, mode: int) -> (Handle, Errno) {
+	
+	handle := unix_open(to_c_str(path), mode);
+	if(handle == -1) {
+		return 0, 1;
+	}
+	return handle, 0;
+}
+// NOTE(zangent): This is here for compatability reasons. Should this be here?
 open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
-	return unix_open(path.data, mode, perm), 0;
+	return open(path, mode);
 }
 
 close :: proc(fd: Handle) {
 	unix_close(fd);
 }
 
-write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
-	return unix_write(fd, data.data, data.count), 0;
+write :: proc(fd: Handle, data: []byte) -> (AddressSize, Errno) {
+	assert(fd != -1);
+
+	bytes_written := unix_write(fd, data.data, data.count);
+	if(bytes_written == -1) {
+		return 0, 1;
+	}
+	return bytes_written, 0;
 }
 
-read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
-	return unix_read(fd, data.data, data.count), 0;
+read :: proc(fd: Handle, data: []byte) -> (AddressSize, Errno) {
+	assert(fd != -1);
+
+	bytes_read := unix_read(fd, data.data, data.count);
+	if(bytes_read == -1) {
+		return 0, 1;
+	}
+	return bytes_read, 0;
 }
 
-seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
-	/*
-	using win32;
-	w: u32;
-	match whence {
-	case 0: w = FILE_BEGIN;
-	case 1: w = FILE_CURRENT;
-	case 2: w = FILE_END;
-	}
-	hi := cast(i32)(offset>>32);
-	lo := cast(i32)(offset);
-	ft := GetFileType(cast(HANDLE)fd);
-	if ft == FILE_TYPE_PIPE {
-		return 0, ERROR_FILE_IS_PIPE;
-	}
-	dw_ptr := SetFilePointer(cast(HANDLE)fd, lo, ^hi, w);
-	if dw_ptr == INVALID_SET_FILE_POINTER {
-		err := GetLastError();
-		return 0, cast(Errno)err;
-	}
-	return cast(i64)hi<<32 + cast(i64)dw_ptr, ERROR_NONE;
+seek :: proc(fd: Handle, offset: AddressSize, whence: int) -> (AddressSize, Errno) {
+	assert(fd != -1);
 
-	*/
-	return 0, 0;
+	final_offset := unix_lseek(fd, offset, whence);
+	if(final_offset == -1) {
+		return 0, 1;
+	}
+	return final_offset, 0;
 }
 
 
@@ -100,97 +128,56 @@ stdin:  Handle = 0; // get_std_handle(win32.STD_INPUT_HANDLE);
 stdout: Handle = 1; // get_std_handle(win32.STD_OUTPUT_HANDLE);
 stderr: Handle = 2; // get_std_handle(win32.STD_ERROR_HANDLE);
 
-
-/*
-get_std_handle :: proc(h: int) -> Handle {
-	fd := win32.GetStdHandle(cast(i32)h);
-	win32.SetHandleInformation(fd, win32.HANDLE_FLAG_INHERIT, 0);
-	return cast(Handle)fd;
-}
-
-
-
-
-
-
-last_write_time :: proc(fd: Handle) -> File_Time {
-	file_info: win32.BY_HANDLE_FILE_INFORMATION;
-	win32.GetFileInformationByHandle(cast(win32.HANDLE)fd, ^file_info);
-	lo := cast(File_Time)file_info.last_write_time.lo;
-	hi := cast(File_Time)file_info.last_write_time.hi;
-	return lo | hi << 32;
-}
-
-last_write_time_by_name :: proc(name: string) -> File_Time {
-	last_write_time: win32.FILETIME;
-	data: win32.FILE_ATTRIBUTE_DATA;
-	buf: [1024]byte;
-
-	assert(buf.count > name.count);
-
-	copy(buf[:], cast([]byte)name);
-
-	if win32.GetFileAttributesExA(^buf[0], win32.GetFileExInfoStandard, ^data) != 0 {
-		last_write_time = data.last_write_time;
-	}
-
-	l := cast(File_Time)last_write_time.lo;
-	h := cast(File_Time)last_write_time.hi;
-	return l | h << 32;
-}
-
-
-
-
+/* TODO(zangent): Implement these!
+last_write_time :: proc(fd: Handle) -> File_Time {}
+last_write_time_by_name :: proc(name: string) -> File_Time {}
+*/
 
 read_entire_file :: proc(name: string) -> ([]byte, bool) {
-	buf: [300]byte;
-	copy(buf[:], cast([]byte)name);
 
-	fd, err := open(name, O_RDONLY, 0);
-	if err != ERROR_NONE {
+	handle, err := open(name, O_RDONLY);
+	if(err != 0) {
+		fmt.println("Failed to open file.");
 		return nil, false;
 	}
-	defer close(fd);
+	defer(close(handle));
 
-	length: i64;
-	file_size_ok := win32.GetFileSizeEx(cast(win32.HANDLE)fd, ^length) != 0;
-	if !file_size_ok {
+	// We have a file!
+
+	size: AddressSize;
+	size, err = seek(handle, 0, SEEK_END);
+	if(err != 0) {
+		fmt.println("Failed to seek to end of file.");
 		return nil, false;
 	}
 
-	data := new_slice(u8, length);
+	_, err = seek(handle, 0, SEEK_SET);
+	if(err != 0) {
+		fmt.println("Failed to seek to beginning of file.");
+		return nil, false;
+	}
+
+	// We have a file size!
+
+	data := new_slice(u8, size);
 	if data.data == nil {
+		fmt.println("Failed to allocate file buffer.");
 		return nil, false;
 	}
 
-	single_read_length: i32;
-	total_read: i64;
-
-	for total_read < length {
-		remaining := length - total_read;
-		to_read: u32;
-		MAX :: 1<<32-1;
-		if remaining <= MAX {
-			to_read = cast(u32)remaining;
-		} else {
-			to_read = MAX;
-		}
-
-		win32.ReadFile(cast(win32.HANDLE)fd, ^data[total_read], to_read, ^single_read_length, nil);
-		if single_read_length <= 0 {
-			free(data);
-			return nil, false;
-		}
-
-		total_read += cast(i64)single_read_length;
-	}
+	read(handle, data);
 
 	return data, true;
 }
+read_entire_file_to_string :: proc(name: string) -> (string, bool) {
 
-
-*/
+	contents, success := read_entire_file(name);
+	if(!success) {
+		fmt.println("Failed to seek to end of file.");
+		return  "", false;
+	}
+	return from_c_str(^contents[0]), true;
+}
 
 heap_alloc :: proc(size: int) -> rawptr #inline {
 	assert(size > 0);
@@ -215,22 +202,16 @@ current_thread_id :: proc() -> int {
 }
 
 dlopen :: proc(filename: string, flags: int) -> rawptr #inline {
-	return unix_dlopen(filename.data, flags);
+	return unix_dlopen(to_c_str(filename), flags);
 }
 dlsym :: proc(handle: rawptr, symbol: string) -> (proc() #cc_c) #inline {
 	assert(handle != nil);
-	return unix_dlsym(handle, symbol.data);
+	return unix_dlsym(handle, to_c_str(symbol));
 }
 dlclose :: proc(handle: rawptr) -> bool #inline {
 	assert(handle != nil);
 	return unix_dlclose(handle) == 0;
 }
 dlerror :: proc() -> string {
-	// TODO(zangent): Should this be split out into a from_c_string()?
-	c_str := unix_dlerror();
-	len := 0;
-	for s := c_str; s^ != 0; s += 1 {
-		len += 1;
-	}
-	return cast(string)slice_ptr(c_str, len);
+	return from_c_str(unix_dlerror());
 }
