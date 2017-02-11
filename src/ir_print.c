@@ -172,13 +172,6 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		ir_print_type(f, m, t->Pointer.elem);
 		ir_fprintf(f, "*");
 		return;
-	case Type_Maybe:
-		ir_fprintf(f, "{");
-		ir_print_type(f, m, t->Maybe.elem);
-		ir_fprintf(f, ", ");
-		ir_print_type(f, m, t_bool);
-		ir_fprintf(f, "}");
-		return;
 	case Type_Array:
 		ir_fprintf(f, "[%lld x ", t->Array.count);
 		ir_print_type(f, m, t->Array.elem);
@@ -306,24 +299,10 @@ void ir_print_compound_element(irFileBuffer *f, irModule *m, ExactValue v, Type 
 	ir_print_type(f, m, elem_type);
 	ir_fprintf(f, " ");
 
-	if (v.kind != ExactValue_Invalid && is_type_maybe(elem_type)) {
-		Type *t = base_type(elem_type)->Maybe.elem;
-		ir_fprintf(f, "{");
-		ir_print_type(f, m, t);
-		ir_fprintf(f, " ");
-	}
-
 	if (v.kind == ExactValue_Invalid || base_type(elem_type) == t_any) {
 		ir_fprintf(f, "zeroinitializer");
 	} else {
 		ir_print_exact_value(f, m, v, elem_type);
-	}
-
-	if (v.kind != ExactValue_Invalid && is_type_maybe(elem_type)) {
-		ir_fprintf(f, ", ");
-		ir_print_type(f, m, t_bool);
-		ir_fprintf(f, " ");
-		ir_fprintf(f, "true}");
 	}
 }
 

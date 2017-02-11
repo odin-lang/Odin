@@ -167,14 +167,6 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		return 1;
 	}
 
-	if (is_type_maybe(dst)) {
-		Type *elem = base_type(dst)->Maybe.elem;
-		if (are_types_identical(elem, s)) {
-			return 1;
-		}
-		return -1;
-	}
-
 	if (check_is_assignable_to_using_subtype(operand->type, type)) {
 		return 4;
 	}
@@ -743,7 +735,13 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		} else if (str_eq(name, str_lit("max_value"))) {
 			error_node(field, "`max_value` is a reserved identifier for enumerations");
 			continue;
-		}
+		} else if (str_eq(name, str_lit("names"))) {
+			error_node(field, "`names` is a reserved identifier for enumerations");
+			continue;
+		}/*  else if (str_eq(name, str_lit("base_type"))) {
+			error_node(field, "`base_type` is a reserved identifier for enumerations");
+			continue;
+		} */
 
 		if (compare_exact_values(Token_Gt, min_value, iota)) {
 			min_value = iota;
@@ -778,6 +776,11 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		make_token_ident(str_lit("min_value")), constant_type, min_value);
 	enum_type->Record.enum_max_value = make_entity_constant(c->allocator, c->context.scope,
 		make_token_ident(str_lit("max_value")), constant_type, max_value);
+
+	enum_type->Record.enum_names = make_entity_field(c->allocator, c->context.scope,
+		make_token_ident(str_lit("names")), t_string_slice, false, 0);
+	enum_type->Record.enum_names->Variable.is_immutable = true;
+	enum_type->Record.enum_names->flags |= EntityFlag_EnumField;
 
 	gb_temp_arena_memory_end(tmp);
 }
@@ -909,7 +912,7 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 }
 
 
-void check_ident                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   (Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint) {
+void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint) {
 	GB_ASSERT(n->kind == AstNode_Ident);
 	o->mode = Addressing_Invalid;
 	o->expr = n;
@@ -1282,12 +1285,6 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 	case_ast_node(pt, PointerType, e);
 		Type *elem = check_type(c, pt->type);
 		type = make_type_pointer(c->allocator, elem);
-		goto end;
-	case_end;
-
-	case_ast_node(mt, MaybeType, e);
-		Type *elem = check_type(c, mt->type);
-		type = make_type_maybe(c->allocator, elem);
 		goto end;
 	case_end;
 
@@ -1687,29 +1684,6 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 		}
 		o->mode = Addressing_Value;
 		o->type = make_type_pointer(c->allocator, o->type);
-		return;
-	}
-
-	case Token_Maybe: { // Make maybe
-		Type *t = default_type(o->type);
-
-		if (o->mode == Addressing_Type) {
-			o->type = make_type_pointer(c->allocator, t);
-			return;
-		}
-
-		if (!is_operand_value(*o) || is_type_untyped(t)) {
-			if (ast_node_expect(node, AstNode_UnaryExpr)) {
-				ast_node(ue, UnaryExpr, node);
-				gbString str = expr_to_string(ue->expr);
-				error(op, "Cannot convert `%s` to a maybe", str);
-				gb_string_free(str);
-			}
-			o->mode = Addressing_Invalid;
-			return;
-		}
-		o->mode = Addressing_Value;
-		o->type = make_type_maybe(c->allocator, t);
 		return;
 	}
 	}
@@ -2436,13 +2410,6 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 		}
 		break;
 
-	case Type_Maybe:
-		if (is_type_untyped_nil(operand->type)) {
-			// Okay
-		} else if (level == 0) {
-			goto error;
-		}
-
 	default:
 		if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
 			goto error;
@@ -2545,7 +2512,14 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 			check_op_expr = false;
 			entity = scope_lookup_entity(e->ImportName.scope, sel_name);
-			if (entity == NULL) {
+			bool is_declared = entity != NULL;
+			if (entity->kind == Entity_Builtin) {
+				is_declared = false;
+			}
+			if (entity->scope->is_global && !e->ImportName.scope->is_global) {
+				is_declared = false;
+			}
+			if (!is_declared) {
 				error_node(op_expr, "`%.*s` is not declared by `%.*s`", LIT(sel_name), LIT(name));
 				goto error;
 			}
@@ -2638,6 +2612,11 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	if (entity == NULL && selector->kind == AstNode_Ident) {
 		sel = lookup_field(c->allocator, operand->type, selector->Ident.string, operand->mode == Addressing_Type);
 		entity = sel.entity;
+
+		// NOTE(bill): Add enum type info needed for fields like `names`
+		if (entity != NULL && (entity->flags&EntityFlag_EnumField)) {
+			add_type_info_type(c, operand->type);
+		}
 	}
 	if (entity == NULL && selector->kind == AstNode_BasicLit) {
 		if (is_type_struct(operand->type) || is_type_tuple(operand->type)) {
@@ -2699,6 +2678,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	}
 
 
+
 	add_entity_use(c, selector, entity);
 
 	switch (entity->kind) {
@@ -2755,10 +2735,11 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		if (err) {
-			ast_node(proc, Ident, ce->proc);
-			error(ce->close, "`%s` arguments for `%.*s`, expected %td, got %td",
-			      err, LIT(proc->string),
+			gbString expr = expr_to_string(ce->proc);
+			error(ce->close, "`%s` arguments for `%s`, expected %td, got %td",
+			      err, expr,
 			      bp->arg_count, ce->args.count);
+			gb_string_free(expr);
 			return false;
 		}
 	}
@@ -2852,19 +2833,12 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 
 	case BuiltinProc_reserve: {
-		// reserve :: proc(^[dynamic]Type, count: int) {
-		// reserve :: proc(^map[Key]Type, count: int) {
+		// reserve :: proc([dynamic]Type, count: int) {
+		// reserve :: proc(map[Key]Type, count: int) {
 		Type *type = operand->type;
-		if (!is_type_pointer(type)) {
-			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a pointer, got `%s`", str);
-			gb_string_free(str);
-			return false;
-		}
-		type = type_deref(type);
 		if (!is_type_dynamic_array(type) && !is_type_dynamic_map(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a pointer to a dynamic array or dynamic map, got `%s`", str);
+			error_node(operand->expr, "Expected a dynamic array or dynamic map, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
@@ -2887,16 +2861,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	case BuiltinProc_clear: {
 		Type *type = operand->type;
-		if (!is_type_pointer(type)) {
-			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a pointer, got `%s`", str);
-			gb_string_free(str);
-			return false;
-		}
-		type = type_deref(type);
 		if (!is_type_dynamic_array(type) && !is_type_map(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a pointer to a map or dynamic array, got `%s`", str);
+			error_node(operand->expr, "Expected a map or dynamic array, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
@@ -2906,18 +2873,12 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_append: {
-		// append :: proc(^[dynamic]Type, item: ...Type) {
+		// append :: proc([dynamic]Type, item: ...Type) {
 		Type *type = operand->type;
-		if (!is_type_pointer(type)) {
-			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a pointer to a dynamic array, got `%s`", str);
-			gb_string_free(str);
-			return false;
-		}
-		type = base_type(type_deref(type));
+		type = base_type(type);
 		if (!is_type_dynamic_array(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a pointer to a dynamic array, got `%s`", str);
+			error_node(operand->expr, "Expected a dynamic array, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
@@ -3140,7 +3101,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_compile_assert:
-		// compile_assert :: proc(cond: bool)
+		// compile_assert :: proc(cond: bool) -> bool
 
 		if (!is_type_boolean(operand->type) && operand->mode != Addressing_Constant) {
 			gbString str = expr_to_string(ce->args.e[0]);
@@ -3153,10 +3114,13 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			error_node(call, "Compile time assertion: `%s`", str);
 			gb_string_free(str);
 		}
+
+		operand->mode = Addressing_Constant;
+		operand->type = t_untyped_bool;
 		break;
 
 	case BuiltinProc_assert:
-		// assert :: proc(cond: bool)
+		// assert :: proc(cond: bool) -> bool
 
 		if (!is_type_boolean(operand->type)) {
 			gbString str = expr_to_string(ce->args.e[0]);
@@ -3165,7 +3129,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 
-		operand->mode = Addressing_NoValue;
+		operand->mode = Addressing_Value;
+		operand->type = t_untyped_bool;
 		break;
 
 	case BuiltinProc_panic:
@@ -4801,11 +4766,12 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		o->expr = node;
 	case_end;
 
-
 	case_ast_node(te, TagExpr, node);
-		// TODO(bill): Tag expressions
-		error_node(node, "Tag expressions are not supported yet");
-		kind = check_expr_base(c, o, te->expr, type_hint);
+		String name = te->name.string;
+		error_node(node, "Unknown tag expression, #%.*s", LIT(name));
+		if (te->expr) {
+			kind = check_expr_base(c, o, te->expr, type_hint);
+		}
 		o->expr = node;
 	case_end;
 
@@ -5187,37 +5153,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		}
 	case_end;
 
-	case_ast_node(de, DemaybeExpr, node);
-		check_expr_or_type(c, o, de->expr);
-		if (o->mode == Addressing_Invalid) {
-			goto error;
-		} else {
-			Type *t = base_type(o->type);
-			if (t->kind == Type_Maybe) {
-				Entity **variables = gb_alloc_array(c->allocator, Entity *, 2);
-				Type *elem = t->Maybe.elem;
-				Token tok = make_token_ident(str_lit(""));
-				variables[0] = make_entity_param(c->allocator, NULL, tok, elem, false, true);
-				variables[1] = make_entity_param(c->allocator, NULL, tok, t_bool, false, true);
-
-				Type *tuple = make_type_tuple(c->allocator);
-				tuple->Tuple.variables = variables;
-				tuple->Tuple.variable_count = 2;
-
-				o->type = tuple;
-				o->mode = Addressing_Variable;
- 			} else {
- 				gbString str = expr_to_string(o->expr);
- 				error_node(o->expr, "Cannot demaybe `%s`", str);
- 				gb_string_free(str);
- 				goto error;
- 			}
-		}
-	case_end;
-
 	case AstNode_ProcType:
 	case AstNode_PointerType:
-	case AstNode_MaybeType:
 	case AstNode_ArrayType:
 	case AstNode_VectorType:
 	case AstNode_StructType:
@@ -5401,14 +5338,17 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, ue->expr);
 	case_end;
 
+	case_ast_node(ce, CastExpr, node);
+		str = string_append_token(str, ce->token);
+		str = gb_string_appendc(str, "(");
+		str = write_expr_to_string(str, ce->type);
+		str = gb_string_appendc(str, ")");
+		str = write_expr_to_string(str, ce->expr);
+	case_end;
+
 	case_ast_node(de, DerefExpr, node);
 		str = write_expr_to_string(str, de->expr);
 		str = gb_string_appendc(str, "^");
-	case_end;
-
-	case_ast_node(de, DemaybeExpr, node);
-		str = write_expr_to_string(str, de->expr);
-		str = gb_string_appendc(str, "?");
 	case_end;
 
 	case_ast_node(be, BinaryExpr, node);
@@ -5460,11 +5400,6 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_ast_node(pt, PointerType, node);
 		str = gb_string_appendc(str, "^");
 		str = write_expr_to_string(str, pt->type);
-	case_end;
-
-	case_ast_node(mt, MaybeType, node);
-		str = gb_string_appendc(str, "?");
-		str = write_expr_to_string(str, mt->type);
 	case_end;
 
 	case_ast_node(at, ArrayType, node);
