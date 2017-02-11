@@ -1008,6 +1008,22 @@ irValue *ir_make_value_procedure(gbAllocator a, irModule *m, Entity *entity, Typ
 	return v;
 }
 
+
+irValue *ir_generate_array(irModule *m, Type *elem_type, i64 count, String prefix, i64 id) {
+	gbAllocator a = m->allocator;
+	Token token = {Token_Ident};
+	isize name_len = prefix.len + 10;
+	token.string.text = gb_alloc_array(a, u8, name_len);
+	token.string.len = gb_snprintf(cast(char *)token.string.text, name_len,
+	                               "%.*s-%llx", LIT(prefix), id)-1;
+	Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, elem_type, count), false);
+	irValue *value = ir_make_value_global(a, e, NULL);
+	value->Global.is_private = true;
+	ir_module_add_value(m, e, value);
+	map_ir_value_set(&m->members, hash_string(token.string), value);
+	return value;
+}
+
 irBlock *ir_new_block(irProcedure *proc, AstNode *node, char *label) {
 	Scope *scope = NULL;
 	if (node != NULL) {
@@ -3709,50 +3725,55 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		AstNode *sel = unparen_expr(se->selector);
 		if (sel->kind == AstNode_Ident) {
 			String selector = sel->Ident.string;
-			Type *type = type_of_expr(proc->module->info, se->expr);
+			TypeAndValue *tav = type_and_value_of_expression(proc->module->info, se->expr);
 
-			if (is_type_enum(type)) {
-				Selection sel = lookup_field(proc->module->allocator, type, selector, true);
-				Entity *e = sel.entity;
-				GB_ASSERT(e->kind == Entity_Variable);
-				i32 index = e->Variable.field_index;
-				switch (index) {
-				case 0: {
-					irValue *ti_ptr = ir_type_info(proc, type);
-					{
-						irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 1);
-						args[0] = ti_ptr;
-						ti_ptr = ir_emit_global_call(proc, "type_info_base", args, 1);
-					}
-
-
-					irValue *enum_info = ir_emit_conv(proc, ti_ptr, t_type_info_enum_ptr);
-					irValue *names_ptr = ir_emit_struct_ep(proc, enum_info, 1);
-					return ir_make_addr(names_ptr);
-				} break;
-				default:
-					GB_PANIC("Unhandled enum index %d %.*s", index, LIT(selector));
-					break;
-				}
-			}
-
-			type = base_type(type);
-
-			if (type == t_invalid) {
+			if (tav == NULL) {
 				// NOTE(bill): Imports
 				Entity *imp = entity_of_ident(proc->module->info, se->expr);
 				if (imp != NULL) {
 					GB_ASSERT(imp->kind == Entity_ImportName);
 				}
 				return ir_build_addr(proc, unparen_expr(se->selector));
-			} else {
-				Selection sel = lookup_field(proc->module->allocator, type, selector, false);
-				GB_ASSERT(sel.entity != NULL);
-
-				irValue *a = ir_build_addr(proc, se->expr).addr;
-				a = ir_emit_deep_field_gep(proc, type, a, sel);
-				return ir_make_addr(a);
 			}
+
+
+			Type *type = base_type(tav->type);
+			if (tav->mode == Addressing_Type) { // Addressing_Type
+				Selection sel = lookup_field(proc->module->allocator, type, selector, true);
+				Entity *e = sel.entity;
+				GB_ASSERT(e->kind == Entity_Variable);
+				GB_ASSERT(e->flags & EntityFlag_TypeField);
+				String name = e->token.string;
+				if (str_eq(name, str_lit("names"))) {
+					irValue *ti_ptr = ir_type_info(proc, type);
+					// {
+					// 	irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 1);
+					// 	args[0] = ti_ptr;
+					// 	ti_ptr = ir_emit_global_call(proc, "type_info_base", args, 1);
+					// }
+					irValue *names_ptr = NULL;
+
+					if (is_type_enum(type)) {
+						irValue *enum_info = ir_emit_conv(proc, ti_ptr, t_type_info_enum_ptr);
+						names_ptr = ir_emit_struct_ep(proc, enum_info, 1);
+					} else {
+						GB_PANIC("TODO(bill): `names` for records");
+						// irValue *record_info = ir_emit_conv(proc, ti_ptr, t_type_info_record_ptr);
+						// names_ptr = ir_emit_struct_ep(proc, record_info, 1);
+					}
+					return ir_make_addr(names_ptr);
+				} else {
+					GB_PANIC("Unhandled TypeField %.*s", LIT(name));
+				}
+				GB_PANIC("Unreachable");
+			}
+
+			Selection sel = lookup_field(proc->module->allocator, type, selector, false);
+			GB_ASSERT(sel.entity != NULL);
+
+			irValue *a = ir_build_addr(proc, se->expr).addr;
+			a = ir_emit_deep_field_gep(proc, type, a, sel);
+			return ir_make_addr(a);
 		} else {
 			Type *type = base_type(type_of_expr(proc->module->info, se->expr));
 			GB_ASSERT(is_type_integer(type));
@@ -4117,33 +4138,6 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 					ir_emit_store(proc, gep, ev);
 				}
 			}
-
-
-			// irValue *result = ir_add_module_constant(proc->module, type, make_exact_value_compound(expr));
-			// for_array(index, cl->elems) {
-			// 	AstNode *elem = cl->elems.e[index];
-			// 	if (ir_is_elem_const(proc->module, elem, et)) {
-			// 		continue;
-			// 	}
-			// 	irValue *field_elem = ir_build_expr(proc, elem);
-			// 	Type *t = ir_type(field_elem);
-			// 	GB_ASSERT(t->kind != Type_Tuple);
-			// 	irValue *ev = ir_emit_conv(proc, field_elem, et);
-			// 	irValue *i = ir_make_const_int(proc->module->allocator, index);
-			// 	result = ir_emit(proc, ir_make_instr_insert_element(proc, result, ev, i));
-			// }
-
-			// if (cl->elems.count == 1 && bt->Vector.count > 1) {
-			// 	isize index_count = bt->Vector.count;
-			// 	i32 *indices = gb_alloc_array(proc->module->allocator, i32, index_count);
-			// 	for (isize i = 0; i < index_count; i++) {
-			// 		indices[i] = 0;
-			// 	}
-			// 	irValue *sv = ir_emit(proc, ir_make_instr_vector_shuffle(proc, result, indices, index_count));
-			// 	ir_emit_store(proc, v, sv);
-			// 	return ir_make_addr(v);
-			// }
-			// ir_emit_store(proc, v, result);
 		} break;
 
 		case Type_Record: {
@@ -4186,13 +4180,51 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			}
 		} break;
 
+		case Type_DynamicArray: {
+			if (cl->elems.count == 0) {
+				break;
+			}
+			Type *elem = bt->DynamicArray.elem;
+			gbAllocator a = proc->module->allocator;
+			irValue *size  = ir_make_const_int(a, type_size_of(proc->module->sizes, a, elem));
+			irValue *align = ir_make_const_int(a, type_align_of(proc->module->sizes, a, elem));
+			{
+				irValue **args = gb_alloc_array(a, irValue *, 4);
+				args[0] = ir_emit_conv(proc, v, t_rawptr);
+				args[1] = size;
+				args[2] = align;
+				args[3] = ir_make_const_int(a, 2*cl->elems.count);
+				ir_emit_global_call(proc, "__dynamic_array_reserve", args, 4);
+			}
+
+			i64 item_count = cl->elems.count;
+			irValue *items = ir_generate_array(proc->module, elem, item_count, str_lit("__dacl$"), cast(i64)cast(intptr)expr);
+
+			for_array(field_index, cl->elems) {
+				AstNode *f = cl->elems.e[field_index];
+				irValue *value = ir_emit_conv(proc, ir_build_expr(proc, f), elem);
+				irValue *ep = ir_emit_array_epi(proc, items, field_index);
+				ir_emit_store(proc, ep, value);
+			}
+
+			{
+				irValue **args = gb_alloc_array(a, irValue *, 5);
+				args[0] = ir_emit_conv(proc, v, t_rawptr);
+				args[1] = size;
+				args[2] = align;
+				args[3] = ir_emit_conv(proc, items, t_rawptr);
+				args[4] = ir_make_const_int(a, item_count);
+				ir_emit_global_call(proc, "__dynamic_array_append", args, 5);
+			}
+		} break;
+
 		case Type_Map: {
 			if (cl->elems.count == 0) {
 				break;
 			}
 			gbAllocator a = proc->module->allocator;
 			{
-				irValue **args = gb_alloc_array(a, irValue *, 4);
+				irValue **args = gb_alloc_array(a, irValue *, 2);
 				args[0] = ir_gen_map_header(proc, v, type);
 				args[1] = ir_make_const_int(a, 2*cl->elems.count);
 				ir_emit_global_call(proc, "__dynamic_map_reserve", args, 2);
@@ -5294,17 +5326,6 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			AstNode *clause = body->stmts.e[i];
 			ast_node(cc, CaseClause, clause);
 
-			if (cc->list.count == 0) {
-				// default case
-				default_stmts = cc->stmts;
-				default_block = ir_new_block(proc, clause, "type-match.dflt.body");
-				continue;
-			}
-			GB_ASSERT(cc->list.count == 1);
-
-
-			irBlock *body = ir_new_block(proc, clause, "type-match.case.body");
-
 			Entity *tag_var_entity = NULL;
 			Type *tag_var_type = NULL;
 			if (str_eq(tag_var_name, str_lit("_"))) {
@@ -5323,6 +5344,26 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 			irBlock *next_cond = NULL;
 			irValue *cond = NULL;
+
+			if (cc->list.count == 0) {
+				// default case
+				default_stmts = cc->stmts;
+				default_block = ir_new_block(proc, clause, "type-match.dflt.body");
+
+
+				irValue *tag_var = NULL;
+				if (tag_var_entity != NULL) {
+					tag_var = ir_add_local(proc, tag_var_entity);
+				} else {
+					tag_var = ir_add_local_generated(proc, tag_var_type);
+				}
+				ir_emit_store(proc, tag_var, parent);
+				continue;
+			}
+			GB_ASSERT(cc->list.count == 1);
+
+			irBlock *body = ir_new_block(proc, clause, "type-match.case.body");
+
 
 			if (is_union_ptr) {
 				Type *bt = type_deref(tag_var_type);
@@ -6409,38 +6450,10 @@ void ir_gen_tree(irGen *s) {
 							if (t->Record.field_count > 0) {
 								Entity **fields = t->Record.fields;
 								isize count = t->Record.field_count;
-								irValue *name_array = NULL;
-								irValue *value_array = NULL;
-
-								{
-									Token token = {Token_Ident};
-									i32 id = cast(i32)entry_index;
-									char name_base[] = "__$enum_names";
-									isize name_len = gb_size_of(name_base) + 10;
-									token.string.text = gb_alloc_array(a, u8, name_len);
-									token.string.len = gb_snprintf(cast(char *)token.string.text, name_len,
-									                               "%s-%d", name_base, id)-1;
-									Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, t_string, count), false);
-									name_array = ir_make_value_global(a, e, NULL);
-									name_array->Global.is_private = true;
-									ir_module_add_value(m, e, name_array);
-									map_ir_value_set(&m->members, hash_string(token.string), name_array);
-								}
-
-								{
-									Token token = {Token_Ident};
-									i32 id = cast(i32)entry_index;
-									char name_base[] = "__$enum_values";
-									isize name_len = gb_size_of(name_base) + 10;
-									token.string.text = gb_alloc_array(a, u8, name_len);
-									token.string.len = gb_snprintf(cast(char *)token.string.text, name_len,
-									                               "%s-%d", name_base, id)-1;
-									Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, t_type_info_enum_value, count), false);
-									value_array = ir_make_value_global(a, e, NULL);
-									value_array->Global.is_private = true;
-									ir_module_add_value(m, e, value_array);
-									map_ir_value_set(&m->members, hash_string(token.string), value_array);
-								}
+								irValue *name_array  = ir_generate_array(m, t_string, count,
+								                                         str_lit("__$enum_names"), cast(i64)entry_index);
+								irValue *value_array = ir_generate_array(m, t_type_info_enum_value, count,
+								                                         str_lit("__$enum_values"), cast(i64)entry_index);
 
 								bool is_value_int = is_type_integer(t->Record.enum_base_type);
 

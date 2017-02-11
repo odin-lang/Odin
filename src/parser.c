@@ -2337,26 +2337,6 @@ bool parse_expect_separator(AstFile *f, TokenKind separator, AstNode *param) {
 	return false;
 }
 
-AstNodeArray convert_to_ident_list(AstFile *f, AstNodeArray list) {
-	AstNodeArray idents = {0};
-	array_init_reserve(&idents, heap_allocator(), list.count);
-	// Convert to ident list
-	for_array(i, list) {
-		AstNode *ident = list.e[i];
-		switch (ident->kind) {
-		case AstNode_Ident:
-		case AstNode_BadExpr:
-			break;
-		default:
-			error_node(ident, "Expected an identifier");
-			ident = ast_ident(f, blank_token);
-			break;
-		}
-		array_add(&idents, ident);
-	}
-	return idents;
-}
-
 AstNode *parse_var_type(AstFile *f, bool allow_ellipsis) {
 	if (allow_ellipsis && f->curr_token.kind == Token_Ellipsis) {
 		Token tok = f->curr_token;
@@ -2377,16 +2357,24 @@ AstNode *parse_var_type(AstFile *f, bool allow_ellipsis) {
 	return type;
 }
 
+bool is_token_field_prefix(TokenKind kind) {
+	switch (kind) {
+	case Token_using:
+	case Token_no_alias:
+	// case Token_immutable:
+		return true;
+	}
+	return false;
+}
+
 
 u32 parse_field_prefixes(AstFile *f) {
 	i32 using_count     = 0;
 	i32 no_alias_count  = 0;
 	i32 immutable_count = 0;
 
-	bool loop = true;
-	while (loop) {
+	while (is_token_field_prefix(f->curr_token.kind)) {
 		switch (f->curr_token.kind) {
-		default: loop = false; break;
 		case Token_using:     using_count     += 1; next_token(f); break;
 		case Token_no_alias:  no_alias_count  += 1; next_token(f); break;
 		// case Token_immutable: immutable_count += 1; next_token(f); break;
@@ -2404,8 +2392,8 @@ u32 parse_field_prefixes(AstFile *f) {
 	return field_flags;
 }
 
-u32 check_field_prefixes(AstFile *f, AstNodeArray names, u32 allowed_flags, u32 set_flags) {
-	if (names.count > 1 && (set_flags&FieldFlag_using)) {
+u32 check_field_prefixes(AstFile *f, isize name_count, u32 allowed_flags, u32 set_flags) {
+	if (name_count > 1 && (set_flags&FieldFlag_using)) {
 		syntax_error(f->curr_token, "Cannot apply `using` to more than one of the same type");
 		set_flags &= ~FieldFlag_using;
 	}
@@ -2425,19 +2413,54 @@ u32 check_field_prefixes(AstFile *f, AstNodeArray names, u32 allowed_flags, u32 
 	return set_flags;
 }
 
+typedef struct AstNodeAndFlags {
+	AstNode *node;
+	u32      flags;
+} AstNodeAndFlags;
+
+typedef Array(AstNodeAndFlags) AstNodeAndFlagsArray;
+
+AstNodeArray convert_to_ident_list(AstFile *f, AstNodeAndFlagsArray list, bool ignore_flags) {
+	AstNodeArray idents = {0};
+	array_init_reserve(&idents, heap_allocator(), list.count);
+	// Convert to ident list
+	for_array(i, list) {
+		AstNode *ident = list.e[i].node;
+
+		if (!ignore_flags) {
+			if (i != 0) {
+				error_node(ident, "Illegal use of prefixes in parameter list");
+			}
+		}
+
+		switch (ident->kind) {
+		case AstNode_Ident:
+		case AstNode_BadExpr:
+			break;
+		default:
+			error_node(ident, "Expected an identifier");
+			ident = ast_ident(f, blank_token);
+			break;
+		}
+		array_add(&idents, ident);
+	}
+	return idents;
+}
+
 AstNodeArray parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags,
                               TokenKind separator, TokenKind follow) {
 	AstNodeArray params = make_ast_node_array(f);
-	AstNodeArray list   = make_ast_node_array(f);
-	isize name_count    = 0;
+	AstNodeAndFlagsArray list = {0}; array_init(&list, heap_allocator()); // LEAK(bill):
+	isize total_name_count = 0;
 	bool allow_ellipsis = allowed_flags&FieldFlag_ellipsis;
 
-	u32 set_flags = parse_field_prefixes(f);
 	while (f->curr_token.kind != follow &&
 	       f->curr_token.kind != Token_Colon &&
 	       f->curr_token.kind != Token_EOF) {
+		u32 flags = parse_field_prefixes(f);
 		AstNode *param = parse_var_type(f, allow_ellipsis);
-		array_add(&list, param);
+		AstNodeAndFlags naf = {param, flags};
+		array_add(&list, naf);
 		if (f->curr_token.kind != Token_Comma) {
 			break;
 		}
@@ -2445,12 +2468,16 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags,
 	}
 
 	if (f->curr_token.kind == Token_Colon) {
-		AstNodeArray names = convert_to_ident_list(f, list); // Copy for semantic reasons
+		AstNodeArray names = convert_to_ident_list(f, list, true); // Copy for semantic reasons
 		if (names.count == 0) {
 			syntax_error(f->curr_token, "Empty field declaration");
 		}
-		set_flags = check_field_prefixes(f, names, allowed_flags, set_flags);
-		name_count += names.count;
+		u32 set_flags = 0;
+		if (list.count > 0) {
+			set_flags = list.e[0].flags;
+		}
+		set_flags = check_field_prefixes(f, names.count, allowed_flags, set_flags);
+		total_name_count += names.count;
 
 		expect_token_after(f, Token_Colon, "field list");
 		AstNode *type = parse_var_type(f, allow_ellipsis);
@@ -2467,8 +2494,8 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags,
 				syntax_error(f->curr_token, "Empty field declaration");
 				break;
 			}
-			set_flags = check_field_prefixes(f, names, allowed_flags, set_flags);
-			name_count += names.count;
+			set_flags = check_field_prefixes(f, names.count, allowed_flags, set_flags);
+			total_name_count += names.count;
 
 			expect_token_after(f, Token_Colon, "field list");
 			AstNode *type = parse_var_type(f, allow_ellipsis);
@@ -2480,25 +2507,25 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags,
 			}
 		}
 
-		if (name_count_) *name_count_ = name_count;
+		if (name_count_) *name_count_ = total_name_count;
 		return params;
 	}
 
-	set_flags = check_field_prefixes(f, list, allowed_flags, set_flags);
 	for_array(i, list) {
 		AstNodeArray names = {0};
-		AstNode *type = list.e[i];
+		AstNode *type = list.e[i].node;
 		Token token = blank_token;
 
 		array_init_count(&names, heap_allocator(), 1);
 		token.pos = ast_node_token(type).pos;
 		names.e[0] = ast_ident(f, token);
+		u32 flags = check_field_prefixes(f, list.count, allowed_flags, list.e[i].flags);
 
-		AstNode *param = ast_field(f, names, list.e[i], set_flags);
+		AstNode *param = ast_field(f, names, list.e[i].node, flags);
 		array_add(&params, param);
 	}
 
-	if (name_count_) *name_count_ = name_count;
+	if (name_count_) *name_count_ = total_name_count;
 	return params;
 }
 
@@ -2627,11 +2654,9 @@ AstNode *parse_type_or_ident(AstFile *f) {
 
 		f->expr_level = prev_level;
 
-
 		if (is_packed && is_ordered) {
 			syntax_error(token, "`#ordered` is not needed with `#packed` which implies ordering");
 		}
-
 
 		Token open = expect_token_after(f, Token_OpenBrace, "struct");
 		isize decl_count = 0;
@@ -2685,12 +2710,10 @@ AstNode *parse_type_or_ident(AstFile *f) {
 	}
 
 	case Token_OpenParen: {
-		// NOTE(bill): Skip the paren expression
 		Token    open  = expect_token(f, Token_OpenParen);
 		AstNode *type  = parse_type(f);
 		Token    close = expect_token(f, Token_CloseParen);
-		return type;
-		// return ast_paren_expr(f, type, open, close);
+		return ast_paren_expr(f, type, open, close);
 	} break;
 	}
 

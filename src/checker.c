@@ -208,6 +208,7 @@ typedef struct Scope {
 	bool           is_global;
 	bool           is_file;
 	bool           is_init;
+	bool           has_been_imported; // This is only applicable to file scopes
 	AstFile *      file;
 } Scope;
 gb_global Scope *universal_scope = NULL;
@@ -1529,6 +1530,10 @@ void check_all_global_entities(Checker *c) {
 		}
 		add_curr_ast_file(c, d->scope->file);
 
+		if (!d->scope->has_been_imported) {
+			continue;
+		}
+
 		if (e->kind != Entity_Procedure && str_eq(e->token.string, str_lit("main"))) {
 			if (e->scope->is_init) {
 				error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
@@ -1606,6 +1611,12 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 		ast_node(id, ImportDecl, decl);
 		Token token = id->relpath;
 
+		GB_ASSERT(parent_scope->is_file);
+
+		if (!parent_scope->has_been_imported) {
+			continue;
+		}
+
 		HashKey key = hash_string(id->fullpath);
 		Scope **found = map_scope_get(file_scopes, key);
 		if (found == NULL) {
@@ -1651,6 +1662,8 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 		} else {
 			warning(token, "Multiple #import of the same file within this scope");
 		}
+
+		scope->has_been_imported = true;
 
 		if (str_eq(id->import_name.string, str_lit("."))) {
 			// NOTE(bill): Add imported entities to this file's scope
@@ -1721,6 +1734,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 			}
 		}
 
+
 		String library_name = path_to_entity_name(fl->library_name.string, file_str);
 		if (str_eq(library_name, str_lit("_"))) {
 			error(fl->token, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
@@ -1753,6 +1767,10 @@ void check_parsed_files(Checker *c) {
 
 		if (scope->is_global) {
 			array_add(&c->global_scope->shared, scope);
+		}
+
+		if (scope->is_init || scope->is_global) {
+			scope->has_been_imported = true;
 		}
 
 		f->scope = scope;

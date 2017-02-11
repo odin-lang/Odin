@@ -1,9 +1,8 @@
-_ := compile_assert(ODIN_OS == "windows");
-#foreign_system_library "kernel32.lib";
-#foreign_system_library "user32.lib";
-#foreign_system_library "gdi32.lib";
-#foreign_system_library "winmm.lib";
-#foreign_system_library "opengl32.lib";
+#foreign_system_library "kernel32.lib" when ODIN_OS == "windows";
+#foreign_system_library "user32.lib"   when ODIN_OS == "windows";
+#foreign_system_library "gdi32.lib"    when ODIN_OS == "windows";
+#foreign_system_library "winmm.lib"    when ODIN_OS == "windows";
+#foreign_system_library "opengl32.lib" when ODIN_OS == "windows";
 
 HANDLE    :: rawptr;
 HWND      :: HANDLE;

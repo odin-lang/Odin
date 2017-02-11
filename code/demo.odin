@@ -1,22 +1,13 @@
 #import "fmt.odin";
-#import "atomic.odin";
-#import "hash.odin";
-#import "math.odin";
-#import "mem.odin";
-#import "opengl.odin";
-#import "os.odin";
-#import "sync.odin";
-#import "utf8.odin";
-#import ht "http_test.odin";
 
 main :: proc() {
+
 	{
 		Fruit :: enum {
 			APPLE,
 			BANANA,
 			COCONUT,
 		}
-
 		fmt.println(Fruit.names);
 	}
 
