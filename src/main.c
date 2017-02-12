@@ -106,6 +106,8 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	// }
 
 	// exit_code = status;
+	
+	return exit_code;
 }
 #endif
 

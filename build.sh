@@ -2,7 +2,7 @@
 
 release_mode=0
 
-warnings_to_disable="-Wno-attributes -Wno-implicit-function-declaration -Wno-incompatible-pointer-types -Wno-switch -Wno-pointer-sign"
+warnings_to_disable="-Wno-attributes -Wno-implicit-function-declaration -Wno-incompatible-pointer-types -Wno-switch -Wno-pointer-sign -Wno-tautological-constant-out-of-range-compare -Wno-autological-compare"
 libraries="-pthread -ldl -lm"
 other_args="-x c"
 compiler="gcc"
