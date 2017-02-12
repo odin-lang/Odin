@@ -1,15 +1,41 @@
-#import . "fmt.odin";
-#import "atomic.odin";
-#import "hash.odin";
-#import "math.odin";
-#import "mem.odin";
-#import "opengl.odin";
-#import "os.odin";
-#import "sync.odin";
-#import "types.odin";
-#import "utf8.odin";
+#import "fmt.odin";
 
 main :: proc() {
+/*
+	Version 0.1.0
+
+	Added:
+	 * Dynamic Arrays `[...]Type`
+	 * Dynamic Maps   `map[Key]Value`
+	 * Dynamic array and map literals
+	 * Custom struct alignemnt `struct #align 8 { bar: i8 }`
+	 * Allow `_` in numbers
+	 * Variadic `append`
+	 * fmt.sprint*
+	 * Entities prefixes with an underscore do not get exported on imports
+	 * Overloaded `free` for pointers, slices, strings, dynamic arrays, and dynamic maps
+	 * enum types have an implict `names` field, a []string of all the names in that enum
+
+	Removed:
+	 * Maybe/option types
+	 * immutable variables
+	 * Remove `type` keyword and other "reserved" keywords
+	 * `compile_assert` and `assert`return the value of the condition for semantic reasons
+
+	Changed:
+	 * thread_local -> #thread_local
+	 * #include -> #load
+	 * Files only get checked if they are actually used
+	 * match x in y {} // For type match statements
+	 * Version numbering now starts from 0.1.0 and uses the convention:
+	 	- major.minor.patch
+
+	Fixes:
+	 * Many fmt.* fixes
+
+	To come very Soon™:
+	 * Linux and OS X builds (unofficial ones do exist already)
+*/
 
 	{
 		Fruit :: enum {
@@ -17,10 +43,9 @@ main :: proc() {
 			BANANA,
 			COCONUT,
 		}
-		println(x, Fruit.names);
+		fmt.println(Fruit.names);
 	}
 
-when false {
 	{
 		m: map[f32]int;
 		reserve(m, 16);
@@ -33,16 +58,16 @@ when false {
 		c := m[3.0];
 		assert(ok && c == 564);
 
-		print("map[");
+		fmt.print("map[");
 		i := 0;
 		for val, key in m {
 			if i > 0 {
-				print(", ");
+				fmt.print(", ");
 			}
-			printf("%v=%v", key, val);
+			fmt.printf("%v=%v", key, val);
 			i += 1;
 		}
-		println("]");
+		fmt.println("]");
 	}
 	{
 		m := map[string]u32{
@@ -56,39 +81,47 @@ when false {
 		_, ok := m["c"];
 		assert(ok && c == 7654);
 
-		println(m);
+		fmt.println(m);
 	}
 
 	{
-		println("Hellope!");
-
-		x: [dynamic]f64;
+		x: [...]f64;
 		reserve(x, 16);
 		defer free(x);
 		append(x, 2_000_000.500_000, 3, 5, 7);
 
 		for p, i in x {
-			if i > 0 { print(", "); }
-			print(p);
+			if i > 0 { fmt.print(", "); }
+			fmt.print(p);
 		}
-		println();
-
-		{
-			Vec3 :: [vector 3]f32;
-
-			x := Vec3{1, 2, 3};
-			y := Vec3{4, 5, 6};
-			println(x < y);
-			println(x + y);
-			println(x - y);
-			println(x * y);
-			println(x / y);
-
-			for i in x {
-				println(i);
-			}
-		}
+		fmt.println();
 	}
-}
+
+	{
+		x := [...]f64{2_000_000.500_000, 3, 5, 7};
+		defer free(x);
+		fmt.println(x);
+	}
+
+
+	{
+		Vec3 :: [vector 3]f32;
+
+		x := Vec3{1, 2, 3};
+		y := Vec3{4, 5, 6};
+		fmt.println(x < y);
+		fmt.println(x + y);
+		fmt.println(x - y);
+		fmt.println(x * y);
+		fmt.println(x / y);
+
+		for i in x {
+			fmt.println(i);
+		}
+
+		compile_assert(size_of([vector 7]bool) == size_of([7]bool));
+		compile_assert(size_of([vector 7]i32) == size_of([7]i32));
+		// align_of([vector 7]i32) != align_of([7]i32) // this may be the case
+	}
 }
 

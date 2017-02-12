@@ -98,8 +98,23 @@ struct Entity {
 
 gb_global Entity *e_context = NULL;
 
-bool is_entity_name_exported(Entity *e) {
+bool is_entity_kind_exported(EntityKind kind) {
+	switch (kind) {
+	case Entity_Builtin:
+	case Entity_ImportName:
+	case Entity_LibraryName:
+	case Entity_Nil:
+		return false;
+	}
+	return true;
+}
+
+bool is_entity_exported(Entity *e) {
 	GB_ASSERT(e != NULL);
+	if (!is_entity_kind_exported(e->kind)) {
+		return false;
+	}
+
 	String name = e->token.string;
 	if (name.len == 0) {
 		return false;

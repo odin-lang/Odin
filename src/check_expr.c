@@ -2532,7 +2532,6 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	}
 
 	if (op_expr->kind == AstNode_Ident) {
-		b32 is_not_exported = true;
 		String name = op_expr->Ident.string;
 		Entity *e = scope_lookup_entity(c->context.scope, name);
 
@@ -2576,14 +2575,19 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 				}
 			}
 
-
-			is_not_exported = !is_entity_name_exported(entity);
+			bool implicit_is_found = map_bool_get(&e->ImportName.scope->implicit, hash_pointer(entity)) != NULL;
+			bool is_not_exported = !is_entity_exported(entity);
+			if (!implicit_is_found) {
+				is_not_exported = false;
+			} else if (entity->kind == Entity_ImportName) {
+				is_not_exported = true;
+			}
 
 			if (is_not_exported) {
 				gbString sel_str = expr_to_string(selector);
 				error_node(op_expr, "`%s` is not exported by `%.*s`", sel_str, LIT(name));
 				gb_string_free(sel_str);
-				// NOTE(bill): We will have to cause an error his even though it exists
+				// NOTE(bill): Not really an error so don't goto error
 				goto error;
 			}
 
@@ -2628,22 +2632,6 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 					operand->overload_entities = procs;
 					return procs[0];
 				}
-			}
-
-			bool *found = map_bool_get(&e->ImportName.scope->implicit, hash_pointer(entity));
-			if (!found) {
-				is_not_exported = false;
-			} else {
-				if (entity->kind == Entity_ImportName) {
-					is_not_exported = true;
-				}
-			}
-
-			if (is_not_exported) {
-				gbString sel_str = expr_to_string(selector);
-				error_node(op_expr, "`%s` is not exported by `%.*s`", sel_str, LIT(name));
-				gb_string_free(sel_str);
-				// NOTE(bill): Not really an error so don't goto error
 			}
 		}
 	}

@@ -47,7 +47,7 @@ The Odin programming language is fast, concise, readable, pragmatic and open sou
 
 ## Roadmap
 
-Not in any particular order
+Not in any particular order and not be implemented
 
 * Compile Time Execution (CTE)
 	- More metaprogramming madness
@@ -57,10 +57,8 @@ Not in any particular order
 * Replace LLVM backend with my own custom backend
 * Improve SSA design to accommodate for lowering to a "bytecode"
 * SSA optimizations
-* Parametric Polymorphism ("Generics")
 * Documentation Generator for "Entities"
 * Multiple Architecture support
-* Language level atomics and concurrency support
 * Debug Information
 	- pdb format too
 * Command Line Tooling
