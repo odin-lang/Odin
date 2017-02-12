@@ -4,7 +4,7 @@ extern "C" {
 
 #include "common.c"
 #include "timings.c"
-#include "build.c"
+#include "build_settings.c"
 #include "tokenizer.c"
 #include "parser.c"
 // #include "printer.c"
@@ -145,10 +145,9 @@ int main(int argc, char **argv) {
 
 #if 1
 
-	BuildContext build_context = {0};
-	init_build_context(&build_context);
+	init_build_context();
 
-	init_universal_scope(&build_context);
+	init_universal_scope();
 
 	char *init_filename = NULL;
 	bool run_output = false;
@@ -222,7 +221,7 @@ int main(int argc, char **argv) {
 #if 1
 
 	irGen ir_gen = {0};
-	if (!ir_gen_init(&ir_gen, &checker, &build_context)) {
+	if (!ir_gen_init(&ir_gen, &checker)) {
 		return 1;
 	}
 	// defer (ssa_gen_destroy(&ir_gen));

@@ -137,8 +137,7 @@ void ir_print_encoded_global(irFileBuffer *f, String name, bool remove_prefix) {
 
 
 void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
-	BaseTypeSizes s = m->sizes;
-	i64 word_bits = 8*s.word_size;
+	i64 word_bits = 8*build_context.word_size;
 	GB_ASSERT_NOT_NULL(t);
 	t = default_type(t);
 	GB_ASSERT(is_type_typed(t));
@@ -178,7 +177,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		ir_fprintf(f, "]");
 		return;
 	case Type_Vector: {
-		i64 align = type_align_of(s, heap_allocator(), t);
+		i64 align = type_align_of(heap_allocator(), t);
 		i64 count = t->Vector.count;
 		ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x ", align, count);
 		ir_print_type(f, m, t->Vector.elem);
@@ -228,15 +227,15 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		case TypeRecord_Union: {
 			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
 			// LLVM takes the first element's alignment as the entire alignment (like C)
-			i64 size_of_union  = type_size_of(s, heap_allocator(), t) - s.word_size;
-			i64 align_of_union = type_align_of(s, heap_allocator(), t);
+			i64 size_of_union  = type_size_of(heap_allocator(), t) - build_context.word_size;
+			i64 align_of_union = type_align_of(heap_allocator(), t);
 			ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8], i%lld}", align_of_union, size_of_union, word_bits);
 		} return;
 		case TypeRecord_RawUnion: {
 			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
 			// LLVM takes the first element's alignment as the entire alignment (like C)
-			i64 size_of_union  = type_size_of(s, heap_allocator(), t);
-			i64 align_of_union = type_align_of(s, heap_allocator(), t);
+			i64 size_of_union  = type_size_of(heap_allocator(), t);
+			i64 align_of_union = type_align_of(heap_allocator(), t);
 			ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align_of_union, size_of_union);
 		} return;
 		case TypeRecord_Enum:
@@ -455,7 +454,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				break;
 			}
 
-			i64 align = type_align_of(m->sizes, m->allocator, type);
+			i64 align = type_align_of(m->allocator, type);
 			i64 count = type->Vector.count;
 			Type *elem_type = type->Vector.elem;
 
@@ -681,7 +680,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		Type *type = instr->Local.entity->type;
 		ir_fprintf(f, "%%%d = alloca ", value->index);
 		ir_print_type(f, m, type);
-		ir_fprintf(f, ", align %lld\n", type_align_of(m->sizes, m->allocator, type));
+		ir_fprintf(f, ", align %lld\n", type_align_of(m->allocator, type));
 	} break;
 
 	case irInstr_ZeroInit: {
@@ -714,7 +713,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, type);
 		ir_fprintf(f, "* ");
 		ir_print_value(f, m, instr->Load.address, type);
-		ir_fprintf(f, ", align %lld\n", type_align_of(m->sizes, m->allocator, type));
+		ir_fprintf(f, ", align %lld\n", type_align_of(m->allocator, type));
 	} break;
 
 	case irInstr_ArrayElementPtr: {
@@ -1273,7 +1272,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	} else {
 		ir_fprintf(f, "\n");
 		ir_fprintf(f, "define ");
-		if (m->build_context->is_dll) {
+		if (build_context.is_dll) {
 			// if (proc->tags & (ProcTag_export|ProcTag_dll_export)) {
 			if (proc->tags & (ProcTag_export)) {
 				ir_fprintf(f, "dllexport ");
@@ -1449,6 +1448,9 @@ void print_llvm_ir(irGen *ir) {
 		}
 		ir_print_encoded_global(f, g->entity->token.string, in_global_scope);
 		ir_fprintf(f, " = ");
+		if (g->is_foreign) {
+			ir_fprintf(f, "external ");
+		}
 		if (g->is_thread_local) {
 			ir_fprintf(f, "thread_local ");
 		}
@@ -1468,10 +1470,12 @@ void print_llvm_ir(irGen *ir) {
 
 		ir_print_type(f, m, g->entity->type);
 		ir_fprintf(f, " ");
-		if (g->value != NULL) {
-			ir_print_value(f, m, g->value, g->entity->type);
-		} else {
-			ir_fprintf(f, "zeroinitializer");
+		if (!g->is_foreign) {
+			if (g->value != NULL) {
+				ir_print_value(f, m, g->value, g->entity->type);
+			} else {
+				ir_fprintf(f, "zeroinitializer");
+			}
 		}
 		ir_fprintf(f, "\n");
 	}
