@@ -1,6 +1,13 @@
 #import "fmt.odin";
 
 main :: proc() {
+
+	{
+		Vec2 :: [vector 2]f32;
+		i: f32 = 1;
+		b := Vec2{i, i};
+	}
+
 /*
 	Version 0.1.0
 

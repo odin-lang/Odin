@@ -1757,7 +1757,7 @@ irValue *ir_emit_array_ep(irProcedure *proc, irValue *s, irValue *index) {
 	Type *t = ir_type(s);
 	GB_ASSERT(is_type_pointer(t));
 	Type *st = base_type(type_deref(t));
-	GB_ASSERT(is_type_array(st) || is_type_vector(st));
+	GB_ASSERT_MSG(is_type_array(st) || is_type_vector(st), "%s", type_to_string(st));
 
 	// NOTE(bill): For some weird legacy reason in LLVM, structure elements must be accessed as an i32
 	index = ir_emit_conv(proc, index, t_i32);
@@ -4125,15 +4125,14 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		default: GB_PANIC("Unknown CompoundLit type: %s", type_to_string(type)); break;
 
 		case Type_Vector: {
-			irValue *vector_elem = ir_vector_elem(proc, v);
 			if (cl->elems.count == 1 && bt->Vector.count > 1) {
 				isize index_count = bt->Vector.count;
 				irValue *elem_val = ir_build_expr(proc, cl->elems.e[0]);
 				for (isize i = 0; i < index_count; i++) {
-					ir_emit_store(proc, ir_emit_array_epi(proc, vector_elem, i), elem_val);
+					ir_emit_store(proc, ir_emit_array_epi(proc, v, i), elem_val);
 				}
 			} else if (cl->elems.count > 0) {
-				ir_emit_store(proc, vector_elem, ir_add_module_constant(proc->module, type, make_exact_value_compound(expr)));
+				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, make_exact_value_compound(expr)));
 				for_array(i, cl->elems) {
 					AstNode *elem = cl->elems.e[i];
 					if (ir_is_elem_const(proc->module, elem, et)) {
@@ -4143,7 +4142,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 					Type *t = ir_type(field_expr);
 					GB_ASSERT(t->kind != Type_Tuple);
 					irValue *ev = ir_emit_conv(proc, field_expr, et);
-					irValue *gep = ir_emit_array_epi(proc, vector_elem, i);
+					irValue *gep = ir_emit_array_epi(proc, v, i);
 					ir_emit_store(proc, gep, ev);
 				}
 			}
