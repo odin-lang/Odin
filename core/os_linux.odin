@@ -199,24 +199,16 @@ current_thread_id :: proc() -> int {
 }
 
 dlopen :: proc(filename: string, flags: int) -> rawptr #inline {
-	filename += "\x00";
-	return unix_dlopen(filename.data, flags);
+	return unix_dlopen(to_c_str(filename), flags);
 }
 dlsym :: proc(handle: rawptr, symbol: string) -> (proc() #cc_c) #inline {
 	assert(handle != nil);
-	symbol += "\x00";
-	return unix_dlsym(handle, symbol.data);
+	return unix_dlsym(handle, to_c_str(symbol));
 }
 dlclose :: proc(handle: rawptr) -> bool #inline {
 	assert(handle != nil);
 	return unix_dlclose(handle) == 0;
 }
 dlerror :: proc() -> string {
-	// TODO(zangent): Should this be split out into a from_c_string()?
-	c_str := unix_dlerror();
-	len := 0;
-	for s := c_str; s^ != 0; s += 1 {
-		len += 1;
-	}
-	return cast(string)slice_ptr(c_str, len);
+	return from_c_str(unix_dlerror());
 }
