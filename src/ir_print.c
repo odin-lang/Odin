@@ -842,6 +842,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_fprintf(f, " 0, ");
 		ir_print_type(f, m, t_i32);
 		ir_fprintf(f, " %d", 2);
+		ir_fprintf(f, " ; UnionTagPtr");
 		ir_fprintf(f, "\n");
 	} break;
 
@@ -852,7 +853,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, et);
 		ir_fprintf(f, " ");
 		ir_print_value(f, m, instr->UnionTagValue.address, et);
-		ir_fprintf(f, ", %d\n", 2);
+		ir_fprintf(f, ", %d", 2);
+		ir_fprintf(f, " ; UnionTagValue");
+		ir_fprintf(f, "\n");
 	} break;
 
 	case irInstr_Jump: {;

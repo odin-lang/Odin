@@ -291,10 +291,10 @@ gb_global Type *t_string_slice = NULL;
 
 
 gb_global Type *t_type_info                = NULL;
-gb_global Type *t_type_info_member         = NULL;
+gb_global Type *t_type_info_record         = NULL;
 gb_global Type *t_type_info_enum_value     = NULL;
 gb_global Type *t_type_info_ptr            = NULL;
-gb_global Type *t_type_info_member_ptr     = NULL;
+gb_global Type *t_type_info_record_ptr     = NULL;
 gb_global Type *t_type_info_enum_value_ptr = NULL;
 
 gb_global Type *t_type_info_named         = NULL;
@@ -867,7 +867,9 @@ bool are_types_identical(Type *x, Type *y) {
 				case TypeRecord_Union:
 					if (x->Record.field_count == y->Record.field_count &&
 					    x->Record.struct_is_packed == y->Record.struct_is_packed &&
-					    x->Record.struct_is_ordered == y->Record.struct_is_ordered) {
+					    x->Record.struct_is_ordered == y->Record.struct_is_ordered &&
+					    x->Record.custom_align == y->Record.custom_align) {
+						// TODO(bill); Fix the custom alignment rule
 						for (isize i = 0; i < x->Record.field_count; i++) {
 							if (!are_types_identical(x->Record.fields[i]->type, y->Record.fields[i]->type)) {
 								return false;

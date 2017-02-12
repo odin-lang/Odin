@@ -502,6 +502,14 @@ GB_COMPARE_PROC(cmp_struct_entity_size) {
 	return xa > ya ? -1 : xa < ya;
 }
 
+Entity *make_names_field_for_record(Checker *c, Scope *scope) {
+	Entity *e = make_entity_field(c->allocator, scope,
+		make_token_ident(str_lit("names")), t_string_slice, false, 0);
+	e->Variable.is_immutable = true;
+	e->flags |= EntityFlag_TypeField;
+	return e;
+}
+
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
@@ -525,11 +533,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	struct_type->Record.fields              = fields;
 	struct_type->Record.fields_in_src_order = fields;
 	struct_type->Record.field_count         = field_count;
-
-	// struct_type->Record.names = make_entity_field(c->allocator, c->context.scope,
-	// 	make_token_ident(str_lit("names")), t_string_slice, false, 0);
-	// struct_type->Record.names->Variable.is_immutable = true;
-	// struct_type->Record.names->flags |= EntityFlag_TypeField;
+	struct_type->Record.names = make_names_field_for_record(c, c->context.scope);
 
 	if (!st->is_packed && !st->is_ordered) {
 		// NOTE(bill): Reorder fields for reduced size/performance
@@ -615,11 +619,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	union_type->Record.fields            = fields;
 	union_type->Record.field_count       = field_count;
-
-	// union_type->Record.names = make_entity_field(c->allocator, c->context.scope,
-	// 	make_token_ident(str_lit("names")), t_string_slice, false, 0);
-	// union_type->Record.names->Variable.is_immutable = true;
-	// union_type->Record.names->flags |= EntityFlag_TypeField;
+	union_type->Record.names = make_names_field_for_record(c, c->context.scope);
 }
 
 void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
@@ -643,11 +643,7 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	union_type->Record.fields = fields;
 	union_type->Record.field_count = field_count;
-
-// 	union_type->Record.names = make_entity_field(c->allocator, c->context.scope,
-// 		make_token_ident(str_lit("names")), t_string_slice, false, 0);
-// 	union_type->Record.names->Variable.is_immutable = true;
-// 	union_type->Record.names->flags |= EntityFlag_TypeField;
+	union_type->Record.names = make_names_field_for_record(c, c->context.scope);
 }
 
 // GB_COMPARE_PROC(cmp_enum_order) {
@@ -802,10 +798,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	enum_type->Record.enum_max_value = make_entity_constant(c->allocator, c->context.scope,
 		make_token_ident(str_lit("max_value")), constant_type, max_value);
 
-	enum_type->Record.names = make_entity_field(c->allocator, c->context.scope,
-		make_token_ident(str_lit("names")), t_string_slice, false, 0);
-	enum_type->Record.names->Variable.is_immutable = true;
-	enum_type->Record.names->flags |= EntityFlag_TypeField;
+	enum_type->Record.names = make_names_field_for_record(c, c->context.scope);
 }
 
 

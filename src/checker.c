@@ -1079,19 +1079,16 @@ void init_preload(Checker *c) {
 	}
 
 	if (t_type_info == NULL) {
-		Entity *type_info_entity            = find_core_entity(c, str_lit("Type_Info"));
-		Entity *type_info_member_entity     = find_core_entity(c, str_lit("Type_Info_Member"));
-		Entity *type_info_enum_value_entity = find_core_entity(c, str_lit("Type_Info_Enum_Value"));
+		Entity *type_info_entity = find_core_entity(c, str_lit("Type_Info"));
 
 		t_type_info = type_info_entity->type;
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
 		GB_ASSERT(is_type_union(type_info_entity->type));
 		TypeRecord *record = &base_type(type_info_entity->type)->Record;
 
-		t_type_info_member = type_info_member_entity->type;
-		t_type_info_member_ptr = make_type_pointer(c->allocator, t_type_info_member);
-
-		t_type_info_enum_value = type_info_enum_value_entity->type;
+		t_type_info_record = find_core_entity(c, str_lit("Type_Info_Record"))->type;
+		t_type_info_record_ptr = make_type_pointer(c->allocator, t_type_info_record);
+		t_type_info_enum_value = find_core_entity(c, str_lit("Type_Info_Enum_Value"))->type;
 		t_type_info_enum_value_ptr = make_type_pointer(c->allocator, t_type_info_enum_value);
 
 
