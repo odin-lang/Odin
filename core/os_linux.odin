@@ -71,8 +71,8 @@ from_c_str :: proc(c_str: ^u8) -> string {
 	}
 	return cast(string)slice_ptr(c_str, len);
 }
-
-open :: proc(path: string, mode: int) -> (Handle, Errno) {
+// TODO(zangent): Change this to just `open` when Bill fixes overloading.
+open_simple :: proc(path: string, mode: int) -> (Handle, Errno) {
 	
 	handle := unix_open(to_c_str(path), mode);
 	if(handle == -1) {
@@ -132,7 +132,7 @@ last_write_time_by_name :: proc(name: string) -> File_Time {}
 
 read_entire_file :: proc(name: string) -> ([]byte, bool) {
 
-	handle, err := open(name, O_RDONLY);
+	handle, err := open_simple(name, O_RDONLY);
 	if(err != 0) {
 		fmt.println("Failed to open file.");
 		return nil, false;

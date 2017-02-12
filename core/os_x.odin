@@ -74,8 +74,8 @@ from_c_str :: proc(c_str: ^u8) -> string {
 	}
 	return cast(string)slice_ptr(c_str, len);
 }
-
-open :: proc(path: string, mode: int) -> (Handle, Errno) {
+// TODO(zangent): Change this to just `open` when Bill fixes overloading.
+open_simple :: proc(path: string, mode: int) -> (Handle, Errno) {
 	
 	handle := unix_open(to_c_str(path), mode);
 	if(handle == -1) {
@@ -83,9 +83,10 @@ open :: proc(path: string, mode: int) -> (Handle, Errno) {
 	}
 	return handle, 0;
 }
+
 // NOTE(zangent): This is here for compatability reasons. Should this be here?
 open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
-	return open(path, mode);
+	return open_simple(path, mode);
 }
 
 close :: proc(fd: Handle) {
@@ -132,10 +133,10 @@ stderr: Handle = 2; // get_std_handle(win32.STD_ERROR_HANDLE);
 last_write_time :: proc(fd: Handle) -> File_Time {}
 last_write_time_by_name :: proc(name: string) -> File_Time {}
 */
-
+/*
 read_entire_file :: proc(name: string) -> ([]byte, bool) {
 
-	handle, err := open(name, O_RDONLY);
+	handle, err := open_simple(name, O_RDONLY);
 	if(err != 0) {
 		fmt.println("Failed to open file.");
 		return nil, false;
@@ -178,6 +179,7 @@ read_entire_file_to_string :: proc(name: string) -> (string, bool) {
 	}
 	return from_c_str(^contents[0]), true;
 }
+*/
 
 heap_alloc :: proc(size: int) -> rawptr #inline {
 	assert(size > 0);
