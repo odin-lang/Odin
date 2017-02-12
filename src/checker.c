@@ -264,7 +264,7 @@ typedef struct CheckerInfo {
 	MapScope             scopes;          // Key: AstNode * | Node       -> Scope
 	MapExprInfo          untyped;         // Key: AstNode * | Expression -> ExprInfo
 	MapDeclInfo          entities;        // Key: Entity *
-	MapEntity            foreign_procs;   // Key: String
+	MapEntity            foreigns;        // Key: String
 	MapAstFile           files;           // Key: String (full path)
 	MapIsize             type_info_map;   // Key: Type *
 	isize                type_info_count;
@@ -275,12 +275,10 @@ typedef struct Checker {
 	CheckerInfo info;
 
 	AstFile *              curr_ast_file;
-	BaseTypeSizes          sizes;
 	Scope *                global_scope;
 	Array(ProcedureInfo)   procs; // NOTE(bill): Procedures to check
 	Array(DelayedDecl)     delayed_imports;
 	Array(DelayedDecl)     delayed_foreign_libraries;
-
 
 	gbArena                arena;
 	gbArena                tmp_arena;
@@ -591,7 +589,8 @@ void add_global_string_constant(gbAllocator a, String name, String value) {
 }
 
 
-void init_universal_scope(BuildContext *bc) {
+void init_universal_scope(void) {
+	BuildContext *bc = &build_context;
 	// NOTE(bill): No need to free these
 	gbAllocator a = heap_allocator();
 	universal_scope = make_scope(NULL, a);
@@ -650,7 +649,7 @@ void init_checker_info(CheckerInfo *i) {
 	map_scope_init(&i->scopes,         a);
 	map_decl_info_init(&i->entities,   a);
 	map_expr_info_init(&i->untyped,    a);
-	map_entity_init(&i->foreign_procs, a);
+	map_entity_init(&i->foreigns,      a);
 	map_isize_init(&i->type_info_map,  a);
 	map_ast_file_init(&i->files,       a);
 	i->type_info_count = 0;
@@ -664,7 +663,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_scope_destroy(&i->scopes);
 	map_decl_info_destroy(&i->entities);
 	map_expr_info_destroy(&i->untyped);
-	map_entity_destroy(&i->foreign_procs);
+	map_entity_destroy(&i->foreigns);
 	map_isize_destroy(&i->type_info_map);
 	map_ast_file_destroy(&i->files);
 }
@@ -675,8 +674,6 @@ void init_checker(Checker *c, Parser *parser, BuildContext *bc) {
 
 	c->parser = parser;
 	init_checker_info(&c->info);
-	c->sizes.word_size = bc->word_size;
-	c->sizes.max_align = bc->max_align;
 
 	array_init(&c->proc_stack, a);
 	array_init(&c->procs, a);
@@ -1079,19 +1076,16 @@ void init_preload(Checker *c) {
 	}
 
 	if (t_type_info == NULL) {
-		Entity *type_info_entity            = find_core_entity(c, str_lit("Type_Info"));
-		Entity *type_info_member_entity     = find_core_entity(c, str_lit("Type_Info_Member"));
-		Entity *type_info_enum_value_entity = find_core_entity(c, str_lit("Type_Info_Enum_Value"));
+		Entity *type_info_entity = find_core_entity(c, str_lit("Type_Info"));
 
 		t_type_info = type_info_entity->type;
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
 		GB_ASSERT(is_type_union(type_info_entity->type));
 		TypeRecord *record = &base_type(type_info_entity->type)->Record;
 
-		t_type_info_member = type_info_member_entity->type;
-		t_type_info_member_ptr = make_type_pointer(c->allocator, t_type_info_member);
-
-		t_type_info_enum_value = type_info_enum_value_entity->type;
+		t_type_info_record = find_core_entity(c, str_lit("Type_Info_Record"))->type;
+		t_type_info_record_ptr = make_type_pointer(c->allocator, t_type_info_record);
+		t_type_info_enum_value = find_core_entity(c, str_lit("Type_Info_Enum_Value"))->type;
 		t_type_info_enum_value_ptr = make_type_pointer(c->allocator, t_type_info_enum_value);
 
 
@@ -1387,7 +1381,13 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 					di->entities = entities;
 					di->type_expr = vd->type;
 					di->init_expr = vd->values.e[0];
+
+
+					if (vd->flags & VarDeclFlag_thread_local) {
+						error_node(decl, "#thread_local variable declarations cannot have initialization values");
+					}
 				}
+
 
 				for_array(i, vd->names) {
 					AstNode *name = vd->names.e[i];
@@ -1400,8 +1400,9 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 						continue;
 					}
 					Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL, vd->flags & VarDeclFlag_immutable);
-					e->Variable.is_thread_local = vd->flags & VarDeclFlag_thread_local;
+					e->Variable.is_thread_local = (vd->flags & VarDeclFlag_thread_local) != 0;
 					e->identifier = name;
+
 					if (vd->flags & VarDeclFlag_using) {
 						vd->flags &= ~VarDeclFlag_using; // NOTE(bill): This error will be only caught once
 						error_node(name, "`using` is not allowed at the file scope");
@@ -1899,7 +1900,7 @@ void check_parsed_files(Checker *c) {
 		if (e->kind == Entity_TypeName) {
 			if (e->type != NULL) {
 				// i64 size  = type_size_of(c->sizes, c->allocator, e->type);
-				i64 align = type_align_of(c->sizes, c->allocator, e->type);
+				i64 align = type_align_of(c->allocator, e->type);
 			}
 		}
 	}

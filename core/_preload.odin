@@ -14,13 +14,10 @@
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
-Type_Info_Member :: struct #ordered {
-	name:      string,     // can be empty if tuple
-	type_info: ^Type_Info,
-	offset:    int,        // offsets may not be used in tuples
-}
 Type_Info_Record :: struct #ordered {
-	fields:       []Type_Info_Member,
+	types:        []^Type_Info,
+	names:        []string,
+	offsets:      []int,    // offsets may not be used in tuples
 	size:         int, // in bytes
 	align:        int, // in bytes
 	packed:       bool,

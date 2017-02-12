@@ -84,9 +84,9 @@ typedef enum ProcCallingConvention {
 } ProcCallingConvention;
 
 typedef enum VarDeclFlag {
-	VarDeclFlag_thread_local = 1<<0,
-	VarDeclFlag_using        = 1<<1,
-	VarDeclFlag_immutable    = 1<<2,
+	VarDeclFlag_using            = 1<<0,
+	VarDeclFlag_immutable        = 1<<1,
+	VarDeclFlag_thread_local     = 1<<2,
 } VarDeclFlag;
 
 typedef enum StmtStateFlag {
@@ -493,15 +493,11 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_ImportDecl:     return node->ImportDecl.token;
 	case AstNode_ForeignLibrary: return node->ForeignLibrary.token;
 
-
-	case AstNode_Field: {
+	case AstNode_Field:
 		if (node->Field.names.count > 0) {
 			return ast_node_token(node->Field.names.e[0]);
-		} else {
-			return ast_node_token(node->Field.type);
 		}
-	}
-
+		return ast_node_token(node->Field.type);
 
 	case AstNode_HelperType:       return node->HelperType.token;
 	case AstNode_ProcType:         return node->ProcType.token;

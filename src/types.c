@@ -178,19 +178,6 @@ typedef struct Type {
 	bool failure;
 } Type;
 
-// NOTE(bill): Internal sizes of certain types
-// string: 2*word_size  (ptr+len)
-// slice:  3*word_size  (ptr+len+cap)
-// array:  count*size_of(elem) aligned
-
-// NOTE(bill): Alignment of structures and other types are to be compatible with C
-
-typedef struct BaseTypeSizes {
-	i64 word_size;
-	i64 max_align;
-} BaseTypeSizes;
-
-
 typedef Array(i32) Array_i32;
 
 typedef struct Selection {
@@ -291,10 +278,10 @@ gb_global Type *t_string_slice = NULL;
 
 
 gb_global Type *t_type_info                = NULL;
-gb_global Type *t_type_info_member         = NULL;
+gb_global Type *t_type_info_record         = NULL;
 gb_global Type *t_type_info_enum_value     = NULL;
 gb_global Type *t_type_info_ptr            = NULL;
-gb_global Type *t_type_info_member_ptr     = NULL;
+gb_global Type *t_type_info_record_ptr     = NULL;
 gb_global Type *t_type_info_enum_value_ptr = NULL;
 
 gb_global Type *t_type_info_named         = NULL;
@@ -349,6 +336,10 @@ gb_global Type *t_map_key               = NULL;
 gb_global Type *t_map_header            = NULL;
 
 
+
+i64 type_size_of  (gbAllocator allocator, Type *t);
+i64 type_align_of (gbAllocator allocator, Type *t);
+i64 type_offset_of(gbAllocator allocator, Type *t, i32 index);
 
 
 
@@ -867,7 +858,9 @@ bool are_types_identical(Type *x, Type *y) {
 				case TypeRecord_Union:
 					if (x->Record.field_count == y->Record.field_count &&
 					    x->Record.struct_is_packed == y->Record.struct_is_packed &&
-					    x->Record.struct_is_ordered == y->Record.struct_is_ordered) {
+					    x->Record.struct_is_ordered == y->Record.struct_is_ordered &&
+					    x->Record.custom_align == y->Record.custom_align) {
+						// TODO(bill); Fix the custom alignment rule
 						for (isize i = 0; i < x->Record.field_count; i++) {
 							if (!are_types_identical(x->Record.fields[i]->type, y->Record.fields[i]->type)) {
 								return false;
@@ -969,6 +962,8 @@ bool is_type_cte_safe(Type *type) {
 		return is_type_cte_safe(type->Array.elem);
 
 	case Type_DynamicArray:
+		return false;
+	case Type_Map:
 		return false;
 
 	case Type_Vector: // NOTE(bill): This should always to be true but this is for sanity reasons
@@ -1461,12 +1456,8 @@ void type_path_pop(TypePath *tp) {
 #define FAILURE_ALIGNMENT 0
 
 
-i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
-i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t);
-i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, i32 index);
-
-i64 type_size_of_internal (BaseTypeSizes s, gbAllocator allocator, Type *t, TypePath *path);
-i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypePath *path);
+i64 type_size_of_internal (gbAllocator allocator, Type *t, TypePath *path);
+i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path);
 
 i64 align_formula(i64 size, i64 align) {
 	if (align > 0) {
@@ -1476,32 +1467,32 @@ i64 align_formula(i64 size, i64 align) {
 	return size;
 }
 
-i64 type_size_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
+i64 type_size_of(gbAllocator allocator, Type *t) {
 	if (t == NULL) {
 		return 0;
 	}
 	i64 size;
 	TypePath path = {0};
 	type_path_init(&path);
-	size = type_size_of_internal(s, allocator, t, &path);
+	size = type_size_of_internal(allocator, t, &path);
 	type_path_free(&path);
 	return size;
 }
 
-i64 type_align_of(BaseTypeSizes s, gbAllocator allocator, Type *t) {
+i64 type_align_of(gbAllocator allocator, Type *t) {
 	if (t == NULL) {
 		return 1;
 	}
 	i64 align;
 	TypePath path = {0};
 	type_path_init(&path);
-	align = type_align_of_internal(s, allocator, t, &path);
+	align = type_align_of_internal(allocator, t, &path);
 	type_path_free(&path);
 	return align;
 }
 
 
-i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypePath *path) {
+i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	if (t->failure) {
 		return FAILURE_ALIGNMENT;
 	}
@@ -1511,11 +1502,11 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 	case Type_Basic: {
 		GB_ASSERT(is_type_typed(t));
 		switch (t->kind) {
-		case Basic_string: return s.word_size;
-		case Basic_any:    return s.word_size;
+		case Basic_string: return build_context.word_size;
+		case Basic_any:    return build_context.word_size;
 
 		case Basic_int: case Basic_uint: case Basic_rawptr:
-			return s.word_size;
+			return build_context.word_size;
 		}
 	} break;
 
@@ -1525,17 +1516,17 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 		if (path->failure) {
 			return FAILURE_ALIGNMENT;
 		}
-		i64 align = type_align_of_internal(s, allocator, t->Array.elem, path);
+		i64 align = type_align_of_internal(allocator, t->Array.elem, path);
 		type_path_pop(path);
 		return align;
 	}
 
 	case Type_DynamicArray:
 		// data, count, capacity, allocator
-		return s.word_size;
+		return build_context.word_size;
 
 	case Type_Slice:
-		return s.word_size;
+		return build_context.word_size;
 
 	case Type_Vector: {
 		Type *elem = t->Vector.elem;
@@ -1543,17 +1534,17 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 		if (path->failure) {
 			return FAILURE_ALIGNMENT;
 		}
-		i64 size = type_size_of_internal(s, allocator, t->Vector.elem, path);
+		i64 size = type_size_of_internal(allocator, t->Vector.elem, path);
 		type_path_pop(path);
 		i64 count = gb_max(prev_pow2(t->Vector.count), 1);
 		i64 total = size * count;
-		return gb_clamp(total, 1, s.max_align);
+		return gb_clamp(total, 1, build_context.max_align);
 	} break;
 
 	case Type_Tuple: {
 		i64 max = 1;
 		for (isize i = 0; i < t->Tuple.variable_count; i++) {
-			i64 align = type_align_of_internal(s, allocator, t->Tuple.variables[i]->type, path);
+			i64 align = type_align_of_internal(allocator, t->Tuple.variables[i]->type, path);
 			if (max < align) {
 				max = align;
 			}
@@ -1563,7 +1554,7 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 
 	case Type_Map: {
 		if (t->Map.count == 0) { // Dynamic
-			return type_align_of_internal(s, allocator, t->Map.generated_struct_type, path);
+			return type_align_of_internal(allocator, t->Map.generated_struct_type, path);
 		}
 		GB_PANIC("TODO(bill): Fixed map alignment");
 	} break;
@@ -1572,19 +1563,19 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 		switch (t->Record.kind) {
 		case TypeRecord_Struct:
 			if (t->Record.custom_align > 0) {
-				return gb_clamp(t->Record.custom_align, 1, s.max_align);
+				return gb_clamp(t->Record.custom_align, 1, build_context.max_align);
 			}
 			if (t->Record.field_count > 0) {
 				// TODO(bill): What is this supposed to be?
 				if (t->Record.struct_is_packed) {
-					i64 max = s.word_size;
+					i64 max = build_context.word_size;
 					for (isize i = 0; i < t->Record.field_count; i++) {
 						Type *field_type = t->Record.fields[i]->type;
 						type_path_push(path, field_type);
 						if (path->failure) {
 							return FAILURE_ALIGNMENT;
 						}
-						i64 align = type_align_of_internal(s, allocator, field_type, path);
+						i64 align = type_align_of_internal(allocator, field_type, path);
 						type_path_pop(path);
 						if (max < align) {
 							max = align;
@@ -1597,7 +1588,7 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 				if (path->failure) {
 					return FAILURE_ALIGNMENT;
 				}
-				i64 align = type_align_of_internal(s, allocator, field_type, path);
+				i64 align = type_align_of_internal(allocator, field_type, path);
 				type_path_pop(path);
 				return align;
 			}
@@ -1611,7 +1602,7 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 				if (path->failure) {
 					return FAILURE_ALIGNMENT;
 				}
-				i64 align = type_align_of_internal(s, allocator, field_type, path);
+				i64 align = type_align_of_internal(allocator, field_type, path);
 				type_path_pop(path);
 				if (max < align) {
 					max = align;
@@ -1627,7 +1618,7 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 				if (path->failure) {
 					return FAILURE_ALIGNMENT;
 				}
-				i64 align = type_align_of_internal(s, allocator, field_type, path);
+				i64 align = type_align_of_internal(allocator, field_type, path);
 				type_path_pop(path);
 				if (max < align) {
 					max = align;
@@ -1639,43 +1630,43 @@ i64 type_align_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, Type
 	} break;
 	}
 
-	// return gb_clamp(next_pow2(type_size_of(s, allocator, t)), 1, s.max_align);
-	// NOTE(bill): Things that are bigger than s.word_size, are actually comprised of smaller types
+	// return gb_clamp(next_pow2(type_size_of(allocator, t)), 1, build_context.max_align);
+	// NOTE(bill): Things that are bigger than build_context.word_size, are actually comprised of smaller types
 	// TODO(bill): Is this correct for 128-bit types (integers)?
-	return gb_clamp(next_pow2(type_size_of_internal(s, allocator, t, path)), 1, s.word_size);
+	return gb_clamp(next_pow2(type_size_of_internal(allocator, t, path)), 1, build_context.word_size);
 }
 
-i64 *type_set_offsets_of(BaseTypeSizes s, gbAllocator allocator, Entity **fields, isize field_count, bool is_packed) {
+i64 *type_set_offsets_of(gbAllocator allocator, Entity **fields, isize field_count, bool is_packed) {
 	i64 *offsets = gb_alloc_array(allocator, i64, field_count);
 	i64 curr_offset = 0;
 	if (is_packed) {
 		for (isize i = 0; i < field_count; i++) {
 			offsets[i] = curr_offset;
-			curr_offset += type_size_of(s, allocator, fields[i]->type);
+			curr_offset += type_size_of(allocator, fields[i]->type);
 		}
 
 	} else {
 		for (isize i = 0; i < field_count; i++) {
-			i64 align = type_align_of(s, allocator, fields[i]->type);
+			i64 align = type_align_of(allocator, fields[i]->type);
 			curr_offset = align_formula(curr_offset, align);
 			offsets[i] = curr_offset;
-			curr_offset += type_size_of(s, allocator, fields[i]->type);
+			curr_offset += type_size_of(allocator, fields[i]->type);
 		}
 	}
 	return offsets;
 }
 
-bool type_set_offsets(BaseTypeSizes s, gbAllocator allocator, Type *t) {
+bool type_set_offsets(gbAllocator allocator, Type *t) {
 	t = base_type(t);
 	if (is_type_struct(t)) {
 		if (!t->Record.struct_are_offsets_set) {
-			t->Record.struct_offsets = type_set_offsets_of(s, allocator, t->Record.fields, t->Record.field_count, t->Record.struct_is_packed);
+			t->Record.struct_offsets = type_set_offsets_of(allocator, t->Record.fields, t->Record.field_count, t->Record.struct_is_packed);
 			t->Record.struct_are_offsets_set = true;
 			return true;
 		}
 	} else if (is_type_tuple(t)) {
 		if (!t->Tuple.are_offsets_set) {
-			t->Tuple.offsets = type_set_offsets_of(s, allocator, t->Tuple.variables, t->Tuple.variable_count, false);
+			t->Tuple.offsets = type_set_offsets_of(allocator, t->Tuple.variables, t->Tuple.variable_count, false);
 			t->Tuple.are_offsets_set = true;
 			return true;
 		}
@@ -1685,7 +1676,7 @@ bool type_set_offsets(BaseTypeSizes s, gbAllocator allocator, Type *t) {
 	return false;
 }
 
-i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypePath *path) {
+i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	if (t->failure) {
 		return FAILURE_SIZE;
 	}
@@ -1699,11 +1690,11 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 			return size;
 		}
 		switch (kind) {
-		case Basic_string: return 2*s.word_size;
-		case Basic_any:    return 2*s.word_size;
+		case Basic_string: return 2*build_context.word_size;
+		case Basic_any:    return 2*build_context.word_size;
 
 		case Basic_int: case Basic_uint: case Basic_rawptr:
-			return s.word_size;
+			return build_context.word_size;
 		}
 	} break;
 
@@ -1713,17 +1704,17 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 		if (count == 0) {
 			return 0;
 		}
-		align = type_align_of_internal(s, allocator, t->Array.elem, path);
+		align = type_align_of_internal(allocator, t->Array.elem, path);
 		if (path->failure) {
 			return FAILURE_SIZE;
 		}
-		size  = type_size_of_internal(s,  allocator, t->Array.elem, path);
+		size  = type_size_of_internal( allocator, t->Array.elem, path);
 		alignment = align_formula(size, align);
 		return alignment*(count-1) + size;
 	} break;
 
 	case Type_DynamicArray:
-		return 3*s.word_size + type_size_of(s, allocator, t_allocator);
+		return 3*build_context.word_size + type_size_of(allocator, t_allocator);
 
 	case Type_Vector: {
 #if 0
@@ -1736,7 +1727,7 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 		if (path->failure) {
 			return FAILURE_SIZE;
 		}
-		bit_size = 8*type_size_of_internal(s, allocator, t->Vector.elem, path);
+		bit_size = 8*type_size_of_internal(allocator, t->Vector.elem, path);
 		type_path_pop(path);
 		if (is_type_boolean(t->Vector.elem)) {
 			bit_size = 1; // NOTE(bill): LLVM can store booleans as 1 bit because a boolean _is_ an `i1`
@@ -1751,11 +1742,11 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 		if (count == 0) {
 			return 0;
 		}
-		align = type_align_of_internal(s, allocator, t->Vector.elem, path);
+		align = type_align_of_internal(allocator, t->Vector.elem, path);
 		if (path->failure) {
 			return FAILURE_SIZE;
 		}
-		size  = type_size_of_internal(s,  allocator, t->Vector.elem, path);
+		size  = type_size_of_internal( allocator, t->Vector.elem, path);
 		alignment = align_formula(size, align);
 		return alignment*(count-1) + size;
 #endif
@@ -1763,11 +1754,11 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 
 
 	case Type_Slice: // ptr + count
-		return 2 * s.word_size;
+		return 2 * build_context.word_size;
 
 	case Type_Map: {
 		if (t->Map.count == 0) { // Dynamic
-			return type_size_of_internal(s, allocator, t->Map.generated_struct_type, path);
+			return type_size_of_internal(allocator, t->Map.generated_struct_type, path);
 		}
 		GB_PANIC("TODO(bill): Fixed map size");
 	}
@@ -1778,9 +1769,9 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 		if (count == 0) {
 			return 0;
 		}
-		align = type_align_of_internal(s, allocator, t, path);
-		type_set_offsets(s, allocator, t);
-		size = t->Tuple.offsets[count-1] + type_size_of_internal(s, allocator, t->Tuple.variables[count-1]->type, path);
+		align = type_align_of_internal(allocator, t, path);
+		type_set_offsets(allocator, t);
+		size = t->Tuple.offsets[count-1] + type_size_of_internal(allocator, t->Tuple.variables[count-1]->type, path);
 		return align_formula(size, align);
 	} break;
 
@@ -1791,44 +1782,44 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 			if (count == 0) {
 				return 0;
 			}
-			i64 align = type_align_of_internal(s, allocator, t, path);
+			i64 align = type_align_of_internal(allocator, t, path);
 			if (path->failure) {
 				return FAILURE_SIZE;
 			}
-			type_set_offsets(s, allocator, t);
-			i64 size = t->Record.struct_offsets[count-1] + type_size_of_internal(s, allocator, t->Record.fields[count-1]->type, path);
+			type_set_offsets(allocator, t);
+			i64 size = t->Record.struct_offsets[count-1] + type_size_of_internal(allocator, t->Record.fields[count-1]->type, path);
 			return align_formula(size, align);
 		} break;
 
 		case TypeRecord_Union: {
 			i64 count = t->Record.field_count;
-			i64 align = type_align_of_internal(s, allocator, t, path);
+			i64 align = type_align_of_internal(allocator, t, path);
 			if (path->failure) {
 				return FAILURE_SIZE;
 			}
 			i64 max = 0;
 			// NOTE(bill): Zeroth field is invalid
 			for (isize i = 1; i < count; i++) {
-				i64 size = type_size_of_internal(s, allocator, t->Record.fields[i]->type, path);
+				i64 size = type_size_of_internal(allocator, t->Record.fields[i]->type, path);
 				if (max < size) {
 					max = size;
 				}
 			}
 			// NOTE(bill): Align to int
-			isize size =  align_formula(max, s.word_size);
-			size += type_size_of_internal(s, allocator, t_int, path);
+			isize size =  align_formula(max, build_context.word_size);
+			size += type_size_of_internal(allocator, t_int, path);
 			return align_formula(size, align);
 		} break;
 
 		case TypeRecord_RawUnion: {
 			i64 count = t->Record.field_count;
-			i64 align = type_align_of_internal(s, allocator, t, path);
+			i64 align = type_align_of_internal(allocator, t, path);
 			if (path->failure) {
 				return FAILURE_SIZE;
 			}
 			i64 max = 0;
 			for (isize i = 0; i < count; i++) {
-				i64 size = type_size_of_internal(s, allocator, t->Record.fields[i]->type, path);
+				i64 size = type_size_of_internal(allocator, t->Record.fields[i]->type, path);
 				if (max < size) {
 					max = size;
 				}
@@ -1841,18 +1832,18 @@ i64 type_size_of_internal(BaseTypeSizes s, gbAllocator allocator, Type *t, TypeP
 	}
 
 	// Catch all
-	return s.word_size;
+	return build_context.word_size;
 }
 
-i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, i32 index) {
+i64 type_offset_of(gbAllocator allocator, Type *t, i32 index) {
 	t = base_type(t);
 	if (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct) {
-		type_set_offsets(s, allocator, t);
+		type_set_offsets(allocator, t);
 		if (gb_is_between(index, 0, t->Record.field_count-1)) {
 			return t->Record.struct_offsets[index];
 		}
 	} else if (t->kind == Type_Tuple) {
-		type_set_offsets(s, allocator, t);
+		type_set_offsets(allocator, t);
 		if (gb_is_between(index, 0, t->Tuple.variable_count-1)) {
 			return t->Tuple.offsets[index];
 		}
@@ -1860,32 +1851,32 @@ i64 type_offset_of(BaseTypeSizes s, gbAllocator allocator, Type *t, i32 index) {
 		if (t->Basic.kind == Basic_string) {
 			switch (index) {
 			case 0: return 0;           // data
-			case 1: return s.word_size; // count
+			case 1: return build_context.word_size; // count
 			}
 		} else if (t->Basic.kind == Basic_any) {
 			switch (index) {
 			case 0: return 0;           // type_info
-			case 1: return s.word_size; // data
+			case 1: return build_context.word_size; // data
 			}
 		}
 	} else if (t->kind == Type_Slice) {
 		switch (index) {
 		case 0: return 0;             // data
-		case 1: return 1*s.word_size; // count
+		case 1: return 1*build_context.word_size; // count
 		}
 	} else if (t->kind == Type_DynamicArray) {
 		switch (index) {
 		case 0: return 0;             // data
-		case 1: return 1*s.word_size; // count
-		case 2: return 2*s.word_size; // capacity
-		case 3: return 3*s.word_size; // allocator
+		case 1: return 1*build_context.word_size; // count
+		case 2: return 2*build_context.word_size; // capacity
+		case 3: return 3*build_context.word_size; // allocator
 		}
 	}
 	return 0;
 }
 
 
-i64 type_offset_of_from_selection(BaseTypeSizes s, gbAllocator allocator, Type *type, Selection sel) {
+i64 type_offset_of_from_selection(gbAllocator allocator, Type *type, Selection sel) {
 	GB_ASSERT(sel.indirect == false);
 
 	Type *t = type;
@@ -1893,7 +1884,7 @@ i64 type_offset_of_from_selection(BaseTypeSizes s, gbAllocator allocator, Type *
 	for_array(i, sel.index) {
 		isize index = sel.index.e[i];
 		t = base_type(t);
-		offset += type_offset_of(s, allocator, t, index);
+		offset += type_offset_of(allocator, t, index);
 		if (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct) {
 			t = t->Record.fields[index]->type;
 		} else {

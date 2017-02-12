@@ -300,7 +300,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 	if (is_foreign) {
-		MapEntity *fp = &c->info.foreign_procs;
+		MapEntity *fp = &c->info.foreigns;
 		String name = e->token.string;
 		if (pd->foreign_name.len > 0) {
 			name = pd->foreign_name;
@@ -355,7 +355,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 		}
 
 		if (is_link_name || is_export) {
-			MapEntity *fp = &c->info.foreign_procs;
+			MapEntity *fp = &c->info.foreigns;
 
 			e->Procedure.link_name = name;
 

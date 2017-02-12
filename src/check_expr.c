@@ -473,7 +473,6 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 
 // TODO(bill): Cleanup struct field reordering
 // TODO(bill): Inline sorting procedure?
-gb_global BaseTypeSizes __checker_sizes = {0};
 gb_global gbAllocator   __checker_allocator = {0};
 
 GB_COMPARE_PROC(cmp_struct_entity_size) {
@@ -487,10 +486,10 @@ GB_COMPARE_PROC(cmp_struct_entity_size) {
 	GB_ASSERT(y != NULL);
 	GB_ASSERT(x->kind == Entity_Variable);
 	GB_ASSERT(y->kind == Entity_Variable);
-	i64 xa = type_align_of(__checker_sizes, __checker_allocator, x->type);
-	i64 ya = type_align_of(__checker_sizes, __checker_allocator, y->type);
-	i64 xs = type_size_of(__checker_sizes, __checker_allocator, x->type);
-	i64 ys = type_size_of(__checker_sizes, __checker_allocator, y->type);
+	i64 xa = type_align_of(__checker_allocator, x->type);
+	i64 ya = type_align_of(__checker_allocator, y->type);
+	i64 xs = type_size_of(__checker_allocator, x->type);
+	i64 ys = type_size_of(__checker_allocator, y->type);
 
 	if (xa == ya) {
 		if (xs == ys) {
@@ -500,6 +499,14 @@ GB_COMPARE_PROC(cmp_struct_entity_size) {
 		return xs > ys ? -1 : xs < ys;
 	}
 	return xa > ya ? -1 : xa < ya;
+}
+
+Entity *make_names_field_for_record(Checker *c, Scope *scope) {
+	Entity *e = make_entity_field(c->allocator, scope,
+		make_token_ident(str_lit("names")), t_string_slice, false, 0);
+	e->Variable.is_immutable = true;
+	e->flags |= EntityFlag_TypeField;
+	return e;
 }
 
 void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
@@ -525,11 +532,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	struct_type->Record.fields              = fields;
 	struct_type->Record.fields_in_src_order = fields;
 	struct_type->Record.field_count         = field_count;
-
-	// struct_type->Record.names = make_entity_field(c->allocator, c->context.scope,
-	// 	make_token_ident(str_lit("names")), t_string_slice, false, 0);
-	// struct_type->Record.names->Variable.is_immutable = true;
-	// struct_type->Record.names->flags |= EntityFlag_TypeField;
+	struct_type->Record.names = make_names_field_for_record(c, c->context.scope);
 
 	if (!st->is_packed && !st->is_ordered) {
 		// NOTE(bill): Reorder fields for reduced size/performance
@@ -541,7 +544,6 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 
 		// NOTE(bill): Hacky thing
 		// TODO(bill): Probably make an inline sorting procedure rather than use global variables
-		__checker_sizes = c->sizes;
 		__checker_allocator = c->allocator;
 		// NOTE(bill): compound literal order must match source not layout
 		gb_sort_array(reordered_fields, field_count, cmp_struct_entity_size);
@@ -553,7 +555,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 		struct_type->Record.fields = reordered_fields;
 	}
 
-	type_set_offsets(c->sizes, c->allocator, struct_type);
+	type_set_offsets(c->allocator, struct_type);
 
 	if (st->align != NULL) {
 		if (st->is_packed) {
@@ -580,7 +582,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 				}
 
 				// NOTE(bill): Success!!!
-				i64 custom_align = gb_clamp(align, 1, c->sizes.max_align);
+				i64 custom_align = gb_clamp(align, 1, build_context.max_align);
 				if (custom_align < align) {
 					warning_node(st->align, "Custom alignment has been clamped to %lld from %lld", align, custom_align);
 				}
@@ -615,11 +617,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	union_type->Record.fields            = fields;
 	union_type->Record.field_count       = field_count;
-
-	// union_type->Record.names = make_entity_field(c->allocator, c->context.scope,
-	// 	make_token_ident(str_lit("names")), t_string_slice, false, 0);
-	// union_type->Record.names->Variable.is_immutable = true;
-	// union_type->Record.names->flags |= EntityFlag_TypeField;
+	union_type->Record.names = make_names_field_for_record(c, c->context.scope);
 }
 
 void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
@@ -643,11 +641,7 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	union_type->Record.fields = fields;
 	union_type->Record.field_count = field_count;
-
-// 	union_type->Record.names = make_entity_field(c->allocator, c->context.scope,
-// 		make_token_ident(str_lit("names")), t_string_slice, false, 0);
-// 	union_type->Record.names->Variable.is_immutable = true;
-// 	union_type->Record.names->flags |= EntityFlag_TypeField;
+	union_type->Record.names = make_names_field_for_record(c, c->context.scope);
 }
 
 // GB_COMPARE_PROC(cmp_enum_order) {
@@ -802,10 +796,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	enum_type->Record.enum_max_value = make_entity_constant(c->allocator, c->context.scope,
 		make_token_ident(str_lit("max_value")), constant_type, max_value);
 
-	enum_type->Record.names = make_entity_field(c->allocator, c->context.scope,
-		make_token_ident(str_lit("names")), t_string_slice, false, 0);
-	enum_type->Record.names->Variable.is_immutable = true;
-	enum_type->Record.names->flags |= EntityFlag_TypeField;
+	enum_type->Record.names = make_names_field_for_record(c, c->context.scope);
 }
 
 
@@ -1195,7 +1186,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 		entry_type->Record.fields_in_src_order = fields;
 		entry_type->Record.field_count         = field_count;
 
-		type_set_offsets(c->sizes, a, entry_type);
+		type_set_offsets(a, entry_type);
 		type->Map.entry_type = entry_type;
 	}
 
@@ -1226,7 +1217,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 		generated_struct_type->Record.fields_in_src_order = fields;
 		generated_struct_type->Record.field_count         = field_count;
 
-		type_set_offsets(c->sizes, a, generated_struct_type);
+		type_set_offsets(a, generated_struct_type);
 		type->Map.generated_struct_type = generated_struct_type;
 	}
 
@@ -1583,7 +1574,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		if (out_value) *out_value = v;
 		i64 i = v.value_integer;
 		u64 u = *cast(u64 *)&i;
-		i64 s = 8*type_size_of(c->sizes, c->allocator, type);
+		i64 s = 8*type_size_of(c->allocator, type);
 		u64 umax = ~0ull;
 		if (s < 64) {
 			umax = (1ull << s) - 1ull;
@@ -1741,7 +1732,7 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 
 		i32 precision = 0;
 		if (is_type_unsigned(type)) {
-			precision = cast(i32)(8 * type_size_of(c->sizes, c->allocator, type));
+			precision = cast(i32)(8 * type_size_of(c->allocator, type));
 		}
 		o->value = exact_unary_operator_value(op.kind, o->value, precision);
 
@@ -2066,7 +2057,7 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 
 
 	if (ptr->mode == Addressing_Constant && offset->mode == Addressing_Constant) {
-		i64 elem_size = type_size_of(c->sizes, c->allocator, ptr->type);
+		i64 elem_size = type_size_of(c->allocator, ptr->type);
 		i64 ptr_val = ptr->value.value_pointer;
 		i64 offset_val = exact_value_to_integer(offset->value).value_integer;
 		i64 new_ptr_val = ptr_val;
@@ -2264,7 +2255,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		if (is_type_pointer(type)) {
 			GB_ASSERT(op.kind == Token_Sub);
 			i64 bytes = a.value_pointer - b.value_pointer;
-			i64 diff = bytes/type_size_of(c->sizes, c->allocator, type);
+			i64 diff = bytes/type_size_of(c->allocator, type);
 			x->value = make_exact_value_pointer(diff);
 			return;
 		}
@@ -2948,7 +2939,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_size_of(c->sizes, c->allocator, type));
+		operand->value = make_exact_value_integer(type_size_of(c->allocator, type));
 		operand->type = t_untyped_integer;
 
 	} break;
@@ -2961,7 +2952,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_size_of(c->sizes, c->allocator, operand->type));
+		operand->value = make_exact_value_integer(type_size_of(c->allocator, operand->type));
 		operand->type = t_untyped_integer;
 		break;
 
@@ -2973,7 +2964,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_align_of(c->sizes, c->allocator, type));
+		operand->value = make_exact_value_integer(type_align_of(c->allocator, type));
 		operand->type = t_untyped_integer;
 	} break;
 
@@ -2985,7 +2976,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_align_of(c->sizes, c->allocator, operand->type));
+		operand->value = make_exact_value_integer(type_align_of(c->allocator, operand->type));
 		operand->type = t_untyped_integer;
 		break;
 
@@ -3029,7 +3020,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_offset_of_from_selection(c->sizes, c->allocator, type, sel));
+		operand->value = make_exact_value_integer(type_offset_of_from_selection(c->allocator, type, sel));
 		operand->type  = t_untyped_integer;
 	} break;
 
@@ -3078,7 +3069,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->mode = Addressing_Constant;
 		// IMPORTANT TODO(bill): Fix for anonymous fields
-		operand->value = make_exact_value_integer(type_offset_of_from_selection(c->sizes, c->allocator, type, sel));
+		operand->value = make_exact_value_integer(type_offset_of_from_selection(c->allocator, type, sel));
 		operand->type  = t_untyped_integer;
 	} break;
 
@@ -3310,7 +3301,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (operand->mode == Addressing_Constant &&
 		    op.mode == Addressing_Constant) {
 			i64 ptr = operand->value.value_pointer;
-			i64 elem_size = type_size_of(c->sizes, c->allocator, ptr_type->Pointer.elem);
+			i64 elem_size = type_size_of(c->allocator, ptr_type->Pointer.elem);
 			ptr += elem_size * op.value.value_integer;
 			operand->value.value_pointer = ptr;
 		} else {
@@ -3373,7 +3364,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		    op.mode == Addressing_Constant) {
 			u8 *ptr_a = cast(u8 *)operand->value.value_pointer;
 			u8 *ptr_b = cast(u8 *)op.value.value_pointer;
-			isize elem_size = type_size_of(c->sizes, c->allocator, ptr_type->Pointer.elem);
+			isize elem_size = type_size_of(c->allocator, ptr_type->Pointer.elem);
 			operand->value = make_exact_value_integer((ptr_a - ptr_b) / elem_size);
 		} else {
 			operand->mode = Addressing_Value;
@@ -4848,8 +4839,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 				goto error;
 			}
 
-			i64 srcz = type_size_of(c->sizes, c->allocator, o->type);
-			i64 dstz = type_size_of(c->sizes, c->allocator, t);
+			i64 srcz = type_size_of(c->allocator, o->type);
+			i64 dstz = type_size_of(c->allocator, t);
 			if (srcz != dstz) {
 				gbString expr_str = expr_to_string(o->expr);
 				gbString type_str = type_to_string(t);

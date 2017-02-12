@@ -140,11 +140,11 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		if info.params == nil {
 			buffer_write_string(buf, "()");
 		} else {
-			fields := (cast(^Tuple)info.params).fields;
+			t := cast(^Tuple)info.params;
 			buffer_write_string(buf, "(");
-			for f, i in fields {
+			for type, i in t.types {
 				if i > 0 { buffer_write_string(buf, ", "); }
-				buffer_write_type(buf, f.type_info);
+				buffer_write_type(buf, type);
 			}
 			buffer_write_string(buf, ")");
 		}
@@ -153,18 +153,19 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 			buffer_write_type(buf, info.results);
 		}
 	case Tuple:
-		count := info.fields.count;
+		count := info.names.count;
 		if count != 1 { buffer_write_string(buf, "("); }
 		for i in 0..<count {
 			if i > 0 { buffer_write_string(buf, ", "); }
 
-			f := info.fields[i];
+			name := info.names[i];
+			type := info.types[i];
 
-			if f.name.count > 0 {
-				buffer_write_string(buf, f.name);
+			if name.count > 0 {
+				buffer_write_string(buf, name);
 				buffer_write_string(buf, ": ");
 			}
-			buffer_write_type(buf, f.type_info);
+			buffer_write_type(buf, type);
 		}
 		if count != 1 { buffer_write_string(buf, ")"); }
 
@@ -205,30 +206,30 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 			buffer_write_byte(buf, ' ');
 		}
 		buffer_write_byte(buf, '{');
-		for field, i in info.fields {
-			buffer_write_string(buf, field.name);
+		for name, i in info.names {
+			buffer_write_string(buf, name);
 			buffer_write_string(buf, ": ");
-			buffer_write_type(buf, field.type_info);
+			buffer_write_type(buf, info.types[i]);
 			buffer_write_byte(buf, ',');
 		}
 		buffer_write_byte(buf, '}');
 
 	case Union:
 		buffer_write_string(buf, "union {");
-		for field, i in info.fields {
-			buffer_write_string(buf, field.name);
+		for name, i in info.names {
+			buffer_write_string(buf, name);
 			buffer_write_string(buf, ": ");
-			buffer_write_type(buf, field.type_info);
+			buffer_write_type(buf, info.types[i]);
 			buffer_write_byte(buf, ',');
 		}
 		buffer_write_string(buf, "}");
 
 	case Raw_Union:
 		buffer_write_string(buf, "raw_union {");
-		for field, i in info.fields {
-			buffer_write_string(buf, field.name);
+		for name, i in info.names {
+			buffer_write_string(buf, name);
 			buffer_write_string(buf, ": ");
-			buffer_write_type(buf, field.type_info);
+			buffer_write_type(buf, info.types[i]);
 			buffer_write_byte(buf, ',');
 		}
 		buffer_write_string(buf, "}");
@@ -417,9 +418,10 @@ fmt_write_padding :: proc(fi: ^Fmt_Info, width: int) {
 }
 
 fmt_integer :: proc(fi: ^Fmt_Info, u: u64, base: int, signed: bool, digits: string) {
-	s := cast(i64)u;
-	negative := signed && s < 0;
-	u = cast(u64)abs(s);
+	negative := signed && cast(i64)u < 0;
+	if signed {
+		u = cast(u64)abs(cast(i64)u);
+	}
 	buf: [256]byte;
 	if fi.width_set || fi.prec_set {
 		width := fi.width + fi.prec + 3;
@@ -719,14 +721,14 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			}
 			buffer_write_string(fi.buf, info.name);
 			buffer_write_byte(fi.buf, '{');
-			for f, i in b.fields {
+			for _, i in b.names {
 				if i > 0 {
 					buffer_write_string(fi.buf, ", ");
 				}
-				buffer_write_string(fi.buf, f.name);
+				buffer_write_string(fi.buf, b.names[i]);
 				buffer_write_string(fi.buf, " = ");
-				data := cast(^byte)v.data + f.offset;
-				fmt_arg(fi, any{f.type_info, cast(rawptr)data}, 'v');
+				data := cast(^byte)v.data + b.offsets[i];
+				fmt_arg(fi, any{b.types[i], cast(rawptr)data}, 'v');
 			}
 			buffer_write_byte(fi.buf, '}');
 
@@ -788,8 +790,8 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		buffer_write_string(fi.buf, "map[");
 		defer buffer_write_byte(fi.buf, ']');
 		entries := ^(cast(^Raw_Dynamic_Map)v.data).entries;
-		gs, gs_ok := union_cast(^Struct)type_info_base(info.generated_struct);         assert(gs_ok);
-		ed, ed_ok := union_cast(^Dynamic_Array)type_info_base(gs.fields[1].type_info); assert(ed_ok);
+		gs, gs_ok := union_cast(^Struct)type_info_base(info.generated_struct); assert(gs_ok);
+		ed, ed_ok := union_cast(^Dynamic_Array)type_info_base(gs.types[1]);    assert(ed_ok);
 
 		entry_type, et_ok := union_cast(^Struct)ed.elem; assert(et_ok);
 		entry_size := ed.elem_size;
@@ -809,7 +811,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 			buffer_write_string(fi.buf, "=");
 
-			value := data + entry_type.fields[2].offset;
+			value := data + entry_type.offsets[2];
 			fmt_arg(fi, any{info.value, cast(rawptr)value}, 'v');
 		}
 
@@ -847,15 +849,14 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		buffer_write_byte(fi.buf, '{');
 		defer buffer_write_byte(fi.buf, '}');
 
-		for f, i in info.fields {
+		for _, i in info.names {
 			if i > 0 {
 				buffer_write_string(fi.buf, ", ");
 			}
-			buffer_write_string(fi.buf, f.name);
+			buffer_write_string(fi.buf, info.names[i]);
 			buffer_write_string(fi.buf, " = ");
-			data := cast(^byte)v.data + f.offset;
-			ti := f.type_info;
-			fmt_value(fi, any{ti, cast(rawptr)data}, 'v');
+			data := cast(^byte)v.data + info.offsets[i];
+			fmt_value(fi, any{info.types[i], cast(rawptr)data}, 'v');
 		}
 
 	case Union:
