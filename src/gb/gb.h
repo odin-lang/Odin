@@ -3632,6 +3632,13 @@ gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 #if defined(_MSC_VER)
 	// TODO(bill): Is this good enough?
 	__movsb(cast(u8 *)dest, cast(u8 *)source, n);
+#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+	// NOTE(zangent): I assume there's a reason this isn't being used elsewhere,
+	//   but casting pointers as arguments to an __asm__ call is considered an
+	//   error on MacOS and (I think) Linux
+	// TODO(zangent): Figure out how to refactor the asm code so it works on MacOS,
+	//   since this is probably not the way the author intended this to work.
+	memcpy(dest, source, n);
 #elif defined(GB_CPU_X86)
 	__asm__ __volatile__("rep movsb" : "+D"(cast(u8 *)dest), "+S"(cast(u8 *)source), "+c"(n) : : "memory");
 #else
