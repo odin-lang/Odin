@@ -133,7 +133,7 @@ stderr: Handle = 2; // get_std_handle(win32.STD_ERROR_HANDLE);
 last_write_time :: proc(fd: Handle) -> File_Time {}
 last_write_time_by_name :: proc(name: string) -> File_Time {}
 */
-/*
+
 read_entire_file :: proc(name: string) -> ([]byte, bool) {
 
 	handle, err := open_simple(name, O_RDONLY);
@@ -170,16 +170,6 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 
 	return data, true;
 }
-read_entire_file_to_string :: proc(name: string) -> (string, bool) {
-
-	contents, success := read_entire_file(name);
-	if(!success) {
-		fmt.println("Failed to seek to end of file.");
-		return  "", false;
-	}
-	return from_c_str(^contents[0]), true;
-}
-*/
 
 heap_alloc :: proc(size: int) -> rawptr #inline {
 	assert(size > 0);
