@@ -1927,6 +1927,76 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 	x->mode = Addressing_Value;
 }
 
+
+String check_down_cast_name(Type *dst_, Type *src_) {
+	String result = {0};
+	Type *dst = type_deref(dst_);
+	Type *src = type_deref(src_);
+	Type *dst_s = base_type(dst);
+	GB_ASSERT(is_type_struct(dst_s) || is_type_raw_union(dst_s));
+	for (isize i = 0; i < dst_s->Record.field_count; i++) {
+		Entity *f = dst_s->Record.fields[i];
+		GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
+		if (f->flags & EntityFlag_Anonymous) {
+			if (are_types_identical(f->type, src_)) {
+				return f->token.string;
+			}
+			if (are_types_identical(type_deref(f->type), src_)) {
+				return f->token.string;
+			}
+
+			if (!is_type_pointer(f->type)) {
+				result = check_down_cast_name(f->type, src_);
+				if (result.len > 0) {
+					return result;
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
+Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offset, AstNode *node) {
+	GB_ASSERT(node->kind == AstNode_BinaryExpr);
+	ast_node(be, BinaryExpr, node);
+	GB_ASSERT(is_type_pointer(ptr->type));
+	GB_ASSERT(is_type_integer(offset->type));
+	GB_ASSERT(op == Token_Add || op == Token_Sub);
+
+	Operand operand = {0};
+	operand.mode = Addressing_Value;
+	operand.type = ptr->type;
+	operand.expr = node;
+
+	if (base_type(ptr->type) == t_rawptr) {
+		gbString str = type_to_string(ptr->type);
+		error_node(node, "Invalid pointer type for pointer arithmetic: `%s`", str);
+		gb_string_free(str);
+		operand.mode = Addressing_Invalid;
+		return operand;
+	}
+
+
+	if (ptr->mode == Addressing_Constant && offset->mode == Addressing_Constant) {
+		i64 elem_size = type_size_of(c->allocator, ptr->type);
+		i64 ptr_val = ptr->value.value_pointer;
+		i64 offset_val = exact_value_to_integer(offset->value).value_integer;
+		i64 new_ptr_val = ptr_val;
+		if (op == Token_Add) {
+			new_ptr_val += elem_size*offset_val;
+		} else {
+			new_ptr_val -= elem_size*offset_val;
+		}
+		operand.mode = Addressing_Constant;
+		operand.value = make_exact_value_pointer(new_ptr_val);
+	}
+
+	return operand;
+}
+
+
+
 bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 	if (check_is_assignable_to(c, operand, y)) {
 		return true;
@@ -2012,78 +2082,19 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+	{
+		gbString expr_str = expr_to_string(operand->expr);
+		gbString to_type  = type_to_string(y);
+		gbString from_type = type_to_string(x);
+		error_node(operand->expr, "Cannot cast `%s` as `%s` from `%s`", expr_str, to_type, from_type);
+		gb_string_free(from_type);
+		gb_string_free(to_type);
+		gb_string_free(expr_str);
+	}
 	return false;
 }
 
-String check_down_cast_name(Type *dst_, Type *src_) {
-	String result = {0};
-	Type *dst = type_deref(dst_);
-	Type *src = type_deref(src_);
-	Type *dst_s = base_type(dst);
-	GB_ASSERT(is_type_struct(dst_s) || is_type_raw_union(dst_s));
-	for (isize i = 0; i < dst_s->Record.field_count; i++) {
-		Entity *f = dst_s->Record.fields[i];
-		GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
-		if (f->flags & EntityFlag_Anonymous) {
-			if (are_types_identical(f->type, src_)) {
-				return f->token.string;
-			}
-			if (are_types_identical(type_deref(f->type), src_)) {
-				return f->token.string;
-			}
-
-			if (!is_type_pointer(f->type)) {
-				result = check_down_cast_name(f->type, src_);
-				if (result.len > 0) {
-					return result;
-				}
-			}
-		}
-	}
-
-	return result;
-}
-
-Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offset, AstNode *node) {
-	GB_ASSERT(node->kind == AstNode_BinaryExpr);
-	ast_node(be, BinaryExpr, node);
-	GB_ASSERT(is_type_pointer(ptr->type));
-	GB_ASSERT(is_type_integer(offset->type));
-	GB_ASSERT(op == Token_Add || op == Token_Sub);
-
-	Operand operand = {0};
-	operand.mode = Addressing_Value;
-	operand.type = ptr->type;
-	operand.expr = node;
-
-	if (base_type(ptr->type) == t_rawptr) {
-		gbString str = type_to_string(ptr->type);
-		error_node(node, "Invalid pointer type for pointer arithmetic: `%s`", str);
-		gb_string_free(str);
-		operand.mode = Addressing_Invalid;
-		return operand;
-	}
-
-
-	if (ptr->mode == Addressing_Constant && offset->mode == Addressing_Constant) {
-		i64 elem_size = type_size_of(c->allocator, ptr->type);
-		i64 ptr_val = ptr->value.value_pointer;
-		i64 offset_val = exact_value_to_integer(offset->value).value_integer;
-		i64 new_ptr_val = ptr_val;
-		if (op == Token_Add) {
-			new_ptr_val += elem_size*offset_val;
-		} else {
-			new_ptr_val -= elem_size*offset_val;
-		}
-		operand.mode = Addressing_Constant;
-		operand.value = make_exact_value_pointer(new_ptr_val);
-	}
-
-	return operand;
-}
-
-
-void check_conversion(Checker *c, Operand *x, Type *type) {
+void check_cast(Checker *c, Operand *x, Type *type) {
 	bool is_const_expr = x->mode == Addressing_Constant;
 	bool can_convert = false;
 
@@ -2104,14 +2115,7 @@ void check_conversion(Checker *c, Operand *x, Type *type) {
 	}
 
 	if (!can_convert) {
-		gbString expr_str = expr_to_string(x->expr);
-		gbString to_type  = type_to_string(type);
-		gbString from_type = type_to_string(x->type);
-		error_node(x->expr, "Cannot cast `%s` as `%s` from `%s`", expr_str, to_type, from_type);
-		gb_string_free(from_type);
-		gb_string_free(to_type);
-		gb_string_free(expr_str);
-
+		// NOTE(bill): Error handled in `cast_is_castable_to`
 		x->mode = Addressing_Invalid;
 		return;
 	}
@@ -4007,7 +4011,7 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		case 1:
 			check_expr(c, operand, ce->args.e[0]);
 			if (operand->mode != Addressing_Invalid) {
-				check_conversion(c, operand, t);
+				check_cast(c, operand, t);
 			}
 			break;
 		}
@@ -4836,7 +4840,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		}
 		switch (ce->token.kind) {
 		case Token_cast:
-			check_conversion(c, o, t);
+			check_cast(c, o, t);
 			break;
 		case Token_transmute: {
 			if (o->mode == Addressing_Constant) {

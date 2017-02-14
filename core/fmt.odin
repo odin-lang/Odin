@@ -155,10 +155,9 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 	case Tuple:
 		count := info.names.count;
 		if count != 1 { buffer_write_string(buf, "("); }
-		for i in 0..<count {
+		for name, i in info.names {
 			if i > 0 { buffer_write_string(buf, ", "); }
 
-			name := info.names[i];
 			type := info.types[i];
 
 			if name.count > 0 {
