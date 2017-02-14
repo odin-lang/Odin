@@ -1,13 +1,19 @@
 #import "fmt.odin";
 
-main :: proc() {
+x := [...]int{1, 2, 3, 4};
 
+main :: proc() {
 	{
-		Vec2 :: [vector 2]f32;
-		i: f32 = 1;
-		b := Vec2{i, i};
+
+
+		foo :: proc() -> [...]int {
+			return x;
+		}
+
+		// foo()[0] = 2;
 	}
 
+/*
 /*
 	Version 0.1.0
 
@@ -130,5 +136,6 @@ main :: proc() {
 		compile_assert(size_of([vector 7]i32) == size_of([7]i32));
 		// align_of([vector 7]i32) != align_of([7]i32) // this may be the case
 	}
+*/
 }
 

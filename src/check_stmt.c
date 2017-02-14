@@ -182,40 +182,40 @@ bool check_is_terminating(AstNode *node) {
 	return false;
 }
 
-Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
-	if (op_a->mode == Addressing_Invalid ||
-	    (op_a->type == t_invalid && op_a->mode != Addressing_Overload)) {
+Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
+	if (rhs->mode == Addressing_Invalid ||
+	    (rhs->type == t_invalid && rhs->mode != Addressing_Overload)) {
 		return NULL;
 	}
 
-	AstNode *node = unparen_expr(lhs);
+	AstNode *node = unparen_expr(lhs_node);
 
 	// NOTE(bill): Ignore assignments to `_`
 	if (node->kind == AstNode_Ident &&
 	    str_eq(node->Ident.string, str_lit("_"))) {
 		add_entity_definition(&c->info, node, NULL);
-		check_assignment(c, op_a, NULL, str_lit("assignment to `_` identifier"));
-		if (op_a->mode == Addressing_Invalid) {
+		check_assignment(c, rhs, NULL, str_lit("assignment to `_` identifier"));
+		if (rhs->mode == Addressing_Invalid) {
 			return NULL;
 		}
-		return op_a->type;
+		return rhs->type;
 	}
 
 	Entity *e = NULL;
 	bool used = false;
-	Operand op_b = {Addressing_Invalid};
+	Operand lhs = {Addressing_Invalid};
 
 
-	check_expr(c, &op_b, lhs);
-	if (op_b.mode == Addressing_Invalid ||
-	    op_b.type == t_invalid) {
+	check_expr(c, &lhs, lhs_node);
+	if (lhs.mode == Addressing_Invalid ||
+	    lhs.type == t_invalid) {
 		return NULL;
 	}
 
 
-	if (op_a->mode == Addressing_Overload) {
-		isize overload_count = op_a->overload_count;
-		Entity **procs = op_a->overload_entities;
+	if (rhs->mode == Addressing_Overload) {
+		isize overload_count = rhs->overload_count;
+		Entity **procs = rhs->overload_entities;
 		GB_ASSERT(procs != NULL && overload_count > 0);
 
 		// NOTE(bill): These should be done
@@ -227,19 +227,19 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 			Operand x = {0};
 			x.mode = Addressing_Value;
 			x.type = t;
-			if (check_is_assignable_to(c, &x, op_b.type)) {
+			if (check_is_assignable_to(c, &x, lhs.type)) {
 				e = procs[i];
-				add_entity_use(c, op_a->expr, e);
+				add_entity_use(c, rhs->expr, e);
 				break;
 			}
 		}
 
 		if (e != NULL) {
 			// HACK TODO(bill): Should the entities be freed as it's technically a leak
-			op_a->mode = Addressing_Value;
-			op_a->type = e->type;
-			op_a->overload_count = 0;
-			op_a->overload_entities = NULL;
+			rhs->mode = Addressing_Value;
+			rhs->type = e->type;
+			rhs->overload_count = 0;
+			rhs->overload_entities = NULL;
 		}
 	} else {
 		if (node->kind == AstNode_Ident) {
@@ -256,43 +256,62 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 		e->flags |= EntityFlag_Used;
 	}
 
-	Type *assignment_type = op_b.type;
-	switch (op_b.mode) {
+	Type *assignment_type = lhs.type;
+	switch (lhs.mode) {
 	case Addressing_Invalid:
 		return NULL;
 	case Addressing_Variable:
-	case Addressing_MapIndex:
 		break;
+	case Addressing_MapIndex: {
+		AstNode *ln = unparen_expr(lhs_node);
+		if (ln->kind == AstNode_IndexExpr) {
+			AstNode *x = ln->IndexExpr.expr;
+			TypeAndValue *tav = type_and_value_of_expression(&c->info, x);
+			GB_ASSERT(tav != NULL);
+			switch (tav->mode) {
+			case Addressing_Variable:
+				break;
+			case Addressing_Value:
+				if (!is_type_pointer(tav->type)) {
+					gbString str = expr_to_string(lhs.expr);
+					error_node(lhs.expr, "Cannot assign to the value of a map `%s`", str);
+					gb_string_free(str);
+					return NULL;
+				}
+				break;
+			}
+		}
+	} break;
 	default: {
-		if (op_b.expr->kind == AstNode_SelectorExpr) {
+		if (lhs.expr->kind == AstNode_SelectorExpr) {
 			// NOTE(bill): Extra error checks
 			Operand op_c = {Addressing_Invalid};
-			ast_node(se, SelectorExpr, op_b.expr);
+			ast_node(se, SelectorExpr, lhs.expr);
 			check_expr(c, &op_c, se->expr);
 			if (op_c.mode == Addressing_MapIndex) {
-				gbString str = expr_to_string(op_b.expr);
-				error_node(op_b.expr, "Cannot assign to record field `%s` in map", str);
+				gbString str = expr_to_string(lhs.expr);
+				error_node(lhs.expr, "Cannot assign to record field `%s` in map", str);
 				gb_string_free(str);
 				return NULL;
 			}
 		}
 
-		gbString str = expr_to_string(op_b.expr);
+		gbString str = expr_to_string(lhs.expr);
 		if (e != NULL && e->kind == Entity_Variable && e->Variable.is_immutable) {
-			error_node(op_b.expr, "Cannot assign to an immutable: `%s`", str);
+			error_node(lhs.expr, "Cannot assign to an immutable: `%s`", str);
 		} else {
-			error_node(op_b.expr, "Cannot assign to `%s`", str);
+			error_node(lhs.expr, "Cannot assign to `%s`", str);
 		}
 		gb_string_free(str);
 	} break;
 	}
 
-	check_assignment(c, op_a, assignment_type, str_lit("assignment"));
-	if (op_a->mode == Addressing_Invalid) {
+	check_assignment(c, rhs, assignment_type, str_lit("assignment"));
+	if (rhs->mode == Addressing_Invalid) {
 		return NULL;
 	}
 
-	return op_a->type;
+	return rhs->type;
 }
 
 bool check_valid_type_match_type(Type *type, bool *is_union_ptr, bool *is_any) {
