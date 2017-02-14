@@ -315,7 +315,11 @@ __assert :: proc(file: string, line, column: int, msg: string) #inline {
 	            file, line, column, msg);
 	__debug_trap();
 }
-
+__panic :: proc(file: string, line, column: int, msg: string) #inline {
+	fmt.fprintf(os.stderr, "%s(%d:%d) Panic: %s\n",
+	            file, line, column, msg);
+	__debug_trap();
+}
 __bounds_check_error :: proc(file: string, line, column: int, index, count: int) {
 	if 0 <= index && index < count {
 		return;
@@ -340,6 +344,13 @@ __substring_expr_error :: proc(file: string, line, column: int, low, high: int) 
 	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid substring indices: [%d:%d]\n",
 	            file, line, column, low, high);
 	__debug_trap();
+}
+__union_cast_check :: proc(ok: bool, file: string, line, column: int, from, to: ^Type_Info) {
+	if !ok {
+		fmt.fprintf(os.stderr, "%s(%d:%d) Invalid `union_cast` from %T to %T\n",
+		            file, line, column, from, to);
+		__debug_trap();
+	}
 }
 
 __string_decode_rune :: proc(s: string) -> (rune, int) #inline {
@@ -448,6 +459,8 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 	return array.count;
 }
 
+
+// Map stuff
 
 __default_hash :: proc(data: []byte) -> u64 {
 	return hash.fnv64a(data);
@@ -650,13 +663,3 @@ __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
 		m.hashes[last.hash_index] = fr.entry_index;
 	}
 }
-
-
-__print_ti_ptr :: proc(ti: ^Type_Info) {
-	fmt.println(ti);
-	match e in ti {
-	case Type_Info.Enum:
-		fmt.println(e.names);
-	}
-}
-

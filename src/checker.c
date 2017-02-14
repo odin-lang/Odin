@@ -109,18 +109,19 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 #include "types.c"
 
 typedef enum AddressingMode {
-	Addressing_Invalid,   // invalid addressing mode
-	Addressing_NoValue,   // no value (void in C)
-	Addressing_Value,     // computed value (rvalue)
-	Addressing_Immutable, // immutable computed value (const rvalue)
-	Addressing_Variable,  // addressable variable (lvalue)
-	Addressing_Constant,  // constant & type will be a of Type_Basic (stripping Type_Named)
-	Addressing_Type,      // type
-	Addressing_Builtin,   // built in procedure
-	Addressing_Overload,  // overloaded procedure
-	Addressing_MapIndex,  // map index expression
-	                      // 	lhs: acts like a Variable
-	                      // 	ths: acts like a value with an optional boolean part (for existence check)
+	Addressing_Invalid,    // invalid addressing mode
+	Addressing_NoValue,    // no value (void in C)
+	Addressing_Value,      // computed value (rvalue)
+	Addressing_Immutable,  // immutable computed value (const rvalue)
+	Addressing_Variable,   // addressable variable (lvalue)
+	Addressing_Constant,   // constant & type will be a of Type_Basic (stripping Type_Named)
+	Addressing_Type,       // type
+	Addressing_Builtin,    // built in procedure
+	Addressing_Overload,   // overloaded procedure
+	Addressing_MapIndex,   // map index expression -
+	                       // 	lhs: acts like a Variable
+	                       // 	rhs: acts like OptionalOk
+	Addressing_OptionalOk, // rhs: acts like a value with an optional boolean part (for existence check)
 } AddressingMode;
 
 // Operand is used as an intermediate value whilst checking

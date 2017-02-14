@@ -260,6 +260,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 	switch (lhs.mode) {
 	case Addressing_Invalid:
 		return NULL;
+
 	case Addressing_Variable:
 		break;
 	case Addressing_MapIndex: {
@@ -278,6 +279,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 			}
 		}
 	} break;
+
 	default: {
 		if (lhs.expr->kind == AstNode_SelectorExpr) {
 			// NOTE(bill): Extra error checks
@@ -434,40 +436,34 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		switch (as->op.kind) {
 		case Token_Eq: {
 			// a, b, c = 1, 2, 3;  // Multisided
-			if (as->lhs.count == 0) {
+
+			isize lhs_count = as->lhs.count;
+			if (lhs_count == 0) {
 				error(as->op, "Missing lhs in assignment statement");
 				return;
 			}
+
+			// TODO(bill): This is a very similar to check_init_variables, should I merge the two some how or just
+			// leave it?
 
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
 			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 			// an extra allocation
-			Array(Operand) operands;
-			array_init_reserve(&operands, c->tmp_allocator, 2 * as->lhs.count);
+			ArrayOperand operands = {0};
+			array_init_reserve(&operands, c->tmp_allocator, 2 * lhs_count);
+			check_unpack_arguments(c, lhs_count, &operands, as->rhs, true);
 
-			for_array(i, as->rhs) {
-				AstNode *rhs = as->rhs.e[i];
-				Operand o = {0};
-				check_multi_expr(c, &o, rhs);
-				if (o.type->kind != Type_Tuple) {
-					array_add(&operands, o);
-				} else {
-					TypeTuple *tuple = &o.type->Tuple;
-					for (isize j = 0; j < tuple->variable_count; j++) {
-						o.type = tuple->variables[j]->type;
-						array_add(&operands, o);
-					}
+			isize rhs_count = operands.count;
+			for_array(i, operands) {
+				if (operands.e[i].mode == Addressing_Invalid) {
+					rhs_count--;
 				}
 			}
 
-			isize lhs_count = as->lhs.count;
-			isize rhs_count = operands.count;
-
-			isize operand_count = gb_min(as->lhs.count, operands.count);
-			for (isize i = 0; i < operand_count; i++) {
-				AstNode *lhs = as->lhs.e[i];
-				check_assignment_variable(c, &operands.e[i], lhs);
+			isize max = gb_min(lhs_count, rhs_count);
+			for (isize i = 0; i < max; i++) {
+				check_assignment_variable(c, &operands.e[i], as->lhs.e[i]);
 			}
 			if (lhs_count != rhs_count) {
 				error_node(as->lhs.e[0], "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);

@@ -72,24 +72,13 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 		}
 	}
 
-
 	isize max = gb_min(lhs_count, rhs_count);
 	for (isize i = 0; i < max; i++) {
 		check_init_variable(c, lhs[i], &operands.e[i], context_name);
 	}
-
 	if (rhs_count > 0 && lhs_count != rhs_count) {
 		error(lhs[0]->token, "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
 	}
-
-#if 0
-	if (lhs[0]->kind == Entity_Variable &&
-	    lhs[0]->Variable.is_let) {
-		if (lhs_count != rhs_count) {
-			error(lhs[0]->token, "`let` variables must be initialized, `%td` = `%td`", lhs_count, rhs_count);
-		}
-	}
-#endif
 
 	gb_temp_arena_memory_end(tmp);
 }

@@ -2462,12 +2462,18 @@ irValue *ir_emit_down_cast(irProcedure *proc, irValue *value, Type *t) {
 	return ir_emit_conv(proc, head, t);
 }
 
-irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *tuple) {
-	GB_ASSERT(tuple->kind == Type_Tuple);
+irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, TokenPos pos) {
 	gbAllocator a = proc->module->allocator;
 
 	Type *src_type = ir_type(value);
 	bool is_ptr = is_type_pointer(src_type);
+
+	bool is_tuple = true;
+	Type *tuple = type;
+	if (type->kind != Type_Tuple) {
+		is_tuple = false;
+		tuple = make_optional_ok_type(a, type);
+	}
 
 	irValue *v = ir_add_local_generated(proc, tuple);
 
@@ -2540,6 +2546,25 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *tuple) {
 		ir_emit_jump(proc, end_block);
 		ir_start_block(proc, end_block);
 
+	}
+
+	if (!is_tuple) {
+		// NOTE(bill): Panic on invalid conversion
+		Type *dst_type = tuple->Tuple.variables[0]->type;
+
+		irValue *ok = ir_emit_load(proc, ir_emit_struct_ep(proc, v, 1));
+		irValue **args = gb_alloc_array(a, irValue *, 6);
+		args[0] = ok;
+
+		args[1] = ir_make_const_string(a, pos.file);
+		args[2] = ir_make_const_int(a, pos.line);
+		args[3] = ir_make_const_int(a, pos.column);
+
+		args[4] = ir_type_info(proc, src_type);
+		args[5] = ir_type_info(proc, dst_type);
+		ir_emit_global_call(proc, "__union_cast_check", args, 6);
+
+		return ir_emit_load(proc, ir_emit_struct_ep(proc, v, 0));
 	}
 	return ir_emit_load(proc, v);
 }
@@ -2930,23 +2955,23 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 
 	case_ast_node(ce, CastExpr, expr);
 		Type *type = tv->type;
-		irValue *expr = ir_build_expr(proc, ce->expr);
+		irValue *e = ir_build_expr(proc, ce->expr);
 		switch (ce->token.kind) {
 		case Token_cast:
 			ir_emit_comment(proc, str_lit("cast - cast"));
-			return ir_emit_conv(proc, expr, type);
+			return ir_emit_conv(proc, e, type);
 
 		case Token_transmute:
 			ir_emit_comment(proc, str_lit("cast - transmute"));
-			return ir_emit_transmute(proc, expr, type);
+			return ir_emit_transmute(proc, e, type);
 
 		case Token_down_cast:
 			ir_emit_comment(proc, str_lit("cast - down_cast"));
-			return ir_emit_down_cast(proc, expr, type);
+			return ir_emit_down_cast(proc, e, type);
 
 		case Token_union_cast:
 			ir_emit_comment(proc, str_lit("cast - union_cast"));
-			return ir_emit_union_cast(proc, expr, type);
+			return ir_emit_union_cast(proc, e, type, ast_node_token(expr).pos);
 
 		default:
 			GB_PANIC("Unknown cast expression");
@@ -3384,7 +3409,7 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 					args[1] = ir_make_const_int(proc->module->allocator, pos.line);
 					args[2] = ir_make_const_int(proc->module->allocator, pos.column);
 					args[3] = msg;
-					ir_emit_global_call(proc, "__assert", args, 4);
+					ir_emit_global_call(proc, "__panic", args, 4);
 
 					return NULL;
 				} break;

@@ -265,8 +265,6 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 	}
 
 
-
-
 	if (type == NULL) {
 		return;
 	}
@@ -1115,7 +1113,7 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 	return 0;
 }
 
-Type *make_map_tuple_type(gbAllocator a, Type *value) {
+Type *make_optional_ok_type(gbAllocator a, Type *value) {
 	Type *t = make_type_tuple(a);
 	t->Tuple.variables = gb_alloc_array(a, Entity *, 2);
 	t->Tuple.variable_count = 2;
@@ -1221,7 +1219,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 		type->Map.generated_struct_type = generated_struct_type;
 	}
 
-	type->Map.lookup_result_type = make_map_tuple_type(a, value);
+	type->Map.lookup_result_type = make_optional_ok_type(a, value);
 
 	// error_node(node, "`map` types are not yet implemented");
 }
@@ -3821,17 +3819,15 @@ int valid_proc_and_score_cmp(void const *a, void const *b) {
 
 typedef Array(Operand) ArrayOperand;
 
-void check_unpack_arguments(Checker *c, isize lhs_count, ArrayOperand *operands, AstNodeArray args, bool allow_map_ok) {
-	for_array(i, args) {
+void check_unpack_arguments(Checker *c, isize lhs_count, ArrayOperand *operands, AstNodeArray rhs, bool allow_ok) {
+	for_array(i, rhs) {
 		Operand o = {0};
-		check_multi_expr(c, &o, args.e[i]);
+		check_multi_expr(c, &o, rhs.e[i]);
 
 		if (o.type == NULL || o.type->kind != Type_Tuple) {
-			if (o.mode == Addressing_MapIndex &&
-			    allow_map_ok &&
-			    lhs_count == 2 &&
-			    args.count == 1) {
-				Type *tuple = make_map_tuple_type(c->allocator, o.type);
+			if (allow_ok && lhs_count == 2 && rhs.count == 1 &&
+			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk)) {
+				Type *tuple = make_optional_ok_type(c->allocator, o.type);
 				add_type_and_value(&c->info, o.expr, o.mode, tuple, o.value);
 
 				Operand val = o;
@@ -4922,16 +4918,11 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 				goto error;
 			}
 
-			Entity **variables = gb_alloc_array(c->allocator, Entity *, 2);
-			variables[0] = make_entity_param(c->allocator, NULL, empty_token, t, false, true);
-			variables[1] = make_entity_param(c->allocator, NULL, empty_token, t_bool, false, true);
+			add_type_info_type(c, o->type);
+			add_type_info_type(c, t);
 
-			Type *tuple = make_type_tuple(c->allocator);
-			tuple->Tuple.variables = variables;
-			tuple->Tuple.variable_count = 2;
-
-			o->type = tuple;
-			o->mode = Addressing_Value;
+			o->type = t;
+			o->mode = Addressing_OptionalOk;
 		} break;
 		case Token_down_cast: {
 			if (o->mode == Addressing_Constant) {

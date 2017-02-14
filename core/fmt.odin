@@ -790,10 +790,10 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		buffer_write_string(fi.buf, "map[");
 		defer buffer_write_byte(fi.buf, ']');
 		entries := ^(cast(^Raw_Dynamic_Map)v.data).entries;
-		gs, gs_ok := union_cast(^Struct)type_info_base(info.generated_struct); assert(gs_ok);
-		ed, ed_ok := union_cast(^Dynamic_Array)type_info_base(gs.types[1]);    assert(ed_ok);
+		gs := union_cast(^Struct)type_info_base(info.generated_struct);
+		ed := union_cast(^Dynamic_Array)type_info_base(gs.types[1]);
 
-		entry_type, et_ok := union_cast(^Struct)ed.elem; assert(et_ok);
+		entry_type := union_cast(^Struct)ed.elem;
 		entry_size := ed.elem_size;
 		for i in 0..<entries.count {
 			if i > 0 {

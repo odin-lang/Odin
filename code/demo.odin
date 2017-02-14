@@ -2,6 +2,12 @@
 
 
 main :: proc() {
+	x := type_info(int);
+	t1, ok := union_cast(^Type_Info.Integer)x;
+	_, ok = union_cast(^Type_Info.Integer)x;
+	t2 := union_cast(^Type_Info.Integer)x;
+
+
 /*
 /*
 	Version 0.1.1
@@ -17,7 +23,7 @@ main :: proc() {
 	 * Entities prefixes with an underscore do not get exported on imports
 	 * Overloaded `free` for pointers, slices, strings, dynamic arrays, and dynamic maps
 	 * enum types have an implict `names` field, a []string of all the names in that enum
-	 * immutable variables are "completely immutable"
+	 * immutable variables are "completely immutable" - rules need a full explanation
 	 * `slice_to_bytes` - convert any slice to a slice of bytes
 
 	Removed:
