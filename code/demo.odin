@@ -9,18 +9,14 @@
 
 
 main :: proc() {
-	x := type_info(int);
-	t1, ok := union_cast(^Type_Info.Integer)x;
-	_, ok = union_cast(^Type_Info.Integer)x;
-	t2 := union_cast(^Type_Info.Integer)x;
-
-
+	x: f32 = false ? 123 : 55;
+	fmt.println("Ternary:", x);
 /*
 /*
 	Version 0.1.1
 
 	Added:
-	 * Dynamic Arrays `[...]Type`
+	 * Dynamic Arrays [dynamic]Type`
 	 * Dynamic Maps   `map[Key]Value`
 	 * Dynamic array and map literals
 	 * Custom struct alignemnt `struct #align 8 { bar: i8 }`
@@ -32,6 +28,7 @@ main :: proc() {
 	 * enum types have an implict `names` field, a []string of all the names in that enum
 	 * immutable variables are "completely immutable" - rules need a full explanation
 	 * `slice_to_bytes` - convert any slice to a slice of bytes
+	 * `union_cast` allows for optional ok check
 
 	Removed:
 	 * Maybe/option types
@@ -101,7 +98,7 @@ main :: proc() {
 	}
 
 	{
-		x: [...]f64;
+		x: [dynamic]f64;
 		reserve(x, 16);
 		defer free(x);
 		append(x, 2_000_000.500_000, 3, 5, 7);
@@ -114,7 +111,7 @@ main :: proc() {
 	}
 
 	{
-		x := [...]f64{2_000_000.500_000, 3, 5, 7};
+		x := [dynamic]f64{2_000_000.500_000, 3, 5, 7};
 		defer free(x);
 		fmt.println(x);
 	}

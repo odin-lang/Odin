@@ -30,11 +30,6 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 			case AstNode_ReturnStmt:
 				error_node(n, "Statements after this `return` are never executed");
 				break;
-			case AstNode_ExprStmt:
-				if (n->ExprStmt.expr->kind == AstNode_GiveExpr) {
-					error_node(n, "A `give` must be the last statement in a block");
-				}
-				break;
 			}
 		}
 
@@ -412,12 +407,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 			if (operand.expr->kind == AstNode_CallExpr) {
 				return;
-			}
-			if (operand.expr->kind == AstNode_GiveExpr) {
-				if ((flags&Stmt_GiveAllowed) != 0) {
-					return;
-				}
-				error_node(node, "Illegal use of `give`");
 			}
 			gbString expr_str = expr_to_string(operand.expr);
 			error_node(node, "Expression is not used: `%s`", expr_str);

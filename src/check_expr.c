@@ -1114,11 +1114,12 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 }
 
 Type *make_optional_ok_type(gbAllocator a, Type *value) {
+	bool typed = true;
 	Type *t = make_type_tuple(a);
 	t->Tuple.variables = gb_alloc_array(a, Entity *, 2);
 	t->Tuple.variable_count = 2;
 	t->Tuple.variables[0] = make_entity_field(a, NULL, blank_token, value,  false, 0);
-	t->Tuple.variables[1] = make_entity_field(a, NULL, blank_token, t_bool, false, 1);
+	t->Tuple.variables[1] = make_entity_field(a, NULL, blank_token, typed ? t_bool : t_untyped_bool, false, 1);
 	return t;
 }
 
@@ -2113,6 +2114,7 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 		gb_string_free(from_type);
 		gb_string_free(to_type);
 		gb_string_free(expr_str);
+
 		x->mode = Addressing_Invalid;
 		return;
 	}
@@ -3831,7 +3833,8 @@ int valid_proc_and_score_cmp(void const *a, void const *b) {
 
 typedef Array(Operand) ArrayOperand;
 
-void check_unpack_arguments(Checker *c, isize lhs_count, ArrayOperand *operands, AstNodeArray rhs, bool allow_ok) {
+bool check_unpack_arguments(Checker *c, isize lhs_count, ArrayOperand *operands, AstNodeArray rhs, bool allow_ok) {
+	bool optional_ok = false;
 	for_array(i, rhs) {
 		Operand o = {0};
 		check_multi_expr(c, &o, rhs.e[i]);
@@ -3849,6 +3852,8 @@ void check_unpack_arguments(Checker *c, isize lhs_count, ArrayOperand *operands,
 				ok.type  = t_bool;
 				array_add(operands, val);
 				array_add(operands, ok);
+
+				optional_ok = true;
 			} else {
 				array_add(operands, o);
 			}
@@ -3860,6 +3865,8 @@ void check_unpack_arguments(Checker *c, isize lhs_count, ArrayOperand *operands,
 			}
 		}
 	}
+
+	return optional_ok;
 }
 
 Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
@@ -4162,40 +4169,6 @@ bool check_set_index_data(Operand *o, Type *type, bool indirection, i64 *max_cou
 	return false;
 }
 
-
-bool check_is_giving(AstNode *node, AstNode **give_expr) {
-	switch (node->kind) {
-	case_ast_node(es, ExprStmt, node);
-		if (es->expr->kind == AstNode_GiveExpr) {
-			if (give_expr) *give_expr = es->expr;
-			return true;
-		}
-	case_end;
-
-	case_ast_node(ge, GiveExpr, node);
-		if (give_expr) *give_expr = node;
-		return true;
-	case_end;
-
-	case_ast_node(be, BlockExpr, node);
-		// Iterate backwards
-		for (isize n = be->stmts.count-1; n >= 0; n--) {
-			AstNode *stmt = be->stmts.e[n];
-			if (stmt->kind == AstNode_EmptyStmt) {
-				continue;
-			}
-			if (stmt->kind == AstNode_ExprStmt && stmt->ExprStmt.expr->kind == AstNode_GiveExpr) {
-				if (give_expr) *give_expr = stmt->ExprStmt.expr;
-				return true;
-			}
-		}
-	case_end;
-	}
-
-	if (give_expr) *give_expr = NULL;
-	return false;
-}
-
 ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint) {
 	ExprKind kind = Expr_Stmt;
 
@@ -4297,177 +4270,30 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		o->type = type;
 	case_end;
 
-	case_ast_node(ge, GiveExpr, node);
+	case_ast_node(te, TernaryExpr, node);
 		if (c->proc_stack.count == 0) {
-			error_node(node, "A give expression is only allowed within a procedure");
+			error_node(node, "A ternary expression is only allowed within a procedure");
 			goto error;
 		}
-
-		if (ge->results.count == 0) {
-			error_node(node, "`give` has no results");
-			goto error;
-		}
-
-		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-
-		Array(Operand) operands;
-		array_init_reserve(&operands, c->tmp_allocator, 2*ge->results.count);
-
-		for_array(i, ge->results) {
-			AstNode *rhs = ge->results.e[i];
-			Operand o = {0};
-			check_multi_expr(c, &o, rhs);
-			if (!is_operand_value(o)) {
-				error_node(rhs, "Expected a value for a `give`");
-				continue;
-			}
-			if (o.type->kind != Type_Tuple) {
-				array_add(&operands, o);
-			} else {
-				TypeTuple *tuple = &o.type->Tuple;
-				for (isize j = 0; j < tuple->variable_count; j++) {
-					o.type = tuple->variables[j]->type;
-					array_add(&operands, o);
-				}
-			}
-		}
-
-		if (operands.count == 0) {
-			error_node(node, "`give` has no value");
-			gb_temp_arena_memory_end(tmp);
-			goto error;
-		} else if (operands.count == 1) {
-			Operand operand = operands.e[0];
-			Type *th = type_hint != NULL ? type_hint : c->context.type_hint;
-			if (th != NULL) {
-				convert_to_typed(c, &operand, th, 0);
-			}
-			// IMPORTANT NOTE(bill): This type could be untyped!!!
-			o->type = default_type(operand.type);
-			o->mode = Addressing_Value;
-		} else {
-			Type *tuple = make_type_tuple(c->allocator);
-
-			Entity **variables = gb_alloc_array(c->allocator, Entity *, operands.count);
-			isize variable_index = 0;
-			for_array(i, operands) {
-				Operand operand = operands.e[i];
-				// Type *type = default_type(operand.type);
-				Type *type = operand.type;
-				switch (operand.mode) {
-				case Addressing_Constant:
-					variables[variable_index++] = make_entity_constant(c->allocator, NULL, empty_token, type, operand.value);
-					break;
-				default:
-					variables[variable_index++] = make_entity_param(c->allocator, NULL, empty_token, type, false, true);
-					break;
-				}
-			}
-			tuple->Tuple.variables = variables;
-			tuple->Tuple.variable_count = operands.count;
-
-			o->type = tuple;
-			o->mode = Addressing_Value;
-		}
-		gb_temp_arena_memory_end(tmp);
-	case_end;
-
-	case_ast_node(be, BlockExpr, node);
-		if (c->proc_stack.count == 0) {
-			error_node(node, "A block expression is only allowed within a procedure");
-			goto error;
-		}
-
-		for (isize i = be->stmts.count-1; i >= 0; i--) {
-			if (be->stmts.e[i]->kind != AstNode_EmptyStmt) {
-				break;
-			}
-			be->stmts.count--;
-		}
-
-		if (be->stmts.count == 0) {
-			error_node(node, "Empty block expression");
-			goto error;
-		}
-
-		CheckerContext prev_context = c->context;
-		c->context.type_hint = type_hint;
-		check_open_scope(c, node);
-		check_stmt_list(c, be->stmts, Stmt_GiveAllowed);
-		check_close_scope(c);
-
-		c->context = prev_context;
-
-		AstNode *give_node = NULL;
-		if (!check_is_giving(node, &give_node) || give_node == NULL) {
-			error_node(node, "Missing give statement at end of block expression");
-			goto error;
-		}
-
-		GB_ASSERT(give_node != NULL && give_node->kind == AstNode_GiveExpr);
-		be->give_node = give_node;
-
-		Type *type = type_of_expr(&c->info, give_node);
-		if (type == NULL) {
-			goto error;
-		} else if (type == t_invalid) {
-			o->type = t_invalid;
-			o->mode = Addressing_Invalid;
-		} else {
-			o->type = type;
-			o->mode = Addressing_Value;
-		}
-	case_end;
-
-	case_ast_node(ie, IfExpr, node);
-		if (c->proc_stack.count == 0) {
-			error_node(node, "An if expression is only allowed within a procedure");
-			goto error;
-		}
-
-		check_open_scope(c, node);
-
-		if (ie->init != NULL) {
-			check_stmt(c, ie->init, 0);
-		}
-
 		Operand operand = {Addressing_Invalid};
-		check_expr(c, &operand, ie->cond);
+		check_expr(c, &operand, te->cond);
 		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-			error_node(ie->cond, "Non-boolean condition in if expression");
+			error_node(te->cond, "Non-boolean condition in if expression");
 		}
 
 		Operand x = {Addressing_Invalid};
 		Operand y = {Addressing_Invalid};
-		Type *if_type = NULL;
-		Type *else_type = NULL;
-		if (type_hint) {
-			gb_printf_err("here\n");
-		}
-		check_expr_with_type_hint(c, &x, ie->body, type_hint);
-		if_type = x.type;
+		check_expr_with_type_hint(c, &x, te->x, type_hint);
 
-		if (ie->else_expr != NULL) {
-			switch (ie->else_expr->kind) {
-			case AstNode_IfExpr:
-			case AstNode_BlockExpr:
-				check_expr_with_type_hint(c, &y, ie->else_expr, if_type);
-				else_type = y.type;
-				break;
-			default:
-				error_node(ie->else_expr, "Invalid else expression in if expression");
-				break;
-			}
+		if (te->y != NULL) {
+			check_expr_with_type_hint(c, &y, te->y, type_hint);
 		} else {
-			error_node(ie->else_expr, "An if expression must have an else expression");
-			check_close_scope(c);
+			error_node(node, "A ternary expression must have an else clause");
 			goto error;
 		}
 
-		check_close_scope(c);
-
-		if (if_type == NULL || if_type == t_invalid ||
-		    else_type == NULL || else_type == t_invalid) {
+		if (x.type == NULL || x.type == t_invalid ||
+		    y.type == NULL || y.type == t_invalid) {
 			goto error;
 		}
 
@@ -4482,16 +4308,16 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		}
 
 
-		if (!are_types_identical(if_type, else_type)) {
-			gbString its = type_to_string(if_type);
-			gbString ets = type_to_string(else_type);
-			error_node(node, "Mismatched types in if expression, %s vs %s", its, ets);
+		if (!are_types_identical(x.type, y.type)) {
+			gbString its = type_to_string(x.type);
+			gbString ets = type_to_string(y.type);
+			error_node(node, "Mismatched types in ternary expression, %s vs %s", its, ets);
 			gb_string_free(ets);
 			gb_string_free(its);
 			goto error;
 		}
 
-		o->type = if_type;
+		o->type = x.type;
 		o->mode = Addressing_Value;
 	case_end;
 
@@ -5371,12 +5197,6 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, "}");
 	case_end;
 
-	case_ast_node(be, BlockExpr, node);
-		str = gb_string_appendc(str, "block expression");
-	case_end;
-	case_ast_node(ie, IfExpr, node);
-		str = gb_string_appendc(str, "if expression");
-	case_end;
 
 	case_ast_node(te, TagExpr, node);
 		str = gb_string_appendc(str, "#");

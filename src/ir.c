@@ -2851,25 +2851,40 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 		return ir_addr_load(proc, ir_build_addr(proc, expr));
 	case_end;
 
-	case_ast_node(be, BlockExpr, expr);
-		ir_emit_comment(proc, str_lit("BlockExpr"));
+	case_ast_node(te, TernaryExpr, expr);
+		ir_emit_comment(proc, str_lit("TernaryExpr"));
+
+		irValueArray edges = {0};
+		array_init_reserve(&edges, proc->module->allocator, 2);
+
+		GB_ASSERT(te->y != NULL);
+		irBlock *then  = ir_new_block(proc, NULL, "if.then");
+		irBlock *done  = ir_new_block(proc, NULL, "if.done"); // NOTE(bill): Append later
+		irBlock *else_ = ir_new_block(proc, NULL, "if.else");
+
+		irValue *cond = ir_build_cond(proc, te->cond, then, else_);
+		ir_start_block(proc, then);
+
 		ir_open_scope(proc);
-
-		AstNodeArray stmts = be->stmts;
-		stmts.count--;
-		ir_build_stmt_list(proc, stmts);
-
-		AstNode *give_stmt = be->stmts.e[be->stmts.count-1];
-		GB_ASSERT(give_stmt->kind == AstNode_ExprStmt);
-		AstNode *give_expr = give_stmt->ExprStmt.expr;
-		GB_ASSERT(give_expr->kind == AstNode_GiveExpr);
-		irValue *value = ir_build_expr(proc, give_expr);
-
+		array_add(&edges, ir_build_expr(proc, te->x));
 		ir_close_scope(proc, irDeferExit_Default, NULL);
 
-		return value;
+		ir_emit_jump(proc, done);
+		ir_start_block(proc, else_);
+
+		ir_open_scope(proc);
+		array_add(&edges, ir_build_expr(proc, te->y));
+		ir_close_scope(proc, irDeferExit_Default, NULL);
+
+		ir_emit_jump(proc, done);
+		ir_start_block(proc, done);
+
+		Type *type = type_of_expr(proc->module->info, expr);
+
+		return ir_emit(proc, ir_make_instr_phi(proc, edges, type));
 	case_end;
 
+#if 0
 	case_ast_node(ie, IfExpr, expr);
 		ir_emit_comment(proc, str_lit("IfExpr"));
 		if (ie->init != NULL) {
@@ -2908,50 +2923,7 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 
 		return ir_emit(proc, ir_make_instr_phi(proc, edges, type));
 	case_end;
-
-	case_ast_node(ge, GiveExpr, expr);
-		ir_emit_comment(proc, str_lit("GiveExpr"));
-
-		irValue *v = NULL;
-		Type *give_type = type_of_expr(proc->module->info, expr);
-		GB_ASSERT(give_type != NULL);
-		if (give_type->kind != Type_Tuple) {
-			v = ir_emit_conv(proc, ir_build_expr(proc, ge->results.e[0]), give_type);
-		} else {
-			TypeTuple *tuple = &give_type->Tuple;
-			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
-
-			irValueArray results;
-			array_init_reserve(&results, proc->module->tmp_allocator, tuple->variable_count);
-
-			for_array(res_index, ge->results) {
-				irValue *res = ir_build_expr(proc, ge->results.e[res_index]);
-				Type *t = ir_type(res);
-				if (t->kind == Type_Tuple) {
-					for (isize i = 0; i < t->Tuple.variable_count; i++) {
-						Entity *e = t->Tuple.variables[i];
-						irValue *v = ir_emit_struct_ev(proc, res, i);
-						array_add(&results, v);
-					}
-				} else {
-					array_add(&results, res);
-				}
-			}
-
-			v = ir_add_local_generated(proc, give_type);
-			for_array(i, results) {
-				Entity *e = tuple->variables[i];
-				irValue *res = ir_emit_conv(proc, results.e[i], e->type);
-				irValue *field = ir_emit_struct_ep(proc, v, i);
-				ir_emit_store(proc, field, res);
-			}
-			v = ir_emit_load(proc, v);
-
-			gb_temp_arena_memory_end(tmp);
-		}
-
-		return v;
-	case_end;
+#endif
 
 	case_ast_node(ce, CastExpr, expr);
 		Type *type = tv->type;
