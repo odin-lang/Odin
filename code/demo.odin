@@ -2,16 +2,9 @@
 
 
 main :: proc() {
-	{
-
-		x := [...]int{1, 2, 3, 4};
-		immutable y := ^x;
-		fmt.println(y^[0]);
-	}
-
 /*
 /*
-	Version 0.1.0
+	Version 0.1.1
 
 	Added:
 	 * Dynamic Arrays `[...]Type`
@@ -24,10 +17,11 @@ main :: proc() {
 	 * Entities prefixes with an underscore do not get exported on imports
 	 * Overloaded `free` for pointers, slices, strings, dynamic arrays, and dynamic maps
 	 * enum types have an implict `names` field, a []string of all the names in that enum
+	 * immutable variables are "completely immutable"
+	 * `slice_to_bytes` - convert any slice to a slice of bytes
 
 	Removed:
 	 * Maybe/option types
-	 * immutable variables
 	 * Remove `type` keyword and other "reserved" keywords
 	 * `compile_assert` and `assert`return the value of the condition for semantic reasons
 

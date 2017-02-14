@@ -4103,7 +4103,8 @@ void check_set_mode_with_indirection(Operand *o, bool indirection) {
 	if (o->mode != Addressing_Immutable) {
 		if (indirection) {
 			o->mode = Addressing_Variable;
-		} else if (o->mode != Addressing_Variable) {
+		} else if (o->mode != Addressing_Variable &&
+		           o->mode != Addressing_Constant) {
 			o->mode = Addressing_Value;
 		}
 	}
@@ -4139,7 +4140,9 @@ bool check_set_index_data(Operand *o, Type *type, bool indirection, i64 *max_cou
 
 	case Type_Slice:
 		o->type = t->Slice.elem;
-		o->mode = Addressing_Variable;
+		if (o->mode != Addressing_Immutable) {
+			o->mode = Addressing_Variable;
+		}
 		return true;
 
 	case Type_DynamicArray:
@@ -5132,7 +5135,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			goto error;
 		}
 
-		o->mode = Addressing_Value;
+		if (o->mode != Addressing_Immutable) {
+			o->mode = Addressing_Value;
+		}
 
 		i64 indices[2] = {0};
 		AstNode *nodes[2] = {se->low, se->high};

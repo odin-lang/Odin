@@ -6,22 +6,6 @@ typedef enum ExprKind {
 	Expr_Stmt,
 } ExprKind;
 
-typedef enum AddressingMode {
-	Addressing_Invalid,
-
-	Addressing_NoValue,
-	Addressing_Value,
-	Addressing_Variable,
-	Addressing_Immutable,
-	Addressing_Constant,
-	Addressing_Type,
-	Addressing_Builtin,
-	Addressing_Overload,
-	Addressing_MapIndex,
-
-	Addressing_Count,
-} AddressingMode;
-
 // Statements and Declarations
 typedef enum StmtFlag {
 	Stmt_BreakAllowed       = 1<<0,
@@ -124,11 +108,26 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 
 #include "types.c"
 
-#define MAP_TYPE Entity *
-#define MAP_PROC map_entity_
-#define MAP_NAME MapEntity
-#include "map.c"
+typedef enum AddressingMode {
+	Addressing_Invalid,   // invalid addressing mode
+	Addressing_NoValue,   // no value (void in C)
+	Addressing_Value,     // computed value (rvalue)
+	Addressing_Immutable, // immutable computed value (const rvalue)
+	Addressing_Variable,  // addressable variable (lvalue)
+	Addressing_Constant,  // constant & type will be a of Type_Basic (stripping Type_Named)
+	Addressing_Type,      // type
+	Addressing_Builtin,   // built in procedure
+	Addressing_Overload,  // overloaded procedure
+	Addressing_MapIndex,  // map index expression
+	                      // 	lhs: acts like a Variable
+	                      // 	ths: acts like a value with an optional boolean part (for existence check)
+} AddressingMode;
 
+// Operand is used as an intermediate value whilst checking
+// Operands store an addressing mode, the expression being evaluated,
+// its type and node, and other specific information for certain
+// addressing modes
+// Its zero-value is a valid "invalid operand"
 typedef struct Operand {
 	AddressingMode mode;
 	Type *         type;
@@ -161,7 +160,7 @@ bool is_operand_nil(Operand o) {
 }
 
 
-
+// DeclInfo is used to store information of certain declarations to allow for "any order" usage
 typedef struct DeclInfo {
 	Scope *scope;
 
@@ -175,6 +174,17 @@ typedef struct DeclInfo {
 	MapBool deps; // Key: Entity *
 } DeclInfo;
 
+// ProcedureInfo stores the information needed for checking a procedure
+typedef struct ProcedureInfo {
+	AstFile * file;
+	Token     token;
+	DeclInfo *decl;
+	Type *    type; // Type_Procedure
+	AstNode * body; // AstNode_BlockStmt
+	u32       tags;
+} ProcedureInfo;
+
+// ExprInfo stores information used for "untyped" expressions
 typedef struct ExprInfo {
 	bool           is_lhs; // Debug info
 	AddressingMode mode;
@@ -187,14 +197,12 @@ ExprInfo make_expr_info(bool is_lhs, AddressingMode mode, Type *type, ExactValue
 	return ei;
 }
 
-typedef struct ProcedureInfo {
-	AstFile * file;
-	Token     token;
-	DeclInfo *decl;
-	Type *    type; // Type_Procedure
-	AstNode * body; // AstNode_BlockStmt
-	u32       tags;
-} ProcedureInfo;
+
+
+#define MAP_TYPE Entity *
+#define MAP_PROC map_entity_
+#define MAP_NAME MapEntity
+#include "map.c"
 
 typedef struct Scope {
 	Scope *        parent;
@@ -258,7 +266,7 @@ typedef struct CheckerContext {
 	Type *     type_hint;
 } CheckerContext;
 
-// NOTE(bill): Symbol tables
+// CheckerInfo stores all the symbol information for a type-checked program
 typedef struct CheckerInfo {
 	MapTypeAndValue      types;           // Key: AstNode * | Expression -> Type (and value)
 	MapEntity            definitions;     // Key: AstNode * | Identifier -> Entity

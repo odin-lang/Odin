@@ -111,7 +111,9 @@ AstNodeArray make_ast_node_array(AstFile *f) {
 }
 
 
-
+// NOTE(bill): This massive define is so it is possible to create a discriminated union (and extra debug info)
+// for the AstNode. I personally prefer discriminated unions over subtype polymorphism as I can preallocate
+// all the nodes and even memcpy in a different kind of node
 #define AST_NODE_KINDS \
 	AST_NODE_KIND(Ident,          "identifier",      Token) \
 	AST_NODE_KIND(Implicit,       "implicit",        Token) \

@@ -178,8 +178,9 @@ typedef struct Type {
 	bool failure;
 } Type;
 
-typedef Array(i32) Array_i32;
 
+// TODO(bill): Should I add extra information here specifying the kind of selection?
+// e.g. field, constant, vector field, type field, etc.
 typedef struct Selection {
 	Entity *  entity;
 	Array_i32 index;
@@ -195,6 +196,7 @@ Selection make_selection(Entity *entity, Array_i32 index, bool indirect) {
 void selection_add_index(Selection *s, isize index) {
 	// IMPORTANT NOTE(bill): this requires a stretchy buffer/dynamic array so it requires some form
 	// of heap allocation
+	// TODO(bill): Find a way to use a backing buffer for initial use as the general case is probably .count<3
 	if (s->index.e == NULL) {
 		array_init(&s->index, heap_allocator());
 	}
@@ -277,6 +279,7 @@ gb_global Type *t_byte_slice = NULL;
 gb_global Type *t_string_slice = NULL;
 
 
+// Type generated for the "preload" file
 gb_global Type *t_type_info                = NULL;
 gb_global Type *t_type_info_record         = NULL;
 gb_global Type *t_type_info_enum_value     = NULL;
@@ -303,7 +306,6 @@ gb_global Type *t_type_info_raw_union     = NULL;
 gb_global Type *t_type_info_enum          = NULL;
 gb_global Type *t_type_info_map           = NULL;
 
-
 gb_global Type *t_type_info_named_ptr         = NULL;
 gb_global Type *t_type_info_integer_ptr       = NULL;
 gb_global Type *t_type_info_float_ptr         = NULL;
@@ -323,8 +325,6 @@ gb_global Type *t_type_info_raw_union_ptr     = NULL;
 gb_global Type *t_type_info_enum_ptr          = NULL;
 gb_global Type *t_type_info_map_ptr           = NULL;
 
-
-
 gb_global Type *t_allocator            = NULL;
 gb_global Type *t_allocator_ptr        = NULL;
 gb_global Type *t_context              = NULL;
@@ -337,13 +337,14 @@ gb_global Type *t_map_header            = NULL;
 
 
 
-i64 type_size_of  (gbAllocator allocator, Type *t);
-i64 type_align_of (gbAllocator allocator, Type *t);
-i64 type_offset_of(gbAllocator allocator, Type *t, i32 index);
 
 
-
+i64     type_size_of   (gbAllocator allocator, Type *t);
+i64     type_align_of  (gbAllocator allocator, Type *t);
+i64     type_offset_of (gbAllocator allocator, Type *t, i32 index);
 gbString type_to_string(Type *type);
+
+
 
 Type *base_type(Type *t) {
 	for (;;) {

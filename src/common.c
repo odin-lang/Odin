@@ -131,6 +131,9 @@ i16 f32_to_f16(f32 value) {
 //
 ////////////////////////////////////////////////////////////////
 
+typedef Array(i32)   Array_i32;
+typedef Array(isize) Array_isize;
+
 
 #define MAP_TYPE String
 #define MAP_PROC map_string_
