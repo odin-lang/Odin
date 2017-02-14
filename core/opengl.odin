@@ -22,7 +22,8 @@ Color3f       :: proc(r, g, b: f32)                             #foreign lib "gl
 Vertex3f      :: proc(x, y, z: f32)                             #foreign lib "glVertex3f";
 TexImage2D    :: proc(target, level, internal_format,
                       width, height, border,
-                      format, _type: i32, pixels: rawptr) #foreign lib "glTexImage2D";
+                      format, _type: i32, pixels: []f32) #foreign lib "glTexImage2D";
+TexCoord2f    :: proc(x,y: f32)                                 #foreign lib "glTexCoord2f";		      
 
 GetError    :: proc() -> i32            #foreign lib "glGetError";
 GetString   :: proc(name: i32) -> ^byte #foreign lib "glGetString";
