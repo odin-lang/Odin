@@ -381,7 +381,7 @@ Raw_Dynamic_Array :: struct #ordered {
 };
 
 Raw_Dynamic_Map :: struct #ordered {
-	hashes:  [...]int,
+	hashes:  [dynamic]int,
 	entries: Raw_Dynamic_Array,
 };
 

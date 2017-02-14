@@ -2574,8 +2574,8 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		AstNode *count_expr = NULL;
 		bool is_vector = false;
 
-		if (f->curr_token.kind == Token_Question) {
-			count_expr = ast_unary_expr(f, expect_token(f, Token_Question), NULL);
+		if (f->curr_token.kind == Token_Ellipsis) {
+			count_expr = ast_unary_expr(f, expect_token(f, Token_Ellipsis), NULL);
 		} else if (f->curr_token.kind == Token_vector) {
 			next_token(f);
 			if (f->curr_token.kind != Token_CloseBracket) {
@@ -2586,7 +2586,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 				syntax_error(f->curr_token, "Vector type missing count");
 			}
 			is_vector = true;
-		} else if (f->curr_token.kind == Token_Ellipsis) {
+		} else if (f->curr_token.kind == Token_dynamic) {
 			next_token(f);
 			expect_token(f, Token_CloseBracket);
 			return ast_dynamic_array_type(f, token, parse_type(f));

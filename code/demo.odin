@@ -1,4 +1,11 @@
 #import "fmt.odin";
+#import "atomic.odin";
+#import "hash.odin";
+#import "math.odin";
+#import "mem.odin";
+#import "opengl.odin";
+#import "os.odin";
+#import "utf8.odin";
 
 
 main :: proc() {

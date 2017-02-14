@@ -1071,7 +1071,7 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 	}
 	Operand o = {0};
 	if (e->kind == AstNode_UnaryExpr &&
-	    e->UnaryExpr.op.kind == Token_Question) {
+	    e->UnaryExpr.op.kind == Token_Ellipsis) {
 		return -1;
 	}
 
@@ -1966,10 +1966,21 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 
 	// Cast between pointers
 	if (is_type_pointer(src) && is_type_pointer(dst)) {
+		Type *s = base_type(type_deref(src));
+		if (is_type_union(s)) {
+			// NOTE(bill): Should the error be here?!
+			// NOTE(bill): This error should suppress the next casting error as it's at the same position
+			gbString xs = type_to_string(x);
+			gbString ys = type_to_string(y);
+			error_node(operand->expr, "Cannot cast from a union pointer `%s` to `%s`, try using `union_cast` or cast to a `rawptr`", xs, ys);
+			gb_string_free(ys);
+			gb_string_free(xs);
+			return false;
+		}
 		return true;
 	}
 
-	// (u)int <-> pointer
+	// (u)int <-> rawptr
 	if (is_type_int_or_uint(src) && is_type_rawptr(dst)) {
 		return true;
 	}
@@ -4494,7 +4505,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			if (cl->type->kind == AstNode_ArrayType && cl->type->ArrayType.count != NULL) {
 				AstNode *count = cl->type->ArrayType.count;
 				if (count->kind == AstNode_UnaryExpr &&
-				    count->UnaryExpr.op.kind == Token_Question) {
+				    count->UnaryExpr.op.kind == Token_Ellipsis) {
 					type = make_type_array(c->allocator, check_type(c, cl->type->ArrayType.elem), -1);
 					is_to_be_determined_array_count = true;
 				}

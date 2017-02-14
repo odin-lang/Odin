@@ -140,7 +140,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		if info.params == nil {
 			buffer_write_string(buf, "()");
 		} else {
-			t := cast(^Tuple)info.params;
+			t := union_cast(^Tuple)info.params;
 			buffer_write_string(buf, "(");
 			for type, i in t.types {
 				if i > 0 { buffer_write_string(buf, ", "); }

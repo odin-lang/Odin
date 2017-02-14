@@ -1,6 +1,6 @@
 is_signed :: proc(info: ^Type_Info) -> bool {
 	if is_integer(info) {
-		i := cast(^Type_Info.Integer)info;
+		i := union_cast(^Type_Info.Integer)info;
 		return i.signed;
 	}
 	if is_float(info) {
