@@ -1,16 +1,12 @@
 #import "fmt.odin";
 
-x := [...]int{1, 2, 3, 4};
 
 main :: proc() {
 	{
 
-
-		foo :: proc() -> [...]int {
-			return x;
-		}
-
-		// foo()[0] = 2;
+		x := [...]int{1, 2, 3, 4};
+		immutable y := ^x;
+		fmt.println(y^[0]);
 	}
 
 /*

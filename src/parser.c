@@ -2358,7 +2358,7 @@ bool is_token_field_prefix(TokenKind kind) {
 	switch (kind) {
 	case Token_using:
 	case Token_no_alias:
-	// case Token_immutable:
+	case Token_immutable:
 		return true;
 	}
 	return false;
@@ -2374,7 +2374,7 @@ u32 parse_field_prefixes(AstFile *f) {
 		switch (f->curr_token.kind) {
 		case Token_using:     using_count     += 1; next_token(f); break;
 		case Token_no_alias:  no_alias_count  += 1; next_token(f); break;
-		// case Token_immutable: immutable_count += 1; next_token(f); break;
+		case Token_immutable: immutable_count += 1; next_token(f); break;
 		}
 	}
 	if (using_count     > 1) syntax_error(f->curr_token, "Multiple `using` in this field list");
@@ -3272,7 +3272,7 @@ AstNode *parse_stmt(AstFile *f) {
 		return ast_bad_stmt(f, token, f->curr_token);
 	} break;
 
-#if 0
+#if 1
 	case Token_immutable: {
 		Token token = expect_token(f, Token_immutable);
 		AstNode *node = parse_stmt(f);

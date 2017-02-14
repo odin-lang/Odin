@@ -6,6 +6,22 @@ typedef enum ExprKind {
 	Expr_Stmt,
 } ExprKind;
 
+typedef enum AddressingMode {
+	Addressing_Invalid,
+
+	Addressing_NoValue,
+	Addressing_Value,
+	Addressing_Variable,
+	Addressing_Immutable,
+	Addressing_Constant,
+	Addressing_Type,
+	Addressing_Builtin,
+	Addressing_Overload,
+	Addressing_MapIndex,
+
+	Addressing_Count,
+} AddressingMode;
+
 // Statements and Declarations
 typedef enum StmtFlag {
 	Stmt_BreakAllowed       = 1<<0,
@@ -106,22 +122,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 };
 
 
-
-typedef enum AddressingMode {
-	Addressing_Invalid,
-
-	Addressing_NoValue,
-	Addressing_Value,
-	Addressing_Variable,
-	Addressing_Constant,
-	Addressing_Type,
-	Addressing_Builtin,
-	Addressing_Overload,
-	Addressing_MapIndex,
-
-	Addressing_Count,
-} AddressingMode;
-
 #include "types.c"
 
 #define MAP_TYPE Entity *
@@ -149,7 +149,9 @@ bool is_operand_value(Operand o) {
 	switch (o.mode) {
 	case Addressing_Value:
 	case Addressing_Variable:
+	case Addressing_Immutable:
 	case Addressing_Constant:
+	case Addressing_MapIndex:
 		return true;
 	}
 	return false;

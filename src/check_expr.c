@@ -1030,7 +1030,7 @@ void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *typ
 		}
 		o->mode = Addressing_Variable;
 		if (e->Variable.is_immutable) {
-			o->mode = Addressing_Value;
+			o->mode = Addressing_Immutable;
 		}
 		break;
 
@@ -2714,7 +2714,9 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		break;
 	case Entity_Variable:
 		// TODO(bill): This is the rule I need?
-		if (sel.indirect || operand->mode != Addressing_Value) {
+		if (operand->mode == Addressing_Immutable) {
+			// Okay
+		} else if (sel.indirect || operand->mode != Addressing_Value) {
 			operand->mode = Addressing_Variable;
 		} else {
 			operand->mode = Addressing_Value;
@@ -4097,6 +4099,16 @@ void check_expr_with_type_hint(Checker *c, Operand *o, AstNode *e, Type *t) {
 	}
 }
 
+void check_set_mode_with_indirection(Operand *o, bool indirection) {
+	if (o->mode != Addressing_Immutable) {
+		if (indirection) {
+			o->mode = Addressing_Variable;
+		} else if (o->mode != Addressing_Variable) {
+			o->mode = Addressing_Value;
+		}
+	}
+}
+
 bool check_set_index_data(Operand *o, Type *type, bool indirection, i64 *max_count) {
 	Type *t = base_type(type_deref(type));
 
@@ -4106,9 +4118,7 @@ bool check_set_index_data(Operand *o, Type *type, bool indirection, i64 *max_cou
 			if (o->mode == Addressing_Constant) {
 				*max_count = o->value.value_string.len;
 			}
-			if (o->mode != Addressing_Variable) {
-				o->mode = Addressing_Value;
-			}
+			check_set_mode_with_indirection(o, indirection);
 			o->type = t_u8;
 			return true;
 		}
@@ -4116,22 +4126,13 @@ bool check_set_index_data(Operand *o, Type *type, bool indirection, i64 *max_cou
 
 	case Type_Array:
 		*max_count = t->Array.count;
-		if (indirection) {
-			o->mode = Addressing_Variable;
-		} else if (o->mode != Addressing_Variable) {
-			o->mode = Addressing_Value;
-		}
-
+		check_set_mode_with_indirection(o, indirection);
 		o->type = t->Array.elem;
 		return true;
 
 	case Type_Vector:
 		*max_count = t->Vector.count;
-		if (indirection) {
-			o->mode = Addressing_Variable;
-		} else if (o->mode != Addressing_Variable) {
-			o->mode = Addressing_Value;
-		}
+		check_set_mode_with_indirection(o, indirection);
 		o->type = t->Vector.elem;
 		return true;
 
@@ -4143,11 +4144,7 @@ bool check_set_index_data(Operand *o, Type *type, bool indirection, i64 *max_cou
 
 	case Type_DynamicArray:
 		o->type = t->DynamicArray.elem;
-		if (indirection) {
-			o->mode = Addressing_Variable;
-		} else if (o->mode != Addressing_Variable) {
-			o->mode = Addressing_Value;
-		}
+		check_set_mode_with_indirection(o, indirection);
 		return true;
 	}
 
@@ -5183,7 +5180,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		} else {
 			Type *t = base_type(o->type);
 			if (t->kind == Type_Pointer) {
-				o->mode = Addressing_Variable;
+				if (o->mode != Addressing_Immutable) {
+					o->mode = Addressing_Variable;
+				}
 				o->type = t->Pointer.elem;
  			} else {
  				gbString str = expr_to_string(o->expr);

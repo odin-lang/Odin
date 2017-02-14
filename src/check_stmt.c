@@ -268,17 +268,13 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 			AstNode *x = ln->IndexExpr.expr;
 			TypeAndValue *tav = type_and_value_of_expression(&c->info, x);
 			GB_ASSERT(tav != NULL);
-			switch (tav->mode) {
-			case Addressing_Variable:
-				break;
-			case Addressing_Value:
+			if (tav->mode != Addressing_Variable) {
 				if (!is_type_pointer(tav->type)) {
 					gbString str = expr_to_string(lhs.expr);
 					error_node(lhs.expr, "Cannot assign to the value of a map `%s`", str);
 					gb_string_free(str);
 					return NULL;
 				}
-				break;
 			}
 		}
 	} break;
@@ -297,7 +293,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 		}
 
 		gbString str = expr_to_string(lhs.expr);
-		if (e != NULL && e->kind == Entity_Variable && e->Variable.is_immutable) {
+		if (lhs.mode == Addressing_Immutable) {
 			error_node(lhs.expr, "Cannot assign to an immutable: `%s`", str);
 		} else {
 			error_node(lhs.expr, "Cannot assign to `%s`", str);
