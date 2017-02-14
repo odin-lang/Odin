@@ -2082,15 +2082,6 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 		return true;
 	}
 
-	{
-		gbString expr_str = expr_to_string(operand->expr);
-		gbString to_type  = type_to_string(y);
-		gbString from_type = type_to_string(x);
-		error_node(operand->expr, "Cannot cast `%s` as `%s` from `%s`", expr_str, to_type, from_type);
-		gb_string_free(from_type);
-		gb_string_free(to_type);
-		gb_string_free(expr_str);
-	}
 	return false;
 }
 
@@ -2115,7 +2106,13 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 	}
 
 	if (!can_convert) {
-		// NOTE(bill): Error handled in `cast_is_castable_to`
+		gbString expr_str = expr_to_string(x->expr);
+		gbString to_type  = type_to_string(type);
+		gbString from_type = type_to_string(x->type);
+		error_node(x->expr, "Cannot cast `%s` as `%s` from `%s`", expr_str, to_type, from_type);
+		gb_string_free(from_type);
+		gb_string_free(to_type);
+		gb_string_free(expr_str);
 		x->mode = Addressing_Invalid;
 		return;
 	}
