@@ -19,6 +19,7 @@ typedef struct String {
 #define str_lit(c_str) (String){cast(u8 *)c_str, gb_size_of(c_str)-1}
 
 
+// NOTE(bill): String16 is only used for Windows due to its file directories
 typedef struct String16 {
 	wchar_t *text;
 	isize    len;

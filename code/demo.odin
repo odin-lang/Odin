@@ -1,18 +1,22 @@
 #import "fmt.odin";
+#import "atomic.odin";
+#import "hash.odin";
+#import "math.odin";
+#import "mem.odin";
+#import "opengl.odin";
+#import "os.odin";
+#import "utf8.odin";
+
 
 main :: proc() {
-
-	{
-		Vec2 :: [vector 2]f32;
-		i: f32 = 1;
-		b := Vec2{i, i};
-	}
-
+	x: f32 = false ? 123 : 55;
+	fmt.println("Ternary:", x);
 /*
-	Version 0.1.0
+/*
+	Version 0.1.1
 
 	Added:
-	 * Dynamic Arrays `[...]Type`
+	 * Dynamic Arrays [dynamic]Type`
 	 * Dynamic Maps   `map[Key]Value`
 	 * Dynamic array and map literals
 	 * Custom struct alignemnt `struct #align 8 { bar: i8 }`
@@ -22,10 +26,12 @@ main :: proc() {
 	 * Entities prefixes with an underscore do not get exported on imports
 	 * Overloaded `free` for pointers, slices, strings, dynamic arrays, and dynamic maps
 	 * enum types have an implict `names` field, a []string of all the names in that enum
+	 * immutable variables are "completely immutable" - rules need a full explanation
+	 * `slice_to_bytes` - convert any slice to a slice of bytes
+	 * `union_cast` allows for optional ok check
 
 	Removed:
 	 * Maybe/option types
-	 * immutable variables
 	 * Remove `type` keyword and other "reserved" keywords
 	 * `compile_assert` and `assert`return the value of the condition for semantic reasons
 
@@ -92,7 +98,7 @@ main :: proc() {
 	}
 
 	{
-		x: [...]f64;
+		x: [dynamic]f64;
 		reserve(x, 16);
 		defer free(x);
 		append(x, 2_000_000.500_000, 3, 5, 7);
@@ -105,7 +111,7 @@ main :: proc() {
 	}
 
 	{
-		x := [...]f64{2_000_000.500_000, 3, 5, 7};
+		x := [dynamic]f64{2_000_000.500_000, 3, 5, 7};
 		defer free(x);
 		fmt.println(x);
 	}
@@ -130,5 +136,6 @@ main :: proc() {
 		compile_assert(size_of([vector 7]i32) == size_of([7]i32));
 		// align_of([vector 7]i32) != align_of([7]i32) // this may be the case
 	}
+*/
 }
 

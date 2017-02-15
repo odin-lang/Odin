@@ -40,12 +40,15 @@ typedef enum EntityFlag {
 	EntityFlag_TypeField  = 1<<8,
 } EntityFlag;
 
+// Zero value means the overloading process is not yet done
 typedef enum OverloadKind {
-	Overload_No      = -1,
-	Overload_Unknown = 0,
-	Overload_Yes     = +1,
+	Overload_Unknown,
+	Overload_No,
+	Overload_Yes,
 } OverloadKind;
 
+
+// An Entity is a named "thing" in the language
 typedef struct Entity Entity;
 struct Entity {
 	EntityKind kind;

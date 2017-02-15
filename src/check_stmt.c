@@ -30,11 +30,6 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 			case AstNode_ReturnStmt:
 				error_node(n, "Statements after this `return` are never executed");
 				break;
-			case AstNode_ExprStmt:
-				if (n->ExprStmt.expr->kind == AstNode_GiveExpr) {
-					error_node(n, "A `give` must be the last statement in a block");
-				}
-				break;
 			}
 		}
 
@@ -182,40 +177,40 @@ bool check_is_terminating(AstNode *node) {
 	return false;
 }
 
-Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
-	if (op_a->mode == Addressing_Invalid ||
-	    (op_a->type == t_invalid && op_a->mode != Addressing_Overload)) {
+Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
+	if (rhs->mode == Addressing_Invalid ||
+	    (rhs->type == t_invalid && rhs->mode != Addressing_Overload)) {
 		return NULL;
 	}
 
-	AstNode *node = unparen_expr(lhs);
+	AstNode *node = unparen_expr(lhs_node);
 
 	// NOTE(bill): Ignore assignments to `_`
 	if (node->kind == AstNode_Ident &&
 	    str_eq(node->Ident.string, str_lit("_"))) {
 		add_entity_definition(&c->info, node, NULL);
-		check_assignment(c, op_a, NULL, str_lit("assignment to `_` identifier"));
-		if (op_a->mode == Addressing_Invalid) {
+		check_assignment(c, rhs, NULL, str_lit("assignment to `_` identifier"));
+		if (rhs->mode == Addressing_Invalid) {
 			return NULL;
 		}
-		return op_a->type;
+		return rhs->type;
 	}
 
 	Entity *e = NULL;
 	bool used = false;
-	Operand op_b = {Addressing_Invalid};
+	Operand lhs = {Addressing_Invalid};
 
 
-	check_expr(c, &op_b, lhs);
-	if (op_b.mode == Addressing_Invalid ||
-	    op_b.type == t_invalid) {
+	check_expr(c, &lhs, lhs_node);
+	if (lhs.mode == Addressing_Invalid ||
+	    lhs.type == t_invalid) {
 		return NULL;
 	}
 
 
-	if (op_a->mode == Addressing_Overload) {
-		isize overload_count = op_a->overload_count;
-		Entity **procs = op_a->overload_entities;
+	if (rhs->mode == Addressing_Overload) {
+		isize overload_count = rhs->overload_count;
+		Entity **procs = rhs->overload_entities;
 		GB_ASSERT(procs != NULL && overload_count > 0);
 
 		// NOTE(bill): These should be done
@@ -227,19 +222,19 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 			Operand x = {0};
 			x.mode = Addressing_Value;
 			x.type = t;
-			if (check_is_assignable_to(c, &x, op_b.type)) {
+			if (check_is_assignable_to(c, &x, lhs.type)) {
 				e = procs[i];
-				add_entity_use(c, op_a->expr, e);
+				add_entity_use(c, rhs->expr, e);
 				break;
 			}
 		}
 
 		if (e != NULL) {
 			// HACK TODO(bill): Should the entities be freed as it's technically a leak
-			op_a->mode = Addressing_Value;
-			op_a->type = e->type;
-			op_a->overload_count = 0;
-			op_a->overload_entities = NULL;
+			rhs->mode = Addressing_Value;
+			rhs->type = e->type;
+			rhs->overload_count = 0;
+			rhs->overload_entities = NULL;
 		}
 	} else {
 		if (node->kind == AstNode_Ident) {
@@ -256,43 +251,60 @@ Type *check_assignment_variable(Checker *c, Operand *op_a, AstNode *lhs) {
 		e->flags |= EntityFlag_Used;
 	}
 
-	Type *assignment_type = op_b.type;
-	switch (op_b.mode) {
+	Type *assignment_type = lhs.type;
+	switch (lhs.mode) {
 	case Addressing_Invalid:
 		return NULL;
+
 	case Addressing_Variable:
-	case Addressing_MapIndex:
 		break;
+	case Addressing_MapIndex: {
+		AstNode *ln = unparen_expr(lhs_node);
+		if (ln->kind == AstNode_IndexExpr) {
+			AstNode *x = ln->IndexExpr.expr;
+			TypeAndValue *tav = type_and_value_of_expression(&c->info, x);
+			GB_ASSERT(tav != NULL);
+			if (tav->mode != Addressing_Variable) {
+				if (!is_type_pointer(tav->type)) {
+					gbString str = expr_to_string(lhs.expr);
+					error_node(lhs.expr, "Cannot assign to the value of a map `%s`", str);
+					gb_string_free(str);
+					return NULL;
+				}
+			}
+		}
+	} break;
+
 	default: {
-		if (op_b.expr->kind == AstNode_SelectorExpr) {
+		if (lhs.expr->kind == AstNode_SelectorExpr) {
 			// NOTE(bill): Extra error checks
 			Operand op_c = {Addressing_Invalid};
-			ast_node(se, SelectorExpr, op_b.expr);
+			ast_node(se, SelectorExpr, lhs.expr);
 			check_expr(c, &op_c, se->expr);
 			if (op_c.mode == Addressing_MapIndex) {
-				gbString str = expr_to_string(op_b.expr);
-				error_node(op_b.expr, "Cannot assign to record field `%s` in map", str);
+				gbString str = expr_to_string(lhs.expr);
+				error_node(lhs.expr, "Cannot assign to record field `%s` in map", str);
 				gb_string_free(str);
 				return NULL;
 			}
 		}
 
-		gbString str = expr_to_string(op_b.expr);
-		if (e != NULL && e->kind == Entity_Variable && e->Variable.is_immutable) {
-			error_node(op_b.expr, "Cannot assign to an immutable: `%s`", str);
+		gbString str = expr_to_string(lhs.expr);
+		if (lhs.mode == Addressing_Immutable) {
+			error_node(lhs.expr, "Cannot assign to an immutable: `%s`", str);
 		} else {
-			error_node(op_b.expr, "Cannot assign to `%s`", str);
+			error_node(lhs.expr, "Cannot assign to `%s`", str);
 		}
 		gb_string_free(str);
 	} break;
 	}
 
-	check_assignment(c, op_a, assignment_type, str_lit("assignment"));
-	if (op_a->mode == Addressing_Invalid) {
+	check_assignment(c, rhs, assignment_type, str_lit("assignment"));
+	if (rhs->mode == Addressing_Invalid) {
 		return NULL;
 	}
 
-	return op_a->type;
+	return rhs->type;
 }
 
 bool check_valid_type_match_type(Type *type, bool *is_union_ptr, bool *is_any) {
@@ -396,12 +408,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			if (operand.expr->kind == AstNode_CallExpr) {
 				return;
 			}
-			if (operand.expr->kind == AstNode_GiveExpr) {
-				if ((flags&Stmt_GiveAllowed) != 0) {
-					return;
-				}
-				error_node(node, "Illegal use of `give`");
-			}
 			gbString expr_str = expr_to_string(operand.expr);
 			error_node(node, "Expression is not used: `%s`", expr_str);
 			gb_string_free(expr_str);
@@ -419,40 +425,34 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		switch (as->op.kind) {
 		case Token_Eq: {
 			// a, b, c = 1, 2, 3;  // Multisided
-			if (as->lhs.count == 0) {
+
+			isize lhs_count = as->lhs.count;
+			if (lhs_count == 0) {
 				error(as->op, "Missing lhs in assignment statement");
 				return;
 			}
+
+			// TODO(bill): This is a very similar to check_init_variables, should I merge the two some how or just
+			// leave it?
 
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
 			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 			// an extra allocation
-			Array(Operand) operands;
-			array_init_reserve(&operands, c->tmp_allocator, 2 * as->lhs.count);
+			ArrayOperand operands = {0};
+			array_init_reserve(&operands, c->tmp_allocator, 2 * lhs_count);
+			check_unpack_arguments(c, lhs_count, &operands, as->rhs, true);
 
-			for_array(i, as->rhs) {
-				AstNode *rhs = as->rhs.e[i];
-				Operand o = {0};
-				check_multi_expr(c, &o, rhs);
-				if (o.type->kind != Type_Tuple) {
-					array_add(&operands, o);
-				} else {
-					TypeTuple *tuple = &o.type->Tuple;
-					for (isize j = 0; j < tuple->variable_count; j++) {
-						o.type = tuple->variables[j]->type;
-						array_add(&operands, o);
-					}
+			isize rhs_count = operands.count;
+			for_array(i, operands) {
+				if (operands.e[i].mode == Addressing_Invalid) {
+					rhs_count--;
 				}
 			}
 
-			isize lhs_count = as->lhs.count;
-			isize rhs_count = operands.count;
-
-			isize operand_count = gb_min(as->lhs.count, operands.count);
-			for (isize i = 0; i < operand_count; i++) {
-				AstNode *lhs = as->lhs.e[i];
-				check_assignment_variable(c, &operands.e[i], lhs);
+			isize max = gb_min(lhs_count, rhs_count);
+			for (isize i = 0; i < max; i++) {
+				check_assignment_variable(c, &operands.e[i], as->lhs.e[i]);
 			}
 			if (lhs_count != rhs_count) {
 				error_node(as->lhs.e[0], "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);

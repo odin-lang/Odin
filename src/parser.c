@@ -111,7 +111,9 @@ AstNodeArray make_ast_node_array(AstFile *f) {
 }
 
 
-
+// NOTE(bill): This massive define is so it is possible to create a discriminated union (and extra debug info)
+// for the AstNode. I personally prefer discriminated unions over subtype polymorphism as I can preallocate
+// all the nodes and even memcpy in a different kind of node
 #define AST_NODE_KINDS \
 	AST_NODE_KIND(Ident,          "identifier",      Token) \
 	AST_NODE_KIND(Implicit,       "implicit",        Token) \
@@ -166,24 +168,9 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 		Token        open; \
 		Token        close; \
 	}) \
-	AST_NODE_KIND(CastExpr, "cast expression", struct { Token token; AstNode *type, *expr; Token open, close; }) \
-	AST_NODE_KIND(FieldValue, "field value", struct { Token eq; AstNode *field, *value; }) \
-	AST_NODE_KIND(BlockExpr, "block expr", struct { \
-		AstNodeArray stmts; \
-		Token open, close; \
-		AstNode *give_node; \
-	}) \
-	AST_NODE_KIND(GiveExpr, "give expression", struct { \
-		Token token; \
-		AstNodeArray results; \
-	}) \
-	AST_NODE_KIND(IfExpr, "if expression", struct { \
-		Token token; \
-		AstNode *init; \
-		AstNode *cond; \
-		AstNode *body; \
-		AstNode *else_expr; \
-	}) \
+	AST_NODE_KIND(CastExpr,     "cast expression",     struct { Token token; AstNode *type, *expr; Token open, close; }) \
+	AST_NODE_KIND(FieldValue,   "field value",         struct { Token eq; AstNode *field, *value; }) \
+	AST_NODE_KIND(TernaryExpr,  "ternary expression",  struct { AstNode *cond, *x, *y; }) \
 	AST_NODE_KIND(IntervalExpr, "interval expression", struct { Token op; AstNode *left, *right; }) \
 AST_NODE_KIND(_ExprEnd,       "", i32) \
 AST_NODE_KIND(_StmtBegin,     "", i32) \
@@ -463,9 +450,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_CastExpr:     return node->CastExpr.token;
 	case AstNode_FieldValue:   return node->FieldValue.eq;
 	case AstNode_DerefExpr:    return node->DerefExpr.op;
-	case AstNode_BlockExpr:    return node->BlockExpr.open;
-	case AstNode_GiveExpr:     return node->GiveExpr.token;
-	case AstNode_IfExpr:       return node->IfExpr.token;
+	case AstNode_TernaryExpr:  return ast_node_token(node->TernaryExpr.cond);
 	case AstNode_IntervalExpr: return ast_node_token(node->IntervalExpr.left);
 
 	case AstNode_BadStmt:       return node->BadStmt.begin;
@@ -766,29 +751,11 @@ AstNode *ast_compound_lit(AstFile *f, AstNode *type, AstNodeArray elems, Token o
 	return result;
 }
 
-
-AstNode *ast_block_expr(AstFile *f, AstNodeArray stmts, Token open, Token close) {
-	AstNode *result = make_ast_node(f, AstNode_BlockExpr);
-	result->BlockExpr.stmts = stmts;
-	result->BlockExpr.open = open;
-	result->BlockExpr.close = close;
-	return result;
-}
-
-AstNode *ast_give_expr(AstFile *f, Token token, AstNodeArray results) {
-	AstNode *result = make_ast_node(f, AstNode_GiveExpr);
-	result->GiveExpr.token = token;
-	result->GiveExpr.results = results;
-	return result;
-}
-
-AstNode *ast_if_expr(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *body, AstNode *else_expr) {
-	AstNode *result = make_ast_node(f, AstNode_IfExpr);
-	result->IfExpr.token = token;
-	result->IfExpr.init = init;
-	result->IfExpr.cond = cond;
-	result->IfExpr.body = body;
-	result->IfExpr.else_expr = else_expr;
+AstNode *ast_ternary_expr(AstFile *f, AstNode *cond, AstNode *x, AstNode *y) {
+	AstNode *result = make_ast_node(f, AstNode_TernaryExpr);
+	result->TernaryExpr.cond = cond;
+	result->TernaryExpr.x = x;
+	result->TernaryExpr.y = y;
 	return result;
 }
 
@@ -1319,13 +1286,13 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 				return;
 			}
 		} else {
-			switch (s->kind) {
-			case AstNode_GiveExpr:
-				if (f->curr_token.kind == Token_CloseBrace) {
-					return;
-				}
-				break;
-			}
+			// switch (s->kind) {
+			// case AstNode_GiveExpr:
+			// 	if (f->curr_token.kind == Token_CloseBrace) {
+			// 		return;
+			// 	}
+			// 	break;
+			// }
 		}
 		syntax_error(prev_token, "Expected `;` after %.*s, got %.*s",
 		             LIT(ast_node_strings[s->kind]), LIT(token_strings[prev_token.kind]));
@@ -1610,72 +1577,72 @@ AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
 
 
 
-AstNode *parse_block_expr(AstFile *f) {
-	AstNodeArray stmts = {0};
-	Token open, close;
-	open = expect_token(f, Token_OpenBrace);
-	f->expr_level++;
-	stmts = parse_stmt_list(f);
-	f->expr_level--;
-	close = expect_token(f, Token_CloseBrace);
-	return ast_block_expr(f, stmts, open, close);
-}
+// AstNode *parse_block_expr(AstFile *f) {
+// 	AstNodeArray stmts = {0};
+// 	Token open, close;
+// 	open = expect_token(f, Token_OpenBrace);
+// 	f->expr_level++;
+// 	stmts = parse_stmt_list(f);
+// 	f->expr_level--;
+// 	close = expect_token(f, Token_CloseBrace);
+// 	return ast_block_expr(f, stmts, open, close);
+// }
 
-AstNode *parse_if_expr(AstFile *f) {
-	if (f->curr_proc == NULL) {
-		syntax_error(f->curr_token, "You cannot use an if expression in the file scope");
-		return ast_bad_stmt(f, f->curr_token, f->curr_token);
-	}
+// AstNode *parse_if_expr(AstFile *f) {
+// 	if (f->curr_proc == NULL) {
+// 		syntax_error(f->curr_token, "You cannot use an if expression in the file scope");
+// 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
+// 	}
 
-	Token token = expect_token(f, Token_if);
-	AstNode *init = NULL;
-	AstNode *cond = NULL;
-	AstNode *body = NULL;
-	AstNode *else_expr = NULL;
+// 	Token token = expect_token(f, Token_if);
+// 	AstNode *init = NULL;
+// 	AstNode *cond = NULL;
+// 	AstNode *body = NULL;
+// 	AstNode *else_expr = NULL;
 
-	isize prev_level = f->expr_level;
-	f->expr_level = -1;
+// 	isize prev_level = f->expr_level;
+// 	f->expr_level = -1;
 
-	if (allow_token(f, Token_Semicolon)) {
-		cond = parse_expr(f, false);
-	} else {
-		init = parse_simple_stmt(f, false);
-		if (allow_token(f, Token_Semicolon)) {
-			cond = parse_expr(f, false);
-		} else {
-			cond = convert_stmt_to_expr(f, init, str_lit("boolean expression"));
-			init = NULL;
-		}
-	}
+// 	if (allow_token(f, Token_Semicolon)) {
+// 		cond = parse_expr(f, false);
+// 	} else {
+// 		init = parse_simple_stmt(f, false);
+// 		if (allow_token(f, Token_Semicolon)) {
+// 			cond = parse_expr(f, false);
+// 		} else {
+// 			cond = convert_stmt_to_expr(f, init, str_lit("boolean expression"));
+// 			init = NULL;
+// 		}
+// 	}
 
-	f->expr_level = prev_level;
+// 	f->expr_level = prev_level;
 
-	if (cond == NULL) {
-		syntax_error(f->curr_token, "Expected condition for if statement");
-	}
+// 	if (cond == NULL) {
+// 		syntax_error(f->curr_token, "Expected condition for if statement");
+// 	}
 
-	body = parse_block_expr(f);
+// 	body = parse_block_expr(f);
 
-	if (allow_token(f, Token_else)) {
-		switch (f->curr_token.kind) {
-		case Token_if:
-			else_expr = parse_if_expr(f);
-			break;
-		case Token_OpenBrace:
-			else_expr = parse_block_expr(f);
-			break;
-		default:
-			syntax_error(f->curr_token, "Expected if expression block statement");
-			else_expr = ast_bad_expr(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
-			break;
-		}
-	} else {
-		syntax_error(f->curr_token, "An if expression must have an else clause");
-		return ast_bad_stmt(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
-	}
+// 	if (allow_token(f, Token_else)) {
+// 		switch (f->curr_token.kind) {
+// 		case Token_if:
+// 			else_expr = parse_if_expr(f);
+// 			break;
+// 		case Token_OpenBrace:
+// 			else_expr = parse_block_expr(f);
+// 			break;
+// 		default:
+// 			syntax_error(f->curr_token, "Expected if expression block statement");
+// 			else_expr = ast_bad_expr(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
+// 			break;
+// 		}
+// 	} else {
+// 		syntax_error(f->curr_token, "An if expression must have an else clause");
+// 		return ast_bad_stmt(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
+// 	}
 
-	return ast_if_expr(f, token, init, cond, body, else_expr);
-}
+// 	return ast_if_expr(f, token, init, cond, body, else_expr);
+// }
 
 AstNode *parse_operand(AstFile *f, bool lhs) {
 	AstNode *operand = NULL; // Operand
@@ -1789,16 +1756,16 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		return type;
 	}
 
-	case Token_if:
-		if (!lhs && f->expr_level >= 0) {
-			return parse_if_expr(f);
-		}
-		break;
-	case Token_OpenBrace:
-		if (!lhs && f->expr_level >= 0) {
-			return parse_block_expr(f);
-		}
-		break;
+	// case Token_if:
+	// 	if (!lhs && f->expr_level >= 0) {
+	// 		return parse_if_expr(f);
+	// 	}
+	// 	break;
+	// case Token_OpenBrace:
+	// 	if (!lhs && f->expr_level >= 0) {
+	// 		return parse_block_expr(f);
+	// 	}
+	// 	break;
 
 	default: {
 		AstNode *type = parse_type_or_ident(f);
@@ -1977,6 +1944,19 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 		case Token_OpenBrace:
 			if (!lhs && is_literal_type(operand) && f->expr_level >= 0) {
 				operand = parse_literal_value(f, operand);
+			} else {
+				loop = false;
+			}
+			break;
+
+		case Token_Question:
+			if (!lhs && operand != NULL && f->expr_level >= 0) {
+				AstNode *cond = operand;
+				Token token_q = expect_token(f, Token_Question);
+				AstNode *x = parse_expr(f, false);
+				Token token_c = expect_token(f, Token_Colon);
+				AstNode *y = parse_expr(f, false);
+				operand = ast_ternary_expr(f, cond, x, y);
 			} else {
 				loop = false;
 			}
@@ -2358,7 +2338,7 @@ bool is_token_field_prefix(TokenKind kind) {
 	switch (kind) {
 	case Token_using:
 	case Token_no_alias:
-	// case Token_immutable:
+	case Token_immutable:
 		return true;
 	}
 	return false;
@@ -2374,7 +2354,7 @@ u32 parse_field_prefixes(AstFile *f) {
 		switch (f->curr_token.kind) {
 		case Token_using:     using_count     += 1; next_token(f); break;
 		case Token_no_alias:  no_alias_count  += 1; next_token(f); break;
-		// case Token_immutable: immutable_count += 1; next_token(f); break;
+		case Token_immutable: immutable_count += 1; next_token(f); break;
 		}
 	}
 	if (using_count     > 1) syntax_error(f->curr_token, "Multiple `using` in this field list");
@@ -2572,8 +2552,8 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		AstNode *count_expr = NULL;
 		bool is_vector = false;
 
-		if (f->curr_token.kind == Token_Question) {
-			count_expr = ast_unary_expr(f, expect_token(f, Token_Question), NULL);
+		if (f->curr_token.kind == Token_Ellipsis) {
+			count_expr = ast_unary_expr(f, expect_token(f, Token_Ellipsis), NULL);
 		} else if (f->curr_token.kind == Token_vector) {
 			next_token(f);
 			if (f->curr_token.kind != Token_CloseBracket) {
@@ -2584,7 +2564,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 				syntax_error(f->curr_token, "Vector type missing count");
 			}
 			is_vector = true;
-		} else if (f->curr_token.kind == Token_Ellipsis) {
+		} else if (f->curr_token.kind == Token_dynamic) {
 			next_token(f);
 			expect_token(f, Token_CloseBracket);
 			return ast_dynamic_array_type(f, token, parse_type(f));
@@ -2923,27 +2903,27 @@ AstNode *parse_return_stmt(AstFile *f) {
 }
 
 
-AstNode *parse_give_stmt(AstFile *f) {
-	if (f->curr_proc == NULL) {
-		syntax_error(f->curr_token, "You cannot use a give statement in the file scope");
-		return ast_bad_stmt(f, f->curr_token, f->curr_token);
-	}
-	if (f->expr_level == 0) {
-		syntax_error(f->curr_token, "A give statement must be used within an expression");
-		return ast_bad_stmt(f, f->curr_token, f->curr_token);
-	}
+// AstNode *parse_give_stmt(AstFile *f) {
+// 	if (f->curr_proc == NULL) {
+// 		syntax_error(f->curr_token, "You cannot use a give statement in the file scope");
+// 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
+// 	}
+// 	if (f->expr_level == 0) {
+// 		syntax_error(f->curr_token, "A give statement must be used within an expression");
+// 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
+// 	}
 
-	Token token = expect_token(f, Token_give);
-	AstNodeArray results;
-	if (f->curr_token.kind != Token_Semicolon && f->curr_token.kind != Token_CloseBrace) {
-		results = parse_rhs_expr_list(f);
-	} else {
-		results = make_ast_node_array(f);
-	}
-	AstNode *ge = ast_give_expr(f, token, results);
-	expect_semicolon(f, ge);
-	return ast_expr_stmt(f, ge);
-}
+// 	Token token = expect_token(f, Token_give);
+// 	AstNodeArray results;
+// 	if (f->curr_token.kind != Token_Semicolon && f->curr_token.kind != Token_CloseBrace) {
+// 		results = parse_rhs_expr_list(f);
+// 	} else {
+// 		results = make_ast_node_array(f);
+// 	}
+// 	AstNode *ge = ast_give_expr(f, token, results);
+// 	expect_semicolon(f, ge);
+// 	return ast_expr_stmt(f, ge);
+// }
 
 AstNode *parse_for_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
@@ -3225,7 +3205,7 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_defer:  return parse_defer_stmt(f);
 	case Token_asm:    return parse_asm_stmt(f);
 	case Token_return: return parse_return_stmt(f);
-	case Token_give:   return parse_give_stmt(f);
+	// case Token_give:   return parse_give_stmt(f);
 
 	case Token_break:
 	case Token_continue:
@@ -3272,7 +3252,7 @@ AstNode *parse_stmt(AstFile *f) {
 		return ast_bad_stmt(f, token, f->curr_token);
 	} break;
 
-#if 0
+#if 1
 	case Token_immutable: {
 		Token token = expect_token(f, Token_immutable);
 		AstNode *node = parse_stmt(f);

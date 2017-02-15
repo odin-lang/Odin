@@ -99,9 +99,12 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_raw_union,      "raw_union"),           \
 	TOKEN_KIND(Token_enum,           "enum"),                \
 	TOKEN_KIND(Token_vector,         "vector"),              \
+	TOKEN_KIND(Token_static,         "static"),              \
+	TOKEN_KIND(Token_dynamic,        "dynamic"),             \
 	TOKEN_KIND(Token_map,            "map"),                 \
 	TOKEN_KIND(Token_using,          "using"),               \
 	TOKEN_KIND(Token_no_alias,       "no_alias"),            \
+	TOKEN_KIND(Token_immutable,      "immutable"),           \
 	TOKEN_KIND(Token_cast,           "cast"),                \
 	TOKEN_KIND(Token_transmute,      "transmute"),           \
 	TOKEN_KIND(Token_down_cast,      "down_cast"),           \

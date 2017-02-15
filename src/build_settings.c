@@ -1,4 +1,6 @@
+// This stores the information for the specify architecture of this build
 typedef struct BuildContext {
+	// Constants
 	String ODIN_OS;      // target operating system
 	String ODIN_ARCH;    // target architecture
 	String ODIN_ENDIAN;  // target endian
@@ -6,8 +8,10 @@ typedef struct BuildContext {
 	String ODIN_VERSION; // compiler version
 	String ODIN_ROOT;    // Odin ROOT
 
-	i64    word_size;
-	i64    max_align;
+	// In bytes
+	i64    word_size; // Size of a pointer, must be >= 4
+	i64    max_align; // max alignment, must be >= 1 (and typically >= word_size)
+
 	String llc_flags;
 	String link_flags;
 	bool   is_dll;

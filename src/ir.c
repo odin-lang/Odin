@@ -2462,12 +2462,18 @@ irValue *ir_emit_down_cast(irProcedure *proc, irValue *value, Type *t) {
 	return ir_emit_conv(proc, head, t);
 }
 
-irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *tuple) {
-	GB_ASSERT(tuple->kind == Type_Tuple);
+irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, TokenPos pos) {
 	gbAllocator a = proc->module->allocator;
 
 	Type *src_type = ir_type(value);
 	bool is_ptr = is_type_pointer(src_type);
+
+	bool is_tuple = true;
+	Type *tuple = type;
+	if (type->kind != Type_Tuple) {
+		is_tuple = false;
+		tuple = make_optional_ok_type(a, type);
+	}
 
 	irValue *v = ir_add_local_generated(proc, tuple);
 
@@ -2540,6 +2546,25 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *tuple) {
 		ir_emit_jump(proc, end_block);
 		ir_start_block(proc, end_block);
 
+	}
+
+	if (!is_tuple) {
+		// NOTE(bill): Panic on invalid conversion
+		Type *dst_type = tuple->Tuple.variables[0]->type;
+
+		irValue *ok = ir_emit_load(proc, ir_emit_struct_ep(proc, v, 1));
+		irValue **args = gb_alloc_array(a, irValue *, 6);
+		args[0] = ok;
+
+		args[1] = ir_make_const_string(a, pos.file);
+		args[2] = ir_make_const_int(a, pos.line);
+		args[3] = ir_make_const_int(a, pos.column);
+
+		args[4] = ir_type_info(proc, src_type);
+		args[5] = ir_type_info(proc, dst_type);
+		ir_emit_global_call(proc, "__union_cast_check", args, 6);
+
+		return ir_emit_load(proc, ir_emit_struct_ep(proc, v, 0));
 	}
 	return ir_emit_load(proc, v);
 }
@@ -2826,25 +2851,40 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 		return ir_addr_load(proc, ir_build_addr(proc, expr));
 	case_end;
 
-	case_ast_node(be, BlockExpr, expr);
-		ir_emit_comment(proc, str_lit("BlockExpr"));
+	case_ast_node(te, TernaryExpr, expr);
+		ir_emit_comment(proc, str_lit("TernaryExpr"));
+
+		irValueArray edges = {0};
+		array_init_reserve(&edges, proc->module->allocator, 2);
+
+		GB_ASSERT(te->y != NULL);
+		irBlock *then  = ir_new_block(proc, NULL, "if.then");
+		irBlock *done  = ir_new_block(proc, NULL, "if.done"); // NOTE(bill): Append later
+		irBlock *else_ = ir_new_block(proc, NULL, "if.else");
+
+		irValue *cond = ir_build_cond(proc, te->cond, then, else_);
+		ir_start_block(proc, then);
+
 		ir_open_scope(proc);
-
-		AstNodeArray stmts = be->stmts;
-		stmts.count--;
-		ir_build_stmt_list(proc, stmts);
-
-		AstNode *give_stmt = be->stmts.e[be->stmts.count-1];
-		GB_ASSERT(give_stmt->kind == AstNode_ExprStmt);
-		AstNode *give_expr = give_stmt->ExprStmt.expr;
-		GB_ASSERT(give_expr->kind == AstNode_GiveExpr);
-		irValue *value = ir_build_expr(proc, give_expr);
-
+		array_add(&edges, ir_build_expr(proc, te->x));
 		ir_close_scope(proc, irDeferExit_Default, NULL);
 
-		return value;
+		ir_emit_jump(proc, done);
+		ir_start_block(proc, else_);
+
+		ir_open_scope(proc);
+		array_add(&edges, ir_build_expr(proc, te->y));
+		ir_close_scope(proc, irDeferExit_Default, NULL);
+
+		ir_emit_jump(proc, done);
+		ir_start_block(proc, done);
+
+		Type *type = type_of_expr(proc->module->info, expr);
+
+		return ir_emit(proc, ir_make_instr_phi(proc, edges, type));
 	case_end;
 
+#if 0
 	case_ast_node(ie, IfExpr, expr);
 		ir_emit_comment(proc, str_lit("IfExpr"));
 		if (ie->init != NULL) {
@@ -2883,70 +2923,27 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 
 		return ir_emit(proc, ir_make_instr_phi(proc, edges, type));
 	case_end;
-
-	case_ast_node(ge, GiveExpr, expr);
-		ir_emit_comment(proc, str_lit("GiveExpr"));
-
-		irValue *v = NULL;
-		Type *give_type = type_of_expr(proc->module->info, expr);
-		GB_ASSERT(give_type != NULL);
-		if (give_type->kind != Type_Tuple) {
-			v = ir_emit_conv(proc, ir_build_expr(proc, ge->results.e[0]), give_type);
-		} else {
-			TypeTuple *tuple = &give_type->Tuple;
-			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
-
-			irValueArray results;
-			array_init_reserve(&results, proc->module->tmp_allocator, tuple->variable_count);
-
-			for_array(res_index, ge->results) {
-				irValue *res = ir_build_expr(proc, ge->results.e[res_index]);
-				Type *t = ir_type(res);
-				if (t->kind == Type_Tuple) {
-					for (isize i = 0; i < t->Tuple.variable_count; i++) {
-						Entity *e = t->Tuple.variables[i];
-						irValue *v = ir_emit_struct_ev(proc, res, i);
-						array_add(&results, v);
-					}
-				} else {
-					array_add(&results, res);
-				}
-			}
-
-			v = ir_add_local_generated(proc, give_type);
-			for_array(i, results) {
-				Entity *e = tuple->variables[i];
-				irValue *res = ir_emit_conv(proc, results.e[i], e->type);
-				irValue *field = ir_emit_struct_ep(proc, v, i);
-				ir_emit_store(proc, field, res);
-			}
-			v = ir_emit_load(proc, v);
-
-			gb_temp_arena_memory_end(tmp);
-		}
-
-		return v;
-	case_end;
+#endif
 
 	case_ast_node(ce, CastExpr, expr);
 		Type *type = tv->type;
-		irValue *expr = ir_build_expr(proc, ce->expr);
+		irValue *e = ir_build_expr(proc, ce->expr);
 		switch (ce->token.kind) {
 		case Token_cast:
 			ir_emit_comment(proc, str_lit("cast - cast"));
-			return ir_emit_conv(proc, expr, type);
+			return ir_emit_conv(proc, e, type);
 
 		case Token_transmute:
 			ir_emit_comment(proc, str_lit("cast - transmute"));
-			return ir_emit_transmute(proc, expr, type);
+			return ir_emit_transmute(proc, e, type);
 
 		case Token_down_cast:
 			ir_emit_comment(proc, str_lit("cast - down_cast"));
-			return ir_emit_down_cast(proc, expr, type);
+			return ir_emit_down_cast(proc, e, type);
 
 		case Token_union_cast:
 			ir_emit_comment(proc, str_lit("cast - union_cast"));
-			return ir_emit_union_cast(proc, expr, type);
+			return ir_emit_union_cast(proc, e, type, ast_node_token(expr).pos);
 
 		default:
 			GB_PANIC("Unknown cast expression");
@@ -3384,7 +3381,7 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 					args[1] = ir_make_const_int(proc->module->allocator, pos.line);
 					args[2] = ir_make_const_int(proc->module->allocator, pos.column);
 					args[3] = msg;
-					ir_emit_global_call(proc, "__assert", args, 4);
+					ir_emit_global_call(proc, "__panic", args, 4);
 
 					return NULL;
 				} break;

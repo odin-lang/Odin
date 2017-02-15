@@ -265,8 +265,6 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 	}
 
 
-
-
 	if (type == NULL) {
 		return;
 	}
@@ -1030,7 +1028,7 @@ void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *typ
 		}
 		o->mode = Addressing_Variable;
 		if (e->Variable.is_immutable) {
-			o->mode = Addressing_Value;
+			o->mode = Addressing_Immutable;
 		}
 		break;
 
@@ -1073,7 +1071,7 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 	}
 	Operand o = {0};
 	if (e->kind == AstNode_UnaryExpr &&
-	    e->UnaryExpr.op.kind == Token_Question) {
+	    e->UnaryExpr.op.kind == Token_Ellipsis) {
 		return -1;
 	}
 
@@ -1115,12 +1113,13 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 	return 0;
 }
 
-Type *make_map_tuple_type(gbAllocator a, Type *value) {
+Type *make_optional_ok_type(gbAllocator a, Type *value) {
+	bool typed = true;
 	Type *t = make_type_tuple(a);
 	t->Tuple.variables = gb_alloc_array(a, Entity *, 2);
 	t->Tuple.variable_count = 2;
 	t->Tuple.variables[0] = make_entity_field(a, NULL, blank_token, value,  false, 0);
-	t->Tuple.variables[1] = make_entity_field(a, NULL, blank_token, t_bool, false, 1);
+	t->Tuple.variables[1] = make_entity_field(a, NULL, blank_token, typed ? t_bool : t_untyped_bool, false, 1);
 	return t;
 }
 
@@ -1221,7 +1220,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 		type->Map.generated_struct_type = generated_struct_type;
 	}
 
-	type->Map.lookup_result_type = make_map_tuple_type(a, value);
+	type->Map.lookup_result_type = make_optional_ok_type(a, value);
 
 	// error_node(node, "`map` types are not yet implemented");
 }
@@ -1929,82 +1928,6 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 	x->mode = Addressing_Value;
 }
 
-bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
-	if (check_is_assignable_to(c, operand, y)) {
-		return true;
-	}
-
-	Type *x = operand->type;
-	Type *src = base_type(base_enum_type(x));
-	Type *dst = base_type(base_enum_type(y));
-	if (are_types_identical(src, dst)) {
-		return true;
-	}
-
-
-	if (dst->kind == Type_Array && src->kind == Type_Array) {
-		if (are_types_identical(dst->Array.elem, src->Array.elem)) {
-			return dst->Array.count == src->Array.count;
-		}
-	}
-
-	if (dst->kind == Type_Slice && src->kind == Type_Slice) {
-		return are_types_identical(dst->Slice.elem, src->Slice.elem);
-	}
-
-	// Cast between booleans and integers
-	if (is_type_boolean(src) || is_type_integer(src)) {
-		if (is_type_boolean(dst) || is_type_integer(dst)) {
-			return true;
-		}
-	}
-
-	// Cast between numbers
-	if (is_type_integer(src) || is_type_float(src)) {
-		if (is_type_integer(dst) || is_type_float(dst)) {
-			return true;
-		}
-	}
-
-	// Cast between pointers
-	if (is_type_pointer(src) && is_type_pointer(dst)) {
-		return true;
-	}
-
-	// (u)int <-> pointer
-	if (is_type_int_or_uint(src) && is_type_rawptr(dst)) {
-		return true;
-	}
-	if (is_type_rawptr(src) && is_type_int_or_uint(dst)) {
-		return true;
-	}
-
-	// []byte/[]u8 <-> string
-	if (is_type_u8_slice(src) && is_type_string(dst)) {
-		return true;
-	}
-	if (is_type_string(src) && is_type_u8_slice(dst)) {
-		if (is_type_typed(src)) {
-			return true;
-		}
-	}
-
-	// proc <-> proc
-	if (is_type_proc(src) && is_type_proc(dst)) {
-		return true;
-	}
-
-	// proc -> rawptr
-	if (is_type_proc(src) && is_type_rawptr(dst)) {
-		return true;
-	}
-	// rawptr -> proc
-	if (is_type_rawptr(src) && is_type_proc(dst)) {
-		return true;
-	}
-
-	return false;
-}
 
 String check_down_cast_name(Type *dst_, Type *src_) {
 	String result = {0};
@@ -2074,7 +1997,96 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 }
 
 
-void check_conversion(Checker *c, Operand *x, Type *type) {
+
+bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
+	if (check_is_assignable_to(c, operand, y)) {
+		return true;
+	}
+
+	Type *x = operand->type;
+	Type *src = base_type(base_enum_type(x));
+	Type *dst = base_type(base_enum_type(y));
+	if (are_types_identical(src, dst)) {
+		return true;
+	}
+
+
+	if (dst->kind == Type_Array && src->kind == Type_Array) {
+		if (are_types_identical(dst->Array.elem, src->Array.elem)) {
+			return dst->Array.count == src->Array.count;
+		}
+	}
+
+	if (dst->kind == Type_Slice && src->kind == Type_Slice) {
+		return are_types_identical(dst->Slice.elem, src->Slice.elem);
+	}
+
+	// Cast between booleans and integers
+	if (is_type_boolean(src) || is_type_integer(src)) {
+		if (is_type_boolean(dst) || is_type_integer(dst)) {
+			return true;
+		}
+	}
+
+	// Cast between numbers
+	if (is_type_integer(src) || is_type_float(src)) {
+		if (is_type_integer(dst) || is_type_float(dst)) {
+			return true;
+		}
+	}
+
+	// Cast between pointers
+	if (is_type_pointer(src) && is_type_pointer(dst)) {
+		Type *s = base_type(type_deref(src));
+		if (is_type_union(s)) {
+			// NOTE(bill): Should the error be here?!
+			// NOTE(bill): This error should suppress the next casting error as it's at the same position
+			gbString xs = type_to_string(x);
+			gbString ys = type_to_string(y);
+			error_node(operand->expr, "Cannot cast from a union pointer `%s` to `%s`, try using `union_cast` or cast to a `rawptr`", xs, ys);
+			gb_string_free(ys);
+			gb_string_free(xs);
+			return false;
+		}
+		return true;
+	}
+
+	// (u)int <-> rawptr
+	if (is_type_int_or_uint(src) && is_type_rawptr(dst)) {
+		return true;
+	}
+	if (is_type_rawptr(src) && is_type_int_or_uint(dst)) {
+		return true;
+	}
+
+	// []byte/[]u8 <-> string
+	if (is_type_u8_slice(src) && is_type_string(dst)) {
+		return true;
+	}
+	if (is_type_string(src) && is_type_u8_slice(dst)) {
+		if (is_type_typed(src)) {
+			return true;
+		}
+	}
+
+	// proc <-> proc
+	if (is_type_proc(src) && is_type_proc(dst)) {
+		return true;
+	}
+
+	// proc -> rawptr
+	if (is_type_proc(src) && is_type_rawptr(dst)) {
+		return true;
+	}
+	// rawptr -> proc
+	if (is_type_rawptr(src) && is_type_proc(dst)) {
+		return true;
+	}
+
+	return false;
+}
+
+void check_cast(Checker *c, Operand *x, Type *type) {
 	bool is_const_expr = x->mode == Addressing_Constant;
 	bool can_convert = false;
 
@@ -2714,7 +2726,9 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		break;
 	case Entity_Variable:
 		// TODO(bill): This is the rule I need?
-		if (sel.indirect || operand->mode != Addressing_Value) {
+		if (operand->mode == Addressing_Immutable) {
+			// Okay
+		} else if (sel.indirect || operand->mode != Addressing_Value) {
 			operand->mode = Addressing_Variable;
 		} else {
 			operand->mode = Addressing_Value;
@@ -3819,17 +3833,16 @@ int valid_proc_and_score_cmp(void const *a, void const *b) {
 
 typedef Array(Operand) ArrayOperand;
 
-void check_unpack_arguments(Checker *c, isize lhs_count, ArrayOperand *operands, AstNodeArray args, bool allow_map_ok) {
-	for_array(i, args) {
+bool check_unpack_arguments(Checker *c, isize lhs_count, ArrayOperand *operands, AstNodeArray rhs, bool allow_ok) {
+	bool optional_ok = false;
+	for_array(i, rhs) {
 		Operand o = {0};
-		check_multi_expr(c, &o, args.e[i]);
+		check_multi_expr(c, &o, rhs.e[i]);
 
 		if (o.type == NULL || o.type->kind != Type_Tuple) {
-			if (o.mode == Addressing_MapIndex &&
-			    allow_map_ok &&
-			    lhs_count == 2 &&
-			    args.count == 1) {
-				Type *tuple = make_map_tuple_type(c->allocator, o.type);
+			if (allow_ok && lhs_count == 2 && rhs.count == 1 &&
+			    (o.mode == Addressing_MapIndex || o.mode == Addressing_OptionalOk)) {
+				Type *tuple = make_optional_ok_type(c->allocator, o.type);
 				add_type_and_value(&c->info, o.expr, o.mode, tuple, o.value);
 
 				Operand val = o;
@@ -3839,9 +3852,11 @@ void check_unpack_arguments(Checker *c, isize lhs_count, ArrayOperand *operands,
 				ok.type  = t_bool;
 				array_add(operands, val);
 				array_add(operands, ok);
-				continue;
+
+				optional_ok = true;
+			} else {
+				array_add(operands, o);
 			}
-			array_add(operands, o);
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
 			for (isize j = 0; j < tuple->variable_count; j++) {
@@ -3850,6 +3865,8 @@ void check_unpack_arguments(Checker *c, isize lhs_count, ArrayOperand *operands,
 			}
 		}
 	}
+
+	return optional_ok;
 }
 
 Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
@@ -3998,7 +4015,7 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		case 1:
 			check_expr(c, operand, ce->args.e[0]);
 			if (operand->mode != Addressing_Invalid) {
-				check_conversion(c, operand, t);
+				check_cast(c, operand, t);
 			}
 			break;
 		}
@@ -4097,8 +4114,19 @@ void check_expr_with_type_hint(Checker *c, Operand *o, AstNode *e, Type *t) {
 	}
 }
 
-bool check_set_index_data(Operand *o, Type *t, i64 *max_count) {
-	t = base_type(type_deref(t));
+void check_set_mode_with_indirection(Operand *o, bool indirection) {
+	if (o->mode != Addressing_Immutable) {
+		if (indirection) {
+			o->mode = Addressing_Variable;
+		} else if (o->mode != Addressing_Variable &&
+		           o->mode != Addressing_Constant) {
+			o->mode = Addressing_Value;
+		}
+	}
+}
+
+bool check_set_index_data(Operand *o, Type *type, bool indirection, i64 *max_count) {
+	Type *t = base_type(type_deref(type));
 
 	switch (t->kind) {
 	case Type_Basic:
@@ -4106,9 +4134,7 @@ bool check_set_index_data(Operand *o, Type *t, i64 *max_count) {
 			if (o->mode == Addressing_Constant) {
 				*max_count = o->value.value_string.len;
 			}
-			if (o->mode != Addressing_Variable) {
-				o->mode = Addressing_Value;
-			}
+			check_set_mode_with_indirection(o, indirection);
 			o->type = t_u8;
 			return true;
 		}
@@ -4116,66 +4142,30 @@ bool check_set_index_data(Operand *o, Type *t, i64 *max_count) {
 
 	case Type_Array:
 		*max_count = t->Array.count;
-		if (o->mode != Addressing_Variable) {
-			o->mode = Addressing_Value;
-		}
+		check_set_mode_with_indirection(o, indirection);
 		o->type = t->Array.elem;
 		return true;
 
 	case Type_Vector:
 		*max_count = t->Vector.count;
-		if (o->mode != Addressing_Variable) {
-			o->mode = Addressing_Value;
-		}
+		check_set_mode_with_indirection(o, indirection);
 		o->type = t->Vector.elem;
 		return true;
 
 
 	case Type_Slice:
 		o->type = t->Slice.elem;
-		o->mode = Addressing_Variable;
+		if (o->mode != Addressing_Immutable) {
+			o->mode = Addressing_Variable;
+		}
 		return true;
 
 	case Type_DynamicArray:
 		o->type = t->DynamicArray.elem;
-		o->mode = Addressing_Variable;
+		check_set_mode_with_indirection(o, indirection);
 		return true;
 	}
 
-	return false;
-}
-
-
-bool check_is_giving(AstNode *node, AstNode **give_expr) {
-	switch (node->kind) {
-	case_ast_node(es, ExprStmt, node);
-		if (es->expr->kind == AstNode_GiveExpr) {
-			if (give_expr) *give_expr = es->expr;
-			return true;
-		}
-	case_end;
-
-	case_ast_node(ge, GiveExpr, node);
-		if (give_expr) *give_expr = node;
-		return true;
-	case_end;
-
-	case_ast_node(be, BlockExpr, node);
-		// Iterate backwards
-		for (isize n = be->stmts.count-1; n >= 0; n--) {
-			AstNode *stmt = be->stmts.e[n];
-			if (stmt->kind == AstNode_EmptyStmt) {
-				continue;
-			}
-			if (stmt->kind == AstNode_ExprStmt && stmt->ExprStmt.expr->kind == AstNode_GiveExpr) {
-				if (give_expr) *give_expr = stmt->ExprStmt.expr;
-				return true;
-			}
-		}
-	case_end;
-	}
-
-	if (give_expr) *give_expr = NULL;
 	return false;
 }
 
@@ -4280,177 +4270,30 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		o->type = type;
 	case_end;
 
-	case_ast_node(ge, GiveExpr, node);
+	case_ast_node(te, TernaryExpr, node);
 		if (c->proc_stack.count == 0) {
-			error_node(node, "A give expression is only allowed within a procedure");
+			error_node(node, "A ternary expression is only allowed within a procedure");
 			goto error;
 		}
-
-		if (ge->results.count == 0) {
-			error_node(node, "`give` has no results");
-			goto error;
-		}
-
-		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-
-		Array(Operand) operands;
-		array_init_reserve(&operands, c->tmp_allocator, 2*ge->results.count);
-
-		for_array(i, ge->results) {
-			AstNode *rhs = ge->results.e[i];
-			Operand o = {0};
-			check_multi_expr(c, &o, rhs);
-			if (!is_operand_value(o)) {
-				error_node(rhs, "Expected a value for a `give`");
-				continue;
-			}
-			if (o.type->kind != Type_Tuple) {
-				array_add(&operands, o);
-			} else {
-				TypeTuple *tuple = &o.type->Tuple;
-				for (isize j = 0; j < tuple->variable_count; j++) {
-					o.type = tuple->variables[j]->type;
-					array_add(&operands, o);
-				}
-			}
-		}
-
-		if (operands.count == 0) {
-			error_node(node, "`give` has no value");
-			gb_temp_arena_memory_end(tmp);
-			goto error;
-		} else if (operands.count == 1) {
-			Operand operand = operands.e[0];
-			Type *th = type_hint != NULL ? type_hint : c->context.type_hint;
-			if (th != NULL) {
-				convert_to_typed(c, &operand, th, 0);
-			}
-			// IMPORTANT NOTE(bill): This type could be untyped!!!
-			o->type = default_type(operand.type);
-			o->mode = Addressing_Value;
-		} else {
-			Type *tuple = make_type_tuple(c->allocator);
-
-			Entity **variables = gb_alloc_array(c->allocator, Entity *, operands.count);
-			isize variable_index = 0;
-			for_array(i, operands) {
-				Operand operand = operands.e[i];
-				// Type *type = default_type(operand.type);
-				Type *type = operand.type;
-				switch (operand.mode) {
-				case Addressing_Constant:
-					variables[variable_index++] = make_entity_constant(c->allocator, NULL, empty_token, type, operand.value);
-					break;
-				default:
-					variables[variable_index++] = make_entity_param(c->allocator, NULL, empty_token, type, false, true);
-					break;
-				}
-			}
-			tuple->Tuple.variables = variables;
-			tuple->Tuple.variable_count = operands.count;
-
-			o->type = tuple;
-			o->mode = Addressing_Value;
-		}
-		gb_temp_arena_memory_end(tmp);
-	case_end;
-
-	case_ast_node(be, BlockExpr, node);
-		if (c->proc_stack.count == 0) {
-			error_node(node, "A block expression is only allowed within a procedure");
-			goto error;
-		}
-
-		for (isize i = be->stmts.count-1; i >= 0; i--) {
-			if (be->stmts.e[i]->kind != AstNode_EmptyStmt) {
-				break;
-			}
-			be->stmts.count--;
-		}
-
-		if (be->stmts.count == 0) {
-			error_node(node, "Empty block expression");
-			goto error;
-		}
-
-		CheckerContext prev_context = c->context;
-		c->context.type_hint = type_hint;
-		check_open_scope(c, node);
-		check_stmt_list(c, be->stmts, Stmt_GiveAllowed);
-		check_close_scope(c);
-
-		c->context = prev_context;
-
-		AstNode *give_node = NULL;
-		if (!check_is_giving(node, &give_node) || give_node == NULL) {
-			error_node(node, "Missing give statement at end of block expression");
-			goto error;
-		}
-
-		GB_ASSERT(give_node != NULL && give_node->kind == AstNode_GiveExpr);
-		be->give_node = give_node;
-
-		Type *type = type_of_expr(&c->info, give_node);
-		if (type == NULL) {
-			goto error;
-		} else if (type == t_invalid) {
-			o->type = t_invalid;
-			o->mode = Addressing_Invalid;
-		} else {
-			o->type = type;
-			o->mode = Addressing_Value;
-		}
-	case_end;
-
-	case_ast_node(ie, IfExpr, node);
-		if (c->proc_stack.count == 0) {
-			error_node(node, "An if expression is only allowed within a procedure");
-			goto error;
-		}
-
-		check_open_scope(c, node);
-
-		if (ie->init != NULL) {
-			check_stmt(c, ie->init, 0);
-		}
-
 		Operand operand = {Addressing_Invalid};
-		check_expr(c, &operand, ie->cond);
+		check_expr(c, &operand, te->cond);
 		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-			error_node(ie->cond, "Non-boolean condition in if expression");
+			error_node(te->cond, "Non-boolean condition in if expression");
 		}
 
 		Operand x = {Addressing_Invalid};
 		Operand y = {Addressing_Invalid};
-		Type *if_type = NULL;
-		Type *else_type = NULL;
-		if (type_hint) {
-			gb_printf_err("here\n");
-		}
-		check_expr_with_type_hint(c, &x, ie->body, type_hint);
-		if_type = x.type;
+		check_expr_with_type_hint(c, &x, te->x, type_hint);
 
-		if (ie->else_expr != NULL) {
-			switch (ie->else_expr->kind) {
-			case AstNode_IfExpr:
-			case AstNode_BlockExpr:
-				check_expr_with_type_hint(c, &y, ie->else_expr, if_type);
-				else_type = y.type;
-				break;
-			default:
-				error_node(ie->else_expr, "Invalid else expression in if expression");
-				break;
-			}
+		if (te->y != NULL) {
+			check_expr_with_type_hint(c, &y, te->y, type_hint);
 		} else {
-			error_node(ie->else_expr, "An if expression must have an else expression");
-			check_close_scope(c);
+			error_node(node, "A ternary expression must have an else clause");
 			goto error;
 		}
 
-		check_close_scope(c);
-
-		if (if_type == NULL || if_type == t_invalid ||
-		    else_type == NULL || else_type == t_invalid) {
+		if (x.type == NULL || x.type == t_invalid ||
+		    y.type == NULL || y.type == t_invalid) {
 			goto error;
 		}
 
@@ -4465,16 +4308,16 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		}
 
 
-		if (!are_types_identical(if_type, else_type)) {
-			gbString its = type_to_string(if_type);
-			gbString ets = type_to_string(else_type);
-			error_node(node, "Mismatched types in if expression, %s vs %s", its, ets);
+		if (!are_types_identical(x.type, y.type)) {
+			gbString its = type_to_string(x.type);
+			gbString ets = type_to_string(y.type);
+			error_node(node, "Mismatched types in ternary expression, %s vs %s", its, ets);
 			gb_string_free(ets);
 			gb_string_free(its);
 			goto error;
 		}
 
-		o->type = if_type;
+		o->type = x.type;
 		o->mode = Addressing_Value;
 	case_end;
 
@@ -4489,7 +4332,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			if (cl->type->kind == AstNode_ArrayType && cl->type->ArrayType.count != NULL) {
 				AstNode *count = cl->type->ArrayType.count;
 				if (count->kind == AstNode_UnaryExpr &&
-				    count->UnaryExpr.op.kind == Token_Question) {
+				    count->UnaryExpr.op.kind == Token_Ellipsis) {
 					type = make_type_array(c->allocator, check_type(c, cl->type->ArrayType.elem), -1);
 					is_to_be_determined_array_count = true;
 				}
@@ -4820,7 +4663,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		}
 		switch (ce->token.kind) {
 		case Token_cast:
-			check_conversion(c, o, t);
+			check_cast(c, o, t);
 			break;
 		case Token_transmute: {
 			if (o->mode == Addressing_Constant) {
@@ -4913,16 +4756,11 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 				goto error;
 			}
 
-			Entity **variables = gb_alloc_array(c->allocator, Entity *, 2);
-			variables[0] = make_entity_param(c->allocator, NULL, empty_token, t, false, true);
-			variables[1] = make_entity_param(c->allocator, NULL, empty_token, t_bool, false, true);
+			add_type_info_type(c, o->type);
+			add_type_info_type(c, t);
 
-			Type *tuple = make_type_tuple(c->allocator);
-			tuple->Tuple.variables = variables;
-			tuple->Tuple.variable_count = 2;
-
-			o->type = tuple;
-			o->mode = Addressing_Value;
+			o->type = t;
+			o->mode = Addressing_OptionalOk;
 		} break;
 		case Token_down_cast: {
 			if (o->mode == Addressing_Constant) {
@@ -5023,6 +4861,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		}
 
 		Type *t = base_type(type_deref(o->type));
+		bool is_ptr = is_type_pointer(o->type);
 		bool is_const = o->mode == Addressing_Constant;
 
 		if (is_type_map(t)) {
@@ -5039,7 +4878,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		}
 
 		i64 max_count = -1;
-		bool valid = check_set_index_data(o, t, &max_count);
+		bool valid = check_set_index_data(o, t, is_ptr, &max_count);
 
 		if (is_const) {
 			valid = false;
@@ -5048,7 +4887,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		if (!valid && (is_type_struct(t) || is_type_raw_union(t))) {
 			Entity *found = find_using_index_expr(t);
 			if (found != NULL) {
-				valid = check_set_index_data(o, found->type, &max_count);
+				valid = check_set_index_data(o, found->type, is_type_pointer(found->type), &max_count);
 			}
 		}
 
@@ -5125,7 +4964,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			goto error;
 		}
 
-		o->mode = Addressing_Value;
+		if (o->mode != Addressing_Immutable) {
+			o->mode = Addressing_Value;
+		}
 
 		i64 indices[2] = {0};
 		AstNode *nodes[2] = {se->low, se->high};
@@ -5173,7 +5014,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		} else {
 			Type *t = base_type(o->type);
 			if (t->kind == Type_Pointer) {
-				o->mode = Addressing_Variable;
+				if (o->mode != Addressing_Immutable) {
+					o->mode = Addressing_Variable;
+				}
 				o->type = t->Pointer.elem;
  			} else {
  				gbString str = expr_to_string(o->expr);
@@ -5354,12 +5197,6 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, "}");
 	case_end;
 
-	case_ast_node(be, BlockExpr, node);
-		str = gb_string_appendc(str, "block expression");
-	case_end;
-	case_ast_node(ie, IfExpr, node);
-		str = gb_string_appendc(str, "if expression");
-	case_end;
 
 	case_ast_node(te, TagExpr, node);
 		str = gb_string_appendc(str, "#");

@@ -6,6 +6,9 @@
 	#define MAP_NAME MapString
 	#include "map.c"
 */
+// A `Map` is an unordered hash table which can allow for a key to point to multiple values
+// with the use of the `multi_*` procedures.
+// TODO(bill): I should probably allow the `multi_*` stuff to be #ifdefed out
 
 #ifndef MAP_UTIL_STUFF
 #define MAP_UTIL_STUFF

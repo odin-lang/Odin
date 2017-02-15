@@ -116,7 +116,11 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		case ti == type_info(int):  buffer_write_string(buf, "int");
 		case ti == type_info(uint): buffer_write_string(buf, "uint");
 		default:
-			buffer_write_string(buf, if info.signed { give "i" } else { give "u"});
+			if info.signed {
+				buffer_write_string(buf, "i");
+			} else {
+				buffer_write_string(buf, "u");
+			}
 			fi := Fmt_Info{buf = buf};
 			fmt_int(^fi, cast(u64)(8*info.size), false, 'd');
 		}
@@ -140,7 +144,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		if info.params == nil {
 			buffer_write_string(buf, "()");
 		} else {
-			t := cast(^Tuple)info.params;
+			t := union_cast(^Tuple)info.params;
 			buffer_write_string(buf, "(");
 			for type, i in t.types {
 				if i > 0 { buffer_write_string(buf, ", "); }
@@ -155,10 +159,9 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 	case Tuple:
 		count := info.names.count;
 		if count != 1 { buffer_write_string(buf, "("); }
-		for i in 0..<count {
+		for name, i in info.names {
 			if i > 0 { buffer_write_string(buf, ", "); }
 
-			name := info.names[i];
 			type := info.types[i];
 
 			if name.count > 0 {
@@ -393,7 +396,11 @@ fmt_bad_verb :: proc(using fi: ^Fmt_Info, verb: rune) {
 fmt_bool :: proc(using fi: ^Fmt_Info, b: bool, verb: rune) {
 	match verb {
 	case 't', 'v':
-		buffer_write_string(buf, if b { give "true" } else { give "false" });
+		if b {
+			buffer_write_string(buf, "true");
+		} else {
+			buffer_write_string(buf, "false");
+		}
 	default:
 		fmt_bad_verb(fi, verb);
 	}
@@ -790,10 +797,10 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		buffer_write_string(fi.buf, "map[");
 		defer buffer_write_byte(fi.buf, ']');
 		entries := ^(cast(^Raw_Dynamic_Map)v.data).entries;
-		gs, gs_ok := union_cast(^Struct)type_info_base(info.generated_struct); assert(gs_ok);
-		ed, ed_ok := union_cast(^Dynamic_Array)type_info_base(gs.types[1]);    assert(ed_ok);
+		gs := union_cast(^Struct)type_info_base(info.generated_struct);
+		ed := union_cast(^Dynamic_Array)type_info_base(gs.types[1]);
 
-		entry_type, et_ok := union_cast(^Struct)ed.elem; assert(et_ok);
+		entry_type := union_cast(^Struct)ed.elem;
 		entry_size := ed.elem_size;
 		for i in 0..<entries.count {
 			if i > 0 {
