@@ -82,7 +82,7 @@ open_simple :: proc(path: string, mode: int) -> (Handle, Errno) {
 }
 // NOTE(zangent): This is here for compatability reasons. Should this be here?
 open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
-	return open(path, mode);
+	return open_simple(path, mode);
 }
 
 close :: proc(fd: Handle) {
