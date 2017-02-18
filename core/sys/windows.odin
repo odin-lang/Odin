@@ -396,8 +396,8 @@ PIXELFORMATDESCRIPTOR :: struct #ordered {
 	damage_mask: u32,
 }
 
-GetDC             :: proc(h: HANDLE) -> HDC #foreign user32;
-SetPixelFormat    :: proc(hdc: HDC, pixel_format: i32, pfd: ^PIXELFORMATDESCRIPTOR ) -> BOOL #foreign gdi32;
+GetDC             :: proc(h: HWND) -> HDC #foreign user32;
+SetPixelFormat    :: proc(hdc: HDC, pixel_format: i32, pfd: ^PIXELFORMATDESCRIPTOR) -> BOOL #foreign gdi32;
 ChoosePixelFormat :: proc(hdc: HDC, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 #foreign gdi32;
 SwapBuffers       :: proc(hdc: HDC) -> BOOL #foreign gdi32;
 ReleaseDC         :: proc(wnd: HWND, hdc: HDC) -> i32 #foreign user32;
@@ -412,6 +412,7 @@ wglCreateContext  :: proc(hdc: HDC) -> HGLRC              #foreign opengl32;
 wglMakeCurrent    :: proc(hdc: HDC, hglrc: HGLRC) -> BOOL #foreign opengl32;
 wglGetProcAddress :: proc(c_str: ^u8) -> PROC             #foreign opengl32;
 wglDeleteContext  :: proc(hglrc: HGLRC) -> BOOL           #foreign opengl32;
+wglChoosePixelFormatARB :: proc(hdc: HDC, attribi_list: ^i32, attribf_list: ^f32, max_formats: u32, formats: ^i32, num_formats: u32) -> BOOL #foreign opengl32;
 
 
 

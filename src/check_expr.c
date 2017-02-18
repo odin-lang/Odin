@@ -183,10 +183,7 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 
 	// TODO(bill): Should I allow this implicit conversion at all?!
 	// rawptr <- ^T
-	if (is_type_rawptr(dst) && is_type_pointer(src)) {
-		if (dst != type) {
-			return -1;
-		}
+	if (are_types_identical(type, t_rawptr) && is_type_pointer(src)) {
 	    return 5;
 	}
 #endif

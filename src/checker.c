@@ -1242,6 +1242,9 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
 			switch (kind) {
 			case ProcOverload_Identical:
+				error(p->token, "Overloaded procedure `%.*s` as the same type as another procedure in this scope", LIT(name));
+				is_invalid = true;
+				break;
 			case ProcOverload_CallingConvention:
 				error(p->token, "Overloaded procedure `%.*s` as the same type as another procedure in this scope", LIT(name));
 				is_invalid = true;
