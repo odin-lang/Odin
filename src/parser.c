@@ -1949,19 +1949,6 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			}
 			break;
 
-		case Token_Question:
-			if (!lhs && operand != NULL && f->expr_level >= 0) {
-				AstNode *cond = operand;
-				Token token_q = expect_token(f, Token_Question);
-				AstNode *x = parse_expr(f, false);
-				Token token_c = expect_token(f, Token_Colon);
-				AstNode *y = parse_expr(f, false);
-				operand = ast_ternary_expr(f, cond, x, y);
-			} else {
-				loop = false;
-			}
-			break;
-
 		default:
 			loop = false;
 			break;
@@ -2016,22 +2003,24 @@ AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 // NOTE(bill): result == priority
 i32 token_precedence(TokenKind t) {
 	switch (t) {
-	case Token_CmpOr:
+	case Token_Question:
 		return 1;
-	case Token_CmpAnd:
+	case Token_CmpOr:
 		return 2;
+	case Token_CmpAnd:
+		return 3;
 	case Token_CmpEq:
 	case Token_NotEq:
 	case Token_Lt:
 	case Token_Gt:
 	case Token_LtEq:
 	case Token_GtEq:
-		return 3;
+		return 4;
 	case Token_Add:
 	case Token_Sub:
 	case Token_Or:
 	case Token_Xor:
-		return 4;
+		return 5;
 	case Token_Mul:
 	case Token_Quo:
 	case Token_Mod:
@@ -2039,51 +2028,42 @@ i32 token_precedence(TokenKind t) {
 	case Token_AndNot:
 	case Token_Shl:
 	case Token_Shr:
-		return 5;
-	// case Token_as:
-	// case Token_transmute:
-	// case Token_down_cast:
-	// case Token_union_cast:
-		// return 6;
+		return 6;
 	}
 	return 0;
 }
 
 AstNode *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
-	AstNode *expression = parse_unary_expr(f, lhs);
+	AstNode *expr = parse_unary_expr(f, lhs);
 	for (i32 prec = token_precedence(f->curr_token.kind); prec >= prec_in; prec--) {
 		for (;;) {
-			AstNode *right;
 			Token op = f->curr_token;
 			i32 op_prec = token_precedence(op.kind);
 			if (op_prec != prec) {
+				// NOTE(bill): This will also catch operators that are not valid "binary" operators
 				break;
 			}
 			expect_operator(f); // NOTE(bill): error checks too
-			if (lhs) {
-				// TODO(bill): error checking
-				lhs = false;
-			}
 
-			switch (op.kind) {
-			/* case Token_as:
-			case Token_transmute:
-			case Token_down_cast:
-			case Token_union_cast:
-				right = parse_type(f);
-				break; */
-
-			default:
-				right = parse_binary_expr(f, false, prec+1);
+			if (op.kind == Token_Question) {
+				AstNode *cond = expr;
+				// Token_Question
+				AstNode *x = parse_expr(f, lhs);
+				Token token_c = expect_token(f, Token_Colon);
+				AstNode *y = parse_expr(f, lhs);
+				expr = ast_ternary_expr(f, cond, x, y);
+			} else {
+				AstNode *right = parse_binary_expr(f, false, prec+1);
 				if (!right) {
-					syntax_error(op, "Expected expression on the right hand side of the binary operator");
+					syntax_error(op, "Expected expression on the right-hand side of the binary operator");
 				}
-				break;
+				expr = ast_binary_expr(f, op, expr, right);
 			}
-			expression = ast_binary_expr(f, op, expression, right);
+
+			lhs = false;
 		}
 	}
-	return expression;
+	return expr;
 }
 
 AstNode *parse_expr(AstFile *f, bool lhs) {
@@ -3458,8 +3438,18 @@ AstNode *parse_stmt(AstFile *f) {
 			return s;
 		}
 
-		expect_semicolon(f, s);
-		return ast_tag_stmt(f, hash_token, name, parse_stmt(f));
+
+		if (str_eq(tag, str_lit("include"))) {
+			syntax_error(token, "#include is not a valid import declaration kind. Use #load instead");
+			s = ast_bad_stmt(f, token, f->curr_token);
+		} else {
+			syntax_error(token, "Unknown tag used: `%.*s`", LIT(tag));
+			s = ast_bad_stmt(f, token, f->curr_token);
+		}
+
+		fix_advance_to_next_stmt(f);
+
+		return s;
 	} break;
 
 	case Token_OpenBrace:

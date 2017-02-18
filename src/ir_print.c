@@ -1254,6 +1254,29 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_fprintf(f, ")\n");
 	} break;
 
+	case irInstr_DebugDeclare: {
+		/* irInstrDebugDeclare *dd = &instr->DebugDeclare;
+		Type *vt = ir_type(dd->value);
+		irDebugInfo *di = dd->debug_info;
+		Entity *e = dd->entity;
+		String name = e->token.string;
+		TokenPos pos = e->token.pos;
+		// gb_printf("debug_declare %.*s\n", LIT(dd->entity->token.string));
+		ir_fprintf(f, "call void @llvm.dbg.declare(");
+		ir_fprintf(f, "metadata ");
+		ir_print_type(f, m, vt);
+		ir_fprintf(f, " ");
+		ir_print_value(f, m, dd->value, vt);
+		ir_fprintf(f, ", metadata !DILocalVariable(name: \"");
+		ir_print_escape_string(f, name, false);
+		ir_fprintf(f, "\", scope: !%d, line: %td)", di->id, pos.line);
+		ir_fprintf(f, ", metadata !DIExpression()");
+		ir_fprintf(f, ")");
+		ir_fprintf(f, ", !dbg !DILocation(line: %td, column: %td, scope: !%d)", pos.line, pos.column, di->id);
+
+		ir_fprintf(f, "\n"); */
+	} break;
+
 
 	default: {
 		GB_PANIC("<unknown instr> %d\n", instr->kind);
@@ -1326,11 +1349,14 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	}
 
 
-	if (proc->module->generate_debug_info && proc->entity != NULL) {
+	if (proc->entity != NULL) {
 		if (proc->body != NULL) {
-			irDebugInfo *di = *map_ir_debug_info_get(&proc->module->debug_info, hash_pointer(proc->entity));
-			GB_ASSERT(di->kind == irDebugInfo_Proc);
-			ir_fprintf(f, "!dbg !%d ", di->id);
+			irDebugInfo **di_ = map_ir_debug_info_get(&proc->module->debug_info, hash_pointer(proc->entity));
+			if (di_ != NULL) {
+				irDebugInfo *di = *di_;
+				GB_ASSERT(di->kind == irDebugInfo_Proc);
+				// ir_fprintf(f, "!dbg !%d ", di->id);
+			}
 		}
 	}
 
@@ -1395,6 +1421,8 @@ void print_llvm_ir(irGen *ir) {
 	ir_fprintf(f, ", ");
 	ir_print_type(f, m, t_rawptr);
 	ir_fprintf(f, "} ; Basic_any\n");
+
+	ir_fprintf(f, "declare void @llvm.dbg.declare(metadata, metadata, metadata) nounwind readnone \n");
 
 
 	for_array(member_index, m->members.entries) {
@@ -1482,9 +1510,18 @@ void print_llvm_ir(irGen *ir) {
 
 
 #if 0
-	if (m->generate_debug_info) {
+	// if (m->generate_debug_info) {
+	{
 		ir_fprintf(f, "\n");
+
+		i32 diec = m->debug_info.entries.count;
+
 		ir_fprintf(f, "!llvm.dbg.cu = !{!0}\n");
+		ir_fprintf(f, "!llvm.ident = !{!%d}\n", diec+3);
+		ir_fprintf(f, "!%d = !{i32 2, !\"Dwarf Version\", i32 4}\n", diec+0);
+		ir_fprintf(f, "!%d = !{i32 2, !\"Debug Info Version\", i32 3}\n", diec+1);
+		ir_fprintf(f, "!%d = !{i32 1, !\"PIC Level\", i32 2}\n", diec+2);
+		ir_fprintf(f, "!%d = !{!\"clang version 3.9.0 (branches/release_39)\"}\n", diec+3);
 
 		for_array(di_index, m->debug_info.entries) {
 			MapIrDebugInfoEntry *entry = &m->debug_info.entries.e[di_index];
@@ -1493,19 +1530,18 @@ void print_llvm_ir(irGen *ir) {
 
 			switch (di->kind) {
 			case irDebugInfo_CompileUnit: {
-				auto *cu = &di->CompileUnit;
-				irDebugInfo *file = *map_ir_debug_info_get(&m->debug_info, hash_pointer(cu->file));
+				irDebugInfo *file = *map_ir_debug_info_get(&m->debug_info, hash_pointer(di->CompileUnit.file));
 				ir_fprintf(f,
 				            "distinct !DICompileUnit("
 				            "language: DW_LANG_Go, " // Is this good enough?
 				            "file: !%d, "
-				            "producer: \"%.*s\", "
+				            "producer: \"clang version 3.9.0 (branches/release_39)\", "
 				            "flags: \"\", "
 				            "runtimeVersion: 0, "
 				            "isOptimized: false, "
 				            "emissionKind: FullDebug"
 				            ")",
-				            file->id, LIT(cu->producer));
+				            file->id);
 
 			} break;
 			case irDebugInfo_File:

@@ -116,11 +116,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		case ti == type_info(int):  buffer_write_string(buf, "int");
 		case ti == type_info(uint): buffer_write_string(buf, "uint");
 		default:
-			if info.signed {
-				buffer_write_string(buf, "i");
-			} else {
-				buffer_write_string(buf, "u");
-			}
+			buffer_write_string(buf, info.signed ? "i" : "u");
 			fi := Fmt_Info{buf = buf};
 			fmt_int(^fi, cast(u64)(8*info.size), false, 'd');
 		}
@@ -396,11 +392,7 @@ fmt_bad_verb :: proc(using fi: ^Fmt_Info, verb: rune) {
 fmt_bool :: proc(using fi: ^Fmt_Info, b: bool, verb: rune) {
 	match verb {
 	case 't', 'v':
-		if b {
-			buffer_write_string(buf, "true");
-		} else {
-			buffer_write_string(buf, "false");
-		}
+		buffer_write_string(buf, b ? "true" : "false");
 	default:
 		fmt_bad_verb(fi, verb);
 	}

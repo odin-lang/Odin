@@ -2,6 +2,7 @@
 extern "C" {
 #endif
 
+
 #include "common.c"
 #include "timings.c"
 #include "build_settings.c"
@@ -216,10 +217,10 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	ssa_generate(&checker.info, &build_context);
-#endif
-#if 1
-
+	if (!ssa_generate(&checker.info)) {
+		return 1;
+	}
+#else
 	irGen ir_gen = {0};
 	if (!ir_gen_init(&ir_gen, &checker)) {
 		return 1;

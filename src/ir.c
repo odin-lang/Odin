@@ -15,13 +15,14 @@ typedef Array(irValue *) irValueArray;
 #define MAP_NAME MapIrDebugInfo
 #include "map.c"
 
+
 typedef struct irModule {
 	CheckerInfo * info;
 	gbArena       arena;
 	gbArena       tmp_arena;
 	gbAllocator   allocator;
 	gbAllocator   tmp_allocator;
-	bool generate_debug_info;
+	// bool generate_debug_info;
 
 	u32 stmt_state_flags;
 
@@ -29,20 +30,20 @@ typedef struct irModule {
 	String layout;
 	// String triple;
 
-	MapEntity       min_dep_map; // Key: Entity *
-	MapIrValue      values;      // Key: Entity *
-	MapIrValue      members;     // Key: String
-	MapString       type_names;  // Key: Type *
-	MapIrDebugInfo  debug_info;  // Key: Unique pointer
-	i32             global_string_index;
-	i32             global_array_index; // For ConstantSlice
+	MapEntity             min_dep_map; // Key: Entity *
+	MapIrValue            values;      // Key: Entity *
+	MapIrValue            members;     // Key: String
+	MapString             type_names;  // Key: Type *
+	MapIrDebugInfo        debug_info;  // Key: Unique pointer
+	i32                   global_string_index;
+	i32                   global_array_index; // For ConstantSlice
 
-	Entity *        entry_point_entity;
+	Entity *              entry_point_entity;
 
-	Array(irProcedure *) procs;             // NOTE(bill): All procedures with bodies
-	irValueArray         procs_to_generate; // NOTE(bill): Procedures to generate
+	Array(irProcedure *)  procs;             // NOTE(bill): All procedures with bodies
+	irValueArray          procs_to_generate; // NOTE(bill): Procedures to generate
 
-	Array(String) foreign_library_paths; // Only the ones that were used
+	Array(String)         foreign_library_paths; // Only the ones that were used
 } irModule;
 
 // NOTE(bill): For more info, see https://en.wikipedia.org/wiki/Dominator_(graph_theory)
@@ -121,6 +122,7 @@ struct irProcedure {
 	irTargetList *       target_list;
 	irValueArray         referrers;
 
+
 	i32                  local_count;
 	i32                  instr_count;
 	i32                  block_count;
@@ -134,90 +136,99 @@ struct irProcedure {
 
 
 #define IR_INSTR_KINDS \
-	IR_INSTR_KIND(Comment, struct { String text; }) \
-	IR_INSTR_KIND(Local,   struct { \
-		Entity *      entity; \
-		Type *        type; \
-		bool          zero_initialized; \
-		irValueArray referrers; \
-	}) \
-	IR_INSTR_KIND(ZeroInit, struct { irValue *address; }) \
-	IR_INSTR_KIND(Store,    struct { irValue *address, *value; }) \
+	IR_INSTR_KIND(Comment, struct { String text; })                   \
+	IR_INSTR_KIND(Local,   struct {                                   \
+		Entity *      entity;                                         \
+		Type *        type;                                           \
+		bool          zero_initialized;                               \
+		irValueArray referrers;                                       \
+	})                                                                \
+	IR_INSTR_KIND(ZeroInit, struct { irValue *address; })             \
+	IR_INSTR_KIND(Store,    struct { irValue *address, *value; })     \
 	IR_INSTR_KIND(Load,     struct { Type *type; irValue *address; }) \
-	IR_INSTR_KIND(PtrOffset, struct { \
-		irValue *address; \
-		irValue *offset; \
+	IR_INSTR_KIND(PtrOffset, struct {                                 \
+		irValue *address;                                             \
+		irValue *offset;                                              \
+	})                                                                \
+	IR_INSTR_KIND(ArrayElementPtr, struct {                           \
+		irValue *address;                                             \
+		Type *   result_type;                                         \
+		irValue *elem_index;                                          \
+	})                                                                \
+	IR_INSTR_KIND(StructElementPtr, struct {                          \
+		irValue *address;                                             \
+		Type *    result_type;                                        \
+		i32       elem_index;                                         \
+	})                                                                \
+	IR_INSTR_KIND(StructExtractValue, struct {                        \
+		irValue *address;                                             \
+		Type *    result_type;                                        \
+		i32       index;                                              \
+	})                                                                \
+	IR_INSTR_KIND(UnionTagPtr, struct {                               \
+		irValue *address;                                             \
+		Type     *type; /* ^int */                                    \
+	})                                                                \
+	IR_INSTR_KIND(UnionTagValue, struct {                             \
+		irValue *address;                                             \
+		Type     *type; /* int */                                     \
+	})                                                                \
+	IR_INSTR_KIND(Conv, struct {                                      \
+		irConvKind kind;                                              \
+		irValue *value;                                               \
+		Type *from, *to;                                              \
+	})                                                                \
+	IR_INSTR_KIND(Jump, struct { irBlock *block; })                   \
+	IR_INSTR_KIND(If, struct {                                        \
+		irValue *cond;                                                \
+		irBlock *true_block;                                          \
+		irBlock *false_block;                                         \
+	})                                                                \
+	IR_INSTR_KIND(Return, struct { irValue *value; })                 \
+	IR_INSTR_KIND(Select, struct {                                    \
+		irValue *cond;                                                \
+		irValue *true_value;                                          \
+		irValue *false_value;                                         \
+	})                                                                \
+	IR_INSTR_KIND(Phi, struct { irValueArray edges; Type *type; })    \
+	IR_INSTR_KIND(Unreachable, i32)                                   \
+	IR_INSTR_KIND(UnaryOp, struct {                                   \
+		Type *    type;                                               \
+		TokenKind op;                                                 \
+		irValue * expr;                                               \
+	})                                                                \
+	IR_INSTR_KIND(BinaryOp, struct {                                  \
+		Type *    type;                                               \
+		TokenKind op;                                                 \
+		irValue * left, *right;                                       \
+	})                                                                \
+	IR_INSTR_KIND(Call, struct {                                      \
+		Type *    type; /* return type */                             \
+		irValue * value;                                              \
+		irValue **args;                                               \
+		isize     arg_count;                                          \
+	})                                                                \
+	IR_INSTR_KIND(StartupRuntime, i32)                                \
+	IR_INSTR_KIND(BoundsCheck, struct {                               \
+		TokenPos pos;                                                 \
+		irValue *index;                                               \
+		irValue *len;                                                 \
+	})                                                                \
+	IR_INSTR_KIND(SliceBoundsCheck, struct {                          \
+		TokenPos pos;                                                 \
+		irValue *low;                                                 \
+		irValue *high;                                                \
+		bool     is_substring;                                        \
+	})                                                                \
+	IR_INSTR_KIND(DebugDeclare, struct { \
+		irDebugInfo *debug_info; \
+		AstNode *    expr; \
+		Entity *     entity; \
+		bool         is_addr; \
+		irValue *    value; \
 	}) \
-	IR_INSTR_KIND(ArrayElementPtr, struct { \
-		irValue *address; \
-		Type *   result_type; \
-		irValue *elem_index; \
-	}) \
-	IR_INSTR_KIND(StructElementPtr, struct {  \
-		irValue *address; \
-		Type *    result_type; \
-		i32       elem_index; \
-	}) \
-	IR_INSTR_KIND(StructExtractValue, struct { \
-		irValue *address; \
-		Type *    result_type; \
-		i32       index; \
-	}) \
-	IR_INSTR_KIND(UnionTagPtr, struct { \
-		irValue *address; \
-		Type     *type; /* ^int */  \
-	}) \
-	IR_INSTR_KIND(UnionTagValue, struct { \
-		irValue *address; \
-		Type     *type; /* int */ \
-	}) \
-	IR_INSTR_KIND(Conv, struct { \
-		irConvKind kind; \
-		irValue *value; \
-		Type *from, *to; \
-	}) \
-	IR_INSTR_KIND(Jump, struct { irBlock *block; }) \
-	IR_INSTR_KIND(If, struct { \
-		irValue *cond; \
-		irBlock *true_block; \
-		irBlock *false_block; \
-	}) \
-	IR_INSTR_KIND(Return, struct { irValue *value; }) \
-	IR_INSTR_KIND(Select, struct { \
-		irValue *cond; \
-		irValue *true_value; \
-		irValue *false_value; \
-	}) \
-	IR_INSTR_KIND(Phi, struct { irValueArray edges; Type *type; }) \
-	IR_INSTR_KIND(Unreachable, i32) \
-	IR_INSTR_KIND(UnaryOp, struct { \
-		Type *    type; \
-		TokenKind op; \
-		irValue *expr; \
-	}) \
-	IR_INSTR_KIND(BinaryOp, struct { \
-		Type *    type; \
-		TokenKind op; \
-		irValue *left, *right; \
-	}) \
-	IR_INSTR_KIND(Call, struct { \
-		Type *    type; /* return type */  \
-		irValue *value; \
-		irValue **args; \
-		isize      arg_count; \
-	}) \
-	IR_INSTR_KIND(StartupRuntime, i32) \
-	IR_INSTR_KIND(BoundsCheck, struct { \
-		TokenPos  pos; \
-		irValue *index; \
-		irValue *len; \
-	}) \
-	IR_INSTR_KIND(SliceBoundsCheck, struct { \
-		TokenPos  pos; \
-		irValue *low; \
-		irValue *high; \
-		bool      is_substring; \
-	})
+
+
 
 #define IR_CONV_KINDS \
 	IR_CONV_KIND(trunc) \
@@ -394,7 +405,6 @@ irAddr ir_make_addr_map(irValue *addr, irValue *map_key, Type *map_type, Type *m
 	return v;
 }
 
-
 typedef enum irDebugEncoding {
 	irDebugBasicEncoding_Invalid       = 0,
 
@@ -519,11 +529,16 @@ struct irDebugInfo {
 	};
 };
 
+
+
 typedef struct irGen {
 	irModule module;
-	gbFile    output_file;
-	bool       opt_called;
+	gbFile   output_file;
+	bool     opt_called;
 } irGen;
+
+
+
 
 
 
@@ -948,6 +963,16 @@ irValue *ir_make_instr_slice_bounds_check(irProcedure *p, TokenPos pos, irValue 
 	v->Instr.SliceBoundsCheck.is_substring = is_substring;
 	return v;
 }
+irValue *ir_make_instr_debug_declare(irProcedure *p, irDebugInfo *debug_info, AstNode *expr, Entity *entity, bool is_addr, irValue *value) {
+	irValue *v = ir_alloc_instr(p, irInstr_DebugDeclare);
+	v->Instr.DebugDeclare.debug_info = debug_info;
+	v->Instr.DebugDeclare.expr       = expr;
+	v->Instr.DebugDeclare.entity     = entity;
+	v->Instr.DebugDeclare.is_addr    = is_addr;
+	v->Instr.DebugDeclare.value      = value;
+	return v;
+
+}
 
 
 
@@ -966,6 +991,23 @@ irValue *ir_make_value_constant_slice(gbAllocator a, Type *type, irValue *backin
 	v->ConstantSlice.count = count;
 	return v;
 }
+
+
+
+irValue *ir_emit(irProcedure *proc, irValue *instr) {
+	GB_ASSERT(instr->kind == irValue_Instr);
+	irBlock *b = proc->curr_block;
+	instr->Instr.parent = b;
+	if (b != NULL) {
+		irInstr *i = ir_get_last_instr(b);
+		if (!ir_is_instr_terminating(i)) {
+			array_add(&b->instrs, instr);
+		}
+	}
+	return instr;
+}
+
+
 
 irValue *ir_make_const_int(gbAllocator a, i64 i) {
 	return ir_make_value_constant(a, t_int, make_exact_value_integer(i));
@@ -1166,7 +1208,7 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 
 
 
-irValue *ir_add_local(irProcedure *proc, Entity *e) {
+irValue *ir_add_local(irProcedure *proc, Entity *e, AstNode *expr) {
 	irBlock *b = proc->decl_block; // all variables must be in the first block
 	irValue *instr = ir_make_instr_local(proc, e, true);
 	instr->Instr.parent = b;
@@ -1178,6 +1220,11 @@ irValue *ir_add_local(irProcedure *proc, Entity *e) {
 		ir_emit_zero_init(proc, instr);
 	// }
 
+	if (expr != NULL) {
+		irDebugInfo *di = *map_ir_debug_info_get(&proc->module->debug_info, hash_pointer(proc->entity));
+		ir_emit(proc, ir_make_instr_debug_declare(proc, di, expr, e, true, instr));
+	}
+
 	return instr;
 }
 
@@ -1186,7 +1233,7 @@ irValue *ir_add_local_for_identifier(irProcedure *proc, AstNode *name, bool zero
 	if (found) {
 		Entity *e = *found;
 		ir_emit_comment(proc, e->token.string);
-		return ir_add_local(proc, e);
+		return ir_add_local(proc, e, name);
 	}
 	return NULL;
 }
@@ -1202,14 +1249,14 @@ irValue *ir_add_local_generated(irProcedure *proc, Type *type) {
 	                                 scope,
 	                                 empty_token,
 	                                 type, false);
-	return ir_add_local(proc, e);
+	return ir_add_local(proc, e, NULL);
 }
 
 
-irValue *ir_add_param(irProcedure *proc, Entity *e) {
+irValue *ir_add_param(irProcedure *proc, Entity *e, AstNode *expr) {
 	irValue *v = ir_make_value_param(proc->module->allocator, proc, e);
 #if 1
-	irValue *l = ir_add_local(proc, e);
+	irValue *l = ir_add_local(proc, e, expr);
 	ir_emit_store(proc, l, v);
 
 #else
@@ -1227,9 +1274,9 @@ irValue *ir_add_param(irProcedure *proc, Entity *e) {
 ////////////////////////////////////////////////////////////////
 
 irDebugInfo *ir_add_debug_info_file(irProcedure *proc, AstFile *file) {
-	if (!proc->module->generate_debug_info) {
-		return NULL;
-	}
+	// if (!proc->module->generate_debug_info) {
+	// 	return NULL;
+	// }
 
 	GB_ASSERT(file != NULL);
 	irDebugInfo *di = ir_alloc_debug_info(proc->module->allocator, irDebugInfo_File);
@@ -1259,9 +1306,9 @@ irDebugInfo *ir_add_debug_info_file(irProcedure *proc, AstFile *file) {
 
 
 irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String name, irDebugInfo *file) {
-	if (!proc->module->generate_debug_info) {
-		return NULL;
-	}
+	// if (!proc->module->generate_debug_info) {
+	// 	return NULL;
+	// }
 
 	GB_ASSERT(entity != NULL);
 	irDebugInfo *di = ir_alloc_debug_info(proc->module->allocator, irDebugInfo_Proc);
@@ -1281,18 +1328,7 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 ////////////////////////////////////////////////////////////////
 
 
-irValue *ir_emit(irProcedure *proc, irValue *instr) {
-	GB_ASSERT(instr->kind == irValue_Instr);
-	irBlock *b = proc->curr_block;
-	instr->Instr.parent = b;
-	if (b != NULL) {
-		irInstr *i = ir_get_last_instr(b);
-		if (!ir_is_instr_terminating(i)) {
-			array_add(&b->instrs, instr);
-		}
-	}
-	return instr;
-}
+
 irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value) {
 #if 1
 	// NOTE(bill): Sanity check
@@ -5357,7 +5393,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 				irValue *tag_var = NULL;
 				if (tag_var_entity != NULL) {
-					tag_var = ir_add_local(proc, tag_var_entity);
+					tag_var = ir_add_local(proc, tag_var_entity, NULL);
 				} else {
 					tag_var = ir_add_local_generated(proc, tag_var_type);
 				}
@@ -5385,7 +5421,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 				irValue *tag_var = NULL;
 				if (tag_var_entity != NULL) {
-					tag_var = ir_add_local(proc, tag_var_entity);
+					tag_var = ir_add_local(proc, tag_var_entity, NULL);
 				} else {
 					tag_var = ir_add_local_generated(proc, tag_var_type);
 				}
@@ -5558,12 +5594,24 @@ void ir_begin_procedure_body(irProcedure *proc) {
 	ir_start_block(proc, proc->entry_block);
 
 	if (proc->type->Proc.params != NULL) {
+		ast_node(pt, ProcType, proc->type_expr);
+		isize param_index = 0;
+		isize q_index = 0;
+
 		TypeTuple *params = &proc->type->Proc.params->Tuple;
 		for (isize i = 0; i < params->variable_count; i++) {
+			GB_ASSERT(pt->params.e[0]->kind == AstNode_Field);
+			if (q_index == pt->params.e[param_index]->Field.names.count) {
+				q_index = 0;
+				param_index++;
+			}
+			ast_node(field, Field, pt->params.e[param_index]);
+			AstNode *name = field->names.e[q_index++];
+
 			Entity *e = params->variables[i];
 			if (!str_eq(e->token.string, str_lit("")) &&
 			    !str_eq(e->token.string, str_lit("_"))) {
-				irValue *param = ir_add_param(proc, e);
+				irValue *param = ir_add_param(proc, e, name);
 				array_add(&proc->params, param);
 			}
 		}
@@ -5790,7 +5838,7 @@ bool ir_gen_init(irGen *s, Checker *c) {
 	}
 
 	ir_init_module(&s->module, c);
-	s->module.generate_debug_info = false;
+	// s->module.generate_debug_info = false;
 
 	// TODO(bill): generate appropriate output name
 	int pos = cast(int)string_extension_position(c->parser->init_fullpath);
@@ -6025,7 +6073,9 @@ void ir_gen_tree(irGen *s) {
 				name = pd->link_name;
 			}
 
-			irValue *p = ir_make_value_procedure(a, m, e, e->type, decl->type_expr, body, name);
+			AstNode *type_expr = decl->proc_lit->ProcLit.type;
+
+			irValue *p = ir_make_value_procedure(a, m, e, e->type, type_expr, body, name);
 			p->Proc.tags = pd->tags;
 
 			ir_module_add_value(m, e, p);
@@ -6067,7 +6117,6 @@ void ir_gen_tree(irGen *s) {
 	for_array(i, m->debug_info.entries) {
 		MapIrDebugInfoEntry *entry = &m->debug_info.entries.e[i];
 		irDebugInfo *di = entry->value;
-		di->id = i;
 		if (di->kind == irDebugInfo_Proc) {
 			array_add(&all_procs->AllProcs.procs, di);
 		}
@@ -6617,6 +6666,13 @@ void ir_gen_tree(irGen *s) {
 
 	for_array(i, m->procs_to_generate) {
 		ir_build_proc(m->procs_to_generate.e[i], m->procs_to_generate.e[i]->Proc.parent);
+	}
+
+	// Number debug info
+	for_array(i, m->debug_info.entries) {
+		MapIrDebugInfoEntry *entry = &m->debug_info.entries.e[i];
+		irDebugInfo *di = entry->value;
+		di->id = i;
 	}
 
 

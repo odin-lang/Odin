@@ -5,12 +5,10 @@
 #import "mem.odin";
 #import "opengl.odin";
 #import "os.odin";
-#import "utf8.odin";
+#import "halloc.odin";
 
 
 main :: proc() {
-	x: f32 = false ? 123 : 55;
-	fmt.println("Ternary:", x);
 /*
 /*
 	Version 0.1.1
@@ -29,6 +27,7 @@ main :: proc() {
 	 * immutable variables are "completely immutable" - rules need a full explanation
 	 * `slice_to_bytes` - convert any slice to a slice of bytes
 	 * `union_cast` allows for optional ok check
+	 * ?: ternary operator
 
 	Removed:
 	 * Maybe/option types
