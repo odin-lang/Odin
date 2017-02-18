@@ -293,7 +293,7 @@ sprintf :: proc(buf: []byte, fmt: string, args: ...any) -> string {
 
 
 
-parse_int :: proc(s: string, offset: int) -> (int, int, bool) {
+parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: bool) {
 	is_digit :: proc(r: rune) -> bool #inline {
 		return '0' <= r && r <= '9';
 	}
@@ -316,7 +316,12 @@ parse_int :: proc(s: string, offset: int) -> (int, int, bool) {
 	return result, offset+i, i != 0;
 }
 
-_arg_number :: proc(fi: ^Fmt_Info, arg_index: int, format: string, offset: int, arg_count: int) -> (int, int, bool) {
+_arg_number :: proc(fi: ^Fmt_Info,
+                    arg_index: int,
+                    format: string,
+                    offset: int,
+                    arg_count: int,
+                    ) -> (index: int, offset: int, ok: bool) {
 	parse_arg_number :: proc(format: string) -> (int, int, bool) {
 		if format.count < 3 {
 			return 0, 1, false;

@@ -798,7 +798,13 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 }
 
 
-Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_variadic_) {
+Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_variadic_) {
+	if (_params == NULL) {
+		return NULL;
+	}
+	ast_node(field_list, FieldList, _params);
+	AstNodeArray params = field_list->list;
+
 	if (params.count == 0) {
 		return NULL;
 	}
@@ -808,7 +814,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_v
 		AstNode *field = params.e[i];
 		if (ast_node_expect(field, AstNode_Field)) {
 			ast_node(f, Field, field);
-			variable_count += f->names.count;
+			variable_count += max(f->names.count, 1);
 		}
 	}
 
@@ -877,26 +883,73 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_v
 	return tuple;
 }
 
-Type *check_get_results(Checker *c, Scope *scope, AstNodeArray results) {
+Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
+	if (_results == NULL) {
+		return NULL;
+	}
+	ast_node(field_list, FieldList, _results);
+	AstNodeArray results = field_list->list;
+
 	if (results.count == 0) {
 		return NULL;
 	}
 	Type *tuple = make_type_tuple(c->allocator);
 
-	Entity **variables = gb_alloc_array(c->allocator, Entity *, results.count);
+	isize variable_count = 0;
+	for_array(i, results) {
+		AstNode *field = results.e[i];
+		if (ast_node_expect(field, AstNode_Field)) {
+			ast_node(f, Field, field);
+			variable_count += max(f->names.count, 1);
+		}
+	}
+
+	Entity **variables = gb_alloc_array(c->allocator, Entity *, variable_count);
 	isize variable_index = 0;
 	for_array(i, results) {
-		AstNode *item = results.e[i];
-		Type *type = check_type(c, item);
-		Token token = ast_node_token(item);
-		token.string = str_lit(""); // NOTE(bill): results are not named
-		// TODO(bill): Should I have named results?
-		Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
-		// NOTE(bill): No need to record
-		variables[variable_index++] = param;
+		ast_node(field, Field, results.e[i]);
+		Type *type = check_type(c, field->type);
+		if (field->names.count == 0) {
+			Token token = ast_node_token(field->type);
+			token.string = str_lit("");
+			Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
+			variables[variable_index++] = param;
+		} else {
+			for_array(j, field->names) {
+				Token token = ast_node_token(field->type);
+				token.string = str_lit("");
+
+				AstNode *name = field->names.e[j];
+				if (name->kind != AstNode_Ident) {
+					error_node(name, "Expected an identifer for as the field name");
+				} else {
+					token = name->Ident;
+				}
+
+				Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
+				variables[variable_index++] = param;
+			}
+		}
 	}
+
+	for (isize i = 0; i < variable_index; i++) {
+		String x = variables[i]->token.string;
+		if (x.len == 0 || str_eq(x, str_lit("_"))) {
+			continue;
+		}
+		for (isize j = i+1; j < variable_index; j++) {
+			String y = variables[j]->token.string;
+			if (y.len == 0 || str_eq(y, str_lit("_"))) {
+				continue;
+			}
+			if (str_eq(x, y)) {
+				error(variables[j]->token, "Duplicate return value name `%.*s`", LIT(y));
+			}
+		}
+	}
+
 	tuple->Tuple.variables = variables;
-	tuple->Tuple.variable_count = results.count;
+	tuple->Tuple.variable_count = variable_index;
 
 	return tuple;
 }
@@ -5126,16 +5179,6 @@ void check_expr_or_type(Checker *c, Operand *o, AstNode *e) {
 
 gbString write_expr_to_string(gbString str, AstNode *node);
 
-gbString write_params_to_string(gbString str, AstNodeArray params, char *sep) {
-	for_array(i, params) {
-		if (i > 0) {
-			str = gb_string_appendc(str, sep);
-		}
-		str = write_expr_to_string(str, params.e[i]);
-	}
-	return str;
-}
-
 gbString write_record_fields_to_string(gbString str, AstNodeArray params) {
 	for_array(i, params) {
 		if (i > 0) {
@@ -5301,6 +5344,13 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		if (f->flags&FieldFlag_using) {
 			str = gb_string_appendc(str, "using ");
 		}
+		if (f->flags&FieldFlag_immutable) {
+			str = gb_string_appendc(str, "immutable ");
+		}
+		if (f->flags&FieldFlag_no_alias) {
+			str = gb_string_appendc(str, "no_alias ");
+		}
+
 		for_array(i, f->names) {
 			AstNode *name = f->names.e[i];
 			if (i > 0) {
@@ -5308,12 +5358,22 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 			}
 			str = write_expr_to_string(str, name);
 		}
-
-		str = gb_string_appendc(str, ": ");
+		if (f->names.count > 0) {
+			str = gb_string_appendc(str, ": ");
+		}
 		if (f->flags&FieldFlag_ellipsis) {
 			str = gb_string_appendc(str, "...");
 		}
 		str = write_expr_to_string(str, f->type);
+	case_end;
+
+	case_ast_node(f, FieldList, node);
+		for_array(i, f->list) {
+			if (i > 0) {
+				str = gb_string_appendc(str, ", ");
+			}
+			str = write_expr_to_string(str, f->list.e[i]);
+		}
 	case_end;
 
 	case_ast_node(ce, CallExpr, node);
@@ -5332,7 +5392,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(pt, ProcType, node);
 		str = gb_string_appendc(str, "proc(");
-		str = write_params_to_string(str, pt->params, ", ");
+		str = write_expr_to_string(str, pt->params);
 		str = gb_string_appendc(str, ")");
 	case_end;
 
@@ -5366,7 +5426,12 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 			str = gb_string_appendc(str, " ");
 		}
 		str = gb_string_appendc(str, "{");
-		str = write_params_to_string(str, et->fields, ", ");
+		for_array(i, et->fields) {
+			if (i > 0) {
+				str = gb_string_appendc(str, ", ");
+			}
+			str = write_expr_to_string(str, et->fields.e[i]);
+		}
 		str = gb_string_appendc(str, "}");
 	case_end;
 

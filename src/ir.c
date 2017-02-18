@@ -5600,12 +5600,14 @@ void ir_begin_procedure_body(irProcedure *proc) {
 
 		TypeTuple *params = &proc->type->Proc.params->Tuple;
 		for (isize i = 0; i < params->variable_count; i++) {
-			GB_ASSERT(pt->params.e[0]->kind == AstNode_Field);
-			if (q_index == pt->params.e[param_index]->Field.names.count) {
+			ast_node(fl, FieldList, pt->params);
+			GB_ASSERT(fl->list.count > 0);
+			GB_ASSERT(fl->list.e[0]->kind == AstNode_Field);
+			if (q_index == fl->list.e[param_index]->Field.names.count) {
 				q_index = 0;
 				param_index++;
 			}
-			ast_node(field, Field, pt->params.e[param_index]);
+			ast_node(field, Field, fl->list.e[param_index]);
 			AstNode *name = field->names.e[q_index++];
 
 			Entity *e = params->variables[i];
