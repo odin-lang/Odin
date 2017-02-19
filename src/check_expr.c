@@ -2564,15 +2564,16 @@ bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *val
 	return true;
 }
 
-isize procedure_overload_count(Scope *s, String name) {
-	isize overload_count = 0;
+isize entity_overload_count(Scope *s, String name) {
 	Entity *e = scope_lookup_entity(s, name);
-	if (e->kind == Entity_Procedure) {
-		HashKey key = hash_string(e->token.string);
-		// NOTE(bill): Overloads are only allowed with the same scope
-		overload_count = map_entity_multi_count(&s->elements, key);
+	if (e == NULL) {
+		return 0;
 	}
-	return overload_count;
+	if (e->kind == Entity_Procedure) {
+		// NOTE(bill): Overloads are only allowed with the same scope
+		return map_entity_multi_count(&s->elements, hash_string(e->token.string));
+	}
+	return 1;
 }
 
 Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_hint) {
@@ -2596,8 +2597,8 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	}
 
 	if (op_expr->kind == AstNode_Ident) {
-		String name = op_expr->Ident.string;
-		Entity *e = scope_lookup_entity(c->context.scope, name);
+		String op_name = op_expr->Ident.string;
+		Entity *e = scope_lookup_entity(c->context.scope, op_name);
 
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
@@ -2606,29 +2607,30 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			// IMPORTANT NOTE(bill): This is very sloppy code but it's also very fragile
 			// It pretty much needs to be in this order and this way
 			// If you can clean this up, please do but be really careful
-
+			String import_name = op_name;
 			Scope *import_scope = e->ImportName.scope;
-
-			String sel_name = selector->Ident.string;
+			String entity_name = selector->Ident.string;
 
 			check_op_expr = false;
-			entity = scope_lookup_entity(import_scope, sel_name);
+			entity = scope_lookup_entity(import_scope, entity_name);
 			bool is_declared = entity != NULL;
 			if (is_declared) {
 				if (entity->kind == Entity_Builtin) {
+					// NOTE(bill): Builtin's are in the universe scope which is part of every scopes hierarchy
+					// This means that we should just ignore the found result through it
 					is_declared = false;
 				} else if (entity->scope->is_global && !import_scope->is_global) {
 					is_declared = false;
 				}
 			}
 			if (!is_declared) {
-				error_node(op_expr, "`%.*s` is not declared by `%.*s`", LIT(sel_name), LIT(name));
+				error_node(op_expr, "`%.*s` is not declared by `%.*s`", LIT(entity_name), LIT(import_name));
 				goto error;
 			}
 			check_entity_decl(c, entity, NULL, NULL);
 			GB_ASSERT(entity->type != NULL);
 
-			isize overload_count = procedure_overload_count(import_scope, entity->token.string);
+			isize overload_count = entity_overload_count(import_scope, entity_name);
 			bool is_overloaded = overload_count > 1;
 
 			bool implicit_is_found = map_bool_get(&e->ImportName.scope->implicit, hash_pointer(entity)) != NULL;
@@ -2641,18 +2643,17 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 			if (is_not_exported) {
 				gbString sel_str = expr_to_string(selector);
-				error_node(op_expr, "`%s` is not exported by `%.*s`", sel_str, LIT(name));
+				error_node(op_expr, "`%s` is not exported by `%.*s`", sel_str, LIT(import_name));
 				gb_string_free(sel_str);
 				goto error;
 			}
 
 			if (is_overloaded) {
-				HashKey key = hash_string(entity->token.string);
-				Scope *s = import_scope;
+				HashKey key = hash_string(entity_name);
 				bool skip = false;
 
 				Entity **procs = gb_alloc_array(heap_allocator(), Entity *, overload_count);
-				map_entity_multi_get_all(&s->elements, key, procs);
+				map_entity_multi_get_all(&import_scope->elements, key, procs);
 				for (isize i = 0; i < overload_count; i++) {
 					Type *t = base_type(procs[i]->type);
 					if (t == t_invalid) {
@@ -2660,7 +2661,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 					}
 
 					// NOTE(bill): Check to see if it's imported
-					if (map_bool_get(&e->ImportName.scope->implicit, hash_pointer(procs[i]))) {
+					if (map_bool_get(&import_scope->implicit, hash_pointer(procs[i]))) {
 						gb_swap(Entity *, procs[i], procs[overload_count-1]);
 						overload_count--;
 						i--; // NOTE(bill): Counteract the post event
@@ -4464,10 +4465,23 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 						String name = fv->field->Ident.string;
 
 						Selection sel = lookup_field(c->allocator, type, name, o->mode == Addressing_Type);
-						if (sel.entity == NULL) {
+						bool is_unknown = sel.entity == NULL;
+						if (is_unknown) {
 							error_node(elem, "Unknown field `%.*s` in structure literal", LIT(name));
 							continue;
 						}
+						if (!is_unknown) {
+							Entity *f = sel.entity;
+							Scope *file_scope = f->scope;
+							while (!file_scope->is_file) {
+								file_scope = file_scope->parent;
+							}
+							if (!is_entity_exported(f) && file_scope != c->context.file_scope) {
+								error_node(elem, "Cannot assign to an unexported field `%.*s` in structure literal", LIT(name));
+								continue;
+							}
+						}
+
 
 						if (sel.index.count > 1) {
 							error_node(elem, "Cannot assign to an anonymous field `%.*s` in a structure literal (at the moment)", LIT(name));
@@ -4508,6 +4522,18 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 						if (index >= field_count) {
 							error_node(o->expr, "Too many values in structure literal, expected %td", field_count);
 							break;
+						}
+
+						Scope *file_scope = field->scope;
+						while (!file_scope->is_file) {
+							file_scope = file_scope->parent;
+						}
+						if (!is_entity_exported(field) && file_scope != c->context.file_scope) {
+							gbString t = type_to_string(type);
+							error_node(o->expr, "Implicit assignment to an unexported field `%.*s` in `%s` literal",
+							           LIT(field->token.string), t);
+							gb_string_free(t);
+							continue;
 						}
 
 						if (base_type(field->type) == t_any) {

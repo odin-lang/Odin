@@ -113,6 +113,7 @@ bool is_entity_kind_exported(EntityKind kind) {
 }
 
 bool is_entity_exported(Entity *e) {
+	// TODO(bill): Determine the actual exportation rules for imports of entities
 	GB_ASSERT(e != NULL);
 	if (!is_entity_kind_exported(e->kind)) {
 		return false;

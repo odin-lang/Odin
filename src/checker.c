@@ -261,6 +261,7 @@ typedef struct DelayedDecl {
 } DelayedDecl;
 
 typedef struct CheckerContext {
+	Scope *    file_scope;
 	Scope *    scope;
 	DeclInfo * decl;
 	u32        stmt_state_flags;
@@ -1018,6 +1019,7 @@ void add_curr_ast_file(Checker *c, AstFile *file) {
 		c->curr_ast_file = file;
 		c->context.decl  = file->decl_info;
 		c->context.scope = file->scope;
+		c->context.file_scope = file->scope;
 	}
 }
 

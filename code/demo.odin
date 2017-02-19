@@ -8,13 +8,6 @@
 #import "halloc.odin";
 
 main :: proc() {
-
-	m: map[int]int;
-	m[123] = 312;
-	fmt.println(m[123]);
-	delete(m, 123);
-	fmt.println(m[123]);
-
 /*
 /*
 	Version 0.1.1
