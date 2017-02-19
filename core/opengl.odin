@@ -1,5 +1,6 @@
 #foreign_system_library lib "opengl32.lib" when ODIN_OS == "windows";
 #import win32 "sys/windows.odin" when ODIN_OS == "windows";
+#import "sys/wgl.odin" when ODIN_OS == "windows";
 #load "opengl_constants.odin";
 
 Clear         :: proc(mask: u32)                                #foreign lib "glClear";
@@ -35,7 +36,7 @@ _libgl := win32.LoadLibraryA(string_data("opengl32.dll\x00"));
 
 GetProcAddress :: proc(name: string) -> proc() #cc_c {
 	assert(name[name.count-1] == 0);
-	res := win32.wglGetProcAddress(name.data);
+	res := wgl.GetProcAddress(name.data);
 	if res == nil {
 		res = win32.GetProcAddress(_libgl, name.data);
 	}

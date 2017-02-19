@@ -13,7 +13,7 @@ main :: proc() {
 	Version 0.1.1
 
 	Added:
-	 * Dynamic Arrays [dynamic]Type`
+	 * Dynamic Arrays `[dynamic]Type`
 	 * Dynamic Maps   `map[Key]Value`
 	 * Dynamic array and map literals
 	 * Custom struct alignemnt `struct #align 8 { bar: i8 }`

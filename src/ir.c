@@ -1102,13 +1102,6 @@ void ir_add_block_to_proc(irProcedure *proc, irBlock *b) {
 	b->index = proc->block_count++;
 }
 
-
-// irBlock *ir_add_block(irProcedure *proc, AstNode *node, char *label) {
-// 	irBlock *block = ir_new_block(proc, node, label);
-// 	ir_add_block_to_proc(proc, block);
-// 	return block;
-// }
-
 void ir_start_block(irProcedure *proc, irBlock *block) {
 	proc->curr_block = block;
 	if (block != NULL) {

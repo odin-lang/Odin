@@ -2564,6 +2564,17 @@ bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *val
 	return true;
 }
 
+isize procedure_overload_count(Scope *s, String name) {
+	isize overload_count = 0;
+	Entity *e = scope_lookup_entity(s, name);
+	if (e->kind == Entity_Procedure) {
+		HashKey key = hash_string(e->token.string);
+		// NOTE(bill): Overloads are only allowed with the same scope
+		overload_count = map_entity_multi_count(&s->elements, key);
+	}
+	return overload_count;
+}
+
 Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_hint) {
 	ast_node(se, SelectorExpr, node);
 
@@ -2596,15 +2607,17 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			// It pretty much needs to be in this order and this way
 			// If you can clean this up, please do but be really careful
 
+			Scope *import_scope = e->ImportName.scope;
+
 			String sel_name = selector->Ident.string;
 
 			check_op_expr = false;
-			entity = scope_lookup_entity(e->ImportName.scope, sel_name);
+			entity = scope_lookup_entity(import_scope, sel_name);
 			bool is_declared = entity != NULL;
 			if (is_declared) {
 				if (entity->kind == Entity_Builtin) {
 					is_declared = false;
-				} else if (entity->scope->is_global && !e->ImportName.scope->is_global) {
+				} else if (entity->scope->is_global && !import_scope->is_global) {
 					is_declared = false;
 				}
 			}
@@ -2615,18 +2628,8 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			check_entity_decl(c, entity, NULL, NULL);
 			GB_ASSERT(entity->type != NULL);
 
-			bool is_overloaded = false;
-			isize overload_count = 0;
-			HashKey key = {0};
-			if (entity->kind == Entity_Procedure) {
-				key = hash_string(entity->token.string);
-				// NOTE(bill): Overloads are only allowed with the same scope
-				Scope *s = entity->scope;
-				overload_count = map_entity_multi_count(&s->elements, key);
-				if (overload_count > 1) {
-					is_overloaded = true;
-				}
-			}
+			isize overload_count = procedure_overload_count(import_scope, entity->token.string);
+			bool is_overloaded = overload_count > 1;
 
 			bool implicit_is_found = map_bool_get(&e->ImportName.scope->implicit, hash_pointer(entity)) != NULL;
 			bool is_not_exported = !is_entity_exported(entity);
@@ -2645,12 +2648,13 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			}
 
 			if (is_overloaded) {
-				Scope *s = entity->scope;
+				HashKey key = hash_string(entity->token.string);
+				Scope *s = import_scope;
 				bool skip = false;
 
 				Entity **procs = gb_alloc_array(heap_allocator(), Entity *, overload_count);
 				map_entity_multi_get_all(&s->elements, key, procs);
-				for (isize i = 0; i < overload_count; /**/) {
+				for (isize i = 0; i < overload_count; i++) {
 					Type *t = base_type(procs[i]->type);
 					if (t == t_invalid) {
 						continue;
@@ -2660,6 +2664,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 					if (map_bool_get(&e->ImportName.scope->implicit, hash_pointer(procs[i]))) {
 						gb_swap(Entity *, procs[i], procs[overload_count-1]);
 						overload_count--;
+						i--; // NOTE(bill): Counteract the post event
 						continue;
 					}
 
@@ -2673,8 +2678,6 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 							break;
 						}
 					}
-
-					i++;
 				}
 
 				if (overload_count > 0 && !skip) {

@@ -2,7 +2,6 @@
 #foreign_system_library "user32.lib"   when ODIN_OS == "windows";
 #foreign_system_library "gdi32.lib"    when ODIN_OS == "windows";
 #foreign_system_library "winmm.lib"    when ODIN_OS == "windows";
-#foreign_system_library "opengl32.lib" when ODIN_OS == "windows";
 
 HANDLE    :: rawptr;
 HWND      :: HANDLE;
@@ -167,6 +166,9 @@ DefWindowProcA :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> 
 
 AdjustWindowRect :: proc(rect: ^RECT, style: u32, menu: BOOL) -> BOOL #foreign user32;
 GetActiveWindow  :: proc() -> HWND #foreign user32;
+
+DestroyWindow       :: proc(wnd: HWND) -> BOOL #foreign user32;
+DescribePixelFormat :: proc(dc: HDC, pixel_format: i32, bytes : u32, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 #foreign user32;
 
 
 GetQueryPerformanceFrequency :: proc() -> i64 {
@@ -360,10 +362,6 @@ PFD_DEPTH_DONTCARE        :: 0x20000000;
 PFD_DOUBLEBUFFER_DONTCARE :: 0x40000000;
 PFD_STEREO_DONTCARE       :: 0x80000000;
 
-HGLRC :: HANDLE;
-PROC  :: #type proc() #cc_c;
-wglCreateContextAttribsARBType :: #type proc(hdc: HDC, hshareContext: rawptr, attribList: ^i32) -> HGLRC;
-
 
 PIXELFORMATDESCRIPTOR :: struct #ordered {
 	size,
@@ -402,18 +400,8 @@ ChoosePixelFormat :: proc(hdc: HDC, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 #foreign
 SwapBuffers       :: proc(hdc: HDC) -> BOOL #foreign gdi32;
 ReleaseDC         :: proc(wnd: HWND, hdc: HDC) -> i32 #foreign user32;
 
-WGL_CONTEXT_MAJOR_VERSION_ARB             :: 0x2091;
-WGL_CONTEXT_MINOR_VERSION_ARB             :: 0x2092;
-WGL_CONTEXT_PROFILE_MASK_ARB              :: 0x9126;
-WGL_CONTEXT_CORE_PROFILE_BIT_ARB          :: 0x0001;
-WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB :: 0x0002;
 
-wglCreateContext  :: proc(hdc: HDC) -> HGLRC              #foreign opengl32;
-wglMakeCurrent    :: proc(hdc: HDC, hglrc: HGLRC) -> BOOL #foreign opengl32;
-wglGetProcAddress :: proc(c_str: ^u8) -> PROC             #foreign opengl32;
-wglDeleteContext  :: proc(hglrc: HGLRC) -> BOOL           #foreign opengl32;
-wglChoosePixelFormatARB :: proc(hdc: HDC, attribi_list: ^i32, attribf_list: ^f32, max_formats: u32, formats: ^i32, num_formats: u32) -> BOOL #foreign opengl32;
-
+PROC  :: #type proc() #cc_c;
 
 
 GetKeyState      :: proc(v_key: i32) -> i16 #foreign user32;
