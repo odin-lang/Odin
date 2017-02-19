@@ -11,8 +11,6 @@ Buffer :: struct {
 	length: int,
 }
 
-
-
 buffer_write :: proc(buf: ^Buffer, b: []byte) {
 	if buf.length < buf.data.count {
 		n := min(buf.data.count-buf.length, b.count);

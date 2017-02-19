@@ -2576,6 +2576,27 @@ isize entity_overload_count(Scope *s, String name) {
 	return 1;
 }
 
+bool check_is_field_exported(Checker *c, Entity *field) {
+	if (field == NULL) {
+		// NOTE(bill): Just incase
+		return true;
+	}
+	if (field->kind != Entity_Variable) {
+		return true;
+	}
+	Scope *file_scope = field->scope;
+	if (file_scope == NULL) {
+		return true;
+	}
+	while (!file_scope->is_file) {
+		file_scope = file_scope->parent;
+	}
+	if (!is_entity_exported(field) && file_scope != c->context.file_scope) {
+		return false;
+	}
+	return true;
+}
+
 Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_hint) {
 	ast_node(se, SelectorExpr, node);
 
@@ -2701,7 +2722,13 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 
 	if (entity == NULL && selector->kind == AstNode_Ident) {
-		sel = lookup_field(c->allocator, operand->type, selector->Ident.string, operand->mode == Addressing_Type);
+		String field_name = selector->Ident.string;
+		sel = lookup_field(c->allocator, operand->type, field_name, operand->mode == Addressing_Type);
+
+		if (operand->mode != Addressing_Type && !check_is_field_exported(c, sel.entity)) {
+			error_node(op_expr, "`%.*s` is an unexported field", LIT(field_name));
+			goto error;
+		}
 		entity = sel.entity;
 
 		// NOTE(bill): Add type info needed for fields like `names`
@@ -4470,16 +4497,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 							error_node(elem, "Unknown field `%.*s` in structure literal", LIT(name));
 							continue;
 						}
-						if (!is_unknown) {
-							Entity *f = sel.entity;
-							Scope *file_scope = f->scope;
-							while (!file_scope->is_file) {
-								file_scope = file_scope->parent;
-							}
-							if (!is_entity_exported(f) && file_scope != c->context.file_scope) {
-								error_node(elem, "Cannot assign to an unexported field `%.*s` in structure literal", LIT(name));
-								continue;
-							}
+						if (!is_unknown && !check_is_field_exported(c, sel.entity)) {
+							error_node(elem, "Cannot assign to an unexported field `%.*s` in structure literal", LIT(name));
+							continue;
 						}
 
 
@@ -4524,11 +4544,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 							break;
 						}
 
-						Scope *file_scope = field->scope;
-						while (!file_scope->is_file) {
-							file_scope = file_scope->parent;
-						}
-						if (!is_entity_exported(field) && file_scope != c->context.file_scope) {
+						if (!check_is_field_exported(c, field)) {
 							gbString t = type_to_string(type);
 							error_node(o->expr, "Implicit assignment to an unexported field `%.*s` in `%s` literal",
 							           LIT(field->token.string), t);
