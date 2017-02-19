@@ -30,6 +30,7 @@ typedef enum BuiltinProcId {
 	BuiltinProc_reserve,
 	BuiltinProc_clear,
 	BuiltinProc_append,
+	BuiltinProc_delete,
 
 	BuiltinProc_size_of,
 	BuiltinProc_size_of_val,
@@ -73,6 +74,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("reserve"),          2, false, Expr_Stmt},
 	{STR_LIT("clear"),            1, false, Expr_Stmt},
 	{STR_LIT("append"),           1, true,  Expr_Expr},
+	{STR_LIT("delete"),           2, false, Expr_Stmt},
 
 	{STR_LIT("size_of"),          1, false, Expr_Expr},
 	{STR_LIT("size_of_val"),      1, false, Expr_Expr},
@@ -1715,12 +1717,6 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 					continue;
 				}
 				if (id->is_import) {
-					// String gpa = str_lit("GetProcAddress");
-					// if (str_eq(e->token.string, gpa)) {
-					// 	Entity *f = scope_lookup_entity(parent_scope, gpa);
-					// 	gb_printf_err("%.*s %.*s %td\n", LIT(gpa), LIT(f->token.pos.file), entity_procedure_overload_count(f));
-					// }
-
 					if (is_entity_exported(e)) {
 						// TODO(bill): Should these entities be imported but cause an error when used?
 						bool ok = add_entity(c, parent_scope, NULL, e);
@@ -1728,12 +1724,6 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 							map_bool_set(&parent_scope->implicit, hash_pointer(e), true);
 						}
 					}
-
-					// if (str_eq(e->token.string, gpa)) {
-					// 	Entity *f = scope_lookup_entity(parent_scope, gpa);
-					// 	gb_printf_err("%.*s %.*s %td\n", LIT(gpa), LIT(f->token.pos.file), entity_procedure_overload_count(f));
-					// }
-
 				} else {
 					add_entity(c, parent_scope, NULL, e);
 				}

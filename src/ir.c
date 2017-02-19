@@ -3244,7 +3244,7 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 						args[3] = capacity;
 						return ir_emit_global_call(proc, "__dynamic_array_reserve", args, 4);
 					} else if (is_type_dynamic_map(type)) {
-						irValue **args = gb_alloc_array(a, irValue *, 4);
+						irValue **args = gb_alloc_array(a, irValue *, 2);
 						args[0] = ir_gen_map_header(proc, ptr, type);
 						args[1] = capacity;
 						return ir_emit_global_call(proc, "__dynamic_map_reserve", args, 2);
@@ -3358,6 +3358,23 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 					daa_args[3] = ir_emit_conv(proc, items, t_rawptr);
 					daa_args[4] = ir_emit_conv(proc, item_count, t_int);
 					return ir_emit_global_call(proc, "__dynamic_array_append", daa_args, 5);
+				} break;
+
+				case BuiltinProc_delete: {
+					ir_emit_comment(proc, str_lit("delete"));
+					irValue *map = ir_build_expr(proc, ce->args.e[0]);
+					irValue *key = ir_build_expr(proc, ce->args.e[1]);
+					Type *map_type = ir_type(map);
+					GB_ASSERT(is_type_dynamic_map(map_type));
+					Type *key_type = base_type(map_type)->Map.key;
+
+					irValue *addr = ir_address_from_load_or_generate_local(proc, map);
+
+					gbAllocator a = proc->module->allocator;
+					irValue **args = gb_alloc_array(a, irValue *, 2);
+					args[0] = ir_gen_map_header(proc, addr, map_type);
+					args[1] = ir_gen_map_key(proc, key, key_type);
+					return ir_emit_global_call(proc, "__dynamic_map_delete", args, 2);
 				} break;
 
 

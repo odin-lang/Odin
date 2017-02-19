@@ -2643,7 +2643,6 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 				gbString sel_str = expr_to_string(selector);
 				error_node(op_expr, "`%s` is not exported by `%.*s`", sel_str, LIT(name));
 				gb_string_free(sel_str);
-				// NOTE(bill): Not really an error so don't goto error
 				goto error;
 			}
 
@@ -2966,7 +2965,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_append: {
-		// append :: proc([dynamic]Type, item: ...Type) {
+		// append :: proc([dynamic]Type, item: ...Type)
 		Type *type = operand->type;
 		type = base_type(type);
 		if (!is_type_dynamic_array(type)) {
@@ -2994,6 +2993,37 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 		operand->mode = Addressing_Value;
 		operand->type = t_int;
+	} break;
+
+	case BuiltinProc_delete: {
+		// delete :: proc(map[Key]Value, key: Key)
+		Type *type = operand->type;
+		if (!is_type_map(type)) {
+			gbString str = type_to_string(type);
+			error_node(operand->expr, "Expected a map, got `%s`", str);
+			gb_string_free(str);
+			return false;
+		}
+
+		Type *key = base_type(type)->Map.key;
+		Operand x = {Addressing_Invalid};
+		AstNode *key_node = ce->args.e[1];
+		Operand op = {0};
+		check_expr(c, &op, key_node);
+		if (op.mode == Addressing_Invalid) {
+			return false;
+		}
+
+		if (!check_is_assignable_to(c, &op, key)) {
+			gbString kt = type_to_string(key);
+			gbString ot = type_to_string(op.type);
+			error_node(operand->expr, "Expected a key of type `%s`, got `%s`", key, ot);
+			gb_string_free(ot);
+			gb_string_free(kt);
+			return false;
+		}
+
+		operand->mode = Addressing_NoValue;
 	} break;
 
 

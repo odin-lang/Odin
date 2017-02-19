@@ -633,7 +633,7 @@ __dynamic_map_add_entry :: proc(using h: __Map_Header, key: __Map_Key) -> int {
 }
 
 
-__dynamic_map_remove :: proc(using h: __Map_Header, key: __Map_Key) {
+__dynamic_map_delete :: proc(using h: __Map_Header, key: __Map_Key) {
 	fr := __dynamic_map_find(h, key);
 	if fr.entry_index >= 0 {
 		__dynamic_map_erase(h, fr);
