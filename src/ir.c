@@ -6467,10 +6467,11 @@ void ir_gen_tree(irGen *s) {
 				case Type_Tuple: {
 					ir_emit_comment(proc, str_lit("Type_Info_Tuple"));
 					tag = ir_emit_conv(proc, ti_ptr, t_type_info_tuple_ptr);
+					irValue *record = ir_emit_struct_ep(proc, tag, 0);
 
 					{
 						irValue *align = ir_make_const_int(a, type_align_of(a, t));
-						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 4), align);
+						ir_emit_store(proc, ir_emit_struct_ep(proc, record, 4), align);
 					}
 
 					irValue *memory_types   = ir_type_info_member_offset(proc, type_info_member_types,   t->Record.field_count, &type_info_member_types_index);
@@ -6490,14 +6491,15 @@ void ir_gen_tree(irGen *s) {
 						}
 					}
 
-					ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types,   ir_make_const_int(a, t->Record.field_count));
-					ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   ir_make_const_int(a, t->Record.field_count));
+					ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 0), memory_types,   ir_make_const_int(a, t->Record.field_count));
+					ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 1), memory_names,   ir_make_const_int(a, t->Record.field_count));
 				} break;
 				case Type_Record: {
 					switch (t->Record.kind) {
 					case TypeRecord_Struct: {
 						ir_emit_comment(proc, str_lit("Type_Info_Struct"));
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_struct_ptr);
+						irValue *record = ir_emit_struct_ep(proc, tag, 0);
 
 						{
 							irValue *size         = ir_make_const_int(a,  type_size_of(a, t));
@@ -6505,11 +6507,11 @@ void ir_gen_tree(irGen *s) {
 							irValue *packed       = ir_make_const_bool(a, t->Record.struct_is_packed);
 							irValue *ordered      = ir_make_const_bool(a, t->Record.struct_is_ordered);
 							irValue *custom_align = ir_make_const_bool(a, t->Record.custom_align);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3), size);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 4), align);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 5), packed);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 6), ordered);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 7), custom_align);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 3), size);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 4), align);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 5), packed);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 6), ordered);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 7), custom_align);
 						}
 
 						irValue *memory_types   = ir_type_info_member_offset(proc, type_info_member_types,   t->Record.field_count, &type_info_member_types_index);
@@ -6536,28 +6538,52 @@ void ir_gen_tree(irGen *s) {
 							ir_emit_store(proc, offset, ir_make_const_int(a, foffset));
 						}
 
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types,   ir_make_const_int(a, t->Record.field_count));
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   ir_make_const_int(a, t->Record.field_count));
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, ir_make_const_int(a, t->Record.field_count));
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 0), memory_types,   ir_make_const_int(a, t->Record.field_count));
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 1), memory_names,   ir_make_const_int(a, t->Record.field_count));
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 2), memory_offsets, ir_make_const_int(a, t->Record.field_count));
 					} break;
-					case TypeRecord_Union:
+					case TypeRecord_Union: {
 						ir_emit_comment(proc, str_lit("Type_Info_Union"));
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_union_ptr);
+						irValue *record = ir_emit_struct_ep(proc, tag, 0);
 						{
 							irValue *size    = ir_make_const_int(a, type_size_of(a, t));
 							irValue *align   = ir_make_const_int(a, type_align_of(a, t));
-							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3),  size);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 4),  align);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 3),  size);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 4),  align);
 						}
-						break;
+
+						irValue *memory_types = ir_type_info_member_offset(proc, type_info_member_types, t->Record.field_count, &type_info_member_types_index);
+						irValue *memory_names = ir_type_info_member_offset(proc, type_info_member_names, t->Record.field_count, &type_info_member_names_index);
+
+						for (isize source_index = 1; source_index < t->Record.field_count; source_index++) {
+							// TODO(bill): Order fields in source order not layout order
+							Entity *f = t->Record.fields[source_index];
+							irValue *tip = ir_get_type_info_ptr(proc, type_info_data, f->type);
+							irValue *index     = ir_make_const_int(a, source_index);
+							irValue *type_info = ir_emit_ptr_offset(proc, memory_types,   index);
+
+							ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
+							if (f->token.string.len > 0) {
+								irValue *name = ir_emit_ptr_offset(proc, memory_names,   index);
+								ir_emit_store(proc, name, ir_make_const_string(a, f->token.string));
+							}
+						}
+
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 0), memory_types, ir_make_const_int(a, t->Record.field_count));
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 1), memory_names, ir_make_const_int(a, t->Record.field_count));
+
+					} break;
 					case TypeRecord_RawUnion: {
 						ir_emit_comment(proc, str_lit("Type_Info_RawUnion"));
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_raw_union_ptr);
+						irValue *record = ir_emit_struct_ep(proc, tag, 0);
+
 						{
 							irValue *size    = ir_make_const_int(a, type_size_of(a, t));
 							irValue *align   = ir_make_const_int(a, type_align_of(a, t));
-							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3),  size);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 4),  align);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 3),  size);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 4),  align);
 						}
 
 						irValue *memory_types   = ir_type_info_member_offset(proc, type_info_member_types,   t->Record.field_count, &type_info_member_types_index);
@@ -6577,9 +6603,9 @@ void ir_gen_tree(irGen *s) {
 							}
 						}
 
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types,   ir_make_const_int(a, t->Record.field_count));
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   ir_make_const_int(a, t->Record.field_count));
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, ir_make_const_int(a, t->Record.field_count));
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 0), memory_types,   ir_make_const_int(a, t->Record.field_count));
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 1), memory_names,   ir_make_const_int(a, t->Record.field_count));
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 2), memory_offsets, ir_make_const_int(a, t->Record.field_count));
 					} break;
 					case TypeRecord_Enum:
 						ir_emit_comment(proc, str_lit("Type_Info_Enum"));
@@ -6668,7 +6694,7 @@ void ir_gen_tree(irGen *s) {
 							break;
 						}
 					}
-					GB_ASSERT(found);
+					GB_ASSERT_MSG(found, "%s", type_to_string(tag_type));
 				}
 			}
 		}

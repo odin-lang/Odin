@@ -5,7 +5,7 @@
 #import "mem.odin";
 #import "opengl.odin";
 #import "os.odin";
-#import "halloc.odin";
+// #import "halloc.odin";
 
 main :: proc() {
 	m: map[int]int;

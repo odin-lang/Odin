@@ -306,6 +306,10 @@ AST_NODE_KIND(_DeclEnd,   "", i32) \
 		Token token; \
 		AstNodeArray list; \
 	}) \
+	AST_NODE_KIND(UnionField, "union field", struct { \
+		AstNode *name; \
+		AstNode *list; \
+	}) \
 AST_NODE_KIND(_TypeBegin, "", i32) \
 	AST_NODE_KIND(HelperType, "type", struct { \
 		Token token; \
@@ -490,6 +494,8 @@ Token ast_node_token(AstNode *node) {
 		return ast_node_token(node->Field.type);
 	case AstNode_FieldList:
 		return node->FieldList.token;
+	case AstNode_UnionField:
+		return ast_node_token(node->UnionField.name);
 
 	case AstNode_HelperType:       return node->HelperType.token;
 	case AstNode_ProcType:         return node->ProcType.token;
@@ -965,6 +971,12 @@ AstNode *ast_field_list(AstFile *f, Token token, AstNodeArray list) {
 	result->FieldList.list  = list;
 	return result;
 }
+AstNode *ast_union_field(AstFile *f, AstNode *name, AstNode *list) {
+	AstNode *result = make_ast_node(f, AstNode_UnionField);
+	result->UnionField.name = name;
+	result->UnionField.list = list;
+	return result;
+}
 
 
 AstNode *ast_helper_type(AstFile *f, Token token, AstNode *type) {
@@ -1016,7 +1028,7 @@ AstNode *ast_vector_type(AstFile *f, Token token, AstNode *count, AstNode *elem)
 }
 
 AstNode *ast_struct_type(AstFile *f, Token token, AstNodeArray fields, isize field_count,
-                          bool is_packed, bool is_ordered, AstNode *align) {
+                         bool is_packed, bool is_ordered, AstNode *align) {
 	AstNode *result = make_ast_node(f, AstNode_StructType);
 	result->StructType.token       = token;
 	result->StructType.fields      = fields;
@@ -2670,17 +2682,29 @@ AstNode *parse_type_or_ident(AstFile *f) {
 	case Token_union: {
 		Token token = expect_token(f, Token_union);
 		Token open = expect_token_after(f, Token_OpenBrace, "union");
-		isize decl_count = 0;
-		AstNode *fields = parse_record_fields(f, &decl_count, 0, str_lit("union"));
-		Token close = expect_token(f, Token_CloseBrace);
+		AstNodeArray variants = make_ast_node_array(f);
 
-		AstNodeArray decls = {0};
-		if (fields != NULL) {
-			GB_ASSERT(fields->kind == AstNode_FieldList);
-			decls = fields->FieldList.list;
+		while (f->curr_token.kind != Token_CloseBrace &&
+		       f->curr_token.kind != Token_EOF) {
+			AstNode *name  = parse_ident(f);
+			Token    open  = expect_token(f, Token_OpenBrace);
+			isize decl_count = 0;
+			AstNode *list  = parse_record_fields(f, &decl_count, FieldFlag_using, str_lit("union"));
+			Token    close = expect_token(f, Token_CloseBrace);
+
+			array_add(&variants, ast_union_field(f, name, list));
+
+			if (f->curr_token.kind != Token_Comma) {
+				break;
+			}
+			next_token(f);
 		}
 
-		return ast_union_type(f, token, decls, decl_count);
+		// AstNode *fields = parse_record_fields(f, &decl_count, 0, str_lit("union"));
+		Token close = expect_token(f, Token_CloseBrace);
+
+
+		return ast_union_type(f, token, variants, variants.count);
 	}
 
 	case Token_raw_union: {

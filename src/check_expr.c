@@ -355,7 +355,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 
 				Token name_token = name->Ident;
 
-				if (str_eq(name_token.string, str_lit(""))) {
+				if (str_eq(name_token.string, str_lit("names"))) {
 					error(name_token, "`names` is a reserved identifier for unions");
 					continue;
 				}
@@ -596,22 +596,76 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
 
-	isize field_count = 1;
-	for_array(field_index, ut->fields) {
-		AstNode *field = ut->fields.e[field_index];
-		switch (field->kind) {
-		case_ast_node(f, Field, field);
-			field_count += f->names.count;
-		case_end;
-		}
-	}
+	isize field_count = ut->fields.count+1;
+
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+
+	MapEntity entity_map = {0};
+	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*field_count);
 
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
 
-	check_fields(c, node, ut->fields, fields, field_count, str_lit("union"));
+	isize field_index = 0;
+	fields[field_index++] = make_entity_type_name(c->allocator, c->context.scope, empty_token, NULL);
 
-	union_type->Record.fields            = fields;
-	union_type->Record.field_count       = field_count;
+	for_array(i, ut->fields) {
+		AstNode *field = ut->fields.e[i];
+		if (field->kind != AstNode_UnionField) {
+			continue;
+		}
+		ast_node(f, UnionField, ut->fields.e[i]);
+		Token name_token = f->name->Ident;
+
+		if (str_eq(name_token.string, str_lit("names"))) {
+			error(name_token, "`names` is a reserved identifier for unions");
+			continue;
+		}
+
+		Type *base_type = make_type_struct(c->allocator);
+		{
+			ast_node(fl, FieldList, f->list);
+			isize field_count = 0;
+			for_array(j, fl->list) {
+				ast_node(f, Field, fl->list.e[j]);
+				field_count += f->names.count;
+			}
+
+			Token token = name_token;
+			token.kind = Token_struct;
+			AstNode *dummy_struct = ast_struct_type(c->curr_ast_file, token, fl->list, field_count,
+			                                        false, true, NULL);
+
+			check_open_scope(c, dummy_struct);
+			check_struct_type(c, base_type, dummy_struct);
+			check_close_scope(c);
+			base_type->Record.node = dummy_struct;
+		}
+
+		Type *type = make_type_named(c->allocator, name_token.string, base_type, NULL);
+		Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, type);
+		type->Named.type_name = e;
+		add_entity(c, c->context.scope, f->name, e);
+
+		if (str_eq(name_token.string, str_lit("_"))) {
+			error(name_token, "`_` cannot be used a union subtype");
+			continue;
+		}
+
+		HashKey key = hash_string(name_token.string);
+		if (map_entity_get(&entity_map, key) != NULL) {
+			// TODO(bill): Scope checking already checks the declaration
+			error(name_token, "`%.*s` is already declared in this union", LIT(name_token.string));
+		} else {
+			map_entity_set(&entity_map, key, e);
+			fields[field_index++] = e;
+		}
+		add_entity_use(c, f->name, e);
+	}
+
+	gb_temp_arena_memory_end(tmp);
+
+	union_type->Record.fields      = fields;
+	union_type->Record.field_count = field_index;
 	union_type->Record.names = make_names_field_for_record(c, c->context.scope);
 }
 
