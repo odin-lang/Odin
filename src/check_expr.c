@@ -183,10 +183,7 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 
 	// TODO(bill): Should I allow this implicit conversion at all?!
 	// rawptr <- ^T
-	if (is_type_rawptr(dst) && is_type_pointer(src)) {
-		if (dst != type) {
-			return -1;
-		}
+	if (are_types_identical(type, t_rawptr) && is_type_pointer(src)) {
 	    return 5;
 	}
 #endif
@@ -358,7 +355,7 @@ void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 
 				Token name_token = name->Ident;
 
-				if (str_eq(name_token.string, str_lit(""))) {
+				if (str_eq(name_token.string, str_lit("names"))) {
 					error(name_token, "`names` is a reserved identifier for unions");
 					continue;
 				}
@@ -599,22 +596,76 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
 
-	isize field_count = 1;
-	for_array(field_index, ut->fields) {
-		AstNode *field = ut->fields.e[field_index];
-		switch (field->kind) {
-		case_ast_node(f, Field, field);
-			field_count += f->names.count;
-		case_end;
-		}
-	}
+	isize field_count = ut->fields.count+1;
+
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+
+	MapEntity entity_map = {0};
+	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*field_count);
 
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
 
-	check_fields(c, node, ut->fields, fields, field_count, str_lit("union"));
+	isize field_index = 0;
+	fields[field_index++] = make_entity_type_name(c->allocator, c->context.scope, empty_token, NULL);
 
-	union_type->Record.fields            = fields;
-	union_type->Record.field_count       = field_count;
+	for_array(i, ut->fields) {
+		AstNode *field = ut->fields.e[i];
+		if (field->kind != AstNode_UnionField) {
+			continue;
+		}
+		ast_node(f, UnionField, ut->fields.e[i]);
+		Token name_token = f->name->Ident;
+
+		if (str_eq(name_token.string, str_lit("names"))) {
+			error(name_token, "`names` is a reserved identifier for unions");
+			continue;
+		}
+
+		Type *base_type = make_type_struct(c->allocator);
+		{
+			ast_node(fl, FieldList, f->list);
+			isize field_count = 0;
+			for_array(j, fl->list) {
+				ast_node(f, Field, fl->list.e[j]);
+				field_count += f->names.count;
+			}
+
+			Token token = name_token;
+			token.kind = Token_struct;
+			AstNode *dummy_struct = ast_struct_type(c->curr_ast_file, token, fl->list, field_count,
+			                                        false, true, NULL);
+
+			check_open_scope(c, dummy_struct);
+			check_struct_type(c, base_type, dummy_struct);
+			check_close_scope(c);
+			base_type->Record.node = dummy_struct;
+		}
+
+		Type *type = make_type_named(c->allocator, name_token.string, base_type, NULL);
+		Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, type);
+		type->Named.type_name = e;
+		add_entity(c, c->context.scope, f->name, e);
+
+		if (str_eq(name_token.string, str_lit("_"))) {
+			error(name_token, "`_` cannot be used a union subtype");
+			continue;
+		}
+
+		HashKey key = hash_string(name_token.string);
+		if (map_entity_get(&entity_map, key) != NULL) {
+			// TODO(bill): Scope checking already checks the declaration
+			error(name_token, "`%.*s` is already declared in this union", LIT(name_token.string));
+		} else {
+			map_entity_set(&entity_map, key, e);
+			fields[field_index++] = e;
+		}
+		add_entity_use(c, f->name, e);
+	}
+
+	gb_temp_arena_memory_end(tmp);
+
+	union_type->Record.fields      = fields;
+	union_type->Record.field_count = field_index;
 	union_type->Record.names = make_names_field_for_record(c, c->context.scope);
 }
 
@@ -798,7 +849,13 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 }
 
 
-Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_variadic_) {
+Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_variadic_) {
+	if (_params == NULL) {
+		return NULL;
+	}
+	ast_node(field_list, FieldList, _params);
+	AstNodeArray params = field_list->list;
+
 	if (params.count == 0) {
 		return NULL;
 	}
@@ -808,7 +865,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_v
 		AstNode *field = params.e[i];
 		if (ast_node_expect(field, AstNode_Field)) {
 			ast_node(f, Field, field);
-			variable_count += f->names.count;
+			variable_count += max(f->names.count, 1);
 		}
 	}
 
@@ -877,26 +934,73 @@ Type *check_get_params(Checker *c, Scope *scope, AstNodeArray params, bool *is_v
 	return tuple;
 }
 
-Type *check_get_results(Checker *c, Scope *scope, AstNodeArray results) {
+Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
+	if (_results == NULL) {
+		return NULL;
+	}
+	ast_node(field_list, FieldList, _results);
+	AstNodeArray results = field_list->list;
+
 	if (results.count == 0) {
 		return NULL;
 	}
 	Type *tuple = make_type_tuple(c->allocator);
 
-	Entity **variables = gb_alloc_array(c->allocator, Entity *, results.count);
+	isize variable_count = 0;
+	for_array(i, results) {
+		AstNode *field = results.e[i];
+		if (ast_node_expect(field, AstNode_Field)) {
+			ast_node(f, Field, field);
+			variable_count += max(f->names.count, 1);
+		}
+	}
+
+	Entity **variables = gb_alloc_array(c->allocator, Entity *, variable_count);
 	isize variable_index = 0;
 	for_array(i, results) {
-		AstNode *item = results.e[i];
-		Type *type = check_type(c, item);
-		Token token = ast_node_token(item);
-		token.string = str_lit(""); // NOTE(bill): results are not named
-		// TODO(bill): Should I have named results?
-		Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
-		// NOTE(bill): No need to record
-		variables[variable_index++] = param;
+		ast_node(field, Field, results.e[i]);
+		Type *type = check_type(c, field->type);
+		if (field->names.count == 0) {
+			Token token = ast_node_token(field->type);
+			token.string = str_lit("");
+			Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
+			variables[variable_index++] = param;
+		} else {
+			for_array(j, field->names) {
+				Token token = ast_node_token(field->type);
+				token.string = str_lit("");
+
+				AstNode *name = field->names.e[j];
+				if (name->kind != AstNode_Ident) {
+					error_node(name, "Expected an identifer for as the field name");
+				} else {
+					token = name->Ident;
+				}
+
+				Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
+				variables[variable_index++] = param;
+			}
+		}
 	}
+
+	for (isize i = 0; i < variable_index; i++) {
+		String x = variables[i]->token.string;
+		if (x.len == 0 || str_eq(x, str_lit("_"))) {
+			continue;
+		}
+		for (isize j = i+1; j < variable_index; j++) {
+			String y = variables[j]->token.string;
+			if (y.len == 0 || str_eq(y, str_lit("_"))) {
+				continue;
+			}
+			if (str_eq(x, y)) {
+				error(variables[j]->token, "Duplicate return value name `%.*s`", LIT(y));
+			}
+		}
+	}
+
 	tuple->Tuple.variables = variables;
-	tuple->Tuple.variable_count = results.count;
+	tuple->Tuple.variable_count = variable_index;
 
 	return tuple;
 }
@@ -2514,6 +2618,39 @@ bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *val
 	return true;
 }
 
+isize entity_overload_count(Scope *s, String name) {
+	Entity *e = scope_lookup_entity(s, name);
+	if (e == NULL) {
+		return 0;
+	}
+	if (e->kind == Entity_Procedure) {
+		// NOTE(bill): Overloads are only allowed with the same scope
+		return map_entity_multi_count(&s->elements, hash_string(e->token.string));
+	}
+	return 1;
+}
+
+bool check_is_field_exported(Checker *c, Entity *field) {
+	if (field == NULL) {
+		// NOTE(bill): Just incase
+		return true;
+	}
+	if (field->kind != Entity_Variable) {
+		return true;
+	}
+	Scope *file_scope = field->scope;
+	if (file_scope == NULL) {
+		return true;
+	}
+	while (!file_scope->is_file) {
+		file_scope = file_scope->parent;
+	}
+	if (!is_entity_exported(field) && file_scope != c->context.file_scope) {
+		return false;
+	}
+	return true;
+}
+
 Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_hint) {
 	ast_node(se, SelectorExpr, node);
 
@@ -2535,8 +2672,8 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	}
 
 	if (op_expr->kind == AstNode_Ident) {
-		String name = op_expr->Ident.string;
-		Entity *e = scope_lookup_entity(c->context.scope, name);
+		String op_name = op_expr->Ident.string;
+		Entity *e = scope_lookup_entity(c->context.scope, op_name);
 
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
@@ -2545,38 +2682,31 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			// IMPORTANT NOTE(bill): This is very sloppy code but it's also very fragile
 			// It pretty much needs to be in this order and this way
 			// If you can clean this up, please do but be really careful
-
-			String sel_name = selector->Ident.string;
+			String import_name = op_name;
+			Scope *import_scope = e->ImportName.scope;
+			String entity_name = selector->Ident.string;
 
 			check_op_expr = false;
-			entity = scope_lookup_entity(e->ImportName.scope, sel_name);
+			entity = scope_lookup_entity(import_scope, entity_name);
 			bool is_declared = entity != NULL;
 			if (is_declared) {
 				if (entity->kind == Entity_Builtin) {
+					// NOTE(bill): Builtin's are in the universe scope which is part of every scopes hierarchy
+					// This means that we should just ignore the found result through it
 					is_declared = false;
-				} else if (entity->scope->is_global && !e->ImportName.scope->is_global) {
+				} else if (entity->scope->is_global && !import_scope->is_global) {
 					is_declared = false;
 				}
 			}
 			if (!is_declared) {
-				error_node(op_expr, "`%.*s` is not declared by `%.*s`", LIT(sel_name), LIT(name));
+				error_node(op_expr, "`%.*s` is not declared by `%.*s`", LIT(entity_name), LIT(import_name));
 				goto error;
 			}
 			check_entity_decl(c, entity, NULL, NULL);
 			GB_ASSERT(entity->type != NULL);
 
-			bool is_overloaded = false;
-			isize overload_count = 0;
-			HashKey key = {0};
-			if (entity->kind == Entity_Procedure) {
-				key = hash_string(entity->token.string);
-				// NOTE(bill): Overloads are only allowed with the same scope
-				Scope *s = entity->scope;
-				overload_count = map_entity_multi_count(&s->elements, key);
-				if (overload_count > 1) {
-					is_overloaded = true;
-				}
-			}
+			isize overload_count = entity_overload_count(import_scope, entity_name);
+			bool is_overloaded = overload_count > 1;
 
 			bool implicit_is_found = map_bool_get(&e->ImportName.scope->implicit, hash_pointer(entity)) != NULL;
 			bool is_not_exported = !is_entity_exported(entity);
@@ -2588,28 +2718,28 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 			if (is_not_exported) {
 				gbString sel_str = expr_to_string(selector);
-				error_node(op_expr, "`%s` is not exported by `%.*s`", sel_str, LIT(name));
+				error_node(op_expr, "`%s` is not exported by `%.*s`", sel_str, LIT(import_name));
 				gb_string_free(sel_str);
-				// NOTE(bill): Not really an error so don't goto error
 				goto error;
 			}
 
 			if (is_overloaded) {
-				Scope *s = entity->scope;
+				HashKey key = hash_string(entity_name);
 				bool skip = false;
 
 				Entity **procs = gb_alloc_array(heap_allocator(), Entity *, overload_count);
-				map_entity_multi_get_all(&s->elements, key, procs);
-				for (isize i = 0; i < overload_count; /**/) {
+				map_entity_multi_get_all(&import_scope->elements, key, procs);
+				for (isize i = 0; i < overload_count; i++) {
 					Type *t = base_type(procs[i]->type);
 					if (t == t_invalid) {
 						continue;
 					}
 
 					// NOTE(bill): Check to see if it's imported
-					if (map_bool_get(&e->ImportName.scope->implicit, hash_pointer(procs[i]))) {
+					if (map_bool_get(&import_scope->implicit, hash_pointer(procs[i]))) {
 						gb_swap(Entity *, procs[i], procs[overload_count-1]);
 						overload_count--;
+						i--; // NOTE(bill): Counteract the post event
 						continue;
 					}
 
@@ -2623,8 +2753,6 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 							break;
 						}
 					}
-
-					i++;
 				}
 
 				if (overload_count > 0 && !skip) {
@@ -2648,7 +2776,13 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 
 	if (entity == NULL && selector->kind == AstNode_Ident) {
-		sel = lookup_field(c->allocator, operand->type, selector->Ident.string, operand->mode == Addressing_Type);
+		String field_name = selector->Ident.string;
+		sel = lookup_field(c->allocator, operand->type, field_name, operand->mode == Addressing_Type);
+
+		if (operand->mode != Addressing_Type && !check_is_field_exported(c, sel.entity)) {
+			error_node(op_expr, "`%.*s` is an unexported field", LIT(field_name));
+			goto error;
+		}
 		entity = sel.entity;
 
 		// NOTE(bill): Add type info needed for fields like `names`
@@ -2913,7 +3047,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_append: {
-		// append :: proc([dynamic]Type, item: ...Type) {
+		// append :: proc([dynamic]Type, item: ...Type)
 		Type *type = operand->type;
 		type = base_type(type);
 		if (!is_type_dynamic_array(type)) {
@@ -2941,6 +3075,37 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 		operand->mode = Addressing_Value;
 		operand->type = t_int;
+	} break;
+
+	case BuiltinProc_delete: {
+		// delete :: proc(map[Key]Value, key: Key)
+		Type *type = operand->type;
+		if (!is_type_map(type)) {
+			gbString str = type_to_string(type);
+			error_node(operand->expr, "Expected a map, got `%s`", str);
+			gb_string_free(str);
+			return false;
+		}
+
+		Type *key = base_type(type)->Map.key;
+		Operand x = {Addressing_Invalid};
+		AstNode *key_node = ce->args.e[1];
+		Operand op = {0};
+		check_expr(c, &op, key_node);
+		if (op.mode == Addressing_Invalid) {
+			return false;
+		}
+
+		if (!check_is_assignable_to(c, &op, key)) {
+			gbString kt = type_to_string(key);
+			gbString ot = type_to_string(op.type);
+			error_node(operand->expr, "Expected a key of type `%s`, got `%s`", key, ot);
+			gb_string_free(ot);
+			gb_string_free(kt);
+			return false;
+		}
+
+		operand->mode = Addressing_NoValue;
 	} break;
 
 
@@ -4381,10 +4546,16 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 						String name = fv->field->Ident.string;
 
 						Selection sel = lookup_field(c->allocator, type, name, o->mode == Addressing_Type);
-						if (sel.entity == NULL) {
+						bool is_unknown = sel.entity == NULL;
+						if (is_unknown) {
 							error_node(elem, "Unknown field `%.*s` in structure literal", LIT(name));
 							continue;
 						}
+						if (!is_unknown && !check_is_field_exported(c, sel.entity)) {
+							error_node(elem, "Cannot assign to an unexported field `%.*s` in structure literal", LIT(name));
+							continue;
+						}
+
 
 						if (sel.index.count > 1) {
 							error_node(elem, "Cannot assign to an anonymous field `%.*s` in a structure literal (at the moment)", LIT(name));
@@ -4425,6 +4596,14 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 						if (index >= field_count) {
 							error_node(o->expr, "Too many values in structure literal, expected %td", field_count);
 							break;
+						}
+
+						if (!check_is_field_exported(c, field)) {
+							gbString t = type_to_string(type);
+							error_node(o->expr, "Implicit assignment to an unexported field `%.*s` in `%s` literal",
+							           LIT(field->token.string), t);
+							gb_string_free(t);
+							continue;
 						}
 
 						if (base_type(field->type) == t_any) {
@@ -5126,16 +5305,6 @@ void check_expr_or_type(Checker *c, Operand *o, AstNode *e) {
 
 gbString write_expr_to_string(gbString str, AstNode *node);
 
-gbString write_params_to_string(gbString str, AstNodeArray params, char *sep) {
-	for_array(i, params) {
-		if (i > 0) {
-			str = gb_string_appendc(str, sep);
-		}
-		str = write_expr_to_string(str, params.e[i]);
-	}
-	return str;
-}
-
 gbString write_record_fields_to_string(gbString str, AstNodeArray params) {
 	for_array(i, params) {
 		if (i > 0) {
@@ -5301,6 +5470,13 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		if (f->flags&FieldFlag_using) {
 			str = gb_string_appendc(str, "using ");
 		}
+		if (f->flags&FieldFlag_immutable) {
+			str = gb_string_appendc(str, "immutable ");
+		}
+		if (f->flags&FieldFlag_no_alias) {
+			str = gb_string_appendc(str, "no_alias ");
+		}
+
 		for_array(i, f->names) {
 			AstNode *name = f->names.e[i];
 			if (i > 0) {
@@ -5308,12 +5484,22 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 			}
 			str = write_expr_to_string(str, name);
 		}
-
-		str = gb_string_appendc(str, ": ");
+		if (f->names.count > 0) {
+			str = gb_string_appendc(str, ": ");
+		}
 		if (f->flags&FieldFlag_ellipsis) {
 			str = gb_string_appendc(str, "...");
 		}
 		str = write_expr_to_string(str, f->type);
+	case_end;
+
+	case_ast_node(f, FieldList, node);
+		for_array(i, f->list) {
+			if (i > 0) {
+				str = gb_string_appendc(str, ", ");
+			}
+			str = write_expr_to_string(str, f->list.e[i]);
+		}
 	case_end;
 
 	case_ast_node(ce, CallExpr, node);
@@ -5332,7 +5518,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(pt, ProcType, node);
 		str = gb_string_appendc(str, "proc(");
-		str = write_params_to_string(str, pt->params, ", ");
+		str = write_expr_to_string(str, pt->params);
 		str = gb_string_appendc(str, ")");
 	case_end;
 
@@ -5366,7 +5552,12 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 			str = gb_string_appendc(str, " ");
 		}
 		str = gb_string_appendc(str, "{");
-		str = write_params_to_string(str, et->fields, ", ");
+		for_array(i, et->fields) {
+			if (i > 0) {
+				str = gb_string_appendc(str, ", ");
+			}
+			str = write_expr_to_string(str, et->fields.e[i]);
+		}
 		str = gb_string_appendc(str, "}");
 	case_end;
 

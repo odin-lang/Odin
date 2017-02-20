@@ -302,16 +302,24 @@ AST_NODE_KIND(_DeclEnd,   "", i32) \
 		AstNode *    type;     \
 		u32          flags;    \
 	}) \
+	AST_NODE_KIND(FieldList, "field list", struct { \
+		Token token; \
+		AstNodeArray list; \
+	}) \
+	AST_NODE_KIND(UnionField, "union field", struct { \
+		AstNode *name; \
+		AstNode *list; \
+	}) \
 AST_NODE_KIND(_TypeBegin, "", i32) \
 	AST_NODE_KIND(HelperType, "type", struct { \
 		Token token; \
 		AstNode *type; \
 	}) \
 	AST_NODE_KIND(ProcType, "procedure type", struct { \
-		Token token;          \
-		AstNodeArray params;  \
-		AstNodeArray results; \
-		u64          tags;    \
+		Token    token;   \
+		AstNode *params;  \
+		AstNode *results; \
+		u64      tags;    \
 		ProcCallingConvention calling_convention; \
 	}) \
 	AST_NODE_KIND(PointerType, "pointer type", struct { \
@@ -478,11 +486,16 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_ImportDecl:     return node->ImportDecl.token;
 	case AstNode_ForeignLibrary: return node->ForeignLibrary.token;
 
+
 	case AstNode_Field:
 		if (node->Field.names.count > 0) {
 			return ast_node_token(node->Field.names.e[0]);
 		}
 		return ast_node_token(node->Field.type);
+	case AstNode_FieldList:
+		return node->FieldList.token;
+	case AstNode_UnionField:
+		return ast_node_token(node->UnionField.name);
 
 	case AstNode_HelperType:       return node->HelperType.token;
 	case AstNode_ProcType:         return node->ProcType.token;
@@ -952,6 +965,19 @@ AstNode *ast_field(AstFile *f, AstNodeArray names, AstNode *type, u32 flags) {
 	return result;
 }
 
+AstNode *ast_field_list(AstFile *f, Token token, AstNodeArray list) {
+	AstNode *result = make_ast_node(f, AstNode_FieldList);
+	result->FieldList.token = token;
+	result->FieldList.list  = list;
+	return result;
+}
+AstNode *ast_union_field(AstFile *f, AstNode *name, AstNode *list) {
+	AstNode *result = make_ast_node(f, AstNode_UnionField);
+	result->UnionField.name = name;
+	result->UnionField.list = list;
+	return result;
+}
+
 
 AstNode *ast_helper_type(AstFile *f, Token token, AstNode *type) {
 	AstNode *result = make_ast_node(f, AstNode_HelperType);
@@ -961,7 +987,7 @@ AstNode *ast_helper_type(AstFile *f, Token token, AstNode *type) {
 }
 
 
-AstNode *ast_proc_type(AstFile *f, Token token, AstNodeArray params, AstNodeArray results, u64 tags, ProcCallingConvention calling_convention) {
+AstNode *ast_proc_type(AstFile *f, Token token, AstNode *params, AstNode *results, u64 tags, ProcCallingConvention calling_convention) {
 	AstNode *result = make_ast_node(f, AstNode_ProcType);
 	result->ProcType.token = token;
 	result->ProcType.params = params;
@@ -1002,7 +1028,7 @@ AstNode *ast_vector_type(AstFile *f, Token token, AstNode *count, AstNode *elem)
 }
 
 AstNode *ast_struct_type(AstFile *f, Token token, AstNodeArray fields, isize field_count,
-                          bool is_packed, bool is_ordered, AstNode *align) {
+                         bool is_packed, bool is_ordered, AstNode *align) {
 	AstNode *result = make_ast_node(f, AstNode_StructType);
 	result->StructType.token       = token;
 	result->StructType.fields      = fields;
@@ -1308,7 +1334,6 @@ AstNode *    parse_proc_type(AstFile *f, AstNode **foreign_library, String *fore
 AstNodeArray parse_stmt_list(AstFile *f);
 AstNode *    parse_stmt(AstFile *f);
 AstNode *    parse_body(AstFile *f);
-void         parse_proc_signature(AstFile *f, AstNodeArray *params, AstNodeArray *results);
 
 
 
@@ -1949,19 +1974,6 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			}
 			break;
 
-		case Token_Question:
-			if (!lhs && operand != NULL && f->expr_level >= 0) {
-				AstNode *cond = operand;
-				Token token_q = expect_token(f, Token_Question);
-				AstNode *x = parse_expr(f, false);
-				Token token_c = expect_token(f, Token_Colon);
-				AstNode *y = parse_expr(f, false);
-				operand = ast_ternary_expr(f, cond, x, y);
-			} else {
-				loop = false;
-			}
-			break;
-
 		default:
 			loop = false;
 			break;
@@ -2016,22 +2028,24 @@ AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 // NOTE(bill): result == priority
 i32 token_precedence(TokenKind t) {
 	switch (t) {
-	case Token_CmpOr:
+	case Token_Question:
 		return 1;
-	case Token_CmpAnd:
+	case Token_CmpOr:
 		return 2;
+	case Token_CmpAnd:
+		return 3;
 	case Token_CmpEq:
 	case Token_NotEq:
 	case Token_Lt:
 	case Token_Gt:
 	case Token_LtEq:
 	case Token_GtEq:
-		return 3;
+		return 4;
 	case Token_Add:
 	case Token_Sub:
 	case Token_Or:
 	case Token_Xor:
-		return 4;
+		return 5;
 	case Token_Mul:
 	case Token_Quo:
 	case Token_Mod:
@@ -2039,51 +2053,42 @@ i32 token_precedence(TokenKind t) {
 	case Token_AndNot:
 	case Token_Shl:
 	case Token_Shr:
-		return 5;
-	// case Token_as:
-	// case Token_transmute:
-	// case Token_down_cast:
-	// case Token_union_cast:
-		// return 6;
+		return 6;
 	}
 	return 0;
 }
 
 AstNode *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
-	AstNode *expression = parse_unary_expr(f, lhs);
+	AstNode *expr = parse_unary_expr(f, lhs);
 	for (i32 prec = token_precedence(f->curr_token.kind); prec >= prec_in; prec--) {
 		for (;;) {
-			AstNode *right;
 			Token op = f->curr_token;
 			i32 op_prec = token_precedence(op.kind);
 			if (op_prec != prec) {
+				// NOTE(bill): This will also catch operators that are not valid "binary" operators
 				break;
 			}
 			expect_operator(f); // NOTE(bill): error checks too
-			if (lhs) {
-				// TODO(bill): error checking
-				lhs = false;
-			}
 
-			switch (op.kind) {
-			/* case Token_as:
-			case Token_transmute:
-			case Token_down_cast:
-			case Token_union_cast:
-				right = parse_type(f);
-				break; */
-
-			default:
-				right = parse_binary_expr(f, false, prec+1);
+			if (op.kind == Token_Question) {
+				AstNode *cond = expr;
+				// Token_Question
+				AstNode *x = parse_expr(f, lhs);
+				Token token_c = expect_token(f, Token_Colon);
+				AstNode *y = parse_expr(f, lhs);
+				expr = ast_ternary_expr(f, cond, x, y);
+			} else {
+				AstNode *right = parse_binary_expr(f, false, prec+1);
 				if (!right) {
-					syntax_error(op, "Expected expression on the right hand side of the binary operator");
+					syntax_error(op, "Expected expression on the right-hand side of the binary operator");
 				}
-				break;
+				expr = ast_binary_expr(f, op, expr, right);
 			}
-			expression = ast_binary_expr(f, op, expression, right);
+
+			lhs = false;
 		}
 	}
-	return expression;
+	return expr;
 }
 
 AstNode *parse_expr(AstFile *f, bool lhs) {
@@ -2278,15 +2283,39 @@ AstNode *parse_block_stmt(AstFile *f, b32 is_when) {
 	return parse_body(f);
 }
 
+AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind separator, TokenKind follow);
 
 
+AstNode *parse_results(AstFile *f) {
+	if (!allow_token(f, Token_ArrowRight)) {
+		return NULL;
+	}
+
+	if (f->curr_token.kind != Token_OpenParen) {
+		Token begin_token = f->curr_token;
+		AstNodeArray empty_names = {0};
+		AstNodeArray list = make_ast_node_array(f);
+		AstNode *type = parse_type(f);
+		array_add(&list, ast_field(f, empty_names, type, 0));
+		return ast_field_list(f, begin_token, list);
+	}
+
+	AstNode *list = NULL;
+	expect_token(f, Token_OpenParen);
+	list = parse_field_list(f, NULL, 0, Token_Comma, Token_CloseParen);
+	expect_token_after(f, Token_CloseParen, "parameter list");
+	return list;
+}
 
 AstNode *parse_proc_type(AstFile *f, AstNode **foreign_library_, String *foreign_name_, String *link_name_) {
-	AstNodeArray params = {0};
-	AstNodeArray results = {0};
+	AstNode *params = {0};
+	AstNode *results = {0};
 
 	Token proc_token = expect_token(f, Token_proc);
-	parse_proc_signature(f, &params, &results);
+	expect_token(f, Token_OpenParen);
+	params = parse_field_list(f, NULL, FieldFlag_Signature, Token_Comma, Token_CloseParen);
+	expect_token_after(f, Token_CloseParen, "parameter list");
+	results = parse_results(f);
 
 	u64 tags = 0;
 	String foreign_name = {0};
@@ -2424,8 +2453,9 @@ AstNodeArray convert_to_ident_list(AstFile *f, AstNodeAndFlagsArray list, bool i
 	return idents;
 }
 
-AstNodeArray parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags,
-                              TokenKind separator, TokenKind follow) {
+AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind separator, TokenKind follow) {
+	Token start_token = f->curr_token;
+
 	AstNodeArray params = make_ast_node_array(f);
 	AstNodeAndFlagsArray list = {0}; array_init(&list, heap_allocator()); // LEAK(bill):
 	isize total_name_count = 0;
@@ -2485,7 +2515,7 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags,
 		}
 
 		if (name_count_) *name_count_ = total_name_count;
-		return params;
+		return ast_field_list(f, start_token, params);
 	}
 
 	for_array(i, list) {
@@ -2503,11 +2533,11 @@ AstNodeArray parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags,
 	}
 
 	if (name_count_) *name_count_ = total_name_count;
-	return params;
+	return ast_field_list(f, start_token, params);
 }
 
 
-AstNodeArray parse_record_fields(AstFile *f, isize *field_count_, u32 flags, String context) {
+AstNode *parse_record_fields(AstFile *f, isize *field_count_, u32 flags, String context) {
 	return parse_field_list(f, field_count_, flags, Token_Comma, Token_CloseBrace);
 }
 
@@ -2637,8 +2667,14 @@ AstNode *parse_type_or_ident(AstFile *f) {
 
 		Token open = expect_token_after(f, Token_OpenBrace, "struct");
 		isize decl_count = 0;
-		AstNodeArray decls = parse_record_fields(f, &decl_count, FieldFlag_using, str_lit("struct"));
+		AstNode *fields = parse_record_fields(f, &decl_count, FieldFlag_using, str_lit("struct"));
 		Token close = expect_token(f, Token_CloseBrace);
+
+		AstNodeArray decls = {0};
+		if (fields != NULL) {
+			GB_ASSERT(fields->kind == AstNode_FieldList);
+			decls = fields->FieldList.list;
+		}
 
 		return ast_struct_type(f, token, decls, decl_count, is_packed, is_ordered, align);
 	} break;
@@ -2646,19 +2682,43 @@ AstNode *parse_type_or_ident(AstFile *f) {
 	case Token_union: {
 		Token token = expect_token(f, Token_union);
 		Token open = expect_token_after(f, Token_OpenBrace, "union");
-		isize decl_count = 0;
-		AstNodeArray decls = parse_record_fields(f, &decl_count, 0, str_lit("union"));
+		AstNodeArray variants = make_ast_node_array(f);
+
+		while (f->curr_token.kind != Token_CloseBrace &&
+		       f->curr_token.kind != Token_EOF) {
+			AstNode *name  = parse_ident(f);
+			Token    open  = expect_token(f, Token_OpenBrace);
+			isize decl_count = 0;
+			AstNode *list  = parse_record_fields(f, &decl_count, FieldFlag_using, str_lit("union"));
+			Token    close = expect_token(f, Token_CloseBrace);
+
+			array_add(&variants, ast_union_field(f, name, list));
+
+			if (f->curr_token.kind != Token_Comma) {
+				break;
+			}
+			next_token(f);
+		}
+
+		// AstNode *fields = parse_record_fields(f, &decl_count, 0, str_lit("union"));
 		Token close = expect_token(f, Token_CloseBrace);
 
-		return ast_union_type(f, token, decls, decl_count);
+
+		return ast_union_type(f, token, variants, variants.count);
 	}
 
 	case Token_raw_union: {
 		Token token = expect_token(f, Token_raw_union);
 		Token open = expect_token_after(f, Token_OpenBrace, "raw_union");
 		isize decl_count = 0;
-		AstNodeArray decls = parse_record_fields(f, &decl_count, FieldFlag_using, str_lit("raw_union"));
+		AstNode *fields = parse_record_fields(f, &decl_count, FieldFlag_using, str_lit("raw_union"));
 		Token close = expect_token(f, Token_CloseBrace);
+
+		AstNodeArray decls = {0};
+		if (fields != NULL) {
+			GB_ASSERT(fields->kind == AstNode_FieldList);
+			decls = fields->FieldList.list;
+		}
 
 		return ast_raw_union_type(f, token, decls, decl_count);
 	}
@@ -2699,39 +2759,6 @@ AstNode *parse_type_or_ident(AstFile *f) {
 }
 
 
-AstNodeArray parse_results(AstFile *f) {
-	AstNodeArray results = make_ast_node_array(f);
-	if (allow_token(f, Token_ArrowRight)) {
-		if (f->curr_token.kind == Token_OpenParen) {
-			expect_token(f, Token_OpenParen);
-			while (f->curr_token.kind != Token_CloseParen &&
-			       f->curr_token.kind != Token_EOF) {
-				array_add(&results, parse_type(f));
-				if (f->curr_token.kind != Token_Comma) {
-					break;
-				}
-				next_token(f);
-			}
-			expect_token(f, Token_CloseParen);
-
-			return results;
-		}
-
-		array_add(&results, parse_type(f));
-		return results;
-	}
-	return results;
-}
-
-void parse_proc_signature(AstFile *f,
-                          AstNodeArray *params,
-                          AstNodeArray *results) {
-	expect_token(f, Token_OpenParen);
-	*params = parse_field_list(f, NULL, FieldFlag_Signature, Token_Comma, Token_CloseParen);
-	expect_token_after(f, Token_CloseParen, "parameter list");
-	*results = parse_results(f);
-}
-
 AstNode *parse_body(AstFile *f) {
 	AstNodeArray stmts = {0};
 	Token open, close;
@@ -2746,48 +2773,6 @@ AstNode *parse_body(AstFile *f) {
 
 	return ast_block_stmt(f, stmts, open, close);
 }
-
-
-/*
-AstNode *parse_proc_decl(AstFile *f) {
-	if (look_ahead_token_kind(f, 1) == Token_OpenParen) {
-		// NOTE(bill): It's an anonymous procedure
-		// NOTE(bill): This look-ahead technically makes the grammar LALR(2)
-		// but is that a problem in practice?
-		return ast_expr_stmt(f, parse_expr(f, true));
-	}
-
-	AstNodeArray params = {0};
-	AstNodeArray results = {0};
-
-	Token proc_token = expect_token(f, Token_proc);
-	AstNode *name = parse_ident(f);
-	parse_proc_signature(f, &params, &results);
-
-	u64 tags = 0;
-	String foreign_name = {0};
-	String link_name = {0};
-	ProcCallingConvention cc = ProcCC_Odin;
-
-	parse_proc_tags(f, &tags, &foreign_name, &link_name, &cc);
-
-	AstNode *proc_type = ast_proc_type(f, proc_token, params, results, tags, cc);
-	AstNode *body = NULL;
-
-	if (f->curr_token.kind == Token_OpenBrace) {
-		if ((tags & ProcTag_foreign) != 0) {
-			syntax_error(proc_token, "A procedure tagged as `#foreign` cannot have a body");
-		}
-		AstNode *curr_proc = f->curr_proc;
-		f->curr_proc = proc_type;
-		body = parse_body(f);
-		f->curr_proc = curr_proc;
-	} else if ((tags & ProcTag_foreign) == 0) {
-		syntax_error(proc_token, "Only a procedure tagged as `#foreign` cannot have a body");
-	}
-
-	return ast_proc_decl(f, name, proc_type, body, tags, foreign_name, link_name);
-} */
 
 AstNode *parse_if_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
@@ -3458,8 +3443,18 @@ AstNode *parse_stmt(AstFile *f) {
 			return s;
 		}
 
-		expect_semicolon(f, s);
-		return ast_tag_stmt(f, hash_token, name, parse_stmt(f));
+
+		if (str_eq(tag, str_lit("include"))) {
+			syntax_error(token, "#include is not a valid import declaration kind. Use #load instead");
+			s = ast_bad_stmt(f, token, f->curr_token);
+		} else {
+			syntax_error(token, "Unknown tag used: `%.*s`", LIT(tag));
+			s = ast_bad_stmt(f, token, f->curr_token);
+		}
+
+		fix_advance_to_next_stmt(f);
+
+		return s;
 	} break;
 
 	case Token_OpenBrace:

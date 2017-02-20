@@ -705,7 +705,7 @@ extern "C++" {
 #endif
 
 #ifndef gb_is_between
-#define gb_is_between(x, lower, upper) (((x) >= (lower)) && ((x) <= (upper)))
+#define gb_is_between(x, lower, upper) (((lower) <= (x)) && ((x) <= (upper)))
 #endif
 
 #ifndef gb_abs

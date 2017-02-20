@@ -888,7 +888,7 @@ bool are_types_identical(Type *x, Type *y) {
 
 	case Type_Named:
 		if (y->kind == Type_Named) {
-			return x->Named.base == y->Named.base;
+			return x->Named.type_name == y->Named.type_name;
 		}
 		break;
 
@@ -922,7 +922,6 @@ bool are_types_identical(Type *x, Type *y) {
 		}
 		break;
 	}
-
 
 	return false;
 }
@@ -1023,38 +1022,47 @@ typedef enum ProcTypeOverloadKind {
 ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
  	if (!is_type_proc(x)) return ProcOverload_NotProcedure;
  	if (!is_type_proc(y)) return ProcOverload_NotProcedure;
-	TypeProc *px = &base_type(x)->Proc;
-	TypeProc *py = &base_type(y)->Proc;
+	TypeProc px = base_type(x)->Proc;
+	TypeProc py = base_type(y)->Proc;
 
-	if (px->calling_convention != py->calling_convention) {
+	if (px.calling_convention != py.calling_convention) {
 		return ProcOverload_CallingConvention;
 	}
 
-	if (px->param_count != py->param_count) {
+	if (px.param_count != py.param_count) {
 		return ProcOverload_ParamCount;
 	}
 
-	for (isize i = 0; i < px->param_count; i++) {
-		Entity *ex = px->params->Tuple.variables[i];
-		Entity *ey = py->params->Tuple.variables[i];
+	for (isize i = 0; i < px.param_count; i++) {
+		Entity *ex = px.params->Tuple.variables[i];
+		Entity *ey = py.params->Tuple.variables[i];
 		if (!are_types_identical(ex->type, ey->type)) {
 			return ProcOverload_ParamTypes;
 		}
 	}
 	// IMPORTANT TODO(bill): Determine the rules for overloading procedures with variadic parameters
-	if (px->variadic != py->variadic) {
+	if (px.variadic != py.variadic) {
 		return ProcOverload_ParamVariadic;
 	}
 
-	if (px->result_count != py->result_count) {
+	if (px.result_count != py.result_count) {
 		return ProcOverload_ResultCount;
 	}
 
-	for (isize i = 0; i < px->result_count; i++) {
-		Entity *ex = px->results->Tuple.variables[i];
-		Entity *ey = py->results->Tuple.variables[i];
+	for (isize i = 0; i < px.result_count; i++) {
+		Entity *ex = px.results->Tuple.variables[i];
+		Entity *ey = py.results->Tuple.variables[i];
 		if (!are_types_identical(ex->type, ey->type)) {
 			return ProcOverload_ResultTypes;
+		}
+	}
+
+	{
+		Entity *ex = px.params->Tuple.variables[0];
+		Entity *ey = py.params->Tuple.variables[0];
+		bool ok = are_types_identical(ex->type, ey->type);
+		if (ok) {
+			gb_printf_err("Here\n");
 		}
 	}
 

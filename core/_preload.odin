@@ -37,6 +37,7 @@ Calling_Convention :: enum {
 	FAST = 3,
 }
 
+/*
 Type_Info :: union {
 	Named: struct #ordered {
 		name: string,
@@ -96,6 +97,48 @@ Type_Info :: union {
 		count:            int, // == 0 if dynamic
 	},
 }
+*/
+Type_Info :: union {
+	Named{name: string, base: ^Type_Info},
+	Integer{size: int, signed: bool},
+	Float{size: int},
+	String{},
+	Boolean{},
+	Any{},
+	Pointer{
+		elem: ^Type_Info, // nil -> rawptr
+	},
+	Procedure{
+		params:     ^Type_Info, // Type_Info.Tuple
+		results:    ^Type_Info, // Type_Info.Tuple
+		variadic:   bool,
+		convention: Calling_Convention,
+	},
+	Array{
+		elem:      ^Type_Info,
+		elem_size: int,
+		count:     int,
+	},
+	Dynamic_Array{elem: ^Type_Info, elem_size: int},
+	Slice        {elem: ^Type_Info, elem_size: int},
+	Vector       {elem: ^Type_Info, elem_size, count, align: int},
+	Tuple        {using record: Type_Info_Record}, // Only really used for procedures
+	Struct       {using record: Type_Info_Record},
+	Union        {using record: Type_Info_Record},
+	Raw_Union    {using record: Type_Info_Record},
+	Enum{
+		base:   ^Type_Info,
+		names:  []string,
+		values: []Type_Info_Enum_Value,
+	},
+	Map{
+		key:              ^Type_Info,
+		value:            ^Type_Info,
+		generated_struct: ^Type_Info,
+		count:            int, // == 0 if dynamic
+	},
+}
+
 
 // // NOTE(bill): only the ones that are needed (not all types)
 // // This will be set by the compiler
@@ -633,7 +676,7 @@ __dynamic_map_add_entry :: proc(using h: __Map_Header, key: __Map_Key) -> int {
 }
 
 
-__dynamic_map_remove :: proc(using h: __Map_Header, key: __Map_Key) {
+__dynamic_map_delete :: proc(using h: __Map_Header, key: __Map_Key) {
 	fr := __dynamic_map_find(h, key);
 	if fr.entry_index >= 0 {
 		__dynamic_map_erase(h, fr);

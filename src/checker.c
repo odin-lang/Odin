@@ -30,6 +30,7 @@ typedef enum BuiltinProcId {
 	BuiltinProc_reserve,
 	BuiltinProc_clear,
 	BuiltinProc_append,
+	BuiltinProc_delete,
 
 	BuiltinProc_size_of,
 	BuiltinProc_size_of_val,
@@ -73,6 +74,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("reserve"),          2, false, Expr_Stmt},
 	{STR_LIT("clear"),            1, false, Expr_Stmt},
 	{STR_LIT("append"),           1, true,  Expr_Expr},
+	{STR_LIT("delete"),           2, false, Expr_Stmt},
 
 	{STR_LIT("size_of"),          1, false, Expr_Expr},
 	{STR_LIT("size_of_val"),      1, false, Expr_Expr},
@@ -259,6 +261,7 @@ typedef struct DelayedDecl {
 } DelayedDecl;
 
 typedef struct CheckerContext {
+	Scope *    file_scope;
 	Scope *    scope;
 	DeclInfo * decl;
 	u32        stmt_state_flags;
@@ -1016,6 +1019,7 @@ void add_curr_ast_file(Checker *c, AstFile *file) {
 		c->curr_ast_file = file;
 		c->context.decl  = file->decl_info;
 		c->context.scope = file->scope;
+		c->context.file_scope = file->scope;
 	}
 }
 
@@ -1242,6 +1246,9 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
 			switch (kind) {
 			case ProcOverload_Identical:
+				error(p->token, "Overloaded procedure `%.*s` as the same type as another procedure in this scope", LIT(name));
+				is_invalid = true;
+				break;
 			case ProcOverload_CallingConvention:
 				error(p->token, "Overloaded procedure `%.*s` as the same type as another procedure in this scope", LIT(name));
 				is_invalid = true;
@@ -1746,6 +1753,8 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 				Entity *e = make_entity_import_name(c->allocator, parent_scope, id->import_name, t_invalid,
 				                                    id->fullpath, id->import_name.string,
 				                                    scope);
+
+
 				add_entity(c, parent_scope, NULL, e);
 			}
 		}

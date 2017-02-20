@@ -116,11 +116,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		case ti == type_info(int):  buffer_write_string(buf, "int");
 		case ti == type_info(uint): buffer_write_string(buf, "uint");
 		default:
-			if info.signed {
-				buffer_write_string(buf, "i");
-			} else {
-				buffer_write_string(buf, "u");
-			}
+			buffer_write_string(buf, info.signed ? "i" : "u");
 			fi := Fmt_Info{buf = buf};
 			fmt_int(^fi, cast(u64)(8*info.size), false, 'd');
 		}
@@ -297,7 +293,7 @@ sprintf :: proc(buf: []byte, fmt: string, args: ...any) -> string {
 
 
 
-parse_int :: proc(s: string, offset: int) -> (int, int, bool) {
+parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: bool) {
 	is_digit :: proc(r: rune) -> bool #inline {
 		return '0' <= r && r <= '9';
 	}
@@ -320,7 +316,12 @@ parse_int :: proc(s: string, offset: int) -> (int, int, bool) {
 	return result, offset+i, i != 0;
 }
 
-_arg_number :: proc(fi: ^Fmt_Info, arg_index: int, format: string, offset: int, arg_count: int) -> (int, int, bool) {
+_arg_number :: proc(fi: ^Fmt_Info,
+                    arg_index: int,
+                    format: string,
+                    offset: int,
+                    arg_count: int,
+                    ) -> (index: int, offset: int, ok: bool) {
 	parse_arg_number :: proc(format: string) -> (int, int, bool) {
 		if format.count < 3 {
 			return 0, 1, false;
@@ -396,11 +397,7 @@ fmt_bad_verb :: proc(using fi: ^Fmt_Info, verb: rune) {
 fmt_bool :: proc(using fi: ^Fmt_Info, b: bool, verb: rune) {
 	match verb {
 	case 't', 'v':
-		if b {
-			buffer_write_string(buf, "true");
-		} else {
-			buffer_write_string(buf, "false");
-		}
+		buffer_write_string(buf, b ? "true" : "false");
 	default:
 		fmt_bad_verb(fi, verb);
 	}

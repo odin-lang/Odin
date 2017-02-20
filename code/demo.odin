@@ -5,18 +5,22 @@
 #import "mem.odin";
 #import "opengl.odin";
 #import "os.odin";
-#import "utf8.odin";
-
+// #import "halloc.odin";
 
 main :: proc() {
-	x: f32 = false ? 123 : 55;
-	fmt.println("Ternary:", x);
+	m: map[int]int;
+	m[123] = 312;
+	fmt.println(m[123]);
+	delete(m, 123);
+	fmt.println(m[123]);
+
+
 /*
 /*
 	Version 0.1.1
 
 	Added:
-	 * Dynamic Arrays [dynamic]Type`
+	 * Dynamic Arrays `[dynamic]Type`
 	 * Dynamic Maps   `map[Key]Value`
 	 * Dynamic array and map literals
 	 * Custom struct alignemnt `struct #align 8 { bar: i8 }`
@@ -29,6 +33,7 @@ main :: proc() {
 	 * immutable variables are "completely immutable" - rules need a full explanation
 	 * `slice_to_bytes` - convert any slice to a slice of bytes
 	 * `union_cast` allows for optional ok check
+	 * ?: ternary operator
 
 	Removed:
 	 * Maybe/option types
