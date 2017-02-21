@@ -14,6 +14,18 @@
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
+Type_Info_Enum_Value :: raw_union {
+	f: f64,
+	i: i64,
+}
+// NOTE(bill): This must match the compiler's
+Calling_Convention :: enum {
+	ODIN = 0,
+	C    = 1,
+	STD  = 2,
+	FAST = 3,
+}
+
 Type_Info_Record :: struct #ordered {
 	types:        []^Type_Info,
 	names:        []string,
@@ -24,80 +36,7 @@ Type_Info_Record :: struct #ordered {
 	ordered:      bool,
 	custom_align: bool,
 }
-Type_Info_Enum_Value :: raw_union {
-	f: f64,
-	i: i64,
-}
 
-// NOTE(bill): This much the same as the compiler's
-Calling_Convention :: enum {
-	ODIN = 0,
-	C    = 1,
-	STD  = 2,
-	FAST = 3,
-}
-
-/*
-Type_Info :: union {
-	Named: struct #ordered {
-		name: string,
-		base: ^Type_Info, // This will _not_ be a Type_Info.Named
-	},
-	Integer: struct #ordered {
-		size:   int, // in bytes
-		signed: bool,
-	},
-	Float: struct #ordered {
-		size: int, // in bytes
-	},
-	String:  struct #ordered {},
-	Boolean: struct #ordered {},
-	Any:     struct #ordered {},
-	Pointer: struct #ordered {
-		elem: ^Type_Info, // nil -> rawptr
-	},
-	Procedure: struct #ordered {
-		params:     ^Type_Info, // Type_Info.Tuple
-		results:    ^Type_Info, // Type_Info.Tuple
-		variadic:   bool,
-		convention: Calling_Convention,
-	},
-	Array: struct #ordered {
-		elem:      ^Type_Info,
-		elem_size: int,
-		count:     int,
-	},
-	Dynamic_Array: struct #ordered {
-		elem:      ^Type_Info,
-		elem_size: int,
-	},
-	Slice: struct #ordered {
-		elem:      ^Type_Info,
-		elem_size: int,
-	},
-	Vector: struct #ordered {
-		elem:      ^Type_Info,
-		elem_size: int,
-		count:     int,
-		align:     int,
-	},
-	Tuple:     Type_Info_Record, // Only really used for procedures
-	Struct:    Type_Info_Record,
-	Union:     Type_Info_Record,
-	Raw_Union: Type_Info_Record,
-	Enum: struct #ordered {
-		base:   ^Type_Info,
-		names:  []string,
-		values: []Type_Info_Enum_Value,
-	},
-	Map: struct #ordered {
-		key:              ^Type_Info,
-		value:            ^Type_Info,
-		generated_struct: ^Type_Info,
-		count:            int, // == 0 if dynamic
-	},
-}
-*/
 Type_Info :: union {
 	Named{name: string, base: ^Type_Info},
 	Integer{size: int, signed: bool},
@@ -124,8 +63,18 @@ Type_Info :: union {
 	Vector       {elem: ^Type_Info, elem_size, count, align: int},
 	Tuple        {using record: Type_Info_Record}, // Only really used for procedures
 	Struct       {using record: Type_Info_Record},
-	Union        {using record: Type_Info_Record},
 	Raw_Union    {using record: Type_Info_Record},
+	Union{
+		common_fields: struct {
+			types:        []^Type_Info,
+			names:        []string,
+			offsets:      []int,    // offsets may not be used in tuples
+		},
+		variant_names: []string,
+		variant_types: []^Type_Info,
+		size:          int,
+		align:         int,
+	},
 	Enum{
 		base:   ^Type_Info,
 		names:  []string,
@@ -142,7 +91,7 @@ Type_Info :: union {
 
 // // NOTE(bill): only the ones that are needed (not all types)
 // // This will be set by the compiler
-// immutable __type_infos: []Type_Info;
+__type_infos: []Type_Info;
 
 type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 	if info == nil {

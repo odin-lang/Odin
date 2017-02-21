@@ -189,8 +189,8 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 #endif
 
 	if (is_type_union(dst)) {
-		for (isize i = 0; i < dst->Record.field_count; i++) {
-			Entity *f = dst->Record.fields[i];
+		for (isize i = 0; i < dst->Record.variant_count; i++) {
+			Entity *f = dst->Record.variants[i];
 			if (are_types_identical(f->type, s)) {
 				return 1;
 			}
@@ -297,7 +297,10 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 
 void populate_using_entity_map(Checker *c, AstNode *node, Type *t, MapEntity *entity_map) {
 	t = base_type(type_deref(t));
-	gbString str = expr_to_string(node);
+	gbString str = NULL;
+	if (node != NULL) {
+		expr_to_string(node);
+	}
 
 	if (t->kind == Type_Record) {
 		for (isize i = 0; i < t->Record.field_count; i++) {
@@ -309,7 +312,11 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, MapEntity *en
 			if (found != NULL) {
 				Entity *e = *found;
 				// TODO(bill): Better type error
-				error(e->token, "`%.*s` is already declared in `%s`", LIT(name), str);
+				if (str != NULL) {
+					error(e->token, "`%.*s` is already declared in `%s`", LIT(name), str);
+				} else {
+					error(e->token, "`%.*s` is already declared`", LIT(name));
+				}
 			} else {
 				map_entity_set(entity_map, key, f);
 				add_entity(c, c->context.scope, NULL, f);
@@ -324,145 +331,106 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, MapEntity *en
 }
 
 
-void check_fields(Checker *c, AstNode *node, AstNodeArray decls,
-                  Entity **fields, isize field_count,
-                  String context) {
+// Returns filled field_count
+isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
+                   Entity **fields, isize field_count,
+                   String context) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
 	MapEntity entity_map = {0};
 	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*field_count);
 
-	isize other_field_index = 0;
 	Entity *using_index_expr = NULL;
 
-	if (node->kind == AstNode_UnionType) {
-		isize field_index = 0;
-		fields[field_index++] = make_entity_type_name(c->allocator, c->context.scope, empty_token, NULL);
-		for_array(decl_index, decls) {
-			AstNode *decl = decls.e[decl_index];
-			if (decl->kind != AstNode_Field) {
+	if (node != NULL) {
+		GB_ASSERT(node->kind != AstNode_UnionType);
+	}
+
+	isize field_index = 0;
+	for_array(decl_index, decls) {
+		AstNode *decl = decls.e[decl_index];
+		if (decl->kind != AstNode_Field) {
+			continue;
+		}
+		ast_node(f, Field, decl);
+
+		Type *type = check_type(c, f->type);
+
+		if (f->flags&FieldFlag_using) {
+			if (f->names.count > 1) {
+				error_node(f->names.e[0], "Cannot apply `using` to more than one of the same type");
+			}
+		}
+
+		for_array(name_index, f->names) {
+			AstNode *name = f->names.e[name_index];
+			if (!ast_node_expect(name, AstNode_Ident)) {
 				continue;
 			}
 
-			ast_node(f, Field, decl);
-			Type *base_type = check_type_extra(c, f->type, NULL);
+			Token name_token = name->Ident;
 
-			for_array(name_index, f->names) {
-				AstNode *name = f->names.e[name_index];
-				if (!ast_node_expect(name, AstNode_Ident)) {
-					continue;
-				}
-
-				Token name_token = name->Ident;
-
-				if (str_eq(name_token.string, str_lit("names"))) {
-					error(name_token, "`names` is a reserved identifier for unions");
-					continue;
-				}
-
-				Type *type = make_type_named(c->allocator, name_token.string, base_type, NULL);
-				Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, type);
-				type->Named.type_name = e;
-				add_entity(c, c->context.scope, name, e);
-
-				if (str_eq(name_token.string, str_lit("_"))) {
-					error(name_token, "`_` cannot be used a union subtype");
-					continue;
-				}
-
+			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, f->flags&FieldFlag_using, cast(i32)field_index);
+			e->identifier = name;
+			if (str_eq(name_token.string, str_lit("_"))) {
+				fields[field_index++] = e;
+			} else {
 				HashKey key = hash_string(name_token.string);
-				if (map_entity_get(&entity_map, key) != NULL) {
+				Entity **found = map_entity_get(&entity_map, key);
+				if (found != NULL) {
+					Entity *e = *found;
 					// TODO(bill): Scope checking already checks the declaration
-					error(name_token, "`%.*s` is already declared in this union", LIT(name_token.string));
+					error(name_token, "`%.*s` is already declared in this type", LIT(name_token.string));
+					error(e->token,   "\tpreviously declared");
 				} else {
 					map_entity_set(&entity_map, key, e);
 					fields[field_index++] = e;
+					add_entity(c, c->context.scope, name, e);
 				}
 				add_entity_use(c, name, e);
 			}
 		}
-	} else {
-		isize field_index = 0;
-		for_array(decl_index, decls) {
-			AstNode *decl = decls.e[decl_index];
-			if (decl->kind != AstNode_Field) {
-				continue;
-			}
-			ast_node(f, Field, decl);
-
-			Type *type = check_type_extra(c, f->type, NULL);
-
-			if (f->flags&FieldFlag_using) {
-				if (f->names.count > 1) {
-					error_node(f->names.e[0], "Cannot apply `using` to more than one of the same type");
-				}
-			}
-
-			for_array(name_index, f->names) {
-				AstNode *name = f->names.e[name_index];
-				if (!ast_node_expect(name, AstNode_Ident)) {
-					continue;
-				}
-
-				Token name_token = name->Ident;
-
-				Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, f->flags&FieldFlag_using, cast(i32)field_index);
-				e->identifier = name;
-				if (str_eq(name_token.string, str_lit("_"))) {
-					fields[field_index++] = e;
-				} else {
-					HashKey key = hash_string(name_token.string);
-					if (map_entity_get(&entity_map, key) != NULL) {
-						// TODO(bill): Scope checking already checks the declaration
-						error(name_token, "`%.*s` is already declared in this type", LIT(name_token.string));
-					} else {
-						map_entity_set(&entity_map, key, e);
-						fields[field_index++] = e;
-						add_entity(c, c->context.scope, name, e);
-					}
-					add_entity_use(c, name, e);
-				}
-			}
 
 
-			if (f->flags&FieldFlag_using) {
-				Type *t = base_type(type_deref(type));
-				if (!is_type_struct(t) && !is_type_raw_union(t) &&
-				    f->names.count >= 1 &&
-				    f->names.e[0]->kind == AstNode_Ident) {
-					Token name_token = f->names.e[0]->Ident;
-					if (is_type_indexable(t)) {
-						bool ok = true;
-						for_array(emi, entity_map.entries) {
-							Entity *e = entity_map.entries.e[emi].value;
-							if (e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous) {
-								if (is_type_indexable(e->type)) {
-									if (e->identifier != f->names.e[0]) {
-										ok = false;
-										using_index_expr = e;
-										break;
-									}
+		if (f->flags&FieldFlag_using) {
+			Type *t = base_type(type_deref(type));
+			if (!is_type_struct(t) && !is_type_raw_union(t) &&
+			    f->names.count >= 1 &&
+			    f->names.e[0]->kind == AstNode_Ident) {
+				Token name_token = f->names.e[0]->Ident;
+				if (is_type_indexable(t)) {
+					bool ok = true;
+					for_array(emi, entity_map.entries) {
+						Entity *e = entity_map.entries.e[emi].value;
+						if (e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous) {
+							if (is_type_indexable(e->type)) {
+								if (e->identifier != f->names.e[0]) {
+									ok = false;
+									using_index_expr = e;
+									break;
 								}
 							}
 						}
-						if (ok) {
-							using_index_expr = fields[field_index-1];
-						} else {
-							fields[field_index-1]->flags &= ~EntityFlag_Anonymous;
-							error(name_token, "Previous `using` for an index expression `%.*s`", LIT(name_token.string));
-						}
-					} else {
-						error(name_token, "`using` on a field `%.*s` must be a `struct` or `raw_union`", LIT(name_token.string));
-						continue;
 					}
+					if (ok) {
+						using_index_expr = fields[field_index-1];
+					} else {
+						fields[field_index-1]->flags &= ~EntityFlag_Anonymous;
+						error(name_token, "Previous `using` for an index expression `%.*s`", LIT(name_token.string));
+					}
+				} else {
+					error(name_token, "`using` on a field `%.*s` must be a `struct` or `raw_union`", LIT(name_token.string));
+					continue;
 				}
-
-				populate_using_entity_map(c, node, type, &entity_map);
 			}
+
+			populate_using_entity_map(c, node, type, &entity_map);
 		}
 	}
 
 	gb_temp_arena_memory_end(tmp);
+
+	return field_index;
 }
 
 
@@ -520,7 +488,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
 
-	check_fields(c, node, st->fields, fields, field_count, str_lit("struct"));
+	field_count = check_fields(c, node, st->fields, fields, field_count, str_lit("struct"));
 
 	struct_type->Record.struct_is_packed    = st->is_packed;
 	struct_type->Record.struct_is_ordered   = st->is_ordered;
@@ -590,55 +558,88 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 		return;
 	}
 
-}
 
+}
 void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
 
-	isize field_count = ut->fields.count+1;
+	isize variant_count = ut->variants.count+1;
+	isize field_count = 0;
+	for_array(i, ut->fields) {
+		AstNode *field = ut->fields.e[i];
+		if (field->kind == AstNode_Field) {
+			ast_node(f, Field, field);
+			field_count += f->names.count;
+		}
+	}
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
 	MapEntity entity_map = {0};
-	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*field_count);
+	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*variant_count);
 
-	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
+	Entity *using_index_expr = NULL;
 
-	isize field_index = 0;
-	fields[field_index++] = make_entity_type_name(c->allocator, c->context.scope, empty_token, NULL);
+	Entity **variants = gb_alloc_array(c->allocator, Entity *, variant_count);
+	Entity **fields   = gb_alloc_array(c->allocator, Entity *, field_count);
 
-	for_array(i, ut->fields) {
-		AstNode *field = ut->fields.e[i];
-		if (field->kind != AstNode_UnionField) {
+	isize variant_index = 0;
+	variants[variant_index++] = make_entity_type_name(c->allocator, c->context.scope, empty_token, NULL);
+
+	field_count = check_fields(c, NULL, ut->fields, fields, field_count, str_lit("union"));
+
+	union_type->Record.fields      = fields;
+	union_type->Record.field_count = field_count;
+
+	for_array(i, ut->variants) {
+		AstNode *variant = ut->variants.e[i];
+		if (variant->kind != AstNode_UnionField) {
 			continue;
 		}
-		ast_node(f, UnionField, ut->fields.e[i]);
+		ast_node(f, UnionField, variant);
 		Token name_token = f->name->Ident;
-
-		if (str_eq(name_token.string, str_lit("names"))) {
-			error(name_token, "`names` is a reserved identifier for unions");
-			continue;
-		}
 
 		Type *base_type = make_type_struct(c->allocator);
 		{
 			ast_node(fl, FieldList, f->list);
-			isize field_count = 0;
-			for_array(j, fl->list) {
-				ast_node(f, Field, fl->list.e[j]);
-				field_count += f->names.count;
+
+			// TODO(bill): Just do a gb_memcopy here
+			// NOTE(bill): Copy the contents for the common fields for now
+			AstNodeArray list = {0};
+			array_init_count(&list, c->allocator, ut->fields.count+fl->list.count);
+			for (isize j = 0; j < ut->fields.count; j++) {
+				list.e[j] = ut->fields.e[j];
 			}
+			for (isize j = 0; j < fl->list.count; j++) {
+				list.e[j+ut->fields.count] = fl->list.e[j];
+			}
+
+			isize list_count = 0;
+			for_array(j, list) {
+				ast_node(f, Field, list.e[j]);
+				list_count += f->names.count;
+			}
+
 
 			Token token = name_token;
 			token.kind = Token_struct;
-			AstNode *dummy_struct = ast_struct_type(c->curr_ast_file, token, fl->list, field_count,
-			                                        false, true, NULL);
+			AstNode *dummy_struct = ast_struct_type(c->curr_ast_file, token, list, list_count, false, true, NULL);
 
 			check_open_scope(c, dummy_struct);
-			check_struct_type(c, base_type, dummy_struct);
-			check_close_scope(c);
+			Entity **fields = gb_alloc_array(c->allocator, Entity *, list_count);
+			isize field_count = check_fields(c, dummy_struct, list, fields, list_count, str_lit("variant"));
+			base_type->Record.struct_is_packed    = false;
+			base_type->Record.struct_is_ordered   = true;
+			base_type->Record.fields              = fields;
+			base_type->Record.fields_in_src_order = fields;
+			base_type->Record.field_count         = field_count;
+			base_type->Record.names = make_names_field_for_record(c, c->context.scope);
 			base_type->Record.node = dummy_struct;
+
+			type_set_offsets(c->allocator, base_type);
+
+			check_close_scope(c);
 		}
 
 		Type *type = make_type_named(c->allocator, name_token.string, base_type, NULL);
@@ -657,16 +658,15 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 			error(name_token, "`%.*s` is already declared in this union", LIT(name_token.string));
 		} else {
 			map_entity_set(&entity_map, key, e);
-			fields[field_index++] = e;
+			variants[variant_index++] = e;
 		}
 		add_entity_use(c, f->name, e);
 	}
 
 	gb_temp_arena_memory_end(tmp);
 
-	union_type->Record.fields      = fields;
-	union_type->Record.field_count = field_index;
-	union_type->Record.names = make_names_field_for_record(c, c->context.scope);
+	union_type->Record.variants      = variants;
+	union_type->Record.variant_count = variant_index;
 }
 
 void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
@@ -686,7 +686,7 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
 
-	check_fields(c, node, ut->fields, fields, field_count, str_lit("raw_union"));
+	field_count = check_fields(c, node, ut->fields, fields, field_count, str_lit("raw_union"));
 
 	union_type->Record.fields = fields;
 	union_type->Record.field_count = field_count;
@@ -865,7 +865,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		AstNode *field = params.e[i];
 		if (ast_node_expect(field, AstNode_Field)) {
 			ast_node(f, Field, field);
-			variable_count += max(f->names.count, 1);
+			variable_count += gb_max(f->names.count, 1);
 		}
 	}
 
@@ -951,7 +951,7 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 		AstNode *field = results.e[i];
 		if (ast_node_expect(field, AstNode_Field)) {
 			ast_node(f, Field, field);
-			variable_count += max(f->names.count, 1);
+			variable_count += gb_max(f->names.count, 1);
 		}
 	}
 
@@ -4516,11 +4516,14 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		Type *t = base_type(type);
 		switch (t->kind) {
 		case Type_Record: {
-			if (!is_type_struct(t)) {
+			if (!is_type_struct(t) && !is_type_union(t)) {
 				if (cl->elems.count != 0) {
 					error_node(node, "Illegal compound literal");
 				}
 				break;
+			}
+			if (is_type_union(t)) {
+				is_constant = false;
 			}
 			if (cl->elems.count == 0) {
 				break; // NOTE(bill): No need to init
@@ -4917,8 +4920,8 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			}
 
 			bool ok = false;
-			for (isize i = 1; i < bsrc->Record.field_count; i++) {
-				Entity *f = bsrc->Record.fields[i];
+			for (isize i = 1; i < bsrc->Record.variant_count; i++) {
+				Entity *f = bsrc->Record.variants[i];
 				if (are_types_identical(f->type, dst)) {
 					ok = true;
 					break;
@@ -5308,11 +5311,9 @@ gbString write_expr_to_string(gbString str, AstNode *node);
 gbString write_record_fields_to_string(gbString str, AstNodeArray params) {
 	for_array(i, params) {
 		if (i > 0) {
-			str = gb_string_appendc(str, " ");
+			str = gb_string_appendc(str, ", ");
 		}
 		str = write_expr_to_string(str, params.e[i]);
-		str = gb_string_appendc(str, ";");
-
 	}
 	return str;
 }
@@ -5500,6 +5501,13 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 			}
 			str = write_expr_to_string(str, f->list.e[i]);
 		}
+	case_end;
+
+	case_ast_node(f, UnionField, node);
+		str = write_expr_to_string(str, f->name);
+		str = gb_string_appendc(str, "{");
+		str = write_expr_to_string(str, f->list);
+		str = gb_string_appendc(str, "}");
 	case_end;
 
 	case_ast_node(ce, CallExpr, node);

@@ -1029,8 +1029,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				if (is_union_ptr) {
 					GB_ASSERT(is_type_union(bt));
 					bool tag_type_found = false;
-					for (isize i = 0; i < bt->Record.field_count; i++) {
-						Entity *f = bt->Record.fields[i];
+					for (isize i = 0; i < bt->Record.variant_count; i++) {
+						Entity *f = bt->Record.variants[i];
 						if (are_types_identical(f->type, y.type)) {
 							tag_type_found = true;
 							break;
@@ -1038,8 +1038,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					}
 					if (!tag_type_found) {
 						gbString type_str = type_to_string(y.type);
-						error_node(y.expr,
-						           "Unknown tag type, got `%s`", type_str);
+						error_node(y.expr, "Unknown tag type, got `%s`", type_str);
 						gb_string_free(type_str);
 						continue;
 					}
@@ -1163,8 +1162,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			case Entity_TypeName: {
 				Type *t = base_type(e->type);
 				if (is_type_union(t)) {
-					for (isize i = 0; i < t->Record.field_count; i++) {
-						Entity *f = t->Record.fields[i];
+					for (isize i = 0; i < t->Record.variant_count; i++) {
+						Entity *f = t->Record.variants[i];
 						Entity *found = scope_insert_entity(c->context.scope, f);
 						if (found != NULL) {
 							gbString expr_str = expr_to_string(expr);
