@@ -215,11 +215,36 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 
 	case Union:
 		buffer_write_string(buf, "union {");
-		for name, i in info.names {
+		cf := info.common_fields;
+		total_count := 0;
+		for name, i in cf.names {
+			if i > 0 {
+				buffer_write_string(buf, ", ");
+			}
 			buffer_write_string(buf, name);
 			buffer_write_string(buf, ": ");
-			buffer_write_type(buf, info.types[i]);
-			buffer_write_byte(buf, ',');
+			buffer_write_type(buf, cf.types[i]);
+			total_count += 1;
+		}
+		for name, i in info.variant_names {
+			if i > 0 || total_count > 0 {
+				buffer_write_string(buf, ", ");
+			}
+			buffer_write_string(buf, name);
+			buffer_write_byte(buf, '{');
+			defer buffer_write_byte(buf, '}');
+
+			variant_type := type_info_base(info.variant_types[i]);
+			variant := union_cast(^Struct)variant_type;
+
+			for j in cf.names.count..<variant.names.count {
+				if j > 0 {
+					buffer_write_byte(buf, ',');
+				}
+				buffer_write_string(buf, variant.names[j]);
+				buffer_write_string(buf, ": ");
+				buffer_write_type(buf, variant.types[j]);
+			}
 		}
 		buffer_write_string(buf, "}");
 
@@ -687,6 +712,9 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 						break;
 					}
 				}
+			} else if e.values.count == 0 {
+				buffer_write_string(fi.buf, "");
+				ok = true;
 			} else {
 				for it, idx in e.values {
 					if it.f == f {
@@ -864,7 +892,21 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		}
 
 	case Union:
-		buffer_write_string(fi.buf, "(union)");
+		buffer_write_byte(fi.buf, '{');
+		defer buffer_write_byte(fi.buf, '}');
+
+		cf := info.common_fields;
+
+		for _, i in cf.names {
+			if i > 0 {
+				buffer_write_string(fi.buf, ", ");
+			}
+			buffer_write_string(fi.buf, cf.names[i]);
+			buffer_write_string(fi.buf, " = ");
+			data := cast(^byte)v.data + cf.offsets[i];
+			fmt_value(fi, any{cf.types[i], cast(rawptr)data}, 'v');
+		}
+
 	case Raw_Union:
 		buffer_write_string(fi.buf, "(raw_union)");
 

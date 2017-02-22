@@ -89,11 +89,14 @@ typedef struct TypeRecord {
 	// All record types
 	// Theses are arrays
 	// Entity_Variable - struct/raw_union
-	// Entity_TypeName - union
 	// Entity_Constant - enum
 	Entity **fields;
 	i32      field_count; // == struct_offsets count
 	AstNode *node;
+
+	// Entity_TypeName - union
+	Entity **variants;
+	i32      variant_count;
 
 	i64 *    struct_offsets;
 	bool     struct_are_offsets_set;
@@ -301,8 +304,8 @@ gb_global Type *t_type_info_slice         = NULL;
 gb_global Type *t_type_info_vector        = NULL;
 gb_global Type *t_type_info_tuple         = NULL;
 gb_global Type *t_type_info_struct        = NULL;
-gb_global Type *t_type_info_union         = NULL;
 gb_global Type *t_type_info_raw_union     = NULL;
+gb_global Type *t_type_info_union         = NULL;
 gb_global Type *t_type_info_enum          = NULL;
 gb_global Type *t_type_info_map           = NULL;
 
@@ -320,8 +323,8 @@ gb_global Type *t_type_info_slice_ptr         = NULL;
 gb_global Type *t_type_info_vector_ptr        = NULL;
 gb_global Type *t_type_info_tuple_ptr         = NULL;
 gb_global Type *t_type_info_struct_ptr        = NULL;
-gb_global Type *t_type_info_union_ptr         = NULL;
 gb_global Type *t_type_info_raw_union_ptr     = NULL;
+gb_global Type *t_type_info_union_ptr         = NULL;
 gb_global Type *t_type_info_enum_ptr          = NULL;
 gb_global Type *t_type_info_map_ptr           = NULL;
 
@@ -858,6 +861,7 @@ bool are_types_identical(Type *x, Type *y) {
 				case TypeRecord_RawUnion:
 				case TypeRecord_Union:
 					if (x->Record.field_count == y->Record.field_count &&
+					    x->Record.variant_count == y->Record.variant_count &&
 					    x->Record.struct_is_packed == y->Record.struct_is_packed &&
 					    x->Record.struct_is_ordered == y->Record.struct_is_ordered &&
 					    x->Record.custom_align == y->Record.custom_align) {
@@ -870,9 +874,18 @@ bool are_types_identical(Type *x, Type *y) {
 								return false;
 							}
 						}
+						for (isize i = 1; i < x->Record.variant_count; i++) {
+							if (!are_types_identical(x->Record.variants[i]->type, y->Record.variants[i]->type)) {
+								return false;
+							}
+							if (str_ne(x->Record.variants[i]->token.string, y->Record.variants[i]->token.string)) {
+								return false;
+							}
+						}
 						return true;
 					}
 					break;
+
 				case TypeRecord_Enum:
 					return x == y; // NOTE(bill): All enums are unique
 				}
@@ -1331,14 +1344,12 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		}
 
 		if (is_type_union(type)) {
-			// NOTE(bill): The subtype for a union are stored in the fields
-			// as they are "kind of" like variables but not
-			for (isize i = 0; i < type->Record.field_count; i++) {
-				Entity *f = type->Record.fields[i];
+			for (isize i = 1; i < type->Record.variant_count; i++) {
+				Entity *f = type->Record.variants[i];
 				GB_ASSERT(f->kind == Entity_TypeName);
 				String str = f->token.string;
 
-				if (str_eq(field_name, str)) {
+				if (str_eq(str, field_name)) {
 					sel.entity = f;
 					// selection_add_index(&sel, i);
 					return sel;
@@ -1373,7 +1384,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				}
 			}
 		}
-	} else if (!is_type_union(type)) {
+	} else {
 		for (isize i = 0; i < type->Record.field_count; i++) {
 			Entity *f = type->Record.fields[i];
 			if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
@@ -1605,13 +1616,13 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		case TypeRecord_Union: {
 			i64 max = 1;
 			// NOTE(bill): field zero is null
-			for (isize i = 1; i < t->Record.field_count; i++) {
-				Type *field_type = t->Record.fields[i]->type;
-				type_path_push(path, field_type);
+			for (isize i = 1; i < t->Record.variant_count; i++) {
+				Type *variant = t->Record.variants[i]->type;
+				type_path_push(path, variant);
 				if (path->failure) {
 					return FAILURE_ALIGNMENT;
 				}
-				i64 align = type_align_of_internal(allocator, field_type, path);
+				i64 align = type_align_of_internal(allocator, variant, path);
 				type_path_pop(path);
 				if (max < align) {
 					max = align;
@@ -1620,7 +1631,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			return max;
 		} break;
 		case TypeRecord_RawUnion: {
-			i64 max = 1;
+			i64 max = build_context.word_size;
 			for (isize i = 0; i < t->Record.field_count; i++) {
 				Type *field_type = t->Record.fields[i]->type;
 				type_path_push(path, field_type);
@@ -1653,7 +1664,6 @@ i64 *type_set_offsets_of(gbAllocator allocator, Entity **fields, isize field_cou
 			offsets[i] = curr_offset;
 			curr_offset += type_size_of(allocator, fields[i]->type);
 		}
-
 	} else {
 		for (isize i = 0; i < field_count; i++) {
 			i64 align = type_align_of(allocator, fields[i]->type);
@@ -1673,7 +1683,13 @@ bool type_set_offsets(gbAllocator allocator, Type *t) {
 			t->Record.struct_are_offsets_set = true;
 			return true;
 		}
-	} else if (is_type_tuple(t)) {
+	} else if (is_type_union(t)) {
+		if (!t->Record.struct_are_offsets_set) {
+			t->Record.struct_offsets = type_set_offsets_of(allocator, t->Record.fields, t->Record.field_count, false);
+			t->Record.struct_are_offsets_set = true;
+			return true;
+		}
+	}  else if (is_type_tuple(t)) {
 		if (!t->Tuple.are_offsets_set) {
 			t->Tuple.offsets = type_set_offsets_of(allocator, t->Tuple.variables, t->Tuple.variable_count, false);
 			t->Tuple.are_offsets_set = true;
@@ -1801,7 +1817,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		} break;
 
 		case TypeRecord_Union: {
-			i64 count = t->Record.field_count;
+			i64 count = t->Record.variant_count;
 			i64 align = type_align_of_internal(allocator, t, path);
 			if (path->failure) {
 				return FAILURE_SIZE;
@@ -1809,13 +1825,13 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			i64 max = 0;
 			// NOTE(bill): Zeroth field is invalid
 			for (isize i = 1; i < count; i++) {
-				i64 size = type_size_of_internal(allocator, t->Record.fields[i]->type, path);
+				i64 size = type_size_of_internal(allocator, t->Record.variants[i]->type, path);
 				if (max < size) {
 					max = size;
 				}
 			}
 			// NOTE(bill): Align to int
-			isize size =  align_formula(max, build_context.word_size);
+			i64 size = align_formula(max, build_context.word_size);
 			size += type_size_of_internal(allocator, t_int, path);
 			return align_formula(size, align);
 		} break;
@@ -1983,8 +1999,9 @@ gbString write_type_to_string(gbString str, Type *type) {
 			for (isize i = 0; i < type->Record.field_count; i++) {
 				Entity *f = type->Record.fields[i];
 				GB_ASSERT(f->kind == Entity_Variable);
-				if (i > 0)
-					str = gb_string_appendc(str, "; ");
+				if (i > 0) {
+					str = gb_string_appendc(str, ", ");
+				}
 				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
 				str = gb_string_appendc(str, ": ");
 				str = write_type_to_string(str, f->type);
@@ -1994,15 +2011,37 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 		case TypeRecord_Union:
 			str = gb_string_appendc(str, "union{");
-			for (isize i = 1; i < type->Record.field_count; i++) {
+			for (isize i = 0; i < type->Record.field_count; i++) {
 				Entity *f = type->Record.fields[i];
-				GB_ASSERT(f->kind == Entity_TypeName);
-				if (i > 1) {
-					str = gb_string_appendc(str, "; ");
+				GB_ASSERT(f->kind == Entity_Variable);
+				if (i > 0) {
+					str = gb_string_appendc(str, ", ");
 				}
 				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
 				str = gb_string_appendc(str, ": ");
 				str = write_type_to_string(str, base_type(f->type));
+			}
+			for (isize i = 1; i < type->Record.variant_count; i++) {
+				Entity *f = type->Record.variants[i];
+				GB_ASSERT(f->kind == Entity_TypeName);
+				if (i > 1 || type->Record.field_count > 1) {
+					str = gb_string_appendc(str, ", ");
+				}
+				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
+				str = gb_string_appendc(str, "{");
+				Type *variant = base_type(f->type);
+				for (isize i = 0; i < variant->Record.field_count; i++) {
+					Entity *f = variant->Record.fields[i];
+					GB_ASSERT(f->kind == Entity_Variable);
+					if (i > 0) {
+						str = gb_string_appendc(str, ", ");
+					}
+					str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
+					str = gb_string_appendc(str, ": ");
+					str = write_type_to_string(str, f->type);
+				}
+				str = gb_string_appendc(str, "{");
+
 			}
 			str = gb_string_appendc(str, "}");
 			break;
@@ -2018,6 +2057,25 @@ gbString write_type_to_string(gbString str, Type *type) {
 				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
 				str = gb_string_appendc(str, ": ");
 				str = write_type_to_string(str, f->type);
+			}
+			str = gb_string_appendc(str, "}");
+			break;
+
+		case TypeRecord_Enum:
+			str = gb_string_appendc(str, "enum");
+			if (type->Record.enum_base_type != NULL) {
+			str = gb_string_appendc(str, " ");
+				str = write_type_to_string(str, type->Record.enum_base_type);
+			}
+			str = gb_string_appendc(str, " {");
+			for (isize i = 0; i < type->Record.field_count; i++) {
+				Entity *f = type->Record.fields[i];
+				GB_ASSERT(f->kind == Entity_Constant);
+				if (i > 0) {
+					str = gb_string_appendc(str, ", ");
+				}
+				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
+				// str = gb_string_appendc(str, " = ");
 			}
 			str = gb_string_appendc(str, "}");
 			break;
