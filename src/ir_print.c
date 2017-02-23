@@ -195,7 +195,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		return;
 	case Type_DynamicArray:
 		ir_fprintf(f, "{");
-		ir_print_type(f, m, t->Slice.elem);
+		ir_print_type(f, m, t->DynamicArray.elem);
 		ir_fprintf(f, "*, i%lld, i%lld,", word_bits, word_bits);
 		ir_print_type(f, m, t_allocator);
 		ir_fprintf(f, "}");
@@ -615,8 +615,6 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 			ir_fprintf(f, ", ");
 			ir_print_type(f, m, t_int);
 			ir_fprintf(f, " 0, i32 0), ");
-			ir_print_type(f, m, t_int);
-			ir_fprintf(f, " %lld, ", cs->count);
 			ir_print_type(f, m, t_int);
 			ir_fprintf(f, " %lld}", cs->count);
 		}

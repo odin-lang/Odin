@@ -206,10 +206,12 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		}
 		buffer_write_byte(buf, '{');
 		for name, i in info.names {
+			if i > 0 {
+				buffer_write_string(buf, ", ");
+			}
 			buffer_write_string(buf, name);
 			buffer_write_string(buf, ": ");
 			buffer_write_type(buf, info.types[i]);
-			buffer_write_byte(buf, ',');
 		}
 		buffer_write_byte(buf, '}');
 
@@ -227,7 +229,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 			total_count += 1;
 		}
 		for name, i in info.variant_names {
-			if i > 0 || total_count > 0 {
+			if total_count > 0 || i > 0 {
 				buffer_write_string(buf, ", ");
 			}
 			buffer_write_string(buf, name);
@@ -237,13 +239,15 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 			variant_type := type_info_base(info.variant_types[i]);
 			variant := union_cast(^Struct)variant_type;
 
-			for j in cf.names.count..<variant.names.count {
+			vc := variant.names.count-cf.names.count;
+			for j in 0..<vc {
 				if j > 0 {
-					buffer_write_byte(buf, ',');
+					buffer_write_string(buf, ", ");
 				}
-				buffer_write_string(buf, variant.names[j]);
+				index := j + cf.names.count;
+				buffer_write_string(buf, variant.names[index]);
 				buffer_write_string(buf, ": ");
-				buffer_write_type(buf, variant.types[j]);
+				buffer_write_type(buf, variant.types[index]);
 			}
 		}
 		buffer_write_string(buf, "}");
@@ -251,17 +255,21 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 	case Raw_Union:
 		buffer_write_string(buf, "raw_union {");
 		for name, i in info.names {
+			if i > 0 {
+				buffer_write_string(buf, ", ");
+			}
 			buffer_write_string(buf, name);
 			buffer_write_string(buf, ": ");
 			buffer_write_type(buf, info.types[i]);
-			buffer_write_byte(buf, ',');
 		}
 		buffer_write_string(buf, "}");
 
 	case Enum:
 		buffer_write_string(buf, "enum ");
 		buffer_write_type(buf, info.base);
-		buffer_write_string(buf, " {}");
+		buffer_write_string(buf, " {");
+
+		buffer_write_string(buf, "}");
 	}
 }
 

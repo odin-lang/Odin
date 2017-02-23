@@ -6353,14 +6353,12 @@ void ir_gen_tree(irGen *s) {
 			CheckerInfo *info = proc->module->info;
 
 			if (true) {
-				irValue *global_type_infos = ir_find_global_variable(proc, str_lit("__type_infos"));
+				irValue *global_type_table = ir_find_global_variable(proc, str_lit("__type_table"));
 				Type *type = base_type(type_deref(ir_type(ir_global_type_info_data)));
 				GB_ASSERT(is_type_array(type));
-				irValue *array_data  = ir_emit_array_epi(proc, ir_global_type_info_data, 0);
-				irValue *array_count = ir_make_const_int(proc->module->allocator, type->Array.count);
-
-				ir_emit_store(proc, ir_emit_struct_ep(proc, global_type_infos, 0), array_data);
-				ir_emit_store(proc, ir_emit_struct_ep(proc, global_type_infos, 1), array_count);
+				ir_fill_slice(proc, global_type_table,
+				              ir_emit_array_epi(proc, ir_global_type_info_data, 0),
+				              ir_make_const_int(proc->module->allocator, type->Array.count));
 			}
 
 
