@@ -52,6 +52,7 @@ unix_gettid :: proc() -> u64                                                    
 unix_malloc  :: proc(size: int) -> rawptr                                         #foreign libc "malloc";
 unix_free    :: proc(ptr: rawptr)                                                 #foreign libc "free";
 unix_realloc :: proc(ptr: rawptr, size: int) -> rawptr                            #foreign libc "realloc";
+unix_getenv  :: proc(^u8) -> ^u8                                                  #foreign libc "getenv";
 
 unix_exit :: proc(status: int)                                                    #foreign libc "exit";
 
@@ -182,6 +183,13 @@ heap_free :: proc(ptr: rawptr) #inline {
 	unix_free(ptr);
 }
 
+getenv :: proc(name: string) -> (string, bool) {
+	cstr: ^u8 = unix_getenv(to_c_str(name));
+	if(cstr == nil) {
+		return "", false;
+	}
+	return from_c_str(cstr), true;
+}
 
 exit :: proc(code: int) #inline {
 	unix_exit(code);
