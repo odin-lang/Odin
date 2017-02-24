@@ -268,7 +268,12 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 		buffer_write_string(buf, "enum ");
 		buffer_write_type(buf, info.base);
 		buffer_write_string(buf, " {");
-
+		for name, i in info.names {
+			if i > 0 {
+				buffer_write_string(buf, ", ");
+			}
+			buffer_write_string(buf, name);
+		}
 		buffer_write_string(buf, "}");
 	}
 }
@@ -708,13 +713,13 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			case u32:  i = cast(i64)v;
 			case u64:  i = cast(i64)v;
 			case uint: i = cast(i64)v;
-			case f32:  f = cast(f64)v;
-			case f64:  f = cast(f64)v;
+			case f32:  f = cast(f64)v; i = transmute(i64)f;
+			case f64:  f = cast(f64)v; i = transmute(i64)f;
 			}
 
 			if types.is_string(e.base) {
-				for it, idx in e.values {
-					if it.i == i {
+				for val, idx in e.values {
+					if val.i == i {
 						buffer_write_string(fi.buf, e.names[idx]);
 						ok = true;
 						break;
@@ -724,8 +729,8 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				buffer_write_string(fi.buf, "");
 				ok = true;
 			} else {
-				for it, idx in e.values {
-					if it.f == f {
+				for val, idx in e.values {
+					if val.i == i {
 						buffer_write_string(fi.buf, e.names[idx]);
 						ok = true;
 						break;
