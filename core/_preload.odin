@@ -89,9 +89,9 @@ Type_Info :: union {
 }
 
 
-// // NOTE(bill): only the ones that are needed (not all types)
-// // This will be set by the compiler
-__type_infos: []Type_Info;
+// NOTE(bill): only the ones that are needed (not all types)
+// This will be set by the compiler
+__type_table: []Type_Info;
 
 type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 	if info == nil {

@@ -195,7 +195,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		return;
 	case Type_DynamicArray:
 		ir_fprintf(f, "{");
-		ir_print_type(f, m, t->Slice.elem);
+		ir_print_type(f, m, t->DynamicArray.elem);
 		ir_fprintf(f, "*, i%lld, i%lld,", word_bits, word_bits);
 		ir_print_type(f, m, t_allocator);
 		ir_fprintf(f, "}");
@@ -203,7 +203,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 	case Type_Record: {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct:
-			if (t->Record.struct_is_packed) {
+			if (t->Record.is_packed) {
 				ir_fprintf(f, "<");
 			}
 			ir_fprintf(f, "{");
@@ -220,7 +220,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 				ir_print_type(f, m, t->Record.fields[i]->type);
 			}
 			ir_fprintf(f, "}");
-			if (t->Record.struct_is_packed) {
+			if (t->Record.is_packed) {
 				ir_fprintf(f, ">");
 			}
 			return;
@@ -526,7 +526,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 
 
-			if (type->Record.struct_is_packed) {
+			if (type->Record.is_packed) {
 				ir_fprintf(f, "<");
 			}
 			ir_fprintf(f, "{");
@@ -543,7 +543,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 
 			ir_fprintf(f, "}");
-			if (type->Record.struct_is_packed) {
+			if (type->Record.is_packed) {
 				ir_fprintf(f, ">");
 			}
 
@@ -615,8 +615,6 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 			ir_fprintf(f, ", ");
 			ir_print_type(f, m, t_int);
 			ir_fprintf(f, " 0, i32 0), ");
-			ir_print_type(f, m, t_int);
-			ir_fprintf(f, " %lld, ", cs->count);
 			ir_print_type(f, m, t_int);
 			ir_fprintf(f, " %lld}", cs->count);
 		}

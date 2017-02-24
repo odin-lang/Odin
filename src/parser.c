@@ -3475,7 +3475,7 @@ AstNode *parse_stmt(AstFile *f) {
 			syntax_error(token, "#include is not a valid import declaration kind. Use #load instead");
 			s = ast_bad_stmt(f, token, f->curr_token);
 		} else {
-			syntax_error(token, "Unknown tag used: `%.*s`", LIT(tag));
+			syntax_error(token, "Unknown tag directive used: `%.*s`", LIT(tag));
 			s = ast_bad_stmt(f, token, f->curr_token);
 		}
 

@@ -490,8 +490,8 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 
 	field_count = check_fields(c, node, st->fields, fields, field_count, str_lit("struct"));
 
-	struct_type->Record.struct_is_packed    = st->is_packed;
-	struct_type->Record.struct_is_ordered   = st->is_ordered;
+	struct_type->Record.is_packed           = st->is_packed;
+	struct_type->Record.is_ordered          = st->is_ordered;
 	struct_type->Record.fields              = fields;
 	struct_type->Record.fields_in_src_order = fields;
 	struct_type->Record.field_count         = field_count;
@@ -629,8 +629,8 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 			check_open_scope(c, dummy_struct);
 			Entity **fields = gb_alloc_array(c->allocator, Entity *, list_count);
 			isize field_count = check_fields(c, dummy_struct, list, fields, list_count, str_lit("variant"));
-			base_type->Record.struct_is_packed    = false;
-			base_type->Record.struct_is_ordered   = true;
+			base_type->Record.is_packed           = false;
+			base_type->Record.is_ordered          = true;
 			base_type->Record.fields              = fields;
 			base_type->Record.fields_in_src_order = fields;
 			base_type->Record.field_count         = field_count;
