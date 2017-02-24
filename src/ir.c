@@ -1832,7 +1832,7 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 		GB_ASSERT(t->Record.field_count > 0);
 		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
 		result_type = make_type_pointer(a, t->Record.fields[index]->type);
-		i64 offset = t->Record.struct_offsets[index];
+		i64 offset = t->Record.offsets[index];
 		irValue *ptr = ir_emit_conv(proc, s, t_u8_ptr);
 		ptr = ir_emit_ptr_offset(proc, ptr, ir_make_const_int(a, offset));
 		return ir_emit_conv(proc, ptr, result_type);
@@ -1895,7 +1895,7 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 		GB_ASSERT(t->Record.field_count > 0);
 		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
 		Type *ptr_type = make_type_pointer(a, t->Record.fields[index]->type);
-		i64 offset = t->Record.struct_offsets[index];
+		i64 offset = t->Record.offsets[index];
 		irValue *ptr = ir_address_from_load_or_generate_local(proc, s);
 		ptr = ir_emit_conv(proc, s, t_u8_ptr);
 		ptr = ir_emit_ptr_offset(proc, ptr, ir_make_const_int(a, offset));
@@ -6555,8 +6555,8 @@ void ir_gen_tree(irGen *s) {
 						{
 							irValue *size         = ir_make_const_int(a,  type_size_of(a, t));
 							irValue *align        = ir_make_const_int(a,  type_align_of(a, t));
-							irValue *packed       = ir_make_const_bool(a, t->Record.struct_is_packed);
-							irValue *ordered      = ir_make_const_bool(a, t->Record.struct_is_ordered);
+							irValue *packed       = ir_make_const_bool(a, t->Record.is_packed);
+							irValue *ordered      = ir_make_const_bool(a, t->Record.is_ordered);
 							irValue *custom_align = ir_make_const_bool(a, t->Record.custom_align);
 							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 3), size);
 							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 4), align);
@@ -6574,7 +6574,7 @@ void ir_gen_tree(irGen *s) {
 							// TODO(bill): Order fields in source order not layout order
 							Entity *f = t->Record.fields_in_src_order[source_index];
 							irValue *tip = ir_get_type_info_ptr(proc, f->type);
-							i64 foffset = t->Record.struct_offsets[f->Variable.field_index];
+							i64 foffset = t->Record.offsets[f->Variable.field_index];
 							GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
 
 							irValue *index     = ir_make_const_int(a, source_index);
@@ -6616,7 +6616,7 @@ void ir_gen_tree(irGen *s) {
 								// TODO(bill): Order fields in source order not layout order
 								Entity *f = t->Record.fields[field_index];
 								irValue *tip = ir_get_type_info_ptr(proc, f->type);
-								i64 foffset = t->Record.struct_offsets[f->Variable.field_index];
+								i64 foffset = t->Record.offsets[f->Variable.field_index];
 								GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
 
 								irValue *index     = ir_make_const_int(a, field_index);

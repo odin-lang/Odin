@@ -5,107 +5,8 @@
 #import "mem.odin";
 #import "opengl.odin";
 #import "os.odin";
-// #import "halloc.odin";
-
-Token_Kind :: enum {
-}
-Token_Pos :: struct {
-	file:   string,
-	line:   int,
-	column: int,
-}
-Token :: struct {
-	kind:      Token_Kind,
-	name:      string,
-	using pos: Token_Pos,
-}
-
-Exact_Value :: union {
-	Boolean {b: bool},
-	String  {s: string},
-	Integer {i: i64},
-	Float   {f: f64},
-	Pointer {p: i64},
-	Compound{c: rawptr},
-}
-Overload_Kind :: enum {
-	UNKNOWN,
-	NO,
-	YES,
-}
-Scope :: struct {
-	parent:                  ^Scope,
-	prev, next:              ^Scope,
-	first_child, last_child: ^Scope,
-	elements:                map[string]^Entity,
-	implicit:                map[^Entity]bool,
-
-	shared:                  [dynamic]^Scope,
-	imported:                [dynamic]^Scope,
-	is_proc:                 bool,
-	is_global:               bool,
-	is_file:                 bool,
-	is_init:                 bool,
-	has_been_imported:       bool, // This is only applicable to file scopes
-	file:                    rawptr,
-}
-
-Type :: struct {
-}
-
-Entity :: union {
-// Common Fields
-	flags:        u32,
-	using token:  Token,
-	scope:        ^Scope, // Parent's scope
-	type:         ^Type,
-	// identifier:   ^ast.Node,
-
-	using_parent: ^Entity,
-	// using_expr:   ^ast.Node,
-
-// Variants
-	Constant{value: Exact_Value},
-	Variable{
-		field_index, field_src_index:  int,
-		is_immutable, is_thread_local: bool,
-	},
-	Type_Name{},
-	Procedure{
-		is_foreign:      bool,
-		foreign_name:    string,
-		foreign_library: ^Entity,
-		link_name:       string,
-		tags:            u64,
-		overload_kind:   Overload_Kind,
-	},
-	Builtin{id: int},
-	Import_Name{
-		import_path:  string,
-		import_name:  string,
-		import_scope: ^Scope,
-		used:         bool,
-	},
-	Library_Name{
-		library_path: string,
-		library_name: string,
-		used:         bool,
-	},
-	Nil{},
-}
 
 main :: proc() {
-	e: Entity;
-	u := union_cast(^Type_Info.Union)type_info_base(type_info_of_val(e));
-
-
-	fmt.println(type_info_base(type_info(Entity)));
-
-
-	// e.flags = 123;
-
-
-/*
 /*
 	Version 0.1.1
 
@@ -123,7 +24,14 @@ main :: proc() {
 	 * immutable variables are "completely immutable" - rules need a full explanation
 	 * `slice_to_bytes` - convert any slice to a slice of bytes
 	 * `union_cast` allows for optional ok check
+	 * Record type field `names` (struct/raw_union/enum)
 	 * ?: ternary operator
+	 * Unions with variants and common fields
+	 * New built-in procedures
+	     - `delete` to delete map entries `delete(m, key)`
+	     - `clear` to clear dynamic maps and arrays `clear(map_or_array)`
+	     - `reserve` to reserve space for the dynamic maps and arrays `reserve(map_or_array)`
+	 * Unexported entities and fields using an underscore prefix
 
 	Removed:
 	 * Maybe/option types
@@ -137,9 +45,14 @@ main :: proc() {
 	 * match x in y {} // For type match statements
 	 * Version numbering now starts from 0.1.0 and uses the convention:
 	 	- major.minor.patch
+	 * Core library additions to Windows specific stuff
 
 	Fixes:
 	 * Many fmt.* fixes
+	 * Overloading bug due to comparison of named types
+	 * Overloading bug due to `#import .` collision
+	 * disallow a `cast` from pointers of unions
+	 * Minor bugs in generated IR code for slices
 
 	To come very Soon™:
 	 * Linux and OS X builds (unofficial ones do exist already)
@@ -231,6 +144,5 @@ main :: proc() {
 		compile_assert(size_of([vector 7]i32) == size_of([7]i32));
 		// align_of([vector 7]i32) != align_of([7]i32) // this may be the case
 	}
-*/
 }
 

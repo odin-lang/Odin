@@ -88,21 +88,21 @@ typedef struct TypeRecord {
 
 	// All record types
 	// Theses are arrays
-	// Entity_Variable - struct/raw_union
+	// Entity_Variable - struct/raw_union/union (for common fields)
 	// Entity_Constant - enum
 	Entity **fields;
 	i32      field_count; // == struct_offsets count
+	Entity **fields_in_src_order; // Entity_Variable
 	AstNode *node;
 
 	// Entity_TypeName - union
 	Entity **variants;
 	i32      variant_count;
 
-	i64 *    struct_offsets;
-	bool     struct_are_offsets_set;
-	bool     struct_is_packed;
-	bool     struct_is_ordered;
-	Entity **fields_in_src_order; // Entity_Variable
+	i64 *    offsets;
+	bool     are_offsets_set;
+	bool     is_packed;
+	bool     is_ordered;
 
 	i64      custom_align; // NOTE(bill): Only used in structs at the moment
 	Entity * names;
@@ -862,8 +862,8 @@ bool are_types_identical(Type *x, Type *y) {
 				case TypeRecord_Union:
 					if (x->Record.field_count == y->Record.field_count &&
 					    x->Record.variant_count == y->Record.variant_count &&
-					    x->Record.struct_is_packed == y->Record.struct_is_packed &&
-					    x->Record.struct_is_ordered == y->Record.struct_is_ordered &&
+					    x->Record.is_packed == y->Record.is_packed &&
+					    x->Record.is_ordered == y->Record.is_ordered &&
 					    x->Record.custom_align == y->Record.custom_align) {
 						// TODO(bill); Fix the custom alignment rule
 						for (isize i = 0; i < x->Record.field_count; i++) {
@@ -1587,7 +1587,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			}
 			if (t->Record.field_count > 0) {
 				// TODO(bill): What is this supposed to be?
-				if (t->Record.struct_is_packed) {
+				if (t->Record.is_packed) {
 					i64 max = build_context.word_size;
 					for (isize i = 0; i < t->Record.field_count; i++) {
 						Type *field_type = t->Record.fields[i]->type;
@@ -1678,15 +1678,15 @@ i64 *type_set_offsets_of(gbAllocator allocator, Entity **fields, isize field_cou
 bool type_set_offsets(gbAllocator allocator, Type *t) {
 	t = base_type(t);
 	if (is_type_struct(t)) {
-		if (!t->Record.struct_are_offsets_set) {
-			t->Record.struct_offsets = type_set_offsets_of(allocator, t->Record.fields, t->Record.field_count, t->Record.struct_is_packed);
-			t->Record.struct_are_offsets_set = true;
+		if (!t->Record.are_offsets_set) {
+			t->Record.offsets = type_set_offsets_of(allocator, t->Record.fields, t->Record.field_count, t->Record.is_packed);
+			t->Record.are_offsets_set = true;
 			return true;
 		}
 	} else if (is_type_union(t)) {
-		if (!t->Record.struct_are_offsets_set) {
-			t->Record.struct_offsets = type_set_offsets_of(allocator, t->Record.fields, t->Record.field_count, false);
-			t->Record.struct_are_offsets_set = true;
+		if (!t->Record.are_offsets_set) {
+			t->Record.offsets = type_set_offsets_of(allocator, t->Record.fields, t->Record.field_count, false);
+			t->Record.are_offsets_set = true;
 			return true;
 		}
 	}  else if (is_type_tuple(t)) {
@@ -1812,7 +1812,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 				return FAILURE_SIZE;
 			}
 			type_set_offsets(allocator, t);
-			i64 size = t->Record.struct_offsets[count-1] + type_size_of_internal(allocator, t->Record.fields[count-1]->type, path);
+			i64 size = t->Record.offsets[count-1] + type_size_of_internal(allocator, t->Record.fields[count-1]->type, path);
 			return align_formula(size, align);
 		} break;
 
@@ -1865,7 +1865,7 @@ i64 type_offset_of(gbAllocator allocator, Type *t, i32 index) {
 	if (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct) {
 		type_set_offsets(allocator, t);
 		if (gb_is_between(index, 0, t->Record.field_count-1)) {
-			return t->Record.struct_offsets[index];
+			return t->Record.offsets[index];
 		}
 	} else if (t->kind == Type_Tuple) {
 		type_set_offsets(allocator, t);
@@ -1989,10 +1989,10 @@ gbString write_type_to_string(gbString str, Type *type) {
 		switch (type->Record.kind) {
 		case TypeRecord_Struct:
 			str = gb_string_appendc(str, "struct");
-			if (type->Record.struct_is_packed) {
+			if (type->Record.is_packed) {
 				str = gb_string_appendc(str, " #packed");
 			}
-			if (type->Record.struct_is_ordered) {
+			if (type->Record.is_ordered) {
 				str = gb_string_appendc(str, " #ordered");
 			}
 			str = gb_string_appendc(str, " {");
