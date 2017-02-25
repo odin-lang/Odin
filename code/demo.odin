@@ -6,7 +6,15 @@
 #import "opengl.odin";
 #import "os.odin";
 
+foo :: proc(x: int) -> f32 {
+	return 123;
+}
+
 main :: proc() {
+
+	fmt.printf("%T\n", foo);
+
+when false {
 /*
 	Version 0.1.1
 
@@ -57,6 +65,9 @@ main :: proc() {
 	To come very Soon™:
 	 * Linux and OS X builds (unofficial ones do exist already)
 */
+	{
+
+	}
 
 	{
 		Fruit :: enum {
@@ -144,5 +155,6 @@ main :: proc() {
 		compile_assert(size_of([vector 7]i32) == size_of([7]i32));
 		// align_of([vector 7]i32) != align_of([7]i32) // this may be the case
 	}
+}
 }
 

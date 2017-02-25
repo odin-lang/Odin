@@ -6504,10 +6504,10 @@ void ir_gen_tree(irGen *s) {
 					irValue *variadic   = ir_emit_struct_ep(proc, tag, 2);
 					irValue *convention = ir_emit_struct_ep(proc, tag, 3);
 
-					if (t->Proc.params) {
+					if (t->Proc.params != NULL) {
 						ir_emit_store(proc, params, ir_get_type_info_ptr(proc, t->Proc.params));
 					}
-					if (t->Proc.results) {
+					if (t->Proc.results != NULL) {
 						ir_emit_store(proc, results, ir_get_type_info_ptr(proc, t->Proc.results));
 					}
 					ir_emit_store(proc, variadic, ir_make_const_bool(a, t->Proc.variadic));
@@ -6525,8 +6525,8 @@ void ir_gen_tree(irGen *s) {
 						ir_emit_store(proc, ir_emit_struct_ep(proc, record, 4), align);
 					}
 
-					irValue *memory_types   = ir_type_info_member_types_offset(proc, t->Record.field_count);
-					irValue *memory_names   = ir_type_info_member_names_offset(proc, t->Record.field_count);
+					irValue *memory_types = ir_type_info_member_types_offset(proc, t->Tuple.variable_count);
+					irValue *memory_names = ir_type_info_member_names_offset(proc, t->Tuple.variable_count);
 
 					for (isize i = 0; i < t->Tuple.variable_count; i++) {
 						// NOTE(bill): offset is not used for tuples
@@ -6542,8 +6542,8 @@ void ir_gen_tree(irGen *s) {
 						}
 					}
 
-					ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 0), memory_types,   ir_make_const_int(a, t->Record.field_count));
-					ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 1), memory_names,   ir_make_const_int(a, t->Record.field_count));
+					ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 0), memory_types,   ir_make_const_int(a, t->Tuple.variable_count));
+					ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 1), memory_names,   ir_make_const_int(a, t->Tuple.variable_count));
 				} break;
 				case Type_Record: {
 					switch (t->Record.kind) {
