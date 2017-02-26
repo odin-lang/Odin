@@ -18,24 +18,24 @@ parse_bool :: proc(s: string) -> (result: bool, ok: bool) {
 	return false, false;
 }
 
-format_bool :: proc(buf: []byte, b: bool) -> string {
+append_bool :: proc(buf: []byte, b: bool) -> string {
 	s := b ? "true" : "false";
-	len := copy(buf, cast([]byte)s);
-	return cast(string)buf[..len];
+	append(buf, ..cast([]byte)s);
+	return cast(string)buf;
 }
 
-format_uint :: proc(buf: []byte, u: u64, base: int) -> string {
+append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
 	using Int_Flag;
-	return format_bits(buf, u, base, false, digits, 0);
+	return append_bits(buf, u, base, false, digits, 0);
 }
-format_int :: proc(buf: []byte, i: i64, base: int) -> string {
-	return format_bits(buf, cast(u64)i, base, i < 0, digits, 0);
+append_int :: proc(buf: []byte, i: i64, base: int) -> string {
+	return append_bits(buf, cast(u64)i, base, i < 0, digits, 0);
 }
 itoa :: proc(buf: []byte, i: int) -> string {
-	return format_int(buf, cast(i64)i, 10);
+	return append_int(buf, cast(i64)i, 10);
 }
 
-format_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
+append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
 	return cast(string)generic_ftoa(buf, f, fmt, prec, bit_size);
 }
 
@@ -87,8 +87,8 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 		} else {
 			s = "+Inf";
 		}
-		len := copy(buf, cast([]byte)s);
-		return buf[..len];
+		append(buf, ..cast([]byte)s);
+		return buf;
 
 	case 0: // denormalized
 		exp++;
@@ -190,8 +190,8 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 	c: [2]byte;
 	c[0] = '%';
 	c[1] = fmt;
-	len := copy(buf, ..c[..]);
-	return buf[..len];
+	append(buf, ..c[..]);
+	return buf;
 }
 
 round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
@@ -265,7 +265,7 @@ MAX_BASE :: 32;
 immutable digits := "0123456789abcdefghijklmnopqrstuvwxyz";
 
 
-format_bits :: proc(buf: []byte, u: u64, base: int, neg: bool, digits: string, flags: Int_Flag) -> string {
+append_bits :: proc(buf: []byte, u: u64, base: int, neg: bool, digits: string, flags: Int_Flag) -> string {
 	is_pow2 :: proc(x: i64) -> bool {
 		if (x <= 0) {
 			return false;
@@ -274,7 +274,7 @@ format_bits :: proc(buf: []byte, u: u64, base: int, neg: bool, digits: string, f
 	}
 
 	if base < 2 || base > MAX_BASE {
-		panic("strconv: illegal base passed to format_bits");
+		panic("strconv: illegal base passed to append_bits");
 	}
 
 	a: [65]byte;
@@ -330,7 +330,7 @@ format_bits :: proc(buf: []byte, u: u64, base: int, neg: bool, digits: string, f
 	}
 
 
-	len := copy(buf, ..a[i..]);
-	return cast(string)buf[..len];
+	append(buf, ..a[i..]);
+	return cast(string)buf;
 }
 

@@ -5127,6 +5127,10 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		switch (t->kind) {
 		case Type_Basic:
 			if (is_type_string(t)) {
+				if (se->index3) {
+					error_node(node, "3-index slice on a string in not needed");
+					goto error;
+				}
 				valid = true;
 				if (o->mode == Addressing_Constant) {
 					max_count = o->value.value_string.len;
@@ -5167,14 +5171,20 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			o->mode = Addressing_Value;
 		}
 
+		if (se->index3 && (se->high == NULL || se->max == NULL)) {
+			error(se->close, "2nd and 3rd indices are required in a 3-index slice");
+			goto error;
+		}
+
 		i64 indices[2] = {0};
-		AstNode *nodes[2] = {se->low, se->high};
+		AstNode *nodes[3] = {se->low, se->high, se->max};
 		for (isize i = 0; i < gb_count_of(nodes); i++) {
 			i64 index = max_count;
 			if (nodes[i] != NULL) {
 				i64 capacity = -1;
-				if (max_count >= 0)
+				if (max_count >= 0) {
 					capacity = max_count;
+				}
 				i64 j = 0;
 				if (check_index_value(c, nodes[i], capacity, &j)) {
 					index = j;

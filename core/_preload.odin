@@ -460,11 +460,7 @@ __slice_append :: proc(slice_: rawptr, elem_size, elem_align: int,
 		return slice.count;
 	}
 
-
-	ok := true;
-	if item_count > (slice.capacity-slice.count) {
-		item_count = (slice.capacity-slice.count);
-	}
+	item_count = min(slice.capacity-slice.count, item_count);
 	if item_count > 0 {
 		data := cast(^byte)slice.data;
 		assert(data != nil);
