@@ -197,11 +197,11 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		}
 	}
 
-	// if (is_type_proc(dst)) {
-	// 	if (are_types_identical(src, dst)) {
-	// 		return 1;
-	// 	}
-	// }
+	if (is_type_proc(dst)) {
+		if (are_types_identical(src, dst)) {
+			return 3;
+		}
+	}
 
 	if (is_type_any(dst)) {
 		// NOTE(bill): Anything can cast to `Any`
@@ -2827,6 +2827,16 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			goto error;
 		}
 	}
+
+	if (entity == NULL &&
+	    operand->type != NULL && is_type_untyped(operand->type) && is_type_string(operand->type)) {
+		String s = operand->value.value_string;
+		operand->mode = Addressing_Constant;
+		operand->value = make_exact_value_integer(s.len);
+		operand->type = t_untyped_integer;
+		return NULL;
+	}
+
 	if (entity == NULL) {
 		gbString op_str   = expr_to_string(op_expr);
 		gbString type_str = type_to_string(operand->type);
@@ -5445,9 +5455,10 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(at, ArrayType, node);
 		str = gb_string_appendc(str, "[");
-		if (at->count->kind == AstNode_UnaryExpr &&
-		    at->count->UnaryExpr.op.kind == Token_Hash) {
-			str = gb_string_appendc(str, "#");
+		if (at->count != NULL &&
+		    at->count->kind == AstNode_UnaryExpr &&
+		    at->count->UnaryExpr.op.kind == Token_Ellipsis) {
+			str = gb_string_appendc(str, "...");
 		} else {
 			str = write_expr_to_string(str, at->count);
 		}

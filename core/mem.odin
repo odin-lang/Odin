@@ -79,7 +79,7 @@ allocation_header_fill :: proc(header: ^Allocation_Header, data: rawptr, size: i
 	header.size = size;
 	ptr := cast(^int)(header+1);
 
-	for i := 0; cast(rawptr)ptr < data; i += 1 {
+	for i := 0; cast(rawptr)ptr < data; i++ {
 		(ptr+i)^ = -1;
 	}
 }
@@ -183,7 +183,7 @@ begin_arena_temp_memory :: proc(a: ^Arena) -> Arena_Temp_Memory {
 	tmp: Arena_Temp_Memory;
 	tmp.arena = a;
 	tmp.original_count = a.memory.count;
-	a.temp_count += 1;
+	a.temp_count++;
 	return tmp;
 }
 
@@ -191,7 +191,7 @@ end_arena_temp_memory :: proc(using tmp: Arena_Temp_Memory) {
 	assert(arena.memory.count >= original_count);
 	assert(arena.temp_count > 0);
 	arena.memory.count = original_count;
-	arena.temp_count -= 1;
+	arena.temp_count--;
 }
 
 

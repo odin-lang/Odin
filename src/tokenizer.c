@@ -51,8 +51,8 @@ TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
 TOKEN_KIND(Token__AssignOpEnd,   "_AssignOpEnd"), \
 	TOKEN_KIND(Token_ArrowRight, "->"), \
 	TOKEN_KIND(Token_ArrowLeft,  "<-"), \
-	TOKEN_KIND(Token_Increment,  "++"), \
-	TOKEN_KIND(Token_Decrement,  "--"), \
+	TOKEN_KIND(Token_Inc,        "++"), \
+	TOKEN_KIND(Token_Dec,        "--"), \
 \
 TOKEN_KIND(Token__ComparisonBegin, "_ComparisonBegin"), \
 	TOKEN_KIND(Token_CmpEq, "=="), \
@@ -859,13 +859,13 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '{': token.kind = Token_OpenBrace;    break;
 		case '}': token.kind = Token_CloseBrace;   break;
 
-		case '*': token.kind = token_kind_variant2(t, Token_Mul, Token_MulEq);                                              break;
-		case '%': token.kind = token_kind_variant2(t, Token_Mod, Token_ModEq);                                              break;
-		case '=': token.kind = token_kind_variant2(t, Token_Eq,  Token_CmpEq);                                              break;
-		case '~': token.kind = token_kind_variant2(t, Token_Xor, Token_XorEq);                                              break;
-		case '!': token.kind = token_kind_variant2(t, Token_Not, Token_NotEq);                                              break;
-		case '+': token.kind = token_kind_variant3(t, Token_Add, Token_AddEq, '+', Token_Increment);                        break;
-		case '-': token.kind = token_kind_variant4(t, Token_Sub, Token_SubEq, '-', Token_Decrement, '>', Token_ArrowRight); break;
+		case '*': token.kind = token_kind_variant2(t, Token_Mul, Token_MulEq);                                        break;
+		case '%': token.kind = token_kind_variant2(t, Token_Mod, Token_ModEq);                                        break;
+		case '=': token.kind = token_kind_variant2(t, Token_Eq,  Token_CmpEq);                                        break;
+		case '~': token.kind = token_kind_variant2(t, Token_Xor, Token_XorEq);                                        break;
+		case '!': token.kind = token_kind_variant2(t, Token_Not, Token_NotEq);                                        break;
+		case '+': token.kind = token_kind_variant3(t, Token_Add, Token_AddEq, '+', Token_Inc);                        break;
+		case '-': token.kind = token_kind_variant4(t, Token_Sub, Token_SubEq, '-', Token_Dec, '>', Token_ArrowRight); break;
 		case '/': {
 			if (t->curr_rune == '/') {
 				while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {

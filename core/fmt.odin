@@ -2,6 +2,7 @@
 #import "mem.odin";
 #import "utf8.odin";
 #import "types.odin";
+#import "strconv.odin";
 
 
 _BUFFER_SIZE :: 1<<12;
@@ -26,7 +27,7 @@ buffer_write_string :: proc(buf: ^Buffer, s: string) {
 buffer_write_byte :: proc(buf: ^Buffer, b: byte) {
 	if buf.length < buf.data.count {
 		buf.data[buf.length] = b;
-		buf.length += 1;
+		buf.length++;
 	}
 }
 buffer_write_rune :: proc(buf: ^Buffer, r: rune) {
@@ -226,7 +227,7 @@ buffer_write_type :: proc(buf: ^Buffer, ti: ^Type_Info) {
 			buffer_write_string(buf, name);
 			buffer_write_string(buf, ": ");
 			buffer_write_type(buf, cf.types[i]);
-			total_count += 1;
+			total_count++;
 		}
 		for name, i in info.variant_names {
 			if total_count > 0 || i > 0 {
@@ -345,7 +346,7 @@ parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: bool
 		if !is_digit(c) {
 			break;
 		}
-		i += 1;
+		i++;
 
 		result *= 10;
 		result += cast(int)(c - '0');
@@ -459,17 +460,16 @@ fmt_write_padding :: proc(fi: ^Fmt_Info, width: int) {
 	fi.buf.length += count;
 }
 
-fmt_integer :: proc(fi: ^Fmt_Info, u: u64, base: int, signed: bool, digits: string) {
-	negative := signed && cast(i64)u < 0;
-	if signed {
-		u = cast(u64)abs(cast(i64)u);
+_write_int :: proc(fi: ^Fmt_Info, u: u64, base: int, neg: bool, digits: string) {
+	if neg {
+		u = -u;
 	}
-	buf: [256]byte;
+	BUF_SIZE :: 256;
 	if fi.width_set || fi.prec_set {
 		width := fi.width + fi.prec + 3;
-		if width > buf.count {
+		if width > BUF_SIZE {
 			// TODO(bill):????
-			panic("fmt_integer buffer overrun. Width and precision too big");
+			panic("_write_int buffer overrun. Width and precision too big");
 		}
 	}
 
@@ -485,95 +485,64 @@ fmt_integer :: proc(fi: ^Fmt_Info, u: u64, base: int, signed: bool, digits: stri
 		}
 	} else if fi.zero && fi.width_set {
 		prec = fi.width;
-		if negative || fi.plus || fi.space {
+		if neg || fi.plus || fi.space {
 			// There needs to be space for the "sign"
-			prec -= 1;
+			prec--;
 		}
 	}
-
-	i := buf.count;
 
 	match base {
 	case 2, 8, 10, 16:
 		break;
 	default:
-		panic("fmt_integer: unknown base, whoops");
+		panic("_write_int: unknown base, whoops");
 	}
 
-	for b := cast(u64)base; u >= b;  {
-		i -= 1;
-		next := u / b;
-		buf[i] = digits[u%b];
-		u = next;
-	}
-	i -= 1;
-	buf[i] = digits[u];
-	for i > 0 && prec > buf.count-i {
-		i -= 1;
-		buf[i] = '0';
-	}
-
-	if fi.hash {
-		i -= 1;
-		match base {
-		case 2:  buf[i] = 'b';
-		case 8:  buf[i] = 'o';
-		case 10: buf[i] = 'd';
-		case 16: buf[i] = digits[16];
-		}
-		i -= 1;
-		buf[i] = '0';
-	}
-
-	if negative {
-		i -= 1;
-		buf[i] = '-';
-	} else if fi.plus {
-		i -= 1;
-		buf[i] = '+';
-	} else if fi.space {
-		i -= 1;
-		buf[i] = ' ';
-	}
+	buf: [256]byte;
+	flags: strconv.Int_Flag;
+	if fi.hash  { flags |= strconv.Int_Flag.PREFIX; }
+	if fi.plus  { flags |= strconv.Int_Flag.PLUS; }
+	if fi.space { flags |= strconv.Int_Flag.SPACE; }
+	s := strconv.format_bits(buf[:], u, base, neg, digits, flags);
 
 	old_zero := fi.zero;
 	defer fi.zero = old_zero;
 	fi.zero = false;
 
 	if !fi.width_set || fi.width == 0 {
-		buffer_write(fi.buf, buf[i:]);
+		buffer_write_string(fi.buf, s);
 	} else {
-		width := fi.width - utf8.rune_count(cast(string)buf[i:]);
+		width := fi.width - utf8.rune_count(s);
 			if width > 0 {
 			if fi.minus {
 				// Right pad
-				buffer_write(fi.buf, buf[i:]);
+				buffer_write_string(fi.buf, s);
 				fmt_write_padding(fi, width);
 			} else {
 				// Left pad
 				fmt_write_padding(fi, width);
-				buffer_write(fi.buf, buf[i:]);
+				buffer_write_string(fi.buf, s);
 			}
 		}
 	}
 
 }
 
-__DIGITS_LOWER := "0123456789abcdefx";
-__DIGITS_UPPER := "0123456789ABCDEFX";
+immutable __DIGITS_LOWER := "0123456789abcdefx";
+immutable __DIGITS_UPPER := "0123456789ABCDEFX";
 
 fmt_rune :: proc(fi: ^Fmt_Info, r: rune) {
 	buffer_write_rune(fi.buf, r);
 }
 
-fmt_int :: proc(fi: ^Fmt_Info, u: u64, signed: bool, verb: rune) {
+fmt_int :: proc(fi: ^Fmt_Info, u: u64, neg: bool, verb: rune) {
 	match verb {
-	case 'v': fmt_integer(fi, u, 10, signed, __DIGITS_LOWER);
-	case 'b': fmt_integer(fi, u,  2, signed, __DIGITS_LOWER);
-	case 'o': fmt_integer(fi, u,  8, signed, __DIGITS_LOWER);
-	case 'd': fmt_integer(fi, u, 10, signed, __DIGITS_LOWER);
-	case 'x': fmt_integer(fi, u, 16, signed, __DIGITS_LOWER);
-	case 'X': fmt_integer(fi, u, 16, signed, __DIGITS_UPPER);
+	case 'v': _write_int(fi, u, 10, neg, __DIGITS_LOWER);
+	case 'b': _write_int(fi, u,  2, neg, __DIGITS_LOWER);
+	case 'o': _write_int(fi, u,  8, neg, __DIGITS_LOWER);
+	case 'd': _write_int(fi, u, 10, neg, __DIGITS_LOWER);
+	case 'x': _write_int(fi, u, 16, neg, __DIGITS_LOWER);
+	case 'X': _write_int(fi, u, 16, neg, __DIGITS_UPPER);
 	case 'c', 'r':
 		fmt_rune(fi, cast(rune)u);
 	case 'U':
@@ -582,7 +551,7 @@ fmt_int :: proc(fi: ^Fmt_Info, u: u64, signed: bool, verb: rune) {
 			fmt_bad_verb(fi, verb);
 		} else {
 			buffer_write_string(fi.buf, "U+");
-			fmt_integer(fi, u, 16, false, __DIGITS_UPPER);
+			_write_int(fi, u, 16, false, __DIGITS_UPPER);
 		}
 
 	default:
@@ -592,67 +561,60 @@ fmt_int :: proc(fi: ^Fmt_Info, u: u64, signed: bool, verb: rune) {
 
 
 fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
+	pad :: proc(fi: ^Fmt_Info, s: string) {
+		if !fi.width_set || fi.width == 0 {
+			buffer_write_string(fi.buf, s);
+			return;
+		}
+		width := fi.width - utf8.rune_count(s);
+		if fi.minus { // right pad
+			buffer_write_string(fi.buf, s);
+			fmt_write_padding(fi, width);
+		} else { // left pad
+			fmt_write_padding(fi, width);
+			buffer_write_string(fi.buf, s);
+		}
+	}
+
 	match verb {
 	// case 'e', 'E', 'f', 'F', 'g', 'G', 'v':
 	// case 'f', 'F', 'v':
 
-	// TODO(bill): This is a shit copy from gb.h and I really need a decent implementation
 	case 'f', 'F', 'v':
-		width := 0;
-		if fi.width_set {
-			width = max(fi.width, 0);
-		}
-		prec := 3;
+		prec: int = 3;
 		if fi.prec_set {
-			prec = max(fi.prec, 0);
+			prec = fi.prec;
+		}
+		buf: [128]byte;
+		str := strconv.format_float(buf[1:], v, 'f', prec, bit_size);
+		str = cast(string)buf[:str.count+1];
+		if str[1] == '+' || str[1] == '-' {
+			str = str[1:];
+		} else {
+			str[0] = '+';
 		}
 
-		if v == 0 {
-			buffer_write_byte(fi.buf, '0');
-			if fi.hash && width > 0 {
-				buffer_write_byte(fi.buf, '.');
+		if fi.space && !fi.plus && str[0] == '+' {
+			str[0] = ' ';
+		}
+
+		if str[1] == 'N' && str[1] == 'I' {
+			buffer_write_string(fi.buf, str);
+			return;
+		}
+
+		if fi.plus || str[0] != '+' {
+			if fi.zero && fi.width_set && fi.width > str.count {
+				buffer_write_byte(fi.buf, str[0]);
+				fmt_write_padding(fi, fi.width - str.count);
+				buffer_write_string(fi.buf, str[1:]);
+			} else {
+				pad(fi, str);
 			}
 		} else {
-			signed := v < 0;
-			v = abs(v);
-
-			if signed {
-				buffer_write_byte(fi.buf, '-');
-			}
-
-			val := cast(u64)v;
-			fi.minus = false;
-			fi.width = 0;
-			fi.prec = 0;
-			// TODO(bill): Write integer to buffer than use this crap
-			fmt_integer(fi, val, 10, false, __DIGITS_LOWER);
-
-			if fi.hash || prec > 0 {
-				arg := v - cast(f64)val;
-				mult: f64 = 10;
-				buffer_write_byte(fi.buf, '.');
-				for _ in 0..<prec {
-					val := cast(u64)(arg*mult);
-					buffer_write_byte(fi.buf, __DIGITS_LOWER[cast(u64)val]);
-					arg -= cast(f64)val / mult;
-					mult *= 10;
-				}
-			}
+			pad(fi, str[1:]);
 		}
 
-
-		if width > 0 {
-			fill: byte = ' ';
-			match {
-			case fi.zero:  fill = '0';
-			case fi.space: fill = ' ';
-			}
-
-			for width > 0 {
-				width -= 1;
-				buffer_write_byte(fi.buf, fill);
-			}
-		}
 	default:
 		fmt_bad_verb(fi, verb);
 		return;
@@ -679,7 +641,7 @@ fmt_pointer :: proc(fi: ^Fmt_Info, p: rawptr, verb: rune) {
 	if !fi.hash || verb == 'v' {
 		buffer_write_string(fi.buf, "0x");
 	}
-	fmt_integer(fi, u, 16, false, __DIGITS_UPPER);
+	_write_int(fi, u, 16, false, __DIGITS_UPPER);
 }
 
 fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
@@ -957,11 +919,11 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	case f32:     fmt_float(fi, cast(f64)a, 32, verb);
 	case f64:     fmt_float(fi, a, 64, verb);
 
-	case int:     fmt_int(fi, cast(u64)a, true, verb);
-	case i8:      fmt_int(fi, cast(u64)a, true, verb);
-	case i16:     fmt_int(fi, cast(u64)a, true, verb);
-	case i32:     fmt_int(fi, cast(u64)a, true, verb);
-	case i64:     fmt_int(fi, cast(u64)a, true, verb);
+	case int:     fmt_int(fi, cast(u64)a, a < 0, verb);
+	case i8:      fmt_int(fi, cast(u64)a, a < 0, verb);
+	case i16:     fmt_int(fi, cast(u64)a, a < 0, verb);
+	case i32:     fmt_int(fi, cast(u64)a, a < 0, verb);
+	case i64:     fmt_int(fi, cast(u64)a, a < 0, verb);
 	case uint:    fmt_int(fi, cast(u64)a, false, verb);
 	case u8:      fmt_int(fi, cast(u64)a, false, verb);
 	case u16:     fmt_int(fi, cast(u64)a, false, verb);
@@ -984,7 +946,7 @@ bprintf :: proc(b: ^Buffer, fmt: string, args: ...any) -> int {
 
 		prev_i := i;
 		for i < end && fmt[i] != '%' {
-			i += 1;
+			i++;
 		}
 		if i > prev_i {
 			buffer_write_string(b, fmt[prev_i:i]);
@@ -994,10 +956,10 @@ bprintf :: proc(b: ^Buffer, fmt: string, args: ...any) -> int {
 		}
 
 		// Process a "verb"
-		i += 1;
+		i++;
 
 
-		for ; i < end; i += 1 {
+		for ; i < end; i++ {
 			skip_loop := false;
 			c := fmt[i];
 			match c {
@@ -1025,7 +987,7 @@ bprintf :: proc(b: ^Buffer, fmt: string, args: ...any) -> int {
 
 		// Width
 		if i < end && fmt[i] == '*' {
-			i += 1;
+			i++;
 			fi.width, arg_index, fi.width_set = int_from_arg(args, arg_index);
 			if !fi.width_set {
 				buffer_write_string(b, "%!(BAD WIDTH)");
@@ -1046,13 +1008,13 @@ bprintf :: proc(b: ^Buffer, fmt: string, args: ...any) -> int {
 
 		// Precision
 		if i < end && fmt[i] == '.' {
-			i += 1;
+			i++;
 			if was_prev_index { // %[6].2d
 				fi.good_arg_index = false;
 			}
 			if i < end && fmt[i] == '*' {
 				arg_index, i, was_prev_index = _arg_number(^fi, arg_index, fmt, i, args.count);
-				i += 1;
+				i++;
 				fi.prec, arg_index, fi.prec_set = int_from_arg(args, arg_index);
 				if fi.prec < 0 {
 					fi.prec = 0;
@@ -1091,7 +1053,7 @@ bprintf :: proc(b: ^Buffer, fmt: string, args: ...any) -> int {
 			buffer_write_string(b, "%!(MISSING ARGUMENT)");
 		} else {
 			fmt_arg(^fi, args[arg_index], verb);
-			arg_index += 1;
+			arg_index++;
 		}
 	}
 

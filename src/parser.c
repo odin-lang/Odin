@@ -186,6 +186,10 @@ AST_NODE_KIND(_StmtBegin,     "", i32) \
 		Token op; \
 		AstNodeArray lhs, rhs; \
 	}) \
+	AST_NODE_KIND(IncDecStmt, "increment decrement statement", struct { \
+		Token op; \
+		AstNode *expr; \
+	}) \
 AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 	AST_NODE_KIND(BlockStmt, "block statement", struct { \
 		AstNodeArray stmts; \
@@ -467,6 +471,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_ExprStmt:      return ast_node_token(node->ExprStmt.expr);
 	case AstNode_TagStmt:       return node->TagStmt.token;
 	case AstNode_AssignStmt:    return node->AssignStmt.op;
+	case AstNode_IncDecStmt:    return ast_node_token(node->IncDecStmt.expr);
 	case AstNode_BlockStmt:     return node->BlockStmt.open;
 	case AstNode_IfStmt:        return node->IfStmt.token;
 	case AstNode_WhenStmt:      return node->WhenStmt.token;
@@ -801,6 +806,16 @@ AstNode *ast_assign_stmt(AstFile *f, Token op, AstNodeArray lhs, AstNodeArray rh
 	result->AssignStmt.rhs = rhs;
 	return result;
 }
+
+
+AstNode *ast_inc_dec_stmt(AstFile *f, Token op, AstNode *expr) {
+	AstNode *result = make_ast_node(f, AstNode_IncDecStmt);
+	result->IncDecStmt.op = op;
+	result->IncDecStmt.expr = expr;
+	return result;
+}
+
+
 
 AstNode *ast_block_stmt(AstFile *f, AstNodeArray stmts, Token open, Token close) {
 	AstNode *result = make_ast_node(f, AstNode_BlockStmt);
@@ -2270,6 +2285,13 @@ AstNode *parse_simple_stmt(AstFile *f, bool in_stmt_ok) {
 	if (lhs.count > 1) {
 		syntax_error(token, "Expected 1 expression");
 		return ast_bad_stmt(f, token, f->curr_token);
+	}
+
+	switch (token.kind) {
+	case Token_Inc:
+	case Token_Dec:
+		next_token(f);
+		return ast_inc_dec_stmt(f, token, lhs.e[0]);
 	}
 
 	return ast_expr_stmt(f, lhs.e[0]);

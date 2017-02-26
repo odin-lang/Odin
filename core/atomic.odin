@@ -37,7 +37,7 @@ spin_lock :: proc(a: ^i32, time_out: int) -> bool { // NOTE(bill) time_out = -1 
 	old_value := compare_exchange(a, 1, 0);
 	counter := 0;
 	for old_value != 0 && (time_out < 0 || counter < time_out) {
-		counter += 1;
+		counter++;
 		yield_thread();
 		old_value = compare_exchange(a, 1, 0);
 		mfence();
@@ -81,7 +81,7 @@ spin_lock :: proc(a: ^i64, time_out: int) -> bool { // NOTE(bill) time_out = -1 
 	old_value := compare_exchange(a, 1, 0);
 	counter := 0;
 	for old_value != 0 && (time_out < 0 || counter < time_out) {
-		counter += 1;
+		counter++;
 		yield_thread();
 		old_value = compare_exchange(a, 1, 0);
 		mfence();

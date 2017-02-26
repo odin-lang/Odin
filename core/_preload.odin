@@ -447,7 +447,7 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 	data := cast(^byte)array.data;
 	assert(data != nil);
 	mem.zero(data + (elem_size*array.count), elem_size);
-	array.count += 1;
+	array.count++;
 	return array.count;
 }
 
@@ -506,7 +506,7 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
 		nm.hashes[i] = -1;
 	}
 
-	for i := 0; i < nm.entries.count; i += 1 {
+	for i := 0; i < nm.entries.count; i++ {
 		entry_header := __dynamic_map_get_entry(new_header, i);
 		data := cast(^byte)entry_header;
 
@@ -645,7 +645,7 @@ __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
 	}
 
 	if fr.entry_index == m.entries.count-1 {
-		m.entries.count -= 1;
+		m.entries.count--;
 	}
 	mem.copy(__dynamic_map_get_entry(h, fr.entry_index), __dynamic_map_get_entry(h, m.entries.count-1), entry_size);
 	last := __dynamic_map_find(h, __dynamic_map_get_entry(h, fr.entry_index).key);

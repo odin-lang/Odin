@@ -233,6 +233,7 @@ struct irProcedure {
 #define IR_CONV_KINDS \
 	IR_CONV_KIND(trunc) \
 	IR_CONV_KIND(zext) \
+	IR_CONV_KIND(sext) \
 	IR_CONV_KIND(fptrunc) \
 	IR_CONV_KIND(fpext) \
 	IR_CONV_KIND(fptoui) \
@@ -2240,12 +2241,23 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		i64 sz = type_size_of(proc->module->allocator, src);
 		i64 dz = type_size_of(proc->module->allocator, dst);
 		irConvKind kind = irConv_trunc;
-		if (sz == dz) {
+		if (dz == sz) {
 			// NOTE(bill): In LLVM, all integers are signed and rely upon 2's compliment
 			// NOTE(bill): Copy the value just for type correctness
 			kind = irConv_bitcast;
 		} else if (dz > sz) {
 			kind = irConv_zext;
+
+			// TODO(bill): figure out the rules completely
+			bool ss = !is_type_unsigned(src);
+			bool ds = !is_type_unsigned(dst);
+			if (ss && ds) {
+				kind = irConv_sext;
+			} else if (ss) {
+				kind = irConv_sext;
+			} else {
+				kind = irConv_zext;
+			}
 		}
 
 		return ir_emit(proc, ir_make_instr_conv(proc, kind, value, src, dst));
@@ -4767,6 +4779,15 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 	case_ast_node(ws, WhenStmt, node);
 		ir_build_when_stmt(proc, ws);
+	case_end;
+
+	case_ast_node(s, IncDecStmt, node);
+		TokenKind op = Token_Add;
+		if (s->op.kind == Token_Dec) {
+			op = Token_Sub;
+		}
+		irAddr addr = ir_build_addr(proc, s->expr);
+		ir_build_assign_op(proc, addr, v_one, op);
 	case_end;
 
 	case_ast_node(vd, ValueDecl, node);

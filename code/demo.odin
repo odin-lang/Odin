@@ -5,14 +5,19 @@
 #import "mem.odin";
 #import "opengl.odin";
 #import "os.odin";
-
-foo :: proc(x: int) -> f32 {
-	return 123;
-}
+#import "strconv.odin";
 
 main :: proc() {
+	buf: [64]byte;
+	// len := strconv.generic_ftoa(buf[:], 123.5431, 'f', 4, 64);
+	x := 624.123;
+	s := strconv.format_float(buf[:], x, 'f', 6, 64);
+	fmt.println(s);
+	fmt.printf("%.3f\n", x);
 
-	fmt.printf("%T\n", foo);
+	i := 123;
+	fmt.println(123);
+
 
 when false {
 /*
