@@ -13,7 +13,7 @@ main :: proc() {
 	x := 624.123;
 	s := strconv.format_float(buf[:], x, 'f', 6, 64);
 	fmt.println(s);
-	fmt.printf("%.3f\n", x);
+	fmt.printf("%3d\n", 102);
 
 	i := 123;
 	fmt.println(123);

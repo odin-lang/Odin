@@ -466,7 +466,7 @@ _write_int :: proc(fi: ^Fmt_Info, u: u64, base: int, neg: bool, digits: string) 
 	}
 	BUF_SIZE :: 256;
 	if fi.width_set || fi.prec_set {
-		width := fi.width + fi.prec + 3;
+		width := fi.width + fi.prec + 3; // 3 extra bytes for sign and prefix
 		if width > BUF_SIZE {
 			// TODO(bill):????
 			panic("_write_int buffer overrun. Width and precision too big");
@@ -477,10 +477,10 @@ _write_int :: proc(fi: ^Fmt_Info, u: u64, base: int, neg: bool, digits: string) 
 	if fi.prec_set {
 		prec = fi.prec;
 		if prec == 0 && u == 0 {
-			old_zero := fi.zero;
+			prev_zero := fi.zero;
 			fi.zero = false;
 			fmt_write_padding(fi, fi.width);
-			fi.zero = old_zero;
+			fi.zero = prev_zero;
 			return;
 		}
 	} else if fi.zero && fi.width_set {
@@ -505,27 +505,10 @@ _write_int :: proc(fi: ^Fmt_Info, u: u64, base: int, neg: bool, digits: string) 
 	if fi.space { flags |= strconv.Int_Flag.SPACE; }
 	s := strconv.format_bits(buf[:], u, base, neg, digits, flags);
 
-	old_zero := fi.zero;
-	defer fi.zero = old_zero;
+	prev_zero := fi.zero;
 	fi.zero = false;
-
-	if !fi.width_set || fi.width == 0 {
-		buffer_write_string(fi.buf, s);
-	} else {
-		width := fi.width - utf8.rune_count(s);
-			if width > 0 {
-			if fi.minus {
-				// Right pad
-				buffer_write_string(fi.buf, s);
-				fmt_write_padding(fi, width);
-			} else {
-				// Left pad
-				fmt_write_padding(fi, width);
-				buffer_write_string(fi.buf, s);
-			}
-		}
-	}
-
+	defer fi.zero = prev_zero;
+	_pad(fi, s);
 }
 
 immutable __DIGITS_LOWER := "0123456789abcdefx";
@@ -559,22 +542,23 @@ fmt_int :: proc(fi: ^Fmt_Info, u: u64, neg: bool, verb: rune) {
 	}
 }
 
+_pad :: proc(fi: ^Fmt_Info, s: string) {
+	if !fi.width_set || fi.width == 0 {
+		buffer_write_string(fi.buf, s);
+		return;
+	}
+	width := fi.width - utf8.rune_count(s);
+	if fi.minus { // right pad
+		buffer_write_string(fi.buf, s);
+		fmt_write_padding(fi, width);
+	} else { // left pad
+		fmt_write_padding(fi, width);
+		buffer_write_string(fi.buf, s);
+	}
+}
 
 fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
-	pad :: proc(fi: ^Fmt_Info, s: string) {
-		if !fi.width_set || fi.width == 0 {
-			buffer_write_string(fi.buf, s);
-			return;
-		}
-		width := fi.width - utf8.rune_count(s);
-		if fi.minus { // right pad
-			buffer_write_string(fi.buf, s);
-			fmt_write_padding(fi, width);
-		} else { // left pad
-			fmt_write_padding(fi, width);
-			buffer_write_string(fi.buf, s);
-		}
-	}
+
 
 	match verb {
 	// case 'e', 'E', 'f', 'F', 'g', 'G', 'v':
@@ -609,10 +593,10 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
 				fmt_write_padding(fi, fi.width - str.count);
 				buffer_write_string(fi.buf, str[1:]);
 			} else {
-				pad(fi, str);
+				_pad(fi, str);
 			}
 		} else {
-			pad(fi, str[1:]);
+			_pad(fi, str[1:]);
 		}
 
 	default:
