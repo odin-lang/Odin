@@ -191,7 +191,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 	case Type_Slice:
 		ir_fprintf(f, "{");
 		ir_print_type(f, m, t->Slice.elem);
-		ir_fprintf(f, "*, i%lld}", word_bits);
+		ir_fprintf(f, "*, i%lld, i%lld}", word_bits, word_bits);
 		return;
 	case Type_DynamicArray:
 		ir_fprintf(f, "{");
@@ -1248,6 +1248,13 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, t_int);
 		ir_fprintf(f, " ");
 		ir_print_value(f, m, bc->high, t_int);
+
+		if (!bc->is_substring) {
+			ir_fprintf(f, ", ");
+			ir_print_type(f, m, t_int);
+			ir_fprintf(f, " ");
+			ir_print_value(f, m, bc->max, t_int);
+		}
 
 		ir_fprintf(f, ")\n");
 	} break;

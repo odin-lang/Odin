@@ -321,12 +321,12 @@ __bounds_check_error :: proc(file: string, line, column: int, index, count: int)
 	__debug_trap();
 }
 
-__slice_expr_error :: proc(file: string, line, column: int, low, high: int) {
-	if 0 <= low && low <= high {
+__slice_expr_error :: proc(file: string, line, column: int, low, high, max: int) {
+	if 0 <= low && low <= high && high <= max {
 		return;
 	}
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: [%d..%d]\n",
-	            file, line, column, low, high);
+	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: [%d..%d..%d]\n",
+	            file, line, column, low, high, max);
 	__debug_trap();
 }
 __substring_expr_error :: proc(file: string, line, column: int, low, high: int) {
@@ -361,8 +361,9 @@ Raw_String :: struct #ordered {
 };
 
 Raw_Slice :: struct #ordered {
-	data:  rawptr,
-	count: int,
+	data:     rawptr,
+	count:    int,
+	capacity: int,
 };
 
 Raw_Dynamic_Array :: struct #ordered {
@@ -449,6 +450,28 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 	mem.zero(data + (elem_size*array.count), elem_size);
 	array.count++;
 	return array.count;
+}
+
+__slice_append :: proc(slice_: rawptr, elem_size, elem_align: int,
+                       items: rawptr, item_count: int) -> int {
+	slice := cast(^Raw_Slice)slice_;
+
+	if item_count <= 0 || items == nil {
+		return slice.count;
+	}
+
+
+	ok := true;
+	if item_count > (slice.capacity-slice.count) {
+		item_count = (slice.capacity-slice.count);
+	}
+	if item_count > 0 {
+		data := cast(^byte)slice.data;
+		assert(data != nil);
+		mem.copy(data + (elem_size*slice.count), items, elem_size * item_count);
+		slice.count += item_count;
+	}
+	return slice.count;
 }
 
 

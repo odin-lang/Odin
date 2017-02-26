@@ -1090,6 +1090,7 @@ gb_global Entity *entity__any_data       = NULL;
 gb_global Entity *entity__string_data    = NULL;
 gb_global Entity *entity__string_count   = NULL;
 gb_global Entity *entity__slice_count    = NULL;
+gb_global Entity *entity__slice_capacity = NULL;
 
 gb_global Entity *entity__dynamic_array_count     = NULL;
 gb_global Entity *entity__dynamic_array_capacity  = NULL;
@@ -1251,6 +1252,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 	} else if (type->kind == Type_Slice) {
 		String data_str     = str_lit("data");
 		String count_str    = str_lit("count");
+		String capacity_str = str_lit("capacity");
 
 		if (str_eq(field_name, data_str)) {
 			selection_add_index(&sel, 0);
@@ -1265,7 +1267,16 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 
 			sel.entity = entity__slice_count;
 			return sel;
+		}  else if (str_eq(field_name, capacity_str)) {
+			selection_add_index(&sel, 2);
+			if (entity__slice_capacity == NULL) {
+				entity__slice_capacity = make_entity_field(a, NULL, make_token_ident(capacity_str), t_int, false, 2);
+			}
+
+			sel.entity = entity__slice_capacity;
+			return sel;
 		}
+
 	} else if (type->kind == Type_DynamicArray) {
 		String data_str      = str_lit("data");
 		String count_str     = str_lit("count");
@@ -1779,7 +1790,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 
 	case Type_Slice: // ptr + count
-		return 2 * build_context.word_size;
+		return 3 * build_context.word_size;
 
 	case Type_Map: {
 		if (t->Map.count == 0) { // Dynamic
@@ -1875,23 +1886,24 @@ i64 type_offset_of(gbAllocator allocator, Type *t, i32 index) {
 	}  else if (t->kind == Type_Basic) {
 		if (t->Basic.kind == Basic_string) {
 			switch (index) {
-			case 0: return 0;           // data
+			case 0: return 0;                       // data
 			case 1: return build_context.word_size; // count
 			}
 		} else if (t->Basic.kind == Basic_any) {
 			switch (index) {
-			case 0: return 0;           // type_info
+			case 0: return 0;                       // type_info
 			case 1: return build_context.word_size; // data
 			}
 		}
 	} else if (t->kind == Type_Slice) {
 		switch (index) {
-		case 0: return 0;             // data
+		case 0: return 0;                         // data
 		case 1: return 1*build_context.word_size; // count
+		case 2: return 2*build_context.word_size; // capacity
 		}
 	} else if (t->kind == Type_DynamicArray) {
 		switch (index) {
-		case 0: return 0;             // data
+		case 0: return 0;                         // data
 		case 1: return 1*build_context.word_size; // count
 		case 2: return 2*build_context.word_size; // capacity
 		case 3: return 3*build_context.word_size; // allocator
@@ -1928,18 +1940,19 @@ i64 type_offset_of_from_selection(gbAllocator allocator, Type *type, Selection s
 					}
 				}
 				break;
+			case Type_Slice:
+				switch (index) {
+				case 0: t = t_rawptr; break;
+				case 1: t = t_int;    break;
+				case 2: t = t_int;    break;
+				}
+				break;
 			case Type_DynamicArray:
 				switch (index) {
 				case 0: t = t_rawptr;    break;
 				case 1: t = t_int;       break;
 				case 2: t = t_int;       break;
 				case 3: t = t_allocator; break;
-				}
-				break;
-			case Type_Slice:
-				switch (index) {
-				case 0: t = t_rawptr; break;
-				case 1: t = t_int;    break;
 				}
 				break;
 			}

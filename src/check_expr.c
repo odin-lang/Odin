@@ -3057,19 +3057,26 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_append: {
-		// append :: proc([dynamic]Type, item: ...Type)
+		// append :: proc([dynamic]Type, item: ..Type)
+		// append :: proc([]Type, item: ..Type)
 		Type *type = operand->type;
 		type = base_type(type);
-		if (!is_type_dynamic_array(type)) {
+		if (!is_type_dynamic_array(type) && !is_type_slice(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a dynamic array, got `%s`", str);
+			error_node(operand->expr, "Expected a slice or dynamic array, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
 
-		// TODO(bill): Semi-memory leaks
-		Type *elem = type->DynamicArray.elem;
-		Type *slice_elem = make_type_slice(c->allocator, elem);
+		Type *elem = NULL;
+		Type *slice_elem = NULL;
+		if (is_type_dynamic_array(type)) {
+			// TODO(bill): Semi-memory leaks
+			elem = type->DynamicArray.elem;
+		} else {
+			elem = type->Slice.elem;
+		}
+		slice_elem = make_type_slice(c->allocator, elem);
 
 		Type *proc_type_params = make_type_tuple(c->allocator);
 		proc_type_params->Tuple.variables = gb_alloc_array(c->allocator, Entity *, 2);
@@ -3404,7 +3411,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_swizzle: {
-		// swizzle :: proc(v: {N}T, T...) -> {M}T
+		// swizzle :: proc(v: {N}T, T..) -> {M}T
 		Type *vector_type = base_type(operand->type);
 		if (!is_type_vector(vector_type)) {
 			gbString type_str = type_to_string(operand->type);
@@ -5433,13 +5440,17 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, se->expr);
 		str = gb_string_appendc(str, "[");
 		str = write_expr_to_string(str, se->low);
-		str = gb_string_appendc(str, ":");
+		str = gb_string_appendc(str, "..");
 		str = write_expr_to_string(str, se->high);
+		if (se->index3) {
+			str = gb_string_appendc(str, "..");
+			str = write_expr_to_string(str, se->max);
+		}
 		str = gb_string_appendc(str, "]");
 	case_end;
 
 	case_ast_node(e, Ellipsis, node);
-		str = gb_string_appendc(str, "...");
+		str = gb_string_appendc(str, "..");
 	case_end;
 
 	case_ast_node(fv, FieldValue, node);
@@ -5458,7 +5469,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		if (at->count != NULL &&
 		    at->count->kind == AstNode_UnaryExpr &&
 		    at->count->UnaryExpr.op.kind == Token_Ellipsis) {
-			str = gb_string_appendc(str, "...");
+			str = gb_string_appendc(str, "..");
 		} else {
 			str = write_expr_to_string(str, at->count);
 		}
@@ -5467,7 +5478,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_end;
 
 	case_ast_node(at, DynamicArrayType, node);
-		str = gb_string_appendc(str, "[...]");
+		str = gb_string_appendc(str, "[..]");
 		str = write_expr_to_string(str, at->elem);
 	case_end;
 
@@ -5500,7 +5511,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 			str = gb_string_appendc(str, ": ");
 		}
 		if (f->flags&FieldFlag_ellipsis) {
-			str = gb_string_appendc(str, "...");
+			str = gb_string_appendc(str, "..");
 		}
 		str = write_expr_to_string(str, f->type);
 	case_end;

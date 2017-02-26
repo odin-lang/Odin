@@ -1258,6 +1258,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			case Entity_Variable: {
 				Type *t = base_type(type_deref(e->type));
 				if (is_type_struct(t) || is_type_raw_union(t)) {
+					// TODO(bill): Make it work for unions too
 					Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
 					GB_ASSERT(found != NULL);
 					for_array(i, (*found)->elements.entries) {
