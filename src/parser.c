@@ -1950,16 +1950,12 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
 
-			// if (f->curr_token.kind != Token_Ellipsis &&
-			    // f->curr_token.kind != Token_HalfOpenRange) {
-			if (f->curr_token.kind != Token_Colon) {
+			if (f->curr_token.kind != Token_Ellipsis) {
 				indices[0] = parse_expr(f, false);
 			}
 			bool is_index = true;
 
-			// if (f->curr_token.kind == Token_Ellipsis ||
-			    // f->curr_token.kind == Token_HalfOpenRange) {
-			if (f->curr_token.kind == Token_Colon) {
+			if (f->curr_token.kind == Token_Ellipsis) {
 				is_index = false;
 				interval = f->curr_token;
 				next_token(f);
@@ -2261,7 +2257,6 @@ AstNode *parse_simple_stmt(AstFile *f, bool in_stmt_ok) {
 			allow_token(f, Token_in);
 			AstNode *expr = parse_expr(f, false);
 			switch (f->curr_token.kind) {
-			case Token_HalfOpenRange:
 			case Token_Ellipsis: {
 				Token op = f->curr_token;
 				next_token(f);

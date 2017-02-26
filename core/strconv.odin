@@ -1,6 +1,5 @@
 #import . "decimal.odin";
 #import "math.odin";
-#import format "fmt.odin";
 
 Int_Flag :: enum {
 	PREFIX = 1<<0,
@@ -22,7 +21,7 @@ parse_bool :: proc(s: string) -> (result: bool, ok: bool) {
 format_bool :: proc(buf: []byte, b: bool) -> string {
 	s := b ? "true" : "false";
 	len := copy(buf, cast([]byte)s);
-	return cast(string)buf[:len];
+	return cast(string)buf[..len];
 }
 
 format_uint :: proc(buf: []byte, u: u64, base: int) -> string {
@@ -44,10 +43,10 @@ format_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> str
 
 
 Decimal_Slice :: struct {
-	d:   []byte,
-	ndu: int,
-	dp:  int,
-	neg: bool,
+	digits:        []byte,
+	count:         int,
+	decimal_point: int,
+	neg:           bool,
 }
 
 Float_Info :: struct {
@@ -89,7 +88,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 			s = "+Inf";
 		}
 		len := copy(buf, cast([]byte)s);
-		return buf[:len];
+		return buf[..len];
 
 	case 0: // denormalized
 		exp++;
@@ -108,19 +107,19 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 	shortest := prec < 0;
 	if shortest {
 		round_shortest(d, mant, exp, flt);
-		digs = Decimal_Slice{d = d.d[:], ndu = d.ndu, dp = d.dp};
+		digs = Decimal_Slice{digits = d.digits[..], count = d.count, decimal_point = d.decimal_point};
 		match fmt {
 		case 'e', 'E':
-			prec = digs.ndu-1;
+			prec = digs.count-1;
 		case 'f', 'F':
-			prec = max(digs.ndu-digs.dp, 0);
+			prec = max(digs.count-digs.decimal_point, 0);
 		case 'g', 'G':
-			prec = digs.ndu;
+			prec = digs.count;
 		}
 	} else {
 		match fmt {
 		case 'e', 'E': round(d, prec+1);
-		case 'f', 'F': round(d, d.dp+prec);
+		case 'f', 'F': round(d, d.decimal_point+prec);
 		case 'g', 'G':
 			if prec == 0 {
 				prec = 1;
@@ -128,7 +127,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 			round(d, prec);
 		}
 
-		digs = Decimal_Slice{d = d.d[:], ndu = d.ndu, dp = d.dp};
+		digs = Decimal_Slice{digits = d.digits[..], count = d.count, decimal_point = d.decimal_point};
 	}
 	return format_digits(buf, shortest, neg, digs, prec, fmt);
 }
@@ -138,7 +137,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, prec: int, fmt: byte) -> []byte {
 	match fmt {
 	case 'f', 'F':
-		add_bytes :: proc(dst: ^[]byte, w: ^int, bytes: ...byte) {
+		add_bytes :: proc(dst: ^[]byte, w: ^int, bytes: ..byte) {
 			for b in bytes {
 				if dst.count <= w^ {
 					break;
@@ -148,7 +147,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 			}
 		}
 
-		dst := buf[:];
+		dst := buf[..];
 		w := 0;
 		if neg {
 			add_bytes(^dst, ^w, '-');
@@ -157,10 +156,10 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 		}
 
 		// integer, padded with zeros when needed
-		if digs.dp > 0 {
-			m := min(digs.ndu, digs.dp);
-			add_bytes(^dst, ^w, ...digs.d[:m]);
-			for ; m < digs.dp; m++ {
+		if digs.decimal_point > 0 {
+			m := min(digs.count, digs.decimal_point);
+			add_bytes(^dst, ^w, ..digs.digits[..m]);
+			for ; m < digs.decimal_point; m++ {
 				add_bytes(^dst, ^w, '0');
 			}
 		} else {
@@ -170,16 +169,16 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 		// fractional part
 		if prec > 0 {
 			add_bytes(^dst, ^w, '.');
-			for i in 0..<prec {
+			for i in 0..prec {
 				c: byte = '0';
-				if j := digs.dp + i; 0 <= j && j < digs.ndu {
-					c = digs.d[j];
+				if j := digs.decimal_point + i; 0 <= j && j < digs.count {
+					c = digs.digits[j];
 				}
 				add_bytes(^dst, ^w, c);
 			}
 		}
 
-		return buf[:w];
+		return buf[..w];
 
 	case 'e', 'E':
 		return nil; // TODO
@@ -191,13 +190,13 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 	c: [2]byte;
 	c[0] = '%';
 	c[1] = fmt;
-	len := copy(buf, ...c[:]);
-	return buf[:len];
+	len := copy(buf, ..c[..]);
+	return buf[..len];
 }
 
 round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 	if mant == 0 { // If mantissa is zero, the number is zero
-		d.ndu = 0;
+		d.count = 0;
 		return;
 	}
 
@@ -208,7 +207,7 @@ round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 		332*(dp-nd) >= 100*(exp-mantbits)
 	 */
 	minexp := flt.bias+1;
-	if exp > minexp && 332*(d.dp-d.ndu) >= 100*(exp - cast(int)flt.mantbits) {
+	if exp > minexp && 332*(d.decimal_point-d.count) >= 100*(exp - cast(int)flt.mantbits) {
 		// Number is already its shortest
 		return;
 	}
@@ -232,19 +231,19 @@ round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 
 	inclusive := mant%2 == 0;
 
-	for i in 0..<d.ndu {
+	for i in 0..d.count {
 		l: byte = '0'; // lower digit
-		if i < lower.ndu {
-			l = lower.d[i];
+		if i < lower.count {
+			l = lower.digits[i];
 		}
-		m := d.d[i];   // middle digit
+		m := d.digits[i];   // middle digit
 		u: byte = '0'; // upper digit
-		if i < upper.ndu {
-			u = upper.d[i];
+		if i < upper.count {
+			u = upper.digits[i];
 		}
 
-		ok_round_down := l != m || inclusive && i+1 == lower.ndu;
-		ok_round_up   := m != u && (inclusive || m+1 < u || i+1 < upper.ndu);
+		ok_round_down := l != m || inclusive && i+1 == lower.count;
+		ok_round_up   := m != u && (inclusive || m+1 < u || i+1 < upper.count);
 
 		if (ok_round_down && ok_round_up) {
 			round(d, i+1);
@@ -331,7 +330,7 @@ format_bits :: proc(buf: []byte, u: u64, base: int, neg: bool, digits: string, f
 	}
 
 
-	len := copy(buf, ...a[i:]);
-	return cast(string)buf[:len];
+	len := copy(buf, ..a[i..]);
+	return cast(string)buf[..len];
 }
 

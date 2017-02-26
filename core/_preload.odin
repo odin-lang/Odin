@@ -316,7 +316,7 @@ __bounds_check_error :: proc(file: string, line, column: int, index, count: int)
 	if 0 <= index && index < count {
 		return;
 	}
-	fmt.fprintf(os.stderr, "%s(%d:%d) Index %d is out of bounds range 0..<%d\n",
+	fmt.fprintf(os.stderr, "%s(%d:%d) Index %d is out of bounds range 0..%d\n",
 	            file, line, column, index, count);
 	__debug_trap();
 }
@@ -325,7 +325,7 @@ __slice_expr_error :: proc(file: string, line, column: int, low, high: int) {
 	if 0 <= low && low <= high {
 		return;
 	}
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: [%d:%d]\n",
+	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: [%d..%d]\n",
 	            file, line, column, low, high);
 	__debug_trap();
 }
@@ -333,7 +333,7 @@ __substring_expr_error :: proc(file: string, line, column: int, low, high: int) 
 	if 0 <= low && low <= high {
 		return;
 	}
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid substring indices: [%d:%d]\n",
+	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid substring indices: [%d..%d]\n",
 	            file, line, column, low, high);
 	__debug_trap();
 }

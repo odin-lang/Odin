@@ -4742,8 +4742,7 @@ void ir_build_range_interval(irProcedure *proc, AstNodeIntervalExpr *node, Type 
 
 	TokenKind op = Token_Lt;
 	switch (node->op.kind) {
-	case Token_HalfOpenRange: op = Token_Lt;   break;
-	case Token_Ellipsis:      op = Token_LtEq; break;
+	case Token_Ellipsis: op = Token_Lt; break;
 	default: GB_PANIC("Invalid interval operator"); break;
 	}
 	irValue *cond = ir_emit_comp(proc, op, ir_emit_load(proc, value), upper);

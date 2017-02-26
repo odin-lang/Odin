@@ -9,14 +9,14 @@
 
 main :: proc() {
 	buf: [64]byte;
-	// len := strconv.generic_ftoa(buf[:], 123.5431, 'f', 4, 64);
+	// len := strconv.generic_ftoa(buf[..], 123.5431, 'f', 4, 64);
 	x := 624.123;
-	s := strconv.format_float(buf[:], x, 'f', 6, 64);
+	s := strconv.format_float(buf[..], x, 'f', 6, 64);
 	fmt.println(s);
 	fmt.printf("%3d\n", 102);
 
-	i := 123;
-	fmt.println(123);
+	a := [..]int{0, 1, 2, 3, 4, 5, 6};
+	fmt.println(a[0..4]);
 
 
 when false {

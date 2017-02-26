@@ -66,7 +66,7 @@ murmur32 :: proc(data: []byte) -> u32 {
 		h1 = h1*5 + 0xe6546b64;
 	}
 
-	tail := data[nblocks*4:];
+	tail := data[nblocks*4 ..];
 
 	k1: u32;
 	match tail.count&3 {
@@ -174,7 +174,7 @@ murmur64 :: proc(data: []byte) -> u64 {
 			len -= 4;
 		}
 
-		data8 := slice_to_bytes(data32[i:])[:3];
+		data8 := slice_to_bytes(data32[i..])[..3];
 		match len {
 		case 3:
 			h2 ~= cast(u32)data8[2] << 16;

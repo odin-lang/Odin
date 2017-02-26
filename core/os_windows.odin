@@ -95,7 +95,7 @@ open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 	}
 
 	buf: [300]byte;
-	copy(buf[:], cast([]byte)path);
+	copy(buf[..], cast([]byte)path);
 
 	handle := cast(Handle)CreateFileA(^buf[0], access, share_mode, sa, create_mode, FILE_ATTRIBUTE_NORMAL, nil);
 	if handle != INVALID_HANDLE {
@@ -184,7 +184,7 @@ last_write_time_by_name :: proc(name: string) -> File_Time {
 
 	assert(buf.count > name.count);
 
-	copy(buf[:], cast([]byte)name);
+	copy(buf[..], cast([]byte)name);
 
 	if win32.GetFileAttributesExA(^buf[0], win32.GetFileExInfoStandard, ^data) != 0 {
 		last_write_time = data.last_write_time;
@@ -201,7 +201,7 @@ last_write_time_by_name :: proc(name: string) -> File_Time {
 
 read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	buf: [300]byte;
-	copy(buf[:], cast([]byte)name);
+	copy(buf[..], cast([]byte)name);
 
 	fd, err := open(name, O_RDONLY, 0);
 	if err != ERROR_NONE {

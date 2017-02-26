@@ -32,7 +32,7 @@ copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #link_name "_
 
 compare :: proc(a, b: []byte) -> int #link_name "__mem_compare" {
 	n := min(a.count, b.count);
-	for i in 0..<n {
+	for i in 0..n {
 		match {
 		case a[i] < b[i]:
 			return -1;
@@ -117,7 +117,7 @@ Arena_Temp_Memory :: struct {
 
 init_arena_from_memory :: proc(using a: ^Arena, data: []byte) {
 	backing    = Allocator{};
-	memory     = data[:0];
+	memory     = data[..0];
 	temp_count = 0;
 }
 
