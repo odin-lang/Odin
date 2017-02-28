@@ -51,8 +51,8 @@ TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
 TOKEN_KIND(Token__AssignOpEnd,   "_AssignOpEnd"), \
 	TOKEN_KIND(Token_ArrowRight, "->"), \
 	TOKEN_KIND(Token_ArrowLeft,  "<-"), \
-	TOKEN_KIND(Token_Increment,  "++"), \
-	TOKEN_KIND(Token_Decrement,  "--"), \
+	TOKEN_KIND(Token_Inc,        "++"), \
+	TOKEN_KIND(Token_Dec,        "--"), \
 \
 TOKEN_KIND(Token__ComparisonBegin, "_ComparisonBegin"), \
 	TOKEN_KIND(Token_CmpEq, "=="), \
@@ -73,8 +73,8 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 	TOKEN_KIND(Token_Semicolon,     ";"), \
 	TOKEN_KIND(Token_Period,        "."), \
 	TOKEN_KIND(Token_Comma,         ","), \
-	TOKEN_KIND(Token_Ellipsis,      "..."), \
-	TOKEN_KIND(Token_HalfOpenRange, "..<"), \
+	TOKEN_KIND(Token_Ellipsis,      ".."), \
+	/* TOKEN_KIND(Token_HalfOpenRange, "..<"), */ \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
@@ -225,6 +225,23 @@ void syntax_error_va(Token token, char *fmt, va_list va) {
 	gb_mutex_unlock(&global_error_collector.mutex);
 }
 
+void syntax_warning_va(Token token, char *fmt, va_list va) {
+	gb_mutex_lock(&global_error_collector.mutex);
+	global_error_collector.warning_count++;
+	// NOTE(bill): Duplicate error, skip it
+	if (!token_pos_eq(global_error_collector.prev, token.pos)) {
+		global_error_collector.prev = token.pos;
+		gb_printf_err("%.*s(%td:%td) Syntax Warning: %s\n",
+		              LIT(token.pos.file), token.pos.line, token.pos.column,
+		              gb_bprintf_va(fmt, va));
+	} else if (token.pos.line == 0) {
+		gb_printf_err("Warning: %s\n", gb_bprintf_va(fmt, va));
+	}
+
+	gb_mutex_unlock(&global_error_collector.mutex);
+}
+
+
 
 void warning(Token token, char *fmt, ...) {
 	va_list va;
@@ -244,6 +261,13 @@ void syntax_error(Token token, char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	syntax_error_va(token, fmt, va);
+	va_end(va);
+}
+
+void syntax_warning(Token token, char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	syntax_warning_va(token, fmt, va);
 	va_end(va);
 }
 
@@ -834,13 +858,11 @@ Token tokenizer_get_token(Tokenizer *t) {
 			token.kind = Token_Period; // Default
 			if (t->curr_rune == '.') { // Could be an ellipsis
 				advance_to_next_rune(t);
-				if (t->curr_rune == '<') {
-					advance_to_next_rune(t);
-					token.kind = Token_HalfOpenRange;
-				} else if (t->curr_rune == '.') {
-					advance_to_next_rune(t);
-					token.kind = Token_Ellipsis;
-				}
+				token.kind = Token_Ellipsis;
+				// if (t->curr_rune == '<') {
+					// advance_to_next_rune(t);
+					// token.kind = Token_HalfOpenRange;
+				// }
 			}
 			break;
 
@@ -859,13 +881,13 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '{': token.kind = Token_OpenBrace;    break;
 		case '}': token.kind = Token_CloseBrace;   break;
 
-		case '*': token.kind = token_kind_variant2(t, Token_Mul, Token_MulEq);                                              break;
-		case '%': token.kind = token_kind_variant2(t, Token_Mod, Token_ModEq);                                              break;
-		case '=': token.kind = token_kind_variant2(t, Token_Eq,  Token_CmpEq);                                              break;
-		case '~': token.kind = token_kind_variant2(t, Token_Xor, Token_XorEq);                                              break;
-		case '!': token.kind = token_kind_variant2(t, Token_Not, Token_NotEq);                                              break;
-		case '+': token.kind = token_kind_variant3(t, Token_Add, Token_AddEq, '+', Token_Increment);                        break;
-		case '-': token.kind = token_kind_variant4(t, Token_Sub, Token_SubEq, '-', Token_Decrement, '>', Token_ArrowRight); break;
+		case '*': token.kind = token_kind_variant2(t, Token_Mul, Token_MulEq);                                        break;
+		case '%': token.kind = token_kind_variant2(t, Token_Mod, Token_ModEq);                                        break;
+		case '=': token.kind = token_kind_variant2(t, Token_Eq,  Token_CmpEq);                                        break;
+		case '~': token.kind = token_kind_variant2(t, Token_Xor, Token_XorEq);                                        break;
+		case '!': token.kind = token_kind_variant2(t, Token_Not, Token_NotEq);                                        break;
+		case '+': token.kind = token_kind_variant3(t, Token_Add, Token_AddEq, '+', Token_Inc);                        break;
+		case '-': token.kind = token_kind_variant4(t, Token_Sub, Token_SubEq, '-', Token_Dec, '>', Token_ArrowRight); break;
 		case '/': {
 			if (t->curr_rune == '/') {
 				while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {

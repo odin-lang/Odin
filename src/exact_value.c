@@ -274,8 +274,7 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 		case ExactValue_Invalid:
 			return v;
 		case ExactValue_Integer:
-			i = v.value_integer;
-			i = ~i;
+			i = ~v.value_integer;
 			break;
 		default:
 			goto failure;
@@ -283,8 +282,10 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 
 		// NOTE(bill): unsigned integers will be negative and will need to be
 		// limited to the types precision
-		if (precision > 0)
+		// IMPORTANT NOTE(bill): Max precision is 64 bits as that's how integers are stored
+		if (0 < precision && precision < 64) {
 			i &= ~((~0ll)<<precision);
+		}
 
 		return make_exact_value_integer(i);
 	} break;

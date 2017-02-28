@@ -32,7 +32,7 @@ copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #link_name "_
 
 compare :: proc(a, b: []byte) -> int #link_name "__mem_compare" {
 	n := min(a.count, b.count);
-	for i in 0..<n {
+	for i in 0..n {
 		match {
 		case a[i] < b[i]:
 			return -1;
@@ -79,7 +79,7 @@ allocation_header_fill :: proc(header: ^Allocation_Header, data: rawptr, size: i
 	header.size = size;
 	ptr := cast(^int)(header+1);
 
-	for i := 0; cast(rawptr)ptr < data; i += 1 {
+	for i := 0; cast(rawptr)ptr < data; i++ {
 		(ptr+i)^ = -1;
 	}
 }
@@ -117,7 +117,7 @@ Arena_Temp_Memory :: struct {
 
 init_arena_from_memory :: proc(using a: ^Arena, data: []byte) {
 	backing    = Allocator{};
-	memory     = data[:0];
+	memory     = data[..0];
 	temp_count = 0;
 }
 
@@ -183,7 +183,7 @@ begin_arena_temp_memory :: proc(a: ^Arena) -> Arena_Temp_Memory {
 	tmp: Arena_Temp_Memory;
 	tmp.arena = a;
 	tmp.original_count = a.memory.count;
-	a.temp_count += 1;
+	a.temp_count++;
 	return tmp;
 }
 
@@ -191,7 +191,7 @@ end_arena_temp_memory :: proc(using tmp: Arena_Temp_Memory) {
 	assert(arena.memory.count >= original_count);
 	assert(arena.temp_count > 0);
 	arena.memory.count = original_count;
-	arena.temp_count -= 1;
+	arena.temp_count--;
 }
 
 

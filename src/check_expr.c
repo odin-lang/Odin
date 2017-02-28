@@ -197,11 +197,11 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		}
 	}
 
-	// if (is_type_proc(dst)) {
-	// 	if (are_types_identical(src, dst)) {
-	// 		return 1;
-	// 	}
-	// }
+	if (is_type_proc(dst)) {
+		if (are_types_identical(src, dst)) {
+			return 3;
+		}
+	}
 
 	if (is_type_any(dst)) {
 		// NOTE(bill): Anything can cast to `Any`
@@ -2827,6 +2827,16 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			goto error;
 		}
 	}
+
+	if (entity == NULL &&
+	    operand->type != NULL && is_type_untyped(operand->type) && is_type_string(operand->type)) {
+		String s = operand->value.value_string;
+		operand->mode = Addressing_Constant;
+		operand->value = make_exact_value_integer(s.len);
+		operand->type = t_untyped_integer;
+		return NULL;
+	}
+
 	if (entity == NULL) {
 		gbString op_str   = expr_to_string(op_expr);
 		gbString type_str = type_to_string(operand->type);
@@ -3047,19 +3057,26 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_append: {
-		// append :: proc([dynamic]Type, item: ...Type)
+		// append :: proc([dynamic]Type, item: ..Type)
+		// append :: proc([]Type, item: ..Type)
 		Type *type = operand->type;
 		type = base_type(type);
-		if (!is_type_dynamic_array(type)) {
+		if (!is_type_dynamic_array(type) && !is_type_slice(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a dynamic array, got `%s`", str);
+			error_node(operand->expr, "Expected a slice or dynamic array, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
 
-		// TODO(bill): Semi-memory leaks
-		Type *elem = type->DynamicArray.elem;
-		Type *slice_elem = make_type_slice(c->allocator, elem);
+		Type *elem = NULL;
+		Type *slice_elem = NULL;
+		if (is_type_dynamic_array(type)) {
+			// TODO(bill): Semi-memory leaks
+			elem = type->DynamicArray.elem;
+		} else {
+			elem = type->Slice.elem;
+		}
+		slice_elem = make_type_slice(c->allocator, elem);
 
 		Type *proc_type_params = make_type_tuple(c->allocator);
 		proc_type_params->Tuple.variables = gb_alloc_array(c->allocator, Entity *, 2);
@@ -3394,7 +3411,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_swizzle: {
-		// swizzle :: proc(v: {N}T, T...) -> {M}T
+		// swizzle :: proc(v: {N}T, T..) -> {M}T
 		Type *vector_type = base_type(operand->type);
 		if (!is_type_vector(vector_type)) {
 			gbString type_str = type_to_string(operand->type);
@@ -5110,6 +5127,10 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		switch (t->kind) {
 		case Type_Basic:
 			if (is_type_string(t)) {
+				if (se->index3) {
+					error_node(node, "3-index slice on a string in not needed");
+					goto error;
+				}
 				valid = true;
 				if (o->mode == Addressing_Constant) {
 					max_count = o->value.value_string.len;
@@ -5150,14 +5171,20 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 			o->mode = Addressing_Value;
 		}
 
+		if (se->index3 && (se->high == NULL || se->max == NULL)) {
+			error(se->close, "2nd and 3rd indices are required in a 3-index slice");
+			goto error;
+		}
+
 		i64 indices[2] = {0};
-		AstNode *nodes[2] = {se->low, se->high};
+		AstNode *nodes[3] = {se->low, se->high, se->max};
 		for (isize i = 0; i < gb_count_of(nodes); i++) {
 			i64 index = max_count;
 			if (nodes[i] != NULL) {
 				i64 capacity = -1;
-				if (max_count >= 0)
+				if (max_count >= 0) {
 					capacity = max_count;
+				}
 				i64 j = 0;
 				if (check_index_value(c, nodes[i], capacity, &j)) {
 					index = j;
@@ -5423,13 +5450,17 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, se->expr);
 		str = gb_string_appendc(str, "[");
 		str = write_expr_to_string(str, se->low);
-		str = gb_string_appendc(str, ":");
+		str = gb_string_appendc(str, "..");
 		str = write_expr_to_string(str, se->high);
+		if (se->index3) {
+			str = gb_string_appendc(str, "..");
+			str = write_expr_to_string(str, se->max);
+		}
 		str = gb_string_appendc(str, "]");
 	case_end;
 
 	case_ast_node(e, Ellipsis, node);
-		str = gb_string_appendc(str, "...");
+		str = gb_string_appendc(str, "..");
 	case_end;
 
 	case_ast_node(fv, FieldValue, node);
@@ -5445,9 +5476,10 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(at, ArrayType, node);
 		str = gb_string_appendc(str, "[");
-		if (at->count->kind == AstNode_UnaryExpr &&
-		    at->count->UnaryExpr.op.kind == Token_Hash) {
-			str = gb_string_appendc(str, "#");
+		if (at->count != NULL &&
+		    at->count->kind == AstNode_UnaryExpr &&
+		    at->count->UnaryExpr.op.kind == Token_Ellipsis) {
+			str = gb_string_appendc(str, "..");
 		} else {
 			str = write_expr_to_string(str, at->count);
 		}
@@ -5456,7 +5488,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_end;
 
 	case_ast_node(at, DynamicArrayType, node);
-		str = gb_string_appendc(str, "[...]");
+		str = gb_string_appendc(str, "[..]");
 		str = write_expr_to_string(str, at->elem);
 	case_end;
 
@@ -5489,7 +5521,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 			str = gb_string_appendc(str, ": ");
 		}
 		if (f->flags&FieldFlag_ellipsis) {
-			str = gb_string_appendc(str, "...");
+			str = gb_string_appendc(str, "..");
 		}
 		str = write_expr_to_string(str, f->type);
 	case_end;

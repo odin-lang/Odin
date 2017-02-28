@@ -92,7 +92,8 @@ encode_rune :: proc(r: rune) -> ([4]byte, int) {
 	return buf, 4;
 }
 
-decode_rune :: proc(s: string) -> (rune, int) {
+decode_rune :: proc(s: string) -> (rune, int) #inline { return decode_rune(cast([]byte)s); }
+decode_rune :: proc(s: []byte) -> (rune, int) {
 	n := s.count;
 	if n < 1 {
 		return RUNE_ERROR, 0;
@@ -130,6 +131,46 @@ decode_rune :: proc(s: string) -> (rune, int) {
 }
 
 
+
+decode_last_rune :: proc(s: string) -> (rune, int) #inline { return decode_last_rune(cast([]byte)s); }
+decode_last_rune :: proc(s: []byte) -> (rune, int) {
+	r: rune;
+	size: int;
+	start, end, limit: int;
+
+	end = s.count;
+	if end == 0 {
+		return RUNE_ERROR, 0;
+	}
+	start = end-1;
+	r = cast(rune)s[start];
+	if r < RUNE_SELF {
+		return r, 1;
+	}
+
+
+	limit = max(end - UTF_MAX, 0);
+
+	start--;
+	for start >= limit {
+		if rune_start(s[start]) {
+			break;
+		}
+		start--;
+	}
+
+	start = max(start, 0);
+	r, size = decode_rune(s[start..end]);
+	if start+size != end {
+		return RUNE_ERROR, 1;
+	}
+	return r, size;
+}
+
+
+
+
+
 valid_rune :: proc(r: rune) -> bool {
 	if r < 0 {
 		return false;
@@ -146,7 +187,7 @@ valid_string :: proc(s: string) -> bool {
 	for i := 0; i < n; {
 		si := s[i];
 		if si < RUNE_SELF { // ascii
-			i += 1;
+			i++;
 			continue;
 		}
 		x := accept_sizes[si];
@@ -174,25 +215,28 @@ valid_string :: proc(s: string) -> bool {
 	return true;
 }
 
-rune_count :: proc(s: string) -> int {
+rune_start :: proc(b: byte) -> bool #inline { return b&0xc0 != 0x80; }
+
+rune_count :: proc(s: string) -> int #inline { return rune_count(cast([]byte)s); }
+rune_count :: proc(s: []byte) -> int {
 	count := 0;
 	n := s.count;
 
 	for i := 0; i < n; {
-		defer count += 1;
+		defer count++;
 		si := s[i];
 		if si < RUNE_SELF { // ascii
-			i += 1;
+			i++;
 			continue;
 		}
 		x := accept_sizes[si];
 		if x == 0xf1 {
-			i += 1;
+			i++;
 			continue;
 		}
 		size := cast(int)(x & 7);
 		if i+size > n {
-			i += 1;
+			i++;
 			continue;
 		}
 		ar := accept_ranges[x>>4];

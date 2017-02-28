@@ -316,24 +316,24 @@ __bounds_check_error :: proc(file: string, line, column: int, index, count: int)
 	if 0 <= index && index < count {
 		return;
 	}
-	fmt.fprintf(os.stderr, "%s(%d:%d) Index %d is out of bounds range 0..<%d\n",
+	fmt.fprintf(os.stderr, "%s(%d:%d) Index %d is out of bounds range 0..%d\n",
 	            file, line, column, index, count);
 	__debug_trap();
 }
 
-__slice_expr_error :: proc(file: string, line, column: int, low, high: int) {
-	if 0 <= low && low <= high {
+__slice_expr_error :: proc(file: string, line, column: int, low, high, max: int) {
+	if 0 <= low && low <= high && high <= max {
 		return;
 	}
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: [%d:%d]\n",
-	            file, line, column, low, high);
+	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: [%d..%d..%d]\n",
+	            file, line, column, low, high, max);
 	__debug_trap();
 }
 __substring_expr_error :: proc(file: string, line, column: int, low, high: int) {
 	if 0 <= low && low <= high {
 		return;
 	}
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid substring indices: [%d:%d]\n",
+	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid substring indices: [%d..%d]\n",
 	            file, line, column, low, high);
 	__debug_trap();
 }
@@ -361,8 +361,9 @@ Raw_String :: struct #ordered {
 };
 
 Raw_Slice :: struct #ordered {
-	data:  rawptr,
-	count: int,
+	data:     rawptr,
+	count:    int,
+	capacity: int,
 };
 
 Raw_Dynamic_Array :: struct #ordered {
@@ -447,8 +448,26 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 	data := cast(^byte)array.data;
 	assert(data != nil);
 	mem.zero(data + (elem_size*array.count), elem_size);
-	array.count += 1;
+	array.count++;
 	return array.count;
+}
+
+__slice_append :: proc(slice_: rawptr, elem_size, elem_align: int,
+                       items: rawptr, item_count: int) -> int {
+	slice := cast(^Raw_Slice)slice_;
+
+	if item_count <= 0 || items == nil {
+		return slice.count;
+	}
+
+	item_count = min(slice.capacity-slice.count, item_count);
+	if item_count > 0 {
+		data := cast(^byte)slice.data;
+		assert(data != nil);
+		mem.copy(data + (elem_size*slice.count), items, elem_size * item_count);
+		slice.count += item_count;
+	}
+	return slice.count;
 }
 
 
@@ -506,7 +525,7 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
 		nm.hashes[i] = -1;
 	}
 
-	for i := 0; i < nm.entries.count; i += 1 {
+	for i := 0; i < nm.entries.count; i++ {
 		entry_header := __dynamic_map_get_entry(new_header, i);
 		data := cast(^byte)entry_header;
 
@@ -645,7 +664,7 @@ __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
 	}
 
 	if fr.entry_index == m.entries.count-1 {
-		m.entries.count -= 1;
+		m.entries.count--;
 	}
 	mem.copy(__dynamic_map_get_entry(h, fr.entry_index), __dynamic_map_get_entry(h, m.entries.count-1), entry_size);
 	last := __dynamic_map_find(h, __dynamic_map_get_entry(h, fr.entry_index).key);

@@ -5,14 +5,21 @@
 #import "mem.odin";
 #import "opengl.odin";
 #import "os.odin";
-
-foo :: proc(x: int) -> f32 {
-	return 123;
-}
+#import "strconv.odin";
 
 main :: proc() {
+	// buf: [64]byte;
+	// // len := strconv.generic_ftoa(buf[..], 123.5431, 'f', 4, 64);
+	// x := 624.123;
+	// s := strconv.format_float(buf[..], x, 'f', 6, 64);
+	// fmt.println(s);
+	// fmt.printf("%3d\n", 102);
 
-	fmt.printf("%T\n", foo);
+	a: [10]int;
+	s := a[..0];
+	append(s, 1, 2, 6, 3, 6, 5, 5, 5, 5, 1, 2);
+	fmt.println(s);
+
 
 when false {
 /*

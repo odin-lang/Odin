@@ -421,6 +421,49 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		check_stmt(c, ts->stmt, flags);
 	case_end;
 
+	case_ast_node(s, IncDecStmt, node);
+		TokenKind op = s->op.kind;
+		switch (op) {
+		case Token_Inc: op = Token_Add; break;
+		case Token_Dec: op = Token_Sub; break;
+		default:
+			error_node(node, "Invalid inc/dec operation");
+			return;
+		}
+
+		Operand x = {0};
+		check_expr(c, &x, s->expr);
+		if (x.mode == Addressing_Invalid) {
+			return;
+		}
+		if (!is_type_integer(x.type) && !is_type_float(x.type)) {
+			gbString e = expr_to_string(s->expr);
+			gbString t = type_to_string(x.type);
+			error_node(node, "%s%.*s used on non-numeric type %s", e, LIT(s->op.string), t);
+			gb_string_free(t);
+			gb_string_free(e);
+			return;
+		}
+		AstNode *left = s->expr;
+		AstNode *right = gb_alloc_item(c->allocator, AstNode);
+		right->kind = AstNode_BasicLit;
+		right->BasicLit.pos = s->op.pos;
+		right->BasicLit.kind = Token_Integer;
+		right->BasicLit.string = str_lit("1");
+
+		AstNode *be = gb_alloc_item(c->allocator, AstNode);
+		be->kind = AstNode_BinaryExpr;
+		be->BinaryExpr.op = s->op;
+		be->BinaryExpr.op.kind = op;
+		be->BinaryExpr.left = left;
+		be->BinaryExpr.right = right;
+		check_binary_expr(c, &x, be);
+		if (x.mode == Addressing_Invalid) {
+			return;
+		}
+		check_assignment_variable(c, &x, left);
+	case_end;
+
 	case_ast_node(as, AssignStmt, node);
 		switch (as->op.kind) {
 		case Token_Eq: {
@@ -591,8 +634,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		if (fs->post != NULL) {
 			check_stmt(c, fs->post, 0);
 
-			if (fs->post->kind != AstNode_AssignStmt) {
-				error_node(fs->post, "`for` statement post statement must be an assignment");
+			if (fs->post->kind != AstNode_AssignStmt &&
+			    fs->post->kind != AstNode_IncDecStmt) {
+				error_node(fs->post, "`for` statement post statement must be a simple statement");
 			}
 		}
 		check_stmt(c, fs->body, new_flags);
@@ -671,8 +715,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 				TokenKind op = Token_Lt;
 				switch (ie->op.kind) {
-				case Token_HalfOpenRange: op = Token_Lt;   break;
-				case Token_Ellipsis:      op = Token_LtEq; break;
+				case Token_Ellipsis: op = Token_Lt; break;
 				default: error(ie->op, "Invalid range operator"); break;
 				}
 				bool ok = compare_exact_values(Token_Lt, a, b);
@@ -1215,6 +1258,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			case Entity_Variable: {
 				Type *t = base_type(type_deref(e->type));
 				if (is_type_struct(t) || is_type_raw_union(t)) {
+					// TODO(bill): Make it work for unions too
 					Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
 					GB_ASSERT(found != NULL);
 					for_array(i, (*found)->elements.entries) {

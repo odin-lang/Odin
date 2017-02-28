@@ -151,8 +151,9 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 	AST_NODE_KIND(DerefExpr,    "dereference expression", struct { Token op; AstNode *expr; }) \
 	AST_NODE_KIND(SliceExpr, "slice expression", struct { \
 		AstNode *expr; \
-		Token open, close, interval; \
-		AstNode *low, *high; \
+		Token open, close; \
+		bool index3; \
+		AstNode *low, *high, *max; \
 	}) \
 	AST_NODE_KIND(CallExpr,     "call expression", struct { \
 		AstNode *    proc; \
@@ -185,6 +186,10 @@ AST_NODE_KIND(_StmtBegin,     "", i32) \
 	AST_NODE_KIND(AssignStmt, "assign statement", struct { \
 		Token op; \
 		AstNodeArray lhs, rhs; \
+	}) \
+	AST_NODE_KIND(IncDecStmt, "increment decrement statement", struct { \
+		Token op; \
+		AstNode *expr; \
 	}) \
 AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 	AST_NODE_KIND(BlockStmt, "block statement", struct { \
@@ -467,6 +472,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_ExprStmt:      return ast_node_token(node->ExprStmt.expr);
 	case AstNode_TagStmt:       return node->TagStmt.token;
 	case AstNode_AssignStmt:    return node->AssignStmt.op;
+	case AstNode_IncDecStmt:    return ast_node_token(node->IncDecStmt.expr);
 	case AstNode_BlockStmt:     return node->BlockStmt.open;
 	case AstNode_IfStmt:        return node->IfStmt.token;
 	case AstNode_WhenStmt:      return node->WhenStmt.token;
@@ -662,14 +668,15 @@ AstNode *ast_index_expr(AstFile *f, AstNode *expr, AstNode *index, Token open, T
 }
 
 
-AstNode *ast_slice_expr(AstFile *f, AstNode *expr, Token open, Token close, Token interval, AstNode *low, AstNode *high) {
+AstNode *ast_slice_expr(AstFile *f, AstNode *expr, Token open, Token close, bool index3, AstNode *low, AstNode *high, AstNode *max) {
 	AstNode *result = make_ast_node(f, AstNode_SliceExpr);
 	result->SliceExpr.expr = expr;
 	result->SliceExpr.open = open;
 	result->SliceExpr.close = close;
-	result->SliceExpr.interval = interval;
+	result->SliceExpr.index3 = index3;
 	result->SliceExpr.low = low;
 	result->SliceExpr.high = high;
+	result->SliceExpr.max = max;
 	return result;
 }
 
@@ -801,6 +808,16 @@ AstNode *ast_assign_stmt(AstFile *f, Token op, AstNodeArray lhs, AstNodeArray rh
 	result->AssignStmt.rhs = rhs;
 	return result;
 }
+
+
+AstNode *ast_inc_dec_stmt(AstFile *f, Token op, AstNode *expr) {
+	AstNode *result = make_ast_node(f, AstNode_IncDecStmt);
+	result->IncDecStmt.op = op;
+	result->IncDecStmt.expr = expr;
+	return result;
+}
+
+
 
 AstNode *ast_block_stmt(AstFile *f, AstNodeArray stmts, Token open, Token close) {
 	AstNode *result = make_ast_node(f, AstNode_BlockStmt);
@@ -1930,37 +1947,49 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 				// TODO(bill): Handle this
 			}
 			Token open = {0}, close = {0}, interval = {0};
-			AstNode *indices[2] = {0};
+			AstNode *indices[3] = {0};
+			isize ellipsis_count = 0;
+			Token ellipses[2] = {0};
 
 			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
 
-			// if (f->curr_token.kind != Token_Ellipsis &&
-			    // f->curr_token.kind != Token_HalfOpenRange) {
-			if (f->curr_token.kind != Token_Colon) {
+			if (f->curr_token.kind != Token_Ellipsis) {
 				indices[0] = parse_expr(f, false);
 			}
 			bool is_index = true;
 
-			// if (f->curr_token.kind == Token_Ellipsis ||
-			    // f->curr_token.kind == Token_HalfOpenRange) {
-			if (f->curr_token.kind == Token_Colon) {
-				is_index = false;
-				interval = f->curr_token;
+			while (f->curr_token.kind == Token_Ellipsis && ellipsis_count < gb_count_of(ellipses)) {
+				ellipses[ellipsis_count++] = f->curr_token;
 				next_token(f);
-				if (f->curr_token.kind != Token_CloseBracket &&
+				if (f->curr_token.kind != Token_Ellipsis &&
+				    f->curr_token.kind != Token_CloseBracket &&
 				    f->curr_token.kind != Token_EOF) {
-					indices[1] = parse_expr(f, false);
+					indices[ellipsis_count] = parse_expr(f, false);
 				}
 			}
+
 
 			f->expr_level--;
 			close = expect_token(f, Token_CloseBracket);
 
-			if (is_index) {
-				operand = ast_index_expr(f, operand, indices[0], open, close);
+			if (ellipsis_count > 0) {
+				bool index3 = false;
+				if (ellipsis_count == 2) {
+					index3 = true;
+					// 2nd and 3rd index must be present
+					if (indices[1] == NULL) {
+						error(ellipses[0], "2nd index required in 3-index slice expression");
+						indices[1] = ast_bad_expr(f, ellipses[0], ellipses[1]);
+					}
+					if (indices[2] == NULL) {
+						error(ellipses[1], "3rd index required in 3-index slice expression");
+						indices[2] = ast_bad_expr(f, ellipses[1], close);
+					}
+				}
+				operand = ast_slice_expr(f, operand, open, close, index3, indices[0], indices[1], indices[2]);
 			} else {
-				operand = ast_slice_expr(f, operand, open, close, interval, indices[0], indices[1]);
+				operand = ast_index_expr(f, operand, indices[0], open, close);
 			}
 		} break;
 
@@ -2246,7 +2275,6 @@ AstNode *parse_simple_stmt(AstFile *f, bool in_stmt_ok) {
 			allow_token(f, Token_in);
 			AstNode *expr = parse_expr(f, false);
 			switch (f->curr_token.kind) {
-			case Token_HalfOpenRange:
 			case Token_Ellipsis: {
 				Token op = f->curr_token;
 				next_token(f);
@@ -2270,6 +2298,13 @@ AstNode *parse_simple_stmt(AstFile *f, bool in_stmt_ok) {
 	if (lhs.count > 1) {
 		syntax_error(token, "Expected 1 expression");
 		return ast_bad_stmt(f, token, f->curr_token);
+	}
+
+	switch (token.kind) {
+	case Token_Inc:
+	case Token_Dec:
+		next_token(f);
+		return ast_inc_dec_stmt(f, token, lhs.e[0]);
 	}
 
 	return ast_expr_stmt(f, lhs.e[0]);

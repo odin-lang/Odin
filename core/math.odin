@@ -151,8 +151,8 @@ mat4_identity :: proc() -> Mat4 {
 }
 
 mat4_transpose :: proc(m: Mat4) -> Mat4 {
-	for j in 0..<4 {
-		for i in 0..<4 {
+	for j in 0..4 {
+		for i in 0..4 {
 			m[i][j], m[j][i] = m[j][i], m[i][j];
 		}
 	}
@@ -161,8 +161,8 @@ mat4_transpose :: proc(m: Mat4) -> Mat4 {
 
 mul :: proc(a, b: Mat4) -> Mat4 {
 	c: Mat4;
-	for j in 0..<4 {
-		for i in 0..<4 {
+	for j in 0..4 {
+		for i in 0..4 {
 			c[j][i] = a[0][i]*b[j][0] +
 			          a[1][i]*b[j][1] +
 			          a[2][i]*b[j][2] +
