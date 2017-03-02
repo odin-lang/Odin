@@ -6,6 +6,7 @@
 #import "opengl.odin";
 #import "os.odin";
 #import "strconv.odin";
+#import "sync.odin";
 
 main :: proc() {
 	// buf: [64]byte;
@@ -15,8 +16,7 @@ main :: proc() {
 	// fmt.println(s);
 	// fmt.printf("%3d\n", 102);
 
-	a: [10]int;
-	s := a[..0];
+	s := new_slice(int, 0, 10);
 	append(s, 1, 2, 6, 3, 6, 5, 5, 5, 5, 1, 2);
 	fmt.println(s);
 

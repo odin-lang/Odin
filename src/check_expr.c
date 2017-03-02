@@ -2918,9 +2918,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			err = "Too many";
 		}
 
-		if (err) {
+		if (err != NULL) {
 			gbString expr = expr_to_string(ce->proc);
-			error(ce->close, "`%s` arguments for `%s`, expected %td, got %td",
+			error(ce->close, "%s arguments for `%s`, expected %td, got %td",
 			      err, expr,
 			      bp->arg_count, ce->args.count);
 			gb_string_free(expr);
@@ -2962,6 +2962,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 	case BuiltinProc_new_slice: {
 		// new_slice :: proc(Type, len: int) -> []Type
+		// new_slice :: proc(Type, len, cap: int) -> []Type
 		Operand op = {0};
 		check_expr_or_type(c, &op, ce->args.e[0]);
 		Type *type = op.type;
@@ -2970,15 +2971,27 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 
-		check_expr(c, &op, ce->args.e[1]);
-		if (op.mode == Addressing_Invalid) {
-			return false;
-		}
-		if (!is_type_integer(op.type)) {
-			gbString type_str = type_to_string(op.type);
-			error_node(call, "Length for `new_slice` must be an integer, got `%s`", type_str);
-			gb_string_free(type_str);
-			return false;
+		isize arg_count = ce->args.count;
+		if (arg_count < 2 || 3 < arg_count) {
+			error_node(ce->args.e[0], "`new_slice` expects 2 or 3 arguments, found %td", arg_count);
+			// NOTE(bill): Return the correct type to reduce errors
+		} else {
+			// If any are constant
+			i64 sizes[2] = {0};
+			isize size_count = 0;
+			for (isize i = 1; i < arg_count; i++) {
+				i64 val = 0;
+				bool ok = check_index_value(c, ce->args.e[i], -1, &val);
+				if (ok && val >= 0) {
+					GB_ASSERT(size_count < gb_count_of(sizes));
+					sizes[size_count++] = val;
+				}
+			}
+
+			if (size_count == 2 && sizes[0] > sizes[1]) {
+				error_node(ce->args.e[1], "`new_slice` count and capacity are swapped");
+				// No need quit
+			}
 		}
 
 		operand->mode = Addressing_Value;
@@ -3060,11 +3073,21 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		// append :: proc([dynamic]Type, item: ..Type)
 		// append :: proc([]Type, item: ..Type)
 		Type *type = operand->type;
-		type = base_type(type);
+		bool is_pointer = is_type_pointer(type);
+		type = base_type(type_deref(type));
 		if (!is_type_dynamic_array(type) && !is_type_slice(type)) {
 			gbString str = type_to_string(type);
 			error_node(operand->expr, "Expected a slice or dynamic array, got `%s`", str);
 			gb_string_free(str);
+			return false;
+		}
+
+		bool is_addressable = operand->mode == Addressing_Variable;
+		if (is_pointer) {
+			is_addressable = true;
+		}
+		if (!is_addressable) {
+			error_node(operand->expr, "`append` can only operate on addressable values");
 			return false;
 		}
 

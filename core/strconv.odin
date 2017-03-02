@@ -109,12 +109,9 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 		round_shortest(d, mant, exp, flt);
 		digs = Decimal_Slice{digits = d.digits[..], count = d.count, decimal_point = d.decimal_point};
 		match fmt {
-		case 'e', 'E':
-			prec = digs.count-1;
-		case 'f', 'F':
-			prec = max(digs.count-digs.decimal_point, 0);
-		case 'g', 'G':
-			prec = digs.count;
+		case 'e', 'E': prec = digs.count-1;
+		case 'f', 'F': prec = max(digs.count-digs.decimal_point, 0);
+		case 'g', 'G': prec = digs.count;
 		}
 	} else {
 		match fmt {
@@ -139,9 +136,10 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 	case 'f', 'F':
 		add_bytes :: proc(dst: ^[]byte, w: ^int, bytes: ..byte) {
 			for b in bytes {
-				if dst.count <= w^ {
+				if dst.capacity <= w^ {
 					break;
 				}
+				dst.count++;
 				dst[w^] = b;
 				w^++;
 			}
@@ -166,6 +164,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 			add_bytes(^dst, ^w, '0');
 		}
 
+
 		// fractional part
 		if prec > 0 {
 			add_bytes(^dst, ^w, '.');
@@ -181,10 +180,12 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 		return buf[..w];
 
 	case 'e', 'E':
-		return nil; // TODO
+		panic("strconv: e/E float printing is not yet supported");
+		return buf; // TODO
 
 	case 'g', 'G':
-		return nil; // TODO
+		panic("strconv: g/G float printing is not yet supported");
+		return buf; // TODO
 	}
 
 	c: [2]byte;

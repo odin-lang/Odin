@@ -664,6 +664,11 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	ir_fprintf(f, "\t");
 
 	switch (instr->kind) {
+	default: {
+		GB_PANIC("<unknown instr> %d\n", instr->kind);
+		ir_fprintf(f, "; <unknown instr> %d\n", instr->kind);
+	} break;
+
 	case irInstr_StartupRuntime: {
 		ir_fprintf(f, "call void ");
 		ir_print_encoded_global(f, str_lit(IR_STARTUP_RUNTIME_PROC_NAME), false);
@@ -1280,12 +1285,6 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_fprintf(f, ", !dbg !DILocation(line: %td, column: %td, scope: !%d)", pos.line, pos.column, di->id);
 
 		ir_fprintf(f, "\n"); */
-	} break;
-
-
-	default: {
-		GB_PANIC("<unknown instr> %d\n", instr->kind);
-		ir_fprintf(f, "; <unknown instr> %d\n", instr->kind);
 	} break;
 	}
 }

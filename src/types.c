@@ -1342,9 +1342,6 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		}
 	}
 
-	if (type->kind != Type_Record) {
-		return sel;
-	}
 	if (is_type) {
 		if (type->kind == Type_Record) {
 			if (type->Record.names != NULL &&
@@ -1395,7 +1392,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				}
 			}
 		}
-	} else {
+	} else if (type->kind == Type_Record) {
 		for (isize i = 0; i < type->Record.field_count; i++) {
 			Entity *f = type->Record.fields[i];
 			if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {

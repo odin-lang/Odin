@@ -3168,7 +3168,8 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 
 				case BuiltinProc_new_slice: {
 					ir_emit_comment(proc, str_lit("new_slice"));
-					// new_slice :: proc(Type, len: int) -> ^Type
+					// new_slice :: proc(Type, len: int) -> []Type
+					// new_slice :: proc(Type, len, cap: int) -> []Type
 					gbAllocator allocator = proc->module->allocator;
 
 					Type *type = type_of_expr(proc->module->info, ce->args.e[0]);
@@ -3182,10 +3183,15 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 					irValue *elem_align = ir_make_const_int(allocator, a);
 
 					irValue *count = ir_emit_conv(proc, ir_build_expr(proc, ce->args.e[1]), t_int);
+					irValue *capacity = count;
 
-					ir_emit_slice_bounds_check(proc, ast_node_token(ce->args.e[1]), v_zero, count, count, false);
+					if (ce->args.count == 3)  {
+						capacity = ir_emit_conv(proc, ir_build_expr(proc, ce->args.e[2]), t_int);
+					}
 
-					irValue *slice_size = ir_emit_arith(proc, Token_Mul, elem_size, count, t_int);
+					ir_emit_slice_bounds_check(proc, ast_node_token(ce->args.e[1]), v_zero, count, capacity, false);
+
+					irValue *slice_size = ir_emit_arith(proc, Token_Mul, elem_size, capacity, t_int);
 
 					irValue **args = gb_alloc_array(allocator, irValue *, 2);
 					args[0] = slice_size;
@@ -3195,7 +3201,7 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 					irValue *ptr = ir_emit_conv(proc, call, ptr_type);
 					irValue *slice = ir_add_local_generated(proc, slice_type);
 
-					ir_fill_slice(proc, slice, ptr, count, count);
+					ir_fill_slice(proc, slice, ptr, count, capacity);
 					return ir_emit_load(proc, slice);
 				} break;
 
@@ -3330,7 +3336,12 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 					ir_emit_comment(proc, str_lit("append"));
 					gbAllocator a = proc->module->allocator;
 
-					irValue *array_ptr = ir_build_addr(proc, ce->args.e[0]).addr;
+					Type *value_type = type_of_expr(proc->module->info, ce->args.e[0]);
+					irAddr array_addr = ir_build_addr(proc, ce->args.e[0]);
+					irValue *array_ptr = array_addr.addr;
+					if (is_type_pointer(value_type)) {
+						array_ptr = ir_addr_load(proc, array_addr);
+					}
 					Type *type = ir_type(array_ptr);
 					GB_ASSERT(is_type_pointer(type));
 					type = base_type(type_deref(type));
