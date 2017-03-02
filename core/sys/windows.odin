@@ -40,14 +40,19 @@ WS_CAPTION          :: 0x00C00000;
 WS_VISIBLE          :: 0x10000000;
 WS_OVERLAPPEDWINDOW :: WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
 
-WM_DESTROY     :: 0x0002;
-WM_SIZE	       :: 0x0005;
-WM_CLOSE       :: 0x0010;
-WM_ACTIVATEAPP :: 0x001C;
-WM_QUIT        :: 0x0012;
-WM_KEYDOWN     :: 0x0100;
-WM_KEYUP       :: 0x0101;
-WM_SIZING      :: 0x0214;
+WM_DESTROY           :: 0x0002;
+WM_SIZE	             :: 0x0005;
+WM_CLOSE             :: 0x0010;
+WM_ACTIVATEAPP       :: 0x001C;
+WM_QUIT              :: 0x0012;
+WM_KEYDOWN           :: 0x0100;
+WM_KEYUP             :: 0x0101;
+WM_SIZING            :: 0x0214;
+WM_MOUSEWHEEL        :: 0x020A;
+WM_SYSKEYDOWN        :: 0x0104;
+WM_WINDOWPOSCHANGED  :: 0x0047;
+WM_SETCURSOR         :: 0x0020;
+WM_CHAR              :: 0x0102;
 
 PM_REMOVE :: 1;
 
@@ -297,6 +302,68 @@ mm_pause         :: proc() #foreign kernel32 "_mm_pause";
 ReadWriteBarrier :: proc() #foreign kernel32;
 WriteBarrier     :: proc() #foreign kernel32;
 ReadBarrier      :: proc() #foreign kernel32;
+
+
+
+
+
+HMONITOR :: HANDLE;
+
+GWL_STYLE     :: -16;
+
+HWND_TOP :: cast(HWND)cast(uint)0;
+
+MONITOR_DEFAULTTONULL    :: 0x00000000;
+MONITOR_DEFAULTTOPRIMARY :: 0x00000001;
+MONITOR_DEFAULTTONEAREST :: 0x00000002;
+
+SWP_FRAMECHANGED  :: 0x0020;
+SWP_NOOWNERZORDER :: 0x0200;
+SWP_NOZORDER      :: 0x0004;
+SWP_NOSIZE        :: 0x0001;
+SWP_NOMOVE        :: 0x0002;
+
+
+MONITORINFO :: struct #ordered {
+	size:      u32,
+	monitor:   RECT,
+	work:      RECT,
+	flags:     u32,
+}
+
+WINDOWPLACEMENT :: struct #ordered {
+	length:     u32,
+	flags:      u32,
+	show_cmd:   u32,
+	min_pos:    POINT,
+	max_pos:    POINT,
+	normal_pos: RECT,
+}
+
+GetMonitorInfoA    :: proc(monitor: HMONITOR, mi: ^MONITORINFO) -> BOOL #foreign user32;
+MonitorFromWindow  :: proc(wnd: HWND, flags : u32) -> HMONITOR #foreign user32;
+
+SetWindowPos       :: proc(wnd: HWND, wndInsertAfter: HWND, x, y, width, height: i32, flags: u32) #foreign user32 "SetWindowPos";
+
+GetWindowPlacement :: proc(wnd: HWND, wndpl: ^WINDOWPLACEMENT) -> BOOL #foreign user32;
+SetWindowPlacement :: proc(wnd: HWND, wndpl: ^WINDOWPLACEMENT) -> BOOL #foreign user32;
+
+GetWindowLongPtrA :: proc(wnd: HWND, index: i32) -> i64 #foreign user32;
+SetWindowLongPtrA :: proc(wnd: HWND, index: i32, new: i64) -> i64 #foreign user32;
+
+GetWindowText :: proc(wnd: HWND, str: ^byte, maxCount: i32) -> i32 #foreign user32;
+
+HIWORD :: proc(wParam: WPARAM) -> u16 { return cast(u16)((cast(u32)wParam >> 16) & 0xffff); }
+HIWORD :: proc(lParam: LPARAM) -> u16 { return cast(u16)((cast(u32)lParam >> 16) & 0xffff); }
+LOWORD :: proc(wParam: WPARAM) -> u16 { return cast(u16)wParam; }
+LOWORD :: proc(lParam: LPARAM) -> u16 { return cast(u16)lParam; }
+
+
+
+
+
+
+
 
 
 

@@ -68,7 +68,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT(""),                 0, false, Expr_Stmt},
 
 	{STR_LIT("new"),              1, false, Expr_Expr},
-	{STR_LIT("new_slice"),        2, false, Expr_Expr},
+	{STR_LIT("new_slice"),        2, true,  Expr_Expr},
 	{STR_LIT("free"),             1, false, Expr_Stmt},
 
 	{STR_LIT("reserve"),          2, false, Expr_Stmt},

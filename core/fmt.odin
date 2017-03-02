@@ -8,10 +8,10 @@
 _BUFFER_SIZE :: 1<<12;
 
 write_string :: proc(buf: ^[]byte, s: string) {
-	append(buf^, ..cast([]byte)s);
+	append(buf, ..cast([]byte)s);
 }
 write_byte :: proc(buf: ^[]byte, b: byte) {
-	append(buf^, b);
+	append(buf, b);
 }
 write_rune :: proc(buf: ^[]byte, r: rune) {
 	if r < utf8.RUNE_SELF {
@@ -20,7 +20,7 @@ write_rune :: proc(buf: ^[]byte, r: rune) {
 	}
 
 	b, n := utf8.encode_rune(r);
-	append(buf^, ..b[..n]);
+	append(buf, ..b[..n]);
 }
 
 Fmt_Info :: struct {
@@ -431,7 +431,7 @@ fmt_write_padding :: proc(fi: ^Fmt_Info, width: int) {
 
 	count := min(width, fi.buf.capacity-fi.buf.count);
 	for _ in 0..count {
-		append(fi.buf^, pad_byte);
+		append(fi.buf, pad_byte);
 	}
 }
 
@@ -533,8 +533,6 @@ _pad :: proc(fi: ^Fmt_Info, s: string) {
 }
 
 fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
-
-
 	match verb {
 	// case 'e', 'E', 'f', 'F', 'g', 'G', 'v':
 	// case 'f', 'F', 'v':
