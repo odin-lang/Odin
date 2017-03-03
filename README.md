@@ -27,6 +27,7 @@ The Odin programming language is fast, concise, readable, pragmatic and open sou
 * MSVC 2015 installed (C99 support)
 * Requires MSVC's link.exe as the linker
 	- run `vcvarsall.bat` to setup the path
+* [LLVM binaries](https://github.com/gingerBill/Odin/releases/tag/llvm-4.0-windows) for `opt.exe` and `llc.exe`
 
 ## Warnings
 
