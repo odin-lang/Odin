@@ -252,7 +252,5 @@ paket-files/
 
 # Project Specific
 *.sln
-!misc/llvm-bim/lli.exe
-!misc/llvm-bim/opt.exe
-builds
-bin
+builds/
+bin/
