@@ -25,7 +25,6 @@ append_bool :: proc(buf: []byte, b: bool) -> string {
 }
 
 append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
-	using Int_Flag;
 	return append_bits(buf, u, base, false, digits, 0);
 }
 append_int :: proc(buf: []byte, i: i64, base: int) -> string {
