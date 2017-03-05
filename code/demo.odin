@@ -9,19 +9,15 @@
 #import "sync.odin";
 
 main :: proc() {
-	// buf: [64]byte;
-	// // len := strconv.generic_ftoa(buf[..], 123.5431, 'f', 4, 64);
-	// x := 624.123;
-	// s := strconv.format_float(buf[..], x, 'f', 6, 64);
-	// fmt.println(s);
-	// fmt.printf("%3d\n", 102);
+	x := 2;
+	y := 3;
+	z := x+y;
+	fmt.println(z);
 
+when false {
 	s := new_slice(int, 0, 10);
 	append(s, 1, 2, 6, 3, 6, 5, 5, 5, 5, 1, 2);
 	fmt.println(s);
-
-
-when false {
 /*
 	Version 0.1.1
 

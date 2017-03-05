@@ -4868,8 +4868,8 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					}
 				}
 			} else { // Tuple(s)
-				Array(irAddr) lvals;
-				irValueArray  inits;
+				Array(irAddr) lvals = {0};
+				irValueArray  inits = {0};
 				array_init_reserve(&lvals, m->tmp_allocator, vd->names.count);
 				array_init_reserve(&inits, m->tmp_allocator, vd->names.count);
 

@@ -128,9 +128,6 @@ __debug_trap       :: proc()        #foreign __llvm_core "llvm.debugtrap";
 __trap             :: proc()        #foreign __llvm_core "llvm.trap";
 read_cycle_counter :: proc() -> u64 #foreign __llvm_core "llvm.readcyclecounter";
 
-__cpuid :: proc(level: u32, sig: ^u32) -> i32 #foreign __llvm_core "__get_cpuid";
-
-
 
 
 
@@ -347,6 +344,40 @@ __union_cast_check :: proc(ok: bool, file: string, line, column: int, from, to: 
 
 __string_decode_rune :: proc(s: string) -> (rune, int) #inline {
 	return utf8.decode_rune(s);
+}
+
+
+__mem_set :: proc(data: rawptr, value: i32, len: int) -> rawptr {
+	llvm_memset_64bit :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memset.p0i8.i64";
+	llvm_memset_64bit(data, cast(byte)value, len, 1, false);
+	return data;
+}
+__mem_zero :: proc(data: rawptr, len: int) -> rawptr {
+	return __mem_set(data, 0, len);
+}
+__mem_copy :: proc(dst, src: rawptr, len: int) -> rawptr {
+	// NOTE(bill): This _must_ be implemented like C's memmove
+	llvm_memmove_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memmove.p0i8.p0i8.i64";
+	llvm_memmove_64bit(dst, src, len, 1, false);
+	return dst;
+}
+__mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr {
+	// NOTE(bill): This _must_ be implemented like C's memcpy
+	llvm_memcpy_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memcpy.p0i8.p0i8.i64";
+	llvm_memcpy_64bit(dst, src, len, 1, false);
+	return dst;
+}
+
+__mem_compare :: proc(a, b: ^byte, n: int) -> int {
+	for i in 0..n {
+		match {
+		case (a+i)^ < (b+i)^:
+			return -1;
+		case (a+i)^ > (b+i)^:
+			return +1;
+		}
+	}
+	return 0;
 }
 
 

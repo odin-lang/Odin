@@ -6,41 +6,20 @@ swap :: proc(b: u32) -> u32 #foreign __llvm_core "llvm.bswap.i32";
 swap :: proc(b: u64) -> u64 #foreign __llvm_core "llvm.bswap.i64";
 
 
-set :: proc(data: rawptr, value: i32, len: int) -> rawptr #link_name "__mem_set" {
-	llvm_memset_64bit :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memset.p0i8.i64";
-	llvm_memset_64bit(data, cast(byte)value, len, 1, false);
-	return data;
+set :: proc(data: rawptr, value: i32, len: int) -> rawptr {
+	return __mem_set(data, value, len);
 }
-
-zero :: proc(data: rawptr, len: int) -> rawptr #link_name "__mem_zero" {
-	return set(data, 0, len);
+zero :: proc(data: rawptr, len: int) -> rawptr {
+	return __mem_zero(data, len);
 }
-
-copy :: proc(dst, src: rawptr, len: int) -> rawptr #link_name "__mem_copy" {
-	// NOTE(bill): This _must_ be implemented like C's memmove
-	llvm_memmove_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memmove.p0i8.p0i8.i64";
-	llvm_memmove_64bit(dst, src, len, 1, false);
-	return dst;
+copy :: proc(dst, src: rawptr, len: int) -> rawptr {
+	return __mem_copy(dst, src, len);
 }
-
-copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #link_name "__mem_copy_non_overlapping" {
-	// NOTE(bill): This _must_ be implemented like C's memcpy
-	llvm_memcpy_64bit :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memcpy.p0i8.p0i8.i64";
-	llvm_memcpy_64bit(dst, src, len, 1, false);
-	return dst;
+copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr {
+	return __mem_copy_non_overlapping(dst, src, len);
 }
-
-compare :: proc(a, b: []byte) -> int #link_name "__mem_compare" {
-	n := min(a.count, b.count);
-	for i in 0..n {
-		match {
-		case a[i] < b[i]:
-			return -1;
-		case a[i] > b[i]:
-			return +1;
-		}
-	}
-	return 0;
+compare :: proc(a, b: []byte) -> int {
+	return __mem_compare(a.data, b.data, min(a.count, b.count));
 }
 
 
