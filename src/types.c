@@ -1215,7 +1215,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		// NOTE(bill): Underlying memory address cannot be changed
 		if (str_eq(field_name, count_str)) {
 			// HACK(bill): Memory leak
-			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, make_exact_value_integer(type->Array.count));
+			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, exact_value_integer(type->Array.count));
 			return sel;
 		}
 	} else if (type->kind == Type_Vector) {
@@ -1223,7 +1223,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		// NOTE(bill): Vectors are not addressable
 		if (str_eq(field_name, count_str)) {
 			// HACK(bill): Memory leak
-			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, make_exact_value_integer(type->Vector.count));
+			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, exact_value_integer(type->Vector.count));
 			return sel;
 		}
 

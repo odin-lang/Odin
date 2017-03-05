@@ -208,21 +208,21 @@ ExprInfo make_expr_info(bool is_lhs, AddressingMode mode, Type *type, ExactValue
 #include "map.c"
 
 typedef struct Scope {
-	Scope *        parent;
-	Scope *        prev, *next;
-	Scope *        first_child;
-	Scope *        last_child;
-	MapEntity      elements; // Key: String
-	MapBool        implicit; // Key: Entity *
+	Scope *          parent;
+	Scope *          prev, *next;
+	Scope *          first_child;
+	Scope *          last_child;
+	MapEntity        elements; // Key: String
+	MapBool          implicit; // Key: Entity *
 
-	Array(Scope *) shared;
-	Array(Scope *) imported;
-	bool           is_proc;
-	bool           is_global;
-	bool           is_file;
-	bool           is_init;
-	bool           has_been_imported; // This is only applicable to file scopes
-	AstFile *      file;
+	Array(Scope *)   shared;
+	Array(Scope *)   imported;
+	bool             is_proc;
+	bool             is_global;
+	bool             is_file;
+	bool             is_init;
+	bool             has_been_imported; // This is only applicable to file scopes
+	AstFile *        file;
 } Scope;
 gb_global Scope *universal_scope = NULL;
 
@@ -357,9 +357,9 @@ Scope *make_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
 	map_entity_init(&s->elements,   heap_allocator());
-	map_bool_init(&s->implicit,   heap_allocator());
-	array_init(&s->shared,   heap_allocator());
-	array_init(&s->imported, heap_allocator());
+	map_bool_init(&s->implicit,     heap_allocator());
+	array_init(&s->shared,          heap_allocator());
+	array_init(&s->imported,        heap_allocator());
 
 	if (parent != NULL && parent != universal_scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
@@ -596,7 +596,7 @@ void add_global_constant(gbAllocator a, String name, Type *type, ExactValue valu
 
 
 void add_global_string_constant(gbAllocator a, String name, String value) {
-	add_global_constant(a, name, t_untyped_string, make_exact_value_string(value));
+	add_global_constant(a, name, t_untyped_string, exact_value_string(value));
 
 }
 
@@ -616,8 +616,8 @@ void init_universal_scope(void) {
 	}
 
 // Constants
-	add_global_constant(a, str_lit("true"),  t_untyped_bool,    make_exact_value_bool(true));
-	add_global_constant(a, str_lit("false"), t_untyped_bool,    make_exact_value_bool(false));
+	add_global_constant(a, str_lit("true"),  t_untyped_bool, exact_value_bool(true));
+	add_global_constant(a, str_lit("false"), t_untyped_bool, exact_value_bool(false));
 
 	add_global_entity(make_entity_nil(a, str_lit("nil"), t_untyped_nil));
 	add_global_entity(make_entity_library_name(a,  universal_scope,

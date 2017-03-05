@@ -746,9 +746,9 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		constant_type = named_type;
 	}
 
-	ExactValue iota = make_exact_value_integer(-1);
-	ExactValue min_value = make_exact_value_integer(0);
-	ExactValue max_value = make_exact_value_integer(0);
+	ExactValue iota = exact_value_integer(-1);
+	ExactValue min_value = exact_value_integer(0);
+	ExactValue max_value = exact_value_integer(0);
 
 	for_array(i, et->fields) {
 		AstNode *field = et->fields.e[i];
@@ -783,10 +783,10 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 			if (o.mode != Addressing_Invalid) {
 				iota = o.value;
 			} else {
-				iota = exact_binary_operator_value(Token_Add, iota, make_exact_value_integer(1));
+				iota = exact_binary_operator_value(Token_Add, iota, exact_value_integer(1));
 			}
 		} else {
-			iota = exact_binary_operator_value(Token_Add, iota, make_exact_value_integer(1));
+			iota = exact_binary_operator_value(Token_Add, iota, exact_value_integer(1));
 		}
 
 
@@ -839,7 +839,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	enum_type->Record.field_count = field_count;
 
 	enum_type->Record.enum_count = make_entity_constant(c->allocator, c->context.scope,
-		make_token_ident(str_lit("count")), t_int, make_exact_value_integer(field_count));
+		make_token_ident(str_lit("count")), t_int, exact_value_integer(field_count));
 	enum_type->Record.enum_min_value = make_entity_constant(c->allocator, c->context.scope,
 		make_token_ident(str_lit("min_value")), constant_type, min_value);
 	enum_type->Record.enum_max_value = make_entity_constant(c->allocator, c->context.scope,
@@ -1860,7 +1860,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 		}
 		x->mode  = Addressing_Constant;
 		x->type  = t_untyped_bool;
-		x->value = make_exact_value_bool(comp);
+		x->value = exact_value_bool(comp);
 		return;
 	}
 
@@ -1913,7 +1913,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 	} else {
 		if (x->mode == Addressing_Constant &&
 		    y->mode == Addressing_Constant) {
-			x->value = make_exact_value_bool(compare_exact_values(op, x->value, y->value));
+			x->value = exact_value_bool(compare_exact_values(op, x->value, y->value));
 		} else {
 			x->mode = Addressing_Value;
 
@@ -1995,7 +1995,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 				x->type = t_untyped_integer;
 			}
 
-			x->value = exact_value_shift(be->op.kind, x_val, make_exact_value_integer(amount));
+			x->value = exact_value_shift(be->op.kind, x_val, exact_value_integer(amount));
 
 			if (is_type_typed(x->type)) {
 				check_is_expressible(c, x, base_type(x->type));
@@ -2094,7 +2094,7 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 			new_ptr_val -= elem_size*offset_val;
 		}
 		operand.mode = Addressing_Constant;
-		operand.value = make_exact_value_pointer(new_ptr_val);
+		operand.value = exact_value_pointer(new_ptr_val);
 	}
 
 	return operand;
@@ -2372,7 +2372,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			GB_ASSERT(op.kind == Token_Sub);
 			i64 bytes = a.value_pointer - b.value_pointer;
 			i64 diff = bytes/type_size_of(c->allocator, type);
-			x->value = make_exact_value_pointer(diff);
+			x->value = exact_value_pointer(diff);
 			return;
 		}
 
@@ -2832,7 +2832,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	    operand->type != NULL && is_type_untyped(operand->type) && is_type_string(operand->type)) {
 		String s = operand->value.value_string;
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(s.len);
+		operand->value = exact_value_integer(s.len);
 		operand->type = t_untyped_integer;
 		return NULL;
 	}
@@ -3158,7 +3158,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_size_of(c->allocator, type));
+		operand->value = exact_value_integer(type_size_of(c->allocator, type));
 		operand->type = t_untyped_integer;
 
 	} break;
@@ -3171,7 +3171,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_size_of(c->allocator, operand->type));
+		operand->value = exact_value_integer(type_size_of(c->allocator, operand->type));
 		operand->type = t_untyped_integer;
 		break;
 
@@ -3183,7 +3183,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_align_of(c->allocator, type));
+		operand->value = exact_value_integer(type_align_of(c->allocator, type));
 		operand->type = t_untyped_integer;
 	} break;
 
@@ -3195,7 +3195,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_align_of(c->allocator, operand->type));
+		operand->value = exact_value_integer(type_align_of(c->allocator, operand->type));
 		operand->type = t_untyped_integer;
 		break;
 
@@ -3239,7 +3239,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_offset_of_from_selection(c->allocator, type, sel));
+		operand->value = exact_value_integer(type_offset_of_from_selection(c->allocator, type, sel));
 		operand->type  = t_untyped_integer;
 	} break;
 
@@ -3288,7 +3288,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->mode = Addressing_Constant;
 		// IMPORTANT TODO(bill): Fix for anonymous fields
-		operand->value = make_exact_value_integer(type_offset_of_from_selection(c->allocator, type, sel));
+		operand->value = exact_value_integer(type_offset_of_from_selection(c->allocator, type, sel));
 		operand->type  = t_untyped_integer;
 	} break;
 
@@ -3584,7 +3584,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			u8 *ptr_a = cast(u8 *)operand->value.value_pointer;
 			u8 *ptr_b = cast(u8 *)op.value.value_pointer;
 			isize elem_size = type_size_of(c->allocator, ptr_type->Pointer.elem);
-			operand->value = make_exact_value_integer((ptr_a - ptr_b) / elem_size);
+			operand->value = exact_value_integer((ptr_a - ptr_b) / elem_size);
 		} else {
 			operand->mode = Addressing_Value;
 		}
@@ -4426,24 +4426,24 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		}
 		o->mode  = Addressing_Constant;
 		o->type  = t;
-		o->value = make_exact_value_from_basic_literal(*bl);
+		o->value = exact_value_from_basic_literal(*bl);
 	case_end;
 
 	case_ast_node(bd, BasicDirective, node);
 		if (str_eq(bd->name, str_lit("file"))) {
 			o->type = t_untyped_string;
-			o->value = make_exact_value_string(bd->token.pos.file);
+			o->value = exact_value_string(bd->token.pos.file);
 		} else if (str_eq(bd->name, str_lit("line"))) {
 			o->type = t_untyped_integer;
-			o->value = make_exact_value_integer(bd->token.pos.line);
+			o->value = exact_value_integer(bd->token.pos.line);
 		} else if (str_eq(bd->name, str_lit("procedure"))) {
 			if (c->proc_stack.count == 0) {
 				error_node(node, "#procedure may only be used within procedures");
 				o->type = t_untyped_string;
-				o->value = make_exact_value_string(str_lit(""));
+				o->value = exact_value_string(str_lit(""));
 			} else {
 				o->type = t_untyped_string;
-				o->value = make_exact_value_string(c->context.proc_name);
+				o->value = exact_value_string(c->context.proc_name);
 			}
 
 		} else {
@@ -4850,7 +4850,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 		if (is_constant) {
 			o->mode = Addressing_Constant;
-			o->value = make_exact_value_compound(node);
+			o->value = exact_value_compound(node);
 		} else {
 			o->mode = Addressing_Value;
 		}

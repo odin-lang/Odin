@@ -850,7 +850,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		} else {
 			x.mode  = Addressing_Constant;
 			x.type  = t_bool;
-			x.value = make_exact_value_bool(true);
+			x.value = exact_value_bool(true);
 
 			Token token = {0};
 			token.pos = ast_node_token(ms->body).pos;
