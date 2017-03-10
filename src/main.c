@@ -4,7 +4,6 @@ extern "C" {
 
 #define USE_CUSTOM_BACKEND false
 
-
 #include "common.c"
 #include "timings.c"
 #include "build_settings.c"

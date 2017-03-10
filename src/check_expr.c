@@ -1917,6 +1917,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 		} else {
 			x->mode = Addressing_Value;
 
+
 			update_expr_type(c, x->expr, default_type(x->type), true);
 			update_expr_type(c, y->expr, default_type(y->type), true);
 		}

@@ -6,7 +6,7 @@ typedef struct ssaProc     ssaProc;
 typedef struct ssaEdge     ssaEdge;
 typedef struct ssaRegister ssaRegister;
 typedef enum ssaBlockKind  ssaBlockKind;
-typedef enum ssaBranchPredicition ssaBranchPredicition;
+typedef enum ssaBranchPrediction ssaBranchPrediction;
 
 String ssa_mangle_name(ssaModule *m, String path, Entity *e);
 
@@ -21,6 +21,8 @@ enum ssaOp {
 	ssaOp_Invalid,
 
 	ssaOp_Unknown,
+
+	ssaOp_Comment, // Does nothing
 
 	ssaOp_SP,    // Stack Pointer
 	ssaOp_SB,    // Stack Base
@@ -38,6 +40,7 @@ enum ssaOp {
 	ssaOp_ArrayIndex, // Index for a fixed array
 	ssaOp_PtrIndex,   // Index for a struct/tuple/etc
 	ssaOp_OffsetPtr,
+	ssaOp_ValueIndex, // Extract for a value from a register
 
 	ssaOp_Phi,
 	ssaOp_Copy,
@@ -309,7 +312,7 @@ enum ssaBlockKind {
 	ssaBlock_Count,
 };
 
-enum ssaBranchPredicition {
+enum ssaBranchPrediction {
 	ssaBranch_Unknown  = 0,
 	ssaBranch_Likely   = +1,
 	ssaBranch_Unlikely = -1,
@@ -332,7 +335,7 @@ struct ssaBlock {
 	ssaProc *            proc; // Containing procedure
 
 	// Likely branch direction
-	ssaBranchPredicition likeliness;
+	ssaBranchPrediction likeliness;
 
 	ssaValueArray values;
 	ssaEdgeArray  preds;
@@ -428,7 +431,7 @@ void ssa_add_to_edge(ssaBlock *b, ssaBlock *c) {
 	ssaEdge s = {c, j};
 	ssaEdge p = {b, i};
 	array_add(&b->succs, s);
-	array_add(&b->preds, p);
+	array_add(&c->preds, p);
 }
 
 
@@ -522,6 +525,24 @@ bool ssa_is_blank_ident(AstNode *node) {
 }
 
 
+typedef enum ssaAddrKind {
+	ssaAddr_Default,
+} ssaAddrKind;
+
+typedef struct ssaAddr {
+	ssaValue *  addr;
+	ssaAddrKind kind;
+} ssaAddr;
+
+ssaAddr ssa_addr(ssaValue *v) {
+	if (v != NULL) {
+		GB_ASSERT(is_type_pointer(v->type));
+	}
+	ssaAddr addr = {0};
+	addr.addr = v;
+	return addr;
+}
+
 
 
 ssaProc *ssa_new_proc(ssaModule *m, String name, Entity *entity, DeclInfo *decl_info) {
@@ -537,7 +558,9 @@ ssaProc *ssa_new_proc(ssaModule *m, String name, Entity *entity, DeclInfo *decl_
 	return p;
 }
 
-ssaValue *ssa_add_local(ssaProc *p, Entity *e, AstNode *expr) {
+ssaAddr ssa_add_local(ssaProc *p, Entity *e, AstNode *expr) {
+	ssaAddr result = {0};
+
 	Type *t = make_type_pointer(p->module->allocator, e->type);
 	ssaValue *local = ssa_new_value0(p->entry, ssaOp_Local, t);
 	map_ssa_value_set(&p->values,         hash_pointer(e), local);
@@ -545,18 +568,21 @@ ssaValue *ssa_add_local(ssaProc *p, Entity *e, AstNode *expr) {
 
 	ssaValue *addr = ssa_new_value1(p->curr_block, ssaOp_Addr, local->type, local);
 	ssa_new_value1(p->curr_block, ssaOp_Zero, t, addr);
-	return addr;
+	result.addr = addr;
+	return result;
 }
-ssaValue *ssa_add_local_for_ident(ssaProc *p, AstNode *name) {
+ssaAddr ssa_add_local_for_ident(ssaProc *p, AstNode *name) {
+	ssaAddr result = {0};
+
 	Entity **found = map_entity_get(&p->module->info->definitions, hash_pointer(name));
 	if (found) {
 		Entity *e = *found;
 		return ssa_add_local(p, e, name);
 	}
-	return NULL;
+	return result;
 }
 
-ssaValue *ssa_add_local_generated(ssaProc *p, Type *t) {
+ssaAddr ssa_add_local_generated(ssaProc *p, Type *t) {
 	GB_ASSERT(t != NULL);
 
 	Scope *scope = NULL;
@@ -567,8 +593,9 @@ ssaValue *ssa_add_local_generated(ssaProc *p, Type *t) {
 	return ssa_add_local(p, e, NULL);
 }
 
-
-
+void ssa_emit_comment(ssaProc *p, String s) {
+	ssa_new_value0v(p->curr_block, ssaOp_Comment, NULL, exact_value_string(s));
+}
 
 
 
@@ -576,9 +603,14 @@ ssaValue *ssa_add_local_generated(ssaProc *p, Type *t) {
 void ssa_build_stmt(ssaProc *p, AstNode *node);
 void ssa_build_stmt_list(ssaProc *p, AstNodeArray nodes);
 
+void ssa_addr_store(ssaProc *p, ssaAddr addr, ssaValue *value) {
+	if (addr.addr == NULL) {
+		return;
+	}
+}
 
-ssaValue *ssa_build_addr(ssaProc *p, AstNode *node) {
-	return NULL;
+ssaAddr ssa_build_addr(ssaProc *p, AstNode *node) {
+	return ssa_addr(NULL);
 }
 
 ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
@@ -633,10 +665,6 @@ void ssa_build_stmt_list(ssaProc *p, AstNodeArray nodes) {
 	}
 }
 
-void ssa_addr_store(ssaProc *p, ssaValue *addr, ssaValue *value) {
-
-}
-
 
 ssaValue *ssa_emit_struct_ep(ssaProc *p, ssaValue *ptr, i32 index) {
 	GB_ASSERT(ptr->type != NULL);
@@ -659,6 +687,13 @@ void ssa_build_stmt(ssaProc *p, AstNode *node) {
 		ssa_build_stmt_list(p, bs->stmts);
 	case_end;
 
+	case_ast_node(us, UsingStmt, node);
+		AstNode *decl = unparen_expr(us->node);
+		if (decl->kind == AstNode_ValueDecl) {
+			ssa_build_stmt(p, decl);
+		}
+	case_end;
+
 	case_ast_node(vd, ValueDecl, node);
 		if (vd->is_var) {
 			ssaModule *m = p->module;
@@ -671,14 +706,14 @@ void ssa_build_stmt(ssaProc *p, AstNode *node) {
 					}
 				}
 			} else {
-				ssaValueArray lvals = {0};
-				ssaValueArray inits = {0};
+				Array(ssaAddr) lvals = {0};
+				ssaValueArray  inits = {0};
 				array_init_reserve(&lvals, m->tmp_allocator, vd->names.count);
 				array_init_reserve(&inits, m->tmp_allocator, vd->names.count);
 
 				for_array(i, vd->names) {
 					AstNode *name = vd->names.e[i];
-					ssaValue *lval = NULL;
+					ssaAddr lval = ssa_addr(NULL);
 					if (!ssa_is_blank_ident(name)) {
 						lval = ssa_add_local_for_ident(p, name);
 					}
@@ -688,11 +723,10 @@ void ssa_build_stmt(ssaProc *p, AstNode *node) {
 
 				for_array(i, vd->values) {
 					ssaValue *init = ssa_build_expr(p, vd->values.e[i]);
-					if (init == NULL || init->type == NULL) {
-						// TODO(bill): remove this
+					if (init == NULL) { // TODO(bill): remove this
 						continue;
 					}
-					Type *t = base_type(init->type);
+					Type *t = type_deref(init->type);
 					if (init->op == ssaOp_Addr && t->kind == Type_Tuple) {
 						for (isize i = 0; i < t->Tuple.variable_count; i++) {
 							Entity *e = t->Tuple.variables[i];
@@ -704,17 +738,96 @@ void ssa_build_stmt(ssaProc *p, AstNode *node) {
 					}
 				}
 
-
 				for_array(i, inits) {
-					if (lvals.e[i] == NULL) {
-						continue;
-					}
 					ssa_addr_store(p, lvals.e[i], inits.e[i]);
 				}
 			}
 
 			gb_temp_arena_memory_end(tmp);
 		}
+	case_end;
+
+	case_ast_node(as, AssignStmt, node);
+		ssa_emit_comment(p, str_lit("AssignStmt"));
+
+		ssaModule *m = p->module;
+		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
+
+		switch (as->op.kind) {
+		case Token_Eq: {
+			Array(ssaAddr) lvals = {0};
+			array_init(&lvals, m->tmp_allocator);
+
+			for_array(i, as->lhs) {
+				AstNode *lhs = as->lhs.e[i];
+				ssaAddr lval = {0};
+				if (!ssa_is_blank_ident(lhs)) {
+					lval = ssa_build_addr(p, lhs);
+				}
+				array_add(&lvals, lval);
+			}
+
+			if (as->lhs.count == as->rhs.count) {
+				if (as->lhs.count == 1) {
+					AstNode *rhs = as->rhs.e[0];
+					ssaValue *init = ssa_build_expr(p, rhs);
+					ssa_addr_store(p, lvals.e[0], init);
+				} else {
+					ssaValueArray inits;
+					array_init_reserve(&inits, m->tmp_allocator, lvals.count);
+
+					for_array(i, as->rhs) {
+						ssaValue *init = ssa_build_expr(p, as->rhs.e[i]);
+						array_add(&inits, init);
+					}
+
+					for_array(i, inits) {
+						ssa_addr_store(p, lvals.e[i], inits.e[i]);
+					}
+				}
+			} else {
+				ssaValueArray inits;
+				array_init_reserve(&inits, m->tmp_allocator, lvals.count);
+
+				for_array(i, as->rhs) {
+					ssaValue *init = ssa_build_expr(p, as->rhs.e[i]);
+					Type *t = type_deref(init->type);
+					// TODO(bill): refactor for code reuse as this is repeated a bit
+					if (init->op == ssaOp_Addr && t->kind == Type_Tuple) {
+						for (isize i = 0; i < t->Tuple.variable_count; i++) {
+							Entity *e = t->Tuple.variables[i];
+							ssaValue *v = ssa_emit_struct_ep(p, init, i);
+							array_add(&inits, v);
+						}
+					} else {
+						array_add(&inits, init);
+					}
+				}
+
+				for_array(i, inits) {
+					ssa_addr_store(p, lvals.e[i], inits.e[i]);
+				}
+			}
+		} break;
+
+		default: {
+			GB_PANIC("TODO(bill): assign operations");
+			// NOTE(bill): Only 1 += 1 is allowed, no tuples
+			// +=, -=, etc
+			// i32 op = cast(i32)as->op.kind;
+			// op += Token_Add - Token_AddEq; // Convert += to +
+			// ssaAddr lhs = ssa_build_addr(p, as->lhs.e[0]);
+			// ssaValue *value = ssa_build_expr(p, as->rhs.e[0]);
+			// ssa_build_assign_op(p, lhs, value, cast(TokenKind)op);
+		} break;
+		}
+
+		gb_temp_arena_memory_end(tmp);
+	case_end;
+
+	case_ast_node(es, ExprStmt, node);
+		// NOTE(bill): No need to use return value
+		ssa_build_expr(p, es->expr);
 	case_end;
 	}
 }

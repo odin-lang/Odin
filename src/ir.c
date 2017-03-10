@@ -2261,22 +2261,18 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		i64 sz = type_size_of(proc->module->allocator, src);
 		i64 dz = type_size_of(proc->module->allocator, dst);
 		irConvKind kind = irConv_trunc;
-		if (dz == sz) {
+
+		if (dz < sz) {
+			kind = irConv_trunc;
+		} else if (dz == sz) {
 			// NOTE(bill): In LLVM, all integers are signed and rely upon 2's compliment
 			// NOTE(bill): Copy the value just for type correctness
 			kind = irConv_bitcast;
 		} else if (dz > sz) {
-			kind = irConv_zext;
-
-			// TODO(bill): figure out the rules completely
-			bool ss = !is_type_unsigned(src);
-			bool ds = !is_type_unsigned(dst);
-			if (ss && ds) {
-				kind = irConv_sext;
-			} else if (ss) {
-				kind = irConv_sext;
+			if (is_type_unsigned(src)) {
+				kind = irConv_zext; // zero extent
 			} else {
-				kind = irConv_zext;
+				kind = irConv_sext; // sign extent
 			}
 		}
 
@@ -4900,9 +4896,6 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 
 				for_array(i, inits) {
-					if (lvals.e[i].addr == NULL) {
-						continue;
-					}
 					ir_addr_store(proc, lvals.e[i], inits.e[i]);
 				}
 			}

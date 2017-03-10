@@ -25,10 +25,10 @@ append_bool :: proc(buf: []byte, b: bool) -> string {
 }
 
 append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
-	return append_bits(buf, u, base, false, digits, 0);
+	return append_bits(buf, u, base, false, 8*size_of(uint), digits, 0);
 }
 append_int :: proc(buf: []byte, i: i64, base: int) -> string {
-	return append_bits(buf, cast(u64)i, base, i < 0, digits, 0);
+	return append_bits(buf, cast(u64)i, base, true, 8*size_of(int), digits, 0);
 }
 itoa :: proc(buf: []byte, i: int) -> string {
 	return append_int(buf, cast(i64)i, 10);
@@ -265,7 +265,39 @@ MAX_BASE :: 32;
 immutable digits := "0123456789abcdefghijklmnopqrstuvwxyz";
 
 
-append_bits :: proc(buf: []byte, u: u64, base: int, neg: bool, digits: string, flags: Int_Flag) -> string {
+is_integer_negative :: proc(u: u64, is_signed: bool, bit_size: int) -> (unsigned: u64, neg: bool) {
+	neg := false;
+	if is_signed {
+		match bit_size {
+		case 8:
+			i := cast(i8)u;
+			neg = i < 0;
+			if neg { i = -i; }
+			u = cast(u64)i;
+		case 16:
+			i := cast(i16)u;
+			neg = i < 0;
+			if neg { i = -i; }
+			u = cast(u64)i;
+		case 32:
+			i := cast(i32)u;
+			neg = i < 0;
+			if neg { i = -i; }
+			u = cast(u64)i;
+		case 64:
+			i := cast(i64)u;
+			neg = i < 0;
+			if neg { i = -i; }
+			u = cast(u64)i;
+		default:
+			panic("is_integer_negative: Unknown integer size");
+		}
+	}
+	return u, neg;
+}
+
+
+append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flag) -> string {
 	is_pow2 :: proc(x: i64) -> bool {
 		if (x <= 0) {
 			return false;
@@ -279,9 +311,9 @@ append_bits :: proc(buf: []byte, u: u64, base: int, neg: bool, digits: string, f
 
 	a: [65]byte;
 	i := a.count;
-	if neg {
-		u = -u;
-	}
+
+	neg: bool;
+	u, neg = is_integer_negative(u, is_signed, bit_size);
 
 	if is_pow2(cast(i64)base) {
 		b := cast(u64)base;

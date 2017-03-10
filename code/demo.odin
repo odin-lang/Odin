@@ -9,10 +9,10 @@
 #import "sync.odin";
 
 main :: proc() {
-	x := 2;
-	y := 3;
-	z := x+y;
-	fmt.println(z);
+	a: i8 = -1;
+	fmt.println(a, cast(u64)a, cast(i64)a);
+	b: i64 = -1;
+	fmt.println(b, cast(u64)b, cast(i64)b);
 
 when false {
 	s := new_slice(int, 0, 10);
