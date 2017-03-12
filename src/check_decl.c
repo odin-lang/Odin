@@ -408,6 +408,56 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 }
 
 
+void check_alias_decl(Checker *c, Entity *e, AstNode *expr) {
+	GB_ASSERT(e->type == NULL);
+	GB_ASSERT(e->kind == Entity_Alias);
+
+	if (e->flags & EntityFlag_Visited) {
+		e->type = t_invalid;
+		return;
+	}
+	e->flags |= EntityFlag_Visited;
+	e->type = t_invalid;
+
+	expr = unparen_expr(expr);
+
+	if (expr->kind == AstNode_Alias) {
+		error_node(expr, "#alias of an #alias is not allowed");
+		return;
+	}
+
+	if (expr->kind == AstNode_Ident) {
+		Operand o = {0};
+		Entity *f = check_ident(c, &o, expr, NULL, NULL, true);
+		if (f != NULL) {
+			e->Alias.original = f;
+			e->type = f->type;
+		}
+		return;
+	} else if (expr->kind == AstNode_SelectorExpr) {
+		Operand o = {0};
+		Entity *f = check_selector(c, &o, expr, NULL);
+		if (f != NULL) {
+			e->Alias.original = f;
+			e->type = f->type;
+		}
+		return;
+	}
+
+	Operand o = {0};
+	check_expr_or_type(c, &o, expr);
+	if (o.mode == Addressing_Invalid) {
+		return;
+	}
+	switch (o.mode) {
+	case Addressing_Type:
+		e->type = o.type;
+		break;
+	default:
+		error_node(expr, "#alias declarations only allow types");
+	}
+}
+
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 	if (e->type != NULL) {
 		return;
@@ -442,6 +492,9 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 		break;
 	case Entity_Procedure:
 		check_proc_lit(c, e, d);
+		break;
+	case Entity_Alias:
+		check_alias_decl(c, e, d->init_expr);
 		break;
 	}
 

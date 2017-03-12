@@ -2916,8 +2916,21 @@ irValue *ir_find_global_variable(irProcedure *proc, String name) {
 
 void ir_build_stmt_list(irProcedure *proc, AstNodeArray stmts);
 
-irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv) {
+
+irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	expr = unparen_expr(expr);
+
+	TypeAndValue *tv = map_tav_get(&proc->module->info->types, hash_pointer(expr));
+	GB_ASSERT_NOT_NULL(tv);
+
+	if (tv->value.kind != ExactValue_Invalid) {
+		return ir_add_module_constant(proc->module, tv->type, tv->value);
+	}
+
+	if (tv->mode == Addressing_Variable) {
+		return ir_addr_load(proc, ir_build_addr(proc, expr));
+	}
+
 	switch (expr->kind) {
 	case_ast_node(bl, BasicLit, expr);
 		TokenPos pos = bl->pos;
@@ -3780,27 +3793,6 @@ irValue *ir_build_single_expr(irProcedure *proc, AstNode *expr, TypeAndValue *tv
 
 	GB_PANIC("Unexpected expression: %.*s", LIT(ast_node_strings[expr->kind]));
 	return NULL;
-}
-
-
-irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
-	expr = unparen_expr(expr);
-
-	TypeAndValue *tv = map_tav_get(&proc->module->info->types, hash_pointer(expr));
-	GB_ASSERT_NOT_NULL(tv);
-
-	if (tv->value.kind != ExactValue_Invalid) {
-		return ir_add_module_constant(proc->module, tv->type, tv->value);
-	}
-
-	irValue *value = NULL;
-	if (tv->mode == Addressing_Variable) {
-		value = ir_addr_load(proc, ir_build_addr(proc, expr));
-	} else {
-		value = ir_build_single_expr(proc, expr, tv);
-	}
-
-	return value;
 }
 
 irValue *ir_get_using_variable(irProcedure *proc, Entity *e) {
@@ -5192,9 +5184,9 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		if (fs->cond != NULL) {
 			loop = ir_new_block(proc, node, "for.loop");
 		}
-		irBlock *cont = loop;
+		irBlock *post = loop;
 		if (fs->post != NULL) {
-			cont = ir_new_block(proc, node, "for.post");
+			post = ir_new_block(proc, node, "for.post");
 		}
 		ir_emit_jump(proc, loop);
 		ir_start_block(proc, loop);
@@ -5204,7 +5196,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			ir_start_block(proc, body);
 		}
 
-		ir_push_target_list(proc, done, cont, NULL);
+		ir_push_target_list(proc, done, post, NULL);
 
 		ir_open_scope(proc);
 		ir_build_stmt(proc, fs->body);
@@ -5212,10 +5204,10 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 		ir_pop_target_list(proc);
 
-		ir_emit_jump(proc, cont);
+		ir_emit_jump(proc, post);
 
 		if (fs->post != NULL) {
-			ir_start_block(proc, cont);
+			ir_start_block(proc, post);
 			ir_build_stmt(proc, fs->post);
 			ir_emit_jump(proc, loop);
 		}
@@ -5646,7 +5638,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 	case_end;
 
 
-	case_ast_node(pa, PushContext, node);
+	case_ast_node(pc, PushContext, node);
 		ir_emit_comment(proc, str_lit("PushContext"));
 		ir_open_scope(proc);
 
@@ -5656,9 +5648,9 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 		ir_add_defer_instr(proc, proc->scope_index, ir_instr_store(proc, context_ptr, ir_emit_load(proc, prev_context)));
 
-		ir_emit_store(proc, context_ptr, ir_build_expr(proc, pa->expr));
+		ir_emit_store(proc, context_ptr, ir_build_expr(proc, pc->expr));
 
-		ir_build_stmt(proc, pa->body);
+		ir_build_stmt(proc, pc->body);
 
 		ir_close_scope(proc, irDeferExit_Default, NULL);
 	case_end;

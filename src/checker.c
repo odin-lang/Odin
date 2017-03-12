@@ -816,7 +816,7 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 					return false;
 				}
 				error(entity->token,
-				      "Redeclararation of `%.*s` in this scope through `using`\n"
+				      "Redeclaration of `%.*s` in this scope through `using`\n"
 				      "\tat %.*s(%td:%td)",
 				      LIT(name),
 				      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
@@ -827,7 +827,7 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 					return false;
 				}
 				error(entity->token,
-				      "Redeclararation of `%.*s` in this scope\n"
+				      "Redeclaration of `%.*s` in this scope\n"
 				      "\tat %.*s(%td:%td)",
 				      LIT(name),
 				      LIT(pos.file), pos.line, pos.column);
@@ -1467,7 +1467,12 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 						// TODO(bill): What if vd->type != NULL??? How to handle this case?
 						d->type_expr = init;
 						d->init_expr = init;
-					} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
+					} else if (up_init != NULL && up_init->kind == AstNode_Alias) {
+						error_node(up_init, "#alias declarations are not yet supported");
+						continue;
+						// e = make_entity_alias(c->allocator, d->scope, name->Ident, NULL, NULL);
+						// d->init_expr = init->Alias.expr;
+					}else if (init != NULL && up_init->kind == AstNode_ProcLit) {
 						e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
 						d->proc_lit = up_init;
 						d->type_expr = vd->type;

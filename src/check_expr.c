@@ -1028,7 +1028,7 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 }
 
 
-void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint) {
+Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint, bool allow_import_name) {
 	GB_ASSERT(n->kind == AstNode_Ident);
 	o->mode = Addressing_Invalid;
 	o->expr = n;
@@ -1046,7 +1046,7 @@ void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *typ
 		if (named_type != NULL) {
 			set_base_type(named_type, t_invalid);
 		}
-		return;
+		return NULL;
 	}
 
 	bool is_overloaded = false;
@@ -1095,7 +1095,7 @@ void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *typ
 			o->type              = t_invalid;
 			o->overload_count    = overload_count;
 			o->overload_entities = procs;
-			return;
+			return NULL;
 		}
 		gb_free(heap_allocator(), procs);
 	}
@@ -1106,20 +1106,26 @@ void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *typ
 
 	if (e->type == NULL) {
 		compiler_error("Compiler error: How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(name));
-		return;
+		return NULL;
+	}
+
+	e->flags |= EntityFlag_Used;
+
+	Entity *original_e = e;
+	while (e->kind == Entity_Alias && e->Alias.original != NULL) {
+		e = e->Alias.original;
 	}
 
 	Type *type = e->type;
-
 	switch (e->kind) {
 	case Entity_Constant:
 		if (type == t_invalid) {
 			o->type = t_invalid;
-			return;
+			return e;
 		}
 		o->value = e->Constant.value;
 		if (o->value.kind == ExactValue_Invalid) {
-			return;
+			return e;
 		}
 		o->mode = Addressing_Constant;
 		break;
@@ -1128,7 +1134,7 @@ void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *typ
 		e->flags |= EntityFlag_Used;
 		if (type == t_invalid) {
 			o->type = t_invalid;
-			return;
+			return e;
 		}
 		o->mode = Addressing_Variable;
 		if (e->Variable.is_immutable) {
@@ -1151,22 +1157,25 @@ void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *typ
 		break;
 
 	case Entity_ImportName:
-		error_node(n, "Use of import `%.*s` not in selector", LIT(e->ImportName.name));
-		return;
+		if (!allow_import_name) {
+			error_node(n, "Use of import `%.*s` not in selector", LIT(name));
+		}
+		return e;
 	case Entity_LibraryName:
-		error_node(n, "Use of library `%.*s` not in #foreign tag", LIT(e->LibraryName.name));
-		return;
+		error_node(n, "Use of library `%.*s` not in #foreign tag", LIT(name));
+		return e;
 
 	case Entity_Nil:
 		o->mode = Addressing_Value;
 		break;
 
 	default:
-		compiler_error("Compiler error: Unknown EntityKind");
+		compiler_error("Unknown EntityKind");
 		break;
 	}
 
 	o->type = type;
+	return e;
 }
 
 i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
@@ -1342,7 +1351,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 	switch (e->kind) {
 	case_ast_node(i, Ident, e);
 		Operand o = {0};
-		check_ident(c, &o, e, named_type, NULL);
+		check_ident(c, &o, e, named_type, NULL, false);
 
 		switch (o.mode) {
 		case Addressing_Invalid:
@@ -2678,6 +2687,11 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
+
+		Entity *original_e = e;
+		while (e->kind == Entity_Alias && e->Alias.original != NULL) {
+			e = e->Alias.original;
+		}
 
 		if (e != NULL && e->kind == Entity_ImportName && selector->kind == AstNode_Ident) {
 			// IMPORTANT NOTE(bill): This is very sloppy code but it's also very fragile
@@ -4413,7 +4427,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case_end;
 
 	case_ast_node(i, Ident, node);
-		check_ident(c, o, node, NULL, type_hint);
+		check_ident(c, o, node, NULL, type_hint, false);
 	case_end;
 
 	case_ast_node(bl, BasicLit, node);
@@ -5626,7 +5640,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_end;
 
 	case_ast_node(ht, HelperType, node);
-		str = gb_string_appendc(str, "type ");
+		str = gb_string_appendc(str, "#type ");
 		str = write_expr_to_string(str, ht->type);
 	case_end;
 	}

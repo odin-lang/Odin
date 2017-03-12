@@ -7,17 +7,18 @@
 #import "os.odin";
 #import "strconv.odin";
 #import "sync.odin";
+#import win32 "sys/windows.odin";
 
 main :: proc() {
-	a: i8 = -1;
-	fmt.println(a, cast(u64)a, cast(i64)a);
-	b: i64 = -1;
-	fmt.println(b, cast(u64)b, cast(i64)b);
+	a := 1;
+	b := 2;
+	c := a + b;
+
+	if c > 0 {
+		c = 0;
+	}
 
 when false {
-	s := new_slice(int, 0, 10);
-	append(s, 1, 2, 6, 3, 6, 5, 5, 5, 5, 1, 2);
-	fmt.println(s);
 /*
 	Version 0.1.1
 

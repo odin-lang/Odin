@@ -2,7 +2,7 @@
 #import "atomic.odin";
 
 Semaphore :: struct {
-	_handle: win32.HANDLE,
+	_handle: win32.Handle,
 }
 
 Mutex :: struct {

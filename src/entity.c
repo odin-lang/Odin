@@ -13,6 +13,7 @@ typedef struct Type Type;
 	ENTITY_KIND(Builtin) \
 	ENTITY_KIND(ImportName) \
 	ENTITY_KIND(LibraryName) \
+	ENTITY_KIND(Alias) \
 	ENTITY_KIND(Nil) \
 	ENTITY_KIND(Count)
 
@@ -95,6 +96,9 @@ struct Entity {
 			String name;
 			bool   used;
 		} LibraryName;
+		struct {
+			Entity *original;
+		} Alias;
 		i32 Nil;
 	};
 };
@@ -215,6 +219,13 @@ Entity *make_entity_library_name(gbAllocator a, Scope *scope, Token token, Type 
 	Entity *entity = alloc_entity(a, Entity_LibraryName, scope, token, type);
 	entity->LibraryName.path = path;
 	entity->LibraryName.name = name;
+	return entity;
+}
+
+Entity *make_entity_alias(gbAllocator a, Scope *scope, Token token, Type *type,
+                          Entity *original) {
+	Entity *entity = alloc_entity(a, Entity_Alias, scope, token, type);
+	entity->Alias.original = original;
 	return entity;
 }
 

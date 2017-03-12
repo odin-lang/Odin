@@ -139,6 +139,10 @@ AstNodeArray make_ast_node_array(AstFile *f) {
 		AstNodeArray elems; \
 		Token open, close; \
 	}) \
+	AST_NODE_KIND(Alias, "alias", struct { \
+		Token token; \
+		AstNode *expr; \
+	}) \
 AST_NODE_KIND(_ExprBegin,  "",  i32) \
 	AST_NODE_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
 	AST_NODE_KIND(TagExpr,      "tag expression",         struct { Token token, name; AstNode *expr; }) \
@@ -445,6 +449,8 @@ Token ast_node_token(AstNode *node) {
 			return ast_node_token(node->CompoundLit.type);
 		}
 		return node->CompoundLit.open;
+	case AstNode_Alias:         return node->Alias.token;
+
 	case AstNode_TagExpr:       return node->TagExpr.token;
 	case AstNode_RunExpr:       return node->RunExpr.token;
 	case AstNode_BadExpr:       return node->BadExpr.begin;
@@ -771,6 +777,13 @@ AstNode *ast_compound_lit(AstFile *f, AstNode *type, AstNodeArray elems, Token o
 	result->CompoundLit.close = close;
 	return result;
 }
+AstNode *ast_alias(AstFile *f, Token token, AstNode *expr) {
+	AstNode *result = make_ast_node(f, AstNode_Alias);
+	result->Alias.token = token;
+	result->Alias.expr  = expr;
+	return result;
+}
+
 
 AstNode *ast_ternary_expr(AstFile *f, AstNode *cond, AstNode *x, AstNode *y) {
 	AstNode *result = make_ast_node(f, AstNode_TernaryExpr);
@@ -1762,6 +1775,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		} else if (str_eq(name.string, str_lit("line"))) { return ast_basic_directive(f, token, name.string);
 		} else if (str_eq(name.string, str_lit("procedure"))) { return ast_basic_directive(f, token, name.string);
 		} else if (str_eq(name.string, str_lit("type"))) { return ast_helper_type(f, token, parse_type(f));
+		} else if (!lhs && str_eq(name.string, str_lit("alias"))) { return ast_alias(f, token, parse_expr(f, false));
 		} else {
 			operand = ast_tag_expr(f, token, name, parse_expr(f, false));
 		}
