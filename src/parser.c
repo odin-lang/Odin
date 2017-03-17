@@ -402,7 +402,6 @@ String const ast_node_strings[] = {
 
 typedef struct AstNode {
 	AstNodeKind kind;
-	// AstNode *prev, *next; // NOTE(bill): allow for Linked list
 	u32 stmt_state_flags;
 	union {
 #define AST_NODE_KIND(_kind_name_, name, ...) GB_JOIN2(AstNode, _kind_name_) _kind_name_;
@@ -414,7 +413,9 @@ typedef struct AstNode {
 
 #define ast_node(n_, Kind_, node_) GB_JOIN2(AstNode, Kind_) *n_ = &(node_)->Kind_; GB_ASSERT((node_)->kind == GB_JOIN2(AstNode_, Kind_))
 #define case_ast_node(n_, Kind_, node_) case GB_JOIN2(AstNode_, Kind_): { ast_node(n_, Kind_, node_);
+#ifndef case_end
 #define case_end } break;
+#endif
 
 
 gb_inline bool is_ast_node_expr(AstNode *node) {
@@ -3841,7 +3842,7 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 				gb_printf_err("File permissions problem");
 				break;
 			case ParseFile_NotFound:
-				gb_printf_err("File cannot be found");
+				gb_printf_err("File cannot be found (`%.*s`)", LIT(import_path));
 				break;
 			case ParseFile_InvalidToken:
 				gb_printf_err("Invalid token found in file");

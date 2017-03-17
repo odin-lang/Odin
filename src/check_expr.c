@@ -1112,7 +1112,7 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 	e->flags |= EntityFlag_Used;
 
 	Entity *original_e = e;
-	while (e->kind == Entity_Alias && e->Alias.original != NULL) {
+	while (e != NULL && e->kind == Entity_Alias && e->Alias.original != NULL) {
 		e = e->Alias.original;
 	}
 
@@ -1672,7 +1672,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		return true;
 	}
 
-	type = base_type(base_enum_type(type));
+	type = core_type(type);
 
 	if (is_type_boolean(type)) {
 		return in_value.kind == ExactValue_Bool;
@@ -2118,8 +2118,8 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 	}
 
 	Type *x = operand->type;
-	Type *src = base_type(base_enum_type(x));
-	Type *dst = base_type(base_enum_type(y));
+	Type *src = core_type(x);
+	Type *dst = core_type(y);
 	if (are_types_identical(src, dst)) {
 		return true;
 	}
@@ -2527,7 +2527,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 		return;
 	}
 
-	Type *t = base_type(base_enum_type(target_type));
+	Type *t = core_type(target_type);
 	switch (t->kind) {
 	case Type_Basic:
 		if (operand->mode == Addressing_Constant) {
@@ -2689,7 +2689,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		expr_entity = e;
 
 		Entity *original_e = e;
-		while (e->kind == Entity_Alias && e->Alias.original != NULL) {
+		while (e != NULL && e->kind == Entity_Alias && e->Alias.original != NULL) {
 			e = e->Alias.original;
 		}
 

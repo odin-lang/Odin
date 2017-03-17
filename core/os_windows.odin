@@ -247,7 +247,6 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 
 
 heap_alloc :: proc(size: int) -> rawptr {
-	assert(size > 0);
 	return w.HeapAlloc(w.GetProcessHeap(), w.HEAP_ZERO_MEMORY, size);
 }
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {

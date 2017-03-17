@@ -10,14 +10,7 @@
 #import win32 "sys/windows.odin";
 
 main :: proc() {
-	a := 1;
-	b := 2;
-	c := a + b;
-
-	if c > 0 {
-		c = 0;
-	}
-
+	fmt.println("Here");
 when false {
 /*
 	Version 0.1.1

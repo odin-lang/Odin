@@ -375,6 +375,10 @@ Type *base_enum_type(Type *t) {
 	return t;
 }
 
+Type *core_type(Type *t) {
+	return base_type(base_enum_type(t));
+}
+
 void set_base_type(Type *t, Type *base) {
 	if (t && t->kind == Type_Named) {
 		t->Named.base = base;
@@ -530,28 +534,28 @@ bool is_type_named(Type *t) {
 	return t->kind == Type_Named;
 }
 bool is_type_boolean(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Boolean) != 0;
 	}
 	return false;
 }
 bool is_type_integer(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Integer) != 0;
 	}
 	return false;
 }
 bool is_type_unsigned(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Unsigned) != 0;
 	}
 	return false;
 }
 bool is_type_numeric(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Numeric) != 0;
 	}
@@ -586,7 +590,7 @@ bool is_type_untyped(Type *t) {
 	return false;
 }
 bool is_type_ordered(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	switch (t->kind) {
 	case Type_Basic:
 		return (t->Basic.flags & BasicFlag_Ordered) != 0;
@@ -598,28 +602,28 @@ bool is_type_ordered(Type *t) {
 	return false;
 }
 bool is_type_constant_type(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_ConstantType) != 0;
 	}
 	return false;
 }
 bool is_type_float(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Float) != 0;
 	}
 	return false;
 }
 bool is_type_f32(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_f32;
 	}
 	return false;
 }
 bool is_type_f64(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_f64;
 	}
@@ -737,7 +741,7 @@ bool is_type_untyped_nil(Type *t) {
 
 
 bool is_type_valid_for_keys(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (is_type_untyped(t)) {
 		return false;
 	}
@@ -798,7 +802,7 @@ bool is_type_comparable(Type *t) {
 		return true;
 	case Type_Record: {
 		if (is_type_enum(t)) {
-			return is_type_comparable(base_enum_type(t));
+			return is_type_comparable(core_type(t));
 		}
 		return false;
 	} break;

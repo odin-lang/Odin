@@ -1,6 +1,7 @@
 typedef enum   ssaOp               ssaOp;
 typedef struct ssaModule           ssaModule;
 typedef struct ssaValue            ssaValue;
+typedef struct ssaValueArgs        ssaValueArgs;
 typedef struct ssaBlock            ssaBlock;
 typedef struct ssaProc             ssaProc;
 typedef struct ssaEdge             ssaEdge;
@@ -294,7 +295,15 @@ String const ssa_op_strings[] = {
 #undef SSA_OP
 };
 
-#define SSA_MAX_ARGS 4
+
+#define SSA_DEFAULT_VALUE_ARG_CAPACITY 8
+struct ssaValueArgs {
+	ssaValue ** e;
+	isize       count;
+	isize       capacity;
+	ssaValue *  backing[SSA_DEFAULT_VALUE_ARG_CAPACITY];
+	gbAllocator allocator;
+};
 
 struct ssaValue {
 	i32           id;    // Unique identifier but the pointer could be used too
@@ -303,13 +312,7 @@ struct ssaValue {
 	ssaBlock *    block; // Containing basic block
 
 	i32           uses;
-	// Most values will only a few number of arguments
-	// Procedure calls may need a lot more so they will use the `var_args` parameter instead
-	ssaValue *    args[SSA_MAX_ARGS];
-	isize         arg_count;
-
-	ssaValueArray var_args; // Only used in procedure calls as the SSA_MAX_ARGS may be too small
-
+	ssaValueArgs  args;
 	ExactValue    exact_value; // Used for constants
 
 	String        comment_string;
@@ -501,21 +504,29 @@ void ssa_emit_jump(ssaProc *p, ssaBlock *edge) {
 	ssa_add_edge_to(ssa_end_block(p), edge);
 }
 
-
-bool ssa_op_uses_var_args(ssaOp op) {
-	switch (op) {
-	case ssaOp_CallOdin:
-	case ssaOp_CallC:
-	case ssaOp_CallStd:
-	case ssaOp_CallFast:
-		return true;
-
-	case ssaOp_Phi:
-		return true;
-	}
-	return false;
+void ssa_init_value_args(ssaValueArgs *va, gbAllocator a) {
+	va->e              = va->backing;
+	va->count          = 0;
+	va->capacity       = gb_count_of(va->backing);
+	va->allocator      = a;
 }
 
+void ssa_add_arg(ssaValueArgs *va, ssaValue *arg) {
+	if (va->count >= va->capacity) {
+		isize capacity = 2*va->capacity;
+		if (va->e == va->backing) { // Replace the backing with an allocated version instead
+			ssaValue **new_args = gb_alloc_array(va->allocator, ssaValue *, capacity);
+			gb_memcopy_array(new_args, va->e, va->count);
+			va->e = new_args;
+		} else {
+			isize old_cap_size = va->capacity * gb_size_of(ssaValue *);
+			isize new_cap_size = capacity * gb_size_of(ssaValue *);
+			va->e = gb_resize(va->allocator, va->e, old_cap_size, new_cap_size);
+		}
+		va->capacity = capacity;
+	}
+	va->e[va->count++] = arg; arg->uses++;
+}
 
 
 
@@ -525,6 +536,7 @@ ssaValue *ssa_new_value(ssaProc *p, ssaOp op, Type *t, ssaBlock *b) {
 	v->op    = op;
 	v->type  = t;
 	v->block = b;
+	ssa_init_value_args(&v->args, p->module->allocator);
 	array_add(&b->values, v);
 	return v;
 }
@@ -541,7 +553,7 @@ ssaValue *ssa_new_value0v(ssaBlock *b, ssaOp op, Type *t, ExactValue exact_value
 
 ssaValue *ssa_new_value1(ssaBlock *b, ssaOp op, Type *t, ssaValue *arg) {
 	ssaValue *v = ssa_new_value(b->proc, op, t, b);
-	v->args[v->arg_count++] = arg; arg->uses++;
+	ssa_add_arg(&v->args, arg);
 	return v;
 }
 ssaValue *ssa_new_value1v(ssaBlock *b, ssaOp op, Type *t, ExactValue exact_value, ssaValue *arg) {
@@ -552,8 +564,8 @@ ssaValue *ssa_new_value1v(ssaBlock *b, ssaOp op, Type *t, ExactValue exact_value
 
 ssaValue *ssa_new_value2(ssaBlock *b, ssaOp op, Type *t, ssaValue *arg0, ssaValue *arg1) {
 	ssaValue *v = ssa_new_value(b->proc, op, t, b);
-	v->args[v->arg_count++] = arg0; arg0->uses++;
-	v->args[v->arg_count++] = arg1; arg1->uses++;
+	ssa_add_arg(&v->args, arg0);
+	ssa_add_arg(&v->args, arg1);
 	return v;
 }
 ssaValue *ssa_new_value2v(ssaBlock *b, ssaOp op, Type *t, ExactValue exact_value, ssaValue *arg0, ssaValue *arg1) {
@@ -564,9 +576,9 @@ ssaValue *ssa_new_value2v(ssaBlock *b, ssaOp op, Type *t, ExactValue exact_value
 
 ssaValue *ssa_new_value3(ssaBlock *b, ssaOp op, Type *t, ssaValue *arg0, ssaValue *arg1, ssaValue *arg2) {
 	ssaValue *v = ssa_new_value(b->proc, op, t, b);
-	v->args[v->arg_count++] = arg0; arg0->uses++;
-	v->args[v->arg_count++] = arg1; arg1->uses++;
-	v->args[v->arg_count++] = arg2; arg2->uses++;
+	ssa_add_arg(&v->args, arg0);
+	ssa_add_arg(&v->args, arg1);
+	ssa_add_arg(&v->args, arg2);
 	return v;
 }
 ssaValue *ssa_new_value3v(ssaBlock *b, ssaOp op, Type *t, ExactValue exact_value, ssaValue *arg0, ssaValue *arg1, ssaValue *arg2) {
@@ -577,10 +589,10 @@ ssaValue *ssa_new_value3v(ssaBlock *b, ssaOp op, Type *t, ExactValue exact_value
 
 ssaValue *ssa_new_value4(ssaBlock *b, ssaOp op, Type *t, ssaValue *arg0, ssaValue *arg1, ssaValue *arg2, ssaValue *arg3) {
 	ssaValue *v = ssa_new_value(b->proc, op, t, b);
-	v->args[v->arg_count++] = arg0; arg0->uses++;
-	v->args[v->arg_count++] = arg1; arg1->uses++;
-	v->args[v->arg_count++] = arg2; arg2->uses++;
-	v->args[v->arg_count++] = arg3; arg3->uses++;
+	ssa_add_arg(&v->args, arg0);
+	ssa_add_arg(&v->args, arg1);
+	ssa_add_arg(&v->args, arg2);
+	ssa_add_arg(&v->args, arg3);
 	return v;
 }
 
@@ -612,17 +624,10 @@ ssaValue *ssa_const_int(ssaProc *p, Type *t, i64 c) {
 }
 
 void ssa_reset_value_args(ssaValue *v) {
-	if (ssa_op_uses_var_args(v->op)) {
-		for_array(i, v->var_args) {
-			v->var_args.e[i]->uses--;
-		}
-		v->var_args.count = 0;
-	} else {
-		for (isize i = 0; i < v->arg_count; i++) {
-			v->args[i]->uses--;
-		}
-		v->arg_count = 0;
+	for_array(i, v->args) {
+		v->args.e[i]->uses--;
 	}
+	v->args.count = 0;
 }
 
 
@@ -721,6 +726,55 @@ void ssa_emit_comment(ssaProc *p, String s) {
 	// ssa_new_value0v(p->curr_block, ssaOp_Comment, NULL, exact_value_string(s));
 }
 
+#define SSA_MAX_STRUCT_FIELD_COUNT 4
+
+bool can_ssa_type(Type *t) {
+	i64 s = type_size_of(heap_allocator(), t);
+	if (s > 4*build_context.word_size) {
+		return false;
+	}
+	t = core_type(t);
+
+	switch (t->kind) {
+	case Type_Array:
+		return t->Array.count == 0;
+	case Type_Vector:
+		return s < 2*build_context.word_size;
+
+	case Type_DynamicArray:
+		return false;
+	case Type_Map:
+		return false;
+	case Type_Tuple:
+		if (t->Tuple.variable_count > SSA_MAX_STRUCT_FIELD_COUNT) {
+			return false;
+		}
+		for (isize i = 0; i < t->Tuple.variable_count; i++) {
+			if (!can_ssa_type(t->Tuple.variables[i]->type)) {
+				return false;
+			}
+		}
+		return true;
+	case Type_Record:
+		if (t->Record.kind == TypeRecord_Union) {
+			return false;
+		} else if (t->Record.kind == TypeRecord_Struct) {
+			if (t->Record.field_count > SSA_MAX_STRUCT_FIELD_COUNT) {
+				return false;
+			}
+			for (isize i = 0; i < t->Record.field_count; i++) {
+				if (!can_ssa_type(t->Record.fields[i]->type)) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+	return true;
+}
+
+
+
 void ssa_build_stmt(ssaProc *p, AstNode *node);
 void ssa_build_stmt_list(ssaProc *p, AstNodeArray nodes);
 
@@ -815,7 +869,7 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 
 
 Type *ssa_proper_type(Type *t) {
-	t = default_type(base_type(base_enum_type(t)));
+	t = default_type(core_type(t));
 
 	if (t->kind == Type_Basic) {
 		switch (t->Basic.kind) {
@@ -1041,7 +1095,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 	GB_ASSERT_NOT_NULL(tv);
 
 	if (tv->value.kind != ExactValue_Invalid) {
-		Type *t = base_type(base_enum_type(tv->type));
+		Type *t = core_type(tv->type);
 		if (is_type_boolean(t)) {
 			return ssa_const_bool(p, tv->type, tv->value.value_bool);
 		} else if (is_type_string(t)) {
@@ -1675,16 +1729,9 @@ void ssa_print_reg_value(gbFile *f, ssaValue *v) {
 
 	ssa_print_exact_value(f, v);
 
-	if (ssa_op_uses_var_args(v->op)) {
-		for_array(i, v->var_args) {
-			gb_fprintf(f, " ");
-			ssa_print_value(f, v->var_args.e[i]);
-		}
-	} else {
-		for (isize i = 0; i < v->arg_count; i++) {
-			gb_fprintf(f, " ");
-			ssa_print_value(f, v->args[i]);
-		}
+	for_array(i, v->args) {
+		gb_fprintf(f, " ");
+		ssa_print_value(f, v->args.e[i]);
 	}
 
 	if (v->comment_string.len > 0) {
@@ -1733,21 +1780,11 @@ void ssa_print_proc(gbFile *f, ssaProc *p) {
 					continue;
 				}
 				bool skip = false;
-				if (ssa_op_uses_var_args(v->op)) {
-					for_array(k, v->var_args) {
-						ssaValue *w = v->var_args.e[k];
-						if (w != NULL && w->block == b && !printed[w->id]) {
-							skip = true;
-							break;
-						}
-					}
-				} else {
-					for (isize k = 0; k < v->arg_count; k++) {
-						ssaValue *w = v->args[k];
-						if (w != NULL && w->block == b && !printed[w->id]) {
-							skip = true;
-							break;
-						}
+				for_array(k, v->args) {
+					ssaValue *w = v->args.e[k];
+					if (w != NULL && w->block == b && !printed[w->id]) {
+						skip = true;
+						break;
 					}
 				}
 

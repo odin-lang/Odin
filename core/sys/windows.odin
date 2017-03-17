@@ -2,6 +2,7 @@
 #foreign_system_library "user32.lib"   when ODIN_OS == "windows";
 #foreign_system_library "gdi32.lib"    when ODIN_OS == "windows";
 #foreign_system_library "winmm.lib"    when ODIN_OS == "windows";
+#foreign_system_library "shell32.lib"  when ODIN_OS == "windows";
 
 Handle    :: rawptr;
 Hwnd      :: Handle;
@@ -181,15 +182,17 @@ GetQueryPerformanceFrequency :: proc() -> i64 {
 	return r;
 }
 
-GetCommandLineA    :: proc() -> ^u8 #foreign kernel32;
-GetSystemMetrics   :: proc(index: i32) -> i32 #foreign kernel32;
-GetCurrentThreadId :: proc() -> u32 #foreign kernel32;
+GetCommandLineA    :: proc() -> ^u8                                 #foreign kernel32;
+GetCommandLineW    :: proc() -> ^u16                                #foreign kernel32;
+GetSystemMetrics   :: proc(index: i32) -> i32                       #foreign kernel32;
+GetCurrentThreadId :: proc() -> u32                                 #foreign kernel32;
+CommandLineToArgvW :: proc(cmd_list: ^u16, num_args: ^i32) -> ^^u16 #foreign shell32;
 
-timeGetTime             :: proc() -> u32 #foreign winmm;
-GetSystemTimeAsFileTime :: proc(system_time_as_file_time: ^Filetime) #foreign kernel32;
+timeGetTime             :: proc() -> u32                                                  #foreign winmm;
+GetSystemTimeAsFileTime :: proc(system_time_as_file_time: ^Filetime)                      #foreign kernel32;
 FileTimeToLocalFileTime :: proc(file_time: ^Filetime, local_file_time: ^Filetime) -> Bool #foreign kernel32;
-FileTimeToSystemTime    :: proc(file_time: ^Filetime, system_time: ^Systemtime) -> Bool #foreign kernel32;
-SystemTimeToFileTime    :: proc(system_time: ^Systemtime, file_time: ^Filetime) -> Bool #foreign kernel32;
+FileTimeToSystemTime    :: proc(file_time: ^Filetime, system_time: ^Systemtime) -> Bool   #foreign kernel32;
+SystemTimeToFileTime    :: proc(system_time: ^Systemtime, file_time: ^Filetime) -> Bool   #foreign kernel32;
 
 // File Stuff
 

@@ -306,7 +306,7 @@ void ir_print_compound_element(irFileBuffer *f, irModule *m, ExactValue v, Type 
 }
 
 void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *type) {
-	type = base_type(base_enum_type(type));
+	type = core_type(type);
 	if (is_type_float(type)) {
 		value = exact_value_to_float(value);
 	} else if (is_type_integer(type)) {

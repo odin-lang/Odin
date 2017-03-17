@@ -1328,8 +1328,8 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value) {
 #if 1
 	// NOTE(bill): Sanity check
-	Type *a = base_type(base_enum_type(type_deref(ir_type(address))));
-	Type *b = base_type(base_enum_type(ir_type(value)));
+	Type *a = core_type(type_deref(ir_type(address)));
+	Type *b = core_type(ir_type(value));
 	if (!is_type_untyped(b)) {
 		GB_ASSERT_MSG(are_types_identical(a, b), "%s %s", type_to_string(a), type_to_string(b));
 	}
@@ -2218,8 +2218,8 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		return value;
 	}
 
-	Type *src = base_type(base_enum_type(src_type));
-	Type *dst = base_type(base_enum_type(t));
+	Type *src = core_type(src_type);
+	Type *dst = core_type(t);
 
 
 	// if (is_type_untyped_nil(src) && type_has_nil(dst)) {
