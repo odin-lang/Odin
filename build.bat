@@ -44,10 +44,9 @@ del *.ilk > NUL 2> NUL
 
 cl %compiler_settings% "src\main.c" ^
 	/link %linker_settings% -OUT:%exe_name% ^
-	&& odin build code/metagen.odin ^
-	&& call "code\metagen.exe" "src\ast_nodes.metagen"
-	rem && odin build code/markdown.odin ^
-	rem && call "code\markdown.exe" "misc\example.md"
+	&& odin run code/demo.odin
+	rem && odin build code/metagen.odin ^
+	rem && call "code\metagen.exe" "src\ast_nodes.metagen"
 	rem && odin run code/Jaze/src/main.odin
 
 del *.obj > NUL 2> NUL

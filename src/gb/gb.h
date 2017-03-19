@@ -811,6 +811,10 @@ GB_DEF void const *gb_memrchr   (void const *data, u8 byte_value, isize size);
 #define gb_memcopy_array(dst, src, count) gb_memcopy((dst), (src), gb_size_of(*(dst))*(count))
 #endif
 
+#ifndef gb_memmove_array
+#define gb_memmove_array(dst, src, count) gb_memmove((dst), (src), gb_size_of(*(dst))*(count))
+#endif
+
 // NOTE(bill): Very similar to doing `*cast(T *)(&u)`
 #ifndef GB_BIT_CAST
 #define GB_BIT_CAST(dest, source) do { \

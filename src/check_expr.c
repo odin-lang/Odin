@@ -272,6 +272,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 
 		if (operand->mode == Addressing_Builtin) {
 			// TODO(bill): is this a good enough error message?
+			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error_node(operand->expr,
 			           "Cannot assign builtin procedure `%s` in %.*s",
 			           expr_str,
@@ -379,7 +380,8 @@ isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 				Entity **found = map_entity_get(&entity_map, key);
 				if (found != NULL) {
 					Entity *e = *found;
-					// TODO(bill): Scope checking already checks the declaration
+					// NOTE(bill): Scope checking already checks the declaration but in many cases, this can happen so why not?
+					// This may be a little janky but it's not really that much of a problem
 					error(name_token, "`%.*s` is already declared in this type", LIT(name_token.string));
 					error(e->token,   "\tpreviously declared");
 				} else {
@@ -604,16 +606,11 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 		{
 			ast_node(fl, FieldList, f->list);
 
-			// TODO(bill): Just do a gb_memcopy here
 			// NOTE(bill): Copy the contents for the common fields for now
 			AstNodeArray list = {0};
 			array_init_count(&list, c->allocator, ut->fields.count+fl->list.count);
-			for (isize j = 0; j < ut->fields.count; j++) {
-				list.e[j] = ut->fields.e[j];
-			}
-			for (isize j = 0; j < fl->list.count; j++) {
-				list.e[j+ut->fields.count] = fl->list.e[j];
-			}
+			gb_memmove_array(list.e, ut->fields.e, ut->fields.count);
+			gb_memmove_array(list.e+ut->fields.count, fl->list.e, fl->list.count);
 
 			isize list_count = 0;
 			for_array(j, list) {
@@ -654,7 +651,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 		HashKey key = hash_string(name_token.string);
 		if (map_entity_get(&entity_map, key) != NULL) {
-			// TODO(bill): Scope checking already checks the declaration
+			// NOTE(bill): Scope checking already checks the declaration
 			error(name_token, "`%.*s` is already declared in this union", LIT(name_token.string));
 		} else {
 			map_entity_set(&entity_map, key, e);
@@ -1142,10 +1139,10 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 		}
 		break;
 
-	case Entity_TypeName: {
+	case Entity_TypeName:
+		// NOTE(bill): Cyclical dependency checking is handled in the "type system" not here
 		o->mode = Addressing_Type;
-		// TODO(bill): Fix cyclical dependancy checker
-	} break;
+		break;
 
 	case Entity_Procedure:
 		o->mode = Addressing_Value;
@@ -1164,6 +1161,10 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 	case Entity_LibraryName:
 		error_node(n, "Use of library `%.*s` not in #foreign tag", LIT(name));
 		return e;
+
+	case Entity_Label:
+		o->mode = Addressing_NoValue;
+		break;
 
 	case Entity_Nil:
 		o->mode = Addressing_Value;
@@ -1691,7 +1692,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		if (s < 64) {
 			umax = (1ull << s) - 1ull;
 		} else {
-			// TODO(bill): I NEED A PROPER BIG NUMBER LIBRARY THAT CAN SUPPORT 128 bit integers and floats
+			// IMPORTANT TODO(bill): I NEED A PROPER BIG NUMBER LIBRARY THAT CAN SUPPORT 128 bit integers and floats
 			s = 64;
 		}
 		i64 imax = (1ll << (s-1ll));
@@ -2884,7 +2885,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		operand->value = entity->Constant.value;
 		break;
 	case Entity_Variable:
-		// TODO(bill): This is the rule I need?
+		// TODO(bill): Is this the rule I need?
 		if (operand->mode == Addressing_Immutable) {
 			// Okay
 		} else if (sel.indirect || operand->mode != Addressing_Value) {
@@ -3073,9 +3074,11 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	case BuiltinProc_clear: {
 		Type *type = operand->type;
-		if (!is_type_dynamic_array(type) && !is_type_map(type)) {
+		bool is_pointer = is_type_pointer(type);
+		type = base_type(type_deref(type));
+		if (!is_type_dynamic_array(type) && !is_type_map(type) && !is_type_slice(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a map or dynamic array, got `%s`", str);
+			error_node(operand->expr, "Invalid type for `clear`, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
@@ -3107,14 +3110,12 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		Type *elem = NULL;
-		Type *slice_elem = NULL;
 		if (is_type_dynamic_array(type)) {
-			// TODO(bill): Semi-memory leaks
 			elem = type->DynamicArray.elem;
 		} else {
 			elem = type->Slice.elem;
 		}
-		slice_elem = make_type_slice(c->allocator, elem);
+		Type *slice_elem = make_type_slice(c->allocator, elem);
 
 		Type *proc_type_params = make_type_tuple(c->allocator);
 		proc_type_params->Tuple.variables = gb_alloc_array(c->allocator, Entity *, 2);
@@ -3501,113 +3502,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_Value;
 	} break;
 
-#if 0
-	case BuiltinProc_ptr_offset: {
-		// ptr_offset :: proc(ptr: ^T, offset: int) -> ^T
-		// ^T cannot be rawptr
-		Type *ptr_type = base_type(operand->type);
-		if (!is_type_pointer(ptr_type)) {
-			gbString type_str = type_to_string(operand->type);
-			defer (gb_string_free(type_str));
-			error_node(call,
-			      "Expected a pointer to `ptr_offset`, got `%s`",
-			      type_str);
-			return false;
-		}
-
-		if (ptr_type == t_rawptr) {
-			error_node(call,
-			      "`rawptr` cannot have pointer arithmetic");
-			return false;
-		}
-
-		AstNode *offset = ce->args.e[1];
-		Operand op = {0};
-		check_expr(c, &op, offset);
-		if (op.mode == Addressing_Invalid)
-			return false;
-		Type *offset_type = base_type(op.type);
-		if (!is_type_integer(offset_type)) {
-			error_node(op.expr, "Pointer offsets for `ptr_offset` must be an integer");
-			return false;
-		}
-
-		if (operand->mode == Addressing_Constant &&
-		    op.mode == Addressing_Constant) {
-			i64 ptr = operand->value.value_pointer;
-			i64 elem_size = type_size_of(c->allocator, ptr_type->Pointer.elem);
-			ptr += elem_size * op.value.value_integer;
-			operand->value.value_pointer = ptr;
-		} else {
-			operand->mode = Addressing_Value;
-		}
-
-	} break;
-
-	case BuiltinProc_ptr_sub: {
-		// ptr_sub :: proc(a, b: ^T) -> int
-		// ^T cannot be rawptr
-		Type *ptr_type = base_type(operand->type);
-		if (!is_type_pointer(ptr_type)) {
-			gbString type_str = type_to_string(operand->type);
-			defer (gb_string_free(type_str));
-			error_node(call,
-			      "Expected a pointer to `ptr_add`, got `%s`",
-			      type_str);
-			return false;
-		}
-
-		if (ptr_type == t_rawptr) {
-			error_node(call,
-			      "`rawptr` cannot have pointer arithmetic");
-			return false;
-		}
-		AstNode *offset = ce->args[1];
-		Operand op = {0};
-		check_expr(c, &op, offset);
-		if (op.mode == Addressing_Invalid)
-			return false;
-		if (!is_type_pointer(op.type)) {
-			gbString type_str = type_to_string(operand->type);
-			defer (gb_string_free(type_str));
-			error_node(call,
-			      "Expected a pointer to `ptr_add`, got `%s`",
-			      type_str);
-			return false;
-		}
-
-		if (base_type(op.type) == t_rawptr) {
-			error_node(call,
-			      "`rawptr` cannot have pointer arithmetic");
-			return false;
-		}
-
-		if (!are_types_identical(operand->type, op.type)) {
-			gbString a = type_to_string(operand->type);
-			gbString b = type_to_string(op.type);
-			defer (gb_string_free(a));
-			defer (gb_string_free(b));
-			error_node(op.expr,
-			      "`ptr_sub` requires to pointer of the same type. Got `%s` and `%s`.", a, b);
-			return false;
-		}
-
-		operand->type = t_int;
-
-		if (operand->mode == Addressing_Constant &&
-		    op.mode == Addressing_Constant) {
-			u8 *ptr_a = cast(u8 *)operand->value.value_pointer;
-			u8 *ptr_b = cast(u8 *)op.value.value_pointer;
-			isize elem_size = type_size_of(c->allocator, ptr_type->Pointer.elem);
-			operand->value = exact_value_integer((ptr_a - ptr_b) / elem_size);
-		} else {
-			operand->mode = Addressing_Value;
-		}
-	} break;
-#endif
-
 	case BuiltinProc_slice_ptr: {
 		// slice_ptr :: proc(a: ^T, len: int) -> []T
+		// slice_ptr :: proc(a: ^T, len, cap: int) -> []T
 		// ^T cannot be rawptr
 		Type *ptr_type = base_type(operand->type);
 		if (!is_type_pointer(ptr_type)) {
@@ -3625,21 +3522,28 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 
-		AstNode *len = ce->args.e[1];
+		isize arg_count = ce->args.count;
+		if (arg_count < 2 || 3 < arg_count) {
+			error_node(ce->args.e[0], "`slice_ptr` expects 2 or 3 arguments, found %td", arg_count);
+			// NOTE(bill): Return the correct type to reduce errors
+		} else {
+			// If any are constant
+			i64 sizes[2] = {0};
+			isize size_count = 0;
+			for (isize i = 1; i < arg_count; i++) {
+				i64 val = 0;
+				bool ok = check_index_value(c, ce->args.e[i], -1, &val);
+				if (ok && val >= 0) {
+					GB_ASSERT(size_count < gb_count_of(sizes));
+					sizes[size_count++] = val;
+				}
+			}
 
-		Operand op = {0};
-		check_expr(c, &op, len);
-		if (op.mode == Addressing_Invalid)
-			return false;
-		if (!is_type_integer(op.type)) {
-			gbString type_str = type_to_string(operand->type);
-			error_node(call,
-			      "Length for `slice_ptr` must be an integer, got `%s`",
-			      type_str);
-			gb_string_free(type_str);
-			return false;
+			if (size_count == 2 && sizes[0] > sizes[1]) {
+				error_node(ce->args.e[1], "`slice_ptr` count and capacity are swapped");
+				// No need quit
+			}
 		}
-
 		operand->type = make_type_slice(c->allocator, ptr_type->Pointer.elem);
 		operand->mode = Addressing_Value;
 	} break;
@@ -4491,13 +4395,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case_end;
 
 	case_ast_node(te, TernaryExpr, node);
-		if (c->proc_stack.count == 0) {
-			error_node(node, "A ternary expression is only allowed within a procedure");
-			goto error;
-		}
-		Operand operand = {Addressing_Invalid};
-		check_expr(c, &operand, te->cond);
-		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
+		Operand cond = {Addressing_Invalid};
+		check_expr(c, &cond, te->cond);
+		if (cond.mode != Addressing_Invalid && !is_type_boolean(cond.type)) {
 			error_node(te->cond, "Non-boolean condition in if expression");
 		}
 
@@ -4539,6 +4439,20 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 		o->type = x.type;
 		o->mode = Addressing_Value;
+
+		if (cond.mode == Addressing_Constant && is_type_boolean(cond.type) &&
+		    x.mode == Addressing_Constant &&
+		    y.mode == Addressing_Constant) {
+
+			o->mode = Addressing_Constant;
+
+			if (cond.value.value_bool) {
+				o->value = x.value;
+			} else {
+				o->value = y.value;
+			}
+		}
+
 	case_end;
 
 	case_ast_node(cl, CompoundLit, node);

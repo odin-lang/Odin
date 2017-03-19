@@ -87,14 +87,8 @@ void array__set_capacity(void *ptr, isize capacity, isize element_size) {
 		x->count = capacity;
 	}
 
-	{
-		// TODO(bill): Resize rather than copy and delete
-		void *new_data = gb_alloc(x->allocator, element_size*capacity);
-		gb_memmove(new_data, x->e, element_size*x->count);
-		gb_free(x->allocator, x->e);
-		x->capacity = capacity;
-		x->e = new_data;
-	}
+	x->e = gb_resize(x->allocator, x->e, element_size*x->capacity, element_size*capacity);
+	x->capacity = capacity;
 }
 
 

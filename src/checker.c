@@ -98,7 +98,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 
 	// {STR_LIT("ptr_offset"),       2, false, Expr_Expr},
 	// {STR_LIT("ptr_sub"),          2, false, Expr_Expr},
-	{STR_LIT("slice_ptr"),        2, false,  Expr_Expr},
+	{STR_LIT("slice_ptr"),        2, true,   Expr_Expr},
 	{STR_LIT("slice_to_bytes"),   1, false,  Expr_Stmt},
 
 	{STR_LIT("min"),              2, false, Expr_Expr},
@@ -163,6 +163,11 @@ bool is_operand_nil(Operand o) {
 }
 
 
+typedef struct BlockLabel {
+	String   name;
+	AstNode *label; // AstNode_Label
+} BlockLabel;
+
 // DeclInfo is used to store information of certain declarations to allow for "any order" usage
 typedef struct DeclInfo {
 	Scope *scope;
@@ -175,16 +180,19 @@ typedef struct DeclInfo {
 	AstNode *proc_lit; // AstNode_ProcLit
 
 	MapBool deps; // Key: Entity *
+	Array(BlockLabel) labels;
 } DeclInfo;
 
 // ProcedureInfo stores the information needed for checking a procedure
+
+
 typedef struct ProcedureInfo {
-	AstFile * file;
-	Token     token;
-	DeclInfo *decl;
-	Type *    type; // Type_Procedure
-	AstNode * body; // AstNode_BlockStmt
-	u32       tags;
+	AstFile *             file;
+	Token                 token;
+	DeclInfo *            decl;
+	Type *                type; // Type_Procedure
+	AstNode *             body; // AstNode_BlockStmt
+	u32                   tags;
 } ProcedureInfo;
 
 // ExprInfo stores information used for "untyped" expressions
@@ -320,6 +328,7 @@ typedef Array(DelayedEntity) DelayedEntities;
 void init_declaration_info(DeclInfo *d, Scope *scope) {
 	d->scope = scope;
 	map_bool_init(&d->deps, heap_allocator());
+	array_init(&d->labels,  heap_allocator());
 }
 
 DeclInfo *make_declaration_info(gbAllocator a, Scope *scope) {
@@ -455,6 +464,9 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 		if (found) {
 			Entity *e = *found;
 			if (gone_thru_proc) {
+				if (e->kind == Entity_Label) {
+					continue;
+				}
 				if (e->kind == Entity_Variable &&
 				    !e->scope->is_file &&
 				    !e->scope->is_global) {

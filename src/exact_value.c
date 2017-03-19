@@ -82,6 +82,7 @@ ExactValue exact_value_integer_from_string(String string) {
 		case 'b': base = 2;  has_prefix = true; break;
 		case 'o': base = 8;  has_prefix = true; break;
 		case 'd': base = 10; has_prefix = true; break;
+		case 'z': base = 12; has_prefix = true; break;
 		case 'x': base = 16; has_prefix = true; break;
 		}
 	}
@@ -100,14 +101,10 @@ ExactValue exact_value_integer_from_string(String string) {
 			continue;
 		}
 		i64 v = 0;
-		if (gb_char_is_digit(r)) {
-			v = r - '0';
-		} else if (gb_char_is_hex_digit(r)) {
-			v = gb_hex_digit_to_int(r);
-		} else {
+		v = digit_value(r);
+		if (v >= base) {
 			break;
 		}
-
 		result *= base;
 		result += v;
 	}
@@ -137,10 +134,10 @@ ExactValue exact_value_float_from_string(String string) {
 		if (r == '_') {
 			continue;
 		}
-		if (!gb_char_is_digit(r)) {
+		i64 v = digit_value(r);
+		if (v >= 10) {
 			break;
 		}
-		i64 v = r - '0';
 		value *= 10.0;
 		value += v;
 	}
@@ -153,29 +150,38 @@ ExactValue exact_value_float_from_string(String string) {
 			if (r == '_') {
 				continue;
 			}
-			if (!gb_char_is_digit(r)) {
+			i64 v = digit_value(r);
+			if (v >= 10) {
 				break;
 			}
-			value += (r-'0')/pow10;
+			value += v/pow10;
 			pow10 *= 10.0;
 		}
 	}
 
-	f64 frac = 0;
+	bool frac = false;
 	f64 scale = 1.0;
 	if ((str[i] == 'e') || (str[i] == 'E')) {
 		i++;
 
 		if (str[i] == '-') {
-			frac = 1;
+			frac = true;
 			i++;
 		} else if (str[i] == '+') {
 			i++;
 		}
 
-		u32 exp;
-		for (exp = 0; gb_char_is_digit(str[i]); i++) {
-			exp = exp * 10 + (str[i]-'0');
+		u32 exp = 0;
+		for (; i < len; i++) {
+			Rune r = cast(Rune)str[i];
+			if (r == '_') {
+				continue;
+			}
+			u32 d = cast(u32)digit_value(r);
+			if (d >= 10) {
+				break;
+			}
+			exp = exp * 10 + d;
 		}
 		if (exp > 308) exp = 308;
 

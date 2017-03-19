@@ -12,6 +12,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 			gbString expr_str = expr_to_string(operand->expr);
 
 			// TODO(bill): is this a good enough error message?
+			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error_node(operand->expr,
 			      "Cannot assign builtin procedure `%s` in %.*s",
 			      expr_str,
@@ -275,12 +276,6 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 		if (is_foreign) {
 			error_node(pd->body, "A procedure tagged as `#foreign` cannot have a body");
 		}
-
-		// TODO(bill): Is this the best option? What about passing to external shit?!
-		// if (proc_type->Proc.calling_convention != ProcCC_Odin) {
-		// 	error_node(d->proc_lit, "An internal procedure may only have the Odin calling convention");
-		// 	proc_type->Proc.calling_convention = ProcCC_Odin;
-		// }
 
 		d->scope = c->context.scope;
 

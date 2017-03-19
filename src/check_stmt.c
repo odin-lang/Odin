@@ -307,16 +307,21 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 	return rhs->type;
 }
 
-bool check_valid_type_match_type(Type *type, bool *is_union_ptr, bool *is_any) {
-	if (is_type_pointer(type)) {
-		*is_union_ptr = is_type_union(type_deref(type));
-		return *is_union_ptr;
+typedef enum MatchTypeKind {
+	MatchType_Invalid,
+	MatchType_Union,
+	MatchType_Any,
+} MatchTypeKind;
+
+MatchTypeKind check_valid_type_match_type(Type *type) {
+	type = type_deref(type);
+	if (is_type_union(type)) {
+		return MatchType_Union;
 	}
 	if (is_type_any(type)) {
-		*is_any = true;
-		return *is_any;
+		return MatchType_Any;
 	}
-	return false;
+	return MatchType_Invalid;
 }
 
 void check_stmt_internal(Checker *c, AstNode *node, u32 flags);
@@ -382,6 +387,47 @@ void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
 			error_node(ws->else_stmt, "Invalid `else` statement in `when` statement");
 			break;
 		}
+	}
+}
+
+void check_label(Checker *c, AstNode *label) {
+	if (label == NULL) {
+		return;
+	}
+	ast_node(l, Label, label);
+	if (l->name->kind != AstNode_Ident) {
+		error_node(l->name, "A label's name must be an identifier");
+		return;
+	}
+	String name = l->name->Ident.string;
+	if (str_eq(name, str_lit("_"))) {
+		error_node(l->name, "A label's name cannot be a blank identifier");
+		return;
+	}
+
+
+	if (c->proc_stack.count == 0) {
+		error_node(l->name, "A label is only allowed within a procedure");
+		return;
+	}
+	GB_ASSERT(c->context.decl != NULL);
+
+	bool ok = true;
+	for_array(i, c->context.decl->labels) {
+		BlockLabel bl = c->context.decl->labels.e[i];
+		if (str_eq(bl.name, name)) {
+			error_node(label, "Duplicate label with the name `%.*s`", LIT(name));
+			ok = false;
+			break;
+		}
+	}
+
+	Entity *e = make_entity_label(c->allocator, c->context.scope, l->name->Ident, t_invalid, label);
+	add_entity(c, c->context.scope, l->name, e);
+
+	if (ok) {
+		BlockLabel bl = {name, label};
+		array_add(&c->context.decl->labels, bl);
 	}
 }
 
@@ -475,9 +521,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				return;
 			}
 
-			// TODO(bill): This is a very similar to check_init_variables, should I merge the two some how or just
-			// leave it?
-
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
 			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
@@ -515,7 +558,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				error(op, "Unknown Assignment operation `%.*s`", LIT(op.string));
 				return;
 			}
-			// TODO(bill): Check if valid assignment operator
 			Operand operand = {Addressing_Invalid};
 			AstNode binary_expr = {AstNode_BinaryExpr};
 			ast_node(be, BinaryExpr, &binary_expr);
@@ -580,7 +622,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		if (c->context.in_defer) {
 			error(rs->token, "You cannot `return` within a defer statement");
-			// TODO(bill): Should I break here?
 			break;
 		}
 
@@ -619,7 +660,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(fs, ForStmt, node);
 		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
+
 		check_open_scope(c, node);
+		check_label(c, fs->label); // TODO(bill): What should the label's "scope" be?
 
 		if (fs->init != NULL) {
 			check_stmt(c, fs->init, 0);
@@ -647,6 +690,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	case_ast_node(rs, RangeStmt, node);
 		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 		check_open_scope(c, node);
+
+		check_label(c, rs->label);
 
 		Type *val = NULL;
 		Type *idx = NULL;
@@ -718,7 +763,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				case Token_Ellipsis: op = Token_Lt; break;
 				default: error(ie->op, "Invalid range operator"); break;
 				}
-				bool ok = compare_exact_values(Token_Lt, a, b);
+				bool ok = compare_exact_values(op, a, b);
 				if (!ok) {
 					// TODO(bill): Better error message
 					error(ie->op, "Invalid interval range");
@@ -982,8 +1027,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		mod_flags |= Stmt_BreakAllowed;
 		check_open_scope(c, node);
 
-		bool is_union_ptr = false;
-		bool is_any = false;
+		MatchTypeKind match_type_kind = MatchType_Invalid;
 
 		if (ms->tag->kind != AstNode_AssignStmt) {
 			error_node(ms->tag, "Expected an `in` assignment for this type match statement");
@@ -1005,7 +1049,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		check_expr(c, &x, rhs);
 		check_assignment(c, &x, NULL, str_lit("type match expression"));
-		if (!check_valid_type_match_type(x.type, &is_union_ptr, &is_any)) {
+		match_type_kind = check_valid_type_match_type(x.type);
+		if (check_valid_type_match_type(x.type) == MatchType_Invalid) {
 			gbString str = type_to_string(x.type);
 			error_node(x.expr,
 			           "Invalid type for this type match expression, got `%s`", str);
@@ -1062,14 +1107,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			// TODO(bill): Make robust
 			Type *bt = base_type(type_deref(x.type));
 
-
 			AstNode *type_expr = cc->list.count > 0 ? cc->list.e[0] : NULL;
 			Type *case_type = NULL;
 			if (type_expr != NULL) { // Otherwise it's a default expression
 				Operand y = {0};
 				check_expr_or_type(c, &y, type_expr);
 
-				if (is_union_ptr) {
+				if (match_type_kind == MatchType_Union) {
 					GB_ASSERT(is_type_union(bt));
 					bool tag_type_found = false;
 					for (isize i = 0; i < bt->Record.variant_count; i++) {
@@ -1086,7 +1130,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						continue;
 					}
 					case_type = y.type;
-				} else if (is_any) {
+				} else if (match_type_kind == MatchType_Any) {
 					case_type = y.type;
 				} else {
 					GB_PANIC("Unknown type to type match statement");
@@ -1110,11 +1154,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			check_open_scope(c, stmt);
 			if (case_type == NULL) {
-				if (is_union_ptr) {
-					case_type = type_deref(x.type);
-				} else {
-					case_type = x.type;
-				}
+				case_type = type_deref(x.type);
 			}
 
 			add_type_info_type(c, case_type);
@@ -1122,7 +1162,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			{
 				// NOTE(bill): Dummy type
 				Type *tt = case_type;
-				if (is_union_ptr) {
+				if (is_type_pointer(x.type)) {
 					tt = make_type_pointer(c->allocator, case_type);
 					add_type_info_type(c, tt);
 				}
@@ -1173,20 +1213,38 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			error(token, "Invalid AST: Branch Statement `%.*s`", LIT(token.string));
 			break;
 		}
+
+		if (bs->label != NULL) {
+			if (bs->label->kind != AstNode_Ident) {
+				error_node(bs->label, "A branch statement's label name must be an identifier");
+				return;
+			}
+			AstNode *ident = bs->label;
+			String name = ident->Ident.string;
+			Entity *e = scope_lookup_entity(c->context.scope, name);
+			if (e == NULL) {
+				error_node(ident, "Undeclared label name: %.*s", LIT(name));
+				return;
+			}
+			add_entity_use(c, ident, e);
+			if (e->kind != Entity_Label) {
+				error_node(ident, "`%.*s` is not a label", LIT(name));
+				return;
+			}
+		}
+
 	case_end;
 
 	case_ast_node(us, UsingStmt, node);
-		switch (us->node->kind) {
-		default:
-			// TODO(bill): Better error message for invalid using statement
-			error(us->token, "Invalid `using` statement");
-			break;
-		case_ast_node(es, ExprStmt, us->node);
-			// TODO(bill): Allow for just a LHS expression list rather than this silly code
+		if (us->list.count == 0) {
+			error(us->token, "Empty `using` list");
+			return;
+		}
+		for_array(i, us->list) {
+			AstNode *expr = unparen_expr(us->list.e[0]);
 			Entity *e = NULL;
 
 			bool is_selector = false;
-			AstNode *expr = unparen_expr(es->expr);
 			if (expr->kind == AstNode_Ident) {
 				String name = expr->Ident.string;
 				e = scope_lookup_entity(c->context.scope, name);
@@ -1194,11 +1252,14 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				Operand o = {0};
 				e = check_selector(c, &o, expr, NULL);
 				is_selector = true;
+			} else if (expr->kind == AstNode_Implicit) {
+				error(us->token, "`using` applied to an implicit value");
+				continue;
 			}
 
 			if (e == NULL) {
 				error(us->token, "`using` applied to an unknown entity");
-				return;
+				continue;
 			}
 
 			switch (e->kind) {
@@ -1296,6 +1357,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				error(us->token, "`using` cannot be applied to `nil`");
 				break;
 
+			case Entity_Label:
+				error(us->token, "`using` cannot be applied to a label");
+				break;
+
 			case Entity_Invalid:
 				error(us->token, "`using` cannot be applied to an invalid entity");
 				break;
@@ -1303,11 +1368,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			default:
 				GB_PANIC("TODO(bill): `using` other expressions?");
 			}
-		case_end;
-
 		}
 	case_end;
-
 
 
 	case_ast_node(pa, PushAllocator, node);

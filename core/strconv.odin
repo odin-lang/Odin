@@ -30,9 +30,7 @@ append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
 append_int :: proc(buf: []byte, i: i64, base: int) -> string {
 	return append_bits(buf, cast(u64)i, base, true, 8*size_of(int), digits, 0);
 }
-itoa :: proc(buf: []byte, i: int) -> string {
-	return append_int(buf, cast(i64)i, 10);
-}
+itoa :: proc(buf: []byte, i: int) -> string { return append_int(buf, cast(i64)i, 10); }
 
 append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
 	return cast(string)generic_ftoa(buf, f, fmt, prec, bit_size);

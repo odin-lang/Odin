@@ -295,15 +295,15 @@ bprintln :: proc(buf: ^[]byte, args: ..any) -> int {
 
 sprint :: proc(buf: []byte, args: ..any) -> string {
 	count := bprint(^buf, ..args);
-	return cast(string)buf;
+	return cast(string)buf[..count];
 }
 sprintln :: proc(buf: []byte, args: ..any) -> string {
 	count := bprintln(^buf, ..args);
-	return cast(string)buf;
+	return cast(string)buf[..count];
 }
 sprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
 	count := bprintf(^buf, fmt, ..args);
-	return cast(string)buf;
+	return cast(string)buf[..count];
 }
 
 

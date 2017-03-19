@@ -91,7 +91,7 @@ typedef enum irDeferKind {
 
 typedef struct irDefer {
 	irDeferKind kind;
-	isize         scope_index;
+	isize       scope_index;
 	irBlock *   block;
 	union {
 		AstNode *stmt;
@@ -100,32 +100,41 @@ typedef struct irDefer {
 	};
 } irDefer;
 
+
+typedef struct irBranchBlocks {
+	AstNode *label;
+	irBlock *break_;
+	irBlock *continue_;
+} irBranchBlocks;
+
+
 struct irProcedure {
-	irProcedure *        parent;
-	Array(irProcedure *) children;
+	irProcedure *         parent;
+	Array(irProcedure *)  children;
 
-	Entity *             entity;
-	irModule *           module;
-	String               name;
-	Type *               type;
-	AstNode *            type_expr;
-	AstNode *            body;
-	u64                  tags;
+	Entity *              entity;
+	irModule *            module;
+	String                name;
+	Type *                type;
+	AstNode *             type_expr;
+	AstNode *             body;
+	u64                   tags;
 
-	irValueArray         params;
-	Array(irDefer)       defer_stmts;
-	Array(irBlock *)     blocks;
-	i32                  scope_index;
-	irBlock *            decl_block;
-	irBlock *            entry_block;
-	irBlock *            curr_block;
-	irTargetList *       target_list;
-	irValueArray         referrers;
+	irValueArray          params;
+	Array(irDefer)        defer_stmts;
+	Array(irBlock *)      blocks;
+	i32                   scope_index;
+	irBlock *             decl_block;
+	irBlock *             entry_block;
+	irBlock *             curr_block;
+	irTargetList *        target_list;
+	irValueArray          referrers;
 
+	Array(irBranchBlocks) branch_blocks;
 
-	i32                  local_count;
-	i32                  instr_count;
-	i32                  block_count;
+	i32                   local_count;
+	i32                   instr_count;
+	i32                   block_count;
 };
 
 #define IR_STARTUP_RUNTIME_PROC_NAME "__$startup_runtime"
@@ -1328,10 +1337,10 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value) {
 #if 1
 	// NOTE(bill): Sanity check
-	Type *a = core_type(type_deref(ir_type(address)));
-	Type *b = core_type(ir_type(value));
+	Type *a = type_deref(ir_type(address));
+	Type *b = ir_type(value);
 	if (!is_type_untyped(b)) {
-		GB_ASSERT_MSG(are_types_identical(a, b), "%s %s", type_to_string(a), type_to_string(b));
+		GB_ASSERT_MSG(are_types_identical(core_type(a), core_type(b)), "%s %s", type_to_string(a), type_to_string(b));
 	}
 #endif
 	return ir_emit(p, ir_instr_store(p, address, value));
@@ -1801,8 +1810,8 @@ irValue *ir_emit_array_epi(irProcedure *proc, irValue *s, i32 index) {
 
 irValue *ir_emit_union_tag_ptr(irProcedure *proc, irValue *u) {
 	Type *t = ir_type(u);
-	GB_ASSERT(is_type_pointer(t) &&
-	          is_type_union(type_deref(t)));
+	GB_ASSERT_MSG(is_type_pointer(t) &&
+	              is_type_union(type_deref(t)), "%s", type_to_string(t));
 	irValue *tag_ptr = ir_emit(proc, ir_instr_union_tag_ptr(proc, u));
 	Type *tpt = ir_type(tag_ptr);
 	GB_ASSERT(is_type_pointer(tpt));
@@ -1948,8 +1957,9 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 }
 
 
-irValue *ir_emit_deep_field_gep(irProcedure *proc, Type *type, irValue *e, Selection sel) {
+irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 	GB_ASSERT(sel.index.count > 0);
+	Type *type = type_deref(ir_type(e));
 
 	for_array(i, sel.index) {
 		i32 index = cast(i32)sel.index.e[i];
@@ -1958,7 +1968,7 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, Type *type, irValue *e, Selec
 			e = ir_emit_load(proc, e);
 			e = ir_emit_ptr_offset(proc, e, v_zero); // TODO(bill): Do I need these copies?
 		}
-		type = base_type(type);
+		type = core_type(type);
 
 
 		if (is_type_raw_union(type)) {
@@ -2005,7 +2015,7 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, Type *type, irValue *e, Selec
 			case 2: e = ir_emit_struct_ep(proc, e, 3); break; // allocator
 			}
 		} else {
-			GB_PANIC("un-gep-able type");
+			GB_PANIC("un-gep-able type %s", type_to_string(type));
 		}
 	}
 
@@ -2013,8 +2023,9 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, Type *type, irValue *e, Selec
 }
 
 
-irValue *ir_emit_deep_field_ev(irProcedure *proc, Type *type, irValue *e, Selection sel) {
+irValue *ir_emit_deep_field_ev(irProcedure *proc, irValue *e, Selection sel) {
 	GB_ASSERT(sel.index.count > 0);
+	Type *type = ir_type(e);
 
 	for_array(i, sel.index) {
 		i32 index = cast(i32)sel.index.e[i];
@@ -2359,7 +2370,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 					if (src_is_ptr) {
 						value = ir_emit_load(proc, value);
 					}
-					return ir_emit_deep_field_ev(proc, sb, value, sel);
+					return ir_emit_deep_field_ev(proc, value, sel);
 				}
 			}
 		}
@@ -3368,8 +3379,13 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 				case BuiltinProc_clear: {
 					ir_emit_comment(proc, str_lit("clear"));
-					irValue *ptr = ir_build_addr(proc, ce->args.e[0]).addr;
-					Type *t = base_type(type_deref(ir_type(ptr)));
+					Type *original_type = type_of_expr(proc->module->info, ce->args.e[0]);
+					irAddr addr = ir_build_addr(proc, ce->args.e[0]);
+					irValue *ptr = addr.addr;
+					if (is_type_pointer(original_type)) {
+						ptr = ir_addr_load(proc, addr);
+					}
+					Type *t = base_type(type_deref(original_type));
 					if (is_type_dynamic_array(t)) {
 						irValue *count_ptr = ir_emit_struct_ep(proc, ptr, 1);
 						ir_emit_store(proc, count_ptr, v_zero);
@@ -3378,6 +3394,9 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 						irValue *ea = ir_emit_struct_ep(proc, ptr, 1);
 						ir_emit_store(proc, ir_emit_struct_ep(proc, ha, 1), v_zero);
 						ir_emit_store(proc, ir_emit_struct_ep(proc, ea, 1), v_zero);
+					} else if (is_type_slice(t)) {
+						irValue *count_ptr = ir_emit_struct_ep(proc, ptr, 1);
+						ir_emit_store(proc, count_ptr, v_zero);
 					} else {
 						GB_PANIC("TODO(bill): ir clear for `%s`", type_to_string(t));
 					}
@@ -3627,10 +3646,15 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					irValue *ptr = ir_build_expr(proc, ce->args.e[0]);
 					irValue *count = ir_build_expr(proc, ce->args.e[1]);
 					count = ir_emit_conv(proc, count, t_int);
+					irValue *capacity = count;
+					if (ce->args.count > 2) {
+						capacity = ir_build_expr(proc, ce->args.e[2]);
+						capacity = ir_emit_conv(proc, capacity, t_int);
+					}
 
 					Type *slice_type = make_type_slice(proc->module->allocator, type_deref(ir_type(ptr)));
 					irValue *slice = ir_add_local_generated(proc, slice_type);
-					ir_fill_slice(proc, slice, ptr, count, count);
+					ir_fill_slice(proc, slice, ptr, count, capacity);
 					return ir_emit_load(proc, slice);
 				} break;
 
@@ -3809,7 +3833,8 @@ irValue *ir_get_using_variable(irProcedure *proc, Entity *e) {
 		v = ir_build_addr(proc, e->using_expr).addr;
 	}
 	GB_ASSERT(v != NULL);
-	return ir_emit_deep_field_gep(proc, parent->type, v, sel);
+	GB_ASSERT(parent->type == type_deref(ir_type(v)));
+	return ir_emit_deep_field_gep(proc, v, sel);
 }
 
 // irValue *ir_add_using_variable(irProcedure *proc, Entity *e) {
@@ -3925,7 +3950,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			GB_ASSERT(sel.entity != NULL);
 
 			irValue *a = ir_build_addr(proc, se->expr).addr;
-			a = ir_emit_deep_field_gep(proc, type, a, sel);
+			a = ir_emit_deep_field_gep(proc, a, sel);
 			return ir_addr(a);
 		} else {
 			Type *type = base_type(type_of_expr(proc->module->info, se->expr));
@@ -3937,7 +3962,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			GB_ASSERT(sel.entity != NULL);
 
 			irValue *a = ir_build_addr(proc, se->expr).addr;
-			a = ir_emit_deep_field_gep(proc, type, a, sel);
+			a = ir_emit_deep_field_gep(proc, a, sel);
 			return ir_addr(a);
 		}
 	case_end;
@@ -4032,7 +4057,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			if (using_field != NULL) {
 				Selection sel = lookup_field(a, t, using_field->token.string, false);
 				irValue *e = ir_build_addr(proc, ie->expr).addr;
-				using_addr = ir_emit_deep_field_gep(proc, t, e, sel);
+				using_addr = ir_emit_deep_field_gep(proc, e, sel);
 
 				t = using_field->type;
 			}
@@ -4817,6 +4842,44 @@ void ir_build_range_interval(irProcedure *proc, AstNodeIntervalExpr *node, Type 
 	if (done_) *done_ = done;
 }
 
+void ir_set_label_blocks(irProcedure *proc, AstNode *label, irBlock *break_, irBlock *continue_) {
+	if (label == NULL) {
+		return;
+	}
+	GB_ASSERT(label->kind == AstNode_Label);
+
+
+	for_array(i, proc->branch_blocks) {
+		irBranchBlocks *b = &proc->branch_blocks.e[i];
+		GB_ASSERT(b->label != NULL && label != NULL);
+		GB_ASSERT(b->label->kind == AstNode_Label);
+		if (b->label == label) {
+			b->break_    = break_;
+			b->continue_ = continue_;
+			return;
+		}
+	}
+
+	GB_PANIC("ir_set_label_blocks: Unreachable");
+}
+
+irBranchBlocks ir_lookup_branch_blocks(irProcedure *proc, AstNode *ident) {
+	GB_ASSERT(ident->kind == AstNode_Ident);
+	Entity **found = map_entity_get(&proc->module->info->uses, hash_pointer(ident));
+	GB_ASSERT(found != NULL);
+	Entity *e = *found;
+	GB_ASSERT(e->kind == Entity_Label);
+	for_array(i, proc->branch_blocks) {
+		irBranchBlocks *b = &proc->branch_blocks.e[i];
+		if (b->label == e->Label.node) {
+			return *b;
+		}
+	}
+
+	GB_PANIC("Unreachable");
+	return (irBranchBlocks){0};
+}
+
 
 void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 	switch (node->kind) {
@@ -4824,9 +4887,11 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 	case_end;
 
 	case_ast_node(us, UsingStmt, node);
-		AstNode *decl = unparen_expr(us->node);
-		if (decl->kind == AstNode_ValueDecl) {
-			ir_build_stmt(proc, decl);
+		for_array(i, us->list) {
+			AstNode *decl = unparen_expr(us->list.e[i]);
+			if (decl->kind == AstNode_ValueDecl) {
+				ir_build_stmt(proc, decl);
+			}
 		}
 	case_end;
 
@@ -4944,7 +5009,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 
 						irValue *value = ir_value_procedure(proc->module->allocator,
-						                                           proc->module, e, e->type, pd->type, pd->body, name);
+						                                    proc->module, e, e->type, pd->type, pd->body, name);
 
 						value->Proc.tags = pd->tags;
 						value->Proc.parent = proc;
@@ -5172,6 +5237,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 	case_ast_node(fs, ForStmt, node);
 		ir_emit_comment(proc, str_lit("ForStmt"));
+
 		if (fs->init != NULL) {
 			irBlock *init = ir_new_block(proc, node, "for.init");
 			ir_emit_jump(proc, init);
@@ -5188,6 +5254,8 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		if (fs->post != NULL) {
 			post = ir_new_block(proc, node, "for.post");
 		}
+
+
 		ir_emit_jump(proc, loop);
 		ir_start_block(proc, loop);
 
@@ -5196,6 +5264,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			ir_start_block(proc, body);
 		}
 
+		ir_set_label_blocks(proc, fs->label, done, post);
 		ir_push_target_list(proc, done, post, NULL);
 
 		ir_open_scope(proc);
@@ -5330,6 +5399,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			ir_addr_store(proc, idx_addr, index);
 		}
 
+		ir_set_label_blocks(proc, rs->label, done, loop);
 		ir_push_target_list(proc, done, loop, NULL);
 
 		ir_open_scope(proc);
@@ -5442,16 +5512,23 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		AstNode *rhs = as->rhs.e[0];
 
 		irValue *parent = ir_build_expr(proc, rhs);
-		bool is_union_ptr = false;
-		bool is_any = false;
-		GB_ASSERT(check_valid_type_match_type(ir_type(parent), &is_union_ptr, &is_any));
+		bool is_parent_ptr = is_type_pointer(ir_type(parent));
+		MatchTypeKind match_type_kind = check_valid_type_match_type(ir_type(parent));
+		GB_ASSERT(match_type_kind != MatchType_Invalid);
 
 		irValue *tag_index = NULL;
 		irValue *union_data = NULL;
-		if (is_union_ptr) {
+		if (match_type_kind == MatchType_Union) {
+			if (!is_parent_ptr) {
+				parent = ir_address_from_load_or_generate_local(proc, parent);
+			}
 			ir_emit_comment(proc, str_lit("get union's tag"));
 			tag_index = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, parent));
 			union_data = ir_emit_conv(proc, parent, t_rawptr);
+		} else if (match_type_kind == MatchType_Any) {
+			if (!is_parent_ptr) {
+				parent = ir_address_from_load_or_generate_local(proc, parent);
+			}
 		}
 
 		irBlock *start_block = ir_new_block(proc, node, "type-match.case.first");
@@ -5478,7 +5555,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			Type *tag_var_type = NULL;
 			if (str_eq(tag_var_name, str_lit("_"))) {
 				Type *t = type_of_expr(proc->module->info, cc->list.e[0]);
-				if (is_union_ptr) {
+				if (match_type_kind == MatchType_Union) {
 					t = make_type_pointer(proc->module->allocator, t);
 				}
 				tag_var_type = t;
@@ -5505,7 +5582,12 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				} else {
 					tag_var = ir_add_local_generated(proc, tag_var_type);
 				}
-				ir_emit_store(proc, tag_var, parent);
+
+				if (!is_parent_ptr) {
+					ir_emit_store(proc, tag_var, ir_emit_load(proc, parent));
+				} else {
+					ir_emit_store(proc, tag_var, parent);
+				}
 				continue;
 			}
 			GB_ASSERT(cc->list.count == 1);
@@ -5513,7 +5595,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			irBlock *body = ir_new_block(proc, clause, "type-match.case.body");
 
 
-			if (is_union_ptr) {
+			if (match_type_kind == MatchType_Union) {
 				Type *bt = type_deref(tag_var_type);
 				irValue *index = NULL;
 				Type *ut = base_type(type_deref(ir_type(parent)));
@@ -5534,20 +5616,23 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					tag_var = ir_add_local_generated(proc, tag_var_type);
 				}
 
-
-				irValue *data_ptr = ir_emit_conv(proc, union_data, tag_var_type);
+				Type *bt_ptr = make_type_pointer(proc->module->allocator, bt);
+				irValue *data_ptr = ir_emit_conv(proc, union_data, bt_ptr);
+				if (!is_type_pointer(type_deref(ir_type(tag_var)))) {
+					data_ptr = ir_emit_load(proc, data_ptr);
+				}
 				ir_emit_store(proc, tag_var, data_ptr);
 
 				cond = ir_emit_comp(proc, Token_CmpEq, tag_index, index);
-			} else if (is_any) {
+			} else if (match_type_kind == MatchType_Any) {
 				Type *type = tag_var_type;
-				irValue *any_data = ir_emit_struct_ev(proc, parent, 1);
+				irValue *any_data = ir_emit_load(proc, ir_emit_struct_ep(proc, parent, 1));
 				irValue *data = ir_emit_conv(proc, any_data, make_type_pointer(proc->module->allocator, type));
 				if (tag_var_entity != NULL) {
 					ir_module_add_value(proc->module, tag_var_entity, data);
 				}
 
-				irValue *any_ti  = ir_emit_struct_ev(proc, parent, 0);
+				irValue *any_ti  = ir_emit_load(proc, ir_emit_struct_ep(proc, parent, 0));
 				irValue *case_ti = ir_type_info(proc, type);
 				cond = ir_emit_comp(proc, Token_CmpEq, any_ti, case_ti);
 			} else {
@@ -5588,22 +5673,34 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 	case_ast_node(bs, BranchStmt, node);
 		irBlock *block = NULL;
-		switch (bs->token.kind) {
-		case Token_break:
-			for (irTargetList *t = proc->target_list; t != NULL && block == NULL; t = t->prev) {
-				block = t->break_;
+
+		if (bs->label != NULL) {
+			irBranchBlocks bb = ir_lookup_branch_blocks(proc, bs->label);
+			switch (bs->token.kind) {
+			case Token_break:    block = bb.break_;    break;
+			case Token_continue: block = bb.continue_; break;
+			case Token_fallthrough:
+				GB_PANIC("fallthrough cannot have a label");
+				break;
 			}
-			break;
-		case Token_continue:
-			for (irTargetList *t = proc->target_list; t != NULL && block == NULL; t = t->prev) {
-				block = t->continue_;
+		} else {
+			switch (bs->token.kind) {
+			case Token_break:
+				for (irTargetList *t = proc->target_list; t != NULL && block == NULL; t = t->prev) {
+					block = t->break_;
+				}
+				break;
+			case Token_continue:
+				for (irTargetList *t = proc->target_list; t != NULL && block == NULL; t = t->prev) {
+					block = t->continue_;
+				}
+				break;
+			case Token_fallthrough:
+				for (irTargetList *t = proc->target_list; t != NULL && block == NULL; t = t->prev) {
+					block = t->fallthrough_;
+				}
+				break;
 			}
-			break;
-		case Token_fallthrough:
-			for (irTargetList *t = proc->target_list; t != NULL && block == NULL; t = t->prev) {
-				block = t->fallthrough_;
-			}
-			break;
 		}
 		if (block != NULL) {
 			ir_emit_defer_stmts(proc, irDeferExit_Branch, block);
@@ -5692,9 +5789,20 @@ void ir_number_proc_registers(irProcedure *proc) {
 void ir_begin_procedure_body(irProcedure *proc) {
 	array_add(&proc->module->procs, proc);
 
-	array_init(&proc->blocks,      heap_allocator());
-	array_init(&proc->defer_stmts, heap_allocator());
-	array_init(&proc->children,    heap_allocator());
+	array_init(&proc->blocks,        heap_allocator());
+	array_init(&proc->defer_stmts,   heap_allocator());
+	array_init(&proc->children,      heap_allocator());
+	array_init(&proc->branch_blocks, heap_allocator());
+
+	DeclInfo **found = map_decl_info_get(&proc->module->info->entities, hash_pointer(proc->entity));
+	if (found != NULL) {
+		DeclInfo *decl = *found;
+		for_array(i, decl->labels) {
+			BlockLabel bl = decl->labels.e[i];
+			irBranchBlocks bb = {bl.label, NULL, NULL};
+			array_add(&proc->branch_blocks, bb);
+		}
+	}
 
 	proc->decl_block  = ir_new_block(proc, proc->type_expr, "decls");
 	ir_start_block(proc, proc->decl_block);

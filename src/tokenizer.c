@@ -484,15 +484,9 @@ gb_inline i32 digit_value(Rune r) {
 	return 16; // NOTE(bill): Larger than highest possible
 }
 
-gb_inline void scan_mantissa(Tokenizer *t, i32 base, bool allow_underscore) {
-	if (allow_underscore) {
-		while (digit_value(t->curr_rune) < base || t->curr_rune == '_') {
-			advance_to_next_rune(t);
-		}
-	} else {
-		while (digit_value(t->curr_rune) < base) {
-			advance_to_next_rune(t);
-		}
+gb_inline void scan_mantissa(Tokenizer *t, i32 base) {
+	while (digit_value(t->curr_rune) < base || t->curr_rune == '_') {
+		advance_to_next_rune(t);
 	}
 }
 
@@ -506,7 +500,7 @@ Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 
 	if (seen_decimal_point) {
 		token.kind = Token_Float;
-		scan_mantissa(t, 10, true);
+		scan_mantissa(t, 10);
 		goto exponent;
 	}
 
@@ -515,31 +509,37 @@ Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 		advance_to_next_rune(t);
 		if (t->curr_rune == 'b') { // Binary
 			advance_to_next_rune(t);
-			scan_mantissa(t, 2, true);
+			scan_mantissa(t, 2);
 			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
 			}
 		} else if (t->curr_rune == 'o') { // Octal
 			advance_to_next_rune(t);
-			scan_mantissa(t, 8, true);
+			scan_mantissa(t, 8);
 			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
 			}
 		} else if (t->curr_rune == 'd') { // Decimal
 			advance_to_next_rune(t);
-			scan_mantissa(t, 10, true);
+			scan_mantissa(t, 10);
+			if (t->curr - prev <= 2) {
+				token.kind = Token_Invalid;
+			}
+		} else if (t->curr_rune == 'z') { // Dozenal
+			advance_to_next_rune(t);
+			scan_mantissa(t, 12);
 			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
 			}
 		} else if (t->curr_rune == 'x') { // Hexadecimal
 			advance_to_next_rune(t);
-			scan_mantissa(t, 16, true);
+			scan_mantissa(t, 16);
 			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
 			}
 		} else {
 			seen_decimal_point = false;
-			scan_mantissa(t, 10, true);
+			scan_mantissa(t, 10);
 
 			if (t->curr_rune == '.' || t->curr_rune == 'e' || t->curr_rune == 'E') {
 				seen_decimal_point = true;
@@ -551,7 +551,7 @@ Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 		return token;
 	}
 
-	scan_mantissa(t, 10, true);
+	scan_mantissa(t, 10);
 
 fraction:
 	if (t->curr_rune == '.') {
@@ -564,7 +564,7 @@ fraction:
 			goto end;
 		}
 		token.kind = Token_Float;
-		scan_mantissa(t, 10, true);
+		scan_mantissa(t, 10);
 	}
 
 exponent:
@@ -574,7 +574,7 @@ exponent:
 		if (t->curr_rune == '-' || t->curr_rune == '+') {
 			advance_to_next_rune(t);
 		}
-		scan_mantissa(t, 10, false);
+		scan_mantissa(t, 10);
 	}
 
 end:

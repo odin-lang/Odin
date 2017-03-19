@@ -1,4 +1,3 @@
-typedef enum   ssaOp               ssaOp;
 typedef struct ssaModule           ssaModule;
 typedef struct ssaValue            ssaValue;
 typedef struct ssaValueArgs        ssaValueArgs;
@@ -19,282 +18,7 @@ String ssa_mangle_name(ssaModule *m, String path, Entity *e);
 
 typedef Array(ssaValue *) ssaValueArray;
 
-
-#define SSA_OPS \
-	SSA_OP(Invalid)\
-\
-	SSA_OP(Unknown)\
-\
-	SSA_OP(Comment) /* Does nothing */\
-\
-	SSA_OP(SP)    /* Stack Pointer */\
-	SSA_OP(SB)    /* Stack Base */\
-	SSA_OP(Addr)  /* Address of something - special rules for certain types when loading and storing (e.g. Maps) */\
-\
-	SSA_OP(Local)\
-	SSA_OP(Global)\
-	SSA_OP(Proc)\
-\
-	SSA_OP(Load)\
-	SSA_OP(Store)\
-	SSA_OP(Move)\
-	SSA_OP(Zero) /* Zero initialize */\
-\
-	SSA_OP(ArrayIndex)  /* Index for a fixed array */\
-	SSA_OP(PtrIndex)    /* Index for a struct/tuple/etc */\
-	SSA_OP(OffsetPtr)\
-	SSA_OP(ValueIndex) /* Extract for a value from a register */\
-\
-	SSA_OP(Phi)\
-	SSA_OP(Copy)\
-\
-	/* TODO(bill): calling conventions */\
-	SSA_OP(CallOdin)\
-	SSA_OP(CallC)\
-	SSA_OP(CallStd)\
-	SSA_OP(CallFast)\
-\
-	SSA_OP(BoundsCheck)\
-	SSA_OP(SliceBoundsCheck)\
-\
-	/* Built in operations/procedures */\
-	SSA_OP(Bswap16)\
-	SSA_OP(Bswap32)\
-	SSA_OP(Bswap64)\
-\
-	SSA_OP(Assume)\
-	SSA_OP(DebugTrap)\
-	SSA_OP(Trap)\
-	SSA_OP(ReadCycleCounter)\
-\
-\
-	SSA_OP(ConstBool)\
-	SSA_OP(ConstString)\
-	SSA_OP(ConstSlice)\
-	SSA_OP(ConstNil)\
-	SSA_OP(Const8)\
-	SSA_OP(Const16)\
-	SSA_OP(Const32)\
-	SSA_OP(Const64)\
-	SSA_OP(Const32F)\
-	SSA_OP(Const64F)\
-\
-	/* These should be all the operations I could possibly need for the mean time */\
-	SSA_OP(Add8)\
-	SSA_OP(Add16)\
-	SSA_OP(Add32)\
-	SSA_OP(Add64)\
-	SSA_OP(AddPtr)\
-	SSA_OP(Add32F)\
-	SSA_OP(Add64F)\
-	SSA_OP(Sub8)\
-	SSA_OP(Sub16)\
-	SSA_OP(Sub32)\
-	SSA_OP(Sub64)\
-	SSA_OP(SubPtr)\
-	SSA_OP(Sub32F)\
-	SSA_OP(Sub64F)\
-	SSA_OP(Mul8)\
-	SSA_OP(Mul16)\
-	SSA_OP(Mul32)\
-	SSA_OP(Mul64)\
-	SSA_OP(Mul32F)\
-	SSA_OP(Mul64F)\
-	SSA_OP(Div8)\
-	SSA_OP(Div8U)\
-	SSA_OP(Div16)\
-	SSA_OP(Div16U)\
-	SSA_OP(Div32)\
-	SSA_OP(Div32U)\
-	SSA_OP(Div64)\
-	SSA_OP(Div64U)\
-	SSA_OP(Div32F)\
-	SSA_OP(Div64F)\
-	SSA_OP(Mod8)\
-	SSA_OP(Mod8U)\
-	SSA_OP(Mod16)\
-	SSA_OP(Mod16U)\
-	SSA_OP(Mod32)\
-	SSA_OP(Mod32U)\
-	SSA_OP(Mod64)\
-	SSA_OP(Mod64U)\
-\
-	SSA_OP(And8)\
-	SSA_OP(And16)\
-	SSA_OP(And32)\
-	SSA_OP(And64)\
-	SSA_OP(Or8)\
-	SSA_OP(Or16)\
-	SSA_OP(Or32)\
-	SSA_OP(Or64)\
-	SSA_OP(Xor8)\
-	SSA_OP(Xor16)\
-	SSA_OP(Xor32)\
-	SSA_OP(Xor64)\
-	SSA_OP(AndNot8)\
-	SSA_OP(AndNot16)\
-	SSA_OP(AndNot32)\
-	SSA_OP(AndNot64)\
-\
-	SSA_OP(Lsh8x8)\
-	SSA_OP(Lsh8x16)\
-	SSA_OP(Lsh8x32)\
-	SSA_OP(Lsh8x64)\
-	SSA_OP(Lsh16x8)\
-	SSA_OP(Lsh16x16)\
-	SSA_OP(Lsh16x32)\
-	SSA_OP(Lsh16x64)\
-	SSA_OP(Lsh32x8)\
-	SSA_OP(Lsh32x16)\
-	SSA_OP(Lsh32x32)\
-	SSA_OP(Lsh32x64)\
-	SSA_OP(Lsh64x8)\
-	SSA_OP(Lsh64x16)\
-	SSA_OP(Lsh64x32)\
-	SSA_OP(Lsh64x64)\
-	SSA_OP(Rsh8x8)\
-	SSA_OP(Rsh8x16)\
-	SSA_OP(Rsh8x32)\
-	SSA_OP(Rsh8x64)\
-	SSA_OP(Rsh16x8)\
-	SSA_OP(Rsh16x16)\
-	SSA_OP(Rsh16x32)\
-	SSA_OP(Rsh16x64)\
-	SSA_OP(Rsh32x8)\
-	SSA_OP(Rsh32x16)\
-	SSA_OP(Rsh32x32)\
-	SSA_OP(Rsh32x64)\
-	SSA_OP(Rsh64x8)\
-	SSA_OP(Rsh64x16)\
-	SSA_OP(Rsh64x32)\
-	SSA_OP(Rsh64x64)\
-	SSA_OP(Rsh8Ux8)\
-	SSA_OP(Rsh8Ux16)\
-	SSA_OP(Rsh8Ux32)\
-	SSA_OP(Rsh8Ux64)\
-	SSA_OP(Rsh16Ux8)\
-	SSA_OP(Rsh16Ux16)\
-	SSA_OP(Rsh16Ux32)\
-	SSA_OP(Rsh16Ux64)\
-	SSA_OP(Rsh32Ux8)\
-	SSA_OP(Rsh32Ux16)\
-	SSA_OP(Rsh32Ux32)\
-	SSA_OP(Rsh32Ux64)\
-	SSA_OP(Rsh64Ux8)\
-	SSA_OP(Rsh64Ux16)\
-	SSA_OP(Rsh64Ux32)\
-	SSA_OP(Rsh64Ux64)\
-\
-	SSA_OP(Eq8)\
-	SSA_OP(Eq16)\
-	SSA_OP(Eq32)\
-	SSA_OP(Eq64)\
-	SSA_OP(EqPtr)\
-	SSA_OP(Eq32F)\
-	SSA_OP(Eq64F)\
-	SSA_OP(Ne8)\
-	SSA_OP(Ne16)\
-	SSA_OP(Ne32)\
-	SSA_OP(Ne64)\
-	SSA_OP(NePtr)\
-	SSA_OP(Ne32F)\
-	SSA_OP(Ne64F)\
-	SSA_OP(Lt8)\
-	SSA_OP(Lt16)\
-	SSA_OP(Lt32)\
-	SSA_OP(Lt64)\
-	SSA_OP(LtPtr)\
-	SSA_OP(Lt32F)\
-	SSA_OP(Lt64F)\
-	SSA_OP(Gt8)\
-	SSA_OP(Gt16)\
-	SSA_OP(Gt32)\
-	SSA_OP(Gt64)\
-	SSA_OP(GtPtr)\
-	SSA_OP(Gt32F)\
-	SSA_OP(Gt64F)\
-	SSA_OP(Le8)\
-	SSA_OP(Le16)\
-	SSA_OP(Le32)\
-	SSA_OP(Le64)\
-	SSA_OP(LePtr)\
-	SSA_OP(Le32F)\
-	SSA_OP(Le64F)\
-	SSA_OP(Ge8)\
-	SSA_OP(Ge16)\
-	SSA_OP(Ge32)\
-	SSA_OP(Ge64)\
-	SSA_OP(GePtr)\
-	SSA_OP(Ge32F)\
-	SSA_OP(Ge64F)\
-\
-	SSA_OP(NotB)\
-	SSA_OP(EqB)\
-	SSA_OP(NeB)\
-\
-	SSA_OP(Neg8)\
-	SSA_OP(Neg16)\
-	SSA_OP(Neg32)\
-	SSA_OP(Neg64)\
-	SSA_OP(Neg32F)\
-	SSA_OP(Neg64F)\
-\
-	SSA_OP(Not8)\
-	SSA_OP(Not16)\
-	SSA_OP(Not32)\
-	SSA_OP(Not64)\
-\
-	SSA_OP(SignExt8to16)\
-	SSA_OP(SignExt8to32)\
-	SSA_OP(SignExt8to64)\
-	SSA_OP(SignExt16to32)\
-	SSA_OP(SignExt16to64)\
-	SSA_OP(SignExt32to64)\
-	SSA_OP(ZeroExt8to16)\
-	SSA_OP(ZeroExt8to32)\
-	SSA_OP(ZeroExt8to64)\
-	SSA_OP(ZeroExt16to32)\
-	SSA_OP(ZeroExt16to64)\
-	SSA_OP(ZeroExt32to64)\
-	SSA_OP(Trunc16to8)\
-	SSA_OP(Trunc32to8)\
-	SSA_OP(Trunc32to16)\
-	SSA_OP(Trunc64to8)\
-	SSA_OP(Trunc64to16)\
-	SSA_OP(Trunc64to32)\
-\
-	SSA_OP(Cvt32to32F)\
-	SSA_OP(Cvt32to64F)\
-	SSA_OP(Cvt64to32F)\
-	SSA_OP(Cvt64to64F)\
-	SSA_OP(Cvt32Fto32)\
-	SSA_OP(Cvt32Fto64)\
-	SSA_OP(Cvt64Fto32)\
-	SSA_OP(Cvt64Fto64)\
-	SSA_OP(Cvt32Fto64F)\
-	SSA_OP(Cvt64Fto32F)\
-	SSA_OP(Cvt32Uto32F)\
-	SSA_OP(Cvt32Uto64F)\
-	SSA_OP(Cvt32Fto32U)\
-	SSA_OP(Cvt64Fto32U)\
-	SSA_OP(Cvt64Uto32F)\
-	SSA_OP(Cvt64Uto64F)\
-	SSA_OP(Cvt32Fto64U)\
-	SSA_OP(Cvt64Fto64U)\
-
-
-enum ssaOp {
-#define SSA_OP(k) GB_JOIN2(ssaOp_, k),
-	SSA_OPS
-#undef SSA_OP
-};
-
-String const ssa_op_strings[] = {
-#define SSA_OP(k) {cast(u8 *)#k, gb_size_of(#k)-1},
-	SSA_OPS
-#undef SSA_OP
-};
-
+#include "ssa_op.c"
 
 #define SSA_DEFAULT_VALUE_ARG_CAPACITY 8
 struct ssaValueArgs {
@@ -379,6 +103,7 @@ struct ssaTargetList {
 
 struct ssaProc {
 	ssaModule *       module;     // Parent module
+	gbAllocator       allocator;  // Same allocator as the parent module
 	String            name;       // Mangled name
 	Entity *          entity;
 	DeclInfo *        decl_info;
@@ -424,7 +149,7 @@ struct ssaModule {
 
 
 void ssa_push_target_list(ssaProc *p, ssaBlock *break_, ssaBlock *continue_, ssaBlock *fallthrough_) {
-	ssaTargetList *tl = gb_alloc_item(p->module->allocator, ssaTargetList);
+	ssaTargetList *tl = gb_alloc_item(p->allocator, ssaTargetList);
 	tl->prev          = p->target_list;
 	tl->break_        = break_;
 	tl->continue_     = continue_;
@@ -438,7 +163,7 @@ void ssa_pop_target_list(ssaProc *p) {
 
 
 ssaBlock *ssa_new_block(ssaProc *p, ssaBlockKind kind, char *name) {
-	ssaBlock *b = gb_alloc_item(p->module->allocator, ssaBlock);
+	ssaBlock *b = gb_alloc_item(p->allocator, ssaBlock);
 	b->id = p->block_id++;
 	b->kind = kind;
 	b->proc = p;
@@ -531,64 +256,68 @@ void ssa_add_arg(ssaValueArgs *va, ssaValue *arg) {
 
 
 ssaValue *ssa_new_value(ssaProc *p, ssaOp op, Type *t, ssaBlock *b) {
-	ssaValue *v = gb_alloc_item(p->module->allocator, ssaValue);
+	GB_ASSERT(b != NULL);
+	ssaValue *v = gb_alloc_item(p->allocator, ssaValue);
 	v->id    = p->value_id++;
 	v->op    = op;
 	v->type  = t;
 	v->block = b;
-	ssa_init_value_args(&v->args, p->module->allocator);
+	ssa_init_value_args(&v->args, p->allocator);
 	array_add(&b->values, v);
 	return v;
 }
 
-ssaValue *ssa_new_value0(ssaBlock *b, ssaOp op, Type *t) {
-	ssaValue *v = ssa_new_value(b->proc, op, t, b);
+ssaValue *ssa_new_value0(ssaProc *p, ssaOp op, Type *t) {
+	ssaValue *v = ssa_new_value(p, op, t, p->curr_block);
 	return v;
 }
-ssaValue *ssa_new_value0v(ssaBlock *b, ssaOp op, Type *t, ExactValue exact_value) {
-	ssaValue *v = ssa_new_value0(b, op, t);
+ssaValue *ssa_new_value0v(ssaProc *p, ssaOp op, Type *t, ExactValue exact_value) {
+	ssaValue *v = ssa_new_value0(p, op, t);
 	v->exact_value = exact_value;
 	return v;
 }
 
-ssaValue *ssa_new_value1(ssaBlock *b, ssaOp op, Type *t, ssaValue *arg) {
-	ssaValue *v = ssa_new_value(b->proc, op, t, b);
+ssaValue *ssa_new_value1(ssaProc *p, ssaOp op, Type *t, ssaValue *arg) {
+	ssaValue *v = ssa_new_value(p, op, t, p->curr_block);
 	ssa_add_arg(&v->args, arg);
 	return v;
 }
-ssaValue *ssa_new_value1v(ssaBlock *b, ssaOp op, Type *t, ExactValue exact_value, ssaValue *arg) {
-	ssaValue *v = ssa_new_value1(b, op, t, arg);
+ssaValue *ssa_new_value1v(ssaProc *p, ssaOp op, Type *t, ExactValue exact_value, ssaValue *arg) {
+	ssaValue *v = ssa_new_value1(p, op, t, arg);
 	v->exact_value = exact_value;
 	return v;
 }
+ssaValue *ssa_new_value1i(ssaProc *p, ssaOp op, Type *t, i64 i, ssaValue *arg) {
+	return ssa_new_value1v(p, op, t, exact_value_integer(i), arg);
+}
 
-ssaValue *ssa_new_value2(ssaBlock *b, ssaOp op, Type *t, ssaValue *arg0, ssaValue *arg1) {
-	ssaValue *v = ssa_new_value(b->proc, op, t, b);
+ssaValue *ssa_new_value2(ssaProc *p, ssaOp op, Type *t, ssaValue *arg0, ssaValue *arg1) {
+	ssaValue *v = ssa_new_value(p, op, t, p->curr_block);
 	ssa_add_arg(&v->args, arg0);
 	ssa_add_arg(&v->args, arg1);
 	return v;
 }
-ssaValue *ssa_new_value2v(ssaBlock *b, ssaOp op, Type *t, ExactValue exact_value, ssaValue *arg0, ssaValue *arg1) {
-	ssaValue *v = ssa_new_value2(b, op, t, arg0, arg1);
+ssaValue *ssa_new_value2v(ssaProc *p, ssaOp op, Type *t, ExactValue exact_value, ssaValue *arg0, ssaValue *arg1) {
+	ssaValue *v = ssa_new_value2(p, op, t, arg0, arg1);
 	v->exact_value = exact_value;
 	return v;
 }
 
-ssaValue *ssa_new_value3(ssaBlock *b, ssaOp op, Type *t, ssaValue *arg0, ssaValue *arg1, ssaValue *arg2) {
-	ssaValue *v = ssa_new_value(b->proc, op, t, b);
+ssaValue *ssa_new_value3(ssaProc *p, ssaOp op, Type *t, ssaValue *arg0, ssaValue *arg1, ssaValue *arg2) {
+	ssaValue *v = ssa_new_value(p, op, t, p->curr_block);
 	ssa_add_arg(&v->args, arg0);
 	ssa_add_arg(&v->args, arg1);
 	ssa_add_arg(&v->args, arg2);
 	return v;
 }
-ssaValue *ssa_new_value3v(ssaBlock *b, ssaOp op, Type *t, ExactValue exact_value, ssaValue *arg0, ssaValue *arg1, ssaValue *arg2) {
-	ssaValue *v = ssa_new_value3(b, op, t, arg0, arg1, arg2);
+ssaValue *ssa_new_value3v(ssaProc *p, ssaOp op, Type *t, ExactValue exact_value, ssaValue *arg0, ssaValue *arg1, ssaValue *arg2) {
+	ssaValue *v = ssa_new_value3(p, op, t, arg0, arg1, arg2);
 	v->exact_value = exact_value;
 	return v;
 }
 
-ssaValue *ssa_new_value4(ssaBlock *b, ssaOp op, Type *t, ssaValue *arg0, ssaValue *arg1, ssaValue *arg2, ssaValue *arg3) {
-	ssaValue *v = ssa_new_value(b->proc, op, t, b);
+ssaValue *ssa_new_value4(ssaProc *p, ssaOp op, Type *t, ssaValue *arg0, ssaValue *arg1, ssaValue *arg2, ssaValue *arg3) {
+	ssaValue *v = ssa_new_value(p, op, t, p->curr_block);
 	ssa_add_arg(&v->args, arg0);
 	ssa_add_arg(&v->args, arg1);
 	ssa_add_arg(&v->args, arg2);
@@ -597,7 +326,7 @@ ssaValue *ssa_new_value4(ssaBlock *b, ssaOp op, Type *t, ssaValue *arg0, ssaValu
 }
 
 ssaValue *ssa_const_val(ssaProc *p, ssaOp op, Type *t, ExactValue exact_value) {
-	return ssa_new_value0v(p->curr_block, op, t, exact_value);
+	return ssa_new_value0v(p, op, t, exact_value);
 }
 
 ssaValue *ssa_const_bool        (ssaProc *p, Type *t, bool   c)     { return ssa_const_val(p, ssaOp_ConstBool,   t, exact_value_bool(c)); }
@@ -613,7 +342,7 @@ ssaValue *ssa_const_slice       (ssaProc *p, Type *t, ExactValue v) { return ssa
 ssaValue *ssa_const_nil         (ssaProc *p, Type *t)               { return ssa_const_val(p, ssaOp_ConstNil,    t, (ExactValue){0}); }
 
 ssaValue *ssa_const_int(ssaProc *p, Type *t, i64 c) {
-	switch (8*type_size_of(p->module->allocator, t)) {
+	switch (8*type_size_of(p->allocator, t)) {
 	case 8:  return ssa_const_i8 (p, t, cast(i8)c);
 	case 16: return ssa_const_i16(p, t, cast(i16)c);
 	case 32: return ssa_const_i32(p, t, cast(i32)c);
@@ -628,6 +357,47 @@ void ssa_reset_value_args(ssaValue *v) {
 		v->args.e[i]->uses--;
 	}
 	v->args.count = 0;
+}
+
+void ssa_reset(ssaValue *v, ssaOp op) {
+	v->op = op;
+	v->exact_value = (ExactValue){0};
+	ssa_reset_value_args(v);
+}
+
+ssaValue *ssa_emit_load(ssaProc *p, ssaValue *v) {
+	GB_ASSERT(is_type_pointer(v->type));
+	return ssa_new_value1(p, ssaOp_Load, type_deref(v->type), v);
+}
+
+ssaValue *ssa_emit_store(ssaProc *p, ssaValue *dst, ssaValue *v) {
+	GB_ASSERT(is_type_pointer(dst->type));
+#if 1
+	// NOTE(bill): Sanity check
+	Type *a = core_type(type_deref(dst->type));
+	Type *b = core_type(v->type);
+	if (!is_type_untyped(b)) {
+		GB_ASSERT_MSG(are_types_identical(a, b), "%s %s", type_to_string(a), type_to_string(b));
+	}
+#endif
+	return ssa_new_value2(p, ssaOp_Store, dst->type, dst, v);
+}
+
+bool ssa_is_op_const(ssaOp op) {
+	switch (op) {
+	case ssaOp_ConstBool:
+	case ssaOp_ConstString:
+	case ssaOp_ConstSlice:
+	case ssaOp_ConstNil:
+	case ssaOp_Const8:
+	case ssaOp_Const16:
+	case ssaOp_Const32:
+	case ssaOp_Const64:
+	case ssaOp_Const32F:
+	case ssaOp_Const64F:
+		return true;
+	}
+	return false;
 }
 
 
@@ -680,6 +450,7 @@ Type *ssa_addr_type(ssaAddr addr) {
 ssaProc *ssa_new_proc(ssaModule *m, String name, Entity *entity, DeclInfo *decl_info) {
 	ssaProc *p = gb_alloc_item(m->allocator, ssaProc);
 	p->module    = m;
+	p->allocator = m->allocator;
 	p->name      = name;
 	p->entity    = entity;
 	p->decl_info = decl_info;
@@ -691,14 +462,19 @@ ssaProc *ssa_new_proc(ssaModule *m, String name, Entity *entity, DeclInfo *decl_
 }
 
 ssaAddr ssa_add_local(ssaProc *p, Entity *e, AstNode *expr) {
-	Type *t = make_type_pointer(p->module->allocator, e->type);
-	ssaValue *local = ssa_new_value0(p->entry, ssaOp_Local, t);
+	Type *t = make_type_pointer(p->allocator, e->type);
+
+	ssaBlock *cb = p->curr_block;
+	p->curr_block = p->entry;
+	ssaValue *local = ssa_new_value0(p, ssaOp_Local, t);
+	p->curr_block = cb;
+
 	map_ssa_value_set(&p->values,         hash_pointer(e), local);
 	map_ssa_value_set(&p->module->values, hash_pointer(e), local);
 	local->comment_string = e->token.string;
 
-	ssaValue *addr = ssa_new_value1(p->curr_block, ssaOp_Addr, local->type, local);
-	ssa_new_value1(p->curr_block, ssaOp_Zero, t, addr);
+	ssaValue *addr = ssa_new_value1(p, ssaOp_Addr, local->type, local);
+	ssa_new_value1(p, ssaOp_Zero, t, addr);
 	return ssa_addr(addr);
 }
 ssaAddr ssa_add_local_for_ident(ssaProc *p, AstNode *name) {
@@ -718,12 +494,12 @@ ssaAddr ssa_add_local_generated(ssaProc *p, Type *t) {
 	if (p->curr_block) {
 		// scope = p->curr_block->scope;
 	}
-	Entity *e = make_entity_variable(p->module->allocator, scope, empty_token, t, false);
+	Entity *e = make_entity_variable(p->allocator, scope, empty_token, t, false);
 	return ssa_add_local(p, e, NULL);
 }
 
 void ssa_emit_comment(ssaProc *p, String s) {
-	// ssa_new_value0v(p->curr_block, ssaOp_Comment, NULL, exact_value_string(s));
+	// ssa_new_value0v(p, ssaOp_Comment, NULL, exact_value_string(s));
 }
 
 #define SSA_MAX_STRUCT_FIELD_COUNT 4
@@ -773,10 +549,11 @@ bool can_ssa_type(Type *t) {
 	return true;
 }
 
-
-
-void ssa_build_stmt(ssaProc *p, AstNode *node);
-void ssa_build_stmt_list(ssaProc *p, AstNodeArray nodes);
+ssaAddr   ssa_build_addr     (ssaProc *p, AstNode *expr);
+ssaValue *ssa_build_expr     (ssaProc *p, AstNode *expr);
+void      ssa_build_stmt     (ssaProc *p, AstNode *node);
+void      ssa_build_stmt_list(ssaProc *p, AstNodeArray nodes);
+ssaValue *ssa_emit_deep_field_ptr_index(ssaProc *p, ssaValue *e, Selection sel);
 
 void ssa_addr_store(ssaProc *p, ssaAddr addr, ssaValue *value) {
 	if (addr.addr == NULL) {
@@ -787,7 +564,7 @@ void ssa_addr_store(ssaProc *p, ssaAddr addr, ssaValue *value) {
 		return;
 	}
 
-	ssa_new_value2(p->curr_block, ssaOp_Store, addr.addr->type, addr.addr, value);
+	ssa_emit_store(p, addr.addr, value);
 }
 
 ssaValue *ssa_addr_load(ssaProc *p, ssaAddr addr) {
@@ -806,26 +583,25 @@ ssaValue *ssa_addr_load(ssaProc *p, ssaAddr addr) {
 		return addr.addr;
 	}
 
-	return ssa_new_value1(p->curr_block, ssaOp_Load, type_deref(t), addr.addr);
+	return ssa_emit_load(p, addr.addr);
 }
 
 ssaValue *ssa_get_using_variable(ssaProc *p, Entity *e) {
-	GB_PANIC("TODO(bill): ssa_get_using_variable");
-	return NULL;
-	// GB_ASSERT(e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous);
-	// String name = e->token.string;
-	// Entity *parent = e->using_parent;
-	// Selection sel = lookup_field(proc->module->allocator, parent->type, name, false);
-	// GB_ASSERT(sel.entity != NULL);
-	// irValue **pv = map_ir_value_get(&proc->module->values, hash_pointer(parent));
-	// irValue *v = NULL;
-	// if (pv != NULL) {
-	// 	v = *pv;
-	// } else {
-	// 	v = ir_build_addr(proc, e->using_expr).addr;
-	// }
-	// GB_ASSERT(v != NULL);
-	// return ir_emit_deep_field_gep(proc, parent->type, v, sel);
+	GB_ASSERT(e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous);
+	String name = e->token.string;
+	Entity *parent = e->using_parent;
+	Selection sel = lookup_field(p->allocator, parent->type, name, false);
+	GB_ASSERT(sel.entity != NULL);
+	ssaValue **pv = map_ssa_value_get(&p->module->values, hash_pointer(parent));
+	ssaValue *v = NULL;
+	if (pv != NULL) {
+		v = *pv;
+	} else {
+		v = ssa_build_addr(p, e->using_expr).addr;
+	}
+	GB_ASSERT(v != NULL);
+	GB_ASSERT(type_deref(v->type) == parent->type);
+	return ssa_emit_deep_field_ptr_index(p, v, sel);
 }
 
 ssaAddr ssa_build_addr_from_entity(ssaProc *p, Entity *e, AstNode *expr) {
@@ -847,6 +623,311 @@ ssaAddr ssa_build_addr_from_entity(ssaProc *p, Entity *e, AstNode *expr) {
 	return ssa_addr(v);
 }
 
+
+ssaValue *ssa_emit_conv(ssaProc *p, ssaValue *v, Type *t) {
+	Type *src_type = v->type;
+	if (are_types_identical(t, src_type)) {
+		return v;
+	}
+
+	Type *src = core_type(src_type);
+	Type *dst = core_type(t);
+
+	if (is_type_untyped_nil(src)) {
+		return ssa_const_nil(p, t);
+	}
+
+	// Pointer <-> Pointer
+	if (is_type_pointer(src) && is_type_pointer(dst)) {
+		return ssa_new_value1(p, ssaOp_Copy, dst, v);
+	}
+	// proc <-> proc
+	if (is_type_proc(src) && is_type_proc(dst)) {
+		return ssa_new_value1(p, ssaOp_Copy, dst, v);
+	}
+	// pointer -> proc
+	if (is_type_pointer(src) && is_type_proc(dst)) {
+		return ssa_new_value1(p, ssaOp_Copy, dst, v);
+	}
+	// proc -> pointer
+	if (is_type_proc(src) && is_type_pointer(dst)) {
+		return ssa_new_value1(p, ssaOp_Copy, dst, v);
+	}
+
+
+	gb_printf_err("ssa_emit_conv: src -> dst\n");
+	gb_printf_err("Not Identical %s != %s\n", type_to_string(src_type), type_to_string(t));
+	gb_printf_err("Not Identical %s != %s\n", type_to_string(src), type_to_string(dst));
+
+
+	GB_PANIC("Invalid type conversion: `%s` to `%s`", type_to_string(src_type), type_to_string(t));
+
+	return NULL;
+}
+
+
+// NOTE(bill): Returns NULL if not possible
+ssaValue *ssa_address_from_load_or_generate_local(ssaProc *p, ssaValue *v) {
+	if (v->op == ssaOp_Load) {
+		return v->args.e[0];
+	}
+	ssaAddr addr = ssa_add_local_generated(p, v->type);
+	ssa_new_value2(p, ssaOp_Store, addr.addr->type, addr.addr, v);
+	return addr.addr;
+}
+
+
+ssaValue *ssa_emit_array_index(ssaProc *p, ssaValue *v, ssaValue *index) {
+	GB_ASSERT(v != NULL);
+	GB_ASSERT(is_type_pointer(v->type));
+	Type *t = base_type(type_deref(v->type));
+	GB_ASSERT_MSG(is_type_array(t) || is_type_vector(t), "%s", type_to_string(t));
+	Type *elem_ptr = NULL;
+	if (is_type_array(t)) {
+		elem_ptr = make_type_pointer(p->allocator, t->Array.elem);
+	} else if (is_type_vector(t)) {
+		elem_ptr = make_type_pointer(p->allocator, t->Vector.elem);
+	}
+
+	return ssa_new_value2(p, ssaOp_ArrayIndex, elem_ptr, v, index);
+}
+
+ssaValue *ssa_emit_ptr_index(ssaProc *p, ssaValue *s, i64 index) {
+	gbAllocator a = p->allocator;
+	Type *t = base_type(type_deref(s->type));
+	Type *result_type = NULL;
+
+	if (is_type_struct(t)) {
+		GB_ASSERT(t->Record.field_count > 0);
+		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
+		result_type = make_type_pointer(a, t->Record.fields[index]->type);
+	} else if (is_type_union(t)) {
+		type_set_offsets(a, t);
+		GB_ASSERT(t->Record.field_count > 0);
+		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
+		result_type = make_type_pointer(a, t->Record.fields[index]->type);
+		i64 offset = t->Record.offsets[index];
+		ssaValue *ptr = ssa_emit_conv(p, s, t_u8_ptr);
+		ptr = ssa_new_value2(p, ssaOp_PtrOffset, ptr->type, ptr, ssa_const_int(p, t_int, offset));
+		return ssa_emit_conv(p, ptr, result_type);
+	} else if (is_type_tuple(t)) {
+		GB_ASSERT(t->Tuple.variable_count > 0);
+		GB_ASSERT(gb_is_between(index, 0, t->Tuple.variable_count-1));
+		result_type = make_type_pointer(a, t->Tuple.variables[index]->type);
+	} else if (is_type_slice(t)) {
+		switch (index) {
+		case 0: result_type = make_type_pointer(a, make_type_pointer(a, t->Slice.elem)); break;
+		case 1: result_type = make_type_pointer(a, t_int); break;
+		case 2: result_type = make_type_pointer(a, t_int); break;
+		}
+	} else if (is_type_string(t)) {
+		switch (index) {
+		case 0: result_type = make_type_pointer(a, t_u8_ptr); break;
+		case 1: result_type = make_type_pointer(a, t_int);    break;
+		}
+	} else if (is_type_any(t)) {
+		switch (index) {
+		case 0: result_type = make_type_pointer(a, t_type_info_ptr); break;
+		case 1: result_type = make_type_pointer(a, t_rawptr);        break;
+		}
+	} else if (is_type_dynamic_array(t)) {
+		switch (index) {
+		case 0: result_type = make_type_pointer(a, make_type_pointer(a, t->DynamicArray.elem)); break;
+		case 1: result_type = t_int_ptr;                                      break;
+		case 2: result_type = t_int_ptr;                                      break;
+		case 3: result_type = t_allocator_ptr;                                break;
+		}
+	} else if (is_type_dynamic_map(t)) {
+		Type *gst = t->Map.generated_struct_type;
+		switch (index) {
+		case 0: result_type = make_type_pointer(a, gst->Record.fields[0]->type); break;
+		case 1: result_type = make_type_pointer(a, gst->Record.fields[1]->type); break;
+		}
+	}else {
+		GB_PANIC("TODO(bill): ssa_emit_ptr_index type: %s, %d", type_to_string(s->type), index);
+	}
+
+	GB_ASSERT(result_type != NULL);
+
+	return ssa_new_value1i(p, ssaOp_PtrIndex, result_type, index, s);
+}
+ssaValue *ssa_emit_value_index(ssaProc *p, ssaValue *s, i64 index) {
+	if (s->op == ssaOp_Load) {
+		if (!can_ssa_type(s->type)) {
+			ssaValue *e = ssa_emit_ptr_index(p, s->args.e[0], index);
+			return ssa_emit_load(p, e);
+		}
+	}
+	GB_ASSERT(can_ssa_type(s->type));
+
+	gbAllocator a = p->allocator;
+	Type *t = base_type(s->type);
+	Type *result_type = NULL;
+
+	if (is_type_struct(t)) {
+		GB_ASSERT(t->Record.field_count > 0);
+		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
+		result_type = t->Record.fields[index]->type;
+	} else if (is_type_union(t)) {
+		type_set_offsets(a, t);
+		GB_ASSERT(t->Record.field_count > 0);
+		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
+		Type *ptr_type = make_type_pointer(a, t->Record.fields[index]->type);
+		i64 offset = t->Record.offsets[index];
+		ssaValue *ptr = ssa_address_from_load_or_generate_local(p, s);
+		ptr = ssa_emit_conv(p, s, t_u8_ptr);
+		ptr = ssa_new_value2(p, ssaOp_PtrOffset, ptr->type, ptr, ssa_const_int(p, t_int, offset));
+		ptr = ssa_emit_conv(p, ptr, ptr_type);
+		return ssa_emit_load(p, ptr);
+	} else if (is_type_tuple(t)) {
+		GB_ASSERT(t->Tuple.variable_count > 0);
+		GB_ASSERT(gb_is_between(index, 0, t->Tuple.variable_count-1));
+		result_type = t->Tuple.variables[index]->type;
+	} else if (is_type_slice(t)) {
+		switch (index) {
+		case 0: result_type = make_type_pointer(a, t->Slice.elem); break;
+		case 1: result_type = t_int; break;
+		case 2: result_type = t_int; break;
+		}
+	} else if (is_type_string(t)) {
+		switch (index) {
+		case 0: result_type = t_u8_ptr; break;
+		case 1: result_type = t_int;    break;
+		}
+	} else if (is_type_any(t)) {
+		switch (index) {
+		case 0: result_type = t_type_info_ptr; break;
+		case 1: result_type = t_rawptr;        break;
+		}
+	} else if (is_type_dynamic_array(t)) {
+		switch (index) {
+		case 0: result_type = make_type_pointer(a, t->DynamicArray.elem); break;
+		case 1: result_type = t_int;                                      break;
+		case 2: result_type = t_int;                                      break;
+		case 3: result_type = t_allocator;                                break;
+		}
+	} else if (is_type_dynamic_map(t)) {
+		Type *gst = t->Map.generated_struct_type;
+		switch (index) {
+		case 0: result_type = gst->Record.fields[0]->type; break;
+		case 1: result_type = gst->Record.fields[1]->type; break;
+		}
+	} else {
+		GB_PANIC("TODO(bill): struct_ev type: %s, %d", type_to_string(s->type), index);
+	}
+
+	GB_ASSERT(result_type != NULL);
+
+	return ssa_new_value1i(p, ssaOp_ValueIndex, result_type, index, s);
+}
+
+
+ssaValue *ssa_emit_deep_field_ptr_index(ssaProc *p, ssaValue *e, Selection sel) {
+	GB_ASSERT(sel.index.count > 0);
+	Type *type = type_deref(e->type);
+
+	for_array(i, sel.index) {
+		i32 index = cast(i32)sel.index.e[i];
+		if (is_type_pointer(type)) {
+			type = type_deref(type);
+			e = ssa_emit_load(p, e);
+		}
+		type = base_type(type);
+
+
+		if (is_type_raw_union(type)) {
+			type = type->Record.fields[index]->type;
+			e = ssa_emit_conv(p, e, make_type_pointer(p->allocator, type));
+		} else if (type->kind == Type_Record) {
+			type = type->Record.fields[index]->type;
+			e = ssa_emit_ptr_index(p, e, index);
+		} else if (type->kind == Type_Tuple) {
+			type = type->Tuple.variables[index]->type;
+			e = ssa_emit_ptr_index(p, e, index);
+		}else if (type->kind == Type_Basic) {
+			switch (type->Basic.kind) {
+			case Basic_any: {
+				if (index == 0) {
+					type = t_type_info_ptr;
+				} else if (index == 1) {
+					type = t_rawptr;
+				}
+				e = ssa_emit_ptr_index(p, e, index);
+			} break;
+
+			case Basic_string:
+				e = ssa_emit_ptr_index(p, e, index);
+				break;
+
+			default:
+				GB_PANIC("un-gep-able type");
+				break;
+			}
+		} else if (type->kind == Type_Slice) {
+			e = ssa_emit_ptr_index(p, e, index);
+		} else if (type->kind == Type_DynamicArray) {
+			e = ssa_emit_ptr_index(p, e, index);
+		} else if (type->kind == Type_Vector) {
+			e = ssa_emit_array_index(p, e, ssa_const_int(p, t_int, index));
+		} else if (type->kind == Type_Array) {
+			e = ssa_emit_array_index(p, e, ssa_const_int(p, t_int, index));
+		} else if (type->kind == Type_Map) {
+			e = ssa_emit_ptr_index(p, e, 1);
+			switch (index) {
+			case 0: e = ssa_emit_ptr_index(p, e, 1); break; // count
+			case 1: e = ssa_emit_ptr_index(p, e, 2); break; // capacity
+			case 2: e = ssa_emit_ptr_index(p, e, 3); break; // allocator
+			}
+		} else {
+			GB_PANIC("un-gep-able type");
+		}
+	}
+
+	return e;
+}
+
+ssaValue *ssa_emit_deep_field_value_index(ssaProc *p, ssaValue *e, Selection sel) {
+	GB_ASSERT(sel.index.count > 0);
+	Type *type = e->type;
+	if (e->op == ssaOp_Load) {
+		if (!can_ssa_type(e->type)) {
+			ssaValue *ptr = ssa_emit_deep_field_ptr_index(p, e->args.e[0], sel);
+			return ssa_emit_load(p, ptr);
+		}
+	}
+	GB_ASSERT(can_ssa_type(e->type));
+
+	for_array(i, sel.index) {
+		i32 index = cast(i32)sel.index.e[i];
+		if (is_type_pointer(type)) {
+			e = ssa_emit_load(p, e);
+		}
+		type = base_type(type);
+
+
+		if (is_type_raw_union(type)) {
+			GB_PANIC("TODO(bill): IS THIS EVEN CORRECT?");
+			type = type->Record.fields[index]->type;
+			e = ssa_emit_conv(p, e, type);
+		} else if (type->kind == Type_Map) {
+			e = ssa_emit_value_index(p, e, 1);
+			switch (index) {
+			case 0: e = ssa_emit_value_index(p, e, 1); break; // count
+			case 1: e = ssa_emit_value_index(p, e, 2); break; // capacity
+			case 2: e = ssa_emit_value_index(p, e, 3); break; // allocator
+			}
+		} else {
+			e = ssa_emit_value_index(p, e, index);
+		}
+	}
+
+	return e;
+}
+
+
+
+
+
 ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 	switch (expr->kind) {
 	case_ast_node(i, Ident, expr);
@@ -860,6 +941,71 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 
 	case_ast_node(pe, ParenExpr, expr);
 		return ssa_build_addr(p, unparen_expr(expr));
+	case_end;
+
+	case_ast_node(se, SelectorExpr, expr);
+		ssa_emit_comment(p, str_lit("SelectorExpr"));
+		AstNode *sel = unparen_expr(se->selector);
+		if (sel->kind == AstNode_Ident) {
+			String selector = sel->Ident.string;
+			TypeAndValue *tav = type_and_value_of_expression(p->module->info, se->expr);
+
+			if (tav == NULL) {
+				// NOTE(bill): Imports
+				Entity *imp = entity_of_ident(p->module->info, se->expr);
+				if (imp != NULL) {
+					GB_ASSERT(imp->kind == Entity_ImportName);
+				}
+				return ssa_build_addr(p, se->selector);
+			}
+
+
+			Type *type = base_type(tav->type);
+			if (tav->mode == Addressing_Type) { // Addressing_Type
+				GB_PANIC("TODO: SelectorExpr Addressing_Type");
+				// Selection sel = lookup_field(p->allocator, type, selector, true);
+				// Entity *e = sel.entity;
+				// GB_ASSERT(e->kind == Entity_Variable);
+				// GB_ASSERT(e->flags & EntityFlag_TypeField);
+				// String name = e->token.string;
+				// if (str_eq(name, str_lit("names"))) {
+				// 	ssaValue *ti_ptr = ir_type_info(p, type);
+
+				// 	ssaValue *names_ptr = NULL;
+
+				// 	if (is_type_enum(type)) {
+				// 		ssaValue *enum_info = ssa_emit_conv(p, ti_ptr, t_type_info_enum_ptr);
+				// 		names_ptr = ssa_emit_ptr_index(p, enum_info, 1);
+				// 	} else if (type->kind == Type_Record) {
+				// 		ssaValue *record_info = ssa_emit_conv(p, ti_ptr, t_type_info_record_ptr);
+				// 		names_ptr = ssa_emit_ptr_index(p, record_info, 1);
+				// 	}
+				// 	return ssa_addr(names_ptr);
+				// } else {
+				// 	GB_PANIC("Unhandled TypeField %.*s", LIT(name));
+				// }
+				GB_PANIC("Unreachable");
+			}
+
+			Selection sel = lookup_field(p->allocator, type, selector, false);
+			GB_ASSERT(sel.entity != NULL);
+
+			ssaValue *a = ssa_build_addr(p, se->expr).addr;
+			a = ssa_emit_deep_field_ptr_index(p, a, sel);
+			return ssa_addr(a);
+		} else {
+			Type *type = base_type(type_of_expr(p->module->info, se->expr));
+			GB_ASSERT(is_type_integer(type));
+			ExactValue val = type_and_value_of_expression(p->module->info, sel)->value;
+			i64 index = val.value_integer;
+
+			Selection sel = lookup_field_from_index(p->allocator, type, index);
+			GB_ASSERT(sel.entity != NULL);
+
+			ssaValue *a = ssa_build_addr(p, se->expr).addr;
+			a = ssa_emit_deep_field_ptr_index(p, a, sel);
+			return ssa_addr(a);
+		}
 	case_end;
 	}
 
@@ -1088,6 +1234,131 @@ ssaOp ssa_determine_op(TokenKind op, Type *t) {
 	return ssaOp_Invalid;
 }
 
+ssaValue *ssa_emit_comp(ssaProc *p, TokenKind op, ssaValue *x, ssaValue *y) {
+	GB_ASSERT(x != NULL && y != NULL);
+	Type *a = core_type(x->type);
+	Type *b = core_type(y->type);
+	if (are_types_identical(a, b)) {
+		// NOTE(bill): No need for a conversion
+	} else if (ssa_is_op_const(x->op)) {
+		x = ssa_emit_conv(p, x, y->type);
+	} else if (ssa_is_op_const(y->op)) {
+		y = ssa_emit_conv(p, y, x->type);
+	}
+
+	Type *result = t_bool;
+	if (is_type_vector(a)) {
+		result = make_type_vector(p->allocator, t_bool, a->Vector.count);
+	}
+
+	if (is_type_vector(a)) {
+		ssa_emit_comment(p, str_lit("vector.comp.begin"));
+		Type *tl = base_type(a);
+		ssaValue *lhs = ssa_address_from_load_or_generate_local(p, x);
+		ssaValue *rhs = ssa_address_from_load_or_generate_local(p, y);
+
+		GB_ASSERT(is_type_vector(result));
+		Type *elem_type = base_type(result)->Vector.elem;
+
+		ssaAddr addr = ssa_add_local_generated(p, result);
+		for (i32 i = 0; i < tl->Vector.count; i++) {
+			ssaValue *index = ssa_const_int(p, t_int, i);
+			ssaValue *x = ssa_emit_load(p, ssa_emit_array_index(p, lhs, index));
+			ssaValue *y = ssa_emit_load(p, ssa_emit_array_index(p, rhs, index));
+			ssaValue *z = ssa_emit_comp(p, op, x, y);
+			ssa_emit_store(p, ssa_emit_array_index(p, addr.addr, index), z);
+		}
+
+		ssa_emit_comment(p, str_lit("vector.comp.end"));
+		return ssa_addr_load(p, addr);
+	}
+
+	return ssa_new_value2(p, ssa_determine_op(op, x->type), x->type, x, y);
+}
+
+
+
+ssaValue *ssa_build_cond(ssaProc *p, AstNode *cond, ssaBlock *yes, ssaBlock *no) {
+	switch (cond->kind) {
+	case_ast_node(pe, ParenExpr, cond);
+		return ssa_build_cond(p, pe->expr, yes, no);
+	case_end;
+
+	case_ast_node(ue, UnaryExpr, cond);
+		if (ue->op.kind == Token_Not) {
+			return ssa_build_cond(p, ue->expr, no, yes);
+		}
+	case_end;
+
+	case_ast_node(be, BinaryExpr, cond);
+		if (be->op.kind == Token_CmpAnd) {
+			ssaBlock *block = ssa_new_block(p, ssaBlock_Plain, "cmd.and");
+			ssa_build_cond(p, be->left, block, no);
+			ssa_start_block(p, block);
+			return ssa_build_cond(p, be->right, yes, no);
+		} else if (be->op.kind == Token_CmpOr) {
+			ssaBlock *block = ssa_new_block(p, ssaBlock_Plain, "cmp.or");
+			ssa_build_cond(p, be->left, yes, block);
+			ssa_start_block(p, block);
+			return ssa_build_cond(p, be->right, yes, no);
+		}
+	case_end;
+	}
+
+	ssaValue *c = ssa_build_expr(p, cond);
+	ssaBlock *b = ssa_end_block(p);
+	b->kind = ssaBlock_If;
+	ssa_set_control(b, c);
+	ssa_add_edge_to(b, yes);
+	ssa_add_edge_to(b, no);
+	return c;
+}
+
+ssaValue *ssa_emit_logical_binary_expr(ssaProc *p, AstNode *expr) {
+	ast_node(be, BinaryExpr, expr);
+
+	ssaBlock *rhs = ssa_new_block(p, ssaBlock_Plain, "logical.cmp.rhs");
+	ssaBlock *done = ssa_new_block(p, ssaBlock_Plain, "logical.cmp.done");
+
+	GB_ASSERT(p->curr_block != NULL);
+
+	Type *type = default_type(type_of_expr(p->module->info, expr));
+
+	bool short_circuit_value = false;
+	if (be->op.kind == Token_CmpAnd) {
+		ssa_build_cond(p, be->left, rhs, done);
+		short_circuit_value = false;
+	} else if (be->op.kind == Token_CmpOr) {
+		ssa_build_cond(p, be->left, done, rhs);
+		short_circuit_value = true;
+	}
+	if (rhs->preds.count == 0) {
+		ssa_start_block(p, done);
+		return ssa_const_bool(p, type, short_circuit_value);
+	}
+
+	if (done->preds.count == 0) {
+		ssa_start_block(p, rhs);
+		return ssa_build_expr(p, be->right);
+	}
+
+	ssa_start_block(p, rhs);
+	ssaValue *short_circuit = ssa_const_bool(p, type, short_circuit_value);
+	ssaValueArgs edges = {0};
+	ssa_init_value_args(&edges, p->allocator);
+	for_array(i, done->preds) {
+		ssa_add_arg(&edges, short_circuit);
+	}
+
+	ssa_add_arg(&edges, ssa_build_expr(p, be->right));
+	ssa_emit_jump(p, done);
+	ssa_start_block(p, done);
+
+	ssaValue *phi = ssa_new_value0(p, ssaOp_Phi, type);
+	phi->args = edges;
+	return phi;
+}
+
 ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 	expr = unparen_expr(expr);
 
@@ -1106,7 +1377,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 		} else if (is_type_integer(t)) {
 			GB_ASSERT(tv->value.kind == ExactValue_Integer);
 
-			i64 s = 8*type_size_of(p->module->allocator, t);
+			i64 s = 8*type_size_of(p->allocator, t);
 			switch (s) {
 			case 8:  return ssa_const_i8 (p, tv->type, tv->value.value_integer);
 			case 16: return ssa_const_i16(p, tv->type, tv->value.value_integer);
@@ -1116,7 +1387,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 			}
 		} else if (is_type_float(t)) {
 			GB_ASSERT(tv->value.kind == ExactValue_Float);
-			i64 s = 8*type_size_of(p->module->allocator, t);
+			i64 s = 8*type_size_of(p->allocator, t);
 			switch (s) {
 			case 32: return ssa_const_f32(p, tv->type, tv->value.value_float);
 			case 64: return ssa_const_f64(p, tv->type, tv->value.value_float);
@@ -1170,41 +1441,40 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
 		case Token_Pointer: {
-			ssaValue *ptr = ssa_build_addr(p, ue->expr).addr;
-			return ssa_new_value1(p->curr_block, ssaOp_Copy, tv->type, ptr);
+			return ssa_build_addr(p, ue->expr).addr;
 		} break;
 
 		case Token_Add:
 			return ssa_build_expr(p, ue->expr);
 
 		case Token_Not: // Boolean not
-			return ssa_new_value1(p->curr_block, ssaOp_NotB, tv->type, ssa_build_expr(p, ue->expr));
+			return ssa_new_value1(p, ssaOp_NotB, tv->type, ssa_build_expr(p, ue->expr));
 		case Token_Xor: { // Bitwise not
 			ssaValue *x = ssa_build_expr(p, ue->expr);
-			isize bits = 8*type_size_of(p->module->allocator, x->type);
+			isize bits = 8*type_size_of(p->allocator, x->type);
 			switch (bits) {
-			case  8: return ssa_new_value1(p->curr_block, ssaOp_Not8,  tv->type, x);
-			case 16: return ssa_new_value1(p->curr_block, ssaOp_Not16, tv->type, x);
-			case 32: return ssa_new_value1(p->curr_block, ssaOp_Not32, tv->type, x);
-			case 64: return ssa_new_value1(p->curr_block, ssaOp_Not64, tv->type, x);
+			case  8: return ssa_new_value1(p, ssaOp_Not8,  tv->type, x);
+			case 16: return ssa_new_value1(p, ssaOp_Not16, tv->type, x);
+			case 32: return ssa_new_value1(p, ssaOp_Not32, tv->type, x);
+			case 64: return ssa_new_value1(p, ssaOp_Not64, tv->type, x);
 			}
 			GB_PANIC("unknown integer size");
 		} break;
 
 		case Token_Sub: { // 0-x
 			ssaValue *x = ssa_build_expr(p, ue->expr);
-			isize bits = 8*type_size_of(p->module->allocator, x->type);
+			isize bits = 8*type_size_of(p->allocator, x->type);
 			if (is_type_integer(x->type)) {
 				switch (bits) {
-				case  8: return ssa_new_value1(p->curr_block, ssaOp_Neg8,  tv->type, x);
-				case 16: return ssa_new_value1(p->curr_block, ssaOp_Neg16, tv->type, x);
-				case 32: return ssa_new_value1(p->curr_block, ssaOp_Neg32, tv->type, x);
-				case 64: return ssa_new_value1(p->curr_block, ssaOp_Neg64, tv->type, x);
+				case  8: return ssa_new_value1(p, ssaOp_Neg8,  tv->type, x);
+				case 16: return ssa_new_value1(p, ssaOp_Neg16, tv->type, x);
+				case 32: return ssa_new_value1(p, ssaOp_Neg32, tv->type, x);
+				case 64: return ssa_new_value1(p, ssaOp_Neg64, tv->type, x);
 				}
 			} else if (is_type_float(x->type)) {
 				switch (bits) {
-				case 32: return ssa_new_value1(p->curr_block, ssaOp_Neg32F, tv->type, x);
-				case 64: return ssa_new_value1(p->curr_block, ssaOp_Neg64F, tv->type, x);
+				case 32: return ssa_new_value1(p, ssaOp_Neg32F, tv->type, x);
+				case 64: return ssa_new_value1(p, ssaOp_Neg64F, tv->type, x);
 				}
 			}
 			GB_PANIC("unknown type for -x");
@@ -1228,7 +1498,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 			ssaValue *x = ssa_build_expr(p, be->left);
 			ssaValue *y = ssa_build_expr(p, be->right);
 			GB_ASSERT(x != NULL && y != NULL);
-			return ssa_new_value2(p->curr_block, ssa_determine_op(be->op.kind, x->type), tv->type, x, y);
+			return ssa_new_value2(p, ssa_determine_op(be->op.kind, x->type), tv->type, x, y);
 		}
 
 		case Token_Shl:
@@ -1245,15 +1515,12 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 		case Token_GtEq: {
 			ssaValue *x = ssa_build_expr(p, be->left);
 			ssaValue *y = ssa_build_expr(p, be->right);
-			GB_ASSERT(x != NULL && y != NULL);
-			return ssa_new_value2(p->curr_block, ssa_determine_op(be->op.kind, x->type), tv->type, x, y);
+			return ssa_emit_comp(p, be->op.kind, x, y);
 		} break;
 
 		case Token_CmpAnd:
 		case Token_CmpOr:
-			GB_PANIC("TODO: inline && and ||");
-			return NULL;
-			// return ir_emit_logical_binary_expr(proc, expr);
+			return ssa_emit_logical_binary_expr(p, expr);
 
 		default:
 			GB_PANIC("Invalid binary expression");
@@ -1275,48 +1542,6 @@ void ssa_build_stmt_list(ssaProc *p, AstNodeArray nodes) {
 }
 
 
-ssaValue *ssa_emit_struct_ep(ssaProc *p, ssaValue *ptr, i32 index) {
-	GB_ASSERT(ptr->type != NULL);
-	GB_ASSERT(is_type_pointer(ptr->type));
-	return NULL;
-}
-
-
-ssaValue *ssa_build_cond(ssaProc *p, AstNode *cond, ssaBlock *yes, ssaBlock *no) {
-	switch (cond->kind) {
-	case_ast_node(pe, ParenExpr, cond);
-		return ssa_build_cond(p, pe->expr, yes, no);
-	case_end;
-
-	case_ast_node(ue, UnaryExpr, cond);
-		if (ue->op.kind == Token_Not) {
-			return ssa_build_cond(p, ue->expr, no, yes);
-		}
-	case_end;
-
-	case_ast_node(be, BinaryExpr, cond);
-		if (be->op.kind == Token_CmpAnd) {
-			ssaBlock *block = ssa_new_block(p, ssaBlock_Plain, "cmd.and");
-			ssa_build_cond(p, be->left, block, no);
-			ssa_start_block(p, block);
-			return ssa_build_cond(p, be->right, yes, no);
-		} else if (be->op.kind == Token_CmpOr) {
-			ssaBlock *block = ssa_new_block(p, ssaBlock_Plain, "cmp.or");
-			ssa_build_cond(p, be->left, yes, block);
-			ssa_start_block(p, block);
-			return ssa_build_cond(p, be->right, yes, no);
-		}
-	case_end;
-	}
-
-	ssaValue *c = ssa_build_expr(p, cond);
-	ssaBlock *b = ssa_end_block(p);
-	b->kind = ssaBlock_If;
-	ssa_set_control(b, c);
-	ssa_add_edge_to(b, yes);
-	ssa_add_edge_to(b, no);
-	return c;
-}
 
 void ssa_build_when_stmt(ssaProc *p, AstNodeWhenStmt *ws) {
 	ssaValue *cond = ssa_build_expr(p, ws->cond);
@@ -1370,9 +1595,11 @@ void ssa_build_stmt(ssaProc *p, AstNode *node) {
 	case_end;
 
 	case_ast_node(us, UsingStmt, node);
-		AstNode *decl = unparen_expr(us->node);
-		if (decl->kind == AstNode_ValueDecl) {
-			ssa_build_stmt(p, decl);
+		for_array(i, us->list) {
+			AstNode *decl = unparen_expr(us->list.e[i]);
+			if (decl->kind == AstNode_ValueDecl) {
+				ssa_build_stmt(p, decl);
+			}
 		}
 	case_end;
 
@@ -1426,7 +1653,7 @@ void ssa_build_stmt(ssaProc *p, AstNode *node) {
 					if (init->op == ssaOp_Addr && t->kind == Type_Tuple) {
 						for (isize i = 0; i < t->Tuple.variable_count; i++) {
 							Entity *e = t->Tuple.variables[i];
-							ssaValue *v = ssa_emit_struct_ep(p, init, i);
+							ssaValue *v = ssa_emit_ptr_index(p, init, i);
 							array_add(&inits, v);
 						}
 					} else {
@@ -1492,7 +1719,7 @@ void ssa_build_stmt(ssaProc *p, AstNode *node) {
 					if (init->op == ssaOp_Addr && t->kind == Type_Tuple) {
 						for (isize i = 0; i < t->Tuple.variable_count; i++) {
 							Entity *e = t->Tuple.variables[i];
-							ssaValue *v = ssa_emit_struct_ep(p, init, i);
+							ssaValue *v = ssa_emit_ptr_index(p, init, i);
 							array_add(&inits, v);
 						}
 					} else {
@@ -1839,6 +2066,9 @@ void ssa_print_proc(gbFile *f, ssaProc *p) {
 }
 
 
+void ssa_opt_proc(ssaProc *p) {
+}
+
 void ssa_build_proc(ssaModule *m, ssaProc *p) {
 	p->module = m;
 	m->proc = p;
@@ -1859,6 +2089,8 @@ void ssa_build_proc(ssaModule *m, ssaProc *p) {
 
 	p->exit = ssa_new_block(p, ssaBlock_Exit, "exit");
 	ssa_emit_jump(p, p->exit);
+
+	ssa_opt_proc(p);
 
 	ssa_print_proc(gb_file_get_standard(gbFileStandard_Error), p);
 }

@@ -10,40 +10,18 @@
 #import win32 "sys/windows.odin";
 
 main :: proc() {
-	fmt.println("Here");
-when false {
 /*
-	Version 0.1.1
-
 	Added:
-	 * Dynamic Arrays `[dynamic]Type`
-	 * Dynamic Maps   `map[Key]Value`
-	 * Dynamic array and map literals
-	 * Custom struct alignemnt `struct #align 8 { bar: i8 }`
-	 * Allow `_` in numbers
-	 * Variadic `append`
-	 * fmt.sprint*
-	 * Entities prefixes with an underscore do not get exported on imports
-	 * Overloaded `free` for pointers, slices, strings, dynamic arrays, and dynamic maps
-	 * enum types have an implict `names` field, a []string of all the names in that enum
-	 * immutable variables are "completely immutable" - rules need a full explanation
-	 * `slice_to_bytes` - convert any slice to a slice of bytes
-	 * `union_cast` allows for optional ok check
-	 * Record type field `names` (struct/raw_union/enum)
-	 * ?: ternary operator
-	 * Unions with variants and common fields
-	 * New built-in procedures
-	     - `delete` to delete map entries `delete(m, key)`
-	     - `clear` to clear dynamic maps and arrays `clear(map_or_array)`
-	     - `reserve` to reserve space for the dynamic maps and arrays `reserve(map_or_array)`
-	 * Unexported entities and fields using an underscore prefix
+		* Unexported entities and fields using an underscore prefix
+			- See `sync.odin` and explain
 
 	Removed:
 	 * Maybe/option types
 	 * Remove `type` keyword and other "reserved" keywords
-	 * `compile_assert` and `assert`return the value of the condition for semantic reasons
+	 * ..< and ... removed and replace with .. (half-closed range)
 
 	Changed:
+	 * `compile_assert` and `assert`return the value of the condition for semantic reasons
 	 * thread_local -> #thread_local
 	 * #include -> #load
 	 * Files only get checked if they are actually used
@@ -51,20 +29,7 @@ when false {
 	 * Version numbering now starts from 0.1.0 and uses the convention:
 	 	- major.minor.patch
 	 * Core library additions to Windows specific stuff
-
-	Fixes:
-	 * Many fmt.* fixes
-	 * Overloading bug due to comparison of named types
-	 * Overloading bug due to `#import .` collision
-	 * disallow a `cast` from pointers of unions
-	 * Minor bugs in generated IR code for slices
-
-	To come very Soon™:
-	 * Linux and OS X builds (unofficial ones do exist already)
-*/
-	{
-
-	}
+ */
 
 	{
 		Fruit :: enum {
@@ -73,6 +38,147 @@ when false {
 			COCONUT,
 		}
 		fmt.println(Fruit.names);
+	}
+
+	{
+		A :: struct           {x, y: f32};
+		B :: struct #align 16 {x, y: f32};
+		fmt.println("align_of(A) =", align_of(A));
+		fmt.println("align_of(B) =", align_of(B));
+	}
+
+	{
+		// Removal of ..< and ...
+		for i in 0..16 {
+		}
+		// Is similar to
+		for _i := 0; _i < 16; _i++ { immutable i := _i;
+		}
+	}
+
+	{
+	#label thing
+		for i in 0..10 {
+			for j := i+1; j < 10; j++ {
+				if j == 2 {
+					fmt.println(i, j);
+					break thing;
+				}
+			}
+		}
+		return;
+	}
+
+	{
+		cond := true;
+		x: int;
+		if cond {
+			x = 3;
+		} else {
+			x = 4;
+		}
+
+
+		// Ternary operator
+		y := cond ? 3 : 4;
+
+		FOO :: true ? 123 : 432; // Constant ternary operation
+		fmt.println("Ternary values:", y, FOO);
+	}
+
+	{
+		// Slices now store a capacity
+		buf: [256]byte;
+		s: []byte;
+		s = buf[..0]; // == buf[0..0];
+		fmt.println("count =", s.count);
+		fmt.println("capacity =", s.capacity);
+		append(s, 1, 2, 3);
+		fmt.println(s);
+
+		s = buf[1..2..3];
+		fmt.println("count =", s.count);
+		fmt.println("capacity =", s.capacity);
+		fmt.println(s);
+
+		clear(s); // Sets count to zero
+		s.count = 0; // Equivalent
+	}
+
+	{
+		Foo :: struct {
+			x, y, z: f32,
+			ok:      bool,
+			flags:   u32,
+		}
+		foo_array: [256]Foo;
+		foo_as_bytes: []byte = slice_to_bytes(foo_array[..]);
+		// Useful for things like
+		// os.write(handle, foo_as_bytes);
+
+		foo_slice := slice_ptr(cast(^Foo)foo_as_bytes.data, foo_as_bytes.count/size_of(Foo), foo_as_bytes.capacity/size_of(Foo));
+		// Question: Should there be a bytes_to_slice procedure or is it clearer to do this even if it is error prone?
+		// And if so what would the syntax be?
+		// slice_transmute([]Foo, foo_as_bytes);
+	}
+
+	{
+		Vec3 :: [vector 3]f32;
+
+		x := Vec3{1, 2, 3};
+		y := Vec3{4, 5, 6};
+		fmt.println(x < y);
+		fmt.println(x + y);
+		fmt.println(x - y);
+		fmt.println(x * y);
+		fmt.println(x / y);
+
+		for i in x {
+			fmt.println(i);
+		}
+
+		compile_assert(size_of([vector 7]bool) == size_of([7]bool));
+		compile_assert(size_of([vector 7]i32) == size_of([7]i32));
+		// align_of([vector 7]i32) != align_of([7]i32) // this may be the case
+	}
+
+	{
+		// fmt.* changes
+		// bprint* returns `int` (bytes written)
+		// sprint* returns `string` (bytes written as a string)
+
+		data: [256]byte;
+		str := fmt.sprintf(data[..0], "Hellope %d %s %c", 123, "others", '!');
+		fmt.println(str);
+
+		buf := data[..0];
+		count := fmt.bprintf(^buf, "Hellope %d %s %c", 123, "others", '!');
+		fmt.println(cast(string)buf[..count]);
+
+		// NOTE(bill): We may change this but because this is a library feature, I am not that bothered yet
+	}
+
+	{
+		x: [dynamic]f64;
+		reserve(x, 16);
+		defer free(x); // `free` is overloaded for numerous types
+		// Number literals can have underscores in them for readability
+		append(x, 2_000_000.500_000, 3, 5, 7); // variadic append
+
+		for p, i in x {
+			if i > 0 { fmt.print(", "); }
+			fmt.print(p);
+		}
+		fmt.println();
+	}
+
+	{
+		// Dynamic array "literals"
+		x := [dynamic]f64{2_000_000.500_000, 3, 5, 7};
+		defer free(x);
+		fmt.println(x); // fmt.print* supports printing of dynamic types
+		clear(x);
+		fmt.println(x);
 	}
 
 	{
@@ -109,49 +215,79 @@ when false {
 		c := m["c"];
 		_, ok := m["c"];
 		assert(ok && c == 7654);
+		fmt.println(m);
+
+		delete(m, "c"); // deletes entry with key "c"
+		_, found := m["c"];
+		assert(!found);
 
 		fmt.println(m);
+		clear(m);
+		fmt.println(m);
+
+		// NOTE: Fixed size maps are planned but we have not yet implemented
+		// them as we have had no need for them as of yet
 	}
 
 	{
-		x: [dynamic]f64;
-		reserve(x, 16);
-		defer free(x);
-		append(x, 2_000_000.500_000, 3, 5, 7);
+		Vector3 :: struct{x, y, z: f32};
+		Quaternion :: struct{x, y, z, w: f32};
 
-		for p, i in x {
-			if i > 0 { fmt.print(", "); }
-			fmt.print(p);
-		}
-		fmt.println();
-	}
+		Entity :: union {
+			// Common Fields
+			id:             u64,
+			name:           string,
+			using position: Vector3,
+			orientation:    Quaternion,
+			flags:          u32,
 
-	{
-		x := [dynamic]f64{2_000_000.500_000, 3, 5, 7};
-		defer free(x);
-		fmt.println(x);
-	}
-
-
-	{
-		Vec3 :: [vector 3]f32;
-
-		x := Vec3{1, 2, 3};
-		y := Vec3{4, 5, 6};
-		fmt.println(x < y);
-		fmt.println(x + y);
-		fmt.println(x - y);
-		fmt.println(x * y);
-		fmt.println(x / y);
-
-		for i in x {
-			fmt.println(i);
+			// Variants
+			Frog{
+				ribbit_volume: f32,
+				jump_height:   f32,
+			},
+			Door{
+				openness: f32,
+			},
+			Map{
+				width, height:   f32,
+				place_positions: []Vector3,
+				place_names:     []string,
+			},
 		}
 
-		compile_assert(size_of([vector 7]bool) == size_of([7]bool));
-		compile_assert(size_of([vector 7]i32) == size_of([7]i32));
-		// align_of([vector 7]i32) != align_of([7]i32) // this may be the case
+		entity: Entity;
+		// implicit conversion from variant to base type
+		entity = Entity.Frog{
+			id = 1337,
+			ribbit_volume = 0.5,
+			jump_height = 2.1,
+			/*other data */
+		};
+
+		entity.name = "Frank";
+		entity.position = Vector3{1, 4, 9};
+
+		using Entity;
+		match e in entity {
+		case Frog:
+			fmt.println("Ribbit");
+		case Door:
+			fmt.println("Creak");
+		case Map:
+			fmt.println("Rustle");
+		default:
+			fmt.println("Just a normal entity");
+		}
+
+		if frog, ok := union_cast(Frog)entity; ok {
+			fmt.printf("The frog jumps %f feet high at %v\n", frog.jump_height, frog.position);
+		}
+
+		// Panics if not the correct type
+		frog: Frog;
+		frog = union_cast(Frog)entity;
+		frog, _ = union_cast(Frog)entity; // ignore error and force cast
 	}
-}
 }
 

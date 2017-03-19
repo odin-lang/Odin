@@ -219,6 +219,7 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 	}) \
 	AST_NODE_KIND(ForStmt, "for statement", struct { \
 		Token    token; \
+		AstNode *label; \
 		AstNode *init; \
 		AstNode *cond; \
 		AstNode *post; \
@@ -226,6 +227,7 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 	}) \
 	AST_NODE_KIND(RangeStmt, "range statement", struct { \
 		Token    token; \
+		AstNode *label; \
 		AstNode *value; \
 		AstNode *index; \
 		Token    in_token; \
@@ -249,10 +251,10 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 		AstNode *body;  \
 	}) \
 	AST_NODE_KIND(DeferStmt,  "defer statement",  struct { Token token; AstNode *stmt; }) \
-	AST_NODE_KIND(BranchStmt, "branch statement", struct { Token token; }) \
+	AST_NODE_KIND(BranchStmt, "branch statement", struct { Token token; AstNode *label; }) \
 	AST_NODE_KIND(UsingStmt,  "using statement",  struct { \
 		Token token;   \
-		AstNode *node; \
+		AstNodeArray list; \
 	}) \
 	AST_NODE_KIND(AsmOperand, "assembly operand", struct { \
 		Token string;     \
@@ -304,6 +306,10 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		String base_dir;       \
 		AstNode *cond;         \
 		bool is_system;        \
+	}) \
+	AST_NODE_KIND(Label, "label", struct { 	\
+		Token token; \
+		AstNode *name; \
 	}) \
 AST_NODE_KIND(_DeclEnd,   "", i32) \
 	AST_NODE_KIND(Field, "field", struct { \
@@ -499,6 +505,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_ValueDecl:      return ast_node_token(node->ValueDecl.names.e[0]);
 	case AstNode_ImportDecl:     return node->ImportDecl.token;
 	case AstNode_ForeignLibrary: return node->ForeignLibrary.token;
+	case AstNode_Label:      return node->Label.token;
 
 
 	case AstNode_Field:
@@ -869,9 +876,10 @@ AstNode *ast_return_stmt(AstFile *f, Token token, AstNodeArray results) {
 }
 
 
-AstNode *ast_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *post, AstNode *body) {
+AstNode *ast_for_stmt(AstFile *f, Token token, AstNode *label, AstNode *init, AstNode *cond, AstNode *post, AstNode *body) {
 	AstNode *result = make_ast_node(f, AstNode_ForStmt);
 	result->ForStmt.token = token;
+	result->ForStmt.label = label;
 	result->ForStmt.init  = init;
 	result->ForStmt.cond  = cond;
 	result->ForStmt.post  = post;
@@ -879,8 +887,9 @@ AstNode *ast_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, Ast
 	return result;
 }
 
-AstNode *ast_range_stmt(AstFile *f, Token token, AstNode *value, AstNode *index, Token in_token, AstNode *expr, AstNode *body) {
+AstNode *ast_range_stmt(AstFile *f, Token token, AstNode *label, AstNode *value, AstNode *index, Token in_token, AstNode *expr, AstNode *body) {
 	AstNode *result = make_ast_node(f, AstNode_RangeStmt);
+	result->RangeStmt.label = label;
 	result->RangeStmt.token = token;
 	result->RangeStmt.value = value;
 	result->RangeStmt.index = index;
@@ -924,18 +933,20 @@ AstNode *ast_defer_stmt(AstFile *f, Token token, AstNode *stmt) {
 	return result;
 }
 
-AstNode *ast_branch_stmt(AstFile *f, Token token) {
+AstNode *ast_branch_stmt(AstFile *f, Token token, AstNode *label) {
 	AstNode *result = make_ast_node(f, AstNode_BranchStmt);
 	result->BranchStmt.token = token;
+	result->BranchStmt.label = label;
 	return result;
 }
 
-AstNode *ast_using_stmt(AstFile *f, Token token, AstNode *node) {
+AstNode *ast_using_stmt(AstFile *f, Token token, AstNodeArray list) {
 	AstNode *result = make_ast_node(f, AstNode_UsingStmt);
 	result->UsingStmt.token = token;
-	result->UsingStmt.node  = node;
+	result->UsingStmt.list  = list;
 	return result;
 }
+
 
 AstNode *ast_asm_operand(AstFile *f, Token string, AstNode *operand) {
 	AstNode *result = make_ast_node(f, AstNode_AsmOperand);
@@ -1135,6 +1146,13 @@ AstNode *ast_foreign_library(AstFile *f, Token token, Token filepath, Token libr
 	result->ForeignLibrary.library_name = library_name;
 	result->ForeignLibrary.cond = cond;
 	result->ForeignLibrary.is_system = is_system;
+	return result;
+}
+
+AstNode *ast_label_decl(AstFile *f, Token token, AstNode *name) {
+	AstNode *result = make_ast_node(f, AstNode_Label);
+	result->Label.token = token;
+	result->Label.name  = name;
 	return result;
 }
 
@@ -2335,7 +2353,7 @@ AstNode *parse_block_stmt(AstFile *f, b32 is_when) {
 	return parse_body(f);
 }
 
-AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind separator, TokenKind follow);
+AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow);
 
 
 AstNode *parse_results(AstFile *f) {
@@ -2354,7 +2372,7 @@ AstNode *parse_results(AstFile *f) {
 
 	AstNode *list = NULL;
 	expect_token(f, Token_OpenParen);
-	list = parse_field_list(f, NULL, 0, Token_Comma, Token_CloseParen);
+	list = parse_field_list(f, NULL, 0, Token_CloseParen);
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	return list;
 }
@@ -2365,7 +2383,7 @@ AstNode *parse_proc_type(AstFile *f, AstNode **foreign_library_, String *foreign
 
 	Token proc_token = expect_token(f, Token_proc);
 	expect_token(f, Token_OpenParen);
-	params = parse_field_list(f, NULL, FieldFlag_Signature, Token_Comma, Token_CloseParen);
+	params = parse_field_list(f, NULL, FieldFlag_Signature, Token_CloseParen);
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	results = parse_results(f);
 
@@ -2382,17 +2400,6 @@ AstNode *parse_proc_type(AstFile *f, AstNode **foreign_library_, String *foreign
 	if (link_name_)       *link_name_       = link_name;
 
 	return ast_proc_type(f, proc_token, params, results, tags, cc);
-}
-
-bool parse_expect_separator(AstFile *f, TokenKind separator, AstNode *param) {
-	if (separator == Token_Semicolon) {
-		expect_semicolon(f, param);
-	} else {
-		if (!allow_token(f, separator)) {
-			return true;
-		}
-	}
-	return false;
 }
 
 AstNode *parse_var_type(AstFile *f, bool allow_ellipsis) {
@@ -2505,7 +2512,22 @@ AstNodeArray convert_to_ident_list(AstFile *f, AstNodeAndFlagsArray list, bool i
 	return idents;
 }
 
-AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind separator, TokenKind follow) {
+
+bool parse_expect_field_separator(AstFile *f, AstNode *param) {
+	Token token = f->curr_token;
+	if (allow_token(f, Token_Comma)) {
+		return true;
+	}
+	if (token.kind == Token_Semicolon) {
+		next_token(f);
+		error(f->curr_token, "Expected a comma, got a semicolon");
+		return true;
+	}
+	return false;
+}
+
+AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow) {
+	TokenKind separator = Token_Comma;
 	Token start_token = f->curr_token;
 
 	AstNodeArray params = make_ast_node_array(f);
@@ -2543,7 +2565,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 		AstNode *param = ast_field(f, names, type, set_flags);
 		array_add(&params, param);
 
-		parse_expect_separator(f, separator, type);
+		parse_expect_field_separator(f, type);
 
 		while (f->curr_token.kind != follow &&
 		       f->curr_token.kind != Token_EOF) {
@@ -2561,7 +2583,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 			AstNode *param = ast_field(f, names, type, set_flags);
 			array_add(&params, param);
 
-			if (parse_expect_separator(f, separator, param)) {
+			if (!parse_expect_field_separator(f, param)) {
 				break;
 			}
 		}
@@ -2590,7 +2612,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 
 
 AstNode *parse_record_fields(AstFile *f, isize *field_count_, u32 flags, String context) {
-	return parse_field_list(f, field_count_, flags, Token_Comma, Token_CloseBrace);
+	return parse_field_list(f, field_count_, flags, Token_CloseBrace);
 }
 
 AstNode *parse_type_or_ident(AstFile *f) {
@@ -2987,7 +3009,7 @@ AstNode *parse_return_stmt(AstFile *f) {
 // 	return ast_expr_stmt(f, ge);
 // }
 
-AstNode *parse_for_stmt(AstFile *f) {
+AstNode *parse_for_stmt(AstFile *f, AstNode *label) {
 	if (f->curr_proc == NULL) {
 		syntax_error(f->curr_token, "You cannot use a for statement in the file scope");
 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
@@ -3051,11 +3073,11 @@ AstNode *parse_for_stmt(AstFile *f) {
 		if (cond->AssignStmt.rhs.count > 0) {
 			rhs = cond->AssignStmt.rhs.e[0];
 		}
-		return ast_range_stmt(f, token, value, index, in_token, rhs, body);
+		return ast_range_stmt(f, token, label, value, index, in_token, rhs, body);
 	}
 
 	cond = convert_stmt_to_expr(f, cond, str_lit("boolean expression"));
-	return ast_for_stmt(f, token, init, cond, post, body);
+	return ast_for_stmt(f, token, label, init, cond, post, body);
 
 #if 0
 	Token token = expect_token(f, Token_for);
@@ -3262,7 +3284,7 @@ AstNode *parse_stmt(AstFile *f) {
 
 	case Token_if:     return parse_if_stmt(f);
 	case Token_when:   return parse_when_stmt(f);
-	case Token_for:    return parse_for_stmt(f);
+	case Token_for:    return parse_for_stmt(f, NULL);
 	case Token_match:  return parse_match_stmt(f);
 	case Token_defer:  return parse_defer_stmt(f);
 	case Token_asm:    return parse_asm_stmt(f);
@@ -3271,43 +3293,47 @@ AstNode *parse_stmt(AstFile *f) {
 
 	case Token_break:
 	case Token_continue:
-	case Token_fallthrough:
+	case Token_fallthrough: {
+		AstNode *label = NULL;
 		next_token(f);
-		s = ast_branch_stmt(f, token);
+		if (token.kind != Token_fallthrough &&
+		    f->curr_token.kind == Token_Ident) {
+			label = parse_ident(f);
+		}
+		s = ast_branch_stmt(f, token, label);
 		expect_semicolon(f, s);
 		return s;
+	}
 
 	case Token_using: {
 		// TODO(bill): Make using statements better
 		Token token = expect_token(f, Token_using);
-		AstNode *node = parse_stmt(f);
+		AstNodeArray list = parse_lhs_expr_list(f);
+		if (list.count == 0) {
+			syntax_error(token, "Illegal use of `using` statement");
+			expect_semicolon(f, NULL);
+			return ast_bad_stmt(f, token, f->curr_token);
+		}
 
-		switch (node->kind) {
-		case AstNode_ValueDecl:
-			if (!node->ValueDecl.is_var) {
+		if (f->curr_token.kind != Token_Colon) {
+			expect_semicolon(f, list.e[list.count-1]);
+			return ast_using_stmt(f, token, list);
+		}
+
+		AstNode *decl = parse_simple_stmt(f, false);
+		expect_semicolon(f, decl);
+
+		if (decl->kind == AstNode_ValueDecl) {
+			if (!decl->ValueDecl.is_var) {
 				syntax_error(token, "`using` may not be applied to constant declarations");
+				return decl;
+			}
+			if (f->curr_proc == NULL) {
+				syntax_error(token, "`using` is not allowed at the file scope");
 			} else {
-				if (f->curr_proc == NULL) {
-					syntax_error(token, "`using` is not allowed at the file scope");
-				} else {
-					node->ValueDecl.flags |= VarDeclFlag_using;
-				}
+				decl->ValueDecl.flags |= VarDeclFlag_using;
 			}
-			return node;
-		case AstNode_ExprStmt: {
-			AstNode *e = unparen_expr(node->ExprStmt.expr);
-			while (e->kind == AstNode_SelectorExpr) {
-				e = unparen_expr(e->SelectorExpr.selector);
-			}
-			if (e->kind == AstNode_Ident) {
-				return ast_using_stmt(f, token, node);
-			} else if (e->kind == AstNode_Implicit) {
-				syntax_error(token, "Illegal use of `using` statement with implicit value `%.*s`", LIT(e->Implicit.string));
-				return ast_bad_stmt(f, token, f->curr_token);
-			}
-		} break;
-
-
+			return decl;
 		}
 
 		syntax_error(token, "Illegal use of `using` statement");
@@ -3518,6 +3544,20 @@ AstNode *parse_stmt(AstFile *f) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return s;
+		} else if (str_eq(tag, str_lit("label"))) {
+			AstNode *name = parse_ident(f);
+			AstNode *label = ast_label_decl(f, token, name);
+
+			Token tok = f->curr_token;
+			switch (tok.kind) {
+			case Token_for:
+				return parse_for_stmt(f, label);
+			default:
+				syntax_error(token, "#label may only be applied to a loop");
+				fix_advance_to_next_stmt(f);
+				s = ast_bad_stmt(f, token, f->curr_token);
+				return s;
+			}
 		}
 
 
