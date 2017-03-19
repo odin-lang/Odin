@@ -942,7 +942,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 			ast_node(cc, CaseClause, stmt);
 
-
 			for_array(j, cc->list) {
 				AstNode *expr = cc->list.e[j];
 				Operand y = {0};
@@ -1058,7 +1057,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			break;
 		}
 
-
 		// NOTE(bill): Check for multiple defaults
 		AstNode *first_default = NULL;
 		ast_node(bs, BlockStmt, ms->body);
@@ -1093,7 +1091,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 
 
-		MapBool seen = {0};
+		MapBool seen = {0}; // Multimap
 		map_bool_init(&seen, heap_allocator());
 
 		for_array(i, bs->stmts) {
@@ -1107,69 +1105,68 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			// TODO(bill): Make robust
 			Type *bt = base_type(type_deref(x.type));
 
-			AstNode *type_expr = cc->list.count > 0 ? cc->list.e[0] : NULL;
 			Type *case_type = NULL;
-			if (type_expr != NULL) { // Otherwise it's a default expression
-				Operand y = {0};
-				check_expr_or_type(c, &y, type_expr);
+			for_array(type_index, cc->list) {
+				AstNode *type_expr = cc->list.e[type_index];
+				if (type_expr != NULL) { // Otherwise it's a default expression
+					Operand y = {0};
+					check_expr_or_type(c, &y, type_expr);
 
-				if (match_type_kind == MatchType_Union) {
-					GB_ASSERT(is_type_union(bt));
-					bool tag_type_found = false;
-					for (isize i = 0; i < bt->Record.variant_count; i++) {
-						Entity *f = bt->Record.variants[i];
-						if (are_types_identical(f->type, y.type)) {
-							tag_type_found = true;
-							break;
+					if (match_type_kind == MatchType_Union) {
+						GB_ASSERT(is_type_union(bt));
+						bool tag_type_found = false;
+						for (isize i = 0; i < bt->Record.variant_count; i++) {
+							Entity *f = bt->Record.variants[i];
+							if (are_types_identical(f->type, y.type)) {
+								tag_type_found = true;
+								break;
+							}
 						}
+						if (!tag_type_found) {
+							gbString type_str = type_to_string(y.type);
+							error_node(y.expr, "Unknown tag type, got `%s`", type_str);
+							gb_string_free(type_str);
+							continue;
+						}
+						case_type = y.type;
+					} else if (match_type_kind == MatchType_Any) {
+						case_type = y.type;
+					} else {
+						GB_PANIC("Unknown type to type match statement");
 					}
-					if (!tag_type_found) {
-						gbString type_str = type_to_string(y.type);
-						error_node(y.expr, "Unknown tag type, got `%s`", type_str);
-						gb_string_free(type_str);
-						continue;
-					}
-					case_type = y.type;
-				} else if (match_type_kind == MatchType_Any) {
-					case_type = y.type;
-				} else {
-					GB_PANIC("Unknown type to type match statement");
-				}
 
-				HashKey key = hash_pointer(y.type);
-				bool *found = map_bool_get(&seen, key);
-				if (found) {
-					TokenPos pos = cc->token.pos;
-					gbString expr_str = expr_to_string(y.expr);
-					error_node(y.expr,
-					           "Duplicate type case `%s`\n"
-					           "\tprevious type case at %.*s(%td:%td)",
-					           expr_str,
-					           LIT(pos.file), pos.line, pos.column);
-					gb_string_free(expr_str);
-					break;
+					HashKey key = hash_pointer(y.type);
+					bool *found = map_bool_get(&seen, key);
+					if (found) {
+						TokenPos pos = cc->token.pos;
+						gbString expr_str = expr_to_string(y.expr);
+						error_node(y.expr,
+						           "Duplicate type case `%s`\n"
+						           "\tprevious type case at %.*s(%td:%td)",
+						           expr_str,
+						           LIT(pos.file), pos.line, pos.column);
+						gb_string_free(expr_str);
+						break;
+					}
+					map_bool_set(&seen, key, cast(bool)true);
 				}
-				map_bool_set(&seen, key, cast(bool)true);
 			}
 
-			check_open_scope(c, stmt);
+			if (cc->list.count > 1) {
+				case_type = NULL;
+			}
 			if (case_type == NULL) {
-				case_type = type_deref(x.type);
+				case_type = x.type;
 			}
-
 			add_type_info_type(c, case_type);
 
+			check_open_scope(c, stmt);
 			{
-				// NOTE(bill): Dummy type
-				Type *tt = case_type;
-				if (is_type_pointer(x.type)) {
-					tt = make_type_pointer(c->allocator, case_type);
-					add_type_info_type(c, tt);
-				}
-				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, lhs->Ident, tt, true);
+				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, lhs->Ident, case_type, true);
 				tag_var->flags |= EntityFlag_Used;
 				add_entity(c, c->context.scope, lhs, tag_var);
 				add_entity_use(c, lhs, tag_var);
+				add_implicit_entity(c, stmt, tag_var);
 			}
 			check_stmt_list(c, cc->stmts, mod_flags);
 			check_close_scope(c);

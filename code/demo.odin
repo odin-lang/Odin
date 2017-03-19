@@ -69,6 +69,21 @@ main :: proc() {
 	}
 
 	{
+		t := type_info(int);
+		using Type_Info;
+		match i in t {
+		case Integer, Float:
+			fmt.println("It's a number");
+		}
+
+		x: any = 123;
+		match i in x {
+		case int, f32:
+			fmt.println("It's an int or f32");
+		}
+	}
+
+	{
 		cond := true;
 		x: int;
 		if cond {

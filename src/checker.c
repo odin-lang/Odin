@@ -165,7 +165,7 @@ bool is_operand_nil(Operand o) {
 
 typedef struct BlockLabel {
 	String   name;
-	AstNode *label; // AstNode_Label
+	AstNode *label; //  AstNode_Label;
 } BlockLabel;
 
 // DeclInfo is used to store information of certain declarations to allow for "any order" usage
@@ -286,6 +286,7 @@ typedef struct CheckerInfo {
 	MapScope             scopes;          // Key: AstNode * | Node       -> Scope
 	MapExprInfo          untyped;         // Key: AstNode * | Expression -> ExprInfo
 	MapDeclInfo          entities;        // Key: Entity *
+	MapEntity            implicits;        // Key: AstNode *
 	MapEntity            foreigns;        // Key: String
 	MapAstFile           files;           // Key: String (full path)
 	MapIsize             type_info_map;   // Key: Type *
@@ -674,6 +675,7 @@ void init_checker_info(CheckerInfo *i) {
 	map_decl_info_init(&i->entities,   a);
 	map_expr_info_init(&i->untyped,    a);
 	map_entity_init(&i->foreigns,      a);
+	map_entity_init(&i->implicits,     a);
 	map_isize_init(&i->type_info_map,  a);
 	map_ast_file_init(&i->files,       a);
 	i->type_info_count = 0;
@@ -688,6 +690,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_decl_info_destroy(&i->entities);
 	map_expr_info_destroy(&i->untyped);
 	map_entity_destroy(&i->foreigns);
+	map_entity_destroy(&i->implicits);
 	map_isize_destroy(&i->type_info_map);
 	map_ast_file_destroy(&i->files);
 }
@@ -872,6 +875,12 @@ void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclIn
 	map_decl_info_set(&c->info.entities, hash_pointer(e), d);
 }
 
+
+void add_implicit_entity(Checker *c, AstNode *node, Entity *e) {
+	GB_ASSERT(node != NULL);
+	GB_ASSERT(e != NULL);
+	map_entity_set(&c->info.implicits, hash_pointer(node), e);
+}
 
 
 void add_type_info_type(Checker *c, Type *t) {

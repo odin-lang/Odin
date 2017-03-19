@@ -2162,7 +2162,7 @@ AstNode *parse_expr(AstFile *f, bool lhs) {
 
 AstNodeArray parse_expr_list(AstFile *f, bool lhs) {
 	AstNodeArray list = make_ast_node_array(f);
-	do {
+	for (;;) {
 		AstNode *e = parse_expr(f, lhs);
 		array_add(&list, e);
 		if (f->curr_token.kind != Token_Comma ||
@@ -2170,7 +2170,7 @@ AstNodeArray parse_expr_list(AstFile *f, bool lhs) {
 		    break;
 		}
 		next_token(f);
-	} while (true);
+	}
 
 	return list;
 }
@@ -3099,9 +3099,17 @@ AstNode *parse_case_clause(AstFile *f) {
 
 AstNode *parse_type_case_clause(AstFile *f) {
 	Token token = f->curr_token;
-	AstNodeArray clause = make_ast_node_array(f);
+	AstNodeArray list = make_ast_node_array(f);
 	if (allow_token(f, Token_case)) {
-		array_add(&clause, parse_type(f));
+		for (;;) {
+			AstNode *t = parse_type(f);
+			array_add(&list, t);
+			if (f->curr_token.kind != Token_Comma ||
+			    f->curr_token.kind == Token_EOF) {
+			    break;
+			}
+			next_token(f);
+		}
 	} else {
 		expect_token(f, Token_default);
 	}
@@ -3109,7 +3117,7 @@ AstNode *parse_type_case_clause(AstFile *f) {
 	// expect_token(f, Token_ArrowRight); // TODO(bill): Is this the best syntax?
 	AstNodeArray stmts = parse_stmt_list(f);
 
-	return ast_case_clause(f, token, clause, stmts);
+	return ast_case_clause(f, token, list, stmts);
 }
 
 
