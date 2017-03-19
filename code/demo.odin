@@ -66,7 +66,6 @@ main :: proc() {
 				}
 			}
 		}
-		return;
 	}
 
 	{
@@ -82,7 +81,7 @@ main :: proc() {
 		// Ternary operator
 		y := cond ? 3 : 4;
 
-		FOO :: true ? 123 : 432; // Constant ternary operation
+		FOO :: true ? 123 : 432; // Constant ternary expression
 		fmt.println("Ternary values:", y, FOO);
 	}
 

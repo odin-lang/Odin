@@ -241,12 +241,14 @@ AST_NODE_KIND(_ComplexStmtBegin, "", i32) \
 	}) \
 	AST_NODE_KIND(MatchStmt, "match statement", struct { \
 		Token token;   \
+		AstNode *label; \
 		AstNode *init; \
 		AstNode *tag;  \
 		AstNode *body; \
 	}) \
 	AST_NODE_KIND(TypeMatchStmt, "type match statement", struct { \
 		Token    token; \
+		AstNode *label; \
 		AstNode *tag;   \
 		AstNode *body;  \
 	}) \
@@ -876,10 +878,9 @@ AstNode *ast_return_stmt(AstFile *f, Token token, AstNodeArray results) {
 }
 
 
-AstNode *ast_for_stmt(AstFile *f, Token token, AstNode *label, AstNode *init, AstNode *cond, AstNode *post, AstNode *body) {
+AstNode *ast_for_stmt(AstFile *f, Token token, AstNode *init, AstNode *cond, AstNode *post, AstNode *body) {
 	AstNode *result = make_ast_node(f, AstNode_ForStmt);
 	result->ForStmt.token = token;
-	result->ForStmt.label = label;
 	result->ForStmt.init  = init;
 	result->ForStmt.cond  = cond;
 	result->ForStmt.post  = post;
@@ -887,9 +888,8 @@ AstNode *ast_for_stmt(AstFile *f, Token token, AstNode *label, AstNode *init, As
 	return result;
 }
 
-AstNode *ast_range_stmt(AstFile *f, Token token, AstNode *label, AstNode *value, AstNode *index, Token in_token, AstNode *expr, AstNode *body) {
+AstNode *ast_range_stmt(AstFile *f, Token token, AstNode *value, AstNode *index, Token in_token, AstNode *expr, AstNode *body) {
 	AstNode *result = make_ast_node(f, AstNode_RangeStmt);
-	result->RangeStmt.label = label;
 	result->RangeStmt.token = token;
 	result->RangeStmt.value = value;
 	result->RangeStmt.index = index;
@@ -3009,7 +3009,7 @@ AstNode *parse_return_stmt(AstFile *f) {
 // 	return ast_expr_stmt(f, ge);
 // }
 
-AstNode *parse_for_stmt(AstFile *f, AstNode *label) {
+AstNode *parse_for_stmt(AstFile *f) {
 	if (f->curr_proc == NULL) {
 		syntax_error(f->curr_token, "You cannot use a for statement in the file scope");
 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
@@ -3073,51 +3073,11 @@ AstNode *parse_for_stmt(AstFile *f, AstNode *label) {
 		if (cond->AssignStmt.rhs.count > 0) {
 			rhs = cond->AssignStmt.rhs.e[0];
 		}
-		return ast_range_stmt(f, token, label, value, index, in_token, rhs, body);
+		return ast_range_stmt(f, token, value, index, in_token, rhs, body);
 	}
 
 	cond = convert_stmt_to_expr(f, cond, str_lit("boolean expression"));
-	return ast_for_stmt(f, token, label, init, cond, post, body);
-
-#if 0
-	Token token = expect_token(f, Token_for);
-	AstNodeArray names = parse_ident_list(f);
-	parse_check_name_list_for_reserves(f, names);
-	Token colon = expect_token_after(f, Token_in, "for name list");
-
-	isize prev_level = f->expr_level;
-	f->expr_level = -1;
-	AstNode *expr = parse_expr(f, false);
-	switch (f->curr_token.kind) {
-	case Token_HalfOpenRange:
-	case Token_Ellipsis: {
-		Token op = f->curr_token;
-		next_token(f);
-		AstNode *right = parse_expr(f, false);
-		expr = ast_interval_expr(f, op, expr, right);
-	} break;
-	}
-	f->expr_level = prev_level;
-
-	AstNode *value = NULL;
-	AstNode *index = NULL;
-	AstNode *body  = parse_block_stmt(f, false);
-
-	switch (names.count) {
-	case 1:
-		value = names.e[0];
-		break;
-	case 2:
-		value = names.e[0];
-		index = names.e[1];
-		break;
-	default:
-		error(token, "Expected at 1 or 2 identifiers");
-		return ast_bad_stmt(f, token, f->curr_token);
-	}
-
-	return ast_range_stmt(f, token, value, index, expr, body);
-#endif
+	return ast_for_stmt(f, token, init, cond, post, body);
 }
 
 
@@ -3284,7 +3244,7 @@ AstNode *parse_stmt(AstFile *f) {
 
 	case Token_if:     return parse_if_stmt(f);
 	case Token_when:   return parse_when_stmt(f);
-	case Token_for:    return parse_for_stmt(f, NULL);
+	case Token_for:    return parse_for_stmt(f);
 	case Token_match:  return parse_match_stmt(f);
 	case Token_defer:  return parse_defer_stmt(f);
 	case Token_asm:    return parse_asm_stmt(f);
@@ -3386,7 +3346,25 @@ AstNode *parse_stmt(AstFile *f) {
 		Token name = expect_token(f, Token_Ident);
 		String tag = name.string;
 
-		if (str_eq(tag, str_lit("import"))) {
+		if (str_eq(tag, str_lit("label"))) {
+			AstNode *name  = parse_ident(f);
+			AstNode *label = ast_label_decl(f, token, name);
+			AstNode *stmt  = parse_stmt(f);
+
+		#define _SET_LABEL(Kind_, label_) case GB_JOIN2(AstNode_, Kind_): (stmt->Kind_).label = label_; break
+			switch (stmt->kind) {
+			_SET_LABEL(ForStmt, label);
+			_SET_LABEL(RangeStmt, label);
+			_SET_LABEL(MatchStmt, label);
+			_SET_LABEL(TypeMatchStmt, label);
+			default:
+				syntax_error(token, "#label may only be applied to a loop");
+				break;
+			}
+		#undef _SET_LABEL
+
+			return stmt;
+		} else if (str_eq(tag, str_lit("import"))) {
 			AstNode *cond = NULL;
 			Token import_name = {0};
 
@@ -3544,22 +3522,7 @@ AstNode *parse_stmt(AstFile *f) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return s;
-		} else if (str_eq(tag, str_lit("label"))) {
-			AstNode *name = parse_ident(f);
-			AstNode *label = ast_label_decl(f, token, name);
-
-			Token tok = f->curr_token;
-			switch (tok.kind) {
-			case Token_for:
-				return parse_for_stmt(f, label);
-			default:
-				syntax_error(token, "#label may only be applied to a loop");
-				fix_advance_to_next_stmt(f);
-				s = ast_bad_stmt(f, token, f->curr_token);
-				return s;
-			}
 		}
-
 
 		if (str_eq(tag, str_lit("include"))) {
 			syntax_error(token, "#include is not a valid import declaration kind. Use #load instead");

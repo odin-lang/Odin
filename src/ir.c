@@ -2867,14 +2867,48 @@ void ir_mangle_add_sub_type_name(irModule *m, Entity *field, String parent) {
 }
 
 
+irBranchBlocks ir_lookup_branch_blocks(irProcedure *proc, AstNode *ident) {
+	GB_ASSERT(ident->kind == AstNode_Ident);
+	Entity **found = map_entity_get(&proc->module->info->uses, hash_pointer(ident));
+	GB_ASSERT(found != NULL);
+	Entity *e = *found;
+	GB_ASSERT(e->kind == Entity_Label);
+	for_array(i, proc->branch_blocks) {
+		irBranchBlocks *b = &proc->branch_blocks.e[i];
+		if (b->label == e->Label.node) {
+			return *b;
+		}
+	}
 
-void ir_push_target_list(irProcedure *proc, irBlock *break_, irBlock *continue_, irBlock *fallthrough_) {
+	GB_PANIC("Unreachable");
+	return (irBranchBlocks){0};
+}
+
+
+void ir_push_target_list(irProcedure *proc, AstNode *label, irBlock *break_, irBlock *continue_, irBlock *fallthrough_) {
 	irTargetList *tl = gb_alloc_item(proc->module->allocator, irTargetList);
 	tl->prev          = proc->target_list;
 	tl->break_        = break_;
 	tl->continue_     = continue_;
 	tl->fallthrough_  = fallthrough_;
 	proc->target_list = tl;
+
+	if (label != NULL) { // Set label blocks
+		GB_ASSERT(label->kind == AstNode_Label);
+
+		for_array(i, proc->branch_blocks) {
+			irBranchBlocks *b = &proc->branch_blocks.e[i];
+			GB_ASSERT(b->label != NULL && label != NULL);
+			GB_ASSERT(b->label->kind == AstNode_Label);
+			if (b->label == label) {
+				b->break_    = break_;
+				b->continue_ = continue_;
+				return;
+			}
+		}
+
+		GB_PANIC("ir_set_label_blocks: Unreachable");
+	}
 }
 
 void ir_pop_target_list(irProcedure *proc) {
@@ -4842,43 +4876,7 @@ void ir_build_range_interval(irProcedure *proc, AstNodeIntervalExpr *node, Type 
 	if (done_) *done_ = done;
 }
 
-void ir_set_label_blocks(irProcedure *proc, AstNode *label, irBlock *break_, irBlock *continue_) {
-	if (label == NULL) {
-		return;
-	}
-	GB_ASSERT(label->kind == AstNode_Label);
 
-
-	for_array(i, proc->branch_blocks) {
-		irBranchBlocks *b = &proc->branch_blocks.e[i];
-		GB_ASSERT(b->label != NULL && label != NULL);
-		GB_ASSERT(b->label->kind == AstNode_Label);
-		if (b->label == label) {
-			b->break_    = break_;
-			b->continue_ = continue_;
-			return;
-		}
-	}
-
-	GB_PANIC("ir_set_label_blocks: Unreachable");
-}
-
-irBranchBlocks ir_lookup_branch_blocks(irProcedure *proc, AstNode *ident) {
-	GB_ASSERT(ident->kind == AstNode_Ident);
-	Entity **found = map_entity_get(&proc->module->info->uses, hash_pointer(ident));
-	GB_ASSERT(found != NULL);
-	Entity *e = *found;
-	GB_ASSERT(e->kind == Entity_Label);
-	for_array(i, proc->branch_blocks) {
-		irBranchBlocks *b = &proc->branch_blocks.e[i];
-		if (b->label == e->Label.node) {
-			return *b;
-		}
-	}
-
-	GB_PANIC("Unreachable");
-	return (irBranchBlocks){0};
-}
 
 
 void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
@@ -5264,8 +5262,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			ir_start_block(proc, body);
 		}
 
-		ir_set_label_blocks(proc, fs->label, done, post);
-		ir_push_target_list(proc, done, post, NULL);
+		ir_push_target_list(proc, fs->label, done, post, NULL);
 
 		ir_open_scope(proc);
 		ir_build_stmt(proc, fs->body);
@@ -5399,8 +5396,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			ir_addr_store(proc, idx_addr, index);
 		}
 
-		ir_set_label_blocks(proc, rs->label, done, loop);
-		ir_push_target_list(proc, done, loop, NULL);
+		ir_push_target_list(proc, rs->label, done, loop, NULL);
 
 		ir_open_scope(proc);
 		ir_build_stmt(proc, rs->body);
@@ -5474,7 +5470,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			}
 			ir_start_block(proc, body);
 
-			ir_push_target_list(proc, done, NULL, fall);
+			ir_push_target_list(proc, ms->label, done, NULL, fall);
 			ir_open_scope(proc);
 			ir_build_stmt_list(proc, cc->stmts);
 			ir_close_scope(proc, irDeferExit_Default, body);
@@ -5489,7 +5485,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			ir_emit_jump(proc, default_block);
 			ir_start_block(proc, default_block);
 
-			ir_push_target_list(proc, done, NULL, default_fall);
+			ir_push_target_list(proc, ms->label, done, NULL, default_fall);
 			ir_open_scope(proc);
 			ir_build_stmt_list(proc, default_stmts);
 			ir_close_scope(proc, irDeferExit_Default, default_block);
@@ -5645,7 +5641,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 			ir_start_block(proc, body);
 
-			ir_push_target_list(proc, done, NULL, NULL);
+			ir_push_target_list(proc, ms->label, done, NULL, NULL);
 			ir_open_scope(proc);
 			ir_build_stmt_list(proc, cc->stmts);
 			ir_close_scope(proc, irDeferExit_Default, body);
@@ -5660,7 +5656,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			ir_emit_jump(proc, default_block);
 			ir_start_block(proc, default_block);
 
-			ir_push_target_list(proc, done, NULL, NULL);
+			ir_push_target_list(proc, ms->label, done, NULL, NULL);
 			ir_open_scope(proc);
 			ir_build_stmt_list(proc, default_stmts);
 			ir_close_scope(proc, irDeferExit_Default, default_block);
