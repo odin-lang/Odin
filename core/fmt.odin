@@ -498,7 +498,7 @@ _write_int :: proc(fi: ^Fmt_Info, u: u64, base: int, is_signed: bool, bit_size: 
 	}
 
 	match base {
-	case 2, 8, 10, 16:
+	case 2, 8, 10, 12, 16:
 		break;
 	default:
 		panic("_write_int: unknown base, whoops");

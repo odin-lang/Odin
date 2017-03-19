@@ -342,6 +342,7 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 		case 2:  i--; a[i] = 'b';
 		case 8:  i--; a[i] = 'o';
 		case 10: i--; a[i] = 'd';
+		case 12: i--; a[i] = 'z';
 		case 16: i--; a[i] = 'x';
 		default: ok = false;
 		}
