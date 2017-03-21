@@ -58,24 +58,12 @@ unix_dlsym   :: proc(handle: rawptr, symbol: ^u8) ->  (proc() #cc_c)            
 unix_dlclose :: proc(handle: rawptr) -> int                                       #foreign dl   "dlclose";
 unix_dlerror :: proc() -> ^u8                                                     #foreign dl   "dlerror";
 
-to_c_str :: proc(str: string) -> ^u8 {
-	cstr := new_slice(byte, str.count+1);
-	copy(cstr, cast([]byte)str);
-	cstr[str.count] = 0;
-	return cstr.data;
-}
-
-from_c_str :: proc(c_str: ^u8) -> string {
-	len := 0;
-	for s := c_str; s^ != 0; s += 1 {
-		len += 1;
-	}
-	return cast(string)slice_ptr(c_str, len);
-}
 // TODO(zangent): Change this to just `open` when Bill fixes overloading.
 open_simple :: proc(path: string, mode: int) -> (Handle, Errno) {
 	
-	handle := unix_open(to_c_str(path), mode);
+	cstr := strings.new_c_string(path);
+	handle := unix_open(cstr, mode);
+	free(cstr);
 	if(handle == -1) {
 		return 0, 1;
 	}
@@ -182,11 +170,13 @@ heap_free :: proc(ptr: rawptr) {
 }
 
 getenv :: proc(name: string) -> (string, bool) {
-	cstr: ^u8 = unix_getenv(to_c_str(name));
+	path_str := strings.new_c_string(name);
+	cstr: ^u8 = unix_getenv(path_str);
+	free(path_str);
 	if(cstr == nil) {
 		return "", false;
 	}
-	return from_c_str(cstr), true;
+	return strings.to_odin_string(cstr), true;
 }
 
 exit :: proc(code: int) {
@@ -199,16 +189,22 @@ current_thread_id :: proc() -> int {
 }
 
 dlopen :: proc(filename: string, flags: int) -> rawptr #inline {
-	return unix_dlopen(to_c_str(filename), flags);
+	cstr := strings.new_c_string(filename);
+	handle := unix_dlopen(cstr, flags);
+	free(cstr);
+	return handle;
 }
 dlsym :: proc(handle: rawptr, symbol: string) -> (proc() #cc_c) #inline {
 	assert(handle != nil);
-	return unix_dlsym(handle, to_c_str(symbol));
+	cstr := strings.new_c_string(symbol);
+	handle := unix_dlsym(handle, cstr);
+	free(cstr);
+	return handle;
 }
 dlclose :: proc(handle: rawptr) -> bool #inline {
 	assert(handle != nil);
 	return unix_dlclose(handle) == 0;
 }
 dlerror :: proc() -> string {
-	return from_c_str(unix_dlerror());
+	return strings.to_odin_string(unix_dlerror());
 }
