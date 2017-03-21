@@ -146,13 +146,14 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 
 	// We have a file size!
 
-	data := new_slice(u8, size);
+	data := new_slice(u8, size+1);
 	if data.data == nil {
 		fmt.println("Failed to allocate file buffer.");
 		return nil, false;
 	}
 
 	read(handle, data);
+	data[size] = 0;
 
 	return data, true;
 }
