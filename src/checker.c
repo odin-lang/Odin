@@ -98,7 +98,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 
 	// {STR_LIT("ptr_offset"),       2, false, Expr_Expr},
 	// {STR_LIT("ptr_sub"),          2, false, Expr_Expr},
-	{STR_LIT("slice_ptr"),        2, false,  Expr_Expr},
+	{STR_LIT("slice_ptr"),        2, true,   Expr_Expr},
 	{STR_LIT("slice_to_bytes"),   1, false,  Expr_Stmt},
 
 	{STR_LIT("min"),              2, false, Expr_Expr},
@@ -163,6 +163,11 @@ bool is_operand_nil(Operand o) {
 }
 
 
+typedef struct BlockLabel {
+	String   name;
+	AstNode *label; //  AstNode_Label;
+} BlockLabel;
+
 // DeclInfo is used to store information of certain declarations to allow for "any order" usage
 typedef struct DeclInfo {
 	Scope *scope;
@@ -175,16 +180,19 @@ typedef struct DeclInfo {
 	AstNode *proc_lit; // AstNode_ProcLit
 
 	MapBool deps; // Key: Entity *
+	Array(BlockLabel) labels;
 } DeclInfo;
 
 // ProcedureInfo stores the information needed for checking a procedure
+
+
 typedef struct ProcedureInfo {
-	AstFile * file;
-	Token     token;
-	DeclInfo *decl;
-	Type *    type; // Type_Procedure
-	AstNode * body; // AstNode_BlockStmt
-	u32       tags;
+	AstFile *             file;
+	Token                 token;
+	DeclInfo *            decl;
+	Type *                type; // Type_Procedure
+	AstNode *             body; // AstNode_BlockStmt
+	u32                   tags;
 } ProcedureInfo;
 
 // ExprInfo stores information used for "untyped" expressions
@@ -208,21 +216,21 @@ ExprInfo make_expr_info(bool is_lhs, AddressingMode mode, Type *type, ExactValue
 #include "map.c"
 
 typedef struct Scope {
-	Scope *        parent;
-	Scope *        prev, *next;
-	Scope *        first_child;
-	Scope *        last_child;
-	MapEntity      elements; // Key: String
-	MapBool        implicit; // Key: Entity *
+	Scope *          parent;
+	Scope *          prev, *next;
+	Scope *          first_child;
+	Scope *          last_child;
+	MapEntity        elements; // Key: String
+	MapBool          implicit; // Key: Entity *
 
-	Array(Scope *) shared;
-	Array(Scope *) imported;
-	bool           is_proc;
-	bool           is_global;
-	bool           is_file;
-	bool           is_init;
-	bool           has_been_imported; // This is only applicable to file scopes
-	AstFile *      file;
+	Array(Scope *)   shared;
+	Array(Scope *)   imported;
+	bool             is_proc;
+	bool             is_global;
+	bool             is_file;
+	bool             is_init;
+	bool             has_been_imported; // This is only applicable to file scopes
+	AstFile *        file;
 } Scope;
 gb_global Scope *universal_scope = NULL;
 
@@ -278,6 +286,7 @@ typedef struct CheckerInfo {
 	MapScope             scopes;          // Key: AstNode * | Node       -> Scope
 	MapExprInfo          untyped;         // Key: AstNode * | Expression -> ExprInfo
 	MapDeclInfo          entities;        // Key: Entity *
+	MapEntity            implicits;        // Key: AstNode *
 	MapEntity            foreigns;        // Key: String
 	MapAstFile           files;           // Key: String (full path)
 	MapIsize             type_info_map;   // Key: Type *
@@ -320,6 +329,7 @@ typedef Array(DelayedEntity) DelayedEntities;
 void init_declaration_info(DeclInfo *d, Scope *scope) {
 	d->scope = scope;
 	map_bool_init(&d->deps, heap_allocator());
+	array_init(&d->labels,  heap_allocator());
 }
 
 DeclInfo *make_declaration_info(gbAllocator a, Scope *scope) {
@@ -357,9 +367,9 @@ Scope *make_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
 	map_entity_init(&s->elements,   heap_allocator());
-	map_bool_init(&s->implicit,   heap_allocator());
-	array_init(&s->shared,   heap_allocator());
-	array_init(&s->imported, heap_allocator());
+	map_bool_init(&s->implicit,     heap_allocator());
+	array_init(&s->shared,          heap_allocator());
+	array_init(&s->imported,        heap_allocator());
 
 	if (parent != NULL && parent != universal_scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);
@@ -455,6 +465,9 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 		if (found) {
 			Entity *e = *found;
 			if (gone_thru_proc) {
+				if (e->kind == Entity_Label) {
+					continue;
+				}
 				if (e->kind == Entity_Variable &&
 				    !e->scope->is_file &&
 				    !e->scope->is_global) {
@@ -596,7 +609,7 @@ void add_global_constant(gbAllocator a, String name, Type *type, ExactValue valu
 
 
 void add_global_string_constant(gbAllocator a, String name, String value) {
-	add_global_constant(a, name, t_untyped_string, make_exact_value_string(value));
+	add_global_constant(a, name, t_untyped_string, exact_value_string(value));
 
 }
 
@@ -616,8 +629,8 @@ void init_universal_scope(void) {
 	}
 
 // Constants
-	add_global_constant(a, str_lit("true"),  t_untyped_bool,    make_exact_value_bool(true));
-	add_global_constant(a, str_lit("false"), t_untyped_bool,    make_exact_value_bool(false));
+	add_global_constant(a, str_lit("true"),  t_untyped_bool, exact_value_bool(true));
+	add_global_constant(a, str_lit("false"), t_untyped_bool, exact_value_bool(false));
 
 	add_global_entity(make_entity_nil(a, str_lit("nil"), t_untyped_nil));
 	add_global_entity(make_entity_library_name(a,  universal_scope,
@@ -662,6 +675,7 @@ void init_checker_info(CheckerInfo *i) {
 	map_decl_info_init(&i->entities,   a);
 	map_expr_info_init(&i->untyped,    a);
 	map_entity_init(&i->foreigns,      a);
+	map_entity_init(&i->implicits,     a);
 	map_isize_init(&i->type_info_map,  a);
 	map_ast_file_init(&i->files,       a);
 	i->type_info_count = 0;
@@ -676,6 +690,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_decl_info_destroy(&i->entities);
 	map_expr_info_destroy(&i->untyped);
 	map_entity_destroy(&i->foreigns);
+	map_entity_destroy(&i->implicits);
 	map_isize_destroy(&i->type_info_map);
 	map_ast_file_destroy(&i->files);
 }
@@ -816,7 +831,7 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 					return false;
 				}
 				error(entity->token,
-				      "Redeclararation of `%.*s` in this scope through `using`\n"
+				      "Redeclaration of `%.*s` in this scope through `using`\n"
 				      "\tat %.*s(%td:%td)",
 				      LIT(name),
 				      LIT(up->token.pos.file), up->token.pos.line, up->token.pos.column);
@@ -827,7 +842,7 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 					return false;
 				}
 				error(entity->token,
-				      "Redeclararation of `%.*s` in this scope\n"
+				      "Redeclaration of `%.*s` in this scope\n"
 				      "\tat %.*s(%td:%td)",
 				      LIT(name),
 				      LIT(pos.file), pos.line, pos.column);
@@ -860,6 +875,12 @@ void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclIn
 	map_decl_info_set(&c->info.entities, hash_pointer(e), d);
 }
 
+
+void add_implicit_entity(Checker *c, AstNode *node, Entity *e) {
+	GB_ASSERT(node != NULL);
+	GB_ASSERT(e != NULL);
+	map_entity_set(&c->info.implicits, hash_pointer(node), e);
+}
 
 
 void add_type_info_type(Checker *c, Type *t) {
@@ -1467,7 +1488,12 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 						// TODO(bill): What if vd->type != NULL??? How to handle this case?
 						d->type_expr = init;
 						d->init_expr = init;
-					} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
+					} else if (up_init != NULL && up_init->kind == AstNode_Alias) {
+						error_node(up_init, "#alias declarations are not yet supported");
+						continue;
+						// e = make_entity_alias(c->allocator, d->scope, name->Ident, NULL, NULL);
+						// d->init_expr = init->Alias.expr;
+					}else if (init != NULL && up_init->kind == AstNode_ProcLit) {
 						e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
 						d->proc_lit = up_init;
 						d->type_expr = vd->type;

@@ -375,6 +375,10 @@ Type *base_enum_type(Type *t) {
 	return t;
 }
 
+Type *core_type(Type *t) {
+	return base_type(base_enum_type(t));
+}
+
 void set_base_type(Type *t, Type *base) {
 	if (t && t->kind == Type_Named) {
 		t->Named.base = base;
@@ -530,28 +534,28 @@ bool is_type_named(Type *t) {
 	return t->kind == Type_Named;
 }
 bool is_type_boolean(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Boolean) != 0;
 	}
 	return false;
 }
 bool is_type_integer(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Integer) != 0;
 	}
 	return false;
 }
 bool is_type_unsigned(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Unsigned) != 0;
 	}
 	return false;
 }
 bool is_type_numeric(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Numeric) != 0;
 	}
@@ -586,7 +590,7 @@ bool is_type_untyped(Type *t) {
 	return false;
 }
 bool is_type_ordered(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	switch (t->kind) {
 	case Type_Basic:
 		return (t->Basic.flags & BasicFlag_Ordered) != 0;
@@ -598,28 +602,28 @@ bool is_type_ordered(Type *t) {
 	return false;
 }
 bool is_type_constant_type(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_ConstantType) != 0;
 	}
 	return false;
 }
 bool is_type_float(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Float) != 0;
 	}
 	return false;
 }
 bool is_type_f32(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_f32;
 	}
 	return false;
 }
 bool is_type_f64(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_f64;
 	}
@@ -737,7 +741,7 @@ bool is_type_untyped_nil(Type *t) {
 
 
 bool is_type_valid_for_keys(Type *t) {
-	t = base_type(base_enum_type(t));
+	t = core_type(t);
 	if (is_type_untyped(t)) {
 		return false;
 	}
@@ -798,7 +802,7 @@ bool is_type_comparable(Type *t) {
 		return true;
 	case Type_Record: {
 		if (is_type_enum(t)) {
-			return is_type_comparable(base_enum_type(t));
+			return is_type_comparable(core_type(t));
 		}
 		return false;
 	} break;
@@ -1032,7 +1036,21 @@ typedef enum ProcTypeOverloadKind {
 } ProcTypeOverloadKind;
 
 
+bool has_encountered_null_proc_type = false;
 ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
+	if(x == NULL && y == NULL) {
+		if(!has_encountered_null_proc_type) {
+			printf("The compiler has encountered a NULL proc type.\n"
+			       "  This is probably not an error in your code, and\n"
+			       "  the compile is probably still successful.\n"
+			       "  This does mean that (at least once), there could be a\n"
+			       "  bad procedure overload in your program, and Odin wouldn't catch it.\n"
+			       "  As far as I know, this is a porting bug, and doesn't occur on mainline Odin.\n"
+			       "  Be careful, and sorry about this bug :(\n");
+			has_encountered_null_proc_type = true;
+		}
+		return ProcOverload_ParamCount;
+	}
  	if (!is_type_proc(x)) return ProcOverload_NotProcedure;
  	if (!is_type_proc(y)) return ProcOverload_NotProcedure;
 	TypeProc px = base_type(x)->Proc;
@@ -1215,7 +1233,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		// NOTE(bill): Underlying memory address cannot be changed
 		if (str_eq(field_name, count_str)) {
 			// HACK(bill): Memory leak
-			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, make_exact_value_integer(type->Array.count));
+			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, exact_value_integer(type->Array.count));
 			return sel;
 		}
 	} else if (type->kind == Type_Vector) {
@@ -1223,7 +1241,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		// NOTE(bill): Vectors are not addressable
 		if (str_eq(field_name, count_str)) {
 			// HACK(bill): Memory leak
-			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, make_exact_value_integer(type->Vector.count));
+			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, exact_value_integer(type->Vector.count));
 			return sel;
 		}
 

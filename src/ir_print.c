@@ -306,7 +306,7 @@ void ir_print_compound_element(irFileBuffer *f, irModule *m, ExactValue v, Type 
 }
 
 void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *type) {
-	type = base_type(base_enum_type(type));
+	type = core_type(type);
 	if (is_type_float(type)) {
 		value = exact_value_to_float(value);
 	} else if (is_type_integer(type)) {
@@ -942,7 +942,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		switch (uo->op) {
 		case Token_Sub:
 			if (is_type_float(elem_type)) {
-				ir_print_exact_value(f, m, make_exact_value_float(0), type);
+				ir_print_exact_value(f, m, exact_value_float(0), type);
 			} else {
 				ir_fprintf(f, "0");
 			}
@@ -1197,17 +1197,17 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_fprintf(f, "call void ");
 		ir_print_encoded_global(f, str_lit("__bounds_check_error"), false);
 		ir_fprintf(f, "(");
-		ir_print_compound_element(f, m, make_exact_value_string(bc->pos.file), t_string);
+		ir_print_compound_element(f, m, exact_value_string(bc->pos.file), t_string);
 		ir_fprintf(f, ", ");
 
 		ir_print_type(f, m, t_int);
 		ir_fprintf(f, " ");
-		ir_print_exact_value(f, m, make_exact_value_integer(bc->pos.line), t_int);
+		ir_print_exact_value(f, m, exact_value_integer(bc->pos.line), t_int);
 		ir_fprintf(f, ", ");
 
 		ir_print_type(f, m, t_int);
 		ir_fprintf(f, " ");
-		ir_print_exact_value(f, m, make_exact_value_integer(bc->pos.column), t_int);
+		ir_print_exact_value(f, m, exact_value_integer(bc->pos.column), t_int);
 		ir_fprintf(f, ", ");
 
 		ir_print_type(f, m, t_int);
@@ -1232,17 +1232,17 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		}
 
 		ir_fprintf(f, "(");
-		ir_print_compound_element(f, m, make_exact_value_string(bc->pos.file), t_string);
+		ir_print_compound_element(f, m, exact_value_string(bc->pos.file), t_string);
 		ir_fprintf(f, ", ");
 
 		ir_print_type(f, m, t_int);
 		ir_fprintf(f, " ");
-		ir_print_exact_value(f, m, make_exact_value_integer(bc->pos.line), t_int);
+		ir_print_exact_value(f, m, exact_value_integer(bc->pos.line), t_int);
 		ir_fprintf(f, ", ");
 
 		ir_print_type(f, m, t_int);
 		ir_fprintf(f, " ");
-		ir_print_exact_value(f, m, make_exact_value_integer(bc->pos.column), t_int);
+		ir_print_exact_value(f, m, exact_value_integer(bc->pos.column), t_int);
 		ir_fprintf(f, ", ");
 
 		ir_print_type(f, m, t_int);
@@ -1407,10 +1407,6 @@ void print_llvm_ir(irGen *ir) {
 	irModule *m = &ir->module;
 	irFileBuffer buf = {0}, *f = &buf;
 	ir_file_buffer_init(f, &ir->output_file);
-
-	if (m->layout.len > 0) {
-		ir_fprintf(f, "target datalayout = \"%.*s\"\n", LIT(m->layout));
-	}
 
 	ir_print_encoded_local(f, str_lit("..string"));
 	ir_fprintf(f, " = type {i8*, ");

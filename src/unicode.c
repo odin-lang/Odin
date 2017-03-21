@@ -6,6 +6,7 @@
 
 #pragma warning(pop)
 
+
 bool rune_is_letter(Rune r) {
 	if ((r < 0x80 && gb_char_is_alpha(cast(char)r)) ||
 	    r == '_') {

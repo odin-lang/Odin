@@ -12,6 +12,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 			gbString expr_str = expr_to_string(operand->expr);
 
 			// TODO(bill): is this a good enough error message?
+			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error_node(operand->expr,
 			      "Cannot assign builtin procedure `%s` in %.*s",
 			      expr_str,
@@ -276,12 +277,6 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 			error_node(pd->body, "A procedure tagged as `#foreign` cannot have a body");
 		}
 
-		// TODO(bill): Is this the best option? What about passing to external shit?!
-		// if (proc_type->Proc.calling_convention != ProcCC_Odin) {
-		// 	error_node(d->proc_lit, "An internal procedure may only have the Odin calling convention");
-		// 	proc_type->Proc.calling_convention = ProcCC_Odin;
-		// }
-
 		d->scope = c->context.scope;
 
 		GB_ASSERT(pd->body->kind == AstNode_BlockStmt);
@@ -408,6 +403,56 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 }
 
 
+void check_alias_decl(Checker *c, Entity *e, AstNode *expr) {
+	GB_ASSERT(e->type == NULL);
+	GB_ASSERT(e->kind == Entity_Alias);
+
+	if (e->flags & EntityFlag_Visited) {
+		e->type = t_invalid;
+		return;
+	}
+	e->flags |= EntityFlag_Visited;
+	e->type = t_invalid;
+
+	expr = unparen_expr(expr);
+
+	if (expr->kind == AstNode_Alias) {
+		error_node(expr, "#alias of an #alias is not allowed");
+		return;
+	}
+
+	if (expr->kind == AstNode_Ident) {
+		Operand o = {0};
+		Entity *f = check_ident(c, &o, expr, NULL, NULL, true);
+		if (f != NULL) {
+			e->Alias.original = f;
+			e->type = f->type;
+		}
+		return;
+	} else if (expr->kind == AstNode_SelectorExpr) {
+		Operand o = {0};
+		Entity *f = check_selector(c, &o, expr, NULL);
+		if (f != NULL) {
+			e->Alias.original = f;
+			e->type = f->type;
+		}
+		return;
+	}
+
+	Operand o = {0};
+	check_expr_or_type(c, &o, expr);
+	if (o.mode == Addressing_Invalid) {
+		return;
+	}
+	switch (o.mode) {
+	case Addressing_Type:
+		e->type = o.type;
+		break;
+	default:
+		error_node(expr, "#alias declarations only allow types");
+	}
+}
+
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 	if (e->type != NULL) {
 		return;
@@ -442,6 +487,9 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 		break;
 	case Entity_Procedure:
 		check_proc_lit(c, e, d);
+		break;
+	case Entity_Alias:
+		check_alias_decl(c, e, d->init_expr);
 		break;
 	}
 

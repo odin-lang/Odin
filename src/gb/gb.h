@@ -1,4 +1,4 @@
-/* gb.h - v0.27  - Ginger Bill's C Helper Library - public domain
+/* gb.h - v0.28  - Ginger Bill's C Helper Library - public domain
                  - no warranty implied; use at your own risk
 
 	This is a single header file with a bunch of useful stuff
@@ -58,6 +58,7 @@ TODOS
 	- More date & time functions
 
 VERSION HISTORY
+	0.28  - Handle UCS2 correctly in Win32 part
 	0.27  - OSX fixes and Linux gbAffinity
 	0.26d - Minor changes to how gbFile works
 	0.26c - gb_str_to_f* fix
@@ -805,6 +806,14 @@ GB_DEF void        gb_memswap   (void *i, void *j, isize size);
 GB_DEF void const *gb_memchr    (void const *data, u8 byte_value, isize size);
 GB_DEF void const *gb_memrchr   (void const *data, u8 byte_value, isize size);
 
+
+#ifndef gb_memcopy_array
+#define gb_memcopy_array(dst, src, count) gb_memcopy((dst), (src), gb_size_of(*(dst))*(count))
+#endif
+
+#ifndef gb_memmove_array
+#define gb_memmove_array(dst, src, count) gb_memmove((dst), (src), gb_size_of(*(dst))*(count))
+#endif
 
 // NOTE(bill): Very similar to doing `*cast(T *)(&u)`
 #ifndef GB_BIT_CAST
@@ -1925,6 +1934,7 @@ typedef enum gbSeekWhenceType {
 typedef enum gbFileError {
 	gbFileError_None,
 	gbFileError_Invalid,
+	gbFileError_InvalidFilename,
 	gbFileError_Exists,
 	gbFileError_NotExists,
 	gbFileError_Permission,
@@ -3238,6 +3248,8 @@ extern "C" {
 	#define STD_OUTPUT_HANDLE        ((DWORD)-11)
 	#define STD_ERROR_HANDLE         ((DWORD)-12)
 
+	GB_DLL_IMPORT int           MultiByteToWideChar(UINT code_page, DWORD flags, char const *   multi_byte_str, int multi_byte_len, wchar_t const *wide_char_str,  int wide_char_len);
+	GB_DLL_IMPORT int           WideCharToMultiByte(UINT code_page, DWORD flags, wchar_t const *wide_char_str,  int wide_char_len, char const *    multi_byte_str, int multi_byte_len);
 	GB_DLL_IMPORT BOOL   WINAPI SetFilePointerEx(HANDLE file, LARGE_INTEGER distance_to_move,
 	                                             LARGE_INTEGER *new_file_pointer, DWORD move_method);
 	GB_DLL_IMPORT BOOL   WINAPI ReadFile        (HANDLE file, void *buffer, DWORD bytes_to_read, DWORD *bytes_read, OVERLAPPED *overlapped);
@@ -3646,8 +3658,9 @@ gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 	u8 const *s = cast(u8 const *)source;
 	u32 w, x;
 
-	for (; cast(uintptr)s % 4 && n; n--)
+	for (; cast(uintptr)s % 4 && n; n--) {
 		*d++ = *s++;
+	}
 
 	if (cast(uintptr)d % 4 == 0) {
 		for (; n >= 16;
@@ -5442,8 +5455,9 @@ GB_ALLOCATOR_PROC(gb_pool_allocator_proc) {
 
 gb_inline gbAllocationHeader *gb_allocation_header(void *data) {
 	isize *p = cast(isize *)data;
-	while (p[-1] == cast(isize)(-1))
+	while (p[-1] == cast(isize)(-1)) {
 		p--;
+	}
 	return cast(gbAllocationHeader *)p - 1;
 }
 
@@ -5451,8 +5465,9 @@ gb_inline void gb_allocation_header_fill(gbAllocationHeader *header, void *data,
 	isize *ptr;
 	header->size = size;
 	ptr = cast(isize *)(header + 1);
-	while (cast(void *)ptr < data)
+	while (cast(void *)ptr < data) {
 		*ptr++ = cast(isize)(-1);
+	}
 }
 
 
@@ -5895,8 +5910,9 @@ void gb_shuffle(void *base, isize count, isize size) {
 
 void gb_reverse(void *base, isize count, isize size) {
 	isize i, j = count-1;
-	for (i = 0; i < j; i++, j++)
+	for (i = 0; i < j; i++, j++) {
 		gb_memswap(cast(u8 *)base + i*size, cast(u8 *)base + j*size, size);
+	}
 }
 
 
@@ -6001,18 +6017,21 @@ gb_inline isize gb_strlen(char const *str) {
 		str++;
 	}
 	w = cast(isize const *)str;
-	while (!GB__HAS_ZERO(*w))
+	while (!GB__HAS_ZERO(*w)) {
 		w++;
+	}
 	str = cast(char const *)w;
-	while (*str)
+	while (*str) {
 		str++;
+	}
 	return str - begin;
 }
 
 gb_inline isize gb_strnlen(char const *str, isize max_len) {
 	char const *end = cast(char const *)gb_memchr(str, 0, max_len);
-	if (end)
+	if (end) {
 		return end - str;
+	}
 	return max_len;
 }
 
@@ -6121,18 +6140,20 @@ gb_inline char *gb_strrev(char *str) {
 gb_inline i32 gb_strncmp(char const *s1, char const *s2, isize len) {
 	for (; len > 0;
 	     s1++, s2++, len--) {
-		if (*s1 != *s2)
+		if (*s1 != *s2) {
 			return ((s1 < s2) ? -1 : +1);
-		else if (*s1 == '\0')
+		} else if (*s1 == '\0') {
 			return 0;
+		}
 	}
 	return 0;
 }
 
 
 gb_inline char const *gb_strtok(char *output, char const *src, char const *delimit) {
-	while (*src && gb_char_first_occurence(delimit, *src) != NULL)
+	while (*src && gb_char_first_occurence(delimit, *src) != NULL) {
 		*output++ = *src++;
+	}
 
 	*output = 0;
 	return *src ? src+1 : src;
@@ -6140,8 +6161,9 @@ gb_inline char const *gb_strtok(char *output, char const *src, char const *delim
 
 gb_inline b32 gb_str_has_prefix(char const *str, char const *prefix) {
 	while (*prefix) {
-		if (*str++ != *prefix++)
+		if (*str++ != *prefix++) {
 			return false;
+		}
 	}
 	return true;
 }
@@ -6149,8 +6171,9 @@ gb_inline b32 gb_str_has_prefix(char const *str, char const *prefix) {
 gb_inline b32 gb_str_has_suffix(char const *str, char const *suffix) {
 	isize i = gb_strlen(str);
 	isize j = gb_strlen(suffix);
-	if (j <= i)
+	if (j <= i) {
 		return gb_strcmp(str+i-j, suffix) == 0;
+	}
 	return false;
 }
 
@@ -6160,8 +6183,9 @@ gb_inline b32 gb_str_has_suffix(char const *str, char const *suffix) {
 gb_inline char const *gb_char_first_occurence(char const *s, char c) {
 	char ch = c;
 	for (; *s != ch; s++) {
-		if (*s == '\0')
+		if (*s == '\0') {
 			return NULL;
+		}
 	}
 	return s;
 }
@@ -6170,8 +6194,9 @@ gb_inline char const *gb_char_first_occurence(char const *s, char c) {
 gb_inline char const *gb_char_last_occurence(char const *s, char c) {
 	char const *result = NULL;
 	do {
-		if (*s == c)
+		if (*s == c) {
 			result = s;
+		}
 	} while (*s++);
 
 	return result;
@@ -6201,17 +6226,19 @@ gb_internal isize gb__scan_i64(char const *text, i32 base, i64 *value) {
 		text++;
 	}
 
-	if (base == 16 && gb_strncmp(text, "0x", 2) == 0)
+	if (base == 16 && gb_strncmp(text, "0x", 2) == 0) {
 		text += 2;
+	}
 
 	for (;;) {
 		i64 v;
-		if (gb_char_is_digit(*text))
+		if (gb_char_is_digit(*text)) {
 			v = *text - '0';
-		else if (base == 16 && gb_char_is_hex_digit(*text))
+		} else if (base == 16 && gb_char_is_hex_digit(*text)) {
 			v = gb_hex_digit_to_int(*text);
-		else
+		} else {
 			break;
+		}
 
 		result *= base;
 		result += v;
@@ -6230,16 +6257,17 @@ gb_internal isize gb__scan_u64(char const *text, i32 base, u64 *value) {
 	char const *text_begin = text;
 	u64 result = 0;
 
-	if (base == 16 && gb_strncmp(text, "0x", 2) == 0)
+	if (base == 16 && gb_strncmp(text, "0x", 2) == 0) {
 		text += 2;
+	}
 
 	for (;;) {
 		u64 v;
-		if (gb_char_is_digit(*text))
+		if (gb_char_is_digit(*text)) {
 			v = *text - '0';
-		else if (base == 16 && gb_char_is_hex_digit(*text))
+		} else if (base == 16 && gb_char_is_hex_digit(*text)) {
 			v = gb_hex_digit_to_int(*text);
-		else {
+		} else {
 			break;
 		}
 
@@ -6248,9 +6276,7 @@ gb_internal isize gb__scan_u64(char const *text, i32 base, u64 *value) {
 		text++;
 	}
 
-	if (value)
-		*value = result;
-
+	if (value) *value = result;
 	return (text - text_begin);
 }
 
@@ -6261,15 +6287,15 @@ u64 gb_str_to_u64(char const *str, char **end_ptr, i32 base) {
 	u64 value = 0;
 
 	if (!base) {
-		if ((gb_strlen(str) > 2) && (gb_strncmp(str, "0x", 2) == 0))
+		if ((gb_strlen(str) > 2) && (gb_strncmp(str, "0x", 2) == 0)) {
 			base = 16;
-		else
+		} else {
 			base = 10;
+		}
 	}
 
 	len = gb__scan_u64(str, base, &value);
-	if (end_ptr)
-		*end_ptr = (char *)str + len;
+	if (end_ptr) *end_ptr = (char *)str + len;
 	return value;
 }
 
@@ -6278,15 +6304,15 @@ i64 gb_str_to_i64(char const *str, char **end_ptr, i32 base) {
 	i64 value;
 
 	if (!base) {
-		if ((gb_strlen(str) > 2) && (gb_strncmp(str, "0x", 2) == 0))
+		if ((gb_strlen(str) > 2) && (gb_strncmp(str, "0x", 2) == 0)) {
 			base = 16;
-		else
+		} else {
 			base = 10;
+		}
 	}
 
 	len = gb__scan_i64(str, base, &value);
-	if (end_ptr)
-		*end_ptr = (char *)str + len;
+	if (end_ptr) *end_ptr = (char *)str + len;
 	return value;
 }
 
@@ -6432,8 +6458,9 @@ gbString gb_string_make_length(gbAllocator a, void const *init_str, isize num_by
 	header->allocator = a;
 	header->length    = num_bytes;
 	header->capacity  = num_bytes;
-	if (num_bytes && init_str)
+	if (num_bytes && init_str) {
 		gb_memcopy(str, init_str, num_bytes);
+	}
 	str[num_bytes] = '\0';
 
 	return str;
@@ -6454,8 +6481,9 @@ gb_inline isize gb_string_capacity(gbString const str) { return GB_STRING_HEADER
 
 gb_inline isize gb_string_available_space(gbString const str) {
 	gbStringHeader *h = GB_STRING_HEADER(str);
-	if (h->capacity > h->length)
+	if (h->capacity > h->length) {
 		return h->capacity - h->length;
+	}
 	return 0;
 }
 
@@ -6469,8 +6497,9 @@ gbString gb_string_append_length(gbString str, void const *other, isize other_le
 		isize curr_len = gb_string_length(str);
 
 		str = gb_string_make_space_for(str, other_len);
-		if (str == NULL)
+		if (str == NULL) {
 			return NULL;
+		}
 
 		gb_memcopy(str + curr_len, other, other_len);
 		str[curr_len + other_len] = '\0';
@@ -6488,8 +6517,9 @@ gbString gb_string_set(gbString str, char const *cstr) {
 	isize len = gb_strlen(cstr);
 	if (gb_string_capacity(str) < len) {
 		str = gb_string_make_space_for(str, len - gb_string_length(str));
-		if (str == NULL)
+		if (str == NULL) {
 			return NULL;
+		}
 	}
 
 	gb_memcopy(str, cstr, len);
@@ -6541,12 +6571,14 @@ gb_inline b32 gb_string_are_equal(gbString const lhs, gbString const rhs) {
 	isize lhs_len, rhs_len, i;
 	lhs_len = gb_string_length(lhs);
 	rhs_len = gb_string_length(rhs);
-	if (lhs_len != rhs_len)
+	if (lhs_len != rhs_len) {
 		return false;
+	}
 
 	for (i = 0; i < lhs_len; i++) {
-		if (lhs[i] != rhs[i])
+		if (lhs[i] != rhs[i]) {
 			return false;
+		}
 	}
 
 	return true;
@@ -6560,10 +6592,12 @@ gbString gb_string_trim(gbString str, char const *cut_set) {
 	start_pos = start = str;
 	end_pos   = end   = str + gb_string_length(str) - 1;
 
-	while (start_pos <= end && gb_char_first_occurence(cut_set, *start_pos))
+	while (start_pos <= end && gb_char_first_occurence(cut_set, *start_pos)) {
 		start_pos++;
-	while (end_pos > start_pos && gb_char_first_occurence(cut_set, *end_pos))
+	}
+	while (end_pos > start_pos && gb_char_first_occurence(cut_set, *end_pos)) {
 		end_pos--;
+	}
 
 	len = cast(isize)((start_pos > end_pos) ? 0 : ((end_pos - start_pos)+1));
 
@@ -6917,8 +6951,9 @@ u32 gb_adler32(void const *data, isize len) {
 
 			bytes += 8;
 		}
-		for (; i < block_len; i++)
+		for (; i < block_len; i++) {
 			a += *bytes++, b += a;
+		}
 
 		a %= MOD_ALDER, b %= MOD_ALDER;
 		len -= block_len;
@@ -7067,8 +7102,9 @@ u32 gb_crc32(void const *data, isize len) {
 	isize remaining;
 	u32 result = ~(cast(u32)0);
 	u8 const *c = cast(u8 const *)data;
-	for (remaining = len; remaining--; c++)
+	for (remaining = len; remaining--; c++) {
 		result = (result >> 8) ^ (GB__CRC32_TABLE[(result ^ *c) & 0xff]);
+	}
 	return ~result;
 }
 
@@ -7076,8 +7112,9 @@ u64 gb_crc64(void const *data, isize len) {
 	isize remaining;
 	u64 result = ~(cast(u64)0);
 	u8 const *c = cast(u8 const *)data;
-	for (remaining = len; remaining--; c++)
+	for (remaining = len; remaining--; c++) {
 		result = (result >> 8) ^ (GB__CRC64_TABLE[(result ^ *c) & 0xff]);
+	}
 	return ~result;
 }
 
@@ -7086,8 +7123,9 @@ u32 gb_fnv32(void const *data, isize len) {
 	u32 h = 0x811c9dc5;
 	u8 const *c = cast(u8 const *)data;
 
-	for (i = 0; i < len; i++)
+	for (i = 0; i < len; i++) {
 		h = (h * 0x01000193) ^ c[i];
+	}
 
 	return h;
 }
@@ -7097,8 +7135,9 @@ u64 gb_fnv64(void const *data, isize len) {
 	u64 h = 0xcbf29ce484222325ull;
 	u8 const *c = cast(u8 const *)data;
 
-	for (i = 0; i < len; i++)
+	for (i = 0; i < len; i++) {
 		h = (h * 0x100000001b3ll) ^ c[i];
+	}
 
 	return h;
 }
@@ -7108,8 +7147,9 @@ u32 gb_fnv32a(void const *data, isize len) {
 	u32 h = 0x811c9dc5;
 	u8 const *c = cast(u8 const *)data;
 
-	for (i = 0; i < len; i++)
+	for (i = 0; i < len; i++) {
 		h = (h ^ c[i]) * 0x01000193;
+	}
 
 	return h;
 }
@@ -7119,8 +7159,9 @@ u64 gb_fnv64a(void const *data, isize len) {
 	u64 h = 0xcbf29ce484222325ull;
 	u8 const *c = cast(u8 const *)data;
 
-	for (i = 0; i < len; i++)
+	for (i = 0; i < len; i++) {
 		h = (h ^ c[i]) * 0x100000001b3ll;
+	}
 
 	return h;
 }
@@ -7288,6 +7329,36 @@ u64 gb_murmur64_seed(void const *data_, isize len, u64 seed) {
 //
 
 #if defined(GB_SYSTEM_WINDOWS)
+
+	gb_internal wchar_t *gb__alloc_utf8_to_ucs2(gbAllocator a, char const *text, isize *w_len_) {
+		wchar_t *w_text = NULL;
+		isize len = 0, w_len = 0, w_len1 = 0;
+		if (text == NULL) {
+			if (w_len_) *w_len_ = w_len;
+			return NULL;
+		}
+		len = gb_strlen(text);
+		if (len == 0) {
+			if (w_len_) *w_len_ = w_len;
+			return NULL;
+		}
+		w_len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, len, NULL, 0);
+		if (w_len == 0) {
+			if (w_len_) *w_len_ = w_len;
+			return NULL;
+		}
+		w_text = gb_alloc_array(a, wchar_t, w_len+1);
+		w_len1 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, len, w_text, w_len);
+		if (w_len1 == 0) {
+			gb_free(a, w_text);
+			if (w_len_) *w_len_ = 0;
+			return NULL;
+		}
+		w_text[w_len] = 0;
+		if (w_len_) *w_len_ = w_len;
+		return w_text;
+	}
+
 	gb_internal GB_FILE_SEEK_PROC(gb__win32_file_seek) {
 		LARGE_INTEGER li_offset;
 		li_offset.QuadPart = offset;
@@ -7338,7 +7409,7 @@ u64 gb_murmur64_seed(void const *data_, isize len, u64 seed) {
 		DWORD desired_access;
 		DWORD creation_disposition;
 		void *handle;
-		u16 path[1024] = {0}; // TODO(bill): Is this really enough or should I heap allocate this if it's too large?
+		wchar_t *w_text;
 
 		switch (mode & gbFileMode_Modes) {
 		case gbFileMode_Read:
@@ -7370,10 +7441,16 @@ u64 gb_murmur64_seed(void const *data_, isize len, u64 seed) {
 			return gbFileError_Invalid;
 		}
 
-		handle = CreateFileW(cast(wchar_t const *)gb_utf8_to_ucs2(path, gb_count_of(path), cast(u8 *)filename),
+		w_text = gb__alloc_utf8_to_ucs2(gb_heap_allocator(), filename, NULL);
+		if (w_text == NULL) {
+			return gbFileError_InvalidFilename;
+		}
+		handle = CreateFileW(w_text,
 		                     desired_access,
 		                     FILE_SHARE_READ|FILE_SHARE_DELETE, NULL,
 		                     creation_disposition, FILE_ATTRIBUTE_NORMAL, NULL);
+
+		gb_free(gb_heap_allocator(), w_text);
 
 		if (handle == INVALID_HANDLE_VALUE) {
 			DWORD err = GetLastError();
@@ -7505,23 +7582,27 @@ gbFileError gb_file_open_mode(gbFile *f, gbFileMode mode, char const *filename) 
 #else
 	err = gb__posix_file_open(&f->fd, &f->ops, mode, filename);
 #endif
-	if (err == gbFileError_None)
+	if (err == gbFileError_None) {
 		return gb_file_new(f, f->fd, f->ops, filename);
+	}
 	return err;
 }
 
 gbFileError gb_file_close(gbFile *f) {
-	if (!f)
+	if (!f) {
 		return gbFileError_Invalid;
+	}
 
 	if (f->filename) gb_free(gb_heap_allocator(), cast(char *)f->filename);
 
 #if defined(GB_SYSTEM_WINDOWS)
-	if (f->fd.p == INVALID_HANDLE_VALUE)
+	if (f->fd.p == INVALID_HANDLE_VALUE) {
 		return gbFileError_Invalid;
+	}
 #else
-	if (f->fd.i < 0)
+	if (f->fd.i < 0) {
 		return gbFileError_Invalid;
+	}
 #endif
 
 	if (!f->ops.read_at) f->ops = gbDefaultFileOperations;
@@ -7632,8 +7713,9 @@ gbFileError gb_file_truncate(gbFile *f, i64 size) {
 	gbFileError err = gbFileError_None;
 	i64 prev_offset = gb_file_tell(f);
 	gb_file_seek(f, size);
-	if (!SetEndOfFile(f))
+	if (!SetEndOfFile(f)) {
 		err = gbFileError_TruncationFailure;
+	}
 	gb_file_seek(f, prev_offset);
 	return err;
 }
@@ -7641,8 +7723,18 @@ gbFileError gb_file_truncate(gbFile *f, i64 size) {
 
 b32 gb_file_exists(char const *name) {
 	WIN32_FIND_DATAW data;
-	void *handle = FindFirstFileW(cast(wchar_t const *)gb_utf8_to_ucs2_buf(cast(u8 *)name), &data);
-	b32 found = handle != INVALID_HANDLE_VALUE;
+	wchar_t *w_text;
+	void *handle;
+	b32 found = false;
+	gbAllocator a = gb_heap_allocator();
+
+	w_text = gb__alloc_utf8_to_ucs2(a, name, NULL);
+	if (w_text == NULL) {
+		return false;
+	}
+	handle = FindFirstFileW(w_text, &data);
+	gb_free(a, w_text);
+	found = handle != INVALID_HANDLE_VALUE;
 	if (found) FindClose(handle);
 	return found;
 }
@@ -7686,14 +7778,20 @@ gb_inline b32 gb_file_exists(char const *name) {
 
 #if defined(GB_SYSTEM_WINDOWS)
 gbFileTime gb_file_last_write_time(char const *filepath) {
-	u16 path[1024] = {0};
 	ULARGE_INTEGER li = {0};
 	FILETIME last_write_time = {0};
 	WIN32_FILE_ATTRIBUTE_DATA data = {0};
+	gbAllocator a = gb_heap_allocator();
 
-	if (GetFileAttributesExW(cast(wchar_t const *)gb_utf8_to_ucs2(path, gb_count_of(path), cast(u8 *)filepath),
-	                         GetFileExInfoStandard, &data))
+	wchar_t *w_text = gb__alloc_utf8_to_ucs2(a, filepath, NULL);
+	if (w_text == NULL) {
+		return 0;
+	}
+
+	if (GetFileAttributesExW(w_text, GetFileExInfoStandard, &data)) {
 		last_write_time = data.ftLastWriteTime;
+	}
+	gb_free(a, w_text);
 
 	li.LowPart = last_write_time.dwLowDateTime;
 	li.HighPart = last_write_time.dwHighDateTime;
@@ -7702,20 +7800,41 @@ gbFileTime gb_file_last_write_time(char const *filepath) {
 
 
 gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filename, b32 fail_if_exists) {
-	u16 old_f[300] = {0};
-	u16 new_f[300] = {0};
+	wchar_t *w_old = NULL;
+	wchar_t *w_new = NULL;
+	gbAllocator a = gb_heap_allocator();
+	b32 result = false;
 
-	return CopyFileW(cast(wchar_t const *)gb_utf8_to_ucs2(old_f, gb_count_of(old_f), cast(u8 *)existing_filename),
-	                 cast(wchar_t const *)gb_utf8_to_ucs2(new_f, gb_count_of(new_f), cast(u8 *)new_filename),
-	                 fail_if_exists);
+	w_old = gb__alloc_utf8_to_ucs2(a, existing_filename, NULL);
+	if (w_old == NULL) {
+		return false;
+	}
+	w_new = gb__alloc_utf8_to_ucs2(a, new_filename, NULL);
+	if (w_new != NULL) {
+		result = CopyFileW(w_old, w_new, fail_if_exists);
+	}
+	gb_free(a, w_new);
+	gb_free(a, w_old);
+	return result;
 }
 
 gb_inline b32 gb_file_move(char const *existing_filename, char const *new_filename) {
-	u16 old_f[300] = {0};
-	u16 new_f[300] = {0};
+	wchar_t *w_old = NULL;
+	wchar_t *w_new = NULL;
+	gbAllocator a = gb_heap_allocator();
+	b32 result = false;
 
-	return MoveFileW(cast(wchar_t const *)gb_utf8_to_ucs2(old_f, gb_count_of(old_f), cast(u8 *)existing_filename),
-	                 cast(wchar_t const *)gb_utf8_to_ucs2(new_f, gb_count_of(new_f), cast(u8 *)new_filename));
+	w_old = gb__alloc_utf8_to_ucs2(a, existing_filename, NULL);
+	if (w_old == NULL) {
+		return false;
+	}
+	w_new = gb__alloc_utf8_to_ucs2(a, new_filename, NULL);
+	if (w_new != NULL) {
+		result = MoveFileW(w_old, w_new);
+	}
+	gb_free(a, w_new);
+	gb_free(a, w_old);
+	return result;
 }
 
 
@@ -7726,8 +7845,9 @@ gbFileTime gb_file_last_write_time(char const *filepath) {
 	time_t result = 0;
 	struct stat file_stat;
 
-	if (stat(filepath, &file_stat))
+	if (stat(filepath, &file_stat)) {
 		result = file_stat.st_mtime;
+	}
 
 	return cast(gbFileTime)result;
 }
@@ -7755,8 +7875,9 @@ gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filena
 
 gb_inline b32 gb_file_move(char const *existing_filename, char const *new_filename) {
 	if (link(existing_filename, new_filename) == 0) {
-		if (unlink(existing_filename) != -1)
+		if (unlink(existing_filename) != -1) {
 			return true;
+		}
 	}
 	return false;
 }
@@ -7844,14 +7965,45 @@ gb_inline char const *gb_path_extension(char const *path) {
 
 #if !defined(_WINDOWS_) && defined(GB_SYSTEM_WINDOWS)
 GB_DLL_IMPORT DWORD WINAPI GetFullPathNameA(char const *lpFileName, DWORD nBufferLength, char *lpBuffer, char **lpFilePart);
+GB_DLL_IMPORT DWORD WINAPI GetFullPathNameW(wchar_t const *lpFileName, DWORD nBufferLength, wchar_t *lpBuffer, wchar_t **lpFilePart);
 #endif
 
 char *gb_path_get_full_name(gbAllocator a, char const *path) {
 #if defined(GB_SYSTEM_WINDOWS)
 // TODO(bill): Make UTF-8
-	char buf[300];
-	isize len = GetFullPathNameA(path, gb_count_of(buf), buf, NULL);
-	return gb_alloc_str_len(a, buf, len+1);
+	wchar_t *w_path = NULL;
+	wchar_t *w_fullpath = NULL;
+	isize w_len = 0;
+	isize new_len = 0;
+	isize new_len1 = 0;
+	char *new_path = 0;
+	w_path = gb__alloc_utf8_to_ucs2(gb_heap_allocator(), path, NULL);
+	if (w_path == NULL) {
+		return NULL;
+	}
+	w_len = GetFullPathNameW(w_path, 0, NULL, NULL);
+	if (w_len == 0) {
+		return NULL;
+	}
+	w_fullpath = gb_alloc_array(gb_heap_allocator(), wchar_t, w_len+1);
+	GetFullPathNameW(w_path, w_len, w_fullpath, NULL);
+	w_fullpath[w_len] = 0;
+	gb_free(gb_heap_allocator(), w_path);
+
+	new_len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, w_fullpath, w_len, NULL, 0, NULL, NULL);
+	if (new_len == 0) {
+		gb_free(gb_heap_allocator(), w_fullpath);
+		return NULL;
+	}
+	new_path = gb_alloc_array(a, char, new_len+1);
+	new_len1 = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, w_fullpath, w_len, new_path, new_len, NULL, NULL);
+	if (new_len1 == 0) {
+		gb_free(gb_heap_allocator(), w_fullpath);
+		gb_free(a, new_path);
+		return NULL;
+	}
+	new_path[new_len] = 0;
+	return new_path;
 #else
 // TODO(bill): Make work on *nix, etc.
 	char* p = realpath(path, 0);
@@ -7990,29 +8142,33 @@ gb_internal isize gb__print_string(char *text, isize max_len, gbprivFmtInfo *inf
 	isize res = 0, len;
 	isize remaining = max_len;
 
-	if (info && info->precision >= 0)
+	if (info && info->precision >= 0) {
 		len = gb_strnlen(str, info->precision);
-	else
+	} else {
 		len = gb_strlen(str);
+	}
 
 	if (info && (info->width == 0 || info->flags & gbFmt_Minus)) {
-		if (info->precision > 0)
+		if (info->precision > 0) {
 			len = info->precision < len ? info->precision : len;
+		}
 
 		res += gb_strlcpy(text, str, len);
 
 		if (info->width > res) {
 			isize padding = info->width - len;
 			char pad = (info->flags & gbFmt_Zero) ? '0' : ' ';
-			while (padding --> 0 && remaining --> 0)
+			while (padding --> 0 && remaining --> 0) {
 				*text++ = pad, res++;
+			}
 		}
 	} else {
 		if (info && (info->width > res)) {
 			isize padding = info->width - len;
 			char pad = (info->flags & gbFmt_Zero) ? '0' : ' ';
-			while (padding --> 0 && remaining --> 0)
+			while (padding --> 0 && remaining --> 0) {
 				*text++ = pad, res++;
+			}
 		}
 
 		res += gb_strlcpy(text, str, len);
@@ -8020,10 +8176,11 @@ gb_internal isize gb__print_string(char *text, isize max_len, gbprivFmtInfo *inf
 
 
 	if (info) {
-		if (info->flags & gbFmt_Upper)
+		if (info->flags & gbFmt_Upper) {
 			gb_str_to_upper(text);
-		else if (info->flags & gbFmt_Lower)
+		} else if (info->flags & gbFmt_Lower) {
 			gb_str_to_lower(text);
+		}
 	}
 
 	return res;
@@ -8057,13 +8214,15 @@ gb_internal isize gb__print_f64(char *text, isize max_len, gbprivFmtInfo *info, 
 	if (arg) {
 		u64 value;
 		if (arg < 0) {
-			if (remaining > 1)
+			if (remaining > 1) {
 				*text = '-', remaining--;
+			}
 			text++;
 			arg = -arg;
 		} else if (info->flags & gbFmt_Minus) {
-			if (remaining > 1)
+			if (remaining > 1) {
 				*text = '+', remaining--;
+			}
 			text++;
 		}
 
@@ -8071,39 +8230,45 @@ gb_internal isize gb__print_f64(char *text, isize max_len, gbprivFmtInfo *info, 
 		len = gb__print_u64(text, remaining, NULL, value);
 		text += len;
 
-		if (len >= remaining)
+		if (len >= remaining) {
 			remaining = gb_min(remaining, 1);
-		else
+		} else {
 			remaining -= len;
+		}
 		arg -= value;
 
-		if (info->precision < 0)
+		if (info->precision < 0) {
 			info->precision = 6;
+		}
 
 		if ((info->flags & gbFmt_Alt) || info->precision > 0) {
 			i64 mult = 10;
-			if (remaining > 1)
+			if (remaining > 1) {
 				*text = '.', remaining--;
+			}
 			text++;
 			while (info->precision-- > 0) {
 				value = cast(u64)(arg * mult);
 				len = gb__print_u64(text, remaining, NULL, value);
 				text += len;
-				if (len >= remaining)
+				if (len >= remaining) {
 					remaining = gb_min(remaining, 1);
-				else
+				} else {
 					remaining -= len;
+				}
 				arg -= cast(f64)value / mult;
 				mult *= 10;
 			}
 		}
 	} else {
-		if (remaining > 1)
+		if (remaining > 1) {
 			*text = '0', remaining--;
+		}
 		text++;
 		if (info->flags & gbFmt_Alt) {
-			if (remaining > 1)
+			if (remaining > 1) {
 				*text = '.', remaining--;
+			}
 			text++;
 		}
 	}
@@ -8115,20 +8280,23 @@ gb_internal isize gb__print_f64(char *text, isize max_len, gbprivFmtInfo *info, 
 		len = (text - text_begin);
 
 		for (len = (text - text_begin); len--; ) {
-			if ((text_begin+len+width) < end)
+			if ((text_begin+len+width) < end) {
 				*(text_begin+len+width) = *(text_begin+len);
+			}
 		}
 
 		len = width;
 		text += len;
-		if (len >= remaining)
+		if (len >= remaining) {
 			remaining = gb_min(remaining, 1);
-		else
+		} else {
 			remaining -= len;
+		}
 
 		while (len--) {
-			if (text_begin+len < end)
+			if (text_begin+len < end) {
 				text_begin[len] = fill;
+			}
 		}
 	}
 
@@ -8146,8 +8314,9 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 		isize len = 0;
 		info.precision = -1;
 
-		while (*fmt && *fmt != '%' && remaining)
+		while (*fmt && *fmt != '%' && remaining) {
 			*text++ = *fmt++;
+		}
 
 		if (*fmt == '%') {
 			do {
@@ -8311,10 +8480,11 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 
 
 		text += len;
-		if (len >= remaining)
+		if (len >= remaining) {
 			remaining = gb_min(remaining, 1);
-		else
+		} else {
 			remaining -= len;
+		}
 	}
 
 	*text++ = '\0';
@@ -8512,10 +8682,11 @@ gb_internal gb_inline u32 gb__permute_qpr(u32 x) {
 		return x;
 	} else {
 		u32 residue = cast(u32)(cast(u64) x * x) % prime;
-		if (x <= prime / 2)
+		if (x <= prime / 2) {
 			return residue;
-		else
+		} else {
 			return prime - residue;
+		}
 	}
 }
 
@@ -8742,10 +8913,11 @@ GB_XINPUT_SET_STATE(gbXInputSetState_Stub) {
 gb_internal gb_inline f32 gb__process_xinput_stick_value(i16 value, i16 dead_zone_threshold) {
 	f32 result = 0;
 
-	if (value < -dead_zone_threshold)
+	if (value < -dead_zone_threshold) {
 		result = cast(f32) (value + dead_zone_threshold) / (32768.0f - dead_zone_threshold);
-	else if (value > dead_zone_threshold)
+	} else if (value > dead_zone_threshold) {
 		result = cast(f32) (value - dead_zone_threshold) / (32767.0f - dead_zone_threshold);
+	}
 
 	return result;
 }
@@ -8755,8 +8927,9 @@ gb_internal void gb__platform_resize_dib_section(gbPlatform *p, i32 width, i32 h
 	    !(p->window_width == width && p->window_height == height)) {
 		BITMAPINFO bmi = {0};
 
-		if (width == 0 || height == 0)
+		if (width == 0 || height == 0) {
 			return;
+		}
 
 		p->window_width  = width;
 		p->window_height = height;
@@ -8775,8 +8948,9 @@ gb_internal void gb__platform_resize_dib_section(gbPlatform *p, i32 width, i32 h
 		p->sw_framebuffer.win32_bmi = bmi;
 
 
-		if (p->sw_framebuffer.memory)
+		if (p->sw_framebuffer.memory) {
 			gb_vm_free(gb_virtual_memory(p->sw_framebuffer.memory, p->sw_framebuffer.memory_size));
+		}
 
 		{
 			isize memory_size = p->sw_framebuffer.pitch * height;
@@ -8900,8 +9074,9 @@ LRESULT CALLBACK gb__win32_window_callback(HWND hWnd, UINT msg, WPARAM wParam, L
 		}
 	}
 
-	if (!platform)
+	if (!platform) {
 		return DefWindowProcW(hWnd, msg, wParam, lParam);
+	}
 
 	switch (msg) {
 	case WM_CLOSE:
@@ -8915,8 +9090,9 @@ LRESULT CALLBACK gb__win32_window_callback(HWND hWnd, UINT msg, WPARAM wParam, L
 
 	case WM_UNICHAR: {
 		if (window_has_focus) {
-			if (wParam == '\r')
+			if (wParam == '\r') {
 				wParam = '\n';
+			}
 			// TODO(bill): Does this need to be thread-safe?
 			platform->char_buffer[platform->char_buffer_count++] = cast(Rune)wParam;
 		}
@@ -8961,10 +9137,11 @@ LRESULT CALLBACK gb__win32_window_callback(HWND hWnd, UINT msg, WPARAM wParam, L
 			if (is_e1) {
 				// NOTE(bill): Escaped sequences, turn vk into the correct scan code
 				// except for VK_PAUSE (it's a bug)
-				if (vk == VK_PAUSE)
+				if (vk == VK_PAUSE) {
 					scan_code = 0x45;
-				else
+				} else {
 					scan_code = MapVirtualKeyW(vk, MAPVK_VK_TO_VSC);
+				}
 			}
 
 			switch (vk) {
@@ -9000,8 +9177,9 @@ LRESULT CALLBACK gb__win32_window_callback(HWND hWnd, UINT msg, WPARAM wParam, L
 			long dx = +raw_mouse->lLastX;
 			long dy = -raw_mouse->lLastY;
 
-			if (flags & RI_MOUSE_WHEEL)
+			if (flags & RI_MOUSE_WHEEL) {
 				platform->mouse_wheel_delta = cast(i16)raw_mouse->usButtonData;
+			}
 
 			platform->mouse_raw_dx = dx;
 			platform->mouse_raw_dy = dy;
@@ -9285,8 +9463,9 @@ void gb_platform_update(gbPlatform *p) {
 		h = window_rect.bottom - window_rect.top;
 
 		if ((p->window_width != w) || (p->window_height != h)) {
-			if (p->renderer_type == gbRenderer_Software)
+			if (p->renderer_type == gbRenderer_Software) {
 				gb__platform_resize_dib_section(p, w, h);
+			}
 		}
 
 
@@ -9311,8 +9490,9 @@ void gb_platform_update(gbPlatform *p) {
 
 		// NOTE(bill): This needs to be GetAsyncKeyState as RAWMOUSE doesn't aways work for some odd reason
 		// TODO(bill): Try and get RAWMOUSE to work for key presses
-		for (i = 0; i < gbMouseButton_Count; i++)
+		for (i = 0; i < gbMouseButton_Count; i++) {
 			gb_key_state_update(p->mouse_buttons+i, GetAsyncKeyState(win_button_id[i]) < 0);
+		}
 
 		GetCursorPos(&mouse_pos);
 		ScreenToClient(cast(HWND)p->window_handle, &mouse_pos);
@@ -9345,8 +9525,9 @@ void gb_platform_update(gbPlatform *p) {
 				update = true;
 			}
 
-			if (update)
+			if (update) {
 				gb_platform_set_mouse_position(p, x, y);
+			}
 		}
 
 
@@ -9371,8 +9552,9 @@ void gb_platform_update(gbPlatform *p) {
 
 	{ // NOTE(bill): Set Controller states
 		isize max_controller_count = XUSER_MAX_COUNT;
-		if (max_controller_count > gb_count_of(p->game_controllers))
+		if (max_controller_count > gb_count_of(p->game_controllers)) {
 			max_controller_count = gb_count_of(p->game_controllers);
+		}
 
 		for (i = 0; i < max_controller_count; i++) {
 			gbGameController *controller = &p->game_controllers[i];
@@ -9468,10 +9650,11 @@ void gb_platform_display(gbPlatform *p) {
 
 
 void gb_platform_destroy(gbPlatform *p) {
-	if (p->renderer_type == gbRenderer_Opengl)
+	if (p->renderer_type == gbRenderer_Opengl) {
 		wglDeleteContext(cast(HGLRC)p->opengl.context);
-	else if (p->renderer_type == gbRenderer_Software)
+	} else if (p->renderer_type == gbRenderer_Software) {
 		gb_vm_free(gb_virtual_memory(p->sw_framebuffer.memory, p->sw_framebuffer.memory_size));
+	}
 
 	DestroyWindow(cast(HWND)p->window_handle);
 }
@@ -9525,8 +9708,9 @@ void gb_platform_set_window_title(gbPlatform *p, char const *title, ...) {
 	gb_snprintf_va(str, gb_size_of(str), title, va);
 	va_end(va);
 
-	if (str[0] != '\0')
+	if (str[0] != '\0') {
 		SetWindowTextW(cast(HWND)p->window_handle, cast(wchar_t const *)gb_utf8_to_ucs2(buffer, gb_size_of(buffer), str));
+	}
 }
 
 void gb_platform_toggle_fullscreen(gbPlatform *p, b32 fullscreen_desktop) {
@@ -9551,10 +9735,11 @@ void gb_platform_toggle_fullscreen(gbPlatform *p, b32 fullscreen_desktop) {
 			             monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top,
 			             SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
 
-			if (fullscreen_desktop)
+			if (fullscreen_desktop) {
 				p->window_flags |= gbWindow_FullscreenDesktop;
-			else
+			} else {
 				p->window_flags |= gbWindow_Fullscreen;
+			}
 		}
 	} else {
 		style &= ~WS_POPUP;
@@ -9629,8 +9814,9 @@ b32 gb_platform_has_clipboard_text(gbPlatform *p) {
 		HANDLE mem = GetClipboardData(1/*CF_TEXT*/);
 		if (mem) {
 			char *str = cast(char *)GlobalLock(mem);
-			if (str && str[0] != '\0')
+			if (str && str[0] != '\0') {
 				result = true;
+			}
 			GlobalUnlock(mem);
 		} else {
 			return false;
@@ -9665,8 +9851,9 @@ void gb_platform_set_clipboard_text(gbPlatform *p, char const *str) {
 		}
 
 		EmptyClipboard();
-		if (!SetClipboardData(1/*CF_TEXT*/, mem))
+		if (!SetClipboardData(1/*CF_TEXT*/, mem)) {
 			return;
+		}
 		CloseClipboard();
 	}
 }
@@ -9759,8 +9946,9 @@ gb_internal void gb__osx_window_did_become_key(id self, SEL _sel, id notificatio
 }
 
 b32 gb__platform_init(gbPlatform *p, char const *window_title, gbVideoMode mode, gbRendererType type, u32 window_flags) {
-	if (p->is_initialized)
+	if (p->is_initialized) {
 		return true;
+	}
 	// Init Platform
 	{ // Initial OSX State
 		Class appDelegateClass;
@@ -10243,8 +10431,9 @@ void gb_platform_update(gbPlatform *p) {
 				update = true;
 			}
 
-			if (update)
+			if (update) {
 				gb_platform_set_mouse_position(p, x, y);
+			}
 		}
 	}
 
@@ -10449,8 +10638,9 @@ GB_COMPARE_PROC(gb_video_mode_cmp) {
 	gbVideoMode const *y = cast(gbVideoMode const *)b;
 
 	if (x->bits_per_pixel == y->bits_per_pixel) {
-		if (x->width == y->width)
+		if (x->width == y->width) {
 			return x->height < y->height ? -1 : x->height > y->height;
+		}
 		return x->width < y->width ? -1 : x->width > y->width;
 	}
 	return x->bits_per_pixel < y->bits_per_pixel ? -1 : +1;

@@ -35,45 +35,45 @@ HashKey hash_exact_value(ExactValue v) {
 }
 
 
-ExactValue make_exact_value_compound(AstNode *node) {
+ExactValue exact_value_compound(AstNode *node) {
 	ExactValue result = {ExactValue_Compound};
 	result.value_compound = node;
 	return result;
 }
 
-ExactValue make_exact_value_bool(bool b) {
+ExactValue exact_value_bool(bool b) {
 	ExactValue result = {ExactValue_Bool};
 	result.value_bool = (b != 0);
 	return result;
 }
 
-ExactValue make_exact_value_string(String string) {
+ExactValue exact_value_string(String string) {
 	// TODO(bill): Allow for numbers with underscores in them
 	ExactValue result = {ExactValue_String};
 	result.value_string = string;
 	return result;
 }
 
-ExactValue make_exact_value_integer(i64 i) {
+ExactValue exact_value_integer(i64 i) {
 	ExactValue result = {ExactValue_Integer};
 	result.value_integer = i;
 	return result;
 }
 
-ExactValue make_exact_value_float(f64 f) {
+ExactValue exact_value_float(f64 f) {
 	ExactValue result = {ExactValue_Float};
 	result.value_float = f;
 	return result;
 }
 
-ExactValue make_exact_value_pointer(i64 ptr) {
+ExactValue exact_value_pointer(i64 ptr) {
 	ExactValue result = {ExactValue_Pointer};
 	result.value_pointer = ptr;
 	return result;
 }
 
 
-ExactValue make_exact_value_integer_from_string(String string) {
+ExactValue exact_value_integer_from_string(String string) {
 	// TODO(bill): Allow for numbers with underscores in them
 	i32 base = 10;
 	bool has_prefix = false;
@@ -82,6 +82,7 @@ ExactValue make_exact_value_integer_from_string(String string) {
 		case 'b': base = 2;  has_prefix = true; break;
 		case 'o': base = 8;  has_prefix = true; break;
 		case 'd': base = 10; has_prefix = true; break;
+		case 'z': base = 12; has_prefix = true; break;
 		case 'x': base = 16; has_prefix = true; break;
 		}
 	}
@@ -100,25 +101,21 @@ ExactValue make_exact_value_integer_from_string(String string) {
 			continue;
 		}
 		i64 v = 0;
-		if (gb_char_is_digit(r)) {
-			v = r - '0';
-		} else if (gb_char_is_hex_digit(r)) {
-			v = gb_hex_digit_to_int(r);
-		} else {
+		v = digit_value(r);
+		if (v >= base) {
 			break;
 		}
-
 		result *= base;
 		result += v;
 	}
 
 
-	return make_exact_value_integer(result);
+	return exact_value_integer(result);
 }
 
 
 
-ExactValue make_exact_value_float_from_string(String string) {
+ExactValue exact_value_float_from_string(String string) {
 	isize i = 0;
 	u8 *str = string.text;
 	isize len = string.len;
@@ -137,10 +134,10 @@ ExactValue make_exact_value_float_from_string(String string) {
 		if (r == '_') {
 			continue;
 		}
-		if (!gb_char_is_digit(r)) {
+		i64 v = digit_value(r);
+		if (v >= 10) {
 			break;
 		}
-		i64 v = r - '0';
 		value *= 10.0;
 		value += v;
 	}
@@ -153,29 +150,38 @@ ExactValue make_exact_value_float_from_string(String string) {
 			if (r == '_') {
 				continue;
 			}
-			if (!gb_char_is_digit(r)) {
+			i64 v = digit_value(r);
+			if (v >= 10) {
 				break;
 			}
-			value += (r-'0')/pow10;
+			value += v/pow10;
 			pow10 *= 10.0;
 		}
 	}
 
-	f64 frac = 0;
+	bool frac = false;
 	f64 scale = 1.0;
 	if ((str[i] == 'e') || (str[i] == 'E')) {
 		i++;
 
 		if (str[i] == '-') {
-			frac = 1;
+			frac = true;
 			i++;
 		} else if (str[i] == '+') {
 			i++;
 		}
 
-		u32 exp;
-		for (exp = 0; gb_char_is_digit(str[i]); i++) {
-			exp = exp * 10 + (str[i]-'0');
+		u32 exp = 0;
+		for (; i < len; i++) {
+			Rune r = cast(Rune)str[i];
+			if (r == '_') {
+				continue;
+			}
+			u32 d = cast(u32)digit_value(r);
+			if (d >= 10) {
+				break;
+			}
+			exp = exp * 10 + d;
 		}
 		if (exp > 308) exp = 308;
 
@@ -185,20 +191,20 @@ ExactValue make_exact_value_float_from_string(String string) {
 	}
 
 	f64 result = sign * (frac ? (value / scale) : (value * scale));
-	return make_exact_value_float(result);
+	return exact_value_float(result);
 }
 
 
-ExactValue make_exact_value_from_basic_literal(Token token) {
+ExactValue exact_value_from_basic_literal(Token token) {
 	switch (token.kind) {
-	case Token_String:  return make_exact_value_string(token.string);
-	case Token_Integer: return make_exact_value_integer_from_string(token.string);
-	case Token_Float:   return make_exact_value_float_from_string(token.string);
+	case Token_String:  return exact_value_string(token.string);
+	case Token_Integer: return exact_value_integer_from_string(token.string);
+	case Token_Float:   return exact_value_float_from_string(token.string);
 	case Token_Rune: {
 		Rune r = GB_RUNE_INVALID;
 		gb_utf8_decode(token.string.text, token.string.len, &r);
 		// gb_printf("%.*s rune: %d\n", LIT(token.string), r);
-		return make_exact_value_integer(r);
+		return exact_value_integer(r);
 	}
 	default:
 		GB_PANIC("Invalid token for basic literal");
@@ -217,12 +223,12 @@ ExactValue exact_value_to_integer(ExactValue v) {
 		i64 i = cast(i64)v.value_float;
 		f64 f = cast(f64)i;
 		if (f == v.value_float) {
-			return make_exact_value_integer(i);
+			return exact_value_integer(i);
 		}
 	} break;
 
 	case ExactValue_Pointer:
-		return make_exact_value_integer(cast(i64)cast(intptr)v.value_pointer);
+		return exact_value_integer(cast(i64)cast(intptr)v.value_pointer);
 	}
 	ExactValue r = {ExactValue_Invalid};
 	return r;
@@ -231,7 +237,7 @@ ExactValue exact_value_to_integer(ExactValue v) {
 ExactValue exact_value_to_float(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
-		return make_exact_value_float(cast(i64)v.value_integer);
+		return exact_value_float(cast(i64)v.value_integer);
 	case ExactValue_Float:
 		return v;
 	}
@@ -287,14 +293,14 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 			i &= ~((~0ll)<<precision);
 		}
 
-		return make_exact_value_integer(i);
+		return exact_value_integer(i);
 	} break;
 
 	case Token_Not: {
 		switch (v.kind) {
 		case ExactValue_Invalid: return v;
 		case ExactValue_Bool:
-			return make_exact_value_bool(!v.value_bool);
+			return exact_value_bool(!v.value_bool);
 		}
 	} break;
 	}
@@ -348,7 +354,7 @@ void match_exact_values(ExactValue *x, ExactValue *y) {
 			return;
 		case ExactValue_Float:
 			// TODO(bill): Is this good enough?
-			*x = make_exact_value_float(cast(f64)x->value_integer);
+			*x = exact_value_float(cast(f64)x->value_integer);
 			return;
 		}
 		break;
@@ -372,10 +378,10 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 
 	case ExactValue_Bool:
 		switch (op) {
-		case Token_CmpAnd: return make_exact_value_bool(x.value_bool && y.value_bool);
-		case Token_CmpOr:  return make_exact_value_bool(x.value_bool || y.value_bool);
-		case Token_And:    return make_exact_value_bool(x.value_bool & y.value_bool);
-		case Token_Or:     return make_exact_value_bool(x.value_bool | y.value_bool);
+		case Token_CmpAnd: return exact_value_bool(x.value_bool && y.value_bool);
+		case Token_CmpOr:  return exact_value_bool(x.value_bool || y.value_bool);
+		case Token_And:    return exact_value_bool(x.value_bool & y.value_bool);
+		case Token_Or:     return exact_value_bool(x.value_bool | y.value_bool);
 		default: goto error;
 		}
 		break;
@@ -388,7 +394,7 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		case Token_Add:    c = a + b;  break;
 		case Token_Sub:    c = a - b;  break;
 		case Token_Mul:    c = a * b;  break;
-		case Token_Quo:    return make_exact_value_float(fmod(cast(f64)a, cast(f64)b));
+		case Token_Quo:    return exact_value_float(fmod(cast(f64)a, cast(f64)b));
 		case Token_QuoEq:  c = a / b;  break; // NOTE(bill): Integer division
 		case Token_Mod:    c = a % b;  break;
 		case Token_And:    c = a & b;  break;
@@ -400,17 +406,17 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		default: goto error;
 		}
 
-		return make_exact_value_integer(c);
+		return exact_value_integer(c);
 	} break;
 
 	case ExactValue_Float: {
 		f64 a = x.value_float;
 		f64 b = y.value_float;
 		switch (op) {
-		case Token_Add: return make_exact_value_float(a + b);
-		case Token_Sub: return make_exact_value_float(a - b);
-		case Token_Mul: return make_exact_value_float(a * b);
-		case Token_Quo: return make_exact_value_float(a / b);
+		case Token_Add: return exact_value_float(a + b);
+		case Token_Sub: return exact_value_float(a - b);
+		case Token_Mul: return exact_value_float(a * b);
+		case Token_Quo: return exact_value_float(a / b);
 		default: goto error;
 		}
 	} break;

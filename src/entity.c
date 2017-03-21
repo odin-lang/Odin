@@ -13,13 +13,15 @@ typedef struct Type Type;
 	ENTITY_KIND(Builtin) \
 	ENTITY_KIND(ImportName) \
 	ENTITY_KIND(LibraryName) \
+	ENTITY_KIND(Alias) \
 	ENTITY_KIND(Nil) \
-	ENTITY_KIND(Count)
+	ENTITY_KIND(Label)
 
 typedef enum EntityKind {
 #define ENTITY_KIND(k) GB_JOIN2(Entity_, k),
 	ENTITY_KINDS
 #undef ENTITY_KIND
+	Entity_Count,
 } EntityKind;
 
 String const entity_strings[] = {
@@ -95,7 +97,14 @@ struct Entity {
 			String name;
 			bool   used;
 		} LibraryName;
+		struct {
+			Entity *original;
+		} Alias;
 		i32 Nil;
+		struct {
+			String name;
+			AstNode *node;
+		} Label;
 	};
 };
 
@@ -218,11 +227,27 @@ Entity *make_entity_library_name(gbAllocator a, Scope *scope, Token token, Type 
 	return entity;
 }
 
+Entity *make_entity_alias(gbAllocator a, Scope *scope, Token token, Type *type,
+                          Entity *original) {
+	Entity *entity = alloc_entity(a, Entity_Alias, scope, token, type);
+	entity->Alias.original = original;
+	return entity;
+}
+
 Entity *make_entity_nil(gbAllocator a, String name, Type *type) {
 	Token token = make_token_ident(name);
 	Entity *entity = alloc_entity(a, Entity_Nil, NULL, token, type);
 	return entity;
 }
+
+Entity *make_entity_label(gbAllocator a, Scope *scope, Token token, Type *type,
+                          AstNode *node) {
+	Entity *entity = alloc_entity(a, Entity_Label, scope, token, type);
+	entity->Label.node = node;
+	return entity;
+}
+
+
 
 Entity *make_entity_dummy_variable(gbAllocator a, Scope *scope, Token token) {
 	token.string = str_lit("_");

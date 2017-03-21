@@ -1,4 +1,4 @@
-<img src="logo-slim.png" alt="Odin logo" height="74">
+<img src="misc/logo-slim.png" alt="Odin logo" height="74">
 
 # The Odin Programming Language
 
@@ -25,7 +25,7 @@ The Odin programming language is fast, concise, readable, pragmatic and open sou
 - Windows
 	* x86-64
 	* MSVC 2015 installed (C99 support)
-	* LLVM installed
+	* [LLVM binaries](https://github.com/gingerBill/Odin/releases/tag/llvm-4.0-windows) for `opt.exe` and `llc.exe`
 	* Requires MSVC's link.exe as the linker
 		* run `vcvarsall.bat` to setup the path
 

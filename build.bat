@@ -44,16 +44,12 @@ del *.ilk > NUL 2> NUL
 
 cl %compiler_settings% "src\main.c" ^
 	/link %linker_settings% -OUT:%exe_name% ^
-	&& odin build code/Jaze/src/main.odin
-	rem && odin run code/demo.odin
-	rem && odin build_dll code/example.odin ^
-	rem odin run code/demo.odin
+	&& odin run code/demo.odin
+	rem && odin build code/metagen.odin ^
+	rem && call "code\metagen.exe" "src\ast_nodes.metagen"
+	rem && odin run code/Jaze/src/main.odin
 
-rem pushd src\asm
-rem 	nasm hellope.asm -fwin64 -o hellope.obj ^
-rem 	&& cl /nologo hellope.obj /link kernel32.lib /entry:main  ^
-rem 	&& hellope.exe
-rem popd
+del *.obj > NUL 2> NUL
 
 :end_of_build
 

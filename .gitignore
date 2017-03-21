@@ -254,9 +254,8 @@ paket-files/
 
 # - Windows
 *.sln
-!misc/llvm-bim/lli.exe
-!misc/llvm-bim/opt.exe
-builds
+builds/
+bin/
 
 # - Linux/MacOS
 odin

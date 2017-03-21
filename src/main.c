@@ -2,15 +2,15 @@
 extern "C" {
 #endif
 
+#define USE_CUSTOM_BACKEND false
 
 #include "common.c"
 #include "timings.c"
 #include "build_settings.c"
 #include "tokenizer.c"
 #include "parser.c"
-// #include "printer.c"
 #include "checker.c"
-// #include "ssa.c"
+#include "ssa.c"
 #include "ir.c"
 #include "ir_opt.c"
 #include "ir_print.c"
@@ -151,6 +151,7 @@ int main(int argc, char **argv) {
 	init_scratch_memory(gb_megabytes(10));
 	init_global_error_collector();
 
+
 #if 1
 
 	init_build_context();
@@ -215,7 +216,7 @@ int main(int argc, char **argv) {
 
 
 #endif
-#if 0
+#if USE_CUSTOM_BACKEND
 	if (global_error_collector.count != 0) {
 		return 1;
 	}
@@ -224,7 +225,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	if (!ssa_generate(&checker.info)) {
+	if (!ssa_generate(&parser, &checker.info)) {
 		return 1;
 	}
 #else

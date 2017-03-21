@@ -1,4 +1,4 @@
-#import win32 "sys/windows.odin";
+#import w "sys/windows.odin";
 #import "fmt.odin";
 
 
@@ -53,29 +53,28 @@ ERROR_FILE_IS_PIPE: Errno : 1<<29 + 0;
 
 
 open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
-	using win32;
 	if path.count == 0 {
 		return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
 	}
 
 	access: u32;
 	match mode & (O_RDONLY|O_WRONLY|O_RDWR) {
-	case O_RDONLY: access = FILE_GENERIC_READ;
-	case O_WRONLY: access = FILE_GENERIC_WRITE;
-	case O_RDWR:   access = FILE_GENERIC_READ | FILE_GENERIC_WRITE;
+	case O_RDONLY: access = w.FILE_GENERIC_READ;
+	case O_WRONLY: access = w.FILE_GENERIC_WRITE;
+	case O_RDWR:   access = w.FILE_GENERIC_READ | w.FILE_GENERIC_WRITE;
 	}
 
 	if mode&O_CREAT != 0 {
-		access |= FILE_GENERIC_WRITE;
+		access |= w.FILE_GENERIC_WRITE;
 	}
 	if mode&O_APPEND != 0 {
-		access &~= FILE_GENERIC_WRITE;
-		access |= FILE_APPEND_DATA;
+		access &~= w.FILE_GENERIC_WRITE;
+		access |=  w.FILE_APPEND_DATA;
 	}
 
-	share_mode := cast(u32)(FILE_SHARE_READ|FILE_SHARE_WRITE);
-	sa: ^SECURITY_ATTRIBUTES = nil;
-	sa_inherit := SECURITY_ATTRIBUTES{length = size_of(SECURITY_ATTRIBUTES), inherit_handle = 1};
+	share_mode := cast(u32)(w.FILE_SHARE_READ|w.FILE_SHARE_WRITE);
+	sa: ^w.Security_Attributes = nil;
+	sa_inherit := w.Security_Attributes{length = size_of(w.Security_Attributes), inherit_handle = 1};
 	if mode&O_CLOEXEC == 0 {
 		sa = ^sa_inherit;
 	}
@@ -83,37 +82,37 @@ open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 	create_mode: u32;
 	match {
 	case mode&(O_CREAT|O_EXCL) == (O_CREAT | O_EXCL):
-		create_mode = CREATE_NEW;
+		create_mode = w.CREATE_NEW;
 	case mode&(O_CREAT|O_TRUNC) == (O_CREAT | O_TRUNC):
-		create_mode = CREATE_ALWAYS;
+		create_mode = w.CREATE_ALWAYS;
 	case mode&O_CREAT == O_CREAT:
-		create_mode = OPEN_ALWAYS;
+		create_mode = w.OPEN_ALWAYS;
 	case mode&O_TRUNC == O_TRUNC:
-		create_mode = TRUNCATE_EXISTING;
+		create_mode = w.TRUNCATE_EXISTING;
 	default:
-		create_mode = OPEN_EXISTING;
+		create_mode = w.OPEN_EXISTING;
 	}
 
 	buf: [300]byte;
 	copy(buf[..], cast([]byte)path);
 
-	handle := cast(Handle)CreateFileA(^buf[0], access, share_mode, sa, create_mode, FILE_ATTRIBUTE_NORMAL, nil);
+	handle := cast(Handle)w.CreateFileA(^buf[0], access, share_mode, sa, create_mode, w.FILE_ATTRIBUTE_NORMAL, nil);
 	if handle != INVALID_HANDLE {
 		return handle, ERROR_NONE;
 	}
-	err := GetLastError();
+	err := w.GetLastError();
 	return INVALID_HANDLE, cast(Errno)err;
 }
 
 close :: proc(fd: Handle) {
-	win32.CloseHandle(cast(win32.HANDLE)fd);
+	w.CloseHandle(cast(w.Handle)fd);
 }
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	bytes_written: i32;
-	e := win32.WriteFile(cast(win32.HANDLE)fd, data.data, cast(i32)data.count, ^bytes_written, nil);
-	if e == win32.FALSE {
-		err := win32.GetLastError();
+	e := w.WriteFile(cast(w.Handle)fd, data.data, cast(i32)data.count, ^bytes_written, nil);
+	if e == w.FALSE {
+		err := w.GetLastError();
 		return 0, cast(Errno)err;
 	}
 	return cast(int)bytes_written, ERROR_NONE;
@@ -121,16 +120,16 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	bytes_read: i32;
-	e := win32.ReadFile(cast(win32.HANDLE)fd, data.data, cast(u32)data.count, ^bytes_read, nil);
-	if e == win32.FALSE {
-		err := win32.GetLastError();
+	e := w.ReadFile(cast(w.Handle)fd, data.data, cast(u32)data.count, ^bytes_read, nil);
+	if e == w.FALSE {
+		err := w.GetLastError();
 		return 0, cast(Errno)err;
 	}
 	return cast(int)bytes_read, ERROR_NONE;
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
-	using win32;
+	using w;
 	w: u32;
 	match whence {
 	case 0: w = FILE_BEGIN;
@@ -139,11 +138,11 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	}
 	hi := cast(i32)(offset>>32);
 	lo := cast(i32)(offset);
-	ft := GetFileType(cast(HANDLE)fd);
+	ft := GetFileType(cast(Handle)fd);
 	if ft == FILE_TYPE_PIPE {
 		return 0, ERROR_FILE_IS_PIPE;
 	}
-	dw_ptr := SetFilePointer(cast(HANDLE)fd, lo, ^hi, w);
+	dw_ptr := SetFilePointer(cast(Handle)fd, lo, ^hi, w);
 	if dw_ptr == INVALID_SET_FILE_POINTER {
 		err := GetLastError();
 		return 0, cast(Errno)err;
@@ -153,14 +152,14 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 
 
 // NOTE(bill): Uses startup to initialize it
-stdin  := get_std_handle(win32.STD_INPUT_HANDLE);
-stdout := get_std_handle(win32.STD_OUTPUT_HANDLE);
-stderr := get_std_handle(win32.STD_ERROR_HANDLE);
+stdin  := get_std_handle(w.STD_INPUT_HANDLE);
+stdout := get_std_handle(w.STD_OUTPUT_HANDLE);
+stderr := get_std_handle(w.STD_ERROR_HANDLE);
 
 
 get_std_handle :: proc(h: int) -> Handle {
-	fd := win32.GetStdHandle(cast(i32)h);
-	win32.SetHandleInformation(fd, win32.HANDLE_FLAG_INHERIT, 0);
+	fd := w.GetStdHandle(cast(i32)h);
+	w.SetHandleInformation(fd, w.HANDLE_FLAG_INHERIT, 0);
 	return cast(Handle)fd;
 }
 
@@ -170,23 +169,23 @@ get_std_handle :: proc(h: int) -> Handle {
 
 
 last_write_time :: proc(fd: Handle) -> File_Time {
-	file_info: win32.BY_HANDLE_FILE_INFORMATION;
-	win32.GetFileInformationByHandle(cast(win32.HANDLE)fd, ^file_info);
+	file_info: w.By_Handle_File_Information;
+	w.GetFileInformationByHandle(cast(w.Handle)fd, ^file_info);
 	lo := cast(File_Time)file_info.last_write_time.lo;
 	hi := cast(File_Time)file_info.last_write_time.hi;
 	return lo | hi << 32;
 }
 
 last_write_time_by_name :: proc(name: string) -> File_Time {
-	last_write_time: win32.FILETIME;
-	data: win32.FILE_ATTRIBUTE_DATA;
+	last_write_time: w.Filetime;
+	data: w.File_Attribute_Data;
 	buf: [1024]byte;
 
 	assert(buf.count > name.count);
 
 	copy(buf[..], cast([]byte)name);
 
-	if win32.GetFileAttributesExA(^buf[0], win32.GetFileExInfoStandard, ^data) != 0 {
+	if w.GetFileAttributesExA(^buf[0], w.GetFileExInfoStandard, ^data) != 0 {
 		last_write_time = data.last_write_time;
 	}
 
@@ -210,7 +209,7 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	defer close(fd);
 
 	length: i64;
-	file_size_ok := win32.GetFileSizeEx(cast(win32.HANDLE)fd, ^length) != 0;
+	file_size_ok := w.GetFileSizeEx(cast(w.Handle)fd, ^length) != 0;
 	if !file_size_ok {
 		return nil, false;
 	}
@@ -233,7 +232,7 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 			to_read = MAX;
 		}
 
-		win32.ReadFile(cast(win32.HANDLE)fd, ^data[total_read], to_read, ^single_read_length, nil);
+		w.ReadFile(cast(w.Handle)fd, ^data[total_read], to_read, ^single_read_length, nil);
 		if single_read_length <= 0 {
 			free(data);
 			return nil, false;
@@ -248,8 +247,7 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 
 
 heap_alloc :: proc(size: int) -> rawptr {
-	assert(size > 0);
-	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, size);
+	return w.HeapAlloc(w.GetProcessHeap(), w.HEAP_ZERO_MEMORY, size);
 }
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	if new_size == 0 {
@@ -259,24 +257,24 @@ heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	if ptr == nil {
 		return heap_alloc(new_size);
 	}
-	return win32.HeapReAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, ptr, new_size);
+	return w.HeapReAlloc(w.GetProcessHeap(), w.HEAP_ZERO_MEMORY, ptr, new_size);
 }
 heap_free :: proc(ptr: rawptr) {
 	if ptr == nil {
 		return;
 	}
-	win32.HeapFree(win32.GetProcessHeap(), 0, ptr);
+	w.HeapFree(w.GetProcessHeap(), 0, ptr);
 }
 
 
 exit :: proc(code: int) {
-	win32.ExitProcess(cast(u32)code);
+	w.ExitProcess(cast(u32)code);
 }
 
 
 
 current_thread_id :: proc() -> int {
-	return cast(int)win32.GetCurrentThreadId();
+	return cast(int)w.GetCurrentThreadId();
 }
 
 

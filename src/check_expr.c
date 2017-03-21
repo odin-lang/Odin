@@ -272,6 +272,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 
 		if (operand->mode == Addressing_Builtin) {
 			// TODO(bill): is this a good enough error message?
+			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error_node(operand->expr,
 			           "Cannot assign builtin procedure `%s` in %.*s",
 			           expr_str,
@@ -379,7 +380,8 @@ isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 				Entity **found = map_entity_get(&entity_map, key);
 				if (found != NULL) {
 					Entity *e = *found;
-					// TODO(bill): Scope checking already checks the declaration
+					// NOTE(bill): Scope checking already checks the declaration but in many cases, this can happen so why not?
+					// This may be a little janky but it's not really that much of a problem
 					error(name_token, "`%.*s` is already declared in this type", LIT(name_token.string));
 					error(e->token,   "\tpreviously declared");
 				} else {
@@ -604,16 +606,11 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 		{
 			ast_node(fl, FieldList, f->list);
 
-			// TODO(bill): Just do a gb_memcopy here
 			// NOTE(bill): Copy the contents for the common fields for now
 			AstNodeArray list = {0};
 			array_init_count(&list, c->allocator, ut->fields.count+fl->list.count);
-			for (isize j = 0; j < ut->fields.count; j++) {
-				list.e[j] = ut->fields.e[j];
-			}
-			for (isize j = 0; j < fl->list.count; j++) {
-				list.e[j+ut->fields.count] = fl->list.e[j];
-			}
+			gb_memmove_array(list.e, ut->fields.e, ut->fields.count);
+			gb_memmove_array(list.e+ut->fields.count, fl->list.e, fl->list.count);
 
 			isize list_count = 0;
 			for_array(j, list) {
@@ -654,7 +651,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 		HashKey key = hash_string(name_token.string);
 		if (map_entity_get(&entity_map, key) != NULL) {
-			// TODO(bill): Scope checking already checks the declaration
+			// NOTE(bill): Scope checking already checks the declaration
 			error(name_token, "`%.*s` is already declared in this union", LIT(name_token.string));
 		} else {
 			map_entity_set(&entity_map, key, e);
@@ -746,9 +743,9 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		constant_type = named_type;
 	}
 
-	ExactValue iota = make_exact_value_integer(-1);
-	ExactValue min_value = make_exact_value_integer(0);
-	ExactValue max_value = make_exact_value_integer(0);
+	ExactValue iota = exact_value_integer(-1);
+	ExactValue min_value = exact_value_integer(0);
+	ExactValue max_value = exact_value_integer(0);
 
 	for_array(i, et->fields) {
 		AstNode *field = et->fields.e[i];
@@ -783,10 +780,10 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 			if (o.mode != Addressing_Invalid) {
 				iota = o.value;
 			} else {
-				iota = exact_binary_operator_value(Token_Add, iota, make_exact_value_integer(1));
+				iota = exact_binary_operator_value(Token_Add, iota, exact_value_integer(1));
 			}
 		} else {
-			iota = exact_binary_operator_value(Token_Add, iota, make_exact_value_integer(1));
+			iota = exact_binary_operator_value(Token_Add, iota, exact_value_integer(1));
 		}
 
 
@@ -839,7 +836,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	enum_type->Record.field_count = field_count;
 
 	enum_type->Record.enum_count = make_entity_constant(c->allocator, c->context.scope,
-		make_token_ident(str_lit("count")), t_int, make_exact_value_integer(field_count));
+		make_token_ident(str_lit("count")), t_int, exact_value_integer(field_count));
 	enum_type->Record.enum_min_value = make_entity_constant(c->allocator, c->context.scope,
 		make_token_ident(str_lit("min_value")), constant_type, min_value);
 	enum_type->Record.enum_max_value = make_entity_constant(c->allocator, c->context.scope,
@@ -1028,7 +1025,7 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 }
 
 
-void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint) {
+Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *type_hint, bool allow_import_name) {
 	GB_ASSERT(n->kind == AstNode_Ident);
 	o->mode = Addressing_Invalid;
 	o->expr = n;
@@ -1046,7 +1043,7 @@ void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *typ
 		if (named_type != NULL) {
 			set_base_type(named_type, t_invalid);
 		}
-		return;
+		return NULL;
 	}
 
 	bool is_overloaded = false;
@@ -1095,7 +1092,7 @@ void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *typ
 			o->type              = t_invalid;
 			o->overload_count    = overload_count;
 			o->overload_entities = procs;
-			return;
+			return NULL;
 		}
 		gb_free(heap_allocator(), procs);
 	}
@@ -1106,20 +1103,26 @@ void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *typ
 
 	if (e->type == NULL) {
 		compiler_error("Compiler error: How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(name));
-		return;
+		return NULL;
+	}
+
+	e->flags |= EntityFlag_Used;
+
+	Entity *original_e = e;
+	while (e != NULL && e->kind == Entity_Alias && e->Alias.original != NULL) {
+		e = e->Alias.original;
 	}
 
 	Type *type = e->type;
-
 	switch (e->kind) {
 	case Entity_Constant:
 		if (type == t_invalid) {
 			o->type = t_invalid;
-			return;
+			return e;
 		}
 		o->value = e->Constant.value;
 		if (o->value.kind == ExactValue_Invalid) {
-			return;
+			return e;
 		}
 		o->mode = Addressing_Constant;
 		break;
@@ -1128,7 +1131,7 @@ void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *typ
 		e->flags |= EntityFlag_Used;
 		if (type == t_invalid) {
 			o->type = t_invalid;
-			return;
+			return e;
 		}
 		o->mode = Addressing_Variable;
 		if (e->Variable.is_immutable) {
@@ -1136,10 +1139,10 @@ void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *typ
 		}
 		break;
 
-	case Entity_TypeName: {
+	case Entity_TypeName:
+		// NOTE(bill): Cyclical dependency checking is handled in the "type system" not here
 		o->mode = Addressing_Type;
-		// TODO(bill): Fix cyclical dependancy checker
-	} break;
+		break;
 
 	case Entity_Procedure:
 		o->mode = Addressing_Value;
@@ -1151,22 +1154,29 @@ void check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *typ
 		break;
 
 	case Entity_ImportName:
-		error_node(n, "Use of import `%.*s` not in selector", LIT(e->ImportName.name));
-		return;
+		if (!allow_import_name) {
+			error_node(n, "Use of import `%.*s` not in selector", LIT(name));
+		}
+		return e;
 	case Entity_LibraryName:
-		error_node(n, "Use of library `%.*s` not in #foreign tag", LIT(e->LibraryName.name));
-		return;
+		error_node(n, "Use of library `%.*s` not in #foreign tag", LIT(name));
+		return e;
+
+	case Entity_Label:
+		o->mode = Addressing_NoValue;
+		break;
 
 	case Entity_Nil:
 		o->mode = Addressing_Value;
 		break;
 
 	default:
-		compiler_error("Compiler error: Unknown EntityKind");
+		compiler_error("Unknown EntityKind");
 		break;
 	}
 
 	o->type = type;
+	return e;
 }
 
 i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
@@ -1342,7 +1352,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 	switch (e->kind) {
 	case_ast_node(i, Ident, e);
 		Operand o = {0};
-		check_ident(c, &o, e, named_type, NULL);
+		check_ident(c, &o, e, named_type, NULL, false);
 
 		switch (o.mode) {
 		case Addressing_Invalid:
@@ -1663,7 +1673,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		return true;
 	}
 
-	type = base_type(base_enum_type(type));
+	type = core_type(type);
 
 	if (is_type_boolean(type)) {
 		return in_value.kind == ExactValue_Bool;
@@ -1682,7 +1692,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		if (s < 64) {
 			umax = (1ull << s) - 1ull;
 		} else {
-			// TODO(bill): I NEED A PROPER BIG NUMBER LIBRARY THAT CAN SUPPORT 128 bit integers and floats
+			// IMPORTANT TODO(bill): I NEED A PROPER BIG NUMBER LIBRARY THAT CAN SUPPORT 128 bit integers and floats
 			s = 64;
 		}
 		i64 imax = (1ll << (s-1ll));
@@ -1860,7 +1870,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 		}
 		x->mode  = Addressing_Constant;
 		x->type  = t_untyped_bool;
-		x->value = make_exact_value_bool(comp);
+		x->value = exact_value_bool(comp);
 		return;
 	}
 
@@ -1913,9 +1923,10 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 	} else {
 		if (x->mode == Addressing_Constant &&
 		    y->mode == Addressing_Constant) {
-			x->value = make_exact_value_bool(compare_exact_values(op, x->value, y->value));
+			x->value = exact_value_bool(compare_exact_values(op, x->value, y->value));
 		} else {
 			x->mode = Addressing_Value;
+
 
 			update_expr_type(c, x->expr, default_type(x->type), true);
 			update_expr_type(c, y->expr, default_type(y->type), true);
@@ -1995,7 +2006,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 				x->type = t_untyped_integer;
 			}
 
-			x->value = exact_value_shift(be->op.kind, x_val, make_exact_value_integer(amount));
+			x->value = exact_value_shift(be->op.kind, x_val, exact_value_integer(amount));
 
 			if (is_type_typed(x->type)) {
 				check_is_expressible(c, x, base_type(x->type));
@@ -2094,7 +2105,7 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 			new_ptr_val -= elem_size*offset_val;
 		}
 		operand.mode = Addressing_Constant;
-		operand.value = make_exact_value_pointer(new_ptr_val);
+		operand.value = exact_value_pointer(new_ptr_val);
 	}
 
 	return operand;
@@ -2108,8 +2119,8 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 	}
 
 	Type *x = operand->type;
-	Type *src = base_type(base_enum_type(x));
-	Type *dst = base_type(base_enum_type(y));
+	Type *src = core_type(x);
+	Type *dst = core_type(y);
 	if (are_types_identical(src, dst)) {
 		return true;
 	}
@@ -2372,7 +2383,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			GB_ASSERT(op.kind == Token_Sub);
 			i64 bytes = a.value_pointer - b.value_pointer;
 			i64 diff = bytes/type_size_of(c->allocator, type);
-			x->value = make_exact_value_pointer(diff);
+			x->value = exact_value_pointer(diff);
 			return;
 		}
 
@@ -2517,7 +2528,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 		return;
 	}
 
-	Type *t = base_type(base_enum_type(target_type));
+	Type *t = core_type(target_type);
 	switch (t->kind) {
 	case Type_Basic:
 		if (operand->mode == Addressing_Constant) {
@@ -2678,6 +2689,11 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
 
+		Entity *original_e = e;
+		while (e != NULL && e->kind == Entity_Alias && e->Alias.original != NULL) {
+			e = e->Alias.original;
+		}
+
 		if (e != NULL && e->kind == Entity_ImportName && selector->kind == AstNode_Ident) {
 			// IMPORTANT NOTE(bill): This is very sloppy code but it's also very fragile
 			// It pretty much needs to be in this order and this way
@@ -2832,7 +2848,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	    operand->type != NULL && is_type_untyped(operand->type) && is_type_string(operand->type)) {
 		String s = operand->value.value_string;
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(s.len);
+		operand->value = exact_value_integer(s.len);
 		operand->type = t_untyped_integer;
 		return NULL;
 	}
@@ -2869,7 +2885,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		operand->value = entity->Constant.value;
 		break;
 	case Entity_Variable:
-		// TODO(bill): This is the rule I need?
+		// TODO(bill): Is this the rule I need?
 		if (operand->mode == Addressing_Immutable) {
 			// Okay
 		} else if (sel.indirect || operand->mode != Addressing_Value) {
@@ -3058,9 +3074,11 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	case BuiltinProc_clear: {
 		Type *type = operand->type;
-		if (!is_type_dynamic_array(type) && !is_type_map(type)) {
+		bool is_pointer = is_type_pointer(type);
+		type = base_type(type_deref(type));
+		if (!is_type_dynamic_array(type) && !is_type_map(type) && !is_type_slice(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a map or dynamic array, got `%s`", str);
+			error_node(operand->expr, "Invalid type for `clear`, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
@@ -3092,14 +3110,12 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		Type *elem = NULL;
-		Type *slice_elem = NULL;
 		if (is_type_dynamic_array(type)) {
-			// TODO(bill): Semi-memory leaks
 			elem = type->DynamicArray.elem;
 		} else {
 			elem = type->Slice.elem;
 		}
-		slice_elem = make_type_slice(c->allocator, elem);
+		Type *slice_elem = make_type_slice(c->allocator, elem);
 
 		Type *proc_type_params = make_type_tuple(c->allocator);
 		proc_type_params->Tuple.variables = gb_alloc_array(c->allocator, Entity *, 2);
@@ -3158,7 +3174,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_size_of(c->allocator, type));
+		operand->value = exact_value_integer(type_size_of(c->allocator, type));
 		operand->type = t_untyped_integer;
 
 	} break;
@@ -3171,7 +3187,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_size_of(c->allocator, operand->type));
+		operand->value = exact_value_integer(type_size_of(c->allocator, operand->type));
 		operand->type = t_untyped_integer;
 		break;
 
@@ -3183,7 +3199,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_align_of(c->allocator, type));
+		operand->value = exact_value_integer(type_align_of(c->allocator, type));
 		operand->type = t_untyped_integer;
 	} break;
 
@@ -3195,7 +3211,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_align_of(c->allocator, operand->type));
+		operand->value = exact_value_integer(type_align_of(c->allocator, operand->type));
 		operand->type = t_untyped_integer;
 		break;
 
@@ -3239,7 +3255,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = make_exact_value_integer(type_offset_of_from_selection(c->allocator, type, sel));
+		operand->value = exact_value_integer(type_offset_of_from_selection(c->allocator, type, sel));
 		operand->type  = t_untyped_integer;
 	} break;
 
@@ -3288,7 +3304,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->mode = Addressing_Constant;
 		// IMPORTANT TODO(bill): Fix for anonymous fields
-		operand->value = make_exact_value_integer(type_offset_of_from_selection(c->allocator, type, sel));
+		operand->value = exact_value_integer(type_offset_of_from_selection(c->allocator, type, sel));
 		operand->type  = t_untyped_integer;
 	} break;
 
@@ -3486,113 +3502,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_Value;
 	} break;
 
-#if 0
-	case BuiltinProc_ptr_offset: {
-		// ptr_offset :: proc(ptr: ^T, offset: int) -> ^T
-		// ^T cannot be rawptr
-		Type *ptr_type = base_type(operand->type);
-		if (!is_type_pointer(ptr_type)) {
-			gbString type_str = type_to_string(operand->type);
-			defer (gb_string_free(type_str));
-			error_node(call,
-			      "Expected a pointer to `ptr_offset`, got `%s`",
-			      type_str);
-			return false;
-		}
-
-		if (ptr_type == t_rawptr) {
-			error_node(call,
-			      "`rawptr` cannot have pointer arithmetic");
-			return false;
-		}
-
-		AstNode *offset = ce->args.e[1];
-		Operand op = {0};
-		check_expr(c, &op, offset);
-		if (op.mode == Addressing_Invalid)
-			return false;
-		Type *offset_type = base_type(op.type);
-		if (!is_type_integer(offset_type)) {
-			error_node(op.expr, "Pointer offsets for `ptr_offset` must be an integer");
-			return false;
-		}
-
-		if (operand->mode == Addressing_Constant &&
-		    op.mode == Addressing_Constant) {
-			i64 ptr = operand->value.value_pointer;
-			i64 elem_size = type_size_of(c->allocator, ptr_type->Pointer.elem);
-			ptr += elem_size * op.value.value_integer;
-			operand->value.value_pointer = ptr;
-		} else {
-			operand->mode = Addressing_Value;
-		}
-
-	} break;
-
-	case BuiltinProc_ptr_sub: {
-		// ptr_sub :: proc(a, b: ^T) -> int
-		// ^T cannot be rawptr
-		Type *ptr_type = base_type(operand->type);
-		if (!is_type_pointer(ptr_type)) {
-			gbString type_str = type_to_string(operand->type);
-			defer (gb_string_free(type_str));
-			error_node(call,
-			      "Expected a pointer to `ptr_add`, got `%s`",
-			      type_str);
-			return false;
-		}
-
-		if (ptr_type == t_rawptr) {
-			error_node(call,
-			      "`rawptr` cannot have pointer arithmetic");
-			return false;
-		}
-		AstNode *offset = ce->args[1];
-		Operand op = {0};
-		check_expr(c, &op, offset);
-		if (op.mode == Addressing_Invalid)
-			return false;
-		if (!is_type_pointer(op.type)) {
-			gbString type_str = type_to_string(operand->type);
-			defer (gb_string_free(type_str));
-			error_node(call,
-			      "Expected a pointer to `ptr_add`, got `%s`",
-			      type_str);
-			return false;
-		}
-
-		if (base_type(op.type) == t_rawptr) {
-			error_node(call,
-			      "`rawptr` cannot have pointer arithmetic");
-			return false;
-		}
-
-		if (!are_types_identical(operand->type, op.type)) {
-			gbString a = type_to_string(operand->type);
-			gbString b = type_to_string(op.type);
-			defer (gb_string_free(a));
-			defer (gb_string_free(b));
-			error_node(op.expr,
-			      "`ptr_sub` requires to pointer of the same type. Got `%s` and `%s`.", a, b);
-			return false;
-		}
-
-		operand->type = t_int;
-
-		if (operand->mode == Addressing_Constant &&
-		    op.mode == Addressing_Constant) {
-			u8 *ptr_a = cast(u8 *)operand->value.value_pointer;
-			u8 *ptr_b = cast(u8 *)op.value.value_pointer;
-			isize elem_size = type_size_of(c->allocator, ptr_type->Pointer.elem);
-			operand->value = make_exact_value_integer((ptr_a - ptr_b) / elem_size);
-		} else {
-			operand->mode = Addressing_Value;
-		}
-	} break;
-#endif
-
 	case BuiltinProc_slice_ptr: {
 		// slice_ptr :: proc(a: ^T, len: int) -> []T
+		// slice_ptr :: proc(a: ^T, len, cap: int) -> []T
 		// ^T cannot be rawptr
 		Type *ptr_type = base_type(operand->type);
 		if (!is_type_pointer(ptr_type)) {
@@ -3610,21 +3522,28 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 
-		AstNode *len = ce->args.e[1];
+		isize arg_count = ce->args.count;
+		if (arg_count < 2 || 3 < arg_count) {
+			error_node(ce->args.e[0], "`slice_ptr` expects 2 or 3 arguments, found %td", arg_count);
+			// NOTE(bill): Return the correct type to reduce errors
+		} else {
+			// If any are constant
+			i64 sizes[2] = {0};
+			isize size_count = 0;
+			for (isize i = 1; i < arg_count; i++) {
+				i64 val = 0;
+				bool ok = check_index_value(c, ce->args.e[i], -1, &val);
+				if (ok && val >= 0) {
+					GB_ASSERT(size_count < gb_count_of(sizes));
+					sizes[size_count++] = val;
+				}
+			}
 
-		Operand op = {0};
-		check_expr(c, &op, len);
-		if (op.mode == Addressing_Invalid)
-			return false;
-		if (!is_type_integer(op.type)) {
-			gbString type_str = type_to_string(operand->type);
-			error_node(call,
-			      "Length for `slice_ptr` must be an integer, got `%s`",
-			      type_str);
-			gb_string_free(type_str);
-			return false;
+			if (size_count == 2 && sizes[0] > sizes[1]) {
+				error_node(ce->args.e[1], "`slice_ptr` count and capacity are swapped");
+				// No need quit
+			}
 		}
-
 		operand->type = make_type_slice(c->allocator, ptr_type->Pointer.elem);
 		operand->mode = Addressing_Value;
 	} break;
@@ -4412,7 +4331,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case_end;
 
 	case_ast_node(i, Ident, node);
-		check_ident(c, o, node, NULL, type_hint);
+		check_ident(c, o, node, NULL, type_hint, false);
 	case_end;
 
 	case_ast_node(bl, BasicLit, node);
@@ -4426,24 +4345,24 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 		}
 		o->mode  = Addressing_Constant;
 		o->type  = t;
-		o->value = make_exact_value_from_basic_literal(*bl);
+		o->value = exact_value_from_basic_literal(*bl);
 	case_end;
 
 	case_ast_node(bd, BasicDirective, node);
 		if (str_eq(bd->name, str_lit("file"))) {
 			o->type = t_untyped_string;
-			o->value = make_exact_value_string(bd->token.pos.file);
+			o->value = exact_value_string(bd->token.pos.file);
 		} else if (str_eq(bd->name, str_lit("line"))) {
 			o->type = t_untyped_integer;
-			o->value = make_exact_value_integer(bd->token.pos.line);
+			o->value = exact_value_integer(bd->token.pos.line);
 		} else if (str_eq(bd->name, str_lit("procedure"))) {
 			if (c->proc_stack.count == 0) {
 				error_node(node, "#procedure may only be used within procedures");
 				o->type = t_untyped_string;
-				o->value = make_exact_value_string(str_lit(""));
+				o->value = exact_value_string(str_lit(""));
 			} else {
 				o->type = t_untyped_string;
-				o->value = make_exact_value_string(c->context.proc_name);
+				o->value = exact_value_string(c->context.proc_name);
 			}
 
 		} else {
@@ -4476,13 +4395,9 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 	case_end;
 
 	case_ast_node(te, TernaryExpr, node);
-		if (c->proc_stack.count == 0) {
-			error_node(node, "A ternary expression is only allowed within a procedure");
-			goto error;
-		}
-		Operand operand = {Addressing_Invalid};
-		check_expr(c, &operand, te->cond);
-		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
+		Operand cond = {Addressing_Invalid};
+		check_expr(c, &cond, te->cond);
+		if (cond.mode != Addressing_Invalid && !is_type_boolean(cond.type)) {
 			error_node(te->cond, "Non-boolean condition in if expression");
 		}
 
@@ -4524,6 +4439,20 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 		o->type = x.type;
 		o->mode = Addressing_Value;
+
+		if (cond.mode == Addressing_Constant && is_type_boolean(cond.type) &&
+		    x.mode == Addressing_Constant &&
+		    y.mode == Addressing_Constant) {
+
+			o->mode = Addressing_Constant;
+
+			if (cond.value.value_bool) {
+				o->value = x.value;
+			} else {
+				o->value = y.value;
+			}
+		}
+
 	case_end;
 
 	case_ast_node(cl, CompoundLit, node);
@@ -4850,7 +4779,7 @@ ExprKind check__expr_base(Checker *c, Operand *o, AstNode *node, Type *type_hint
 
 		if (is_constant) {
 			o->mode = Addressing_Constant;
-			o->value = make_exact_value_compound(node);
+			o->value = exact_value_compound(node);
 		} else {
 			o->mode = Addressing_Value;
 		}
@@ -5625,7 +5554,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_end;
 
 	case_ast_node(ht, HelperType, node);
-		str = gb_string_appendc(str, "type ");
+		str = gb_string_appendc(str, "#type ");
 		str = write_expr_to_string(str, ht->type);
 	case_end;
 	}

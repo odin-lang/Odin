@@ -27,14 +27,14 @@ Mat4 :: [4]Vec4;
 sqrt :: proc(x: f32) -> f32 #foreign __llvm_core "llvm.sqrt.f32";
 sqrt :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.sqrt.f64";
 
-sin :: proc(x: f32) -> f32 #foreign __llvm_core "llvm.sin.f32";
-sin :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.sin.f64";
+sin  :: proc(x: f32) -> f32 #foreign __llvm_core "llvm.sin.f32";
+sin  :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.sin.f64";
 
-cos :: proc(x: f32) -> f32 #foreign __llvm_core "llvm.cos.f32";
-cos :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.cos.f64";
+cos  :: proc(x: f32) -> f32 #foreign __llvm_core "llvm.cos.f32";
+cos  :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.cos.f64";
 
-tan :: proc(x: f32) -> f32 #inline { return sin(x)/cos(x); }
-tan :: proc(x: f64) -> f64 #inline { return sin(x)/cos(x); }
+tan  :: proc(x: f32) -> f32 #inline { return sin(x)/cos(x); }
+tan  :: proc(x: f64) -> f64 #inline { return sin(x)/cos(x); }
 
 lerp :: proc(a, b, t: f32) -> f32 { return a*(1-t) + b*t; }
 lerp :: proc(a, b, t: f64) -> f64 { return a*(1-t) + b*t; }
@@ -53,36 +53,42 @@ fmuladd :: proc(a, b, c: f64) -> f64 #foreign __llvm_core "llvm.fmuladd.f64";
 copy_sign :: proc(x, y: f32) -> f32 {
 	ix := transmute(u32)x;
 	iy := transmute(u32)y;
-	ix &= 0x7fffffff;
-	ix |= iy & 0x80000000;
+	ix &= 0x7fff_ffff;
+	ix |= iy & 0x8000_0000;
 	return transmute(f32)ix;
 }
-round :: proc(x: f32) -> f32 {
-	if x >= 0 {
-		return floor(x + 0.5);
-	}
-	return ceil(x - 0.5);
-}
-floor :: proc(x: f32) -> f32 {
-	if x >= 0 {
-		return cast(f32)cast(int)x;
-	}
-	return cast(f32)cast(int)(x-0.5);
-}
-ceil :: proc(x: f32) -> f32 {
-	if x < 0 {
-		return cast(f32)cast(int)x;
-	}
-	return cast(f32)cast(int)(x+1);
+
+copy_sign :: proc(x, y: f64) -> f64 {
+	ix := transmute(u64)x;
+	iy := transmute(u64)y;
+	ix &= 0x7fff_ffff_ffff_ff;
+	ix |= iy & 0x8000_0000_0000_0000;
+	return transmute(f64)ix;
 }
 
-remainder32 :: proc(x, y: f32) -> f32 {
-	return x - round(x/y) * y;
-}
+round     :: proc(x: f32) -> f32 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
+round     :: proc(x: f64) -> f64 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
 
-fmod32 :: proc(x, y: f32) -> f32 {
+floor     :: proc(x: f32) -> f32 { return x >= 0 ? cast(f32)cast(i64)x : cast(f32)cast(i64)(x-0.5); } // TODO: Get accurate versions
+floor     :: proc(x: f64) -> f64 { return x >= 0 ? cast(f64)cast(i64)x : cast(f64)cast(i64)(x-0.5); } // TODO: Get accurate versions
+
+ceil      :: proc(x: f32) -> f32 { return x <  0 ? cast(f32)cast(i64)x : cast(f32)cast(i64)(x+1); } // TODO: Get accurate versions
+ceil      :: proc(x: f64) -> f64 { return x <  0 ? cast(f64)cast(i64)x : cast(f64)cast(i64)(x+1); } // TODO: Get accurate versions
+
+remainder :: proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
+remainder :: proc(x, y: f64) -> f64 { return x - round(x/y) * y; }
+
+mod :: proc(x, y: f32) -> f32 {
 	y = abs(y);
-	result := remainder32(abs(x), y);
+	result := remainder(abs(x), y);
+	if sign(result) < 0 {
+		result += y;
+	}
+	return copy_sign(result, x);
+}
+mod :: proc(x, y: f64) -> f64 {
+	y = abs(y);
+	result := remainder(abs(x), y);
 	if sign(result) < 0 {
 		result += y;
 	}
@@ -92,7 +98,6 @@ fmod32 :: proc(x, y: f32) -> f32 {
 
 to_radians :: proc(degrees: f32) -> f32 { return degrees * TAU / 360; }
 to_degrees :: proc(radians: f32) -> f32 { return radians * 360 / TAU; }
-
 
 
 
