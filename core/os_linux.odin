@@ -1,4 +1,5 @@
 #import "fmt.odin";
+#import "strings.odin";
 
 Handle    :: i32;
 File_Time :: u64;
@@ -197,9 +198,9 @@ dlopen :: proc(filename: string, flags: int) -> rawptr #inline {
 dlsym :: proc(handle: rawptr, symbol: string) -> (proc() #cc_c) #inline {
 	assert(handle != nil);
 	cstr := strings.new_c_string(symbol);
-	handle := unix_dlsym(handle, cstr);
+	proc_handle := unix_dlsym(handle, cstr);
 	free(cstr);
-	return handle;
+	return proc_handle;
 }
 dlclose :: proc(handle: rawptr) -> bool #inline {
 	assert(handle != nil);
