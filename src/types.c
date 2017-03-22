@@ -1035,7 +1035,7 @@ typedef enum ProcTypeOverloadKind {
 
 } ProcTypeOverloadKind;
 
-
+#include "stdio.h"
 bool has_encountered_null_proc_type = false;
 ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 	if(x == NULL && y == NULL) {
