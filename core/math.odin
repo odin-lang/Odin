@@ -36,6 +36,10 @@ cos  :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.cos.f64";
 tan  :: proc(x: f32) -> f32 #inline { return sin(x)/cos(x); }
 tan  :: proc(x: f64) -> f64 #inline { return sin(x)/cos(x); }
 
+pow  :: proc(x, power: f32) -> f32 #foreign __llvm_core "llvm.pow.f32";
+pow  :: proc(x, power: f64) -> f64 #foreign __llvm_core "llvm.pow.f64";
+
+
 lerp :: proc(a, b, t: f32) -> f32 { return a*(1-t) + b*t; }
 lerp :: proc(a, b, t: f64) -> f64 { return a*(1-t) + b*t; }
 

@@ -1659,6 +1659,39 @@ irValue *ir_emit_ptr_offset(irProcedure *proc, irValue *ptr, irValue *offset) {
 	return ir_emit(proc, ir_instr_ptr_offset(proc, ptr, offset));
 }
 
+irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *type) {
+	switch (op) {
+	case Token_Add:
+		return x;
+	case Token_Not: // Boolean not
+	case Token_Xor: // Bitwise not
+	case Token_Sub: // Bitwise Not
+		break;
+	case Token_Pointer:
+		GB_PANIC("This should be handled elsewhere");
+		break;
+	}
+	if (is_type_vector(ir_type(x))) {
+		ir_emit_comment(proc, str_lit("vector.arith.begin"));
+		// IMPORTANT TODO(bill): This is very wasteful with regards to stack memory
+		Type *tl = base_type(ir_type(x));
+		irValue *val = ir_address_from_load_or_generate_local(proc, x);
+		GB_ASSERT(is_type_vector(type));
+		Type *elem_type = base_type(type)->Vector.elem;
+
+		irValue *res = ir_add_local_generated(proc, type);
+		for (i32 i = 0; i < tl->Vector.count; i++) {
+			irValue *e = ir_emit_load(proc, ir_emit_array_epi(proc, val, i));
+			irValue *z = ir_emit_unary_arith(proc, op, e, elem_type);
+			ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
+		}
+		ir_emit_comment(proc, str_lit("vector.arith.end"));
+		return ir_emit_load(proc, res);
+
+	}
+	return ir_emit(proc, ir_instr_unary_op(proc, op, x, type));
+}
+
 irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *right, Type *type) {
 	Type *t_left = ir_type(left);
 	Type *t_right = ir_type(right);
@@ -3143,17 +3176,8 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		switch (ue->op.kind) {
 		case Token_Pointer:
 			return ir_emit_ptr_offset(proc, ir_build_addr(proc, ue->expr).addr, v_zero); // Make a copy of the pointer
-
-		// case Token_Maybe:
-			// return ir_emit_conv(proc, ir_build_expr(proc, ue->expr), type_of_expr(proc->module->info, expr));
-
-		case Token_Add:
-			return ir_build_expr(proc, ue->expr);
-
-		case Token_Not: // Boolean not
-		case Token_Xor: // Bitwise not
-		case Token_Sub: // Bitwise not
-			return ir_emit(proc, ir_instr_unary_op(proc, ue->op.kind, ir_build_expr(proc, ue->expr), tv->type));
+		default:
+			return ir_emit_unary_arith(proc, ue->op.kind, ir_build_expr(proc, ue->expr), tv->type);
 		}
 	case_end;
 

@@ -946,11 +946,9 @@ bprintf :: proc(b: ^[]byte, fmt: string, args: ..any) -> int {
 		// Process a "verb"
 		i++;
 
-
+		#label prefix_loop
 		for ; i < end; i++ {
-			skip_loop := false;
-			c := fmt[i];
-			match c {
+			match fmt[i] {
 			case '+':
 				fi.plus = true;
 			case '-':
@@ -963,11 +961,7 @@ bprintf :: proc(b: ^[]byte, fmt: string, args: ..any) -> int {
 			case '0':
 				fi.zero = !fi.minus;
 			default:
-				skip_loop = true;
-			}
-
-			if skip_loop {
-				break;
+				break prefix_loop;
 			}
 		}
 

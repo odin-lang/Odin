@@ -3366,7 +3366,7 @@ AstNode *parse_stmt(AstFile *f) {
 			_SET_LABEL(MatchStmt, label);
 			_SET_LABEL(TypeMatchStmt, label);
 			default:
-				syntax_error(token, "#label may only be applied to a loop");
+				syntax_error(token, "#label cannot only be applied to a loop or match statement");
 				break;
 			}
 		#undef _SET_LABEL
