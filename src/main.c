@@ -282,6 +282,12 @@ int main(int argc, char **argv) {
 		"-mem2reg "
 		"-memcpyopt "
 		"-die "
+		#if defined(GB_SYSTEM_OSX)
+			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
+			// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
+			//       make sure to also change the `macosx_version_min` param passed to `llc`
+			"-mtriple=x86_64-apple-macosx10.8 "
+		#endif
 		// "-dse "
 		// "-dce "
 		// "-S "
@@ -382,11 +388,12 @@ int main(int argc, char **argv) {
 		//   This allows you to specify '-f' in a #foreign_system_library,
 		//   without having to implement any new syntax specifically for MacOS.
 		#if defined(GB_SYSTEM_OSX)
+			isize len;
 			if(lib.len > 2 && lib.text[0] == '-' && lib.text[1] == 'f') {
-				isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+				len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
 				                        " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
 			} else {
-				isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+				len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
 				                        " -l%.*s ", LIT(lib));
 			}
 		#else
@@ -433,7 +440,10 @@ int main(int argc, char **argv) {
 		" %s "
 		#if defined(GB_SYSTEM_OSX)
 			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
+			// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
+			//       make sure to also change the `mtriple` param passed to `opt`
 			" -macosx_version_min 10.8.0 "
+			// This points the linker to where the entry point is
 			" -e _main "
 		#endif
 		, linker, LIT(output), LIT(output), output_ext,

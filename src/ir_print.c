@@ -364,7 +364,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		}
 	} break;
 	case ExactValue_Float: {
-		GB_ASSERT(is_type_float(type));
+		GB_ASSERT_MSG(is_type_float(type), "%s", type_to_string(type));
 		type = base_type(type);
 		u64 u = *cast(u64*)&value.value_float;
 		switch (type->Basic.kind) {
@@ -942,7 +942,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		switch (uo->op) {
 		case Token_Sub:
 			if (is_type_float(elem_type)) {
-				ir_print_exact_value(f, m, exact_value_float(0), type);
+				ir_print_exact_value(f, m, exact_value_float(0), elem_type);
 			} else {
 				ir_fprintf(f, "0");
 			}

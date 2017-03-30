@@ -689,8 +689,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(rs, RangeStmt, node);
 		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
-		check_open_scope(c, node);
 
+		check_open_scope(c, node);
 		check_label(c, rs->label);
 
 		Type *val = NULL;
@@ -885,6 +885,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		mod_flags |= Stmt_BreakAllowed;
 		check_open_scope(c, node);
+		check_label(c, ms->label); // TODO(bill): What should the label's "scope" be?
 
 		if (ms->init != NULL) {
 			check_stmt(c, ms->init, 0);
@@ -897,8 +898,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			x.type  = t_bool;
 			x.value = exact_value_bool(true);
 
-			Token token = {0};
-			token.pos = ast_node_token(ms->body).pos;
+			Token token  = {0};
+			token.pos    = ast_node_token(ms->body).pos;
 			token.string = str_lit("true");
 			x.expr       = ast_ident(c->curr_ast_file, token);
 		}
@@ -1025,6 +1026,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		mod_flags |= Stmt_BreakAllowed;
 		check_open_scope(c, node);
+		check_label(c, ms->label); // TODO(bill): What should the label's "scope" be?
 
 		MatchTypeKind match_type_kind = MatchType_Invalid;
 
@@ -1051,8 +1053,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		match_type_kind = check_valid_type_match_type(x.type);
 		if (check_valid_type_match_type(x.type) == MatchType_Invalid) {
 			gbString str = type_to_string(x.type);
-			error_node(x.expr,
-			           "Invalid type for this type match expression, got `%s`", str);
+			error_node(x.expr, "Invalid type for this type match expression, got `%s`", str);
 			gb_string_free(str);
 			break;
 		}
@@ -1387,7 +1388,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(vd, ValueDecl, node);
 		GB_ASSERT(!c->context.scope->is_file);
-		if (vd->is_var) {
+		if (!vd->is_var) {
+			// NOTE(bill): Handled elsewhere
+		} else {
 			Entity **entities = gb_alloc_array(c->allocator, Entity *, vd->names.count);
 			isize entity_count = 0;
 
@@ -1497,9 +1500,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					}
 				}
 			}
-
-		} else {
-			// NOTE(bill): Handled elsewhere
 		}
 	case_end;
 	}

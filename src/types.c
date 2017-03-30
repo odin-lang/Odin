@@ -1035,24 +1035,13 @@ typedef enum ProcTypeOverloadKind {
 
 } ProcTypeOverloadKind;
 
-#include "stdio.h"
-bool has_encountered_null_proc_type = false;
 ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
-	if(x == NULL && y == NULL) {
-		if(!has_encountered_null_proc_type) {
-			printf("The compiler has encountered a NULL proc type.\n"
-			       "  This is probably not an error in your code, and\n"
-			       "  the compile is probably still successful.\n"
-			       "  This does mean that (at least once), there could be a\n"
-			       "  bad procedure overload in your program, and Odin wouldn't catch it.\n"
-			       "  As far as I know, this is a porting bug, and doesn't occur on mainline Odin.\n"
-			       "  Be careful, and sorry about this bug :(\n");
-			has_encountered_null_proc_type = true;
-		}
-		return ProcOverload_ParamCount;
-	}
- 	if (!is_type_proc(x)) return ProcOverload_NotProcedure;
- 	if (!is_type_proc(y)) return ProcOverload_NotProcedure;
+	if (x == NULL && y == NULL) return ProcOverload_NotProcedure;
+	if (x == NULL && y != NULL) return ProcOverload_NotProcedure;
+	if (x != NULL && y == NULL) return ProcOverload_NotProcedure;
+ 	if (!is_type_proc(x))       return ProcOverload_NotProcedure;
+ 	if (!is_type_proc(y))       return ProcOverload_NotProcedure;
+
 	TypeProc px = base_type(x)->Proc;
 	TypeProc py = base_type(y)->Proc;
 

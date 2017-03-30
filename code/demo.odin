@@ -1,15 +1,18 @@
-#import "fmt.odin";
 #import "atomic.odin";
 #import "hash.odin";
-#import "math.odin";
 #import "mem.odin";
 #import "opengl.odin";
-#import "os.odin";
 #import "strconv.odin";
 #import "sync.odin";
 #import win32 "sys/windows.odin";
 
+#import "fmt.odin";
+#import "os.odin";
+#import "math.odin";
+
+
 main :: proc() {
+when true {
 /*
 	Added:
 		* Unexported entities and fields using an underscore prefix
@@ -59,13 +62,19 @@ main :: proc() {
 	{
 	#label thing
 		for i in 0..10 {
-			for j := i+1; j < 10; j++ {
+			for j in i+1..10 {
 				if j == 2 {
 					fmt.println(i, j);
+					continue thing;
+				}
+				if j == 3 {
 					break thing;
 				}
 			}
 		}
+
+		// Works with, `for`, `for in`, `match`, `match in`
+		// NOTE(bill): This solves most of the problems I need `goto` for
 	}
 
 	{
@@ -76,10 +85,13 @@ main :: proc() {
 			fmt.println("It's a number");
 		}
 
+
 		x: any = 123;
+	#label foo
 		match i in x {
 		case int, f32:
 			fmt.println("It's an int or f32");
+			break foo;
 		}
 	}
 
@@ -303,5 +315,6 @@ main :: proc() {
 		frog = union_cast(Frog)entity;
 		frog, _ = union_cast(Frog)entity; // ignore error and force cast
 	}
+}
 }
 
