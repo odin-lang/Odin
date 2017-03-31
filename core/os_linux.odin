@@ -10,7 +10,6 @@ AddressSize :: i64;
 
 // INVALID_HANDLE: Handle : -1;
 
-
 O_RDONLY   :: 0x00000;
 O_WRONLY   :: 0x00001;
 O_RDWR     :: 0x00002;
