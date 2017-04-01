@@ -1754,18 +1754,37 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		if (v.kind != ExactValue_Float) {
 			return false;
 		}
+		if (out_value) *out_value = v;
+
 
 		switch (type->Basic.kind) {
-		// case Basic_f16:
 		case Basic_f32:
 		case Basic_f64:
-		// case Basic_f128:
-			if (out_value) *out_value = v;
 			return true;
 
 		case Basic_UntypedFloat:
 			return true;
 		}
+	} else if (is_type_complex(type)) {
+		ExactValue v = exact_value_to_complex(in_value);
+		if (v.kind != ExactValue_Complex) {
+			return false;
+		}
+
+		switch (type->Basic.kind) {
+		case Basic_complex64:
+		case Basic_complex128: {
+			ExactValue real = exact_value_real(v);
+			ExactValue imag = exact_value_imag(v);
+			if (real.kind != ExactValue_Invalid &&
+			    imag.kind != ExactValue_Invalid) {
+				if (out_value) *out_value = exact_binary_operator_value(Token_Add, real, exact_value_make_imag(imag));
+				return true;
+			}
+		} break;
+		}
+
+		return false;
 	} else if (is_type_pointer(type)) {
 		if (in_value.kind == ExactValue_Pointer) {
 			return true;
@@ -2188,6 +2207,10 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 		if (is_type_integer(dst) || is_type_float(dst)) {
 			return true;
 		}
+	}
+
+	if (is_type_complex(src) && is_type_complex(dst)) {
+		return true;
 	}
 
 	// Cast between pointers
@@ -3568,6 +3591,129 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_Value;
 	} break;
 
+	case BuiltinProc_complex: {
+		// complex :: proc(real, imag: float_type) -> complex_type
+		Operand x = *operand;
+		Operand y = {0};
+
+		// NOTE(bill): Invalid will be the default till fixed
+		operand->type = t_invalid;
+		operand->mode = Addressing_Invalid;
+
+		check_expr(c, &y, ce->args.e[1]);
+		if (y.mode == Addressing_Invalid) {
+			return false;
+		}
+
+		u32 flag = 0;
+		if (is_type_untyped(x.type)) {
+			flag |= 1;
+		}
+		if (is_type_untyped(y.type)) {
+			flag |= 2;
+		}
+		switch (flag) {
+		case 0: break;
+		case 1: convert_to_typed(c, &x, y.type, 0); break;
+		case 2: convert_to_typed(c, &y, x.type, 0); break;
+		case 3: {
+			if (x.mode == Addressing_Constant && y.mode == Addressing_Constant)  {
+				if (is_type_numeric(x.type) && exact_value_imag(x.value).value_float == 0) {
+					x.type = t_untyped_float;
+				}
+				if (is_type_numeric(y.type) && exact_value_imag(y.value).value_float == 0) {
+					y.type = t_untyped_float;
+				}
+			} else {
+				convert_to_typed(c, &x, t_f64, 0);
+				convert_to_typed(c, &y, t_f64, 0);
+			}
+		} break;
+		}
+
+		if (x.mode == Addressing_Invalid || y.mode == Addressing_Invalid) {
+			return false;
+		}
+
+		if (!are_types_identical(x.type, y.type)) {
+			gbString type_x = type_to_string(x.type);
+			gbString type_y = type_to_string(y.type);
+			error_node(call,
+			      "Mismatched types to `complex`, `%s` vs `%s`",
+			      type_x, type_y);
+			gb_string_free(type_y);
+			gb_string_free(type_x);
+			return false;
+		}
+
+		if (!is_type_float(x.type)) {
+			gbString s = type_to_string(x.type);
+			error_node(call, "Arguments have type `%s`, expected a floating point", s);
+			gb_string_free(s);
+			return false;
+		}
+
+		if (x.mode == Addressing_Constant && y.mode == Addressing_Constant) {
+			operand->value = exact_binary_operator_value(Token_Add, x.value, y.value);
+			operand->mode = Addressing_Constant;
+		} else {
+			operand->mode = Addressing_Value;
+		}
+
+		BasicKind kind = core_type(x.type)->Basic.kind;
+		switch (kind) {
+		case Basic_f32:          operand->type = t_complex64;       break;
+		case Basic_f64:          operand->type = t_complex128;      break;
+		case Basic_UntypedFloat: operand->type = t_untyped_complex; break;
+		default: GB_PANIC("Invalid type"); break;
+		}
+	} break;
+
+	case BuiltinProc_real:
+	case BuiltinProc_imag: {
+		// real :: proc(c: complex_type) -> float_type
+		// imag :: proc(c: complex_type) -> float_type
+
+		Operand *x = operand;
+		if (is_type_untyped(x->type)) {
+			if (x->mode == Addressing_Constant) {
+				if (is_type_numeric(x->type)) {
+					x->type = t_untyped_complex;
+				}
+			} else {
+				convert_to_typed(c, x, t_complex128, 0);
+				if (x->mode == Addressing_Invalid) {
+					return false;
+				}
+			}
+		}
+
+		if (!is_type_complex(x->type)) {
+			gbString s = type_to_string(x->type);
+			error_node(call, "Argument has type `%s`, expected a complex type", s);
+			gb_string_free(s);
+			return false;
+		}
+
+		if (x->mode == Addressing_Constant) {
+			if (id == BuiltinProc_real) {
+				x->value = exact_value_real(x->value);
+			} else {
+				x->value = exact_value_imag(x->value);
+			}
+		} else {
+			x->mode = Addressing_Value;
+		}
+
+		BasicKind kind = core_type(x->type)->Basic.kind;
+		switch (kind) {
+		case Basic_complex64:      x->type = t_f32;           break;
+		case Basic_complex128:     x->type = t_f64;           break;
+		case Basic_UntypedComplex: x->type = t_untyped_float; break;
+		default: GB_PANIC("Invalid type"); break;
+		}
+	} break;
+
 	case BuiltinProc_slice_ptr: {
 		// slice_ptr :: proc(a: ^T, len: int) -> []T
 		// slice_ptr :: proc(a: ^T, len, cap: int) -> []T
@@ -4405,6 +4551,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		switch (bl->kind) {
 		case Token_Integer: t = t_untyped_integer; break;
 		case Token_Float:   t = t_untyped_float;   break;
+		case Token_Imag:    t = t_untyped_complex; break;
 		case Token_String:  t = t_untyped_string;  break;
 		case Token_Rune:    t = t_untyped_rune;    break;
 		default:            GB_PANIC("Unknown literal"); break;

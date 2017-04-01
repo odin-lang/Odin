@@ -154,12 +154,14 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		case Basic_u32:    ir_fprintf(f, "i32");                     return;
 		case Basic_i64:    ir_fprintf(f, "i64");                     return;
 		case Basic_u64:    ir_fprintf(f, "i64");                     return;
-		// case Basic_i128:   ir_fprintf(f, "i128");                    return;
-		// case Basic_u128:   ir_fprintf(f, "i128");                    return;
-		// case Basic_f16:    ir_fprintf(f, "half");                    return;
+
 		case Basic_f32:    ir_fprintf(f, "float");                   return;
 		case Basic_f64:    ir_fprintf(f, "double");                  return;
-		// case Basic_f128:   ir_fprintf(f, "fp128");                   return;
+
+		case Basic_complex64:  ir_fprintf(f, "%%..complex64");       return;
+		case Basic_complex128: ir_fprintf(f, "%%..complex128");      return;
+
+
 		case Basic_rawptr: ir_fprintf(f, "%%..rawptr");              return;
 		case Basic_string: ir_fprintf(f, "%%..string");              return;
 		case Basic_uint:   ir_fprintf(f, "i%lld", word_bits);        return;
@@ -365,7 +367,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	} break;
 	case ExactValue_Float: {
 		GB_ASSERT_MSG(is_type_float(type), "%s", type_to_string(type));
-		type = base_type(type);
+		type = core_type(type);
 		u64 u = *cast(u64*)&value.value_float;
 		switch (type->Basic.kind) {
 		case Basic_f32:
@@ -382,28 +384,27 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 		switch (type->Basic.kind) {
 		case 0: break;
-#if 0
-		case Basic_f16:
-			ir_fprintf(f, "bitcast (");
-			ir_print_type(f, m, t_u16);
-			ir_fprintf(f, " %u to ", cast(u16)f32_to_f16(cast(f32)value.value_float));
-			ir_print_type(f, m, t_f16);
-			ir_fprintf(f, ")");
-			break;
-		case Basic_f128:
-			ir_fprintf(f, "bitcast (");
-			ir_fprintf(f, "i128");
-			// TODO(bill): Actually support f128
-			ir_fprintf(f, " %llu to ", u);
-			ir_print_type(f, m, t_f128);
-			ir_fprintf(f, ")");
-			break;
-#endif
 		default:
 			ir_fprintf(f, "0x%016llx", u);
 			break;
 		}
 	} break;
+
+	case ExactValue_Complex: {
+		GB_ASSERT_MSG(is_type_complex(type), "%s", type_to_string(type));
+		type = core_type(type);
+		Type *ft = base_complex_elem_type(type);
+		ir_fprintf(f, " {");
+		ir_print_type(f, m, ft);
+		ir_fprintf(f, " ");
+		ir_print_exact_value(f, m, exact_value_float(value.value_complex.real), ft);
+		ir_fprintf(f, ", ");
+		ir_print_type(f, m, ft);
+		ir_fprintf(f, " ");
+		ir_print_exact_value(f, m, exact_value_float(value.value_complex.imag), ft);
+		ir_fprintf(f, "}");
+	} break;
+
 	case ExactValue_Pointer:
 		if (value.value_pointer == 0) {
 			ir_fprintf(f, "null");
@@ -1414,6 +1415,12 @@ void print_llvm_ir(irGen *ir) {
 	ir_fprintf(f, "} ; Basic_string\n");
 	ir_print_encoded_local(f, str_lit("..rawptr"));
 	ir_fprintf(f, " = type i8* ; Basic_rawptr\n");
+
+	ir_print_encoded_local(f, str_lit("..complex64"));
+	ir_fprintf(f, " = type {float, float} ; Basic_complex64\n");
+	ir_print_encoded_local(f, str_lit("..complex128"));
+	ir_fprintf(f, " = type {double, double} ; Basic_complex128\n");
+
 
 	ir_print_encoded_local(f, str_lit("..any"));
 	ir_fprintf(f, " = type {");

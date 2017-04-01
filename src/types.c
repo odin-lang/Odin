@@ -12,25 +12,12 @@ typedef enum BasicKind {
 	Basic_i64,
 	Basic_u64,
 
-/* 	Basic_i16le,
-	Basic_i16be,
-	Basic_u16le,
-	Basic_u16be,
-	Basic_i32le,
-	Basic_i32be,
-	Basic_u32le,
-	Basic_u32be,
-	Basic_i64le,
-	Basic_i64be,
-	Basic_u64le,
-	Basic_u64be, */
-
-	// Basic_i128,
-	// Basic_u128,
-	// Basic_f16,
 	Basic_f32,
 	Basic_f64,
-	// Basic_f128,
+
+	Basic_complex64,
+	Basic_complex128,
+
 	Basic_int,
 	Basic_uint,
 	Basic_rawptr,
@@ -40,6 +27,7 @@ typedef enum BasicKind {
 	Basic_UntypedBool,
 	Basic_UntypedInteger,
 	Basic_UntypedFloat,
+	Basic_UntypedComplex,
 	Basic_UntypedString,
 	Basic_UntypedRune,
 	Basic_UntypedNil,
@@ -55,12 +43,13 @@ typedef enum BasicFlag {
 	BasicFlag_Integer  = GB_BIT(1),
 	BasicFlag_Unsigned = GB_BIT(2),
 	BasicFlag_Float    = GB_BIT(3),
-	BasicFlag_Pointer  = GB_BIT(4),
-	BasicFlag_String   = GB_BIT(5),
-	BasicFlag_Rune     = GB_BIT(6),
-	BasicFlag_Untyped  = GB_BIT(7),
+	BasicFlag_Complex  = GB_BIT(4),
+	BasicFlag_Pointer  = GB_BIT(5),
+	BasicFlag_String   = GB_BIT(6),
+	BasicFlag_Rune     = GB_BIT(7),
+	BasicFlag_Untyped  = GB_BIT(8),
 
-	BasicFlag_Numeric      = BasicFlag_Integer | BasicFlag_Float,
+	BasicFlag_Numeric      = BasicFlag_Integer | BasicFlag_Float | BasicFlag_Complex,
 	BasicFlag_Ordered      = BasicFlag_Numeric | BasicFlag_String  | BasicFlag_Pointer,
 	BasicFlag_ConstantType = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_Pointer | BasicFlag_String | BasicFlag_Rune,
 } BasicFlag;
@@ -210,7 +199,9 @@ void selection_add_index(Selection *s, isize index) {
 
 gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_Invalid,        0,                                       0, STR_LIT("invalid type")}},
+
 	{Type_Basic, {Basic_bool,           BasicFlag_Boolean,                       1, STR_LIT("bool")}},
+
 	{Type_Basic, {Basic_i8,             BasicFlag_Integer,                       1, STR_LIT("i8")}},
 	{Type_Basic, {Basic_u8,             BasicFlag_Integer | BasicFlag_Unsigned,  1, STR_LIT("u8")}},
 	{Type_Basic, {Basic_i16,            BasicFlag_Integer,                       2, STR_LIT("i16")}},
@@ -219,20 +210,24 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_u32,            BasicFlag_Integer | BasicFlag_Unsigned,  4, STR_LIT("u32")}},
 	{Type_Basic, {Basic_i64,            BasicFlag_Integer,                       8, STR_LIT("i64")}},
 	{Type_Basic, {Basic_u64,            BasicFlag_Integer | BasicFlag_Unsigned,  8, STR_LIT("u64")}},
-	// {Type_Basic, {Basic_i128,           BasicFlag_Integer,                      16, STR_LIT("i128")}},
-	// {Type_Basic, {Basic_u128,           BasicFlag_Integer | BasicFlag_Unsigned, 16, STR_LIT("u128")}},
-	// {Type_Basic, {Basic_f16,            BasicFlag_Float,                         2, STR_LIT("f16")}},
+
 	{Type_Basic, {Basic_f32,            BasicFlag_Float,                         4, STR_LIT("f32")}},
 	{Type_Basic, {Basic_f64,            BasicFlag_Float,                         8, STR_LIT("f64")}},
-	// {Type_Basic, {Basic_f128,           BasicFlag_Float,                        16, STR_LIT("f128")}},
+
+	{Type_Basic, {Basic_complex64,      BasicFlag_Complex,                       8, STR_LIT("complex64")}},
+	{Type_Basic, {Basic_complex128,     BasicFlag_Complex,                      16, STR_LIT("complex128")}},
+
 	{Type_Basic, {Basic_int,            BasicFlag_Integer,                      -1, STR_LIT("int")}},
 	{Type_Basic, {Basic_uint,           BasicFlag_Integer | BasicFlag_Unsigned, -1, STR_LIT("uint")}},
+
 	{Type_Basic, {Basic_rawptr,         BasicFlag_Pointer,                      -1, STR_LIT("rawptr")}},
 	{Type_Basic, {Basic_string,         BasicFlag_String,                       -1, STR_LIT("string")}},
 	{Type_Basic, {Basic_any,            0,                                      -1, STR_LIT("any")}},
+
 	{Type_Basic, {Basic_UntypedBool,    BasicFlag_Boolean | BasicFlag_Untyped,   0, STR_LIT("untyped bool")}},
 	{Type_Basic, {Basic_UntypedInteger, BasicFlag_Integer | BasicFlag_Untyped,   0, STR_LIT("untyped integer")}},
 	{Type_Basic, {Basic_UntypedFloat,   BasicFlag_Float   | BasicFlag_Untyped,   0, STR_LIT("untyped float")}},
+	{Type_Basic, {Basic_UntypedComplex, BasicFlag_Complex | BasicFlag_Untyped,   0, STR_LIT("untyped complex")}},
 	{Type_Basic, {Basic_UntypedString,  BasicFlag_String  | BasicFlag_Untyped,   0, STR_LIT("untyped string")}},
 	{Type_Basic, {Basic_UntypedRune,    BasicFlag_Integer | BasicFlag_Untyped,   0, STR_LIT("untyped rune")}},
 	{Type_Basic, {Basic_UntypedNil,     BasicFlag_Untyped,                       0, STR_LIT("untyped nil")}},
@@ -253,20 +248,24 @@ gb_global Type *t_i32             = &basic_types[Basic_i32];
 gb_global Type *t_u32             = &basic_types[Basic_u32];
 gb_global Type *t_i64             = &basic_types[Basic_i64];
 gb_global Type *t_u64             = &basic_types[Basic_u64];
-// gb_global Type *t_i128            = &basic_types[Basic_i128];
-// gb_global Type *t_u128            = &basic_types[Basic_u128];
-// gb_global Type *t_f16             = &basic_types[Basic_f16];
+
 gb_global Type *t_f32             = &basic_types[Basic_f32];
 gb_global Type *t_f64             = &basic_types[Basic_f64];
-// gb_global Type *t_f128            = &basic_types[Basic_f128];
+
+gb_global Type *t_complex64       = &basic_types[Basic_complex64];
+gb_global Type *t_complex128      = &basic_types[Basic_complex128];
+
 gb_global Type *t_int             = &basic_types[Basic_int];
 gb_global Type *t_uint            = &basic_types[Basic_uint];
+
 gb_global Type *t_rawptr          = &basic_types[Basic_rawptr];
 gb_global Type *t_string          = &basic_types[Basic_string];
 gb_global Type *t_any             = &basic_types[Basic_any];
+
 gb_global Type *t_untyped_bool    = &basic_types[Basic_UntypedBool];
 gb_global Type *t_untyped_integer = &basic_types[Basic_UntypedInteger];
 gb_global Type *t_untyped_float   = &basic_types[Basic_UntypedFloat];
+gb_global Type *t_untyped_complex = &basic_types[Basic_UntypedComplex];
 gb_global Type *t_untyped_string  = &basic_types[Basic_UntypedString];
 gb_global Type *t_untyped_rune    = &basic_types[Basic_UntypedRune];
 gb_global Type *t_untyped_nil     = &basic_types[Basic_UntypedNil];
@@ -293,6 +292,7 @@ gb_global Type *t_type_info_enum_value_ptr = NULL;
 gb_global Type *t_type_info_named         = NULL;
 gb_global Type *t_type_info_integer       = NULL;
 gb_global Type *t_type_info_float         = NULL;
+gb_global Type *t_type_info_complex       = NULL;
 gb_global Type *t_type_info_any           = NULL;
 gb_global Type *t_type_info_string        = NULL;
 gb_global Type *t_type_info_boolean       = NULL;
@@ -312,6 +312,7 @@ gb_global Type *t_type_info_map           = NULL;
 gb_global Type *t_type_info_named_ptr         = NULL;
 gb_global Type *t_type_info_integer_ptr       = NULL;
 gb_global Type *t_type_info_float_ptr         = NULL;
+gb_global Type *t_type_info_complex_ptr       = NULL;
 gb_global Type *t_type_info_any_ptr           = NULL;
 gb_global Type *t_type_info_string_ptr        = NULL;
 gb_global Type *t_type_info_boolean_ptr       = NULL;
@@ -615,6 +616,13 @@ bool is_type_float(Type *t) {
 	}
 	return false;
 }
+bool is_type_complex(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_Basic) {
+		return (t->Basic.flags & BasicFlag_Complex) != 0;
+	}
+	return false;
+}
 bool is_type_f32(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_Basic) {
@@ -693,6 +701,19 @@ Type *base_vector_type(Type *t) {
 		return t->Vector.elem;
 	}
 	return t;
+}
+
+Type *base_complex_elem_type(Type *t) {
+	t = core_type(t);
+	if (is_type_complex(t)) {
+		switch (t->Basic.kind) {
+		case Basic_complex64:      return t_f32;
+		case Basic_complex128:     return t_f64;
+		case Basic_UntypedComplex: return t_untyped_float;
+		}
+	}
+	GB_PANIC("Invalid complex type");
+	return t_invalid;
 }
 
 
@@ -953,6 +974,7 @@ Type *default_type(Type *type) {
 		case Basic_UntypedBool:    return t_bool;
 		case Basic_UntypedInteger: return t_int;
 		case Basic_UntypedFloat:   return t_f64;
+		case Basic_UntypedComplex: return t_complex128;
 		case Basic_UntypedString:  return t_string;
 		case Basic_UntypedRune:    return t_rune;
 		}
@@ -1543,6 +1565,10 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 		case Basic_int: case Basic_uint: case Basic_rawptr:
 			return build_context.word_size;
+
+		case Basic_complex64: case Basic_complex128:
+			// complex{64,128} align as [2]f{32,64}
+			return type_size_of_internal(allocator, t, path) / 2;
 		}
 	} break;
 

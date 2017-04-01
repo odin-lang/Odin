@@ -41,6 +41,7 @@ Type_Info :: union {
 	Named{name: string, base: ^Type_Info},
 	Integer{size: int, signed: bool},
 	Float{size: int},
+	Complex{size: int},
 	String{},
 	Boolean{},
 	Any{},

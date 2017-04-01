@@ -252,7 +252,7 @@ int main(int argc, char **argv) {
 	i32 exit_code = 0;
 	// For more passes arguments: http://llvm.org/docs/Passes.html
 	exit_code = system_exec_command_line_app("llvm-opt", false,
-		"\"%.*sbin/opt\" \"%s\" -o \"%.*s\".bc "
+		"\"%.*sbin/opt\" \"%s\" -o \"%.*s.bc\" "
 		"-mem2reg "
 		"-memcpyopt "
 		"-die "

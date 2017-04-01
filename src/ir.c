@@ -1653,6 +1653,7 @@ irValue *ir_addr_load(irProcedure *proc, irAddr addr) {
 }
 
 irValue *ir_emit_array_epi(irProcedure *proc, irValue *s, i32 index);
+irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index);
 
 irValue *ir_emit_ptr_offset(irProcedure *proc, irValue *ptr, irValue *offset) {
 	offset = ir_emit_conv(proc, offset, t_int);
@@ -1713,6 +1714,64 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 			ir_emit_store(proc, ir_emit_array_epi(proc, res, i), z);
 		}
 		ir_emit_comment(proc, str_lit("vector.arith.end"));
+		return ir_emit_load(proc, res);
+	}
+
+	if (is_type_complex(t_left)) {
+		ir_emit_comment(proc, str_lit("complex.arith.begin"));
+		Type *tl = core_type(t_left);
+		Type *ft = t_f32;
+		if (tl->Basic.kind == Basic_complex128) {
+			ft = t_f64;
+		}
+
+		irValue *res = ir_add_local_generated(proc, type);
+		irValue *a = ir_emit_struct_ev(proc, left,  0);
+		irValue *b = ir_emit_struct_ev(proc, left,  1);
+		irValue *c = ir_emit_struct_ev(proc, right, 0);
+		irValue *d = ir_emit_struct_ev(proc, right, 1);
+
+		irValue *real = NULL;
+		irValue *imag = NULL;
+
+		switch (op) {
+		case Token_Add:
+			real = ir_emit_arith(proc, Token_Add, a, c, ft);
+			imag = ir_emit_arith(proc, Token_Add, b, d, ft);
+			break;
+		case Token_Sub:
+			real = ir_emit_arith(proc, Token_Sub, a, c, ft);
+			imag = ir_emit_arith(proc, Token_Sub, b, d, ft);
+			break;
+		case Token_Mul: {
+			irValue *x = ir_emit_arith(proc, Token_Mul, a, c, ft);
+			irValue *y = ir_emit_arith(proc, Token_Mul, b, d, ft);
+			real = ir_emit_arith(proc, Token_Sub, x, y, ft);
+			irValue *z = ir_emit_arith(proc, Token_Mul, b, c, ft);
+			irValue *w = ir_emit_arith(proc, Token_Mul, a, d, ft);
+			imag = ir_emit_arith(proc, Token_Add, z, w, ft);
+		} break;
+		case Token_Quo: {
+			irValue *s1 = ir_emit_arith(proc, Token_Mul, c, c, ft);
+			irValue *s2 = ir_emit_arith(proc, Token_Mul, d, d, ft);
+			irValue *s  = ir_emit_arith(proc, Token_Add, s1, s2, ft);
+
+			irValue *x = ir_emit_arith(proc, Token_Mul, a, c, ft);
+			irValue *y = ir_emit_arith(proc, Token_Mul, b, d, ft);
+			real = ir_emit_arith(proc, Token_Add, x, y, ft);
+			real = ir_emit_arith(proc, Token_Quo, real, s, ft);
+
+			irValue *z = ir_emit_arith(proc, Token_Mul, b, c, ft);
+			irValue *w = ir_emit_arith(proc, Token_Mul, a, d, ft);
+			imag = ir_emit_arith(proc, Token_Sub, z, w, ft);
+			imag = ir_emit_arith(proc, Token_Quo, imag, s, ft);
+		} break;
+		}
+
+		ir_emit_store(proc, ir_emit_struct_ep(proc, res, 0), real);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, res, 1), imag);
+
+		ir_emit_comment(proc, str_lit("complex.end.begin"));
 		return ir_emit_load(proc, res);
 	}
 
@@ -1890,6 +1949,15 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 		GB_ASSERT(t->Tuple.variable_count > 0);
 		GB_ASSERT(gb_is_between(index, 0, t->Tuple.variable_count-1));
 		result_type = make_type_pointer(a, t->Tuple.variables[index]->type);
+	} else if (is_type_complex(t)) {
+		Type *ft = t_f32;
+		if (core_type(t)->Basic.kind == Basic_complex128) {
+			ft = t_f64;
+		}
+		switch (index) {
+		case 0: result_type = make_type_pointer(a, ft); break;
+		case 1: result_type = make_type_pointer(a, ft); break;
+		}
 	} else if (is_type_slice(t)) {
 		switch (index) {
 		case 0: result_type = make_type_pointer(a, make_type_pointer(a, t->Slice.elem)); break;
@@ -1956,6 +2024,15 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 		GB_ASSERT(t->Tuple.variable_count > 0);
 		GB_ASSERT(gb_is_between(index, 0, t->Tuple.variable_count-1));
 		result_type = t->Tuple.variables[index]->type;
+	} else if (is_type_complex(t)) {
+		Type *ft = t_f32;
+		if (core_type(t)->Basic.kind == Basic_complex128) {
+			ft = t_f64;
+		}
+		switch (index) {
+		case 0: result_type = ft; break;
+		case 1: result_type = ft; break;
+		}
 	} else if (is_type_slice(t)) {
 		switch (index) {
 		case 0: result_type = make_type_pointer(a, t->Slice.elem); break;
@@ -2285,6 +2362,8 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 			ExactValue ev = value->Constant.value;
 			if (is_type_float(dst)) {
 				ev = exact_value_to_float(ev);
+			} else if (is_type_complex(dst)) {
+				ev = exact_value_to_complex(ev);
 			} else if (is_type_string(dst)) {
 				// Handled elsewhere
 				GB_ASSERT(ev.kind == ExactValue_String);
@@ -2348,6 +2427,16 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 			kind = irConv_fpext;
 		}
 		return ir_emit(proc, ir_instr_conv(proc, kind, value, src, dst));
+	}
+
+	if (is_type_complex(src) && is_type_complex(dst)) {
+		Type *ft = base_complex_elem_type(dst);
+		irValue *gen = ir_add_local_generated(proc, dst);
+		irValue *real = ir_emit_conv(proc, ir_emit_struct_ev(proc, value, 0), ft);
+		irValue *imag = ir_emit_conv(proc, ir_emit_struct_ev(proc, value, 1), ft);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, gen, 0), real);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, gen, 1), imag);
+		return ir_emit_load(proc, gen);
 	}
 
 	// float <-> integer
@@ -3702,6 +3791,37 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					ir_emit_comment(proc, str_lit("swizzle.end"));
 					return ir_emit_load(proc, dst);
 					// return ir_emit(proc, ir_instr_vector_shuffle(proc, vector, indices, index_count));
+				} break;
+
+				case BuiltinProc_complex: {
+					ir_emit_comment(proc, str_lit("complex"));
+					irValue *real = ir_build_expr(proc, ce->args.e[0]);
+					irValue *imag = ir_build_expr(proc, ce->args.e[1]);
+					irValue *dst = ir_add_local_generated(proc, tv->type);
+
+					Type *ft = base_complex_elem_type(tv->type);
+					irValue *rp = ir_emit_struct_ep(proc, dst, 0);
+					irValue *ip = ir_emit_struct_ep(proc, dst, 1);
+
+					real = ir_emit_conv(proc, real, ft);
+					imag = ir_emit_conv(proc, imag, ft);
+					ir_emit_store(proc, rp, real);
+					ir_emit_store(proc, ip, imag);
+
+					return ir_emit_load(proc, dst);
+				} break;
+
+				case BuiltinProc_real: {
+					ir_emit_comment(proc, str_lit("real"));
+					irValue *complex = ir_build_expr(proc, ce->args.e[0]);
+					irValue *real = ir_emit_struct_ev(proc, complex, 0);
+					return ir_emit_conv(proc, real, tv->type);
+				} break;
+				case BuiltinProc_imag: {
+					ir_emit_comment(proc, str_lit("imag"));
+					irValue *complex = ir_build_expr(proc, ce->args.e[0]);
+					irValue *imag = ir_emit_struct_ev(proc, complex, 1);
+					return ir_emit_conv(proc, imag, tv->type);
 				} break;
 
 				case BuiltinProc_slice_ptr: {
@@ -6528,8 +6648,6 @@ void ir_gen_tree(irGen *s) {
 					case Basic_u32:
 					case Basic_i64:
 					case Basic_u64:
-					// case Basic_i128:
-					// case Basic_u128:
 					case Basic_int:
 					case Basic_uint: {
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_integer_ptr);
@@ -6540,15 +6658,22 @@ void ir_gen_tree(irGen *s) {
 						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), is_signed);
 					} break;
 
-					// case Basic_f16:
 					case Basic_f32:
 					case Basic_f64:
-					// case Basic_f128:
 					{
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_float_ptr);
 						irValue *bits = ir_const_int(a, type_size_of(a, t));
 						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), bits);
 					} break;
+
+					case Basic_complex64:
+					case Basic_complex128:
+					{
+						tag = ir_emit_conv(proc, ti_ptr, t_type_info_complex_ptr);
+						irValue *bits = ir_const_int(a, type_size_of(a, t));
+						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), bits);
+					} break;
+
 
 					case Basic_rawptr:
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_pointer_ptr);
