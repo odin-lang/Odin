@@ -4003,14 +4003,14 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					irValue *res = NULL;
 					Type *t = ir_type(val);
 					if (is_type_complex(t)) {
-						irValue *res = ir_add_local_generated(proc, tv->type);
+						res = ir_add_local_generated(proc, tv->type);
 						irValue *real = ir_emit_struct_ev(proc, val, 0);
 						irValue *imag = ir_emit_struct_ev(proc, val, 1);
 						imag = ir_emit_unary_arith(proc, Token_Sub, imag, ir_type(imag));
 						ir_emit_store(proc, ir_emit_struct_ep(proc, res, 0), real);
 						ir_emit_store(proc, ir_emit_struct_ep(proc, res, 1), imag);
 					} else if (is_type_quaternion(t)) {
-						irValue *res = ir_add_local_generated(proc, tv->type);
+						res = ir_add_local_generated(proc, tv->type);
 						irValue *real = ir_emit_struct_ev(proc, val, 0);
 						irValue *imag = ir_emit_struct_ev(proc, val, 1);
 						irValue *jmag = ir_emit_struct_ev(proc, val, 2);
