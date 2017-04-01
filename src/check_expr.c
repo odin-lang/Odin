@@ -1782,10 +1782,41 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 				return true;
 			}
 		} break;
+		case Basic_UntypedComplex:
+			return true;
 		}
 
 		return false;
-	} else if (is_type_pointer(type)) {
+	} else if (is_type_quaternion(type)) {
+		ExactValue v = exact_value_to_quaternion(in_value);
+		if (v.kind != ExactValue_Quaternion) {
+			return false;
+		}
+
+		switch (type->Basic.kind) {
+		case Basic_quaternion128:
+		case Basic_quaternion256: {
+			ExactValue real = exact_value_real(v);
+			ExactValue imag = exact_value_imag(v);
+			ExactValue jmag = exact_value_jmag(v);
+			ExactValue kmag = exact_value_kmag(v);
+			if (real.kind != ExactValue_Invalid &&
+			    imag.kind != ExactValue_Invalid &&
+			    jmag.kind != ExactValue_Invalid &&
+			    kmag.kind != ExactValue_Invalid) {
+				ExactValue ov = exact_binary_operator_value(Token_Add, real, exact_value_make_imag(imag));
+				ov = exact_binary_operator_value(Token_Add, ov, exact_value_make_jmag(jmag));
+				ov = exact_binary_operator_value(Token_Add, ov, exact_value_make_kmag(kmag));
+				if (out_value) *out_value = ov;
+				return true;
+			}
+		} break;
+		case Basic_UntypedQuaternion:
+			return true;
+		}
+
+		return false;
+	}else if (is_type_pointer(type)) {
 		if (in_value.kind == ExactValue_Pointer) {
 			return true;
 		}
@@ -2213,6 +2244,10 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+	if (is_type_quaternion(src) && is_type_quaternion(dst)) {
+		return true;
+	}
+
 	// Cast between pointers
 	if (is_type_pointer(src) && is_type_pointer(dst)) {
 		Type *s = base_type(type_deref(src));
@@ -2613,6 +2648,8 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 				break;
 			case Basic_UntypedInteger:
 			case Basic_UntypedFloat:
+			case Basic_UntypedComplex:
+			case Basic_UntypedQuaternion:
 			case Basic_UntypedRune:
 				if (!is_type_numeric(target_type)) {
 					operand->mode = Addressing_Invalid;
@@ -3605,44 +3642,24 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 
-		u32 flag = 0;
-		if (is_type_untyped(x.type)) {
-			flag |= 1;
-		}
-		if (is_type_untyped(y.type)) {
-			flag |= 2;
-		}
-		switch (flag) {
-		case 0: break;
-		case 1: convert_to_typed(c, &x, y.type, 0); break;
-		case 2: convert_to_typed(c, &y, x.type, 0); break;
-		case 3: {
-			if (x.mode == Addressing_Constant && y.mode == Addressing_Constant)  {
-				if (is_type_numeric(x.type) && exact_value_imag(x.value).value_float == 0) {
-					x.type = t_untyped_float;
-				}
-				if (is_type_numeric(y.type) && exact_value_imag(y.value).value_float == 0) {
-					y.type = t_untyped_float;
-				}
-			} else {
-				convert_to_typed(c, &x, t_f64, 0);
-				convert_to_typed(c, &y, t_f64, 0);
+		convert_to_typed(c, &x, y.type, 0); if (x.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &y, x.type, 0); if (y.mode == Addressing_Invalid) return false;
+		if (x.mode == Addressing_Constant &&
+		    y.mode == Addressing_Constant) {
+			if (is_type_numeric(x.type) && exact_value_imag(x.value).value_float == 0) {
+				x.type = t_untyped_float;
 			}
-		} break;
-		}
-
-		if (x.mode == Addressing_Invalid || y.mode == Addressing_Invalid) {
-			return false;
+			if (is_type_numeric(y.type) && exact_value_imag(y.value).value_float == 0) {
+				y.type = t_untyped_float;
+			}
 		}
 
 		if (!are_types_identical(x.type, y.type)) {
-			gbString type_x = type_to_string(x.type);
-			gbString type_y = type_to_string(y.type);
-			error_node(call,
-			      "Mismatched types to `complex`, `%s` vs `%s`",
-			      type_x, type_y);
-			gb_string_free(type_y);
-			gb_string_free(type_x);
+			gbString tx = type_to_string(x.type);
+			gbString ty = type_to_string(y.type);
+			error_node(call, "Mismatched types to `complex`, `%s` vs `%s`", tx, ty);
+			gb_string_free(ty);
+			gb_string_free(tx);
 			return false;
 		}
 
@@ -3669,37 +3686,170 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 	} break;
 
+	case BuiltinProc_quaternion: {
+		// quaternion :: proc(real, imag, jmag, kmag: float_type) -> quaternion_type
+		Operand x = *operand;
+		Operand y = {0};
+		Operand z = {0};
+		Operand w = {0};
+
+		GB_PANIC("BuiltinProc_quaternion");
+
+		// NOTE(bill): Invalid will be the default till fixed
+		operand->type = t_invalid;
+		operand->mode = Addressing_Invalid;
+
+		check_expr(c, &y, ce->args.e[1]); if (y.mode == Addressing_Invalid) return false;
+		check_expr(c, &z, ce->args.e[2]); if (z.mode == Addressing_Invalid) return false;
+		check_expr(c, &w, ce->args.e[3]); if (w.mode == Addressing_Invalid) return false;
+
+		convert_to_typed(c, &x, y.type, 0); if (x.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &x, z.type, 0); if (x.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &x, w.type, 0); if (x.mode == Addressing_Invalid) return false;
+
+		convert_to_typed(c, &y, z.type, 0); if (y.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &y, w.type, 0); if (y.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &y, x.type, 0); if (y.mode == Addressing_Invalid) return false;
+
+		convert_to_typed(c, &z, y.type, 0); if (z.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &z, w.type, 0); if (z.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &z, x.type, 0); if (z.mode == Addressing_Invalid) return false;
+
+		convert_to_typed(c, &w, x.type, 0); if (w.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &w, y.type, 0); if (w.mode == Addressing_Invalid) return false;
+		convert_to_typed(c, &w, z.type, 0); if (w.mode == Addressing_Invalid) return false;
+
+		if (x.mode == Addressing_Constant &&
+		    y.mode == Addressing_Constant &&
+		    z.mode == Addressing_Constant &&
+		    w.mode == Addressing_Constant) {
+			if (is_type_numeric(x.type) &&
+			    exact_value_imag(x.value).value_float == 0 &&
+			    exact_value_jmag(x.value).value_float == 0 &&
+			    exact_value_kmag(x.value).value_float == 0) {
+				x.type = t_untyped_float;
+			}
+			if (is_type_numeric(y.type) &&
+			    exact_value_imag(y.value).value_float == 0 &&
+			    exact_value_jmag(y.value).value_float == 0 &&
+			    exact_value_kmag(y.value).value_float == 0) {
+				y.type = t_untyped_float;
+			}
+			if (is_type_numeric(z.type) &&
+			    exact_value_imag(z.value).value_float == 0 &&
+			    exact_value_jmag(z.value).value_float == 0 &&
+			    exact_value_kmag(z.value).value_float == 0) {
+				z.type = t_untyped_float;
+			}
+			if (is_type_numeric(w.type) &&
+			    exact_value_imag(w.value).value_float == 0 &&
+			    exact_value_jmag(w.value).value_float == 0 &&
+			    exact_value_kmag(w.value).value_float == 0) {
+				w.type = t_untyped_float;
+			}
+		}
+
+		if (!are_types_identical(x.type, y.type)) {
+			gbString tx = type_to_string(x.type);
+			gbString ty = type_to_string(y.type);
+			gbString tz = type_to_string(z.type);
+			gbString tw = type_to_string(w.type);
+			error_node(call, "Mismatched types to `complex`, `%s`, `%s` `%s`, `%s`", tx, ty, tz, tw);
+			gb_string_free(tw);
+			gb_string_free(tz);
+			gb_string_free(ty);
+			gb_string_free(tx);
+			return false;
+		}
+
+		if (!is_type_float(x.type)) {
+			gbString s = type_to_string(x.type);
+			error_node(call, "Arguments have type `%s`, expected a floating point", s);
+			gb_string_free(s);
+			return false;
+		}
+
+		if (x.mode == Addressing_Constant &&
+		    y.mode == Addressing_Constant &&
+		    z.mode == Addressing_Constant &&
+		    w.mode == Addressing_Constant) {
+			ExactValue v = exact_binary_operator_value(Token_Add, x.value, y.value);
+			v = exact_binary_operator_value(Token_Add, v, z.value);
+			v = exact_binary_operator_value(Token_Add, v, w.value);
+			operand->value = v;
+			operand->mode = Addressing_Constant;
+		} else {
+			operand->mode = Addressing_Value;
+		}
+
+		BasicKind kind = core_type(x.type)->Basic.kind;
+		switch (kind) {
+		case Basic_complex64:         x.type = t_f32;           break;
+		case Basic_complex128:        x.type = t_f64;           break;
+		case Basic_UntypedComplex:    x.type = t_untyped_float; break;
+		case Basic_quaternion128:     x.type = t_f32;           break;
+		case Basic_quaternion256:     x.type = t_f64;           break;
+		case Basic_UntypedQuaternion: x.type = t_untyped_float; break;
+		default: GB_PANIC("Invalid type"); break;
+		}
+	} break;
+
 	case BuiltinProc_real:
-	case BuiltinProc_imag: {
-		// real :: proc(c: complex_type) -> float_type
-		// imag :: proc(c: complex_type) -> float_type
+	case BuiltinProc_imag:
+	case BuiltinProc_jmag:
+	case BuiltinProc_kmag: {
+		// real :: proc(x: type) -> float_type
+		// imag :: proc(x: type) -> float_type
+		// jmag :: proc(x: type) -> float_type
+		// kmag :: proc(x: type) -> float_type
 
 		Operand *x = operand;
 		if (is_type_untyped(x->type)) {
 			if (x->mode == Addressing_Constant) {
 				if (is_type_numeric(x->type)) {
-					x->type = t_untyped_complex;
+					if (id == BuiltinProc_jmag ||
+					    id == BuiltinProc_kmag) {
+						x->type = t_untyped_quaternion;
+					} else {
+						x->type = t_untyped_complex;
+					}
 				}
 			} else {
-				convert_to_typed(c, x, t_complex128, 0);
+				if (id == BuiltinProc_jmag ||
+				    id == BuiltinProc_kmag) {
+					convert_to_typed(c, x, t_quaternion256, 0);
+				} else {
+					convert_to_typed(c, x, t_complex128, 0);
+				}
 				if (x->mode == Addressing_Invalid) {
 					return false;
 				}
 			}
 		}
 
-		if (!is_type_complex(x->type)) {
-			gbString s = type_to_string(x->type);
-			error_node(call, "Argument has type `%s`, expected a complex type", s);
-			gb_string_free(s);
-			return false;
+		if (id == BuiltinProc_jmag ||
+		    id == BuiltinProc_kmag) {
+			if (!is_type_quaternion(x->type)) {
+				gbString s = type_to_string(x->type);
+				error_node(call, "Argument has type `%s`, expected a complex type", s);
+				gb_string_free(s);
+				return false;
+			}
+		} else {
+			if (!is_type_complex(x->type) && !is_type_quaternion(x->type)) {
+				gbString s = type_to_string(x->type);
+				error_node(call, "Argument has type `%s`, expected a complex or quaternion type", s);
+				gb_string_free(s);
+				return false;
+			}
 		}
 
 		if (x->mode == Addressing_Constant) {
-			if (id == BuiltinProc_real) {
-				x->value = exact_value_real(x->value);
-			} else {
-				x->value = exact_value_imag(x->value);
+			switch (id) {
+			case BuiltinProc_real: x->value = exact_value_real(x->value); break;
+			case BuiltinProc_imag: x->value = exact_value_imag(x->value); break;
+			case BuiltinProc_jmag: x->value = exact_value_jmag(x->value); break;
+			case BuiltinProc_kmag: x->value = exact_value_kmag(x->value); break;
 			}
 		} else {
 			x->mode = Addressing_Value;
@@ -3707,11 +3857,48 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		BasicKind kind = core_type(x->type)->Basic.kind;
 		switch (kind) {
-		case Basic_complex64:      x->type = t_f32;           break;
-		case Basic_complex128:     x->type = t_f64;           break;
-		case Basic_UntypedComplex: x->type = t_untyped_float; break;
+		case Basic_complex64:         x->type = t_f32;           break;
+		case Basic_complex128:        x->type = t_f64;           break;
+		case Basic_UntypedComplex:    x->type = t_untyped_float; break;
+		case Basic_quaternion128:     x->type = t_f32;           break;
+		case Basic_quaternion256:     x->type = t_f64;           break;
+		case Basic_UntypedQuaternion: x->type = t_untyped_float; break;
 		default: GB_PANIC("Invalid type"); break;
 		}
+	} break;
+
+	case BuiltinProc_conj: {
+		// conj :: proc(x: type) -> type
+		Operand *x = operand;
+		if (is_type_complex(x->type)) {
+			if (x->mode == Addressing_Constant) {
+				ExactValue v = exact_value_to_complex(x->value);
+				f64 r = v.value_complex.real;
+				f64 i = v.value_complex.imag;
+				x->value = exact_value_complex(r, i);
+				x->mode = Addressing_Constant;
+			} else {
+				x->mode = Addressing_Value;
+			}
+		} else if (is_type_quaternion(x->type)) {
+			if (x->mode == Addressing_Constant) {
+				ExactValue v = exact_value_to_quaternion(x->value);
+				f64 r = v.value_quaternion.real;
+				f64 i = v.value_quaternion.imag;
+				f64 j = v.value_quaternion.jmag;
+				f64 k = v.value_quaternion.kmag;
+				x->value = exact_value_quaternion(r, i, j, k);
+				x->mode = Addressing_Constant;
+			} else {
+				x->mode = Addressing_Value;
+			}
+		} else {
+			gbString s = type_to_string(x->type);
+			error_node(call, "Expected a complex or quaternion, got `%s`", s);
+			gb_string_free(s);
+			return false;
+		}
+
 	} break;
 
 	case BuiltinProc_slice_ptr: {
@@ -3721,16 +3908,13 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *ptr_type = base_type(operand->type);
 		if (!is_type_pointer(ptr_type)) {
 			gbString type_str = type_to_string(operand->type);
-			error_node(call,
-			      "Expected a pointer to `slice_ptr`, got `%s`",
-			      type_str);
+			error_node(call, "Expected a pointer to `slice_ptr`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
 
 		if (ptr_type == t_rawptr) {
-			error_node(call,
-			      "`rawptr` cannot have pointer arithmetic");
+			error_node(call, "`rawptr` cannot have pointer arithmetic");
 			return false;
 		}
 
@@ -3775,11 +3959,11 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_min: {
-		// min :: proc(a, b: comparable) -> comparable
+		// min :: proc(a, b: ordered) -> ordered
 		Type *type = base_type(operand->type);
-		if (!is_type_comparable(type) || !(is_type_numeric(type) || is_type_string(type))) {
+		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
-			error_node(call, "Expected a comparable numeric type to `min`, got `%s`", type_str);
+			error_node(call, "Expected a ordered numeric type to `min`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -3791,10 +3975,10 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (b.mode == Addressing_Invalid) {
 			return false;
 		}
-		if (!is_type_comparable(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
+		if (!is_type_ordered(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
 			gbString type_str = type_to_string(b.type);
 			error_node(call,
-			      "Expected a comparable numeric type to `min`, got `%s`",
+			      "Expected a ordered numeric type to `min`, got `%s`",
 			      type_str);
 			gb_string_free(type_str);
 			return false;
@@ -3841,12 +4025,12 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_max: {
-		// min :: proc(a, b: comparable) -> comparable
+		// min :: proc(a, b: ordered) -> ordered
 		Type *type = base_type(operand->type);
-		if (!is_type_comparable(type) || !(is_type_numeric(type) || is_type_string(type))) {
+		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
 			error_node(call,
-			      "Expected a comparable numeric or string type to `max`, got `%s`",
+			      "Expected a ordered numeric or string type to `max`, got `%s`",
 			      type_str);
 			gb_string_free(type_str);
 			return false;
@@ -3859,10 +4043,10 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (b.mode == Addressing_Invalid) {
 			return false;
 		}
-		if (!is_type_comparable(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
+		if (!is_type_ordered(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
 			gbString type_str = type_to_string(b.type);
 			error_node(call,
-			      "Expected a comparable numeric or string type to `max`, got `%s`",
+			      "Expected a ordered numeric or string type to `max`, got `%s`",
 			      type_str);
 			gb_string_free(type_str);
 			return false;
@@ -3910,12 +4094,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	case BuiltinProc_abs: {
 		// abs :: proc(n: numeric) -> numeric
-		Type *type = base_type(operand->type);
-		if (!is_type_numeric(type)) {
+		if (!is_type_numeric(operand->type) && !is_type_vector(operand->type)) {
 			gbString type_str = type_to_string(operand->type);
-			error_node(call,
-			      "Expected a numeric type to `abs`, got `%s`",
-			      type_str);
+			error_node(call, "Expected a numeric type to `abs`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -3928,6 +4109,18 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			case ExactValue_Float:
 				operand->value.value_float = gb_abs(operand->value.value_float);
 				break;
+			case ExactValue_Complex: {
+				f64 r = operand->value.value_complex.real;
+				f64 i = operand->value.value_complex.imag;
+				operand->value = exact_value_float(gb_sqrt(r*r + i*i));
+			} break;
+			case ExactValue_Quaternion: {
+				f64 r = operand->value.value_complex.real;
+				f64 i = operand->value.value_complex.imag;
+				f64 j = operand->value.value_complex.imag;
+				f64 k = operand->value.value_complex.imag;
+				operand->value = exact_value_float(gb_sqrt(r*r + i*i + j*j + k*k));
+			} break;
 			default:
 				GB_PANIC("Invalid numeric constant");
 				break;
@@ -3936,17 +4129,20 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			operand->mode = Addressing_Value;
 		}
 
-		operand->type = type;
+		if (is_type_complex(operand->type)) {
+			operand->type = base_complex_elem_type(operand->type);
+		} else if (is_type_quaternion(operand->type)) {
+			operand->type = base_quaternion_elem_type(operand->type);
+		}
+		GB_ASSERT(!is_type_complex(operand->type) && !is_type_quaternion(operand->type));
 	} break;
 
 	case BuiltinProc_clamp: {
-		// clamp :: proc(a, min, max: comparable) -> comparable
+		// clamp :: proc(a, min, max: ordered) -> ordered
 		Type *type = base_type(operand->type);
-		if (!is_type_comparable(type) || !(is_type_numeric(type) || is_type_string(type))) {
+		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
-			error_node(call,
-			      "Expected a comparable numeric or string type to `clamp`, got `%s`",
-			      type_str);
+			error_node(call, "Expected a ordered numeric or string type to `clamp`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -3961,11 +4157,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (y.mode == Addressing_Invalid) {
 			return false;
 		}
-		if (!is_type_comparable(y.type) || !(is_type_numeric(y.type) || is_type_string(y.type))) {
+		if (!is_type_ordered(y.type) || !(is_type_numeric(y.type) || is_type_string(y.type))) {
 			gbString type_str = type_to_string(y.type);
-			error_node(call,
-			      "Expected a comparable numeric or string type to `clamp`, got `%s`",
-			      type_str);
+			error_node(call, "Expected a ordered numeric or string type to `clamp`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -3974,11 +4168,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (z.mode == Addressing_Invalid) {
 			return false;
 		}
-		if (!is_type_comparable(z.type) || !(is_type_numeric(z.type) || is_type_string(z.type))) {
+		if (!is_type_ordered(z.type) || !(is_type_numeric(z.type) || is_type_string(z.type))) {
 			gbString type_str = type_to_string(z.type);
-			error_node(call,
-			      "Expected a comparable numeric or string type to `clamp`, got `%s`",
-			      type_str);
+			error_node(call, "Expected a ordered numeric or string type to `clamp`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -4551,9 +4743,18 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		switch (bl->kind) {
 		case Token_Integer: t = t_untyped_integer; break;
 		case Token_Float:   t = t_untyped_float;   break;
-		case Token_Imag:    t = t_untyped_complex; break;
 		case Token_String:  t = t_untyped_string;  break;
 		case Token_Rune:    t = t_untyped_rune;    break;
+		case Token_Imag: {
+			String s = bl->string;
+			Rune r = s.text[s.len-1];
+			switch (r) {
+			case 'i': t = t_untyped_complex; break;
+			case 'j': case 'k':
+				t = t_untyped_quaternion;
+				break;
+			}
+		} break;
 		default:            GB_PANIC("Unknown literal"); break;
 		}
 		o->mode  = Addressing_Constant;

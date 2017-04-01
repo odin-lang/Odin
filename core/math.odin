@@ -43,8 +43,8 @@ pow  :: proc(x, power: f64) -> f64 #foreign __llvm_core "llvm.pow.f64";
 lerp :: proc(a, b, t: f32) -> f32 { return a*(1-t) + b*t; }
 lerp :: proc(a, b, t: f64) -> f64 { return a*(1-t) + b*t; }
 
-sign :: proc(x: f32) -> f32 { if x >= 0 { return +1; } return -1; }
-sign :: proc(x: f64) -> f64 { if x >= 0 { return +1; } return -1; }
+sign :: proc(x: f32) -> f32 { return x >= 0 ? +1 : -1; }
+sign :: proc(x: f64) -> f64 { return x >= 0 ? +1 : -1; }
 
 bit_reverse :: proc(b: u16) -> u16 #foreign __llvm_core "llvm.bitreverse.i16";
 bit_reverse :: proc(b: u32) -> u32 #foreign __llvm_core "llvm.bitreverse.i32";

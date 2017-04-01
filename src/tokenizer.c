@@ -578,9 +578,11 @@ exponent:
 		scan_mantissa(t, 10);
 	}
 
-	if (t->curr_rune == 'i') {
+	switch (t->curr_rune) {
+	case 'i': case 'j': case 'k':
 		token.kind = Token_Imag;
 		advance_to_next_rune(t);
+		break;
 	}
 
 end:

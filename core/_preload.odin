@@ -2,9 +2,7 @@
 
 #import "os.odin";
 #import "fmt.odin";
-#import "mem.odin";
 #import "utf8.odin";
-#import "hash.odin";
 
 // IMPORTANT NOTE(bill): `type_info` & `type_info_val` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
@@ -42,6 +40,7 @@ Type_Info :: union {
 	Integer{size: int, signed: bool},
 	Float{size: int},
 	Complex{size: int},
+	Quaternion{size: int},
 	String{},
 	Boolean{},
 	Any{},
@@ -128,8 +127,6 @@ assume :: proc(cond: bool) #foreign __llvm_core "llvm.assume";
 __debug_trap       :: proc()        #foreign __llvm_core "llvm.debugtrap";
 __trap             :: proc()        #foreign __llvm_core "llvm.trap";
 read_cycle_counter :: proc() -> u64 #foreign __llvm_core "llvm.readcyclecounter";
-
-
 
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
@@ -231,7 +228,7 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 		return nil;
 	}
 
-	mem.copy(new_memory, old_memory, min(old_size, new_size));;
+	__mem_copy(new_memory, old_memory, min(old_size, new_size));;
 	free(old_memory);
 	return new_memory;
 }
@@ -290,7 +287,7 @@ __string_eq :: proc(a, b: string) -> bool {
 }
 
 __string_cmp :: proc(a, b: string) -> int {
-	return mem.compare(cast([]byte)a, cast([]byte)b);
+	return __mem_compare(a.data, b.data, min(a.count, b.count));
 }
 
 __string_ne :: proc(a, b: string) -> bool #inline { return !__string_eq(a, b); }
@@ -299,6 +296,26 @@ __string_gt :: proc(a, b: string) -> bool #inline { return __string_cmp(a, b) > 
 __string_le :: proc(a, b: string) -> bool #inline { return __string_cmp(a, b) <= 0; }
 __string_ge :: proc(a, b: string) -> bool #inline { return __string_cmp(a, b) >= 0; }
 
+
+__complex64_eq  :: proc(a, b: complex64)  -> bool #inline { return real(a) == real(b) && imag(a) == imag(b); }
+__complex64_ne  :: proc(a, b: complex64)  -> bool #inline { return real(a) != real(b) || imag(a) != imag(b); }
+
+__complex128_eq :: proc(a, b: complex128) -> bool #inline { return real(a) == real(b) && imag(a) == imag(b); }
+__complex128_ne :: proc(a, b: complex128) -> bool #inline { return real(a) != real(b) || imag(a) != imag(b); }
+
+
+__quaternion128_eq :: proc(a, b: quaternion128) -> bool #inline {
+	return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b);
+}
+__quaternion128_ne :: proc(a, b: quaternion128) -> bool #inline {
+	return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b);
+}
+__quaternion256_eq :: proc(a, b: quaternion256) -> bool #inline {
+	return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b);
+}
+__quaternion256_ne :: proc(a, b: quaternion256) -> bool #inline {
+	return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b);
+}
 
 __assert :: proc(file: string, line, column: int, msg: string) #inline {
 	fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion: %s\n",
@@ -381,6 +398,26 @@ __mem_compare :: proc(a, b: ^byte, n: int) -> int {
 	return 0;
 }
 
+__sqrt_f32 :: proc(x: f32) -> f32 #foreign __llvm_core "llvm.sqrt.f32";
+__sqrt_f64 :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.sqrt.f64";
+__abs_complex64 :: proc(x: complex64) -> f32 #inline {
+	r, i := real(x), imag(x);
+	return __sqrt_f32(r*r + i*i);
+}
+__abs_complex128 :: proc(x: complex128) -> f64 #inline {
+	r, i := real(x), imag(x);
+	return __sqrt_f64(r*r + i*i);
+}
+__abs_quaternion128 :: proc(x: quaternion128) -> f32 #inline {
+	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
+	return __sqrt_f32(r*r + i*i + j*j + k*k);
+}
+__abs_quaternion256 :: proc(x: quaternion256) -> f64 #inline {
+	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
+	return __sqrt_f64(r*r + i*i + j*j + k*k);
+}
+
+
 
 Raw_Any :: struct #ordered {
 	type_info: ^Type_Info,
@@ -460,7 +497,7 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 	}
 	data := cast(^byte)array.data;
 	assert(data != nil);
-	mem.copy(data + (elem_size*array.count), items, elem_size * item_count);
+	__mem_copy(data + (elem_size*array.count), items, elem_size * item_count);
 	array.count += item_count;
 	return array.count;
 }
@@ -479,7 +516,7 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 	}
 	data := cast(^byte)array.data;
 	assert(data != nil);
-	mem.zero(data + (elem_size*array.count), elem_size);
+	__mem_zero(data + (elem_size*array.count), elem_size);
 	array.count++;
 	return array.count;
 }
@@ -496,7 +533,7 @@ __slice_append :: proc(slice_: rawptr, elem_size, elem_align: int,
 	if item_count > 0 {
 		data := cast(^byte)slice.data;
 		assert(data != nil);
-		mem.copy(data + (elem_size*slice.count), items, elem_size * item_count);
+		__mem_copy(data + (elem_size*slice.count), items, elem_size * item_count);
 		slice.count += item_count;
 	}
 	return slice.count;
@@ -506,7 +543,14 @@ __slice_append :: proc(slice_: rawptr, elem_size, elem_align: int,
 // Map stuff
 
 __default_hash :: proc(data: []byte) -> u64 {
-	return hash.fnv64a(data);
+	fnv64a :: proc(data: []byte) -> u64 {
+		h: u64 = 0xcbf29ce484222325;
+		for b in data {
+			h = (h ~ cast(u64)b) * 0x100000001b3;
+		}
+		return h;
+	}
+	return fnv64a(data);
 }
 __default_hash_string :: proc(s: string) -> u64 {
 	return __default_hash(cast([]byte)s);
@@ -577,7 +621,7 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
 		e := __dynamic_map_get_entry(new_header, j);
 		e.next = fr.entry_index;
 		ndata := cast(^byte)e;
-		mem.copy(ndata+value_offset, data+value_offset, entry_size-value_offset);
+		__mem_copy(ndata+value_offset, data+value_offset, entry_size-value_offset);
 		if __dynamic_map_full(new_header) {
 			__dynamic_map_grow(new_header);
 		}
@@ -618,7 +662,7 @@ __dynamic_map_set :: proc(using h: __Map_Header, key: __Map_Key, value: rawptr) 
 	{
 		data := cast(^byte)__dynamic_map_get_entry(h, index);
 		val := data+value_offset;
-		mem.copy(val, value, entry_size-value_offset);
+		__mem_copy(val, value, entry_size-value_offset);
 	}
 
 	if __dynamic_map_full(h) {
@@ -698,7 +742,7 @@ __dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
 	if fr.entry_index == m.entries.count-1 {
 		m.entries.count--;
 	}
-	mem.copy(__dynamic_map_get_entry(h, fr.entry_index), __dynamic_map_get_entry(h, m.entries.count-1), entry_size);
+	__mem_copy(__dynamic_map_get_entry(h, fr.entry_index), __dynamic_map_get_entry(h, m.entries.count-1), entry_size);
 	last := __dynamic_map_find(h, __dynamic_map_get_entry(h, fr.entry_index).key);
 	if last.entry_prev >= 0 {
 		__dynamic_map_get_entry(h, last.entry_prev).next = fr.entry_index;

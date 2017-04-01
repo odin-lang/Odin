@@ -145,28 +145,30 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 	switch (t->kind) {
 	case Type_Basic:
 		switch (t->Basic.kind) {
-		case Basic_bool:   ir_fprintf(f, "i1");                      return;
-		case Basic_i8:     ir_fprintf(f, "i8");                      return;
-		case Basic_u8:     ir_fprintf(f, "i8");                      return;
-		case Basic_i16:    ir_fprintf(f, "i16");                     return;
-		case Basic_u16:    ir_fprintf(f, "i16");                     return;
-		case Basic_i32:    ir_fprintf(f, "i32");                     return;
-		case Basic_u32:    ir_fprintf(f, "i32");                     return;
-		case Basic_i64:    ir_fprintf(f, "i64");                     return;
-		case Basic_u64:    ir_fprintf(f, "i64");                     return;
+		case Basic_bool:   ir_fprintf(f, "i1");                       return;
+		case Basic_i8:     ir_fprintf(f, "i8");                       return;
+		case Basic_u8:     ir_fprintf(f, "i8");                       return;
+		case Basic_i16:    ir_fprintf(f, "i16");                      return;
+		case Basic_u16:    ir_fprintf(f, "i16");                      return;
+		case Basic_i32:    ir_fprintf(f, "i32");                      return;
+		case Basic_u32:    ir_fprintf(f, "i32");                      return;
+		case Basic_i64:    ir_fprintf(f, "i64");                      return;
+		case Basic_u64:    ir_fprintf(f, "i64");                      return;
 
-		case Basic_f32:    ir_fprintf(f, "float");                   return;
-		case Basic_f64:    ir_fprintf(f, "double");                  return;
+		case Basic_f32:    ir_fprintf(f, "float");                    return;
+		case Basic_f64:    ir_fprintf(f, "double");                   return;
 
-		case Basic_complex64:  ir_fprintf(f, "%%..complex64");       return;
-		case Basic_complex128: ir_fprintf(f, "%%..complex128");      return;
+		case Basic_complex64:  ir_fprintf(f, "%%..complex64");        return;
+		case Basic_complex128: ir_fprintf(f, "%%..complex128");       return;
 
+		case Basic_quaternion128: ir_fprintf(f, "%%..quaternion128"); return;
+		case Basic_quaternion256: ir_fprintf(f, "%%..quaternion256"); return;
 
-		case Basic_rawptr: ir_fprintf(f, "%%..rawptr");              return;
-		case Basic_string: ir_fprintf(f, "%%..string");              return;
-		case Basic_uint:   ir_fprintf(f, "i%lld", word_bits);        return;
-		case Basic_int:    ir_fprintf(f, "i%lld", word_bits);        return;
-		case Basic_any:    ir_fprintf(f, "%%..any");                 return;
+		case Basic_rawptr: ir_fprintf(f, "%%..rawptr");               return;
+		case Basic_string: ir_fprintf(f, "%%..string");               return;
+		case Basic_uint:   ir_fprintf(f, "i%lld", word_bits);         return;
+		case Basic_int:    ir_fprintf(f, "i%lld", word_bits);         return;
+		case Basic_any:    ir_fprintf(f, "%%..any");                  return;
 		}
 		break;
 	case Type_Pointer:
@@ -391,17 +393,42 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	} break;
 
 	case ExactValue_Complex: {
-		GB_ASSERT_MSG(is_type_complex(type), "%s", type_to_string(type));
 		type = core_type(type);
-		Type *ft = base_complex_elem_type(type);
-		ir_fprintf(f, " {");
-		ir_print_type(f, m, ft);
-		ir_fprintf(f, " ");
-		ir_print_exact_value(f, m, exact_value_float(value.value_complex.real), ft);
-		ir_fprintf(f, ", ");
-		ir_print_type(f, m, ft);
-		ir_fprintf(f, " ");
-		ir_print_exact_value(f, m, exact_value_float(value.value_complex.imag), ft);
+		if (is_type_quaternion(type)) {
+			Type *ft = base_quaternion_elem_type(type);
+			ir_fprintf(f, " {"); ir_print_type(f, m, ft); ir_fprintf(f, " ");
+			ir_print_exact_value(f, m, exact_value_float(value.value_complex.real), ft);
+			ir_fprintf(f, ", "); ir_print_type(f, m, ft); ir_fprintf(f, " ");
+			ir_print_exact_value(f, m, exact_value_float(value.value_complex.imag), ft);
+			ir_fprintf(f, ", "); ir_print_type(f, m, ft); ir_fprintf(f, " ");
+			ir_print_exact_value(f, m, exact_value_float(0), ft);
+			ir_fprintf(f, ", "); ir_print_type(f, m, ft); ir_fprintf(f, " ");
+			ir_print_exact_value(f, m, exact_value_float(0), ft);
+			ir_fprintf(f, "}");
+
+		} else {
+			GB_ASSERT_MSG(is_type_complex(type), "%s", type_to_string(type));
+			Type *ft = base_complex_elem_type(type);
+			ir_fprintf(f, " {"); ir_print_type(f, m, ft); ir_fprintf(f, " ");
+			ir_print_exact_value(f, m, exact_value_float(value.value_complex.real), ft);
+			ir_fprintf(f, ", "); ir_print_type(f, m, ft); ir_fprintf(f, " ");
+			ir_print_exact_value(f, m, exact_value_float(value.value_complex.imag), ft);
+			ir_fprintf(f, "}");
+		}
+	} break;
+
+	case ExactValue_Quaternion: {
+		GB_ASSERT_MSG(is_type_quaternion(type), "%s", type_to_string(type));
+		type = core_type(type);
+		Type *ft = base_quaternion_elem_type(type);
+		ir_fprintf(f, " {"); ir_print_type(f, m, ft); ir_fprintf(f, " ");
+		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.real), ft);
+		ir_fprintf(f, ", "); ir_print_type(f, m, ft); ir_fprintf(f, " ");
+		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.imag), ft);
+		ir_fprintf(f, ", "); ir_print_type(f, m, ft); ir_fprintf(f, " ");
+		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.jmag), ft);
+		ir_fprintf(f, ", "); ir_print_type(f, m, ft); ir_fprintf(f, " ");
+		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.kmag), ft);
 		ir_fprintf(f, "}");
 	} break;
 
@@ -1008,6 +1035,72 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 				case Token_LtEq:  ir_fprintf(f, "ole"); break;
 				case Token_GtEq:  ir_fprintf(f, "oge"); break;
 				}
+			} else if (is_type_complex(elem_type)) {
+				ir_fprintf(f, "call ");
+				ir_print_calling_convention(f, m, ProcCC_Odin);
+				ir_print_type(f, m, t_bool);
+				char *runtime_proc = "";
+				i64 sz = 8*type_size_of(m->allocator, elem_type);
+				switch (sz) {
+				case 64:
+					switch (bo->op) {
+					case Token_CmpEq: runtime_proc = "__complex64_eq"; break;
+					case Token_NotEq: runtime_proc = "__complex64_ne"; break;
+					}
+					break;
+				case 128:
+					switch (bo->op) {
+					case Token_CmpEq: runtime_proc = "__complex128_eq"; break;
+					case Token_NotEq: runtime_proc = "__complex128_ne"; break;
+					}
+					break;
+				}
+
+				ir_fprintf(f, " ");
+				ir_print_encoded_global(f, make_string_c(runtime_proc), false);
+				ir_fprintf(f, "(");
+				ir_print_type(f, m, type);
+				ir_fprintf(f, " ");
+				ir_print_value(f, m, bo->left, type);
+				ir_fprintf(f, ", ");
+				ir_print_type(f, m, type);
+				ir_fprintf(f, " ");
+				ir_print_value(f, m, bo->right, type);
+				ir_fprintf(f, ")\n");
+				return;
+			} else if (is_type_quaternion(elem_type)) {
+				ir_fprintf(f, "call ");
+				ir_print_calling_convention(f, m, ProcCC_Odin);
+				ir_print_type(f, m, t_bool);
+				char *runtime_proc = "";
+				i64 sz = 8*type_size_of(m->allocator, elem_type);
+				switch (sz) {
+				case 128:
+					switch (bo->op) {
+					case Token_CmpEq: runtime_proc = "__quaternion128_eq"; break;
+					case Token_NotEq: runtime_proc = "__quaternion128_ne"; break;
+					}
+					break;
+				case 256:
+					switch (bo->op) {
+					case Token_CmpEq: runtime_proc = "__quaternion256_eq"; break;
+					case Token_NotEq: runtime_proc = "__quaternion256_ne"; break;
+					}
+					break;
+				}
+
+				ir_fprintf(f, " ");
+				ir_print_encoded_global(f, make_string_c(runtime_proc), false);
+				ir_fprintf(f, "(");
+				ir_print_type(f, m, type);
+				ir_fprintf(f, " ");
+				ir_print_value(f, m, bo->left, type);
+				ir_fprintf(f, ", ");
+				ir_print_type(f, m, type);
+				ir_fprintf(f, " ");
+				ir_print_value(f, m, bo->right, type);
+				ir_fprintf(f, ")\n");
+				return;
 			} else {
 				ir_fprintf(f, "icmp ");
 				if (bo->op != Token_CmpEq &&
@@ -1420,6 +1513,10 @@ void print_llvm_ir(irGen *ir) {
 	ir_fprintf(f, " = type {float, float} ; Basic_complex64\n");
 	ir_print_encoded_local(f, str_lit("..complex128"));
 	ir_fprintf(f, " = type {double, double} ; Basic_complex128\n");
+	ir_print_encoded_local(f, str_lit("..quaternion128"));
+	ir_fprintf(f, " = type {float, float, float, float} ; Basic_quaternion128\n");
+	ir_print_encoded_local(f, str_lit("..quaternion256"));
+	ir_fprintf(f, " = type {double, double, double, double} ; Basic_quaternion256\n");
 
 
 	ir_print_encoded_local(f, str_lit("..any"));
