@@ -2,6 +2,8 @@
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
+#include <math.h>
+
 gbAllocator heap_allocator(void) {
 	return gb_heap_allocator();
 }
@@ -102,6 +104,10 @@ i16 f32_to_f16(f32 value) {
 
 		return cast(i16)(s | (e << 10) | (m >> 13));
 	}
+}
+
+f64 gb_sqrt(f64 x) {
+	return sqrt(x);
 }
 
 

@@ -110,6 +110,16 @@ write_type :: proc(buf: ^[]byte, ti: ^Type_Info) {
 		case 4: write_string(buf, "f32");
 		case 8: write_string(buf, "f64");
 		}
+	case Complex:
+		match info.size {
+		case 8:  write_string(buf, "complex64");
+		case 16: write_string(buf, "complex128");
+		}
+	case Quaternion:
+		match info.size {
+		case 16: write_string(buf, "quaternion128");
+		case 32: write_string(buf, "quaternion");
+		}
 	case String:  write_string(buf, "string");
 	case Boolean: write_string(buf, "bool");
 	case Pointer:
@@ -731,10 +741,12 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			fmt_value(fi, any{info.base, v.data}, verb);
 		}
 
-	case Boolean: fmt_arg(fi, v, verb);
-	case Float:   fmt_arg(fi, v, verb);
-	case Integer: fmt_arg(fi, v, verb);
-	case String:  fmt_arg(fi, v, verb);
+	case Boolean:    fmt_arg(fi, v, verb);
+	case Integer:    fmt_arg(fi, v, verb);
+	case Float:      fmt_arg(fi, v, verb);
+	case Complex:    fmt_arg(fi, v, verb);
+	case Quaternion: fmt_arg(fi, v, verb);
+	case String:     fmt_arg(fi, v, verb);
 
 	case Pointer:
 		if v.type_info == type_info(^Type_Info) {
@@ -883,6 +895,51 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	}
 }
 
+fmt_complex :: proc(fi: ^Fmt_Info, c: complex128, bits: int, verb: rune) {
+	match verb {
+	case 'f', 'F', 'v':
+		r := real(c);
+		i := imag(c);
+		fmt_float(fi, r, bits/2, verb);
+		if !fi.plus && i >= 0 {
+			write_rune(fi.buf, '+');
+		}
+		fmt_float(fi, i, bits/2, verb);
+		write_rune(fi.buf, 'i');
+
+	default:
+		fmt_bad_verb(fi, verb);
+		return;
+	}
+}
+
+fmt_quaternion :: proc(fi: ^Fmt_Info, c: quaternion256, bits: int, verb: rune) {
+	match verb {
+	case 'f', 'F', 'v':
+		r := real(c);
+		i := imag(c);
+		j := jmag(c);
+		k := kmag(c);
+		fmt_float(fi, r, bits/4, verb);
+
+		if !fi.plus && i >= 0 { write_rune(fi.buf, '+'); }
+		fmt_float(fi, i, bits/4, verb);
+		write_rune(fi.buf, 'i');
+
+		if !fi.plus && j >= 0 { write_rune(fi.buf, '+'); }
+		fmt_float(fi, j, bits/4, verb);
+		write_rune(fi.buf, 'j');
+
+		if !fi.plus && k >= 0 { write_rune(fi.buf, '+'); }
+		fmt_float(fi, k, bits/4, verb);
+		write_rune(fi.buf, 'k');
+
+	default:
+		fmt_bad_verb(fi, verb);
+		return;
+	}
+}
+
 fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	if arg.data == nil || arg.type_info == nil {
 		write_string(fi.buf, "<nil>");
@@ -903,9 +960,13 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	base_arg := arg;
 	base_arg.type_info = type_info_base(base_arg.type_info);
 	match a in base_arg {
-	case bool:    fmt_bool(fi, a, verb);
-	case f32:     fmt_float(fi, cast(f64)a, 32, verb);
-	case f64:     fmt_float(fi, a, 64, verb);
+	case bool:          fmt_bool(fi, a, verb);
+	case f32:           fmt_float(fi, cast(f64)a, 32, verb);
+	case f64:           fmt_float(fi, a, 64, verb);
+	case complex64:     fmt_complex(fi, cast(complex128)a, 64, verb);
+	case complex128:    fmt_complex(fi, a, 128, verb);
+	case quaternion128: fmt_quaternion(fi, cast(quaternion256)a, 128, verb);
+	case quaternion256: fmt_quaternion(fi, a, 256, verb);
 
 	case int:     fmt_int(fi, cast(u64)a, true,  8*size_of(int), verb);
 	case i8:      fmt_int(fi, cast(u64)a, true,  8, verb);

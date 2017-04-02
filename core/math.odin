@@ -27,14 +27,14 @@ Mat4 :: [4]Vec4;
 sqrt :: proc(x: f32) -> f32 #foreign __llvm_core "llvm.sqrt.f32";
 sqrt :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.sqrt.f64";
 
-sin  :: proc(x: f32) -> f32 #foreign __llvm_core "llvm.sin.f32";
-sin  :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.sin.f64";
+sin  :: proc(θ: f32) -> f32 #foreign __llvm_core "llvm.sin.f32";
+sin  :: proc(θ: f64) -> f64 #foreign __llvm_core "llvm.sin.f64";
 
-cos  :: proc(x: f32) -> f32 #foreign __llvm_core "llvm.cos.f32";
-cos  :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.cos.f64";
+cos  :: proc(θ: f32) -> f32 #foreign __llvm_core "llvm.cos.f32";
+cos  :: proc(θ: f64) -> f64 #foreign __llvm_core "llvm.cos.f64";
 
-tan  :: proc(x: f32) -> f32 #inline { return sin(x)/cos(x); }
-tan  :: proc(x: f64) -> f64 #inline { return sin(x)/cos(x); }
+tan  :: proc(θ: f32) -> f32 #inline { return sin(θ)/cos(θ); }
+tan  :: proc(θ: f64) -> f64 #inline { return sin(θ)/cos(θ); }
 
 pow  :: proc(x, power: f32) -> f32 #foreign __llvm_core "llvm.pow.f32";
 pow  :: proc(x, power: f64) -> f64 #foreign __llvm_core "llvm.pow.f64";
@@ -43,8 +43,8 @@ pow  :: proc(x, power: f64) -> f64 #foreign __llvm_core "llvm.pow.f64";
 lerp :: proc(a, b, t: f32) -> f32 { return a*(1-t) + b*t; }
 lerp :: proc(a, b, t: f64) -> f64 { return a*(1-t) + b*t; }
 
-sign :: proc(x: f32) -> f32 { if x >= 0 { return +1; } return -1; }
-sign :: proc(x: f64) -> f64 { if x >= 0 { return +1; } return -1; }
+sign :: proc(x: f32) -> f32 { return x >= 0 ? +1 : -1; }
+sign :: proc(x: f64) -> f64 { return x >= 0 ? +1 : -1; }
 
 bit_reverse :: proc(b: u16) -> u16 #foreign __llvm_core "llvm.bitreverse.i16";
 bit_reverse :: proc(b: u32) -> u32 #foreign __llvm_core "llvm.bitreverse.i32";

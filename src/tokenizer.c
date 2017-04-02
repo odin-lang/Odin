@@ -7,6 +7,7 @@ TOKEN_KIND(Token__LiteralBegin, "_LiteralBegin"), \
 	TOKEN_KIND(Token_Ident,     "identifier"), \
 	TOKEN_KIND(Token_Integer,   "integer"), \
 	TOKEN_KIND(Token_Float,     "float"), \
+	TOKEN_KIND(Token_Imag,      "imaginary"), \
 	TOKEN_KIND(Token_Rune,      "rune"), \
 	TOKEN_KIND(Token_String,    "string"), \
 TOKEN_KIND(Token__LiteralEnd,   "_LiteralEnd"), \
@@ -547,18 +548,18 @@ Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 			}
 		}
 
-		token.string.len = t->curr - token.string.text;
-		return token;
+		goto end;
 	}
 
 	scan_mantissa(t, 10);
+
 
 fraction:
 	if (t->curr_rune == '.') {
 		// HACK(bill): This may be inefficient
 		TokenizerState state = save_tokenizer_state(t);
 		advance_to_next_rune(t);
-		if (digit_value(t->curr_rune) >= 10) {
+		if (t->curr_rune == '.') {
 			// TODO(bill): Clean up this shit
 			restore_tokenizer_state(t, &state);
 			goto end;
@@ -575,6 +576,13 @@ exponent:
 			advance_to_next_rune(t);
 		}
 		scan_mantissa(t, 10);
+	}
+
+	switch (t->curr_rune) {
+	case 'i': case 'j': case 'k':
+		token.kind = Token_Imag;
+		advance_to_next_rune(t);
+		break;
 	}
 
 end:

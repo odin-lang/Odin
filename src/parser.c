@@ -1735,6 +1735,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_Integer:
 	case Token_Float:
+	case Token_Imag:
 	case Token_Rune:
 		operand = ast_basic_lit(f, f->curr_token);
 		next_token(f);
@@ -3238,6 +3239,7 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Ident:
 	case Token_Integer:
 	case Token_Float:
+	case Token_Imag:
 	case Token_Rune:
 	case Token_String:
 	case Token_OpenParen:

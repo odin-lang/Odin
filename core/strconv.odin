@@ -313,28 +313,15 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 	neg: bool;
 	u, neg = is_integer_negative(u, is_signed, bit_size);
 
-	if is_pow2(cast(i64)base) {
-		b := cast(u64)base;
-		m := cast(uint)b - 1;
-		for u >= b {
-			i--;
-			a[i] = digits[cast(uint)u & m];
-			u >>= b;
-		}
+	for b := cast(u64)base; u >= b; {
 		i--;
-		a[i] = digits[cast(uint)u];
-	} else {
-		b := cast(u64)base;
-		for u >= b {
-			i--;
-			q := u / b;
-			a[i] = digits[cast(uint)(u-q*b)];
-			u = q;
-		}
-
-		i--;
-		a[i] = digits[cast(uint)u];
+		q := u / b;
+		a[i] = digits[cast(uint)(u-q*b)];
+		u = q;
 	}
+
+	i--;
+	a[i] = digits[cast(uint)u];
 
 	if flags&Int_Flag.PREFIX != 0 {
 		ok := true;
