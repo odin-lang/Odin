@@ -1385,6 +1385,138 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 
 void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
+
+#ifndef GB_SYSTEM_WINDOWS
+	bool is_main_proc = proc->parent == NULL && str_eq(proc->name, str_lit("main"));
+
+	AstFile fake_file;
+	gb_arena_init_from_allocator(&fake_file.arena, heap_allocator(), gb_size_of(AstNode) * 4);
+
+	bool uses_args = false;
+	if(is_main_proc)
+	for(int i=0;i<proc->module->min_dep_map.entries.count;i++) {
+		Entity *value = proc->module->min_dep_map.entries.e[i].value;
+		//printf("using: %.*s\n", LIT(proc->module->min_dep_map.entries.e[i].value->token.string));
+		if(value == NULL) continue;
+		if(str_eq(str_lit("args"), value->token.string)) {
+			uses_args = true;
+			break;
+		}
+	}
+
+	//bool uses_args = map_entity_get(&proc->module->min_dep_map, hash_pointer(entity_of_ident(proc->module->info, ast_ident(&fake_file, make_token_ident(str_lit("args")))))) == NULL;
+	//printf("uses_args: %d", (int)uses_args);
+
+	// TODO(zangent): THIS IS AN UGLY HACK
+	// I _SERIOUSLY_ need to change this system, because this is just disgraceful.
+
+	if(uses_args) {
+
+
+	ir_fprintf(f, "%s", "; Hack to give Linux/OSX launch arguments\n"
+"define i32 @main(i32 %argc, i8** %argv) {\n"
+"decls-0:\n"
+"	%0 = alloca i32, align 4\n"
+"	%1 = alloca i8**, align 8\n"
+"	%2 = alloca i32, align 4\n"
+"	%3 = alloca i8*, align 8\n"
+"	%4 = alloca %..string, align 8\n"
+"	store i32 zeroinitializer, i32* %0\n"
+"		store i32 %argc, i32* %0\n"
+"	store i8** zeroinitializer, i8*** %1\n"
+"		store i8** %argv, i8*** %1\n"
+"	call void @.__$startup_runtime()\n"
+"	; reserve\n"
+"	; SelectorExpr\n"
+"	%5 = load i32, i32* %0, align 4\n"
+"	%6 = sext i32 %5 to i64\n"
+"	%7 = bitcast {%..string*, i64, i64,%Allocator}* @.args to %..rawptr\n"
+"	%8 = call i1 @.__dynamic_array_reserve(%..rawptr %7, i64 16, i64 8, i64 %6)\n"
+"	; AssignStmt\n"
+"	; SelectorExpr\n"
+"	; SelectorExpr\n"
+"	%9 = getelementptr inbounds {%..string*, i64, i64,%Allocator}, {%..string*, i64, i64,%Allocator}* @.args, i64 0, i32 1\n"
+"	%10 = load i32, i32* %0, align 4\n"
+"	; cast - cast\n"
+"	%11 = sext i32 %10 to i64\n"
+"	store i64 %11, i64* %9\n"
+"	; i\n"
+"	store i32 zeroinitializer, i32* %2\n"
+"		store i32 0, i32* %2\n"
+"	; ForStmt\n"
+"	br label %for.loop-1\n"
+"\n"
+"for.loop-1:\n"
+"	%12 = load i32, i32* %2, align 4\n"
+"	%13 = load i32, i32* %0, align 4\n"
+"	%14 = icmp slt i32 %12, %13\n"
+"	br i1 %14, label %for.body-2, label %for.done-6\n"
+"\n"
+"for.body-2:\n"
+"	; cstr\n"
+"	store i8* zeroinitializer, i8** %3\n"
+"		%15 = load i8**, i8*** %1, align 8\n"
+"	%16 = load i32, i32* %2, align 4\n"
+"	%17 = sext i32 %16 to i64\n"
+"	%18 = getelementptr inbounds i8*, i8** %15, i64 %17\n"
+"	%19 = getelementptr inbounds i8*, i8** %18, i64 0\n"
+"	%20 = load i8*, i8** %19, align 8\n"
+"	store i8* %20, i8** %3\n"
+"	; str\n"
+"	store %..string zeroinitializer, %..string* %4\n"
+"		; AssignStmt\n"
+"	; SelectorExpr\n"
+"	%21 = getelementptr inbounds %..string, %..string* %4, i64 0, i32 0\n"
+"	%22 = load i8*, i8** %3, align 8\n"
+"	store i8* %22, i8** %21\n"
+"	; ForStmt\n"
+"	br label %for.loop-3\n"
+"\n"
+"for.loop-3:\n"
+"	%23 = load i8*, i8** %3, align 8\n"
+"	; SelectorExpr\n"
+"	%24 = getelementptr inbounds %..string, %..string* %4, i64 0, i32 1\n"
+"	%25 = load i64, i64* %24, align 8\n"
+"	%26 = getelementptr inbounds i8, i8* %23, i64 %25\n"
+"	%27 = getelementptr inbounds i8, i8* %26, i64 0\n"
+"	%28 = load i8, i8* %27, align 1\n"
+"	%29 = icmp ne i8 %28, 0\n"
+"	br i1 %29, label %for.body-4, label %for.done-5\n"
+"\n"
+"for.body-4:\n"
+"	; SelectorExpr\n"
+"	%30 = getelementptr inbounds %..string, %..string* %4, i64 0, i32 1\n"
+"	%31 = load i64, i64* %30, align 8\n"
+"	%32 = add i64 %31, 1\n"
+"	store i64 %32, i64* %30\n"
+"	br label %for.loop-3\n"
+"\n"
+"for.done-5:\n"
+"	; AssignStmt\n"
+"	; IndexExpr\n"
+"	; SelectorExpr\n"
+"	%33 = load {%..string*, i64, i64,%Allocator}, {%..string*, i64, i64,%Allocator}* @.args, align 8\n"
+"	%34 = extractvalue {%..string*, i64, i64,%Allocator} %33, 0\n"
+"	%35 = extractvalue {%..string*, i64, i64,%Allocator} %33, 1\n"
+"	%36 = load i32, i32* %2, align 4\n"
+"	%37 = sext i32 %36 to i64\n"
+"	%38 = getelementptr inbounds %..string, %..string* %34, i64 %37\n"
+"	%39 = load %..string, %..string* %4, align 8\n"
+"	store %..string %39, %..string* %38\n"
+"	; AssignStmt\n"
+"	%40 = load i32, i32* %2, align 4\n"
+"	%41 = add i32 %40, 1\n"
+"	store i32 %41, i32* %2\n"
+"	br label %for.loop-1\n"
+"\n"
+"for.done-6:\n"
+"	call void @.nix_argpatch_main()\n"
+"	ret i32 0\n"
+"}\n"
+);
+	}
+#endif
+
 	if (proc->body == NULL) {
 		ir_fprintf(f, "declare ");
 		// if (proc->tags & ProcTag_dll_import) {
@@ -1412,7 +1544,14 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	}
 
 	ir_fprintf(f, " ");
+
+#ifndef GB_SYSTEM_WINDOWS
+	if(uses_args) 
+		ir_fprintf(f, "@.nix_argpatch_main");
+	else
+#endif
 	ir_print_encoded_global(f, proc->name, ir_print_is_proc_global(m, proc));
+
 	ir_fprintf(f, "(");
 
 	if (proc_type->param_count > 0) {

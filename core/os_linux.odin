@@ -36,6 +36,8 @@ RTLD_NOW          :: 0x002;
 RTLD_BINDING_MASK :: 0x3;
 RTLD_GLOBAL       :: 0x100;
 
+args: [dynamic]string;
+
 #foreign_system_library dl   "dl";
 #foreign_system_library libc "c";
 

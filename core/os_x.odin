@@ -39,6 +39,8 @@ RTLD_NODELETE :: 0x80;
 RTLD_NOLOAD   :: 0x10;
 RTLD_FIRST    :: 0x100;
 
+args: [dynamic]string;
+
 #foreign_system_library dl   "dl";
 #foreign_system_library libc "c";
 
@@ -212,4 +214,3 @@ dlclose :: proc(handle: rawptr) -> bool #inline {
 dlerror :: proc() -> string {
 	return strings.to_odin_string(unix_dlerror());
 }
-
