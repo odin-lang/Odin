@@ -50,8 +50,8 @@ murmur32 :: proc(data: []byte) -> u32 {
 	c2_32: u32 : 0x1b873593;
 
 	h1: u32 = 0;
-	nblocks := data.count/4;
-	p := data.data;
+	nblocks := len(data)/4;
+	p := ^data[0];
 	p1 := p + 4*nblocks;
 
 	for ; p < p1; p += 4 {
@@ -69,7 +69,7 @@ murmur32 :: proc(data: []byte) -> u32 {
 	tail := data[nblocks*4 ..];
 
 	k1: u32;
-	match tail.count&3 {
+	match len(tail)&3 {
 	case 3:
 		k1 ~= cast(u32)tail[2] << 16;
 		fallthrough;
@@ -84,7 +84,7 @@ murmur32 :: proc(data: []byte) -> u32 {
 		h1 ~= k1;
 	}
 
-	h1 ~= cast(u32)data.count;
+	h1 ~= cast(u32)len(data);
 
 	h1 ~= h1 >> 16;
 	h1 *= 0x85ebca6b;
@@ -137,11 +137,11 @@ murmur64 :: proc(data: []byte) -> u64 {
 		m :: 0x5bd1e995;
 		r :: 24;
 
-		h1: u32 = cast(u32)SEED ~ cast(u32)data.count;
+		h1: u32 = cast(u32)SEED ~ cast(u32)len(data);
 		h2: u32 = SEED >> 32;
 
-		data32 := slice_ptr(cast(^u32)^data[0], data.count/size_of(u32));
-		len := data.count;
+		data32 := slice_ptr(cast(^u32)^data[0], len(data)/size_of(u32));
+		len := len(data);
 
 		i := 0;
 		for len >= 8 {

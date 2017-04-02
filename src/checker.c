@@ -23,9 +23,13 @@ typedef struct BuiltinProc {
 typedef enum BuiltinProcId {
 	BuiltinProc_Invalid,
 
+	BuiltinProc_len,
+	BuiltinProc_cap,
+
 	BuiltinProc_new,
-	BuiltinProc_new_slice,
 	BuiltinProc_free,
+	// BuiltinProc_new_slice,
+	BuiltinProc_make,
 
 	BuiltinProc_reserve,
 	BuiltinProc_clear,
@@ -75,9 +79,13 @@ typedef enum BuiltinProcId {
 gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT(""),                 0, false, Expr_Stmt},
 
+	{STR_LIT("len"),              1, false, Expr_Expr},
+	{STR_LIT("cap"),              1, false, Expr_Expr},
+
 	{STR_LIT("new"),              1, false, Expr_Expr},
-	{STR_LIT("new_slice"),        2, true,  Expr_Expr},
 	{STR_LIT("free"),             1, false, Expr_Stmt},
+	// {STR_LIT("new_slice"),        2, true,  Expr_Expr},
+	{STR_LIT("make"),             1, true,  Expr_Expr},
 
 	{STR_LIT("reserve"),          2, false, Expr_Stmt},
 	{STR_LIT("clear"),            1, false, Expr_Stmt},

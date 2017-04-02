@@ -1,15 +1,14 @@
 new_c_string :: proc(s: string) -> ^byte {
-	c := new_slice(byte, s.count+1);
+	c := make([]byte, len(s)+1);
 	copy(c, cast([]byte)s);
-	c[s.count] = 0;
-	return c.data;
+	c[len(s)] = 0;
+	return ^c[0];
 }
 
 to_odin_string :: proc(c: ^byte) -> string {
-	s: string;
-	s.data = c;
-	for (c+s.count)^ != 0 {
-		s.count++;
+	len := 0;
+	for (c+len)^ != 0 {
+		len++;
 	}
-	return s;
+	return cast(string)slice_ptr(c, len);
 }

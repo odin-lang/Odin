@@ -14,14 +14,14 @@ decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
 		for _, i in buf {
 			buf[i] = '0';
 		}
-		return buf.count;
+		return len(buf);
 	}
 
 
 	n := 10 + a.count + abs(a.decimal_point);
 
 	// TODO(bill): make this work with a buffer that's not big enough
-	assert(buf.count >= n);
+	assert(len(buf) >= n);
 	buf = buf[..n];
 
 	if a.count == 0 {
@@ -118,7 +118,7 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 	for n > 0 {
 		dig := n>>k;
 		n &= mask;
-		if w < a.digits.count {
+		if w < len(a.digits) {
 			a.digits[w] = cast(byte)('0' + dig);
 			w++;
 		} else if dig > 0 {
@@ -144,7 +144,7 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 		quo := n/10;
 		rem := n - 10*quo;
 		w--;
-		if w < a.digits.count {
+		if w < len(a.digits) {
 			a.digits[w] = cast(byte)('0' + rem);
 		} else if rem != 0 {
 			a.trunc = true;
@@ -156,7 +156,7 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 		quo := n/10;
 		rem := n - 10*quo;
 		w--;
-		if w < a.digits.count {
+		if w < len(a.digits) {
 			a.digits[w] = cast(byte)('0' + rem);
 		} else if rem != 0 {
 			a.trunc = true;
@@ -165,7 +165,7 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 	}
 
 	a.count += delta;
-	a.count = min(a.count, a.digits.count);
+	a.count = min(a.count, len(a.digits));
 	a.decimal_point += delta;
 	trim(a);
 }

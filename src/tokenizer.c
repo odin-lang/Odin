@@ -619,20 +619,22 @@ bool scan_escape(Tokenizer *t, Rune quote) {
 		advance_to_next_rune(t);
 		len = 8; base = 16; max = GB_RUNE_MAX;
 	} else {
-		if (t->curr_rune < 0)
+		if (t->curr_rune < 0) {
 			tokenizer_err(t, "Escape sequence was not terminated");
-		else
+		} else {
 			tokenizer_err(t, "Unknown escape sequence");
+		}
 		return false;
 	}
 
 	while (len --> 0) {
 		u32 d = cast(u32)digit_value(t->curr_rune);
 		if (d >= base) {
-			if (t->curr_rune < 0)
+			if (t->curr_rune < 0) {
 				tokenizer_err(t, "Escape sequence was not terminated");
-			else
+			} else {
 				tokenizer_err(t, "Illegal character %d in escape sequence", t->curr_rune);
+			}
 			return false;
 		}
 
