@@ -3748,10 +3748,10 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					} else if (is_type_dynamic_array(type)) {
 						Type *elem_type = base_type(type)->DynamicArray.elem;
 						irValue *len = v_zero;
-						irValue *cap = ir_const_int(a, 8);
 						if (ce->args.count > 1) {
 							len = ir_emit_conv(proc, ir_build_expr(proc, ce->args.e[1]), t_int);
 						}
+						irValue *cap = len;
 						if (ce->args.count > 2) {
 							cap = ir_emit_conv(proc, ir_build_expr(proc, ce->args.e[2]), t_int);
 						}

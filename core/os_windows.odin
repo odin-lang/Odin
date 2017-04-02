@@ -49,7 +49,7 @@ ERROR_FILE_IS_PIPE: Errno : 1<<29 + 0;
 
 
 // "Argv" arguments converted to Odin strings
-args := _alloc_command_line_arguments();
+immutable args := _alloc_command_line_arguments();
 
 
 open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
