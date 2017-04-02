@@ -1264,8 +1264,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			case Entity_TypeName: {
 				Type *t = base_type(e->type);
 				if (is_type_union(t)) {
-					for (isize i = 0; i < t->Record.variant_count; i++) {
+					TokenPos pos = ast_node_token(expr).pos;
+					for (isize i = 1; i < t->Record.variant_count; i++) {
 						Entity *f = t->Record.variants[i];
+						// gb_printf_err("%s\n", type_to_string(f->type));
 						Entity *found = scope_insert_entity(c->context.scope, f);
 						if (found != NULL) {
 							gbString expr_str = expr_to_string(expr);

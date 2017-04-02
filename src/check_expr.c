@@ -249,12 +249,10 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 				operand->mode = Addressing_Invalid;
 				return;
 			}
-			if (is_type_any(type)) {
-				target_type = t_any;
-			} else {
-				target_type = default_type(operand->type);
+			target_type = default_type(operand->type);
+			if (!is_type_any(type)) {
+				GB_ASSERT_MSG(is_type_typed(target_type), "%s", type_to_string(type));
 			}
-			GB_ASSERT_MSG(is_type_typed(target_type), "%s", type_to_string(type));
 			add_type_info_type(c, type);
 			add_type_info_type(c, target_type);
 		}

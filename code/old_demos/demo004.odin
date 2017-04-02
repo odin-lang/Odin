@@ -1,14 +1,14 @@
-#import "fmt.odin"
-#import "utf8.odin"
-#import "hash.odin"
-#import "mem.odin"
+#import "fmt.odin";
+#import "utf8.odin";
+#import "hash.odin";
+#import "mem.odin";
 
 main :: proc() {
 	{ // New Standard Library stuff
-		s := "Hello"
+		s := "Hello";
 		fmt.println(s,
 		            utf8.valid_string(s),
-		            hash.murmur64(s.data, s.count))
+		            hash.murmur64(cast([]byte)s));
 
 		// utf8.odin
 		// hash.odin
@@ -19,15 +19,15 @@ main :: proc() {
 	}
 
 	{
-		arena: mem.Arena
-		mem.init_arena_from_context(^arena, mem.megabytes(16)) // Uses default allocator
-		defer mem.free_arena(^arena)
+		arena: mem.Arena;
+		mem.init_arena_from_context(^arena, mem.megabytes(16)); // Uses default allocator
+		defer mem.free_arena(^arena);
 
 		push_allocator mem.arena_allocator(^arena) {
-			x := new(int)
-			x^ = 1337
+			x := new(int);
+			x^ = 1337;
 
-			fmt.println(x^)
+			fmt.println(x^);
 		}
 
 		/*
@@ -48,14 +48,14 @@ main :: proc() {
 
 		// You can also "push" a context
 
-		c := current_context() // Create copy of the allocator
-		c.allocator = mem.arena_allocator(^arena)
+		c := context; // Create copy of the allocator
+		c.allocator = mem.arena_allocator(^arena);
 
 		push_context c {
-			x := new(int)
-			x^ = 365
+			x := new(int);
+			x^ = 365;
 
-			fmt.println(x^)
+			fmt.println(x^);
 		}
 	}
 

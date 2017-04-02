@@ -4263,8 +4263,10 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 					irValue *ptr   = ir_emit_conv(proc, ir_slice_elem(proc, s), t_u8_ptr);
 					irValue *count = ir_slice_count(proc, s);
+					irValue *capacity = ir_slice_capacity(proc, s);
 					count = ir_emit_arith(proc, Token_Mul, count, ir_const_int(proc->module->allocator, elem_size), t_int);
-					ir_fill_slice(proc, slice, ptr, count, count);
+					capacity = ir_emit_arith(proc, Token_Mul, capacity, ir_const_int(proc->module->allocator, elem_size), t_int);
+					ir_fill_slice(proc, slice, ptr, count, capacity);
 					return ir_emit_load(proc, slice);
 				} break;
 
@@ -4600,6 +4602,14 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			Type *type = type_of_expr(proc->module->info, expr);
 			irValue *v = ir_add_local_generated(proc, type);
 			ir_emit_store(proc, v, ir_emit_down_cast(proc, ir_build_expr(proc, ce->expr), type));
+			return ir_addr(v);
+		}
+		case Token_union_cast: {
+			ir_emit_comment(proc, str_lit("Cast - union_cast"));
+			// NOTE(bill): Needed for dereference of pointer conversion
+			Type *type = type_of_expr(proc->module->info, expr);
+			irValue *v = ir_add_local_generated(proc, type);
+			ir_emit_store(proc, v, ir_emit_union_cast(proc, ir_build_expr(proc, ce->expr), type, ast_node_token(expr).pos));
 			return ir_addr(v);
 		}
 		default:

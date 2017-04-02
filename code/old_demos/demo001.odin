@@ -136,7 +136,7 @@ bounds_checking :: proc() {
 
 	{
 		base: [10]int;
-		s := base[2:6];
+		s := base[2..6];
 		a, b := -1, 6;
 
 		#no_bounds_check {
@@ -164,7 +164,7 @@ type_introspection :: proc() {
 		info = type_info_of_val(x); // by value
 		// See: runtime.odin
 
-		match type i in info {
+		match i in info {
 		case Type_Info.Integer:
 			fmt.println("integer!");
 		case Type_Info.Float:
@@ -174,7 +174,7 @@ type_introspection :: proc() {
 		}
 
 		// Unsafe cast
-		integer_info := cast(^Type_Info.Integer)info;
+		integer_info := cast(^Type_Info.Integer)cast(rawptr)info;
 	}
 
 	{
@@ -263,12 +263,12 @@ crazy_introspection :: proc() {
 		}
 
 		fruit_ti := type_info(Fruit);
-		name := (cast(^Type_Info.Named)fruit_ti).name; // Unsafe casts
-		info := cast(^Type_Info.Enum)type_info_base(fruit_ti); // Unsafe casts
+		name := (union_cast(^Type_Info.Named)fruit_ti).name; // Unsafe casts
+		info, _ := union_cast(^Type_Info.Enum)type_info_base(fruit_ti); // Unsafe casts
 
-		fmt.printf("% :: enum % {\n", name, info.base);
-		for i := 0; i < info.values.count; i += 1 {
-			fmt.printf("\t%\t= %,\n", info.names[i], info.values[i]);
+		fmt.printf("%s :: enum %T {\n", name, info.base);
+		for i := 0; i < len(info.values); i++ {
+			fmt.printf("\t%s\t= %v,\n", info.names[i], info.values[i]);
 		}
 		fmt.printf("}\n");
 
