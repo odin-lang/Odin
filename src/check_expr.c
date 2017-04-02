@@ -3204,8 +3204,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 	#endif
 	case BuiltinProc_make: {
-		// make :: proc(Type, len: int) -> []Type
-		// make :: proc(Type, len, cap: int) -> []Type
+		// make :: proc(Type, len: int) -> Type
+		// make :: proc(Type, len, cap: int) -> Type
 		Operand op = {0};
 		check_expr_or_type(c, &op, ce->args.e[0]);
 		Type *type = op.type;
