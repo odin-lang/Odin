@@ -10,6 +10,8 @@ The Odin programming language is fast, concise, readable, pragmatic and open sou
 * metaprogramming
 * designed for good programmers
 
+Website: [https://odin.handmade.network/](https://odin.handmade.network/)
+
 ## Demonstrations:
 * First Talk & Demo
 	- [Talk](https://youtu.be/TMCkT-uASaE?t=338)
