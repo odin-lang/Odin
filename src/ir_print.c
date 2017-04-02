@@ -1396,16 +1396,12 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	if(is_main_proc)
 	for(int i=0;i<proc->module->min_dep_map.entries.count;i++) {
 		Entity *value = proc->module->min_dep_map.entries.e[i].value;
-		//printf("using: %.*s\n", LIT(proc->module->min_dep_map.entries.e[i].value->token.string));
 		if(value == NULL) continue;
 		if(str_eq(str_lit("args"), value->token.string)) {
 			uses_args = true;
 			break;
 		}
 	}
-
-	//bool uses_args = map_entity_get(&proc->module->min_dep_map, hash_pointer(entity_of_ident(proc->module->info, ast_ident(&fake_file, make_token_ident(str_lit("args")))))) == NULL;
-	//printf("uses_args: %d", (int)uses_args);
 
 	// TODO(zangent): THIS IS AN UGLY HACK
 	// I _SERIOUSLY_ need to change this system, because this is just disgraceful.

@@ -261,7 +261,7 @@ int main(int argc, char **argv) {
 	#if defined(GB_SYSTEM_WINDOWS)
 	// For more passes arguments: http://llvm.org/docs/Passes.html
 	exit_code = system_exec_command_line_app("llvm-opt", false,
-		"\"%.*sbin/opt\" \"%s\" -o \"%.*s.bc\" "
+		"\"%.*sbin/opt\" \"%s\" -o \"%.*s\".bc "
 		"-mem2reg "
 		"-memcpyopt "
 		"-die "
@@ -278,7 +278,7 @@ int main(int argc, char **argv) {
 	// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
 	//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
 	exit_code = system_exec_command_line_app("llvm-opt", false,
-		"/usr/local/opt/llvm/bin/opt \"%s\" -o \"%.*s\".bc "
+		"opt \"%s\" -o \"%.*s\".bc "
 		"-mem2reg "
 		"-memcpyopt "
 		"-die "
@@ -365,7 +365,7 @@ int main(int argc, char **argv) {
 	timings_start_section(&timings, str_lit("llvm-llc"));
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 	exit_code = system_exec_command_line_app("llc", false,
-		"/usr/local/opt/llvm/bin/llc \"%.*s.bc\" -filetype=obj -O%d "
+		"llc \"%.*s.bc\" -filetype=obj -O%d "
 		"%.*s "
 		// "-debug-pass=Arguments "
 		"",
@@ -424,7 +424,7 @@ int main(int argc, char **argv) {
 	}
 
 	#if defined(GB_SYSTEM_OSX)
-		linker = "/usr/bin/ld";
+		linker = "ld";
 	#else
 		// TODO(zangent): Figure out how to make ld work on Linux.
 		//   It probably has to do with including the entire CRT, but
