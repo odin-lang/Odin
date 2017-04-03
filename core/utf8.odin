@@ -94,7 +94,7 @@ encode_rune :: proc(r: rune) -> ([4]byte, int) {
 
 decode_rune :: proc(s: string) -> (rune, int) #inline { return decode_rune(cast([]byte)s); }
 decode_rune :: proc(s: []byte) -> (rune, int) {
-	n := s.count;
+	n := len(s);
 	if n < 1 {
 		return RUNE_ERROR, 0;
 	}
@@ -138,7 +138,7 @@ decode_last_rune :: proc(s: []byte) -> (rune, int) {
 	size: int;
 	start, end, limit: int;
 
-	end = s.count;
+	end = len(s);
 	if end == 0 {
 		return RUNE_ERROR, 0;
 	}
@@ -183,7 +183,7 @@ valid_rune :: proc(r: rune) -> bool {
 }
 
 valid_string :: proc(s: string) -> bool {
-	n := s.count;
+	n := len(s);
 	for i := 0; i < n; {
 		si := s[i];
 		if si < RUNE_SELF { // ascii
@@ -220,7 +220,7 @@ rune_start :: proc(b: byte) -> bool #inline { return b&0xc0 != 0x80; }
 rune_count :: proc(s: string) -> int #inline { return rune_count(cast([]byte)s); }
 rune_count :: proc(s: []byte) -> int {
 	count := 0;
-	n := s.count;
+	n := len(s);
 
 	for i := 0; i < n; {
 		defer count++;

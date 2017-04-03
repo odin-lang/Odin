@@ -35,10 +35,10 @@ string_data :: proc(s: string) -> ^u8 #inline { return ^s[0]; }
 _libgl := win32.LoadLibraryA(string_data("opengl32.dll\x00"));
 
 GetProcAddress :: proc(name: string) -> proc() #cc_c {
-	assert(name[name.count-1] == 0);
-	res := wgl.GetProcAddress(name.data);
+	assert(name[len(name)-1] == 0);
+	res := wgl.GetProcAddress(^name[0]);
 	if res == nil {
-		res = win32.GetProcAddress(_libgl, name.data);
+		res = win32.GetProcAddress(_libgl, ^name[0]);
 	}
 	return res;
 }

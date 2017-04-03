@@ -250,7 +250,9 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 				return;
 			}
 			target_type = default_type(operand->type);
-			GB_ASSERT(is_type_typed(target_type));
+			if (!is_type_any(type)) {
+				GB_ASSERT_MSG(is_type_typed(target_type), "%s", type_to_string(type));
+			}
 			add_type_info_type(c, type);
 			add_type_info_type(c, target_type);
 		}
@@ -1963,7 +1965,9 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 		switch (op) {
 		case Token_CmpEq:
 		case Token_NotEq:
-			defined = is_type_comparable(x->type);
+			defined = is_type_comparable(x->type) ||
+			          (is_operand_nil(*x) && type_has_nil(y->type)) ||
+			          (is_operand_nil(*y) && type_has_nil(x->type));
 			break;
 		case Token_Lt:
 		case Token_Gt:
@@ -1973,6 +1977,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 		} break;
 		}
 
+	#if 0
 		// CLEANUP(bill) NOTE(bill): there is an auto assignment to `any` which needs to be checked
 		if (is_type_any(x->type) && !is_type_any(y->type)) {
 			err_type = x->type;
@@ -1981,8 +1986,14 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 			err_type = y->type;
 			defined = false;
 		}
+	#endif
 
 		if (!defined) {
+			if (x->type == err_type && is_operand_nil(*x)) {
+				err_type = y->type;
+			}
+			gb_printf_err("%d %d\n", is_operand_nil(*x), type_has_nil(y->type));
+			gb_printf_err("%d %d\n", is_operand_nil(*y), type_has_nil(x->type));
 			gbString type_string = type_to_string(err_type);
 			err_str = gb_string_make(c->tmp_allocator,
 			                         gb_bprintf("operator `%.*s` not defined for type `%s`", LIT(token_strings[op]), type_string));
@@ -2659,7 +2670,9 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 				break;
 
 			case Basic_UntypedNil:
-				if (!type_has_nil(target_type)) {
+				if (is_type_any(target_type)) {
+					target_type = t_untyped_nil;
+				} else if (!type_has_nil(target_type)) {
 					operand->mode = Addressing_Invalid;
 					convert_untyped_error(c, operand, target_type);
 					return;
@@ -3070,11 +3083,11 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 	}
 
-	Operand prev_operand = *operand;
 
 	switch (id) {
 	case BuiltinProc_new:
-	case BuiltinProc_new_slice:
+	// case BuiltinProc_new_slice:
+	case BuiltinProc_make:
 	case BuiltinProc_size_of:
 	case BuiltinProc_align_of:
 	case BuiltinProc_offset_of:
@@ -3090,6 +3103,53 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		GB_PANIC("Implement builtin procedure: %.*s", LIT(builtin_procs[id].name));
 		break;
 
+	case BuiltinProc_len:
+	case BuiltinProc_cap: {
+		// len :: proc(Type) -> int
+		// cap :: proc(Type) -> int
+		Type *op_type = type_deref(operand->type);
+		Type *type = t_int;
+		AddressingMode mode = Addressing_Invalid;
+		ExactValue value = {0};
+		if (is_type_string(op_type) && id == BuiltinProc_len) {
+			if (operand->mode == Addressing_Constant) {
+				mode = Addressing_Constant;
+				String str = operand->value.value_string;
+				value = exact_value_integer(str.len);
+				type = t_untyped_integer;
+			} else {
+				mode = Addressing_Value;
+			}
+		} else if (is_type_array(op_type)) {
+			Type *at = core_type(op_type);
+			mode = Addressing_Constant;
+			value = exact_value_integer(at->Array.count);
+			type = t_untyped_integer;
+		} else if (is_type_vector(op_type) && id == BuiltinProc_len) {
+			Type *at = core_type(op_type);
+			mode = Addressing_Constant;
+			value = exact_value_integer(at->Vector.count);
+			type = t_untyped_integer;
+		} else if (is_type_slice(op_type)) {
+			mode = Addressing_Value;
+		} else if (is_type_dynamic_array(op_type)) {
+			mode = Addressing_Value;
+		} else if (is_type_map(op_type)) {
+			mode = Addressing_Value;
+		}
+
+		if (mode == Addressing_Invalid) {
+			String name = builtin_procs[id].name;
+			gbString t = type_to_string(operand->type);
+			error_node(call, "`%.*s` is not supported for `%s`", LIT(name), t);
+			return false;
+		}
+
+		operand->mode  = mode;
+		operand->value = value;
+		operand->type  = type;
+	} break;
+
 	case BuiltinProc_new: {
 		// new :: proc(Type) -> ^Type
 		Operand op = {0};
@@ -3102,6 +3162,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_Value;
 		operand->type = make_type_pointer(c->allocator, type);
 	} break;
+	#if 0
 	case BuiltinProc_new_slice: {
 		// new_slice :: proc(Type, len: int) -> []Type
 		// new_slice :: proc(Type, len, cap: int) -> []Type
@@ -3138,6 +3199,62 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->mode = Addressing_Value;
 		operand->type = make_type_slice(c->allocator, type);
+	} break;
+	#endif
+	case BuiltinProc_make: {
+		// make :: proc(Type, len: int) -> Type
+		// make :: proc(Type, len, cap: int) -> Type
+		Operand op = {0};
+		check_expr_or_type(c, &op, ce->args.e[0]);
+		Type *type = op.type;
+		if ((op.mode != Addressing_Type && type == NULL) || type == t_invalid) {
+			error_node(ce->args.e[0], "Expected a type for `make`");
+			return false;
+		}
+
+		isize min_args = 0;
+		isize max_args = 1;
+		if (is_type_slice(type)) {
+			min_args = 2;
+			max_args = 3;
+		} else if (is_type_dynamic_map(type)) {
+			min_args = 1;
+			max_args = 2;
+		} else if (is_type_dynamic_array(type)) {
+			min_args = 1;
+			max_args = 3;
+		} else {
+			gbString str = type_to_string(type);
+			error_node(call, "Cannot `make` %s; type must be a slice, map, or dynamic array", str);
+			gb_string_free(str);
+			return false;
+		}
+
+		isize arg_count = ce->args.count;
+		if (arg_count < min_args || max_args < arg_count) {
+			error_node(ce->args.e[0], "`make` expects %td or %d argument, found %td", min_args, max_args, arg_count);
+			return false;
+		}
+
+		// If any are constant
+		i64 sizes[4] = {0};
+		isize size_count = 0;
+		for (isize i = 1; i < arg_count; i++) {
+			i64 val = 0;
+			bool ok = check_index_value(c, ce->args.e[i], -1, &val);
+			if (ok && val >= 0) {
+				GB_ASSERT(size_count < gb_count_of(sizes));
+				sizes[size_count++] = val;
+			}
+		}
+
+		if (size_count == 2 && sizes[0] > sizes[1]) {
+			error_node(ce->args.e[1], "`make` count and capacity are swapped");
+			// No need quit
+		}
+
+		operand->mode = Addressing_Value;
+		operand->type = type;
 	} break;
 
 	case BuiltinProc_free: {
@@ -3216,6 +3333,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	case BuiltinProc_append: {
 		// append :: proc([dynamic]Type, item: ..Type)
 		// append :: proc([]Type, item: ..Type)
+		Operand prev_operand = *operand;
+
 		Type *type = operand->type;
 		bool is_pointer = is_type_pointer(type);
 		type = base_type(type_deref(type));

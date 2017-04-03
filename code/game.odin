@@ -1,4 +1,5 @@
-#import "win32.odin" when ODIN_OS == "windows";
+#import win32 "sys/windows.odin" when ODIN_OS == "windows";
+#import wgl "sys/wgl.odin" when ODIN_OS == "windows";
 #import "fmt.odin";
 #import "math.odin";
 #import "os.odin";
@@ -12,11 +13,11 @@ time_now :: proc() -> f64 {
 
 	counter: i64;
 	win32.QueryPerformanceCounter(^counter);
-	result := counter as f64 / win32_perf_count_freq as f64;
+	result := cast(f64)counter / cast(f64)win32_perf_count_freq;
 	return result;
 }
 win32_print_last_error :: proc() {
-	err_code := win32.GetLastError() as int;
+	err_code := cast(int)win32.GetLastError();
 	if err_code != 0 {
 		fmt.println("GetLastError: %", err_code);
 	}
@@ -24,42 +25,42 @@ win32_print_last_error :: proc() {
 
 // Yuk!
 to_c_string :: proc(s: string) -> []u8 {
-	c_str := new_slice(u8, s.count+1);
-	copy(c_str, s as []byte);
-	c_str[s.count] = 0;
+	c_str := make([]u8, len(s)+1);
+	copy(c_str, cast([]byte)s);
+	c_str[len(s)] = 0;
 	return c_str;
 }
 
 
 Window :: struct {
-	width, height:      int;
-	wc:                 win32.WNDCLASSEXA;
-	dc:                 win32.HDC;
-	hwnd:               win32.HWND;
-	opengl_context, rc: win32.HGLRC;
-	c_title:            []u8;
+	width, height:      int,
+	wc:                 win32.WndClassExA,
+	dc:                 win32.Hdc,
+	hwnd:               win32.Hwnd,
+	opengl_context, rc: wgl.Hglrc,
+	c_title:            []u8,
 }
 
-make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC) -> (Window, bool) {
+make_window :: proc(title: string, msg, height: int, window_proc: win32.Wnd_Proc) -> (Window, bool) {
 	using win32;
 
 	w: Window;
 	w.width, w.height = msg, height;
 
 	class_name := "Win32-Odin-Window\x00";
-	c_class_name := class_name.data;
-	if title[title.count-1] != 0 {
+	c_class_name := ^class_name[0];
+	if title[len(title)-1] != 0 {
 		w.c_title = to_c_string(title);
 	} else {
-		w.c_title = title as []u8;
+		w.c_title = cast([]u8)title;
 	}
 
 	instance := GetModuleHandleA(nil);
 
-	w.wc = WNDCLASSEXA{
-		size       = size_of(WNDCLASSEXA) as u32,
+	w.wc = WndClassExA{
+		size       = size_of(WndClassExA),
 		style      = CS_VREDRAW | CS_HREDRAW,
-		instance   = instance as HINSTANCE,
+		instance   = cast(Hinstance)instance,
 		class_name = c_class_name,
 		wnd_proc   = window_proc,
 	};
@@ -70,10 +71,10 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 	}
 
 	w.hwnd = CreateWindowExA(0,
-	                         c_class_name, w.c_title.data,
+	                         c_class_name, ^w.c_title[0],
 	                         WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
 	                         CW_USEDEFAULT, CW_USEDEFAULT,
-	                         w.width as i32, w.height as i32,
+	                         cast(i32)w.width, cast(i32)w.height,
 	                         nil, nil, instance, nil);
 
 	if w.hwnd == nil {
@@ -85,7 +86,7 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 
 	{
 		pfd := PIXELFORMATDESCRIPTOR{
-			size         = size_of(PIXELFORMATDESCRIPTOR) as u32,
+			size         = size_of(PIXELFORMATDESCRIPTOR),
 			version      = 1,
 			flags        = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
 			pixel_type   = PFD_TYPE_RGBA,
@@ -97,19 +98,20 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 		};
 
 		SetPixelFormat(w.dc, ChoosePixelFormat(w.dc, ^pfd), nil);
-		w.opengl_context = wglCreateContext(w.dc);
-		wglMakeCurrent(w.dc, w.opengl_context);
+		w.opengl_context = wgl.CreateContext(w.dc);
+		wgl.MakeCurrent(w.dc, w.opengl_context);
 
 		attribs := [8]i32{
-			WGL_CONTEXT_MAJOR_VERSION_ARB, 2,
-			WGL_CONTEXT_MINOR_VERSION_ARB, 1,
-			WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+			wgl.CONTEXT_MAJOR_VERSION_ARB, 2,
+			wgl.CONTEXT_MINOR_VERSION_ARB, 1,
+			wgl.CONTEXT_PROFILE_MASK_ARB, wgl.CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
 			0, // NOTE(bill): tells the proc that this is the end of attribs
 		};
 
-		wglCreateContextAttribsARB := wglGetProcAddress(("wglCreateContextAttribsARB\x00" as string).data) as wglCreateContextAttribsARBType;
-		w.rc = wglCreateContextAttribsARB(w.dc, 0, ^attribs[0]);
-		wglMakeCurrent(w.dc, w.rc);
+		wgl_str := "wglCreateContextAttribsARB\x00";
+		wglCreateContextAttribsARB := cast(wgl.Create_Context_Attribs_ARB_Type)wgl.GetProcAddress(^wgl_str[0]);
+		w.rc = wglCreateContextAttribsARB(w.dc, nil, ^attribs[0]);
+		wgl.MakeCurrent(w.dc, w.rc);
 		SwapBuffers(w.dc);
 	}
 
@@ -117,7 +119,7 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.WNDPROC)
 }
 
 destroy_window :: proc(w: ^Window) {
-	free(w.c_title.data);
+	free(w.c_title);
 }
 
 display_window :: proc(w: ^Window) {
@@ -129,7 +131,7 @@ run :: proc() {
 	using win32;
 	using math;
 
-	win32_proc :: proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT #no_inline {
+	win32_proc :: proc(hwnd: win32.Hwnd, msg: u32, wparam: win32.Wparam, lparam: win32.Lparam) -> win32.Lresult #no_inline {
 		if msg == WM_DESTROY || msg == WM_CLOSE || msg == WM_QUIT {
 			os.exit(0);
 			return 0;
@@ -137,7 +139,7 @@ run :: proc() {
 		return DefWindowProcA(hwnd, msg, wparam, lparam);
 	}
 
-	window, window_success := make_window("Odin Language Demo", 854, 480, win32_proc);
+	window, window_success := make_window("Odin Language Demo", 854, 480, cast(Wnd_Proc)win32_proc);
 	if !window_success {
 		return;
 	}
@@ -153,10 +155,10 @@ run :: proc() {
 
 	for running {
 		curr_time := time_now();
-		dt := (curr_time - prev_time) as f32;
+		dt := cast(f32)(curr_time - prev_time);
 		prev_time = curr_time;
 
-		msg: MSG;
+		msg: Msg;
 		for PeekMessageA(^msg, nil, 0, 0, PM_REMOVE) > 0 {
 			if msg.message == WM_QUIT {
 				running = false;
@@ -178,7 +180,7 @@ run :: proc() {
 			if is_key_down(Key_Code.UP)    { v[1] += 1; }
 			if is_key_down(Key_Code.DOWN)  { v[1] -= 1; }
 
-			v = vec2_norm0(v);
+			v = norm(v);
 
 			pos += v * Vec2{SPEED * dt};
 		}
@@ -188,8 +190,8 @@ run :: proc() {
 		gl.Clear(gl.COLOR_BUFFER_BIT);
 
 		gl.LoadIdentity();
-		gl.Ortho(0, window.width as f64,
-		         0, window.height as f64, 0, 1);
+		gl.Ortho(0, cast(f64)window.width,
+		         0, cast(f64)window.height, 0, 1);
 
 		draw_rect :: proc(x, y, w, h: f32) {
 			gl.Begin(gl.TRIANGLES);
@@ -207,9 +209,14 @@ run :: proc() {
 		draw_rect(pos.x, pos.y, 50, 50);
 
 		display_window(^window);
-		ms_to_sleep := (16 - 1000*dt) as i32;
+		ms_to_sleep := cast(i32)(16 - 1000*dt);
 		if ms_to_sleep > 0 {
 			win32.Sleep(ms_to_sleep);
 		}
 	}
+}
+
+
+main :: proc() {
+	run();
 }

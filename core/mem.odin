@@ -19,7 +19,7 @@ copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr {
 	return __mem_copy_non_overlapping(dst, src, len);
 }
 compare :: proc(a, b: []byte) -> int {
-	return __mem_compare(a.data, b.data, min(a.count, b.count));
+	return __mem_compare(^a[0], ^b[0], min(len(a), len(b)));
 }
 
 
@@ -102,7 +102,7 @@ init_arena_from_memory :: proc(using a: ^Arena, data: []byte) {
 
 init_arena_from_context :: proc(using a: ^Arena, size: int) {
 	backing = context.allocator;
-	memory = new_slice(byte, size);
+	memory = make([]byte, size);
 	temp_count = 0;
 }
 
@@ -133,7 +133,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	case ALLOC:
 		total_size := size + alignment;
 
-		if arena.offset + total_size > arena.memory.count {
+		if arena.offset + total_size > len(arena.memory) {
 			fmt.fprintln(os.stderr, "Arena out of memory");
 			return nil;
 		}
@@ -161,15 +161,15 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 begin_arena_temp_memory :: proc(a: ^Arena) -> Arena_Temp_Memory {
 	tmp: Arena_Temp_Memory;
 	tmp.arena = a;
-	tmp.original_count = a.memory.count;
+	tmp.original_count = len(a.memory);
 	a.temp_count++;
 	return tmp;
 }
 
 end_arena_temp_memory :: proc(using tmp: Arena_Temp_Memory) {
-	assert(arena.memory.count >= original_count);
+	assert(len(arena.memory) >= original_count);
 	assert(arena.temp_count > 0);
-	arena.memory.count = original_count;
+	arena.memory = arena.memory[..original_count];
 	arena.temp_count--;
 }
 

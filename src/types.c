@@ -834,9 +834,10 @@ bool type_has_nil(Type *t) {
 		return false;
 	} break;
 	case Type_Slice:
-	case Type_DynamicArray:
 	case Type_Proc:
 	case Type_Pointer:
+	case Type_DynamicArray:
+	case Type_Map:
 		return true;
 	}
 	return false;
@@ -1231,6 +1232,9 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 	if (type->kind == Type_Basic) {
 		switch (type->Basic.kind) {
 		case Basic_any: {
+		#if 1
+			// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
+			// `Raw_Any` type?
 			String type_info_str = str_lit("type_info");
 			String data_str = str_lit("data");
 			if (entity__any_type_info == NULL) {
@@ -1249,8 +1253,10 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				sel.entity = entity__any_data;
 				return sel;
 			}
+		#endif
 		} break;
 		case Basic_string: {
+		#if 0
 			String data_str = str_lit("data");
 			String count_str = str_lit("count");
 			if (entity__string_data == NULL) {
@@ -1270,11 +1276,13 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				sel.entity = entity__string_count;
 				return sel;
 			}
+		#endif
 		} break;
 		}
 
 		return sel;
 	} else if (type->kind == Type_Array) {
+	#if 0
 		String count_str = str_lit("count");
 		// NOTE(bill): Underlying memory address cannot be changed
 		if (str_eq(field_name, count_str)) {
@@ -1282,7 +1290,9 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, exact_value_integer(type->Array.count));
 			return sel;
 		}
+	#endif
 	} else if (type->kind == Type_Vector) {
+	#if 0
 		String count_str = str_lit("count");
 		// NOTE(bill): Vectors are not addressable
 		if (str_eq(field_name, count_str)) {
@@ -1290,7 +1300,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, exact_value_integer(type->Vector.count));
 			return sel;
 		}
-
+	#endif
 		if (type->Vector.count <= 4 && !is_type_boolean(type->Vector.elem)) {
 			// HACK(bill): Memory leak
 			switch (type->Vector.count) {
@@ -1314,6 +1324,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		}
 
 	} else if (type->kind == Type_Slice) {
+	#if 0
 		String data_str     = str_lit("data");
 		String count_str    = str_lit("count");
 		String capacity_str = str_lit("capacity");
@@ -1340,8 +1351,9 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			sel.entity = entity__slice_capacity;
 			return sel;
 		}
-
+	#endif
 	} else if (type->kind == Type_DynamicArray) {
+	#if 0
 		String data_str      = str_lit("data");
 		String count_str     = str_lit("count");
 		String capacity_str  = str_lit("capacity");
@@ -1374,7 +1386,9 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			sel.entity = entity__dynamic_array_allocator;
 			return sel;
 		}
+	#endif
 	} else if (type->kind == Type_Map) {
+	#if 0
 		String count_str     = str_lit("count");
 		String capacity_str  = str_lit("capacity");
 		String allocator_str = str_lit("allocator");
@@ -1404,6 +1418,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			sel.entity = entity__dynamic_map_allocator;
 			return sel;
 		}
+	#endif
 	}
 
 	if (is_type) {

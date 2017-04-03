@@ -1,10 +1,18 @@
+#import "atomic.odin";
+#import "decimal.odin";
 #import "fmt.odin";
-#import "os.odin";
+#import "hash.odin";
 #import "math.odin";
+#import "mem.odin";
+#import "opengl.odin";
+#import "os.odin";
+#import "strconv.odin";
+#import "strings.odin";
+#import "sync.odin";
+#import "types.odin";
+#import "utf8.odin";
+#import "utf16.odin";
 
 main :: proc() {
-	x := 1+2i+3j+4k;
-	y := conj(x);
-	z := x/y;
-	fmt.println(z, abs(z));
+
 }

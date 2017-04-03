@@ -10,6 +10,8 @@ The Odin programming language is fast, concise, readable, pragmatic and open sou
 * metaprogramming
 * designed for good programmers
 
+Website: [https://odin.handmade.network/](https://odin.handmade.network/)
+
 ## Demonstrations:
 * First Talk & Demo
 	- [Talk](https://youtu.be/TMCkT-uASaE?t=338)
@@ -19,6 +21,8 @@ The Odin programming language is fast, concise, readable, pragmatic and open sou
 * [Introspection, Modules, and Record Layout](https://www.youtube.com/watch?v=UFq8rhWhx4s)
 * [push_allocator & Minimal Dependency Building](https://www.youtube.com/watch?v=f_LGVOAMb78)
 * [when, for, & procedure overloading](https://www.youtube.com/watch?v=OzeOekzyZK8)
+* [when, for, & procedure overloading](https://www.youtube.com/watch?v=OzeOekzyZK8)
+* [Context Types, Unexported Entities, Labelled Branches](https://www.youtube.com/watch?v=CkHVwT1Qk-g)
 
 ## Requirements to build and run
 

@@ -42,12 +42,12 @@ syntax :: proc() {
 	};
 	Thing2 :: struct {x: f32, y: int, z: ^[]int};
 
-	// Slice interals are now just a `ptr+count`
-	slice: []int; compile_assert(size_of_val(slice) == 2*size_of(int));
+	// Slice interals are now just a `ptr+len+cap`
+	slice: []int; compile_assert(size_of_val(slice) == 3*size_of(int));
 
 	// Helper type - Help the reader understand what it is quicker
-	My_Int  :: type int;
-	My_Proc :: type proc(int) -> f32;
+	My_Int  :: #type int;
+	My_Proc :: #type proc(int) -> f32;
 
 
 	// All declarations with : are either variable or constant
@@ -59,6 +59,7 @@ syntax :: proc() {
 	c_proc     :: proc() { /* code here */ };
 
 
+/*
 	x += 1;
 	x -= 1;
 	// ++ and -- have been removed
@@ -67,7 +68,7 @@ syntax :: proc() {
 	// Question: Should they be added again?
 	// They were removed as they are redundant and statements, not expressions
 	// like in C/C++
-
+*/
 
 	// You can now build files as a `.dll`
 	// `odin build_dll demo.odin`
@@ -85,7 +86,7 @@ syntax :: proc() {
 
 Prefix_Type :: struct {x: int, y: f32, z: rawptr};
 
-thread_local my_tls: Prefix_Type;
+#thread_local my_tls: Prefix_Type;
 
 prefixes :: proc() {
 	using var: Prefix_Type;
@@ -98,7 +99,7 @@ prefixes :: proc() {
 
 	foo :: proc(using immutable pt: Prefix_Type, immutable int_ptr: ^int) {
 		// int_ptr = nil; // Not valid
-		int_ptr^ = 123; // Is valid
+		// int_ptr^ = 123; // Not valid
 	}
 
 
@@ -154,6 +155,7 @@ foreign_procedures :: proc() {
 }
 
 special_expressions :: proc() {
+/*
 	// Block expression
 	x := {
 		a: f32 = 123;
@@ -168,7 +170,7 @@ special_expressions :: proc() {
 		// TODO: Type cohesion is not yet finished
 		give 123;
 	}; // semicolon is required as it's an expression
-
+*/
 
 	// This is allows for inline blocks of code and will be a useful feature to have when
 	// macros will be implemented into the language
@@ -191,17 +193,17 @@ loops :: proc() {
 		break;
 	}
 
-	for i in 0..<123 { // 123 exclusive
+	for i in 0..123 { // 123 exclusive
 	}
 
-	for i in 0...122 { // 122 inclusive
+	for i in 0..123-1 { // 122 inclusive
 	}
 
-	for val, idx in 12..<16 {
+	for val, idx in 12..16 {
 		fmt.println(val, idx);
 	}
 
-	primes := [...]int{2, 3, 5, 7, 11, 13, 17, 19};
+	primes := [..]int{2, 3, 5, 7, 11, 13, 17, 19};
 
 	for p in primes {
 		fmt.println(p);
@@ -224,7 +226,7 @@ loops :: proc() {
 	when false {
 		for i, size := 0; i < name.count; i += size {
 			r: rune;
-			r, size = utf8.decode_rune(name[i:]);
+			r, size = utf8.decode_rune(name[i..]);
 			fmt.printf("%r\n", r);
 		}
 	}

@@ -2272,6 +2272,7 @@ AstNode *parse_value_decl(AstFile *f, AstNodeArray lhs) {
 }
 
 
+
 AstNode *parse_simple_stmt(AstFile *f, bool in_stmt_ok) {
 	AstNodeArray lhs = parse_lhs_expr_list(f);
 	Token token = f->curr_token;
@@ -3290,7 +3291,7 @@ AstNode *parse_stmt(AstFile *f) {
 			return ast_using_stmt(f, token, list);
 		}
 
-		AstNode *decl = parse_simple_stmt(f, false);
+		AstNode *decl = parse_value_decl(f, list);
 		expect_semicolon(f, decl);
 
 		if (decl->kind == AstNode_ValueDecl) {

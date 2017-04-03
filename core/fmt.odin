@@ -48,23 +48,23 @@ fprint :: proc(fd: os.Handle, args: ..any) -> int {
 	data: [_BUFFER_SIZE]byte;
 	buf := data[..0];
 	bprint(^buf, ..args);
-	os.write(fd, buf[..buf.count]);
-	return buf.count;
+	os.write(fd, buf[..len(buf)]);
+	return len(buf);
 }
 
 fprintln :: proc(fd: os.Handle, args: ..any) -> int {
 	data: [_BUFFER_SIZE]byte;
 	buf := data[..0];
 	bprintln(^buf, ..args);
-	os.write(fd, buf[..buf.count]);
-	return buf.count;
+	os.write(fd, buf[..len(buf)]);
+	return len(buf);
 }
 fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 	data: [_BUFFER_SIZE]byte;
 	buf := data[..0];
 	bprintf(^buf, fmt, ..args);
-	os.write(fd, buf[..buf.count]);
-	return buf.count;
+	os.write(fd, buf[..len(buf)]);
+	return len(buf);
 }
 
 
@@ -83,7 +83,7 @@ fprint_type :: proc(fd: os.Handle, info: ^Type_Info) {
 	data: [_BUFFER_SIZE]byte;
 	buf := data[..0];
 	write_type(^buf, info);
-	os.write(fd, buf[..buf.count]);
+	os.write(fd, buf[..len(buf)]);
 }
 
 write_type :: proc(buf: ^[]byte, ti: ^Type_Info) {
@@ -147,14 +147,14 @@ write_type :: proc(buf: ^[]byte, ti: ^Type_Info) {
 			write_type(buf, info.results);
 		}
 	case Tuple:
-		count := info.names.count;
+		count := len(info.names);
 		if count != 1 { write_string(buf, "("); }
 		for name, i in info.names {
 			if i > 0 { write_string(buf, ", "); }
 
 			type := info.types[i];
 
-			if name.count > 0 {
+			if len(name) > 0 {
 				write_string(buf, name);
 				write_string(buf, ": ");
 			}
@@ -233,12 +233,12 @@ write_type :: proc(buf: ^[]byte, ti: ^Type_Info) {
 			variant_type := type_info_base(info.variant_types[i]);
 			variant := union_cast(^Struct)variant_type;
 
-			vc := variant.names.count-cf.names.count;
+			vc := len(variant.names)-len(cf.names);
 			for j in 0..vc {
 				if j > 0 {
 					write_string(buf, ", ");
 				}
-				index := j + cf.names.count;
+				index := j + len(cf.names);
 				write_string(buf, variant.names[index]);
 				write_string(buf, ": ");
 				write_type(buf, variant.types[index]);
@@ -279,14 +279,14 @@ bprint :: proc(buf: ^[]byte, args: ..any) -> int {
 
 	prev_string := false;
 	for arg, i in args {
-		is_string := arg.data != nil && types.is_string(arg.type_info);
+		is_string := arg != nil && types.is_string(arg.type_info);
 		if i > 0 && !is_string && !prev_string {
 			write_byte(buf, ' ');
 		}
 		fmt_value(^fi, args[i], 'v');
 		prev_string = is_string;
 	}
-	return buf.count;
+	return len(buf);
 }
 
 bprintln :: proc(buf: ^[]byte, args: ..any) -> int {
@@ -300,7 +300,7 @@ bprintln :: proc(buf: ^[]byte, args: ..any) -> int {
 		fmt_value(^fi, args[i], 'v');
 	}
 	write_byte(buf, '\n');
-	return buf.count;
+	return len(buf);
 }
 
 sprint :: proc(buf: []byte, args: ..any) -> string {
@@ -328,7 +328,7 @@ parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: bool
 	ok := true;
 
 	i := 0;
-	for o in offset..s.count {
+	for o in offset..len(s) {
 		c := cast(rune)s[offset+i];
 		if !is_digit(c) {
 			break;
@@ -349,11 +349,11 @@ _arg_number :: proc(fi: ^Fmt_Info,
                     arg_count: int,
                     ) -> (index: int, offset: int, ok: bool) {
 	parse_arg_number :: proc(format: string) -> (int, int, bool) {
-		if format.count < 3 {
+		if len(format) < 3 {
 			return 0, 1, false;
 		}
 
-		for i in 1..format.count {
+		for i in 1..len(format) {
 			if format[i] == ']' {
 				width, new_index, ok := parse_int(format, 1);
 				if !ok || new_index != i {
@@ -367,7 +367,7 @@ _arg_number :: proc(fi: ^Fmt_Info,
 	}
 
 
-	if format.count <= offset || format[offset] != '[' {
+	if len(format) <= offset || format[offset] != '[' {
 		return arg_index, offset, false;
 	}
 	fi.reordered = true;
@@ -383,7 +383,7 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 	num := 0;
 	new_arg_index := arg_index;
 	ok := true;
-	if arg_index < args.count {
+	if arg_index < len(args) {
 		arg := args[arg_index];
 		arg.type_info = type_info_base(arg.type_info);
 		match i in arg {
@@ -439,7 +439,7 @@ fmt_write_padding :: proc(fi: ^Fmt_Info, width: int) {
 		pad_byte = '0';
 	}
 
-	count := min(width, fi.buf.capacity-fi.buf.count);
+	count := min(width, cap(fi.buf)-len(fi.buf));
 	for _ in 0..count {
 		append(fi.buf, pad_byte);
 	}
@@ -585,7 +585,7 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
 		}
 		buf: [128]byte;
 		str := strconv.append_float(buf[1..1], v, 'f', prec, bit_size);
-		str = cast(string)buf[..str.count+1];
+		str = cast(string)buf[..len(str)+1];
 		if str[1] == '+' || str[1] == '-' {
 			str = str[1..];
 		} else {
@@ -602,9 +602,9 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
 		}
 
 		if fi.plus || str[0] != '+' {
-			if fi.zero && fi.width_set && fi.width > str.count {
+			if fi.zero && fi.width_set && fi.width > len(str) {
 				write_byte(fi.buf, str[0]);
-				fmt_write_padding(fi, fi.width - str.count);
+				fmt_write_padding(fi, fi.width - len(str));
 				write_string(fi.buf, str[1..]);
 			} else {
 				_pad(fi, str);
@@ -685,7 +685,7 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 						break;
 					}
 				}
-			} else if e.values.count == 0 {
+			} else if len(e.values) == 0 {
 				write_string(fi.buf, "");
 				ok = true;
 			} else {
@@ -780,7 +780,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
 		array := cast(^Raw_Dynamic_Array)v.data;
-		for i in 0..array.count {
+		for i in 0..array.len {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
@@ -802,7 +802,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 		entry_type := union_cast(^Struct)ed.elem;
 		entry_size := ed.elem_size;
-		for i in 0..entries.count {
+		for i in 0..entries.len {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
@@ -831,11 +831,11 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
 		slice := cast(^[]byte)v.data;
-		for i in 0..slice.count {
+		for i in 0..len(slice) {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
-			data := slice.data + i*info.elem_size;
+			data := ^slice[0] + i*info.elem_size;
 			fmt_arg(fi, any{info.elem, cast(rawptr)data}, 'v');
 		}
 
@@ -941,7 +941,7 @@ fmt_quaternion :: proc(fi: ^Fmt_Info, c: quaternion256, bits: int, verb: rune) {
 }
 
 fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
-	if arg.data == nil || arg.type_info == nil {
+	if arg == nil {
 		write_string(fi.buf, "<nil>");
 		return;
 	}
@@ -987,7 +987,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 
 bprintf :: proc(b: ^[]byte, fmt: string, args: ..any) -> int {
 	fi := Fmt_Info{};
-	end := fmt.count;
+	end := len(fmt);
 	arg_index := 0;
 	was_prev_index := false;
 	for i := 0; i < end;  {
@@ -1026,7 +1026,7 @@ bprintf :: proc(b: ^[]byte, fmt: string, args: ..any) -> int {
 			}
 		}
 
-		arg_index, i, was_prev_index = _arg_number(^fi, arg_index, fmt, i, args.count);
+		arg_index, i, was_prev_index = _arg_number(^fi, arg_index, fmt, i, len(args));
 
 		// Width
 		if i < end && fmt[i] == '*' {
@@ -1056,7 +1056,7 @@ bprintf :: proc(b: ^[]byte, fmt: string, args: ..any) -> int {
 				fi.good_arg_index = false;
 			}
 			if i < end && fmt[i] == '*' {
-				arg_index, i, was_prev_index = _arg_number(^fi, arg_index, fmt, i, args.count);
+				arg_index, i, was_prev_index = _arg_number(^fi, arg_index, fmt, i, len(args));
 				i++;
 				fi.prec, arg_index, fi.prec_set = int_from_arg(args, arg_index);
 				if fi.prec < 0 {
@@ -1077,7 +1077,7 @@ bprintf :: proc(b: ^[]byte, fmt: string, args: ..any) -> int {
 		}
 
 		if !was_prev_index {
-			arg_index, i, was_prev_index = _arg_number(^fi, arg_index, fmt, i, args.count);
+			arg_index, i, was_prev_index = _arg_number(^fi, arg_index, fmt, i, len(args));
 		}
 
 		if i >= end {
@@ -1092,7 +1092,7 @@ bprintf :: proc(b: ^[]byte, fmt: string, args: ..any) -> int {
 			write_byte(b, '%');
 		} else if !fi.good_arg_index {
 			write_string(b, "%!(BAD ARGUMENT NUMBER)");
-		} else if arg_index >= args.count {
+		} else if arg_index >= len(args) {
 			write_string(b, "%!(MISSING ARGUMENT)");
 		} else {
 			fmt_arg(^fi, args[arg_index], verb);
@@ -1100,13 +1100,13 @@ bprintf :: proc(b: ^[]byte, fmt: string, args: ..any) -> int {
 		}
 	}
 
-	if !fi.reordered && arg_index < args.count {
+	if !fi.reordered && arg_index < len(args) {
 		write_string(b, "%!(EXTRA ");
 		for arg, index in args[arg_index..] {
 			if index > 0 {
 				write_string(b, ", ");
 			}
-			if arg.data == nil || arg.type_info == nil {
+			if arg == nil {
 				write_string(b, "<nil>");
 			} else {
 				fmt_arg(^fi, args[index], 'v');
@@ -1115,5 +1115,5 @@ bprintf :: proc(b: ^[]byte, fmt: string, args: ..any) -> int {
 		write_string(b, ")");
 	}
 
-	return b.count;
+	return len(b);
 }

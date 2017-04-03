@@ -131,50 +131,33 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, prec: int, fmt: byte) -> []byte {
 	match fmt {
 	case 'f', 'F':
-		add_bytes :: proc(dst: ^[]byte, w: ^int, bytes: ..byte) {
-			for b in bytes {
-				if dst.capacity <= w^ {
-					break;
-				}
-				dst.count++;
-				dst[w^] = b;
-				w^++;
-			}
-		}
-
-		dst := buf[..];
-		w := 0;
-		if neg {
-			add_bytes(^dst, ^w, '-');
-		} else {
-			add_bytes(^dst, ^w, '+');
-		}
+		append(buf, neg ? '-' : '+');
 
 		// integer, padded with zeros when needed
 		if digs.decimal_point > 0 {
 			m := min(digs.count, digs.decimal_point);
-			add_bytes(^dst, ^w, ..digs.digits[..m]);
+			append(buf, ..digs.digits[..m]);
 			for ; m < digs.decimal_point; m++ {
-				add_bytes(^dst, ^w, '0');
+				append(buf, '0');
 			}
 		} else {
-			add_bytes(^dst, ^w, '0');
+			append(buf, '0');
 		}
 
 
 		// fractional part
 		if prec > 0 {
-			add_bytes(^dst, ^w, '.');
+			append(buf, '.');
 			for i in 0..prec {
 				c: byte = '0';
 				if j := digs.decimal_point + i; 0 <= j && j < digs.count {
 					c = digs.digits[j];
 				}
-				add_bytes(^dst, ^w, c);
+				append(buf, c);
 			}
 		}
 
-		return buf[..w];
+		return buf;
 
 	case 'e', 'E':
 		panic("strconv: e/E float printing is not yet supported");
@@ -308,7 +291,7 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 	}
 
 	a: [65]byte;
-	i := a.count;
+	i := len(a);
 
 	neg: bool;
 	u, neg = is_integer_negative(u, is_signed, bit_size);

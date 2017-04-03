@@ -49,11 +49,11 @@ ERROR_FILE_IS_PIPE: Errno : 1<<29 + 0;
 
 
 // "Argv" arguments converted to Odin strings
-args := _alloc_command_line_arguments();
+immutable args := _alloc_command_line_arguments();
 
 
 open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
-	if path.count == 0 {
+	if len(path) == 0 {
 		return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
 	}
 
@@ -110,7 +110,7 @@ close :: proc(fd: Handle) {
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	bytes_written: i32;
-	e := win32.WriteFile(cast(win32.Handle)fd, data.data, cast(i32)data.count, ^bytes_written, nil);
+	e := win32.WriteFile(cast(win32.Handle)fd, ^data[0], cast(i32)len(data), ^bytes_written, nil);
 	if e == win32.FALSE {
 		err := win32.GetLastError();
 		return 0, cast(Errno)err;
@@ -120,7 +120,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	bytes_read: i32;
-	e := win32.ReadFile(cast(win32.Handle)fd, data.data, cast(u32)data.count, ^bytes_read, nil);
+	e := win32.ReadFile(cast(win32.Handle)fd, ^data[0], cast(u32)len(data), ^bytes_read, nil);
 	if e == win32.FALSE {
 		err := win32.GetLastError();
 		return 0, cast(Errno)err;
@@ -180,7 +180,7 @@ last_write_time_by_name :: proc(name: string) -> File_Time {
 	data: win32.File_Attribute_Data;
 	buf: [1024]byte;
 
-	assert(buf.count > name.count);
+	assert(len(buf) > len(name));
 
 	copy(buf[..], cast([]byte)name);
 
@@ -213,8 +213,8 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 		return nil, false;
 	}
 
-	data := new_slice(u8, length);
-	if data.data == nil {
+	data := make([]byte, length);
+	if ^data[0] == nil {
 		return nil, false;
 	}
 
@@ -286,9 +286,8 @@ _alloc_command_line_arguments :: proc() -> []string {
 			wstr_len++;
 		}
 		len := 2*wstr_len-1;
-		buf := new_slice(byte, len+1);
+		buf := make([]byte, len+1);
 		str := slice_ptr(wstr, wstr_len+1);
-
 
 		i, j := 0, 0;
 		for str[j] != 0 {
@@ -334,7 +333,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 
 	arg_count: i32;
 	arg_list_ptr := win32.CommandLineToArgvW(win32.GetCommandLineW(), ^arg_count);
-	arg_list := new_slice(string, arg_count);
+	arg_list := make([]string, arg_count);
 	for _, i in arg_list {
 		arg_list[i] = alloc_ucs2_to_utf8((arg_list_ptr+i)^);
 	}
