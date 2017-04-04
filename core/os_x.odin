@@ -87,7 +87,7 @@ close :: proc(fd: Handle) {
 write :: proc(fd: Handle, data: []byte) -> (AddressSize, Errno) {
 	assert(fd != -1);
 
-	bytes_written := unix_write(fd, data.data, data.count);
+	bytes_written := unix_write(fd, ^data[0], len(data));
 	if(bytes_written == -1) {
 		return 0, 1;
 	}
@@ -97,7 +97,7 @@ write :: proc(fd: Handle, data: []byte) -> (AddressSize, Errno) {
 read :: proc(fd: Handle, data: []byte) -> (AddressSize, Errno) {
 	assert(fd != -1);
 
-	bytes_read := unix_read(fd, data.data, data.count);
+	bytes_read := unix_read(fd, ^data[0], len(data));
 	if(bytes_read == -1) {
 		return 0, 1;
 	}
@@ -151,8 +151,8 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 
 	// We have a file size!
 
-	data := new_slice(u8, size+1);
-	if data.data == nil {
+	data := make([]u8, size+1);
+	if ^data[0] == nil {
 		fmt.println("Failed to allocate file buffer.");
 		return nil, false;
 	}
