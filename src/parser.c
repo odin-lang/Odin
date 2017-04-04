@@ -2056,7 +2056,6 @@ AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 
 	case Token_cast:
 	case Token_transmute:
-	case Token_down_cast:
 	case Token_union_cast:
 	{
 		Token token = f->curr_token; next_token(f);
