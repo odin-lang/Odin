@@ -194,9 +194,6 @@ last_write_time_by_name :: proc(name: string) -> File_Time {
 }
 
 
-
-
-
 read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	buf: [300]byte;
 	copy(buf[..], cast([]byte)name);
@@ -208,13 +205,12 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	defer close(fd);
 
 	length: i64;
-	file_size_ok := win32.GetFileSizeEx(cast(win32.Handle)fd, ^length) != 0;
-	if !file_size_ok {
+	if ok := win32.GetFileSizeEx(cast(win32.Handle)fd, ^length) != 0; !ok {
 		return nil, false;
 	}
 
 	data := make([]byte, length);
-	if ^data[0] == nil {
+	if data == nil {
 		return nil, false;
 	}
 

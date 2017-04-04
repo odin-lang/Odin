@@ -3950,7 +3950,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		    id == BuiltinProc_kmag) {
 			if (!is_type_quaternion(x->type)) {
 				gbString s = type_to_string(x->type);
-				error_node(call, "Argument has type `%s`, expected a complex type", s);
+				error_node(call, "Argument has type `%s`, expected a quaternion type", s);
 				gb_string_free(s);
 				return false;
 			}
@@ -5455,71 +5455,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			o->type = t;
 			o->mode = Addressing_OptionalOk;
 		} break;
-		case Token_down_cast: {
-			if (o->mode == Addressing_Constant) {
-				gbString expr_str = expr_to_string(o->expr);
-				error_node(o->expr, "Cannot `down_cast` a constant expression: `%s`", expr_str);
-				gb_string_free(expr_str);
-				o->mode = Addressing_Invalid;
-				o->expr = node;
-				return kind;
-			}
-
-			if (is_type_untyped(o->type)) {
-				gbString expr_str = expr_to_string(o->expr);
-				error_node(o->expr, "Cannot `down_cast` an untyped expression: `%s`", expr_str);
-				gb_string_free(expr_str);
-				o->mode = Addressing_Invalid;
-				o->expr = node;
-				return kind;
-			}
-
-			if (!(is_type_pointer(o->type) && is_type_pointer(t))) {
-				gbString expr_str = expr_to_string(o->expr);
-				error_node(o->expr, "Can only `down_cast` pointers: `%s`", expr_str);
-				gb_string_free(expr_str);
-				o->mode = Addressing_Invalid;
-				o->expr = node;
-				return kind;
-			}
-
-			Type *src = type_deref(o->type);
-			Type *dst = type_deref(t);
-			Type *bsrc = base_type(src);
-			Type *bdst = base_type(dst);
-
-			if (!(is_type_struct(bsrc) || is_type_raw_union(bsrc))) {
-				gbString expr_str = expr_to_string(o->expr);
-				error_node(o->expr, "Can only `down_cast` pointer from structs or unions: `%s`", expr_str);
-				gb_string_free(expr_str);
-				o->mode = Addressing_Invalid;
-				o->expr = node;
-				return kind;
-			}
-
-			if (!(is_type_struct(bdst) || is_type_raw_union(bdst))) {
-				gbString expr_str = expr_to_string(o->expr);
-				error_node(o->expr, "Can only `down_cast` pointer to structs or unions: `%s`", expr_str);
-				gb_string_free(expr_str);
-				o->mode = Addressing_Invalid;
-				o->expr = node;
-				return kind;
-			}
-
-			String param_name = check_down_cast_name(dst, src);
-			if (param_name.len == 0) {
-				gbString expr_str = expr_to_string(o->expr);
-				error_node(o->expr, "Illegal `down_cast`: `%s`", expr_str);
-				gb_string_free(expr_str);
-				o->mode = Addressing_Invalid;
-				o->expr = node;
-				return kind;
-			}
-
-			o->mode = Addressing_Value;
-			o->type = t;
-		} break;
-
 
 		default:
 			GB_PANIC("Unknown cast expression");

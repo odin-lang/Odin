@@ -3468,9 +3468,11 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			ir_emit_comment(proc, str_lit("cast - transmute"));
 			return ir_emit_transmute(proc, e, type);
 
+	#if 0
 		case Token_down_cast:
 			ir_emit_comment(proc, str_lit("cast - down_cast"));
 			return ir_emit_down_cast(proc, e, type);
+	#endif
 
 		case Token_union_cast:
 			ir_emit_comment(proc, str_lit("cast - union_cast"));
@@ -4596,6 +4598,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			ir_emit_store(proc, v, ir_emit_transmute(proc, ir_build_expr(proc, ce->expr), type));
 			return ir_addr(v);
 		}
+	#if 0
 		case Token_down_cast: {
 			ir_emit_comment(proc, str_lit("Cast - down_cast"));
 			// NOTE(bill): Needed for dereference of pointer conversion
@@ -4604,6 +4607,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			ir_emit_store(proc, v, ir_emit_down_cast(proc, ir_build_expr(proc, ce->expr), type));
 			return ir_addr(v);
 		}
+	#endif
 		case Token_union_cast: {
 			ir_emit_comment(proc, str_lit("Cast - union_cast"));
 			// NOTE(bill): Needed for dereference of pointer conversion

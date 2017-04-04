@@ -14,5 +14,9 @@
 #import "utf16.odin";
 
 main :: proc() {
-
+	if x := 0; x < 0 {
+		fmt.println(x);
+	} else {
+		fmt.println(x);
+	}
 }
