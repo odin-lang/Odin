@@ -248,8 +248,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 	bool is_inline       = (pd->tags & ProcTag_inline)    != 0;
 	bool is_no_inline    = (pd->tags & ProcTag_no_inline) != 0;
 
-	if ((d->scope->is_file || d->scope->is_global) &&
-	    str_eq(e->token.string, str_lit("main"))) {
+	if (d->scope->is_file && str_eq(e->token.string, str_lit("main"))) {
 		if (proc_type != NULL) {
 			TypeProc *pt = &proc_type->Proc;
 			if (pt->param_count != 0 ||

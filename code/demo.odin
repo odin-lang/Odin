@@ -14,9 +14,18 @@
 #import "utf16.odin";
 
 main :: proc() {
-	if x := 0; x < 0 {
-		fmt.println(x);
-	} else {
-		fmt.println(x);
+	immutable program := "+ + * - /";
+	accumulator := 0;
+
+	for token in program {
+		match token {
+		case '+': accumulator += 1;
+		case '-': accumulator -= 1;
+		case '*': accumulator *= 2;
+		case '/': accumulator /= 2;
+		default: // Ignore everything else
+		}
 	}
+
+	fmt.printf("The program \"%s\" calculates the value %d\n", program, accumulator);
 }

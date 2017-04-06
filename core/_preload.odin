@@ -66,9 +66,9 @@ Type_Info :: union {
 	Raw_Union    {using record: Type_Info_Record},
 	Union{
 		common_fields: struct {
-			types:        []^Type_Info,
-			names:        []string,
-			offsets:      []int,    // offsets may not be used in tuples
+			types:     []^Type_Info,
+			names:     []string,
+			offsets:   []int,    // offsets may not be used in tuples
 		},
 		variant_names: []string,
 		variant_types: []^Type_Info,
