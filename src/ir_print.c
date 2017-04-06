@@ -251,7 +251,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 
 	case Type_Named:
 		if (is_type_struct(t) || is_type_union(t)) {
-			String *name = map_string_get(&m->type_names, hash_pointer(t));
+			String *name = map_string_get(&m->entity_names, hash_pointer(t->Named.type_name));
 			GB_ASSERT_MSG(name != NULL, "%.*s", LIT(t->Named.name));
 			ir_print_encoded_local(f, *name);
 		} else {
@@ -338,7 +338,6 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			// HACK NOTE(bill): This is a hack but it works because strings are created at the very end
 			// of the .ll file
 			irValue *str_array = ir_add_global_string_array(m, str);
-
 			ir_fprintf(f, "{i8* getelementptr inbounds (");
 			ir_print_type(f, m, str_array->Global.entity->type);
 			ir_fprintf(f, ", ");
@@ -659,9 +658,10 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 		Scope *scope = value->Global.entity->scope;
 		bool in_global_scope = false;
 		if (scope != NULL) {
+			// TODO(bill): Fix this rule. What should it be?
 			in_global_scope = scope->is_global || scope->is_init;
 		}
-		ir_print_encoded_global(f, value->Global.entity->token.string, in_global_scope);
+		ir_print_encoded_global(f, ir_get_global_name(m, value), in_global_scope);
 	} break;
 	case irValue_Param:
 		ir_print_encoded_local(f, value->Param.entity->token.string);
@@ -1711,9 +1711,11 @@ void print_llvm_ir(irGen *ir) {
 		Scope *scope = g->entity->scope;
 		bool in_global_scope = false;
 		if (scope != NULL) {
+			// TODO(bill): Fix this rule. What should it be?
 			in_global_scope = scope->is_global || scope->is_init;
 		}
-		ir_print_encoded_global(f, g->entity->token.string, in_global_scope);
+
+		ir_print_encoded_global(f, ir_get_global_name(m, v), in_global_scope);
 		ir_fprintf(f, " = ");
 		if (g->is_foreign) {
 			ir_fprintf(f, "external ");

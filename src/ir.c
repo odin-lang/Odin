@@ -33,7 +33,7 @@ typedef struct irModule {
 	MapEntity             min_dep_map; // Key: Entity *
 	MapIrValue            values;      // Key: Entity *
 	MapIrValue            members;     // Key: String
-	MapString             type_names;  // Key: Type *
+	MapString             entity_names;  // Key: Entity * of the typename
 	MapIrDebugInfo        debug_info;  // Key: Unique pointer
 	i32                   global_string_index;
 	i32                   global_array_index; // For ConstantSlice
@@ -339,6 +339,7 @@ typedef struct irValueTypeName {
 } irValueTypeName;
 
 typedef struct irValueGlobal {
+	String        name;
 	Entity *      entity;
 	Type *        type;
 	irValue *     value;
@@ -764,6 +765,20 @@ irValue *ir_value_nil(gbAllocator a, Type *type) {
 	irValue *v = ir_alloc_value(a, irValue_Nil);
 	v->Nil.type = type;
 	return v;
+}
+
+String ir_get_global_name(irModule *m, irValue *v) {
+	if (v->kind != irValue_Global) {
+		return str_lit("");
+	}
+	irValueGlobal *g = &v->Global;
+	Entity *e = g->entity;
+	String name = e->token.string;
+	String *found = map_string_get(&m->entity_names, hash_pointer(e));
+	if (found != NULL) {
+		name = *found;
+	}
+	return name;
 }
 
 
@@ -2771,6 +2786,8 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 			return ir_emit_load(proc, result);
 		}
 
+		Type *st = default_type(src_type);
+
 		irValue *data = NULL;
 		if (value->kind == irValue_Instr &&
 		    value->Instr.kind == irInstr_Load) {
@@ -2778,15 +2795,15 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 			data = value->Instr.Load.address;
 		} else {
 			// NOTE(bill): Non-addreirble value
-			data = ir_add_local_generated(proc, src_type);
+			data = ir_add_local_generated(proc, st);
 			ir_emit_store(proc, data, value);
 		}
 		GB_ASSERT(is_type_pointer(ir_type(data)));
-		GB_ASSERT(is_type_typed(src_type));
+		GB_ASSERT_MSG(is_type_typed(st), "%s", type_to_string(st));
 		data = ir_emit_conv(proc, data, t_rawptr);
 
 
-		irValue *ti = ir_type_info(proc, src_type);
+		irValue *ti = ir_type_info(proc, st);
 
 		irValue *gep0 = ir_emit_struct_ep(proc, result, 0);
 		irValue *gep1 = ir_emit_struct_ep(proc, result, 1);
@@ -3195,7 +3212,7 @@ void ir_mangle_add_sub_type_name(irModule *m, Entity *field, String parent) {
 	                                 "%.*s.%.*s", LIT(parent), LIT(cn));
 
 	String child = {text, new_name_len-1};
-	map_string_set(&m->type_names, hash_pointer(field->type), child);
+	map_string_set(&m->entity_names, hash_pointer(field), child);
 	ir_gen_global_type_name(m, field, child);
 }
 
@@ -5582,7 +5599,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 					irValue *value = ir_value_type_name(proc->module->allocator,
 					                                           name, e->type);
-					map_string_set(&proc->module->type_names, hash_pointer(e->type), name);
+					map_string_set(&proc->module->entity_names, hash_pointer(e->type), name);
 					ir_gen_global_type_name(proc->module, e, name);
 				} break;
 				case Entity_Procedure: {
@@ -6500,7 +6517,7 @@ void ir_init_module(irModule *m, Checker *c) {
 	map_ir_value_init(&m->values,  heap_allocator());
 	map_ir_value_init(&m->members, heap_allocator());
 	map_ir_debug_info_init(&m->debug_info, heap_allocator());
-	map_string_init(&m->type_names, heap_allocator());
+	map_string_init(&m->entity_names, heap_allocator());
 	array_init(&m->procs,    heap_allocator());
 	array_init(&m->procs_to_generate, heap_allocator());
 	array_init(&m->foreign_library_paths, heap_allocator());
@@ -6603,7 +6620,7 @@ void ir_init_module(irModule *m, Checker *c) {
 void ir_destroy_module(irModule *m) {
 	map_ir_value_destroy(&m->values);
 	map_ir_value_destroy(&m->members);
-	map_string_destroy(&m->type_names);
+	map_string_destroy(&m->entity_names);
 	map_ir_debug_info_destroy(&m->debug_info);
 	array_free(&m->procs);
 	array_free(&m->procs_to_generate);
@@ -6779,17 +6796,17 @@ void ir_gen_tree(irGen *s) {
 				name = ir_mangle_name(s, e->token.pos.file, e);
 			}
 		}
-
+		map_string_set(&m->entity_names, hash_pointer(e), name);
 
 		switch (e->kind) {
 		case Entity_TypeName:
 			GB_ASSERT(e->type->kind == Type_Named);
-			map_string_set(&m->type_names, hash_pointer(e->type), name);
 			ir_gen_global_type_name(m, e, name);
 			break;
 
 		case Entity_Variable: {
 			irValue *g = ir_value_global(a, e, NULL);
+			g->Global.name = name;
 			g->Global.is_thread_local = e->Variable.is_thread_local;
 
 			irGlobalVariable var = {0};
