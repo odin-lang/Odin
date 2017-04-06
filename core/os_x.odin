@@ -41,6 +41,85 @@ RTLD_FIRST    :: 0x100;
 
 args: [dynamic]string;
 
+FileTime :: struct #ordered {
+	seconds: i64,
+	nanoseconds: i64
+}
+
+Stat :: struct #ordered {
+	device_id : i32, // ID of device containing file
+	mode      : u16, // Mode of the file
+	nlink     : u16, // Number of hard links
+	serial    : u64, // File serial number
+	uid       : u32, // User ID of the file's owner
+	gid       : u32, // Group ID of the file's group
+	rdev      : i32, // Device ID, if device
+
+	last_access   : FileTime, // Time of last access
+	modified      : FileTime, // Time of last modification
+	status_change : FileTime, // Time of last status change
+	created       : FileTime, // Time of creation
+
+	size      : i64,  // Size of the file, in bytes
+	blocks    : i64,  // Number of blocks allocated for the file
+	block_size: i32,  // Optimal blocksize for I/O
+	flags     : u32,  // User-defined flags for the file
+	gen_num   : u32,  // File generation number ...?
+	_spare    : i32,  // RESERVED
+	_reserve1,
+	_reserve2 : i64,  // RESERVED 
+};
+
+// File type
+
+S_IFMT   :: 0170000; // Type of file mask
+S_IFIFO  :: 0010000; // Named pipe (fifo)
+S_IFCHR  :: 0020000; // Character special
+S_IFDIR  :: 0040000; // Directory
+S_IFBLK  :: 0060000; // Block special
+S_IFREG  :: 0100000; // Regular
+S_IFLNK  :: 0120000; // Symbolic link
+S_IFSOCK :: 0140000; // Socket
+
+// File mode
+// Read, write, execute/search by owner
+
+S_IRWXU :: 0000700; // RWX mask for owner
+S_IRUSR :: 0000400; // R for owner
+S_IWUSR :: 0000200; // W for owner
+S_IXUSR :: 0000100; // X for owner
+
+// Read, write, execute/search by group
+
+S_IRWXG :: 0000070; // RWX mask for group
+S_IRGRP :: 0000040; // R for group
+S_IWGRP :: 0000020; // W for group
+S_IXGRP :: 0000010; // X for group
+
+// Read, write, execute/search by others
+
+S_IRWXO :: 0000007; // RWX mask for other
+S_IROTH :: 0000004; // R for other
+S_IWOTH :: 0000002; // W for other
+S_IXOTH :: 0000001; // X for other
+
+S_ISUID :: 0004000; // Set user id on execution
+S_ISGID :: 0002000; // Set group id on execution
+S_ISVTX :: 0001000; // Directory restrcted delete
+
+S_ISLNK  :: proc(m: u32) -> bool #inline  {return ((m) & S_IFMT) == S_IFLNK; }
+S_ISREG  :: proc(m: u32) -> bool #inline  {return ((m) & S_IFMT) == S_IFREG; }
+S_ISDIR  :: proc(m: u32) -> bool #inline  {return ((m) & S_IFMT) == S_IFDIR; }
+S_ISCHR  :: proc(m: u32) -> bool #inline  {return ((m) & S_IFMT) == S_IFCHR; }
+S_ISBLK  :: proc(m: u32) -> bool #inline  {return ((m) & S_IFMT) == S_IFBLK; }
+S_ISFIFO :: proc(m: u32) -> bool #inline  {return ((m) & S_IFMT) == S_IFIFO; }
+S_ISSOCK :: proc(m: u32) -> bool #inline  {return ((m) & S_IFMT) == S_IFSOCK;}
+
+R_OK :: 4; // Test for read permission
+W_OK :: 2; // Test for write permission
+X_OK :: 1; // Test for execute permission
+F_OK :: 0; // Test for file existance
+
 #foreign_system_library dl   "dl";
 #foreign_system_library libc "c";
 
@@ -50,6 +129,8 @@ unix_read   :: proc(handle: Handle, buffer: rawptr, count: int) -> AddressSize  
 unix_write  :: proc(handle: Handle, buffer: rawptr, count: int) -> AddressSize    #foreign libc "write";
 unix_lseek  :: proc(fs: Handle, offset: AddressSize, whence: int) -> AddressSize  #foreign libc "lseek";
 unix_gettid :: proc() -> u64                                                      #foreign libc "gettid";
+unix_stat   :: proc(path: ^u8, stat: ^Stat) -> int                                #foreign libc "stat";
+unix_access :: proc(path: ^u8, mask: int) -> int                                  #foreign libc "access";
 
 unix_malloc  :: proc(size: int) -> rawptr                                         #foreign libc "malloc";
 unix_free    :: proc(ptr: rawptr)                                                 #foreign libc "free";
@@ -62,6 +143,7 @@ unix_dlopen  :: proc(filename: ^u8, flags: int) -> rawptr                       
 unix_dlsym   :: proc(handle: rawptr, symbol: ^u8) ->  (proc() #cc_c)              #foreign dl   "dlsym";
 unix_dlclose :: proc(handle: rawptr) -> int                                       #foreign dl   "dlclose";
 unix_dlerror :: proc() -> ^u8                                                     #foreign dl   "dlerror";
+
 
 // TODO(zangent): Change this to just `open` when Bill fixes overloading.
 open_simple :: proc(path: string, mode: int) -> (Handle, Errno) {
@@ -125,6 +207,20 @@ last_write_time :: proc(fd: Handle) -> File_Time {}
 last_write_time_by_name :: proc(name: string) -> File_Time {}
 */
 
+stat :: proc(path: string) -> (Stat, bool) #inline {
+	s: Stat;
+	cstr := strings.new_c_string(path);
+	defer free(cstr);
+	ret_int := unix_stat(cstr, ^s);
+	return s, ret_int==0;
+}
+
+access :: proc(path: string, mask: int) -> bool #inline {
+	cstr := strings.new_c_string(path);
+	defer free(cstr);
+	return unix_access(cstr, mask) == 0;
+}
+
 read_entire_file :: proc(name: string) -> ([]byte, bool) {
 
 	handle, err := open_simple(name, O_RDONLY);
@@ -152,7 +248,7 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	// We have a file size!
 
 	data := make([]u8, size+1);
-	if ^data[0] == nil {
+	if data == nil {
 		fmt.println("Failed to allocate file buffer.");
 		return nil, false;
 	}

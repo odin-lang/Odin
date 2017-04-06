@@ -276,7 +276,9 @@ extern "C" {
 
 // TODO(bill): How many of these headers do I really need?
 // #include <stdarg.h>
-// #include <stddef.h>
+#if !defined(GB_SYSTEM_WINDOWS)
+	#include <stddef.h>
+#endif
 
 
 
