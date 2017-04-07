@@ -643,7 +643,7 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 			ir_print_type(f, m, t_int);
 			ir_fprintf(f, " 0, i32 0), ");
 			ir_print_type(f, m, t_int);
-			ir_fprintf(f, " %lld}", cs->count);
+			ir_fprintf(f, " %lld, %lld}", cs->count, cs->count);
 		}
 	} break;
 

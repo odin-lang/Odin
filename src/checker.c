@@ -1229,12 +1229,6 @@ void init_preload(Checker *c) {
 		t_context_ptr = make_type_pointer(c->allocator, t_context);
 	}
 
-	if (t_raw_dynamic_array == NULL) {
-		Entity *e = find_core_entity(c, str_lit("Raw_Dynamic_Array"));
-		t_raw_dynamic_array = e->type;
-		t_raw_dynamic_array = make_type_pointer(c->allocator, t_raw_dynamic_array);
-	}
-
 	if (t_map_key == NULL) {
 		Entity *e = find_core_entity(c, str_lit("__Map_Key"));
 		t_map_key = e->type;

@@ -3,6 +3,7 @@
 #import "utf8.odin";
 #import "types.odin";
 #import "strconv.odin";
+#import "raw.odin";
 
 
 _BUFFER_SIZE :: 1<<12;
@@ -106,19 +107,19 @@ write_type :: proc(buf: ^[]byte, ti: ^Type_Info) {
 		}
 
 	case Float:
-		match info.size {
-		case 4: write_string(buf, "f32");
-		case 8: write_string(buf, "f64");
+		match 8*info.size {
+		case 32: write_string(buf, "f32");
+		case 64: write_string(buf, "f64");
 		}
 	case Complex:
-		match info.size {
-		case 8:  write_string(buf, "complex64");
-		case 16: write_string(buf, "complex128");
+		match 8*info.size {
+		case  64:  write_string(buf, "complex64");
+		case 128: write_string(buf, "complex128");
 		}
 	case Quaternion:
-		match info.size {
-		case 16: write_string(buf, "quaternion128");
-		case 32: write_string(buf, "quaternion");
+		match 8*info.size {
+		case 128: write_string(buf, "quaternion128");
+		case 256: write_string(buf, "quaternion256");
 		}
 	case String:  write_string(buf, "string");
 	case Boolean: write_string(buf, "bool");
@@ -388,6 +389,7 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 		arg.type_info = type_info_base(arg.type_info);
 		match i in arg {
 		case int:  num = i;
+		case uint: num = cast(int)i;
 		case i8:   num = cast(int)i;
 		case i16:  num = cast(int)i;
 		case i32:  num = cast(int)i;
@@ -779,7 +781,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
-		array := cast(^Raw_Dynamic_Array)v.data;
+		array := cast(^raw.Dynamic_Array)v.data;
 		for i in 0..array.len {
 			if i > 0 {
 				write_string(fi.buf, ", ");
@@ -796,7 +798,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 		write_string(fi.buf, "map[");
 		defer write_byte(fi.buf, ']');
-		entries := ^(cast(^Raw_Dynamic_Map)v.data).entries;
+		entries := ^(cast(^raw.Dynamic_Map)v.data).entries;
 		gs := union_cast(^Struct)type_info_base(info.generated_struct);
 		ed := union_cast(^Dynamic_Array)type_info_base(gs.types[1]);
 

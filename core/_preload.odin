@@ -3,6 +3,7 @@
 #import "os.odin";
 #import "fmt.odin";
 #import "utf8.odin";
+#import "raw.odin";
 
 // IMPORTANT NOTE(bill): `type_info` & `type_info_val` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
@@ -36,11 +37,14 @@ Type_Info_Record :: struct #ordered {
 }
 
 Type_Info :: union {
+	size:  int,
+	align: int,
+
 	Named{name: string, base: ^Type_Info},
-	Integer{size: int, signed: bool},
-	Float{size: int},
-	Complex{size: int},
-	Quaternion{size: int},
+	Integer{signed: bool},
+	Float{},
+	Complex{},
+	Quaternion{},
 	String{},
 	Boolean{},
 	Any{},
@@ -60,7 +64,7 @@ Type_Info :: union {
 	},
 	Dynamic_Array{elem: ^Type_Info, elem_size: int},
 	Slice        {elem: ^Type_Info, elem_size: int},
-	Vector       {elem: ^Type_Info, elem_size, count, align: int},
+	Vector       {elem: ^Type_Info, elem_size, count: int},
 	Tuple        {using record: Type_Info_Record}, // Only really used for procedures
 	Struct       {using record: Type_Info_Record},
 	Raw_Union    {using record: Type_Info_Record},
@@ -72,8 +76,6 @@ Type_Info :: union {
 		},
 		variant_names: []string,
 		variant_types: []^Type_Info,
-		size:          int,
-		align:         int,
 	},
 	Enum{
 		base:   ^Type_Info,
@@ -419,37 +421,10 @@ __abs_quaternion256 :: proc(x: quaternion256) -> f64 #inline {
 
 
 
-Raw_Any :: struct #ordered {
-	type_info: ^Type_Info,
-	data:      rawptr,
-}
-
-Raw_String :: struct #ordered {
-	data:  ^byte,
-	len:   int,
-};
-
-Raw_Slice :: struct #ordered {
-	data: rawptr,
-	len:  int,
-	cap:  int,
-};
-
-Raw_Dynamic_Array :: struct #ordered {
-	data:      rawptr,
-	len:       int,
-	cap:       int,
-	allocator: Allocator,
-};
-
-Raw_Dynamic_Map :: struct #ordered {
-	hashes:  [dynamic]int,
-	entries: Raw_Dynamic_Array,
-};
 
 
 __dynamic_array_make :: proc(array_: rawptr, elem_size, elem_align: int, len, cap: int) {
-	array := cast(^Raw_Dynamic_Array)array_;
+	array := cast(^raw.Dynamic_Array)array_;
 	__check_context();
 	array.allocator = context.allocator;
 	assert(array.allocator.procedure != nil);
@@ -461,7 +436,7 @@ __dynamic_array_make :: proc(array_: rawptr, elem_size, elem_align: int, len, ca
 }
 
 __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap: int) -> bool {
-	array := cast(^Raw_Dynamic_Array)array_;
+	array := cast(^raw.Dynamic_Array)array_;
 
 	if cap <= array.cap {
 		return true;
@@ -490,7 +465,7 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 
 __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
                                items: rawptr, item_count: int) -> int {
-	array := cast(^Raw_Dynamic_Array)array_;
+	array := cast(^raw.Dynamic_Array)array_;
 
 	if item_count <= 0 || items == nil {
 		return array.len;
@@ -514,7 +489,7 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 }
 
 __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: int) -> int {
-	array := cast(^Raw_Dynamic_Array)array_;
+	array := cast(^raw.Dynamic_Array)array_;
 
 	ok := true;
 	if array.cap <= array.len+1 {
@@ -534,7 +509,7 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 
 __slice_append :: proc(slice_: rawptr, elem_size, elem_align: int,
                        items: rawptr, item_count: int) -> int {
-	slice := cast(^Raw_Slice)slice_;
+	slice := cast(^raw.Slice)slice_;
 
 	if item_count <= 0 || items == nil {
 		return slice.len;
@@ -587,7 +562,7 @@ __Map_Entry_Header :: struct #ordered {
 }
 
 __Map_Header :: struct #ordered {
-	m:             ^Raw_Dynamic_Map,
+	m:             ^raw.Dynamic_Map,
 	is_key_string: bool,
 	entry_size:    int,
 	entry_align:   int,
@@ -602,11 +577,11 @@ __dynamic_map_reserve :: proc(using header: __Map_Header, cap: int) -> bool {
 
 __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
 	new_header := header;
-	nm: Raw_Dynamic_Map;
+	nm: raw.Dynamic_Map;
 	new_header.m = ^nm;
 
-	header_hashes := cast(^Raw_Dynamic_Array)^header.m.hashes;
-	nm_hashes := cast(^Raw_Dynamic_Array)^nm.hashes;
+	header_hashes := cast(^raw.Dynamic_Array)^header.m.hashes;
+	nm_hashes := cast(^raw.Dynamic_Array)^nm.hashes;
 
 
 	reserve(nm.hashes, new_count);
