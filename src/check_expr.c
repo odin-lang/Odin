@@ -2324,10 +2324,10 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 			}
 		}
 	} else if (check_is_castable_to(c, x, type)) {
-		if (x->mode != Addressing_Constant) {
+		can_convert = true;
+		if (x->mode != Addressing_Constant || is_type_any(type)) {
 			x->mode = Addressing_Value;
 		}
-		can_convert = true;
 	}
 
 	if (!can_convert) {
@@ -2348,7 +2348,9 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 		if (is_const_expr && !is_type_constant_type(type)) {
 			final_type = default_type(x->type);
 		}
-		update_expr_type(c, x->expr, final_type, true);
+		if (!is_type_any(final_type)) {
+			update_expr_type(c, x->expr, final_type, true);
+		}
 	}
 
 	x->type = type;
@@ -5349,6 +5351,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		switch (ce->token.kind) {
 		case Token_cast:
 			check_cast(c, o, t);
+			o->expr = node;
 			break;
 		case Token_transmute: {
 			if (o->mode == Addressing_Constant) {
@@ -5459,6 +5462,8 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		default:
 			GB_PANIC("Unknown cast expression");
 		}
+
+		o->expr = node;
 	case_end;
 
 
