@@ -29,8 +29,8 @@ Type_Info_Record :: struct #ordered {
 	types:        []^Type_Info,
 	names:        []string,
 	offsets:      []int,    // offsets may not be used in tuples
-	size:         int, // in bytes
-	align:        int, // in bytes
+	// size:         int,
+	// align:        int,
 	packed:       bool,
 	ordered:      bool,
 	custom_align: bool,
@@ -39,7 +39,6 @@ Type_Info_Record :: struct #ordered {
 Type_Info :: union {
 	size:  int,
 	align: int,
-
 	Named{name: string, base: ^Type_Info},
 	Integer{signed: bool},
 	Float{},
@@ -94,6 +93,9 @@ Type_Info :: union {
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
 __type_table: []Type_Info;
+
+__argv__: ^^byte;
+__argc__: i32;
 
 type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
 	if info == nil {
@@ -418,7 +420,6 @@ __abs_quaternion256 :: proc(x: quaternion256) -> f64 #inline {
 	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
 	return __sqrt_f64(r*r + i*i + j*j + k*k);
 }
-
 
 
 

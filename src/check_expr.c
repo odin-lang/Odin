@@ -580,7 +580,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
-	MapEntity entity_map = {0};
+	MapEntity entity_map = {0}; // Key: String
 	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*variant_count);
 
 	Entity *using_index_expr = NULL;
@@ -592,6 +592,12 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	variants[variant_index++] = make_entity_type_name(c->allocator, c->context.scope, empty_token, NULL);
 
 	field_count = check_fields(c, NULL, ut->fields, fields, field_count, str_lit("union"));
+
+	for (isize i = 0; i < field_count; i++) {
+		Entity *f = fields[i];
+		String name = f->token.string;
+		map_entity_set(&entity_map, hash_string(name), f);
+	}
 
 	union_type->Record.fields      = fields;
 	union_type->Record.field_count = field_count;
@@ -2324,10 +2330,10 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 			}
 		}
 	} else if (check_is_castable_to(c, x, type)) {
-		can_convert = true;
-		if (x->mode != Addressing_Constant || is_type_any(type)) {
+		if (x->mode != Addressing_Constant) {
 			x->mode = Addressing_Value;
 		}
+		can_convert = true;
 	}
 
 	if (!can_convert) {
@@ -2348,9 +2354,7 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 		if (is_const_expr && !is_type_constant_type(type)) {
 			final_type = default_type(x->type);
 		}
-		if (!is_type_any(final_type)) {
-			update_expr_type(c, x->expr, final_type, true);
-		}
+		update_expr_type(c, x->expr, final_type, true);
 	}
 
 	x->type = type;
@@ -5166,10 +5170,15 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			}
 
 			for (; index < elem_count; index++) {
+				GB_ASSERT(cl->elems.e != NULL);
 				AstNode *e = cl->elems.e[index];
+				if (e == NULL) {
+					error_node(node, "Invalid literal element");
+					continue;
+				}
+
 				if (e->kind == AstNode_FieldValue) {
-					error_node(e,
-					      "`field = value` is only allowed in struct literals");
+					error_node(e, "`field = value` is only allowed in struct literals");
 					continue;
 				}
 
@@ -5351,7 +5360,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		switch (ce->token.kind) {
 		case Token_cast:
 			check_cast(c, o, t);
-			o->expr = node;
 			break;
 		case Token_transmute: {
 			if (o->mode == Addressing_Constant) {
@@ -5462,8 +5470,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		default:
 			GB_PANIC("Unknown cast expression");
 		}
-
-		o->expr = node;
 	case_end;
 
 

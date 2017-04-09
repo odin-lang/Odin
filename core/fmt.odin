@@ -107,19 +107,19 @@ write_type :: proc(buf: ^[]byte, ti: ^Type_Info) {
 		}
 
 	case Float:
-		match 8*info.size {
-		case 32: write_string(buf, "f32");
-		case 64: write_string(buf, "f64");
+		match info.size {
+		case 4: write_string(buf, "f32");
+		case 8: write_string(buf, "f64");
 		}
 	case Complex:
-		match 8*info.size {
-		case  64:  write_string(buf, "complex64");
-		case 128: write_string(buf, "complex128");
+		match info.size {
+		case 8:  write_string(buf, "complex64");
+		case 16: write_string(buf, "complex128");
 		}
 	case Quaternion:
-		match 8*info.size {
-		case 128: write_string(buf, "quaternion128");
-		case 256: write_string(buf, "quaternion256");
+		match info.size {
+		case 16: write_string(buf, "quaternion128");
+		case 32: write_string(buf, "quaternion");
 		}
 	case String:  write_string(buf, "string");
 	case Boolean: write_string(buf, "bool");
@@ -389,7 +389,6 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 		arg.type_info = type_info_base(arg.type_info);
 		match i in arg {
 		case int:  num = i;
-		case uint: num = cast(int)i;
 		case i8:   num = cast(int)i;
 		case i16:  num = cast(int)i;
 		case i32:  num = cast(int)i;

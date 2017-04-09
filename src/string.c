@@ -188,6 +188,22 @@ bool string_contains_char(String s, u8 c) {
 	return false;
 }
 
+String filename_from_path(String s) {
+	isize i = string_extension_position(s);
+	if (i > 0) {
+		isize j = 0;
+		s.len = i;
+		for (j = i-1; j >= 0; j--) {
+			if (s.text[j] == '/' ||
+				s.text[j] == '\\') {
+				break;
+			}
+		}
+		s.text += j+1;
+		s.len = i-j-1;
+	}
+	return make_string(NULL, 0);
+}
 
 
 
@@ -207,7 +223,7 @@ bool string_contains_char(String s, u8 c) {
 
 	#include <iconv.h>
 
-	int convert_multibyte_to_widechar(char *multibyte_input, int input_length, wchar_t *output, int output_size) {
+	int convert_multibyte_to_widechar(char *multibyte_input, usize input_length, wchar_t *output, usize output_size) {
 		iconv_t conv = iconv_open("WCHAR_T", "UTF-8");
 		size_t result = iconv(conv, cast(char **)&multibyte_input, &input_length, cast(char **)&output, &output_size);
 		iconv_close(conv);
@@ -215,7 +231,7 @@ bool string_contains_char(String s, u8 c) {
 		return (int) result;
 	}
 
-	int convert_widechar_to_multibyte(wchar_t* widechar_input, int input_length, char* output, int output_size) {
+	int convert_widechar_to_multibyte(wchar_t* widechar_input, usize input_length, char* output, usize output_size) {
 		iconv_t conv = iconv_open("UTF-8", "WCHAR_T");
 		size_t result = iconv(conv, (char**) &widechar_input, &input_length, (char**) &output, &output_size);
 		iconv_close(conv);

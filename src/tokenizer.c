@@ -414,7 +414,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 	TokenizerInitError err = TokenizerInit_None;
 
 	char *c_str = gb_alloc_array(heap_allocator(), char, fullpath.len+1);
-	memcpy(c_str, fullpath.text, fullpath.len);
+	gb_memcopy(c_str, fullpath.text, fullpath.len);
 	c_str[fullpath.len] = '\0';
 
 	// TODO(bill): Memory map rather than copy contents

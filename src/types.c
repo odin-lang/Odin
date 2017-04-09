@@ -2058,12 +2058,12 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_Array:
-		str = gb_string_appendc(str, gb_bprintf("[%lld]", type->Array.count));
+		str = gb_string_appendc(str, gb_bprintf("[%d]", cast(int)type->Array.count));
 		str = write_type_to_string(str, type->Array.elem);
 		break;
 
 	case Type_Vector:
-		str = gb_string_appendc(str, gb_bprintf("[vector %lld]", type->Vector.count));
+		str = gb_string_appendc(str, gb_bprintf("[vector %d]", cast(int)type->Vector.count));
 		str = write_type_to_string(str, type->Vector.elem);
 		break;
 
@@ -2177,7 +2177,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_Map: {
 		str = gb_string_appendc(str, "map[");
 		if (type->Map.count > 0) {
-			str = gb_string_appendc(str, gb_bprintf("%lld, ", type->Map.count));
+			str = gb_string_appendc(str, gb_bprintf("%d, ", cast(int)type->Map.count));
 		}
 		str = write_type_to_string(str, type->Map.key);
 		str = gb_string_appendc(str, "]");

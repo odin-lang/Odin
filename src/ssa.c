@@ -1916,9 +1916,9 @@ void ssa_print_exact_value(gbFile *f, ssaValue *v) {
 		break;
 	case ExactValue_Integer:
 		if (is_type_unsigned(t)) {
-			gb_fprintf(f, " [%llu]", ev.value_integer);
+			gb_fprintf(f, " [%llu]", cast(unsigned long long)ev.value_integer);
 		} else {
-			gb_fprintf(f, " [%lld]", ev.value_integer);
+			gb_fprintf(f, " [%lld]", cast(long long)ev.value_integer);
 		}
 		break;
 	case ExactValue_Float:
@@ -1929,7 +1929,7 @@ void ssa_print_exact_value(gbFile *f, ssaValue *v) {
 		} else if (is_type_f64(t)) {
 			f64 fp = cast(f64)ev.value_float;
 			u64 x = *cast(u64 *)&fp;
-			gb_fprintf(f, " [0x%llx]", x);
+			gb_fprintf(f, " [0x%llx]", cast(unsigned long long)x);
 		} else {
 			GB_PANIC("unhandled integer");
 		}
@@ -1938,7 +1938,7 @@ void ssa_print_exact_value(gbFile *f, ssaValue *v) {
 		gb_fprintf(f, " [%.*s]", LIT(ev.value_string));
 		break;
 	case ExactValue_Pointer:
-		gb_fprintf(f, " [0x%llx]", ev.value_pointer);
+		gb_fprintf(f, " [0x%llx]", cast(unsigned long long)cast(uintptr)ev.value_pointer);
 		break;
 	}
 }

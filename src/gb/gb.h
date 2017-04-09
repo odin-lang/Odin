@@ -278,6 +278,7 @@ extern "C" {
 // #include <stdarg.h>
 #if !defined(GB_SYSTEM_WINDOWS)
 	#include <stddef.h>
+	#include <stdarg.h>
 #endif
 
 
@@ -315,6 +316,10 @@ extern "C" {
 	#include <sys/types.h>
 	#include <time.h>
 	#include <unistd.h>
+
+	#if defined(GB_CPU_X86)
+		#include <xmmintrin.h>
+	#endif
 #endif
 
 #if defined(GB_SYSTEM_OSX)
@@ -3646,15 +3651,15 @@ gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 #if defined(_MSC_VER)
 	// TODO(bill): Is this good enough?
 	__movsb(cast(u8 *)dest, cast(u8 *)source, n);
-#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+// #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
 	// NOTE(zangent): I assume there's a reason this isn't being used elsewhere,
 	//   but casting pointers as arguments to an __asm__ call is considered an
 	//   error on MacOS and (I think) Linux
 	// TODO(zangent): Figure out how to refactor the asm code so it works on MacOS,
 	//   since this is probably not the way the author intended this to work.
-	memcpy(dest, source, n);
+	// memcpy(dest, source, n);
 #elif defined(GB_CPU_X86)
-	__asm__ __volatile__("rep movsb" : "+D"(cast(u8 *)dest), "+S"(cast(u8 *)source), "+c"(n) : : "memory");
+	__asm__ __volatile__("rep movsb" : "+D"(dest), "+S"(source), "+c"(n) : : "memory");
 #else
 	u8 *d = cast(u8 *)dest;
 	u8 const *s = cast(u8 const *)source;
@@ -4849,6 +4854,26 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 	case gbAllocation_Resize:
 		ptr = _aligned_realloc(old_memory, size, alignment);
 		break;
+
+#elif defined(GB_SYSTEM_LINUX)
+	// TODO(bill): *nix version that's decent
+	case gbAllocation_Alloc: {
+		// ptr = aligned_alloc(alignment, size);
+		ptr = malloc(size+alignment);
+
+		if (flags & gbAllocatorFlag_ClearToZero) {
+			gb_zero_size(ptr, size);
+		}
+	} break;
+
+	case gbAllocation_Free: {
+		free(old_memory);
+	} break;
+
+	case gbAllocation_Resize: {
+		ptr = realloc(old_memory, size);
+		// ptr = gb_default_resize_align(gb_heap_allocator(), old_memory, old_size, size, alignment);
+	} break;	
 #else
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {
@@ -4864,8 +4889,7 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 	} break;
 
 	case gbAllocation_Resize: {
-		gbAllocator a = gb_heap_allocator();
-		ptr = gb_default_resize_align(a, old_memory, old_size, size, alignment);
+		ptr = gb_default_resize_align(gb_heap_allocator(), old_memory, old_size, size, alignment);
 	} break;
 #endif
 
@@ -7595,7 +7619,10 @@ gbFileError gb_file_close(gbFile *f) {
 		return gbFileError_Invalid;
 	}
 
-	if (f->filename) gb_free(gb_heap_allocator(), cast(char *)f->filename);
+	//
+	// TODO HACK(bill): Memory Leak!!!
+	// if (f->filename) gb_free(gb_heap_allocator(), cast(char *)f->filename);
+	//
 
 #if defined(GB_SYSTEM_WINDOWS)
 	if (f->fd.p == INVALID_HANDLE_VALUE) {

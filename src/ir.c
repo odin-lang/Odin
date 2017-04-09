@@ -548,6 +548,8 @@ typedef struct irGen {
 	irModule module;
 	gbFile   output_file;
 	bool     opt_called;
+	String   output_base;
+	String   output_name;
 } irGen;
 
 
@@ -6650,9 +6652,13 @@ bool ir_gen_init(irGen *s, Checker *c) {
 	ir_init_module(&s->module, c);
 	// s->module.generate_debug_info = false;
 
+	String init_fullpath = c->parser->init_fullpath;
 	// TODO(bill): generate appropriate output name
-	int pos = cast(int)string_extension_position(c->parser->init_fullpath);
-	gbFileError err = gb_file_create(&s->output_file, gb_bprintf("%.*s.ll", pos, c->parser->init_fullpath.text));
+	int pos = cast(int)string_extension_position(init_fullpath);
+	int dir_pos = cast(int)string_extension_position(init_fullpath);
+	s->output_name = filename_from_path(init_fullpath);
+	s->output_base = make_string(init_fullpath.text, pos);
+	gbFileError err = gb_file_create(&s->output_file, gb_bprintf("%.*s.ll", pos, init_fullpath.text));
 	if (err != gbFileError_None) {
 		return false;
 	}
@@ -6792,12 +6798,6 @@ void ir_gen_tree(irGen *s) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later
 			} else if (scope->is_init && e->kind == Entity_Procedure && str_eq(name, str_lit("main"))) {
-			#ifdef GB_SYSTEM_OSX
-			} else if (str_eq(name, str_lit("args")) && str_eq(e->token.pos.file, get_fullpath_core(heap_allocator(), str_lit("os_x.odin")))) {
-			#endif
-			#ifdef GB_SYSTEM_LINUX
-			} else if (str_eq(name, str_lit("args")) && str_eq(e->token.pos.file, get_fullpath_core(heap_allocator(), str_lit("os_linux.odin")))) {
-			#endif
 			} else {
 				name = ir_mangle_name(s, e->token.pos.file, e);
 			}
@@ -7227,11 +7227,6 @@ void ir_gen_tree(irGen *s) {
 					tag = ir_emit_conv(proc, ti_ptr, t_type_info_tuple_ptr);
 					irValue *record = ir_emit_struct_ep(proc, tag, 2);
 
-					{
-						irValue *align = ir_const_int(a, type_align_of(a, t));
-						ir_emit_store(proc, ir_emit_struct_ep(proc, record, 4), align);
-					}
-
 					irValue *memory_types = ir_type_info_member_types_offset(proc, t->Tuple.variable_count);
 					irValue *memory_names = ir_type_info_member_names_offset(proc, t->Tuple.variable_count);
 
@@ -7261,16 +7256,12 @@ void ir_gen_tree(irGen *s) {
 						irValue *record = ir_emit_struct_ep(proc, tag, 2);
 
 						{
-							irValue *size         = ir_const_int(a,  type_size_of(a, t));
-							irValue *align        = ir_const_int(a,  type_align_of(a, t));
 							irValue *packed       = ir_const_bool(a, t->Record.is_packed);
 							irValue *ordered      = ir_const_bool(a, t->Record.is_ordered);
 							irValue *custom_align = ir_const_bool(a, t->Record.custom_align);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 3), size);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 4), align);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 5), packed);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 6), ordered);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 7), custom_align);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 3), packed);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 4), ordered);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 5), custom_align);
 						}
 
 						irValue *memory_types   = ir_type_info_member_types_offset(proc, t->Record.field_count);
@@ -7374,13 +7365,6 @@ void ir_gen_tree(irGen *s) {
 						ir_emit_comment(proc, str_lit("Type_Info_RawUnion"));
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_raw_union_ptr);
 						irValue *record = ir_emit_struct_ep(proc, tag, 2);
-
-						{
-							irValue *size    = ir_const_int(a, type_size_of(a, t));
-							irValue *align   = ir_const_int(a, type_align_of(a, t));
-							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 3),  size);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 4),  align);
-						}
 
 						irValue *memory_types   = ir_type_info_member_types_offset(proc, t->Record.field_count);
 						irValue *memory_names   = ir_type_info_member_names_offset(proc, t->Record.field_count);

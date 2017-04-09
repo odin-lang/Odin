@@ -144,7 +144,7 @@ String odin_root_dir(void) {
 	Array(char) path_buf;
 	isize len, i;
 	gbTempArenaMemory tmp;
-	wchar_t *text;
+	u8 *text;
 
 	if (global_module_path_set) {
 		return global_module_path;
@@ -212,11 +212,10 @@ String path_to_fullpath(gbAllocator a, String s) {
 }
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
 String path_to_fullpath(gbAllocator a, String s) {
-	char* p = realpath(s.text, 0);
-	// GB_ASSERT(p && "file does not exist");
-	if(!p) return make_string_c("");
+	char *p = realpath(cast(char *)s.text, 0);
+	if(p == NULL) return make_string_c("");
 
-	return make_string(p, strlen(p));
+	return make_string_c(p);
 }
 #else
 #error Implement system

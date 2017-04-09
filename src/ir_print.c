@@ -1386,7 +1386,8 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 
-#ifndef GB_SYSTEM_WINDOWS
+// #ifndef GB_SYSTEM_WINDOWS
+#if 0
 	bool is_main_proc = proc->parent == NULL && str_eq(proc->name, str_lit("main"));
 
 	AstFile fake_file;
@@ -1541,8 +1542,9 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 
 	ir_fprintf(f, " ");
 
-#ifndef GB_SYSTEM_WINDOWS
-	if(uses_args) 
+// #ifndef GB_SYSTEM_WINDOWS
+#if 0
+	if(uses_args)
 		ir_fprintf(f, "@.nix_argpatch_main");
 	else
 #endif
@@ -1713,6 +1715,7 @@ void print_llvm_ir(irGen *ir) {
 		if (scope != NULL) {
 			// TODO(bill): Fix this rule. What should it be?
 			in_global_scope = scope->is_global || scope->is_init;
+			// in_global_scope = value->Global.name_is_not_mangled;
 		}
 
 		ir_print_encoded_global(f, ir_get_global_name(m, v), in_global_scope);

@@ -2,6 +2,7 @@
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
+
 #include <math.h>
 
 gbAllocator heap_allocator(void) {

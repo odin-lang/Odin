@@ -107,7 +107,7 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	// }
 
 	// exit_code = status;
-	
+
 	return exit_code;
 }
 #endif
@@ -249,9 +249,9 @@ int main(int argc, char **argv) {
 	#if 1
 	timings_start_section(&timings, str_lit("llvm-opt"));
 
-	char const *output_name = ir_gen.output_file.filename;
-	isize base_name_len = gb_path_extension(output_name)-1 - output_name;
-	String output = make_string(cast(u8 *)output_name, base_name_len);
+	String output_name = ir_gen.output_name;
+	String output_base = ir_gen.output_base;
+	int base_name_len = output_base.len;
 
 	i32 optimization_level = 0;
 	optimization_level = gb_clamp(optimization_level, 0, 3);
@@ -261,7 +261,7 @@ int main(int argc, char **argv) {
 	#if defined(GB_SYSTEM_WINDOWS)
 	// For more passes arguments: http://llvm.org/docs/Passes.html
 	exit_code = system_exec_command_line_app("llvm-opt", false,
-		"\"%.*sbin/opt\" \"%s\" -o \"%.*s\".bc "
+		"\"%.*sbin/opt\" \"%.*s\".ll -o \"%.*s\".bc "
 		"-mem2reg "
 		"-memcpyopt "
 		"-die "
@@ -270,7 +270,7 @@ int main(int argc, char **argv) {
 		// "-S "
 		"",
 		LIT(build_context.ODIN_ROOT),
-		output_name, LIT(output));
+		LIT(output_base), LIT(output_base));
 	if (exit_code != 0) {
 		return exit_code;
 	}
@@ -278,7 +278,7 @@ int main(int argc, char **argv) {
 	// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
 	//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
 	exit_code = system_exec_command_line_app("llvm-opt", false,
-		"opt \"%s\" -o \"%.*s\".bc "
+		"opt \"%.*s\".ll -o \"%.*s\".bc "
 		"-mem2reg "
 		"-memcpyopt "
 		"-die "
@@ -292,7 +292,7 @@ int main(int argc, char **argv) {
 		// "-dce "
 		// "-S "
 		"",
-		output_name, LIT(output));
+		LIT(output_base), LIT(output_base));
 	if (exit_code != 0) {
 		return exit_code;
 	}
@@ -307,7 +307,7 @@ int main(int argc, char **argv) {
 		// "-debug-pass=Arguments "
 		"",
 		LIT(build_context.ODIN_ROOT),
-		LIT(output),
+		LIT(output_base),
 		optimization_level,
 		LIT(build_context.llc_flags));
 	if (exit_code != 0) {
@@ -343,7 +343,7 @@ int main(int argc, char **argv) {
 		" %.*s "
 		" %s "
 		"",
-		LIT(output), LIT(output), output_ext,
+		LIT(output_base), LIT(output_base), output_ext,
 		lib_str, LIT(build_context.link_flags),
 		link_settings
 		);
@@ -354,7 +354,7 @@ int main(int argc, char **argv) {
 	// timings_print_all(&timings);
 
 	if (run_output) {
-		system_exec_command_line_app("odin run", false, "%.*s.exe", cast(int)base_name_len, output_name);
+		system_exec_command_line_app("odin run", false, "%.*s.exe", LIT(output_base));
 	}
 
 	#else
@@ -369,7 +369,7 @@ int main(int argc, char **argv) {
 		"%.*s "
 		// "-debug-pass=Arguments "
 		"",
-		LIT(output),
+		LIT(output_base),
 		optimization_level,
 		LIT(build_context.llc_flags));
 	if (exit_code != 0) {
@@ -430,7 +430,7 @@ int main(int argc, char **argv) {
 		//   It probably has to do with including the entire CRT, but
 		//   that's quite a complicated issue to solve while remaining distro-agnostic.
 		//   Clang can figure out linker flags for us, and that's good enough _for now_.
-		linker = "clang";
+		linker = "clang -Wno-unused-command-line-argument";
 	#endif
 
 	exit_code = system_exec_command_line_app("ld-link", true,
@@ -446,7 +446,7 @@ int main(int argc, char **argv) {
 			// This points the linker to where the entry point is
 			" -e _main "
 		#endif
-		, linker, LIT(output), LIT(output), output_ext,
+		, linker, LIT(output_base), LIT(output_base), output_ext,
 		lib_str, LIT(build_context.link_flags),
 		link_settings
 		);
@@ -457,7 +457,7 @@ int main(int argc, char **argv) {
 	// timings_print_all(&timings);
 
 	if (run_output) {
-		system_exec_command_line_app("odin run", false, "%.*s", cast(int)base_name_len, output_name);
+		system_exec_command_line_app("odin run", false, "%.*s", LIT(output_base));
 	}
 
 	#endif
