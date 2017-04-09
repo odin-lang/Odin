@@ -1091,7 +1091,6 @@ typedef enum ProcTypeOverloadKind {
 
 } ProcTypeOverloadKind;
 
-
 ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 	if (x == NULL && y == NULL) return ProcOverload_NotProcedure;
 	if (x == NULL && y != NULL) return ProcOverload_NotProcedure;

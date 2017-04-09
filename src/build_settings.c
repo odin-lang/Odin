@@ -135,7 +135,62 @@ String odin_root_dir(void) {
 	return path;
 }
 #else
-#error Implement system
+
+// NOTE: Linux / Unix is unfinished and not tested very well.
+#include <sys/stat.h>
+
+String odin_root_dir(void) {
+	String path = global_module_path;
+	Array(char) path_buf;
+	isize len, i;
+	gbTempArenaMemory tmp;
+	wchar_t *text;
+
+	if (global_module_path_set) {
+		return global_module_path;
+	}
+
+	array_init_count(&path_buf, heap_allocator(), 300);
+
+	len = 0;
+	for (;;) {
+		// This is not a 100% reliable system, but for the purposes
+		// of this compiler, it should be _good enough_.
+		// That said, there's no solid 100% method on Linux to get the program's
+		// path without checking this link. Sorry.
+		len = readlink("/proc/self/exe", &path_buf.e[0], path_buf.count);
+		if(len == 0) {
+			return make_string(NULL, 0);
+		}
+		if (len < path_buf.count) {
+			break;
+		}
+		array_resize(&path_buf, 2*path_buf.count + 300);
+	}
+
+
+	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
+	text = gb_alloc_array(string_buffer_allocator, u8, len + 1);
+	gb_memmove(text, &path_buf.e[0], len);
+
+	path = make_string(text, len);
+	for (i = path.len-1; i >= 0; i--) {
+		u8 c = path.text[i];
+		if (c == '/' || c == '\\') {
+			break;
+		}
+		path.len--;
+	}
+
+	global_module_path = path;
+	global_module_path_set = true;
+
+	gb_temp_arena_memory_end(tmp);
+
+	array_free(&path_buf);
+
+	return path;
+}
 #endif
 
 
@@ -221,18 +276,54 @@ void init_build_context(void) {
 	bc->ODIN_ARCH    = str_lit("amd64");
 	bc->ODIN_ENDIAN  = str_lit("little");
 #else
-#error Implement system
+	bc->ODIN_OS      = str_lit("linux");
+	bc->ODIN_ARCH    = str_lit("amd64");
+	bc->ODIN_ENDIAN  = str_lit("little");
 #endif
+
+
+
+	// NOTE(zangent): The linker flags to set the build architecture are different
+	// across OSs. It doesn't make sense to allocate extra data on the heap
+	// here, so I just #defined the linker flags to keep things concise.
+	#if defined(GB_SYSTEM_WINDOWS)
+
+	#define LINK_FLAG_X64 "/machine:x64"
+	#define LINK_FLAG_X86 "/machine:x86"
+
+	#elif defined(GB_SYSTEM_OSX)
+
+	// NOTE(zangent): MacOS systems are x64 only, so ld doesn't have
+	// an architecture option. All compilation done on MacOS must be x64.
+	GB_ASSERT(str_eq(bc->ODIN_ARCH, str_lit("amd64")));
+
+	#define LINK_FLAG_X64 ""
+	#define LINK_FLAG_X86 ""
+	#else
+	// Linux, but also BSDs and the like.
+	// NOTE(zangent): When clang is swapped out with ld as the linker,
+	//   the commented flags here should be used. Until then, we'll have
+	//   to use alternative build flags made for clang.
+	/*
+		#define LINK_FLAG_X64 "-m elf_x86_64"
+		#define LINK_FLAG_X86 "-m elf_i386"
+	*/
+	#define LINK_FLAG_X64 "-arch x86-64"
+	#define LINK_FLAG_X86 "-arch x86"
+	#endif
 
 	if (str_eq(bc->ODIN_ARCH, str_lit("amd64"))) {
 		bc->word_size = 8;
 		bc->max_align = 16;
 		bc->llc_flags = str_lit("-march=x86-64 ");
-		bc->link_flags = str_lit("/machine:x64 ");
+		bc->link_flags = str_lit(LINK_FLAG_X64 " ");
 	} else if (str_eq(bc->ODIN_ARCH, str_lit("x86"))) {
 		bc->word_size = 4;
 		bc->max_align = 8;
 		bc->llc_flags = str_lit("-march=x86 ");
-		bc->link_flags = str_lit("/machine:x86 ");
+		bc->link_flags = str_lit(LINK_FLAG_X86 " ");
 	}
+
+	#undef LINK_FLAG_X64
+	#undef LINK_FLAG_X86
 }

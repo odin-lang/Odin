@@ -16,6 +16,11 @@ extern "C" {
 #include "ir_print.c"
 // #include "vm.c"
 
+#if defined(GB_SYSTEM_UNIX)
+// Required for intrinsics on GCC
+#include <xmmintrin.h>
+#endif
+
 #if defined(GB_SYSTEM_WINDOWS)
 // NOTE(bill): `name` is used in debugging and profiling modes
 i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
@@ -102,6 +107,8 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	// }
 
 	// exit_code = status;
+	
+	return exit_code;
 }
 #endif
 
@@ -250,9 +257,11 @@ int main(int argc, char **argv) {
 	optimization_level = gb_clamp(optimization_level, 0, 3);
 
 	i32 exit_code = 0;
+
+	#if defined(GB_SYSTEM_WINDOWS)
 	// For more passes arguments: http://llvm.org/docs/Passes.html
 	exit_code = system_exec_command_line_app("llvm-opt", false,
-		"\"%.*sbin/opt\" \"%s\" -o \"%.*s.bc\" "
+		"\"%.*sbin/opt\" \"%s\" -o \"%.*s\".bc "
 		"-mem2reg "
 		"-memcpyopt "
 		"-die "
@@ -265,6 +274,29 @@ int main(int argc, char **argv) {
 	if (exit_code != 0) {
 		return exit_code;
 	}
+	#else
+	// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
+	//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
+	exit_code = system_exec_command_line_app("llvm-opt", false,
+		"opt \"%s\" -o \"%.*s\".bc "
+		"-mem2reg "
+		"-memcpyopt "
+		"-die "
+		#if defined(GB_SYSTEM_OSX)
+			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
+			// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
+			//       make sure to also change the `macosx_version_min` param passed to `llc`
+			"-mtriple=x86_64-apple-macosx10.8 "
+		#endif
+		// "-dse "
+		// "-dce "
+		// "-S "
+		"",
+		output_name, LIT(output));
+	if (exit_code != 0) {
+		return exit_code;
+	}
+	#endif
 
 	#if defined(GB_SYSTEM_WINDOWS)
 	timings_start_section(&timings, str_lit("llvm-llc"));
@@ -326,7 +358,108 @@ int main(int argc, char **argv) {
 	}
 
 	#else
-	#error Implement build stuff for this platform
+
+	// NOTE(zangent): Linux / Unix is unfinished and not tested very well.
+
+
+	timings_start_section(&timings, str_lit("llvm-llc"));
+	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
+	exit_code = system_exec_command_line_app("llc", false,
+		"llc \"%.*s.bc\" -filetype=obj -O%d "
+		"%.*s "
+		// "-debug-pass=Arguments "
+		"",
+		LIT(output),
+		optimization_level,
+		LIT(build_context.llc_flags));
+	if (exit_code != 0) {
+		return exit_code;
+	}
+
+	timings_start_section(&timings, str_lit("ld-link"));
+
+	gbString lib_str = gb_string_make(heap_allocator(), "");
+	// defer (gb_string_free(lib_str));
+	char lib_str_buf[1024] = {0};
+	for_array(i, ir_gen.module.foreign_library_paths) {
+		String lib = ir_gen.module.foreign_library_paths.e[i];
+
+		// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
+		//   This allows you to specify '-f' in a #foreign_system_library,
+		//   without having to implement any new syntax specifically for MacOS.
+		#if defined(GB_SYSTEM_OSX)
+			isize len;
+			if(lib.len > 2 && lib.text[0] == '-' && lib.text[1] == 'f') {
+				len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+				                        " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
+			} else {
+				len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+				                        " -l%.*s ", LIT(lib));
+			}
+		#else
+			isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+			                        " -l%.*s ", LIT(lib));
+		#endif
+		lib_str = gb_string_appendc(lib_str, lib_str_buf);
+	}
+
+	// Unlike the Win32 linker code, the output_ext includes the dot, because
+	// typically executable files on *NIX systems don't have extensions.
+	char *output_ext = "";
+	char *link_settings = "";
+	char *linker;
+	if (build_context.is_dll) {
+		// Shared libraries are .dylib on MacOS and .so on Linux.
+		// TODO(zangent): Is that statement entirely truthful?
+		#if defined(GB_SYSTEM_OSX)
+			output_ext = ".dylib";
+		#else
+			output_ext = ".so";
+		#endif
+
+		link_settings = "-shared";
+	} else {
+		// TODO: Do I need anything here?
+		link_settings = "";
+	}
+
+	#if defined(GB_SYSTEM_OSX)
+		linker = "ld";
+	#else
+		// TODO(zangent): Figure out how to make ld work on Linux.
+		//   It probably has to do with including the entire CRT, but
+		//   that's quite a complicated issue to solve while remaining distro-agnostic.
+		//   Clang can figure out linker flags for us, and that's good enough _for now_.
+		linker = "clang";
+	#endif
+
+	exit_code = system_exec_command_line_app("ld-link", true,
+		"%s \"%.*s\".o -o \"%.*s%s\" %s "
+		"-lc "
+		" %.*s "
+		" %s "
+		#if defined(GB_SYSTEM_OSX)
+			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
+			// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
+			//       make sure to also change the `mtriple` param passed to `opt`
+			" -macosx_version_min 10.8.0 "
+			// This points the linker to where the entry point is
+			" -e _main "
+		#endif
+		, linker, LIT(output), LIT(output), output_ext,
+		lib_str, LIT(build_context.link_flags),
+		link_settings
+		);
+	if (exit_code != 0) {
+		return exit_code;
+	}
+
+	// timings_print_all(&timings);
+
+	if (run_output) {
+		system_exec_command_line_app("odin run", false, "%.*s", cast(int)base_name_len, output_name);
+	}
+
 	#endif
 #endif
 #endif

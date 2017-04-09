@@ -31,43 +31,45 @@ SEEK_MAX   :: SEEK_HOLE;
 
 // NOTE(zangent): These are OS specific!
 // Do not mix these up!
-RTLD_LAZY     :: 0x1;
-RTLD_NOW      :: 0x2;
-RTLD_LOCAL    :: 0x4;
-RTLD_GLOBAL   :: 0x8;
-RTLD_NODELETE :: 0x80;
-RTLD_NOLOAD   :: 0x10;
-RTLD_FIRST    :: 0x100;
+RTLD_LAZY         :: 0x001;
+RTLD_NOW          :: 0x002;
+RTLD_BINDING_MASK :: 0x3;
+RTLD_GLOBAL       :: 0x100;
 
 args: [dynamic]string;
 
 FileTime :: struct #ordered {
 	seconds: i64,
-	nanoseconds: i64
+	nanoseconds: i32,
+	reserved: i32
 }
 
-Stat :: struct #ordered {
-	device_id : i32, // ID of device containing file
-	mode      : u16, // Mode of the file
-	nlink     : u16, // Number of hard links
-	serial    : u64, // File serial number
-	uid       : u32, // User ID of the file's owner
-	gid       : u32, // Group ID of the file's group
-	rdev      : i32, // Device ID, if device
+// Translated from
+//  https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.7-4.6/+/jb-dev/sysroot/usr/include/bits/stat.h
+// Validity is not guaranteed.
 
+Stat :: struct #ordered {
+	device_id  : u64, // ID of device containing file
+	serial     : u64, // File serial number
+	nlink      : u32, // Number of hard links
+	mode       : u32, // Mode of the file
+	uid        : u32, // User ID of the file's owner
+	gid        : u32, // Group ID of the file's group
+	_padding   : i32, // 32 bits of padding
+	rdev       : u64, // Device ID, if device
+	size       : i64, // Size of the file, in bytes
+	block_size : i64, // Optimal bllocksize for I/O
+	blocks     : i64, // Number of 512-byte blocks allocated
+	
 	last_access   : FileTime, // Time of last access
 	modified      : FileTime, // Time of last modification
 	status_change : FileTime, // Time of last status change
-	created       : FileTime, // Time of creation
 
-	size      : i64,  // Size of the file, in bytes
-	blocks    : i64,  // Number of blocks allocated for the file
-	block_size: i32,  // Optimal blocksize for I/O
-	flags     : u32,  // User-defined flags for the file
-	gen_num   : u32,  // File generation number ...?
-	_spare    : i32,  // RESERVED
 	_reserve1,
-	_reserve2 : i64,  // RESERVED 
+	_reserve2,
+	_reserve3 : i64,
+	serial    : u64, // File serial number...? Maybe.
+	_reserve4 : i64
 };
 
 // File type
@@ -144,7 +146,6 @@ unix_dlsym   :: proc(handle: rawptr, symbol: ^u8) ->  (proc() #cc_c)            
 unix_dlclose :: proc(handle: rawptr) -> int                                       #foreign dl   "dlclose";
 unix_dlerror :: proc() -> ^u8                                                     #foreign dl   "dlerror";
 
-
 // TODO(zangent): Change this to just `open` when Bill fixes overloading.
 open_simple :: proc(path: string, mode: int) -> (Handle, Errno) {
 	
@@ -156,7 +157,6 @@ open_simple :: proc(path: string, mode: int) -> (Handle, Errno) {
 	}
 	return handle, 0;
 }
-
 // NOTE(zangent): This is here for compatability reasons. Should this be here?
 open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 	return open_simple(path, mode);
@@ -207,12 +207,12 @@ last_write_time :: proc(fd: Handle) -> File_Time {}
 last_write_time_by_name :: proc(name: string) -> File_Time {}
 */
 
-stat :: proc(path: string) -> (Stat, bool) #inline {
+stat :: proc(path: string) -> (Stat, int) #inline {
 	s: Stat;
 	cstr := strings.new_c_string(path);
 	defer free(cstr);
 	ret_int := unix_stat(cstr, ^s);
-	return s, ret_int==0;
+	return s, ret_int;
 }
 
 access :: proc(path: string, mask: int) -> bool #inline {
@@ -259,14 +259,16 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	return data, true;
 }
 
-heap_alloc :: proc(size: int) -> rawptr #inline {
+heap_alloc :: proc(size: int) -> rawptr {
 	assert(size > 0);
 	return unix_malloc(size);
 }
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr #inline {
+
+heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	return unix_realloc(ptr, new_size);
 }
-heap_free :: proc(ptr: rawptr) #inline {
+
+heap_free :: proc(ptr: rawptr) {
 	unix_free(ptr);
 }
 
@@ -280,10 +282,9 @@ getenv :: proc(name: string) -> (string, bool) {
 	return strings.to_odin_string(cstr), true;
 }
 
-exit :: proc(code: int) #inline {
+exit :: proc(code: int) {
 	unix_exit(code);
 }
-
 
 current_thread_id :: proc() -> int {
 	// return cast(int) unix_gettid();

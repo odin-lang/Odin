@@ -276,7 +276,9 @@ extern "C" {
 
 // TODO(bill): How many of these headers do I really need?
 // #include <stdarg.h>
-// #include <stddef.h>
+#if !defined(GB_SYSTEM_WINDOWS)
+	#include <stddef.h>
+#endif
 
 
 
@@ -3644,6 +3646,13 @@ gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 #if defined(_MSC_VER)
 	// TODO(bill): Is this good enough?
 	__movsb(cast(u8 *)dest, cast(u8 *)source, n);
+#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+	// NOTE(zangent): I assume there's a reason this isn't being used elsewhere,
+	//   but casting pointers as arguments to an __asm__ call is considered an
+	//   error on MacOS and (I think) Linux
+	// TODO(zangent): Figure out how to refactor the asm code so it works on MacOS,
+	//   since this is probably not the way the author intended this to work.
+	memcpy(dest, source, n);
 #elif defined(GB_CPU_X86)
 	__asm__ __volatile__("rep movsb" : "+D"(cast(u8 *)dest), "+S"(cast(u8 *)source), "+c"(n) : : "memory");
 #else
@@ -4695,7 +4704,7 @@ gb_inline u32 gb_thread_current_id(void) {
 #elif defined(GB_ARCH_32_BIT) && defined(GB_CPU_X86)
 	__asm__("mov %%gs:0x08,%0" : "=r"(thread_id));
 #elif defined(GB_ARCH_64_BIT) && defined(GB_CPU_X86)
-	__asm__("mov %%gs:0x10,%0" : "=r"(thread_id));
+	__asm__("mov %%fs:0x10,%0" : "=r"(thread_id));
 #else
 	#error Unsupported architecture for gb_thread_current_id()
 #endif
@@ -5019,7 +5028,10 @@ void gb_affinity_init(gbAffinity *a) {
 	// Parsing /proc/cpuinfo to get the number of threads per core.
 	// NOTE(zangent): This calls the CPU's threads "cores", although the wording
 	// is kind of weird. This should be right, though.
-	if (fopen("/proc/cpuinfo", "r") != NULL) {
+
+	FILE* cpu_info = fopen("/proc/cpuinfo", "r");
+
+	if (cpu_info != NULL) {
 		for (;;) {
 			// The 'temporary char'. Everything goes into this char,
 			// so that we can check against EOF at the end of this loop.
@@ -5050,6 +5062,8 @@ void gb_affinity_init(gbAffinity *a) {
 			}
 #undef AF__CHECK
 		}
+		
+		fclose(cpu_info);
 	}
 
 	if (threads == 0) {

@@ -6792,6 +6792,12 @@ void ir_gen_tree(irGen *s) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later
 			} else if (scope->is_init && e->kind == Entity_Procedure && str_eq(name, str_lit("main"))) {
+			#ifdef GB_SYSTEM_OSX
+			} else if (str_eq(name, str_lit("args")) && str_eq(e->token.pos.file, get_fullpath_core(heap_allocator(), str_lit("os_x.odin")))) {
+			#endif
+			#ifdef GB_SYSTEM_LINUX
+			} else if (str_eq(name, str_lit("args")) && str_eq(e->token.pos.file, get_fullpath_core(heap_allocator(), str_lit("os_linux.odin")))) {
+			#endif
 			} else {
 				name = ir_mangle_name(s, e->token.pos.file, e);
 			}

@@ -26,12 +26,23 @@ Website: [https://odin.handmade.network/](https://odin.handmade.network/)
 
 ## Requirements to build and run
 
-* Windows
-* x86-64
-* MSVC 2015 installed (C99 support)
-* Requires MSVC's link.exe as the linker
-	- run `vcvarsall.bat` to setup the path
-* [LLVM binaries](https://github.com/gingerBill/Odin/releases/tag/llvm-4.0-windows) for `opt.exe` and `llc.exe`
+- Windows
+	* x86-64
+	* MSVC 2015 installed (C99 support)
+	* [LLVM binaries](https://github.com/gingerBill/Odin/releases/tag/llvm-4.0-windows) for `opt.exe` and `llc.exe`
+	* Requires MSVC's link.exe as the linker
+		* run `vcvarsall.bat` to setup the path
+
+- MacOS
+	* x86-64
+	* LLVM explicitly installed (`brew install llvm`)
+	* XCode installed (for the linker)
+
+- GNU/Linux
+	* x86-64
+	* Build tools (ld)
+	* LLVM installed
+	* Clang installed (temporary - this is calling the linker for now)
 
 ## Warnings
 

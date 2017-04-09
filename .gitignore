@@ -251,6 +251,12 @@ paket-files/
 
 
 # Project Specific
+
+# - Windows
 *.sln
 builds/
 bin/
+
+# - Linux/MacOS
+odin
+odin.dSYM

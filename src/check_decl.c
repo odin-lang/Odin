@@ -5,8 +5,8 @@ void check_stmt_list     (Checker *c, AstNodeArray stmts, u32 flags);
 // NOTE(bill): `content_name` is for debugging and error messages
 Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String context_name) {
 	if (operand->mode == Addressing_Invalid ||
-	    operand->type == t_invalid ||
-	    e->type == t_invalid) {
+		operand->type == t_invalid ||
+		e->type == t_invalid) {
 
 		if (operand->mode == Addressing_Builtin) {
 			gbString expr_str = expr_to_string(operand->expr);
@@ -14,9 +14,9 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 			// TODO(bill): is this a good enough error message?
 			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error_node(operand->expr,
-			      "Cannot assign builtin procedure `%s` in %.*s",
-			      expr_str,
-			      LIT(context_name));
+				  "Cannot assign builtin procedure `%s` in %.*s",
+				  expr_str,
+				  LIT(context_name));
 
 			operand->mode = Addressing_Invalid;
 
@@ -86,8 +86,8 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 
 void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	if (operand->mode == Addressing_Invalid ||
-	    operand->type == t_invalid ||
-	    e->type == t_invalid) {
+		operand->type == t_invalid ||
+		e->type == t_invalid) {
 		if (e->type == NULL) {
 			e->type = t_invalid;
 		}
@@ -182,7 +182,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 	check_init_constant(c, e, &operand);
 
 	if (operand.mode == Addressing_Invalid ||
-	    base_type(operand.type) == t_invalid) {
+		base_type(operand.type) == t_invalid) {
 		error(e->token, "Invalid declaration type");
 	}
 }
@@ -324,9 +324,9 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 			Type *other_type = base_type(f->type);
 			if (!are_signatures_similar_enough(this_type, other_type)) {
 				error_node(d->proc_lit,
-				           "Redeclaration of #foreign procedure `%.*s` with different type signatures\n"
-				           "\tat %.*s(%td:%td)",
-				           LIT(name), LIT(pos.file), pos.line, pos.column);
+						   "Redeclaration of #foreign procedure `%.*s` with different type signatures\n"
+						   "\tat %.*s(%td:%td)",
+						   LIT(name), LIT(pos.file), pos.line, pos.column);
 			}
 		} else {
 			map_entity_set(fp, key, e);
@@ -349,9 +349,9 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 				TokenPos pos = f->token.pos;
 				// TODO(bill): Better error message?
 				error_node(d->proc_lit,
-				           "Non unique linking name for procedure `%.*s`\n"
-				           "\tother at %.*s(%td:%td)",
-				           LIT(name), LIT(pos.file), pos.line, pos.column);
+						   "Non unique linking name for procedure `%.*s`\n"
+						   "\tother at %.*s(%td:%td)",
+						   LIT(name), LIT(pos.file), pos.line, pos.column);
 			} else {
 				map_entity_set(fp, key, e);
 			}
