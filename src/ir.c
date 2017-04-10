@@ -3328,6 +3328,17 @@ irValue *ir_find_global_variable(irProcedure *proc, String name) {
 void ir_build_stmt_list(irProcedure *proc, AstNodeArray stmts);
 
 
+bool is_double_pointer(Type *t) {
+	if (!is_type_pointer(t)) {
+		return false;
+	}
+	t = type_deref(t);
+	if (t == NULL) {
+		return false;
+	}
+	return is_type_pointer(t);
+}
+
 irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	expr = unparen_expr(expr);
 
@@ -3906,7 +3917,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					Type *original_type = type_of_expr(proc->module->info, ce->args.e[0]);
 					irAddr addr = ir_build_addr(proc, ce->args.e[0]);
 					irValue *ptr = addr.addr;
-					if (is_type_pointer(original_type)) {
+					if (is_double_pointer(ir_type(ptr))) {
 						ptr = ir_addr_load(proc, addr);
 					}
 					Type *t = base_type(type_deref(original_type));
@@ -3934,11 +3945,16 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					Type *value_type = type_of_expr(proc->module->info, ce->args.e[0]);
 					irAddr array_addr = ir_build_addr(proc, ce->args.e[0]);
 					irValue *array_ptr = array_addr.addr;
-					if (is_type_pointer(value_type)) {
+					if (is_double_pointer(ir_type(array_ptr))) {
 						array_ptr = ir_addr_load(proc, array_addr);
 					}
 					Type *type = ir_type(array_ptr);
-					GB_ASSERT(is_type_pointer(type));
+					{
+						TokenPos pos = ast_node_token(ce->args.e[0]).pos;
+						GB_ASSERT_MSG(is_type_pointer(type), "%.*s(%td) %s",
+						              LIT(pos.file), pos.line,
+						              type_to_string(type));
+					}
 					type = base_type(type_deref(type));
 					Type *elem_type = NULL;
 					bool is_slice = false;
