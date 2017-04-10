@@ -4858,8 +4858,8 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 #elif defined(GB_SYSTEM_LINUX)
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {
-		// ptr = aligned_alloc(alignment, size);
-		ptr = malloc(size+alignment);
+		ptr = aligned_alloc(alignment, size);
+		// ptr = malloc(size+alignment);
 
 		if (flags & gbAllocatorFlag_ClearToZero) {
 			gb_zero_size(ptr, size);
@@ -4871,8 +4871,8 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 	} break;
 
 	case gbAllocation_Resize: {
-		ptr = realloc(old_memory, size);
-		// ptr = gb_default_resize_align(gb_heap_allocator(), old_memory, old_size, size, alignment);
+		// ptr = realloc(old_memory, size);
+		ptr = gb_default_resize_align(gb_heap_allocator(), old_memory, old_size, size, alignment);
 	} break;
 #else
 	// TODO(bill): *nix version that's decent
@@ -7615,12 +7615,14 @@ gbFileError gb_file_open_mode(gbFile *f, gbFileMode mode, char const *filename) 
 }
 
 gbFileError gb_file_close(gbFile *f) {
-	if (!f) {
+	if (f == NULL) {
 		return gbFileError_Invalid;
 	}
 
 #if defined(GB_COMPILER_MSVC)
-	if (f->filename) gb_free(gb_heap_allocator(), cast(char *)f->filename);
+	if (f->filename != NULL) {
+		gb_free(gb_heap_allocator(), cast(char *)f->filename);
+	}
 #else
 	// TODO HACK(bill): Memory Leak!!!
 #endif
@@ -8035,19 +8037,23 @@ char *gb_path_get_full_name(gbAllocator a, char const *path) {
 	new_path[new_len] = 0;
 	return new_path;
 #else
-// TODO(bill): Make work on *nix, etc.
-	char* p = realpath(path, 0);
-	GB_ASSERT(p && "file does not exist");
+	char *p, *result, *fullpath = NULL;
+	isize len;
+	p = realpath(path, NULL);
+	fullpath = p;
+	if (p == NULL) {
+		// NOTE(bill): File does not exist
+		fullpath = cast(char *)path;
+	}
 
-	isize len = gb_strlen(p);
+	len = gb_strlen(fullpath);
 
-	// bill... gb_alloc_str_len refused to work for this...
-	char* ret = gb_alloc(a, sizeof(char) * len + 1);
-	gb_memmove(ret, p, len);
-	ret[len] = 0;
+	result = gb_alloc_array(a, char, len + 1);
+	gb_memmove(result, fullpath, len);
+	result[len] = 0;
 	free(p);
 
-	return ret;
+	return result;
 #endif
 }
 

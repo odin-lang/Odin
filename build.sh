@@ -2,10 +2,10 @@
 
 release_mode=0
 
-warnings_to_disable="-Wno-attributes -Wno-implicit-function-declaration -Wno-incompatible-pointer-types -Wno-switch -Wno-pointer-sign -Wno-tautological-constant-out-of-range-compare -Wno-tautological-compare"
+warnings_to_disable="-std=c11 -Wno-switch -Wno-pointer-sign -Wno-tautological-constant-out-of-range-compare -Wno-tautological-compare -Wno-macro-redefined"
 libraries="-pthread -ldl -lm"
-other_args="-x c"
-compiler="gcc"
+other_args=""
+compiler="clang"
 
 if [ "$release_mode" -eq "0" ]; then
 	other_args="${other_args} -g -fno-inline-functions"
@@ -20,3 +20,5 @@ if [[ "$(uname)" == "Darwin" ]]; then
 fi
 
 ${compiler} src/main.c ${warnings_to_disable} ${libraries} ${other_args} -o odin
+
+./odin run code/demo.odin

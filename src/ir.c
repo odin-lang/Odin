@@ -1090,7 +1090,7 @@ irValue *ir_generate_array(irModule *m, Type *elem_type, i64 count, String prefi
 	isize name_len = prefix.len + 10;
 	token.string.text = gb_alloc_array(a, u8, name_len);
 	token.string.len = gb_snprintf(cast(char *)token.string.text, name_len,
-	                               "%.*s-%llx", LIT(prefix), id)-1;
+	                               "%.*s-%llx", LIT(prefix), cast(unsigned long long)id)-1;
 	Entity *e = make_entity_variable(a, NULL, token, make_type_array(a, elem_type, count), false);
 	irValue *value = ir_value_global(a, e, NULL);
 	value->Global.is_private = true;
