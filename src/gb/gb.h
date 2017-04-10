@@ -4873,7 +4873,7 @@ GB_ALLOCATOR_PROC(gb_heap_allocator_proc) {
 	case gbAllocation_Resize: {
 		ptr = realloc(old_memory, size);
 		// ptr = gb_default_resize_align(gb_heap_allocator(), old_memory, old_size, size, alignment);
-	} break;	
+	} break;
 #else
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {
@@ -5086,7 +5086,7 @@ void gb_affinity_init(gbAffinity *a) {
 			}
 #undef AF__CHECK
 		}
-		
+
 		fclose(cpu_info);
 	}
 
@@ -7619,10 +7619,11 @@ gbFileError gb_file_close(gbFile *f) {
 		return gbFileError_Invalid;
 	}
 
-	//
+#if defined(GB_COMPILER_MSVC)
+	if (f->filename) gb_free(gb_heap_allocator(), cast(char *)f->filename);
+#else
 	// TODO HACK(bill): Memory Leak!!!
-	// if (f->filename) gb_free(gb_heap_allocator(), cast(char *)f->filename);
-	//
+#endif
 
 #if defined(GB_SYSTEM_WINDOWS)
 	if (f->fd.p == INVALID_HANDLE_VALUE) {
