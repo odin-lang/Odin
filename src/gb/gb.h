@@ -3622,14 +3622,11 @@ b32 gb_is_power_of_two(isize x) {
 
 gb_inline void *gb_align_forward(void *ptr, isize alignment) {
 	uintptr p;
-	isize modulo;
 
 	GB_ASSERT(gb_is_power_of_two(alignment));
 
 	p = cast(uintptr)ptr;
-	modulo = p & (alignment-1);
-	if (modulo) p += (alignment - modulo);
-	return cast(void *)p;
+	return cast(void *)((p + (alignment-1)) &~ (alignment-1));
 }
 
 

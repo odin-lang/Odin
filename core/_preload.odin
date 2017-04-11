@@ -592,13 +592,12 @@ __dynamic_map_reserve :: proc(using header: __Map_Header, cap: int)  {
 }
 
 __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
-	new_header := header;
+	new_header: __Map_Header = header;
 	nm: raw.Dynamic_Map;
 	new_header.m = ^nm;
 
 	header_hashes := cast(^raw.Dynamic_Array)^header.m.hashes;
 	nm_hashes := cast(^raw.Dynamic_Array)^nm.hashes;
-
 
 	__dynamic_array_resize(nm_hashes, size_of(int), align_of(int), new_count);
 	__dynamic_array_reserve(^nm.entries, entry_size, entry_align, m.entries.len);
@@ -611,7 +610,7 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
 			__dynamic_map_grow(new_header);
 		}
 
-		entry_header := __dynamic_map_get_entry(new_header, i);
+		entry_header := __dynamic_map_get_entry(header, i);
 		data := cast(^byte)entry_header;
 
 		fr := __dynamic_map_find(new_header, entry_header.key);
@@ -626,7 +625,7 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
 		e := __dynamic_map_get_entry(new_header, j);
 		e.next = fr.entry_index;
 		ndata := cast(^byte)e;
-		__mem_copy(ndata+value_offset, data+value_offset, entry_size-value_offset);
+		__mem_copy(ndata+value_offset, data+value_offset, value_size);
 
 		if __dynamic_map_full(new_header) {
 			__dynamic_map_grow(new_header);
