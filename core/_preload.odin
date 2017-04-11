@@ -663,7 +663,6 @@ __dynamic_map_set :: proc(using h: __Map_Header, key: __Map_Key, value: rawptr) 
 	if __dynamic_map_full(h) {
 		__dynamic_map_grow(h);
 	}
-	fmt.println("entries:", h.m.entries.len);
 }
 
 
@@ -673,7 +672,7 @@ __dynamic_map_grow :: proc(using h: __Map_Header) {
 }
 
 __dynamic_map_full :: proc(using h: __Map_Header) -> bool {
-	return cast(int)(0.75 * cast(f64)len(m.hashes)) <= m.entries.len;
+	return cast(int)(0.75 * cast(f64)len(m.hashes)) <= m.entries.cap;
 }
 
 
