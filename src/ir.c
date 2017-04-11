@@ -1502,12 +1502,15 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val, Type *map_type) 
 		ir_emit_store(proc, ir_emit_struct_ep(proc, h, 1), v_true);
 	}
 
-	i64 entry_size = type_size_of(a, map_type->Map.entry_type);
-	i64 entry_align = type_align_of(a, map_type->Map.entry_type);
+	i64 entry_size   = type_size_of(a, map_type->Map.entry_type);
+	i64 entry_align  = type_align_of(a, map_type->Map.entry_type);
 	i64 value_offset = type_offset_of(a, map_type->Map.entry_type, 2);
+	i64 value_size   = type_size_of(a, map_type->Map.value);
+
 	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 2), ir_const_int(a, entry_size));
 	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 3), ir_const_int(a, entry_align));
 	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 4), ir_const_int(a, value_offset));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, h, 5), ir_const_int(a, value_size));
 
 
 	return ir_emit_load(proc, h);

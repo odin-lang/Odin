@@ -466,6 +466,16 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	return true;
 }
 
+__dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: int) -> bool {
+	array := cast(^raw.Dynamic_Array)array_;
+
+	ok := __dynamic_array_reserve(array_, elem_size, elem_align, len);
+	if ok {
+		array.len = len;
+	}
+	return ok;
+}
+
 
 __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
                                items: rawptr, item_count: int) -> int {
@@ -546,6 +556,8 @@ __default_hash_string :: proc(s: string) -> u64 {
 	return __default_hash(cast([]byte)s);
 }
 
+__INITIAL_MAP_CAP :: 16;
+
 __Map_Key :: struct #ordered {
 	hash: u64,
 	str:  string,
@@ -571,6 +583,7 @@ __Map_Header :: struct #ordered {
 	entry_size:    int,
 	entry_align:   int,
 	value_offset:  int,
+	value_size:    int,
 }
 
 __dynamic_map_reserve :: proc(using header: __Map_Header, cap: int)  {
@@ -587,20 +600,19 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
 	nm_hashes := cast(^raw.Dynamic_Array)^nm.hashes;
 
 
-	reserve(nm.hashes, new_count);
-	nm_hashes.len = nm_hashes.cap;
-	__dynamic_array_reserve(^nm.entries, entry_size, entry_align, m.entries.cap);
-	for _, i in nm.hashes {
+	__dynamic_array_resize(nm_hashes, size_of(int), align_of(int), new_count);
+	__dynamic_array_reserve(^nm.entries, entry_size, entry_align, m.entries.len);
+	for i in 0..new_count {
 		nm.hashes[i] = -1;
 	}
 
-	for i := 0; i < nm.entries.len; i++ {
-		entry_header := __dynamic_map_get_entry(new_header, i);
-		data := cast(^byte)entry_header;
-
+	for i := 0; i < m.entries.len; i++ {
 		if len(nm.hashes) == 0 {
 			__dynamic_map_grow(new_header);
 		}
+
+		entry_header := __dynamic_map_get_entry(new_header, i);
+		data := cast(^byte)entry_header;
 
 		fr := __dynamic_map_find(new_header, entry_header.key);
 		j := __dynamic_map_add_entry(new_header, entry_header.key);
@@ -615,11 +627,12 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
 		e.next = fr.entry_index;
 		ndata := cast(^byte)e;
 		__mem_copy(ndata+value_offset, data+value_offset, entry_size-value_offset);
+
 		if __dynamic_map_full(new_header) {
 			__dynamic_map_grow(new_header);
 		}
 	}
-	free_ptr_with_allocator(header_hashes.allocator,  header_hashes.data);
+	free_ptr_with_allocator(header_hashes.allocator, header_hashes.data);
 	free_ptr_with_allocator(header.m.entries.allocator, header.m.entries.data);
 	header.m^ = nm;
 }
@@ -640,8 +653,10 @@ __dynamic_map_set :: proc(using h: __Map_Header, key: __Map_Key, value: rawptr) 
 
 
 	if len(m.hashes) == 0 {
+		__dynamic_map_reserve(h, __INITIAL_MAP_CAP);
 		__dynamic_map_grow(h);
 	}
+
 	fr := __dynamic_map_find(h, key);
 	if fr.entry_index >= 0 {
 		index = fr.entry_index;
@@ -655,9 +670,10 @@ __dynamic_map_set :: proc(using h: __Map_Header, key: __Map_Key, value: rawptr) 
 		}
 	}
 	{
-		data := cast(^byte)__dynamic_map_get_entry(h, index);
-		val := data+value_offset;
-		__mem_copy(val, value, entry_size-value_offset);
+		e := __dynamic_map_get_entry(h, index);
+		e.key = key;
+		val := cast(^byte)e + value_offset;
+		__mem_copy(val, value, value_size);
 	}
 
 	if __dynamic_map_full(h) {
@@ -667,7 +683,7 @@ __dynamic_map_set :: proc(using h: __Map_Header, key: __Map_Key, value: rawptr) 
 
 
 __dynamic_map_grow :: proc(using h: __Map_Header) {
-	new_count := max(2*m.entries.cap + 8, 8);
+	new_count := max(2*m.entries.cap + 8, __INITIAL_MAP_CAP);
 	__dynamic_map_rehash(h, new_count);
 }
 
