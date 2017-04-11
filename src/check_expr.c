@@ -5619,6 +5619,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		case Type_DynamicArray:
 			valid = true;
+			o->type = make_type_slice(c->allocator, t->DynamicArray.elem);
 			break;
 		}
 

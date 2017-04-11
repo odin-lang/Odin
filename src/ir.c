@@ -1945,13 +1945,15 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	case Token_Shl:
 	case Token_Shr:
 		left = ir_emit_conv(proc, left, type);
-		if (!is_type_unsigned(ir_type(right))) {
-			Type *t = t_u64;
-			if (build_context.word_size == 32) {
-				t = t_u32;
-			}
-			right = ir_emit_conv(proc, right, t);
-		}
+		// if (!is_type_unsigned(ir_type(right))) {
+		// 	Type *t = t_u64;
+		// 	if (build_context.word_size == 32) {
+		// 		t = t_u32;
+		// 	}
+		// 	right = ir_emit_conv(proc, right, t);
+		// }
+		right = ir_emit_conv(proc, right, type);
+
 		break;
 
 	case Token_AndNot: {
@@ -3792,7 +3794,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 						irValue *array = ir_add_local_generated(proc, type);
 						irValue **args = gb_alloc_array(a, irValue *, 5);
-						args[0] = array;
+						args[0] = ir_emit_conv(proc, array, t_rawptr);
 						args[1] = ir_const_int(a, type_size_of(a, elem_type));
 						args[2] = ir_const_int(a, type_align_of(a, elem_type));;
 						args[3] = len;
@@ -4860,17 +4862,18 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		}
 
 		case Type_DynamicArray: {
-			Type *dynamic_array = type;
+			Type *elem_type = type->DynamicArray.elem;
+			Type *slice_type = make_type_slice(a, elem_type);
 
 			if (high == NULL) high = ir_dynamic_array_count(proc, base);
-			if (max == NULL)  max = ir_dynamic_array_capacity(proc, base);
+			if (max == NULL)  max  = ir_dynamic_array_capacity(proc, base);
 
 			ir_emit_slice_bounds_check(proc, se->open, low, high, max, false);
 
 			irValue *elem  = ir_emit_ptr_offset(proc, ir_dynamic_array_elem(proc, base), low);
 			irValue *len   = ir_emit_arith(proc, Token_Sub, high, low, t_int);
 			irValue *cap   = ir_emit_arith(proc, Token_Sub, max, low, t_int);
-			irValue *slice = ir_add_local_generated(proc, dynamic_array);
+			irValue *slice = ir_add_local_generated(proc, slice_type);
 			ir_fill_slice(proc, slice, elem, len, cap);
 			return ir_addr(slice);
 		}
@@ -5617,7 +5620,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 					irValue *value = ir_value_type_name(proc->module->allocator,
 					                                           name, e->type);
-					map_string_set(&proc->module->entity_names, hash_pointer(e->type), name);
+					map_string_set(&proc->module->entity_names, hash_pointer(e), name);
 					ir_gen_global_type_name(proc->module, e, name);
 				} break;
 				case Entity_Procedure: {

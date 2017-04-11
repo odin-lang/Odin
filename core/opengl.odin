@@ -47,6 +47,7 @@ GetProcAddress :: proc(name: string) -> proc() #cc_c {
 GenBuffers:               proc(count: i32, buffers: ^u32) #cc_c;
 GenVertexArrays:          proc(count: i32, buffers: ^u32) #cc_c;
 GenSamplers:              proc(count: i32, buffers: ^u32) #cc_c;
+DeleteBuffers:            proc(count: i32, buffers: ^u32) #cc_c;
 BindBuffer:               proc(target: i32, buffer: u32) #cc_c;
 BindVertexArray:          proc(buffer: u32) #cc_c;
 BindSampler:              proc(position: i32, sampler: u32) #cc_c;
@@ -108,6 +109,7 @@ init :: proc() {
 	set_proc_address(^GenBuffers,              "glGenBuffers\x00");
 	set_proc_address(^GenVertexArrays,         "glGenVertexArrays\x00");
 	set_proc_address(^GenSamplers,             "glGenSamplers\x00");
+	set_proc_address(^DeleteBuffers,           "glDeleteBuffers\x00");
 	set_proc_address(^BindBuffer,              "glBindBuffer\x00");
 	set_proc_address(^BindSampler,             "glBindSampler\x00");
 	set_proc_address(^BindVertexArray,         "glBindVertexArray\x00");

@@ -51,8 +51,17 @@ Glyph_Metrics_Float :: struct #ordered {
 	cell_inc_y:   f32,
 }
 
-Create_Context_Attribs_ARB_Type :: #type proc(hdc: Hdc, hshareContext: rawptr, attribList: ^i32) -> Hglrc;
-Choose_Pixel_Format_ARB_Type    :: #type proc(hdc: Hdc, attrib_i_list: ^i32, attrib_f_list: ^f32, max_formats: u32, formats: ^i32, num_formats : ^u32) -> Bool #cc_c;
+CreateContextAttribsARB_Type :: #type proc(hdc: Hdc, h_share_context: rawptr, attribList: ^i32) -> Hglrc;
+ChoosePixelFormatARB_Type    :: #type proc(hdc: Hdc, attrib_i_list: ^i32, attrib_f_list: ^f32, max_formats: u32, formats: ^i32, num_formats : ^u32) -> Bool #cc_c;
+SwapIntervalEXT_Type         :: #type proc(interval : i32) -> bool #cc_c;
+GetExtensionsStringARB_Type  :: #type proc(Hdc) -> ^byte #cc_c;
+
+
+CreateContextAttribsARB: CreateContextAttribsARB_Type;
+ChoosePixelFormatARB:    ChoosePixelFormatARB_Type;
+SwapIntervalEXT:         SwapIntervalEXT_Type;
+GetExtensionsStringARB:  GetExtensionsStringARB_Type;
+
 
 
 CreateContext           :: proc(hdc: Hdc) -> Hglrc                                                                                                 #foreign opengl32 "wglCreateContext";
