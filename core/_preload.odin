@@ -284,6 +284,9 @@ __string_eq :: proc(a, b: string) -> bool {
 	if len(a) != len(b) {
 		return false;
 	}
+	if len(a) == 0 {
+		return true;
+	}
 	if ^a[0] == ^b[0] {
 		return true;
 	}
@@ -570,10 +573,9 @@ __Map_Header :: struct #ordered {
 	value_offset:  int,
 }
 
-__dynamic_map_reserve :: proc(using header: __Map_Header, cap: int) -> bool {
-	h := __dynamic_array_reserve(^m.hashes, size_of(int), align_of(int), cap);
-	e := __dynamic_array_reserve(^m.entries, entry_size, entry_align,    cap);
-	return h && e;
+__dynamic_map_reserve :: proc(using header: __Map_Header, cap: int)  {
+	__dynamic_array_reserve(^m.hashes, size_of(int), align_of(int), cap);
+	__dynamic_array_reserve(^m.entries, entry_size, entry_align,    cap);
 }
 
 __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
@@ -587,7 +589,7 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
 
 	reserve(nm.hashes, new_count);
 	nm_hashes.len = nm_hashes.cap;
-	__dynamic_array_reserve(^nm.entries, entry_size, entry_align, m.entries.len);
+	__dynamic_array_reserve(^nm.entries, entry_size, entry_align, m.entries.cap);
 	for _, i in nm.hashes {
 		nm.hashes[i] = -1;
 	}
@@ -634,6 +636,8 @@ __dynamic_map_get :: proc(h: __Map_Header, key: __Map_Key) -> rawptr {
 
 __dynamic_map_set :: proc(using h: __Map_Header, key: __Map_Key, value: rawptr) {
 	index: int;
+	assert(value != nil);
+
 
 	if len(m.hashes) == 0 {
 		__dynamic_map_grow(h);
@@ -659,11 +663,12 @@ __dynamic_map_set :: proc(using h: __Map_Header, key: __Map_Key, value: rawptr) 
 	if __dynamic_map_full(h) {
 		__dynamic_map_grow(h);
 	}
+	fmt.println("entries:", h.m.entries.len);
 }
 
 
 __dynamic_map_grow :: proc(using h: __Map_Header) {
-	new_count := 2*m.entries.len + 8;
+	new_count := max(2*m.entries.cap + 8, 8);
 	__dynamic_map_rehash(h, new_count);
 }
 

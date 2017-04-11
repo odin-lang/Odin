@@ -3649,6 +3649,9 @@ gb_inline void gb_zero_size(void *ptr, isize size) { gb_memset(ptr, 0, size); }
 
 gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 #if defined(_MSC_VER)
+	if (dest == NULL) {
+		return NULL;
+	}
 	// TODO(bill): Is this good enough?
 	__movsb(cast(u8 *)dest, cast(u8 *)source, n);
 // #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
@@ -3659,11 +3662,19 @@ gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 	//   since this is probably not the way the author intended this to work.
 	// memcpy(dest, source, n);
 #elif defined(GB_CPU_X86)
+	if (dest == NULL) {
+		return NULL;
+	}
+
 	__asm__ __volatile__("rep movsb" : "+D"(dest), "+S"(source), "+c"(n) : : "memory");
 #else
 	u8 *d = cast(u8 *)dest;
 	u8 const *s = cast(u8 const *)source;
 	u32 w, x;
+
+	if (dest == NULL) {
+		return NULL;
+	}
 
 	for (; cast(uintptr)s % 4 && n; n--) {
 		*d++ = *s++;
@@ -3796,10 +3807,16 @@ gb_inline void *gb_memmove(void *dest, void const *source, isize n) {
 	u8 *d = cast(u8 *)dest;
 	u8 const *s = cast(u8 const *)source;
 
-	if (d == s)
+	if (dest == NULL) {
+		return NULL;
+	}
+
+	if (d == s) {
 		return d;
-	if (s+n <= d || d+n <= s) // NOTE(bill): Non-overlapping
+	}
+	if (s+n <= d || d+n <= s) { // NOTE(bill): Non-overlapping
 		return gb_memcopy(d, s, n);
+	}
 
 	if (d < s) {
 		if (cast(uintptr)s % gb_size_of(isize) == cast(uintptr)d % gb_size_of(isize)) {
@@ -3838,6 +3855,10 @@ gb_inline void *gb_memset(void *dest, u8 c, isize n) {
 	isize k;
 	u32 c32 = ((u32)-1)/255 * c;
 
+	if (dest == NULL) {
+		return NULL;
+	}
+
 	if (n == 0)
 		return dest;
 	s[0] = s[n-1] = c;
@@ -3858,14 +3879,16 @@ gb_inline void *gb_memset(void *dest, u8 c, isize n) {
 
 	*cast(u32 *)(s+0) = c32;
 	*cast(u32 *)(s+n-4) = c32;
-	if (n < 9)
+	if (n < 9) {
 		return dest;
+	}
 	*cast(u32 *)(s +  4)    = c32;
 	*cast(u32 *)(s +  8)    = c32;
 	*cast(u32 *)(s+n-12) = c32;
 	*cast(u32 *)(s+n- 8) = c32;
-	if (n < 25)
+	if (n < 25) {
 		return dest;
+	}
 	*cast(u32 *)(s + 12) = c32;
 	*cast(u32 *)(s + 16) = c32;
 	*cast(u32 *)(s + 20) = c32;
@@ -3898,12 +3921,17 @@ gb_inline void *gb_memset(void *dest, u8 c, isize n) {
 
 gb_inline i32 gb_memcompare(void const *s1, void const *s2, isize size) {
 	// TODO(bill): Heavily optimize
-
 	u8 const *s1p8 = cast(u8 const *)s1;
 	u8 const *s2p8 = cast(u8 const *)s2;
+
+	if (s1 == NULL || s2 == NULL) {
+		return 0;
+	}
+
 	while (size--) {
-		if (*s1p8 != *s2p8)
+		if (*s1p8 != *s2p8) {
 			return (*s1p8 - *s2p8);
+		}
 		s1p8++, s2p8++;
 	}
 	return 0;
@@ -3991,8 +4019,12 @@ gb_inline void  gb_free_all    (gbAllocator a)                                  
 gb_inline void *gb_resize      (gbAllocator a, void *ptr, isize old_size, isize new_size)                  { return gb_resize_align(a, ptr, old_size, new_size, GB_DEFAULT_MEMORY_ALIGNMENT); }
 gb_inline void *gb_resize_align(gbAllocator a, void *ptr, isize old_size, isize new_size, isize alignment) { return a.proc(a.data, gbAllocation_Resize, new_size, alignment, ptr, old_size, GB_DEFAULT_ALLOCATOR_FLAGS); }
 
-gb_inline void *gb_alloc_copy      (gbAllocator a, void const *src, isize size)                  { return gb_memcopy(gb_alloc(a, size), src, size); }
-gb_inline void *gb_alloc_copy_align(gbAllocator a, void const *src, isize size, isize alignment) { return gb_memcopy(gb_alloc_align(a, size, alignment), src, size); }
+gb_inline void *gb_alloc_copy      (gbAllocator a, void const *src, isize size) {
+	return gb_memcopy(gb_alloc(a, size), src, size);
+}
+gb_inline void *gb_alloc_copy_align(gbAllocator a, void const *src, isize size, isize alignment) {
+	return gb_memcopy(gb_alloc_align(a, size, alignment), src, size);
+}
 
 gb_inline char *gb_alloc_str(gbAllocator a, char const *str) {
 	return gb_alloc_str_len(a, str, gb_strlen(str));
@@ -6037,6 +6069,9 @@ gb_inline void gb_str_to_upper(char *str) {
 gb_inline isize gb_strlen(char const *str) {
 	char const *begin = str;
 	isize const *w;
+	if (str == NULL)  {
+		return 0;
+	}
 	while (cast(uintptr)str % sizeof(usize)) {
 		if (!*str)
 			return str - begin;
@@ -7590,10 +7625,14 @@ u64 gb_murmur64_seed(void const *data_, isize len, u64 seed) {
 
 gbFileError gb_file_new(gbFile *f, gbFileDescriptor fd, gbFileOperations ops, char const *filename) {
 	gbFileError err = gbFileError_None;
+	isize len = gb_strlen(filename);
+
+	// gb_printf_err("gb_file_new: %s\n", filename);
 
 	f->ops = ops;
 	f->fd = fd;
-	f->filename = gb_alloc_str(gb_heap_allocator(), filename);
+	f->filename = gb_alloc_array(gb_heap_allocator(), char, len+1);
+	gb_memcopy(cast(char *)f->filename, cast(char *)filename, len+1);
 	f->last_write_time = gb_file_last_write_time(f->filename);
 
 	return err;

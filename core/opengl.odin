@@ -31,12 +31,16 @@ TexImage2D    :: proc(target, level, internal_format,
                       format, type: i32, pixels: rawptr)        #foreign lib "glTexImage2D";
 
 
-string_data :: proc(s: string) -> ^u8 #inline { return ^s[0]; }
+_string_data :: proc(s: string) -> ^u8 #inline { return ^s[0]; }
 
-_libgl := win32.LoadLibraryA(string_data("opengl32.dll\x00"));
+_libgl := win32.LoadLibraryA(_string_data("opengl32.dll\x00"));
 
 GetProcAddress :: proc(name: string) -> proc() #cc_c {
-	assert(name[len(name)-1] == 0);
+	if name[len(name)-1] == 0 {
+		name = name[..len(name)-1];
+	}
+	// NOTE(bill): null terminated
+	assert((^name[0] + len(name))^ == 0);
 	res := wgl.GetProcAddress(^name[0]);
 	if res == nil {
 		res = win32.GetProcAddress(_libgl, ^name[0]);
