@@ -5410,11 +5410,9 @@ void ir_build_range_string(irProcedure *proc, irValue *expr, Type *val_type,
 	irBlock *done = NULL;
 	irBlock *body = NULL;
 
-	irValue *index = ir_add_local_generated(proc, t_int);
-	ir_emit_store(proc, index, v_zero);
 
 	irValue *offset_ = ir_add_local_generated(proc, t_int);
-	ir_emit_store(proc, index, v_zero);
+	ir_emit_store(proc, offset_, v_zero);
 
 	loop = ir_new_block(proc, NULL, "for.string.loop");
 	ir_emit_jump(proc, loop);
@@ -5441,11 +5439,10 @@ void ir_build_range_string(irProcedure *proc, irValue *expr, Type *val_type,
 	ir_emit_store(proc, offset_, ir_emit_arith(proc, Token_Add, offset, len, t_int));
 
 
-	idx = ir_emit_load(proc, index);
+	idx = offset;
 	if (val_type != NULL) {
 		val = ir_emit_struct_ev(proc, rune_and_len, 0);
 	}
-	ir_emit_increment(proc, index);
 
 	if (val_)  *val_  = val;
 	if (idx_)  *idx_  = idx;

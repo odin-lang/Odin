@@ -349,6 +349,7 @@ SetWindowPos       :: proc(wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height:
 
 GetWindowPlacement :: proc(wnd: Hwnd, wndpl: ^Window_Placement) -> Bool #foreign user32;
 SetWindowPlacement :: proc(wnd: Hwnd, wndpl: ^Window_Placement) -> Bool #foreign user32;
+GetWindowRect      :: proc(wnd: Hwnd, rect: ^Rect) -> Bool #foreign user32;
 
 GetWindowLongPtrA :: proc(wnd: Hwnd, index: i32) -> i64 #foreign user32;
 SetWindowLongPtrA :: proc(wnd: Hwnd, index: i32, new: i64) -> i64 #foreign user32;

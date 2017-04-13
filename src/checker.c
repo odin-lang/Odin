@@ -28,7 +28,6 @@ typedef enum BuiltinProcId {
 
 	BuiltinProc_new,
 	BuiltinProc_free,
-	// BuiltinProc_new_slice,
 	BuiltinProc_make,
 
 	BuiltinProc_reserve,
@@ -64,8 +63,6 @@ typedef enum BuiltinProcId {
 	BuiltinProc_kmag,
 	BuiltinProc_conj,
 
-	// BuiltinProc_ptr_offset,
-	// BuiltinProc_ptr_sub,
 	BuiltinProc_slice_ptr,
 	BuiltinProc_slice_to_bytes,
 
@@ -84,7 +81,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 
 	{STR_LIT("new"),              1, false, Expr_Expr},
 	{STR_LIT("free"),             1, false, Expr_Stmt},
-	// {STR_LIT("new_slice"),        2, true,  Expr_Expr},
 	{STR_LIT("make"),             1, true,  Expr_Expr},
 
 	{STR_LIT("reserve"),          2, false, Expr_Stmt},
@@ -108,7 +104,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("panic"),            1, false, Expr_Stmt},
 
 	{STR_LIT("copy"),             2, false, Expr_Expr},
-	// {STR_LIT("append"),           2, false, Expr_Expr},
 
 	{STR_LIT("swizzle"),          1, true,  Expr_Expr},
 
@@ -120,8 +115,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("kmag"),             1, false, Expr_Expr},
 	{STR_LIT("conj"),             1, false, Expr_Expr},
 
-	// {STR_LIT("ptr_offset"),       2, false, Expr_Expr},
-	// {STR_LIT("ptr_sub"),          2, false, Expr_Expr},
 	{STR_LIT("slice_ptr"),        2, true,   Expr_Expr},
 	{STR_LIT("slice_to_bytes"),   1, false,  Expr_Stmt},
 
@@ -310,7 +303,7 @@ typedef struct CheckerInfo {
 	MapScope             scopes;          // Key: AstNode * | Node       -> Scope
 	MapExprInfo          untyped;         // Key: AstNode * | Expression -> ExprInfo
 	MapDeclInfo          entities;        // Key: Entity *
-	MapEntity            implicits;        // Key: AstNode *
+	MapEntity            implicits;       // Key: AstNode *
 	MapEntity            foreigns;        // Key: String
 	MapAstFile           files;           // Key: String (full path)
 	MapIsize             type_info_map;   // Key: Type *

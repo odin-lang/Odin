@@ -170,11 +170,10 @@ write_type :: proc(buf: ^[]byte, ti: ^Type_Info) {
 		write_string(buf, "]");
 		write_type(buf, info.elem);
 	case Dynamic_Array:
-		write_string(buf, "[..]");
+		write_string(buf, "[dynamic]");
 		write_type(buf, info.elem);
 	case Slice:
-		write_string(buf, "[");
-		write_string(buf, "]");
+		write_string(buf, "[]");
 		write_type(buf, info.elem);
 	case Vector:
 		write_string(buf, "[vector ");
@@ -320,7 +319,7 @@ sprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
 
 
 
-parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: bool) {
+_parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: bool) {
 	is_digit :: proc(r: rune) -> bool #inline {
 		return '0' <= r && r <= '9';
 	}
@@ -356,7 +355,7 @@ _arg_number :: proc(fi: ^Fmt_Info,
 
 		for i in 1..len(format) {
 			if format[i] == ']' {
-				width, new_index, ok := parse_int(format, 1);
+				width, new_index, ok := _parse_int(format, 1);
 				if !ok || new_index != i {
 					return 0, i+1, false;
 				}
@@ -623,6 +622,19 @@ fmt_string :: proc(fi: ^Fmt_Info, s: string, verb: rune) {
 	match verb {
 	case 's', 'v':
 		write_string(fi.buf, s);
+
+	case 'x', 'X':
+		space := fi.space;
+		fi.space = false;
+		defer fi.space = space;
+
+		for i in 0..len(s) {
+			if i > 0 && space {
+				write_byte(fi.buf, ' ');
+			}
+			_write_int(fi, cast(u64)s[i], 16, false, 8, verb == 'x' ? __DIGITS_LOWER : __DIGITS_UPPER);
+		}
+
 	default:
 		fmt_bad_verb(fi, verb);
 	}
@@ -1044,7 +1056,7 @@ bprintf :: proc(b: ^[]byte, fmt: string, args: ..any) -> int {
 			}
 			was_prev_index = false;
 		} else {
-			fi.width, i, fi.width_set = parse_int(fmt, i);
+			fi.width, i, fi.width_set = _parse_int(fmt, i);
 			if was_prev_index && fi.width_set { // %[6]2d
 				fi.good_arg_index = false;
 			}
@@ -1069,7 +1081,7 @@ bprintf :: proc(b: ^[]byte, fmt: string, args: ..any) -> int {
 				}
 				was_prev_index = false;
 			} else {
-				fi.prec, i, fi.prec_set = parse_int(fmt, i);
+				fi.prec, i, fi.prec_set = _parse_int(fmt, i);
 				if !fi.prec_set {
 					fi.prec_set = true;
 					fi.prec = 0;

@@ -1724,11 +1724,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	AstNode *operand = NULL; // Operand
 	switch (f->curr_token.kind) {
 	case Token_Ident:
-		operand = parse_ident(f);
-		if (!lhs) {
-			// TODO(bill): Handle?
-		}
-		return operand;
+		return parse_ident(f);
 
 	case Token_context:
 		return ast_implicit(f, expect_token(f, Token_context));
@@ -1833,17 +1829,6 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 		return type;
 	}
-
-	// case Token_if:
-	// 	if (!lhs && f->expr_level >= 0) {
-	// 		return parse_if_expr(f);
-	// 	}
-	// 	break;
-	// case Token_OpenBrace:
-	// 	if (!lhs && f->expr_level >= 0) {
-	// 		return parse_block_expr(f);
-	// 	}
-	// 	break;
 
 	default: {
 		AstNode *type = parse_type_or_ident(f);
