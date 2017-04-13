@@ -1058,6 +1058,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			break;
 		}
 
+		bool is_ptr = is_type_pointer(x.type);
+
 		// NOTE(bill): Check for multiple defaults
 		AstNode *first_default = NULL;
 		ast_node(bs, BlockStmt, ms->body);
@@ -1153,6 +1155,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				}
 			}
 
+			if (is_ptr &&
+			    !is_type_any(type_deref(x.type)) &&
+			    cc->list.count == 1 &&
+			    case_type != NULL) {
+				case_type = make_type_pointer(c->allocator, case_type);
+			}
+
 			if (cc->list.count > 1) {
 				case_type = NULL;
 			}
@@ -1163,8 +1172,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			check_open_scope(c, stmt);
 			{
-				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, lhs->Ident, case_type, true);
+				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, lhs->Ident, case_type, false);
 				tag_var->flags |= EntityFlag_Used;
+				tag_var->flags |= EntityFlag_Value;
 				add_entity(c, c->context.scope, lhs, tag_var);
 				add_entity_use(c, lhs, tag_var);
 				add_implicit_entity(c, stmt, tag_var);

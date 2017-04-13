@@ -1142,6 +1142,9 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 			return e;
 		}
 		o->mode = Addressing_Variable;
+		if (e->flags & EntityFlag_Value) {
+			o->mode = Addressing_Value;
+		}
 		if (e->Variable.is_immutable) {
 			o->mode = Addressing_Immutable;
 		}

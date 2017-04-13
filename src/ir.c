@@ -6239,7 +6239,13 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			ir_start_block(proc, body);
 
 			if (cc->list.count == 1) {
-				Type *ct = make_type_pointer(proc->module->allocator, case_entity->type);
+				bool any_or_not_ptr = is_type_any(type_deref(parent_type)) || !is_parent_ptr;
+
+				Type *ct = case_entity->type;
+				if (any_or_not_ptr) {
+					ct = make_type_pointer(proc->module->allocator, ct);
+				}
+				GB_ASSERT_MSG(is_type_pointer(ct), "%s", type_to_string(ct));
 				irValue *data = NULL;
 				if (match_type_kind == MatchType_Union) {
 					data = union_data;
@@ -6247,7 +6253,10 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					irValue *any_data = ir_emit_load(proc, ir_emit_struct_ep(proc, parent_ptr, 1));
 					data = any_data;
 				}
-				value = ir_emit_load(proc, ir_emit_conv(proc, data, ct));
+				value = ir_emit_conv(proc, data, ct);
+				if (any_or_not_ptr) {
+					value = ir_emit_load(proc, value);
+				}
 			}
 
 			ir_store_type_case_implicit(proc, clause, value);
