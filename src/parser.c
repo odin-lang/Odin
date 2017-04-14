@@ -1197,7 +1197,11 @@ Token expect_token(AstFile *f, TokenKind kind) {
 		syntax_error(f->curr_token, "Expected `%.*s`, got `%.*s`",
 		             LIT(token_strings[kind]),
 		             LIT(token_strings[prev.kind]));
+		if (prev.kind == Token_EOF) {
+			gb_exit(1);
+		}
 	}
+
 	next_token(f);
 	return prev;
 }

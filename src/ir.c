@@ -886,7 +886,7 @@ irValue *ir_instr_union_tag_value(irProcedure *p, irValue *address) {
 	irValue *v = ir_alloc_instr(p, irInstr_UnionTagValue);
 	irInstr *i = &v->Instr;
 	i->UnionTagValue.address = address;
-	i->UnionTagValue.type = t_int_ptr;
+	i->UnionTagValue.type = t_int;
 	return v;
 }
 
@@ -1986,6 +1986,27 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	return ir_emit(proc, ir_instr_binary_op(proc, op, left, right, type));
 }
 
+irValue *ir_emit_union_tag_ptr(irProcedure *proc, irValue *u) {
+	Type *t = ir_type(u);
+	GB_ASSERT_MSG(is_type_pointer(t) &&
+	              is_type_union(type_deref(t)), "%s", type_to_string(t));
+	irValue *tag_ptr = ir_emit(proc, ir_instr_union_tag_ptr(proc, u));
+	Type *tpt = ir_type(tag_ptr);
+	GB_ASSERT(is_type_pointer(tpt));
+	tpt = base_type(type_deref(tpt));
+	GB_ASSERT(tpt == t_int);
+	return tag_ptr;
+}
+
+irValue *ir_emit_union_tag_value(irProcedure *proc, irValue *u) {
+	Type *t = ir_type(u);
+	GB_ASSERT(is_type_union(t));
+	GB_ASSERT(are_types_identical(t, ir_type(u)));
+	return ir_emit(proc, ir_instr_union_tag_value(proc, u));
+}
+
+irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irValue *right);
+
 irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue *x) {
 	Type *t = ir_type(x);
 	if (is_type_any(t)) {
@@ -2034,6 +2055,9 @@ irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue 
 		} else if (op_kind == Token_NotEq) {
 			return ir_emit_arith(proc, Token_And, a, b, t_bool);
 		}
+	} else if (is_type_union(t)) {
+		irValue *tag = ir_emit_union_tag_value(proc, x);
+		return ir_emit_comp(proc, op_kind, tag, v_zero);
 	}
 	return NULL;
 }
@@ -2106,25 +2130,6 @@ irValue *ir_emit_array_ep(irProcedure *proc, irValue *s, irValue *index) {
 
 irValue *ir_emit_array_epi(irProcedure *proc, irValue *s, i32 index) {
 	return ir_emit_array_ep(proc, s, ir_const_i32(proc->module->allocator, index));
-}
-
-irValue *ir_emit_union_tag_ptr(irProcedure *proc, irValue *u) {
-	Type *t = ir_type(u);
-	GB_ASSERT_MSG(is_type_pointer(t) &&
-	              is_type_union(type_deref(t)), "%s", type_to_string(t));
-	irValue *tag_ptr = ir_emit(proc, ir_instr_union_tag_ptr(proc, u));
-	Type *tpt = ir_type(tag_ptr);
-	GB_ASSERT(is_type_pointer(tpt));
-	tpt = base_type(type_deref(tpt));
-	GB_ASSERT(tpt == t_int);
-	return tag_ptr;
-}
-
-irValue *ir_emit_union_tag_value(irProcedure *proc, irValue *u) {
-	Type *t = ir_type(u);
-	GB_ASSERT(is_type_union(t));
-	GB_ASSERT(are_types_identical(t, ir_type(u)));
-	return ir_emit(proc, ir_instr_union_tag_value(proc, u));
 }
 
 
@@ -2697,13 +2702,13 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 			Entity *f = dst->Record.variants[i];
 			if (are_types_identical(f->type, src_type)) {
 				ir_emit_comment(proc, str_lit("union - child to parent"));
-				gbAllocator allocator = proc->module->allocator;
+				gbAllocator a = proc->module->allocator;
 				irValue *parent = ir_add_local_generated(proc, t);
-				irValue *tag_ptr = ir_emit_union_tag_ptr(proc, parent);
-				ir_emit_store(proc, tag_ptr, ir_const_int(allocator, i));
-
-				irValue *underlying = ir_emit_conv(proc, parent, make_type_pointer(allocator, src_type));
+				irValue *underlying = ir_emit_conv(proc, parent, make_type_pointer(a, src_type));
 				ir_emit_store(proc, underlying, value);
+
+				irValue *tag_ptr = ir_emit_union_tag_ptr(proc, parent);
+				ir_emit_store(proc, tag_ptr, ir_const_int(a, i));
 
 				return ir_emit_load(proc, parent);
 			}

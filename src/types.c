@@ -402,6 +402,7 @@ void set_base_type(Type *t, Type *base) {
 
 Type *alloc_type(gbAllocator a, TypeKind kind) {
 	Type *t = gb_alloc_item(a, Type);
+	gb_zero_item(t);
 	t->kind = kind;
 	return t;
 }
@@ -837,6 +838,12 @@ bool type_has_nil(Type *t) {
 	case Type_DynamicArray:
 	case Type_Map:
 		return true;
+	case Type_Record:
+		switch (t->Record.kind) {
+		case TypeRecord_Union:
+			return true;
+		}
+		return false;
 	}
 	return false;
 }
@@ -1138,7 +1145,6 @@ ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 		Entity *ey = py.params->Tuple.variables[0];
 		bool ok = are_types_identical(ex->type, ey->type);
 		if (ok) {
-			gb_printf_err("Here\n");
 		}
 	}
 
@@ -1520,7 +1526,7 @@ void type_path_free(TypePath *tp) {
 TypePath *type_path_push(TypePath *tp, Type *t) {
 	GB_ASSERT(tp != NULL);
 
-	for_array(i, tp->path) {
+	for (isize i = 0; i < tp->path.count; i++) {
 		if (tp->path.e[i] == t) {
 			// TODO(bill):
 			GB_ASSERT(is_type_named(t));
@@ -1601,6 +1607,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	if (t->failure) {
 		return FAILURE_ALIGNMENT;
 	}
+
 	t = base_type(t);
 
 	switch (t->kind) {
@@ -1705,6 +1712,18 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			break;
 		case TypeRecord_Union: {
 			i64 max = 1;
+			if (t->Record.field_count > 0) {
+				Type *field_type = t->Record.fields[0]->type;
+				type_path_push(path, field_type);
+				if (path->failure) {
+					return FAILURE_ALIGNMENT;
+				}
+				i64 align = type_align_of_internal(allocator, field_type, path);
+				type_path_pop(path);
+				if (max < align) {
+					max = align;
+				}
+			}
 			// NOTE(bill): field zero is null
 			for (isize i = 1; i < t->Record.variant_count; i++) {
 				Type *variant = t->Record.variants[i]->type;
@@ -1795,8 +1814,18 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	if (t->failure) {
 		return FAILURE_SIZE;
 	}
-	t = base_type(t);
+
 	switch (t->kind) {
+	case Type_Named: {
+		type_path_push(path, t);
+		if (path->failure) {
+			return FAILURE_ALIGNMENT;
+		}
+		i64 size = type_size_of_internal(allocator, t->Named.base, path);
+		type_path_pop(path);
+		return size;
+	} break;
+
 	case Type_Basic: {
 		GB_ASSERT(is_type_typed(t));
 		BasicKind kind = t->Basic.kind;
@@ -1907,15 +1936,26 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		} break;
 
 		case TypeRecord_Union: {
-			i64 count = t->Record.variant_count;
 			i64 align = type_align_of_internal(allocator, t, path);
 			if (path->failure) {
 				return FAILURE_SIZE;
 			}
-			i64 max = 0;
 			// NOTE(bill): Zeroth field is invalid
-			for (isize i = 1; i < count; i++) {
-				i64 size = type_size_of_internal(allocator, t->Record.variants[i]->type, path);
+			type_set_offsets(allocator, t);
+
+			i64 max = 0;
+			isize field_count = t->Record.field_count;
+			isize variant_count = t->Record.variant_count;
+			if (field_count > 0) {
+				Type *end_type = t->Record.fields[field_count-1]->type;
+				i64 end_offset = t->Record.offsets[field_count-1];
+				i64 end_size = type_size_of_internal(allocator, end_type, path);
+				max = end_offset + end_size ;
+			}
+
+			for (isize i = 1; i < variant_count; i++) {
+				Type *variant_type = t->Record.variants[i]->type;
+				i64 size = type_size_of_internal(allocator, variant_type, path);
 				if (max < size) {
 					max = size;
 				}
@@ -1923,7 +1963,8 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			// NOTE(bill): Align to int
 			i64 size = align_formula(max, build_context.word_size);
 			size += type_size_of_internal(allocator, t_int, path);
-			return align_formula(size, align);
+			size = align_formula(size, align);
+			return size;
 		} break;
 
 		case TypeRecord_RawUnion: {
@@ -2111,7 +2152,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 				}
 				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
 				str = gb_string_appendc(str, ": ");
-				str = write_type_to_string(str, base_type(f->type));
+				str = write_type_to_string(str, f->type);
 			}
 			for (isize i = 1; i < type->Record.variant_count; i++) {
 				Entity *f = type->Record.variants[i];

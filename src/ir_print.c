@@ -231,7 +231,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		case TypeRecord_Union: {
 			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
 			// LLVM takes the first element's alignment as the entire alignment (like C)
-			i64 size_of_union  = type_size_of(heap_allocator(), t) - build_context.word_size;
+			i64 size_of_union  = type_size_of(heap_allocator(),  t) - build_context.word_size;
 			i64 align_of_union = type_align_of(heap_allocator(), t);
 			ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8], i%lld}", align_of_union, size_of_union, word_bits);
 		} return;

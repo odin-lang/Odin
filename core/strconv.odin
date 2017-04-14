@@ -18,6 +18,52 @@ parse_bool :: proc(s: string) -> (result: bool, ok: bool) {
 	return false, false;
 }
 
+_digit_value :: proc(r: rune) -> (int) {
+	ri := cast(int)r;
+	v: int = 16;
+	match {
+	case '0' <= r && r <= '9':
+		v = ri - '0';
+	case 'a' <= r && r <= 'z':
+		v = ri - 'a' + 10;
+	case 'A' <= r && r <= 'Z':
+		v = ri - 'A' + 10;
+	}
+	return v;
+}
+
+parse_i64 :: proc(s: string, base: int) -> i64 {
+	result: i64;
+	for r in s {
+		v := _digit_value(r);
+		if v >= base {
+			break;
+		}
+		result *= cast(i64)base;
+		result += cast(i64)v;
+	}
+	return result;
+}
+parse_u64 :: proc(s: string, base: int) -> u64 {
+	result: u64;
+	for r in s {
+		v := _digit_value(r);
+		if v >= base {
+			break;
+		}
+		result *= cast(u64)base;
+		result += cast(u64)v;
+	}
+	return result;
+}
+parse_int :: proc(s: string, base: int) -> int {
+	return cast(int)parse_i64(s, base);
+}
+parse_uint :: proc(s: string, base: int) -> uint {
+	return cast(uint)parse_u64(s, base);
+}
+
+
 append_bool :: proc(buf: []byte, b: bool) -> string {
 	s := b ? "true" : "false";
 	append(buf, ..cast([]byte)s);

@@ -601,6 +601,8 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	union_type->Record.fields      = fields;
 	union_type->Record.field_count = field_count;
+	union_type->Record.are_offsets_set = false;
+
 
 	for_array(i, ut->variants) {
 		AstNode *variant = ut->variants.e[i];
@@ -667,6 +669,8 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 		}
 		add_entity_use(c, f->name, e);
 	}
+
+	type_set_offsets(c->allocator, union_type);
 
 	gb_temp_arena_memory_end(tmp);
 
