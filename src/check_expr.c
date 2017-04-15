@@ -5371,7 +5371,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		case Token_transmute: {
 			if (o->mode == Addressing_Constant) {
 				gbString expr_str = expr_to_string(o->expr);
-				error_node(o->expr, "Cannot transmute constant expression: `%s`", expr_str);
+				error_node(o->expr, "Cannot transmute a constant expression: `%s`", expr_str);
 				gb_string_free(expr_str);
 				o->mode = Addressing_Invalid;
 				o->expr = node;
