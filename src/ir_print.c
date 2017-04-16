@@ -728,9 +728,13 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 	case irInstr_Local: {
 		Type *type = instr->Local.entity->type;
+		i64 align = instr->Local.alignment;
+		if (align <= 0) {
+			align = type_align_of(m->allocator, type);
+		}
 		ir_fprintf(f, "%%%d = alloca ", value->index);
 		ir_print_type(f, m, type);
-		ir_fprintf(f, ", align %lld\n", type_align_of(m->allocator, type));
+		ir_fprintf(f, ", align %lld\n", align);
 	} break;
 
 	case irInstr_ZeroInit: {

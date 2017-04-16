@@ -147,10 +147,11 @@ struct irProcedure {
 #define IR_INSTR_KINDS \
 	IR_INSTR_KIND(Comment, struct { String text; })                   \
 	IR_INSTR_KIND(Local,   struct {                                   \
-		Entity *      entity;                                         \
-		Type *        type;                                           \
-		bool          zero_initialized;                               \
+		Entity *     entity;                                          \
+		Type *       type;                                            \
+		bool         zero_initialized;                                \
 		irValueArray referrers;                                       \
+		i64          alignment;                                       \
 	})                                                                \
 	IR_INSTR_KIND(ZeroInit, struct { irValue *address; })             \
 	IR_INSTR_KIND(Store,    struct { irValue *address, *value; })     \
@@ -812,6 +813,7 @@ irValue *ir_instr_local(irProcedure *p, Entity *e, bool zero_initialized) {
 	i->Local.entity = e;
 	i->Local.type = make_type_pointer(p->module->allocator, e->type);
 	i->Local.zero_initialized = zero_initialized;
+	i->Local.alignment = type_align_of(p->module->allocator, e->type);
 	array_init(&i->Local.referrers, heap_allocator()); // TODO(bill): Replace heap allocator here
 	ir_module_add_value(p->module, e, v);
 	return v;
@@ -1418,9 +1420,14 @@ irValue *ir_emit_comment(irProcedure *p, String text) {
 	return ir_emit(p, ir_instr_comment(p, text));
 }
 
-irValue *ir_copy_value_to_ptr(irProcedure *proc, irValue *val) {
+irValue *ir_copy_value_to_ptr(irProcedure *proc, irValue *val, i64 alignment) {
 	Type *t = ir_type(val);
+	i64 type_alignment = type_align_of(proc->module->allocator, t);
+	if (alignment < type_alignment) {
+		alignment = type_alignment;
+	}
 	irValue *ptr = ir_add_local_generated(proc, t);
+	ptr->Instr.Local.alignment = alignment;
 	ir_emit_store(proc, ptr, val);
 	return ptr;
 }
@@ -1441,7 +1448,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_
 		Type *new_type = pt->Proc.abi_compat_params[i];
 		if (original_type != new_type) {
 			if (is_type_pointer(new_type)) {
-				args[i] = ir_copy_value_to_ptr(p, args[i]);
+				args[i] = ir_copy_value_to_ptr(p, args[i], 16);
 			} else if (is_type_integer(new_type)) {
 				args[i] = ir_emit_bitcast(p, args[i], new_type);
 			}
