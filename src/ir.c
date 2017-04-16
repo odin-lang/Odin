@@ -2912,17 +2912,25 @@ bool ir_is_type_aggregate(Type *t) {
 		case Basic_string:
 		case Basic_any:
 			return true;
+
+		case Basic_complex64:
+		case Basic_complex128:
+		case Basic_quaternion128:
+		case Basic_quaternion256:
+			return true;
 		}
 		break;
 
 	case Type_Pointer:
-	case Type_Vector:
 		return false;
 
+	case Type_Vector:
 	case Type_Array:
 	case Type_Slice:
 	case Type_Record:
 	case Type_Tuple:
+	case Type_DynamicArray:
+	case Type_Map:
 		return true;
 
 	case Type_Named:
