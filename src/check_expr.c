@@ -1413,7 +1413,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 	// error_node(node, "`map` types are not yet implemented");
 }
 
-bool check_type_extra_interal(Checker *c, AstNode *e, Type **type, Type *named_type) {
+bool check_type_extra_internal(Checker *c, AstNode *e, Type **type, Type *named_type) {
 	GB_ASSERT_NOT_NULL(type);
 	if (e == NULL) {
 		*type = t_invalid;
@@ -1625,7 +1625,7 @@ bool check_type_extra_interal(Checker *c, AstNode *e, Type **type, Type *named_t
 
 Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 	Type *type = NULL;
-	bool ok = check_type_extra_interal(c, e, &type, named_type);
+	bool ok = check_type_extra_internal(c, e, &type, named_type);
 
 	if (!ok) {
 		gbString err_str = expr_to_string(e);
@@ -4977,23 +4977,51 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);
-		Type *type = check_type(c, pl->type);
-		if (type == NULL || !is_type_proc(type)) {
-			gbString str = expr_to_string(node);
-			error_node(node, "Invalid procedure literal `%s`", str);
-			gb_string_free(str);
-			check_close_scope(c);
-			return kind;
-		}
-		if (pl->tags != 0) {
-			error_node(node, "A procedure literal cannot have tags");
-			pl->tags = 0; // TODO(bill): Should I zero this?!
-		}
+		// check_open_scope(c, pl->type);
 
+		CheckerContext prev_context = c->context;
+
+		Type *type = alloc_type(c->allocator, Type_Proc);
 		check_open_scope(c, pl->type);
-		check_procedure_later(c, c->curr_ast_file, empty_token, c->context.decl, type, pl->body, pl->tags);
-		// check_proc_body(c, empty_token, c->context.decl, type, pl->body);
+		{
+			DeclInfo *decl = make_declaration_info(c->allocator, c->context.scope);
+			decl->proc_lit = pl->type;
+			c->context.decl = decl;
+
+			check_procedure_type(c, type, pl->type);
+			if (!is_type_proc(type)) {
+				gbString str = expr_to_string(node);
+				error_node(node, "Invalid procedure literal `%s`", str);
+				gb_string_free(str);
+				check_close_scope(c);
+				return kind;
+			}
+
+			if (pl->tags != 0) {
+				error_node(node, "A procedure literal cannot have tags");
+				pl->tags = 0; // TODO(bill): Should I zero this?!
+			}
+			check_procedure_later(c, c->curr_ast_file, empty_token, decl, type, pl->body, pl->tags);
+
+		}
 		check_close_scope(c);
+
+		c->context = prev_context;
+
+
+		// Type *type = check_type(c, pl->type);
+		// if (type == NULL || !is_type_proc(type)) {
+		// 	gbString str = expr_to_string(node);
+		// 	error_node(node, "Invalid procedure literal `%s`", str);
+		// 	gb_string_free(str);
+		// 	check_close_scope(c);
+		// 	return kind;
+		// }
+
+		// GB_ASSERT(c->context.scope->is_proc);
+		// check_procedure_later(c, c->curr_ast_file, empty_token, c->context.decl, type, pl->body, pl->tags);
+		// check_proc_body(c, empty_token, c->context.decl, type, pl->body);
+		// check_close_scope(c);
 
 		o->mode = Addressing_Value;
 		o->type = type;

@@ -1270,7 +1270,7 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, AstNode *expr) {
 		ir_emit_zero_init(proc, instr);
 	// }
 
-	if (expr != NULL) {
+	if (expr != NULL && proc->entity != NULL) {
 		irDebugInfo *di = *map_ir_debug_info_get(&proc->module->debug_info, hash_pointer(proc->entity));
 		ir_emit(proc, ir_instr_debug_declare(proc, di, expr, e, true, instr));
 	}
