@@ -1596,8 +1596,8 @@ irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 		irValue *bits = NULL;
 		i64 size = type_size_of(proc->module->allocator, t);
 		switch (8*size) {
-		case 32: bits = ir_emit_bitcast(proc, key, t_u32); break;
-		case 64: bits = ir_emit_bitcast(proc, key, t_u64); break;
+		case 32: bits = ir_emit_transmute(proc, key, t_u32); break;
+		case 64: bits = ir_emit_transmute(proc, key, t_u64); break;
 		default: GB_PANIC("Unhandled float size: %lld bits", size); break;
 		}
 
