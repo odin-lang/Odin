@@ -132,6 +132,8 @@ typedef struct TypeRecord {
 		Type * results; /* Type_Tuple */                  \
 		i32    param_count;                               \
 		i32    result_count;                              \
+		Type **abi_compat_params;                         \
+		Type **abi_compat_results;                        \
 		bool   variadic;                                  \
 		ProcCallingConvention calling_convention;         \
 	})                                                    \

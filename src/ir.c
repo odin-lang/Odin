@@ -351,11 +351,20 @@ typedef struct irValueGlobal {
 	bool          is_unnamed_addr;
 } irValueGlobal;
 
+
+typedef enum irParamPasskind {
+	irParamPass_Value,   // Pass by value
+	irParamPass_Pointer, // Pass as a pointer rather than by value
+	irParamPass_Integer, // Pass as an integer of the same size
+} irParamPasskind;
+
 typedef struct irValueParam {
-	irProcedure *parent;
-	Entity *      entity;
-	Type *        type;
-	irValueArray referrers;
+	irParamPasskind kind;
+	irProcedure *   parent;
+	Entity *        entity;
+	Type *          type;
+	Type *          original_type;
+	irValueArray    referrers;
 } irValueParam;
 
 typedef struct irValue {
@@ -755,11 +764,23 @@ irValue *ir_value_global(gbAllocator a, Entity *e, irValue *value) {
 	array_init(&v->Global.referrers, heap_allocator()); // TODO(bill): Replace heap allocator here
 	return v;
 }
-irValue *ir_value_param(gbAllocator a, irProcedure *parent, Entity *e) {
+irValue *ir_value_param(gbAllocator a, irProcedure *parent, Entity *e, Type *abi_type) {
 	irValue *v = ir_alloc_value(a, irValue_Param);
-	v->Param.parent = parent;
-	v->Param.entity = e;
-	v->Param.type   = e->type;
+	v->Param.kind          = irParamPass_Value;
+	v->Param.parent        = parent;
+	v->Param.entity        = e;
+	v->Param.original_type = e->type;
+	v->Param.type          = abi_type;
+
+	if (abi_type != e->type) {
+		if (is_type_pointer(abi_type)) {
+			v->Param.kind = irParamPass_Pointer;
+		} else if (is_type_integer(abi_type)) {
+			v->Param.kind = irParamPass_Integer;
+		} else {
+			GB_PANIC("Invalid abi type pass kind");
+		}
+	}
 	array_init(&v->Param.referrers, heap_allocator()); // TODO(bill): Replace heap allocator here
 	return v;
 }
@@ -1280,16 +1301,30 @@ irValue *ir_add_local_generated(irProcedure *proc, Type *type) {
 }
 
 
-irValue *ir_add_param(irProcedure *proc, Entity *e, AstNode *expr) {
-	irValue *v = ir_value_param(proc->module->allocator, proc, e);
-#if 1
-	irValue *l = ir_add_local(proc, e, expr);
-	ir_emit_store(proc, l, v);
+irValue *ir_add_param(irProcedure *proc, Entity *e, AstNode *expr, Type *abi_type) {
+	irValue *v = ir_value_param(proc->module->allocator, proc, e, abi_type);
+	irValueParam *p = &v->Param;
 
-#else
-	ir_module_add_value(proc->module, e, v);
-#endif
-	return v;
+	switch (p->kind) {
+	case irParamPass_Value: {
+		irValue *l = ir_add_local(proc, e, expr);
+		ir_emit_store(proc, l, v);
+		return v;
+	}
+	case irParamPass_Pointer: {
+		ir_module_add_value(proc->module, e, v);
+		return ir_emit_load(proc, v);
+	}
+	case irParamPass_Integer: {
+		irValue *l = ir_add_local(proc, e, expr);
+		irValue *iptr = ir_emit_conv(proc, l, make_type_pointer(proc->module->allocator, p->type));
+		ir_emit_store(proc, iptr, v);
+		return ir_emit_load(proc, l);
+	}
+	}
+
+	GB_PANIC("Unreachable");
+	return NULL;
 }
 
 
@@ -1383,11 +1418,36 @@ irValue *ir_emit_comment(irProcedure *p, String text) {
 	return ir_emit(p, ir_instr_comment(p, text));
 }
 
+irValue *ir_copy_value_to_ptr(irProcedure *proc, irValue *val) {
+	Type *t = ir_type(val);
+	irValue *ptr = ir_add_local_generated(proc, t);
+	ir_emit_store(proc, ptr, val);
+	return ptr;
+}
+
+irValue *ir_emit_bitcast(irProcedure *proc, irValue *data, Type *type) {
+	return ir_emit(proc, ir_instr_conv(proc, irConv_bitcast, data, ir_type(data), type));
+}
 
 irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_count) {
 	Type *pt = base_type(ir_type(value));
 	GB_ASSERT(pt->kind == Type_Proc);
 	Type *results = pt->Proc.results;
+
+	isize param_count = pt->Proc.param_count;
+	GB_ASSERT(param_count == arg_count);
+	for (isize i = 0; i < param_count; i++) {
+		Type *original_type = pt->Proc.params->Tuple.variables[i]->type;
+		Type *new_type = pt->Proc.abi_compat_params[i];
+		if (original_type != new_type) {
+			if (is_type_pointer(new_type)) {
+				args[i] = ir_copy_value_to_ptr(p, args[i]);
+			} else if (is_type_integer(new_type)) {
+				args[i] = ir_emit_bitcast(p, args[i], new_type);
+			}
+		}
+	}
+
 	return ir_emit(p, ir_instr_call(p, value, args, arg_count, results));
 }
 
@@ -1475,9 +1535,7 @@ void ir_emit_startup_runtime(irProcedure *proc) {
 	ir_emit(proc, ir_alloc_instr(proc, irInstr_StartupRuntime));
 }
 
-irValue *ir_emit_bitcast(irProcedure *proc, irValue *data, Type *type) {
-	return ir_emit(proc, ir_instr_conv(proc, irConv_bitcast, data, ir_type(data), type));
-}
+
 
 
 irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index);
@@ -6436,9 +6494,10 @@ void ir_begin_procedure_body(irProcedure *proc) {
 			AstNode *name = field->names.e[q_index++];
 
 			Entity *e = params->variables[i];
+			Type *abi_type = proc->type->Proc.abi_compat_params[i];
 			if (!str_eq(e->token.string, str_lit("")) &&
 			    !str_eq(e->token.string, str_lit("_"))) {
-				irValue *param = ir_add_param(proc, e, name);
+				irValue *param = ir_add_param(proc, e, name, abi_type);
 				array_add(&proc->params, param);
 			}
 		}
