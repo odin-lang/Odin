@@ -65,6 +65,8 @@ typedef enum ProcTag {
 	ProcTag_bounds_check    = 1<<0,
 	ProcTag_no_bounds_check = 1<<1,
 
+	ProcTag_require_results = 1<<4,
+
 	ProcTag_foreign         = 1<<10,
 	ProcTag_export          = 1<<11,
 	ProcTag_link_name       = 1<<12,
@@ -1570,6 +1572,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, AstNode **foreign_library_token, Str
 				expect_token(f, Token_String);
 			}
 		}
+		ELSE_IF_ADD_TAG(require_results)
 		ELSE_IF_ADD_TAG(export)
 		ELSE_IF_ADD_TAG(bounds_check)
 		ELSE_IF_ADD_TAG(no_bounds_check)

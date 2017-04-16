@@ -442,9 +442,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		Operand operand = {Addressing_Invalid};
 		ExprKind kind = check_expr_base(c, &operand, es->expr, NULL);
 		switch (operand.mode) {
-		case Addressing_Type:
-			error_node(node, "Is not an expression");
-			break;
+		case Addressing_Type: {
+			gbString str = type_to_string(operand.type);
+			error_node(node, "`%s` is not an expression", str);
+			gb_string_free(str);
+		} break;
 		case Addressing_NoValue:
 			return;
 		default: {
@@ -452,6 +454,15 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				return;
 			}
 			if (operand.expr->kind == AstNode_CallExpr) {
+				AstNodeCallExpr *ce = &operand.expr->CallExpr;
+				Type *t = type_of_expr(&c->info, ce->proc);
+				if (is_type_proc(t)) {
+					if (t->Proc.require_results) {
+						gbString expr_str = expr_to_string(ce->proc);
+						error_node(node, "`%s` requires that its results must be handled", expr_str);
+						gb_string_free(expr_str);
+					}
+				}
 				return;
 			}
 			gbString expr_str = expr_to_string(operand.expr);

@@ -4796,7 +4796,7 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	}
 
 	operand->expr = call;
-	return Expr_Stmt;
+	return Expr_Expr;
 }
 
 

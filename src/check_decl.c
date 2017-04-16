@@ -242,11 +242,13 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 	check_open_scope(c, pd->type);
 	check_procedure_type(c, proc_type, pd->type);
 
-	bool is_foreign      = (pd->tags & ProcTag_foreign)   != 0;
-	bool is_link_name    = (pd->tags & ProcTag_link_name) != 0;
-	bool is_export       = (pd->tags & ProcTag_export)    != 0;
-	bool is_inline       = (pd->tags & ProcTag_inline)    != 0;
-	bool is_no_inline    = (pd->tags & ProcTag_no_inline) != 0;
+	bool is_foreign         = (pd->tags & ProcTag_foreign)   != 0;
+	bool is_link_name       = (pd->tags & ProcTag_link_name) != 0;
+	bool is_export          = (pd->tags & ProcTag_export)    != 0;
+	bool is_inline          = (pd->tags & ProcTag_inline)    != 0;
+	bool is_no_inline       = (pd->tags & ProcTag_no_inline) != 0;
+	bool is_require_results = (pd->tags & ProcTag_require_results) != 0;
+
 
 	if (d->scope->is_file && str_eq(e->token.string, str_lit("main"))) {
 		if (proc_type != NULL) {
@@ -280,6 +282,16 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 
 		GB_ASSERT(pd->body->kind == AstNode_BlockStmt);
 		check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pd->body, pd->tags);
+	}
+
+
+	if (proc_type != NULL && is_type_proc(proc_type)) {
+		TypeProc *tp = &proc_type->Proc;
+		if (tp->result_count == 0 && is_require_results) {
+			error_node(pd->type, "`#require_results` is not needed on a procedure with no results");
+		} else {
+			tp->require_results = is_require_results;
+		}
 	}
 
 	if (is_foreign) {

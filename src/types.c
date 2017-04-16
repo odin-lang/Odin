@@ -135,6 +135,7 @@ typedef struct TypeRecord {
 		Type **abi_compat_params;                         \
 		Type **abi_compat_results;                        \
 		bool   variadic;                                  \
+		bool   require_results;                           \
 		ProcCallingConvention calling_convention;         \
 	})                                                    \
 	TYPE_KIND(Map, struct {                               \
