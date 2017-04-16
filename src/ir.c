@@ -1436,6 +1436,8 @@ irValue *ir_emit_bitcast(irProcedure *proc, irValue *data, Type *type) {
 	return ir_emit(proc, ir_instr_conv(proc, irConv_bitcast, data, ir_type(data), type));
 }
 
+irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t);
+
 irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_count) {
 	Type *pt = base_type(ir_type(value));
 	GB_ASSERT(pt->kind == Type_Proc);
@@ -1450,7 +1452,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_
 			if (is_type_pointer(new_type)) {
 				args[i] = ir_copy_value_to_ptr(p, args[i], 16);
 			} else if (is_type_integer(new_type)) {
-				args[i] = ir_emit_bitcast(p, args[i], new_type);
+				args[i] = ir_emit_transmute(p, args[i], new_type);
 			}
 		}
 	}

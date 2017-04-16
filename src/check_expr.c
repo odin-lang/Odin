@@ -1018,6 +1018,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 	Type *new_type = original_type;
 	// NOTE(bill): Changing the passing parameter value type is to match C's ABI
 	// IMPORTANT TODO(bill): This only matches the ABI on MSVC at the moment
+	// SEE: https://msdn.microsoft.com/en-us/library/zthk2dkh.aspx
 	Type *bt = core_type(original_type);
 	switch (bt->kind) {
 	// Okay to pass by value

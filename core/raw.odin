@@ -4,8 +4,8 @@ Any :: struct #ordered {
 }
 
 String :: struct #ordered {
-	data:  ^byte,
-	len:   int,
+	data: ^byte,
+	len:  int,
 };
 
 Slice :: struct #ordered {
