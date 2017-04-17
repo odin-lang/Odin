@@ -110,6 +110,9 @@ close :: proc(fd: Handle) {
 }
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+	if len(data) == 0 {
+		return 0, ERROR_NONE;
+	}
 	bytes_written: i32;
 	e := win32.WriteFile(cast(win32.Handle)fd, ^data[0], cast(i32)len(data), ^bytes_written, nil);
 	if e == win32.FALSE {
@@ -120,6 +123,9 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 }
 
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+	if len(data) == 0 {
+		return 0, ERROR_NONE;
+	}
 	bytes_read: i32;
 	e := win32.ReadFile(cast(win32.Handle)fd, ^data[0], cast(u32)len(data), ^bytes_read, nil);
 	if e == win32.FALSE {

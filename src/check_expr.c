@@ -4764,11 +4764,13 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	Type *proc_type = base_type(operand->type);
 	if (operand->mode != Addressing_Overload) {
 		bool valid_type = (proc_type != NULL) && is_type_proc(proc_type);
-		bool valid_mode = (operand->mode == Addressing_Value) || (operand->mode == Addressing_Variable);
+		bool valid_mode = is_operand_value(*operand);
 		if (!valid_type || !valid_mode) {
 			AstNode *e = operand->expr;
 			gbString str = expr_to_string(e);
-			error_node(e, "Cannot call a non-procedure: `%s` %d", str, operand->mode);
+			gbString type_str = type_to_string(operand->type);
+			error_node(e, "Cannot call a non-procedure: `%s` of type `%s`", str, type_str);
+			gb_string_free(type_str);
 			gb_string_free(str);
 
 			operand->mode = Addressing_Invalid;
