@@ -1016,44 +1016,50 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 
 Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 	Type *new_type = original_type;
-	// NOTE(bill): Changing the passing parameter value type is to match C's ABI
-	// IMPORTANT TODO(bill): This only matches the ABI on MSVC at the moment
-	// SEE: https://msdn.microsoft.com/en-us/library/zthk2dkh.aspx
-	Type *bt = core_type(original_type);
-	switch (bt->kind) {
-	// Okay to pass by value
-	// Especially the only Odin types
-	case Type_Basic:   break;
-	case Type_Pointer: break;
-	case Type_Proc:    break; // NOTE(bill): Just a pointer
 
-	// Odin only types
-	case Type_Slice:
-	case Type_DynamicArray:
-	case Type_Map:
-		break;
+	if (str_eq(build_context.ODIN_OS, str_lit("windows"))) {
+		// NOTE(bill): Changing the passing parameter value type is to match C's ABI
+		// IMPORTANT TODO(bill): This only matches the ABI on MSVC at the moment
+		// SEE: https://msdn.microsoft.com/en-us/library/zthk2dkh.aspx
+		Type *bt = core_type(original_type);
+		switch (bt->kind) {
+		// Okay to pass by value
+		// Especially the only Odin types
+		case Type_Basic:   break;
+		case Type_Pointer: break;
+		case Type_Proc:    break; // NOTE(bill): Just a pointer
 
-	// Odin specific
-	case Type_Array:
-	case Type_Vector:
-	// Could be in C too
-	case Type_Record: {
-		i64 size = type_size_of(a, original_type);
-		switch (8*size) {
-		case 8:  new_type = t_u8;  break;
-		case 16: new_type = t_u16; break;
-		case 32: new_type = t_u32; break;
-		case 64: new_type = t_u64; break;
-		default:
-			// NOTE(bill): It could be an empty struct that is passed
-			// and if that is the case, no need to pass by pointer
-			// (I think..)
-			if (size > 0) {
-				new_type = make_type_pointer(a, original_type);
-			}
+		// Odin only types
+		case Type_Slice:
+		case Type_DynamicArray:
+		case Type_Map:
 			break;
+
+		// Odin specific
+		case Type_Array:
+		case Type_Vector:
+		// Could be in C too
+		case Type_Record: {
+			i64 size = type_size_of(a, original_type);
+			switch (8*size) {
+			case 8:  new_type = t_u8;  break;
+			case 16: new_type = t_u16; break;
+			case 32: new_type = t_u32; break;
+			case 64: new_type = t_u64; break;
+			default:
+				// NOTE(bill): It could be an empty struct that is passed
+				// and if that is the case, no need to pass by pointer
+				// (I think..)
+				if (size > 0) {
+					new_type = make_type_pointer(a, original_type);
+				}
+				break;
+			}
+		} break;
 		}
-	} break;
+	} else {
+		// IMPORTANT TODO(bill): figure out the ABI settings for Linux, OSX etc. for
+		// their architectures
 	}
 
 	return new_type;
