@@ -1521,10 +1521,11 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 
 					AstNode *up_init = unparen_expr(init);
 					if (up_init != NULL && is_ast_node_type(up_init)) {
+						AstNode *type = up_init;
 						e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
 						// TODO(bill): What if vd->type != NULL??? How to handle this case?
-						d->type_expr = init;
-						d->init_expr = init;
+						d->type_expr = type;
+						d->init_expr = type;
 					} else if (up_init != NULL && up_init->kind == AstNode_Alias) {
 						error_node(up_init, "#alias declarations are not yet supported");
 						continue;

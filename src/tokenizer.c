@@ -64,18 +64,18 @@ TOKEN_KIND(Token__ComparisonBegin, "_ComparisonBegin"), \
 	TOKEN_KIND(Token_GtEq,  ">="), \
 TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 \
-	TOKEN_KIND(Token_OpenParen,     "("), \
-	TOKEN_KIND(Token_CloseParen,    ")"), \
-	TOKEN_KIND(Token_OpenBracket,   "["), \
-	TOKEN_KIND(Token_CloseBracket,  "]"), \
-	TOKEN_KIND(Token_OpenBrace,     "{"), \
-	TOKEN_KIND(Token_CloseBrace,    "}"), \
-	TOKEN_KIND(Token_Colon,         ":"), \
-	TOKEN_KIND(Token_Semicolon,     ";"), \
-	TOKEN_KIND(Token_Period,        "."), \
-	TOKEN_KIND(Token_Comma,         ","), \
-	TOKEN_KIND(Token_Ellipsis,      ".."), \
-	/* TOKEN_KIND(Token_HalfOpenRange, "..<"), */ \
+	TOKEN_KIND(Token_OpenParen,     "("),   \
+	TOKEN_KIND(Token_CloseParen,    ")"),   \
+	TOKEN_KIND(Token_OpenBracket,   "["),   \
+	TOKEN_KIND(Token_CloseBracket,  "]"),   \
+	TOKEN_KIND(Token_OpenBrace,     "{"),   \
+	TOKEN_KIND(Token_CloseBrace,    "}"),   \
+	TOKEN_KIND(Token_Colon,         ":"),   \
+	TOKEN_KIND(Token_Semicolon,     ";"),   \
+	TOKEN_KIND(Token_Period,        "."),   \
+	TOKEN_KIND(Token_Comma,         ","),   \
+	TOKEN_KIND(Token_Ellipsis,      ".."),  \
+	TOKEN_KIND(Token_HalfOpenRange, "..<"), \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
@@ -870,10 +870,10 @@ Token tokenizer_get_token(Tokenizer *t) {
 			if (t->curr_rune == '.') { // Could be an ellipsis
 				advance_to_next_rune(t);
 				token.kind = Token_Ellipsis;
-				// if (t->curr_rune == '<') {
-					// advance_to_next_rune(t);
-					// token.kind = Token_HalfOpenRange;
-				// }
+				if (t->curr_rune == '<') {
+					advance_to_next_rune(t);
+					token.kind = Token_HalfOpenRange;
+				}
 			}
 			break;
 

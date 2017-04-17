@@ -2366,9 +2366,9 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 		return true;
 	}
 	if (is_type_string(src) && is_type_u8_slice(dst)) {
-		if (is_type_typed(src)) {
+		// if (is_type_typed(src)) {
 			return true;
-		}
+		// }
 	}
 
 	// proc <-> proc
@@ -2403,6 +2403,8 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 		}
 	} else if (check_is_castable_to(c, x, type)) {
 		if (x->mode != Addressing_Constant) {
+			x->mode = Addressing_Value;
+		} else if (is_type_slice(type) && is_type_string(x->type)) {
 			x->mode = Addressing_Value;
 		}
 		can_convert = true;
@@ -4935,6 +4937,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		check_ident(c, o, node, NULL, type_hint, false);
 	case_end;
 
+
 	case_ast_node(bl, BasicLit, node);
 		Type *t = t_invalid;
 		switch (bl->kind) {
@@ -5927,6 +5930,11 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(bl, BasicLit, node);
 		str = string_append_token(str, *bl);
+	case_end;
+
+	case_ast_node(bd, BasicDirective, node);
+		str = gb_string_appendc(str, "#");
+		str = gb_string_append_length(str, bd->name.text, bd->name.len);
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);

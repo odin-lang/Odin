@@ -210,6 +210,10 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 		return nil, false;
 	}
 
+	if length == 0 {
+		return nil, true;
+	}
+
 	data := make([]byte, length);
 	if data == nil {
 		return nil, false;

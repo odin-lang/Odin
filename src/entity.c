@@ -75,7 +75,9 @@ struct Entity {
 			bool is_immutable;
 			bool is_thread_local;
 		} Variable;
-		i32 TypeName;
+		struct {
+			bool is_type_alias;
+		} TypeName;
 		struct {
 			bool         is_foreign;
 			String       foreign_name;

@@ -39,6 +39,7 @@ Type_Info_Record :: struct #ordered {
 Type_Info :: union {
 	size:  int,
 	align: int,
+
 	Named{name: string, base: ^Type_Info},
 	Integer{signed: bool},
 	Float{},
