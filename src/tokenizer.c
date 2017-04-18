@@ -170,8 +170,8 @@ Token make_token_ident(String s) {
 
 typedef struct ErrorCollector {
 	TokenPos prev;
-	i64 count;
-	i64 warning_count;
+	i64     count;
+	i64     warning_count;
 	gbMutex mutex;
 } ErrorCollector;
 

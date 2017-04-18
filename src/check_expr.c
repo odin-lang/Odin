@@ -599,9 +599,10 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 		map_entity_set(&entity_map, hash_string(name), f);
 	}
 
-	union_type->Record.fields      = fields;
-	union_type->Record.field_count = field_count;
-	union_type->Record.are_offsets_set = false;
+	union_type->Record.fields              = fields;
+	union_type->Record.fields_in_src_order = fields;
+	union_type->Record.field_count         = field_count;
+	union_type->Record.are_offsets_set     = false;
 
 
 	for_array(i, ut->variants) {

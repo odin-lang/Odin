@@ -1718,10 +1718,10 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			if (t->Record.field_count > 0) {
 				Type *field_type = t->Record.fields[0]->type;
 				type_path_push(path, field_type);
+				i64 align = type_align_of_internal(allocator, field_type, path);
 				if (path->failure) {
 					return FAILURE_ALIGNMENT;
 				}
-				i64 align = type_align_of_internal(allocator, field_type, path);
 				type_path_pop(path);
 				if (max < align) {
 					max = align;
@@ -1943,12 +1943,21 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			if (path->failure) {
 				return FAILURE_SIZE;
 			}
-			// NOTE(bill): Zeroth field is invalid
-			type_set_offsets(allocator, t);
 
 			i64 max = 0;
 			isize field_count = t->Record.field_count;
 			isize variant_count = t->Record.variant_count;
+
+			// Check for recursive types
+			for (isize i = 0; i < field_count; i++) {
+				i64 size = type_size_of_internal(allocator, t->Record.fields[i]->type, path);
+				if (path->failure) {
+					return FAILURE_SIZE;
+				}
+			}
+			// NOTE(bill): Zeroth field is invalid
+			type_set_offsets(allocator, t);
+
 			if (field_count > 0) {
 				Type *end_type = t->Record.fields[field_count-1]->type;
 				i64 end_offset = t->Record.offsets[field_count-1];
@@ -1996,7 +2005,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 i64 type_offset_of(gbAllocator allocator, Type *t, i32 index) {
 	t = base_type(t);
-	if (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct) {
+	if (t->kind == Type_Record && (t->Record.kind == TypeRecord_Struct || t->Record.kind == TypeRecord_Union)) {
 		type_set_offsets(allocator, t);
 		if (gb_is_between(index, 0, t->Record.field_count-1)) {
 			return t->Record.offsets[index];

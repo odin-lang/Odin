@@ -2525,14 +2525,14 @@ irValue *ir_string_len(irProcedure *proc, irValue *string) {
 }
 
 
-void ir_fill_slice(irProcedure *proc, irValue *slice_ptr, irValue *data, irValue *count, irValue *capacity) {
+void ir_fill_slice(irProcedure *proc, irValue *slice_ptr, irValue *data, irValue *len, irValue *cap) {
 	Type *t = ir_type(slice_ptr);
 	GB_ASSERT(is_type_pointer(t));
 	t = type_deref(t);
 	GB_ASSERT(is_type_slice(t));
 	ir_emit_store(proc, ir_emit_struct_ep(proc, slice_ptr, 0), data);
-	ir_emit_store(proc, ir_emit_struct_ep(proc, slice_ptr, 1), count);
-	ir_emit_store(proc, ir_emit_struct_ep(proc, slice_ptr, 2), capacity);
+	ir_emit_store(proc, ir_emit_struct_ep(proc, slice_ptr, 1), len);
+	ir_emit_store(proc, ir_emit_struct_ep(proc, slice_ptr, 2), cap);
 }
 
 
@@ -2771,7 +2771,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 				ir_emit_comment(proc, str_lit("union - child to parent"));
 				gbAllocator a = proc->module->allocator;
 				irValue *parent = ir_add_local_generated(proc, t);
-				irValue *underlying = ir_emit_conv(proc, parent, make_type_pointer(a, src_type));
+				irValue *underlying = ir_emit_conv(proc, parent, make_type_pointer(a, f->type));
 				ir_emit_store(proc, underlying, value);
 
 				irValue *tag_ptr = ir_emit_union_tag_ptr(proc, parent);
@@ -5073,7 +5073,8 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 					if (elem->kind == AstNode_FieldValue) {
 						ast_node(fv, FieldValue, elem);
-						Selection sel = lookup_field(proc->module->allocator, bt, fv->field->Ident.string, false);
+						String name = fv->field->Ident.string;
+						Selection sel = lookup_field(proc->module->allocator, bt, name, false);
 						index = sel.index.e[0];
 						elem = fv->value;
 					} else {
