@@ -1779,9 +1779,10 @@ i64 *type_set_offsets_of(gbAllocator allocator, Entity **fields, isize field_cou
 	} else {
 		for (isize i = 0; i < field_count; i++) {
 			i64 align = type_align_of(allocator, fields[i]->type);
+			i64 size  = type_size_of(allocator, fields[i]->type);
 			curr_offset = align_formula(curr_offset, align);
 			offsets[i] = curr_offset;
-			curr_offset += type_size_of(allocator, fields[i]->type);
+			curr_offset += size;
 		}
 	}
 	return offsets;
@@ -1861,7 +1862,8 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	} break;
 
 	case Type_DynamicArray:
-		return 3*build_context.word_size + type_size_of(allocator, t_allocator);
+		// data + len + cap + allocator(procedure+data)
+		return 3*build_context.word_size + 2*build_context.word_size;
 
 	case Type_Vector: {
 #if 0

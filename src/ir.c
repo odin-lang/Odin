@@ -2205,7 +2205,6 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 	gbAllocator a = proc->module->allocator;
 	Type *t = base_type(type_deref(ir_type(s)));
 	Type *result_type = NULL;
-	irValue *gep = NULL;
 
 	if (is_type_struct(t)) {
 		GB_ASSERT(t->Record.field_count > 0);
@@ -2216,10 +2215,6 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 		GB_ASSERT(t->Record.field_count > 0);
 		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
 		result_type = make_type_pointer(a, t->Record.fields[index]->type);
-		i64 offset = t->Record.offsets[index];
-		irValue *ptr = ir_emit_conv(proc, s, t_u8_ptr);
-		ptr = ir_emit_ptr_offset(proc, ptr, ir_const_int(a, offset));
-		return ir_emit_conv(proc, ptr, result_type);
 	} else if (is_type_tuple(t)) {
 		GB_ASSERT(t->Tuple.variable_count > 0);
 		GB_ASSERT(gb_is_between(index, 0, t->Tuple.variable_count-1));
@@ -2273,8 +2268,7 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 
 	GB_ASSERT(result_type != NULL);
 
-	gep = ir_instr_struct_element_ptr(proc, s, index, result_type);
-	return ir_emit(proc, gep);
+	return ir_emit(proc, ir_instr_struct_element_ptr(proc, s, index, result_type));
 }
 
 
@@ -2293,13 +2287,7 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 		type_set_offsets(a, t);
 		GB_ASSERT(t->Record.field_count > 0);
 		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
-		Type *ptr_type = make_type_pointer(a, t->Record.fields[index]->type);
-		i64 offset = t->Record.offsets[index];
-		irValue *ptr = ir_address_from_load_or_generate_local(proc, s);
-		ptr = ir_emit_conv(proc, s, t_u8_ptr);
-		ptr = ir_emit_ptr_offset(proc, ptr, ir_const_int(a, offset));
-		ptr = ir_emit_conv(proc, ptr, ptr_type);
-		return ir_emit_load(proc, ptr);
+		result_type = t->Record.fields[index]->type;
 	} else if (is_type_tuple(t)) {
 		GB_ASSERT(t->Tuple.variable_count > 0);
 		GB_ASSERT(gb_is_between(index, 0, t->Tuple.variable_count-1));

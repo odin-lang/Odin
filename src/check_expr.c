@@ -586,7 +586,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	Entity *using_index_expr = NULL;
 
 	Entity **variants = gb_alloc_array(c->allocator, Entity *, variant_count);
-	Entity **fields   = gb_alloc_array(c->allocator, Entity *, field_count);
+	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
 
 	isize variant_index = 0;
 	variants[variant_index++] = make_entity_type_name(c->allocator, c->context.scope, empty_token, NULL);
@@ -5193,6 +5193,11 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 							continue;
 						}
 						Entity *field = t->Record.fields_in_src_order[index];
+
+						if (str_eq(field->token.string, str_lit("_"))) {
+							// NOTE(bill): Ignore blank identifiers
+							continue;
+						}
 
 						check_expr(c, o, elem);
 						if (index >= field_count) {

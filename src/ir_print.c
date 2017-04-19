@@ -253,9 +253,30 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		case TypeRecord_Union: {
 			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
 			// LLVM takes the first element's alignment as the entire alignment (like C)
-			i64 size_of_union  = type_size_of(heap_allocator(),  t) - build_context.word_size;
-			i64 align_of_union = type_align_of(heap_allocator(), t);
-			ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8], i%lld}", align_of_union, size_of_union, word_bits);
+			i64 align = type_align_of(heap_allocator(), t);
+			i64 total_size = type_size_of(heap_allocator(), t);
+		#if 1
+			i64 fields_size = 0;
+			if (t->Record.field_count > 0) {
+				type_set_offsets(m->allocator, t);
+				isize end_index = t->Record.field_count-1;
+				i64 end_offset = t->Record.offsets[end_index];
+				isize end_size = type_size_of(m->allocator, t->Record.fields[end_index]->type);
+				fields_size = align_formula(end_offset + end_size, build_context.word_size);
+			}
+			i64 block_size = total_size - fields_size -  build_context.word_size;
+
+			ir_fprintf(f, "{[0 x <%lld x i8>], ", align);
+			for (isize i = 0; i < t->Record.field_count; i++) {
+				ir_print_type(f, m, t->Record.fields[i]->type);
+				ir_fprintf(f, ", ");
+			}
+			ir_fprintf(f, "[%lld x i8], ", block_size);
+			ir_fprintf(f, "i%lld}", word_bits);
+		#else
+			i64 block_size = total_size - build_context.word_size;
+			ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8], i%lld}", align, block_size, word_bits);
+		#endif
 		} return;
 		case TypeRecord_RawUnion: {
 			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
@@ -561,12 +582,15 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				}
 			} else {
 				for (isize i = 0; i < value_count; i++) {
-					TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems.e[i]);
-					GB_ASSERT(tav != NULL);
-
 					Entity *f = type->Record.fields_in_src_order[i];
 
-					values[f->Variable.field_index] = tav->value;
+					if (str_eq(f->token.string, str_lit("_"))) {
+						values[f->Variable.field_index] = (ExactValue){0};
+					} else {
+						TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems.e[i]);
+						GB_ASSERT(tav != NULL);
+						values[f->Variable.field_index] = tav->value;
+					}
 				}
 			}
 
@@ -806,6 +830,8 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			if (st->Record.custom_align > 0) {
 				index += 1;
 			}
+		} else if (is_type_union(st)) {
+			index += 1;
 		}
 
 		ir_print_type(f, m, type_deref(et));
@@ -874,6 +900,8 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			if (st->Record.custom_align > 0) {
 				index += 1;
 			}
+		} else if (is_type_union(st)) {
+			index += 1;
 		}
 
 
@@ -886,6 +914,8 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	case irInstr_UnionTagPtr: {
 		Type *et = ir_type(instr->UnionTagPtr.address);
 		ir_fprintf(f, "%%%d = getelementptr inbounds ", value->index);
+		Type *t = base_type(type_deref(et));
+		GB_ASSERT(is_type_union(t));
 
 		ir_print_type(f, m, type_deref(et));
 		ir_fprintf(f, ", ");
@@ -896,7 +926,11 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, t_int);
 		ir_fprintf(f, " 0, ");
 		ir_print_type(f, m, t_i32);
+	#if 1
+		ir_fprintf(f, " %d", 2 + t->Record.field_count);
+	#else
 		ir_fprintf(f, " %d", 2);
+	#endif
 		ir_fprintf(f, " ; UnionTagPtr");
 		ir_fprintf(f, "\n");
 	} break;
@@ -904,11 +938,19 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	case irInstr_UnionTagValue: {
 		Type *et = ir_type(instr->UnionTagValue.address);
 		ir_fprintf(f, "%%%d = extractvalue ", value->index);
+		Type *t = base_type(et);
+		GB_ASSERT(is_type_union(t));
 
 		ir_print_type(f, m, et);
 		ir_fprintf(f, " ");
 		ir_print_value(f, m, instr->UnionTagValue.address, et);
-		ir_fprintf(f, ", %d", 2);
+		ir_fprintf(f, ",");
+	#if 1
+		ir_fprintf(f, " %d", 2 + t->Record.field_count);
+	#else
+		ir_fprintf(f, " %d", 2);
+	#endif
+		ir_fprintf(f, ", %d", 2 + t->Record.field_count);
 		ir_fprintf(f, " ; UnionTagValue");
 		ir_fprintf(f, "\n");
 	} break;
