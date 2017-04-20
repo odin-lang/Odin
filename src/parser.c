@@ -105,6 +105,7 @@ typedef enum FieldFlag {
 	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_immutable,
 } FieldListTag;
 
+
 AstNodeArray make_ast_node_array(AstFile *f) {
 	AstNodeArray a;
 	// array_init(&a, gb_arena_allocator(&f->arena));
@@ -155,9 +156,11 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 	AST_NODE_KIND(SelectorExpr, "selector expression",    struct { Token token; AstNode *expr, *selector; }) \
 	AST_NODE_KIND(IndexExpr,    "index expression",       struct { AstNode *expr, *index; Token open, close; }) \
 	AST_NODE_KIND(DerefExpr,    "dereference expression", struct { Token op; AstNode *expr; }) \
-	AST_NODE_KIND(SliceExpr, "slice expression", struct { \
+	AST_NODE_KIND(SliceExpr,    "slice expression", struct { \
 		AstNode *expr; \
 		Token open, close; \
+		Token interval0; \
+		Token interval1; \
 		bool index3; \
 		AstNode *low, *high, *max; \
 	}) \
@@ -686,11 +689,13 @@ AstNode *ast_index_expr(AstFile *f, AstNode *expr, AstNode *index, Token open, T
 }
 
 
-AstNode *ast_slice_expr(AstFile *f, AstNode *expr, Token open, Token close, bool index3, AstNode *low, AstNode *high, AstNode *max) {
+AstNode *ast_slice_expr(AstFile *f, AstNode *expr, Token open, Token close, Token interval0, Token interval1, bool index3, AstNode *low, AstNode *high, AstNode *max) {
 	AstNode *result = make_ast_node(f, AstNode_SliceExpr);
 	result->SliceExpr.expr = expr;
 	result->SliceExpr.open = open;
 	result->SliceExpr.close = close;
+	result->SliceExpr.interval0 = interval0;
+	result->SliceExpr.interval1 = interval1;
 	result->SliceExpr.index3 = index3;
 	result->SliceExpr.low = low;
 	result->SliceExpr.high = high;
@@ -1980,15 +1985,19 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
 
-			if (f->curr_token.kind != Token_Ellipsis) {
+			if (f->curr_token.kind != Token_Ellipsis &&
+			    f->curr_token.kind != Token_HalfClosed) {
 				indices[0] = parse_expr(f, false);
 			}
 			bool is_index = true;
 
-			while (f->curr_token.kind == Token_Ellipsis && ellipsis_count < gb_count_of(ellipses)) {
+			while ((f->curr_token.kind == Token_Ellipsis ||
+			        f->curr_token.kind == Token_HalfClosed)
+			        && ellipsis_count < gb_count_of(ellipses)) {
 				ellipses[ellipsis_count++] = f->curr_token;
 				next_token(f);
 				if (f->curr_token.kind != Token_Ellipsis &&
+				    f->curr_token.kind != Token_HalfClosed &&
 				    f->curr_token.kind != Token_CloseBracket &&
 				    f->curr_token.kind != Token_EOF) {
 					indices[ellipsis_count] = parse_expr(f, false);
@@ -2013,7 +2022,7 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 						indices[2] = ast_bad_expr(f, ellipses[1], close);
 					}
 				}
-				operand = ast_slice_expr(f, operand, open, close, index3, indices[0], indices[1], indices[2]);
+				operand = ast_slice_expr(f, operand, open, close, ellipses[0], ellipses[1], index3, indices[0], indices[1], indices[2]);
 			} else {
 				operand = ast_index_expr(f, operand, indices[0], open, close);
 			}
@@ -2301,6 +2310,7 @@ AstNode *parse_simple_stmt(AstFile *f, bool in_stmt_ok) {
 			allow_token(f, Token_in);
 			AstNode *expr = parse_expr(f, false);
 			switch (f->curr_token.kind) {
+			case Token_HalfClosed:
 			case Token_Ellipsis: {
 				Token op = f->curr_token;
 				next_token(f);

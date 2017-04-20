@@ -160,7 +160,7 @@ decode_last_rune :: proc(s: []byte) -> (rune, int) {
 	}
 
 	start = max(start, 0);
-	r, size = decode_rune(s[start..end]);
+	r, size = decode_rune(s[start..<end]);
 	if start+size != end {
 		return RUNE_ERROR, 1;
 	}

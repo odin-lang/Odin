@@ -335,7 +335,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 			}
 		}
 
-		return cast(string)buf[..i];
+		return cast(string)buf[0..<i];
 	}
 
 	arg_count: i32;

@@ -75,7 +75,7 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 	TOKEN_KIND(Token_Period,        "."),   \
 	TOKEN_KIND(Token_Comma,         ","),   \
 	TOKEN_KIND(Token_Ellipsis,      ".."),  \
-	TOKEN_KIND(Token_HalfOpenRange, "..<"), \
+	TOKEN_KIND(Token_HalfClosed,    "..<"), \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
@@ -872,7 +872,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 				token.kind = Token_Ellipsis;
 				if (t->curr_rune == '<') {
 					advance_to_next_rune(t);
-					token.kind = Token_HalfOpenRange;
+					token.kind = Token_HalfClosed;
 				}
 			}
 			break;

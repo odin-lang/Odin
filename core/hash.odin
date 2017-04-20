@@ -175,7 +175,7 @@ murmur64 :: proc(data: []byte) -> u64 {
 		}
 
 		// TODO(bill): Fix this
-		#no_bounds_check data8 := slice_to_bytes(data32[i..])[..3];
+		#no_bounds_check data8 := slice_to_bytes(data32[i..])[..<3];
 		match len {
 		case 3:
 			h2 ~= cast(u32)data8[2] << 16;

@@ -37,7 +37,7 @@ _libgl := win32.LoadLibraryA(_string_data("opengl32.dll\x00"));
 
 GetProcAddress :: proc(name: string) -> proc() #cc_c {
 	if name[len(name)-1] == 0 {
-		name = name[..len(name)-1];
+		name = name[0..<len(name)-1];
 	}
 	// NOTE(bill): null terminated
 	assert((^name[0] + len(name))^ == 0);

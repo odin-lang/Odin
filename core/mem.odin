@@ -96,7 +96,7 @@ Arena_Temp_Memory :: struct {
 
 init_arena_from_memory :: proc(using a: ^Arena, data: []byte) {
 	backing    = Allocator{};
-	memory     = data[..0];
+	memory     = data[0..<0];
 	temp_count = 0;
 }
 
@@ -169,7 +169,7 @@ begin_arena_temp_memory :: proc(a: ^Arena) -> Arena_Temp_Memory {
 end_arena_temp_memory :: proc(using tmp: Arena_Temp_Memory) {
 	assert(len(arena.memory) >= original_count);
 	assert(arena.temp_count > 0);
-	arena.memory = arena.memory[..original_count];
+	arena.memory = arena.memory[0..<original_count];
 	arena.temp_count--;
 }
 

@@ -771,7 +771,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 				TokenKind op = Token_Lt;
 				switch (ie->op.kind) {
-				case Token_Ellipsis: op = Token_Lt; break;
+				case Token_Ellipsis:   op = Token_LtEq; break;
+				case Token_HalfClosed: op = Token_Lt; break;
 				default: error(ie->op, "Invalid range operator"); break;
 				}
 				bool ok = compare_exact_values(op, a, b);

@@ -21,7 +21,7 @@ write_rune :: proc(buf: ^[]byte, r: rune) {
 	}
 
 	b, n := utf8.encode_rune(r);
-	append(buf, ..b[..n]);
+	append(buf, ..b[0..<n]);
 }
 
 Fmt_Info :: struct {
@@ -47,24 +47,24 @@ Fmt_Info :: struct {
 
 fprint :: proc(fd: os.Handle, args: ..any) -> int {
 	data: [_BUFFER_SIZE]byte;
-	buf := data[..0];
+	buf := data[0..<0];
 	bprint(^buf, ..args);
-	os.write(fd, buf[..len(buf)]);
+	os.write(fd, buf);
 	return len(buf);
 }
 
 fprintln :: proc(fd: os.Handle, args: ..any) -> int {
 	data: [_BUFFER_SIZE]byte;
-	buf := data[..0];
+	buf := data[0..<0];
 	bprintln(^buf, ..args);
-	os.write(fd, buf[..len(buf)]);
+	os.write(fd, buf);
 	return len(buf);
 }
 fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 	data: [_BUFFER_SIZE]byte;
-	buf := data[..0];
+	buf := data[0..<0];
 	bprintf(^buf, fmt, ..args);
-	os.write(fd, buf[..len(buf)]);
+	os.write(fd, buf);
 	return len(buf);
 }
 
@@ -82,9 +82,9 @@ printf :: proc(fmt: string, args: ..any) -> int {
 
 fprint_type :: proc(fd: os.Handle, info: ^Type_Info) {
 	data: [_BUFFER_SIZE]byte;
-	buf := data[..0];
+	buf := data[0..<0];
 	write_type(^buf, info);
-	os.write(fd, buf[..len(buf)]);
+	os.write(fd, buf);
 }
 
 write_type :: proc(buf: ^[]byte, ti: ^Type_Info) {
@@ -305,15 +305,15 @@ bprintln :: proc(buf: ^[]byte, args: ..any) -> int {
 
 sprint :: proc(buf: []byte, args: ..any) -> string {
 	count := bprint(^buf, ..args);
-	return cast(string)buf[..count];
+	return cast(string)buf[0..<count];
 }
 sprintln :: proc(buf: []byte, args: ..any) -> string {
 	count := bprintln(^buf, ..args);
-	return cast(string)buf[..count];
+	return cast(string)buf[0..<count];
 }
 sprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
 	count := bprintf(^buf, fmt, ..args);
-	return cast(string)buf[..count];
+	return cast(string)buf[0..<count];
 }
 
 
@@ -519,7 +519,7 @@ _write_int :: proc(fi: ^Fmt_Info, u: u64, base: int, is_signed: bool, bit_size: 
 	if fi.hash   { flags |= strconv.Int_Flag.PREFIX; }
 	if fi.plus   { flags |= strconv.Int_Flag.PLUS; }
 	if fi.space  { flags |= strconv.Int_Flag.SPACE; }
-	s := strconv.append_bits(buf[..0], u, base, is_signed, bit_size, digits, flags);
+	s := strconv.append_bits(buf[0..<0], u, base, is_signed, bit_size, digits, flags);
 
 	prev_zero := fi.zero;
 	defer fi.zero = prev_zero;
@@ -584,8 +584,8 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
 			prec = fi.prec;
 		}
 		buf: [128]byte;
-		str := strconv.append_float(buf[1..1], v, 'f', prec, bit_size);
-		str = cast(string)buf[..len(str)+1];
+		str := strconv.append_float(buf[1..<1], v, 'f', prec, bit_size);
+		str = cast(string)buf[0..<len(str)];
 		if str[1] == '+' || str[1] == '-' {
 			str = str[1..];
 		} else {
@@ -605,7 +605,7 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
 			if fi.zero && fi.width_set && fi.width > len(str) {
 				write_byte(fi.buf, str[0]);
 				fmt_write_padding(fi, fi.width - len(str));
-				write_string(fi.buf, str[1..]);
+				write_string(fi.buf, str[1..<]);
 			} else {
 				_pad(fi, str);
 			}
@@ -628,7 +628,7 @@ fmt_string :: proc(fi: ^Fmt_Info, s: string, verb: rune) {
 		fi.space = false;
 		defer fi.space = space;
 
-		for i in 0..len(s) {
+		for i in 0..<len(s) {
 			if i > 0 && space {
 				write_byte(fi.buf, ' ');
 			}
@@ -776,7 +776,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
-		for i in 0..info.count {
+		for i in 0..<info.count {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
@@ -793,7 +793,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
 		array := cast(^raw.Dynamic_Array)v.data;
-		for i in 0..array.len {
+		for i in 0..<array.len {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
@@ -815,7 +815,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 		entry_type := union_cast(^Struct)ed.elem;
 		entry_size := ed.elem_size;
-		for i in 0..entries.len {
+		for i in 0..<entries.len {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
@@ -844,7 +844,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
 		slice := cast(^[]byte)v.data;
-		for i in 0..len(slice) {
+		for _, i in slice {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
@@ -856,7 +856,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		write_byte(fi.buf, '<');
 		defer write_byte(fi.buf, '>');
 
-		for i in 0..info.count {
+		for i in 0..<info.count {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
@@ -1011,7 +1011,7 @@ bprintf :: proc(b: ^[]byte, fmt: string, args: ..any) -> int {
 			i++;
 		}
 		if i > prev_i {
-			write_string(b, fmt[prev_i..i]);
+			write_string(b, fmt[prev_i..<i]);
 		}
 		if i >= end {
 			break;

@@ -339,7 +339,7 @@ __bounds_check_error :: proc(file: string, line, column: int, index, count: int)
 	if 0 <= index && index < count {
 		return;
 	}
-	fmt.fprintf(os.stderr, "%s(%d:%d) Index %d is out of bounds range 0..%d\n",
+	fmt.fprintf(os.stderr, "%s(%d:%d) Index %d is out of bounds range 0..<%d\n",
 	            file, line, column, index, count);
 	__debug_trap();
 }
@@ -348,7 +348,7 @@ __slice_expr_error :: proc(file: string, line, column: int, low, high, max: int)
 	if 0 <= low && low <= high && high <= max {
 		return;
 	}
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: [%d..%d..%d]\n",
+	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: [%d..<%d..<%d]\n",
 	            file, line, column, low, high, max);
 	__debug_trap();
 }
@@ -356,7 +356,7 @@ __substring_expr_error :: proc(file: string, line, column: int, low, high: int) 
 	if 0 <= low && low <= high {
 		return;
 	}
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid substring indices: [%d..%d]\n",
+	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid substring indices: [%d..<%d]\n",
 	            file, line, column, low, high);
 	__debug_trap();
 }
@@ -395,7 +395,7 @@ __mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr {
 }
 
 __mem_compare :: proc(a, b: ^byte, n: int) -> int {
-	for i in 0..n {
+	for i in 0..<n {
 		match {
 		case (a+i)^ < (b+i)^:
 			return -1;
@@ -602,7 +602,7 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
 
 	__dynamic_array_resize(nm_hashes, size_of(int), align_of(int), new_count);
 	__dynamic_array_reserve(^nm.entries, entry_size, entry_align, m.entries.len);
-	for i in 0..new_count {
+	for i in 0..<new_count {
 		nm.hashes[i] = -1;
 	}
 

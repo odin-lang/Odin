@@ -4905,6 +4905,17 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		if (se->low  != NULL)    low  = ir_build_expr(proc, se->low);
 		if (se->high != NULL)    high = ir_build_expr(proc, se->high);
 		if (se->max  != NULL)    max  = ir_build_expr(proc, se->max);
+
+
+		if (high != NULL && se->interval0.kind == Token_Ellipsis) {
+			high = ir_emit_arith(proc, Token_Add, high, v_one, t_int);
+		}
+
+		if (max != NULL && se->interval1.kind == Token_Ellipsis) {
+			GB_ASSERT(se->interval0.kind == se->interval1.kind);
+			max = ir_emit_arith(proc, Token_Add, max, v_one, t_int);
+		}
+
 		irValue *addr = ir_build_addr(proc, se->expr).addr;
 		irValue *base = ir_emit_load(proc, addr);
 		Type *type = base_type(ir_type(base));
@@ -5553,7 +5564,8 @@ void ir_build_range_interval(irProcedure *proc, AstNodeIntervalExpr *node, Type 
 
 	TokenKind op = Token_Lt;
 	switch (node->op.kind) {
-	case Token_Ellipsis: op = Token_Lt; break;
+	case Token_Ellipsis:   op = Token_LtEq; break;
+	case Token_HalfClosed: op = Token_Lt;   break;
 	default: GB_PANIC("Invalid interval operator"); break;
 	}
 	irValue *cond = ir_emit_comp(proc, op, ir_emit_load(proc, value), upper);

@@ -2819,6 +2819,7 @@ bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *val
 				return false;
 			}
 
+
 			return true;
 		}
 	}
@@ -5732,12 +5733,27 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			o->mode = Addressing_Value;
 		}
 
+		if (se->low == NULL && se->high != NULL) {
+			error(se->interval0, "1st index is required if a 2nd index is specified");
+			// It is okay to continue as it will assume the 1st index is zero
+		}
+
 		if (se->index3 && (se->high == NULL || se->max == NULL)) {
 			error(se->close, "2nd and 3rd indices are required in a 3-index slice");
 			o->mode = Addressing_Invalid;
 			o->expr = node;
 			return kind;
 		}
+
+		if (se->index3 && se->interval0.kind != se->interval1.kind) {
+			error(se->close, "The interval separators for in a 3-index slice must be the same");
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
+		}
+
+
+		TokenKind interval_kind = se->interval0.kind;
 
 		i64 indices[2] = {0};
 		AstNode *nodes[3] = {se->low, se->high, se->max};
