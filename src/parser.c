@@ -3088,7 +3088,25 @@ AstNode *parse_case_clause(AstFile *f) {
 	Token token = f->curr_token;
 	AstNodeArray list = make_ast_node_array(f);
 	if (allow_token(f, Token_case)) {
-		list = parse_rhs_expr_list(f);
+		list = make_ast_node_array(f);
+		for (;;) {
+			AstNode *e = parse_expr(f, false);
+			if (f->curr_token.kind == Token_Ellipsis ||
+			    f->curr_token.kind == Token_HalfClosed) {
+				Token op = f->curr_token;
+				next_token(f);
+				AstNode *lhs = e;
+				AstNode *rhs = parse_expr(f, false);
+				e = ast_interval_expr(f, op, lhs, rhs);
+			}
+
+			array_add(&list, e);
+			if (f->curr_token.kind != Token_Comma ||
+			    f->curr_token.kind == Token_EOF) {
+			    break;
+			}
+			next_token(f);
+		}
 	} else {
 		expect_token(f, Token_default);
 	}

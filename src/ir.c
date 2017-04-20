@@ -6191,8 +6191,24 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			for_array(j, cc->list) {
 				AstNode *expr = cc->list.e[j];
 				next_cond = ir_new_block(proc, clause, "match.case.next");
-
-				irValue *cond = ir_emit_comp(proc, Token_CmpEq, tag, ir_build_expr(proc, expr));
+				irValue *cond = v_false;
+				if (expr->kind == AstNode_IntervalExpr) {
+					ast_node(ie, IntervalExpr, expr);
+					TokenKind op = {0};
+					switch (ie->op.kind) {
+					case Token_Ellipsis:   op = Token_LtEq; break;
+					case Token_HalfClosed: op = Token_Lt;   break;
+					default: GB_PANIC("Invalid interval operator"); break;
+					}
+					irValue *lhs = ir_build_expr(proc, ie->left);
+					irValue *rhs = ir_build_expr(proc, ie->right);
+					// TODO(bill): do short circuit here
+					irValue *cond_lhs = ir_emit_comp(proc, Token_LtEq, lhs, tag);
+					irValue *cond_rhs = ir_emit_comp(proc, op, tag, rhs);
+					cond = ir_emit_arith(proc, Token_And, cond_lhs, cond_rhs, t_bool);
+				} else {
+					cond = ir_emit_comp(proc, Token_CmpEq, tag, ir_build_expr(proc, expr));
+				}
 				ir_emit_if(proc, cond, body, next_cond);
 				ir_start_block(proc, next_cond);
 			}

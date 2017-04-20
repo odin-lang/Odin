@@ -250,7 +250,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 				return;
 			}
 			target_type = default_type(operand->type);
-			if (!is_type_any(type)) {
+			if (type != NULL && !is_type_any(type)) {
 				GB_ASSERT_MSG(is_type_typed(target_type), "%s", type_to_string(type));
 			}
 			add_type_info_type(c, type);

@@ -915,6 +915,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			token.string = str_lit("true");
 			x.expr       = ast_ident(c->curr_ast_file, token);
 		}
+		if (is_type_vector(x.type)) {
+			gbString str = type_to_string(x.type);
+			error_node(x.expr, "Invalid match expression type: %s", str);
+			gb_string_free(str);
+			break;
+		}
+
 
 		// NOTE(bill): Check for multiple defaults
 		AstNode *first_default = NULL;
@@ -957,65 +964,119 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			for_array(j, cc->list) {
 				AstNode *expr = cc->list.e[j];
-				Operand y = {0};
 
-				check_expr(c, &y, expr);
-				if (x.mode == Addressing_Invalid ||
-				    y.mode == Addressing_Invalid) {
-					continue;
-				}
+				if (expr->kind == AstNode_IntervalExpr) {
+					ast_node(ie, IntervalExpr, expr);
+					Operand lhs = {0};
+					Operand rhs = {0};
+					check_expr(c, &lhs, ie->left);
+					if (x.mode == Addressing_Invalid) {
+						continue;
+					}
+					if (lhs.mode == Addressing_Invalid) {
+						continue;
+					}
+					check_expr(c, &rhs, ie->right);
+					if (rhs.mode == Addressing_Invalid) {
+						continue;
+					}
 
-				convert_to_typed(c, &y, x.type, 0);
-				if (y.mode == Addressing_Invalid) {
-					continue;
-				}
-
-				// NOTE(bill): the ordering here matters
-				Operand z = y;
-				check_comparison(c, &z, &x, Token_CmpEq);
-				if (z.mode == Addressing_Invalid) {
-					continue;
-				}
-				if (y.mode != Addressing_Constant) {
-					continue;
-				}
+					if (!is_type_ordered(x.type)) {
+						gbString str = type_to_string(x.type);
+						error_node(x.expr, "Unordered type `%s`, is invalid for an interval expression", str);
+						gb_string_free(str);
+						continue;
+					}
 
 
-				if (y.value.kind != ExactValue_Invalid) {
-					HashKey key = hash_exact_value(y.value);
-					TypeAndToken *found = map_type_and_token_get(&seen, key);
-					if (found != NULL) {
-						gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-						isize count = map_type_and_token_multi_count(&seen, key);
-						TypeAndToken *taps = gb_alloc_array(c->tmp_allocator, TypeAndToken, count);
+					TokenKind op = {0};
 
-						map_type_and_token_multi_get_all(&seen, key, taps);
-						bool continue_outer = false;
+					Operand a = lhs;
+					Operand b = rhs;
+					check_comparison(c, &a, &x, Token_LtEq);
+					if (a.mode == Addressing_Invalid) {
+						continue;
+					}
+					switch (ie->op.kind) {
+					case Token_Ellipsis:   op = Token_GtEq; break;
+					case Token_HalfClosed: op = Token_Gt;   break;
+					default: error(ie->op, "Invalid interval operator"); continue;
+					}
 
-						for (isize i = 0; i < count; i++) {
-							TypeAndToken tap = taps[i];
-							if (are_types_identical(y.type, tap.type)) {
-								TokenPos pos = tap.token.pos;
-								gbString expr_str = expr_to_string(y.expr);
-								error_node(y.expr,
-								           "Duplicate case `%s`\n"
-								           "\tprevious case at %.*s(%td:%td)",
-								           expr_str,
-								           LIT(pos.file), pos.line, pos.column);
-								gb_string_free(expr_str);
-								continue_outer = true;
-								break;
+					check_comparison(c, &b, &x, op);
+					if (b.mode == Addressing_Invalid) {
+						continue;
+					}
+
+					switch (ie->op.kind) {
+					case Token_Ellipsis:   op = Token_LtEq; break;
+					case Token_HalfClosed: op = Token_Lt;   break;
+					default: error(ie->op, "Invalid interval operator"); continue;
+					}
+
+					Operand a1 = lhs;
+					Operand b1 = rhs;
+					check_comparison(c, &a1, &b1, op);
+				} else {
+					Operand y = {0};
+					check_expr(c, &y, expr);
+					if (x.mode == Addressing_Invalid ||
+					    y.mode == Addressing_Invalid) {
+						continue;
+					}
+
+					convert_to_typed(c, &y, x.type, 0);
+					if (y.mode == Addressing_Invalid) {
+						continue;
+					}
+
+					// NOTE(bill): the ordering here matters
+					Operand z = y;
+					check_comparison(c, &z, &x, Token_CmpEq);
+					if (z.mode == Addressing_Invalid) {
+						continue;
+					}
+					if (y.mode != Addressing_Constant) {
+						continue;
+					}
+
+
+					if (y.value.kind != ExactValue_Invalid) {
+						HashKey key = hash_exact_value(y.value);
+						TypeAndToken *found = map_type_and_token_get(&seen, key);
+						if (found != NULL) {
+							gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+							isize count = map_type_and_token_multi_count(&seen, key);
+							TypeAndToken *taps = gb_alloc_array(c->tmp_allocator, TypeAndToken, count);
+
+							map_type_and_token_multi_get_all(&seen, key, taps);
+							bool continue_outer = false;
+
+							for (isize i = 0; i < count; i++) {
+								TypeAndToken tap = taps[i];
+								if (are_types_identical(y.type, tap.type)) {
+									TokenPos pos = tap.token.pos;
+									gbString expr_str = expr_to_string(y.expr);
+									error_node(y.expr,
+									           "Duplicate case `%s`\n"
+									           "\tprevious case at %.*s(%td:%td)",
+									           expr_str,
+									           LIT(pos.file), pos.line, pos.column);
+									gb_string_free(expr_str);
+									continue_outer = true;
+									break;
+								}
+							}
+
+							gb_temp_arena_memory_end(tmp);
+
+							if (continue_outer) {
+								continue;
 							}
 						}
-
-						gb_temp_arena_memory_end(tmp);
-
-						if (continue_outer) {
-							continue;
-						}
+						TypeAndToken tap = {y.type, ast_node_token(y.expr)};
+						map_type_and_token_multi_insert(&seen, key, tap);
 					}
-					TypeAndToken tap = {y.type, ast_node_token(y.expr)};
-					map_type_and_token_multi_insert(&seen, key, tap);
 				}
 			}
 
