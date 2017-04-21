@@ -2522,6 +2522,21 @@ void ir_fill_slice(irProcedure *proc, irValue *slice_ptr, irValue *data, irValue
 	ir_emit_store(proc, ir_emit_struct_ep(proc, slice_ptr, 1), len);
 	ir_emit_store(proc, ir_emit_struct_ep(proc, slice_ptr, 2), cap);
 }
+void ir_fill_string(irProcedure *proc, irValue *string_ptr, irValue *data, irValue *len) {
+	Type *t = ir_type(string_ptr);
+	GB_ASSERT(is_type_pointer(t));
+	t = type_deref(t);
+	GB_ASSERT(is_type_string(t));
+	ir_emit_store(proc, ir_emit_struct_ep(proc, string_ptr, 0), data);
+	ir_emit_store(proc, ir_emit_struct_ep(proc, string_ptr, 1), len);
+}
+
+irValue *ir_emit_string(irProcedure *proc, irValue *elem, irValue *len) {
+	irValue *str = ir_add_local_generated(proc, t_string);
+	ir_fill_string(proc, str, elem, len);
+	return ir_emit_load(proc, str);
+}
+
 
 
 
@@ -2565,16 +2580,6 @@ irValue *ir_add_local_slice(irProcedure *proc, Type *slice_type, irValue *base, 
 	ir_fill_slice(proc, slice, elem, len, cap);
 	return slice;
 }
-
-irValue *ir_emit_string(irProcedure *proc, irValue *elem, irValue *len) {
-	irValue *str = ir_add_local_generated(proc, t_string);
-	irValue *str_elem = ir_emit_struct_ep(proc, str, 0);
-	irValue *str_len = ir_emit_struct_ep(proc, str, 1);
-	ir_emit_store(proc, str_elem, elem);
-	ir_emit_store(proc, str_len, len);
-	return ir_emit_load(proc, str);
-}
-
 
 
 
@@ -4906,14 +4911,16 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		if (se->high != NULL)    high = ir_build_expr(proc, se->high);
 		if (se->max  != NULL)    max  = ir_build_expr(proc, se->max);
 
+		bool add_one_to_len = false;
+		bool add_one_to_cap  = false;
 
 		if (high != NULL && se->interval0.kind == Token_Ellipsis) {
-			high = ir_emit_arith(proc, Token_Add, high, v_one, t_int);
+			add_one_to_len = true;
 		}
 
 		if (max != NULL && se->interval1.kind == Token_Ellipsis) {
 			GB_ASSERT(se->interval0.kind == se->interval1.kind);
-			max = ir_emit_arith(proc, Token_Add, max, v_one, t_int);
+			add_one_to_cap = true;
 		}
 
 		irValue *addr = ir_build_addr(proc, se->expr).addr;
@@ -4925,7 +4932,6 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			addr = base;
 			base = ir_emit_load(proc, base);
 		}
-
 		// TODO(bill): Cleanup like mad!
 
 		switch (type->kind) {
@@ -4940,6 +4946,9 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			irValue *elem  = ir_emit_ptr_offset(proc, ir_slice_elem(proc, base), low);
 			irValue *len   = ir_emit_arith(proc, Token_Sub, high, low, t_int);
 			irValue *cap   = ir_emit_arith(proc, Token_Sub, max, low, t_int);
+			if (add_one_to_len) len = ir_emit_arith(proc, Token_Add, len, v_one, t_int);
+			if (add_one_to_cap) cap = ir_emit_arith(proc, Token_Add, cap, v_one, t_int);
+
 			irValue *slice = ir_add_local_generated(proc, slice_type);
 			ir_fill_slice(proc, slice, elem, len, cap);
 			return ir_addr(slice);
@@ -4957,6 +4966,9 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			irValue *elem  = ir_emit_ptr_offset(proc, ir_dynamic_array_elem(proc, base), low);
 			irValue *len   = ir_emit_arith(proc, Token_Sub, high, low, t_int);
 			irValue *cap   = ir_emit_arith(proc, Token_Sub, max, low, t_int);
+			if (add_one_to_len) len = ir_emit_arith(proc, Token_Add, len, v_one, t_int);
+			if (add_one_to_cap) cap = ir_emit_arith(proc, Token_Add, cap, v_one, t_int);
+
 			irValue *slice = ir_add_local_generated(proc, slice_type);
 			ir_fill_slice(proc, slice, elem, len, cap);
 			return ir_addr(slice);
@@ -4974,6 +4986,9 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			irValue *elem = ir_emit_ptr_offset(proc, ir_array_elem(proc, addr), low);
 			irValue *len  = ir_emit_arith(proc, Token_Sub, high, low, t_int);
 			irValue *cap  = ir_emit_arith(proc, Token_Sub, max, low, t_int);
+			if (add_one_to_len) len = ir_emit_arith(proc, Token_Add, len, v_one, t_int);
+			if (add_one_to_cap) cap = ir_emit_arith(proc, Token_Add, cap, v_one, t_int);
+
 			irValue *slice = ir_add_local_generated(proc, slice_type);
 			ir_fill_slice(proc, slice, elem, len, cap);
 			return ir_addr(slice);
@@ -4982,17 +4997,16 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		case Type_Basic: {
 			GB_ASSERT(type == t_string);
 			if (high == NULL) high = ir_string_len(proc, base);
-			if (max == NULL)  max = ir_string_len(proc, base);
+			// if (max == NULL)  max = ir_string_len(proc, base);
 
-			ir_emit_slice_bounds_check(proc, se->open, low, high, max, true);
+			ir_emit_slice_bounds_check(proc, se->open, low, high, NULL, true);
 
 			irValue *elem = ir_emit_ptr_offset(proc, ir_string_elem(proc, base), low);
 			irValue *len = ir_emit_arith(proc, Token_Sub, high, low, t_int);
+			if (add_one_to_len) len = ir_emit_arith(proc, Token_Add, len, v_one, t_int);
 
 			irValue *str = ir_add_local_generated(proc, t_string);
-			ir_emit_store(proc, ir_emit_struct_ep(proc, str, 0), elem);
-			ir_emit_store(proc, ir_emit_struct_ep(proc, str, 1), len);
-
+			ir_fill_string(proc, str, elem, len);
 			return ir_addr(str);
 		} break;
 		}

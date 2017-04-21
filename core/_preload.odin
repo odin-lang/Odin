@@ -28,9 +28,7 @@ Calling_Convention :: enum {
 Type_Info_Record :: struct #ordered {
 	types:        []^Type_Info,
 	names:        []string,
-	offsets:      []int,    // offsets may not be used in tuples
-	// size:         int,
-	// align:        int,
+	offsets:      []int,  // offsets may not be used in tuples
 	packed:       bool,
 	ordered:      bool,
 	custom_align: bool,
