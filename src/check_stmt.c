@@ -3,7 +3,9 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 		return;
 	}
 
-	check_scope_decls(c, stmts, 1.2*stmts.count);
+	if (flags&Stmt_CheckScopeDecls) {
+		check_scope_decls(c, stmts, 1.2*stmts.count);
+	}
 
 	bool ft_ok = (flags & Stmt_FallthroughAllowed) != 0;
 	flags &= ~Stmt_FallthroughAllowed;
@@ -362,6 +364,7 @@ typedef struct TypeAndToken {
 #include "map.c"
 
 void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
+	flags &= ~Stmt_CheckScopeDecls;
 	Operand operand = {Addressing_Invalid};
 	check_expr(c, &operand, ws->cond);
 	if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {

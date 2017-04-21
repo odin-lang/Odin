@@ -1138,6 +1138,8 @@ irBlock *ir_new_block(irProcedure *proc, AstNode *node, char *label) {
 	v->Block.node   = node;
 	v->Block.scope  = scope;
 	v->Block.parent = proc;
+	// TODO(bill): Is this correct or even needed?
+	v->Block.scope_index = proc->scope_index;
 
 	array_init(&v->Block.instrs, heap_allocator());
 	array_init(&v->Block.locals, heap_allocator());

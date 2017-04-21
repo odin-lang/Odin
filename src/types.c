@@ -1143,7 +1143,7 @@ ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 		}
 	}
 
-	{
+	if (px.params != NULL && py.params != NULL) {
 		Entity *ex = px.params->Tuple.variables[0];
 		Entity *ey = py.params->Tuple.variables[0];
 		bool ok = are_types_identical(ex->type, ey->type);
@@ -1159,18 +1159,6 @@ ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 
 gb_global Entity *entity__any_type_info  = NULL;
 gb_global Entity *entity__any_data       = NULL;
-gb_global Entity *entity__string_data    = NULL;
-gb_global Entity *entity__string_count   = NULL;
-gb_global Entity *entity__slice_count    = NULL;
-gb_global Entity *entity__slice_capacity = NULL;
-
-gb_global Entity *entity__dynamic_array_count     = NULL;
-gb_global Entity *entity__dynamic_array_capacity  = NULL;
-gb_global Entity *entity__dynamic_array_allocator = NULL;
-
-gb_global Entity *entity__dynamic_map_count     = NULL;
-gb_global Entity *entity__dynamic_map_capacity  = NULL;
-gb_global Entity *entity__dynamic_map_allocator = NULL;
 
 Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel);
 
@@ -1262,52 +1250,10 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			}
 		#endif
 		} break;
-		case Basic_string: {
-		#if 0
-			String data_str = str_lit("data");
-			String count_str = str_lit("count");
-			if (entity__string_data == NULL) {
-				entity__string_data = make_entity_field(a, NULL, make_token_ident(data_str), make_type_pointer(a, t_u8), false, 0);
-			}
-
-			if (entity__string_count == NULL) {
-				entity__string_count = make_entity_field(a, NULL, make_token_ident(count_str), t_int, false, 1);
-			}
-
-			if (str_eq(field_name, data_str)) {
-				selection_add_index(&sel, 0);
-				sel.entity = entity__string_data;
-				return sel;
-			} else if (str_eq(field_name, count_str)) {
-				selection_add_index(&sel, 1);
-				sel.entity = entity__string_count;
-				return sel;
-			}
-		#endif
-		} break;
 		}
 
 		return sel;
-	} else if (type->kind == Type_Array) {
-	#if 0
-		String count_str = str_lit("count");
-		// NOTE(bill): Underlying memory address cannot be changed
-		if (str_eq(field_name, count_str)) {
-			// HACK(bill): Memory leak
-			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, exact_value_integer(type->Array.count));
-			return sel;
-		}
-	#endif
 	} else if (type->kind == Type_Vector) {
-	#if 0
-		String count_str = str_lit("count");
-		// NOTE(bill): Vectors are not addressable
-		if (str_eq(field_name, count_str)) {
-			// HACK(bill): Memory leak
-			sel.entity = make_entity_constant(a, NULL, make_token_ident(count_str), t_int, exact_value_integer(type->Vector.count));
-			return sel;
-		}
-	#endif
 		if (type->Vector.count <= 4 && !is_type_boolean(type->Vector.elem)) {
 			// HACK(bill): Memory leak
 			switch (type->Vector.count) {
@@ -1329,103 +1275,6 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			#undef _VECTOR_FIELD_CASE
 			}
 		}
-
-	} else if (type->kind == Type_Slice) {
-	#if 0
-		String data_str     = str_lit("data");
-		String count_str    = str_lit("count");
-		String capacity_str = str_lit("capacity");
-
-		if (str_eq(field_name, data_str)) {
-			selection_add_index(&sel, 0);
-			// HACK(bill): Memory leak
-			sel.entity = make_entity_field(a, NULL, make_token_ident(data_str), make_type_pointer(a, type->Slice.elem), false, 0);
-			return sel;
-		} else if (str_eq(field_name, count_str)) {
-			selection_add_index(&sel, 1);
-			if (entity__slice_count == NULL) {
-				entity__slice_count = make_entity_field(a, NULL, make_token_ident(count_str), t_int, false, 1);
-			}
-
-			sel.entity = entity__slice_count;
-			return sel;
-		}  else if (str_eq(field_name, capacity_str)) {
-			selection_add_index(&sel, 2);
-			if (entity__slice_capacity == NULL) {
-				entity__slice_capacity = make_entity_field(a, NULL, make_token_ident(capacity_str), t_int, false, 2);
-			}
-
-			sel.entity = entity__slice_capacity;
-			return sel;
-		}
-	#endif
-	} else if (type->kind == Type_DynamicArray) {
-	#if 0
-		String data_str      = str_lit("data");
-		String count_str     = str_lit("count");
-		String capacity_str  = str_lit("capacity");
-		String allocator_str = str_lit("allocator");
-
-		if (str_eq(field_name, data_str)) {
-			selection_add_index(&sel, 0);
-			// HACK(bill): Memory leak
-			sel.entity = make_entity_field(a, NULL, make_token_ident(data_str), make_type_pointer(a, type->DynamicArray.elem), false, 0);
-			return sel;
-		} else if (str_eq(field_name, count_str)) {
-			selection_add_index(&sel, 1);
-			if (entity__dynamic_array_count == NULL) {
-				entity__dynamic_array_count = make_entity_field(a, NULL, make_token_ident(count_str), t_int, false, 1);
-			}
-			sel.entity = entity__dynamic_array_count;
-			return sel;
-		} else if (str_eq(field_name, capacity_str)) {
-			selection_add_index(&sel, 2);
-			if (entity__dynamic_array_capacity == NULL) {
-				entity__dynamic_array_capacity = make_entity_field(a, NULL, make_token_ident(capacity_str), t_int, false, 2);
-			}
-			sel.entity = entity__dynamic_array_capacity;
-			return sel;
-		} else if (str_eq(field_name, allocator_str)) {
-			selection_add_index(&sel, 3);
-			if (entity__dynamic_array_allocator == NULL) {
-				entity__dynamic_array_allocator = make_entity_field(a, NULL, make_token_ident(allocator_str), t_allocator, false, 3);
-			}
-			sel.entity = entity__dynamic_array_allocator;
-			return sel;
-		}
-	#endif
-	} else if (type->kind == Type_Map) {
-	#if 0
-		String count_str     = str_lit("count");
-		String capacity_str  = str_lit("capacity");
-		String allocator_str = str_lit("allocator");
-
-		if (str_eq(field_name, count_str)) {
-			selection_add_index(&sel, 0);
-			if (entity__dynamic_map_count == NULL) {
-				entity__dynamic_map_count = make_entity_field(a, NULL, make_token_ident(count_str), t_int, false, 0);
-				entity__dynamic_map_count->Variable.is_immutable = true;
-			}
-			sel.entity = entity__dynamic_map_count;
-			return sel;
-		} else if (str_eq(field_name, capacity_str)) {
-			selection_add_index(&sel, 1);
-			if (entity__dynamic_map_capacity == NULL) {
-				entity__dynamic_map_capacity = make_entity_field(a, NULL, make_token_ident(capacity_str), t_int, false, 1);
-				entity__dynamic_map_capacity->Variable.is_immutable = true;
-			}
-			sel.entity = entity__dynamic_map_capacity;
-			return sel;
-		} else if (str_eq(field_name, allocator_str)) {
-			selection_add_index(&sel, 2);
-			if (entity__dynamic_map_allocator == NULL) {
-				entity__dynamic_map_allocator = make_entity_field(a, NULL, make_token_ident(allocator_str), t_allocator, false, 2);
-				entity__dynamic_map_allocator->Variable.is_immutable = true;
-			}
-			sel.entity = entity__dynamic_map_allocator;
-			return sel;
-		}
-	#endif
 	}
 
 	if (is_type) {

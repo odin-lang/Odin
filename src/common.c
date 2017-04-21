@@ -1,7 +1,11 @@
+#if defined(GB_SYSTEM_UNIX)
+// Required for intrinsics on GCC
+#include <xmmintrin.h>
+#endif
+
 #define GB_NO_DEFER
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
-
 
 #include <math.h>
 

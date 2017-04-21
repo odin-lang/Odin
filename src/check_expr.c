@@ -5118,7 +5118,9 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		case Type_Record: {
 			if (!is_type_struct(t) && !is_type_union(t)) {
 				if (cl->elems.count != 0) {
-					error_node(node, "Illegal compound literal");
+					gbString type_str = type_to_string(type);
+					error_node(node, "Illegal compound literal type `%s`", type_str);
+					gb_string_free(type_str);
 				}
 				break;
 			}

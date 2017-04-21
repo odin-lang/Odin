@@ -7,7 +7,6 @@
 \
 	SSA_OP(SP)    /* Stack Pointer */\
 	SSA_OP(SB)    /* Stack Base */\
-	SSA_OP(Addr)  /* Address of something - special rules for certain types when loading and storing (e.g. Maps) */\
 \
 	SSA_OP(Local)\
 	SSA_OP(Global)\

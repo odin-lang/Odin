@@ -16,11 +16,6 @@ extern "C" {
 #include "ir_print.c"
 // #include "vm.c"
 
-#if defined(GB_SYSTEM_UNIX)
-// Required for intrinsics on GCC
-#include <xmmintrin.h>
-#endif
-
 #if defined(GB_SYSTEM_WINDOWS)
 // NOTE(bill): `name` is used in debugging and profiling modes
 i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {

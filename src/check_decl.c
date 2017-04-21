@@ -1,6 +1,5 @@
 bool check_is_terminating(AstNode *node);
 void check_stmt          (Checker *c, AstNode *node, u32 flags);
-void check_stmt_list     (Checker *c, AstNodeArray stmts, u32 flags);
 
 // NOTE(bill): `content_name` is for debugging and error messages
 Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String context_name) {
@@ -563,7 +562,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	push_procedure(c, type);
 	{
 		ast_node(bs, BlockStmt, body);
-		check_stmt_list(c, bs->stmts, 0);
+		check_stmt_list(c, bs->stmts, Stmt_CheckScopeDecls);
 		if (type->Proc.result_count > 0) {
 			if (!check_is_terminating(body)) {
 				if (token.kind == Token_Ident) {
