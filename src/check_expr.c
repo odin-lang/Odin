@@ -4921,11 +4921,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		return kind;
 	case_end;
 
-	case_ast_node(i, IntervalExpr, node);
-		error_node(node, "Invalid use of an interval expression");
-		return kind;
-	case_end;
-
 	case_ast_node(i, Implicit, node)
 		switch (i->kind) {
 		case Token_context:

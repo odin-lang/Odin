@@ -30,6 +30,7 @@ typedef struct AstFile {
 	// <  0: In Control Clause
 	// NOTE(bill): Used to prevent type literals in control clauses
 	isize          expr_level;
+	bool           allow_range;
 
 	AstNodeArray   decls;
 	bool           is_global_scope;
@@ -181,7 +182,6 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 	AST_NODE_KIND(CastExpr,     "cast expression",     struct { Token token; AstNode *type, *expr; Token open, close; }) \
 	AST_NODE_KIND(FieldValue,   "field value",         struct { Token eq; AstNode *field, *value; }) \
 	AST_NODE_KIND(TernaryExpr,  "ternary expression",  struct { AstNode *cond, *x, *y; }) \
-	AST_NODE_KIND(IntervalExpr, "interval expression", struct { Token op; AstNode *left, *right; }) \
 AST_NODE_KIND(_ExprEnd,       "", i32) \
 AST_NODE_KIND(_StmtBegin,     "", i32) \
 	AST_NODE_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
@@ -485,7 +485,6 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_FieldValue:   return node->FieldValue.eq;
 	case AstNode_DerefExpr:    return node->DerefExpr.op;
 	case AstNode_TernaryExpr:  return ast_node_token(node->TernaryExpr.cond);
-	case AstNode_IntervalExpr: return ast_node_token(node->IntervalExpr.left);
 
 	case AstNode_BadStmt:       return node->BadStmt.begin;
 	case AstNode_EmptyStmt:     return node->EmptyStmt.token;
@@ -707,16 +706,6 @@ AstNode *ast_deref_expr(AstFile *f, AstNode *expr, Token op) {
 	AstNode *result = make_ast_node(f, AstNode_DerefExpr);
 	result->DerefExpr.expr = expr;
 	result->DerefExpr.op = op;
-	return result;
-}
-
-AstNode *ast_interval_expr(AstFile *f, Token op, AstNode *left, AstNode *right) {
-	AstNode *result = make_ast_node(f, AstNode_IntervalExpr);
-
-	result->IntervalExpr.op = op;
-	result->IntervalExpr.left = left;
-	result->IntervalExpr.right = right;
-
 	return result;
 }
 
@@ -1231,6 +1220,9 @@ Token expect_operator(AstFile *f) {
 	Token prev = f->curr_token;
 	if (!gb_is_between(prev.kind, Token__OperatorBegin+1, Token__OperatorEnd-1)) {
 		syntax_error(f->curr_token, "Expected an operator, got `%.*s`",
+		             LIT(token_strings[prev.kind]));
+	} else if (!f->allow_range && (prev.kind == Token_Ellipsis || prev.kind == Token_HalfClosed)) {
+		syntax_error(f->curr_token, "Expected an non-range operator, got `%.*s`",
 		             LIT(token_strings[prev.kind]));
 	}
 	next_token(f);
@@ -1977,6 +1969,9 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			if (lhs) {
 				// TODO(bill): Handle this
 			}
+			bool prev_allow_range = f->allow_range;
+			f->allow_range = false;
+
 			Token open = {0}, close = {0}, interval = {0};
 			AstNode *indices[3] = {0};
 			isize ellipsis_count = 0;
@@ -2026,6 +2021,8 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			} else {
 				operand = ast_index_expr(f, operand, indices[0], open, close);
 			}
+
+			f->allow_range = prev_allow_range;
 		} break;
 
 		case Token_Pointer: // Deference
@@ -2090,27 +2087,49 @@ AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 	return parse_atom_expr(f, lhs);
 }
 
+bool is_ast_node_a_range(AstNode *expr) {
+	if (expr == NULL) {
+		return false;
+	}
+	if (expr->kind != AstNode_BinaryExpr) {
+		return false;
+	}
+	TokenKind op = expr->BinaryExpr.op.kind;
+	switch (op) {
+	case Token_Ellipsis:
+	case Token_HalfClosed:
+		return true;
+	}
+	return false;
+}
+
 // NOTE(bill): result == priority
-i32 token_precedence(TokenKind t) {
+i32 token_precedence(AstFile *f, TokenKind t) {
 	switch (t) {
 	case Token_Question:
 		return 1;
+	case Token_Ellipsis:
+	case Token_HalfClosed:
+		if (f->allow_range) {
+			return 2;
+		}
+		return 0;
 	case Token_CmpOr:
-		return 2;
-	case Token_CmpAnd:
 		return 3;
+	case Token_CmpAnd:
+		return 4;
 	case Token_CmpEq:
 	case Token_NotEq:
 	case Token_Lt:
 	case Token_Gt:
 	case Token_LtEq:
 	case Token_GtEq:
-		return 4;
+		return 5;
 	case Token_Add:
 	case Token_Sub:
 	case Token_Or:
 	case Token_Xor:
-		return 5;
+		return 6;
 	case Token_Mul:
 	case Token_Quo:
 	case Token_Mod:
@@ -2118,17 +2137,17 @@ i32 token_precedence(TokenKind t) {
 	case Token_AndNot:
 	case Token_Shl:
 	case Token_Shr:
-		return 6;
+		return 7;
 	}
 	return 0;
 }
 
 AstNode *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 	AstNode *expr = parse_unary_expr(f, lhs);
-	for (i32 prec = token_precedence(f->curr_token.kind); prec >= prec_in; prec--) {
+	for (i32 prec = token_precedence(f, f->curr_token.kind); prec >= prec_in; prec--) {
 		for (;;) {
 			Token op = f->curr_token;
-			i32 op_prec = token_precedence(op.kind);
+			i32 op_prec = token_precedence(f, op.kind);
 			if (op_prec != prec) {
 				// NOTE(bill): This will also catch operators that are not valid "binary" operators
 				break;
@@ -2144,7 +2163,7 @@ AstNode *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 				expr = ast_ternary_expr(f, cond, x, y);
 			} else {
 				AstNode *right = parse_binary_expr(f, false, prec+1);
-				if (!right) {
+				if (right == NULL) {
 					syntax_error(op, "Expected expression on the right-hand side of the binary operator");
 				}
 				expr = ast_binary_expr(f, op, expr, right);
@@ -2308,16 +2327,10 @@ AstNode *parse_simple_stmt(AstFile *f, bool in_stmt_ok) {
 	case Token_in:
 		if (in_stmt_ok) {
 			allow_token(f, Token_in);
+			bool prev_allow_range = f->allow_range;
+			f->allow_range = true;
 			AstNode *expr = parse_expr(f, false);
-			switch (f->curr_token.kind) {
-			case Token_HalfClosed:
-			case Token_Ellipsis: {
-				Token op = f->curr_token;
-				next_token(f);
-				AstNode *right = parse_expr(f, false);
-				expr = ast_interval_expr(f, op, expr, right);
-			} break;
-			}
+			f->allow_range = prev_allow_range;
 
 			AstNodeArray rhs = {0};
 			array_init_count(&rhs, heap_allocator(), 1);
@@ -3088,25 +3101,10 @@ AstNode *parse_case_clause(AstFile *f) {
 	Token token = f->curr_token;
 	AstNodeArray list = make_ast_node_array(f);
 	if (allow_token(f, Token_case)) {
-		list = make_ast_node_array(f);
-		for (;;) {
-			AstNode *e = parse_expr(f, false);
-			if (f->curr_token.kind == Token_Ellipsis ||
-			    f->curr_token.kind == Token_HalfClosed) {
-				Token op = f->curr_token;
-				next_token(f);
-				AstNode *lhs = e;
-				AstNode *rhs = parse_expr(f, false);
-				e = ast_interval_expr(f, op, lhs, rhs);
-			}
-
-			array_add(&list, e);
-			if (f->curr_token.kind != Token_Comma ||
-			    f->curr_token.kind == Token_EOF) {
-			    break;
-			}
-			next_token(f);
-		}
+		bool prev_allow_range = f->allow_range;
+		f->allow_range = true;
+		list = parse_rhs_expr_list(f);
+		f->allow_range = prev_allow_range;
 	} else {
 		expect_token(f, Token_default);
 	}

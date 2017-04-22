@@ -5535,7 +5535,7 @@ void ir_build_range_string(irProcedure *proc, irValue *expr, Type *val_type,
 	if (done_) *done_ = done;
 }
 
-void ir_build_range_interval(irProcedure *proc, AstNodeIntervalExpr *node, Type *val_type,
+void ir_build_range_interval(irProcedure *proc, AstNodeBinaryExpr *node, Type *val_type,
                               irValue **val_, irValue **idx_, irBlock **loop_, irBlock **done_) {
 	// TODO(bill): How should the behaviour work for lower and upper bounds checking for iteration?
 	// If `lower` is changed, should `val` do so or is that not typical behaviour?
@@ -6038,9 +6038,10 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		irValue *index = NULL;
 		irBlock *loop = NULL;
 		irBlock *done = NULL;
+		AstNode *expr = unparen_expr(rs->expr);
 
-		if (rs->expr->kind == AstNode_IntervalExpr) {
-			ir_build_range_interval(proc, &rs->expr->IntervalExpr, val_type, &val, &index, &loop, &done);
+		if (is_ast_node_a_range(expr)) {
+			ir_build_range_interval(proc, &expr->BinaryExpr, val_type, &val, &index, &loop, &done);
 		} else {
 			Type *expr_type = type_of_expr(proc->module->info, rs->expr);
 			Type *et = base_type(type_deref(expr_type));
@@ -6194,11 +6195,11 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 			irBlock *next_cond = NULL;
 			for_array(j, cc->list) {
-				AstNode *expr = cc->list.e[j];
+				AstNode *expr = unparen_expr(cc->list.e[j]);
 				next_cond = ir_new_block(proc, clause, "match.case.next");
 				irValue *cond = v_false;
-				if (expr->kind == AstNode_IntervalExpr) {
-					ast_node(ie, IntervalExpr, expr);
+				if (is_ast_node_a_range(expr)) {
+					ast_node(ie, BinaryExpr, expr);
 					TokenKind op = {0};
 					switch (ie->op.kind) {
 					case Token_Ellipsis:   op = Token_LtEq; break;

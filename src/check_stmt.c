@@ -712,9 +712,11 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		Entity *entities[2] = {0};
 		isize entity_count = 0;
 
+		AstNode *expr = unparen_expr(rs->expr);
 
-		if (rs->expr != NULL && rs->expr->kind == AstNode_IntervalExpr) {
-			ast_node(ie, IntervalExpr, rs->expr);
+
+		if (is_ast_node_a_range(expr)) {
+			ast_node(ie, BinaryExpr, expr);
 			Operand x = {Addressing_Invalid};
 			Operand y = {Addressing_Invalid};
 
@@ -966,10 +968,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			ast_node(cc, CaseClause, stmt);
 
 			for_array(j, cc->list) {
-				AstNode *expr = cc->list.e[j];
+				AstNode *expr = unparen_expr(cc->list.e[j]);
 
-				if (expr->kind == AstNode_IntervalExpr) {
-					ast_node(ie, IntervalExpr, expr);
+				if (is_ast_node_a_range(expr)) {
+					ast_node(ie, BinaryExpr, expr);
 					Operand lhs = {0};
 					Operand rhs = {0};
 					check_expr(c, &lhs, ie->left);
