@@ -21,12 +21,12 @@ parse_bool :: proc(s: string) -> (result: bool, ok: bool) {
 _digit_value :: proc(r: rune) -> (int) {
 	ri := cast(int)r;
 	v: int = 16;
-	match {
-	case '0' <= r && r <= '9':
+	match r {
+	case '0'..'9':
 		v = ri - '0';
-	case 'a' <= r && r <= 'z':
+	case 'a'..'z':
 		v = ri - 'a' + 10;
-	case 'A' <= r && r <= 'Z':
+	case 'A'..'Z':
 		v = ri - 'A' + 10;
 	}
 	return v;

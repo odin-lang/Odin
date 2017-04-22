@@ -2777,7 +2777,7 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 	update_expr_type(c, operand->expr, target_type, true);
 }
 
-bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *value) {
+bool check_index_value(Checker *c, bool open_range, AstNode *index_value, i64 max_count, i64 *value) {
 	Operand operand = {Addressing_Invalid};
 	check_expr(c, &operand, index_value);
 	if (operand.mode == Addressing_Invalid) {
@@ -2812,7 +2812,13 @@ bool check_index_value(Checker *c, AstNode *index_value, i64 max_count, i64 *val
 
 		if (max_count >= 0) { // NOTE(bill): Do array bound checking
 			if (value) *value = i;
-			if (i >= max_count) {
+			bool out_of_bounds = false;
+			if (open_range) {
+				out_of_bounds = i >= max_count;
+			} else {
+				out_of_bounds = i > max_count;
+			}
+			if (out_of_bounds) {
 				gbString expr_str = expr_to_string(operand.expr);
 				error_node(operand.expr, "Index `%s` is out of bounds range 0..<%lld", expr_str, max_count);
 				gb_string_free(expr_str);
@@ -3323,7 +3329,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		isize size_count = 0;
 		for (isize i = 1; i < arg_count; i++) {
 			i64 val = 0;
-			bool ok = check_index_value(c, ce->args.e[i], -1, &val);
+			bool ok = check_index_value(c, false, ce->args.e[i], -1, &val);
 			if (ok && val >= 0) {
 				GB_ASSERT(size_count < gb_count_of(sizes));
 				sizes[size_count++] = val;
@@ -4129,7 +4135,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			isize size_count = 0;
 			for (isize i = 1; i < arg_count; i++) {
 				i64 val = 0;
-				bool ok = check_index_value(c, ce->args.e[i], -1, &val);
+				bool ok = check_index_value(c, false, ce->args.e[i], -1, &val);
 				if (ok && val >= 0) {
 					GB_ASSERT(size_count < gb_count_of(sizes));
 					sizes[size_count++] = val;
@@ -5664,7 +5670,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		}
 
 		i64 index = 0;
-		bool ok = check_index_value(c, ie->index, max_count, &index);
+		bool ok = check_index_value(c, false, ie->index, max_count, &index);
 
 	case_end;
 
@@ -5767,7 +5773,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					capacity = max_count;
 				}
 				i64 j = 0;
-				if (check_index_value(c, nodes[i], capacity, &j)) {
+				if (check_index_value(c, interval_kind == Token_Ellipsis, nodes[i], capacity, &j)) {
 					index = j;
 				}
 			} else if (i == 0) {

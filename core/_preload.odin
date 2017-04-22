@@ -350,6 +350,7 @@ __slice_expr_error :: proc(file: string, line, column: int, low, high, max: int)
 	            file, line, column, low, high, max);
 	__debug_trap();
 }
+
 __substring_expr_error :: proc(file: string, line, column: int, low, high: int) {
 	if 0 <= low && low <= high {
 		return;
