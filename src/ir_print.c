@@ -1596,9 +1596,9 @@ void print_llvm_ir(irGen *ir) {
 
 	ir_print_encoded_local(f, str_lit("..any"));
 	ir_fprintf(f, " = type {");
-	ir_print_type(f, m, t_type_info_ptr);
-	ir_fprintf(f, ", ");
 	ir_print_type(f, m, t_rawptr);
+	ir_fprintf(f, ", ");
+	ir_print_type(f, m, t_type_info_ptr);
 	ir_fprintf(f, "} ; Basic_any\n");
 
 	ir_fprintf(f, "declare void @llvm.dbg.declare(metadata, metadata, metadata) nounwind readnone \n");

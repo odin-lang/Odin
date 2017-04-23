@@ -1165,8 +1165,6 @@ ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 
 
 
-gb_global Entity *entity__any_type_info  = NULL;
-gb_global Entity *entity__any_data       = NULL;
 
 Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel);
 
@@ -1219,6 +1217,10 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 	return empty_selection;
 }
 
+
+gb_global Entity *entity__any_data       = NULL;
+gb_global Entity *entity__any_type_info  = NULL;
+
 Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel) {
 	GB_ASSERT(type_ != NULL);
 
@@ -1238,22 +1240,22 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		#if 1
 			// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
 			// `Raw_Any` type?
-			String type_info_str = str_lit("type_info");
 			String data_str = str_lit("data");
-			if (entity__any_type_info == NULL) {
-				entity__any_type_info = make_entity_field(a, NULL, make_token_ident(type_info_str), t_type_info_ptr, false, 0);
-			}
+			String type_info_str = str_lit("type_info");
 			if (entity__any_data == NULL) {
-				entity__any_data = make_entity_field(a, NULL, make_token_ident(data_str), t_rawptr, false, 1);
+				entity__any_data = make_entity_field(a, NULL, make_token_ident(data_str), t_rawptr, false, 0);
+			}
+			if (entity__any_type_info == NULL) {
+				entity__any_type_info = make_entity_field(a, NULL, make_token_ident(type_info_str), t_type_info_ptr, false, 1);
 			}
 
-			if (str_eq(field_name, type_info_str)) {
+			if (str_eq(field_name, data_str)) {
 				selection_add_index(&sel, 0);
-				sel.entity = entity__any_type_info;
+				sel.entity = entity__any_data;;
 				return sel;
-			} else if (str_eq(field_name, data_str)) {
+			} else if (str_eq(field_name, type_info_str)) {
 				selection_add_index(&sel, 1);
-				sel.entity = entity__any_data;
+				sel.entity = entity__any_type_info;
 				return sel;
 			}
 		#endif

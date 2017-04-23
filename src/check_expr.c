@@ -86,10 +86,10 @@ bool check_is_assignable_to_using_subtype(Type *dst, Type *src) {
 	src_is_ptr = src != prev_src;
 	src = base_type(src);
 
-	if (is_type_struct(src)) {
+	if (is_type_struct(src) || is_type_union(src)) {
 		for (isize i = 0; i < src->Record.field_count; i++) {
 			Entity *f = src->Record.fields[i];
-			if (f->kind == Entity_Variable && (f->flags & EntityFlag_Using)) {
+			if (f->kind == Entity_Variable && (f->flags & EntityFlag_Using) != 0) {
 				if (are_types_identical(dst, f->type)) {
 					return true;
 				}
@@ -202,6 +202,7 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 			return 3;
 		}
 	}
+
 
 	if (is_type_any(dst)) {
 		// NOTE(bill): Anything can cast to `Any`
@@ -442,8 +443,9 @@ isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 // TODO(bill): Inline sorting procedure?
 gb_global gbAllocator   __checker_allocator = {0};
 
-GB_COMPARE_PROC(cmp_struct_entity_size) {
+GB_COMPARE_PROC(cmp_reorder_struct_fields) {
 	// Rule:
+	// `using` over non-`using`
 	// Biggest to smallest alignment
 	// if same alignment: biggest to smallest size
 	// if same size: order by source order
@@ -453,19 +455,25 @@ GB_COMPARE_PROC(cmp_struct_entity_size) {
 	GB_ASSERT(y != NULL);
 	GB_ASSERT(x->kind == Entity_Variable);
 	GB_ASSERT(y->kind == Entity_Variable);
+	bool xu = (x->flags & EntityFlag_Using) != 0;
+	bool yu = (y->flags & EntityFlag_Using) != 0;
 	i64 xa = type_align_of(__checker_allocator, x->type);
 	i64 ya = type_align_of(__checker_allocator, y->type);
 	i64 xs = type_size_of(__checker_allocator, x->type);
 	i64 ys = type_size_of(__checker_allocator, y->type);
 
-	if (xa == ya) {
-		if (xs == ys) {
-			i32 diff = x->Variable.field_index - y->Variable.field_index;
-			return diff < 0 ? -1 : diff > 0;
-		}
+	if (xu != yu) {
+		return xu ? -1 : +1;
+	}
+
+	if (xa != ya) {
+		return xa > ya ? -1 : xa < ya;
+	}
+	if (xs != ys) {
 		return xs > ys ? -1 : xs < ys;
 	}
-	return xa > ya ? -1 : xa < ya;
+	i32 diff = x->Variable.field_index - y->Variable.field_index;
+	return diff < 0 ? -1 : diff > 0;
 }
 
 Entity *make_names_field_for_record(Checker *c, Scope *scope) {
@@ -513,7 +521,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 		// TODO(bill): Probably make an inline sorting procedure rather than use global variables
 		__checker_allocator = c->allocator;
 		// NOTE(bill): compound literal order must match source not layout
-		gb_sort_array(reordered_fields, field_count, cmp_struct_entity_size);
+		gb_sort_array(reordered_fields, field_count, cmp_reorder_struct_fields);
 
 		for (isize i = 0; i < field_count; i++) {
 			reordered_fields[i]->Variable.field_index = i;
@@ -5312,7 +5320,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				break; // NOTE(bill): No need to init
 			}
 			{ // Checker values
-				Type *field_types[2] = {t_type_info_ptr, t_rawptr};
+				Type *field_types[2] = {t_rawptr, t_type_info_ptr};
 				isize field_count = 2;
 				if (cl->elems.e[0]->kind == AstNode_FieldValue) {
 					bool fields_visited[2] = {0};

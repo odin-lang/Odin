@@ -3312,6 +3312,7 @@ AstNode *parse_stmt(AstFile *f) {
 		expect_semicolon(f, decl);
 
 		if (decl->kind == AstNode_ValueDecl) {
+			#if 1
 			if (!decl->ValueDecl.is_var) {
 				syntax_error(token, "`using` may not be applied to constant declarations");
 				return decl;
@@ -3321,6 +3322,9 @@ AstNode *parse_stmt(AstFile *f) {
 			} else {
 				decl->ValueDecl.flags |= VarDeclFlag_using;
 			}
+			#else
+				decl->ValueDecl.flags |= VarDeclFlag_using;
+			#endif
 			return decl;
 		}
 

@@ -29,6 +29,7 @@ Type_Info_Record :: struct #ordered {
 	types:        []^Type_Info,
 	names:        []string,
 	offsets:      []int,  // offsets may not be used in tuples
+	usings:       []bool, // usings may not be used in tuples
 	packed:       bool,
 	ordered:      bool,
 	custom_align: bool,
@@ -146,6 +147,7 @@ Allocator :: struct #ordered {
 	procedure: Allocator_Proc,
 	data:      rawptr,
 }
+
 
 Context :: struct #ordered {
 	thread_id: int,
@@ -268,8 +270,6 @@ default_allocator :: proc() -> Allocator {
 		data = nil,
 	};
 }
-
-
 
 
 

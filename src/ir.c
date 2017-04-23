@@ -2080,15 +2080,15 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 irValue *ir_emit_comp_against_nil(irProcedure *proc, TokenKind op_kind, irValue *x) {
 	Type *t = ir_type(x);
 	if (is_type_any(t)) {
-		irValue *ti = ir_emit_struct_ev(proc, x, 0);
-		irValue *data = ir_emit_struct_ev(proc, x, 1);
+		irValue *data = ir_emit_struct_ev(proc, x, 0);
+		irValue *ti   = ir_emit_struct_ev(proc, x, 1);
 		if (op_kind == Token_CmpEq) {
-			irValue *a = ir_emit_comp(proc, Token_CmpEq, ti, v_raw_nil);
-			irValue *b = ir_emit_comp(proc, Token_CmpEq, data, v_raw_nil);
+			irValue *a = ir_emit_comp(proc, Token_CmpEq, data, v_raw_nil);
+			irValue *b = ir_emit_comp(proc, Token_CmpEq, ti, v_raw_nil);
 			return ir_emit_arith(proc, Token_Or, a, b, t_bool);
 		} else if (op_kind == Token_NotEq) {
-			irValue *a = ir_emit_comp(proc, Token_NotEq, ti, v_raw_nil);
-			irValue *b = ir_emit_comp(proc, Token_NotEq, data, v_raw_nil);
+			irValue *a = ir_emit_comp(proc, Token_NotEq, data, v_raw_nil);
+			irValue *b = ir_emit_comp(proc, Token_NotEq, ti, v_raw_nil);
 			return ir_emit_arith(proc, Token_And, a, b, t_bool);
 		}
 	} else if (is_type_slice(t)) {
@@ -2249,8 +2249,8 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 		}
 	} else if (is_type_any(t)) {
 		switch (index) {
-		case 0: result_type = make_type_pointer(a, t_type_info_ptr); break;
-		case 1: result_type = make_type_pointer(a, t_rawptr);        break;
+		case 0: result_type = make_type_pointer(a, t_rawptr);        break;
+		case 1: result_type = make_type_pointer(a, t_type_info_ptr); break;
 		}
 	} else if (is_type_dynamic_array(t)) {
 		switch (index) {
@@ -2322,8 +2322,8 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 		}
 	} else if (is_type_any(t)) {
 		switch (index) {
-		case 0: result_type = t_type_info_ptr; break;
-		case 1: result_type = t_rawptr;        break;
+		case 0: result_type = t_rawptr;        break;
+		case 1: result_type = t_type_info_ptr; break;
 		}
 	} else if (is_type_dynamic_array(t)) {
 		switch (index) {
@@ -2375,9 +2375,9 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 			switch (type->Basic.kind) {
 			case Basic_any: {
 				if (index == 0) {
-					type = t_type_info_ptr;
-				} else if (index == 1) {
 					type = t_rawptr;
+				} else if (index == 1) {
+					type = t_type_info_ptr;
 				}
 				e = ir_emit_struct_ep(proc, e, index);
 			} break;
@@ -2881,10 +2881,8 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 		irValue *ti = ir_type_info(proc, st);
 
-		irValue *gep0 = ir_emit_struct_ep(proc, result, 0);
-		irValue *gep1 = ir_emit_struct_ep(proc, result, 1);
-		ir_emit_store(proc, gep0, ti);
-		ir_emit_store(proc, gep1, data);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, result, 0), data);
+		ir_emit_store(proc, ir_emit_struct_ep(proc, result, 1), ti);
 
 		return ir_emit_load(proc, result);
 	}
@@ -5217,12 +5215,12 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			if (cl->elems.count > 0) {
 				ir_emit_store(proc, v, ir_add_module_constant(proc->module, type, exact_value_compound(expr)));
 				String field_names[2] = {
-					str_lit("type_info"),
 					str_lit("data"),
+					str_lit("type_info"),
 				};
 				Type *field_types[2] = {
-					t_type_info_ptr,
 					t_rawptr,
+					t_type_info_ptr,
 				};
 
 				for_array(field_index, cl->elems) {
@@ -6322,7 +6320,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					GB_ASSERT(index != NULL);
 					cond = ir_emit_comp(proc, Token_CmpEq, tag_index, index);
 				} else if (match_type_kind == MatchType_Any) {
-					irValue *any_ti  = ir_emit_load(proc, ir_emit_struct_ep(proc, parent_ptr, 0));
+					irValue *any_ti  = ir_emit_load(proc, ir_emit_struct_ep(proc, parent_ptr, 1));
 					irValue *case_ti = ir_type_info(proc, case_type);
 					cond = ir_emit_comp(proc, Token_CmpEq, any_ti, case_ti);
 				}
@@ -6356,7 +6354,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				if (match_type_kind == MatchType_Union) {
 					data = union_data;
 				} else if (match_type_kind == MatchType_Any) {
-					irValue *any_data = ir_emit_load(proc, ir_emit_struct_ep(proc, parent_ptr, 1));
+					irValue *any_data = ir_emit_load(proc, ir_emit_struct_ep(proc, parent_ptr, 0));
 					data = any_data;
 				}
 				value = ir_emit_conv(proc, data, ct);

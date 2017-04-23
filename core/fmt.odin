@@ -669,12 +669,12 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 	case Enum:
 		match verb {
 		case 'd', 'f':
-			fmt_arg(fi, any{type_info_base(e.base), v.data}, verb);
+			fmt_arg(fi, any{v.data, type_info_base(e.base)}, verb);
 		case 's', 'v':
 			i: i64;
 			f: f64;
 			ok := false;
-			a := any{type_info_base(e.base), v.data};
+			a := any{v.data, type_info_base(e.base)};
 			match v in a {
 			case i8:   i = cast(i64)v;
 			case i16:  i = cast(i64)v;
@@ -746,12 +746,12 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				write_string(fi.buf, b.names[i]);
 				write_string(fi.buf, " = ");
 				data := cast(^byte)v.data + b.offsets[i];
-				fmt_arg(fi, any{b.types[i], cast(rawptr)data}, 'v');
+				fmt_arg(fi, any{cast(rawptr)data, b.types[i]}, 'v');
 			}
 			write_byte(fi.buf, '}');
 
 		default:
-			fmt_value(fi, any{info.base, v.data}, verb);
+			fmt_value(fi, any{v.data, info.base}, verb);
 		}
 
 	case Boolean:    fmt_arg(fi, v, verb);
@@ -781,7 +781,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				write_string(fi.buf, ", ");
 			}
 			data := cast(^byte)v.data + i*info.elem_size;
-			fmt_arg(fi, any{info.elem, cast(rawptr)data}, 'v');
+			fmt_arg(fi, any{cast(rawptr)data, info.elem}, 'v');
 		}
 
 	case Dynamic_Array:
@@ -798,7 +798,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				write_string(fi.buf, ", ");
 			}
 			data := cast(^byte)array.data + i*info.elem_size;
-			fmt_arg(fi, any{info.elem, cast(rawptr)data}, 'v');
+			fmt_arg(fi, any{cast(rawptr)data, info.elem}, 'v');
 		}
 
 	case Map:
@@ -826,13 +826,13 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				write_string(fi.buf, header.key.str);
 			} else {
 				fi := Fmt_Info{buf = fi.buf};
-				fmt_arg(^fi, any{info.key, cast(rawptr)^header.key.hash}, 'v');
+				fmt_arg(^fi, any{cast(rawptr)^header.key.hash, info.key}, 'v');
 			}
 
 			write_string(fi.buf, "=");
 
 			value := data + entry_type.offsets[2];
-			fmt_arg(fi, any{info.value, cast(rawptr)value}, 'v');
+			fmt_arg(fi, any{cast(rawptr)value, info.value}, 'v');
 		}
 
 	case Slice:
@@ -849,7 +849,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				write_string(fi.buf, ", ");
 			}
 			data := ^slice[0] + i*info.elem_size;
-			fmt_arg(fi, any{info.elem, cast(rawptr)data}, 'v');
+			fmt_arg(fi, any{cast(rawptr)data, info.elem}, 'v');
 		}
 
 	case Vector:
@@ -862,7 +862,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			}
 
 			data := cast(^byte)v.data + i*info.elem_size;
-			fmt_value(fi, any{info.elem, cast(rawptr)data}, 'v');
+			fmt_value(fi, any{cast(rawptr)data, info.elem}, 'v');
 		}
 
 	case Struct:
@@ -876,7 +876,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			write_string(fi.buf, info.names[i]);
 			write_string(fi.buf, " = ");
 			data := cast(^byte)v.data + info.offsets[i];
-			fmt_value(fi, any{info.types[i], cast(rawptr)data}, 'v');
+			fmt_value(fi, any{cast(rawptr)data, info.types[i]}, 'v');
 		}
 
 	case Union:
@@ -892,7 +892,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			write_string(fi.buf, cf.names[i]);
 			write_string(fi.buf, " = ");
 			data := cast(^byte)v.data + cf.offsets[i];
-			fmt_value(fi, any{cf.types[i], cast(rawptr)data}, 'v');
+			fmt_value(fi, any{cast(rawptr)data, cf.types[i]}, 'v');
 		}
 
 	case Raw_Union:
