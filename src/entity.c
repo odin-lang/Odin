@@ -33,7 +33,7 @@ String const entity_strings[] = {
 typedef enum EntityFlag {
 	EntityFlag_Visited    = 1<<0,
 	EntityFlag_Used       = 1<<1,
-	EntityFlag_Anonymous  = 1<<2,
+	EntityFlag_Using      = 1<<2,
 	EntityFlag_Field      = 1<<3,
 	EntityFlag_Param      = 1<<4,
 	EntityFlag_VectorElem = 1<<5,
@@ -159,7 +159,7 @@ Entity *make_entity_using_variable(gbAllocator a, Entity *parent, Token token, T
 	token.pos = parent->token.pos;
 	Entity *entity = alloc_entity(a, Entity_Variable, parent->scope, token, type);
 	entity->using_parent = parent;
-	entity->flags |= EntityFlag_Anonymous;
+	entity->flags |= EntityFlag_Using;
 	return entity;
 }
 
@@ -178,7 +178,7 @@ Entity *make_entity_type_name(gbAllocator a, Scope *scope, Token token, Type *ty
 Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, bool anonymous, bool is_immutable) {
 	Entity *entity = make_entity_variable(a, scope, token, type, is_immutable);
 	entity->flags |= EntityFlag_Used;
-	if (anonymous) entity->flags |= EntityFlag_Anonymous;
+	if (anonymous) entity->flags |= EntityFlag_Using;
 	entity->flags |= EntityFlag_Param;
 	return entity;
 }
@@ -188,7 +188,7 @@ Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, 
 	entity->Variable.field_src_index = field_src_index;
 	entity->Variable.field_index = field_src_index;
 	entity->flags |= EntityFlag_Field;
-	entity->flags |= EntityFlag_Anonymous*(anonymous != 0);
+	entity->flags |= EntityFlag_Using*(anonymous != 0);
 	return entity;
 }
 

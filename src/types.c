@@ -935,13 +935,21 @@ bool are_types_identical(Type *x, Type *y) {
 					    x->Record.custom_align == y->Record.custom_align) {
 						// TODO(bill); Fix the custom alignment rule
 						for (isize i = 0; i < x->Record.field_count; i++) {
-							if (!are_types_identical(x->Record.fields[i]->type, y->Record.fields[i]->type)) {
+							Entity *xf = x->Record.fields[i];
+							Entity *yf = y->Record.fields[i];
+							if (!are_types_identical(xf->type, yf->type)) {
 								return false;
 							}
-							if (str_ne(x->Record.fields[i]->token.string, y->Record.fields[i]->token.string)) {
+							if (str_ne(xf->token.string, yf->token.string)) {
+								return false;
+							}
+							bool xf_is_using = (xf->flags&EntityFlag_Using) != 0;
+							bool yf_is_using = (yf->flags&EntityFlag_Using) != 0;
+							if (xf_is_using ^ yf_is_using) {
 								return false;
 							}
 						}
+						// NOTE(bill): zeroth variant is NULL
 						for (isize i = 1; i < x->Record.variant_count; i++) {
 							if (!are_types_identical(x->Record.variants[i]->type, y->Record.variants[i]->type)) {
 								return false;
@@ -1340,7 +1348,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				return sel;
 			}
 
-			if (f->flags & EntityFlag_Anonymous) {
+			if (f->flags & EntityFlag_Using) {
 				isize prev_count = sel.index.count;
 				selection_add_index(&sel, i); // HACK(bill): Leaky memory
 

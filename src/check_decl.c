@@ -531,7 +531,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 		for (isize i = 0; i < params->variable_count; i++) {
 			Entity *e = params->variables[i];
 			GB_ASSERT(e->kind == Entity_Variable);
-			if (!(e->flags & EntityFlag_Anonymous)) {
+			if (!(e->flags & EntityFlag_Using)) {
 				continue;
 			}
 			bool is_immutable = e->Variable.is_immutable;

@@ -1984,6 +1984,8 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
+
+
 	// NOTE(bill): Check for illegal cyclic type declarations
 	for_array(i, c->info.definitions.entries) {
 		Entity *e = c->info.definitions.entries.e[i].value;
@@ -1991,9 +1993,14 @@ void check_parsed_files(Checker *c) {
 			if (e->type != NULL) {
 				// i64 size  = type_size_of(c->sizes, c->allocator, e->type);
 				i64 align = type_align_of(c->allocator, e->type);
+				if (align > 0) {
+					// add_type_info_type(c, e->type);
+				}
 			}
 		}
 	}
+
+	// gb_printf_err("Count: %td\n", c->info.type_info_count++);
 
 	for_array(i, file_scopes.entries) {
 		Scope *s = file_scopes.entries.e[i].value;

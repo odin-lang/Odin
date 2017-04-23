@@ -142,6 +142,7 @@ struct irProcedure {
 #define IR_TYPE_INFO_TYPES_NAME      "__$type_info_types_data"
 #define IR_TYPE_INFO_NAMES_NAME      "__$type_info_names_data"
 #define IR_TYPE_INFO_OFFSETS_NAME    "__$type_info_offsets_data"
+#define IR_TYPE_INFO_USINGS_NAME     "__$type_info_usings_data"
 
 
 #define IR_INSTR_KINDS \
@@ -2596,7 +2597,7 @@ String lookup_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
 	GB_ASSERT(is_type_struct(src));
 	for (isize i = 0; i < src->Record.field_count; i++) {
 		Entity *f = src->Record.fields[i];
-		if (f->kind == Entity_Variable && f->flags & EntityFlag_Anonymous) {
+		if (f->kind == Entity_Variable && f->flags & EntityFlag_Using) {
 			if (are_types_identical(dst, f->type)) {
 				return f->token.string;
 			}
@@ -3123,11 +3124,13 @@ gb_global irValue *ir_global_type_info_data           = NULL;
 gb_global irValue *ir_global_type_info_member_types   = NULL;
 gb_global irValue *ir_global_type_info_member_names   = NULL;
 gb_global irValue *ir_global_type_info_member_offsets = NULL;
+gb_global irValue *ir_global_type_info_member_usings  = NULL;
 
 gb_global i32      ir_global_type_info_data_index           = 0;
 gb_global i32      ir_global_type_info_member_types_index   = 0;
 gb_global i32      ir_global_type_info_member_names_index   = 0;
 gb_global i32      ir_global_type_info_member_offsets_index = 0;
+gb_global i32      ir_global_type_info_member_usings_index  = 0;
 
 
 irValue *ir_type_info(irProcedure *proc, Type *type) {
@@ -4550,7 +4553,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 }
 
 irValue *ir_get_using_variable(irProcedure *proc, Entity *e) {
-	GB_ASSERT(e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous);
+	GB_ASSERT(e->kind == Entity_Variable && e->flags & EntityFlag_Using);
 	String name = e->token.string;
 	Entity *parent = e->using_parent;
 	Selection sel = lookup_field(proc->module->allocator, parent->type, name, false);
@@ -4594,7 +4597,7 @@ irAddr ir_build_addr_from_entity(irProcedure *proc, Entity *e, AstNode *expr) {
 	irValue **found = map_ir_value_get(&proc->module->values, hash_pointer(e));
 	if (found) {
 		v = *found;
-	} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous) {
+	} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
 		// NOTE(bill): Calculate the using variable every time
 		v = ir_get_using_variable(proc, e);
 	}
@@ -6741,6 +6744,16 @@ void ir_init_module(irModule *m, Checker *c) {
 				map_ir_value_set(&m->members, hash_string(name), g);
 				ir_global_type_info_member_offsets = g;
 			}
+
+			{
+				String name = str_lit(IR_TYPE_INFO_USINGS_NAME);
+				Entity *e = make_entity_variable(m->allocator, NULL, make_token_ident(name),
+				                                 make_type_array(m->allocator, t_bool, count), false);
+				irValue *g = ir_value_global(m->allocator, e, NULL);
+				ir_module_add_value(m, e, g);
+				map_ir_value_set(&m->members, hash_string(name), g);
+				ir_global_type_info_member_usings = g;
+			}
 		}
 	}
 
@@ -6830,6 +6843,11 @@ irValue *ir_type_info_member_names_offset(irProcedure *proc, isize count) {
 irValue *ir_type_info_member_offsets_offset(irProcedure *proc, isize count) {
 	irValue *offset = ir_emit_array_epi(proc, ir_global_type_info_member_offsets, ir_global_type_info_member_offsets_index);
 	ir_global_type_info_member_offsets_index += count;
+	return offset;
+}
+irValue *ir_type_info_member_usings_offset(irProcedure *proc, isize count) {
+	irValue *offset = ir_emit_array_epi(proc, ir_global_type_info_member_usings, ir_global_type_info_member_usings_index);
+	ir_global_type_info_member_usings_index += count;
 	return offset;
 }
 
@@ -7393,14 +7411,15 @@ void ir_gen_tree(irGen *s) {
 							irValue *packed       = ir_const_bool(a, t->Record.is_packed);
 							irValue *ordered      = ir_const_bool(a, t->Record.is_ordered);
 							irValue *custom_align = ir_const_bool(a, t->Record.custom_align);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 3), packed);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 4), ordered);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 5), custom_align);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 4), packed);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 5), ordered);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 6), custom_align);
 						}
 
 						irValue *memory_types   = ir_type_info_member_types_offset(proc, t->Record.field_count);
 						irValue *memory_names   = ir_type_info_member_names_offset(proc, t->Record.field_count);
 						irValue *memory_offsets = ir_type_info_member_offsets_offset(proc, t->Record.field_count);
+						irValue *memory_usings  = ir_type_info_member_usings_offset(proc, t->Record.field_count);
 
 						type_set_offsets(a, t); // NOTE(bill): Just incase the offsets have not been set yet
 						for (isize source_index = 0; source_index < t->Record.field_count; source_index++) {
@@ -7413,6 +7432,7 @@ void ir_gen_tree(irGen *s) {
 							irValue *index     = ir_const_int(a, source_index);
 							irValue *type_info = ir_emit_ptr_offset(proc, memory_types,   index);
 							irValue *offset    = ir_emit_ptr_offset(proc, memory_offsets, index);
+							irValue *is_using  = ir_emit_ptr_offset(proc, memory_usings, index);
 
 							ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
 							if (f->token.string.len > 0) {
@@ -7420,12 +7440,14 @@ void ir_gen_tree(irGen *s) {
 								ir_emit_store(proc, name, ir_const_string(a, f->token.string));
 							}
 							ir_emit_store(proc, offset, ir_const_int(a, foffset));
+							ir_emit_store(proc, is_using, ir_const_bool(a, f->flags&EntityFlag_Using));
 						}
 
 						irValue *count = ir_const_int(a, t->Record.field_count);
 						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 0), memory_types,   count, count);
 						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 1), memory_names,   count, count);
 						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 2), memory_offsets, count, count);
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 3), memory_usings,  count, count);
 					} break;
 					case TypeRecord_Union: {
 						ir_emit_comment(proc, str_lit("Type_Info_Union"));

@@ -89,7 +89,7 @@ bool check_is_assignable_to_using_subtype(Type *dst, Type *src) {
 	if (is_type_struct(src)) {
 		for (isize i = 0; i < src->Record.field_count; i++) {
 			Entity *f = src->Record.fields[i];
-			if (f->kind == Entity_Variable && (f->flags & EntityFlag_Anonymous)) {
+			if (f->kind == Entity_Variable && (f->flags & EntityFlag_Using)) {
 				if (are_types_identical(dst, f->type)) {
 					return true;
 				}
@@ -323,7 +323,7 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, MapEntity *en
 			} else {
 				map_entity_set(entity_map, key, f);
 				add_entity(c, c->context.scope, NULL, f);
-				if (f->flags & EntityFlag_Anonymous) {
+				if (f->flags & EntityFlag_Using) {
 					populate_using_entity_map(c, node, f->type, entity_map);
 				}
 			}
@@ -406,7 +406,7 @@ isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 					bool ok = true;
 					for_array(emi, entity_map.entries) {
 						Entity *e = entity_map.entries.e[emi].value;
-						if (e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous) {
+						if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
 							if (is_type_indexable(e->type)) {
 								if (e->identifier != f->names.e[0]) {
 									ok = false;
@@ -419,7 +419,7 @@ isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 					if (ok) {
 						using_index_expr = fields[field_index-1];
 					} else {
-						fields[field_index-1]->flags &= ~EntityFlag_Anonymous;
+						fields[field_index-1]->flags &= ~EntityFlag_Using;
 						error(name_token, "Previous `using` for an index expression `%.*s`", LIT(name_token.string));
 					}
 				} else {
@@ -603,6 +603,8 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	union_type->Record.fields_in_src_order = fields;
 	union_type->Record.field_count         = field_count;
 	union_type->Record.are_offsets_set     = false;
+	union_type->Record.is_ordered          = true;
+
 
 
 	for_array(i, ut->variants) {
@@ -2056,17 +2058,6 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 		} break;
 		}
 
-	#if 0
-		// CLEANUP(bill) NOTE(bill): there is an auto assignment to `any` which needs to be checked
-		if (is_type_any(x->type) && !is_type_any(y->type)) {
-			err_type = x->type;
-			defined = false;
-		} else if (is_type_any(y->type) && !is_type_any(x->type)) {
-			err_type = y->type;
-			defined = false;
-		}
-	#endif
-
 		if (!defined) {
 			if (x->type == err_type && is_operand_nil(*x)) {
 				err_type = y->type;
@@ -2223,7 +2214,7 @@ String check_down_cast_name(Type *dst_, Type *src_) {
 	for (isize i = 0; i < dst_s->Record.field_count; i++) {
 		Entity *f = dst_s->Record.fields[i];
 		GB_ASSERT(f->kind == Entity_Variable && f->flags & EntityFlag_Field);
-		if (f->flags & EntityFlag_Anonymous) {
+		if (f->flags & EntityFlag_Using) {
 			if (are_types_identical(f->type, src_)) {
 				return f->token.string;
 			}
@@ -4705,7 +4696,8 @@ Entity *find_using_index_expr(Type *t) {
 	for (isize i = 0; i < t->Record.field_count; i++) {
 		Entity *f = t->Record.fields[i];
 		if (f->kind == Entity_Variable &&
-		    f->flags & (EntityFlag_Anonymous|EntityFlag_Field)) {
+		    (f->flags & EntityFlag_Field) != 0 &&
+		    (f->flags & EntityFlag_Using) != 0) {
 			if (is_type_indexable(f->type)) {
 				return f;
 			}

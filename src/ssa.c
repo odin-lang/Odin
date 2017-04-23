@@ -700,7 +700,7 @@ ssaValue *ssa_addr_load(ssaProc *p, ssaAddr addr) {
 }
 
 ssaValue *ssa_get_using_variable(ssaProc *p, Entity *e) {
-	GB_ASSERT(e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous);
+	GB_ASSERT(e->kind == Entity_Variable && e->flags & EntityFlag_Using);
 	String name = e->token.string;
 	Entity *parent = e->using_parent;
 	Selection sel = lookup_field(p->allocator, parent->type, name, false);
@@ -724,7 +724,7 @@ ssaAddr ssa_build_addr_from_entity(ssaProc *p, Entity *e, AstNode *expr) {
 	ssaValue **found = map_ssa_value_get(&p->module->values, hash_pointer(e));
 	if (found) {
 		v = *found;
-	} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Anonymous) {
+	} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
 		// NOTE(bill): Calculate the using variable every time
 		v = ssa_get_using_variable(p, e);
 	}
