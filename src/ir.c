@@ -37,6 +37,7 @@ typedef struct irModule {
 	MapIrDebugInfo        debug_info;  // Key: Unique pointer
 	i32                   global_string_index;
 	i32                   global_array_index; // For ConstantSlice
+	i32                   global_generated_index;
 
 	Entity *              entry_point_entity;
 
@@ -1303,6 +1304,29 @@ irValue *ir_add_local_generated(irProcedure *proc, Type *type) {
 	                                 empty_token,
 	                                 type, false);
 	return ir_add_local(proc, e, NULL);
+}
+
+
+irValue *ir_add_global_generated(irModule *m, Type *type, irValue *value) {
+	GB_ASSERT(type != NULL);
+	gbAllocator a = m->allocator;
+
+	isize max_len = 7+8+1;
+	u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
+	isize len = gb_snprintf(cast(char *)str, max_len, "__ggv$%x", m->global_generated_index);
+	m->global_generated_index++;
+	String name = make_string(str, len-1);
+
+	Scope *scope = NULL;
+	Entity *e = make_entity_variable(a,
+	                                 scope,
+	                                 make_token_ident(name),
+	                                 type, false);
+
+	irValue *g = ir_value_global(a, e, value);
+	ir_module_add_value(m, e, g);
+	map_ir_value_set(&m->members, hash_string(name), g);
+	return g;
 }
 
 
@@ -6970,13 +6994,17 @@ void ir_gen_tree(irGen *s) {
 			var.decl = decl;
 
 			if (decl->init_expr != NULL) {
-				TypeAndValue *tav = map_tav_get(&info->types, hash_pointer(decl->init_expr));
-				if (tav != NULL) {
-					if (tav->value.kind != ExactValue_Invalid) {
-						ExactValue v = tav->value;
-						// if (v.kind != ExactValue_String) {
-							g->Global.value = ir_add_module_constant(m, tav->type, v);
-						// }
+				if (is_type_any(e->type)) {
+
+				} else {
+					TypeAndValue *tav = map_tav_get(&info->types, hash_pointer(decl->init_expr));
+					if (tav != NULL) {
+						if (tav->value.kind != ExactValue_Invalid) {
+							ExactValue v = tav->value;
+							// if (v.kind != ExactValue_String) {
+								g->Global.value = ir_add_module_constant(m, tav->type, v);
+							// }
+						}
 					}
 				}
 			}
@@ -7186,8 +7214,16 @@ void ir_gen_tree(irGen *s) {
 		// NOTE(bill): Initialize constants first
 		for_array(i, global_variables) {
 			irGlobalVariable *var = &global_variables.e[i];
-			if (var->init != NULL) {
-				if (var->init->kind == irValue_Constant) {
+			if (var->init != NULL && var->init->kind == irValue_Constant) {
+				Type *t = type_deref(ir_type(var->var));
+				if (is_type_any(t)) {
+					Type *var_type = default_type(ir_type(var->init));
+					irValue *g = ir_add_global_generated(proc->module, var_type, var->init);
+					irValue *data = ir_emit_struct_ep(proc, var->var, 0);
+					irValue *ti   = ir_emit_struct_ep(proc, var->var, 1);
+					ir_emit_store(proc, data, ir_emit_conv(proc, g, t_rawptr));
+					ir_emit_store(proc, ti,   ir_type_info(proc, var_type));
+				} else {
 					ir_emit_store(proc, var->var, var->init);
 				}
 			}
@@ -7195,8 +7231,18 @@ void ir_gen_tree(irGen *s) {
 
 		for_array(i, global_variables) {
 			irGlobalVariable *var = &global_variables.e[i];
-			if (var->init != NULL) {
-				if (var->init->kind != irValue_Constant) {
+			if (var->init != NULL && var->init->kind != irValue_Constant) {
+				Type *t = type_deref(ir_type(var->var));
+					if (is_type_any(t)) {
+					Type *var_type = default_type(ir_type(var->init));
+					irValue *g = ir_add_global_generated(proc->module, var_type, var->init);
+					ir_emit_store(proc, g, var->init);
+
+					irValue *data = ir_emit_struct_ep(proc, var->var, 0);
+					irValue *ti   = ir_emit_struct_ep(proc, var->var, 1);
+					ir_emit_store(proc, data, ir_emit_conv(proc, g, t_rawptr));
+					ir_emit_store(proc, ti,   ir_type_info(proc, var_type));
+				} else {
 					ir_emit_store(proc, var->var, var->init);
 				}
 			}
