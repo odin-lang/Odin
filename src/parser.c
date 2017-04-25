@@ -17,6 +17,8 @@ typedef enum ParseFileError {
 
 typedef Array(AstNode *) AstNodeArray;
 
+gb_global i32 global_file_id = 0;
+
 typedef struct AstFile {
 	i32            id;
 	gbArena        arena;
@@ -3639,6 +3641,7 @@ ParseFileError init_ast_file(AstFile *f, String fullpath) {
 		gb_arena_init_from_allocator(&f->arena, heap_allocator(), arena_size);
 
 		f->curr_proc = NULL;
+		f->id = ++global_file_id;
 
 		return ParseFile_None;
 	}

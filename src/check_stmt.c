@@ -125,15 +125,13 @@ bool check_is_terminating(AstNode *node) {
 	case_end;
 
 	case_ast_node(fs, ForStmt, node);
-		if (!check_has_break(fs->body, true)) {
+		if (fs->cond == NULL && !check_has_break(fs->body, true)) {
 			return check_is_terminating(fs->body);
 		}
 	case_end;
 
 	case_ast_node(rs, RangeStmt, node);
-		if (!check_has_break(rs->body, true)) {
-			return check_is_terminating(rs->body);
-		}
+		return false;
 	case_end;
 
 	case_ast_node(ms, MatchStmt, node);
