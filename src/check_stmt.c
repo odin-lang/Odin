@@ -432,6 +432,134 @@ void check_label(Checker *c, AstNode *label) {
 	}
 }
 
+// Returns `true` for `continue`, `false` for `return`
+bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bool is_selector, Entity *e) {
+	if (e == NULL) {
+		error(us->token, "`using` applied to an unknown entity");
+		return true;
+	}
+
+	switch (e->kind) {
+	case Entity_Alias: {
+		if (e->Alias.original != NULL) {
+			check_using_stmt_entity(c, us, expr, is_selector, e->Alias.original);
+		} else {
+			error(us->token, "`using` cannot be applied to the alias `%.*s`", LIT(e->token.string));
+			return false;
+		}
+	} break;
+
+	case Entity_TypeName: {
+		Type *t = base_type(e->type);
+		if (is_type_union(t)) {
+			TokenPos pos = ast_node_token(expr).pos;
+			for (isize i = 1; i < t->Record.variant_count; i++) {
+				Entity *f = t->Record.variants[i];
+				// gb_printf_err("%s\n", type_to_string(f->type));
+				Entity *found = scope_insert_entity(c->context.scope, f);
+				if (found != NULL) {
+					gbString expr_str = expr_to_string(expr);
+					error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+					gb_string_free(expr_str);
+					return false;
+				}
+				f->using_parent = e;
+			}
+		} else if (is_type_enum(t)) {
+			for (isize i = 0; i < t->Record.field_count; i++) {
+				Entity *f = t->Record.fields[i];
+				Entity *found = scope_insert_entity(c->context.scope, f);
+				if (found != NULL) {
+					gbString expr_str = expr_to_string(expr);
+					error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+					gb_string_free(expr_str);
+					return false;
+				}
+				f->using_parent = e;
+			}
+
+		} else {
+			error(us->token, "`using` can be only applied to `union` or `enum` type entities");
+		}
+	} break;
+
+	case Entity_ImportName: {
+		Scope *scope = e->ImportName.scope;
+		for_array(i, scope->elements.entries) {
+			Entity *decl = scope->elements.entries.e[i].value;
+			Entity *found = scope_insert_entity(c->context.scope, decl);
+			if (found != NULL) {
+				gbString expr_str = expr_to_string(expr);
+				error(us->token,
+				      "Namespace collision while `using` `%s` of: %.*s\n"
+				      "\tat %.*s(%td:%td)\n"
+				      "\tat %.*s(%td:%td)",
+				      expr_str, LIT(found->token.string),
+				      LIT(found->token.pos.file), found->token.pos.line, found->token.pos.column,
+				      LIT(decl->token.pos.file), decl->token.pos.line, decl->token.pos.column
+				      );
+				gb_string_free(expr_str);
+				return false;
+			}
+		}
+	} break;
+
+	case Entity_Variable: {
+		Type *t = base_type(type_deref(e->type));
+		if (is_type_struct(t) || is_type_raw_union(t)) {
+			// TODO(bill): Make it work for unions too
+			Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
+			GB_ASSERT(found != NULL);
+			for_array(i, (*found)->elements.entries) {
+				Entity *f = (*found)->elements.entries.e[i].value;
+				if (f->kind == Entity_Variable) {
+					Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
+					if (is_selector) {
+						uvar->using_expr = expr;
+					}
+					Entity *prev = scope_insert_entity(c->context.scope, uvar);
+					if (prev != NULL) {
+						gbString expr_str = expr_to_string(expr);
+						error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(prev->token.string));
+						gb_string_free(expr_str);
+						return false;
+					}
+				}
+			}
+		} else {
+			error(us->token, "`using` can only be applied to variables of type struct or raw_union");
+			return false;
+		}
+	} break;
+
+	case Entity_Constant:
+		error(us->token, "`using` cannot be applied to a constant");
+		break;
+
+	case Entity_Procedure:
+	case Entity_Builtin:
+		error(us->token, "`using` cannot be applied to a procedure");
+		break;
+
+	case Entity_Nil:
+		error(us->token, "`using` cannot be applied to `nil`");
+		break;
+
+	case Entity_Label:
+		error(us->token, "`using` cannot be applied to a label");
+		break;
+
+	case Entity_Invalid:
+		error(us->token, "`using` cannot be applied to an invalid entity");
+		break;
+
+	default:
+		GB_PANIC("TODO(bill): `using` other expressions?");
+	}
+
+	return true;
+}
+
 void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
@@ -1341,118 +1469,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				continue;
 			}
 
-			if (e == NULL) {
-				error(us->token, "`using` applied to an unknown entity");
-				continue;
-			}
-
-			switch (e->kind) {
-			case Entity_TypeName: {
-				Type *t = base_type(e->type);
-				if (is_type_union(t)) {
-					TokenPos pos = ast_node_token(expr).pos;
-					for (isize i = 1; i < t->Record.variant_count; i++) {
-						Entity *f = t->Record.variants[i];
-						// gb_printf_err("%s\n", type_to_string(f->type));
-						Entity *found = scope_insert_entity(c->context.scope, f);
-						if (found != NULL) {
-							gbString expr_str = expr_to_string(expr);
-							error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
-							gb_string_free(expr_str);
-							return;
-						}
-						f->using_parent = e;
-					}
-				} else if (is_type_enum(t)) {
-					for (isize i = 0; i < t->Record.field_count; i++) {
-						Entity *f = t->Record.fields[i];
-						Entity *found = scope_insert_entity(c->context.scope, f);
-						if (found != NULL) {
-							gbString expr_str = expr_to_string(expr);
-							error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
-							gb_string_free(expr_str);
-							return;
-						}
-						f->using_parent = e;
-					}
-
-				} else {
-					error(us->token, "`using` can be only applied to `union` or `enum` type entities");
-				}
-			} break;
-
-			case Entity_ImportName: {
-				Scope *scope = e->ImportName.scope;
-				for_array(i, scope->elements.entries) {
-					Entity *decl = scope->elements.entries.e[i].value;
-					Entity *found = scope_insert_entity(c->context.scope, decl);
-					if (found != NULL) {
-						gbString expr_str = expr_to_string(expr);
-						error(us->token,
-						      "Namespace collision while `using` `%s` of: %.*s\n"
-						      "\tat %.*s(%td:%td)\n"
-						      "\tat %.*s(%td:%td)",
-						      expr_str, LIT(found->token.string),
-						      LIT(found->token.pos.file), found->token.pos.line, found->token.pos.column,
-						      LIT(decl->token.pos.file), decl->token.pos.line, decl->token.pos.column
-						      );
-						gb_string_free(expr_str);
-						return;
-					}
-				}
-			} break;
-
-			case Entity_Variable: {
-				Type *t = base_type(type_deref(e->type));
-				if (is_type_struct(t) || is_type_raw_union(t)) {
-					// TODO(bill): Make it work for unions too
-					Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
-					GB_ASSERT(found != NULL);
-					for_array(i, (*found)->elements.entries) {
-						Entity *f = (*found)->elements.entries.e[i].value;
-						if (f->kind == Entity_Variable) {
-							Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
-							if (is_selector) {
-								uvar->using_expr = expr;
-							}
-							Entity *prev = scope_insert_entity(c->context.scope, uvar);
-							if (prev != NULL) {
-								gbString expr_str = expr_to_string(expr);
-								error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(prev->token.string));
-								gb_string_free(expr_str);
-								return;
-							}
-						}
-					}
-				} else {
-					error(us->token, "`using` can only be applied to variables of type struct or raw_union");
-					return;
-				}
-			} break;
-
-			case Entity_Constant:
-				error(us->token, "`using` cannot be applied to a constant");
-				break;
-
-			case Entity_Procedure:
-			case Entity_Builtin:
-				error(us->token, "`using` cannot be applied to a procedure");
-				break;
-
-			case Entity_Nil:
-				error(us->token, "`using` cannot be applied to `nil`");
-				break;
-
-			case Entity_Label:
-				error(us->token, "`using` cannot be applied to a label");
-				break;
-
-			case Entity_Invalid:
-				error(us->token, "`using` cannot be applied to an invalid entity");
-				break;
-
-			default:
-				GB_PANIC("TODO(bill): `using` other expressions?");
+			if (!check_using_stmt_entity(c, us, expr, is_selector, e)) {
+				return;
 			}
 		}
 	case_end;

@@ -551,6 +551,20 @@ bool is_type_named(Type *t) {
 	}
 	return t->kind == Type_Named;
 }
+bool is_type_named_alias(Type *t) {
+	if (!is_type_named(t)) {
+		return false;
+	}
+	Entity *e = t->Named.type_name;
+	if (e == NULL) {
+		return false;
+	}
+	if (e->kind != Entity_TypeName) {
+		return false;
+	}
+	return e->TypeName.is_type_alias;
+}
+
 bool is_type_boolean(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_Basic) {

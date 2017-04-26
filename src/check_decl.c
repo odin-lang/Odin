@@ -413,7 +413,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 }
 
 
-void check_alias_decl(Checker *c, Entity *e, AstNode *expr) {
+void check_alias_decl(Checker *c, Entity *e, AstNode *expr, Type *named_type) {
 	GB_ASSERT(e->type == NULL);
 	GB_ASSERT(e->kind == Entity_Alias);
 
@@ -431,36 +431,47 @@ void check_alias_decl(Checker *c, Entity *e, AstNode *expr) {
 		return;
 	}
 
-	if (expr->kind == AstNode_Ident) {
-		Operand o = {0};
-		Entity *f = check_ident(c, &o, expr, NULL, NULL, true);
-		if (f != NULL) {
-			e->Alias.original = f;
-			e->type = f->type;
-		}
-		return;
-	} else if (expr->kind == AstNode_SelectorExpr) {
-		Operand o = {0};
-		Entity *f = check_selector(c, &o, expr, NULL);
-		if (f != NULL) {
-			e->Alias.original = f;
-			e->type = f->type;
-		}
-		return;
-	}
-
-	Operand o = {0};
-	check_expr_or_type(c, &o, expr);
-	if (o.mode == Addressing_Invalid) {
-		return;
-	}
-	switch (o.mode) {
-	case Addressing_Type:
-		e->type = o.type;
-		break;
-	default:
+	Operand operand = {0};
+	check_expr_or_type(c, &operand, expr);
+	if (operand.mode != Addressing_Type) {
 		error_node(expr, "#alias declarations only allow types");
+		return;
 	}
+	e->kind = Entity_TypeName;
+	e->TypeName.is_type_alias = true;
+	e->type = NULL;
+
+	DeclInfo *d = c->context.decl;
+	d->type_expr = expr;
+	check_type_decl(c, e, d->type_expr, named_type);
+
+
+	// Operand o = {0};
+	// Entity *f = NULL;
+	// if (expr->kind == AstNode_Ident) {
+	// 	f = check_ident(c, &o, expr, NULL, NULL, true);
+	// } else if (expr->kind == AstNode_SelectorExpr) {
+	// 	f = check_selector(c, &o, expr, NULL);
+	// } else {
+	// 	check_expr_or_type(c, &o, expr);
+	// }
+	// if (o.mode == Addressing_Invalid) {
+	// 	return;
+	// }
+	// switch (o.mode) {
+	// case Addressing_Type:
+	// 	e->type = o.type;
+	// 	// e->kind = Entity_TypeName;
+	// 	// e->TypeName.is_type_alias = true;
+	// 	e->Alias.kind     = EntityAlias_Type;
+	// 	e->Alias.original = f;
+	// 	break;
+	// default:
+	// 	error_node(expr, "#alias declarations only allow types");
+	// 	e->kind = Entity_Invalid;
+	// 	e->type = t_invalid;
+	// 	break;
+	// }
 }
 
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
@@ -495,11 +506,11 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 	case Entity_TypeName:
 		check_type_decl(c, e, d->type_expr, named_type);
 		break;
+	case Entity_Alias:
+		check_alias_decl(c, e, d->init_expr, named_type);
+		break;
 	case Entity_Procedure:
 		check_proc_lit(c, e, d);
-		break;
-	case Entity_Alias:
-		check_alias_decl(c, e, d->init_expr);
 		break;
 	}
 

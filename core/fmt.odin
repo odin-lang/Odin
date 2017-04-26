@@ -8,20 +8,64 @@
 
 _BUFFER_SIZE :: 1<<12;
 
-write_string :: proc(buf: ^[]byte, s: string) {
-	append(buf, ..cast([]byte)s);
+String_Buffer :: struct {
+	is_dynamic: bool,
+	sa: []byte,
+	da: [dynamic]byte,
+};
+
+make_string_buffer_from_slice :: proc(b: []byte) -> String_Buffer {
+	return String_Buffer{
+		is_dynamic = false,
+		sa = b,
+	};
 }
-write_byte :: proc(buf: ^[]byte, b: byte) {
-	append(buf, b);
+
+make_string_dynamic_buffer :: proc() -> String_Buffer {
+	return String_Buffer{
+		is_dynamic = true,
+		da = make([dynamic]byte),
+	};
 }
-write_rune :: proc(buf: ^[]byte, r: rune) {
+string_buffer_data :: proc(buf: ^String_Buffer) -> []byte {
+	return string_buffer_data(buf^);
+}
+string_buffer_data :: proc(buf: String_Buffer) -> []byte {
+	if buf.is_dynamic {
+		return buf.da[..];
+	}
+	return buf.sa[..];
+}
+to_string :: proc(buf: String_Buffer) -> string {
+	return cast(string)string_buffer_data(buf);
+}
+
+
+write_string :: proc(buf: ^String_Buffer, s: string) {
+	write_bytes(buf, cast([]byte)s);
+}
+write_bytes :: proc(buf: ^String_Buffer, b: []byte) {
+	if buf.is_dynamic {
+		append(buf.da, ..b);
+	} else {
+		append(buf.sa, ..b);
+	}
+}
+write_byte :: proc(buf: ^String_Buffer, b: byte) {
+	if buf.is_dynamic {
+		append(buf.da, b);
+	} else {
+		append(buf.sa, b);
+	}
+}
+write_rune :: proc(buf: ^String_Buffer, r: rune) {
 	if r < utf8.RUNE_SELF {
 		write_byte(buf, cast(byte)r);
 		return;
 	}
 
 	b, n := utf8.encode_rune(r);
-	append(buf, ..b[0..<n]);
+	write_bytes(buf, b[0..<n]);
 }
 
 Fmt_Info :: struct {
@@ -39,7 +83,7 @@ Fmt_Info :: struct {
 	reordered:      bool,
 	good_arg_index: bool,
 
-	buf: ^[]byte,
+	buf: ^String_Buffer,
 	arg: any, // Temporary
 }
 
@@ -47,25 +91,28 @@ Fmt_Info :: struct {
 
 fprint :: proc(fd: os.Handle, args: ..any) -> int {
 	data: [_BUFFER_SIZE]byte;
-	buf := data[0..<0];
-	bprint(^buf, ..args);
-	os.write(fd, buf);
-	return len(buf);
+	buf := make_string_buffer_from_slice(data[0..<0]);
+	sbprint(^buf, ..args);
+	res := string_buffer_data(buf);
+	os.write(fd, res);
+	return len(res);
 }
 
 fprintln :: proc(fd: os.Handle, args: ..any) -> int {
 	data: [_BUFFER_SIZE]byte;
-	buf := data[0..<0];
-	bprintln(^buf, ..args);
-	os.write(fd, buf);
-	return len(buf);
+	buf := make_string_buffer_from_slice(data[0..<0]);
+	sbprintln(^buf, ..args);
+	res := string_buffer_data(buf);
+	os.write(fd, res);
+	return len(res);
 }
 fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 	data: [_BUFFER_SIZE]byte;
-	buf := data[0..<0];
-	bprintf(^buf, fmt, ..args);
-	os.write(fd, buf);
-	return len(buf);
+	buf := make_string_buffer_from_slice(data[0..<0]);
+	sbprintf(^buf, fmt, ..args);
+	res := string_buffer_data(buf);
+	os.write(fd, res);
+	return len(res);
 }
 
 
@@ -80,14 +127,56 @@ printf :: proc(fmt: string, args: ..any) -> int {
 }
 
 
-fprint_type :: proc(fd: os.Handle, info: ^Type_Info) {
-	data: [_BUFFER_SIZE]byte;
-	buf := data[0..<0];
-	write_type(^buf, info);
-	os.write(fd, buf);
+// aprint* procedures return a string that was allocated with the current context
+// They must be freed accordingly
+aprint :: proc(args: ..any) -> string {
+	buf := make_string_dynamic_buffer();
+	sbprint(^buf, ..args);
+	return to_string(buf);
+}
+aprintln :: proc(args: ..any) -> string {
+	buf := make_string_dynamic_buffer();
+	sbprintln(^buf, ..args);
+	return to_string(buf);
+}
+aprintf :: proc(fmt: string, args: ..any) -> string {
+	buf := make_string_dynamic_buffer();
+	sbprintf(^buf, fmt, ..args);
+	return to_string(buf);
 }
 
-write_type :: proc(buf: ^[]byte, ti: ^Type_Info) {
+
+// bprint* procedures
+
+
+// aprint* procedure return a string that was allocated with the current context
+// They must be freed accordingly
+bprint :: proc(buf: []byte, args: ..any) -> int {
+	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
+	return sbprint(^sb, ..args);
+}
+bprintln :: proc(buf: []byte, args: ..any) -> int {
+	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
+	return sbprintln(^sb, ..args);
+}
+bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> int {
+	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
+	return sbprintf(^sb, fmt, ..args);
+}
+
+
+
+
+
+
+fprint_type :: proc(fd: os.Handle, info: ^Type_Info) {
+	data: [_BUFFER_SIZE]byte;
+	buf := make_string_buffer_from_slice(data[0..<0]);
+	write_type(^buf, info);
+	os.write(fd, string_buffer_data(buf));
+}
+
+write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 	if ti == nil {
 		return;
 	}
@@ -273,51 +362,6 @@ write_type :: proc(buf: ^[]byte, ti: ^Type_Info) {
 }
 
 
-bprint :: proc(buf: ^[]byte, args: ..any) -> int {
-	fi: Fmt_Info;
-	fi.buf = buf;
-
-	prev_string := false;
-	for arg, i in args {
-		is_string := arg != nil && types.is_string(arg.type_info);
-		if i > 0 && !is_string && !prev_string {
-			write_byte(buf, ' ');
-		}
-		fmt_value(^fi, args[i], 'v');
-		prev_string = is_string;
-	}
-	return len(buf);
-}
-
-bprintln :: proc(buf: ^[]byte, args: ..any) -> int {
-	fi: Fmt_Info;
-	fi.buf = buf;
-
-	for arg, i in args {
-		if i > 0 {
-			write_byte(buf, ' ');
-		}
-		fmt_value(^fi, args[i], 'v');
-	}
-	write_byte(buf, '\n');
-	return len(buf);
-}
-
-sprint :: proc(buf: []byte, args: ..any) -> string {
-	count := bprint(^buf, ..args);
-	return cast(string)buf[0..<count];
-}
-sprintln :: proc(buf: []byte, args: ..any) -> string {
-	count := bprintln(^buf, ..args);
-	return cast(string)buf[0..<count];
-}
-sprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
-	count := bprintf(^buf, fmt, ..args);
-	return cast(string)buf[0..<count];
-}
-
-
-
 
 _parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: bool) {
 	is_digit :: proc(r: rune) -> bool #inline {
@@ -439,9 +483,10 @@ fmt_write_padding :: proc(fi: ^Fmt_Info, width: int) {
 		pad_byte = '0';
 	}
 
-	count := min(width, cap(fi.buf)-len(fi.buf));
+	data := string_buffer_data(fi.buf^);
+	count := min(width, cap(data)-len(data));
 	for _ in 0..count {
-		append(fi.buf, pad_byte);
+		write_byte(fi.buf, pad_byte);
 	}
 }
 
@@ -998,7 +1043,38 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 }
 
 
-bprintf :: proc(b: ^[]byte, fmt: string, args: ..any) -> int {
+
+sbprint :: proc(buf: ^String_Buffer, args: ..any) -> int {
+	fi: Fmt_Info;
+	fi.buf = buf;
+
+	prev_string := false;
+	for arg, i in args {
+		is_string := arg != nil && types.is_string(arg.type_info);
+		if i > 0 && !is_string && !prev_string {
+			write_byte(buf, ' ');
+		}
+		fmt_value(^fi, args[i], 'v');
+		prev_string = is_string;
+	}
+	return len(string_buffer_data(buf));
+}
+
+sbprintln :: proc(buf: ^String_Buffer, args: ..any) -> int {
+	fi: Fmt_Info;
+	fi.buf = buf;
+
+	for arg, i in args {
+		if i > 0 {
+			write_byte(buf, ' ');
+		}
+		fmt_value(^fi, args[i], 'v');
+	}
+	write_byte(buf, '\n');
+	return len(string_buffer_data(buf));
+}
+
+sbprintf :: proc(b: ^String_Buffer, fmt: string, args: ..any) -> int {
 	fi := Fmt_Info{};
 	end := len(fmt);
 	arg_index := 0;
@@ -1128,5 +1204,5 @@ bprintf :: proc(b: ^[]byte, fmt: string, args: ..any) -> int {
 		write_string(b, ")");
 	}
 
-	return len(b);
+	return len(string_buffer_data(b));
 }

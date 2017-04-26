@@ -430,7 +430,7 @@ int main(int argc, char **argv) {
 
 	exit_code = system_exec_command_line_app("ld-link", true,
 		"%s \"%.*s\".o -o \"%.*s%s\" %s "
-		"-lc "
+		"-lc -lm "
 		" %.*s "
 		" %s "
 		#if defined(GB_SYSTEM_OSX)

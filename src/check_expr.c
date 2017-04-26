@@ -147,7 +147,31 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		if (dst->kind == Type_Basic) {
 			if (operand->mode == Addressing_Constant) {
 				if (check_representable_as_constant(c, operand->value, dst, NULL)) {
-					return 1;
+					if (is_type_typed(dst) && src->kind == Type_Basic) {
+						switch (src->Basic.kind) {
+						case Basic_UntypedInteger:
+							if (is_type_integer(dst)) {
+								return 1;
+							}
+							break;
+						case Basic_UntypedFloat:
+							if (is_type_float(dst)) {
+								return 1;
+							}
+							break;
+						case Basic_UntypedComplex:
+							if (is_type_complex(dst)) {
+								return 1;
+							}
+							break;
+						case Basic_UntypedQuaternion:
+							if (is_type_quaternion(dst)) {
+								return 1;
+							}
+							break;
+						}
+					}
+					return 2;
 				}
 				return -1;
 			}
@@ -1058,12 +1082,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 			case 32: new_type = t_u32; break;
 			case 64: new_type = t_u64; break;
 			default:
-				// NOTE(bill): It could be an empty struct that is passed
-				// and if that is the case, no need to pass by pointer
-				// (I think..)
-				if (size > 0) {
-					new_type = make_type_pointer(a, original_type);
-				}
+				new_type = make_type_pointer(a, original_type);
 				break;
 			}
 		} break;
@@ -1196,11 +1215,6 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 
 	e->flags |= EntityFlag_Used;
 
-	Entity *original_e = e;
-	while (e != NULL && e->kind == Entity_Alias && e->Alias.original != NULL) {
-		e = e->Alias.original;
-	}
-
 	Type *type = e->type;
 	switch (e->kind) {
 	case Entity_Constant:
@@ -1260,6 +1274,17 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 	case Entity_Nil:
 		o->mode = Addressing_Value;
 		break;
+
+	case Entity_Alias: {
+		// error_node(n, "#alias entities are not yet supported");
+		// TODO(bill): Fix Entity_Alias rules
+		if (e->Alias.kind == EntityAlias_Type) {
+			o->mode = Addressing_Type;
+		} else {
+			o->mode = Addressing_Invalid;
+			return e;
+		}
+	} break;
 
 	default:
 		compiler_error("Unknown EntityKind");
@@ -3136,6 +3161,11 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		operand->builtin_id = entity->Builtin.id;
 		break;
 
+	case Entity_Alias: {
+		error_node(selector, "#alias entities are not yet supported");
+		return NULL;
+	} break;
+
 	// NOTE(bill): These cases should never be hit but are here for sanity reasons
 	case Entity_Nil:
 		operand->mode = Addressing_Value;
@@ -3899,8 +3929,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Operand z = {0};
 		Operand w = {0};
 
-		GB_PANIC("BuiltinProc_quaternion");
-
 		// NOTE(bill): Invalid will be the default till fixed
 		operand->type = t_invalid;
 		operand->mode = Addressing_Invalid;
@@ -3990,12 +4018,9 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		BasicKind kind = core_type(x.type)->Basic.kind;
 		switch (kind) {
-		case Basic_complex64:         x.type = t_f32;           break;
-		case Basic_complex128:        x.type = t_f64;           break;
-		case Basic_UntypedComplex:    x.type = t_untyped_float; break;
-		case Basic_quaternion128:     x.type = t_f32;           break;
-		case Basic_quaternion256:     x.type = t_f64;           break;
-		case Basic_UntypedQuaternion: x.type = t_untyped_float; break;
+		case Basic_f32:          operand->type = t_quaternion128;      break;
+		case Basic_f64:          operand->type = t_quaternion256;      break;
+		case Basic_UntypedFloat: operand->type = t_untyped_quaternion; break;
 		default: GB_PANIC("Invalid type"); break;
 		}
 	} break;

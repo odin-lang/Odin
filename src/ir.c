@@ -3284,23 +3284,34 @@ String ir_mangle_name(irGen *s, String path, Entity *e) {
 	char const *ext = gb_path_extension(base);
 	isize base_len = ext-1-base;
 
-	isize max_len = base_len + 1 + 10 + 1 + name.len;
+	isize max_len = base_len + 1 + 1 + 10 + 1 + name.len;
 	bool is_overloaded = check_is_entity_overloaded(e);
 	if (is_overloaded) {
 		max_len += 21;
 	}
 
 	u8 *new_name = gb_alloc_array(a, u8, max_len);
-	isize new_name_len = gb_snprintf(
-		cast(char *)new_name, max_len,
-		"%.*s-%u.%.*s",
-		cast(int)base_len, base,
-		file->id,
-		LIT(name));
+	isize new_name_len = 0;
+	if ((base_len > 0 && gb_char_is_digit(base[0])) ||
+	    base_len == 0) {
+		new_name_len = gb_snprintf(
+			cast(char *)new_name, max_len,
+			"_%.*s-%u.%.*s",
+			cast(int)base_len, base,
+			file->id,
+			LIT(name));
+	} else {
+		new_name_len = gb_snprintf(
+			cast(char *)new_name, max_len,
+			"%.*s-%u.%.*s",
+			cast(int)base_len, base,
+			file->id,
+			LIT(name));
+	}
 	if (is_overloaded) {
 		char *str = cast(char *)new_name + new_name_len-1;
 		isize len = max_len-new_name_len;
-		isize extra = gb_snprintf(str, len, "-%tu", cast(usize)cast(uintptr)e);
+		isize extra = gb_snprintf(str, len, "-%llu", cast(unsigned long long)e->id);
 		new_name_len += extra-1;
 	}
 
@@ -4311,7 +4322,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					irValue *kmag = ir_build_expr(proc, ce->args.e[3]);
 					irValue *dst = ir_add_local_generated(proc, tv->type);
 
-					Type *ft = base_complex_elem_type(tv->type);
+					Type *ft = base_quaternion_elem_type(tv->type);
 					real = ir_emit_conv(proc, real, ft);
 					imag = ir_emit_conv(proc, imag, ft);
 					jmag = ir_emit_conv(proc, jmag, ft);
@@ -7217,6 +7228,7 @@ void ir_gen_tree(irGen *s) {
 			if (var->init != NULL && var->init->kind == irValue_Constant) {
 				Type *t = type_deref(ir_type(var->var));
 				if (is_type_any(t)) {
+					// NOTE(bill): Edge case for `any` type
 					Type *var_type = default_type(ir_type(var->init));
 					irValue *g = ir_add_global_generated(proc->module, var_type, var->init);
 					irValue *data = ir_emit_struct_ep(proc, var->var, 0);
@@ -7233,7 +7245,8 @@ void ir_gen_tree(irGen *s) {
 			irGlobalVariable *var = &global_variables.e[i];
 			if (var->init != NULL && var->init->kind != irValue_Constant) {
 				Type *t = type_deref(ir_type(var->var));
-					if (is_type_any(t)) {
+				if (is_type_any(t)) {
+					// NOTE(bill): Edge case for `any` type
 					Type *var_type = default_type(ir_type(var->init));
 					irValue *g = ir_add_global_generated(proc->module, var_type, var->init);
 					ir_emit_store(proc, g, var->init);

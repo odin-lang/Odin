@@ -1531,11 +1531,15 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 						d->type_expr = type;
 						d->init_expr = type;
 					} else if (up_init != NULL && up_init->kind == AstNode_Alias) {
+					#if 1
 						error_node(up_init, "#alias declarations are not yet supported");
 						continue;
-						// e = make_entity_alias(c->allocator, d->scope, name->Ident, NULL, NULL);
-						// d->init_expr = init->Alias.expr;
-					}else if (init != NULL && up_init->kind == AstNode_ProcLit) {
+					#else
+						e = make_entity_alias(c->allocator, d->scope, name->Ident, NULL, EntityAlias_Invalid, NULL);
+						d->type_expr = vd->type;
+						d->init_expr = up_init->Alias.expr;
+					#endif
+					} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
 						e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
 						d->proc_lit = up_init;
 						d->type_expr = vd->type;
@@ -1989,7 +1993,8 @@ void check_parsed_files(Checker *c) {
 	// NOTE(bill): Check for illegal cyclic type declarations
 	for_array(i, c->info.definitions.entries) {
 		Entity *e = c->info.definitions.entries.e[i].value;
-		if (e->kind == Entity_TypeName) {
+		if (e->kind == Entity_TypeName ||
+		    (e->kind == Entity_Alias && e->Alias.kind == EntityAlias_Type)) {
 			if (e->type != NULL) {
 				// i64 size  = type_size_of(c->sizes, c->allocator, e->type);
 				i64 align = type_align_of(c->allocator, e->type);

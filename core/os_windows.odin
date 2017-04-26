@@ -109,6 +109,9 @@ close :: proc(fd: Handle) {
 	win32.CloseHandle(cast(win32.Handle)fd);
 }
 
+write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
+	return write(fd, cast([]byte)str);
+}
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE;

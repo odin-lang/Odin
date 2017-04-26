@@ -50,11 +50,18 @@ typedef enum OverloadKind {
 	Overload_Yes,
 } OverloadKind;
 
+typedef	enum EntityAliasKind {
+	EntityAlias_Invalid,
+	EntityAlias_Type,
+	EntityAlias_Entity,
+} EntityAliasKind;
+
 
 // An Entity is a named "thing" in the language
 typedef struct Entity Entity;
 struct Entity {
 	EntityKind kind;
+	u64        id;
 	u32        flags;
 	Token      token;
 	Scope *    scope;
@@ -101,7 +108,8 @@ struct Entity {
 			bool   used;
 		} LibraryName;
 		struct {
-			Entity *original;
+			EntityAliasKind kind;
+			Entity *        original;
 		} Alias;
 		i32 Nil;
 		struct {
@@ -138,6 +146,7 @@ bool is_entity_exported(Entity *e) {
 	return name.text[0] != '_';
 }
 
+gb_global u64 global_entity_id = 0;
 
 Entity *alloc_entity(gbAllocator a, EntityKind kind, Scope *scope, Token token, Type *type) {
 	Entity *entity = gb_alloc_item(a, Entity);
@@ -145,6 +154,7 @@ Entity *alloc_entity(gbAllocator a, EntityKind kind, Scope *scope, Token token, 
 	entity->scope  = scope;
 	entity->token  = token;
 	entity->type   = type;
+	entity->id     = ++global_entity_id;
 	return entity;
 }
 
@@ -231,8 +241,9 @@ Entity *make_entity_library_name(gbAllocator a, Scope *scope, Token token, Type 
 }
 
 Entity *make_entity_alias(gbAllocator a, Scope *scope, Token token, Type *type,
-                          Entity *original) {
+                          EntityAliasKind kind, Entity *original) {
 	Entity *entity = alloc_entity(a, Entity_Alias, scope, token, type);
+	entity->Alias.kind     = kind;
 	entity->Alias.original = original;
 	return entity;
 }

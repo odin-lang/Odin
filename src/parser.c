@@ -33,6 +33,7 @@ typedef struct AstFile {
 	// NOTE(bill): Used to prevent type literals in control clauses
 	isize          expr_level;
 	bool           allow_range;
+	bool           ignore_operand;
 
 	AstNodeArray   decls;
 	bool           is_global_scope;
@@ -1849,10 +1850,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	}
 	}
 
-	Token begin = f->curr_token;
-	syntax_error(begin, "Expected an operand");
-	fix_advance_to_next_stmt(f);
-	return ast_bad_expr(f, begin, f->curr_token);
+	return NULL;
 }
 
 bool is_literal_type(AstNode *node) {
@@ -1937,6 +1935,12 @@ AstNode *parse_macro_call_expr(AstFile *f, AstNode *operand) {
 
 AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 	AstNode *operand = parse_operand(f, lhs);
+	if (operand == NULL) {
+		Token begin = f->curr_token;
+		syntax_error(begin, "Expected an operand");
+		fix_advance_to_next_stmt(f);
+		operand = ast_bad_expr(f, begin, f->curr_token);
+	}
 
 	bool loop = true;
 	while (loop) {
