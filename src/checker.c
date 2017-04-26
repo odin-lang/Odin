@@ -187,19 +187,21 @@ typedef struct BlockLabel {
 } BlockLabel;
 
 // DeclInfo is used to store information of certain declarations to allow for "any order" usage
-typedef struct DeclInfo {
-	Scope *scope;
+typedef struct DeclInfo DeclInfo;
+struct DeclInfo {
+	DeclInfo *        parent; // NOTE(bill): only used for procedure literals at the moment
+	Scope *           scope;
 
-	Entity **entities;
-	isize    entity_count;
+	Entity **         entities;
+	isize             entity_count;
 
-	AstNode *type_expr;
-	AstNode *init_expr;
-	AstNode *proc_lit; // AstNode_ProcLit
+	AstNode *         type_expr;
+	AstNode *         init_expr;
+	AstNode *         proc_lit; // AstNode_ProcLit
 
-	MapBool deps; // Key: Entity *
+	MapBool           deps; // Key: Entity *
 	Array(BlockLabel) labels;
-} DeclInfo;
+};
 
 // ProcedureInfo stores the information needed for checking a procedure
 
@@ -344,15 +346,16 @@ typedef Array(DelayedEntity) DelayedEntities;
 
 
 
-void init_declaration_info(DeclInfo *d, Scope *scope) {
-	d->scope = scope;
+void init_declaration_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
+	d->parent = parent;
+	d->scope  = scope;
 	map_bool_init(&d->deps, heap_allocator());
 	array_init(&d->labels,  heap_allocator());
 }
 
-DeclInfo *make_declaration_info(gbAllocator a, Scope *scope) {
+DeclInfo *make_declaration_info(gbAllocator a, Scope *scope, DeclInfo *parent) {
 	DeclInfo *d = gb_alloc_item(a, DeclInfo);
-	init_declaration_info(d, scope);
+	init_declaration_info(d, scope, parent);
 	return d;
 }
 
@@ -1459,7 +1462,7 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 				Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_cap);
 				DeclInfo *di = NULL;
 				if (vd->values.count > 0) {
-					di = make_declaration_info(heap_allocator(), c->context.scope);
+					di = make_declaration_info(heap_allocator(), c->context.scope, c->context.decl);
 					di->entities = entities;
 					di->type_expr = vd->type;
 					di->init_expr = vd->values.e[0];
@@ -1494,7 +1497,7 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 					DeclInfo *d = di;
 					if (d == NULL) {
 						AstNode *init_expr = value;
-						d = make_declaration_info(heap_allocator(), e->scope);
+						d = make_declaration_info(heap_allocator(), e->scope, c->context.decl);
 						d->type_expr = vd->type;
 						d->init_expr = init_expr;
 					}
@@ -1520,7 +1523,7 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 						init = vd->values.e[i];
 					}
 
-					DeclInfo *d = make_declaration_info(c->allocator, c->context.scope);
+					DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
 					Entity *e = NULL;
 
 					AstNode *up_init = unparen_expr(init);
@@ -1911,7 +1914,7 @@ void check_parsed_files(Checker *c) {
 		}
 
 		f->scope = scope;
-		f->decl_info = make_declaration_info(c->allocator, f->scope);
+		f->decl_info = make_declaration_info(c->allocator, f->scope, c->context.decl);
 		HashKey key = hash_string(f->tokenizer.fullpath);
 		map_scope_set(&file_scopes, key, scope);
 		map_ast_file_set(&c->info.files, key, f);

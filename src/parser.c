@@ -3866,6 +3866,10 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 
 		if (err != ParseFile_None) {
 			if (err == ParseFile_EmptyFile) {
+				if (str_eq(import_path, init_fullpath)) {
+					gb_printf_err("Initial file is empty - %.*s\n", LIT(init_fullpath));
+					gb_exit(1);
+				}
 				return ParseFile_None;
 			}
 

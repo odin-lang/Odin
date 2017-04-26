@@ -535,7 +535,6 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	c->context.decl = decl;
 	c->context.proc_name = proc_name;
 
-
 	GB_ASSERT(type->kind == Type_Proc);
 	if (type->Proc.param_count > 0) {
 		TypeTuple *params = &type->Proc.params->Tuple;
@@ -588,8 +587,16 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 
 
 	check_scope_usage(c, c->context.scope);
-
 	c->context = old_context;
+
+	if (decl->parent != NULL) {
+		// NOTE(bill): Add the dependencies from the procedure literal (lambda)
+		for_array(i, decl->deps.entries) {
+			HashKey key = decl->deps.entries.e[i].key;
+			Entity *e = cast(Entity *)key.ptr;
+			map_bool_set(&decl->parent->deps, key, true);
+		}
+	}
 }
 
 

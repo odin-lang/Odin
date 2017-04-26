@@ -1075,7 +1075,8 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		case Type_Vector:
 		// Could be in C too
 		case Type_Record: {
-			i64 size = type_size_of(a, original_type);
+			i64 align = type_align_of(a, original_type);
+			i64 size  = type_size_of(a, original_type);
 			switch (8*size) {
 			case 8:  new_type = t_u8;  break;
 			case 16: new_type = t_u16; break;
@@ -5016,14 +5017,12 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);
-		// check_open_scope(c, pl->type);
-
 		CheckerContext prev_context = c->context;
-
+		DeclInfo *decl = NULL;
 		Type *type = alloc_type(c->allocator, Type_Proc);
 		check_open_scope(c, pl->type);
 		{
-			DeclInfo *decl = make_declaration_info(c->allocator, c->context.scope);
+			decl = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
 			decl->proc_lit = pl->type;
 			c->context.decl = decl;
 
@@ -5041,7 +5040,6 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				return kind;
 			}
 			check_procedure_later(c, c->curr_ast_file, empty_token, decl, type, pl->body, pl->tags);
-
 		}
 		check_close_scope(c);
 
