@@ -1,12 +1,18 @@
 #import "fmt.odin";
 
 main :: proc() {
-	x: atomic int = 123;
-	fmt.println(x);
-	arr :[dynamic]any;
-	append(arr, "123", 123, 3.14159265359878, true);
-	for a in arr {
-		fmt.println(a);
+	immutable program := "+ + * - /";
+	accumulator := 0;
+
+	for token in program {
+		match token {
+		case '+': accumulator += 1;
+		case '-': accumulator -= 1;
+		case '*': accumulator *= 2;
+		case '/': accumulator /= 2;
+		default: // Ignore everything else
+		}
 	}
-	fmt.print(arr, "\n");
+
+	fmt.printf("The program \"%s\" calculates the value %d\n", program, accumulator);
 }
