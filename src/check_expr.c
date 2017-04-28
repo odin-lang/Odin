@@ -1539,6 +1539,13 @@ bool check_type_extra_internal(Checker *c, AstNode *e, Type **type, Type *named_
 		return true;
 	case_end;
 
+	case_ast_node(at, AtomicType, e);
+		Type *elem = check_type(c, at->type);
+		i64 esz = type_size_of(c->allocator, elem);
+		*type = make_type_atomic(c->allocator, elem);
+		return true;
+	case_end;
+
 	case_ast_node(at, ArrayType, e);
 		if (at->count != NULL) {
 			Type *elem = check_type_extra(c, at->elem, NULL);
@@ -6213,6 +6220,11 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_ast_node(ht, HelperType, node);
 		str = gb_string_appendc(str, "#type ");
 		str = write_expr_to_string(str, ht->type);
+	case_end;
+
+	case_ast_node(at, AtomicType, node);
+		str = gb_string_appendc(str, "atomic ");
+		str = write_expr_to_string(str, at->type);
 	case_end;
 	}
 

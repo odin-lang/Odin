@@ -994,6 +994,10 @@ void add_type_info_type(Checker *c, Type *t) {
 		add_type_info_type(c, bt->Pointer.elem);
 		break;
 
+	case Type_Atomic:
+		add_type_info_type(c, bt->Atomic.elem);
+		break;
+
 	case Type_Array:
 		add_type_info_type(c, bt->Array.elem);
 		add_type_info_type(c, make_type_pointer(c->allocator, bt->Array.elem));
@@ -1175,7 +1179,7 @@ void init_preload(Checker *c) {
 
 
 
-		if (record->variant_count != 21) {
+		if (record->variant_count != 22) {
 			compiler_error("Invalid `Type_Info` layout");
 		}
 		t_type_info_named         = record->variants[ 1]->type;
@@ -1187,27 +1191,29 @@ void init_preload(Checker *c) {
 		t_type_info_boolean       = record->variants[ 7]->type;
 		t_type_info_any           = record->variants[ 8]->type;
 		t_type_info_pointer       = record->variants[ 9]->type;
-		t_type_info_procedure     = record->variants[10]->type;
-		t_type_info_array         = record->variants[11]->type;
-		t_type_info_dynamic_array = record->variants[12]->type;
-		t_type_info_slice         = record->variants[13]->type;
-		t_type_info_vector        = record->variants[14]->type;
-		t_type_info_tuple         = record->variants[15]->type;
-		t_type_info_struct        = record->variants[16]->type;
-		t_type_info_raw_union     = record->variants[17]->type;
-		t_type_info_union         = record->variants[18]->type;
-		t_type_info_enum          = record->variants[19]->type;
-		t_type_info_map           = record->variants[20]->type;
+		t_type_info_atomic        = record->variants[10]->type;
+		t_type_info_procedure     = record->variants[11]->type;
+		t_type_info_array         = record->variants[12]->type;
+		t_type_info_dynamic_array = record->variants[13]->type;
+		t_type_info_slice         = record->variants[14]->type;
+		t_type_info_vector        = record->variants[15]->type;
+		t_type_info_tuple         = record->variants[16]->type;
+		t_type_info_struct        = record->variants[17]->type;
+		t_type_info_raw_union     = record->variants[18]->type;
+		t_type_info_union         = record->variants[19]->type;
+		t_type_info_enum          = record->variants[20]->type;
+		t_type_info_map           = record->variants[21]->type;
 
 		t_type_info_named_ptr         = make_type_pointer(c->allocator, t_type_info_named);
 		t_type_info_integer_ptr       = make_type_pointer(c->allocator, t_type_info_integer);
 		t_type_info_float_ptr         = make_type_pointer(c->allocator, t_type_info_float);
 		t_type_info_complex_ptr       = make_type_pointer(c->allocator, t_type_info_complex);
-		t_type_info_quaternion_ptr   = make_type_pointer(c->allocator, t_type_info_quaternion);
+		t_type_info_quaternion_ptr    = make_type_pointer(c->allocator, t_type_info_quaternion);
 		t_type_info_string_ptr        = make_type_pointer(c->allocator, t_type_info_string);
 		t_type_info_boolean_ptr       = make_type_pointer(c->allocator, t_type_info_boolean);
 		t_type_info_any_ptr           = make_type_pointer(c->allocator, t_type_info_any);
 		t_type_info_pointer_ptr       = make_type_pointer(c->allocator, t_type_info_pointer);
+		t_type_info_atomic_ptr        = make_type_pointer(c->allocator, t_type_info_atomic);
 		t_type_info_procedure_ptr     = make_type_pointer(c->allocator, t_type_info_procedure);
 		t_type_info_array_ptr         = make_type_pointer(c->allocator, t_type_info_array);
 		t_type_info_dynamic_array_ptr = make_type_pointer(c->allocator, t_type_info_dynamic_array);

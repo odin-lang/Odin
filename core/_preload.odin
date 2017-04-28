@@ -50,6 +50,7 @@ Type_Info :: union {
 	Pointer{
 		elem: ^Type_Info, // nil -> rawptr
 	},
+	Atomic{elem: ^Type_Info},
 	Procedure{
 		params:     ^Type_Info, // Type_Info.Tuple
 		results:    ^Type_Info, // Type_Info.Tuple

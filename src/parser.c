@@ -351,6 +351,10 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		Token token; \
 		AstNode *type; \
 	}) \
+	AST_NODE_KIND(AtomicType, "atomic type", struct { \
+		Token token; \
+		AstNode *type; \
+	}) \
 	AST_NODE_KIND(ArrayType, "array type", struct { \
 		Token token; \
 		AstNode *count; \
@@ -530,6 +534,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_HelperType:       return node->HelperType.token;
 	case AstNode_ProcType:         return node->ProcType.token;
 	case AstNode_PointerType:      return node->PointerType.token;
+	case AstNode_AtomicType:       return node->AtomicType.token;
 	case AstNode_ArrayType:        return node->ArrayType.token;
 	case AstNode_DynamicArrayType: return node->DynamicArrayType.token;
 	case AstNode_VectorType:       return node->VectorType.token;
@@ -1046,6 +1051,13 @@ AstNode *ast_pointer_type(AstFile *f, Token token, AstNode *type) {
 	return result;
 }
 
+AstNode *ast_atomic_type(AstFile *f, Token token, AstNode *type) {
+	AstNode *result = make_ast_node(f, AstNode_AtomicType);
+	result->AtomicType.token = token;
+	result->AtomicType.type = type;
+	return result;
+}
+
 AstNode *ast_array_type(AstFile *f, Token token, AstNode *count, AstNode *elem) {
 	AstNode *result = make_ast_node(f, AstNode_ArrayType);
 	result->ArrayType.token = token;
@@ -1330,6 +1342,9 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 
 	case AstNode_PointerType:
 		return is_semicolon_optional_for_node(f, s->PointerType.type);
+
+	case AstNode_AtomicType:
+		return is_semicolon_optional_for_node(f, s->AtomicType.type);
 
 	case AstNode_StructType:
 	case AstNode_UnionType:
@@ -2671,6 +2686,12 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		Token token = expect_token(f, Token_Pointer);
 		AstNode *elem = parse_type(f);
 		return ast_pointer_type(f, token, elem);
+	}
+
+	case Token_atomic: {
+		Token token = expect_token(f, Token_atomic);
+		AstNode *elem = parse_type(f);
+		return ast_atomic_type(f, token, elem);
 	}
 
 	case Token_OpenBracket: {

@@ -31,6 +31,94 @@ gbAllocator scratch_allocator(void) {
 	return gb_scratch_allocator(&scratch_memory);
 }
 
+typedef struct DynamicArenaBlock DynamicArenaBlock;
+typedef struct DynamicArena      DynamicArena;
+
+struct DynamicArenaBlock {
+	DynamicArenaBlock *prev;
+	DynamicArenaBlock *next;
+	u8 *               start;
+	isize              count;
+	isize              capacity;
+
+	gbVirtualMemory    vm;
+};
+
+struct DynamicArena {
+	DynamicArenaBlock *start_block;
+	DynamicArenaBlock *current_block;
+	isize              block_size;
+};
+
+DynamicArenaBlock *add_dynamic_arena_block(DynamicArena *a) {
+	GB_ASSERT(a != NULL);
+	GB_ASSERT(a->block_size > 0);
+
+	gbVirtualMemory vm = gb_vm_alloc(NULL, a->block_size);
+	DynamicArenaBlock *block = cast(DynamicArenaBlock *)vm.data;
+
+	u8 *start = cast(u8 *)gb_align_forward(cast(u8 *)(block + 1), GB_DEFAULT_MEMORY_ALIGNMENT);
+	u8 *end = cast(u8 *)vm.data + vm.size;
+
+	block->vm       = vm;
+	block->start    = start;
+	block->count    = 0;
+	block->capacity = end-start;
+
+	if (a->current_block != NULL) {
+		a->current_block->next = block;
+		block->prev = a->current_block;
+	}
+	a->current_block = block;
+	return block;
+}
+
+void init_dynamic_arena(DynamicArena *a, isize block_size) {
+	isize size = gb_size_of(DynamicArenaBlock) + block_size;
+	size = cast(isize)gb_align_forward(cast(void *)cast(uintptr)size, GB_DEFAULT_MEMORY_ALIGNMENT);
+	a->block_size = size;
+	a->start_block = add_dynamic_arena_block(a);
+}
+
+void destroy_dynamic_arena(DynamicArena *a) {
+	DynamicArenaBlock *b = a->current_block;
+	while (b != NULL) {
+		gbVirtualMemory vm = b->vm;
+		b = b->prev;
+		gb_vm_free(b->vm);
+	}
+}
+
+GB_ALLOCATOR_PROC(dynamic_arena_allocator_proc) {
+	DynamicArena *a = cast(DynamicArena *)allocator_data;
+	void *ptr = NULL;
+
+	switch (type) {
+	case gbAllocation_Alloc: {
+
+	} break;
+
+	case gbAllocation_Free: {
+	} break;
+
+	case gbAllocation_Resize: {
+	} break;
+
+	case gbAllocation_FreeAll:
+		GB_PANIC("free_all is not supported by this allocator");
+		break;
+	}
+
+	return ptr;
+}
+
+gbAllocator dynamic_arena_allocator(DynamicArena *a) {
+	gbAllocator allocator = {dynamic_arena_allocator_proc, a};
+	return allocator;
+}
+
+
+
 
 i64 next_pow2(i64 n) {
 	if (n <= 0) {

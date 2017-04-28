@@ -115,6 +115,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_asm,            "asm"),                 \
 	TOKEN_KIND(Token_yield,          "yield"),               \
 	TOKEN_KIND(Token_await,          "await"),               \
+	TOKEN_KIND(Token_atomic,         "atomic"),              \
 TOKEN_KIND(Token__KeywordEnd, "_KeywordEnd"), \
 	TOKEN_KIND(Token_Count, "")
 

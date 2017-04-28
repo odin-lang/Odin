@@ -212,6 +212,10 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 		}
 	case String:  write_string(buf, "string");
 	case Boolean: write_string(buf, "bool");
+	case Atomic:
+		write_string(buf, "atomic ");
+		write_type(buf, info.elem);
+
 	case Pointer:
 		if info.elem == nil {
 			write_string(buf, "rawptr");
@@ -812,6 +816,9 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		} else {
 			fmt_pointer(fi, (cast(^rawptr)v.data)^, verb);
 		}
+
+	case Atomic:
+		fmt_arg(fi, any{v.data, info.elem}, verb);
 
 	case Array:
 		if verb != 'v' {

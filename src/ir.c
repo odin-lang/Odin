@@ -156,7 +156,9 @@ struct irProcedure {
 		i64          alignment;                                       \
 	})                                                                \
 	IR_INSTR_KIND(ZeroInit, struct { irValue *address; })             \
-	IR_INSTR_KIND(Store,    struct { irValue *address, *value; })     \
+	IR_INSTR_KIND(Store,    struct {                                  \
+		irValue *address, *value; bool atomic;                        \
+	})                                                                \
 	IR_INSTR_KIND(Load,     struct { Type *type; irValue *address; }) \
 	IR_INSTR_KIND(PtrOffset, struct {                                 \
 		irValue *address;                                             \
@@ -822,11 +824,12 @@ irValue *ir_instr_local(irProcedure *p, Entity *e, bool zero_initialized) {
 }
 
 
-irValue *ir_instr_store(irProcedure *p, irValue *address, irValue *value) {
+irValue *ir_instr_store(irProcedure *p, irValue *address, irValue *value, bool atomic) {
 	irValue *v = ir_alloc_instr(p, irInstr_Store);
 	irInstr *i = &v->Instr;
 	i->Store.address = address;
 	i->Store.value = value;
+	i->Store.atomic = atomic;
 	return v;
 }
 
@@ -1429,7 +1432,7 @@ irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value) {
 		GB_ASSERT_MSG(are_types_identical(core_type(a), core_type(b)), "%s %s", type_to_string(a), type_to_string(b));
 	}
 #endif
-	return ir_emit(p, ir_instr_store(p, address, value));
+	return ir_emit(p, ir_instr_store(p, address, value, is_type_atomic(a)));
 }
 irValue *ir_emit_load(irProcedure *p, irValue *address) {
 	GB_ASSERT(address != NULL);
@@ -2023,7 +2026,7 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 		if (is_type_pointer(t_left) && is_type_integer(t_right)) {
 			// ptr - int
 			irValue *ptr = ir_emit_conv(proc, left, type);
-			irValue *offset = right;
+			irValue *offset = ir_emit_unary_arith(proc, Token_Sub, right, t_int);
 			return ir_emit_ptr_offset(proc, ptr, offset);
 		} else if (is_type_pointer(t_left) && is_type_pointer(t_right)) {
 			GB_ASSERT(is_type_integer(type));
@@ -6465,7 +6468,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		irValue *prev_context = ir_add_local_generated(proc, t_context);
 		ir_emit_store(proc, prev_context, ir_emit_load(proc, context_ptr));
 
-		ir_add_defer_instr(proc, proc->scope_index, ir_instr_store(proc, context_ptr, ir_emit_load(proc, prev_context)));
+		ir_add_defer_instr(proc, proc->scope_index, ir_instr_store(proc, context_ptr, ir_emit_load(proc, prev_context), false));
 
 		irValue *gep = ir_emit_struct_ep(proc, context_ptr, 1);
 		ir_emit_store(proc, gep, ir_build_expr(proc, pa->expr));
@@ -6484,7 +6487,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		irValue *prev_context = ir_add_local_generated(proc, t_context);
 		ir_emit_store(proc, prev_context, ir_emit_load(proc, context_ptr));
 
-		ir_add_defer_instr(proc, proc->scope_index, ir_instr_store(proc, context_ptr, ir_emit_load(proc, prev_context)));
+		ir_add_defer_instr(proc, proc->scope_index, ir_instr_store(proc, context_ptr, ir_emit_load(proc, prev_context), false));
 
 		ir_emit_store(proc, context_ptr, ir_build_expr(proc, pc->expr));
 
@@ -7364,6 +7367,12 @@ void ir_gen_tree(irGen *s) {
 					ir_emit_comment(proc, str_lit("Type_Info_Pointer"));
 					tag = ir_emit_conv(proc, ti_ptr, t_type_info_pointer_ptr);
 					irValue *gep = ir_get_type_info_ptr(proc, t->Pointer.elem);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), gep);
+				} break;
+				case Type_Atomic: {
+					ir_emit_comment(proc, str_lit("Type_Info_Atomic"));
+					tag = ir_emit_conv(proc, ti_ptr, t_type_info_atomic_ptr);
+					irValue *gep = ir_get_type_info_ptr(proc, t->Atomic.elem);
 					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), gep);
 				} break;
 				case Type_Array: {
