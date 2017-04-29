@@ -156,7 +156,7 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 		quo := n/10;
 		rem := n - 10*quo;
 		w--;
-		if w < len(a.digits) {
+		if 0 <= w && w < len(a.digits) {
 			a.digits[w] = cast(byte)('0' + rem);
 		} else if rem != 0 {
 			a.trunc = true;

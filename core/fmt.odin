@@ -1025,6 +1025,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	base_arg := arg;
 	base_arg.type_info = type_info_base(base_arg.type_info);
 	match a in base_arg {
+	case any:           fmt_arg(fi, a, verb);
 	case bool:          fmt_bool(fi, a, verb);
 	case f32:           fmt_float(fi, cast(f64)a, 32, verb);
 	case f64:           fmt_float(fi, a, 64, verb);
