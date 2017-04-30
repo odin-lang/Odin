@@ -2077,29 +2077,6 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 
 AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 	switch (f->curr_token.kind) {
-
-	// case Token_cast:
-	// case Token_transmute:
-	// case Token_union_cast:
-	// {
-		// Token token = f->curr_token; next_token(f);
-		// Token open = expect_token(f, Token_OpenParen);
-		// AstNode *type = parse_type(f);
-		// Token close = expect_token(f, Token_CloseParen);
-		// AstNode *expr = parse_unary_expr(f, lhs);
-		// return ast_cast_expr(f, token, type, expr, open, close);
-	// } break;
-
-	// case Token_Pointer: {
-	// 	Token op = f->curr_token;
-	// 	next_token(f);
-	// 	AstNode *expr = parse_unary_expr(f, lhs);
-	// 	if (is_ast_node_type(expr)) {
-	// 		return ast_pointer_type(f, op, expr);
-	// 	}
-	// 	return ast_unary_expr(f, op, expr);
-	// } break;
-
 	case Token_Add:
 	case Token_Sub:
 	case Token_Not:
@@ -3295,11 +3272,13 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Rune:
 	case Token_String:
 	case Token_OpenParen:
+	case Token_Pointer:
 	// Unary Operators
 	case Token_Add:
 	case Token_Sub:
 	case Token_Xor:
 	case Token_Not:
+	case Token_And:
 		s = parse_simple_stmt(f, false);
 		expect_semicolon(f, s);
 		return s;
