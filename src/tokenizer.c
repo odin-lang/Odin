@@ -107,9 +107,6 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_using,          "using"),               \
 	TOKEN_KIND(Token_no_alias,       "no_alias"),            \
 	TOKEN_KIND(Token_immutable,      "immutable"),           \
-	/* TOKEN_KIND(Token_cast,           "cast"), */                \
-	/* TOKEN_KIND(Token_transmute,      "transmute"), */           \
-	/* TOKEN_KIND(Token_union_cast,     "union_cast"), */          \
 	TOKEN_KIND(Token_context,        "context"),             \
 	TOKEN_KIND(Token_push_context,   "push_context"),        \
 	TOKEN_KIND(Token_push_allocator, "push_allocator"),      \

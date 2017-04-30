@@ -79,32 +79,37 @@ void check_scope_decls(Checker *c, AstNodeArray nodes, isize reserve_size) {
 }
 
 
-bool check_is_assignable_to_using_subtype(Type *dst, Type *src) {
-	bool src_is_ptr;
+bool check_is_assignable_to_using_subtype(Type *src, Type *dst) {
+	bool src_is_ptr = false;
 	Type *prev_src = src;
 	src = type_deref(src);
 	src_is_ptr = src != prev_src;
 	src = base_type(src);
 
-	if (is_type_struct(src) || is_type_union(src)) {
-		for (isize i = 0; i < src->Record.field_count; i++) {
-			Entity *f = src->Record.fields[i];
-			if (f->kind == Entity_Variable && (f->flags & EntityFlag_Using) != 0) {
-				if (are_types_identical(dst, f->type)) {
-					return true;
-				}
-				if (src_is_ptr && is_type_pointer(dst)) {
-					if (are_types_identical(type_deref(dst), f->type)) {
-						return true;
-					}
-				}
-				bool ok = check_is_assignable_to_using_subtype(dst, f->type);
-				if (ok) {
-					return true;
-				}
+	if (!is_type_struct(src) && !is_type_union(src)) {
+		return false;
+	}
+
+	for (isize i = 0; i < src->Record.field_count; i++) {
+		Entity *f = src->Record.fields[i];
+		if (f->kind != Entity_Variable || (f->flags&EntityFlag_Using) == 0) {
+			continue;
+		}
+
+		if (are_types_identical(f->type, dst)) {
+			return true;
+		}
+		if (src_is_ptr && is_type_pointer(dst)) {
+			if (are_types_identical(f->type, type_deref(dst))) {
+				return true;
 			}
 		}
+		bool ok = check_is_assignable_to_using_subtype(f->type, dst);
+		if (ok) {
+			return true;
+		}
 	}
+
 	return false;
 }
 
@@ -113,6 +118,7 @@ bool check_is_assignable_to_using_subtype(Type *dst, Type *src) {
 // -1 is not convertable
 // 0 is exact
 // >0 is convertable
+
 i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 	if (operand->mode == Addressing_Invalid ||
 	    type == t_invalid) {
@@ -383,10 +389,12 @@ isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 		ast_node(f, Field, decl);
 
 		Type *type = check_type(c, f->type);
+		bool is_using = (f->flags&FieldFlag_using) != 0;
 
-		if (f->flags&FieldFlag_using) {
+		if (is_using) {
 			if (f->names.count > 1) {
 				error_node(f->names.e[0], "Cannot apply `using` to more than one of the same type");
+				is_using = false;
 			}
 		}
 
@@ -398,7 +406,7 @@ isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 
 			Token name_token = name->Ident;
 
-			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, f->flags&FieldFlag_using, cast(i32)field_index);
+			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, is_using, cast(i32)field_index);
 			e->identifier = name;
 			if (str_eq(name_token.string, str_lit("_"))) {
 				fields[field_index++] = e;
@@ -421,7 +429,7 @@ isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 		}
 
 
-		if (f->flags&FieldFlag_using) {
+		if (is_using) {
 			Type *t = base_type(type_deref(type));
 			if (!is_type_struct(t) && !is_type_raw_union(t) &&
 			    f->names.count >= 1 &&

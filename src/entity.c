@@ -185,20 +185,20 @@ Entity *make_entity_type_name(gbAllocator a, Scope *scope, Token token, Type *ty
 	return entity;
 }
 
-Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, bool anonymous, bool is_immutable) {
+Entity *make_entity_param(gbAllocator a, Scope *scope, Token token, Type *type, bool is_using, bool is_immutable) {
 	Entity *entity = make_entity_variable(a, scope, token, type, is_immutable);
 	entity->flags |= EntityFlag_Used;
-	if (anonymous) entity->flags |= EntityFlag_Using;
+	if (is_using) entity->flags |= EntityFlag_Using;
 	entity->flags |= EntityFlag_Param;
 	return entity;
 }
 
-Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, bool anonymous, i32 field_src_index) {
+Entity *make_entity_field(gbAllocator a, Scope *scope, Token token, Type *type, bool is_using, i32 field_src_index) {
 	Entity *entity = make_entity_variable(a, scope, token, type, false);
 	entity->Variable.field_src_index = field_src_index;
 	entity->Variable.field_index = field_src_index;
+	if (is_using) entity->flags |= EntityFlag_Using;
 	entity->flags |= EntityFlag_Field;
-	entity->flags |= EntityFlag_Using*(anonymous != 0);
 	return entity;
 }
 

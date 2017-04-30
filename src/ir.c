@@ -2613,7 +2613,7 @@ irValue *ir_add_local_slice(irProcedure *proc, Type *slice_type, irValue *base, 
 
 
 
-String lookup_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
+String ir_lookup_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
 	Type *prev_src = src;
 	// Type *prev_dst = dst;
 	src = base_type(type_deref(src));
@@ -2621,7 +2621,7 @@ String lookup_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
 	bool src_is_ptr = src != prev_src;
 	// bool dst_is_ptr = dst != prev_dst;
 
-	GB_ASSERT(is_type_struct(src));
+	GB_ASSERT(is_type_struct(src) || is_type_union(src));
 	for (isize i = 0; i < src->Record.field_count; i++) {
 		Entity *f = src->Record.fields[i];
 		if (f->kind == Entity_Variable && f->flags & EntityFlag_Using) {
@@ -2634,7 +2634,7 @@ String lookup_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
 				}
 			}
 			if (is_type_struct(f->type)) {
-				String name = lookup_polymorphic_field(info, dst, f->type);
+				String name = ir_lookup_polymorphic_field(info, dst, f->type);
 				if (name.len > 0) {
 					return name;
 				}
@@ -2805,23 +2805,45 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		}
 	}
 
-	// NOTE(bill): This has to be done beofre `Pointer <-> Pointer` as it's
+	// NOTE(bill): This has to be done before `Pointer <-> Pointer` as it's
 	// subtype polymorphism casting
-	{
-		Type *sb = base_type(type_deref(src));
-		bool src_is_ptr = src != sb;
-		if (is_type_struct(sb)) {
-			String field_name = lookup_polymorphic_field(proc->module->info, t, src);
-			// gb_printf("field_name: %.*s\n", LIT(field_name));
-			if (field_name.len > 0) {
-				// NOTE(bill): It can be casted
-				Selection sel = lookup_field(proc->module->allocator, sb, field_name, false);
-				if (sel.entity != NULL) {
-					ir_emit_comment(proc, str_lit("cast - polymorphism"));
-					if (src_is_ptr) {
-						value = ir_emit_load(proc, value);
+	if (check_is_assignable_to_using_subtype(src_type, t)) {
+		Type *st = type_deref(src_type);
+		Type *pst = st;
+		st = type_deref(st);
+
+		bool st_is_ptr = st != pst;
+		st = base_type(st);
+
+		Type *dt = t;
+		bool dt_is_ptr = is_type_pointer(dt);
+
+		GB_ASSERT(is_type_struct(st) || is_type_union(st));
+		String field_name = ir_lookup_polymorphic_field(proc->module->info, t, st);
+		// gb_printf("field_name: %.*s\n", LIT(field_name));
+		if (field_name.len > 0) {
+			// NOTE(bill): It can be casted
+			Selection sel = lookup_field(proc->module->allocator, st, field_name, false);
+			if (sel.entity != NULL) {
+				ir_emit_comment(proc, str_lit("cast - polymorphism"));
+				if (st_is_ptr) {
+					irValue *res = ir_emit_deep_field_gep(proc, value, sel);
+					if (!dt_is_ptr) {
+						res = ir_emit_load(proc, res);
 					}
+					return res;
+				} else {
+					if (is_type_pointer(ir_type(value))) {
+						if (!dt_is_ptr) {
+							value = ir_emit_load(proc, value);
+						} else {
+							value = ir_emit_deep_field_gep(proc, value, sel);
+							return ir_emit_load(proc, value);
+						}
+					}
+
 					return ir_emit_deep_field_ev(proc, value, sel);
+
 				}
 			}
 		}
