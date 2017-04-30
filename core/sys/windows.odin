@@ -21,7 +21,7 @@ Bool      :: i32;
 Wnd_Proc  :: #type proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
 
 
-INVALID_HANDLE :: cast(Handle)~cast(int)0;
+INVALID_HANDLE :: Handle(~int(0));
 
 FALSE: Bool : 0;
 TRUE:  Bool : 1;
@@ -56,7 +56,7 @@ WM_CHAR              :: 0x0102;
 
 PM_REMOVE :: 1;
 
-COLOR_BACKGROUND :: cast(Hbrush)(cast(int)1);
+COLOR_BACKGROUND :: Hbrush(int(1));
 BLACK_BRUSH :: 4;
 
 SM_CXSCREEN :: 0;
@@ -178,7 +178,7 @@ DescribePixelFormat :: proc(dc: Hdc, pixel_format: i32, bytes : u32, pfd: ^PIXEL
 
 GetQueryPerformanceFrequency :: proc() -> i64 {
 	r: i64;
-	QueryPerformanceFrequency(^r);
+	QueryPerformanceFrequency(&r);
 	return r;
 }
 
@@ -260,7 +260,7 @@ FILE_TYPE_DISK :: 0x0001;
 FILE_TYPE_CHAR :: 0x0002;
 FILE_TYPE_PIPE :: 0x0003;
 
-INVALID_SET_FILE_POINTER :: ~cast(u32)0;
+INVALID_SET_FILE_POINTER :: ~u32(0);
 
 
 
@@ -313,7 +313,7 @@ Hmonitor :: Handle;
 
 GWL_STYLE     :: -16;
 
-Hwnd_TOP :: cast(Hwnd)cast(uint)0;
+Hwnd_TOP :: Hwnd(uint(0));
 
 MONITOR_DEFAULTTONULL    :: 0x00000000;
 MONITOR_DEFAULTTOPRIMARY :: 0x00000001;
@@ -356,10 +356,10 @@ SetWindowLongPtrA :: proc(wnd: Hwnd, index: i32, new: i64) -> i64 #foreign user3
 
 GetWindowText :: proc(wnd: Hwnd, str: ^byte, maxCount: i32) -> i32 #foreign user32;
 
-HIWORD :: proc(wParam: Wparam) -> u16 { return cast(u16)((cast(u32)wParam >> 16) & 0xffff); }
-HIWORD :: proc(lParam: Lparam) -> u16 { return cast(u16)((cast(u32)lParam >> 16) & 0xffff); }
-LOWORD :: proc(wParam: Wparam) -> u16 { return cast(u16)wParam; }
-LOWORD :: proc(lParam: Lparam) -> u16 { return cast(u16)lParam; }
+HIWORD :: proc(wParam: Wparam) -> u16 { return u16((u32(wParam) >> 16) & 0xffff); }
+HIWORD :: proc(lParam: Lparam) -> u16 { return u16((u32(lParam) >> 16) & 0xffff); }
+LOWORD :: proc(wParam: Wparam) -> u16 { return u16(wParam); }
+LOWORD :: proc(lParam: Lparam) -> u16 { return u16(lParam); }
 
 
 
@@ -477,7 +477,7 @@ Proc  :: #type proc() #cc_c;
 GetKeyState      :: proc(v_key: i32) -> i16 #foreign user32;
 GetAsyncKeyState :: proc(v_key: i32) -> i16 #foreign user32;
 
-is_key_down :: proc(key: Key_Code) -> bool #inline { return GetAsyncKeyState(cast(i32)key) < 0; }
+is_key_down :: proc(key: Key_Code) -> bool #inline { return GetAsyncKeyState(i32(key)) < 0; }
 
 Key_Code :: enum i32 {
 	LBUTTON    = 0x01,

@@ -19,15 +19,12 @@ parse_bool :: proc(s: string) -> (result: bool, ok: bool) {
 }
 
 _digit_value :: proc(r: rune) -> (int) {
-	ri := cast(int)r;
+	ri := int(r);
 	v: int = 16;
 	match r {
-	case '0'..'9':
-		v = ri - '0';
-	case 'a'..'z':
-		v = ri - 'a' + 10;
-	case 'A'..'Z':
-		v = ri - 'A' + 10;
+	case '0'..'9': v = ri-'0';
+	case 'a'..'z': v = ri-'a'+10;
+	case 'A'..'Z': v = ri-'A'+10;
 	}
 	return v;
 }
@@ -39,8 +36,8 @@ parse_i64 :: proc(s: string, base: int) -> i64 {
 		if v >= base {
 			break;
 		}
-		result *= cast(i64)base;
-		result += cast(i64)v;
+		result *= i64(base);
+		result += i64(v);
 	}
 	return result;
 }
@@ -51,35 +48,35 @@ parse_u64 :: proc(s: string, base: int) -> u64 {
 		if v >= base {
 			break;
 		}
-		result *= cast(u64)base;
-		result += cast(u64)v;
+		result *= u64(base);
+		result += u64(v);
 	}
 	return result;
 }
 parse_int :: proc(s: string, base: int) -> int {
-	return cast(int)parse_i64(s, base);
+	return int(parse_i64(s, base));
 }
 parse_uint :: proc(s: string, base: int) -> uint {
-	return cast(uint)parse_u64(s, base);
+	return uint(parse_u64(s, base));
 }
 
 
 append_bool :: proc(buf: []byte, b: bool) -> string {
 	s := b ? "true" : "false";
-	append(buf, ..cast([]byte)s);
-	return cast(string)buf;
+	append(buf, ..[]byte(s));
+	return string(buf);
 }
 
 append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
 	return append_bits(buf, u, base, false, 8*size_of(uint), digits, 0);
 }
 append_int :: proc(buf: []byte, i: i64, base: int) -> string {
-	return append_bits(buf, cast(u64)i, base, true, 8*size_of(int), digits, 0);
+	return append_bits(buf, u64(i), base, true, 8*size_of(int), digits, 0);
 }
-itoa :: proc(buf: []byte, i: int) -> string { return append_int(buf, cast(i64)i, 10); }
+itoa :: proc(buf: []byte, i: int) -> string { return append_int(buf, i64(i), 10); }
 
 append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
-	return cast(string)generic_ftoa(buf, f, fmt, prec, bit_size);
+	return string(generic_ftoa(buf, f, fmt, prec, bit_size));
 }
 
 
@@ -107,18 +104,18 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 	flt: ^Float_Info;
 	match bit_size {
 	case 32:
-		bits = cast(u64)transmute(u32)cast(f32)val;
-		flt = ^f32_info;
+		bits = u64(transmute(u32, f32(val)));
+		flt = &f32_info;
 	case 64:
-		bits = transmute(u64)val;
-		flt = ^f64_info;
+		bits = transmute(u64, val);
+		flt = &f64_info;
 	default:
 		panic("strconv: invalid bit_size");
 	}
 
 	neg := bits>>(flt.expbits+flt.mantbits) != 0;
-	exp := cast(int)(bits>>flt.mantbits) & (1<<flt.expbits - 1);
-	mant := bits & (cast(u64)1 << flt.mantbits - 1);
+	exp := int(bits>>flt.mantbits) & (1<<flt.expbits - 1);
+	mant := bits & (u64(1) << flt.mantbits - 1);
 
 	match exp {
 	case 1<<flt.expbits - 1:
@@ -130,22 +127,22 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 		} else {
 			s = "+Inf";
 		}
-		append(buf, ..cast([]byte)s);
+		append(buf, ..[]byte(s));
 		return buf;
 
 	case 0: // denormalized
 		exp++;
 
 	default:
-		mant |= cast(u64)1 << flt.mantbits;
+		mant |= u64(1) << flt.mantbits;
 	}
 
 	exp += flt.bias;
 
 	d_: Decimal;
-	d := ^d_;
+	d := &d_;
 	assign(d, mant);
-	shift(d, exp - cast(int)flt.mantbits);
+	shift(d, exp - int(flt.mantbits));
 	digs: Decimal_Slice;
 	shortest := prec < 0;
 	if shortest {
@@ -194,7 +191,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 		// fractional part
 		if prec > 0 {
 			append(buf, '.');
-			for i in 0..<prec {
+			for i in 0..prec {
 				c: byte = '0';
 				if j := digs.decimal_point + i; 0 <= j && j < digs.count {
 					c = digs.digits[j];
@@ -234,14 +231,14 @@ round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 		332*(dp-nd) >= 100*(exp-mantbits)
 	 */
 	minexp := flt.bias+1;
-	if exp > minexp && 332*(d.decimal_point-d.count) >= 100*(exp - cast(int)flt.mantbits) {
+	if exp > minexp && 332*(d.decimal_point-d.count) >= 100*(exp - int(flt.mantbits)) {
 		// Number is already its shortest
 		return;
 	}
 
-	upper_: Decimal; upper: = ^upper_;
+	upper_: Decimal; upper: = &upper_;
 	assign(upper, 2*mant - 1);
-	shift(upper, exp - cast(int)flt.mantbits - 1);
+	shift(upper, exp - int(flt.mantbits) - 1);
 
 	mantlo: u64;
 	explo:  int;
@@ -252,9 +249,9 @@ round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 		mantlo = 2*mant - 1;
 		explo = exp-1;
 	}
-	lower_: Decimal; lower: = ^lower_;
+	lower_: Decimal; lower: = &lower_;
 	assign(lower, 2*mantlo + 1);
-	shift(lower, explo - cast(int)flt.mantbits - 1);
+	shift(lower, explo - int(flt.mantbits) - 1);
 
 	inclusive := mant%2 == 0;
 
@@ -297,25 +294,25 @@ is_integer_negative :: proc(u: u64, is_signed: bool, bit_size: int) -> (unsigned
 	if is_signed {
 		match bit_size {
 		case 8:
-			i := cast(i8)u;
+			i := i8(u);
 			neg = i < 0;
 			if neg { i = -i; }
-			u = cast(u64)i;
+			u = u64(i);
 		case 16:
-			i := cast(i16)u;
+			i := i16(u);
 			neg = i < 0;
 			if neg { i = -i; }
-			u = cast(u64)i;
+			u = u64(i);
 		case 32:
-			i := cast(i32)u;
+			i := i32(u);
 			neg = i < 0;
 			if neg { i = -i; }
-			u = cast(u64)i;
+			u = u64(i);
 		case 64:
-			i := cast(i64)u;
+			i := i64(u);
 			neg = i < 0;
 			if neg { i = -i; }
-			u = cast(u64)i;
+			u = u64(i);
 		default:
 			panic("is_integer_negative: Unknown integer size");
 		}
@@ -342,15 +339,15 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 	neg: bool;
 	u, neg = is_integer_negative(u, is_signed, bit_size);
 
-	for b := cast(u64)base; u >= b; {
+	for b := u64(base); u >= b; {
 		i--;
 		q := u / b;
-		a[i] = digits[cast(uint)(u-q*b)];
+		a[i] = digits[uint(u-q*b)];
 		u = q;
 	}
 
 	i--;
-	a[i] = digits[cast(uint)u];
+	a[i] = digits[uint(u)];
 
 	if flags&Int_Flag.PREFIX != 0 {
 		ok := true;
@@ -378,6 +375,6 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 
 
 	append(buf, ..a[i..]);
-	return cast(string)buf;
+	return string(buf);
 }
 

@@ -55,29 +55,29 @@ fmuladd :: proc(a, b, c: f64) -> f64 #foreign __llvm_core "llvm.fmuladd.f64";
 
 
 copy_sign :: proc(x, y: f32) -> f32 {
-	ix := transmute(u32)x;
-	iy := transmute(u32)y;
+	ix := transmute(u32, x);
+	iy := transmute(u32, y);
 	ix &= 0x7fff_ffff;
 	ix |= iy & 0x8000_0000;
-	return transmute(f32)ix;
+	return transmute(f32, ix);
 }
 
 copy_sign :: proc(x, y: f64) -> f64 {
-	ix := transmute(u64)x;
-	iy := transmute(u64)y;
+	ix := transmute(u64, x);
+	iy := transmute(u64, y);
 	ix &= 0x7fff_ffff_ffff_ff;
 	ix |= iy & 0x8000_0000_0000_0000;
-	return transmute(f64)ix;
+	return transmute(f64, ix);
 }
 
 round     :: proc(x: f32) -> f32 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
 round     :: proc(x: f64) -> f64 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
 
-floor     :: proc(x: f32) -> f32 { return x >= 0 ? cast(f32)cast(i64)x : cast(f32)cast(i64)(x-0.5); } // TODO: Get accurate versions
-floor     :: proc(x: f64) -> f64 { return x >= 0 ? cast(f64)cast(i64)x : cast(f64)cast(i64)(x-0.5); } // TODO: Get accurate versions
+floor     :: proc(x: f32) -> f32 { return x >= 0 ? f32(i64(x)) : f32(i64(x-0.5)); } // TODO: Get accurate versions
+floor     :: proc(x: f64) -> f64 { return x >= 0 ? f64(i64(x)) : f64(i64(x-0.5)); } // TODO: Get accurate versions
 
-ceil      :: proc(x: f32) -> f32 { return x <  0 ? cast(f32)cast(i64)x : cast(f32)cast(i64)(x+1); } // TODO: Get accurate versions
-ceil      :: proc(x: f64) -> f64 { return x <  0 ? cast(f64)cast(i64)x : cast(f64)cast(i64)(x+1); } // TODO: Get accurate versions
+ceil      :: proc(x: f32) -> f32 { return x <  0 ? f32(i64(x)) : f32(i64(x+1)); } // TODO: Get accurate versions
+ceil      :: proc(x: f64) -> f64 { return x <  0 ? f64(i64(x)) : f64(i64(x+1)); } // TODO: Get accurate versions
 
 remainder :: proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
 remainder :: proc(x, y: f64) -> f64 { return x - round(x/y) * y; }

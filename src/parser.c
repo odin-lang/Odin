@@ -182,9 +182,9 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 		Token        open; \
 		Token        close; \
 	}) \
-	AST_NODE_KIND(CastExpr,     "cast expression",     struct { Token token; AstNode *type, *expr; Token open, close; }) \
-	AST_NODE_KIND(FieldValue,   "field value",         struct { Token eq; AstNode *field, *value; }) \
-	AST_NODE_KIND(TernaryExpr,  "ternary expression",  struct { AstNode *cond, *x, *y; }) \
+	AST_NODE_KIND(FieldValue,    "field value",         struct { Token eq; AstNode *field, *value; }) \
+	AST_NODE_KIND(TernaryExpr,   "ternary expression",  struct { AstNode *cond, *x, *y; }) \
+	AST_NODE_KIND(TypeAssertion, "type assertion",      struct { AstNode *expr; Token dot; AstNode *type; }) \
 AST_NODE_KIND(_ExprEnd,       "", i32) \
 AST_NODE_KIND(_StmtBegin,     "", i32) \
 	AST_NODE_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
@@ -485,13 +485,13 @@ Token ast_node_token(AstNode *node) {
 			return ast_node_token(node->SelectorExpr.selector);
 		}
 		return node->SelectorExpr.token;
-	case AstNode_IndexExpr:    return node->IndexExpr.open;
-	case AstNode_SliceExpr:    return node->SliceExpr.open;
-	case AstNode_Ellipsis:     return node->Ellipsis.token;
-	case AstNode_CastExpr:     return node->CastExpr.token;
-	case AstNode_FieldValue:   return node->FieldValue.eq;
-	case AstNode_DerefExpr:    return node->DerefExpr.op;
-	case AstNode_TernaryExpr:  return ast_node_token(node->TernaryExpr.cond);
+	case AstNode_IndexExpr:     return node->IndexExpr.open;
+	case AstNode_SliceExpr:     return node->SliceExpr.open;
+	case AstNode_Ellipsis:      return node->Ellipsis.token;
+	case AstNode_FieldValue:    return node->FieldValue.eq;
+	case AstNode_DerefExpr:     return node->DerefExpr.op;
+	case AstNode_TernaryExpr:   return ast_node_token(node->TernaryExpr.cond);
+	case AstNode_TypeAssertion: return ast_node_token(node->TypeAssertion.expr);
 
 	case AstNode_BadStmt:       return node->BadStmt.begin;
 	case AstNode_EmptyStmt:     return node->EmptyStmt.token;
@@ -773,16 +773,6 @@ AstNode *ast_field_value(AstFile *f, AstNode *field, AstNode *value, Token eq) {
 	return result;
 }
 
-AstNode *ast_cast_expr(AstFile *f, Token token, AstNode *type, AstNode *expr, Token open, Token close) {
-	AstNode *result = make_ast_node(f, AstNode_CastExpr);
-	result->CastExpr.token = token;
-	result->CastExpr.type = type;
-	result->CastExpr.expr = expr;
-	result->CastExpr.open = open;
-	result->CastExpr.close = close;
-	return result;
-}
-
 AstNode *ast_compound_lit(AstFile *f, AstNode *type, AstNodeArray elems, Token open, Token close) {
 	AstNode *result = make_ast_node(f, AstNode_CompoundLit);
 	result->CompoundLit.type = type;
@@ -806,6 +796,14 @@ AstNode *ast_ternary_expr(AstFile *f, AstNode *cond, AstNode *x, AstNode *y) {
 	result->TernaryExpr.y = y;
 	return result;
 }
+AstNode *ast_type_assertion(AstFile *f, AstNode *expr, Token dot, AstNode *type) {
+	AstNode *result = make_ast_node(f, AstNode_TypeAssertion);
+	result->TypeAssertion.expr = expr;
+	result->TypeAssertion.dot  = dot;
+	result->TypeAssertion.type = type;
+	return result;
+}
+
 
 
 
@@ -1977,6 +1975,13 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			// case Token_Integer:
 				// operand = ast_selector_expr(f, token, operand, parse_expr(f, lhs));
 				// break;
+			case Token_OpenParen: {
+				Token open = expect_token(f, Token_OpenParen);
+				AstNode *type = parse_type(f);
+				Token close = expect_token(f, Token_CloseParen);
+				operand = ast_type_assertion(f, operand, token, type);
+			} break;
+
 			default:
 				syntax_error(f->curr_token, "Expected a selector");
 				next_token(f);
@@ -2073,32 +2078,33 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 	switch (f->curr_token.kind) {
 
-	case Token_cast:
-	case Token_transmute:
-	case Token_union_cast:
-	{
-		Token token = f->curr_token; next_token(f);
-		Token open = expect_token(f, Token_OpenParen);
-		AstNode *type = parse_type(f);
-		Token close = expect_token(f, Token_CloseParen);
-		AstNode *expr = parse_unary_expr(f, lhs);
-		return ast_cast_expr(f, token, type, expr, open, close);
-	} break;
+	// case Token_cast:
+	// case Token_transmute:
+	// case Token_union_cast:
+	// {
+		// Token token = f->curr_token; next_token(f);
+		// Token open = expect_token(f, Token_OpenParen);
+		// AstNode *type = parse_type(f);
+		// Token close = expect_token(f, Token_CloseParen);
+		// AstNode *expr = parse_unary_expr(f, lhs);
+		// return ast_cast_expr(f, token, type, expr, open, close);
+	// } break;
 
-	case Token_Pointer: {
-		Token op = f->curr_token;
-		next_token(f);
-		AstNode *expr = parse_unary_expr(f, lhs);
-		if (is_ast_node_type(expr)) {
-			return ast_pointer_type(f, op, expr);
-		}
-		return ast_unary_expr(f, op, expr);
-	} break;
-	// case Token_Maybe:
+	// case Token_Pointer: {
+	// 	Token op = f->curr_token;
+	// 	next_token(f);
+	// 	AstNode *expr = parse_unary_expr(f, lhs);
+	// 	if (is_ast_node_type(expr)) {
+	// 		return ast_pointer_type(f, op, expr);
+	// 	}
+	// 	return ast_unary_expr(f, op, expr);
+	// } break;
+
 	case Token_Add:
 	case Token_Sub:
 	case Token_Not:
-	case Token_Xor: {
+	case Token_Xor:
+	case Token_And: {
 		Token op = f->curr_token;
 		next_token(f);
 		return ast_unary_expr(f, op, parse_unary_expr(f, lhs));
@@ -2663,10 +2669,11 @@ AstNode *parse_type_or_ident(AstFile *f) {
 			AstNode *sel = parse_ident(f);
 			e = ast_selector_expr(f, token, e, sel);
 		}
-		if (f->curr_token.kind == Token_OpenParen) {
+		// TODO(bill): Merge type_or_ident into the general parsing for expressions
+		// if (f->curr_token.kind == Token_OpenParen) {
 			// HACK NOTE(bill): For type_of_val(expr) et al.
-			e = parse_call_expr(f, e);
-		}
+			// e = parse_call_expr(f, e);
+		// }
 		return e;
 	}
 

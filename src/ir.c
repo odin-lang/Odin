@@ -3105,7 +3105,7 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 
 		args[4] = ir_type_info(proc, src_type);
 		args[5] = ir_type_info(proc, dst_type);
-		ir_emit_global_call(proc, "__union_cast_check", args, 6);
+		ir_emit_global_call(proc, "__type_assertion_check", args, 6);
 
 		return ir_emit_load(proc, ir_emit_struct_ep(proc, v, 0));
 	}
@@ -3606,36 +3606,21 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	case_end;
 #endif
 
-	case_ast_node(ce, CastExpr, expr);
+	case_ast_node(ta, TypeAssertion, expr);
 		Type *type = tv->type;
-		irValue *e = ir_build_expr(proc, ce->expr);
-		switch (ce->token.kind) {
-		case Token_cast:
-			ir_emit_comment(proc, str_lit("cast - cast"));
-			return ir_emit_conv(proc, e, type);
-
-		case Token_transmute:
-			ir_emit_comment(proc, str_lit("cast - transmute"));
-			return ir_emit_transmute(proc, e, type);
-
-	#if 0
-		case Token_down_cast:
-			ir_emit_comment(proc, str_lit("cast - down_cast"));
-			return ir_emit_down_cast(proc, e, type);
-	#endif
-
-		case Token_union_cast:
+		irValue *e = ir_build_expr(proc, ta->expr);
+		Type *t = type_deref(ir_type(e));
+		if (is_type_union(t)) {
 			ir_emit_comment(proc, str_lit("cast - union_cast"));
 			return ir_emit_union_cast(proc, e, type, ast_node_token(expr).pos);
-
-		default:
-			GB_PANIC("Unknown cast expression");
+		} else {
+			GB_PANIC("TODO(bill): type assertion %s", type_to_string(ir_type(e)));
 		}
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
-		case Token_Pointer:
+		case Token_And:
 			return ir_emit_ptr_offset(proc, ir_build_addr(proc, ue->expr).addr, v_zero); // Make a copy of the pointer
 		default:
 			return ir_emit_unary_arith(proc, ue->op.kind, ir_build_expr(proc, ue->expr), tv->type);
@@ -3733,6 +3718,11 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					Type *t = default_type(type_of_expr(proc->module->info, ce->args.e[0]));
 					return ir_type_info(proc, t);
 				} break;
+
+				case BuiltinProc_transmute: {
+					irValue *x = ir_build_expr(proc, ce->args.e[1]);
+					return ir_emit_transmute(proc, x, tv->type);
+				}
 
 				case BuiltinProc_len: {
 					irValue *v = ir_build_expr(proc, ce->args.e[0]);
@@ -4736,50 +4726,23 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		}
 	case_end;
 
-	case_ast_node(ce, CastExpr, expr);
-		switch (ce->token.kind) {
-		case Token_cast: {
-			ir_emit_comment(proc, str_lit("Cast - cast"));
-			// NOTE(bill): Needed for dereference of pointer conversion
+	case_ast_node(ta, TypeAssertion, expr);
+		irValue *e = ir_build_expr(proc, ta->expr);
+		Type *t = type_deref(ir_type(e));
+		if (is_type_union(t)) {
 			Type *type = type_of_expr(proc->module->info, expr);
 			irValue *v = ir_add_local_generated(proc, type);
-			ir_emit_store(proc, v, ir_emit_conv(proc, ir_build_expr(proc, ce->expr), type));
+			ir_emit_comment(proc, str_lit("cast - union_cast"));
+			ir_emit_store(proc, v, ir_emit_union_cast(proc, ir_build_expr(proc, ta->expr), type, ast_node_token(expr).pos));
 			return ir_addr(v);
-		}
-		case Token_transmute: {
-			ir_emit_comment(proc, str_lit("Cast - transmute"));
-			// NOTE(bill): Needed for dereference of pointer conversion
-			Type *type = type_of_expr(proc->module->info, expr);
-			irValue *v = ir_add_local_generated(proc, type);
-			ir_emit_store(proc, v, ir_emit_transmute(proc, ir_build_expr(proc, ce->expr), type));
-			return ir_addr(v);
-		}
-	#if 0
-		case Token_down_cast: {
-			ir_emit_comment(proc, str_lit("Cast - down_cast"));
-			// NOTE(bill): Needed for dereference of pointer conversion
-			Type *type = type_of_expr(proc->module->info, expr);
-			irValue *v = ir_add_local_generated(proc, type);
-			ir_emit_store(proc, v, ir_emit_down_cast(proc, ir_build_expr(proc, ce->expr), type));
-			return ir_addr(v);
-		}
-	#endif
-		case Token_union_cast: {
-			ir_emit_comment(proc, str_lit("Cast - union_cast"));
-			// NOTE(bill): Needed for dereference of pointer conversion
-			Type *type = type_of_expr(proc->module->info, expr);
-			irValue *v = ir_add_local_generated(proc, type);
-			ir_emit_store(proc, v, ir_emit_union_cast(proc, ir_build_expr(proc, ce->expr), type, ast_node_token(expr).pos));
-			return ir_addr(v);
-		}
-		default:
-			GB_PANIC("Unknown cast expression");
+		} else {
+			GB_PANIC("TODO(bill): type assertion %s", type_to_string(ir_type(e)));
 		}
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
-		case Token_Pointer: {
+		case Token_And: {
 			return ir_build_addr(proc, ue->expr);
 		}
 		default:

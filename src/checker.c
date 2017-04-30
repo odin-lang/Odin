@@ -52,7 +52,6 @@ typedef enum BuiltinProcId {
 	BuiltinProc_panic,
 
 	BuiltinProc_copy,
-	// BuiltinProc_append,
 
 	BuiltinProc_swizzle,
 
@@ -71,6 +70,8 @@ typedef enum BuiltinProcId {
 	BuiltinProc_max,
 	BuiltinProc_abs,
 	BuiltinProc_clamp,
+
+	BuiltinProc_transmute,
 
 	BuiltinProc_Count,
 } BuiltinProcId;
@@ -123,6 +124,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("max"),              2, false, Expr_Expr},
 	{STR_LIT("abs"),              1, false, Expr_Expr},
 	{STR_LIT("clamp"),            3, false, Expr_Expr},
+
+	{STR_LIT("transmute"),        2, false, Expr_Expr},
 };
 
 

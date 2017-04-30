@@ -58,7 +58,7 @@ Stat :: struct #ordered {
 	size:          i64, // Size of the file, in bytes
 	block_size:    i64, // Optimal bllocksize for I/O
 	blocks:        i64, // Number of 512-byte blocks allocated
-	
+
 	last_access:   _File_Time, // Time of last access
 	modified:      _File_Time, // Time of last modification
 	status_change: _File_Time, // Time of last status change
@@ -146,7 +146,7 @@ _unix_dlerror :: proc() -> ^u8                                                  
 
 // TODO(zangent): Change this to just `open` when Bill fixes overloading.
 open_simple :: proc(path: string, mode: int) -> (Handle, Errno) {
-	
+
 	cstr := strings.new_c_string(path);
 	handle := _unix_open(cstr, mode);
 	free(cstr);
@@ -175,15 +175,15 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
-	res := _unix_seek(fd, offset, cast(i32)whence);
+	res := _unix_seek(fd, offset, i32(whence));
 	return res, 0;
 }
 
 
 // NOTE(bill): Uses startup to initialize it
-stdin:  Handle = 0; 
-stdout: Handle = 1; 
-stderr: Handle = 2; 
+stdin:  Handle = 0;
+stdout: Handle = 1;
+stderr: Handle = 2;
 
 /* TODO(zangent): Implement these!
 last_write_time :: proc(fd: Handle) -> File_Time {}
@@ -195,7 +195,7 @@ stat :: proc(path: string) -> (Stat, int) #inline {
 	cstr := strings.new_c_string(path);
 	defer free(cstr);
 	ret_int := _unix_stat(cstr, ^s);
-	return s, cast(int)ret_int;
+	return s, int(ret_int);
 }
 
 access :: proc(path: string, mask: int) -> bool #inline {

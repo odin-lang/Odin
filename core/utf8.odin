@@ -1,7 +1,7 @@
 RUNE_ERROR :: '\ufffd';
 RUNE_SELF  :: 0x80;
 RUNE_BOM   :: 0xfeff;
-RUNE_EOF   :: ~cast(rune)0;
+RUNE_EOF   :: ~rune(0);
 MAX_RUNE   :: '\U0010ffff';
 UTF_MAX    :: 4;
 
@@ -60,15 +60,15 @@ immutable accept_sizes := [256]byte{
 
 encode_rune :: proc(r: rune) -> ([4]byte, int) {
 	buf: [4]byte;
-	i := cast(u32)r;
+	i := u32(r);
 	mask: byte : 0x3f;
 	if i <= 1<<7-1 {
-		buf[0] = cast(byte)r;
+		buf[0] = byte(r);
 		return buf, 1;
 	}
 	if i <= 1<<11-1 {
-		buf[0] = 0xc0 | cast(byte)(r>>6);
-		buf[1] = 0x80 | cast(byte)r & mask;
+		buf[0] = 0xc0 | byte(r>>6);
+		buf[1] = 0x80 | byte(r) & mask;
 		return buf, 2;
 	}
 
@@ -79,20 +79,20 @@ encode_rune :: proc(r: rune) -> ([4]byte, int) {
 	}
 
 	if i <= 1<<16-1 {
-		buf[0] = 0xe0 | cast(byte)(r>>12);
-		buf[1] = 0x80 | cast(byte)(r>>6) & mask;
-		buf[2] = 0x80 | cast(byte)r    & mask;
+		buf[0] = 0xe0 | byte(r>>12);
+		buf[1] = 0x80 | byte(r>>6) & mask;
+		buf[2] = 0x80 | byte(r)    & mask;
 		return buf, 3;
 	}
 
-	buf[0] = 0xf0 | cast(byte)(r>>18);
-	buf[1] = 0x80 | cast(byte)(r>>12) & mask;
-	buf[2] = 0x80 | cast(byte)(r>>6)  & mask;
-	buf[3] = 0x80 | cast(byte)r       & mask;
+	buf[0] = 0xf0 | byte(r>>18);
+	buf[1] = 0x80 | byte(r>>12) & mask;
+	buf[2] = 0x80 | byte(r>>6)  & mask;
+	buf[3] = 0x80 | byte(r)       & mask;
 	return buf, 4;
 }
 
-decode_rune :: proc(s: string) -> (rune, int) #inline { return decode_rune(cast([]byte)s); }
+decode_rune :: proc(s: string) -> (rune, int) #inline { return decode_rune([]byte(s)); }
 decode_rune :: proc(s: []byte) -> (rune, int) {
 	n := len(s);
 	if n < 1 {
@@ -101,12 +101,12 @@ decode_rune :: proc(s: []byte) -> (rune, int) {
 	s0 := s[0];
 	x := accept_sizes[s0];
 	if x >= 0xF0 {
-		mask := cast(rune)(x) << 31 >> 31; // NOTE(bill): Create 0x0000 or 0xffff.
-		return cast(rune)(s[0])&~mask | RUNE_ERROR&mask, 1;
+		mask := rune(x) << 31 >> 31; // NOTE(bill): Create 0x0000 or 0xffff.
+		return rune(s[0])&~mask | RUNE_ERROR&mask, 1;
 	}
 	sz := x & 7;
 	accept := accept_ranges[x>>4];
-	if n < cast(int)sz {
+	if n < int(sz) {
 		return RUNE_ERROR, 1;
 	}
 	b1 := s[1];
@@ -114,25 +114,25 @@ decode_rune :: proc(s: []byte) -> (rune, int) {
 		return RUNE_ERROR, 1;
 	}
 	if sz == 2 {
-		return cast(rune)(s0&MASK2)<<6 | cast(rune)(b1&MASKX), 2;
+		return rune(s0&MASK2)<<6 | rune(b1&MASKX), 2;
 	}
 	b2 := s[2];
 	if b2 < LOCB || HICB < b2 {
 		return RUNE_ERROR, 1;
 	}
 	if sz == 3 {
-		return cast(rune)(s0&MASK3)<<12 | cast(rune)(b1&MASKX)<<6 | cast(rune)(b2&MASKX), 3;
+		return rune(s0&MASK3)<<12 | rune(b1&MASKX)<<6 | rune(b2&MASKX), 3;
 	}
 	b3 := s[3];
 	if b3 < LOCB || HICB < b3 {
 		return RUNE_ERROR, 1;
 	}
-	return cast(rune)(s0&MASK4)<<18 | cast(rune)(b1&MASKX)<<12 | cast(rune)(b2&MASKX)<<6 | cast(rune)(b3&MASKX), 4;
+	return rune(s0&MASK4)<<18 | rune(b1&MASKX)<<12 | rune(b2&MASKX)<<6 | rune(b3&MASKX), 4;
 }
 
 
 
-decode_last_rune :: proc(s: string) -> (rune, int) #inline { return decode_last_rune(cast([]byte)s); }
+decode_last_rune :: proc(s: string) -> (rune, int) #inline { return decode_last_rune([]byte(s)); }
 decode_last_rune :: proc(s: []byte) -> (rune, int) {
 	r: rune;
 	size: int;
@@ -143,7 +143,7 @@ decode_last_rune :: proc(s: []byte) -> (rune, int) {
 		return RUNE_ERROR, 0;
 	}
 	start = end-1;
-	r = cast(rune)s[start];
+	r = rune(s[start]);
 	if r < RUNE_SELF {
 		return r, 1;
 	}
@@ -194,7 +194,7 @@ valid_string :: proc(s: string) -> bool {
 		if x == 0xf1 {
 			return false;
 		}
-		size := cast(int)(x & 7);
+		size := int(x & 7);
 		if i+size > n {
 			return false;
 		}
@@ -217,7 +217,7 @@ valid_string :: proc(s: string) -> bool {
 
 rune_start :: proc(b: byte) -> bool #inline { return b&0xc0 != 0x80; }
 
-rune_count :: proc(s: string) -> int #inline { return rune_count(cast([]byte)s); }
+rune_count :: proc(s: string) -> int #inline { return rune_count([]byte(s)); }
 rune_count :: proc(s: []byte) -> int {
 	count := 0;
 	n := len(s);
@@ -234,7 +234,7 @@ rune_count :: proc(s: []byte) -> int {
 			i++;
 			continue;
 		}
-		size := cast(int)(x & 7);
+		size := int(x & 7);
 		if i+size > n {
 			i++;
 			continue;

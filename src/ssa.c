@@ -1111,40 +1111,6 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 		}
 	case_end;
 
-
-	case_ast_node(ce, CastExpr, expr);
-		switch (ce->token.kind) {
-		case Token_cast: {
-			ssa_emit_comment(p, str_lit("Cast - cast"));
-			// NOTE(bill): Needed for dereference of pointer conversion
-			Type *type = type_of_expr(p->module->info, expr);
-			ssaAddr addr = ssa_add_local_generated(p, type);
-			ssa_addr_store(p, addr, ssa_emit_conv(p, ssa_build_expr(p, ce->expr), type));
-			return addr;
-		}
-		#if 0
-		case Token_transmute: {
-			ssa_emit_comment(p, str_lit("Cast - transmute"));
-			// NOTE(bill): Needed for dereference of pointer conversion
-			Type *type = type_of_expr(p->module->info, expr);
-			ssaValue *v = ssa_add_local_generated(p, type);
-			ssa_emit_store(p, v, ssa_emit_transmute(p, ssa_build_expr(p, ce->expr), type));
-			return ssa_addr(v);
-		}
-		case Token_union_cast: {
-			ssa_emit_comment(p, str_lit("Cast - union_cast"));
-			// NOTE(bill): Needed for dereference of pointer conversion
-			Type *type = type_of_expr(p->module->info, expr);
-			ssaValue *v = ssa_add_local_generated(p, type);
-			ssa_emit_store(p, v, ssa_emit_union_cast(p, ssa_build_expr(p, ce->expr), type, ast_node_token(expr).pos));
-			return ssa_addr(v);
-		}
-		#endif
-		default:
-			GB_PANIC("Unknown cast expression");
-		}
-	case_end;
-
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
 		case Token_Pointer: {
@@ -1840,33 +1806,6 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 		return ssa_new_value2(p, ssaOp_Phi, tv->type, yes, no);
 	case_end;
 
-
-	case_ast_node(ce, CastExpr, expr);
-		Type *type = tv->type;
-		ssaValue *e = ssa_build_expr(p, ce->expr);
-		switch (ce->token.kind) {
-		case Token_cast:
-			ssa_emit_comment(p, str_lit("cast - cast"));
-			return ssa_emit_conv(p, e, type);
-
-		// case Token_transmute:
-			// ssa_emit_comment(p, str_lit("cast - transmute"));
-			// return ssa_emit_transmute(p, e, type);
-
-	#if 0
-		case Token_down_cast:
-			ssa_emit_comment(p, str_lit("cast - down_cast"));
-			return ssa_emit_down_cast(p, e, type);
-	#endif
-
-		// case Token_union_cast:
-			// ssa_emit_comment(p, str_lit("cast - union_cast"));
-			// return ssa_emit_union_cast(p, e, type, ast_node_token(expr).pos);
-
-		default:
-			GB_PANIC("Unhandled cast expression %.*s", LIT(token_strings[ce->token.kind]));
-		}
-	case_end;
 
 	case_ast_node(pl, ProcLit, expr);
 		GB_PANIC("TODO(bill): ssa_build_expr ProcLit");

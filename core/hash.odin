@@ -1,14 +1,14 @@
 crc32 :: proc(data: []byte) -> u32 {
-	result := ~cast(u32)0;
+	result := ~u32(0);
 	for b in data {
-		result = result>>8 ~ _crc32_table[(result ~ cast(u32)b) & 0xff];
+		result = result>>8 ~ _crc32_table[(result ~ u32(b)) & 0xff];
 	}
 	return ~result;
 }
 crc64 :: proc(data: []byte) -> u64 {
-	result := ~cast(u64)0;
+	result := ~u64(0);
 	for b in data {
-		result = result>>8 ~ _crc64_table[(result ~ cast(u64)b) & 0xff];
+		result = result>>8 ~ _crc64_table[(result ~ u64(b)) & 0xff];
 	}
 	return ~result;
 }
@@ -16,7 +16,7 @@ crc64 :: proc(data: []byte) -> u64 {
 fnv32 :: proc(data: []byte) -> u32 {
 	h: u32 = 0x811c9dc5;
 	for b in data {
-		h = (h * 0x01000193) ~ cast(u32)b;
+		h = (h * 0x01000193) ~ u32(b);
 	}
 	return h;
 }
@@ -24,7 +24,7 @@ fnv32 :: proc(data: []byte) -> u32 {
 fnv64 :: proc(data: []byte) -> u64 {
 	h: u64 = 0xcbf29ce484222325;
 	for b in data {
-		h = (h * 0x100000001b3) ~ cast(u64)b;
+		h = (h * 0x100000001b3) ~ u64(b);
 	}
 	return h;
 }
@@ -32,7 +32,7 @@ fnv64 :: proc(data: []byte) -> u64 {
 fnv32a :: proc(data: []byte) -> u32 {
 	h: u32 = 0x811c9dc5;
 	for b in data {
-		h = (h ~ cast(u32)b) * 0x01000193;
+		h = (h ~ u32(b)) * 0x01000193;
 	}
 	return h;
 }
@@ -40,7 +40,7 @@ fnv32a :: proc(data: []byte) -> u32 {
 fnv64a :: proc(data: []byte) -> u64 {
 	h: u64 = 0xcbf29ce484222325;
 	for b in data {
-		h = (h ~ cast(u64)b) * 0x100000001b3;
+		h = (h ~ u64(b)) * 0x100000001b3;
 	}
 	return h;
 }
@@ -51,11 +51,11 @@ murmur32 :: proc(data: []byte) -> u32 {
 
 	h1: u32 = 0;
 	nblocks := len(data)/4;
-	p := ^data[0];
+	p := &data[0];
 	p1 := p + 4*nblocks;
 
 	for ; p < p1; p += 4 {
-		k1 := (cast(^u32)p)^;
+		k1 := ^u32(p)^;
 
 		k1 *= c1_32;
 		k1 = (k1 << 15) | (k1 >> 17);
@@ -71,20 +71,20 @@ murmur32 :: proc(data: []byte) -> u32 {
 	k1: u32;
 	match len(tail)&3 {
 	case 3:
-		k1 ~= cast(u32)tail[2] << 16;
+		k1 ~= u32(tail[2]) << 16;
 		fallthrough;
 	case 2:
-		k1 ~= cast(u32)tail[2] << 8;
+		k1 ~= u32(tail[2]) << 8;
 		fallthrough;
 	case 1:
-		k1 ~= cast(u32)tail[0];
+		k1 ~= u32(tail[0]);
 		k1 *= c1_32;
 		k1 = (k1 << 15) | (k1 >> 17) ;
 		k1 *= c2_32;
 		h1 ~= k1;
 	}
 
-	h1 ~= cast(u32)len(data);
+	h1 ~= u32(len(data));
 
 	h1 ~= h1 >> 16;
 	h1 *= 0x85ebca6b;
@@ -98,12 +98,12 @@ murmur32 :: proc(data: []byte) -> u32 {
 murmur64 :: proc(data: []byte) -> u64 {
 	SEED :: 0x9747b28c;
 
-	when false && size_of(int) == 8 {
+	when size_of(int) == 8 {
 		m :: 0xc6a4a7935bd1e995;
 		r :: 47;
 
-		h: u64 = SEED ~ (cast(u64)data.count * m);
-		data64 := slice_ptr(cast(^u64)^data[0], data.count/size_of(u64));
+		h: u64 = SEED ~ (u64(len(data)) * m);
+		data64 := slice_ptr(^u64(&data[0]), len(data)/size_of(u64));
 
 		for _, i in data64 {
 			k := data64[i];
@@ -116,15 +116,15 @@ murmur64 :: proc(data: []byte) -> u64 {
 			h *= m;
 		}
 
-		match data.count&7 {
-		case 7: h ~= cast(u64)data[6] << 48; fallthrough;
-		case 6: h ~= cast(u64)data[5] << 40; fallthrough;
-		case 5: h ~= cast(u64)data[4] << 32; fallthrough;
-		case 4: h ~= cast(u64)data[3] << 24; fallthrough;
-		case 3: h ~= cast(u64)data[2] << 16; fallthrough;
-		case 2: h ~= cast(u64)data[1] << 8;  fallthrough;
+		match len(data)&7 {
+		case 7: h ~= u64(data[6]) << 48; fallthrough;
+		case 6: h ~= u64(data[5]) << 40; fallthrough;
+		case 5: h ~= u64(data[4]) << 32; fallthrough;
+		case 4: h ~= u64(data[3]) << 24; fallthrough;
+		case 3: h ~= u64(data[2]) << 16; fallthrough;
+		case 2: h ~= u64(data[1]) << 8;  fallthrough;
 		case 1:
-			h ~= cast(u64)data[0];
+			h ~= u64(data[0]);
 			h *= m;
 		}
 
@@ -137,10 +137,10 @@ murmur64 :: proc(data: []byte) -> u64 {
 		m :: 0x5bd1e995;
 		r :: 24;
 
-		h1: u32 = cast(u32)SEED ~ cast(u32)len(data);
-		h2: u32 = SEED >> 32;
+		h1 := u32(SEED) ~ u32(len(data));
+		h2 := u32(SEED) >> 32;
 
-		data32 := slice_ptr(cast(^u32)^data[0], len(data)/size_of(u32));
+		data32 := slice_ptr(cast(^u32)&data[0], len(data)/size_of(u32));
 		len := len(data);
 
 		i := 0;
@@ -175,16 +175,16 @@ murmur64 :: proc(data: []byte) -> u64 {
 		}
 
 		// TODO(bill): Fix this
-		#no_bounds_check data8 := slice_to_bytes(data32[i..])[..<3];
+		#no_bounds_check data8 := slice_to_bytes(data32[i..])[0..<3];
 		match len {
 		case 3:
-			h2 ~= cast(u32)data8[2] << 16;
+			h2 ~= u32(data8[2]) << 16;
 			fallthrough;
 		case 2:
-			h2 ~= cast(u32)data8[1] << 8;
+			h2 ~= u32(data8[1]) << 8;
 			fallthrough;
 		case 1:
-			h2 ~= cast(u32)data8[0];
+			h2 ~= u32(data8[0]);
 			h2 *= m;
 		}
 

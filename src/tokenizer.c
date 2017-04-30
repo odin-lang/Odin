@@ -76,6 +76,7 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 	TOKEN_KIND(Token_Comma,         ","),   \
 	TOKEN_KIND(Token_Ellipsis,      ".."),  \
 	TOKEN_KIND(Token_HalfClosed,    "..<"), \
+	TOKEN_KIND(Token_BackSlash,     "\\"),  \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
@@ -106,9 +107,9 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_using,          "using"),               \
 	TOKEN_KIND(Token_no_alias,       "no_alias"),            \
 	TOKEN_KIND(Token_immutable,      "immutable"),           \
-	TOKEN_KIND(Token_cast,           "cast"),                \
-	TOKEN_KIND(Token_transmute,      "transmute"),           \
-	TOKEN_KIND(Token_union_cast,     "union_cast"),          \
+	/* TOKEN_KIND(Token_cast,           "cast"), */                \
+	/* TOKEN_KIND(Token_transmute,      "transmute"), */           \
+	/* TOKEN_KIND(Token_union_cast,     "union_cast"), */          \
 	TOKEN_KIND(Token_context,        "context"),             \
 	TOKEN_KIND(Token_push_context,   "push_context"),        \
 	TOKEN_KIND(Token_push_allocator, "push_allocator"),      \
@@ -878,20 +879,21 @@ Token tokenizer_get_token(Tokenizer *t) {
 			}
 			break;
 
-		case '#': token.kind = Token_Hash;         break;
-		case '@': token.kind = Token_At;           break;
-		case '$': token.kind = Token_Dollar;       break;
-		case '?': token.kind = Token_Question;     break;
-		case '^': token.kind = Token_Pointer;      break;
-		case ';': token.kind = Token_Semicolon;    break;
-		case ',': token.kind = Token_Comma;        break;
-		case ':': token.kind = Token_Colon;        break;
-		case '(': token.kind = Token_OpenParen;    break;
-		case ')': token.kind = Token_CloseParen;   break;
-		case '[': token.kind = Token_OpenBracket;  break;
-		case ']': token.kind = Token_CloseBracket; break;
-		case '{': token.kind = Token_OpenBrace;    break;
-		case '}': token.kind = Token_CloseBrace;   break;
+		case '#':  token.kind = Token_Hash;         break;
+		case '@':  token.kind = Token_At;           break;
+		case '$':  token.kind = Token_Dollar;       break;
+		case '?':  token.kind = Token_Question;     break;
+		case '^':  token.kind = Token_Pointer;      break;
+		case ';':  token.kind = Token_Semicolon;    break;
+		case ',':  token.kind = Token_Comma;        break;
+		case ':':  token.kind = Token_Colon;        break;
+		case '(':  token.kind = Token_OpenParen;    break;
+		case ')':  token.kind = Token_CloseParen;   break;
+		case '[':  token.kind = Token_OpenBracket;  break;
+		case ']':  token.kind = Token_CloseBracket; break;
+		case '{':  token.kind = Token_OpenBrace;    break;
+		case '}':  token.kind = Token_CloseBrace;   break;
+		case '\\': token.kind = Token_BackSlash;    break;
 
 		case '*': token.kind = token_kind_variant2(t, Token_Mul, Token_MulEq);                                        break;
 		case '%': token.kind = token_kind_variant2(t, Token_Mod, Token_ModEq);                                        break;

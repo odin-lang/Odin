@@ -1,6 +1,6 @@
 Any :: struct #ordered {
-	type_info: ^Type_Info,
 	data:      rawptr,
+	type_info: ^Type_Info,
 }
 
 String :: struct #ordered {

@@ -41,17 +41,17 @@ encode :: proc(d: []u16, s: []rune) {
 	for r in s {
 		match r {
 		case 0..<_surr1, _surr3..<_surr_self:
-			d[n] = cast(u16)r;
+			d[n] = u16(r);
 			n++;
 
 		case _surr_self..MAX_RUNE:
 			r1, r2 := encode_surrogate_pair(r);
-			d[n]    = cast(u16)r1;
-			d[n+1]  = cast(u16)r2;
+			d[n]    = u16(r1);
+			d[n+1]  = u16(r2);
 			n += 2;
 
 		default:
-			d[n] = cast(u16)REPLACEMENT_CHAR;
+			d[n] = u16(REPLACEMENT_CHAR);
 			n++;
 		}
 	}

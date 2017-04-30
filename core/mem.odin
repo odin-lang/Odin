@@ -19,7 +19,7 @@ copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr {
 	return __mem_copy_non_overlapping(dst, src, len);
 }
 compare :: proc(a, b: []byte) -> int {
-	return __mem_compare(^a[0], ^b[0], min(len(a), len(b)));
+	return __mem_compare(&a[0], &b[0], min(len(a), len(b)));
 }
 
 
@@ -39,13 +39,13 @@ is_power_of_two :: proc(x: int) -> bool {
 align_forward :: proc(ptr: rawptr, align: int) -> rawptr {
 	assert(is_power_of_two(align));
 
-	a := cast(uint)align;
-	p := cast(uint)ptr;
+	a := uint(align);
+	p := uint(ptr);
 	modulo := p & (a-1);
 	if modulo != 0 {
 		p += a - modulo;
 	}
-	return cast(rawptr)p;
+	return rawptr(p);
 }
 
 
@@ -56,9 +56,9 @@ Allocation_Header :: struct {
 
 allocation_header_fill :: proc(header: ^Allocation_Header, data: rawptr, size: int) {
 	header.size = size;
-	ptr := cast(^int)(header+1);
+	ptr := ^int(header+1);
 
-	for i := 0; cast(rawptr)ptr < data; i++ {
+	for i := 0; rawptr(ptr) < data; i++ {
 		(ptr+i)^ = -1;
 	}
 }
@@ -66,11 +66,11 @@ allocation_header :: proc(data: rawptr) -> ^Allocation_Header {
 	if data == nil {
 		return nil;
 	}
-	p := cast(^int)data;
+	p := ^int(data);
 	for (p-1)^ == -1 {
 		p = (p-1);
 	}
-	return cast(^Allocation_Header)p-1;
+	return ^Allocation_Header(p-1);
 }
 
 
@@ -127,7 +127,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                           size, alignment: int,
                           old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
 	using Allocator_Mode;
-	arena := cast(^Arena)allocator_data;
+	arena := ^Arena(allocator_data);
 
 	match mode {
 	case ALLOC:
@@ -138,7 +138,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			return nil;
 		}
 
-		#no_bounds_check end := ^arena.memory[arena.offset];
+		#no_bounds_check end := &arena.memory[arena.offset];
 
 		ptr := align_forward(end, alignment);
 		arena.offset += total_size;
@@ -221,7 +221,7 @@ align_of_type_info :: proc(type_info: ^Type_Info) -> int {
 		return WORD_SIZE;
 	case Vector:
 		size := size_of_type_info(info.elem);
-		count := cast(int)max(prev_pow2(cast(i64)info.count), 1);
+		count := int(max(prev_pow2(i64(info.count)), 1));
 		total := size * count;
 		return clamp(total, 1, MAX_ALIGN);
 	case Tuple:

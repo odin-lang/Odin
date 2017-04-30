@@ -1,8 +1,8 @@
 new_c_string :: proc(s: string) -> ^byte {
 	c := make([]byte, len(s)+1);
-	copy(c, cast([]byte)s);
+	copy(c, []byte(s));
 	c[len(s)] = 0;
-	return ^c[0];
+	return &c[0];
 }
 
 to_odin_string :: proc(c: ^byte) -> string {
@@ -10,5 +10,5 @@ to_odin_string :: proc(c: ^byte) -> string {
 	for (c+len)^ != 0 {
 		len++;
 	}
-	return cast(string)slice_ptr(c, len);
+	return string(slice_ptr(c, len));
 }

@@ -26,7 +26,7 @@ decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
 
 	if a.count == 0 {
 		buf[0] = '0';
-		return cast(string)buf[0..<1];
+		return string(buf[0..<1]);
 	}
 
 	w := 0;
@@ -44,7 +44,7 @@ decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
 		w += digit_zero(buf[w ..< w+a.decimal_point-a.count]);
 	}
 
-	return cast(string)buf[0..<w];
+	return string(buf[0..<w]);
 }
 
 // trim trailing zeros
@@ -64,7 +64,7 @@ assign :: proc(a: ^Decimal, i: u64) {
 	for i > 0 {
 		j := i/10;
 		i -= 10*j;
-		buf[n] = cast(byte)('0'+i);
+		buf[n] = byte('0'+i);
 		n++;
 		i = j;
 	}
@@ -99,7 +99,7 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 			}
 			break;
 		}
-		c := cast(uint)a.digits[r];
+		c := uint(a.digits[r]);
 		n = n*10 + c - '0';
 	}
 	a.decimal_point -= r-1;
@@ -107,10 +107,10 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 	mask: uint = (1<<k) - 1;
 
 	for ; r < a.count; r++ {
-		c := cast(uint)a.digits[r];
+		c := uint(a.digits[r]);
 		dig := n>>k;
 		n &= mask;
-		a.digits[w] = cast(byte)('0' + dig);
+		a.digits[w] = byte('0' + dig);
 		w++;
 		n = n*10 + c - '0';
 	}
@@ -119,7 +119,7 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 		dig := n>>k;
 		n &= mask;
 		if w < len(a.digits) {
-			a.digits[w] = cast(byte)('0' + dig);
+			a.digits[w] = byte('0' + dig);
 			w++;
 		} else if dig > 0 {
 			a.trunc = true;
@@ -133,19 +133,19 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 }
 
 shift_left :: proc(a: ^Decimal, k: uint) {
-	delta := cast(int)(k/4);
+	delta := int(k/4);
 
 	r := a.count;       // read index
 	w := a.count+delta; // write index
 
 	n: uint;
 	for r--; r >= 0; r-- {
-		n += (cast(uint)a.digits[r] - '0') << k;
+		n += (uint(a.digits[r]) - '0') << k;
 		quo := n/10;
 		rem := n - 10*quo;
 		w--;
 		if w < len(a.digits) {
-			a.digits[w] = cast(byte)('0' + rem);
+			a.digits[w] = byte('0' + rem);
 		} else if rem != 0 {
 			a.trunc = true;
 		}
@@ -157,7 +157,7 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 		rem := n - 10*quo;
 		w--;
 		if 0 <= w && w < len(a.digits) {
-			a.digits[w] = cast(byte)('0' + rem);
+			a.digits[w] = byte('0' + rem);
 		} else if rem != 0 {
 			a.trunc = true;
 		}
@@ -179,7 +179,7 @@ shift :: proc(a: ^Decimal, k: int) {
 			shift_left(a, max_shift);
 			k -= max_shift;
 		}
-		shift_left(a, cast(uint)k);
+		shift_left(a, uint(k));
 
 
 	case k < 0:
@@ -187,7 +187,7 @@ shift :: proc(a: ^Decimal, k: int) {
 			shift_right(a, max_shift);
 			k += max_shift;
 		}
-		shift_right(a, cast(uint)-k);
+		shift_right(a, uint(-k));
 	}
 }
 
@@ -245,7 +245,7 @@ rounded_integer :: proc(a: ^Decimal) -> u64 {
 	n: u64 = 0;
 	m := min(a.decimal_point, a.count);
 	for i = 0; i < m; i++ {
-		n = n*10 + cast(u64)(a.digits[i]-'0');
+		n = n*10 + u64(a.digits[i]-'0');
 	}
 	for ; i < a.decimal_point; i++ {
 		n *= 10;

@@ -73,11 +73,11 @@ open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 		access |=  win32.FILE_APPEND_DATA;
 	}
 
-	share_mode := cast(u32)(win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE);
+	share_mode := u32(win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE);
 	sa: ^win32.Security_Attributes = nil;
 	sa_inherit := win32.Security_Attributes{length = size_of(win32.Security_Attributes), inherit_handle = 1};
 	if mode&O_CLOEXEC == 0 {
-		sa = ^sa_inherit;
+		sa = &sa_inherit;
 	}
 
 	create_mode: u32;
@@ -95,34 +95,34 @@ open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 	}
 
 	buf: [300]byte;
-	copy(buf[..], cast([]byte)path);
+	copy(buf[..], []byte(path));
 
-	handle := cast(Handle)win32.CreateFileA(^buf[0], access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil);
+	handle := Handle(win32.CreateFileA(&buf[0], access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
 	if handle != INVALID_HANDLE {
 		return handle, ERROR_NONE;
 	}
 	err := win32.GetLastError();
-	return INVALID_HANDLE, cast(Errno)err;
+	return INVALID_HANDLE, Errno(err);
 }
 
 close :: proc(fd: Handle) {
-	win32.CloseHandle(cast(win32.Handle)fd);
+	win32.CloseHandle(win32.Handle(fd));
 }
 
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
-	return write(fd, cast([]byte)str);
+	return write(fd, []byte(str));
 }
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE;
 	}
 	bytes_written: i32;
-	e := win32.WriteFile(cast(win32.Handle)fd, ^data[0], cast(i32)len(data), ^bytes_written, nil);
+	e := win32.WriteFile(win32.Handle(fd), &data[0], i32(len(data)), &bytes_written, nil);
 	if e == win32.FALSE {
 		err := win32.GetLastError();
-		return 0, cast(Errno)err;
+		return 0, Errno(err);
 	}
-	return cast(int)bytes_written, ERROR_NONE;
+	return int(bytes_written), ERROR_NONE;
 }
 
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
@@ -130,12 +130,12 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 		return 0, ERROR_NONE;
 	}
 	bytes_read: i32;
-	e := win32.ReadFile(cast(win32.Handle)fd, ^data[0], cast(u32)len(data), ^bytes_read, nil);
+	e := win32.ReadFile(win32.Handle(fd), &data[0], u32(len(data)), &bytes_read, nil);
 	if e == win32.FALSE {
 		err := win32.GetLastError();
-		return 0, cast(Errno)err;
+		return 0, Errno(err);
 	}
-	return cast(int)bytes_read, ERROR_NONE;
+	return int(bytes_read), ERROR_NONE;
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
@@ -145,18 +145,18 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	case 1: w = win32.FILE_CURRENT;
 	case 2: w = win32.FILE_END;
 	}
-	hi := cast(i32)(offset>>32);
-	lo := cast(i32)(offset);
-	ft := win32.GetFileType(cast(win32.Handle)fd);
+	hi := i32(offset>>32);
+	lo := i32(offset);
+	ft := win32.GetFileType(win32.Handle(fd));
 	if ft == win32.FILE_TYPE_PIPE {
 		return 0, ERROR_FILE_IS_PIPE;
 	}
-	dw_ptr := win32.SetFilePointer(cast(win32.Handle)fd, lo, ^hi, w);
+	dw_ptr := win32.SetFilePointer(win32.Handle(fd), lo, &hi, w);
 	if dw_ptr == win32.INVALID_SET_FILE_POINTER {
 		err := win32.GetLastError();
-		return 0, cast(Errno)err;
+		return 0, Errno(err);
 	}
-	return cast(i64)hi<<32 + cast(i64)dw_ptr, ERROR_NONE;
+	return i64(hi)<<32 + i64(dw_ptr), ERROR_NONE;
 }
 
 
@@ -167,9 +167,9 @@ stderr := get_std_handle(win32.STD_ERROR_HANDLE);
 
 
 get_std_handle :: proc(h: int) -> Handle {
-	fd := win32.GetStdHandle(cast(i32)h);
+	fd := win32.GetStdHandle(i32(h));
 	win32.SetHandleInformation(fd, win32.HANDLE_FLAG_INHERIT, 0);
-	return cast(Handle)fd;
+	return Handle(fd);
 }
 
 
@@ -179,9 +179,9 @@ get_std_handle :: proc(h: int) -> Handle {
 
 last_write_time :: proc(fd: Handle) -> File_Time {
 	file_info: win32.By_Handle_File_Information;
-	win32.GetFileInformationByHandle(cast(win32.Handle)fd, ^file_info);
-	lo := cast(File_Time)file_info.last_write_time.lo;
-	hi := cast(File_Time)file_info.last_write_time.hi;
+	win32.GetFileInformationByHandle(win32.Handle(fd), &file_info);
+	lo := File_Time(file_info.last_write_time.lo);
+	hi := File_Time(file_info.last_write_time.hi);
 	return lo | hi << 32;
 }
 
@@ -192,21 +192,21 @@ last_write_time_by_name :: proc(name: string) -> File_Time {
 
 	assert(len(buf) > len(name));
 
-	copy(buf[..], cast([]byte)name);
+	copy(buf[..], []byte(name));
 
-	if win32.GetFileAttributesExA(^buf[0], win32.GetFileExInfoStandard, ^data) != 0 {
+	if win32.GetFileAttributesExA(&buf[0], win32.GetFileExInfoStandard, &data) != 0 {
 		last_write_time = data.last_write_time;
 	}
 
-	l := cast(File_Time)last_write_time.lo;
-	h := cast(File_Time)last_write_time.hi;
+	l := File_Time(last_write_time.lo);
+	h := File_Time(last_write_time.hi);
 	return l | h << 32;
 }
 
 
 read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	buf: [300]byte;
-	copy(buf[..], cast([]byte)name);
+	copy(buf[..], []byte(name));
 
 	fd, err := open(name, O_RDONLY, 0);
 	if err != ERROR_NONE {
@@ -215,7 +215,7 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	defer close(fd);
 
 	length: i64;
-	if ok := win32.GetFileSizeEx(cast(win32.Handle)fd, ^length) != 0; !ok {
+	if ok := win32.GetFileSizeEx(win32.Handle(fd), &length) != 0; !ok {
 		return nil, false;
 	}
 
@@ -236,18 +236,18 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 		to_read: u32;
 		MAX :: 1<<32-1;
 		if remaining <= MAX {
-			to_read = cast(u32)remaining;
+			to_read = u32(remaining);
 		} else {
 			to_read = MAX;
 		}
 
-		win32.ReadFile(cast(win32.Handle)fd, ^data[total_read], to_read, ^single_read_length, nil);
+		win32.ReadFile(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
 		if single_read_length <= 0 {
 			free(data);
 			return nil, false;
 		}
 
-		total_read += cast(i64)single_read_length;
+		total_read += i64(single_read_length);
 	}
 
 	return data, true;
@@ -277,13 +277,13 @@ heap_free :: proc(ptr: rawptr) {
 
 
 exit :: proc(code: int) {
-	win32.ExitProcess(cast(u32)code);
+	win32.ExitProcess(u32(code));
 }
 
 
 
 current_thread_id :: proc() -> int {
-	return cast(int)win32.GetCurrentThreadId();
+	return int(win32.GetCurrentThreadId());
 }
 
 
@@ -306,24 +306,24 @@ _alloc_command_line_arguments :: proc() -> []string {
 				if i+1 > len {
 					return "";
 				}
-				buf[i] = cast(byte)str[j]; i++;
+				buf[i] = byte(str[j]); i++;
 				j++;
 			case str[j] < 0x800:
 				if i+2 > len {
 					return "";
 				}
-				buf[i] = cast(byte)(0xc0 + (str[j]>>6));   i++;
-				buf[i] = cast(byte)(0x80 + (str[j]&0x3f)); i++;
+				buf[i] = byte(0xc0 + (str[j]>>6));   i++;
+				buf[i] = byte(0x80 + (str[j]&0x3f)); i++;
 				j++;
 			case 0xd800 <= str[j] && str[j] < 0xdc00:
 				if i+4 > len {
 					return "";
 				}
-				c := cast(rune)((str[j] - 0xd800) << 10) + cast(rune)((str[j+1]) - 0xdc00) + 0x10000;
-				buf[i] = cast(byte)(0xf0 +  (c >> 18));         i++;
-				buf[i] = cast(byte)(0x80 + ((c >> 12) & 0x3f)); i++;
-				buf[i] = cast(byte)(0x80 + ((c >>  6) & 0x3f)); i++;
-				buf[i] = cast(byte)(0x80 + ((c      ) & 0x3f)); i++;
+				c := rune((str[j] - 0xd800) << 10) + rune((str[j+1]) - 0xdc00) + 0x10000;
+				buf[i] = byte(0xf0 +  (c >> 18));         i++;
+				buf[i] = byte(0x80 + ((c >> 12) & 0x3f)); i++;
+				buf[i] = byte(0x80 + ((c >>  6) & 0x3f)); i++;
+				buf[i] = byte(0x80 + ((c      ) & 0x3f)); i++;
 				j += 2;
 			case 0xdc00 <= str[j] && str[j] < 0xe000:
 				return "";
@@ -331,18 +331,18 @@ _alloc_command_line_arguments :: proc() -> []string {
 				if i+3 > len {
 					return "";
 				}
-				buf[i] = 0xe0 + cast(byte) (str[j] >> 12);         i++;
-				buf[i] = 0x80 + cast(byte)((str[j] >>  6) & 0x3f); i++;
-				buf[i] = 0x80 + cast(byte)((str[j]      ) & 0x3f); i++;
+				buf[i] = 0xe0 + byte (str[j] >> 12);         i++;
+				buf[i] = 0x80 + byte((str[j] >>  6) & 0x3f); i++;
+				buf[i] = 0x80 + byte((str[j]      ) & 0x3f); i++;
 				j++;
 			}
 		}
 
-		return cast(string)buf[0..<i];
+		return string(buf[0..<i]);
 	}
 
 	arg_count: i32;
-	arg_list_ptr := win32.CommandLineToArgvW(win32.GetCommandLineW(), ^arg_count);
+	arg_list_ptr := win32.CommandLineToArgvW(win32.GetCommandLineW(), &arg_count);
 	arg_list := make([]string, arg_count);
 	for _, i in arg_list {
 		arg_list[i] = alloc_ucs2_to_utf8((arg_list_ptr+i)^);
