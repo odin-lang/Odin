@@ -120,32 +120,32 @@ mag :: proc(v: Vec2) -> f32 { return sqrt(dot(v, v)); }
 mag :: proc(v: Vec3) -> f32 { return sqrt(dot(v, v)); }
 mag :: proc(v: Vec4) -> f32 { return sqrt(dot(v, v)); }
 
-norm :: proc(v: Vec2) -> Vec2 { return v / Vec2{mag(v)}; }
-norm :: proc(v: Vec3) -> Vec3 { return v / Vec3{mag(v)}; }
-norm :: proc(v: Vec4) -> Vec4 { return v / Vec4{mag(v)}; }
+norm :: proc(v: Vec2) -> Vec2 { return v / mag(v); }
+norm :: proc(v: Vec3) -> Vec3 { return v / mag(v); }
+norm :: proc(v: Vec4) -> Vec4 { return v / mag(v); }
 
 norm0 :: proc(v: Vec2) -> Vec2 {
 	m := mag(v);
 	if m == 0 {
-		return Vec2{0};
+		return 0;
 	}
-	return v / Vec2{m};
+	return v / m;
 }
 
 norm0 :: proc(v: Vec3) -> Vec3 {
 	m := mag(v);
 	if m == 0 {
-		return Vec3{0};
+		return 0;
 	}
-	return v / Vec3{m};
+	return v / m;
 }
 
 norm0 :: proc(v: Vec4) -> Vec4 {
 	m := mag(v);
 	if m == 0 {
-		return Vec4{0};
+		return 0;
 	}
-	return v / Vec4{m};
+	return v / m;
 }
 
 

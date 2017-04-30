@@ -1437,16 +1437,16 @@ void type_path_free(TypePath *tp) {
 TypePath *type_path_push(TypePath *tp, Type *t) {
 	GB_ASSERT(tp != NULL);
 
-	for (isize i = 0; i < tp->path.count; i++) {
+	for (isize i = 1; i < tp->path.count; i++) {
 		if (tp->path.e[i] == t) {
 			// TODO(bill):
-			GB_ASSERT(is_type_named(t));
+			GB_ASSERT_MSG(is_type_named(t), "%s", type_to_string(t));
 			Entity *e = t->Named.type_name;
 			error(e->token, "Illegal declaration cycle of `%.*s`", LIT(t->Named.name));
 			// NOTE(bill): Print cycle, if it's deep enough
-			for (isize j = 0; j < tp->path.count; j++) {
+			for (isize j = i; j < tp->path.count; j++) {
 				Type *t = tp->path.e[j];
-				GB_ASSERT(is_type_named(t));
+				GB_ASSERT_MSG(is_type_named(t), "%s", type_to_string(t));
 				Entity *e = t->Named.type_name;
 				error(e->token, "\t%.*s refers to", LIT(t->Named.name));
 			}
@@ -1461,14 +1461,14 @@ TypePath *type_path_push(TypePath *tp, Type *t) {
 		}
 	}
 
-	if (!tp->failure) {
+	if (!tp->failure && is_type_named(t)) {
 		array_add(&tp->path, t);
 	}
 	return tp;
 }
 
 void type_path_pop(TypePath *tp) {
-	if (tp != NULL) {
+	if (tp != NULL && tp->path.count > 0) {
 		array_pop(&tp->path);
 	}
 }

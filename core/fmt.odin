@@ -151,15 +151,15 @@ aprintf :: proc(fmt: string, args: ..any) -> string {
 
 // aprint* procedure return a string that was allocated with the current context
 // They must be freed accordingly
-bprint :: proc(buf: []byte, args: ..any) -> int {
+bprint :: proc(buf: []byte, args: ..any) -> string {
 	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprint(&sb, ..args);
 }
-bprintln :: proc(buf: []byte, args: ..any) -> int {
+bprintln :: proc(buf: []byte, args: ..any) -> string {
 	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprintln(&sb, ..args);
 }
-bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> int {
+bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
 	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprintf(&sb, fmt, ..args);
 }
@@ -1047,7 +1047,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 
 
 
-sbprint :: proc(buf: ^String_Buffer, args: ..any) -> int {
+sbprint :: proc(buf: ^String_Buffer, args: ..any) -> string {
 	fi: Fmt_Info;
 	fi.buf = buf;
 
@@ -1060,10 +1060,10 @@ sbprint :: proc(buf: ^String_Buffer, args: ..any) -> int {
 		fmt_value(&fi, args[i], 'v');
 		prev_string = is_string;
 	}
-	return len(string_buffer_data(buf));
+	return to_string(buf^);
 }
 
-sbprintln :: proc(buf: ^String_Buffer, args: ..any) -> int {
+sbprintln :: proc(buf: ^String_Buffer, args: ..any) -> string {
 	fi: Fmt_Info;
 	fi.buf = buf;
 
@@ -1074,10 +1074,10 @@ sbprintln :: proc(buf: ^String_Buffer, args: ..any) -> int {
 		fmt_value(&fi, args[i], 'v');
 	}
 	write_byte(buf, '\n');
-	return len(string_buffer_data(buf));
+	return to_string(buf^);
 }
 
-sbprintf :: proc(b: ^String_Buffer, fmt: string, args: ..any) -> int {
+sbprintf :: proc(b: ^String_Buffer, fmt: string, args: ..any) -> string {
 	fi := Fmt_Info{};
 	end := len(fmt);
 	arg_index := 0;
@@ -1207,5 +1207,5 @@ sbprintf :: proc(b: ^String_Buffer, fmt: string, args: ..any) -> int {
 		write_string(b, ")");
 	}
 
-	return len(string_buffer_data(b));
+	return to_string(b^);
 }

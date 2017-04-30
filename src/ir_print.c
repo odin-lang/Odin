@@ -354,13 +354,7 @@ void ir_print_compound_element(irFileBuffer *f, irModule *m, ExactValue v, Type 
 
 void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *type) {
 	type = core_type(type);
-	if (is_type_float(type)) {
-		value = exact_value_to_float(value);
-	} else if (is_type_integer(type)) {
-		value = exact_value_to_integer(value);
-	} else if (is_type_pointer(type)) {
-		value = exact_value_to_integer(value);
-	}
+	value = convert_exact_value_for_type(value, type);
 
 	switch (value.kind) {
 	case ExactValue_Bool:
@@ -1076,9 +1070,6 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		Type *type = base_type(ir_type(bo->left));
 		Type *elem_type = type;
 		GB_ASSERT(!is_type_vector(elem_type));
-		while (elem_type->kind == Type_Vector) {
-			elem_type = base_type(elem_type->Vector.elem);
-		}
 
 		ir_fprintf(f, "%%%d = ", value->index);
 

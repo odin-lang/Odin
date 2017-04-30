@@ -1450,13 +1450,12 @@ irValue *ir_emit_comment(irProcedure *p, String text) {
 	return ir_emit(p, ir_instr_comment(p, text));
 }
 
-irValue *ir_copy_value_to_ptr(irProcedure *proc, irValue *val, i64 alignment) {
-	Type *t = ir_type(val);
-	i64 type_alignment = type_align_of(proc->module->allocator, t);
+irValue *ir_copy_value_to_ptr(irProcedure *proc, irValue *val, Type *new_type, i64 alignment) {
+	i64 type_alignment = type_align_of(proc->module->allocator, new_type);
 	if (alignment < type_alignment) {
 		alignment = type_alignment;
 	}
-	irValue *ptr = ir_add_local_generated(proc, t);
+	irValue *ptr = ir_add_local_generated(proc, new_type);
 	ptr->Instr.Local.alignment = alignment;
 	ir_emit_store(proc, ptr, val);
 	return ptr;
@@ -1480,7 +1479,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_
 		Type *new_type = pt->Proc.abi_compat_params[i];
 		if (original_type != new_type) {
 			if (is_type_pointer(new_type)) {
-				args[i] = ir_copy_value_to_ptr(p, args[i], 16);
+				args[i] = ir_copy_value_to_ptr(p, args[i], original_type, 16);
 			} else if (is_type_integer(new_type)) {
 				args[i] = ir_emit_transmute(p, args[i], new_type);
 			}
@@ -3546,6 +3545,15 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	GB_ASSERT_NOT_NULL(tv);
 
 	if (tv->value.kind != ExactValue_Invalid) {
+		// NOTE(bill): Edge case
+		if (tv->value.kind != ExactValue_Compound &&
+		    is_type_vector(tv->type)) {
+			Type *elem = base_vector_type(tv->type);
+			ExactValue value = convert_exact_value_for_type(tv->value, elem);
+			irValue *x = ir_add_module_constant(proc->module, elem, value);
+			return ir_emit_conv(proc, x, tv->type);
+		}
+
 		return ir_add_module_constant(proc->module, tv->type, tv->value);
 	}
 

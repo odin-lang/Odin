@@ -233,6 +233,14 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		}
 	}
 
+	if (is_type_vector(dst)) {
+		Type *elem = base_vector_type(dst);
+		i64 distance = check_distance_between_types(c, operand, elem);
+		if (distance >= 0) {
+			return distance + 5;
+		}
+	}
+
 
 	if (is_type_any(dst)) {
 		// NOTE(bill): Anything can cast to `Any`
@@ -288,9 +296,13 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 			add_type_info_type(c, target_type);
 		}
 
-		convert_to_typed(c, operand, target_type, 0);
-		if (operand->mode == Addressing_Invalid) {
-			return;
+		if (target_type != NULL && is_type_vector(target_type)) {
+			// NOTE(bill): continue to below
+		} else {
+			convert_to_typed(c, operand, target_type, 0);
+			if (operand->mode == Addressing_Invalid) {
+				return;
+			}
 		}
 	}
 
@@ -1093,6 +1105,33 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 			default:
 				new_type = make_type_pointer(a, original_type);
 				break;
+			}
+		} break;
+		}
+	} else if (str_eq(build_context.ODIN_OS, str_lit("linux"))) {
+		Type *bt = core_type(original_type);
+		switch (bt->kind) {
+		// Okay to pass by value
+		// Especially the only Odin types
+		case Type_Basic:   break;
+		case Type_Pointer: break;
+		case Type_Proc:    break; // NOTE(bill): Just a pointer
+
+		// Odin only types
+		case Type_Slice:
+		case Type_DynamicArray:
+		case Type_Map:
+			break;
+
+		// Odin specific
+		case Type_Array:
+		case Type_Vector:
+		// Could be in C too
+		case Type_Record: {
+			i64 align = type_align_of(a, original_type);
+			i64 size  = type_size_of(a, original_type);
+			if (8*size > 16) {
+				new_type = make_type_pointer(a, original_type);
 			}
 		} break;
 		}
@@ -2453,6 +2492,8 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 			x->mode = Addressing_Value;
 		} else if (is_type_slice(type) && is_type_string(x->type)) {
 			x->mode = Addressing_Value;
+		} else if (!is_type_vector(x->type) && is_type_vector(type)) {
+			x->mode = Addressing_Value;
 		}
 		can_convert = true;
 	}
@@ -2481,6 +2522,16 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 	x->type = type;
 }
 
+bool check_binary_vector_expr(Checker *c, Token op, Operand *x, Operand *y) {
+	if (is_type_vector(x->type) && !is_type_vector(y->type)) {
+		if (check_is_assignable_to(c, y, x->type)) {
+			if (check_binary_op(c, x, op)) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
 
 
 void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
@@ -2560,6 +2611,17 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		return;
 	}
 
+
+	if (check_binary_vector_expr(c, op, x, y)) {
+		x->mode = Addressing_Value;
+		x->type = x->type;
+		return;
+	}
+	if (check_binary_vector_expr(c, op, y, x)) {
+		x->mode = Addressing_Value;
+		x->type = y->type;
+		return;
+	}
 	if (!are_types_identical(x->type, y->type)) {
 		if (x->type != t_invalid &&
 		    y->type != t_invalid) {
@@ -2737,6 +2799,24 @@ void convert_untyped_error(Checker *c, Operand *operand, Type *target_type) {
 	operand->mode = Addressing_Invalid;
 }
 
+ExactValue convert_exact_value_for_type(ExactValue v, Type *type) {
+	Type *t = core_type(type);
+	if (is_type_boolean(t)) {
+		// v = exact_value_to_boolean(v);
+	} else if (is_type_float(t)) {
+		v = exact_value_to_float(v);
+	} else if (is_type_integer(t)) {
+		v = exact_value_to_integer(v);
+	} else if (is_type_pointer(t)) {
+		v = exact_value_to_integer(v);
+	} else if (is_type_complex(t)) {
+		v = exact_value_to_complex(v);
+	} else if (is_type_quaternion(t)) {
+		v = exact_value_to_quaternion(v);
+	}
+	return v;
+}
+
 // NOTE(bill): Set initial level to 0
 void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level) {
 	GB_ASSERT_NOT_NULL(target_type);
@@ -2746,7 +2826,6 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 	    target_type == t_invalid) {
 		return;
 	}
-
 
 	if (is_type_untyped(target_type)) {
 		GB_ASSERT(operand->type->kind == Type_Basic);
@@ -2808,6 +2887,18 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 			}
 		}
 		break;
+
+	case Type_Vector: {
+		Type *elem = base_vector_type(t);
+		if (check_is_assignable_to(c, operand, elem)) {
+			operand->mode = Addressing_Value;
+		} else {
+			operand->mode = Addressing_Invalid;
+			convert_untyped_error(c, operand, target_type);
+			return;
+		}
+	} break;
+
 
 	default:
 		if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
@@ -5361,7 +5452,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			isize index = 0;
 			isize elem_count = cl->elems.count;
 
-			if (base_type(elem_type) == t_any) {
+			if (is_type_any(base_type(elem_type))) {
 				is_constant = false;
 			}
 
