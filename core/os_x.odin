@@ -67,7 +67,7 @@ Stat :: struct #ordered {
 	gen_num   : u32,  // File generation number ...?
 	_spare    : i32,  // RESERVED
 	_reserve1,
-	_reserve2 : i64,  // RESERVED 
+	_reserve2 : i64,  // RESERVED
 };
 
 // File type
@@ -147,7 +147,7 @@ unix_dlerror :: proc() -> ^u8                                                   
 
 // TODO(zangent): Change this to just `open` when Bill fixes overloading.
 open_simple :: proc(path: string, mode: int) -> (Handle, Errno) {
-	
+
 	cstr := strings.new_c_string(path);
 	handle := unix_open(cstr, mode);
 	free(cstr);
@@ -169,7 +169,7 @@ close :: proc(fd: Handle) {
 write :: proc(fd: Handle, data: []byte) -> (AddressSize, Errno) {
 	assert(fd != -1);
 
-	bytes_written := unix_write(fd, ^data[0], len(data));
+	bytes_written := unix_write(fd, &data[0], len(data));
 	if(bytes_written == -1) {
 		return 0, 1;
 	}
@@ -179,7 +179,7 @@ write :: proc(fd: Handle, data: []byte) -> (AddressSize, Errno) {
 read :: proc(fd: Handle, data: []byte) -> (AddressSize, Errno) {
 	assert(fd != -1);
 
-	bytes_read := unix_read(fd, ^data[0], len(data));
+	bytes_read := unix_read(fd, &data[0], len(data));
 	if(bytes_read == -1) {
 		return 0, 1;
 	}
@@ -211,7 +211,7 @@ stat :: proc(path: string) -> (Stat, bool) #inline {
 	s: Stat;
 	cstr := strings.new_c_string(path);
 	defer free(cstr);
-	ret_int := unix_stat(cstr, ^s);
+	ret_int := unix_stat(cstr, &s);
 	return s, ret_int==0;
 }
 

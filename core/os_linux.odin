@@ -165,12 +165,12 @@ close :: proc(fd: Handle) {
 }
 
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
-	sz := _unix_read(fd, ^data[0], len(data));
+	sz := _unix_read(fd, &data[0], len(data));
 	return sz, 0;
 }
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
-	sz := _unix_write(fd, ^data[0], len(data));
+	sz := _unix_write(fd, &data[0], len(data));
 	return sz, 0;
 }
 
@@ -194,7 +194,7 @@ stat :: proc(path: string) -> (Stat, int) #inline {
 	s: Stat;
 	cstr := strings.new_c_string(path);
 	defer free(cstr);
-	ret_int := _unix_stat(cstr, ^s);
+	ret_int := _unix_stat(cstr, &s);
 	return s, int(ret_int);
 }
 
@@ -271,7 +271,7 @@ exit :: proc(code: int) {
 }
 
 current_thread_id :: proc() -> int {
-	// return cast(int) _unix_gettid();
+	// return int(_unix_gettid());
 	return 0;
 }
 
