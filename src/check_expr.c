@@ -5583,38 +5583,44 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			return kind;
 		}
 
-		if (!is_type_union(src)) {
+		if (is_type_union(src)) {
+			bool ok = false;
+			for (isize i = 1; i < bsrc->Record.variant_count; i++) {
+				Entity *f = bsrc->Record.variants[i];
+				if (are_types_identical(f->type, dst)) {
+					ok = true;
+					break;
+				}
+			}
+
+			if (!ok) {
+				gbString expr_str = expr_to_string(o->expr);
+				gbString dst_type_str = type_to_string(t);
+				error_node(o->expr, "Cannot type assert `%s` to `%s`", expr_str, dst_type_str);
+				gb_string_free(dst_type_str);
+				gb_string_free(expr_str);
+				o->mode = Addressing_Invalid;
+				o->expr = node;
+				return kind;
+			}
+
+			add_type_info_type(c, o->type);
+			add_type_info_type(c, t);
+
+			o->type = t;
+			o->mode = Addressing_OptionalOk;
+		} else if (is_type_any(o->type)) {
+			o->type = t;
+			o->mode = Addressing_OptionalOk;
+
+			add_type_info_type(c, o->type);
+			add_type_info_type(c, t);
+		} else {
 			error_node(o->expr, "Type assertions can only operate on unions");
 			o->mode = Addressing_Invalid;
 			o->expr = node;
 			return kind;
 		}
-
-		bool ok = false;
-		for (isize i = 1; i < bsrc->Record.variant_count; i++) {
-			Entity *f = bsrc->Record.variants[i];
-			if (are_types_identical(f->type, dst)) {
-				ok = true;
-				break;
-			}
-		}
-
-		if (!ok) {
-			gbString expr_str = expr_to_string(o->expr);
-			gbString dst_type_str = type_to_string(t);
-			error_node(o->expr, "Cannot type assert `%s` to `%s`", expr_str, dst_type_str);
-			gb_string_free(dst_type_str);
-			gb_string_free(expr_str);
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
-
-		add_type_info_type(c, o->type);
-		add_type_info_type(c, t);
-
-		o->type = t;
-		o->mode = Addressing_OptionalOk;
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, node);

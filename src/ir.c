@@ -3112,6 +3112,64 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 	return ir_emit_load(proc, v);
 }
 
+irAddr ir_emit_any_cast_addr(irProcedure *proc, irValue *value, Type *type, TokenPos pos) {
+	gbAllocator a = proc->module->allocator;
+	Type *src_type = ir_type(value);
+	bool is_tuple = true;
+	Type *tuple = type;
+	if (type->kind != Type_Tuple) {
+		is_tuple = false;
+		tuple = make_optional_ok_type(a, type);
+	}
+	Type *dst_type = tuple->Tuple.variables[0]->type;
+
+	irValue *v = ir_add_local_generated(proc, tuple);
+
+	irValue *ti_ptr = ir_type_info(proc, dst_type);
+	irValue *any_ti = ir_emit_struct_ev(proc, value, 1);
+
+
+	irBlock *ok_block = ir_new_block(proc, NULL, "any_cast.ok");
+	irBlock *end_block = ir_new_block(proc, NULL, "any_cast.end");
+	irValue *cond = ir_emit_comp(proc, Token_CmpEq, any_ti, ti_ptr);
+	ir_emit_if(proc, cond, ok_block, end_block);
+	ir_start_block(proc, ok_block);
+
+	irValue *gep0 = ir_emit_struct_ep(proc, v, 0);
+	irValue *gep1 = ir_emit_struct_ep(proc, v, 1);
+
+	irValue *any_data = ir_emit_struct_ev(proc, value, 0);
+	irValue *ptr = ir_emit_conv(proc, any_data, make_type_pointer(a, dst_type));
+	ir_emit_store(proc, gep0, ir_emit_load(proc, ptr));
+	ir_emit_store(proc, gep1, v_true);
+
+	ir_emit_jump(proc, end_block);
+	ir_start_block(proc, end_block);
+
+	if (!is_tuple) {
+		// NOTE(bill): Panic on invalid conversion
+
+		irValue *ok = ir_emit_load(proc, ir_emit_struct_ep(proc, v, 1));
+		irValue **args = gb_alloc_array(a, irValue *, 6);
+		args[0] = ok;
+
+		args[1] = ir_const_string(a, pos.file);
+		args[2] = ir_const_int(a, pos.line);
+		args[3] = ir_const_int(a, pos.column);
+
+		args[4] = any_ti;
+		args[5] = ti_ptr;
+		ir_emit_global_call(proc, "__type_assertion_check", args, 6);
+
+		return ir_addr(ir_emit_struct_ep(proc, v, 0));
+	}
+	return ir_addr(v);
+}
+irValue *ir_emit_any_cast(irProcedure *proc, irValue *value, Type *type, TokenPos pos) {
+	return ir_addr_load(proc, ir_emit_any_cast_addr(proc, value, type, pos));
+}
+
+
 
 isize ir_type_info_index(CheckerInfo *info, Type *type) {
 	type = default_type(type);
@@ -3607,12 +3665,16 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 #endif
 
 	case_ast_node(ta, TypeAssertion, expr);
+		TokenPos pos = ast_node_token(expr).pos;
 		Type *type = tv->type;
 		irValue *e = ir_build_expr(proc, ta->expr);
 		Type *t = type_deref(ir_type(e));
 		if (is_type_union(t)) {
 			ir_emit_comment(proc, str_lit("cast - union_cast"));
-			return ir_emit_union_cast(proc, e, type, ast_node_token(expr).pos);
+			return ir_emit_union_cast(proc, e, type, pos);
+		} else if (is_type_any(t)) {
+			ir_emit_comment(proc, str_lit("cast - any_cast"));
+			return ir_emit_any_cast(proc, e, type, pos);
 		} else {
 			GB_PANIC("TODO(bill): type assertion %s", type_to_string(ir_type(e)));
 		}
@@ -4727,14 +4789,20 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(ta, TypeAssertion, expr);
+		gbAllocator a = proc->module->allocator;
+		TokenPos pos = ast_node_token(expr).pos;
 		irValue *e = ir_build_expr(proc, ta->expr);
 		Type *t = type_deref(ir_type(e));
 		if (is_type_union(t)) {
 			Type *type = type_of_expr(proc->module->info, expr);
 			irValue *v = ir_add_local_generated(proc, type);
 			ir_emit_comment(proc, str_lit("cast - union_cast"));
-			ir_emit_store(proc, v, ir_emit_union_cast(proc, ir_build_expr(proc, ta->expr), type, ast_node_token(expr).pos));
+			ir_emit_store(proc, v, ir_emit_union_cast(proc, ir_build_expr(proc, ta->expr), type, pos));
 			return ir_addr(v);
+		} else if (is_type_any(t)) {
+			ir_emit_comment(proc, str_lit("cast - any_cast"));
+			Type *type = type_of_expr(proc->module->info, expr);
+			return ir_emit_any_cast_addr(proc, ir_build_expr(proc, ta->expr), type, pos);
 		} else {
 			GB_PANIC("TODO(bill): type assertion %s", type_to_string(ir_type(e)));
 		}
