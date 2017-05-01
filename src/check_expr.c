@@ -2087,7 +2087,7 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 		return;
 	}
 
-	if (o->mode == Addressing_Constant) {
+	if (o->mode == Addressing_Constant && !is_type_vector(o->type)) {
 		Type *type = base_type(o->type);
 		if (!is_type_constant_type(o->type)) {
 			gbString xt = type_to_string(o->type);
