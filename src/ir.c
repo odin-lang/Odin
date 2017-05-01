@@ -6151,6 +6151,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			GB_ASSERT(is_type_enum(t));
 			Type *enum_ptr = make_type_pointer(a, t);
 			t = base_type(t);
+			Type *core_elem = core_type(t);
 			i64 enum_count = t->Record.field_count;
 			irValue *max_count = ir_const_int(a, enum_count);
 
@@ -6176,12 +6177,19 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 
 			irValue *val_ptr = ir_emit_ptr_offset(proc, values_data, offset);
-			val_ptr = ir_emit_conv(proc, val_ptr, enum_ptr);
 			ir_emit_increment(proc, offset_);
 
 			index = offset;
 			if (val_type != NULL) {
-				val = ir_emit_load(proc, val_ptr);
+				if (is_type_float(core_elem)) {
+					irValue *f = ir_emit_load(proc, ir_emit_conv(proc, val_ptr, t_f64_ptr));
+					val = ir_emit_conv(proc, f, t);
+				} else if (is_type_integer(core_elem)) {
+					irValue *i = ir_emit_load(proc, ir_emit_conv(proc, val_ptr, t_i64_ptr));
+					val = ir_emit_conv(proc, i, t);
+				} else {
+					GB_PANIC("TODO(bill): enum core type %s", type_to_string(core_elem));
+				}
 			}
 
 		} else {
