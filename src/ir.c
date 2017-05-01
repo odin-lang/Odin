@@ -1820,6 +1820,8 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 		ir_emit_comment(proc, str_lit("vector.arith.begin"));
 		// IMPORTANT TODO(bill): This is very wasteful with regards to stack memory
 		Type *tl = base_type(t_left);
+		left  = ir_emit_conv(proc, left, type);
+		right = ir_emit_conv(proc, right, type);
 		irValue *lhs = ir_address_from_load_or_generate_local(proc, left);
 		irValue *rhs = ir_address_from_load_or_generate_local(proc, right);
 		GB_ASSERT(is_type_vector(type));
