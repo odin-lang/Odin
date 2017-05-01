@@ -4785,10 +4785,10 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 					if (is_type_enum(type)) {
 						irValue *enum_info = ir_emit_conv(proc, ti_ptr, t_type_info_enum_ptr);
-						names_ptr = ir_emit_struct_ep(proc, enum_info, 1);
+						names_ptr = ir_emit_struct_ep(proc, enum_info, 3);
 					} else if (type->kind == Type_Record) {
 						irValue *record_info = ir_emit_conv(proc, ti_ptr, t_type_info_record_ptr);
-						names_ptr = ir_emit_struct_ep(proc, record_info, 1);
+						names_ptr = ir_emit_struct_ep(proc, record_info, 3);
 					}
 					return ir_addr(names_ptr);
 				} else {
@@ -6140,8 +6140,50 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		irBlock *done = NULL;
 		AstNode *expr = unparen_expr(rs->expr);
 
+		TypeAndValue *tav = type_and_value_of_expression(proc->module->info, expr);
+
 		if (is_ast_node_a_range(expr)) {
 			ir_build_range_interval(proc, &expr->BinaryExpr, val_type, &val, &index, &loop, &done);
+		} else if (tav->mode == Addressing_Type) {
+			TokenPos pos = ast_node_token(expr).pos;
+			gbAllocator a = proc->module->allocator;
+			Type *t = tav->type;
+			GB_ASSERT(is_type_enum(t));
+			Type *enum_ptr = make_type_pointer(a, t);
+			t = base_type(t);
+			i64 enum_count = t->Record.field_count;
+			irValue *max_count = ir_const_int(a, enum_count);
+
+			irValue *eti = ir_emit_union_cast(proc, ir_type_info(proc, t), t_type_info_enum_ptr, pos);
+			irValue *values = ir_emit_load(proc, ir_emit_struct_ep(proc, eti, 4));
+			irValue *values_data = ir_slice_elem(proc, values);
+
+
+			irValue *offset_ = ir_add_local_generated(proc, t_int);
+			ir_emit_store(proc, offset_, v_zero);
+
+			loop = ir_new_block(proc, NULL, "for.enum.loop");
+			ir_emit_jump(proc, loop);
+			ir_start_block(proc, loop);
+
+			irBlock *body = ir_new_block(proc, NULL, "for.enum.body");
+			done = ir_new_block(proc, NULL, "for.enum.done");
+
+			irValue *offset = ir_emit_load(proc, offset_);
+			irValue *cond = ir_emit_comp(proc, Token_Lt, offset, max_count);
+			ir_emit_if(proc, cond, body, done);
+			ir_start_block(proc, body);
+
+
+			irValue *val_ptr = ir_emit_ptr_offset(proc, values_data, offset);
+			val_ptr = ir_emit_conv(proc, val_ptr, enum_ptr);
+			ir_emit_increment(proc, offset_);
+
+			index = offset;
+			if (val_type != NULL) {
+				val = ir_emit_load(proc, val_ptr);
+			}
+
 		} else {
 			Type *expr_type = type_of_expr(proc->module->info, rs->expr);
 			Type *et = base_type(type_deref(expr_type));

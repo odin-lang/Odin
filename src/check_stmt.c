@@ -920,9 +920,21 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			idx = t_int;
 		} else {
 			Operand operand = {Addressing_Invalid};
-			check_expr(c, &operand, rs->expr);
+			check_expr_or_type(c, &operand, rs->expr);
 
-			if (operand.mode != Addressing_Invalid) {
+			if (operand.mode == Addressing_Type) {
+				if (!is_type_enum(operand.type)) {
+					gbString t = type_to_string(operand.type);
+					error_node(operand.expr, "Cannot iterate over the type `%s`", t);
+					gb_string_free(t);
+					goto skip_expr;
+				} else {
+					val = operand.type;
+					idx = t_int;
+					add_type_info_type(c, operand.type);
+					goto skip_expr;
+				}
+			} else if (operand.mode != Addressing_Invalid) {
 				Type *t = base_type(type_deref(operand.type));
 				switch (t->kind) {
 				case Type_Basic:
