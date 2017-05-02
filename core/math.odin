@@ -277,7 +277,7 @@ mat4_rotate :: proc(v: Vec3, angle_radians: f32) -> Mat4 {
 	s := sin(angle_radians);
 
 	a := norm(v);
-	t := a * Vec3{1-c};
+	t := a * (1-c);
 
 	rot := mat4_identity();
 

@@ -127,7 +127,8 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 
 void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
 	GB_ASSERT(e->type == NULL);
-	Type *named = make_type_named(c->allocator, e->token.string, NULL, e);
+	String name = e->token.string;
+	Type *named = make_type_named(c->allocator, name, NULL, e);
 	named->Named.type_name = e;
 	if (def != NULL && def->kind == Type_Named) {
 		def->Named.base = named;

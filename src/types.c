@@ -95,6 +95,7 @@ typedef struct TypeRecord {
 
 	i64 *    offsets;
 	bool     are_offsets_set;
+	bool     are_offsets_being_processed;
 	bool     is_packed;
 	bool     is_ordered;
 
@@ -1434,30 +1435,35 @@ void type_path_free(TypePath *tp) {
 	array_free(&tp->path);
 }
 
+void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
+	GB_ASSERT(tp != NULL);
+
+	GB_ASSERT(start_index < tp->path.count);
+	Type *t = tp->path.e[start_index];
+	GB_ASSERT(t != NULL);
+
+	GB_ASSERT_MSG(is_type_named(t), "%s", type_to_string(t));
+	Entity *e = t->Named.type_name;
+	error(e->token, "Illegal declaration cycle of `%.*s`", LIT(t->Named.name));
+	// NOTE(bill): Print cycle, if it's deep enough
+	for (isize j = start_index; j < tp->path.count; j++) {
+		Type *t = tp->path.e[j];
+		GB_ASSERT_MSG(is_type_named(t), "%s", type_to_string(t));
+		Entity *e = t->Named.type_name;
+		error(e->token, "\t%.*s refers to", LIT(t->Named.name));
+	}
+	// NOTE(bill): This will only print if the path count > 1
+	error(e->token, "\t%.*s", LIT(t->Named.name));
+	tp->failure = true;
+	t->failure = true;
+}
+
 TypePath *type_path_push(TypePath *tp, Type *t) {
 	GB_ASSERT(tp != NULL);
 
-	for (isize i = 1; i < tp->path.count; i++) {
+	for (isize i = 0; i < tp->path.count; i++) {
 		if (tp->path.e[i] == t) {
-			// TODO(bill):
-			GB_ASSERT_MSG(is_type_named(t), "%s", type_to_string(t));
-			Entity *e = t->Named.type_name;
-			error(e->token, "Illegal declaration cycle of `%.*s`", LIT(t->Named.name));
-			// NOTE(bill): Print cycle, if it's deep enough
-			for (isize j = i; j < tp->path.count; j++) {
-				Type *t = tp->path.e[j];
-				GB_ASSERT_MSG(is_type_named(t), "%s", type_to_string(t));
-				Entity *e = t->Named.type_name;
-				error(e->token, "\t%.*s refers to", LIT(t->Named.name));
-			}
-			// NOTE(bill): This will only print if the path count > 1
-			error(e->token, "\t%.*s", LIT(t->Named.name));
-			tp->failure = true;
-			t->failure = true;
-
-			// NOTE(bill): Just quit immediately
-			// TODO(bill): Try and solve this gracefully
-			// gb_exit(1);
+			type_path_print_illegal_cycle(tp, i);
 		}
 	}
 
@@ -1681,13 +1687,14 @@ i64 *type_set_offsets_of(gbAllocator allocator, Entity **fields, isize field_cou
 	i64 curr_offset = 0;
 	if (is_packed) {
 		for (isize i = 0; i < field_count; i++) {
+			i64 size = type_size_of(allocator, fields[i]->type);
 			offsets[i] = curr_offset;
-			curr_offset += type_size_of(allocator, fields[i]->type);
+			curr_offset += size;
 		}
 	} else {
 		for (isize i = 0; i < field_count; i++) {
-			i64 align = type_align_of(allocator, fields[i]->type);
-			i64 size  = type_size_of(allocator, fields[i]->type);
+			i64 align = max(type_align_of(allocator, fields[i]->type), 1);
+			i64 size  = max(type_size_of(allocator, fields[i]->type), 0);
 			curr_offset = align_formula(curr_offset, align);
 			offsets[i] = curr_offset;
 			curr_offset += size;
@@ -1700,18 +1707,21 @@ bool type_set_offsets(gbAllocator allocator, Type *t) {
 	t = base_type(t);
 	if (is_type_struct(t)) {
 		if (!t->Record.are_offsets_set) {
+			t->Record.are_offsets_being_processed = true;
 			t->Record.offsets = type_set_offsets_of(allocator, t->Record.fields, t->Record.field_count, t->Record.is_packed);
 			t->Record.are_offsets_set = true;
 			return true;
 		}
 	} else if (is_type_union(t)) {
 		if (!t->Record.are_offsets_set) {
+			t->Record.are_offsets_being_processed = true;
 			t->Record.offsets = type_set_offsets_of(allocator, t->Record.fields, t->Record.field_count, false);
 			t->Record.are_offsets_set = true;
 			return true;
 		}
 	}  else if (is_type_tuple(t)) {
 		if (!t->Tuple.are_offsets_set) {
+			t->Record.are_offsets_being_processed = true;
 			t->Tuple.offsets = type_set_offsets_of(allocator, t->Tuple.variables, t->Tuple.variable_count, false);
 			t->Tuple.are_offsets_set = true;
 			return true;
@@ -1841,6 +1851,10 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			}
 			i64 align = type_align_of_internal(allocator, t, path);
 			if (path->failure) {
+				return FAILURE_SIZE;
+			}
+			if (t->Record.are_offsets_being_processed && t->Record.offsets == NULL) {
+				type_path_print_illegal_cycle(path, path->path.count-1);
 				return FAILURE_SIZE;
 			}
 			type_set_offsets(allocator, t);

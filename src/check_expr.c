@@ -553,7 +553,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	struct_type->Record.field_count         = field_count;
 	struct_type->Record.names = make_names_field_for_record(c, c->context.scope);
 
-	if (!st->is_packed && !st->is_ordered) {
+	if (false && !st->is_packed && !st->is_ordered) {
 		// NOTE(bill): Reorder fields for reduced size/performance
 
 		Entity **reordered_fields = gb_alloc_array(c->allocator, Entity *, field_count);
@@ -572,6 +572,10 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 		}
 
 		struct_type->Record.fields = reordered_fields;
+	}
+
+	{
+		// i64 size = type_size_of(c->allocator, struct_type);
 	}
 
 	type_set_offsets(c->allocator, struct_type);
@@ -656,8 +660,6 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	union_type->Record.field_count         = field_count;
 	union_type->Record.are_offsets_set     = false;
 	union_type->Record.is_ordered          = true;
-
-
 
 	for_array(i, ut->variants) {
 		AstNode *variant = ut->variants.e[i];
@@ -1601,21 +1603,25 @@ bool check_type_extra_internal(Checker *c, AstNode *e, Type **type, Type *named_
 				error_node(at->count, ".. can only be used in conjuction with compound literals");
 				count = 0;
 			}
+#if 0
 			i64 esz = type_size_of(c->allocator, elem);
-			if (esz <= 0) {
+			if (esz == 0) {
 				gbString str = type_to_string(elem);
 				error_node(at->elem, "Zero sized element type `%s` is not allowed", str);
 				gb_string_free(str);
 			}
+#endif
 			*type = make_type_array(c->allocator, elem, count);
 		} else {
 			Type *elem = check_type(c, at->elem);
+#if 0
 			i64 esz = type_size_of(c->allocator, elem);
-			if (esz <= 0) {
+			if (esz == 0) {
 				gbString str = type_to_string(elem);
 				error_node(at->elem, "Zero sized element type `%s` is not allowed", str);
 				gb_string_free(str);
 			}
+#endif
 			*type = make_type_slice(c->allocator, elem);
 		}
 		return true;
@@ -1624,11 +1630,13 @@ bool check_type_extra_internal(Checker *c, AstNode *e, Type **type, Type *named_
 	case_ast_node(dat, DynamicArrayType, e);
 		Type *elem = check_type_extra(c, dat->elem, NULL);
 		i64 esz = type_size_of(c->allocator, elem);
-		if (esz <= 0) {
+#if 0
+		if (esz == 0) {
 			gbString str = type_to_string(elem);
 			error_node(dat->elem, "Zero sized element type `%s` is not allowed", str);
 			gb_string_free(str);
 		}
+#endif
 		*type = make_type_dynamic_array(c->allocator, elem);
 		return true;
 	case_end;
@@ -1735,7 +1743,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 		type = t_invalid;
 	}
 
-	if (is_type_named(type)) {
+	if (type->kind == Type_Named) {
 		if (type->Named.base == NULL) {
 			gbString name = type_to_string(type);
 			error_node(e, "Invalid type definition of %s", name);
