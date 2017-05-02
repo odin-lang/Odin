@@ -1,27 +1,27 @@
-Any :: struct #ordered {
+Any :: struct {
 	data:      rawptr,
 	type_info: ^Type_Info,
 }
 
-String :: struct #ordered {
+String :: struct {
 	data: ^byte,
 	len:  int,
 };
 
-Slice :: struct #ordered {
+Slice :: struct {
 	data: rawptr,
 	len:  int,
 	cap:  int,
 };
 
-Dynamic_Array :: struct #ordered {
+Dynamic_Array :: struct {
 	data:      rawptr,
 	len:       int,
 	cap:       int,
 	allocator: Allocator,
 };
 
-Dynamic_Map :: struct #ordered {
+Dynamic_Map :: struct {
 	hashes:  [dynamic]int,
 	entries: Dynamic_Array,
 };

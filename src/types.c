@@ -1595,6 +1595,8 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 	case Type_Record: {
 		switch (t->Record.kind) {
+		case TypeRecord_Enum:
+			return type_align_of_internal(allocator, t->Record.enum_base_type, path);
 		case TypeRecord_Struct:
 			if (t->Record.custom_align > 0) {
 				return gb_clamp(t->Record.custom_align, 1, build_context.max_align);
@@ -1844,6 +1846,9 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 	case Type_Record: {
 		switch (t->Record.kind) {
+		case TypeRecord_Enum:
+			return type_size_of_internal(allocator, t->Record.enum_base_type, path);
+
 		case TypeRecord_Struct: {
 			i64 count = t->Record.field_count;
 			if (count == 0) {

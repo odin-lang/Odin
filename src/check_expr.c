@@ -534,7 +534,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 
 	isize field_count = 0;
 	for_array(field_index, st->fields) {
-		AstNode *field = st->fields.e[field_index];
+	AstNode *field = st->fields.e[field_index];
 		switch (field->kind) {
 		case_ast_node(f, Field, field);
 			field_count += f->names.count;

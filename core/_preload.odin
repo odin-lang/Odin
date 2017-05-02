@@ -25,7 +25,7 @@ Calling_Convention :: enum {
 	FAST = 3,
 }
 
-Type_Info_Record :: struct #ordered {
+Type_Info_Record :: struct {
 	types:        []^Type_Info,
 	names:        []string,
 	offsets:      []int,  // offsets may not be used in tuples
@@ -144,13 +144,13 @@ Allocator_Mode :: enum u8 {
 Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
-Allocator :: struct #ordered {
+Allocator :: struct {
 	procedure: Allocator_Proc,
 	data:      rawptr,
 }
 
 
-Context :: struct #ordered {
+Context :: struct {
 	thread_id: int,
 
 	allocator: Allocator,
@@ -559,18 +559,18 @@ __default_hash_string :: proc(s: string) -> u64 {
 
 __INITIAL_MAP_CAP :: 16;
 
-__Map_Key :: struct #ordered {
+__Map_Key :: struct {
 	hash: u64,
 	str:  string,
 }
 
-__Map_Find_Result :: struct #ordered {
+__Map_Find_Result :: struct {
 	hash_index:  int,
 	entry_prev:  int,
 	entry_index: int,
 }
 
-__Map_Entry_Header :: struct #ordered {
+__Map_Entry_Header :: struct {
 	key:  __Map_Key,
 	next: int,
 /*
@@ -578,7 +578,7 @@ __Map_Entry_Header :: struct #ordered {
 */
 }
 
-__Map_Header :: struct #ordered {
+__Map_Header :: struct {
 	m:             ^raw.Dynamic_Map,
 	is_key_string: bool,
 	entry_size:    int,

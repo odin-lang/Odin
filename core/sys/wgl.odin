@@ -12,7 +12,7 @@ CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB :: 0x00000002;
 Hglrc :: Handle;
 Color_Ref :: u32;
 
-Layer_Plane_Descriptor :: struct #ordered {
+Layer_Plane_Descriptor :: struct {
 	size:             u16,
 	version:          u16,
 	flags:            u32,
@@ -39,11 +39,11 @@ Layer_Plane_Descriptor :: struct #ordered {
 	transparent:      Color_Ref,
 }
 
-Point_Float :: struct #ordered {
+Point_Float :: struct {
 	x, y: f32,
 }
 
-Glyph_Metrics_Float :: struct #ordered {
+Glyph_Metrics_Float :: struct {
 	black_box_x:  f32,
 	black_box_y:  f32,
 	glyph_origin: Point_Float,
