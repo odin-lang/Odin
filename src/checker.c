@@ -557,10 +557,6 @@ Entity *scope_lookup_entity(Scope *s, String name) {
 
 Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	String name = entity->token.string;
-	if (str_eq(name, str_lit("output"))) {
-		gb_printf_err("Here! %.*s\n", LIT(name));
-	}
-
 	HashKey key = hash_string(name);
 	Entity **found = map_entity_get(&s->elements, key);
 

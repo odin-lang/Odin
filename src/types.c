@@ -1695,8 +1695,8 @@ i64 *type_set_offsets_of(gbAllocator allocator, Entity **fields, isize field_cou
 		}
 	} else {
 		for (isize i = 0; i < field_count; i++) {
-			i64 align = max(type_align_of(allocator, fields[i]->type), 1);
-			i64 size  = max(type_size_of(allocator, fields[i]->type), 0);
+			i64 align = gb_max(type_align_of(allocator, fields[i]->type), 1);
+			i64 size  = gb_max(type_size_of(allocator, fields[i]->type), 0);
 			curr_offset = align_formula(curr_offset, align);
 			offsets[i] = curr_offset;
 			curr_offset += size;
