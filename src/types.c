@@ -93,6 +93,7 @@ typedef struct TypeRecord {
 	Entity **variants;
 	i32      variant_count;
 	Entity * union__tag;
+	i64      variant_block_size; // NOTE(bill): Internal use only
 
 
 	i64 *    offsets;
@@ -1817,18 +1818,18 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		total_size = (total_size_in_bits+7)/8;
 		return total_size;
 #else
-		i64 count, align, size, alignment;
-		count = t->Vector.count;
+		i64 count = t->Vector.count;
 		if (count == 0) {
 			return 0;
 		}
-		align = type_align_of_internal(allocator, t->Vector.elem, path);
+		i64 elem_align = type_align_of_internal(allocator, t->Vector.elem, path);
 		if (path->failure) {
 			return FAILURE_SIZE;
 		}
-		size  = type_size_of_internal( allocator, t->Vector.elem, path);
-		alignment = align_formula(size, align);
-		return alignment*(count-1) + size;
+		i64 vector_align = type_align_of_internal(allocator, t, path);
+		i64 elem_size = type_size_of_internal(allocator, t->Vector.elem, path);
+		i64 alignment = align_formula(elem_size, elem_align);
+		return align_formula(alignment*(count-1) + elem_size, vector_align);
 #endif
 	} break;
 
@@ -1904,6 +1905,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 				i64 end_size = type_size_of_internal(allocator, end_type, path);
 				max = end_offset + end_size ;
 			}
+			i64 field_size = max;
 
 			for (isize i = 1; i < variant_count; i++) {
 				Type *variant_type = t->Record.variants[i]->type;
@@ -1912,9 +1914,13 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 					max = size;
 				}
 			}
+
 			// NOTE(bill): Align to int
 			i64 size = align_formula(max, build_context.word_size);
-			size += type_size_of_internal(allocator, t_int, path);
+			// NOTE(bill): Calculate the padding between the common fields and the tag
+			t->Record.variant_block_size = size - field_size;
+
+			size += type_size_of(allocator, t_int);
 			size = align_formula(size, align);
 			return size;
 		} break;

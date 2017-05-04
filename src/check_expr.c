@@ -5380,7 +5380,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						fields_visited[sel.index.e[0]] = true;
 						check_expr(c, o, fv->value);
 
-						if (base_type(field->type) == t_any) {
+						if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type)) {
 							is_constant = false;
 						}
 						if (is_constant) {
@@ -5418,7 +5418,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 							continue;
 						}
 
-						if (base_type(field->type) == t_any) {
+						if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type)) {
 							is_constant = false;
 						}
 						if (is_constant) {

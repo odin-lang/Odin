@@ -259,15 +259,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 			i64 align = type_align_of(heap_allocator(), t);
 			i64 total_size = type_size_of(heap_allocator(), t);
 		#if 1
-			i64 fields_size = 0;
-			if (t->Record.field_count > 0) {
-				type_set_offsets(m->allocator, t);
-				isize end_index = t->Record.field_count-1;
-				i64 end_offset = t->Record.offsets[end_index];
-				isize end_size = type_size_of(m->allocator, t->Record.fields[end_index]->type);
-				fields_size = align_formula(end_offset + end_size, build_context.word_size);
-			}
-			i64 block_size = total_size - fields_size -  build_context.word_size;
+			i64 block_size =  t->Record.variant_block_size;
 
 			ir_fprintf(f, "{[0 x <%lld x i8>], ", align);
 			for (isize i = 0; i < t->Record.field_count; i++) {

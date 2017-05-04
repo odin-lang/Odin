@@ -5203,7 +5203,9 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 					}
 
 					field = st->fields[index];
-					if (!is_union && ir_is_elem_const(proc->module, elem, field->type)) {
+					Type *ft = field->type;
+					if (!is_union && !is_type_union(ft) &&
+					    ir_is_elem_const(proc->module, elem, ft)) {
 						continue;
 					}
 
@@ -5211,7 +5213,9 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 					GB_ASSERT(ir_type(field_expr)->kind != Type_Tuple);
 
-					Type *ft = field->type;
+					if (is_type_union(ft)) {
+						// gb_printf_err("HERE! %s\n", type_to_string(ft));
+					}
 					irValue *fv = ir_emit_conv(proc, field_expr, ft);
 					irValue *gep = ir_emit_struct_ep(proc, v, index);
 					ir_emit_store(proc, gep, fv);
