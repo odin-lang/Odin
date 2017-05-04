@@ -179,6 +179,13 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	return res, 0;
 }
 
+file_size :: proc(fd: Handle) -> (i64, bool) {
+	prev, _ := seek(fd, 0, SEEK_CUR);
+	size, err := seek(fd, 0, SEEK_END);
+	seek(fd, prev, SEEK_SET);
+	return size, err != 0;
+}
+
 
 // NOTE(bill): Uses startup to initialize it
 stdin:  Handle = 0;
@@ -204,44 +211,46 @@ access :: proc(path: string, mask: int) -> bool #inline {
 	return _unix_access(cstr, mask) == 0;
 }
 
-read_entire_file :: proc(name: string) -> ([]byte, bool) {
-	fd: Handle;
-	err: Errno;
-	size: i64;
 
-	fd, err = open_simple(name, O_RDONLY);
-	if(err != 0) {
-		fmt.println("Failed to open file.");
-		return nil, false;
-	}
-	defer close(fd);
 
-	// We have a file
-	size, err = seek(fd, 0, SEEK_END);
-	if(err != 0) {
-		fmt.println("Failed to seek to end of file.");
-		return nil, false;
-	}
+// read_entire_file :: proc(name: string) -> ([]byte, bool) {
+// 	fd: Handle;
+// 	err: Errno;
+// 	size: i64;
 
-	_, err = seek(fd, 0, SEEK_SET);
-	if(err != 0) {
-		fmt.println("Failed to seek to beginning of file.");
-		return nil, false;
-	}
+// 	fd, err = open_simple(name, O_RDONLY);
+// 	if(err != 0) {
+// 		fmt.println("Failed to open file.");
+// 		return nil, false;
+// 	}
+// 	defer close(fd);
 
-	// We have a file size!
+// 	// We have a file
+// 	size, err = seek(fd, 0, SEEK_END);
+// 	if(err != 0) {
+// 		fmt.println("Failed to seek to end of file.");
+// 		return nil, false;
+// 	}
 
-	data := make([]u8, size+1);
-	if data == nil {
-		fmt.println("Failed to allocate file buffer.");
-		return nil, false;
-	}
+// 	_, err = seek(fd, 0, SEEK_SET);
+// 	if(err != 0) {
+// 		fmt.println("Failed to seek to beginning of file.");
+// 		return nil, false;
+// 	}
 
-	read(fd, data);
-	data[size] = 0;
+// 	// We have a file size!
 
-	return data, true;
-}
+// 	data := make([]u8, size+1);
+// 	if data == nil {
+// 		fmt.println("Failed to allocate file buffer.");
+// 		return nil, false;
+// 	}
+
+// 	read(fd, data);
+// 	data[size] = 0;
+
+// 	return data, true;
+// }
 
 heap_alloc :: proc(size: int) -> rawptr {
 	assert(size > 0);

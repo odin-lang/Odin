@@ -1844,7 +1844,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			return ast_proc_lit(f, type, NULL, tags, foreign_library, foreign_name, link_name);
 		}
 		if (tags != 0) {
-			syntax_error(token, "A procedure type cannot have tags");
+			// syntax_error(token, "A procedure type cannot have tags");
 		}
 
 		return type;

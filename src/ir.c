@@ -2244,8 +2244,13 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 	} else if (is_type_union(t)) {
 		type_set_offsets(a, t);
 		GB_ASSERT(t->Record.field_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
-		result_type = make_type_pointer(a, t->Record.fields[index]->type);
+		if (index == -1) {
+			index = t->Record.field_count+1;
+			result_type = t_int_ptr;
+		} else {
+			GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
+			result_type = make_type_pointer(a, t->Record.fields[index]->type);
+		}
 	} else if (is_type_tuple(t)) {
 		GB_ASSERT(t->Tuple.variable_count > 0);
 		GB_ASSERT(gb_is_between(index, 0, t->Tuple.variable_count-1));
@@ -2316,8 +2321,12 @@ irValue *ir_emit_struct_ev(irProcedure *proc, irValue *s, i32 index) {
 		result_type = t->Record.fields[index]->type;
 	} else if (is_type_union(t)) {
 		type_set_offsets(a, t);
-		GB_ASSERT(t->Record.field_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
+		if (index == -1) {
+			index = t->Record.field_count+1;
+			result_type = t_int_ptr;
+		} else {
+			GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
+		}
 		result_type = t->Record.fields[index]->type;
 	} else if (is_type_tuple(t)) {
 		GB_ASSERT(t->Tuple.variable_count > 0);
@@ -2394,7 +2403,11 @@ irValue *ir_emit_deep_field_gep(irProcedure *proc, irValue *e, Selection sel) {
 			type = type->Record.fields[index]->type;
 			e = ir_emit_conv(proc, e, make_type_pointer(proc->module->allocator, type));
 		} else if (type->kind == Type_Record) {
-			type = type->Record.fields[index]->type;
+			if (index == -1) {
+				type = t_int;
+			} else {
+				type = type->Record.fields[index]->type;
+			}
 			e = ir_emit_struct_ep(proc, e, index);
 		} else if (type->kind == Type_Tuple) {
 			type = type->Tuple.variables[index]->type;

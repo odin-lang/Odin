@@ -109,33 +109,61 @@ close :: proc(fd: Handle) {
 	win32.CloseHandle(win32.Handle(fd));
 }
 
-write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
-	return write(fd, []byte(str));
-}
+
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE;
 	}
-	bytes_written: i32;
-	e := win32.WriteFile(win32.Handle(fd), &data[0], i32(len(data)), &bytes_written, nil);
-	if e == win32.FALSE {
-		err := win32.GetLastError();
-		return 0, Errno(err);
+	single_write_length: i32;
+	total_write: i64;
+	length := i64(len(data));
+
+	for total_write < length {
+		remaining := length - total_write;
+		to_read: i32;
+		MAX :: 1<<31-1;
+		if remaining <= MAX {
+			to_read = i32(remaining);
+		} else {
+			to_read = MAX;
+		}
+		e := win32.WriteFile(win32.Handle(fd), &data[total_write], to_read, &single_write_length, nil);
+		if single_write_length <= 0 || e == win32.FALSE {
+			err := win32.GetLastError();
+			return int(total_write), Errno(e);
+		}
+		total_write += i64(single_write_length);
 	}
-	return int(bytes_written), ERROR_NONE;
+	return int(total_write), ERROR_NONE;
 }
 
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE;
 	}
-	bytes_read: i32;
-	e := win32.ReadFile(win32.Handle(fd), &data[0], u32(len(data)), &bytes_read, nil);
-	if e == win32.FALSE {
-		err := win32.GetLastError();
-		return 0, Errno(err);
+
+	single_read_length: i32;
+	total_read: i64;
+	length := i64(len(data));
+
+	for total_read < length {
+		remaining := length - total_read;
+		to_read: u32;
+		MAX :: 1<<32-1;
+		if remaining <= MAX {
+			to_read = u32(remaining);
+		} else {
+			to_read = MAX;
+		}
+
+		e := win32.ReadFile(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
+		if single_read_length <= 0 || e == win32.FALSE {
+			err := win32.GetLastError();
+			return int(total_read), Errno(e);
+		}
+		total_read += i64(single_read_length);
 	}
-	return int(bytes_read), ERROR_NONE;
+	return int(total_read), ERROR_NONE;
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
@@ -158,6 +186,16 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	}
 	return i64(hi)<<32 + i64(dw_ptr), ERROR_NONE;
 }
+
+file_size :: proc(fd: Handle) -> (i64, Errno) {
+	length: i64;
+	err: Errno;
+	if win32.GetFileSizeEx(win32.Handle(fd), &length) == 0 {
+		err = Errno(win32.GetLastError());
+	}
+	return length, err;
+}
+
 
 
 // NOTE(bill): Uses startup to initialize it
@@ -201,56 +239,6 @@ last_write_time_by_name :: proc(name: string) -> File_Time {
 	l := File_Time(last_write_time.lo);
 	h := File_Time(last_write_time.hi);
 	return l | h << 32;
-}
-
-
-read_entire_file :: proc(name: string) -> ([]byte, bool) {
-	buf: [300]byte;
-	copy(buf[..], []byte(name));
-
-	fd, err := open(name, O_RDONLY, 0);
-	if err != ERROR_NONE {
-		return nil, false;
-	}
-	defer close(fd);
-
-	length: i64;
-	if ok := win32.GetFileSizeEx(win32.Handle(fd), &length) != 0; !ok {
-		return nil, false;
-	}
-
-	if length == 0 {
-		return nil, true;
-	}
-
-	data := make([]byte, length);
-	if data == nil {
-		return nil, false;
-	}
-
-	single_read_length: i32;
-	total_read: i64;
-
-	for total_read < length {
-		remaining := length - total_read;
-		to_read: u32;
-		MAX :: 1<<32-1;
-		if remaining <= MAX {
-			to_read = u32(remaining);
-		} else {
-			to_read = MAX;
-		}
-
-		win32.ReadFile(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
-		if single_read_length <= 0 {
-			free(data);
-			return nil, false;
-		}
-
-		total_read += i64(single_read_length);
-	}
-
-	return data, true;
 }
 
 

@@ -92,6 +92,8 @@ typedef struct TypeRecord {
 	// Entity_TypeName - union
 	Entity **variants;
 	i32      variant_count;
+	Entity * union__tag;
+
 
 	i64 *    offsets;
 	bool     are_offsets_set;
@@ -1413,6 +1415,15 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 					return sel;
 				}
 				sel.index.count = prev_count;
+			}
+		}
+		if (type->Record.kind == TypeRecord_Union) {
+			if (str_eq(field_name, str_lit("__tag"))) {
+				Entity *e = type->Record.union__tag;
+				GB_ASSERT(e != NULL);
+				selection_add_index(&sel, -1); // HACK(bill): Leaky memory
+				sel.entity = e;
+				return sel;
 			}
 		}
 	}

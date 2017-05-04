@@ -422,6 +422,8 @@ isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 			e->identifier = name;
 			if (str_eq(name_token.string, str_lit("_"))) {
 				fields[field_index++] = e;
+			} else if (str_eq(name_token.string, str_lit("__tag"))) {
+				error_node(name, "`__tag` is a reserved identifier for fields");
 			} else {
 				HashKey key = hash_string(name_token.string);
 				Entity **found = map_entity_get(&entity_map, key);
@@ -660,6 +662,10 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	union_type->Record.field_count         = field_count;
 	union_type->Record.are_offsets_set     = false;
 	union_type->Record.is_ordered          = true;
+	{
+		Entity *__tag = make_entity_field(c->allocator, NULL, make_token_ident(str_lit("__tag")), t_int, false, -1);
+		union_type->Record.union__tag = __tag;
+	}
 
 	for_array(i, ut->variants) {
 		AstNode *variant = ut->variants.e[i];

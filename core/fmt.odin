@@ -194,7 +194,6 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 			fi := Fmt_Info{buf = buf};
 			fmt_int(&fi, u64(8*info.size), false, 64, 'd');
 		}
-
 	case Float:
 		match info.size {
 		case 4: write_string(buf, "f32");
@@ -212,6 +211,8 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 		}
 	case String:  write_string(buf, "string");
 	case Boolean: write_string(buf, "bool");
+	case Any:
+		write_string(buf, "any");
 	case Atomic:
 		write_string(buf, "atomic ");
 		write_type(buf, info.elem);

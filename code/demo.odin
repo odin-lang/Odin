@@ -1,4 +1,5 @@
 #import "fmt.odin";
+#import "os.odin";
 
 main :: proc() {
 	immutable program := "+ + * - /";
