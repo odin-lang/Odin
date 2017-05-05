@@ -129,6 +129,20 @@ File_Attribute_Data :: struct {
 	file_size_low:    u32,
 }
 
+Find_Data :: struct {
+    file_attributes     : u32,
+    creation_time       : Filetime,
+    last_access_time    : Filetime,
+    last_write_time     : Filetime,
+    file_size_high      : u32,
+    file_size_low       : u32,
+    reserved0           : u32,
+    reserved1           : u32,
+    file_name           : [MAX_PATH]byte,
+    alternate_file_name : [14]byte,
+}
+
+
 GET_FILEEX_INFO_LEVELS :: i32;
 
 GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0;
@@ -137,6 +151,7 @@ GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1;
 GetLastError     :: proc() -> i32                            #foreign kernel32;
 ExitProcess      :: proc(exit_code: u32)                     #foreign kernel32;
 GetDesktopWindow :: proc() -> Hwnd                           #foreign user32;
+ShowCursor       :: proc(show : Bool)                  #foreign user32;
 GetCursorPos     :: proc(p: ^Point) -> i32                   #foreign user32;
 ScreenToClient   :: proc(h: Hwnd, p: ^Point) -> i32          #foreign user32;
 GetModuleHandleA :: proc(module_name: ^u8) -> Hinstance      #foreign kernel32;
@@ -205,6 +220,7 @@ ReadFile  :: proc(h: Handle, buf: rawptr, to_read: u32, bytes_read: ^i32, overla
 WriteFile :: proc(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool #foreign kernel32;
 
 GetFileSizeEx              :: proc(file_handle: Handle, file_size: ^i64) -> Bool #foreign kernel32;
+GetFileAttributesA          :: proc(filename : ^byte) -> u32 #foreign kernel32;
 GetFileAttributesExA       :: proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool #foreign kernel32;
 GetFileInformationByHandle :: proc(file_handle: Handle, file_info: ^By_Handle_File_Information) -> Bool #foreign kernel32;
 
@@ -212,6 +228,12 @@ GetFileType    :: proc(file_handle: Handle) -> u32 #foreign kernel32;
 SetFilePointer :: proc(file_handle: Handle, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 #foreign kernel32;
 
 SetHandleInformation :: proc(obj: Handle, mask, flags: u32) -> Bool #foreign kernel32;
+
+FindFirstFileA     :: proc(file_name : ^byte, data : ^Find_Data) -> Handle #foreign kernel32;
+FindNextFileA      :: proc(file : Handle, data : ^Find_Data) -> Bool #foreign kernel32;
+FindClose          :: proc(file : Handle) -> Bool #foreign kernel32;
+
+MAX_PATH :: 0x00000104;
 
 HANDLE_FLAG_INHERIT :: 1;
 HANDLE_FLAG_PROTECT_FROM_CLOSE :: 2;
@@ -240,6 +262,8 @@ CREATE_ALWAYS     :: 2;
 OPEN_EXISTING     :: 3;
 OPEN_ALWAYS       :: 4;
 TRUNCATE_EXISTING :: 5;
+
+INVALID_FILE_ATTRIBUTES  :: -1;
 
 FILE_ATTRIBUTE_READONLY             :: 0x00000001;
 FILE_ATTRIBUTE_HIDDEN               :: 0x00000002;
