@@ -439,6 +439,8 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 		return true;
 	}
 
+	add_entity_use(c, expr, e);
+
 	switch (e->kind) {
 	case Entity_Alias: {
 		if (e->Alias.original != NULL) {
@@ -506,17 +508,18 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 
 	case Entity_Variable: {
 		Type *t = base_type(type_deref(e->type));
-		if (is_type_struct(t) || is_type_raw_union(t)) {
+		if (is_type_struct(t) || is_type_raw_union(t) || is_type_union(t)) {
 			// TODO(bill): Make it work for unions too
-			Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
-			GB_ASSERT(found != NULL);
-			for_array(i, (*found)->elements.entries) {
-				Entity *f = (*found)->elements.entries.e[i].value;
+			Scope **found_ = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
+			GB_ASSERT(found_ != NULL);
+			Scope *found = *found_;
+			for_array(i, found->elements.entries) {
+				Entity *f = found->elements.entries.e[i].value;
 				if (f->kind == Entity_Variable) {
 					Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
-					if (is_selector) {
+					// if (is_selector) {
 						uvar->using_expr = expr;
-					}
+					// }
 					Entity *prev = scope_insert_entity(c->context.scope, uvar);
 					if (prev != NULL) {
 						gbString expr_str = expr_to_string(expr);

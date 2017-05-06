@@ -4696,6 +4696,7 @@ irValue *ir_get_using_variable(irProcedure *proc, Entity *e) {
 	if (pv != NULL) {
 		v = *pv;
 	} else {
+		GB_ASSERT_MSG(e->using_expr != NULL, "%.*s", LIT(name));
 		v = ir_build_addr(proc, e->using_expr).addr;
 	}
 	GB_ASSERT(v != NULL);
