@@ -71,7 +71,7 @@ bool ir_valid_char(u8 c) {
 	return false;
 }
 
-void ir_print_escape_string(irFileBuffer *f, String name, bool print_quotes) {
+void ir_print_escape_string(irFileBuffer *f, String name, bool print_quotes, bool prefix_with_dot) {
 	isize extra = 0;
 	for (isize i = 0; i < name.len; i++) {
 		u8 c = name.text[i];
@@ -87,7 +87,7 @@ void ir_print_escape_string(irFileBuffer *f, String name, bool print_quotes) {
 
 
 	char hex_table[] = "0123456789ABCDEF";
-	isize buf_len = name.len + extra + 2;
+	isize buf_len = name.len + extra + 2 + 1;
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 
@@ -97,6 +97,10 @@ void ir_print_escape_string(irFileBuffer *f, String name, bool print_quotes) {
 
 	if (print_quotes) {
 		buf[j++] = '"';
+	}
+
+	if (prefix_with_dot) {
+		buf[j++] = '.';
 	}
 
 	for (isize i = 0; i < name.len; i++) {
@@ -124,15 +128,12 @@ void ir_print_escape_string(irFileBuffer *f, String name, bool print_quotes) {
 
 void ir_print_encoded_local(irFileBuffer *f, String name) {
 	ir_fprintf(f, "%%");
-	ir_print_escape_string(f, name, true);
+	ir_print_escape_string(f, name, true, false);
 }
 
 void ir_print_encoded_global(irFileBuffer *f, String name, bool remove_prefix) {
 	ir_fprintf(f, "@");
-	if (!remove_prefix) {
-		ir_fprintf(f, ".");
-	}
-	ir_print_escape_string(f, name, true);
+	ir_print_escape_string(f, name, true, !remove_prefix);
 }
 
 void ir_print_type(irFileBuffer *f, irModule *m, Type *t);
@@ -361,7 +362,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		if (!is_type_string(type)) {
 			GB_ASSERT(is_type_array(type));
 			ir_fprintf(f, "c\"");
-			ir_print_escape_string(f, str, false);
+			ir_print_escape_string(f, str, false, false);
 			ir_fprintf(f, "\"");
 		} else {
 			// HACK NOTE(bill): This is a hack but it works because strings are created at the very end
@@ -622,7 +623,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 void ir_print_block_name(irFileBuffer *f, irBlock *b) {
 	if (b != NULL) {
-		ir_print_escape_string(f, b->label, false);
+		ir_print_escape_string(f, b->label, false, false);
 		ir_fprintf(f, "-%td", b->index);
 	} else {
 		ir_fprintf(f, "<INVALID-BLOCK>");
