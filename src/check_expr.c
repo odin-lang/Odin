@@ -30,7 +30,7 @@ gb_inline Type *check_type(Checker *c, AstNode *expression) {
 void error_operand_not_expression(Operand *o) {
 	if (o->mode == Addressing_Type) {
 		gbString err = expr_to_string(o->expr);
-		error_node(o->expr, "`%s` is not an expression", err);
+		error_node(o->expr, "`%s` is not an expression but a type", err);
 		gb_string_free(err);
 		o->mode = Addressing_Invalid;
 	}
@@ -1787,8 +1787,8 @@ bool check_unary_op(Checker *c, Operand *o, Token op) {
 		break;
 
 	case Token_Xor:
-		if (!is_type_integer(type)) {
-			error(op, "Operator `%.*s` is only allowed with integers", LIT(op.string));
+		if (!is_type_integer(type) && !is_type_boolean(type)) {
+			error(op, "Operator `%.*s` is only allowed with integers or booleans", LIT(op.string));
 		}
 		break;
 
@@ -1845,6 +1845,8 @@ bool check_binary_op(Checker *c, Operand *o, Token op) {
 	case Token_Or:
 	case Token_AndEq:
 	case Token_OrEq:
+	case Token_Xor:
+	case Token_XorEq:
 		if (!is_type_integer(type) && !is_type_boolean(type)) {
 			error(op, "Operator `%.*s` is only allowed with integers or booleans", LIT(op.string));
 			return false;
@@ -1852,10 +1854,8 @@ bool check_binary_op(Checker *c, Operand *o, Token op) {
 		break;
 
 	case Token_Mod:
-	case Token_Xor:
 	case Token_AndNot:
 	case Token_ModEq:
-	case Token_XorEq:
 	case Token_AndNotEq:
 		if (!is_type_integer(type)) {
 			error(op, "Operator `%.*s` is only allowed with integers", LIT(op.string));
@@ -4649,13 +4649,19 @@ typedef enum CallArgumentError {
 	CallArgumentError_TooManyArguments,
 } CallArgumentError;
 
+typedef enum CallArgumentErrorMode {
+	CallArgumentMode_NoErrors,
+	CallArgumentMode_ShowErrors,
+} CallArgumentErrorMode;
+
 CallArgumentError check_call_arguments_internal(Checker *c, AstNode *call, Type *proc_type, Operand *operands, isize operand_count,
-                                                bool show_error, i64 *score_) {
+                                                CallArgumentErrorMode show_error_mode, i64 *score_) {
 	ast_node(ce, CallExpr, call);
 	isize param_count = 0;
 	bool variadic = proc_type->Proc.variadic;
 	bool vari_expand = (ce->ellipsis.pos.line != 0);
 	i64 score = 0;
+	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
 
 	if (proc_type->Proc.params != NULL) {
 		param_count = proc_type->Proc.params->Tuple.variable_count;
@@ -4839,7 +4845,7 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 			Type *proc_type = base_type(p->type);
 			if (proc_type != NULL && is_type_proc(proc_type)) {
 				i64 score = 0;
-				CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.e, operands.count, false, &score);
+				CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.e, operands.count, CallArgumentMode_NoErrors, &score);
 				if (err == CallArgumentError_None) {
 					valids[valid_count].index = i;
 					valids[valid_count].score = score;
@@ -4884,14 +4890,14 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 			add_entity_use(c, expr, e);
 			proc_type = e->type;
 			i64 score = 0;
-			CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.e, operands.count, true, &score);
+			CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.e, operands.count, CallArgumentMode_ShowErrors, &score);
 		}
 
 		gb_free(heap_allocator(), valids);
 		gb_free(heap_allocator(), procs);
 	} else {
 		i64 score = 0;
-		CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.e, operands.count, true, &score);
+		CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.e, operands.count, CallArgumentMode_ShowErrors, &score);
 		array_free(&operands);
 	}
 	return proc_type;
@@ -4936,14 +4942,6 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	}
 
 	if (operand->mode == Addressing_Type) {
-	#if 0
-		gbString str = type_to_string(operand->type);
-		error_node(call, "Expected a procedure, got a type `%s`", str);
-		gb_string_free(str);
-		operand->mode = Addressing_Invalid;
-		operand->expr = call;
-		return Expr_Stmt;
-	#else
 		Type *t = operand->type;
 		gbString str = type_to_string(t);
 		operand->mode = Addressing_Invalid;
@@ -4961,7 +4959,6 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 
 		gb_string_free(str);
 		return Expr_Expr;
-	#endif
 	}
 
 	if (operand->mode == Addressing_Builtin) {

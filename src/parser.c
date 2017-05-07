@@ -32,8 +32,7 @@ typedef struct AstFile {
 	// <  0: In Control Clause
 	// NOTE(bill): Used to prevent type literals in control clauses
 	isize          expr_level;
-	bool           allow_range;
-	bool           ignore_operand;
+	bool           allow_range; // NOTE(bill): Ranges are only allowed in certain cases
 
 	AstNodeArray   decls;
 	bool           is_global_scope;
@@ -3774,7 +3773,48 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, AstNodeArray
 			syntax_error_node(node, "Only declarations are allowed at file scope %.*s", LIT(ast_node_strings[node->kind]));
 		} else if (node->kind == AstNode_ImportDecl) {
 			ast_node(id, ImportDecl, node);
+			String collection_name = {0};
+			String oirignal_string = id->relpath.string;
 			String file_str = id->relpath.string;
+			gbAllocator allocator = heap_allocator(); // TODO(bill): Change this allocator
+			String import_file = {0};
+
+		#if 0
+			isize colon_pos = -1;
+			for (isize j = 0; j < file_str.len; j++) {
+				if (file_str.text[j] == ':') {
+					colon_pos = j;
+					break;
+				}
+			}
+			if (colon_pos > 0) {
+				collection_name = make_string(file_str.text, colon_pos);
+				file_str.text += colon_pos+1;
+				file_str.len  -= colon_pos+1;
+			}
+
+			if (collection_name.len == 0) {
+				syntax_error_node(node, "Missing import collection for path: `%.*s`", LIT(oirignal_string));
+				decls.e[i] = ast_bad_decl(f, id->relpath, id->relpath);
+				continue;
+			}
+
+
+			if (str_eq(collection_name, str_lit("core"))) {
+				String abs_path = get_fullpath_core(allocator, file_str);
+				if (gb_file_exists(cast(char *)abs_path.text)) { // NOTE(bill): This should be null terminated
+					import_file = abs_path;
+				}
+			} else if (str_eq(collection_name, str_lit("local"))) {
+				String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
+				if (gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
+					import_file = rel_path;
+				}
+			} else {
+				syntax_error_node(node, "Unknown import collection: `%.*s`", LIT(collection_name));
+				decls.e[i] = ast_bad_decl(f, id->relpath, id->relpath);
+				continue;
+			}
 
 			if (!is_import_path_valid(file_str)) {
 				if (id->is_import) {
@@ -3787,16 +3827,28 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, AstNodeArray
 				continue;
 			}
 
-			gbAllocator allocator = heap_allocator(); // TODO(bill): Change this allocator
+		#else
+			if (!is_import_path_valid(file_str)) {
+				if (id->is_import) {
+					syntax_error_node(node, "Invalid import path: `%.*s`", LIT(file_str));
+				} else {
+					syntax_error_node(node, "Invalid include path: `%.*s`", LIT(file_str));
+				}
+				// NOTE(bill): It's a naughty name
+				decls.e[i] = ast_bad_decl(f, id->relpath, id->relpath);
+				continue;
+			}
+
 
 			String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
-			String import_file = rel_path;
+			import_file = rel_path;
 			if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
 				String abs_path = get_fullpath_core(allocator, file_str);
 				if (gb_file_exists(cast(char *)abs_path.text)) {
 					import_file = abs_path;
 				}
 			}
+		#endif
 
 			id->fullpath = import_file;
 			try_add_import_path(p, import_file, file_str, ast_node_token(node).pos);
