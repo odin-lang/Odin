@@ -628,9 +628,10 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
 		if fi.prec_set {
 			prec = fi.prec;
 		}
-		buf: [128]byte;
+
+		buf: [386]byte;
 		str := strconv.append_float(buf[1..<1], v, 'f', prec, bit_size);
-		str = string(buf[0..<len(str)]);
+		str = string(buf[0..len(str)]);
 		if str[1] == '+' || str[1] == '-' {
 			str = str[1..];
 		} else {
@@ -650,7 +651,7 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
 			if fi.zero && fi.width_set && fi.width > len(str) {
 				write_byte(fi.buf, str[0]);
 				fmt_write_padding(fi, fi.width - len(str));
-				write_string(fi.buf, str[1..<]);
+				write_string(fi.buf, str[1..]);
 			} else {
 				_pad(fi, str);
 			}
