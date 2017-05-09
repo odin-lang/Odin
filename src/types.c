@@ -1763,7 +1763,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	} break;
 
 	case Type_Basic: {
-		GB_ASSERT(is_type_typed(t));
+		GB_ASSERT_MSG(is_type_typed(t), "%s", type_to_string(t));
 		BasicKind kind = t->Basic.kind;
 		i64 size = t->Basic.size;
 		if (size > 0) {

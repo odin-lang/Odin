@@ -604,7 +604,7 @@ fmt_int :: proc(fi: ^Fmt_Info, u: u64, is_signed: bool, bit_size: int, verb: run
 }
 
 _pad :: proc(fi: ^Fmt_Info, s: string) {
-	if !fi.width_set || fi.width == 0 {
+	if !fi.width_set {
 		write_string(fi.buf, s);
 		return;
 	}
@@ -818,11 +818,6 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 		fmt_arg(fi, any{v.data, info.elem}, verb);
 
 	case Array:
-		if verb != 'v' {
-			fmt_bad_verb(fi, verb);
-			return;
-		}
-
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
 		for i in 0..<info.count {
@@ -830,15 +825,10 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				write_string(fi.buf, ", ");
 			}
 			data := ^byte(v.data) + i*info.elem_size;
-			fmt_arg(fi, any{rawptr(data), info.elem}, 'v');
+			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
 		}
 
 	case Dynamic_Array:
-		if verb != 'v' {
-			fmt_bad_verb(fi, verb);
-			return;
-		}
-
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
 		array := (^raw.Dynamic_Array)(v.data);
@@ -847,7 +837,32 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 				write_string(fi.buf, ", ");
 			}
 			data := ^byte(array.data) + i*info.elem_size;
-			fmt_arg(fi, any{rawptr(data), info.elem}, 'v');
+			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
+		}
+
+	case Slice:
+		write_byte(fi.buf, '[');
+		defer write_byte(fi.buf, ']');
+		slice := (^[]byte)(v.data);
+		for _, i in slice {
+			if i > 0 {
+				write_string(fi.buf, ", ");
+			}
+			data := &slice[0] + i*info.elem_size;
+			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
+		}
+
+	case Vector:
+		write_byte(fi.buf, '<');
+		defer write_byte(fi.buf, '>');
+
+		for i in 0..<info.count {
+			if i > 0 {
+				write_string(fi.buf, ", ");
+			}
+
+			data := ^byte(v.data) + i*info.elem_size;
+			fmt_value(fi, any{rawptr(data), info.elem}, verb);
 		}
 
 	case Map:
@@ -884,35 +899,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			fmt_arg(fi, any{rawptr(value), info.value}, 'v');
 		}
 
-	case Slice:
-		if verb != 'v' {
-			fmt_bad_verb(fi, verb);
-			return;
-		}
 
-		write_byte(fi.buf, '[');
-		defer write_byte(fi.buf, ']');
-		slice := (^[]byte)(v.data);
-		for _, i in slice {
-			if i > 0 {
-				write_string(fi.buf, ", ");
-			}
-			data := &slice[0] + i*info.elem_size;
-			fmt_arg(fi, any{rawptr(data), info.elem}, 'v');
-		}
-
-	case Vector:
-		write_byte(fi.buf, '<');
-		defer write_byte(fi.buf, '>');
-
-		for i in 0..<info.count {
-			if i > 0 {
-				write_string(fi.buf, ", ");
-			}
-
-			data := ^byte(v.data) + i*info.elem_size;
-			fmt_value(fi, any{rawptr(data), info.elem}, 'v');
-		}
 
 	case Struct:
 		write_byte(fi.buf, '{');

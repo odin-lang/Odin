@@ -2710,8 +2710,8 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	if (is_type_integer(src) && is_type_integer(dst)) {
 		GB_ASSERT(src->kind == Type_Basic &&
 		          dst->kind == Type_Basic);
-		i64 sz = type_size_of(proc->module->allocator, src);
-		i64 dz = type_size_of(proc->module->allocator, dst);
+		i64 sz = type_size_of(proc->module->allocator, default_type(src));
+		i64 dz = type_size_of(proc->module->allocator, default_type(dst));
 		irConvKind kind = irConv_trunc;
 
 		if (dz < sz) {
