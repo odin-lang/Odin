@@ -425,6 +425,7 @@ void check_label(Checker *c, AstNode *label) {
 
 	Entity *e = make_entity_label(c->allocator, c->context.scope, l->name->Ident, t_invalid, label);
 	add_entity(c, c->context.scope, l->name, e);
+	e->parent_proc_decl = c->context.curr_proc_decl;
 
 	if (ok) {
 		BlockLabel bl = {name, label};
@@ -1448,7 +1449,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 			AstNode *ident = bs->label;
 			String name = ident->Ident.string;
-			Entity *e = scope_lookup_entity(c->context.scope, name);
+			Operand o = {0};
+			Entity *e = check_ident(c, &o, ident, NULL, NULL, false);
 			if (e == NULL) {
 				error_node(ident, "Undeclared label name: %.*s", LIT(name));
 				return;
@@ -1473,8 +1475,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			bool is_selector = false;
 			if (expr->kind == AstNode_Ident) {
-				String name = expr->Ident.string;
-				e = scope_lookup_entity(c->context.scope, name);
+				Operand o = {0};
+				e = check_ident(c, &o, expr, NULL, NULL, true);
 			} else if (expr->kind == AstNode_SelectorExpr) {
 				Operand o = {0};
 				e = check_selector(c, &o, expr, NULL);
@@ -1548,6 +1550,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				if (entity == NULL) {
 					entity = make_entity_dummy_variable(c->allocator, c->global_scope, ast_node_token(name));
 				}
+				entity->parent_proc_decl = c->context.curr_proc_decl;
 				entities[entity_count++] = entity;
 			}
 

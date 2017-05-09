@@ -1,6 +1,7 @@
-typedef struct Scope Scope;
-typedef struct Checker Checker;
-typedef struct Type Type;
+typedef struct Scope    Scope;
+typedef struct Checker  Checker;
+typedef struct Type     Type;
+typedef struct DeclInfo DeclInfo;
 // typedef enum BuiltinProcId BuiltinProcId;
 
 
@@ -67,6 +68,7 @@ struct Entity {
 	Scope *    scope;
 	Type *     type;
 	AstNode *  identifier; // Can be NULL
+	DeclInfo * parent_proc_decl; // NULL if in file/global scope
 
 	// TODO(bill): Cleanup how `using` works for entities
 	Entity *   using_parent;
@@ -169,6 +171,7 @@ Entity *make_entity_using_variable(gbAllocator a, Entity *parent, Token token, T
 	token.pos = parent->token.pos;
 	Entity *entity = alloc_entity(a, Entity_Variable, parent->scope, token, type);
 	entity->using_parent = parent;
+	entity->parent_proc_decl = parent->parent_proc_decl;
 	entity->flags |= EntityFlag_Using;
 	return entity;
 }

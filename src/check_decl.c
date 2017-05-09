@@ -44,6 +44,8 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 		e->type = t;
 	}
 
+	e->parent_proc_decl = c->context.curr_proc_decl;
+
 	check_assignment(c, operand, e->type, context_name);
 	if (operand->mode == Addressing_Invalid) {
 		return NULL;
@@ -121,6 +123,8 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	if (operand->mode == Addressing_Invalid) {
 		return;
 	}
+
+	e->parent_proc_decl = c->context.curr_proc_decl;
 
 	e->Constant.value = operand->value;
 }
@@ -497,6 +501,8 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 	c->context.scope = d->scope;
 	c->context.decl  = d;
 
+	e->parent_proc_decl = c->context.curr_proc_decl;
+
 	switch (e->kind) {
 	case Entity_Variable:
 		check_var_decl(c, e, d->entities, d->entity_count, d->type_expr, d->init_expr);
@@ -535,6 +541,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	c->context.scope = decl->scope;
 	c->context.decl = decl;
 	c->context.proc_name = proc_name;
+	c->context.curr_proc_decl = decl;
 
 	GB_ASSERT(type->kind == Type_Proc);
 	if (type->Proc.param_count > 0) {

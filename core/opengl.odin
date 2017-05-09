@@ -54,6 +54,7 @@ GenSamplers:              proc(count: i32, buffers: ^u32) #cc_c;
 DeleteBuffers:            proc(count: i32, buffers: ^u32) #cc_c;
 BindBuffer:               proc(target: i32, buffer: u32) #cc_c;
 BindVertexArray:          proc(buffer: u32) #cc_c;
+DeleteVertexArrays:       proc(count: i32, arrays: ^u32) #cc_c;
 BindSampler:              proc(position: i32, sampler: u32) #cc_c;
 BufferData:               proc(target: i32, size: int, data: rawptr, usage: i32) #cc_c;
 BufferSubData:            proc(target: i32, offset, size: int, data: rawptr) #cc_c;
@@ -120,6 +121,7 @@ init :: proc() {
 	set_proc_address(&BindBuffer,              "glBindBuffer\x00");
 	set_proc_address(&BindSampler,             "glBindSampler\x00");
 	set_proc_address(&BindVertexArray,         "glBindVertexArray\x00");
+	set_proc_address(&DeleteVertexArrays,      "glDeleteVertexArrays\x00");
 	set_proc_address(&BufferData,              "glBufferData\x00");
 	set_proc_address(&BufferSubData,           "glBufferSubData\x00");
 

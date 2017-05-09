@@ -1208,6 +1208,16 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 		}
 		return NULL;
 	}
+	if (e->parent_proc_decl != NULL &&
+	    e->parent_proc_decl != c->context.curr_proc_decl) {
+		if (e->kind == Entity_Variable) {
+			error(n->Ident, "Nested procedures do not capture its parent's variables: %.*s", LIT(name));
+			return NULL;
+		} else if (e->kind == Entity_Label) {
+			error(n->Ident, "Nested procedures do not capture its parent's labels: %.*s", LIT(name));
+			return NULL;
+		}
+	}
 
 	bool is_overloaded = false;
 	isize overload_count = 0;

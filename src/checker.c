@@ -299,6 +299,7 @@ typedef struct CheckerContext {
 	bool       in_defer; // TODO(bill): Actually handle correctly
 	String     proc_name;
 	Type *     type_hint;
+	DeclInfo * curr_proc_decl;
 } CheckerContext;
 
 // CheckerInfo stores all the symbol information for a type-checked program
@@ -489,14 +490,14 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 		if (found) {
 			Entity *e = *found;
 			if (gone_thru_proc) {
-				if (e->kind == Entity_Label) {
-					continue;
-				}
-				if (e->kind == Entity_Variable &&
-				    !e->scope->is_file &&
-				    !e->scope->is_global) {
-					continue;
-				}
+				// if (e->kind == Entity_Label) {
+					// continue;
+				// }
+				// if (e->kind == Entity_Variable &&
+				    // !e->scope->is_file &&
+				    // !e->scope->is_global) {
+					// continue;
+				// }
 			}
 
 			if (entity_) *entity_ = e;
@@ -1079,7 +1080,7 @@ void pop_procedure(Checker *c) {
 	array_pop(&c->proc_stack);
 }
 
-Type *const curr_procedure(Checker *c) {
+Type *const curr_procedure_type(Checker *c) {
 	isize count = c->proc_stack.count;
 	if (count > 0) {
 		return c->proc_stack.e[count-1];
