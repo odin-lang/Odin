@@ -2136,6 +2136,7 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 	case Token_Mul:
 	case Token_Quo:
 	case Token_Mod:
+	case Token_ModMod:
 	case Token_And:
 	case Token_AndNot:
 	case Token_Shl:
@@ -2305,6 +2306,7 @@ AstNode *parse_simple_stmt(AstFile *f, bool in_stmt_ok) {
 	case Token_MulEq:
 	case Token_QuoEq:
 	case Token_ModEq:
+	case Token_ModModEq:
 	case Token_AndEq:
 	case Token_OrEq:
 	case Token_XorEq:

@@ -595,6 +595,7 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		case Token_Quo:    return exact_value_float(fmod(cast(f64)a, cast(f64)b));
 		case Token_QuoEq:  c = a / b;  break; // NOTE(bill): Integer division
 		case Token_Mod:    c = a % b;  break;
+		case Token_ModMod: c = ((a % b) + b)%b; break;
 		case Token_And:    c = a & b;  break;
 		case Token_Or:     c = a | b;  break;
 		case Token_Xor:    c = a ^ b;  break;

@@ -2073,12 +2073,21 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	case Token_Mul:
 	case Token_Quo:
 	case Token_Mod:
+	case Token_ModMod:
 	case Token_And:
 	case Token_Or:
 	case Token_Xor:
 		left  = ir_emit_conv(proc, left, type);
 		right = ir_emit_conv(proc, right, type);
 		break;
+	}
+
+	if (op == Token_ModMod) {
+		irValue *n = left;
+		irValue *m = right;
+		irValue *a = ir_emit(proc, ir_instr_binary_op(proc, Token_Mod, n, m, type));
+		irValue *b = ir_emit(proc, ir_instr_binary_op(proc, Token_Add, a, m, type));
+		return ir_emit(proc, ir_instr_binary_op(proc, Token_Mod, b, m, type));
 	}
 
 	return ir_emit(proc, ir_instr_binary_op(proc, op, left, right, type));
@@ -3744,6 +3753,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		case Token_Mul:
 		case Token_Quo:
 		case Token_Mod:
+		case Token_ModMod:
 		case Token_And:
 		case Token_Or:
 		case Token_Xor:

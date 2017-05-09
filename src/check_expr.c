@@ -1864,8 +1864,10 @@ bool check_binary_op(Checker *c, Operand *o, Token op) {
 		break;
 
 	case Token_Mod:
+	case Token_ModMod:
 	case Token_AndNot:
 	case Token_ModEq:
+	case Token_ModModEq:
 	case Token_AndNotEq:
 		if (!is_type_integer(type)) {
 			error(op, "Operator `%.*s` is only allowed with integers", LIT(op.string));
@@ -2669,8 +2671,10 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	switch (op.kind) {
 	case Token_Quo:
 	case Token_Mod:
+	case Token_ModMod:
 	case Token_QuoEq:
 	case Token_ModEq:
+	case Token_ModModEq:
 		if ((x->mode == Addressing_Constant || is_type_integer(x->type)) &&
 		    y->mode == Addressing_Constant) {
 			bool fail = false;

@@ -25,6 +25,7 @@ TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
 	TOKEN_KIND(Token_Mul,      "*"), \
 	TOKEN_KIND(Token_Quo,      "/"), \
 	TOKEN_KIND(Token_Mod,      "%"), \
+	TOKEN_KIND(Token_ModMod,   "%%"), \
 	TOKEN_KIND(Token_And,      "&"), \
 	TOKEN_KIND(Token_Or,       "|"), \
 	TOKEN_KIND(Token_Xor,      "~"), \
@@ -41,6 +42,7 @@ TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
 	TOKEN_KIND(Token_MulEq,      "*="), \
 	TOKEN_KIND(Token_QuoEq,      "/="), \
 	TOKEN_KIND(Token_ModEq,      "%="), \
+	TOKEN_KIND(Token_ModModEq,   "%%="), \
 	TOKEN_KIND(Token_AndEq,      "&="), \
 	TOKEN_KIND(Token_OrEq,       "|="), \
 	TOKEN_KIND(Token_XorEq,      "~="), \
@@ -892,8 +894,9 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '}':  token.kind = Token_CloseBrace;   break;
 		case '\\': token.kind = Token_BackSlash;    break;
 
+		case '%': token.kind = token_kind_dub_eq(t, '%', Token_Mod, Token_ModEq, Token_ModMod, Token_ModModEq);      break;
+
 		case '*': token.kind = token_kind_variant2(t, Token_Mul, Token_MulEq);                                        break;
-		case '%': token.kind = token_kind_variant2(t, Token_Mod, Token_ModEq);                                        break;
 		case '=': token.kind = token_kind_variant2(t, Token_Eq,  Token_CmpEq);                                        break;
 		case '~': token.kind = token_kind_variant2(t, Token_Xor, Token_XorEq);                                        break;
 		case '!': token.kind = token_kind_variant2(t, Token_Not, Token_NotEq);                                        break;
