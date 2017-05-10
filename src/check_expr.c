@@ -3126,6 +3126,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 				Entity **procs = gb_alloc_array(heap_allocator(), Entity *, overload_count);
 				map_entity_multi_get_all(&import_scope->elements, key, procs);
+
 				for (isize i = 0; i < overload_count; i++) {
 					Type *t = base_type(procs[i]->type);
 					if (t == t_invalid) {

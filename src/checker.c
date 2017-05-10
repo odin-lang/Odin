@@ -1797,7 +1797,6 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 			}
 		}
 
-
 		if (!previously_added) {
 			array_add(&parent_scope->imported, scope);
 		} else {
@@ -1813,19 +1812,21 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 				if (e->scope == parent_scope) {
 					continue;
 				}
+
+
 				if (!is_entity_kind_exported(e->kind)) {
 					continue;
 				}
 				if (id->is_import) {
 					if (is_entity_exported(e)) {
 						// TODO(bill): Should these entities be imported but cause an error when used?
-						bool ok = add_entity(c, parent_scope, NULL, e);
+						bool ok = add_entity(c, parent_scope, e->identifier, e);
 						if (ok) {
 							map_bool_set(&parent_scope->implicit, hash_pointer(e), true);
 						}
 					}
 				} else {
-					add_entity(c, parent_scope, NULL, e);
+					add_entity(c, parent_scope, e->identifier, e);
 				}
 			}
 		} else {

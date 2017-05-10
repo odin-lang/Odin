@@ -1614,31 +1614,23 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 				return gb_clamp(t->Record.custom_align, 1, build_context.max_align);
 			}
 			if (t->Record.field_count > 0) {
-				// TODO(bill): What is this supposed to be?
+				i64 max = 1;
 				if (t->Record.is_packed) {
-					i64 max = build_context.word_size;
-					for (isize i = 0; i < t->Record.field_count; i++) {
-						Type *field_type = t->Record.fields[i]->type;
-						type_path_push(path, field_type);
-						if (path->failure) {
-							return FAILURE_ALIGNMENT;
-						}
-						i64 align = type_align_of_internal(allocator, field_type, path);
-						type_path_pop(path);
-						if (max < align) {
-							max = align;
-						}
+					max = build_context.word_size;
+				}
+				for (isize i = 0; i < t->Record.field_count; i++) {
+					Type *field_type = t->Record.fields[i]->type;
+					type_path_push(path, field_type);
+					if (path->failure) {
+						return FAILURE_ALIGNMENT;
 					}
-					return max;
+					i64 align = type_align_of_internal(allocator, field_type, path);
+					type_path_pop(path);
+					if (max < align) {
+						max = align;
+					}
 				}
-				Type *field_type = t->Record.fields[0]->type;
-				type_path_push(path, field_type);
-				if (path->failure) {
-					return FAILURE_ALIGNMENT;
-				}
-				i64 align = type_align_of_internal(allocator, field_type, path);
-				type_path_pop(path);
-				return align;
+				return max;
 			}
 			break;
 		case TypeRecord_Union: {
