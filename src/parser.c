@@ -2746,11 +2746,11 @@ AstNode *parse_type_or_ident(AstFile *f) {
 					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
 				}
 				is_packed = true;
-			// } else if (str_eq(tag.string, str_lit("ordered"))) {
-				// if (is_ordered) {
-					// syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
-				// }
-				// is_ordered = true;
+			} else if (str_eq(tag.string, str_lit("ordered"))) {
+				if (is_ordered) {
+					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
+				}
+				is_ordered = true;
 			} else if (str_eq(tag.string, str_lit("align"))) {
 				if (align) {
 					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));

@@ -65,11 +65,11 @@ SM_CYSCREEN :: 1;
 SW_SHOW :: 5;
 
 
-Point :: struct {
+Point :: struct #ordered {
 	x, y: i32,
 }
 
-WndClassExA :: struct {
+WndClassExA :: struct #ordered {
 	size, style:           u32,
 	wnd_proc:              Wnd_Proc,
 	cls_extra, wnd_extra:  i32,
@@ -81,7 +81,7 @@ WndClassExA :: struct {
 	sm:                    Hicon,
 }
 
-Msg :: struct {
+Msg :: struct #ordered {
 	hwnd:    Hwnd,
 	message: u32,
 	wparam:  Wparam,
@@ -90,24 +90,24 @@ Msg :: struct {
 	pt:      Point,
 }
 
-Rect :: struct {
+Rect :: struct #ordered {
 	left:   i32,
 	top:    i32,
 	right:  i32,
 	bottom: i32,
 }
 
-Filetime :: struct {
+Filetime :: struct #ordered {
 	lo, hi: u32,
 }
 
-Systemtime :: struct {
+Systemtime :: struct #ordered {
 	year, month: u16,
 	day_of_week, day: u16,
 	hour, minute, second, millisecond: u16,
 }
 
-By_Handle_File_Information :: struct {
+By_Handle_File_Information :: struct #ordered {
 	file_attributes:      u32,
 	creation_time,
 	last_access_time,
@@ -120,7 +120,7 @@ By_Handle_File_Information :: struct {
 	file_index_low:       u32,
 }
 
-File_Attribute_Data :: struct {
+File_Attribute_Data :: struct #ordered {
 	file_attributes:  u32,
 	creation_time,
 	last_access_time,
@@ -129,7 +129,7 @@ File_Attribute_Data :: struct {
 	file_size_low:    u32,
 }
 
-Find_Data :: struct {
+Find_Data :: struct #ordered {
     file_attributes     : u32,
     creation_time       : Filetime,
     last_access_time    : Filetime,
@@ -299,7 +299,7 @@ HEAP_ZERO_MEMORY :: 0x00000008;
 
 // Synchronization
 
-Security_Attributes :: struct {
+Security_Attributes :: struct #ordered {
 	length:              u32,
 	security_descriptor: rawptr,
 	inherit_handle:      Bool,
@@ -350,14 +350,14 @@ SWP_NOSIZE        :: 0x0001;
 SWP_NOMOVE        :: 0x0002;
 
 
-Monitor_Info :: struct {
+Monitor_Info :: struct #ordered {
 	size:      u32,
 	monitor:   Rect,
 	work:      Rect,
 	flags:     u32,
 }
 
-Window_Placement :: struct {
+Window_Placement :: struct #ordered {
 	length:     u32,
 	flags:      u32,
 	show_cmd:   u32,
@@ -394,7 +394,7 @@ LOWORD :: proc(lParam: Lparam) -> u16 { return u16(lParam); }
 
 
 
-Bitmap_Info_Header :: struct {
+Bitmap_Info_Header :: struct #ordered {
 	size:              u32,
 	width, height:     i32,
 	planes, bit_count: i16,
@@ -405,13 +405,13 @@ Bitmap_Info_Header :: struct {
 	clr_used:          u32,
 	clr_important:     u32,
 }
-Bitmap_Info :: struct {
+Bitmap_Info :: struct #ordered {
 	using header: Bitmap_Info_Header,
 	colors:       [1]Rgb_Quad,
 }
 
 
-Rgb_Quad :: struct { blue, green, red, reserved: byte }
+Rgb_Quad :: struct #ordered { blue, green, red, reserved: byte }
 
 BI_RGB         :: 0;
 DIB_RGB_COLORS :: 0x00;
@@ -457,7 +457,7 @@ PFD_DOUBLEBUFFER_DONTCARE :: 0x40000000;
 PFD_STEREO_DONTCARE       :: 0x80000000;
 
 
-PIXELFORMATDESCRIPTOR :: struct {
+PIXELFORMATDESCRIPTOR :: struct #ordered {
 	size,
 	version,
 	flags: u32,

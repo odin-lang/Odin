@@ -555,7 +555,13 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	struct_type->Record.field_count         = field_count;
 	struct_type->Record.names = make_names_field_for_record(c, c->context.scope);
 
-	if (false && !st->is_packed && !st->is_ordered) {
+	type_set_offsets(c->allocator, struct_type);
+
+
+	if (!struct_type->failure && !st->is_packed && !st->is_ordered) {
+		struct_type->failure = false;
+		struct_type->Record.are_offsets_set = false;
+		struct_type->Record.offsets = NULL;
 		// NOTE(bill): Reorder fields for reduced size/performance
 
 		Entity **reordered_fields = gb_alloc_array(c->allocator, Entity *, field_count);
@@ -576,11 +582,8 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 		struct_type->Record.fields = reordered_fields;
 	}
 
-	{
-		// i64 size = type_size_of(c->allocator, struct_type);
-	}
-
 	type_set_offsets(c->allocator, struct_type);
+
 
 	if (st->align != NULL) {
 		if (st->is_packed) {
