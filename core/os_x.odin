@@ -196,11 +196,11 @@ seek :: proc(fd: Handle, offset: AddressSize, whence: int) -> (AddressSize, Errn
 	return final_offset, 0;
 }
 
-file_size :: proc(fd: Handle) -> (i64, bool) {
+file_size :: proc(fd: Handle) -> (i64, Errno) {
 	prev, _ := seek(fd, 0, SEEK_CUR);
 	size, err := seek(fd, 0, SEEK_END);
 	seek(fd, prev, SEEK_SET);
-	return size, err != 0;
+	return size, err;
 }
 
 
