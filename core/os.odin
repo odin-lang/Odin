@@ -8,13 +8,13 @@ write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 
 read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	fd, err := open(name, O_RDONLY, 0);
-	if err != ERROR_NONE {
+	if err != 0 {
 		return nil, false;
 	}
 	defer close(fd);
 
 	length: i64;
-	if length, err = file_size(fd); err != ERROR_NONE {
+	if length, err = file_size(fd); err != 0 {
 		return nil, false;
 	}
 
@@ -28,7 +28,7 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	}
 
 	bytes_read, read_err := read(fd, data);
-	if read_err != ERROR_NONE {
+	if read_err != 0 {
 		free(data);
 		return nil, false;
 	}

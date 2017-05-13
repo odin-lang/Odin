@@ -3658,21 +3658,21 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		irValue *cond = ir_build_cond(proc, te->cond, then, else_);
 		ir_start_block(proc, then);
 
+		Type *type = type_of_expr(proc->module->info, expr);
+
 		ir_open_scope(proc);
-		array_add(&edges, ir_build_expr(proc, te->x));
+		array_add(&edges, ir_emit_conv(proc, ir_build_expr(proc, te->x), type));
 		ir_close_scope(proc, irDeferExit_Default, NULL);
 
 		ir_emit_jump(proc, done);
 		ir_start_block(proc, else_);
 
 		ir_open_scope(proc);
-		array_add(&edges, ir_build_expr(proc, te->y));
+		array_add(&edges, ir_emit_conv(proc, ir_build_expr(proc, te->y), type));
 		ir_close_scope(proc, irDeferExit_Default, NULL);
 
 		ir_emit_jump(proc, done);
 		ir_start_block(proc, done);
-
-		Type *type = type_of_expr(proc->module->info, expr);
 
 		return ir_emit(proc, ir_instr_phi(proc, edges, type));
 	case_end;
