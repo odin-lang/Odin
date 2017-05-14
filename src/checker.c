@@ -137,9 +137,9 @@ typedef enum AddressingMode {
 	Addressing_Value,      // computed value (rvalue)
 	Addressing_Immutable,  // immutable computed value (const rvalue)
 	Addressing_Variable,   // addressable variable (lvalue)
-	Addressing_Constant,   // constant & type will be a of Type_Basic (stripping Type_Named)
+	Addressing_Constant,   // constant
 	Addressing_Type,       // type
-	Addressing_Builtin,    // built in procedure
+	Addressing_Builtin,    // built-in procedure
 	Addressing_Overload,   // overloaded procedure
 	Addressing_MapIndex,   // map index expression -
 	                       // 	lhs: acts like a Variable

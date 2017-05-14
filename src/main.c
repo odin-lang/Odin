@@ -177,7 +177,7 @@ int main(int argc, char **argv) {
 		}
 		init_filename = argv[2];
 	} else if (str_eq(arg1, str_lit("version"))) {
-		gb_printf("%s version %.*s", argv[0], LIT(build_context.ODIN_VERSION));
+		gb_printf("%s version %.*s\n", argv[0], LIT(build_context.ODIN_VERSION));
 		return 0;
 	} else {
 		usage(argv[0]);
