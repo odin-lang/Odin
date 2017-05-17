@@ -4830,8 +4830,9 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			a = ir_emit_deep_field_gep(proc, a, sel);
 			return ir_addr(a);
 		} else {
-			Type *type = base_type(type_of_expr(proc->module->info, se->expr));
-			GB_ASSERT(is_type_integer(type));
+			Type *type = type_deref(type_of_expr(proc->module->info, se->expr));
+			Type *selector_type = base_type(type_of_expr(proc->module->info, se->selector));
+			GB_ASSERT_MSG(is_type_integer(selector_type), "%s", type_to_string(selector_type));
 			ExactValue val = type_and_value_of_expression(proc->module->info, sel)->value;
 			i64 index = val.value_integer;
 
@@ -7283,7 +7284,17 @@ void ir_gen_tree(irGen *s) {
 		irBlock *done = ir_new_block(proc, NULL, "if.done"); // NOTE(bill): Append later
 		ir_emit_if(proc, cond, then, done);
 		ir_start_block(proc, then);
-		ir_emit_global_call(proc, "main", NULL, 0);
+
+		{
+			String main_name = str_lit("main");
+			irValue **found = map_ir_value_get(&m->members, hash_string(main_name));
+			if (found != NULL) {
+				ir_emit_call(proc, *found, NULL, 0);
+			} else {
+				ir_emit(proc, ir_alloc_instr(proc, irInstr_StartupRuntime));
+			}
+		}
+
 		ir_emit_jump(proc, done);
 		ir_start_block(proc, done);
 

@@ -573,14 +573,12 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			} else {
 				for (isize i = 0; i < value_count; i++) {
 					Entity *f = type->Record.fields_in_src_order[i];
-
-					if (str_eq(f->token.string, str_lit("_"))) {
-						values[f->Variable.field_index] = (ExactValue){0};
-					} else {
-						TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems.e[i]);
-						GB_ASSERT(tav != NULL);
-						values[f->Variable.field_index] = tav->value;
+					TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems.e[i]);
+					ExactValue val = {0};
+					if (tav != NULL) {
+						val = tav->value;
 					}
+					values[f->Variable.field_index] = val;
 				}
 			}
 

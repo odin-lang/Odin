@@ -3054,8 +3054,8 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		return NULL;
 	}
 
-	// if (selector->kind != AstNode_Ident && selector->kind != AstNode_BasicLit) {
-	if (selector->kind != AstNode_Ident) {
+	if (selector->kind != AstNode_Ident && selector->kind != AstNode_BasicLit) {
+	// if (selector->kind != AstNode_Ident) {
 		error_node(selector, "Illegal selector kind: `%.*s`", LIT(ast_node_strings[selector->kind]));
 		operand->mode = Addressing_Invalid;
 		operand->expr = node;
@@ -5406,6 +5406,15 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						check_assignment(c, o, field->type, str_lit("structure literal"));
 					}
 				} else {
+					bool all_fields_are_blank = true;
+					for (isize i = 0; i < t->Record.field_count; i++) {
+						Entity *field = t->Record.fields_in_src_order[i];
+						if (str_ne(field->token.string, str_lit("_"))) {
+							all_fields_are_blank = false;
+							break;
+						}
+					}
+
 					for_array(index, cl->elems) {
 						AstNode *elem = cl->elems.e[index];
 						if (elem->kind == AstNode_FieldValue) {
@@ -5414,7 +5423,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						}
 						Entity *field = t->Record.fields_in_src_order[index];
 
-						if (str_eq(field->token.string, str_lit("_"))) {
+						if (!all_fields_are_blank && str_eq(field->token.string, str_lit("_"))) {
 							// NOTE(bill): Ignore blank identifiers
 							continue;
 						}

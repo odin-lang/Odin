@@ -1226,7 +1226,7 @@ Selection lookup_field(gbAllocator a, Type *type_, String field_name, bool is_ty
 }
 
 Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
-	GB_ASSERT(is_type_struct(type) || is_type_tuple(type));
+	GB_ASSERT(is_type_struct(type) || is_type_union(type) || is_type_tuple(type));
 	type = base_type(type);
 
 	i64 max_count = 0;

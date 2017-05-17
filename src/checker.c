@@ -291,6 +291,13 @@ typedef struct DelayedDecl {
 	AstNode *decl;
 } DelayedDecl;
 
+typedef struct CheckerFileNode {
+	i32       id;
+	Array_i32 wheres;
+	Array_i32 whats;
+	i32       score; // Higher the score, the better
+} CheckerFileNode;
+
 typedef struct CheckerContext {
 	Scope *    file_scope;
 	Scope *    scope;
@@ -326,6 +333,7 @@ typedef struct Checker {
 	Array(ProcedureInfo)   procs; // NOTE(bill): Procedures to check
 	Array(DelayedDecl)     delayed_imports;
 	Array(DelayedDecl)     delayed_foreign_libraries;
+	Array(CheckerFileNode) file_nodes;
 
 	gbArena                arena;
 	gbArena                tmp_arena;
@@ -735,6 +743,16 @@ void init_checker(Checker *c, Parser *parser, BuildContext *bc) {
 	array_init(&c->procs, a);
 	array_init(&c->delayed_imports, a);
 	array_init(&c->delayed_foreign_libraries, a);
+	array_init(&c->file_nodes, a);
+
+	for_array(i, parser->files) {
+		AstFile *file = &parser->files.e[i];
+		CheckerFileNode node = {0};
+		node.id = file->id;
+		array_init(&node.whats,  a);
+		array_init(&node.wheres, a);
+		array_add(&c->file_nodes, node);
+	}
 
 	// NOTE(bill): Is this big enough or too small?
 	isize item_size = gb_max3(gb_size_of(Entity), gb_size_of(Type), gb_size_of(Scope));
@@ -762,6 +780,7 @@ void destroy_checker(Checker *c) {
 	array_free(&c->procs);
 	array_free(&c->delayed_imports);
 	array_free(&c->delayed_foreign_libraries);
+	array_free(&c->file_nodes);
 
 	gb_arena_free(&c->arena);
 }
@@ -1746,6 +1765,106 @@ String path_to_entity_name(String name, String fullpath) {
 }
 
 void check_import_entities(Checker *c, MapScope *file_scopes) {
+#if 0
+	// TODO(bill): Dependency ordering for imports
+	{
+		Array_i32 shared_global_file_ids = {0};
+		array_init_reserve(&shared_global_file_ids, heap_allocator(), c->file_nodes.count);
+		for_array(i, c->file_nodes) {
+			CheckerFileNode *node = &c->file_nodes.e[i];
+			AstFile *f = &c->parser->files.e[node->id];
+			GB_ASSERT(f->id == node->id);
+			if (f->scope->is_global) {
+				array_add(&shared_global_file_ids, f->id);
+			}
+		}
+
+		for_array(i, c->file_nodes) {
+			CheckerFileNode *node = &c->file_nodes.e[i];
+			AstFile *f = &c->parser->files.e[node->id];
+			if (!f->scope->is_global) {
+				for_array(j, shared_global_file_ids) {
+					array_add(&node->whats, shared_global_file_ids.e[j]);
+				}
+			}
+		}
+
+		array_free(&shared_global_file_ids);
+	}
+
+	for_array(i, c->delayed_imports) {
+		Scope *parent_scope = c->delayed_imports.e[i].parent;
+		AstNode *decl = c->delayed_imports.e[i].decl;
+		ast_node(id, ImportDecl, decl);
+		Token token = id->relpath;
+
+		GB_ASSERT(parent_scope->is_file);
+
+		if (!parent_scope->has_been_imported) {
+			continue;
+		}
+
+		HashKey key = hash_string(id->fullpath);
+		Scope **found = map_scope_get(file_scopes, key);
+		if (found == NULL) {
+			for_array(scope_index, file_scopes->entries) {
+				Scope *scope = file_scopes->entries.e[scope_index].value;
+				gb_printf_err("%.*s\n", LIT(scope->file->tokenizer.fullpath));
+			}
+			gb_printf_err("%.*s(%td:%td)\n", LIT(token.pos.file), token.pos.line, token.pos.column);
+			GB_PANIC("Unable to find scope for file: %.*s", LIT(id->fullpath));
+		}
+		Scope *scope = *found;
+
+		if (scope->is_global) {
+			continue;
+		}
+
+		i32 parent_id = parent_scope->file->id;
+		i32 child_id  = scope->file->id;
+
+		// TODO(bill): Very slow
+		CheckerFileNode *parent_node = &c->file_nodes.e[parent_id];
+		bool add_child = true;
+		for_array(j, parent_node->whats) {
+			if (parent_node->whats.e[j] == child_id) {
+				add_child = false;
+				break;
+			}
+		}
+		if (add_child) {
+			array_add(&parent_node->whats, child_id);
+		}
+
+		CheckerFileNode *child_node  = &c->file_nodes.e[child_id];
+		bool add_parent = true;
+		for_array(j, parent_node->wheres) {
+			if (parent_node->wheres.e[j] == parent_id) {
+				add_parent = false;
+				break;
+			}
+		}
+		if (add_parent) {
+			array_add(&child_node->wheres, parent_id);
+		}
+	}
+
+	for_array(i, c->file_nodes) {
+		CheckerFileNode *node = &c->file_nodes.e[i];
+		AstFile *f = &c->parser->files.e[node->id];
+		gb_printf_err("File %d %.*s", node->id, LIT(f->tokenizer.fullpath));
+		gb_printf_err("\n  wheres:");
+		for_array(j, node->wheres) {
+			gb_printf_err(" %d", node->wheres.e[j]);
+		}
+		gb_printf_err("\n  whats:");
+		for_array(j, node->whats) {
+			gb_printf_err(" %d", node->whats.e[j]);
+		}
+		gb_printf_err("\n");
+	}
+#endif
+
 	for_array(i, c->delayed_imports) {
 		Scope *parent_scope = c->delayed_imports.e[i].parent;
 		AstNode *decl = c->delayed_imports.e[i].decl;
@@ -2017,24 +2136,26 @@ void check_parsed_files(Checker *c) {
 
 	// gb_printf_err("Count: %td\n", c->info.type_info_count++);
 
-	for_array(i, file_scopes.entries) {
-		Scope *s = file_scopes.entries.e[i].value;
-		if (s->is_init) {
-			Entity *e = current_scope_lookup_entity(s, str_lit("main"));
-			if (e == NULL) {
-				Token token = {0};
-				if (s->file->tokens.count > 0) {
-					token = s->file->tokens.e[0];
-				} else {
-					token.pos.file = s->file->tokenizer.fullpath;
-					token.pos.line = 1;
-					token.pos.column = 1;
+	if (!build_context.is_dll) {
+		for_array(i, file_scopes.entries) {
+			Scope *s = file_scopes.entries.e[i].value;
+			if (s->is_init) {
+				Entity *e = current_scope_lookup_entity(s, str_lit("main"));
+				if (e == NULL) {
+					Token token = {0};
+					if (s->file->tokens.count > 0) {
+						token = s->file->tokens.e[0];
+					} else {
+						token.pos.file = s->file->tokenizer.fullpath;
+						token.pos.line = 1;
+						token.pos.column = 1;
+					}
+
+					error(token, "Undefined entry point procedure `main`");
 				}
 
-				error(token, "Undefined entry point procedure `main`");
+				break;
 			}
-
-			break;
 		}
 	}
 
