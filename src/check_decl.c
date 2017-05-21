@@ -257,10 +257,27 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 	if (d->scope->is_file && str_eq(e->token.string, str_lit("main"))) {
 		if (proc_type != NULL) {
 			TypeProc *pt = &proc_type->Proc;
-			if (pt->param_count != 0 ||
-			    pt->result_count != 0) {
+
+			// This is an ugly monstrosity, but I see no other way.
+			bool valid_param = pt->param_count == 0 || (pt->params->kind == Type_Tuple &&
+			                                            pt->params->Tuple.variable_count == 2 &&
+			                                            pt->params->Tuple.variables[0]->kind == Entity_Variable &&
+			                                            pt->params->Tuple.variables[0]->type->kind == Type_Basic &&
+			                                            pt->params->Tuple.variables[0]->type->Basic.kind == Basic_i32 &&
+			                                            pt->params->Tuple.variables[1]->kind == Entity_Variable &&
+			                                            pt->params->Tuple.variables[1]->type->kind == Type_Slice &&
+			                                            pt->params->Tuple.variables[1]->type->Slice.elem->kind == Type_Pointer &&
+			                                            pt->params->Tuple.variables[1]->type->Slice.elem->Pointer.elem->kind == Type_Basic &&
+			                                            pt->params->Tuple.variables[1]->type->Slice.elem->Pointer.elem->Basic.kind == Basic_u8);
+			
+			bool valid_result = pt->result_count == 0 || (pt->results->kind == Type_Tuple &&
+			                                              pt->results->Tuple.variable_count == 1 &&
+			                                              pt->results->Tuple.variables[0]->kind == Entity_Variable &&
+			                                              pt->results->Tuple.variables[0]->type->kind == Type_Basic &&
+			                                              pt->results->Tuple.variables[0]->type->Basic.kind == Basic_i32);
+			if (!valid_param || !valid_result) {
 				gbString str = type_to_string(proc_type);
-				error(e->token, "Procedure type of `main` was expected to be `proc()`, got %s", str);
+				error(e->token, "Procedure type of `main` was expected to be `proc()` or `proc(i32, []^byte) -> i32`, got %s", str);
 				gb_string_free(str);
 			}
 		}
