@@ -673,8 +673,11 @@ bool ir_is_instr_terminating(irInstr *i) {
 
 
 void ir_add_edge(irBlock *from, irBlock *to) {
-	array_add(&from->succs, to);
-	array_add(&to->preds, from);
+	GB_ASSERT(from->instrs.count > 0);
+	if (!ir_is_instr_terminating(ir_get_last_instr(from))) {
+		array_add(&from->succs, to);
+		array_add(&to->preds, from);
+	}
 }
 
 void ir_set_instr_parent(irValue *instr, irBlock *parent) {
@@ -1812,14 +1815,15 @@ irValue *ir_emit_unary_arith(irProcedure *proc, TokenKind op, irValue *x, Type *
 	return ir_emit(proc, ir_instr_unary_op(proc, op, x, type));
 }
 
+
+
 irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *right, Type *type) {
 	Type *t_left = ir_type(left);
 	Type *t_right = ir_type(right);
 
-	if (is_type_vector(t_left)) {
+	if (is_type_vector(t_left) || is_type_vector(t_right)) {
 		ir_emit_comment(proc, str_lit("vector.arith.begin"));
 		// IMPORTANT TODO(bill): This is very wasteful with regards to stack memory
-		Type *tl = base_type(t_left);
 		left  = ir_emit_conv(proc, left, type);
 		right = ir_emit_conv(proc, right, type);
 		irValue *lhs = ir_address_from_load_or_generate_local(proc, left);
@@ -1828,7 +1832,8 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 		Type *elem_type = base_type(type)->Vector.elem;
 
 		irValue *res = ir_add_local_generated(proc, type);
-		for (i32 i = 0; i < tl->Vector.count; i++) {
+		i64 count = base_type(type)->Vector.count;
+		for (i32 i = 0; i < count; i++) {
 			irValue *x = ir_emit_load(proc, ir_emit_array_epi(proc, lhs, i));
 			irValue *y = ir_emit_load(proc, ir_emit_array_epi(proc, rhs, i));
 			irValue *z = ir_emit_arith(proc, op, x, y, elem_type);
@@ -5640,7 +5645,6 @@ void ir_build_range_string(irProcedure *proc, irValue *expr, Type *val_type,
 	done = ir_new_block(proc, NULL, "for.string.done");
 
 	irValue *offset = ir_emit_load(proc, offset_);
-
 	irValue *cond = ir_emit_comp(proc, Token_Lt, offset, count);
 	ir_emit_if(proc, cond, body, done);
 	ir_start_block(proc, body);
@@ -5696,7 +5700,6 @@ void ir_build_range_interval(irProcedure *proc, AstNodeBinaryExpr *node, Type *v
 	body = ir_new_block(proc, NULL, "for.interval.body");
 	done = ir_new_block(proc, NULL, "for.interval.done");
 
-	upper = ir_build_expr(proc, node->right);
 
 	TokenKind op = Token_Lt;
 	switch (node->op.kind) {
@@ -5704,6 +5707,9 @@ void ir_build_range_interval(irProcedure *proc, AstNodeBinaryExpr *node, Type *v
 	case Token_HalfClosed: op = Token_Lt;   break;
 	default: GB_PANIC("Invalid interval operator"); break;
 	}
+
+	upper = ir_build_expr(proc, node->right);
+
 	irValue *cond = ir_emit_comp(proc, op, ir_emit_load(proc, value), upper);
 	ir_emit_if(proc, cond, body, done);
 	ir_start_block(proc, body);
@@ -6222,7 +6228,6 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					GB_PANIC("TODO(bill): enum core type %s", type_to_string(core_elem));
 				}
 			}
-
 		} else {
 			Type *expr_type = type_of_expr(proc->module->info, rs->expr);
 			Type *et = base_type(type_deref(expr_type));

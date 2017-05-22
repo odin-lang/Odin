@@ -319,15 +319,14 @@ look_at :: proc(eye, centre, up: Vec3) -> Mat4 {
 	s := norm(cross(f, up));
 	u := cross(s, f);
 
-	m: Mat4;
-
-	m[0] = [4]f32{+s.x, +s.y, +s.z, 0};
-	m[1] = [4]f32{+u.x, +u.y, +u.z, 0};
-	m[2] = [4]f32{-f.x, -f.y, -f.z, 0};
-	m[3] = [4]f32{dot(s, eye), dot(u, eye), dot(f, eye), 1};
-
-	return m;
+	return Mat4{
+		{+s.x, +u.x, -f.x, 0},
+		{+s.y, +u.y, -f.y, 0},
+		{+s.z, +u.z, -f.z, 0},
+		{-dot(s, eye), -dot(u, eye), dot(f, eye), 1},
+	};
 }
+
 perspective :: proc(fovy, aspect, near, far: f32) -> Mat4 {
 	m: Mat4;
 	tan_half_fovy := tan(0.5 * fovy);

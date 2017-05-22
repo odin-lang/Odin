@@ -918,6 +918,14 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				}
 			}
 
+			if (x.mode != Addressing_Constant) {
+				x.value = (ExactValue){0};
+			}
+			if (y.mode != Addressing_Constant) {
+				y.value = (ExactValue){0};
+			}
+
+
 			add_type_and_value(&c->info, ie->left,  x.mode, x.type, x.value);
 			add_type_and_value(&c->info, ie->right, y.mode, y.type, y.value);
 			val = type;

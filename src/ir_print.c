@@ -1060,7 +1060,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		irInstrBinaryOp *bo = &value->Instr.BinaryOp;
 		Type *type = base_type(ir_type(bo->left));
 		Type *elem_type = type;
-		GB_ASSERT(!is_type_vector(elem_type));
+		GB_ASSERT_MSG(!is_type_vector(elem_type), type_to_string(elem_type));
 
 		ir_fprintf(f, "%%%d = ", value->index);
 

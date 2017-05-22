@@ -3345,10 +3345,15 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 	}
 
+	bool vari_expand = (ce->ellipsis.pos.line != 0);
+	if (vari_expand && id != BuiltinProc_append) {
+		error(ce->ellipsis, "Invalid use of `..` with built-in procedure `append`");
+		return false;
+	}
+
 
 	switch (id) {
 	case BuiltinProc_new:
-	// case BuiltinProc_new_slice:
 	case BuiltinProc_make:
 	case BuiltinProc_size_of:
 	case BuiltinProc_align_of:
@@ -4083,50 +4088,34 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		check_expr(c, &z, ce->args.e[2]); if (z.mode == Addressing_Invalid) return false;
 		check_expr(c, &w, ce->args.e[3]); if (w.mode == Addressing_Invalid) return false;
 
-		convert_to_typed(c, &x, y.type, 0); if (x.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &x, z.type, 0); if (x.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &x, w.type, 0); if (x.mode == Addressing_Invalid) return false;
-
-		convert_to_typed(c, &y, z.type, 0); if (y.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &y, w.type, 0); if (y.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &y, x.type, 0); if (y.mode == Addressing_Invalid) return false;
-
-		convert_to_typed(c, &z, y.type, 0); if (z.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &z, w.type, 0); if (z.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &z, x.type, 0); if (z.mode == Addressing_Invalid) return false;
-
-		convert_to_typed(c, &w, x.type, 0); if (w.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &w, y.type, 0); if (w.mode == Addressing_Invalid) return false;
-		convert_to_typed(c, &w, z.type, 0); if (w.mode == Addressing_Invalid) return false;
+#define _QUAT_CTT(x, y, z, w) do { \
+		convert_to_typed(c, &(x), (y).type, 0); if ((x).mode == Addressing_Invalid) return false; \
+		convert_to_typed(c, &(x), (z).type, 0); if ((x).mode == Addressing_Invalid) return false; \
+		convert_to_typed(c, &(x), (w).type, 0); if ((x).mode == Addressing_Invalid) return false; \
+	} while (0)
+		_QUAT_CTT(x, y, z, w);
+		_QUAT_CTT(y, z, w, x);
+		_QUAT_CTT(z, w, x, y);
+		_QUAT_CTT(w, x, y, z);
+#undef _QUAT_CTT
 
 		if (x.mode == Addressing_Constant &&
 		    y.mode == Addressing_Constant &&
 		    z.mode == Addressing_Constant &&
 		    w.mode == Addressing_Constant) {
-			if (is_type_numeric(x.type) &&
-			    exact_value_imag(x.value).value_float == 0 &&
-			    exact_value_jmag(x.value).value_float == 0 &&
-			    exact_value_kmag(x.value).value_float == 0) {
-				x.type = t_untyped_float;
-			}
-			if (is_type_numeric(y.type) &&
-			    exact_value_imag(y.value).value_float == 0 &&
-			    exact_value_jmag(y.value).value_float == 0 &&
-			    exact_value_kmag(y.value).value_float == 0) {
-				y.type = t_untyped_float;
-			}
-			if (is_type_numeric(z.type) &&
-			    exact_value_imag(z.value).value_float == 0 &&
-			    exact_value_jmag(z.value).value_float == 0 &&
-			    exact_value_kmag(z.value).value_float == 0) {
-				z.type = t_untyped_float;
-			}
-			if (is_type_numeric(w.type) &&
-			    exact_value_imag(w.value).value_float == 0 &&
-			    exact_value_jmag(w.value).value_float == 0 &&
-			    exact_value_kmag(w.value).value_float == 0) {
-				w.type = t_untyped_float;
-			}
+#define _QUAT_EXACT_VAL(x) do { \
+			if (is_type_numeric((x).type) && \
+			    exact_value_imag((x).value).value_float == 0 && \
+			    exact_value_jmag((x).value).value_float == 0 && \
+			    exact_value_kmag((x).value).value_float == 0) { \
+				(x).type = t_untyped_float; \
+			} \
+		} while (0)
+		_QUAT_EXACT_VAL(x);
+		_QUAT_EXACT_VAL(y);
+		_QUAT_EXACT_VAL(z);
+		_QUAT_EXACT_VAL(w);
+#undef _QUAT_EXACT_VAL
 		}
 
 		if (!are_types_identical(x.type, y.type)) {
