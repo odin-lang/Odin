@@ -108,7 +108,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 	case 64:
 		bits = transmute(u64, val);
 		flt = &f64_info;
-	default:
+	case:
 		panic("strconv: invalid bit_size");
 	}
 
@@ -132,7 +132,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 	case 0: // denormalized
 		exp++;
 
-	default:
+	case:
 		mant |= u64(1) << flt.mantbits;
 	}
 
@@ -312,7 +312,7 @@ is_integer_negative :: proc(u: u64, is_signed: bool, bit_size: int) -> (unsigned
 			neg = i < 0;
 			if neg { i = -i; }
 			u = u64(i);
-		default:
+		case:
 			panic("is_integer_negative: Unknown integer size");
 		}
 	}
@@ -356,7 +356,7 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 		case 10: i--; a[i] = 'd';
 		case 12: i--; a[i] = 'z';
 		case 16: i--; a[i] = 'x';
-		default: ok = false;
+		case: ok = false;
 		}
 		if ok {
 			i--;

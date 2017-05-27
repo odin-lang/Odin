@@ -189,7 +189,7 @@ write_type :: proc(buf: ^String_Buffer, ti: ^Type_Info) {
 		match {
 		case ti == type_info(int):  write_string(buf, "int");
 		case ti == type_info(uint): write_string(buf, "uint");
-		default:
+		case:
 			write_string(buf, info.signed ? "i" : "u");
 			fi := Fmt_Info{buf = buf};
 			fmt_int(&fi, u64(8*info.size), false, 64, 'd');
@@ -440,7 +440,7 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 		case u16:  num = int(i);
 		case u32:  num = int(i);
 		case u64:  num = int(i);
-		default:
+		case:
 			ok = false;
 		}
 	}
@@ -468,7 +468,7 @@ fmt_bool :: proc(using fi: ^Fmt_Info, b: bool, verb: rune) {
 	match verb {
 	case 't', 'v':
 		write_string(buf, b ? "true" : "false");
-	default:
+	case:
 		fmt_bad_verb(fi, verb);
 	}
 }
@@ -515,7 +515,7 @@ is_integer_negative :: proc(u: u64, is_signed: bool, bit_size: int) -> (unsigned
 			neg = i < 0;
 			if neg { i = -i; }
 			u = u64(i);
-		default:
+		case:
 			panic("is_integer_negative: Unknown integer size");
 		}
 	}
@@ -555,7 +555,7 @@ _write_int :: proc(fi: ^Fmt_Info, u: u64, base: int, is_signed: bool, bit_size: 
 	match base {
 	case 2, 8, 10, 12, 16:
 		break;
-	default:
+	case:
 		panic("_write_int: unknown base, whoops");
 	}
 
@@ -598,7 +598,7 @@ fmt_int :: proc(fi: ^Fmt_Info, u: u64, is_signed: bool, bit_size: int, verb: run
 			_write_int(fi, u, 16, false, bit_size, __DIGITS_UPPER);
 		}
 
-	default:
+	case:
 		fmt_bad_verb(fi, verb);
 	}
 }
@@ -659,7 +659,7 @@ fmt_float :: proc(fi: ^Fmt_Info, v: f64, bit_size: int, verb: rune) {
 			_pad(fi, str[1..]);
 		}
 
-	default:
+	case:
 		fmt_bad_verb(fi, verb);
 		return;
 	}
@@ -681,7 +681,7 @@ fmt_string :: proc(fi: ^Fmt_Info, s: string, verb: rune) {
 			_write_int(fi, u64(s[i]), 16, false, 8, verb == 'x' ? __DIGITS_LOWER : __DIGITS_UPPER);
 		}
 
-	default:
+	case:
 		fmt_bad_verb(fi, verb);
 	}
 }
@@ -690,7 +690,7 @@ fmt_pointer :: proc(fi: ^Fmt_Info, p: rawptr, verb: rune) {
 	match verb {
 	case 'p', 'v':
 		// Okay
-	default:
+	case:
 		fmt_bad_verb(fi, verb);
 		return;
 	}
@@ -709,7 +709,7 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 
 	using Type_Info;
 	match e in v.type_info {
-	default:
+	case:
 		fmt_bad_verb(fi, verb);
 		return;
 	case Enum:
@@ -760,7 +760,7 @@ fmt_enum :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			if !ok {
 				write_string(fi.buf, "!%(BAD ENUM VALUE)");
 			}
-		default:
+		case:
 			fmt_bad_verb(fi, verb);
 			return;
 		}
@@ -796,7 +796,7 @@ fmt_value :: proc(fi: ^Fmt_Info, v: any, verb: rune) {
 			}
 			write_byte(fi.buf, '}');
 
-		default:
+		case:
 			fmt_value(fi, any{v.data, info.base}, verb);
 		}
 
@@ -956,7 +956,7 @@ fmt_complex :: proc(fi: ^Fmt_Info, c: complex128, bits: int, verb: rune) {
 		fmt_float(fi, i, bits/2, verb);
 		write_rune(fi.buf, 'i');
 
-	default:
+	case:
 		fmt_bad_verb(fi, verb);
 		return;
 	}
@@ -983,7 +983,7 @@ fmt_quaternion :: proc(fi: ^Fmt_Info, c: quaternion256, bits: int, verb: rune) {
 		fmt_float(fi, k, bits/4, verb);
 		write_rune(fi.buf, 'k');
 
-	default:
+	case:
 		fmt_bad_verb(fi, verb);
 		return;
 	}
@@ -1029,7 +1029,7 @@ fmt_arg :: proc(fi: ^Fmt_Info, arg: any, verb: rune) {
 	case u32:     fmt_int(fi, u64(a), false, 32, verb);
 	case u64:     fmt_int(fi, u64(a), false, 64, verb);
 	case string:  fmt_string(fi, a, verb);
-	default:      fmt_value(fi, arg, verb);
+	case:      fmt_value(fi, arg, verb);
 	}
 
 }
@@ -1102,7 +1102,7 @@ sbprintf :: proc(b: ^String_Buffer, fmt: string, args: ..any) -> string {
 				fi.hash = true;
 			case '0':
 				fi.zero = !fi.minus;
-			default:
+			case:
 				break prefix_loop;
 			}
 		}

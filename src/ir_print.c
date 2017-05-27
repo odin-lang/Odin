@@ -490,9 +490,9 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				if (i > 0) {
 					ir_fprintf(f, ", ");
 				}
-				TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems.e[i]);
-				GB_ASSERT(tav != NULL);
-				ir_print_compound_element(f, m, tav->value, elem_type);
+				TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems.e[i]);
+				GB_ASSERT(tav.mode != Addressing_Invalid);
+				ir_print_compound_element(f, m, tav.value, elem_type);
 			}
 			for (isize i = elem_count; i < type->Array.count; i++) {
 				if (i >= elem_count) {
@@ -520,23 +520,23 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_fprintf(f, "][");
 
 			if (elem_count == 1 && type->Vector.count > 1) {
-				TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems.e[0]);
-				GB_ASSERT(tav != NULL);
+				TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems.e[0]);
+				GB_ASSERT(tav.mode != Addressing_Invalid);
 
 				for (isize i = 0; i < type->Vector.count; i++) {
 					if (i > 0) {
 						ir_fprintf(f, ", ");
 					}
-					ir_print_compound_element(f, m, tav->value, elem_type);
+					ir_print_compound_element(f, m, tav.value, elem_type);
 				}
 			} else {
 				for (isize i = 0; i < elem_count; i++) {
 					if (i > 0) {
 						ir_fprintf(f, ", ");
 					}
-					TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems.e[i]);
-					GB_ASSERT(tav != NULL);
-					ir_print_compound_element(f, m, tav->value, elem_type);
+					TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems.e[i]);
+					GB_ASSERT(tav.mode != Addressing_Invalid);
+					ir_print_compound_element(f, m, tav.value, elem_type);
 				}
 			}
 
@@ -562,21 +562,21 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 					ast_node(fv, FieldValue, cl->elems.e[i]);
 					String name = fv->field->Ident.string;
 
-					TypeAndValue *tav = type_and_value_of_expression(m->info, fv->value);
-					GB_ASSERT(tav != NULL);
+					TypeAndValue tav = type_and_value_of_expr(m->info, fv->value);
+					GB_ASSERT(tav.mode != Addressing_Invalid);
 
 					Selection sel = lookup_field(m->allocator, type, name, false);
 					Entity *f = type->Record.fields[sel.index.e[0]];
 
-					values[f->Variable.field_index] = tav->value;
+					values[f->Variable.field_index] = tav.value;
 				}
 			} else {
 				for (isize i = 0; i < value_count; i++) {
 					Entity *f = type->Record.fields_in_src_order[i];
-					TypeAndValue *tav = type_and_value_of_expression(m->info, cl->elems.e[i]);
+					TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems.e[i]);
 					ExactValue val = {0};
-					if (tav != NULL) {
-						val = tav->value;
+					if (tav.mode != Addressing_Invalid) {
+						val = tav.value;
 					}
 					values[f->Variable.field_index] = val;
 				}

@@ -14,7 +14,8 @@ typedef struct DeclInfo DeclInfo;
 	ENTITY_KIND(Builtin) \
 	ENTITY_KIND(ImportName) \
 	ENTITY_KIND(LibraryName) \
-	ENTITY_KIND(Alias) \
+	ENTITY_KIND(TypeAlias) \
+	ENTITY_KIND(ProcedureAlias) \
 	ENTITY_KIND(Nil) \
 	ENTITY_KIND(Label)
 
@@ -109,10 +110,10 @@ struct Entity {
 			String name;
 			bool   used;
 		} LibraryName;
+		i32 TypeAlias;
 		struct {
-			EntityAliasKind kind;
-			Entity *        original;
-		} Alias;
+			Entity *original;
+		} ProcedureAlias;
 		i32 Nil;
 		struct {
 			String name;
@@ -243,13 +244,19 @@ Entity *make_entity_library_name(gbAllocator a, Scope *scope, Token token, Type 
 	return entity;
 }
 
-Entity *make_entity_alias(gbAllocator a, Scope *scope, Token token, Type *type,
-                          EntityAliasKind kind, Entity *original) {
-	Entity *entity = alloc_entity(a, Entity_Alias, scope, token, type);
-	entity->Alias.kind     = kind;
-	entity->Alias.original = original;
+Entity *make_entity_type_alias(gbAllocator a, Scope *scope, Token token, Type *type) {
+	Entity *entity = alloc_entity(a, Entity_TypeAlias, scope, token, type);
 	return entity;
 }
+Entity *make_entity_procedure_alias(gbAllocator a, Scope *scope, Token token, Entity *original) {
+	GB_ASSERT(original != NULL);
+	Entity *entity = alloc_entity(a, Entity_ProcedureAlias, scope, token, original->type);
+	entity->ProcedureAlias.original = original;
+	return entity;
+}
+
+
+
 
 Entity *make_entity_nil(gbAllocator a, String name, Type *type) {
 	Token token = make_token_ident(name);

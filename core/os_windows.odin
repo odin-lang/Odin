@@ -89,7 +89,7 @@ open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 		create_mode = win32.OPEN_ALWAYS;
 	case mode&O_TRUNC == O_TRUNC:
 		create_mode = win32.TRUNCATE_EXISTING;
-	default:
+	case:
 		create_mode = win32.OPEN_EXISTING;
 	}
 
@@ -314,7 +314,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 				j += 2;
 			case 0xdc00 <= str[j] && str[j] < 0xe000:
 				return "";
-			default:
+			case:
 				if i+3 > len {
 					return "";
 				}

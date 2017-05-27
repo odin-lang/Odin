@@ -3570,23 +3570,23 @@ bool is_double_pointer(Type *t) {
 irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	expr = unparen_expr(expr);
 
-	TypeAndValue *tv = map_tav_get(&proc->module->info->types, hash_pointer(expr));
-	GB_ASSERT_NOT_NULL(tv);
+	TypeAndValue tv = type_and_value_of_expr(proc->module->info, expr);
+	GB_ASSERT(tv.mode != Addressing_Invalid);
 
-	if (tv->value.kind != ExactValue_Invalid) {
+	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): Edge case
-		if (tv->value.kind != ExactValue_Compound &&
-		    is_type_vector(tv->type)) {
-			Type *elem = base_vector_type(tv->type);
-			ExactValue value = convert_exact_value_for_type(tv->value, elem);
+		if (tv.value.kind != ExactValue_Compound &&
+		    is_type_vector(tv.type)) {
+			Type *elem = base_vector_type(tv.type);
+			ExactValue value = convert_exact_value_for_type(tv.value, elem);
 			irValue *x = ir_add_module_constant(proc->module, elem, value);
-			return ir_emit_conv(proc, x, tv->type);
+			return ir_emit_conv(proc, x, tv.type);
 		}
 
-		return ir_add_module_constant(proc->module, tv->type, tv->value);
+		return ir_add_module_constant(proc->module, tv.type, tv.value);
 	}
 
-	if (tv->mode == Addressing_Variable) {
+	if (tv.mode == Addressing_Variable) {
 		return ir_addr_load(proc, ir_build_addr(proc, expr));
 	}
 
@@ -3614,7 +3614,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			         LIT(token.pos.file), token.pos.line, token.pos.column);
 			return NULL;
 		} else if (e->kind == Entity_Nil) {
-			return ir_value_nil(proc->module->allocator, tv->type);
+			return ir_value_nil(proc->module->allocator, tv.type);
 		}
 
 		irValue **found = map_ir_value_get(&proc->module->values, hash_pointer(e));
@@ -3644,8 +3644,8 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(se, SelectorExpr, expr);
-		TypeAndValue *tav = map_tav_get(&proc->module->info->types, hash_pointer(expr));
-		GB_ASSERT(tav != NULL);
+		TypeAndValue tav = type_and_value_of_expr(proc->module->info, expr);
+		GB_ASSERT(tav.mode != Addressing_Invalid);
 		return ir_addr_load(proc, ir_build_addr(proc, expr));
 	case_end;
 
@@ -3725,7 +3725,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 	case_ast_node(ta, TypeAssertion, expr);
 		TokenPos pos = ast_node_token(expr).pos;
-		Type *type = tv->type;
+		Type *type = tv.type;
 		irValue *e = ir_build_expr(proc, ta->expr);
 		Type *t = type_deref(ir_type(e));
 		if (is_type_union(t)) {
@@ -3744,13 +3744,13 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		case Token_And:
 			return ir_emit_ptr_offset(proc, ir_build_addr(proc, ue->expr).addr, v_zero); // Make a copy of the pointer
 		default:
-			return ir_emit_unary_arith(proc, ue->op.kind, ir_build_expr(proc, ue->expr), tv->type);
+			return ir_emit_unary_arith(proc, ue->op.kind, ir_build_expr(proc, ue->expr), tv.type);
 		}
 	case_end;
 
 	case_ast_node(be, BinaryExpr, expr);
 		irValue *left = ir_build_expr(proc, be->left);
-		Type *type = default_type(tv->type);
+		Type *type = default_type(tv.type);
 
 		switch (be->op.kind) {
 		case Token_Add:
@@ -3822,7 +3822,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		if (map_tav_get(&proc->module->info->types, hash_pointer(ce->proc))->mode == Addressing_Type) {
 			GB_ASSERT(ce->args.count == 1);
 			irValue *x = ir_build_expr(proc, ce->args.e[0]);
-			irValue *y = ir_emit_conv(proc, x, tv->type);
+			irValue *y = ir_emit_conv(proc, x, tv.type);
 			return y;
 		}
 
@@ -3843,7 +3843,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 				case BuiltinProc_transmute: {
 					irValue *x = ir_build_expr(proc, ce->args.e[1]);
-					return ir_emit_transmute(proc, x, tv->type);
+					return ir_emit_transmute(proc, x, tv.type);
 				}
 
 				case BuiltinProc_len: {
@@ -4042,7 +4042,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					gbAllocator a = proc->module->allocator;
 
 					AstNode *node = ce->args.e[0];
-					TypeAndValue tav = *type_and_value_of_expression(proc->module->info, node);
+					TypeAndValue tav = type_and_value_of_expr(proc->module->info, node);
 					Type *type = base_type(tav.type);
 
 					if (is_type_dynamic_array(type)) {
@@ -4394,14 +4394,14 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 						return ir_addr_load(proc, vector_addr);
 					}
 					irValue *src = vector_addr.addr;
-					irValue *dst = ir_add_local_generated(proc, tv->type);
+					irValue *dst = ir_add_local_generated(proc, tv.type);
 
 					for (i32 i = 1; i < ce->args.count; i++) {
-						TypeAndValue *tv = type_and_value_of_expression(proc->module->info, ce->args.e[i]);
-						GB_ASSERT(is_type_integer(tv->type));
-						GB_ASSERT(tv->value.kind == ExactValue_Integer);
+						TypeAndValue tv = type_and_value_of_expr(proc->module->info, ce->args.e[i]);
+						GB_ASSERT(is_type_integer(tv.type));
+						GB_ASSERT(tv.value.kind == ExactValue_Integer);
 
-						i32 src_index = cast(i32)tv->value.value_integer;
+						i32 src_index = cast(i32)tv.value.value_integer;
 						i32 dst_index = i-1;
 
 						irValue *src_elem = ir_emit_array_epi(proc, src, src_index);
@@ -4418,9 +4418,9 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					ir_emit_comment(proc, str_lit("complex"));
 					irValue *real = ir_build_expr(proc, ce->args.e[0]);
 					irValue *imag = ir_build_expr(proc, ce->args.e[1]);
-					irValue *dst = ir_add_local_generated(proc, tv->type);
+					irValue *dst = ir_add_local_generated(proc, tv.type);
 
-					Type *ft = base_complex_elem_type(tv->type);
+					Type *ft = base_complex_elem_type(tv.type);
 					real = ir_emit_conv(proc, real, ft);
 					imag = ir_emit_conv(proc, imag, ft);
 					ir_emit_store(proc, ir_emit_struct_ep(proc, dst, 0), real);
@@ -4435,9 +4435,9 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					irValue *imag = ir_build_expr(proc, ce->args.e[1]);
 					irValue *jmag = ir_build_expr(proc, ce->args.e[2]);
 					irValue *kmag = ir_build_expr(proc, ce->args.e[3]);
-					irValue *dst = ir_add_local_generated(proc, tv->type);
+					irValue *dst = ir_add_local_generated(proc, tv.type);
 
-					Type *ft = base_quaternion_elem_type(tv->type);
+					Type *ft = base_quaternion_elem_type(tv.type);
 					real = ir_emit_conv(proc, real, ft);
 					imag = ir_emit_conv(proc, imag, ft);
 					jmag = ir_emit_conv(proc, jmag, ft);
@@ -4454,25 +4454,25 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					ir_emit_comment(proc, str_lit("real"));
 					irValue *val = ir_build_expr(proc, ce->args.e[0]);
 					irValue *real = ir_emit_struct_ev(proc, val, 0);
-					return ir_emit_conv(proc, real, tv->type);
+					return ir_emit_conv(proc, real, tv.type);
 				} break;
 				case BuiltinProc_imag: {
 					ir_emit_comment(proc, str_lit("imag"));
 					irValue *val = ir_build_expr(proc, ce->args.e[0]);
 					irValue *imag = ir_emit_struct_ev(proc, val, 1);
-					return ir_emit_conv(proc, imag, tv->type);
+					return ir_emit_conv(proc, imag, tv.type);
 				} break;
 				case BuiltinProc_jmag: {
 					ir_emit_comment(proc, str_lit("jmag"));
 					irValue *val = ir_build_expr(proc, ce->args.e[0]);
 					irValue *jmag = ir_emit_struct_ev(proc, val, 2);
-					return ir_emit_conv(proc, jmag, tv->type);
+					return ir_emit_conv(proc, jmag, tv.type);
 				} break;
 				case BuiltinProc_kmag: {
 					ir_emit_comment(proc, str_lit("kmag"));
 					irValue *val = ir_build_expr(proc, ce->args.e[0]);
 					irValue *kmag = ir_emit_struct_ev(proc, val, 3);
-					return ir_emit_conv(proc, kmag, tv->type);
+					return ir_emit_conv(proc, kmag, tv.type);
 				} break;
 
 				case BuiltinProc_conj: {
@@ -4481,14 +4481,14 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					irValue *res = NULL;
 					Type *t = ir_type(val);
 					if (is_type_complex(t)) {
-						res = ir_add_local_generated(proc, tv->type);
+						res = ir_add_local_generated(proc, tv.type);
 						irValue *real = ir_emit_struct_ev(proc, val, 0);
 						irValue *imag = ir_emit_struct_ev(proc, val, 1);
 						imag = ir_emit_unary_arith(proc, Token_Sub, imag, ir_type(imag));
 						ir_emit_store(proc, ir_emit_struct_ep(proc, res, 0), real);
 						ir_emit_store(proc, ir_emit_struct_ep(proc, res, 1), imag);
 					} else if (is_type_quaternion(t)) {
-						res = ir_add_local_generated(proc, tv->type);
+						res = ir_add_local_generated(proc, tv.type);
 						irValue *real = ir_emit_struct_ev(proc, val, 0);
 						irValue *imag = ir_emit_struct_ev(proc, val, 1);
 						irValue *jmag = ir_emit_struct_ev(proc, val, 2);
@@ -4526,9 +4526,9 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					irValue *s = ir_build_expr(proc, ce->args.e[0]);
 					Type *t = base_type(ir_type(s));
 					if (is_type_u8_slice(t)) {
-						return ir_emit_conv(proc, s, tv->type);
+						return ir_emit_conv(proc, s, tv.type);
 					}
-					irValue *slice = ir_add_local_generated(proc, tv->type);
+					irValue *slice = ir_add_local_generated(proc, tv.type);
 					i64 elem_size = type_size_of(proc->module->allocator, t->Slice.elem);
 
 					irValue *ptr   = ir_emit_conv(proc, ir_slice_elem(proc, s), t_u8_ptr);
@@ -4733,9 +4733,9 @@ bool ir_is_elem_const(irModule *m, AstNode *elem, Type *elem_type) {
 	if (elem->kind == AstNode_FieldValue) {
 		elem = elem->FieldValue.value;
 	}
-	TypeAndValue *tav = type_and_value_of_expression(m->info, elem);
-	GB_ASSERT(tav != NULL);
-	return tav->value.kind != ExactValue_Invalid;
+	TypeAndValue tav = type_and_value_of_expr(m->info, elem);
+	GB_ASSERT(tav.mode != Addressing_Invalid);
+	return tav.value.kind != ExactValue_Invalid;
 }
 
 irAddr ir_build_addr_from_entity(irProcedure *proc, Entity *e, AstNode *expr) {
@@ -4790,9 +4790,9 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		AstNode *sel = unparen_expr(se->selector);
 		if (sel->kind == AstNode_Ident) {
 			String selector = sel->Ident.string;
-			TypeAndValue *tav = type_and_value_of_expression(proc->module->info, se->expr);
+			TypeAndValue tav = type_and_value_of_expr(proc->module->info, se->expr);
 
-			if (tav == NULL) {
+			if (tav.mode == Addressing_Invalid) {
 				// NOTE(bill): Imports
 				Entity *imp = entity_of_ident(proc->module->info, se->expr);
 				if (imp != NULL) {
@@ -4802,8 +4802,8 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			}
 
 
-			Type *type = base_type(tav->type);
-			if (tav->mode == Addressing_Type) { // Addressing_Type
+			Type *type = base_type(tav.type);
+			if (tav.mode == Addressing_Type) { // Addressing_Type
 				Selection sel = lookup_field(proc->module->allocator, type, selector, true);
 				Entity *e = sel.entity;
 				GB_ASSERT(e->kind == Entity_Variable);
@@ -4838,7 +4838,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			Type *type = type_deref(type_of_expr(proc->module->info, se->expr));
 			Type *selector_type = base_type(type_of_expr(proc->module->info, se->selector));
 			GB_ASSERT_MSG(is_type_integer(selector_type), "%s", type_to_string(selector_type));
-			ExactValue val = type_and_value_of_expression(proc->module->info, sel)->value;
+			ExactValue val = type_and_value_of_expr(proc->module->info, sel).value;
 			i64 index = val.value_integer;
 
 			Selection sel = lookup_field_from_index(proc->module->allocator, type, index);
@@ -5009,7 +5009,6 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 
 		case Type_Basic: { // Basic_string
-			TypeAndValue *tv = map_tav_get(&proc->module->info->types, hash_pointer(ie->expr));
 			irValue *str;
 			irValue *elem;
 			irValue *len;
@@ -5214,7 +5213,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 						index = sel.index.e[0];
 						elem = fv->value;
 					} else {
-						TypeAndValue *tav = type_and_value_of_expression(proc->module->info, elem);
+						TypeAndValue tav = type_and_value_of_expr(proc->module->info, elem);
 						Selection sel = lookup_field(proc->module->allocator, bt, st->fields_in_src_order[field_index]->token.string, false);
 						index = sel.index.e[0];
 					}
@@ -5370,7 +5369,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 						index = sel.index.e[0];
 						elem = fv->value;
 					} else {
-						TypeAndValue *tav = type_and_value_of_expression(proc->module->info, elem);
+						TypeAndValue tav = type_and_value_of_expr(proc->module->info, elem);
 						Selection sel = lookup_field(proc->module->allocator, bt, field_names[field_index], false);
 						index = sel.index.e[0];
 					}
@@ -6177,14 +6176,14 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		irBlock *done = NULL;
 		AstNode *expr = unparen_expr(rs->expr);
 
-		TypeAndValue *tav = type_and_value_of_expression(proc->module->info, expr);
+		TypeAndValue tav = type_and_value_of_expr(proc->module->info, expr);
 
 		if (is_ast_node_a_range(expr)) {
 			ir_build_range_interval(proc, &expr->BinaryExpr, val_type, &val, &index, &loop, &done);
-		} else if (tav->mode == Addressing_Type) {
+		} else if (tav.mode == Addressing_Type) {
 			TokenPos pos = ast_node_token(expr).pos;
 			gbAllocator a = proc->module->allocator;
-			Type *t = tav->type;
+			Type *t = tav.type;
 			GB_ASSERT(is_type_enum(t));
 			Type *enum_ptr = make_type_pointer(a, t);
 			t = base_type(t);
@@ -7158,12 +7157,12 @@ void ir_gen_tree(irGen *s) {
 				if (is_type_any(e->type)) {
 
 				} else {
-					TypeAndValue *tav = map_tav_get(&info->types, hash_pointer(decl->init_expr));
-					if (tav != NULL) {
-						if (tav->value.kind != ExactValue_Invalid) {
-							ExactValue v = tav->value;
+					TypeAndValue tav = type_and_value_of_expr(info, decl->init_expr);
+					if (tav.mode != Addressing_Invalid) {
+						if (tav.value.kind != ExactValue_Invalid) {
+							ExactValue v = tav.value;
 							// if (v.kind != ExactValue_String) {
-								g->Global.value = ir_add_module_constant(m, tav->type, v);
+								g->Global.value = ir_add_module_constant(m, tav.type, v);
 							// }
 						}
 					}

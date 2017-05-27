@@ -28,8 +28,8 @@ typedef enum BuiltinProcId {
 	BuiltinProc_cap,
 
 	BuiltinProc_new,
-	BuiltinProc_free,
 	BuiltinProc_make,
+	BuiltinProc_free,
 
 	BuiltinProc_reserve,
 	BuiltinProc_clear,
@@ -82,8 +82,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("cap"),              1, false, Expr_Expr},
 
 	{STR_LIT("new"),              1, false, Expr_Expr},
-	{STR_LIT("free"),             1, false, Expr_Stmt},
 	{STR_LIT("make"),             1, true,  Expr_Expr},
+	{STR_LIT("free"),             1, false, Expr_Stmt},
 
 	{STR_LIT("reserve"),          2, false, Expr_Stmt},
 	{STR_LIT("clear"),            1, false, Expr_Stmt},
@@ -624,14 +624,15 @@ void add_declaration_dependency(Checker *c, Entity *e) {
 }
 
 
-void add_global_entity(Entity *entity) {
+Entity *add_global_entity(Entity *entity) {
 	String name = entity->token.string;
 	if (gb_memchr(name.text, ' ', name.len)) {
-		return; // NOTE(bill): `untyped thing`
+		return entity; // NOTE(bill): `untyped thing`
 	}
 	if (scope_insert_entity(universal_scope, entity)) {
 		compiler_error("double declaration");
 	}
+	return entity;
 }
 
 void add_global_constant(gbAllocator a, String name, Type *type, ExactValue value) {
@@ -646,6 +647,11 @@ void add_global_string_constant(gbAllocator a, String name, String value) {
 
 }
 
+Type *add_global_type_alias(gbAllocator a, String name, Type *t) {
+	Entity *e = add_global_entity(make_entity_type_alias(a, NULL, make_token_ident(name), t));
+	return e->type;
+}
+
 
 void init_universal_scope(void) {
 	BuildContext *bc = &build_context;
@@ -657,9 +663,16 @@ void init_universal_scope(void) {
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
 		add_global_entity(make_entity_type_name(a, NULL, make_token_ident(basic_types[i].Basic.name), &basic_types[i]));
 	}
+#if 1
 	for (isize i = 0; i < gb_count_of(basic_type_aliases); i++) {
 		add_global_entity(make_entity_type_name(a, NULL, make_token_ident(basic_type_aliases[i].Basic.name), &basic_type_aliases[i]));
 	}
+#else
+	{
+		t_byte = add_global_type_alias(a, str_lit("byte"), &basic_types[Basic_u8]);
+		t_rune = add_global_type_alias(a, str_lit("rune"), &basic_types[Basic_i32]);
+	}
+#endif
 
 // Constants
 	add_global_constant(a, str_lit("true"),  t_untyped_bool, exact_value_bool(true));
@@ -786,11 +799,6 @@ void destroy_checker(Checker *c) {
 }
 
 
-TypeAndValue *type_and_value_of_expression(CheckerInfo *i, AstNode *expression) {
-	TypeAndValue *found = map_tav_get(&i->types, hash_pointer(expression));
-	return found;
-}
-
 
 Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
 	if (identifier->kind == AstNode_Ident) {
@@ -806,13 +814,22 @@ Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
 	return NULL;
 }
 
-Type *type_of_expr(CheckerInfo *i, AstNode *expression) {
-	TypeAndValue *found = type_and_value_of_expression(i, expression);
-	if (found) {
-		return found->type;
+
+TypeAndValue type_and_value_of_expr(CheckerInfo *i, AstNode *expression) {
+	TypeAndValue result = {0};
+	TypeAndValue *found = map_tav_get(&i->types, hash_pointer(expression));
+	if (found) result = *found;
+	return result;
+}
+
+
+Type *type_of_expr(CheckerInfo *i, AstNode *expr) {
+	TypeAndValue tav = type_and_value_of_expr(i, expr);
+	if (tav.mode != Addressing_Invalid) {
+		return tav.type;
 	}
-	if (expression->kind == AstNode_Ident) {
-		Entity *entity = entity_of_ident(i, expression);
+	if (expr->kind == AstNode_Ident) {
+		Entity *entity = entity_of_ident(i, expr);
 		if (entity) {
 			return entity->type;
 		}
@@ -2102,6 +2119,7 @@ void check_parsed_files(Checker *c) {
 	// TODO(bill): Any other checks?
 
 
+#if 1
 	// Add "Basic" type information
 	for (isize i = 0; i < gb_count_of(basic_types)-1; i++) {
 		Type *t = &basic_types[i];
@@ -2116,14 +2134,13 @@ void check_parsed_files(Checker *c) {
 			add_type_info_type(c, t);
 		}
 	}
-
+#endif
 
 
 	// NOTE(bill): Check for illegal cyclic type declarations
 	for_array(i, c->info.definitions.entries) {
 		Entity *e = c->info.definitions.entries.e[i].value;
-		if (e->kind == Entity_TypeName ||
-		    (e->kind == Entity_Alias && e->Alias.kind == EntityAlias_Type)) {
+		if (e->kind == Entity_TypeName) {
 			if (e->type != NULL) {
 				// i64 size  = type_size_of(c->sizes, c->allocator, e->type);
 				i64 align = type_align_of(c->allocator, e->type);

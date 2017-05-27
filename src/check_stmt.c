@@ -262,10 +262,10 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 		AstNode *ln = unparen_expr(lhs_node);
 		if (ln->kind == AstNode_IndexExpr) {
 			AstNode *x = ln->IndexExpr.expr;
-			TypeAndValue *tav = type_and_value_of_expression(&c->info, x);
-			GB_ASSERT(tav != NULL);
-			if (tav->mode != Addressing_Variable) {
-				if (!is_type_pointer(tav->type)) {
+			TypeAndValue tav = type_and_value_of_expr(&c->info, x);
+			GB_ASSERT(tav.mode != Addressing_Invalid);
+			if (tav.mode != Addressing_Variable) {
+				if (!is_type_pointer(tav.type)) {
 					gbString str = expr_to_string(lhs.expr);
 					error_node(lhs.expr, "Cannot assign to the value of a map `%s`", str);
 					gb_string_free(str);
@@ -443,15 +443,6 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 	add_entity_use(c, expr, e);
 
 	switch (e->kind) {
-	case Entity_Alias: {
-		if (e->Alias.original != NULL) {
-			check_using_stmt_entity(c, us, expr, is_selector, e->Alias.original);
-		} else {
-			error(us->token, "`using` cannot be applied to the alias `%.*s`", LIT(e->token.string));
-			return false;
-		}
-	} break;
-
 	case Entity_TypeName: {
 		Type *t = base_type(e->type);
 		if (is_type_union(t)) {

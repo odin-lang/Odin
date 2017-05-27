@@ -1547,9 +1547,9 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_defer:
 		case Token_asm:
 		case Token_using:
+		case Token_immutable:
 		// case Token_thread_local:
-		case Token_no_alias:
-		// case Token_immutable:
+		// case Token_no_alias:
 
 		case Token_break:
 		case Token_continue:
@@ -2703,14 +2703,38 @@ AstNode *parse_var_type(AstFile *f, bool allow_ellipsis) {
 	return type;
 }
 
-bool is_token_field_prefix(TokenKind kind) {
-	switch (kind) {
+
+typedef enum FieldPrefixKind {
+	FieldPrefix_Invalid,
+
+	FieldPrefix_Using,
+	FieldPrefix_Immutable,
+	FieldPrefix_NoAlias,
+} FieldPrefixKind;
+
+FieldPrefixKind is_token_field_prefix(AstFile *f) {
+	switch (f->curr_token.kind) {
+	case Token_EOF:
+		return FieldPrefix_Invalid;
+
 	case Token_using:
-	case Token_no_alias:
+		return FieldPrefix_Using;
+
 	case Token_immutable:
-		return true;
+		return FieldPrefix_Immutable;
+
+	case Token_Hash: {
+		next_token(f);
+		switch (f->curr_token.kind) {
+		case Token_Ident:
+			if (str_eq(f->curr_token.string, str_lit("no_alias"))) {
+				return FieldPrefix_NoAlias;
+			}
+			break;
+		}
+	} break;
 	}
-	return false;
+	return FieldPrefix_Invalid;
 }
 
 
@@ -2719,16 +2743,20 @@ u32 parse_field_prefixes(AstFile *f) {
 	i32 no_alias_count  = 0;
 	i32 immutable_count = 0;
 
-	while (is_token_field_prefix(f->curr_token.kind)) {
-		switch (f->curr_token.kind) {
-		case Token_using:     using_count     += 1; next_token(f); break;
-		case Token_no_alias:  no_alias_count  += 1; next_token(f); break;
-		case Token_immutable: immutable_count += 1; next_token(f); break;
+	for (;;) {
+		FieldPrefixKind kind = is_token_field_prefix(f);
+		if (kind == FieldPrefix_Invalid) {
+			break;
+		}
+		switch (kind) {
+		case FieldPrefix_Using:     using_count     += 1; next_token(f); break;
+		case FieldPrefix_Immutable: immutable_count += 1; next_token(f); break;
+		case FieldPrefix_NoAlias:   no_alias_count  += 1; next_token(f); break;
 		}
 	}
 	if (using_count     > 1) syntax_error(f->curr_token, "Multiple `using` in this field list");
-	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple `no_alias` in this field list");
 	if (immutable_count > 1) syntax_error(f->curr_token, "Multiple `immutable` in this field list");
+	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple `#no_alias` in this field list");
 
 
 	u32 field_flags = 0;
@@ -3369,48 +3397,21 @@ AstNode *parse_for_stmt(AstFile *f) {
 }
 
 
-AstNode *parse_case_clause(AstFile *f) {
+AstNode *parse_case_clause(AstFile *f, bool is_type) {
 	Token token = f->curr_token;
 	AstNodeArray list = make_ast_node_array(f);
-	if (allow_token(f, Token_case)) {
-		bool prev_allow_range = f->allow_range;
-		f->allow_range = true;
+	expect_token(f, Token_case);
+	bool prev_allow_range = f->allow_range;
+	f->allow_range = !is_type;
+	if (f->curr_token.kind != Token_Colon) {
 		list = parse_rhs_expr_list(f);
-		f->allow_range = prev_allow_range;
-	} else {
-		expect_token(f, Token_default);
 	}
+	f->allow_range = prev_allow_range;
 	expect_token(f, Token_Colon); // TODO(bill): Is this the best syntax?
-	// expect_token(f, Token_ArrowRight); // TODO(bill): Is this the best syntax?
 	AstNodeArray stmts = parse_stmt_list(f);
 
 	return ast_case_clause(f, token, list, stmts);
 }
-
-
-AstNode *parse_type_case_clause(AstFile *f) {
-	Token token = f->curr_token;
-	AstNodeArray list = make_ast_node_array(f);
-	if (allow_token(f, Token_case)) {
-		for (;;) {
-			AstNode *t = parse_type(f);
-			array_add(&list, t);
-			if (f->curr_token.kind != Token_Comma ||
-			    f->curr_token.kind == Token_EOF) {
-			    break;
-			}
-			next_token(f);
-		}
-	} else {
-		expect_token(f, Token_default);
-	}
-	expect_token(f, Token_Colon); // TODO(bill): Is this the best syntax?
-	// expect_token(f, Token_ArrowRight); // TODO(bill): Is this the best syntax?
-	AstNodeArray stmts = parse_stmt_list(f);
-
-	return ast_case_clause(f, token, list, stmts);
-}
-
 
 
 AstNode *parse_match_stmt(AstFile *f) {
@@ -3425,6 +3426,7 @@ AstNode *parse_match_stmt(AstFile *f) {
 	AstNode *body = NULL;
 	Token open, close;
 	bool is_type_match = false;
+	AstNodeArray list = make_ast_node_array(f);
 
 	if (f->curr_token.kind != Token_OpenBrace) {
 		isize prev_level = f->expr_level;
@@ -3445,15 +3447,9 @@ AstNode *parse_match_stmt(AstFile *f) {
 		f->expr_level = prev_level;
 	}
 	open = expect_token(f, Token_OpenBrace);
-	AstNodeArray list = make_ast_node_array(f);
 
-	while (f->curr_token.kind == Token_case ||
-	       f->curr_token.kind == Token_default) {
-		if (is_type_match) {
-			array_add(&list, parse_type_case_clause(f));
-		} else {
-			array_add(&list, parse_case_clause(f));
-		}
+	while (f->curr_token.kind == Token_case) {
+		array_add(&list, parse_case_clause(f, is_type_match));
 	}
 
 	close = expect_token(f, Token_CloseBrace);
@@ -3863,7 +3859,7 @@ AstNodeArray parse_stmt_list(AstFile *f) {
 	AstNodeArray list = make_ast_node_array(f);
 
 	while (f->curr_token.kind != Token_case &&
-	       f->curr_token.kind != Token_default &&
+	       // f->curr_token.kind != Token_default &&
 	       f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
 		AstNode *stmt = parse_stmt(f);

@@ -35,3 +35,13 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	return data[0..<bytes_read], true;
 }
 
+write_entire_file :: proc(name: string, data: []byte) -> bool {
+	fd, err := open(name, O_WRONLY, 0);
+	if err != 0 {
+		return false;
+	}
+	defer close(fd);
+
+	bytes_written, write_err := write(fd, data);
+	return write_err != 0;
+}

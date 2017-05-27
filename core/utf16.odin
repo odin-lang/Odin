@@ -50,7 +50,7 @@ encode :: proc(d: []u16, s: []rune) {
 			d[n+1]  = u16(r2);
 			n += 2;
 
-		default:
+		case:
 			d[n] = u16(REPLACEMENT_CHAR);
 			n++;
 		}

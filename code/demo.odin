@@ -10,7 +10,7 @@ main :: proc() {
 		case '-': accumulator -= 1;
 		case '*': accumulator *= 2;
 		case '/': accumulator /= 2;
-		default: // Ignore everything else
+		case: // Ignore everything else
 		}
 	}
 

@@ -88,14 +88,12 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_for,            "for"),                 \
 	TOKEN_KIND(Token_in,             "in"),                  \
 	TOKEN_KIND(Token_match,          "match"),               \
-	TOKEN_KIND(Token_default,        "default"),             \
 	TOKEN_KIND(Token_case,           "case"),                \
 	TOKEN_KIND(Token_break,          "break"),               \
 	TOKEN_KIND(Token_continue,       "continue"),            \
 	TOKEN_KIND(Token_fallthrough,    "fallthrough"),         \
 	TOKEN_KIND(Token_defer,          "defer"),               \
 	TOKEN_KIND(Token_return,         "return"),              \
-	TOKEN_KIND(Token_give,           "give"),                \
 	TOKEN_KIND(Token_proc,           "proc"),                \
 	TOKEN_KIND(Token_macro,          "macro"),               \
 	TOKEN_KIND(Token_struct,         "struct"),              \
@@ -107,7 +105,6 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_dynamic,        "dynamic"),             \
 	TOKEN_KIND(Token_map,            "map"),                 \
 	TOKEN_KIND(Token_using,          "using"),               \
-	TOKEN_KIND(Token_no_alias,       "no_alias"),            \
 	TOKEN_KIND(Token_immutable,      "immutable"),           \
 	TOKEN_KIND(Token_context,        "context"),             \
 	TOKEN_KIND(Token_push_context,   "push_context"),        \

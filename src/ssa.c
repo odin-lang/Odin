@@ -1051,9 +1051,9 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 		AstNode *sel = unparen_expr(se->selector);
 		if (sel->kind == AstNode_Ident) {
 			String selector = sel->Ident.string;
-			TypeAndValue *tav = type_and_value_of_expression(p->module->info, se->expr);
+			TypeAndValue tav = type_and_value_of_expr(p->module->info, se->expr);
 
-			if (tav == NULL) {
+			if (tav.mode == Addressing_Invalid) {
 				// NOTE(bill): Imports
 				Entity *imp = entity_of_ident(p->module->info, se->expr);
 				if (imp != NULL) {
@@ -1063,8 +1063,8 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 			}
 
 
-			Type *type = base_type(tav->type);
-			if (tav->mode == Addressing_Type) { // Addressing_Type
+			Type *type = base_type(tav.type);
+			if (tav.mode == Addressing_Type) { // Addressing_Type
 				GB_PANIC("TODO: SelectorExpr Addressing_Type");
 				// Selection sel = lookup_field(p->allocator, type, selector, true);
 				// Entity *e = sel.entity;
@@ -1099,7 +1099,7 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 		} else {
 			Type *type = base_type(type_of_expr(p->module->info, se->expr));
 			GB_ASSERT(is_type_integer(type));
-			ExactValue val = type_and_value_of_expression(p->module->info, sel)->value;
+			ExactValue val = type_and_value_of_expr(p->module->info, sel).value;
 			i64 index = val.value_integer;
 
 			Selection sel = lookup_field_from_index(p->allocator, type, index);
@@ -1635,43 +1635,43 @@ ssaValue *ssa_emit_logical_binary_expr(ssaProc *p, AstNode *expr) {
 ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 	expr = unparen_expr(expr);
 
-	TypeAndValue *tv = map_tav_get(&p->module->info->types, hash_pointer(expr));
-	GB_ASSERT_NOT_NULL(tv);
+	TypeAndValue tv = type_and_value_of_expr(p->module->info, expr);
+	GB_ASSERT(tv.mode != Addressing_Invalid);
 
-	if (tv->value.kind != ExactValue_Invalid) {
-		Type *t = core_type(tv->type);
+	if (tv.value.kind != ExactValue_Invalid) {
+		Type *t = core_type(tv.type);
 		if (is_type_boolean(t)) {
-			return ssa_const_bool(p, tv->type, tv->value.value_bool);
+			return ssa_const_bool(p, tv.type, tv.value.value_bool);
 		} else if (is_type_string(t)) {
-			GB_ASSERT(tv->value.kind == ExactValue_String);
-			return ssa_const_string(p, tv->type, tv->value.value_string);
+			GB_ASSERT(tv.value.kind == ExactValue_String);
+			return ssa_const_string(p, tv.type, tv.value.value_string);
 		} else if(is_type_slice(t)) {
-			return ssa_const_slice(p, tv->type, tv->value);
+			return ssa_const_slice(p, tv.type, tv.value);
 		} else if (is_type_integer(t)) {
-			GB_ASSERT(tv->value.kind == ExactValue_Integer);
+			GB_ASSERT(tv.value.kind == ExactValue_Integer);
 
 			i64 s = 8*type_size_of(p->allocator, t);
 			switch (s) {
-			case 8:  return ssa_const_i8 (p, tv->type, tv->value.value_integer);
-			case 16: return ssa_const_i16(p, tv->type, tv->value.value_integer);
-			case 32: return ssa_const_i32(p, tv->type, tv->value.value_integer);
-			case 64: return ssa_const_i64(p, tv->type, tv->value.value_integer);
+			case 8:  return ssa_const_i8 (p, tv.type, tv.value.value_integer);
+			case 16: return ssa_const_i16(p, tv.type, tv.value.value_integer);
+			case 32: return ssa_const_i32(p, tv.type, tv.value.value_integer);
+			case 64: return ssa_const_i64(p, tv.type, tv.value.value_integer);
 			default: GB_PANIC("Unknown integer size");
 			}
 		} else if (is_type_float(t)) {
-			GB_ASSERT(tv->value.kind == ExactValue_Float);
+			GB_ASSERT(tv.value.kind == ExactValue_Float);
 			i64 s = 8*type_size_of(p->allocator, t);
 			switch (s) {
-			case 32: return ssa_const_f32(p, tv->type, tv->value.value_float);
-			case 64: return ssa_const_f64(p, tv->type, tv->value.value_float);
+			case 32: return ssa_const_f32(p, tv.type, tv.value.value_float);
+			case 64: return ssa_const_f64(p, tv.type, tv.value.value_float);
 			default: GB_PANIC("Unknown float size");
 			}
 		}
 		// IMPORTANT TODO(bill): Do constant record/array literals correctly
-		return ssa_const_nil(p, tv->type);
+		return ssa_const_nil(p, tv.type);
 	}
 
-	if (tv->mode == Addressing_Variable) {
+	if (tv.mode == Addressing_Variable) {
 		return ssa_addr_load(p, ssa_build_addr(p, expr));
 	}
 
@@ -1716,12 +1716,12 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 			return ssa_build_addr(p, ue->expr).addr;
 		}
 		ssaValue *x = ssa_build_expr(p, ue->expr);
-		return ssa_emit_unary_arith(p, ue->op.kind, x, tv->type);
+		return ssa_emit_unary_arith(p, ue->op.kind, x, tv.type);
 
 	case_end;
 
 	case_ast_node(be, BinaryExpr, expr);
-		Type *type = default_type(tv->type);
+		Type *type = default_type(tv.type);
 
 		switch (be->op.kind) {
 		case Token_Add:
@@ -1803,7 +1803,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 		ssa_emit_jump(p, done);
 		ssa_start_block(p, done);
 
-		return ssa_new_value2(p, ssaOp_Phi, tv->type, yes, no);
+		return ssa_new_value2(p, ssaOp_Phi, tv.type, yes, no);
 	case_end;
 
 
@@ -1840,7 +1840,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 		if (map_tav_get(&p->module->info->types, hash_pointer(ce->proc))->mode == Addressing_Type) {
 			GB_ASSERT(ce->args.count == 1);
 			ssaValue *x = ssa_build_expr(p, ce->args.e[0]);
-			return ssa_emit_conv(p, x, tv->type);
+			return ssa_emit_conv(p, x, tv.type);
 		}
 
 		AstNode *p = unparen_expr(ce->proc);

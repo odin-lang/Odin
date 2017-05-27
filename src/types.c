@@ -36,7 +36,7 @@ typedef enum BasicKind {
 	Basic_UntypedRune,
 	Basic_UntypedNil,
 
-	Basic_Count,
+	Basic_COUNT,
 
 	Basic_byte = Basic_u8,
 	Basic_rune = Basic_i32,
@@ -290,9 +290,9 @@ gb_global Type *t_untyped_quaternion = &basic_types[Basic_UntypedQuaternion];
 gb_global Type *t_untyped_string     = &basic_types[Basic_UntypedString];
 gb_global Type *t_untyped_rune       = &basic_types[Basic_UntypedRune];
 gb_global Type *t_untyped_nil        = &basic_types[Basic_UntypedNil];
+
 gb_global Type *t_byte               = &basic_type_aliases[0];
 gb_global Type *t_rune               = &basic_type_aliases[1];
-
 
 gb_global Type *t_u8_ptr  = NULL;
 gb_global Type *t_int_ptr = NULL;

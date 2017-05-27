@@ -1313,8 +1313,8 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 		}
 		break;
 
+	case Entity_TypeAlias:
 	case Entity_TypeName:
-		// NOTE(bill): Cyclical dependency checking is handled in the "type system" not here
 		o->mode = Addressing_Type;
 		break;
 
@@ -1343,17 +1343,6 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 	case Entity_Nil:
 		o->mode = Addressing_Value;
 		break;
-
-	case Entity_Alias: {
-		// error_node(n, "#alias entities are not yet supported");
-		// TODO(bill): Fix Entity_Alias rules
-		if (e->Alias.kind == EntityAlias_Type) {
-			o->mode = Addressing_Type;
-		} else {
-			o->mode = Addressing_Invalid;
-			return e;
-		}
-	} break;
 
 	default:
 		compiler_error("Unknown EntityKind");
@@ -3070,10 +3059,6 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		expr_entity = e;
 
 		Entity *original_e = e;
-		while (e != NULL && e->kind == Entity_Alias && e->Alias.original != NULL) {
-			e = e->Alias.original;
-		}
-
 		if (e != NULL && e->kind == Entity_ImportName && selector->kind == AstNode_Ident) {
 			// IMPORTANT NOTE(bill): This is very sloppy code but it's also very fragile
 			// It pretty much needs to be in this order and this way
@@ -3295,6 +3280,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			operand->mode = Addressing_Value;
 		}
 		break;
+	case Entity_TypeAlias:
 	case Entity_TypeName:
 		operand->mode = Addressing_Type;
 		break;
@@ -3305,11 +3291,6 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		operand->mode = Addressing_Builtin;
 		operand->builtin_id = entity->Builtin.id;
 		break;
-
-	case Entity_Alias: {
-		error_node(selector, "#alias entities are not yet supported");
-		return NULL;
-	} break;
 
 	// NOTE(bill): These cases should never be hit but are here for sanity reasons
 	case Entity_Nil:
