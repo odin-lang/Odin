@@ -5391,18 +5391,17 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 							error_node(elem, "Mixture of `field = value` and value elements in a structure literal is not allowed");
 							continue;
 						}
-						Entity *field = t->Record.fields_in_src_order[index];
-
-						if (!all_fields_are_blank && str_eq(field->token.string, str_lit("_"))) {
-							// NOTE(bill): Ignore blank identifiers
-							continue;
-						}
-
-						check_expr(c, o, elem);
 						if (index >= field_count) {
 							error_node(o->expr, "Too many values in structure literal, expected %td", field_count);
 							break;
 						}
+
+						Entity *field = t->Record.fields_in_src_order[index];
+						if (!all_fields_are_blank && str_eq(field->token.string, str_lit("_"))) {
+							// NOTE(bill): Ignore blank identifiers
+							continue;
+						}
+						check_expr(c, o, elem);
 
 						if (!check_is_field_exported(c, field)) {
 							gbString t = type_to_string(type);
