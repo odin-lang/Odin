@@ -43,6 +43,7 @@ typedef enum EntityFlag {
 	EntityFlag_NoAlias    = 1<<7,
 	EntityFlag_TypeField  = 1<<8,
 	EntityFlag_Value      = 1<<9,
+	EntityFlag_Sret       = 1<<10,
 } EntityFlag;
 
 // Zero value means the overloading process is not yet done

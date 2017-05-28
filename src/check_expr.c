@@ -1217,6 +1217,29 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
 	return new_type;
 }
 
+bool abi_compat_return_by_value(gbAllocator a, ProcCallingConvention cc, Type *abi_return_type) {
+	if (abi_return_type == NULL) {
+		return false;
+	}
+	if (cc == ProcCC_Odin) {
+		return false;
+	}
+
+	if (str_eq(build_context.ODIN_OS, str_lit("windows"))) {
+		i64 size = 8*type_size_of(a, abi_return_type);
+		switch (size) {
+		case 0:
+		case 8:
+		case 16:
+		case 32:
+		case 64:
+			return false;
+		default:
+			return true;
+		}
+	}
+	return false;
+}
 
 void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 	ast_node(pt, ProcType, proc_type_node);
@@ -1248,6 +1271,7 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 
 	// NOTE(bill): The types are the same
 	type->Proc.abi_compat_result_type = type_to_abi_compat_result_type(c->allocator, type->Proc.results);
+	type->Proc.return_by_pointer = abi_compat_return_by_value(c->allocator, pt->calling_convention, type->Proc.abi_compat_result_type);
 }
 
 

@@ -137,6 +137,7 @@ typedef struct TypeRecord {
 		Type * results; /* Type_Tuple */                  \
 		i32    param_count;                               \
 		i32    result_count;                              \
+		bool   return_by_pointer;                         \
 		Type **abi_compat_params;                         \
 		Type * abi_compat_result_type;                    \
 		bool   variadic;                                  \

@@ -121,6 +121,7 @@ struct irProcedure {
 	AstNode *             body;
 	u64                   tags;
 
+	irValue *             return_ptr;
 	irValueArray          params;
 	Array(irDefer)        defer_stmts;
 	Array(irBlock *)      blocks;
@@ -219,6 +220,7 @@ struct irProcedure {
 	IR_INSTR_KIND(Call, struct {                                      \
 		Type *    type; /* return type */                             \
 		irValue * value;                                              \
+		irValue * return_ptr;                                         \
 		irValue **args;                                               \
 		isize     arg_count;                                          \
 	})                                                                \
@@ -984,9 +986,10 @@ irValue *ir_instr_select(irProcedure *p, irValue *cond, irValue *t, irValue *f) 
 	return v;
 }
 
-irValue *ir_instr_call(irProcedure *p, irValue *value, irValue **args, isize arg_count, Type *result_type) {
+irValue *ir_instr_call(irProcedure *p, irValue *value, irValue *return_ptr, irValue **args, isize arg_count, Type *result_type) {
 	irValue *v = ir_alloc_instr(p, irInstr_Call);
 	v->Instr.Call.value = value;
+	v->Instr.Call.return_ptr = return_ptr;
 	v->Instr.Call.args = args;
 	v->Instr.Call.arg_count = arg_count;
 	v->Instr.Call.type = result_type;
@@ -1491,8 +1494,14 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_
 
 	Type *abi_rt = pt->Proc.abi_compat_result_type;
 	Type *rt = reduce_tuple_to_single_type(results);
+	if (pt->Proc.return_by_pointer) {
+		irValue *return_ptr = ir_add_local_generated(p, rt);
+		GB_ASSERT(is_type_pointer(ir_type(return_ptr)));
+		ir_emit(p, ir_instr_call(p, value, return_ptr, args, arg_count, NULL));
+		return ir_emit_load(p, return_ptr);
+	}
 
-	irValue *result = ir_emit(p, ir_instr_call(p, value, args, arg_count, abi_rt));
+	irValue *result = ir_emit(p, ir_instr_call(p, value, NULL, args, arg_count, abi_rt));
 	if (abi_rt != results) {
 		result = ir_emit_transmute(p, result, rt);
 	}
@@ -1555,12 +1564,17 @@ void ir_emit_unreachable(irProcedure *proc) {
 void ir_emit_return(irProcedure *proc, irValue *v) {
 	ir_emit_defer_stmts(proc, irDeferExit_Return, NULL);
 
-	Type *abi_rt = proc->type->Proc.abi_compat_result_type;
-	if (abi_rt != proc->type->Proc.results) {
-		v = ir_emit_transmute(proc, v, abi_rt);
-	}
+	if (proc->type->Proc.return_by_pointer) {
+		ir_emit_store(proc, proc->return_ptr, v);
+		ir_emit(proc, ir_instr_return(proc, NULL));
+	} else {
+		Type *abi_rt = proc->type->Proc.abi_compat_result_type;
+		if (abi_rt != proc->type->Proc.results) {
+			v = ir_emit_transmute(proc, v, abi_rt);
+		}
 
-	ir_emit(proc, ir_instr_return(proc, v));
+		ir_emit(proc, ir_instr_return(proc, v));
+	}
 }
 
 void ir_emit_jump(irProcedure *proc, irBlock *target_block) {
@@ -6718,6 +6732,20 @@ void ir_begin_procedure_body(irProcedure *proc) {
 	proc->entry_block = ir_new_block(proc, proc->type_expr, "entry");
 	ir_start_block(proc, proc->entry_block);
 
+	if (proc->type->Proc.return_by_pointer) {
+		// NOTE(bill): this must be the first parameter stored
+		gbAllocator a = proc->module->allocator;
+		Type *ptr_type = make_type_pointer(a, reduce_tuple_to_single_type(proc->type->Proc.results));
+		Entity *e = make_entity_param(a, NULL, make_token_ident(str_lit("agg.result")), ptr_type, false, false);
+		e->flags |= EntityFlag_Sret | EntityFlag_NoAlias;
+
+		irValue *param = ir_value_param(a, proc, e, ptr_type);
+		param->Param.kind = irParamPass_Pointer;
+
+		ir_module_add_value(proc->module, e, param);
+		proc->return_ptr = param;
+	}
+
 	if (proc->type->Proc.params != NULL) {
 		ast_node(pt, ProcType, proc->type_expr);
 		isize param_index = 0;
@@ -6744,6 +6772,8 @@ void ir_begin_procedure_body(irProcedure *proc) {
 			}
 		}
 	}
+
+
 }
 
 

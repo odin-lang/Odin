@@ -142,7 +142,7 @@ void ir_print_proc_results(irFileBuffer *f, irModule *m, Type *t) {
 	GB_ASSERT(is_type_proc(t));
 	t = base_type(t);
 	isize result_count = t->Proc.result_count;
-	if (result_count == 0) {
+	if (result_count == 0 || t->Proc.return_by_pointer) {
 		ir_fprintf(f, "void");
 	} else {
 		Type *rt = t->Proc.abi_compat_result_type;
@@ -322,6 +322,13 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		isize result_count = t->Proc.result_count;
 		ir_print_proc_results(f, m, t);
 		ir_fprintf(f, " (");
+		if (t->Proc.return_by_pointer) {
+			ir_print_type(f, m, reduce_tuple_to_single_type(t->Proc.results));
+			ir_fprintf(f, "* sret noalias ");
+			if (param_count > 0) {
+				ir_fprintf(f, ", ");
+			}
+		}
 		for (isize i = 0; i < param_count; i++) {
 			if (i > 0) {
 				ir_fprintf(f, ", ");
@@ -1248,7 +1255,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		}
 		ir_fprintf(f, "call ");
 		ir_print_calling_convention(f, m, proc_type->Proc.calling_convention);
-		if (result_type) {
+		if (result_type && !proc_type->Proc.return_by_pointer) {
 			ir_print_proc_results(f, m, proc_type);
 		} else {
 			ir_fprintf(f, "void");
@@ -1258,6 +1265,16 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 
 		ir_fprintf(f, "(");
+		if (proc_type->Proc.return_by_pointer) {
+			GB_ASSERT(call->return_ptr != NULL);
+			ir_print_type(f, m, proc_type->Proc.results);
+			ir_fprintf(f, "* ");
+			ir_print_value(f, m, call->return_ptr, ir_type(call->return_ptr));
+			if (call->arg_count > 0) {
+				ir_fprintf(f, ", ");
+			}
+		}
+
 		if (call->arg_count > 0) {
 			Type *proc_type = base_type(ir_type(call->value));
 			GB_ASSERT(proc_type->kind == Type_Proc);
@@ -1492,6 +1509,15 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	ir_print_encoded_global(f, proc->name, ir_print_is_proc_global(m, proc));
 
 	ir_fprintf(f, "(");
+
+	if (proc_type->return_by_pointer) {
+		ir_print_type(f, m, reduce_tuple_to_single_type(proc_type->results));
+		ir_fprintf(f, "* sret noalias ");
+		ir_fprintf(f, "%%agg.result");
+		if (param_count > 0) {
+			ir_fprintf(f, ", ");
+		}
+	}
 
 	if (param_count > 0) {
 		TypeTuple *params = &proc_type->params->Tuple;
