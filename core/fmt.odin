@@ -561,10 +561,10 @@ _write_int :: proc(fi: ^FmtInfo, u: u64, base: int, is_signed: bool, bit_size: i
 	}
 
 	buf: [256]byte;
-	flags: strconv.Int_Flag;
-	if fi.hash   { flags |= strconv.Int_Flag.PREFIX; }
-	if fi.plus   { flags |= strconv.Int_Flag.PLUS; }
-	if fi.space  { flags |= strconv.Int_Flag.SPACE; }
+	flags: strconv.IntFlag;
+	if fi.hash   { flags |= strconv.IntFlag.PREFIX; }
+	if fi.plus   { flags |= strconv.IntFlag.PLUS; }
+	if fi.space  { flags |= strconv.IntFlag.SPACE; }
 	s := strconv.append_bits(buf[0..<0], u, base, is_signed, bit_size, digits, flags);
 
 	prev_zero := fi.zero;
@@ -1089,7 +1089,7 @@ sbprintf :: proc(b: ^StringBuffer, fmt: string, args: ..any) -> string {
 		// Process a "verb"
 		i++;
 
-		#label prefix_loop
+	prefix_loop:
 		for ; i < end; i++ {
 			match fmt[i] {
 			case '+':

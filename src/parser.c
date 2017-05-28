@@ -106,6 +106,13 @@ typedef enum FieldFlag {
 	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_immutable,
 } FieldListTag;
 
+typedef enum StmtAllowFlag {
+	StmtAllowFlag_None  = 0,
+	StmtAllowFlag_In    = 1<<0,
+	StmtAllowFlag_Label = 1<<1,
+} StmtAllowFlag;
+
+
 
 AstNodeArray make_ast_node_array(AstFile *f) {
 	AstNodeArray a;
@@ -1594,6 +1601,14 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 	}
 
 	switch (s->kind) {
+	case AstNode_IfStmt:
+	case AstNode_WhenStmt:
+	case AstNode_ForStmt:
+	case AstNode_RangeStmt:
+	case AstNode_MatchStmt:
+	case AstNode_TypeMatchStmt:
+		return true;
+
 	case AstNode_HelperType:
 		return is_semicolon_optional_for_node(f, s->HelperType.type);
 
@@ -1912,9 +1927,10 @@ void parse_proc_tags(AstFile *f, u64 *tags, AstNode **foreign_library_token, Str
 	}
 }
 
+
 AstNodeArray parse_lhs_expr_list(AstFile *f);
 AstNodeArray parse_rhs_expr_list(AstFile *f);
-AstNode *    parse_simple_stmt  (AstFile *f, bool in_stmt_ok);
+AstNode *    parse_simple_stmt  (AstFile *f, StmtAllowFlag flags);
 AstNode *    parse_type         (AstFile *f);
 
 AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
@@ -1931,73 +1947,6 @@ AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
 }
 
 
-
-// AstNode *parse_block_expr(AstFile *f) {
-// 	AstNodeArray stmts = {0};
-// 	Token open, close;
-// 	open = expect_token(f, Token_OpenBrace);
-// 	f->expr_level++;
-// 	stmts = parse_stmt_list(f);
-// 	f->expr_level--;
-// 	close = expect_token(f, Token_CloseBrace);
-// 	return ast_block_expr(f, stmts, open, close);
-// }
-
-// AstNode *parse_if_expr(AstFile *f) {
-// 	if (f->curr_proc == NULL) {
-// 		syntax_error(f->curr_token, "You cannot use an if expression in the file scope");
-// 		return ast_bad_stmt(f, f->curr_token, f->curr_token);
-// 	}
-
-// 	Token token = expect_token(f, Token_if);
-// 	AstNode *init = NULL;
-// 	AstNode *cond = NULL;
-// 	AstNode *body = NULL;
-// 	AstNode *else_expr = NULL;
-
-// 	isize prev_level = f->expr_level;
-// 	f->expr_level = -1;
-
-// 	if (allow_token(f, Token_Semicolon)) {
-// 		cond = parse_expr(f, false);
-// 	} else {
-// 		init = parse_simple_stmt(f, false);
-// 		if (allow_token(f, Token_Semicolon)) {
-// 			cond = parse_expr(f, false);
-// 		} else {
-// 			cond = convert_stmt_to_expr(f, init, str_lit("boolean expression"));
-// 			init = NULL;
-// 		}
-// 	}
-
-// 	f->expr_level = prev_level;
-
-// 	if (cond == NULL) {
-// 		syntax_error(f->curr_token, "Expected condition for if statement");
-// 	}
-
-// 	body = parse_block_expr(f);
-
-// 	if (allow_token(f, Token_else)) {
-// 		switch (f->curr_token.kind) {
-// 		case Token_if:
-// 			else_expr = parse_if_expr(f);
-// 			break;
-// 		case Token_OpenBrace:
-// 			else_expr = parse_block_expr(f);
-// 			break;
-// 		default:
-// 			syntax_error(f->curr_token, "Expected if expression block statement");
-// 			else_expr = ast_bad_expr(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
-// 			break;
-// 		}
-// 	} else {
-// 		syntax_error(f->curr_token, "An if expression must have an else clause");
-// 		return ast_bad_stmt(f, f->curr_token, f->tokens.e[f->curr_token_index+1]);
-// 	}
-
-// 	return ast_if_expr(f, token, init, cond, body, else_expr);
-// }
 
 AstNode *parse_operand(AstFile *f, bool lhs) {
 	AstNode *operand = NULL; // Operand
@@ -2556,7 +2505,7 @@ AstNode *parse_value_decl(AstFile *f, AstNodeArray lhs) {
 
 
 
-AstNode *parse_simple_stmt(AstFile *f, bool in_stmt_ok) {
+AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 	AstNodeArray lhs = parse_lhs_expr_list(f);
 	Token token = f->curr_token;
 	switch (token.kind) {
@@ -2590,7 +2539,7 @@ AstNode *parse_simple_stmt(AstFile *f, bool in_stmt_ok) {
 	} break;
 
 	case Token_in:
-		if (in_stmt_ok) {
+		if (flags&StmtAllowFlag_In) {
 			allow_token(f, Token_in);
 			bool prev_allow_range = f->allow_range;
 			f->allow_range = true;
@@ -2606,6 +2555,31 @@ AstNode *parse_simple_stmt(AstFile *f, bool in_stmt_ok) {
 		break;
 
 	case Token_Colon:
+		if ((flags&StmtAllowFlag_Label) && lhs.count == 1) {
+			TokenKind next = look_ahead_token_kind(f, 1);
+			switch (next) {
+			case Token_for:
+			case Token_match: {
+				next_token(f);
+				AstNode *name = lhs.e[0];
+				AstNode *label = ast_label_decl(f, ast_node_token(name), name);
+				AstNode *stmt = parse_stmt(f);
+			#define _SET_LABEL(Kind_, label_) case GB_JOIN2(AstNode_, Kind_): (stmt->Kind_).label = label_; break
+				switch (stmt->kind) {
+				_SET_LABEL(ForStmt, label);
+				_SET_LABEL(RangeStmt, label);
+				_SET_LABEL(MatchStmt, label);
+				_SET_LABEL(TypeMatchStmt, label);
+				default:
+					syntax_error(token, "Labels can only be applied to a loop or match statement");
+					break;
+				}
+			#undef _SET_LABEL
+				return stmt;
+			} break;
+			}
+		}
+
 		return parse_value_decl(f, lhs);
 	}
 
@@ -2613,6 +2587,8 @@ AstNode *parse_simple_stmt(AstFile *f, bool in_stmt_ok) {
 		syntax_error(token, "Expected 1 expression");
 		return ast_bad_stmt(f, token, f->curr_token);
 	}
+
+
 
 	switch (token.kind) {
 	case Token_Inc:
@@ -3207,7 +3183,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 	if (allow_token(f, Token_Semicolon)) {
 		cond = parse_expr(f, false);
 	} else {
-		init = parse_simple_stmt(f, false);
+		init = parse_simple_stmt(f, StmtAllowFlag_None);
 		if (allow_token(f, Token_Semicolon)) {
 			cond = parse_expr(f, false);
 		} else {
@@ -3343,7 +3319,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 		isize prev_level = f->expr_level;
 		f->expr_level = -1;
 		if (f->curr_token.kind != Token_Semicolon) {
-			cond = parse_simple_stmt(f, true);
+			cond = parse_simple_stmt(f, StmtAllowFlag_In);
 			if (cond->kind == AstNode_AssignStmt && cond->AssignStmt.op.kind == Token_in) {
 				is_range = true;
 			}
@@ -3354,11 +3330,11 @@ AstNode *parse_for_stmt(AstFile *f) {
 			init = cond;
 			cond = NULL;
 			if (f->curr_token.kind != Token_Semicolon) {
-				cond = parse_simple_stmt(f, false);
+				cond = parse_simple_stmt(f, StmtAllowFlag_None);
 			}
 			expect_semicolon(f, cond);
 			if (f->curr_token.kind != Token_OpenBrace) {
-				post = parse_simple_stmt(f, false);
+				post = parse_simple_stmt(f, StmtAllowFlag_None);
 			}
 		}
 
@@ -3432,7 +3408,7 @@ AstNode *parse_match_stmt(AstFile *f) {
 		isize prev_level = f->expr_level;
 		f->expr_level = -1;
 
-		tag = parse_simple_stmt(f, true);
+		tag = parse_simple_stmt(f, StmtAllowFlag_In);
 		if (tag->kind == AstNode_AssignStmt && tag->AssignStmt.op.kind == Token_in) {
 			is_type_match = true;
 		} else {
@@ -3440,7 +3416,7 @@ AstNode *parse_match_stmt(AstFile *f) {
 				init = tag;
 				tag = NULL;
 				if (f->curr_token.kind != Token_OpenBrace) {
-					tag = parse_simple_stmt(f, false);
+					tag = parse_simple_stmt(f, StmtAllowFlag_None);
 				}
 			}
 		}
@@ -3536,7 +3512,7 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_Xor:
 	case Token_Not:
 	case Token_And:
-		s = parse_simple_stmt(f, false);
+		s = parse_simple_stmt(f, StmtAllowFlag_Label);
 		expect_semicolon(f, s);
 		return s;
 
@@ -3648,25 +3624,7 @@ AstNode *parse_stmt(AstFile *f) {
 		Token name = expect_token(f, Token_Ident);
 		String tag = name.string;
 
-		if (str_eq(tag, str_lit("label"))) {
-			AstNode *name  = parse_ident(f);
-			AstNode *label = ast_label_decl(f, token, name);
-			AstNode *stmt  = parse_stmt(f);
-
-		#define _SET_LABEL(Kind_, label_) case GB_JOIN2(AstNode_, Kind_): (stmt->Kind_).label = label_; break
-			switch (stmt->kind) {
-			_SET_LABEL(ForStmt, label);
-			_SET_LABEL(RangeStmt, label);
-			_SET_LABEL(MatchStmt, label);
-			_SET_LABEL(TypeMatchStmt, label);
-			default:
-				syntax_error(token, "#label cannot only be applied to a loop or match statement");
-				break;
-			}
-		#undef _SET_LABEL
-
-			return stmt;
-		} else if (str_eq(tag, str_lit("import"))) {
+		if (str_eq(tag, str_lit("import"))) {
 			AstNode *cond = NULL;
 			Token import_name = {0};
 

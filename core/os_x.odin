@@ -41,7 +41,7 @@ RTLD_FIRST    :: 0x100;
 
 args: [dynamic]string;
 
-FileTime :: struct #ordered {
+_FileTime :: struct #ordered {
 	seconds: i64,
 	nanoseconds: i64
 }
