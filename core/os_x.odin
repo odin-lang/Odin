@@ -2,7 +2,7 @@
 #import "strings.odin";
 
 Handle    :: i32;
-File_Time :: u64;
+FileTime :: u64;
 Errno     :: int;
 
 // TODO(zangent): Find out how to make this work on x64 and x32.
@@ -211,8 +211,8 @@ stdout: Handle = 1; // get_std_handle(win32.STD_OUTPUT_HANDLE);
 stderr: Handle = 2; // get_std_handle(win32.STD_ERROR_HANDLE);
 
 /* TODO(zangent): Implement these!
-last_write_time :: proc(fd: Handle) -> File_Time {}
-last_write_time_by_name :: proc(name: string) -> File_Time {}
+last_write_time :: proc(fd: Handle) -> FileTime {}
+last_write_time_by_name :: proc(name: string) -> FileTime {}
 */
 
 stat :: proc(path: string) -> (Stat, bool) #inline {

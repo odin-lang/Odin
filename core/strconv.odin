@@ -1,6 +1,6 @@
 #import . "decimal.odin";
 
-Int_Flag :: enum {
+IntFlag :: enum {
 	PREFIX = 1<<0,
 	PLUS   = 1<<1,
 	SPACE  = 1<<2,
@@ -320,7 +320,7 @@ is_integer_negative :: proc(u: u64, is_signed: bool, bit_size: int) -> (unsigned
 }
 
 
-append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flag) -> string {
+append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: IntFlag) -> string {
 	is_pow2 :: proc(x: i64) -> bool {
 		if (x <= 0) {
 			return false;
@@ -348,7 +348,7 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 	i--;
 	a[i] = digits[uint(u)];
 
-	if flags&Int_Flag.PREFIX != 0 {
+	if flags&IntFlag.PREFIX != 0 {
 		ok := true;
 		match base {
 		case 2:  i--; a[i] = 'b';
@@ -366,9 +366,9 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 
 	if neg {
 		i--; a[i] = '-';
-	} else if flags&Int_Flag.PLUS != 0 {
+	} else if flags&IntFlag.PLUS != 0 {
 		i--; a[i] = '+';
-	} else if flags&Int_Flag.SPACE != 0 {
+	} else if flags&IntFlag.SPACE != 0 {
 		i--; a[i] = ' ';
 	}
 

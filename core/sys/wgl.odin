@@ -12,7 +12,7 @@ CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB :: 0x00000002;
 Hglrc :: Handle;
 Color_Ref :: u32;
 
-Layer_Plane_Descriptor :: struct {
+LayerPlaneDescriptor :: struct {
 	size:             u16,
 	version:          u16,
 	flags:            u32,
@@ -39,28 +39,28 @@ Layer_Plane_Descriptor :: struct {
 	transparent:      Color_Ref,
 }
 
-Point_Float :: struct {
+PointFloat :: struct {
 	x, y: f32,
 }
 
-Glyph_Metrics_Float :: struct {
+Glyph_MetricsFloat :: struct {
 	black_box_x:  f32,
 	black_box_y:  f32,
-	glyph_origin: Point_Float,
+	glyph_origin: PointFloat,
 	cell_inc_x:   f32,
 	cell_inc_y:   f32,
 }
 
-CreateContextAttribsARB_Type :: #type proc(hdc: Hdc, h_share_context: rawptr, attribList: ^i32) -> Hglrc;
-ChoosePixelFormatARB_Type    :: #type proc(hdc: Hdc, attrib_i_list: ^i32, attrib_f_list: ^f32, max_formats: u32, formats: ^i32, num_formats : ^u32) -> Bool #cc_c;
-SwapIntervalEXT_Type         :: #type proc(interval : i32) -> bool #cc_c;
-GetExtensionsStringARB_Type  :: #type proc(Hdc) -> ^byte #cc_c;
+CreateContextAttribsARBType :: #type proc(hdc: Hdc, h_share_context: rawptr, attribList: ^i32) -> Hglrc;
+ChoosePixelFormatARBType    :: #type proc(hdc: Hdc, attrib_i_list: ^i32, attrib_f_list: ^f32, max_formats: u32, formats: ^i32, num_formats : ^u32) -> Bool #cc_c;
+SwapIntervalEXTType         :: #type proc(interval : i32) -> bool #cc_c;
+GetExtensionsStringARBType  :: #type proc(Hdc) -> ^byte #cc_c;
 
 
-CreateContextAttribsARB: CreateContextAttribsARB_Type;
-ChoosePixelFormatARB:    ChoosePixelFormatARB_Type;
-SwapIntervalEXT:         SwapIntervalEXT_Type;
-GetExtensionsStringARB:  GetExtensionsStringARB_Type;
+CreateContextAttribsARB: CreateContextAttribsARBType;
+ChoosePixelFormatARB:    ChoosePixelFormatARBType;
+SwapIntervalEXT:         SwapIntervalEXTType;
+GetExtensionsStringARB:  GetExtensionsStringARBType;
 
 
 
@@ -70,7 +70,7 @@ GetProcAddress          :: proc(c_str: ^u8) -> Proc                             
 DeleteContext           :: proc(hglrc: Hglrc) -> Bool                                                                                              #foreign opengl32 "wglDeleteContext";
 CopyContext             :: proc(src, dst: Hglrc, mask: u32) -> Bool                                                                                #foreign opengl32 "wglCopyContext";
 CreateLayerContext      :: proc(hdc: Hdc, layer_plane: i32) -> Hglrc                                                                               #foreign opengl32 "wglCreateLayerContext";
-DescribeLayerPlane      :: proc(hdc: Hdc, pixel_format, layer_plane: i32, bytes: u32, pd: ^Layer_Plane_Descriptor) -> Bool                         #foreign opengl32 "wglDescribeLayerPlane";
+DescribeLayerPlane      :: proc(hdc: Hdc, pixel_format, layer_plane: i32, bytes: u32, pd: ^LayerPlaneDescriptor) -> Bool                         #foreign opengl32 "wglDescribeLayerPlane";
 GetCurrentContext       :: proc() -> Hglrc                                                                                                         #foreign opengl32 "wglGetCurrentContext";
 GetCurrentDC            :: proc() -> Hdc                                                                                                           #foreign opengl32 "wglGetCurrentDC";
 GetLayerPaletteEntries  :: proc(hdc: Hdc, layer_plane, start, entries: i32, cr: ^Color_Ref) -> i32                                                 #foreign opengl32 "wglGetLayerPaletteEntries";
@@ -79,4 +79,4 @@ SetLayerPaletteEntries  :: proc(hdc: Hdc, layer_plane, start, entries: i32, cr: 
 ShareLists              :: proc(hglrc1, hglrc2: Hglrc) -> Bool                                                                                     #foreign opengl32 "wglShareLists";
 SwapLayerBuffers        :: proc(hdc: Hdc, planes: u32) -> Bool                                                                                     #foreign opengl32 "wglSwapLayerBuffers";
 UseFontBitmaps          :: proc(hdc: Hdc, first, count, list_base: u32) -> Bool                                                                    #foreign opengl32 "wglUseFontBitmaps";
-UseFontOutlines         :: proc(hdc: Hdc, first, count, list_base: u32, deviation, extrusion: f32, format: i32, gmf: ^Glyph_Metrics_Float) -> Bool #foreign opengl32 "wglUseFontOutlines";
+UseFontOutlines         :: proc(hdc: Hdc, first, count, list_base: u32, deviation, extrusion: f32, format: i32, gmf: ^Glyph_MetricsFloat) -> Bool #foreign opengl32 "wglUseFontOutlines";

@@ -2,7 +2,7 @@
 #import "strings.odin";
 
 Handle    :: i32;
-File_Time :: u64;
+FileTime :: u64;
 Errno     :: i32;
 
 // INVALID_HANDLE: Handle : -1;
@@ -36,7 +36,7 @@ RTLD_GLOBAL       :: 0x100;
 // "Argv" arguments converted to Odin strings
 immutable args := _alloc_command_line_arguments();
 
-_File_Time :: struct #ordered {
+_FileTime :: struct #ordered {
 	seconds:     i64,
 	nanoseconds: i32,
 	reserved:    i32,
@@ -59,9 +59,9 @@ Stat :: struct #ordered {
 	block_size:    i64, // Optimal bllocksize for I/O
 	blocks:        i64, // Number of 512-byte blocks allocated
 
-	last_access:   _File_Time, // Time of last access
-	modified:      _File_Time, // Time of last modification
-	status_change: _File_Time, // Time of last status change
+	last_access:   _FileTime, // Time of last access
+	modified:      _FileTime, // Time of last modification
+	status_change: _FileTime, // Time of last status change
 
 	_reserve1,
 	_reserve2,
@@ -193,8 +193,8 @@ stdout: Handle = 1;
 stderr: Handle = 2;
 
 /* TODO(zangent): Implement these!
-last_write_time :: proc(fd: Handle) -> File_Time {}
-last_write_time_by_name :: proc(name: string) -> File_Time {}
+last_write_time :: proc(fd: Handle) -> FileTime {}
+last_write_time_by_name :: proc(name: string) -> FileTime {}
 */
 
 stat :: proc(path: string) -> (Stat, int) #inline {

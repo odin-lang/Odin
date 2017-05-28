@@ -1,7 +1,7 @@
 #import win32 "sys/windows.odin";
 
 Handle    :: int;
-File_Time :: u64;
+FileTime :: u64;
 Errno     :: int;
 
 INVALID_HANDLE: Handle : -1;
@@ -214,17 +214,17 @@ get_std_handle :: proc(h: int) -> Handle {
 
 
 
-last_write_time :: proc(fd: Handle) -> File_Time {
-	file_info: win32.By_Handle_File_Information;
+last_write_time :: proc(fd: Handle) -> FileTime {
+	file_info: win32.ByHandleFileInformation;
 	win32.GetFileInformationByHandle(win32.Handle(fd), &file_info);
-	lo := File_Time(file_info.last_write_time.lo);
-	hi := File_Time(file_info.last_write_time.hi);
+	lo := FileTime(file_info.last_write_time.lo);
+	hi := FileTime(file_info.last_write_time.hi);
 	return lo | hi << 32;
 }
 
-last_write_time_by_name :: proc(name: string) -> File_Time {
+last_write_time_by_name :: proc(name: string) -> FileTime {
 	last_write_time: win32.Filetime;
-	data: win32.File_Attribute_Data;
+	data: win32.FileAttributeData;
 	buf: [1024]byte;
 
 	assert(len(buf) > len(name));
@@ -235,8 +235,8 @@ last_write_time_by_name :: proc(name: string) -> File_Time {
 		last_write_time = data.last_write_time;
 	}
 
-	l := File_Time(last_write_time.lo);
-	h := File_Time(last_write_time.hi);
+	l := FileTime(last_write_time.lo);
+	h := FileTime(last_write_time.hi);
 	return l | h << 32;
 }
 

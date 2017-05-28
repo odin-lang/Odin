@@ -5,6 +5,17 @@
 #import "utf8.odin";
 #import "raw.odin";
 
+// Naming Conventions:
+// In general, PascalCase for types and snake_case for values
+//
+// Import Name:        snake_case (but prefer single word)
+// Types:              PascalCase
+// Union Variants:     PascalCase
+// Enum Values:        PascalCase
+// Procedures:         snake_case
+// Local Variables:    snake_case
+// Constant Variables: SCREAMING_SNAKE_CASE
+
 // IMPORTANT NOTE(bill): `type_info` & `type_info_val` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
 // This could change at a later date if the all these data structures are
@@ -13,20 +24,20 @@
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
-Type_Info_Enum_Value :: raw_union {
+TypeInfoEnumValue :: raw_union {
 	f: f64,
 	i: i64,
 }
 // NOTE(bill): This must match the compiler's
-Calling_Convention :: enum {
+CallingConvention :: enum {
 	ODIN = 0,
 	C    = 1,
 	STD  = 2,
 	FAST = 3,
 }
 
-Type_Info_Record :: struct #ordered {
-	types:        []^Type_Info,
+TypeInfoRecord :: struct #ordered {
+	types:        []^TypeInfo,
 	names:        []string,
 	offsets:      []int,  // offsets may not be used in tuples
 	usings:       []bool, // usings may not be used in tuples
@@ -35,11 +46,11 @@ Type_Info_Record :: struct #ordered {
 	custom_align: bool,
 }
 
-Type_Info :: union {
+TypeInfo :: union {
 	size:  int,
 	align: int,
 
-	Named{name: string, base: ^Type_Info},
+	Named{name: string, base: ^TypeInfo},
 	Integer{signed: bool},
 	Float{},
 	Complex{},
@@ -48,44 +59,44 @@ Type_Info :: union {
 	Boolean{},
 	Any{},
 	Pointer{
-		elem: ^Type_Info, // nil -> rawptr
+		elem: ^TypeInfo, // nil -> rawptr
 	},
-	Atomic{elem: ^Type_Info},
+	Atomic{elem: ^TypeInfo},
 	Procedure{
-		params:     ^Type_Info, // Type_Info.Tuple
-		results:    ^Type_Info, // Type_Info.Tuple
+		params:     ^TypeInfo, // TypeInfo.Tuple
+		results:    ^TypeInfo, // TypeInfo.Tuple
 		variadic:   bool,
-		convention: Calling_Convention,
+		convention: CallingConvention,
 	},
 	Array{
-		elem:      ^Type_Info,
+		elem:      ^TypeInfo,
 		elem_size: int,
 		count:     int,
 	},
-	Dynamic_Array{elem: ^Type_Info, elem_size: int},
-	Slice        {elem: ^Type_Info, elem_size: int},
-	Vector       {elem: ^Type_Info, elem_size, count: int},
-	Tuple        {using record: Type_Info_Record}, // Only really used for procedures
-	Struct       {using record: Type_Info_Record},
-	Raw_Union    {using record: Type_Info_Record},
+	DynamicArray{elem: ^TypeInfo, elem_size: int},
+	Slice       {elem: ^TypeInfo, elem_size: int},
+	Vector      {elem: ^TypeInfo, elem_size, count: int},
+	Tuple       {using record: TypeInfoRecord}, // Only really used for procedures
+	Struct      {using record: TypeInfoRecord},
+	RawUnion    {using record: TypeInfoRecord},
 	Union{
 		common_fields: struct {
-			types:     []^Type_Info,
+			types:     []^TypeInfo,
 			names:     []string,
 			offsets:   []int,    // offsets may not be used in tuples
 		},
 		variant_names: []string,
-		variant_types: []^Type_Info,
+		variant_types: []^TypeInfo,
 	},
 	Enum{
-		base:   ^Type_Info,
+		base:   ^TypeInfo,
 		names:  []string,
-		values: []Type_Info_Enum_Value,
+		values: []TypeInfoEnumValue,
 	},
 	Map{
-		key:              ^Type_Info,
-		value:            ^Type_Info,
-		generated_struct: ^Type_Info,
+		key:              ^TypeInfo,
+		value:            ^TypeInfo,
+		generated_struct: ^TypeInfo,
 		count:            int, // == 0 if dynamic
 	},
 }
@@ -93,33 +104,33 @@ Type_Info :: union {
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
-__type_table: []Type_Info;
+__type_table: []TypeInfo;
 
 __argv__: ^^byte;
 __argc__: i32;
 
-type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
+type_info_base :: proc(info: ^TypeInfo) -> ^TypeInfo {
 	if info == nil {
 		return nil;
 	}
 	base := info;
 	match i in base {
-	case Type_Info.Named:
+	case TypeInfo.Named:
 		base = i.base;
 	}
 	return base;
 }
 
 
-type_info_base_without_enum :: proc(info: ^Type_Info) -> ^Type_Info {
+type_info_base_without_enum :: proc(info: ^TypeInfo) -> ^TypeInfo {
 	if info == nil {
 		return nil;
 	}
 	base := info;
 	match i in base {
-	case Type_Info.Named:
+	case TypeInfo.Named:
 		base = i.base;
-	case Type_Info.Enum:
+	case TypeInfo.Enum:
 		base = i.base;
 	}
 	return base;
@@ -135,17 +146,17 @@ read_cycle_counter :: proc() -> u64 #foreign __llvm_core "llvm.readcyclecounter"
 
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
-Allocator_Mode :: enum u8 {
-	ALLOC,
-	FREE,
-	FREE_ALL,
-	RESIZE,
+AllocatorMode :: enum u8 {
+	Alloc,
+	Free,
+	FreeAll,
+	Resize,
 }
-Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
+AllocatorProc :: #type proc(allocator_data: rawptr, mode: AllocatorMode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
 Allocator :: struct #ordered {
-	procedure: Allocator_Proc,
+	procedure: AllocatorProc,
 	data:      rawptr,
 }
 
@@ -181,7 +192,7 @@ alloc :: proc(size: int) -> rawptr #inline { return alloc_align(size, DEFAULT_AL
 alloc_align :: proc(size, alignment: int) -> rawptr #inline {
 	__check_context();
 	a := context.allocator;
-	return a.procedure(a.data, Allocator_Mode.ALLOC, size, alignment, nil, 0, 0);
+	return a.procedure(a.data, AllocatorMode.Alloc, size, alignment, nil, 0, 0);
 }
 
 free_ptr_with_allocator :: proc(a: Allocator, ptr: rawptr) #inline {
@@ -191,7 +202,7 @@ free_ptr_with_allocator :: proc(a: Allocator, ptr: rawptr) #inline {
 	if a.procedure == nil {
 		return;
 	}
-	a.procedure(a.data, Allocator_Mode.FREE, 0, 0, ptr, 0, 0);
+	a.procedure(a.data, AllocatorMode.Free, 0, 0, ptr, 0, 0);
 }
 
 free_ptr :: proc(ptr: rawptr) #inline {
@@ -202,7 +213,7 @@ free_ptr :: proc(ptr: rawptr) #inline {
 free_all :: proc() #inline {
 	__check_context();
 	a := context.allocator;
-	a.procedure(a.data, Allocator_Mode.FREE_ALL, 0, 0, nil, 0, 0);
+	a.procedure(a.data, AllocatorMode.FreeAll, 0, 0, nil, 0, 0);
 }
 
 
@@ -210,7 +221,7 @@ resize       :: proc(ptr: rawptr, old_size, new_size: int) -> rawptr #inline { r
 resize_align :: proc(ptr: rawptr, old_size, new_size, alignment: int) -> rawptr #inline {
 	__check_context();
 	a := context.allocator;
-	return a.procedure(a.data, Allocator_Mode.RESIZE, new_size, alignment, ptr, old_size, 0);
+	return a.procedure(a.data, AllocatorMode.Resize, new_size, alignment, ptr, old_size, 0);
 }
 
 
@@ -240,23 +251,23 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 }
 
 
-default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
+default_allocator_proc :: proc(allocator_data: rawptr, mode: AllocatorMode,
                                size, alignment: int,
                                old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
-	using Allocator_Mode;
+	using AllocatorMode;
 
 	match mode {
-	case ALLOC:
+	case Alloc:
 		return os.heap_alloc(size);
 
-	case FREE:
+	case Free:
 		os.heap_free(old_memory);
 		return nil;
 
-	case FREE_ALL:
+	case FreeAll:
 		// NOTE(bill): Does nothing
 
-	case RESIZE:
+	case Resize:
 		ptr := os.heap_resize(old_memory, size);
 		assert(ptr != nil);
 		return ptr;
@@ -360,7 +371,7 @@ __substring_expr_error :: proc(file: string, line, column: int, low, high: int) 
 	            file, line, column, low, high);
 	__debug_trap();
 }
-__type_assertion_check :: proc(ok: bool, file: string, line, column: int, from, to: ^Type_Info) {
+__type_assertion_check :: proc(ok: bool, file: string, line, column: int, from, to: ^TypeInfo) {
 	if !ok {
 		fmt.fprintf(os.stderr, "%s(%d:%d) Invalid type_assertion from %T to %T\n",
 		            file, line, column, from, to);
@@ -429,7 +440,7 @@ __abs_quaternion256 :: proc(x: quaternion256) -> f64 #inline {
 
 
 __dynamic_array_make :: proc(array_: rawptr, elem_size, elem_align: int, len, cap: int) {
-	array := ^raw.Dynamic_Array(array_);
+	array := ^raw.DynamicArray(array_);
 	__check_context();
 	array.allocator = context.allocator;
 	assert(array.allocator.procedure != nil);
@@ -441,7 +452,7 @@ __dynamic_array_make :: proc(array_: rawptr, elem_size, elem_align: int, len, ca
 }
 
 __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap: int) -> bool {
-	array := ^raw.Dynamic_Array(array_);
+	array := ^raw.DynamicArray(array_);
 
 	if cap <= array.cap {
 		return true;
@@ -457,7 +468,7 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	new_size  := cap * elem_size;
 	allocator := array.allocator;
 
-	new_data := allocator.procedure(allocator.data, Allocator_Mode.RESIZE, new_size, elem_align, array.data, old_size, 0);
+	new_data := allocator.procedure(allocator.data, AllocatorMode.Resize, new_size, elem_align, array.data, old_size, 0);
 	if new_data == nil {
 		return false;
 	}
@@ -468,7 +479,7 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 }
 
 __dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: int) -> bool {
-	array := ^raw.Dynamic_Array(array_);
+	array := ^raw.DynamicArray(array_);
 
 	ok := __dynamic_array_reserve(array_, elem_size, elem_align, len);
 	if ok {
@@ -480,7 +491,7 @@ __dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: 
 
 __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
                                items: rawptr, item_count: int) -> int {
-	array := ^raw.Dynamic_Array(array_);
+	array := ^raw.DynamicArray(array_);
 
 	if item_count <= 0 || items == nil {
 		return array.len;
@@ -504,7 +515,7 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 }
 
 __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: int) -> int {
-	array := ^raw.Dynamic_Array(array_);
+	array := ^raw.DynamicArray(array_);
 
 	ok := true;
 	if array.cap <= array.len+1 {
@@ -559,27 +570,27 @@ __default_hash_string :: proc(s: string) -> u64 {
 
 __INITIAL_MAP_CAP :: 16;
 
-__Map_Key :: struct #ordered {
+__MapKey :: struct #ordered {
 	hash: u64,
 	str:  string,
 }
 
-__Map_Find_Result :: struct #ordered {
+__MapFindResult :: struct #ordered {
 	hash_index:  int,
 	entry_prev:  int,
 	entry_index: int,
 }
 
-__Map_Entry_Header :: struct #ordered {
-	key:  __Map_Key,
+__MapEntryHeader :: struct #ordered {
+	key:  __MapKey,
 	next: int,
 /*
 	value: Value_Type,
 */
 }
 
-__Map_Header :: struct #ordered {
-	m:             ^raw.Dynamic_Map,
+__MapHeader :: struct #ordered {
+	m:             ^raw.DynamicMap,
 	is_key_string: bool,
 	entry_size:    int,
 	entry_align:   int,
@@ -587,18 +598,18 @@ __Map_Header :: struct #ordered {
 	value_size:    int,
 }
 
-__dynamic_map_reserve :: proc(using header: __Map_Header, cap: int)  {
+__dynamic_map_reserve :: proc(using header: __MapHeader, cap: int)  {
 	__dynamic_array_reserve(&m.hashes, size_of(int), align_of(int), cap);
 	__dynamic_array_reserve(&m.entries, entry_size, entry_align,    cap);
 }
 
-__dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
-	new_header: __Map_Header = header;
-	nm: raw.Dynamic_Map;
+__dynamic_map_rehash :: proc(using header: __MapHeader, new_count: int) {
+	new_header: __MapHeader = header;
+	nm: raw.DynamicMap;
 	new_header.m = &nm;
 
-	header_hashes := ^raw.Dynamic_Array(&header.m.hashes);
-	nm_hashes := ^raw.Dynamic_Array(&nm.hashes);
+	header_hashes := ^raw.DynamicArray(&header.m.hashes);
+	nm_hashes := ^raw.DynamicArray(&nm.hashes);
 
 	__dynamic_array_resize(nm_hashes, size_of(int), align_of(int), new_count);
 	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len);
@@ -637,7 +648,7 @@ __dynamic_map_rehash :: proc(using header: __Map_Header, new_count: int) {
 	header.m^ = nm;
 }
 
-__dynamic_map_get :: proc(h: __Map_Header, key: __Map_Key) -> rawptr {
+__dynamic_map_get :: proc(h: __MapHeader, key: __MapKey) -> rawptr {
 	index := __dynamic_map_find(h, key).entry_index;
 	if index >= 0 {
 		data := ^byte(__dynamic_map_get_entry(h, index));
@@ -647,7 +658,7 @@ __dynamic_map_get :: proc(h: __Map_Header, key: __Map_Key) -> rawptr {
 	return nil;
 }
 
-__dynamic_map_set :: proc(using h: __Map_Header, key: __Map_Key, value: rawptr) {
+__dynamic_map_set :: proc(using h: __MapHeader, key: __MapKey, value: rawptr) {
 	index: int;
 	assert(value != nil);
 
@@ -682,17 +693,17 @@ __dynamic_map_set :: proc(using h: __Map_Header, key: __Map_Key, value: rawptr) 
 }
 
 
-__dynamic_map_grow :: proc(using h: __Map_Header) {
+__dynamic_map_grow :: proc(using h: __MapHeader) {
 	new_count := max(2*m.entries.cap + 8, __INITIAL_MAP_CAP);
 	__dynamic_map_rehash(h, new_count);
 }
 
-__dynamic_map_full :: proc(using h: __Map_Header) -> bool {
+__dynamic_map_full :: proc(using h: __MapHeader) -> bool {
 	return int(0.75 * f64(len(m.hashes))) <= m.entries.cap;
 }
 
 
-__dynamic_map_hash_equal :: proc(h: __Map_Header, a, b: __Map_Key) -> bool {
+__dynamic_map_hash_equal :: proc(h: __MapHeader, a, b: __MapKey) -> bool {
 	if a.hash == b.hash {
 		if h.is_key_string {
 			return a.str == b.str;
@@ -702,8 +713,8 @@ __dynamic_map_hash_equal :: proc(h: __Map_Header, a, b: __Map_Key) -> bool {
 	return false;
 }
 
-__dynamic_map_find :: proc(using h: __Map_Header, key: __Map_Key) -> __Map_Find_Result {
-	fr := __Map_Find_Result{-1, -1, -1};
+__dynamic_map_find :: proc(using h: __MapHeader, key: __MapKey) -> __MapFindResult {
+	fr := __MapFindResult{-1, -1, -1};
 	if len(m.hashes) > 0 {
 		fr.hash_index = int(key.hash % u64(len(m.hashes)));
 		fr.entry_index = m.hashes[fr.hash_index];
@@ -719,7 +730,7 @@ __dynamic_map_find :: proc(using h: __Map_Header, key: __Map_Key) -> __Map_Find_
 	return fr;
 }
 
-__dynamic_map_add_entry :: proc(using h: __Map_Header, key: __Map_Key) -> int {
+__dynamic_map_add_entry :: proc(using h: __MapHeader, key: __MapKey) -> int {
 	prev := m.entries.len;
 	c := __dynamic_array_append_nothing(&m.entries, entry_size, entry_align);
 	if c != prev {
@@ -731,19 +742,19 @@ __dynamic_map_add_entry :: proc(using h: __Map_Header, key: __Map_Key) -> int {
 }
 
 
-__dynamic_map_delete :: proc(using h: __Map_Header, key: __Map_Key) {
+__dynamic_map_delete :: proc(using h: __MapHeader, key: __MapKey) {
 	fr := __dynamic_map_find(h, key);
 	if fr.entry_index >= 0 {
 		__dynamic_map_erase(h, fr);
 	}
 }
 
-__dynamic_map_get_entry :: proc(using h: __Map_Header, index: int) -> ^__Map_Entry_Header {
+__dynamic_map_get_entry :: proc(using h: __MapHeader, index: int) -> ^__MapEntryHeader {
 	data := ^byte(m.entries.data) + index*entry_size;
-	return ^__Map_Entry_Header(data);
+	return ^__MapEntryHeader(data);
 }
 
-__dynamic_map_erase :: proc(using h: __Map_Header, fr: __Map_Find_Result) {
+__dynamic_map_erase :: proc(using h: __MapHeader, fr: __MapFindResult) {
 	if fr.entry_prev < 0 {
 		m.hashes[fr.hash_index] = __dynamic_map_get_entry(h, fr.entry_index).next;
 	} else {

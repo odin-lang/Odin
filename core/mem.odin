@@ -50,11 +50,11 @@ align_forward :: proc(ptr: rawptr, align: int) -> rawptr {
 
 
 
-Allocation_Header :: struct {
+AllocationHeader :: struct {
 	size: int,
 }
 
-allocation_header_fill :: proc(header: ^Allocation_Header, data: rawptr, size: int) {
+allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: int) {
 	header.size = size;
 	ptr := ^int(header+1);
 
@@ -62,7 +62,7 @@ allocation_header_fill :: proc(header: ^Allocation_Header, data: rawptr, size: i
 		(ptr+i)^ = -1;
 	}
 }
-allocation_header :: proc(data: rawptr) -> ^Allocation_Header {
+allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
 	if data == nil {
 		return nil;
 	}
@@ -70,7 +70,7 @@ allocation_header :: proc(data: rawptr) -> ^Allocation_Header {
 	for (p-1)^ == -1 {
 		p = (p-1);
 	}
-	return ^Allocation_Header(p-1);
+	return ^AllocationHeader(p-1);
 }
 
 
@@ -85,7 +85,7 @@ Arena :: struct {
 	temp_count: int,
 }
 
-Arena_Temp_Memory :: struct {
+ArenaTempMemory :: struct {
 	arena:          ^Arena,
 	original_count: int,
 }
@@ -123,14 +123,14 @@ arena_allocator :: proc(arena: ^Arena) -> Allocator {
 	};
 }
 
-arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
+arena_allocator_proc :: proc(allocator_data: rawptr, mode: AllocatorMode,
                           size, alignment: int,
                           old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
-	using Allocator_Mode;
+	using AllocatorMode;
 	arena := ^Arena(allocator_data);
 
 	match mode {
-	case ALLOC:
+	case Alloc:
 		total_size := size + alignment;
 
 		if arena.offset + total_size > len(arena.memory) {
@@ -144,29 +144,29 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		arena.offset += total_size;
 		return zero(ptr, size);
 
-	case FREE:
+	case Free:
 		// NOTE(bill): Free all at once
-		// Use Arena_Temp_Memory if you want to free a block
+		// Use ArenaTempMemory if you want to free a block
 
-	case FREE_ALL:
+	case FreeAll:
 		arena.offset = 0;
 
-	case RESIZE:
+	case Resize:
 		return default_resize_align(old_memory, old_size, size, alignment);
 	}
 
 	return nil;
 }
 
-begin_arena_temp_memory :: proc(a: ^Arena) -> Arena_Temp_Memory {
-	tmp: Arena_Temp_Memory;
+begin_arena_temp_memory :: proc(a: ^Arena) -> ArenaTempMemory {
+	tmp: ArenaTempMemory;
 	tmp.arena = a;
 	tmp.original_count = len(a.memory);
 	a.temp_count++;
 	return tmp;
 }
 
-end_arena_temp_memory :: proc(using tmp: Arena_Temp_Memory) {
+end_arena_temp_memory :: proc(using tmp: ArenaTempMemory) {
 	assert(len(arena.memory) >= original_count);
 	assert(arena.temp_count > 0);
 	arena.memory = arena.memory[0..<original_count];
@@ -179,7 +179,7 @@ end_arena_temp_memory :: proc(using tmp: Arena_Temp_Memory) {
 
 
 
-align_of_type_info :: proc(type_info: ^Type_Info) -> int {
+align_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 	prev_pow2 :: proc(n: i64) -> i64 {
 		if n <= 0 {
 			return 0;
@@ -195,7 +195,7 @@ align_of_type_info :: proc(type_info: ^Type_Info) -> int {
 
 	WORD_SIZE :: size_of(int);
 	MAX_ALIGN :: size_of([vector 64]f64); // TODO(bill): Should these constants be builtin constants?
-	using Type_Info;
+	using TypeInfo;
 	match info in type_info {
 	case Named:
 		return align_of_type_info(info.base);
@@ -215,7 +215,7 @@ align_of_type_info :: proc(type_info: ^Type_Info) -> int {
 		return WORD_SIZE;
 	case Array:
 		return align_of_type_info(info.elem);
-	case Dynamic_Array:
+	case DynamicArray:
 		return WORD_SIZE;
 	case Slice:
 		return WORD_SIZE;
@@ -230,7 +230,7 @@ align_of_type_info :: proc(type_info: ^Type_Info) -> int {
 		return info.align;
 	case Union:
 		return info.align;
-	case Raw_Union:
+	case RawUnion:
 		return info.align;
 	case Enum:
 		return align_of_type_info(info.base);
@@ -246,9 +246,9 @@ align_formula :: proc(size, align: int) -> int {
 	return result - result%align;
 }
 
-size_of_type_info :: proc(type_info: ^Type_Info) -> int {
+size_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 	WORD_SIZE :: size_of(int);
-	using Type_Info;
+	using TypeInfo;
 	match info in type_info {
 	case Named:
 		return size_of_type_info(info.base);
@@ -275,7 +275,7 @@ size_of_type_info :: proc(type_info: ^Type_Info) -> int {
 		align     := align_of_type_info(info.elem);
 		alignment := align_formula(size, align);
 		return alignment*(count-1) + size;
-	case Dynamic_Array:
+	case DynamicArray:
 		return size_of(rawptr) + 2*size_of(int) + size_of(Allocator);
 	case Slice:
 		return 2*WORD_SIZE;
@@ -292,7 +292,7 @@ size_of_type_info :: proc(type_info: ^Type_Info) -> int {
 		return info.size;
 	case Union:
 		return info.size;
-	case Raw_Union:
+	case RawUnion:
 		return info.size;
 	case Enum:
 		return size_of_type_info(info.base);

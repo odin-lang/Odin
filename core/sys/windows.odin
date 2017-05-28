@@ -18,7 +18,7 @@ Wparam    :: uint;
 Lparam    :: int;
 Lresult   :: int;
 Bool      :: i32;
-Wnd_Proc  :: #type proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
+WndProc  :: #type proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
 
 
 INVALID_HANDLE :: Handle(~int(0));
@@ -71,7 +71,7 @@ Point :: struct #ordered {
 
 WndClassExA :: struct #ordered {
 	size, style:           u32,
-	wnd_proc:              Wnd_Proc,
+	wndproc:              WndProc,
 	cls_extra, wnd_extra:  i32,
 	instance:              Hinstance,
 	icon:                  Hicon,
@@ -107,7 +107,7 @@ Systemtime :: struct #ordered {
 	hour, minute, second, millisecond: u16,
 }
 
-By_Handle_File_Information :: struct #ordered {
+ByHandleFileInformation :: struct #ordered {
 	file_attributes:      u32,
 	creation_time,
 	last_access_time,
@@ -120,7 +120,7 @@ By_Handle_File_Information :: struct #ordered {
 	file_index_low:       u32,
 }
 
-File_Attribute_Data :: struct #ordered {
+FileAttributeData :: struct #ordered {
 	file_attributes:  u32,
 	creation_time,
 	last_access_time,
@@ -129,7 +129,7 @@ File_Attribute_Data :: struct #ordered {
 	file_size_low:    u32,
 }
 
-Find_Data :: struct #ordered {
+FindData :: struct #ordered {
     file_attributes     : u32,
     creation_time       : Filetime,
     last_access_time    : Filetime,
@@ -188,7 +188,7 @@ AdjustWindowRect :: proc(rect: ^Rect, style: u32, menu: Bool) -> Bool #foreign u
 GetActiveWindow  :: proc() -> Hwnd #foreign user32;
 
 DestroyWindow       :: proc(wnd: Hwnd) -> Bool #foreign user32;
-DescribePixelFormat :: proc(dc: Hdc, pixel_format: i32, bytes : u32, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 #foreign user32;
+DescribePixelFormat :: proc(dc: Hdc, pixel_format: i32, bytes : u32, pfd: ^PixelFormatDescriptor) -> i32 #foreign user32;
 
 
 GetQueryPerformanceFrequency :: proc() -> i64 {
@@ -222,15 +222,15 @@ WriteFile :: proc(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overla
 GetFileSizeEx              :: proc(file_handle: Handle, file_size: ^i64) -> Bool #foreign kernel32;
 GetFileAttributesA          :: proc(filename : ^byte) -> u32 #foreign kernel32;
 GetFileAttributesExA       :: proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool #foreign kernel32;
-GetFileInformationByHandle :: proc(file_handle: Handle, file_info: ^By_Handle_File_Information) -> Bool #foreign kernel32;
+GetFileInformationByHandle :: proc(file_handle: Handle, file_info: ^ByHandleFileInformation) -> Bool #foreign kernel32;
 
 GetFileType    :: proc(file_handle: Handle) -> u32 #foreign kernel32;
 SetFilePointer :: proc(file_handle: Handle, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 #foreign kernel32;
 
 SetHandleInformation :: proc(obj: Handle, mask, flags: u32) -> Bool #foreign kernel32;
 
-FindFirstFileA     :: proc(file_name : ^byte, data : ^Find_Data) -> Handle #foreign kernel32;
-FindNextFileA      :: proc(file : Handle, data : ^Find_Data) -> Bool #foreign kernel32;
+FindFirstFileA     :: proc(file_name : ^byte, data : ^FindData) -> Handle #foreign kernel32;
+FindNextFileA      :: proc(file : Handle, data : ^FindData) -> Bool #foreign kernel32;
 FindClose          :: proc(file : Handle) -> Bool #foreign kernel32;
 
 MAX_PATH :: 0x00000104;
@@ -350,14 +350,14 @@ SWP_NOSIZE        :: 0x0001;
 SWP_NOMOVE        :: 0x0002;
 
 
-Monitor_Info :: struct #ordered {
+MonitorInfo :: struct #ordered {
 	size:      u32,
 	monitor:   Rect,
 	work:      Rect,
 	flags:     u32,
 }
 
-Window_Placement :: struct #ordered {
+WindowPlacement :: struct #ordered {
 	length:     u32,
 	flags:      u32,
 	show_cmd:   u32,
@@ -366,13 +366,13 @@ Window_Placement :: struct #ordered {
 	normal_pos: Rect,
 }
 
-GetMonitorInfoA    :: proc(monitor: Hmonitor, mi: ^Monitor_Info) -> Bool #foreign user32;
+GetMonitorInfoA    :: proc(monitor: Hmonitor, mi: ^MonitorInfo) -> Bool #foreign user32;
 MonitorFromWindow  :: proc(wnd: Hwnd, flags : u32) -> Hmonitor #foreign user32;
 
 SetWindowPos       :: proc(wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height: i32, flags: u32) #foreign user32 "SetWindowPos";
 
-GetWindowPlacement :: proc(wnd: Hwnd, wndpl: ^Window_Placement) -> Bool #foreign user32;
-SetWindowPlacement :: proc(wnd: Hwnd, wndpl: ^Window_Placement) -> Bool #foreign user32;
+GetWindowPlacement :: proc(wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool #foreign user32;
+SetWindowPlacement :: proc(wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool #foreign user32;
 GetWindowRect      :: proc(wnd: Hwnd, rect: ^Rect) -> Bool #foreign user32;
 
 GetWindowLongPtrA :: proc(wnd: Hwnd, index: i32) -> i64 #foreign user32;
@@ -394,7 +394,7 @@ LOWORD :: proc(lParam: Lparam) -> u16 { return u16(lParam); }
 
 
 
-Bitmap_Info_Header :: struct #ordered {
+BitmapInfoHeader :: struct #ordered {
 	size:              u32,
 	width, height:     i32,
 	planes, bit_count: i16,
@@ -405,13 +405,13 @@ Bitmap_Info_Header :: struct #ordered {
 	clr_used:          u32,
 	clr_important:     u32,
 }
-Bitmap_Info :: struct #ordered {
-	using header: Bitmap_Info_Header,
-	colors:       [1]Rgb_Quad,
+BitmapInfo :: struct #ordered {
+	using header: BitmapInfoHeader,
+	colors:       [1]RgbQuad,
 }
 
 
-Rgb_Quad :: struct #ordered { blue, green, red, reserved: byte }
+RgbQuad :: struct #ordered { blue, green, red, reserved: byte }
 
 BI_RGB         :: 0;
 DIB_RGB_COLORS :: 0x00;
@@ -421,7 +421,7 @@ SRCCOPY: u32    : 0x00cc0020;
 StretchDIBits :: proc (hdc: Hdc,
                        x_dst, y_dst, width_dst, height_dst: i32,
                        x_src, y_src, width_src, header_src: i32,
-                       bits: rawptr, bits_info: ^Bitmap_Info,
+                       bits: rawptr, bits_info: ^BitmapInfo,
                        usage: u32,
                        rop: u32) -> i32 #foreign gdi32;
 
@@ -457,7 +457,7 @@ PFD_DOUBLEBUFFER_DONTCARE :: 0x40000000;
 PFD_STEREO_DONTCARE       :: 0x80000000;
 
 
-PIXELFORMATDESCRIPTOR :: struct #ordered {
+PixelFormatDescriptor :: struct #ordered {
 	size,
 	version,
 	flags: u32,
@@ -489,8 +489,8 @@ PIXELFORMATDESCRIPTOR :: struct #ordered {
 }
 
 GetDC             :: proc(h: Hwnd) -> Hdc #foreign user32;
-SetPixelFormat    :: proc(hdc: Hdc, pixel_format: i32, pfd: ^PIXELFORMATDESCRIPTOR) -> Bool #foreign gdi32;
-ChoosePixelFormat :: proc(hdc: Hdc, pfd: ^PIXELFORMATDESCRIPTOR) -> i32 #foreign gdi32;
+SetPixelFormat    :: proc(hdc: Hdc, pixel_format: i32, pfd: ^PixelFormatDescriptor) -> Bool #foreign gdi32;
+ChoosePixelFormat :: proc(hdc: Hdc, pfd: ^PixelFormatDescriptor) -> i32 #foreign gdi32;
 SwapBuffers       :: proc(hdc: Hdc) -> Bool #foreign gdi32;
 ReleaseDC         :: proc(wnd: Hwnd, hdc: Hdc) -> i32 #foreign user32;
 
@@ -501,62 +501,62 @@ Proc  :: #type proc() #cc_c;
 GetKeyState      :: proc(v_key: i32) -> i16 #foreign user32;
 GetAsyncKeyState :: proc(v_key: i32) -> i16 #foreign user32;
 
-is_key_down :: proc(key: Key_Code) -> bool #inline { return GetAsyncKeyState(i32(key)) < 0; }
+is_key_down :: proc(key: KeyCode) -> bool #inline { return GetAsyncKeyState(i32(key)) < 0; }
 
-Key_Code :: enum i32 {
-	LBUTTON    = 0x01,
-	RBUTTON    = 0x02,
-	CANCEL     = 0x03,
-	MBUTTON    = 0x04,
-	BACK       = 0x08,
-	TAB        = 0x09,
-	CLEAR      = 0x0C,
-	RETURN     = 0x0D,
+KeyCode :: enum i32 {
+	Lbutton    = 0x01,
+	Rbutton    = 0x02,
+	Cancel     = 0x03,
+	Mbutton    = 0x04,
+	Back       = 0x08,
+	Tab        = 0x09,
+	Clear      = 0x0C,
+	Return     = 0x0D,
 
-	SHIFT      = 0x10,
-	CONTROL    = 0x11,
-	MENU       = 0x12,
-	PAUSE      = 0x13,
-	CAPITAL    = 0x14,
-	KANA       = 0x15,
-	HANGEUL    = 0x15,
-	HANGUL     = 0x15,
-	JUNJA      = 0x17,
-	FINAL      = 0x18,
-	HANJA      = 0x19,
-	KANJI      = 0x19,
-	ESCAPE     = 0x1B,
-	CONVERT    = 0x1C,
-	NONCONVERT = 0x1D,
-	ACCEPT     = 0x1E,
-	MODECHANGE = 0x1F,
-	SPACE      = 0x20,
-	PRIOR      = 0x21,
-	NEXT       = 0x22,
-	END        = 0x23,
-	HOME       = 0x24,
-	LEFT       = 0x25,
-	UP         = 0x26,
-	RIGHT      = 0x27,
-	DOWN       = 0x28,
-	SELECT     = 0x29,
-	PRINT      = 0x2A,
-	EXECUTE    = 0x2B,
-	SNAPSHOT   = 0x2C,
-	INSERT     = 0x2D,
-	DELETE     = 0x2E,
-	HELP       = 0x2F,
+	Shift      = 0x10,
+	Control    = 0x11,
+	Menu       = 0x12,
+	Pause      = 0x13,
+	Capital    = 0x14,
+	Kana       = 0x15,
+	Hangeul    = 0x15,
+	Hangul     = 0x15,
+	Junja      = 0x17,
+	Final      = 0x18,
+	Hanja      = 0x19,
+	Kanji      = 0x19,
+	Escape     = 0x1B,
+	Convert    = 0x1C,
+	NonConvert = 0x1D,
+	Accept     = 0x1E,
+	ModeChange = 0x1F,
+	Space      = 0x20,
+	Prior      = 0x21,
+	Next       = 0x22,
+	End        = 0x23,
+	Home       = 0x24,
+	Left       = 0x25,
+	Up         = 0x26,
+	Right      = 0x27,
+	Down       = 0x28,
+	Select     = 0x29,
+	Print      = 0x2A,
+	Execute    = 0x2B,
+	Snapshot   = 0x2C,
+	Insert     = 0x2D,
+	Delete     = 0x2E,
+	Help       = 0x2F,
 
-	NUM0 = '0',
-	NUM1 = '1',
-	NUM2 = '2',
-	NUM3 = '3',
-	NUM4 = '4',
-	NUM5 = '5',
-	NUM6 = '6',
-	NUM7 = '7',
-	NUM8 = '8',
-	NUM9 = '9',
+	Num0 = '0',
+	Num1 = '1',
+	Num2 = '2',
+	Num3 = '3',
+	Num4 = '4',
+	Num5 = '5',
+	Num6 = '6',
+	Num7 = '7',
+	Num8 = '8',
+	Num9 = '9',
 	A = 'A',
 	B = 'B',
 	C = 'C',
@@ -584,26 +584,26 @@ Key_Code :: enum i32 {
 	Y = 'Y',
 	Z = 'Z',
 
-	LWIN       = 0x5B,
-	RWIN       = 0x5C,
-	APPS       = 0x5D,
+	Lwin       = 0x5B,
+	Rwin       = 0x5C,
+	Apps       = 0x5D,
 
-	NUMPAD0    = 0x60,
-	NUMPAD1    = 0x61,
-	NUMPAD2    = 0x62,
-	NUMPAD3    = 0x63,
-	NUMPAD4    = 0x64,
-	NUMPAD5    = 0x65,
-	NUMPAD6    = 0x66,
-	NUMPAD7    = 0x67,
-	NUMPAD8    = 0x68,
-	NUMPAD9    = 0x69,
-	MULTIPLY   = 0x6A,
-	ADD        = 0x6B,
-	SEPARATOR  = 0x6C,
-	SUBTRACT   = 0x6D,
-	DECIMAL    = 0x6E,
-	DIVIDE     = 0x6F,
+	Numpad0    = 0x60,
+	Numpad1    = 0x61,
+	Numpad2    = 0x62,
+	Numpad3    = 0x63,
+	Numpad4    = 0x64,
+	Numpad5    = 0x65,
+	Numpad6    = 0x66,
+	Numpad7    = 0x67,
+	Numpad8    = 0x68,
+	Numpad9    = 0x69,
+	Multiply   = 0x6A,
+	Add        = 0x6B,
+	Separator  = 0x6C,
+	Subtract   = 0x6D,
+	Decimal    = 0x6E,
+	Divide     = 0x6F,
 
 	F1         = 0x70,
 	F2         = 0x71,
@@ -630,22 +630,22 @@ Key_Code :: enum i32 {
 	F23        = 0x86,
 	F24        = 0x87,
 
-	NUMLOCK    = 0x90,
-	SCROLL     = 0x91,
-	LSHIFT     = 0xA0,
-	RSHIFT     = 0xA1,
-	LCONTROL   = 0xA2,
-	RCONTROL   = 0xA3,
-	LMENU      = 0xA4,
-	RMENU      = 0xA5,
-	ProcESSKEY = 0xE5,
-	ATTN       = 0xF6,
-	CRSEL      = 0xF7,
-	EXSEL      = 0xF8,
-	EREOF      = 0xF9,
-	PLAY       = 0xFA,
-	ZOOM       = 0xFB,
-	NONAME     = 0xFC,
-	PA1        = 0xFD,
-	OEM_CLEAR  = 0xFE,
+	Numlock    = 0x90,
+	Scroll     = 0x91,
+	Lshift     = 0xA0,
+	Rshift     = 0xA1,
+	Lcontrol   = 0xA2,
+	Rcontrol   = 0xA3,
+	Lmenu      = 0xA4,
+	Rmenu      = 0xA5,
+	ProcessKey = 0xE5,
+	Attn       = 0xF6,
+	Crsel      = 0xF7,
+	Exsel      = 0xF8,
+	Ereof      = 0xF9,
+	Play       = 0xFA,
+	Zoom       = 0xFB,
+	Noname     = 0xFC,
+	Pa1        = 0xFD,
+	OemClear   = 0xFE,
 }
