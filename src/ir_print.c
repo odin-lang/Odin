@@ -601,6 +601,12 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				ir_fprintf(f, "<");
 			}
 			ir_fprintf(f, "{");
+			if (type->Record.custom_align > 0) {
+				ir_fprintf(f, "[0 x <%lld x i8>] zeroinitializer", cast(i64)type->Record.custom_align);
+				if (value_count > 0) {
+					ir_fprintf(f, ", ");
+				}
+			}
 
 
 			for (isize i = 0; i < value_count; i++) {
