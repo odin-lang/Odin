@@ -1489,7 +1489,14 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_
 		}
 	}
 
-	return ir_emit(p, ir_instr_call(p, value, args, arg_count, results));
+	Type *abi_rt = pt->Proc.abi_compat_result_type;
+	Type *rt = reduce_tuple_to_single_type(results);
+
+	irValue *result = ir_emit(p, ir_instr_call(p, value, args, arg_count, abi_rt));
+	if (abi_rt != results) {
+		result = ir_emit_transmute(p, result, rt);
+	}
+	return result;
 }
 
 irValue *ir_emit_global_call(irProcedure *proc, char *name_, irValue **args, isize arg_count) {
@@ -1547,6 +1554,12 @@ void ir_emit_unreachable(irProcedure *proc) {
 
 void ir_emit_return(irProcedure *proc, irValue *v) {
 	ir_emit_defer_stmts(proc, irDeferExit_Return, NULL);
+
+	Type *abi_rt = proc->type->Proc.abi_compat_result_type;
+	if (abi_rt != proc->type->Proc.results) {
+		v = ir_emit_transmute(proc, v, abi_rt);
+	}
+
 	ir_emit(proc, ir_instr_return(proc, v));
 }
 
@@ -2970,7 +2983,9 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	gb_printf_err("Not Identical %s != %s\n", type_to_string(src), type_to_string(dst));
 
 
-	GB_PANIC("Invalid type conversion: `%s` to `%s`", type_to_string(src_type), type_to_string(t));
+	GB_PANIC("Invalid type conversion: `%s` to `%s` for procedure `%.*s`",
+	         type_to_string(src_type), type_to_string(t),
+	         LIT(proc->name));
 
 	return NULL;
 }
@@ -3019,10 +3034,11 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 
 	Type *src = base_type(src_type);
 	Type *dst = base_type(t);
+#if 0
 	if (are_types_identical(t, src_type)) {
 		return value;
 	}
-
+#endif
 	irModule *m = proc->module;
 
 	i64 sz = type_size_of(m->allocator, src);
@@ -3032,7 +3048,7 @@ irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t) {
 
 	if (ir_is_type_aggregate(src) || ir_is_type_aggregate(dst)) {
 		irValue *s = ir_address_from_load_or_generate_local(proc, value);
-		irValue *d = ir_emit_bitcast(proc, s, make_type_pointer(m->allocator, dst));
+		irValue *d = ir_emit_bitcast(proc, s, make_type_pointer(m->allocator, t));
 		return ir_emit_load(proc, d);
 	}
 
@@ -5214,7 +5230,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 						elem = fv->value;
 					} else {
 						TypeAndValue tav = type_and_value_of_expr(proc->module->info, elem);
-						Selection sel = lookup_field(proc->module->allocator, bt, st->fields_in_src_order[field_index]->token.string, false);
+						Selection sel = lookup_field_from_index(proc->module->allocator, bt, st->fields_in_src_order[field_index]->Variable.field_index);
 						index = sel.index.e[0];
 					}
 
@@ -6061,6 +6077,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 			gb_temp_arena_memory_end(tmp);
 		}
+
 		ir_emit_return(proc, v);
 
 	case_end;

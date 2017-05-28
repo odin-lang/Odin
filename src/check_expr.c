@@ -1154,6 +1154,69 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 	return new_type;
 }
 
+Type *reduce_tuple_to_single_type(Type *original_type) {
+	if (original_type != NULL) {
+		Type *t = core_type(original_type);
+		if (t->kind == Type_Tuple && t->Tuple.variable_count == 1) {
+			return t->Tuple.variables[0]->type;
+		}
+	}
+	return original_type;
+}
+
+Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
+	Type *new_type = original_type;
+	if (new_type == NULL) {
+		return NULL;
+	}
+	GB_ASSERT(is_type_tuple(original_type));
+
+
+
+	if (str_eq(build_context.ODIN_OS, str_lit("windows"))) {
+		Type *bt = core_type(reduce_tuple_to_single_type(original_type));
+		// NOTE(bill): This is just reversed engineered from LLVM IR output
+		switch (bt->kind) {
+		// Okay to pass by value
+		// Especially the only Odin types
+		case Type_Pointer: break;
+		case Type_Proc:    break; // NOTE(bill): Just a pointer
+		case Type_Basic:   break;
+
+
+		default: {
+			i64 align = type_align_of(a, original_type);
+			i64 size  = type_size_of(a, original_type);
+			switch (8*size) {
+#if 1
+			case 8:  new_type = t_u8;  break;
+			case 16: new_type = t_u16; break;
+			case 32: new_type = t_u32; break;
+			case 64: new_type = t_u64; break;
+#endif
+			}
+		} break;
+		}
+	} else if (str_eq(build_context.ODIN_OS, str_lit("linux"))) {
+
+	} else {
+		// IMPORTANT TODO(bill): figure out the ABI settings for Linux, OSX etc. for
+		// their architectures
+	}
+
+	if (new_type != original_type) {
+		Type *tuple = make_type_tuple(a);
+		tuple->Tuple.variable_count = 1;
+		tuple->Tuple.variables = gb_alloc_array(a, Entity *, 1);
+		tuple->Tuple.variables[0] = make_entity_param(a, original_type->Tuple.variables[0]->scope, empty_token, new_type, false, false);
+		new_type = tuple;
+	}
+
+
+	// return reduce_tuple_to_single_type(new_type);
+	return new_type;
+}
+
 
 void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 	ast_node(pt, ProcType, proc_type_node);
@@ -1184,10 +1247,7 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 	}
 
 	// NOTE(bill): The types are the same
-	type->Proc.abi_compat_results = gb_alloc_array(c->allocator, Type *, result_count);
-	for (isize i = 0; i < result_count; i++) {
-		type->Proc.abi_compat_results[i] = type->Proc.results->Tuple.variables[i]->type;
-	}
+	type->Proc.abi_compat_result_type = type_to_abi_compat_result_type(c->allocator, type->Proc.results);
 }
 
 

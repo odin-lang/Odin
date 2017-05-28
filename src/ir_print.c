@@ -144,17 +144,23 @@ void ir_print_proc_results(irFileBuffer *f, irModule *m, Type *t) {
 	isize result_count = t->Proc.result_count;
 	if (result_count == 0) {
 		ir_fprintf(f, "void");
-	} else if (result_count == 1) {
-		ir_print_type(f, m, t->Proc.abi_compat_results[0]);
 	} else {
-		ir_fprintf(f, "{");
-		for (isize i = 0; i < result_count; i++) {
-			if (i > 0) {
-				ir_fprintf(f, ", ");
+		Type *rt = t->Proc.abi_compat_result_type;
+		if (!is_type_tuple(rt)) {
+			ir_print_type(f, m, rt);
+		} else if (rt->Tuple.variable_count == 1) {
+			ir_print_type(f, m, rt->Tuple.variables[0]->type);
+		} else {
+			isize count = rt->Tuple.variable_count;
+			ir_fprintf(f, "{");
+			for (isize i = 0; i < count; i++) {
+				if (i > 0) {
+					ir_fprintf(f, ", ");
+				}
+				ir_print_type(f, m, rt->Tuple.variables[i]->type);
 			}
-			ir_print_type(f, m, t->Proc.abi_compat_results[i]);
+			ir_fprintf(f, "}");
 		}
-		ir_fprintf(f, "}");
 	}
 }
 
