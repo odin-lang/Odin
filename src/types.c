@@ -1173,9 +1173,9 @@ ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 	TypeProc px = base_type(x)->Proc;
 	TypeProc py = base_type(y)->Proc;
 
-	if (px.calling_convention != py.calling_convention) {
-		return ProcOverload_CallingConvention;
-	}
+	// if (px.calling_convention != py.calling_convention) {
+		// return ProcOverload_CallingConvention;
+	// }
 
 	if (px.param_count != py.param_count) {
 		return ProcOverload_ParamCount;

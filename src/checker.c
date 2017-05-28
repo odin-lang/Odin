@@ -1360,10 +1360,10 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 				error(p->token, "Overloaded procedure `%.*s` as the same type as another procedure in this scope", LIT(name));
 				is_invalid = true;
 				break;
-			case ProcOverload_CallingConvention:
-				error(p->token, "Overloaded procedure `%.*s` as the same type as another procedure in this scope", LIT(name));
-				is_invalid = true;
-				break;
+			// case ProcOverload_CallingConvention:
+				// error(p->token, "Overloaded procedure `%.*s` as the same type as another procedure in this scope", LIT(name));
+				// is_invalid = true;
+				// break;
 			case ProcOverload_ParamVariadic:
 				error(p->token, "Overloaded procedure `%.*s` as the same type as another procedure in this scope", LIT(name));
 				is_invalid = true;
@@ -1377,6 +1377,7 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 			case ProcOverload_ParamTypes:
 				// This is okay :)
 				break;
+
 			}
 
 			if (is_invalid) {
