@@ -1225,6 +1225,7 @@ bool abi_compat_return_by_value(gbAllocator a, ProcCallingConvention cc, Type *a
 		return false;
 	}
 
+
 	if (str_eq(build_context.ODIN_OS, str_lit("windows"))) {
 		i64 size = 8*type_size_of(a, abi_return_type);
 		switch (size) {
@@ -1859,6 +1860,12 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 
 
 bool check_unary_op(Checker *c, Operand *o, Token op) {
+	if (o->type == NULL) {
+		gbString str = expr_to_string(o->expr);
+		error_node(o->expr, "Expression has no value `%s`", str);
+		gb_string_free(str);
+		return false;
+	}
 	// TODO(bill): Handle errors correctly
 	Type *type = base_type(base_vector_type(o->type));
 	gbString str = NULL;
