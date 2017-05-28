@@ -13,25 +13,25 @@ Mutex :: struct {
 }
 
 current_thread_id :: proc() -> i32 {
-	return i32(win32.GetCurrentThreadId());
+	return i32(win32.get_current_thread_id());
 }
 
 semaphore_init :: proc(s: ^Semaphore) {
-	s._handle = win32.CreateSemaphoreA(nil, 0, 1<<31-1, nil);
+	s._handle = win32.create_semaphore_a(nil, 0, 1<<31-1, nil);
 }
 
 semaphore_destroy :: proc(s: ^Semaphore) {
-	win32.CloseHandle(s._handle);
+	win32.close_handle(s._handle);
 }
 
 semaphore_post :: proc(s: ^Semaphore, count: int) {
-	win32.ReleaseSemaphore(s._handle, i32(count), nil);
+	win32.release_semaphore(s._handle, i32(count), nil);
 }
 
 semaphore_release :: proc(s: ^Semaphore) #inline { semaphore_post(s, 1); }
 
 semaphore_wait :: proc(s: ^Semaphore) {
-	win32.WaitForSingleObject(s._handle, win32.INFINITE);
+	win32.wait_for_single_object(s._handle, win32.INFINITE);
 }
 
 

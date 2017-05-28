@@ -33,17 +33,17 @@ TexImage2D    :: proc(target, level, internal_format,
 
 _string_data :: proc(s: string) -> ^u8 #inline { return &s[0]; }
 
-_libgl := win32.LoadLibraryA(_string_data("opengl32.dll\x00"));
+_libgl := win32.load_library_a(_string_data("opengl32.dll\x00"));
 
-GetProcAddress :: proc(name: string) -> proc() #cc_c {
+get_proc_address :: proc(name: string) -> proc() #cc_c {
 	if name[len(name)-1] == 0 {
 		name = name[0..<len(name)-1];
 	}
 	// NOTE(bill): null terminated
 	assert((&name[0] + len(name))^ == 0);
-	res := wgl.GetProcAddress(&name[0]);
+	res := wgl.get_proc_address(&name[0]);
 	if res == nil {
-		res = win32.GetProcAddress(_libgl, &name[0]);
+		res = win32.get_proc_address(_libgl, &name[0]);
 	}
 	return res;
 }
@@ -111,7 +111,7 @@ GetUniformLocation:       proc(program: u32, name: ^byte) -> i32 #cc_c;
 init :: proc() {
 	set_proc_address :: proc(p: rawptr, name: string) #inline {
 		x := ^(proc() #cc_c)(p);
-		x^ = GetProcAddress(name);
+		x^ = get_proc_address(name);
 	}
 
 	set_proc_address(&GenBuffers,              "glGenBuffers\x00");

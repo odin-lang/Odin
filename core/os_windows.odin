@@ -96,16 +96,16 @@ open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 	buf: [300]byte;
 	copy(buf[..], []byte(path));
 
-	handle := Handle(win32.CreateFileA(&buf[0], access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
+	handle := Handle(win32.create_file_a(&buf[0], access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
 	if handle != INVALID_HANDLE {
 		return handle, ERROR_NONE;
 	}
-	err := win32.GetLastError();
+	err := win32.get_last_error();
 	return INVALID_HANDLE, Errno(err);
 }
 
 close :: proc(fd: Handle) {
-	win32.CloseHandle(win32.Handle(fd));
+	win32.close_handle(win32.Handle(fd));
 }
 
 
@@ -126,9 +126,9 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 		} else {
 			to_read = MAX;
 		}
-		e := win32.WriteFile(win32.Handle(fd), &data[total_write], to_read, &single_write_length, nil);
+		e := win32.write_file(win32.Handle(fd), &data[total_write], to_read, &single_write_length, nil);
 		if single_write_length <= 0 || e == win32.FALSE {
-			err := win32.GetLastError();
+			err := win32.get_last_error();
 			return int(total_write), Errno(e);
 		}
 		total_write += i64(single_write_length);
@@ -155,9 +155,9 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 			to_read = MAX;
 		}
 
-		e := win32.ReadFile(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
+		e := win32.read_file(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
 		if single_read_length <= 0 || e == win32.FALSE {
-			err := win32.GetLastError();
+			err := win32.get_last_error();
 			return int(total_read), Errno(e);
 		}
 		total_read += i64(single_read_length);
@@ -174,13 +174,13 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	}
 	hi := i32(offset>>32);
 	lo := i32(offset);
-	ft := win32.GetFileType(win32.Handle(fd));
+	ft := win32.get_file_type(win32.Handle(fd));
 	if ft == win32.FILE_TYPE_PIPE {
 		return 0, ERROR_FILE_IS_PIPE;
 	}
-	dw_ptr := win32.SetFilePointer(win32.Handle(fd), lo, &hi, w);
+	dw_ptr := win32.set_file_pointer(win32.Handle(fd), lo, &hi, w);
 	if dw_ptr == win32.INVALID_SET_FILE_POINTER {
-		err := win32.GetLastError();
+		err := win32.get_last_error();
 		return 0, Errno(err);
 	}
 	return i64(hi)<<32 + i64(dw_ptr), ERROR_NONE;
@@ -189,8 +189,8 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 file_size :: proc(fd: Handle) -> (i64, Errno) {
 	length: i64;
 	err: Errno;
-	if win32.GetFileSizeEx(win32.Handle(fd), &length) == 0 {
-		err = Errno(win32.GetLastError());
+	if win32.get_file_size_ex(win32.Handle(fd), &length) == 0 {
+		err = Errno(win32.get_last_error());
 	}
 	return length, err;
 }
@@ -204,8 +204,8 @@ stderr := get_std_handle(win32.STD_ERROR_HANDLE);
 
 
 get_std_handle :: proc(h: int) -> Handle {
-	fd := win32.GetStdHandle(i32(h));
-	win32.SetHandleInformation(fd, win32.HANDLE_FLAG_INHERIT, 0);
+	fd := win32.get_std_handle(i32(h));
+	win32.set_handle_information(fd, win32.HANDLE_FLAG_INHERIT, 0);
 	return Handle(fd);
 }
 
@@ -216,7 +216,7 @@ get_std_handle :: proc(h: int) -> Handle {
 
 last_write_time :: proc(fd: Handle) -> FileTime {
 	file_info: win32.ByHandleFileInformation;
-	win32.GetFileInformationByHandle(win32.Handle(fd), &file_info);
+	win32.get_file_information_by_handle(win32.Handle(fd), &file_info);
 	lo := FileTime(file_info.last_write_time.lo);
 	hi := FileTime(file_info.last_write_time.hi);
 	return lo | hi << 32;
@@ -231,7 +231,7 @@ last_write_time_by_name :: proc(name: string) -> FileTime {
 
 	copy(buf[..], []byte(name));
 
-	if win32.GetFileAttributesExA(&buf[0], win32.GetFileExInfoStandard, &data) != 0 {
+	if win32.get_file_attributes_ex_a(&buf[0], win32.GetFileExInfoStandard, &data) != 0 {
 		last_write_time = data.last_write_time;
 	}
 
@@ -243,7 +243,7 @@ last_write_time_by_name :: proc(name: string) -> FileTime {
 
 
 heap_alloc :: proc(size: int) -> rawptr {
-	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, size);
+	return win32.heap_alloc(win32.get_process_heap(), win32.HEAP_ZERO_MEMORY, size);
 }
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	if new_size == 0 {
@@ -253,24 +253,24 @@ heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	if ptr == nil {
 		return heap_alloc(new_size);
 	}
-	return win32.HeapReAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, ptr, new_size);
+	return win32.heap_realloc(win32.get_process_heap(), win32.HEAP_ZERO_MEMORY, ptr, new_size);
 }
 heap_free :: proc(ptr: rawptr) {
 	if ptr == nil {
 		return;
 	}
-	win32.HeapFree(win32.GetProcessHeap(), 0, ptr);
+	win32.heap_free(win32.get_process_heap(), 0, ptr);
 }
 
 
 exit :: proc(code: int) {
-	win32.ExitProcess(u32(code));
+	win32.exit_process(u32(code));
 }
 
 
 
 current_thread_id :: proc() -> int {
-	return int(win32.GetCurrentThreadId());
+	return int(win32.get_current_thread_id());
 }
 
 
@@ -329,7 +329,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 	}
 
 	arg_count: i32;
-	arg_list_ptr := win32.CommandLineToArgvW(win32.GetCommandLineW(), &arg_count);
+	arg_list_ptr := win32.command_line_to_argv_w(win32.get_command_line_w(), &arg_count);
 	arg_list := make([]string, arg_count);
 	for _, i in arg_list {
 		arg_list[i] = alloc_ucs2_to_utf8((arg_list_ptr+i)^);

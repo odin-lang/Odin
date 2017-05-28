@@ -1072,7 +1072,7 @@ sbprintf :: proc(b: ^StringBuffer, fmt: string, args: ..any) -> string {
 	end := len(fmt);
 	arg_index := 0;
 	was_prev_index := false;
-	for i := 0; i < end;  {
+	for i := 0; i < end; /**/ {
 		fi = FmtInfo{buf = b, good_arg_index = true};
 
 		prev_i := i;
