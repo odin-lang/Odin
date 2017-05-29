@@ -45,13 +45,7 @@ u64 unix_time_stamp__freq(void) {
 	if (freq == 0) {
 		struct timespec ts;
 		clock_getres(CLOCK_PROCESS_CPUTIME_ID, &ts);
-
-		// that would be an absurd resolution (or lack thereof)
-		GB_ASSERT(ts.tv_sec == 0);
-
 		freq = cast(u64) ((1.0 / ts.tv_nsec) * 1000000000.0);
-
-		GB_ASSERT(freq != 0);
 	}
 
 	return freq;
