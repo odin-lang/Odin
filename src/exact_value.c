@@ -33,7 +33,7 @@ typedef struct ExactValue {
 	union {
 		bool          value_bool;
 		String        value_string;
-		i64           value_integer; // NOTE(bill): This must be an integer and not a pointer
+		i128          value_integer; // NOTE(bill): This must be an integer and not a pointer
 		f64           value_float;
 		i64           value_pointer;
 		Complex128    value_complex;
@@ -66,7 +66,13 @@ ExactValue exact_value_string(String string) {
 	return result;
 }
 
-ExactValue exact_value_integer(i64 i) {
+ExactValue exact_value_i64(i64 i) {
+	ExactValue result = {ExactValue_Integer};
+	result.value_integer = i128_from_i64(i);
+	return result;
+}
+
+ExactValue exact_value_i128(i128 i) {
 	ExactValue result = {ExactValue_Integer};
 	result.value_integer = i;
 	return result;
@@ -103,43 +109,7 @@ ExactValue exact_value_pointer(i64 ptr) {
 
 
 ExactValue exact_value_integer_from_string(String string) {
-	// TODO(bill): Allow for numbers with underscores in them
-	i32 base = 10;
-	bool has_prefix = false;
-	if (string.len > 2 && string.text[0] == '0') {
-		switch (string.text[1]) {
-		case 'b': base = 2;  has_prefix = true; break;
-		case 'o': base = 8;  has_prefix = true; break;
-		case 'd': base = 10; has_prefix = true; break;
-		case 'z': base = 12; has_prefix = true; break;
-		case 'x': base = 16; has_prefix = true; break;
-		}
-	}
-
-	u8 *text = string.text;
-	isize len = string.len;
-	if (has_prefix) {
-		text += 2;
-		len -= 2;
-	}
-
-	i64 result = 0;
-	for (isize i = 0; i < len; i++) {
-		Rune r = cast(Rune)text[i];
-		if (r == '_') {
-			continue;
-		}
-		i64 v = 0;
-		v = digit_value(r);
-		if (v >= base) {
-			break;
-		}
-		result *= base;
-		result += v;
-	}
-
-
-	return exact_value_integer(result);
+	return exact_value_i128(i128_from_string(string));
 }
 
 f64 float_from_string(String string) {
@@ -246,7 +216,7 @@ ExactValue exact_value_from_basic_literal(Token token) {
 		Rune r = GB_RUNE_INVALID;
 		gb_utf8_decode(token.string.text, token.string.len, &r);
 		// gb_printf("%.*s rune: %d\n", LIT(token.string), r);
-		return exact_value_integer(r);
+		return exact_value_i64(r);
 	}
 	default:
 		GB_PANIC("Invalid token for basic literal");
@@ -262,15 +232,15 @@ ExactValue exact_value_to_integer(ExactValue v) {
 	case ExactValue_Integer:
 		return v;
 	case ExactValue_Float: {
-		i64 i = cast(i64)v.value_float;
-		f64 f = cast(f64)i;
+		i128 i = i128_from_f64(v.value_float);
+		f64 f = i128_to_f64(i);
 		if (f == v.value_float) {
-			return exact_value_integer(i);
+			return exact_value_i128(i);
 		}
 	} break;
 
 	case ExactValue_Pointer:
-		return exact_value_integer(cast(i64)cast(intptr)v.value_pointer);
+		return exact_value_i64(cast(i64)cast(intptr)v.value_pointer);
 	}
 	ExactValue r = {ExactValue_Invalid};
 	return r;
@@ -279,7 +249,7 @@ ExactValue exact_value_to_integer(ExactValue v) {
 ExactValue exact_value_to_float(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
-		return exact_value_float(cast(i64)v.value_integer);
+		return exact_value_float(i128_to_f64(v.value_integer));
 	case ExactValue_Float:
 		return v;
 	}
@@ -290,7 +260,7 @@ ExactValue exact_value_to_float(ExactValue v) {
 ExactValue exact_value_to_complex(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
-		return exact_value_complex(cast(i64)v.value_integer, 0);
+		return exact_value_complex(i128_to_f64(v.value_integer), 0);
 	case ExactValue_Float:
 		return exact_value_complex(v.value_float, 0);
 	case ExactValue_Complex:
@@ -304,7 +274,7 @@ ExactValue exact_value_to_complex(ExactValue v) {
 ExactValue exact_value_to_quaternion(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
-		return exact_value_quaternion(cast(i64)v.value_integer, 0, 0, 0);
+		return exact_value_quaternion(i128_to_f64(v.value_integer), 0, 0, 0);
 	case ExactValue_Float:
 		return exact_value_quaternion(v.value_float, 0, 0, 0);
 	case ExactValue_Complex:
@@ -335,7 +305,7 @@ ExactValue exact_value_imag(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
-		return exact_value_integer(0);
+		return exact_value_i64(0);
 	case ExactValue_Complex:
 		return exact_value_float(v.value_complex.imag);
 	case ExactValue_Quaternion:
@@ -350,7 +320,7 @@ ExactValue exact_value_jmag(ExactValue v) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
 	case ExactValue_Complex:
-		return exact_value_integer(0);
+		return exact_value_i64(0);
 	case ExactValue_Quaternion:
 		return exact_value_float(v.value_quaternion.jmag);
 	}
@@ -362,7 +332,7 @@ ExactValue exact_value_kmag(ExactValue v) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
 	case ExactValue_Complex:
-		return exact_value_integer(0);
+		return exact_value_i64(0);
 	case ExactValue_Quaternion:
 		return exact_value_float(v.value_quaternion.kmag);
 	}
@@ -429,7 +399,7 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 			return v;
 		case ExactValue_Integer: {
 			ExactValue i = v;
-			i.value_integer = -i.value_integer;
+			i.value_integer = i128_neg(i.value_integer);
 			return i;
 		}
 		case ExactValue_Float: {
@@ -453,12 +423,12 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 	} break;
 
 	case Token_Xor: {
-		i64 i = 0;
+		i128 i = I128_ZERO;
 		switch (v.kind) {
 		case ExactValue_Invalid:
 			return v;
 		case ExactValue_Integer:
-			i = ~v.value_integer;
+			i = i128_not(v.value_integer);
 			break;
 		default:
 			goto failure;
@@ -467,11 +437,11 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 		// NOTE(bill): unsigned integers will be negative and will need to be
 		// limited to the types precision
 		// IMPORTANT NOTE(bill): Max precision is 64 bits as that's how integers are stored
-		if (0 < precision && precision < 64) {
-			i &= ~((~0ll)<<precision);
+		if (0 < precision && precision < 128) {
+			i = i128_and(i, i128_not(i128_shl(I128_NEG_ONE, precision)));
 		}
 
-		return exact_value_integer(i);
+		return exact_value_i128(i);
 	} break;
 
 	case Token_Not: {
@@ -538,13 +508,13 @@ void match_exact_values(ExactValue *x, ExactValue *y) {
 			return;
 		case ExactValue_Float:
 			// TODO(bill): Is this good enough?
-			*x = exact_value_float(cast(f64)x->value_integer);
+			*x = exact_value_float(i128_to_f64(x->value_integer));
 			return;
 		case ExactValue_Complex:
-			*x = exact_value_complex(cast(f64)x->value_integer, 0);
+			*x = exact_value_complex(i128_to_f64(x->value_integer), 0);
 			return;
 		case ExactValue_Quaternion:
-			*x = exact_value_quaternion(cast(f64)x->value_integer, 0, 0, 0);
+			*x = exact_value_quaternion(i128_to_f64(x->value_integer), 0, 0, 0);
 			return;
 		}
 		break;
@@ -585,27 +555,27 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		break;
 
 	case ExactValue_Integer: {
-		i64 a = x.value_integer;
-		i64 b = y.value_integer;
-		i64 c = 0;
+		i128 a = x.value_integer;
+		i128 b = y.value_integer;
+		i128 c = I128_ZERO;
 		switch (op) {
-		case Token_Add:    c = a + b;  break;
-		case Token_Sub:    c = a - b;  break;
-		case Token_Mul:    c = a * b;  break;
-		case Token_Quo:    return exact_value_float(fmod(cast(f64)a, cast(f64)b));
-		case Token_QuoEq:  c = a / b;  break; // NOTE(bill): Integer division
-		case Token_Mod:    c = a % b;  break;
-		case Token_ModMod: c = ((a % b) + b)%b; break;
-		case Token_And:    c = a & b;  break;
-		case Token_Or:     c = a | b;  break;
-		case Token_Xor:    c = a ^ b;  break;
-		case Token_AndNot: c = a&(~b); break;
-		case Token_Shl:    c = a << b; break;
-		case Token_Shr:    c = a >> b; break;
+		case Token_Add:    c = i128_add(a, b);                           break;
+		case Token_Sub:    c = i128_sub(a, b);                           break;
+		case Token_Mul:    c = i128_mul(a, b);                           break;
+		case Token_Quo:    return exact_value_float(fmod(i128_to_f64(a), i128_to_f64(b)));
+		case Token_QuoEq:  c = i128_quo(a, b);                           break; // NOTE(bill): Integer division
+		case Token_Mod:    c = i128_mod(a, b);                           break;
+		case Token_ModMod: c = i128_mod(i128_add(i128_mod(a, b), b), b); break;
+		case Token_And:    c = i128_and    (a, b);                       break;
+		case Token_Or:     c = i128_or     (a, b);                       break;
+		case Token_Xor:    c = i128_xor    (a, b);                       break;
+		case Token_AndNot: c = i128_and_not(a, b);                       break;
+		case Token_Shl:    c = i128_shl    (a, i128_to_u64(b));          break;
+		case Token_Shr:    c = i128_shr    (a, i128_to_u64(b));          break;
 		default: goto error;
 		}
 
-		return exact_value_integer(c);
+		return exact_value_i128(c);
 	} break;
 
 	case ExactValue_Float: {
@@ -732,15 +702,15 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 		break;
 
 	case ExactValue_Integer: {
-		i64 a = x.value_integer;
-		i64 b = y.value_integer;
+		i128 a = x.value_integer;
+		i128 b = y.value_integer;
 		switch (op) {
-		case Token_CmpEq: return a == b;
-		case Token_NotEq: return a != b;
-		case Token_Lt:    return a <  b;
-		case Token_LtEq:  return a <= b;
-		case Token_Gt:    return a >  b;
-		case Token_GtEq:  return a >= b;
+		case Token_CmpEq: return i128_eq(a, b);
+		case Token_NotEq: return i128_ne(a, b);
+		case Token_Lt:    return i128_lt(a, b);
+		case Token_LtEq:  return i128_le(a, b);
+		case Token_Gt:    return i128_gt(a, b);
+		case Token_GtEq:  return i128_ge(a, b);
 		}
 	} break;
 

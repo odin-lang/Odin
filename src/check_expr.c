@@ -603,7 +603,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 		Type *type = base_type(o.type);
 		if (is_type_untyped(type) || is_type_integer(type)) {
 			if (o.value.kind == ExactValue_Integer) {
-				i64 align = o.value.value_integer;
+				i64 align = i128_to_i64(o.value.value_integer);
 				if (align < 1 || !gb_is_power_of_two(align)) {
 					error_node(st->align, "#align must be a power of 2, got %lld", align);
 					return;
@@ -768,24 +768,6 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
 	union_type->Record.names = make_names_field_for_record(c, c->context.scope);
 }
 
-// GB_COMPARE_PROC(cmp_enum_order) {
-// 	// Rule:
-// 	// Biggest to smallest alignment
-// 	// if same alignment: biggest to smallest size
-// 	// if same size: order by source order
-// 	Entity *x = *(Entity **)a;
-// 	Entity *y = *(Entity **)b;
-// 	GB_ASSERT(x != NULL);
-// 	GB_ASSERT(y != NULL);
-// 	GB_ASSERT(x->kind == Entity_Constant);
-// 	GB_ASSERT(y->kind == Entity_Constant);
-// 	GB_ASSERT(x->Constant.value.kind == ExactValue_Integer);
-// 	GB_ASSERT(y->Constant.value.kind == ExactValue_Integer);
-// 	i64 i = x->Constant.value.value_integer;
-// 	i64 j = y->Constant.value.value_integer;
-
-// 	return i < j ? -1 : i > j;
-// }
 
 void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *node) {
 	ast_node(et, EnumType, node);
@@ -821,9 +803,9 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		constant_type = named_type;
 	}
 
-	ExactValue iota = exact_value_integer(-1);
-	ExactValue min_value = exact_value_integer(0);
-	ExactValue max_value = exact_value_integer(0);
+	ExactValue iota = exact_value_i64(-1);
+	ExactValue min_value = exact_value_i64(0);
+	ExactValue max_value = exact_value_i64(0);
 
 	for_array(i, et->fields) {
 		AstNode *field = et->fields.e[i];
@@ -858,10 +840,10 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 			if (o.mode != Addressing_Invalid) {
 				iota = o.value;
 			} else {
-				iota = exact_binary_operator_value(Token_Add, iota, exact_value_integer(1));
+				iota = exact_binary_operator_value(Token_Add, iota, exact_value_i64(1));
 			}
 		} else {
-			iota = exact_binary_operator_value(Token_Add, iota, exact_value_integer(1));
+			iota = exact_binary_operator_value(Token_Add, iota, exact_value_i64(1));
 		}
 
 
@@ -914,7 +896,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	enum_type->Record.field_count = field_count;
 
 	enum_type->Record.enum_count = make_entity_constant(c->allocator, c->context.scope,
-		make_token_ident(str_lit("count")), t_int, exact_value_integer(field_count));
+		make_token_ident(str_lit("count")), t_int, exact_value_i64(field_count));
 	enum_type->Record.enum_min_value = make_entity_constant(c->allocator, c->context.scope,
 		make_token_ident(str_lit("min_value")), constant_type, min_value);
 	enum_type->Record.enum_max_value = make_entity_constant(c->allocator, c->context.scope,
@@ -1462,7 +1444,7 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 	Type *type = base_type(o.type);
 	if (is_type_untyped(type) || is_type_integer(type)) {
 		if (o.value.kind == ExactValue_Integer) {
-			i64 count = o.value.value_integer;
+			i64 count = i128_to_i64(o.value.value_integer);
 			if (is_map) {
 				if (count > 0) {
 					return count;
@@ -2001,17 +1983,17 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 			return true;
 		}
 
-		i64 i = v.value_integer;
-		u64 u = *cast(u64 *)&i;
+		i128 i = v.value_integer;
+		u128 u = *cast(u128 *)&i;
 		i64 s = 8*type_size_of(c->allocator, type);
-		u64 umax = ~0ull;
-		if (s < 64) {
-			umax = (1ull << s) - 1ull;
+		u128 umax = U128_NEG_ONE;
+		if (s < 128) {
+			umax = u128_sub(u128_shl(U128_ONE, s), U128_ONE);
 		} else {
 			// IMPORTANT TODO(bill): I NEED A PROPER BIG NUMBER LIBRARY THAT CAN SUPPORT 128 bit integers and floats
-			s = 64;
+			s = 128;
 		}
-		i64 imax = (1ll << (s-1ll));
+		i128 imax = i128_shl(I128_ONE, s-1ll);
 
 		switch (type->Basic.kind) {
 		case Basic_i8:
@@ -2020,7 +2002,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		case Basic_i64:
 		// case Basic_i128:
 		case Basic_int:
-			return gb_is_between(i, -imax, imax-1);
+			return i128_le(i128_neg(imax), i) && i128_le(i, i128_sub(imax, I128_ONE));
 
 		case Basic_u8:
 		case Basic_u16:
@@ -2028,7 +2010,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		case Basic_u64:
 		// case Basic_u128:
 		case Basic_uint:
-			return !(u < 0 || u > umax);
+			return !(u128_lt(u, U128_ZERO) || u128_gt(u, umax));
 
 		case Basic_UntypedInteger:
 			return true;
@@ -2127,7 +2109,7 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error_node(o->expr, "`%s` truncated to `%s`", a, b);
 			} else {
-				error_node(o->expr, "`%s = %lld` overflows `%s`", a, o->value.value_integer, b);
+				error_node(o->expr, "`%s = %lld` overflows `%s`", a, i128_to_i64(o->value.value_integer), b);
 			}
 		} else {
 			error_node(o->expr, "Cannot convert `%s` to `%s`", a, b);
@@ -2355,7 +2337,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 				return;
 			}
 
-			u64 amount = cast(u64)y_val.value_integer;
+			i64 amount = i128_to_i64(y_val.value_integer);
 			if (amount > 64) {
 				gbString err_str = expr_to_string(y->expr);
 				error_node(node, "Shift amount too large: `%s`", err_str);
@@ -2370,7 +2352,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 				x->type = t_untyped_integer;
 			}
 
-			x->value = exact_value_shift(be->op.kind, x_val, exact_value_integer(amount));
+			x->value = exact_value_shift(be->op.kind, x_val, exact_value_i64(amount));
 
 			if (is_type_typed(x->type)) {
 				check_is_expressible(c, x, base_type(x->type));
@@ -2390,7 +2372,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 		}
 	}
 
-	if (y->mode == Addressing_Constant && y->value.value_integer < 0) {
+	if (y->mode == Addressing_Constant && i128_lt(y->value.value_integer, I128_ZERO)) {
 		gbString err_str = expr_to_string(y->expr);
 		error_node(node, "Shift amount cannot be negative: `%s`", err_str);
 		gb_string_free(err_str);
@@ -2471,7 +2453,7 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 
 	if (ptr->mode == Addressing_Constant && offset->mode == Addressing_Constant) {
 		i64 ptr_val = ptr->value.value_pointer;
-		i64 offset_val = exact_value_to_integer(offset->value).value_integer;
+		i64 offset_val = i128_to_i64(exact_value_to_integer(offset->value).value_integer);
 		i64 new_ptr_val = ptr_val;
 		if (op == Token_Add) {
 			new_ptr_val += elem_size*offset_val;
@@ -2763,7 +2745,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			bool fail = false;
 			switch (y->value.kind) {
 			case ExactValue_Integer:
-				if (y->value.value_integer == 0) {
+				if (i128_eq(y->value.value_integer, I128_ZERO)) {
 					fail = true;
 				}
 				break;
@@ -2896,7 +2878,7 @@ void convert_untyped_error(Checker *c, Operand *operand, Type *target_type) {
 	char *extra_text = "";
 
 	if (operand->mode == Addressing_Constant) {
-		if (operand->value.value_integer == 0) {
+		if (i128_eq(operand->value.value_integer, I128_ZERO)) {
 			if (str_ne(make_string_c(expr_str), str_lit("nil"))) { // HACK NOTE(bill): Just in case
 				// NOTE(bill): Doesn't matter what the type is as it's still zero in the union
 				extra_text = " - Did you want `nil`?";
@@ -3049,7 +3031,7 @@ bool check_index_value(Checker *c, bool open_range, AstNode *index_value, i64 ma
 
 	if (operand.mode == Addressing_Constant &&
 	    (c->context.stmt_state_flags & StmtStateFlag_no_bounds_check) == 0) {
-		i64 i = exact_value_to_integer(operand.value).value_integer;
+		i64 i = i128_to_i64(exact_value_to_integer(operand.value).value_integer);
 		if (i < 0) {
 			gbString expr_str = expr_to_string(operand.expr);
 			error_node(operand.expr, "Index `%s` cannot be a negative value", expr_str);
@@ -3283,7 +3265,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 				operand->expr = node;
 				return NULL;
 			}
-			i64 index = o.value.value_integer;
+			i64 index = i128_to_i64(o.value.value_integer);
 			if (index < 0) {
 				error_node(o.expr, "Index %lld cannot be a negative value", index);
 				operand->mode = Addressing_Invalid;
@@ -3321,7 +3303,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	    operand->type != NULL && is_type_untyped(operand->type) && is_type_string(operand->type)) {
 		String s = operand->value.value_string;
 		operand->mode = Addressing_Constant;
-		operand->value = exact_value_integer(s.len);
+		operand->value = exact_value_i64(s.len);
 		operand->type = t_untyped_integer;
 		return NULL;
 	}
@@ -3455,7 +3437,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			if (operand->mode == Addressing_Constant) {
 				mode = Addressing_Constant;
 				String str = operand->value.value_string;
-				value = exact_value_integer(str.len);
+				value = exact_value_i64(str.len);
 				type = t_untyped_integer;
 			} else {
 				mode = Addressing_Value;
@@ -3463,12 +3445,12 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		} else if (is_type_array(op_type)) {
 			Type *at = core_type(op_type);
 			mode = Addressing_Constant;
-			value = exact_value_integer(at->Array.count);
+			value = exact_value_i64(at->Array.count);
 			type = t_untyped_integer;
 		} else if (is_type_vector(op_type) && id == BuiltinProc_len) {
 			Type *at = core_type(op_type);
 			mode = Addressing_Constant;
-			value = exact_value_integer(at->Vector.count);
+			value = exact_value_i64(at->Vector.count);
 			type = t_untyped_integer;
 		} else if (is_type_slice(op_type)) {
 			mode = Addressing_Value;
@@ -3759,7 +3741,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = exact_value_integer(type_size_of(c->allocator, type));
+		operand->value = exact_value_i64(type_size_of(c->allocator, type));
 		operand->type = t_untyped_integer;
 
 	} break;
@@ -3772,7 +3754,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = exact_value_integer(type_size_of(c->allocator, operand->type));
+		operand->value = exact_value_i64(type_size_of(c->allocator, operand->type));
 		operand->type = t_untyped_integer;
 		break;
 
@@ -3784,7 +3766,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 		operand->mode = Addressing_Constant;
-		operand->value = exact_value_integer(type_align_of(c->allocator, type));
+		operand->value = exact_value_i64(type_align_of(c->allocator, type));
 		operand->type = t_untyped_integer;
 	} break;
 
@@ -3796,7 +3778,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = exact_value_integer(type_align_of(c->allocator, operand->type));
+		operand->value = exact_value_i64(type_align_of(c->allocator, operand->type));
 		operand->type = t_untyped_integer;
 		break;
 
@@ -3840,7 +3822,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->mode = Addressing_Constant;
-		operand->value = exact_value_integer(type_offset_of_from_selection(c->allocator, type, sel));
+		operand->value = exact_value_i64(type_offset_of_from_selection(c->allocator, type, sel));
 		operand->type  = t_untyped_integer;
 	} break;
 
@@ -3889,7 +3871,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->mode = Addressing_Constant;
 		// IMPORTANT TODO(bill): Fix for anonymous fields
-		operand->value = exact_value_integer(type_offset_of_from_selection(c->allocator, type, sel));
+		operand->value = exact_value_i64(type_offset_of_from_selection(c->allocator, type, sel));
 		operand->type  = t_untyped_integer;
 	} break;
 
@@ -4047,6 +4029,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		isize max_count = vector_type->Vector.count;
+		i128 max_count128 = i128_from_i64(max_count);
 		isize arg_count = 0;
 		for_array(i, ce->args) {
 			if (i == 0) {
@@ -4064,12 +4047,12 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 				return false;
 			}
 
-			if (op.value.value_integer < 0) {
+			if (i128_lt(op.value.value_integer, I128_ZERO)) {
 				error_node(op.expr, "Negative `swizzle` index");
 				return false;
 			}
 
-			if (max_count <= op.value.value_integer) {
+			if (i128_le(max_count128, op.value.value_integer)) {
 				error_node(op.expr, "`swizzle` index exceeds vector length");
 				return false;
 			}
@@ -4542,7 +4525,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (operand->mode == Addressing_Constant) {
 			switch (operand->value.kind) {
 			case ExactValue_Integer:
-				operand->value.value_integer = gb_abs(operand->value.value_integer);
+				operand->value.value_integer = i128_abs(operand->value.value_integer);
 				break;
 			case ExactValue_Float:
 				operand->value.value_float = gb_abs(operand->value.value_float);
@@ -5253,7 +5236,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			o->value = exact_value_string(bd->token.pos.file);
 		} else if (str_eq(bd->name, str_lit("line"))) {
 			o->type = t_untyped_integer;
-			o->value = exact_value_integer(bd->token.pos.line);
+			o->value = exact_value_i64(bd->token.pos.line);
 		} else if (str_eq(bd->name, str_lit("procedure"))) {
 			if (c->proc_stack.count == 0) {
 				error_node(node, "#procedure may only be used within procedures");

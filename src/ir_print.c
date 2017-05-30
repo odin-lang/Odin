@@ -44,7 +44,19 @@ void ir_fprintf(irFileBuffer *f, char *fmt, ...) {
 	ir_file_buffer_write(f, buf, len-1);
 	va_end(va);
 }
-
+void ir_fprint_string(irFileBuffer *f, String s) {
+	ir_file_buffer_write(f, s.text, s.len);
+}
+void ir_fprint_i128(irFileBuffer *f, i128 i) {
+	char buf[200] = {0};
+	String str = i128_to_string(i, buf, gb_size_of(buf)-1);
+	ir_fprint_string(f, str);
+}
+void ir_fprint_u128(irFileBuffer *f, u128 i) {
+	char buf[200] = {0};
+	String str = u128_to_string(i, buf, gb_size_of(buf)-1);
+	ir_fprint_string(f, str);
+}
 
 void ir_file_write(irFileBuffer *f, void *data, isize len) {
 	ir_file_buffer_write(f, data, len);
@@ -396,17 +408,19 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 	} break;
 	case ExactValue_Integer: {
 		if (is_type_pointer(type)) {
-			if (value.value_integer == 0) {
+			if (i128_eq(value.value_integer, I128_ZERO)) {
 				ir_fprintf(f, "null");
 			} else {
 				ir_fprintf(f, "inttoptr (");
 				ir_print_type(f, m, t_int);
-				ir_fprintf(f, " %llu to ", value.value_integer);
+				ir_fprintf(f, " ");
+				ir_fprint_i128(f, value.value_integer);
+				ir_fprintf(f, " to ");
 				ir_print_type(f, m, t_rawptr);
 				ir_fprintf(f, ")");
 			}
 		} else {
-			ir_fprintf(f, "%lld", value.value_integer);
+			ir_fprint_i128(f, value.value_integer);
 		}
 	} break;
 	case ExactValue_Float: {
@@ -1392,12 +1406,12 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 		ir_print_type(f, m, t_int);
 		ir_fprintf(f, " ");
-		ir_print_exact_value(f, m, exact_value_integer(bc->pos.line), t_int);
+		ir_print_exact_value(f, m, exact_value_i64(bc->pos.line), t_int);
 		ir_fprintf(f, ", ");
 
 		ir_print_type(f, m, t_int);
 		ir_fprintf(f, " ");
-		ir_print_exact_value(f, m, exact_value_integer(bc->pos.column), t_int);
+		ir_print_exact_value(f, m, exact_value_i64(bc->pos.column), t_int);
 		ir_fprintf(f, ", ");
 
 		ir_print_type(f, m, t_int);
@@ -1427,12 +1441,12 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 		ir_print_type(f, m, t_int);
 		ir_fprintf(f, " ");
-		ir_print_exact_value(f, m, exact_value_integer(bc->pos.line), t_int);
+		ir_print_exact_value(f, m, exact_value_i64(bc->pos.line), t_int);
 		ir_fprintf(f, ", ");
 
 		ir_print_type(f, m, t_int);
 		ir_fprintf(f, " ");
-		ir_print_exact_value(f, m, exact_value_integer(bc->pos.column), t_int);
+		ir_print_exact_value(f, m, exact_value_i64(bc->pos.column), t_int);
 		ir_fprintf(f, ", ");
 
 		ir_print_type(f, m, t_int);

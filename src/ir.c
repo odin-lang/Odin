@@ -1076,16 +1076,16 @@ irValue *ir_emit(irProcedure *proc, irValue *instr) {
 
 
 irValue *ir_const_int(gbAllocator a, i64 i) {
-	return ir_value_constant(a, t_int, exact_value_integer(i));
+	return ir_value_constant(a, t_int, exact_value_i64(i));
 }
 irValue *ir_const_i32(gbAllocator a, i64 i) {
-	return ir_value_constant(a, t_i32, exact_value_integer(i));
+	return ir_value_constant(a, t_i32, exact_value_i64(i));
 }
 irValue *ir_const_i64(gbAllocator a, i64 i) {
-	return ir_value_constant(a, t_i64, exact_value_integer(i));
+	return ir_value_constant(a, t_i64, exact_value_i64(i));
 }
 irValue *ir_const_u64(gbAllocator a, u64 i) {
-	return ir_value_constant(a, t_u64, exact_value_integer(i));
+	return ir_value_constant(a, t_u64, exact_value_i64(i));
 }
 irValue *ir_const_f32(gbAllocator a, f32 f) {
 	return ir_value_constant(a, t_f32, exact_value_float(f));
@@ -2093,7 +2093,7 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	case Token_AndNot: {
 		// NOTE(bill): x &~ y == x & (~y) == x & (y ~ -1)
 		// NOTE(bill): "not" `x` == `x` "xor" `-1`
-		irValue *neg = ir_add_module_constant(proc->module, type, exact_value_integer(-1));
+		irValue *neg = ir_add_module_constant(proc->module, type, exact_value_i64(-1));
 		op = Token_Xor;
 		right = ir_emit_arith(proc, op, right, neg, type);
 		GB_ASSERT(right->Instr.kind == irInstr_BinaryOp);
@@ -4431,7 +4431,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 						GB_ASSERT(is_type_integer(tv.type));
 						GB_ASSERT(tv.value.kind == ExactValue_Integer);
 
-						i32 src_index = cast(i32)tv.value.value_integer;
+						i32 src_index = cast(i32)i128_to_i64(tv.value.value_integer);
 						i32 dst_index = i-1;
 
 						irValue *src_elem = ir_emit_array_epi(proc, src, src_index);
@@ -4869,7 +4869,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			Type *selector_type = base_type(type_of_expr(proc->module->info, se->selector));
 			GB_ASSERT_MSG(is_type_integer(selector_type), "%s", type_to_string(selector_type));
 			ExactValue val = type_and_value_of_expr(proc->module->info, sel).value;
-			i64 index = val.value_integer;
+			i64 index = i128_to_i64(val.value_integer);
 
 			Selection sel = lookup_field_from_index(proc->module->allocator, type, index);
 			GB_ASSERT(sel.entity != NULL);
@@ -7838,7 +7838,7 @@ void ir_gen_tree(irGen *s) {
 									ExactValue value = fields[i]->Constant.value;
 
 									if (is_value_int) {
-										i64 i = value.value_integer;
+										i64 i = i128_to_i64(value.value_integer);
 										value_ep = ir_emit_conv(proc, value_ep, t_i64_ptr);
 										ir_emit_store(proc, value_ep, ir_const_i64(a, i));
 									} else {

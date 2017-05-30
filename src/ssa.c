@@ -329,7 +329,7 @@ ssaValue *ssa_new_value1v(ssaProc *p, ssaOp op, Type *t, ExactValue exact_value,
 	return v;
 }
 ssaValue *ssa_new_value1i(ssaProc *p, ssaOp op, Type *t, i64 i, ssaValue *arg) {
-	return ssa_new_value1v(p, op, t, exact_value_integer(i), arg);
+	return ssa_new_value1v(p, op, t, exact_value_i64(i), arg);
 }
 
 ssaValue *ssa_new_value2(ssaProc *p, ssaOp op, Type *t, ssaValue *arg0, ssaValue *arg1) {
@@ -371,10 +371,10 @@ ssaValue *ssa_const_val(ssaProc *p, ssaOp op, Type *t, ExactValue exact_value) {
 }
 
 ssaValue *ssa_const_bool        (ssaProc *p, Type *t, bool   c)     { return ssa_const_val(p, ssaOp_ConstBool,   t, exact_value_bool(c)); }
-ssaValue *ssa_const_i8          (ssaProc *p, Type *t, i8     c)     { return ssa_const_val(p, ssaOp_Const8,      t, exact_value_integer(cast(i64)c)); }
-ssaValue *ssa_const_i16         (ssaProc *p, Type *t, i16    c)     { return ssa_const_val(p, ssaOp_Const16,     t, exact_value_integer(cast(i64)c)); }
-ssaValue *ssa_const_i32         (ssaProc *p, Type *t, i32    c)     { return ssa_const_val(p, ssaOp_Const32,     t, exact_value_integer(cast(i64)c)); }
-ssaValue *ssa_const_i64         (ssaProc *p, Type *t, i64    c)     { return ssa_const_val(p, ssaOp_Const64,     t, exact_value_integer(cast(i64)c)); }
+ssaValue *ssa_const_i8          (ssaProc *p, Type *t, i8     c)     { return ssa_const_val(p, ssaOp_Const8,      t, exact_value_i64(cast(i64)c)); }
+ssaValue *ssa_const_i16         (ssaProc *p, Type *t, i16    c)     { return ssa_const_val(p, ssaOp_Const16,     t, exact_value_i64(cast(i64)c)); }
+ssaValue *ssa_const_i32         (ssaProc *p, Type *t, i32    c)     { return ssa_const_val(p, ssaOp_Const32,     t, exact_value_i64(cast(i64)c)); }
+ssaValue *ssa_const_i64         (ssaProc *p, Type *t, i64    c)     { return ssa_const_val(p, ssaOp_Const64,     t, exact_value_i64(cast(i64)c)); }
 ssaValue *ssa_const_f32         (ssaProc *p, Type *t, f32    c)     { return ssa_const_val(p, ssaOp_Const32F,    t, exact_value_float(c)); }
 ssaValue *ssa_const_f64         (ssaProc *p, Type *t, f64    c)     { return ssa_const_val(p, ssaOp_Const64F,    t, exact_value_float(c)); }
 ssaValue *ssa_const_string      (ssaProc *p, Type *t, String c)     { return ssa_const_val(p, ssaOp_ConstString, t, exact_value_string(c)); }
@@ -1100,7 +1100,7 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 			Type *type = base_type(type_of_expr(p->module->info, se->expr));
 			GB_ASSERT(is_type_integer(type));
 			ExactValue val = type_and_value_of_expr(p->module->info, sel).value;
-			i64 index = val.value_integer;
+			i64 index = i128_to_i64(val.value_integer);
 
 			Selection sel = lookup_field_from_index(p->allocator, type, index);
 			GB_ASSERT(sel.entity != NULL);
@@ -1652,10 +1652,10 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 
 			i64 s = 8*type_size_of(p->allocator, t);
 			switch (s) {
-			case 8:  return ssa_const_i8 (p, tv.type, tv.value.value_integer);
-			case 16: return ssa_const_i16(p, tv.type, tv.value.value_integer);
-			case 32: return ssa_const_i32(p, tv.type, tv.value.value_integer);
-			case 64: return ssa_const_i64(p, tv.type, tv.value.value_integer);
+			case 8:  return ssa_const_i8 (p, tv.type, i128_to_i64(tv.value.value_integer));
+			case 16: return ssa_const_i16(p, tv.type, i128_to_i64(tv.value.value_integer));
+			case 32: return ssa_const_i32(p, tv.type, i128_to_i64(tv.value.value_integer));
+			case 64: return ssa_const_i64(p, tv.type, i128_to_i64(tv.value.value_integer));
 			default: GB_PANIC("Unknown integer size");
 			}
 		} else if (is_type_float(t)) {
@@ -2276,9 +2276,9 @@ void ssa_print_exact_value(gbFile *f, ssaValue *v) {
 		break;
 	case ExactValue_Integer:
 		if (is_type_unsigned(t)) {
-			gb_fprintf(f, " [%llu]", cast(unsigned long long)ev.value_integer);
+			gb_fprintf(f, " [%llu]", cast(unsigned long long)i128_to_u64(ev.value_integer));
 		} else {
-			gb_fprintf(f, " [%lld]", cast(long long)ev.value_integer);
+			gb_fprintf(f, " [%lld]", cast(long long)i128_to_i64(ev.value_integer));
 		}
 		break;
 	case ExactValue_Float:
