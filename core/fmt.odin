@@ -772,9 +772,9 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 
 	case Pointer:
 		if v.type_info == type_info(^TypeInfo) {
-			write_type(fi.buf, (^^TypeInfo)(v.data)^);
+			write_type(fi.buf, ^^TypeInfo(v.data)^);
 		} else {
-			fmt_pointer(fi, (^rawptr)(v.data)^, verb);
+			fmt_pointer(fi, ^rawptr(v.data)^, verb);
 		}
 
 	case Atomic:
@@ -794,7 +794,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 	case DynamicArray:
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
-		array := (^raw.DynamicArray)(v.data);
+		array := ^raw.DynamicArray(v.data);
 		for i in 0..<array.len {
 			if i > 0 {
 				write_string(fi.buf, ", ");
@@ -806,7 +806,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 	case Slice:
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
-		slice := (^[]byte)(v.data);
+		slice := ^[]byte(v.data);
 		for _, i in slice {
 			if i > 0 {
 				write_string(fi.buf, ", ");
@@ -903,7 +903,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 	case Procedure:
 		write_type(fi.buf, v.type_info);
 		write_string(fi.buf, " @ ");
-		fmt_pointer(fi, (^rawptr)(v.data)^, 'p');
+		fmt_pointer(fi, ^rawptr(v.data)^, 'p');
 	}
 }
 

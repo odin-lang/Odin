@@ -26,7 +26,6 @@ Mat3 :: [3][3]f32;
 Mat4 :: [4][4]f32;
 
 Complex :: complex64;
-Quat    :: quaternion128;
 
 sqrt :: proc(x: f32) -> f32 #foreign __llvm_core "llvm.sqrt.f32";
 sqrt :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.sqrt.f64";
