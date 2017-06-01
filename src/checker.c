@@ -56,11 +56,8 @@ typedef enum BuiltinProcId {
 	BuiltinProc_swizzle,
 
 	BuiltinProc_complex,
-	BuiltinProc_quaternion,
 	BuiltinProc_real,
 	BuiltinProc_imag,
-	BuiltinProc_jmag,
-	BuiltinProc_kmag,
 	BuiltinProc_conj,
 
 	BuiltinProc_slice_ptr,
@@ -110,11 +107,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("swizzle"),          1, true,  Expr_Expr},
 
 	{STR_LIT("complex"),          2, false, Expr_Expr},
-	{STR_LIT("quaternion"),       4, false, Expr_Expr},
 	{STR_LIT("real"),             1, false, Expr_Expr},
 	{STR_LIT("imag"),             1, false, Expr_Expr},
-	{STR_LIT("jmag"),             1, false, Expr_Expr},
-	{STR_LIT("kmag"),             1, false, Expr_Expr},
 	{STR_LIT("conj"),             1, false, Expr_Expr},
 
 	{STR_LIT("slice_ptr"),        2, true,   Expr_Expr},
@@ -1014,15 +1008,6 @@ void add_type_info_type(Checker *c, Type *t) {
 			add_type_info_type(c, t_type_info_float);
 			add_type_info_type(c, t_f64);
 			break;
-
-		case Basic_quaternion128:
-			add_type_info_type(c, t_type_info_float);
-			add_type_info_type(c, t_f32);
-			break;
-		case Basic_quaternion256:
-			add_type_info_type(c, t_type_info_float);
-			add_type_info_type(c, t_f64);
-			break;
 		}
 	} break;
 
@@ -1215,36 +1200,34 @@ void init_preload(Checker *c) {
 
 
 
-		if (record->variant_count != 22) {
+		if (record->variant_count != 21) {
 			compiler_error("Invalid `TypeInfo` layout");
 		}
 		t_type_info_named         = record->variants[ 1]->type;
 		t_type_info_integer       = record->variants[ 2]->type;
 		t_type_info_float         = record->variants[ 3]->type;
 		t_type_info_complex       = record->variants[ 4]->type;
-		t_type_info_quaternion    = record->variants[ 5]->type;
-		t_type_info_string        = record->variants[ 6]->type;
-		t_type_info_boolean       = record->variants[ 7]->type;
-		t_type_info_any           = record->variants[ 8]->type;
-		t_type_info_pointer       = record->variants[ 9]->type;
-		t_type_info_atomic        = record->variants[10]->type;
-		t_type_info_procedure     = record->variants[11]->type;
-		t_type_info_array         = record->variants[12]->type;
-		t_type_info_dynamic_array = record->variants[13]->type;
-		t_type_info_slice         = record->variants[14]->type;
-		t_type_info_vector        = record->variants[15]->type;
-		t_type_info_tuple         = record->variants[16]->type;
-		t_type_info_struct        = record->variants[17]->type;
-		t_type_info_raw_union     = record->variants[18]->type;
-		t_type_info_union         = record->variants[19]->type;
-		t_type_info_enum          = record->variants[20]->type;
-		t_type_info_map           = record->variants[21]->type;
+		t_type_info_string        = record->variants[ 5]->type;
+		t_type_info_boolean       = record->variants[ 6]->type;
+		t_type_info_any           = record->variants[ 7]->type;
+		t_type_info_pointer       = record->variants[ 8]->type;
+		t_type_info_atomic        = record->variants[ 9]->type;
+		t_type_info_procedure     = record->variants[10]->type;
+		t_type_info_array         = record->variants[11]->type;
+		t_type_info_dynamic_array = record->variants[12]->type;
+		t_type_info_slice         = record->variants[13]->type;
+		t_type_info_vector        = record->variants[14]->type;
+		t_type_info_tuple         = record->variants[15]->type;
+		t_type_info_struct        = record->variants[16]->type;
+		t_type_info_raw_union     = record->variants[17]->type;
+		t_type_info_union         = record->variants[18]->type;
+		t_type_info_enum          = record->variants[19]->type;
+		t_type_info_map           = record->variants[20]->type;
 
 		t_type_info_named_ptr         = make_type_pointer(c->allocator, t_type_info_named);
 		t_type_info_integer_ptr       = make_type_pointer(c->allocator, t_type_info_integer);
 		t_type_info_float_ptr         = make_type_pointer(c->allocator, t_type_info_float);
 		t_type_info_complex_ptr       = make_type_pointer(c->allocator, t_type_info_complex);
-		t_type_info_quaternion_ptr    = make_type_pointer(c->allocator, t_type_info_quaternion);
 		t_type_info_string_ptr        = make_type_pointer(c->allocator, t_type_info_string);
 		t_type_info_boolean_ptr       = make_type_pointer(c->allocator, t_type_info_boolean);
 		t_type_info_any_ptr           = make_type_pointer(c->allocator, t_type_info_any);

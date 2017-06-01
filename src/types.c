@@ -20,9 +20,6 @@ typedef enum BasicKind {
 	Basic_complex64,
 	Basic_complex128,
 
-	Basic_quaternion128,
-	Basic_quaternion256,
-
 	Basic_int,
 	Basic_uint,
 	Basic_rawptr,
@@ -33,7 +30,6 @@ typedef enum BasicKind {
 	Basic_UntypedInteger,
 	Basic_UntypedFloat,
 	Basic_UntypedComplex,
-	Basic_UntypedQuaternion,
 	Basic_UntypedString,
 	Basic_UntypedRune,
 	Basic_UntypedNil,
@@ -50,13 +46,12 @@ typedef enum BasicFlag {
 	BasicFlag_Unsigned    = GB_BIT(2),
 	BasicFlag_Float       = GB_BIT(3),
 	BasicFlag_Complex     = GB_BIT(4),
-	BasicFlag_Quaternion  = GB_BIT(5),
-	BasicFlag_Pointer     = GB_BIT(6),
-	BasicFlag_String      = GB_BIT(7),
-	BasicFlag_Rune        = GB_BIT(8),
-	BasicFlag_Untyped     = GB_BIT(9),
+	BasicFlag_Pointer     = GB_BIT(5),
+	BasicFlag_String      = GB_BIT(6),
+	BasicFlag_Rune        = GB_BIT(7),
+	BasicFlag_Untyped     = GB_BIT(8),
 
-	BasicFlag_Numeric      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Complex | BasicFlag_Quaternion,
+	BasicFlag_Numeric      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Complex,
 	BasicFlag_Ordered      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_String  | BasicFlag_Pointer,
 	BasicFlag_ConstantType = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_Pointer | BasicFlag_String | BasicFlag_Rune,
 } BasicFlag;
@@ -236,9 +231,6 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_complex64,         BasicFlag_Complex,                          8, STR_LIT("complex64")}},
 	{Type_Basic, {Basic_complex128,        BasicFlag_Complex,                         16, STR_LIT("complex128")}},
 
-	{Type_Basic, {Basic_quaternion128,     BasicFlag_Quaternion,                      16, STR_LIT("quaternion128")}},
-	{Type_Basic, {Basic_quaternion256,     BasicFlag_Quaternion,                      32, STR_LIT("quaternion256")}},
-
 	{Type_Basic, {Basic_int,               BasicFlag_Integer,                         -1, STR_LIT("int")}},
 	{Type_Basic, {Basic_uint,              BasicFlag_Integer | BasicFlag_Unsigned,    -1, STR_LIT("uint")}},
 
@@ -250,7 +242,6 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_UntypedInteger,    BasicFlag_Integer    | BasicFlag_Untyped,   0, STR_LIT("untyped integer")}},
 	{Type_Basic, {Basic_UntypedFloat,      BasicFlag_Float      | BasicFlag_Untyped,   0, STR_LIT("untyped float")}},
 	{Type_Basic, {Basic_UntypedComplex,    BasicFlag_Complex    | BasicFlag_Untyped,   0, STR_LIT("untyped complex")}},
-	{Type_Basic, {Basic_UntypedQuaternion, BasicFlag_Quaternion | BasicFlag_Untyped,   0, STR_LIT("untyped quaternion")}},
 	{Type_Basic, {Basic_UntypedString,     BasicFlag_String     | BasicFlag_Untyped,   0, STR_LIT("untyped string")}},
 	{Type_Basic, {Basic_UntypedRune,       BasicFlag_Integer    | BasicFlag_Untyped,   0, STR_LIT("untyped rune")}},
 	{Type_Basic, {Basic_UntypedNil,        BasicFlag_Untyped,                          0, STR_LIT("untyped nil")}},
@@ -280,9 +271,6 @@ gb_global Type *t_f64             = &basic_types[Basic_f64];
 gb_global Type *t_complex64       = &basic_types[Basic_complex64];
 gb_global Type *t_complex128      = &basic_types[Basic_complex128];
 
-gb_global Type *t_quaternion128   = &basic_types[Basic_quaternion128];
-gb_global Type *t_quaternion256   = &basic_types[Basic_quaternion256];
-
 gb_global Type *t_int             = &basic_types[Basic_int];
 gb_global Type *t_uint            = &basic_types[Basic_uint];
 
@@ -294,7 +282,6 @@ gb_global Type *t_untyped_bool       = &basic_types[Basic_UntypedBool];
 gb_global Type *t_untyped_integer    = &basic_types[Basic_UntypedInteger];
 gb_global Type *t_untyped_float      = &basic_types[Basic_UntypedFloat];
 gb_global Type *t_untyped_complex    = &basic_types[Basic_UntypedComplex];
-gb_global Type *t_untyped_quaternion = &basic_types[Basic_UntypedQuaternion];
 gb_global Type *t_untyped_string     = &basic_types[Basic_UntypedString];
 gb_global Type *t_untyped_rune       = &basic_types[Basic_UntypedRune];
 gb_global Type *t_untyped_nil        = &basic_types[Basic_UntypedNil];
@@ -322,7 +309,6 @@ gb_global Type *t_type_info_named         = NULL;
 gb_global Type *t_type_info_integer       = NULL;
 gb_global Type *t_type_info_float         = NULL;
 gb_global Type *t_type_info_complex       = NULL;
-gb_global Type *t_type_info_quaternion    = NULL;
 gb_global Type *t_type_info_any           = NULL;
 gb_global Type *t_type_info_string        = NULL;
 gb_global Type *t_type_info_boolean       = NULL;
@@ -697,13 +683,6 @@ bool is_type_complex(Type *t) {
 	}
 	return false;
 }
-bool is_type_quaternion(Type *t) {
-	t = core_type(t);
-	if (t->kind == Type_Basic) {
-		return (t->Basic.flags & BasicFlag_Quaternion) != 0;
-	}
-	return false;
-}
 bool is_type_f32(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_Basic) {
@@ -806,19 +785,6 @@ Type *base_complex_elem_type(Type *t) {
 	GB_PANIC("Invalid complex type");
 	return t_invalid;
 }
-Type *base_quaternion_elem_type(Type *t) {
-	t = core_type(t);
-	if (is_type_quaternion(t)) {
-		switch (t->Basic.kind) {
-		case Basic_quaternion128:     return t_f32;
-		case Basic_quaternion256:     return t_f64;
-		case Basic_UntypedQuaternion: return t_untyped_float;
-		}
-	}
-	GB_PANIC("Invalid quaternion type");
-	return t_invalid;
-}
-
 
 bool is_type_struct(Type *t) {
 	t = base_type(t);
@@ -1094,7 +1060,6 @@ Type *default_type(Type *type) {
 		case Basic_UntypedInteger:    return t_int;
 		case Basic_UntypedFloat:      return t_f64;
 		case Basic_UntypedComplex:    return t_complex128;
-		case Basic_UntypedQuaternion: return t_quaternion256;
 		case Basic_UntypedString:     return t_string;
 		case Basic_UntypedRune:       return t_rune;
 		}
@@ -1566,8 +1531,6 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 
 		case Basic_complex64: case Basic_complex128:
 			return type_size_of_internal(allocator, t, path) / 2;
-		case Basic_quaternion128: case Basic_quaternion256:
-			return type_size_of_internal(allocator, t, path) / 4;
 		}
 	} break;
 

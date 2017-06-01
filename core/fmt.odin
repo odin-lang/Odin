@@ -205,11 +205,6 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		case 8:  write_string(buf, "complex64");
 		case 16: write_string(buf, "complex128");
 		}
-	case Quaternion:
-		match info.size {
-		case 16: write_string(buf, "quaternion128");
-		case 32: write_string(buf, "quaternion");
-		}
 	case String:  write_string(buf, "string");
 	case Boolean: write_string(buf, "bool");
 	case Any:
@@ -773,7 +768,6 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 	case Integer:    fmt_arg(fi, v, verb);
 	case Float:      fmt_arg(fi, v, verb);
 	case Complex:    fmt_arg(fi, v, verb);
-	case Quaternion: fmt_arg(fi, v, verb);
 	case String:     fmt_arg(fi, v, verb);
 
 	case Pointer:
@@ -931,33 +925,6 @@ fmt_complex :: proc(fi: ^FmtInfo, c: complex128, bits: int, verb: rune) {
 	}
 }
 
-fmt_quaternion :: proc(fi: ^FmtInfo, c: quaternion256, bits: int, verb: rune) {
-	match verb {
-	case 'f', 'F', 'v':
-		r := real(c);
-		i := imag(c);
-		j := jmag(c);
-		k := kmag(c);
-		fmt_float(fi, r, bits/4, verb);
-
-		if !fi.plus && i >= 0 { write_rune(fi.buf, '+'); }
-		fmt_float(fi, i, bits/4, verb);
-		write_rune(fi.buf, 'i');
-
-		if !fi.plus && j >= 0 { write_rune(fi.buf, '+'); }
-		fmt_float(fi, j, bits/4, verb);
-		write_rune(fi.buf, 'j');
-
-		if !fi.plus && k >= 0 { write_rune(fi.buf, '+'); }
-		fmt_float(fi, k, bits/4, verb);
-		write_rune(fi.buf, 'k');
-
-	case:
-		fmt_bad_verb(fi, verb);
-		return;
-	}
-}
-
 _u128_to_lo_hi :: proc(a: u128) -> (lo, hi: u64) { return u64(a), u64(a>>64); }
 _i128_to_lo_hi :: proc(a: u128) -> (lo: u64 hi: i64) { return u64(a), i64(a>>64); }
 
@@ -987,8 +954,6 @@ fmt_arg :: proc(fi: ^FmtInfo, arg: any, verb: rune) {
 	case f64:           fmt_float(fi, a, 64, verb);
 	case complex64:     fmt_complex(fi, complex128(a), 64, verb);
 	case complex128:    fmt_complex(fi, a, 128, verb);
-	case quaternion128: fmt_quaternion(fi, quaternion256(a), 128, verb);
-	case quaternion256: fmt_quaternion(fi, a, 256, verb);
 
 	case int:     fmt_int(fi, u128(a), true,  8*size_of(int), verb);
 	case i8:      fmt_int(fi, u128(a), true,  8, verb);

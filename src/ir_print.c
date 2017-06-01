@@ -199,9 +199,6 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		case Basic_complex64:  ir_fprintf(f, "%%..complex64");        return;
 		case Basic_complex128: ir_fprintf(f, "%%..complex128");       return;
 
-		case Basic_quaternion128: ir_fprintf(f, "%%..quaternion128"); return;
-		case Basic_quaternion256: ir_fprintf(f, "%%..quaternion256"); return;
-
 		case Basic_rawptr: ir_fprintf(f, "%%..rawptr");               return;
 		case Basic_string: ir_fprintf(f, "%%..string");               return;
 		case Basic_uint:   ir_fprintf(f, "i%lld", word_bits);         return;
@@ -447,41 +444,12 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 	case ExactValue_Complex: {
 		type = core_type(type);
-		if (is_type_quaternion(type)) {
-			Type *ft = base_quaternion_elem_type(type);
-			ir_fprintf(f, " {"); ir_print_type(f, m, ft); ir_fprintf(f, " ");
-			ir_print_exact_value(f, m, exact_value_float(value.value_complex.real), ft);
-			ir_fprintf(f, ", "); ir_print_type(f, m, ft); ir_fprintf(f, " ");
-			ir_print_exact_value(f, m, exact_value_float(value.value_complex.imag), ft);
-			ir_fprintf(f, ", "); ir_print_type(f, m, ft); ir_fprintf(f, " ");
-			ir_print_exact_value(f, m, exact_value_float(0), ft);
-			ir_fprintf(f, ", "); ir_print_type(f, m, ft); ir_fprintf(f, " ");
-			ir_print_exact_value(f, m, exact_value_float(0), ft);
-			ir_fprintf(f, "}");
-
-		} else {
-			GB_ASSERT_MSG(is_type_complex(type), "%s", type_to_string(type));
-			Type *ft = base_complex_elem_type(type);
-			ir_fprintf(f, " {"); ir_print_type(f, m, ft); ir_fprintf(f, " ");
-			ir_print_exact_value(f, m, exact_value_float(value.value_complex.real), ft);
-			ir_fprintf(f, ", "); ir_print_type(f, m, ft); ir_fprintf(f, " ");
-			ir_print_exact_value(f, m, exact_value_float(value.value_complex.imag), ft);
-			ir_fprintf(f, "}");
-		}
-	} break;
-
-	case ExactValue_Quaternion: {
-		GB_ASSERT_MSG(is_type_quaternion(type), "%s", type_to_string(type));
-		type = core_type(type);
-		Type *ft = base_quaternion_elem_type(type);
+		GB_ASSERT_MSG(is_type_complex(type), "%s", type_to_string(type));
+		Type *ft = base_complex_elem_type(type);
 		ir_fprintf(f, " {"); ir_print_type(f, m, ft); ir_fprintf(f, " ");
-		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.real), ft);
+		ir_print_exact_value(f, m, exact_value_float(value.value_complex.real), ft);
 		ir_fprintf(f, ", "); ir_print_type(f, m, ft); ir_fprintf(f, " ");
-		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.imag), ft);
-		ir_fprintf(f, ", "); ir_print_type(f, m, ft); ir_fprintf(f, " ");
-		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.jmag), ft);
-		ir_fprintf(f, ", "); ir_print_type(f, m, ft); ir_fprintf(f, " ");
-		ir_print_exact_value(f, m, exact_value_float(value.value_quaternion.kmag), ft);
+		ir_print_exact_value(f, m, exact_value_float(value.value_complex.imag), ft);
 		ir_fprintf(f, "}");
 	} break;
 
@@ -1149,39 +1117,6 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					switch (bo->op) {
 					case Token_CmpEq: runtime_proc = "__complex128_eq"; break;
 					case Token_NotEq: runtime_proc = "__complex128_ne"; break;
-					}
-					break;
-				}
-
-				ir_fprintf(f, " ");
-				ir_print_encoded_global(f, make_string_c(runtime_proc), false);
-				ir_fprintf(f, "(");
-				ir_print_type(f, m, type);
-				ir_fprintf(f, " ");
-				ir_print_value(f, m, bo->left, type);
-				ir_fprintf(f, ", ");
-				ir_print_type(f, m, type);
-				ir_fprintf(f, " ");
-				ir_print_value(f, m, bo->right, type);
-				ir_fprintf(f, ")\n");
-				return;
-			} else if (is_type_quaternion(elem_type)) {
-				ir_fprintf(f, "call ");
-				ir_print_calling_convention(f, m, ProcCC_Odin);
-				ir_print_type(f, m, t_bool);
-				char *runtime_proc = "";
-				i64 sz = 8*type_size_of(m->allocator, elem_type);
-				switch (sz) {
-				case 128:
-					switch (bo->op) {
-					case Token_CmpEq: runtime_proc = "__quaternion128_eq"; break;
-					case Token_NotEq: runtime_proc = "__quaternion128_ne"; break;
-					}
-					break;
-				case 256:
-					switch (bo->op) {
-					case Token_CmpEq: runtime_proc = "__quaternion256_eq"; break;
-					case Token_NotEq: runtime_proc = "__quaternion256_ne"; break;
 					}
 					break;
 				}

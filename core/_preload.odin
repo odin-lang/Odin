@@ -54,7 +54,6 @@ TypeInfo :: union {
 	Integer{signed: bool},
 	Float{},
 	Complex{},
-	Quaternion{},
 	String{},
 	Boolean{},
 	Any{},
@@ -322,19 +321,6 @@ __complex128_eq :: proc(a, b: complex128) -> bool #inline { return real(a) == re
 __complex128_ne :: proc(a, b: complex128) -> bool #inline { return real(a) != real(b) || imag(a) != imag(b); }
 
 
-__quaternion128_eq :: proc(a, b: quaternion128) -> bool #inline {
-	return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b);
-}
-__quaternion128_ne :: proc(a, b: quaternion128) -> bool #inline {
-	return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b);
-}
-__quaternion256_eq :: proc(a, b: quaternion256) -> bool #inline {
-	return real(a) == real(b) && imag(a) == imag(b) && jmag(a) == jmag(b) && kmag(a) == kmag(b);
-}
-__quaternion256_ne :: proc(a, b: quaternion256) -> bool #inline {
-	return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b);
-}
-
 __assert :: proc(file: string, line, column: int, msg: string) #inline {
 	fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion: %s\n",
 	            file, line, column, msg);
@@ -426,14 +412,6 @@ __abs_complex64 :: proc(x: complex64) -> f32 #inline {
 __abs_complex128 :: proc(x: complex128) -> f64 #inline {
 	r, i := real(x), imag(x);
 	return __sqrt_f64(r*r + i*i);
-}
-__abs_quaternion128 :: proc(x: quaternion128) -> f32 #inline {
-	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
-	return __sqrt_f32(r*r + i*i + j*j + k*k);
-}
-__abs_quaternion256 :: proc(x: quaternion256) -> f64 #inline {
-	r, i, j, k := real(x), imag(x), jmag(x), kmag(x);
-	return __sqrt_f64(r*r + i*i + j*j + k*k);
 }
 
 

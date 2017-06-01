@@ -1495,8 +1495,6 @@ ssaValue *ssa_emit_arith(ssaProc *p, TokenKind op, ssaValue *x, ssaValue *y, Typ
 		GB_PANIC("TODO(bill): ssa_emit_arith vector");
 	} else if (is_type_complex(x->type)) {
 		GB_PANIC("TODO(bill): ssa_emit_arith complex");
-	} else if (is_type_quaternion(x->type)) {
-		GB_PANIC("TODO(bill): ssa_emit_arith quaternion");
 	}
 
 	if (op == Token_Add) {

@@ -9,10 +9,6 @@ typedef struct Complex128 {
 	f64 real, imag;
 } Complex128;
 
-typedef struct Quaternion256 {
-	f64 real, imag, jmag, kmag;
-} Quaternion256;
-
 typedef enum ExactValueKind {
 	ExactValue_Invalid,
 
@@ -21,7 +17,6 @@ typedef enum ExactValueKind {
 	ExactValue_Integer,
 	ExactValue_Float,
 	ExactValue_Complex,
-	ExactValue_Quaternion,
 	ExactValue_Pointer,
 	ExactValue_Compound, // TODO(bill): Is this good enough?
 
@@ -37,7 +32,6 @@ typedef struct ExactValue {
 		f64           value_float;
 		i64           value_pointer;
 		Complex128    value_complex;
-		Quaternion256 value_quaternion;
 		AstNode *     value_compound;
 	};
 } ExactValue;
@@ -90,16 +84,6 @@ ExactValue exact_value_complex(f64 real, f64 imag) {
 	result.value_complex.imag = imag;
 	return result;
 }
-
-ExactValue exact_value_quaternion(f64 real, f64 imag, f64 jmag, f64 kmag) {
-	ExactValue result = {ExactValue_Quaternion};
-	result.value_quaternion.real = real;
-	result.value_quaternion.imag = imag;
-	result.value_quaternion.jmag = jmag;
-	result.value_quaternion.kmag = kmag;
-	return result;
-}
-
 
 ExactValue exact_value_pointer(i64 ptr) {
 	ExactValue result = {ExactValue_Pointer};
@@ -206,10 +190,8 @@ ExactValue exact_value_from_basic_literal(Token token) {
 		str.len--; // Ignore the `i|j|k`
 		f64 imag = float_from_string(str);
 
-		switch (last_rune) {
-		case 'i': return exact_value_complex(0, imag);
-		case 'j': return exact_value_quaternion(0, 0, imag, 0);
-		case 'k': return exact_value_quaternion(0, 0, 0, imag);
+		if (last_rune == 'i') {
+			return exact_value_complex(0, imag);
 		}
 	}
 	case Token_Rune: {
@@ -271,22 +253,6 @@ ExactValue exact_value_to_complex(ExactValue v) {
 }
 
 
-ExactValue exact_value_to_quaternion(ExactValue v) {
-	switch (v.kind) {
-	case ExactValue_Integer:
-		return exact_value_quaternion(i128_to_f64(v.value_integer), 0, 0, 0);
-	case ExactValue_Float:
-		return exact_value_quaternion(v.value_float, 0, 0, 0);
-	case ExactValue_Complex:
-		return exact_value_quaternion(v.value_complex.real, v.value_complex.imag, 0, 0);
-	case ExactValue_Quaternion:
-		return v;
-	}
-	ExactValue r = {ExactValue_Invalid};
-	return r;
-}
-
-
 ExactValue exact_value_real(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
@@ -294,8 +260,6 @@ ExactValue exact_value_real(ExactValue v) {
 		return v;
 	case ExactValue_Complex:
 		return exact_value_float(v.value_complex.real);
-	case ExactValue_Quaternion:
-		return exact_value_float(v.value_quaternion.real);
 	}
 	ExactValue r = {ExactValue_Invalid};
 	return r;
@@ -308,38 +272,10 @@ ExactValue exact_value_imag(ExactValue v) {
 		return exact_value_i64(0);
 	case ExactValue_Complex:
 		return exact_value_float(v.value_complex.imag);
-	case ExactValue_Quaternion:
-		return exact_value_float(v.value_quaternion.imag);
 	}
 	ExactValue r = {ExactValue_Invalid};
 	return r;
 }
-
-ExactValue exact_value_jmag(ExactValue v) {
-	switch (v.kind) {
-	case ExactValue_Integer:
-	case ExactValue_Float:
-	case ExactValue_Complex:
-		return exact_value_i64(0);
-	case ExactValue_Quaternion:
-		return exact_value_float(v.value_quaternion.jmag);
-	}
-	ExactValue r = {ExactValue_Invalid};
-	return r;
-}
-ExactValue exact_value_kmag(ExactValue v) {
-	switch (v.kind) {
-	case ExactValue_Integer:
-	case ExactValue_Float:
-	case ExactValue_Complex:
-		return exact_value_i64(0);
-	case ExactValue_Quaternion:
-		return exact_value_float(v.value_quaternion.kmag);
-	}
-	ExactValue r = {ExactValue_Invalid};
-	return r;
-}
-
 
 ExactValue exact_value_make_imag(ExactValue v) {
 	switch (v.kind) {
@@ -353,31 +289,6 @@ ExactValue exact_value_make_imag(ExactValue v) {
 	ExactValue r = {ExactValue_Invalid};
 	return r;
 }
-ExactValue exact_value_make_jmag(ExactValue v) {
-	switch (v.kind) {
-	case ExactValue_Integer:
-		return exact_value_quaternion(0, 0, exact_value_to_float(v).value_float, 0);
-	case ExactValue_Float:
-		return exact_value_quaternion(0, 0, v.value_float, 0);
-	default:
-		GB_PANIC("Expected an integer or float type for `exact_value_make_jmag`");
-	}
-	ExactValue r = {ExactValue_Invalid};
-	return r;
-}
-ExactValue exact_value_make_kmag(ExactValue v) {
-	switch (v.kind) {
-	case ExactValue_Integer:
-		return exact_value_quaternion(0, 0, 0, exact_value_to_float(v).value_float);
-	case ExactValue_Float:
-		return exact_value_quaternion(0, 0, 0, v.value_float);
-	default:
-		GB_PANIC("Expected an integer or float type for `exact_value_make_kmag`");
-	}
-	ExactValue r = {ExactValue_Invalid};
-	return r;
-}
-
 
 
 ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision) {
@@ -388,7 +299,6 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 		case ExactValue_Integer:
 		case ExactValue_Float:
 		case ExactValue_Complex:
-		case ExactValue_Quaternion:
 			return v;
 		}
 	} break;
@@ -411,13 +321,6 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 			f64 real = v.value_complex.real;
 			f64 imag = v.value_complex.imag;
 			return exact_value_complex(-real, -imag);
-		}
-		case ExactValue_Quaternion: {
-			f64 real = v.value_quaternion.real;
-			f64 imag = v.value_quaternion.imag;
-			f64 jmag = v.value_quaternion.jmag;
-			f64 kmag = v.value_quaternion.kmag;
-			return exact_value_quaternion(-real, -imag, -jmag, -kmag);
 		}
 		}
 	} break;
@@ -474,10 +377,8 @@ i32 exact_value_order(ExactValue v) {
 		return 3;
 	case ExactValue_Complex:
 		return 4;
-	case ExactValue_Quaternion:
-		return 5;
 	case ExactValue_Pointer:
-		return 6;
+		return 5;
 
 	default:
 		GB_PANIC("How'd you get here? Invalid Value.kind");
@@ -499,7 +400,6 @@ void match_exact_values(ExactValue *x, ExactValue *y) {
 	case ExactValue_Bool:
 	case ExactValue_String:
 	case ExactValue_Complex:
-	case ExactValue_Quaternion:
 		return;
 
 	case ExactValue_Integer:
@@ -513,9 +413,6 @@ void match_exact_values(ExactValue *x, ExactValue *y) {
 		case ExactValue_Complex:
 			*x = exact_value_complex(i128_to_f64(x->value_integer), 0);
 			return;
-		case ExactValue_Quaternion:
-			*x = exact_value_quaternion(i128_to_f64(x->value_integer), 0, 0, 0);
-			return;
 		}
 		break;
 
@@ -525,9 +422,6 @@ void match_exact_values(ExactValue *x, ExactValue *y) {
 			return;
 		case ExactValue_Complex:
 			*x = exact_value_to_complex(*x);
-			return;
-		case ExactValue_Quaternion:
-			*x = exact_value_to_quaternion(*x);
 			return;
 		}
 		break;
@@ -620,53 +514,6 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		}
 		return exact_value_complex(real, imag);
 	} break;
-
-	case ExactValue_Quaternion: {
-		y = exact_value_to_quaternion(y);
-		f64 a = x.value_quaternion.real;
-		f64 b = x.value_quaternion.imag;
-		f64 c = x.value_quaternion.jmag;
-		f64 d = x.value_quaternion.kmag;
-
-		f64 e = x.value_quaternion.real;
-		f64 f = x.value_quaternion.imag;
-		f64 g = x.value_quaternion.jmag;
-		f64 h = x.value_quaternion.kmag;
-
-		f64 real = 0;
-		f64 imag = 0;
-		f64 jmag = 0;
-		f64 kmag = 0;
-		switch (op) {
-		case Token_Add:
-			real = a + e;
-			imag = b + f;
-			jmag = c + g;
-			kmag = d + h;
-			break;
-		case Token_Sub:
-			real = a - e;
-			imag = b - f;
-			jmag = c - g;
-			kmag = d - h;
-			break;
-		case Token_Mul:
-			real = a*f + b*e + c*h - d*g;
-			imag = a*g - b*h + c*e + d*f;
-			jmag = a*h + b*g - c*f + d*e;
-			kmag = a*e - b*f - c*g - d*h;
-			break;
-		case Token_Quo: {
-			f64 s = e*e + f*f + g*g + h*h;
-			real = (+a*e + b*f + c*g + d*h)/s;
-			imag = (-a*f + b*e - c*h + d*h)/s;
-			jmag = (-a*g + b*h + c*e - d*f)/s;
-			kmag = (-a*h - b*g + c*f + d*e)/s;
-		} break;
-		default: goto error;
-		}
-		return exact_value_quaternion(real, imag, jmag, kmag);
-	} break;
 	}
 
 error:
@@ -735,23 +582,6 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 		switch (op) {
 		case Token_CmpEq: return cmp_f64(a, c) == 0 && cmp_f64(b, d) == 0;
 		case Token_NotEq: return cmp_f64(a, c) != 0 || cmp_f64(b, d) != 0;
-		}
-	} break;
-
-	case ExactValue_Quaternion: {
-		f64 a = x.value_quaternion.real;
-		f64 b = x.value_quaternion.imag;
-		f64 c = x.value_quaternion.jmag;
-		f64 d = x.value_quaternion.kmag;
-
-		f64 e = y.value_quaternion.real;
-		f64 f = y.value_quaternion.imag;
-		f64 g = y.value_quaternion.jmag;
-		f64 h = y.value_quaternion.kmag;
-
-		switch (op) {
-		case Token_CmpEq: return cmp_f64(a, e) == 0 && cmp_f64(b, f) == 0 && cmp_f64(c, g) == 0 && cmp_f64(d, h) == 0;
-		case Token_NotEq: return cmp_f64(a, e) != 0 || cmp_f64(b, f) != 0 || cmp_f64(c, g) != 0 || cmp_f64(d, h) != 0;
 		}
 	} break;
 
