@@ -11,6 +11,8 @@ typedef enum BasicKind {
 	Basic_u32,
 	Basic_i64,
 	Basic_u64,
+	Basic_i128,
+	Basic_u128,
 
 	Basic_f32,
 	Basic_f64,
@@ -224,6 +226,9 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_u32,               BasicFlag_Integer | BasicFlag_Unsigned,     4, STR_LIT("u32")}},
 	{Type_Basic, {Basic_i64,               BasicFlag_Integer,                          8, STR_LIT("i64")}},
 	{Type_Basic, {Basic_u64,               BasicFlag_Integer | BasicFlag_Unsigned,     8, STR_LIT("u64")}},
+	{Type_Basic, {Basic_i128,              BasicFlag_Integer,                         16, STR_LIT("i128")}},
+	{Type_Basic, {Basic_u128,              BasicFlag_Integer | BasicFlag_Unsigned,    16, STR_LIT("u128")}},
+
 
 	{Type_Basic, {Basic_f32,               BasicFlag_Float,                            4, STR_LIT("f32")}},
 	{Type_Basic, {Basic_f64,               BasicFlag_Float,                            8, STR_LIT("f64")}},
@@ -266,6 +271,8 @@ gb_global Type *t_i32             = &basic_types[Basic_i32];
 gb_global Type *t_u32             = &basic_types[Basic_u32];
 gb_global Type *t_i64             = &basic_types[Basic_i64];
 gb_global Type *t_u64             = &basic_types[Basic_u64];
+gb_global Type *t_i128            = &basic_types[Basic_i128];
+gb_global Type *t_u128            = &basic_types[Basic_u128];
 
 gb_global Type *t_f32             = &basic_types[Basic_f32];
 gb_global Type *t_f64             = &basic_types[Basic_f64];
@@ -734,6 +741,12 @@ bool is_type_int_or_uint(Type *t) {
 	}
 	return false;
 }
+bool is_type_i128_or_u128(Type *t) {
+	if (t->kind == Type_Basic) {
+		return (t->Basic.kind == Basic_i128) || (t->Basic.kind == Basic_u128);
+	}
+	return false;
+}
 bool is_type_rawptr(Type *t) {
 	if (t->kind == Type_Basic) {
 		return t->Basic.kind == Basic_rawptr;
@@ -857,7 +870,8 @@ bool is_type_valid_for_keys(Type *t) {
 		return false;
 	}
 	if (is_type_integer(t)) {
-		return true;
+		// NOTE(bill): Not (u|i)128
+		return t->Basic.size <= 8;
 	}
 	if (is_type_float(t)) {
 		return true;

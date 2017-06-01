@@ -243,60 +243,44 @@ f64 i128_to_f64(i128 a) {
 }
 
 
-String u128_to_string(u128 a, char *out_buf, isize out_buf_len) {
+String u128_to_string(u128 v, char *out_buf, isize out_buf_len) {
 	char buf[200] = {0};
-	isize i = 0;
+	isize i = gb_size_of(buf);
 
-	if (u128_ne(a, U128_ZERO)) {
-		u128 base = u128_from_u64(10);
-		while (u128_gt(a, U128_ZERO)) {
-			i64 digit = u128_to_i64(u128_mod(a, base));
-			buf[i++] = gb__num_to_char_table[digit];
-			a = u128_quo(a, base);
-		}
-	} else {
-		buf[i++] = '0';
+	u128 b = u128_from_u64(10);;
+	while (u128_ge(v, b)) {
+		buf[--i] = gb__num_to_char_table[u128_to_i64(u128_mod(v, b))];
+		v = u128_quo(v, b);
 	}
+	buf[--i] = gb__num_to_char_table[u128_to_i64(u128_mod(v, b))];
 
-	gb_reverse(buf, i, 1);
-
-	isize len = gb_min(i, out_buf_len);
-	gb_memcopy(out_buf, &buf[0], len);
+	isize len = gb_min(gb_size_of(buf)-i, out_buf_len);
+	gb_memcopy(out_buf, &buf[i], len);
 	return make_string(cast(u8 *)out_buf, len);
 }
 String i128_to_string(i128 a, char *out_buf, isize out_buf_len) {
 	char buf[200] = {0};
-	isize i = 0;
+	isize i = gb_size_of(buf);
 	bool negative = false;
 	if (i128_lt(a, I128_ZERO)) {
 		negative = true;
 		a = i128_neg(a);
 	}
 
-	if (i128_ne(a, I128_ZERO)) {
-		i128 base = i128_from_u64(10);
-		while (i128_gt(a, I128_ZERO)) {
-			i64 digit = i128_to_i64(i128_mod(a, base));
-			buf[i++] = gb__num_to_char_table[digit];
-			a = i128_quo(a, base);
-		}
-	} else {
-		buf[i++] = '0';
+	u128 v = *cast(u128 *)&a;
+	u128 b = u128_from_u64(10);;
+	while (u128_ge(v, b)) {
+		buf[--i] = gb__num_to_char_table[u128_to_i64(u128_mod(v, b))];
+		v = u128_quo(v, b);
 	}
+	buf[--i] = gb__num_to_char_table[u128_to_i64(u128_mod(v, b))];
 
 	if (negative) {
-		buf[i++] = '-';
+		buf[--i] = '-';
 	}
 
-	GB_ASSERT(i > 0);
-	for (isize j = 0; j < i/2; j++) {
-		char tmp = buf[j];
-		buf[j] = buf[i-1-j];
-		buf[i-1-j] = tmp;
-	}
-
-	isize len = gb_min(i, out_buf_len);
-	gb_memcopy(out_buf, &buf[0], len);
+	isize len = gb_min(gb_size_of(buf)-i, out_buf_len);
+	gb_memcopy(out_buf, &buf[i], len);
 	return make_string(cast(u8 *)out_buf, len);
 }
 
@@ -571,6 +555,21 @@ i128 i128_mul(i128 a, i128 b) {
 }
 
 void i128_divide(i128 num, i128 den, i128 *quo, i128 *rem) {
+	// TODO(bill): Which one is correct?!
+#if 0
+	i128 s = i128_shr(den, 127);
+	den = i128_sub(i128_xor(den, s), s);
+	s = i128_shr(num, 127);
+	den = i128_sub(i128_xor(num, s), s);
+
+	u128 n, r = {0};
+	u128_divide(*cast(u128 *)&num, *cast(u128 *)&den, &n, &r);
+	i128 ni = *cast(i128 *)&n;
+	i128 ri = *cast(i128 *)&r;
+
+	if (quo) *quo = i128_sub(i128_xor(ni, s), s);
+	if (rem) *rem = i128_sub(i128_xor(ri, s), s);
+#else
 	if (i128_eq(den, I128_ZERO)) {
 		if (quo) *quo = i128_from_u64(num.lo/den.lo);
 		if (rem) *rem = I128_ZERO;
@@ -598,6 +597,7 @@ void i128_divide(i128 num, i128 den, i128 *quo, i128 *rem) {
 		if (quo) *quo = r;
 		if (rem) *rem = n;
 	}
+#endif
 }
 
 i128 i128_quo(i128 a, i128 b) {

@@ -206,10 +206,18 @@ bool are_signatures_similar_enough(Type *a_, Type *b_) {
 		return false;
 	}
 	for (isize i = 0; i < a->param_count; i++) {
-		Type *x = base_type(a->params->Tuple.variables[i]->type);
-		Type *y = base_type(b->params->Tuple.variables[i]->type);
+		Type *x = core_type(a->params->Tuple.variables[i]->type);
+		Type *y = core_type(b->params->Tuple.variables[i]->type);
 		if (is_type_pointer(x) && is_type_pointer(y)) {
 			continue;
+		}
+
+		if (is_type_integer(x) && is_type_integer(y)) {
+			GB_ASSERT(x->kind == Type_Basic);
+			GB_ASSERT(y->kind == Type_Basic);
+			if (x->Basic.size == y->Basic.size) {
+				continue;
+			}
 		}
 
 		if (!are_types_identical(x, y)) {
@@ -221,6 +229,14 @@ bool are_signatures_similar_enough(Type *a_, Type *b_) {
 		Type *y = base_type(b->results->Tuple.variables[i]->type);
 		if (is_type_pointer(x) && is_type_pointer(y)) {
 			continue;
+		}
+
+		if (is_type_integer(x) && is_type_integer(y)) {
+			GB_ASSERT(x->kind == Type_Basic);
+			GB_ASSERT(y->kind == Type_Basic);
+			if (x->Basic.size == y->Basic.size) {
+				continue;
+			}
 		}
 
 		if (!are_types_identical(x, y)) {

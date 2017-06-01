@@ -146,7 +146,6 @@ int main(int argc, char **argv) {
 	init_scratch_memory(gb_megabytes(10));
 	init_global_error_collector();
 
-
 #if 1
 
 	init_build_context();

@@ -6384,20 +6384,23 @@ gb_global char const gb__num_to_char_table[] =
 gb_inline void gb_i64_to_str(i64 value, char *string, i32 base) {
 	char *buf = string;
 	b32 negative = false;
+	u64 v;
 	if (value < 0) {
 		negative = true;
 		value = -value;
 	}
-	if (value) {
-		while (value > 0) {
-			*buf++ = gb__num_to_char_table[value % base];
-			value /= base;
+	v = cast(u64)value;
+	if (v != 0) {
+		while (v > 0) {
+			*buf++ = gb__num_to_char_table[v % base];
+			v /= base;
 		}
 	} else {
 		*buf++ = '0';
 	}
-	if (negative)
+	if (negative) {
 		*buf++ = '-';
+	}
 	*buf = '\0';
 	gb_strrev(string);
 }

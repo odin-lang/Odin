@@ -67,10 +67,10 @@ append_bool :: proc(buf: []byte, b: bool) -> string {
 }
 
 append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
-	return append_bits(buf, u, base, false, 8*size_of(uint), digits, 0);
+	return append_bits(buf, u128(u), base, false, 8*size_of(uint), digits, 0);
 }
 append_int :: proc(buf: []byte, i: i64, base: int) -> string {
-	return append_bits(buf, u64(i), base, true, 8*size_of(int), digits, 0);
+	return append_bits(buf, u128(i), base, true, 8*size_of(int), digits, 0);
 }
 itoa :: proc(buf: []byte, i: int) -> string { return append_int(buf, i64(i), 10); }
 
@@ -288,7 +288,7 @@ MAX_BASE :: 32;
 immutable digits := "0123456789abcdefghijklmnopqrstuvwxyz";
 
 
-is_integer_negative :: proc(u: u64, is_signed: bool, bit_size: int) -> (unsigned: u64, neg: bool) {
+is_integer_negative :: proc(u: u128, is_signed: bool, bit_size: int) -> (unsigned: u128, neg: bool) {
 	neg := false;
 	if is_signed {
 		match bit_size {
@@ -296,22 +296,27 @@ is_integer_negative :: proc(u: u64, is_signed: bool, bit_size: int) -> (unsigned
 			i := i8(u);
 			neg = i < 0;
 			if neg { i = -i; }
-			u = u64(i);
+			u = u128(i);
 		case 16:
 			i := i16(u);
 			neg = i < 0;
 			if neg { i = -i; }
-			u = u64(i);
+			u = u128(i);
 		case 32:
 			i := i32(u);
 			neg = i < 0;
 			if neg { i = -i; }
-			u = u64(i);
+			u = u128(i);
 		case 64:
 			i := i64(u);
 			neg = i < 0;
 			if neg { i = -i; }
-			u = u64(i);
+			u = u128(i);
+		case 128:
+			i := i128(u);
+			neg = i < 0;
+			if neg { i = -i; }
+			u = u128(i);
 		case:
 			panic("is_integer_negative: Unknown integer size");
 		}
@@ -319,48 +324,33 @@ is_integer_negative :: proc(u: u64, is_signed: bool, bit_size: int) -> (unsigned
 	return u, neg;
 }
 
-
-append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: IntFlag) -> string {
-	is_pow2 :: proc(x: i64) -> bool {
-		if (x <= 0) {
-			return false;
-		}
-		return x&(x-1) == 0;
-	}
-
+append_bits :: proc(buf: []byte, u_: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: IntFlag) -> string {
 	if base < 2 || base > MAX_BASE {
 		panic("strconv: illegal base passed to append_bits");
 	}
 
-	a: [65]byte;
+	a: [129]byte;
 	i := len(a);
-
-	neg: bool;
-	u, neg = is_integer_negative(u, is_signed, bit_size);
-
-	for b := u64(base); u >= b; {
-		i--;
-		q := u / b;
-		a[i] = digits[uint(u-q*b)];
-		u = q;
+	u, neg := is_integer_negative(u_, is_signed, bit_size);
+	b := u128(base);
+	for u >= b {
+		i--; a[i] = digits[uint(u % b)];
+		u /= b;
 	}
-
-	i--;
-	a[i] = digits[uint(u)];
+	i--; a[i] = digits[uint(u % b)];
 
 	if flags&IntFlag.PREFIX != 0 {
 		ok := true;
 		match base {
-		case 2:  i--; a[i] = 'b';
-		case 8:  i--; a[i] = 'o';
+		case  2: i--; a[i] = 'b';
+		case  8: i--; a[i] = 'o';
 		case 10: i--; a[i] = 'd';
 		case 12: i--; a[i] = 'z';
 		case 16: i--; a[i] = 'x';
 		case: ok = false;
 		}
 		if ok {
-			i--;
-			a[i] = '0';
+			i--; a[i] = '0';
 		}
 	}
 
@@ -371,7 +361,6 @@ append_bits :: proc(buf: []byte, u: u64, base: int, is_signed: bool, bit_size: i
 	} else if flags&IntFlag.SPACE != 0 {
 		i--; a[i] = ' ';
 	}
-
 
 	append(buf, ..a[i..]);
 	return string(buf);

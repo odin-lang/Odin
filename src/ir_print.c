@@ -52,11 +52,6 @@ void ir_fprint_i128(irFileBuffer *f, i128 i) {
 	String str = i128_to_string(i, buf, gb_size_of(buf)-1);
 	ir_fprint_string(f, str);
 }
-void ir_fprint_u128(irFileBuffer *f, u128 i) {
-	char buf[200] = {0};
-	String str = u128_to_string(i, buf, gb_size_of(buf)-1);
-	ir_fprint_string(f, str);
-}
 
 void ir_file_write(irFileBuffer *f, void *data, isize len) {
 	ir_file_buffer_write(f, data, len);
@@ -195,6 +190,8 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		case Basic_u32:    ir_fprintf(f, "i32");                      return;
 		case Basic_i64:    ir_fprintf(f, "i64");                      return;
 		case Basic_u64:    ir_fprintf(f, "i64");                      return;
+		case Basic_i128:   ir_fprintf(f, "i128");                     return;
+		case Basic_u128:   ir_fprintf(f, "i128");                     return;
 
 		case Basic_f32:    ir_fprintf(f, "float");                    return;
 		case Basic_f64:    ir_fprintf(f, "double");                   return;

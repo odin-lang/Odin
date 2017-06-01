@@ -193,7 +193,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		case:
 			write_string(buf, info.signed ? "i" : "u");
 			fi := FmtInfo{buf = buf};
-			fmt_int(&fi, u64(8*info.size), false, 64, 'd');
+			fmt_int(&fi, u128(8*info.size), false, 64, 'd');
 		}
 	case Float:
 		match info.size {
@@ -261,7 +261,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 	case Array:
 		write_string(buf, "[");
 		fi := FmtInfo{buf = buf};
-		fmt_int(&fi, u64(info.count), false, 64, 'd');
+		fmt_int(&fi, u128(info.count), false, 64, 'd');
 		write_string(buf, "]");
 		write_type(buf, info.elem);
 	case DynamicArray:
@@ -273,7 +273,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 	case Vector:
 		write_string(buf, "[vector ");
 		fi := FmtInfo{buf = buf};
-		fmt_int(&fi, u64(info.count), false, 64, 'd');
+		fmt_int(&fi, u128(info.count), false, 64, 'd');
 		write_string(buf, "]");
 		write_type(buf, info.elem);
 
@@ -290,7 +290,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		if info.custom_align {
 			write_string(buf, "#align ");
 			fi := FmtInfo{buf = buf};
-			fmt_int(&fi, u64(info.align), false, 64, 'd');
+			fmt_int(&fi, u128(info.align), false, 64, 'd');
 			write_byte(buf, ' ');
 		}
 		write_byte(buf, '{');
@@ -491,40 +491,8 @@ fmt_write_padding :: proc(fi: ^FmtInfo, width: int) {
 	}
 }
 
-
-is_integer_negative :: proc(u: u64, is_signed: bool, bit_size: int) -> (unsigned: u64, neg: bool) {
-	neg := false;
-	if is_signed {
-		match bit_size {
-		case 8:
-			i := i8(u);
-			neg = i < 0;
-			if neg { i = -i; }
-			u = u64(i);
-		case 16:
-			i := i16(u);
-			neg = i < 0;
-			if neg { i = -i; }
-			u = u64(i);
-		case 32:
-			i := i32(u);
-			neg = i < 0;
-			if neg { i = -i; }
-			u = u64(i);
-		case 64:
-			i := i64(u);
-			neg = i < 0;
-			if neg { i = -i; }
-			u = u64(i);
-		case:
-			panic("is_integer_negative: Unknown integer size");
-		}
-	}
-	return u, neg;
-}
-
-_write_int :: proc(fi: ^FmtInfo, u: u64, base: int, is_signed: bool, bit_size: int, digits: string) {
-	_, neg := is_integer_negative(u, is_signed, bit_size);
+_write_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
+	_, neg := strconv.is_integer_negative(u128(u), is_signed, bit_size);
 
 	BUF_SIZE :: 256;
 	if fi.width_set || fi.prec_set {
@@ -565,7 +533,7 @@ _write_int :: proc(fi: ^FmtInfo, u: u64, base: int, is_signed: bool, bit_size: i
 	if fi.hash   { flags |= strconv.IntFlag.PREFIX; }
 	if fi.plus   { flags |= strconv.IntFlag.PLUS; }
 	if fi.space  { flags |= strconv.IntFlag.SPACE; }
-	s := strconv.append_bits(buf[0..<0], u, base, is_signed, bit_size, digits, flags);
+	s := strconv.append_bits(buf[0..<0], u128(u), base, is_signed, bit_size, digits, flags);
 
 	prev_zero := fi.zero;
 	defer fi.zero = prev_zero;
@@ -580,7 +548,7 @@ fmt_rune :: proc(fi: ^FmtInfo, r: rune) {
 	write_rune(fi.buf, r);
 }
 
-fmt_int :: proc(fi: ^FmtInfo, u: u64, is_signed: bool, bit_size: int, verb: rune) {
+fmt_int :: proc(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: rune) {
 	match verb {
 	case 'v': _write_int(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
 	case 'b': _write_int(fi, u,  2, is_signed, bit_size, __DIGITS_LOWER);
@@ -679,7 +647,7 @@ fmt_string :: proc(fi: ^FmtInfo, s: string, verb: rune) {
 			if i > 0 && space {
 				write_byte(fi.buf, ' ');
 			}
-			_write_int(fi, u64(s[i]), 16, false, 8, verb == 'x' ? __DIGITS_LOWER : __DIGITS_UPPER);
+			_write_int(fi, u128(s[i]), 16, false, 8, verb == 'x' ? __DIGITS_LOWER : __DIGITS_UPPER);
 		}
 
 	case:
@@ -695,7 +663,7 @@ fmt_pointer :: proc(fi: ^FmtInfo, p: rawptr, verb: rune) {
 		fmt_bad_verb(fi, verb);
 		return;
 	}
-	u := u64(uint(p));
+	u := u128(uint(p));
 	if !fi.hash || verb == 'v' {
 		write_string(fi.buf, "0x");
 	}
@@ -990,6 +958,9 @@ fmt_quaternion :: proc(fi: ^FmtInfo, c: quaternion256, bits: int, verb: rune) {
 	}
 }
 
+_u128_to_lo_hi :: proc(a: u128) -> (lo, hi: u64) { return u64(a), u64(a>>64); }
+_i128_to_lo_hi :: proc(a: u128) -> (lo: u64 hi: i64) { return u64(a), i64(a>>64); }
+
 fmt_arg :: proc(fi: ^FmtInfo, arg: any, verb: rune) {
 	if arg == nil {
 		write_string(fi.buf, "<nil>");
@@ -1019,18 +990,25 @@ fmt_arg :: proc(fi: ^FmtInfo, arg: any, verb: rune) {
 	case quaternion128: fmt_quaternion(fi, quaternion256(a), 128, verb);
 	case quaternion256: fmt_quaternion(fi, a, 256, verb);
 
-	case int:     fmt_int(fi, u64(a), true,  8*size_of(int), verb);
-	case i8:      fmt_int(fi, u64(a), true,  8, verb);
-	case i16:     fmt_int(fi, u64(a), true,  16, verb);
-	case i32:     fmt_int(fi, u64(a), true,  32, verb);
-	case i64:     fmt_int(fi, u64(a), true,  64, verb);
-	case uint:    fmt_int(fi, u64(a), false, 8*size_of(uint), verb);
-	case u8:      fmt_int(fi, u64(a), false, 8, verb);
-	case u16:     fmt_int(fi, u64(a), false, 16, verb);
-	case u32:     fmt_int(fi, u64(a), false, 32, verb);
-	case u64:     fmt_int(fi, u64(a), false, 64, verb);
+	case int:     fmt_int(fi, u128(a), true,  8*size_of(int), verb);
+	case i8:      fmt_int(fi, u128(a), true,  8, verb);
+	case i16:     fmt_int(fi, u128(a), true,  16, verb);
+	case i32:     fmt_int(fi, u128(a), true,  32, verb);
+	case i64:     fmt_int(fi, u128(a), true,  64, verb);
+	case i128:    fmt_int(fi, u128(a), false, 128, verb);
+
+	case uint:    fmt_int(fi, u128(a), false, 8*size_of(uint), verb);
+	case u8:      fmt_int(fi, u128(a), false, 8, verb);
+	case u16:     fmt_int(fi, u128(a), false, 16, verb);
+	case u32:     fmt_int(fi, u128(a), false, 32, verb);
+	case u64:     fmt_int(fi, u128(a), false, 64, verb);
+	case u128:    fmt_int(fi, u128(a), false, 128, verb);
+
+
 	case string:  fmt_string(fi, a, verb);
-	case:      fmt_value(fi, arg, verb);
+
+
+	case:         fmt_value(fi, arg, verb);
 	}
 
 }

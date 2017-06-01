@@ -2000,7 +2000,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		case Basic_i16:
 		case Basic_i32:
 		case Basic_i64:
-		// case Basic_i128:
+		case Basic_i128:
 		case Basic_int:
 			return i128_le(i128_neg(imax), i) && i128_le(i, i128_sub(imax, I128_ONE));
 
@@ -2008,7 +2008,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		case Basic_u16:
 		case Basic_u32:
 		case Basic_u64:
-		// case Basic_u128:
+		case Basic_u128:
 		case Basic_uint:
 			return !(u128_lt(u, U128_ZERO) || u128_gt(u, umax));
 
@@ -2338,7 +2338,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 			}
 
 			i64 amount = i128_to_i64(y_val.value_integer);
-			if (amount > 64) {
+			if (amount > 128) {
 				gbString err_str = expr_to_string(y->expr);
 				error_node(node, "Shift amount too large: `%s`", err_str);
 				gb_string_free(err_str);

@@ -2117,9 +2117,26 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	if (op == Token_ModMod) {
 		irValue *n = left;
 		irValue *m = right;
-		irValue *a = ir_emit(proc, ir_instr_binary_op(proc, Token_Mod, n, m, type));
-		irValue *b = ir_emit(proc, ir_instr_binary_op(proc, Token_Add, a, m, type));
-		return ir_emit(proc, ir_instr_binary_op(proc, Token_Mod, b, m, type));
+		irValue *a = ir_emit_arith(proc, Token_Mod, n, m, type);
+		irValue *b = ir_emit_arith(proc, Token_Add, a, m, type);
+		return ir_emit_arith(proc, Token_Mod, b, m, type);
+	}
+
+	if (is_type_i128_or_u128(type)) {
+		// IMPORTANT NOTE(bill): LLVM is goddamn buggy!
+		bool is_unsigned = is_type_unsigned(type);
+		char *name = NULL;
+		if (op == Token_Quo) {
+			name = is_unsigned ? "__udivti3" : "__divti3";
+		} else if (op == Token_Mod) {
+			name = is_unsigned ? "__umodti3" : "__modti3";
+		}
+		if (name != NULL) {
+			irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 2);
+			args[0] = left;
+			args[1] = right;
+			return ir_emit_global_call(proc, name, args, 2);
+		}
 	}
 
 	return ir_emit(proc, ir_instr_binary_op(proc, op, left, right, type));
@@ -7529,6 +7546,8 @@ void ir_gen_tree(irGen *s) {
 					case Basic_u32:
 					case Basic_i64:
 					case Basic_u64:
+					case Basic_i128:
+					case Basic_u128:
 					case Basic_int:
 					case Basic_uint: {
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_integer_ptr);
