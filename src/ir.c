@@ -2781,12 +2781,12 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 			}
 		}
 
-		return ir_emit(proc, ir_instr_conv(proc, kind, value, src, dst));
+		return ir_emit(proc, ir_instr_conv(proc, kind, value, src_type, t));
 	}
 
 	// boolean -> integer
 	if (is_type_boolean(src) && is_type_integer(dst)) {
-		return ir_emit(proc, ir_instr_conv(proc, irConv_zext, value, src, dst));
+		return ir_emit(proc, ir_instr_conv(proc, irConv_zext, value, src_type, t));
 	}
 
 	// integer -> boolean
@@ -2834,7 +2834,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		if (dz >= sz) {
 			kind = irConv_fpext;
 		}
-		return ir_emit(proc, ir_instr_conv(proc, kind, value, src, dst));
+		return ir_emit(proc, ir_instr_conv(proc, kind, value, src_type, t));
 	}
 
 	if (is_type_complex(src) && is_type_complex(dst)) {
@@ -2853,22 +2853,22 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		if (is_type_unsigned(dst)) {
 			kind = irConv_fptoui;
 		}
-		return ir_emit(proc, ir_instr_conv(proc, kind, value, src, dst));
+		return ir_emit(proc, ir_instr_conv(proc, kind, value, src_type, t));
 	}
 	if (is_type_integer(src) && is_type_float(dst)) {
 		irConvKind kind = irConv_sitofp;
 		if (is_type_unsigned(src)) {
 			kind = irConv_uitofp;
 		}
-		return ir_emit(proc, ir_instr_conv(proc, kind, value, src, dst));
+		return ir_emit(proc, ir_instr_conv(proc, kind, value, src_type, t));
 	}
 
 	// Pointer <-> int
 	if (is_type_pointer(src) && is_type_int_or_uint(dst)) {
-		return ir_emit(proc, ir_instr_conv(proc, irConv_ptrtoint, value, src, dst));
+		return ir_emit(proc, ir_instr_conv(proc, irConv_ptrtoint, value, src_type, t));
 	}
 	if (is_type_int_or_uint(src) && is_type_pointer(dst)) {
-		return ir_emit(proc, ir_instr_conv(proc, irConv_inttoptr, value, src, dst));
+		return ir_emit(proc, ir_instr_conv(proc, irConv_inttoptr, value, src_type, t));
 	}
 
 	if (is_type_union(dst)) {
@@ -2937,23 +2937,23 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 	// Pointer <-> Pointer
 	if (is_type_pointer(src) && is_type_pointer(dst)) {
-		return ir_emit_bitcast(proc, value, dst);
+		return ir_emit_bitcast(proc, value, t);
 	}
 
 
 
 	// proc <-> proc
 	if (is_type_proc(src) && is_type_proc(dst)) {
-		return ir_emit_bitcast(proc, value, dst);
+		return ir_emit_bitcast(proc, value, t);
 	}
 
 	// pointer -> proc
 	if (is_type_pointer(src) && is_type_proc(dst)) {
-		return ir_emit_bitcast(proc, value, dst);
+		return ir_emit_bitcast(proc, value, t);
 	}
 	// proc -> pointer
 	if (is_type_proc(src) && is_type_pointer(dst)) {
-		return ir_emit_bitcast(proc, value, dst);
+		return ir_emit_bitcast(proc, value, t);
 	}
 
 
@@ -2971,7 +2971,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 		irValue *len  = ir_string_len(proc, value);
 		irValue *cap  = len;
-		irValue *slice = ir_add_local_slice(proc, dst, elem_ptr, v_zero, len, cap);
+		irValue *slice = ir_add_local_slice(proc, t, elem_ptr, v_zero, len, cap);
 		return ir_emit_load(proc, slice);
 	}
 
@@ -5240,9 +5240,6 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 					GB_ASSERT(ir_type(field_expr)->kind != Type_Tuple);
 
-					if (is_type_union(ft)) {
-						// gb_printf_err("HERE! %s\n", type_to_string(ft));
-					}
 					irValue *fv = ir_emit_conv(proc, field_expr, ft);
 					irValue *gep = ir_emit_struct_ep(proc, v, index);
 					ir_emit_store(proc, gep, fv);

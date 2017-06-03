@@ -2668,7 +2668,7 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 
 	Type *bt = base_type(type);
 	if (is_const_expr && is_type_constant_type(bt)) {
-		if (bt->kind == Type_Basic) {
+		if (core_type(bt)->kind == Type_Basic) {
 			if (check_representable_as_constant(c, x->value, bt, &x->value)) {
 				can_convert = true;
 			} else if (is_type_pointer(type) && check_is_castable_to(c, x, type)) {
