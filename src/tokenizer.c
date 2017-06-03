@@ -100,6 +100,7 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_union,          "union"),               \
 	TOKEN_KIND(Token_raw_union,      "raw_union"),           \
 	TOKEN_KIND(Token_enum,           "enum"),                \
+	TOKEN_KIND(Token_bit_field,      "bit_field"),           \
 	TOKEN_KIND(Token_vector,         "vector"),              \
 	TOKEN_KIND(Token_static,         "static"),              \
 	TOKEN_KIND(Token_dynamic,        "dynamic"),             \
@@ -888,6 +889,10 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '{':  token.kind = Token_OpenBrace;    break;
 		case '}':  token.kind = Token_CloseBrace;   break;
 		case '\\': token.kind = Token_BackSlash;    break;
+
+		case '≠':  token.kind = Token_NotEq; break;
+		case '≤':  token.kind = Token_LtEq;  break;
+		case '≥':  token.kind = Token_GtEq;  break;
 
 		case '%': token.kind = token_kind_dub_eq(t, '%', Token_Mod, Token_ModEq, Token_ModMod, Token_ModModEq);      break;
 

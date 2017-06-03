@@ -14,9 +14,11 @@ typedef enum BasicKind {
 	Basic_i128,
 	Basic_u128,
 
+	// Basic_f16,
 	Basic_f32,
 	Basic_f64,
 
+	// Basic_complex32,
 	Basic_complex64,
 	Basic_complex128,
 
@@ -149,6 +151,15 @@ typedef struct TypeRecord {
 		Type *generated_struct_type;                      \
 		Type *lookup_result_type;                         \
 	})                                                    \
+	TYPE_KIND(BitFieldValue, struct { u32 bits; })        \
+	TYPE_KIND(BitField, struct {                          \
+		Scope *  scope;                                   \
+		Entity **fields;                                  \
+		i32      field_count;                             \
+		u32 *    offsets;                                 \
+		u32 *    sizes;                                   \
+		i64      custom_align;                            \
+	})                                                    \
 
 
 
@@ -225,9 +236,11 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_u128,              BasicFlag_Integer | BasicFlag_Unsigned,    16, STR_LIT("u128")}},
 
 
+	// {Type_Basic, {Basic_f16,               BasicFlag_Float,                            2, STR_LIT("f16")}},
 	{Type_Basic, {Basic_f32,               BasicFlag_Float,                            4, STR_LIT("f32")}},
 	{Type_Basic, {Basic_f64,               BasicFlag_Float,                            8, STR_LIT("f64")}},
 
+	// {Type_Basic, {Basic_complex32,         BasicFlag_Complex,                          4, STR_LIT("complex32")}},
 	{Type_Basic, {Basic_complex64,         BasicFlag_Complex,                          8, STR_LIT("complex64")}},
 	{Type_Basic, {Basic_complex128,        BasicFlag_Complex,                         16, STR_LIT("complex128")}},
 
@@ -265,9 +278,11 @@ gb_global Type *t_u64             = &basic_types[Basic_u64];
 gb_global Type *t_i128            = &basic_types[Basic_i128];
 gb_global Type *t_u128            = &basic_types[Basic_u128];
 
+// gb_global Type *t_f16             = &basic_types[Basic_f16];
 gb_global Type *t_f32             = &basic_types[Basic_f32];
 gb_global Type *t_f64             = &basic_types[Basic_f64];
 
+// gb_global Type *t_complex32       = &basic_types[Basic_complex32];
 gb_global Type *t_complex64       = &basic_types[Basic_complex64];
 gb_global Type *t_complex128      = &basic_types[Basic_complex128];
 
@@ -325,6 +340,7 @@ gb_global Type *t_type_info_raw_union     = NULL;
 gb_global Type *t_type_info_union         = NULL;
 gb_global Type *t_type_info_enum          = NULL;
 gb_global Type *t_type_info_map           = NULL;
+gb_global Type *t_type_info_bit_field     = NULL;
 
 gb_global Type *t_type_info_named_ptr         = NULL;
 gb_global Type *t_type_info_integer_ptr       = NULL;
@@ -347,6 +363,7 @@ gb_global Type *t_type_info_raw_union_ptr     = NULL;
 gb_global Type *t_type_info_union_ptr         = NULL;
 gb_global Type *t_type_info_enum_ptr          = NULL;
 gb_global Type *t_type_info_map_ptr           = NULL;
+gb_global Type *t_type_info_bit_field_ptr     = NULL;
 
 gb_global Type *t_allocator            = NULL;
 gb_global Type *t_allocator_ptr        = NULL;
@@ -560,7 +577,20 @@ Type *make_type_map(gbAllocator a, i64 count, Type *key, Type *value) {
 	return t;
 }
 
+Type *make_type_bit_field_value(gbAllocator a, u32 bits) {
+	Type *t = alloc_type(a, Type_BitFieldValue);
+	t->BitFieldValue.bits = bits;
+	return t;
+}
 
+Type *make_type_bit_field(gbAllocator a) {
+	Type *t = alloc_type(a, Type_BitField);
+	return t;
+}
+
+
+
+////////////////////////////////////////////////////////////////
 
 
 Type *type_deref(Type *t) {
@@ -777,6 +807,7 @@ Type *base_complex_elem_type(Type *t) {
 	t = core_type(t);
 	if (is_type_complex(t)) {
 		switch (t->Basic.kind) {
+		// case Basic_complex32:      return t_f16;
 		case Basic_complex64:      return t_f32;
 		case Basic_complex128:     return t_f64;
 		case Basic_UntypedComplex: return t_untyped_float;
@@ -802,7 +833,14 @@ bool is_type_enum(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_Enum);
 }
-
+bool is_type_bit_field(Type *t) {
+	t = base_type(t);
+	return (t->kind == Type_BitField);
+}
+bool is_type_bit_field_value(Type *t) {
+	t = base_type(t);
+	return (t->kind == Type_BitFieldValue);
+}
 bool is_type_map(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Map;
@@ -1067,6 +1105,26 @@ Type *default_type(Type *type) {
 	return type;
 }
 
+Type *default_bit_field_value_type(Type *type) {
+	if (type == NULL) {
+		return t_invalid;
+	}
+	Type *t = base_type(type);
+	if (t->kind == Type_BitFieldValue) {
+		i32 bits = t->BitFieldValue.bits;
+		i32 size = 8*next_pow2((bits+7)/8);
+		switch (size) {
+		case 8:   return t_u8;
+		case 16:  return t_u16;
+		case 32:  return t_u32;
+		case 64:  return t_u64;
+		case 128: return t_u128;
+		default:  GB_PANIC("Too big of a bit size!"); break;
+		}
+	}
+	return type;
+}
+
 // NOTE(bill): Valid Compile time execution #run type
 bool is_type_cte_safe(Type *type) {
 	type = default_type(base_type(type));
@@ -1211,8 +1269,9 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 
 	i64 max_count = 0;
 	switch (type->kind) {
-	case Type_Record: max_count = type->Record.field_count;   break;
-	case Type_Tuple:  max_count = type->Tuple.variable_count; break;
+	case Type_Record:   max_count = type->Record.field_count;   break;
+	case Type_Tuple:    max_count = type->Tuple.variable_count; break;
+	case Type_BitField: max_count = type->BitField.field_count; break;
 	}
 
 	if (index >= max_count) {
@@ -1244,6 +1303,14 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 			}
 		}
 		break;
+
+	case Type_BitField: {
+		Array_i32 sel_array = {0};
+		array_init_count(&sel_array, a, 1);
+		sel_array.e[0] = cast(i32)index;
+		return make_selection(type->BitField.fields[index], sel_array, false);
+	} break;
+
 	}
 
 	GB_PANIC("Illegal index");
@@ -1404,6 +1471,21 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				GB_ASSERT(e != NULL);
 				selection_add_index(&sel, -1); // HACK(bill): Leaky memory
 				sel.entity = e;
+				return sel;
+			}
+		}
+	} else if (type->kind == Type_BitField) {
+		for (isize i = 0; i < type->BitField.field_count; i++) {
+			Entity *f = type->BitField.fields[i];
+			if (f->kind != Entity_Variable ||
+			    (f->flags & EntityFlag_BitFieldValue) == 0) {
+				continue;
+			}
+
+			String str = f->token.string;
+			if (str_eq(field_name, str)) {
+				selection_add_index(&sel, i);  // HACK(bill): Leaky memory
+				sel.entity = f;
 				return sel;
 			}
 		}
@@ -1641,7 +1723,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			return max;
 		} break;
 		case TypeRecord_RawUnion: {
-			i64 max = build_context.word_size;
+			i64 max = 1;
 			for (isize i = 0; i < t->Record.field_count; i++) {
 				Type *field_type = t->Record.fields[i]->type;
 				type_path_push(path, field_type);
@@ -1657,6 +1739,14 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			return max;
 		} break;
 		}
+	} break;
+
+	case Type_BitField: {
+		i64 align = 1;
+		if (t->BitField.custom_align > 0) {
+			align = t->BitField.custom_align;
+		}
+		return gb_clamp(next_pow2(align), 1, build_context.max_align);
 	} break;
 	}
 
@@ -1913,6 +2003,18 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		} break;
 		}
 	} break;
+
+	case Type_BitField: {
+		i64 align = 8*type_align_of_internal(allocator, t, path);
+		i64 end = 0;
+		if (t->BitField.field_count > 0) {
+			i64 last = t->BitField.field_count-1;
+			end = t->BitField.offsets[last] + t->BitField.sizes[last];
+		}
+		i64 bits = align_formula(end, align);
+		GB_ASSERT((bits%8) == 0);
+		return bits/8;
+	} break;
 	}
 
 	// Catch all
@@ -2008,8 +2110,6 @@ i64 type_offset_of_from_selection(gbAllocator allocator, Type *type, Selection s
 	}
 	return offset;
 }
-
-
 
 gbString write_type_to_string(gbString str, Type *type) {
 	if (type == NULL) {
@@ -2191,8 +2291,9 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 	case Type_Proc:
 		str = gb_string_appendc(str, "proc(");
-		if (type->Proc.params)
+		if (type->Proc.params) {
 			str = write_type_to_string(str, type->Proc.params);
+		}
 		str = gb_string_appendc(str, ")");
 		if (type->Proc.results) {
 			str = gb_string_appendc(str, " -> ");
@@ -2212,6 +2313,32 @@ gbString write_type_to_string(gbString str, Type *type) {
 			str = gb_string_appendc(str, " #cc_fast");
 			break;
 		}
+		break;
+
+	case Type_BitField:
+		str = gb_string_appendc(str, "bit_field ");
+		if (type->BitField.custom_align != 0) {
+			str = gb_string_appendc(str, gb_bprintf("#align %d ", cast(int)type->BitField.custom_align));
+		}
+		str = gb_string_appendc(str, "{");
+
+		for (isize i = 0; i < type->BitField.field_count; i++) {
+			Entity *f = type->BitField.fields[i];
+			GB_ASSERT(f->kind == Entity_Variable);
+			GB_ASSERT(f->type != NULL && f->type->kind == Type_BitFieldValue);
+			str = gb_string_appendc(str, "{");
+			if (i > 0) {
+				str = gb_string_appendc(str, ", ");
+			}
+			str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
+			str = gb_string_appendc(str, " : ");
+			str = gb_string_appendc(str, gb_bprintf("%lld", cast(long long)f->type->BitFieldValue.bits));
+		}
+		str = gb_string_appendc(str, "}");
+		break;
+
+	case Type_BitFieldValue:
+		str = gb_string_appendc(str, gb_bprintf("(bit field value with %lld bits)", cast(int)type->BitFieldValue.bits));
 		break;
 	}
 

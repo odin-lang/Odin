@@ -98,6 +98,11 @@ TypeInfo :: union {
 		generated_struct: ^TypeInfo,
 		count:            int, // == 0 if dynamic
 	},
+	BitField{
+		names:   []string,
+		bits:    []i32,
+		offsets: []i32,
+	},
 }
 
 

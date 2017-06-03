@@ -197,11 +197,13 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		}
 	case Float:
 		match info.size {
+		case 2: write_string(buf, "f16");
 		case 4: write_string(buf, "f32");
 		case 8: write_string(buf, "f64");
 		}
 	case Complex:
 		match info.size {
+		case 4:  write_string(buf, "complex32");
 		case 8:  write_string(buf, "complex64");
 		case 16: write_string(buf, "complex128");
 		}
@@ -625,7 +627,6 @@ fmt_float :: proc(fi: ^FmtInfo, v: f64, bit_size: int, verb: rune) {
 
 	case:
 		fmt_bad_verb(fi, verb);
-		return;
 	}
 }
 fmt_string :: proc(fi: ^FmtInfo, s: string, verb: rune) {
@@ -928,6 +929,11 @@ fmt_complex :: proc(fi: ^FmtInfo, c: complex128, bits: int, verb: rune) {
 _u128_to_lo_hi :: proc(a: u128) -> (lo, hi: u64) { return u64(a), u64(a>>64); }
 _i128_to_lo_hi :: proc(a: u128) -> (lo: u64 hi: i64) { return u64(a), i64(a>>64); }
 
+
+do_foo :: proc(fi: ^FmtInfo, f: f64) {
+	fmt_string(fi, "Hellope$%!", 'v');
+}
+
 fmt_arg :: proc(fi: ^FmtInfo, arg: any, verb: rune) {
 	if arg == nil {
 		write_string(fi.buf, "<nil>");
@@ -950,8 +956,10 @@ fmt_arg :: proc(fi: ^FmtInfo, arg: any, verb: rune) {
 	match a in base_arg {
 	case any:           fmt_arg(fi, a, verb);
 	case bool:          fmt_bool(fi, a, verb);
+
 	case f32:           fmt_float(fi, f64(a), 32, verb);
-	case f64:           fmt_float(fi, a, 64, verb);
+	case f64:           fmt_float(fi, a,      64, verb);
+
 	case complex64:     fmt_complex(fi, complex128(a), 64, verb);
 	case complex128:    fmt_complex(fi, a, 128, verb);
 

@@ -193,9 +193,11 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		case Basic_i128:   ir_fprintf(f, "i128");                     return;
 		case Basic_u128:   ir_fprintf(f, "i128");                     return;
 
+		// case Basic_f16:    ir_fprintf(f, "half");                     return;
 		case Basic_f32:    ir_fprintf(f, "float");                    return;
 		case Basic_f64:    ir_fprintf(f, "double");                   return;
 
+		// case Basic_complex32:  ir_fprintf(f, "%%..complex32");        return;
 		case Basic_complex64:  ir_fprintf(f, "%%..complex64");        return;
 		case Basic_complex128: ir_fprintf(f, "%%..complex128");       return;
 
@@ -348,6 +350,12 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		GB_ASSERT(t->Map.generated_struct_type != NULL);
 		ir_print_type(f, m, t->Map.generated_struct_type);
 	} break;
+
+	case Type_BitField: {
+		i64 align = type_align_of(heap_allocator(), t);
+		i64 size  = type_size_of(heap_allocator(),  t);
+		ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align, size);
+	} break;
 	}
 }
 
@@ -426,12 +434,17 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			// IMPORTANT NOTE(bill): LLVM requires all floating point constants to be
 			// a 64 bit number if bits_of(float type) <= 64.
 			// https://groups.google.com/forum/#!topic/llvm-dev/IlqV3TbSk6M
-			// 64 bit mantiir: 52 bits
-			// 32 bit mantiir: 23 bits
+			// 64 bit mantissa: 52 bits
+			// 32 bit mantissa: 23 bits
+			// 16 bit mantissa: 10 bits
 			// 29 == 52-23
 			u >>= 29;
 			u <<= 29;
 			break;
+		// case Basic_f16:
+			// u >>= 42;
+			// u <<= 42;
+			// break;
 		}
 
 		switch (type->Basic.kind) {
@@ -1568,6 +1581,8 @@ void print_llvm_ir(irGen *ir) {
 	ir_print_encoded_local(f, str_lit("..rawptr"));
 	ir_fprintf(f, " = type i8* ; Basic_rawptr\n");
 
+	ir_print_encoded_local(f, str_lit("..complex32"));
+	ir_fprintf(f, " = type {half, half} ; Basic_complex32\n");
 	ir_print_encoded_local(f, str_lit("..complex64"));
 	ir_fprintf(f, " = type {float, float} ; Basic_complex64\n");
 	ir_print_encoded_local(f, str_lit("..complex128"));

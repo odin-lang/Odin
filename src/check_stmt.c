@@ -207,7 +207,6 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 		return NULL;
 	}
 
-
 	if (rhs->mode == Addressing_Overload) {
 		isize overload_count = rhs->overload_count;
 		Entity **procs = rhs->overload_entities;
@@ -256,8 +255,42 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 	case Addressing_Invalid:
 		return NULL;
 
-	case Addressing_Variable:
+	case Addressing_Variable: {
+		if (is_type_bit_field_value(lhs.type)) {
+			Type *lt = base_type(lhs.type);
+			i64 lhs_bits = lt->BitFieldValue.bits;
+			if (rhs->mode == Addressing_Constant) {
+				ExactValue v = exact_value_to_integer(rhs->value);
+				if (v.kind == ExactValue_Integer) {
+					i128 i = v.value_integer;
+					u128 u = *cast(u128 *)&i;
+					u128 umax = U128_NEG_ONE;
+					if (lhs_bits < 128) {
+						umax = u128_sub(u128_shl(U128_ONE, lhs_bits), U128_ONE);
+					}
+					i128 imax = i128_shl(I128_ONE, lhs_bits-1ll);
+
+					bool ok = false;
+					ok = !(u128_lt(u, U128_ZERO) || u128_gt(u, umax));
+
+					if (ok) {
+						return rhs->type;
+					}
+				}
+			} else if (is_type_integer(rhs->type)) {
+				// TODO(bill): Any other checks?
+				return rhs->type;
+			}
+			gbString lhs_expr = expr_to_string(lhs.expr);
+			gbString rhs_expr = expr_to_string(rhs->expr);
+			error_node(rhs->expr, "Cannot assign `%s` to bit field `%s`", rhs_expr, lhs_expr);
+			gb_string_free(rhs_expr);
+			gb_string_free(lhs_expr);
+			return NULL;
+		}
 		break;
+	}
+
 	case Addressing_MapIndex: {
 		AstNode *ln = unparen_expr(lhs_node);
 		if (ln->kind == AstNode_IndexExpr) {

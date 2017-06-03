@@ -397,6 +397,11 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		AstNode *base_type; \
 		AstNodeArray fields; /* FieldValue */ \
 	}) \
+	AST_NODE_KIND(BitFieldType, "bit field type", struct { \
+		Token token; \
+		AstNodeArray fields; /* FieldValue with : */ \
+		AstNode *align; \
+	}) \
 	AST_NODE_KIND(MapType, "map type", struct { \
 		Token token; \
 		AstNode *count; \
@@ -547,6 +552,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_UnionType:        return node->UnionType.token;
 	case AstNode_RawUnionType:     return node->RawUnionType.token;
 	case AstNode_EnumType:         return node->EnumType.token;
+	case AstNode_BitFieldType:     return node->BitFieldType.token;
 	case AstNode_MapType:          return node->MapType.token;
 	}
 
@@ -804,6 +810,9 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		n->EnumType.base_type = clone_ast_node(a, n->EnumType.base_type);
 		n->EnumType.fields    = clone_ast_node_array(a, n->EnumType.fields);
 		break;
+	case AstNode_BitFieldType:
+		n->BitFieldType.fields = clone_ast_node_array(a, n->BitFieldType.fields);
+		n->BitFieldType.align = clone_ast_node(a, n->BitFieldType.align);
 	case AstNode_MapType:
 		n->MapType.count = clone_ast_node(a, n->MapType.count);
 		n->MapType.key   = clone_ast_node(a, n->MapType.key);
@@ -1384,6 +1393,14 @@ AstNode *ast_enum_type(AstFile *f, Token token, AstNode *base_type, AstNodeArray
 	return result;
 }
 
+AstNode *ast_bit_field_type(AstFile *f, Token token, AstNodeArray fields, AstNode *align) {
+	AstNode *result = make_ast_node(f, AstNode_BitFieldType);
+	result->BitFieldType.token = token;
+	result->BitFieldType.fields = fields;
+	result->BitFieldType.align = align;
+	return result;
+}
+
 AstNode *ast_map_type(AstFile *f, Token token, AstNode *count, AstNode *key, AstNode *value) {
 	AstNode *result = make_ast_node(f, AstNode_MapType);
 	result->MapType.token = token;
@@ -1622,6 +1639,7 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 	case AstNode_UnionType:
 	case AstNode_RawUnionType:
 	case AstNode_EnumType:
+	case AstNode_BitFieldType:
 		return true;
 	case AstNode_ProcLit:
 		return s->ProcLit.body != NULL;
@@ -3126,6 +3144,51 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		Token close = expect_token(f, Token_CloseBrace);
 
 		return ast_enum_type(f, token, base_type, values);
+	}
+
+	case Token_bit_field: {
+		Token token = expect_token(f, Token_bit_field);
+		AstNodeArray fields = make_ast_node_array(f);
+		AstNode *align = NULL;
+		Token open, close;
+
+		isize prev_level = f->expr_level;
+		f->expr_level = -1;
+
+		while (allow_token(f, Token_Hash)) {
+			Token tag = expect_token_after(f, Token_Ident, "#");
+			if (str_eq(tag.string, str_lit("align"))) {
+				if (align) {
+					syntax_error(tag, "Duplicate bit_field tag `#%.*s`", LIT(tag.string));
+				}
+				align = parse_expr(f, true);
+			} else {
+				syntax_error(tag, "Invalid bit_field tag `#%.*s`", LIT(tag.string));
+			}
+		}
+
+		f->expr_level = prev_level;
+
+		open = expect_token_after(f, Token_OpenBrace, "bit_field");
+
+		while (f->curr_token.kind != Token_EOF &&
+		       f->curr_token.kind != Token_CloseBrace) {
+			AstNode *name = parse_ident(f);
+			Token colon = expect_token(f, Token_Colon);
+			AstNode *value = parse_expr(f, true);
+
+			AstNode *field = ast_field_value(f, name, value, colon);
+			array_add(&fields, field);
+
+			if (f->curr_token.kind != Token_Comma) {
+				break;
+			}
+			next_token(f);
+		}
+
+		close = expect_token(f, Token_CloseBrace);
+
+		return ast_bit_field_type(f, token, fields, align);
 	}
 
 	case Token_proc: {

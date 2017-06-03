@@ -2289,7 +2289,7 @@ void ssa_print_exact_value(gbFile *f, ssaValue *v) {
 			u64 x = *cast(u64 *)&fp;
 			gb_fprintf(f, " [0x%llx]", cast(unsigned long long)x);
 		} else {
-			GB_PANIC("unhandled integer");
+			GB_PANIC("unhandled float");
 		}
 		break;
 	case ExactValue_String:

@@ -28,35 +28,164 @@ _digit_value :: proc(r: rune) -> (int) {
 	return v;
 }
 
-parse_i64 :: proc(s: string, base: int) -> i64 {
-	result: i64;
+parse_i128 :: proc(s: string) -> i128 {
+	neg := false;
+	if len(s) > 1 {
+		match s[0] {
+		case '-':
+			neg = true;
+			s = s[1..];
+		case '+':
+			s = s[1..];
+		}
+	}
+
+
+	base: i128 = 10;
+	if len(s) > 2 && s[0] == '0' {
+		match s[1] {
+		case 'b': base =  2;  s = s[2..];
+		case 'o': base =  8;  s = s[2..];
+		case 'd': base = 10;  s = s[2..];
+		case 'z': base = 12;  s = s[2..];
+		case 'x': base = 16;  s = s[2..];
+		}
+	}
+
+
+	value: i128;
 	for r in s {
-		v := _digit_value(r);
+		if r == '_' {
+			continue;
+		}
+
+		v := i128(_digit_value(r));
 		if v >= base {
 			break;
 		}
-		result *= i64(base);
-		result += i64(v);
+		value *= base;
+		value += v;
 	}
-	return result;
+
+	return neg ? -value : value;
 }
-parse_u64 :: proc(s: string, base: int) -> u64 {
-	result: u64;
+
+parse_u128 :: proc(s: string) -> u128 {
+	neg := false;
+	if len(s) > 1 && s[0] == '+' {
+		s = s[1..];
+	}
+
+
+	base: = u128(10);
+	if len(s) > 2 && s[0] == '0' {
+		match s[1] {
+		case 'b': base =  2;  s = s[2..];
+		case 'o': base =  8;  s = s[2..];
+		case 'd': base = 10;  s = s[2..];
+		case 'z': base = 12;  s = s[2..];
+		case 'x': base = 16;  s = s[2..];
+		}
+	}
+
+
+	value: u128;
 	for r in s {
-		v := _digit_value(r);
+		if r == '_' {
+			continue;
+		}
+
+		v := u128(_digit_value(r));
 		if v >= base {
 			break;
 		}
-		result *= u64(base);
-		result += u64(v);
+		value *= base;
+		value += u128(v);
 	}
-	return result;
+
+	return neg ? -value : value;
 }
-parse_int :: proc(s: string, base: int) -> int {
-	return int(parse_i64(s, base));
+
+
+parse_int :: proc(s: string) -> int {
+	return int(parse_i128(s));
 }
 parse_uint :: proc(s: string, base: int) -> uint {
-	return uint(parse_u64(s, base));
+	return uint(parse_u128(s));
+}
+
+parse_f64 :: proc(s: string) -> f64 {
+	i := 0;
+
+	sign: f64 = 1;
+	match s[i] {
+	case '-': i++; sign = -1;
+	case '+': i++;
+	}
+
+	value: f64 = 0;
+	for ; i < len(s); i++ {
+		r := rune(s[i]);
+		if r == '_' {
+			continue;
+		}
+		v := _digit_value(r);
+		if v >= 10 {
+			break;
+		}
+		value *= 10;
+		value += f64(v);
+	}
+
+	if s[i] == '.' {
+		pow10: f64 = 10;
+		i++;
+
+		for ; i < len(s); i++ {
+			r := rune(s[i]);
+			if r == '_' {
+				continue;
+			}
+			v := _digit_value(r);
+			if v >= 10 {
+				break;
+			}
+			value += f64(v)/pow10;
+			pow10 *= 10;
+		}
+	}
+
+	frac := false;
+	scale: f64 = 1;
+
+	if s[i] == 'e' || s[i] == 'E' {
+		i++;
+
+		match s[i] {
+		case '-': i++; frac = true;
+		case '+': i++;
+		}
+
+		exp: u32 = 0;
+		for ; i < len(s); i++ {
+			r := rune(s[i]);
+			if r == '_' {
+				continue;
+			}
+			d := u32(_digit_value(r));
+			if d >= 10 {
+				break;
+			}
+			exp = exp * 10 + d;
+		}
+		if exp > 308 { exp = 308; }
+
+		for exp >= 50 { scale *= 1e50; exp -= 50; }
+		for exp >=  8 { scale *=  1e8; exp -=  8; }
+		for exp >   0 { scale *=   10; exp -=  1; }
+	}
+
+	return sign * (frac ? (value/scale) : (value*scale));
 }
 
 
@@ -81,7 +210,7 @@ append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> str
 
 
 
-Decimal_Slice :: struct {
+DecimalSlice :: struct {
 	digits:        []byte,
 	count:         int,
 	decimal_point: int,
@@ -94,8 +223,9 @@ Float_Info :: struct {
 	bias:     int,
 }
 
-f32_info := Float_Info{23, 8, -127};
-f64_info := Float_Info{52, 11, -1023};
+_f16_info := Float_Info{10, 5,   -15};
+_f32_info := Float_Info{23, 8,  -127};
+_f64_info := Float_Info{52, 11, -1023};
 
 
 generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> []byte {
@@ -104,10 +234,10 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 	match bit_size {
 	case 32:
 		bits = u64(transmute(u32, f32(val)));
-		flt = &f32_info;
+		flt = &_f32_info;
 	case 64:
 		bits = transmute(u64, val);
-		flt = &f64_info;
+		flt = &_f64_info;
 	case:
 		panic("strconv: invalid bit_size");
 	}
@@ -142,11 +272,11 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 	d := &d_;
 	assign(d, mant);
 	shift(d, exp - int(flt.mantbits));
-	digs: Decimal_Slice;
+	digs: DecimalSlice;
 	shortest := prec < 0;
 	if shortest {
 		round_shortest(d, mant, exp, flt);
-		digs = Decimal_Slice{digits = d.digits[..], count = d.count, decimal_point = d.decimal_point};
+		digs = DecimalSlice{digits = d.digits[..], count = d.count, decimal_point = d.decimal_point};
 		match fmt {
 		case 'e', 'E': prec = digs.count-1;
 		case 'f', 'F': prec = max(digs.count-digs.decimal_point, 0);
@@ -163,14 +293,14 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 			round(d, prec);
 		}
 
-		digs = Decimal_Slice{digits = d.digits[..], count = d.count, decimal_point = d.decimal_point};
+		digs = DecimalSlice{digits = d.digits[..], count = d.count, decimal_point = d.decimal_point};
 	}
 	return format_digits(buf, shortest, neg, digs, prec, fmt);
 }
 
 
 
-format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, prec: int, fmt: byte) -> []byte {
+format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: DecimalSlice, prec: int, fmt: byte) -> []byte {
 	match fmt {
 	case 'f', 'F':
 		append(buf, neg ? '-' : '+');
@@ -190,7 +320,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 		// fractional part
 		if prec > 0 {
 			append(buf, '.');
-			for i in 0..prec {
+			for i in 0..<prec {
 				c: byte = '0';
 				if j := digs.decimal_point + i; 0 <= j && j < digs.count {
 					c = digs.digits[j];

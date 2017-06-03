@@ -33,17 +33,18 @@ String const entity_strings[] = {
 };
 
 typedef enum EntityFlag {
-	EntityFlag_Visited    = 1<<0,
-	EntityFlag_Used       = 1<<1,
-	EntityFlag_Using      = 1<<2,
-	EntityFlag_Field      = 1<<3,
-	EntityFlag_Param      = 1<<4,
-	EntityFlag_VectorElem = 1<<5,
-	EntityFlag_Ellipsis   = 1<<6,
-	EntityFlag_NoAlias    = 1<<7,
-	EntityFlag_TypeField  = 1<<8,
-	EntityFlag_Value      = 1<<9,
-	EntityFlag_Sret       = 1<<10,
+	EntityFlag_Visited       = 1<<0,
+	EntityFlag_Used          = 1<<1,
+	EntityFlag_Using         = 1<<2,
+	EntityFlag_Field         = 1<<3,
+	EntityFlag_Param         = 1<<4,
+	EntityFlag_VectorElem    = 1<<5,
+	EntityFlag_Ellipsis      = 1<<6,
+	EntityFlag_NoAlias       = 1<<7,
+	EntityFlag_TypeField     = 1<<8,
+	EntityFlag_Value         = 1<<9,
+	EntityFlag_Sret          = 1<<10,
+	EntityFlag_BitFieldValue = 1<<11,
 } EntityFlag;
 
 // Zero value means the overloading process is not yet done

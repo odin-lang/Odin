@@ -404,6 +404,7 @@ typedef enum irAddrKind {
 	irAddr_Default,
 	// irAddr_Vector,
 	irAddr_Map,
+	irAddr_BitField,
 } irAddrKind;
 
 typedef struct irAddr {
@@ -414,6 +415,9 @@ typedef struct irAddr {
 			irValue *map_key;
 			Type *   map_type;
 			Type *   map_result;
+		};
+		struct {
+			i32      bit_field_value_index;
 		};
 	};
 	// union {
@@ -431,6 +435,12 @@ irAddr ir_addr_map(irValue *addr, irValue *map_key, Type *map_type, Type *map_re
 	v.map_key    = map_key;
 	v.map_type   = map_type;
 	v.map_result = map_result;
+	return v;
+}
+
+irAddr ir_addr_bit_field(irValue *addr, isize bit_field_value_index) {
+	irAddr v = {irAddr_BitField, addr};
+	v.bit_field_value_index = bit_field_value_index;
 	return v;
 }
 
@@ -1078,8 +1088,11 @@ irValue *ir_emit(irProcedure *proc, irValue *instr) {
 irValue *ir_const_int(gbAllocator a, i64 i) {
 	return ir_value_constant(a, t_int, exact_value_i64(i));
 }
-irValue *ir_const_i32(gbAllocator a, i64 i) {
+irValue *ir_const_i32(gbAllocator a, i32 i) {
 	return ir_value_constant(a, t_i32, exact_value_i64(i));
+}
+irValue *ir_const_u32(gbAllocator a, u32 i) {
+	return ir_value_constant(a, t_u32, exact_value_i64(i));
 }
 irValue *ir_const_i64(gbAllocator a, i64 i) {
 	return ir_value_constant(a, t_i64, exact_value_i64(i));
@@ -1734,12 +1747,82 @@ irValue *ir_insert_dynamic_map_key_and_value(irProcedure *proc, irValue *addr, T
 }
 
 
+irValue *ir_emit_ptr_offset(irProcedure *proc, irValue *ptr, irValue *offset);
+irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *right, Type *type);
+
 irValue *ir_addr_store(irProcedure *proc, irAddr addr, irValue *value) {
 	if (addr.addr == NULL) {
 		return NULL;
 	}
 	if (addr.kind == irAddr_Map) {
 		return ir_insert_dynamic_map_key_and_value(proc, addr.addr, addr.map_type, addr.map_key, value);
+	} else if (addr.kind == irAddr_BitField) {
+		gbAllocator a = proc->module->allocator;
+
+		Type *bft = base_type(type_deref(ir_type(addr.addr)));
+		GB_ASSERT(is_type_bit_field(bft));
+		i32 value_index = addr.bit_field_value_index;
+		i32 offset = bft->BitField.offsets[value_index];
+		i32 size_in_bits = bft->BitField.fields[value_index]->type->BitFieldValue.bits;
+
+		i32 byte_index = offset / 8;
+		i32 bit_inset = offset % 8;
+
+		i32 size_in_bytes = next_pow2((size_in_bits+7)/8);
+		if (size_in_bytes == 0) {
+			GB_ASSERT(size_in_bits == 0);
+			return NULL;
+		}
+
+		Type *int_type = NULL;
+		switch (size_in_bytes) {
+		case 1:  int_type = t_u8;   break;
+		case 2:  int_type = t_u16;  break;
+		case 4:  int_type = t_u32;  break;
+		case 8:  int_type = t_u64;  break;
+		case 16: int_type = t_u128; break;
+		}
+		GB_ASSERT(int_type != NULL);
+
+		value = ir_emit_conv(proc, value, int_type);
+
+		irValue *bytes = ir_emit_conv(proc, addr.addr, t_u8_ptr);
+		bytes = ir_emit_ptr_offset(proc, bytes, ir_const_int(a, byte_index));
+
+
+		if (bit_inset == 0) {
+			irValue *v = value;
+			i32 sa = 8*size_in_bytes - size_in_bits;
+			if (sa > 0) {
+				irValue *shift_amount = ir_const_int(a, sa);
+				v = ir_emit_arith(proc, Token_Shl, v, shift_amount, int_type);
+				v = ir_emit_arith(proc, Token_Shr, v, shift_amount, int_type);
+			}
+			irValue *ptr = ir_emit_conv(proc, bytes, make_type_pointer(a, int_type));
+			v = ir_emit_arith(proc, Token_Or, ir_emit_load(proc, ptr), v, int_type);
+			return ir_emit_store(proc, ptr, v);
+		}
+
+
+		// First byte
+		{
+			i32 sa = 8 - bit_inset;
+			irValue *shift_amount = ir_const_int(a, sa);
+			irValue *v = ir_emit_conv(proc, value, t_u8);
+			v = ir_emit_arith(proc, Token_Shl, v, shift_amount, int_type);
+			v = ir_emit_arith(proc, Token_Or, ir_emit_load(proc, bytes), v, int_type);
+			ir_emit_store(proc, bytes, v);
+
+		}
+
+		// Remaining bytes
+		{
+			irValue *shift_amount = ir_const_int(a, bit_inset);
+			irValue *ptr = ir_emit_conv(proc, ir_emit_ptr_offset(proc, bytes, v_one), make_type_pointer(a, int_type));
+			irValue *v = ir_emit_arith(proc, Token_Shr, value, shift_amount, int_type);
+			v = ir_emit_arith(proc, Token_Or, ir_emit_load(proc, ptr), v, int_type);
+			return ir_emit_store(proc, ptr, v);
+		}
 	}
 
 	irValue *v = ir_emit_conv(proc, value, ir_addr_type(addr));
@@ -1787,12 +1870,62 @@ irValue *ir_addr_load(irProcedure *proc, irAddr addr) {
 			irValue *single = ir_emit_struct_ep(proc, v, 0);
 			return ir_emit_load(proc, single);
 		}
+	} else if (addr.kind == irAddr_BitField) {
+		gbAllocator a = proc->module->allocator;
+
+
+		Type *bft = base_type(type_deref(ir_type(addr.addr)));
+		GB_ASSERT(is_type_bit_field(bft));
+		i32 value_index = addr.bit_field_value_index;
+		i32 offset = bft->BitField.offsets[value_index];
+		i32 size_in_bits = bft->BitField.fields[value_index]->type->BitFieldValue.bits;
+
+		i32 byte_index = offset / 8;
+		i32 bit_inset = offset % 8;
+
+		i32 size_in_bytes = next_pow2((size_in_bits+7)/8);
+		if (size_in_bytes == 0) {
+			GB_ASSERT(size_in_bits == 0);
+			return ir_const_i32(a, 0);
+		}
+
+		Type *int_type = NULL;
+		switch (size_in_bytes) {
+		case 1:  int_type = t_u8;   break;
+		case 2:  int_type = t_u16;  break;
+		case 4:  int_type = t_u32;  break;
+		case 8:  int_type = t_u64;  break;
+		case 16: int_type = t_u128; break;
+		}
+		GB_ASSERT(int_type != NULL);
+
+
+		irValue *bytes = ir_emit_conv(proc, addr.addr, t_u8_ptr);
+		bytes = ir_emit_ptr_offset(proc, bytes, ir_const_int(a, byte_index));
+
+		Type *int_ptr = make_type_pointer(a, int_type);
+
+		if (bit_inset == 0) {
+			irValue *v = ir_emit_load(proc, ir_emit_conv(proc, bytes, int_ptr));
+			i32 sa = 8*size_in_bytes - size_in_bits;
+			if (sa > 0) {
+				irValue *shift_amount = ir_const_int(a, sa);
+				v = ir_emit_arith(proc, Token_Shl, v, shift_amount, int_type);
+				v = ir_emit_arith(proc, Token_Shr, v, shift_amount, int_type);
+			}
+			return v;
+		}
+
+
+		irValue *first_byte = ir_emit_load(proc, bytes);
+		irValue *res = ir_emit_arith(proc, Token_Shr, first_byte, ir_const_int(a, 8 - bit_inset), int_type);
+
+		irValue *remaining_bytes = ir_emit_load(proc, ir_emit_conv(proc, ir_emit_ptr_offset(proc, bytes, v_one), int_ptr));
+		remaining_bytes = ir_emit_arith(proc, Token_Shl, remaining_bytes, ir_const_int(a, bit_inset), int_type);
+		return ir_emit_arith(proc, Token_Or, res, remaining_bytes, int_type);
+
 	}
 
-	// if (addr.kind == irAddr_Vector) {
-		// irValue *v = ir_emit_load(proc, addr.addr);
-		// return ir_emit(proc, ir_instr_extract_element(proc, v, addr.Vector.index));
-	// }
 	Type *t = base_type(ir_type(addr.addr));
 	if (t->kind == Type_Proc) {
 		// NOTE(bill): Imported procedures don't require a load as they are pointers
@@ -2664,8 +2797,39 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 	// float -> float
 	if (is_type_float(src) && is_type_float(dst)) {
+		gbAllocator a = proc->module->allocator;
 		i64 sz = type_size_of(proc->module->allocator, src);
 		i64 dz = type_size_of(proc->module->allocator, dst);
+		if (sz == 2) {
+			switch (dz) {
+			case 2: return value;
+			case 4: {
+				irValue **args = gb_alloc_array(a, irValue *, 1);
+				args[0] = value;
+				return ir_emit_global_call(proc, "__gnu_h2f_ieee", args, 1);
+			} break;
+			case 8: {
+				irValue **args = gb_alloc_array(a, irValue *, 1);
+				args[0] = value;
+				return ir_emit_global_call(proc, "__f16_to_f64", args, 1);
+			} break;
+			}
+		} else if (dz == 2) {
+			switch (sz) {
+			case 2: return value;
+			case 4: {
+				irValue **args = gb_alloc_array(a, irValue *, 1);
+				args[0] = value;
+				return ir_emit_global_call(proc, "__gnu_f2h_ieee", args, 1);
+			} break;
+			case 8: {
+				irValue **args = gb_alloc_array(a, irValue *, 1);
+				args[0] = value;
+				return ir_emit_global_call(proc, "__truncdfhf2", args, 1);
+			} break;
+			}
+		}
+
 		irConvKind kind = irConv_fptrunc;
 		if (dz >= sz) {
 			kind = irConv_fpext;
@@ -2878,6 +3042,7 @@ bool ir_is_type_aggregate(Type *t) {
 		case Basic_any:
 			return true;
 
+		// case Basic_complex32:
 		case Basic_complex64:
 		case Basic_complex128:
 			return true;
@@ -3139,7 +3304,7 @@ isize ir_type_info_index(CheckerInfo *info, Type *type) {
 	}
 
 	if (entry_index < 0) {
-		compiler_error("Type_Info for `%s` could not be found", type_to_string(type));
+		compiler_error("TypeInfo for `%s` could not be found", type_to_string(type));
 	}
 	return entry_index;
 }
@@ -4668,9 +4833,18 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			Selection sel = lookup_field(proc->module->allocator, type, selector, false);
 			GB_ASSERT(sel.entity != NULL);
 
-			irValue *a = ir_build_addr(proc, se->expr).addr;
-			a = ir_emit_deep_field_gep(proc, a, sel);
-			return ir_addr(a);
+			if (sel.entity->type->kind == Type_BitFieldValue) {
+				irAddr addr = ir_build_addr(proc, se->expr);
+				Type *bft = type_deref(ir_addr_type(addr));
+				GB_ASSERT(is_type_bit_field(bft));
+				GB_ASSERT(sel.index.count == 1);
+				i32 index = sel.index.e[0];
+				return ir_addr_bit_field(addr.addr, index);
+			} else {
+				irValue *a = ir_build_addr(proc, se->expr).addr;
+				a = ir_emit_deep_field_gep(proc, a, sel);
+				return ir_addr(a);
+			}
 		} else {
 			Type *type = type_deref(type_of_expr(proc->module->info, se->expr));
 			Type *selector_type = base_type(type_of_expr(proc->module->info, se->selector));
@@ -7311,7 +7485,7 @@ void ir_gen_tree(irGen *s) {
 
 				switch (t->kind) {
 				case Type_Named: {
-					ir_emit_comment(proc, str_lit("Type_Info_Named"));
+					ir_emit_comment(proc, str_lit("TypeInfoNamed"));
 					tag = ir_emit_conv(proc, ti_ptr, t_type_info_named_ptr);
 
 					// TODO(bill): Which is better? The mangled name or actual name?
@@ -7323,11 +7497,12 @@ void ir_gen_tree(irGen *s) {
 				} break;
 
 				case Type_Basic:
-					ir_emit_comment(proc, str_lit("Type_Info_Basic"));
+					ir_emit_comment(proc, str_lit("TypeInfoBasic"));
 					switch (t->Basic.kind) {
 					case Basic_bool:
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_boolean_ptr);
 						break;
+
 					case Basic_i8:
 					case Basic_u8:
 					case Basic_i16:
@@ -7341,20 +7516,21 @@ void ir_gen_tree(irGen *s) {
 					case Basic_int:
 					case Basic_uint: {
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_integer_ptr);
-						bool is_unsigned = (t->Basic.flags & BasicFlag_Unsigned) != 0;
-						irValue *is_signed = ir_const_bool(a, !is_unsigned);
+						irValue *is_signed = ir_const_bool(a, (t->Basic.flags & BasicFlag_Unsigned) == 0);
 						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), is_signed);
 					} break;
 
+					// case Basic_f16:
 					case Basic_f32:
-					case Basic_f64: {
+					case Basic_f64:
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_float_ptr);
-					} break;
+						break;
 
+					// case Basic_complex32:
 					case Basic_complex64:
-					case Basic_complex128: {
+					case Basic_complex128:
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_complex_ptr);
-					} break;
+						break;
 
 					case Basic_rawptr:
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_pointer_ptr);
@@ -7371,19 +7547,19 @@ void ir_gen_tree(irGen *s) {
 					break;
 
 				case Type_Pointer: {
-					ir_emit_comment(proc, str_lit("Type_Info_Pointer"));
+					ir_emit_comment(proc, str_lit("TypeInfoPointer"));
 					tag = ir_emit_conv(proc, ti_ptr, t_type_info_pointer_ptr);
 					irValue *gep = ir_get_type_info_ptr(proc, t->Pointer.elem);
 					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), gep);
 				} break;
 				case Type_Atomic: {
-					ir_emit_comment(proc, str_lit("Type_Info_Atomic"));
+					ir_emit_comment(proc, str_lit("TypeInfoAtomic"));
 					tag = ir_emit_conv(proc, ti_ptr, t_type_info_atomic_ptr);
 					irValue *gep = ir_get_type_info_ptr(proc, t->Atomic.elem);
 					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), gep);
 				} break;
 				case Type_Array: {
-					ir_emit_comment(proc, str_lit("Type_Info_Array"));
+					ir_emit_comment(proc, str_lit("TypeInfoArray"));
 					tag = ir_emit_conv(proc, ti_ptr, t_type_info_array_ptr);
 					irValue *gep = ir_get_type_info_ptr(proc, t->Array.elem);
 					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), gep);
@@ -7397,7 +7573,7 @@ void ir_gen_tree(irGen *s) {
 
 				} break;
 				case Type_DynamicArray: {
-					ir_emit_comment(proc, str_lit("Type_Info_DynamicArray"));
+					ir_emit_comment(proc, str_lit("TypeInfoDynamicArray"));
 					tag = ir_emit_conv(proc, ti_ptr, t_type_info_dynamic_array_ptr);
 					irValue *gep = ir_get_type_info_ptr(proc, t->DynamicArray.elem);
 					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), gep);
@@ -7407,7 +7583,7 @@ void ir_gen_tree(irGen *s) {
 					ir_emit_store(proc, elem_size, ir_const_int(a, ez));
 				} break;
 				case Type_Slice: {
-					ir_emit_comment(proc, str_lit("Type_Info_Slice"));
+					ir_emit_comment(proc, str_lit("TypeInfoSlice"));
 					tag = ir_emit_conv(proc, ti_ptr, t_type_info_slice_ptr);
 					irValue *gep = ir_get_type_info_ptr(proc, t->Slice.elem);
 					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), gep);
@@ -7417,7 +7593,7 @@ void ir_gen_tree(irGen *s) {
 					ir_emit_store(proc, elem_size, ir_const_int(a, ez));
 				} break;
 				case Type_Vector: {
-					ir_emit_comment(proc, str_lit("Type_Info_Vector"));
+					ir_emit_comment(proc, str_lit("TypeInfoVector"));
 					tag = ir_emit_conv(proc, ti_ptr, t_type_info_vector_ptr);
 					irValue *gep = ir_get_type_info_ptr(proc, t->Vector.elem);
 					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), gep);
@@ -7428,7 +7604,7 @@ void ir_gen_tree(irGen *s) {
 
 				} break;
 				case Type_Proc: {
-					ir_emit_comment(proc, str_lit("Type_Info_Proc"));
+					ir_emit_comment(proc, str_lit("TypeInfoProc"));
 					tag = ir_emit_conv(proc, ti_ptr, t_type_info_procedure_ptr);
 
 					irValue *params     = ir_emit_struct_ep(proc, tag, 2);
@@ -7445,10 +7621,10 @@ void ir_gen_tree(irGen *s) {
 					ir_emit_store(proc, variadic, ir_const_bool(a, t->Proc.variadic));
 					ir_emit_store(proc, convention, ir_const_int(a, t->Proc.calling_convention));
 
-					// TODO(bill): Type_Info for procedures
+					// TODO(bill): TypeInfo for procedures
 				} break;
 				case Type_Tuple: {
-					ir_emit_comment(proc, str_lit("Type_Info_Tuple"));
+					ir_emit_comment(proc, str_lit("TypeInfoTuple"));
 					tag = ir_emit_conv(proc, ti_ptr, t_type_info_tuple_ptr);
 					irValue *record = ir_emit_struct_ep(proc, tag, 2);
 
@@ -7476,7 +7652,7 @@ void ir_gen_tree(irGen *s) {
 				case Type_Record: {
 					switch (t->Record.kind) {
 					case TypeRecord_Struct: {
-						ir_emit_comment(proc, str_lit("Type_Info_Struct"));
+						ir_emit_comment(proc, str_lit("TypeInfoStruct"));
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_struct_ptr);
 						irValue *record = ir_emit_struct_ep(proc, tag, 2);
 
@@ -7523,7 +7699,7 @@ void ir_gen_tree(irGen *s) {
 						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 3), memory_usings,  count, count);
 					} break;
 					case TypeRecord_Union: {
-						ir_emit_comment(proc, str_lit("Type_Info_Union"));
+						ir_emit_comment(proc, str_lit("TypeInfoUnion"));
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_union_ptr);
 
 						{
@@ -7591,7 +7767,7 @@ void ir_gen_tree(irGen *s) {
 
 					} break;
 					case TypeRecord_RawUnion: {
-						ir_emit_comment(proc, str_lit("Type_Info_RawUnion"));
+						ir_emit_comment(proc, str_lit("TypeInfoRawUnion"));
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_raw_union_ptr);
 						irValue *record = ir_emit_struct_ep(proc, tag, 2);
 
@@ -7618,7 +7794,7 @@ void ir_gen_tree(irGen *s) {
 						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 2), memory_offsets, count, count);
 					} break;
 					case TypeRecord_Enum:
-						ir_emit_comment(proc, str_lit("Type_Info_Enum"));
+						ir_emit_comment(proc, str_lit("TypeInfoEnum"));
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_enum_ptr);
 						{
 							GB_ASSERT(t->Record.enum_base_type != NULL);
@@ -7659,22 +7835,18 @@ void ir_gen_tree(irGen *s) {
 
 								irValue *names = ir_emit_struct_ep(proc, tag, 3);
 								irValue *name_array_elem = ir_array_elem(proc, name_array);
-
-								ir_emit_store(proc, ir_emit_struct_ep(proc, names, 0), name_array_elem);
-								ir_emit_store(proc, ir_emit_struct_ep(proc, names, 1), v_count);
+								ir_fill_slice(proc, names, name_array_elem, v_count, v_count);
 
 								irValue *values = ir_emit_struct_ep(proc, tag, 4);
 								irValue *value_array_elem = ir_array_elem(proc, value_array);
-
-								ir_emit_store(proc, ir_emit_struct_ep(proc, values, 0), value_array_elem);
-								ir_emit_store(proc, ir_emit_struct_ep(proc, values, 1), v_count);
+								ir_fill_slice(proc, values, value_array_elem, v_count, v_count);
 							}
 						}
 						break;
 					}
 				} break;
 				case Type_Map: {
-					ir_emit_comment(proc, str_lit("Type_Info_Map"));
+					ir_emit_comment(proc, str_lit("TypeInfoMap"));
 					tag = ir_emit_conv(proc, ti_ptr, t_type_info_map_ptr);
 
 					irValue *key              = ir_emit_struct_ep(proc, tag, 2);
@@ -7686,6 +7858,49 @@ void ir_gen_tree(irGen *s) {
 					ir_emit_store(proc, value,            ir_get_type_info_ptr(proc, t->Map.value));
 					ir_emit_store(proc, generated_struct, ir_get_type_info_ptr(proc, t->Map.generated_struct_type));
 					ir_emit_store(proc, count,            ir_const_int(a, t->Map.count));
+				} break;
+
+				case Type_BitField: {
+					ir_emit_comment(proc, str_lit("TypeInfoBitField"));
+					tag = ir_emit_conv(proc, ti_ptr, t_type_info_map_ptr);
+					// names:   []string,
+					// bits:    []u32,
+					// offsets: []u32,
+					isize count = t->BitField.field_count;
+					if (count > 0) {
+						Entity **fields = t->BitField.fields;
+						irValue *name_array   = ir_generate_array(m, t_string, count, str_lit("__$bit_field_names"),   cast(i64)entry_index);
+						irValue *bit_array    = ir_generate_array(m, t_u32,    count, str_lit("__$bit_field_bits"),    cast(i64)entry_index);
+						irValue *offset_array = ir_generate_array(m, t_u32,    count, str_lit("__$bit_field_offsets"), cast(i64)entry_index);
+
+						for (isize i = 0; i < count; i++) {
+							Entity *f = fields[i];
+							GB_ASSERT(f->type != NULL);
+							GB_ASSERT(f->type->kind == Type_BitFieldValue);
+							irValue *name_ep   = ir_emit_array_epi(proc, name_array,   i);
+							irValue *bit_ep    = ir_emit_array_epi(proc, bit_array,    i);
+							irValue *offset_ep = ir_emit_array_epi(proc, offset_array, i);
+
+							ir_emit_store(proc, name_ep, ir_const_string(a, f->token.string));
+							ir_emit_store(proc, bit_ep, ir_const_u32(a, f->type->BitFieldValue.bits));
+							ir_emit_store(proc, offset_ep, ir_const_u32(a, t->BitField.offsets[i]));
+
+						}
+
+						irValue *v_count = ir_const_int(a, count);
+
+						irValue *names = ir_emit_struct_ep(proc, tag, 3);
+						irValue *name_array_elem = ir_array_elem(proc, name_array);
+						ir_fill_slice(proc, names, name_array_elem, v_count, v_count);
+
+						irValue *bits = ir_emit_struct_ep(proc, tag, 4);
+						irValue *bit_array_elem = ir_array_elem(proc, bit_array);
+						ir_fill_slice(proc, bits, bit_array_elem, v_count, v_count);
+
+						irValue *offsets = ir_emit_struct_ep(proc, tag, 5);
+						irValue *offset_array_elem = ir_array_elem(proc, offset_array);
+						ir_fill_slice(proc, offsets, offset_array_elem, v_count, v_count);
+					}
 				} break;
 				}
 
@@ -7707,7 +7922,7 @@ void ir_gen_tree(irGen *s) {
 					}
 					GB_ASSERT_MSG(found, "%s", type_to_string(tag_type));
 				} else {
-					GB_PANIC("Unhandled Type_Info type: %s", type_to_string(t));
+					GB_PANIC("Unhandled TypeInfo type: %s", type_to_string(t));
 				}
 			}
 		}

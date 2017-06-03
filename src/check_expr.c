@@ -192,6 +192,18 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		return 1;
 	}
 
+
+	if (is_type_bit_field_value(operand->type) && is_type_integer(type)) {
+		Type *bfv = base_type(operand->type);
+		i32 bits = bfv->BitFieldValue.bits;
+		i32 size = next_pow2((bits+7)/8);
+		i32 dst_size = type_size_of(c->allocator, type);
+		i32 diff = gb_abs(dst_size - size);
+		// TODO(bill): figure out a decent rule here
+		return 1;
+	}
+
+
 	if (check_is_assignable_to_using_subtype(operand->type, type)) {
 		return 4;
 	}
@@ -301,10 +313,10 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 		}
 	}
 
-
 	if (type == NULL) {
 		return;
 	}
+
 	if (!check_is_assignable_to(c, operand, type)) {
 		gbString type_str    = type_to_string(type);
 		gbString op_type_str = type_to_string(operand->type);
@@ -899,6 +911,119 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 
 	enum_type->Record.names = make_names_field_for_record(c, c->context.scope);
 }
+
+
+void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, AstNode *node) {
+	ast_node(bft, BitFieldType, node);
+	GB_ASSERT(is_type_bit_field(bit_field_type));
+
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+
+
+	MapEntity entity_map = {0}; // Key: String
+	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*(bft->fields.count));
+
+	isize field_count = 0;
+	Entity **fields  = gb_alloc_array(c->allocator, Entity *, bft->fields.count);
+	u32 *    sizes   = gb_alloc_array(c->allocator, u32,      bft->fields.count);
+	u32 *    offsets = gb_alloc_array(c->allocator, u32,      bft->fields.count);
+
+	u32 curr_offset = 0;
+	for_array(i, bft->fields) {
+		AstNode *field = bft->fields.e[i];
+		GB_ASSERT(field->kind == AstNode_FieldValue);
+		AstNode *ident = field->FieldValue.field;
+		AstNode *value = field->FieldValue.value;
+
+		if (ident->kind != AstNode_Ident) {
+			error_node(field, "A bit field value's name must be an identifier");
+			continue;
+		}
+		String name = ident->Ident.string;
+
+		Operand o = {0};
+		check_expr(c, &o, value);
+		if (o.mode != Addressing_Constant) {
+			error_node(value, "Bit field bit size must be a constant");
+			continue;
+		}
+		ExactValue v = exact_value_to_integer(o.value);
+		if (v.kind != ExactValue_Integer) {
+			error_node(value, "Bit field bit size must be a constant integer");
+			continue;
+		}
+		i64 bits = i128_to_i64(v.value_integer);
+		if (bits < 0 || bits > 128) {
+			error_node(value, "Bit field's bit size must be within the range 1..<128, got %lld", cast(long long)bits);
+			continue;
+		}
+
+		Type *value_type = make_type_bit_field_value(c->allocator, bits);
+		Entity *e = make_entity_variable(c->allocator, bit_field_type->BitField.scope, ident->Ident, value_type, false);
+		e->identifier = ident;
+		e->flags |= EntityFlag_BitFieldValue;
+
+		HashKey key = hash_string(name);
+		if (str_ne(name, str_lit("_")) &&
+		    map_entity_get(&entity_map, key) != NULL) {
+			error_node(ident, "`%.*s` is already declared in this bit field", LIT(name));
+		} else {
+			map_entity_set(&entity_map, key, e);
+			add_entity(c, c->context.scope, NULL, e);
+			add_entity_use(c, field, e);
+
+			fields [field_count] = e;
+			offsets[field_count] = curr_offset;
+			sizes  [field_count] = bits;
+			field_count++;
+
+			curr_offset += bits;
+		}
+	}
+	GB_ASSERT(field_count <= bft->fields.count);
+	gb_temp_arena_memory_end(tmp);
+
+	bit_field_type->BitField.fields      = fields;
+	bit_field_type->BitField.field_count = field_count;
+	bit_field_type->BitField.sizes       = sizes;
+	bit_field_type->BitField.offsets     = offsets;
+
+
+	if (bft->align != NULL) {
+		Operand o = {0};
+		check_expr(c, &o, bft->align);
+		if (o.mode != Addressing_Constant) {
+			if (o.mode != Addressing_Invalid) {
+				error_node(bft->align, "#align must be a constant");
+			}
+			return;
+		}
+
+		Type *type = base_type(o.type);
+		if (is_type_untyped(type) || is_type_integer(type)) {
+			if (o.value.kind == ExactValue_Integer) {
+				i64 align = i128_to_i64(o.value.value_integer);
+				if (align < 1 || !gb_is_power_of_two(align)) {
+					error_node(bft->align, "#align must be a power of 2, got %lld", align);
+					return;
+				}
+
+				// NOTE(bill): Success!!!
+				i64 custom_align = gb_clamp(align, 1, build_context.max_align);
+				if (custom_align < align) {
+					warning_node(bft->align, "Custom alignment has been clamped to %lld from %lld", align, custom_align);
+				}
+				bit_field_type->BitField.custom_align = custom_align;
+				return;
+			}
+		}
+
+		error_node(bft->align, "#align must be an integer");
+		return;
+	}
+}
+
+
 
 
 Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_variadic_) {
@@ -1766,6 +1891,15 @@ bool check_type_extra_internal(Checker *c, AstNode *e, Type **type, Type *named_
 		return true;
 	case_end;
 
+	case_ast_node(et, BitFieldType, e);
+		*type = make_type_bit_field(c->allocator);
+		set_base_type(named_type, *type);
+		check_open_scope(c, e);
+		check_bit_field_type(c, *type, named_type, e);
+		check_close_scope(c);
+		return true;
+	case_end;
+
 	case_ast_node(pt, ProcType, e);
 		*type = alloc_type(c->allocator, Type_Proc);
 		set_base_type(named_type, *type);
@@ -1985,7 +2119,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		if (s < 128) {
 			umax = u128_sub(u128_shl(U128_ONE, s), U128_ONE);
 		} else {
-			// IMPORTANT TODO(bill): I NEED A PROPER BIG NUMBER LIBRARY THAT CAN SUPPORT 128 bit integers and floats
+			// IMPORTANT TODO(bill): I NEED A PROPER BIG NUMBER LIBRARY THAT CAN SUPPORT 128 bit floats
 			s = 128;
 		}
 		i128 imax = i128_shl(I128_ONE, s-1ll);
@@ -2021,6 +2155,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 
 
 		switch (type->Basic.kind) {
+		// case Basic_f16:
 		case Basic_f32:
 		case Basic_f64:
 			return true;
@@ -4080,6 +4215,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		BasicKind kind = core_type(x.type)->Basic.kind;
 		switch (kind) {
+		// case Basic_f16:          operand->type = t_complex32;       break;
 		case Basic_f32:          operand->type = t_complex64;       break;
 		case Basic_f64:          operand->type = t_complex128;      break;
 		case Basic_UntypedFloat: operand->type = t_untyped_complex; break;

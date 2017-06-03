@@ -43,15 +43,14 @@ pow  :: proc(x, power: f32) -> f32 #foreign __llvm_core "llvm.pow.f32";
 pow  :: proc(x, power: f64) -> f64 #foreign __llvm_core "llvm.pow.f64";
 
 
-lerp :: proc(a, b, t: f32) -> f32 { return a*(1-t) + b*t; }
-lerp :: proc(a, b, t: f64) -> f64 { return a*(1-t) + b*t; }
+lerp   :: proc(a, b, t: f32) -> (x: f32) { return a*(1-t) + b*t; }
+lerp   :: proc(a, b, t: f64) -> (x: f64) { return a*(1-t) + b*t; }
+unlerp :: proc(a, b, x: f32) -> (t: f32) { return (x-a)/(b-a); }
+unlerp :: proc(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }
+
 
 sign :: proc(x: f32) -> f32 { return x >= 0 ? +1 : -1; }
 sign :: proc(x: f64) -> f64 { return x >= 0 ? +1 : -1; }
-
-bit_reverse :: proc(b: u16) -> u16 #foreign __llvm_core "llvm.bitreverse.i16";
-bit_reverse :: proc(b: u32) -> u32 #foreign __llvm_core "llvm.bitreverse.i32";
-bit_reverse :: proc(b: u64) -> u64 #foreign __llvm_core "llvm.bitreverse.i64";
 
 fmuladd :: proc(a, b, c: f32) -> f32 #foreign __llvm_core "llvm.fmuladd.f32";
 fmuladd :: proc(a, b, c: f64) -> f64 #foreign __llvm_core "llvm.fmuladd.f64";

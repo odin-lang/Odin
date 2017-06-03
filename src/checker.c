@@ -126,19 +126,19 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 #include "types.c"
 
 typedef enum AddressingMode {
-	Addressing_Invalid,    // invalid addressing mode
-	Addressing_NoValue,    // no value (void in C)
-	Addressing_Value,      // computed value (rvalue)
-	Addressing_Immutable,  // immutable computed value (const rvalue)
-	Addressing_Variable,   // addressable variable (lvalue)
-	Addressing_Constant,   // constant
-	Addressing_Type,       // type
-	Addressing_Builtin,    // built-in procedure
-	Addressing_Overload,   // overloaded procedure
-	Addressing_MapIndex,   // map index expression -
-	                       // 	lhs: acts like a Variable
-	                       // 	rhs: acts like OptionalOk
-	Addressing_OptionalOk, // rhs: acts like a value with an optional boolean part (for existence check)
+	Addressing_Invalid,       // invalid addressing mode
+	Addressing_NoValue,       // no value (void in C)
+	Addressing_Value,         // computed value (rvalue)
+	Addressing_Immutable,     // immutable computed value (const rvalue)
+	Addressing_Variable,      // addressable variable (lvalue)
+	Addressing_Constant,      // constant
+	Addressing_Type,          // type
+	Addressing_Builtin,       // built-in procedure
+	Addressing_Overload,      // overloaded procedure
+	Addressing_MapIndex,      // map index expression -
+	                          // 	lhs: acts like a Variable
+	                          // 	rhs: acts like OptionalOk
+	Addressing_OptionalOk,    // rhs: acts like a value with an optional boolean part (for existence check)
 } AddressingMode;
 
 // Operand is used as an intermediate value whilst checking
@@ -947,6 +947,9 @@ void add_type_info_type(Checker *c, Type *t) {
 		return;
 	}
 	t = default_type(t);
+	if (is_type_bit_field_value(t)) {
+		t = default_bit_field_value_type(t);
+	}
 	if (is_type_untyped(t)) {
 		return; // Could be nil
 	}
@@ -1200,7 +1203,7 @@ void init_preload(Checker *c) {
 
 
 
-		if (record->variant_count != 21) {
+		if (record->variant_count != 22) {
 			compiler_error("Invalid `TypeInfo` layout");
 		}
 		t_type_info_named         = record->variants[ 1]->type;
@@ -1223,6 +1226,7 @@ void init_preload(Checker *c) {
 		t_type_info_union         = record->variants[18]->type;
 		t_type_info_enum          = record->variants[19]->type;
 		t_type_info_map           = record->variants[20]->type;
+		t_type_info_bit_field     = record->variants[21]->type;
 
 		t_type_info_named_ptr         = make_type_pointer(c->allocator, t_type_info_named);
 		t_type_info_integer_ptr       = make_type_pointer(c->allocator, t_type_info_integer);
@@ -1244,6 +1248,7 @@ void init_preload(Checker *c) {
 		t_type_info_union_ptr         = make_type_pointer(c->allocator, t_type_info_union);
 		t_type_info_enum_ptr          = make_type_pointer(c->allocator, t_type_info_enum);
 		t_type_info_map_ptr           = make_type_pointer(c->allocator, t_type_info_map);
+		t_type_info_bit_field_ptr     = make_type_pointer(c->allocator, t_type_info_bit_field);
 	}
 
 	if (t_allocator == NULL) {
