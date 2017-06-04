@@ -8,34 +8,29 @@
 
 _BUFFER_SIZE :: 1<<12;
 
-// TODO(bill): Make this a union
-StringBuffer :: struct {
-	is_dynamic: bool,
-	sa: []byte,
-	da: [dynamic]byte,
-};
+StringBuffer :: union {
+	Static {buf: []byte},
+	Dynamic{buf: [dynamic]byte},
+}
 
 make_string_buffer_from_slice :: proc(b: []byte) -> StringBuffer {
-	return StringBuffer{
-		is_dynamic = false,
-		sa = b,
-	};
+	return StringBuffer.Static{b};
 }
 
 make_string_dynamic_buffer :: proc() -> StringBuffer {
-	return StringBuffer{
-		is_dynamic = true,
-		da = make([dynamic]byte),
-	};
+	return StringBuffer.Dynamic{make([dynamic]byte)};
 }
 string_buffer_data :: proc(buf: ^StringBuffer) -> []byte {
 	return string_buffer_data(buf^);
 }
 string_buffer_data :: proc(buf: StringBuffer) -> []byte {
-	if buf.is_dynamic {
-		return buf.da[..];
+	match b in buf {
+	case StringBuffer.Static:
+		return b.buf[..];
+	case StringBuffer.Dynamic:
+		return b.buf[..];
 	}
-	return buf.sa[..];
+	return nil;
 }
 to_string :: proc(buf: StringBuffer) -> string {
 	return string(string_buffer_data(buf));
@@ -45,18 +40,20 @@ to_string :: proc(buf: StringBuffer) -> string {
 write_string :: proc(buf: ^StringBuffer, s: string) {
 	write_bytes(buf, []byte(s));
 }
-write_bytes :: proc(buf: ^StringBuffer, b: []byte) {
-	if buf.is_dynamic {
-		append(buf.da, ..b);
-	} else {
-		append(buf.sa, ..b);
+write_bytes :: proc(buf: ^StringBuffer, data: []byte) {
+	match b in buf {
+	case StringBuffer.Static:
+		append(b.buf, ..data);
+	case StringBuffer.Dynamic:
+		append(b.buf, ..data);
 	}
 }
-write_byte :: proc(buf: ^StringBuffer, b: byte) {
-	if buf.is_dynamic {
-		append(buf.da, b);
-	} else {
-		append(buf.sa, b);
+write_byte :: proc(buf: ^StringBuffer, data: byte) {
+	match b in buf {
+	case StringBuffer.Static:
+		append(b.buf, data);
+	case StringBuffer.Dynamic:
+		append(b.buf, data);
 	}
 }
 write_rune :: proc(buf: ^StringBuffer, r: rune) {
@@ -192,8 +189,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		case ti == type_info(uint): write_string(buf, "uint");
 		case:
 			write_string(buf, info.signed ? "i" : "u");
-			fi := FmtInfo{buf = buf};
-			fmt_int(&fi, u128(8*info.size), false, 64, 'd');
+			write_int(buf, i64(8*info.size), 10);
 		}
 	case Float:
 		match info.size {
@@ -258,7 +254,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 	case Array:
 		write_string(buf, "[");
 		fi := FmtInfo{buf = buf};
-		fmt_int(&fi, u128(info.count), false, 64, 'd');
+		write_int(buf, i64(info.count), 10);
 		write_string(buf, "]");
 		write_type(buf, info.elem);
 	case DynamicArray:
@@ -269,8 +265,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		write_type(buf, info.elem);
 	case Vector:
 		write_string(buf, "[vector ");
-		fi := FmtInfo{buf = buf};
-		fmt_int(&fi, u128(info.count), false, 64, 'd');
+		write_int(buf, i64(info.count), 10);
 		write_string(buf, "]");
 		write_type(buf, info.elem);
 
@@ -286,8 +281,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		if info.ordered { write_string(buf, "#ordered "); }
 		if info.custom_align {
 			write_string(buf, "#align ");
-			fi := FmtInfo{buf = buf};
-			fmt_int(&fi, u128(info.align), false, 64, 'd');
+			write_int(buf, i64(info.align), 10);
 			write_byte(buf, ' ');
 		}
 		write_byte(buf, '{');
@@ -361,10 +355,37 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 			write_string(buf, name);
 		}
 		write_string(buf, "}");
+	case BitField:
+		write_string(buf, "bit_field ");
+		if info.align != 1 {
+			write_string(buf, "#align ");
+			write_int(buf, i64(info.align), 10);
+			write_rune(buf, ' ');
+		}
+		write_string(buf, " {");
+		for name, i in info.names {
+			if i > 0 {
+				write_string(buf, ", ");
+			}
+			write_string(buf, name);
+			write_string(buf, ": ");
+			write_int(buf, i64(info.bits[i]), 10);
+		}
+		write_string(buf, "}");
+
 	}
 }
 
-
+write_int :: proc(buf: ^StringBuffer, i: i128, base: int) {
+	b: [129]byte;
+	s := strconv.append_bits(b[0..<0], u128(i), base, true, 128, strconv.digits, 0);
+	write_string(buf, s);
+}
+write_int :: proc(buf: ^StringBuffer, i: i64, base: int) {
+	b: [129]byte;
+	s := strconv.append_bits(b[0..<0], u128(i), base, true, 64, strconv.digits, 0);
+	write_string(buf, s);
+}
 
 _parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: bool) {
 	is_digit :: proc(r: rune) -> bool #inline {
@@ -488,7 +509,7 @@ fmt_write_padding :: proc(fi: ^FmtInfo, width: int) {
 	}
 }
 
-_write_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
+_fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
 	_, neg := strconv.is_integer_negative(u128(u), is_signed, bit_size);
 
 	BUF_SIZE :: 256;
@@ -496,7 +517,7 @@ _write_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: 
 		width := fi.width + fi.prec + 3; // 3 extra bytes for sign and prefix
 		if width > BUF_SIZE {
 			// TODO(bill):????
-			panic("_write_int: buffer overrun. Width and precision too big");
+			panic("_fmt_int: buffer overrun. Width and precision too big");
 		}
 	}
 
@@ -522,7 +543,7 @@ _write_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: 
 	case 2, 8, 10, 12, 16:
 		break;
 	case:
-		panic("_write_int: unknown base, whoops");
+		panic("_fmt_int: unknown base, whoops");
 	}
 
 	buf: [256]byte;
@@ -547,12 +568,12 @@ fmt_rune :: proc(fi: ^FmtInfo, r: rune) {
 
 fmt_int :: proc(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: rune) {
 	match verb {
-	case 'v': _write_int(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
-	case 'b': _write_int(fi, u,  2, is_signed, bit_size, __DIGITS_LOWER);
-	case 'o': _write_int(fi, u,  8, is_signed, bit_size, __DIGITS_LOWER);
-	case 'd': _write_int(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
-	case 'x': _write_int(fi, u, 16, is_signed, bit_size, __DIGITS_LOWER);
-	case 'X': _write_int(fi, u, 16, is_signed, bit_size, __DIGITS_UPPER);
+	case 'v': _fmt_int(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
+	case 'b': _fmt_int(fi, u,  2, is_signed, bit_size, __DIGITS_LOWER);
+	case 'o': _fmt_int(fi, u,  8, is_signed, bit_size, __DIGITS_LOWER);
+	case 'd': _fmt_int(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
+	case 'x': _fmt_int(fi, u, 16, is_signed, bit_size, __DIGITS_LOWER);
+	case 'X': _fmt_int(fi, u, 16, is_signed, bit_size, __DIGITS_UPPER);
 	case 'c', 'r':
 		fmt_rune(fi, rune(u));
 	case 'U':
@@ -561,7 +582,7 @@ fmt_int :: proc(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: run
 			fmt_bad_verb(fi, verb);
 		} else {
 			write_string(fi.buf, "U+");
-			_write_int(fi, u, 16, false, bit_size, __DIGITS_UPPER);
+			_fmt_int(fi, u, 16, false, bit_size, __DIGITS_UPPER);
 		}
 
 	case:
@@ -643,7 +664,7 @@ fmt_string :: proc(fi: ^FmtInfo, s: string, verb: rune) {
 			if i > 0 && space {
 				write_byte(fi.buf, ' ');
 			}
-			_write_int(fi, u128(s[i]), 16, false, 8, verb == 'x' ? __DIGITS_LOWER : __DIGITS_UPPER);
+			_fmt_int(fi, u128(s[i]), 16, false, 8, verb == 'x' ? __DIGITS_LOWER : __DIGITS_UPPER);
 		}
 
 	case:
@@ -663,7 +684,7 @@ fmt_pointer :: proc(fi: ^FmtInfo, p: rawptr, verb: rune) {
 	if !fi.hash || verb == 'v' {
 		write_string(fi.buf, "0x");
 	}
-	_write_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
+	_fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
 }
 
 fmt_enum :: proc(fi: ^FmtInfo, v: any, verb: rune) {

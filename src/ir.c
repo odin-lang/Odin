@@ -4836,10 +4836,18 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			if (sel.entity->type->kind == Type_BitFieldValue) {
 				irAddr addr = ir_build_addr(proc, se->expr);
 				Type *bft = type_deref(ir_addr_type(addr));
-				GB_ASSERT(is_type_bit_field(bft));
-				GB_ASSERT(sel.index.count == 1);
-				i32 index = sel.index.e[0];
-				return ir_addr_bit_field(addr.addr, index);
+				if (sel.index.count == 1) {
+					GB_ASSERT(is_type_bit_field(bft));
+					i32 index = sel.index.e[0];
+					return ir_addr_bit_field(addr.addr, index);
+				} else {
+					Selection s = sel;
+					s.index.count--;
+					i32 index = s.index.e[s.index.count-1];
+					irValue *a = addr.addr;
+					a = ir_emit_deep_field_gep(proc, a, s);
+					return ir_addr_bit_field(a, index);
+				}
 			} else {
 				irValue *a = ir_build_addr(proc, se->expr).addr;
 				a = ir_emit_deep_field_gep(proc, a, sel);

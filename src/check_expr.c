@@ -452,7 +452,7 @@ isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 
 		if (is_using) {
 			Type *t = base_type(type_deref(type));
-			if (!is_type_struct(t) && !is_type_raw_union(t) &&
+			if (!is_type_struct(t) && !is_type_raw_union(t) && !is_type_bit_field(t) &&
 			    f->names.count >= 1 &&
 			    f->names.e[0]->kind == AstNode_Ident) {
 				Token name_token = f->names.e[0]->Ident;
@@ -477,7 +477,9 @@ isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 						error(name_token, "Previous `using` for an index expression `%.*s`", LIT(name_token.string));
 					}
 				} else {
-					error(name_token, "`using` on a field `%.*s` must be a `struct` or `raw_union`", LIT(name_token.string));
+					gbString type_str = type_to_string(type);
+					error(name_token, "`using` cannot be applied to the field `%.*s` of type `%s`", LIT(name_token.string), type_str);
+					gb_string_free(type_str);
 					continue;
 				}
 			}
@@ -2258,7 +2260,8 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 
 		if (o->mode != Addressing_Variable ||
 		    check_is_expr_vector_index(c, o->expr) ||
-		    check_is_vector_elem(c, o->expr)) {
+		    check_is_vector_elem(c, o->expr) ||
+		    is_type_bit_field_value(o->type)) {
 			if (ast_node_expect(node, AstNode_UnaryExpr)) {
 				ast_node(ue, UnaryExpr, node);
 				gbString str = expr_to_string(ue->expr);
