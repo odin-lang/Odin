@@ -310,8 +310,8 @@ typedef struct CheckerInfo {
 	MapEntity            uses;            // Key: AstNode * | Identifier -> Entity
 	MapScope             scopes;          // Key: AstNode * | Node       -> Scope
 	MapExprInfo          untyped;         // Key: AstNode * | Expression -> ExprInfo
-	MapDeclInfo          entities;        // Key: Entity *
 	MapEntity            implicits;       // Key: AstNode *
+	MapDeclInfo          entities;        // Key: Entity *
 	MapEntity            foreigns;        // Key: String
 	MapAstFile           files;           // Key: String (full path)
 	MapIsize             type_info_map;   // Key: Type *
@@ -698,6 +698,7 @@ void init_universal_scope(void) {
 	t_u8_ptr       = make_type_pointer(a, t_u8);
 	t_int_ptr      = make_type_pointer(a, t_int);
 	t_i64_ptr      = make_type_pointer(a, t_i64);
+	t_i128_ptr     = make_type_pointer(a, t_i128);
 	t_f64_ptr      = make_type_pointer(a, t_f64);
 	t_byte_slice   = make_type_slice(a, t_byte);
 	t_string_slice = make_type_slice(a, t_string);

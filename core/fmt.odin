@@ -13,6 +13,26 @@ StringBuffer :: union {
 	Dynamic{buf: [dynamic]byte},
 }
 
+FmtInfo :: struct {
+	minus:     bool,
+	plus:      bool,
+	space:     bool,
+	zero:      bool,
+	hash:      bool,
+	width_set: bool,
+	prec_set:  bool,
+
+	width:     int,
+	prec:      int,
+
+	reordered:      bool,
+	good_arg_index: bool,
+
+	buf: ^StringBuffer,
+	arg: any, // Temporary
+}
+
+
 make_string_buffer_from_slice :: proc(b: []byte) -> StringBuffer {
 	return StringBuffer.Static{b};
 }
@@ -21,7 +41,13 @@ make_string_dynamic_buffer :: proc() -> StringBuffer {
 	return StringBuffer.Dynamic{make([dynamic]byte)};
 }
 string_buffer_data :: proc(buf: ^StringBuffer) -> []byte {
-	return string_buffer_data(buf^);
+	match b in buf {
+	case StringBuffer.Static:
+		return b.buf[..];
+	case StringBuffer.Dynamic:
+		return b.buf[..];
+	}
+	return nil;
 }
 string_buffer_data :: proc(buf: StringBuffer) -> []byte {
 	match b in buf {
@@ -66,23 +92,15 @@ write_rune :: proc(buf: ^StringBuffer, r: rune) {
 	write_bytes(buf, b[0..<n]);
 }
 
-FmtInfo :: struct {
-	minus:     bool,
-	plus:      bool,
-	space:     bool,
-	zero:      bool,
-	hash:      bool,
-	width_set: bool,
-	prec_set:  bool,
-
-	width:     int,
-	prec:      int,
-
-	reordered:      bool,
-	good_arg_index: bool,
-
-	buf: ^StringBuffer,
-	arg: any, // Temporary
+write_int :: proc(buf: ^StringBuffer, i: i128, base: int) {
+	b: [129]byte;
+	s := strconv.append_bits(b[0..<0], u128(i), base, true, 128, strconv.digits, 0);
+	write_string(buf, s);
+}
+write_int :: proc(buf: ^StringBuffer, i: i64, base: int) {
+	b: [129]byte;
+	s := strconv.append_bits(b[0..<0], u128(i), base, true, 64, strconv.digits, 0);
+	write_string(buf, s);
 }
 
 
@@ -114,15 +132,13 @@ fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 }
 
 
-print :: proc(args: ..any) -> int {
-	return fprint(os.stdout, ..args);
-}
-println :: proc(args: ..any) -> int {
-	return fprintln(os.stdout, ..args);
-}
-printf :: proc(fmt: string, args: ..any) -> int {
-	return fprintf(os.stdout, fmt, ..args);
-}
+// print* procedures return the number of bytes written
+print       :: proc(args: ..any)              -> int { return fprint(os.stdout, ..args); }
+print_err   :: proc(args: ..any)              -> int { return fprint(os.stderr, ..args); }
+println     :: proc(args: ..any)              -> int { return fprintln(os.stdout, ..args); }
+println_err :: proc(args: ..any)              -> int { return fprintln(os.stderr, ..args); }
+printf      :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stdout, fmt, ..args); }
+printf_err  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stderr, fmt, ..args); }
 
 
 // aprint* procedures return a string that was allocated with the current context
@@ -144,10 +160,7 @@ aprintf :: proc(fmt: string, args: ..any) -> string {
 }
 
 
-// bprint* procedures
-
-
-// aprint* procedure return a string that was allocated with the current context
+// bprint* procedures return a string that was allocated with the current context
 // They must be freed accordingly
 bprint :: proc(buf: []byte, args: ..any) -> string {
 	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
@@ -376,16 +389,6 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 	}
 }
 
-write_int :: proc(buf: ^StringBuffer, i: i128, base: int) {
-	b: [129]byte;
-	s := strconv.append_bits(b[0..<0], u128(i), base, true, 128, strconv.digits, 0);
-	write_string(buf, s);
-}
-write_int :: proc(buf: ^StringBuffer, i: i64, base: int) {
-	b: [129]byte;
-	s := strconv.append_bits(b[0..<0], u128(i), base, true, 64, strconv.digits, 0);
-	write_string(buf, s);
-}
 
 _parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: bool) {
 	is_digit :: proc(r: rune) -> bool #inline {
@@ -703,23 +706,26 @@ fmt_enum :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		case 'd', 'f':
 			fmt_arg(fi, any{v.data, type_info_base(e.base)}, verb);
 		case 's', 'v':
-			i: i64;
+			i: i128;
 			f: f64;
 			ok := false;
 			a := any{v.data, type_info_base(e.base)};
 			match v in a {
-			case i8:   i = i64(v);
-			case i16:  i = i64(v);
-			case i32:  i = i64(v);
-			case i64:  i = i64(v);
-			case int:  i = i64(v);
-			case u8:   i = i64(v);
-			case u16:  i = i64(v);
-			case u32:  i = i64(v);
-			case u64:  i = i64(v);
-			case uint: i = i64(v);
-			case f32:  f = f64(v); i = transmute(i64, f);
-			case f64:  f = f64(v); i = transmute(i64, f);
+			case i8:   i = i128(v);
+			case i16:  i = i128(v);
+			case i32:  i = i128(v);
+			case i64:  i = i128(v);
+			case i128: i = i128(v);
+			case int:  i = i128(v);
+			case u8:   i = i128(v);
+			case u16:  i = i128(v);
+			case u32:  i = i128(v);
+			case u64:  i = i128(v);
+			case u128: i = i128(v);
+			case uint: i = i128(v);
+
+			case f32:  f = f64(v); i = i128(transmute(i64, f));
+			case f64:  f = f64(v); i = i128(transmute(i64, f));
 			}
 
 			if types.is_string(e.base) {

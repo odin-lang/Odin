@@ -17,6 +17,7 @@ gbAllocator heap_allocator(void) {
 #include "string.c"
 #include "array.c"
 #include "integer128.c"
+#include "murmurhash3.c"
 
 gb_global String global_module_path = {0};
 gb_global bool global_module_path_set = false;

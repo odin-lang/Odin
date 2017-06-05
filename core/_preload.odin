@@ -26,7 +26,7 @@
 // The compiler relies upon this _exact_ order
 TypeInfoEnumValue :: raw_union {
 	f: f64,
-	i: i64,
+	i: i128,
 }
 // NOTE(bill): This must match the compiler's
 CallingConvention :: enum {
@@ -537,24 +537,24 @@ __slice_append :: proc(slice_: rawptr, elem_size, elem_align: int,
 
 // Map stuff
 
-__default_hash :: proc(data: []byte) -> u64 {
-	fnv64a :: proc(data: []byte) -> u64 {
-		h: u64 = 0xcbf29ce484222325;
+__default_hash :: proc(data: []byte) -> u128 {
+	fnv128a :: proc(data: []byte) -> u128 {
+		h: u128 = 0x6c62272e07bb014262b821756295c58d;
 		for b in data {
-			h = (h ~ u64(b)) * 0x100000001b3;
+			h = (h ~ u128(b)) * 0x1000000000000000000013b;
 		}
 		return h;
 	}
-	return fnv64a(data);
+	return fnv128a(data);
 }
-__default_hash_string :: proc(s: string) -> u64 {
+__default_hash_string :: proc(s: string) -> u128 {
 	return __default_hash([]byte(s));
 }
 
 __INITIAL_MAP_CAP :: 16;
 
 __MapKey :: struct #ordered {
-	hash: u64,
+	hash: u128,
 	str:  string,
 }
 
@@ -699,7 +699,7 @@ __dynamic_map_hash_equal :: proc(h: __MapHeader, a, b: __MapKey) -> bool {
 __dynamic_map_find :: proc(using h: __MapHeader, key: __MapKey) -> __MapFindResult {
 	fr := __MapFindResult{-1, -1, -1};
 	if len(m.hashes) > 0 {
-		fr.hash_index = int(key.hash % u64(len(m.hashes)));
+		fr.hash_index = int(key.hash % u128(len(m.hashes)));
 		fr.entry_index = m.hashes[fr.hash_index];
 		for fr.entry_index >= 0 {
 			entry := __dynamic_map_get_entry(h, fr.entry_index);

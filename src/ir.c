@@ -1656,24 +1656,25 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val, Type *map_type) 
 }
 
 irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
+	Type *hash_type = t_u128;
 	irValue *v = ir_add_local_generated(proc, t_map_key);
 	Type *t = base_type(ir_type(key));
 	key = ir_emit_conv(proc, key, key_type);
 	if (is_type_integer(t)) {
-		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, key, t_u64));
+		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, key, hash_type));
 	} else if (is_type_pointer(t)) {
 		irValue *p = ir_emit_conv(proc, key, t_uint);
-		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, p, t_u64));
+		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, p, hash_type));
 	} else if (is_type_float(t)) {
 		irValue *bits = NULL;
 		i64 size = type_size_of(proc->module->allocator, t);
 		switch (8*size) {
-		case 32: bits = ir_emit_transmute(proc, key, t_u32); break;
-		case 64: bits = ir_emit_transmute(proc, key, t_u64); break;
+		case 32:  bits = ir_emit_transmute(proc, key, t_u32); break;
+		case 64:  bits = ir_emit_transmute(proc, key, t_u64);  break;
 		default: GB_PANIC("Unhandled float size: %lld bits", size); break;
 		}
 
-		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, bits, t_u64));
+		ir_emit_store(proc, ir_emit_struct_ep(proc, v, 0), ir_emit_conv(proc, bits, hash_type));
 	} else if (is_type_string(t)) {
 		irValue *str = ir_emit_conv(proc, key, t_string);
 		irValue *hashed_str = NULL;
@@ -7823,9 +7824,8 @@ void ir_gen_tree(irGen *s) {
 									ExactValue value = fields[i]->Constant.value;
 
 									if (is_value_int) {
-										i64 i = i128_to_i64(value.value_integer);
-										value_ep = ir_emit_conv(proc, value_ep, t_i64_ptr);
-										ir_emit_store(proc, value_ep, ir_const_i64(a, i));
+										value_ep = ir_emit_conv(proc, value_ep, t_i128_ptr);
+										ir_emit_store(proc, value_ep, ir_value_constant(a, t_i128, value));
 									} else {
 										GB_ASSERT(is_type_float(t->Record.enum_base_type));
 										f64 f = value.value_float;

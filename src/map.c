@@ -39,6 +39,8 @@ gb_inline HashKey hashing_proc(void const *data, isize len) {
 	h.kind = HashKey_Default;
 	// h.key = gb_murmur64(data, len);
 	h.key = gb_fnv64a(data, len);
+	// h.key = MurmurHash3_128(data, len, 0x3803cb8e);
+
 	return h;
 }
 
@@ -51,6 +53,7 @@ gb_inline HashKey hash_string(String s) {
 
 gb_inline HashKey hash_pointer(void *ptr) {
 	HashKey h = {HashKey_Default};
+	// h.key = u128_from_u64(cast(u64)cast(uintptr)ptr);
 	h.key = cast(u64)cast(uintptr)ptr;
 	h.ptr = ptr;
 	h.kind = HashKey_Default;

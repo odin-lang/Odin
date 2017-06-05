@@ -304,11 +304,12 @@ gb_global Type *t_untyped_nil        = &basic_types[Basic_UntypedNil];
 gb_global Type *t_byte               = &basic_type_aliases[0];
 gb_global Type *t_rune               = &basic_type_aliases[1];
 
-gb_global Type *t_u8_ptr  = NULL;
-gb_global Type *t_int_ptr = NULL;
-gb_global Type *t_i64_ptr = NULL;
-gb_global Type *t_f64_ptr = NULL;
-gb_global Type *t_byte_slice = NULL;
+gb_global Type *t_u8_ptr       = NULL;
+gb_global Type *t_int_ptr      = NULL;
+gb_global Type *t_i64_ptr      = NULL;
+gb_global Type *t_i128_ptr     = NULL;
+gb_global Type *t_f64_ptr      = NULL;
+gb_global Type *t_byte_slice   = NULL;
 gb_global Type *t_string_slice = NULL;
 
 
@@ -874,8 +875,7 @@ bool is_type_valid_for_keys(Type *t) {
 		return false;
 	}
 	if (is_type_integer(t)) {
-		// NOTE(bill): Not (u|i)128
-		return t->Basic.size <= 8;
+		return true;
 	}
 	if (is_type_float(t)) {
 		return true;

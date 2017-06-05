@@ -2250,6 +2250,23 @@ bool check_is_vector_elem(Checker *c, AstNode *expr) {
 	return false;
 }
 
+bool check_is_not_addressable(Checker *c, Operand *o) {
+	if (o->mode != Addressing_Variable) {
+		return true;
+	}
+	if (is_type_bit_field_value(o->type)) {
+		return true;
+	}
+	if (check_is_expr_vector_index(c, o->expr)) {
+		return true;
+	}
+	if (check_is_vector_elem(c, o->expr)) {
+		return true;
+	}
+
+	return false;
+}
+
 void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 	switch (op.kind) {
 	case Token_And: { // Pointer address
@@ -2257,11 +2274,7 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 			o->type = make_type_pointer(c->allocator, o->type);
 			return;
 		}
-
-		if (o->mode != Addressing_Variable ||
-		    check_is_expr_vector_index(c, o->expr) ||
-		    check_is_vector_elem(c, o->expr) ||
-		    is_type_bit_field_value(o->type)) {
+		if (check_is_not_addressable(c, o)) {
 			if (ast_node_expect(node, AstNode_UnaryExpr)) {
 				ast_node(ue, UnaryExpr, node);
 				gbString str = expr_to_string(ue->expr);
