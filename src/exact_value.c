@@ -71,6 +71,11 @@ ExactValue exact_value_i128(i128 i) {
 	result.value_integer = i;
 	return result;
 }
+ExactValue exact_value_u128(u128 i) {
+	ExactValue result = {ExactValue_Integer};
+	result.value_integer = *cast(i128 *)&i;
+	return result;
+}
 
 ExactValue exact_value_float(f64 f) {
 	ExactValue result = {ExactValue_Float};

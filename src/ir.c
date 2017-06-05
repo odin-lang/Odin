@@ -1682,8 +1682,8 @@ irValue *ir_gen_map_key(irProcedure *proc, irValue *key, Type *key_type) {
 		if (str->kind == irValue_Constant) {
 			ExactValue ev = str->Constant.value;
 			GB_ASSERT(ev.kind == ExactValue_String);
-			u64 hs = gb_fnv64a(ev.value_string.text, ev.value_string.len);
-			hashed_str = ir_const_u64(proc->module->allocator, hs);
+			u128 hs = fnv128a(ev.value_string.text, ev.value_string.len);
+			hashed_str = ir_value_constant(proc->module->allocator, t_u128, exact_value_u128(hs));
 		} else {
 			irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 1);
 			args[0] = str;
@@ -1729,7 +1729,7 @@ Type *ir_addr_type(irAddr addr) {
 }
 
 irValue *ir_insert_dynamic_map_key_and_value(irProcedure *proc, irValue *addr, Type *map_type,
-                                     irValue *map_key, irValue *map_value) {
+                                             irValue *map_key, irValue *map_value) {
 	map_type = base_type(map_type);
 
 	irValue *h = ir_gen_map_header(proc, addr, map_type);

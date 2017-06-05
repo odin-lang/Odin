@@ -19,6 +19,16 @@ gbAllocator heap_allocator(void) {
 #include "integer128.c"
 #include "murmurhash3.c"
 
+u128 fnv128a(void const *data, isize len) {
+	u128 o = u128_lo_hi(0x13bull, 0x1000000ull);
+	u128 h = u128_lo_hi(0x62b821756295c58dull, 0x6c62272e07bb0142ull);
+	u8 const *bytes = cast(u8 const *)data;
+	for (isize i = 0; i < len; i++) {
+		h = u128_mul(u128_xor(h, u128_from_u64(bytes[i])), o);
+	}
+	return h;
+}
+
 gb_global String global_module_path = {0};
 gb_global bool global_module_path_set = false;
 
