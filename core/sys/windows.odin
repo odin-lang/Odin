@@ -54,7 +54,9 @@ WM_WINDOWPOSCHANGED  :: 0x0047;
 WM_SETCURSOR         :: 0x0020;
 WM_CHAR              :: 0x0102;
 
-PM_REMOVE :: 1;
+PM_NOREMOVE :: 0x0000;
+PM_REMOVE   :: 0x0001;
+PM_NOYIELD  :: 0x0002;
 
 COLOR_BACKGROUND :: Hbrush(int(1));
 BLACK_BRUSH :: 4;
@@ -179,8 +181,11 @@ show_window        :: proc(hwnd: Hwnd, cmd_show: i32) -> Bool #foreign user32 "S
 translate_message  :: proc(msg: ^Msg) -> Bool                 #foreign user32 "TranslateMessage";
 dispatch_message_a :: proc(msg: ^Msg) -> Lresult              #foreign user32 "DispatchMessageA";
 update_window      :: proc(hwnd: Hwnd) -> Bool                #foreign user32 "UpdateWindow";
+get_message_a      :: proc(msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max : u32) -> Bool #foreign user32 "GetMessageA";
 peek_message_a     :: proc(msg: ^Msg, hwnd: Hwnd,
                            msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool #foreign user32 "PeekMessageA";
+
+post_message :: proc(hwnd: Hwnd, msg, wparam, lparam : u32) -> Bool #foreign user32 "PostMessageA";
 
 def_window_proc_a :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult #foreign user32 "DefWindowProcA";
 
