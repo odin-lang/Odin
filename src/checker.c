@@ -658,13 +658,12 @@ void init_universal_scope(void) {
 		add_global_entity(make_entity_type_name(a, NULL, make_token_ident(basic_types[i].Basic.name), &basic_types[i]));
 	}
 #if 1
-	for (isize i = 0; i < gb_count_of(basic_type_aliases); i++) {
-		add_global_entity(make_entity_type_name(a, NULL, make_token_ident(basic_type_aliases[i].Basic.name), &basic_type_aliases[i]));
-	}
+	// for (isize i = 0; i < gb_count_of(basic_type_aliases); i++) {
+		// add_global_entity(make_entity_type_name(a, NULL, make_token_ident(basic_type_aliases[i].Basic.name), &basic_type_aliases[i]));
+	// }
 #else
 	{
 		t_byte = add_global_type_alias(a, str_lit("byte"), &basic_types[Basic_u8]);
-		t_rune = add_global_type_alias(a, str_lit("rune"), &basic_types[Basic_i32]);
 	}
 #endif
 
@@ -700,7 +699,7 @@ void init_universal_scope(void) {
 	t_i64_ptr      = make_type_pointer(a, t_i64);
 	t_i128_ptr     = make_type_pointer(a, t_i128);
 	t_f64_ptr      = make_type_pointer(a, t_f64);
-	t_byte_slice   = make_type_slice(a, t_byte);
+	t_u8_slice     = make_type_slice(a, t_u8);
 	t_string_slice = make_type_slice(a, t_string);
 }
 
@@ -1204,33 +1203,35 @@ void init_preload(Checker *c) {
 
 
 
-		if (record->variant_count != 22) {
+		if (record->variant_count != 23) {
 			compiler_error("Invalid `TypeInfo` layout");
 		}
 		t_type_info_named         = record->variants[ 1]->type;
 		t_type_info_integer       = record->variants[ 2]->type;
-		t_type_info_float         = record->variants[ 3]->type;
-		t_type_info_complex       = record->variants[ 4]->type;
-		t_type_info_string        = record->variants[ 5]->type;
-		t_type_info_boolean       = record->variants[ 6]->type;
-		t_type_info_any           = record->variants[ 7]->type;
-		t_type_info_pointer       = record->variants[ 8]->type;
-		t_type_info_atomic        = record->variants[ 9]->type;
-		t_type_info_procedure     = record->variants[10]->type;
-		t_type_info_array         = record->variants[11]->type;
-		t_type_info_dynamic_array = record->variants[12]->type;
-		t_type_info_slice         = record->variants[13]->type;
-		t_type_info_vector        = record->variants[14]->type;
-		t_type_info_tuple         = record->variants[15]->type;
-		t_type_info_struct        = record->variants[16]->type;
-		t_type_info_raw_union     = record->variants[17]->type;
-		t_type_info_union         = record->variants[18]->type;
-		t_type_info_enum          = record->variants[19]->type;
-		t_type_info_map           = record->variants[20]->type;
-		t_type_info_bit_field     = record->variants[21]->type;
+		t_type_info_rune          = record->variants[ 3]->type;
+		t_type_info_float         = record->variants[ 4]->type;
+		t_type_info_complex       = record->variants[ 5]->type;
+		t_type_info_string        = record->variants[ 6]->type;
+		t_type_info_boolean       = record->variants[ 7]->type;
+		t_type_info_any           = record->variants[ 8]->type;
+		t_type_info_pointer       = record->variants[ 9]->type;
+		t_type_info_atomic        = record->variants[10]->type;
+		t_type_info_procedure     = record->variants[11]->type;
+		t_type_info_array         = record->variants[12]->type;
+		t_type_info_dynamic_array = record->variants[13]->type;
+		t_type_info_slice         = record->variants[14]->type;
+		t_type_info_vector        = record->variants[15]->type;
+		t_type_info_tuple         = record->variants[16]->type;
+		t_type_info_struct        = record->variants[17]->type;
+		t_type_info_raw_union     = record->variants[18]->type;
+		t_type_info_union         = record->variants[19]->type;
+		t_type_info_enum          = record->variants[20]->type;
+		t_type_info_map           = record->variants[21]->type;
+		t_type_info_bit_field     = record->variants[22]->type;
 
 		t_type_info_named_ptr         = make_type_pointer(c->allocator, t_type_info_named);
 		t_type_info_integer_ptr       = make_type_pointer(c->allocator, t_type_info_integer);
+		t_type_info_rune_ptr          = make_type_pointer(c->allocator, t_type_info_rune);
 		t_type_info_float_ptr         = make_type_pointer(c->allocator, t_type_info_float);
 		t_type_info_complex_ptr       = make_type_pointer(c->allocator, t_type_info_complex);
 		t_type_info_string_ptr        = make_type_pointer(c->allocator, t_type_info_string);
@@ -2118,12 +2119,14 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
+	/*
 	for (isize i = 0; i < gb_count_of(basic_type_aliases)-1; i++) {
 		Type *t = &basic_type_aliases[i];
 		if (t->Basic.size > 0) {
 			add_type_info_type(c, t);
 		}
 	}
+	*/
 #endif
 
 

@@ -9,8 +9,8 @@
 _BUFFER_SIZE :: 1<<12;
 
 StringBuffer :: union {
-	Static {buf: []byte},
-	Dynamic{buf: [dynamic]byte},
+	Static {buf: []u8},
+	Dynamic{buf: [dynamic]u8},
 }
 
 FmtInfo :: struct {
@@ -33,14 +33,14 @@ FmtInfo :: struct {
 }
 
 
-make_string_buffer_from_slice :: proc(b: []byte) -> StringBuffer {
+make_string_buffer_from_slice :: proc(b: []u8) -> StringBuffer {
 	return StringBuffer.Static{b};
 }
 
 make_string_dynamic_buffer :: proc() -> StringBuffer {
-	return StringBuffer.Dynamic{make([dynamic]byte)};
+	return StringBuffer.Dynamic{make([dynamic]u8)};
 }
-string_buffer_data :: proc(buf: ^StringBuffer) -> []byte {
+string_buffer_data :: proc(buf: ^StringBuffer) -> []u8 {
 	match b in buf {
 	case StringBuffer.Static:
 		return b.buf[..];
@@ -49,7 +49,7 @@ string_buffer_data :: proc(buf: ^StringBuffer) -> []byte {
 	}
 	return nil;
 }
-string_buffer_data :: proc(buf: StringBuffer) -> []byte {
+string_buffer_data :: proc(buf: StringBuffer) -> []u8 {
 	match b in buf {
 	case StringBuffer.Static:
 		return b.buf[..];
@@ -64,9 +64,9 @@ to_string :: proc(buf: StringBuffer) -> string {
 
 
 write_string :: proc(buf: ^StringBuffer, s: string) {
-	write_bytes(buf, []byte(s));
+	write_bytes(buf, []u8(s));
 }
-write_bytes :: proc(buf: ^StringBuffer, data: []byte) {
+write_bytes :: proc(buf: ^StringBuffer, data: []u8) {
 	match b in buf {
 	case StringBuffer.Static:
 		append(b.buf, ..data);
@@ -74,7 +74,7 @@ write_bytes :: proc(buf: ^StringBuffer, data: []byte) {
 		append(b.buf, ..data);
 	}
 }
-write_byte :: proc(buf: ^StringBuffer, data: byte) {
+write_byte :: proc(buf: ^StringBuffer, data: u8) {
 	match b in buf {
 	case StringBuffer.Static:
 		append(b.buf, data);
@@ -84,7 +84,7 @@ write_byte :: proc(buf: ^StringBuffer, data: byte) {
 }
 write_rune :: proc(buf: ^StringBuffer, r: rune) {
 	if r < utf8.RUNE_SELF {
-		write_byte(buf, byte(r));
+		write_byte(buf, u8(r));
 		return;
 	}
 
@@ -93,12 +93,12 @@ write_rune :: proc(buf: ^StringBuffer, r: rune) {
 }
 
 write_int :: proc(buf: ^StringBuffer, i: i128, base: int) {
-	b: [129]byte;
+	b: [129]u8;
 	s := strconv.append_bits(b[0..<0], u128(i), base, true, 128, strconv.digits, 0);
 	write_string(buf, s);
 }
 write_int :: proc(buf: ^StringBuffer, i: i64, base: int) {
-	b: [129]byte;
+	b: [129]u8;
 	s := strconv.append_bits(b[0..<0], u128(i), base, true, 64, strconv.digits, 0);
 	write_string(buf, s);
 }
@@ -106,7 +106,7 @@ write_int :: proc(buf: ^StringBuffer, i: i64, base: int) {
 
 
 fprint :: proc(fd: os.Handle, args: ..any) -> int {
-	data: [_BUFFER_SIZE]byte;
+	data: [_BUFFER_SIZE]u8;
 	buf := make_string_buffer_from_slice(data[0..<0]);
 	sbprint(&buf, ..args);
 	res := string_buffer_data(buf);
@@ -115,7 +115,7 @@ fprint :: proc(fd: os.Handle, args: ..any) -> int {
 }
 
 fprintln :: proc(fd: os.Handle, args: ..any) -> int {
-	data: [_BUFFER_SIZE]byte;
+	data: [_BUFFER_SIZE]u8;
 	buf := make_string_buffer_from_slice(data[0..<0]);
 	sbprintln(&buf, ..args);
 	res := string_buffer_data(buf);
@@ -123,7 +123,7 @@ fprintln :: proc(fd: os.Handle, args: ..any) -> int {
 	return len(res);
 }
 fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
-	data: [_BUFFER_SIZE]byte;
+	data: [_BUFFER_SIZE]u8;
 	buf := make_string_buffer_from_slice(data[0..<0]);
 	sbprintf(&buf, fmt, ..args);
 	res := string_buffer_data(buf);
@@ -162,15 +162,15 @@ aprintf :: proc(fmt: string, args: ..any) -> string {
 
 // bprint* procedures return a string that was allocated with the current context
 // They must be freed accordingly
-bprint :: proc(buf: []byte, args: ..any) -> string {
+bprint :: proc(buf: []u8, args: ..any) -> string {
 	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprint(&sb, ..args);
 }
-bprintln :: proc(buf: []byte, args: ..any) -> string {
+bprintln :: proc(buf: []u8, args: ..any) -> string {
 	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprintln(&sb, ..args);
 }
-bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
+bprintf :: proc(buf: []u8, fmt: string, args: ..any) -> string {
 	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprintf(&sb, fmt, ..args);
 }
@@ -181,7 +181,7 @@ bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
 
 
 fprint_type :: proc(fd: os.Handle, info: ^TypeInfo) {
-	data: [_BUFFER_SIZE]byte;
+	data: [_BUFFER_SIZE]u8;
 	buf := make_string_buffer_from_slice(data[0..<0]);
 	write_type(&buf, info);
 	os.write(fd, string_buffer_data(buf));
@@ -204,6 +204,8 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 			write_string(buf, info.signed ? "i" : "u");
 			write_int(buf, i64(8*info.size), 10);
 		}
+	case Rune:
+		write_string(buf, "rune");
 	case Float:
 		match info.size {
 		case 2: write_string(buf, "f16");
@@ -500,7 +502,7 @@ fmt_write_padding :: proc(fi: ^FmtInfo, width: int) {
 	if width <= 0 {
 		return;
 	}
-	pad_byte: byte = '0';
+	pad_byte: u8 = '0';
 	if fi.space {
 		pad_byte = ' ';
 	}
@@ -549,7 +551,7 @@ _fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: in
 		panic("_fmt_int: unknown base, whoops");
 	}
 
-	buf: [256]byte;
+	buf: [256]u8;
 	start := 0;
 
 
@@ -560,7 +562,7 @@ _fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: in
 	s := strconv.append_bits(buf[start..<start], u128(u), base, is_signed, bit_size, digits, flags);
 
 	if fi.hash && fi.zero {
-		c: byte;
+		c: u8;
 		match base {
 		case 2:  c = 'b';
 		case 8:  c = 'o';
@@ -583,8 +585,13 @@ _fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: in
 immutable __DIGITS_LOWER := "0123456789abcdefx";
 immutable __DIGITS_UPPER := "0123456789ABCDEFX";
 
-fmt_rune :: proc(fi: ^FmtInfo, r: rune) {
-	write_rune(fi.buf, r);
+fmt_rune :: proc(fi: ^FmtInfo, r: rune, verb: rune) {
+	match verb {
+	case 'c', 'r', 'v':
+		write_rune(fi.buf, r);
+	case:
+		fmt_bad_verb(fi, verb);
+	}
 }
 
 fmt_int :: proc(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: rune) {
@@ -596,7 +603,7 @@ fmt_int :: proc(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: run
 	case 'x': _fmt_int(fi, u, 16, is_signed, bit_size, __DIGITS_LOWER);
 	case 'X': _fmt_int(fi, u, 16, is_signed, bit_size, __DIGITS_UPPER);
 	case 'c', 'r':
-		fmt_rune(fi, rune(u));
+		fmt_rune(fi, rune(u), verb);
 	case 'U':
 		r := rune(u);
 		if r < 0 || r > utf8.MAX_RUNE {
@@ -637,7 +644,7 @@ fmt_float :: proc(fi: ^FmtInfo, v: f64, bit_size: int, verb: rune) {
 			prec = fi.prec;
 		}
 
-		buf: [386]byte;
+		buf: [386]u8;
 		str := strconv.append_float(buf[1..<1], v, 'f', prec, bit_size);
 		str = string(buf[0..len(str)]);
 		if str[1] == '+' || str[1] == '-' {
@@ -729,6 +736,7 @@ fmt_enum :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			ok := false;
 			a := any{v.data, type_info_base(e.base)};
 			match v in a {
+			case rune:  i = i128(v);
 			case i8:   i = i128(v);
 			case i16:  i = i128(v);
 			case i32:  i = i128(v);
@@ -801,7 +809,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 				}
 				write_string(fi.buf, b.names[i]);
 				write_string(fi.buf, " = ");
-				data := ^byte(v.data) + b.offsets[i];
+				data := ^u8(v.data) + b.offsets[i];
 				fmt_arg(fi, any{rawptr(data), b.types[i]}, 'v');
 			}
 			write_byte(fi.buf, '}');
@@ -812,6 +820,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 
 	case Boolean:    fmt_arg(fi, v, verb);
 	case Integer:    fmt_arg(fi, v, verb);
+	case Rune:       fmt_arg(fi, v, verb);
 	case Float:      fmt_arg(fi, v, verb);
 	case Complex:    fmt_arg(fi, v, verb);
 	case String:     fmt_arg(fi, v, verb);
@@ -833,7 +842,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
-			data := ^byte(v.data) + i*info.elem_size;
+			data := ^u8(v.data) + i*info.elem_size;
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
 		}
 
@@ -845,14 +854,14 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
-			data := ^byte(array.data) + i*info.elem_size;
+			data := ^u8(array.data) + i*info.elem_size;
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
 		}
 
 	case Slice:
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
-		slice := ^[]byte(v.data);
+		slice := ^[]u8(v.data);
 		for _, i in slice {
 			if i > 0 {
 				write_string(fi.buf, ", ");
@@ -870,7 +879,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 				write_string(fi.buf, ", ");
 			}
 
-			data := ^byte(v.data) + i*info.elem_size;
+			data := ^u8(v.data) + i*info.elem_size;
 			fmt_value(fi, any{rawptr(data), info.elem}, verb);
 		}
 
@@ -892,7 +901,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
-			data := ^byte(entries.data) + i*entry_size;
+			data := ^u8(entries.data) + i*entry_size;
 
 			header := ^__MapEntryHeader(data);
 			if types.is_string(info.key) {
@@ -920,7 +929,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			}
 			write_string(fi.buf, info.names[i]);
 			write_string(fi.buf, " = ");
-			data := ^byte(v.data) + info.offsets[i];
+			data := ^u8(v.data) + info.offsets[i];
 			fmt_value(fi, any{rawptr(data), info.types[i]}, 'v');
 		}
 
@@ -936,7 +945,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			}
 			write_string(fi.buf, cf.names[i]);
 			write_string(fi.buf, " = ");
-			data := ^byte(v.data) + cf.offsets[i];
+			data := ^u8(v.data) + cf.offsets[i];
 			fmt_value(fi, any{rawptr(data), cf.types[i]}, 'v');
 		}
 
@@ -999,8 +1008,9 @@ fmt_arg :: proc(fi: ^FmtInfo, arg: any, verb: rune) {
 	base_arg := arg;
 	base_arg.type_info = type_info_base(base_arg.type_info);
 	match a in base_arg {
-	case any:           fmt_arg(fi, a, verb);
+	case any:           fmt_arg(fi,  a, verb);
 	case bool:          fmt_bool(fi, a, verb);
+	case rune:          fmt_rune(fi, a, verb);
 
 	case f32:           fmt_float(fi, f64(a), 32, verb);
 	case f64:           fmt_float(fi, a,      64, verb);

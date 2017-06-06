@@ -18,7 +18,7 @@ copy :: proc(dst, src: rawptr, len: int) -> rawptr {
 copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr {
 	return __mem_copy_non_overlapping(dst, src, len);
 }
-compare :: proc(a, b: []byte) -> int {
+compare :: proc(a, b: []u8) -> int {
 	return __mem_compare(&a[0], &b[0], min(len(a), len(b)));
 }
 
@@ -81,7 +81,7 @@ allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
 Arena :: struct {
 	backing:    Allocator,
 	offset:     int,
-	memory:     []byte,
+	memory:     []u8,
 	temp_count: int,
 }
 
@@ -94,7 +94,7 @@ ArenaTempMemory :: struct {
 
 
 
-init_arena_from_memory :: proc(using a: ^Arena, data: []byte) {
+init_arena_from_memory :: proc(using a: ^Arena, data: []u8) {
 	backing    = Allocator{};
 	memory     = data[0..<0];
 	temp_count = 0;
@@ -102,7 +102,7 @@ init_arena_from_memory :: proc(using a: ^Arena, data: []byte) {
 
 init_arena_from_context :: proc(using a: ^Arena, size: int) {
 	backing = context.allocator;
-	memory = make([]byte, size);
+	memory = make([]u8, size);
 	temp_count = 0;
 }
 

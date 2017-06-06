@@ -193,6 +193,8 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		case Basic_i128:   ir_fprintf(f, "i128");                     return;
 		case Basic_u128:   ir_fprintf(f, "i128");                     return;
 
+		case Basic_rune:   ir_fprintf(f, "i32");                      return;
+
 		// case Basic_f16:    ir_fprintf(f, "half");                     return;
 		case Basic_f32:    ir_fprintf(f, "float");                    return;
 		case Basic_f64:    ir_fprintf(f, "double");                   return;

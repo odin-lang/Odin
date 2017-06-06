@@ -3,10 +3,10 @@
 #load "os_linux.odin"   when ODIN_OS == "linux";
 
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
-	return write(fd, []byte(str));
+	return write(fd, []u8(str));
 }
 
-read_entire_file :: proc(name: string) -> ([]byte, bool) {
+read_entire_file :: proc(name: string) -> ([]u8, bool) {
 	fd, err := open(name, O_RDONLY, 0);
 	if err != 0 {
 		return nil, false;
@@ -22,7 +22,7 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 		return nil, true;
 	}
 
-	data := make([]byte, length);
+	data := make([]u8, length);
 	if data == nil {
 		return nil, false;
 	}
@@ -35,7 +35,7 @@ read_entire_file :: proc(name: string) -> ([]byte, bool) {
 	return data[0..<bytes_read], true;
 }
 
-write_entire_file :: proc(name: string, data: []byte) -> bool {
+write_entire_file :: proc(name: string, data: []u8) -> bool {
 	fd, err := open(name, O_WRONLY, 0);
 	if err != 0 {
 		return false;

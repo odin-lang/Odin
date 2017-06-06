@@ -189,21 +189,21 @@ parse_f64 :: proc(s: string) -> f64 {
 }
 
 
-append_bool :: proc(buf: []byte, b: bool) -> string {
+append_bool :: proc(buf: []u8, b: bool) -> string {
 	s := b ? "true" : "false";
-	append(buf, ..[]byte(s));
+	append(buf, ..[]u8(s));
 	return string(buf);
 }
 
-append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
+append_uint :: proc(buf: []u8, u: u64, base: int) -> string {
 	return append_bits(buf, u128(u), base, false, 8*size_of(uint), digits, 0);
 }
-append_int :: proc(buf: []byte, i: i64, base: int) -> string {
+append_int :: proc(buf: []u8, i: i64, base: int) -> string {
 	return append_bits(buf, u128(i), base, true, 8*size_of(int), digits, 0);
 }
-itoa :: proc(buf: []byte, i: int) -> string { return append_int(buf, i64(i), 10); }
+itoa :: proc(buf: []u8, i: int) -> string { return append_int(buf, i64(i), 10); }
 
-append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
+append_float :: proc(buf: []u8, f: f64, fmt: u8, prec, bit_size: int) -> string {
 	return string(generic_ftoa(buf, f, fmt, prec, bit_size));
 }
 
@@ -211,7 +211,7 @@ append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> str
 
 
 DecimalSlice :: struct {
-	digits:        []byte,
+	digits:        []u8,
 	count:         int,
 	decimal_point: int,
 	neg:           bool,
@@ -228,7 +228,7 @@ _f32_info := Float_Info{23, 8,  -127};
 _f64_info := Float_Info{52, 11, -1023};
 
 
-generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> []byte {
+generic_ftoa :: proc(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 {
 	bits: u64;
 	flt: ^Float_Info;
 	match bit_size {
@@ -256,7 +256,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 		} else {
 			s = "+Inf";
 		}
-		append(buf, ..[]byte(s));
+		append(buf, ..[]u8(s));
 		return buf;
 
 	case 0: // denormalized
@@ -300,7 +300,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, prec, bit_size: int) -> [
 
 
 
-format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: DecimalSlice, prec: int, fmt: byte) -> []byte {
+format_digits :: proc(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, prec: int, fmt: u8) -> []u8 {
 	match fmt {
 	case 'f', 'F':
 		append(buf, neg ? '-' : '+');
@@ -321,7 +321,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: DecimalSlice
 		if prec > 0 {
 			append(buf, '.');
 			for i in 0..<prec {
-				c: byte = '0';
+				c: u8 = '0';
 				if j := digs.decimal_point + i; 0 <= j && j < digs.count {
 					c = digs.digits[j];
 				}
@@ -340,7 +340,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: DecimalSlice
 		return buf; // TODO
 	}
 
-	c: [2]byte;
+	c: [2]u8;
 	c[0] = '%';
 	c[1] = fmt;
 	append(buf, ..c[..]);
@@ -385,12 +385,12 @@ round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 	inclusive := mant%2 == 0;
 
 	for i in 0..<d.count {
-		l: byte = '0'; // lower digit
+		l: u8 = '0'; // lower digit
 		if i < lower.count {
 			l = lower.digits[i];
 		}
 		m := d.digits[i];   // middle digit
-		u: byte = '0'; // upper digit
+		u: u8 = '0'; // upper digit
 		if i < upper.count {
 			u = upper.digits[i];
 		}
@@ -454,12 +454,12 @@ is_integer_negative :: proc(u: u128, is_signed: bool, bit_size: int) -> (unsigne
 	return u, neg;
 }
 
-append_bits :: proc(buf: []byte, u_: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: IntFlag) -> string {
+append_bits :: proc(buf: []u8, u_: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: IntFlag) -> string {
 	if base < 2 || base > MAX_BASE {
 		panic("strconv: illegal base passed to append_bits");
 	}
 
-	a: [129]byte;
+	a: [129]u8;
 	i := len(a);
 	u, neg := is_integer_negative(u_, is_signed, bit_size);
 	b := u128(base);

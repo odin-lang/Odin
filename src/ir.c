@@ -7526,6 +7526,10 @@ void ir_gen_tree(irGen *s) {
 						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), is_signed);
 					} break;
 
+					case Basic_rune:
+						tag = ir_emit_conv(proc, ti_ptr, t_type_info_rune_ptr);
+						break;
+
 					// case Basic_f16:
 					case Basic_f32:
 					case Basic_f64:

@@ -156,7 +156,7 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 					if (is_type_typed(dst) && src->kind == Type_Basic) {
 						switch (src->Basic.kind) {
 						case Basic_UntypedInteger:
-							if (is_type_integer(dst)) {
+							if (is_type_integer(dst) || is_type_rune(dst)) {
 								return 1;
 							}
 							break;
@@ -2102,7 +2102,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		return in_value.kind == ExactValue_Bool;
 	} else if (is_type_string(type)) {
 		return in_value.kind == ExactValue_String;
-	} else if (is_type_integer(type)) {
+	} else if (is_type_integer(type) || is_type_rune(type)) {
 		ExactValue v = exact_value_to_integer(in_value);
 		if (v.kind != ExactValue_Integer) {
 			return false;
@@ -2127,6 +2127,7 @@ bool check_representable_as_constant(Checker *c, ExactValue in_value, Type *type
 		i128 imax = i128_shl(I128_ONE, s-1ll);
 
 		switch (type->Basic.kind) {
+		case Basic_rune:
 		case Basic_i8:
 		case Basic_i16:
 		case Basic_i32:
@@ -2212,7 +2213,15 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error_node(o->expr, "`%s` truncated to `%s`", a, b);
 			} else {
-				error_node(o->expr, "`%s = %lld` overflows `%s`", a, i128_to_i64(o->value.value_integer), b);
+				char buf[127] = {0};
+				String str = {0};
+				i128 i = o->value.value_integer;
+				if (is_type_unsigned(o->type)) {
+					str = u128_to_string(*cast(u128 *)&i, buf, gb_size_of(buf));
+				} else {
+					str = i128_to_string(i, buf, gb_size_of(buf));
+				}
+				error_node(o->expr, "`%s = %.*s` overflows `%s`", a, str, b);
 			}
 		} else {
 			error_node(o->expr, "Cannot convert `%s` to `%s`", a, b);
@@ -2621,6 +2630,13 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 		if (is_type_integer(dst) || is_type_float(dst)) {
 			return true;
 		}
+	}
+
+	if (is_type_integer(src) && is_type_rune(dst)) {
+		return true;
+	}
+	if (is_type_rune(src) && is_type_integer(dst)) {
+		return true;
 	}
 
 	if (is_type_complex(src) && is_type_complex(dst)) {
@@ -4349,7 +4365,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_slice_to_bytes: {
-		// slice_to_bytes :: proc(a: []T) -> []byte
+		// slice_to_bytes :: proc(a: []T) -> []u8
 		Type *slice_type = base_type(operand->type);
 		if (!is_type_slice(slice_type)) {
 			gbString type_str = type_to_string(operand->type);
@@ -4358,7 +4374,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 
-		operand->type = t_byte_slice;
+		operand->type = t_u8_slice;
 		operand->mode = Addressing_Value;
 	} break;
 

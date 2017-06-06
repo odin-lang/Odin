@@ -16,26 +16,26 @@ LayerPlaneDescriptor :: struct {
 	size:             u16,
 	version:          u16,
 	flags:            u32,
-	pixel_type:       byte,
-	color_bits:       byte,
-	red_bits:         byte,
-	red_shift:        byte,
-	green_bits:       byte,
-	green_shift:      byte,
-	blue_bits:        byte,
-	blue_shift:       byte,
-	alpha_bits:       byte,
-	alpha_shift:      byte,
-	accum_bits:       byte,
-	accum_red_bits:   byte,
-	accum_green_bits: byte,
-	accum_blue_bits:  byte,
-	accum_alpha_bits: byte,
-	depth_bits:       byte,
-	stencil_bits:     byte,
-	aux_buffers:      byte,
-	layer_type:       byte,
-	reserved:         byte,
+	pixel_type:       u8,
+	color_bits:       u8,
+	red_bits:         u8,
+	red_shift:        u8,
+	green_bits:       u8,
+	green_shift:      u8,
+	blue_bits:        u8,
+	blue_shift:       u8,
+	alpha_bits:       u8,
+	alpha_shift:      u8,
+	accum_bits:       u8,
+	accum_red_bits:   u8,
+	accum_green_bits: u8,
+	accum_blue_bits:  u8,
+	accum_alpha_bits: u8,
+	depth_bits:       u8,
+	stencil_bits:     u8,
+	aux_buffers:      u8,
+	layer_type:       u8,
+	reserved:         u8,
 	transparent:      ColorRef,
 }
 
@@ -53,8 +53,8 @@ Glyph_MetricsFloat :: struct {
 
 CreateContextAttribsARBType :: #type proc(hdc: Hdc, h_share_context: rawptr, attribList: ^i32) -> Hglrc;
 ChoosePixelFormatARBType    :: #type proc(hdc: Hdc, attrib_i_list: ^i32, attrib_f_list: ^f32, max_formats: u32, formats: ^i32, num_formats : ^u32) -> Bool #cc_c;
-SwapIntervalEXTType         :: #type proc(interval : i32) -> bool #cc_c;
-GetExtensionsStringARBType  :: #type proc(Hdc) -> ^byte #cc_c;
+SwapIntervalEXTType         :: #type proc(interval: i32) -> bool #cc_c;
+GetExtensionsStringARBType  :: #type proc(Hdc) -> ^u8 #cc_c;
 
 
 create_context_attribs_arb: CreateContextAttribsARBType;

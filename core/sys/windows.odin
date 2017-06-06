@@ -73,7 +73,7 @@ Point :: struct #ordered {
 
 WndClassExA :: struct #ordered {
 	size, style:           u32,
-	wndproc:               WndProc,
+	wnd_proc:              WndProc,
 	cls_extra, wnd_extra:  i32,
 	instance:              Hinstance,
 	icon:                  Hicon,
@@ -140,8 +140,8 @@ FindData :: struct #ordered {
     file_size_low       : u32,
     reserved0           : u32,
     reserved1           : u32,
-    file_name           : [MAX_PATH]byte,
-    alternate_file_name : [14]byte,
+    file_name           : [MAX_PATH]u8,
+    alternate_file_name : [14]u8,
 }
 
 
@@ -225,7 +225,7 @@ read_file  :: proc(h: Handle, buf: rawptr, to_read: u32, bytes_read: ^i32, overl
 write_file :: proc(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool #foreign kernel32 "WriteFile";
 
 get_file_size_ex               :: proc(file_handle: Handle, file_size: ^i64) -> Bool                                    #foreign kernel32 "GetFileSizeEx";
-get_file_attributes_a          :: proc(filename: ^byte) -> u32                                                          #foreign kernel32 "GetFileAttributesA";
+get_file_attributes_a          :: proc(filename: ^u8) -> u32                                                          #foreign kernel32 "GetFileAttributesA";
 get_file_attributes_ex_a       :: proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool #foreign kernel32 "GetFileAttributesExA";
 get_file_information_by_handle :: proc(file_handle: Handle, file_info: ^ByHandleFileInformation) -> Bool                #foreign kernel32 "GetFileInformationByHandle";
 
@@ -234,7 +234,7 @@ set_file_pointer :: proc(file_handle: Handle, distance_to_move: i32, distance_to
 
 set_handle_information :: proc(obj: Handle, mask, flags: u32) -> Bool #foreign kernel32 "SetHandleInformation";
 
-find_first_file_a :: proc(file_name : ^byte, data : ^FindData) -> Handle #foreign kernel32 "FindFirstFileA";
+find_first_file_a :: proc(file_name : ^u8, data : ^FindData) -> Handle #foreign kernel32 "FindFirstFileA";
 find_next_file_a  :: proc(file : Handle, data : ^FindData) -> Bool       #foreign kernel32 "FindNextFileA";
 find_close        :: proc(file : Handle) -> Bool                         #foreign kernel32 "FindClose";
 
@@ -312,7 +312,7 @@ Security_Attributes :: struct #ordered {
 
 INFINITE :: 0xffffffff;
 
-create_semaphore_a     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^byte) -> Handle #foreign kernel32 "CreateSemaphoreA";
+create_semaphore_a     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^u8) -> Handle #foreign kernel32 "CreateSemaphoreA";
 release_semaphore      :: proc(semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool                        #foreign kernel32 "ReleaseSemaphore";
 wait_for_single_object :: proc(handle: Handle, milliseconds: u32) -> u32                                                   #foreign kernel32 "WaitForSingleObject";
 
@@ -383,7 +383,7 @@ get_window_rect       :: proc(wnd: Hwnd, rect: ^Rect) -> Bool                   
 get_window_long_ptr_a :: proc(wnd: Hwnd, index: i32) -> i64                                          #foreign user32 "GetWindowLongPtrA";
 set_window_long_ptr_a :: proc(wnd: Hwnd, index: i32, new: i64) -> i64                                #foreign user32 "SetWindowLongPtrA";
 
-get_window_text       :: proc(wnd: Hwnd, str: ^byte, maxCount: i32) -> i32                           #foreign user32 "GetWindowText";
+get_window_text       :: proc(wnd: Hwnd, str: ^u8, maxCount: i32) -> i32                           #foreign user32 "GetWindowText";
 
 HIWORD :: proc(wParam: Wparam) -> u16 { return u16((u32(wParam) >> 16) & 0xffff); }
 HIWORD :: proc(lParam: Lparam) -> u16 { return u16((u32(lParam) >> 16) & 0xffff); }
@@ -416,7 +416,7 @@ BitmapInfo :: struct #ordered {
 }
 
 
-RgbQuad :: struct #ordered { blue, green, red, reserved: byte }
+RgbQuad :: struct #ordered { blue, green, red, reserved: u8 }
 
 BI_RGB         :: 0;
 DIB_RGB_COLORS :: 0x00;
@@ -486,18 +486,18 @@ PixelFormatDescriptor :: struct #ordered {
 	stencil_bits,
 	aux_buffers,
 	layer_type,
-	reserved: byte,
+	reserved: u8,
 
 	layer_mask,
 	visible_mask,
 	damage_mask: u32,
 }
 
-get_d_c             :: proc(h: Hwnd) -> Hdc                                                   #foreign user32 "GetDC";
+get_dc              :: proc(h: Hwnd) -> Hdc                                                   #foreign user32 "GetDC";
 set_pixel_format    :: proc(hdc: Hdc, pixel_format: i32, pfd: ^PixelFormatDescriptor) -> Bool #foreign gdi32  "SetPixelFormat";
 choose_pixel_format :: proc(hdc: Hdc, pfd: ^PixelFormatDescriptor) -> i32                     #foreign gdi32  "ChoosePixelFormat";
 swap_buffers        :: proc(hdc: Hdc) -> Bool                                                 #foreign gdi32  "SwapBuffers";
-release_d_c         :: proc(wnd: Hwnd, hdc: Hdc) -> i32                                       #foreign user32 "ReleaseDC";
+release_dc          :: proc(wnd: Hwnd, hdc: Hdc) -> i32                                       #foreign user32 "ReleaseDC";
 
 
 Proc  :: #type proc() #cc_c;

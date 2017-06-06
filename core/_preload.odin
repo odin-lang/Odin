@@ -52,6 +52,7 @@ TypeInfo :: union {
 
 	Named{name: string, base: ^TypeInfo},
 	Integer{signed: bool},
+	Rune{},
 	Float{},
 	Complex{},
 	String{},
@@ -110,7 +111,7 @@ TypeInfo :: union {
 // This will be set by the compiler
 __type_table: []TypeInfo;
 
-__argv__: ^^byte;
+__argv__: ^^u8;
 __argc__: i32;
 
 type_info_base :: proc(info: ^TypeInfo) -> ^TypeInfo {
@@ -376,8 +377,8 @@ __string_decode_rune :: proc(s: string) -> (rune, int) #inline {
 
 
 __mem_set :: proc(data: rawptr, value: i32, len: int) -> rawptr {
-	llvm_memset_64bit :: proc(dst: rawptr, val: byte, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memset.p0i8.i64";
-	llvm_memset_64bit(data, byte(value), len, 1, false);
+	llvm_memset_64bit :: proc(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memset.p0i8.i64";
+	llvm_memset_64bit(data, u8(value), len, 1, false);
 	return data;
 }
 __mem_zero :: proc(data: rawptr, len: int) -> rawptr {
@@ -396,7 +397,7 @@ __mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr {
 	return dst;
 }
 
-__mem_compare :: proc(a, b: ^byte, n: int) -> int {
+__mem_compare :: proc(a, b: ^u8, n: int) -> int {
 	for i in 0..<n {
 		match {
 		case (a+i)^ < (b+i)^:
@@ -490,7 +491,7 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 		// TODO(bill): Better error handling for failed reservation
 		return array.len;
 	}
-	data := ^byte(array.data);
+	data := ^u8(array.data);
 	assert(data != nil);
 	__mem_copy(data + (elem_size*array.len), items, elem_size * item_count);
 	array.len += item_count;
@@ -509,7 +510,7 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 		// TODO(bill): Better error handling for failed reservation
 		return array.len;
 	}
-	data := ^byte(array.data);
+	data := ^u8(array.data);
 	assert(data != nil);
 	__mem_zero(data + (elem_size*array.len), elem_size);
 	array.len++;
@@ -526,7 +527,7 @@ __slice_append :: proc(slice_: rawptr, elem_size, elem_align: int,
 
 	item_count = min(slice.cap-slice.len, item_count);
 	if item_count > 0 {
-		data := ^byte(slice.data);
+		data := ^u8(slice.data);
 		assert(data != nil);
 		__mem_copy(data + (elem_size*slice.len), items, elem_size * item_count);
 		slice.len += item_count;
@@ -537,8 +538,8 @@ __slice_append :: proc(slice_: rawptr, elem_size, elem_align: int,
 
 // Map stuff
 
-__default_hash :: proc(data: []byte) -> u128 {
-	fnv128a :: proc(data: []byte) -> u128 {
+__default_hash :: proc(data: []u8) -> u128 {
+	fnv128a :: proc(data: []u8) -> u128 {
 		h: u128 = 0x6c62272e07bb014262b821756295c58d;
 		for b in data {
 			h = (h ~ u128(b)) * 0x1000000000000000000013b;
@@ -548,7 +549,7 @@ __default_hash :: proc(data: []byte) -> u128 {
 	return fnv128a(data);
 }
 __default_hash_string :: proc(s: string) -> u128 {
-	return __default_hash([]byte(s));
+	return __default_hash([]u8(s));
 }
 
 __INITIAL_MAP_CAP :: 16;
@@ -606,7 +607,7 @@ __dynamic_map_rehash :: proc(using header: __MapHeader, new_count: int) {
 		}
 
 		entry_header := __dynamic_map_get_entry(header, i);
-		data := ^byte(entry_header);
+		data := ^u8(entry_header);
 
 		fr := __dynamic_map_find(new_header, entry_header.key);
 		j := __dynamic_map_add_entry(new_header, entry_header.key);
@@ -619,7 +620,7 @@ __dynamic_map_rehash :: proc(using header: __MapHeader, new_count: int) {
 
 		e := __dynamic_map_get_entry(new_header, j);
 		e.next = fr.entry_index;
-		ndata := ^byte(e);
+		ndata := ^u8(e);
 		__mem_copy(ndata+value_offset, data+value_offset, value_size);
 
 		if __dynamic_map_full(new_header) {
@@ -634,7 +635,7 @@ __dynamic_map_rehash :: proc(using header: __MapHeader, new_count: int) {
 __dynamic_map_get :: proc(h: __MapHeader, key: __MapKey) -> rawptr {
 	index := __dynamic_map_find(h, key).entry_index;
 	if index >= 0 {
-		data := ^byte(__dynamic_map_get_entry(h, index));
+		data := ^u8(__dynamic_map_get_entry(h, index));
 		val := data + h.value_offset;
 		return val;
 	}
@@ -666,7 +667,7 @@ __dynamic_map_set :: proc(using h: __MapHeader, key: __MapKey, value: rawptr) {
 	{
 		e := __dynamic_map_get_entry(h, index);
 		e.key = key;
-		val := ^byte(e) + value_offset;
+		val := ^u8(e) + value_offset;
 		__mem_copy(val, value, value_size);
 	}
 
@@ -733,7 +734,7 @@ __dynamic_map_delete :: proc(using h: __MapHeader, key: __MapKey) {
 }
 
 __dynamic_map_get_entry :: proc(using h: __MapHeader, index: int) -> ^__MapEntryHeader {
-	data := ^byte(m.entries.data) + index*entry_size;
+	data := ^u8(m.entries.data) + index*entry_size;
 	return ^__MapEntryHeader(data);
 }
 

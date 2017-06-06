@@ -93,8 +93,8 @@ open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 		create_mode = win32.OPEN_EXISTING;
 	}
 
-	buf: [300]byte;
-	copy(buf[..], []byte(path));
+	buf: [300]u8;
+	copy(buf[..], []u8(path));
 
 	handle := Handle(win32.create_file_a(&buf[0], access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
 	if handle != INVALID_HANDLE {
@@ -109,7 +109,7 @@ close :: proc(fd: Handle) {
 }
 
 
-write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE;
 	}
@@ -136,7 +136,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	return int(total_write), ERROR_NONE;
 }
 
-read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE;
 	}
@@ -225,11 +225,11 @@ last_write_time :: proc(fd: Handle) -> FileTime {
 last_write_time_by_name :: proc(name: string) -> FileTime {
 	last_write_time: win32.Filetime;
 	data: win32.FileAttributeData;
-	buf: [1024]byte;
+	buf: [1024]u8;
 
 	assert(len(buf) > len(name));
 
-	copy(buf[..], []byte(name));
+	copy(buf[..], []u8(name));
 
 	if win32.get_file_attributes_ex_a(&buf[0], win32.GetFileExInfoStandard, &data) != 0 {
 		last_write_time = data.last_write_time;
@@ -283,7 +283,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 			wstr_len++;
 		}
 		len := 2*wstr_len-1;
-		buf := make([]byte, len+1);
+		buf := make([]u8, len+1);
 		str := slice_ptr(wstr, wstr_len+1);
 
 		i, j := 0, 0;
@@ -293,24 +293,24 @@ _alloc_command_line_arguments :: proc() -> []string {
 				if i+1 > len {
 					return "";
 				}
-				buf[i] = byte(str[j]); i++;
+				buf[i] = u8(str[j]); i++;
 				j++;
 			case str[j] < 0x800:
 				if i+2 > len {
 					return "";
 				}
-				buf[i] = byte(0xc0 + (str[j]>>6));   i++;
-				buf[i] = byte(0x80 + (str[j]&0x3f)); i++;
+				buf[i] = u8(0xc0 + (str[j]>>6));   i++;
+				buf[i] = u8(0x80 + (str[j]&0x3f)); i++;
 				j++;
 			case 0xd800 <= str[j] && str[j] < 0xdc00:
 				if i+4 > len {
 					return "";
 				}
 				c := rune((str[j] - 0xd800) << 10) + rune((str[j+1]) - 0xdc00) + 0x10000;
-				buf[i] = byte(0xf0 +  (c >> 18));         i++;
-				buf[i] = byte(0x80 + ((c >> 12) & 0x3f)); i++;
-				buf[i] = byte(0x80 + ((c >>  6) & 0x3f)); i++;
-				buf[i] = byte(0x80 + ((c      ) & 0x3f)); i++;
+				buf[i] = u8(0xf0 +  (c >> 18));         i++;
+				buf[i] = u8(0x80 + ((c >> 12) & 0x3f)); i++;
+				buf[i] = u8(0x80 + ((c >>  6) & 0x3f)); i++;
+				buf[i] = u8(0x80 + ((c      ) & 0x3f)); i++;
 				j += 2;
 			case 0xdc00 <= str[j] && str[j] < 0xe000:
 				return "";
@@ -318,9 +318,9 @@ _alloc_command_line_arguments :: proc() -> []string {
 				if i+3 > len {
 					return "";
 				}
-				buf[i] = 0xe0 + byte (str[j] >> 12);         i++;
-				buf[i] = 0x80 + byte((str[j] >>  6) & 0x3f); i++;
-				buf[i] = 0x80 + byte((str[j]      ) & 0x3f); i++;
+				buf[i] = 0xe0 + u8 (str[j] >> 12);         i++;
+				buf[i] = 0x80 + u8((str[j] >>  6) & 0x3f); i++;
+				buf[i] = 0x80 + u8((str[j]      ) & 0x3f); i++;
 				j++;
 			}
 		}

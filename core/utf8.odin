@@ -38,7 +38,7 @@ immutable accept_ranges := [5]AcceptRange{
 	{0x80, 0x8f},
 };
 
-immutable accept_sizes := [256]byte{
+immutable accept_sizes := [256]u8{
 	0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x00-0x0f
 	0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x10-0x1f
 	0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x20-0x2f
@@ -58,17 +58,17 @@ immutable accept_sizes := [256]byte{
 	0x34, 0x04, 0x04, 0x04, 0x44, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, // 0xf0-0xff
 };
 
-encode_rune :: proc(r: rune) -> ([4]byte, int) {
-	buf: [4]byte;
+encode_rune :: proc(r: rune) -> ([4]u8, int) {
+	buf: [4]u8;
 	i := u32(r);
-	mask: byte : 0x3f;
+	mask: u8 : 0x3f;
 	if i <= 1<<7-1 {
-		buf[0] = byte(r);
+		buf[0] = u8(r);
 		return buf, 1;
 	}
 	if i <= 1<<11-1 {
-		buf[0] = 0xc0 | byte(r>>6);
-		buf[1] = 0x80 | byte(r) & mask;
+		buf[0] = 0xc0 | u8(r>>6);
+		buf[1] = 0x80 | u8(r) & mask;
 		return buf, 2;
 	}
 
@@ -79,21 +79,21 @@ encode_rune :: proc(r: rune) -> ([4]byte, int) {
 	}
 
 	if i <= 1<<16-1 {
-		buf[0] = 0xe0 | byte(r>>12);
-		buf[1] = 0x80 | byte(r>>6) & mask;
-		buf[2] = 0x80 | byte(r)    & mask;
+		buf[0] = 0xe0 | u8(r>>12);
+		buf[1] = 0x80 | u8(r>>6) & mask;
+		buf[2] = 0x80 | u8(r)    & mask;
 		return buf, 3;
 	}
 
-	buf[0] = 0xf0 | byte(r>>18);
-	buf[1] = 0x80 | byte(r>>12) & mask;
-	buf[2] = 0x80 | byte(r>>6)  & mask;
-	buf[3] = 0x80 | byte(r)       & mask;
+	buf[0] = 0xf0 | u8(r>>18);
+	buf[1] = 0x80 | u8(r>>12) & mask;
+	buf[2] = 0x80 | u8(r>>6)  & mask;
+	buf[3] = 0x80 | u8(r)       & mask;
 	return buf, 4;
 }
 
-decode_rune :: proc(s: string) -> (rune, int) #inline { return decode_rune([]byte(s)); }
-decode_rune :: proc(s: []byte) -> (rune, int) {
+decode_rune :: proc(s: string) -> (rune, int) #inline { return decode_rune([]u8(s)); }
+decode_rune :: proc(s: []u8) -> (rune, int) {
 	n := len(s);
 	if n < 1 {
 		return RUNE_ERROR, 0;
@@ -132,8 +132,8 @@ decode_rune :: proc(s: []byte) -> (rune, int) {
 
 
 
-decode_last_rune :: proc(s: string) -> (rune, int) #inline { return decode_last_rune([]byte(s)); }
-decode_last_rune :: proc(s: []byte) -> (rune, int) {
+decode_last_rune :: proc(s: string) -> (rune, int) #inline { return decode_last_rune([]u8(s)); }
+decode_last_rune :: proc(s: []u8) -> (rune, int) {
 	r: rune;
 	size: int;
 	start, end, limit: int;
@@ -215,10 +215,10 @@ valid_string :: proc(s: string) -> bool {
 	return true;
 }
 
-rune_start :: proc(b: byte) -> bool #inline { return b&0xc0 != 0x80; }
+rune_start :: proc(b: u8) -> bool #inline { return b&0xc0 != 0x80; }
 
-rune_count :: proc(s: string) -> int #inline { return rune_count([]byte(s)); }
-rune_count :: proc(s: []byte) -> int {
+rune_count :: proc(s: string) -> int #inline { return rune_count([]u8(s)); }
+rune_count :: proc(s: []u8) -> int {
 	count := 0;
 	n := len(s);
 

@@ -164,12 +164,12 @@ close :: proc(fd: Handle) {
 	_unix_close(fd);
 }
 
-read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	sz := _unix_read(fd, &data[0], len(data));
 	return sz, 0;
 }
 
-write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	sz := _unix_write(fd, &data[0], len(data));
 	return sz, 0;
 }
@@ -213,7 +213,7 @@ access :: proc(path: string, mask: int) -> bool #inline {
 
 
 
-// read_entire_file :: proc(name: string) -> ([]byte, bool) {
+// read_entire_file :: proc(name: string) -> ([]u8, bool) {
 // 	fd: Handle;
 // 	err: Errno;
 // 	size: i64;

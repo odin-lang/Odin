@@ -4,7 +4,7 @@ Any :: struct #ordered {
 }
 
 String :: struct #ordered {
-	data: ^byte,
+	data: ^u8,
 	len:  int,
 };
 

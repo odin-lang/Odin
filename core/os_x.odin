@@ -166,7 +166,7 @@ close :: proc(fd: Handle) {
 	unix_close(fd);
 }
 
-write :: proc(fd: Handle, data: []byte) -> (AddressSize, Errno) {
+write :: proc(fd: Handle, data: []u8) -> (AddressSize, Errno) {
 	assert(fd != -1);
 
 	bytes_written := unix_write(fd, &data[0], len(data));
@@ -176,7 +176,7 @@ write :: proc(fd: Handle, data: []byte) -> (AddressSize, Errno) {
 	return bytes_written, 0;
 }
 
-read :: proc(fd: Handle, data: []byte) -> (AddressSize, Errno) {
+read :: proc(fd: Handle, data: []u8) -> (AddressSize, Errno) {
 	assert(fd != -1);
 
 	bytes_read := unix_read(fd, &data[0], len(data));
@@ -229,7 +229,7 @@ access :: proc(path: string, mask: int) -> bool #inline {
 	return unix_access(cstr, mask) == 0;
 }
 
-// read_entire_file :: proc(name: string) -> ([]byte, bool) {
+// read_entire_file :: proc(name: string) -> ([]u8, bool) {
 
 // 	handle, err := open_simple(name, O_RDONLY);
 // 	if(err != 0) {

@@ -1,11 +1,11 @@
-new_c_string :: proc(s: string) -> ^byte {
-	c := make([]byte, len(s)+1);
-	copy(c, []byte(s));
+new_c_string :: proc(s: string) -> ^u8 {
+	c := make([]u8, len(s)+1);
+	copy(c, []u8(s));
 	c[len(s)] = 0;
 	return &c[0];
 }
 
-to_odin_string :: proc(c: ^byte) -> string {
+to_odin_string :: proc(c: ^u8) -> string {
 	len := 0;
 	for (c+len)^ != 0 {
 		len++;

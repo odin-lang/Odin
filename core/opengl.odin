@@ -23,7 +23,7 @@ Ortho         :: proc(left, right, bottom, top, near, far: f64) #foreign lib "gl
 Color3f       :: proc(r, g, b: f32)                             #foreign lib "glColor3f";
 Vertex3f      :: proc(x, y, z: f32)                             #foreign lib "glVertex3f";
 GetError      :: proc() -> i32                                  #foreign lib "glGetError";
-GetString     :: proc(name: i32) -> ^byte                       #foreign lib "glGetString";
+GetString     :: proc(name: i32) -> ^u8                       #foreign lib "glGetString";
 GetIntegerv   :: proc(name: i32, v: ^i32)                       #foreign lib "glGetIntegerv";
 TexCoord2f    :: proc(x, y: f32)                                #foreign lib "glTexCoord2f";
 TexImage2D    :: proc(target, level, internal_format,
@@ -69,7 +69,7 @@ VertexAttribPointer:      proc(index: u32, size, type_: i32, normalized: i32, st
 EnableVertexAttribArray:  proc(index: u32) #cc_c;
 
 CreateShader:             proc(shader_type: i32) -> u32 #cc_c;
-ShaderSource:             proc(shader: u32, count: u32, str: ^^byte, length: ^i32) #cc_c;
+ShaderSource:             proc(shader: u32, count: u32, str: ^^u8, length: ^i32) #cc_c;
 CompileShader:            proc(shader: u32) #cc_c;
 CreateProgram:            proc() -> u32 #cc_c;
 AttachShader:             proc(program, shader: u32) #cc_c;
@@ -82,8 +82,8 @@ DeleteProgram:            proc(program: u32) #cc_c;
 
 GetShaderiv:              proc(shader:  u32, pname: i32, params: ^i32) #cc_c;
 GetProgramiv:             proc(program: u32, pname: i32, params: ^i32) #cc_c;
-GetShaderInfoLog:         proc(shader:  u32, max_length: u32, length: ^u32, info_long: ^byte) #cc_c;
-GetProgramInfoLog:        proc(program: u32, max_length: u32, length: ^u32, info_long: ^byte) #cc_c;
+GetShaderInfoLog:         proc(shader:  u32, max_length: u32, length: ^u32, info_long: ^u8) #cc_c;
+GetProgramInfoLog:        proc(program: u32, max_length: u32, length: ^u32, info_long: ^u8) #cc_c;
 
 ActiveTexture:            proc(texture: i32) #cc_c;
 GenerateMipmap:           proc(target:  i32) #cc_c;
@@ -106,7 +106,7 @@ Uniform3f:                proc(loc: i32, v0, v1, v2: f32) #cc_c;
 Uniform4f:                proc(loc: i32, v0, v1, v2, v3: f32) #cc_c;
 UniformMatrix4fv:         proc(loc: i32, count: u32, transpose: i32, value: ^f32) #cc_c;
 
-GetUniformLocation:       proc(program: u32, name: ^byte) -> i32 #cc_c;
+GetUniformLocation:       proc(program: u32, name: ^u8) -> i32 #cc_c;
 
 init :: proc() {
 	set_proc_address :: proc(p: rawptr, name: string) #inline {

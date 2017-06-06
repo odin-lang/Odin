@@ -14,6 +14,8 @@ typedef enum BasicKind {
 	Basic_i128,
 	Basic_u128,
 
+	Basic_rune,
+
 	// Basic_f16,
 	Basic_f32,
 	Basic_f64,
@@ -39,7 +41,6 @@ typedef enum BasicKind {
 	Basic_COUNT,
 
 	Basic_byte = Basic_u8,
-	Basic_rune = Basic_i32,
 } BasicKind;
 
 typedef enum BasicFlag {
@@ -54,8 +55,8 @@ typedef enum BasicFlag {
 	BasicFlag_Untyped     = GB_BIT(8),
 
 	BasicFlag_Numeric      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Complex,
-	BasicFlag_Ordered      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_String  | BasicFlag_Pointer,
-	BasicFlag_ConstantType = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_Pointer | BasicFlag_String | BasicFlag_Rune,
+	BasicFlag_Ordered      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
+	BasicFlag_ConstantType = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
 } BasicFlag;
 
 typedef struct BasicType {
@@ -235,6 +236,7 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_i128,              BasicFlag_Integer,                         16, STR_LIT("i128")}},
 	{Type_Basic, {Basic_u128,              BasicFlag_Integer | BasicFlag_Unsigned,    16, STR_LIT("u128")}},
 
+	{Type_Basic, {Basic_rune,              BasicFlag_Integer | BasicFlag_Rune,         4, STR_LIT("rune")}},
 
 	// {Type_Basic, {Basic_f16,               BasicFlag_Float,                            2, STR_LIT("f16")}},
 	{Type_Basic, {Basic_f32,               BasicFlag_Float,                            4, STR_LIT("f32")}},
@@ -260,10 +262,10 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_UntypedNil,        BasicFlag_Untyped,                          0, STR_LIT("untyped nil")}},
 };
 
-gb_global Type basic_type_aliases[] = {
-	{Type_Basic, {Basic_byte, BasicFlag_Integer | BasicFlag_Unsigned, 1, STR_LIT("byte")}},
-	{Type_Basic, {Basic_rune, BasicFlag_Integer,                      4, STR_LIT("rune")}},
-};
+// gb_global Type basic_type_aliases[] = {
+// 	// {Type_Basic, {Basic_byte, BasicFlag_Integer | BasicFlag_Unsigned, 1, STR_LIT("byte")}},
+// 	// {Type_Basic, {Basic_rune, BasicFlag_Integer,                      4, STR_LIT("rune")}},
+// };
 
 gb_global Type *t_invalid         = &basic_types[Basic_Invalid];
 gb_global Type *t_bool            = &basic_types[Basic_bool];
@@ -277,6 +279,8 @@ gb_global Type *t_i64             = &basic_types[Basic_i64];
 gb_global Type *t_u64             = &basic_types[Basic_u64];
 gb_global Type *t_i128            = &basic_types[Basic_i128];
 gb_global Type *t_u128            = &basic_types[Basic_u128];
+
+gb_global Type *t_rune            = &basic_types[Basic_rune];
 
 // gb_global Type *t_f16             = &basic_types[Basic_f16];
 gb_global Type *t_f32             = &basic_types[Basic_f32];
@@ -301,15 +305,13 @@ gb_global Type *t_untyped_string     = &basic_types[Basic_UntypedString];
 gb_global Type *t_untyped_rune       = &basic_types[Basic_UntypedRune];
 gb_global Type *t_untyped_nil        = &basic_types[Basic_UntypedNil];
 
-gb_global Type *t_byte               = &basic_type_aliases[0];
-gb_global Type *t_rune               = &basic_type_aliases[1];
 
 gb_global Type *t_u8_ptr       = NULL;
 gb_global Type *t_int_ptr      = NULL;
 gb_global Type *t_i64_ptr      = NULL;
 gb_global Type *t_i128_ptr     = NULL;
 gb_global Type *t_f64_ptr      = NULL;
-gb_global Type *t_byte_slice   = NULL;
+gb_global Type *t_u8_slice     = NULL;
 gb_global Type *t_string_slice = NULL;
 
 
@@ -323,6 +325,7 @@ gb_global Type *t_type_info_enum_value_ptr = NULL;
 
 gb_global Type *t_type_info_named         = NULL;
 gb_global Type *t_type_info_integer       = NULL;
+gb_global Type *t_type_info_rune          = NULL;
 gb_global Type *t_type_info_float         = NULL;
 gb_global Type *t_type_info_complex       = NULL;
 gb_global Type *t_type_info_any           = NULL;
@@ -345,6 +348,7 @@ gb_global Type *t_type_info_bit_field     = NULL;
 
 gb_global Type *t_type_info_named_ptr         = NULL;
 gb_global Type *t_type_info_integer_ptr       = NULL;
+gb_global Type *t_type_info_rune_ptr          = NULL;
 gb_global Type *t_type_info_float_ptr         = NULL;
 gb_global Type *t_type_info_complex_ptr       = NULL;
 gb_global Type *t_type_info_quaternion_ptr    = NULL;
@@ -646,6 +650,13 @@ bool is_type_unsigned(Type *t) {
 	}
 	return false;
 }
+bool is_type_rune(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_Basic) {
+		return (t->Basic.flags & BasicFlag_Rune) != 0;
+	}
+	return false;
+}
 bool is_type_numeric(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_Basic) {
@@ -932,6 +943,8 @@ bool is_type_comparable(Type *t) {
 		case Basic_UntypedNil:
 		case Basic_any:
 			return false;
+		case Basic_rune:
+			return true;
 		}
 		return true;
 	case Type_Pointer:
