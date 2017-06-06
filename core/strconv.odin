@@ -1,9 +1,9 @@
 #import . "decimal.odin";
 
 IntFlag :: enum {
-	PREFIX = 1<<0,
-	PLUS   = 1<<1,
-	SPACE  = 1<<2,
+	Prefix = 1<<0,
+	Plus   = 1<<1,
+	Space  = 1<<2,
 }
 
 
@@ -469,7 +469,7 @@ append_bits :: proc(buf: []byte, u_: u128, base: int, is_signed: bool, bit_size:
 	}
 	i--; a[i] = digits[uint(u % b)];
 
-	if flags&IntFlag.PREFIX != 0 {
+	if flags&IntFlag.Prefix != 0 {
 		ok := true;
 		match base {
 		case  2: i--; a[i] = 'b';
@@ -486,9 +486,9 @@ append_bits :: proc(buf: []byte, u_: u128, base: int, is_signed: bool, bit_size:
 
 	if neg {
 		i--; a[i] = '-';
-	} else if flags&IntFlag.PLUS != 0 {
+	} else if flags&IntFlag.Plus != 0 {
 		i--; a[i] = '+';
-	} else if flags&IntFlag.SPACE != 0 {
+	} else if flags&IntFlag.Space != 0 {
 		i--; a[i] = ' ';
 	}
 

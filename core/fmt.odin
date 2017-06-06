@@ -500,14 +500,14 @@ fmt_write_padding :: proc(fi: ^FmtInfo, width: int) {
 	if width <= 0 {
 		return;
 	}
-	pad_byte: byte = ' ';
-	if fi.zero {
-		pad_byte = '0';
+	pad_byte: byte = '0';
+	if fi.space {
+		pad_byte = ' ';
 	}
 
 	data := string_buffer_data(fi.buf^);
 	count := min(width, cap(data)-len(data));
-	for _ in 0..count {
+	for _ in 0..<count {
 		write_byte(fi.buf, pad_byte);
 	}
 }
@@ -550,11 +550,29 @@ _fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: in
 	}
 
 	buf: [256]byte;
+	start := 0;
+
+
 	flags: strconv.IntFlag;
-	if fi.hash   { flags |= strconv.IntFlag.PREFIX; }
-	if fi.plus   { flags |= strconv.IntFlag.PLUS; }
-	if fi.space  { flags |= strconv.IntFlag.SPACE; }
-	s := strconv.append_bits(buf[0..<0], u128(u), base, is_signed, bit_size, digits, flags);
+	if fi.hash && !fi.zero { flags |= strconv.IntFlag.Prefix; }
+	if fi.plus             { flags |= strconv.IntFlag.Plus; }
+	if fi.space            { flags |= strconv.IntFlag.Space; }
+	s := strconv.append_bits(buf[start..<start], u128(u), base, is_signed, bit_size, digits, flags);
+
+	if fi.hash && fi.zero {
+		c: byte;
+		match base {
+		case 2:  c = 'b';
+		case 8:  c = 'o';
+		case 10: c = 'd';
+		case 12: c = 'z';
+		case 16: c = 'x';
+		}
+		if c != 0 {
+			write_byte(fi.buf, '0');
+			write_byte(fi.buf, c);
+		}
+	}
 
 	prev_zero := fi.zero;
 	defer fi.zero = prev_zero;
