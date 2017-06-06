@@ -359,7 +359,7 @@ int main(int argc, char **argv) {
 	timings_start_section(&timings, str_lit("llvm-llc"));
 	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
 	exit_code = system_exec_command_line_app("llc", false,
-		"llc \"%.*s.bc\" -filetype=obj -O%d "
+		"llc \"%.*s.bc\" -filetype=obj -relocation-model=pic -O%d "
 		"%.*s "
 		// "-debug-pass=Arguments "
 		"",
