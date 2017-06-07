@@ -2643,6 +2643,14 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+	if (is_type_bit_field_value(src) && is_type_integer(dst)) {
+		return true;
+	}
+
+	if (is_type_bit_field_value(src) && is_type_boolean(dst)) {
+		return src->BitFieldValue.bits == 1;
+	}
+
 	// Cast between pointers
 	if (is_type_pointer(src) && is_type_pointer(dst)) {
 		Type *s = base_type(type_deref(src));

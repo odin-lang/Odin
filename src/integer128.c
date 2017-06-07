@@ -554,28 +554,28 @@ i128 i128_mul(i128 a, i128 b) {
 	return res;
 }
 
-void i128_divide(i128 num, i128 den, i128 *quo, i128 *rem) {
+void i128_divide(i128 a, i128 b, i128 *quo, i128 *rem) {
 	// TODO(bill): Which one is correct?!
-#if 0
-	i128 s = i128_shr(den, 127);
-	den = i128_sub(i128_xor(den, s), s);
-	s = i128_shr(num, 127);
-	den = i128_sub(i128_xor(num, s), s);
+#if 1
+	i128 s = i128_shr(b, 127);
+	b = i128_sub(i128_xor(b, s), s);
+	s = i128_shr(a, 127);
+	b = i128_sub(i128_xor(a, s), s);
 
 	u128 n, r = {0};
-	u128_divide(*cast(u128 *)&num, *cast(u128 *)&den, &n, &r);
+	u128_divide(*cast(u128 *)&a, *cast(u128 *)&b, &n, &r);
 	i128 ni = *cast(i128 *)&n;
 	i128 ri = *cast(i128 *)&r;
 
-	if (quo) *quo = i128_sub(i128_xor(ni, s), s);
-	if (rem) *rem = i128_sub(i128_xor(ri, s), s);
+	if (quo) *quo = i128_sub(i128_xor(ri, s), s);
+	if (rem) *rem = i128_sub(i128_xor(ni, s), s);
 #else
-	if (i128_eq(den, I128_ZERO)) {
-		if (quo) *quo = i128_from_u64(num.lo/den.lo);
+	if (i128_eq(b, I128_ZERO)) {
+		if (quo) *quo = i128_from_u64(a.lo/b.lo);
 		if (rem) *rem = I128_ZERO;
 	} else {
-		i128 n = num;
-		i128 d = den;
+		i128 n = a;
+		i128 d = b;
 		i128 x = I128_ONE;
 		i128 r = I128_ZERO;
 

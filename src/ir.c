@@ -3060,6 +3060,7 @@ bool ir_is_type_aggregate(Type *t) {
 	case Type_Tuple:
 	case Type_DynamicArray:
 	case Type_Map:
+	case Type_BitField:
 		return true;
 
 	case Type_Named:

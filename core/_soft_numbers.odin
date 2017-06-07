@@ -27,8 +27,8 @@ __i128_quo_mod :: proc(a, b: i128, rem: ^i128) -> (quo: i128) #cc_odin #link_nam
 	s = a >> 127;
 	b = (a~s) - s;
 
-	urem: u128;
-	uquo := __u128_quo_mod(transmute(u128, a), transmute(u128, b), &urem);
+	uquo: u128;
+	urem := __u128_quo_mod(transmute(u128, a), transmute(u128, b), &uquo);
 	iquo := transmute(i128, uquo);
 	irem := transmute(i128, urem);
 

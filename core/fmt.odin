@@ -1023,7 +1023,7 @@ fmt_arg :: proc(fi: ^FmtInfo, arg: any, verb: rune) {
 	case i16:     fmt_int(fi, u128(a), true,  16, verb);
 	case i32:     fmt_int(fi, u128(a), true,  32, verb);
 	case i64:     fmt_int(fi, u128(a), true,  64, verb);
-	case i128:    fmt_int(fi, u128(a), false, 128, verb);
+	case i128:    fmt_int(fi, u128(a), true, 128, verb);
 
 	case uint:    fmt_int(fi, u128(a), false, 8*size_of(uint), verb);
 	case u8:      fmt_int(fi, u128(a), false, 8, verb);

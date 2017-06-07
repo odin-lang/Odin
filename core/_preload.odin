@@ -158,8 +158,8 @@ AllocatorMode :: enum u8 {
 	Resize,
 }
 AllocatorProc :: #type proc(allocator_data: rawptr, mode: AllocatorMode,
-                             size, alignment: int,
-                             old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
+                            size, alignment: int,
+                            old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
 Allocator :: struct #ordered {
 	procedure: AllocatorProc,
 	data:      rawptr,
