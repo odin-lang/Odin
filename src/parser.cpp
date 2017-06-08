@@ -1547,7 +1547,7 @@ bool allow_token(AstFile *f, TokenKind kind) {
 
 bool is_blank_ident(String str) {
 	if (str.len == 1) {
-		return str.text[0] == '_';
+		return str[0] == '_';
 	}
 	return false;
 }
@@ -1605,7 +1605,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 Token expect_closing(AstFile *f, TokenKind kind, String context) {
 	if (f->curr_token.kind != kind &&
 	    f->curr_token.kind == Token_Semicolon &&
-	    str_eq(f->curr_token.string, str_lit("\n"))) {
+	    f->curr_token.string == "\n") {
 		error(f->curr_token, "Missing `,` before newline in %.*s", LIT(context));
 		next_token(f);
 	}
@@ -1847,11 +1847,11 @@ void parse_proc_tags(AstFile *f, u64 *tags, AstNode **foreign_library_token, Str
 		String tag_name = te->name.string;
 
 		#define ELSE_IF_ADD_TAG(name) \
-		else if (str_eq(tag_name, str_lit(#name))) { \
+		else if (tag_name == #name) { \
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_##name, tag_name); \
 		}
 
-		if (str_eq(tag_name, str_lit("foreign"))) {
+		if (tag_name == "foreign") {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_foreign, tag_name);
 			*foreign_library_token = parse_ident(f);
 			if (f->curr_token.kind == Token_String) {
@@ -1863,7 +1863,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, AstNode **foreign_library_token, Str
 
 				next_token(f);
 			}
-		} else if (str_eq(tag_name, str_lit("link_name"))) {
+		} else if (tag_name == "link_name") {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_link_name, tag_name);
 			if (f->curr_token.kind == Token_String) {
 				*link_name = f->curr_token.string;
@@ -1885,25 +1885,25 @@ void parse_proc_tags(AstFile *f, u64 *tags, AstNode **foreign_library_token, Str
 		ELSE_IF_ADD_TAG(no_inline)
 		// ELSE_IF_ADD_TAG(dll_import)
 		// ELSE_IF_ADD_TAG(dll_export)
-		else if (str_eq(tag_name, str_lit("cc_odin"))) {
+		else if (tag_name == "cc_odin") {
 			if (cc == ProcCC_Invalid) {
 				cc = ProcCC_Odin;
 			} else {
 				syntax_error_node(tag_expr, "Multiple calling conventions for procedure type");
 			}
-		} else if (str_eq(tag_name, str_lit("cc_c"))) {
+		} else if (tag_name == "cc_c") {
 			if (cc == ProcCC_Invalid) {
 				cc = ProcCC_C;
 			} else {
 				syntax_error_node(tag_expr, "Multiple calling conventions for procedure type");
 			}
-		} else if (str_eq(tag_name, str_lit("cc_std"))) {
+		} else if (tag_name == "cc_std") {
 			if (cc == ProcCC_Invalid) {
 				cc = ProcCC_Std;
 			} else {
 				syntax_error_node(tag_expr, "Multiple calling conventions for procedure type");
 			}
-		} else if (str_eq(tag_name, str_lit("cc_fast"))) {
+		} else if (tag_name == "cc_fast") {
 			if (cc == ProcCC_Invalid) {
 				cc = ProcCC_Fast;
 			} else {
@@ -2025,7 +2025,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	case Token_Hash: {
 		Token token = expect_token(f, Token_Hash);
 		Token name  = expect_token(f, Token_Ident);
-		if (str_eq(name.string, str_lit("run"))) {
+		if (name.string == "run") {
 			AstNode *expr = parse_expr(f, false);
 			operand = ast_run_expr(f, token, name, expr);
 			if (unparen_expr(expr)->kind != AstNode_CallExpr) {
@@ -2033,11 +2033,11 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 				operand = ast_bad_expr(f, token, f->curr_token);
 			}
 			warning(token, "#run is not yet implemented");
-		} else if (str_eq(name.string, str_lit("file"))) { return ast_basic_directive(f, token, name.string);
-		} else if (str_eq(name.string, str_lit("line"))) { return ast_basic_directive(f, token, name.string);
-		} else if (str_eq(name.string, str_lit("procedure"))) { return ast_basic_directive(f, token, name.string);
-		} else if (str_eq(name.string, str_lit("type"))) { return ast_helper_type(f, token, parse_type(f));
-		} else if (!lhs && str_eq(name.string, str_lit("alias"))) { return ast_alias(f, token, parse_expr(f, false));
+		} else if (name.string == "file") { return ast_basic_directive(f, token, name.string);
+		} else if (name.string == "line") { return ast_basic_directive(f, token, name.string);
+		} else if (name.string == "procedure") { return ast_basic_directive(f, token, name.string);
+		} else if (name.string == "type") { return ast_helper_type(f, token, parse_type(f));
+		} else if (!lhs && name.string == "alias") { return ast_alias(f, token, parse_expr(f, false));
 		} else {
 			operand = ast_tag_expr(f, token, name, parse_expr(f, false));
 		}
@@ -2721,7 +2721,7 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 		next_token(f);
 		switch (f->curr_token.kind) {
 		case Token_Ident:
-			if (str_eq(f->curr_token.string, str_lit("no_alias"))) {
+			if (f->curr_token.string == "no_alias") {
 				return FieldPrefix_NoAlias;
 			}
 			break;
@@ -2941,7 +2941,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		Token hash_token = expect_token(f, Token_Hash);
 		Token name = expect_token(f, Token_Ident);
 		String tag = name.string;
-		if (str_eq(tag, str_lit("type"))) {
+		if (tag == "type") {
 			AstNode *type = parse_type(f);
 			return ast_helper_type(f, hash_token, type);
 		}
@@ -3023,17 +3023,17 @@ AstNode *parse_type_or_ident(AstFile *f) {
 
 		while (allow_token(f, Token_Hash)) {
 			Token tag = expect_token_after(f, Token_Ident, "#");
-			if (str_eq(tag.string, str_lit("packed"))) {
+			if (tag.string == "packed") {
 				if (is_packed) {
 					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
 				}
 				is_packed = true;
-			} else if (str_eq(tag.string, str_lit("ordered"))) {
+			} else if (tag.string == "ordered") {
 				if (is_ordered) {
 					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
 				}
 				is_ordered = true;
-			} else if (str_eq(tag.string, str_lit("align"))) {
+			} else if (tag.string == "align") {
 				if (align) {
 					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
 				}
@@ -3157,7 +3157,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 
 		while (allow_token(f, Token_Hash)) {
 			Token tag = expect_token_after(f, Token_Ident, "#");
-			if (str_eq(tag.string, str_lit("align"))) {
+			if (tag.string == "align") {
 				if (align) {
 					syntax_error(tag, "Duplicate bit_field tag `#%.*s`", LIT(tag.string));
 				}
@@ -3687,7 +3687,7 @@ AstNode *parse_stmt(AstFile *f) {
 		Token name = expect_token(f, Token_Ident);
 		String tag = name.string;
 
-		if (str_eq(tag, str_lit("import"))) {
+		if (tag == "import") {
 			AstNode *cond = NULL;
 			Token import_name = {};
 
@@ -3706,7 +3706,7 @@ AstNode *parse_stmt(AstFile *f) {
 				break;
 			}
 
-			if (str_eq(import_name.string, str_lit("_"))) {
+			if (import_name.string == "_") {
 				syntax_error(import_name, "Illegal #import name: `_`");
 			}
 
@@ -3724,7 +3724,7 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			expect_semicolon(f, decl);
 			return decl;
-		} else if (str_eq(tag, str_lit("load"))) {
+		} else if (tag == "load") {
 			AstNode *cond = NULL;
 			Token file_path = expect_token_after(f, Token_String, "#load");
 			Token import_name = file_path;
@@ -3743,7 +3743,7 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			expect_semicolon(f, decl);
 			return decl;
-		} else if (str_eq(tag, str_lit("shared_global_scope"))) {
+		} else if (tag == "shared_global_scope") {
 			if (f->curr_proc == NULL) {
 				f->is_global_scope = true;
 				s = ast_empty_stmt(f, f->curr_token);
@@ -3753,7 +3753,7 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			expect_semicolon(f, s);
 			return s;
-		} else if (str_eq(tag, str_lit("foreign_system_library"))) {
+		} else if (tag == "foreign_system_library") {
 			AstNode *cond = NULL;
 			Token lib_name = {};
 
@@ -3767,7 +3767,7 @@ AstNode *parse_stmt(AstFile *f) {
 				break;
 			}
 
-			if (str_eq(lib_name.string, str_lit("_"))) {
+			if (lib_name.string == "_") {
 				syntax_error(lib_name, "Illegal #foreign_library name: `_`");
 			}
 			Token file_path = expect_token(f, Token_String);
@@ -3784,7 +3784,7 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			expect_semicolon(f, s);
 			return s;
-		} else if (str_eq(tag, str_lit("foreign_library"))) {
+		} else if (tag == "foreign_library") {
 			AstNode *cond = NULL;
 			Token lib_name = {};
 
@@ -3798,7 +3798,7 @@ AstNode *parse_stmt(AstFile *f) {
 				break;
 			}
 
-			if (str_eq(lib_name.string, str_lit("_"))) {
+			if (lib_name.string == "_") {
 				syntax_error(lib_name, "Illegal #foreign_library name: `_`");
 			}
 			Token file_path = expect_token(f, Token_String);
@@ -3815,7 +3815,7 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			expect_semicolon(f, s);
 			return s;
-		} else if (str_eq(tag, str_lit("thread_local"))) {
+		} else if (tag == "thread_local") {
 			AstNode *s = parse_stmt(f);
 
 			if (s->kind == AstNode_ValueDecl) {
@@ -3831,14 +3831,14 @@ AstNode *parse_stmt(AstFile *f) {
 			}
 			syntax_error(token, "`thread_local` may only be applied to a variable declaration");
 			return ast_bad_stmt(f, token, f->curr_token);
-		} else if (str_eq(tag, str_lit("bounds_check"))) {
+		} else if (tag == "bounds_check") {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_bounds_check;
 			if ((s->stmt_state_flags & StmtStateFlag_no_bounds_check) != 0) {
 				syntax_error(token, "#bounds_check and #no_bounds_check cannot be applied together");
 			}
 			return s;
-		} else if (str_eq(tag, str_lit("no_bounds_check"))) {
+		} else if (tag == "no_bounds_check") {
 			s = parse_stmt(f);
 			s->stmt_state_flags |= StmtStateFlag_no_bounds_check;
 			if ((s->stmt_state_flags & StmtStateFlag_bounds_check) != 0) {
@@ -3847,7 +3847,7 @@ AstNode *parse_stmt(AstFile *f) {
 			return s;
 		}
 
-		if (str_eq(tag, str_lit("include"))) {
+		if (tag == "include") {
 			syntax_error(token, "#include is not a valid import declaration kind. Use #load instead");
 			s = ast_bad_stmt(f, token, f->curr_token);
 		} else {
@@ -3983,7 +3983,7 @@ bool try_add_import_path(Parser *p, String path, String rel_path, TokenPos pos) 
 
 	for_array(i, p->imports) {
 		String import = p->imports.e[i].path;
-		if (str_eq(import, path)) {
+		if (import == path) {
 			return false;
 		}
 	}
@@ -4059,7 +4059,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, AstNodeArray
 		#if 0
 			isize colon_pos = -1;
 			for (isize j = 0; j < file_str.len; j++) {
-				if (file_str.text[j] == ':') {
+				if (file_str[j] == ':') {
 					colon_pos = j;
 					break;
 				}
@@ -4077,12 +4077,12 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, AstNodeArray
 			}
 
 
-			if (str_eq(collection_name, str_lit("core"))) {
+			if (collection_name == "core") {
 				String abs_path = get_fullpath_core(allocator, file_str);
 				if (gb_file_exists(cast(char *)abs_path.text)) { // NOTE(bill): This should be null terminated
 					import_file = abs_path;
 				}
-			} else if (str_eq(collection_name, str_lit("local"))) {
+			} else if (collection_name == "local") {
 				String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
 				if (gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
 					import_file = rel_path;
@@ -4153,8 +4153,8 @@ void parse_file(Parser *p, AstFile *f) {
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = filepath;
 	for (isize i = filepath.len-1; i >= 0; i--) {
-		if (base_dir.text[i] == '\\' ||
-		    base_dir.text[i] == '/') {
+		if (base_dir[i] == '\\' ||
+		    base_dir[i] == '/') {
 			break;
 		}
 		base_dir.len--;
@@ -4202,7 +4202,7 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 
 		if (err != ParseFile_None) {
 			if (err == ParseFile_EmptyFile) {
-				if (str_eq(import_path, init_fullpath)) {
+				if (import_path == init_fullpath) {
 					gb_printf_err("Initial file is empty - %.*s\n", LIT(init_fullpath));
 					gb_exit(1);
 				}

@@ -378,9 +378,9 @@ ssaValue *ssa_const_i64         (ssaProc *p, Type *t, i64    c)     { return ssa
 ssaValue *ssa_const_f32         (ssaProc *p, Type *t, f32    c)     { return ssa_const_val(p, ssaOp_Const32F,    t, exact_value_float(c)); }
 ssaValue *ssa_const_f64         (ssaProc *p, Type *t, f64    c)     { return ssa_const_val(p, ssaOp_Const64F,    t, exact_value_float(c)); }
 ssaValue *ssa_const_string      (ssaProc *p, Type *t, String c)     { return ssa_const_val(p, ssaOp_ConstString, t, exact_value_string(c)); }
-ssaValue *ssa_const_empty_string(ssaProc *p, Type *t)               { return ssa_const_val(p, ssaOp_ConstString, t, ExactValue{}); }
+ssaValue *ssa_const_empty_string(ssaProc *p, Type *t)               { return ssa_const_val(p, ssaOp_ConstString, t, empty_exact_value); }
 ssaValue *ssa_const_slice       (ssaProc *p, Type *t, ExactValue v) { return ssa_const_val(p, ssaOp_ConstSlice,  t, v); }
-ssaValue *ssa_const_nil         (ssaProc *p, Type *t)               { return ssa_const_val(p, ssaOp_ConstNil,    t, ExactValue{}); }
+ssaValue *ssa_const_nil         (ssaProc *p, Type *t)               { return ssa_const_val(p, ssaOp_ConstNil,    t, empty_exact_value); }
 
 ssaValue *ssa_const_int(ssaProc *p, Type *t, i64 c) {
 	switch (8*type_size_of(p->allocator, t)) {
@@ -413,7 +413,7 @@ void ssa_reset_value_args(ssaValue *v) {
 
 void ssa_reset(ssaValue *v, ssaOp op) {
 	v->op = op;
-	v->exact_value = ExactValue{};
+	v->exact_value = empty_exact_value;
 	ssa_reset_value_args(v);
 }
 
@@ -1071,7 +1071,7 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 				// GB_ASSERT(e->kind == Entity_Variable);
 				// GB_ASSERT(e->flags & EntityFlag_TypeField);
 				// String name = e->token.string;
-				// if (str_eq(name, str_lit("names"))) {
+				// if (name == "names") {
 				// 	ssaValue *ti_ptr = ir_type_info(p, type);
 
 				// 	ssaValue *names_ptr = NULL;
@@ -2497,15 +2497,15 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 		if (e->kind == Entity_Variable) {
 			global_variable_max_count++;
 		} else if (e->kind == Entity_Procedure && !e->scope->is_global) {
-			if (e->scope->is_init && str_eq(name, str_lit("main"))) {
+			if (e->scope->is_init && name == "main") {
 				entry_point = e;
 			}
 			if ((e->Procedure.tags & ProcTag_export) != 0 ||
 			    (e->Procedure.link_name.len > 0) ||
 			    (e->scope->is_file && e->Procedure.link_name.len > 0)) {
-				if (!has_dll_main && str_eq(name, str_lit("DllMain"))) {
+				if (!has_dll_main && name == "DllMain") {
 					has_dll_main = true;
-				} else if (!has_win_main && str_eq(name, str_lit("WinMain"))) {
+				} else if (!has_win_main && name == "WinMain") {
 					has_win_main = true;
 				}
 			}
@@ -2536,7 +2536,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 			if (e->kind == Entity_Procedure && (e->Procedure.tags & ProcTag_export) != 0) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later
-			} else if (scope->is_init && e->kind == Entity_Procedure && str_eq(name, str_lit("main"))) {
+			} else if (scope->is_init && e->kind == Entity_Procedure && name == "main") {
 			} else {
 				name = ssa_mangle_name(&m, e->token.pos.file, e);
 			}

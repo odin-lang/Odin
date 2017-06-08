@@ -1025,7 +1025,7 @@ bool are_types_identical(Type *x, Type *y) {
 							if (!are_types_identical(xf->type, yf->type)) {
 								return false;
 							}
-							if (str_ne(xf->token.string, yf->token.string)) {
+							if (xf->token.string != yf->token.string) {
 								return false;
 							}
 							bool xf_is_using = (xf->flags&EntityFlag_Using) != 0;
@@ -1039,7 +1039,7 @@ bool are_types_identical(Type *x, Type *y) {
 							if (!are_types_identical(x->Record.variants[i]->type, y->Record.variants[i]->type)) {
 								return false;
 							}
-							if (str_ne(x->Record.variants[i]->token.string, y->Record.variants[i]->token.string)) {
+							if (x->Record.variants[i]->token.string != y->Record.variants[i]->token.string) {
 								return false;
 							}
 						}
@@ -1337,7 +1337,7 @@ gb_global Entity *entity__any_type_info  = NULL;
 Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel) {
 	GB_ASSERT(type_ != NULL);
 
-	if (str_eq(field_name, str_lit("_"))) {
+	if (field_name == "_") {
 		return empty_selection;
 	}
 
@@ -1362,11 +1362,11 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				entity__any_type_info = make_entity_field(a, NULL, make_token_ident(type_info_str), t_type_info_ptr, false, 1);
 			}
 
-			if (str_eq(field_name, data_str)) {
+			if (field_name == data_str) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__any_data;;
 				return sel;
-			} else if (str_eq(field_name, type_info_str)) {
+			} else if (field_name == type_info_str) {
 				selection_add_index(&sel, 1);
 				sel.entity = entity__any_type_info;
 				return sel;
@@ -1382,7 +1382,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			switch (type->Vector.count) {
 			#define _VECTOR_FIELD_CASE(_length, _name) \
 			case (_length): \
-				if (str_eq(field_name, str_lit(_name))) { \
+				if (field_name == _name) { \
 					selection_add_index(&sel, (_length)-1); \
 					sel.entity = make_entity_vector_elem(a, NULL, make_token_ident(str_lit(_name)), type->Vector.elem, (_length)-1); \
 					return sel; \
@@ -1403,7 +1403,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 	if (is_type) {
 		if (type->kind == Type_Record) {
 			if (type->Record.names != NULL &&
-			    str_eq(field_name, str_lit("names"))) {
+			    field_name == "names") {
 				sel.entity = type->Record.names;
 				return sel;
 			}
@@ -1415,7 +1415,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				GB_ASSERT(f->kind == Entity_TypeName);
 				String str = f->token.string;
 
-				if (str_eq(str, field_name)) {
+				if (str == field_name) {
 					sel.entity = f;
 					// selection_add_index(&sel, i);
 					return sel;
@@ -1424,15 +1424,15 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		} else if (is_type_enum(type)) {
 			// NOTE(bill): These may not have been added yet, so check in case
 			if (type->Record.enum_count != NULL) {
-				if (str_eq(field_name, str_lit("count"))) {
+				if (field_name == "count") {
 					sel.entity = type->Record.enum_count;
 					return sel;
 				}
-				if (str_eq(field_name, str_lit("min_value"))) {
+				if (field_name == "min_value") {
 					sel.entity = type->Record.enum_min_value;
 					return sel;
 				}
-				if (str_eq(field_name, str_lit("max_value"))) {
+				if (field_name == "max_value") {
 					sel.entity = type->Record.enum_max_value;
 					return sel;
 				}
@@ -1443,7 +1443,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				GB_ASSERT(f->kind == Entity_Constant);
 				String str = f->token.string;
 
-				if (str_eq(field_name, str)) {
+				if (field_name == str) {
 					sel.entity = f;
 					// selection_add_index(&sel, i);
 					return sel;
@@ -1457,7 +1457,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				continue;
 			}
 			String str = f->token.string;
-			if (str_eq(field_name, str)) {
+			if (field_name == str) {
 				selection_add_index(&sel, i);  // HACK(bill): Leaky memory
 				sel.entity = f;
 				return sel;
@@ -1479,7 +1479,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			}
 		}
 		if (type->Record.kind == TypeRecord_Union) {
-			if (str_eq(field_name, str_lit("__tag"))) {
+			if (field_name == "__tag") {
 				Entity *e = type->Record.union__tag;
 				GB_ASSERT(e != NULL);
 				selection_add_index(&sel, -1); // HACK(bill): Leaky memory
@@ -1496,7 +1496,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			}
 
 			String str = f->token.string;
-			if (str_eq(field_name, str)) {
+			if (field_name == str) {
 				selection_add_index(&sel, i);  // HACK(bill): Leaky memory
 				sel.entity = f;
 				return sel;

@@ -187,7 +187,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 
 	// NOTE(bill): Ignore assignments to `_`
 	if (node->kind == AstNode_Ident &&
-	    str_eq(node->Ident.string, str_lit("_"))) {
+	    node->Ident.string == "_") {
 		add_entity_definition(&c->info, node, NULL);
 		check_assignment(c, rhs, NULL, str_lit("assignment to `_` identifier"));
 		if (rhs->mode == Addressing_Invalid) {
@@ -434,7 +434,7 @@ void check_label(Checker *c, AstNode *label) {
 		return;
 	}
 	String name = l->name->Ident.string;
-	if (str_eq(name, str_lit("_"))) {
+	if (name == "_") {
 		error_node(l->name, "A label's name cannot be a blank identifier");
 		return;
 	}
@@ -449,7 +449,7 @@ void check_label(Checker *c, AstNode *label) {
 	bool ok = true;
 	for_array(i, c->context.decl->labels) {
 		BlockLabel bl = c->context.decl->labels.e[i];
-		if (str_eq(bl.name, name)) {
+		if (bl.name == name) {
 			error_node(label, "Duplicate label with the name `%.*s`", LIT(name));
 			ok = false;
 			break;
@@ -943,10 +943,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 
 			if (x.mode != Addressing_Constant) {
-				x.value = ExactValue{};
+				x.value = empty_exact_value;
 			}
 			if (y.mode != Addressing_Constant) {
-				y.value = ExactValue{};
+				y.value = empty_exact_value;
 			}
 
 
@@ -1032,7 +1032,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				String str = token.string;
 				Entity *found = NULL;
 
-				if (str_ne(str, str_lit("_"))) {
+				if (str != "_") {
 					found = current_scope_lookup_entity(c->context.scope, str);
 				}
 				if (found == NULL) {
@@ -1564,7 +1564,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					String str = token.string;
 					Entity *found = NULL;
 					// NOTE(bill): Ignore assignments to `_`
-					if (str_ne(str, str_lit("_"))) {
+					if (str != "_") {
 						found = current_scope_lookup_entity(c->context.scope, str);
 					}
 					if (found == NULL) {

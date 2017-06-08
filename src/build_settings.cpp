@@ -65,7 +65,7 @@ String odin_root_dir(void) {
 	GetModuleFileNameW(NULL, text, len);
 	path = string16_to_string(heap_allocator(), make_string16(text, len));
 	for (i = path.len-1; i >= 0; i--) {
-		u8 c = path.text[i];
+		u8 c = path[i];
 		if (c == '/' || c == '\\') {
 			break;
 		}
@@ -118,7 +118,7 @@ String odin_root_dir(void) {
 
 	path = make_string(text, len);
 	for (i = path.len-1; i >= 0; i--) {
-		u8 c = path.text[i];
+		u8 c = path[i];
 		if (c == '/' || c == '\\') {
 			break;
 		}
@@ -175,7 +175,7 @@ String odin_root_dir(void) {
 
 	path = make_string(text, len);
 	for (i = path.len-1; i >= 0; i--) {
-		u8 c = path.text[i];
+		u8 c = path[i];
 		if (c == '/' || c == '\\') {
 			break;
 		}
@@ -200,10 +200,10 @@ String path_to_fullpath(gbAllocator a, String s) {
 	String16 string16 = string_to_string16(string_buffer_allocator, s);
 	String result = {0};
 
-	DWORD len = GetFullPathNameW(string16.text, 0, NULL, NULL);
+	DWORD len = GetFullPathNameW(&string16[0], 0, NULL, NULL);
 	if (len != 0) {
 		wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
-		GetFullPathNameW(string16.text, len, text, NULL);
+		GetFullPathNameW(&string16[0], len, text, NULL);
 		text[len] = 0;
 		result = string16_to_string(a, make_string16(text, len));
 	}
@@ -212,7 +212,7 @@ String path_to_fullpath(gbAllocator a, String s) {
 }
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
 String path_to_fullpath(gbAllocator a, String s) {
-	char *p = realpath(cast(char *)s.text, 0);
+	char *p = realpath(cast(char *)&s[0], 0);
 	if(p == NULL) return make_string_c("");
 
 	return make_string_c(p);
@@ -229,8 +229,8 @@ String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
 
 	isize i = 0;
-	gb_memmove(str+i, base_dir.text, base_dir.len); i += base_dir.len;
-	gb_memmove(str+i, path.text, path.len);
+	gb_memmove(str+i, &base_dir[0], base_dir.len); i += base_dir.len;
+	gb_memmove(str+i, &path[0], path.len);
 	str[str_len] = '\0';
 	res = path_to_fullpath(a, make_string(str, str_len));
 	gb_free(heap_allocator(), str);
@@ -247,9 +247,9 @@ String get_fullpath_core(gbAllocator a, String path) {
 	isize str_len = module_dir.len + core_len + path.len;
 	u8 *str = gb_alloc_array(heap_allocator(), u8, str_len+1);
 
-	gb_memmove(str, module_dir.text, module_dir.len);
+	gb_memmove(str, &module_dir[0], module_dir.len);
 	gb_memmove(str+module_dir.len, core, core_len);
-	gb_memmove(str+module_dir.len+core_len, path.text, path.len);
+	gb_memmove(str+module_dir.len+core_len, &path[0], path.len);
 	str[str_len] = '\0';
 
 	res = path_to_fullpath(a, make_string(str, str_len));
@@ -294,7 +294,7 @@ void init_build_context(void) {
 
 	// NOTE(zangent): MacOS systems are x64 only, so ld doesn't have
 	// an architecture option. All compilation done on MacOS must be x64.
-	GB_ASSERT(str_eq(bc->ODIN_ARCH, str_lit("amd64")));
+	GB_ASSERT(bc->ODIN_ARCH == "amd64");
 
 	#define LINK_FLAG_X64 ""
 	#define LINK_FLAG_X86 ""
@@ -311,12 +311,12 @@ void init_build_context(void) {
 	#define LINK_FLAG_X86 "-arch x86"
 	#endif
 
-	if (str_eq(bc->ODIN_ARCH, str_lit("amd64"))) {
+	if (bc->ODIN_ARCH == "amd64") {
 		bc->word_size = 8;
 		bc->max_align = 16;
 		bc->llc_flags = str_lit("-march=x86-64 ");
 		bc->link_flags = str_lit(LINK_FLAG_X64 " ");
-	} else if (str_eq(bc->ODIN_ARCH, str_lit("x86"))) {
+	} else if (bc->ODIN_ARCH == "x86") {
 		bc->word_size = 4;
 		bc->max_align = 8;
 		bc->llc_flags = str_lit("-march=x86 ");

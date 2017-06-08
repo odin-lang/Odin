@@ -65,7 +65,7 @@ bool hash_key_equal(HashKey a, HashKey b) {
 		// NOTE(bill): If two string's hashes collide, compare the strings themselves
 		if (a.kind == HashKey_String) {
 			if (b.kind == HashKey_String) {
-				return str_eq(a.string, b.string);
+				return a.string == b.string;
 			}
 			return false;
 		}

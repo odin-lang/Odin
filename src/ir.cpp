@@ -1399,8 +1399,8 @@ irDebugInfo *ir_add_debug_info_file(irProcedure *proc, AstFile *file) {
 	String directory = filename;
 	isize slash_index = 0;
 	for (isize i = filename.len-1; i >= 0; i--) {
-		if (filename.text[i] == '\\' ||
-		    filename.text[i] == '/') {
+		if (filename[i] == '\\' ||
+		    filename[i] == '/') {
 			break;
 		}
 		slash_index = i;
@@ -1612,7 +1612,7 @@ void ir_emit_if(irProcedure *proc, irValue *cond, irBlock *true_block, irBlock *
 }
 
 void ir_emit_startup_runtime(irProcedure *proc) {
-	GB_ASSERT(proc->parent == NULL && str_eq(proc->name, str_lit("main")));
+	GB_ASSERT(proc->parent == NULL && proc->name == "main");
 	ir_emit(proc, ir_alloc_instr(proc, irInstr_StartupRuntime));
 }
 
@@ -4813,7 +4813,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 				GB_ASSERT(e->kind == Entity_Variable);
 				GB_ASSERT(e->flags & EntityFlag_TypeField);
 				String name = e->token.string;
-				if (str_eq(name, str_lit("names"))) {
+				if (name == "names") {
 					irValue *ti_ptr = ir_type_info(proc, type);
 
 					irValue *names_ptr = NULL;
@@ -6733,8 +6733,8 @@ void ir_begin_procedure_body(irProcedure *proc) {
 
 			Entity *e = params->variables[i];
 			Type *abi_type = proc->type->Proc.abi_compat_params[i];
-			if (!str_eq(e->token.string, str_lit("")) &&
-			    !str_eq(e->token.string, str_lit("_"))) {
+			if (e->token.string != "" &&
+			    e->token.string != "_") {
 				irValue *param = ir_add_param(proc, e, name, abi_type);
 				array_add(&proc->params, param);
 			}
@@ -6764,7 +6764,7 @@ void ir_end_procedure_body(irProcedure *proc) {
 
 void ir_insert_code_before_proc(irProcedure* proc, irProcedure *parent) {
 	if (parent == NULL) {
-		if (str_eq(proc->name, str_lit("main"))) {
+		if (proc->name == "main") {
 			ir_emit_startup_runtime(proc);
 		}
 	}
@@ -7101,15 +7101,15 @@ void ir_gen_tree(irGen *s) {
 		if (e->kind == Entity_Variable) {
 			global_variable_max_count++;
 		} else if (e->kind == Entity_Procedure && !e->scope->is_global) {
-			if (e->scope->is_init && str_eq(name, str_lit("main"))) {
+			if (e->scope->is_init && name == "main") {
 				entry_point = e;
 			}
 			if ((e->Procedure.tags & ProcTag_export) != 0 ||
 			    (e->Procedure.link_name.len > 0) ||
 			    (e->scope->is_file && e->Procedure.link_name.len > 0)) {
-				if (!has_dll_main && str_eq(name, str_lit("DllMain"))) {
+				if (!has_dll_main && name == "DllMain") {
 					has_dll_main = true;
-				} else if (!has_win_main && str_eq(name, str_lit("WinMain"))) {
+				} else if (!has_win_main && name == "WinMain") {
 					has_win_main = true;
 				}
 			}
@@ -7146,7 +7146,7 @@ void ir_gen_tree(irGen *s) {
 			if (e->kind == Entity_Procedure && (e->Procedure.tags & ProcTag_export) != 0) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later
-			} else if (scope->is_init && e->kind == Entity_Procedure && str_eq(name, str_lit("main"))) {
+			} else if (scope->is_init && e->kind == Entity_Procedure && name == "main") {
 			} else {
 				name = ir_mangle_name(s, e->token.pos.file, e);
 			}

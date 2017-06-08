@@ -109,8 +109,8 @@ u128 u128_from_string(String string) {
 	// TODO(bill): Allow for numbers with underscores in them
 	u64 base = 10;
 	bool has_prefix = false;
-	if (string.len > 2 && string.text[0] == '0') {
-		switch (string.text[1]) {
+	if (string.len > 2 && string[0] == '0') {
+		switch (string[1]) {
 		case 'b': base = 2;  has_prefix = true; break;
 		case 'o': base = 8;  has_prefix = true; break;
 		case 'd': base = 10; has_prefix = true; break;
@@ -160,8 +160,8 @@ i128 i128_from_string(String string) {
 	// TODO(bill): Allow for numbers with underscores in them
 	u64 base = 10;
 	bool has_prefix = false;
-	if (string.len > 2 && string.text[0] == '0') {
-		switch (string.text[1]) {
+	if (string.len > 2 && string[0] == '0') {
+		switch (string[1]) {
 		case 'b': base = 2;  has_prefix = true; break;
 		case 'o': base = 8;  has_prefix = true; break;
 		case 'd': base = 10; has_prefix = true; break;

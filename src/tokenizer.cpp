@@ -760,7 +760,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 		// NOTE(bill): All keywords are > 1
 		if (token.string.len > 1) {
 			for (i32 k = Token__KeywordBegin+1; k < Token__KeywordEnd; k++) {
-				if (str_eq(token.string, token_strings[k])) {
+				if (token.string == token_strings[k]) {
 					token.kind = cast(TokenKind)k;
 					break;
 				}

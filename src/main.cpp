@@ -1,7 +1,3 @@
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 #define USE_CUSTOM_BACKEND false
 
 #include "common.cpp"
@@ -154,27 +150,27 @@ int main(int argc, char **argv) {
 	char *init_filename = NULL;
 	bool run_output = false;
 	String arg1 = make_string_c(argv[1]);
-	if (str_eq(arg1, str_lit("run"))) {
+	if (arg1 == "run") {
 		if (argc != 3) {
 			usage(argv[0]);
 			return 1;
 		}
 		init_filename = argv[2];
 		run_output = true;
-	} else if (str_eq(arg1, str_lit("build_dll"))) {
+	} else if (arg1 == "build_dll") {
 		if (argc != 3) {
 			usage(argv[0]);
 			return 1;
 		}
 		init_filename = argv[2];
 		build_context.is_dll = true;
-	} else if (str_eq(arg1, str_lit("build"))) {
+	} else if (arg1 == "build") {
 		if (argc != 3) {
 			usage(argv[0]);
 			return 1;
 		}
 		init_filename = argv[2];
-	} else if (str_eq(arg1, str_lit("version"))) {
+	} else if (arg1 == "version") {
 		gb_printf("%s version %.*s\n", argv[0], LIT(build_context.ODIN_VERSION));
 		return 0;
 	} else {
@@ -382,7 +378,7 @@ int main(int argc, char **argv) {
 		//   without having to implement any new syntax specifically for MacOS.
 		#if defined(GB_SYSTEM_OSX)
 			isize len;
-			if(lib.len > 2 && lib.text[0] == '-' && lib.text[1] == 'f') {
+			if(lib.len > 2 && lib[0] == '-' && lib[1] == 'f') {
 				len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
 				                        " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
 			} else {
@@ -460,7 +456,3 @@ int main(int argc, char **argv) {
 
 	return 0;
 }
-
-#if defined(__cplusplus)
-}
-#endif

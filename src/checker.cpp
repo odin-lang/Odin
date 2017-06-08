@@ -867,7 +867,7 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier != NULL);
 	if (identifier->kind == AstNode_Ident) {
-		if (str_eq(identifier->Ident.string, str_lit("_"))) {
+		if (identifier->Ident.string == "_") {
 			return;
 		}
 		HashKey key = hash_pointer(identifier);
@@ -879,7 +879,7 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 
 bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 	String name = entity->token.string;
-	if (!str_eq(name, str_lit("_"))) {
+	if (name != "_") {
 		Entity *ie = scope_insert_entity(scope, entity);
 		if (ie) {
 			TokenPos pos = ie->token.pos;
@@ -929,7 +929,7 @@ void add_entity_use(Checker *c, AstNode *identifier, Entity *entity) {
 void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d) {
 	GB_ASSERT(identifier->kind == AstNode_Ident);
 	GB_ASSERT(e != NULL && d != NULL);
-	GB_ASSERT(str_eq(identifier->Ident.string, e->token.string));
+	GB_ASSERT(identifier->Ident.string == e->token.string);
 	add_entity(c, e->scope, identifier, e);
 	map_decl_info_set(&c->info.entities, hash_pointer(e), d);
 }
@@ -1580,7 +1580,7 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 						d->proc_lit = up_init;
 						d->type_expr = vd->type;
 					} else {
-						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, ExactValue{});
+						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, empty_exact_value);
 						d->type_expr = vd->type;
 						d->init_expr = init;
 					}
@@ -1678,12 +1678,12 @@ void check_all_global_entities(Checker *c) {
 			continue;
 		}
 
-		if (e->kind != Entity_Procedure && str_eq(e->token.string, str_lit("main"))) {
+		if (e->kind != Entity_Procedure && e->token.string == "main") {
 			if (e->scope->is_init) {
 				error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
 				continue;
 			}
-		} else if (e->scope->is_global && str_eq(e->token.string, str_lit("main"))) {
+		} else if (e->scope->is_global && e->token.string == "main") {
 			error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
 			continue;
 		}
@@ -1745,7 +1745,7 @@ String path_to_entity_name(String name, String fullpath) {
 	isize slash = 0;
 	isize dot = 0;
 	for (isize i = filename.len-1; i >= 0; i--) {
-		u8 c = filename.text[i];
+		u8 c = filename[i];
 		if (c == '/' || c == '\\') {
 			break;
 		}
@@ -1757,7 +1757,7 @@ String path_to_entity_name(String name, String fullpath) {
 
 	dot = filename.len;
 	while (dot --> 0) {
-		u8 c = filename.text[dot];
+		u8 c = filename[dot];
 		if (c == '.') {
 			break;
 		}
@@ -1932,7 +1932,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 
 		scope->has_been_imported = true;
 
-		if (str_eq(id->import_name.string, str_lit("."))) {
+		if (id->import_name.string == ".") {
 			// NOTE(bill): Add imported entities to this file's scope
 			for_array(elem_index, scope->elements.entries) {
 				Entity *e = scope->elements.entries.e[elem_index].value;
@@ -1958,7 +1958,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 			}
 		} else {
 			String import_name = path_to_entity_name(id->import_name.string, id->fullpath);
-			if (str_eq(import_name, str_lit("_"))) {
+			if (import_name == "_") {
 				error(token, "File name, %.*s, cannot be as an import name as it is not a valid identifier", LIT(id->import_name.string));
 			} else {
 				GB_ASSERT(id->import_name.pos.line != 0);
@@ -2010,7 +2010,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 
 
 		String library_name = path_to_entity_name(fl->library_name.string, file_str);
-		if (str_eq(library_name, str_lit("_"))) {
+		if (library_name == "_") {
 			error(fl->token, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
 		} else {
 			GB_ASSERT(fl->library_name.pos.line != 0);
@@ -2035,7 +2035,7 @@ void check_parsed_files(Checker *c) {
 		scope->is_global = f->is_global_scope;
 		scope->is_file   = true;
 		scope->file      = f;
-		if (str_eq(f->tokenizer.fullpath, c->parser->init_fullpath)) {
+		if (f->tokenizer.fullpath == c->parser->init_fullpath) {
 			scope->is_init = true;
 		}
 

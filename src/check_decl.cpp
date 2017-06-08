@@ -274,7 +274,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 	bool is_require_results = (pd->tags & ProcTag_require_results) != 0;
 
 
-	if (d->scope->is_file && str_eq(e->token.string, str_lit("main"))) {
+	if (d->scope->is_file && e->token.string == "main") {
 		if (proc_type != NULL) {
 			TypeProc *pt = &proc_type->Proc;
 			if (pt->param_count != 0 ||
@@ -334,7 +334,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 			String name = foreign_library->Ident.string;
 			Entity *found = scope_lookup_entity(c->context.scope, name);
 			if (found == NULL) {
-				if (str_eq(name, str_lit("_"))) {
+				if (name == "_") {
 					error_node(foreign_library, "`_` cannot be used as a value type");
 				} else {
 					error_node(foreign_library, "Undeclared name: %.*s", LIT(name));

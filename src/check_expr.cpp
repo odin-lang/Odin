@@ -427,9 +427,9 @@ isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 
 			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, is_using, cast(i32)field_index);
 			e->identifier = name;
-			if (str_eq(name_token.string, str_lit("_"))) {
+			if (name_token.string == "_") {
 				fields[field_index++] = e;
-			} else if (str_eq(name_token.string, str_lit("__tag"))) {
+			} else if (name_token.string == "__tag") {
 				error_node(name, "`__tag` is a reserved identifier for fields");
 			} else {
 				HashKey key = hash_string(name_token.string);
@@ -729,7 +729,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 		type->Named.type_name = e;
 		add_entity(c, c->context.scope, f->name, e);
 
-		if (str_eq(name_token.string, str_lit("_"))) {
+		if (name_token.string == "_") {
 			error(name_token, "`_` cannot be used a union subtype");
 			continue;
 		}
@@ -857,21 +857,21 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 
 
 		// NOTE(bill): Skip blank identifiers
-		if (str_eq(name, str_lit("_"))) {
+		if (name == "_") {
 			continue;
-		} else if (str_eq(name, str_lit("count"))) {
+		} else if (name == "count") {
 			error_node(field, "`count` is a reserved identifier for enumerations");
 			continue;
-		} else if (str_eq(name, str_lit("min_value"))) {
+		} else if (name == "min_value") {
 			error_node(field, "`min_value` is a reserved identifier for enumerations");
 			continue;
-		} else if (str_eq(name, str_lit("max_value"))) {
+		} else if (name == "max_value") {
 			error_node(field, "`max_value` is a reserved identifier for enumerations");
 			continue;
-		} else if (str_eq(name, str_lit("names"))) {
+		} else if (name == "names") {
 			error_node(field, "`names` is a reserved identifier for enumerations");
 			continue;
-		}/*  else if (str_eq(name, str_lit("base_type"))) {
+		}/*  else if (name == "base_type") {
 			error_node(field, "`base_type` is a reserved identifier for enumerations");
 			continue;
 		} */
@@ -966,7 +966,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 		e->flags |= EntityFlag_BitFieldValue;
 
 		HashKey key = hash_string(name);
-		if (str_ne(name, str_lit("_")) &&
+		if (name != "_" &&
 		    map_entity_get(&entity_map, key) != NULL) {
 			error_node(ident, "`%.*s` is already declared in this bit field", LIT(name));
 		} else {
@@ -1164,15 +1164,15 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 
 	for (isize i = 0; i < variable_index; i++) {
 		String x = variables[i]->token.string;
-		if (x.len == 0 || str_eq(x, str_lit("_"))) {
+		if (x.len == 0 || x == "_") {
 			continue;
 		}
 		for (isize j = i+1; j < variable_index; j++) {
 			String y = variables[j]->token.string;
-			if (y.len == 0 || str_eq(y, str_lit("_"))) {
+			if (y.len == 0 || y == "_") {
 				continue;
 			}
-			if (str_eq(x, y)) {
+			if (x == y) {
 				error(variables[j]->token, "Duplicate return value name `%.*s`", LIT(y));
 			}
 		}
@@ -1187,7 +1187,7 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 	Type *new_type = original_type;
 
-	if (str_eq(build_context.ODIN_OS, str_lit("windows"))) {
+	if (build_context.ODIN_OS == "windows") {
 		// NOTE(bill): Changing the passing parameter value type is to match C's ABI
 		// IMPORTANT TODO(bill): This only matches the ABI on MSVC at the moment
 		// SEE: https://msdn.microsoft.com/en-us/library/zthk2dkh.aspx
@@ -1223,7 +1223,7 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 			}
 		} break;
 		}
-	} else if (str_eq(build_context.ODIN_OS, str_lit("linux"))) {
+	} else if (build_context.ODIN_OS == "linux") {
 		Type *bt = core_type(original_type);
 		switch (bt->kind) {
 		// Okay to pass by value
@@ -1277,7 +1277,7 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
 
 
 
-	if (str_eq(build_context.ODIN_OS, str_lit("windows"))) {
+	if (build_context.ODIN_OS == "windows") {
 		Type *bt = core_type(reduce_tuple_to_single_type(original_type));
 		// NOTE(bill): This is just reversed engineered from LLVM IR output
 		switch (bt->kind) {
@@ -1301,7 +1301,7 @@ Type *type_to_abi_compat_result_type(gbAllocator a, Type *original_type) {
 			}
 		} break;
 		}
-	} else if (str_eq(build_context.ODIN_OS, str_lit("linux"))) {
+	} else if (build_context.ODIN_OS == "linux") {
 
 	} else {
 		// IMPORTANT TODO(bill): figure out the ABI settings for Linux, OSX etc. for
@@ -1330,7 +1330,7 @@ bool abi_compat_return_by_value(gbAllocator a, ProcCallingConvention cc, Type *a
 	}
 
 
-	if (str_eq(build_context.ODIN_OS, str_lit("windows"))) {
+	if (build_context.ODIN_OS == "windows") {
 		i64 size = 8*type_size_of(a, abi_return_type);
 		switch (size) {
 		case 0:
@@ -1388,7 +1388,7 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 
 	Entity *e = scope_lookup_entity(c->context.scope, name);
 	if (e == NULL) {
-		if (str_eq(name, str_lit("_"))) {
+		if (name == "_") {
 			error(n->Ident, "`_` cannot be used as a value type");
 		} else {
 			error(n->Ident, "Undeclared name: %.*s", LIT(name));
@@ -1959,7 +1959,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 	}
 
 	if (is_type_typed(type)) {
-		add_type_and_value(&c->info, e, Addressing_Type, type, ExactValue{});
+		add_type_and_value(&c->info, e, Addressing_Type, type, empty_exact_value);
 	} else {
 		gbString name = type_to_string(type);
 		error_node(e, "Invalid type definition of %s", name);
@@ -3016,7 +3016,7 @@ void convert_untyped_error(Checker *c, Operand *operand, Type *target_type) {
 
 	if (operand->mode == Addressing_Constant) {
 		if (i128_eq(operand->value.value_integer, I128_ZERO)) {
-			if (str_ne(make_string_c(expr_str), str_lit("nil"))) { // HACK NOTE(bill): Just in case
+			if (make_string_c(expr_str) != "nil") { // HACK NOTE(bill): Just in case
 				// NOTE(bill): Doesn't matter what the type is as it's still zero in the union
 				extra_text = " - Did you want `nil`?";
 			}
@@ -5213,7 +5213,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		case Token_Rune:    t = t_untyped_rune;    break;
 		case Token_Imag: {
 			String s = bl->string;
-			Rune r = s.text[s.len-1];
+			Rune r = s[s.len-1];
 			switch (r) {
 			case 'i': t = t_untyped_complex; break;
 			}
@@ -5226,13 +5226,13 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 	case_end;
 
 	case_ast_node(bd, BasicDirective, node);
-		if (str_eq(bd->name, str_lit("file"))) {
+		if (bd->name == "file") {
 			o->type = t_untyped_string;
 			o->value = exact_value_string(bd->token.pos.file);
-		} else if (str_eq(bd->name, str_lit("line"))) {
+		} else if (bd->name == "line") {
 			o->type = t_untyped_integer;
 			o->value = exact_value_i64(bd->token.pos.line);
-		} else if (str_eq(bd->name, str_lit("procedure"))) {
+		} else if (bd->name == "procedure") {
 			if (c->proc_stack.count == 0) {
 				error_node(node, "#procedure may only be used within procedures");
 				o->type = t_untyped_string;
@@ -5448,7 +5448,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					bool all_fields_are_blank = true;
 					for (isize i = 0; i < t->Record.field_count; i++) {
 						Entity *field = t->Record.fields_in_src_order[i];
-						if (str_ne(field->token.string, str_lit("_"))) {
+						if (field->token.string != "_") {
 							all_fields_are_blank = false;
 							break;
 						}
@@ -5466,7 +5466,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						}
 
 						Entity *field = t->Record.fields_in_src_order[index];
-						if (!all_fields_are_blank && str_eq(field->token.string, str_lit("_"))) {
+						if (!all_fields_are_blank && field->token.string == "_") {
 							// NOTE(bill): Ignore blank identifiers
 							continue;
 						}
@@ -6153,7 +6153,7 @@ gbString write_record_fields_to_string(gbString str, AstNodeArray params) {
 
 gbString string_append_token(gbString str, Token token) {
 	if (token.string.len > 0) {
-		return gb_string_append_length(str, token.string.text, token.string.len);
+		return gb_string_append_length(str, &token.string[0], token.string.len);
 	}
 	return str;
 }
@@ -6186,7 +6186,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(bd, BasicDirective, node);
 		str = gb_string_appendc(str, "#");
-		str = gb_string_append_length(str, bd->name.text, bd->name.len);
+		str = gb_string_append_length(str, &bd->name[0], bd->name.len);
 	case_end;
 
 	case_ast_node(pl, ProcLit, node);

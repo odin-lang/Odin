@@ -36,6 +36,8 @@ typedef struct ExactValue {
 	};
 } ExactValue;
 
+gb_global ExactValue const empty_exact_value = {};
+
 HashKey hash_exact_value(ExactValue v) {
 	return hashing_proc(&v, gb_size_of(ExactValue));
 }
@@ -191,7 +193,7 @@ ExactValue exact_value_from_basic_literal(Token token) {
 	case Token_Float:   return exact_value_float_from_string(token.string);
 	case Token_Imag: {
 		String str = token.string;
-		Rune last_rune = cast(Rune)str.text[str.len-1];
+		Rune last_rune = cast(Rune)str[str.len-1];
 		str.len--; // Ignore the `i|j|k`
 		f64 imag = float_from_string(str);
 

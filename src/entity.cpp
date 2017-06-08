@@ -148,7 +148,7 @@ bool is_entity_exported(Entity *e) {
 	if (name.len == 0) {
 		return false;
 	}
-	return name.text[0] != '_';
+	return name[0] != '_';
 }
 
 gb_global u64 global_entity_id = 0;

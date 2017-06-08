@@ -81,7 +81,7 @@ bool ir_valid_char(u8 c) {
 void ir_print_escape_string(irFileBuffer *f, String name, bool print_quotes, bool prefix_with_dot) {
 	isize extra = 0;
 	for (isize i = 0; i < name.len; i++) {
-		u8 c = name.text[i];
+		u8 c = name[i];
 		if (!ir_valid_char(c)) {
 			extra += 2;
 		}
@@ -111,7 +111,7 @@ void ir_print_escape_string(irFileBuffer *f, String name, bool print_quotes, boo
 	}
 
 	for (isize i = 0; i < name.len; i++) {
-		u8 c = name.text[i];
+		u8 c = name[i];
 		if (ir_valid_char(c)) {
 			buf[j++] = c;
 		} else {
@@ -1500,8 +1500,8 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 				ir_fprintf(f, " noalias");
 			}
 			if (proc->body != NULL) {
-				if (!str_eq(e->token.string, str_lit("")) &&
-				    !str_eq(e->token.string, str_lit("_"))) {
+				if (e->token.string != "" &&
+				    e->token.string != "_") {
 					ir_fprintf(f, " ");
 					ir_print_encoded_local(f, e->token.string);
 				} else {
