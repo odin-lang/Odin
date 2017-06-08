@@ -30,10 +30,10 @@ TypeInfoEnumValue :: raw_union {
 }
 // NOTE(bill): This must match the compiler's
 CallingConvention :: enum {
-	ODIN = 0,
+	Odin = 0,
 	C    = 1,
-	STD  = 2,
-	FAST = 3,
+	Std  = 2,
+	Fast = 3,
 }
 
 TypeInfoRecord :: struct #ordered {
@@ -325,7 +325,6 @@ __complex64_ne  :: proc(a, b: complex64)  -> bool #inline { return real(a) != re
 
 __complex128_eq :: proc(a, b: complex128) -> bool #inline { return real(a) == real(b) && imag(a) == imag(b); }
 __complex128_ne :: proc(a, b: complex128) -> bool #inline { return real(a) != real(b) || imag(a) != imag(b); }
-
 
 __assert :: proc(file: string, line, column: int, msg: string) #inline {
 	fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion: %s\n",

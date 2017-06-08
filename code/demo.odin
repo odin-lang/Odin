@@ -41,7 +41,7 @@ main :: proc() {
 
 	// Divisor based modulo operator
 	{
-		x: i128 = -5;
+		x: i128 = -15;
 		y: i128 = 2;
 
 		fmt.println(x %  y); // Dividend based
@@ -73,6 +73,7 @@ main :: proc() {
 			id:       u64,
 			position: [vector 2]f32,
 			name:     string,
+
 			Tree{leaf_count: int},
 			Frog{ribbit_volume: f32},
 		}
@@ -81,7 +82,7 @@ main :: proc() {
 		e = Entity.Frog{ribbit_volume = 0.5, name = "Trevor"};
 
 		if frog, ok := e.(Entity.Frog); ok {
-			fmt.printf("%s the frog ribbit's at %f\n", frog.name, frog.ribbit_volume);
+			fmt.printf("%s the frog ribbits at %f\n", frog.name, frog.ribbit_volume);
 		}
 
 		// Panics if the type assertion fails
@@ -153,7 +154,7 @@ main :: proc() {
 
 
 
-		Float32Data :: bit_field {
+		Float32Data :: bit_field #align 4 {
 			fraction: 23,
 			exponent:  8,
 			sign:      1,
@@ -182,7 +183,7 @@ main :: proc() {
 	}
 
 	// Goals for v0.4 and further
-	//  * Compile as C++and use some of its constructs for sanity e.g. overloading
+	//  * Compile as C++ and use some of its constructs for sanity e.g. overloading
 	//  	- Safe array with bounds checking
 	//  	- Map type for self documentation
 	//  	- u128 i128 acting like core types
@@ -196,4 +197,5 @@ main :: proc() {
 	//  	- Foreign variables
 	//  * Documentation Generation System for code
 	//  * General Documentation for Odin
+	//  * Attributes
 }

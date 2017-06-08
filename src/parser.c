@@ -3880,7 +3880,6 @@ AstNodeArray parse_stmt_list(AstFile *f) {
 	AstNodeArray list = make_ast_node_array(f);
 
 	while (f->curr_token.kind != Token_case &&
-	       // f->curr_token.kind != Token_default &&
 	       f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
 		AstNode *stmt = parse_stmt(f);
