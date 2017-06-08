@@ -9,7 +9,7 @@ void init_string_buffer_memory(void) {
 
 
 // NOTE(bill): Used for UTF-8 strings
-typedef struct String {
+struct String {
 	u8 *  text;
 	isize len;
 
@@ -21,7 +21,7 @@ typedef struct String {
 		GB_ASSERT(0 <= i && i < len);
 		return text[i];
 	}
-} String;
+};
 // NOTE(bill): used for printf style arguments
 #define LIT(x) ((int)(x).len), (x).text
 #define STR_LIT(c_str) {cast(u8 *)c_str, gb_size_of(c_str)-1}
@@ -29,7 +29,7 @@ typedef struct String {
 
 
 // NOTE(bill): String16 is only used for Windows due to its file directories
-typedef struct String16 {
+struct String16 {
 	wchar_t *text;
 	isize    len;
 	wchar_t &operator[](isize i) {
@@ -40,7 +40,7 @@ typedef struct String16 {
 		GB_ASSERT(0 <= i && i < len);
 		return text[i];
 	}
-} String16;
+};
 
 
 gb_inline String make_string(u8 *text, isize len) {

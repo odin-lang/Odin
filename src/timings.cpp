@@ -1,14 +1,14 @@
-typedef struct TimeStamp {
+struct TimeStamp {
 	u64    start;
 	u64    finish;
 	String label;
-} TimeStamp;
+};
 
-typedef struct Timings {
+struct Timings {
 	TimeStamp        total;
 	Array<TimeStamp> sections;
 	u64              freq;
-} Timings;
+};
 
 
 #if defined(GB_SYSTEM_WINDOWS)

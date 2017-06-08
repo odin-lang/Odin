@@ -1,6 +1,6 @@
-typedef struct Scope Scope;
+struct Scope;
 
-typedef enum BasicKind {
+enum BasicKind {
 	Basic_Invalid,
 	Basic_bool,
 	Basic_i8,
@@ -41,9 +41,9 @@ typedef enum BasicKind {
 	Basic_COUNT,
 
 	Basic_byte = Basic_u8,
-} BasicKind;
+};
 
-typedef enum BasicFlag {
+enum BasicFlag {
 	BasicFlag_Boolean     = GB_BIT(0),
 	BasicFlag_Integer     = GB_BIT(1),
 	BasicFlag_Unsigned    = GB_BIT(2),
@@ -57,16 +57,16 @@ typedef enum BasicFlag {
 	BasicFlag_Numeric      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Complex,
 	BasicFlag_Ordered      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
 	BasicFlag_ConstantType = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
-} BasicFlag;
+};
 
-typedef struct BasicType {
+struct BasicType {
 	BasicKind kind;
 	u32       flags;
 	i64       size; // -1 if arch. dep.
 	String    name;
-} BasicType;
+};
 
-typedef enum TypeRecordKind {
+enum TypeRecordKind {
 	TypeRecord_Invalid,
 
 	TypeRecord_Struct,
@@ -75,9 +75,9 @@ typedef enum TypeRecordKind {
 	TypeRecord_Enum,
 
 	TypeRecord_Count,
-} TypeRecordKind;
+};
 
-typedef struct TypeRecord {
+struct TypeRecord {
 	TypeRecordKind kind;
 
 	// All record types
@@ -109,7 +109,7 @@ typedef struct TypeRecord {
 	Entity * enum_count;
 	Entity * enum_min_value;
 	Entity * enum_max_value;
-} TypeRecord;
+};
 
 #define TYPE_KINDS                                        \
 	TYPE_KIND(Basic,   BasicType)                         \
@@ -164,13 +164,13 @@ typedef struct TypeRecord {
 
 
 
-typedef enum TypeKind {
+enum TypeKind {
 	Type_Invalid,
 #define TYPE_KIND(k, ...) GB_JOIN2(Type_, k),
 	TYPE_KINDS
 #undef TYPE_KIND
 	Type_Count,
-} TypeKind;
+};
 
 String const type_strings[] = {
 	{cast(u8 *)"Invalid", gb_size_of("Invalid")},
@@ -183,7 +183,7 @@ String const type_strings[] = {
 	TYPE_KINDS
 #undef TYPE_KIND
 
-typedef struct Type {
+struct Type {
 	TypeKind kind;
 	union {
 #define TYPE_KIND(k, ...) GB_JOIN2(Type, k) k;
@@ -191,16 +191,16 @@ typedef struct Type {
 #undef TYPE_KIND
 	};
 	bool failure;
-} Type;
+};
 
 
 // TODO(bill): Should I add extra information here specifying the kind of selection?
 // e.g. field, constant, vector field, type field, etc.
-typedef struct Selection {
+struct Selection {
 	Entity *   entity;
 	Array<i32> index;
 	bool       indirect; // Set if there was a pointer deref anywhere down the line
-} Selection;
+};
 Selection empty_selection = {0};
 
 Selection make_selection(Entity *entity, Array<i32> index, bool indirect) {
@@ -1199,7 +1199,7 @@ bool is_type_cte_safe(Type *type) {
 	return false;
 }
 
-typedef enum ProcTypeOverloadKind {
+enum ProcTypeOverloadKind {
 	ProcOverload_Identical, // The types are identical
 
 	ProcOverload_CallingConvention,
@@ -1211,7 +1211,7 @@ typedef enum ProcTypeOverloadKind {
 
 	ProcOverload_NotProcedure,
 
-} ProcTypeOverloadKind;
+};
 
 ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 	if (x == NULL && y == NULL) return ProcOverload_NotProcedure;
@@ -1508,10 +1508,10 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 }
 
 
-typedef struct TypePath {
+struct TypePath {
 	Array<Type *> path; // Entity_TypeName;
 	bool failure;
-} TypePath;
+};
 
 void type_path_init(TypePath *tp) {
 	// TODO(bill): Use an allocator that uses a backing array if it can and then use alternative allocator when exhausted

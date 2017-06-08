@@ -1,15 +1,15 @@
-typedef struct ssaModule           ssaModule;
-typedef struct ssaValue            ssaValue;
-typedef struct ssaValueArgs        ssaValueArgs;
-typedef struct ssaDefer            ssaDefer;
-typedef struct ssaBlock            ssaBlock;
-typedef struct ssaProc             ssaProc;
-typedef struct ssaEdge             ssaEdge;
-typedef struct ssaRegister         ssaRegister;
-typedef struct ssaTargetList       ssaTargetList;
-typedef enum   ssaBlockKind        ssaBlockKind;
-typedef enum   ssaBranchPrediction ssaBranchPrediction;
-typedef enum   ssaDeferExitKind    ssaDeferExitKind;
+struct ssaModule;
+struct ssaValue;
+struct ssaValueArgs;
+struct ssaDefer;
+struct ssaBlock;
+struct ssaProc;
+struct ssaEdge;
+struct ssaRegister;
+struct ssaTargetList;
+enum   ssaBlockKind;
+enum   ssaBranchPrediction;
+enum   ssaDeferExitKind;
 
 
 String ssa_mangle_name(ssaModule *m, String path, Entity *e);
@@ -18,8 +18,6 @@ String ssa_mangle_name(ssaModule *m, String path, Entity *e);
 #define MAP_PROC map_ssa_value_
 #define MAP_NAME MapSsaValue
 #include "map.cpp"
-
-typedef Array<ssaValue *> ssaValueArray;
 
 #include "ssa_op.cpp"
 
@@ -76,10 +74,10 @@ enum ssaBranchPrediction {
 	ssaBranch_Unlikely = -1,
 };
 
-typedef enum ssaDeferKind {
+enum ssaDeferKind {
 	ssaDefer_Node,
 	ssaDefer_Instr,
-} ssaDeferKind;
+};
 
 struct ssaDefer {
 	ssaDeferKind     kind;
@@ -106,8 +104,6 @@ struct ssaEdge {
 	isize     index;
 };
 
-typedef Array<ssaEdge> ssaEdgeArray;
-
 struct ssaBlock {
 	i32                  id;   // Unique identifier but the pointer could be used too
 	ssaBlockKind         kind;
@@ -124,9 +120,9 @@ struct ssaBlock {
 	//  - BlockExit will be a memory control value
 	ssaValue *control;
 
-	ssaValueArray values;
-	ssaEdgeArray  preds;
-	ssaEdgeArray  succs;
+	Array<ssaValue *> values;
+	Array<ssaEdge>  preds;
+	Array<ssaEdge>  succs;
 };
 
 struct ssaTargetList {
@@ -182,18 +178,18 @@ struct ssaModule {
 	u32 stmt_state_flags;
 
 	Array<ssaProc *>  procs;
-	ssaValueArray     procs_to_generate;
+	Array<ssaValue *>     procs_to_generate;
 };
 
-typedef enum ssaAddrKind {
+enum ssaAddrKind {
 	ssaAddr_Default,
 	ssaAddr_Map,
-} ssaAddrKind;
+};
 
-typedef struct ssaAddr {
+struct ssaAddr {
 	ssaValue *  addr;
 	ssaAddrKind kind;
-} ssaAddr;
+};
 
 
 
@@ -408,7 +404,7 @@ ssaValue *ssa_const_int(ssaProc *p, Type *t, i64 c) {
 ssaAddr   ssa_build_addr     (ssaProc *p, AstNode *expr);
 ssaValue *ssa_build_expr     (ssaProc *p, AstNode *expr);
 void      ssa_build_stmt     (ssaProc *p, AstNode *node);
-void      ssa_build_stmt_list(ssaProc *p, AstNodeArray nodes);
+void      ssa_build_stmt_list(ssaProc *p, Array<AstNode *> nodes);
 ssaValue *ssa_emit_deep_field_ptr_index(ssaProc *p, ssaValue *e, Selection sel);
 
 
@@ -1870,7 +1866,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 
 
 
-void ssa_build_stmt_list(ssaProc *p, AstNodeArray nodes) {
+void ssa_build_stmt_list(ssaProc *p, Array<AstNode *> nodes) {
 	for_array(i, nodes) {
 		ssa_build_stmt(p, nodes[i]);
 	}
@@ -1989,7 +1985,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 				}
 			} else {
 				Array<ssaAddr> lvals = {0};
-				ssaValueArray  inits = {0};
+				Array<ssaValue *>  inits = {0};
 				array_init(&lvals, m->tmp_allocator, vd->names.count);
 				array_init(&inits, m->tmp_allocator, vd->names.count);
 
@@ -2057,7 +2053,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 					ssaValue *init = ssa_build_expr(p, rhs);
 					ssa_addr_store(p, lvals[0], init);
 				} else {
-					ssaValueArray inits;
+					Array<ssaValue *> inits;
 					array_init(&inits, m->tmp_allocator, lvals.count);
 
 					for_array(i, as->rhs) {
@@ -2070,7 +2066,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 					}
 				}
 			} else {
-				ssaValueArray inits;
+				Array<ssaValue *> inits;
 				array_init(&inits, m->tmp_allocator, lvals.count);
 
 				for_array(i, as->rhs) {

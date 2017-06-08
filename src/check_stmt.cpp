@@ -1,4 +1,4 @@
-void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
+void check_stmt_list(Checker *c, Array<AstNode *> stmts, u32 flags) {
 	if (stmts.count == 0) {
 		return;
 	}
@@ -40,7 +40,7 @@ void check_stmt_list(Checker *c, AstNodeArray stmts, u32 flags) {
 
 }
 
-bool check_is_terminating_list(AstNodeArray stmts) {
+bool check_is_terminating_list(Array<AstNode *> stmts) {
 	// Iterate backwards
 	for (isize n = stmts.count-1; n >= 0; n--) {
 		AstNode *stmt = stmts[n];
@@ -52,7 +52,7 @@ bool check_is_terminating_list(AstNodeArray stmts) {
 	return false;
 }
 
-bool check_has_break_list(AstNodeArray stmts, bool implicit) {
+bool check_has_break_list(Array<AstNode *> stmts, bool implicit) {
 	for_array(i, stmts) {
 		AstNode *stmt = stmts[i];
 		if (check_has_break(stmt, implicit)) {
@@ -340,11 +340,11 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 	return rhs->type;
 }
 
-typedef enum MatchTypeKind {
+enum MatchTypeKind {
 	MatchType_Invalid,
 	MatchType_Union,
 	MatchType_Any,
-} MatchTypeKind;
+};
 
 MatchTypeKind check_valid_type_match_type(Type *type) {
 	type = type_deref(type);
@@ -384,10 +384,10 @@ void check_stmt(Checker *c, AstNode *node, u32 flags) {
 
 
 
-typedef struct TypeAndToken {
+struct TypeAndToken {
 	Type *type;
 	Token token;
-} TypeAndToken;
+};
 
 #define MAP_TYPE TypeAndToken
 #define MAP_PROC map_type_and_token_

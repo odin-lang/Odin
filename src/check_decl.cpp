@@ -58,7 +58,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 	return e->type;
 }
 
-void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArray inits, String context_name) {
+void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, Array<AstNode *> inits, String context_name) {
 	if ((lhs == NULL || lhs_count == 0) && inits.count == 0) {
 		return;
 	}
@@ -431,7 +431,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 		}
 	}
 
-	AstNodeArray inits;
+	Array<AstNode *> inits;
 	array_init(&inits, c->allocator, 1);
 	array_add(&inits, init_expr);
 	check_init_variables(c, entities, entity_count, inits, str_lit("variable declaration"));

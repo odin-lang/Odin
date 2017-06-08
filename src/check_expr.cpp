@@ -16,7 +16,7 @@ void     update_expr_type               (Checker *c, AstNode *e, Type *type, boo
 bool     check_is_terminating           (AstNode *node);
 bool     check_has_break                (AstNode *stmt, bool implicit);
 void     check_stmt                     (Checker *c, AstNode *node, u32 flags);
-void     check_stmt_list                (Checker *c, AstNodeArray stmts, u32 flags);
+void     check_stmt_list                (Checker *c, Array<AstNode *> stmts, u32 flags);
 void     check_init_constant            (Checker *c, Entity *e, Operand *operand);
 bool     check_representable_as_constant(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
 Type *   check_call_arguments           (Checker *c, Operand *operand, Type *proc_type, AstNode *call);
@@ -46,7 +46,7 @@ void error_operand_no_value(Operand *o) {
 }
 
 
-void check_scope_decls(Checker *c, AstNodeArray nodes, isize reserve_size) {
+void check_scope_decls(Checker *c, Array<AstNode *> nodes, isize reserve_size) {
 	Scope *s = c->context.scope;
 	GB_ASSERT(!s->is_file);
 
@@ -385,7 +385,7 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, MapEntity *en
 
 
 // Returns filled field_count
-isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
+isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
                    Entity **fields, isize field_count,
                    String context) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
@@ -692,7 +692,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 			ast_node(fl, FieldList, f->list);
 
 			// NOTE(bill): Copy the contents for the common fields for now
-			AstNodeArray list = {};
+			Array<AstNode *> list = {};
 			array_init_count(&list, c->allocator, ut->fields.count+fl->list.count);
 			gb_memmove_array(list.data, ut->fields.data, ut->fields.count);
 			gb_memmove_array(list.data+ut->fields.count, fl->list.data, fl->list.count);
@@ -1033,7 +1033,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		return NULL;
 	}
 	ast_node(field_list, FieldList, _params);
-	AstNodeArray params = field_list->list;
+	Array<AstNode *> params = field_list->list;
 
 	if (params.count == 0) {
 		return NULL;
@@ -1118,7 +1118,7 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 		return NULL;
 	}
 	ast_node(field_list, FieldList, _results);
-	AstNodeArray results = field_list->list;
+	Array<AstNode *> results = field_list->list;
 
 	if (results.count == 0) {
 		return NULL;
@@ -4698,7 +4698,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	return true;
 }
 
-typedef enum CallArgumentError {
+enum CallArgumentError {
 	CallArgumentError_None,
 	CallArgumentError_WrongTypes,
 	CallArgumentError_NonVariadicExpand,
@@ -4707,12 +4707,12 @@ typedef enum CallArgumentError {
 	CallArgumentError_ArgumentCount,
 	CallArgumentError_TooFewArguments,
 	CallArgumentError_TooManyArguments,
-} CallArgumentError;
+};
 
-typedef enum CallArgumentErrorMode {
+enum CallArgumentErrorMode {
 	CallArgumentMode_NoErrors,
 	CallArgumentMode_ShowErrors,
-} CallArgumentErrorMode;
+};
 
 CallArgumentError check_call_arguments_internal(Checker *c, AstNode *call, Type *proc_type, Operand *operands, isize operand_count,
                                                 CallArgumentErrorMode show_error_mode, i64 *score_) {
@@ -4823,10 +4823,10 @@ CallArgumentError check_call_arguments_internal(Checker *c, AstNode *call, Type 
 	return err;
 }
 
-typedef struct ValidProcAndScore {
+struct ValidProcAndScore {
 	isize index;
 	i64   score;
-} ValidProcAndScore;
+};
 
 int valid_proc_and_score_cmp(void const *a, void const *b) {
 	i64 si = (cast(ValidProcAndScore const *)a)->score;
@@ -4834,7 +4834,7 @@ int valid_proc_and_score_cmp(void const *a, void const *b) {
 	return sj < si ? -1 : sj > si;
 }
 
-bool check_unpack_arguments(Checker *c, isize lhs_count, Array<Operand> *operands, AstNodeArray rhs, bool allow_ok) {
+bool check_unpack_arguments(Checker *c, isize lhs_count, Array<Operand> *operands, Array<AstNode *> rhs, bool allow_ok) {
 	bool optional_ok = false;
 	for_array(i, rhs) {
 		Operand o = {};
@@ -6139,7 +6139,7 @@ void check_expr_or_type(Checker *c, Operand *o, AstNode *e) {
 
 gbString write_expr_to_string(gbString str, AstNode *node);
 
-gbString write_record_fields_to_string(gbString str, AstNodeArray params) {
+gbString write_record_fields_to_string(gbString str, Array<AstNode *> params) {
 	for_array(i, params) {
 		if (i > 0) {
 			str = gb_string_appendc(str, ", ");

@@ -1,27 +1,27 @@
 #include "exact_value.cpp"
 #include "entity.cpp"
 
-typedef enum ExprKind {
+enum ExprKind {
 	Expr_Expr,
 	Expr_Stmt,
-} ExprKind;
+};
 
 // Statements and Declarations
-typedef enum StmtFlag {
+enum StmtFlag {
 	Stmt_BreakAllowed       = 1<<0,
 	Stmt_ContinueAllowed    = 1<<1,
 	Stmt_FallthroughAllowed = 1<<2,
 
 	Stmt_CheckScopeDecls    = 1<<5,
-} StmtFlag;
+};
 
-typedef struct BuiltinProc {
+struct BuiltinProc {
 	String   name;
 	isize    arg_count;
 	bool     variadic;
 	ExprKind kind;
-} BuiltinProc;
-typedef enum BuiltinProcId {
+};
+enum BuiltinProcId {
 	BuiltinProc_Invalid,
 
 	BuiltinProc_len,
@@ -71,7 +71,7 @@ typedef enum BuiltinProcId {
 	BuiltinProc_transmute,
 
 	BuiltinProc_Count,
-} BuiltinProcId;
+};
 gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT(""),                 0, false, Expr_Stmt},
 
@@ -125,7 +125,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 
 #include "types.cpp"
 
-typedef enum AddressingMode {
+enum AddressingMode {
 	Addressing_Invalid,       // invalid addressing mode
 	Addressing_NoValue,       // no value (void in C)
 	Addressing_Value,         // computed value (rvalue)
@@ -139,14 +139,14 @@ typedef enum AddressingMode {
 	                          // 	lhs: acts like a Variable
 	                          // 	rhs: acts like OptionalOk
 	Addressing_OptionalOk,    // rhs: acts like a value with an optional boolean part (for existence check)
-} AddressingMode;
+};
 
 // Operand is used as an intermediate value whilst checking
 // Operands store an addressing mode, the expression being evaluated,
 // its type and node, and other specific information for certain
 // addressing modes
 // Its zero-value is a valid "invalid operand"
-typedef struct Operand {
+struct Operand {
 	AddressingMode mode;
 	Type *         type;
 	ExactValue     value;
@@ -154,13 +154,13 @@ typedef struct Operand {
 	BuiltinProcId  builtin_id;
 	isize          overload_count;
 	Entity **      overload_entities;
-} Operand;
+};
 
-typedef struct TypeAndValue {
+struct TypeAndValue {
 	AddressingMode mode;
 	Type *         type;
 	ExactValue     value;
-} TypeAndValue;
+};
 
 bool is_operand_value(Operand o) {
 	switch (o.mode) {
@@ -178,13 +178,12 @@ bool is_operand_nil(Operand o) {
 }
 
 
-typedef struct BlockLabel {
+struct BlockLabel {
 	String   name;
 	AstNode *label; //  AstNode_Label;
-} BlockLabel;
+};
 
 // DeclInfo is used to store information of certain declarations to allow for "any order" usage
-typedef struct DeclInfo DeclInfo;
 struct DeclInfo {
 	DeclInfo *        parent; // NOTE(bill): only used for procedure literals at the moment
 	Scope *           scope;
@@ -203,22 +202,22 @@ struct DeclInfo {
 // ProcedureInfo stores the information needed for checking a procedure
 
 
-typedef struct ProcedureInfo {
+struct ProcedureInfo {
 	AstFile *             file;
 	Token                 token;
 	DeclInfo *            decl;
 	Type *                type; // Type_Procedure
 	AstNode *             body; // AstNode_BlockStmt
 	u32                   tags;
-} ProcedureInfo;
+};
 
 // ExprInfo stores information used for "untyped" expressions
-typedef struct ExprInfo {
+struct ExprInfo {
 	bool           is_lhs; // Debug info
 	AddressingMode mode;
 	Type *         type; // Type_Basic
 	ExactValue     value;
-} ExprInfo;
+};
 
 ExprInfo make_expr_info(bool is_lhs, AddressingMode mode, Type *type, ExactValue value) {
 	ExprInfo ei = {is_lhs, mode, type, value};
@@ -232,7 +231,7 @@ ExprInfo make_expr_info(bool is_lhs, AddressingMode mode, Type *type, ExactValue
 #define MAP_NAME MapEntity
 #include "map.cpp"
 
-typedef struct Scope {
+struct Scope {
 	Scope *          parent;
 	Scope *          prev, *next;
 	Scope *          first_child;
@@ -248,7 +247,7 @@ typedef struct Scope {
 	bool             is_init;
 	bool             has_been_imported; // This is only applicable to file scopes
 	AstFile *        file;
-} Scope;
+};
 gb_global Scope *universal_scope = NULL;
 
 
@@ -280,19 +279,19 @@ gb_global Scope *universal_scope = NULL;
 #define MAP_NAME MapExprInfo
 #include "map.cpp"
 
-typedef struct DelayedDecl {
+struct DelayedDecl {
 	Scope *  parent;
 	AstNode *decl;
-} DelayedDecl;
+};
 
-typedef struct CheckerFileNode {
+struct CheckerFileNode {
 	i32        id;
 	Array<i32> wheres;
 	Array<i32> whats;
 	i32        score; // Higher the score, the better
-} CheckerFileNode;
+};
 
-typedef struct CheckerContext {
+struct CheckerContext {
 	Scope *    file_scope;
 	Scope *    scope;
 	DeclInfo * decl;
@@ -301,10 +300,10 @@ typedef struct CheckerContext {
 	String     proc_name;
 	Type *     type_hint;
 	DeclInfo * curr_proc_decl;
-} CheckerContext;
+};
 
 // CheckerInfo stores all the symbol information for a type-checked program
-typedef struct CheckerInfo {
+struct CheckerInfo {
 	MapTypeAndValue      types;           // Key: AstNode * | Expression -> Type (and value)
 	MapEntity            definitions;     // Key: AstNode * | Identifier -> Entity
 	MapEntity            uses;            // Key: AstNode * | Identifier -> Entity
@@ -316,9 +315,9 @@ typedef struct CheckerInfo {
 	MapAstFile           files;           // Key: String (full path)
 	MapIsize             type_info_map;   // Key: Type *
 	isize                type_info_count;
-} CheckerInfo;
+};
 
-typedef struct Checker {
+struct Checker {
 	Parser *    parser;
 	CheckerInfo info;
 
@@ -338,14 +337,14 @@ typedef struct Checker {
 
 	Array<Type *>          proc_stack;
 	bool                   done_preload;
-} Checker;
+};
 
 
-typedef struct DelayedEntity {
+struct DelayedEntity {
 	AstNode *   ident;
 	Entity *    entity;
 	DeclInfo *  decl;
-} DelayedEntity;
+};
 
 
 
@@ -1281,7 +1280,7 @@ void init_preload(Checker *c) {
 
 
 bool check_arity_match(Checker *c, AstNodeValueDecl *d);
-void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope);
+void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_scope);
 void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, bool is_file_scope);
 
 bool check_is_entity_overloaded(Entity *e) {
@@ -1455,7 +1454,7 @@ void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, bool
 }
 
 // NOTE(bill): If file_scopes == NULL, this will act like a local scope
-void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) {
+void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_scope) {
 	// NOTE(bill): File scope and local scope are different kinds of scopes
 	if (is_file_scope) {
 		GB_ASSERT(c->context.scope->is_file);

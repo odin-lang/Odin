@@ -1,7 +1,7 @@
-typedef struct Scope    Scope;
-typedef struct Checker  Checker;
-typedef struct Type     Type;
-typedef struct DeclInfo DeclInfo;
+struct Scope;
+struct Checker;
+struct Type;
+struct DeclInfo;
 // typedef enum BuiltinProcId BuiltinProcId;
 
 
@@ -19,12 +19,12 @@ typedef struct DeclInfo DeclInfo;
 	ENTITY_KIND(Nil) \
 	ENTITY_KIND(Label)
 
-typedef enum EntityKind {
+enum EntityKind {
 #define ENTITY_KIND(k) GB_JOIN2(Entity_, k),
 	ENTITY_KINDS
 #undef ENTITY_KIND
 	Entity_Count,
-} EntityKind;
+};
 
 String const entity_strings[] = {
 #define ENTITY_KIND(k) {cast(u8 *)#k, gb_size_of(#k)-1},
@@ -32,7 +32,7 @@ String const entity_strings[] = {
 #undef ENTITY_KIND
 };
 
-typedef enum EntityFlag {
+enum EntityFlag {
 	EntityFlag_Visited       = 1<<0,
 	EntityFlag_Used          = 1<<1,
 	EntityFlag_Using         = 1<<2,
@@ -45,24 +45,23 @@ typedef enum EntityFlag {
 	EntityFlag_Value         = 1<<9,
 	EntityFlag_Sret          = 1<<10,
 	EntityFlag_BitFieldValue = 1<<11,
-} EntityFlag;
+};
 
 // Zero value means the overloading process is not yet done
-typedef enum OverloadKind {
+enum OverloadKind {
 	Overload_Unknown,
 	Overload_No,
 	Overload_Yes,
-} OverloadKind;
+};
 
-typedef	enum EntityAliasKind {
+enum EntityAliasKind {
 	EntityAlias_Invalid,
 	EntityAlias_Type,
 	EntityAlias_Entity,
-} EntityAliasKind;
+};
 
 
 // An Entity is a named "thing" in the language
-typedef struct Entity Entity;
 struct Entity {
 	EntityKind kind;
 	u64        id;

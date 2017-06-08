@@ -267,7 +267,6 @@ enum ssaOp {
 	SSA_OPS
 #undef SSA_OP
 };
-typedef enum ssaOp ssaOp;
 
 String const ssa_op_strings[] = {
 #define SSA_OP(k) {cast(u8 *)#k, gb_size_of(#k)-1},

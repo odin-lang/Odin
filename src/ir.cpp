@@ -1,9 +1,7 @@
-typedef struct irProcedure irProcedure;
-typedef struct irBlock irBlock;
-typedef struct irValue irValue;
-typedef struct irDebugInfo irDebugInfo;
-
-typedef Array<irValue *> irValueArray;
+struct irProcedure;
+struct irBlock;
+struct irValue;
+struct irDebugInfo;
 
 #define MAP_TYPE irValue *
 #define MAP_PROC map_ir_value_
@@ -16,7 +14,7 @@ typedef Array<irValue *> irValueArray;
 #include "map.cpp"
 
 
-typedef struct irModule {
+struct irModule {
 	CheckerInfo * info;
 	gbArena       arena;
 	gbArena       tmp_arena;
@@ -42,20 +40,20 @@ typedef struct irModule {
 	Entity *              entry_point_entity;
 
 	Array<irProcedure *>  procs;             // NOTE(bill): All procedures with bodies
-	irValueArray          procs_to_generate; // NOTE(bill): Procedures to generate
+	Array<irValue *>      procs_to_generate; // NOTE(bill): Procedures to generate
 
 	Array<String>         foreign_library_paths; // Only the ones that were used
-} irModule;
+};
 
 // NOTE(bill): For more info, see https://en.wikipedia.org/wiki/Dominator_(graph_theory)
-typedef struct irDomNode {
+struct irDomNode {
 	irBlock *        idom; // Parent (Immediate Dominator)
 	Array<irBlock *> children;
 	i32              pre, post; // Ordering in tree
-} irDomNode;
+};
 
 
-typedef struct irBlock {
+struct irBlock {
 	i32          index;
 	String       label;
 	irProcedure *parent;
@@ -65,14 +63,13 @@ typedef struct irBlock {
 	irDomNode    dom;
 	i32          gaps;
 
-	irValueArray instrs;
-	irValueArray locals;
+	Array<irValue *> instrs;
+	Array<irValue *> locals;
 
 	Array<irBlock *> preds;
 	Array<irBlock *> succs;
-} irBlock;
+};
 
-typedef struct irTargetList irTargetList;
 struct irTargetList {
 	irTargetList *prev;
 	irBlock *     break_;
@@ -80,17 +77,17 @@ struct irTargetList {
 	irBlock *     fallthrough_;
 };
 
-typedef enum irDeferExitKind {
+enum irDeferExitKind {
 	irDeferExit_Default,
 	irDeferExit_Return,
 	irDeferExit_Branch,
-} irDeferExitKind;
-typedef enum irDeferKind {
+};
+enum irDeferKind {
 	irDefer_Node,
 	irDefer_Instr,
-} irDeferKind;
+};
 
-typedef struct irDefer {
+struct irDefer {
 	irDeferKind kind;
 	isize       scope_index;
 	irBlock *   block;
@@ -99,14 +96,14 @@ typedef struct irDefer {
 		// NOTE(bill): `instr` will be copied every time to create a new one
 		irValue *instr;
 	};
-} irDefer;
+};
 
 
-typedef struct irBranchBlocks {
+struct irBranchBlocks {
 	AstNode *label;
 	irBlock *break_;
 	irBlock *continue_;
-} irBranchBlocks;
+};
 
 
 struct irProcedure {
@@ -122,7 +119,7 @@ struct irProcedure {
 	u64                   tags;
 
 	irValue *             return_ptr;
-	irValueArray          params;
+	Array<irValue *>      params;
 	Array<irDefer>        defer_stmts;
 	Array<irBlock *>      blocks;
 	i32                   scope_index;
@@ -130,7 +127,7 @@ struct irProcedure {
 	irBlock *             entry_block;
 	irBlock *             curr_block;
 	irTargetList *        target_list;
-	irValueArray          referrers;
+	Array<irValue *>      referrers;
 
 	Array<irBranchBlocks> branch_blocks;
 
@@ -153,7 +150,7 @@ struct irProcedure {
 		Entity *     entity;                                          \
 		Type *       type;                                            \
 		bool         zero_initialized;                                \
-		irValueArray referrers;                                       \
+		Array<irValue *> referrers;                                       \
 		i64          alignment;                                       \
 	})                                                                \
 	IR_INSTR_KIND(ZeroInit, struct { irValue *address; })             \
@@ -205,7 +202,7 @@ struct irProcedure {
 		irValue *true_value;                                          \
 		irValue *false_value;                                         \
 	})                                                                \
-	IR_INSTR_KIND(Phi, struct { irValueArray edges; Type *type; })    \
+	IR_INSTR_KIND(Phi, struct { Array<irValue *> edges; Type *type; })    \
 	IR_INSTR_KIND(Unreachable, i32)                                   \
 	IR_INSTR_KIND(UnaryOp, struct {                                   \
 		Type *    type;                                               \
@@ -261,12 +258,12 @@ struct irProcedure {
 	IR_CONV_KIND(inttoptr) \
 	IR_CONV_KIND(bitcast)
 
-typedef enum irInstrKind {
+enum irInstrKind {
 	irInstr_Invalid,
 #define IR_INSTR_KIND(x, ...) GB_JOIN2(irInstr_, x),
 	IR_INSTR_KINDS
 #undef IR_INSTR_KIND
-} irInstrKind;
+};
 
 String const ir_instr_strings[] = {
 	{cast(u8 *)"Invalid", gb_size_of("Invalid")-1},
@@ -275,12 +272,12 @@ String const ir_instr_strings[] = {
 #undef IR_INSTR_KIND
 };
 
-typedef enum irConvKind {
+enum irConvKind {
 	irConv_Invalid,
 #define IR_CONV_KIND(x) GB_JOIN2(irConv_, x),
 	IR_CONV_KINDS
 #undef IR_CONV_KIND
-} irConvKind;
+};
 
 String const ir_conv_strings[] = {
 	{cast(u8 *)"Invalid", gb_size_of("Invalid")-1},
@@ -293,7 +290,6 @@ String const ir_conv_strings[] = {
 	IR_INSTR_KINDS
 #undef IR_INSTR_KIND
 
-typedef struct irInstr irInstr;
 struct irInstr {
 	irInstrKind kind;
 
@@ -308,7 +304,7 @@ struct irInstr {
 };
 
 
-typedef enum irValueKind {
+enum irValueKind {
 	irValue_Invalid,
 
 	irValue_Constant,
@@ -323,58 +319,58 @@ typedef enum irValueKind {
 	irValue_Instr,
 
 	irValue_Count,
-} irValueKind;
+};
 
-typedef struct irValueConstant {
+struct irValueConstant {
 	Type *     type;
 	ExactValue value;
-} irValueConstant;
+};
 
-typedef struct irValueConstantSlice {
+struct irValueConstantSlice {
 	Type *    type;
 	irValue *backing_array;
 	i64       count;
-} irValueConstantSlice;
+};
 
-typedef struct irValueNil {
+struct irValueNil {
 	Type *type;
-} irValueNil;
+};
 
-typedef struct irValueTypeName {
+struct irValueTypeName {
 	Type * type;
 	String name;
-} irValueTypeName;
+};
 
-typedef struct irValueGlobal {
+struct irValueGlobal {
 	String        name;
 	Entity *      entity;
 	Type *        type;
 	irValue *     value;
-	irValueArray  referrers;
+	Array<irValue *>  referrers;
 	bool          is_constant;
 	bool          is_private;
 	bool          is_thread_local;
 	bool          is_foreign;
 	bool          is_unnamed_addr;
-} irValueGlobal;
+};
 
 
-typedef enum irParamPasskind {
+enum irParamPasskind {
 	irParamPass_Value,   // Pass by value
 	irParamPass_Pointer, // Pass as a pointer rather than by value
 	irParamPass_Integer, // Pass as an integer of the same size
-} irParamPasskind;
+};
 
-typedef struct irValueParam {
+struct irValueParam {
 	irParamPasskind kind;
 	irProcedure *   parent;
 	Entity *        entity;
 	Type *          type;
 	Type *          original_type;
-	irValueArray    referrers;
-} irValueParam;
+	Array<irValue *>    referrers;
+};
 
-typedef struct irValue {
+struct irValue {
 	irValueKind kind;
 	i32         index;
 	bool        index_set;
@@ -389,7 +385,7 @@ typedef struct irValue {
 		irBlock              Block;
 		irInstr              Instr;
 	};
-} irValue;
+};
 
 gb_global irValue *v_zero    = NULL;
 gb_global irValue *v_one     = NULL;
@@ -400,14 +396,14 @@ gb_global irValue *v_false   = NULL;
 gb_global irValue *v_true    = NULL;
 gb_global irValue *v_raw_nil = NULL;
 
-typedef enum irAddrKind {
+enum irAddrKind {
 	irAddr_Default,
 	// irAddr_Vector,
 	irAddr_Map,
 	irAddr_BitField,
-} irAddrKind;
+};
 
-typedef struct irAddr {
+struct irAddr {
 	irAddrKind kind;
 	irValue *  addr;
 	union {
@@ -423,7 +419,7 @@ typedef struct irAddr {
 	// union {
 		// struct { irValue *index; } Vector;
 	// };
-} irAddr;
+};
 
 irAddr ir_addr(irValue *addr) {
 	irAddr v = {irAddr_Default, addr};
@@ -444,7 +440,7 @@ irAddr ir_addr_bit_field(irValue *addr, isize bit_field_value_index) {
 	return v;
 }
 
-typedef enum irDebugEncoding {
+enum irDebugEncoding {
 	irDebugBasicEncoding_Invalid       = 0,
 
 	irDebugBasicEncoding_address       = 1,
@@ -464,9 +460,9 @@ typedef enum irDebugEncoding {
 	irDebugBasicEncoding_structure_type   = 19,
 	irDebugBasicEncoding_union_type       = 23,
 
-} irDebugEncoding;
+};
 
-typedef enum irDebugInfoKind {
+enum irDebugInfoKind {
 	irDebugInfo_Invalid,
 
 	irDebugInfo_CompileUnit,
@@ -485,9 +481,8 @@ typedef enum irDebugInfoKind {
 
 
 	irDebugInfo_Count,
-} irDebugInfoKind;
+};
 
-typedef struct irDebugInfo irDebugInfo;
 struct irDebugInfo {
 	irDebugInfoKind kind;
 	i32 id;
@@ -569,14 +564,13 @@ struct irDebugInfo {
 };
 
 
-
-typedef struct irGen {
+struct irGen {
 	irModule module;
 	gbFile   output_file;
 	bool     opt_called;
 	String   output_base;
 	String   output_name;
-} irGen;
+};
 
 
 
@@ -698,7 +692,7 @@ void ir_set_instr_parent(irValue *instr, irBlock *parent) {
 	}
 }
 
-irValueArray *ir_value_referrers(irValue *v) {
+Array<irValue *> *ir_value_referrers(irValue *v) {
 	switch (v->kind) {
 	case irValue_Global:
 		return &v->Global.referrers;
@@ -969,7 +963,7 @@ irValue *ir_instr_if(irProcedure *p, irValue *cond, irBlock *true_block, irBlock
 }
 
 
-irValue *ir_instr_phi(irProcedure *p, irValueArray edges, Type *type) {
+irValue *ir_instr_phi(irProcedure *p, Array<irValue *> edges, Type *type) {
 	irValue *v = ir_alloc_instr(p, irInstr_Phi);
 	irInstr *i = &v->Instr;
 	i->Phi.edges = edges;
@@ -3387,7 +3381,7 @@ irValue *ir_emit_logical_binary_expr(irProcedure *proc, AstNode *expr) {
 		return ir_build_expr(proc, be->right);
 	}
 
-	irValueArray edges = {};
+	Array<irValue *> edges = {};
 	array_init(&edges, proc->module->allocator, done->preds.count+1);
 	for_array(i, done->preds) {
 		array_add(&edges, short_circuit);
@@ -3613,7 +3607,7 @@ irValue *ir_find_global_variable(irProcedure *proc, String name) {
 	return *value;
 }
 
-void ir_build_stmt_list(irProcedure *proc, AstNodeArray stmts);
+void ir_build_stmt_list(irProcedure *proc, Array<AstNode *> stmts);
 
 
 bool is_double_pointer(Type *t) {
@@ -3712,7 +3706,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	case_ast_node(te, TernaryExpr, expr);
 		ir_emit_comment(proc, str_lit("TernaryExpr"));
 
-		irValueArray edges = {};
+		Array<irValue *> edges = {};
 		array_init(&edges, proc->module->allocator, 2);
 
 		GB_ASSERT(te->y != NULL);
@@ -3752,7 +3746,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			ir_build_stmt(proc, ie->init);
 		}
 
-		irValueArray edges = {};
+		Array<irValue *> edges = {};
 		array_init(&edges, proc->module->allocator, 2);
 
 		GB_ASSERT(ie->else_expr != NULL);
@@ -5450,7 +5444,7 @@ irValue *ir_build_cond(irProcedure *proc, AstNode *cond, irBlock *true_block, ir
 
 
 
-void ir_build_stmt_list(irProcedure *proc, AstNodeArray stmts) {
+void ir_build_stmt_list(irProcedure *proc, Array<AstNode *> stmts) {
 	for_array(i, stmts) {
 		ir_build_stmt(proc, stmts[i]);
 	}
@@ -5787,7 +5781,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				}
 			} else { // Tuple(s)
 				Array<irAddr> lvals = {};
-				irValueArray  inits = {};
+				Array<irValue *>  inits = {};
 				array_init(&lvals, m->tmp_allocator, vd->names.count);
 				array_init(&inits, m->tmp_allocator, vd->names.count);
 
@@ -5943,7 +5937,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					irValue *init = ir_build_expr(proc, rhs);
 					ir_addr_store(proc, lvals[0], init);
 				} else {
-					irValueArray inits;
+					Array<irValue *> inits;
 					array_init(&inits, m->tmp_allocator, lvals.count);
 
 					for_array(i, as->rhs) {
@@ -5956,7 +5950,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					}
 				}
 			} else {
-				irValueArray inits;
+				Array<irValue *> inits;
 				array_init(&inits, m->tmp_allocator, lvals.count);
 
 				for_array(i, as->rhs) {
@@ -6029,7 +6023,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		} else {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
 
-			irValueArray results;
+			Array<irValue *> results;
 			array_init(&results, proc->module->tmp_allocator, return_count);
 
 			for_array(res_index, rs->results) {
@@ -6338,7 +6332,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 		ast_node(body, BlockStmt, ms->body);
 
-		AstNodeArray default_stmts = {};
+		Array<AstNode *> default_stmts = {};
 		irBlock *default_fall = NULL;
 		irBlock *default_block = NULL;
 
@@ -7116,10 +7110,10 @@ void ir_gen_tree(irGen *s) {
 		}
 	}
 
-	typedef struct irGlobalVariable {
+	struct irGlobalVariable {
 		irValue *var, *init;
 		DeclInfo *decl;
-	} irGlobalVariable;
+	};
 	Array<irGlobalVariable> global_variables;
 	array_init(&global_variables, m->tmp_allocator, global_variable_max_count);
 

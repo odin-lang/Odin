@@ -3,13 +3,13 @@
 // TODO(bill): Big numbers
 // IMPORTANT TODO(bill): This needs to be completely fixed!!!!!!!!
 
-typedef struct AstNode AstNode;
+struct AstNode;
 
-typedef struct Complex128 {
+struct Complex128 {
 	f64 real, imag;
-} Complex128;
+};
 
-typedef enum ExactValueKind {
+enum ExactValueKind {
 	ExactValue_Invalid,
 
 	ExactValue_Bool,
@@ -21,9 +21,9 @@ typedef enum ExactValueKind {
 	ExactValue_Compound, // TODO(bill): Is this good enough?
 
 	ExactValue_Count,
-} ExactValueKind;
+};
 
-typedef struct ExactValue {
+struct ExactValue {
 	ExactValueKind kind;
 	union {
 		bool          value_bool;
@@ -34,7 +34,7 @@ typedef struct ExactValue {
 		Complex128    value_complex;
 		AstNode *     value_compound;
 	};
-} ExactValue;
+};
 
 gb_global ExactValue const empty_exact_value = {};
 

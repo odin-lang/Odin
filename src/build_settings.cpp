@@ -1,5 +1,5 @@
 // This stores the information for the specify architecture of this build
-typedef struct BuildContext {
+struct BuildContext {
 	// Constants
 	String ODIN_OS;      // target operating system
 	String ODIN_ARCH;    // target architecture
@@ -15,7 +15,7 @@ typedef struct BuildContext {
 	String llc_flags;
 	String link_flags;
 	bool   is_dll;
-} BuildContext;
+};
 
 
 gb_global BuildContext build_context = {0};

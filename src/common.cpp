@@ -43,8 +43,6 @@ gbAllocator scratch_allocator(void) {
 	return gb_scratch_allocator(&scratch_memory);
 }
 
-typedef struct DynamicArenaBlock DynamicArenaBlock;
-typedef struct DynamicArena      DynamicArena;
 
 struct DynamicArenaBlock {
 	DynamicArenaBlock *prev;

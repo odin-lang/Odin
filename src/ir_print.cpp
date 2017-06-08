@@ -1,8 +1,8 @@
-typedef struct irFileBuffer {
+struct irFileBuffer {
 	gbVirtualMemory vm;
 	isize           offset;
 	gbFile *        output;
-} irFileBuffer;
+};
 
 void ir_file_buffer_init(irFileBuffer *f, gbFile *output) {
 	isize size = 8*gb_virtual_memory_page_size(NULL);

@@ -1,6 +1,6 @@
 // Optimizations for the IR code
 
-void ir_opt_add_operands(irValueArray *ops, irInstr *i) {
+void ir_opt_add_operands(Array<irValue *> *ops, irInstr *i) {
 	switch (i->kind) {
 	case irInstr_Comment:
 		break;
@@ -126,8 +126,8 @@ bool ir_opt_block_has_phi(irBlock *b) {
 
 
 
-irValueArray ir_get_block_phi_nodes(irBlock *b) {
-	irValueArray phis = {0};
+Array<irValue *> ir_get_block_phi_nodes(irBlock *b) {
+	Array<irValue *> phis = {0};
 	for_array(i, b->instrs) {
 		irInstr *instr = &b->instrs[i]->Instr;
 		if (instr->kind != irInstr_Phi) {
@@ -140,7 +140,7 @@ irValueArray ir_get_block_phi_nodes(irBlock *b) {
 }
 
 void ir_remove_pred(irBlock *b, irBlock *p) {
-	irValueArray phis = ir_get_block_phi_nodes(b);
+	Array<irValue *> phis = ir_get_block_phi_nodes(b);
 	isize i = 0;
 	for_array(j, b->preds) {
 		irBlock *pred = b->preds[j];
@@ -273,7 +273,7 @@ void ir_opt_blocks(irProcedure *proc) {
 void ir_opt_build_referrers(irProcedure *proc) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
 
-	irValueArray ops = {0}; // NOTE(bill): Act as a buffer
+	Array<irValue *> ops = {0}; // NOTE(bill): Act as a buffer
 	array_init(&ops, proc->module->tmp_allocator, 64); // HACK(bill): This _could_ overflow the temp arena
 	for_array(i, proc->blocks) {
 		irBlock *b = proc->blocks[i];
@@ -286,7 +286,7 @@ void ir_opt_build_referrers(irProcedure *proc) {
 				if (op == NULL) {
 					continue;
 				}
-				irValueArray *refs = ir_value_referrers(op);
+				Array<irValue *> *refs = ir_value_referrers(op);
 				if (refs != NULL) {
 					array_add(refs, instr);
 				}
