@@ -317,7 +317,7 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 			return v;
 		case ExactValue_Integer: {
 			ExactValue i = v;
-			i.value_integer = i128_neg(i.value_integer);
+			i.value_integer = -i.value_integer;
 			return i;
 		}
 		case ExactValue_Float: {
@@ -339,7 +339,7 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 		case ExactValue_Invalid:
 			return v;
 		case ExactValue_Integer:
-			i = i128_not(v.value_integer);
+			i = ~v.value_integer;
 			break;
 		default:
 			goto failure;
@@ -349,7 +349,7 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 		// limited to the types precision
 		// IMPORTANT NOTE(bill): Max precision is 64 bits as that's how integers are stored
 		if (0 < precision && precision < 128) {
-			i = i128_and(i, i128_not(i128_shl(I128_NEG_ONE, precision)));
+			i = i & ~(I128_NEG_ONE << precision);
 		}
 
 		return exact_value_i128(i);
@@ -461,19 +461,19 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 		i128 b = y.value_integer;
 		i128 c = I128_ZERO;
 		switch (op) {
-		case Token_Add:    c = i128_add(a, b);                           break;
-		case Token_Sub:    c = i128_sub(a, b);                           break;
-		case Token_Mul:    c = i128_mul(a, b);                           break;
+		case Token_Add:    c = a + b;               break;
+		case Token_Sub:    c = a - b;               break;
+		case Token_Mul:    c = a * b;               break;
 		case Token_Quo:    return exact_value_float(fmod(i128_to_f64(a), i128_to_f64(b)));
-		case Token_QuoEq:  c = i128_quo(a, b);                           break; // NOTE(bill): Integer division
-		case Token_Mod:    c = i128_mod(a, b);                           break;
-		case Token_ModMod: c = i128_mod(i128_add(i128_mod(a, b), b), b); break;
-		case Token_And:    c = i128_and    (a, b);                       break;
-		case Token_Or:     c = i128_or     (a, b);                       break;
-		case Token_Xor:    c = i128_xor    (a, b);                       break;
-		case Token_AndNot: c = i128_and_not(a, b);                       break;
-		case Token_Shl:    c = i128_shl    (a, i128_to_u64(b));          break;
-		case Token_Shr:    c = i128_shr    (a, i128_to_u64(b));          break;
+		case Token_QuoEq:  c = a / b;               break; // NOTE(bill): Integer division
+		case Token_Mod:    c = a % b;               break;
+		case Token_ModMod: c = ((a % b) + b) % b;   break;
+		case Token_And:    c = a & b;               break;
+		case Token_Or:     c = a | b;               break;
+		case Token_Xor:    c = a ^ b;               break;
+		case Token_AndNot: c = i128_and_not(a, b);  break;
+		case Token_Shl:    c = a << i128_to_u64(b); break;
+		case Token_Shr:    c = a >> i128_to_u64(b); break;
 		default: goto error;
 		}
 
@@ -560,12 +560,12 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 		i128 a = x.value_integer;
 		i128 b = y.value_integer;
 		switch (op) {
-		case Token_CmpEq: return i128_eq(a, b);
-		case Token_NotEq: return i128_ne(a, b);
-		case Token_Lt:    return i128_lt(a, b);
-		case Token_LtEq:  return i128_le(a, b);
-		case Token_Gt:    return i128_gt(a, b);
-		case Token_GtEq:  return i128_ge(a, b);
+		case Token_CmpEq: return a == b;
+		case Token_NotEq: return a != b;
+		case Token_Lt:    return a <  b;
+		case Token_LtEq:  return a <= b;
+		case Token_Gt:    return a >  b;
+		case Token_GtEq:  return a >= b;
 		}
 	} break;
 
@@ -596,15 +596,14 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 	case ExactValue_String: {
 		String a = x.value_string;
 		String b = y.value_string;
-		isize len = gb_min(a.len, b.len);
 		// TODO(bill): gb_memcompare is used because the strings are UTF-8
 		switch (op) {
-		case Token_CmpEq: return gb_memcompare(a.text, b.text, len) == 0;
-		case Token_NotEq: return gb_memcompare(a.text, b.text, len) != 0;
-		case Token_Lt:    return gb_memcompare(a.text, b.text, len) <  0;
-		case Token_LtEq:  return gb_memcompare(a.text, b.text, len) <= 0;
-		case Token_Gt:    return gb_memcompare(a.text, b.text, len) >  0;
-		case Token_GtEq:  return gb_memcompare(a.text, b.text, len) >= 0;
+		case Token_CmpEq: return a == b;
+		case Token_NotEq: return a != b;
+		case Token_Lt:    return a <  b;
+		case Token_LtEq:  return a <= b;
+		case Token_Gt:    return a >  b;
+		case Token_GtEq:  return a >= b;
 		}
 	} break;
 	}

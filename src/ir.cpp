@@ -1902,12 +1902,14 @@ irValue *ir_addr_load(irProcedure *proc, irAddr addr) {
 			return v;
 		}
 
+		GB_ASSERT(8 > bit_inset);
 
+		irValue *shift_amount = ir_value_constant(a, int_type, exact_value_i64(bit_inset));
 		irValue *first_byte = ir_emit_load(proc, bytes);
-		irValue *res = ir_emit_arith(proc, Token_Shr, first_byte, ir_const_int(a, 8 - bit_inset), int_type);
+		irValue *res = ir_emit_arith(proc, Token_Shr, first_byte, shift_amount, int_type);
 
 		irValue *remaining_bytes = ir_emit_load(proc, ir_emit_conv(proc, ir_emit_ptr_offset(proc, bytes, v_one), int_ptr));
-		remaining_bytes = ir_emit_arith(proc, Token_Shl, remaining_bytes, ir_const_int(a, bit_inset), int_type);
+		remaining_bytes = ir_emit_arith(proc, Token_Shl, remaining_bytes, shift_amount, int_type);
 		return ir_emit_arith(proc, Token_Or, res, remaining_bytes, int_type);
 
 	}
