@@ -19,7 +19,7 @@ String ssa_mangle_name(ssaModule *m, String path, Entity *e);
 #define MAP_NAME MapSsaValue
 #include "map.cpp"
 
-typedef Array(ssaValue *) ssaValueArray;
+typedef Array<ssaValue *> ssaValueArray;
 
 #include "ssa_op.cpp"
 
@@ -30,6 +30,15 @@ struct ssaValueArgs {
 	isize       capacity;
 	ssaValue *  backing[SSA_DEFAULT_VALUE_ARG_CAPACITY];
 	gbAllocator allocator;
+
+	ssaValue *&operator[](isize i) {
+		GB_ASSERT(0 <= i && i <= count);
+		return e[i];
+	}
+	ssaValue * const &operator[](isize i) const {
+		GB_ASSERT(0 <= i && i <= count);
+		return e[i];
+	}
 };
 
 struct ssaValue {
@@ -97,7 +106,7 @@ struct ssaEdge {
 	isize     index;
 };
 
-typedef Array(ssaEdge) ssaEdgeArray;
+typedef Array<ssaEdge> ssaEdgeArray;
 
 struct ssaBlock {
 	i32                  id;   // Unique identifier but the pointer could be used too
@@ -134,7 +143,7 @@ struct ssaProc {
 	Entity *          entity;
 	DeclInfo *        decl_info;
 
-	Array(ssaBlock *) blocks;
+	Array<ssaBlock *> blocks;
 	ssaBlock *        entry;      // Entry block
 	ssaBlock *        exit;       // Exit block
 	ssaBlock *        curr_block;
@@ -145,7 +154,7 @@ struct ssaProc {
 	i32               value_id;
 	MapSsaValue       values;   // Key: Entity *
 
-	Array(ssaDefer)   defer_stmts;
+	Array<ssaDefer>   defer_stmts;
 	i32               scope_level;
 };
 
@@ -164,7 +173,7 @@ struct ssaModule {
 	MapEntity          min_dep_map; // Key: Entity *
 	MapSsaValue        values;      // Key: Entity *
 	// List of registers for the specific architecture
-	Array(ssaRegister) registers;
+	Array<ssaRegister> registers;
 
 	ssaProc *proc; // current procedure
 
@@ -172,7 +181,7 @@ struct ssaModule {
 
 	u32 stmt_state_flags;
 
-	Array(ssaProc *)  procs;
+	Array<ssaProc *>  procs;
 	ssaValueArray     procs_to_generate;
 };
 
@@ -406,7 +415,7 @@ ssaValue *ssa_emit_deep_field_ptr_index(ssaProc *p, ssaValue *e, Selection sel);
 
 void ssa_reset_value_args(ssaValue *v) {
 	for_array(i, v->args) {
-		v->args.e[i]->uses--;
+		v->args[i]->uses--;
 	}
 	v->args.count = 0;
 }
@@ -425,7 +434,7 @@ ssaValue *ssa_get_last_value(ssaBlock *b) {
 	if (len <= 0) {
 		return 0;
 	}
-	ssaValue *v = b->values.e[len-1];
+	ssaValue *v = b->values[len-1];
 	return v;
 }
 
@@ -451,7 +460,7 @@ void ssa_build_defer_stmt(ssaProc *p, ssaDefer d) {
 void ssa_emit_defer_stmts(ssaProc *p, ssaDeferExitKind kind, ssaBlock *b) {
 	isize count = p->defer_stmts.count;
 	for (isize i = count-1; i >= 0; i--) {
-		ssaDefer d = p->defer_stmts.e[i];
+		ssaDefer d = p->defer_stmts[i];
 		if (kind == ssaDeferExit_Default) {
 			gb_printf_err("scope_level %d %d\n", p->scope_level, d.scope_level);
 			if (p->scope_level == d.scope_level &&
@@ -782,7 +791,7 @@ ssaValue *ssa_emit_conv(ssaProc *p, ssaValue *v, Type *t) {
 // NOTE(bill): Returns NULL if not possible
 ssaValue *ssa_address_from_load_or_generate_local(ssaProc *p, ssaValue *v) {
 	if (v->op == ssaOp_Load) {
-		return v->args.e[0];
+		return v->args[0];
 	}
 	ssaAddr addr = ssa_add_local_generated(p, v->type);
 	ssa_new_value2(p, ssaOp_Store, addr.addr->type, addr.addr, v);
@@ -863,7 +872,7 @@ ssaValue *ssa_emit_ptr_index(ssaProc *p, ssaValue *s, i64 index) {
 ssaValue *ssa_emit_value_index(ssaProc *p, ssaValue *s, i64 index) {
 	if (s->op == ssaOp_Load) {
 		if (!can_ssa_type(s->type)) {
-			ssaValue *e = ssa_emit_ptr_index(p, s->args.e[0], index);
+			ssaValue *e = ssa_emit_ptr_index(p, s->args[0], index);
 			return ssa_emit_load(p, e);
 		}
 	}
@@ -930,7 +939,7 @@ ssaValue *ssa_emit_deep_field_ptr_index(ssaProc *p, ssaValue *e, Selection sel) 
 	Type *type = type_deref(e->type);
 
 	for_array(i, sel.index) {
-		i32 index = cast(i32)sel.index.e[i];
+		i32 index = cast(i32)sel.index[i];
 		if (is_type_pointer(type)) {
 			type = type_deref(type);
 			e = ssa_emit_load(p, e);
@@ -994,14 +1003,14 @@ ssaValue *ssa_emit_deep_field_value_index(ssaProc *p, ssaValue *e, Selection sel
 	Type *type = e->type;
 	if (e->op == ssaOp_Load) {
 		if (!can_ssa_type(e->type)) {
-			ssaValue *ptr = ssa_emit_deep_field_ptr_index(p, e->args.e[0], sel);
+			ssaValue *ptr = ssa_emit_deep_field_ptr_index(p, e->args[0], sel);
 			return ssa_emit_load(p, ptr);
 		}
 	}
 	GB_ASSERT(can_ssa_type(e->type));
 
 	for_array(i, sel.index) {
-		i32 index = cast(i32)sel.index.e[i];
+		i32 index = cast(i32)sel.index[i];
 		if (is_type_pointer(type)) {
 			e = ssa_emit_load(p, e);
 		}
@@ -1837,7 +1846,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 	case_ast_node(ce, CallExpr, expr);
 		if (map_tav_get(&p->module->info->types, hash_pointer(ce->proc))->mode == Addressing_Type) {
 			GB_ASSERT(ce->args.count == 1);
-			ssaValue *x = ssa_build_expr(p, ce->args.e[0]);
+			ssaValue *x = ssa_build_expr(p, ce->args[0]);
 			return ssa_emit_conv(p, x, tv.type);
 		}
 
@@ -1863,7 +1872,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 
 void ssa_build_stmt_list(ssaProc *p, AstNodeArray nodes) {
 	for_array(i, nodes) {
-		ssa_build_stmt(p, nodes.e[i]);
+		ssa_build_stmt(p, nodes[i]);
 	}
 }
 
@@ -1946,7 +1955,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 
 	case_ast_node(us, UsingStmt, node);
 		for_array(i, us->list) {
-			AstNode *decl = unparen_expr(us->list.e[i]);
+			AstNode *decl = unparen_expr(us->list[i]);
 			if (decl->kind == AstNode_ValueDecl) {
 				ssa_build_stmt(p, decl);
 			}
@@ -1973,19 +1982,19 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
 			if (vd->values.count == 0) {
 				for_array(i, vd->names) {
-					AstNode *name = vd->names.e[i];
+					AstNode *name = vd->names[i];
 					if (!ssa_is_blank_ident(name)) {
 						ssa_add_local_for_ident(p, name);
 					}
 				}
 			} else {
-				Array(ssaAddr) lvals = {0};
+				Array<ssaAddr> lvals = {0};
 				ssaValueArray  inits = {0};
-				array_init_reserve(&lvals, m->tmp_allocator, vd->names.count);
-				array_init_reserve(&inits, m->tmp_allocator, vd->names.count);
+				array_init(&lvals, m->tmp_allocator, vd->names.count);
+				array_init(&inits, m->tmp_allocator, vd->names.count);
 
 				for_array(i, vd->names) {
-					AstNode *name = vd->names.e[i];
+					AstNode *name = vd->names[i];
 					ssaAddr lval = ssa_addr(NULL);
 					if (!ssa_is_blank_ident(name)) {
 						lval = ssa_add_local_for_ident(p, name);
@@ -1995,7 +2004,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 				}
 
 				for_array(i, vd->values) {
-					ssaValue *init = ssa_build_expr(p, vd->values.e[i]);
+					ssaValue *init = ssa_build_expr(p, vd->values[i]);
 					if (init == NULL) { // TODO(bill): remove this
 						continue;
 					}
@@ -2012,7 +2021,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 				}
 
 				for_array(i, inits) {
-					ssa_addr_store(p, lvals.e[i], inits.e[i]);
+					ssa_addr_store(p, lvals[i], inits[i]);
 				}
 			}
 
@@ -2030,11 +2039,11 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 
 		switch (as->op.kind) {
 		case Token_Eq: {
-			Array(ssaAddr) lvals = {0};
+			Array<ssaAddr> lvals = {0};
 			array_init(&lvals, m->tmp_allocator);
 
 			for_array(i, as->lhs) {
-				AstNode *lhs = as->lhs.e[i];
+				AstNode *lhs = as->lhs[i];
 				ssaAddr lval = {0};
 				if (!ssa_is_blank_ident(lhs)) {
 					lval = ssa_build_addr(p, lhs);
@@ -2044,28 +2053,28 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 
 			if (as->lhs.count == as->rhs.count) {
 				if (as->lhs.count == 1) {
-					AstNode *rhs = as->rhs.e[0];
+					AstNode *rhs = as->rhs[0];
 					ssaValue *init = ssa_build_expr(p, rhs);
-					ssa_addr_store(p, lvals.e[0], init);
+					ssa_addr_store(p, lvals[0], init);
 				} else {
 					ssaValueArray inits;
-					array_init_reserve(&inits, m->tmp_allocator, lvals.count);
+					array_init(&inits, m->tmp_allocator, lvals.count);
 
 					for_array(i, as->rhs) {
-						ssaValue *init = ssa_build_expr(p, as->rhs.e[i]);
+						ssaValue *init = ssa_build_expr(p, as->rhs[i]);
 						array_add(&inits, init);
 					}
 
 					for_array(i, inits) {
-						ssa_addr_store(p, lvals.e[i], inits.e[i]);
+						ssa_addr_store(p, lvals[i], inits[i]);
 					}
 				}
 			} else {
 				ssaValueArray inits;
-				array_init_reserve(&inits, m->tmp_allocator, lvals.count);
+				array_init(&inits, m->tmp_allocator, lvals.count);
 
 				for_array(i, as->rhs) {
-					ssaValue *init = ssa_build_expr(p, as->rhs.e[i]);
+					ssaValue *init = ssa_build_expr(p, as->rhs[i]);
 					Type *t = base_type(init->type);
 					// TODO(bill): refactor for code reuse as this is repeated a bit
 					if (t->kind == Type_Tuple) {
@@ -2080,7 +2089,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 				}
 
 				for_array(i, inits) {
-					ssa_addr_store(p, lvals.e[i], inits.e[i]);
+					ssa_addr_store(p, lvals[i], inits[i]);
 				}
 			}
 		} break;
@@ -2091,8 +2100,8 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 			// +=, -=, etc
 			i32 op = cast(i32)as->op.kind;
 			op += Token_Add - Token_AddEq; // Convert += to +
-			ssaAddr lhs = ssa_build_addr(p, as->lhs.e[0]);
-			ssaValue *value = ssa_build_expr(p, as->rhs.e[0]);
+			ssaAddr lhs = ssa_build_addr(p, as->lhs[0]);
+			ssaValue *value = ssa_build_expr(p, as->rhs[0]);
 			ssa_build_assign_op(p, lhs, value, cast(TokenKind)op);
 		} break;
 		}
@@ -2316,7 +2325,7 @@ void ssa_print_reg_value(gbFile *f, ssaValue *v) {
 
 	for_array(i, v->args) {
 		gb_fprintf(f, " ");
-		ssa_print_value(f, v->args.e[i]);
+		ssa_print_value(f, v->args[i]);
 	}
 
 	if (v->comment_string.len > 0) {
@@ -2335,12 +2344,12 @@ void ssa_print_proc(gbFile *f, ssaProc *p) {
 	bool *printed = gb_alloc_array(heap_allocator(), bool, p->value_id+1);
 
 	for_array(i, p->blocks) {
-		ssaBlock *b = p->blocks.e[i];
+		ssaBlock *b = p->blocks[i];
 		gb_fprintf(f, "  b%d:", b->id);
 		if (b->preds.count > 0) {
 			gb_fprintf(f, " <-");
 			for_array(j, b->preds) {
-				ssaBlock *pred = b->preds.e[j].block;
+				ssaBlock *pred = b->preds[j].block;
 				gb_fprintf(f, " b%d", pred->id);
 			}
 		}
@@ -2351,7 +2360,7 @@ void ssa_print_proc(gbFile *f, ssaProc *p) {
 
 		isize n = 0;
 		for_array(j, b->values) {
-			ssaValue *v = b->values.e[j];
+			ssaValue *v = b->values[j];
 			if (v->op != ssaOp_Phi) {
 				continue;
 			}
@@ -2363,13 +2372,13 @@ void ssa_print_proc(gbFile *f, ssaProc *p) {
 		while (n < b->values.count) {
 			isize m = 0;
 			for_array(j, b->values) {
-				ssaValue *v = b->values.e[j];
+				ssaValue *v = b->values[j];
 				if (printed[v->id]) {
 					continue;
 				}
 				bool skip = false;
 				for_array(k, v->args) {
-					ssaValue *w = v->args.e[k];
+					ssaValue *w = v->args[k];
 					if (w != NULL && w->block == b && !printed[w->id]) {
 						skip = true;
 						break;
@@ -2387,7 +2396,7 @@ void ssa_print_proc(gbFile *f, ssaProc *p) {
 			if (m == n) {
 				gb_fprintf(f, "!!!!DepCycle!!!!\n");
 				for_array(k, b->values) {
-					ssaValue *v = b->values.e[k];
+					ssaValue *v = b->values[k];
 					if (printed[v->id]) {
 						continue;
 					}
@@ -2401,14 +2410,14 @@ void ssa_print_proc(gbFile *f, ssaProc *p) {
 
 		if (b->kind == ssaBlock_Plain) {
 			GB_ASSERT(b->succs.count == 1);
-			ssaBlock *next = b->succs.e[0].block;
+			ssaBlock *next = b->succs[0].block;
 			gb_fprintf(f, "    ");
 			gb_fprintf(f, "jump b%d", next->id);
 			gb_fprintf(f, "\n");
 		} else if (b->kind == ssaBlock_If) {
 			GB_ASSERT(b->succs.count == 2);
-			ssaBlock *yes = b->succs.e[0].block;
-			ssaBlock *no = b->succs.e[1].block;
+			ssaBlock *yes = b->succs[0].block;
+			ssaBlock *no = b->succs[1].block;
 			gb_fprintf(f, "    ");
 			gb_fprintf(f, "branch v%d, b%d, b%d", b->control->id, yes->id, no->id);
 			gb_fprintf(f, "\n");
@@ -2491,7 +2500,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 	bool has_win_main = false;
 
 	for_array(i, info->entities.entries) {
-		MapDeclInfoEntry *entry = &info->entities.entries.e[i];
+		MapDeclInfoEntry *entry = &info->entities.entries[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		String name = e->token.string;
 		if (e->kind == Entity_Variable) {
@@ -2517,7 +2526,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 	m.min_dep_map = generate_minimum_dependency_map(info, entry_point);
 
 	for_array(i, info->entities.entries) {
-		MapDeclInfoEntry *entry = &info->entities.entries.e[i];
+		MapDeclInfoEntry *entry = &info->entities.entries[i];
 		Entity *e = cast(Entity *)entry->key.ptr;
 		String name = e->token.string;
 		DeclInfo *decl = entry->value;

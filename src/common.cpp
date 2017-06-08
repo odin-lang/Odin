@@ -242,10 +242,6 @@ f64 gb_sqrt(f64 x) {
 //
 ////////////////////////////////////////////////////////////////
 
-typedef Array(i32)   Array_i32;
-typedef Array(isize) Array_isize;
-
-
 #define MAP_TYPE String
 #define MAP_PROC map_string_
 #define MAP_NAME MapString

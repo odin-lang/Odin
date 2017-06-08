@@ -35,7 +35,7 @@ String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
 #if defined(GB_SYSTEM_WINDOWS)
 String odin_root_dir(void) {
 	String path = global_module_path;
-	Array(wchar_t) path_buf;
+	Array<wchar_t> path_buf;
 	isize len, i;
 	gbTempArenaMemory tmp;
 	wchar_t *text;
@@ -48,7 +48,7 @@ String odin_root_dir(void) {
 
 	len = 0;
 	for (;;) {
-		len = GetModuleFileNameW(NULL, &path_buf.e[0], path_buf.count);
+		len = GetModuleFileNameW(NULL, &path_buf[0], path_buf.count);
 		if (len == 0) {
 			return make_string(NULL, 0);
 		}
@@ -102,7 +102,7 @@ String odin_root_dir(void) {
 	len = 0;
 	for (;;) {
 		int sz = path_buf.count;
-		int res = _NSGetExecutablePath(&path_buf.e[0], &sz);
+		int res = _NSGetExecutablePath(&path_buf[0], &sz);
 		if(res == 0) {
 			len = sz;
 			break;
@@ -114,7 +114,7 @@ String odin_root_dir(void) {
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	text = gb_alloc_array(string_buffer_allocator, u8, len + 1);
-	gb_memmove(text, &path_buf.e[0], len);
+	gb_memmove(text, &path_buf[0], len);
 
 	path = make_string(text, len);
 	for (i = path.len-1; i >= 0; i--) {
@@ -158,7 +158,7 @@ String odin_root_dir(void) {
 		// of this compiler, it should be _good enough_.
 		// That said, there's no solid 100% method on Linux to get the program's
 		// path without checking this link. Sorry.
-		len = readlink("/proc/self/exe", &path_buf.e[0], path_buf.count);
+		len = readlink("/proc/self/exe", &path_buf[0], path_buf.count);
 		if(len == 0) {
 			return make_string(NULL, 0);
 		}
@@ -171,7 +171,7 @@ String odin_root_dir(void) {
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 	text = gb_alloc_array(string_buffer_allocator, u8, len + 1);
-	gb_memmove(text, &path_buf.e[0], len);
+	gb_memmove(text, &path_buf[0], len);
 
 	path = make_string(text, len);
 	for (i = path.len-1; i >= 0; i--) {

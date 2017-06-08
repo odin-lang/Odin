@@ -197,13 +197,13 @@ typedef struct Type {
 // TODO(bill): Should I add extra information here specifying the kind of selection?
 // e.g. field, constant, vector field, type field, etc.
 typedef struct Selection {
-	Entity *  entity;
-	Array_i32 index;
-	bool      indirect; // Set if there was a pointer deref anywhere down the line
+	Entity *   entity;
+	Array<i32> index;
+	bool       indirect; // Set if there was a pointer deref anywhere down the line
 } Selection;
 Selection empty_selection = {0};
 
-Selection make_selection(Entity *entity, Array_i32 index, bool indirect) {
+Selection make_selection(Entity *entity, Array<i32> index, bool indirect) {
 	Selection s = {entity, index, indirect};
 	return s;
 }
@@ -212,10 +212,10 @@ void selection_add_index(Selection *s, isize index) {
 	// IMPORTANT NOTE(bill): this requires a stretchy buffer/dynamic array so it requires some form
 	// of heap allocation
 	// TODO(bill): Find a way to use a backing buffer for initial use as the general case is probably .count<3
-	if (s->index.e == NULL) {
+	if (s->index.data == NULL) {
 		array_init(&s->index, heap_allocator());
 	}
-	array_add(&s->index, index);
+	array_add(&s->index, cast(i32)index);
 }
 
 
@@ -1297,9 +1297,9 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 			Entity *f = type->Record.fields[i];
 			if (f->kind == Entity_Variable) {
 				if (f->Variable.field_src_index == index) {
-					Array_i32 sel_array = {0};
+					Array<i32> sel_array = {0};
 					array_init_count(&sel_array, a, 1);
-					sel_array.e[0] = i;
+					sel_array[0] = i;
 					return make_selection(f, sel_array, false);
 				}
 			}
@@ -1309,18 +1309,18 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 		for (isize i = 0; i < max_count; i++) {
 			Entity *f = type->Tuple.variables[i];
 			if (i == index) {
-				Array_i32 sel_array = {0};
+				Array<i32> sel_array = {0};
 				array_init_count(&sel_array, a, 1);
-				sel_array.e[0] = i;
+				sel_array[0] = i;
 				return make_selection(f, sel_array, false);
 			}
 		}
 		break;
 
 	case Type_BitField: {
-		Array_i32 sel_array = {0};
+		Array<i32> sel_array = {0};
 		array_init_count(&sel_array, a, 1);
-		sel_array.e[0] = cast(i32)index;
+		sel_array[0] = cast(i32)index;
 		return make_selection(type->BitField.fields[index], sel_array, false);
 	} break;
 
@@ -1509,7 +1509,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 
 
 typedef struct TypePath {
-	Array(Type *) path; // Entity_TypeName;
+	Array<Type *> path; // Entity_TypeName;
 	bool failure;
 } TypePath;
 
@@ -1526,7 +1526,7 @@ void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
 	GB_ASSERT(tp != NULL);
 
 	GB_ASSERT(start_index < tp->path.count);
-	Type *t = tp->path.e[start_index];
+	Type *t = tp->path[start_index];
 	GB_ASSERT(t != NULL);
 
 	GB_ASSERT_MSG(is_type_named(t), "%s", type_to_string(t));
@@ -1534,7 +1534,7 @@ void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
 	error(e->token, "Illegal declaration cycle of `%.*s`", LIT(t->Named.name));
 	// NOTE(bill): Print cycle, if it's deep enough
 	for (isize j = start_index; j < tp->path.count; j++) {
-		Type *t = tp->path.e[j];
+		Type *t = tp->path[j];
 		GB_ASSERT_MSG(is_type_named(t), "%s", type_to_string(t));
 		Entity *e = t->Named.type_name;
 		error(e->token, "\t%.*s refers to", LIT(t->Named.name));
@@ -1549,7 +1549,7 @@ TypePath *type_path_push(TypePath *tp, Type *t) {
 	GB_ASSERT(tp != NULL);
 
 	for (isize i = 0; i < tp->path.count; i++) {
-		if (tp->path.e[i] == t) {
+		if (tp->path[i] == t) {
 			type_path_print_illegal_cycle(tp, i);
 		}
 	}
@@ -2082,7 +2082,7 @@ i64 type_offset_of_from_selection(gbAllocator allocator, Type *type, Selection s
 	Type *t = type;
 	i64 offset = 0;
 	for_array(i, sel.index) {
-		isize index = sel.index.e[i];
+		isize index = sel.index[i];
 		t = base_type(t);
 		offset += type_offset_of(allocator, t, index);
 		if (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct) {

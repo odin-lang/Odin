@@ -497,7 +497,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				if (i > 0) {
 					ir_fprintf(f, ", ");
 				}
-				TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems.e[i]);
+				TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[i]);
 				GB_ASSERT(tav.mode != Addressing_Invalid);
 				ir_print_compound_element(f, m, tav.value, elem_type);
 			}
@@ -527,7 +527,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_fprintf(f, "][");
 
 			if (elem_count == 1 && type->Vector.count > 1) {
-				TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems.e[0]);
+				TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[0]);
 				GB_ASSERT(tav.mode != Addressing_Invalid);
 
 				for (isize i = 0; i < type->Vector.count; i++) {
@@ -541,7 +541,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 					if (i > 0) {
 						ir_fprintf(f, ", ");
 					}
-					TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems.e[i]);
+					TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[i]);
 					GB_ASSERT(tav.mode != Addressing_Invalid);
 					ir_print_compound_element(f, m, tav.value, elem_type);
 				}
@@ -563,24 +563,24 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ExactValue *values = gb_alloc_array(m->tmp_allocator, ExactValue, value_count);
 
 
-			if (cl->elems.e[0]->kind == AstNode_FieldValue) {
+			if (cl->elems[0]->kind == AstNode_FieldValue) {
 				isize elem_count = cl->elems.count;
 				for (isize i = 0; i < elem_count; i++) {
-					ast_node(fv, FieldValue, cl->elems.e[i]);
+					ast_node(fv, FieldValue, cl->elems[i]);
 					String name = fv->field->Ident.string;
 
 					TypeAndValue tav = type_and_value_of_expr(m->info, fv->value);
 					GB_ASSERT(tav.mode != Addressing_Invalid);
 
 					Selection sel = lookup_field(m->allocator, type, name, false);
-					Entity *f = type->Record.fields[sel.index.e[0]];
+					Entity *f = type->Record.fields[sel.index[0]];
 
 					values[f->Variable.field_index] = tav.value;
 				}
 			} else {
 				for (isize i = 0; i < value_count; i++) {
 					Entity *f = type->Record.fields_in_src_order[i];
-					TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems.e[i]);
+					TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[i]);
 					ExactValue val = {};
 					if (tav.mode != Addressing_Invalid) {
 						val = tav.value;
@@ -891,11 +891,11 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 				ir_fprintf(f, ", ");
 			}
 
-			irValue *edge = instr->Phi.edges.e[i];
+			irValue *edge = instr->Phi.edges[i];
 			irBlock *block = NULL;
 			if (instr->parent != NULL &&
 			    i < instr->parent->preds.count) {
-				block = instr->parent->preds.e[i];
+				block = instr->parent->preds[i];
 			}
 
 			ir_fprintf(f, "[ ");
@@ -1538,14 +1538,14 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 
 		ir_fprintf(f, "{\n");
 		for_array(i, proc->blocks) {
-			irBlock *block = proc->blocks.e[i];
+			irBlock *block = proc->blocks[i];
 
 			if (i > 0) ir_fprintf(f, "\n");
 			ir_print_block_name(f, block);
 			ir_fprintf(f, ":\n");
 
 			for_array(j, block->instrs) {
-				irValue *value = block->instrs.e[j];
+				irValue *value = block->instrs[j];
 				ir_print_instr(f, m, value);
 			}
 		}
@@ -1555,7 +1555,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	}
 
 	for_array(i, proc->children) {
-		ir_print_proc(f, m, proc->children.e[i]);
+		ir_print_proc(f, m, proc->children[i]);
 	}
 }
 
@@ -1606,7 +1606,7 @@ void print_llvm_ir(irGen *ir) {
 
 
 	for_array(member_index, m->members.entries) {
-		MapIrValueEntry *entry = &m->members.entries.e[member_index];
+		MapIrValueEntry *entry = &m->members.entries[member_index];
 		irValue *v = entry->value;
 		if (v->kind != irValue_TypeName) {
 			continue;
@@ -1619,7 +1619,7 @@ void print_llvm_ir(irGen *ir) {
 	bool dll_main_found = false;
 
 	for_array(member_index, m->members.entries) {
-		MapIrValueEntry *entry = &m->members.entries.e[member_index];
+		MapIrValueEntry *entry = &m->members.entries[member_index];
 		irValue *v = entry->value;
 		if (v->kind != irValue_Proc) {
 			continue;
@@ -1631,7 +1631,7 @@ void print_llvm_ir(irGen *ir) {
 	}
 
 	for_array(member_index, m->members.entries) {
-		MapIrValueEntry *entry = &m->members.entries.e[member_index];
+		MapIrValueEntry *entry = &m->members.entries[member_index];
 		irValue *v = entry->value;
 		if (v->kind != irValue_Proc) {
 			continue;
@@ -1643,7 +1643,7 @@ void print_llvm_ir(irGen *ir) {
 	}
 
 	for_array(member_index, m->members.entries) {
-		MapIrValueEntry *entry = &m->members.entries.e[member_index];
+		MapIrValueEntry *entry = &m->members.entries[member_index];
 		irValue *v = entry->value;
 		if (v->kind != irValue_Global) {
 			continue;
@@ -1707,7 +1707,7 @@ void print_llvm_ir(irGen *ir) {
 		ir_fprintf(f, "!%d = !{!\"clang version 3.9.0 (branches/release_39)\"}\n", diec+3);
 
 		for_array(di_index, m->debug_info.entries) {
-			MapIrDebugInfoEntry *entry = &m->debug_info.entries.e[di_index];
+			MapIrDebugInfoEntry *entry = &m->debug_info.entries[di_index];
 			irDebugInfo *di = entry->value;
 			ir_fprintf(f, "!%d = ", di->id);
 
@@ -1752,7 +1752,7 @@ void print_llvm_ir(irGen *ir) {
 			case irDebugInfo_AllProcs:
 				ir_fprintf(f, "!{");
 				for_array(proc_index, di->AllProcs.procs) {
-					irDebugInfo *p = di->AllProcs.procs.e[proc_index];
+					irDebugInfo *p = di->AllProcs.procs[proc_index];
 					if (proc_index > 0) {ir_fprintf(f, ",");}
 					ir_fprintf(f, "!%d", p->id);
 				}

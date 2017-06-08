@@ -309,7 +309,7 @@ int main(int argc, char **argv) {
 	// defer (gb_string_free(lib_str));
 	char lib_str_buf[1024] = {0};
 	for_array(i, ir_gen.module.foreign_library_paths) {
-		String lib = ir_gen.module.foreign_library_paths.e[i];
+		String lib = ir_gen.module.foreign_library_paths[i];
 		// gb_printf_err("Linking lib: %.*s\n", LIT(lib));
 		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
 		                        " \"%.*s\"", LIT(lib));
@@ -371,7 +371,7 @@ int main(int argc, char **argv) {
 	// defer (gb_string_free(lib_str));
 	char lib_str_buf[1024] = {0};
 	for_array(i, ir_gen.module.foreign_library_paths) {
-		String lib = ir_gen.module.foreign_library_paths.e[i];
+		String lib = ir_gen.module.foreign_library_paths[i];
 
 		// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
 		//   This allows you to specify '-f' in a #foreign_system_library,

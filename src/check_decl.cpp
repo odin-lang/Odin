@@ -67,20 +67,20 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 
 	// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 	// an extra allocation
-	ArrayOperand operands = {};
-	array_init_reserve(&operands, c->tmp_allocator, 2*lhs_count);
+	Array<Operand> operands = {};
+	array_init(&operands, c->tmp_allocator, 2*lhs_count);
 	check_unpack_arguments(c, lhs_count, &operands, inits, true);
 
 	isize rhs_count = operands.count;
 	for_array(i, operands) {
-		if (operands.e[i].mode == Addressing_Invalid) {
+		if (operands[i].mode == Addressing_Invalid) {
 			rhs_count--;
 		}
 	}
 
 	isize max = gb_min(lhs_count, rhs_count);
 	for (isize i = 0; i < max; i++) {
-		check_init_variable(c, lhs[i], &operands.e[i], context_name);
+		check_init_variable(c, lhs[i], &operands[i], context_name);
 	}
 	if (rhs_count > 0 && lhs_count != rhs_count) {
 		error(lhs[0]->token, "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
@@ -432,7 +432,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	}
 
 	AstNodeArray inits;
-	array_init_reserve(&inits, c->allocator, 1);
+	array_init(&inits, c->allocator, 1);
 	array_add(&inits, init_expr);
 	check_init_variables(c, entities, entity_count, inits, str_lit("variable declaration"));
 }
@@ -514,7 +514,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 				Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
 				GB_ASSERT(found != NULL);
 				for_array(i, (*found)->elements.entries) {
-					Entity *f = (*found)->elements.entries.e[i].value;
+					Entity *f = (*found)->elements.entries[i].value;
 					if (f->kind == Entity_Variable) {
 						Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
 						uvar->Variable.is_immutable = is_immutable;
@@ -555,7 +555,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	if (decl->parent != NULL) {
 		// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 		for_array(i, decl->deps.entries) {
-			HashKey key = decl->deps.entries.e[i].key;
+			HashKey key = decl->deps.entries[i].key;
 			Entity *e = cast(Entity *)key.ptr;
 			map_bool_set(&decl->parent->deps, key, true);
 		}
