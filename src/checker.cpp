@@ -195,7 +195,7 @@ struct DeclInfo {
 	AstNode *         init_expr;
 	AstNode *         proc_lit; // AstNode_ProcLit
 
-	MapBool           deps; // Key: Entity *
+	Map<bool>         deps; // Key: Entity *
 	Array<BlockLabel> labels;
 };
 
@@ -226,18 +226,13 @@ ExprInfo make_expr_info(bool is_lhs, AddressingMode mode, Type *type, ExactValue
 
 
 
-#define MAP_TYPE Entity *
-#define MAP_PROC map_entity_
-#define MAP_NAME MapEntity
-#include "map.cpp"
-
 struct Scope {
 	Scope *          parent;
 	Scope *          prev, *next;
 	Scope *          first_child;
 	Scope *          last_child;
-	MapEntity        elements; // Key: String
-	MapBool          implicit; // Key: Entity *
+	Map<Entity *>    elements; // Key: String
+	Map<bool>        implicit; // Key: Entity *
 
 	Array<Scope *>   shared;
 	Array<Scope *>   imported;
@@ -253,31 +248,6 @@ gb_global Scope *universal_scope = NULL;
 
 
 
-
-#define MAP_TYPE TypeAndValue
-#define MAP_PROC map_tav_
-#define MAP_NAME MapTypeAndValue
-#include "map.cpp"
-
-#define MAP_TYPE Scope *
-#define MAP_PROC map_scope_
-#define MAP_NAME MapScope
-#include "map.cpp"
-
-#define MAP_TYPE DeclInfo *
-#define MAP_PROC map_decl_info_
-#define MAP_NAME MapDeclInfo
-#include "map.cpp"
-
-#define MAP_TYPE AstFile *
-#define MAP_PROC map_ast_file_
-#define MAP_NAME MapAstFile
-#include "map.cpp"
-
-#define MAP_TYPE ExprInfo
-#define MAP_PROC map_expr_info_
-#define MAP_NAME MapExprInfo
-#include "map.cpp"
 
 struct DelayedDecl {
 	Scope *  parent;
@@ -304,16 +274,16 @@ struct CheckerContext {
 
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
-	MapTypeAndValue      types;           // Key: AstNode * | Expression -> Type (and value)
-	MapEntity            definitions;     // Key: AstNode * | Identifier -> Entity
-	MapEntity            uses;            // Key: AstNode * | Identifier -> Entity
-	MapScope             scopes;          // Key: AstNode * | Node       -> Scope
-	MapExprInfo          untyped;         // Key: AstNode * | Expression -> ExprInfo
-	MapEntity            implicits;       // Key: AstNode *
-	MapDeclInfo          entities;        // Key: Entity *
-	MapEntity            foreigns;        // Key: String
-	MapAstFile           files;           // Key: String (full path)
-	MapIsize             type_info_map;   // Key: Type *
+	Map<TypeAndValue>    types;           // Key: AstNode * | Expression -> Type (and value)
+	Map<Entity *>        definitions;     // Key: AstNode * | Identifier -> Entity
+	Map<Entity *>        uses;            // Key: AstNode * | Identifier -> Entity
+	Map<Scope *>         scopes;          // Key: AstNode * | Node       -> Scope
+	Map<ExprInfo>        untyped;         // Key: AstNode * | Expression -> ExprInfo
+	Map<Entity *>        implicits;       // Key: AstNode *
+	Map<DeclInfo *>      entities;        // Key: Entity *
+	Map<Entity *>        foreigns;        // Key: String
+	Map<AstFile *>       files;           // Key: String (full path)
+	Map<isize>           type_info_map;   // Key: Type *
 	isize                type_info_count;
 };
 
@@ -352,7 +322,7 @@ struct DelayedEntity {
 void init_declaration_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	d->parent = parent;
 	d->scope  = scope;
-	map_bool_init(&d->deps, heap_allocator());
+	map_init(&d->deps, heap_allocator());
 	array_init(&d->labels,  heap_allocator());
 }
 
@@ -363,7 +333,7 @@ DeclInfo *make_declaration_info(gbAllocator a, Scope *scope, DeclInfo *parent) {
 }
 
 void destroy_declaration_info(DeclInfo *d) {
-	map_bool_destroy(&d->deps);
+	map_destroy(&d->deps);
 }
 
 bool decl_info_has_init(DeclInfo *d) {
@@ -390,8 +360,8 @@ bool decl_info_has_init(DeclInfo *d) {
 Scope *make_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
-	map_entity_init(&s->elements,   heap_allocator());
-	map_bool_init(&s->implicit,     heap_allocator());
+	map_init(&s->elements,   heap_allocator());
+	map_init(&s->implicit,     heap_allocator());
 	array_init(&s->shared,          heap_allocator());
 	array_init(&s->imported,        heap_allocator());
 
@@ -417,8 +387,8 @@ void destroy_scope(Scope *scope) {
 		destroy_scope(child);
 	}
 
-	map_entity_destroy(&scope->elements);
-	map_bool_destroy(&scope->implicit);
+	map_destroy(&scope->elements);
+	map_destroy(&scope->implicit);
 	array_free(&scope->shared);
 	array_free(&scope->imported);
 
@@ -428,7 +398,7 @@ void destroy_scope(Scope *scope) {
 void add_scope(Checker *c, AstNode *node, Scope *scope) {
 	GB_ASSERT(node != NULL);
 	GB_ASSERT(scope != NULL);
-	map_scope_set(&c->info.scopes, hash_pointer(node), scope);
+	map_set(&c->info.scopes, hash_pointer(node), scope);
 }
 
 
@@ -454,13 +424,13 @@ void check_close_scope(Checker *c) {
 
 Entity *current_scope_lookup_entity(Scope *s, String name) {
 	HashKey key = hash_string(name);
-	Entity **found = map_entity_get(&s->elements, key);
+	Entity **found = map_get(&s->elements, key);
 	if (found) {
 		return *found;
 	}
 	for_array(i, s->shared) {
 		Scope *shared = s->shared[i];
-		Entity **found = map_entity_get(&shared->elements, key);
+		Entity **found = map_get(&shared->elements, key);
 		if (found) {
 			Entity *e = *found;
 			if (e->kind == Entity_Variable &&
@@ -485,7 +455,7 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 	bool gone_thru_file = false;
 	HashKey key = hash_string(name);
 	for (Scope *s = scope; s != NULL; s = s->parent) {
-		Entity **found = map_entity_get(&s->elements, key);
+		Entity **found = map_get(&s->elements, key);
 		if (found) {
 			Entity *e = *found;
 			if (gone_thru_proc) {
@@ -510,7 +480,7 @@ void scope_lookup_parent_entity(Scope *scope, String name, Scope **scope_, Entit
 			// Check shared scopes - i.e. other files @ global scope
 			for_array(i, s->shared) {
 				Scope *shared = s->shared[i];
-				Entity **found = map_entity_get(&shared->elements, key);
+				Entity **found = map_get(&shared->elements, key);
 				if (found) {
 					Entity *e = *found;
 					if (e->kind == Entity_Variable &&
@@ -558,7 +528,7 @@ Entity *scope_lookup_entity(Scope *s, String name) {
 Entity *scope_insert_entity(Scope *s, Entity *entity) {
 	String name = entity->token.string;
 	HashKey key = hash_string(name);
-	Entity **found = map_entity_get(&s->elements, key);
+	Entity **found = map_get(&s->elements, key);
 
 #if 1
 	// IMPORTANT NOTE(bill): Procedure overloading code
@@ -576,15 +546,15 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 		if (s->is_global) {
 			return prev;
 		}
-		map_entity_multi_insert(&s->elements, key, entity);
+		multi_map_insert(&s->elements, key, entity);
 	} else {
-		map_entity_set(&s->elements, key, entity);
+		map_set(&s->elements, key, entity);
 	}
 #else
 	if (found) {
 		return *found;
 	}
-	map_entity_set(&s->elements, key, entity);
+	map_set(&s->elements, key, entity);
 #endif
 	if (entity->scope == NULL) {
 		entity->scope = s;
@@ -599,7 +569,7 @@ void check_scope_usage(Checker *c, Scope *scope) {
 
 
 void add_dependency(DeclInfo *d, Entity *e) {
-	map_bool_set(&d->deps, hash_pointer(e), cast(bool)true);
+	map_set(&d->deps, hash_pointer(e), cast(bool)true);
 }
 
 void add_declaration_dependency(Checker *c, Entity *e) {
@@ -607,7 +577,7 @@ void add_declaration_dependency(Checker *c, Entity *e) {
 		return;
 	}
 	if (c->context.decl != NULL) {
-		DeclInfo **found = map_decl_info_get(&c->info.entities, hash_pointer(e));
+		DeclInfo **found = map_get(&c->info.entities, hash_pointer(e));
 		if (found) {
 			add_dependency(c->context.decl, e);
 		}
@@ -705,31 +675,31 @@ void init_universal_scope(void) {
 
 void init_checker_info(CheckerInfo *i) {
 	gbAllocator a = heap_allocator();
-	map_tav_init(&i->types,            a);
-	map_entity_init(&i->definitions,   a);
-	map_entity_init(&i->uses,          a);
-	map_scope_init(&i->scopes,         a);
-	map_decl_info_init(&i->entities,   a);
-	map_expr_info_init(&i->untyped,    a);
-	map_entity_init(&i->foreigns,      a);
-	map_entity_init(&i->implicits,     a);
-	map_isize_init(&i->type_info_map,  a);
-	map_ast_file_init(&i->files,       a);
+	map_init(&i->types,            a);
+	map_init(&i->definitions,   a);
+	map_init(&i->uses,          a);
+	map_init(&i->scopes,         a);
+	map_init(&i->entities,   a);
+	map_init(&i->untyped,    a);
+	map_init(&i->foreigns,      a);
+	map_init(&i->implicits,     a);
+	map_init(&i->type_info_map,  a);
+	map_init(&i->files,       a);
 	i->type_info_count = 0;
 
 }
 
 void destroy_checker_info(CheckerInfo *i) {
-	map_tav_destroy(&i->types);
-	map_entity_destroy(&i->definitions);
-	map_entity_destroy(&i->uses);
-	map_scope_destroy(&i->scopes);
-	map_decl_info_destroy(&i->entities);
-	map_expr_info_destroy(&i->untyped);
-	map_entity_destroy(&i->foreigns);
-	map_entity_destroy(&i->implicits);
-	map_isize_destroy(&i->type_info_map);
-	map_ast_file_destroy(&i->files);
+	map_destroy(&i->types);
+	map_destroy(&i->definitions);
+	map_destroy(&i->uses);
+	map_destroy(&i->scopes);
+	map_destroy(&i->entities);
+	map_destroy(&i->untyped);
+	map_destroy(&i->foreigns);
+	map_destroy(&i->implicits);
+	map_destroy(&i->type_info_map);
+	map_destroy(&i->files);
 }
 
 
@@ -793,11 +763,11 @@ void destroy_checker(Checker *c) {
 
 Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
 	if (identifier->kind == AstNode_Ident) {
-		Entity **found = map_entity_get(&i->definitions, hash_pointer(identifier));
+		Entity **found = map_get(&i->definitions, hash_pointer(identifier));
 		if (found) {
 			return *found;
 		}
-		found = map_entity_get(&i->uses, hash_pointer(identifier));
+		found = map_get(&i->uses, hash_pointer(identifier));
 		if (found) {
 			return *found;
 		}
@@ -808,7 +778,7 @@ Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
 
 TypeAndValue type_and_value_of_expr(CheckerInfo *i, AstNode *expression) {
 	TypeAndValue result = {};
-	TypeAndValue *found = map_tav_get(&i->types, hash_pointer(expression));
+	TypeAndValue *found = map_get(&i->types, hash_pointer(expression));
 	if (found) result = *found;
 	return result;
 }
@@ -831,7 +801,7 @@ Type *type_of_expr(CheckerInfo *i, AstNode *expr) {
 
 
 void add_untyped(CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value) {
-	map_expr_info_set(&i->untyped, hash_pointer(expression), make_expr_info(lhs, mode, basic_type, value));
+	map_set(&i->untyped, hash_pointer(expression), make_expr_info(lhs, mode, basic_type, value));
 }
 
 void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode, Type *type, ExactValue value) {
@@ -858,7 +828,7 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 	tv.type  = type;
 	tv.value = value;
 	tv.mode  = mode;
-	map_tav_set(&i->types, hash_pointer(expression), tv);
+	map_set(&i->types, hash_pointer(expression), tv);
 }
 
 void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) {
@@ -868,7 +838,7 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 			return;
 		}
 		HashKey key = hash_pointer(identifier);
-		map_entity_set(&i->definitions, key, entity);
+		map_set(&i->definitions, key, entity);
 	} else {
 		// NOTE(bill): Error should handled elsewhere
 	}
@@ -918,7 +888,7 @@ void add_entity_use(Checker *c, AstNode *identifier, Entity *entity) {
 		return;
 	}
 	HashKey key = hash_pointer(identifier);
-	map_entity_set(&c->info.uses, key, entity);
+	map_set(&c->info.uses, key, entity);
 	add_declaration_dependency(c, entity); // TODO(bill): Should this be here?
 }
 
@@ -928,14 +898,14 @@ void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclIn
 	GB_ASSERT(e != NULL && d != NULL);
 	GB_ASSERT(identifier->Ident.string == e->token.string);
 	add_entity(c, e->scope, identifier, e);
-	map_decl_info_set(&c->info.entities, hash_pointer(e), d);
+	map_set(&c->info.entities, hash_pointer(e), d);
 }
 
 
 void add_implicit_entity(Checker *c, AstNode *node, Entity *e) {
 	GB_ASSERT(node != NULL);
 	GB_ASSERT(e != NULL);
-	map_entity_set(&c->info.implicits, hash_pointer(node), e);
+	map_set(&c->info.implicits, hash_pointer(node), e);
 }
 
 
@@ -951,14 +921,14 @@ void add_type_info_type(Checker *c, Type *t) {
 		return; // Could be nil
 	}
 
-	if (map_isize_get(&c->info.type_info_map, hash_pointer(t)) != NULL) {
+	if (map_get(&c->info.type_info_map, hash_pointer(t)) != NULL) {
 		// Types have already been added
 		return;
 	}
 
 	isize ti_index = -1;
 	for_array(i, c->info.type_info_map.entries) {
-		MapIsizeEntry *e = &c->info.type_info_map.entries[i];
+		auto *e = &c->info.type_info_map.entries[i];
 		Type *prev_type = cast(Type *)e->key.ptr;
 		if (are_types_identical(t, prev_type)) {
 			// Duplicate entry
@@ -972,7 +942,7 @@ void add_type_info_type(Checker *c, Type *t) {
 		ti_index = c->info.type_info_count;
 		c->info.type_info_count++;
 	}
-	map_isize_set(&c->info.type_info_map, hash_pointer(t), ti_index);
+	map_set(&c->info.type_info_map, hash_pointer(t), ti_index);
 
 
 
@@ -1123,17 +1093,17 @@ void add_curr_ast_file(Checker *c, AstFile *file) {
 
 
 
-void add_dependency_to_map(MapEntity *map, CheckerInfo *info, Entity *node) {
+void add_dependency_to_map(Map<Entity *> *map, CheckerInfo *info, Entity *node) {
 	if (node == NULL) {
 		return;
 	}
-	if (map_entity_get(map, hash_pointer(node)) != NULL) {
+	if (map_get(map, hash_pointer(node)) != NULL) {
 		return;
 	}
-	map_entity_set(map, hash_pointer(node), node);
+	map_set(map, hash_pointer(node), node);
 
 
-	DeclInfo **found = map_decl_info_get(&info->entities, hash_pointer(node));
+	DeclInfo **found = map_get(&info->entities, hash_pointer(node));
 	if (found == NULL) {
 		return;
 	}
@@ -1145,9 +1115,9 @@ void add_dependency_to_map(MapEntity *map, CheckerInfo *info, Entity *node) {
 	}
 }
 
-MapEntity generate_minimum_dependency_map(CheckerInfo *info, Entity *start) {
-	MapEntity map = {}; // Key: Entity *
-	map_entity_init(&map, heap_allocator());
+Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) {
+	Map<Entity *> map = {}; // Key: Entity *
+	map_init(&map, heap_allocator());
 
 	for_array(i, info->definitions.entries) {
 		Entity *e = info->definitions.entries[i].value;
@@ -1289,7 +1259,7 @@ bool check_is_entity_overloaded(Entity *e) {
 	}
 	Scope *s = e->scope;
 	HashKey key = hash_string(e->token.string);
-	isize overload_count = map_entity_multi_count(&s->elements, key);
+	isize overload_count = multi_map_count(&s->elements, key);
 	return overload_count > 1;
 }
 
@@ -1309,7 +1279,7 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 	String name = e->token.string;
 	HashKey key = hash_string(name);
 	Scope *s = e->scope;
-	isize overload_count = map_entity_multi_count(&s->elements, key);
+	isize overload_count = multi_map_count(&s->elements, key);
 	GB_ASSERT(overload_count >= 1);
 	if (overload_count == 1) {
 		e->Procedure.overload_kind = Overload_No;
@@ -1320,7 +1290,7 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 	Entity **procs = gb_alloc_array(c->tmp_allocator, Entity *, overload_count);
-	map_entity_multi_get_all(&s->elements, key, procs);
+	multi_map_get_all(&s->elements, key, procs);
 
 	for (isize j = 0; j < overload_count; j++) {
 		Entity *p = procs[j];
@@ -1660,7 +1630,7 @@ void check_all_global_entities(Checker *c) {
 	Scope *prev_file = {};
 
 	for_array(i, c->info.entities.entries) {
-		MapDeclInfoEntry *entry = &c->info.entities.entries[i];
+		auto *entry = &c->info.entities.entries[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		DeclInfo *d = entry->value;
 
@@ -1698,7 +1668,7 @@ void check_all_global_entities(Checker *c) {
 	}
 
 	for_array(i, c->info.entities.entries) {
-		MapDeclInfoEntry *entry = &c->info.entities.entries[i];
+		auto *entry = &c->info.entities.entries[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		if (e->kind != Entity_Procedure) {
 			continue;
@@ -1769,7 +1739,7 @@ String path_to_entity_name(String name, String fullpath) {
 	}
 }
 
-void check_import_entities(Checker *c, MapScope *file_scopes) {
+void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 #if 0
 	// TODO(bill): Dependency ordering for imports
 	{
@@ -1810,7 +1780,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 		}
 
 		HashKey key = hash_string(id->fullpath);
-		Scope **found = map_scope_get(file_scopes, key);
+		Scope **found = map_get(file_scopes, key);
 		if (found == NULL) {
 			for_array(scope_index, file_scopes->entries) {
 				Scope *scope = file_scopes->entries[scope_index].value;
@@ -1883,7 +1853,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 		}
 
 		HashKey key = hash_string(id->fullpath);
-		Scope **found = map_scope_get(file_scopes, key);
+		Scope **found = map_get(file_scopes, key);
 		if (found == NULL) {
 			for_array(scope_index, file_scopes->entries) {
 				Scope *scope = file_scopes->entries[scope_index].value;
@@ -1946,7 +1916,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 						// TODO(bill): Should these entities be imported but cause an error when used?
 						bool ok = add_entity(c, parent_scope, e->identifier, e);
 						if (ok) {
-							map_bool_set(&parent_scope->implicit, hash_pointer(e), true);
+							map_set(&parent_scope->implicit, hash_pointer(e), true);
 						}
 					}
 				} else {
@@ -2021,8 +1991,8 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 
 
 void check_parsed_files(Checker *c) {
-	MapScope file_scopes; // Key: String (fullpath)
-	map_scope_init(&file_scopes, heap_allocator());
+	Map<Scope *> file_scopes; // Key: String (fullpath)
+	map_init(&file_scopes, heap_allocator());
 
 	// Map full filepaths to Scopes
 	for_array(i, c->parser->files) {
@@ -2047,8 +2017,8 @@ void check_parsed_files(Checker *c) {
 		f->scope = scope;
 		f->decl_info = make_declaration_info(c->allocator, f->scope, c->context.decl);
 		HashKey key = hash_string(f->tokenizer.fullpath);
-		map_scope_set(&file_scopes, key, scope);
-		map_ast_file_set(&c->info.files, key, f);
+		map_set(&file_scopes, key, scope);
+		map_set(&c->info.files, key, f);
 	}
 
 	// Collect Entities
@@ -2091,7 +2061,7 @@ void check_parsed_files(Checker *c) {
 
 	// Add untyped expression values
 	for_array(i, c->info.untyped.entries) {
-		MapExprInfoEntry *entry = &c->info.untyped.entries[i];
+		auto *entry = &c->info.untyped.entries[i];
 		HashKey key = entry->key;
 		AstNode *expr = cast(AstNode *)cast(uintptr)key.key;
 		ExprInfo *info = &entry->value;
@@ -2166,6 +2136,6 @@ void check_parsed_files(Checker *c) {
 		}
 	}
 
-	map_scope_destroy(&file_scopes);
+	map_destroy(&file_scopes);
 
 }

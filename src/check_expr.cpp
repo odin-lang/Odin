@@ -62,7 +62,7 @@ void check_scope_decls(Checker *c, Array<AstNode *> nodes, isize reserve_size) {
 		default:
 			continue;
 		}
-		DeclInfo **found = map_decl_info_get(&c->info.entities, hash_pointer(e));
+		DeclInfo **found = map_get(&c->info.entities, hash_pointer(e));
 		if (found != NULL) {
 			DeclInfo *d = *found;
 			check_entity_decl(c, e, d, NULL);
@@ -348,7 +348,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 }
 
 
-void populate_using_entity_map(Checker *c, AstNode *node, Type *t, MapEntity *entity_map) {
+void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *> *entity_map) {
 	t = base_type(type_deref(t));
 	gbString str = NULL;
 	if (node != NULL) {
@@ -361,7 +361,7 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, MapEntity *en
 			GB_ASSERT(f->kind == Entity_Variable);
 			String name = f->token.string;
 			HashKey key = hash_string(name);
-			Entity **found = map_entity_get(entity_map, key);
+			Entity **found = map_get(entity_map, key);
 			if (found != NULL) {
 				Entity *e = *found;
 				// TODO(bill): Better type error
@@ -371,7 +371,7 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, MapEntity *en
 					error(e->token, "`%.*s` is already declared`", LIT(name));
 				}
 			} else {
-				map_entity_set(entity_map, key, f);
+				map_set(entity_map, key, f);
 				add_entity(c, c->context.scope, NULL, f);
 				if (f->flags & EntityFlag_Using) {
 					populate_using_entity_map(c, node, f->type, entity_map);
@@ -390,8 +390,8 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
                    String context) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
-	MapEntity entity_map = {};
-	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*field_count);
+	Map<Entity *> entity_map = {};
+	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*field_count);
 
 	Entity *using_index_expr = NULL;
 
@@ -433,7 +433,7 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 				error_node(name, "`__tag` is a reserved identifier for fields");
 			} else {
 				HashKey key = hash_string(name_token.string);
-				Entity **found = map_entity_get(&entity_map, key);
+				Entity **found = map_get(&entity_map, key);
 				if (found != NULL) {
 					Entity *e = *found;
 					// NOTE(bill): Scope checking already checks the declaration but in many cases, this can happen so why not?
@@ -441,7 +441,7 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 					error(name_token, "`%.*s` is already declared in this type", LIT(name_token.string));
 					error(e->token,   "\tpreviously declared");
 				} else {
-					map_entity_set(&entity_map, key, e);
+					map_set(&entity_map, key, e);
 					fields[field_index++] = e;
 					add_entity(c, c->context.scope, name, e);
 				}
@@ -650,8 +650,8 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
-	MapEntity entity_map = {}; // Key: String
-	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*variant_count);
+	Map<Entity *> entity_map = {}; // Key: String
+	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*variant_count);
 
 	Entity *using_index_expr = NULL;
 
@@ -666,7 +666,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 	for (isize i = 0; i < field_count; i++) {
 		Entity *f = fields[i];
 		String name = f->token.string;
-		map_entity_set(&entity_map, hash_string(name), f);
+		map_set(&entity_map, hash_string(name), f);
 	}
 
 	union_type->Record.fields              = fields;
@@ -735,11 +735,11 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 		}
 
 		HashKey key = hash_string(name_token.string);
-		if (map_entity_get(&entity_map, key) != NULL) {
+		if (map_get(&entity_map, key) != NULL) {
 			// NOTE(bill): Scope checking already checks the declaration
 			error(name_token, "`%.*s` is already declared in this union", LIT(name_token.string));
 		} else {
-			map_entity_set(&entity_map, key, e);
+			map_set(&entity_map, key, e);
 			variants[variant_index++] = e;
 		}
 		add_entity_use(c, f->name, e);
@@ -801,8 +801,8 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	// NOTE(bill): Must be up here for the `check_init_constant` system
 	enum_type->Record.enum_base_type = base_type;
 
-	MapEntity entity_map = {}; // Key: String
-	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*(et->fields.count));
+	Map<Entity *> entity_map = {}; // Key: String
+	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*(et->fields.count));
 
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, et->fields.count);
 	isize field_count = 0;
@@ -888,10 +888,10 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		e->flags |= EntityFlag_Visited;
 
 		HashKey key = hash_string(name);
-		if (map_entity_get(&entity_map, key) != NULL) {
+		if (map_get(&entity_map, key) != NULL) {
 			error_node(ident, "`%.*s` is already declared in this enumeration", LIT(name));
 		} else {
-			map_entity_set(&entity_map, key, e);
+			map_set(&entity_map, key, e);
 			add_entity(c, c->context.scope, NULL, e);
 			fields[field_count++] = e;
 			add_entity_use(c, field, e);
@@ -922,8 +922,8 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
 
-	MapEntity entity_map = {}; // Key: String
-	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*(bft->fields.count));
+	Map<Entity *> entity_map = {}; // Key: String
+	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*(bft->fields.count));
 
 	isize field_count = 0;
 	Entity **fields  = gb_alloc_array(c->allocator, Entity *, bft->fields.count);
@@ -967,10 +967,10 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 
 		HashKey key = hash_string(name);
 		if (name != "_" &&
-		    map_entity_get(&entity_map, key) != NULL) {
+		    map_get(&entity_map, key) != NULL) {
 			error_node(ident, "`%.*s` is already declared in this bit field", LIT(name));
 		} else {
-			map_entity_set(&entity_map, key, e);
+			map_set(&entity_map, key, e);
 			add_entity(c, c->context.scope, NULL, e);
 			add_entity_use(c, field, e);
 
@@ -1418,7 +1418,7 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 	if (e->kind == Entity_Procedure) {
 		// NOTE(bill): Overloads are only allowed with the same scope
 		Scope *s = e->scope;
-		overload_count = map_entity_multi_count(&s->elements, key);
+		overload_count = multi_map_count(&s->elements, key);
 		if (overload_count > 1) {
 			is_overloaded = true;
 		}
@@ -1429,7 +1429,7 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 		bool skip = false;
 
 		Entity **procs = gb_alloc_array(heap_allocator(), Entity *, overload_count);
-		map_entity_multi_get_all(&s->elements, key, procs);
+		multi_map_get_all(&s->elements, key, procs);
 		if (type_hint != NULL) {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 			// NOTE(bill): These should be done
@@ -2488,7 +2488,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 
 		TokenPos pos = ast_node_token(x->expr).pos;
 		if (x_is_untyped) {
-			ExprInfo *info = map_expr_info_get(&c->info.untyped, hash_pointer(x->expr));
+			ExprInfo *info = map_get(&c->info.untyped, hash_pointer(x->expr));
 			if (info != NULL) {
 				info->is_lhs = true;
 			}
@@ -2944,7 +2944,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 
 void update_expr_type(Checker *c, AstNode *e, Type *type, bool final) {
 	HashKey key = hash_pointer(e);
-	ExprInfo *found = map_expr_info_get(&c->info.untyped, key);
+	ExprInfo *found = map_get(&c->info.untyped, key);
 	if (found == NULL) {
 		return;
 	}
@@ -2983,12 +2983,12 @@ void update_expr_type(Checker *c, AstNode *e, Type *type, bool final) {
 
 	if (!final && is_type_untyped(type)) {
 		old.type = base_type(type);
-		map_expr_info_set(&c->info.untyped, key, old);
+		map_set(&c->info.untyped, key, old);
 		return;
 	}
 
 	// We need to remove it and then give it a new one
-	map_expr_info_remove(&c->info.untyped, key);
+	map_remove(&c->info.untyped, key);
 
 	if (old.is_lhs && !is_type_integer(type)) {
 		gbString expr_str = expr_to_string(e);
@@ -3003,7 +3003,7 @@ void update_expr_type(Checker *c, AstNode *e, Type *type, bool final) {
 }
 
 void update_expr_value(Checker *c, AstNode *e, ExactValue value) {
-	ExprInfo *found = map_expr_info_get(&c->info.untyped, hash_pointer(e));
+	ExprInfo *found = map_get(&c->info.untyped, hash_pointer(e));
 	if (found) {
 		found->value = value;
 	}
@@ -3206,7 +3206,7 @@ isize entity_overload_count(Scope *s, String name) {
 	}
 	if (e->kind == Entity_Procedure) {
 		// NOTE(bill): Overloads are only allowed with the same scope
-		return map_entity_multi_count(&s->elements, hash_string(e->token.string));
+		return multi_map_count(&s->elements, hash_string(e->token.string));
 	}
 	return 1;
 }
@@ -3298,7 +3298,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			isize overload_count = entity_overload_count(import_scope, entity_name);
 			bool is_overloaded = overload_count > 1;
 
-			bool implicit_is_found = map_bool_get(&e->ImportName.scope->implicit, hash_pointer(entity)) != NULL;
+			bool implicit_is_found = map_get(&e->ImportName.scope->implicit, hash_pointer(entity)) != NULL;
 			bool is_not_exported = !is_entity_exported(entity);
 			if (!implicit_is_found) {
 				is_not_exported = false;
@@ -3320,7 +3320,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 				bool skip = false;
 
 				Entity **procs = gb_alloc_array(heap_allocator(), Entity *, overload_count);
-				map_entity_multi_get_all(&import_scope->elements, key, procs);
+				multi_map_get_all(&import_scope->elements, key, procs);
 
 				for (isize i = 0; i < overload_count; i++) {
 					Type *t = base_type(procs[i]->type);
@@ -3329,7 +3329,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 					}
 
 					// NOTE(bill): Check to see if it's imported
-					if (map_bool_get(&import_scope->implicit, hash_pointer(procs[i]))) {
+					if (map_get(&import_scope->implicit, hash_pointer(procs[i]))) {
 						gb_swap(Entity *, procs[i], procs[overload_count-1]);
 						overload_count--;
 						i--; // NOTE(bill): Counteract the post event
@@ -4892,7 +4892,7 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 
 		for (isize i = 0; i < overload_count; i++) {
 			Entity *e = procs[i];
-			DeclInfo **found = map_decl_info_get(&c->info.entities, hash_pointer(e));
+			DeclInfo **found = map_get(&c->info.entities, hash_pointer(e));
 			GB_ASSERT(found != NULL);
 			DeclInfo *d = *found;
 			check_entity_decl(c, e, d, NULL);

@@ -4,6 +4,7 @@
 // IMPORTANT TODO(bill): This needs to be completely fixed!!!!!!!!
 
 struct AstNode;
+struct HashKey;
 
 struct Complex128 {
 	f64 real, imag;

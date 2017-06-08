@@ -3,15 +3,6 @@ struct irBlock;
 struct irValue;
 struct irDebugInfo;
 
-#define MAP_TYPE irValue *
-#define MAP_PROC map_ir_value_
-#define MAP_NAME MapIrValue
-#include "map.cpp"
-
-#define MAP_TYPE irDebugInfo *
-#define MAP_PROC map_ir_debug_info_
-#define MAP_NAME MapIrDebugInfo
-#include "map.cpp"
 
 
 struct irModule {
@@ -28,11 +19,11 @@ struct irModule {
 	String layout;
 	// String triple;
 
-	MapEntity             min_dep_map; // Key: Entity *
-	MapIrValue            values;      // Key: Entity *
-	MapIrValue            members;     // Key: String
-	MapString             entity_names;  // Key: Entity * of the typename
-	MapIrDebugInfo        debug_info;  // Key: Unique pointer
+	Map<Entity *>         min_dep_map; // Key: Entity *
+	Map<irValue *>        values;      // Key: Entity *
+	Map<irValue *>        members;     // Key: String
+	Map<String>           entity_names;  // Key: Entity * of the typename
+	Map<irDebugInfo *>    debug_info;  // Key: Unique pointer
 	i32                   global_string_index;
 	i32                   global_array_index; // For ConstantSlice
 	i32                   global_generated_index;
@@ -811,7 +802,7 @@ String ir_get_global_name(irModule *m, irValue *v) {
 	irValueGlobal *g = &v->Global;
 	Entity *e = g->entity;
 	String name = e->token.string;
-	String *found = map_string_get(&m->entity_names, hash_pointer(e));
+	String *found = map_get(&m->entity_names, hash_pointer(e));
 	if (found != NULL) {
 		name = *found;
 	}
@@ -1136,14 +1127,14 @@ irValue *ir_generate_array(irModule *m, Type *elem_type, i64 count, String prefi
 	irValue *value = ir_value_global(a, e, NULL);
 	value->Global.is_private = true;
 	ir_module_add_value(m, e, value);
-	map_ir_value_set(&m->members, hash_string(token.string), value);
+	map_set(&m->members, hash_string(token.string), value);
 	return value;
 }
 
 irBlock *ir_new_block(irProcedure *proc, AstNode *node, char *label) {
 	Scope *scope = NULL;
 	if (node != NULL) {
-		Scope **found = map_scope_get(&proc->module->info->scopes, hash_pointer(node));
+		Scope **found = map_get(&proc->module->info->scopes, hash_pointer(node));
 		if (found) {
 			scope = *found;
 		} else {
@@ -1239,7 +1230,7 @@ irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 		Entity *e = make_entity_constant(a, NULL, make_token_ident(name), t, value);
 		irValue *g = ir_value_global(a, e, backing_array);
 		ir_module_add_value(m, e, g);
-		map_ir_value_set(&m->members, hash_string(name), g);
+		map_set(&m->members, hash_string(name), g);
 
 		return ir_value_constant_slice(a, type, g, count);
 	}
@@ -1270,7 +1261,7 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 	// g->Global.is_constant = true;
 
 	ir_module_add_value(m, entity, g);
-	map_ir_value_set(&m->members, hash_string(name), g);
+	map_set(&m->members, hash_string(name), g);
 
 	return g;
 }
@@ -1291,7 +1282,7 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, AstNode *expr) {
 	// }
 
 	if (expr != NULL && proc->entity != NULL) {
-		irDebugInfo *di = *map_ir_debug_info_get(&proc->module->debug_info, hash_pointer(proc->entity));
+		irDebugInfo *di = *map_get(&proc->module->debug_info, hash_pointer(proc->entity));
 		ir_emit(proc, ir_instr_debug_declare(proc, di, expr, e, true, instr));
 	}
 
@@ -1299,7 +1290,7 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, AstNode *expr) {
 }
 
 irValue *ir_add_local_for_identifier(irProcedure *proc, AstNode *name, bool zero_initialized) {
-	Entity **found = map_entity_get(&proc->module->info->definitions, hash_pointer(name));
+	Entity **found = map_get(&proc->module->info->definitions, hash_pointer(name));
 	if (found) {
 		Entity *e = *found;
 		ir_emit_comment(proc, e->token.string);
@@ -1341,7 +1332,7 @@ irValue *ir_add_global_generated(irModule *m, Type *type, irValue *value) {
 
 	irValue *g = ir_value_global(a, e, value);
 	ir_module_add_value(m, e, g);
-	map_ir_value_set(&m->members, hash_string(name), g);
+	map_set(&m->members, hash_string(name), g);
 	return g;
 }
 
@@ -1407,7 +1398,7 @@ irDebugInfo *ir_add_debug_info_file(irProcedure *proc, AstFile *file) {
 	di->File.filename = filename;
 	di->File.directory = directory;
 
-	map_ir_debug_info_set(&proc->module->debug_info, hash_pointer(file), di);
+	map_set(&proc->module->debug_info, hash_pointer(file), di);
 	return di;
 }
 
@@ -1424,7 +1415,7 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 	di->Proc.file = file;
 	di->Proc.pos = entity->token.pos;
 
-	map_ir_debug_info_set(&proc->module->debug_info, hash_pointer(entity), di);
+	map_set(&proc->module->debug_info, hash_pointer(entity), di);
 	return di;
 }
 
@@ -1517,7 +1508,7 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_
 
 irValue *ir_emit_global_call(irProcedure *proc, char *name_, irValue **args, isize arg_count) {
 	String name = make_string_c(name_);
-	irValue **found = map_ir_value_get(&proc->module->members, hash_string(name));
+	irValue **found = map_get(&proc->module->members, hash_string(name));
 	GB_ASSERT_MSG(found != NULL, "%.*s", LIT(name));
 	irValue *gp = *found;
 	return ir_emit_call(proc, gp, args, arg_count);
@@ -3280,7 +3271,7 @@ isize ir_type_info_index(CheckerInfo *info, Type *type) {
 
 	isize entry_index = -1;
 	HashKey key = hash_pointer(type);
-	isize *found_entry_index = map_isize_get(&info->type_info_map, key);
+	isize *found_entry_index = map_get(&info->type_info_map, key);
 	if (found_entry_index) {
 		entry_index = *found_entry_index;
 	}
@@ -3288,12 +3279,12 @@ isize ir_type_info_index(CheckerInfo *info, Type *type) {
 		// NOTE(bill): Do manual search
 		// TODO(bill): This is O(n) and can be very slow
 		for_array(i, info->type_info_map.entries){
-			MapIsizeEntry *e = &info->type_info_map.entries[i];
+			auto *e = &info->type_info_map.entries[i];
 			Type *prev_type = cast(Type *)e->key.ptr;
 			if (are_types_identical(prev_type, type)) {
 				entry_index = e->value;
 				// NOTE(bill): Add it to the search map
-				map_isize_set(&info->type_info_map, key, entry_index);
+				map_set(&info->type_info_map, key, entry_index);
 				break;
 			}
 		}
@@ -3434,7 +3425,7 @@ String ir_mangle_name(irGen *s, String path, Entity *e) {
 	irModule *m = &s->module;
 	CheckerInfo *info = m->info;
 	gbAllocator a = m->allocator;
-	AstFile *file = *map_ast_file_get(&info->files, hash_string(path));
+	AstFile *file = *map_get(&info->files, hash_string(path));
 
 	char *str = gb_alloc_array(a, char, path.len+1);
 	gb_memmove(str, path.text, path.len);
@@ -3496,14 +3487,14 @@ void ir_mangle_add_sub_type_name(irModule *m, Entity *field, String parent) {
 	                                 "%.*s.%.*s", LIT(parent), LIT(cn));
 
 	String child = {text, new_name_len-1};
-	map_string_set(&m->entity_names, hash_pointer(field), child);
+	map_set(&m->entity_names, hash_pointer(field), child);
 	ir_gen_global_type_name(m, field, child);
 }
 
 
 irBranchBlocks ir_lookup_branch_blocks(irProcedure *proc, AstNode *ident) {
 	GB_ASSERT(ident->kind == AstNode_Ident);
-	Entity **found = map_entity_get(&proc->module->info->uses, hash_pointer(ident));
+	Entity **found = map_get(&proc->module->info->uses, hash_pointer(ident));
 	GB_ASSERT(found != NULL);
 	Entity *e = *found;
 	GB_ASSERT(e->kind == Entity_Label);
@@ -3553,7 +3544,7 @@ void ir_pop_target_list(irProcedure *proc) {
 void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	irValue *t = ir_value_type_name(m->allocator, name, e->type);
 	ir_module_add_value(m, e, t);
-	map_ir_value_set(&m->members, hash_string(name), t);
+	map_set(&m->members, hash_string(name), t);
 
 	if (is_type_union(e->type)) {
 		Type *bt = base_type(e->type);
@@ -3602,7 +3593,7 @@ irValue *ir_emit_clamp(irProcedure *proc, Type *t, irValue *x, irValue *min, irV
 
 
 irValue *ir_find_global_variable(irProcedure *proc, String name) {
-	irValue **value = map_ir_value_get(&proc->module->members, hash_string(name));
+	irValue **value = map_get(&proc->module->members, hash_string(name));
 	GB_ASSERT_MSG(value != NULL, "Unable to find global variable `%.*s`", LIT(name));
 	return *value;
 }
@@ -3660,7 +3651,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(i, Ident, expr);
-		Entity *e = *map_entity_get(&proc->module->info->uses, hash_pointer(expr));
+		Entity *e = *map_get(&proc->module->info->uses, hash_pointer(expr));
 		if (e->kind == Entity_Builtin) {
 			Token token = ast_node_token(expr);
 			GB_PANIC("TODO(bill): ir_build_single_expr Entity_Builtin `%.*s`\n"
@@ -3671,7 +3662,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			return ir_value_nil(proc->module->allocator, tv.type);
 		}
 
-		irValue **found = map_ir_value_get(&proc->module->values, hash_pointer(e));
+		irValue **found = map_get(&proc->module->values, hash_pointer(e));
 		if (found) {
 			irValue *v = *found;
 			if (v->kind == irValue_Proc) {
@@ -3873,7 +3864,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 
 	case_ast_node(ce, CallExpr, expr);
-		if (map_tav_get(&proc->module->info->types, hash_pointer(ce->proc))->mode == Addressing_Type) {
+		if (map_get(&proc->module->info->types, hash_pointer(ce->proc))->mode == Addressing_Type) {
 			GB_ASSERT(ce->args.count == 1);
 			irValue *x = ir_build_expr(proc, ce->args[0]);
 			irValue *y = ir_emit_conv(proc, x, tv.type);
@@ -3882,7 +3873,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 		AstNode *p = unparen_expr(ce->proc);
 		if (p->kind == AstNode_Ident) {
-			Entity **found = map_entity_get(&proc->module->info->uses, hash_pointer(p));
+			Entity **found = map_get(&proc->module->info->uses, hash_pointer(p));
 			if (found && (*found)->kind == Entity_Builtin) {
 				Entity *e = *found;
 				switch (e->Builtin.id) {
@@ -4704,7 +4695,7 @@ irValue *ir_get_using_variable(irProcedure *proc, Entity *e) {
 	Entity *parent = e->using_parent;
 	Selection sel = lookup_field(proc->module->allocator, parent->type, name, false);
 	GB_ASSERT(sel.entity != NULL);
-	irValue **pv = map_ir_value_get(&proc->module->values, hash_pointer(parent));
+	irValue **pv = map_get(&proc->module->values, hash_pointer(parent));
 	irValue *v = NULL;
 	if (pv != NULL) {
 		v = *pv;
@@ -4719,7 +4710,7 @@ irValue *ir_get_using_variable(irProcedure *proc, Entity *e) {
 
 // irValue *ir_add_using_variable(irProcedure *proc, Entity *e) {
 // 	irValue *var = ir_get_using_variable(proc, e);
-// 	map_ir_value_set(&proc->module->values, hash_pointer(e), var);
+// 	map_set(&proc->module->values, hash_pointer(e), var);
 // 	return var;
 // }
 
@@ -4741,7 +4732,7 @@ irAddr ir_build_addr_from_entity(irProcedure *proc, Entity *e, AstNode *expr) {
 	GB_ASSERT(e->kind != Entity_Constant);
 
 	irValue *v = NULL;
-	irValue **found = map_ir_value_get(&proc->module->values, hash_pointer(e));
+	irValue **found = map_get(&proc->module->values, hash_pointer(e));
 	if (found) {
 		v = *found;
 	} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
@@ -5720,7 +5711,7 @@ void ir_build_range_interval(irProcedure *proc, AstNodeBinaryExpr *node, Type *v
 }
 
 void ir_store_type_case_implicit(irProcedure *proc, AstNode *clause, irValue *value) {
-	Entity **found = map_entity_get(&proc->module->info->implicits, hash_pointer(clause));
+	Entity **found = map_get(&proc->module->info->implicits, hash_pointer(clause));
 	GB_ASSERT(found != NULL);
 	Entity *e = *found; GB_ASSERT(e != NULL);
 	irValue *x = ir_add_local(proc, e, NULL);
@@ -5836,18 +5827,18 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 					irValue *value = ir_value_type_name(proc->module->allocator,
 					                                           name, e->type);
-					map_string_set(&proc->module->entity_names, hash_pointer(e), name);
+					map_set(&proc->module->entity_names, hash_pointer(e), name);
 					ir_gen_global_type_name(proc->module, e, name);
 				} break;
 				case Entity_Procedure: {
-					DeclInfo **decl_info = map_decl_info_get(&proc->module->info->entities, hash_pointer(e));
+					DeclInfo **decl_info = map_get(&proc->module->info->entities, hash_pointer(e));
 					GB_ASSERT(decl_info != NULL);
 					DeclInfo *dl = *decl_info;
 					ast_node(pd, ProcLit, dl->proc_lit);
 					if (pd->body != NULL) {
 						CheckerInfo *info = proc->module->info;
 
-						if (map_entity_get(&proc->module->min_dep_map, hash_pointer(e)) == NULL) {
+						if (map_get(&proc->module->min_dep_map, hash_pointer(e)) == NULL) {
 							// NOTE(bill): Nothing depends upon it so doesn't need to be built
 							break;
 						}
@@ -5896,10 +5887,10 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 						if (value->Proc.tags & ProcTag_foreign) {
 							HashKey key = hash_string(name);
-							irValue **prev_value = map_ir_value_get(&proc->module->members, key);
+							irValue **prev_value = map_get(&proc->module->members, key);
 							if (prev_value == NULL) {
 								// NOTE(bill): Don't do mutliple declarations in the IR
-								map_ir_value_set(&proc->module->members, key, value);
+								map_set(&proc->module->members, key, value);
 							}
 						} else {
 							array_add(&proc->children, &value->Proc);
@@ -6509,7 +6500,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 			Entity *case_entity = NULL;
 			{
-				Entity **found = map_entity_get(&proc->module->info->implicits, hash_pointer(clause));
+				Entity **found = map_get(&proc->module->info->implicits, hash_pointer(clause));
 				GB_ASSERT(found != NULL);
 				case_entity = *found;
 			}
@@ -6679,7 +6670,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 	array_init(&proc->children,         heap_allocator());
 	array_init(&proc->branch_blocks,    heap_allocator());
 
-	DeclInfo **found = map_decl_info_get(&proc->module->info->entities, hash_pointer(proc->entity));
+	DeclInfo **found = map_get(&proc->module->info->entities, hash_pointer(proc->entity));
 	if (found != NULL) {
 		DeclInfo *decl = *found;
 		for_array(i, decl->labels) {
@@ -6774,12 +6765,12 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 		CheckerInfo *info = m->info;
 		Entity *e = proc->entity;
 		String filename = e->token.pos.file;
-		AstFile **found = map_ast_file_get(&info->files, hash_string(filename));
+		AstFile **found = map_get(&info->files, hash_string(filename));
 		GB_ASSERT(found != NULL);
 		AstFile *f = *found;
 		irDebugInfo *di_file = NULL;
 
-		irDebugInfo **di_file_found = map_ir_debug_info_get(&m->debug_info, hash_pointer(f));
+		irDebugInfo **di_file_found = map_get(&m->debug_info, hash_pointer(f));
 		if (di_file_found) {
 			di_file = *di_file_found;
 			GB_ASSERT(di_file->kind == irDebugInfo_File);
@@ -6831,7 +6822,7 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 
 
 void ir_module_add_value(irModule *m, Entity *e, irValue *v) {
-	map_ir_value_set(&m->values, hash_pointer(e), v);
+	map_set(&m->values, hash_pointer(e), v);
 }
 
 void ir_init_module(irModule *m, Checker *c) {
@@ -6844,10 +6835,10 @@ void ir_init_module(irModule *m, Checker *c) {
 	m->tmp_allocator = gb_arena_allocator(&m->tmp_arena);
 	m->info = &c->info;
 
-	map_ir_value_init(&m->values,  heap_allocator());
-	map_ir_value_init(&m->members, heap_allocator());
-	map_ir_debug_info_init(&m->debug_info, heap_allocator());
-	map_string_init(&m->entity_names, heap_allocator());
+	map_init(&m->values,  heap_allocator());
+	map_init(&m->members, heap_allocator());
+	map_init(&m->debug_info, heap_allocator());
+	map_init(&m->entity_names, heap_allocator());
 	array_init(&m->procs,    heap_allocator());
 	array_init(&m->procs_to_generate, heap_allocator());
 	array_init(&m->foreign_library_paths, heap_allocator());
@@ -6861,7 +6852,7 @@ void ir_init_module(irModule *m, Checker *c) {
 		{
 			isize max_index = -1;
 			for_array(type_info_map_index, m->info->type_info_map.entries) {
-				MapIsizeEntry *entry = &m->info->type_info_map.entries[type_info_map_index];
+				auto *entry = &m->info->type_info_map.entries[type_info_map_index];
 				Type *t = cast(Type *)cast(uintptr)entry->key.key;
 				t = default_type(t);
 				isize entry_index = ir_type_info_index(m->info, t);
@@ -6876,7 +6867,7 @@ void ir_init_module(irModule *m, Checker *c) {
 			irValue *g = ir_value_global(m->allocator, e, NULL);
 			g->Global.is_private  = true;
 			ir_module_add_value(m, e, g);
-			map_ir_value_set(&m->members, hash_string(name), g);
+			map_set(&m->members, hash_string(name), g);
 			ir_global_type_info_data = g;
 		}
 
@@ -6886,7 +6877,7 @@ void ir_init_module(irModule *m, Checker *c) {
 			isize count = 0;
 
 			for_array(entry_index, m->info->type_info_map.entries) {
-				MapIsizeEntry *entry = &m->info->type_info_map.entries[entry_index];
+				auto *entry = &m->info->type_info_map.entries[entry_index];
 				Type *t = cast(Type *)cast(uintptr)entry->key.key;
 
 				switch (t->kind) {
@@ -6914,7 +6905,7 @@ void ir_init_module(irModule *m, Checker *c) {
 				                                 make_type_array(m->allocator, t_type_info_ptr, count), false);
 				irValue *g = ir_value_global(m->allocator, e, NULL);
 				ir_module_add_value(m, e, g);
-				map_ir_value_set(&m->members, hash_string(name), g);
+				map_set(&m->members, hash_string(name), g);
 				ir_global_type_info_member_types = g;
 			}
 			{
@@ -6923,7 +6914,7 @@ void ir_init_module(irModule *m, Checker *c) {
 				                                 make_type_array(m->allocator, t_string, count), false);
 				irValue *g = ir_value_global(m->allocator, e, NULL);
 				ir_module_add_value(m, e, g);
-				map_ir_value_set(&m->members, hash_string(name), g);
+				map_set(&m->members, hash_string(name), g);
 				ir_global_type_info_member_names = g;
 			}
 			{
@@ -6932,7 +6923,7 @@ void ir_init_module(irModule *m, Checker *c) {
 				                                 make_type_array(m->allocator, t_int, count), false);
 				irValue *g = ir_value_global(m->allocator, e, NULL);
 				ir_module_add_value(m, e, g);
-				map_ir_value_set(&m->members, hash_string(name), g);
+				map_set(&m->members, hash_string(name), g);
 				ir_global_type_info_member_offsets = g;
 			}
 
@@ -6942,7 +6933,7 @@ void ir_init_module(irModule *m, Checker *c) {
 				                                 make_type_array(m->allocator, t_bool, count), false);
 				irValue *g = ir_value_global(m->allocator, e, NULL);
 				ir_module_add_value(m, e, g);
-				map_ir_value_set(&m->members, hash_string(name), g);
+				map_set(&m->members, hash_string(name), g);
 				ir_global_type_info_member_usings = g;
 			}
 		}
@@ -6953,15 +6944,15 @@ void ir_init_module(irModule *m, Checker *c) {
 		di->CompileUnit.file = m->info->files.entries[0].value; // Zeroth is the init file
 		di->CompileUnit.producer = str_lit("odin");
 
-		map_ir_debug_info_set(&m->debug_info, hash_pointer(m), di);
+		map_set(&m->debug_info, hash_pointer(m), di);
 	}
 }
 
 void ir_destroy_module(irModule *m) {
-	map_ir_value_destroy(&m->values);
-	map_ir_value_destroy(&m->members);
-	map_string_destroy(&m->entity_names);
-	map_ir_debug_info_destroy(&m->debug_info);
+	map_destroy(&m->values);
+	map_destroy(&m->members);
+	map_destroy(&m->entity_names);
+	map_destroy(&m->debug_info);
 	array_free(&m->procs);
 	array_free(&m->procs_to_generate);
 	array_free(&m->foreign_library_paths);
@@ -7089,7 +7080,7 @@ void ir_gen_tree(irGen *s) {
 	bool has_win_main = false;
 
 	for_array(i, info->entities.entries) {
-		MapDeclInfoEntry *entry = &info->entities.entries[i];
+		auto *entry = &info->entities.entries[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		String name = e->token.string;
 		if (e->kind == Entity_Variable) {
@@ -7121,7 +7112,7 @@ void ir_gen_tree(irGen *s) {
 	m->min_dep_map = generate_minimum_dependency_map(info, entry_point);
 
 	for_array(i, info->entities.entries) {
-		MapDeclInfoEntry *entry = &info->entities.entries[i];
+		auto *entry = &info->entities.entries[i];
 		Entity *e = cast(Entity *)entry->key.ptr;
 		String name = e->token.string;
 		DeclInfo *decl = entry->value;
@@ -7131,7 +7122,7 @@ void ir_gen_tree(irGen *s) {
 			continue;
 		}
 
-		if (map_entity_get(&m->min_dep_map, hash_pointer(e)) == NULL) {
+		if (map_get(&m->min_dep_map, hash_pointer(e)) == NULL) {
 			// NOTE(bill): Nothing depends upon it so doesn't need to be built
 			continue;
 		}
@@ -7145,7 +7136,7 @@ void ir_gen_tree(irGen *s) {
 				name = ir_mangle_name(s, e->token.pos.file, e);
 			}
 		}
-		map_string_set(&m->entity_names, hash_pointer(e), name);
+		map_set(&m->entity_names, hash_pointer(e), name);
 
 		switch (e->kind) {
 		case Entity_TypeName:
@@ -7183,7 +7174,7 @@ void ir_gen_tree(irGen *s) {
 			}
 
 			ir_module_add_value(m, e, g);
-			map_ir_value_set(&m->members, hash_string(name), g);
+			map_set(&m->members, hash_string(name), g);
 		} break;
 
 		case Entity_Procedure: {
@@ -7207,15 +7198,15 @@ void ir_gen_tree(irGen *s) {
 
 			ir_module_add_value(m, e, p);
 			HashKey hash_name = hash_string(name);
-			if (map_ir_value_get(&m->members, hash_name) == NULL) {
-				map_ir_value_multi_insert(&m->members, hash_name, p);
+			if (map_get(&m->members, hash_name) == NULL) {
+				multi_map_insert(&m->members, hash_name, p);
 			}
 		} break;
 		}
 	}
 
 	for_array(i, m->members.entries) {
-		MapIrValueEntry *entry = &m->members.entries[i];
+		auto *entry = &m->members.entries[i];
 		irValue *v = entry->value;
 		if (v->kind == irValue_Proc) {
 			ir_build_proc(v, NULL);
@@ -7228,7 +7219,7 @@ void ir_gen_tree(irGen *s) {
 
 	isize all_proc_max_count = 0;
 	for_array(i, m->debug_info.entries) {
-		MapIrDebugInfoEntry *entry = &m->debug_info.entries[i];
+		auto *entry = &m->debug_info.entries[i];
 		irDebugInfo *di = entry->value;
 		di->id = i;
 		if (di->kind == irDebugInfo_Proc) {
@@ -7237,12 +7228,12 @@ void ir_gen_tree(irGen *s) {
 	}
 
 	array_init(&all_procs->AllProcs.procs, m->allocator, all_proc_max_count);
-	map_ir_debug_info_set(&m->debug_info, hash_pointer(all_procs), all_procs); // NOTE(bill): This doesn't need to be mapped
+	map_set(&m->debug_info, hash_pointer(all_procs), all_procs); // NOTE(bill): This doesn't need to be mapped
 	compile_unit->CompileUnit.all_procs = all_procs;
 
 
 	for_array(i, m->debug_info.entries) {
-		MapIrDebugInfoEntry *entry = &m->debug_info.entries[i];
+		auto *entry = &m->debug_info.entries[i];
 		irDebugInfo *di = entry->value;
 		if (di->kind == irDebugInfo_Proc) {
 			array_add(&all_procs->AllProcs.procs, di);
@@ -7279,8 +7270,8 @@ void ir_gen_tree(irGen *s) {
 		Entity *e = make_entity_procedure(a, NULL, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(a, m, e, proc_type, NULL, body, name);
 
-		map_ir_value_set(&m->values, hash_pointer(e), p);
-		map_ir_value_set(&m->members, hash_string(name), p);
+		map_set(&m->values, hash_pointer(e), p);
+		map_set(&m->members, hash_string(name), p);
 
 		irProcedure *proc = &p->Proc;
 		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
@@ -7300,7 +7291,7 @@ void ir_gen_tree(irGen *s) {
 
 		{
 			String main_name = str_lit("main");
-			irValue **found = map_ir_value_get(&m->members, hash_string(main_name));
+			irValue **found = map_get(&m->members, hash_string(main_name));
 			if (found != NULL) {
 				ir_emit_call(proc, *found, NULL, 0);
 			} else {
@@ -7350,8 +7341,8 @@ void ir_gen_tree(irGen *s) {
 
 		m->entry_point_entity = e;
 
-		map_ir_value_set(&m->values, hash_pointer(e), p);
-		map_ir_value_set(&m->members, hash_string(name), p);
+		map_set(&m->values, hash_pointer(e), p);
+		map_set(&m->members, hash_string(name), p);
 
 		irProcedure *proc = &p->Proc;
 		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
@@ -7373,8 +7364,8 @@ void ir_gen_tree(irGen *s) {
 		Entity *e = make_entity_procedure(a, NULL, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(a, m, e, proc_type, NULL, body, name);
 
-		map_ir_value_set(&m->values, hash_pointer(e), p);
-		map_ir_value_set(&m->members, hash_string(name), p);
+		map_set(&m->values, hash_pointer(e), p);
+		map_set(&m->members, hash_string(name), p);
 
 
 		irProcedure *proc = &p->Proc;
@@ -7452,7 +7443,7 @@ void ir_gen_tree(irGen *s) {
 			i32 type_info_member_offsets_index = 0;
 
 			for_array(type_info_map_index, info->type_info_map.entries) {
-				MapIsizeEntry *entry = &info->type_info_map.entries[type_info_map_index];
+				auto *entry = &info->type_info_map.entries[type_info_map_index];
 				Type *t = cast(Type *)cast(uintptr)entry->key.key;
 				t = default_type(t);
 				isize entry_index = ir_type_info_index(info, t);
@@ -7915,7 +7906,7 @@ void ir_gen_tree(irGen *s) {
 	}
 
 	for_array(type_info_map_index, info->type_info_map.entries) {
-		MapIsizeEntry *entry = &info->type_info_map.entries[type_info_map_index];
+		auto *entry = &info->type_info_map.entries[type_info_map_index];
 		Type *t = cast(Type *)cast(uintptr)entry->key.key;
 		t = default_type(t);
 		isize entry_index = entry->value;
@@ -7934,7 +7925,7 @@ void ir_gen_tree(irGen *s) {
 
 	// Number debug info
 	for_array(i, m->debug_info.entries) {
-		MapIrDebugInfoEntry *entry = &m->debug_info.entries[i];
+		auto *entry = &m->debug_info.entries[i];
 		irDebugInfo *di = entry->value;
 		di->id = i;
 	}

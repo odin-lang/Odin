@@ -389,11 +389,6 @@ struct TypeAndToken {
 	Token token;
 };
 
-#define MAP_TYPE TypeAndToken
-#define MAP_PROC map_type_and_token_
-#define MAP_NAME MapTypeAndToken
-#include "map.cpp"
-
 void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
 	flags &= ~Stmt_CheckScopeDecls;
 	Operand operand = {Addressing_Invalid};
@@ -535,7 +530,7 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 		Type *t = base_type(type_deref(e->type));
 		if (is_type_struct(t) || is_type_raw_union(t) || is_type_union(t)) {
 			// TODO(bill): Make it work for unions too
-			Scope **found_ = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
+			Scope **found_ = map_get(&c->info.scopes, hash_pointer(t->Record.node));
 			GB_ASSERT(found_ != NULL);
 			Scope *found = *found_;
 			for_array(i, found->elements.entries) {
@@ -1130,8 +1125,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 		}
 
-		MapTypeAndToken seen = {}; // NOTE(bill): Multimap
-		map_type_and_token_init(&seen, heap_allocator());
+		Map<TypeAndToken> seen = {}; // NOTE(bill): Multimap
+		map_init(&seen, heap_allocator());
 
 		for_array(i, bs->stmts) {
 			AstNode *stmt = bs->stmts[i];
@@ -1222,13 +1217,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 					if (y.value.kind != ExactValue_Invalid) {
 						HashKey key = hash_exact_value(y.value);
-						TypeAndToken *found = map_type_and_token_get(&seen, key);
+						TypeAndToken *found = map_get(&seen, key);
 						if (found != NULL) {
 							gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-							isize count = map_type_and_token_multi_count(&seen, key);
+							isize count = multi_map_count(&seen, key);
 							TypeAndToken *taps = gb_alloc_array(c->tmp_allocator, TypeAndToken, count);
 
-							map_type_and_token_multi_get_all(&seen, key, taps);
+							multi_map_get_all(&seen, key, taps);
 							bool continue_outer = false;
 
 							for (isize i = 0; i < count; i++) {
@@ -1254,7 +1249,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 							}
 						}
 						TypeAndToken tap = {y.type, ast_node_token(y.expr)};
-						map_type_and_token_multi_insert(&seen, key, tap);
+						multi_map_insert(&seen, key, tap);
 					}
 				}
 			}
@@ -1268,7 +1263,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			check_close_scope(c);
 		}
 
-		map_type_and_token_destroy(&seen);
+		map_destroy(&seen);
 
 		check_close_scope(c);
 	case_end;
@@ -1346,8 +1341,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 
 
-		MapBool seen = {}; // Multimap
-		map_bool_init(&seen, heap_allocator());
+		Map<bool> seen = {}; // Multimap
+		map_init(&seen, heap_allocator());
 
 		for_array(i, bs->stmts) {
 			AstNode *stmt = bs->stmts[i];
@@ -1391,7 +1386,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					}
 
 					HashKey key = hash_pointer(y.type);
-					bool *found = map_bool_get(&seen, key);
+					bool *found = map_get(&seen, key);
 					if (found) {
 						TokenPos pos = cc->token.pos;
 						gbString expr_str = expr_to_string(y.expr);
@@ -1403,7 +1398,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						gb_string_free(expr_str);
 						break;
 					}
-					map_bool_set(&seen, key, cast(bool)true);
+					map_set(&seen, key, cast(bool)true);
 				}
 			}
 
@@ -1434,7 +1429,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			check_stmt_list(c, cc->stmts, mod_flags);
 			check_close_scope(c);
 		}
-		map_bool_destroy(&seen);
+		map_destroy(&seen);
 
 		check_close_scope(c);
 	case_end;
@@ -1635,7 +1630,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					Type *t = base_type(type_deref(e->type));
 
 					if (is_type_struct(t) || is_type_raw_union(t)) {
-						Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
+						Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
 						GB_ASSERT(found != NULL);
 						for_array(i, (*found)->elements.entries) {
 							Entity *f = (*found)->elements.entries[i].value;

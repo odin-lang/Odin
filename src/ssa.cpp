@@ -14,10 +14,6 @@ enum   ssaDeferExitKind;
 
 String ssa_mangle_name(ssaModule *m, String path, Entity *e);
 
-#define MAP_TYPE ssaValue *
-#define MAP_PROC map_ssa_value_
-#define MAP_NAME MapSsaValue
-#include "map.cpp"
 
 #include "ssa_op.cpp"
 
@@ -148,7 +144,7 @@ struct ssaProc {
 
 	i32               block_id;
 	i32               value_id;
-	MapSsaValue       values;   // Key: Entity *
+	Map<ssaValue *>   values;   // Key: Entity *
 
 	Array<ssaDefer>   defer_stmts;
 	i32               scope_level;
@@ -166,8 +162,8 @@ struct ssaModule {
 	gbAllocator        tmp_allocator;
 	gbArena            tmp_arena;
 
-	MapEntity          min_dep_map; // Key: Entity *
-	MapSsaValue        values;      // Key: Entity *
+	Map<Entity *>      min_dep_map; // Key: Entity *
+	Map<ssaValue *>    values;      // Key: Entity *
 	// List of registers for the specific architecture
 	Array<ssaRegister> registers;
 
@@ -584,7 +580,7 @@ ssaProc *ssa_new_proc(ssaModule *m, String name, Entity *entity, DeclInfo *decl_
 
 	array_init(&p->blocks, heap_allocator());
 	array_init(&p->defer_stmts, heap_allocator());
-	map_ssa_value_init(&p->values, heap_allocator());
+	map_init(&p->values, heap_allocator());
 
 	return p;
 }
@@ -597,14 +593,14 @@ ssaAddr ssa_add_local(ssaProc *p, Entity *e, AstNode *expr) {
 	ssaValue *local = ssa_new_value0(p, ssaOp_Local, t);
 	p->curr_block = cb;
 
-	map_ssa_value_set(&p->values,         hash_pointer(e), local);
-	map_ssa_value_set(&p->module->values, hash_pointer(e), local);
+	map_set(&p->values,         hash_pointer(e), local);
+	map_set(&p->module->values, hash_pointer(e), local);
 	local->comment_string = e->token.string;
 	ssa_new_value1(p, ssaOp_Zero, t, local);
 	return ssa_addr(local);
 }
 ssaAddr ssa_add_local_for_ident(ssaProc *p, AstNode *name) {
-	Entity **found = map_entity_get(&p->module->info->definitions, hash_pointer(name));
+	Entity **found = map_get(&p->module->info->definitions, hash_pointer(name));
 	if (found) {
 		Entity *e = *found;
 		return ssa_add_local(p, e, name);
@@ -710,7 +706,7 @@ ssaValue *ssa_get_using_variable(ssaProc *p, Entity *e) {
 	Entity *parent = e->using_parent;
 	Selection sel = lookup_field(p->allocator, parent->type, name, false);
 	GB_ASSERT(sel.entity != NULL);
-	ssaValue **pv = map_ssa_value_get(&p->module->values, hash_pointer(parent));
+	ssaValue **pv = map_get(&p->module->values, hash_pointer(parent));
 	ssaValue *v = NULL;
 	if (pv != NULL) {
 		v = *pv;
@@ -726,7 +722,7 @@ ssaAddr ssa_build_addr_from_entity(ssaProc *p, Entity *e, AstNode *expr) {
 	GB_ASSERT(e != NULL);
 
 	ssaValue *v = NULL;
-	ssaValue **found = map_ssa_value_get(&p->module->values, hash_pointer(e));
+	ssaValue **found = map_get(&p->module->values, hash_pointer(e));
 	if (found) {
 		v = *found;
 	} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
@@ -1690,7 +1686,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 	case_end;
 
 	case_ast_node(i, Ident, expr);
-		Entity *e = *map_entity_get(&p->module->info->uses, hash_pointer(expr));
+		Entity *e = *map_get(&p->module->info->uses, hash_pointer(expr));
 		if (e->kind == Entity_Builtin) {
 			Token token = ast_node_token(expr);
 			GB_PANIC("TODO(bill): ssa_build_expr Entity_Builtin `%.*s`\n"
@@ -1702,7 +1698,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 			return NULL;
 		}
 
-		ssaValue **found = map_ssa_value_get(&p->module->values, hash_pointer(e));
+		ssaValue **found = map_get(&p->module->values, hash_pointer(e));
 		if (found) {
 			ssaValue *v = *found;
 			if (v->op == ssaOp_Proc) {
@@ -1840,7 +1836,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 
 
 	case_ast_node(ce, CallExpr, expr);
-		if (map_tav_get(&p->module->info->types, hash_pointer(ce->proc))->mode == Addressing_Type) {
+		if (map_get(&p->module->info->types, hash_pointer(ce->proc))->mode == Addressing_Type) {
 			GB_ASSERT(ce->args.count == 1);
 			ssaValue *x = ssa_build_expr(p, ce->args[0]);
 			return ssa_emit_conv(p, x, tv.type);
@@ -2484,7 +2480,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 		m.tmp_allocator = gb_arena_allocator(&m.tmp_arena);
 		m.allocator     = gb_arena_allocator(&m.arena);
 
-		map_ssa_value_init(&m.values,    heap_allocator());
+		map_init(&m.values,    heap_allocator());
 		array_init(&m.registers,         heap_allocator());
 		array_init(&m.procs,             heap_allocator());
 		array_init(&m.procs_to_generate, heap_allocator());
@@ -2496,7 +2492,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 	bool has_win_main = false;
 
 	for_array(i, info->entities.entries) {
-		MapDeclInfoEntry *entry = &info->entities.entries[i];
+		auto *entry = &info->entities.entries[i];
 		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
 		String name = e->token.string;
 		if (e->kind == Entity_Variable) {
@@ -2522,7 +2518,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 	m.min_dep_map = generate_minimum_dependency_map(info, entry_point);
 
 	for_array(i, info->entities.entries) {
-		MapDeclInfoEntry *entry = &info->entities.entries[i];
+		auto *entry = &info->entities.entries[i];
 		Entity *e = cast(Entity *)entry->key.ptr;
 		String name = e->token.string;
 		DeclInfo *decl = entry->value;
@@ -2532,7 +2528,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 			continue;
 		}
 
-		if (map_entity_get(&m.min_dep_map, hash_pointer(e)) == NULL) {
+		if (map_get(&m.min_dep_map, hash_pointer(e)) == NULL) {
 			// NOTE(bill): Nothing depends upon it so doesn't need to be built
 			continue;
 		}
@@ -2579,8 +2575,8 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 
 			// ssa_module_add_value(m, e, p);
 			// HashKey hash_name = hash_string(name);
-			// if (map_ssa_value_get(&m.members, hash_name) == NULL) {
-				// map_ssa_value_set(&m.members, hash_name, p);
+			// if (map_get(&m.members, hash_name) == NULL) {
+				// map_set(&m.members, hash_name, p);
 			// }
 		} break;
 		}
@@ -2600,7 +2596,7 @@ String ssa_mangle_name(ssaModule *m, String path, Entity *e) {
 	String name = e->token.string;
 	CheckerInfo *info = m->info;
 	gbAllocator a = m->allocator;
-	AstFile *file = *map_ast_file_get(&info->files, hash_string(path));
+	AstFile *file = *map_get(&info->files, hash_string(path));
 
 	char *str = gb_alloc_array(a, char, path.len+1);
 	gb_memmove(str, path.text, path.len);

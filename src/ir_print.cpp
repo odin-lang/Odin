@@ -306,7 +306,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 
 	case Type_Named:
 		if (is_type_struct(t) || is_type_union(t)) {
-			String *name = map_string_get(&m->entity_names, hash_pointer(t->Named.type_name));
+			String *name = map_get(&m->entity_names, hash_pointer(t->Named.type_name));
 			GB_ASSERT_MSG(name != NULL, "%.*s", LIT(t->Named.name));
 			ir_print_encoded_local(f, *name);
 		} else {
@@ -1523,7 +1523,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 
 	if (proc->entity != NULL) {
 		if (proc->body != NULL) {
-			irDebugInfo **di_ = map_ir_debug_info_get(&proc->module->debug_info, hash_pointer(proc->entity));
+			irDebugInfo **di_ = map_get(&proc->module->debug_info, hash_pointer(proc->entity));
 			if (di_ != NULL) {
 				irDebugInfo *di = *di_;
 				GB_ASSERT(di->kind == irDebugInfo_Proc);
@@ -1606,7 +1606,7 @@ void print_llvm_ir(irGen *ir) {
 
 
 	for_array(member_index, m->members.entries) {
-		MapIrValueEntry *entry = &m->members.entries[member_index];
+		auto *entry = &m->members.entries[member_index];
 		irValue *v = entry->value;
 		if (v->kind != irValue_TypeName) {
 			continue;
@@ -1619,7 +1619,7 @@ void print_llvm_ir(irGen *ir) {
 	bool dll_main_found = false;
 
 	for_array(member_index, m->members.entries) {
-		MapIrValueEntry *entry = &m->members.entries[member_index];
+		auto *entry = &m->members.entries[member_index];
 		irValue *v = entry->value;
 		if (v->kind != irValue_Proc) {
 			continue;
@@ -1631,7 +1631,7 @@ void print_llvm_ir(irGen *ir) {
 	}
 
 	for_array(member_index, m->members.entries) {
-		MapIrValueEntry *entry = &m->members.entries[member_index];
+		auto *entry = &m->members.entries[member_index];
 		irValue *v = entry->value;
 		if (v->kind != irValue_Proc) {
 			continue;
@@ -1643,7 +1643,7 @@ void print_llvm_ir(irGen *ir) {
 	}
 
 	for_array(member_index, m->members.entries) {
-		MapIrValueEntry *entry = &m->members.entries[member_index];
+		auto *entry = &m->members.entries[member_index];
 		irValue *v = entry->value;
 		if (v->kind != irValue_Global) {
 			continue;
@@ -1713,7 +1713,7 @@ void print_llvm_ir(irGen *ir) {
 
 			switch (di->kind) {
 			case irDebugInfo_CompileUnit: {
-				irDebugInfo *file = *map_ir_debug_info_get(&m->debug_info, hash_pointer(di->CompileUnit.file));
+				irDebugInfo *file = *map_get(&m->debug_info, hash_pointer(di->CompileUnit.file));
 				ir_fprintf(f,
 				            "distinct !DICompileUnit("
 				            "language: DW_LANG_Go, " // Is this good enough?

@@ -319,7 +319,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 	if (is_foreign) {
-		MapEntity *fp = &c->info.foreigns;
+		auto *fp = &c->info.foreigns;
 		String name = e->token.string;
 		if (pd->foreign_name.len > 0) {
 			name = pd->foreign_name;
@@ -352,7 +352,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 		e->Procedure.foreign_name = name;
 
 		HashKey key = hash_string(name);
-		Entity **found = map_entity_get(fp, key);
+		Entity **found = map_get(fp, key);
 		if (found) {
 			Entity *f = *found;
 			TokenPos pos = f->token.pos;
@@ -365,7 +365,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 						   LIT(name), LIT(pos.file), pos.line, pos.column);
 			}
 		} else {
-			map_entity_set(fp, key, e);
+			map_set(fp, key, e);
 		}
 	} else {
 		String name = e->token.string;
@@ -374,12 +374,12 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 		}
 
 		if (is_link_name || is_export) {
-			MapEntity *fp = &c->info.foreigns;
+			auto *fp = &c->info.foreigns;
 
 			e->Procedure.link_name = name;
 
 			HashKey key = hash_string(name);
-			Entity **found = map_entity_get(fp, key);
+			Entity **found = map_get(fp, key);
 			if (found) {
 				Entity *f = *found;
 				TokenPos pos = f->token.pos;
@@ -389,7 +389,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 						   "\tother at %.*s(%td:%td)",
 						   LIT(name), LIT(pos.file), pos.line, pos.column);
 			} else {
-				map_entity_set(fp, key, e);
+				map_set(fp, key, e);
 			}
 		}
 	}
@@ -443,7 +443,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 	}
 
 	if (d == NULL) {
-		DeclInfo **found = map_decl_info_get(&c->info.entities, hash_pointer(e));
+		DeclInfo **found = map_get(&c->info.entities, hash_pointer(e));
 		if (found) {
 			d = *found;
 		} else {
@@ -511,7 +511,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 			String name = e->token.string;
 			Type *t = base_type(type_deref(e->type));
 			if (is_type_struct(t) || is_type_raw_union(t)) {
-				Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
+				Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
 				GB_ASSERT(found != NULL);
 				for_array(i, (*found)->elements.entries) {
 					Entity *f = (*found)->elements.entries[i].value;
@@ -557,7 +557,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 		for_array(i, decl->deps.entries) {
 			HashKey key = decl->deps.entries[i].key;
 			Entity *e = cast(Entity *)key.ptr;
-			map_bool_set(&decl->parent->deps, key, true);
+			map_set(&decl->parent->deps, key, true);
 		}
 	}
 }
