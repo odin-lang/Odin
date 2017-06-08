@@ -4,8 +4,8 @@
 set exe_name=odin.exe
 
 :: Debug = 0, Release = 1
-set release_mode=1
-set compiler_flags= -nologo -Oi -TC -fp:fast -fp:except- -Gm- -MP -FC -GS- -EHsc- -GR-
+set release_mode=0
+set compiler_flags= -nologo -Oi -TP -fp:fast -fp:except- -Gm- -MP -FC -GS- -EHsc- -GR-
 
 if %release_mode% EQU 0 ( rem Debug
 	set compiler_flags=%compiler_flags% -Od -MDd -Z7
@@ -42,13 +42,10 @@ set linker_settings=%libs% %linker_flags%
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-odin run code/demo.odin
-rem cl %compiler_settings% "src\main.c" ^
-	rem /link %linker_settings% -OUT:%exe_name% ^
-	rem && odin run code/demo.odin
-	rem && odin build code/metagen.odin ^
-	rem && call "code\metagen.exe" "src\ast_nodes.metagen"
-	rem && odin run code/Jaze/src/main.odin
+rem odin run code/demo.odin
+cl %compiler_settings% "src\main.cpp" ^
+	/link %linker_settings% -OUT:%exe_name% ^
+	&& odin run code/demo.odin
 
 del *.obj > NUL 2> NUL
 

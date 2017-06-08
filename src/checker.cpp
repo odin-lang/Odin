@@ -1,5 +1,5 @@
-#include "exact_value.c"
-#include "entity.c"
+#include "exact_value.cpp"
+#include "entity.cpp"
 
 typedef enum ExprKind {
 	Expr_Expr,
@@ -123,7 +123,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 };
 
 
-#include "types.c"
+#include "types.cpp"
 
 typedef enum AddressingMode {
 	Addressing_Invalid,       // invalid addressing mode
@@ -230,7 +230,7 @@ ExprInfo make_expr_info(bool is_lhs, AddressingMode mode, Type *type, ExactValue
 #define MAP_TYPE Entity *
 #define MAP_PROC map_entity_
 #define MAP_NAME MapEntity
-#include "map.c"
+#include "map.cpp"
 
 typedef struct Scope {
 	Scope *          parent;
@@ -258,27 +258,27 @@ gb_global Scope *universal_scope = NULL;
 #define MAP_TYPE TypeAndValue
 #define MAP_PROC map_tav_
 #define MAP_NAME MapTypeAndValue
-#include "map.c"
+#include "map.cpp"
 
 #define MAP_TYPE Scope *
 #define MAP_PROC map_scope_
 #define MAP_NAME MapScope
-#include "map.c"
+#include "map.cpp"
 
 #define MAP_TYPE DeclInfo *
 #define MAP_PROC map_decl_info_
 #define MAP_NAME MapDeclInfo
-#include "map.c"
+#include "map.cpp"
 
 #define MAP_TYPE AstFile *
 #define MAP_PROC map_ast_file_
 #define MAP_NAME MapAstFile
-#include "map.c"
+#include "map.cpp"
 
 #define MAP_TYPE ExprInfo
 #define MAP_PROC map_expr_info_
 #define MAP_NAME MapExprInfo
-#include "map.c"
+#include "map.cpp"
 
 typedef struct DelayedDecl {
 	Scope *  parent;
@@ -754,7 +754,7 @@ void init_checker(Checker *c, Parser *parser, BuildContext *bc) {
 
 	for_array(i, parser->files) {
 		AstFile *file = &parser->files.e[i];
-		CheckerFileNode node = {0};
+		CheckerFileNode node = {};
 		node.id = file->id;
 		array_init(&node.whats,  a);
 		array_init(&node.wheres, a);
@@ -810,7 +810,7 @@ Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
 
 
 TypeAndValue type_and_value_of_expr(CheckerInfo *i, AstNode *expression) {
-	TypeAndValue result = {0};
+	TypeAndValue result = {};
 	TypeAndValue *found = map_tav_get(&i->types, hash_pointer(expression));
 	if (found) result = *found;
 	return result;
@@ -857,7 +857,7 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 		}
 	}
 
-	TypeAndValue tv = {0};
+	TypeAndValue tv = {};
 	tv.type  = type;
 	tv.value = value;
 	tv.mode  = mode;
@@ -1086,7 +1086,7 @@ void add_type_info_type(Checker *c, Type *t) {
 
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body, u32 tags) {
-	ProcedureInfo info = {0};
+	ProcedureInfo info = {};
 	info.file = file;
 	info.token = token;
 	info.decl  = decl;
@@ -1114,7 +1114,7 @@ Type *const curr_procedure_type(Checker *c) {
 
 void add_curr_ast_file(Checker *c, AstFile *file) {
 	if (file != NULL) {
-		TokenPos zero_pos = {0};
+		TokenPos zero_pos = {};
 		global_error_collector.prev = zero_pos;
 		c->curr_ast_file = file;
 		c->context.decl  = file->decl_info;
@@ -1149,7 +1149,7 @@ void add_dependency_to_map(MapEntity *map, CheckerInfo *info, Entity *node) {
 }
 
 MapEntity generate_minimum_dependency_map(CheckerInfo *info, Entity *start) {
-	MapEntity map = {0}; // Key: Entity *
+	MapEntity map = {}; // Key: Entity *
 	map_entity_init(&map, heap_allocator());
 
 	for_array(i, info->definitions.entries) {
@@ -1388,9 +1388,9 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 }
 
 
-#include "check_expr.c"
-#include "check_decl.c"
-#include "check_stmt.c"
+#include "check_expr.cpp"
+#include "check_decl.cpp"
+#include "check_stmt.cpp"
 
 
 
@@ -1517,7 +1517,7 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 						error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 						continue;
 					}
-					Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL, vd->flags & VarDeclFlag_immutable);
+					Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL, (vd->flags&VarDeclFlag_immutable) != 0);
 					e->Variable.is_thread_local = (vd->flags & VarDeclFlag_thread_local) != 0;
 					e->identifier = name;
 
@@ -1580,7 +1580,7 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 						d->proc_lit = up_init;
 						d->type_expr = vd->type;
 					} else {
-						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, (ExactValue){0});
+						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, ExactValue{});
 						d->type_expr = vd->type;
 						d->init_expr = init;
 					}
@@ -1660,7 +1660,7 @@ void check_collect_entities(Checker *c, AstNodeArray nodes, bool is_file_scope) 
 
 
 void check_all_global_entities(Checker *c) {
-	Scope *prev_file = {0};
+	Scope *prev_file = {};
 
 	for_array(i, c->info.entities.entries) {
 		MapDeclInfoEntry *entry = &c->info.entities.entries.e[i];
@@ -1776,7 +1776,7 @@ void check_import_entities(Checker *c, MapScope *file_scopes) {
 #if 0
 	// TODO(bill): Dependency ordering for imports
 	{
-		Array_i32 shared_global_file_ids = {0};
+		Array_i32 shared_global_file_ids = {};
 		array_init_reserve(&shared_global_file_ids, heap_allocator(), c->file_nodes.count);
 		for_array(i, c->file_nodes) {
 			CheckerFileNode *node = &c->file_nodes.e[i];
@@ -2152,7 +2152,7 @@ void check_parsed_files(Checker *c) {
 			if (s->is_init) {
 				Entity *e = current_scope_lookup_entity(s, str_lit("main"));
 				if (e == NULL) {
-					Token token = {0};
+					Token token = {};
 					if (s->file->tokens.count > 0) {
 						token = s->file->tokens.e[0];
 					} else {

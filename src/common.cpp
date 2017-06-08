@@ -13,11 +13,11 @@ gbAllocator heap_allocator(void) {
 	return gb_heap_allocator();
 }
 
-#include "unicode.c"
-#include "string.c"
-#include "array.c"
-#include "integer128.c"
-#include "murmurhash3.c"
+#include "unicode.cpp"
+#include "string.cpp"
+#include "array.cpp"
+#include "integer128.cpp"
+#include "murmurhash3.cpp"
 
 u128 fnv128a(void const *data, isize len) {
 	u128 o = u128_lo_hi(0x13bull, 0x1000000ull);
@@ -249,14 +249,14 @@ typedef Array(isize) Array_isize;
 #define MAP_TYPE String
 #define MAP_PROC map_string_
 #define MAP_NAME MapString
-#include "map.c"
+#include "map.cpp"
 
 #define MAP_TYPE bool
 #define MAP_PROC map_bool_
 #define MAP_NAME MapBool
-#include "map.c"
+#include "map.cpp"
 
 #define MAP_TYPE isize
 #define MAP_PROC map_isize_
 #define MAP_NAME MapIsize
-#include "map.c"
+#include "map.cpp"

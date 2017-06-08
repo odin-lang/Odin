@@ -1,16 +1,16 @@
 typedef struct u128 {u64 lo; u64 hi;} u128;
 typedef struct i128 {u64 lo; i64 hi;} i128;
 
-#define BIT128_U64_HIGHBIT 0x8000000000000000ul
-#define BIT128_U64_BITS62  0x7ffffffffffffffful
-#define BIT128_U64_ALLBITS 0xfffffffffffffffful
+#define BIT128_U64_HIGHBIT 0x8000000000000000ull
+#define BIT128_U64_BITS62  0x7fffffffffffffffull
+#define BIT128_U64_ALLBITS 0xffffffffffffffffull
 
 static u128 const U128_ZERO = {0, 0};
 static u128 const U128_ONE  = {1, 0};
 static i128 const I128_ZERO = {0, 0};
 static i128 const I128_ONE  = {1, 0};
 static u128 const U128_NEG_ONE = {BIT128_U64_ALLBITS, BIT128_U64_ALLBITS};
-static i128 const I128_NEG_ONE = {BIT128_U64_ALLBITS, BIT128_U64_ALLBITS};
+static i128 const I128_NEG_ONE = {BIT128_U64_ALLBITS, cast(i64)BIT128_U64_ALLBITS};
 
 u128 u128_lo_hi      (u64 lo, u64 hi);
 u128 u128_from_u32   (u32 u);
@@ -99,7 +99,7 @@ u64 bit128__digit_value(Rune r) {
 	return 16; // NOTE(bill): Larger than highest possible
 }
 
-u128 u128_lo_hi(u64 lo, u64 hi) { return (u128){lo, hi}; }
+u128 u128_lo_hi(u64 lo, u64 hi) { return u128{lo, hi}; }
 u128 u128_from_u32(u32 u)       { return u128_lo_hi(cast(u64)u, 0); }
 u128 u128_from_u64(u64 u)       { return u128_lo_hi(cast(u64)u, 0); }
 u128 u128_from_i64(i64 u)       { return u128_lo_hi(cast(u64)u, u < 0 ? -1 : 0); }

@@ -8,12 +8,12 @@ typedef Array(irValue *) irValueArray;
 #define MAP_TYPE irValue *
 #define MAP_PROC map_ir_value_
 #define MAP_NAME MapIrValue
-#include "map.c"
+#include "map.cpp"
 
 #define MAP_TYPE irDebugInfo *
 #define MAP_PROC map_ir_debug_info_
 #define MAP_NAME MapIrDebugInfo
-#include "map.c"
+#include "map.cpp"
 
 
 typedef struct irModule {
@@ -3387,7 +3387,7 @@ irValue *ir_emit_logical_binary_expr(irProcedure *proc, AstNode *expr) {
 		return ir_build_expr(proc, be->right);
 	}
 
-	irValueArray edges = {0};
+	irValueArray edges = {};
 	array_init_reserve(&edges, proc->module->allocator, done->preds.count+1);
 	for_array(i, done->preds) {
 		array_add(&edges, short_circuit);
@@ -3521,7 +3521,7 @@ irBranchBlocks ir_lookup_branch_blocks(irProcedure *proc, AstNode *ident) {
 	}
 
 	GB_PANIC("Unreachable");
-	return (irBranchBlocks){0};
+	return irBranchBlocks{};
 }
 
 
@@ -3712,7 +3712,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	case_ast_node(te, TernaryExpr, expr);
 		ir_emit_comment(proc, str_lit("TernaryExpr"));
 
-		irValueArray edges = {0};
+		irValueArray edges = {};
 		array_init_reserve(&edges, proc->module->allocator, 2);
 
 		GB_ASSERT(te->y != NULL);
@@ -3752,7 +3752,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			ir_build_stmt(proc, ie->init);
 		}
 
-		irValueArray edges = {0};
+		irValueArray edges = {};
 		array_init_reserve(&edges, proc->module->allocator, 2);
 
 		GB_ASSERT(ie->else_expr != NULL);
@@ -4375,7 +4375,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 					TokenPos pos = token.pos;
 					gbString expr = expr_to_string(ce->args.e[0]);
 					isize expr_len = gb_string_length(expr);
-					String expr_str = {0};
+					String expr_str = {};
 					expr_str.text = cast(u8 *)gb_alloc_copy_align(proc->module->allocator, expr, expr_len, 1);
 					expr_str.len = expr_len;
 					gb_string_free(expr);
@@ -4778,7 +4778,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 	case_ast_node(i, Ident, expr);
 		if (ir_is_blank_ident(expr)) {
-			irAddr val = {0};
+			irAddr val = {};
 			return val;
 		}
 		Entity *e = entity_of_ident(proc->module->info, expr);
@@ -4902,27 +4902,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(be, BinaryExpr, expr);
-		switch (be->op.kind) {
-		// case Token_as: {
-		// 	ir_emit_comment(proc, str_lit("Cast - as"));
-		// 	// NOTE(bill): Needed for dereference of pointer conversion
-		// 	Type *type = type_of_expr(proc->module->info, expr);
-		// 	irValue *v = ir_add_local_generated(proc, type);
-		// 	ir_emit_store(proc, v, ir_emit_conv(proc, ir_build_expr(proc, be->left), type));
-		// 	return ir_addr(v);
-		// }
-		// case Token_transmute: {
-		// 	ir_emit_comment(proc, str_lit("Cast - transmute"));
-		// 	// NOTE(bill): Needed for dereference of pointer conversion
-		// 	Type *type = type_of_expr(proc->module->info, expr);
-		// 	irValue *v = ir_add_local_generated(proc, type);
-		// 	ir_emit_store(proc, v, ir_emit_transmute(proc, ir_build_expr(proc, be->left), type));
-		// 	return ir_addr(v);
-		// }
-		default:
-			GB_PANIC("Invalid binary expression for ir_build_addr: %.*s\n", LIT(be->op.string));
-			break;
-		}
+		GB_PANIC("Invalid binary expression for ir_build_addr: %.*s\n", LIT(be->op.string));
 	case_end;
 
 	case_ast_node(ie, IndexExpr, expr);
@@ -5806,8 +5786,8 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					}
 				}
 			} else { // Tuple(s)
-				Array(irAddr) lvals = {0};
-				irValueArray  inits = {0};
+				Array(irAddr) lvals = {};
+				irValueArray  inits = {};
 				array_init_reserve(&lvals, m->tmp_allocator, vd->names.count);
 				array_init_reserve(&inits, m->tmp_allocator, vd->names.count);
 
@@ -5950,7 +5930,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 			for_array(i, as->lhs) {
 				AstNode *lhs = as->lhs.e[i];
-				irAddr lval = {0};
+				irAddr lval = {};
 				if (!ir_is_blank_ident(lhs)) {
 					lval = ir_build_addr(proc, lhs);
 				}
@@ -6319,8 +6299,8 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			}
 		}
 
-		irAddr val_addr = {0};
-		irAddr idx_addr = {0};
+		irAddr val_addr = {};
+		irAddr idx_addr = {};
 		if (val_type != NULL) {
 			val_addr = ir_build_addr(proc, rs->value);
 		}
@@ -6358,7 +6338,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 		ast_node(body, BlockStmt, ms->body);
 
-		AstNodeArray default_stmts = {0};
+		AstNodeArray default_stmts = {};
 		irBlock *default_fall = NULL;
 		irBlock *default_block = NULL;
 
@@ -6404,7 +6384,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				irValue *cond = v_false;
 				if (is_ast_node_a_range(expr)) {
 					ast_node(ie, BinaryExpr, expr);
-					TokenKind op = {0};
+					TokenKind op = {};
 					switch (ie->op.kind) {
 					case Token_Ellipsis:   op = Token_LtEq; break;
 					case Token_HalfClosed: op = Token_Lt;   break;
@@ -7184,7 +7164,7 @@ void ir_gen_tree(irGen *s) {
 			g->Global.name = name;
 			g->Global.is_thread_local = e->Variable.is_thread_local;
 
-			irGlobalVariable var = {0};
+			irGlobalVariable var = {};
 			var.var = g;
 			var.decl = decl;
 
@@ -7670,7 +7650,7 @@ void ir_gen_tree(irGen *s) {
 						{
 							irValue *packed       = ir_const_bool(a, t->Record.is_packed);
 							irValue *ordered      = ir_const_bool(a, t->Record.is_ordered);
-							irValue *custom_align = ir_const_bool(a, t->Record.custom_align);
+							irValue *custom_align = ir_const_bool(a, t->Record.custom_align != 0);
 							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 4), packed);
 							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 5), ordered);
 							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 6), custom_align);
@@ -7700,7 +7680,7 @@ void ir_gen_tree(irGen *s) {
 								ir_emit_store(proc, name, ir_const_string(a, f->token.string));
 							}
 							ir_emit_store(proc, offset, ir_const_int(a, foffset));
-							ir_emit_store(proc, is_using, ir_const_bool(a, f->flags&EntityFlag_Using));
+							ir_emit_store(proc, is_using, ir_const_bool(a, (f->flags&EntityFlag_Using) != 0));
 						}
 
 						irValue *count = ir_const_int(a, t->Record.field_count);

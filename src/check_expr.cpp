@@ -390,7 +390,7 @@ isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
                    String context) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
-	MapEntity entity_map = {0};
+	MapEntity entity_map = {};
 	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*field_count);
 
 	Entity *using_index_expr = NULL;
@@ -496,7 +496,7 @@ isize check_fields(Checker *c, AstNode *node, AstNodeArray decls,
 
 // TODO(bill): Cleanup struct field reordering
 // TODO(bill): Inline sorting procedure?
-gb_global gbAllocator   __checker_allocator = {0};
+gb_global gbAllocator   __checker_allocator = {};
 
 GB_COMPARE_PROC(cmp_reorder_struct_fields) {
 	// Rule:
@@ -600,7 +600,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 			return;
 		}
 
-		Operand o = {0};
+		Operand o = {};
 		check_expr(c, &o, st->align);
 		if (o.mode != Addressing_Constant) {
 			if (o.mode != Addressing_Invalid) {
@@ -650,7 +650,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
-	MapEntity entity_map = {0}; // Key: String
+	MapEntity entity_map = {}; // Key: String
 	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*variant_count);
 
 	Entity *using_index_expr = NULL;
@@ -692,7 +692,7 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 			ast_node(fl, FieldList, f->list);
 
 			// NOTE(bill): Copy the contents for the common fields for now
-			AstNodeArray list = {0};
+			AstNodeArray list = {};
 			array_init_count(&list, c->allocator, ut->fields.count+fl->list.count);
 			gb_memmove_array(list.e, ut->fields.e, ut->fields.count);
 			gb_memmove_array(list.e+ut->fields.count, fl->list.e, fl->list.count);
@@ -801,7 +801,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	// NOTE(bill): Must be up here for the `check_init_constant` system
 	enum_type->Record.enum_base_type = base_type;
 
-	MapEntity entity_map = {0}; // Key: String
+	MapEntity entity_map = {}; // Key: String
 	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*(et->fields.count));
 
 	Entity **fields = gb_alloc_array(c->allocator, Entity *, et->fields.count);
@@ -837,7 +837,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		String name = ident->Ident.string;
 
 		if (init != NULL) {
-			Operand o = {0};
+			Operand o = {};
 			check_expr(c, &o, init);
 			if (o.mode != Addressing_Constant) {
 				error_node(init, "Enumeration value must be a constant");
@@ -922,7 +922,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
 
-	MapEntity entity_map = {0}; // Key: String
+	MapEntity entity_map = {}; // Key: String
 	map_entity_init_with_reserve(&entity_map, c->tmp_allocator, 2*(bft->fields.count));
 
 	isize field_count = 0;
@@ -943,7 +943,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 		}
 		String name = ident->Ident.string;
 
-		Operand o = {0};
+		Operand o = {};
 		check_expr(c, &o, value);
 		if (o.mode != Addressing_Constant) {
 			error_node(value, "Bit field bit size must be a constant");
@@ -992,7 +992,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 
 
 	if (bft->align != NULL) {
-		Operand o = {0};
+		Operand o = {};
 		check_expr(c, &o, bft->align);
 		if (o.mode != Addressing_Constant) {
 			if (o.mode != Addressing_Invalid) {
@@ -1079,7 +1079,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				AstNode *name = p->names.e[j];
 				if (ast_node_expect(name, AstNode_Ident)) {
 					Entity *param = make_entity_param(c->allocator, scope, name->Ident, type,
-					                                  p->flags&FieldFlag_using, p->flags&FieldFlag_immutable);
+					                                  (p->flags&FieldFlag_using) != 0, (p->flags&FieldFlag_immutable) != 0);
 					if (p->flags&FieldFlag_no_alias) {
 						param->flags |= EntityFlag_NoAlias;
 					}
@@ -1438,7 +1438,7 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 				if (t == t_invalid) {
 					continue;
 				}
-				Operand x = {0};
+				Operand x = {};
 				x.mode = Addressing_Value;
 				x.type = t;
 				if (check_is_assignable_to(c, &x, type_hint)) {
@@ -1512,7 +1512,7 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 		break;
 
 	case Entity_Builtin:
-		o->builtin_id = e->Builtin.id;
+		o->builtin_id = cast(BuiltinProcId)e->Builtin.id;
 		o->mode = Addressing_Builtin;
 		break;
 
@@ -1546,7 +1546,7 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 	if (e == NULL) {
 		return 0;
 	}
-	Operand o = {0};
+	Operand o = {};
 	if (e->kind == AstNode_UnaryExpr &&
 	    e->UnaryExpr.op.kind == Token_Ellipsis) {
 		return -1;
@@ -1711,7 +1711,7 @@ bool check_type_extra_internal(Checker *c, AstNode *e, Type **type, Type *named_
 
 	switch (e->kind) {
 	case_ast_node(i, Ident, e);
-		Operand o = {0};
+		Operand o = {};
 		check_ident(c, &o, e, named_type, NULL, false);
 
 		switch (o.mode) {
@@ -1735,7 +1735,7 @@ bool check_type_extra_internal(Checker *c, AstNode *e, Type **type, Type *named_
 	case_end;
 
 	case_ast_node(se, SelectorExpr, e);
-		Operand o = {0};
+		Operand o = {};
 		check_selector(c, &o, e, NULL);
 
 		switch (o.mode) {
@@ -1919,7 +1919,7 @@ bool check_type_extra_internal(Checker *c, AstNode *e, Type **type, Type *named_
 	case_end;
 
 	case_ast_node(ce, CallExpr, e);
-		Operand o = {0};
+		Operand o = {};
 		check_expr_or_type(c, &o, e);
 		if (o.mode == Addressing_Type) {
 			*type = o.type;
@@ -1959,7 +1959,7 @@ Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
 	}
 
 	if (is_type_typed(type)) {
-		add_type_and_value(&c->info, e, Addressing_Type, type, (ExactValue){0});
+		add_type_and_value(&c->info, e, Addressing_Type, type, ExactValue{});
 	} else {
 		gbString name = type_to_string(type);
 		error_node(e, "Invalid type definition of %s", name);
@@ -2213,8 +2213,8 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error_node(o->expr, "`%s` truncated to `%s`", a, b);
 			} else {
-				char buf[127] = {0};
-				String str = {0};
+				char buf[127] = {};
+				String str = {};
 				i128 i = o->value.value_integer;
 				if (is_type_unsigned(o->type)) {
 					str = u128_to_string(*cast(u128 *)&i, buf, gb_size_of(buf));
@@ -2421,7 +2421,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_BinaryExpr);
 	ast_node(be, BinaryExpr, node);
 
-	ExactValue x_val = {0};
+	ExactValue x_val = {};
 	if (x->mode == Addressing_Constant) {
 		x_val = exact_value_to_integer(x->value);
 	}
@@ -2517,7 +2517,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 
 
 String check_down_cast_name(Type *dst_, Type *src_) {
-	String result = {0};
+	String result = {};
 	Type *dst = type_deref(dst_);
 	Type *src = type_deref(src_);
 	Type *dst_s = base_type(dst);
@@ -2552,7 +2552,7 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 	GB_ASSERT(is_type_integer(offset->type));
 	GB_ASSERT(op == Token_Add || op == Token_Sub);
 
-	Operand operand = {0};
+	Operand operand = {};
 	operand.mode = Addressing_Value;
 	operand.type = ptr->type;
 	operand.expr = node;
@@ -2764,7 +2764,7 @@ bool check_binary_vector_expr(Checker *c, Token op, Operand *x, Operand *y) {
 
 void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 	GB_ASSERT(node->kind == AstNode_BinaryExpr);
-	Operand y_ = {0}, *y = &y_;
+	Operand y_ = {}, *y = &y_;
 
 	ast_node(be, BinaryExpr, node);
 
@@ -3238,7 +3238,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	bool check_op_expr = true;
 	Entity *expr_entity = NULL;
 	Entity *entity = NULL;
-	Selection sel = {0}; // NOTE(bill): Not used if it's an import name
+	Selection sel = {}; // NOTE(bill): Not used if it's an import name
 
 	operand->expr = node;
 
@@ -3336,7 +3336,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 						continue;
 					}
 
-					Operand x = {0};
+					Operand x = {};
 					x.mode = Addressing_Value;
 					x.type = t;
 					if (type_hint != NULL) {
@@ -3390,7 +3390,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	if (entity == NULL && selector->kind == AstNode_BasicLit) {
 		if (is_type_struct(operand->type) || is_type_tuple(operand->type)) {
 			Type *type = base_type(operand->type);
-			Operand o = {0};
+			Operand o = {};
 			check_expr(c, &o, selector);
 			if (o.mode != Addressing_Constant ||
 			    !is_type_integer(o.type)) {
@@ -3496,7 +3496,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		break;
 	case Entity_Builtin:
 		operand->mode = Addressing_Builtin;
-		operand->builtin_id = entity->Builtin.id;
+		operand->builtin_id = cast(BuiltinProcId)entity->Builtin.id;
 		break;
 
 	// NOTE(bill): These cases should never be hit but are here for sanity reasons
@@ -3566,7 +3566,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *op_type = type_deref(operand->type);
 		Type *type = t_int;
 		AddressingMode mode = Addressing_Invalid;
-		ExactValue value = {0};
+		ExactValue value = {};
 		if (is_type_string(op_type) && id == BuiltinProc_len) {
 			if (operand->mode == Addressing_Constant) {
 				mode = Addressing_Constant;
@@ -3608,7 +3608,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	case BuiltinProc_new: {
 		// new :: proc(Type) -> ^Type
-		Operand op = {0};
+		Operand op = {};
 		check_expr_or_type(c, &op, ce->args.e[0]);
 		Type *type = op.type;
 		if ((op.mode != Addressing_Type && type == NULL) || type == t_invalid) {
@@ -3622,7 +3622,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	case BuiltinProc_new_slice: {
 		// new_slice :: proc(Type, len: int) -> []Type
 		// new_slice :: proc(Type, len, cap: int) -> []Type
-		Operand op = {0};
+		Operand op = {};
 		check_expr_or_type(c, &op, ce->args.e[0]);
 		Type *type = op.type;
 		if ((op.mode != Addressing_Type && type == NULL) || type == t_invalid) {
@@ -3636,7 +3636,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			// NOTE(bill): Return the correct type to reduce errors
 		} else {
 			// If any are constant
-			i64 sizes[2] = {0};
+			i64 sizes[2] = {};
 			isize size_count = 0;
 			for (isize i = 1; i < arg_count; i++) {
 				i64 val = 0;
@@ -3660,7 +3660,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	case BuiltinProc_make: {
 		// make :: proc(Type, len: int) -> Type
 		// make :: proc(Type, len, cap: int) -> Type
-		Operand op = {0};
+		Operand op = {};
 		check_expr_or_type(c, &op, ce->args.e[0]);
 		Type *type = op.type;
 		if ((op.mode != Addressing_Type && type == NULL) || type == t_invalid) {
@@ -3693,7 +3693,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		// If any are constant
-		i64 sizes[4] = {0};
+		i64 sizes[4] = {};
 		isize size_count = 0;
 		for (isize i = 1; i < arg_count; i++) {
 			i64 val = 0;
@@ -3756,7 +3756,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		AstNode *capacity = ce->args.e[1];
-		Operand op = {0};
+		Operand op = {};
 		check_expr(c, &op, capacity);
 		if (op.mode == Addressing_Invalid) {
 			return false;
@@ -3847,7 +3847,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *key = base_type(type)->Map.key;
 		Operand x = {Addressing_Invalid};
 		AstNode *key_node = ce->args.e[1];
-		Operand op = {0};
+		Operand op = {};
 		check_expr(c, &op, key_node);
 		if (op.mode == Addressing_Invalid) {
 			return false;
@@ -3918,7 +3918,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	case BuiltinProc_offset_of: {
 		// offset_of :: proc(Type, field) -> untyped int
-		Operand op = {0};
+		Operand op = {};
 		Type *bt = check_type(c, ce->args.e[0]);
 		Type *type = base_type(bt);
 		if (type == NULL || type == t_invalid) {
@@ -4116,7 +4116,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (d->kind == Type_Slice) {
 			dest_type = d->Slice.elem;
 		}
-		Operand op = {0};
+		Operand op = {};
 		check_expr(c, &op, ce->args.e[1]);
 		if (op.mode == Addressing_Invalid) {
 			return false;
@@ -4170,7 +4170,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 				continue;
 			}
 			AstNode *arg = ce->args.e[i];
-			Operand op = {0};
+			Operand op = {};
 			check_expr(c, &op, arg);
 			if (op.mode == Addressing_Invalid) {
 				return false;
@@ -4207,7 +4207,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	case BuiltinProc_complex: {
 		// complex :: proc(real, imag: float_type) -> complex_type
 		Operand x = *operand;
-		Operand y = {0};
+		Operand y = {};
 
 		// NOTE(bill): Invalid will be the default till fixed
 		operand->type = t_invalid;
@@ -4352,7 +4352,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			// NOTE(bill): Return the correct type to reduce errors
 		} else {
 			// If any are constant
-			i64 sizes[2] = {0};
+			i64 sizes[2] = {};
 			isize size_count = 0;
 			for (isize i = 1; i < arg_count; i++) {
 				i64 val = 0;
@@ -4398,7 +4398,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		AstNode *other_arg = ce->args.e[1];
 		Operand a = *operand;
-		Operand b = {0};
+		Operand b = {};
 		check_expr(c, &b, other_arg);
 		if (b.mode == Addressing_Invalid) {
 			return false;
@@ -4466,7 +4466,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		AstNode *other_arg = ce->args.e[1];
 		Operand a = *operand;
-		Operand b = {0};
+		Operand b = {};
 		check_expr(c, &b, other_arg);
 		if (b.mode == Addressing_Invalid) {
 			return false;
@@ -4569,8 +4569,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		AstNode *min_arg = ce->args.e[1];
 		AstNode *max_arg = ce->args.e[2];
 		Operand x = *operand;
-		Operand y = {0};
-		Operand z = {0};
+		Operand y = {};
+		Operand z = {};
 
 		check_expr(c, &y, min_arg);
 		if (y.mode == Addressing_Invalid) {
@@ -4645,7 +4645,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_transmute: {
-		Operand op = {0};
+		Operand op = {};
 		check_expr_or_type(c, &op, ce->args.e[0]);
 		Type *t = op.type;
 		if ((op.mode != Addressing_Type && t == NULL) || t == t_invalid) {
@@ -4768,7 +4768,7 @@ CallArgumentError check_call_arguments_internal(Checker *c, AstNode *call, Type 
 		return err;
 	}
 
-	bool err = CallArgumentError_None;
+	CallArgumentError err = CallArgumentError_None;
 
 	GB_ASSERT(proc_type->Proc.params != NULL);
 	Entity **sig_params = proc_type->Proc.params->Tuple.variables;
@@ -4839,7 +4839,7 @@ typedef Array(Operand) ArrayOperand;
 bool check_unpack_arguments(Checker *c, isize lhs_count, ArrayOperand *operands, AstNodeArray rhs, bool allow_ok) {
 	bool optional_ok = false;
 	for_array(i, rhs) {
-		Operand o = {0};
+		Operand o = {};
 		check_multi_expr(c, &o, rhs.e[i]);
 
 		if (o.type == NULL || o.type->kind != Type_Tuple) {
@@ -5502,7 +5502,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		case Type_DynamicArray:
 		{
 			Type *elem_type = NULL;
-			String context_name = {0};
+			String context_name = {};
 			i64 max_type_count = -1;
 			if (t->kind == Type_Slice) {
 				elem_type = t->Slice.elem;
@@ -5549,7 +5549,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					error_node(e, "Index %lld is out of bounds (>= %lld) for %.*s", index, max_type_count, LIT(context_name));
 				}
 
-				Operand operand = {0};
+				Operand operand = {};
 				check_expr_with_type_hint(c, &operand, e, elem_type);
 				check_assignment(c, &operand, elem_type, context_name);
 
@@ -5586,7 +5586,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				Type *field_types[2] = {t_rawptr, t_type_info_ptr};
 				isize field_count = 2;
 				if (cl->elems.e[0]->kind == AstNode_FieldValue) {
-					bool fields_visited[2] = {0};
+					bool fields_visited[2] = {};
 
 					for_array(i, cl->elems) {
 						AstNode *elem = cl->elems.e[i];
@@ -5839,7 +5839,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		bool is_const = o->mode == Addressing_Constant;
 
 		if (is_type_map(t)) {
-			Operand key = {0};
+			Operand key = {};
 			check_expr(c, &key, ie->index);
 			check_assignment(c, &key, t->Map.key, str_lit("map index"));
 			if (key.mode == Addressing_Invalid) {
@@ -5983,7 +5983,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		TokenKind interval_kind = se->interval0.kind;
 
-		i64 indices[2] = {0};
+		i64 indices[2] = {};
 		AstNode *nodes[3] = {se->low, se->high, se->max};
 		for (isize i = 0; i < gb_count_of(nodes); i++) {
 			i64 index = max_count;

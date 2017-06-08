@@ -364,7 +364,7 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision)
 failure:
 	GB_PANIC("Invalid unary operation, %.*s", LIT(token_strings[op]));
 
-	ExactValue error_value = {0};
+	ExactValue error_value = {};
 	return error_value;
 }
 
@@ -523,7 +523,7 @@ ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y)
 
 error:
 	;		// MSVC accepts this??? apparently you cannot declare variables immediately after labels...
-	ExactValue error_value = {0};
+	ExactValue error_value = {};
 	// gb_printf_err("Invalid binary operation: %s\n", token_kind_to_string(op));
 	return error_value;
 }

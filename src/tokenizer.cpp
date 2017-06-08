@@ -343,7 +343,7 @@ typedef struct Tokenizer {
 
 
 TokenizerState save_tokenizer_state(Tokenizer *t) {
-	TokenizerState state = {0};
+	TokenizerState state = {};
 	state.curr_rune  = t->curr_rune;
 	state.curr       = t->curr;
 	state.read_curr  = t->read_curr;
@@ -435,7 +435,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 
 		array_init(&t->allocated_strings, heap_allocator());
 	} else {
-		gbFile f = {0};
+		gbFile f = {};
 		gbFileError file_err = gb_file_open(&f, c_str);
 
 		switch (file_err) {
@@ -492,7 +492,7 @@ gb_inline void scan_mantissa(Tokenizer *t, i32 base) {
 }
 
 Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
-	Token token = {0};
+	Token token = {};
 	token.kind = Token_Integer;
 	token.string = make_string(t->curr, 1);
 	token.pos.file = t->fullpath;
@@ -742,7 +742,7 @@ bool tokenizer_find_line_end(Tokenizer *t) {
 Token tokenizer_get_token(Tokenizer *t) {
 	tokenizer_skip_whitespace(t);
 
-	Token token = {0};
+	Token token = {};
 	token.string = make_string(t->curr, 1);
 	token.pos.file = t->fullpath;
 	token.pos.line = t->line_count;
@@ -963,7 +963,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 		default:
 			if (curr_rune != GB_RUNE_BOM) {
-				u8 str[4] = {0};
+				u8 str[4] = {};
 				int len = cast(int)gb_utf8_encode_rune(str, curr_rune);
 				tokenizer_err(t, "Illegal character: %.*s (%d) ", len, str, curr_rune);
 			}

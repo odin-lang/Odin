@@ -1617,7 +1617,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	switch (t->kind) {
 	case Type_Basic: {
 		GB_ASSERT(is_type_typed(t));
-		switch (t->kind) {
+		switch (t->Basic.kind) {
 		case Basic_string: return build_context.word_size;
 		case Basic_any:    return build_context.word_size;
 

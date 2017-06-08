@@ -67,7 +67,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 
 	// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 	// an extra allocation
-	ArrayOperand operands = {0};
+	ArrayOperand operands = {};
 	array_init_reserve(&operands, c->tmp_allocator, 2*lhs_count);
 	check_unpack_arguments(c, lhs_count, &operands, inits, true);
 
@@ -174,7 +174,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 		e->type = t;
 	}
 
-	Operand operand = {0};
+	Operand operand = {};
 	if (init != NULL) {
 		check_expr_or_type(c, &operand, init);
 	}
@@ -420,7 +420,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 
 	if (entities == NULL || entity_count == 1) {
 		GB_ASSERT(entities == NULL || entities[0] == e);
-		Operand operand = {0};
+		Operand operand = {};
 		check_expr(c, &operand, init_expr);
 		check_init_variable(c, e, &operand, str_lit("variable declaration"));
 	}
@@ -484,7 +484,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body) {
 	GB_ASSERT(body->kind == AstNode_BlockStmt);
 
-	String proc_name = {0};
+	String proc_name = {};
 	if (token.kind == Token_Ident) {
 		proc_name = token.string;
 	} else {

@@ -4,17 +4,16 @@ extern "C" {
 
 #define USE_CUSTOM_BACKEND false
 
-#include "common.c"
-#include "timings.c"
-#include "build_settings.c"
-#include "tokenizer.c"
-#include "parser.c"
-#include "checker.c"
-#include "ssa.c"
-#include "ir.c"
-#include "ir_opt.c"
-#include "ir_print.c"
-// #include "vm.c"
+#include "common.cpp"
+#include "timings.cpp"
+#include "build_settings.cpp"
+#include "tokenizer.cpp"
+#include "parser.cpp"
+#include "checker.cpp"
+#include "ssa.cpp"
+#include "ir.cpp"
+#include "ir_opt.cpp"
+#include "ir_print.cpp"
 
 #if defined(GB_SYSTEM_WINDOWS)
 // NOTE(bill): `name` is used in debugging and profiling modes

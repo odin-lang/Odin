@@ -218,7 +218,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 			if (t == t_invalid) {
 				continue;
 			}
-			Operand x = {0};
+			Operand x = {};
 			x.mode = Addressing_Value;
 			x.type = t;
 			if (check_is_assignable_to(c, &x, lhs.type)) {
@@ -392,7 +392,7 @@ typedef struct TypeAndToken {
 #define MAP_TYPE TypeAndToken
 #define MAP_PROC map_type_and_token_
 #define MAP_NAME MapTypeAndToken
-#include "map.c"
+#include "map.cpp"
 
 void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
 	flags &= ~Stmt_CheckScopeDecls;
@@ -645,7 +645,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			return;
 		}
 
-		Operand x = {0};
+		Operand x = {};
 		check_expr(c, &x, s->expr);
 		if (x.mode == Addressing_Invalid) {
 			return;
@@ -693,7 +693,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 			// an extra allocation
-			ArrayOperand operands = {0};
+			ArrayOperand operands = {};
 			array_init_reserve(&operands, c->tmp_allocator, 2 * lhs_count);
 			check_unpack_arguments(c, lhs_count, &operands, as->rhs, true);
 
@@ -863,7 +863,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		Type *val = NULL;
 		Type *idx = NULL;
-		Entity *entities[2] = {0};
+		Entity *entities[2] = {};
 		isize entity_count = 0;
 
 		AstNode *expr = unparen_expr(rs->expr);
@@ -943,10 +943,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 
 			if (x.mode != Addressing_Constant) {
-				x.value = (ExactValue){0};
+				x.value = ExactValue{};
 			}
 			if (y.mode != Addressing_Constant) {
-				y.value = (ExactValue){0};
+				y.value = ExactValue{};
 			}
 
 
@@ -1072,7 +1072,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(ms, MatchStmt, node);
-		Operand x = {0};
+		Operand x = {};
 
 		mod_flags |= Stmt_BreakAllowed;
 		check_open_scope(c, node);
@@ -1089,7 +1089,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			x.type  = t_bool;
 			x.value = exact_value_bool(true);
 
-			Token token  = {0};
+			Token token  = {};
 			token.pos    = ast_node_token(ms->body).pos;
 			token.string = str_lit("true");
 			x.expr       = ast_ident(c->curr_ast_file, token);
@@ -1130,7 +1130,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 		}
 
-		MapTypeAndToken seen = {0}; // NOTE(bill): Multimap
+		MapTypeAndToken seen = {}; // NOTE(bill): Multimap
 		map_type_and_token_init(&seen, heap_allocator());
 
 		for_array(i, bs->stmts) {
@@ -1146,8 +1146,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 				if (is_ast_node_a_range(expr)) {
 					ast_node(ie, BinaryExpr, expr);
-					Operand lhs = {0};
-					Operand rhs = {0};
+					Operand lhs = {};
+					Operand rhs = {};
 					check_expr(c, &lhs, ie->left);
 					if (x.mode == Addressing_Invalid) {
 						continue;
@@ -1168,7 +1168,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					}
 
 
-					TokenKind op = {0};
+					TokenKind op = {};
 
 					Operand a = lhs;
 					Operand b = rhs;
@@ -1197,7 +1197,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					Operand b1 = rhs;
 					check_comparison(c, &a1, &b1, op);
 				} else {
-					Operand y = {0};
+					Operand y = {};
 					check_expr(c, &y, expr);
 					if (x.mode == Addressing_Invalid ||
 					    y.mode == Addressing_Invalid) {
@@ -1274,7 +1274,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 	case_end;
 
 	case_ast_node(ms, TypeMatchStmt, node);
-		Operand x = {0};
+		Operand x = {};
 
 		mod_flags |= Stmt_BreakAllowed;
 		check_open_scope(c, node);
@@ -1346,7 +1346,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 
 
-		MapBool seen = {0}; // Multimap
+		MapBool seen = {}; // Multimap
 		map_bool_init(&seen, heap_allocator());
 
 		for_array(i, bs->stmts) {
@@ -1364,7 +1364,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			for_array(type_index, cc->list) {
 				AstNode *type_expr = cc->list.e[type_index];
 				if (type_expr != NULL) { // Otherwise it's a default expression
-					Operand y = {0};
+					Operand y = {};
 					check_expr_or_type(c, &y, type_expr);
 
 					if (match_type_kind == MatchType_Union) {
@@ -1481,7 +1481,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 			AstNode *ident = bs->label;
 			String name = ident->Ident.string;
-			Operand o = {0};
+			Operand o = {};
 			Entity *e = check_ident(c, &o, ident, NULL, NULL, false);
 			if (e == NULL) {
 				error_node(ident, "Undeclared label name: %.*s", LIT(name));
@@ -1507,10 +1507,10 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			bool is_selector = false;
 			if (expr->kind == AstNode_Ident) {
-				Operand o = {0};
+				Operand o = {};
 				e = check_ident(c, &o, expr, NULL, NULL, true);
 			} else if (expr->kind == AstNode_SelectorExpr) {
-				Operand o = {0};
+				Operand o = {};
 				e = check_selector(c, &o, expr, NULL);
 				is_selector = true;
 			} else if (expr->kind == AstNode_Implicit) {
@@ -1526,7 +1526,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 
 	case_ast_node(pa, PushAllocator, node);
-		Operand op = {0};
+		Operand op = {};
 		check_expr(c, &op, pa->expr);
 		check_assignment(c, &op, t_allocator, str_lit("argument to push_allocator"));
 		check_stmt(c, pa->body, mod_flags);
@@ -1534,7 +1534,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 
 	case_ast_node(pa, PushContext, node);
-		Operand op = {0};
+		Operand op = {};
 		check_expr(c, &op, pa->expr);
 		check_assignment(c, &op, t_context, str_lit("argument to push_context"));
 		check_stmt(c, pa->body, mod_flags);
@@ -1568,7 +1568,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						found = current_scope_lookup_entity(c->context.scope, str);
 					}
 					if (found == NULL) {
-						entity = make_entity_variable(c->allocator, c->context.scope, token, NULL, vd->flags&VarDeclFlag_immutable);
+						entity = make_entity_variable(c->allocator, c->context.scope, token, NULL, (vd->flags&VarDeclFlag_immutable) != 0);
 						entity->identifier = name;
 					} else {
 						TokenPos pos = found->token.pos;

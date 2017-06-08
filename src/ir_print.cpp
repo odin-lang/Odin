@@ -39,7 +39,7 @@ void ir_file_buffer_write(irFileBuffer *f, void *data, isize len) {
 void ir_fprintf(irFileBuffer *f, char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	char buf[4096] = {0};
+	char buf[4096] = {};
 	isize len = gb_snprintf_va(buf, gb_size_of(buf), fmt, va);
 	ir_file_buffer_write(f, buf, len-1);
 	va_end(va);
@@ -48,7 +48,7 @@ void ir_fprint_string(irFileBuffer *f, String s) {
 	ir_file_buffer_write(f, s.text, s.len);
 }
 void ir_fprint_i128(irFileBuffer *f, i128 i) {
-	char buf[200] = {0};
+	char buf[200] = {};
 	String str = i128_to_string(i, buf, gb_size_of(buf)-1);
 	ir_fprint_string(f, str);
 }
@@ -581,7 +581,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				for (isize i = 0; i < value_count; i++) {
 					Entity *f = type->Record.fields_in_src_order[i];
 					TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems.e[i]);
-					ExactValue val = {0};
+					ExactValue val = {};
 					if (tav.mode != Addressing_Invalid) {
 						val = tav.value;
 					}
@@ -1573,7 +1573,7 @@ void ir_print_type_name(irFileBuffer *f, irModule *m, irValue *v) {
 
 void print_llvm_ir(irGen *ir) {
 	irModule *m = &ir->module;
-	irFileBuffer buf = {0}, *f = &buf;
+	irFileBuffer buf = {}, *f = &buf;
 	ir_file_buffer_init(f, &ir->output_file);
 
 	ir_print_encoded_local(f, str_lit("..string"));

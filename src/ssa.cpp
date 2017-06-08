@@ -17,11 +17,11 @@ String ssa_mangle_name(ssaModule *m, String path, Entity *e);
 #define MAP_TYPE ssaValue *
 #define MAP_PROC map_ssa_value_
 #define MAP_NAME MapSsaValue
-#include "map.c"
+#include "map.cpp"
 
 typedef Array(ssaValue *) ssaValueArray;
 
-#include "ssa_op.c"
+#include "ssa_op.cpp"
 
 #define SSA_DEFAULT_VALUE_ARG_CAPACITY 8
 struct ssaValueArgs {
@@ -287,7 +287,7 @@ void ssa_add_arg(ssaValueArgs *va, ssaValue *arg) {
 		} else {
 			isize old_cap_size = va->capacity * gb_size_of(ssaValue *);
 			isize new_cap_size = capacity * gb_size_of(ssaValue *);
-			va->e = gb_resize(va->allocator, va->e, old_cap_size, new_cap_size);
+			*(cast(void **)&va->e) = gb_resize(va->allocator, va->e, old_cap_size, new_cap_size);
 		}
 		va->capacity = capacity;
 	}
@@ -378,9 +378,9 @@ ssaValue *ssa_const_i64         (ssaProc *p, Type *t, i64    c)     { return ssa
 ssaValue *ssa_const_f32         (ssaProc *p, Type *t, f32    c)     { return ssa_const_val(p, ssaOp_Const32F,    t, exact_value_float(c)); }
 ssaValue *ssa_const_f64         (ssaProc *p, Type *t, f64    c)     { return ssa_const_val(p, ssaOp_Const64F,    t, exact_value_float(c)); }
 ssaValue *ssa_const_string      (ssaProc *p, Type *t, String c)     { return ssa_const_val(p, ssaOp_ConstString, t, exact_value_string(c)); }
-ssaValue *ssa_const_empty_string(ssaProc *p, Type *t)               { return ssa_const_val(p, ssaOp_ConstString, t, (ExactValue){0}); }
+ssaValue *ssa_const_empty_string(ssaProc *p, Type *t)               { return ssa_const_val(p, ssaOp_ConstString, t, ExactValue{}); }
 ssaValue *ssa_const_slice       (ssaProc *p, Type *t, ExactValue v) { return ssa_const_val(p, ssaOp_ConstSlice,  t, v); }
-ssaValue *ssa_const_nil         (ssaProc *p, Type *t)               { return ssa_const_val(p, ssaOp_ConstNil,    t, (ExactValue){0}); }
+ssaValue *ssa_const_nil         (ssaProc *p, Type *t)               { return ssa_const_val(p, ssaOp_ConstNil,    t, ExactValue{}); }
 
 ssaValue *ssa_const_int(ssaProc *p, Type *t, i64 c) {
 	switch (8*type_size_of(p->allocator, t)) {
@@ -413,7 +413,7 @@ void ssa_reset_value_args(ssaValue *v) {
 
 void ssa_reset(ssaValue *v, ssaOp op) {
 	v->op = op;
-	v->exact_value = (ExactValue){0};
+	v->exact_value = ExactValue{};
 	ssa_reset_value_args(v);
 }
 

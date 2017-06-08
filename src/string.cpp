@@ -1,5 +1,5 @@
-gb_global gbArena string_buffer_arena = {0};
-gb_global gbAllocator string_buffer_allocator = {0};
+gb_global gbArena string_buffer_arena = {};
+gb_global gbAllocator string_buffer_allocator = {};
 
 void init_string_buffer_memory(void) {
 	// NOTE(bill): This should be enough memory for file systems
@@ -16,7 +16,7 @@ typedef struct String {
 // NOTE(bill): used for printf style arguments
 #define LIT(x) ((int)(x).len), (x).text
 #define STR_LIT(c_str) {cast(u8 *)c_str, gb_size_of(c_str)-1}
-#define str_lit(c_str) (String){cast(u8 *)c_str, gb_size_of(c_str)-1}
+#define str_lit(c_str) String{cast(u8 *)c_str, gb_size_of(c_str)-1}
 
 
 // NOTE(bill): String16 is only used for Windows due to its file directories
@@ -471,12 +471,12 @@ i32 unquote_string(gbAllocator a, String *s_) {
 
 
 	{
-		u8 rune_temp[4] = {0};
+		u8 rune_temp[4] = {};
 		isize buf_len = 3*s.len / 2;
 		u8 *buf = gb_alloc_array(a, u8, buf_len);
 		isize offset = 0;
 		while (s.len > 0) {
-			String tail_string = {0};
+			String tail_string = {};
 			Rune r = 0;
 			bool multiple_bytes = false;
 			bool success = unquote_char(s, quote, &r, &multiple_bytes, &tail_string);

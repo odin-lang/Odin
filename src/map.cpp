@@ -4,7 +4,7 @@
 	#define MAP_TYPE String
 	#define MAP_PROC map_string_
 	#define MAP_NAME MapString
-	#include "map.c"
+	#include "map.cpp"
 */
 // A `Map` is an unordered hash table which can allow for a key to point to multiple values
 // with the use of the `multi_*` procedures.
@@ -134,7 +134,7 @@ gb_inline void _J2(MAP_PROC,destroy)(MAP_NAME *h) {
 }
 
 gb_internal isize _J2(MAP_PROC,_add_entry)(MAP_NAME *h, HashKey key) {
-	MAP_ENTRY e = {0};
+	MAP_ENTRY e = {};
 	e.key = key;
 	e.next = -1;
 	array_add(&h->entries, e);
@@ -185,7 +185,7 @@ gb_inline void _J2(MAP_PROC,grow)(MAP_NAME *h) {
 
 void _J2(MAP_PROC,rehash)(MAP_NAME *h, isize new_count) {
 	isize i, j;
-	MAP_NAME nh = {0};
+	MAP_NAME nh = {};
 	_J2(MAP_PROC,init)(&nh, h->hashes.allocator);
 	array_resize(&nh.hashes, new_count);
 	array_reserve(&nh.entries, h->entries.count);

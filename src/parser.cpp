@@ -561,7 +561,7 @@ Token ast_node_token(AstNode *node) {
 
 AstNode *clone_ast_node(gbAllocator a, AstNode *node);
 AstNodeArray clone_ast_node_array(gbAllocator a, AstNodeArray array) {
-	AstNodeArray result = {0};
+	AstNodeArray result = {};
 	if (array.count > 0) {
 		array_init_count(&result, a, array.count);
 		for_array(i, array) {
@@ -1754,7 +1754,7 @@ AstNodeArray parse_element_list(AstFile *f) {
 }
 
 AstNode *parse_literal_value(AstFile *f, AstNode *type) {
-	AstNodeArray elems = {0};
+	AstNodeArray elems = {};
 	Token open = expect_token(f, Token_OpenBrace);
 	f->expr_level++;
 	if (f->curr_token.kind != Token_CloseBrace) {
@@ -2048,8 +2048,8 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	case Token_proc: {
 		Token token = f->curr_token;
 		AstNode *foreign_library = NULL;
-		String foreign_name = {0};
-		String link_name = {0};
+		String foreign_name = {};
+		String link_name = {};
 		AstNode *type = parse_proc_type(f, &foreign_library, &foreign_name, &link_name);
 		u64 tags = type->ProcType.tags;
 
@@ -2111,7 +2111,7 @@ bool is_literal_type(AstNode *node) {
 AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 	AstNodeArray args = make_ast_node_array(f);
 	Token open_paren, close_paren;
-	Token ellipsis = {0};
+	Token ellipsis = {};
 
 	f->expr_level++;
 	open_paren = expect_token(f, Token_OpenParen);
@@ -2224,10 +2224,10 @@ AstNode *parse_atom_expr(AstFile *f, bool lhs) {
 			bool prev_allow_range = f->allow_range;
 			f->allow_range = false;
 
-			Token open = {0}, close = {0}, interval = {0};
-			AstNode *indices[3] = {0};
+			Token open = {}, close = {}, interval = {};
+			AstNode *indices[3] = {};
 			isize ellipsis_count = 0;
-			Token ellipses[2] = {0};
+			Token ellipses[2] = {};
 
 			f->expr_level++;
 			open = expect_token(f, Token_OpenBracket);
@@ -2472,7 +2472,7 @@ AstNode *parse_type(AstFile *f) {
 
 AstNode *parse_value_decl(AstFile *f, AstNodeArray lhs) {
 	AstNode *type = NULL;
-	AstNodeArray values = {0};
+	AstNodeArray values = {};
 	bool is_mutable = true;
 
 	if (allow_token(f, Token_Colon)) {
@@ -2516,7 +2516,7 @@ AstNode *parse_value_decl(AstFile *f, AstNodeArray lhs) {
 		values = make_ast_node_array(f);
 	}
 
-	AstNodeArray specs = {0};
+	AstNodeArray specs = {};
 	array_init_reserve(&specs, heap_allocator(), 1);
 	return ast_value_decl(f, is_mutable, lhs, type, values);
 }
@@ -2564,7 +2564,7 @@ AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 			AstNode *expr = parse_expr(f, false);
 			f->allow_range = prev_allow_range;
 
-			AstNodeArray rhs = {0};
+			AstNodeArray rhs = {};
 			array_init_count(&rhs, heap_allocator(), 1);
 			rhs.e[0] = expr;
 
@@ -2638,7 +2638,7 @@ AstNode *parse_results(AstFile *f) {
 
 	if (f->curr_token.kind != Token_OpenParen) {
 		Token begin_token = f->curr_token;
-		AstNodeArray empty_names = {0};
+		AstNodeArray empty_names = {};
 		AstNodeArray list = make_ast_node_array(f);
 		AstNode *type = parse_type(f);
 		array_add(&list, ast_field(f, empty_names, type, 0));
@@ -2653,8 +2653,8 @@ AstNode *parse_results(AstFile *f) {
 }
 
 AstNode *parse_proc_type(AstFile *f, AstNode **foreign_library_, String *foreign_name_, String *link_name_) {
-	AstNode *params = {0};
-	AstNode *results = {0};
+	AstNode *params = {};
+	AstNode *results = {};
 
 	Token proc_token = expect_token(f, Token_proc);
 	expect_token(f, Token_OpenParen);
@@ -2663,8 +2663,8 @@ AstNode *parse_proc_type(AstFile *f, AstNode **foreign_library_, String *foreign
 	results = parse_results(f);
 
 	u64 tags = 0;
-	String foreign_name = {0};
-	String link_name = {0};
+	String foreign_name = {};
+	String link_name = {};
 	AstNode *foreign_library = NULL;
 	ProcCallingConvention cc = ProcCC_Odin;
 
@@ -2789,7 +2789,7 @@ typedef struct AstNodeAndFlags {
 typedef Array(AstNodeAndFlags) AstNodeAndFlagsArray;
 
 AstNodeArray convert_to_ident_list(AstFile *f, AstNodeAndFlagsArray list, bool ignore_flags) {
-	AstNodeArray idents = {0};
+	AstNodeArray idents = {};
 	array_init_reserve(&idents, heap_allocator(), list.count);
 	// Convert to ident list
 	for_array(i, list) {
@@ -2834,7 +2834,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 	Token start_token = f->curr_token;
 
 	AstNodeArray params = make_ast_node_array(f);
-	AstNodeAndFlagsArray list = {0}; array_init(&list, heap_allocator()); // LEAK(bill):
+	AstNodeAndFlagsArray list = {}; array_init(&list, heap_allocator()); // LEAK(bill):
 	isize total_name_count = 0;
 	bool allow_ellipsis = allowed_flags&FieldFlag_ellipsis;
 
@@ -2896,7 +2896,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 	}
 
 	for_array(i, list) {
-		AstNodeArray names = {0};
+		AstNodeArray names = {};
 		AstNode *type = list.e[i].node;
 		Token token = blank_token;
 
@@ -3054,7 +3054,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		AstNode *fields = parse_record_fields(f, &decl_count, FieldFlag_using, str_lit("struct"));
 		Token close = expect_token(f, Token_CloseBrace);
 
-		AstNodeArray decls = {0};
+		AstNodeArray decls = {};
 		if (fields != NULL) {
 			GB_ASSERT(fields->kind == AstNode_FieldList);
 			decls = fields->FieldList.list;
@@ -3123,7 +3123,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		AstNode *fields = parse_record_fields(f, &decl_count, FieldFlag_using, str_lit("raw_union"));
 		Token close = expect_token(f, Token_CloseBrace);
 
-		AstNodeArray decls = {0};
+		AstNodeArray decls = {};
 		if (fields != NULL) {
 			GB_ASSERT(fields->kind == AstNode_FieldList);
 			decls = fields->FieldList.list;
@@ -3214,7 +3214,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 
 
 AstNode *parse_body(AstFile *f) {
-	AstNodeArray stmts = {0};
+	AstNodeArray stmts = {};
 	Token open, close;
 	isize prev_expr_level = f->expr_level;
 
@@ -3689,7 +3689,7 @@ AstNode *parse_stmt(AstFile *f) {
 
 		if (str_eq(tag, str_lit("import"))) {
 			AstNode *cond = NULL;
-			Token import_name = {0};
+			Token import_name = {};
 
 			switch (f->curr_token.kind) {
 			case Token_Period:
@@ -3755,7 +3755,7 @@ AstNode *parse_stmt(AstFile *f) {
 			return s;
 		} else if (str_eq(tag, str_lit("foreign_system_library"))) {
 			AstNode *cond = NULL;
-			Token lib_name = {0};
+			Token lib_name = {};
 
 			switch (f->curr_token.kind) {
 			case Token_Ident:
@@ -3786,7 +3786,7 @@ AstNode *parse_stmt(AstFile *f) {
 			return s;
 		} else if (str_eq(tag, str_lit("foreign_library"))) {
 			AstNode *cond = NULL;
-			Token lib_name = {0};
+			Token lib_name = {};
 
 			switch (f->curr_token.kind) {
 			case Token_Ident:
@@ -4050,11 +4050,11 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, AstNodeArray
 			syntax_error_node(node, "Only declarations are allowed at file scope %.*s", LIT(ast_node_strings[node->kind]));
 		} else if (node->kind == AstNode_ImportDecl) {
 			ast_node(id, ImportDecl, node);
-			String collection_name = {0};
+			String collection_name = {};
 			String oirignal_string = id->relpath.string;
 			String file_str = id->relpath.string;
 			gbAllocator allocator = heap_allocator(); // TODO(bill): Change this allocator
-			String import_file = {0};
+			String import_file = {};
 
 		#if 0
 			isize colon_pos = -1;
@@ -4173,7 +4173,7 @@ void parse_file(Parser *p, AstFile *f) {
 ParseFileError parse_files(Parser *p, char *init_filename) {
 	char *fullpath_str = gb_path_get_full_name(heap_allocator(), init_filename);
 	String init_fullpath = make_string_c(fullpath_str);
-	TokenPos init_pos = {0};
+	TokenPos init_pos = {};
 	ImportedFile init_imported_file = {init_fullpath, init_fullpath, init_pos};
 
 
@@ -4196,7 +4196,7 @@ ParseFileError parse_files(Parser *p, char *init_filename) {
 		String import_path = imported_file.path;
 		String import_rel_path = imported_file.rel_path;
 		TokenPos pos = imported_file.pos;
-		AstFile file = {0};
+		AstFile file = {};
 
 		ParseFileError err = init_ast_file(&file, import_path);
 
