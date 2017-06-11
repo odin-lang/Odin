@@ -4616,16 +4616,20 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			}
 			TypeTuple *pt = &type->params->Tuple;
 			for (isize i = 0; i < param_count; i++) {
-				Type *param_type = pt->variables[i]->type;
+				Entity *e = pt->variables[i];
+				GB_ASSERT(e->kind == Entity_Variable);
 				if (args[i] == NULL) {
-					args[i] = ir_value_nil(proc->module->allocator, param_type);
+					if (e->Variable.default_value.kind != ExactValue_Invalid) {
+						args[i] = ir_value_constant(proc->module->allocator, e->type, e->Variable.default_value);
+					} else {
+						args[i] = ir_value_nil(proc->module->allocator, e->type);
+					}
 				} else {
-					args[i] = ir_emit_conv(proc, args[i], param_type);
+					args[i] = ir_emit_conv(proc, args[i], e->type);
 				}
 			}
 
 			return ir_emit_call(proc, value, args, param_count);
-			// GB_PANIC("HERE!\n");
 		}
 
 		isize arg_index = 0;
@@ -4640,7 +4644,9 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 				arg_count++;
 			}
 		}
-		irValue **args = gb_alloc_array(proc->module->allocator, irValue *, arg_count);
+
+
+		irValue **args = gb_alloc_array(proc->module->allocator, irValue *, gb_max(type->param_count, arg_count));
 		bool variadic = type->variadic;
 		bool vari_expand = ce->ellipsis.pos.line != 0;
 
@@ -4660,6 +4666,23 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 		TypeTuple *pt = &type->params->Tuple;
 
+		if (arg_count < type->param_count) {
+			isize end = type->param_count;
+			if (variadic) {
+				end--;
+			}
+			while (arg_index < end) {
+				Entity *e = pt->variables[arg_index];
+				GB_ASSERT(e->kind == Entity_Variable);
+				if (e->Variable.default_value.kind != ExactValue_Invalid) {
+					args[arg_index++] = ir_value_constant(proc->module->allocator, e->type, e->Variable.default_value);
+				} else {
+					args[arg_index++] = ir_value_nil(proc->module->allocator, e->type);
+				}
+			}
+		}
+
+
 		if (variadic) {
 			isize i = 0;
 			for (; i < type->param_count-1; i++) {
@@ -4674,7 +4697,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 				}
 			}
 		} else {
-			for (isize i = 0; i < arg_count; i++) {
+			for (isize i = 0; i < type->param_count; i++) {
 				args[i] = ir_emit_conv(proc, args[i], pt->variables[i]->type);
 			}
 		}
@@ -4704,7 +4727,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			args[arg_count-1] = ir_emit_load(proc, slice);
 		}
 
-		return ir_emit_call(proc, value, args, arg_count);
+		return ir_emit_call(proc, value, args, type->param_count);
 	case_end;
 
 	case_ast_node(se, SliceExpr, expr);
@@ -6680,7 +6703,7 @@ void ir_number_proc_registers(irProcedure *proc) {
 		b->index = i;
 		for_array(j, b->instrs) {
 			irValue *value = b->instrs[j];
-			GB_ASSERT(value->kind == irValue_Instr);
+			GB_ASSERT_MSG(value->kind == irValue_Instr, "%.*s", LIT(proc->name));
 			irInstr *instr = &value->Instr;
 			if (ir_instr_type(instr) == NULL) { // NOTE(bill): Ignore non-returning instructions
 				value->index = -1;

@@ -81,10 +81,11 @@ struct Entity {
 			ExactValue value;
 		} Constant;
 		struct {
-			i32  field_index;
-			i32  field_src_index;
-			bool is_immutable;
-			bool is_thread_local;
+			i32        field_index;
+			i32        field_src_index;
+			bool       is_immutable;
+			bool       is_thread_local;
+			ExactValue default_value;
 		} Variable;
 		struct {
 			bool is_type_alias;

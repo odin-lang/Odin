@@ -255,13 +255,18 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 }
 
 
+i64 assign_score_function(i64 distance) {
+	// TODO(bill): A decent score function
+	return gb_max(1000000 - distance*distance, 0);
+}
+
+
 bool check_is_assignable_to_with_score(Checker *c, Operand *operand, Type *type, i64 *score_) {
 	i64 score = 0;
 	i64 distance = check_distance_between_types(c, operand, type);
 	bool ok = distance >= 0;
 	if (ok) {
-		// TODO(bill): A decent score function
-		score = gb_max(1000000 - distance*distance, 0);
+		score = assign_score_function(distance);
 	}
 	if (score_) *score_ = score;
 	return ok;
@@ -1051,7 +1056,22 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		}
 		ast_node(p, Field, params[i]);
 		AstNode *type_expr = p->type;
-		if (type_expr) {
+		Type *type = NULL;
+		AstNode *default_value = p->default_value;
+		ExactValue value = {};
+
+		if (type_expr == NULL) {
+			Operand o = {};
+			check_expr(c, &o, default_value);
+
+			if (o.mode != Addressing_Constant) {
+				error_node(default_value, "Default parameter must be a constant");
+			} else {
+				value = o.value;
+			}
+
+			type = default_type(o.type);
+		} else {
 			if (type_expr->kind == AstNode_Ellipsis) {
 				type_expr = type_expr->Ellipsis.expr;
 				if (i+1 == params.count) {
@@ -1061,28 +1081,49 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				}
 			}
 
-			Type *type = check_type(c, type_expr);
-			if (p->flags&FieldFlag_no_alias) {
-				if (!is_type_pointer(type)) {
-					error_node(params[i], "`no_alias` can only be applied to fields of pointer type");
-					p->flags &= ~FieldFlag_no_alias; // Remove the flag
+			type = check_type(c, type_expr);
+
+			if (default_value != NULL) {
+				Operand o = {};
+				check_expr(c, &o, default_value);
+
+				if (o.mode != Addressing_Constant) {
+					error_node(default_value, "Default parameter must be a constant");
+				} else {
+					value = o.value;
 				}
+
+				check_is_assignable_to(c, &o, type);
 			}
 
-			for_array(j, p->names) {
-				AstNode *name = p->names[j];
-				if (ast_node_expect(name, AstNode_Ident)) {
-					Entity *param = make_entity_param(c->allocator, scope, name->Ident, type,
-					                                  (p->flags&FieldFlag_using) != 0, (p->flags&FieldFlag_immutable) != 0);
-					if (p->flags&FieldFlag_no_alias) {
-						param->flags |= EntityFlag_NoAlias;
-					}
-					if (p->flags&FieldFlag_immutable) {
-						param->Variable.is_immutable = true;
-					}
-					add_entity(c, scope, name, param);
-					variables[variable_index++] = param;
+		}
+		if (type == NULL) {
+			error_node(params[i], "Invalid parameter type");
+			type = t_invalid;
+		}
+
+		if (p->flags&FieldFlag_no_alias) {
+			if (!is_type_pointer(type)) {
+				error_node(params[i], "`no_alias` can only be applied to fields of pointer type");
+				p->flags &= ~FieldFlag_no_alias; // Remove the flag
+			}
+		}
+
+		for_array(j, p->names) {
+			AstNode *name = p->names[j];
+			if (ast_node_expect(name, AstNode_Ident)) {
+				Entity *param = make_entity_param(c->allocator, scope, name->Ident, type,
+				                                  (p->flags&FieldFlag_using) != 0, (p->flags&FieldFlag_immutable) != 0);
+				if (p->flags&FieldFlag_no_alias) {
+					param->flags |= EntityFlag_NoAlias;
 				}
+				if (p->flags&FieldFlag_immutable) {
+					param->Variable.is_immutable = true;
+				}
+				param->Variable.default_value = value;
+
+				add_entity(c, scope, name, param);
+				variables[variable_index++] = param;
 			}
 		}
 	}
@@ -4775,15 +4816,32 @@ typedef CALL_ARGUMENT_CHECKER(CallArgumentCheckerType);
 CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 	ast_node(ce, CallExpr, call);
 	isize param_count = 0;
+	isize param_count_excluding_defaults = 0;
 	bool variadic = proc_type->Proc.variadic;
 	bool vari_expand = (ce->ellipsis.pos.line != 0);
 	i64 score = 0;
 	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
 
+	TypeTuple *param_tuple = NULL;
+
 	if (proc_type->Proc.params != NULL) {
-		param_count = proc_type->Proc.params->Tuple.variable_count;
+		param_tuple = &proc_type->Proc.params->Tuple;
+
+		param_count = param_tuple->variable_count;
 		if (variadic) {
 			param_count--;
+		}
+	}
+
+	param_count_excluding_defaults = param_count;
+	if (param_tuple != NULL) {
+		for (isize i = param_count-1; i >= 0; i--) {
+			Entity *e = param_tuple->variables[i];
+			GB_ASSERT(e->kind == Entity_Variable);
+			if (e->Variable.default_value.kind == ExactValue_Invalid) {
+				break;
+			}
+			param_count_excluding_defaults--;
 		}
 	}
 
@@ -4797,13 +4855,13 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		return CallArgumentError_NonVariadicExpand;
 	}
 
-	if (operands.count == 0 && param_count == 0) {
+	if (operands.count == 0 && param_count_excluding_defaults == 0) {
 		if (score_) *score_ = score;
 		return CallArgumentError_None;
 	}
 
 	i32 error_code = 0;
-	if (operands.count < param_count) {
+	if (operands.count < param_count_excluding_defaults) {
 		error_code = -1;
 	} else if (!variadic && operands.count > param_count) {
 		error_code = +1;
@@ -4818,7 +4876,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 
 		if (show_error) {
 			gbString proc_str = expr_to_string(ce->proc);
-			error_node(call, err_fmt, proc_str, param_count);
+			error_node(call, err_fmt, proc_str, param_count_excluding_defaults);
 			gb_string_free(proc_str);
 		}
 		if (score_) *score_ = score;
@@ -4828,9 +4886,9 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 	CallArgumentError err = CallArgumentError_None;
 
 	GB_ASSERT(proc_type->Proc.params != NULL);
-	Entity **sig_params = proc_type->Proc.params->Tuple.variables;
+	Entity **sig_params = param_tuple->variables;
 	isize operand_index = 0;
-	for (; operand_index < param_count; operand_index++) {
+	for (; operand_index < param_count_excluding_defaults; operand_index++) {
 		Type *t = sig_params[operand_index]->type;
 		Operand o = operands[operand_index];
 		if (variadic) {
@@ -4972,6 +5030,12 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			if (e->token.string == "_") {
 				continue;
 			}
+			GB_ASSERT(e->kind == Entity_Variable);
+			if (e->Variable.default_value.kind != ExactValue_Invalid) {
+				score += assign_score_function(1);
+				continue;
+			}
+
 			if (show_error) {
 				gbString str = type_to_string(e->type);
 				error_node(call, "Parameter `%.*s` of type `%s` is missing in procedure call",

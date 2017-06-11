@@ -326,9 +326,10 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 	}) \
 AST_NODE_KIND(_DeclEnd,   "", i32) \
 	AST_NODE_KIND(Field, "field", struct { \
-		Array<AstNode *> names;    \
-		AstNode *    type;     \
-		u32          flags;    \
+		Array<AstNode *> names;            \
+		AstNode *    type;                 \
+		AstNode *    default_value;        \
+		u32          flags;                \
 	}) \
 	AST_NODE_KIND(FieldList, "field list", struct { \
 		Token token; \
@@ -1276,10 +1277,11 @@ AstNode *ast_bad_decl(AstFile *f, Token begin, Token end) {
 	return result;
 }
 
-AstNode *ast_field(AstFile *f, Array<AstNode *> names, AstNode *type, u32 flags) {
+AstNode *ast_field(AstFile *f, Array<AstNode *> names, AstNode *type, AstNode *default_value, u32 flags) {
 	AstNode *result = make_ast_node(f, AstNode_Field);
 	result->Field.names = names;
 	result->Field.type = type;
+	result->Field.default_value = default_value;
 	result->Field.flags = flags;
 	return result;
 }
@@ -2645,7 +2647,7 @@ AstNode *parse_results(AstFile *f) {
 		Array<AstNode *> empty_names = {};
 		Array<AstNode *> list = make_ast_node_array(f);
 		AstNode *type = parse_type(f);
-		array_add(&list, ast_field(f, empty_names, type, 0));
+		array_add(&list, ast_field(f, empty_names, type, NULL, 0));
 		return ast_field_list(f, begin_token, list);
 	}
 
@@ -2839,6 +2841,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 	Array<AstNodeAndFlags> list = {}; array_init(&list, heap_allocator()); // LEAK(bill):
 	isize total_name_count = 0;
 	bool allow_ellipsis = allowed_flags&FieldFlag_ellipsis;
+	bool is_procedure = (allowed_flags&FieldFlag_Signature) != 0;
 
 	while (f->curr_token.kind != follow &&
 	       f->curr_token.kind != Token_Colon &&
@@ -2866,8 +2869,25 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 		total_name_count += names.count;
 
 		expect_token_after(f, Token_Colon, "field list");
-		AstNode *type = parse_var_type(f, allow_ellipsis);
-		AstNode *param = ast_field(f, names, type, set_flags);
+		AstNode *type = NULL;
+		AstNode *default_value = NULL;
+
+		if (f->curr_token.kind != Token_Eq) {
+			type = parse_var_type(f, allow_ellipsis);
+		}
+		if (allow_token(f, Token_Eq)) {
+			// TODO(bill): Should this be true==lhs or false==rhs?
+			default_value = parse_expr(f, true);
+			if (!is_procedure) {
+				syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
+			}
+		}
+
+		if (default_value != NULL && names.count > 1) {
+			syntax_error(f->curr_token, "Default parameters can only be applied to single values");
+		}
+
+		AstNode *param = ast_field(f, names, type, default_value, set_flags);
 		array_add(&params, param);
 
 		parse_expect_field_separator(f, type);
@@ -2884,8 +2904,24 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 			total_name_count += names.count;
 
 			expect_token_after(f, Token_Colon, "field list");
-			AstNode *type = parse_var_type(f, allow_ellipsis);
-			AstNode *param = ast_field(f, names, type, set_flags);
+			AstNode *type = NULL;
+			AstNode *default_value = NULL;
+			if (f->curr_token.kind != Token_Eq) {
+				type = parse_var_type(f, allow_ellipsis);
+			}
+			if (allow_token(f, Token_Eq)) {
+				// TODO(bill): Should this be true==lhs or false==rhs?
+				default_value = parse_expr(f, true);
+				if (!is_procedure) {
+					syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
+				}
+			}
+
+			if (default_value != NULL && names.count > 1) {
+				syntax_error(f->curr_token, "Default parameters can only be applied to single values");
+			}
+
+			AstNode *param = ast_field(f, names, type, default_value, set_flags);
 			array_add(&params, param);
 
 			if (!parse_expect_field_separator(f, param)) {
@@ -2907,7 +2943,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 		names[0] = ast_ident(f, token);
 		u32 flags = check_field_prefixes(f, list.count, allowed_flags, list[i].flags);
 
-		AstNode *param = ast_field(f, names, list[i].node, flags);
+		AstNode *param = ast_field(f, names, list[i].node, NULL, flags);
 		array_add(&params, param);
 	}
 
@@ -3084,7 +3120,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 				total_decl_name_count += names.count;
 				expect_token_after(f, Token_Colon, "field list");
 				AstNode *type = parse_var_type(f, false);
-				array_add(&decls, ast_field(f, names, type, set_flags));
+				array_add(&decls, ast_field(f, names, type, NULL, set_flags));
 			} else {
 				Array<AstNode *> names = parse_ident_list(f);
 				if (names.count == 0) {
@@ -3095,7 +3131,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 					total_decl_name_count += names.count;
 					expect_token_after(f, Token_Colon, "field list");
 					AstNode *type = parse_var_type(f, false);
-					array_add(&decls, ast_field(f, names, type, set_flags));
+					array_add(&decls, ast_field(f, names, type, NULL, set_flags));
 				} else {
 					AstNode *name  = names[0];
 					Token    open  = expect_token(f, Token_OpenBrace);
