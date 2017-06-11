@@ -2731,7 +2731,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 				ev = exact_value_to_complex(ev);
 			} else if (is_type_string(dst)) {
 				// Handled elsewhere
-				GB_ASSERT(ev.kind == ExactValue_String);
+				GB_ASSERT_MSG(ev.kind == ExactValue_String, "%d", ev.kind);
 			} else if (is_type_integer(dst)) {
 				ev = exact_value_to_integer(ev);
 			} else if (is_type_pointer(dst)) {

@@ -86,6 +86,7 @@ struct Entity {
 			bool       is_immutable;
 			bool       is_thread_local;
 			ExactValue default_value;
+			bool       default_is_nil;
 		} Variable;
 		struct {
 			bool is_type_alias;

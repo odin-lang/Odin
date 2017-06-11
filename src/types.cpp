@@ -1100,24 +1100,6 @@ bool are_types_identical(Type *x, Type *y) {
 	return false;
 }
 
-
-Type *default_type(Type *type) {
-	if (type == NULL) {
-		return t_invalid;
-	}
-	if (type->kind == Type_Basic) {
-		switch (type->Basic.kind) {
-		case Basic_UntypedBool:       return t_bool;
-		case Basic_UntypedInteger:    return t_int;
-		case Basic_UntypedFloat:      return t_f64;
-		case Basic_UntypedComplex:    return t_complex128;
-		case Basic_UntypedString:     return t_string;
-		case Basic_UntypedRune:       return t_rune;
-		}
-	}
-	return type;
-}
-
 Type *default_bit_field_value_type(Type *type) {
 	if (type == NULL) {
 		return t_invalid;
@@ -1137,6 +1119,27 @@ Type *default_bit_field_value_type(Type *type) {
 	}
 	return type;
 }
+
+Type *default_type(Type *type) {
+	if (type == NULL) {
+		return t_invalid;
+	}
+	if (type->kind == Type_Basic) {
+		switch (type->Basic.kind) {
+		case Basic_UntypedBool:       return t_bool;
+		case Basic_UntypedInteger:    return t_int;
+		case Basic_UntypedFloat:      return t_f64;
+		case Basic_UntypedComplex:    return t_complex128;
+		case Basic_UntypedString:     return t_string;
+		case Basic_UntypedRune:       return t_rune;
+		}
+	}
+	if (type->kind == Type_BitFieldValue) {
+		return default_bit_field_value_type(type);
+	}
+	return type;
+}
+
 
 // NOTE(bill): Valid Compile time execution #run type
 bool is_type_cte_safe(Type *type) {

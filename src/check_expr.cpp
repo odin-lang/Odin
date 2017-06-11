@@ -2,6 +2,7 @@ void     check_expr                     (Checker *c, Operand *operand, AstNode *
 void     check_multi_expr               (Checker *c, Operand *operand, AstNode *expression);
 void     check_expr_or_type             (Checker *c, Operand *operand, AstNode *expression);
 ExprKind check_expr_base                (Checker *c, Operand *operand, AstNode *expression, Type *type_hint);
+void     check_expr_with_type_hint      (Checker *c, Operand *o, AstNode *e, Type *t);
 Type *   check_type                     (Checker *c, AstNode *expression, Type *named_type = NULL);
 void     check_type_decl                (Checker *c, Entity *e, AstNode *type_expr, Type *def);
 Entity * check_selector                 (Checker *c, Operand *operand, AstNode *node, Type *type_hint);
@@ -1051,20 +1052,23 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 	Entity **variables = gb_alloc_array(c->allocator, Entity *, variable_count);
 	isize variable_index = 0;
 	for_array(i, params) {
-		if (params[i]->kind != AstNode_Field) {
+		AstNode *param = params[i];
+		if (param->kind != AstNode_Field) {
 			continue;
 		}
-		ast_node(p, Field, params[i]);
+		ast_node(p, Field, param);
 		AstNode *type_expr = p->type;
 		Type *type = NULL;
 		AstNode *default_value = p->default_value;
 		ExactValue value = {};
+		bool default_is_nil = false;
 
 		if (type_expr == NULL) {
 			Operand o = {};
 			check_expr(c, &o, default_value);
-
-			if (o.mode != Addressing_Constant) {
+			if (is_operand_nil(o)) {
+				default_is_nil = true;
+			} else if (o.mode != Addressing_Constant) {
 				error_node(default_value, "Default parameter must be a constant");
 			} else {
 				value = o.value;
@@ -1077,7 +1081,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				if (i+1 == params.count) {
 					is_variadic = true;
 				} else {
-					error_node(params[i], "Invalid AST: Invalid variadic parameter");
+					error_node(param, "Invalid AST: Invalid variadic parameter");
 				}
 			}
 
@@ -1085,9 +1089,11 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 
 			if (default_value != NULL) {
 				Operand o = {};
-				check_expr(c, &o, default_value);
+				check_expr_with_type_hint(c, &o, default_value, type);
 
-				if (o.mode != Addressing_Constant) {
+				if (is_operand_nil(o)) {
+					default_is_nil = true;
+				} else if (o.mode != Addressing_Constant) {
 					error_node(default_value, "Default parameter must be a constant");
 				} else {
 					value = o.value;
@@ -1099,6 +1105,10 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		}
 		if (type == NULL) {
 			error_node(params[i], "Invalid parameter type");
+			type = t_invalid;
+		}
+		if (is_type_untyped(type)) {
+			error_node(params[i], "Cannot determine parameter type from a nil");
 			type = t_invalid;
 		}
 
@@ -1121,6 +1131,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					param->Variable.is_immutable = true;
 				}
 				param->Variable.default_value = value;
+				param->Variable.default_is_nil = default_is_nil;
 
 				add_entity(c, scope, name, param);
 				variables[variable_index++] = param;
@@ -4838,10 +4849,15 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		for (isize i = param_count-1; i >= 0; i--) {
 			Entity *e = param_tuple->variables[i];
 			GB_ASSERT(e->kind == Entity_Variable);
-			if (e->Variable.default_value.kind == ExactValue_Invalid) {
-				break;
+			if (e->Variable.default_value.kind != ExactValue_Invalid) {
+				param_count_excluding_defaults--;
+				continue;
 			}
-			param_count_excluding_defaults--;
+			if (e->Variable.default_is_nil) {
+				param_count_excluding_defaults--;
+				continue;
+			}
+			break;
 		}
 	}
 
@@ -4888,7 +4904,8 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 	GB_ASSERT(proc_type->Proc.params != NULL);
 	Entity **sig_params = param_tuple->variables;
 	isize operand_index = 0;
-	for (; operand_index < param_count_excluding_defaults; operand_index++) {
+	isize max_operand_count = gb_min(param_count, operands.count);
+	for (; operand_index < max_operand_count; operand_index++) {
 		Type *t = sig_params[operand_index]->type;
 		Operand o = operands[operand_index];
 		if (variadic) {
@@ -5036,6 +5053,11 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 				continue;
 			}
 
+			if (e->Variable.default_is_nil) {
+				score += assign_score_function(1);
+				continue;
+			}
+
 			if (show_error) {
 				gbString str = type_to_string(e->type);
 				error_node(call, "Parameter `%.*s` of type `%s` is missing in procedure call",
@@ -5067,7 +5089,7 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 		for_array(i, ce->args) {
 			AstNode *arg = ce->args[i];
 			ast_node(fv, FieldValue, arg);
-			check_expr(c, &operands[i], fv->value);
+			check_expr_or_type(c, &operands[i], fv->value);
 		}
 
 		bool vari_expand = (ce->ellipsis.pos.line != 0);
