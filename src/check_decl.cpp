@@ -13,7 +13,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 			// TODO(bill): is this a good enough error message?
 			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error_node(operand->expr,
-				  "Cannot assign builtin procedure `%s` in %.*s",
+				  "Cannot assign built-in procedure `%s` in %.*s",
 				  expr_str,
 				  LIT(context_name));
 
@@ -58,7 +58,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 	return e->type;
 }
 
-void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArray inits, String context_name) {
+void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, Array<AstNode *> inits, String context_name) {
 	if ((lhs == NULL || lhs_count == 0) && inits.count == 0) {
 		return;
 	}
@@ -67,20 +67,20 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, AstNodeArra
 
 	// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 	// an extra allocation
-	ArrayOperand operands = {0};
-	array_init_reserve(&operands, c->tmp_allocator, 2*lhs_count);
+	Array<Operand> operands = {};
+	array_init(&operands, c->tmp_allocator, 2*lhs_count);
 	check_unpack_arguments(c, lhs_count, &operands, inits, true);
 
 	isize rhs_count = operands.count;
 	for_array(i, operands) {
-		if (operands.e[i].mode == Addressing_Invalid) {
+		if (operands[i].mode == Addressing_Invalid) {
 			rhs_count--;
 		}
 	}
 
 	isize max = gb_min(lhs_count, rhs_count);
 	for (isize i = 0; i < max; i++) {
-		check_init_variable(c, lhs[i], &operands.e[i], context_name);
+		check_init_variable(c, lhs[i], &operands[i], context_name);
 	}
 	if (rhs_count > 0 && lhs_count != rhs_count) {
 		error(lhs[0]->token, "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
@@ -145,7 +145,7 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
 
 	// gb_printf_err("%.*s %p\n", LIT(e->token.string), e);
 
-	Type *bt = check_type_extra(c, type_expr, named);
+	Type *bt = check_type(c, type_expr, named);
 	named->Named.base = base_type(bt);
 	if (named->Named.base == t_invalid) {
 		// gb_printf("check_type_decl: %s\n", type_to_string(named));
@@ -174,7 +174,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 		e->type = t;
 	}
 
-	Operand operand = {0};
+	Operand operand = {};
 	if (init != NULL) {
 		check_expr_or_type(c, &operand, init);
 	}
@@ -274,7 +274,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 	bool is_require_results = (pd->tags & ProcTag_require_results) != 0;
 
 
-	if (d->scope->is_file && str_eq(e->token.string, str_lit("main"))) {
+	if (d->scope->is_file && e->token.string == "main") {
 		if (proc_type != NULL) {
 			TypeProc *pt = &proc_type->Proc;
 			if (pt->param_count != 0 ||
@@ -319,7 +319,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 	if (is_foreign) {
-		MapEntity *fp = &c->info.foreigns;
+		auto *fp = &c->info.foreigns;
 		String name = e->token.string;
 		if (pd->foreign_name.len > 0) {
 			name = pd->foreign_name;
@@ -334,7 +334,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 			String name = foreign_library->Ident.string;
 			Entity *found = scope_lookup_entity(c->context.scope, name);
 			if (found == NULL) {
-				if (str_eq(name, str_lit("_"))) {
+				if (name == "_") {
 					error_node(foreign_library, "`_` cannot be used as a value type");
 				} else {
 					error_node(foreign_library, "Undeclared name: %.*s", LIT(name));
@@ -352,7 +352,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 		e->Procedure.foreign_name = name;
 
 		HashKey key = hash_string(name);
-		Entity **found = map_entity_get(fp, key);
+		Entity **found = map_get(fp, key);
 		if (found) {
 			Entity *f = *found;
 			TokenPos pos = f->token.pos;
@@ -365,7 +365,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 						   LIT(name), LIT(pos.file), pos.line, pos.column);
 			}
 		} else {
-			map_entity_set(fp, key, e);
+			map_set(fp, key, e);
 		}
 	} else {
 		String name = e->token.string;
@@ -374,12 +374,12 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 		}
 
 		if (is_link_name || is_export) {
-			MapEntity *fp = &c->info.foreigns;
+			auto *fp = &c->info.foreigns;
 
 			e->Procedure.link_name = name;
 
 			HashKey key = hash_string(name);
-			Entity **found = map_entity_get(fp, key);
+			Entity **found = map_get(fp, key);
 			if (found) {
 				Entity *f = *found;
 				TokenPos pos = f->token.pos;
@@ -389,7 +389,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 						   "\tother at %.*s(%td:%td)",
 						   LIT(name), LIT(pos.file), pos.line, pos.column);
 			} else {
-				map_entity_set(fp, key, e);
+				map_set(fp, key, e);
 			}
 		}
 	}
@@ -408,7 +408,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	e->flags |= EntityFlag_Visited;
 
 	if (type_expr != NULL) {
-		e->type = check_type_extra(c, type_expr, NULL);
+		e->type = check_type(c, type_expr);
 	}
 
 	if (init_expr == NULL) {
@@ -420,7 +420,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 
 	if (entities == NULL || entity_count == 1) {
 		GB_ASSERT(entities == NULL || entities[0] == e);
-		Operand operand = {0};
+		Operand operand = {};
 		check_expr(c, &operand, init_expr);
 		check_init_variable(c, e, &operand, str_lit("variable declaration"));
 	}
@@ -431,8 +431,8 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 		}
 	}
 
-	AstNodeArray inits;
-	array_init_reserve(&inits, c->allocator, 1);
+	Array<AstNode *> inits;
+	array_init(&inits, c->allocator, 1);
 	array_add(&inits, init_expr);
 	check_init_variables(c, entities, entity_count, inits, str_lit("variable declaration"));
 }
@@ -443,7 +443,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 	}
 
 	if (d == NULL) {
-		DeclInfo **found = map_decl_info_get(&c->info.entities, hash_pointer(e));
+		DeclInfo **found = map_get(&c->info.entities, hash_pointer(e));
 		if (found) {
 			d = *found;
 		} else {
@@ -484,7 +484,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body) {
 	GB_ASSERT(body->kind == AstNode_BlockStmt);
 
-	String proc_name = {0};
+	String proc_name = {};
 	if (token.kind == Token_Ident) {
 		proc_name = token.string;
 	} else {
@@ -511,10 +511,10 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 			String name = e->token.string;
 			Type *t = base_type(type_deref(e->type));
 			if (is_type_struct(t) || is_type_raw_union(t)) {
-				Scope **found = map_scope_get(&c->info.scopes, hash_pointer(t->Record.node));
+				Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
 				GB_ASSERT(found != NULL);
 				for_array(i, (*found)->elements.entries) {
-					Entity *f = (*found)->elements.entries.e[i].value;
+					Entity *f = (*found)->elements.entries[i].value;
 					if (f->kind == Entity_Variable) {
 						Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
 						uvar->Variable.is_immutable = is_immutable;
@@ -555,9 +555,9 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	if (decl->parent != NULL) {
 		// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 		for_array(i, decl->deps.entries) {
-			HashKey key = decl->deps.entries.e[i].key;
+			HashKey key = decl->deps.entries[i].key;
 			Entity *e = cast(Entity *)key.ptr;
-			map_bool_set(&decl->parent->deps, key, true);
+			map_set(&decl->parent->deps, key, true);
 		}
 	}
 }

@@ -1,5 +1,5 @@
-gb_global gbArena string_buffer_arena = {0};
-gb_global gbAllocator string_buffer_allocator = {0};
+gb_global gbArena string_buffer_arena = {};
+gb_global gbAllocator string_buffer_allocator = {};
 
 void init_string_buffer_memory(void) {
 	// NOTE(bill): This should be enough memory for file systems
@@ -9,21 +9,38 @@ void init_string_buffer_memory(void) {
 
 
 // NOTE(bill): Used for UTF-8 strings
-typedef struct String {
+struct String {
 	u8 *  text;
 	isize len;
-} String;
+
+	u8 &operator[](isize i) {
+		GB_ASSERT(0 <= i && i < len);
+		return text[i];
+	}
+	u8 const &operator[](isize i) const {
+		GB_ASSERT(0 <= i && i < len);
+		return text[i];
+	}
+};
 // NOTE(bill): used for printf style arguments
 #define LIT(x) ((int)(x).len), (x).text
 #define STR_LIT(c_str) {cast(u8 *)c_str, gb_size_of(c_str)-1}
-#define str_lit(c_str) (String){cast(u8 *)c_str, gb_size_of(c_str)-1}
+#define str_lit(c_str) String{cast(u8 *)c_str, gb_size_of(c_str)-1}
 
 
 // NOTE(bill): String16 is only used for Windows due to its file directories
-typedef struct String16 {
+struct String16 {
 	wchar_t *text;
 	isize    len;
-} String16;
+	wchar_t &operator[](isize i) {
+		GB_ASSERT(0 <= i && i < len);
+		return text[i];
+	}
+	wchar_t const &operator[](isize i) const {
+		GB_ASSERT(0 <= i && i < len);
+		return text[i];
+	}
+};
 
 
 gb_inline String make_string(u8 *text, isize len) {
@@ -56,8 +73,8 @@ gb_inline bool str_eq_ignore_case(String a, String b) {
 	if (a.len == b.len) {
 		isize i;
 		for (i = 0; i < a.len; i++) {
-			char x = cast(char)a.text[i];
-			char y = cast(char)b.text[i];
+			char x = cast(char)a[i];
+			char y = cast(char)b[i];
 			if (gb_char_to_lower(x) != gb_char_to_lower(y))
 				return false;
 		}
@@ -88,16 +105,16 @@ int string_compare(String x, String y) {
 		for (; curr_block < fast; curr_block++) {
 			if (la[curr_block] ^ lb[curr_block]) {
 				for (pos = curr_block*gb_size_of(isize); pos < n; pos++) {
-					if (x.text[pos] ^ y.text[pos]) {
-						return cast(int)x.text[pos] - cast(int)y.text[pos];
+					if (x[pos] ^ y[pos]) {
+						return cast(int)x[pos] - cast(int)y[pos];
 					}
 				}
 			}
 		}
 
 		for (; offset < n; offset++) {
-			if (x.text[offset] ^ y.text[offset]) {
-				return cast(int)x.text[offset] - cast(int)y.text[offset];
+			if (x[offset] ^ y[offset]) {
+				return cast(int)x[offset] - cast(int)y[offset];
 			}
 		}
 	}
@@ -117,13 +134,29 @@ gb_inline bool str_gt(String a, String b) { return string_compare(a, b) > 0;    
 gb_inline bool str_le(String a, String b) { return string_compare(a, b) <= 0;    }
 gb_inline bool str_ge(String a, String b) { return string_compare(a, b) >= 0;    }
 
+bool operator == (String a, String b) { return str_eq(a, b); }
+bool operator != (String a, String b) { return str_ne(a, b); }
+bool operator <  (String a, String b) { return str_lt(a, b); }
+bool operator >  (String a, String b) { return str_gt(a, b); }
+bool operator <= (String a, String b) { return str_le(a, b); }
+bool operator >= (String a, String b) { return str_ge(a, b); }
+
+template <isize N> bool operator == (String a, char const (&b)[N]) { return str_eq(a, make_string(cast(u8 *)b, N-1)); }
+template <isize N> bool operator != (String a, char const (&b)[N]) { return str_ne(a, make_string(cast(u8 *)b, N-1)); }
+template <isize N> bool operator <  (String a, char const (&b)[N]) { return str_lt(a, make_string(cast(u8 *)b, N-1)); }
+template <isize N> bool operator >  (String a, char const (&b)[N]) { return str_gt(a, make_string(cast(u8 *)b, N-1)); }
+template <isize N> bool operator <= (String a, char const (&b)[N]) { return str_le(a, make_string(cast(u8 *)b, N-1)); }
+template <isize N> bool operator >= (String a, char const (&b)[N]) { return str_ge(a, make_string(cast(u8 *)b, N-1)); }
+
+
+
 gb_inline bool str_has_prefix(String s, String prefix) {
 	isize i;
 	if (prefix.len < s.len) {
 		return false;
 	}
 	for (i = 0; i < prefix.len; i++) {
-		if (s.text[i] != prefix.text[i]) {
+		if (s[i] != prefix[i]) {
 			return false;
 		}
 	}
@@ -135,9 +168,9 @@ gb_inline isize string_extension_position(String str) {
 	isize i = str.len;
 	bool seen_dot = false;
 	while (i --> 0) {
-		if (str.text[i] == GB_PATH_SEPARATOR)
+		if (str[i] == GB_PATH_SEPARATOR)
 			break;
-		if (str.text[i] == '.') {
+		if (str[i] == '.') {
 			dot_pos = i;
 			break;
 		}
@@ -147,11 +180,11 @@ gb_inline isize string_extension_position(String str) {
 }
 
 String string_trim_whitespace(String str) {
-	while (str.len > 0 && rune_is_whitespace(str.text[str.len-1])) {
+	while (str.len > 0 && rune_is_whitespace(str[str.len-1])) {
 		str.len--;
 	}
 
-	while (str.len > 0 && rune_is_whitespace(str.text[0])) {
+	while (str.len > 0 && rune_is_whitespace(str[0])) {
 		str.text++;
 		str.len--;
 	}
@@ -166,7 +199,7 @@ gb_inline bool string_has_extension(String str, String ext) {
 	}
 	isize len = str.len;
 	for (isize i = len-1; i >= 0; i--) {
-		if (str.text[i] == '.') {
+		if (str[i] == '.') {
 			break;
 		}
 		len--;
@@ -182,7 +215,7 @@ gb_inline bool string_has_extension(String str, String ext) {
 bool string_contains_char(String s, u8 c) {
 	isize i;
 	for (i = 0; i < s.len; i++) {
-		if (s.text[i] == c)
+		if (s[i] == c)
 			return true;
 	}
 	return false;
@@ -194,8 +227,8 @@ String filename_from_path(String s) {
 		isize j = 0;
 		s.len = i;
 		for (j = i-1; j >= 0; j--) {
-			if (s.text[j] == '/' ||
-				s.text[j] == '\\') {
+			if (s[j] == '/' ||
+				s[j] == '\\') {
 				break;
 			}
 		}
@@ -315,18 +348,18 @@ String string16_to_string(gbAllocator a, String16 s) {
 bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *tail_string) {
 	u8 c;
 
-	if (s.text[0] == quote &&
+	if (s[0] == quote &&
 	    (quote == '\'' || quote == '"')) {
 		return false;
-	} else if (s.text[0] >= 0x80) {
+	} else if (s[0] >= 0x80) {
 		Rune r = -1;
 		isize size = gb_utf8_decode(s.text, s.len, &r);
 		*rune = r;
 		*multiple_bytes = true;
 		*tail_string = make_string(s.text+size, s.len-size);
 		return true;
-	} else if (s.text[0] != '\\') {
-		*rune = s.text[0];
+	} else if (s[0] != '\\') {
+		*rune = s[0];
 		*tail_string = make_string(s.text+1, s.len-1);
 		return true;
 	}
@@ -334,7 +367,7 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 	if (s.len <= 1) {
 		return false;
 	}
-	c = s.text[1];
+	c = s[1];
 	s = make_string(s.text+2, s.len-2);
 
 	switch (c) {
@@ -372,7 +405,7 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 			return false;
 		}
 		for (i = 0; i < 2; i++) {
-			i32 d = gb_digit_to_int(s.text[i]);
+			i32 d = gb_digit_to_int(s[i]);
 			if (d < 0 || d > 7) {
 				return false;
 			}
@@ -400,7 +433,7 @@ bool unquote_char(String s, u8 quote, Rune *rune, bool *multiple_bytes, String *
 			return false;
 		}
 		for (i = 0; i < count; i++) {
-			i32 d = gb_hex_digit_to_int(s.text[i]);
+			i32 d = gb_hex_digit_to_int(s[i]);
 			if (d < 0) {
 				return false;
 			}
@@ -433,8 +466,8 @@ i32 unquote_string(gbAllocator a, String *s_) {
 	if (n < 2) {
 		return 0;
 	}
-	quote = s.text[0];
-	if (quote != s.text[n-1]) {
+	quote = s[0];
+	if (quote != s[n-1]) {
 		return 0;
 	}
 	s.text += 1;
@@ -471,12 +504,12 @@ i32 unquote_string(gbAllocator a, String *s_) {
 
 
 	{
-		u8 rune_temp[4] = {0};
+		u8 rune_temp[4] = {};
 		isize buf_len = 3*s.len / 2;
 		u8 *buf = gb_alloc_array(a, u8, buf_len);
 		isize offset = 0;
 		while (s.len > 0) {
-			String tail_string = {0};
+			String tail_string = {};
 			Rune r = 0;
 			bool multiple_bytes = false;
 			bool success = unquote_char(s, quote, &r, &multiple_bytes, &tail_string);

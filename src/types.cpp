@@ -1,6 +1,6 @@
-typedef struct Scope Scope;
+struct Scope;
 
-typedef enum BasicKind {
+enum BasicKind {
 	Basic_Invalid,
 	Basic_bool,
 	Basic_i8,
@@ -41,9 +41,9 @@ typedef enum BasicKind {
 	Basic_COUNT,
 
 	Basic_byte = Basic_u8,
-} BasicKind;
+};
 
-typedef enum BasicFlag {
+enum BasicFlag {
 	BasicFlag_Boolean     = GB_BIT(0),
 	BasicFlag_Integer     = GB_BIT(1),
 	BasicFlag_Unsigned    = GB_BIT(2),
@@ -57,16 +57,16 @@ typedef enum BasicFlag {
 	BasicFlag_Numeric      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_Complex,
 	BasicFlag_Ordered      = BasicFlag_Integer | BasicFlag_Float   | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
 	BasicFlag_ConstantType = BasicFlag_Boolean | BasicFlag_Numeric | BasicFlag_String  | BasicFlag_Pointer | BasicFlag_Rune,
-} BasicFlag;
+};
 
-typedef struct BasicType {
+struct BasicType {
 	BasicKind kind;
 	u32       flags;
 	i64       size; // -1 if arch. dep.
 	String    name;
-} BasicType;
+};
 
-typedef enum TypeRecordKind {
+enum TypeRecordKind {
 	TypeRecord_Invalid,
 
 	TypeRecord_Struct,
@@ -75,9 +75,9 @@ typedef enum TypeRecordKind {
 	TypeRecord_Enum,
 
 	TypeRecord_Count,
-} TypeRecordKind;
+};
 
-typedef struct TypeRecord {
+struct TypeRecord {
 	TypeRecordKind kind;
 
 	// All record types
@@ -109,7 +109,7 @@ typedef struct TypeRecord {
 	Entity * enum_count;
 	Entity * enum_min_value;
 	Entity * enum_max_value;
-} TypeRecord;
+};
 
 #define TYPE_KINDS                                        \
 	TYPE_KIND(Basic,   BasicType)                         \
@@ -164,13 +164,13 @@ typedef struct TypeRecord {
 
 
 
-typedef enum TypeKind {
+enum TypeKind {
 	Type_Invalid,
 #define TYPE_KIND(k, ...) GB_JOIN2(Type_, k),
 	TYPE_KINDS
 #undef TYPE_KIND
 	Type_Count,
-} TypeKind;
+};
 
 String const type_strings[] = {
 	{cast(u8 *)"Invalid", gb_size_of("Invalid")},
@@ -183,7 +183,7 @@ String const type_strings[] = {
 	TYPE_KINDS
 #undef TYPE_KIND
 
-typedef struct Type {
+struct Type {
 	TypeKind kind;
 	union {
 #define TYPE_KIND(k, ...) GB_JOIN2(Type, k) k;
@@ -191,19 +191,19 @@ typedef struct Type {
 #undef TYPE_KIND
 	};
 	bool failure;
-} Type;
+};
 
 
 // TODO(bill): Should I add extra information here specifying the kind of selection?
 // e.g. field, constant, vector field, type field, etc.
-typedef struct Selection {
-	Entity *  entity;
-	Array_i32 index;
-	bool      indirect; // Set if there was a pointer deref anywhere down the line
-} Selection;
+struct Selection {
+	Entity *   entity;
+	Array<i32> index;
+	bool       indirect; // Set if there was a pointer deref anywhere down the line
+};
 Selection empty_selection = {0};
 
-Selection make_selection(Entity *entity, Array_i32 index, bool indirect) {
+Selection make_selection(Entity *entity, Array<i32> index, bool indirect) {
 	Selection s = {entity, index, indirect};
 	return s;
 }
@@ -212,10 +212,10 @@ void selection_add_index(Selection *s, isize index) {
 	// IMPORTANT NOTE(bill): this requires a stretchy buffer/dynamic array so it requires some form
 	// of heap allocation
 	// TODO(bill): Find a way to use a backing buffer for initial use as the general case is probably .count<3
-	if (s->index.e == NULL) {
+	if (s->index.data == NULL) {
 		array_init(&s->index, heap_allocator());
 	}
-	array_add(&s->index, index);
+	array_add(&s->index, cast(i32)index);
 }
 
 
@@ -1025,7 +1025,7 @@ bool are_types_identical(Type *x, Type *y) {
 							if (!are_types_identical(xf->type, yf->type)) {
 								return false;
 							}
-							if (str_ne(xf->token.string, yf->token.string)) {
+							if (xf->token.string != yf->token.string) {
 								return false;
 							}
 							bool xf_is_using = (xf->flags&EntityFlag_Using) != 0;
@@ -1039,7 +1039,7 @@ bool are_types_identical(Type *x, Type *y) {
 							if (!are_types_identical(x->Record.variants[i]->type, y->Record.variants[i]->type)) {
 								return false;
 							}
-							if (str_ne(x->Record.variants[i]->token.string, y->Record.variants[i]->token.string)) {
+							if (x->Record.variants[i]->token.string != y->Record.variants[i]->token.string) {
 								return false;
 							}
 						}
@@ -1199,7 +1199,7 @@ bool is_type_cte_safe(Type *type) {
 	return false;
 }
 
-typedef enum ProcTypeOverloadKind {
+enum ProcTypeOverloadKind {
 	ProcOverload_Identical, // The types are identical
 
 	ProcOverload_CallingConvention,
@@ -1211,7 +1211,7 @@ typedef enum ProcTypeOverloadKind {
 
 	ProcOverload_NotProcedure,
 
-} ProcTypeOverloadKind;
+};
 
 ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 	if (x == NULL && y == NULL) return ProcOverload_NotProcedure;
@@ -1297,9 +1297,9 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 			Entity *f = type->Record.fields[i];
 			if (f->kind == Entity_Variable) {
 				if (f->Variable.field_src_index == index) {
-					Array_i32 sel_array = {0};
+					Array<i32> sel_array = {0};
 					array_init_count(&sel_array, a, 1);
-					sel_array.e[0] = i;
+					sel_array[0] = i;
 					return make_selection(f, sel_array, false);
 				}
 			}
@@ -1309,18 +1309,18 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 		for (isize i = 0; i < max_count; i++) {
 			Entity *f = type->Tuple.variables[i];
 			if (i == index) {
-				Array_i32 sel_array = {0};
+				Array<i32> sel_array = {0};
 				array_init_count(&sel_array, a, 1);
-				sel_array.e[0] = i;
+				sel_array[0] = i;
 				return make_selection(f, sel_array, false);
 			}
 		}
 		break;
 
 	case Type_BitField: {
-		Array_i32 sel_array = {0};
+		Array<i32> sel_array = {0};
 		array_init_count(&sel_array, a, 1);
-		sel_array.e[0] = cast(i32)index;
+		sel_array[0] = cast(i32)index;
 		return make_selection(type->BitField.fields[index], sel_array, false);
 	} break;
 
@@ -1337,7 +1337,7 @@ gb_global Entity *entity__any_type_info  = NULL;
 Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel) {
 	GB_ASSERT(type_ != NULL);
 
-	if (str_eq(field_name, str_lit("_"))) {
+	if (field_name == "_") {
 		return empty_selection;
 	}
 
@@ -1362,11 +1362,11 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				entity__any_type_info = make_entity_field(a, NULL, make_token_ident(type_info_str), t_type_info_ptr, false, 1);
 			}
 
-			if (str_eq(field_name, data_str)) {
+			if (field_name == data_str) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__any_data;;
 				return sel;
-			} else if (str_eq(field_name, type_info_str)) {
+			} else if (field_name == type_info_str) {
 				selection_add_index(&sel, 1);
 				sel.entity = entity__any_type_info;
 				return sel;
@@ -1382,7 +1382,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			switch (type->Vector.count) {
 			#define _VECTOR_FIELD_CASE(_length, _name) \
 			case (_length): \
-				if (str_eq(field_name, str_lit(_name))) { \
+				if (field_name == _name) { \
 					selection_add_index(&sel, (_length)-1); \
 					sel.entity = make_entity_vector_elem(a, NULL, make_token_ident(str_lit(_name)), type->Vector.elem, (_length)-1); \
 					return sel; \
@@ -1403,7 +1403,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 	if (is_type) {
 		if (type->kind == Type_Record) {
 			if (type->Record.names != NULL &&
-			    str_eq(field_name, str_lit("names"))) {
+			    field_name == "names") {
 				sel.entity = type->Record.names;
 				return sel;
 			}
@@ -1415,7 +1415,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				GB_ASSERT(f->kind == Entity_TypeName);
 				String str = f->token.string;
 
-				if (str_eq(str, field_name)) {
+				if (str == field_name) {
 					sel.entity = f;
 					// selection_add_index(&sel, i);
 					return sel;
@@ -1424,15 +1424,15 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		} else if (is_type_enum(type)) {
 			// NOTE(bill): These may not have been added yet, so check in case
 			if (type->Record.enum_count != NULL) {
-				if (str_eq(field_name, str_lit("count"))) {
+				if (field_name == "count") {
 					sel.entity = type->Record.enum_count;
 					return sel;
 				}
-				if (str_eq(field_name, str_lit("min_value"))) {
+				if (field_name == "min_value") {
 					sel.entity = type->Record.enum_min_value;
 					return sel;
 				}
-				if (str_eq(field_name, str_lit("max_value"))) {
+				if (field_name == "max_value") {
 					sel.entity = type->Record.enum_max_value;
 					return sel;
 				}
@@ -1443,7 +1443,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				GB_ASSERT(f->kind == Entity_Constant);
 				String str = f->token.string;
 
-				if (str_eq(field_name, str)) {
+				if (field_name == str) {
 					sel.entity = f;
 					// selection_add_index(&sel, i);
 					return sel;
@@ -1457,7 +1457,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				continue;
 			}
 			String str = f->token.string;
-			if (str_eq(field_name, str)) {
+			if (field_name == str) {
 				selection_add_index(&sel, i);  // HACK(bill): Leaky memory
 				sel.entity = f;
 				return sel;
@@ -1479,7 +1479,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			}
 		}
 		if (type->Record.kind == TypeRecord_Union) {
-			if (str_eq(field_name, str_lit("__tag"))) {
+			if (field_name == "__tag") {
 				Entity *e = type->Record.union__tag;
 				GB_ASSERT(e != NULL);
 				selection_add_index(&sel, -1); // HACK(bill): Leaky memory
@@ -1496,7 +1496,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			}
 
 			String str = f->token.string;
-			if (str_eq(field_name, str)) {
+			if (field_name == str) {
 				selection_add_index(&sel, i);  // HACK(bill): Leaky memory
 				sel.entity = f;
 				return sel;
@@ -1508,10 +1508,10 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 }
 
 
-typedef struct TypePath {
-	Array(Type *) path; // Entity_TypeName;
+struct TypePath {
+	Array<Type *> path; // Entity_TypeName;
 	bool failure;
-} TypePath;
+};
 
 void type_path_init(TypePath *tp) {
 	// TODO(bill): Use an allocator that uses a backing array if it can and then use alternative allocator when exhausted
@@ -1526,7 +1526,7 @@ void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
 	GB_ASSERT(tp != NULL);
 
 	GB_ASSERT(start_index < tp->path.count);
-	Type *t = tp->path.e[start_index];
+	Type *t = tp->path[start_index];
 	GB_ASSERT(t != NULL);
 
 	GB_ASSERT_MSG(is_type_named(t), "%s", type_to_string(t));
@@ -1534,7 +1534,7 @@ void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
 	error(e->token, "Illegal declaration cycle of `%.*s`", LIT(t->Named.name));
 	// NOTE(bill): Print cycle, if it's deep enough
 	for (isize j = start_index; j < tp->path.count; j++) {
-		Type *t = tp->path.e[j];
+		Type *t = tp->path[j];
 		GB_ASSERT_MSG(is_type_named(t), "%s", type_to_string(t));
 		Entity *e = t->Named.type_name;
 		error(e->token, "\t%.*s refers to", LIT(t->Named.name));
@@ -1549,7 +1549,7 @@ TypePath *type_path_push(TypePath *tp, Type *t) {
 	GB_ASSERT(tp != NULL);
 
 	for (isize i = 0; i < tp->path.count; i++) {
-		if (tp->path.e[i] == t) {
+		if (tp->path[i] == t) {
 			type_path_print_illegal_cycle(tp, i);
 		}
 	}
@@ -1617,7 +1617,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 	switch (t->kind) {
 	case Type_Basic: {
 		GB_ASSERT(is_type_typed(t));
-		switch (t->kind) {
+		switch (t->Basic.kind) {
 		case Basic_string: return build_context.word_size;
 		case Basic_any:    return build_context.word_size;
 
@@ -2082,7 +2082,7 @@ i64 type_offset_of_from_selection(gbAllocator allocator, Type *type, Selection s
 	Type *t = type;
 	i64 offset = 0;
 	for_array(i, sel.index) {
-		isize index = sel.index.e[i];
+		isize index = sel.index[i];
 		t = base_type(t);
 		offset += type_offset_of(allocator, t, index);
 		if (t->kind == Type_Record && t->Record.kind == TypeRecord_Struct) {
@@ -2291,7 +2291,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 					}
 					if (var->flags&EntityFlag_Ellipsis) {
 						Type *slice = base_type(var->type);
-						str = gb_string_appendc(str, "...");
+						str = gb_string_appendc(str, "..");
 						GB_ASSERT(is_type_slice(var->type));
 						str = write_type_to_string(str, slice->Slice.elem);
 					} else {

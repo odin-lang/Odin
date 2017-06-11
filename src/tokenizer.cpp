@@ -117,11 +117,11 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 TOKEN_KIND(Token__KeywordEnd, "_KeywordEnd"), \
 	TOKEN_KIND(Token_Count, "")
 
-typedef enum TokenKind {
+enum TokenKind {
 #define TOKEN_KIND(e, s) e
 	TOKEN_KINDS
 #undef TOKEN_KIND
-} TokenKind;
+};
 
 String const token_strings[] = {
 #define TOKEN_KIND(e, s) {cast(u8 *)s, gb_size_of(s)-1}
@@ -130,11 +130,11 @@ String const token_strings[] = {
 };
 
 
-typedef struct TokenPos {
+struct TokenPos {
 	String file;
 	isize  line;
 	isize  column;
-} TokenPos;
+};
 
 i32 token_pos_cmp(TokenPos a, TokenPos b) {
 	if (a.line == b.line) {
@@ -152,11 +152,11 @@ bool token_pos_eq(TokenPos a, TokenPos b) {
 	return token_pos_cmp(a, b) == 0;
 }
 
-typedef struct Token {
+struct Token {
 	TokenKind kind;
 	String string;
 	TokenPos pos;
-} Token;
+};
 
 Token empty_token = {Token_Invalid};
 Token blank_token = {Token_Ident, {cast(u8 *)"_", 1}};
@@ -167,12 +167,12 @@ Token make_token_ident(String s) {
 }
 
 
-typedef struct ErrorCollector {
+struct ErrorCollector {
 	TokenPos prev;
 	i64     count;
 	i64     warning_count;
 	gbMutex mutex;
-} ErrorCollector;
+};
 
 gb_global ErrorCollector global_error_collector;
 
@@ -306,7 +306,7 @@ gb_inline bool token_is_shift(TokenKind t) {
 gb_inline void print_token(Token t) { gb_printf("%.*s\n", LIT(t.string)); }
 
 
-typedef enum TokenizerInitError {
+enum TokenizerInitError {
 	TokenizerInit_None,
 
 	TokenizerInit_Invalid,
@@ -315,18 +315,18 @@ typedef enum TokenizerInitError {
 	TokenizerInit_Empty,
 
 	TokenizerInit_Count,
-} TokenizerInitError;
+};
 
 
-typedef struct TokenizerState {
+struct TokenizerState {
 	Rune  curr_rune;   // current character
 	u8 *  curr;        // character pos
 	u8 *  read_curr;   // pos from start
 	u8 *  line;        // current line pos
 	isize line_count;
-} TokenizerState;
+};
 
-typedef struct Tokenizer {
+struct Tokenizer {
 	String fullpath;
 	u8 *start;
 	u8 *end;
@@ -338,12 +338,12 @@ typedef struct Tokenizer {
 	isize line_count;
 
 	isize error_count;
-	Array(String) allocated_strings;
-} Tokenizer;
+	Array<String> allocated_strings;
+};
 
 
 TokenizerState save_tokenizer_state(Tokenizer *t) {
-	TokenizerState state = {0};
+	TokenizerState state = {};
 	state.curr_rune  = t->curr_rune;
 	state.curr       = t->curr;
 	state.read_curr  = t->read_curr;
@@ -435,7 +435,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 
 		array_init(&t->allocated_strings, heap_allocator());
 	} else {
-		gbFile f = {0};
+		gbFile f = {};
 		gbFileError file_err = gb_file_open(&f, c_str);
 
 		switch (file_err) {
@@ -460,7 +460,7 @@ gb_inline void destroy_tokenizer(Tokenizer *t) {
 		gb_free(heap_allocator(), t->start);
 	}
 	for_array(i, t->allocated_strings) {
-		gb_free(heap_allocator(), t->allocated_strings.e[i].text);
+		gb_free(heap_allocator(), t->allocated_strings[i].text);
 	}
 	array_free(&t->allocated_strings);
 }
@@ -492,7 +492,7 @@ gb_inline void scan_mantissa(Tokenizer *t, i32 base) {
 }
 
 Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
-	Token token = {0};
+	Token token = {};
 	token.kind = Token_Integer;
 	token.string = make_string(t->curr, 1);
 	token.pos.file = t->fullpath;
@@ -742,7 +742,7 @@ bool tokenizer_find_line_end(Tokenizer *t) {
 Token tokenizer_get_token(Tokenizer *t) {
 	tokenizer_skip_whitespace(t);
 
-	Token token = {0};
+	Token token = {};
 	token.string = make_string(t->curr, 1);
 	token.pos.file = t->fullpath;
 	token.pos.line = t->line_count;
@@ -760,7 +760,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 		// NOTE(bill): All keywords are > 1
 		if (token.string.len > 1) {
 			for (i32 k = Token__KeywordBegin+1; k < Token__KeywordEnd; k++) {
-				if (str_eq(token.string, token_strings[k])) {
+				if (token.string == token_strings[k]) {
 					token.kind = cast(TokenKind)k;
 					break;
 				}
@@ -963,7 +963,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 
 		default:
 			if (curr_rune != GB_RUNE_BOM) {
-				u8 str[4] = {0};
+				u8 str[4] = {};
 				int len = cast(int)gb_utf8_encode_rune(str, curr_rune);
 				tokenizer_err(t, "Illegal character: %.*s (%d) ", len, str, curr_rune);
 			}

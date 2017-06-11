@@ -1,6 +1,6 @@
 // Optimizations for the IR code
 
-void ir_opt_add_operands(irValueArray *ops, irInstr *i) {
+void ir_opt_add_operands(Array<irValue *> *ops, irInstr *i) {
 	switch (i->kind) {
 	case irInstr_Comment:
 		break;
@@ -48,7 +48,7 @@ void ir_opt_add_operands(irValueArray *ops, irInstr *i) {
 		break;
 	case irInstr_Phi:
 		for_array(j, i->Phi.edges) {
-			array_add(ops, i->Phi.edges.e[j]);
+			array_add(ops, i->Phi.edges[j]);
 		}
 		break;
 	case irInstr_Unreachable:
@@ -97,24 +97,24 @@ void ir_opt_add_operands(irValueArray *ops, irInstr *i) {
 
 void ir_opt_block_replace_pred(irBlock *b, irBlock *from, irBlock *to) {
 	for_array(i, b->preds) {
-		irBlock *pred = b->preds.e[i];
+		irBlock *pred = b->preds[i];
 		if (pred == from) {
-			b->preds.e[i] = to;
+			b->preds[i] = to;
 		}
 	}
 }
 
 void ir_opt_block_replace_succ(irBlock *b, irBlock *from, irBlock *to) {
 	for_array(i, b->succs) {
-		irBlock *succ = b->succs.e[i];
+		irBlock *succ = b->succs[i];
 		if (succ == from) {
-			b->succs.e[i] = to;
+			b->succs[i] = to;
 		}
 	}
 }
 
 bool ir_opt_block_has_phi(irBlock *b) {
-	return b->instrs.e[0]->Instr.kind == irInstr_Phi;
+	return b->instrs[0]->Instr.kind == irInstr_Phi;
 }
 
 
@@ -126,10 +126,10 @@ bool ir_opt_block_has_phi(irBlock *b) {
 
 
 
-irValueArray ir_get_block_phi_nodes(irBlock *b) {
-	irValueArray phis = {0};
+Array<irValue *> ir_get_block_phi_nodes(irBlock *b) {
+	Array<irValue *> phis = {0};
 	for_array(i, b->instrs) {
-		irInstr *instr = &b->instrs.e[i]->Instr;
+		irInstr *instr = &b->instrs[i]->Instr;
 		if (instr->kind != irInstr_Phi) {
 			phis = b->instrs;
 			phis.count = i;
@@ -140,22 +140,22 @@ irValueArray ir_get_block_phi_nodes(irBlock *b) {
 }
 
 void ir_remove_pred(irBlock *b, irBlock *p) {
-	irValueArray phis = ir_get_block_phi_nodes(b);
+	Array<irValue *> phis = ir_get_block_phi_nodes(b);
 	isize i = 0;
 	for_array(j, b->preds) {
-		irBlock *pred = b->preds.e[j];
+		irBlock *pred = b->preds[j];
 		if (pred != p) {
-			b->preds.e[i] = b->preds.e[j];
+			b->preds[i] = b->preds[j];
 			for_array(k, phis) {
-				irInstrPhi *phi = &phis.e[k]->Instr.Phi;
-				phi->edges.e[i] = phi->edges.e[j];
+				irInstrPhi *phi = &phis[k]->Instr.Phi;
+				phi->edges[i] = phi->edges[j];
 			}
 			i++;
 		}
 	}
 	b->preds.count = i;
 	for_array(k, phis) {
-		irInstrPhi *phi = &phis.e[k]->Instr.Phi;
+		irInstrPhi *phi = &phis[k]->Instr.Phi;
 		phi->edges.count = i;
 	}
 
@@ -164,13 +164,13 @@ void ir_remove_pred(irBlock *b, irBlock *p) {
 void ir_remove_dead_blocks(irProcedure *proc) {
 	isize j = 0;
 	for_array(i, proc->blocks) {
-		irBlock *b = proc->blocks.e[i];
+		irBlock *b = proc->blocks[i];
 		if (b == NULL) {
 			continue;
 		}
 		// NOTE(bill): Swap order
 		b->index = j;
-		proc->blocks.e[j++] = b;
+		proc->blocks[j++] = b;
 	}
 	proc->blocks.count = j;
 }
@@ -180,7 +180,7 @@ void ir_mark_reachable(irBlock *b) {
 	isize const BLACK = -1;
 	b->index = BLACK;
 	for_array(i, b->succs) {
-		irBlock *succ = b->succs.e[i];
+		irBlock *succ = b->succs[i];
 		if (succ->index == WHITE) {
 			ir_mark_reachable(succ);
 		}
@@ -191,23 +191,23 @@ void ir_remove_unreachable_blocks(irProcedure *proc) {
 	isize const WHITE =  0;
 	isize const BLACK = -1;
 	for_array(i, proc->blocks) {
-		proc->blocks.e[i]->index = WHITE;
+		proc->blocks[i]->index = WHITE;
 	}
 
-	ir_mark_reachable(proc->blocks.e[0]);
+	ir_mark_reachable(proc->blocks[0]);
 
 	for_array(i, proc->blocks) {
-		irBlock *b = proc->blocks.e[i];
+		irBlock *b = proc->blocks[i];
 		if (b->index == WHITE) {
 			for_array(j, b->succs) {
-				irBlock *c = b->succs.e[j];
+				irBlock *c = b->succs[j];
 				if (c->index == BLACK) {
 					ir_remove_pred(c, b);
 				}
 			}
 			// NOTE(bill): Mark as empty but don't actually free it
 			// As it's been allocated with an arena
-			proc->blocks.e[i] = NULL;
+			proc->blocks[i] = NULL;
 		}
 	}
 	ir_remove_dead_blocks(proc);
@@ -217,7 +217,7 @@ bool ir_opt_block_fusion(irProcedure *proc, irBlock *a) {
 	if (a->succs.count != 1) {
 		return false;
 	}
-	irBlock *b = a->succs.e[0];
+	irBlock *b = a->succs[0];
 	if (b->preds.count != 1) {
 		return false;
 	}
@@ -228,21 +228,21 @@ bool ir_opt_block_fusion(irProcedure *proc, irBlock *a) {
 
 	array_pop(&a->instrs); // Remove branch at end
 	for_array(i, b->instrs) {
-		array_add(&a->instrs, b->instrs.e[i]);
-		ir_set_instr_parent(b->instrs.e[i], a);
+		array_add(&a->instrs, b->instrs[i]);
+		ir_set_instr_parent(b->instrs[i], a);
 	}
 
 	array_clear(&a->succs);
 	for_array(i, b->succs) {
-		array_add(&a->succs, b->succs.e[i]);
+		array_add(&a->succs, b->succs[i]);
 	}
 
 	// Fix preds links
 	for_array(i, b->succs) {
-		ir_opt_block_replace_pred(b->succs.e[i], b, a);
+		ir_opt_block_replace_pred(b->succs[i], b, a);
 	}
 
-	proc->blocks.e[b->index] = NULL;
+	proc->blocks[b->index] = NULL;
 	return true;
 }
 
@@ -254,7 +254,7 @@ void ir_opt_blocks(irProcedure *proc) {
 	while (changed) {
 		changed = false;
 		for_array(i, proc->blocks) {
-			irBlock *b = proc->blocks.e[i];
+			irBlock *b = proc->blocks[i];
 			if (b == NULL) {
 				continue;
 			}
@@ -273,20 +273,20 @@ void ir_opt_blocks(irProcedure *proc) {
 void ir_opt_build_referrers(irProcedure *proc) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&proc->module->tmp_arena);
 
-	irValueArray ops = {0}; // NOTE(bill): Act as a buffer
-	array_init_reserve(&ops, proc->module->tmp_allocator, 64); // HACK(bill): This _could_ overflow the temp arena
+	Array<irValue *> ops = {0}; // NOTE(bill): Act as a buffer
+	array_init(&ops, proc->module->tmp_allocator, 64); // HACK(bill): This _could_ overflow the temp arena
 	for_array(i, proc->blocks) {
-		irBlock *b = proc->blocks.e[i];
+		irBlock *b = proc->blocks[i];
 		for_array(j, b->instrs) {
-			irValue *instr = b->instrs.e[j];
+			irValue *instr = b->instrs[j];
 			array_clear(&ops);
 			ir_opt_add_operands(&ops, &instr->Instr);
 			for_array(k, ops) {
-				irValue *op = ops.e[k];
+				irValue *op = ops[k];
 				if (op == NULL) {
 					continue;
 				}
-				irValueArray *refs = ir_value_referrers(op);
+				Array<irValue *> *refs = ir_value_referrers(op);
 				if (refs != NULL) {
 					array_add(refs, instr);
 				}
@@ -324,7 +324,7 @@ i32 ir_lt_depth_first_search(irLTState *lt, irBlock *p, i32 i, irBlock **preorde
 	lt->sdom[p->index] = p;
 	ir_lt_link(lt, NULL, p);
 	for_array(index, p->succs) {
-		irBlock *q = p->succs.e[index];
+		irBlock *q = p->succs[index];
 		if (lt->sdom[q->index] == NULL) {
 			lt->parent[q->index] = p;
 			i = ir_lt_depth_first_search(lt, q, i, preorder);
@@ -354,7 +354,7 @@ irDomPrePost ir_opt_number_dom_tree(irBlock *v, i32 pre, i32 post) {
 
 	v->dom.pre = pre++;
 	for_array(i, v->dom.children) {
-		result = ir_opt_number_dom_tree(v->dom.children.e[i], result.pre, result.post);
+		result = ir_opt_number_dom_tree(v->dom.children[i], result.pre, result.post);
 	}
 	v->dom.post = post++;
 
@@ -381,7 +381,7 @@ void ir_opt_build_dom_tree(irProcedure *proc) {
 
 	irBlock **preorder = &buf[3*n];
 	irBlock **buckets  = &buf[4*n];
-	irBlock *root = proc->blocks.e[0];
+	irBlock *root = proc->blocks[0];
 
 	// Step 1 - number vertices
 	i32 pre_num = ir_lt_depth_first_search(&lt, root, 0, preorder);
@@ -403,7 +403,7 @@ void ir_opt_build_dom_tree(irProcedure *proc) {
 		// Step 2 - Compute all sdoms
 		lt.sdom[w->index] = lt.parent[w->index];
 		for_array(pred_index, w->preds) {
-			irBlock *v = w->preds.e[pred_index];
+			irBlock *v = w->preds[pred_index];
 			irBlock *u = ir_lt_eval(&lt, v);
 			if (lt.sdom[u->index]->dom.pre < lt.sdom[w->index]->dom.pre) {
 				lt.sdom[w->index] = lt.sdom[u->index];
@@ -438,7 +438,7 @@ void ir_opt_build_dom_tree(irProcedure *proc) {
 			}
 
 			// Calculate children relation as inverse of idom
-			if (w->dom.idom->dom.children.e == NULL) {
+			if (w->dom.idom->dom.children.data == NULL) {
 				// TODO(bill): Is this good enough for memory allocations?
 				array_init(&w->dom.idom->dom.children, heap_allocator());
 			}
@@ -461,7 +461,7 @@ void ir_opt_tree(irGen *s) {
 	s->opt_called = true;
 
 	for_array(member_index, s->module.procs) {
-		irProcedure *proc = s->module.procs.e[member_index];
+		irProcedure *proc = s->module.procs[member_index];
 		if (proc->blocks.count == 0) { // Prototype/external procedure
 			continue;
 		}

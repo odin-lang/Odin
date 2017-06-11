@@ -41,15 +41,15 @@ gb_inline u64 fmix64(u64 k) {
 	return k;
 }
 
-gb_inline u32 mm3_getblock32(u32 *const p, isize i) {
+gb_inline u32 mm3_getblock32(u32 const *p, isize i) {
 	return p[i];
 }
-gb_inline u64 mm3_getblock64(u64 *const p, isize i) {
+gb_inline u64 mm3_getblock64(u64 const *p, isize i) {
 	return p[i];
 }
 
-u128 MurmurHash3_x64_128(void *const key, isize len, u32 seed) {
-	u8 *const data = cast(u8 *const)key;
+void MurmurHash3_x64_128(void const *key, isize len, u32 seed, void *out) {
+	u8 const * data = cast(u8 const *)key;
 	isize nblocks = len / 16;
 
 	u64 h1 = seed;
@@ -58,7 +58,7 @@ u128 MurmurHash3_x64_128(void *const key, isize len, u32 seed) {
 	u64 const c1 = 0x87c37b91114253d5ULL;
 	u64 const c2 = 0x4cf5ad432745937fULL;
 
-	u64 *const blocks = cast(u64 *const)data;
+	u64 const * blocks = cast(u64 const *)data;
 
 	for (isize i = 0; i < nblocks; i++) {
 		u64 k1 = mm3_getblock64(blocks, i*2 + 0);
@@ -70,7 +70,7 @@ u128 MurmurHash3_x64_128(void *const key, isize len, u32 seed) {
 		h2 = ROTL64(h2,31); h2 += h1; h2 = h2*5+0x38495ab5;
 	}
 
-	u8 *const tail = cast(u8 *const)(data + nblocks*16);
+	u8 const * tail = cast(u8 const *)(data + nblocks*16);
 
 	u64 k1 = 0;
 	u64 k2 = 0;
@@ -108,11 +108,12 @@ u128 MurmurHash3_x64_128(void *const key, isize len, u32 seed) {
 	h1 += h2;
 	h2 += h1;
 
-	return u128_lo_hi(h1, h2);
+	((u64 *)out)[0] = h1;
+	((u64 *)out)[1] = h2;
 }
 
-u128 MurmurHash3_x86_128(void *const key, isize len, u32 seed) {
-	u8 *const data = cast(u8 * const)key;
+void MurmurHash3_x86_128(void const *key, isize len, u32 seed, void *out) {
+	u8 const * data = cast(u8 * const)key;
 	isize nblocks = len / 16;
 
 	u32 h1 = seed;
@@ -128,7 +129,7 @@ u128 MurmurHash3_x86_128(void *const key, isize len, u32 seed) {
 	//----------
 	// body
 
-	u32 *const blocks = cast(u32 *const)(data + nblocks*16);
+	u32 const * blocks = cast(u32 const *)(data + nblocks*16);
 
 	for (isize i = -nblocks; i != 0; i++) {
 		u32 k1 = mm3_getblock32(blocks, i*4 + 0);
@@ -156,7 +157,7 @@ u128 MurmurHash3_x86_128(void *const key, isize len, u32 seed) {
 	//----------
 	// tail
 
-	u8 *const tail = cast(u8 *const)(data + nblocks*16);
+	u8 const * tail = cast(u8 const *)(data + nblocks*16);
 
 	u32 k1 = 0;
 	u32 k2 = 0;
@@ -204,17 +205,21 @@ u128 MurmurHash3_x86_128(void *const key, isize len, u32 seed) {
 	h1 += h2; h1 += h3; h1 += h4;
 	h2 += h1; h3 += h1; h4 += h1;
 
-	u64 lo = (u64)h1 | ((u64)h2 << 32);
-	u64 hi = (u64)h3 | ((u64)h4 << 32);
-	return u128_lo_hi(lo, hi);
+
+	((u32 *)out)[0] = h1;
+	((u32 *)out)[1] = h2;
+	((u32 *)out)[2] = h3;
+	((u32 *)out)[3] = h4;
 }
 
-gb_inline u128 MurmurHash3_128(void *const key, isize len, u32 seed) {
+gb_inline u128 MurmurHash3_128(void const *key, isize len, u32 seed) {
+	u128 res;
 #if defined(GB_ARCH_64_BIT)
-	return MurmurHash3_x64_128(key, len, seed);
+	MurmurHash3_x64_128(key, len, seed, &res);
 #else
-	return MurmurHash3_x86_128(key, len, seed);
+	MurmurHash3_x86_128(key, len, seed, &res);
 #endif
+	return res;
 }
 
 

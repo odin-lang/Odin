@@ -3,7 +3,7 @@
 #include <xmmintrin.h>
 #endif
 
-#define GB_NO_DEFER
+// #define GB_NO_DEFER
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
 
@@ -13,21 +13,26 @@ gbAllocator heap_allocator(void) {
 	return gb_heap_allocator();
 }
 
-#include "unicode.c"
-#include "string.c"
-#include "array.c"
-#include "integer128.c"
-#include "murmurhash3.c"
+#include "unicode.cpp"
+#include "string.cpp"
+#include "array.cpp"
+#include "integer128.cpp"
+#include "murmurhash3.cpp"
 
 u128 fnv128a(void const *data, isize len) {
 	u128 o = u128_lo_hi(0x13bull, 0x1000000ull);
 	u128 h = u128_lo_hi(0x62b821756295c58dull, 0x6c62272e07bb0142ull);
 	u8 const *bytes = cast(u8 const *)data;
 	for (isize i = 0; i < len; i++) {
-		h = u128_mul(u128_xor(h, u128_from_u64(bytes[i])), o);
+		h.lo ^= bytes[i];
+		h = h * o;
 	}
 	return h;
 }
+
+#include "map.cpp"
+
+
 
 gb_global String global_module_path = {0};
 gb_global bool global_module_path_set = false;
@@ -43,8 +48,6 @@ gbAllocator scratch_allocator(void) {
 	return gb_scratch_allocator(&scratch_memory);
 }
 
-typedef struct DynamicArenaBlock DynamicArenaBlock;
-typedef struct DynamicArena      DynamicArena;
 
 struct DynamicArenaBlock {
 	DynamicArenaBlock *prev;
@@ -236,27 +239,4 @@ f64 gb_sqrt(f64 x) {
 	} \
 } while (0)
 
-////////////////////////////////////////////////////////////////
-//
-// Generic Data Structures
-//
-////////////////////////////////////////////////////////////////
 
-typedef Array(i32)   Array_i32;
-typedef Array(isize) Array_isize;
-
-
-#define MAP_TYPE String
-#define MAP_PROC map_string_
-#define MAP_NAME MapString
-#include "map.c"
-
-#define MAP_TYPE bool
-#define MAP_PROC map_bool_
-#define MAP_NAME MapBool
-#include "map.c"
-
-#define MAP_TYPE isize
-#define MAP_PROC map_isize_
-#define MAP_NAME MapIsize
-#include "map.c"

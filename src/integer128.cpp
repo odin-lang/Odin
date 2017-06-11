@@ -1,16 +1,25 @@
-typedef struct u128 {u64 lo; u64 hi;} u128;
-typedef struct i128 {u64 lo; i64 hi;} i128;
 
-#define BIT128_U64_HIGHBIT 0x8000000000000000ul
-#define BIT128_U64_BITS62  0x7ffffffffffffffful
-#define BIT128_U64_ALLBITS 0xfffffffffffffffful
+#if defined(GB_COMPILER_MSVC) && defined(GB_ARCH_64_BIT) && defined(GB_CPU_X86)
+	#define MSVC_AMD64_INTRINSICS
+	#include <intrin.h>
+	#pragma intrinsic(_mul128)
+#endif
+
+#define BIT128_U64_HIGHBIT 0x8000000000000000ull
+#define BIT128_U64_BITS62  0x7fffffffffffffffull
+#define BIT128_U64_ALLBITS 0xffffffffffffffffull
+
+
+typedef struct u128 { u64 lo; u64 hi; } u128;
+typedef struct i128 { u64 lo; i64 hi; } i128;
+
 
 static u128 const U128_ZERO = {0, 0};
 static u128 const U128_ONE  = {1, 0};
 static i128 const I128_ZERO = {0, 0};
 static i128 const I128_ONE  = {1, 0};
 static u128 const U128_NEG_ONE = {BIT128_U64_ALLBITS, BIT128_U64_ALLBITS};
-static i128 const I128_NEG_ONE = {BIT128_U64_ALLBITS, BIT128_U64_ALLBITS};
+static i128 const I128_NEG_ONE = {BIT128_U64_ALLBITS, cast(i64)BIT128_U64_ALLBITS};
 
 u128 u128_lo_hi      (u64 lo, u64 hi);
 u128 u128_from_u32   (u32 u);
@@ -84,6 +93,48 @@ void i128_divide (i128 num, i128 den, i128 *quo, i128 *rem);
 i128 i128_quo    (i128 a, i128 b);
 i128 i128_mod    (i128 a, i128 b);
 
+bool operator==(u128 a, u128 b) { return u128_eq(a, b); }
+bool operator!=(u128 a, u128 b) { return u128_ne(a, b); }
+bool operator< (u128 a, u128 b) { return u128_lt(a, b); }
+bool operator> (u128 a, u128 b) { return u128_gt(a, b); }
+bool operator<=(u128 a, u128 b) { return u128_le(a, b); }
+bool operator>=(u128 a, u128 b) { return u128_ge(a, b); }
+
+u128 operator+(u128 a, u128 b) { return u128_add(a, b); }
+u128 operator-(u128 a, u128 b) { return u128_sub(a, b); }
+u128 operator*(u128 a, u128 b) { return u128_mul(a, b); }
+u128 operator/(u128 a, u128 b) { return u128_quo(a, b); }
+u128 operator%(u128 a, u128 b) { return u128_mod(a, b); }
+u128 operator&(u128 a, u128 b) { return u128_and(a, b); }
+u128 operator|(u128 a, u128 b) { return u128_or (a, b); }
+u128 operator^(u128 a, u128 b) { return u128_xor(a, b); }
+u128 operator~(u128 a)         { return u128_not(a); }
+u128 operator+(u128 a)         { return a; }
+u128 operator-(u128 a)         { return u128_neg(a); }
+u128 operator<<(u128 a, u32 b) { return u128_shl(a, b); }
+u128 operator>>(u128 a, u32 b) { return u128_shr(a, b); }
+
+
+bool operator==(i128 a, i128 b) { return i128_eq(a, b); }
+bool operator!=(i128 a, i128 b) { return i128_ne(a, b); }
+bool operator< (i128 a, i128 b) { return i128_lt(a, b); }
+bool operator> (i128 a, i128 b) { return i128_gt(a, b); }
+bool operator<=(i128 a, i128 b) { return i128_le(a, b); }
+bool operator>=(i128 a, i128 b) { return i128_ge(a, b); }
+
+i128 operator+(i128 a, i128 b) { return i128_add(a, b); }
+i128 operator-(i128 a, i128 b) { return i128_sub(a, b); }
+i128 operator*(i128 a, i128 b) { return i128_mul(a, b); }
+i128 operator/(i128 a, i128 b) { return i128_quo(a, b); }
+i128 operator%(i128 a, i128 b) { return i128_mod(a, b); }
+i128 operator&(i128 a, i128 b) { return i128_and(a, b); }
+i128 operator|(i128 a, i128 b) { return i128_or (a, b); }
+i128 operator^(i128 a, i128 b) { return i128_xor(a, b); }
+i128 operator~(i128 a)         { return i128_not(a); }
+i128 operator+(i128 a)         { return a; }
+i128 operator-(i128 a)         { return i128_neg(a); }
+i128 operator<<(i128 a, u32 b) { return i128_shl(a, b); }
+i128 operator>>(i128 a, u32 b) { return i128_shr(a, b); }
 
 ////////////////////////////////////////////////////////////////
 
@@ -99,7 +150,7 @@ u64 bit128__digit_value(Rune r) {
 	return 16; // NOTE(bill): Larger than highest possible
 }
 
-u128 u128_lo_hi(u64 lo, u64 hi) { return (u128){lo, hi}; }
+u128 u128_lo_hi(u64 lo, u64 hi) { return u128{lo, hi}; }
 u128 u128_from_u32(u32 u)       { return u128_lo_hi(cast(u64)u, 0); }
 u128 u128_from_u64(u64 u)       { return u128_lo_hi(cast(u64)u, 0); }
 u128 u128_from_i64(i64 u)       { return u128_lo_hi(cast(u64)u, u < 0 ? -1 : 0); }
@@ -109,8 +160,8 @@ u128 u128_from_string(String string) {
 	// TODO(bill): Allow for numbers with underscores in them
 	u64 base = 10;
 	bool has_prefix = false;
-	if (string.len > 2 && string.text[0] == '0') {
-		switch (string.text[1]) {
+	if (string.len > 2 && string[0] == '0') {
+		switch (string[1]) {
 		case 'b': base = 2;  has_prefix = true; break;
 		case 'o': base = 8;  has_prefix = true; break;
 		case 'd': base = 10; has_prefix = true; break;
@@ -160,8 +211,8 @@ i128 i128_from_string(String string) {
 	// TODO(bill): Allow for numbers with underscores in them
 	u64 base = 10;
 	bool has_prefix = false;
-	if (string.len > 2 && string.text[0] == '0') {
-		switch (string.text[1]) {
+	if (string.len > 2 && string[0] == '0') {
+		switch (string[1]) {
 		case 'b': base = 2;  has_prefix = true; break;
 		case 'o': base = 8;  has_prefix = true; break;
 		case 'd': base = 10; has_prefix = true; break;
@@ -332,7 +383,11 @@ u128 u128_shl(u128 a, u32 n) {
 	if (n >= 128) {
 		return u128_lo_hi(0, 0);
 	}
-
+#if 0 && defined(MSVC_AMD64_INTRINSICS)
+	a.hi = __shiftleft128(a.lo, a.hi, n);
+	a.lo = a.lo << n;
+	return a;
+#else
 	if (n >= 64) {
 		n -= 64;
 		a.hi = a.lo;
@@ -347,13 +402,18 @@ u128 u128_shl(u128 a, u32 n) {
 		a.lo <<= n;
 	}
 	return a;
+#endif
 }
 
 u128 u128_shr(u128 a, u32 n) {
 	if (n >= 128) {
 		return u128_lo_hi(0, 0);
 	}
-
+#if 0 && defined(MSVC_AMD64_INTRINSICS)
+	a.lo = __shiftright128(a.lo, a.hi, n);
+	a.hi = a.hi >> n;
+	return a;
+#else
 	if (n >= 64) {
 		n -= 64;
 		a.lo = a.hi;
@@ -367,6 +427,7 @@ u128 u128_shr(u128 a, u32 n) {
 		a.hi >>= n;
 	}
 	return a;
+#endif
 }
 
 
@@ -383,6 +444,14 @@ u128 u128_mul(u128 a, u128 b) {
 		return a;
 	}
 
+
+#if defined(MSVC_AMD64_INTRINSICS)
+	if (a.hi == 0 && b.hi == 0) {
+		a.lo = _umul128(a.lo, b.lo, &a.hi);
+		return a;
+	}
+#endif
+
 	u128 res = {0};
 	u128 t = b;
 	for (u32 i = 0; i < 128; i++) {
@@ -396,6 +465,8 @@ u128 u128_mul(u128 a, u128 b) {
 	return res;
 }
 
+bool u128_hibit(u128 *d) { return (d->hi & BIT128_U64_HIGHBIT) != 0; }
+
 void u128_divide(u128 num, u128 den, u128 *quo, u128 *rem) {
 	if (u128_eq(den, U128_ZERO)) {
 		if (quo) *quo = u128_from_u64(num.lo/den.lo);
@@ -406,7 +477,7 @@ void u128_divide(u128 num, u128 den, u128 *quo, u128 *rem) {
 		u128 x = U128_ONE;
 		u128 r = U128_ZERO;
 
-		while (u128_ge(n, d) && ((u128_shr(d, 128-1).lo&1) == 0)) {
+		while (u128_ge(n, d) && !u128_hibit(&d)) {
 			x = u128_shl(x, 1);
 			d = u128_shl(d, 1);
 		}
@@ -427,11 +498,18 @@ void u128_divide(u128 num, u128 den, u128 *quo, u128 *rem) {
 }
 
 u128 u128_quo(u128 a, u128 b) {
+	if (a.hi == 0 && b.hi == 0) {
+		return u128_from_u64(a.lo/b.lo);
+	}
+
 	u128 res = {0};
 	u128_divide(a, b, &res, NULL);
 	return res;
 }
 u128 u128_mod(u128 a, u128 b) {
+	if (a.hi == 0 && b.hi == 0) {
+		return u128_from_u64(a.lo%b.lo);
+	}
 	u128 res = {0};
 	u128_divide(a, b, NULL, &res);
 	return res;
@@ -491,6 +569,11 @@ i128 i128_shl(i128 a, u32 n) {
 		return i128_lo_hi(0, 0);
 	}
 
+#if 0 && defined(MSVC_AMD64_INTRINSICS)
+	a.hi = __shiftleft128(a.lo, a.hi, n);
+	a.lo = a.lo << n;
+	return a;
+#else
 	if (n >= 64) {
 		n -= 64;
 		a.hi = a.lo;
@@ -505,6 +588,7 @@ i128 i128_shl(i128 a, u32 n) {
 		a.lo <<= n;
 	}
 	return a;
+#endif
 }
 
 i128 i128_shr(i128 a, u32 n) {
@@ -512,6 +596,11 @@ i128 i128_shr(i128 a, u32 n) {
 		return i128_lo_hi(0, 0);
 	}
 
+#if 0 && defined(MSVC_AMD64_INTRINSICS)
+	a.lo = __shiftright128(a.lo, a.hi, n);
+	a.hi = a.hi >> n;
+	return a;
+#else
 	if (n >= 64) {
 		n -= 64;
 		a.lo = a.hi;
@@ -525,6 +614,7 @@ i128 i128_shr(i128 a, u32 n) {
 		a.hi >>= n;
 	}
 	return a;
+#endif
 }
 
 
@@ -540,6 +630,13 @@ i128 i128_mul(i128 a, i128 b) {
 	if (i128_eq(b, I128_ONE)) {
 		return a;
 	}
+
+#if defined(MSVC_AMD64_INTRINSICS)
+	if (a.hi == 0 && b.hi == 0) {
+		a.lo = _mul128(a.lo, b.lo, &a.hi);
+		return a;
+	}
+#endif
 
 	i128 res = {0};
 	i128 t = b;

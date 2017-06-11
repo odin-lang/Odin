@@ -1,14 +1,14 @@
-typedef struct TimeStamp {
+struct TimeStamp {
 	u64    start;
 	u64    finish;
 	String label;
-} TimeStamp;
+};
 
-typedef struct Timings {
+struct Timings {
 	TimeStamp        total;
-	Array(TimeStamp) sections;
+	Array<TimeStamp> sections;
 	u64              freq;
-} Timings;
+};
 
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -83,7 +83,7 @@ TimeStamp make_time_stamp(String label) {
 }
 
 void timings_init(Timings *t, String label, isize buffer_size) {
-	array_init_reserve(&t->sections, heap_allocator(), buffer_size);
+	array_init(&t->sections, heap_allocator(), buffer_size);
 	t->total = make_time_stamp(label);
 	t->freq  = time_stamp__freq();
 }
@@ -94,7 +94,7 @@ void timings_destroy(Timings *t) {
 
 void timings__stop_current_section(Timings *t) {
 	if (t->sections.count > 0) {
-		t->sections.e[t->sections.count-1].finish = time_stamp_time_now();
+		t->sections[t->sections.count-1].finish = time_stamp_time_now();
 	}
 }
 
@@ -110,14 +110,14 @@ f64 time_stamp_as_ms(TimeStamp ts, u64 freq) {
 
 void timings_print_all(Timings *t) {
 	char const SPACES[] = "                                                                ";
-	isize max_len, i;
+	isize max_len;
 
 	timings__stop_current_section(t);
 	t->total.finish = time_stamp_time_now();
 
 	max_len = t->total.label.len;
 	for_array(i, t->sections) {
-		TimeStamp ts = t->sections.e[i];
+		TimeStamp ts = t->sections[i];
 		max_len = gb_max(max_len, ts.label.len);
 	}
 
@@ -129,7 +129,7 @@ void timings_print_all(Timings *t) {
 	          time_stamp_as_ms(t->total, t->freq));
 
 	for_array(i, t->sections) {
-		TimeStamp ts = t->sections.e[i];
+		TimeStamp ts = t->sections[i];
 		gb_printf("%.*s%.*s - %.3f ms\n",
 		          LIT(ts.label),
 	              cast(int)(max_len-ts.label.len), SPACES,

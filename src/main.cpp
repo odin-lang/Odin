@@ -1,20 +1,15 @@
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 #define USE_CUSTOM_BACKEND false
 
-#include "common.c"
-#include "timings.c"
-#include "build_settings.c"
-#include "tokenizer.c"
-#include "parser.c"
-#include "checker.c"
-#include "ssa.c"
-#include "ir.c"
-#include "ir_opt.c"
-#include "ir_print.c"
-// #include "vm.c"
+#include "common.cpp"
+#include "timings.cpp"
+#include "build_settings.cpp"
+#include "tokenizer.cpp"
+#include "parser.cpp"
+#include "checker.cpp"
+#include "ssa.cpp"
+#include "ir.cpp"
+#include "ir_opt.cpp"
+#include "ir_print.cpp"
 
 #if defined(GB_SYSTEM_WINDOWS)
 // NOTE(bill): `name` is used in debugging and profiling modes
@@ -155,27 +150,27 @@ int main(int argc, char **argv) {
 	char *init_filename = NULL;
 	bool run_output = false;
 	String arg1 = make_string_c(argv[1]);
-	if (str_eq(arg1, str_lit("run"))) {
+	if (arg1 == "run") {
 		if (argc != 3) {
 			usage(argv[0]);
 			return 1;
 		}
 		init_filename = argv[2];
 		run_output = true;
-	} else if (str_eq(arg1, str_lit("build_dll"))) {
+	} else if (arg1 == "build_dll") {
 		if (argc != 3) {
 			usage(argv[0]);
 			return 1;
 		}
 		init_filename = argv[2];
 		build_context.is_dll = true;
-	} else if (str_eq(arg1, str_lit("build"))) {
+	} else if (arg1 == "build") {
 		if (argc != 3) {
 			usage(argv[0]);
 			return 1;
 		}
 		init_filename = argv[2];
-	} else if (str_eq(arg1, str_lit("version"))) {
+	} else if (arg1 == "version") {
 		gb_printf("%s version %.*s\n", argv[0], LIT(build_context.ODIN_VERSION));
 		return 0;
 	} else {
@@ -314,7 +309,7 @@ int main(int argc, char **argv) {
 	// defer (gb_string_free(lib_str));
 	char lib_str_buf[1024] = {0};
 	for_array(i, ir_gen.module.foreign_library_paths) {
-		String lib = ir_gen.module.foreign_library_paths.e[i];
+		String lib = ir_gen.module.foreign_library_paths[i];
 		// gb_printf_err("Linking lib: %.*s\n", LIT(lib));
 		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
 		                        " \"%.*s\"", LIT(lib));
@@ -376,14 +371,14 @@ int main(int argc, char **argv) {
 	// defer (gb_string_free(lib_str));
 	char lib_str_buf[1024] = {0};
 	for_array(i, ir_gen.module.foreign_library_paths) {
-		String lib = ir_gen.module.foreign_library_paths.e[i];
+		String lib = ir_gen.module.foreign_library_paths[i];
 
 		// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
 		//   This allows you to specify '-f' in a #foreign_system_library,
 		//   without having to implement any new syntax specifically for MacOS.
 		#if defined(GB_SYSTEM_OSX)
 			isize len;
-			if(lib.len > 2 && lib.text[0] == '-' && lib.text[1] == 'f') {
+			if(lib.len > 2 && lib[0] == '-' && lib[1] == 'f') {
 				len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
 				                        " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
 			} else {
@@ -461,7 +456,3 @@ int main(int argc, char **argv) {
 
 	return 0;
 }
-
-#if defined(__cplusplus)
-}
-#endif
