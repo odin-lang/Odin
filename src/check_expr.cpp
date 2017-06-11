@@ -4968,8 +4968,11 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	}
 	for (isize i = 0; i < param_count_to_check; i++) {
 		if (!params_visited[i]) {
+			Entity *e = pt->params->Tuple.variables[i];
+			if (e->token.string == "_") {
+				continue;
+			}
 			if (show_error) {
-				Entity *e = pt->params->Tuple.variables[i];
 				gbString str = type_to_string(e->type);
 				error_node(call, "Parameter `%.*s` of type `%s` is missing in procedure call",
 				           LIT(e->token.string), str);
@@ -4989,7 +4992,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
 	ast_node(ce, CallExpr, call);
 
-	CallArgumentCheckerType *call_checker = NULL;
+	CallArgumentCheckerType *call_checker = check_call_arguments_internal;
 	Array<Operand> operands = {};
 	defer (array_free(&operands));
 
@@ -5002,18 +5005,20 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 			ast_node(fv, FieldValue, arg);
 			check_expr(c, &operands[i], fv->value);
 		}
-	} else {
-		call_checker = check_call_arguments_internal;
 
+		bool vari_expand = (ce->ellipsis.pos.line != 0);
+		if (vari_expand) {
+			error(ce->ellipsis, "Invalid use of `..` with `field = value` call`");
+		}
+
+	} else {
 		array_init(&operands, heap_allocator(), 2*ce->args.count);
 		check_unpack_arguments(c, -1, &operands, ce->args, false);
 	}
 
-	GB_ASSERT(call_checker != NULL);
-
 	if (operand->mode == Addressing_Overload) {
 		GB_ASSERT(operand->overload_entities != NULL &&
-		          operand->overload_count > 0);
+		          operand->overload_count > 1);
 
 		isize              overload_count = operand->overload_count;
 		Entity **          procs          = operand->overload_entities;
@@ -5069,7 +5074,7 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 				Entity *proc = procs[valids[i].index];
 				TokenPos pos = proc->token.pos;
 				gbString pt = type_to_string(proc->type);
-				gb_printf_err("\t%.*s :: %s at %.*s(%td:%td)\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column);
+				gb_printf_err("\t%.*s :: %s at %.*s(%td:%td) with score %lld\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, valids[i].score);
 				gb_string_free(pt);
 			}
 			proc_type = t_invalid;
