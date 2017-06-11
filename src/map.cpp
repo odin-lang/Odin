@@ -19,6 +19,7 @@ enum HashKeyKind {
 
 struct HashKey {
 	HashKeyKind kind;
+	// u128        key;
 	u64         key;
 	union {
 		String string; // if String, s.len > 0
@@ -29,9 +30,8 @@ struct HashKey {
 gb_inline HashKey hashing_proc(void const *data, isize len) {
 	HashKey h = {HashKey_Default};
 	h.kind = HashKey_Default;
-	// h.key = gb_murmur64(data, len);
+	// h.key = u128_from_u64(gb_fnv64a(data, len));
 	h.key = gb_fnv64a(data, len);
-	// h.key = MurmurHash3_128(data, len, 0x3803cb8e);
 
 	return h;
 }
@@ -136,7 +136,8 @@ template <typename T>
 gb_internal MapFindResult map__find(Map<T> *h, HashKey key) {
 	MapFindResult fr = {-1, -1, -1};
 	if (h->hashes.count > 0) {
-		fr.hash_index  = key.key % h->hashes.count;
+		// fr.hash_index  = u128_to_i64(key.key % u128_from_i64(h->hashes.count));
+		fr.hash_index = key.key % h->hashes.count;
 		fr.entry_index = h->hashes[fr.hash_index];
 		while (fr.entry_index >= 0) {
 			if (hash_key_equal(h->entries[fr.entry_index].key, key)) {

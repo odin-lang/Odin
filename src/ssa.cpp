@@ -2493,7 +2493,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 
 	for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
-		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
+		Entity *e = cast(Entity *)entry->key.ptr;
 		String name = e->token.string;
 		if (e->kind == Entity_Variable) {
 			global_variable_max_count++;

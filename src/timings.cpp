@@ -110,7 +110,7 @@ f64 time_stamp_as_ms(TimeStamp ts, u64 freq) {
 
 void timings_print_all(Timings *t) {
 	char const SPACES[] = "                                                                ";
-	isize max_len, i;
+	isize max_len;
 
 	timings__stop_current_section(t);
 	t->total.finish = time_stamp_time_now();

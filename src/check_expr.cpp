@@ -2,8 +2,7 @@ void     check_expr                     (Checker *c, Operand *operand, AstNode *
 void     check_multi_expr               (Checker *c, Operand *operand, AstNode *expression);
 void     check_expr_or_type             (Checker *c, Operand *operand, AstNode *expression);
 ExprKind check_expr_base                (Checker *c, Operand *operand, AstNode *expression, Type *type_hint);
-Type *   check_type_extra               (Checker *c, AstNode *expression, Type *named_type);
-Type *   check_type                     (Checker *c, AstNode *expression);
+Type *   check_type                     (Checker *c, AstNode *expression, Type *named_type = NULL);
 void     check_type_decl                (Checker *c, Entity *e, AstNode *type_expr, Type *def);
 Entity * check_selector                 (Checker *c, Operand *operand, AstNode *node, Type *type_hint);
 void     check_not_tuple                (Checker *c, Operand *operand);
@@ -20,11 +19,6 @@ void     check_stmt_list                (Checker *c, Array<AstNode *> stmts, u32
 void     check_init_constant            (Checker *c, Entity *e, Operand *operand);
 bool     check_representable_as_constant(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
 Type *   check_call_arguments           (Checker *c, Operand *operand, Type *proc_type, AstNode *call);
-
-
-gb_inline Type *check_type(Checker *c, AstNode *expression) {
-	return check_type_extra(c, expression, NULL);
-}
 
 
 void error_operand_not_expression(Operand *o) {
@@ -326,7 +320,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 			// TODO(bill): is this a good enough error message?
 			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error_node(operand->expr,
-			           "Cannot assign builtin procedure `%s` in %.*s",
+			           "Cannot assign built-in procedure `%s` in %.*s",
 			           expr_str,
 			           LIT(context_name));
 		} else {
@@ -1605,8 +1599,8 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 	ast_node(mt, MapType, node);
 
 	i64 count   = check_array_or_map_count(c, mt->count, true);
-	Type *key   = check_type_extra(c, mt->key, NULL);
-	Type *value = check_type_extra(c, mt->value, NULL);
+	Type *key   = check_type(c, mt->key);
+	Type *value = check_type(c, mt->value);
 
 	if (!is_type_valid_for_keys(key)) {
 		if (is_type_boolean(key)) {
@@ -1702,7 +1696,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 	// error_node(node, "`map` types are not yet implemented");
 }
 
-bool check_type_extra_internal(Checker *c, AstNode *e, Type **type, Type *named_type) {
+bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) {
 	GB_ASSERT_NOT_NULL(type);
 	if (e == NULL) {
 		*type = t_invalid;
@@ -1759,7 +1753,7 @@ bool check_type_extra_internal(Checker *c, AstNode *e, Type **type, Type *named_
 	case_end;
 
 	case_ast_node(pe, ParenExpr, e);
-		*type = check_type_extra(c, pe->expr, named_type);
+		*type = check_type(c, pe->expr, named_type);
 		return true;
 	case_end;
 
@@ -1794,7 +1788,7 @@ bool check_type_extra_internal(Checker *c, AstNode *e, Type **type, Type *named_
 
 	case_ast_node(at, ArrayType, e);
 		if (at->count != NULL) {
-			Type *elem = check_type_extra(c, at->elem, NULL);
+			Type *elem = check_type(c, at->elem, NULL);
 			i64 count = check_array_or_map_count(c, at->count, false);
 			if (count < 0) {
 				error_node(at->count, ".. can only be used in conjuction with compound literals");
@@ -1825,7 +1819,7 @@ bool check_type_extra_internal(Checker *c, AstNode *e, Type **type, Type *named_
 	case_end;
 
 	case_ast_node(dat, DynamicArrayType, e);
-		Type *elem = check_type_extra(c, dat->elem, NULL);
+		Type *elem = check_type(c, dat->elem);
 		i64 esz = type_size_of(c->allocator, elem);
 #if 0
 		if (esz == 0) {
@@ -1934,9 +1928,9 @@ bool check_type_extra_internal(Checker *c, AstNode *e, Type **type, Type *named_
 
 
 
-Type *check_type_extra(Checker *c, AstNode *e, Type *named_type) {
+Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 	Type *type = NULL;
-	bool ok = check_type_extra_internal(c, e, &type, named_type);
+	bool ok = check_type_internal(c, e, &type, named_type);
 
 	if (!ok) {
 		gbString err_str = expr_to_string(e);
@@ -3533,6 +3527,14 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 	}
 
+	if (ce->args.count > 0) {
+		if (ce->args[0]->kind == AstNode_FieldValue) {
+			error_node(call, "`field = value` calling is not allowed on built-in procedures");
+			return false;
+		}
+	}
+
+
 	bool vari_expand = (ce->ellipsis.pos.line != 0);
 	if (vari_expand && id != BuiltinProc_append) {
 		error(ce->ellipsis, "Invalid use of `..` with built-in procedure `append`");
@@ -3556,7 +3558,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	switch (id) {
 	default:
-		GB_PANIC("Implement builtin procedure: %.*s", LIT(builtin_procs[id].name));
+		GB_PANIC("Implement built-in procedure: %.*s", LIT(builtin_procs[id].name));
 		break;
 
 	case BuiltinProc_len:
@@ -4707,6 +4709,10 @@ enum CallArgumentError {
 	CallArgumentError_ArgumentCount,
 	CallArgumentError_TooFewArguments,
 	CallArgumentError_TooManyArguments,
+	CallArgumentError_InvalidFieldValue,
+	CallArgumentError_ParameterNotFound,
+	CallArgumentError_ParameterMissing,
+	CallArgumentError_DuplicateParameter,
 };
 
 enum CallArgumentErrorMode {
@@ -4714,114 +4720,6 @@ enum CallArgumentErrorMode {
 	CallArgumentMode_ShowErrors,
 };
 
-CallArgumentError check_call_arguments_internal(Checker *c, AstNode *call, Type *proc_type, Operand *operands, isize operand_count,
-                                                CallArgumentErrorMode show_error_mode, i64 *score_) {
-	ast_node(ce, CallExpr, call);
-	isize param_count = 0;
-	bool variadic = proc_type->Proc.variadic;
-	bool vari_expand = (ce->ellipsis.pos.line != 0);
-	i64 score = 0;
-	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
-
-	if (proc_type->Proc.params != NULL) {
-		param_count = proc_type->Proc.params->Tuple.variable_count;
-		if (variadic) {
-			param_count--;
-		}
-	}
-
-	if (vari_expand && !variadic) {
-		if (show_error) {
-			error(ce->ellipsis,
-			      "Cannot use `..` in call to a non-variadic procedure: `%.*s`",
-			      LIT(ce->proc->Ident.string));
-		}
-		if (score_) *score_ = score;
-		return CallArgumentError_NonVariadicExpand;
-	}
-
-	if (operand_count == 0 && param_count == 0) {
-		if (score_) *score_ = score;
-		return CallArgumentError_None;
-	}
-
-	i32 error_code = 0;
-	if (operand_count < param_count) {
-		error_code = -1;
-	} else if (!variadic && operand_count > param_count) {
-		error_code = +1;
-	}
-	if (error_code != 0) {
-		CallArgumentError err = CallArgumentError_TooManyArguments;
-		char *err_fmt = "Too many arguments for `%s`, expected %td arguments";
-		if (error_code < 0) {
-			err = CallArgumentError_TooFewArguments;
-			err_fmt = "Too few arguments for `%s`, expected %td arguments";
-		}
-
-		if (show_error) {
-			gbString proc_str = expr_to_string(ce->proc);
-			error_node(call, err_fmt, proc_str, param_count);
-			gb_string_free(proc_str);
-		}
-		if (score_) *score_ = score;
-		return err;
-	}
-
-	CallArgumentError err = CallArgumentError_None;
-
-	GB_ASSERT(proc_type->Proc.params != NULL);
-	Entity **sig_params = proc_type->Proc.params->Tuple.variables;
-	isize operand_index = 0;
-	for (; operand_index < param_count; operand_index++) {
-		Type *t = sig_params[operand_index]->type;
-		Operand o = operands[operand_index];
-		if (variadic) {
-			o = operands[operand_index];
-		}
-		i64 s = 0;
-		if (!check_is_assignable_to_with_score(c, &o, t, &s)) {
-			if (show_error) {
-				check_assignment(c, &o, t, str_lit("argument"));
-			}
-			err = CallArgumentError_WrongTypes;
-		}
-		score += s;
-	}
-
-	if (variadic) {
-		bool variadic_expand = false;
-		Type *slice = sig_params[param_count]->type;
-		GB_ASSERT(is_type_slice(slice));
-		Type *elem = base_type(slice)->Slice.elem;
-		Type *t = elem;
-		for (; operand_index < operand_count; operand_index++) {
-			Operand o = operands[operand_index];
-			if (vari_expand) {
-				variadic_expand = true;
-				t = slice;
-				if (operand_index != param_count) {
-					if (show_error) {
-						error_node(o.expr, "`..` in a variadic procedure can only have one variadic argument at the end");
-					}
-					if (score_) *score_ = score;
-					return CallArgumentError_MultipleVariadicExpand;
-				}
-			}
-			i64 s = 0;
-			if (!check_is_assignable_to_with_score(c, &o, t, &s)) {
-				if (show_error) {
-					check_assignment(c, &o, t, str_lit("argument"));
-				}
-				err = CallArgumentError_WrongTypes;
-			}
-			score += s;
-		}
-	}
-
-	if (score_) *score_ = score;
-	return err;
-}
 
 struct ValidProcAndScore {
 	isize index;
@@ -4870,14 +4768,248 @@ bool check_unpack_arguments(Checker *c, isize lhs_count, Array<Operand> *operand
 	return optional_ok;
 }
 
-Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
-	GB_ASSERT(call->kind == AstNode_CallExpr);
+#define CALL_ARGUMENT_CHECKER(name) CallArgumentError name(Checker *c, AstNode *call, Type *proc_type, Array<Operand> operands, CallArgumentErrorMode show_error_mode, i64 *score_)
+typedef CALL_ARGUMENT_CHECKER(CallArgumentCheckerType);
 
+
+CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
+	ast_node(ce, CallExpr, call);
+	isize param_count = 0;
+	bool variadic = proc_type->Proc.variadic;
+	bool vari_expand = (ce->ellipsis.pos.line != 0);
+	i64 score = 0;
+	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
+
+	if (proc_type->Proc.params != NULL) {
+		param_count = proc_type->Proc.params->Tuple.variable_count;
+		if (variadic) {
+			param_count--;
+		}
+	}
+
+	if (vari_expand && !variadic) {
+		if (show_error) {
+			error(ce->ellipsis,
+			      "Cannot use `..` in call to a non-variadic procedure: `%.*s`",
+			      LIT(ce->proc->Ident.string));
+		}
+		if (score_) *score_ = score;
+		return CallArgumentError_NonVariadicExpand;
+	}
+
+	if (operands.count == 0 && param_count == 0) {
+		if (score_) *score_ = score;
+		return CallArgumentError_None;
+	}
+
+	i32 error_code = 0;
+	if (operands.count < param_count) {
+		error_code = -1;
+	} else if (!variadic && operands.count > param_count) {
+		error_code = +1;
+	}
+	if (error_code != 0) {
+		CallArgumentError err = CallArgumentError_TooManyArguments;
+		char *err_fmt = "Too many arguments for `%s`, expected %td arguments";
+		if (error_code < 0) {
+			err = CallArgumentError_TooFewArguments;
+			err_fmt = "Too few arguments for `%s`, expected %td arguments";
+		}
+
+		if (show_error) {
+			gbString proc_str = expr_to_string(ce->proc);
+			error_node(call, err_fmt, proc_str, param_count);
+			gb_string_free(proc_str);
+		}
+		if (score_) *score_ = score;
+		return err;
+	}
+
+	CallArgumentError err = CallArgumentError_None;
+
+	GB_ASSERT(proc_type->Proc.params != NULL);
+	Entity **sig_params = proc_type->Proc.params->Tuple.variables;
+	isize operand_index = 0;
+	for (; operand_index < param_count; operand_index++) {
+		Type *t = sig_params[operand_index]->type;
+		Operand o = operands[operand_index];
+		if (variadic) {
+			o = operands[operand_index];
+		}
+		i64 s = 0;
+		if (!check_is_assignable_to_with_score(c, &o, t, &s)) {
+			if (show_error) {
+				check_assignment(c, &o, t, str_lit("argument"));
+			}
+			err = CallArgumentError_WrongTypes;
+		}
+		score += s;
+	}
+
+	if (variadic) {
+		bool variadic_expand = false;
+		Type *slice = sig_params[param_count]->type;
+		GB_ASSERT(is_type_slice(slice));
+		Type *elem = base_type(slice)->Slice.elem;
+		Type *t = elem;
+		for (; operand_index < operands.count; operand_index++) {
+			Operand o = operands[operand_index];
+			if (vari_expand) {
+				variadic_expand = true;
+				t = slice;
+				if (operand_index != param_count) {
+					if (show_error) {
+						error_node(o.expr, "`..` in a variadic procedure can only have one variadic argument at the end");
+					}
+					if (score_) *score_ = score;
+					return CallArgumentError_MultipleVariadicExpand;
+				}
+			}
+			i64 s = 0;
+			if (!check_is_assignable_to_with_score(c, &o, t, &s)) {
+				if (show_error) {
+					check_assignment(c, &o, t, str_lit("argument"));
+				}
+				err = CallArgumentError_WrongTypes;
+			}
+			score += s;
+		}
+	}
+
+	if (score_) *score_ = score;
+	return err;
+}
+
+bool is_call_expr_field_value(AstNodeCallExpr *ce) {
+	GB_ASSERT(ce != NULL);
+
+	if (ce->args.count == 0) {
+		return false;
+	}
+	return ce->args[0]->kind == AstNode_FieldValue;
+}
+
+isize lookup_procedure_parameter(TypeProc *pt, String parameter_name) {
+	isize param_count = pt->param_count;
+	for (isize i = 0; i < param_count; i++) {
+		Entity *e = pt->params->Tuple.variables[i];
+		String name = e->token.string;
+		if (name == "_") {
+			continue;
+		}
+		if (name == parameter_name) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
+	ast_node(ce, CallExpr, call);
+	GB_ASSERT(is_type_proc(proc_type));
+	TypeProc *pt = &base_type(proc_type)->Proc;
+
+	i64 score = 0;
+	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
+	CallArgumentError err = CallArgumentError_None;
+
+	isize param_count = pt->param_count;
+	bool *params_visited = gb_alloc_array(c->allocator, bool, param_count);
+
+	for_array(i, ce->args) {
+		AstNode *arg = ce->args[i];
+		ast_node(fv, FieldValue, arg);
+		if (fv->field->kind != AstNode_Ident) {
+			if (show_error) {
+				gbString expr_str = expr_to_string(fv->field);
+				error_node(arg, "Invalid parameter name `%s` in procedure call", expr_str);
+				gb_string_free(expr_str);
+			}
+			err = CallArgumentError_InvalidFieldValue;
+			continue;
+		}
+		String name = fv->field->Ident.string;
+		isize index = lookup_procedure_parameter(pt, name);
+		if (index < 0) {
+			if (show_error) {
+				error_node(arg, "No parameter named `%.*s` for this procedure type", LIT(name));
+			}
+			err = CallArgumentError_ParameterNotFound;
+			continue;
+		}
+		if (params_visited[index]) {
+			if (show_error) {
+				error_node(arg, "Duplicate parameter `%.*s` in procedure call", LIT(name));
+			}
+			err = CallArgumentError_DuplicateParameter;
+			continue;
+		}
+
+		params_visited[index] = true;
+		Operand *o = &operands[i];
+
+		Type *param_type = pt->params->Tuple.variables[index]->type;
+
+		i64 s = 0;
+		if (!check_is_assignable_to_with_score(c, o, param_type, &s)) {
+			if (show_error) {
+				check_assignment(c, o, param_type, str_lit("procedure argument"));
+			}
+			err = CallArgumentError_WrongTypes;
+		}
+		score += s;
+	}
+
+
+#if 1
+	isize param_count_to_check = param_count;
+	if (pt->variadic) {
+		param_count_to_check--;
+	}
+	for (isize i = 0; i < param_count_to_check; i++) {
+		if (!params_visited[i]) {
+			if (show_error) {
+				Entity *e = pt->params->Tuple.variables[i];
+				gbString str = type_to_string(e->type);
+				error_node(call, "Parameter `%.*s` of type `%s` is missing in procedure call",
+				           LIT(e->token.string), str);
+				gb_string_free(str);
+			}
+			err = CallArgumentError_ParameterMissing;
+		}
+	}
+#endif
+
+	if (score_) *score_ = score;
+
+	return err;
+}
+
+
+Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
 	ast_node(ce, CallExpr, call);
 
-	Array<Operand> operands;
-	array_init(&operands, heap_allocator(), 2*ce->args.count);
-	check_unpack_arguments(c, -1, &operands, ce->args, false);
+	CallArgumentCheckerType *call_checker = NULL;
+	Array<Operand> operands = {};
+	defer (array_free(&operands));
+
+	if (is_call_expr_field_value(ce)) {
+		call_checker = check_named_call_arguments;
+
+		array_init_count(&operands, heap_allocator(), ce->args.count);
+		for_array(i, ce->args) {
+			AstNode *arg = ce->args[i];
+			ast_node(fv, FieldValue, arg);
+			check_expr(c, &operands[i], fv->value);
+		}
+	} else {
+		call_checker = check_call_arguments_internal;
+
+		array_init(&operands, heap_allocator(), 2*ce->args.count);
+		check_unpack_arguments(c, -1, &operands, ce->args, false);
+	}
+
+	GB_ASSERT(call_checker != NULL);
 
 	if (operand->mode == Addressing_Overload) {
 		GB_ASSERT(operand->overload_entities != NULL &&
@@ -4887,6 +5019,9 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 		Entity **          procs          = operand->overload_entities;
 		ValidProcAndScore *valids         = gb_alloc_array(heap_allocator(), ValidProcAndScore, overload_count);
 		isize              valid_count    = 0;
+
+		defer (gb_free(heap_allocator(), procs));
+		defer (gb_free(heap_allocator(), valids));
 
 		String name = procs[0]->token.string;
 
@@ -4903,7 +5038,7 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 			Type *proc_type = base_type(p->type);
 			if (proc_type != NULL && is_type_proc(proc_type)) {
 				i64 score = 0;
-				CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.data, operands.count, CallArgumentMode_NoErrors, &score);
+				CallArgumentError err = call_checker(c, call, proc_type, operands, CallArgumentMode_NoErrors, &score);
 				if (err == CallArgumentError_None) {
 					valids[valid_count].index = i;
 					valids[valid_count].score = score;
@@ -4948,16 +5083,14 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 			add_entity_use(c, expr, e);
 			proc_type = e->type;
 			i64 score = 0;
-			CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.data, operands.count, CallArgumentMode_ShowErrors, &score);
+			CallArgumentError err = call_checker(c, call, proc_type, operands, CallArgumentMode_ShowErrors, &score);
 		}
-
-		gb_free(heap_allocator(), valids);
-		gb_free(heap_allocator(), procs);
 	} else {
 		i64 score = 0;
-		CallArgumentError err = check_call_arguments_internal(c, call, proc_type, operands.data, operands.count, CallArgumentMode_ShowErrors, &score);
-		array_free(&operands);
+		CallArgumentError err = call_checker(c, call, proc_type, operands, CallArgumentMode_ShowErrors, &score);
 	}
+
+
 	return proc_type;
 }
 
@@ -4990,9 +5123,37 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	ast_node(ce, CallExpr, call);
 	check_expr_or_type(c, operand, ce->proc);
 
+	if (ce->args.count > 0) {
+		bool fail = false;
+		bool first_is_field_value = (ce->args[0]->kind == AstNode_FieldValue);
+		for_array(i, ce->args) {
+			AstNode *arg = ce->args[i];
+			bool mix = false;
+			if (first_is_field_value) {
+				mix = arg->kind != AstNode_FieldValue;
+			} else {
+				mix = arg->kind == AstNode_FieldValue;
+			}
+			if (mix) {
+				error_node(arg, "Mixture of `field = value` and value elements in a procedure all is not allowed");
+				fail = true;
+			}
+		}
+
+		if (fail) {
+			operand->mode = Addressing_Invalid;
+			operand->expr = call;
+			return Expr_Stmt;
+		}
+	}
+
 	if (operand->mode == Addressing_Invalid) {
 		for_array(i, ce->args) {
-			check_expr_base(c, operand, ce->args[i], NULL);
+			AstNode *arg = ce->args[i];
+			if (arg->kind == AstNode_FieldValue) {
+				arg = arg->FieldValue.value;
+			}
+			check_expr_base(c, operand, arg, NULL);
 		}
 		operand->mode = Addressing_Invalid;
 		operand->expr = call;
@@ -5005,14 +5166,20 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		operand->mode = Addressing_Invalid;
 		isize arg_count = ce->args.count;
 		switch (arg_count) {
-		case 0:  error_node(call, "Missing argument in convertion to `%s`", str);   break;
-		default: error_node(call, "Too many arguments in convertion to `%s`", str); break;
-		case 1:
-			check_expr(c, operand, ce->args[0]);
+		case 0:  error_node(call, "Missing argument in conversion to `%s`", str);   break;
+		default: error_node(call, "Too many arguments in conversion to `%s`", str); break;
+		case 1: {
+			AstNode *arg = ce->args[0];
+			if (arg->kind == AstNode_FieldValue) {
+				error_node(call, "`field = value` cannot be used in a type conversion");
+				arg = arg->FieldValue.value;
+				// NOTE(bill): Carry on the cast regardless
+			}
+			check_expr(c, operand, arg);
 			if (operand->mode != Addressing_Invalid) {
 				check_cast(c, operand, t);
 			}
-			break;
+		} break;
 		}
 
 		gb_string_free(str);

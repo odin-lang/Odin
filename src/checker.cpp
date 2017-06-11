@@ -1631,7 +1631,7 @@ void check_all_global_entities(Checker *c) {
 
 	for_array(i, c->info.entities.entries) {
 		auto *entry = &c->info.entities.entries[i];
-		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
+		Entity *e = cast(Entity *)entry->key.ptr;
 		DeclInfo *d = entry->value;
 
 		if (d->scope != e->scope) {
@@ -1669,7 +1669,7 @@ void check_all_global_entities(Checker *c) {
 
 	for_array(i, c->info.entities.entries) {
 		auto *entry = &c->info.entities.entries[i];
-		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
+		Entity *e = cast(Entity *)entry->key.ptr;
 		if (e->kind != Entity_Procedure) {
 			continue;
 		}
@@ -2063,7 +2063,7 @@ void check_parsed_files(Checker *c) {
 	for_array(i, c->info.untyped.entries) {
 		auto *entry = &c->info.untyped.entries[i];
 		HashKey key = entry->key;
-		AstNode *expr = cast(AstNode *)cast(uintptr)key.key;
+		AstNode *expr = cast(AstNode *)key.ptr;
 		ExprInfo *info = &entry->value;
 		if (info != NULL && expr != NULL) {
 			if (is_type_typed(info->type)) {

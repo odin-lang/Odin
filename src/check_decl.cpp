@@ -13,7 +13,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 			// TODO(bill): is this a good enough error message?
 			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error_node(operand->expr,
-				  "Cannot assign builtin procedure `%s` in %.*s",
+				  "Cannot assign built-in procedure `%s` in %.*s",
 				  expr_str,
 				  LIT(context_name));
 
@@ -145,7 +145,7 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
 
 	// gb_printf_err("%.*s %p\n", LIT(e->token.string), e);
 
-	Type *bt = check_type_extra(c, type_expr, named);
+	Type *bt = check_type(c, type_expr, named);
 	named->Named.base = base_type(bt);
 	if (named->Named.base == t_invalid) {
 		// gb_printf("check_type_decl: %s\n", type_to_string(named));
@@ -408,7 +408,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	e->flags |= EntityFlag_Visited;
 
 	if (type_expr != NULL) {
-		e->type = check_type_extra(c, type_expr, NULL);
+		e->type = check_type(c, type_expr);
 	}
 
 	if (init_expr == NULL) {

@@ -2128,6 +2128,11 @@ AstNode *parse_call_expr(AstFile *f, AstNode *operand) {
 		}
 
 		AstNode *arg = parse_expr(f, false);
+		if (f->curr_token.kind == Token_Eq) {
+			Token eq = expect_token(f, Token_Eq);
+			AstNode *value = parse_value(f);
+			arg = ast_field_value(f, arg, value, eq);
+		}
 		array_add(&args, arg);
 
 		if (!allow_token(f, Token_Comma)) {

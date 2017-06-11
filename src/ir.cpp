@@ -4599,6 +4599,35 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		GB_ASSERT(proc_type_->kind == Type_Proc);
 		TypeProc *type = &proc_type_->Proc;
 
+		if (is_call_expr_field_value(ce)) {
+			isize param_count = type->param_count;
+			irValue **args = gb_alloc_array(proc->module->allocator, irValue *, param_count);
+
+			for_array(arg_index, ce->args) {
+				AstNode *arg = ce->args[arg_index];
+				ast_node(fv, FieldValue, arg);
+				GB_ASSERT(fv->field->kind == AstNode_Ident);
+				String name = fv->field->Ident.string;
+				isize index = lookup_procedure_parameter(type, name);
+				GB_ASSERT(index >= 0);
+				irValue *expr = ir_build_expr(proc, fv->value);
+				args[index] = expr;
+
+			}
+			TypeTuple *pt = &type->params->Tuple;
+			for (isize i = 0; i < param_count; i++) {
+				Type *param_type = pt->variables[i]->type;
+				if (args[i] == NULL) {
+					args[i] = ir_value_nil(proc->module->allocator, param_type);
+				} else {
+					args[i] = ir_emit_conv(proc, args[i], param_type);
+				}
+			}
+
+			return ir_emit_call(proc, value, args, param_count);
+			// GB_PANIC("HERE!\n");
+		}
+
 		isize arg_index = 0;
 
 		isize arg_count = 0;
@@ -4612,7 +4641,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			}
 		}
 		irValue **args = gb_alloc_array(proc->module->allocator, irValue *, arg_count);
-		bool variadic = proc_type_->Proc.variadic;
+		bool variadic = type->variadic;
 		bool vari_expand = ce->ellipsis.pos.line != 0;
 
 		for_array(i, ce->args) {
@@ -6855,7 +6884,7 @@ void ir_init_module(irModule *m, Checker *c) {
 			isize max_index = -1;
 			for_array(type_info_map_index, m->info->type_info_map.entries) {
 				auto *entry = &m->info->type_info_map.entries[type_info_map_index];
-				Type *t = cast(Type *)cast(uintptr)entry->key.key;
+				Type *t = cast(Type *)entry->key.ptr;
 				t = default_type(t);
 				isize entry_index = ir_type_info_index(m->info, t);
 				if (max_index < entry_index) {
@@ -6880,7 +6909,7 @@ void ir_init_module(irModule *m, Checker *c) {
 
 			for_array(entry_index, m->info->type_info_map.entries) {
 				auto *entry = &m->info->type_info_map.entries[entry_index];
-				Type *t = cast(Type *)cast(uintptr)entry->key.key;
+				Type *t = cast(Type *)entry->key.ptr;
 
 				switch (t->kind) {
 				case Type_Record:
@@ -7083,7 +7112,7 @@ void ir_gen_tree(irGen *s) {
 
 	for_array(i, info->entities.entries) {
 		auto *entry = &info->entities.entries[i];
-		Entity *e = cast(Entity *)cast(uintptr)entry->key.key;
+		Entity *e = cast(Entity *)entry->key.ptr;
 		String name = e->token.string;
 		if (e->kind == Entity_Variable) {
 			global_variable_max_count++;
@@ -7446,7 +7475,7 @@ void ir_gen_tree(irGen *s) {
 
 			for_array(type_info_map_index, info->type_info_map.entries) {
 				auto *entry = &info->type_info_map.entries[type_info_map_index];
-				Type *t = cast(Type *)cast(uintptr)entry->key.key;
+				Type *t = cast(Type *)entry->key.ptr;
 				t = default_type(t);
 				isize entry_index = ir_type_info_index(info, t);
 
@@ -7909,7 +7938,7 @@ void ir_gen_tree(irGen *s) {
 
 	for_array(type_info_map_index, info->type_info_map.entries) {
 		auto *entry = &info->type_info_map.entries[type_info_map_index];
-		Type *t = cast(Type *)cast(uintptr)entry->key.key;
+		Type *t = cast(Type *)entry->key.ptr;
 		t = default_type(t);
 		isize entry_index = entry->value;
 

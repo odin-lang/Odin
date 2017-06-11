@@ -1583,7 +1583,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			Type *init_type = NULL;
 			if (vd->type) {
-				init_type = check_type_extra(c, vd->type, NULL);
+				init_type = check_type(c, vd->type, NULL);
 				if (init_type == NULL) {
 					init_type = t_invalid;
 				}
