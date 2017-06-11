@@ -36,9 +36,12 @@ WS_MAXIMIZEBOX      :: 0x00010000;
 WS_MINIMIZEBOX      :: 0x00020000;
 WS_THICKFRAME       :: 0x00040000;
 WS_SYSMENU          :: 0x00080000;
+WS_BORDER           :: 0x00800000;
 WS_CAPTION          :: 0x00C00000;
 WS_VISIBLE          :: 0x10000000;
+WS_POPUP            :: 0x80000000;
 WS_OVERLAPPEDWINDOW :: WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
+WS_POPUPWINDOW      :: WS_POPUP | WS_BORDER | WS_SYSMENU;
 
 WM_DESTROY           :: 0x0002;
 WM_SIZE	             :: 0x0005;
@@ -48,11 +51,27 @@ WM_QUIT              :: 0x0012;
 WM_KEYDOWN           :: 0x0100;
 WM_KEYUP             :: 0x0101;
 WM_SIZING            :: 0x0214;
-WM_MOUSEWHEEL        :: 0x020A;
 WM_SYSKEYDOWN        :: 0x0104;
+WM_SYSKEYUP          :: 0x0105;
 WM_WINDOWPOSCHANGED  :: 0x0047;
 WM_SETCURSOR         :: 0x0020;
 WM_CHAR              :: 0x0102;
+WM_ACTIVATE          :: 0x0006;
+WM_SETFOCUS          :: 0x0007;
+WM_KILLFOCUS         :: 0x0008;
+WM_USER              :: 0x0400;
+
+WM_MOUSEWHEEL    :: 0x020A;
+WM_MOUSEMOVE     :: 0x0200;
+WM_LBUTTONDOWN   :: 0x0201;
+WM_LBUTTONUP     :: 0x0202;
+WM_LBUTTONDBLCLK :: 0x0203;
+WM_RBUTTONDOWN   :: 0x0204;
+WM_RBUTTONUP     :: 0x0205;
+WM_RBUTTONDBLCLK :: 0x0206;
+WM_MBUTTONDOWN   :: 0x0207;
+WM_MBUTTONUP     :: 0x0208;
+WM_MBUTTONDBLCLK :: 0x0209;
 
 PM_NOREMOVE :: 0x0000;
 PM_REMOVE   :: 0x0001;
@@ -502,6 +521,12 @@ release_dc          :: proc(wnd: Hwnd, hdc: Hdc) -> i32                         
 
 Proc  :: #type proc() #cc_c;
 
+MAPVK_VK_TO_CHAR   :: 2;
+MAPVK_VK_TO_VSC    :: 0;
+MAPVK_VSC_TO_VK    :: 1;
+MAPVK_VSC_TO_VK_EX :: 3;
+
+map_virtual_key :: proc(scancode : u32, map_type : u32) -> u32 #foreign user32 "MapVirtualKeyA";
 
 get_key_state       :: proc(v_key: i32) -> i16 #foreign user32 "GetKeyState";
 get_async_key_state :: proc(v_key: i32) -> i16 #foreign user32 "GetAsyncKeyState";
