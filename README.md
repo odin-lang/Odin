@@ -28,7 +28,7 @@ Website: [https://odin.handmade.network/](https://odin.handmade.network/)
 
 - Windows
 	* x86-64
-	* MSVC 2015 installed (C99 support)
+	* MSVC 2015 installed (C++11 support)
 	* [LLVM binaries](https://github.com/gingerBill/Odin/releases/tag/llvm-4.0-windows) for `opt.exe` and `llc.exe`
 	* Requires MSVC's link.exe as the linker
 		* run `vcvarsall.bat` to setup the path
@@ -42,7 +42,7 @@ Website: [https://odin.handmade.network/](https://odin.handmade.network/)
 	* x86-64
 	* Build tools (ld)
 	* LLVM installed
-	* Clang installed (temporary - this is calling the linker for now)
+	* Clang installed (temporary - this is Calling the linker for now)
 
 ## Warnings
 
