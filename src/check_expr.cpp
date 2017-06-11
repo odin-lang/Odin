@@ -5082,8 +5082,7 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 
 	if (operand->mode == Addressing_Overload) {
 		GB_ASSERT(operand->overload_entities != NULL &&
-		          operand->overload_count > 1);
-
+		          operand->overload_count > 0);
 		isize              overload_count = operand->overload_count;
 		Entity **          procs          = operand->overload_entities;
 		ValidProcAndScore *valids         = gb_alloc_array(heap_allocator(), ValidProcAndScore, overload_count);
