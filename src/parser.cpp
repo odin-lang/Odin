@@ -2841,7 +2841,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 	Array<AstNodeAndFlags> list = {}; array_init(&list, heap_allocator()); // LEAK(bill):
 	isize total_name_count = 0;
 	bool allow_ellipsis = allowed_flags&FieldFlag_ellipsis;
-	bool is_procedure = (allowed_flags&FieldFlag_Signature) != 0;
+	bool is_procedure = allowed_flags == FieldFlag_Signature;
 
 	while (f->curr_token.kind != follow &&
 	       f->curr_token.kind != Token_Colon &&
