@@ -1,89 +1,96 @@
-#foreign_system_library "kernel32.lib" when ODIN_OS == "windows";
-#foreign_system_library "user32.lib"   when ODIN_OS == "windows";
-#foreign_system_library "gdi32.lib"    when ODIN_OS == "windows";
-#foreign_system_library "winmm.lib"    when ODIN_OS == "windows";
-#foreign_system_library "shell32.lib"  when ODIN_OS == "windows";
+foreign_system_library (
+	"kernel32.lib" when ODIN_OS == "windows";
+	"user32.lib"   when ODIN_OS == "windows";
+	"gdi32.lib"    when ODIN_OS == "windows";
+	"winmm.lib"    when ODIN_OS == "windows";
+	"shell32.lib"  when ODIN_OS == "windows";
+)
 
-type Handle    rawptr;
-type Hwnd      Handle;
-type Hdc       Handle;
-type Hinstance Handle;
-type Hicon     Handle;
-type Hcursor   Handle;
-type Hmenu     Handle;
-type Hbrush    Handle;
-type Hgdiobj   Handle;
-type Hmodule   Handle;
-type Wparam    uint;
-type Lparam    int;
-type Lresult   int;
-type Bool      i32;
-type WndProc   proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
-
+type (
+	Handle    rawptr;
+	Hwnd      Handle;
+	Hdc       Handle;
+	Hinstance Handle;
+	Hicon     Handle;
+	Hcursor   Handle;
+	Hmenu     Handle;
+	Hbrush    Handle;
+	Hgdiobj   Handle;
+	Hmodule   Handle;
+	Wparam    uint;
+	Lparam    int;
+	Lresult   int;
+	Bool      i32;
+	WndProc   proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
+)
 
 const INVALID_HANDLE = Handle(~int(0));
+const (
+	FALSE: Bool = 0;
+	TRUE        = 1;
+)
 
-const FALSE: Bool = 0;
-const TRUE:  Bool = 1;
+const (
+	CS_VREDRAW    = 0x0001;
+	CS_HREDRAW    = 0x0002;
+	CS_OWNDC      = 0x0020;
+	CW_USEDEFAULT = -0x80000000;
 
-const CS_VREDRAW    = 0x0001;
-const CS_HREDRAW    = 0x0002;
-const CS_OWNDC      = 0x0020;
-const CW_USEDEFAULT = -0x80000000;
+	WS_OVERLAPPED       = 0;
+	WS_MAXIMIZEBOX      = 0x00010000;
+	WS_MINIMIZEBOX      = 0x00020000;
+	WS_THICKFRAME       = 0x00040000;
+	WS_SYSMENU          = 0x00080000;
+	WS_BORDER           = 0x00800000;
+	WS_CAPTION          = 0x00C00000;
+	WS_VISIBLE          = 0x10000000;
+	WS_POPUP            = 0x80000000;
+	WS_OVERLAPPEDWINDOW = WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
+	WS_POPUPWINDOW      = WS_POPUP | WS_BORDER | WS_SYSMENU;
 
-const WS_OVERLAPPED       = 0;
-const WS_MAXIMIZEBOX      = 0x00010000;
-const WS_MINIMIZEBOX      = 0x00020000;
-const WS_THICKFRAME       = 0x00040000;
-const WS_SYSMENU          = 0x00080000;
-const WS_BORDER           = 0x00800000;
-const WS_CAPTION          = 0x00C00000;
-const WS_VISIBLE          = 0x10000000;
-const WS_POPUP            = 0x80000000;
-const WS_OVERLAPPEDWINDOW = WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
-const WS_POPUPWINDOW      = WS_POPUP | WS_BORDER | WS_SYSMENU;
+	WM_DESTROY           = 0x0002;
+	WM_SIZE	             = 0x0005;
+	WM_CLOSE             = 0x0010;
+	WM_ACTIVATEAPP       = 0x001C;
+	WM_QUIT              = 0x0012;
+	WM_KEYDOWN           = 0x0100;
+	WM_KEYUP             = 0x0101;
+	WM_SIZING            = 0x0214;
+	WM_SYSKEYDOWN        = 0x0104;
+	WM_SYSKEYUP          = 0x0105;
+	WM_WINDOWPOSCHANGED  = 0x0047;
+	WM_SETCURSOR         = 0x0020;
+	WM_CHAR              = 0x0102;
+	WM_ACTIVATE          = 0x0006;
+	WM_SETFOCUS          = 0x0007;
+	WM_KILLFOCUS         = 0x0008;
+	WM_USER              = 0x0400;
 
-const WM_DESTROY           = 0x0002;
-const WM_SIZE	             = 0x0005;
-const WM_CLOSE             = 0x0010;
-const WM_ACTIVATEAPP       = 0x001C;
-const WM_QUIT              = 0x0012;
-const WM_KEYDOWN           = 0x0100;
-const WM_KEYUP             = 0x0101;
-const WM_SIZING            = 0x0214;
-const WM_SYSKEYDOWN        = 0x0104;
-const WM_SYSKEYUP          = 0x0105;
-const WM_WINDOWPOSCHANGED  = 0x0047;
-const WM_SETCURSOR         = 0x0020;
-const WM_CHAR              = 0x0102;
-const WM_ACTIVATE          = 0x0006;
-const WM_SETFOCUS          = 0x0007;
-const WM_KILLFOCUS         = 0x0008;
-const WM_USER              = 0x0400;
+	WM_MOUSEWHEEL    = 0x020A;
+	WM_MOUSEMOVE     = 0x0200;
+	WM_LBUTTONDOWN   = 0x0201;
+	WM_LBUTTONUP     = 0x0202;
+	WM_LBUTTONDBLCLK = 0x0203;
+	WM_RBUTTONDOWN   = 0x0204;
+	WM_RBUTTONUP     = 0x0205;
+	WM_RBUTTONDBLCLK = 0x0206;
+	WM_MBUTTONDOWN   = 0x0207;
+	WM_MBUTTONUP     = 0x0208;
+	WM_MBUTTONDBLCLK = 0x0209;
 
-const WM_MOUSEWHEEL    = 0x020A;
-const WM_MOUSEMOVE     = 0x0200;
-const WM_LBUTTONDOWN   = 0x0201;
-const WM_LBUTTONUP     = 0x0202;
-const WM_LBUTTONDBLCLK = 0x0203;
-const WM_RBUTTONDOWN   = 0x0204;
-const WM_RBUTTONUP     = 0x0205;
-const WM_RBUTTONDBLCLK = 0x0206;
-const WM_MBUTTONDOWN   = 0x0207;
-const WM_MBUTTONUP     = 0x0208;
-const WM_MBUTTONDBLCLK = 0x0209;
+	PM_NOREMOVE = 0x0000;
+	PM_REMOVE   = 0x0001;
+	PM_NOYIELD  = 0x0002;
 
-const PM_NOREMOVE = 0x0000;
-const PM_REMOVE   = 0x0001;
-const PM_NOYIELD  = 0x0002;
+	BLACK_BRUSH = 4;
+
+	SM_CXSCREEN = 0;
+	SM_CYSCREEN = 1;
+
+	SW_SHOW = 5;
+)
 
 const COLOR_BACKGROUND = Hbrush(int(1));
-const BLACK_BRUSH = 4;
-
-const SM_CXSCREEN = 0;
-const SM_CYSCREEN = 1;
-
-const SW_SHOW = 5;
 
 
 type Point struct #ordered {
@@ -151,23 +158,24 @@ type FileAttributeData struct #ordered {
 }
 
 type FindData struct #ordered {
-    file_attributes     : u32,
-    creation_time       : Filetime,
-    last_access_time    : Filetime,
-    last_write_time     : Filetime,
-    file_size_high      : u32,
-    file_size_low       : u32,
-    reserved0           : u32,
-    reserved1           : u32,
-    file_name           : [MAX_PATH]u8,
-    alternate_file_name : [14]u8,
+    file_attributes:     u32,
+    creation_time:       Filetime,
+    last_access_time:    Filetime,
+    last_write_time:     Filetime,
+    file_size_high:      u32,
+    file_size_low:       u32,
+    reserved0:           u32,
+    reserved1:           u32,
+    file_name:           [MAX_PATH]u8,
+    alternate_file_name: [14]u8,
 }
 
 
 type GET_FILEEX_INFO_LEVELS i32;
-
-const GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS = 0;
-const GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS = 1;
+const (
+	GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS = 0;
+	GetFileExMaxInfoLevel                         = 1;
+)
 
 proc get_last_error     () -> i32                            #foreign kernel32 "GetLastError";
 proc exit_process       (exit_code: u32)                     #foreign kernel32 "ExitProcess";
@@ -257,56 +265,58 @@ proc find_first_file_a(file_name : ^u8, data : ^FindData) -> Handle #foreign ker
 proc find_next_file_a (file : Handle, data : ^FindData) -> Bool       #foreign kernel32 "FindNextFileA";
 proc find_close       (file : Handle) -> Bool                         #foreign kernel32 "FindClose";
 
-const MAX_PATH = 0x00000104;
 
-const HANDLE_FLAG_INHERIT = 1;
-const HANDLE_FLAG_PROTECT_FROM_CLOSE = 2;
+const (
+	MAX_PATH = 0x00000104;
 
+	HANDLE_FLAG_INHERIT = 1;
+	HANDLE_FLAG_PROTECT_FROM_CLOSE = 2;
 
-const FILE_BEGIN   = 0;
-const FILE_CURRENT = 1;
-const FILE_END     = 2;
+	FILE_BEGIN   = 0;
+	FILE_CURRENT = 1;
+	FILE_END     = 2;
 
-const FILE_SHARE_READ      = 0x00000001;
-const FILE_SHARE_WRITE     = 0x00000002;
-const FILE_SHARE_DELETE    = 0x00000004;
-const FILE_GENERIC_ALL     = 0x10000000;
-const FILE_GENERIC_EXECUTE = 0x20000000;
-const FILE_GENERIC_WRITE   = 0x40000000;
-const FILE_GENERIC_READ    = 0x80000000;
+	FILE_SHARE_READ      = 0x00000001;
+	FILE_SHARE_WRITE     = 0x00000002;
+	FILE_SHARE_DELETE    = 0x00000004;
+	FILE_GENERIC_ALL     = 0x10000000;
+	FILE_GENERIC_EXECUTE = 0x20000000;
+	FILE_GENERIC_WRITE   = 0x40000000;
+	FILE_GENERIC_READ    = 0x80000000;
 
-const FILE_APPEND_DATA = 0x0004;
+	FILE_APPEND_DATA = 0x0004;
 
-const STD_INPUT_HANDLE  = -10;
-const STD_OUTPUT_HANDLE = -11;
-const STD_ERROR_HANDLE  = -12;
+	STD_INPUT_HANDLE  = -10;
+	STD_OUTPUT_HANDLE = -11;
+	STD_ERROR_HANDLE  = -12;
 
-const CREATE_NEW        = 1;
-const CREATE_ALWAYS     = 2;
-const OPEN_EXISTING     = 3;
-const OPEN_ALWAYS       = 4;
-const TRUNCATE_EXISTING = 5;
+	CREATE_NEW        = 1;
+	CREATE_ALWAYS     = 2;
+	OPEN_EXISTING     = 3;
+	OPEN_ALWAYS       = 4;
+	TRUNCATE_EXISTING = 5;
 
-const INVALID_FILE_ATTRIBUTES  = -1;
+	INVALID_FILE_ATTRIBUTES  = -1;
 
-const FILE_ATTRIBUTE_READONLY             = 0x00000001;
-const FILE_ATTRIBUTE_HIDDEN               = 0x00000002;
-const FILE_ATTRIBUTE_SYSTEM               = 0x00000004;
-const FILE_ATTRIBUTE_DIRECTORY            = 0x00000010;
-const FILE_ATTRIBUTE_ARCHIVE              = 0x00000020;
-const FILE_ATTRIBUTE_DEVICE               = 0x00000040;
-const FILE_ATTRIBUTE_NORMAL               = 0x00000080;
-const FILE_ATTRIBUTE_TEMPORARY            = 0x00000100;
-const FILE_ATTRIBUTE_SPARSE_FILE          = 0x00000200;
-const FILE_ATTRIBUTE_REPARSE_Point        = 0x00000400;
-const FILE_ATTRIBUTE_COMPRESSED           = 0x00000800;
-const FILE_ATTRIBUTE_OFFLINE              = 0x00001000;
-const FILE_ATTRIBUTE_NOT_CONTENT_INDEXED  = 0x00002000;
-const FILE_ATTRIBUTE_ENCRYPTED            = 0x00004000;
+	FILE_ATTRIBUTE_READONLY             = 0x00000001;
+	FILE_ATTRIBUTE_HIDDEN               = 0x00000002;
+	FILE_ATTRIBUTE_SYSTEM               = 0x00000004;
+	FILE_ATTRIBUTE_DIRECTORY            = 0x00000010;
+	FILE_ATTRIBUTE_ARCHIVE              = 0x00000020;
+	FILE_ATTRIBUTE_DEVICE               = 0x00000040;
+	FILE_ATTRIBUTE_NORMAL               = 0x00000080;
+	FILE_ATTRIBUTE_TEMPORARY            = 0x00000100;
+	FILE_ATTRIBUTE_SPARSE_FILE          = 0x00000200;
+	FILE_ATTRIBUTE_REPARSE_Point        = 0x00000400;
+	FILE_ATTRIBUTE_COMPRESSED           = 0x00000800;
+	FILE_ATTRIBUTE_OFFLINE              = 0x00001000;
+	FILE_ATTRIBUTE_NOT_CONTENT_INDEXED  = 0x00002000;
+	FILE_ATTRIBUTE_ENCRYPTED            = 0x00004000;
 
-const FILE_TYPE_DISK = 0x0001;
-const FILE_TYPE_CHAR = 0x0002;
-const FILE_TYPE_PIPE = 0x0003;
+	FILE_TYPE_DISK = 0x0001;
+	FILE_TYPE_CHAR = 0x0002;
+	FILE_TYPE_PIPE = 0x0003;
+)
 
 const INVALID_SET_FILE_POINTER = ~u32(0);
 
@@ -363,16 +373,18 @@ const GWL_STYLE = -16;
 
 const Hwnd_TOP = Hwnd(uint(0));
 
-const MONITOR_DEFAULTTONULL    = 0x00000000;
-const MONITOR_DEFAULTTOPRIMARY = 0x00000001;
-const MONITOR_DEFAULTTONEAREST = 0x00000002;
-
-const SWP_FRAMECHANGED  = 0x0020;
-const SWP_NOOWNERZORDER = 0x0200;
-const SWP_NOZORDER      = 0x0004;
-const SWP_NOSIZE        = 0x0001;
-const SWP_NOMOVE        = 0x0002;
-
+const (
+	MONITOR_DEFAULTTONULL    = 0x00000000;
+	MONITOR_DEFAULTTOPRIMARY = 0x00000001;
+	MONITOR_DEFAULTTONEAREST = 0x00000002;
+)
+const (
+	SWP_FRAMECHANGED  = 0x0020;
+	SWP_NOOWNERZORDER = 0x0200;
+	SWP_NOZORDER      = 0x0004;
+	SWP_NOSIZE        = 0x0001;
+	SWP_NOMOVE        = 0x0002;
+)
 
 type MonitorInfo struct #ordered {
 	size:      u32,
@@ -458,28 +470,29 @@ proc get_proc_address( h: Hmodule, c_str: ^u8) -> Proc #foreign kernel32 "GetPro
 proc get_client_rect (hwnd: Hwnd, rect: ^Rect) -> Bool #foreign user32 "GetClientRect";
 
 // Windows OpenGL
-const PFD_TYPE_RGBA             = 0;
-const PFD_TYPE_COLORINDEX       = 1;
-const PFD_MAIN_PLANE            = 0;
-const PFD_OVERLAY_PLANE         = 1;
-const PFD_UNDERLAY_PLANE        = -1;
-const PFD_DOUBLEBUFFER          = 1;
-const PFD_STEREO                = 2;
-const PFD_DRAW_TO_WINDOW        = 4;
-const PFD_DRAW_TO_BITMAP        = 8;
-const PFD_SUPPORT_GDI           = 16;
-const PFD_SUPPORT_OPENGL        = 32;
-const PFD_GENERIC_FORMAT        = 64;
-const PFD_NEED_PALETTE          = 128;
-const PFD_NEED_SYSTEM_PALETTE   = 0x00000100;
-const PFD_SWAP_EXCHANGE         = 0x00000200;
-const PFD_SWAP_COPY             = 0x00000400;
-const PFD_SWAP_LAYER_BUFFERS    = 0x00000800;
-const PFD_GENERIC_ACCELERATED   = 0x00001000;
-const PFD_DEPTH_DONTCARE        = 0x20000000;
-const PFD_DOUBLEBUFFER_DONTCARE = 0x40000000;
-const PFD_STEREO_DONTCARE       = 0x80000000;
-
+const (
+	PFD_TYPE_RGBA             = 0;
+	PFD_TYPE_COLORINDEX       = 1;
+	PFD_MAIN_PLANE            = 0;
+	PFD_OVERLAY_PLANE         = 1;
+	PFD_UNDERLAY_PLANE        = -1;
+	PFD_DOUBLEBUFFER          = 1;
+	PFD_STEREO                = 2;
+	PFD_DRAW_TO_WINDOW        = 4;
+	PFD_DRAW_TO_BITMAP        = 8;
+	PFD_SUPPORT_GDI           = 16;
+	PFD_SUPPORT_OPENGL        = 32;
+	PFD_GENERIC_FORMAT        = 64;
+	PFD_NEED_PALETTE          = 128;
+	PFD_NEED_SYSTEM_PALETTE   = 0x00000100;
+	PFD_SWAP_EXCHANGE         = 0x00000200;
+	PFD_SWAP_COPY             = 0x00000400;
+	PFD_SWAP_LAYER_BUFFERS    = 0x00000800;
+	PFD_GENERIC_ACCELERATED   = 0x00001000;
+	PFD_DEPTH_DONTCARE        = 0x20000000;
+	PFD_DOUBLEBUFFER_DONTCARE = 0x40000000;
+	PFD_STEREO_DONTCARE       = 0x80000000;
+)
 
 type PixelFormatDescriptor struct #ordered {
 	size,
@@ -521,10 +534,12 @@ proc release_dc         (wnd: Hwnd, hdc: Hdc) -> i32                            
 
 type Proc proc() #cc_c;
 
-const MAPVK_VK_TO_CHAR   = 2;
-const MAPVK_VK_TO_VSC    = 0;
-const MAPVK_VSC_TO_VK    = 1;
-const MAPVK_VSC_TO_VK_EX = 3;
+const (
+	MAPVK_VK_TO_CHAR   = 2;
+	MAPVK_VK_TO_VSC    = 0;
+	MAPVK_VSC_TO_VK    = 1;
+	MAPVK_VSC_TO_VK_EX = 3;
+)
 
 proc map_virtual_key(scancode : u32, map_type : u32) -> u32 #foreign user32 "MapVirtualKeyA";
 

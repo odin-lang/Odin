@@ -1,6 +1,8 @@
-#foreign_system_library dl   "dl";
-#foreign_system_library libc "c";
-import "fmt.odin";
+foreign_system_library (
+	dl   "dl";
+	libc "c";
+)
+
 import "strings.odin";
 
 type (

@@ -1123,12 +1123,9 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			AstNode *name = p->names[j];
 			if (ast_node_expect(name, AstNode_Ident)) {
 				Entity *param = make_entity_param(c->allocator, scope, name->Ident, type,
-				                                  (p->flags&FieldFlag_using) != 0, (p->flags&FieldFlag_immutable) != 0);
+				                                  (p->flags&FieldFlag_using) != 0, false);
 				if (p->flags&FieldFlag_no_alias) {
 					param->flags |= EntityFlag_NoAlias;
-				}
-				if (p->flags&FieldFlag_immutable) {
-					param->Variable.is_immutable = true;
 				}
 				param->Variable.default_value = value;
 				param->Variable.default_is_nil = default_is_nil;
@@ -6568,11 +6565,8 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		if (f->flags&FieldFlag_using) {
 			str = gb_string_appendc(str, "using ");
 		}
-		if (f->flags&FieldFlag_immutable) {
-			str = gb_string_appendc(str, "immutable ");
-		}
 		if (f->flags&FieldFlag_no_alias) {
-			str = gb_string_appendc(str, "no_alias ");
+			str = gb_string_appendc(str, "#no_alias ");
 		}
 
 		for_array(i, f->names) {

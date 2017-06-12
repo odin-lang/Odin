@@ -88,6 +88,8 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_type,                   "type"),                   \
 	TOKEN_KIND(Token_import,                 "import"),                 \
 	TOKEN_KIND(Token_import_load,            "import_load"),            \
+	TOKEN_KIND(Token_foreign_library,        "foreign_library"),        \
+	TOKEN_KIND(Token_foreign_system_library, "foreign_system_library"), \
 	TOKEN_KIND(Token_when,                   "when"),                   \
 	TOKEN_KIND(Token_if,                     "if"),                     \
 	TOKEN_KIND(Token_else,                   "else"),                   \

@@ -100,9 +100,8 @@ enum FieldFlag {
 	FieldFlag_ellipsis  = 1<<0,
 	FieldFlag_using     = 1<<1,
 	FieldFlag_no_alias  = 1<<2,
-	FieldFlag_immutable = 1<<3,
 
-	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_immutable,
+	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias,
 };
 
 enum StmtAllowFlag {
@@ -307,12 +306,12 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		String   foreign_name;    \
 		String   link_name;       \
 	}) \
-	AST_NODE_KIND(ForeignLibrary, "foreign library", struct { \
-		Token token, filepath; \
-		Token library_name;     \
-		String base_dir;       \
+	AST_NODE_KIND(ForeignLibrarySpec, "foreign library specification", struct { \
+		Token    filepath;     \
+		Token    library_name; \
+		String   base_dir;     \
 		AstNode *cond;         \
-		bool is_system;        \
+		bool     is_system;    \
 	}) \
 	AST_NODE_KIND(Label, "label", struct { 	\
 		Token token; \
@@ -541,15 +540,15 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_PushAllocator: return node->PushAllocator.token;
 	case AstNode_PushContext:   return node->PushContext.token;
 
-	case AstNode_BadDecl:        return node->BadDecl.begin;
-	case AstNode_ProcDecl:       return node->ProcDecl.token;
-	case AstNode_ForeignLibrary: return node->ForeignLibrary.token;
-	case AstNode_Label:          return node->Label.token;
+	case AstNode_BadDecl:            return node->BadDecl.begin;
+	case AstNode_ProcDecl:           return node->ProcDecl.token;
+	case AstNode_ForeignLibrarySpec: return node->ForeignLibrarySpec.filepath;
+	case AstNode_Label:              return node->Label.token;
 
-	case AstNode_GenDecl:        return node->GenDecl.token;
-	case AstNode_ValueSpec:      return ast_node_token(node->ValueSpec.names[0]);
-	case AstNode_ImportSpec:     return node->ImportSpec.import_name;
-	case AstNode_TypeSpec:       return ast_node_token(node->TypeSpec.name);
+	case AstNode_GenDecl:            return node->GenDecl.token;
+	case AstNode_ValueSpec:          return ast_node_token(node->ValueSpec.names[0]);
+	case AstNode_ImportSpec:         return node->ImportSpec.import_name;
+	case AstNode_TypeSpec:           return ast_node_token(node->TypeSpec.name);
 
 
 	case AstNode_Field:
@@ -766,8 +765,8 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		break;
 
 	case AstNode_BadDecl: break;
-	case AstNode_ForeignLibrary:
-		n->ForeignLibrary.cond = clone_ast_node(a, n->ForeignLibrary.cond);
+	case AstNode_ForeignLibrarySpec:
+		n->ForeignLibrarySpec.cond = clone_ast_node(a, n->ForeignLibrarySpec.cond);
 		break;
 	case AstNode_Label:
 		n->Label.name = clone_ast_node(a, n->Label.name);
@@ -1438,13 +1437,12 @@ AstNode *ast_proc_decl(AstFile *f, Token token, AstNode *name, AstNode *type, As
 	return result;
 }
 
-AstNode *ast_foreign_library(AstFile *f, Token token, Token filepath, Token library_name, AstNode *cond, bool is_system) {
-	AstNode *result = make_ast_node(f, AstNode_ForeignLibrary);
-	result->ForeignLibrary.token = token;
-	result->ForeignLibrary.filepath = filepath;
-	result->ForeignLibrary.library_name = library_name;
-	result->ForeignLibrary.cond = cond;
-	result->ForeignLibrary.is_system = is_system;
+AstNode *ast_foreign_library_spec(AstFile *f, Token filepath, Token library_name, AstNode *cond, bool is_system) {
+	AstNode *result = make_ast_node(f, AstNode_ForeignLibrarySpec);
+	result->ForeignLibrarySpec.filepath = filepath;
+	result->ForeignLibrarySpec.library_name = library_name;
+	result->ForeignLibrarySpec.cond = cond;
+	result->ForeignLibrarySpec.is_system = is_system;
 	return result;
 }
 
@@ -2690,6 +2688,72 @@ PARSE_SPEC_FUNC(parse_import_spec) {
 	}
 }
 
+PARSE_SPEC_FUNC(parse_foreign_library_spec) {
+	if (token.kind == Token_foreign_system_library) {
+		AstNode *cond = NULL;
+		Token lib_name = {};
+
+		switch (f->curr_token.kind) {
+		case Token_Ident:
+			lib_name = f->curr_token;
+			next_token(f);
+			break;
+		default:
+			lib_name.pos = f->curr_token.pos;
+			break;
+		}
+
+		if (lib_name.string == "_") {
+			syntax_error(lib_name, "Illegal foreign_library name: `_`");
+		}
+		Token file_path = expect_token(f, Token_String);
+
+		if (allow_token(f, Token_when)) {
+			cond = parse_expr(f, false);
+		}
+
+		AstNode *spec = NULL;
+		if (f->curr_proc == NULL) {
+			spec = ast_foreign_library_spec(f, file_path, lib_name, cond, true);
+		} else {
+			syntax_error(lib_name, "You cannot use foreign_system_library within a procedure. This must be done at the file scope");
+			spec = ast_bad_decl(f, lib_name, file_path);
+		}
+		return spec;
+	} else {
+		AstNode *cond = NULL;
+		Token lib_name = {};
+
+		switch (f->curr_token.kind) {
+		case Token_Ident:
+			lib_name = f->curr_token;
+			next_token(f);
+			break;
+		default:
+			lib_name.pos = f->curr_token.pos;
+			break;
+		}
+
+		if (lib_name.string == "_") {
+			syntax_error(lib_name, "Illegal foreign_library name: `_`");
+		}
+		Token file_path = expect_token(f, Token_String);
+
+		if (allow_token(f, Token_when)) {
+			cond = parse_expr(f, false);
+		}
+
+		AstNode *spec = NULL;
+		if (f->curr_proc == NULL) {
+			spec = ast_foreign_library_spec(f, file_path, lib_name, cond, false);
+		} else {
+			syntax_error(lib_name, "You cannot use foreign_library within a procedure. This must be done at the file scope");
+			spec = ast_bad_decl(f, lib_name, file_path);
+		}
+		return spec;
+	}
+}
+
 AstNode *parse_decl(AstFile *f) {
 	ParseSpecFunc *func = NULL;
 	switch (f->curr_token.kind) {
@@ -2706,6 +2770,11 @@ AstNode *parse_decl(AstFile *f) {
 	case Token_import:
 	case Token_import_load:
 		func = parse_import_spec;
+		break;
+
+	case Token_foreign_library:
+	case Token_foreign_system_library:
+		func = parse_foreign_library_spec;
 		break;
 
 	case Token_proc:
@@ -2913,7 +2982,6 @@ enum FieldPrefixKind {
 	FieldPrefix_Invalid,
 
 	FieldPrefix_Using,
-	FieldPrefix_Immutable,
 	FieldPrefix_NoAlias,
 };
 
@@ -2924,9 +2992,6 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 
 	case Token_using:
 		return FieldPrefix_Using;
-
-	case Token_let:
-		return FieldPrefix_Immutable;
 
 	case Token_Hash: {
 		next_token(f);
@@ -2944,9 +3009,8 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 
 
 u32 parse_field_prefixes(AstFile *f) {
-	i32 using_count     = 0;
-	i32 no_alias_count  = 0;
-	i32 immutable_count = 0;
+	i32 using_count    = 0;
+	i32 no_alias_count = 0;
 
 	for (;;) {
 		FieldPrefixKind kind = is_token_field_prefix(f);
@@ -2954,20 +3018,17 @@ u32 parse_field_prefixes(AstFile *f) {
 			break;
 		}
 		switch (kind) {
-		case FieldPrefix_Using:     using_count     += 1; next_token(f); break;
-		case FieldPrefix_Immutable: immutable_count += 1; next_token(f); break;
-		case FieldPrefix_NoAlias:   no_alias_count  += 1; next_token(f); break;
+		case FieldPrefix_Using:     using_count    += 1; next_token(f); break;
+		case FieldPrefix_NoAlias:   no_alias_count += 1; next_token(f); break;
 		}
 	}
-	if (using_count     > 1) syntax_error(f->curr_token, "Multiple `using` in this field list");
-	if (immutable_count > 1) syntax_error(f->curr_token, "Multiple `immutable` in this field list");
+	if (using_count     > 1) syntax_error(f->curr_token, "Multiple `using`     in this field list");
 	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple `#no_alias` in this field list");
 
 
 	u32 field_flags = 0;
 	if (using_count     > 0) field_flags |= FieldFlag_using;
 	if (no_alias_count  > 0) field_flags |= FieldFlag_no_alias;
-	if (immutable_count > 0) field_flags |= FieldFlag_immutable;
 	return field_flags;
 }
 
@@ -2984,10 +3045,6 @@ u32 check_field_prefixes(AstFile *f, isize name_count, u32 allowed_flags, u32 se
 	if ((allowed_flags&FieldFlag_no_alias) == 0 && (set_flags&FieldFlag_no_alias)) {
 		syntax_error(f->curr_token, "`no_alias` is not allowed within this field list");
 		set_flags &= ~FieldFlag_no_alias;
-	}
-	if ((allowed_flags&FieldFlag_immutable) == 0 && (set_flags&FieldFlag_immutable)) {
-		syntax_error(f->curr_token, "`immutable` is not allowed within this field list");
-		set_flags &= ~FieldFlag_immutable;
 	}
 	return set_flags;
 }
@@ -3833,6 +3890,8 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_type:
 	case Token_import:
 	case Token_import_load:
+	case Token_foreign_library:
+	case Token_foreign_system_library:
 		return parse_decl(f);
 
 	case Token_if:     return parse_if_stmt(f);
@@ -3899,24 +3958,6 @@ AstNode *parse_stmt(AstFile *f) {
 		return ast_bad_stmt(f, token, f->curr_token);
 	} break;
 
-#if 0
-	case Token_immutable: {
-		Token token = expect_token(f, Token_immutable);
-		AstNode *node = parse_stmt(f);
-
-		if (node->kind == AstNode_ValueDecl) {
-			if (node->ValueDecl.token.kind == Token_const) {
-				syntax_error(token, "`immutable` may not be applied to constant declarations");
-			} else {
-				node->ValueDecl.flags |= VarDeclFlag_immutable;
-			}
-			return node;
-		}
-		syntax_error(token, "`immutable` may only be applied to a variable declaration");
-		return ast_bad_stmt(f, token, f->curr_token);
-	} break;
-#endif
-
 	case Token_push_allocator: {
 		next_token(f);
 		isize prev_level = f->expr_level;
@@ -3939,70 +3980,6 @@ AstNode *parse_stmt(AstFile *f) {
 		return ast_push_context(f, token, expr, body);
 	} break;
 
-#if 0
-	case Token_import: {
-		Token token = expect_token(f, Token_import);
-		AstNode *cond = NULL;
-		Token import_name = {};
-
-		switch (f->curr_token.kind) {
-		case Token_Period:
-			import_name = f->curr_token;
-			import_name.kind = Token_Ident;
-			next_token(f);
-			break;
-		case Token_Ident:
-			import_name = f->curr_token;
-			next_token(f);
-			break;
-		default:
-			import_name.pos = f->curr_token.pos;
-			break;
-		}
-
-		if (import_name.string == "_") {
-			syntax_error(import_name, "Illegal import name: `_`");
-		}
-
-		Token file_path = expect_token_after(f, Token_String, "import");
-		if (allow_token(f, Token_when)) {
-			cond = parse_expr(f, false);
-		}
-
-		AstNode *decl = NULL;
-		if (f->curr_proc != NULL) {
-			syntax_error(import_name, "You cannot use `import` within a procedure. This must be done at the file scope");
-			decl = ast_bad_decl(f, import_name, file_path);
-		} else {
-			decl = ast_import_decl(f, token, true, file_path, import_name, cond);
-		}
-		expect_semicolon(f, decl);
-		return decl;
-	}
-
-	case Token_import_load: {
-		Token token = expect_token(f, Token_import_load);
-		AstNode *cond = NULL;
-		Token file_path = expect_token_after(f, Token_String, "import_load");
-		Token import_name = file_path;
-		import_name.string = str_lit(".");
-
-		if (allow_token(f, Token_when)) {
-			cond = parse_expr(f, false);
-		}
-
-		AstNode *decl = NULL;
-		if (f->curr_proc != NULL) {
-			syntax_error(import_name, "You cannot use `import_load` within a procedure. This must be done at the file scope");
-			decl = ast_bad_decl(f, import_name, file_path);
-		} else {
-			decl = ast_import_decl(f, token, false, file_path, import_name, cond);
-		}
-		expect_semicolon(f, decl);
-		return decl;
-	}
-#endif
-
 	case Token_Hash: {
 		AstNode *s = NULL;
 		Token hash_token = expect_token(f, Token_Hash);
@@ -4016,68 +3993,6 @@ AstNode *parse_stmt(AstFile *f) {
 			} else {
 				syntax_error(token, "You cannot use #shared_global_scope within a procedure. This must be done at the file scope");
 				s = ast_bad_decl(f, token, f->curr_token);
-			}
-			expect_semicolon(f, s);
-			return s;
-		} else if (tag == "foreign_system_library") {
-			AstNode *cond = NULL;
-			Token lib_name = {};
-
-			switch (f->curr_token.kind) {
-			case Token_Ident:
-				lib_name = f->curr_token;
-				next_token(f);
-				break;
-			default:
-				lib_name.pos = f->curr_token.pos;
-				break;
-			}
-
-			if (lib_name.string == "_") {
-				syntax_error(lib_name, "Illegal #foreign_library name: `_`");
-			}
-			Token file_path = expect_token(f, Token_String);
-
-			if (allow_token(f, Token_when)) {
-				cond = parse_expr(f, false);
-			}
-
-			if (f->curr_proc == NULL) {
-				s = ast_foreign_library(f, hash_token, file_path, lib_name, cond, true);
-			} else {
-				syntax_error(token, "You cannot use #foreign_system_library within a procedure. This must be done at the file scope");
-				s = ast_bad_decl(f, token, file_path);
-			}
-			expect_semicolon(f, s);
-			return s;
-		} else if (tag == "foreign_library") {
-			AstNode *cond = NULL;
-			Token lib_name = {};
-
-			switch (f->curr_token.kind) {
-			case Token_Ident:
-				lib_name = f->curr_token;
-				next_token(f);
-				break;
-			default:
-				lib_name.pos = f->curr_token.pos;
-				break;
-			}
-
-			if (lib_name.string == "_") {
-				syntax_error(lib_name, "Illegal #foreign_library name: `_`");
-			}
-			Token file_path = expect_token(f, Token_String);
-
-			if (allow_token(f, Token_when)) {
-				cond = parse_expr(f, false);
-			}
-
-			if (f->curr_proc == NULL) {
-				s = ast_foreign_library(f, hash_token, file_path, lib_name, cond, false);
-			} else {
-				syntax_error(token, "You cannot use #foreign_library within a procedure. This must be done at the file scope");
-				s = ast_bad_decl(f, token, file_path);
 			}
 			expect_semicolon(f, s);
 			return s;
@@ -4328,55 +4243,6 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 					gbAllocator allocator = heap_allocator(); // TODO(bill): Change this allocator
 					String import_file = {};
 
-				#if 0
-					isize colon_pos = -1;
-					for (isize j = 0; j < file_str.len; j++) {
-						if (file_str[j] == ':') {
-							colon_pos = j;
-							break;
-						}
-					}
-					if (colon_pos > 0) {
-						collection_name = make_string(file_str.text, colon_pos);
-						file_str.text += colon_pos+1;
-						file_str.len  -= colon_pos+1;
-					}
-
-					if (collection_name.len == 0) {
-						syntax_error_node(node, "Missing import collection for path: `%.*s`", LIT(oirignal_string));
-						decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
-						continue;
-					}
-
-
-					if (collection_name == "core") {
-						String abs_path = get_fullpath_core(allocator, file_str);
-						if (gb_file_exists(cast(char *)abs_path.text)) { // NOTE(bill): This should be null terminated
-							import_file = abs_path;
-						}
-					} else if (collection_name == "local") {
-						String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
-						if (gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
-							import_file = rel_path;
-						}
-					} else {
-						syntax_error_node(node, "Unknown import collection: `%.*s`", LIT(collection_name));
-						decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
-						continue;
-					}
-
-					if (!is_import_path_valid(file_str)) {
-						if (id->is_import) {
-							syntax_error_node(node, "Invalid import path: `%.*s`", LIT(file_str));
-						} else {
-							syntax_error_node(node, "Invalid include path: `%.*s`", LIT(file_str));
-						}
-						// NOTE(bill): It's a naughty name
-						decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
-						continue;
-					}
-
-				#else
 					if (!is_import_path_valid(file_str)) {
 						if (id->is_import) {
 							syntax_error_node(node, "Invalid import path: `%.*s`", LIT(file_str));
@@ -4397,28 +4263,31 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 							import_file = abs_path;
 						}
 					}
-				#endif
 
 					id->fullpath = import_file;
 					try_add_import_path(p, import_file, file_str, ast_node_token(node).pos);
 				}
-			}
-		} else if (node->kind == AstNode_ForeignLibrary) {
-			AstNodeForeignLibrary *fl = &node->ForeignLibrary;
-			String file_str = fl->filepath.string;
+			} else if (gd->token.kind == Token_foreign_library ||
+			           gd->token.kind == Token_foreign_system_library) {
+				for_array(spec_index, gd->specs) {
+					AstNode *spec = gd->specs[spec_index];
+					ast_node(fl, ForeignLibrarySpec, spec);
+					String file_str = fl->filepath.string;
 
-			if (!is_import_path_valid(file_str)) {
-				if (fl->is_system) {
-					syntax_error_node(node, "Invalid `foreign_system_library` path");
-				} else {
-					syntax_error_node(node, "Invalid `foreign_library` path");
+					if (!is_import_path_valid(file_str)) {
+						if (fl->is_system) {
+							syntax_error_node(node, "Invalid `foreign_system_library` path");
+						} else {
+							syntax_error_node(node, "Invalid `foreign_library` path");
+						}
+						// NOTE(bill): It's a naughty name
+						gd->specs[spec_index] = ast_bad_decl(f, fl->filepath, fl->filepath);
+						continue;
+					}
+
+					fl->base_dir = base_dir;
 				}
-				// NOTE(bill): It's a naughty name
-				f->decls[i] = ast_bad_decl(f, fl->token, fl->token);
-				continue;
 			}
-
-			fl->base_dir = base_dir;
 		}
 	}
 }

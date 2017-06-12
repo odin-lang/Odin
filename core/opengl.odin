@@ -1,5 +1,7 @@
-#foreign_system_library lib "opengl32.lib" when ODIN_OS == "windows";
-#foreign_system_library lib "gl" when ODIN_OS == "linux";
+foreign_system_library (
+	lib "opengl32.lib" when ODIN_OS == "windows";
+	lib "gl" when ODIN_OS == "linux";
+)
 import (
 	win32 "sys/windows.odin" when ODIN_OS == "windows";
 	"sys/wgl.odin" when ODIN_OS == "windows";

@@ -1451,27 +1451,62 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 		case_end;
 
 		case_ast_node(gd, GenDecl, decl);
+			AstNodeValueSpec empty_spec = {};
+			AstNodeValueSpec *last_spec = NULL;
 			for_array(i, gd->specs) {
 				AstNode *spec = gd->specs[i];
 				switch (gd->token.kind) {
+				case Token_const: {
+					ast_node(vs, ValueSpec, spec);
+
+					if (vs->type != NULL || vs->values.count > 0) {
+						last_spec = vs;
+					} else if (last_spec == NULL) {
+						last_spec = &empty_spec;
+					}
+
+					for_array(i, vs->names) {
+						AstNode *name = vs->names[i];
+						if (name->kind != AstNode_Ident) {
+							error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+							continue;
+						}
+
+						AstNode *init = NULL;
+						if (i < vs->values.count) {
+							init = vs->values[i];
+						}
+
+						DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
+						Entity *e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, empty_exact_value);
+						d->type_expr = last_spec->type;
+						d->init_expr = init;
+						e->identifier = name;
+
+						add_entity_and_decl_info(c, name, e, d);
+					}
+
+					check_arity_match(c, vs);
+				} break;
+
 				case Token_var:
 				case Token_let: {
 					if (!c->context.scope->is_file) {
 						// NOTE(bill): local scope -> handle later and in order
 						break;
 					}
-					ast_node(vd, ValueSpec, spec);
+					ast_node(vs, ValueSpec, spec);
 
 					// NOTE(bill): You need to store the entity information here unline a constant declaration
-					isize entity_cap = vd->names.count;
+					isize entity_cap = vs->names.count;
 					isize entity_count = 0;
 					Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_cap);
 					DeclInfo *di = NULL;
-					if (vd->values.count > 0) {
+					if (vs->values.count > 0) {
 						di = make_declaration_info(heap_allocator(), c->context.scope, c->context.decl);
 						di->entities = entities;
-						di->type_expr = vd->type;
-						di->init_expr = vd->values[0];
+						di->type_expr = vs->type;
+						di->init_expr = vs->values[0];
 
 
 						if (gd->flags & VarDeclFlag_thread_local) {
@@ -1480,11 +1515,11 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					}
 
 
-					for_array(i, vd->names) {
-						AstNode *name = vd->names[i];
+					for_array(i, vs->names) {
+						AstNode *name = vs->names[i];
 						AstNode *value = NULL;
-						if (i < vd->values.count) {
-							value = vd->values[i];
+						if (i < vs->values.count) {
+							value = vs->values[i];
 						}
 						if (name->kind != AstNode_Ident) {
 							error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
@@ -1504,7 +1539,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 						if (d == NULL) {
 							AstNode *init_expr = value;
 							d = make_declaration_info(heap_allocator(), e->scope, c->context.decl);
-							d->type_expr = vd->type;
+							d->type_expr = vs->type;
 							d->init_expr = init_expr;
 						}
 
@@ -1515,65 +1550,13 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 						di->entity_count = entity_count;
 					}
 
-					check_arity_match(c, vd);
-				} break;
-
-				case Token_const: {
-					ast_node(vd, ValueSpec, spec);
-
-					for_array(i, vd->names) {
-						AstNode *name = vd->names[i];
-						if (name->kind != AstNode_Ident) {
-							error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-							continue;
-						}
-
-						AstNode *init = NULL;
-						if (i < vd->values.count) {
-							init = vd->values[i];
-						}
-
-						DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
-						Entity *e = NULL;
-
-						AstNode *up_init = unparen_expr(init);
-						// if (up_init != NULL && is_ast_node_type(up_init)) {
-						// 	AstNode *type = up_init;
-						// 	e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
-						// 	// TODO(bill): What if vd->type != NULL??? How to handle this case?
-						// 	d->type_expr = type;
-						// 	d->init_expr = type;
-						// } else if (up_init != NULL && up_init->kind == AstNode_Alias) {
-						// #if 1
-						// 	error_node(up_init, "#alias declarations are not yet supported");
-						// 	continue;
-						// #else
-						// 	e = make_entity_alias(c->allocator, d->scope, name->Ident, NULL, EntityAlias_Invalid, NULL);
-						// 	d->type_expr = vd->type;
-						// 	d->init_expr = up_init->Alias.expr;
-						// #endif
-						// // } else if (init != NULL && up_init->kind == AstNode_ProcLit) {
-						// 	// e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
-						// 	// d->proc_lit = up_init;
-						// 	// d->type_expr = vd->type;
-						// } else {
-							e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, empty_exact_value);
-							d->type_expr = vd->type;
-							d->init_expr = init;
-						// }
-						GB_ASSERT(e != NULL);
-						e->identifier = name;
-
-						add_entity_and_decl_info(c, name, e, d);
-					}
-
-					check_arity_match(c, vd);
+					check_arity_match(c, vs);
 				} break;
 
 				case Token_type: {
-					ast_node(td, TypeSpec, spec);
+					ast_node(ts, TypeSpec, spec);
 
-					AstNode *name = td->name;
+					AstNode *name = ts->name;
 					if (name->kind != AstNode_Ident) {
 						error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 						break;
@@ -1583,9 +1566,8 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
 					Entity *e = NULL;
 
-					AstNode *type = unparen_expr(td->type);
+					AstNode *type = unparen_expr(ts->type);
 					e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
-					// TODO(bill): What if vd->type != NULL??? How to handle this case?
 					d->type_expr = type;
 					d->init_expr = type;
 
@@ -1595,9 +1577,9 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 
 				case Token_import:
 				case Token_import_load: {
-					ast_node(id, ImportSpec, spec);
+					ast_node(ts, ImportSpec, spec);
 					if (!c->context.scope->is_file) {
-						if (id->is_import) {
+						if (ts->is_import) {
 							error_node(decl, "import declarations are only allowed in the file scope");
 						} else {
 							error_node(decl, "import_load declarations are only allowed in the file scope");
@@ -1608,6 +1590,37 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					}
 					DelayedDecl di = {c->context.scope, spec};
 					array_add(&c->delayed_imports, di);
+				} break;
+
+				case Token_foreign_library:
+				case Token_foreign_system_library:  {
+					ast_node(fl, ForeignLibrarySpec, spec);
+					if (!c->context.scope->is_file) {
+						if (fl->is_system) {
+							error_node(spec, "foreign_system_library declarations are only allowed in the file scope");
+						} else {
+							error_node(spec, "foreign_library declarations are only allowed in the file scope");
+						}
+						// NOTE(bill): _Should_ be caught by the parser
+						// TODO(bill): Better error handling if it isn't
+						continue;
+					}
+
+					if (fl->cond != NULL) {
+						Operand operand = {Addressing_Invalid};
+						check_expr(c, &operand, fl->cond);
+						if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
+							error_node(fl->cond, "Non-constant boolean `when` condition");
+							continue;
+						}
+						if (operand.value.kind == ExactValue_Bool &&
+							!operand.value.value_bool) {
+							continue;
+						}
+					}
+
+					DelayedDecl di = {c->context.scope, spec};
+					array_add(&c->delayed_foreign_libraries, di);
 				} break;
 				}
 			}
@@ -1631,34 +1644,6 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 			add_entity_and_decl_info(c, name, e, d);
 		case_end;
 
-		case_ast_node(fl, ForeignLibrary, decl);
-			if (!c->context.scope->is_file) {
-				if (fl->is_system) {
-					error_node(decl, "#foreign_system_library declarations are only allowed in the file scope");
-				} else {
-					error_node(decl, "#foreign_library declarations are only allowed in the file scope");
-				}
-				// NOTE(bill): _Should_ be caught by the parser
-				// TODO(bill): Better error handling if it isn't
-				continue;
-			}
-
-			if (fl->cond != NULL) {
-				Operand operand = {Addressing_Invalid};
-				check_expr(c, &operand, fl->cond);
-				if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
-					error_node(fl->cond, "Non-constant boolean `when` condition");
-					continue;
-				}
-				if (operand.value.kind == ExactValue_Bool &&
-					!operand.value.value_bool) {
-					continue;
-				}
-			}
-
-			DelayedDecl di = {c->context.scope, decl};
-			array_add(&c->delayed_foreign_libraries, di);
-		case_end;
 		default:
 			if (c->context.scope->is_file) {
 				error_node(decl, "Only declarations are allowed at file scope");
@@ -1998,8 +1983,8 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 
 	for_array(i, c->delayed_foreign_libraries) {
 		Scope *parent_scope = c->delayed_foreign_libraries[i].parent;
-		AstNode *decl = c->delayed_foreign_libraries[i].decl;
-		ast_node(fl, ForeignLibrary, decl);
+		AstNode *spec = c->delayed_foreign_libraries[i].decl;
+		ast_node(fl, ForeignLibrarySpec, spec);
 
 		String file_str = fl->filepath.string;
 		String base_dir = fl->base_dir;
@@ -2034,7 +2019,7 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 
 		String library_name = path_to_entity_name(fl->library_name.string, file_str);
 		if (library_name == "_") {
-			error(fl->token, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
+			error_node(spec, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
 		} else {
 			GB_ASSERT(fl->library_name.pos.line != 0);
 			fl->library_name.string = library_name;

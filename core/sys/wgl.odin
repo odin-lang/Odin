@@ -1,4 +1,4 @@
-#foreign_system_library "opengl32.lib" when ODIN_OS == "windows";
+foreign_system_library "opengl32.lib" when ODIN_OS == "windows";
 import . "windows.odin";
 
 const CONTEXT_MAJOR_VERSION_ARB          = 0x2091;
