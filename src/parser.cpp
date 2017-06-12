@@ -48,7 +48,7 @@ struct AstFile {
 struct ImportedFile {
 	String   path;
 	String   rel_path;
-	TokenPos pos; // #import
+	TokenPos pos; // import
 };
 
 struct Parser {
@@ -2098,7 +2098,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 	// Parse Procedure Type or Literal
 	case Token_proc: {
-		Token token = f->curr_token; next_token(f);
+		Token token = expect_token(f, Token_proc);
 		AstNode *foreign_library = NULL;
 		String foreign_name = {};
 		String link_name = {};
@@ -2582,11 +2582,17 @@ AstNode *parse_value_decl(AstFile *f, Token token) {
 }
 
 AstNode *parse_proc_decl(AstFile *f) {
+	TokenKind look_ahead = look_ahead_token_kind(f, 1);
+	if (look_ahead != Token_Ident) {
+		return ast_expr_stmt(f, parse_expr(f, true));
+	}
+
 	Token token = expect_token(f, Token_proc);
 	AstNode *body = NULL;
 	AstNode *foreign_library = NULL;
 	String foreign_name = {};
 	String link_name = {};
+
 
 	AstNode *name = parse_ident(f);
 	AstNode *type = parse_proc_type(f, token, &foreign_library, &foreign_name, &link_name);
@@ -3840,69 +3846,75 @@ AstNode *parse_stmt(AstFile *f) {
 		return ast_push_context(f, token, expr, body);
 	} break;
 
+	case Token_import: {
+		Token token = expect_token(f, Token_import);
+		AstNode *cond = NULL;
+		Token import_name = {};
+
+		switch (f->curr_token.kind) {
+		case Token_Period:
+			import_name = f->curr_token;
+			import_name.kind = Token_Ident;
+			next_token(f);
+			break;
+		case Token_Ident:
+			import_name = f->curr_token;
+			next_token(f);
+			break;
+		default:
+			import_name.pos = f->curr_token.pos;
+			break;
+		}
+
+		if (import_name.string == "_") {
+			syntax_error(import_name, "Illegal import name: `_`");
+		}
+
+		Token file_path = expect_token_after(f, Token_String, "import");
+		if (allow_token(f, Token_when)) {
+			cond = parse_expr(f, false);
+		}
+
+		AstNode *decl = NULL;
+		if (f->curr_proc != NULL) {
+			syntax_error(import_name, "You cannot use `import` within a procedure. This must be done at the file scope");
+			decl = ast_bad_decl(f, import_name, file_path);
+		} else {
+			decl = ast_import_decl(f, token, true, file_path, import_name, cond);
+		}
+		expect_semicolon(f, decl);
+		return decl;
+	}
+
+	case Token_import_load: {
+		Token token = expect_token(f, Token_import_load);
+		AstNode *cond = NULL;
+		Token file_path = expect_token_after(f, Token_String, "import_load");
+		Token import_name = file_path;
+		import_name.string = str_lit(".");
+
+		if (allow_token(f, Token_when)) {
+			cond = parse_expr(f, false);
+		}
+
+		AstNode *decl = NULL;
+		if (f->curr_proc != NULL) {
+			syntax_error(import_name, "You cannot use `import_load` within a procedure. This must be done at the file scope");
+			decl = ast_bad_decl(f, import_name, file_path);
+		} else {
+			decl = ast_import_decl(f, token, false, file_path, import_name, cond);
+		}
+		expect_semicolon(f, decl);
+		return decl;
+	}
+
 	case Token_Hash: {
 		AstNode *s = NULL;
 		Token hash_token = expect_token(f, Token_Hash);
 		Token name = expect_token(f, Token_Ident);
 		String tag = name.string;
 
-		if (tag == "import") {
-			AstNode *cond = NULL;
-			Token import_name = {};
-
-			switch (f->curr_token.kind) {
-			case Token_Period:
-				import_name = f->curr_token;
-				import_name.kind = Token_Ident;
-				next_token(f);
-				break;
-			case Token_Ident:
-				import_name = f->curr_token;
-				next_token(f);
-				break;
-			default:
-				import_name.pos = f->curr_token.pos;
-				break;
-			}
-
-			if (import_name.string == "_") {
-				syntax_error(import_name, "Illegal #import name: `_`");
-			}
-
-			Token file_path = expect_token_after(f, Token_String, "#import");
-			if (allow_token(f, Token_when)) {
-				cond = parse_expr(f, false);
-			}
-
-			AstNode *decl = NULL;
-			if (f->curr_proc != NULL) {
-				syntax_error(import_name, "You cannot use `#import` within a procedure. This must be done at the file scope");
-				decl = ast_bad_decl(f, import_name, file_path);
-			} else {
-				decl = ast_import_decl(f, hash_token, true, file_path, import_name, cond);
-			}
-			expect_semicolon(f, decl);
-			return decl;
-		} else if (tag == "load") {
-			AstNode *cond = NULL;
-			Token file_path = expect_token_after(f, Token_String, "#load");
-			Token import_name = file_path;
-			import_name.string = str_lit(".");
-
-			if (allow_token(f, Token_when)) {
-				cond = parse_expr(f, false);
-			}
-
-			AstNode *decl = NULL;
-			if (f->curr_proc != NULL) {
-				syntax_error(import_name, "You cannot use `#load` within a procedure. This must be done at the file scope");
-				decl = ast_bad_decl(f, import_name, file_path);
-			} else {
-				decl = ast_import_decl(f, hash_token, false, file_path, import_name, cond);
-			}
-			expect_semicolon(f, decl);
-			return decl;
-		} else if (tag == "shared_global_scope") {
+		if (tag == "shared_global_scope") {
 			if (f->curr_proc == NULL) {
 				f->is_global_scope = true;
 				s = ast_empty_stmt(f, f->curr_token);
@@ -4007,7 +4019,7 @@ AstNode *parse_stmt(AstFile *f) {
 		}
 
 		if (tag == "include") {
-			syntax_error(token, "#include is not a valid import declaration kind. Use #load instead");
+			syntax_error(token, "#include is not a valid import declaration kind. Use import_load instead");
 			s = ast_bad_stmt(f, token, f->curr_token);
 		} else {
 			syntax_error(token, "Unknown tag directive used: `%.*s`", LIT(tag));

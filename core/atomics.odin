@@ -1,7 +1,7 @@
 // TODO(bill): Use assembly instead here to implement atomics
 // Inline vs external file?
 
-#import win32 "sys/windows.odin" when ODIN_OS == "windows";
+import win32 "sys/windows.odin" when ODIN_OS == "windows";
 var _ = compile_assert(ODIN_ARCH == "amd64"); // TODO(bill): x86 version
 
 

@@ -1,9 +1,9 @@
-#import "os.odin";
-#import "mem.odin";
-#import "utf8.odin";
-#import "types.odin";
-#import "strconv.odin";
-#import "raw.odin";
+import "os.odin";
+import "mem.odin";
+import "utf8.odin";
+import "types.odin";
+import "strconv.odin";
+import "raw.odin";
 
 
 const _BUFFER_SIZE = 1<<12;

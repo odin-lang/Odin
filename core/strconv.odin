@@ -1,4 +1,4 @@
-#import . "decimal.odin";
+import . "decimal.odin";
 
 type IntFlag enum {
 	Prefix = 1<<0,

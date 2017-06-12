@@ -1,5 +1,5 @@
-#import "fmt.odin";
-#import "os.odin";
+import "fmt.odin";
+import "os.odin";
 
 proc swap(b: u16) -> u16 #foreign __llvm_core "llvm.bswap.i16";
 proc swap(b: u32) -> u32 #foreign __llvm_core "llvm.bswap.i32";

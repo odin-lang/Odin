@@ -1,4 +1,4 @@
-#import win32 "sys/windows.odin";
+import win32 "sys/windows.odin";
 
 type Handle   int;
 type FileTime u64;

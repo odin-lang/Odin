@@ -1,9 +1,9 @@
 #shared_global_scope;
 
-#import "os.odin";
-#import "fmt.odin";
-#import "utf8.odin";
-#import "raw.odin";
+import "os.odin";
+import "fmt.odin";
+import "utf8.odin";
+import "raw.odin";
 
 // Naming Conventions:
 // In general, PascalCase for types and snake_case for values

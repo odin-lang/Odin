@@ -1,5 +1,4 @@
-// #import "fmt.odin";
-#import "strings.odin";
+import "strings.odin";
 
 type Handle   i32;
 type FileTime u64;

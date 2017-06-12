@@ -1,6 +1,6 @@
-#load "os_windows.odin" when ODIN_OS == "windows";
-#load "os_x.odin"       when ODIN_OS == "osx";
-#load "os_linux.odin"   when ODIN_OS == "linux";
+import_load "os_windows.odin" when ODIN_OS == "windows";
+import_load "os_x.odin"       when ODIN_OS == "osx";
+import_load "os_linux.odin"   when ODIN_OS == "linux";
 
 proc write_string(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, []u8(str));
