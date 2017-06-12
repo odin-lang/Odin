@@ -2567,9 +2567,17 @@ AstNode *parse_gen_decl(AstFile *f, Token token, ParseSpecFunc *func) {
 			expect_semicolon(f, spec);
 		}
 		close = expect_token(f, Token_CloseParen);
+		if (f->curr_token.pos.line == close.pos.line ||
+		    open.pos.line == close.pos.line) {
+			expect_semicolon(f, NULL);
+		}
 	} else {
 		array_init(&specs, heap_allocator(), 1);
 		array_add(&specs, func(f, token));
+	}
+
+	if (specs.count == 0) {
+		syntax_error(token, "Empty %.*s declaration list", LIT(token_strings[token.kind]));
 	}
 
 	AstNode *decl = ast_gen_decl(f, token, open, close, specs);
@@ -2790,7 +2798,6 @@ AstNode *parse_decl(AstFile *f) {
 
 	Token token = f->curr_token;
 	next_token(f);
-
 	return parse_gen_decl(f, token, func);
 }
 

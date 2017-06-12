@@ -1,3 +1,10 @@
+proc new_string(s: string) -> string {
+	var c = make([]u8, len(s)+1);
+	copy(c, []u8(s));
+	c[len(s)] = 0;
+	return string(c[0..<len(s)]);
+}
+
 proc new_c_string(s: string) -> ^u8 {
 	var c = make([]u8, len(s)+1);
 	copy(c, []u8(s));

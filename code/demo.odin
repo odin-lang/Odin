@@ -14,10 +14,6 @@ import (
 	"utf16.odin";
 )
 
-const (
-	X = 123;
-	Y = 432;
-)
 
 proc main() {
 	proc(s: string){
