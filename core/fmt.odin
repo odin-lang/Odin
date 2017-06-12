@@ -6,14 +6,14 @@
 #import "raw.odin";
 
 
-_BUFFER_SIZE :: 1<<12;
+const _BUFFER_SIZE = 1<<12;
 
-StringBuffer :: union {
+const StringBuffer = union {
 	Static {buf: []u8},
 	Dynamic{buf: [dynamic]u8},
 }
 
-FmtInfo :: struct {
+const FmtInfo = struct {
 	minus:     bool,
 	plus:      bool,
 	space:     bool,
@@ -33,14 +33,14 @@ FmtInfo :: struct {
 }
 
 
-make_string_buffer_from_slice :: proc(b: []u8) -> StringBuffer {
+const make_string_buffer_from_slice = proc(b: []u8) -> StringBuffer {
 	return StringBuffer.Static{b};
 }
 
-make_string_dynamic_buffer :: proc() -> StringBuffer {
+const make_string_dynamic_buffer = proc() -> StringBuffer {
 	return StringBuffer.Dynamic{make([dynamic]u8)};
 }
-string_buffer_data :: proc(buf: ^StringBuffer) -> []u8 {
+const string_buffer_data = proc(buf: ^StringBuffer) -> []u8 {
 	match b in buf {
 	case StringBuffer.Static:
 		return b.buf[..];
@@ -49,7 +49,7 @@ string_buffer_data :: proc(buf: ^StringBuffer) -> []u8 {
 	}
 	return nil;
 }
-string_buffer_data :: proc(buf: StringBuffer) -> []u8 {
+const string_buffer_data = proc(buf: StringBuffer) -> []u8 {
 	match b in buf {
 	case StringBuffer.Static:
 		return b.buf[..];
@@ -58,15 +58,15 @@ string_buffer_data :: proc(buf: StringBuffer) -> []u8 {
 	}
 	return nil;
 }
-to_string :: proc(buf: StringBuffer) -> string {
+const to_string = proc(buf: StringBuffer) -> string {
 	return string(string_buffer_data(buf));
 }
 
 
-write_string :: proc(buf: ^StringBuffer, s: string) {
+const write_string = proc(buf: ^StringBuffer, s: string) {
 	write_bytes(buf, []u8(s));
 }
-write_bytes :: proc(buf: ^StringBuffer, data: []u8) {
+const write_bytes = proc(buf: ^StringBuffer, data: []u8) {
 	match b in buf {
 	case StringBuffer.Static:
 		append(b.buf, ..data);
@@ -74,7 +74,7 @@ write_bytes :: proc(buf: ^StringBuffer, data: []u8) {
 		append(b.buf, ..data);
 	}
 }
-write_byte :: proc(buf: ^StringBuffer, data: u8) {
+const write_byte = proc(buf: ^StringBuffer, data: u8) {
 	match b in buf {
 	case StringBuffer.Static:
 		append(b.buf, data);
@@ -82,79 +82,79 @@ write_byte :: proc(buf: ^StringBuffer, data: u8) {
 		append(b.buf, data);
 	}
 }
-write_rune :: proc(buf: ^StringBuffer, r: rune) {
+const write_rune = proc(buf: ^StringBuffer, r: rune) {
 	if r < utf8.RUNE_SELF {
 		write_byte(buf, u8(r));
 		return;
 	}
 
-	b, n := utf8.encode_rune(r);
+	var b, n = utf8.encode_rune(r);
 	write_bytes(buf, b[0..<n]);
 }
 
-write_int :: proc(buf: ^StringBuffer, i: i128, base: int) {
-	b: [129]u8;
-	s := strconv.append_bits(b[0..<0], u128(i), base, true, 128, strconv.digits, 0);
+const write_int = proc(buf: ^StringBuffer, i: i128, base: int) {
+	var b: [129]u8;
+	var s = strconv.append_bits(b[0..<0], u128(i), base, true, 128, strconv.digits, 0);
 	write_string(buf, s);
 }
-write_int :: proc(buf: ^StringBuffer, i: i64, base: int) {
-	b: [129]u8;
-	s := strconv.append_bits(b[0..<0], u128(i), base, true, 64, strconv.digits, 0);
+const write_int = proc(buf: ^StringBuffer, i: i64, base: int) {
+	var b: [129]u8;
+	var s = strconv.append_bits(b[0..<0], u128(i), base, true, 64, strconv.digits, 0);
 	write_string(buf, s);
 }
 
 
 
-fprint :: proc(fd: os.Handle, args: ..any) -> int {
-	data: [_BUFFER_SIZE]u8;
-	buf := make_string_buffer_from_slice(data[0..<0]);
+const fprint = proc(fd: os.Handle, args: ..any) -> int {
+	var data: [_BUFFER_SIZE]u8;
+	var buf = make_string_buffer_from_slice(data[0..<0]);
 	sbprint(&buf, ..args);
-	res := string_buffer_data(buf);
+	var res = string_buffer_data(buf);
 	os.write(fd, res);
 	return len(res);
 }
 
-fprintln :: proc(fd: os.Handle, args: ..any) -> int {
-	data: [_BUFFER_SIZE]u8;
-	buf := make_string_buffer_from_slice(data[0..<0]);
+const fprintln = proc(fd: os.Handle, args: ..any) -> int {
+	var data: [_BUFFER_SIZE]u8;
+	var buf = make_string_buffer_from_slice(data[0..<0]);
 	sbprintln(&buf, ..args);
-	res := string_buffer_data(buf);
+	var res = string_buffer_data(buf);
 	os.write(fd, res);
 	return len(res);
 }
-fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
-	data: [_BUFFER_SIZE]u8;
-	buf := make_string_buffer_from_slice(data[0..<0]);
+const fprintf = proc(fd: os.Handle, fmt: string, args: ..any) -> int {
+	var data: [_BUFFER_SIZE]u8;
+	var buf = make_string_buffer_from_slice(data[0..<0]);
 	sbprintf(&buf, fmt, ..args);
-	res := string_buffer_data(buf);
+	var res = string_buffer_data(buf);
 	os.write(fd, res);
 	return len(res);
 }
 
 
 // print* procedures return the number of bytes written
-print       :: proc(args: ..any)              -> int { return fprint(os.stdout, ..args); }
-print_err   :: proc(args: ..any)              -> int { return fprint(os.stderr, ..args); }
-println     :: proc(args: ..any)              -> int { return fprintln(os.stdout, ..args); }
-println_err :: proc(args: ..any)              -> int { return fprintln(os.stderr, ..args); }
-printf      :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stdout, fmt, ..args); }
-printf_err  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stderr, fmt, ..args); }
+const print       = proc(args: ..any)              -> int { return fprint(os.stdout, ..args); }
+const print_err   = proc(args: ..any)              -> int { return fprint(os.stderr, ..args); }
+const println     = proc(args: ..any)              -> int { return fprintln(os.stdout, ..args); }
+const println_err = proc(args: ..any)              -> int { return fprintln(os.stderr, ..args); }
+const printf      = proc(fmt: string, args: ..any) -> int { return fprintf(os.stdout, fmt, ..args); }
+const printf_err  = proc(fmt: string, args: ..any) -> int { return fprintf(os.stderr, fmt, ..args); }
 
 
 // aprint* procedures return a string that was allocated with the current context
 // They must be freed accordingly
-aprint :: proc(args: ..any) -> string {
-	buf := make_string_dynamic_buffer();
+const aprint = proc(args: ..any) -> string {
+	var buf = make_string_dynamic_buffer();
 	sbprint(&buf, ..args);
 	return to_string(buf);
 }
-aprintln :: proc(args: ..any) -> string {
-	buf := make_string_dynamic_buffer();
+const aprintln = proc(args: ..any) -> string {
+	var buf = make_string_dynamic_buffer();
 	sbprintln(&buf, ..args);
 	return to_string(buf);
 }
-aprintf :: proc(fmt: string, args: ..any) -> string {
-	buf := make_string_dynamic_buffer();
+const aprintf = proc(fmt: string, args: ..any) -> string {
+	var buf = make_string_dynamic_buffer();
 	sbprintf(&buf, fmt, ..args);
 	return to_string(buf);
 }
@@ -162,16 +162,16 @@ aprintf :: proc(fmt: string, args: ..any) -> string {
 
 // bprint* procedures return a string that was allocated with the current context
 // They must be freed accordingly
-bprint :: proc(buf: []u8, args: ..any) -> string {
-	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
+const bprint = proc(buf: []u8, args: ..any) -> string {
+	var sb = make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprint(&sb, ..args);
 }
-bprintln :: proc(buf: []u8, args: ..any) -> string {
-	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
+const bprintln = proc(buf: []u8, args: ..any) -> string {
+	var sb = make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprintln(&sb, ..args);
 }
-bprintf :: proc(buf: []u8, fmt: string, args: ..any) -> string {
-	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
+const bprintf = proc(buf: []u8, fmt: string, args: ..any) -> string {
+	var sb = make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprintf(&sb, fmt, ..args);
 }
 
@@ -180,14 +180,14 @@ bprintf :: proc(buf: []u8, fmt: string, args: ..any) -> string {
 
 
 
-fprint_type :: proc(fd: os.Handle, info: ^TypeInfo) {
-	data: [_BUFFER_SIZE]u8;
-	buf := make_string_buffer_from_slice(data[0..<0]);
+const fprint_type = proc(fd: os.Handle, info: ^TypeInfo) {
+	var data: [_BUFFER_SIZE]u8;
+	var buf = make_string_buffer_from_slice(data[0..<0]);
 	write_type(&buf, info);
 	os.write(fd, string_buffer_data(buf));
 }
 
-write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
+const write_type = proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 	if ti == nil {
 		return;
 	}
@@ -238,11 +238,11 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		if info.params == nil {
 			write_string(buf, "()");
 		} else {
-			t := info.params.(^Tuple);
+			var t = info.params.(^Tuple);
 			write_string(buf, "(");
-			for type, i in t.types {
+			for t, i in t.types {
 				if i > 0 { write_string(buf, ", "); }
-				write_type(buf, type);
+				write_type(buf, t);
 			}
 			write_string(buf, ")");
 		}
@@ -251,24 +251,24 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 			write_type(buf, info.results);
 		}
 	case Tuple:
-		count := len(info.names);
+		var count = len(info.names);
 		if count != 1 { write_string(buf, "("); }
 		for name, i in info.names {
 			if i > 0 { write_string(buf, ", "); }
 
-			type := info.types[i];
+			var t = info.types[i];
 
 			if len(name) > 0 {
 				write_string(buf, name);
 				write_string(buf, ": ");
 			}
-			write_type(buf, type);
+			write_type(buf, t);
 		}
 		if count != 1 { write_string(buf, ")"); }
 
 	case Array:
 		write_string(buf, "[");
-		fi := FmtInfo{buf = buf};
+		var fi = FmtInfo{buf = buf};
 		write_int(buf, i64(info.count), 10);
 		write_string(buf, "]");
 		write_type(buf, info.elem);
@@ -312,8 +312,8 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 
 	case Union:
 		write_string(buf, "union {");
-		cf := info.common_fields;
-		total_count := 0;
+		var cf = info.common_fields;
+		var total_count = 0;
 		for name, i in cf.names {
 			if i > 0 {
 				write_string(buf, ", ");
@@ -331,15 +331,15 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 			write_byte(buf, '{');
 			defer write_byte(buf, '}');
 
-			variant_type := type_info_base(info.variant_types[i]);
-			variant := variant_type.(^Struct);
+			var variant_type = type_info_base(info.variant_types[i]);
+			var variant = variant_type.(^Struct);
 
-			vc := len(variant.names)-len(cf.names);
+			var vc = len(variant.names)-len(cf.names);
 			for j in 0..vc {
 				if j > 0 {
 					write_string(buf, ", ");
 				}
-				index := j + len(cf.names);
+				var index = j + len(cf.names);
 				write_string(buf, variant.names[index]);
 				write_string(buf, ": ");
 				write_type(buf, variant.types[index]);
@@ -392,17 +392,17 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 }
 
 
-_parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: bool) {
-	is_digit :: proc(r: rune) -> bool #inline {
+const _parse_int = proc(s: string, offset: int) -> (result: int, offset: int, ok: bool) {
+	const is_digit = proc(r: rune) -> bool #inline {
 		return '0' <= r && r <= '9';
 	}
 
-	result := 0;
-	ok := true;
+	var result = 0;
+	var ok = true;
 
-	i := 0;
+	var i = 0;
 	for i < len(s[offset..]) {
-		c := rune(s[offset+i]);
+		var c = rune(s[offset+i]);
 		if !is_digit(c) {
 			break;
 		}
@@ -415,15 +415,15 @@ _parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: boo
 	return result, offset+i, i != 0;
 }
 
-_arg_number :: proc(fi: ^FmtInfo, arg_index: int, format: string, offset, arg_count: int) -> (index, offset: int, ok: bool) {
-	parse_arg_number :: proc(format: string) -> (int, int, bool) {
+const _arg_number = proc(fi: ^FmtInfo, arg_index: int, format: string, offset, arg_count: int) -> (index, offset: int, ok: bool) {
+	const parse_arg_number = proc(format: string) -> (int, int, bool) {
 		if len(format) < 3 {
 			return 0, 1, false;
 		}
 
 		for i in 1..len(format) {
 			if format[i] == ']' {
-				width, new_index, ok := _parse_int(format, 1);
+				var width, new_index, ok = _parse_int(format, 1);
 				if !ok || new_index != i {
 					return 0, i+1, false;
 				}
@@ -439,7 +439,7 @@ _arg_number :: proc(fi: ^FmtInfo, arg_index: int, format: string, offset, arg_co
 		return arg_index, offset, false;
 	}
 	fi.reordered = true;
-	index, width, ok := parse_arg_number(format[offset..]);
+	var index, width, ok = parse_arg_number(format[offset..]);
 	if ok && 0 <= index && index < arg_count {
 		return index, offset+width, true;
 	}
@@ -447,12 +447,12 @@ _arg_number :: proc(fi: ^FmtInfo, arg_index: int, format: string, offset, arg_co
 	return arg_index, offset+width, false;
 }
 
-int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
-	num := 0;
-	new_arg_index := arg_index;
-	ok := true;
+const int_from_arg = proc(args: []any, arg_index: int) -> (int, int, bool) {
+	var num = 0;
+	var new_arg_index = arg_index;
+	var ok = true;
 	if arg_index < len(args) {
-		arg := args[arg_index];
+		var arg = args[arg_index];
 		arg.type_info = type_info_base(arg.type_info);
 		match i in arg {
 		case int:  num = i;
@@ -473,7 +473,7 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 }
 
 
-fmt_bad_verb :: proc(using fi: ^FmtInfo, verb: rune) {
+const fmt_bad_verb = proc(using fi: ^FmtInfo, verb: rune) {
 	assert(verb != 'v');
 	write_string(buf, "%!");
 	write_rune(buf, verb);
@@ -488,7 +488,7 @@ fmt_bad_verb :: proc(using fi: ^FmtInfo, verb: rune) {
 	write_byte(buf, ')');
 }
 
-fmt_bool :: proc(using fi: ^FmtInfo, b: bool, verb: rune) {
+const fmt_bool = proc(using fi: ^FmtInfo, b: bool, verb: rune) {
 	match verb {
 	case 't', 'v':
 		write_string(buf, b ? "true" : "false");
@@ -498,39 +498,39 @@ fmt_bool :: proc(using fi: ^FmtInfo, b: bool, verb: rune) {
 }
 
 
-fmt_write_padding :: proc(fi: ^FmtInfo, width: int) {
+const fmt_write_padding = proc(fi: ^FmtInfo, width: int) {
 	if width <= 0 {
 		return;
 	}
-	pad_byte: u8 = '0';
+	var pad_byte: u8 = '0';
 	if fi.space {
 		pad_byte = ' ';
 	}
 
-	data := string_buffer_data(fi.buf^);
-	count := min(width, cap(data)-len(data));
+	var data = string_buffer_data(fi.buf^);
+	var count = min(width, cap(data)-len(data));
 	for _ in 0..<count {
 		write_byte(fi.buf, pad_byte);
 	}
 }
 
-_fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
-	_, neg := strconv.is_integer_negative(u128(u), is_signed, bit_size);
+const _fmt_int = proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
+	var _, neg = strconv.is_integer_negative(u128(u), is_signed, bit_size);
 
-	BUF_SIZE :: 256;
+	const BUF_SIZE = 256;
 	if fi.width_set || fi.prec_set {
-		width := fi.width + fi.prec + 3; // 3 extra bytes for sign and prefix
+		var width = fi.width + fi.prec + 3; // 3 extra bytes for sign and prefix
 		if width > BUF_SIZE {
 			// TODO(bill):????
 			panic("_fmt_int: buffer overrun. Width and precision too big");
 		}
 	}
 
-	prec := 0;
+	var prec = 0;
 	if fi.prec_set {
 		prec = fi.prec;
 		if prec == 0 && u == 0 {
-			prev_zero := fi.zero;
+			var prev_zero = fi.zero;
 			fi.zero = false;
 			fmt_write_padding(fi, fi.width);
 			fi.zero = prev_zero;
@@ -551,18 +551,18 @@ _fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: in
 		panic("_fmt_int: unknown base, whoops");
 	}
 
-	buf: [256]u8;
-	start := 0;
+	var buf: [256]u8;
+	var start = 0;
 
 
-	flags: strconv.IntFlag;
+	var flags: strconv.IntFlag;
 	if fi.hash && !fi.zero { flags |= strconv.IntFlag.Prefix; }
 	if fi.plus             { flags |= strconv.IntFlag.Plus; }
 	if fi.space            { flags |= strconv.IntFlag.Space; }
-	s := strconv.append_bits(buf[start..<start], u128(u), base, is_signed, bit_size, digits, flags);
+	var s = strconv.append_bits(buf[start..<start], u128(u), base, is_signed, bit_size, digits, flags);
 
 	if fi.hash && fi.zero {
-		c: u8;
+		var c: u8;
 		match base {
 		case 2:  c = 'b';
 		case 8:  c = 'o';
@@ -576,16 +576,16 @@ _fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: in
 		}
 	}
 
-	prev_zero := fi.zero;
+	var prev_zero = fi.zero;
 	defer fi.zero = prev_zero;
 	fi.zero = false;
 	_pad(fi, s);
 }
 
-immutable __DIGITS_LOWER := "0123456789abcdefx";
-immutable __DIGITS_UPPER := "0123456789ABCDEFX";
+immutable var __DIGITS_LOWER = "0123456789abcdefx";
+immutable var __DIGITS_UPPER = "0123456789ABCDEFX";
 
-fmt_rune :: proc(fi: ^FmtInfo, r: rune, verb: rune) {
+const fmt_rune = proc(fi: ^FmtInfo, r: rune, verb: rune) {
 	match verb {
 	case 'c', 'r', 'v':
 		write_rune(fi.buf, r);
@@ -594,7 +594,7 @@ fmt_rune :: proc(fi: ^FmtInfo, r: rune, verb: rune) {
 	}
 }
 
-fmt_int :: proc(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: rune) {
+const fmt_int = proc(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: rune) {
 	match verb {
 	case 'v': _fmt_int(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
 	case 'b': _fmt_int(fi, u,  2, is_signed, bit_size, __DIGITS_LOWER);
@@ -605,7 +605,7 @@ fmt_int :: proc(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: run
 	case 'c', 'r':
 		fmt_rune(fi, rune(u), verb);
 	case 'U':
-		r := rune(u);
+		var r = rune(u);
 		if r < 0 || r > utf8.MAX_RUNE {
 			fmt_bad_verb(fi, verb);
 		} else {
@@ -618,12 +618,12 @@ fmt_int :: proc(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: run
 	}
 }
 
-_pad :: proc(fi: ^FmtInfo, s: string) {
+const _pad = proc(fi: ^FmtInfo, s: string) {
 	if !fi.width_set {
 		write_string(fi.buf, s);
 		return;
 	}
-	width := fi.width - utf8.rune_count(s);
+	var width = fi.width - utf8.rune_count(s);
 	if fi.minus { // right pad
 		write_string(fi.buf, s);
 		fmt_write_padding(fi, width);
@@ -633,19 +633,19 @@ _pad :: proc(fi: ^FmtInfo, s: string) {
 	}
 }
 
-fmt_float :: proc(fi: ^FmtInfo, v: f64, bit_size: int, verb: rune) {
+const fmt_float = proc(fi: ^FmtInfo, v: f64, bit_size: int, verb: rune) {
 	match verb {
 	// case 'e', 'E', 'f', 'F', 'g', 'G', 'v':
 	// case 'f', 'F', 'v':
 
 	case 'f', 'F', 'v':
-		prec: int = 3;
+		var prec: int = 3;
+		var buf: [386]u8;
 		if fi.prec_set {
 			prec = fi.prec;
 		}
 
-		buf: [386]u8;
-		str := strconv.append_float(buf[1..<1], v, 'f', prec, bit_size);
+		var str = strconv.append_float(buf[1..<1], v, 'f', prec, bit_size);
 		str = string(buf[0..len(str)]);
 		if str[1] == '+' || str[1] == '-' {
 			str = str[1..];
@@ -678,13 +678,13 @@ fmt_float :: proc(fi: ^FmtInfo, v: f64, bit_size: int, verb: rune) {
 		fmt_bad_verb(fi, verb);
 	}
 }
-fmt_string :: proc(fi: ^FmtInfo, s: string, verb: rune) {
+const fmt_string = proc(fi: ^FmtInfo, s: string, verb: rune) {
 	match verb {
 	case 's', 'v':
 		write_string(fi.buf, s);
 
 	case 'x', 'X':
-		space := fi.space;
+		var space = fi.space;
 		fi.space = false;
 		defer fi.space = space;
 
@@ -700,7 +700,7 @@ fmt_string :: proc(fi: ^FmtInfo, s: string, verb: rune) {
 	}
 }
 
-fmt_pointer :: proc(fi: ^FmtInfo, p: rawptr, verb: rune) {
+const fmt_pointer = proc(fi: ^FmtInfo, p: rawptr, verb: rune) {
 	match verb {
 	case 'p', 'v':
 		// Okay
@@ -708,14 +708,14 @@ fmt_pointer :: proc(fi: ^FmtInfo, p: rawptr, verb: rune) {
 		fmt_bad_verb(fi, verb);
 		return;
 	}
-	u := u128(uint(p));
+	var u = u128(uint(p));
 	if !fi.hash || verb == 'v' {
 		write_string(fi.buf, "0x");
 	}
 	_fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
 }
 
-fmt_enum :: proc(fi: ^FmtInfo, v: any, verb: rune) {
+const fmt_enum = proc(fi: ^FmtInfo, v: any, verb: rune) {
 	if v.type_info == nil || v.data == nil {
 		write_string(fi.buf, "<nil>");
 		return;
@@ -731,10 +731,10 @@ fmt_enum :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		case 'd', 'f':
 			fmt_arg(fi, any{v.data, type_info_base(e.base)}, verb);
 		case 's', 'v':
-			i: i128;
-			f: f64;
-			ok := false;
-			a := any{v.data, type_info_base(e.base)};
+			var i: i128;
+			var f: f64;
+			var ok = false;
+			var a = any{v.data, type_info_base(e.base)};
 			match v in a {
 			case rune:  i = i128(v);
 			case i8:   i = i128(v);
@@ -786,7 +786,7 @@ fmt_enum :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 }
 
 
-fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
+const fmt_value = proc(fi: ^FmtInfo, v: any, verb: rune) {
 	if v.data == nil || v.type_info == nil {
 		write_string(fi.buf, "<nil>");
 		return;
@@ -809,7 +809,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 				}
 				write_string(fi.buf, b.names[i]);
 				write_string(fi.buf, " = ");
-				data := ^u8(v.data) + b.offsets[i];
+				var data = ^u8(v.data) + b.offsets[i];
 				fmt_arg(fi, any{rawptr(data), b.types[i]}, 'v');
 			}
 			write_byte(fi.buf, '}');
@@ -842,31 +842,31 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
-			data := ^u8(v.data) + i*info.elem_size;
+			var data = ^u8(v.data) + i*info.elem_size;
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
 		}
 
 	case DynamicArray:
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
-		array := ^raw.DynamicArray(v.data);
+		var array = ^raw.DynamicArray(v.data);
 		for i in 0..<array.len {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
-			data := ^u8(array.data) + i*info.elem_size;
+			var data = ^u8(array.data) + i*info.elem_size;
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
 		}
 
 	case Slice:
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
-		slice := ^[]u8(v.data);
+		var slice = ^[]u8(v.data);
 		for _, i in slice {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
-			data := &slice[0] + i*info.elem_size;
+			var data = &slice[0] + i*info.elem_size;
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
 		}
 
@@ -879,7 +879,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 				write_string(fi.buf, ", ");
 			}
 
-			data := ^u8(v.data) + i*info.elem_size;
+			var data = ^u8(v.data) + i*info.elem_size;
 			fmt_value(fi, any{rawptr(data), info.elem}, verb);
 		}
 
@@ -891,29 +891,29 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 
 		write_string(fi.buf, "map[");
 		defer write_byte(fi.buf, ']');
-		entries := &(^raw.DynamicMap(v.data).entries);
-		gs := type_info_base(info.generated_struct).(^Struct);
-		ed := type_info_base(gs.types[1]).(^DynamicArray);
+		var entries = &(^raw.DynamicMap(v.data).entries);
+		var gs = type_info_base(info.generated_struct).(^Struct);
+		var ed = type_info_base(gs.types[1]).(^DynamicArray);
 
-		entry_type := ed.elem.(^Struct);
-		entry_size := ed.elem_size;
+		var entry_type = ed.elem.(^Struct);
+		var entry_size = ed.elem_size;
 		for i in 0..<entries.len {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
-			data := ^u8(entries.data) + i*entry_size;
+			var data = ^u8(entries.data) + i*entry_size;
 
-			header := ^__MapEntryHeader(data);
+			var header = ^__MapEntryHeader(data);
 			if types.is_string(info.key) {
 				write_string(fi.buf, header.key.str);
 			} else {
-				fi := FmtInfo{buf = fi.buf};
+				var fi = FmtInfo{buf = fi.buf};
 				fmt_arg(&fi, any{rawptr(&header.key.hash), info.key}, 'v');
 			}
 
 			write_string(fi.buf, "=");
 
-			value := data + entry_type.offsets[2];
+			var value = data + entry_type.offsets[2];
 			fmt_arg(fi, any{rawptr(value), info.value}, 'v');
 		}
 
@@ -929,7 +929,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			}
 			write_string(fi.buf, info.names[i]);
 			write_string(fi.buf, " = ");
-			data := ^u8(v.data) + info.offsets[i];
+			var data = ^u8(v.data) + info.offsets[i];
 			fmt_value(fi, any{rawptr(data), info.types[i]}, 'v');
 		}
 
@@ -937,7 +937,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		write_byte(fi.buf, '{');
 		defer write_byte(fi.buf, '}');
 
-		cf := info.common_fields;
+		var cf = info.common_fields;
 
 		for _, i in cf.names {
 			if i > 0 {
@@ -945,7 +945,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			}
 			write_string(fi.buf, cf.names[i]);
 			write_string(fi.buf, " = ");
-			data := ^u8(v.data) + cf.offsets[i];
+			var data = ^u8(v.data) + cf.offsets[i];
 			fmt_value(fi, any{rawptr(data), cf.types[i]}, 'v');
 		}
 
@@ -962,11 +962,11 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 	}
 }
 
-fmt_complex :: proc(fi: ^FmtInfo, c: complex128, bits: int, verb: rune) {
+const fmt_complex = proc(fi: ^FmtInfo, c: complex128, bits: int, verb: rune) {
 	match verb {
 	case 'f', 'F', 'v':
-		r := real(c);
-		i := imag(c);
+		var r = real(c);
+		var i = imag(c);
 		fmt_float(fi, r, bits/2, verb);
 		if !fi.plus && i >= 0 {
 			write_rune(fi.buf, '+');
@@ -980,15 +980,15 @@ fmt_complex :: proc(fi: ^FmtInfo, c: complex128, bits: int, verb: rune) {
 	}
 }
 
-_u128_to_lo_hi :: proc(a: u128) -> (lo, hi: u64) { return u64(a), u64(a>>64); }
-_i128_to_lo_hi :: proc(a: u128) -> (lo: u64 hi: i64) { return u64(a), i64(a>>64); }
+const _u128_to_lo_hi = proc(a: u128) -> (lo, hi: u64) { return u64(a), u64(a>>64); }
+const _i128_to_lo_hi = proc(a: u128) -> (lo: u64 hi: i64) { return u64(a), i64(a>>64); }
 
 
-do_foo :: proc(fi: ^FmtInfo, f: f64) {
+const do_foo = proc(fi: ^FmtInfo, f: f64) {
 	fmt_string(fi, "Hellope$%!", 'v');
 }
 
-fmt_arg :: proc(fi: ^FmtInfo, arg: any, verb: rune) {
+const fmt_arg = proc(fi: ^FmtInfo, arg: any, verb: rune) {
 	if arg == nil {
 		write_string(fi.buf, "<nil>");
 		return;
@@ -996,7 +996,7 @@ fmt_arg :: proc(fi: ^FmtInfo, arg: any, verb: rune) {
 	fi.arg = arg;
 
 	if verb == 'T' {
-		ti := arg.type_info;
+		var ti = arg.type_info;
 		match a in arg {
 		case ^TypeInfo: ti = a;
 		}
@@ -1005,7 +1005,7 @@ fmt_arg :: proc(fi: ^FmtInfo, arg: any, verb: rune) {
 	}
 
 
-	base_arg := arg;
+	var base_arg = arg;
 	base_arg.type_info = type_info_base(base_arg.type_info);
 	match a in base_arg {
 	case any:           fmt_arg(fi,  a, verb);
@@ -1043,13 +1043,13 @@ fmt_arg :: proc(fi: ^FmtInfo, arg: any, verb: rune) {
 
 
 
-sbprint :: proc(buf: ^StringBuffer, args: ..any) -> string {
-	fi: FmtInfo;
+const sbprint = proc(buf: ^StringBuffer, args: ..any) -> string {
+	var fi: FmtInfo;
 	fi.buf = buf;
 
-	prev_string := false;
+	var prev_string = false;
 	for arg, i in args {
-		is_string := arg != nil && types.is_string(arg.type_info);
+		var is_string = arg != nil && types.is_string(arg.type_info);
 		if i > 0 && !is_string && !prev_string {
 			write_byte(buf, ' ');
 		}
@@ -1059,8 +1059,8 @@ sbprint :: proc(buf: ^StringBuffer, args: ..any) -> string {
 	return to_string(buf^);
 }
 
-sbprintln :: proc(buf: ^StringBuffer, args: ..any) -> string {
-	fi: FmtInfo;
+const sbprintln = proc(buf: ^StringBuffer, args: ..any) -> string {
+	var fi: FmtInfo;
 	fi.buf = buf;
 
 	for arg, i in args {
@@ -1073,15 +1073,15 @@ sbprintln :: proc(buf: ^StringBuffer, args: ..any) -> string {
 	return to_string(buf^);
 }
 
-sbprintf :: proc(b: ^StringBuffer, fmt: string, args: ..any) -> string {
-	fi := FmtInfo{};
-	end := len(fmt);
-	arg_index := 0;
-	was_prev_index := false;
-	for i := 0; i < end; /**/ {
+const sbprintf = proc(b: ^StringBuffer, fmt: string, args: ..any) -> string {
+	var fi = FmtInfo{};
+	var end = len(fmt);
+	var arg_index = 0;
+	var was_prev_index = false;
+	for var i = 0; i < end; /**/ {
 		fi = FmtInfo{buf = b, good_arg_index = true};
 
-		prev_i := i;
+		var prev_i = i;
 		for i < end && fmt[i] != '%' {
 			i++;
 		}
@@ -1173,7 +1173,7 @@ sbprintf :: proc(b: ^StringBuffer, fmt: string, args: ..any) -> string {
 			break;
 		}
 
-		verb, w := utf8.decode_rune(fmt[i..]);
+		var verb, w = utf8.decode_rune(fmt[i..]);
 		i += w;
 
 		if verb == '%' {

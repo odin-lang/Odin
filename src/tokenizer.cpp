@@ -82,6 +82,9 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
+	TOKEN_KIND(Token_var,            "var"),                 \
+	TOKEN_KIND(Token_const,          "const"),               \
+	TOKEN_KIND(Token_type,           "type"),                \
 	TOKEN_KIND(Token_when,           "when"),                \
 	TOKEN_KIND(Token_if,             "if"),                  \
 	TOKEN_KIND(Token_else,           "else"),                \

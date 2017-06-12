@@ -5813,7 +5813,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 	case_end;
 
 	case_ast_node(vd, ValueDecl, node);
-		if (vd->is_var) {
+		if (vd->token.kind == Token_var) {
 			irModule *m = proc->module;
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
 

@@ -1,100 +1,100 @@
-TAU          :: 6.28318530717958647692528676655900576;
-PI           :: 3.14159265358979323846264338327950288;
-ONE_OVER_TAU :: 0.636619772367581343075535053490057448;
-ONE_OVER_PI  :: 0.159154943091895335768883763372514362;
+const TAU          = 6.28318530717958647692528676655900576;
+const PI           = 3.14159265358979323846264338327950288;
+const ONE_OVER_TAU = 0.636619772367581343075535053490057448;
+const ONE_OVER_PI  = 0.159154943091895335768883763372514362;
 
-E            :: 2.71828182845904523536;
-SQRT_TWO     :: 1.41421356237309504880168872420969808;
-SQRT_THREE   :: 1.73205080756887729352744634150587236;
-SQRT_FIVE    :: 2.23606797749978969640917366873127623;
+const E            = 2.71828182845904523536;
+const SQRT_TWO     = 1.41421356237309504880168872420969808;
+const SQRT_THREE   = 1.73205080756887729352744634150587236;
+const SQRT_FIVE    = 2.23606797749978969640917366873127623;
 
-LOG_TWO      :: 0.693147180559945309417232121458176568;
-LOG_TEN      :: 2.30258509299404568401799145468436421;
+const LOG_TWO      = 0.693147180559945309417232121458176568;
+const LOG_TEN      = 2.30258509299404568401799145468436421;
 
-EPSILON      :: 1.19209290e-7;
+const EPSILON      = 1.19209290e-7;
 
-τ :: TAU;
-π :: PI;
+const τ = TAU;
+const π = PI;
 
-Vec2 :: [vector 2]f32;
-Vec3 :: [vector 3]f32;
-Vec4 :: [vector 4]f32;
+const Vec2 = [vector 2]f32;
+const Vec3 = [vector 3]f32;
+const Vec4 = [vector 4]f32;
 
 // Column major
-Mat2 :: [2][2]f32;
-Mat3 :: [3][3]f32;
-Mat4 :: [4][4]f32;
+const Mat2 = [2][2]f32;
+const Mat3 = [3][3]f32;
+const Mat4 = [4][4]f32;
 
-Complex :: complex64;
+const Complex = complex64;
 
-sqrt :: proc(x: f32) -> f32 #foreign __llvm_core "llvm.sqrt.f32";
-sqrt :: proc(x: f64) -> f64 #foreign __llvm_core "llvm.sqrt.f64";
+const sqrt = proc(x: f32) -> f32 #foreign __llvm_core "llvm.sqrt.f32";
+const sqrt = proc(x: f64) -> f64 #foreign __llvm_core "llvm.sqrt.f64";
 
-sin  :: proc(θ: f32) -> f32 #foreign __llvm_core "llvm.sin.f32";
-sin  :: proc(θ: f64) -> f64 #foreign __llvm_core "llvm.sin.f64";
+const sin  = proc(θ: f32) -> f32 #foreign __llvm_core "llvm.sin.f32";
+const sin  = proc(θ: f64) -> f64 #foreign __llvm_core "llvm.sin.f64";
 
-cos  :: proc(θ: f32) -> f32 #foreign __llvm_core "llvm.cos.f32";
-cos  :: proc(θ: f64) -> f64 #foreign __llvm_core "llvm.cos.f64";
+const cos  = proc(θ: f32) -> f32 #foreign __llvm_core "llvm.cos.f32";
+const cos  = proc(θ: f64) -> f64 #foreign __llvm_core "llvm.cos.f64";
 
-tan  :: proc(θ: f32) -> f32 #inline { return sin(θ)/cos(θ); }
-tan  :: proc(θ: f64) -> f64 #inline { return sin(θ)/cos(θ); }
+const tan  = proc(θ: f32) -> f32 #inline { return sin(θ)/cos(θ); }
+const tan  = proc(θ: f64) -> f64 #inline { return sin(θ)/cos(θ); }
 
-pow  :: proc(x, power: f32) -> f32 #foreign __llvm_core "llvm.pow.f32";
-pow  :: proc(x, power: f64) -> f64 #foreign __llvm_core "llvm.pow.f64";
-
-
-lerp   :: proc(a, b, t: f32) -> (x: f32) { return a*(1-t) + b*t; }
-lerp   :: proc(a, b, t: f64) -> (x: f64) { return a*(1-t) + b*t; }
-unlerp :: proc(a, b, x: f32) -> (t: f32) { return (x-a)/(b-a); }
-unlerp :: proc(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }
+const pow  = proc(x, power: f32) -> f32 #foreign __llvm_core "llvm.pow.f32";
+const pow  = proc(x, power: f64) -> f64 #foreign __llvm_core "llvm.pow.f64";
 
 
-sign :: proc(x: f32) -> f32 { return x >= 0 ? +1 : -1; }
-sign :: proc(x: f64) -> f64 { return x >= 0 ? +1 : -1; }
+const lerp   = proc(a, b, t: f32) -> (x: f32) { return a*(1-t) + b*t; }
+const lerp   = proc(a, b, t: f64) -> (x: f64) { return a*(1-t) + b*t; }
+const unlerp = proc(a, b, x: f32) -> (t: f32) { return (x-a)/(b-a); }
+const unlerp = proc(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }
 
-fmuladd :: proc(a, b, c: f32) -> f32 #foreign __llvm_core "llvm.fmuladd.f32";
-fmuladd :: proc(a, b, c: f64) -> f64 #foreign __llvm_core "llvm.fmuladd.f64";
+
+const sign = proc(x: f32) -> f32 { return x >= 0 ? +1 : -1; }
+const sign = proc(x: f64) -> f64 { return x >= 0 ? +1 : -1; }
+
+const fmuladd = proc(a, b, c: f32) -> f32 #foreign __llvm_core "llvm.fmuladd.f32";
+const fmuladd = proc(a, b, c: f64) -> f64 #foreign __llvm_core "llvm.fmuladd.f64";
 
 
-copy_sign :: proc(x, y: f32) -> f32 {
-	ix := transmute(u32, x);
-	iy := transmute(u32, y);
+const copy_sign = proc(x, y: f32) -> f32 {
+	var ix = transmute(u32, x);
+	var iy = transmute(u32, y);
 	ix &= 0x7fff_ffff;
 	ix |= iy & 0x8000_0000;
 	return transmute(f32, ix);
 }
 
-copy_sign :: proc(x, y: f64) -> f64 {
-	ix := transmute(u64, x);
-	iy := transmute(u64, y);
+const copy_sign = proc(x, y: f64) -> f64 {
+	var ix = transmute(u64, x);
+	var iy = transmute(u64, y);
 	ix &= 0x7fff_ffff_ffff_ff;
 	ix |= iy & 0x8000_0000_0000_0000;
 	return transmute(f64, ix);
 }
 
-round     :: proc(x: f32) -> f32 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
-round     :: proc(x: f64) -> f64 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
+const round     = proc(x: f32) -> f32 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
+const round     = proc(x: f64) -> f64 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
 
-floor     :: proc(x: f32) -> f32 { return x >= 0 ? f32(i64(x)) : f32(i64(x-0.5)); } // TODO: Get accurate versions
-floor     :: proc(x: f64) -> f64 { return x >= 0 ? f64(i64(x)) : f64(i64(x-0.5)); } // TODO: Get accurate versions
+const floor     = proc(x: f32) -> f32 { return x >= 0 ? f32(i64(x)) : f32(i64(x-0.5)); } // TODO: Get accurate versions
+const floor     = proc(x: f64) -> f64 { return x >= 0 ? f64(i64(x)) : f64(i64(x-0.5)); } // TODO: Get accurate versions
 
-ceil      :: proc(x: f32) -> f32 { return x <  0 ? f32(i64(x)) : f32(i64(x+1)); } // TODO: Get accurate versions
-ceil      :: proc(x: f64) -> f64 { return x <  0 ? f64(i64(x)) : f64(i64(x+1)); } // TODO: Get accurate versions
+const ceil      = proc(x: f32) -> f32 { return x <  0 ? f32(i64(x)) : f32(i64(x+1)); } // TODO: Get accurate versions
+const ceil      = proc(x: f64) -> f64 { return x <  0 ? f64(i64(x)) : f64(i64(x+1)); } // TODO: Get accurate versions
 
-remainder :: proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
-remainder :: proc(x, y: f64) -> f64 { return x - round(x/y) * y; }
+const remainder = proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
+const remainder = proc(x, y: f64) -> f64 { return x - round(x/y) * y; }
 
-mod :: proc(x, y: f32) -> f32 {
+const mod = proc(x, y: f32) -> f32 {
 	y = abs(y);
-	result := remainder(abs(x), y);
+	var result = remainder(abs(x), y);
 	if sign(result) < 0 {
 		result += y;
 	}
 	return copy_sign(result, x);
 }
-mod :: proc(x, y: f64) -> f64 {
+const mod = proc(x, y: f64) -> f64 {
 	y = abs(y);
-	result := remainder(abs(x), y);
+	var result = remainder(abs(x), y);
 	if sign(result) < 0 {
 		result += y;
 	}
@@ -102,48 +102,48 @@ mod :: proc(x, y: f64) -> f64 {
 }
 
 
-to_radians :: proc(degrees: f32) -> f32 { return degrees * TAU / 360; }
-to_degrees :: proc(radians: f32) -> f32 { return radians * 360 / TAU; }
+const to_radians = proc(degrees: f32) -> f32 { return degrees * TAU / 360; }
+const to_degrees = proc(radians: f32) -> f32 { return radians * 360 / TAU; }
 
 
 
-dot :: proc(a, b: Vec2) -> f32 { c := a*b; return c.x + c.y; }
-dot :: proc(a, b: Vec3) -> f32 { c := a*b; return c.x + c.y + c.z; }
-dot :: proc(a, b: Vec4) -> f32 { c := a*b; return c.x + c.y + c.z + c.w; }
+const dot = proc(a, b: Vec2) -> f32 { var c = a*b; return c.x + c.y; }
+const dot = proc(a, b: Vec3) -> f32 { var c = a*b; return c.x + c.y + c.z; }
+const dot = proc(a, b: Vec4) -> f32 { var c = a*b; return c.x + c.y + c.z + c.w; }
 
-cross :: proc(x, y: Vec3) -> Vec3 {
-	a := swizzle(x, 1, 2, 0) * swizzle(y, 2, 0, 1);
-	b := swizzle(x, 2, 0, 1) * swizzle(y, 1, 2, 0);
+const cross = proc(x, y: Vec3) -> Vec3 {
+	var a = swizzle(x, 1, 2, 0) * swizzle(y, 2, 0, 1);
+	var b = swizzle(x, 2, 0, 1) * swizzle(y, 1, 2, 0);
 	return a - b;
 }
 
 
-mag :: proc(v: Vec2) -> f32 { return sqrt(dot(v, v)); }
-mag :: proc(v: Vec3) -> f32 { return sqrt(dot(v, v)); }
-mag :: proc(v: Vec4) -> f32 { return sqrt(dot(v, v)); }
+const mag = proc(v: Vec2) -> f32 { return sqrt(dot(v, v)); }
+const mag = proc(v: Vec3) -> f32 { return sqrt(dot(v, v)); }
+const mag = proc(v: Vec4) -> f32 { return sqrt(dot(v, v)); }
 
-norm :: proc(v: Vec2) -> Vec2 { return v / mag(v); }
-norm :: proc(v: Vec3) -> Vec3 { return v / mag(v); }
-norm :: proc(v: Vec4) -> Vec4 { return v / mag(v); }
+const norm = proc(v: Vec2) -> Vec2 { return v / mag(v); }
+const norm = proc(v: Vec3) -> Vec3 { return v / mag(v); }
+const norm = proc(v: Vec4) -> Vec4 { return v / mag(v); }
 
-norm0 :: proc(v: Vec2) -> Vec2 {
-	m := mag(v);
+const norm0 = proc(v: Vec2) -> Vec2 {
+	var m = mag(v);
 	if m == 0 {
 		return 0;
 	}
 	return v / m;
 }
 
-norm0 :: proc(v: Vec3) -> Vec3 {
-	m := mag(v);
+const norm0 = proc(v: Vec3) -> Vec3 {
+	var m = mag(v);
 	if m == 0 {
 		return 0;
 	}
 	return v / m;
 }
 
-norm0 :: proc(v: Vec4) -> Vec4 {
-	m := mag(v);
+const norm0 = proc(v: Vec4) -> Vec4 {
+	var m = mag(v);
 	if m == 0 {
 		return 0;
 	}
@@ -152,7 +152,7 @@ norm0 :: proc(v: Vec4) -> Vec4 {
 
 
 
-mat4_identity :: proc() -> Mat4 {
+const mat4_identity = proc() -> Mat4 {
 	return Mat4{
 		{1, 0, 0, 0},
 		{0, 1, 0, 0},
@@ -161,7 +161,7 @@ mat4_identity :: proc() -> Mat4 {
 	};
 }
 
-mat4_transpose :: proc(m: Mat4) -> Mat4 {
+const mat4_transpose = proc(m: Mat4) -> Mat4 {
 	for j in 0..<4 {
 		for i in 0..<4 {
 			m[i][j], m[j][i] = m[j][i], m[i][j];
@@ -170,8 +170,8 @@ mat4_transpose :: proc(m: Mat4) -> Mat4 {
 	return m;
 }
 
-mul :: proc(a, b: Mat4) -> Mat4 {
-	c: Mat4;
+const mul = proc(a, b: Mat4) -> Mat4 {
+	var c: Mat4;
 	for j in 0..<4 {
 		for i in 0..<4 {
 			c[j][i] = a[0][i]*b[j][0] +
@@ -183,7 +183,7 @@ mul :: proc(a, b: Mat4) -> Mat4 {
 	return c;
 }
 
-mul :: proc(m: Mat4, v: Vec4) -> Vec4 {
+const mul = proc(m: Mat4, v: Vec4) -> Vec4 {
 	return Vec4{
 		m[0][0]*v.x + m[1][0]*v.y + m[2][0]*v.z + m[3][0]*v.w,
 		m[0][1]*v.x + m[1][1]*v.y + m[2][1]*v.z + m[3][1]*v.w,
@@ -192,28 +192,28 @@ mul :: proc(m: Mat4, v: Vec4) -> Vec4 {
 	};
 }
 
-inverse :: proc(m: Mat4) -> Mat4 {
-	o: Mat4;
+const inverse = proc(m: Mat4) -> Mat4 {
+	var o: Mat4;
 
-	sf00 := m[2][2] * m[3][3] - m[3][2] * m[2][3];
-	sf01 := m[2][1] * m[3][3] - m[3][1] * m[2][3];
-	sf02 := m[2][1] * m[3][2] - m[3][1] * m[2][2];
-	sf03 := m[2][0] * m[3][3] - m[3][0] * m[2][3];
-	sf04 := m[2][0] * m[3][2] - m[3][0] * m[2][2];
-	sf05 := m[2][0] * m[3][1] - m[3][0] * m[2][1];
-	sf06 := m[1][2] * m[3][3] - m[3][2] * m[1][3];
-	sf07 := m[1][1] * m[3][3] - m[3][1] * m[1][3];
-	sf08 := m[1][1] * m[3][2] - m[3][1] * m[1][2];
-	sf09 := m[1][0] * m[3][3] - m[3][0] * m[1][3];
-	sf10 := m[1][0] * m[3][2] - m[3][0] * m[1][2];
-	sf11 := m[1][1] * m[3][3] - m[3][1] * m[1][3];
-	sf12 := m[1][0] * m[3][1] - m[3][0] * m[1][1];
-	sf13 := m[1][2] * m[2][3] - m[2][2] * m[1][3];
-	sf14 := m[1][1] * m[2][3] - m[2][1] * m[1][3];
-	sf15 := m[1][1] * m[2][2] - m[2][1] * m[1][2];
-	sf16 := m[1][0] * m[2][3] - m[2][0] * m[1][3];
-	sf17 := m[1][0] * m[2][2] - m[2][0] * m[1][2];
-	sf18 := m[1][0] * m[2][1] - m[2][0] * m[1][1];
+	var sf00 = m[2][2] * m[3][3] - m[3][2] * m[2][3];
+	var sf01 = m[2][1] * m[3][3] - m[3][1] * m[2][3];
+	var sf02 = m[2][1] * m[3][2] - m[3][1] * m[2][2];
+	var sf03 = m[2][0] * m[3][3] - m[3][0] * m[2][3];
+	var sf04 = m[2][0] * m[3][2] - m[3][0] * m[2][2];
+	var sf05 = m[2][0] * m[3][1] - m[3][0] * m[2][1];
+	var sf06 = m[1][2] * m[3][3] - m[3][2] * m[1][3];
+	var sf07 = m[1][1] * m[3][3] - m[3][1] * m[1][3];
+	var sf08 = m[1][1] * m[3][2] - m[3][1] * m[1][2];
+	var sf09 = m[1][0] * m[3][3] - m[3][0] * m[1][3];
+	var sf10 = m[1][0] * m[3][2] - m[3][0] * m[1][2];
+	var sf11 = m[1][1] * m[3][3] - m[3][1] * m[1][3];
+	var sf12 = m[1][0] * m[3][1] - m[3][0] * m[1][1];
+	var sf13 = m[1][2] * m[2][3] - m[2][2] * m[1][3];
+	var sf14 = m[1][1] * m[2][3] - m[2][1] * m[1][3];
+	var sf15 = m[1][1] * m[2][2] - m[2][1] * m[1][2];
+	var sf16 = m[1][0] * m[2][3] - m[2][0] * m[1][3];
+	var sf17 = m[1][0] * m[2][2] - m[2][0] * m[1][2];
+	var sf18 = m[1][0] * m[2][1] - m[2][0] * m[1][1];
 
 	o[0][0] = +(m[1][1] * sf00 - m[1][2] * sf01 + m[1][3] * sf02);
 	o[0][1] = -(m[1][0] * sf00 - m[1][2] * sf03 + m[1][3] * sf04);
@@ -235,7 +235,7 @@ inverse :: proc(m: Mat4) -> Mat4 {
 	o[3][2] = -(m[0][0] * sf14 - m[0][1] * sf16 + m[0][3] * sf18);
 	o[3][3] = +(m[0][0] * sf15 - m[0][1] * sf17 + m[0][2] * sf18);
 
-	ood := 1.0 / (m[0][0] * o[0][0] +
+	var ood = 1.0 / (m[0][0] * o[0][0] +
 	              m[0][1] * o[0][1] +
 	              m[0][2] * o[0][2] +
 	              m[0][3] * o[0][3]);
@@ -261,8 +261,8 @@ inverse :: proc(m: Mat4) -> Mat4 {
 }
 
 
-mat4_translate :: proc(v: Vec3) -> Mat4 {
-	m := mat4_identity();
+const mat4_translate = proc(v: Vec3) -> Mat4 {
+	var m = mat4_identity();
 	m[3][0] = v.x;
 	m[3][1] = v.y;
 	m[3][2] = v.z;
@@ -270,14 +270,14 @@ mat4_translate :: proc(v: Vec3) -> Mat4 {
 	return m;
 }
 
-mat4_rotate :: proc(v: Vec3, angle_radians: f32) -> Mat4 {
-	c := cos(angle_radians);
-	s := sin(angle_radians);
+const mat4_rotate = proc(v: Vec3, angle_radians: f32) -> Mat4 {
+	var c = cos(angle_radians);
+	var s = sin(angle_radians);
 
-	a := norm(v);
-	t := a * (1-c);
+	var a = norm(v);
+	var t = a * (1-c);
 
-	rot := mat4_identity();
+	var rot = mat4_identity();
 
 	rot[0][0] = c + t.x*a.x;
 	rot[0][1] = 0 + t.x*a.y + s*a.z;
@@ -297,14 +297,14 @@ mat4_rotate :: proc(v: Vec3, angle_radians: f32) -> Mat4 {
 	return rot;
 }
 
-scale :: proc(m: Mat4, v: Vec3) -> Mat4 {
+const scale = proc(m: Mat4, v: Vec3) -> Mat4 {
 	m[0][0] *= v.x;
 	m[1][1] *= v.y;
 	m[2][2] *= v.z;
 	return m;
 }
 
-scale :: proc(m: Mat4, s: f32) -> Mat4 {
+const scale = proc(m: Mat4, s: f32) -> Mat4 {
 	m[0][0] *= s;
 	m[1][1] *= s;
 	m[2][2] *= s;
@@ -312,10 +312,10 @@ scale :: proc(m: Mat4, s: f32) -> Mat4 {
 }
 
 
-look_at :: proc(eye, centre, up: Vec3) -> Mat4 {
-	f := norm(centre - eye);
-	s := norm(cross(f, up));
-	u := cross(s, f);
+const look_at = proc(eye, centre, up: Vec3) -> Mat4 {
+	var f = norm(centre - eye);
+	var s = norm(cross(f, up));
+	var u = cross(s, f);
 
 	return Mat4{
 		{+s.x, +u.x, -f.x, 0},
@@ -325,9 +325,9 @@ look_at :: proc(eye, centre, up: Vec3) -> Mat4 {
 	};
 }
 
-perspective :: proc(fovy, aspect, near, far: f32) -> Mat4 {
-	m: Mat4;
-	tan_half_fovy := tan(0.5 * fovy);
+const perspective = proc(fovy, aspect, near, far: f32) -> Mat4 {
+	var m: Mat4;
+	var tan_half_fovy = tan(0.5 * fovy);
 	m[0][0] = 1.0 / (aspect*tan_half_fovy);
 	m[1][1] = 1.0 / (tan_half_fovy);
 	m[2][2] = -(far + near) / (far - near);
@@ -337,8 +337,8 @@ perspective :: proc(fovy, aspect, near, far: f32) -> Mat4 {
 }
 
 
-ortho3d :: proc(left, right, bottom, top, near, far: f32) -> Mat4 {
-	m := mat4_identity();
+const ortho3d = proc(left, right, bottom, top, near, far: f32) -> Mat4 {
+	var m = mat4_identity();
 	m[0][0] = +2.0 / (right - left);
 	m[1][1] = +2.0 / (top - bottom);
 	m[2][2] = -2.0 / (far - near);
@@ -352,28 +352,28 @@ ortho3d :: proc(left, right, bottom, top, near, far: f32) -> Mat4 {
 
 
 
-F32_DIG        :: 6;
-F32_EPSILON    :: 1.192092896e-07;
-F32_GUARD      :: 0;
-F32_MANT_DIG   :: 24;
-F32_MAX        :: 3.402823466e+38;
-F32_MAX_10_EXP :: 38;
-F32_MAX_EXP    :: 128;
-F32_MIN        :: 1.175494351e-38;
-F32_MIN_10_EXP :: -37;
-F32_MIN_EXP    :: -125;
-F32_NORMALIZE  :: 0;
-F32_RADIX      :: 2;
-F32_ROUNDS     :: 1;
+const F32_DIG        = 6;
+const F32_EPSILON    = 1.192092896e-07;
+const F32_GUARD      = 0;
+const F32_MANT_DIG   = 24;
+const F32_MAX        = 3.402823466e+38;
+const F32_MAX_10_EXP = 38;
+const F32_MAX_EXP    = 128;
+const F32_MIN        = 1.175494351e-38;
+const F32_MIN_10_EXP = -37;
+const F32_MIN_EXP    = -125;
+const F32_NORMALIZE  = 0;
+const F32_RADIX      = 2;
+const F32_ROUNDS     = 1;
 
-F64_DIG        :: 15;                       // # of decimal digits of precision
-F64_EPSILON    :: 2.2204460492503131e-016;  // smallest such that 1.0+F64_EPSILON != 1.0
-F64_MANT_DIG   :: 53;                       // # of bits in mantissa
-F64_MAX        :: 1.7976931348623158e+308;  // max value
-F64_MAX_10_EXP :: 308;                      // max decimal exponent
-F64_MAX_EXP    :: 1024;                     // max binary exponent
-F64_MIN        :: 2.2250738585072014e-308;  // min positive value
-F64_MIN_10_EXP :: -307;                     // min decimal exponent
-F64_MIN_EXP    :: -1021;                    // min binary exponent
-F64_RADIX      :: 2;                        // exponent radix
-F64_ROUNDS     :: 1;                        // addition rounding: near
+const F64_DIG        = 15;                       // # of decimal digits of precision
+const F64_EPSILON    = 2.2204460492503131e-016;  // smallest such that 1.0+F64_EPSILON != 1.0
+const F64_MANT_DIG   = 53;                       // # of bits in mantissa
+const F64_MAX        = 1.7976931348623158e+308;  // max value
+const F64_MAX_10_EXP = 308;                      // max decimal exponent
+const F64_MAX_EXP    = 1024;                     // max binary exponent
+const F64_MIN        = 2.2250738585072014e-308;  // min positive value
+const F64_MIN_10_EXP = -307;                     // min decimal exponent
+const F64_MIN_EXP    = -1021;                    // min binary exponent
+const F64_RADIX      = 2;                        // exponent radix
+const F64_ROUNDS     = 1;                        // addition rounding: near

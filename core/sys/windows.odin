@@ -4,93 +4,93 @@
 #foreign_system_library "winmm.lib"    when ODIN_OS == "windows";
 #foreign_system_library "shell32.lib"  when ODIN_OS == "windows";
 
-Handle    :: rawptr;
-Hwnd      :: Handle;
-Hdc       :: Handle;
-Hinstance :: Handle;
-Hicon     :: Handle;
-Hcursor   :: Handle;
-Hmenu     :: Handle;
-Hbrush    :: Handle;
-Hgdiobj   :: Handle;
-Hmodule   :: Handle;
-Wparam    :: uint;
-Lparam    :: int;
-Lresult   :: int;
-Bool      :: i32;
-WndProc  :: #type proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
+const Handle    = rawptr;
+const Hwnd      = Handle;
+const Hdc       = Handle;
+const Hinstance = Handle;
+const Hicon     = Handle;
+const Hcursor   = Handle;
+const Hmenu     = Handle;
+const Hbrush    = Handle;
+const Hgdiobj   = Handle;
+const Hmodule   = Handle;
+const Wparam    = uint;
+const Lparam    = int;
+const Lresult   = int;
+const Bool      = i32;
+const WndProc  = type proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
 
 
-INVALID_HANDLE :: Handle(~int(0));
+const INVALID_HANDLE = Handle(~int(0));
 
-FALSE: Bool : 0;
-TRUE:  Bool : 1;
+const FALSE: Bool = 0;
+const TRUE:  Bool = 1;
 
-CS_VREDRAW    :: 0x0001;
-CS_HREDRAW    :: 0x0002;
-CS_OWNDC      :: 0x0020;
-CW_USEDEFAULT :: -0x80000000;
+const CS_VREDRAW    = 0x0001;
+const CS_HREDRAW    = 0x0002;
+const CS_OWNDC      = 0x0020;
+const CW_USEDEFAULT = -0x80000000;
 
-WS_OVERLAPPED       :: 0;
-WS_MAXIMIZEBOX      :: 0x00010000;
-WS_MINIMIZEBOX      :: 0x00020000;
-WS_THICKFRAME       :: 0x00040000;
-WS_SYSMENU          :: 0x00080000;
-WS_BORDER           :: 0x00800000;
-WS_CAPTION          :: 0x00C00000;
-WS_VISIBLE          :: 0x10000000;
-WS_POPUP            :: 0x80000000;
-WS_OVERLAPPEDWINDOW :: WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
-WS_POPUPWINDOW      :: WS_POPUP | WS_BORDER | WS_SYSMENU;
+const WS_OVERLAPPED       = 0;
+const WS_MAXIMIZEBOX      = 0x00010000;
+const WS_MINIMIZEBOX      = 0x00020000;
+const WS_THICKFRAME       = 0x00040000;
+const WS_SYSMENU          = 0x00080000;
+const WS_BORDER           = 0x00800000;
+const WS_CAPTION          = 0x00C00000;
+const WS_VISIBLE          = 0x10000000;
+const WS_POPUP            = 0x80000000;
+const WS_OVERLAPPEDWINDOW = WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
+const WS_POPUPWINDOW      = WS_POPUP | WS_BORDER | WS_SYSMENU;
 
-WM_DESTROY           :: 0x0002;
-WM_SIZE	             :: 0x0005;
-WM_CLOSE             :: 0x0010;
-WM_ACTIVATEAPP       :: 0x001C;
-WM_QUIT              :: 0x0012;
-WM_KEYDOWN           :: 0x0100;
-WM_KEYUP             :: 0x0101;
-WM_SIZING            :: 0x0214;
-WM_SYSKEYDOWN        :: 0x0104;
-WM_SYSKEYUP          :: 0x0105;
-WM_WINDOWPOSCHANGED  :: 0x0047;
-WM_SETCURSOR         :: 0x0020;
-WM_CHAR              :: 0x0102;
-WM_ACTIVATE          :: 0x0006;
-WM_SETFOCUS          :: 0x0007;
-WM_KILLFOCUS         :: 0x0008;
-WM_USER              :: 0x0400;
+const WM_DESTROY           = 0x0002;
+const WM_SIZE	             = 0x0005;
+const WM_CLOSE             = 0x0010;
+const WM_ACTIVATEAPP       = 0x001C;
+const WM_QUIT              = 0x0012;
+const WM_KEYDOWN           = 0x0100;
+const WM_KEYUP             = 0x0101;
+const WM_SIZING            = 0x0214;
+const WM_SYSKEYDOWN        = 0x0104;
+const WM_SYSKEYUP          = 0x0105;
+const WM_WINDOWPOSCHANGED  = 0x0047;
+const WM_SETCURSOR         = 0x0020;
+const WM_CHAR              = 0x0102;
+const WM_ACTIVATE          = 0x0006;
+const WM_SETFOCUS          = 0x0007;
+const WM_KILLFOCUS         = 0x0008;
+const WM_USER              = 0x0400;
 
-WM_MOUSEWHEEL    :: 0x020A;
-WM_MOUSEMOVE     :: 0x0200;
-WM_LBUTTONDOWN   :: 0x0201;
-WM_LBUTTONUP     :: 0x0202;
-WM_LBUTTONDBLCLK :: 0x0203;
-WM_RBUTTONDOWN   :: 0x0204;
-WM_RBUTTONUP     :: 0x0205;
-WM_RBUTTONDBLCLK :: 0x0206;
-WM_MBUTTONDOWN   :: 0x0207;
-WM_MBUTTONUP     :: 0x0208;
-WM_MBUTTONDBLCLK :: 0x0209;
+const WM_MOUSEWHEEL    = 0x020A;
+const WM_MOUSEMOVE     = 0x0200;
+const WM_LBUTTONDOWN   = 0x0201;
+const WM_LBUTTONUP     = 0x0202;
+const WM_LBUTTONDBLCLK = 0x0203;
+const WM_RBUTTONDOWN   = 0x0204;
+const WM_RBUTTONUP     = 0x0205;
+const WM_RBUTTONDBLCLK = 0x0206;
+const WM_MBUTTONDOWN   = 0x0207;
+const WM_MBUTTONUP     = 0x0208;
+const WM_MBUTTONDBLCLK = 0x0209;
 
-PM_NOREMOVE :: 0x0000;
-PM_REMOVE   :: 0x0001;
-PM_NOYIELD  :: 0x0002;
+const PM_NOREMOVE = 0x0000;
+const PM_REMOVE   = 0x0001;
+const PM_NOYIELD  = 0x0002;
 
-COLOR_BACKGROUND :: Hbrush(int(1));
-BLACK_BRUSH :: 4;
+const COLOR_BACKGROUND = Hbrush(int(1));
+const BLACK_BRUSH = 4;
 
-SM_CXSCREEN :: 0;
-SM_CYSCREEN :: 1;
+const SM_CXSCREEN = 0;
+const SM_CYSCREEN = 1;
 
-SW_SHOW :: 5;
+const SW_SHOW = 5;
 
 
-Point :: struct #ordered {
+const Point = struct #ordered {
 	x, y: i32,
 }
 
-WndClassExA :: struct #ordered {
+const WndClassExA = struct #ordered {
 	size, style:           u32,
 	wnd_proc:              WndProc,
 	cls_extra, wnd_extra:  i32,
@@ -102,7 +102,7 @@ WndClassExA :: struct #ordered {
 	sm:                    Hicon,
 }
 
-Msg :: struct #ordered {
+const Msg = struct #ordered {
 	hwnd:    Hwnd,
 	message: u32,
 	wparam:  Wparam,
@@ -111,24 +111,24 @@ Msg :: struct #ordered {
 	pt:      Point,
 }
 
-Rect :: struct #ordered {
+const Rect = struct #ordered {
 	left:   i32,
 	top:    i32,
 	right:  i32,
 	bottom: i32,
 }
 
-Filetime :: struct #ordered {
+const Filetime = struct #ordered {
 	lo, hi: u32,
 }
 
-Systemtime :: struct #ordered {
+const Systemtime = struct #ordered {
 	year, month: u16,
 	day_of_week, day: u16,
 	hour, minute, second, millisecond: u16,
 }
 
-ByHandleFileInformation :: struct #ordered {
+const ByHandleFileInformation = struct #ordered {
 	file_attributes:      u32,
 	creation_time,
 	last_access_time,
@@ -141,7 +141,7 @@ ByHandleFileInformation :: struct #ordered {
 	file_index_low:       u32,
 }
 
-FileAttributeData :: struct #ordered {
+const FileAttributeData = struct #ordered {
 	file_attributes:  u32,
 	creation_time,
 	last_access_time,
@@ -150,7 +150,7 @@ FileAttributeData :: struct #ordered {
 	file_size_low:    u32,
 }
 
-FindData :: struct #ordered {
+const FindData = struct #ordered {
     file_attributes     : u32,
     creation_time       : Filetime,
     last_access_time    : Filetime,
@@ -164,224 +164,224 @@ FindData :: struct #ordered {
 }
 
 
-GET_FILEEX_INFO_LEVELS :: i32;
+const GET_FILEEX_INFO_LEVELS = i32;
 
-GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0;
-GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1;
+const GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS = 0;
+const GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS = 1;
 
-get_last_error      :: proc() -> i32                            #foreign kernel32 "GetLastError";
-exit_process        :: proc(exit_code: u32)                     #foreign kernel32 "ExitProcess";
-get_desktop_window  :: proc() -> Hwnd                           #foreign user32   "GetDesktopWindow";
-show_cursor         :: proc(show : Bool)                        #foreign user32   "ShowCursor";
-get_cursor_pos      :: proc(p: ^Point) -> i32                   #foreign user32   "GetCursorPos";
-screen_to_client    :: proc(h: Hwnd, p: ^Point) -> i32          #foreign user32   "ScreenToClient";
-get_module_handle_a :: proc(module_name: ^u8) -> Hinstance      #foreign kernel32 "GetModuleHandleA";
-get_stock_object    :: proc(fn_object: i32) -> Hgdiobj          #foreign gdi32    "GetStockObject";
-post_quit_message   :: proc(exit_code: i32)                     #foreign user32   "PostQuitMessage";
-set_window_text_a   :: proc(hwnd: Hwnd, c_string: ^u8) -> Bool  #foreign user32   "SetWindowTextA";
+const get_last_error      = proc() -> i32                            #foreign kernel32 "GetLastError";
+const exit_process        = proc(exit_code: u32)                     #foreign kernel32 "ExitProcess";
+const get_desktop_window  = proc() -> Hwnd                           #foreign user32   "GetDesktopWindow";
+const show_cursor         = proc(show : Bool)                        #foreign user32   "ShowCursor";
+const get_cursor_pos      = proc(p: ^Point) -> i32                   #foreign user32   "GetCursorPos";
+const screen_to_client    = proc(h: Hwnd, p: ^Point) -> i32          #foreign user32   "ScreenToClient";
+const get_module_handle_a = proc(module_name: ^u8) -> Hinstance      #foreign kernel32 "GetModuleHandleA";
+const get_stock_object    = proc(fn_object: i32) -> Hgdiobj          #foreign gdi32    "GetStockObject";
+const post_quit_message   = proc(exit_code: i32)                     #foreign user32   "PostQuitMessage";
+const set_window_text_a   = proc(hwnd: Hwnd, c_string: ^u8) -> Bool  #foreign user32   "SetWindowTextA";
 
-query_performance_frequency :: proc(result: ^i64) -> i32 #foreign kernel32 "QueryPerformanceFrequency";
-query_performance_counter   :: proc(result: ^i64) -> i32 #foreign kernel32 "QueryPerformanceCounter";
+const query_performance_frequency = proc(result: ^i64) -> i32 #foreign kernel32 "QueryPerformanceFrequency";
+const query_performance_counter   = proc(result: ^i64) -> i32 #foreign kernel32 "QueryPerformanceCounter";
 
-sleep :: proc(ms: i32) -> i32 #foreign kernel32 "Sleep";
+const sleep = proc(ms: i32) -> i32 #foreign kernel32 "Sleep";
 
-output_debug_string_a :: proc(c_str: ^u8) #foreign kernel32 "OutputDebugStringA";
+const output_debug_string_a = proc(c_str: ^u8) #foreign kernel32 "OutputDebugStringA";
 
 
-register_class_ex_a :: proc(wc: ^WndClassExA) -> i16 #foreign user32 "RegisterClassExA";
-create_window_ex_a  :: proc(ex_style: u32,
+const register_class_ex_a = proc(wc: ^WndClassExA) -> i16 #foreign user32 "RegisterClassExA";
+const create_window_ex_a  = proc(ex_style: u32,
                             class_name, title: ^u8,
                             style: u32,
                             x, y, w, h: i32,
                             parent: Hwnd, menu: Hmenu, instance: Hinstance,
                             param: rawptr) -> Hwnd #foreign user32 "CreateWindowExA";
 
-show_window        :: proc(hwnd: Hwnd, cmd_show: i32) -> Bool #foreign user32 "ShowWindow";
-translate_message  :: proc(msg: ^Msg) -> Bool                 #foreign user32 "TranslateMessage";
-dispatch_message_a :: proc(msg: ^Msg) -> Lresult              #foreign user32 "DispatchMessageA";
-update_window      :: proc(hwnd: Hwnd) -> Bool                #foreign user32 "UpdateWindow";
-get_message_a      :: proc(msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max : u32) -> Bool #foreign user32 "GetMessageA";
-peek_message_a     :: proc(msg: ^Msg, hwnd: Hwnd,
+const show_window        = proc(hwnd: Hwnd, cmd_show: i32) -> Bool #foreign user32 "ShowWindow";
+const translate_message  = proc(msg: ^Msg) -> Bool                 #foreign user32 "TranslateMessage";
+const dispatch_message_a = proc(msg: ^Msg) -> Lresult              #foreign user32 "DispatchMessageA";
+const update_window      = proc(hwnd: Hwnd) -> Bool                #foreign user32 "UpdateWindow";
+const get_message_a      = proc(msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max : u32) -> Bool #foreign user32 "GetMessageA";
+const peek_message_a     = proc(msg: ^Msg, hwnd: Hwnd,
                            msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool #foreign user32 "PeekMessageA";
 
-post_message :: proc(hwnd: Hwnd, msg, wparam, lparam : u32) -> Bool #foreign user32 "PostMessageA";
+const post_message = proc(hwnd: Hwnd, msg, wparam, lparam : u32) -> Bool #foreign user32 "PostMessageA";
 
-def_window_proc_a :: proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult #foreign user32 "DefWindowProcA";
+const def_window_proc_a = proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult #foreign user32 "DefWindowProcA";
 
-adjust_window_rect :: proc(rect: ^Rect, style: u32, menu: Bool) -> Bool #foreign user32 "AdjustWindowRect";
-get_active_window  :: proc() -> Hwnd                                    #foreign user32 "GetActiveWindow";
+const adjust_window_rect = proc(rect: ^Rect, style: u32, menu: Bool) -> Bool #foreign user32 "AdjustWindowRect";
+const get_active_window  = proc() -> Hwnd                                    #foreign user32 "GetActiveWindow";
 
-destroy_window        :: proc(wnd: Hwnd) -> Bool                                                           #foreign user32 "DestroyWindow";
-describe_pixel_format :: proc(dc: Hdc, pixel_format: i32, bytes : u32, pfd: ^PixelFormatDescriptor) -> i32 #foreign user32 "DescribePixelFormat";
+const destroy_window        = proc(wnd: Hwnd) -> Bool                                                           #foreign user32 "DestroyWindow";
+const describe_pixel_format = proc(dc: Hdc, pixel_format: i32, bytes : u32, pfd: ^PixelFormatDescriptor) -> i32 #foreign user32 "DescribePixelFormat";
 
 
-get_query_performance_frequency :: proc() -> i64 {
-	r: i64;
+const get_query_performance_frequency = proc() -> i64 {
+	var r: i64;
 	query_performance_frequency(&r);
 	return r;
 }
 
-get_command_line_a     :: proc() -> ^u8                                 #foreign kernel32 "GetCommandLineA";
-get_command_line_w     :: proc() -> ^u16                                #foreign kernel32 "GetCommandLineW";
-get_system_metrics     :: proc(index: i32) -> i32                       #foreign kernel32 "GetSystemMetrics";
-get_current_thread_id  :: proc() -> u32                                 #foreign kernel32 "GetCurrentThreadId";
-command_line_to_argv_w :: proc(cmd_list: ^u16, num_args: ^i32) -> ^^u16 #foreign shell32  "CommandLineToArgvW";
+const get_command_line_a     = proc() -> ^u8                                 #foreign kernel32 "GetCommandLineA";
+const get_command_line_w     = proc() -> ^u16                                #foreign kernel32 "GetCommandLineW";
+const get_system_metrics     = proc(index: i32) -> i32                       #foreign kernel32 "GetSystemMetrics";
+const get_current_thread_id  = proc() -> u32                                 #foreign kernel32 "GetCurrentThreadId";
+const command_line_to_argv_w = proc(cmd_list: ^u16, num_args: ^i32) -> ^^u16 #foreign shell32  "CommandLineToArgvW";
 
-time_get_time                :: proc() -> u32                                                  #foreign winmm    "timeGetTime";
-get_system_time_as_file_time :: proc(system_time_as_file_time: ^Filetime)                      #foreign kernel32 "GetSystemTimeAsFileTime";
-file_time_to_local_file_time :: proc(file_time: ^Filetime, local_file_time: ^Filetime) -> Bool #foreign kernel32 "FileTimeToLocalFileTime";
-file_time_to_system_time     :: proc(file_time: ^Filetime, system_time: ^Systemtime) -> Bool   #foreign kernel32 "FileTimeToSystemTime";
-system_time_to_file_time     :: proc(system_time: ^Systemtime, file_time: ^Filetime) -> Bool   #foreign kernel32 "SystemTimeToFileTime";
+const time_get_time                = proc() -> u32                                                  #foreign winmm    "timeGetTime";
+const get_system_time_as_file_time = proc(system_time_as_file_time: ^Filetime)                      #foreign kernel32 "GetSystemTimeAsFileTime";
+const file_time_to_local_file_time = proc(file_time: ^Filetime, local_file_time: ^Filetime) -> Bool #foreign kernel32 "FileTimeToLocalFileTime";
+const file_time_to_system_time     = proc(file_time: ^Filetime, system_time: ^Systemtime) -> Bool   #foreign kernel32 "FileTimeToSystemTime";
+const system_time_to_file_time     = proc(system_time: ^Systemtime, file_time: ^Filetime) -> Bool   #foreign kernel32 "SystemTimeToFileTime";
 
 // File Stuff
 
-close_handle   :: proc(h: Handle) -> i32 #foreign kernel32 "CloseHandle";
-get_std_handle :: proc(h: i32) -> Handle #foreign kernel32 "GetStdHandle";
-create_file_a  :: proc(filename: ^u8, desired_access, share_mode: u32,
+const close_handle   = proc(h: Handle) -> i32 #foreign kernel32 "CloseHandle";
+const get_std_handle = proc(h: i32) -> Handle #foreign kernel32 "GetStdHandle";
+const create_file_a  = proc(filename: ^u8, desired_access, share_mode: u32,
                        security: rawptr,
                        creation, flags_and_attribs: u32, template_file: Handle) -> Handle #foreign kernel32 "CreateFileA";
-read_file  :: proc(h: Handle, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> Bool #foreign kernel32 "ReadFile";
-write_file :: proc(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool #foreign kernel32 "WriteFile";
+const read_file  = proc(h: Handle, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> Bool #foreign kernel32 "ReadFile";
+const write_file = proc(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool #foreign kernel32 "WriteFile";
 
-get_file_size_ex               :: proc(file_handle: Handle, file_size: ^i64) -> Bool                                    #foreign kernel32 "GetFileSizeEx";
-get_file_attributes_a          :: proc(filename: ^u8) -> u32                                                          #foreign kernel32 "GetFileAttributesA";
-get_file_attributes_ex_a       :: proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool #foreign kernel32 "GetFileAttributesExA";
-get_file_information_by_handle :: proc(file_handle: Handle, file_info: ^ByHandleFileInformation) -> Bool                #foreign kernel32 "GetFileInformationByHandle";
+const get_file_size_ex               = proc(file_handle: Handle, file_size: ^i64) -> Bool                                    #foreign kernel32 "GetFileSizeEx";
+const get_file_attributes_a          = proc(filename: ^u8) -> u32                                                          #foreign kernel32 "GetFileAttributesA";
+const get_file_attributes_ex_a       = proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool #foreign kernel32 "GetFileAttributesExA";
+const get_file_information_by_handle = proc(file_handle: Handle, file_info: ^ByHandleFileInformation) -> Bool                #foreign kernel32 "GetFileInformationByHandle";
 
-get_file_type    :: proc(file_handle: Handle) -> u32                                                                       #foreign kernel32 "GetFileType";
-set_file_pointer :: proc(file_handle: Handle, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 #foreign kernel32 "SetFilePointer";
+const get_file_type    = proc(file_handle: Handle) -> u32                                                                       #foreign kernel32 "GetFileType";
+const set_file_pointer = proc(file_handle: Handle, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 #foreign kernel32 "SetFilePointer";
 
-set_handle_information :: proc(obj: Handle, mask, flags: u32) -> Bool #foreign kernel32 "SetHandleInformation";
+const set_handle_information = proc(obj: Handle, mask, flags: u32) -> Bool #foreign kernel32 "SetHandleInformation";
 
-find_first_file_a :: proc(file_name : ^u8, data : ^FindData) -> Handle #foreign kernel32 "FindFirstFileA";
-find_next_file_a  :: proc(file : Handle, data : ^FindData) -> Bool       #foreign kernel32 "FindNextFileA";
-find_close        :: proc(file : Handle) -> Bool                         #foreign kernel32 "FindClose";
+const find_first_file_a = proc(file_name : ^u8, data : ^FindData) -> Handle #foreign kernel32 "FindFirstFileA";
+const find_next_file_a  = proc(file : Handle, data : ^FindData) -> Bool       #foreign kernel32 "FindNextFileA";
+const find_close        = proc(file : Handle) -> Bool                         #foreign kernel32 "FindClose";
 
-MAX_PATH :: 0x00000104;
+const MAX_PATH = 0x00000104;
 
-HANDLE_FLAG_INHERIT :: 1;
-HANDLE_FLAG_PROTECT_FROM_CLOSE :: 2;
-
-
-FILE_BEGIN   :: 0;
-FILE_CURRENT :: 1;
-FILE_END     :: 2;
-
-FILE_SHARE_READ      :: 0x00000001;
-FILE_SHARE_WRITE     :: 0x00000002;
-FILE_SHARE_DELETE    :: 0x00000004;
-FILE_GENERIC_ALL     :: 0x10000000;
-FILE_GENERIC_EXECUTE :: 0x20000000;
-FILE_GENERIC_WRITE   :: 0x40000000;
-FILE_GENERIC_READ    :: 0x80000000;
-
-FILE_APPEND_DATA :: 0x0004;
-
-STD_INPUT_HANDLE  :: -10;
-STD_OUTPUT_HANDLE :: -11;
-STD_ERROR_HANDLE  :: -12;
-
-CREATE_NEW        :: 1;
-CREATE_ALWAYS     :: 2;
-OPEN_EXISTING     :: 3;
-OPEN_ALWAYS       :: 4;
-TRUNCATE_EXISTING :: 5;
-
-INVALID_FILE_ATTRIBUTES  :: -1;
-
-FILE_ATTRIBUTE_READONLY             :: 0x00000001;
-FILE_ATTRIBUTE_HIDDEN               :: 0x00000002;
-FILE_ATTRIBUTE_SYSTEM               :: 0x00000004;
-FILE_ATTRIBUTE_DIRECTORY            :: 0x00000010;
-FILE_ATTRIBUTE_ARCHIVE              :: 0x00000020;
-FILE_ATTRIBUTE_DEVICE               :: 0x00000040;
-FILE_ATTRIBUTE_NORMAL               :: 0x00000080;
-FILE_ATTRIBUTE_TEMPORARY            :: 0x00000100;
-FILE_ATTRIBUTE_SPARSE_FILE          :: 0x00000200;
-FILE_ATTRIBUTE_REPARSE_Point        :: 0x00000400;
-FILE_ATTRIBUTE_COMPRESSED           :: 0x00000800;
-FILE_ATTRIBUTE_OFFLINE              :: 0x00001000;
-FILE_ATTRIBUTE_NOT_CONTENT_INDEXED  :: 0x00002000;
-FILE_ATTRIBUTE_ENCRYPTED            :: 0x00004000;
-
-FILE_TYPE_DISK :: 0x0001;
-FILE_TYPE_CHAR :: 0x0002;
-FILE_TYPE_PIPE :: 0x0003;
-
-INVALID_SET_FILE_POINTER :: ~u32(0);
+const HANDLE_FLAG_INHERIT = 1;
+const HANDLE_FLAG_PROTECT_FROM_CLOSE = 2;
 
 
+const FILE_BEGIN   = 0;
+const FILE_CURRENT = 1;
+const FILE_END     = 2;
+
+const FILE_SHARE_READ      = 0x00000001;
+const FILE_SHARE_WRITE     = 0x00000002;
+const FILE_SHARE_DELETE    = 0x00000004;
+const FILE_GENERIC_ALL     = 0x10000000;
+const FILE_GENERIC_EXECUTE = 0x20000000;
+const FILE_GENERIC_WRITE   = 0x40000000;
+const FILE_GENERIC_READ    = 0x80000000;
+
+const FILE_APPEND_DATA = 0x0004;
+
+const STD_INPUT_HANDLE  = -10;
+const STD_OUTPUT_HANDLE = -11;
+const STD_ERROR_HANDLE  = -12;
+
+const CREATE_NEW        = 1;
+const CREATE_ALWAYS     = 2;
+const OPEN_EXISTING     = 3;
+const OPEN_ALWAYS       = 4;
+const TRUNCATE_EXISTING = 5;
+
+const INVALID_FILE_ATTRIBUTES  = -1;
+
+const FILE_ATTRIBUTE_READONLY             = 0x00000001;
+const FILE_ATTRIBUTE_HIDDEN               = 0x00000002;
+const FILE_ATTRIBUTE_SYSTEM               = 0x00000004;
+const FILE_ATTRIBUTE_DIRECTORY            = 0x00000010;
+const FILE_ATTRIBUTE_ARCHIVE              = 0x00000020;
+const FILE_ATTRIBUTE_DEVICE               = 0x00000040;
+const FILE_ATTRIBUTE_NORMAL               = 0x00000080;
+const FILE_ATTRIBUTE_TEMPORARY            = 0x00000100;
+const FILE_ATTRIBUTE_SPARSE_FILE          = 0x00000200;
+const FILE_ATTRIBUTE_REPARSE_Point        = 0x00000400;
+const FILE_ATTRIBUTE_COMPRESSED           = 0x00000800;
+const FILE_ATTRIBUTE_OFFLINE              = 0x00001000;
+const FILE_ATTRIBUTE_NOT_CONTENT_INDEXED  = 0x00002000;
+const FILE_ATTRIBUTE_ENCRYPTED            = 0x00004000;
+
+const FILE_TYPE_DISK = 0x0001;
+const FILE_TYPE_CHAR = 0x0002;
+const FILE_TYPE_PIPE = 0x0003;
+
+const INVALID_SET_FILE_POINTER = ~u32(0);
 
 
-heap_alloc       :: proc (h: Handle, flags: u32, bytes: int) -> rawptr                 #foreign kernel32 "HeapAlloc";
-heap_realloc     :: proc (h: Handle, flags: u32, memory: rawptr, bytes: int) -> rawptr #foreign kernel32 "HeapReAlloc";
-heap_free        :: proc (h: Handle, flags: u32, memory: rawptr) -> Bool               #foreign kernel32 "HeapFree";
-get_process_heap :: proc () -> Handle                                                  #foreign kernel32 "GetProcessHeap";
 
 
-HEAP_ZERO_MEMORY :: 0x00000008;
+const heap_alloc       = proc (h: Handle, flags: u32, bytes: int) -> rawptr                 #foreign kernel32 "HeapAlloc";
+const heap_realloc     = proc (h: Handle, flags: u32, memory: rawptr, bytes: int) -> rawptr #foreign kernel32 "HeapReAlloc";
+const heap_free        = proc (h: Handle, flags: u32, memory: rawptr) -> Bool               #foreign kernel32 "HeapFree";
+const get_process_heap = proc () -> Handle                                                  #foreign kernel32 "GetProcessHeap";
+
+
+const HEAP_ZERO_MEMORY = 0x00000008;
 
 // Synchronization
 
-Security_Attributes :: struct #ordered {
+const Security_Attributes = struct #ordered {
 	length:              u32,
 	security_descriptor: rawptr,
 	inherit_handle:      Bool,
 }
 
-INFINITE :: 0xffffffff;
+const INFINITE = 0xffffffff;
 
-create_semaphore_a     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^u8) -> Handle #foreign kernel32 "CreateSemaphoreA";
-release_semaphore      :: proc(semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool                        #foreign kernel32 "ReleaseSemaphore";
-wait_for_single_object :: proc(handle: Handle, milliseconds: u32) -> u32                                                   #foreign kernel32 "WaitForSingleObject";
-
-
-interlocked_compare_exchange   :: proc(dst: ^i32, exchange, comparand: i32) -> i32   #foreign kernel32 "InterlockedCompareExchange";
-interlocked_exchange           :: proc(dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedExchange";
-interlocked_exchange_add       :: proc(dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedExchangeAdd";
-interlocked_and                :: proc(dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedAnd";
-interlocked_or                 :: proc(dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedOr";
-
-interlocked_compare_exchange64 :: proc(dst: ^i64, exchange, comparand: i64) -> i64   #foreign kernel32 "InterlockedCompareExchange64";
-interlocked_exchange64         :: proc(dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedExchange64";
-interlocked_exchange_add64     :: proc(dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedExchangeAdd64";
-interlocked_and64              :: proc(dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedAnd64";
-interlocked_or64               :: proc(dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedOr64";
-
-mm_pause           :: proc() #foreign kernel32 "_mm_pause";
-read_write_barrier :: proc() #foreign kernel32 "ReadWriteBarrier";
-write_barrier      :: proc() #foreign kernel32 "WriteBarrier";
-read_barrier       :: proc() #foreign kernel32 "ReadBarrier";
+const create_semaphore_a     = proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^u8) -> Handle #foreign kernel32 "CreateSemaphoreA";
+const release_semaphore      = proc(semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool                        #foreign kernel32 "ReleaseSemaphore";
+const wait_for_single_object = proc(handle: Handle, milliseconds: u32) -> u32                                                   #foreign kernel32 "WaitForSingleObject";
 
 
+const interlocked_compare_exchange   = proc(dst: ^i32, exchange, comparand: i32) -> i32   #foreign kernel32 "InterlockedCompareExchange";
+const interlocked_exchange           = proc(dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedExchange";
+const interlocked_exchange_add       = proc(dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedExchangeAdd";
+const interlocked_and                = proc(dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedAnd";
+const interlocked_or                 = proc(dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedOr";
+
+const interlocked_compare_exchange64 = proc(dst: ^i64, exchange, comparand: i64) -> i64   #foreign kernel32 "InterlockedCompareExchange64";
+const interlocked_exchange64         = proc(dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedExchange64";
+const interlocked_exchange_add64     = proc(dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedExchangeAdd64";
+const interlocked_and64              = proc(dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedAnd64";
+const interlocked_or64               = proc(dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedOr64";
+
+const mm_pause           = proc() #foreign kernel32 "_mm_pause";
+const read_write_barrier = proc() #foreign kernel32 "ReadWriteBarrier";
+const write_barrier      = proc() #foreign kernel32 "WriteBarrier";
+const read_barrier       = proc() #foreign kernel32 "ReadBarrier";
 
 
 
-Hmonitor :: Handle;
-
-GWL_STYLE :: -16;
-
-Hwnd_TOP :: Hwnd(uint(0));
-
-MONITOR_DEFAULTTONULL    :: 0x00000000;
-MONITOR_DEFAULTTOPRIMARY :: 0x00000001;
-MONITOR_DEFAULTTONEAREST :: 0x00000002;
-
-SWP_FRAMECHANGED  :: 0x0020;
-SWP_NOOWNERZORDER :: 0x0200;
-SWP_NOZORDER      :: 0x0004;
-SWP_NOSIZE        :: 0x0001;
-SWP_NOMOVE        :: 0x0002;
 
 
-MonitorInfo :: struct #ordered {
+const Hmonitor = Handle;
+
+const GWL_STYLE = -16;
+
+const Hwnd_TOP = Hwnd(uint(0));
+
+const MONITOR_DEFAULTTONULL    = 0x00000000;
+const MONITOR_DEFAULTTOPRIMARY = 0x00000001;
+const MONITOR_DEFAULTTONEAREST = 0x00000002;
+
+const SWP_FRAMECHANGED  = 0x0020;
+const SWP_NOOWNERZORDER = 0x0200;
+const SWP_NOZORDER      = 0x0004;
+const SWP_NOSIZE        = 0x0001;
+const SWP_NOMOVE        = 0x0002;
+
+
+const MonitorInfo = struct #ordered {
 	size:      u32,
 	monitor:   Rect,
 	work:      Rect,
 	flags:     u32,
 }
 
-WindowPlacement :: struct #ordered {
+const WindowPlacement = struct #ordered {
 	length:     u32,
 	flags:      u32,
 	show_cmd:   u32,
@@ -390,26 +390,24 @@ WindowPlacement :: struct #ordered {
 	normal_pos: Rect,
 }
 
-get_monitor_info_a    :: proc(monitor: Hmonitor, mi: ^MonitorInfo) -> Bool                           #foreign user32 "GetMonitorInfoA";
-monitor_from_window   :: proc(wnd: Hwnd, flags : u32) -> Hmonitor                                    #foreign user32 "MonitorFromWindow";
+const get_monitor_info_a    = proc(monitor: Hmonitor, mi: ^MonitorInfo) -> Bool                           #foreign user32 "GetMonitorInfoA";
+const monitor_from_window   = proc(wnd: Hwnd, flags : u32) -> Hmonitor                                    #foreign user32 "MonitorFromWindow";
 
-set_window_pos        :: proc(wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height: i32, flags: u32) #foreign user32 "SetWindowPos";
+const set_window_pos        = proc(wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height: i32, flags: u32) #foreign user32 "SetWindowPos";
 
-get_window_placement  :: proc(wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool                            #foreign user32 "GetWindowPlacement";
-set_window_placement  :: proc(wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool                            #foreign user32 "SetWindowPlacement";
-get_window_rect       :: proc(wnd: Hwnd, rect: ^Rect) -> Bool                                        #foreign user32 "GetWindowRect";
+const get_window_placement  = proc(wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool                            #foreign user32 "GetWindowPlacement";
+const set_window_placement  = proc(wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool                            #foreign user32 "SetWindowPlacement";
+const get_window_rect       = proc(wnd: Hwnd, rect: ^Rect) -> Bool                                        #foreign user32 "GetWindowRect";
 
-get_window_long_ptr_a :: proc(wnd: Hwnd, index: i32) -> i64                                          #foreign user32 "GetWindowLongPtrA";
-set_window_long_ptr_a :: proc(wnd: Hwnd, index: i32, new: i64) -> i64                                #foreign user32 "SetWindowLongPtrA";
+const get_window_long_ptr_a = proc(wnd: Hwnd, index: i32) -> i64                                          #foreign user32 "GetWindowLongPtrA";
+const set_window_long_ptr_a = proc(wnd: Hwnd, index: i32, new: i64) -> i64                                #foreign user32 "SetWindowLongPtrA";
 
-get_window_text       :: proc(wnd: Hwnd, str: ^u8, maxCount: i32) -> i32                           #foreign user32 "GetWindowText";
+const get_window_text       = proc(wnd: Hwnd, str: ^u8, maxCount: i32) -> i32                           #foreign user32 "GetWindowText";
 
-HIWORD :: proc(wParam: Wparam) -> u16 { return u16((u32(wParam) >> 16) & 0xffff); }
-HIWORD :: proc(lParam: Lparam) -> u16 { return u16((u32(lParam) >> 16) & 0xffff); }
-LOWORD :: proc(wParam: Wparam) -> u16 { return u16(wParam); }
-LOWORD :: proc(lParam: Lparam) -> u16 { return u16(lParam); }
-
-
+const HIWORD = proc(wParam: Wparam) -> u16 { return u16((u32(wParam) >> 16) & 0xffff); }
+const HIWORD = proc(lParam: Lparam) -> u16 { return u16((u32(lParam) >> 16) & 0xffff); }
+const LOWORD = proc(wParam: Wparam) -> u16 { return u16(wParam); }
+const LOWORD = proc(lParam: Lparam) -> u16 { return u16(lParam); }
 
 
 
@@ -418,7 +416,9 @@ LOWORD :: proc(lParam: Lparam) -> u16 { return u16(lParam); }
 
 
 
-BitmapInfoHeader :: struct #ordered {
+
+
+const BitmapInfoHeader = struct #ordered {
 	size:              u32,
 	width, height:     i32,
 	planes, bit_count: i16,
@@ -429,20 +429,20 @@ BitmapInfoHeader :: struct #ordered {
 	clr_used:          u32,
 	clr_important:     u32,
 }
-BitmapInfo :: struct #ordered {
+const BitmapInfo = struct #ordered {
 	using header: BitmapInfoHeader,
 	colors:       [1]RgbQuad,
 }
 
 
-RgbQuad :: struct #ordered { blue, green, red, reserved: u8 }
+const RgbQuad = struct #ordered { blue, green, red, reserved: u8 }
 
-BI_RGB         :: 0;
-DIB_RGB_COLORS :: 0x00;
-SRCCOPY: u32    : 0x00cc0020;
+const BI_RGB         = 0;
+const DIB_RGB_COLORS = 0x00;
+const SRCCOPY: u32   = 0x00cc0020;
 
 
-stretch_dibits :: proc (hdc: Hdc,
+const stretch_dibits = proc (hdc: Hdc,
                         x_dst, y_dst, width_dst, height_dst: i32,
                         x_src, y_src, width_src, header_src: i32,
                         bits: rawptr, bits_info: ^BitmapInfo,
@@ -451,37 +451,37 @@ stretch_dibits :: proc (hdc: Hdc,
 
 
 
-load_library_a   :: proc (c_str: ^u8) -> Hmodule          #foreign kernel32 "LoadLibraryA";
-free_library     :: proc (h: Hmodule)                     #foreign kernel32 "FreeLibrary";
-get_proc_address :: proc (h: Hmodule, c_str: ^u8) -> Proc #foreign kernel32 "GetProcAddress";
+const load_library_a   = proc (c_str: ^u8) -> Hmodule          #foreign kernel32 "LoadLibraryA";
+const free_library     = proc (h: Hmodule)                     #foreign kernel32 "FreeLibrary";
+const get_proc_address = proc (h: Hmodule, c_str: ^u8) -> Proc #foreign kernel32 "GetProcAddress";
 
-get_client_rect  :: proc(hwnd: Hwnd, rect: ^Rect) -> Bool #foreign user32 "GetClientRect";
+const get_client_rect  = proc(hwnd: Hwnd, rect: ^Rect) -> Bool #foreign user32 "GetClientRect";
 
 // Windows OpenGL
-PFD_TYPE_RGBA             :: 0;
-PFD_TYPE_COLORINDEX       :: 1;
-PFD_MAIN_PLANE            :: 0;
-PFD_OVERLAY_PLANE         :: 1;
-PFD_UNDERLAY_PLANE        :: -1;
-PFD_DOUBLEBUFFER          :: 1;
-PFD_STEREO                :: 2;
-PFD_DRAW_TO_WINDOW        :: 4;
-PFD_DRAW_TO_BITMAP        :: 8;
-PFD_SUPPORT_GDI           :: 16;
-PFD_SUPPORT_OPENGL        :: 32;
-PFD_GENERIC_FORMAT        :: 64;
-PFD_NEED_PALETTE          :: 128;
-PFD_NEED_SYSTEM_PALETTE   :: 0x00000100;
-PFD_SWAP_EXCHANGE         :: 0x00000200;
-PFD_SWAP_COPY             :: 0x00000400;
-PFD_SWAP_LAYER_BUFFERS    :: 0x00000800;
-PFD_GENERIC_ACCELERATED   :: 0x00001000;
-PFD_DEPTH_DONTCARE        :: 0x20000000;
-PFD_DOUBLEBUFFER_DONTCARE :: 0x40000000;
-PFD_STEREO_DONTCARE       :: 0x80000000;
+const PFD_TYPE_RGBA             = 0;
+const PFD_TYPE_COLORINDEX       = 1;
+const PFD_MAIN_PLANE            = 0;
+const PFD_OVERLAY_PLANE         = 1;
+const PFD_UNDERLAY_PLANE        = -1;
+const PFD_DOUBLEBUFFER          = 1;
+const PFD_STEREO                = 2;
+const PFD_DRAW_TO_WINDOW        = 4;
+const PFD_DRAW_TO_BITMAP        = 8;
+const PFD_SUPPORT_GDI           = 16;
+const PFD_SUPPORT_OPENGL        = 32;
+const PFD_GENERIC_FORMAT        = 64;
+const PFD_NEED_PALETTE          = 128;
+const PFD_NEED_SYSTEM_PALETTE   = 0x00000100;
+const PFD_SWAP_EXCHANGE         = 0x00000200;
+const PFD_SWAP_COPY             = 0x00000400;
+const PFD_SWAP_LAYER_BUFFERS    = 0x00000800;
+const PFD_GENERIC_ACCELERATED   = 0x00001000;
+const PFD_DEPTH_DONTCARE        = 0x20000000;
+const PFD_DOUBLEBUFFER_DONTCARE = 0x40000000;
+const PFD_STEREO_DONTCARE       = 0x80000000;
 
 
-PixelFormatDescriptor :: struct #ordered {
+const PixelFormatDescriptor = struct #ordered {
 	size,
 	version,
 	flags: u32,
@@ -512,28 +512,28 @@ PixelFormatDescriptor :: struct #ordered {
 	damage_mask: u32,
 }
 
-get_dc              :: proc(h: Hwnd) -> Hdc                                                   #foreign user32 "GetDC";
-set_pixel_format    :: proc(hdc: Hdc, pixel_format: i32, pfd: ^PixelFormatDescriptor) -> Bool #foreign gdi32  "SetPixelFormat";
-choose_pixel_format :: proc(hdc: Hdc, pfd: ^PixelFormatDescriptor) -> i32                     #foreign gdi32  "ChoosePixelFormat";
-swap_buffers        :: proc(hdc: Hdc) -> Bool                                                 #foreign gdi32  "SwapBuffers";
-release_dc          :: proc(wnd: Hwnd, hdc: Hdc) -> i32                                       #foreign user32 "ReleaseDC";
+const get_dc              = proc(h: Hwnd) -> Hdc                                                   #foreign user32 "GetDC";
+const set_pixel_format    = proc(hdc: Hdc, pixel_format: i32, pfd: ^PixelFormatDescriptor) -> Bool #foreign gdi32  "SetPixelFormat";
+const choose_pixel_format = proc(hdc: Hdc, pfd: ^PixelFormatDescriptor) -> i32                     #foreign gdi32  "ChoosePixelFormat";
+const swap_buffers        = proc(hdc: Hdc) -> Bool                                                 #foreign gdi32  "SwapBuffers";
+const release_dc          = proc(wnd: Hwnd, hdc: Hdc) -> i32                                       #foreign user32 "ReleaseDC";
 
 
-Proc  :: #type proc() #cc_c;
+const Proc  = type proc() #cc_c;
 
-MAPVK_VK_TO_CHAR   :: 2;
-MAPVK_VK_TO_VSC    :: 0;
-MAPVK_VSC_TO_VK    :: 1;
-MAPVK_VSC_TO_VK_EX :: 3;
+const MAPVK_VK_TO_CHAR   = 2;
+const MAPVK_VK_TO_VSC    = 0;
+const MAPVK_VSC_TO_VK    = 1;
+const MAPVK_VSC_TO_VK_EX = 3;
 
-map_virtual_key :: proc(scancode : u32, map_type : u32) -> u32 #foreign user32 "MapVirtualKeyA";
+const map_virtual_key = proc(scancode : u32, map_type : u32) -> u32 #foreign user32 "MapVirtualKeyA";
 
-get_key_state       :: proc(v_key: i32) -> i16 #foreign user32 "GetKeyState";
-get_async_key_state :: proc(v_key: i32) -> i16 #foreign user32 "GetAsyncKeyState";
+const get_key_state       = proc(v_key: i32) -> i16 #foreign user32 "GetKeyState";
+const get_async_key_state = proc(v_key: i32) -> i16 #foreign user32 "GetAsyncKeyState";
 
-is_key_down :: proc(key: KeyCode) -> bool #inline { return get_async_key_state(i32(key)) < 0; }
+const is_key_down = proc(key: KeyCode) -> bool #inline { return get_async_key_state(i32(key)) < 0; }
 
-KeyCode :: enum i32 {
+const KeyCode = enum i32 {
 	Lbutton    = 0x01,
 	Rbutton    = 0x02,
 	Cancel     = 0x03,

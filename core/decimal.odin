@@ -2,15 +2,15 @@
 // Multiple precision decimal numbers
 // NOTE: This is only for floating point printing and nothing else
 
-Decimal :: struct {
+const Decimal = struct {
 	digits:        [384]u8, // big-endian digits
 	count:         int,
 	decimal_point: int,
 	neg, trunc:    bool,
 }
 
-decimal_to_string :: proc(buf: []u8, a: ^Decimal) -> string {
-	digit_zero :: proc(buf: []u8) -> int {
+const decimal_to_string = proc(buf: []u8, a: ^Decimal) -> string {
+	const digit_zero = proc(buf: []u8) -> int {
 		for _, i in buf {
 			buf[i] = '0';
 		}
@@ -18,7 +18,7 @@ decimal_to_string :: proc(buf: []u8, a: ^Decimal) -> string {
 	}
 
 
-	n := 10 + a.count + abs(a.decimal_point);
+	var n = 10 + a.count + abs(a.decimal_point);
 
 	// TODO(bill): make this work with a buffer that's not big enough
 	assert(len(buf) >= n);
@@ -29,7 +29,7 @@ decimal_to_string :: proc(buf: []u8, a: ^Decimal) -> string {
 		return string(buf[0..<1]);
 	}
 
-	w := 0;
+	var w = 0;
 	if a.decimal_point <= 0 {
 		buf[w] = '0'; w++;
 		buf[w] = '.'; w++;
@@ -48,7 +48,7 @@ decimal_to_string :: proc(buf: []u8, a: ^Decimal) -> string {
 }
 
 // trim trailing zeros
-trim :: proc(a: ^Decimal) {
+const trim = proc(a: ^Decimal) {
 	for a.count > 0 && a.digits[a.count-1] == '0' {
 		a.count--;
 	}
@@ -58,11 +58,11 @@ trim :: proc(a: ^Decimal) {
 }
 
 
-assign :: proc(a: ^Decimal, i: u64) {
-	buf: [32]u8;
-	n := 0;
+const assign = proc(a: ^Decimal, i: u64) {
+	var buf: [32]u8;
+	var n = 0;
 	for i > 0 {
-		j := i/10;
+		var j = i/10;
 		i -= 10*j;
 		buf[n] = u8('0'+i);
 		n++;
@@ -78,14 +78,14 @@ assign :: proc(a: ^Decimal, i: u64) {
 	trim(a);
 }
 
-uint_size :: 8*size_of(uint);
-max_shift :: uint_size-4;
+const uint_size = 8*size_of(uint);
+const max_shift = uint_size-4;
 
-shift_right :: proc(a: ^Decimal, k: uint) {
-	r := 0; // read index
-	w := 0; // write index
+const shift_right = proc(a: ^Decimal, k: uint) {
+	var r = 0; // read index
+	var w = 0; // write index
 
-	n: uint;
+	var n: uint;
 	for ; n>>k == 0; r++ {
 		if r >= a.count {
 			if n == 0 {
@@ -99,16 +99,16 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 			}
 			break;
 		}
-		c := uint(a.digits[r]);
+		var c = uint(a.digits[r]);
 		n = n*10 + c - '0';
 	}
 	a.decimal_point -= r-1;
 
-	mask: uint = (1<<k) - 1;
+	var mask: uint = (1<<k) - 1;
 
 	for ; r < a.count; r++ {
-		c := uint(a.digits[r]);
-		dig := n>>k;
+		var c = uint(a.digits[r]);
+		var dig = n>>k;
 		n &= mask;
 		a.digits[w] = u8('0' + dig);
 		w++;
@@ -116,7 +116,7 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 	}
 
 	for n > 0 {
-		dig := n>>k;
+		var dig = n>>k;
 		n &= mask;
 		if w < len(a.digits) {
 			a.digits[w] = u8('0' + dig);
@@ -132,17 +132,17 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 	trim(a);
 }
 
-shift_left :: proc(a: ^Decimal, k: uint) {
-	delta := int(k/4);
+const shift_left = proc(a: ^Decimal, k: uint) {
+	var delta = int(k/4);
 
-	r := a.count;       // read index
-	w := a.count+delta; // write index
+	var r = a.count;       // read index
+	var w = a.count+delta; // write index
 
-	n: uint;
+	var n: uint;
 	for r--; r >= 0; r-- {
 		n += (uint(a.digits[r]) - '0') << k;
-		quo := n/10;
-		rem := n - 10*quo;
+		var quo = n/10;
+		var rem = n - 10*quo;
 		w--;
 		if w < len(a.digits) {
 			a.digits[w] = u8('0' + rem);
@@ -153,8 +153,8 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 	}
 
 	for n > 0 {
-		quo := n/10;
-		rem := n - 10*quo;
+		var quo = n/10;
+		var rem = n - 10*quo;
 		w--;
 		if 0 <= w && w < len(a.digits) {
 			a.digits[w] = u8('0' + rem);
@@ -170,7 +170,7 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 	trim(a);
 }
 
-shift :: proc(a: ^Decimal, k: int) {
+const shift = proc(a: ^Decimal, k: int) {
 	match {
 	case a.count == 0:
 		// no need to update
@@ -191,7 +191,7 @@ shift :: proc(a: ^Decimal, k: int) {
 	}
 }
 
-can_round_up :: proc(a: ^Decimal, nd: int) -> bool {
+const can_round_up = proc(a: ^Decimal, nd: int) -> bool {
 	if nd < 0 || nd >= a.count { return false ; }
 	if a.digits[nd] == '5' && nd+1 == a.count {
 		if a.trunc {
@@ -203,7 +203,7 @@ can_round_up :: proc(a: ^Decimal, nd: int) -> bool {
 	return a.digits[nd] >= '5';
 }
 
-round :: proc(a: ^Decimal, nd: int) {
+const round = proc(a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return; }
 	if can_round_up(a, nd) {
 		round_up(a, nd);
@@ -212,11 +212,11 @@ round :: proc(a: ^Decimal, nd: int) {
 	}
 }
 
-round_up :: proc(a: ^Decimal, nd: int) {
+const round_up = proc(a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return; }
 
-	for i := nd-1; i >= 0; i-- {
-		if c := a.digits[i]; c < '9' {
+	for var i = nd-1; i >= 0; i-- {
+		if var c = a.digits[i]; c < '9' {
 			a.digits[i]++;
 			a.count = i+1;
 			return;
@@ -229,7 +229,7 @@ round_up :: proc(a: ^Decimal, nd: int) {
 	a.decimal_point++;
 }
 
-round_down :: proc(a: ^Decimal, nd: int) {
+const round_down = proc(a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return; }
 	a.count = nd;
 	trim(a);
@@ -237,13 +237,13 @@ round_down :: proc(a: ^Decimal, nd: int) {
 
 
 // Extract integer part, rounded appropriately. There are no guarantees about overflow.
-rounded_integer :: proc(a: ^Decimal) -> u64 {
+const rounded_integer = proc(a: ^Decimal) -> u64 {
 	if a.decimal_point > 20 {
 		return 0xffff_ffff_ffff_ffff;
 	}
-	i: int;
-	n: u64 = 0;
-	m := min(a.decimal_point, a.count);
+	var i: int;
+	var n: u64 = 0;
+	var m = min(a.decimal_point, a.count);
 	for i = 0; i < m; i++ {
 		n = n*10 + u64(a.digits[i]-'0');
 	}

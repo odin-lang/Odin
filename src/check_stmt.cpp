@@ -1538,7 +1538,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(vd, ValueDecl, node);
 		GB_ASSERT(!c->context.scope->is_file);
-		if (!vd->is_var) {
+		if (vd->token.kind != Token_var) {
 			// NOTE(bill): Handled elsewhere
 		} else {
 			Entity **entities = gb_alloc_array(c->allocator, Entity *, vd->names.count);

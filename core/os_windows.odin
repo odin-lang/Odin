@@ -1,63 +1,63 @@
 #import win32 "sys/windows.odin";
 
-Handle    :: int;
-FileTime :: u64;
-Errno     :: int;
+const Handle    = int;
+const FileTime  = u64;
+const Errno     = int;
 
-INVALID_HANDLE: Handle : -1;
+const INVALID_HANDLE: Handle = -1;
 
 
-O_RDONLY   :: 0x00000;
-O_WRONLY   :: 0x00001;
-O_RDWR     :: 0x00002;
-O_CREAT    :: 0x00040;
-O_EXCL     :: 0x00080;
-O_NOCTTY   :: 0x00100;
-O_TRUNC    :: 0x00200;
-O_NONBLOCK :: 0x00800;
-O_APPEND   :: 0x00400;
-O_SYNC     :: 0x01000;
-O_ASYNC    :: 0x02000;
-O_CLOEXEC  :: 0x80000;
+const O_RDONLY   = 0x00000;
+const O_WRONLY   = 0x00001;
+const O_RDWR     = 0x00002;
+const O_CREAT    = 0x00040;
+const O_EXCL     = 0x00080;
+const O_NOCTTY   = 0x00100;
+const O_TRUNC    = 0x00200;
+const O_NONBLOCK = 0x00800;
+const O_APPEND   = 0x00400;
+const O_SYNC     = 0x01000;
+const O_ASYNC    = 0x02000;
+const O_CLOEXEC  = 0x80000;
 
-ERROR_NONE:                Errno : 0;
-ERROR_FILE_NOT_FOUND:      Errno : 2;
-ERROR_PATH_NOT_FOUND:      Errno : 3;
-ERROR_ACCESS_DENIED:       Errno : 5;
-ERROR_NO_MORE_FILES:       Errno : 18;
-ERROR_HANDLE_EOF:          Errno : 38;
-ERROR_NETNAME_DELETED:     Errno : 64;
-ERROR_FILE_EXISTS:         Errno : 80;
-ERROR_BROKEN_PIPE:         Errno : 109;
-ERROR_BUFFER_OVERFLOW:     Errno : 111;
-ERROR_INSUFFICIENT_BUFFER: Errno : 122;
-ERROR_MOD_NOT_FOUND:       Errno : 126;
-ERROR_PROC_NOT_FOUND:      Errno : 127;
-ERROR_DIR_NOT_EMPTY:       Errno : 145;
-ERROR_ALREADY_EXISTS:      Errno : 183;
-ERROR_ENVVAR_NOT_FOUND:    Errno : 203;
-ERROR_MORE_DATA:           Errno : 234;
-ERROR_OPERATION_ABORTED:   Errno : 995;
-ERROR_IO_PENDING:          Errno : 997;
-ERROR_NOT_FOUND:           Errno : 1168;
-ERROR_PRIVILEGE_NOT_HELD:  Errno : 1314;
-WSAEACCES:                 Errno : 10013;
-WSAECONNRESET:             Errno : 10054;
+const ERROR_NONE:                Errno = 0;
+const ERROR_FILE_NOT_FOUND:      Errno = 2;
+const ERROR_PATH_NOT_FOUND:      Errno = 3;
+const ERROR_ACCESS_DENIED:       Errno = 5;
+const ERROR_NO_MORE_FILES:       Errno = 18;
+const ERROR_HANDLE_EOF:          Errno = 38;
+const ERROR_NETNAME_DELETED:     Errno = 64;
+const ERROR_FILE_EXISTS:         Errno = 80;
+const ERROR_BROKEN_PIPE:         Errno = 109;
+const ERROR_BUFFER_OVERFLOW:     Errno = 111;
+const ERROR_INSUFFICIENT_BUFFER: Errno = 122;
+const ERROR_MOD_NOT_FOUND:       Errno = 126;
+const ERROR_PROC_NOT_FOUND:      Errno = 127;
+const ERROR_DIR_NOT_EMPTY:       Errno = 145;
+const ERROR_ALREADY_EXISTS:      Errno = 183;
+const ERROR_ENVVAR_NOT_FOUND:    Errno = 203;
+const ERROR_MORE_DATA:           Errno = 234;
+const ERROR_OPERATION_ABORTED:   Errno = 995;
+const ERROR_IO_PENDING:          Errno = 997;
+const ERROR_NOT_FOUND:           Errno = 1168;
+const ERROR_PRIVILEGE_NOT_HELD:  Errno = 1314;
+const WSAEACCES:                 Errno = 10013;
+const WSAECONNRESET:             Errno = 10054;
 
 // Windows reserves errors >= 1<<29 for application use
-ERROR_FILE_IS_PIPE: Errno : 1<<29 + 0;
+const ERROR_FILE_IS_PIPE: Errno = 1<<29 + 0;
 
 
 // "Argv" arguments converted to Odin strings
-immutable args := _alloc_command_line_arguments();
+immutable var args = _alloc_command_line_arguments();
 
 
-open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
+const open = proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 	if len(path) == 0 {
 		return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
 	}
 
-	access: u32;
+	var access: u32;
 	match mode & (O_RDONLY|O_WRONLY|O_RDWR) {
 	case O_RDONLY: access = win32.FILE_GENERIC_READ;
 	case O_WRONLY: access = win32.FILE_GENERIC_WRITE;
@@ -72,14 +72,14 @@ open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 		access |=  win32.FILE_APPEND_DATA;
 	}
 
-	share_mode := u32(win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE);
-	sa: ^win32.Security_Attributes = nil;
-	sa_inherit := win32.Security_Attributes{length = size_of(win32.Security_Attributes), inherit_handle = 1};
+	var share_mode = u32(win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE);
+	var sa: ^win32.Security_Attributes = nil;
+	var sa_inherit = win32.Security_Attributes{length = size_of(win32.Security_Attributes), inherit_handle = 1};
 	if mode&O_CLOEXEC == 0 {
 		sa = &sa_inherit;
 	}
 
-	create_mode: u32;
+	var create_mode: u32;
 	match {
 	case mode&(O_CREAT|O_EXCL) == (O_CREAT | O_EXCL):
 		create_mode = win32.CREATE_NEW;
@@ -93,42 +93,42 @@ open :: proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 		create_mode = win32.OPEN_EXISTING;
 	}
 
-	buf: [300]u8;
+	var buf: [300]u8;
 	copy(buf[..], []u8(path));
 
-	handle := Handle(win32.create_file_a(&buf[0], access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
+	var handle = Handle(win32.create_file_a(&buf[0], access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
 	if handle != INVALID_HANDLE {
 		return handle, ERROR_NONE;
 	}
-	err := win32.get_last_error();
+	var err = win32.get_last_error();
 	return INVALID_HANDLE, Errno(err);
 }
 
-close :: proc(fd: Handle) {
+const close = proc(fd: Handle) {
 	win32.close_handle(win32.Handle(fd));
 }
 
 
-write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
+const write = proc(fd: Handle, data: []u8) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE;
 	}
-	single_write_length: i32;
-	total_write: i64;
-	length := i64(len(data));
+	var single_write_length: i32;
+	var total_write: i64;
+	var length = i64(len(data));
 
 	for total_write < length {
-		remaining := length - total_write;
-		to_read: i32;
-		MAX :: 1<<31-1;
+		var remaining = length - total_write;
+		var to_read: i32;
+		const MAX = 1<<31-1;
 		if remaining <= MAX {
 			to_read = i32(remaining);
 		} else {
 			to_read = MAX;
 		}
-		e := win32.write_file(win32.Handle(fd), &data[total_write], to_read, &single_write_length, nil);
+		var e = win32.write_file(win32.Handle(fd), &data[total_write], to_read, &single_write_length, nil);
 		if single_write_length <= 0 || e == win32.FALSE {
-			err := win32.get_last_error();
+			var err = win32.get_last_error();
 			return int(total_write), Errno(e);
 		}
 		total_write += i64(single_write_length);
@@ -136,28 +136,28 @@ write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	return int(total_write), ERROR_NONE;
 }
 
-read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
+const read = proc(fd: Handle, data: []u8) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE;
 	}
 
-	single_read_length: i32;
-	total_read: i64;
-	length := i64(len(data));
+	var single_read_length: i32;
+	var total_read: i64;
+	var length = i64(len(data));
 
 	for total_read < length {
-		remaining := length - total_read;
-		to_read: u32;
-		MAX :: 1<<32-1;
+		var remaining = length - total_read;
+		var to_read: u32;
+		const MAX = 1<<32-1;
 		if remaining <= MAX {
 			to_read = u32(remaining);
 		} else {
 			to_read = MAX;
 		}
 
-		e := win32.read_file(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
+		var e = win32.read_file(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
 		if single_read_length <= 0 || e == win32.FALSE {
-			err := win32.get_last_error();
+			var err = win32.get_last_error();
 			return int(total_read), Errno(e);
 		}
 		total_read += i64(single_read_length);
@@ -165,30 +165,30 @@ read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	return int(total_read), ERROR_NONE;
 }
 
-seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
-	w: u32;
+const seek = proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
+	var w: u32;
 	match whence {
 	case 0: w = win32.FILE_BEGIN;
 	case 1: w = win32.FILE_CURRENT;
 	case 2: w = win32.FILE_END;
 	}
-	hi := i32(offset>>32);
-	lo := i32(offset);
-	ft := win32.get_file_type(win32.Handle(fd));
+	var hi = i32(offset>>32);
+	var lo = i32(offset);
+	var ft = win32.get_file_type(win32.Handle(fd));
 	if ft == win32.FILE_TYPE_PIPE {
 		return 0, ERROR_FILE_IS_PIPE;
 	}
-	dw_ptr := win32.set_file_pointer(win32.Handle(fd), lo, &hi, w);
+	var dw_ptr = win32.set_file_pointer(win32.Handle(fd), lo, &hi, w);
 	if dw_ptr == win32.INVALID_SET_FILE_POINTER {
-		err := win32.get_last_error();
+		var err = win32.get_last_error();
 		return 0, Errno(err);
 	}
 	return i64(hi)<<32 + i64(dw_ptr), ERROR_NONE;
 }
 
-file_size :: proc(fd: Handle) -> (i64, Errno) {
-	length: i64;
-	err: Errno;
+const file_size = proc(fd: Handle) -> (i64, Errno) {
+	var length: i64;
+	var err: Errno;
 	if win32.get_file_size_ex(win32.Handle(fd), &length) == 0 {
 		err = Errno(win32.get_last_error());
 	}
@@ -198,13 +198,13 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 
 
 // NOTE(bill): Uses startup to initialize it
-stdin  := get_std_handle(win32.STD_INPUT_HANDLE);
-stdout := get_std_handle(win32.STD_OUTPUT_HANDLE);
-stderr := get_std_handle(win32.STD_ERROR_HANDLE);
+var stdin  = get_std_handle(win32.STD_INPUT_HANDLE);
+var stdout = get_std_handle(win32.STD_OUTPUT_HANDLE);
+var stderr = get_std_handle(win32.STD_ERROR_HANDLE);
 
 
-get_std_handle :: proc(h: int) -> Handle {
-	fd := win32.get_std_handle(i32(h));
+const get_std_handle = proc(h: int) -> Handle {
+	var fd = win32.get_std_handle(i32(h));
 	win32.set_handle_information(fd, win32.HANDLE_FLAG_INHERIT, 0);
 	return Handle(fd);
 }
@@ -214,18 +214,18 @@ get_std_handle :: proc(h: int) -> Handle {
 
 
 
-last_write_time :: proc(fd: Handle) -> FileTime {
-	file_info: win32.ByHandleFileInformation;
+const last_write_time = proc(fd: Handle) -> FileTime {
+	var file_info: win32.ByHandleFileInformation;
 	win32.get_file_information_by_handle(win32.Handle(fd), &file_info);
-	lo := FileTime(file_info.last_write_time.lo);
-	hi := FileTime(file_info.last_write_time.hi);
+	var lo = FileTime(file_info.last_write_time.lo);
+	var hi = FileTime(file_info.last_write_time.hi);
 	return lo | hi << 32;
 }
 
-last_write_time_by_name :: proc(name: string) -> FileTime {
-	last_write_time: win32.Filetime;
-	data: win32.FileAttributeData;
-	buf: [1024]u8;
+const last_write_time_by_name = proc(name: string) -> FileTime {
+	var last_write_time: win32.Filetime;
+	var data: win32.FileAttributeData;
+	var buf: [1024]u8;
 
 	assert(len(buf) > len(name));
 
@@ -235,17 +235,17 @@ last_write_time_by_name :: proc(name: string) -> FileTime {
 		last_write_time = data.last_write_time;
 	}
 
-	l := FileTime(last_write_time.lo);
-	h := FileTime(last_write_time.hi);
+	var l = FileTime(last_write_time.lo);
+	var h = FileTime(last_write_time.hi);
 	return l | h << 32;
 }
 
 
 
-heap_alloc :: proc(size: int) -> rawptr {
+const heap_alloc = proc(size: int) -> rawptr {
 	return win32.heap_alloc(win32.get_process_heap(), win32.HEAP_ZERO_MEMORY, size);
 }
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
+const heap_resize = proc(ptr: rawptr, new_size: int) -> rawptr {
 	if new_size == 0 {
 		heap_free(ptr);
 		return nil;
@@ -255,7 +255,7 @@ heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	}
 	return win32.heap_realloc(win32.get_process_heap(), win32.HEAP_ZERO_MEMORY, ptr, new_size);
 }
-heap_free :: proc(ptr: rawptr) {
+const heap_free = proc(ptr: rawptr) {
 	if ptr == nil {
 		return;
 	}
@@ -263,30 +263,30 @@ heap_free :: proc(ptr: rawptr) {
 }
 
 
-exit :: proc(code: int) {
+const exit = proc(code: int) {
 	win32.exit_process(u32(code));
 }
 
 
 
-current_thread_id :: proc() -> int {
+const current_thread_id = proc() -> int {
 	return int(win32.get_current_thread_id());
 }
 
 
 
 
-_alloc_command_line_arguments :: proc() -> []string {
-	alloc_ucs2_to_utf8 :: proc(wstr: ^u16) -> string {
-		wstr_len := 0;
+const _alloc_command_line_arguments = proc() -> []string {
+	const alloc_ucs2_to_utf8 = proc(wstr: ^u16) -> string {
+		var wstr_len = 0;
 		for (wstr+wstr_len)^ != 0 {
 			wstr_len++;
 		}
-		len := 2*wstr_len-1;
-		buf := make([]u8, len+1);
-		str := slice_ptr(wstr, wstr_len+1);
+		var len = 2*wstr_len-1;
+		var buf = make([]u8, len+1);
+		var str = slice_ptr(wstr, wstr_len+1);
 
-		i, j := 0, 0;
+		var i, j = 0, 0;
 		for str[j] != 0 {
 			match {
 			case str[j] < 0x80:
@@ -306,7 +306,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 				if i+4 > len {
 					return "";
 				}
-				c := rune((str[j] - 0xd800) << 10) + rune((str[j+1]) - 0xdc00) + 0x10000;
+				var c = rune((str[j] - 0xd800) << 10) + rune((str[j+1]) - 0xdc00) + 0x10000;
 				buf[i] = u8(0xf0 +  (c >> 18));         i++;
 				buf[i] = u8(0x80 + ((c >> 12) & 0x3f)); i++;
 				buf[i] = u8(0x80 + ((c >>  6) & 0x3f)); i++;
@@ -328,9 +328,9 @@ _alloc_command_line_arguments :: proc() -> []string {
 		return string(buf[0..<i]);
 	}
 
-	arg_count: i32;
-	arg_list_ptr := win32.command_line_to_argv_w(win32.get_command_line_w(), &arg_count);
-	arg_list := make([]string, arg_count);
+	var arg_count: i32;
+	var arg_list_ptr = win32.command_line_to_argv_w(win32.get_command_line_w(), &arg_count);
+	var arg_list = make([]string, arg_count);
 	for _, i in arg_list {
 		arg_list[i] = alloc_ucs2_to_utf8((arg_list_ptr+i)^);
 	}

@@ -4,113 +4,113 @@
 #import "sys/wgl.odin" when ODIN_OS == "windows";
 #load "opengl_constants.odin";
 
-Clear         :: proc(mask: u32)                                #foreign lib "glClear";
-ClearColor    :: proc(r, g, b, a: f32)                          #foreign lib "glClearColor";
-Begin         :: proc(mode: i32)                                #foreign lib "glBegin";
-End           :: proc()                                         #foreign lib "glEnd";
-Finish        :: proc()                                         #foreign lib "glFinish";
-BlendFunc     :: proc(sfactor, dfactor: i32)                    #foreign lib "glBlendFunc";
-Enable        :: proc(cap: i32)                                 #foreign lib "glEnable";
-Disable       :: proc(cap: i32)                                 #foreign lib "glDisable";
-GenTextures   :: proc(count: i32, result: ^u32)                 #foreign lib "glGenTextures";
-DeleteTextures:: proc(count: i32, result: ^u32)                 #foreign lib "glDeleteTextures";
-TexParameteri :: proc(target, pname, param: i32)                #foreign lib "glTexParameteri";
-TexParameterf :: proc(target: i32, pname: i32, param: f32)      #foreign lib "glTexParameterf";
-BindTexture   :: proc(target: i32, texture: u32)                #foreign lib "glBindTexture";
-LoadIdentity  :: proc()                                         #foreign lib "glLoadIdentity";
-Viewport      :: proc(x, y, width, height: i32)                 #foreign lib "glViewport";
-Ortho         :: proc(left, right, bottom, top, near, far: f64) #foreign lib "glOrtho";
-Color3f       :: proc(r, g, b: f32)                             #foreign lib "glColor3f";
-Vertex3f      :: proc(x, y, z: f32)                             #foreign lib "glVertex3f";
-GetError      :: proc() -> i32                                  #foreign lib "glGetError";
-GetString     :: proc(name: i32) -> ^u8                       #foreign lib "glGetString";
-GetIntegerv   :: proc(name: i32, v: ^i32)                       #foreign lib "glGetIntegerv";
-TexCoord2f    :: proc(x, y: f32)                                #foreign lib "glTexCoord2f";
-TexImage2D    :: proc(target, level, internal_format,
+const Clear         = proc(mask: u32)                                #foreign lib "glClear";
+const ClearColor    = proc(r, g, b, a: f32)                          #foreign lib "glClearColor";
+const Begin         = proc(mode: i32)                                #foreign lib "glBegin";
+const End           = proc()                                         #foreign lib "glEnd";
+const Finish        = proc()                                         #foreign lib "glFinish";
+const BlendFunc     = proc(sfactor, dfactor: i32)                    #foreign lib "glBlendFunc";
+const Enable        = proc(cap: i32)                                 #foreign lib "glEnable";
+const Disable       = proc(cap: i32)                                 #foreign lib "glDisable";
+const GenTextures   = proc(count: i32, result: ^u32)                 #foreign lib "glGenTextures";
+const DeleteTextures= proc(count: i32, result: ^u32)                 #foreign lib "glDeleteTextures";
+const TexParameteri = proc(target, pname, param: i32)                #foreign lib "glTexParameteri";
+const TexParameterf = proc(target: i32, pname: i32, param: f32)      #foreign lib "glTexParameterf";
+const BindTexture   = proc(target: i32, texture: u32)                #foreign lib "glBindTexture";
+const LoadIdentity  = proc()                                         #foreign lib "glLoadIdentity";
+const Viewport      = proc(x, y, width, height: i32)                 #foreign lib "glViewport";
+const Ortho         = proc(left, right, bottom, top, near, far: f64) #foreign lib "glOrtho";
+const Color3f       = proc(r, g, b: f32)                             #foreign lib "glColor3f";
+const Vertex3f      = proc(x, y, z: f32)                             #foreign lib "glVertex3f";
+const GetError      = proc() -> i32                                  #foreign lib "glGetError";
+const GetString     = proc(name: i32) -> ^u8                       #foreign lib "glGetString";
+const GetIntegerv   = proc(name: i32, v: ^i32)                       #foreign lib "glGetIntegerv";
+const TexCoord2f    = proc(x, y: f32)                                #foreign lib "glTexCoord2f";
+const TexImage2D    = proc(target, level, internal_format,
                       width, height, border,
-                      format, type: i32, pixels: rawptr)        #foreign lib "glTexImage2D";
+                      format, type_: i32, pixels: rawptr)        #foreign lib "glTexImage2D";
 
 
-_string_data :: proc(s: string) -> ^u8 #inline { return &s[0]; }
+const _string_data = proc(s: string) -> ^u8 #inline { return &s[0]; }
 
-_libgl := win32.load_library_a(_string_data("opengl32.dll\x00"));
+var _libgl = win32.load_library_a(_string_data("opengl32.dll\x00"));
 
-get_proc_address :: proc(name: string) -> proc() #cc_c {
+const get_proc_address = proc(name: string) -> proc() #cc_c {
 	if name[len(name)-1] == 0 {
 		name = name[0..<len(name)-1];
 	}
 	// NOTE(bill): null terminated
 	assert((&name[0] + len(name))^ == 0);
-	res := wgl.get_proc_address(&name[0]);
+	var res = wgl.get_proc_address(&name[0]);
 	if res == nil {
 		res = win32.get_proc_address(_libgl, &name[0]);
 	}
 	return res;
 }
 
-GenBuffers:               proc(count: i32, buffers: ^u32) #cc_c;
-GenVertexArrays:          proc(count: i32, buffers: ^u32) #cc_c;
-GenSamplers:              proc(count: i32, buffers: ^u32) #cc_c;
-DeleteBuffers:            proc(count: i32, buffers: ^u32) #cc_c;
-BindBuffer:               proc(target: i32, buffer: u32) #cc_c;
-BindVertexArray:          proc(buffer: u32) #cc_c;
-DeleteVertexArrays:       proc(count: i32, arrays: ^u32) #cc_c;
-BindSampler:              proc(position: i32, sampler: u32) #cc_c;
-BufferData:               proc(target: i32, size: int, data: rawptr, usage: i32) #cc_c;
-BufferSubData:            proc(target: i32, offset, size: int, data: rawptr) #cc_c;
+var GenBuffers:               proc(count: i32, buffers: ^u32) #cc_c;
+var GenVertexArrays:          proc(count: i32, buffers: ^u32) #cc_c;
+var GenSamplers:              proc(count: i32, buffers: ^u32) #cc_c;
+var DeleteBuffers:            proc(count: i32, buffers: ^u32) #cc_c;
+var BindBuffer:               proc(target: i32, buffer: u32) #cc_c;
+var BindVertexArray:          proc(buffer: u32) #cc_c;
+var DeleteVertexArrays:       proc(count: i32, arrays: ^u32) #cc_c;
+var BindSampler:              proc(position: i32, sampler: u32) #cc_c;
+var BufferData:               proc(target: i32, size: int, data: rawptr, usage: i32) #cc_c;
+var BufferSubData:            proc(target: i32, offset, size: int, data: rawptr) #cc_c;
 
-DrawArrays:               proc(mode, first: i32, count: u32) #cc_c;
-DrawElements:             proc(mode: i32, count: u32, type_: i32, indices: rawptr) #cc_c;
+var DrawArrays:               proc(mode, first: i32, count: u32) #cc_c;
+var DrawElements:             proc(mode: i32, count: u32, type_: i32, indices: rawptr) #cc_c;
 
-MapBuffer:                proc(target, access: i32) -> rawptr #cc_c;
-UnmapBuffer:              proc(target: i32) #cc_c;
+var MapBuffer:                proc(target, access: i32) -> rawptr #cc_c;
+var UnmapBuffer:              proc(target: i32) #cc_c;
 
-VertexAttribPointer:      proc(index: u32, size, type_: i32, normalized: i32, stride: u32, pointer: rawptr) #cc_c;
-EnableVertexAttribArray:  proc(index: u32) #cc_c;
+var VertexAttribPointer:      proc(index: u32, size, type_: i32, normalized: i32, stride: u32, pointer: rawptr) #cc_c;
+var EnableVertexAttribArray:  proc(index: u32) #cc_c;
 
-CreateShader:             proc(shader_type: i32) -> u32 #cc_c;
-ShaderSource:             proc(shader: u32, count: u32, str: ^^u8, length: ^i32) #cc_c;
-CompileShader:            proc(shader: u32) #cc_c;
-CreateProgram:            proc() -> u32 #cc_c;
-AttachShader:             proc(program, shader: u32) #cc_c;
-DetachShader:             proc(program, shader: u32) #cc_c;
-DeleteShader:             proc(shader:  u32) #cc_c;
-LinkProgram:              proc(program: u32) #cc_c;
-UseProgram:               proc(program: u32) #cc_c;
-DeleteProgram:            proc(program: u32) #cc_c;
-
-
-GetShaderiv:              proc(shader:  u32, pname: i32, params: ^i32) #cc_c;
-GetProgramiv:             proc(program: u32, pname: i32, params: ^i32) #cc_c;
-GetShaderInfoLog:         proc(shader:  u32, max_length: u32, length: ^u32, info_long: ^u8) #cc_c;
-GetProgramInfoLog:        proc(program: u32, max_length: u32, length: ^u32, info_long: ^u8) #cc_c;
-
-ActiveTexture:            proc(texture: i32) #cc_c;
-GenerateMipmap:           proc(target:  i32) #cc_c;
-
-SamplerParameteri:        proc(sampler: u32, pname: i32, param: i32) #cc_c;
-SamplerParameterf:        proc(sampler: u32, pname: i32, param: f32) #cc_c;
-SamplerParameteriv:       proc(sampler: u32, pname: i32, params: ^i32) #cc_c;
-SamplerParameterfv:       proc(sampler: u32, pname: i32, params: ^f32) #cc_c;
-SamplerParameterIiv:      proc(sampler: u32, pname: i32, params: ^i32) #cc_c;
-SamplerParameterIuiv:     proc(sampler: u32, pname: i32, params: ^u32) #cc_c;
+var CreateShader:             proc(shader_type: i32) -> u32 #cc_c;
+var ShaderSource:             proc(shader: u32, count: u32, str: ^^u8, length: ^i32) #cc_c;
+var CompileShader:            proc(shader: u32) #cc_c;
+var CreateProgram:            proc() -> u32 #cc_c;
+var AttachShader:             proc(program, shader: u32) #cc_c;
+var DetachShader:             proc(program, shader: u32) #cc_c;
+var DeleteShader:             proc(shader:  u32) #cc_c;
+var LinkProgram:              proc(program: u32) #cc_c;
+var UseProgram:               proc(program: u32) #cc_c;
+var DeleteProgram:            proc(program: u32) #cc_c;
 
 
-Uniform1i:                proc(loc: i32, v0: i32) #cc_c;
-Uniform2i:                proc(loc: i32, v0, v1: i32) #cc_c;
-Uniform3i:                proc(loc: i32, v0, v1, v2: i32) #cc_c;
-Uniform4i:                proc(loc: i32, v0, v1, v2, v3: i32) #cc_c;
-Uniform1f:                proc(loc: i32, v0: f32) #cc_c;
-Uniform2f:                proc(loc: i32, v0, v1: f32) #cc_c;
-Uniform3f:                proc(loc: i32, v0, v1, v2: f32) #cc_c;
-Uniform4f:                proc(loc: i32, v0, v1, v2, v3: f32) #cc_c;
-UniformMatrix4fv:         proc(loc: i32, count: u32, transpose: i32, value: ^f32) #cc_c;
+var GetShaderiv:              proc(shader:  u32, pname: i32, params: ^i32) #cc_c;
+var GetProgramiv:             proc(program: u32, pname: i32, params: ^i32) #cc_c;
+var GetShaderInfoLog:         proc(shader:  u32, max_length: u32, length: ^u32, info_long: ^u8) #cc_c;
+var GetProgramInfoLog:        proc(program: u32, max_length: u32, length: ^u32, info_long: ^u8) #cc_c;
 
-GetUniformLocation:       proc(program: u32, name: ^u8) -> i32 #cc_c;
+var ActiveTexture:            proc(texture: i32) #cc_c;
+var GenerateMipmap:           proc(target:  i32) #cc_c;
 
-init :: proc() {
-	set_proc_address :: proc(p: rawptr, name: string) #inline {
-		x := ^(proc() #cc_c)(p);
+var SamplerParameteri:        proc(sampler: u32, pname: i32, param: i32) #cc_c;
+var SamplerParameterf:        proc(sampler: u32, pname: i32, param: f32) #cc_c;
+var SamplerParameteriv:       proc(sampler: u32, pname: i32, params: ^i32) #cc_c;
+var SamplerParameterfv:       proc(sampler: u32, pname: i32, params: ^f32) #cc_c;
+var SamplerParameterIiv:      proc(sampler: u32, pname: i32, params: ^i32) #cc_c;
+var SamplerParameterIuiv:     proc(sampler: u32, pname: i32, params: ^u32) #cc_c;
+
+
+var Uniform1i:                proc(loc: i32, v0: i32) #cc_c;
+var Uniform2i:                proc(loc: i32, v0, v1: i32) #cc_c;
+var Uniform3i:                proc(loc: i32, v0, v1, v2: i32) #cc_c;
+var Uniform4i:                proc(loc: i32, v0, v1, v2, v3: i32) #cc_c;
+var Uniform1f:                proc(loc: i32, v0: f32) #cc_c;
+var Uniform2f:                proc(loc: i32, v0, v1: f32) #cc_c;
+var Uniform3f:                proc(loc: i32, v0, v1, v2: f32) #cc_c;
+var Uniform4f:                proc(loc: i32, v0, v1, v2, v3: f32) #cc_c;
+var UniformMatrix4fv:         proc(loc: i32, count: u32, transpose: i32, value: ^f32) #cc_c;
+
+var GetUniformLocation:       proc(program: u32, name: ^u8) -> i32 #cc_c;
+
+const init = proc() {
+	const set_proc_address = proc(p: rawptr, name: string) #inline {
+		var x = ^(proc() #cc_c)(p);
 		x^ = get_proc_address(name);
 	}
 

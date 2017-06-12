@@ -2,18 +2,18 @@
 #load "os_x.odin"       when ODIN_OS == "osx";
 #load "os_linux.odin"   when ODIN_OS == "linux";
 
-write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
+const write_string = proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, []u8(str));
 }
 
-read_entire_file :: proc(name: string) -> ([]u8, bool) {
-	fd, err := open(name, O_RDONLY, 0);
+const read_entire_file = proc(name: string) -> ([]u8, bool) {
+	var fd, err = open(name, O_RDONLY, 0);
 	if err != 0 {
 		return nil, false;
 	}
 	defer close(fd);
 
-	length: i64;
+	var length: i64;
 	if length, err = file_size(fd); err != 0 {
 		return nil, false;
 	}
@@ -22,12 +22,12 @@ read_entire_file :: proc(name: string) -> ([]u8, bool) {
 		return nil, true;
 	}
 
-	data := make([]u8, length);
+	var data = make([]u8, length);
 	if data == nil {
 		return nil, false;
 	}
 
-	bytes_read, read_err := read(fd, data);
+	var bytes_read, read_err = read(fd, data);
 	if read_err != 0 {
 		free(data);
 		return nil, false;
@@ -35,13 +35,13 @@ read_entire_file :: proc(name: string) -> ([]u8, bool) {
 	return data[0..<bytes_read], true;
 }
 
-write_entire_file :: proc(name: string, data: []u8) -> bool {
-	fd, err := open(name, O_WRONLY, 0);
+const write_entire_file = proc(name: string, data: []u8) -> bool {
+	var fd, err = open(name, O_WRONLY, 0);
 	if err != 0 {
 		return false;
 	}
 	defer close(fd);
 
-	bytes_written, write_err := write(fd, data);
+	var bytes_written, write_err = write(fd, data);
 	return write_err != 0;
 }

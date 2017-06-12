@@ -1,36 +1,36 @@
-RUNE_ERROR :: '\ufffd';
-RUNE_SELF  :: 0x80;
-RUNE_BOM   :: 0xfeff;
-RUNE_EOF   :: ~rune(0);
-MAX_RUNE   :: '\U0010ffff';
-UTF_MAX    :: 4;
+const RUNE_ERROR = '\ufffd';
+const RUNE_SELF  = 0x80;
+const RUNE_BOM   = 0xfeff;
+const RUNE_EOF   = ~rune(0);
+const MAX_RUNE   = '\U0010ffff';
+const UTF_MAX    = 4;
 
-SURROGATE_MIN :: 0xd800;
-SURROGATE_MAX :: 0xdfff;
+const SURROGATE_MIN = 0xd800;
+const SURROGATE_MAX = 0xdfff;
 
-T1 :: 0b0000_0000;
-TX :: 0b1000_0000;
-T2 :: 0b1100_0000;
-T3 :: 0b1110_0000;
-T4 :: 0b1111_0000;
-T5 :: 0b1111_1000;
+const T1 = 0b0000_0000;
+const TX = 0b1000_0000;
+const T2 = 0b1100_0000;
+const T3 = 0b1110_0000;
+const T4 = 0b1111_0000;
+const T5 = 0b1111_1000;
 
-MASKX :: 0b0011_1111;
-MASK2 :: 0b0001_1111;
-MASK3 :: 0b0000_1111;
-MASK4 :: 0b0000_0111;
+const MASKX = 0b0011_1111;
+const MASK2 = 0b0001_1111;
+const MASK3 = 0b0000_1111;
+const MASK4 = 0b0000_0111;
 
-RUNE1_MAX :: 1<<7 - 1;
-RUNE2_MAX :: 1<<11 - 1;
-RUNE3_MAX :: 1<<16 - 1;
+const RUNE1_MAX = 1<<7 - 1;
+const RUNE2_MAX = 1<<11 - 1;
+const RUNE3_MAX = 1<<16 - 1;
 
 // The default lowest and highest continuation byte.
-LOCB :: 0b1000_0000;
-HICB :: 0b1011_1111;
+const LOCB = 0b1000_0000;
+const HICB = 0b1011_1111;
 
-AcceptRange :: struct { lo, hi: u8 }
+const AcceptRange = struct { lo, hi: u8 }
 
-immutable accept_ranges := [5]AcceptRange{
+immutable var accept_ranges = [5]AcceptRange{
 	{0x80, 0xbf},
 	{0xa0, 0xbf},
 	{0x80, 0x9f},
@@ -38,7 +38,7 @@ immutable accept_ranges := [5]AcceptRange{
 	{0x80, 0x8f},
 };
 
-immutable accept_sizes := [256]u8{
+immutable var accept_sizes = [256]u8{
 	0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x00-0x0f
 	0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x10-0x1f
 	0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x20-0x2f
@@ -58,10 +58,10 @@ immutable accept_sizes := [256]u8{
 	0x34, 0x04, 0x04, 0x04, 0x44, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, // 0xf0-0xff
 };
 
-encode_rune :: proc(r: rune) -> ([4]u8, int) {
-	buf: [4]u8;
-	i := u32(r);
-	mask: u8 : 0x3f;
+const encode_rune = proc(r: rune) -> ([4]u8, int) {
+	var buf: [4]u8;
+	var i = u32(r);
+	const mask: u8 = 0x3f;
 	if i <= 1<<7-1 {
 		buf[0] = u8(r);
 		return buf, 1;
@@ -92,38 +92,38 @@ encode_rune :: proc(r: rune) -> ([4]u8, int) {
 	return buf, 4;
 }
 
-decode_rune :: proc(s: string) -> (rune, int) #inline { return decode_rune([]u8(s)); }
-decode_rune :: proc(s: []u8) -> (rune, int) {
-	n := len(s);
+const decode_rune = proc(s: string) -> (rune, int) #inline { return decode_rune([]u8(s)); }
+const decode_rune = proc(s: []u8) -> (rune, int) {
+	var n = len(s);
 	if n < 1 {
 		return RUNE_ERROR, 0;
 	}
-	s0 := s[0];
-	x := accept_sizes[s0];
+	var s0 = s[0];
+	var x = accept_sizes[s0];
 	if x >= 0xF0 {
-		mask := rune(x) << 31 >> 31; // NOTE(bill): Create 0x0000 or 0xffff.
+		var mask = rune(x) << 31 >> 31; // NOTE(bill): Create 0x0000 or 0xffff.
 		return rune(s[0])&~mask | RUNE_ERROR&mask, 1;
 	}
-	sz := x & 7;
-	accept := accept_ranges[x>>4];
+	var sz = x & 7;
+	var accept = accept_ranges[x>>4];
 	if n < int(sz) {
 		return RUNE_ERROR, 1;
 	}
-	b1 := s[1];
+	var b1 = s[1];
 	if b1 < accept.lo || accept.hi < b1 {
 		return RUNE_ERROR, 1;
 	}
 	if sz == 2 {
 		return rune(s0&MASK2)<<6 | rune(b1&MASKX), 2;
 	}
-	b2 := s[2];
+	var b2 = s[2];
 	if b2 < LOCB || HICB < b2 {
 		return RUNE_ERROR, 1;
 	}
 	if sz == 3 {
 		return rune(s0&MASK3)<<12 | rune(b1&MASKX)<<6 | rune(b2&MASKX), 3;
 	}
-	b3 := s[3];
+	var b3 = s[3];
 	if b3 < LOCB || HICB < b3 {
 		return RUNE_ERROR, 1;
 	}
@@ -132,11 +132,11 @@ decode_rune :: proc(s: []u8) -> (rune, int) {
 
 
 
-decode_last_rune :: proc(s: string) -> (rune, int) #inline { return decode_last_rune([]u8(s)); }
-decode_last_rune :: proc(s: []u8) -> (rune, int) {
-	r: rune;
-	size: int;
-	start, end, limit: int;
+const decode_last_rune = proc(s: string) -> (rune, int) #inline { return decode_last_rune([]u8(s)); }
+const decode_last_rune = proc(s: []u8) -> (rune, int) {
+	var r: rune;
+	var size: int;
+	var start, end, limit: int;
 
 	end = len(s);
 	if end == 0 {
@@ -171,7 +171,7 @@ decode_last_rune :: proc(s: []u8) -> (rune, int) {
 
 
 
-valid_rune :: proc(r: rune) -> bool {
+const valid_rune = proc(r: rune) -> bool {
 	if r < 0 {
 		return false;
 	} else if SURROGATE_MIN <= r && r <= SURROGATE_MAX {
@@ -182,32 +182,32 @@ valid_rune :: proc(r: rune) -> bool {
 	return true;
 }
 
-valid_string :: proc(s: string) -> bool {
-	n := len(s);
-	for i := 0; i < n; {
-		si := s[i];
+const valid_string = proc(s: string) -> bool {
+	var n = len(s);
+	for var i = 0; i < n; {
+		var si = s[i];
 		if si < RUNE_SELF { // ascii
 			i++;
 			continue;
 		}
-		x := accept_sizes[si];
+		var x = accept_sizes[si];
 		if x == 0xf1 {
 			return false;
 		}
-		size := int(x & 7);
+		var size = int(x & 7);
 		if i+size > n {
 			return false;
 		}
-		ar := accept_ranges[x>>4];
-		if b := s[i+1]; b < ar.lo || ar.hi < b {
+		var ar = accept_ranges[x>>4];
+		if var b = s[i+1]; b < ar.lo || ar.hi < b {
 			return false;
 		} else if size == 2 {
 			// Okay
-		} else if b := s[i+2]; b < 0x80 || 0xbf < b {
+		} else if var b = s[i+2]; b < 0x80 || 0xbf < b {
 			return false;
 		} else if size == 3 {
 			// Okay
-		} else if b := s[i+3]; b < 0x80 || 0xbf < b {
+		} else if var b = s[i+3]; b < 0x80 || 0xbf < b {
 			return false;
 		}
 		i += size;
@@ -215,40 +215,40 @@ valid_string :: proc(s: string) -> bool {
 	return true;
 }
 
-rune_start :: proc(b: u8) -> bool #inline { return b&0xc0 != 0x80; }
+const rune_start = proc(b: u8) -> bool #inline { return b&0xc0 != 0x80; }
 
-rune_count :: proc(s: string) -> int #inline { return rune_count([]u8(s)); }
-rune_count :: proc(s: []u8) -> int {
-	count := 0;
-	n := len(s);
+const rune_count = proc(s: string) -> int #inline { return rune_count([]u8(s)); }
+const rune_count = proc(s: []u8) -> int {
+	var count = 0;
+	var n = len(s);
 
-	for i := 0; i < n; {
+	for var i = 0; i < n; {
 		defer count++;
-		si := s[i];
+		var si = s[i];
 		if si < RUNE_SELF { // ascii
 			i++;
 			continue;
 		}
-		x := accept_sizes[si];
+		var x = accept_sizes[si];
 		if x == 0xf1 {
 			i++;
 			continue;
 		}
-		size := int(x & 7);
+		var size = int(x & 7);
 		if i+size > n {
 			i++;
 			continue;
 		}
-		ar := accept_ranges[x>>4];
-		if b := s[i+1]; b < ar.lo || ar.hi < b {
+		var ar = accept_ranges[x>>4];
+		if var b = s[i+1]; b < ar.lo || ar.hi < b {
 			size = 1;
 		} else if size == 2 {
 			// Okay
-		} else if b := s[i+2]; b < 0x80 || 0xbf < b {
+		} else if var b = s[i+2]; b < 0x80 || 0xbf < b {
 			size = 1;
 		} else if size == 3 {
 			// Okay
-		} else if b := s[i+3]; b < 0x80 || 0xbf < b {
+		} else if var b = s[i+3]; b < 0x80 || 0xbf < b {
 			size = 1;
 		}
 		i += size;
@@ -257,7 +257,7 @@ rune_count :: proc(s: []u8) -> int {
 }
 
 
-rune_size :: proc(r: rune) -> int {
+const rune_size = proc(r: rune) -> int {
 	match {
 	case r < 0:          return -1;
 	case r <= 1<<7  - 1: return 1;

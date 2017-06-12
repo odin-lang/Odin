@@ -1451,7 +1451,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 		case_end;
 
 		case_ast_node(vd, ValueDecl, decl);
-			if (vd->is_var) {
+			if (vd->token.kind == Token_var) {
 				if (!c->context.scope->is_file) {
 					// NOTE(bill): local scope -> handle later and in order
 					break;

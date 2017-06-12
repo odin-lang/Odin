@@ -298,11 +298,11 @@ AST_NODE_KIND(_StmtEnd,        "", i32) \
 AST_NODE_KIND(_DeclBegin,      "", i32) \
 	AST_NODE_KIND(BadDecl,     "bad declaration",     struct { Token begin, end; }) \
 	AST_NODE_KIND(ValueDecl, "value declaration", struct { \
-		bool         is_var; \
+		Token            token; \
 		Array<AstNode *> names;  \
-		AstNode *    type;   \
+		AstNode *        type;   \
 		Array<AstNode *> values; \
-		u32          flags;  \
+		u32              flags;  \
 	}) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
 		Token     token;        \
@@ -525,10 +525,10 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_PushContext:   return node->PushContext.token;
 
 	case AstNode_BadDecl:        return node->BadDecl.begin;
-	case AstNode_ValueDecl:      return ast_node_token(node->ValueDecl.names[0]);
+	case AstNode_ValueDecl:      return node->ValueDecl.token;
 	case AstNode_ImportDecl:     return node->ImportDecl.token;
 	case AstNode_ForeignLibrary: return node->ForeignLibrary.token;
-	case AstNode_Label:      return node->Label.token;
+	case AstNode_Label:          return node->Label.token;
 
 
 	case AstNode_Field:
@@ -1412,9 +1412,9 @@ AstNode *ast_map_type(AstFile *f, Token token, AstNode *count, AstNode *key, Ast
 }
 
 
-AstNode *ast_value_decl(AstFile *f, bool is_var, Array<AstNode *> names, AstNode *type, Array<AstNode *> values) {
+AstNode *ast_value_decl(AstFile *f, Token token, Array<AstNode *> names, AstNode *type, Array<AstNode *> values) {
 	AstNode *result = make_ast_node(f, AstNode_ValueDecl);
-	result->ValueDecl.is_var = is_var;
+	result->ValueDecl.token  = token;
 	result->ValueDecl.names  = names;
 	result->ValueDecl.type   = type;
 	result->ValueDecl.values = values;
@@ -1646,7 +1646,7 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 		return s->ProcLit.body != NULL;
 
 	case AstNode_ValueDecl:
-		if (!s->ValueDecl.is_var) {
+		if (s->ValueDecl.token.kind != Token_var) {
 			if (s->ValueDecl.values.count > 0) {
 				AstNode *last = s->ValueDecl.values[s->ValueDecl.values.count-1];
 				return is_semicolon_optional_for_node(f, last);
@@ -2023,6 +2023,11 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		return ast_paren_expr(f, operand, open, close);
 	}
 
+	case Token_type: {
+		Token token = expect_token(f, Token_type);
+		return ast_helper_type(f, token, parse_type(f));
+	}
+
 	case Token_Hash: {
 		Token token = expect_token(f, Token_Hash);
 		Token name  = expect_token(f, Token_Ident);
@@ -2037,7 +2042,6 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		} else if (name.string == "file") { return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "line") { return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "procedure") { return ast_basic_directive(f, token, name.string);
-		} else if (name.string == "type") { return ast_helper_type(f, token, parse_type(f));
 		} else if (!lhs && name.string == "alias") { return ast_alias(f, token, parse_expr(f, false));
 		} else {
 			operand = ast_tag_expr(f, token, name, parse_expr(f, false));
@@ -2476,13 +2480,14 @@ AstNode *parse_type(AstFile *f) {
 }
 
 
-AstNode *parse_value_decl(AstFile *f, Array<AstNode *> lhs) {
+AstNode *parse_value_decl(AstFile *f, Token token) {
+	Array<AstNode *> lhs = parse_lhs_expr_list(f);
 	AstNode *type = NULL;
 	Array<AstNode *> values = {};
-	bool is_mutable = true;
+	bool is_mutable = token.kind == Token_var;
 
 	if (allow_token(f, Token_Colon)) {
-		type = parse_type_attempt(f);
+		type = parse_type(f);
 	} else if (f->curr_token.kind != Token_Eq &&
 	           f->curr_token.kind != Token_Semicolon) {
 		syntax_error(f->curr_token, "Expected a type separator `:` or `=`");
@@ -2490,9 +2495,6 @@ AstNode *parse_value_decl(AstFile *f, Array<AstNode *> lhs) {
 
 
 	switch (f->curr_token.kind) {
-	case Token_Colon:
-		is_mutable = false;
-		/*fallthrough*/
 	case Token_Eq:
 		next_token(f);
 		values = parse_rhs_expr_list(f);
@@ -2524,14 +2526,25 @@ AstNode *parse_value_decl(AstFile *f, Array<AstNode *> lhs) {
 
 	Array<AstNode *> specs = {};
 	array_init(&specs, heap_allocator(), 1);
-	return ast_value_decl(f, is_mutable, lhs, type, values);
+	// Token token = ast_node_token(lhs[0]);
+	// token.kind = is_mutable ? Token_var : Token_const;
+	// token.string = is_mutable ? str_lit("var") : str_lit("const");
+	return ast_value_decl(f, token, lhs, type, values);
 }
 
 
 
 AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
-	Array<AstNode *> lhs = parse_lhs_expr_list(f);
 	Token token = f->curr_token;
+	switch (f->curr_token.kind) {
+	case Token_var:
+	case Token_const:
+		next_token(f);
+		return parse_value_decl(f, token);
+	}
+
+	Array<AstNode *> lhs = parse_lhs_expr_list(f);
+	token = f->curr_token;
 	switch (token.kind) {
 	case Token_Eq:
 	case Token_AddEq:
@@ -2604,7 +2617,7 @@ AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 			}
 		}
 
-		return parse_value_decl(f, lhs);
+		// return parse_value_decl(f, lhs);
 	}
 
 	if (lhs.count > 1) {
@@ -3621,6 +3634,13 @@ AstNode *parse_stmt(AstFile *f) {
 		expect_semicolon(f, s);
 		return s;
 
+	case Token_var:
+	case Token_const:
+		s = parse_simple_stmt(f, StmtAllowFlag_None);
+		expect_semicolon(f, s);
+		return s;
+
+
 	case Token_if:     return parse_if_stmt(f);
 	case Token_when:   return parse_when_stmt(f);
 	case Token_for:    return parse_for_stmt(f);
@@ -3659,12 +3679,15 @@ AstNode *parse_stmt(AstFile *f) {
 			return ast_using_stmt(f, token, list);
 		}
 
-		AstNode *decl = parse_value_decl(f, list);
+		Token var = ast_node_token(list[0]);
+		var.kind = Token_var;
+		var.string = str_lit("var");
+		AstNode *decl = parse_value_decl(f, var);
 		expect_semicolon(f, decl);
 
 		if (decl->kind == AstNode_ValueDecl) {
 			#if 1
-			if (!decl->ValueDecl.is_var) {
+			if (decl->ValueDecl.token.kind != Token_var) {
 				syntax_error(token, "`using` may not be applied to constant declarations");
 				return decl;
 			}
@@ -3689,7 +3712,7 @@ AstNode *parse_stmt(AstFile *f) {
 		AstNode *node = parse_stmt(f);
 
 		if (node->kind == AstNode_ValueDecl) {
-			if (!node->ValueDecl.is_var) {
+			if (node->ValueDecl.token.kind != Token_var) {
 				syntax_error(token, "`immutable` may not be applied to constant declarations");
 			} else {
 				node->ValueDecl.flags |= VarDeclFlag_immutable;
@@ -3861,7 +3884,7 @@ AstNode *parse_stmt(AstFile *f) {
 			AstNode *s = parse_stmt(f);
 
 			if (s->kind == AstNode_ValueDecl) {
-				if (!s->ValueDecl.is_var) {
+				if (s->ValueDecl.token.kind != Token_var) {
 					syntax_error(token, "`thread_local` may not be applied to constant declarations");
 				}
 				if (f->curr_proc != NULL) {

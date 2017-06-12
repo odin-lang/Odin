@@ -1,36 +1,36 @@
 #shared_global_scope;
 
-__u128_mod :: proc(a, b: u128) -> u128 #cc_odin #link_name "__umodti3" {
-	r: u128;
+const __u128_mod = proc(a, b: u128) -> u128 #cc_odin #link_name "__umodti3" {
+	var r: u128;
 	__u128_quo_mod(a, b, &r);
 	return r;
 }
 
-__u128_quo :: proc(a, b: u128) -> u128 #cc_odin #link_name "__udivti3" {
+const __u128_quo = proc(a, b: u128) -> u128 #cc_odin #link_name "__udivti3" {
 	return __u128_quo_mod(a, b, nil);
 }
 
-__i128_mod :: proc(a, b: i128) -> i128 #cc_odin #link_name "__modti3" {
-	r: i128;
+const __i128_mod = proc(a, b: i128) -> i128 #cc_odin #link_name "__modti3" {
+	var r: i128;
 	__i128_quo_mod(a, b, &r);
 	return r;
 }
 
-__i128_quo :: proc(a, b: i128) -> i128 #cc_odin #link_name "__divti3" {
+const __i128_quo = proc(a, b: i128) -> i128 #cc_odin #link_name "__divti3" {
 	return __i128_quo_mod(a, b, nil);
 }
 
-__i128_quo_mod :: proc(a, b: i128, rem: ^i128) -> (quo: i128) #cc_odin #link_name "__divmodti4" {
-	s: i128;
+const __i128_quo_mod = proc(a, b: i128, rem: ^i128) -> (quo: i128) #cc_odin #link_name "__divmodti4" {
+	var s: i128;
 	s = b >> 127;
 	b = (b~s) - s;
 	s = a >> 127;
 	b = (a~s) - s;
 
-	uquo: u128;
-	urem := __u128_quo_mod(transmute(u128, a), transmute(u128, b), &uquo);
-	iquo := transmute(i128, uquo);
-	irem := transmute(i128, urem);
+	var uquo: u128;
+	var urem = __u128_quo_mod(transmute(u128, a), transmute(u128, b), &uquo);
+	var iquo = transmute(i128, uquo);
+	var irem = transmute(i128, urem);
 
 	iquo = (iquo~s) - s;
 	irem = (irem~s) - s;
@@ -39,15 +39,15 @@ __i128_quo_mod :: proc(a, b: i128, rem: ^i128) -> (quo: i128) #cc_odin #link_nam
 }
 
 
-__u128_quo_mod :: proc(a, b: u128, rem: ^u128) -> (quo: u128) #cc_odin #link_name "__udivmodti4" {
-	alo, ahi := u64(a), u64(a>>64);
-	blo, bhi := u64(b), u64(b>>64);
+const __u128_quo_mod = proc(a, b: u128, rem: ^u128) -> (quo: u128) #cc_odin #link_name "__udivmodti4" {
+	var alo, ahi = u64(a), u64(a>>64);
+	var blo, bhi = u64(b), u64(b>>64);
 	if b == 0 {
 		if rem != nil { rem^ = 0; }
 		return u128(alo/blo);
 	}
 
-	r, d, x, q: u128 = a, b, 1, 0;
+	var r, d, x, q: u128 = a, b, 1, 0;
 
 	for r >= d && (d>>127)&1 == 0 {
 		x <<= 1;
@@ -68,10 +68,10 @@ __u128_quo_mod :: proc(a, b: u128, rem: ^u128) -> (quo: u128) #cc_odin #link_nam
 }
 
 /*
-__f16_to_f32 :: proc(f: f16) -> f32 #cc_odin #no_inline #link_name "__gnu_h2f_ieee" {
+const __f16_to_f32 = proc(f: f16) -> f32 #cc_odin #no_inline #link_name "__gnu_h2f_ieee" {
 	when true {
 		// Source: https://fgiesen.wordpress.com/2012/03/28/half-to-float-done-quic/
-		FP32 :: raw_union {u: u32, f: f32};
+		const FP32 = raw_union {u: u32, f: f32};
 
 		magic, was_infnan: FP32;
 		magic.u = (254-15) << 23;
@@ -92,19 +92,19 @@ __f16_to_f32 :: proc(f: f16) -> f32 #cc_odin #no_inline #link_name "__gnu_h2f_ie
 		return 0;
 	}
 }
-__f32_to_f16 :: proc(f_: f32) -> f16 #cc_odin #no_inline #link_name "__gnu_f2h_ieee" {
+const __f32_to_f16 = proc(f_: f32) -> f16 #cc_odin #no_inline #link_name "__gnu_f2h_ieee" {
 	when false {
 		// Source: https://gist.github.com/rygorous/2156668
-		FP16 :: raw_union {u: u16, f: f16};
-		FP32 :: raw_union {u: u32, f: f32};
+		const FP16 = raw_union {u: u16, f: f16};
+		const FP32 = raw_union {u: u32, f: f32};
 
 		f32infty, f16infty, magic: FP32;
 		f32infty.u = 255<<23;
 		f16infty.u =  31<<23;
 		magic.u    =  15<<23;
 
-		sign_mask :: u32(0x80000000);
-		round_mask :: ~u32(0x0fff);
+		const sign_mask = u32(0x80000000);
+		const round_mask = ~u32(0x0fff);
 
 		f := transmute(FP32, f_);
 
@@ -182,11 +182,11 @@ __f32_to_f16 :: proc(f_: f32) -> f16 #cc_odin #no_inline #link_name "__gnu_f2h_i
 	}
 }
 
-__f64_to_f16 :: proc(f: f64) -> f16 #cc_odin #no_inline #link_name "__truncdfhf2" {
+const __f64_to_f16 = proc(f: f64) -> f16 #cc_odin #no_inline #link_name "__truncdfhf2" {
 	return __f32_to_f16(f32(f));
 }
 
-__f16_to_f64 :: proc(f: f16) -> f64 #cc_odin #no_inline {
+const __f16_to_f64 = proc(f: f16) -> f64 #cc_odin #no_inline {
 	return f64(__f16_to_f32(f));
 }
 */
