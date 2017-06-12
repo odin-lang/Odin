@@ -14,9 +14,6 @@ import (
 	"utf16.odin";
 )
 
-
 proc main() {
-	proc(s: string){
-		fmt.println(s, "world!");
-	}("Hellope");
+	fmt.println("Hellope!");
 }

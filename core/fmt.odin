@@ -583,8 +583,10 @@ proc _fmt_int(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, 
 	_pad(fi, s);
 }
 
-let __DIGITS_LOWER = "0123456789abcdefx";
-let __DIGITS_UPPER = "0123456789ABCDEFX";
+let (
+	__DIGITS_LOWER = "0123456789abcdefx";
+	__DIGITS_UPPER = "0123456789ABCDEFX";
+)
 
 proc fmt_rune(fi: ^FmtInfo, r: rune, verb: rune) {
 	match verb {
@@ -732,10 +734,13 @@ proc fmt_enum(fi: ^FmtInfo, v: any, verb: rune) {
 		case 'd', 'f':
 			fmt_arg(fi, any{v.data, type_info_base(e.base)}, verb);
 		case 's', 'v':
-			var i: i128;
-			var f: f64;
-			var ok = false;
-			var a = any{v.data, type_info_base(e.base)};
+			var (
+				i:  i128;
+				f:  f64;
+				ok: bool;
+				a:  any;
+			)
+			a = any{v.data, type_info_base(e.base)};
 			match v in a {
 			case rune:  i = i128(v);
 			case i8:   i = i128(v);
@@ -810,6 +815,7 @@ proc fmt_value(fi: ^FmtInfo, v: any, verb: rune) {
 				}
 				write_string(fi.buf, b.names[i]);
 				write_string(fi.buf, " = ");
+
 				var data = ^u8(v.data) + b.offsets[i];
 				fmt_arg(fi, any{rawptr(data), b.types[i]}, 'v');
 			}
@@ -892,19 +898,20 @@ proc fmt_value(fi: ^FmtInfo, v: any, verb: rune) {
 
 		write_string(fi.buf, "map[");
 		defer write_byte(fi.buf, ']');
-		var entries = &(^raw.DynamicMap(v.data).entries);
-		var gs = type_info_base(info.generated_struct).(^Struct);
-		var ed = type_info_base(gs.types[1]).(^DynamicArray);
-
-		var entry_type = ed.elem.(^Struct);
-		var entry_size = ed.elem_size;
+		var (
+			entries    = &(^raw.DynamicMap(v.data).entries);
+			gs         = type_info_base(info.generated_struct).(^Struct);
+			ed         = type_info_base(gs.types[1]).(^DynamicArray);
+			entry_type = ed.elem.(^Struct);
+			entry_size = ed.elem_size;
+		)
 		for i in 0..<entries.len {
 			if i > 0 {
 				write_string(fi.buf, ", ");
 			}
 			var data = ^u8(entries.data) + i*entry_size;
-
 			var header = ^__MapEntryHeader(data);
+
 			if types.is_string(info.key) {
 				write_string(fi.buf, header.key.str);
 			} else {
@@ -939,7 +946,6 @@ proc fmt_value(fi: ^FmtInfo, v: any, verb: rune) {
 		defer write_byte(fi.buf, '}');
 
 		var cf = info.common_fields;
-
 		for _, i in cf.names {
 			if i > 0 {
 				write_string(fi.buf, ", ");
@@ -966,8 +972,7 @@ proc fmt_value(fi: ^FmtInfo, v: any, verb: rune) {
 proc fmt_complex(fi: ^FmtInfo, c: complex128, bits: int, verb: rune) {
 	match verb {
 	case 'f', 'F', 'v':
-		var r = real(c);
-		var i = imag(c);
+		var r, i = real(c), imag(c);
 		fmt_float(fi, r, bits/2, verb);
 		if !fi.plus && i >= 0 {
 			write_rune(fi.buf, '+');
@@ -1046,9 +1051,10 @@ proc fmt_arg(fi: ^FmtInfo, arg: any, verb: rune) {
 
 proc sbprint(buf: ^StringBuffer, args: ..any) -> string {
 	var fi: FmtInfo;
+	var prev_string = false;
+
 	fi.buf = buf;
 
-	var prev_string = false;
 	for arg, i in args {
 		var is_string = arg != nil && types.is_string(arg.type_info);
 		if i > 0 && !is_string && !prev_string {
@@ -1075,10 +1081,12 @@ proc sbprintln(buf: ^StringBuffer, args: ..any) -> string {
 }
 
 proc sbprintf(b: ^StringBuffer, fmt: string, args: ..any) -> string {
-	var fi = FmtInfo{};
-	var end = len(fmt);
-	var arg_index = 0;
-	var was_prev_index = false;
+	var (
+		end            = len(fmt);
+		arg_index: int = 0;
+		was_prev_index = false;
+		fi: FmtInfo;
+	)
 	for var i = 0; i < end; /**/ {
 		fi = FmtInfo{buf = b, good_arg_index = true};
 

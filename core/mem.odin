@@ -80,18 +80,19 @@ proc allocation_header(data: rawptr) -> ^AllocationHeader {
 
 
 // Custom allocators
-type Arena struct {
-	backing:    Allocator,
-	offset:     int,
-	memory:     []u8,
-	temp_count: int,
-}
+type (
+	Arena struct {
+		backing:    Allocator,
+		offset:     int,
+		memory:     []u8,
+		temp_count: int,
+	}
 
-type ArenaTempMemory struct {
-	arena:          ^Arena,
-	original_count: int,
-}
-
+	ArenaTempMemory struct {
+		arena:          ^Arena,
+		original_count: int,
+	}
+)
 
 
 

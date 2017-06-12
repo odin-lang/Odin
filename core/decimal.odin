@@ -78,8 +78,7 @@ proc assign(a: ^Decimal, i: u64) {
 	trim(a);
 }
 
-const uint_size = 8*size_of(uint);
-const max_shift = uint_size-4;
+
 
 proc shift_right(a: ^Decimal, k: uint) {
 	var r = 0; // read index
@@ -171,6 +170,11 @@ proc shift_left(a: ^Decimal, k: uint) {
 }
 
 proc shift(a: ^Decimal, k: int) {
+	const (
+		uint_size = 8*size_of(uint);
+		max_shift = uint_size-4;
+	)
+
 	match {
 	case a.count == 0:
 		// no need to update

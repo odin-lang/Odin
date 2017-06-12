@@ -3125,7 +3125,8 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 		next_token(f);
 	}
 
-	if (f->curr_token.kind == Token_Colon) {
+	if (f->curr_token.kind == Token_Colon ||
+	    f->curr_token.kind == Token_Eq) {
 		Array<AstNode *> names = convert_to_ident_list(f, list, true); // Copy for semantic reasons
 		if (names.count == 0) {
 			syntax_error(f->curr_token, "Empty field declaration");
@@ -3137,11 +3138,11 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 		set_flags = check_field_prefixes(f, names.count, allowed_flags, set_flags);
 		total_name_count += names.count;
 
-		expect_token_after(f, Token_Colon, "field list");
 		AstNode *type = NULL;
 		AstNode *default_value = NULL;
 
 		if (f->curr_token.kind != Token_Eq) {
+			expect_token_after(f, Token_Colon, "field list");
 			type = parse_var_type(f, allow_ellipsis);
 		}
 		if (allow_token(f, Token_Eq)) {
@@ -3172,10 +3173,10 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 			set_flags = check_field_prefixes(f, names.count, allowed_flags, set_flags);
 			total_name_count += names.count;
 
-			expect_token_after(f, Token_Colon, "field list");
 			AstNode *type = NULL;
 			AstNode *default_value = NULL;
 			if (f->curr_token.kind != Token_Eq) {
+				expect_token_after(f, Token_Colon, "field list");
 				type = parse_var_type(f, allow_ellipsis);
 			}
 			if (allow_token(f, Token_Eq)) {

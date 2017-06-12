@@ -22,7 +22,7 @@ type (
 	Vec3 [vector 3]f32;
 	Vec4 [vector 4]f32;
 
-// Column major
+	// Column major
 	Mat2 [2][2]f32;
 	Mat3 [3][3]f32;
 	Mat4 [4][4]f32;
@@ -88,16 +88,18 @@ proc remainder(x, y: f32) -> f32 { return x - round(x/y) * y; }
 proc remainder(x, y: f64) -> f64 { return x - round(x/y) * y; }
 
 proc mod(x, y: f32) -> f32 {
+	var result: f32;
 	y = abs(y);
-	var result = remainder(abs(x), y);
+	result = remainder(abs(x), y);
 	if sign(result) < 0 {
 		result += y;
 	}
 	return copy_sign(result, x);
 }
 proc mod(x, y: f64) -> f64 {
+	var result: f64;
 	y = abs(y);
-	var result = remainder(abs(x), y);
+	result = remainder(abs(x), y);
 	if sign(result) < 0 {
 		result += y;
 	}
@@ -198,25 +200,27 @@ proc mul(m: Mat4, v: Vec4) -> Vec4 {
 proc inverse(m: Mat4) -> Mat4 {
 	var o: Mat4;
 
-	var sf00 = m[2][2] * m[3][3] - m[3][2] * m[2][3];
-	var sf01 = m[2][1] * m[3][3] - m[3][1] * m[2][3];
-	var sf02 = m[2][1] * m[3][2] - m[3][1] * m[2][2];
-	var sf03 = m[2][0] * m[3][3] - m[3][0] * m[2][3];
-	var sf04 = m[2][0] * m[3][2] - m[3][0] * m[2][2];
-	var sf05 = m[2][0] * m[3][1] - m[3][0] * m[2][1];
-	var sf06 = m[1][2] * m[3][3] - m[3][2] * m[1][3];
-	var sf07 = m[1][1] * m[3][3] - m[3][1] * m[1][3];
-	var sf08 = m[1][1] * m[3][2] - m[3][1] * m[1][2];
-	var sf09 = m[1][0] * m[3][3] - m[3][0] * m[1][3];
-	var sf10 = m[1][0] * m[3][2] - m[3][0] * m[1][2];
-	var sf11 = m[1][1] * m[3][3] - m[3][1] * m[1][3];
-	var sf12 = m[1][0] * m[3][1] - m[3][0] * m[1][1];
-	var sf13 = m[1][2] * m[2][3] - m[2][2] * m[1][3];
-	var sf14 = m[1][1] * m[2][3] - m[2][1] * m[1][3];
-	var sf15 = m[1][1] * m[2][2] - m[2][1] * m[1][2];
-	var sf16 = m[1][0] * m[2][3] - m[2][0] * m[1][3];
-	var sf17 = m[1][0] * m[2][2] - m[2][0] * m[1][2];
-	var sf18 = m[1][0] * m[2][1] - m[2][0] * m[1][1];
+	var (
+		sf00 = m[2][2] * m[3][3] - m[3][2] * m[2][3];
+		sf01 = m[2][1] * m[3][3] - m[3][1] * m[2][3];
+		sf02 = m[2][1] * m[3][2] - m[3][1] * m[2][2];
+		sf03 = m[2][0] * m[3][3] - m[3][0] * m[2][3];
+		sf04 = m[2][0] * m[3][2] - m[3][0] * m[2][2];
+		sf05 = m[2][0] * m[3][1] - m[3][0] * m[2][1];
+		sf06 = m[1][2] * m[3][3] - m[3][2] * m[1][3];
+		sf07 = m[1][1] * m[3][3] - m[3][1] * m[1][3];
+		sf08 = m[1][1] * m[3][2] - m[3][1] * m[1][2];
+		sf09 = m[1][0] * m[3][3] - m[3][0] * m[1][3];
+		sf10 = m[1][0] * m[3][2] - m[3][0] * m[1][2];
+		sf11 = m[1][1] * m[3][3] - m[3][1] * m[1][3];
+		sf12 = m[1][0] * m[3][1] - m[3][0] * m[1][1];
+		sf13 = m[1][2] * m[2][3] - m[2][2] * m[1][3];
+		sf14 = m[1][1] * m[2][3] - m[2][1] * m[1][3];
+		sf15 = m[1][1] * m[2][2] - m[2][1] * m[1][2];
+		sf16 = m[1][0] * m[2][3] - m[2][0] * m[1][3];
+		sf17 = m[1][0] * m[2][2] - m[2][0] * m[1][2];
+		sf18 = m[1][0] * m[2][1] - m[2][0] * m[1][1];
+	)
 
 	o[0][0] = +(m[1][1] * sf00 - m[1][2] * sf01 + m[1][3] * sf02);
 	o[0][1] = -(m[1][0] * sf00 - m[1][2] * sf03 + m[1][3] * sf04);
@@ -274,13 +278,15 @@ proc mat4_translate(v: Vec3) -> Mat4 {
 }
 
 proc mat4_rotate(v: Vec3, angle_radians: f32) -> Mat4 {
-	var c = cos(angle_radians);
-	var s = sin(angle_radians);
+	var (
+		c = cos(angle_radians);
+		s = sin(angle_radians);
 
-	var a = norm(v);
-	var t = a * (1-c);
+		a = norm(v);
+		t = a * (1-c);
 
-	var rot = mat4_identity();
+		rot = mat4_identity();
+	)
 
 	rot[0][0] = c + t.x*a.x;
 	rot[0][1] = 0 + t.x*a.y + s*a.z;
@@ -316,9 +322,11 @@ proc scale(m: Mat4, s: f32) -> Mat4 {
 
 
 proc look_at(eye, centre, up: Vec3) -> Mat4 {
-	var f = norm(centre - eye);
-	var s = norm(cross(f, up));
-	var u = cross(s, f);
+	var (
+		f = norm(centre - eye);
+		s = norm(cross(f, up));
+		u = cross(s, f);
+	)
 
 	return Mat4{
 		{+s.x, +u.x, -f.x, 0},
@@ -329,8 +337,10 @@ proc look_at(eye, centre, up: Vec3) -> Mat4 {
 }
 
 proc perspective(fovy, aspect, near, far: f32) -> Mat4 {
-	var m: Mat4;
-	var tan_half_fovy = tan(0.5 * fovy);
+	var (
+		m: Mat4;
+		tan_half_fovy = tan(0.5 * fovy);
+	)
 	m[0][0] = 1.0 / (aspect*tan_half_fovy);
 	m[1][1] = 1.0 / (tan_half_fovy);
 	m[2][2] = -(far + near) / (far - near);
@@ -354,29 +364,30 @@ proc ortho3d(left, right, bottom, top, near, far: f32) -> Mat4 {
 
 
 
+const (
+	F32_DIG        = 6;
+	F32_EPSILON    = 1.192092896e-07;
+	F32_GUARD      = 0;
+	F32_MANT_DIG   = 24;
+	F32_MAX        = 3.402823466e+38;
+	F32_MAX_10_EXP = 38;
+	F32_MAX_EXP    = 128;
+	F32_MIN        = 1.175494351e-38;
+	F32_MIN_10_EXP = -37;
+	F32_MIN_EXP    = -125;
+	F32_NORMALIZE  = 0;
+	F32_RADIX      = 2;
+	F32_ROUNDS     = 1;
 
-const F32_DIG        = 6;
-const F32_EPSILON    = 1.192092896e-07;
-const F32_GUARD      = 0;
-const F32_MANT_DIG   = 24;
-const F32_MAX        = 3.402823466e+38;
-const F32_MAX_10_EXP = 38;
-const F32_MAX_EXP    = 128;
-const F32_MIN        = 1.175494351e-38;
-const F32_MIN_10_EXP = -37;
-const F32_MIN_EXP    = -125;
-const F32_NORMALIZE  = 0;
-const F32_RADIX      = 2;
-const F32_ROUNDS     = 1;
-
-const F64_DIG        = 15;                       // # of decimal digits of precision
-const F64_EPSILON    = 2.2204460492503131e-016;  // smallest such that 1.0+F64_EPSILON != 1.0
-const F64_MANT_DIG   = 53;                       // # of bits in mantissa
-const F64_MAX        = 1.7976931348623158e+308;  // max value
-const F64_MAX_10_EXP = 308;                      // max decimal exponent
-const F64_MAX_EXP    = 1024;                     // max binary exponent
-const F64_MIN        = 2.2250738585072014e-308;  // min positive value
-const F64_MIN_10_EXP = -307;                     // min decimal exponent
-const F64_MIN_EXP    = -1021;                    // min binary exponent
-const F64_RADIX      = 2;                        // exponent radix
-const F64_ROUNDS     = 1;                        // addition rounding: near
+	F64_DIG        = 15;                       // # of decimal digits of precision
+	F64_EPSILON    = 2.2204460492503131e-016;  // smallest such that 1.0+F64_EPSILON != 1.0
+	F64_MANT_DIG   = 53;                       // # of bits in mantissa
+	F64_MAX        = 1.7976931348623158e+308;  // max value
+	F64_MAX_10_EXP = 308;                      // max decimal exponent
+	F64_MAX_EXP    = 1024;                     // max binary exponent
+	F64_MIN        = 2.2250738585072014e-308;  // min positive value
+	F64_MIN_10_EXP = -307;                     // min decimal exponent
+	F64_MIN_EXP    = -1021;                    // min binary exponent
+	F64_RADIX      = 2;                        // exponent radix
+	F64_ROUNDS     = 1;                        // addition rounding: near
+)

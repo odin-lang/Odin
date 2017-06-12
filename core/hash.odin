@@ -46,13 +46,17 @@ proc fnv64a(data: []u8) -> u64 {
 }
 
 proc murmur32(data: []u8) -> u32 {
-	const c1_32: u32 = 0xcc9e2d51;
-	const c2_32: u32 = 0x1b873593;
+	const (
+		c1_32: u32 = 0xcc9e2d51;
+		c2_32: u32 = 0x1b873593;
+	)
 
-	var h1: u32 = 0;
-	var nblocks = len(data)/4;
-	var p = &data[0];
-	var p1 = p + 4*nblocks;
+	var (
+		h1: u32 = 0;
+		nblocks = len(data)/4;
+		p = &data[0];
+		p1 = p + 4*nblocks;
+	)
 
 	for ; p < p1; p += 4 {
 		var k1 = ^u32(p)^;
@@ -67,7 +71,6 @@ proc murmur32(data: []u8) -> u32 {
 	}
 
 	var tail = data[nblocks*4 ..];
-
 	var k1: u32;
 	match len(tail)&3 {
 	case 3:
@@ -99,8 +102,10 @@ proc murmur64(data: []u8) -> u64 {
 	const SEED = 0x9747b28c;
 
 	when size_of(int) == 8 {
-		const m = 0xc6a4a7935bd1e995;
-		const r = 47;
+		const (
+			m = 0xc6a4a7935bd1e995;
+			r = 47;
+		)
 
 		var h: u64 = SEED ~ (u64(len(data)) * m);
 		var data64 = slice_ptr(^u64(&data[0]), len(data)/size_of(u64));
@@ -134,16 +139,19 @@ proc murmur64(data: []u8) -> u64 {
 
 		return h;
 	} else {
-		const m = 0x5bd1e995;
-		const r = 24;
+		const (
+			m = 0x5bd1e995;
+			r = 24;
+		)
 
-		var h1 = u32(SEED) ~ u32(len(data));
-		var h2 = u32(SEED) >> 32;
+		var (
+			h1 = u32(SEED) ~ u32(len(data));
+			h2 = u32(SEED) >> 32;
+			data32 = slice_ptr(^u32(&data[0]), len(data)/size_of(u32));
+			len = len(data);
+			i = 0;
+		)
 
-		var data32 = slice_ptr(cast(^u32)&data[0], len(data)/size_of(u32));
-		var len = len(data);
-
-		var i = 0;
 		for len >= 8 {
 			var k1, k2: u32;
 			k1 = data32[i]; i++;
@@ -197,8 +205,7 @@ proc murmur64(data: []u8) -> u64 {
 		h2 ~= h1>>19;
 		h2 *= m;
 
-		var h = cast(u64)(h1)<<32 | cast(u64)(h2);
-		return h;
+		return u64(h1)<<32 | u64(h2);
 	}
 }
 
