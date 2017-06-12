@@ -139,8 +139,6 @@ Array<AstNode *> make_ast_node_array(AstFile *f) {
 		AstNode *type;            \
 		AstNode *body;            \
 		u64      tags;            \
-		AstNode *foreign_library; \
-		String   foreign_name;    \
 		String   link_name;       \
 	}) \
 	AST_NODE_KIND(CompoundLit, "compound literal", struct { \
@@ -302,16 +300,13 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		AstNode *type;            \
 		AstNode *body;            \
 		u64      tags;            \
-		AstNode *foreign_library; \
-		String   foreign_name;    \
 		String   link_name;       \
 	}) \
-	AST_NODE_KIND(ForeignLibrarySpec, "foreign library specification", struct { \
-		Token    filepath;     \
-		Token    library_name; \
-		String   base_dir;     \
-		AstNode *cond;         \
-		bool     is_system;    \
+	AST_NODE_KIND(ForeignBlockDecl, "foreign block declaration", struct { \
+		Token            token;           \
+		AstNode *        foreign_library; \
+		Token            open, close;     \
+		Array<AstNode *> decls;           \
 	}) \
 	AST_NODE_KIND(Label, "label", struct { 	\
 		Token token; \
@@ -340,12 +335,19 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Token    import_name; \
 		AstNode *cond;        \
 	}) \
+	AST_NODE_KIND(ForeignLibrarySpec, "foreign library specification", struct { \
+		Token    filepath;     \
+		Token    library_name; \
+		String   base_dir;     \
+		AstNode *cond;         \
+		bool     is_system;    \
+	}) \
 AST_NODE_KIND(_DeclEnd,   "", i32) \
 	AST_NODE_KIND(Field, "field", struct { \
 		Array<AstNode *> names;            \
-		AstNode *    type;                 \
-		AstNode *    default_value;        \
-		u32          flags;                \
+		AstNode *        type;             \
+		AstNode *        default_value;    \
+		u32              flags;            \
 	}) \
 	AST_NODE_KIND(FieldList, "field list", struct { \
 		Token token; \
@@ -609,7 +611,6 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	case AstNode_ProcLit:
 		n->ProcLit.type = clone_ast_node(a, n->ProcLit.type);
 		n->ProcLit.body = clone_ast_node(a, n->ProcLit.body);
-		n->ProcLit.foreign_library = clone_ast_node(a, n->ProcLit.foreign_library);
 		break;
 	case AstNode_CompoundLit:
 		n->CompoundLit.type  = clone_ast_node(a, n->CompoundLit.type);
@@ -1040,13 +1041,11 @@ AstNode *ast_ellipsis(AstFile *f, Token token, AstNode *expr) {
 }
 
 
-AstNode *ast_proc_lit(AstFile *f, AstNode *type, AstNode *body, u64 tags, AstNode *foreign_library, String foreign_name, String link_name) {
+AstNode *ast_proc_lit(AstFile *f, AstNode *type, AstNode *body, u64 tags, String link_name) {
 	AstNode *result = make_ast_node(f, AstNode_ProcLit);
 	result->ProcLit.type = type;
 	result->ProcLit.body = body;
 	result->ProcLit.tags = tags;
-	result->ProcLit.foreign_library = foreign_library;
-	result->ProcLit.foreign_name = foreign_name;
 	result->ProcLit.link_name = link_name;
 	return result;
 }
@@ -1424,25 +1423,24 @@ AstNode *ast_map_type(AstFile *f, Token token, AstNode *count, AstNode *key, Ast
 
 
 AstNode *ast_proc_decl(AstFile *f, Token token, AstNode *name, AstNode *type, AstNode *body,
-                       u64 tags, AstNode *foreign_library, String foreign_name, String link_name) {
+                       u64 tags, String link_name) {
 	AstNode *result = make_ast_node(f, AstNode_ProcDecl);
 	result->ProcDecl.token           = token;
 	result->ProcDecl.name            = name;
 	result->ProcDecl.type            = type;
 	result->ProcDecl.body            = body;
 	result->ProcDecl.tags            = tags;
-	result->ProcDecl.foreign_library = foreign_library;
-	result->ProcDecl.foreign_name    = foreign_name;
 	result->ProcDecl.link_name       = link_name;
 	return result;
 }
 
-AstNode *ast_foreign_library_spec(AstFile *f, Token filepath, Token library_name, AstNode *cond, bool is_system) {
-	AstNode *result = make_ast_node(f, AstNode_ForeignLibrarySpec);
-	result->ForeignLibrarySpec.filepath = filepath;
-	result->ForeignLibrarySpec.library_name = library_name;
-	result->ForeignLibrarySpec.cond = cond;
-	result->ForeignLibrarySpec.is_system = is_system;
+AstNode *ast_foreign_block_decl(AstFile *f, Token token, AstNode *foreign_library, Token open, Token close, Array<AstNode *> decls) {
+	AstNode *result = make_ast_node(f, AstNode_ForeignBlockDecl);
+	result->ForeignBlockDecl.token           = token;
+	result->ForeignBlockDecl.foreign_library = foreign_library;
+	result->ForeignBlockDecl.open            = open;
+	result->ForeignBlockDecl.close           = close;
+	result->ForeignBlockDecl.decls           = decls;
 	return result;
 }
 
@@ -1483,6 +1481,15 @@ AstNode *ast_import_spec(AstFile *f, bool is_import, Token relpath, Token import
 	result->ImportSpec.relpath     = relpath;
 	result->ImportSpec.import_name = import_name;
 	result->ImportSpec.cond        = cond;
+	return result;
+}
+
+AstNode *ast_foreign_library_spec(AstFile *f, Token filepath, Token library_name, AstNode *cond, bool is_system) {
+	AstNode *result = make_ast_node(f, AstNode_ForeignLibrarySpec);
+	result->ForeignLibrarySpec.filepath = filepath;
+	result->ForeignLibrarySpec.library_name = library_name;
+	result->ForeignLibrarySpec.cond = cond;
+	result->ForeignLibrarySpec.is_system = is_system;
 	return result;
 }
 
@@ -1731,11 +1738,11 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 }
 
 
-AstNode *    parse_expr(AstFile *f, bool lhs);
-AstNode *    parse_proc_type(AstFile *f, Token proc_token, AstNode **foreign_library, String *foreign_name, String *link_name);
+AstNode *        parse_expr(AstFile *f, bool lhs);
+AstNode *        parse_proc_type(AstFile *f, Token proc_token, String *link_name);
 Array<AstNode *> parse_stmt_list(AstFile *f);
-AstNode *    parse_stmt(AstFile *f);
-AstNode *    parse_body(AstFile *f);
+AstNode *        parse_stmt(AstFile *f);
+AstNode *        parse_body(AstFile *f);
 
 
 
@@ -1753,7 +1760,12 @@ AstNode *parse_ident(AstFile *f) {
 
 AstNode *parse_tag_expr(AstFile *f, AstNode *expression) {
 	Token token = expect_token(f, Token_Hash);
-	Token name  = expect_token(f, Token_Ident);
+	Token name  = {};
+	if (f->curr_token.kind == Token_foreign) {
+		name = expect_token(f, Token_foreign);
+	} else {
+		name = expect_token(f, Token_Ident);
+	}
 	return ast_tag_expr(f, token, name, expression);
 }
 
@@ -1873,10 +1885,9 @@ bool is_foreign_name_valid(String name) {
 	return true;
 }
 
-void parse_proc_tags(AstFile *f, u64 *tags, AstNode **foreign_library_token, String *foreign_name, String *link_name, ProcCallingConvention *calling_convention) {
+void parse_proc_tags(AstFile *f, u64 *tags, String *link_name, ProcCallingConvention *calling_convention) {
 	// TODO(bill): Add this to procedure literals too
 	GB_ASSERT(tags         != NULL);
-	GB_ASSERT(link_name    != NULL);
 	GB_ASSERT(link_name    != NULL);
 
 	ProcCallingConvention cc = ProcCC_Invalid;
@@ -1891,19 +1902,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, AstNode **foreign_library_token, Str
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_##name, tag_name); \
 		}
 
-		if (tag_name == "foreign") {
-			check_proc_add_tag(f, tag_expr, tags, ProcTag_foreign, tag_name);
-			*foreign_library_token = parse_ident(f);
-			if (f->curr_token.kind == Token_String) {
-				*foreign_name = f->curr_token.string;
-				// TODO(bill): Check if valid string
-				if (!is_foreign_name_valid(*foreign_name)) {
-					syntax_error_node(tag_expr, "Invalid alternative foreign procedure name: `%.*s`", LIT(*foreign_name));
-				}
-
-				next_token(f);
-			}
-		} else if (tag_name == "link_name") {
+		if (tag_name == "link_name") {
 			check_proc_add_tag(f, tag_expr, tags, ProcTag_link_name, tag_name);
 			if (f->curr_token.kind == Token_String) {
 				*link_name = f->curr_token.string;
@@ -2081,7 +2080,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		} else if (name.string == "file") { return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "line") { return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "procedure") { return ast_basic_directive(f, token, name.string);
-		} else if (!lhs && name.string == "alias") { return ast_alias(f, token, parse_expr(f, false));
+		// } else if (!lhs && name.string == "alias") { return ast_alias(f, token, parse_expr(f, false));
 		} else {
 			operand = ast_tag_expr(f, token, name, parse_expr(f, false));
 		}
@@ -2091,10 +2090,8 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	// Parse Procedure Type or Literal
 	case Token_proc: {
 		Token token = expect_token(f, Token_proc);
-		AstNode *foreign_library = NULL;
-		String foreign_name = {};
 		String link_name = {};
-		AstNode *type = parse_proc_type(f, token, &foreign_library, &foreign_name, &link_name);
+		AstNode *type = parse_proc_type(f, token, &link_name);
 		u64 tags = type->ProcType.tags;
 
 		if (f->curr_token.kind == Token_OpenBrace) {
@@ -2107,11 +2104,11 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			body = parse_body(f);
 			f->curr_proc = curr_proc;
 
-			return ast_proc_lit(f, type, body, tags, foreign_library, foreign_name, link_name);
+			return ast_proc_lit(f, type, body, tags, link_name);
 		}
 
 		if ((tags & ProcTag_foreign) != 0) {
-			return ast_proc_lit(f, type, NULL, tags, foreign_library, foreign_name, link_name);
+			return ast_proc_lit(f, type, NULL, tags, link_name);
 		}
 		if (tags != 0) {
 			// syntax_error(token, "A procedure type cannot have tags");
@@ -2526,13 +2523,11 @@ AstNode *parse_proc_decl(AstFile *f) {
 
 	Token token = expect_token(f, Token_proc);
 	AstNode *body = NULL;
-	AstNode *foreign_library = NULL;
-	String foreign_name = {};
 	String link_name = {};
 
 
 	AstNode *name = parse_ident(f);
-	AstNode *type = parse_proc_type(f, token, &foreign_library, &foreign_name, &link_name);
+	AstNode *type = parse_proc_type(f, token, &link_name);
 	u64 tags = type->ProcType.tags;
 
 	if (f->curr_token.kind == Token_OpenBrace) {
@@ -2545,7 +2540,9 @@ AstNode *parse_proc_decl(AstFile *f) {
 		f->curr_proc = curr_proc;
 	}
 
-	return ast_proc_decl(f, token, name, type, body, tags, foreign_library, foreign_name, link_name);
+	AstNode *decl = ast_proc_decl(f, token, name, type, body, tags, link_name);
+	expect_semicolon(f, decl);
+	return decl;
 }
 
 
@@ -2791,7 +2788,7 @@ AstNode *parse_decl(AstFile *f) {
 	default: {
 		Token tok = f->curr_token;
 		fix_advance_to_next_stmt(f);
-		syntax_error(tok, "Expected a declaration");
+		syntax_error(tok, "Expected a declaration got %.*s", LIT(token_strings[tok.kind]));
 		return ast_bad_decl(f, tok, f->curr_token);
 	}
 	}
@@ -2940,7 +2937,7 @@ AstNode *parse_results(AstFile *f) {
 	return list;
 }
 
-AstNode *parse_proc_type(AstFile *f, Token proc_token, AstNode **foreign_library_, String *foreign_name_, String *link_name_) {
+AstNode *parse_proc_type(AstFile *f, Token proc_token, String *link_name_) {
 	AstNode *params = {};
 	AstNode *results = {};
 
@@ -2950,15 +2947,11 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token, AstNode **foreign_library
 	results = parse_results(f);
 
 	u64 tags = 0;
-	String foreign_name = {};
 	String link_name = {};
-	AstNode *foreign_library = NULL;
 	ProcCallingConvention cc = ProcCC_Odin;
 
-	parse_proc_tags(f, &tags, &foreign_library, &foreign_name, &link_name, &cc);
+	parse_proc_tags(f, &tags, &link_name, &cc);
 
-	if (foreign_library_) *foreign_library_ = foreign_library;
-	if (foreign_name_)    *foreign_name_    = foreign_name;
 	if (link_name_)       *link_name_       = link_name;
 
 	return ast_proc_type(f, proc_token, params, results, tags, cc);
@@ -3245,18 +3238,6 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		return e;
 	}
 
-	case Token_Hash: {
-		Token hash_token = expect_token(f, Token_Hash);
-		Token name = expect_token(f, Token_Ident);
-		String tag = name.string;
-		if (tag == "type") {
-			AstNode *type = parse_type(f);
-			return ast_helper_type(f, hash_token, type);
-		}
-		syntax_error(name, "Expected `type` after #");
-		return ast_bad_expr(f, hash_token, f->curr_token);
-	}
-
 	case Token_Pointer: {
 		Token token = expect_token(f, Token_Pointer);
 		AstNode *elem = parse_type(f);
@@ -3501,7 +3482,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 
 	case Token_proc: {
 		Token token = f->curr_token; next_token(f);
-		AstNode *pt = parse_proc_type(f, token, NULL, NULL, NULL);
+		AstNode *pt = parse_proc_type(f, token, NULL);
 		if (pt->ProcType.tags != 0) {
 			syntax_error(token, "A procedure type cannot have tags");
 		}
@@ -3866,6 +3847,29 @@ AstNode *parse_asm_stmt(AstFile *f) {
 
 }
 
+void parse_foreign_block_decl(AstFile *f, Array<AstNode *> *decls) {
+	AstNode *decl = parse_decl(f);
+	switch (decl->kind) {
+	case AstNode_BadDecl:
+		break;
+
+	case AstNode_ProcDecl:
+		array_add(decls, decl);
+		break;
+
+	// case AstNode_GenDecl:
+		// if (decl->GenDecl.token.kind == Token_var) {
+			// array_add(decls, decl);
+			// break;
+		// }
+
+		/* fallthrough */
+	default:
+		error_node(decl, "Only procedures declarations are allowed within a foreign block at the moment");
+		break;
+	}
+}
+
 
 AstNode *parse_stmt(AstFile *f) {
 	AstNode *s = NULL;
@@ -3901,6 +3905,31 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_foreign_library:
 	case Token_foreign_system_library:
 		return parse_decl(f);
+
+	case Token_foreign: {
+		Token token = expect_token(f, Token_foreign);
+		AstNode *foreign_library = parse_ident(f);
+		Token open = {};
+		Token close = {};
+		Array<AstNode *> decls = make_ast_node_array(f);
+
+		if (f->curr_token.kind != Token_OpenBrace) {
+			parse_foreign_block_decl(f, &decls);
+		} else {
+			open = expect_token(f, Token_OpenBrace);
+
+			while (f->curr_token.kind != Token_CloseBrace &&
+			       f->curr_token.kind != Token_EOF) {
+				parse_foreign_block_decl(f, &decls);
+			}
+
+			close = expect_token(f, Token_CloseBrace);
+		}
+
+
+		return ast_foreign_block_decl(f, token, foreign_library, open, close, decls);
+	} break;
+
 
 	case Token_if:     return parse_if_stmt(f);
 	case Token_when:   return parse_when_stmt(f);

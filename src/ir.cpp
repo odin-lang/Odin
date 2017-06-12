@@ -5790,6 +5790,12 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 	case_ast_node(bs, EmptyStmt, node);
 	case_end;
 
+	case_ast_node(fb, ForeignBlockDecl, node);
+		for_array(i, fb->decls) {
+			ir_build_stmt(proc, fb->decls[i]);
+		}
+	case_end;
+
 	case_ast_node(us, UsingStmt, node);
 		for_array(i, us->list) {
 			AstNode *decl = unparen_expr(us->list[i]);
@@ -5943,8 +5949,8 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			// FFI - Foreign function interace
 			String original_name = e->token.string;
 			String name = original_name;
-			if (pd->foreign_name.len > 0) {
-				name = pd->foreign_name;
+			if (pd->link_name.len > 0) {
+				name = pd->link_name;
 			}
 
 			irValue *value = ir_value_procedure(proc->module->allocator,
@@ -7251,9 +7257,7 @@ void ir_gen_tree(irGen *s) {
 				name = e->token.string; // NOTE(bill): Don't use the mangled name
 				ir_add_foreign_library_path(m, e->Procedure.foreign_library);
 			}
-			if (pd->foreign_name.len > 0) {
-				name = pd->foreign_name;
-			} else if (pd->link_name.len > 0) {
+			if (pd->link_name.len > 0) {
 				name = pd->link_name;
 			}
 

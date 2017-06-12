@@ -292,16 +292,14 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		error_node(pd->type, "You cannot apply both `inline` and `no_inline` to a procedure");
 	}
 
-	if (is_foreign && is_link_name) {
-		error_node(pd->type, "You cannot apply both `foreign` and `link_name` to a procedure");
-	} else if (is_foreign && is_export) {
+	if (is_foreign && is_export) {
 		error_node(pd->type, "You cannot apply both `foreign` and `export` to a procedure");
 	}
 
 
 	if (pd->body != NULL) {
 		if (is_foreign) {
-			error_node(pd->body, "A procedure tagged as `#foreign` cannot have a body");
+			error_node(pd->body, "A procedure tagged as `foreign` cannot have a body");
 		}
 
 		d->scope = c->context.scope;
@@ -323,15 +321,15 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	if (is_foreign) {
 		auto *fp = &c->info.foreigns;
 		String name = e->token.string;
-		if (pd->foreign_name.len > 0) {
-			name = pd->foreign_name;
+		if (pd->link_name.len > 0) {
+			name = pd->link_name;
 		}
 
-		AstNode *foreign_library = d->proc_decl->ProcDecl.foreign_library;
+		AstNode *foreign_library = e->Procedure.foreign_library_ident;
 		if (foreign_library == NULL) {
-			error(e->token, "#foreign procedures must declare which library they are from");
+			error(e->token, "foreign procedures must declare which library they are from");
 		} else if (foreign_library->kind != AstNode_Ident) {
-			error_node(foreign_library, "#foreign library names must be an identifier");
+			error_node(foreign_library, "foreign library names must be an identifier");
 		} else {
 			String name = foreign_library->Ident.string;
 			Entity *found = scope_lookup_entity(c->context.scope, name);
@@ -342,7 +340,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 					error_node(foreign_library, "Undeclared name: %.*s", LIT(name));
 				}
 			} else if (found->kind != Entity_LibraryName) {
-				error_node(foreign_library, "`_` cannot be used as a library name");
+				error_node(foreign_library, "`%.*s` cannot be used as a library name", LIT(name));
 			} else {
 				// TODO(bill): Extra stuff to do with library names?
 				e->Procedure.foreign_library = found;
@@ -352,6 +350,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 		e->Procedure.is_foreign = true;
 		e->Procedure.foreign_name = name;
+		e->Procedure.link_name = name;
 
 		HashKey key = hash_string(name);
 		Entity **found = map_get(fp, key);

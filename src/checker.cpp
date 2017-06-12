@@ -270,6 +270,7 @@ struct CheckerContext {
 	String     proc_name;
 	Type *     type_hint;
 	DeclInfo * curr_proc_decl;
+	AstNode *  curr_foreign_library;
 };
 
 // CheckerInfo stores all the symbol information for a type-checked program
@@ -1626,6 +1627,24 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 			}
 		case_end;
 
+		case_ast_node(fb, ForeignBlockDecl, decl);
+			AstNode *foreign_library = fb->foreign_library;
+			bool ok = true;
+			if (foreign_library->kind != AstNode_Ident) {
+				error_node(foreign_library, "foreign library name must be an identifier");
+				ok = false;
+			}
+
+			CheckerContext prev_context = c->context;
+			if (ok) {
+				c->context.curr_foreign_library = foreign_library;
+			}
+
+			check_collect_entities(c, fb->decls, is_file_scope);
+
+			c->context = prev_context;
+		case_end;
+
 		case_ast_node(pd, ProcDecl, decl);
 			AstNode *name = pd->name;
 			if (name->kind != AstNode_Ident) {
@@ -1638,6 +1657,12 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 			Entity *e = NULL;
 
 			e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, pd->tags);
+			AstNode *fl = c->context.curr_foreign_library;
+			if (fl != NULL) {
+				GB_ASSERT(fl->kind == AstNode_Ident);
+				e->Procedure.foreign_library_ident = fl;
+				pd->tags |= ProcTag_foreign;
+			}
 			d->proc_decl = decl;
 			d->type_expr = pd->type;
 			e->identifier = name;
@@ -1652,14 +1677,14 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 		}
 	}
 
+	// NOTE(bill): `when` stmts need to be handled after the other as the condition may refer to something
+	// declared after this stmt in source
 	if (!c->context.scope->is_file) {
-		// NOTE(bill): `when` stmts need to be handled after the other as the condition may refer to something
-		// declared after this stmt in source
 		for_array(i, nodes) {
 			AstNode *node = nodes[i];
 			switch (node->kind) {
 			case_ast_node(ws, WhenStmt, node);
-				check_collect_entities_from_when_stmt(c, ws, is_file_scope);
+					check_collect_entities_from_when_stmt(c, ws, is_file_scope);
 			case_end;
 			}
 		}

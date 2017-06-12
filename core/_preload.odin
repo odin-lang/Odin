@@ -147,12 +147,12 @@ proc type_info_base_without_enum(info: ^TypeInfo) -> ^TypeInfo {
 
 
 
-proc assume(cond: bool) #foreign __llvm_core "llvm.assume";
-
-proc __debug_trap      ()        #foreign __llvm_core "llvm.debugtrap";
-proc __trap            ()        #foreign __llvm_core "llvm.trap";
-proc read_cycle_counter() -> u64 #foreign __llvm_core "llvm.readcyclecounter";
-
+foreign __llvm_core {
+	proc assume            (cond: bool) #link_name "llvm.assume";
+	proc __debug_trap      ()           #link_name "llvm.debugtrap";
+	proc __trap            ()           #link_name "llvm.trap";
+	proc read_cycle_counter() -> u64    #link_name "llvm.readcyclecounter";
+}
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
 type (
@@ -382,7 +382,7 @@ proc __string_decode_rune(s: string) -> (rune, int) #inline {
 
 
 proc __mem_set(data: rawptr, value: i32, len: int) -> rawptr {
-	proc llvm_memset_64bit(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memset.p0i8.i64";
+	foreign __llvm_core proc llvm_memset_64bit(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) #link_name "llvm.memset.p0i8.i64";
 	llvm_memset_64bit(data, u8(value), len, 1, false);
 	return data;
 }
@@ -391,13 +391,13 @@ proc __mem_zero(data: rawptr, len: int) -> rawptr {
 }
 proc __mem_copy(dst, src: rawptr, len: int) -> rawptr {
 	// NOTE(bill): This _must_ be implemented like C's memmove
-	proc llvm_memmove_64bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memmove.p0i8.p0i8.i64";
+	foreign __llvm_core proc llvm_memmove_64bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memmove.p0i8.p0i8.i64";
 	llvm_memmove_64bit(dst, src, len, 1, false);
 	return dst;
 }
 proc __mem_copy_non_overlapping(dst, src: rawptr, len: int) -> rawptr {
 	// NOTE(bill): This _must_ be implemented like C's memcpy
-	proc llvm_memcpy_64bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memcpy.p0i8.p0i8.i64";
+	foreign __llvm_core proc llvm_memcpy_64bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i64";
 	llvm_memcpy_64bit(dst, src, len, 1, false);
 	return dst;
 }
@@ -414,8 +414,10 @@ proc __mem_compare(a, b: ^u8, n: int) -> int {
 	return 0;
 }
 
-proc __sqrt_f32(x: f32) -> f32 #foreign __llvm_core "llvm.sqrt.f32";
-proc __sqrt_f64(x: f64) -> f64 #foreign __llvm_core "llvm.sqrt.f64";
+foreign __llvm_core {
+	proc __sqrt_f32(x: f32) -> f32 #link_name "llvm.sqrt.f32";
+	proc __sqrt_f64(x: f64) -> f64 #link_name "llvm.sqrt.f64";
+}
 proc __abs_complex64(x: complex64) -> f32 #inline {
 	var r, i = real(x), imag(x);
 	return __sqrt_f32(r*r + i*i);

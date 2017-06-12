@@ -30,20 +30,25 @@ type (
 	Complex complex64;
 )
 
-proc sqrt(x: f32) -> f32 #foreign __llvm_core "llvm.sqrt.f32";
-proc sqrt(x: f64) -> f64 #foreign __llvm_core "llvm.sqrt.f64";
+foreign __llvm_core {
+	proc sqrt(x: f32) -> f32          #link_name "llvm.sqrt.f32";
+	proc sqrt(x: f64) -> f64          #link_name "llvm.sqrt.f64";
 
-proc sin (θ: f32) -> f32 #foreign __llvm_core "llvm.sin.f32";
-proc sin (θ: f64) -> f64 #foreign __llvm_core "llvm.sin.f64";
+	proc sin (θ: f32) -> f32          #link_name "llvm.sin.f32";
+	proc sin (θ: f64) -> f64          #link_name "llvm.sin.f64";
 
-proc cos (θ: f32) -> f32 #foreign __llvm_core "llvm.cos.f32";
-proc cos (θ: f64) -> f64 #foreign __llvm_core "llvm.cos.f64";
+	proc cos (θ: f32) -> f32          #link_name "llvm.cos.f32";
+	proc cos (θ: f64) -> f64          #link_name "llvm.cos.f64";
+
+	proc pow (x, power: f32) -> f32   #link_name "llvm.pow.f32";
+	proc pow (x, power: f64) -> f64   #link_name "llvm.pow.f64";
+
+	proc fmuladd(a, b, c: f32) -> f32 #link_name "llvm.fmuladd.f32";
+	proc fmuladd(a, b, c: f64) -> f64 #link_name "llvm.fmuladd.f64";
+}
 
 proc tan (θ: f32) -> f32 #inline { return sin(θ)/cos(θ); }
 proc tan (θ: f64) -> f64 #inline { return sin(θ)/cos(θ); }
-
-proc pow (x, power: f32) -> f32 #foreign __llvm_core "llvm.pow.f32";
-proc pow (x, power: f64) -> f64 #foreign __llvm_core "llvm.pow.f64";
 
 
 proc lerp  (a, b, t: f32) -> (x: f32) { return a*(1-t) + b*t; }
@@ -55,8 +60,6 @@ proc unlerp(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }
 proc sign(x: f32) -> f32 { return x >= 0 ? +1 : -1; }
 proc sign(x: f64) -> f64 { return x >= 0 ? +1 : -1; }
 
-proc fmuladd(a, b, c: f32) -> f32 #foreign __llvm_core "llvm.fmuladd.f32";
-proc fmuladd(a, b, c: f64) -> f64 #foreign __llvm_core "llvm.fmuladd.f64";
 
 
 proc copy_sign(x, y: f32) -> f32 {

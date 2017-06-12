@@ -70,19 +70,21 @@ var (
 )
 
 
-proc create_context           (hdc: Hdc) -> Hglrc                                                                                                 #foreign opengl32 "wglCreateContext";
-proc make_current             (hdc: Hdc, hglrc: Hglrc) -> Bool                                                                                    #foreign opengl32 "wglMakeCurrent";
-proc get_proc_address         (c_str: ^u8) -> Proc                                                                                                #foreign opengl32 "wglGetProcAddress";
-proc delete_context           (hglrc: Hglrc) -> Bool                                                                                              #foreign opengl32 "wglDeleteContext";
-proc copy_context             (src, dst: Hglrc, mask: u32) -> Bool                                                                                #foreign opengl32 "wglCopyContext";
-proc create_layer_context     (hdc: Hdc, layer_plane: i32) -> Hglrc                                                                               #foreign opengl32 "wglCreateLayerContext";
-proc describe_layer_plane     (hdc: Hdc, pixel_format, layer_plane: i32, bytes: u32, pd: ^LayerPlaneDescriptor) -> Bool                           #foreign opengl32 "wglDescribeLayerPlane";
-proc get_current_context      () -> Hglrc                                                                                                         #foreign opengl32 "wglGetCurrentContext";
-proc get_current_dc           () -> Hdc                                                                                                           #foreign opengl32 "wglGetCurrentDC";
-proc get_layer_palette_entries(hdc: Hdc, layer_plane, start, entries: i32, cr: ^ColorRef) -> i32                                                  #foreign opengl32 "wglGetLayerPaletteEntries";
-proc realize_layer_palette    (hdc: Hdc, layer_plane: i32, realize: Bool) -> Bool                                                                 #foreign opengl32 "wglRealizeLayerPalette";
-proc set_layer_palette_entries(hdc: Hdc, layer_plane, start, entries: i32, cr: ^ColorRef) -> i32                                                  #foreign opengl32 "wglSetLayerPaletteEntries";
-proc share_lists              (hglrc1, hglrc2: Hglrc) -> Bool                                                                                     #foreign opengl32 "wglShareLists";
-proc swap_layer_buffers       (hdc: Hdc, planes: u32) -> Bool                                                                                     #foreign opengl32 "wglSwapLayerBuffers";
-proc use_font_bitmaps         (hdc: Hdc, first, count, list_base: u32) -> Bool                                                                    #foreign opengl32 "wglUseFontBitmaps";
-proc use_font_outlines        (hdc: Hdc, first, count, list_base: u32, deviation, extrusion: f32, format: i32, gmf: ^Glyph_MetricsFloat) -> Bool  #foreign opengl32 "wglUseFontOutlines";
+foreign opengl32 {
+	proc create_context           (hdc: Hdc) -> Hglrc                                                                                                 #link_name "wglCreateContext";
+	proc make_current             (hdc: Hdc, hglrc: Hglrc) -> Bool                                                                                    #link_name "wglMakeCurrent";
+	proc get_proc_address         (c_str: ^u8) -> Proc                                                                                                #link_name "wglGetProcAddress";
+	proc delete_context           (hglrc: Hglrc) -> Bool                                                                                              #link_name "wglDeleteContext";
+	proc copy_context             (src, dst: Hglrc, mask: u32) -> Bool                                                                                #link_name "wglCopyContext";
+	proc create_layer_context     (hdc: Hdc, layer_plane: i32) -> Hglrc                                                                               #link_name "wglCreateLayerContext";
+	proc describe_layer_plane     (hdc: Hdc, pixel_format, layer_plane: i32, bytes: u32, pd: ^LayerPlaneDescriptor) -> Bool                           #link_name "wglDescribeLayerPlane";
+	proc get_current_context      () -> Hglrc                                                                                                         #link_name "wglGetCurrentContext";
+	proc get_current_dc           () -> Hdc                                                                                                           #link_name "wglGetCurrentDC";
+	proc get_layer_palette_entries(hdc: Hdc, layer_plane, start, entries: i32, cr: ^ColorRef) -> i32                                                  #link_name "wglGetLayerPaletteEntries";
+	proc realize_layer_palette    (hdc: Hdc, layer_plane: i32, realize: Bool) -> Bool                                                                 #link_name "wglRealizeLayerPalette";
+	proc set_layer_palette_entries(hdc: Hdc, layer_plane, start, entries: i32, cr: ^ColorRef) -> i32                                                  #link_name "wglSetLayerPaletteEntries";
+	proc share_lists              (hglrc1, hglrc2: Hglrc) -> Bool                                                                                     #link_name "wglShareLists";
+	proc swap_layer_buffers       (hdc: Hdc, planes: u32) -> Bool                                                                                     #link_name "wglSwapLayerBuffers";
+	proc use_font_bitmaps         (hdc: Hdc, first, count, list_base: u32) -> Bool                                                                    #link_name "wglUseFontBitmaps";
+	proc use_font_outlines        (hdc: Hdc, first, count, list_base: u32, deviation, extrusion: f32, format: i32, gmf: ^Glyph_MetricsFloat) -> Bool  #link_name "wglUseFontOutlines";
+}

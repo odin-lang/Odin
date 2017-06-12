@@ -8,31 +8,33 @@ import (
 )
 import_load "opengl_constants.odin";
 
-proc Clear         (mask: u32)                                #foreign lib "glClear";
-proc ClearColor    (r, g, b, a: f32)                          #foreign lib "glClearColor";
-proc Begin         (mode: i32)                                #foreign lib "glBegin";
-proc End           ()                                         #foreign lib "glEnd";
-proc Finish        ()                                         #foreign lib "glFinish";
-proc BlendFunc     (sfactor, dfactor: i32)                    #foreign lib "glBlendFunc";
-proc Enable        (cap: i32)                                 #foreign lib "glEnable";
-proc Disable       (cap: i32)                                 #foreign lib "glDisable";
-proc GenTextures   (count: i32, result: ^u32)                 #foreign lib "glGenTextures";
-proc DeleteTextures(count: i32, result: ^u32)                 #foreign lib "glDeleteTextures";
-proc TexParameteri (target, pname, param: i32)                #foreign lib "glTexParameteri";
-proc TexParameterf (target: i32, pname: i32, param: f32)      #foreign lib "glTexParameterf";
-proc BindTexture   (target: i32, texture: u32)                #foreign lib "glBindTexture";
-proc LoadIdentity  ()                                         #foreign lib "glLoadIdentity";
-proc Viewport      (x, y, width, height: i32)                 #foreign lib "glViewport";
-proc Ortho         (left, right, bottom, top, near, far: f64) #foreign lib "glOrtho";
-proc Color3f       (r, g, b: f32)                             #foreign lib "glColor3f";
-proc Vertex3f      (x, y, z: f32)                             #foreign lib "glVertex3f";
-proc GetError      () -> i32                                  #foreign lib "glGetError";
-proc GetString     (name: i32) -> ^u8                         #foreign lib "glGetString";
-proc GetIntegerv   (name: i32, v: ^i32)                       #foreign lib "glGetIntegerv";
-proc TexCoord2f    (x, y: f32)                                #foreign lib "glTexCoord2f";
-proc TexImage2D    (target, level, internal_format,
-                    width, height, border,
-                    format, type_: i32, pixels: rawptr)       #foreign lib "glTexImage2D";
+foreign lib {
+	proc Clear         (mask: u32)                                #link_name "glClear";
+	proc ClearColor    (r, g, b, a: f32)                          #link_name "glClearColor";
+	proc Begin         (mode: i32)                                #link_name "glBegin";
+	proc End           ()                                         #link_name "glEnd";
+	proc Finish        ()                                         #link_name "glFinish";
+	proc BlendFunc     (sfactor, dfactor: i32)                    #link_name "glBlendFunc";
+	proc Enable        (cap: i32)                                 #link_name "glEnable";
+	proc Disable       (cap: i32)                                 #link_name "glDisable";
+	proc GenTextures   (count: i32, result: ^u32)                 #link_name "glGenTextures";
+	proc DeleteTextures(count: i32, result: ^u32)                 #link_name "glDeleteTextures";
+	proc TexParameteri (target, pname, param: i32)                #link_name "glTexParameteri";
+	proc TexParameterf (target: i32, pname: i32, param: f32)      #link_name "glTexParameterf";
+	proc BindTexture   (target: i32, texture: u32)                #link_name "glBindTexture";
+	proc LoadIdentity  ()                                         #link_name "glLoadIdentity";
+	proc Viewport      (x, y, width, height: i32)                 #link_name "glViewport";
+	proc Ortho         (left, right, bottom, top, near, far: f64) #link_name "glOrtho";
+	proc Color3f       (r, g, b: f32)                             #link_name "glColor3f";
+	proc Vertex3f      (x, y, z: f32)                             #link_name "glVertex3f";
+	proc GetError      () -> i32                                  #link_name "glGetError";
+	proc GetString     (name: i32) -> ^u8                         #link_name "glGetString";
+	proc GetIntegerv   (name: i32, v: ^i32)                       #link_name "glGetIntegerv";
+	proc TexCoord2f    (x, y: f32)                                #link_name "glTexCoord2f";
+	proc TexImage2D    (target, level, internal_format,
+	                    width, height, border,
+	                    format, type_: i32, pixels: rawptr)       #link_name "glTexImage2D";
+}
 
 
 proc _string_data(s: string) -> ^u8 #inline { return &s[0]; }

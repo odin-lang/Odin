@@ -125,27 +125,30 @@ const (
 	F_OK = 0; // Test for file existance
 )
 
-proc unix_open  (path: ^u8, mode: int) -> Handle                               #foreign libc "open";
-proc unix_close (handle: Handle)                                               #foreign libc "close";
-proc unix_read  (handle: Handle, buffer: rawptr, count: int) -> AddressSize    #foreign libc "read";
-proc unix_write (handle: Handle, buffer: rawptr, count: int) -> AddressSize    #foreign libc "write";
-proc unix_lseek (fs: Handle, offset: AddressSize, whence: int) -> AddressSize  #foreign libc "lseek";
-proc unix_gettid() -> u64                                                      #foreign libc "gettid";
-proc unix_stat  (path: ^u8, stat: ^Stat) -> int                                #foreign libc "stat";
-proc unix_access(path: ^u8, mask: int) -> int                                  #foreign libc "access";
+foreign libc {
+	proc unix_open  (path: ^u8, mode: int) -> Handle                               #link_name "open";
+	proc unix_close (handle: Handle)                                               #link_name "close";
+	proc unix_read  (handle: Handle, buffer: rawptr, count: int) -> AddressSize    #link_name "read";
+	proc unix_write (handle: Handle, buffer: rawptr, count: int) -> AddressSize    #link_name "write";
+	proc unix_lseek (fs: Handle, offset: AddressSize, whence: int) -> AddressSize  #link_name "lseek";
+	proc unix_gettid() -> u64                                                      #link_name "gettid";
+	proc unix_stat  (path: ^u8, stat: ^Stat) -> int                                #link_name "stat";
+	proc unix_access(path: ^u8, mask: int) -> int                                  #link_name "access";
 
-proc unix_malloc (size: int) -> rawptr                                         #foreign libc "malloc";
-proc unix_free   (ptr: rawptr)                                                 #foreign libc "free";
-proc unix_realloc(ptr: rawptr, size: int) -> rawptr                            #foreign libc "realloc";
-proc unix_getenv (^u8) -> ^u8                                                  #foreign libc "getenv";
+	proc unix_malloc (size: int) -> rawptr                                         #link_name "malloc";
+	proc unix_free   (ptr: rawptr)                                                 #link_name "free";
+	proc unix_realloc(ptr: rawptr, size: int) -> rawptr                            #link_name "realloc";
+	proc unix_getenv (^u8) -> ^u8                                                  #link_name "getenv";
 
-proc unix_exit(status: int)                                                    #foreign libc "exit";
+	proc unix_exit(status: int)                                                    #link_name "exit";
+}
 
-proc unix_dlopen (filename: ^u8, flags: int) -> rawptr                         #foreign dl   "dlopen";
-proc unix_dlsym  (handle: rawptr, symbol: ^u8) ->  (proc() #cc_c)              #foreign dl   "dlsym";
-proc unix_dlclose(handle: rawptr) -> int                                       #foreign dl   "dlclose";
-proc unix_dlerror() -> ^u8                                                     #foreign dl   "dlerror";
-
+foreign dl {
+	proc unix_dlopen (filename: ^u8, flags: int) -> rawptr                         #link_name "dlopen";
+	proc unix_dlsym  (handle: rawptr, symbol: ^u8) ->  (proc() #cc_c)              #link_name "dlsym";
+	proc unix_dlclose(handle: rawptr) -> int                                       #link_name "dlclose";
+	proc unix_dlerror() -> ^u8                                                     #link_name "dlerror";
+}
 
 // TODO(zangent): Change this to just `open` when Bill fixes overloading.
 proc open_simple(path: string, mode: int) -> (Handle, Errno) {

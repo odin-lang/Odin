@@ -95,6 +95,7 @@ struct Entity {
 			bool         is_foreign;
 			String       foreign_name;
 			Entity *     foreign_library;
+			AstNode *    foreign_library_ident;
 			String       link_name;
 			u64          tags;
 			OverloadKind overload_kind;
