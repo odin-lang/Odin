@@ -23,6 +23,7 @@ Website: [https://odin.handmade.network/](https://odin.handmade.network/)
 * [when, for, & procedure overloading](https://www.youtube.com/watch?v=OzeOekzyZK8)
 * [when, for, & procedure overloading](https://www.youtube.com/watch?v=OzeOekzyZK8)
 * [Context Types, Unexported Entities, Labelled Branches](https://www.youtube.com/watch?v=CkHVwT1Qk-g)
+* [Bit Fields, i128 & u128, Syntax Changes](https://www.youtube.com/watch?v=NlTutcLyF64)
 
 ## Requirements to build and run
 
