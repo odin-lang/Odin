@@ -1615,6 +1615,10 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_const:
 		case Token_let:
 		case Token_type:
+		case Token_proc:
+		case Token_foreign:
+		case Token_foreign_library:
+		case Token_foreign_system_library:
 
 		case Token_if:
 		case Token_when:
@@ -1760,12 +1764,7 @@ AstNode *parse_ident(AstFile *f) {
 
 AstNode *parse_tag_expr(AstFile *f, AstNode *expression) {
 	Token token = expect_token(f, Token_Hash);
-	Token name  = {};
-	if (f->curr_token.kind == Token_foreign) {
-		name = expect_token(f, Token_foreign);
-	} else {
-		name = expect_token(f, Token_Ident);
-	}
+	Token name  = expect_token(f, Token_Ident);
 	return ast_tag_expr(f, token, name, expression);
 }
 
@@ -2759,6 +2758,31 @@ PARSE_SPEC_FUNC(parse_foreign_library_spec) {
 	}
 }
 
+AstNode *parse_decl(AstFile *f);
+
+void parse_foreign_block_decl(AstFile *f, Array<AstNode *> *decls) {
+	AstNode *decl = parse_decl(f);
+	switch (decl->kind) {
+	case AstNode_BadDecl:
+		break;
+
+	case AstNode_ProcDecl:
+		array_add(decls, decl);
+		break;
+
+	// case AstNode_GenDecl:
+		// if (decl->GenDecl.token.kind == Token_var) {
+			// array_add(decls, decl);
+			// break;
+		// }
+
+		/* fallthrough */
+	default:
+		error_node(decl, "Only procedures declarations are allowed within a foreign block at the moment");
+		break;
+	}
+}
+
 AstNode *parse_decl(AstFile *f) {
 	ParseSpecFunc *func = NULL;
 	switch (f->curr_token.kind) {
@@ -2781,6 +2805,29 @@ AstNode *parse_decl(AstFile *f) {
 	case Token_foreign_system_library:
 		func = parse_foreign_library_spec;
 		break;
+
+	case Token_foreign: {
+		Token token = expect_token(f, Token_foreign);
+		AstNode *foreign_library = parse_ident(f);
+		Token open = {};
+		Token close = {};
+		Array<AstNode *> decls = make_ast_node_array(f);
+
+		if (f->curr_token.kind != Token_OpenBrace) {
+			parse_foreign_block_decl(f, &decls);
+		} else {
+			open = expect_token(f, Token_OpenBrace);
+
+			while (f->curr_token.kind != Token_CloseBrace &&
+			       f->curr_token.kind != Token_EOF) {
+				parse_foreign_block_decl(f, &decls);
+			}
+
+			close = expect_token(f, Token_CloseBrace);
+		}
+
+		return ast_foreign_block_decl(f, token, foreign_library, open, close, decls);
+	} break;
 
 	case Token_proc:
 		return parse_proc_decl(f);
@@ -3847,29 +3894,6 @@ AstNode *parse_asm_stmt(AstFile *f) {
 
 }
 
-void parse_foreign_block_decl(AstFile *f, Array<AstNode *> *decls) {
-	AstNode *decl = parse_decl(f);
-	switch (decl->kind) {
-	case AstNode_BadDecl:
-		break;
-
-	case AstNode_ProcDecl:
-		array_add(decls, decl);
-		break;
-
-	// case AstNode_GenDecl:
-		// if (decl->GenDecl.token.kind == Token_var) {
-			// array_add(decls, decl);
-			// break;
-		// }
-
-		/* fallthrough */
-	default:
-		error_node(decl, "Only procedures declarations are allowed within a foreign block at the moment");
-		break;
-	}
-}
-
 
 AstNode *parse_stmt(AstFile *f) {
 	AstNode *s = NULL;
@@ -3902,33 +3926,10 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_type:
 	case Token_import:
 	case Token_import_load:
+	case Token_foreign:
 	case Token_foreign_library:
 	case Token_foreign_system_library:
 		return parse_decl(f);
-
-	case Token_foreign: {
-		Token token = expect_token(f, Token_foreign);
-		AstNode *foreign_library = parse_ident(f);
-		Token open = {};
-		Token close = {};
-		Array<AstNode *> decls = make_ast_node_array(f);
-
-		if (f->curr_token.kind != Token_OpenBrace) {
-			parse_foreign_block_decl(f, &decls);
-		} else {
-			open = expect_token(f, Token_OpenBrace);
-
-			while (f->curr_token.kind != Token_CloseBrace &&
-			       f->curr_token.kind != Token_EOF) {
-				parse_foreign_block_decl(f, &decls);
-			}
-
-			close = expect_token(f, Token_CloseBrace);
-		}
-
-
-		return ast_foreign_block_decl(f, token, foreign_library, open, close, decls);
-	} break;
 
 
 	case Token_if:     return parse_if_stmt(f);
