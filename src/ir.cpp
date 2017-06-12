@@ -5871,7 +5871,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			} break;
 
 			case Token_type: {
-				ast_node(td, TypeSpec, node);
+				ast_node(td, TypeSpec, spec);
 
 				AstNode *ident = td->name;
 				GB_ASSERT(ident->kind == AstNode_Ident);
