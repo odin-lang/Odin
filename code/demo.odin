@@ -1,19 +1,18 @@
-import (
-	"fmt.odin";
-	"hash.odin";
-	"atomics.odin";
-	"bits.odin";
-	"math.odin";
-	"mem.odin";
-	"opengl.odin";
-	"strconv.odin";
-	"strings.odin";
-	"sync.odin";
-	"types.odin";
-	"utf8.odin";
-	"utf16.odin";
-)
+import "fmt.odin";
 
 proc main() {
-	fmt.println("Hellope!");
+	let program = "+ + * - /";
+	var accumulator = 0;
+
+	for token in program {
+		match token {
+		case '+': accumulator += 1;
+		case '-': accumulator -= 1;
+		case '*': accumulator *= 2;
+		case '/': accumulator /= 2;
+		case: // Ignore everything else
+		}
+	}
+
+	fmt.printf("The program \"%s\" calculates the value %d\n", program, accumulator);
 }
