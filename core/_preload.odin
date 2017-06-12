@@ -1,10 +1,11 @@
 #shared_global_scope;
 
-import "os.odin";
-import "fmt.odin";
-import "utf8.odin";
-import "raw.odin";
-
+import (
+	"os.odin";
+	"fmt.odin";
+	"utf8.odin";
+	"raw.odin";
+)
 // Naming Conventions:
 // In general, PascalCase for types and snake_case for values
 //
@@ -24,95 +25,98 @@ import "raw.odin";
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
-type TypeInfoEnumValue raw_union {
-	f: f64,
-	i: i128,
-}
-// NOTE(bill): This must match the compiler's
-type CallingConvention enum {
-	Odin = 0,
-	C    = 1,
-	Std  = 2,
-	Fast = 3,
-}
+type (
+	TypeInfoEnumValue raw_union {
+		f: f64,
+		i: i128,
+	}
+	// NOTE(bill): This must match the compiler's
+	CallingConvention enum {
+		Odin = 0,
+		C    = 1,
+		Std  = 2,
+		Fast = 3,
+	}
 
-type TypeInfoRecord struct #ordered {
-	types:        []^TypeInfo,
-	names:        []string,
-	offsets:      []int,  // offsets may not be used in tuples
-	usings:       []bool, // usings may not be used in tuples
-	packed:       bool,
-	ordered:      bool,
-	custom_align: bool,
-}
+	TypeInfoRecord struct #ordered {
+		types:        []^TypeInfo,
+		names:        []string,
+		offsets:      []int,  // offsets may not be used in tuples
+		usings:       []bool, // usings may not be used in tuples
+		packed:       bool,
+		ordered:      bool,
+		custom_align: bool,
+	}
 
-type TypeInfo union {
-	size:  int,
-	align: int,
+	TypeInfo union {
+		size:  int,
+		align: int,
 
-	Named{name: string, base: ^TypeInfo},
-	Integer{signed: bool},
-	Rune{},
-	Float{},
-	Complex{},
-	String{},
-	Boolean{},
-	Any{},
-	Pointer{
-		elem: ^TypeInfo, // nil -> rawptr
-	},
-	Atomic{elem: ^TypeInfo},
-	Procedure{
-		params:     ^TypeInfo, // TypeInfo.Tuple
-		results:    ^TypeInfo, // TypeInfo.Tuple
-		variadic:   bool,
-		convention: CallingConvention,
-	},
-	Array{
-		elem:      ^TypeInfo,
-		elem_size: int,
-		count:     int,
-	},
-	DynamicArray{elem: ^TypeInfo, elem_size: int},
-	Slice       {elem: ^TypeInfo, elem_size: int},
-	Vector      {elem: ^TypeInfo, elem_size, count: int},
-	Tuple       {using record: TypeInfoRecord}, // Only really used for procedures
-	Struct      {using record: TypeInfoRecord},
-	RawUnion    {using record: TypeInfoRecord},
-	Union{
-		common_fields: struct {
-			types:     []^TypeInfo,
-			names:     []string,
-			offsets:   []int,    // offsets may not be used in tuples
+		Named{name: string, base: ^TypeInfo},
+		Integer{signed: bool},
+		Rune{},
+		Float{},
+		Complex{},
+		String{},
+		Boolean{},
+		Any{},
+		Pointer{
+			elem: ^TypeInfo, // nil -> rawptr
 		},
-		variant_names: []string,
-		variant_types: []^TypeInfo,
-	},
-	Enum{
-		base:   ^TypeInfo,
-		names:  []string,
-		values: []TypeInfoEnumValue,
-	},
-	Map{
-		key:              ^TypeInfo,
-		value:            ^TypeInfo,
-		generated_struct: ^TypeInfo,
-		count:            int, // == 0 if dynamic
-	},
-	BitField{
-		names:   []string,
-		bits:    []i32,
-		offsets: []i32,
-	},
-}
-
+		Atomic{elem: ^TypeInfo},
+		Procedure{
+			params:     ^TypeInfo, // TypeInfo.Tuple
+			results:    ^TypeInfo, // TypeInfo.Tuple
+			variadic:   bool,
+			convention: CallingConvention,
+		},
+		Array{
+			elem:      ^TypeInfo,
+			elem_size: int,
+			count:     int,
+		},
+		DynamicArray{elem: ^TypeInfo, elem_size: int},
+		Slice       {elem: ^TypeInfo, elem_size: int},
+		Vector      {elem: ^TypeInfo, elem_size, count: int},
+		Tuple       {using record: TypeInfoRecord}, // Only really used for procedures
+		Struct      {using record: TypeInfoRecord},
+		RawUnion    {using record: TypeInfoRecord},
+		Union{
+			common_fields: struct {
+				types:     []^TypeInfo,
+				names:     []string,
+				offsets:   []int,    // offsets may not be used in tuples
+			},
+			variant_names: []string,
+			variant_types: []^TypeInfo,
+		},
+		Enum{
+			base:   ^TypeInfo,
+			names:  []string,
+			values: []TypeInfoEnumValue,
+		},
+		Map{
+			key:              ^TypeInfo,
+			value:            ^TypeInfo,
+			generated_struct: ^TypeInfo,
+			count:            int, // == 0 if dynamic
+		},
+		BitField{
+			names:   []string,
+			bits:    []i32,
+			offsets: []i32,
+		},
+	}
+)
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
-var __type_table: []TypeInfo;
+var (
+	__type_table: []TypeInfo;
 
-var __argv__: ^^u8;
-var __argc__: i32;
+	__argv__: ^^u8;
+	__argc__: i32;
+)
 
 proc type_info_base(info: ^TypeInfo) -> ^TypeInfo {
 	if info == nil {
@@ -151,29 +155,31 @@ proc read_cycle_counter() -> u64 #foreign __llvm_core "llvm.readcyclecounter";
 
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
-type AllocatorMode enum u8 {
-	Alloc,
-	Free,
-	FreeAll,
-	Resize,
-}
-type AllocatorProc proc(allocator_data: rawptr, mode: AllocatorMode,
-                        size, alignment: int,
-                        old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
-type Allocator struct #ordered {
-	procedure: AllocatorProc,
-	data:      rawptr,
-}
+type (
+	AllocatorMode enum u8 {
+		Alloc,
+		Free,
+		FreeAll,
+		Resize,
+	}
+	AllocatorProc proc(allocator_data: rawptr, mode: AllocatorMode,
+	                        size, alignment: int,
+	                        old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
+	Allocator struct #ordered {
+		procedure: AllocatorProc,
+		data:      rawptr,
+	}
 
 
-type Context struct #ordered {
-	thread_id: int,
+	Context struct #ordered {
+		thread_id: int,
 
-	allocator: Allocator,
+		allocator: Allocator,
 
-	user_data:  rawptr,
-	user_index: int,
-}
+		user_data:  rawptr,
+		user_index: int,
+	}
+)
 
 #thread_local var __context: Context;
 
@@ -553,33 +559,35 @@ proc __default_hash_string(s: string) -> u128 {
 
 const __INITIAL_MAP_CAP = 16;
 
-type __MapKey struct #ordered {
-	hash: u128,
-	str:  string,
-}
+type (
+	__MapKey struct #ordered {
+		hash: u128,
+		str:  string,
+	}
 
-type __MapFindResult struct #ordered {
-	hash_index:  int,
-	entry_prev:  int,
-	entry_index: int,
-}
+	__MapFindResult struct #ordered {
+		hash_index:  int,
+		entry_prev:  int,
+		entry_index: int,
+	}
 
-type __MapEntryHeader struct #ordered {
-	key:  __MapKey,
-	next: int,
-/*
-	value: Value_Type,
-*/
-}
+	__MapEntryHeader struct #ordered {
+		key:  __MapKey,
+		next: int,
+	/*
+		value: Value_Type,
+	*/
+	}
 
-type __MapHeader struct #ordered {
-	m:             ^raw.DynamicMap,
-	is_key_string: bool,
-	entry_size:    int,
-	entry_align:   int,
-	value_offset:  int,
-	value_size:    int,
-}
+	__MapHeader struct #ordered {
+		m:             ^raw.DynamicMap,
+		is_key_string: bool,
+		entry_size:    int,
+		entry_align:   int,
+		value_offset:  int,
+		value_size:    int,
+	}
+)
 
 proc __dynamic_map_reserve(using header: __MapHeader, cap: int)  {
 	__dynamic_array_reserve(&m.hashes, size_of(int), align_of(int), cap);

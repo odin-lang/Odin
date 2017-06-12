@@ -297,13 +297,6 @@ AST_NODE_KIND(_ComplexStmtEnd, "", i32) \
 AST_NODE_KIND(_StmtEnd,        "", i32) \
 AST_NODE_KIND(_DeclBegin,      "", i32) \
 	AST_NODE_KIND(BadDecl,     "bad declaration",     struct { Token begin, end; }) \
-	AST_NODE_KIND(ValueDecl, "value declaration", struct { \
-		Token            token; \
-		Array<AstNode *> names;  \
-		AstNode *        type;   \
-		Array<AstNode *> values; \
-		u32              flags;  \
-	}) \
 	AST_NODE_KIND(ProcDecl, "procedure declaration", struct { \
 		Token    token;           \
 		AstNode *name;            \
@@ -313,20 +306,6 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		AstNode *foreign_library; \
 		String   foreign_name;    \
 		String   link_name;       \
-	}) \
-	AST_NODE_KIND(TypeDecl, "type declaration", struct { \
-		Token    token; \
-		AstNode *name;  \
-		AstNode *type;  \
-	}) \
-	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
-		Token     token;        \
-		bool      is_import;    \
-		Token     relpath;      \
-		String    fullpath;     \
-		Token     import_name;  \
-		AstNode   *cond;        \
-		AstNode   *note;        \
 	}) \
 	AST_NODE_KIND(ForeignLibrary, "foreign library", struct { \
 		Token token, filepath; \
@@ -338,6 +317,29 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 	AST_NODE_KIND(Label, "label", struct { 	\
 		Token token; \
 		AstNode *name; \
+	}) \
+	AST_NODE_KIND(GenDecl, "generic declaration", struct { \
+		Token            token; \
+		Token            open;  \
+		Token            close; \
+		Array<AstNode *> specs; \
+		u64              flags; \
+	}) \
+	AST_NODE_KIND(ValueSpec, "value specification", struct { \
+		Array<AstNode *> names;  \
+		AstNode *        type;   \
+		Array<AstNode *> values; \
+	}) \
+	AST_NODE_KIND(TypeSpec, "type specification", struct { \
+		AstNode *name;  \
+		AstNode *type;  \
+	}) \
+	AST_NODE_KIND(ImportSpec, "import specification", struct { \
+		bool     is_import;   \
+		Token    relpath;     \
+		String   fullpath;    \
+		Token    import_name; \
+		AstNode *cond;        \
 	}) \
 AST_NODE_KIND(_DeclEnd,   "", i32) \
 	AST_NODE_KIND(Field, "field", struct { \
@@ -540,11 +542,14 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_PushContext:   return node->PushContext.token;
 
 	case AstNode_BadDecl:        return node->BadDecl.begin;
-	case AstNode_ValueDecl:      return node->ValueDecl.token;
 	case AstNode_ProcDecl:       return node->ProcDecl.token;
-	case AstNode_ImportDecl:     return node->ImportDecl.token;
 	case AstNode_ForeignLibrary: return node->ForeignLibrary.token;
 	case AstNode_Label:          return node->Label.token;
+
+	case AstNode_GenDecl:        return node->GenDecl.token;
+	case AstNode_ValueSpec:      return ast_node_token(node->ValueSpec.names[0]);
+	case AstNode_ImportSpec:     return node->ImportSpec.import_name;
+	case AstNode_TypeSpec:       return ast_node_token(node->TypeSpec.name);
 
 
 	case AstNode_Field:
@@ -761,15 +766,6 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		break;
 
 	case AstNode_BadDecl: break;
-	case AstNode_ValueDecl:
-		n->ValueDecl.names  = clone_ast_node_array(a, n->ValueDecl.names);
-		n->ValueDecl.type   = clone_ast_node(a, n->ValueDecl.type);
-		n->ValueDecl.values = clone_ast_node_array(a, n->ValueDecl.values);
-		break;
-	case AstNode_ImportDecl:
-		n->ImportDecl.cond = clone_ast_node(a, n->ImportDecl.cond);
-		n->ImportDecl.note = clone_ast_node(a, n->ImportDecl.note);
-		break;
 	case AstNode_ForeignLibrary:
 		n->ForeignLibrary.cond = clone_ast_node(a, n->ForeignLibrary.cond);
 		break;
@@ -1428,15 +1424,6 @@ AstNode *ast_map_type(AstFile *f, Token token, AstNode *count, AstNode *key, Ast
 }
 
 
-AstNode *ast_value_decl(AstFile *f, Token token, Array<AstNode *> names, AstNode *type, Array<AstNode *> values) {
-	AstNode *result = make_ast_node(f, AstNode_ValueDecl);
-	result->ValueDecl.token  = token;
-	result->ValueDecl.names  = names;
-	result->ValueDecl.type   = type;
-	result->ValueDecl.values = values;
-	return result;
-}
-
 AstNode *ast_proc_decl(AstFile *f, Token token, AstNode *name, AstNode *type, AstNode *body,
                        u64 tags, AstNode *foreign_library, String foreign_name, String link_name) {
 	AstNode *result = make_ast_node(f, AstNode_ProcDecl);
@@ -1448,25 +1435,6 @@ AstNode *ast_proc_decl(AstFile *f, Token token, AstNode *name, AstNode *type, As
 	result->ProcDecl.foreign_library = foreign_library;
 	result->ProcDecl.foreign_name    = foreign_name;
 	result->ProcDecl.link_name       = link_name;
-	return result;
-}
-
-AstNode *ast_type_decl(AstFile *f, Token token, AstNode *name, AstNode *type) {
-	AstNode *result = make_ast_node(f, AstNode_TypeDecl);
-	result->TypeDecl.token = token;
-	result->TypeDecl.name  = name;
-	result->TypeDecl.type  = type;
-	return result;
-}
-
-
-AstNode *ast_import_decl(AstFile *f, Token token, bool is_import, Token relpath, Token import_name, AstNode *cond) {
-	AstNode *result = make_ast_node(f, AstNode_ImportDecl);
-	result->ImportDecl.token = token;
-	result->ImportDecl.is_import = is_import;
-	result->ImportDecl.relpath = relpath;
-	result->ImportDecl.import_name = import_name;
-	result->ImportDecl.cond = cond;
 	return result;
 }
 
@@ -1486,6 +1454,41 @@ AstNode *ast_label_decl(AstFile *f, Token token, AstNode *name) {
 	result->Label.name  = name;
 	return result;
 }
+
+AstNode *ast_gen_decl(AstFile *f, Token token, Token open, Token close, Array<AstNode *> specs) {
+	AstNode *result = make_ast_node(f, AstNode_GenDecl);
+	result->GenDecl.token = token;
+	result->GenDecl.open  = open;
+	result->GenDecl.close = close;
+	result->GenDecl.specs = specs;
+	return result;
+}
+
+AstNode *ast_value_spec(AstFile *f, Array<AstNode *> names, AstNode *type, Array<AstNode *> values) {
+	AstNode *result = make_ast_node(f, AstNode_ValueSpec);
+	result->ValueSpec.names  = names;
+	result->ValueSpec.type   = type;
+	result->ValueSpec.values = values;
+	return result;
+}
+
+AstNode *ast_type_spec(AstFile *f, AstNode *name, AstNode *type) {
+	AstNode *result = make_ast_node(f, AstNode_TypeSpec);
+	result->TypeSpec.name = name;
+	result->TypeSpec.type = type;
+	return result;
+}
+
+AstNode *ast_import_spec(AstFile *f, bool is_import, Token relpath, Token import_name, AstNode *cond) {
+	AstNode *result = make_ast_node(f, AstNode_ImportSpec);
+	result->ImportSpec.is_import   = is_import;
+	result->ImportSpec.relpath     = relpath;
+	result->ImportSpec.import_name = import_name;
+	result->ImportSpec.cond        = cond;
+	return result;
+}
+
+
 
 
 bool next_token(AstFile *f) {
@@ -1688,18 +1691,9 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 		return s->ProcLit.body != NULL;
 	case AstNode_ProcDecl:
 		return s->ProcDecl.body != NULL;
-	case AstNode_TypeDecl:
-		return is_semicolon_optional_for_node(f, s->TypeDecl.type);
 
-
-	case AstNode_ValueDecl:
-		if (s->ValueDecl.token.kind != Token_const) {
-			if (s->ValueDecl.values.count > 0) {
-				AstNode *last = s->ValueDecl.values[s->ValueDecl.values.count-1];
-				return is_semicolon_optional_for_node(f, last);
-			}
-		}
-		break;
+	case AstNode_TypeSpec:
+		return is_semicolon_optional_for_node(f, s->TypeSpec.type);
 	}
 
 	return false;
@@ -2526,61 +2520,6 @@ AstNode *parse_type(AstFile *f) {
 	return type;
 }
 
-
-AstNode *parse_value_decl(AstFile *f, Token token) {
-	Array<AstNode *> lhs = parse_lhs_expr_list(f);
-	AstNode *type = NULL;
-	Array<AstNode *> values = {};
-	bool is_mutable = token.kind != Token_const;
-
-	if (allow_token(f, Token_Colon)) {
-		type = parse_type(f);
-	} else if (f->curr_token.kind != Token_Eq &&
-	           f->curr_token.kind != Token_Semicolon) {
-		syntax_error(f->curr_token, "Expected a type separator `:` or `=`");
-	}
-
-
-	switch (f->curr_token.kind) {
-	case Token_Eq:
-		next_token(f);
-		values = parse_rhs_expr_list(f);
-		if (values.count > lhs.count) {
-			syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
-		} else if (values.count < lhs.count && !is_mutable) {
-			syntax_error(f->curr_token, "All constant declarations must be defined");
-		} else if (values.count == 0) {
-			syntax_error(f->curr_token, "Expected an expression for this declaration");
-		}
-		break;
-	}
-
-	if (is_mutable) {
-		if (type == NULL && values.count == 0) {
-			syntax_error(f->curr_token, "Missing variable type or initialization");
-			return ast_bad_decl(f, f->curr_token, f->curr_token);
-		}
-	} else {
-		if (type == NULL && values.count == 0 && lhs.count > 0) {
-			syntax_error(f->curr_token, "Missing constant value");
-			return ast_bad_decl(f, f->curr_token, f->curr_token);
-		}
-	}
-
-	if (values.data == NULL) {
-		values = make_ast_node_array(f);
-	}
-
-
-	Array<AstNode *> specs = {};
-	array_init(&specs, heap_allocator(), 1);
-	AstNode *decl =  ast_value_decl(f, token, lhs, type, values);
-	if (token.kind == Token_let) {
-		decl->ValueDecl.flags |= VarDeclFlag_immutable;
-	}
-	return decl;
-}
-
 AstNode *parse_proc_decl(AstFile *f) {
 	TokenKind look_ahead = look_ahead_token_kind(f, 1);
 	if (look_ahead != Token_Ident) {
@@ -2611,11 +2550,179 @@ AstNode *parse_proc_decl(AstFile *f) {
 	return ast_proc_decl(f, token, name, type, body, tags, foreign_library, foreign_name, link_name);
 }
 
-AstNode *parse_type_decl(AstFile *f) {
-	Token token = expect_token(f, Token_type);
+
+#define PARSE_SPEC_FUNC(name) AstNode *name(AstFile *f, Token token)
+typedef PARSE_SPEC_FUNC(ParseSpecFunc);
+
+AstNode *parse_gen_decl(AstFile *f, Token token, ParseSpecFunc *func) {
+	Array<AstNode *> specs = {};
+	Token open = {};
+	Token close = {};
+
+	if (f->curr_token.kind == Token_OpenParen) {
+		specs = make_ast_node_array(f);
+		open = expect_token(f, Token_OpenParen);
+		while (f->curr_token.kind != Token_CloseParen &&
+		       f->curr_token.kind != Token_EOF) {
+			AstNode *spec = func(f, token);
+			array_add(&specs, spec);
+			expect_semicolon(f, spec);
+		}
+		close = expect_token(f, Token_CloseParen);
+	} else {
+		array_init(&specs, heap_allocator(), 1);
+		array_add(&specs, func(f, token));
+	}
+
+	AstNode *decl = ast_gen_decl(f, token, open, close, specs);
+	if (token.kind == Token_let) {
+		decl->GenDecl.flags |= VarDeclFlag_immutable;
+	}
+	return decl;
+}
+
+PARSE_SPEC_FUNC(parse_value_spec) {
+	bool is_mutable = token.kind != Token_const;
+
+	Array<AstNode *> names = parse_ident_list(f);
+	AstNode *type = NULL;
+	Array<AstNode *> values = {};
+
+	if (allow_token(f, Token_Colon)) {
+		type = parse_type(f);
+	} else if (f->curr_token.kind != Token_Eq &&
+	           f->curr_token.kind != Token_Semicolon) {
+		syntax_error(f->curr_token, "Expected a type separator `:` or `=`");
+	}
+
+	if (allow_token(f, Token_Eq)) {
+		values = parse_rhs_expr_list(f);
+		if (values.count > names.count) {
+			syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
+		} else if (values.count < names.count && !is_mutable) {
+			syntax_error(f->curr_token, "All constant declarations must be defined");
+		} else if (values.count == 0) {
+			syntax_error(f->curr_token, "Expected an expression for this declaration");
+		}
+	}
+
+
+	if (is_mutable) {
+		if (type == NULL && values.count == 0) {
+			syntax_error(f->curr_token, "Missing variable type or initialization");
+			return ast_bad_decl(f, f->curr_token, f->curr_token);
+		}
+	} else {
+		if (type == NULL && values.count == 0 && names.count > 0) {
+			syntax_error(f->curr_token, "Missing constant value");
+			return ast_bad_decl(f, f->curr_token, f->curr_token);
+		}
+	}
+
+	if (values.data == NULL) {
+		values = make_ast_node_array(f);
+	}
+
+	return ast_value_spec(f, names, type, values);
+}
+
+PARSE_SPEC_FUNC(parse_type_spec) {
 	AstNode *name = parse_ident(f);
 	AstNode *type = parse_type(f);
-	return ast_type_decl(f, token, name, type);
+	return ast_type_spec(f, name, type);
+}
+
+PARSE_SPEC_FUNC(parse_import_spec) {
+	if (token.kind == Token_import) {
+		AstNode *cond = NULL;
+		Token import_name = {};
+
+		switch (f->curr_token.kind) {
+		case Token_Period:
+			import_name = f->curr_token;
+			import_name.kind = Token_Ident;
+			next_token(f);
+			break;
+		case Token_Ident:
+			import_name = f->curr_token;
+			next_token(f);
+			break;
+		default:
+			import_name.pos = f->curr_token.pos;
+			break;
+		}
+
+		if (import_name.string == "_") {
+			syntax_error(import_name, "Illegal import name: `_`");
+		}
+
+		Token file_path = expect_token_after(f, Token_String, "import");
+		if (allow_token(f, Token_when)) {
+			cond = parse_expr(f, false);
+		}
+
+		AstNode *spec = NULL;
+		if (f->curr_proc != NULL) {
+			syntax_error(import_name, "You cannot use `import` within a procedure. This must be done at the file scope");
+			spec = ast_bad_decl(f, import_name, file_path);
+		} else {
+			spec = ast_import_spec(f, true, file_path, import_name, cond);
+		}
+		return spec;
+	} else {
+		AstNode *cond = NULL;
+		Token file_path = expect_token_after(f, Token_String, "import_load");
+		Token import_name = file_path;
+		import_name.string = str_lit(".");
+
+		if (allow_token(f, Token_when)) {
+			cond = parse_expr(f, false);
+		}
+
+		AstNode *spec = NULL;
+		if (f->curr_proc != NULL) {
+			syntax_error(import_name, "You cannot use `import_load` within a procedure. This must be done at the file scope");
+			spec = ast_bad_decl(f, import_name, file_path);
+		} else {
+			spec = ast_import_spec(f, false, file_path, import_name, cond);
+		}
+		return spec;
+	}
+}
+
+AstNode *parse_decl(AstFile *f) {
+	ParseSpecFunc *func = NULL;
+	switch (f->curr_token.kind) {
+	case Token_var:
+	case Token_const:
+	case Token_let:
+		func = parse_value_spec;
+		break;
+
+	case Token_type:
+		func = parse_type_spec;
+		break;
+
+	case Token_import:
+	case Token_import_load:
+		func = parse_import_spec;
+		break;
+
+	case Token_proc:
+		return parse_proc_decl(f);
+
+	default: {
+		Token tok = f->curr_token;
+		fix_advance_to_next_stmt(f);
+		syntax_error(tok, "Expected a declaration");
+		return ast_bad_decl(f, tok, f->curr_token);
+	}
+	}
+
+	Token token = f->curr_token;
+	next_token(f);
+
+	return parse_gen_decl(f, token, func);
 }
 
 
@@ -2626,8 +2733,7 @@ AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 	case Token_var:
 	case Token_const:
 	case Token_let:
-		next_token(f);
-		return parse_value_decl(f, token);
+		return parse_decl(f);
 	}
 
 	Array<AstNode *> lhs = parse_lhs_expr_list(f);
@@ -3723,20 +3829,11 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_var:
 	case Token_const:
 	case Token_let:
-		s = parse_simple_stmt(f, StmtAllowFlag_None);
-		expect_semicolon(f, s);
-		return s;
-
 	case Token_proc:
-		s = parse_proc_decl(f);
-		expect_semicolon(f, s);
-		return s;
-
 	case Token_type:
-		s = parse_type_decl(f);
-		expect_semicolon(f, s);
-		return s;
-
+	case Token_import:
+	case Token_import_load:
+		return parse_decl(f);
 
 	case Token_if:     return parse_if_stmt(f);
 	case Token_when:   return parse_when_stmt(f);
@@ -3767,8 +3864,7 @@ AstNode *parse_stmt(AstFile *f) {
 		AstNode *decl = NULL;
 		if (f->curr_token.kind == Token_var ||
 		    f->curr_token.kind == Token_let) {
-			Token var = f->curr_token; next_token(f);
-			decl = parse_value_decl(f, var);
+			decl = parse_decl(f);
 			expect_semicolon(f, decl);
 		} else {
 			Array<AstNode *> list = parse_lhs_expr_list(f);
@@ -3785,20 +3881,17 @@ AstNode *parse_stmt(AstFile *f) {
 		}
 
 
-		if (decl != NULL && decl->kind == AstNode_ValueDecl) {
-			#if 1
-			if (decl->ValueDecl.token.kind == Token_const) {
-				syntax_error(token, "`using` may not be applied to constant declarations");
+		if (decl != NULL && decl->kind == AstNode_GenDecl) {
+			if (decl->GenDecl.token.kind != Token_var &&
+			    decl->GenDecl.token.kind != Token_let) {
+				syntax_error(token, "`using` may only be applied to variable declarations");
 				return decl;
 			}
 			if (f->curr_proc == NULL) {
 				syntax_error(token, "`using` is not allowed at the file scope");
 			} else {
-				decl->ValueDecl.flags |= VarDeclFlag_using;
+				decl->GenDecl.flags |= VarDeclFlag_using;
 			}
-			#else
-				decl->ValueDecl.flags |= VarDeclFlag_using;
-			#endif
 			return decl;
 		}
 
@@ -3846,6 +3939,7 @@ AstNode *parse_stmt(AstFile *f) {
 		return ast_push_context(f, token, expr, body);
 	} break;
 
+#if 0
 	case Token_import: {
 		Token token = expect_token(f, Token_import);
 		AstNode *cond = NULL;
@@ -3907,6 +4001,7 @@ AstNode *parse_stmt(AstFile *f) {
 		expect_semicolon(f, decl);
 		return decl;
 	}
+#endif
 
 	case Token_Hash: {
 		AstNode *s = NULL;
@@ -3989,14 +4084,15 @@ AstNode *parse_stmt(AstFile *f) {
 		} else if (tag == "thread_local") {
 			AstNode *s = parse_stmt(f);
 
-			if (s->kind == AstNode_ValueDecl) {
-				if (s->ValueDecl.token.kind == Token_const) {
-					syntax_error(token, "`thread_local` may not be applied to constant declarations");
+			if (s->kind == AstNode_GenDecl) {
+				if (s->GenDecl.token.kind != Token_var &&
+				    s->GenDecl.token.kind != Token_let) {
+					syntax_error(token, "`thread_local` may only be applied to variable declarations");
 				}
 				if (f->curr_proc != NULL) {
 					syntax_error(token, "`thread_local` is only allowed at the file scope");
 				} else {
-					s->ValueDecl.flags |= VarDeclFlag_thread_local;
+					s->GenDecl.flags |= VarDeclFlag_thread_local;
 				}
 				return s;
 			}
@@ -4219,87 +4315,94 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 		    node->kind != AstNode_EmptyStmt) {
 			// NOTE(bill): Sanity check
 			syntax_error_node(node, "Only declarations are allowed at file scope %.*s", LIT(ast_node_strings[node->kind]));
-		} else if (node->kind == AstNode_ImportDecl) {
-			ast_node(id, ImportDecl, node);
-			String collection_name = {};
-			String oirignal_string = id->relpath.string;
-			String file_str = id->relpath.string;
-			gbAllocator allocator = heap_allocator(); // TODO(bill): Change this allocator
-			String import_file = {};
+		} else if (node->kind == AstNode_GenDecl) {
+			ast_node(gd, GenDecl, node);
+			if (gd->token.kind == Token_import ||
+			    gd->token.kind == Token_import_load) {
+				for_array(spec_index, gd->specs) {
+					AstNode *spec = gd->specs[spec_index];
+					ast_node(id, ImportSpec, spec);
+					String collection_name = {};
+					String oirignal_string = id->relpath.string;
+					String file_str = id->relpath.string;
+					gbAllocator allocator = heap_allocator(); // TODO(bill): Change this allocator
+					String import_file = {};
 
-		#if 0
-			isize colon_pos = -1;
-			for (isize j = 0; j < file_str.len; j++) {
-				if (file_str[j] == ':') {
-					colon_pos = j;
-					break;
-				}
-			}
-			if (colon_pos > 0) {
-				collection_name = make_string(file_str.text, colon_pos);
-				file_str.text += colon_pos+1;
-				file_str.len  -= colon_pos+1;
-			}
+				#if 0
+					isize colon_pos = -1;
+					for (isize j = 0; j < file_str.len; j++) {
+						if (file_str[j] == ':') {
+							colon_pos = j;
+							break;
+						}
+					}
+					if (colon_pos > 0) {
+						collection_name = make_string(file_str.text, colon_pos);
+						file_str.text += colon_pos+1;
+						file_str.len  -= colon_pos+1;
+					}
 
-			if (collection_name.len == 0) {
-				syntax_error_node(node, "Missing import collection for path: `%.*s`", LIT(oirignal_string));
-				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
-				continue;
-			}
+					if (collection_name.len == 0) {
+						syntax_error_node(node, "Missing import collection for path: `%.*s`", LIT(oirignal_string));
+						decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
+						continue;
+					}
 
 
-			if (collection_name == "core") {
-				String abs_path = get_fullpath_core(allocator, file_str);
-				if (gb_file_exists(cast(char *)abs_path.text)) { // NOTE(bill): This should be null terminated
-					import_file = abs_path;
-				}
-			} else if (collection_name == "local") {
-				String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
-				if (gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
+					if (collection_name == "core") {
+						String abs_path = get_fullpath_core(allocator, file_str);
+						if (gb_file_exists(cast(char *)abs_path.text)) { // NOTE(bill): This should be null terminated
+							import_file = abs_path;
+						}
+					} else if (collection_name == "local") {
+						String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
+						if (gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
+							import_file = rel_path;
+						}
+					} else {
+						syntax_error_node(node, "Unknown import collection: `%.*s`", LIT(collection_name));
+						decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
+						continue;
+					}
+
+					if (!is_import_path_valid(file_str)) {
+						if (id->is_import) {
+							syntax_error_node(node, "Invalid import path: `%.*s`", LIT(file_str));
+						} else {
+							syntax_error_node(node, "Invalid include path: `%.*s`", LIT(file_str));
+						}
+						// NOTE(bill): It's a naughty name
+						decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
+						continue;
+					}
+
+				#else
+					if (!is_import_path_valid(file_str)) {
+						if (id->is_import) {
+							syntax_error_node(node, "Invalid import path: `%.*s`", LIT(file_str));
+						} else {
+							syntax_error_node(node, "Invalid include path: `%.*s`", LIT(file_str));
+						}
+						// NOTE(bill): It's a naughty name
+						decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
+						continue;
+					}
+
+
+					String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
 					import_file = rel_path;
-				}
-			} else {
-				syntax_error_node(node, "Unknown import collection: `%.*s`", LIT(collection_name));
-				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
-				continue;
-			}
+					if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
+						String abs_path = get_fullpath_core(allocator, file_str);
+						if (gb_file_exists(cast(char *)abs_path.text)) {
+							import_file = abs_path;
+						}
+					}
+				#endif
 
-			if (!is_import_path_valid(file_str)) {
-				if (id->is_import) {
-					syntax_error_node(node, "Invalid import path: `%.*s`", LIT(file_str));
-				} else {
-					syntax_error_node(node, "Invalid include path: `%.*s`", LIT(file_str));
-				}
-				// NOTE(bill): It's a naughty name
-				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
-				continue;
-			}
-
-		#else
-			if (!is_import_path_valid(file_str)) {
-				if (id->is_import) {
-					syntax_error_node(node, "Invalid import path: `%.*s`", LIT(file_str));
-				} else {
-					syntax_error_node(node, "Invalid include path: `%.*s`", LIT(file_str));
-				}
-				// NOTE(bill): It's a naughty name
-				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
-				continue;
-			}
-
-
-			String rel_path = get_fullpath_relative(allocator, base_dir, file_str);
-			import_file = rel_path;
-			if (!gb_file_exists(cast(char *)rel_path.text)) { // NOTE(bill): This should be null terminated
-				String abs_path = get_fullpath_core(allocator, file_str);
-				if (gb_file_exists(cast(char *)abs_path.text)) {
-					import_file = abs_path;
+					id->fullpath = import_file;
+					try_add_import_path(p, import_file, file_str, ast_node_token(node).pos);
 				}
 			}
-		#endif
-
-			id->fullpath = import_file;
-			try_add_import_path(p, import_file, file_str, ast_node_token(node).pos);
 		} else if (node->kind == AstNode_ForeignLibrary) {
 			AstNodeForeignLibrary *fl = &node->ForeignLibrary;
 			String file_str = fl->filepath.string;

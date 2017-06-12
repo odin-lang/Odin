@@ -1948,7 +1948,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 	case_ast_node(us, UsingStmt, node);
 		for_array(i, us->list) {
 			AstNode *decl = unparen_expr(us->list[i]);
-			if (decl->kind == AstNode_ValueDecl) {
+			if (decl->kind == AstNode_GenDecl) {
 				ssa_build_stmt(p, decl);
 			}
 		}
@@ -1966,61 +1966,6 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 		ssaAddr addr = ssa_build_addr(p, s->expr);
 		Type *t = ssa_addr_type(addr);
 		ssa_build_assign_op(p, addr, ssa_const_int(p, t, 1), op);
-	case_end;
-
-	case_ast_node(vd, ValueDecl, node);
-		if (vd->token.kind != Token_const) {
-			ssaModule *m = p->module;
-			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
-			if (vd->values.count == 0) {
-				for_array(i, vd->names) {
-					AstNode *name = vd->names[i];
-					if (!ssa_is_blank_ident(name)) {
-						ssa_add_local_for_ident(p, name);
-					}
-				}
-			} else {
-				Array<ssaAddr> lvals = {0};
-				Array<ssaValue *>  inits = {0};
-				array_init(&lvals, m->tmp_allocator, vd->names.count);
-				array_init(&inits, m->tmp_allocator, vd->names.count);
-
-				for_array(i, vd->names) {
-					AstNode *name = vd->names[i];
-					ssaAddr lval = ssa_addr(NULL);
-					if (!ssa_is_blank_ident(name)) {
-						lval = ssa_add_local_for_ident(p, name);
-					}
-
-					array_add(&lvals, lval);
-				}
-
-				for_array(i, vd->values) {
-					ssaValue *init = ssa_build_expr(p, vd->values[i]);
-					if (init == NULL) { // TODO(bill): remove this
-						continue;
-					}
-					Type *t = base_type(init->type);
-					if (t->kind == Type_Tuple) {
-						for (isize i = 0; i < t->Tuple.variable_count; i++) {
-							// Entity *e = t->Tuple.variables[i];
-							ssaValue *v = ssa_emit_value_index(p, init, i);
-							array_add(&inits, v);
-						}
-					} else {
-						array_add(&inits, init);
-					}
-				}
-
-				for_array(i, inits) {
-					ssa_addr_store(p, lvals[i], inits[i]);
-				}
-			}
-
-			gb_temp_arena_memory_end(tmp);
-		} else {
-			GB_PANIC("TODO(bill): ssa_build_stmt Type/Proc Entities");
-		}
 	case_end;
 
 	case_ast_node(as, AssignStmt, node);

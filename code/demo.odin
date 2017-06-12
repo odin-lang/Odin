@@ -1,15 +1,23 @@
-import "fmt.odin";
-import "atomics.odin";
-import "bits.odin";
-import "math.odin";
-import "mem.odin";
-import "opengl.odin";
-import "strconv.odin";
-import "strings.odin";
-import "sync.odin";
-import "types.odin";
-import "utf8.odin";
-import "utf16.odin";
+import (
+	"fmt.odin";
+	"hash.odin";
+	"atomics.odin";
+	"bits.odin";
+	"math.odin";
+	"mem.odin";
+	"opengl.odin";
+	"strconv.odin";
+	"strings.odin";
+	"sync.odin";
+	"types.odin";
+	"utf8.odin";
+	"utf16.odin";
+)
+
+const (
+	X = 123;
+	Y = 432;
+)
 
 proc main() {
 	proc(s: string){

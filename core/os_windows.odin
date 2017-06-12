@@ -1,52 +1,54 @@
 import win32 "sys/windows.odin";
 
-type Handle   int;
-type FileTime u64;
-type Errno    int;
+type (
+	Handle   int;
+	FileTime u64;
+	Errno    int;
+)
 
-const INVALID_HANDLE: Handle = -1;
+const (
+	INVALID_HANDLE: Handle = -1;
 
+	O_RDONLY   = 0x00000;
+	O_WRONLY   = 0x00001;
+	O_RDWR     = 0x00002;
+	O_CREAT    = 0x00040;
+	O_EXCL     = 0x00080;
+	O_NOCTTY   = 0x00100;
+	O_TRUNC    = 0x00200;
+	O_NONBLOCK = 0x00800;
+	O_APPEND   = 0x00400;
+	O_SYNC     = 0x01000;
+	O_ASYNC    = 0x02000;
+	O_CLOEXEC  = 0x80000;
 
-const O_RDONLY   = 0x00000;
-const O_WRONLY   = 0x00001;
-const O_RDWR     = 0x00002;
-const O_CREAT    = 0x00040;
-const O_EXCL     = 0x00080;
-const O_NOCTTY   = 0x00100;
-const O_TRUNC    = 0x00200;
-const O_NONBLOCK = 0x00800;
-const O_APPEND   = 0x00400;
-const O_SYNC     = 0x01000;
-const O_ASYNC    = 0x02000;
-const O_CLOEXEC  = 0x80000;
+	ERROR_NONE:                Errno = 0;
+	ERROR_FILE_NOT_FOUND:      Errno = 2;
+	ERROR_PATH_NOT_FOUND:      Errno = 3;
+	ERROR_ACCESS_DENIED:       Errno = 5;
+	ERROR_NO_MORE_FILES:       Errno = 18;
+	ERROR_HANDLE_EOF:          Errno = 38;
+	ERROR_NETNAME_DELETED:     Errno = 64;
+	ERROR_FILE_EXISTS:         Errno = 80;
+	ERROR_BROKEN_PIPE:         Errno = 109;
+	ERROR_BUFFER_OVERFLOW:     Errno = 111;
+	ERROR_INSUFFICIENT_BUFFER: Errno = 122;
+	ERROR_MOD_NOT_FOUND:       Errno = 126;
+	ERROR_PROC_NOT_FOUND:      Errno = 127;
+	ERROR_DIR_NOT_EMPTY:       Errno = 145;
+	ERROR_ALREADY_EXISTS:      Errno = 183;
+	ERROR_ENVVAR_NOT_FOUND:    Errno = 203;
+	ERROR_MORE_DATA:           Errno = 234;
+	ERROR_OPERATION_ABORTED:   Errno = 995;
+	ERROR_IO_PENDING:          Errno = 997;
+	ERROR_NOT_FOUND:           Errno = 1168;
+	ERROR_PRIVILEGE_NOT_HELD:  Errno = 1314;
+	WSAEACCES:                 Errno = 10013;
+	WSAECONNRESET:             Errno = 10054;
 
-const ERROR_NONE:                Errno = 0;
-const ERROR_FILE_NOT_FOUND:      Errno = 2;
-const ERROR_PATH_NOT_FOUND:      Errno = 3;
-const ERROR_ACCESS_DENIED:       Errno = 5;
-const ERROR_NO_MORE_FILES:       Errno = 18;
-const ERROR_HANDLE_EOF:          Errno = 38;
-const ERROR_NETNAME_DELETED:     Errno = 64;
-const ERROR_FILE_EXISTS:         Errno = 80;
-const ERROR_BROKEN_PIPE:         Errno = 109;
-const ERROR_BUFFER_OVERFLOW:     Errno = 111;
-const ERROR_INSUFFICIENT_BUFFER: Errno = 122;
-const ERROR_MOD_NOT_FOUND:       Errno = 126;
-const ERROR_PROC_NOT_FOUND:      Errno = 127;
-const ERROR_DIR_NOT_EMPTY:       Errno = 145;
-const ERROR_ALREADY_EXISTS:      Errno = 183;
-const ERROR_ENVVAR_NOT_FOUND:    Errno = 203;
-const ERROR_MORE_DATA:           Errno = 234;
-const ERROR_OPERATION_ABORTED:   Errno = 995;
-const ERROR_IO_PENDING:          Errno = 997;
-const ERROR_NOT_FOUND:           Errno = 1168;
-const ERROR_PRIVILEGE_NOT_HELD:  Errno = 1314;
-const WSAEACCES:                 Errno = 10013;
-const WSAECONNRESET:             Errno = 10054;
-
-// Windows reserves errors >= 1<<29 for application use
-const ERROR_FILE_IS_PIPE: Errno = 1<<29 + 0;
-
+	// Windows reserves errors >= 1<<29 for application use
+	ERROR_FILE_IS_PIPE: Errno = 1<<29 + 0;
+)
 
 // "Argv" arguments converted to Odin strings
 let args = _alloc_command_line_arguments();

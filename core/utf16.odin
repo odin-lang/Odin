@@ -1,11 +1,12 @@
-const REPLACEMENT_CHAR = '\uFFFD';
-const MAX_RUNE         = '\U0010FFFF';
+const (
+	REPLACEMENT_CHAR = '\uFFFD';
+	MAX_RUNE         = '\U0010FFFF';
 
-const _surr1           = 0xd800;
-const _surr2           = 0xdc00;
-const _surr3           = 0xe000;
-const _surr_self       = 0x10000;
-
+	_surr1           = 0xd800;
+	_surr2           = 0xdc00;
+	_surr3           = 0xe000;
+	_surr_self       = 0x10000;
+)
 
 proc is_surrogate(r: rune) -> bool {
 	return _surr1 <= r && r < _surr3;

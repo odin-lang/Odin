@@ -1,27 +1,28 @@
-const U8_MIN   =   u8(0);
-const U16_MIN  =  u16(0);
-const U32_MIN  =  u32(0);
-const U64_MIN  =  u64(0);
-const U128_MIN = u128(0);
+const (
+	U8_MIN   =   u8(0);
+	U16_MIN  =  u16(0);
+	U32_MIN  =  u32(0);
+	U64_MIN  =  u64(0);
+	U128_MIN = u128(0);
 
-const I8_MIN   =   i8(-0x80);
-const I16_MIN  =  i16(-0x8000);
-const I32_MIN  =  i32(-0x8000_0000);
-const I64_MIN  =  i64(-0x8000_0000_0000_0000);
-const I128_MIN = i128(-0x8000_0000_0000_0000_0000_0000_0000_0000);
+	I8_MIN   =   i8(-0x80);
+	I16_MIN  =  i16(-0x8000);
+	I32_MIN  =  i32(-0x8000_0000);
+	I64_MIN  =  i64(-0x8000_0000_0000_0000);
+	I128_MIN = i128(-0x8000_0000_0000_0000_0000_0000_0000_0000);
 
-const U8_MAX   =   ~u8(0);
-const U16_MAX  =  ~u16(0);
-const U32_MAX  =  ~u32(0);
-const U64_MAX  =  ~u64(0);
-const U128_MAX = ~u128(0);
+	U8_MAX   =   ~u8(0);
+	U16_MAX  =  ~u16(0);
+	U32_MAX  =  ~u32(0);
+	U64_MAX  =  ~u64(0);
+	U128_MAX = ~u128(0);
 
-const I8_MAX   =   i8(0x7f);
-const I16_MAX  =  i16(0x7fff);
-const I32_MAX  =  i32(0x7fff_ffff);
-const I64_MAX  =  i64(0x7fff_ffff_ffff_ffff);
-const I128_MAX = i128(0x7fff_ffff_ffff_ffff_ffff_ffff_ffff_ffff);
-
+	I8_MAX   =   i8(0x7f);
+	I16_MAX  =  i16(0x7fff);
+	I32_MAX  =  i32(0x7fff_ffff);
+	I64_MAX  =  i64(0x7fff_ffff_ffff_ffff);
+	I128_MAX = i128(0x7fff_ffff_ffff_ffff_ffff_ffff_ffff_ffff);
+)
 
 proc count_ones(i:   u8) ->   u8 { proc __llvm_ctpop(u8)   ->   u8 #foreign __llvm_core "llvm.ctpop.i8";  return __llvm_ctpop(i); }
 proc count_ones(i:   i8) ->   i8 { proc __llvm_ctpop(i8)   ->   i8 #foreign __llvm_core "llvm.ctpop.i8";  return __llvm_ctpop(i); }
