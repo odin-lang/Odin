@@ -1,6 +1,6 @@
 #import . "decimal.odin";
 
-const IntFlag = enum {
+type IntFlag enum {
 	Prefix = 1<<0,
 	Plus   = 1<<1,
 	Space  = 1<<2,
@@ -210,14 +210,14 @@ proc append_float(buf: []u8, f: f64, fmt: u8, prec, bit_size: int) -> string {
 
 
 
-const DecimalSlice = struct {
+type DecimalSlice struct {
 	digits:        []u8,
 	count:         int,
 	decimal_point: int,
 	neg:           bool,
 }
 
-const Float_Info = struct {
+type Float_Info struct {
 	mantbits: uint,
 	expbits:  uint,
 	bias:     int,
@@ -415,7 +415,7 @@ proc round_shortest(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 }
 
 const MAX_BASE = 32;
-immutable var digits = "0123456789abcdefghijklmnopqrstuvwxyz";
+let digits = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 
 proc is_integer_negative(u: u128, is_signed: bool, bit_size: int) -> (unsigned: u128, neg: bool) {

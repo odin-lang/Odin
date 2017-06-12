@@ -9,10 +9,10 @@ const CONTEXT_FORWARD_COMPATIBLE_BIT_ARB = 0x0002;
 const CONTEXT_CORE_PROFILE_BIT_ARB       = 0x00000001;
 const CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB = 0x00000002;
 
-const Hglrc = Handle;
-const ColorRef = u32;
+type Hglrc    Handle;
+type ColorRef u32;
 
-const LayerPlaneDescriptor = struct {
+type LayerPlaneDescriptor struct {
 	size:             u16,
 	version:          u16,
 	flags:            u32,
@@ -39,11 +39,11 @@ const LayerPlaneDescriptor = struct {
 	transparent:      ColorRef,
 }
 
-const PointFloat = struct {
+type PointFloat struct {
 	x, y: f32,
 }
 
-const Glyph_MetricsFloat = struct {
+type Glyph_MetricsFloat struct {
 	black_box_x:  f32,
 	black_box_y:  f32,
 	glyph_origin: PointFloat,
@@ -51,10 +51,10 @@ const Glyph_MetricsFloat = struct {
 	cell_inc_y:   f32,
 }
 
-const CreateContextAttribsARBType = type proc(hdc: Hdc, h_share_context: rawptr, attribList: ^i32) -> Hglrc;
-const ChoosePixelFormatARBType    = type proc(hdc: Hdc, attrib_i_list: ^i32, attrib_f_list: ^f32, max_formats: u32, formats: ^i32, num_formats : ^u32) -> Bool #cc_c;
-const SwapIntervalEXTType         = type proc(interval: i32) -> bool #cc_c;
-const GetExtensionsStringARBType  = type proc(Hdc) -> ^u8 #cc_c;
+type CreateContextAttribsARBType proc(hdc: Hdc, h_share_context: rawptr, attribList: ^i32) -> Hglrc;
+type ChoosePixelFormatARBType    proc(hdc: Hdc, attrib_i_list: ^i32, attrib_f_list: ^f32, max_formats: u32, formats: ^i32, num_formats : ^u32) -> Bool #cc_c;
+type SwapIntervalEXTType         proc(interval: i32) -> bool #cc_c;
+type GetExtensionsStringARBType  proc(Hdc) -> ^u8 #cc_c;
 
 
 var create_context_attribs_arb: CreateContextAttribsARBType;

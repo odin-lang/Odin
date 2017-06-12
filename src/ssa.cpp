@@ -1969,7 +1969,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 	case_end;
 
 	case_ast_node(vd, ValueDecl, node);
-		if (vd->token.kind == Token_var) {
+		if (vd->token.kind != Token_const) {
 			ssaModule *m = p->module;
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
 			if (vd->values.count == 0) {

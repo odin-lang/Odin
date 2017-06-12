@@ -1451,7 +1451,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 		case_end;
 
 		case_ast_node(vd, ValueDecl, decl);
-			if (vd->token.kind == Token_var) {
+			if (vd->token.kind != Token_const) {
 				if (!c->context.scope->is_file) {
 					// NOTE(bill): local scope -> handle later and in order
 					break;
@@ -1527,30 +1527,30 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					Entity *e = NULL;
 
 					AstNode *up_init = unparen_expr(init);
-					if (up_init != NULL && is_ast_node_type(up_init)) {
-						AstNode *type = up_init;
-						e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
-						// TODO(bill): What if vd->type != NULL??? How to handle this case?
-						d->type_expr = type;
-						d->init_expr = type;
-					} else if (up_init != NULL && up_init->kind == AstNode_Alias) {
-					#if 1
-						error_node(up_init, "#alias declarations are not yet supported");
-						continue;
-					#else
-						e = make_entity_alias(c->allocator, d->scope, name->Ident, NULL, EntityAlias_Invalid, NULL);
-						d->type_expr = vd->type;
-						d->init_expr = up_init->Alias.expr;
-					#endif
-					// } else if (init != NULL && up_init->kind == AstNode_ProcLit) {
-						// e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
-						// d->proc_lit = up_init;
-						// d->type_expr = vd->type;
-					} else {
+					// if (up_init != NULL && is_ast_node_type(up_init)) {
+					// 	AstNode *type = up_init;
+					// 	e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
+					// 	// TODO(bill): What if vd->type != NULL??? How to handle this case?
+					// 	d->type_expr = type;
+					// 	d->init_expr = type;
+					// } else if (up_init != NULL && up_init->kind == AstNode_Alias) {
+					// #if 1
+					// 	error_node(up_init, "#alias declarations are not yet supported");
+					// 	continue;
+					// #else
+					// 	e = make_entity_alias(c->allocator, d->scope, name->Ident, NULL, EntityAlias_Invalid, NULL);
+					// 	d->type_expr = vd->type;
+					// 	d->init_expr = up_init->Alias.expr;
+					// #endif
+					// // } else if (init != NULL && up_init->kind == AstNode_ProcLit) {
+					// 	// e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
+					// 	// d->proc_lit = up_init;
+					// 	// d->type_expr = vd->type;
+					// } else {
 						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, empty_exact_value);
 						d->type_expr = vd->type;
 						d->init_expr = init;
-					}
+					// }
 					GB_ASSERT(e != NULL);
 					e->identifier = name;
 
@@ -1575,6 +1575,27 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 			e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, pd->tags);
 			d->proc_decl = decl;
 			d->type_expr = pd->type;
+			e->identifier = name;
+			add_entity_and_decl_info(c, name, e, d);
+		case_end;
+
+		case_ast_node(td, TypeDecl, decl);
+			AstNode *name = td->name;
+			if (name->kind != AstNode_Ident) {
+				error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+				break;
+			}
+
+
+			DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
+			Entity *e = NULL;
+
+			AstNode *type = unparen_expr(td->type);
+			e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
+			// TODO(bill): What if vd->type != NULL??? How to handle this case?
+			d->type_expr = type;
+			d->init_expr = type;
+
 			e->identifier = name;
 			add_entity_and_decl_info(c, name, e, d);
 		case_end;

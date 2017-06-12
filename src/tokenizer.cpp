@@ -83,6 +83,7 @@ TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
 TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_var,            "var"),                 \
+	TOKEN_KIND(Token_let,            "let"),                 \
 	TOKEN_KIND(Token_const,          "const"),               \
 	TOKEN_KIND(Token_type,           "type"),                \
 	TOKEN_KIND(Token_when,           "when"),                \
@@ -109,7 +110,6 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_dynamic,        "dynamic"),             \
 	TOKEN_KIND(Token_map,            "map"),                 \
 	TOKEN_KIND(Token_using,          "using"),               \
-	TOKEN_KIND(Token_immutable,      "immutable"),           \
 	TOKEN_KIND(Token_context,        "context"),             \
 	TOKEN_KIND(Token_push_context,   "push_context"),        \
 	TOKEN_KIND(Token_push_allocator, "push_allocator"),      \

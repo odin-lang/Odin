@@ -1,12 +1,12 @@
 #import "fmt.odin";
 #import "strings.odin";
 
-const Handle    = i32;
-const FileTime  = u64;
-const Errno     = int;
+type Handle    i32;
+type FileTime  u64;
+type Errno     int;
 
 // TODO(zangent): Find out how to make this work on x64 and x32.
-const AddressSize = i64;
+type AddressSize i64;
 
 // INVALID_HANDLE: Handle : -1;
 
@@ -41,12 +41,12 @@ const RTLD_FIRST    = 0x100;
 
 var args: [dynamic]string;
 
-const _FileTime = struct #ordered {
+type _FileTime struct #ordered {
 	seconds: i64,
 	nanoseconds: i64
 }
 
-const Stat = struct #ordered {
+type Stat struct #ordered {
 	device_id : i32, // ID of device containing file
 	mode      : u16, // Mode of the file
 	nlink     : u16, // Number of hard links

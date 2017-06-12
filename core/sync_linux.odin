@@ -1,11 +1,11 @@
 #import "atomics.odin";
 #import "os.odin";
 
-const Semaphore = struct {
+type Semaphore struct {
 	// _handle: win32.Handle,
 }
 
-const Mutex = struct {
+type Mutex struct {
 	_semaphore: Semaphore,
 	_counter:   i32,
 	_owner:     i32,

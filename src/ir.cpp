@@ -5813,7 +5813,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 	case_end;
 
 	case_ast_node(vd, ValueDecl, node);
-		if (vd->token.kind == Token_var) {
+		if (vd->token.kind != Token_const) {
 			irModule *m = proc->module;
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
 
@@ -5862,30 +5862,6 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			}
 
 			gb_temp_arena_memory_end(tmp);
-		} else {
-			for_array(i, vd->names) {
-				AstNode *ident = vd->names[i];
-				GB_ASSERT(ident->kind == AstNode_Ident);
-				Entity *e = entity_of_ident(proc->module->info, ident);
-				GB_ASSERT(e != NULL);
-				switch (e->kind) {
-				case Entity_TypeName: {
-					// NOTE(bill): Generate a new name
-					// parent_proc.name-guid
-					String ts_name = e->token.string;
-					isize name_len = proc->name.len + 1 + ts_name.len + 1 + 10 + 1;
-					u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-					i32 guid = cast(i32)proc->module->members.entries.count;
-					name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(ts_name), guid);
-					String name = make_string(name_text, name_len-1);
-
-					irValue *value = ir_value_type_name(proc->module->allocator,
-					                                           name, e->type);
-					map_set(&proc->module->entity_names, hash_pointer(e), name);
-					ir_gen_global_type_name(proc->module, e, name);
-				} break;
-				}
-			}
 		}
 	case_end;
 
@@ -5957,6 +5933,28 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			} else {
 				array_add(&proc->children, &value->Proc);
 			}
+		}
+	case_end;
+
+	case_ast_node(td, TypeDecl, node);
+		AstNode *ident = td->name;
+		GB_ASSERT(ident->kind == AstNode_Ident);
+		Entity *e = entity_of_ident(proc->module->info, ident);
+		GB_ASSERT(e != NULL);
+		if (e->kind == Entity_TypeName) {
+			// NOTE(bill): Generate a new name
+			// parent_proc.name-guid
+			String ts_name = e->token.string;
+			isize name_len = proc->name.len + 1 + ts_name.len + 1 + 10 + 1;
+			u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
+			i32 guid = cast(i32)proc->module->members.entries.count;
+			name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(ts_name), guid);
+			String name = make_string(name_text, name_len-1);
+
+			irValue *value = ir_value_type_name(proc->module->allocator,
+			                                           name, e->type);
+			map_set(&proc->module->entity_names, hash_pointer(e), name);
+			ir_gen_global_type_name(proc->module, e, name);
 		}
 	case_end;
 

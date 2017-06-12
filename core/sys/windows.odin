@@ -4,21 +4,21 @@
 #foreign_system_library "winmm.lib"    when ODIN_OS == "windows";
 #foreign_system_library "shell32.lib"  when ODIN_OS == "windows";
 
-const Handle    = rawptr;
-const Hwnd      = Handle;
-const Hdc       = Handle;
-const Hinstance = Handle;
-const Hicon     = Handle;
-const Hcursor   = Handle;
-const Hmenu     = Handle;
-const Hbrush    = Handle;
-const Hgdiobj   = Handle;
-const Hmodule   = Handle;
-const Wparam    = uint;
-const Lparam    = int;
-const Lresult   = int;
-const Bool      = i32;
-const WndProc  = type proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
+type Handle    rawptr;
+type Hwnd      Handle;
+type Hdc       Handle;
+type Hinstance Handle;
+type Hicon     Handle;
+type Hcursor   Handle;
+type Hmenu     Handle;
+type Hbrush    Handle;
+type Hgdiobj   Handle;
+type Hmodule   Handle;
+type Wparam    uint;
+type Lparam    int;
+type Lresult   int;
+type Bool      i32;
+type WndProc   proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
 
 
 const INVALID_HANDLE = Handle(~int(0));
@@ -86,11 +86,11 @@ const SM_CYSCREEN = 1;
 const SW_SHOW = 5;
 
 
-const Point = struct #ordered {
+type Point struct #ordered {
 	x, y: i32,
 }
 
-const WndClassExA = struct #ordered {
+type WndClassExA struct #ordered {
 	size, style:           u32,
 	wnd_proc:              WndProc,
 	cls_extra, wnd_extra:  i32,
@@ -102,7 +102,7 @@ const WndClassExA = struct #ordered {
 	sm:                    Hicon,
 }
 
-const Msg = struct #ordered {
+type Msg struct #ordered {
 	hwnd:    Hwnd,
 	message: u32,
 	wparam:  Wparam,
@@ -111,24 +111,24 @@ const Msg = struct #ordered {
 	pt:      Point,
 }
 
-const Rect = struct #ordered {
+type Rect struct #ordered {
 	left:   i32,
 	top:    i32,
 	right:  i32,
 	bottom: i32,
 }
 
-const Filetime = struct #ordered {
+type Filetime struct #ordered {
 	lo, hi: u32,
 }
 
-const Systemtime = struct #ordered {
+type Systemtime struct #ordered {
 	year, month: u16,
 	day_of_week, day: u16,
 	hour, minute, second, millisecond: u16,
 }
 
-const ByHandleFileInformation = struct #ordered {
+type ByHandleFileInformation struct #ordered {
 	file_attributes:      u32,
 	creation_time,
 	last_access_time,
@@ -141,7 +141,7 @@ const ByHandleFileInformation = struct #ordered {
 	file_index_low:       u32,
 }
 
-const FileAttributeData = struct #ordered {
+type FileAttributeData struct #ordered {
 	file_attributes:  u32,
 	creation_time,
 	last_access_time,
@@ -150,7 +150,7 @@ const FileAttributeData = struct #ordered {
 	file_size_low:    u32,
 }
 
-const FindData = struct #ordered {
+type FindData struct #ordered {
     file_attributes     : u32,
     creation_time       : Filetime,
     last_access_time    : Filetime,
@@ -164,7 +164,7 @@ const FindData = struct #ordered {
 }
 
 
-const GET_FILEEX_INFO_LEVELS = i32;
+type GET_FILEEX_INFO_LEVELS i32;
 
 const GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS = 0;
 const GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS = 1;
@@ -323,7 +323,7 @@ const HEAP_ZERO_MEMORY = 0x00000008;
 
 // Synchronization
 
-const Security_Attributes = struct #ordered {
+type Security_Attributes struct #ordered {
 	length:              u32,
 	security_descriptor: rawptr,
 	inherit_handle:      Bool,
@@ -357,7 +357,7 @@ proc read_barrier      () #foreign kernel32 "ReadBarrier";
 
 
 
-const Hmonitor = Handle;
+type Hmonitor Handle;
 
 const GWL_STYLE = -16;
 
@@ -374,14 +374,14 @@ const SWP_NOSIZE        = 0x0001;
 const SWP_NOMOVE        = 0x0002;
 
 
-const MonitorInfo = struct #ordered {
+type MonitorInfo struct #ordered {
 	size:      u32,
 	monitor:   Rect,
 	work:      Rect,
 	flags:     u32,
 }
 
-const WindowPlacement = struct #ordered {
+type WindowPlacement struct #ordered {
 	length:     u32,
 	flags:      u32,
 	show_cmd:   u32,
@@ -418,7 +418,7 @@ proc LOWORD(lParam: Lparam) -> u16 { return u16(lParam); }
 
 
 
-const BitmapInfoHeader = struct #ordered {
+type BitmapInfoHeader struct #ordered {
 	size:              u32,
 	width, height:     i32,
 	planes, bit_count: i16,
@@ -429,13 +429,13 @@ const BitmapInfoHeader = struct #ordered {
 	clr_used:          u32,
 	clr_important:     u32,
 }
-const BitmapInfo = struct #ordered {
+type BitmapInfo struct #ordered {
 	using header: BitmapInfoHeader,
 	colors:       [1]RgbQuad,
 }
 
 
-const RgbQuad = struct #ordered { blue, green, red, reserved: u8 }
+type RgbQuad struct #ordered { blue, green, red, reserved: u8 }
 
 const BI_RGB         = 0;
 const DIB_RGB_COLORS = 0x00;
@@ -481,7 +481,7 @@ const PFD_DOUBLEBUFFER_DONTCARE = 0x40000000;
 const PFD_STEREO_DONTCARE       = 0x80000000;
 
 
-const PixelFormatDescriptor = struct #ordered {
+type PixelFormatDescriptor struct #ordered {
 	size,
 	version,
 	flags: u32,
@@ -519,7 +519,7 @@ proc swap_buffers       (hdc: Hdc) -> Bool                                      
 proc release_dc         (wnd: Hwnd, hdc: Hdc) -> i32                                       #foreign user32 "ReleaseDC";
 
 
-const Proc  = type proc() #cc_c;
+type Proc proc() #cc_c;
 
 const MAPVK_VK_TO_CHAR   = 2;
 const MAPVK_VK_TO_VSC    = 0;
@@ -533,7 +533,7 @@ proc get_async_key_state(v_key: i32) -> i16 #foreign user32 "GetAsyncKeyState";
 
 proc is_key_down(key: KeyCode) -> bool #inline { return get_async_key_state(i32(key)) < 0; }
 
-const KeyCode = enum i32 {
+type KeyCode enum i32 {
 	Lbutton    = 0x01,
 	Rbutton    = 0x02,
 	Cancel     = 0x03,

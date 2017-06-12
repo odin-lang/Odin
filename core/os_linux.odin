@@ -1,9 +1,9 @@
 // #import "fmt.odin";
 #import "strings.odin";
 
-const Handle    = i32;
-const FileTime  = u64;
-const Errno     = i32;
+type Handle   i32;
+type FileTime u64;
+type Errno    i32;
 
 // INVALID_HANDLE: Handle : -1;
 
@@ -34,9 +34,9 @@ const RTLD_BINDING_MASK = 0x3;
 const RTLD_GLOBAL       = 0x100;
 
 // "Argv" arguments converted to Odin strings
-immutable var args = _alloc_command_line_arguments();
+let args = _alloc_command_line_arguments();
 
-const _FileTime = struct #ordered {
+type _FileTime struct #ordered {
 	seconds:     i64,
 	nanoseconds: i32,
 	reserved:    i32,
@@ -46,7 +46,7 @@ const _FileTime = struct #ordered {
 //  https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.7-4.6/+/jb-dev/sysroot/usr/include/bits/stat.h
 // Validity is not guaranteed.
 
-const Stat = struct #ordered {
+type Stat struct #ordered {
 	device_id:     u64, // ID of device containing file
 	serial:        u64, // File serial number
 	nlink:         u32, // Number of hard links

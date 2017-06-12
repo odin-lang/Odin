@@ -178,6 +178,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 	if (init != NULL) {
 		check_expr_or_type(c, &operand, init);
 	}
+#if 0
 	if (operand.mode == Addressing_Type) {
 		e->kind = Entity_TypeName;
 
@@ -186,6 +187,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 		check_type_decl(c, e, d->type_expr, named_type);
 		return;
 	}
+#endif
 
 	check_init_constant(c, e, &operand);
 

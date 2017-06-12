@@ -16,16 +16,16 @@ const EPSILON      = 1.19209290e-7;
 const τ = TAU;
 const π = PI;
 
-const Vec2 = [vector 2]f32;
-const Vec3 = [vector 3]f32;
-const Vec4 = [vector 4]f32;
+type Vec2 [vector 2]f32;
+type Vec3 [vector 3]f32;
+type Vec4 [vector 4]f32;
 
 // Column major
-const Mat2 = [2][2]f32;
-const Mat3 = [3][3]f32;
-const Mat4 = [4][4]f32;
+type Mat2 [2][2]f32;
+type Mat3 [3][3]f32;
+type Mat4 [4][4]f32;
 
-const Complex = complex64;
+type Complex complex64;
 
 proc sqrt(x: f32) -> f32 #foreign __llvm_core "llvm.sqrt.f32";
 proc sqrt(x: f64) -> f64 #foreign __llvm_core "llvm.sqrt.f64";

@@ -1,8 +1,8 @@
 #import win32 "sys/windows.odin";
 
-const Handle    = int;
-const FileTime  = u64;
-const Errno     = int;
+type Handle   int;
+type FileTime u64;
+type Errno    int;
 
 const INVALID_HANDLE: Handle = -1;
 
@@ -49,7 +49,7 @@ const ERROR_FILE_IS_PIPE: Errno = 1<<29 + 0;
 
 
 // "Argv" arguments converted to Odin strings
-immutable var args = _alloc_command_line_arguments();
+let args = _alloc_command_line_arguments();
 
 
 proc open(path: string, mode: int, perm: u32) -> (Handle, Errno) {

@@ -24,19 +24,19 @@
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
-const TypeInfoEnumValue = raw_union {
+type TypeInfoEnumValue raw_union {
 	f: f64,
 	i: i128,
 }
 // NOTE(bill): This must match the compiler's
-const CallingConvention = enum {
+type CallingConvention enum {
 	Odin = 0,
 	C    = 1,
 	Std  = 2,
 	Fast = 3,
 }
 
-const TypeInfoRecord = struct #ordered {
+type TypeInfoRecord struct #ordered {
 	types:        []^TypeInfo,
 	names:        []string,
 	offsets:      []int,  // offsets may not be used in tuples
@@ -46,7 +46,7 @@ const TypeInfoRecord = struct #ordered {
 	custom_align: bool,
 }
 
-const TypeInfo = union {
+type TypeInfo union {
 	size:  int,
 	align: int,
 
@@ -151,22 +151,22 @@ proc read_cycle_counter() -> u64 #foreign __llvm_core "llvm.readcyclecounter";
 
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
-const AllocatorMode = enum u8 {
+type AllocatorMode enum u8 {
 	Alloc,
 	Free,
 	FreeAll,
 	Resize,
 }
-const AllocatorProc = type proc(allocator_data: rawptr, mode: AllocatorMode,
-                           size, alignment: int,
-                           old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
-const Allocator = struct #ordered {
+type AllocatorProc proc(allocator_data: rawptr, mode: AllocatorMode,
+                        size, alignment: int,
+                        old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
+type Allocator struct #ordered {
 	procedure: AllocatorProc,
 	data:      rawptr,
 }
 
 
-const Context = struct #ordered {
+type Context struct #ordered {
 	thread_id: int,
 
 	allocator: Allocator,
@@ -553,18 +553,18 @@ proc __default_hash_string(s: string) -> u128 {
 
 const __INITIAL_MAP_CAP = 16;
 
-const __MapKey = struct #ordered {
+type __MapKey struct #ordered {
 	hash: u128,
 	str:  string,
 }
 
-const __MapFindResult = struct #ordered {
+type __MapFindResult struct #ordered {
 	hash_index:  int,
 	entry_prev:  int,
 	entry_index: int,
 }
 
-const __MapEntryHeader = struct #ordered {
+type __MapEntryHeader struct #ordered {
 	key:  __MapKey,
 	next: int,
 /*
@@ -572,7 +572,7 @@ const __MapEntryHeader = struct #ordered {
 */
 }
 
-const __MapHeader = struct #ordered {
+type __MapHeader struct #ordered {
 	m:             ^raw.DynamicMap,
 	is_key_string: bool,
 	entry_size:    int,

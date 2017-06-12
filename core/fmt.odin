@@ -8,12 +8,12 @@
 
 const _BUFFER_SIZE = 1<<12;
 
-const StringBuffer = union {
+type StringBuffer union {
 	Static {buf: []u8},
 	Dynamic{buf: [dynamic]u8},
 }
 
-const FmtInfo = struct {
+type FmtInfo struct {
 	minus:     bool,
 	plus:      bool,
 	space:     bool,
@@ -582,8 +582,8 @@ proc _fmt_int(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, 
 	_pad(fi, s);
 }
 
-immutable var __DIGITS_LOWER = "0123456789abcdefx";
-immutable var __DIGITS_UPPER = "0123456789ABCDEFX";
+let __DIGITS_LOWER = "0123456789abcdefx";
+let __DIGITS_UPPER = "0123456789ABCDEFX";
 
 proc fmt_rune(fi: ^FmtInfo, r: rune, verb: rune) {
 	match verb {
