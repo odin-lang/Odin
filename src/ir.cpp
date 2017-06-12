@@ -5884,74 +5884,78 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					map_set(&proc->module->entity_names, hash_pointer(e), name);
 					ir_gen_global_type_name(proc->module, e, name);
 				} break;
-				case Entity_Procedure: {
-					DeclInfo **decl_info = map_get(&proc->module->info->entities, hash_pointer(e));
-					GB_ASSERT(decl_info != NULL);
-					DeclInfo *dl = *decl_info;
-					ast_node(pd, ProcLit, dl->proc_lit);
-					if (pd->body != NULL) {
-						CheckerInfo *info = proc->module->info;
-
-						if (map_get(&proc->module->min_dep_map, hash_pointer(e)) == NULL) {
-							// NOTE(bill): Nothing depends upon it so doesn't need to be built
-							break;
-						}
-
-						// NOTE(bill): Generate a new name
-						// parent.name-guid
-						String original_name = e->token.string;
-						String pd_name = original_name;
-						if (pd->link_name.len > 0) {
-							pd_name = pd->link_name;
-						}
-
-						isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
-						u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-						i32 guid = cast(i32)proc->children.count;
-						name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
-						String name = make_string(name_text, name_len-1);
-
-
-						irValue *value = ir_value_procedure(proc->module->allocator,
-						                                    proc->module, e, e->type, pd->type, pd->body, name);
-
-						value->Proc.tags = pd->tags;
-						value->Proc.parent = proc;
-
-						ir_module_add_value(proc->module, e, value);
-						array_add(&proc->children, &value->Proc);
-						array_add(&proc->module->procs_to_generate, value);
-					} else {
-						CheckerInfo *info = proc->module->info;
-
-						// FFI - Foreign function interace
-						String original_name = e->token.string;
-						String name = original_name;
-						if (pd->foreign_name.len > 0) {
-							name = pd->foreign_name;
-						}
-
-						irValue *value = ir_value_procedure(proc->module->allocator,
-						                                           proc->module, e, e->type, pd->type, pd->body, name);
-
-						value->Proc.tags = pd->tags;
-
-						ir_module_add_value(proc->module, e, value);
-						ir_build_proc(value, proc);
-
-						if (value->Proc.tags & ProcTag_foreign) {
-							HashKey key = hash_string(name);
-							irValue **prev_value = map_get(&proc->module->members, key);
-							if (prev_value == NULL) {
-								// NOTE(bill): Don't do mutliple declarations in the IR
-								map_set(&proc->module->members, key, value);
-							}
-						} else {
-							array_add(&proc->children, &value->Proc);
-						}
-					}
-				} break;
 				}
+			}
+		}
+	case_end;
+
+	case_ast_node(pd, ProcDecl, node);
+		AstNode *ident = pd->name;
+		GB_ASSERT(ident->kind == AstNode_Ident);
+		Entity *e = entity_of_ident(proc->module->info, ident);
+		DeclInfo **decl_info = map_get(&proc->module->info->entities, hash_pointer(e));
+		GB_ASSERT(decl_info != NULL);
+		DeclInfo *dl = *decl_info;
+
+		if (pd->body != NULL) {
+			CheckerInfo *info = proc->module->info;
+
+			if (map_get(&proc->module->min_dep_map, hash_pointer(e)) == NULL) {
+				// NOTE(bill): Nothing depends upon it so doesn't need to be built
+				break;
+			}
+
+			// NOTE(bill): Generate a new name
+			// parent.name-guid
+			String original_name = e->token.string;
+			String pd_name = original_name;
+			if (pd->link_name.len > 0) {
+				pd_name = pd->link_name;
+			}
+
+			isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
+			u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
+			i32 guid = cast(i32)proc->children.count;
+			name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
+			String name = make_string(name_text, name_len-1);
+
+
+			irValue *value = ir_value_procedure(proc->module->allocator,
+			                                    proc->module, e, e->type, pd->type, pd->body, name);
+
+			value->Proc.tags = pd->tags;
+			value->Proc.parent = proc;
+
+			ir_module_add_value(proc->module, e, value);
+			array_add(&proc->children, &value->Proc);
+			array_add(&proc->module->procs_to_generate, value);
+		} else {
+			CheckerInfo *info = proc->module->info;
+
+			// FFI - Foreign function interace
+			String original_name = e->token.string;
+			String name = original_name;
+			if (pd->foreign_name.len > 0) {
+				name = pd->foreign_name;
+			}
+
+			irValue *value = ir_value_procedure(proc->module->allocator,
+			                                           proc->module, e, e->type, pd->type, pd->body, name);
+
+			value->Proc.tags = pd->tags;
+
+			ir_module_add_value(proc->module, e, value);
+			ir_build_proc(value, proc);
+
+			if (value->Proc.tags & ProcTag_foreign) {
+				HashKey key = hash_string(name);
+				irValue **prev_value = map_get(&proc->module->members, key);
+				if (prev_value == NULL) {
+					// NOTE(bill): Don't do mutliple declarations in the IR
+					map_set(&proc->module->members, key, value);
+				}
+			} else {
+				array_add(&proc->children, &value->Proc);
 			}
 		}
 	case_end;
@@ -7232,7 +7236,7 @@ void ir_gen_tree(irGen *s) {
 		} break;
 
 		case Entity_Procedure: {
-			ast_node(pd, ProcLit, decl->proc_lit);
+			ast_node(pd, ProcDecl, decl->proc_decl);
 			String original_name = name;
 			AstNode *body = pd->body;
 			if (e->Procedure.is_foreign) {
@@ -7245,7 +7249,7 @@ void ir_gen_tree(irGen *s) {
 				name = pd->link_name;
 			}
 
-			AstNode *type_expr = decl->proc_lit->ProcLit.type;
+			AstNode *type_expr = pd->type;
 
 			irValue *p = ir_value_procedure(a, m, e, e->type, type_expr, body, name);
 			p->Proc.tags = pd->tags;

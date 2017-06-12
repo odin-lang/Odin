@@ -58,7 +58,7 @@ immutable var accept_sizes = [256]u8{
 	0x34, 0x04, 0x04, 0x04, 0x44, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, 0xf1, // 0xf0-0xff
 };
 
-const encode_rune = proc(r: rune) -> ([4]u8, int) {
+proc encode_rune(r: rune) -> ([4]u8, int) {
 	var buf: [4]u8;
 	var i = u32(r);
 	const mask: u8 = 0x3f;
@@ -92,8 +92,8 @@ const encode_rune = proc(r: rune) -> ([4]u8, int) {
 	return buf, 4;
 }
 
-const decode_rune = proc(s: string) -> (rune, int) #inline { return decode_rune([]u8(s)); }
-const decode_rune = proc(s: []u8) -> (rune, int) {
+proc decode_rune(s: string) -> (rune, int) #inline { return decode_rune([]u8(s)); }
+proc decode_rune(s: []u8) -> (rune, int) {
 	var n = len(s);
 	if n < 1 {
 		return RUNE_ERROR, 0;
@@ -132,8 +132,8 @@ const decode_rune = proc(s: []u8) -> (rune, int) {
 
 
 
-const decode_last_rune = proc(s: string) -> (rune, int) #inline { return decode_last_rune([]u8(s)); }
-const decode_last_rune = proc(s: []u8) -> (rune, int) {
+proc decode_last_rune(s: string) -> (rune, int) #inline { return decode_last_rune([]u8(s)); }
+proc decode_last_rune(s: []u8) -> (rune, int) {
 	var r: rune;
 	var size: int;
 	var start, end, limit: int;
@@ -171,7 +171,7 @@ const decode_last_rune = proc(s: []u8) -> (rune, int) {
 
 
 
-const valid_rune = proc(r: rune) -> bool {
+proc valid_rune(r: rune) -> bool {
 	if r < 0 {
 		return false;
 	} else if SURROGATE_MIN <= r && r <= SURROGATE_MAX {
@@ -182,7 +182,7 @@ const valid_rune = proc(r: rune) -> bool {
 	return true;
 }
 
-const valid_string = proc(s: string) -> bool {
+proc valid_string(s: string) -> bool {
 	var n = len(s);
 	for var i = 0; i < n; {
 		var si = s[i];
@@ -215,10 +215,10 @@ const valid_string = proc(s: string) -> bool {
 	return true;
 }
 
-const rune_start = proc(b: u8) -> bool #inline { return b&0xc0 != 0x80; }
+proc rune_start(b: u8) -> bool #inline { return b&0xc0 != 0x80; }
 
-const rune_count = proc(s: string) -> int #inline { return rune_count([]u8(s)); }
-const rune_count = proc(s: []u8) -> int {
+proc rune_count(s: string) -> int #inline { return rune_count([]u8(s)); }
+proc rune_count(s: []u8) -> int {
 	var count = 0;
 	var n = len(s);
 
@@ -257,7 +257,7 @@ const rune_count = proc(s: []u8) -> int {
 }
 
 
-const rune_size = proc(r: rune) -> int {
+proc rune_size(r: rune) -> int {
 	match {
 	case r < 0:          return -1;
 	case r <= 1<<7  - 1: return 1;

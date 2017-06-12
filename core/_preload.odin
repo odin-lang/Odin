@@ -114,7 +114,7 @@ var __type_table: []TypeInfo;
 var __argv__: ^^u8;
 var __argc__: i32;
 
-const type_info_base = proc(info: ^TypeInfo) -> ^TypeInfo {
+proc type_info_base(info: ^TypeInfo) -> ^TypeInfo {
 	if info == nil {
 		return nil;
 	}
@@ -127,7 +127,7 @@ const type_info_base = proc(info: ^TypeInfo) -> ^TypeInfo {
 }
 
 
-const type_info_base_without_enum = proc(info: ^TypeInfo) -> ^TypeInfo {
+proc type_info_base_without_enum(info: ^TypeInfo) -> ^TypeInfo {
 	if info == nil {
 		return nil;
 	}
@@ -143,11 +143,11 @@ const type_info_base_without_enum = proc(info: ^TypeInfo) -> ^TypeInfo {
 
 
 
-const assume = proc(cond: bool) #foreign __llvm_core "llvm.assume";
+proc assume(cond: bool) #foreign __llvm_core "llvm.assume";
 
-const __debug_trap       = proc()        #foreign __llvm_core "llvm.debugtrap";
-const __trap             = proc()        #foreign __llvm_core "llvm.trap";
-const read_cycle_counter = proc() -> u64 #foreign __llvm_core "llvm.readcyclecounter";
+proc __debug_trap      ()        #foreign __llvm_core "llvm.debugtrap";
+proc __trap            ()        #foreign __llvm_core "llvm.trap";
+proc read_cycle_counter() -> u64 #foreign __llvm_core "llvm.readcyclecounter";
 
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
@@ -181,7 +181,7 @@ const Context = struct #ordered {
 const DEFAULT_ALIGNMENT = align_of([vector 4]f32);
 
 
-const __check_context = proc() {
+proc __check_context() {
 	var c = &__context;
 
 	if c.allocator.procedure == nil {
@@ -192,15 +192,15 @@ const __check_context = proc() {
 	}
 }
 
-const alloc = proc(size: int) -> rawptr #inline { return alloc_align(size, DEFAULT_ALIGNMENT); }
+proc alloc(size: int) -> rawptr #inline { return alloc_align(size, DEFAULT_ALIGNMENT); }
 
-const alloc_align = proc(size, alignment: int) -> rawptr #inline {
+proc alloc_align(size, alignment: int) -> rawptr #inline {
 	__check_context();
 	var a = context.allocator;
 	return a.procedure(a.data, AllocatorMode.Alloc, size, alignment, nil, 0, 0);
 }
 
-const free_ptr_with_allocator = proc(a: Allocator, ptr: rawptr) #inline {
+proc free_ptr_with_allocator(a: Allocator, ptr: rawptr) #inline {
 	if ptr == nil {
 		return;
 	}
@@ -210,20 +210,20 @@ const free_ptr_with_allocator = proc(a: Allocator, ptr: rawptr) #inline {
 	a.procedure(a.data, AllocatorMode.Free, 0, 0, ptr, 0, 0);
 }
 
-const free_ptr = proc(ptr: rawptr) #inline {
+proc free_ptr(ptr: rawptr) #inline {
 	__check_context();
 	free_ptr_with_allocator(context.allocator, ptr);
 }
 
-const free_all = proc() #inline {
+proc free_all() #inline {
 	__check_context();
 	var a = context.allocator;
 	a.procedure(a.data, AllocatorMode.FreeAll, 0, 0, nil, 0, 0);
 }
 
 
-const resize       = proc(ptr: rawptr, old_size, new_size: int) -> rawptr #inline { return resize_align(ptr, old_size, new_size, DEFAULT_ALIGNMENT); }
-const resize_align = proc(ptr: rawptr, old_size, new_size, alignment: int) -> rawptr #inline {
+proc resize      (ptr: rawptr, old_size, new_size: int) -> rawptr #inline { return resize_align(ptr, old_size, new_size, DEFAULT_ALIGNMENT); }
+proc resize_align(ptr: rawptr, old_size, new_size, alignment: int) -> rawptr #inline {
 	__check_context();
 	var a = context.allocator;
 	return a.procedure(a.data, AllocatorMode.Resize, new_size, alignment, ptr, old_size, 0);
@@ -231,7 +231,7 @@ const resize_align = proc(ptr: rawptr, old_size, new_size, alignment: int) -> ra
 
 
 
-const default_resize_align = proc(old_memory: rawptr, old_size, new_size, alignment: int) -> rawptr {
+proc default_resize_align(old_memory: rawptr, old_size, new_size, alignment: int) -> rawptr {
 	if old_memory == nil {
 		return alloc_align(new_size, alignment);
 	}
@@ -256,7 +256,7 @@ const default_resize_align = proc(old_memory: rawptr, old_size, new_size, alignm
 }
 
 
-const default_allocator_proc = proc(allocator_data: rawptr, mode: AllocatorMode,
+proc default_allocator_proc(allocator_data: rawptr, mode: AllocatorMode,
                                size, alignment: int,
                                old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
 	using AllocatorMode;
@@ -281,7 +281,7 @@ const default_allocator_proc = proc(allocator_data: rawptr, mode: AllocatorMode,
 	return nil;
 }
 
-const default_allocator = proc() -> Allocator {
+proc default_allocator() -> Allocator {
 	return Allocator{
 		procedure = default_allocator_proc,
 		data = nil,
@@ -296,7 +296,7 @@ const default_allocator = proc() -> Allocator {
 
 
 
-const __string_eq = proc(a, b: string) -> bool {
+proc __string_eq(a, b: string) -> bool {
 	if len(a) != len(b) {
 		return false;
 	}
@@ -309,34 +309,34 @@ const __string_eq = proc(a, b: string) -> bool {
 	return __string_cmp(a, b) == 0;
 }
 
-const __string_cmp = proc(a, b: string) -> int {
+proc __string_cmp(a, b: string) -> int {
 	return __mem_compare(&a[0], &b[0], min(len(a), len(b)));
 }
 
-const __string_ne = proc(a, b: string) -> bool #inline { return !__string_eq(a, b); }
-const __string_lt = proc(a, b: string) -> bool #inline { return __string_cmp(a, b) < 0; }
-const __string_gt = proc(a, b: string) -> bool #inline { return __string_cmp(a, b) > 0; }
-const __string_le = proc(a, b: string) -> bool #inline { return __string_cmp(a, b) <= 0; }
-const __string_ge = proc(a, b: string) -> bool #inline { return __string_cmp(a, b) >= 0; }
+proc __string_ne(a, b: string) -> bool #inline { return !__string_eq(a, b); }
+proc __string_lt(a, b: string) -> bool #inline { return __string_cmp(a, b) < 0; }
+proc __string_gt(a, b: string) -> bool #inline { return __string_cmp(a, b) > 0; }
+proc __string_le(a, b: string) -> bool #inline { return __string_cmp(a, b) <= 0; }
+proc __string_ge(a, b: string) -> bool #inline { return __string_cmp(a, b) >= 0; }
 
 
-const __complex64_eq  = proc(a, b: complex64)  -> bool #inline { return real(a) == real(b) && imag(a) == imag(b); }
-const __complex64_ne  = proc(a, b: complex64)  -> bool #inline { return real(a) != real(b) || imag(a) != imag(b); }
+proc __complex64_eq (a, b: complex64)  -> bool #inline { return real(a) == real(b) && imag(a) == imag(b); }
+proc __complex64_ne (a, b: complex64)  -> bool #inline { return real(a) != real(b) || imag(a) != imag(b); }
 
-const __complex128_eq = proc(a, b: complex128) -> bool #inline { return real(a) == real(b) && imag(a) == imag(b); }
-const __complex128_ne = proc(a, b: complex128) -> bool #inline { return real(a) != real(b) || imag(a) != imag(b); }
+proc __complex128_eq(a, b: complex128) -> bool #inline { return real(a) == real(b) && imag(a) == imag(b); }
+proc __complex128_ne(a, b: complex128) -> bool #inline { return real(a) != real(b) || imag(a) != imag(b); }
 
-const __assert = proc(file: string, line, column: int, msg: string) #inline {
+proc __assert(file: string, line, column: int, msg: string) #inline {
 	fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion: %s\n",
 	            file, line, column, msg);
 	__debug_trap();
 }
-const __panic = proc(file: string, line, column: int, msg: string) #inline {
+proc __panic(file: string, line, column: int, msg: string) #inline {
 	fmt.fprintf(os.stderr, "%s(%d:%d) Panic: %s\n",
 	            file, line, column, msg);
 	__debug_trap();
 }
-const __bounds_check_error = proc(file: string, line, column: int, index, count: int) {
+proc __bounds_check_error(file: string, line, column: int, index, count: int) {
 	if 0 <= index && index < count {
 		return;
 	}
@@ -345,7 +345,7 @@ const __bounds_check_error = proc(file: string, line, column: int, index, count:
 	__debug_trap();
 }
 
-const __slice_expr_error = proc(file: string, line, column: int, low, high, max: int) {
+proc __slice_expr_error(file: string, line, column: int, low, high, max: int) {
 	if 0 <= low && low <= high && high <= max {
 		return;
 	}
@@ -354,7 +354,7 @@ const __slice_expr_error = proc(file: string, line, column: int, low, high, max:
 	__debug_trap();
 }
 
-const __substring_expr_error = proc(file: string, line, column: int, low, high: int) {
+proc __substring_expr_error(file: string, line, column: int, low, high: int) {
 	if 0 <= low && low <= high {
 		return;
 	}
@@ -362,7 +362,7 @@ const __substring_expr_error = proc(file: string, line, column: int, low, high: 
 	            file, line, column, low, high);
 	__debug_trap();
 }
-const __type_assertion_check = proc(ok: bool, file: string, line, column: int, from, to: ^TypeInfo) {
+proc __type_assertion_check(ok: bool, file: string, line, column: int, from, to: ^TypeInfo) {
 	if !ok {
 		fmt.fprintf(os.stderr, "%s(%d:%d) Invalid type_assertion from %T to %T\n",
 		            file, line, column, from, to);
@@ -370,33 +370,33 @@ const __type_assertion_check = proc(ok: bool, file: string, line, column: int, f
 	}
 }
 
-const __string_decode_rune = proc(s: string) -> (rune, int) #inline {
+proc __string_decode_rune(s: string) -> (rune, int) #inline {
 	return utf8.decode_rune(s);
 }
 
 
-const __mem_set = proc(data: rawptr, value: i32, len: int) -> rawptr {
-	const llvm_memset_64bit = proc(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memset.p0i8.i64";
+proc __mem_set(data: rawptr, value: i32, len: int) -> rawptr {
+	proc llvm_memset_64bit(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memset.p0i8.i64";
 	llvm_memset_64bit(data, u8(value), len, 1, false);
 	return data;
 }
-const __mem_zero = proc(data: rawptr, len: int) -> rawptr {
+proc __mem_zero(data: rawptr, len: int) -> rawptr {
 	return __mem_set(data, 0, len);
 }
-const __mem_copy = proc(dst, src: rawptr, len: int) -> rawptr {
+proc __mem_copy(dst, src: rawptr, len: int) -> rawptr {
 	// NOTE(bill): This _must_ be implemented like C's memmove
-	const llvm_memmove_64bit = proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memmove.p0i8.p0i8.i64";
+	proc llvm_memmove_64bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memmove.p0i8.p0i8.i64";
 	llvm_memmove_64bit(dst, src, len, 1, false);
 	return dst;
 }
-const __mem_copy_non_overlapping = proc(dst, src: rawptr, len: int) -> rawptr {
+proc __mem_copy_non_overlapping(dst, src: rawptr, len: int) -> rawptr {
 	// NOTE(bill): This _must_ be implemented like C's memcpy
-	const llvm_memcpy_64bit = proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memcpy.p0i8.p0i8.i64";
+	proc llvm_memcpy_64bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #foreign __llvm_core "llvm.memcpy.p0i8.p0i8.i64";
 	llvm_memcpy_64bit(dst, src, len, 1, false);
 	return dst;
 }
 
-const __mem_compare = proc(a, b: ^u8, n: int) -> int {
+proc __mem_compare(a, b: ^u8, n: int) -> int {
 	for i in 0..<n {
 		match {
 		case (a+i)^ < (b+i)^:
@@ -408,13 +408,13 @@ const __mem_compare = proc(a, b: ^u8, n: int) -> int {
 	return 0;
 }
 
-const __sqrt_f32 = proc(x: f32) -> f32 #foreign __llvm_core "llvm.sqrt.f32";
-const __sqrt_f64 = proc(x: f64) -> f64 #foreign __llvm_core "llvm.sqrt.f64";
-const __abs_complex64 = proc(x: complex64) -> f32 #inline {
+proc __sqrt_f32(x: f32) -> f32 #foreign __llvm_core "llvm.sqrt.f32";
+proc __sqrt_f64(x: f64) -> f64 #foreign __llvm_core "llvm.sqrt.f64";
+proc __abs_complex64(x: complex64) -> f32 #inline {
 	var r, i = real(x), imag(x);
 	return __sqrt_f32(r*r + i*i);
 }
-const __abs_complex128 = proc(x: complex128) -> f64 #inline {
+proc __abs_complex128(x: complex128) -> f64 #inline {
 	var r, i = real(x), imag(x);
 	return __sqrt_f64(r*r + i*i);
 }
@@ -422,7 +422,7 @@ const __abs_complex128 = proc(x: complex128) -> f64 #inline {
 
 
 
-const __dynamic_array_make = proc(array_: rawptr, elem_size, elem_align: int, len, cap: int) {
+proc __dynamic_array_make(array_: rawptr, elem_size, elem_align: int, len, cap: int) {
 	var array = ^raw.DynamicArray(array_);
 	__check_context();
 	array.allocator = context.allocator;
@@ -434,7 +434,7 @@ const __dynamic_array_make = proc(array_: rawptr, elem_size, elem_align: int, le
 	}
 }
 
-const __dynamic_array_reserve = proc(array_: rawptr, elem_size, elem_align: int, cap: int) -> bool {
+proc __dynamic_array_reserve(array_: rawptr, elem_size, elem_align: int, cap: int) -> bool {
 	var array = ^raw.DynamicArray(array_);
 
 	if cap <= array.cap {
@@ -461,7 +461,7 @@ const __dynamic_array_reserve = proc(array_: rawptr, elem_size, elem_align: int,
 	return true;
 }
 
-const __dynamic_array_resize = proc(array_: rawptr, elem_size, elem_align: int, len: int) -> bool {
+proc __dynamic_array_resize(array_: rawptr, elem_size, elem_align: int, len: int) -> bool {
 	var array = ^raw.DynamicArray(array_);
 
 	var ok = __dynamic_array_reserve(array_, elem_size, elem_align, len);
@@ -472,7 +472,7 @@ const __dynamic_array_resize = proc(array_: rawptr, elem_size, elem_align: int, 
 }
 
 
-const __dynamic_array_append = proc(array_: rawptr, elem_size, elem_align: int,
+proc __dynamic_array_append(array_: rawptr, elem_size, elem_align: int,
                                items: rawptr, item_count: int) -> int {
 	var array = ^raw.DynamicArray(array_);
 
@@ -497,7 +497,7 @@ const __dynamic_array_append = proc(array_: rawptr, elem_size, elem_align: int,
 	return array.len;
 }
 
-const __dynamic_array_append_nothing = proc(array_: rawptr, elem_size, elem_align: int) -> int {
+proc __dynamic_array_append_nothing(array_: rawptr, elem_size, elem_align: int) -> int {
 	var array = ^raw.DynamicArray(array_);
 
 	var ok = true;
@@ -516,7 +516,7 @@ const __dynamic_array_append_nothing = proc(array_: rawptr, elem_size, elem_alig
 	return array.len;
 }
 
-const __slice_append = proc(slice_: rawptr, elem_size, elem_align: int,
+proc __slice_append(slice_: rawptr, elem_size, elem_align: int,
                        items: rawptr, item_count: int) -> int {
 	var slice = ^raw.Slice(slice_);
 
@@ -537,8 +537,8 @@ const __slice_append = proc(slice_: rawptr, elem_size, elem_align: int,
 
 // Map stuff
 
-const __default_hash = proc(data: []u8) -> u128 {
-	const fnv128a = proc(data: []u8) -> u128 {
+proc __default_hash(data: []u8) -> u128 {
+	proc fnv128a(data: []u8) -> u128 {
 		var h: u128 = 0x6c62272e07bb014262b821756295c58d;
 		for b in data {
 			h = (h ~ u128(b)) * 0x1000000000000000000013b;
@@ -547,7 +547,7 @@ const __default_hash = proc(data: []u8) -> u128 {
 	}
 	return fnv128a(data);
 }
-const __default_hash_string = proc(s: string) -> u128 {
+proc __default_hash_string(s: string) -> u128 {
 	return __default_hash([]u8(s));
 }
 
@@ -581,12 +581,12 @@ const __MapHeader = struct #ordered {
 	value_size:    int,
 }
 
-const __dynamic_map_reserve = proc(using header: __MapHeader, cap: int)  {
+proc __dynamic_map_reserve(using header: __MapHeader, cap: int)  {
 	__dynamic_array_reserve(&m.hashes, size_of(int), align_of(int), cap);
 	__dynamic_array_reserve(&m.entries, entry_size, entry_align,    cap);
 }
 
-const __dynamic_map_rehash = proc(using header: __MapHeader, new_count: int) {
+proc __dynamic_map_rehash(using header: __MapHeader, new_count: int) {
 	var new_header: __MapHeader = header;
 	var nm: raw.DynamicMap;
 	new_header.m = &nm;
@@ -631,7 +631,7 @@ const __dynamic_map_rehash = proc(using header: __MapHeader, new_count: int) {
 	header.m^ = nm;
 }
 
-const __dynamic_map_get = proc(h: __MapHeader, key: __MapKey) -> rawptr {
+proc __dynamic_map_get(h: __MapHeader, key: __MapKey) -> rawptr {
 	var index = __dynamic_map_find(h, key).entry_index;
 	if index >= 0 {
 		var data = ^u8(__dynamic_map_get_entry(h, index));
@@ -641,7 +641,7 @@ const __dynamic_map_get = proc(h: __MapHeader, key: __MapKey) -> rawptr {
 	return nil;
 }
 
-const __dynamic_map_set = proc(using h: __MapHeader, key: __MapKey, value: rawptr) {
+proc __dynamic_map_set(using h: __MapHeader, key: __MapKey, value: rawptr) {
 	var index: int;
 	assert(value != nil);
 
@@ -676,17 +676,17 @@ const __dynamic_map_set = proc(using h: __MapHeader, key: __MapKey, value: rawpt
 }
 
 
-const __dynamic_map_grow = proc(using h: __MapHeader) {
+proc __dynamic_map_grow(using h: __MapHeader) {
 	var new_count = max(2*m.entries.cap + 8, __INITIAL_MAP_CAP);
 	__dynamic_map_rehash(h, new_count);
 }
 
-const __dynamic_map_full = proc(using h: __MapHeader) -> bool {
+proc __dynamic_map_full(using h: __MapHeader) -> bool {
 	return int(0.75 * f64(len(m.hashes))) <= m.entries.cap;
 }
 
 
-const __dynamic_map_hash_equal = proc(h: __MapHeader, a, b: __MapKey) -> bool {
+proc __dynamic_map_hash_equal(h: __MapHeader, a, b: __MapKey) -> bool {
 	if a.hash == b.hash {
 		if h.is_key_string {
 			return a.str == b.str;
@@ -696,7 +696,7 @@ const __dynamic_map_hash_equal = proc(h: __MapHeader, a, b: __MapKey) -> bool {
 	return false;
 }
 
-const __dynamic_map_find = proc(using h: __MapHeader, key: __MapKey) -> __MapFindResult {
+proc __dynamic_map_find(using h: __MapHeader, key: __MapKey) -> __MapFindResult {
 	var fr = __MapFindResult{-1, -1, -1};
 	if len(m.hashes) > 0 {
 		fr.hash_index = int(key.hash % u128(len(m.hashes)));
@@ -713,7 +713,7 @@ const __dynamic_map_find = proc(using h: __MapHeader, key: __MapKey) -> __MapFin
 	return fr;
 }
 
-const __dynamic_map_add_entry = proc(using h: __MapHeader, key: __MapKey) -> int {
+proc __dynamic_map_add_entry(using h: __MapHeader, key: __MapKey) -> int {
 	var prev = m.entries.len;
 	var c = __dynamic_array_append_nothing(&m.entries, entry_size, entry_align);
 	if c != prev {
@@ -725,19 +725,19 @@ const __dynamic_map_add_entry = proc(using h: __MapHeader, key: __MapKey) -> int
 }
 
 
-const __dynamic_map_delete = proc(using h: __MapHeader, key: __MapKey) {
+proc __dynamic_map_delete(using h: __MapHeader, key: __MapKey) {
 	var fr = __dynamic_map_find(h, key);
 	if fr.entry_index >= 0 {
 		__dynamic_map_erase(h, fr);
 	}
 }
 
-const __dynamic_map_get_entry = proc(using h: __MapHeader, index: int) -> ^__MapEntryHeader {
+proc __dynamic_map_get_entry(using h: __MapHeader, index: int) -> ^__MapEntryHeader {
 	var data = ^u8(m.entries.data) + index*entry_size;
 	return ^__MapEntryHeader(data);
 }
 
-const __dynamic_map_erase = proc(using h: __MapHeader, fr: __MapFindResult) {
+proc __dynamic_map_erase(using h: __MapHeader, fr: __MapFindResult) {
 	if fr.entry_prev < 0 {
 		m.hashes[fr.hash_index] = __dynamic_map_get_entry(h, fr.entry_index).next;
 	} else {

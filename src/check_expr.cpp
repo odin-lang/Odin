@@ -5510,7 +5510,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		check_open_scope(c, pl->type);
 		{
 			decl = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
-			decl->proc_lit = pl->type;
+			decl->proc_decl = pl->type;
 			c->context.decl = decl;
 
 			if (pl->tags != 0) {

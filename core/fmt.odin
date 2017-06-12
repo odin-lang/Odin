@@ -33,14 +33,14 @@ const FmtInfo = struct {
 }
 
 
-const make_string_buffer_from_slice = proc(b: []u8) -> StringBuffer {
+proc make_string_buffer_from_slice(b: []u8) -> StringBuffer {
 	return StringBuffer.Static{b};
 }
 
-const make_string_dynamic_buffer = proc() -> StringBuffer {
+proc make_string_dynamic_buffer() -> StringBuffer {
 	return StringBuffer.Dynamic{make([dynamic]u8)};
 }
-const string_buffer_data = proc(buf: ^StringBuffer) -> []u8 {
+proc string_buffer_data(buf: ^StringBuffer) -> []u8 {
 	match b in buf {
 	case StringBuffer.Static:
 		return b.buf[..];
@@ -49,7 +49,7 @@ const string_buffer_data = proc(buf: ^StringBuffer) -> []u8 {
 	}
 	return nil;
 }
-const string_buffer_data = proc(buf: StringBuffer) -> []u8 {
+proc string_buffer_data(buf: StringBuffer) -> []u8 {
 	match b in buf {
 	case StringBuffer.Static:
 		return b.buf[..];
@@ -58,15 +58,15 @@ const string_buffer_data = proc(buf: StringBuffer) -> []u8 {
 	}
 	return nil;
 }
-const to_string = proc(buf: StringBuffer) -> string {
+proc to_string(buf: StringBuffer) -> string {
 	return string(string_buffer_data(buf));
 }
 
 
-const write_string = proc(buf: ^StringBuffer, s: string) {
+proc write_string(buf: ^StringBuffer, s: string) {
 	write_bytes(buf, []u8(s));
 }
-const write_bytes = proc(buf: ^StringBuffer, data: []u8) {
+proc write_bytes(buf: ^StringBuffer, data: []u8) {
 	match b in buf {
 	case StringBuffer.Static:
 		append(b.buf, ..data);
@@ -74,7 +74,7 @@ const write_bytes = proc(buf: ^StringBuffer, data: []u8) {
 		append(b.buf, ..data);
 	}
 }
-const write_byte = proc(buf: ^StringBuffer, data: u8) {
+proc write_byte(buf: ^StringBuffer, data: u8) {
 	match b in buf {
 	case StringBuffer.Static:
 		append(b.buf, data);
@@ -82,7 +82,7 @@ const write_byte = proc(buf: ^StringBuffer, data: u8) {
 		append(b.buf, data);
 	}
 }
-const write_rune = proc(buf: ^StringBuffer, r: rune) {
+proc write_rune(buf: ^StringBuffer, r: rune) {
 	if r < utf8.RUNE_SELF {
 		write_byte(buf, u8(r));
 		return;
@@ -92,12 +92,12 @@ const write_rune = proc(buf: ^StringBuffer, r: rune) {
 	write_bytes(buf, b[0..<n]);
 }
 
-const write_int = proc(buf: ^StringBuffer, i: i128, base: int) {
+proc write_int(buf: ^StringBuffer, i: i128, base: int) {
 	var b: [129]u8;
 	var s = strconv.append_bits(b[0..<0], u128(i), base, true, 128, strconv.digits, 0);
 	write_string(buf, s);
 }
-const write_int = proc(buf: ^StringBuffer, i: i64, base: int) {
+proc write_int(buf: ^StringBuffer, i: i64, base: int) {
 	var b: [129]u8;
 	var s = strconv.append_bits(b[0..<0], u128(i), base, true, 64, strconv.digits, 0);
 	write_string(buf, s);
@@ -105,7 +105,7 @@ const write_int = proc(buf: ^StringBuffer, i: i64, base: int) {
 
 
 
-const fprint = proc(fd: os.Handle, args: ..any) -> int {
+proc fprint(fd: os.Handle, args: ..any) -> int {
 	var data: [_BUFFER_SIZE]u8;
 	var buf = make_string_buffer_from_slice(data[0..<0]);
 	sbprint(&buf, ..args);
@@ -114,7 +114,7 @@ const fprint = proc(fd: os.Handle, args: ..any) -> int {
 	return len(res);
 }
 
-const fprintln = proc(fd: os.Handle, args: ..any) -> int {
+proc fprintln(fd: os.Handle, args: ..any) -> int {
 	var data: [_BUFFER_SIZE]u8;
 	var buf = make_string_buffer_from_slice(data[0..<0]);
 	sbprintln(&buf, ..args);
@@ -122,7 +122,7 @@ const fprintln = proc(fd: os.Handle, args: ..any) -> int {
 	os.write(fd, res);
 	return len(res);
 }
-const fprintf = proc(fd: os.Handle, fmt: string, args: ..any) -> int {
+proc fprintf(fd: os.Handle, fmt: string, args: ..any) -> int {
 	var data: [_BUFFER_SIZE]u8;
 	var buf = make_string_buffer_from_slice(data[0..<0]);
 	sbprintf(&buf, fmt, ..args);
@@ -133,27 +133,27 @@ const fprintf = proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 
 
 // print* procedures return the number of bytes written
-const print       = proc(args: ..any)              -> int { return fprint(os.stdout, ..args); }
-const print_err   = proc(args: ..any)              -> int { return fprint(os.stderr, ..args); }
-const println     = proc(args: ..any)              -> int { return fprintln(os.stdout, ..args); }
-const println_err = proc(args: ..any)              -> int { return fprintln(os.stderr, ..args); }
-const printf      = proc(fmt: string, args: ..any) -> int { return fprintf(os.stdout, fmt, ..args); }
-const printf_err  = proc(fmt: string, args: ..any) -> int { return fprintf(os.stderr, fmt, ..args); }
+proc print       (args: ..any)              -> int { return fprint(os.stdout, ..args); }
+proc print_err   (args: ..any)              -> int { return fprint(os.stderr, ..args); }
+proc println     (args: ..any)              -> int { return fprintln(os.stdout, ..args); }
+proc println_err (args: ..any)              -> int { return fprintln(os.stderr, ..args); }
+proc printf      (fmt: string, args: ..any) -> int { return fprintf(os.stdout, fmt, ..args); }
+proc printf_err  (fmt: string, args: ..any) -> int { return fprintf(os.stderr, fmt, ..args); }
 
 
 // aprint* procedures return a string that was allocated with the current context
 // They must be freed accordingly
-const aprint = proc(args: ..any) -> string {
+proc aprint(args: ..any) -> string {
 	var buf = make_string_dynamic_buffer();
 	sbprint(&buf, ..args);
 	return to_string(buf);
 }
-const aprintln = proc(args: ..any) -> string {
+proc aprintln(args: ..any) -> string {
 	var buf = make_string_dynamic_buffer();
 	sbprintln(&buf, ..args);
 	return to_string(buf);
 }
-const aprintf = proc(fmt: string, args: ..any) -> string {
+proc aprintf(fmt: string, args: ..any) -> string {
 	var buf = make_string_dynamic_buffer();
 	sbprintf(&buf, fmt, ..args);
 	return to_string(buf);
@@ -162,15 +162,15 @@ const aprintf = proc(fmt: string, args: ..any) -> string {
 
 // bprint* procedures return a string that was allocated with the current context
 // They must be freed accordingly
-const bprint = proc(buf: []u8, args: ..any) -> string {
+proc bprint(buf: []u8, args: ..any) -> string {
 	var sb = make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprint(&sb, ..args);
 }
-const bprintln = proc(buf: []u8, args: ..any) -> string {
+proc bprintln(buf: []u8, args: ..any) -> string {
 	var sb = make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprintln(&sb, ..args);
 }
-const bprintf = proc(buf: []u8, fmt: string, args: ..any) -> string {
+proc bprintf(buf: []u8, fmt: string, args: ..any) -> string {
 	var sb = make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprintf(&sb, fmt, ..args);
 }
@@ -180,14 +180,14 @@ const bprintf = proc(buf: []u8, fmt: string, args: ..any) -> string {
 
 
 
-const fprint_type = proc(fd: os.Handle, info: ^TypeInfo) {
+proc fprint_type(fd: os.Handle, info: ^TypeInfo) {
 	var data: [_BUFFER_SIZE]u8;
 	var buf = make_string_buffer_from_slice(data[0..<0]);
 	write_type(&buf, info);
 	os.write(fd, string_buffer_data(buf));
 }
 
-const write_type = proc(buf: ^StringBuffer, ti: ^TypeInfo) {
+proc write_type(buf: ^StringBuffer, ti: ^TypeInfo) {
 	if ti == nil {
 		return;
 	}
@@ -392,8 +392,8 @@ const write_type = proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 }
 
 
-const _parse_int = proc(s: string, offset: int) -> (result: int, offset: int, ok: bool) {
-	const is_digit = proc(r: rune) -> bool #inline {
+proc _parse_int(s: string, offset: int) -> (result: int, offset: int, ok: bool) {
+	proc is_digit(r: rune) -> bool #inline {
 		return '0' <= r && r <= '9';
 	}
 
@@ -415,8 +415,8 @@ const _parse_int = proc(s: string, offset: int) -> (result: int, offset: int, ok
 	return result, offset+i, i != 0;
 }
 
-const _arg_number = proc(fi: ^FmtInfo, arg_index: int, format: string, offset, arg_count: int) -> (index, offset: int, ok: bool) {
-	const parse_arg_number = proc(format: string) -> (int, int, bool) {
+proc _arg_number(fi: ^FmtInfo, arg_index: int, format: string, offset, arg_count: int) -> (index, offset: int, ok: bool) {
+	proc parse_arg_number(format: string) -> (int, int, bool) {
 		if len(format) < 3 {
 			return 0, 1, false;
 		}
@@ -447,7 +447,7 @@ const _arg_number = proc(fi: ^FmtInfo, arg_index: int, format: string, offset, a
 	return arg_index, offset+width, false;
 }
 
-const int_from_arg = proc(args: []any, arg_index: int) -> (int, int, bool) {
+proc int_from_arg(args: []any, arg_index: int) -> (int, int, bool) {
 	var num = 0;
 	var new_arg_index = arg_index;
 	var ok = true;
@@ -473,7 +473,7 @@ const int_from_arg = proc(args: []any, arg_index: int) -> (int, int, bool) {
 }
 
 
-const fmt_bad_verb = proc(using fi: ^FmtInfo, verb: rune) {
+proc fmt_bad_verb(using fi: ^FmtInfo, verb: rune) {
 	assert(verb != 'v');
 	write_string(buf, "%!");
 	write_rune(buf, verb);
@@ -488,7 +488,7 @@ const fmt_bad_verb = proc(using fi: ^FmtInfo, verb: rune) {
 	write_byte(buf, ')');
 }
 
-const fmt_bool = proc(using fi: ^FmtInfo, b: bool, verb: rune) {
+proc fmt_bool(using fi: ^FmtInfo, b: bool, verb: rune) {
 	match verb {
 	case 't', 'v':
 		write_string(buf, b ? "true" : "false");
@@ -498,7 +498,7 @@ const fmt_bool = proc(using fi: ^FmtInfo, b: bool, verb: rune) {
 }
 
 
-const fmt_write_padding = proc(fi: ^FmtInfo, width: int) {
+proc fmt_write_padding(fi: ^FmtInfo, width: int) {
 	if width <= 0 {
 		return;
 	}
@@ -514,7 +514,7 @@ const fmt_write_padding = proc(fi: ^FmtInfo, width: int) {
 	}
 }
 
-const _fmt_int = proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
+proc _fmt_int(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
 	var _, neg = strconv.is_integer_negative(u128(u), is_signed, bit_size);
 
 	const BUF_SIZE = 256;
@@ -585,7 +585,7 @@ const _fmt_int = proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_siz
 immutable var __DIGITS_LOWER = "0123456789abcdefx";
 immutable var __DIGITS_UPPER = "0123456789ABCDEFX";
 
-const fmt_rune = proc(fi: ^FmtInfo, r: rune, verb: rune) {
+proc fmt_rune(fi: ^FmtInfo, r: rune, verb: rune) {
 	match verb {
 	case 'c', 'r', 'v':
 		write_rune(fi.buf, r);
@@ -594,7 +594,7 @@ const fmt_rune = proc(fi: ^FmtInfo, r: rune, verb: rune) {
 	}
 }
 
-const fmt_int = proc(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: rune) {
+proc fmt_int(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: rune) {
 	match verb {
 	case 'v': _fmt_int(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
 	case 'b': _fmt_int(fi, u,  2, is_signed, bit_size, __DIGITS_LOWER);
@@ -618,7 +618,7 @@ const fmt_int = proc(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb
 	}
 }
 
-const _pad = proc(fi: ^FmtInfo, s: string) {
+proc _pad(fi: ^FmtInfo, s: string) {
 	if !fi.width_set {
 		write_string(fi.buf, s);
 		return;
@@ -633,7 +633,7 @@ const _pad = proc(fi: ^FmtInfo, s: string) {
 	}
 }
 
-const fmt_float = proc(fi: ^FmtInfo, v: f64, bit_size: int, verb: rune) {
+proc fmt_float(fi: ^FmtInfo, v: f64, bit_size: int, verb: rune) {
 	match verb {
 	// case 'e', 'E', 'f', 'F', 'g', 'G', 'v':
 	// case 'f', 'F', 'v':
@@ -678,7 +678,7 @@ const fmt_float = proc(fi: ^FmtInfo, v: f64, bit_size: int, verb: rune) {
 		fmt_bad_verb(fi, verb);
 	}
 }
-const fmt_string = proc(fi: ^FmtInfo, s: string, verb: rune) {
+proc fmt_string(fi: ^FmtInfo, s: string, verb: rune) {
 	match verb {
 	case 's', 'v':
 		write_string(fi.buf, s);
@@ -700,7 +700,7 @@ const fmt_string = proc(fi: ^FmtInfo, s: string, verb: rune) {
 	}
 }
 
-const fmt_pointer = proc(fi: ^FmtInfo, p: rawptr, verb: rune) {
+proc fmt_pointer(fi: ^FmtInfo, p: rawptr, verb: rune) {
 	match verb {
 	case 'p', 'v':
 		// Okay
@@ -715,7 +715,7 @@ const fmt_pointer = proc(fi: ^FmtInfo, p: rawptr, verb: rune) {
 	_fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER);
 }
 
-const fmt_enum = proc(fi: ^FmtInfo, v: any, verb: rune) {
+proc fmt_enum(fi: ^FmtInfo, v: any, verb: rune) {
 	if v.type_info == nil || v.data == nil {
 		write_string(fi.buf, "<nil>");
 		return;
@@ -786,7 +786,7 @@ const fmt_enum = proc(fi: ^FmtInfo, v: any, verb: rune) {
 }
 
 
-const fmt_value = proc(fi: ^FmtInfo, v: any, verb: rune) {
+proc fmt_value(fi: ^FmtInfo, v: any, verb: rune) {
 	if v.data == nil || v.type_info == nil {
 		write_string(fi.buf, "<nil>");
 		return;
@@ -962,7 +962,7 @@ const fmt_value = proc(fi: ^FmtInfo, v: any, verb: rune) {
 	}
 }
 
-const fmt_complex = proc(fi: ^FmtInfo, c: complex128, bits: int, verb: rune) {
+proc fmt_complex(fi: ^FmtInfo, c: complex128, bits: int, verb: rune) {
 	match verb {
 	case 'f', 'F', 'v':
 		var r = real(c);
@@ -980,15 +980,15 @@ const fmt_complex = proc(fi: ^FmtInfo, c: complex128, bits: int, verb: rune) {
 	}
 }
 
-const _u128_to_lo_hi = proc(a: u128) -> (lo, hi: u64) { return u64(a), u64(a>>64); }
-const _i128_to_lo_hi = proc(a: u128) -> (lo: u64 hi: i64) { return u64(a), i64(a>>64); }
+proc _u128_to_lo_hi(a: u128) -> (lo, hi: u64) { return u64(a), u64(a>>64); }
+proc _i128_to_lo_hi(a: u128) -> (lo: u64 hi: i64) { return u64(a), i64(a>>64); }
 
 
-const do_foo = proc(fi: ^FmtInfo, f: f64) {
+proc do_foo(fi: ^FmtInfo, f: f64) {
 	fmt_string(fi, "Hellope$%!", 'v');
 }
 
-const fmt_arg = proc(fi: ^FmtInfo, arg: any, verb: rune) {
+proc fmt_arg(fi: ^FmtInfo, arg: any, verb: rune) {
 	if arg == nil {
 		write_string(fi.buf, "<nil>");
 		return;
@@ -1043,7 +1043,7 @@ const fmt_arg = proc(fi: ^FmtInfo, arg: any, verb: rune) {
 
 
 
-const sbprint = proc(buf: ^StringBuffer, args: ..any) -> string {
+proc sbprint(buf: ^StringBuffer, args: ..any) -> string {
 	var fi: FmtInfo;
 	fi.buf = buf;
 
@@ -1059,7 +1059,7 @@ const sbprint = proc(buf: ^StringBuffer, args: ..any) -> string {
 	return to_string(buf^);
 }
 
-const sbprintln = proc(buf: ^StringBuffer, args: ..any) -> string {
+proc sbprintln(buf: ^StringBuffer, args: ..any) -> string {
 	var fi: FmtInfo;
 	fi.buf = buf;
 
@@ -1073,7 +1073,7 @@ const sbprintln = proc(buf: ^StringBuffer, args: ..any) -> string {
 	return to_string(buf^);
 }
 
-const sbprintf = proc(b: ^StringBuffer, fmt: string, args: ..any) -> string {
+proc sbprintf(b: ^StringBuffer, fmt: string, args: ..any) -> string {
 	var fi = FmtInfo{};
 	var end = len(fmt);
 	var arg_index = 0;

@@ -27,36 +27,36 @@ const Mat4 = [4][4]f32;
 
 const Complex = complex64;
 
-const sqrt = proc(x: f32) -> f32 #foreign __llvm_core "llvm.sqrt.f32";
-const sqrt = proc(x: f64) -> f64 #foreign __llvm_core "llvm.sqrt.f64";
+proc sqrt(x: f32) -> f32 #foreign __llvm_core "llvm.sqrt.f32";
+proc sqrt(x: f64) -> f64 #foreign __llvm_core "llvm.sqrt.f64";
 
-const sin  = proc(θ: f32) -> f32 #foreign __llvm_core "llvm.sin.f32";
-const sin  = proc(θ: f64) -> f64 #foreign __llvm_core "llvm.sin.f64";
+proc sin (θ: f32) -> f32 #foreign __llvm_core "llvm.sin.f32";
+proc sin (θ: f64) -> f64 #foreign __llvm_core "llvm.sin.f64";
 
-const cos  = proc(θ: f32) -> f32 #foreign __llvm_core "llvm.cos.f32";
-const cos  = proc(θ: f64) -> f64 #foreign __llvm_core "llvm.cos.f64";
+proc cos (θ: f32) -> f32 #foreign __llvm_core "llvm.cos.f32";
+proc cos (θ: f64) -> f64 #foreign __llvm_core "llvm.cos.f64";
 
-const tan  = proc(θ: f32) -> f32 #inline { return sin(θ)/cos(θ); }
-const tan  = proc(θ: f64) -> f64 #inline { return sin(θ)/cos(θ); }
+proc tan (θ: f32) -> f32 #inline { return sin(θ)/cos(θ); }
+proc tan (θ: f64) -> f64 #inline { return sin(θ)/cos(θ); }
 
-const pow  = proc(x, power: f32) -> f32 #foreign __llvm_core "llvm.pow.f32";
-const pow  = proc(x, power: f64) -> f64 #foreign __llvm_core "llvm.pow.f64";
-
-
-const lerp   = proc(a, b, t: f32) -> (x: f32) { return a*(1-t) + b*t; }
-const lerp   = proc(a, b, t: f64) -> (x: f64) { return a*(1-t) + b*t; }
-const unlerp = proc(a, b, x: f32) -> (t: f32) { return (x-a)/(b-a); }
-const unlerp = proc(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }
+proc pow (x, power: f32) -> f32 #foreign __llvm_core "llvm.pow.f32";
+proc pow (x, power: f64) -> f64 #foreign __llvm_core "llvm.pow.f64";
 
 
-const sign = proc(x: f32) -> f32 { return x >= 0 ? +1 : -1; }
-const sign = proc(x: f64) -> f64 { return x >= 0 ? +1 : -1; }
+proc lerp  (a, b, t: f32) -> (x: f32) { return a*(1-t) + b*t; }
+proc lerp  (a, b, t: f64) -> (x: f64) { return a*(1-t) + b*t; }
+proc unlerp(a, b, x: f32) -> (t: f32) { return (x-a)/(b-a); }
+proc unlerp(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }
 
-const fmuladd = proc(a, b, c: f32) -> f32 #foreign __llvm_core "llvm.fmuladd.f32";
-const fmuladd = proc(a, b, c: f64) -> f64 #foreign __llvm_core "llvm.fmuladd.f64";
+
+proc sign(x: f32) -> f32 { return x >= 0 ? +1 : -1; }
+proc sign(x: f64) -> f64 { return x >= 0 ? +1 : -1; }
+
+proc fmuladd(a, b, c: f32) -> f32 #foreign __llvm_core "llvm.fmuladd.f32";
+proc fmuladd(a, b, c: f64) -> f64 #foreign __llvm_core "llvm.fmuladd.f64";
 
 
-const copy_sign = proc(x, y: f32) -> f32 {
+proc copy_sign(x, y: f32) -> f32 {
 	var ix = transmute(u32, x);
 	var iy = transmute(u32, y);
 	ix &= 0x7fff_ffff;
@@ -64,7 +64,7 @@ const copy_sign = proc(x, y: f32) -> f32 {
 	return transmute(f32, ix);
 }
 
-const copy_sign = proc(x, y: f64) -> f64 {
+proc copy_sign(x, y: f64) -> f64 {
 	var ix = transmute(u64, x);
 	var iy = transmute(u64, y);
 	ix &= 0x7fff_ffff_ffff_ff;
@@ -72,19 +72,19 @@ const copy_sign = proc(x, y: f64) -> f64 {
 	return transmute(f64, ix);
 }
 
-const round     = proc(x: f32) -> f32 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
-const round     = proc(x: f64) -> f64 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
+proc round    (x: f32) -> f32 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
+proc round    (x: f64) -> f64 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
 
-const floor     = proc(x: f32) -> f32 { return x >= 0 ? f32(i64(x)) : f32(i64(x-0.5)); } // TODO: Get accurate versions
-const floor     = proc(x: f64) -> f64 { return x >= 0 ? f64(i64(x)) : f64(i64(x-0.5)); } // TODO: Get accurate versions
+proc floor    (x: f32) -> f32 { return x >= 0 ? f32(i64(x)) : f32(i64(x-0.5)); } // TODO: Get accurate versions
+proc floor    (x: f64) -> f64 { return x >= 0 ? f64(i64(x)) : f64(i64(x-0.5)); } // TODO: Get accurate versions
 
-const ceil      = proc(x: f32) -> f32 { return x <  0 ? f32(i64(x)) : f32(i64(x+1)); } // TODO: Get accurate versions
-const ceil      = proc(x: f64) -> f64 { return x <  0 ? f64(i64(x)) : f64(i64(x+1)); } // TODO: Get accurate versions
+proc ceil     (x: f32) -> f32 { return x <  0 ? f32(i64(x)) : f32(i64(x+1)); } // TODO: Get accurate versions
+proc ceil     (x: f64) -> f64 { return x <  0 ? f64(i64(x)) : f64(i64(x+1)); } // TODO: Get accurate versions
 
-const remainder = proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
-const remainder = proc(x, y: f64) -> f64 { return x - round(x/y) * y; }
+proc remainder(x, y: f32) -> f32 { return x - round(x/y) * y; }
+proc remainder(x, y: f64) -> f64 { return x - round(x/y) * y; }
 
-const mod = proc(x, y: f32) -> f32 {
+proc mod(x, y: f32) -> f32 {
 	y = abs(y);
 	var result = remainder(abs(x), y);
 	if sign(result) < 0 {
@@ -92,7 +92,7 @@ const mod = proc(x, y: f32) -> f32 {
 	}
 	return copy_sign(result, x);
 }
-const mod = proc(x, y: f64) -> f64 {
+proc mod(x, y: f64) -> f64 {
 	y = abs(y);
 	var result = remainder(abs(x), y);
 	if sign(result) < 0 {
@@ -102,31 +102,31 @@ const mod = proc(x, y: f64) -> f64 {
 }
 
 
-const to_radians = proc(degrees: f32) -> f32 { return degrees * TAU / 360; }
-const to_degrees = proc(radians: f32) -> f32 { return radians * 360 / TAU; }
+proc to_radians(degrees: f32) -> f32 { return degrees * TAU / 360; }
+proc to_degrees(radians: f32) -> f32 { return radians * 360 / TAU; }
 
 
 
-const dot = proc(a, b: Vec2) -> f32 { var c = a*b; return c.x + c.y; }
-const dot = proc(a, b: Vec3) -> f32 { var c = a*b; return c.x + c.y + c.z; }
-const dot = proc(a, b: Vec4) -> f32 { var c = a*b; return c.x + c.y + c.z + c.w; }
+proc dot(a, b: Vec2) -> f32 { var c = a*b; return c.x + c.y; }
+proc dot(a, b: Vec3) -> f32 { var c = a*b; return c.x + c.y + c.z; }
+proc dot(a, b: Vec4) -> f32 { var c = a*b; return c.x + c.y + c.z + c.w; }
 
-const cross = proc(x, y: Vec3) -> Vec3 {
+proc cross(x, y: Vec3) -> Vec3 {
 	var a = swizzle(x, 1, 2, 0) * swizzle(y, 2, 0, 1);
 	var b = swizzle(x, 2, 0, 1) * swizzle(y, 1, 2, 0);
 	return a - b;
 }
 
 
-const mag = proc(v: Vec2) -> f32 { return sqrt(dot(v, v)); }
-const mag = proc(v: Vec3) -> f32 { return sqrt(dot(v, v)); }
-const mag = proc(v: Vec4) -> f32 { return sqrt(dot(v, v)); }
+proc mag(v: Vec2) -> f32 { return sqrt(dot(v, v)); }
+proc mag(v: Vec3) -> f32 { return sqrt(dot(v, v)); }
+proc mag(v: Vec4) -> f32 { return sqrt(dot(v, v)); }
 
-const norm = proc(v: Vec2) -> Vec2 { return v / mag(v); }
-const norm = proc(v: Vec3) -> Vec3 { return v / mag(v); }
-const norm = proc(v: Vec4) -> Vec4 { return v / mag(v); }
+proc norm(v: Vec2) -> Vec2 { return v / mag(v); }
+proc norm(v: Vec3) -> Vec3 { return v / mag(v); }
+proc norm(v: Vec4) -> Vec4 { return v / mag(v); }
 
-const norm0 = proc(v: Vec2) -> Vec2 {
+proc norm0(v: Vec2) -> Vec2 {
 	var m = mag(v);
 	if m == 0 {
 		return 0;
@@ -134,7 +134,7 @@ const norm0 = proc(v: Vec2) -> Vec2 {
 	return v / m;
 }
 
-const norm0 = proc(v: Vec3) -> Vec3 {
+proc norm0(v: Vec3) -> Vec3 {
 	var m = mag(v);
 	if m == 0 {
 		return 0;
@@ -142,7 +142,7 @@ const norm0 = proc(v: Vec3) -> Vec3 {
 	return v / m;
 }
 
-const norm0 = proc(v: Vec4) -> Vec4 {
+proc norm0(v: Vec4) -> Vec4 {
 	var m = mag(v);
 	if m == 0 {
 		return 0;
@@ -152,7 +152,7 @@ const norm0 = proc(v: Vec4) -> Vec4 {
 
 
 
-const mat4_identity = proc() -> Mat4 {
+proc mat4_identity() -> Mat4 {
 	return Mat4{
 		{1, 0, 0, 0},
 		{0, 1, 0, 0},
@@ -161,7 +161,7 @@ const mat4_identity = proc() -> Mat4 {
 	};
 }
 
-const mat4_transpose = proc(m: Mat4) -> Mat4 {
+proc mat4_transpose(m: Mat4) -> Mat4 {
 	for j in 0..<4 {
 		for i in 0..<4 {
 			m[i][j], m[j][i] = m[j][i], m[i][j];
@@ -170,7 +170,7 @@ const mat4_transpose = proc(m: Mat4) -> Mat4 {
 	return m;
 }
 
-const mul = proc(a, b: Mat4) -> Mat4 {
+proc mul(a, b: Mat4) -> Mat4 {
 	var c: Mat4;
 	for j in 0..<4 {
 		for i in 0..<4 {
@@ -183,7 +183,7 @@ const mul = proc(a, b: Mat4) -> Mat4 {
 	return c;
 }
 
-const mul = proc(m: Mat4, v: Vec4) -> Vec4 {
+proc mul(m: Mat4, v: Vec4) -> Vec4 {
 	return Vec4{
 		m[0][0]*v.x + m[1][0]*v.y + m[2][0]*v.z + m[3][0]*v.w,
 		m[0][1]*v.x + m[1][1]*v.y + m[2][1]*v.z + m[3][1]*v.w,
@@ -192,7 +192,7 @@ const mul = proc(m: Mat4, v: Vec4) -> Vec4 {
 	};
 }
 
-const inverse = proc(m: Mat4) -> Mat4 {
+proc inverse(m: Mat4) -> Mat4 {
 	var o: Mat4;
 
 	var sf00 = m[2][2] * m[3][3] - m[3][2] * m[2][3];
@@ -261,7 +261,7 @@ const inverse = proc(m: Mat4) -> Mat4 {
 }
 
 
-const mat4_translate = proc(v: Vec3) -> Mat4 {
+proc mat4_translate(v: Vec3) -> Mat4 {
 	var m = mat4_identity();
 	m[3][0] = v.x;
 	m[3][1] = v.y;
@@ -270,7 +270,7 @@ const mat4_translate = proc(v: Vec3) -> Mat4 {
 	return m;
 }
 
-const mat4_rotate = proc(v: Vec3, angle_radians: f32) -> Mat4 {
+proc mat4_rotate(v: Vec3, angle_radians: f32) -> Mat4 {
 	var c = cos(angle_radians);
 	var s = sin(angle_radians);
 
@@ -297,14 +297,14 @@ const mat4_rotate = proc(v: Vec3, angle_radians: f32) -> Mat4 {
 	return rot;
 }
 
-const scale = proc(m: Mat4, v: Vec3) -> Mat4 {
+proc scale(m: Mat4, v: Vec3) -> Mat4 {
 	m[0][0] *= v.x;
 	m[1][1] *= v.y;
 	m[2][2] *= v.z;
 	return m;
 }
 
-const scale = proc(m: Mat4, s: f32) -> Mat4 {
+proc scale(m: Mat4, s: f32) -> Mat4 {
 	m[0][0] *= s;
 	m[1][1] *= s;
 	m[2][2] *= s;
@@ -312,7 +312,7 @@ const scale = proc(m: Mat4, s: f32) -> Mat4 {
 }
 
 
-const look_at = proc(eye, centre, up: Vec3) -> Mat4 {
+proc look_at(eye, centre, up: Vec3) -> Mat4 {
 	var f = norm(centre - eye);
 	var s = norm(cross(f, up));
 	var u = cross(s, f);
@@ -325,7 +325,7 @@ const look_at = proc(eye, centre, up: Vec3) -> Mat4 {
 	};
 }
 
-const perspective = proc(fovy, aspect, near, far: f32) -> Mat4 {
+proc perspective(fovy, aspect, near, far: f32) -> Mat4 {
 	var m: Mat4;
 	var tan_half_fovy = tan(0.5 * fovy);
 	m[0][0] = 1.0 / (aspect*tan_half_fovy);
@@ -337,7 +337,7 @@ const perspective = proc(fovy, aspect, near, far: f32) -> Mat4 {
 }
 
 
-const ortho3d = proc(left, right, bottom, top, near, far: f32) -> Mat4 {
+proc ortho3d(left, right, bottom, top, near, far: f32) -> Mat4 {
 	var m = mat4_identity();
 	m[0][0] = +2.0 / (right - left);
 	m[1][1] = +2.0 / (top - bottom);

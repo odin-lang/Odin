@@ -4,38 +4,38 @@
 #import "sys/wgl.odin" when ODIN_OS == "windows";
 #load "opengl_constants.odin";
 
-const Clear         = proc(mask: u32)                                #foreign lib "glClear";
-const ClearColor    = proc(r, g, b, a: f32)                          #foreign lib "glClearColor";
-const Begin         = proc(mode: i32)                                #foreign lib "glBegin";
-const End           = proc()                                         #foreign lib "glEnd";
-const Finish        = proc()                                         #foreign lib "glFinish";
-const BlendFunc     = proc(sfactor, dfactor: i32)                    #foreign lib "glBlendFunc";
-const Enable        = proc(cap: i32)                                 #foreign lib "glEnable";
-const Disable       = proc(cap: i32)                                 #foreign lib "glDisable";
-const GenTextures   = proc(count: i32, result: ^u32)                 #foreign lib "glGenTextures";
-const DeleteTextures= proc(count: i32, result: ^u32)                 #foreign lib "glDeleteTextures";
-const TexParameteri = proc(target, pname, param: i32)                #foreign lib "glTexParameteri";
-const TexParameterf = proc(target: i32, pname: i32, param: f32)      #foreign lib "glTexParameterf";
-const BindTexture   = proc(target: i32, texture: u32)                #foreign lib "glBindTexture";
-const LoadIdentity  = proc()                                         #foreign lib "glLoadIdentity";
-const Viewport      = proc(x, y, width, height: i32)                 #foreign lib "glViewport";
-const Ortho         = proc(left, right, bottom, top, near, far: f64) #foreign lib "glOrtho";
-const Color3f       = proc(r, g, b: f32)                             #foreign lib "glColor3f";
-const Vertex3f      = proc(x, y, z: f32)                             #foreign lib "glVertex3f";
-const GetError      = proc() -> i32                                  #foreign lib "glGetError";
-const GetString     = proc(name: i32) -> ^u8                       #foreign lib "glGetString";
-const GetIntegerv   = proc(name: i32, v: ^i32)                       #foreign lib "glGetIntegerv";
-const TexCoord2f    = proc(x, y: f32)                                #foreign lib "glTexCoord2f";
-const TexImage2D    = proc(target, level, internal_format,
-                      width, height, border,
-                      format, type_: i32, pixels: rawptr)        #foreign lib "glTexImage2D";
+proc Clear         (mask: u32)                                #foreign lib "glClear";
+proc ClearColor    (r, g, b, a: f32)                          #foreign lib "glClearColor";
+proc Begin         (mode: i32)                                #foreign lib "glBegin";
+proc End           ()                                         #foreign lib "glEnd";
+proc Finish        ()                                         #foreign lib "glFinish";
+proc BlendFunc     (sfactor, dfactor: i32)                    #foreign lib "glBlendFunc";
+proc Enable        (cap: i32)                                 #foreign lib "glEnable";
+proc Disable       (cap: i32)                                 #foreign lib "glDisable";
+proc GenTextures   (count: i32, result: ^u32)                 #foreign lib "glGenTextures";
+proc DeleteTextures(count: i32, result: ^u32)                 #foreign lib "glDeleteTextures";
+proc TexParameteri (target, pname, param: i32)                #foreign lib "glTexParameteri";
+proc TexParameterf (target: i32, pname: i32, param: f32)      #foreign lib "glTexParameterf";
+proc BindTexture   (target: i32, texture: u32)                #foreign lib "glBindTexture";
+proc LoadIdentity  ()                                         #foreign lib "glLoadIdentity";
+proc Viewport      (x, y, width, height: i32)                 #foreign lib "glViewport";
+proc Ortho         (left, right, bottom, top, near, far: f64) #foreign lib "glOrtho";
+proc Color3f       (r, g, b: f32)                             #foreign lib "glColor3f";
+proc Vertex3f      (x, y, z: f32)                             #foreign lib "glVertex3f";
+proc GetError      () -> i32                                  #foreign lib "glGetError";
+proc GetString     (name: i32) -> ^u8                         #foreign lib "glGetString";
+proc GetIntegerv   (name: i32, v: ^i32)                       #foreign lib "glGetIntegerv";
+proc TexCoord2f    (x, y: f32)                                #foreign lib "glTexCoord2f";
+proc TexImage2D    (target, level, internal_format,
+                    width, height, border,
+                    format, type_: i32, pixels: rawptr)       #foreign lib "glTexImage2D";
 
 
-const _string_data = proc(s: string) -> ^u8 #inline { return &s[0]; }
+proc _string_data(s: string) -> ^u8 #inline { return &s[0]; }
 
 var _libgl = win32.load_library_a(_string_data("opengl32.dll\x00"));
 
-const get_proc_address = proc(name: string) -> proc() #cc_c {
+proc get_proc_address(name: string) -> proc() #cc_c {
 	if name[len(name)-1] == 0 {
 		name = name[0..<len(name)-1];
 	}
@@ -108,8 +108,8 @@ var UniformMatrix4fv:         proc(loc: i32, count: u32, transpose: i32, value: 
 
 var GetUniformLocation:       proc(program: u32, name: ^u8) -> i32 #cc_c;
 
-const init = proc() {
-	const set_proc_address = proc(p: rawptr, name: string) #inline {
+proc init() {
+	proc set_proc_address(p: rawptr, name: string) #inline {
 		var x = ^(proc() #cc_c)(p);
 		x^ = get_proc_address(name);
 	}

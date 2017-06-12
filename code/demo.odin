@@ -11,6 +11,9 @@
 #import "utf8.odin";
 #import "utf16.odin";
 
-const main = proc() {
-	fmt.println("Hello");
+proc main() {
+	var x = proc() {
+		fmt.println("Hello");
+	};
+	x();
 }

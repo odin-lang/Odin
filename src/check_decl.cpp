@@ -251,17 +251,17 @@ bool are_signatures_similar_enough(Type *a_, Type *b_) {
 	return true;
 }
 
-void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
+void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e->type == NULL);
-	if (d->proc_lit->kind != AstNode_ProcLit) {
+	if (d->proc_decl->kind != AstNode_ProcDecl) {
 		// TOOD(bill): Better error message
-		error_node(d->proc_lit, "Expected a procedure to check");
+		error_node(d->proc_decl, "Expected a procedure to check");
 		return;
 	}
 
 	Type *proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0, false, ProcCC_Odin);
 	e->type = proc_type;
-	ast_node(pd, ProcLit, d->proc_lit);
+	ast_node(pd, ProcDecl, d->proc_decl);
 
 	check_open_scope(c, pd->type);
 	check_procedure_type(c, proc_type, pd->type);
@@ -325,7 +325,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 			name = pd->foreign_name;
 		}
 
-		AstNode *foreign_library = d->proc_lit->ProcLit.foreign_library;
+		AstNode *foreign_library = d->proc_decl->ProcDecl.foreign_library;
 		if (foreign_library == NULL) {
 			error(e->token, "#foreign procedures must declare which library they are from");
 		} else if (foreign_library->kind != AstNode_Ident) {
@@ -359,7 +359,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 			Type *this_type = base_type(e->type);
 			Type *other_type = base_type(f->type);
 			if (!are_signatures_similar_enough(this_type, other_type)) {
-				error_node(d->proc_lit,
+				error_node(d->proc_decl,
 						   "Redeclaration of #foreign procedure `%.*s` with different type signatures\n"
 						   "\tat %.*s(%td:%td)",
 						   LIT(name), LIT(pos.file), pos.line, pos.column);
@@ -384,7 +384,7 @@ void check_proc_lit(Checker *c, Entity *e, DeclInfo *d) {
 				Entity *f = *found;
 				TokenPos pos = f->token.pos;
 				// TODO(bill): Better error message?
-				error_node(d->proc_lit,
+				error_node(d->proc_decl,
 						   "Non unique linking name for procedure `%.*s`\n"
 						   "\tother at %.*s(%td:%td)",
 						   LIT(name), LIT(pos.file), pos.line, pos.column);
@@ -472,7 +472,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 		check_type_decl(c, e, d->type_expr, named_type);
 		break;
 	case Entity_Procedure:
-		check_proc_lit(c, e, d);
+		check_proc_decl(c, e, d);
 		break;
 	}
 
@@ -482,6 +482,9 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 
 
 void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body) {
+	if (body == NULL) {
+		return;
+	}
 	GB_ASSERT(body->kind == AstNode_BlockStmt);
 
 	String proc_name = {};

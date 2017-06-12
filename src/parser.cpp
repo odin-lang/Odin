@@ -304,6 +304,16 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Array<AstNode *> values; \
 		u32              flags;  \
 	}) \
+	AST_NODE_KIND(ProcDecl, "procedure declaration", struct { \
+		Token    token;           \
+		AstNode *name;            \
+		AstNode *type;            \
+		AstNode *body;            \
+		u64      tags;            \
+		AstNode *foreign_library; \
+		String   foreign_name;    \
+		String   link_name;       \
+	}) \
 	AST_NODE_KIND(ImportDecl, "import declaration", struct { \
 		Token     token;        \
 		bool      is_import;    \
@@ -526,6 +536,7 @@ Token ast_node_token(AstNode *node) {
 
 	case AstNode_BadDecl:        return node->BadDecl.begin;
 	case AstNode_ValueDecl:      return node->ValueDecl.token;
+	case AstNode_ProcDecl:       return node->ProcDecl.token;
 	case AstNode_ImportDecl:     return node->ImportDecl.token;
 	case AstNode_ForeignLibrary: return node->ForeignLibrary.token;
 	case AstNode_Label:          return node->Label.token;
@@ -1421,6 +1432,20 @@ AstNode *ast_value_decl(AstFile *f, Token token, Array<AstNode *> names, AstNode
 	return result;
 }
 
+AstNode *ast_proc_decl(AstFile *f, Token token, AstNode *name, AstNode *type, AstNode *body,
+                       u64 tags, AstNode *foreign_library, String foreign_name, String link_name) {
+	AstNode *result = make_ast_node(f, AstNode_ProcDecl);
+	result->ProcDecl.token           = token;
+	result->ProcDecl.name            = name;
+	result->ProcDecl.type            = type;
+	result->ProcDecl.body            = body;
+	result->ProcDecl.tags            = tags;
+	result->ProcDecl.foreign_library = foreign_library;
+	result->ProcDecl.foreign_name    = foreign_name;
+	result->ProcDecl.link_name       = link_name;
+	return result;
+}
+
 
 AstNode *ast_import_decl(AstFile *f, Token token, bool is_import, Token relpath, Token import_name, AstNode *cond) {
 	AstNode *result = make_ast_node(f, AstNode_ImportDecl);
@@ -1644,6 +1669,8 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 		return true;
 	case AstNode_ProcLit:
 		return s->ProcLit.body != NULL;
+	case AstNode_ProcDecl:
+		return s->ProcDecl.body != NULL;
 
 	case AstNode_ValueDecl:
 		if (s->ValueDecl.token.kind != Token_var) {
@@ -1693,7 +1720,7 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 
 
 AstNode *    parse_expr(AstFile *f, bool lhs);
-AstNode *    parse_proc_type(AstFile *f, AstNode **foreign_library, String *foreign_name, String *link_name);
+AstNode *    parse_proc_type(AstFile *f, Token proc_token, AstNode **foreign_library, String *foreign_name, String *link_name);
 Array<AstNode *> parse_stmt_list(AstFile *f);
 AstNode *    parse_stmt(AstFile *f);
 AstNode *    parse_body(AstFile *f);
@@ -2051,11 +2078,11 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 	// Parse Procedure Type or Literal
 	case Token_proc: {
-		Token token = f->curr_token;
+		Token token = f->curr_token; next_token(f);
 		AstNode *foreign_library = NULL;
 		String foreign_name = {};
 		String link_name = {};
-		AstNode *type = parse_proc_type(f, &foreign_library, &foreign_name, &link_name);
+		AstNode *type = parse_proc_type(f, token, &foreign_library, &foreign_name, &link_name);
 		u64 tags = type->ProcType.tags;
 
 		if (f->curr_token.kind == Token_OpenBrace) {
@@ -2532,6 +2559,30 @@ AstNode *parse_value_decl(AstFile *f, Token token) {
 	return ast_value_decl(f, token, lhs, type, values);
 }
 
+AstNode *parse_proc_decl(AstFile *f) {
+	Token token = expect_token(f, Token_proc);
+	AstNode *body = NULL;
+	AstNode *foreign_library = NULL;
+	String foreign_name = {};
+	String link_name = {};
+
+	AstNode *name = parse_ident(f);
+	AstNode *type = parse_proc_type(f, token, &foreign_library, &foreign_name, &link_name);
+	u64 tags = type->ProcType.tags;
+
+	if (f->curr_token.kind == Token_OpenBrace) {
+		if ((tags & ProcTag_foreign) != 0) {
+			syntax_error(token, "A procedure tagged as `#foreign` cannot have a body");
+		}
+		AstNode *curr_proc = f->curr_proc;
+		f->curr_proc = type;
+		body = parse_body(f);
+		f->curr_proc = curr_proc;
+	}
+
+	return ast_proc_decl(f, token, name, type, body, tags, foreign_library, foreign_name, link_name);
+}
+
 
 
 AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
@@ -2671,11 +2722,10 @@ AstNode *parse_results(AstFile *f) {
 	return list;
 }
 
-AstNode *parse_proc_type(AstFile *f, AstNode **foreign_library_, String *foreign_name_, String *link_name_) {
+AstNode *parse_proc_type(AstFile *f, Token proc_token, AstNode **foreign_library_, String *foreign_name_, String *link_name_) {
 	AstNode *params = {};
 	AstNode *results = {};
 
-	Token proc_token = expect_token(f, Token_proc);
 	expect_token(f, Token_OpenParen);
 	params = parse_field_list(f, NULL, FieldFlag_Signature, Token_CloseParen);
 	expect_token_after(f, Token_CloseParen, "parameter list");
@@ -3243,8 +3293,8 @@ AstNode *parse_type_or_ident(AstFile *f) {
 	}
 
 	case Token_proc: {
-		Token token = f->curr_token;
-		AstNode *pt = parse_proc_type(f, NULL, NULL, NULL);
+		Token token = f->curr_token; next_token(f);
+		AstNode *pt = parse_proc_type(f, token, NULL, NULL, NULL);
 		if (pt->ProcType.tags != 0) {
 			syntax_error(token, "A procedure type cannot have tags");
 		}
@@ -3637,6 +3687,11 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_var:
 	case Token_const:
 		s = parse_simple_stmt(f, StmtAllowFlag_None);
+		expect_semicolon(f, s);
+		return s;
+
+	case Token_proc:
+		s = parse_proc_decl(f);
 		expect_semicolon(f, s);
 		return s;
 

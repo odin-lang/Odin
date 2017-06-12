@@ -193,7 +193,7 @@ struct DeclInfo {
 
 	AstNode *         type_expr;
 	AstNode *         init_expr;
-	AstNode *         proc_lit; // AstNode_ProcLit
+	AstNode *         proc_decl; // AstNode_ProcDecl
 
 	Map<bool>         deps; // Key: Entity *
 	Array<BlockLabel> labels;
@@ -340,9 +340,9 @@ bool decl_info_has_init(DeclInfo *d) {
 	if (d->init_expr != NULL) {
 		return true;
 	}
-	if (d->proc_lit != NULL) {
-		switch (d->proc_lit->kind) {
-		case_ast_node(pd, ProcLit, d->proc_lit);
+	if (d->proc_decl != NULL) {
+		switch (d->proc_decl->kind) {
+		case_ast_node(pd, ProcDecl, d->proc_decl);
 			if (pd->body != NULL) {
 				return true;
 			}
@@ -1542,10 +1542,10 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 						d->type_expr = vd->type;
 						d->init_expr = up_init->Alias.expr;
 					#endif
-					} else if (init != NULL && up_init->kind == AstNode_ProcLit) {
-						e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
-						d->proc_lit = up_init;
-						d->type_expr = vd->type;
+					// } else if (init != NULL && up_init->kind == AstNode_ProcLit) {
+						// e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, up_init->ProcLit.tags);
+						// d->proc_lit = up_init;
+						// d->type_expr = vd->type;
 					} else {
 						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, empty_exact_value);
 						d->type_expr = vd->type;
@@ -1559,6 +1559,24 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 
 				check_arity_match(c, vd);
 			}
+		case_end;
+
+		case_ast_node(pd, ProcDecl, decl);
+			AstNode *name = pd->name;
+			if (name->kind != AstNode_Ident) {
+				error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+				break;
+			}
+
+
+			DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
+			Entity *e = NULL;
+
+			e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, pd->tags);
+			d->proc_decl = decl;
+			d->type_expr = pd->type;
+			e->identifier = name;
+			add_entity_and_decl_info(c, name, e, d);
 		case_end;
 
 		case_ast_node(id, ImportDecl, decl);

@@ -7,7 +7,7 @@ const IntFlag = enum {
 }
 
 
-const parse_bool = proc(s: string) -> (result: bool, ok: bool) {
+proc parse_bool(s: string) -> (result: bool, ok: bool) {
 	match s {
 	case "1", "t", "T", "true", "TRUE", "True":
 		return true, true;
@@ -17,7 +17,7 @@ const parse_bool = proc(s: string) -> (result: bool, ok: bool) {
 	return false, false;
 }
 
-const _digit_value = proc(r: rune) -> (int) {
+proc _digit_value(r: rune) -> int {
 	var ri = int(r);
 	var v: int = 16;
 	match r {
@@ -28,7 +28,7 @@ const _digit_value = proc(r: rune) -> (int) {
 	return v;
 }
 
-const parse_i128 = proc(s: string) -> i128 {
+proc parse_i128(s: string) -> i128 {
 	var neg = false;
 	if len(s) > 1 {
 		match s[0] {
@@ -70,7 +70,7 @@ const parse_i128 = proc(s: string) -> i128 {
 	return neg ? -value : value;
 }
 
-const parse_u128 = proc(s: string) -> u128 {
+proc parse_u128(s: string) -> u128 {
 	var neg = false;
 	if len(s) > 1 && s[0] == '+' {
 		s = s[1..];
@@ -107,14 +107,14 @@ const parse_u128 = proc(s: string) -> u128 {
 }
 
 
-const parse_int = proc(s: string) -> int {
+proc parse_int(s: string) -> int {
 	return int(parse_i128(s));
 }
-const parse_uint = proc(s: string, base: int) -> uint {
+proc parse_uint(s: string, base: int) -> uint {
 	return uint(parse_u128(s));
 }
 
-const parse_f64 = proc(s: string) -> f64 {
+proc parse_f64(s: string) -> f64 {
 	var i = 0;
 
 	var sign: f64 = 1;
@@ -189,21 +189,21 @@ const parse_f64 = proc(s: string) -> f64 {
 }
 
 
-const append_bool = proc(buf: []u8, b: bool) -> string {
+proc append_bool(buf: []u8, b: bool) -> string {
 	var s = b ? "true" : "false";
 	append(buf, ..[]u8(s));
 	return string(buf);
 }
 
-const append_uint = proc(buf: []u8, u: u64, base: int) -> string {
+proc append_uint(buf: []u8, u: u64, base: int) -> string {
 	return append_bits(buf, u128(u), base, false, 8*size_of(uint), digits, 0);
 }
-const append_int = proc(buf: []u8, i: i64, base: int) -> string {
+proc append_int(buf: []u8, i: i64, base: int) -> string {
 	return append_bits(buf, u128(i), base, true, 8*size_of(int), digits, 0);
 }
-const itoa = proc(buf: []u8, i: int) -> string { return append_int(buf, i64(i), 10); }
+proc itoa(buf: []u8, i: int) -> string { return append_int(buf, i64(i), 10); }
 
-const append_float = proc(buf: []u8, f: f64, fmt: u8, prec, bit_size: int) -> string {
+proc append_float(buf: []u8, f: f64, fmt: u8, prec, bit_size: int) -> string {
 	return string(generic_ftoa(buf, f, fmt, prec, bit_size));
 }
 
@@ -228,7 +228,7 @@ var _f32_info = Float_Info{23, 8,  -127};
 var _f64_info = Float_Info{52, 11, -1023};
 
 
-const generic_ftoa = proc(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 {
+proc generic_ftoa(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 {
 	var bits: u64;
 	var flt: ^Float_Info;
 	match bit_size {
@@ -300,7 +300,7 @@ const generic_ftoa = proc(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> 
 
 
 
-const format_digits = proc(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, prec: int, fmt: u8) -> []u8 {
+proc format_digits(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, prec: int, fmt: u8) -> []u8 {
 	match fmt {
 	case 'f', 'F':
 		append(buf, neg ? '-' : '+');
@@ -347,7 +347,7 @@ const format_digits = proc(buf: []u8, shortest: bool, neg: bool, digs: DecimalSl
 	return buf;
 }
 
-const round_shortest = proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
+proc round_shortest(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 	if mant == 0 { // If mantissa is zero, the number is zero
 		d.count = 0;
 		return;
@@ -418,7 +418,7 @@ const MAX_BASE = 32;
 immutable var digits = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 
-const is_integer_negative = proc(u: u128, is_signed: bool, bit_size: int) -> (unsigned: u128, neg: bool) {
+proc is_integer_negative(u: u128, is_signed: bool, bit_size: int) -> (unsigned: u128, neg: bool) {
 	var neg = false;
 	if is_signed {
 		match bit_size {
@@ -454,7 +454,7 @@ const is_integer_negative = proc(u: u128, is_signed: bool, bit_size: int) -> (un
 	return u, neg;
 }
 
-const append_bits = proc(buf: []u8, u_: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: IntFlag) -> string {
+proc append_bits(buf: []u8, u_: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: IntFlag) -> string {
 	if base < 2 || base > MAX_BASE {
 		panic("strconv: illegal base passed to append_bits");
 	}

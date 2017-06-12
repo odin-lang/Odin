@@ -64,19 +64,19 @@ var get_extensions_string_arb:  GetExtensionsStringARBType;
 
 
 
-const create_context            = proc(hdc: Hdc) -> Hglrc                                                                                                 #foreign opengl32 "wglCreateContext";
-const make_current              = proc(hdc: Hdc, hglrc: Hglrc) -> Bool                                                                                    #foreign opengl32 "wglMakeCurrent";
-const get_proc_address          = proc(c_str: ^u8) -> Proc                                                                                                #foreign opengl32 "wglGetProcAddress";
-const delete_context            = proc(hglrc: Hglrc) -> Bool                                                                                              #foreign opengl32 "wglDeleteContext";
-const copy_context              = proc(src, dst: Hglrc, mask: u32) -> Bool                                                                                #foreign opengl32 "wglCopyContext";
-const create_layer_context      = proc(hdc: Hdc, layer_plane: i32) -> Hglrc                                                                               #foreign opengl32 "wglCreateLayerContext";
-const describe_layer_plane      = proc(hdc: Hdc, pixel_format, layer_plane: i32, bytes: u32, pd: ^LayerPlaneDescriptor) -> Bool                           #foreign opengl32 "wglDescribeLayerPlane";
-const get_current_context       = proc() -> Hglrc                                                                                                         #foreign opengl32 "wglGetCurrentContext";
-const get_current_dc            = proc() -> Hdc                                                                                                           #foreign opengl32 "wglGetCurrentDC";
-const get_layer_palette_entries = proc(hdc: Hdc, layer_plane, start, entries: i32, cr: ^ColorRef) -> i32                                                 #foreign opengl32 "wglGetLayerPaletteEntries";
-const realize_layer_palette     = proc(hdc: Hdc, layer_plane: i32, realize: Bool) -> Bool                                                                 #foreign opengl32 "wglRealizeLayerPalette";
-const set_layer_palette_entries = proc(hdc: Hdc, layer_plane, start, entries: i32, cr: ^ColorRef) -> i32                                                 #foreign opengl32 "wglSetLayerPaletteEntries";
-const share_lists               = proc(hglrc1, hglrc2: Hglrc) -> Bool                                                                                     #foreign opengl32 "wglShareLists";
-const swap_layer_buffers        = proc(hdc: Hdc, planes: u32) -> Bool                                                                                     #foreign opengl32 "wglSwapLayerBuffers";
-const use_font_bitmaps          = proc(hdc: Hdc, first, count, list_base: u32) -> Bool                                                                    #foreign opengl32 "wglUseFontBitmaps";
-const use_font_outlines         = proc(hdc: Hdc, first, count, list_base: u32, deviation, extrusion: f32, format: i32, gmf: ^Glyph_MetricsFloat) -> Bool  #foreign opengl32 "wglUseFontOutlines";
+proc create_context           (hdc: Hdc) -> Hglrc                                                                                                 #foreign opengl32 "wglCreateContext";
+proc make_current             (hdc: Hdc, hglrc: Hglrc) -> Bool                                                                                    #foreign opengl32 "wglMakeCurrent";
+proc get_proc_address         (c_str: ^u8) -> Proc                                                                                                #foreign opengl32 "wglGetProcAddress";
+proc delete_context           (hglrc: Hglrc) -> Bool                                                                                              #foreign opengl32 "wglDeleteContext";
+proc copy_context             (src, dst: Hglrc, mask: u32) -> Bool                                                                                #foreign opengl32 "wglCopyContext";
+proc create_layer_context     (hdc: Hdc, layer_plane: i32) -> Hglrc                                                                               #foreign opengl32 "wglCreateLayerContext";
+proc describe_layer_plane     (hdc: Hdc, pixel_format, layer_plane: i32, bytes: u32, pd: ^LayerPlaneDescriptor) -> Bool                           #foreign opengl32 "wglDescribeLayerPlane";
+proc get_current_context      () -> Hglrc                                                                                                         #foreign opengl32 "wglGetCurrentContext";
+proc get_current_dc           () -> Hdc                                                                                                           #foreign opengl32 "wglGetCurrentDC";
+proc get_layer_palette_entries(hdc: Hdc, layer_plane, start, entries: i32, cr: ^ColorRef) -> i32                                                 #foreign opengl32 "wglGetLayerPaletteEntries";
+proc realize_layer_palette    (hdc: Hdc, layer_plane: i32, realize: Bool) -> Bool                                                                 #foreign opengl32 "wglRealizeLayerPalette";
+proc set_layer_palette_entries(hdc: Hdc, layer_plane, start, entries: i32, cr: ^ColorRef) -> i32                                                 #foreign opengl32 "wglSetLayerPaletteEntries";
+proc share_lists              (hglrc1, hglrc2: Hglrc) -> Bool                                                                                     #foreign opengl32 "wglShareLists";
+proc swap_layer_buffers       (hdc: Hdc, planes: u32) -> Bool                                                                                     #foreign opengl32 "wglSwapLayerBuffers";
+proc use_font_bitmaps         (hdc: Hdc, first, count, list_base: u32) -> Bool                                                                    #foreign opengl32 "wglUseFontBitmaps";
+proc use_font_outlines        (hdc: Hdc, first, count, list_base: u32, deviation, extrusion: f32, format: i32, gmf: ^Glyph_MetricsFloat) -> Bool  #foreign opengl32 "wglUseFontOutlines";

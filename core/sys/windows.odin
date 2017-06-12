@@ -169,93 +169,93 @@ const GET_FILEEX_INFO_LEVELS = i32;
 const GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS = 0;
 const GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS = 1;
 
-const get_last_error      = proc() -> i32                            #foreign kernel32 "GetLastError";
-const exit_process        = proc(exit_code: u32)                     #foreign kernel32 "ExitProcess";
-const get_desktop_window  = proc() -> Hwnd                           #foreign user32   "GetDesktopWindow";
-const show_cursor         = proc(show : Bool)                        #foreign user32   "ShowCursor";
-const get_cursor_pos      = proc(p: ^Point) -> i32                   #foreign user32   "GetCursorPos";
-const screen_to_client    = proc(h: Hwnd, p: ^Point) -> i32          #foreign user32   "ScreenToClient";
-const get_module_handle_a = proc(module_name: ^u8) -> Hinstance      #foreign kernel32 "GetModuleHandleA";
-const get_stock_object    = proc(fn_object: i32) -> Hgdiobj          #foreign gdi32    "GetStockObject";
-const post_quit_message   = proc(exit_code: i32)                     #foreign user32   "PostQuitMessage";
-const set_window_text_a   = proc(hwnd: Hwnd, c_string: ^u8) -> Bool  #foreign user32   "SetWindowTextA";
+proc get_last_error     () -> i32                            #foreign kernel32 "GetLastError";
+proc exit_process       (exit_code: u32)                     #foreign kernel32 "ExitProcess";
+proc get_desktop_window () -> Hwnd                           #foreign user32   "GetDesktopWindow";
+proc show_cursor        (show : Bool)                        #foreign user32   "ShowCursor";
+proc get_cursor_pos     (p: ^Point) -> i32                   #foreign user32   "GetCursorPos";
+proc screen_to_client   (h: Hwnd, p: ^Point) -> i32          #foreign user32   "ScreenToClient";
+proc get_module_handle_a(module_name: ^u8) -> Hinstance      #foreign kernel32 "GetModuleHandleA";
+proc get_stock_object   (fn_object: i32) -> Hgdiobj          #foreign gdi32    "GetStockObject";
+proc post_quit_message  (exit_code: i32)                     #foreign user32   "PostQuitMessage";
+proc set_window_text_a  (hwnd: Hwnd, c_string: ^u8) -> Bool  #foreign user32   "SetWindowTextA";
 
-const query_performance_frequency = proc(result: ^i64) -> i32 #foreign kernel32 "QueryPerformanceFrequency";
-const query_performance_counter   = proc(result: ^i64) -> i32 #foreign kernel32 "QueryPerformanceCounter";
+proc query_performance_frequency(result: ^i64) -> i32 #foreign kernel32 "QueryPerformanceFrequency";
+proc query_performance_counter  (result: ^i64) -> i32 #foreign kernel32 "QueryPerformanceCounter";
 
-const sleep = proc(ms: i32) -> i32 #foreign kernel32 "Sleep";
+proc sleep(ms: i32) -> i32 #foreign kernel32 "Sleep";
 
-const output_debug_string_a = proc(c_str: ^u8) #foreign kernel32 "OutputDebugStringA";
+proc output_debug_string_a(c_str: ^u8) #foreign kernel32 "OutputDebugStringA";
 
 
-const register_class_ex_a = proc(wc: ^WndClassExA) -> i16 #foreign user32 "RegisterClassExA";
-const create_window_ex_a  = proc(ex_style: u32,
+proc register_class_ex_a(wc: ^WndClassExA) -> i16 #foreign user32 "RegisterClassExA";
+proc create_window_ex_a (ex_style: u32,
                             class_name, title: ^u8,
                             style: u32,
                             x, y, w, h: i32,
                             parent: Hwnd, menu: Hmenu, instance: Hinstance,
                             param: rawptr) -> Hwnd #foreign user32 "CreateWindowExA";
 
-const show_window        = proc(hwnd: Hwnd, cmd_show: i32) -> Bool #foreign user32 "ShowWindow";
-const translate_message  = proc(msg: ^Msg) -> Bool                 #foreign user32 "TranslateMessage";
-const dispatch_message_a = proc(msg: ^Msg) -> Lresult              #foreign user32 "DispatchMessageA";
-const update_window      = proc(hwnd: Hwnd) -> Bool                #foreign user32 "UpdateWindow";
-const get_message_a      = proc(msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max : u32) -> Bool #foreign user32 "GetMessageA";
-const peek_message_a     = proc(msg: ^Msg, hwnd: Hwnd,
+proc show_window       (hwnd: Hwnd, cmd_show: i32) -> Bool #foreign user32 "ShowWindow";
+proc translate_message (msg: ^Msg) -> Bool                 #foreign user32 "TranslateMessage";
+proc dispatch_message_a(msg: ^Msg) -> Lresult              #foreign user32 "DispatchMessageA";
+proc update_window     (hwnd: Hwnd) -> Bool                #foreign user32 "UpdateWindow";
+proc get_message_a     (msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max : u32) -> Bool #foreign user32 "GetMessageA";
+proc peek_message_a    (msg: ^Msg, hwnd: Hwnd,
                            msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool #foreign user32 "PeekMessageA";
 
-const post_message = proc(hwnd: Hwnd, msg, wparam, lparam : u32) -> Bool #foreign user32 "PostMessageA";
+proc post_message(hwnd: Hwnd, msg, wparam, lparam : u32) -> Bool #foreign user32 "PostMessageA";
 
-const def_window_proc_a = proc(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult #foreign user32 "DefWindowProcA";
+proc def_window_proc_a(hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult #foreign user32 "DefWindowProcA";
 
-const adjust_window_rect = proc(rect: ^Rect, style: u32, menu: Bool) -> Bool #foreign user32 "AdjustWindowRect";
-const get_active_window  = proc() -> Hwnd                                    #foreign user32 "GetActiveWindow";
+proc adjust_window_rect(rect: ^Rect, style: u32, menu: Bool) -> Bool #foreign user32 "AdjustWindowRect";
+proc get_active_window () -> Hwnd                                    #foreign user32 "GetActiveWindow";
 
-const destroy_window        = proc(wnd: Hwnd) -> Bool                                                           #foreign user32 "DestroyWindow";
-const describe_pixel_format = proc(dc: Hdc, pixel_format: i32, bytes : u32, pfd: ^PixelFormatDescriptor) -> i32 #foreign user32 "DescribePixelFormat";
+proc destroy_window       (wnd: Hwnd) -> Bool                                                           #foreign user32 "DestroyWindow";
+proc describe_pixel_format(dc: Hdc, pixel_format: i32, bytes : u32, pfd: ^PixelFormatDescriptor) -> i32 #foreign user32 "DescribePixelFormat";
 
 
-const get_query_performance_frequency = proc() -> i64 {
+proc get_query_performance_frequency() -> i64 {
 	var r: i64;
 	query_performance_frequency(&r);
 	return r;
 }
 
-const get_command_line_a     = proc() -> ^u8                                 #foreign kernel32 "GetCommandLineA";
-const get_command_line_w     = proc() -> ^u16                                #foreign kernel32 "GetCommandLineW";
-const get_system_metrics     = proc(index: i32) -> i32                       #foreign kernel32 "GetSystemMetrics";
-const get_current_thread_id  = proc() -> u32                                 #foreign kernel32 "GetCurrentThreadId";
-const command_line_to_argv_w = proc(cmd_list: ^u16, num_args: ^i32) -> ^^u16 #foreign shell32  "CommandLineToArgvW";
+proc get_command_line_a    () -> ^u8                                 #foreign kernel32 "GetCommandLineA";
+proc get_command_line_w    () -> ^u16                                #foreign kernel32 "GetCommandLineW";
+proc get_system_metrics    (index: i32) -> i32                       #foreign kernel32 "GetSystemMetrics";
+proc get_current_thread_id () -> u32                                 #foreign kernel32 "GetCurrentThreadId";
+proc command_line_to_argv_w(cmd_list: ^u16, num_args: ^i32) -> ^^u16 #foreign shell32  "CommandLineToArgvW";
 
-const time_get_time                = proc() -> u32                                                  #foreign winmm    "timeGetTime";
-const get_system_time_as_file_time = proc(system_time_as_file_time: ^Filetime)                      #foreign kernel32 "GetSystemTimeAsFileTime";
-const file_time_to_local_file_time = proc(file_time: ^Filetime, local_file_time: ^Filetime) -> Bool #foreign kernel32 "FileTimeToLocalFileTime";
-const file_time_to_system_time     = proc(file_time: ^Filetime, system_time: ^Systemtime) -> Bool   #foreign kernel32 "FileTimeToSystemTime";
-const system_time_to_file_time     = proc(system_time: ^Systemtime, file_time: ^Filetime) -> Bool   #foreign kernel32 "SystemTimeToFileTime";
+proc time_get_time               () -> u32                                                  #foreign winmm    "timeGetTime";
+proc get_system_time_as_file_time(system_time_as_file_time: ^Filetime)                      #foreign kernel32 "GetSystemTimeAsFileTime";
+proc file_time_to_local_file_time(file_time: ^Filetime, local_file_time: ^Filetime) -> Bool #foreign kernel32 "FileTimeToLocalFileTime";
+proc file_time_to_system_time    (file_time: ^Filetime, system_time: ^Systemtime) -> Bool   #foreign kernel32 "FileTimeToSystemTime";
+proc system_time_to_file_time    (system_time: ^Systemtime, file_time: ^Filetime) -> Bool   #foreign kernel32 "SystemTimeToFileTime";
 
 // File Stuff
 
-const close_handle   = proc(h: Handle) -> i32 #foreign kernel32 "CloseHandle";
-const get_std_handle = proc(h: i32) -> Handle #foreign kernel32 "GetStdHandle";
-const create_file_a  = proc(filename: ^u8, desired_access, share_mode: u32,
+proc close_handle  (h: Handle) -> i32 #foreign kernel32 "CloseHandle";
+proc get_std_handle(h: i32) -> Handle #foreign kernel32 "GetStdHandle";
+proc create_file_a (filename: ^u8, desired_access, share_mode: u32,
                        security: rawptr,
                        creation, flags_and_attribs: u32, template_file: Handle) -> Handle #foreign kernel32 "CreateFileA";
-const read_file  = proc(h: Handle, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> Bool #foreign kernel32 "ReadFile";
-const write_file = proc(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool #foreign kernel32 "WriteFile";
+proc read_file (h: Handle, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> Bool #foreign kernel32 "ReadFile";
+proc write_file(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool #foreign kernel32 "WriteFile";
 
-const get_file_size_ex               = proc(file_handle: Handle, file_size: ^i64) -> Bool                                    #foreign kernel32 "GetFileSizeEx";
-const get_file_attributes_a          = proc(filename: ^u8) -> u32                                                          #foreign kernel32 "GetFileAttributesA";
-const get_file_attributes_ex_a       = proc(filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool #foreign kernel32 "GetFileAttributesExA";
-const get_file_information_by_handle = proc(file_handle: Handle, file_info: ^ByHandleFileInformation) -> Bool                #foreign kernel32 "GetFileInformationByHandle";
+proc get_file_size_ex              (file_handle: Handle, file_size: ^i64) -> Bool                                    #foreign kernel32 "GetFileSizeEx";
+proc get_file_attributes_a         (filename: ^u8) -> u32                                                          #foreign kernel32 "GetFileAttributesA";
+proc get_file_attributes_ex_a      (filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool #foreign kernel32 "GetFileAttributesExA";
+proc get_file_information_by_handle(file_handle: Handle, file_info: ^ByHandleFileInformation) -> Bool                #foreign kernel32 "GetFileInformationByHandle";
 
-const get_file_type    = proc(file_handle: Handle) -> u32                                                                       #foreign kernel32 "GetFileType";
-const set_file_pointer = proc(file_handle: Handle, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 #foreign kernel32 "SetFilePointer";
+proc get_file_type   (file_handle: Handle) -> u32                                                                       #foreign kernel32 "GetFileType";
+proc set_file_pointer(file_handle: Handle, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 #foreign kernel32 "SetFilePointer";
 
-const set_handle_information = proc(obj: Handle, mask, flags: u32) -> Bool #foreign kernel32 "SetHandleInformation";
+proc set_handle_information(obj: Handle, mask, flags: u32) -> Bool #foreign kernel32 "SetHandleInformation";
 
-const find_first_file_a = proc(file_name : ^u8, data : ^FindData) -> Handle #foreign kernel32 "FindFirstFileA";
-const find_next_file_a  = proc(file : Handle, data : ^FindData) -> Bool       #foreign kernel32 "FindNextFileA";
-const find_close        = proc(file : Handle) -> Bool                         #foreign kernel32 "FindClose";
+proc find_first_file_a(file_name : ^u8, data : ^FindData) -> Handle #foreign kernel32 "FindFirstFileA";
+proc find_next_file_a (file : Handle, data : ^FindData) -> Bool       #foreign kernel32 "FindNextFileA";
+proc find_close       (file : Handle) -> Bool                         #foreign kernel32 "FindClose";
 
 const MAX_PATH = 0x00000104;
 
@@ -313,10 +313,10 @@ const INVALID_SET_FILE_POINTER = ~u32(0);
 
 
 
-const heap_alloc       = proc (h: Handle, flags: u32, bytes: int) -> rawptr                 #foreign kernel32 "HeapAlloc";
-const heap_realloc     = proc (h: Handle, flags: u32, memory: rawptr, bytes: int) -> rawptr #foreign kernel32 "HeapReAlloc";
-const heap_free        = proc (h: Handle, flags: u32, memory: rawptr) -> Bool               #foreign kernel32 "HeapFree";
-const get_process_heap = proc () -> Handle                                                  #foreign kernel32 "GetProcessHeap";
+proc heap_alloc      ( h: Handle, flags: u32, bytes: int) -> rawptr                 #foreign kernel32 "HeapAlloc";
+proc heap_realloc    ( h: Handle, flags: u32, memory: rawptr, bytes: int) -> rawptr #foreign kernel32 "HeapReAlloc";
+proc heap_free       ( h: Handle, flags: u32, memory: rawptr) -> Bool               #foreign kernel32 "HeapFree";
+proc get_process_heap( ) -> Handle                                                  #foreign kernel32 "GetProcessHeap";
 
 
 const HEAP_ZERO_MEMORY = 0x00000008;
@@ -331,27 +331,27 @@ const Security_Attributes = struct #ordered {
 
 const INFINITE = 0xffffffff;
 
-const create_semaphore_a     = proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^u8) -> Handle #foreign kernel32 "CreateSemaphoreA";
-const release_semaphore      = proc(semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool                        #foreign kernel32 "ReleaseSemaphore";
-const wait_for_single_object = proc(handle: Handle, milliseconds: u32) -> u32                                                   #foreign kernel32 "WaitForSingleObject";
+proc create_semaphore_a    (attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^u8) -> Handle #foreign kernel32 "CreateSemaphoreA";
+proc release_semaphore     (semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool                        #foreign kernel32 "ReleaseSemaphore";
+proc wait_for_single_object(handle: Handle, milliseconds: u32) -> u32                                                   #foreign kernel32 "WaitForSingleObject";
 
 
-const interlocked_compare_exchange   = proc(dst: ^i32, exchange, comparand: i32) -> i32   #foreign kernel32 "InterlockedCompareExchange";
-const interlocked_exchange           = proc(dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedExchange";
-const interlocked_exchange_add       = proc(dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedExchangeAdd";
-const interlocked_and                = proc(dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedAnd";
-const interlocked_or                 = proc(dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedOr";
+proc interlocked_compare_exchange  (dst: ^i32, exchange, comparand: i32) -> i32   #foreign kernel32 "InterlockedCompareExchange";
+proc interlocked_exchange          (dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedExchange";
+proc interlocked_exchange_add      (dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedExchangeAdd";
+proc interlocked_and               (dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedAnd";
+proc interlocked_or                (dst: ^i32, desired: i32) -> i32               #foreign kernel32 "InterlockedOr";
 
-const interlocked_compare_exchange64 = proc(dst: ^i64, exchange, comparand: i64) -> i64   #foreign kernel32 "InterlockedCompareExchange64";
-const interlocked_exchange64         = proc(dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedExchange64";
-const interlocked_exchange_add64     = proc(dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedExchangeAdd64";
-const interlocked_and64              = proc(dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedAnd64";
-const interlocked_or64               = proc(dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedOr64";
+proc interlocked_compare_exchange64(dst: ^i64, exchange, comparand: i64) -> i64   #foreign kernel32 "InterlockedCompareExchange64";
+proc interlocked_exchange64        (dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedExchange64";
+proc interlocked_exchange_add64    (dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedExchangeAdd64";
+proc interlocked_and64             (dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedAnd64";
+proc interlocked_or64              (dst: ^i64, desired: i64) -> i64               #foreign kernel32 "InterlockedOr64";
 
-const mm_pause           = proc() #foreign kernel32 "_mm_pause";
-const read_write_barrier = proc() #foreign kernel32 "ReadWriteBarrier";
-const write_barrier      = proc() #foreign kernel32 "WriteBarrier";
-const read_barrier       = proc() #foreign kernel32 "ReadBarrier";
+proc mm_pause          () #foreign kernel32 "_mm_pause";
+proc read_write_barrier() #foreign kernel32 "ReadWriteBarrier";
+proc write_barrier     () #foreign kernel32 "WriteBarrier";
+proc read_barrier      () #foreign kernel32 "ReadBarrier";
 
 
 
@@ -390,24 +390,24 @@ const WindowPlacement = struct #ordered {
 	normal_pos: Rect,
 }
 
-const get_monitor_info_a    = proc(monitor: Hmonitor, mi: ^MonitorInfo) -> Bool                           #foreign user32 "GetMonitorInfoA";
-const monitor_from_window   = proc(wnd: Hwnd, flags : u32) -> Hmonitor                                    #foreign user32 "MonitorFromWindow";
+proc get_monitor_info_a   (monitor: Hmonitor, mi: ^MonitorInfo) -> Bool                           #foreign user32 "GetMonitorInfoA";
+proc monitor_from_window  (wnd: Hwnd, flags : u32) -> Hmonitor                                    #foreign user32 "MonitorFromWindow";
 
-const set_window_pos        = proc(wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height: i32, flags: u32) #foreign user32 "SetWindowPos";
+proc set_window_pos       (wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height: i32, flags: u32) #foreign user32 "SetWindowPos";
 
-const get_window_placement  = proc(wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool                            #foreign user32 "GetWindowPlacement";
-const set_window_placement  = proc(wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool                            #foreign user32 "SetWindowPlacement";
-const get_window_rect       = proc(wnd: Hwnd, rect: ^Rect) -> Bool                                        #foreign user32 "GetWindowRect";
+proc get_window_placement (wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool                            #foreign user32 "GetWindowPlacement";
+proc set_window_placement (wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool                            #foreign user32 "SetWindowPlacement";
+proc get_window_rect      (wnd: Hwnd, rect: ^Rect) -> Bool                                        #foreign user32 "GetWindowRect";
 
-const get_window_long_ptr_a = proc(wnd: Hwnd, index: i32) -> i64                                          #foreign user32 "GetWindowLongPtrA";
-const set_window_long_ptr_a = proc(wnd: Hwnd, index: i32, new: i64) -> i64                                #foreign user32 "SetWindowLongPtrA";
+proc get_window_long_ptr_a(wnd: Hwnd, index: i32) -> i64                                          #foreign user32 "GetWindowLongPtrA";
+proc set_window_long_ptr_a(wnd: Hwnd, index: i32, new: i64) -> i64                                #foreign user32 "SetWindowLongPtrA";
 
-const get_window_text       = proc(wnd: Hwnd, str: ^u8, maxCount: i32) -> i32                           #foreign user32 "GetWindowText";
+proc get_window_text      (wnd: Hwnd, str: ^u8, maxCount: i32) -> i32                           #foreign user32 "GetWindowText";
 
-const HIWORD = proc(wParam: Wparam) -> u16 { return u16((u32(wParam) >> 16) & 0xffff); }
-const HIWORD = proc(lParam: Lparam) -> u16 { return u16((u32(lParam) >> 16) & 0xffff); }
-const LOWORD = proc(wParam: Wparam) -> u16 { return u16(wParam); }
-const LOWORD = proc(lParam: Lparam) -> u16 { return u16(lParam); }
+proc HIWORD(wParam: Wparam) -> u16 { return u16((u32(wParam) >> 16) & 0xffff); }
+proc HIWORD(lParam: Lparam) -> u16 { return u16((u32(lParam) >> 16) & 0xffff); }
+proc LOWORD(wParam: Wparam) -> u16 { return u16(wParam); }
+proc LOWORD(lParam: Lparam) -> u16 { return u16(lParam); }
 
 
 
@@ -442,7 +442,7 @@ const DIB_RGB_COLORS = 0x00;
 const SRCCOPY: u32   = 0x00cc0020;
 
 
-const stretch_dibits = proc (hdc: Hdc,
+proc stretch_dibits( hdc: Hdc,
                         x_dst, y_dst, width_dst, height_dst: i32,
                         x_src, y_src, width_src, header_src: i32,
                         bits: rawptr, bits_info: ^BitmapInfo,
@@ -451,11 +451,11 @@ const stretch_dibits = proc (hdc: Hdc,
 
 
 
-const load_library_a   = proc (c_str: ^u8) -> Hmodule          #foreign kernel32 "LoadLibraryA";
-const free_library     = proc (h: Hmodule)                     #foreign kernel32 "FreeLibrary";
-const get_proc_address = proc (h: Hmodule, c_str: ^u8) -> Proc #foreign kernel32 "GetProcAddress";
+proc load_library_a  ( c_str: ^u8) -> Hmodule          #foreign kernel32 "LoadLibraryA";
+proc free_library    ( h: Hmodule)                     #foreign kernel32 "FreeLibrary";
+proc get_proc_address( h: Hmodule, c_str: ^u8) -> Proc #foreign kernel32 "GetProcAddress";
 
-const get_client_rect  = proc(hwnd: Hwnd, rect: ^Rect) -> Bool #foreign user32 "GetClientRect";
+proc get_client_rect (hwnd: Hwnd, rect: ^Rect) -> Bool #foreign user32 "GetClientRect";
 
 // Windows OpenGL
 const PFD_TYPE_RGBA             = 0;
@@ -512,11 +512,11 @@ const PixelFormatDescriptor = struct #ordered {
 	damage_mask: u32,
 }
 
-const get_dc              = proc(h: Hwnd) -> Hdc                                                   #foreign user32 "GetDC";
-const set_pixel_format    = proc(hdc: Hdc, pixel_format: i32, pfd: ^PixelFormatDescriptor) -> Bool #foreign gdi32  "SetPixelFormat";
-const choose_pixel_format = proc(hdc: Hdc, pfd: ^PixelFormatDescriptor) -> i32                     #foreign gdi32  "ChoosePixelFormat";
-const swap_buffers        = proc(hdc: Hdc) -> Bool                                                 #foreign gdi32  "SwapBuffers";
-const release_dc          = proc(wnd: Hwnd, hdc: Hdc) -> i32                                       #foreign user32 "ReleaseDC";
+proc get_dc             (h: Hwnd) -> Hdc                                                   #foreign user32 "GetDC";
+proc set_pixel_format   (hdc: Hdc, pixel_format: i32, pfd: ^PixelFormatDescriptor) -> Bool #foreign gdi32  "SetPixelFormat";
+proc choose_pixel_format(hdc: Hdc, pfd: ^PixelFormatDescriptor) -> i32                     #foreign gdi32  "ChoosePixelFormat";
+proc swap_buffers       (hdc: Hdc) -> Bool                                                 #foreign gdi32  "SwapBuffers";
+proc release_dc         (wnd: Hwnd, hdc: Hdc) -> i32                                       #foreign user32 "ReleaseDC";
 
 
 const Proc  = type proc() #cc_c;
@@ -526,12 +526,12 @@ const MAPVK_VK_TO_VSC    = 0;
 const MAPVK_VSC_TO_VK    = 1;
 const MAPVK_VSC_TO_VK_EX = 3;
 
-const map_virtual_key = proc(scancode : u32, map_type : u32) -> u32 #foreign user32 "MapVirtualKeyA";
+proc map_virtual_key(scancode : u32, map_type : u32) -> u32 #foreign user32 "MapVirtualKeyA";
 
-const get_key_state       = proc(v_key: i32) -> i16 #foreign user32 "GetKeyState";
-const get_async_key_state = proc(v_key: i32) -> i16 #foreign user32 "GetAsyncKeyState";
+proc get_key_state      (v_key: i32) -> i16 #foreign user32 "GetKeyState";
+proc get_async_key_state(v_key: i32) -> i16 #foreign user32 "GetAsyncKeyState";
 
-const is_key_down = proc(key: KeyCode) -> bool #inline { return get_async_key_state(i32(key)) < 0; }
+proc is_key_down(key: KeyCode) -> bool #inline { return get_async_key_state(i32(key)) < 0; }
 
 const KeyCode = enum i32 {
 	Lbutton    = 0x01,

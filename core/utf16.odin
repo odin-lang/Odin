@@ -7,11 +7,11 @@ const _surr3           = 0xe000;
 const _surr_self       = 0x10000;
 
 
-const is_surrogate = proc(r: rune) -> bool {
+proc is_surrogate(r: rune) -> bool {
 	return _surr1 <= r && r < _surr3;
 }
 
-const decode_surrogate_pair = proc(r1, r2: rune) -> rune {
+proc decode_surrogate_pair(r1, r2: rune) -> rune {
 	if _surr1 <= r1 && r1 < _surr2 && _surr2 <= r2 && r2 < _surr3 {
 		return (r1-_surr1)<<10 | (r2 - _surr2) + _surr_self;
 	}
@@ -19,7 +19,7 @@ const decode_surrogate_pair = proc(r1, r2: rune) -> rune {
 }
 
 
-const encode_surrogate_pair = proc(r: rune) -> (r1, r2: rune) {
+proc encode_surrogate_pair(r: rune) -> (r1, r2: rune) {
 	if r < _surr_self || r > MAX_RUNE {
 		return REPLACEMENT_CHAR, REPLACEMENT_CHAR;
 	}
@@ -27,7 +27,7 @@ const encode_surrogate_pair = proc(r: rune) -> (r1, r2: rune) {
 	return _surr1 + (r>>10)&0x3ff, _surr2 + r&0x3ff;
 }
 
-const encode = proc(d: []u16, s: []rune) {
+proc encode(d: []u16, s: []rune) {
 	var n = len(s);
 	for r in s {
 		if r >= _surr_self {

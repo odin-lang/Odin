@@ -2435,12 +2435,12 @@ void ssa_build_proc(ssaModule *m, ssaProc *p) {
 	p->module = m;
 	m->proc = p;
 
-	if (p->decl_info->proc_lit == NULL ||
-	    p->decl_info->proc_lit->kind != AstNode_ProcLit) {
+	if (p->decl_info->proc_decl == NULL ||
+	    p->decl_info->proc_decl->kind != AstNode_ProcDecl) {
 		return;
 	}
 
-	ast_node(pl, ProcLit, p->decl_info->proc_lit);
+	ast_node(pl, ProcLit, p->decl_info->proc_decl);
 	if (pl->body == NULL) {
 		return;
 	}
@@ -2553,7 +2553,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 		} break;
 
 		case Entity_Procedure: {
-			ast_node(pd, ProcLit, decl->proc_lit);
+			ast_node(pd, ProcDecl, decl->proc_decl);
 			String original_name = name;
 			AstNode *body = pd->body;
 			if (e->Procedure.is_foreign) {

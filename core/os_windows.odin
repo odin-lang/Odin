@@ -52,7 +52,7 @@ const ERROR_FILE_IS_PIPE: Errno = 1<<29 + 0;
 immutable var args = _alloc_command_line_arguments();
 
 
-const open = proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
+proc open(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 	if len(path) == 0 {
 		return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
 	}
@@ -104,12 +104,12 @@ const open = proc(path: string, mode: int, perm: u32) -> (Handle, Errno) {
 	return INVALID_HANDLE, Errno(err);
 }
 
-const close = proc(fd: Handle) {
+proc close(fd: Handle) {
 	win32.close_handle(win32.Handle(fd));
 }
 
 
-const write = proc(fd: Handle, data: []u8) -> (int, Errno) {
+proc write(fd: Handle, data: []u8) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE;
 	}
@@ -136,7 +136,7 @@ const write = proc(fd: Handle, data: []u8) -> (int, Errno) {
 	return int(total_write), ERROR_NONE;
 }
 
-const read = proc(fd: Handle, data: []u8) -> (int, Errno) {
+proc read(fd: Handle, data: []u8) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE;
 	}
@@ -165,7 +165,7 @@ const read = proc(fd: Handle, data: []u8) -> (int, Errno) {
 	return int(total_read), ERROR_NONE;
 }
 
-const seek = proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
+proc seek(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	var w: u32;
 	match whence {
 	case 0: w = win32.FILE_BEGIN;
@@ -186,7 +186,7 @@ const seek = proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	return i64(hi)<<32 + i64(dw_ptr), ERROR_NONE;
 }
 
-const file_size = proc(fd: Handle) -> (i64, Errno) {
+proc file_size(fd: Handle) -> (i64, Errno) {
 	var length: i64;
 	var err: Errno;
 	if win32.get_file_size_ex(win32.Handle(fd), &length) == 0 {
@@ -203,7 +203,7 @@ var stdout = get_std_handle(win32.STD_OUTPUT_HANDLE);
 var stderr = get_std_handle(win32.STD_ERROR_HANDLE);
 
 
-const get_std_handle = proc(h: int) -> Handle {
+proc get_std_handle(h: int) -> Handle {
 	var fd = win32.get_std_handle(i32(h));
 	win32.set_handle_information(fd, win32.HANDLE_FLAG_INHERIT, 0);
 	return Handle(fd);
@@ -214,7 +214,7 @@ const get_std_handle = proc(h: int) -> Handle {
 
 
 
-const last_write_time = proc(fd: Handle) -> FileTime {
+proc last_write_time(fd: Handle) -> FileTime {
 	var file_info: win32.ByHandleFileInformation;
 	win32.get_file_information_by_handle(win32.Handle(fd), &file_info);
 	var lo = FileTime(file_info.last_write_time.lo);
@@ -222,7 +222,7 @@ const last_write_time = proc(fd: Handle) -> FileTime {
 	return lo | hi << 32;
 }
 
-const last_write_time_by_name = proc(name: string) -> FileTime {
+proc last_write_time_by_name(name: string) -> FileTime {
 	var last_write_time: win32.Filetime;
 	var data: win32.FileAttributeData;
 	var buf: [1024]u8;
@@ -242,10 +242,10 @@ const last_write_time_by_name = proc(name: string) -> FileTime {
 
 
 
-const heap_alloc = proc(size: int) -> rawptr {
+proc heap_alloc(size: int) -> rawptr {
 	return win32.heap_alloc(win32.get_process_heap(), win32.HEAP_ZERO_MEMORY, size);
 }
-const heap_resize = proc(ptr: rawptr, new_size: int) -> rawptr {
+proc heap_resize(ptr: rawptr, new_size: int) -> rawptr {
 	if new_size == 0 {
 		heap_free(ptr);
 		return nil;
@@ -255,7 +255,7 @@ const heap_resize = proc(ptr: rawptr, new_size: int) -> rawptr {
 	}
 	return win32.heap_realloc(win32.get_process_heap(), win32.HEAP_ZERO_MEMORY, ptr, new_size);
 }
-const heap_free = proc(ptr: rawptr) {
+proc heap_free(ptr: rawptr) {
 	if ptr == nil {
 		return;
 	}
@@ -263,21 +263,21 @@ const heap_free = proc(ptr: rawptr) {
 }
 
 
-const exit = proc(code: int) {
+proc exit(code: int) {
 	win32.exit_process(u32(code));
 }
 
 
 
-const current_thread_id = proc() -> int {
+proc current_thread_id() -> int {
 	return int(win32.get_current_thread_id());
 }
 
 
 
 
-const _alloc_command_line_arguments = proc() -> []string {
-	const alloc_ucs2_to_utf8 = proc(wstr: ^u16) -> string {
+proc _alloc_command_line_arguments() -> []string {
+	proc alloc_ucs2_to_utf8(wstr: ^u16) -> string {
 		var wstr_len = 0;
 		for (wstr+wstr_len)^ != 0 {
 			wstr_len++;

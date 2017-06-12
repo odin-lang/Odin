@@ -9,8 +9,8 @@ const Decimal = struct {
 	neg, trunc:    bool,
 }
 
-const decimal_to_string = proc(buf: []u8, a: ^Decimal) -> string {
-	const digit_zero = proc(buf: []u8) -> int {
+proc decimal_to_string(buf: []u8, a: ^Decimal) -> string {
+	proc digit_zero(buf: []u8) -> int {
 		for _, i in buf {
 			buf[i] = '0';
 		}
@@ -48,7 +48,7 @@ const decimal_to_string = proc(buf: []u8, a: ^Decimal) -> string {
 }
 
 // trim trailing zeros
-const trim = proc(a: ^Decimal) {
+proc trim(a: ^Decimal) {
 	for a.count > 0 && a.digits[a.count-1] == '0' {
 		a.count--;
 	}
@@ -58,7 +58,7 @@ const trim = proc(a: ^Decimal) {
 }
 
 
-const assign = proc(a: ^Decimal, i: u64) {
+proc assign(a: ^Decimal, i: u64) {
 	var buf: [32]u8;
 	var n = 0;
 	for i > 0 {
@@ -81,7 +81,7 @@ const assign = proc(a: ^Decimal, i: u64) {
 const uint_size = 8*size_of(uint);
 const max_shift = uint_size-4;
 
-const shift_right = proc(a: ^Decimal, k: uint) {
+proc shift_right(a: ^Decimal, k: uint) {
 	var r = 0; // read index
 	var w = 0; // write index
 
@@ -132,7 +132,7 @@ const shift_right = proc(a: ^Decimal, k: uint) {
 	trim(a);
 }
 
-const shift_left = proc(a: ^Decimal, k: uint) {
+proc shift_left(a: ^Decimal, k: uint) {
 	var delta = int(k/4);
 
 	var r = a.count;       // read index
@@ -170,7 +170,7 @@ const shift_left = proc(a: ^Decimal, k: uint) {
 	trim(a);
 }
 
-const shift = proc(a: ^Decimal, k: int) {
+proc shift(a: ^Decimal, k: int) {
 	match {
 	case a.count == 0:
 		// no need to update
@@ -191,7 +191,7 @@ const shift = proc(a: ^Decimal, k: int) {
 	}
 }
 
-const can_round_up = proc(a: ^Decimal, nd: int) -> bool {
+proc can_round_up(a: ^Decimal, nd: int) -> bool {
 	if nd < 0 || nd >= a.count { return false ; }
 	if a.digits[nd] == '5' && nd+1 == a.count {
 		if a.trunc {
@@ -203,7 +203,7 @@ const can_round_up = proc(a: ^Decimal, nd: int) -> bool {
 	return a.digits[nd] >= '5';
 }
 
-const round = proc(a: ^Decimal, nd: int) {
+proc round(a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return; }
 	if can_round_up(a, nd) {
 		round_up(a, nd);
@@ -212,7 +212,7 @@ const round = proc(a: ^Decimal, nd: int) {
 	}
 }
 
-const round_up = proc(a: ^Decimal, nd: int) {
+proc round_up(a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return; }
 
 	for var i = nd-1; i >= 0; i-- {
@@ -229,7 +229,7 @@ const round_up = proc(a: ^Decimal, nd: int) {
 	a.decimal_point++;
 }
 
-const round_down = proc(a: ^Decimal, nd: int) {
+proc round_down(a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return; }
 	a.count = nd;
 	trim(a);
@@ -237,7 +237,7 @@ const round_down = proc(a: ^Decimal, nd: int) {
 
 
 // Extract integer part, rounded appropriately. There are no guarantees about overflow.
-const rounded_integer = proc(a: ^Decimal) -> u64 {
+proc rounded_integer(a: ^Decimal) -> u64 {
 	if a.decimal_point > 20 {
 		return 0xffff_ffff_ffff_ffff;
 	}

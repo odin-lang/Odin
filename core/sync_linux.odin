@@ -12,41 +12,41 @@ const Mutex = struct {
 	_recursion: i32,
 }
 
-const current_thread_id = proc() -> i32 {
+proc current_thread_id() -> i32 {
 	return i32(os.current_thread_id());
 }
 
-const semaphore_init = proc(s: ^Semaphore) {
+proc semaphore_init(s: ^Semaphore) {
 	// s._handle = win32.CreateSemaphoreA(nil, 0, 1<<31-1, nil);
 }
 
-const semaphore_destroy = proc(s: ^Semaphore) {
+proc semaphore_destroy(s: ^Semaphore) {
 	// win32.CloseHandle(s._handle);
 }
 
-const semaphore_post = proc(s: ^Semaphore, count: int) {
+proc semaphore_post(s: ^Semaphore, count: int) {
 	// win32.ReleaseSemaphore(s._handle, cast(i32)count, nil);
 }
 
-const semaphore_release = proc(s: ^Semaphore) #inline {
+proc semaphore_release(s: ^Semaphore) #inline {
 	semaphore_post(s, 1);
 }
 
-const semaphore_wait = proc(s: ^Semaphore) {
+proc semaphore_wait(s: ^Semaphore) {
 	// win32.WaitForSingleObject(s._handle, win32.INFINITE);
 }
 
 
-const mutex_init = proc(m: ^Mutex) {
+proc mutex_init(m: ^Mutex) {
 	atomics.store(&m._counter, 0);
 	atomics.store(&m._owner, current_thread_id());
 	semaphore_init(&m._semaphore);
 	m._recursion = 0;
 }
-const mutex_destroy = proc(m: ^Mutex) {
+proc mutex_destroy(m: ^Mutex) {
 	semaphore_destroy(&m._semaphore);
 }
-const mutex_lock = proc(m: ^Mutex) {
+proc mutex_lock(m: ^Mutex) {
 	var thread_id = current_thread_id();
 	if atomics.fetch_add(&m._counter, 1) > 0 {
 		if thread_id != atomics.load(&m._owner) {
@@ -56,7 +56,7 @@ const mutex_lock = proc(m: ^Mutex) {
 	atomics.store(&m._owner, thread_id);
 	m._recursion++;
 }
-const mutex_try_lock = proc(m: ^Mutex) -> bool {
+proc mutex_try_lock(m: ^Mutex) -> bool {
 	var thread_id = current_thread_id();
 	if atomics.load(&m._owner) == thread_id {
 		atomics.fetch_add(&m._counter, 1);
@@ -73,7 +73,7 @@ const mutex_try_lock = proc(m: ^Mutex) -> bool {
 	m._recursion++;
 	return true;
 }
-const mutex_unlock = proc(m: ^Mutex) {
+proc mutex_unlock(m: ^Mutex) {
 	var recursion: i32;
 	var thread_id = current_thread_id();
 	assert(thread_id == atomics.load(&m._owner));

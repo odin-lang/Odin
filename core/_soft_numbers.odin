@@ -1,26 +1,26 @@
 #shared_global_scope;
 
-const __u128_mod = proc(a, b: u128) -> u128 #cc_odin #link_name "__umodti3" {
+proc __u128_mod(a, b: u128) -> u128 #cc_odin #link_name "__umodti3" {
 	var r: u128;
 	__u128_quo_mod(a, b, &r);
 	return r;
 }
 
-const __u128_quo = proc(a, b: u128) -> u128 #cc_odin #link_name "__udivti3" {
+proc __u128_quo(a, b: u128) -> u128 #cc_odin #link_name "__udivti3" {
 	return __u128_quo_mod(a, b, nil);
 }
 
-const __i128_mod = proc(a, b: i128) -> i128 #cc_odin #link_name "__modti3" {
+proc __i128_mod(a, b: i128) -> i128 #cc_odin #link_name "__modti3" {
 	var r: i128;
 	__i128_quo_mod(a, b, &r);
 	return r;
 }
 
-const __i128_quo = proc(a, b: i128) -> i128 #cc_odin #link_name "__divti3" {
+proc __i128_quo(a, b: i128) -> i128 #cc_odin #link_name "__divti3" {
 	return __i128_quo_mod(a, b, nil);
 }
 
-const __i128_quo_mod = proc(a, b: i128, rem: ^i128) -> (quo: i128) #cc_odin #link_name "__divmodti4" {
+proc __i128_quo_mod(a, b: i128, rem: ^i128) -> (quo: i128) #cc_odin #link_name "__divmodti4" {
 	var s: i128;
 	s = b >> 127;
 	b = (b~s) - s;
@@ -39,7 +39,7 @@ const __i128_quo_mod = proc(a, b: i128, rem: ^i128) -> (quo: i128) #cc_odin #lin
 }
 
 
-const __u128_quo_mod = proc(a, b: u128, rem: ^u128) -> (quo: u128) #cc_odin #link_name "__udivmodti4" {
+proc __u128_quo_mod(a, b: u128, rem: ^u128) -> (quo: u128) #cc_odin #link_name "__udivmodti4" {
 	var alo, ahi = u64(a), u64(a>>64);
 	var blo, bhi = u64(b), u64(b>>64);
 	if b == 0 {
@@ -68,7 +68,7 @@ const __u128_quo_mod = proc(a, b: u128, rem: ^u128) -> (quo: u128) #cc_odin #lin
 }
 
 /*
-const __f16_to_f32 = proc(f: f16) -> f32 #cc_odin #no_inline #link_name "__gnu_h2f_ieee" {
+proc __f16_to_f32(f: f16) -> f32 #cc_odin #no_inline #link_name "__gnu_h2f_ieee" {
 	when true {
 		// Source: https://fgiesen.wordpress.com/2012/03/28/half-to-float-done-quic/
 		const FP32 = raw_union {u: u32, f: f32};
@@ -81,7 +81,7 @@ const __f16_to_f32 = proc(f: f16) -> f32 #cc_odin #no_inline #link_name "__gnu_h
 
 		o := FP32{};
 
-		o.u = u32((hu & 0x7fff) << 13);
+		o.u = u32(hu & 0x7fff) << 13);
 		o.f *= magic.f;
 		if o.f >= was_infnan.f {
 			o.u |= 255 << 23;
@@ -92,7 +92,7 @@ const __f16_to_f32 = proc(f: f16) -> f32 #cc_odin #no_inline #link_name "__gnu_h
 		return 0;
 	}
 }
-const __f32_to_f16 = proc(f_: f32) -> f16 #cc_odin #no_inline #link_name "__gnu_f2h_ieee" {
+proc __f32_to_f16(f_: f32) -> f16 #cc_odin #no_inline #link_name "__gnu_f2h_ieee" {
 	when false {
 		// Source: https://gist.github.com/rygorous/2156668
 		const FP16 = raw_union {u: u16, f: f16};
@@ -182,11 +182,11 @@ const __f32_to_f16 = proc(f_: f32) -> f16 #cc_odin #no_inline #link_name "__gnu_
 	}
 }
 
-const __f64_to_f16 = proc(f: f64) -> f16 #cc_odin #no_inline #link_name "__truncdfhf2" {
+proc __f64_to_f16(f: f64) -> f16 #cc_odin #no_inline #link_name "__truncdfhf2" {
 	return __f32_to_f16(f32(f));
 }
 
-const __f16_to_f64 = proc(f: f16) -> f64 #cc_odin #no_inline {
+proc __f16_to_f64(f: f16) -> f64 #cc_odin #no_inline {
 	return f64(__f16_to_f32(f));
 }
 */
