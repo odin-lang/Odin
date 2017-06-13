@@ -14,8 +14,6 @@ struct DeclInfo;
 	ENTITY_KIND(Builtin) \
 	ENTITY_KIND(ImportName) \
 	ENTITY_KIND(LibraryName) \
-	ENTITY_KIND(TypeAlias) \
-	ENTITY_KIND(ProcedureAlias) \
 	ENTITY_KIND(Nil) \
 	ENTITY_KIND(Label)
 
@@ -92,13 +90,12 @@ struct Entity {
 			bool is_type_alias;
 		} TypeName;
 		struct {
-			bool         is_foreign;
-			String       foreign_name;
-			Entity *     foreign_library;
-			AstNode *    foreign_library_ident;
+			OverloadKind overload_kind;
 			String       link_name;
 			u64          tags;
-			OverloadKind overload_kind;
+			bool         is_foreign;
+			Entity *     foreign_library;
+			AstNode *    foreign_library_ident;
 		} Procedure;
 		struct {
 			i32 id;
@@ -114,10 +111,6 @@ struct Entity {
 			String name;
 			bool   used;
 		} LibraryName;
-		i32 TypeAlias;
-		struct {
-			Entity *original;
-		} ProcedureAlias;
 		i32 Nil;
 		struct {
 			String name;
@@ -248,16 +241,6 @@ Entity *make_entity_library_name(gbAllocator a, Scope *scope, Token token, Type 
 	return entity;
 }
 
-Entity *make_entity_type_alias(gbAllocator a, Scope *scope, Token token, Type *type) {
-	Entity *entity = alloc_entity(a, Entity_TypeAlias, scope, token, type);
-	return entity;
-}
-Entity *make_entity_procedure_alias(gbAllocator a, Scope *scope, Token token, Entity *original) {
-	GB_ASSERT(original != NULL);
-	Entity *entity = alloc_entity(a, Entity_ProcedureAlias, scope, token, original->type);
-	entity->ProcedureAlias.original = original;
-	return entity;
-}
 
 
 

@@ -1,11 +1,11 @@
 #shared_global_scope;
 
-import (
+import {
 	"os.odin";
 	"fmt.odin";
 	"utf8.odin";
 	"raw.odin";
-)
+}
 // Naming Conventions:
 // In general, PascalCase for types and snake_case for values
 //
@@ -25,7 +25,7 @@ import (
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
-type (
+type {
 	TypeInfoEnumValue raw_union {
 		f: f64,
 		i: i128,
@@ -107,16 +107,16 @@ type (
 			offsets: []i32,
 		},
 	}
-)
+}
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
-var (
+var {
 	__type_table: []TypeInfo;
 
 	__argv__: ^^u8;
 	__argc__: i32;
-)
+}
 
 proc type_info_base(info: ^TypeInfo) -> ^TypeInfo {
 	if info == nil {
@@ -155,7 +155,7 @@ foreign __llvm_core {
 }
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
-type (
+type {
 	AllocatorMode enum u8 {
 		Alloc,
 		Free,
@@ -179,7 +179,7 @@ type (
 		user_data:  rawptr,
 		user_index: int,
 	}
-)
+}
 
 #thread_local var __context: Context;
 
@@ -561,7 +561,7 @@ proc __default_hash_string(s: string) -> u128 {
 
 const __INITIAL_MAP_CAP = 16;
 
-type (
+type {
 	__MapKey struct #ordered {
 		hash: u128,
 		str:  string,
@@ -589,7 +589,7 @@ type (
 		value_offset:  int,
 		value_size:    int,
 	}
-)
+}
 
 proc __dynamic_map_reserve(using header: __MapHeader, cap: int)  {
 	__dynamic_array_reserve(&m.hashes, size_of(int), align_of(int), cap);

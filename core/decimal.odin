@@ -170,10 +170,10 @@ proc shift_left(a: ^Decimal, k: uint) {
 }
 
 proc shift(a: ^Decimal, k: int) {
-	const (
+	const {
 		uint_size = 8*size_of(uint);
 		max_shift = uint_size-4;
-	)
+	}
 
 	match {
 	case a.count == 0:

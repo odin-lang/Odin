@@ -1,7 +1,7 @@
-import (
+import {
 	"fmt.odin";
 	"os.odin";
-)
+}
 foreign __llvm_core {
 	proc swap(b: u16) -> u16 #link_name "llvm.bswap.i16";
 	proc swap(b: u32) -> u32 #link_name "llvm.bswap.i32";
@@ -80,7 +80,7 @@ proc allocation_header(data: rawptr) -> ^AllocationHeader {
 
 
 // Custom allocators
-type (
+type {
 	Arena struct {
 		backing:    Allocator,
 		offset:     int,
@@ -92,7 +92,7 @@ type (
 		arena:          ^Arena,
 		original_count: int,
 	}
-)
+}
 
 
 

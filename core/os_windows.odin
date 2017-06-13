@@ -1,14 +1,14 @@
 import win32 "sys/windows.odin";
 
-type (
+type {
 	Handle   int;
 	FileTime u64;
-	Errno    int;
-)
+}
 
-const (
-	INVALID_HANDLE: Handle = -1;
+const INVALID_HANDLE: Handle = -1;
 
+
+const {
 	O_RDONLY   = 0x00000;
 	O_WRONLY   = 0x00001;
 	O_RDWR     = 0x00002;
@@ -21,34 +21,37 @@ const (
 	O_SYNC     = 0x01000;
 	O_ASYNC    = 0x02000;
 	O_CLOEXEC  = 0x80000;
+}
 
-	ERROR_NONE:                Errno = 0;
-	ERROR_FILE_NOT_FOUND:      Errno = 2;
-	ERROR_PATH_NOT_FOUND:      Errno = 3;
-	ERROR_ACCESS_DENIED:       Errno = 5;
-	ERROR_NO_MORE_FILES:       Errno = 18;
-	ERROR_HANDLE_EOF:          Errno = 38;
-	ERROR_NETNAME_DELETED:     Errno = 64;
-	ERROR_FILE_EXISTS:         Errno = 80;
-	ERROR_BROKEN_PIPE:         Errno = 109;
-	ERROR_BUFFER_OVERFLOW:     Errno = 111;
-	ERROR_INSUFFICIENT_BUFFER: Errno = 122;
-	ERROR_MOD_NOT_FOUND:       Errno = 126;
-	ERROR_PROC_NOT_FOUND:      Errno = 127;
-	ERROR_DIR_NOT_EMPTY:       Errno = 145;
-	ERROR_ALREADY_EXISTS:      Errno = 183;
-	ERROR_ENVVAR_NOT_FOUND:    Errno = 203;
-	ERROR_MORE_DATA:           Errno = 234;
-	ERROR_OPERATION_ABORTED:   Errno = 995;
-	ERROR_IO_PENDING:          Errno = 997;
-	ERROR_NOT_FOUND:           Errno = 1168;
-	ERROR_PRIVILEGE_NOT_HELD:  Errno = 1314;
-	WSAEACCES:                 Errno = 10013;
-	WSAECONNRESET:             Errno = 10054;
+type Errno int;
+const {
+	ERROR_NONE:               Errno = 0;
+	ERROR_FILE_NOT_FOUND            = 2;
+	ERROR_PATH_NOT_FOUND            = 3;
+	ERROR_ACCESS_DENIED             = 5;
+	ERROR_NO_MORE_FILES             = 18;
+	ERROR_HANDLE_EOF                = 38;
+	ERROR_NETNAME_DELETED           = 64;
+	ERROR_FILE_EXISTS               = 80;
+	ERROR_BROKEN_PIPE               = 109;
+	ERROR_BUFFER_OVERFLOW           = 111;
+	ERROR_INSUFFICIENT_BUFFER       = 122;
+	ERROR_MOD_NOT_FOUND             = 126;
+	ERROR_PROC_NOT_FOUND            = 127;
+	ERROR_DIR_NOT_EMPTY             = 145;
+	ERROR_ALREADY_EXISTS            = 183;
+	ERROR_ENVVAR_NOT_FOUND          = 203;
+	ERROR_MORE_DATA                 = 234;
+	ERROR_OPERATION_ABORTED         = 995;
+	ERROR_IO_PENDING                = 997;
+	ERROR_NOT_FOUND                 = 1168;
+	ERROR_PRIVILEGE_NOT_HELD        = 1314;
+	WSAEACCES                       = 10013;
+	WSAECONNRESET                   = 10054;
 
 	// Windows reserves errors >= 1<<29 for application use
-	ERROR_FILE_IS_PIPE: Errno = 1<<29 + 0;
-)
+	ERROR_FILE_IS_PIPE              = 1<<29 + 0;
+}
 
 // "Argv" arguments converted to Odin strings
 let args = _alloc_command_line_arguments();

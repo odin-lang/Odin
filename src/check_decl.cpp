@@ -349,7 +349,6 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		}
 
 		e->Procedure.is_foreign = true;
-		e->Procedure.foreign_name = name;
 		e->Procedure.link_name = name;
 
 		HashKey key = hash_string(name);

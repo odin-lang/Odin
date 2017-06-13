@@ -609,10 +609,6 @@ void add_global_string_constant(gbAllocator a, String name, String value) {
 
 }
 
-Type *add_global_type_alias(gbAllocator a, String name, Type *t) {
-	Entity *e = add_global_entity(make_entity_type_alias(a, NULL, make_token_ident(name), t));
-	return e->type;
-}
 
 
 void init_universal_scope(void) {

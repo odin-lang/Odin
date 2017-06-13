@@ -1,7 +1,7 @@
 foreign_system_library "opengl32.lib" when ODIN_OS == "windows";
 import . "windows.odin";
 
-const (
+const {
 	CONTEXT_MAJOR_VERSION_ARB          = 0x2091;
 	CONTEXT_MINOR_VERSION_ARB          = 0x2092;
 	CONTEXT_FLAGS_ARB                  = 0x2094;
@@ -9,9 +9,9 @@ const (
 	CONTEXT_FORWARD_COMPATIBLE_BIT_ARB = 0x0002;
 	CONTEXT_CORE_PROFILE_BIT_ARB       = 0x00000001;
 	CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB = 0x00000002;
-)
+}
 
-type (
+type {
 	Hglrc    Handle;
 	ColorRef u32;
 
@@ -53,21 +53,21 @@ type (
 		cell_inc_x:   f32,
 		cell_inc_y:   f32,
 	}
-)
+}
 
-type (
+type {
 	CreateContextAttribsARBType proc(hdc: Hdc, h_share_context: rawptr, attribList: ^i32) -> Hglrc;
 	ChoosePixelFormatARBType    proc(hdc: Hdc, attrib_i_list: ^i32, attrib_f_list: ^f32, max_formats: u32, formats: ^i32, num_formats : ^u32) -> Bool #cc_c;
 	SwapIntervalEXTType         proc(interval: i32) -> bool #cc_c;
 	GetExtensionsStringARBType  proc(Hdc) -> ^u8 #cc_c;
-)
+}
 
-var (
+var {
 	create_context_attribs_arb: CreateContextAttribsARBType;
 	choose_pixel_format_arb:    ChoosePixelFormatARBType;
 	swap_interval_ext:          SwapIntervalEXTType;
 	get_extensions_string_arb:  GetExtensionsStringARBType;
-)
+}
 
 
 foreign opengl32 {

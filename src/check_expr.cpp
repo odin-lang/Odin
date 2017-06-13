@@ -1545,11 +1545,6 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 		}
 		break;
 
-	case Entity_TypeAlias:
-	case Entity_TypeName:
-		o->mode = Addressing_Type;
-		break;
-
 	case Entity_Procedure:
 		o->mode = Addressing_Value;
 		break;
@@ -3530,7 +3525,6 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			operand->mode = Addressing_Value;
 		}
 		break;
-	case Entity_TypeAlias:
 	case Entity_TypeName:
 		operand->mode = Addressing_Type;
 		break;

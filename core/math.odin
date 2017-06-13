@@ -1,4 +1,4 @@
-const (
+const {
 	TAU          = 6.28318530717958647692528676655900576;
 	PI           = 3.14159265358979323846264338327950288;
 	ONE_OVER_TAU = 0.636619772367581343075535053490057448;
@@ -16,8 +16,8 @@ const (
 
 	τ = TAU;
 	π = PI;
-)
-type (
+}
+type {
 	Vec2 [vector 2]f32;
 	Vec3 [vector 3]f32;
 	Vec4 [vector 4]f32;
@@ -28,7 +28,7 @@ type (
 	Mat4 [4][4]f32;
 
 	Complex complex64;
-)
+}
 
 foreign __llvm_core {
 	proc sqrt(x: f32) -> f32          #link_name "llvm.sqrt.f32";
@@ -203,7 +203,7 @@ proc mul(m: Mat4, v: Vec4) -> Vec4 {
 proc inverse(m: Mat4) -> Mat4 {
 	var o: Mat4;
 
-	var (
+	var {
 		sf00 = m[2][2] * m[3][3] - m[3][2] * m[2][3];
 		sf01 = m[2][1] * m[3][3] - m[3][1] * m[2][3];
 		sf02 = m[2][1] * m[3][2] - m[3][1] * m[2][2];
@@ -223,7 +223,7 @@ proc inverse(m: Mat4) -> Mat4 {
 		sf16 = m[1][0] * m[2][3] - m[2][0] * m[1][3];
 		sf17 = m[1][0] * m[2][2] - m[2][0] * m[1][2];
 		sf18 = m[1][0] * m[2][1] - m[2][0] * m[1][1];
-	)
+	}
 
 	o[0][0] = +(m[1][1] * sf00 - m[1][2] * sf01 + m[1][3] * sf02);
 	o[0][1] = -(m[1][0] * sf00 - m[1][2] * sf03 + m[1][3] * sf04);
@@ -281,7 +281,7 @@ proc mat4_translate(v: Vec3) -> Mat4 {
 }
 
 proc mat4_rotate(v: Vec3, angle_radians: f32) -> Mat4 {
-	var (
+	var {
 		c = cos(angle_radians);
 		s = sin(angle_radians);
 
@@ -289,7 +289,7 @@ proc mat4_rotate(v: Vec3, angle_radians: f32) -> Mat4 {
 		t = a * (1-c);
 
 		rot = mat4_identity();
-	)
+	}
 
 	rot[0][0] = c + t.x*a.x;
 	rot[0][1] = 0 + t.x*a.y + s*a.z;
@@ -325,11 +325,11 @@ proc scale(m: Mat4, s: f32) -> Mat4 {
 
 
 proc look_at(eye, centre, up: Vec3) -> Mat4 {
-	var (
+	var {
 		f = norm(centre - eye);
 		s = norm(cross(f, up));
 		u = cross(s, f);
-	)
+	}
 
 	return Mat4{
 		{+s.x, +u.x, -f.x, 0},
@@ -340,10 +340,10 @@ proc look_at(eye, centre, up: Vec3) -> Mat4 {
 }
 
 proc perspective(fovy, aspect, near, far: f32) -> Mat4 {
-	var (
+	var {
 		m: Mat4;
 		tan_half_fovy = tan(0.5 * fovy);
-	)
+	}
 	m[0][0] = 1.0 / (aspect*tan_half_fovy);
 	m[1][1] = 1.0 / (tan_half_fovy);
 	m[2][2] = -(far + near) / (far - near);
@@ -367,7 +367,7 @@ proc ortho3d(left, right, bottom, top, near, far: f32) -> Mat4 {
 
 
 
-const (
+const {
 	F32_DIG        = 6;
 	F32_EPSILON    = 1.192092896e-07;
 	F32_GUARD      = 0;
@@ -393,4 +393,4 @@ const (
 	F64_MIN_EXP    = -1021;                    // min binary exponent
 	F64_RADIX      = 2;                        // exponent radix
 	F64_ROUNDS     = 1;                        // addition rounding: near
-)
+}

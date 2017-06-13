@@ -1,11 +1,11 @@
-foreign_system_library (
+foreign_system_library {
 	lib "opengl32.lib" when ODIN_OS == "windows";
 	lib "gl" when ODIN_OS == "linux";
-)
-import (
+}
+import {
 	win32 "sys/windows.odin" when ODIN_OS == "windows";
 	"sys/wgl.odin" when ODIN_OS == "windows";
-)
+}
 import_load "opengl_constants.odin";
 
 foreign lib {
@@ -54,7 +54,7 @@ proc get_proc_address(name: string) -> proc() #cc_c {
 	return res;
 }
 
-var (
+var {
 	GenBuffers:               proc(count: i32, buffers: ^u32) #cc_c;
 	GenVertexArrays:          proc(count: i32, buffers: ^u32) #cc_c;
 	GenSamplers:              proc(count: i32, buffers: ^u32) #cc_c;
@@ -114,7 +114,7 @@ var (
 	UniformMatrix4fv:         proc(loc: i32, count: u32, transpose: i32, value: ^f32) #cc_c;
 
 	GetUniformLocation:       proc(program: u32, name: ^u8) -> i32 #cc_c;
-)
+}
 
 proc init() {
 	proc set_proc_address(p: rawptr, name: string) #inline {

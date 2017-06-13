@@ -2553,16 +2553,16 @@ AstNode *parse_gen_decl(AstFile *f, Token token, ParseSpecFunc *func) {
 	Token open = {};
 	Token close = {};
 
-	if (f->curr_token.kind == Token_OpenParen) {
+	if (f->curr_token.kind == Token_OpenBrace) {
 		specs = make_ast_node_array(f);
-		open = expect_token(f, Token_OpenParen);
-		while (f->curr_token.kind != Token_CloseParen &&
+		open = expect_token(f, Token_OpenBrace);
+		while (f->curr_token.kind != Token_CloseBrace &&
 		       f->curr_token.kind != Token_EOF) {
 			AstNode *spec = func(f, token);
 			array_add(&specs, spec);
 			expect_semicolon(f, spec);
 		}
-		close = expect_token(f, Token_CloseParen);
+		close = expect_token(f, Token_CloseBrace);
 		if (f->curr_token.pos.line == close.pos.line ||
 		    open.pos.line == close.pos.line) {
 			expect_semicolon(f, NULL);
