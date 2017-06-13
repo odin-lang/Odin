@@ -43,6 +43,9 @@ enum EntityFlag {
 	EntityFlag_Value         = 1<<9,
 	EntityFlag_Sret          = 1<<10,
 	EntityFlag_BitFieldValue = 1<<11,
+
+	EntityFlag_CVarArg       = 1<<20,
+
 };
 
 // Zero value means the overloading process is not yet done

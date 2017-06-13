@@ -1477,7 +1477,11 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_
 	Type *results = pt->Proc.results;
 
 	isize param_count = pt->Proc.param_count;
-	GB_ASSERT(param_count == arg_count);
+	if (pt->Proc.c_vararg) {
+		GB_ASSERT(param_count-1 <= arg_count);
+	} else {
+		GB_ASSERT(param_count == arg_count);
+	}
 	for (isize i = 0; i < param_count; i++) {
 		Type *original_type = pt->Proc.params->Tuple.variables[i]->type;
 		Type *new_type = pt->Proc.abi_compat_params[i];
@@ -4649,6 +4653,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		irValue **args = gb_alloc_array(proc->module->allocator, irValue *, gb_max(type->param_count, arg_count));
 		bool variadic = type->variadic;
 		bool vari_expand = ce->ellipsis.pos.line != 0;
+		bool is_c_vararg = type->c_vararg;
 
 		for_array(i, ce->args) {
 			irValue *a = ir_build_expr(proc, ce->args[i]);
@@ -4683,7 +4688,26 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		}
 
 
-		if (variadic) {
+		if (is_c_vararg) {
+			GB_ASSERT(variadic);
+			GB_ASSERT(!vari_expand);
+			isize i = 0;
+			for (; i < type->param_count-1; i++) {
+				args[i] = ir_emit_conv(proc, args[i], pt->variables[i]->type);
+			}
+			Type *variadic_type = pt->variables[i]->type;
+			GB_ASSERT(is_type_slice(variadic_type));
+			variadic_type = base_type(variadic_type)->Slice.elem;
+			if (!is_type_any(variadic_type)) {
+				for (; i < arg_count; i++) {
+					args[i] = ir_emit_conv(proc, args[i], variadic_type);
+				}
+			} else {
+				for (; i < arg_count; i++) {
+					args[i] = ir_emit_conv(proc, args[i], default_type(ir_type(args[i])));
+				}
+			}
+		} else if (variadic) {
 			isize i = 0;
 			for (; i < type->param_count-1; i++) {
 				args[i] = ir_emit_conv(proc, args[i], pt->variables[i]->type);
@@ -4702,7 +4726,12 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			}
 		}
 
-		if (variadic && !vari_expand) {
+		i64 final_count = type->param_count;
+		if (is_c_vararg) {
+			final_count = arg_count;
+		}
+
+		if (variadic && !vari_expand && !is_c_vararg) {
 			ir_emit_comment(proc, str_lit("variadic call argument generation"));
 			gbAllocator allocator = proc->module->allocator;
 			Type *slice_type = pt->variables[type->param_count-1]->type;
@@ -4727,7 +4756,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			args[arg_count-1] = ir_emit_load(proc, slice);
 		}
 
-		return ir_emit_call(proc, value, args, type->param_count);
+		return ir_emit_call(proc, value, args, final_count);
 	case_end;
 
 	case_ast_node(se, SliceExpr, expr);

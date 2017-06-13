@@ -142,6 +142,7 @@ struct TypeRecord {
 		Type * abi_compat_result_type;                    \
 		bool   variadic;                                  \
 		bool   require_results;                           \
+		bool   c_vararg;                                  \
 		ProcCallingConvention calling_convention;         \
 	})                                                    \
 	TYPE_KIND(Map, struct {                               \
@@ -1070,7 +1071,9 @@ bool are_types_identical(Type *x, Type *y) {
 		if (y->kind == Type_Tuple) {
 			if (x->Tuple.variable_count == y->Tuple.variable_count) {
 				for (isize i = 0; i < x->Tuple.variable_count; i++) {
-					if (!are_types_identical(x->Tuple.variables[i]->type, y->Tuple.variables[i]->type)) {
+					Entity *xe = x->Tuple.variables[i];
+					Entity *ye = y->Tuple.variables[i];
+					if (!are_types_identical(xe->type, ye->type)) {
 						return false;
 					}
 				}
@@ -1082,6 +1085,7 @@ bool are_types_identical(Type *x, Type *y) {
 	case Type_Proc:
 		if (y->kind == Type_Proc) {
 			return x->Proc.calling_convention == y->Proc.calling_convention &&
+			       x->Proc.c_vararg == y->Proc.c_vararg &&
 			       x->Proc.variadic == y->Proc.variadic &&
 			       are_types_identical(x->Proc.params, y->Proc.params) &&
 			       are_types_identical(x->Proc.results, y->Proc.results);
@@ -2291,6 +2295,9 @@ gbString write_type_to_string(gbString str, Type *type) {
 					GB_ASSERT(var->kind == Entity_Variable);
 					if (i > 0) {
 						str = gb_string_appendc(str, ", ");
+					}
+					if (var->flags&EntityFlag_CVarArg) {
+						str = gb_string_appendc(str, "#c_vararg ");
 					}
 					if (var->flags&EntityFlag_Ellipsis) {
 						Type *slice = base_type(var->type);

@@ -1049,6 +1049,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 	}
 
 	bool is_variadic = false;
+	bool is_c_vararg = false;
 	Entity **variables = gb_alloc_array(c->allocator, Entity *, variable_count);
 	isize variable_index = 0;
 	for_array(i, params) {
@@ -1114,8 +1115,17 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 
 		if (p->flags&FieldFlag_no_alias) {
 			if (!is_type_pointer(type)) {
-				error_node(params[i], "`no_alias` can only be applied to fields of pointer type");
+				error_node(params[i], "`#no_alias` can only be applied to fields of pointer type");
 				p->flags &= ~FieldFlag_no_alias; // Remove the flag
+			}
+		}
+		if (p->flags&FieldFlag_c_vararg) {
+			if (p->type == NULL ||
+			    p->type->kind != AstNode_Ellipsis) {
+				error_node(params[i], "`#c_vararg` can only be applied to variadic type fields");
+				p->flags &= ~FieldFlag_c_vararg; // Remove the flag
+			} else {
+				is_c_vararg = true;
 			}
 		}
 
@@ -1145,6 +1155,9 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		Entity *end = variables[variable_count-1];
 		end->type = make_type_slice(c->allocator, end->type);
 		end->flags |= EntityFlag_Ellipsis;
+		if (is_c_vararg) {
+			end->flags |= EntityFlag_CVarArg;
+		}
 	}
 
 	Type *tuple = make_type_tuple(c->allocator);
@@ -1408,6 +1421,19 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 	type->Proc.result_count       = result_count;
 	type->Proc.variadic           = variadic;
 	type->Proc.calling_convention = pt->calling_convention;
+
+	if (param_count > 0) {
+		Entity *end = params->Tuple.variables[param_count-1];
+		if (end->flags&EntityFlag_CVarArg) {
+			if (pt->calling_convention == ProcCC_Odin) {
+				error(end->token, "Odin calling convention does not support #c_vararg");
+			} else if (pt->calling_convention == ProcCC_Fast) {
+				error(end->token, "Fast calling convention does not support #c_vararg");
+			} else {
+				type->Proc.c_vararg = true;
+			}
+		}
+	}
 
 
 	type->Proc.abi_compat_params = gb_alloc_array(c->allocator, Type *, param_count);
@@ -4865,6 +4891,15 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		if (score_) *score_ = score;
 		return CallArgumentError_NonVariadicExpand;
 	}
+	if (vari_expand && proc_type->Proc.c_vararg) {
+		if (show_error) {
+			error(ce->ellipsis,
+			      "Cannot use `..` in call to a `#c_vararg` variadic procedure: `%.*s`",
+			      LIT(ce->proc->Ident.string));
+		}
+		if (score_) *score_ = score;
+		return CallArgumentError_NonVariadicExpand;
+	}
 
 	if (operands.count == 0 && param_count_excluding_defaults == 0) {
 		if (score_) *score_ = score;
@@ -6565,6 +6600,9 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		}
 		if (f->flags&FieldFlag_no_alias) {
 			str = gb_string_appendc(str, "#no_alias ");
+		}
+		if (f->flags&FieldFlag_c_vararg) {
+			str = gb_string_appendc(str, "#c_vararg ");
 		}
 
 		for_array(i, f->names) {

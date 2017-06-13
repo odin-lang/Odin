@@ -293,13 +293,16 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 	if (is_foreign && is_export) {
-		error_node(pd->type, "You cannot apply both `foreign` and `export` to a procedure");
+		error_node(pd->type, "A foreign procedure cannot have an `export` tag");
 	}
 
 
 	if (pd->body != NULL) {
 		if (is_foreign) {
-			error_node(pd->body, "A procedure tagged as `foreign` cannot have a body");
+			error_node(pd->body, "A foreign procedure cannot have a body");
+		}
+		if (proc_type->Proc.c_vararg) {
+			error_node(pd->body, "A procedure with a `#c_vararg` field cannot have a body");
 		}
 
 		d->scope = c->context.scope;
@@ -360,7 +363,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			Type *other_type = base_type(f->type);
 			if (!are_signatures_similar_enough(this_type, other_type)) {
 				error_node(d->proc_decl,
-						   "Redeclaration of #foreign procedure `%.*s` with different type signatures\n"
+						   "Redeclaration of foreign procedure `%.*s` with different type signatures\n"
 						   "\tat %.*s(%td:%td)",
 						   LIT(name), LIT(pos.file), pos.line, pos.column);
 			}
