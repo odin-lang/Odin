@@ -1554,6 +1554,10 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 		o->mode = Addressing_Builtin;
 		break;
 
+	case Entity_TypeName:
+		o->mode = Addressing_Type;
+		break;
+
 	case Entity_ImportName:
 		if (!allow_import_name) {
 			error_node(n, "Use of import `%.*s` not in selector", LIT(name));
@@ -1572,7 +1576,7 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 		break;
 
 	default:
-		compiler_error("Unknown EntityKind");
+		compiler_error("Unknown EntityKind %.*s", LIT(entity_strings[e->kind]));
 		break;
 	}
 
