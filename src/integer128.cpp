@@ -40,10 +40,12 @@ i128 i128_from_string(String string);
 u64 u128_to_u64(u128 a);
 i64 u128_to_i64(u128 a);
 f64 u128_to_f64(u128 a);
+i128 u128_to_i128(u128 a);
 
 u64 i128_to_u64(i128 a);
 i64 i128_to_i64(i128 a);
 f64 i128_to_f64(i128 a);
+u128 i128_to_u128(i128 a);
 
 String u128_to_string(u128 a, char *buf, isize len);
 String i128_to_string(i128 a, char *buf, isize len);
@@ -270,6 +272,12 @@ f64 u128_to_f64(u128 a) {
 
 	return -((cast(f64)h * 18446744073709551616.0) + cast(f64)l);
 }
+i128 u128_to_i128(u128 a) {
+	return *cast(i128 *)&a;
+}
+
+
+
 
 u64 i128_to_u64(i128 a) {
 	return (a.lo&BIT128_U64_BITS62) | (a.hi&BIT128_U64_HIGHBIT);
@@ -292,6 +300,10 @@ f64 i128_to_f64(i128 a) {
 
 	return -((cast(f64)h * 18446744073709551616.0) + cast(f64)l);
 }
+u128 i128_to_u128(i128 a) {
+	return *cast(u128 *)&a;
+}
+
 
 
 String u128_to_string(u128 v, char *out_buf, isize out_buf_len) {

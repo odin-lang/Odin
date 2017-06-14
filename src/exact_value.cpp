@@ -76,7 +76,7 @@ ExactValue exact_value_i128(i128 i) {
 }
 ExactValue exact_value_u128(u128 i) {
 	ExactValue result = {ExactValue_Integer};
-	result.value_integer = *cast(i128 *)&i;
+	result.value_integer = u128_to_i128(i);
 	return result;
 }
 
@@ -101,7 +101,7 @@ ExactValue exact_value_pointer(i64 ptr) {
 
 
 ExactValue exact_value_integer_from_string(String string) {
-	return exact_value_i128(i128_from_string(string));
+	return exact_value_u128(u128_from_string(string));
 }
 
 f64 float_from_string(String string) {
