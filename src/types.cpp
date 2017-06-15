@@ -115,6 +115,7 @@ struct TypeRecord {
 
 #define TYPE_KINDS                                        \
 	TYPE_KIND(Basic,   BasicType)                         \
+	TYPE_KIND(Generic, struct{ i64 id; })                 \
 	TYPE_KIND(Pointer, struct { Type *elem; })            \
 	TYPE_KIND(Atomic,  struct { Type *elem; })            \
 	TYPE_KIND(Array,   struct { Type *elem; i64 count; }) \
@@ -145,6 +146,7 @@ struct TypeRecord {
 		bool   variadic;                                  \
 		bool   require_results;                           \
 		bool   c_vararg;                                  \
+		bool   is_generic;                                \
 		ProcCallingConvention calling_convention;         \
 	})                                                    \
 	TYPE_KIND(Map, struct {                               \
@@ -464,6 +466,12 @@ Type *alloc_type(gbAllocator a, TypeKind kind) {
 Type *make_type_basic(gbAllocator a, BasicType basic) {
 	Type *t = alloc_type(a, Type_Basic);
 	t->Basic = basic;
+	return t;
+}
+
+Type *make_type_generic(gbAllocator a, i64 id) {
+	Type *t = alloc_type(a, Type_Generic);
+	t->Generic.id = id;
 	return t;
 }
 
@@ -915,6 +923,72 @@ bool is_type_valid_for_keys(Type *t) {
 
 bool is_type_indexable(Type *t) {
 	return is_type_array(t) || is_type_slice(t) || is_type_vector(t) || is_type_string(t);
+}
+
+bool is_type_generic(Type *t) {
+	t = core_type(t);
+	switch (t->kind) {
+	case Type_Generic:
+		return true;
+
+	case Type_Pointer:
+		return is_type_generic(t->Pointer.elem);
+	case Type_Atomic:
+		return is_type_generic(t->Atomic.elem);
+	case Type_Array:
+		return is_type_generic(t->Array.elem);
+	case Type_DynamicArray:
+		return is_type_generic(t->DynamicArray.elem);
+	case Type_Vector:
+		return is_type_generic(t->Vector.elem);
+	case Type_Slice:
+		return is_type_generic(t->Slice.elem);
+
+	case Type_Tuple:
+		for (isize i = 0; i < t->Tuple.variable_count; i++) {
+			if (is_type_generic(t->Tuple.variables[i]->type)) {
+				return true;
+			}
+		}
+		break;
+
+	case Type_Proc:
+		if (t->Proc.param_count > 0 &&
+		    is_type_generic(t->Proc.params)) {
+			return true;
+		}
+		if (t->Proc.result_count > 0 &&
+		    is_type_generic(t->Proc.results)) {
+			return true;
+		}
+		break;
+
+	// case Type_Record:
+	// 	GB_ASSERT(t->Record.kind != TypeRecord_Enum);
+	// 	for (isize i = 0; i < t->Record.field_count; i++) {
+	// 	    if (is_type_generic(t->Record.fields[i]->type)) {
+	// 	    	return true;
+	// 	    }
+	// 	}
+	// 	for (isize i = 1; i < t->Record.variant_count; i++) {
+	// 	    if (is_type_generic(t->Record.variants[i]->type)) {
+	// 	    	return true;
+	// 	    }
+	// 	}
+	// 	break;
+
+	case Type_Map:
+		if (is_type_generic(t->Map.key)) {
+			return true;
+		}
+		if (is_type_generic(t->Map.value)) {
+			return true;
+		}
+		break;
+
+	}
+
+	return false;
 }
 
 

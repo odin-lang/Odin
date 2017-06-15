@@ -312,6 +312,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	ast_node(pd, ProcDecl, d->proc_decl);
 
 	check_open_scope(c, pd->type);
+	defer (check_close_scope(c));
+
 	check_procedure_type(c, proc_type, pd->type);
 
 	bool is_foreign         = (pd->tags & ProcTag_foreign)   != 0;
@@ -322,15 +324,14 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	bool is_require_results = (pd->tags & ProcTag_require_results) != 0;
 
 
+	TypeProc *pt = &proc_type->Proc;
+
 	if (d->scope->is_file && e->token.string == "main") {
-		if (proc_type != NULL) {
-			TypeProc *pt = &proc_type->Proc;
-			if (pt->param_count != 0 ||
-			    pt->result_count != 0) {
-				gbString str = type_to_string(proc_type);
-				error(e->token, "Procedure type of `main` was expected to be `proc()`, got %s", str);
-				gb_string_free(str);
-			}
+		if (pt->param_count != 0 ||
+		    pt->result_count != 0) {
+			gbString str = type_to_string(proc_type);
+			error(e->token, "Procedure type of `main` was expected to be `proc()`, got %s", str);
+			gb_string_free(str);
 		}
 	}
 
@@ -342,6 +343,12 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		error_node(pd->type, "A foreign procedure cannot have an `export` tag");
 	}
 
+
+	if (pt->is_generic) {
+		if (pd->body == NULL) {
+			error(e->token, "Generic procedures must have a body");
+		}
+	}
 
 	if (pd->body != NULL) {
 		if (is_foreign) {
@@ -357,14 +364,10 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pd->body, pd->tags);
 	}
 
-
-	if (proc_type != NULL && is_type_proc(proc_type)) {
-		TypeProc *tp = &proc_type->Proc;
-		if (tp->result_count == 0 && is_require_results) {
-			error_node(pd->type, "`#require_results` is not needed on a procedure with no results");
-		} else {
-			tp->require_results = is_require_results;
-		}
+	if (pt->result_count == 0 && is_require_results) {
+		error_node(pd->type, "`#require_results` is not needed on a procedure with no results");
+	} else {
+		pt->require_results = is_require_results;
 	}
 
 	if (is_foreign) {
@@ -428,8 +431,6 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			}
 		}
 	}
-
-	check_close_scope(c);
 }
 
 void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, AstNode *init_expr) {
@@ -506,10 +507,8 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 	}
 
 	if (d == NULL) {
-		DeclInfo **found = map_get(&c->info.entities, hash_pointer(e));
-		if (found) {
-			d = *found;
-		} else {
+		d = decl_info_of_entity(&c->info, e);
+		if (d == NULL) {
 			// TODO(bill): Err here?
 			e->type = t_invalid;
 			set_base_type(named_type, t_invalid);
@@ -577,10 +576,10 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 			String name = e->token.string;
 			Type *t = base_type(type_deref(e->type));
 			if (is_type_struct(t) || is_type_raw_union(t)) {
-				Scope **found = map_get(&c->info.scopes, hash_pointer(t->Record.node));
-				GB_ASSERT(found != NULL);
-				for_array(i, (*found)->elements.entries) {
-					Entity *f = (*found)->elements.entries[i].value;
+				Scope *scope = scope_of_node(&c->info, t->Record.node);
+				GB_ASSERT(scope != NULL);
+				for_array(i, scope->elements.entries) {
+					Entity *f = scope->elements.entries[i].value;
 					if (f->kind == Entity_Variable) {
 						Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
 						uvar->Variable.is_immutable = is_immutable;

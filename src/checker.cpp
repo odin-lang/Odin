@@ -284,7 +284,8 @@ struct Checker {
 
 	AstFile *              curr_ast_file;
 	Scope *                global_scope;
-	Array<ProcedureInfo>   procs; // NOTE(bill): Procedures to check
+	// NOTE(bill): Procedures to check
+	Map<ProcedureInfo>     procs; // Key: DeclInfo *
 	Array<DelayedDecl>     delayed_imports;
 	Array<DelayedDecl>     delayed_foreign_libraries;
 	Array<CheckerFileNode> file_nodes;
@@ -307,6 +308,22 @@ struct DelayedEntity {
 	DeclInfo *  decl;
 };
 
+Entity *     entity_of_ident        (CheckerInfo *i, AstNode *identifier);
+TypeAndValue type_and_value_of_expr (CheckerInfo *i, AstNode *expr);
+Type *       type_of_expr           (CheckerInfo *i, AstNode *expr);
+Entity *     implicit_entity_of_node(CheckerInfo *i, AstNode *clause);
+DeclInfo *   decl_info_of_entity    (CheckerInfo *i, Entity * e);
+DeclInfo *   decl_info_of_ident     (CheckerInfo *i, AstNode *ident);
+AstFile *    ast_file_of_filename   (CheckerInfo *i, String   filename);
+Scope *      scope_of_node          (CheckerInfo *i, AstNode *node);
+ExprInfo *   check_get_expr_info    (CheckerInfo *i, AstNode *expr);
+void         check_set_expr_info    (CheckerInfo *i, AstNode *expr, ExprInfo info);
+void         check_remove_expr_info (CheckerInfo *i, AstNode *expr);
+
+Entity *current_scope_lookup_entity(Scope *s, String name);
+void    scope_lookup_parent_entity (Scope *s, String name, Scope **scope_, Entity **entity_);
+Entity *scope_lookup_entity        (Scope *s, String name);
+Entity *scope_insert_entity        (Scope *s, Entity *entity);
 
 
 
@@ -596,8 +613,9 @@ void add_global_constant(gbAllocator a, String name, Type *type, ExactValue valu
 
 void add_global_string_constant(gbAllocator a, String name, String value) {
 	add_global_constant(a, name, t_untyped_string, exact_value_string(value));
-
 }
+
+
 
 
 
@@ -701,7 +719,7 @@ void init_checker(Checker *c, Parser *parser, BuildContext *bc) {
 	init_checker_info(&c->info);
 
 	array_init(&c->proc_stack, a);
-	array_init(&c->procs, a);
+	map_init(&c->procs, a);
 	array_init(&c->delayed_imports, a);
 	array_init(&c->delayed_foreign_libraries, a);
 	array_init(&c->file_nodes, a);
@@ -738,7 +756,7 @@ void destroy_checker(Checker *c) {
 	destroy_checker_info(&c->info);
 	destroy_scope(c->global_scope);
 	array_free(&c->proc_stack);
-	array_free(&c->procs);
+	map_destroy(&c->procs);
 	array_free(&c->delayed_imports);
 	array_free(&c->delayed_foreign_libraries);
 	array_free(&c->file_nodes);
@@ -761,9 +779,9 @@ Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
 	return NULL;
 }
 
-TypeAndValue type_and_value_of_expr(CheckerInfo *i, AstNode *expression) {
+TypeAndValue type_and_value_of_expr(CheckerInfo *i, AstNode *expr) {
 	TypeAndValue result = {};
-	TypeAndValue *found = map_get(&i->types, hash_pointer(expression));
+	TypeAndValue *found = map_get(&i->types, hash_pointer(expr));
 	if (found) result = *found;
 	return result;
 }
@@ -812,8 +830,22 @@ AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
 	}
 	return NULL;
 }
-
-
+Scope *scope_of_node(CheckerInfo *i, AstNode *node) {
+	Scope **found = map_get(&i->scopes, hash_pointer(node));
+	if (found) {
+		return *found;
+	}
+	return NULL;
+}
+ExprInfo *check_get_expr_info(CheckerInfo *i, AstNode *expr) {
+	return map_get(&i->untyped, hash_pointer(expr));
+}
+void check_set_expr_info(CheckerInfo *i, AstNode *expr, ExprInfo info) {
+	map_set(&i->untyped, hash_pointer(expr), info);
+}
+void check_remove_expr_info(CheckerInfo *i, AstNode *expr) {
+	map_remove(&i->untyped, hash_pointer(expr));
+}
 
 
 
@@ -1082,7 +1114,7 @@ void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *dec
 	info.type  = type;
 	info.body  = body;
 	info.tags  = tags;
-	array_add(&c->procs, info);
+	map_set(&c->procs, hash_pointer(decl), info);
 }
 
 void push_procedure(Checker *c, Type *type) {
@@ -1113,24 +1145,21 @@ void add_curr_ast_file(Checker *c, AstFile *file) {
 }
 
 
-
-
-void add_dependency_to_map(Map<Entity *> *map, CheckerInfo *info, Entity *node) {
-	if (node == NULL) {
+void add_dependency_to_map(Map<Entity *> *map, CheckerInfo *info, Entity *entity) {
+	if (entity == NULL) {
 		return;
 	}
-	if (map_get(map, hash_pointer(node)) != NULL) {
+	if (map_get(map, hash_pointer(entity)) != NULL) {
 		return;
 	}
-	map_set(map, hash_pointer(node), node);
+	map_set(map, hash_pointer(entity), entity);
 
 
-	DeclInfo **found = map_get(&info->entities, hash_pointer(node));
-	if (found == NULL) {
+	DeclInfo *decl = decl_info_of_entity(info, entity);
+	if (decl == NULL) {
 		return;
 	}
 
-	DeclInfo *decl = *found;
 	for_array(i, decl->deps.entries) {
 		Entity *e = cast(Entity *)decl->deps.entries[i].key.ptr;
 		add_dependency_to_map(map, info, e);
@@ -1332,6 +1361,15 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 			GB_ASSERT(q->kind == Entity_Procedure);
 
 			TokenPos pos = q->token.pos;
+
+			if (is_type_proc(q->type)) {
+				TypeProc *ptq = &base_type(q->type)->Proc;
+				if (ptq->is_generic) {
+					q->type = t_invalid;
+					error(q->token, "Generic procedure `%.*s` cannot be overloaded", LIT(name));
+					continue;
+				}
+			}
 
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
 			switch (kind) {
@@ -2132,9 +2170,17 @@ void check_parsed_files(Checker *c) {
 
 	// Check procedure bodies
 	// NOTE(bill): Nested procedures bodies will be added to this "queue"
-	for_array(i, c->procs) {
-		ProcedureInfo *pi = &c->procs[i];
+	for_array(i, c->procs.entries) {
+		ProcedureInfo *pi = &c->procs.entries[i].value;
 		CheckerContext prev_context = c->context;
+		defer (c->context = prev_context);
+
+		TypeProc *pt = &pi->type->Proc;
+		if (pt->is_generic) {
+			error(pi->token, "Generic procedures are not yet supported");
+			continue;
+		}
+
 		add_curr_ast_file(c, pi->file);
 
 		bool bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
@@ -2150,8 +2196,6 @@ void check_parsed_files(Checker *c) {
 		}
 
 		check_proc_body(c, pi->token, pi->decl, pi->type, pi->body);
-
-		c->context = prev_context;
 	}
 
 	// Add untyped expression values

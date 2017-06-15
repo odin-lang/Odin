@@ -1134,10 +1134,7 @@ irValue *ir_generate_array(irModule *m, Type *elem_type, i64 count, String prefi
 irBlock *ir_new_block(irProcedure *proc, AstNode *node, char *label) {
 	Scope *scope = NULL;
 	if (node != NULL) {
-		Scope **found = map_get(&proc->module->info->scopes, hash_pointer(node));
-		if (found) {
-			scope = *found;
-		}
+		scope = scope_of_node(proc->module->info, node);
 		GB_ASSERT_MSG(scope != NULL, "Block scope not found for %.*s", LIT(ast_node_strings[node->kind]));
 	}
 
