@@ -1696,19 +1696,14 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
 			AstNode *foreign_library = fb->foreign_library;
-			bool ok = true;
 			if (foreign_library->kind != AstNode_Ident) {
 				error_node(foreign_library, "foreign library name must be an identifier");
-				ok = false;
+				foreign_library = NULL;
 			}
 
 			CheckerContext prev_context = c->context;
-			if (ok) {
-				c->context.curr_foreign_library = foreign_library;
-			}
-
+			c->context.curr_foreign_library = foreign_library;
 			check_collect_entities(c, fb->decls, is_file_scope);
-
 			c->context = prev_context;
 		case_end;
 

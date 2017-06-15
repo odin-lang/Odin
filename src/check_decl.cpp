@@ -362,6 +362,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 		GB_ASSERT(pd->body->kind == AstNode_BlockStmt);
 		check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pd->body, pd->tags);
+	} else if (!is_foreign) {
+		error(e->token, "Only a foreign procedure cannot have a body");
 	}
 
 	if (pt->result_count == 0 && is_require_results) {
