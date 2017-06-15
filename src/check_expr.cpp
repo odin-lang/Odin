@@ -634,7 +634,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 
 
 }
-void check_union_type(Checker *c, Type *union_type, AstNode *node) {
+void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *node) {
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
 
@@ -718,6 +718,9 @@ void check_union_type(Checker *c, Type *union_type, AstNode *node) {
 			base_type->Record.field_count         = field_count;
 			base_type->Record.names = make_names_field_for_record(c, c->context.scope);
 			base_type->Record.node = dummy_struct;
+			base_type->Record.variant_parent = named_type != NULL ? named_type : union_type;
+			base_type->Record.variant_index = variant_index;
+
 
 			type_set_offsets(c->allocator, base_type);
 
@@ -1935,7 +1938,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		*type = make_type_union(c->allocator);
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
-		check_union_type(c, *type, e);
+		check_union_type(c, named_type, *type, e);
 		check_close_scope(c);
 		(*type)->Record.node = e;
 		return true;
@@ -3636,8 +3639,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	case BuiltinProc_len:
 	case BuiltinProc_cap: {
-		// len :: proc(Type) -> int
-		// cap :: proc(Type) -> int
+		// proc len(Type) -> int
+		// proc cap(Type) -> int
 		Type *op_type = type_deref(operand->type);
 		Type *type = t_int;
 		AddressingMode mode = Addressing_Invalid;
@@ -3682,7 +3685,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_new: {
-		// new :: proc(Type) -> ^Type
+		// proc new(Type) -> ^Type
 		Operand op = {};
 		check_expr_or_type(c, &op, ce->args[0]);
 		Type *type = op.type;
@@ -3695,8 +3698,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 	#if 0
 	case BuiltinProc_new_slice: {
-		// new_slice :: proc(Type, len: int) -> []Type
-		// new_slice :: proc(Type, len, cap: int) -> []Type
+		// proc new_slice(Type, len: int) -> []Type
+		// proc new_slice(Type, len, cap: int) -> []Type
 		Operand op = {};
 		check_expr_or_type(c, &op, ce->args[0]);
 		Type *type = op.type;
@@ -3733,8 +3736,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 	#endif
 	case BuiltinProc_make: {
-		// make :: proc(Type, len: int) -> Type
-		// make :: proc(Type, len, cap: int) -> Type
+		// proc make(Type, len: int) -> Type
+		// proc make(Type, len, cap: int) -> Type
 		Operand op = {};
 		check_expr_or_type(c, &op, ce->args[0]);
 		Type *type = op.type;
@@ -3789,10 +3792,10 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_free: {
-		// free :: proc(^Type)
-		// free :: proc([]Type)
-		// free :: proc(string)
-		// free :: proc(map[K]T)
+		// proc free(^Type)
+		// proc free([]Type)
+		// proc free(string)
+		// proc free(map[K]T)
 		Type *type = operand->type;
 		bool ok = false;
 		if (is_type_pointer(type)) {
@@ -3820,8 +3823,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 
 	case BuiltinProc_reserve: {
-		// reserve :: proc([dynamic]Type, count: int) {
-		// reserve :: proc(map[Key]Type, count: int) {
+		// proc reserve([dynamic]Type, count: int) {
+		// proc reserve(map[Key]Type, count: int) {
 		Type *type = operand->type;
 		if (!is_type_dynamic_array(type) && !is_type_dynamic_map(type)) {
 			gbString str = type_to_string(type);
@@ -3862,8 +3865,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_append: {
-		// append :: proc([dynamic]Type, item: ..Type)
-		// append :: proc([]Type, item: ..Type)
+		// proc append([dynamic]Type, item: ..Type)
+		// proc append([]Type, item: ..Type)
 		Operand prev_operand = *operand;
 
 		Type *type = operand->type;
@@ -3910,7 +3913,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_delete: {
-		// delete :: proc(map[Key]Value, key: Key)
+		// proc delete(map[Key]Value, key: Key)
 		Type *type = operand->type;
 		if (!is_type_map(type)) {
 			gbString str = type_to_string(type);
@@ -3942,7 +3945,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 
 	case BuiltinProc_size_of: {
-		// size_of :: proc(Type) -> untyped int
+		// proc size_of(Type) -> untyped int
 		Type *type = check_type(c, ce->args[0]);
 		if (type == NULL || type == t_invalid) {
 			error_node(ce->args[0], "Expected a type for `size_of`");
@@ -3956,7 +3959,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_size_of_val:
-		// size_of_val :: proc(val: Type) -> untyped int
+		// proc size_of_val(val: Type) -> untyped int
 		check_assignment(c, operand, NULL, str_lit("argument of `size_of_val`"));
 		if (operand->mode == Addressing_Invalid) {
 			return false;
@@ -3968,7 +3971,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		break;
 
 	case BuiltinProc_align_of: {
-		// align_of :: proc(Type) -> untyped int
+		// proc align_of(Type) -> untyped int
 		Type *type = check_type(c, ce->args[0]);
 		if (type == NULL || type == t_invalid) {
 			error_node(ce->args[0], "Expected a type for `align_of`");
@@ -3980,7 +3983,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_align_of_val:
-		// align_of_val :: proc(val: Type) -> untyped int
+		// proc align_of_val(val: Type) -> untyped int
 		check_assignment(c, operand, NULL, str_lit("argument of `align_of_val`"));
 		if (operand->mode == Addressing_Invalid) {
 			return false;
@@ -3992,7 +3995,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		break;
 
 	case BuiltinProc_offset_of: {
-		// offset_of :: proc(Type, field) -> untyped int
+		// proc offset_of(Type, field) -> untyped int
 		Operand op = {};
 		Type *bt = check_type(c, ce->args[0]);
 		Type *type = base_type(bt);
@@ -4036,7 +4039,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_offset_of_val: {
-		// offset_of_val :: proc(val: expression) -> untyped int
+		// proc offset_of_val(val: expression) -> untyped int
 		AstNode *arg = unparen_expr(ce->args[0]);
 		if (arg->kind != AstNode_SelectorExpr) {
 			gbString str = expr_to_string(arg);
@@ -4085,7 +4088,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_type_of_val:
-		// type_of_val :: proc(val: Type) -> type(Type)
+		// proc type_of_val(val: Type) -> type(Type)
 		check_assignment(c, operand, NULL, str_lit("argument of `type_of_val`"));
 		if (operand->mode == Addressing_Invalid || operand->mode == Addressing_Builtin) {
 			return false;
@@ -4099,7 +4102,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 
 	case BuiltinProc_type_info: {
-		// type_info :: proc(Type) -> ^Type_Info
+		// proc type_info(Type) -> ^Type_Info
 		if (c->context.scope->is_global) {
 			compiler_error("`type_info` Cannot be declared within a #shared_global_scope due to how the internals of the compiler works");
 		}
@@ -4120,7 +4123,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_type_info_of_val: {
-		// type_info_of_val :: proc(val: Type) -> ^Type_Info
+		// proc type_info_of_val(val: Type) -> ^Type_Info
 		if (c->context.scope->is_global) {
 			compiler_error("`type_info` Cannot be declared within a #shared_global_scope due to how the internals of the compiler works");
 		}
@@ -4138,7 +4141,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_compile_assert:
-		// compile_assert :: proc(cond: bool) -> bool
+		// proc compile_assert(cond: bool) -> bool
 
 		if (!is_type_boolean(operand->type) && operand->mode != Addressing_Constant) {
 			gbString str = expr_to_string(ce->args[0]);
@@ -4157,7 +4160,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		break;
 
 	case BuiltinProc_assert:
-		// assert :: proc(cond: bool) -> bool
+		// proc assert(cond: bool) -> bool
 
 		if (!is_type_boolean(operand->type)) {
 			gbString str = expr_to_string(ce->args[0]);
@@ -4171,7 +4174,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		break;
 
 	case BuiltinProc_panic:
-		// panic :: proc(msg: string)
+		// proc panic(msg: string)
 
 		if (!is_type_string(operand->type)) {
 			gbString str = expr_to_string(ce->args[0]);
@@ -4184,7 +4187,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		break;
 
 	case BuiltinProc_copy: {
-		// copy :: proc(x, y: []Type) -> int
+		// proc copy(x, y: []Type) -> int
 		Type *dest_type = NULL, *src_type = NULL;
 
 		Type *d = base_type(operand->type);
@@ -4226,7 +4229,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_swizzle: {
-		// swizzle :: proc(v: {N}T, T..) -> {M}T
+		// proc swizzle(v: {N}T, T..) -> {M}T
 		Type *vector_type = base_type(operand->type);
 		if (!is_type_vector(vector_type)) {
 			gbString type_str = type_to_string(operand->type);
@@ -4280,7 +4283,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_complex: {
-		// complex :: proc(real, imag: float_type) -> complex_type
+		// proc complex(real, imag: float_type) -> complex_type
 		Operand x = *operand;
 		Operand y = {};
 
@@ -4340,8 +4343,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	case BuiltinProc_real:
 	case BuiltinProc_imag: {
-		// real :: proc(x: type) -> float_type
-		// imag :: proc(x: type) -> float_type
+		// proc real(x: type) -> float_type
+		// proc imag(x: type) -> float_type
 
 		Operand *x = operand;
 		if (is_type_untyped(x->type)) {
@@ -4383,7 +4386,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_conj: {
-		// conj :: proc(x: type) -> type
+		// proc conj(x: type) -> type
 		Operand *x = operand;
 		if (is_type_complex(x->type)) {
 			if (x->mode == Addressing_Constant) {
@@ -4405,8 +4408,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_slice_ptr: {
-		// slice_ptr :: proc(a: ^T, len: int) -> []T
-		// slice_ptr :: proc(a: ^T, len, cap: int) -> []T
+		// proc slice_ptr(a: ^T, len: int) -> []T
+		// proc slice_ptr(a: ^T, len, cap: int) -> []T
 		// ^T cannot be rawptr
 		Type *ptr_type = base_type(operand->type);
 		if (!is_type_pointer(ptr_type)) {
@@ -4448,7 +4451,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_slice_to_bytes: {
-		// slice_to_bytes :: proc(a: []T) -> []u8
+		// proc slice_to_bytes(a: []T) -> []u8
 		Type *slice_type = base_type(operand->type);
 		if (!is_type_slice(slice_type)) {
 			gbString type_str = type_to_string(operand->type);
@@ -4462,7 +4465,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_min: {
-		// min :: proc(a, b: ordered) -> ordered
+		// proc min(a, b: ordered) -> ordered
 		Type *type = base_type(operand->type);
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
@@ -4528,7 +4531,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_max: {
-		// min :: proc(a, b: ordered) -> ordered
+		// proc min(a, b: ordered) -> ordered
 		Type *type = base_type(operand->type);
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
@@ -4596,7 +4599,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_abs: {
-		// abs :: proc(n: numeric) -> numeric
+		// proc abs(n: numeric) -> numeric
 		if (!is_type_numeric(operand->type) && !is_type_vector(operand->type)) {
 			gbString type_str = type_to_string(operand->type);
 			error_node(call, "Expected a numeric type to `abs`, got `%s`", type_str);
@@ -4632,7 +4635,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	} break;
 
 	case BuiltinProc_clamp: {
-		// clamp :: proc(a, min, max: ordered) -> ordered
+		// proc clamp(a, min, max: ordered) -> ordered
 		Type *type = base_type(operand->type);
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);

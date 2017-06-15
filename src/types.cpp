@@ -95,6 +95,8 @@ struct TypeRecord {
 	Entity * union__tag;
 	i64      variant_block_size; // NOTE(bill): Internal use only
 
+	Type *   variant_parent;
+	i32      variant_index;
 
 	i64 *    offsets;
 	bool     are_offsets_set;
@@ -838,6 +840,14 @@ bool is_type_union(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_Union);
 }
+bool is_type_variant(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Record) {
+		return t->Record.kind == TypeRecord_Struct && t->Record.variant_parent != NULL;
+	}
+	return false;
+}
+
 bool is_type_raw_union(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Record && t->Record.kind == TypeRecord_RawUnion);

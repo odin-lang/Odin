@@ -757,7 +757,6 @@ void destroy_checker(Checker *c) {
 }
 
 
-
 Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
 	if (identifier->kind == AstNode_Ident) {
 		Entity **found = map_get(&i->definitions, hash_pointer(identifier));
@@ -772,14 +771,12 @@ Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
 	return NULL;
 }
 
-
 TypeAndValue type_and_value_of_expr(CheckerInfo *i, AstNode *expression) {
 	TypeAndValue result = {};
 	TypeAndValue *found = map_get(&i->types, hash_pointer(expression));
 	if (found) result = *found;
 	return result;
 }
-
 
 Type *type_of_expr(CheckerInfo *i, AstNode *expr) {
 	TypeAndValue tav = type_and_value_of_expr(i, expr);
@@ -795,6 +792,41 @@ Type *type_of_expr(CheckerInfo *i, AstNode *expr) {
 
 	return NULL;
 }
+
+Entity *implicit_entity_of_node(CheckerInfo *i, AstNode *clause) {
+	Entity **found = map_get(&i->implicits, hash_pointer(clause));
+	if (found != NULL) {
+		return *found;
+	}
+	return NULL;
+}
+
+DeclInfo *decl_info_of_entity(CheckerInfo *i, Entity *e) {
+	if (e != NULL) {
+		DeclInfo **found = map_get(&i->entities, hash_pointer(e));
+		if (found != NULL) {
+			return *found;
+		}
+	}
+	return NULL;
+}
+
+DeclInfo *decl_info_of_ident(CheckerInfo *i, AstNode *ident) {
+	return decl_info_of_entity(i, entity_of_ident(i, ident));
+}
+
+AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
+	AstFile **found = map_get(&i->files, hash_string(filename));
+	if (found != NULL) {
+		return *found;
+	}
+	return NULL;
+}
+
+
+
+
+
 
 
 void add_untyped(CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value) {
@@ -904,6 +936,9 @@ void add_implicit_entity(Checker *c, AstNode *node, Entity *e) {
 	GB_ASSERT(e != NULL);
 	map_set(&c->info.implicits, hash_pointer(node), e);
 }
+
+
+
 
 
 void add_type_info_type(Checker *c, Type *t) {

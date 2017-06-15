@@ -43,7 +43,11 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 		if (is_type_bit_field_value(t)) {
 			t = default_bit_field_value_type(t);
 		}
-
+		if (is_type_variant(t)) {
+			Type *st = base_type(t);
+			GB_ASSERT(st->Record.variant_parent != NULL);
+			t = st->Record.variant_parent;
+		}
 		GB_ASSERT(is_type_typed(t));
 		e->type = t;
 	}
