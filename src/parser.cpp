@@ -1704,6 +1704,24 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 	case AstNode_ProcDecl:
 		return s->ProcDecl.body != NULL;
 
+	case AstNode_GenDecl:
+		if (s->GenDecl.close.pos.line != 0) {
+			return true;
+		}
+		if (s->GenDecl.specs.count == 1) {
+			return is_semicolon_optional_for_node(f, s->GenDecl.specs[0]);
+		}
+		break;
+
+	case AstNode_ForeignBlockDecl:
+		if (s->ForeignBlockDecl.close.pos.line != 0) {
+			return true;
+		}
+		if (s->ForeignBlockDecl.decls.count == 1) {
+			return is_semicolon_optional_for_node(f, s->ForeignBlockDecl.decls[0]);
+		}
+		break;
+
 	case AstNode_TypeSpec:
 		return is_semicolon_optional_for_node(f, s->TypeSpec.type);
 	}
@@ -1716,6 +1734,9 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 		return;
 	}
 	Token prev_token = f->prev_token;
+	if (prev_token.kind == Token_Semicolon) {
+		return;
+	}
 
 	switch (f->curr_token.kind) {
 	case Token_EOF:
@@ -1736,8 +1757,32 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 			// 	break;
 			// }
 		}
+		String node_string = ast_node_strings[s->kind];
+		if (s->kind == AstNode_GenDecl) {
+			switch (s->GenDecl.token.kind) {
+			case Token_var:
+			case Token_let:
+				node_string = str_lit("variable declaration");
+				break;
+			case Token_const:
+				node_string = str_lit("const declaration");
+				break;
+			case Token_type:
+				node_string = str_lit("type declaration");
+				break;
+			case Token_import:
+			case Token_import_load:
+				node_string = str_lit("import declaration");
+				break;
+			case Token_foreign_library:
+			case Token_foreign_system_library:
+				node_string = str_lit("foreign library declaration");
+				break;
+			}
+		}
+
 		syntax_error(prev_token, "Expected `;` after %.*s, got %.*s",
-		             LIT(ast_node_strings[s->kind]), LIT(token_strings[prev_token.kind]));
+		             LIT(node_string), LIT(token_strings[prev_token.kind]));
 	} else {
 		syntax_error(prev_token, "Expected `;`");
 	}
@@ -2572,7 +2617,8 @@ AstNode *parse_gen_decl(AstFile *f, Token token, ParseSpecFunc *func) {
 		}
 	} else {
 		array_init(&specs, heap_allocator(), 1);
-		array_add(&specs, func(f, token));
+		AstNode *spec = func(f, token);
+		array_add(&specs, spec);
 	}
 
 	if (specs.count == 0) {
@@ -2764,25 +2810,29 @@ PARSE_SPEC_FUNC(parse_foreign_library_spec) {
 AstNode *parse_decl(AstFile *f);
 
 void parse_foreign_block_decl(AstFile *f, Array<AstNode *> *decls) {
-	AstNode *decl = parse_decl(f);
+	AstNode *decl = parse_stmt(f);
 	switch (decl->kind) {
+	case AstNode_EmptyStmt:
+	case AstNode_BadStmt:
 	case AstNode_BadDecl:
-		break;
+		return;
 
 	case AstNode_ProcDecl:
 		array_add(decls, decl);
-		break;
+		return;
 
-	// case AstNode_GenDecl:
-		// if (decl->GenDecl.token.kind == Token_var) {
-			// array_add(decls, decl);
-			// break;
-		// }
+	case AstNode_GenDecl:
+		switch (decl->GenDecl.token.kind) {
+		case Token_var:
+		case Token_let:
+			array_add(decls, decl);
+			return;
+		}
 
 		/* fallthrough */
 	default:
 		error_node(decl, "Only procedures declarations are allowed within a foreign block at the moment");
-		break;
+		return;
 	}
 }
 
@@ -3944,7 +3994,9 @@ AstNode *parse_stmt(AstFile *f) {
 	case Token_foreign:
 	case Token_foreign_library:
 	case Token_foreign_system_library:
-		return parse_decl(f);
+		s = parse_decl(f);
+		expect_semicolon(f, s);
+		return s;
 
 
 	case Token_if:     return parse_if_stmt(f);

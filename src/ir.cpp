@@ -480,8 +480,8 @@ struct irDebugInfo {
 
 	union {
 		struct {
-			AstFile *     file;
-			String        producer;
+			AstFile *    file;
+			String       producer;
 			irDebugInfo *all_procs;
 		} CompileUnit;
 		struct {
@@ -492,14 +492,14 @@ struct irDebugInfo {
 		struct {
 			irDebugInfo *parent;
 			irDebugInfo *file;
-			TokenPos      pos;
-			Scope *       scope; // Actual scope
+			TokenPos     pos;
+			Scope *      scope; // Actual scope
 		} Scope;
 		struct {
-			Entity *      entity;
-			String        name;
+			Entity *     entity;
+			String       name;
 			irDebugInfo *file;
-			TokenPos      pos;
+			TokenPos     pos;
 		} Proc;
 		struct {
 			Array<irDebugInfo *> procs;
@@ -507,9 +507,9 @@ struct irDebugInfo {
 
 
 		struct {
-			String           name;
-			i32              size;
-			i32              align;
+			String          name;
+			i32             size;
+			i32             align;
 			irDebugEncoding encoding;
 		} BasicType;
 		struct {
@@ -522,12 +522,12 @@ struct irDebugInfo {
 		} DerivedType;
 		struct {
 			irDebugEncoding      encoding;
-			String                name;
-			String                identifier;
+			String               name;
+			String               identifier;
 			irDebugInfo *        file;
-			TokenPos              pos;
-			i32                   size;
-			i32                   align;
+			TokenPos             pos;
+			i32                  size;
+			i32                  align;
 			Array<irDebugInfo *> elements;
 		} CompositeType;
 		struct {
@@ -535,20 +535,20 @@ struct irDebugInfo {
 			i64    value;
 		} Enumerator;
 		struct {
-			String        name;
-			String        linkage_name;
+			String       name;
+			String       linkage_name;
 			irDebugInfo *scope;
 			irDebugInfo *file;
-			TokenPos      pos;
+			TokenPos     pos;
 			irValue     *variable;
 			irDebugInfo *declaration;
 		} GlobalVariable;
 		struct {
-			String        name;
+			String       name;
 			irDebugInfo *scope;
 			irDebugInfo *file;
-			TokenPos      pos;
-			i32           arg; // Non-zero if proc parameter
+			TokenPos     pos;
+			i32          arg; // Non-zero if proc parameter
 			irDebugInfo *type;
 		} LocalVariable;
 	};
@@ -1292,6 +1292,23 @@ irValue *ir_add_local_for_identifier(irProcedure *proc, AstNode *name, bool zero
 	Entity *e = entity_of_ident(proc->module->info, name);
 	if (e != NULL) {
 		ir_emit_comment(proc, e->token.string);
+		if (e->kind == Entity_Variable &&
+		    e->Variable.is_foreign) {
+			HashKey key = hash_string(e->token.string);
+			irValue **prev_value = map_get(&proc->module->members, key);
+			if (prev_value == NULL) {
+				// NOTE(bill): Don't do mutliple declarations in the IR
+				irValue *g = ir_value_global(proc->module->allocator, e, NULL);
+
+				g->Global.name = e->token.string;
+				g->Global.is_foreign = true;
+				ir_module_add_value(proc->module, e, g);
+				map_set(&proc->module->members, key, g);
+				return g;
+			} else {
+				return *prev_value;
+			}
+		}
 		return ir_add_local(proc, e, name);
 	}
 	return NULL;

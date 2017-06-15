@@ -1535,6 +1535,35 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		check_stmt(c, pa->body, mod_flags);
 	case_end;
 
+	case_ast_node(fb, ForeignBlockDecl, node);
+		AstNode *foreign_library = fb->foreign_library;
+		bool ok = true;
+		if (foreign_library->kind != AstNode_Ident) {
+			error_node(foreign_library, "foreign library name must be an identifier");
+			ok = false;
+		}
+
+		CheckerContext prev_context = c->context;
+		if (ok) {
+			c->context.curr_foreign_library = foreign_library;
+		}
+
+		for_array(i, fb->decls) {
+			AstNode *decl = fb->decls[i];
+			if (decl->kind == AstNode_GenDecl) {
+				switch (decl->GenDecl.token.kind) {
+				case Token_var:
+				case Token_let:
+					check_stmt(c, decl, flags);
+					break;
+				}
+			}
+		}
+
+		c->context = prev_context;
+	case_end;
+
+
 	case_ast_node(gd, GenDecl, node);
 		GB_ASSERT(!c->context.scope->is_file);
 		for_array(i, gd->specs) {
@@ -1568,6 +1597,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						if (found == NULL) {
 							entity = make_entity_variable(c->allocator, c->context.scope, token, NULL, (gd->flags&VarDeclFlag_immutable) != 0);
 							entity->identifier = name;
+
+							AstNode *fl = c->context.curr_foreign_library;
+							if (fl != NULL) {
+								GB_ASSERT(fl->kind == AstNode_Ident);
+								entity->Variable.is_foreign = true;
+								entity->Variable.foreign_library_ident = fl;
+							}
 						} else {
 							TokenPos pos = found->token.pos;
 							error(token,
@@ -1610,7 +1646,33 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				check_init_variables(c, entities, entity_count, vd->values, str_lit("variable declaration"));
 
 				for (isize i = 0; i < entity_count; i++) {
-					add_entity(c, c->context.scope, entities[i]->identifier, entities[i]);
+					Entity *e = entities[i];
+					if (e->Variable.is_foreign) {
+						if (vd->values.count > 0) {
+							error(e->token, "A foreign variable declaration cannot have a default value");
+						}
+						init_entity_foreign_library(c, e);
+
+						String name = e->token.string;
+						auto *fp = &c->info.foreigns;
+						HashKey key = hash_string(name);
+						Entity **found = map_get(fp, key);
+						if (found) {
+							Entity *f = *found;
+							TokenPos pos = f->token.pos;
+							Type *this_type = base_type(e->type);
+							Type *other_type = base_type(f->type);
+							if (!are_types_identical(this_type, other_type)) {
+								error(e->token,
+								      "Foreign entity `%.*s` previously declared elsewhere with a different type\n"
+								      "\tat %.*s(%td:%td)",
+								      LIT(name), LIT(pos.file), pos.line, pos.column);
+							}
+						} else {
+							map_set(fp, key, e);
+						}
+					}
+					add_entity(c, c->context.scope, e->identifier, e);
 				}
 
 				if ((gd->flags & VarDeclFlag_using) != 0) {

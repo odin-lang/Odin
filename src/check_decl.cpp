@@ -67,6 +67,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, Array<AstNo
 		return;
 	}
 
+
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 
 	// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
@@ -89,6 +90,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, Array<AstNo
 	if (rhs_count > 0 && lhs_count != rhs_count) {
 		error(lhs[0]->token, "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
 	}
+
 
 	gb_temp_arena_memory_end(tmp);
 }
@@ -257,6 +259,46 @@ bool are_signatures_similar_enough(Type *a_, Type *b_) {
 	return true;
 }
 
+void init_entity_foreign_library(Checker *c, Entity *e) {
+	AstNode *ident = NULL;
+	Entity **foreign_library = NULL;
+
+	switch (e->kind) {
+	case Entity_Procedure:
+		ident = e->Procedure.foreign_library_ident;
+		foreign_library = &e->Procedure.foreign_library;
+		break;
+	case Entity_Variable:
+		ident = e->Variable.foreign_library_ident;
+		foreign_library = &e->Variable.foreign_library;
+		break;
+	default:
+		return;
+	}
+
+	if (ident == NULL) {
+		error(e->token, "foreign entiies must declare which library they are from");
+	} else if (ident->kind != AstNode_Ident) {
+		error_node(ident, "foreign library names must be an identifier");
+	} else {
+		String name = ident->Ident.string;
+		Entity *found = scope_lookup_entity(c->context.scope, name);
+		if (found == NULL) {
+			if (name == "_") {
+				error_node(ident, "`_` cannot be used as a value type");
+			} else {
+				error_node(ident, "Undeclared name: %.*s", LIT(name));
+			}
+		} else if (found->kind != Entity_LibraryName) {
+			error_node(ident, "`%.*s` cannot be used as a library name", LIT(name));
+		} else {
+			// TODO(bill): Extra stuff to do with library names?
+			*foreign_library = found;
+			add_entity_use(c, ident, found);
+		}
+	}
+}
+
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e->type == NULL);
 	if (d->proc_decl->kind != AstNode_ProcDecl) {
@@ -326,38 +368,17 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 	if (is_foreign) {
-		auto *fp = &c->info.foreigns;
 		String name = e->token.string;
 		if (pd->link_name.len > 0) {
 			name = pd->link_name;
 		}
-
-		AstNode *foreign_library = e->Procedure.foreign_library_ident;
-		if (foreign_library == NULL) {
-			error(e->token, "foreign procedures must declare which library they are from");
-		} else if (foreign_library->kind != AstNode_Ident) {
-			error_node(foreign_library, "foreign library names must be an identifier");
-		} else {
-			String name = foreign_library->Ident.string;
-			Entity *found = scope_lookup_entity(c->context.scope, name);
-			if (found == NULL) {
-				if (name == "_") {
-					error_node(foreign_library, "`_` cannot be used as a value type");
-				} else {
-					error_node(foreign_library, "Undeclared name: %.*s", LIT(name));
-				}
-			} else if (found->kind != Entity_LibraryName) {
-				error_node(foreign_library, "`%.*s` cannot be used as a library name", LIT(name));
-			} else {
-				// TODO(bill): Extra stuff to do with library names?
-				e->Procedure.foreign_library = found;
-				add_entity_use(c, foreign_library, found);
-			}
-		}
-
 		e->Procedure.is_foreign = true;
 		e->Procedure.link_name = name;
 
+		init_entity_foreign_library(c, e);
+
+
+		auto *fp = &c->info.foreigns;
 		HashKey key = hash_string(name);
 		Entity **found = map_get(fp, key);
 		if (found) {
@@ -365,9 +386,16 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			TokenPos pos = f->token.pos;
 			Type *this_type = base_type(e->type);
 			Type *other_type = base_type(f->type);
-			if (!are_signatures_similar_enough(this_type, other_type)) {
+			if (is_type_proc(this_type) && is_type_proc(other_type)) {
+				if (!are_signatures_similar_enough(this_type, other_type)) {
+					error_node(d->proc_decl,
+							   "Redeclaration of foreign procedure `%.*s` with different type signatures\n"
+							   "\tat %.*s(%td:%td)",
+							   LIT(name), LIT(pos.file), pos.line, pos.column);
+				}
+			} else if (!are_types_identical(this_type, other_type)) {
 				error_node(d->proc_decl,
-						   "Redeclaration of foreign procedure `%.*s` with different type signatures\n"
+						   "Foreign entity `%.*s` previously declared elsewhere with a different type\n"
 						   "\tat %.*s(%td:%td)",
 						   LIT(name), LIT(pos.file), pos.line, pos.column);
 			}
@@ -418,6 +446,33 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 		e->type = check_type(c, type_expr);
 	}
 
+
+	if (e->Variable.is_foreign) {
+		if (init_expr != NULL) {
+			error(e->token, "A foreign variable declaration cannot have a default value");
+		}
+		init_entity_foreign_library(c, e);
+
+		String name = e->token.string;
+		auto *fp = &c->info.foreigns;
+		HashKey key = hash_string(name);
+		Entity **found = map_get(fp, key);
+		if (found) {
+			Entity *f = *found;
+			TokenPos pos = f->token.pos;
+			Type *this_type = base_type(e->type);
+			Type *other_type = base_type(f->type);
+			if (!are_types_identical(this_type, other_type)) {
+				error(e->token,
+				      "Foreign entity `%.*s` previously declared elsewhere with a different type\n"
+				      "\tat %.*s(%td:%td)",
+				      LIT(name), LIT(pos.file), pos.line, pos.column);
+			}
+		} else {
+			map_set(fp, key, e);
+		}
+	}
+
 	if (init_expr == NULL) {
 		if (type_expr == NULL) {
 			e->type = t_invalid;
@@ -437,6 +492,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 			entities[i]->type = e->type;
 		}
 	}
+
 
 	Array<AstNode *> inits;
 	array_init(&inits, c->allocator, 1);

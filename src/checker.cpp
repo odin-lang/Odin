@@ -1555,6 +1555,14 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 							gd->flags &= ~VarDeclFlag_using; // NOTE(bill): This error will be only caught once
 							error_node(name, "`using` is not allowed at the file scope");
 						}
+
+						AstNode *fl = c->context.curr_foreign_library;
+						if (fl != NULL) {
+							GB_ASSERT(fl->kind == AstNode_Ident);
+							e->Variable.is_foreign = true;
+							e->Variable.foreign_library_ident = fl;
+						}
+
 						entities[entity_count++] = e;
 
 						DeclInfo *d = di;

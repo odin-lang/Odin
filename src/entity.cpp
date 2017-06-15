@@ -84,10 +84,13 @@ struct Entity {
 		struct {
 			i32        field_index;
 			i32        field_src_index;
-			bool       is_immutable;
-			bool       is_thread_local;
 			ExactValue default_value;
 			bool       default_is_nil;
+			bool       is_immutable;
+			bool       is_thread_local;
+			bool       is_foreign;
+			Entity *   foreign_library;
+			AstNode *  foreign_library_ident;
 		} Variable;
 		struct {
 			bool is_type_alias;
