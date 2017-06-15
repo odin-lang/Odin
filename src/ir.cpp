@@ -3622,10 +3622,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		Type *t = default_type(type_of_expr(proc->module->info, ce->args[0]));
 		return ir_type_info(proc, t);
 	} break;
-	case BuiltinProc_type_info_of_val: {
-		Type *t = default_type(type_of_expr(proc->module->info, ce->args[0]));
-		return ir_type_info(proc, t);
-	} break;
 
 	case BuiltinProc_transmute: {
 		irValue *x = ir_build_expr(proc, ce->args[1]);

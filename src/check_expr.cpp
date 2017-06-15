@@ -3945,54 +3945,43 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 
 	case BuiltinProc_size_of: {
-		// proc size_of(Type) -> untyped int
-		Type *type = check_type(c, ce->args[0]);
-		if (type == NULL || type == t_invalid) {
-			error_node(ce->args[0], "Expected a type for `size_of`");
+		// proc size_of(Type or expr) -> untyped int
+		Operand o = {};
+		check_expr_or_type(c, &o, ce->args[0]);
+		if (o.mode == Addressing_Invalid) {
 			return false;
 		}
+		Type *t = o.type;
+		if (t == NULL || t == t_invalid) {
+			error_node(ce->args[0], "Invalid argument for `size_of`");
+			return false;
+		}
+		t = default_type(t);
 
 		operand->mode = Addressing_Constant;
-		operand->value = exact_value_i64(type_size_of(c->allocator, type));
+		operand->value = exact_value_i64(type_size_of(c->allocator, t));
 		operand->type = t_untyped_integer;
-
 	} break;
-
-	case BuiltinProc_size_of_val:
-		// proc size_of_val(val: Type) -> untyped int
-		check_assignment(c, operand, NULL, str_lit("argument of `size_of_val`"));
-		if (operand->mode == Addressing_Invalid) {
-			return false;
-		}
-
-		operand->mode = Addressing_Constant;
-		operand->value = exact_value_i64(type_size_of(c->allocator, operand->type));
-		operand->type = t_untyped_integer;
-		break;
 
 	case BuiltinProc_align_of: {
-		// proc align_of(Type) -> untyped int
-		Type *type = check_type(c, ce->args[0]);
-		if (type == NULL || type == t_invalid) {
-			error_node(ce->args[0], "Expected a type for `align_of`");
+		// proc align_of(Type or expr) -> untyped int
+		Operand o = {};
+		check_expr_or_type(c, &o, ce->args[0]);
+		if (o.mode == Addressing_Invalid) {
 			return false;
 		}
+		Type *t = o.type;
+		if (t == NULL || t == t_invalid) {
+			error_node(ce->args[0], "Invalid argument for `align_of`");
+			return false;
+		}
+		t = default_type(t);
+
 		operand->mode = Addressing_Constant;
-		operand->value = exact_value_i64(type_align_of(c->allocator, type));
+		operand->value = exact_value_i64(type_align_of(c->allocator, t));
 		operand->type = t_untyped_integer;
 	} break;
 
-	case BuiltinProc_align_of_val:
-		// proc align_of_val(val: Type) -> untyped int
-		check_assignment(c, operand, NULL, str_lit("argument of `align_of_val`"));
-		if (operand->mode == Addressing_Invalid) {
-			return false;
-		}
-
-		operand->mode = Addressing_Constant;
-		operand->value = exact_value_i64(type_align_of(c->allocator, operand->type));
-		operand->type = t_untyped_integer;
-		break;
 
 	case BuiltinProc_offset_of: {
 		// proc offset_of(Type, field) -> untyped int
@@ -4038,56 +4027,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->type  = t_untyped_integer;
 	} break;
 
-	case BuiltinProc_offset_of_val: {
-		// proc offset_of_val(val: expression) -> untyped int
-		AstNode *arg = unparen_expr(ce->args[0]);
-		if (arg->kind != AstNode_SelectorExpr) {
-			gbString str = expr_to_string(arg);
-			error_node(arg, "`%s` is not a selector expression", str);
-			return false;
-		}
-		ast_node(s, SelectorExpr, arg);
 
-		check_expr(c, operand, s->expr);
-		if (operand->mode == Addressing_Invalid) {
-			return false;
-		}
-
-		Type *type = operand->type;
-		if (base_type(type)->kind == Type_Pointer) {
-			Type *p = base_type(type);
-			if (is_type_struct(p)) {
-				type = p->Pointer.elem;
-			}
-		}
-		if (is_type_array(type) || is_type_vector(type)) {
-			error_node(arg, "Invalid type for `offset_of_val`");
-			return false;
-		}
-
-		ast_node(i, Ident, s->selector);
-		Selection sel = lookup_field(c->allocator, type, i->string, operand->mode == Addressing_Type);
-		if (sel.entity == NULL) {
-			gbString type_str = type_to_string(type);
-			error_node(arg,
-			      "`%s` has no field named `%.*s`", type_str, LIT(i->string));
-			return false;
-		}
-		if (sel.indirect) {
-			gbString type_str = type_to_string(type);
-			error_node(ce->args[0],
-			      "Field `%.*s` is embedded via a pointer in `%s`", LIT(i->string), type_str);
-			gb_string_free(type_str);
-			return false;
-		}
-
-		operand->mode = Addressing_Constant;
-		// IMPORTANT TODO(bill): Fix for anonymous fields
-		operand->value = exact_value_i64(type_offset_of_from_selection(c->allocator, type, sel));
-		operand->type  = t_untyped_integer;
-	} break;
-
-	case BuiltinProc_type_of_val:
+	case BuiltinProc_type_of:
 		// proc type_of_val(val: Type) -> type(Type)
 		check_assignment(c, operand, NULL, str_lit("argument of `type_of_val`"));
 		if (operand->mode == Addressing_Invalid || operand->mode == Addressing_Builtin) {
@@ -4110,31 +4051,19 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		// NOTE(bill): The type information may not be setup yet
 		init_preload(c);
 		AstNode *expr = ce->args[0];
-		Type *type = check_type(c, expr);
-		if (type == NULL || type == t_invalid) {
-			error_node(expr, "Invalid argument to `type_info`");
+		Operand o = {};
+		check_expr_or_type(c, &o, ce->args[0]);
+		if (o.mode == Addressing_Invalid) {
 			return false;
 		}
-
-		add_type_info_type(c, type);
-
-		operand->mode = Addressing_Value;
-		operand->type = t_type_info_ptr;
-	} break;
-
-	case BuiltinProc_type_info_of_val: {
-		// proc type_info_of_val(val: Type) -> ^Type_Info
-		if (c->context.scope->is_global) {
-			compiler_error("`type_info` Cannot be declared within a #shared_global_scope due to how the internals of the compiler works");
-		}
-
-		// NOTE(bill): The type information may not be setup yet
-		init_preload(c);
-		AstNode *expr = ce->args[0];
-		check_assignment(c, operand, NULL, str_lit("argument of `type_info_of_val`"));
-		if (operand->mode == Addressing_Invalid || operand->mode == Addressing_Builtin)
+		Type *t = o.type;
+		if (t == NULL || t == t_invalid) {
+			error_node(ce->args[0], "Invalid argument for `size_of`");
 			return false;
-		add_type_info_type(c, operand->type);
+		}
+		t = default_type(t);
+
+		add_type_info_type(c, t);
 
 		operand->mode = Addressing_Value;
 		operand->type = t_type_info_ptr;
