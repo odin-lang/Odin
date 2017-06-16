@@ -141,7 +141,7 @@ String odin_root_dir(void) {
 
 String odin_root_dir(void) {
 	String path = global_module_path;
-	Array(char) path_buf;
+	Array<char> path_buf;
 	isize len, i;
 	gbTempArenaMemory tmp;
 	u8 *text;
