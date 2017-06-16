@@ -2144,9 +2144,9 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 		bool is_unsigned = is_type_unsigned(type);
 		char *name = NULL;
 		if (op == Token_Quo) {
-			name = is_unsigned ? "__udivti3" : "__divti3";
+			name = (char*)(is_unsigned ? "__udivti3" : "__divti3");
 		} else if (op == Token_Mod) {
-			name = is_unsigned ? "__umodti3" : "__modti3";
+			name = (char*)(is_unsigned ? "__umodti3" : "__modti3");
 		}
 		if (name != NULL) {
 			irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 2);

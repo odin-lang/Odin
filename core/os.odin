@@ -1,5 +1,5 @@
 import_load {
-	"os_windows.odin" when ODIN_OS == "windows";
+	//"os_windows.odin" when ODIN_OS == "windows";
 	"os_x.odin"       when ODIN_OS == "osx";
 	"os_linux.odin"   when ODIN_OS == "linux";
 }

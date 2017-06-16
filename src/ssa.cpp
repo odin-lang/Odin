@@ -7,9 +7,6 @@ struct ssaProc;
 struct ssaEdge;
 struct ssaRegister;
 struct ssaTargetList;
-enum   ssaBlockKind;
-enum   ssaBranchPrediction;
-enum   ssaDeferExitKind;
 
 
 String ssa_mangle_name(ssaModule *m, String path, Entity *e);
