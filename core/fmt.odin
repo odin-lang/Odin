@@ -1,11 +1,11 @@
-import {
+import (
 	"os.odin";
 	"mem.odin";
 	"utf8.odin";
 	"types.odin";
 	"strconv.odin";
 	"raw.odin";
-}
+)
 
 const _BUFFER_SIZE = 1<<12;
 
@@ -583,10 +583,10 @@ proc _fmt_int(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, 
 	_pad(fi, s);
 }
 
-let {
+let (
 	__DIGITS_LOWER = "0123456789abcdefx";
 	__DIGITS_UPPER = "0123456789ABCDEFX";
-}
+)
 
 proc fmt_rune(fi: ^FmtInfo, r: rune, verb: rune) {
 	match verb {
@@ -734,12 +734,12 @@ proc fmt_enum(fi: ^FmtInfo, v: any, verb: rune) {
 		case 'd', 'f':
 			fmt_arg(fi, any{v.data, type_info_base(e.base)}, verb);
 		case 's', 'v':
-			var {
+			var (
 				i:  i128;
 				f:  f64;
 				ok: bool;
 				a:  any;
-			}
+			)
 			a = any{v.data, type_info_base(e.base)};
 			match v in a {
 			case rune:  i = i128(v);
@@ -898,13 +898,13 @@ proc fmt_value(fi: ^FmtInfo, v: any, verb: rune) {
 
 		write_string(fi.buf, "map[");
 		defer write_byte(fi.buf, ']');
-		var {
+		var (
 			entries    = &(^raw.DynamicMap(v.data).entries);
 			gs         = type_info_base(info.generated_struct).(^Struct);
 			ed         = type_info_base(gs.types[1]).(^DynamicArray);
 			entry_type = ed.elem.(^Struct);
 			entry_size = ed.elem_size;
-		}
+		)
 		for i in 0..<entries.len {
 			if i > 0 {
 				write_string(fi.buf, ", ");
@@ -1081,12 +1081,12 @@ proc sbprintln(buf: ^StringBuffer, args: ..any) -> string {
 }
 
 proc sbprintf(b: ^StringBuffer, fmt: string, args: ..any) -> string {
-	var {
+	var (
 		end            = len(fmt);
 		arg_index: int = 0;
 		was_prev_index = false;
 		fi: FmtInfo;
-	}
+	)
 	for var i = 0; i < end; /**/ {
 		fi = FmtInfo{buf = b, good_arg_index = true};
 

@@ -1593,7 +1593,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 							found = current_scope_lookup_entity(c->context.scope, str);
 						}
 						if (found == NULL) {
-							entity = make_entity_variable(c->allocator, c->context.scope, token, NULL, (gd->flags&VarDeclFlag_immutable) != 0);
+							entity = make_entity_variable(c->allocator, c->context.scope, token, NULL, gd->token.kind == Token_let);
 							entity->identifier = name;
 
 							AstNode *fl = c->context.curr_foreign_library;

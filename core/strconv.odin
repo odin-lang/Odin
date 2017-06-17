@@ -223,11 +223,11 @@ type Float_Info struct {
 	bias:     int,
 }
 
-var {
+var (
 	_f16_info = Float_Info{10, 5,   -15};
 	_f32_info = Float_Info{23, 8,  -127};
 	_f64_info = Float_Info{52, 11, -1023};
-}
+)
 
 proc generic_ftoa(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 {
 	var bits: u64;

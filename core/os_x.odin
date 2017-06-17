@@ -1,19 +1,19 @@
-foreign_system_library {
+foreign_system_library (
 	dl   "dl";
 	libc "c";
-}
+)
 
 import "strings.odin";
 
-type {
+type (
 	Handle    i32;
 	FileTime  u64;
 	Errno     int;
 
 	AddressSize int;
-}
+)
 
-const {
+const (
 	O_RDONLY   = 0x00000;
 	O_WRONLY   = 0x00001;
 	O_RDWR     = 0x00002;
@@ -26,17 +26,17 @@ const {
 	O_SYNC     = 0x01000;
 	O_ASYNC    = 0x02000;
 	O_CLOEXEC  = 0x80000;
-}
-const {
+)
+const (
 	SEEK_SET   = 0;
 	SEEK_CUR   = 1;
 	SEEK_END   = 2;
 	SEEK_DATA  = 3;
 	SEEK_HOLE  = 4;
 	SEEK_MAX   = SEEK_HOLE;
-}
+)
 
-const {
+const (
 	// NOTE(zangent): These are OS specific!
 	// Do not mix these up!
 	RTLD_LAZY     = 0x1;
@@ -46,7 +46,7 @@ const {
 	RTLD_NODELETE = 0x80;
 	RTLD_NOLOAD   = 0x10;
 	RTLD_FIRST    = 0x100;
-}
+)
 
 var args: [dynamic]string;
 
@@ -80,7 +80,7 @@ type Stat struct #ordered {
 };
 
 // File type
-const {
+const (
 	S_IFMT   = 0170000; // Type of file mask
 	S_IFIFO  = 0010000; // Named pipe (fifo)
 	S_IFCHR  = 0020000; // Character special
@@ -112,7 +112,7 @@ const {
 	S_ISUID = 0004000; // Set user id on execution
 	S_ISGID = 0002000; // Set group id on execution
 	S_ISVTX = 0001000; // Directory restrcted delete
-}
+)
 
 proc S_ISLNK (m: u32) -> bool #inline  {return (m & S_IFMT) == S_IFLNK; }
 proc S_ISREG (m: u32) -> bool #inline  {return (m & S_IFMT) == S_IFREG; }
@@ -122,12 +122,12 @@ proc S_ISBLK (m: u32) -> bool #inline  {return (m & S_IFMT) == S_IFBLK; }
 proc S_ISFIFO(m: u32) -> bool #inline  {return (m & S_IFMT) == S_IFIFO; }
 proc S_ISSOCK(m: u32) -> bool #inline  {return (m & S_IFMT) == S_IFSOCK;}
 
-const {
+const (
 	R_OK = 4; // Test for read permission
 	W_OK = 2; // Test for write permission
 	X_OK = 1; // Test for execute permission
 	F_OK = 0; // Test for file existance
-}
+)
 
 foreign libc {
 	proc unix_open  (path: ^u8, mode: int) -> Handle                               #link_name "open";
@@ -167,7 +167,7 @@ proc open_simple(path: string, mode: int) -> (Handle, Errno) {
 }
 
 // NOTE(zangent): This is here for compatability reasons. Should this be here?
-proc open(path: string, mode: int, perm: u32) -> (Handle, Errno) {
+proc open(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) {
 	return open_simple(path, mode);
 }
 
@@ -215,11 +215,11 @@ proc file_size(fd: Handle) -> (i64, Errno) {
 
 
 // NOTE(bill): Uses startup to initialize it
-var {
+var (
 	stdin:  Handle = 0; // get_std_handle(win32.STD_INPUT_HANDLE);
 	stdout: Handle = 1; // get_std_handle(win32.STD_OUTPUT_HANDLE);
 	stderr: Handle = 2; // get_std_handle(win32.STD_ERROR_HANDLE);
-}
+)
 /* TODO(zangent): Implement these!
 proc last_write_time(fd: Handle) -> FileTime {}
 proc last_write_time_by_name(name: string) -> FileTime {}

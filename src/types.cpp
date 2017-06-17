@@ -2445,7 +2445,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_BitFieldValue:
-		str = gb_string_appendc(str, gb_bprintf("(bit field value with %lld bits)", cast(int)type->BitFieldValue.bits));
+		str = gb_string_appendc(str, gb_bprintf("(bit field value with %d bits)", cast(int)type->BitFieldValue.bits));
 		break;
 	}
 

@@ -2144,9 +2144,9 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 		bool is_unsigned = is_type_unsigned(type);
 		char *name = NULL;
 		if (op == Token_Quo) {
-			name = is_unsigned ? "__udivti3" : "__divti3";
+			name = cast(char *)(is_unsigned ? "__udivti3" : "__divti3");
 		} else if (op == Token_Mod) {
-			name = is_unsigned ? "__umodti3" : "__modti3";
+			name = cast(char *)(is_unsigned ? "__umodti3" : "__modti3");
 		}
 		if (name != NULL) {
 			irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 2);
@@ -3698,7 +3698,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 
 	case BuiltinProc_new: {
 		ir_emit_comment(proc, str_lit("new"));
-		// new :: proc(Type) -> ^Type
+		// proc new(Type) -> ^Type
 		gbAllocator a = proc->module->allocator;
 
 		Type *type = type_of_expr(proc->module->info, ce->args[0]);
@@ -3720,7 +3720,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		irValue **args = gb_alloc_array(a, irValue *, 2);
 		args[0] = ir_const_int(a, size);
 		args[1] = ir_const_int(a, align);
-		irValue *call = ir_emit_global_call(proc, "alloc_align", args, 2);
+		irValue *call = ir_emit_global_call(proc, "alloc", args, 2);
 		irValue *v = ir_emit_conv(proc, call, ptr_type);
 		if (type != allocation_type) {
 			Type *u = base_type(allocation_type);
@@ -3758,7 +3758,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			irValue **args = gb_alloc_array(a, irValue *, 2);
 			args[0] = slice_size;
 			args[1] = elem_align;
-			irValue *call = ir_emit_global_call(proc, "alloc_align", args, 2);
+			irValue *call = ir_emit_global_call(proc, "alloc", args, 2);
 
 			irValue *ptr = ir_emit_conv(proc, call, elem_ptr_type);
 			irValue *slice = ir_add_local_generated(proc, type);
@@ -4128,7 +4128,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 
 	case BuiltinProc_copy: {
 		ir_emit_comment(proc, str_lit("copy"));
-		// copy :: proc(dst, src: []Type) -> int
+		// proc copy(dst, src: []Type) -> int
 		AstNode *dst_node = ce->args[0];
 		AstNode *src_node = ce->args[1];
 		irValue *dst_slice = ir_build_expr(proc, dst_node);
@@ -7321,7 +7321,7 @@ void ir_gen_tree(irGen *s) {
 
 #if defined(GB_SYSTEM_WINDOWS)
 	if (build_context.is_dll && !has_dll_main) {
-		// DllMain :: proc(inst: rawptr, reason: u32, reserved: rawptr) -> i32
+		// proc DllMain(inst: rawptr, reason: u32, reserved: rawptr) -> i32
 		String name = str_lit("DllMain");
 		Type *proc_params = make_type_tuple(a);
 		Type *proc_results = make_type_tuple(a);
@@ -7389,7 +7389,7 @@ void ir_gen_tree(irGen *s) {
 #endif
 #if 0 && defined(GB_SYSTEM_WINDOWS)
 	if (!m->build_context->is_dll && !has_win_main) {
-		// WinMain :: proc(inst, prev: rawptr, cmd_line: ^byte, cmd_show: i32) -> i32
+		// proc WinMain(inst, prev: rawptr, cmd_line: ^byte, cmd_show: i32) -> i32
 		String name = str_lit("WinMain");
 		Type *proc_params = make_type_tuple(a);
 		Type *proc_results = make_type_tuple(a);

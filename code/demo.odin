@@ -1,4 +1,6 @@
-import "fmt.odin";
+import (
+	"fmt.odin";
+)
 
 proc main() {
 	let program = "+ + * - /";

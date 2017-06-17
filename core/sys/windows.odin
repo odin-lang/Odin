@@ -1,12 +1,12 @@
-foreign_system_library {
+foreign_system_library (
 	"kernel32.lib" when ODIN_OS == "windows";
 	"user32.lib"   when ODIN_OS == "windows";
 	"gdi32.lib"    when ODIN_OS == "windows";
 	"winmm.lib"    when ODIN_OS == "windows";
 	"shell32.lib"  when ODIN_OS == "windows";
-}
+)
 
-type {
+type (
 	Handle    rawptr;
 	Hwnd      Handle;
 	Hdc       Handle;
@@ -22,13 +22,13 @@ type {
 	Lparam    int;
 	Lresult   int;
 	WndProc   proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
-}
+)
 
 type Bool i32;
-const {
+const (
 	FALSE: Bool = 0;
 	TRUE        = 1;
-}
+)
 
 type Point struct #ordered {
 	x, y: i32,
@@ -151,19 +151,19 @@ type PixelFormatDescriptor struct #ordered {
 
 type Proc proc() #cc_c;
 
-const {
-	MAPVK_VK_TO_CHAR   = 2;
+const (
 	MAPVK_VK_TO_VSC    = 0;
 	MAPVK_VSC_TO_VK    = 1;
+	MAPVK_VK_TO_CHAR   = 2;
 	MAPVK_VSC_TO_VK_EX = 3;
-}
+)
 
 
 
 const INVALID_HANDLE = Handle(~int(0));
 
 
-const {
+const (
 	CS_VREDRAW    = 0x0001;
 	CS_HREDRAW    = 0x0002;
 	CS_OWNDC      = 0x0020;
@@ -221,7 +221,7 @@ const {
 	SM_CYSCREEN = 1;
 
 	SW_SHOW = 5;
-}
+)
 
 const COLOR_BACKGROUND = Hbrush(int(1));
 
@@ -235,24 +235,24 @@ const BI_RGB         = 0;
 const DIB_RGB_COLORS = 0x00;
 const SRCCOPY: u32   = 0x00cc0020;
 
-const {
+const (
 	MONITOR_DEFAULTTONULL    = 0x00000000;
 	MONITOR_DEFAULTTOPRIMARY = 0x00000001;
 	MONITOR_DEFAULTTONEAREST = 0x00000002;
-}
-const {
+)
+const (
 	SWP_FRAMECHANGED  = 0x0020;
 	SWP_NOOWNERZORDER = 0x0200;
 	SWP_NOZORDER      = 0x0004;
 	SWP_NOSIZE        = 0x0001;
 	SWP_NOMOVE        = 0x0002;
-}
+)
 
 
 
 
 // Windows OpenGL
-const {
+const (
 	PFD_TYPE_RGBA             = 0;
 	PFD_TYPE_COLORINDEX       = 1;
 	PFD_MAIN_PLANE            = 0;
@@ -274,15 +274,15 @@ const {
 	PFD_DEPTH_DONTCARE        = 0x20000000;
 	PFD_DOUBLEBUFFER_DONTCARE = 0x40000000;
 	PFD_STEREO_DONTCARE       = 0x80000000;
-}
+)
 
 
 
 type GET_FILEEX_INFO_LEVELS i32;
-const {
+const (
 	GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS = 0;
 	GetFileExMaxInfoLevel                         = 1;
-}
+)
 
 foreign kernel32 {
 	proc get_last_error     () -> i32                                                                                       #link_name "GetLastError";
@@ -463,7 +463,7 @@ proc is_key_down(key: KeyCode) -> bool #inline { return get_async_key_state(i32(
 
 
 
-const {
+const (
 	MAX_PATH = 0x00000104;
 
 	HANDLE_FLAG_INHERIT = 1;
@@ -513,7 +513,7 @@ const {
 	FILE_TYPE_DISK = 0x0001;
 	FILE_TYPE_CHAR = 0x0002;
 	FILE_TYPE_PIPE = 0x0003;
-}
+)
 
 
 type MonitorInfo struct #ordered {

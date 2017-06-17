@@ -1,4 +1,4 @@
-const {
+const (
 	FALSE                          = 0;
 	TRUE                           = 1;
 
@@ -1382,4 +1382,4 @@ const {
 	DEBUG_SEVERITY_HIGH_ARB        = 0x9146;
 	DEBUG_SEVERITY_MEDIUM_ARB      = 0x9147;
 	DEBUG_SEVERITY_LOW_ARB         = 0x9148;
-}
+)

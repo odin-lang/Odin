@@ -1,11 +1,11 @@
 #shared_global_scope;
 
-import {
+import (
 	"os.odin";
 	"fmt.odin";
 	"utf8.odin";
 	"raw.odin";
-}
+)
 // Naming Conventions:
 // In general, PascalCase for types and snake_case for values
 //
@@ -25,7 +25,7 @@ import {
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
-type {
+type (
 	TypeInfoEnumValue raw_union {
 		f: f64,
 		i: i128,
@@ -107,16 +107,16 @@ type {
 			offsets: []i32,
 		},
 	}
-}
+)
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
-var {
+var (
 	__type_table: []TypeInfo;
 
 	__argv__: ^^u8;
 	__argc__: i32;
-}
+)
 
 proc type_info_base(info: ^TypeInfo) -> ^TypeInfo {
 	if info == nil {
@@ -155,7 +155,7 @@ foreign __llvm_core {
 }
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
-type {
+type (
 	AllocatorMode enum u8 {
 		Alloc,
 		Free,
@@ -163,8 +163,8 @@ type {
 		Resize,
 	}
 	AllocatorProc proc(allocator_data: rawptr, mode: AllocatorMode,
-	                        size, alignment: int,
-	                        old_memory: rawptr, old_size: int, flags: u64) -> rawptr;
+	                   size, alignment: int,
+	                   old_memory: rawptr, old_size: int, flags: u64 = 0) -> rawptr;
 	Allocator struct #ordered {
 		procedure: AllocatorProc,
 		data:      rawptr,
@@ -172,14 +172,14 @@ type {
 
 
 	Context struct #ordered {
-		thread_id: int,
+		thread_id:  int,
 
-		allocator: Allocator,
+		allocator:  Allocator,
 
 		user_data:  rawptr,
 		user_index: int,
 	}
-}
+)
 
 #thread_local var __context: Context;
 
@@ -198,9 +198,7 @@ proc __check_context() {
 	}
 }
 
-proc alloc(size: int) -> rawptr #inline { return alloc_align(size, DEFAULT_ALIGNMENT); }
-
-proc alloc_align(size, alignment: int) -> rawptr #inline {
+proc alloc(size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr #inline {
 	__check_context();
 	var a = context.allocator;
 	return a.procedure(a.data, AllocatorMode.Alloc, size, alignment, nil, 0, 0);
@@ -228,8 +226,7 @@ proc free_all() #inline {
 }
 
 
-proc resize      (ptr: rawptr, old_size, new_size: int) -> rawptr #inline { return resize_align(ptr, old_size, new_size, DEFAULT_ALIGNMENT); }
-proc resize_align(ptr: rawptr, old_size, new_size, alignment: int) -> rawptr #inline {
+proc resize(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr #inline {
 	__check_context();
 	var a = context.allocator;
 	return a.procedure(a.data, AllocatorMode.Resize, new_size, alignment, ptr, old_size, 0);
@@ -239,7 +236,7 @@ proc resize_align(ptr: rawptr, old_size, new_size, alignment: int) -> rawptr #in
 
 proc default_resize_align(old_memory: rawptr, old_size, new_size, alignment: int) -> rawptr {
 	if old_memory == nil {
-		return alloc_align(new_size, alignment);
+		return alloc(new_size, alignment);
 	}
 
 	if new_size == 0 {
@@ -251,7 +248,7 @@ proc default_resize_align(old_memory: rawptr, old_size, new_size, alignment: int
 		return old_memory;
 	}
 
-	var new_memory = alloc_align(new_size, alignment);
+	var new_memory = alloc(new_size, alignment);
 	if new_memory == nil {
 		return nil;
 	}
@@ -263,8 +260,8 @@ proc default_resize_align(old_memory: rawptr, old_size, new_size, alignment: int
 
 
 proc default_allocator_proc(allocator_data: rawptr, mode: AllocatorMode,
-                               size, alignment: int,
-                               old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
+                            size, alignment: int,
+                            old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
 	using AllocatorMode;
 
 	match mode {
@@ -561,7 +558,7 @@ proc __default_hash_string(s: string) -> u128 {
 
 const __INITIAL_MAP_CAP = 16;
 
-type {
+type (
 	__MapKey struct #ordered {
 		hash: u128,
 		str:  string,
@@ -589,7 +586,7 @@ type {
 		value_offset:  int,
 		value_size:    int,
 	}
-}
+)
 
 proc __dynamic_map_reserve(using header: __MapHeader, cap: int)  {
 	__dynamic_array_reserve(&m.hashes, size_of(int), align_of(int), cap);

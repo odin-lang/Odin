@@ -89,8 +89,7 @@ enum ProcCallingConvention {
 
 enum VarDeclFlag {
 	VarDeclFlag_using            = 1<<0,
-	VarDeclFlag_immutable        = 1<<1,
-	VarDeclFlag_thread_local     = 1<<2,
+	VarDeclFlag_thread_local     = 1<<1,
 };
 
 enum StmtStateFlag {
@@ -2590,17 +2589,24 @@ AstNode *parse_gen_decl(AstFile *f, Token token, ParseSpecFunc *func) {
 	Token open = {};
 	Token close = {};
 
-	if (f->curr_token.kind == Token_OpenBrace) {
+	if (f->curr_token.kind == Token_OpenParen) {
 		specs = make_ast_node_array(f);
-		open = expect_token(f, Token_OpenBrace);
-		while (f->curr_token.kind != Token_CloseBrace &&
+		open = expect_token(f, Token_OpenParen);
+		bool require_semicolon_after_paren = false;
+		while (f->curr_token.kind != Token_CloseParen &&
 		       f->curr_token.kind != Token_EOF) {
 			AstNode *spec = func(f, token);
 			array_add(&specs, spec);
-			expect_semicolon(f, spec);
+			if (f->curr_token.kind == Token_CloseParen &&
+			    f->curr_token.pos.line == f->prev_token.pos.line) {
+				require_semicolon_after_paren = true;
+			} else {
+				expect_semicolon(f, spec);
+			}
 		}
-		close = expect_token(f, Token_CloseBrace);
-		if (f->curr_token.pos.line == close.pos.line ||
+		close = expect_token(f, Token_CloseParen);
+		if (require_semicolon_after_paren ||
+		    f->curr_token.pos.line == close.pos.line ||
 		    open.pos.line == close.pos.line) {
 			expect_semicolon(f, NULL);
 		}
@@ -2614,11 +2620,7 @@ AstNode *parse_gen_decl(AstFile *f, Token token, ParseSpecFunc *func) {
 		syntax_error(token, "Empty %.*s declaration list", LIT(token_strings[token.kind]));
 	}
 
-	AstNode *decl = ast_gen_decl(f, token, open, close, specs);
-	if (token.kind == Token_let) {
-		decl->GenDecl.flags |= VarDeclFlag_immutable;
-	}
-	return decl;
+	return ast_gen_decl(f, token, open, close, specs);
 }
 
 PARSE_SPEC_FUNC(parse_value_spec) {
@@ -3247,7 +3249,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 		}
 		if (allow_token(f, Token_Eq)) {
 			// TODO(bill): Should this be true==lhs or false==rhs?
-			default_value = parse_expr(f, true);
+			default_value = parse_expr(f, false);
 			if (!is_procedure) {
 				syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
 			}
@@ -3281,7 +3283,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 			}
 			if (allow_token(f, Token_Eq)) {
 				// TODO(bill): Should this be true==lhs or false==rhs?
-				default_value = parse_expr(f, true);
+				default_value = parse_expr(f, false);
 				if (!is_procedure) {
 					syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
 				}

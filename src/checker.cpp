@@ -1585,7 +1585,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 							error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 							continue;
 						}
-						Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL, (gd->flags&VarDeclFlag_immutable) != 0);
+						Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL, gd->token.kind == Token_let);
 						e->Variable.is_thread_local = (gd->flags & VarDeclFlag_thread_local) != 0;
 						e->identifier = name;
 
@@ -2005,7 +2005,7 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 				continue;
 			}
 			if (operand.value.kind == ExactValue_Bool &&
-			    !operand.value.value_bool) {
+			    operand.value.value_bool == false) {
 				continue;
 			}
 		}

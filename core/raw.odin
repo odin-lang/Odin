@@ -1,4 +1,4 @@
-type {
+type (
 	Any struct #ordered {
 		data:      rawptr,
 		type_info: ^TypeInfo,
@@ -26,4 +26,4 @@ type {
 		hashes:  [dynamic]int,
 		entries: DynamicArray,
 	};
-}
+)

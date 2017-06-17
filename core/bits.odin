@@ -1,4 +1,4 @@
-const {
+const (
 	U8_MIN   =   u8(0);
 	U16_MIN  =  u16(0);
 	U32_MIN  =  u32(0);
@@ -22,7 +22,7 @@ const {
 	I32_MAX  =  i32(0x7fff_ffff);
 	I64_MAX  =  i64(0x7fff_ffff_ffff_ffff);
 	I128_MAX = i128(0x7fff_ffff_ffff_ffff_ffff_ffff_ffff_ffff);
-}
+)
 
 proc count_ones(i:   u8) ->   u8 { foreign __llvm_core proc __llvm_ctpop(u8)   ->   u8 #link_name "llvm.ctpop.i8";  return __llvm_ctpop(i); }
 proc count_ones(i:   i8) ->   i8 { foreign __llvm_core proc __llvm_ctpop(i8)   ->   i8 #link_name "llvm.ctpop.i8";  return __llvm_ctpop(i); }

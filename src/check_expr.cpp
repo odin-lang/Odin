@@ -5162,7 +5162,7 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 				Entity *proc = procs[valids[i].index];
 				TokenPos pos = proc->token.pos;
 				gbString pt = type_to_string(proc->type);
-				gb_printf_err("\t%.*s :: %s at %.*s(%td:%td) with score %lld\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, valids[i].score);
+				gb_printf_err("\t%.*s of type %s at %.*s(%td:%td) with score %lld\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
 				gb_string_free(pt);
 			}
 			proc_type = t_invalid;

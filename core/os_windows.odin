@@ -1,14 +1,14 @@
 import win32 "sys/windows.odin";
 
-type {
+type (
 	Handle   int;
 	FileTime u64;
-}
+)
 
 const INVALID_HANDLE: Handle = -1;
 
 
-const {
+const (
 	O_RDONLY   = 0x00000;
 	O_WRONLY   = 0x00001;
 	O_RDWR     = 0x00002;
@@ -21,10 +21,10 @@ const {
 	O_SYNC     = 0x01000;
 	O_ASYNC    = 0x02000;
 	O_CLOEXEC  = 0x80000;
-}
+)
 
 type Errno int;
-const {
+const (
 	ERROR_NONE:               Errno = 0;
 	ERROR_FILE_NOT_FOUND            = 2;
 	ERROR_PATH_NOT_FOUND            = 3;
@@ -51,13 +51,13 @@ const {
 
 	// Windows reserves errors >= 1<<29 for application use
 	ERROR_FILE_IS_PIPE              = 1<<29 + 0;
-}
+)
 
 // "Argv" arguments converted to Odin strings
 let args = _alloc_command_line_arguments();
 
 
-proc open(path: string, mode: int, perm: u32) -> (Handle, Errno) {
+proc open(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) {
 	if len(path) == 0 {
 		return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
 	}
