@@ -553,6 +553,8 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_ImportSpec:         return node->ImportSpec.import_name;
 	case AstNode_TypeSpec:           return ast_node_token(node->TypeSpec.name);
 
+	case AstNode_ForeignBlockDecl:   return node->ForeignBlockDecl.token;
+
 
 	case AstNode_Field:
 		if (node->Field.names.count > 0) {
@@ -2822,7 +2824,7 @@ void parse_foreign_block_decl(AstFile *f, Array<AstNode *> *decls) {
 
 		/* fallthrough */
 	default:
-		error_node(decl, "Only procedures declarations are allowed within a foreign block at the moment");
+		error_node(decl, "Foreign blocks only allow procedure and variable declarations");
 		return;
 	}
 }
