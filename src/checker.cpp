@@ -43,8 +43,6 @@ enum BuiltinProcId {
 	BuiltinProc_type_info,
 
 	BuiltinProc_compile_assert,
-	BuiltinProc_assert,
-	BuiltinProc_panic,
 
 	BuiltinProc_copy,
 
@@ -65,7 +63,7 @@ enum BuiltinProcId {
 
 	BuiltinProc_transmute,
 
-	BuiltinProc_DIRECTIVE,
+	BuiltinProc_DIRECTIVE, // NOTE(bill): This is used for specialized hash-prefixed procedures
 
 	BuiltinProc_COUNT,
 };
@@ -91,8 +89,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_info"),        1, false, Expr_Expr},
 
 	{STR_LIT("compile_assert"),   1, false, Expr_Expr},
-	{STR_LIT("assert"),           1, false, Expr_Expr},
-	{STR_LIT("panic"),            1, false, Expr_Stmt},
 
 	{STR_LIT("copy"),             2, false, Expr_Expr},
 

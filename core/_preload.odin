@@ -187,12 +187,12 @@ type (
 
 type SourceCodeLocation struct {
 	fully_pathed_filename: string,
-	procedure:             string,
 	line, column:          i64,
+	procedure:             string,
 }
 
-proc make_source_code_location(file, procedure: string, line, column: i64) -> SourceCodeLocation {
-	return SourceCodeLocation{file, procedure, line, column};
+proc make_source_code_location(file: string, line, column: i64, procedure: string) -> SourceCodeLocation #inline {
+	return SourceCodeLocation{file, line, column, procedure};
 }
 
 
@@ -305,9 +305,26 @@ proc default_allocator() -> Allocator {
 }
 
 
+proc assert(condition: bool, message = "", using location = #caller_location) -> bool {
+	if !condition {
+		if len(message) > 0 {
+			fmt.printf("%s(%d:%d) Runtime assertion: %s\n", fully_pathed_filename, line, column, message);
+		} else {
+			fmt.printf("%s(%d:%d) Runtime assertion\n", fully_pathed_filename, line, column);
+		}
+		__debug_trap();
+	}
+	return condition;
+}
 
-
-
+proc panic(message = "", using location = #caller_location) {
+	if len(message) > 0 {
+		fmt.printf("%s(%d:%d) Panic: %s\n", fully_pathed_filename, line, column, message);
+	} else {
+		fmt.printf("%s(%d:%d) Panic\n", fully_pathed_filename, line, column);
+	}
+	__debug_trap();
+}
 
 
 
@@ -342,16 +359,7 @@ proc __complex64_ne (a, b: complex64)  -> bool #inline { return real(a) != real(
 proc __complex128_eq(a, b: complex128) -> bool #inline { return real(a) == real(b) && imag(a) == imag(b); }
 proc __complex128_ne(a, b: complex128) -> bool #inline { return real(a) != real(b) || imag(a) != imag(b); }
 
-proc __assert(file: string, line, column: int, msg: string) #inline {
-	fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion: %s\n",
-	            file, line, column, msg);
-	__debug_trap();
-}
-proc __panic(file: string, line, column: int, msg: string) #inline {
-	fmt.fprintf(os.stderr, "%s(%d:%d) Panic: %s\n",
-	            file, line, column, msg);
-	__debug_trap();
-}
+
 proc __bounds_check_error(file: string, line, column: int, index, count: int) {
 	if 0 <= index && index < count {
 		return;

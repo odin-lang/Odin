@@ -19,14 +19,19 @@ struct irModule {
 	String layout;
 	// String triple;
 
-	Map<Entity *>         min_dep_map; // Key: Entity *
-	Map<irValue *>        values;      // Key: Entity *
-	Map<irValue *>        members;     // Key: String
+	Map<Entity *>         min_dep_map;   // Key: Entity *
+	Map<irValue *>        values;        // Key: Entity *
+	Map<irValue *>        members;       // Key: String
 	Map<String>           entity_names;  // Key: Entity * of the typename
-	Map<irDebugInfo *>    debug_info;  // Key: Unique pointer
+	Map<irDebugInfo *>    debug_info;    // Key: Unique pointer
 	i32                   global_string_index;
 	i32                   global_array_index; // For ConstantSlice
 	i32                   global_generated_index;
+
+	// NOTE(bill): To prevent strings from being copied a lot
+	// Mainly used for file names
+	Map<irValue *>        const_strings; // Key: String
+
 
 	Entity *              entry_point_entity;
 
@@ -2686,6 +2691,19 @@ irValue *ir_add_local_slice(irProcedure *proc, Type *slice_type, irValue *base, 
 
 
 
+irValue *ir_find_or_add_entity_string(irModule *m, String str) {
+	irValue **found = map_get(&m->const_strings, hash_string(str));
+	if (found != NULL) {
+		return *found;
+	}
+	irValue *v = ir_const_string(m->allocator, str);
+	map_set(&m->const_strings, hash_string(str), v);
+	return v;
+
+}
+
+
+
 String ir_lookup_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
 	Type *prev_src = src;
 	// Type *prev_dst = dst;
@@ -3212,7 +3230,7 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 		irValue **args = gb_alloc_array(a, irValue *, 6);
 		args[0] = ok;
 
-		args[1] = ir_const_string(a, pos.file);
+		args[1] = ir_find_or_add_entity_string(proc->module, pos.file);
 		args[2] = ir_const_int(a, pos.line);
 		args[3] = ir_const_int(a, pos.column);
 
@@ -3266,7 +3284,7 @@ irAddr ir_emit_any_cast_addr(irProcedure *proc, irValue *value, Type *type, Toke
 		irValue **args = gb_alloc_array(a, irValue *, 6);
 		args[0] = ok;
 
-		args[1] = ir_const_string(a, pos.file);
+		args[1] = ir_find_or_add_entity_string(proc->module, pos.file);
 		args[2] = ir_const_int(a, pos.line);
 		args[3] = ir_const_int(a, pos.column);
 
@@ -3629,13 +3647,14 @@ bool is_double_pointer(Type *t) {
 	return is_type_pointer(td);
 }
 
+
 irValue *ir_emit_source_code_location(irProcedure *proc, String procedure, TokenPos pos) {
 	gbAllocator a = proc->module->allocator;
 	irValue **args = gb_alloc_array(a, irValue *, 4);
-	args[0] = ir_const_string(a, pos.file);
-	args[1] = ir_const_string(a, procedure);
-	args[2] = ir_const_i64(a, pos.line);
-	args[3] = ir_const_i64(a, pos.column);
+	args[0] = ir_find_or_add_entity_string(proc->module, pos.file);
+	args[1] = ir_const_i64(a, pos.line);
+	args[2] = ir_const_i64(a, pos.column);
+	args[3] = ir_find_or_add_entity_string(proc->module, procedure);
 	return ir_emit_global_call(proc, "make_source_code_location", args, 4);
 }
 
@@ -4106,62 +4125,6 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		args[1] = ir_gen_map_key(proc, key, key_type);
 		return ir_emit_global_call(proc, "__dynamic_map_delete", args, 2);
 	} break;
-
-
-	case BuiltinProc_assert: {
-		ir_emit_comment(proc, str_lit("assert"));
-		irValue *cond = ir_build_expr(proc, ce->args[0]);
-		GB_ASSERT(is_type_boolean(ir_type(cond)));
-
-		cond = ir_emit_comp(proc, Token_CmpEq, cond, v_false);
-		irBlock *err  = ir_new_block(proc, NULL, "builtin.assert.err");
-		irBlock *done = ir_new_block(proc, NULL, "builtin.assert.done");
-
-		ir_emit_if(proc, cond, err, done);
-		ir_start_block(proc, err);
-
-		// TODO(bill): Cleanup allocations here
-		Token token = ast_node_token(ce->args[0]);
-		TokenPos pos = token.pos;
-		gbString expr = expr_to_string(ce->args[0]);
-		isize expr_len = gb_string_length(expr);
-		String expr_str = {};
-		expr_str.text = cast(u8 *)gb_alloc_copy_align(proc->module->allocator, expr, expr_len, 1);
-		expr_str.len = expr_len;
-		gb_string_free(expr);
-
-
-		irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 4);
-		args[0] = ir_const_string(proc->module->allocator, pos.file);
-		args[1] = ir_const_int(proc->module->allocator, pos.line);
-		args[2] = ir_const_int(proc->module->allocator, pos.column);
-		args[3] = ir_const_string(proc->module->allocator, expr_str);
-		ir_emit_global_call(proc, "__assert", args, 4);
-
-		ir_emit_jump(proc, done);
-		ir_start_block(proc, done);
-
-		return cond;
-	} break;
-
-	case BuiltinProc_panic: {
-		ir_emit_comment(proc, str_lit("panic"));
-		irValue *msg = ir_build_expr(proc, ce->args[0]);
-		GB_ASSERT(is_type_string(ir_type(msg)));
-
-		Token token = ast_node_token(ce->args[0]);
-		TokenPos pos = token.pos;
-
-		irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 4);
-		args[0] = ir_const_string(proc->module->allocator, pos.file);
-		args[1] = ir_const_int(proc->module->allocator, pos.line);
-		args[2] = ir_const_int(proc->module->allocator, pos.column);
-		args[3] = msg;
-		ir_emit_global_call(proc, "__panic", args, 4);
-
-		return NULL;
-	} break;
-
 
 	case BuiltinProc_copy: {
 		ir_emit_comment(proc, str_lit("copy"));
@@ -5318,7 +5281,8 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 						elem = fv->value;
 					} else {
 						TypeAndValue tav = type_and_value_of_expr(proc->module->info, elem);
-						Selection sel = lookup_field_from_index(proc->module->allocator, bt, st->fields_in_src_order[field_index]->Variable.field_index);
+						Selection sel = lookup_field_from_index(proc->module->allocator, bt,
+						                                        st->fields_in_src_order[field_index]->Variable.field_src_index);
 						index = sel.index[0];
 					}
 
@@ -6966,6 +6930,7 @@ void ir_init_module(irModule *m, Checker *c) {
 	array_init(&m->procs,    heap_allocator());
 	array_init(&m->procs_to_generate, heap_allocator());
 	array_init(&m->foreign_library_paths, heap_allocator());
+	map_init(&m->const_strings, heap_allocator());
 
 	// Default states
 	m->stmt_state_flags = 0;
@@ -7077,6 +7042,7 @@ void ir_destroy_module(irModule *m) {
 	map_destroy(&m->members);
 	map_destroy(&m->entity_names);
 	map_destroy(&m->debug_info);
+	map_destroy(&m->const_strings);
 	array_free(&m->procs);
 	array_free(&m->procs_to_generate);
 	array_free(&m->foreign_library_paths);

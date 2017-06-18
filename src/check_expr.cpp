@@ -4144,33 +4144,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->type = t_untyped_bool;
 		break;
 
-	case BuiltinProc_assert:
-		// proc assert(cond: bool) -> bool
-
-		if (!is_type_boolean(operand->type)) {
-			gbString str = expr_to_string(ce->args[0]);
-			error_node(call, "`%s` is not a boolean", str);
-			gb_string_free(str);
-			return false;
-		}
-
-		operand->mode = Addressing_Value;
-		operand->type = t_untyped_bool;
-		break;
-
-	case BuiltinProc_panic:
-		// proc panic(msg: string)
-
-		if (!is_type_string(operand->type)) {
-			gbString str = expr_to_string(ce->args[0]);
-			error_node(call, "`%s` is not a string", str);
-			gb_string_free(str);
-			return false;
-		}
-
-		operand->mode = Addressing_NoValue;
-		break;
-
 	case BuiltinProc_copy: {
 		// proc copy(x, y: []Type) -> int
 		Type *dest_type = NULL, *src_type = NULL;
