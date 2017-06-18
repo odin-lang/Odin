@@ -970,7 +970,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '|': token.kind = token_kind_dub_eq(t, '|', Token_Or, Token_OrEq, Token_CmpOr, Token_CmpOrEq); break;
 
 		default:
-			if (curr_rune != GB_RUNE_BOM) {
+		if (curr_rune != GB_RUNE_BOM) {
 				u8 str[4] = {};
 				int len = cast(int)gb_utf8_encode_rune(str, curr_rune);
 				tokenizer_err(t, "Illegal character: %.*s (%d) ", len, str, curr_rune);

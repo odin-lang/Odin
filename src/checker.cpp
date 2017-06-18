@@ -711,10 +711,11 @@ void destroy_checker_info(CheckerInfo *i) {
 }
 
 
-void init_checker(Checker *c, Parser *parser, BuildContext *bc) {
+void init_checker(Checker *c, Parser *parser) {
 	if (global_error_collector.count > 0) {
 		gb_exit(1);
 	}
+	BuildContext *bc = &build_context;
 
 	gbAllocator a = heap_allocator();
 

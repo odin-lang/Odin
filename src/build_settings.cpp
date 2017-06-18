@@ -15,6 +15,7 @@ struct BuildContext {
 	String llc_flags;
 	String link_flags;
 	bool   is_dll;
+	bool   generate_docs;
 };
 
 
@@ -263,7 +264,7 @@ String get_fullpath_core(gbAllocator a, String path) {
 void init_build_context(void) {
 	BuildContext *bc = &build_context;
 	bc->ODIN_VENDOR  = str_lit("odin");
-	bc->ODIN_VERSION = str_lit("0.4.0");
+	bc->ODIN_VERSION = str_lit("0.5.0");
 	bc->ODIN_ROOT    = odin_root_dir();
 
 #if defined(GB_SYSTEM_WINDOWS)

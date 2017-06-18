@@ -6637,11 +6637,47 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_end;
 
 	case_ast_node(f, FieldList, node);
+		bool has_name = false;
+		for_array(i, f->list) {
+			ast_node(field, Field, f->list[i]);
+			if (field->names.count > 1) {
+				has_name = true;
+				break;
+			}
+
+			if (field->names.count == 0) {
+				continue;
+			}
+			AstNode *name = field->names[0];
+			ast_node(n, Ident, name);
+			if (n->string != "_") {
+				has_name = true;
+				break;
+			}
+		}
+
+
 		for_array(i, f->list) {
 			if (i > 0) {
 				str = gb_string_appendc(str, ", ");
 			}
-			str = write_expr_to_string(str, f->list[i]);
+			if (has_name) {
+				str = write_expr_to_string(str, f->list[i]);
+			} else {
+				ast_node(field, Field, f->list[i]);
+
+				if (field->flags&FieldFlag_using) {
+					str = gb_string_appendc(str, "using ");
+				}
+				if (field->flags&FieldFlag_no_alias) {
+					str = gb_string_appendc(str, "#no_alias ");
+				}
+				if (field->flags&FieldFlag_c_vararg) {
+					str = gb_string_appendc(str, "#c_vararg ");
+				}
+
+				str = write_expr_to_string(str, field->type);
+			}
 		}
 	case_end;
 
@@ -6670,6 +6706,11 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, "proc(");
 		str = write_expr_to_string(str, pt->params);
 		str = gb_string_appendc(str, ")");
+		if (pt->results != NULL) {
+			str = gb_string_appendc(str, " -> ");
+			str = write_expr_to_string(str, pt->results);
+		}
+
 	case_end;
 
 	case_ast_node(st, StructType, node);

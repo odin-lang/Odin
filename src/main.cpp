@@ -5,6 +5,7 @@
 #include "build_settings.cpp"
 #include "tokenizer.cpp"
 #include "parser.cpp"
+#include "docs.cpp"
 #include "checker.cpp"
 #include "ssa.cpp"
 #include "ir.cpp"
@@ -125,6 +126,7 @@ void usage(char *argv0) {
 	print_usage_line(1, "build        compile .odin file as executable");
 	print_usage_line(1, "build_dll    compile .odin file as dll");
 	print_usage_line(1, "run          compile and run .odin file");
+	print_usage_line(1, "docs         generate documentation for a .odin file");
 	print_usage_line(1, "version      print version");
 }
 
@@ -142,7 +144,6 @@ int main(int argc, char **argv) {
 	init_global_error_collector();
 
 #if 1
-
 	init_build_context();
 
 	init_universal_scope();
@@ -170,6 +171,18 @@ int main(int argc, char **argv) {
 			return 1;
 		}
 		init_filename = argv[2];
+	} else if (arg1 == "docs") {
+		if (argc != 3) {
+			usage(argv[0]);
+			return 1;
+		}
+
+		init_filename = argv[2];
+		build_context.generate_docs = true;
+		#if 1
+		print_usage_line(0, "Documentation generation is not yet supported");
+		return 1;
+		#endif
 	} else if (arg1 == "version") {
 		gb_printf("%s version %.*s\n", argv[0], LIT(build_context.ODIN_VERSION));
 		return 0;
@@ -192,13 +205,17 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
+	if (build_context.generate_docs) {
+		generate_documentation(&parser);
+		return 0;
+	}
 
 #if 1
 	timings_start_section(&timings, str_lit("type check"));
 
 	Checker checker = {0};
 
-	init_checker(&checker, &parser, &build_context);
+	init_checker(&checker, &parser);
 	// defer (destroy_checker(&checker));
 
 	check_parsed_files(&checker);
