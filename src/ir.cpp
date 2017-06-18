@@ -3677,7 +3677,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			Entity *e = entity_of_ident(proc->module->info, ident);
 			GB_ASSERT(e != NULL);
 
-			if (e->parent_proc_decl != NULL) {
+			if (e->parent_proc_decl != NULL && e->parent_proc_decl->entity_count > 0) {
 				procedure = e->parent_proc_decl->entities[0]->token.string;
 			} else {
 				procedure = str_lit("");
@@ -4665,7 +4665,10 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		TypeTuple *pt = &type->params->Tuple;
 
 		if (arg_count < type->param_count) {
-			String procedure = proc->entity->token.string;
+			String procedure = {};
+			if (proc->entity != NULL) {
+				procedure = proc->entity->token.string;
+			}
 			TokenPos pos = ast_node_token(ce->proc).pos;
 
 			isize end = type->param_count;

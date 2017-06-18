@@ -200,15 +200,21 @@ proc make_source_code_location(file: string, line, column: i64, procedure: strin
 const DEFAULT_ALIGNMENT = align_of([vector 4]f32);
 
 
-proc __check_context() {
-	var c = &__context;
-
+proc __init_context(c: ^Context) {
+	if c == nil {
+		return;
+	}
 	if c.allocator.procedure == nil {
 		c.allocator = default_allocator();
 	}
 	if c.thread_id == 0 {
 		c.thread_id = os.current_thread_id();
 	}
+}
+
+
+proc __check_context() {
+	__init_context(&__context);
 }
 
 proc alloc(size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr #inline {
