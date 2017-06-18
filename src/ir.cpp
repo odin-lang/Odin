@@ -3522,7 +3522,8 @@ irBranchBlocks ir_lookup_branch_blocks(irProcedure *proc, AstNode *ident) {
 	}
 
 	GB_PANIC("Unreachable");
-	return irBranchBlocks{};
+	irBranchBlocks empty = {};
+	return empty;
 }
 
 
@@ -3628,10 +3629,46 @@ bool is_double_pointer(Type *t) {
 	return is_type_pointer(td);
 }
 
-irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv, Entity *e) {
+irValue *ir_emit_source_code_location(irProcedure *proc, String procedure, TokenPos pos) {
+	gbAllocator a = proc->module->allocator;
+	irValue **args = gb_alloc_array(a, irValue *, 4);
+	args[0] = ir_const_string(a, pos.file);
+	args[1] = ir_const_string(a, procedure);
+	args[2] = ir_const_i64(a, pos.line);
+	args[3] = ir_const_i64(a, pos.column);
+	return ir_emit_global_call(proc, "make_source_code_location", args, 4);
+}
+
+irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv, BuiltinProcId id) {
 	ast_node(ce, CallExpr, expr);
 
-	switch (e->Builtin.id) {
+	switch (id) {
+	case BuiltinProc_DIRECTIVE: {
+		ast_node(bd, BasicDirective, ce->proc);
+		String name = bd->name;
+		GB_ASSERT(name == "location");
+		String procedure = proc->entity->token.string;
+		TokenPos pos = ast_node_token(ce->proc).pos;
+		if (ce->args.count > 0) {
+			AstNode *ident = ce->args[0];;
+
+			while (ident->kind == AstNode_SelectorExpr) {
+				ident = ident->SelectorExpr.selector;
+			}
+			Entity *e = entity_of_ident(proc->module->info, ident);
+			GB_ASSERT(e != NULL);
+
+			if (e->parent_proc_decl != NULL) {
+				procedure = e->parent_proc_decl->entities[0]->token.string;
+			} else {
+				procedure = str_lit("");
+			}
+			pos = e->token.pos;
+
+		}
+		return ir_emit_source_code_location(proc, procedure, pos);
+	} break;
+
 	case BuiltinProc_type_info: {
 		Type *t = default_type(type_of_expr(proc->module->info, ce->args[0]));
 		return ir_type_info(proc, t);
@@ -4573,7 +4610,9 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 
 	case_ast_node(ce, CallExpr, expr);
-		if (type_and_value_of_expr(proc->module->info, ce->proc).mode == Addressing_Type) {
+		TypeAndValue proc_tv = type_and_value_of_expr(proc->module->info, ce->proc);
+		AddressingMode proc_mode = proc_tv.mode;
+		if (proc_mode == Addressing_Type) {
 			GB_ASSERT(ce->args.count == 1);
 			irValue *x = ir_build_expr(proc, ce->args[0]);
 			irValue *y = ir_emit_conv(proc, x, tv.type);
@@ -4581,11 +4620,10 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		}
 
 		AstNode *p = unparen_expr(ce->proc);
-		if (p->kind == AstNode_Ident) {
+		if (proc_mode == Addressing_Builtin) {
 			Entity *e = entity_of_ident(proc->module->info, p);
-			if (e != NULL && e->kind == Entity_Builtin) {
-				return ir_build_builtin_proc(proc, expr, tv, e);
-			}
+			BuiltinProcId id = cast(BuiltinProcId)(e != NULL ? e->Builtin.id : BuiltinProc_DIRECTIVE);
+			return ir_build_builtin_proc(proc, expr, tv, id);
 		}
 
 		// NOTE(bill): Regular call
@@ -4664,6 +4702,9 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		TypeTuple *pt = &type->params->Tuple;
 
 		if (arg_count < type->param_count) {
+			String procedure = proc->entity->token.string;
+			TokenPos pos = ast_node_token(ce->proc).pos;
+
 			isize end = type->param_count;
 			if (variadic) {
 				end--;
@@ -4673,6 +4714,8 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 				GB_ASSERT(e->kind == Entity_Variable);
 				if (e->Variable.default_value.kind != ExactValue_Invalid) {
 					args[arg_index++] = ir_value_constant(proc->module->allocator, e->type, e->Variable.default_value);
+				} else if (e->Variable.default_is_location) {
+					args[arg_index++] = ir_emit_source_code_location(proc, procedure, pos);
 				} else {
 					args[arg_index++] = ir_value_nil(proc->module->allocator, e->type);
 				}
@@ -6459,7 +6502,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				irValue *cond = v_false;
 				if (is_ast_node_a_range(expr)) {
 					ast_node(ie, BinaryExpr, expr);
-					TokenKind op = {};
+					TokenKind op = Token_Invalid;
 					switch (ie->op.kind) {
 					case Token_Ellipsis:   op = Token_LtEq; break;
 					case Token_HalfClosed: op = Token_Lt;   break;

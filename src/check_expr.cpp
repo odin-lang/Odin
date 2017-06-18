@@ -1062,22 +1062,30 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		ast_node(p, Field, param);
 		AstNode *type_expr = p->type;
 		Type *type = NULL;
-		AstNode *default_value = p->default_value;
+		AstNode *default_value = unparen_expr(p->default_value);
 		ExactValue value = {};
 		bool default_is_nil = false;
+		bool default_is_location = false;
 
 		if (type_expr == NULL) {
-			Operand o = {};
-			check_expr_or_type(c, &o, default_value);
-			if (is_operand_nil(o)) {
-				default_is_nil = true;
-			} else if (o.mode != Addressing_Constant) {
-				error_node(default_value, "Default parameter must be a constant");
+			if (default_value->kind == AstNode_BasicDirective &&
+			    default_value->BasicDirective.name == "caller_location") {
+				init_preload(c);
+				default_is_location = true;
+				type = t_source_code_location;
 			} else {
-				value = o.value;
-			}
+				Operand o = {};
+				check_expr_or_type(c, &o, default_value);
+				if (is_operand_nil(o)) {
+					default_is_nil = true;
+				} else if (o.mode != Addressing_Constant) {
+					error_node(default_value, "Default parameter must be a constant");
+				} else {
+					value = o.value;
+				}
 
-			type = default_type(o.type);
+				type = default_type(o.type);
+			}
 		} else {
 			if (type_expr->kind == AstNode_Ellipsis) {
 				type_expr = type_expr->Ellipsis.expr;
@@ -1095,14 +1103,22 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 
 			if (default_value != NULL) {
 				Operand o = {};
-				check_expr_with_type_hint(c, &o, default_value, type);
-
-				if (is_operand_nil(o)) {
-					default_is_nil = true;
-				} else if (o.mode != Addressing_Constant) {
-					error_node(default_value, "Default parameter must be a constant");
+				if (default_value->kind == AstNode_BasicDirective &&
+				    default_value->BasicDirective.name == "caller_location") {
+					init_preload(c);
+					default_is_location = true;
+					o.type = t_source_code_location;
+					o.mode = Addressing_Value;
 				} else {
-					value = o.value;
+					check_expr_with_type_hint(c, &o, default_value, type);
+
+					if (is_operand_nil(o)) {
+						default_is_nil = true;
+					} else if (o.mode != Addressing_Constant) {
+						error_node(default_value, "Default parameter must be a constant");
+					} else {
+						value = o.value;
+					}
 				}
 
 				check_is_assignable_to(c, &o, type);
@@ -1145,6 +1161,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					                          (p->flags&FieldFlag_using) != 0, false);
 					param->Variable.default_value = value;
 					param->Variable.default_is_nil = default_is_nil;
+					param->Variable.default_is_location = default_is_location;
 				}
 				if (p->flags&FieldFlag_no_alias) {
 					param->flags |= EntityFlag_NoAlias;
@@ -3639,13 +3656,42 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 	default:
-		check_multi_expr(c, operand, ce->args[0]);
+		if (ce->args.count > 0) {
+			check_multi_expr(c, operand, ce->args[0]);
+		}
+		break;
 	}
 
 	switch (id) {
 	default:
 		GB_PANIC("Implement built-in procedure: %.*s", LIT(builtin_procs[id].name));
 		break;
+
+	case BuiltinProc_DIRECTIVE: {
+		ast_node(bd, BasicDirective, ce->proc);
+		String name = bd->name;
+		GB_ASSERT(name == "location");
+		if (ce->args.count > 1) {
+			error_node(ce->args[0], "`#location` expects either 0 or 1 arguments, got %td", ce->args.count);
+		}
+		if (ce->args.count > 0) {
+			AstNode *arg = ce->args[0];
+			Entity *e = NULL;
+			Operand o = {};
+			if (arg->kind == AstNode_Ident) {
+				e = check_ident(c, &o, arg, NULL, NULL, true);
+			} else if (arg->kind == AstNode_SelectorExpr) {
+				e = check_selector(c, &o, arg, NULL);
+			}
+			if (e == NULL) {
+				error_node(ce->args[0], "`#location` expected a valid entity name");
+			}
+		}
+
+
+		operand->type = t_source_code_location;
+		operand->mode = Addressing_Value;
+	} break;
 
 	case BuiltinProc_len:
 	case BuiltinProc_cap: {
@@ -4822,11 +4868,9 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			}
 
 			GB_ASSERT(e->kind == Entity_Variable);
-			if (e->Variable.default_value.kind != ExactValue_Invalid) {
-				param_count_excluding_defaults--;
-				continue;
-			}
-			if (e->Variable.default_is_nil) {
+			if (e->Variable.default_value.kind != ExactValue_Invalid ||
+			    e->Variable.default_is_nil ||
+			    e->Variable.default_is_location) {
 				param_count_excluding_defaults--;
 				continue;
 			}
@@ -5214,7 +5258,19 @@ Entity *find_using_index_expr(Type *t) {
 ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	GB_ASSERT(call->kind == AstNode_CallExpr);
 	ast_node(ce, CallExpr, call);
-	check_expr_or_type(c, operand, ce->proc);
+	if (ce->proc != NULL &&
+	    ce->proc->kind == AstNode_BasicDirective) {
+		ast_node(bd, BasicDirective, ce->proc);
+		String name = bd->name;
+		GB_ASSERT(name == "location");
+		operand->mode = Addressing_Builtin;
+		operand->builtin_id = BuiltinProc_DIRECTIVE;
+		operand->expr = ce->proc;
+		operand->type = t_invalid;
+		add_type_and_value(&c->info, ce->proc, operand->mode, operand->type, operand->value);
+	} else {
+		check_expr_or_type(c, operand, ce->proc);
+	}
 
 	if (ce->args.count > 0) {
 		bool fail = false;
@@ -5508,9 +5564,13 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				o->type = t_untyped_string;
 				o->value = exact_value_string(c->context.proc_name);
 			}
-
+		} else if (bd->name == "caller_location") {
+			init_preload(c);
+			error_node(node, "#caller_location may only be used as a default argument parameter");
+			o->type = t_source_code_location;
+			o->mode = Addressing_Value;
 		} else {
-			GB_PANIC("Unknown basic basic directive");
+			GB_PANIC("Unknown basic directive");
 		}
 		o->mode = Addressing_Constant;
 	case_end;

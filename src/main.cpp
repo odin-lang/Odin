@@ -1,4 +1,4 @@
-#define USE_CUSTOM_BACKEND false
+#define USE_CUSTOM_BACKEND 0
 
 #include "common.cpp"
 #include "timings.cpp"
@@ -205,7 +205,7 @@ int main(int argc, char **argv) {
 
 
 #endif
-#if USE_CUSTOM_BACKEND
+#if defined(USE_CUSTOM_BACKEND) && USE_CUSTOM_BACKEND
 	if (global_error_collector.count != 0) {
 		return 1;
 	}

@@ -114,10 +114,9 @@ enum StmtAllowFlag {
 
 
 
-Array<AstNode *> make_ast_node_array(AstFile *f) {
+Array<AstNode *> make_ast_node_array(AstFile *f, isize init_capacity = 8) {
 	Array<AstNode *> a;
-	// array_init(&a, gb_arena_allocator(&f->arena));
-	array_init(&a, heap_allocator());
+	array_init(&a, heap_allocator(), init_capacity);
 	return a;
 }
 
@@ -2029,8 +2028,9 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *link_name, ProcCallingConven
 
 Array<AstNode *> parse_lhs_expr_list(AstFile *f);
 Array<AstNode *> parse_rhs_expr_list(AstFile *f);
-AstNode *    parse_simple_stmt  (AstFile *f, StmtAllowFlag flags);
-AstNode *    parse_type         (AstFile *f);
+AstNode *        parse_simple_stmt  (AstFile *f, StmtAllowFlag flags);
+AstNode *        parse_type         (AstFile *f);
+AstNode *        parse_call_expr    (AstFile *f, AstNode *operand);
 
 AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
 	if (statement == NULL) {
@@ -2117,7 +2117,10 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		} else if (name.string == "file") { return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "line") { return ast_basic_directive(f, token, name.string);
 		} else if (name.string == "procedure") { return ast_basic_directive(f, token, name.string);
-		// } else if (!lhs && name.string == "alias") { return ast_alias(f, token, parse_expr(f, false));
+		} else if (name.string == "caller_location") { return ast_basic_directive(f, token, name.string);
+		} else if (name.string == "location") {
+			AstNode *tag = ast_basic_directive(f, token, name.string);
+			return parse_call_expr(f, tag);
 		} else {
 			operand = ast_tag_expr(f, token, name, parse_expr(f, false));
 		}
@@ -2613,7 +2616,7 @@ AstNode *parse_gen_decl(AstFile *f, Token token, ParseSpecFunc *func) {
 			expect_semicolon(f, NULL);
 		}
 	} else {
-		array_init(&specs, heap_allocator(), 1);
+		specs = make_ast_node_array(f, 1);
 		AstNode *spec = func(f, token);
 		array_add(&specs, spec);
 	}
@@ -2942,9 +2945,8 @@ AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 			AstNode *expr = parse_expr(f, false);
 			f->allow_range = prev_allow_range;
 
-			Array<AstNode *> rhs = {};
-			array_init_count(&rhs, heap_allocator(), 1);
-			rhs[0] = expr;
+			Array<AstNode *> rhs = make_ast_node_array(f, 1);
+			array_add(&rhs, expr);
 
 			return ast_assign_stmt(f, token, lhs, rhs);
 		}
@@ -3031,8 +3033,8 @@ AstNode *parse_results(AstFile *f) {
 }
 
 AstNode *parse_proc_type(AstFile *f, Token proc_token, String *link_name_) {
-	AstNode *params = {};
-	AstNode *results = {};
+	AstNode *params = NULL;
+	AstNode *results = NULL;
 
 	expect_token(f, Token_OpenParen);
 	params = parse_field_list(f, NULL, FieldFlag_Signature, Token_CloseParen);
@@ -3166,8 +3168,7 @@ struct AstNodeAndFlags {
 };
 
 Array<AstNode *> convert_to_ident_list(AstFile *f, Array<AstNodeAndFlags> list, bool ignore_flags) {
-	Array<AstNode *> idents = {};
-	array_init(&idents, heap_allocator(), list.count);
+	Array<AstNode *> idents = make_ast_node_array(f, list.count);
 	// Convert to ident list
 	for_array(i, list) {
 		AstNode *ident = list[i].node;
@@ -3211,7 +3212,10 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 	Token start_token = f->curr_token;
 
 	Array<AstNode *> params = make_ast_node_array(f);
-	Array<AstNodeAndFlags> list = {}; array_init(&list, heap_allocator()); // LEAK(bill):
+
+	Array<AstNodeAndFlags> list = {}; array_init(&list, heap_allocator());
+	defer (array_free(&list));
+
 	isize total_name_count = 0;
 	bool allow_ellipsis = allowed_flags&FieldFlag_ellipsis;
 	bool is_procedure = allowed_flags == FieldFlag_Signature;

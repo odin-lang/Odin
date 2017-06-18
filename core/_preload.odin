@@ -184,6 +184,19 @@ type (
 #thread_local var __context: Context;
 
 
+
+type SourceCodeLocation struct {
+	fully_pathed_filename: string,
+	procedure:             string,
+	line, column:          i64,
+}
+
+proc make_source_code_location(file, procedure: string, line, column: i64) -> SourceCodeLocation {
+	return SourceCodeLocation{file, procedure, line, column};
+}
+
+
+
 const DEFAULT_ALIGNMENT = align_of([vector 4]f32);
 
 

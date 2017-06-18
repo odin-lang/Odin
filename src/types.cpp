@@ -321,35 +321,35 @@ gb_global Type *t_string_slice = NULL;
 
 
 // Type generated for the "preload" file
-gb_global Type *t_type_info                = NULL;
-gb_global Type *t_type_info_record         = NULL;
-gb_global Type *t_type_info_enum_value     = NULL;
-gb_global Type *t_type_info_ptr            = NULL;
-gb_global Type *t_type_info_record_ptr     = NULL;
-gb_global Type *t_type_info_enum_value_ptr = NULL;
+gb_global Type *t_type_info                   = NULL;
+gb_global Type *t_type_info_record            = NULL;
+gb_global Type *t_type_info_enum_value        = NULL;
+gb_global Type *t_type_info_ptr               = NULL;
+gb_global Type *t_type_info_record_ptr        = NULL;
+gb_global Type *t_type_info_enum_value_ptr    = NULL;
 
-gb_global Type *t_type_info_named         = NULL;
-gb_global Type *t_type_info_integer       = NULL;
-gb_global Type *t_type_info_rune          = NULL;
-gb_global Type *t_type_info_float         = NULL;
-gb_global Type *t_type_info_complex       = NULL;
-gb_global Type *t_type_info_any           = NULL;
-gb_global Type *t_type_info_string        = NULL;
-gb_global Type *t_type_info_boolean       = NULL;
-gb_global Type *t_type_info_pointer       = NULL;
-gb_global Type *t_type_info_atomic        = NULL;
-gb_global Type *t_type_info_procedure     = NULL;
-gb_global Type *t_type_info_array         = NULL;
-gb_global Type *t_type_info_dynamic_array = NULL;
-gb_global Type *t_type_info_slice         = NULL;
-gb_global Type *t_type_info_vector        = NULL;
-gb_global Type *t_type_info_tuple         = NULL;
-gb_global Type *t_type_info_struct        = NULL;
-gb_global Type *t_type_info_raw_union     = NULL;
-gb_global Type *t_type_info_union         = NULL;
-gb_global Type *t_type_info_enum          = NULL;
-gb_global Type *t_type_info_map           = NULL;
-gb_global Type *t_type_info_bit_field     = NULL;
+gb_global Type *t_type_info_named             = NULL;
+gb_global Type *t_type_info_integer           = NULL;
+gb_global Type *t_type_info_rune              = NULL;
+gb_global Type *t_type_info_float             = NULL;
+gb_global Type *t_type_info_complex           = NULL;
+gb_global Type *t_type_info_any               = NULL;
+gb_global Type *t_type_info_string            = NULL;
+gb_global Type *t_type_info_boolean           = NULL;
+gb_global Type *t_type_info_pointer           = NULL;
+gb_global Type *t_type_info_atomic            = NULL;
+gb_global Type *t_type_info_procedure         = NULL;
+gb_global Type *t_type_info_array             = NULL;
+gb_global Type *t_type_info_dynamic_array     = NULL;
+gb_global Type *t_type_info_slice             = NULL;
+gb_global Type *t_type_info_vector            = NULL;
+gb_global Type *t_type_info_tuple             = NULL;
+gb_global Type *t_type_info_struct            = NULL;
+gb_global Type *t_type_info_raw_union         = NULL;
+gb_global Type *t_type_info_union             = NULL;
+gb_global Type *t_type_info_enum              = NULL;
+gb_global Type *t_type_info_map               = NULL;
+gb_global Type *t_type_info_bit_field         = NULL;
 
 gb_global Type *t_type_info_named_ptr         = NULL;
 gb_global Type *t_type_info_integer_ptr       = NULL;
@@ -375,13 +375,16 @@ gb_global Type *t_type_info_enum_ptr          = NULL;
 gb_global Type *t_type_info_map_ptr           = NULL;
 gb_global Type *t_type_info_bit_field_ptr     = NULL;
 
-gb_global Type *t_allocator            = NULL;
-gb_global Type *t_allocator_ptr        = NULL;
-gb_global Type *t_context              = NULL;
-gb_global Type *t_context_ptr          = NULL;
+gb_global Type *t_allocator                   = NULL;
+gb_global Type *t_allocator_ptr               = NULL;
+gb_global Type *t_context                     = NULL;
+gb_global Type *t_context_ptr                 = NULL;
 
-gb_global Type *t_map_key               = NULL;
-gb_global Type *t_map_header            = NULL;
+gb_global Type *t_source_code_location        = NULL;
+gb_global Type *t_source_code_location_ptr    = NULL;
+
+gb_global Type *t_map_key                     = NULL;
+gb_global Type *t_map_header                  = NULL;
 
 
 

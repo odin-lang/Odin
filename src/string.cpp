@@ -25,8 +25,11 @@ struct String {
 // NOTE(bill): used for printf style arguments
 #define LIT(x) ((int)(x).len), (x).text
 #define STR_LIT(c_str) {cast(u8 *)c_str, gb_size_of(c_str)-1}
-#define str_lit(c_str) String{cast(u8 *)c_str, gb_size_of(c_str)-1}
-
+#if defined(GB_COMPILER_MSVC) && _MSC_VER < 1700
+	#define str_lit(c_str) make_string(cast(u8 *)c_str, gb_size_of(c_str)-1)
+#else
+	#define str_lit(c_str) String{cast(u8 *)c_str, gb_size_of(c_str)-1}
+#endif
 
 // NOTE(bill): String16 is only used for Windows due to its file directories
 struct String16 {

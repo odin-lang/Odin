@@ -152,7 +152,12 @@ u64 bit128__digit_value(Rune r) {
 	return 16; // NOTE(bill): Larger than highest possible
 }
 
-u128 u128_lo_hi(u64 lo, u64 hi) { return u128{lo, hi}; }
+u128 u128_lo_hi(u64 lo, u64 hi) {
+	u128 r = {};
+	r.lo = lo;
+	r.hi = hi;
+	return r;
+}
 u128 u128_from_u32(u32 u)       { return u128_lo_hi(cast(u64)u, 0); }
 u128 u128_from_u64(u64 u)       { return u128_lo_hi(cast(u64)u, 0); }
 u128 u128_from_i64(i64 u)       { return u128_lo_hi(cast(u64)u, u < 0 ? -1 : 0); }

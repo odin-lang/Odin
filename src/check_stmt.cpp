@@ -1161,7 +1161,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					}
 
 
-					TokenKind op = {};
+					TokenKind op = Token_Invalid;
 
 					Operand a = lhs;
 					Operand b = rhs;

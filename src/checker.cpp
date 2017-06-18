@@ -65,9 +65,11 @@ enum BuiltinProcId {
 
 	BuiltinProc_transmute,
 
-	BuiltinProc_Count,
+	BuiltinProc_DIRECTIVE,
+
+	BuiltinProc_COUNT,
 };
-gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
+gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT(""),                 0, false, Expr_Stmt},
 
 	{STR_LIT("len"),              1, false, Expr_Expr},
@@ -110,6 +112,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_Count] = {
 	{STR_LIT("clamp"),            3, false, Expr_Expr},
 
 	{STR_LIT("transmute"),        2, false, Expr_Expr},
+
+	{STR_LIT(""),                 0, true,  Expr_Expr}, // DIRECTIVE
 };
 
 
@@ -660,9 +664,12 @@ void init_universal_scope(void) {
 // Builtin Procedures
 	for (isize i = 0; i < gb_count_of(builtin_procs); i++) {
 		BuiltinProcId id = cast(BuiltinProcId)i;
-		Entity *entity = alloc_entity(a, Entity_Builtin, NULL, make_token_ident(builtin_procs[i].name), t_invalid);
-		entity->Builtin.id = id;
-		add_global_entity(entity);
+		String name = builtin_procs[i].name;
+		if (name != "") {
+			Entity *entity = alloc_entity(a, Entity_Builtin, NULL, make_token_ident(name), t_invalid);
+			entity->Builtin.id = id;
+			add_global_entity(entity);
+		}
 	}
 
 
@@ -1284,6 +1291,12 @@ void init_preload(Checker *c) {
 		t_context_ptr = make_type_pointer(c->allocator, t_context);
 	}
 
+	if (t_source_code_location == NULL) {
+		Entity *e = find_core_entity(c, str_lit("SourceCodeLocation"));
+		t_source_code_location = e->type;
+		t_source_code_location_ptr = make_type_pointer(c->allocator, t_allocator);
+	}
+
 	if (t_map_key == NULL) {
 		Entity *e = find_core_entity(c, str_lit("__MapKey"));
 		t_map_key = e->type;
@@ -1755,7 +1768,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 
 
 void check_all_global_entities(Checker *c) {
-	Scope *prev_file = {};
+	Scope *prev_file = NULL;
 
 	for_array(i, c->info.entities.entries) {
 		auto *entry = &c->info.entities.entries[i];
