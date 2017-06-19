@@ -198,7 +198,7 @@ struct irProcedure {
 		irValue *true_value;                                          \
 		irValue *false_value;                                         \
 	})                                                                \
-	IR_INSTR_KIND(Phi, struct { Array<irValue *> edges; Type *type; })    \
+	IR_INSTR_KIND(Phi, struct { Array<irValue *> edges; Type *type; })\
 	IR_INSTR_KIND(Unreachable, i32)                                   \
 	IR_INSTR_KIND(UnaryOp, struct {                                   \
 		Type *    type;                                               \
@@ -218,26 +218,26 @@ struct irProcedure {
 		isize     arg_count;                                          \
 	})                                                                \
 	IR_INSTR_KIND(StartupRuntime, i32)                                \
-	IR_INSTR_KIND(BoundsCheck, struct {                               \
-		TokenPos pos;                                                 \
-		irValue *index;                                               \
-		irValue *len;                                                 \
+	IR_INSTR_KIND(DebugDeclare, struct {                              \
+		irDebugInfo *debug_info;                                      \
+		AstNode *    expr;                                            \
+		Entity *     entity;                                          \
+		bool         is_addr;                                         \
+		irValue *    value;                                           \
 	})                                                                \
-	IR_INSTR_KIND(SliceBoundsCheck, struct {                          \
-		TokenPos pos;                                                 \
-		irValue *low;                                                 \
-		irValue *high;                                                \
-		irValue *max;                                                 \
-		bool     is_substring;                                        \
-	})                                                                \
-	IR_INSTR_KIND(DebugDeclare, struct { \
-		irDebugInfo *debug_info; \
-		AstNode *    expr; \
-		Entity *     entity; \
-		bool         is_addr; \
-		irValue *    value; \
-	}) \
 
+// 	IR_INSTR_KIND(BoundsCheck, struct {                               \
+// 		TokenPos pos;                                                 \
+// 		irValue *index;                                               \
+// 		irValue *len;                                                 \
+// 	})                                                                \
+// 	IR_INSTR_KIND(SliceBoundsCheck, struct {                          \
+// 		TokenPos pos;                                                 \
+// 		irValue *low;                                                 \
+// 		irValue *high;                                                \
+// 		irValue *max;                                                 \
+// 		bool     is_substring;                                        \
+// 	})                                                                \
 
 
 #define IR_CONV_KINDS \
@@ -1011,22 +1011,6 @@ irValue *ir_instr_comment(irProcedure *p, String text) {
 	return v;
 }
 
-irValue *ir_instr_bounds_check(irProcedure *p, TokenPos pos, irValue *index, irValue *len) {
-	irValue *v = ir_alloc_instr(p, irInstr_BoundsCheck);
-	v->Instr.BoundsCheck.pos   = pos;
-	v->Instr.BoundsCheck.index = index;
-	v->Instr.BoundsCheck.len   = len;
-	return v;
-}
-irValue *ir_instr_slice_bounds_check(irProcedure *p, TokenPos pos, irValue *low, irValue *high, irValue *max, bool is_substring) {
-	irValue *v = ir_alloc_instr(p, irInstr_SliceBoundsCheck);
-	v->Instr.SliceBoundsCheck.pos  = pos;
-	v->Instr.SliceBoundsCheck.low  = low;
-	v->Instr.SliceBoundsCheck.high = high;
-	v->Instr.SliceBoundsCheck.max  = max;
-	v->Instr.SliceBoundsCheck.is_substring = is_substring;
-	return v;
-}
 irValue *ir_instr_debug_declare(irProcedure *p, irDebugInfo *debug_info, AstNode *expr, Entity *entity, bool is_addr, irValue *value) {
 	irValue *v = ir_alloc_instr(p, irInstr_DebugDeclare);
 	v->Instr.DebugDeclare.debug_info = debug_info;
@@ -3443,7 +3427,21 @@ void ir_emit_bounds_check(irProcedure *proc, Token token, irValue *index, irValu
 	index = ir_emit_conv(proc, index, t_int);
 	len = ir_emit_conv(proc, len, t_int);
 
-	ir_emit(proc, ir_instr_bounds_check(proc, token.pos, index, len));
+	gbAllocator a = proc->module->allocator;
+	irValue *file = ir_find_or_add_entity_string(proc->module, token.pos.file);
+	irValue *line = ir_const_int(a, token.pos.line);
+	irValue *column = ir_const_int(a, token.pos.column);
+
+	irValue **args = gb_alloc_array(a, irValue *, 5);
+	args[0] = file;
+	args[1] = line;
+	args[2] = column;
+	args[3] = index;
+	args[4] = len;
+
+	ir_emit_global_call(proc, "__bounds_check_error", args, 5);
+
+	// ir_emit(proc, ir_instr_bounds_check(proc, token.pos, index, len));
 }
 
 void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, irValue *high, irValue *max, bool is_substring) {
@@ -3451,10 +3449,29 @@ void ir_emit_slice_bounds_check(irProcedure *proc, Token token, irValue *low, ir
 		return;
 	}
 
+	gbAllocator a = proc->module->allocator;
+	irValue *file = ir_find_or_add_entity_string(proc->module, token.pos.file);
+	irValue *line = ir_const_int(a, token.pos.line);
+	irValue *column = ir_const_int(a, token.pos.column);
 	low  = ir_emit_conv(proc, low,  t_int);
 	high = ir_emit_conv(proc, high, t_int);
 
-	ir_emit(proc, ir_instr_slice_bounds_check(proc, token.pos, low, high, max, is_substring));
+	irValue **args = gb_alloc_array(a, irValue *, 6);
+	args[0] = file;
+	args[1] = line;
+	args[2] = column;
+	args[3] = low;
+	args[4] = high;
+	args[5] = max;
+
+	if (is_substring) {
+		ir_emit_global_call(proc, "__substring_expr_error", args, 5);
+	} else {
+		ir_emit_global_call(proc, "__slice_expr_error", args, 6);
+	}
+
+
+	// ir_emit(proc, ir_instr_slice_bounds_check(proc, token.pos, low, high, max, is_substring));
 }
 
 

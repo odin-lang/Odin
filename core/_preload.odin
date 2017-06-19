@@ -17,7 +17,7 @@ import (
 // Local Variables:    snake_case
 // Constant Variables: SCREAMING_SNAKE_CASE
 
-// IMPORTANT NOTE(bill): `type_info` & `type_info_val` cannot be used within a
+// IMPORTANT NOTE(bill): `type_info` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
 // This could change at a later date if the all these data structures are
 // implemented within the compiler rather than in this "preload" file
@@ -407,24 +407,42 @@ proc __string_decode_rune(s: string) -> (rune, int) #inline {
 
 
 proc __mem_set(data: rawptr, value: i32, len: int) -> rawptr {
-	foreign __llvm_core proc llvm_memset_64bit(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) #link_name "llvm.memset.p0i8.i64";
-	llvm_memset_64bit(data, u8(value), len, 1, false);
-	return data;
+	when size_of(rawptr) == 8 {
+		foreign __llvm_core proc llvm_memset_64bit(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) #link_name "llvm.memset.p0i8.i64";
+		llvm_memset_64bit(data, u8(value), len, 1, false);
+		return data;
+	} else {
+		foreign __llvm_core proc llvm_memset_32bit(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) #link_name "llvm.memset.p0i8.i32";
+		llvm_memset_32bit(data, u8(value), len, 1, false);
+		return data;
+	}
 }
 proc __mem_zero(data: rawptr, len: int) -> rawptr {
 	return __mem_set(data, 0, len);
 }
 proc __mem_copy(dst, src: rawptr, len: int) -> rawptr {
 	// NOTE(bill): This _must_ be implemented like C's memmove
-	foreign __llvm_core proc llvm_memmove_64bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memmove.p0i8.p0i8.i64";
-	llvm_memmove_64bit(dst, src, len, 1, false);
-	return dst;
+	when size_of(rawptr) == 8 {
+		foreign __llvm_core proc llvm_memmove_64bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memmove.p0i8.p0i8.i64";
+		llvm_memmove_64bit(dst, src, len, 1, false);
+		return dst;
+	} else {
+		foreign __llvm_core proc llvm_memmove_32bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memmove.p0i8.p0i8.i32";
+		llvm_memmove_32bit(dst, src, len, 1, false);
+		return dst;
+	}
 }
 proc __mem_copy_non_overlapping(dst, src: rawptr, len: int) -> rawptr {
 	// NOTE(bill): This _must_ be implemented like C's memcpy
-	foreign __llvm_core proc llvm_memcpy_64bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i64";
-	llvm_memcpy_64bit(dst, src, len, 1, false);
-	return dst;
+	when size_of(rawptr) == 8 {
+		foreign __llvm_core proc llvm_memcpy_64bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i64";
+		llvm_memcpy_64bit(dst, src, len, 1, false);
+		return dst;
+	} else {
+		foreign __llvm_core proc llvm_memcpy_32bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i32";
+		llvm_memcpy_32bit(dst, src, len, 1, false);
+		return dst;
+	}
 }
 
 proc __mem_compare(a, b: ^u8, n: int) -> int {

@@ -1391,6 +1391,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	// 	ir_fprintf(f, "\n");
 	// } break;
 
+	#if 0
 	case irInstr_BoundsCheck: {
 		irInstrBoundsCheck *bc = &instr->BoundsCheck;
 		ir_fprintf(f, "call void ");
@@ -1462,6 +1463,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 		ir_fprintf(f, ")\n");
 	} break;
+	#endif
 
 	case irInstr_DebugDeclare: {
 		/* irInstrDebugDeclare *dd = &instr->DebugDeclare;

@@ -1206,10 +1206,6 @@ Entity *find_core_entity(Checker *c, String name) {
 }
 
 void init_preload(Checker *c) {
-	if (c->done_preload) {
-		return;
-	}
-
 	if (t_type_info == NULL) {
 		Entity *type_info_entity = find_core_entity(c, str_lit("TypeInfo"));
 

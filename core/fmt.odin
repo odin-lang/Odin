@@ -1087,6 +1087,7 @@ proc sbprintf(b: ^StringBuffer, fmt: string, args: ..any) -> string {
 		was_prev_index = false;
 		fi: FmtInfo;
 	)
+
 	for var i = 0; i < end; /**/ {
 		fi = FmtInfo{buf = b, good_arg_index = true};
 
@@ -1104,8 +1105,7 @@ proc sbprintf(b: ^StringBuffer, fmt: string, args: ..any) -> string {
 		// Process a "verb"
 		i++;
 
-	prefix_loop:
-		for ; i < end; i++ {
+		prefix_loop: for ; i < end; i++ {
 			match fmt[i] {
 			case '+':
 				fi.plus = true;

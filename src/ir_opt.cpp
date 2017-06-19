@@ -80,6 +80,8 @@ void ir_opt_add_operands(Array<irValue *> *ops, irInstr *i) {
 		// break;
 	case irInstr_StartupRuntime:
 		break;
+
+	#if 0
 	case irInstr_BoundsCheck:
 		array_add(ops, i->BoundsCheck.index);
 		array_add(ops, i->BoundsCheck.len);
@@ -88,6 +90,7 @@ void ir_opt_add_operands(Array<irValue *> *ops, irInstr *i) {
 		array_add(ops, i->SliceBoundsCheck.low);
 		array_add(ops, i->SliceBoundsCheck.high);
 		break;
+	#endif
 	}
 }
 

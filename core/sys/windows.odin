@@ -285,164 +285,164 @@ const (
 )
 
 foreign kernel32 {
-	proc get_last_error     () -> i32                                                                                       #cc_c #link_name "GetLastError";
-	proc exit_process       (exit_code: u32)                                                                                #cc_c #link_name "ExitProcess";
-	proc get_module_handle_a(module_name: ^u8) -> Hinstance                                                                 #cc_c #link_name "GetModuleHandleA";
-	proc sleep(ms: i32) -> i32                                                                                              #cc_c #link_name "Sleep";
-	proc query_performance_frequency(result: ^i64) -> i32                                                                   #cc_c #link_name "QueryPerformanceFrequency";
-	proc query_performance_counter  (result: ^i64) -> i32                                                                   #cc_c #link_name "QueryPerformanceCounter";
-	proc output_debug_string_a(c_str: ^u8)                                                                                  #cc_c #link_name "OutputDebugStringA";
+	proc get_last_error     () -> i32                                                                                       #cc_std #link_name "GetLastError";
+	proc exit_process       (exit_code: u32)                                                                                #cc_std #link_name "ExitProcess";
+	proc get_module_handle_a(module_name: ^u8) -> Hinstance                                                                 #cc_std #link_name "GetModuleHandleA";
+	proc sleep(ms: i32) -> i32                                                                                              #cc_std #link_name "Sleep";
+	proc query_performance_frequency(result: ^i64) -> i32                                                                   #cc_std #link_name "QueryPerformanceFrequency";
+	proc query_performance_counter  (result: ^i64) -> i32                                                                   #cc_std #link_name "QueryPerformanceCounter";
+	proc output_debug_string_a(c_str: ^u8)                                                                                  #cc_std #link_name "OutputDebugStringA";
 
-	proc get_command_line_a    () -> ^u8                                                                                    #cc_c #link_name "GetCommandLineA";
-	proc get_command_line_w    () -> ^u16                                                                                   #cc_c #link_name "GetCommandLineW";
-	proc get_system_metrics    (index: i32) -> i32                                                                          #cc_c #link_name "GetSystemMetrics";
-	proc get_current_thread_id () -> u32                                                                                    #cc_c #link_name "GetCurrentThreadId";
+	proc get_command_line_a    () -> ^u8                                                                                    #cc_std #link_name "GetCommandLineA";
+	proc get_command_line_w    () -> ^u16                                                                                   #cc_std #link_name "GetCommandLineW";
+	proc get_system_metrics    (index: i32) -> i32                                                                          #cc_std #link_name "GetSystemMetrics";
+	proc get_current_thread_id () -> u32                                                                                    #cc_std #link_name "GetCurrentThreadId";
 
-	proc get_system_time_as_file_time(system_time_as_file_time: ^Filetime)                                                  #cc_c #link_name "GetSystemTimeAsFileTime";
-	proc file_time_to_local_file_time(file_time: ^Filetime, local_file_time: ^Filetime) -> Bool                             #cc_c #link_name "FileTimeToLocalFileTime";
-	proc file_time_to_system_time    (file_time: ^Filetime, system_time: ^Systemtime) -> Bool                               #cc_c #link_name "FileTimeToSystemTime";
-	proc system_time_to_file_time    (system_time: ^Systemtime, file_time: ^Filetime) -> Bool                               #cc_c #link_name "SystemTimeToFileTime";
+	proc get_system_time_as_file_time(system_time_as_file_time: ^Filetime)                                                  #cc_std #link_name "GetSystemTimeAsFileTime";
+	proc file_time_to_local_file_time(file_time: ^Filetime, local_file_time: ^Filetime) -> Bool                             #cc_std #link_name "FileTimeToLocalFileTime";
+	proc file_time_to_system_time    (file_time: ^Filetime, system_time: ^Systemtime) -> Bool                               #cc_std #link_name "FileTimeToSystemTime";
+	proc system_time_to_file_time    (system_time: ^Systemtime, file_time: ^Filetime) -> Bool                               #cc_std #link_name "SystemTimeToFileTime";
 
-	proc close_handle  (h: Handle) -> i32                                                                                   #cc_c #link_name "CloseHandle";
-	proc get_std_handle(h: i32) -> Handle                                                                                   #cc_c #link_name "GetStdHandle";
+	proc close_handle  (h: Handle) -> i32                                                                                   #cc_std #link_name "CloseHandle";
+	proc get_std_handle(h: i32) -> Handle                                                                                   #cc_std #link_name "GetStdHandle";
 	proc create_file_a (filename: ^u8, desired_access, share_mode: u32,
 	                       security: rawptr,
-	                       creation, flags_and_attribs: u32, template_file: Handle) -> Handle                               #cc_c #link_name "CreateFileA";
-	proc read_file (h: Handle, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> Bool                     #cc_c #link_name "ReadFile";
-	proc write_file(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool                     #cc_c #link_name "WriteFile";
+	                       creation, flags_and_attribs: u32, template_file: Handle) -> Handle                               #cc_std #link_name "CreateFileA";
+	proc read_file (h: Handle, buf: rawptr, to_read: u32, bytes_read: ^i32, overlapped: rawptr) -> Bool                     #cc_std #link_name "ReadFile";
+	proc write_file(h: Handle, buf: rawptr, len: i32, written_result: ^i32, overlapped: rawptr) -> Bool                     #cc_std #link_name "WriteFile";
 
-	proc get_file_size_ex              (file_handle: Handle, file_size: ^i64) -> Bool                                       #cc_c #link_name "GetFileSizeEx";
-	proc get_file_attributes_a         (filename: ^u8) -> u32                                                               #cc_c #link_name "GetFileAttributesA";
-	proc get_file_attributes_ex_a      (filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool    #cc_c #link_name "GetFileAttributesExA";
-	proc get_file_information_by_handle(file_handle: Handle, file_info: ^ByHandleFileInformation) -> Bool                   #cc_c #link_name "GetFileInformationByHandle";
+	proc get_file_size_ex              (file_handle: Handle, file_size: ^i64) -> Bool                                       #cc_std #link_name "GetFileSizeEx";
+	proc get_file_attributes_a         (filename: ^u8) -> u32                                                               #cc_std #link_name "GetFileAttributesA";
+	proc get_file_attributes_ex_a      (filename: ^u8, info_level_id: GET_FILEEX_INFO_LEVELS, file_info: rawptr) -> Bool    #cc_std #link_name "GetFileAttributesExA";
+	proc get_file_information_by_handle(file_handle: Handle, file_info: ^ByHandleFileInformation) -> Bool                   #cc_std #link_name "GetFileInformationByHandle";
 
-	proc get_file_type   (file_handle: Handle) -> u32                                                                       #cc_c #link_name "GetFileType";
-	proc set_file_pointer(file_handle: Handle, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 #cc_c #link_name "SetFilePointer";
+	proc get_file_type   (file_handle: Handle) -> u32                                                                       #cc_std #link_name "GetFileType";
+	proc set_file_pointer(file_handle: Handle, distance_to_move: i32, distance_to_move_high: ^i32, move_method: u32) -> u32 #cc_std #link_name "SetFilePointer";
 
-	proc set_handle_information(obj: Handle, mask, flags: u32) -> Bool                                                      #cc_c #link_name "SetHandleInformation";
+	proc set_handle_information(obj: Handle, mask, flags: u32) -> Bool                                                      #cc_std #link_name "SetHandleInformation";
 
-	proc find_first_file_a(file_name : ^u8, data : ^FindData) -> Handle                                                     #cc_c #link_name "FindFirstFileA";
-	proc find_next_file_a (file : Handle, data : ^FindData) -> Bool                                                         #cc_c #link_name "FindNextFileA";
-	proc find_close       (file : Handle) -> Bool                                                                           #cc_c #link_name "FindClose";
-
-
-	proc heap_alloc      (h: Handle, flags: u32, bytes: int) -> rawptr                                                      #cc_c #link_name "HeapAlloc";
-	proc heap_realloc    (h: Handle, flags: u32, memory: rawptr, bytes: int) -> rawptr                                      #cc_c #link_name "HeapReAlloc";
-	proc heap_free       (h: Handle, flags: u32, memory: rawptr) -> Bool                                                    #cc_c #link_name "HeapFree";
-	proc get_process_heap() -> Handle                                                                                       #cc_c #link_name "GetProcessHeap";
+	proc find_first_file_a(file_name : ^u8, data : ^FindData) -> Handle                                                     #cc_std #link_name "FindFirstFileA";
+	proc find_next_file_a (file : Handle, data : ^FindData) -> Bool                                                         #cc_std #link_name "FindNextFileA";
+	proc find_close       (file : Handle) -> Bool                                                                           #cc_std #link_name "FindClose";
 
 
-	proc create_semaphore_a    (attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^u8) -> Handle   #cc_c #link_name "CreateSemaphoreA";
-	proc release_semaphore     (semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool                        #cc_c #link_name "ReleaseSemaphore";
-	proc wait_for_single_object(handle: Handle, milliseconds: u32) -> u32                                                   #cc_c #link_name "WaitForSingleObject";
+	proc heap_alloc      (h: Handle, flags: u32, bytes: int) -> rawptr                                                      #cc_std #link_name "HeapAlloc";
+	proc heap_realloc    (h: Handle, flags: u32, memory: rawptr, bytes: int) -> rawptr                                      #cc_std #link_name "HeapReAlloc";
+	proc heap_free       (h: Handle, flags: u32, memory: rawptr) -> Bool                                                    #cc_std #link_name "HeapFree";
+	proc get_process_heap() -> Handle                                                                                       #cc_std #link_name "GetProcessHeap";
 
 
-	proc interlocked_compare_exchange  (dst: ^i32, exchange, comparand: i32) -> i32                                         #cc_c #link_name "InterlockedCompareExchange";
-	proc interlocked_exchange          (dst: ^i32, desired: i32) -> i32                                                     #cc_c #link_name "InterlockedExchange";
-	proc interlocked_exchange_add      (dst: ^i32, desired: i32) -> i32                                                     #cc_c #link_name "InterlockedExchangeAdd";
-	proc interlocked_and               (dst: ^i32, desired: i32) -> i32                                                     #cc_c #link_name "InterlockedAnd";
-	proc interlocked_or                (dst: ^i32, desired: i32) -> i32                                                     #cc_c #link_name "InterlockedOr";
-
-	proc interlocked_compare_exchange64(dst: ^i64, exchange, comparand: i64) -> i64                                         #cc_c #link_name "InterlockedCompareExchange64";
-	proc interlocked_exchange64        (dst: ^i64, desired: i64) -> i64                                                     #cc_c #link_name "InterlockedExchange64";
-	proc interlocked_exchange_add64    (dst: ^i64, desired: i64) -> i64                                                     #cc_c #link_name "InterlockedExchangeAdd64";
-	proc interlocked_and64             (dst: ^i64, desired: i64) -> i64                                                     #cc_c #link_name "InterlockedAnd64";
-	proc interlocked_or64              (dst: ^i64, desired: i64) -> i64                                                     #cc_c #link_name "InterlockedOr64";
-
-	proc mm_pause          ()                                                                                               #cc_c #link_name "_mm_pause";
-	proc read_write_barrier()                                                                                               #cc_c #link_name "ReadWriteBarrier";
-	proc write_barrier     ()                                                                                               #cc_c #link_name "WriteBarrier";
-	proc read_barrier      ()                                                                                               #cc_c #link_name "ReadBarrier";
+	proc create_semaphore_a    (attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^u8) -> Handle   #cc_std #link_name "CreateSemaphoreA";
+	proc release_semaphore     (semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool                        #cc_std #link_name "ReleaseSemaphore";
+	proc wait_for_single_object(handle: Handle, milliseconds: u32) -> u32                                                   #cc_std #link_name "WaitForSingleObject";
 
 
-	proc load_library_a  (c_str: ^u8) -> Hmodule                                                                            #cc_c #link_name "LoadLibraryA";
-	proc free_library    (h: Hmodule)                                                                                       #cc_c #link_name "FreeLibrary";
-	proc get_proc_address(h: Hmodule, c_str: ^u8) -> Proc                                                                   #cc_c #link_name "GetProcAddress";
+	proc interlocked_compare_exchange  (dst: ^i32, exchange, comparand: i32) -> i32                                         #cc_std #link_name "InterlockedCompareExchange";
+	proc interlocked_exchange          (dst: ^i32, desired: i32) -> i32                                                     #cc_std #link_name "InterlockedExchange";
+	proc interlocked_exchange_add      (dst: ^i32, desired: i32) -> i32                                                     #cc_std #link_name "InterlockedExchangeAdd";
+	proc interlocked_and               (dst: ^i32, desired: i32) -> i32                                                     #cc_std #link_name "InterlockedAnd";
+	proc interlocked_or                (dst: ^i32, desired: i32) -> i32                                                     #cc_std #link_name "InterlockedOr";
+
+	proc interlocked_compare_exchange64(dst: ^i64, exchange, comparand: i64) -> i64                                         #cc_std #link_name "InterlockedCompareExchange64";
+	proc interlocked_exchange64        (dst: ^i64, desired: i64) -> i64                                                     #cc_std #link_name "InterlockedExchange64";
+	proc interlocked_exchange_add64    (dst: ^i64, desired: i64) -> i64                                                     #cc_std #link_name "InterlockedExchangeAdd64";
+	proc interlocked_and64             (dst: ^i64, desired: i64) -> i64                                                     #cc_std #link_name "InterlockedAnd64";
+	proc interlocked_or64              (dst: ^i64, desired: i64) -> i64                                                     #cc_std #link_name "InterlockedOr64";
+
+	proc mm_pause          ()                                                                                               #cc_std #link_name "_mm_pause";
+	proc read_write_barrier()                                                                                               #cc_std #link_name "ReadWriteBarrier";
+	proc write_barrier     ()                                                                                               #cc_std #link_name "WriteBarrier";
+	proc read_barrier      ()                                                                                               #cc_std #link_name "ReadBarrier";
+
+
+	proc load_library_a  (c_str: ^u8) -> Hmodule                                                                            #cc_std #link_name "LoadLibraryA";
+	proc free_library    (h: Hmodule)                                                                                       #cc_std #link_name "FreeLibrary";
+	proc get_proc_address(h: Hmodule, c_str: ^u8) -> Proc                                                                   #cc_std #link_name "GetProcAddress";
 
 }
 
 foreign user32 {
-	proc get_desktop_window   () -> Hwnd                                                                    #cc_c #link_name "GetDesktopWindow";
-	proc show_cursor          (show : Bool)                                                                 #cc_c #link_name "ShowCursor";
-	proc get_cursor_pos       (p: ^Point) -> i32                                                            #cc_c #link_name "GetCursorPos";
-	proc screen_to_client     (h: Hwnd, p: ^Point) -> i32                                                   #cc_c #link_name "ScreenToClient";
-	proc post_quit_message    (exit_code: i32)                                                              #cc_c #link_name "PostQuitMessage";
-	proc set_window_text_a    (hwnd: Hwnd, c_string: ^u8) -> Bool                                           #cc_c #link_name "SetWindowTextA";
-	proc register_class_ex_a  (wc: ^WndClassExA) -> i16                                                     #cc_c #link_name "RegisterClassExA";
+	proc get_desktop_window   () -> Hwnd                                                                    #cc_std #link_name "GetDesktopWindow";
+	proc show_cursor          (show : Bool)                                                                 #cc_std #link_name "ShowCursor";
+	proc get_cursor_pos       (p: ^Point) -> i32                                                            #cc_std #link_name "GetCursorPos";
+	proc screen_to_client     (h: Hwnd, p: ^Point) -> i32                                                   #cc_std #link_name "ScreenToClient";
+	proc post_quit_message    (exit_code: i32)                                                              #cc_std #link_name "PostQuitMessage";
+	proc set_window_text_a    (hwnd: Hwnd, c_string: ^u8) -> Bool                                           #cc_std #link_name "SetWindowTextA";
+	proc register_class_ex_a  (wc: ^WndClassExA) -> i16                                                     #cc_std #link_name "RegisterClassExA";
 
 	proc create_window_ex_a   (ex_style: u32,
                                class_name, title: ^u8,
                                style: u32,
                                x, y, w, h: i32,
                                parent: Hwnd, menu: Hmenu, instance: Hinstance,
-                               param: rawptr) -> Hwnd                                                       #cc_c #link_name "CreateWindowExA";
+                               param: rawptr) -> Hwnd                                                       #cc_std #link_name "CreateWindowExA";
 
-	proc show_window          (hwnd: Hwnd, cmd_show: i32) -> Bool                                           #cc_c #link_name "ShowWindow";
-	proc translate_message    (msg: ^Msg) -> Bool                                                           #cc_c #link_name "TranslateMessage";
-	proc dispatch_message_a   (msg: ^Msg) -> Lresult                                                        #cc_c #link_name "DispatchMessageA";
-	proc update_window        (hwnd: Hwnd) -> Bool                                                          #cc_c #link_name "UpdateWindow";
-	proc get_message_a        (msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max : u32) -> Bool         #cc_c #link_name "GetMessageA";
+	proc show_window          (hwnd: Hwnd, cmd_show: i32) -> Bool                                           #cc_std #link_name "ShowWindow";
+	proc translate_message    (msg: ^Msg) -> Bool                                                           #cc_std #link_name "TranslateMessage";
+	proc dispatch_message_a   (msg: ^Msg) -> Lresult                                                        #cc_std #link_name "DispatchMessageA";
+	proc update_window        (hwnd: Hwnd) -> Bool                                                          #cc_std #link_name "UpdateWindow";
+	proc get_message_a        (msg: ^Msg, hwnd: Hwnd, msg_filter_min, msg_filter_max : u32) -> Bool         #cc_std #link_name "GetMessageA";
 	proc peek_message_a       (msg: ^Msg, hwnd: Hwnd,
-	                           msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool                     #cc_c #link_name "PeekMessageA";
+	                           msg_filter_min, msg_filter_max, remove_msg: u32) -> Bool                     #cc_std #link_name "PeekMessageA";
 
 
-	proc post_message         (hwnd: Hwnd, msg, wparam, lparam : u32) -> Bool                               #cc_c #link_name "PostMessageA";
+	proc post_message         (hwnd: Hwnd, msg, wparam, lparam : u32) -> Bool                               #cc_std #link_name "PostMessageA";
 
-	proc def_window_proc_a    (hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult             #cc_c #link_name "DefWindowProcA";
+	proc def_window_proc_a    (hwnd: Hwnd, msg: u32, wparam: Wparam, lparam: Lparam) -> Lresult             #cc_std #link_name "DefWindowProcA";
 
-	proc adjust_window_rect   (rect: ^Rect, style: u32, menu: Bool) -> Bool                                 #cc_c #link_name "AdjustWindowRect";
-	proc get_active_window    () -> Hwnd                                                                    #cc_c #link_name "GetActiveWindow";
+	proc adjust_window_rect   (rect: ^Rect, style: u32, menu: Bool) -> Bool                                 #cc_std #link_name "AdjustWindowRect";
+	proc get_active_window    () -> Hwnd                                                                    #cc_std #link_name "GetActiveWindow";
 
-	proc destroy_window       (wnd: Hwnd) -> Bool                                                           #cc_c #link_name "DestroyWindow";
-	proc describe_pixel_format(dc: Hdc, pixel_format: i32, bytes : u32, pfd: ^PixelFormatDescriptor) -> i32 #cc_c #link_name "DescribePixelFormat";
+	proc destroy_window       (wnd: Hwnd) -> Bool                                                           #cc_std #link_name "DestroyWindow";
+	proc describe_pixel_format(dc: Hdc, pixel_format: i32, bytes : u32, pfd: ^PixelFormatDescriptor) -> i32 #cc_std #link_name "DescribePixelFormat";
 
-	proc get_monitor_info_a   (monitor: Hmonitor, mi: ^MonitorInfo) -> Bool                                 #cc_c #link_name "GetMonitorInfoA";
-	proc monitor_from_window  (wnd: Hwnd, flags : u32) -> Hmonitor                                          #cc_c #link_name "MonitorFromWindow";
+	proc get_monitor_info_a   (monitor: Hmonitor, mi: ^MonitorInfo) -> Bool                                 #cc_std #link_name "GetMonitorInfoA";
+	proc monitor_from_window  (wnd: Hwnd, flags : u32) -> Hmonitor                                          #cc_std #link_name "MonitorFromWindow";
 
-	proc set_window_pos       (wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height: i32, flags: u32)       #cc_c #link_name "SetWindowPos";
+	proc set_window_pos       (wnd: Hwnd, wndInsertAfter: Hwnd, x, y, width, height: i32, flags: u32)       #cc_std #link_name "SetWindowPos";
 
-	proc get_window_placement (wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool                                  #cc_c #link_name "GetWindowPlacement";
-	proc set_window_placement (wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool                                  #cc_c #link_name "SetWindowPlacement";
-	proc get_window_rect      (wnd: Hwnd, rect: ^Rect) -> Bool                                              #cc_c #link_name "GetWindowRect";
+	proc get_window_placement (wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool                                  #cc_std #link_name "GetWindowPlacement";
+	proc set_window_placement (wnd: Hwnd, wndpl: ^WindowPlacement) -> Bool                                  #cc_std #link_name "SetWindowPlacement";
+	proc get_window_rect      (wnd: Hwnd, rect: ^Rect) -> Bool                                              #cc_std #link_name "GetWindowRect";
 
-	proc get_window_long_ptr_a(wnd: Hwnd, index: i32) -> i64                                                #cc_c #link_name "GetWindowLongPtrA";
-	proc set_window_long_ptr_a(wnd: Hwnd, index: i32, new: i64) -> i64                                      #cc_c #link_name "SetWindowLongPtrA";
+	proc get_window_long_ptr_a(wnd: Hwnd, index: i32) -> i64                                                #cc_std #link_name "GetWindowLongPtrA";
+	proc set_window_long_ptr_a(wnd: Hwnd, index: i32, new: i64) -> i64                                      #cc_std #link_name "SetWindowLongPtrA";
 
-	proc get_window_text      (wnd: Hwnd, str: ^u8, maxCount: i32) -> i32                                   #cc_c #link_name "GetWindowText";
+	proc get_window_text      (wnd: Hwnd, str: ^u8, maxCount: i32) -> i32                                   #cc_std #link_name "GetWindowText";
 
-	proc get_client_rect (hwnd: Hwnd, rect: ^Rect) -> Bool                                                  #cc_c #link_name "GetClientRect";
+	proc get_client_rect (hwnd: Hwnd, rect: ^Rect) -> Bool                                                  #cc_std #link_name "GetClientRect";
 
-	proc get_dc             (h: Hwnd) -> Hdc                                                                #cc_c #link_name "GetDC";
-	proc release_dc         (wnd: Hwnd, hdc: Hdc) -> i32                                                    #cc_c #link_name "ReleaseDC";
+	proc get_dc             (h: Hwnd) -> Hdc                                                                #cc_std #link_name "GetDC";
+	proc release_dc         (wnd: Hwnd, hdc: Hdc) -> i32                                                    #cc_std #link_name "ReleaseDC";
 
-	proc map_virtual_key(scancode : u32, map_type : u32) -> u32                                             #cc_c #link_name "MapVirtualKeyA";
+	proc map_virtual_key(scancode : u32, map_type : u32) -> u32                                             #cc_std #link_name "MapVirtualKeyA";
 
-	proc get_key_state      (v_key: i32) -> i16                                                             #cc_c #link_name "GetKeyState";
-	proc get_async_key_state(v_key: i32) -> i16                                                             #cc_c #link_name "GetAsyncKeyState";
+	proc get_key_state      (v_key: i32) -> i16                                                             #cc_std #link_name "GetKeyState";
+	proc get_async_key_state(v_key: i32) -> i16                                                             #cc_std #link_name "GetAsyncKeyState";
 }
 
 foreign gdi32 {
-	proc get_stock_object(fn_object: i32) -> Hgdiobj                                           #cc_c #link_name "GetStockObject";
+	proc get_stock_object(fn_object: i32) -> Hgdiobj                                           #cc_std #link_name "GetStockObject";
 
 	proc stretch_dibits( hdc: Hdc,
 	                        x_dst, y_dst, width_dst, height_dst: i32,
 	                        x_src, y_src, width_src, header_src: i32,
 	                        bits: rawptr, bits_info: ^BitmapInfo,
 	                        usage: u32,
-	                        rop: u32) -> i32                                                   #cc_c #link_name "StretchDIBits";
+	                        rop: u32) -> i32                                                   #cc_std #link_name "StretchDIBits";
 
-	proc set_pixel_format   (hdc: Hdc, pixel_format: i32, pfd: ^PixelFormatDescriptor) -> Bool #cc_c #link_name "SetPixelFormat";
-	proc choose_pixel_format(hdc: Hdc, pfd: ^PixelFormatDescriptor) -> i32                     #cc_c #link_name "ChoosePixelFormat";
-	proc swap_buffers       (hdc: Hdc) -> Bool                                                 #cc_c #link_name "SwapBuffers";
+	proc set_pixel_format   (hdc: Hdc, pixel_format: i32, pfd: ^PixelFormatDescriptor) -> Bool #cc_std #link_name "SetPixelFormat";
+	proc choose_pixel_format(hdc: Hdc, pfd: ^PixelFormatDescriptor) -> i32                     #cc_std #link_name "ChoosePixelFormat";
+	proc swap_buffers       (hdc: Hdc) -> Bool                                                 #cc_std #link_name "SwapBuffers";
 
 }
 
 foreign shell32 {
-	proc command_line_to_argv_w(cmd_list: ^u16, num_args: ^i32) -> ^^u16 #cc_c #link_name "CommandLineToArgvW";
+	proc command_line_to_argv_w(cmd_list: ^u16, num_args: ^i32) -> ^^u16 #cc_std #link_name "CommandLineToArgvW";
 }
 
 foreign winmm {
-	proc time_get_time() -> u32 #cc_c #link_name "timeGetTime";
+	proc time_get_time() -> u32 #cc_std #link_name "timeGetTime";
 }
 
 

@@ -1276,9 +1276,14 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 		// SEE: https://msdn.microsoft.com/en-us/library/zthk2dkh.aspx
 		Type *bt = core_type(original_type);
 		switch (bt->kind) {
-		// Okay to pass by value
+		// Okay to pass by value (usually)
 		// Especially the only Odin types
-		case Type_Basic:   break;
+		case Type_Basic: {
+			i64 sz = bt->Basic.size;
+			if (sz > 8 && build_context.word_size < 8) {
+				new_type = make_type_pointer(a, original_type);
+			}
+		} break;
 		case Type_Pointer: break;
 		case Type_Proc:    break; // NOTE(bill): Just a pointer
 
@@ -1306,12 +1311,18 @@ Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 			}
 		} break;
 		}
-	} else if (build_context.ODIN_OS == "linux") {
+	} else if (build_context.ODIN_OS == "linux" ||
+	           build_context.ODIN_OS == "osx") {
 		Type *bt = core_type(original_type);
 		switch (bt->kind) {
-		// Okay to pass by value
+		// Okay to pass by value (usually)
 		// Especially the only Odin types
-		case Type_Basic:   break;
+		case Type_Basic: {
+			i64 sz = bt->Basic.size;
+			if (sz > 8 && build_context.word_size < 8) {
+				new_type = make_type_pointer(a, original_type);
+			}
+		} break;
 		case Type_Pointer: break;
 		case Type_Proc:    break; // NOTE(bill): Just a pointer
 
@@ -1735,9 +1746,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 
 	{
 		// NOTE(bill): The preload types may have not been set yet
-		if (t_map_key == NULL) {
-			init_preload(c);
-		}
+		init_preload(c);
 		GB_ASSERT(t_map_key != NULL);
 
 		Type *entry_type = make_type_struct(a);
