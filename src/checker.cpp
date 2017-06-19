@@ -1438,23 +1438,23 @@ bool check_arity_match(Checker *c, AstNodeValueSpec *spec) {
 
 	if (rhs == 0) {
 		if (spec->type == NULL) {
-			error_node(spec->names[0], "Missing type or initial expression");
+			error(spec->names[0], "Missing type or initial expression");
 			return false;
 		}
 	} else if (lhs < rhs) {
 		if (lhs < spec->values.count) {
 			AstNode *n = spec->values[lhs];
 			gbString str = expr_to_string(n);
-			error_node(n, "Extra initial expression `%s`", str);
+			error(n, "Extra initial expression `%s`", str);
 			gb_string_free(str);
 		} else {
-			error_node(spec->names[0], "Extra initial expression");
+			error(spec->names[0], "Extra initial expression");
 		}
 		return false;
 	} else if (lhs > rhs && rhs != 1) {
 		AstNode *n = spec->names[rhs];
 		gbString str = expr_to_string(n);
-		error_node(n, "Missing expression for `%s`", str);
+		error(n, "Missing expression for `%s`", str);
 		gb_string_free(str);
 		return false;
 	}
@@ -1466,13 +1466,13 @@ void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, bool
 	Operand operand = {Addressing_Invalid};
 	check_expr(c, &operand, ws->cond);
 	if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-		error_node(ws->cond, "Non-boolean condition in `when` statement");
+		error(ws->cond, "Non-boolean condition in `when` statement");
 	}
 	if (operand.mode != Addressing_Constant) {
-		error_node(ws->cond, "Non-constant condition in `when` statement");
+		error(ws->cond, "Non-constant condition in `when` statement");
 	}
 	if (ws->body == NULL || ws->body->kind != AstNode_BlockStmt) {
-		error_node(ws->cond, "Invalid body for `when` statement");
+		error(ws->cond, "Invalid body for `when` statement");
 	} else {
 		if (operand.value.kind == ExactValue_Bool &&
 		    operand.value.value_bool) {
@@ -1486,7 +1486,7 @@ void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, bool
 				check_collect_entities_from_when_stmt(c, &ws->else_stmt->WhenStmt, is_file_scope);
 				break;
 			default:
-				error_node(ws->else_stmt, "Invalid `else` statement in `when` statement");
+				error(ws->else_stmt, "Invalid `else` statement in `when` statement");
 				break;
 			}
 		}
@@ -1514,7 +1514,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 
 		case_ast_node(ws, WhenStmt, decl);
 			if (c->context.scope->is_file) {
-				error_node(decl, "`when` statements are not allowed at file scope");
+				error(decl, "`when` statements are not allowed at file scope");
 			} else {
 				// Will be handled later
 			}
@@ -1538,7 +1538,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					for_array(i, vs->names) {
 						AstNode *name = vs->names[i];
 						if (name->kind != AstNode_Ident) {
-							error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+							error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 							continue;
 						}
 
@@ -1580,7 +1580,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 
 
 						if (gd->flags & VarDeclFlag_thread_local) {
-							error_node(decl, "#thread_local variable declarations cannot have initialization values");
+							error(decl, "#thread_local variable declarations cannot have initialization values");
 						}
 					}
 
@@ -1592,7 +1592,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 							value = vs->values[i];
 						}
 						if (name->kind != AstNode_Ident) {
-							error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+							error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 							continue;
 						}
 						Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL, gd->token.kind == Token_let);
@@ -1601,7 +1601,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 
 						if (gd->flags & VarDeclFlag_using) {
 							gd->flags &= ~VarDeclFlag_using; // NOTE(bill): This error will be only caught once
-							error_node(name, "`using` is not allowed at the file scope");
+							error(name, "`using` is not allowed at the file scope");
 						}
 
 						AstNode *fl = c->context.curr_foreign_library;
@@ -1636,7 +1636,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 
 					AstNode *name = ts->name;
 					if (name->kind != AstNode_Ident) {
-						error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+						error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 						break;
 					}
 
@@ -1658,9 +1658,9 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					ast_node(ts, ImportSpec, spec);
 					if (!c->context.scope->is_file) {
 						if (ts->is_import) {
-							error_node(decl, "import declarations are only allowed in the file scope");
+							error(decl, "import declarations are only allowed in the file scope");
 						} else {
-							error_node(decl, "import_load declarations are only allowed in the file scope");
+							error(decl, "import_load declarations are only allowed in the file scope");
 						}
 						// NOTE(bill): _Should_ be caught by the parser
 						// TODO(bill): Better error handling if it isn't
@@ -1675,9 +1675,9 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					ast_node(fl, ForeignLibrarySpec, spec);
 					if (!c->context.scope->is_file) {
 						if (fl->is_system) {
-							error_node(spec, "foreign_system_library declarations are only allowed in the file scope");
+							error(spec, "foreign_system_library declarations are only allowed in the file scope");
 						} else {
-							error_node(spec, "foreign_library declarations are only allowed in the file scope");
+							error(spec, "foreign_library declarations are only allowed in the file scope");
 						}
 						// NOTE(bill): _Should_ be caught by the parser
 						// TODO(bill): Better error handling if it isn't
@@ -1688,7 +1688,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 						Operand operand = {Addressing_Invalid};
 						check_expr(c, &operand, fl->cond);
 						if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
-							error_node(fl->cond, "Non-constant boolean `when` condition");
+							error(fl->cond, "Non-constant boolean `when` condition");
 							continue;
 						}
 						if (operand.value.kind == ExactValue_Bool &&
@@ -1707,7 +1707,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 		case_ast_node(fb, ForeignBlockDecl, decl);
 			AstNode *foreign_library = fb->foreign_library;
 			if (foreign_library->kind != AstNode_Ident) {
-				error_node(foreign_library, "foreign library name must be an identifier");
+				error(foreign_library, "foreign library name must be an identifier");
 				foreign_library = NULL;
 			}
 
@@ -1720,7 +1720,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 		case_ast_node(pd, ProcDecl, decl);
 			AstNode *name = pd->name;
 			if (name->kind != AstNode_Ident) {
-				error_node(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+				error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 				break;
 			}
 
@@ -1743,7 +1743,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 
 		default:
 			if (c->context.scope->is_file) {
-				error_node(decl, "Only declarations are allowed at file scope");
+				error(decl, "Only declarations are allowed at file scope");
 			}
 			break;
 		}
@@ -2011,7 +2011,7 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 			Operand operand = {Addressing_Invalid};
 			check_expr(c, &operand, id->cond);
 			if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
-				error_node(id->cond, "Non-constant boolean `when` condition");
+				error(id->cond, "Non-constant boolean `when` condition");
 				continue;
 			}
 			if (operand.value.kind == ExactValue_Bool &&
@@ -2104,7 +2104,7 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 			Operand operand = {Addressing_Invalid};
 			check_expr(c, &operand, fl->cond);
 			if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
-				error_node(fl->cond, "Non-constant boolean `when` condition");
+				error(fl->cond, "Non-constant boolean `when` condition");
 				continue;
 			}
 			if (operand.value.kind == ExactValue_Bool &&
@@ -2116,7 +2116,7 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 
 		String library_name = path_to_entity_name(fl->library_name.string, file_str);
 		if (library_name == "_") {
-			error_node(spec, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
+			error(spec, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
 		} else {
 			GB_ASSERT(fl->library_name.pos.line != 0);
 			fl->library_name.string = library_name;

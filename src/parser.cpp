@@ -34,6 +34,7 @@ struct AstFile {
 	// NOTE(bill): Used to prevent type literals in control clauses
 	isize          expr_level;
 	bool           allow_range; // NOTE(bill): Ranges are only allowed in certain cases
+	bool           in_foreign_block;
 
 	Array<AstNode *> decls;
 	bool             is_global_scope;
@@ -90,12 +91,11 @@ enum ProcTag {
 };
 
 enum ProcCallingConvention {
-	ProcCC_Odin = 0,
-	ProcCC_C    = 1,
-	ProcCC_Std  = 2,
-	ProcCC_Fast = 3,
-
-	ProcCC_Invalid,
+	ProcCC_Invalid = 0,
+	ProcCC_Odin    = 1,
+	ProcCC_C       = 2,
+	ProcCC_Std     = 3,
+	ProcCC_Fast    = 4,
 };
 
 enum VarDeclFlag {
@@ -861,21 +861,21 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 }
 
 
-void error_node(AstNode *node, char *fmt, ...) {
+void error(AstNode *node, char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	error_va(ast_node_token(node), fmt, va);
 	va_end(va);
 }
 
-void warning_node(AstNode *node, char *fmt, ...) {
+void warning(AstNode *node, char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	warning_va(ast_node_token(node), fmt, va);
 	va_end(va);
 }
 
-void syntax_error_node(AstNode *node, char *fmt, ...) {
+void syntax_error(AstNode *node, char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	syntax_error_va(ast_node_token(node), fmt, va);
@@ -885,7 +885,7 @@ void syntax_error_node(AstNode *node, char *fmt, ...) {
 
 bool ast_node_expect(AstNode *node, AstNodeKind kind) {
 	if (node->kind != kind) {
-		error_node(node, "Expected %.*s, got %.*s", LIT(ast_node_strings[node->kind]));
+		error(node, "Expected %.*s, got %.*s", LIT(ast_node_strings[node->kind]));
 		return false;
 	}
 	return true;
@@ -1980,7 +1980,7 @@ AstNode *parse_type_or_ident(AstFile *f);
 
 void check_proc_add_tag(AstFile *f, AstNode *tag_expr, u64 *tags, ProcTag tag, String tag_name) {
 	if (*tags & tag) {
-		syntax_error_node(tag_expr, "Procedure tag already used: %.*s", LIT(tag_name));
+		syntax_error(tag_expr, "Procedure tag already used: %.*s", LIT(tag_name));
 	}
 	*tags |= tag;
 }
@@ -2056,7 +2056,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *link_name, ProcCallingConven
 				*link_name = f->curr_token.string;
 				// TODO(bill): Check if valid string
 				if (!is_foreign_name_valid(*link_name)) {
-					syntax_error_node(tag_expr, "Invalid alternative link procedure name `%.*s`", LIT(*link_name));
+					syntax_error(tag_expr, "Invalid alternative link procedure name `%.*s`", LIT(*link_name));
 				}
 
 				next_token(f);
@@ -2076,35 +2076,35 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *link_name, ProcCallingConven
 			if (cc == ProcCC_Invalid) {
 				cc = ProcCC_Odin;
 			} else {
-				syntax_error_node(tag_expr, "Multiple calling conventions for procedure type");
+				syntax_error(tag_expr, "Multiple calling conventions for procedure type");
 			}
 		} else if (tag_name == "cc_c") {
 			if (cc == ProcCC_Invalid) {
 				cc = ProcCC_C;
 			} else {
-				syntax_error_node(tag_expr, "Multiple calling conventions for procedure type");
+				syntax_error(tag_expr, "Multiple calling conventions for procedure type");
 			}
 		} else if (tag_name == "cc_std") {
 			if (cc == ProcCC_Invalid) {
 				cc = ProcCC_Std;
 			} else {
-				syntax_error_node(tag_expr, "Multiple calling conventions for procedure type");
+				syntax_error(tag_expr, "Multiple calling conventions for procedure type");
 			}
 		} else if (tag_name == "cc_fast") {
 			if (cc == ProcCC_Invalid) {
 				cc = ProcCC_Fast;
 			} else {
-				syntax_error_node(tag_expr, "Multiple calling conventions for procedure type");
+				syntax_error(tag_expr, "Multiple calling conventions for procedure type");
 			}
 		} else {
-			syntax_error_node(tag_expr, "Unknown procedure tag #%.*s\n", LIT(tag_name));
+			syntax_error(tag_expr, "Unknown procedure tag #%.*s\n", LIT(tag_name));
 		}
 
 		#undef ELSE_IF_ADD_TAG
 	}
 
 	if (cc == ProcCC_Invalid) {
-		if ((*tags) & ProcTag_foreign) {
+		if ((*tags) & ProcTag_foreign || f->in_foreign_block) {
 			cc = ProcCC_C;
 		} else {
 			cc = ProcCC_Odin;
@@ -2116,7 +2116,7 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *link_name, ProcCallingConven
 	}
 
 	if ((*tags & ProcTag_foreign) && (*tags & ProcTag_export)) {
-		syntax_error(f->curr_token, "You cannot apply both #foreign and #export to a procedure");
+		syntax_error(f->curr_token, "A foreign procedure cannot have #export");
 	}
 
 	if ((*tags & ProcTag_inline) && (*tags & ProcTag_no_inline)) {
@@ -2221,7 +2221,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			AstNode *expr = parse_expr(f, false);
 			operand = ast_run_expr(f, token, name, expr);
 			if (unparen_expr(expr)->kind != AstNode_CallExpr) {
-				error_node(expr, "#run can only be applied to procedure calls");
+				error(expr, "#run can only be applied to procedure calls");
 				operand = ast_bad_expr(f, token, f->curr_token);
 			}
 			warning(token, "#run is not yet implemented");
@@ -2943,7 +2943,7 @@ void parse_foreign_block_decl(AstFile *f, Array<AstNode *> *decls) {
 
 		/* fallthrough */
 	default:
-		error_node(decl, "Foreign blocks only allow procedure and variable declarations");
+		error(decl, "Foreign blocks only allow procedure and variable declarations");
 		return;
 	}
 }
@@ -2978,6 +2978,10 @@ AstNode *parse_decl(AstFile *f) {
 		Token open = {};
 		Token close = {};
 		Array<AstNode *> decls = make_ast_node_array(f);
+
+		bool prev_in_foreign_block = f->in_foreign_block;
+		defer (f->in_foreign_block = prev_in_foreign_block);
+		f->in_foreign_block = true;
 
 		if (f->curr_token.kind != Token_OpenBrace) {
 			parse_foreign_block_decl(f, &decls);
@@ -3161,8 +3165,7 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token, String *link_name_) {
 
 	u64 tags = 0;
 	String link_name = {};
-	ProcCallingConvention cc = ProcCC_Odin;
-
+	ProcCallingConvention cc = ProcCC_Invalid;
 	parse_proc_tags(f, &tags, &link_name, &cc);
 
 	if (link_name_) *link_name_ = link_name;
@@ -3293,7 +3296,7 @@ Array<AstNode *> convert_to_ident_list(AstFile *f, Array<AstNodeAndFlags> list, 
 
 		if (!ignore_flags) {
 			if (i != 0) {
-				error_node(ident, "Illegal use of prefixes in parameter list");
+				error(ident, "Illegal use of prefixes in parameter list");
 			}
 		}
 
@@ -3302,7 +3305,7 @@ Array<AstNode *> convert_to_ident_list(AstFile *f, Array<AstNodeAndFlags> list, 
 		case AstNode_BadExpr:
 			break;
 		default:
-			error_node(ident, "Expected an identifier");
+			error(ident, "Expected an identifier");
 			ident = ast_ident(f, blank_token);
 			break;
 		}
@@ -3951,7 +3954,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 			index = cond->AssignStmt.lhs[1];
 			break;
 		default:
-			error_node(cond, "Expected at 1 or 2 identifiers");
+			error(cond, "Expected at 1 or 2 identifiers");
 			return ast_bad_stmt(f, token, f->curr_token);
 		}
 
@@ -4301,7 +4304,7 @@ Array<AstNode *> parse_stmt_list(AstFile *f) {
 			if (stmt->kind == AstNode_ExprStmt &&
 			    stmt->ExprStmt.expr != NULL &&
 			    stmt->ExprStmt.expr->kind == AstNode_ProcLit) {
-				syntax_error_node(stmt, "Procedure literal evaluated but not used");
+				syntax_error(stmt, "Procedure literal evaluated but not used");
 			}
 		}
 	}
@@ -4466,7 +4469,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 		    node->kind != AstNode_BadStmt &&
 		    node->kind != AstNode_EmptyStmt) {
 			// NOTE(bill): Sanity check
-			syntax_error_node(node, "Only declarations are allowed at file scope %.*s", LIT(ast_node_strings[node->kind]));
+			syntax_error(node, "Only declarations are allowed at file scope %.*s", LIT(ast_node_strings[node->kind]));
 		} else if (node->kind == AstNode_GenDecl) {
 			ast_node(gd, GenDecl, node);
 			if (gd->token.kind == Token_import ||
@@ -4482,9 +4485,9 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 
 					if (!is_import_path_valid(file_str)) {
 						if (id->is_import) {
-							syntax_error_node(node, "Invalid import path: `%.*s`", LIT(file_str));
+							syntax_error(node, "Invalid import path: `%.*s`", LIT(file_str));
 						} else {
-							syntax_error_node(node, "Invalid include path: `%.*s`", LIT(file_str));
+							syntax_error(node, "Invalid include path: `%.*s`", LIT(file_str));
 						}
 						// NOTE(bill): It's a naughty name
 						decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
@@ -4513,9 +4516,9 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Array<AstNod
 
 					if (!is_import_path_valid(file_str)) {
 						if (fl->is_system) {
-							syntax_error_node(node, "Invalid `foreign_system_library` path");
+							syntax_error(node, "Invalid `foreign_system_library` path");
 						} else {
-							syntax_error_node(node, "Invalid `foreign_library` path");
+							syntax_error(node, "Invalid `foreign_library` path");
 						}
 						// NOTE(bill): It's a naughty name
 						gd->specs[spec_index] = ast_bad_decl(f, fl->filepath, fl->filepath);

@@ -2262,6 +2262,17 @@ irValue *ir_emit_comp(irProcedure *proc, TokenKind op_kind, irValue *left, irVal
 		left = ir_emit_conv(proc, left, ir_type(right));
 	} else if (right->kind == irValue_Constant || right->kind == irValue_Nil) {
 		right = ir_emit_conv(proc, right, ir_type(left));
+	} else {
+		gbAllocator a = proc->module->allocator;
+		i64 ls = type_size_of(a, ir_type(left));
+		i64 rs = type_size_of(a, ir_type(right));
+		if (ls < rs) {
+			left = ir_emit_conv(proc, left, ir_type(right));
+		} else if (ls > rs) {
+			right = ir_emit_conv(proc, right, ir_type(left));
+		} else {
+			right = ir_emit_conv(proc, right, ir_type(left));
+		}
 	}
 
 	Type *result = t_bool;

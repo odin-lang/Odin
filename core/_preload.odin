@@ -32,10 +32,11 @@ type (
 	}
 	// NOTE(bill): This must match the compiler's
 	CallingConvention enum {
-		Odin = 0,
-		C    = 1,
-		Std  = 2,
-		Fast = 3,
+		Invalid = 0,
+		Odin    = 1,
+		C       = 2,
+		Std     = 3,
+		Fast    = 4,
 	}
 
 	TypeInfoRecord struct #ordered {

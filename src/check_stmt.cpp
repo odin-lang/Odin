@@ -30,7 +30,7 @@ void check_stmt_list(Checker *c, Array<AstNode *> stmts, u32 flags) {
 		if (i+1 < max) {
 			switch (n->kind) {
 			case AstNode_ReturnStmt:
-				error_node(n, "Statements after this `return` are never executed");
+				error(n, "Statements after this `return` are never executed");
 				break;
 			}
 		}
@@ -283,7 +283,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 			}
 			gbString lhs_expr = expr_to_string(lhs.expr);
 			gbString rhs_expr = expr_to_string(rhs->expr);
-			error_node(rhs->expr, "Cannot assign `%s` to bit field `%s`", rhs_expr, lhs_expr);
+			error(rhs->expr, "Cannot assign `%s` to bit field `%s`", rhs_expr, lhs_expr);
 			gb_string_free(rhs_expr);
 			gb_string_free(lhs_expr);
 			return NULL;
@@ -300,7 +300,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 			if (tav.mode != Addressing_Variable) {
 				if (!is_type_pointer(tav.type)) {
 					gbString str = expr_to_string(lhs.expr);
-					error_node(lhs.expr, "Cannot assign to the value of a map `%s`", str);
+					error(lhs.expr, "Cannot assign to the value of a map `%s`", str);
 					gb_string_free(str);
 					return NULL;
 				}
@@ -316,7 +316,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 			check_expr(c, &op_c, se->expr);
 			if (op_c.mode == Addressing_MapIndex) {
 				gbString str = expr_to_string(lhs.expr);
-				error_node(lhs.expr, "Cannot assign to record field `%s` in map", str);
+				error(lhs.expr, "Cannot assign to record field `%s` in map", str);
 				gb_string_free(str);
 				return NULL;
 			}
@@ -324,9 +324,9 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 
 		gbString str = expr_to_string(lhs.expr);
 		if (lhs.mode == Addressing_Immutable) {
-			error_node(lhs.expr, "Cannot assign to an immutable: `%s`", str);
+			error(lhs.expr, "Cannot assign to an immutable: `%s`", str);
 		} else {
-			error_node(lhs.expr, "Cannot assign to `%s`", str);
+			error(lhs.expr, "Cannot assign to `%s`", str);
 		}
 		gb_string_free(str);
 	} break;
@@ -394,11 +394,11 @@ void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
 	Operand operand = {Addressing_Invalid};
 	check_expr(c, &operand, ws->cond);
 	if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
-		error_node(ws->cond, "Non-constant boolean `when` condition");
+		error(ws->cond, "Non-constant boolean `when` condition");
 		return;
 	}
 	if (ws->body == NULL || ws->body->kind != AstNode_BlockStmt) {
-		error_node(ws->cond, "Invalid body for `when` statement");
+		error(ws->cond, "Invalid body for `when` statement");
 		return;
 	}
 	if (operand.value.kind == ExactValue_Bool &&
@@ -413,7 +413,7 @@ void check_when_stmt(Checker *c, AstNodeWhenStmt *ws, u32 flags) {
 			check_when_stmt(c, &ws->else_stmt->WhenStmt, flags);
 			break;
 		default:
-			error_node(ws->else_stmt, "Invalid `else` statement in `when` statement");
+			error(ws->else_stmt, "Invalid `else` statement in `when` statement");
 			break;
 		}
 	}
@@ -425,18 +425,18 @@ void check_label(Checker *c, AstNode *label) {
 	}
 	ast_node(l, Label, label);
 	if (l->name->kind != AstNode_Ident) {
-		error_node(l->name, "A label's name must be an identifier");
+		error(l->name, "A label's name must be an identifier");
 		return;
 	}
 	String name = l->name->Ident.string;
 	if (name == "_") {
-		error_node(l->name, "A label's name cannot be a blank identifier");
+		error(l->name, "A label's name cannot be a blank identifier");
 		return;
 	}
 
 
 	if (c->proc_stack.count == 0) {
-		error_node(l->name, "A label is only allowed within a procedure");
+		error(l->name, "A label is only allowed within a procedure");
 		return;
 	}
 	GB_ASSERT(c->context.decl != NULL);
@@ -445,7 +445,7 @@ void check_label(Checker *c, AstNode *label) {
 	for_array(i, c->context.decl->labels) {
 		BlockLabel bl = c->context.decl->labels[i];
 		if (bl.name == name) {
-			error_node(label, "Duplicate label with the name `%.*s`", LIT(name));
+			error(label, "Duplicate label with the name `%.*s`", LIT(name));
 			ok = false;
 			break;
 		}
@@ -594,7 +594,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		switch (operand.mode) {
 		case Addressing_Type: {
 			gbString str = type_to_string(operand.type);
-			error_node(node, "`%s` is not an expression", str);
+			error(node, "`%s` is not an expression", str);
 			gb_string_free(str);
 		} break;
 		case Addressing_NoValue:
@@ -609,14 +609,14 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				if (is_type_proc(t)) {
 					if (t->Proc.require_results) {
 						gbString expr_str = expr_to_string(ce->proc);
-						error_node(node, "`%s` requires that its results must be handled", expr_str);
+						error(node, "`%s` requires that its results must be handled", expr_str);
 						gb_string_free(expr_str);
 					}
 				}
 				return;
 			}
 			gbString expr_str = expr_to_string(operand.expr);
-			error_node(node, "Expression is not used: `%s`", expr_str);
+			error(node, "Expression is not used: `%s`", expr_str);
 			gb_string_free(expr_str);
 		} break;
 		}
@@ -624,7 +624,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 	case_ast_node(ts, TagStmt, node);
 		// TODO(bill): Tag Statements
-		error_node(node, "Tag statements are not supported yet");
+		error(node, "Tag statements are not supported yet");
 		check_stmt(c, ts->stmt, flags);
 	case_end;
 
@@ -634,7 +634,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		case Token_Inc: op = Token_Add; break;
 		case Token_Dec: op = Token_Sub; break;
 		default:
-			error_node(node, "Invalid inc/dec operation");
+			error(node, "Invalid inc/dec operation");
 			return;
 		}
 
@@ -646,7 +646,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		if (!is_type_integer(x.type) && !is_type_float(x.type)) {
 			gbString e = expr_to_string(s->expr);
 			gbString t = type_to_string(x.type);
-			error_node(node, "%s%.*s used on non-numeric type %s", e, LIT(s->op.string), t);
+			error(node, "%s%.*s used on non-numeric type %s", e, LIT(s->op.string), t);
 			gb_string_free(t);
 			gb_string_free(e);
 			return;
@@ -702,7 +702,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				check_assignment_variable(c, &operands[i], as->lhs[i]);
 			}
 			if (lhs_count != rhs_count) {
-				error_node(as->lhs[0], "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
+				error(as->lhs[0], "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
 			}
 
 			gb_temp_arena_memory_end(tmp);
@@ -754,7 +754,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		Operand operand = {Addressing_Invalid};
 		check_expr(c, &operand, is->cond);
 		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-			error_node(is->cond, "Non-boolean condition in `if` statement");
+			error(is->cond, "Non-boolean condition in `if` statement");
 		}
 
 		check_stmt(c, is->body, mod_flags);
@@ -766,7 +766,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				check_stmt(c, is->else_stmt, mod_flags);
 				break;
 			default:
-				error_node(is->else_stmt, "Invalid `else` statement in `if` statement");
+				error(is->else_stmt, "Invalid `else` statement in `if` statement");
 				break;
 			}
 		}
@@ -800,7 +800,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				variables = tuple->variables;
 			}
 			if (rs->results.count == 0) {
-				error_node(node, "Expected %td return values, got 0", result_count);
+				error(node, "Expected %td return values, got 0", result_count);
 			} else {
 				// TokenPos pos = rs->token.pos;
 				// if (pos.line == 10) {
@@ -815,7 +815,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				// }
 			}
 		} else if (rs->results.count > 0) {
-			error_node(rs->results[0], "No return values expected");
+			error(rs->results[0], "No return values expected");
 		}
 	case_end;
 
@@ -832,7 +832,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			Operand o = {Addressing_Invalid};
 			check_expr(c, &o, fs->cond);
 			if (o.mode != Addressing_Invalid && !is_type_boolean(o.type)) {
-				error_node(fs->cond, "Non-boolean condition in `for` statement");
+				error(fs->cond, "Non-boolean condition in `for` statement");
 			}
 		}
 		if (fs->post != NULL) {
@@ -840,7 +840,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			if (fs->post->kind != AstNode_AssignStmt &&
 			    fs->post->kind != AstNode_IncDecStmt) {
-				error_node(fs->post, "`for` statement post statement must be a simple statement");
+				error(fs->post, "`for` statement post statement must be a simple statement");
 			}
 		}
 		check_stmt(c, fs->body, new_flags);
@@ -954,7 +954,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			if (operand.mode == Addressing_Type) {
 				if (!is_type_enum(operand.type)) {
 					gbString t = type_to_string(operand.type);
-					error_node(operand.expr, "Cannot iterate over the type `%s`", t);
+					error(operand.expr, "Cannot iterate over the type `%s`", t);
 					gb_string_free(t);
 					goto skip_expr;
 				} else {
@@ -1002,7 +1002,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			if (val == NULL) {
 				gbString s = expr_to_string(operand.expr);
 				gbString t = type_to_string(operand.type);
-				error_node(operand.expr, "Cannot iterate over `%s` of type `%s`", s, t);
+				error(operand.expr, "Cannot iterate over `%s` of type `%s`", s, t);
 				gb_string_free(t);
 				gb_string_free(s);
 			}
@@ -1040,7 +1040,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					entity = found;
 				}
 			} else {
-				error_node(name, "A variable declaration must be an identifier");
+				error(name, "A variable declaration must be an identifier");
 			}
 
 			if (entity == NULL) {
@@ -1089,7 +1089,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 		if (is_type_vector(x.type)) {
 			gbString str = type_to_string(x.type);
-			error_node(x.expr, "Invalid match expression type: %s", str);
+			error(x.expr, "Invalid match expression type: %s", str);
 			gb_string_free(str);
 			break;
 		}
@@ -1107,13 +1107,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					default_stmt = stmt;
 				}
 			} else {
-				error_node(stmt, "Invalid AST - expected case clause");
+				error(stmt, "Invalid AST - expected case clause");
 			}
 
 			if (default_stmt != NULL) {
 				if (first_default != NULL) {
 					TokenPos pos = ast_node_token(first_default).pos;
-					error_node(stmt,
+					error(stmt,
 					           "multiple `default` clauses\n"
 					           "\tfirst at %.*s(%td:%td)",
 					           LIT(pos.file), pos.line, pos.column);
@@ -1155,7 +1155,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 					if (!is_type_ordered(x.type)) {
 						gbString str = type_to_string(x.type);
-						error_node(x.expr, "Unordered type `%s`, is invalid for an interval expression", str);
+						error(x.expr, "Unordered type `%s`, is invalid for an interval expression", str);
 						gb_string_free(str);
 						continue;
 					}
@@ -1229,7 +1229,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 								if (are_types_identical(y.type, tap.type)) {
 									TokenPos pos = tap.token.pos;
 									gbString expr_str = expr_to_string(y.expr);
-									error_node(y.expr,
+									error(y.expr,
 									           "Duplicate case `%s`\n"
 									           "\tprevious case at %.*s(%td:%td)",
 									           expr_str,
@@ -1276,7 +1276,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		MatchTypeKind match_type_kind = MatchType_Invalid;
 
 		if (ms->tag->kind != AstNode_AssignStmt) {
-			error_node(ms->tag, "Expected an `in` assignment for this type match statement");
+			error(ms->tag, "Expected an `in` assignment for this type match statement");
 			break;
 		}
 
@@ -1298,7 +1298,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		match_type_kind = check_valid_type_match_type(x.type);
 		if (check_valid_type_match_type(x.type) == MatchType_Invalid) {
 			gbString str = type_to_string(x.type);
-			error_node(x.expr, "Invalid type for this type match expression, got `%s`", str);
+			error(x.expr, "Invalid type for this type match expression, got `%s`", str);
 			gb_string_free(str);
 			break;
 		}
@@ -1317,13 +1317,13 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					default_stmt = stmt;
 				}
 			} else {
-				error_node(stmt, "Invalid AST - expected case clause");
+				error(stmt, "Invalid AST - expected case clause");
 			}
 
 			if (default_stmt != NULL) {
 				if (first_default != NULL) {
 					TokenPos pos = ast_node_token(first_default).pos;
-					error_node(stmt,
+					error(stmt,
 					           "Multiple `default` clauses\n"
 					           "\tfirst at %.*s(%td:%td)", LIT(pos.file), pos.line, pos.column);
 				} else {
@@ -1334,7 +1334,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 
 		if (lhs->kind != AstNode_Ident) {
-			error_node(rhs, "Expected an identifier, got `%.*s`", LIT(ast_node_strings[rhs->kind]));
+			error(rhs, "Expected an identifier, got `%.*s`", LIT(ast_node_strings[rhs->kind]));
 			break;
 		}
 
@@ -1372,7 +1372,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						}
 						if (!tag_type_found) {
 							gbString type_str = type_to_string(y.type);
-							error_node(y.expr, "Unknown tag type, got `%s`", type_str);
+							error(y.expr, "Unknown tag type, got `%s`", type_str);
 							gb_string_free(type_str);
 							continue;
 						}
@@ -1388,7 +1388,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					if (found) {
 						TokenPos pos = cc->token.pos;
 						gbString expr_str = expr_to_string(y.expr);
-						error_node(y.expr,
+						error(y.expr,
 						           "Duplicate type case `%s`\n"
 						           "\tprevious type case at %.*s(%td:%td)",
 						           expr_str,
@@ -1469,7 +1469,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		if (bs->label != NULL) {
 			if (bs->label->kind != AstNode_Ident) {
-				error_node(bs->label, "A branch statement's label name must be an identifier");
+				error(bs->label, "A branch statement's label name must be an identifier");
 				return;
 			}
 			AstNode *ident = bs->label;
@@ -1477,12 +1477,12 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			Operand o = {};
 			Entity *e = check_ident(c, &o, ident, NULL, NULL, false);
 			if (e == NULL) {
-				error_node(ident, "Undeclared label name: %.*s", LIT(name));
+				error(ident, "Undeclared label name: %.*s", LIT(name));
 				return;
 			}
 			add_entity_use(c, ident, e);
 			if (e->kind != Entity_Label) {
-				error_node(ident, "`%.*s` is not a label", LIT(name));
+				error(ident, "`%.*s` is not a label", LIT(name));
 				return;
 			}
 		}
@@ -1537,7 +1537,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		AstNode *foreign_library = fb->foreign_library;
 		bool ok = true;
 		if (foreign_library->kind != AstNode_Ident) {
-			error_node(foreign_library, "foreign library name must be an identifier");
+			error(foreign_library, "foreign library name must be an identifier");
 			ok = false;
 		}
 
@@ -1576,14 +1576,14 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 				if (gd->flags & VarDeclFlag_thread_local) {
 					gd->flags &= ~VarDeclFlag_thread_local;
-					error_node(node, "`thread_local` may only be applied to a variable declaration");
+					error(node, "`thread_local` may only be applied to a variable declaration");
 				}
 
 				for_array(i, vd->names) {
 					AstNode *name = vd->names[i];
 					Entity *entity = NULL;
 					if (name->kind != AstNode_Ident) {
-						error_node(name, "A variable declaration must be an identifier");
+						error(name, "A variable declaration must be an identifier");
 					} else {
 						Token token = name->Ident;
 						String str = token.string;

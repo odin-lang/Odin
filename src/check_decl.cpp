@@ -12,7 +12,7 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 
 			// TODO(bill): is this a good enough error message?
 			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
-			error_node(operand->expr,
+			error(operand->expr,
 				  "Cannot assign built-in procedure `%s` in %.*s",
 				  expr_str,
 				  LIT(context_name));
@@ -108,7 +108,7 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	if (operand->mode != Addressing_Constant) {
 		// TODO(bill): better error
 		gbString str = expr_to_string(operand->expr);
-		error_node(operand->expr, "`%s` is not a constant", str);
+		error(operand->expr, "`%s` is not a constant", str);
 		gb_string_free(str);
 		if (e->type == NULL) {
 			e->type = t_invalid;
@@ -117,7 +117,7 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	}
 	if (!is_type_constant_type(operand->type)) {
 		gbString type_str = type_to_string(operand->type);
-		error_node(operand->expr, "Invalid constant type: `%s`", type_str);
+		error(operand->expr, "Invalid constant type: `%s`", type_str);
 		gb_string_free(type_str);
 		if (e->type == NULL) {
 			e->type = t_invalid;
@@ -172,7 +172,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 		Type *t = check_type(c, type_expr);
 		if (!is_type_constant_type(t)) {
 			gbString str = type_to_string(t);
-			error_node(type_expr, "Invalid constant type `%s`", str);
+			error(type_expr, "Invalid constant type `%s`", str);
 			gb_string_free(str);
 			e->type = t_invalid;
 			return;
@@ -279,18 +279,18 @@ void init_entity_foreign_library(Checker *c, Entity *e) {
 	if (ident == NULL) {
 		error(e->token, "foreign entiies must declare which library they are from");
 	} else if (ident->kind != AstNode_Ident) {
-		error_node(ident, "foreign library names must be an identifier");
+		error(ident, "foreign library names must be an identifier");
 	} else {
 		String name = ident->Ident.string;
 		Entity *found = scope_lookup_entity(c->context.scope, name);
 		if (found == NULL) {
 			if (name == "_") {
-				error_node(ident, "`_` cannot be used as a value type");
+				error(ident, "`_` cannot be used as a value type");
 			} else {
-				error_node(ident, "Undeclared name: %.*s", LIT(name));
+				error(ident, "Undeclared name: %.*s", LIT(name));
 			}
 		} else if (found->kind != Entity_LibraryName) {
-			error_node(ident, "`%.*s` cannot be used as a library name", LIT(name));
+			error(ident, "`%.*s` cannot be used as a library name", LIT(name));
 		} else {
 			// TODO(bill): Extra stuff to do with library names?
 			*foreign_library = found;
@@ -303,7 +303,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e->type == NULL);
 	if (d->proc_decl->kind != AstNode_ProcDecl) {
 		// TOOD(bill): Better error message
-		error_node(d->proc_decl, "Expected a procedure to check");
+		error(d->proc_decl, "Expected a procedure to check");
 		return;
 	}
 
@@ -336,11 +336,11 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 	if (is_inline && is_no_inline) {
-		error_node(pd->type, "You cannot apply both `inline` and `no_inline` to a procedure");
+		error(pd->type, "You cannot apply both `inline` and `no_inline` to a procedure");
 	}
 
 	if (is_foreign && is_export) {
-		error_node(pd->type, "A foreign procedure cannot have an `export` tag");
+		error(pd->type, "A foreign procedure cannot have an `export` tag");
 	}
 
 
@@ -352,10 +352,10 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 	if (pd->body != NULL) {
 		if (is_foreign) {
-			error_node(pd->body, "A foreign procedure cannot have a body");
+			error(pd->body, "A foreign procedure cannot have a body");
 		}
 		if (proc_type->Proc.c_vararg) {
-			error_node(pd->body, "A procedure with a `#c_vararg` field cannot have a body");
+			error(pd->body, "A procedure with a `#c_vararg` field cannot have a body");
 		}
 
 		d->scope = c->context.scope;
@@ -367,7 +367,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 	if (pt->result_count == 0 && is_require_results) {
-		error_node(pd->type, "`#require_results` is not needed on a procedure with no results");
+		error(pd->type, "`#require_results` is not needed on a procedure with no results");
 	} else {
 		pt->require_results = is_require_results;
 	}
@@ -393,13 +393,13 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			Type *other_type = base_type(f->type);
 			if (is_type_proc(this_type) && is_type_proc(other_type)) {
 				if (!are_signatures_similar_enough(this_type, other_type)) {
-					error_node(d->proc_decl,
+					error(d->proc_decl,
 							   "Redeclaration of foreign procedure `%.*s` with different type signatures\n"
 							   "\tat %.*s(%td:%td)",
 							   LIT(name), LIT(pos.file), pos.line, pos.column);
 				}
 			} else if (!are_types_identical(this_type, other_type)) {
-				error_node(d->proc_decl,
+				error(d->proc_decl,
 						   "Foreign entity `%.*s` previously declared elsewhere with a different type\n"
 						   "\tat %.*s(%td:%td)",
 						   LIT(name), LIT(pos.file), pos.line, pos.column);
@@ -424,7 +424,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 				Entity *f = *found;
 				TokenPos pos = f->token.pos;
 				// TODO(bill): Better error message?
-				error_node(d->proc_decl,
+				error(d->proc_decl,
 						   "Non unique linking name for procedure `%.*s`\n"
 						   "\tother at %.*s(%td:%td)",
 						   LIT(name), LIT(pos.file), pos.line, pos.column);

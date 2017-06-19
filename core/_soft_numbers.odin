@@ -1,26 +1,61 @@
 #shared_global_scope;
 
-proc __u128_mod(a, b: u128) -> u128 #cc_odin #link_name "__umodti3" {
+proc __multi3(a, b: u128) -> u128 #cc_c #link_name "__multi3" {
+	const bits_in_dword_2 = size_of(i64) * 4;
+	const lower_mask = u128(~u64(0) >> bits_in_dword_2);
+
+
+	when ODIN_ENDIAN == "bit" {
+		type TWords raw_union {
+			all: u128,
+			using _: struct {lo, hi: u64},
+		};
+	} else {
+		type TWords raw_union {
+			all: u128,
+			using _: struct {hi, lo: u64},
+		};
+	}
+
+	var r: TWords;
+	var t: u64;
+
+	r.lo = u64(a & lower_mask) * u64(b & lower_mask);
+	t = r.lo >> bits_in_dword_2;
+	r.lo &= u64(lower_mask);
+	t += u64(a >> bits_in_dword_2) * u64(b & lower_mask);
+	r.lo += u64(t & u64(lower_mask)) << bits_in_dword_2;
+	r.hi = t >> bits_in_dword_2;
+	t = r.lo >> bits_in_dword_2;
+	r.lo &= u64(lower_mask);
+	t += u64(b >> bits_in_dword_2) * u64(a & lower_mask);
+	r.lo += u64(t & u64(lower_mask)) << bits_in_dword_2;
+	r.hi += t >> bits_in_dword_2;
+	r.hi += u64(a >> bits_in_dword_2) * u64(b >> bits_in_dword_2);
+	return r.all;
+}
+
+proc __u128_mod(a, b: u128) -> u128 #cc_c #link_name "__umodti3" {
 	var r: u128;
 	__u128_quo_mod(a, b, &r);
 	return r;
 }
 
-proc __u128_quo(a, b: u128) -> u128 #cc_odin #link_name "__udivti3" {
+proc __u128_quo(a, b: u128) -> u128 #cc_c #link_name "__udivti3" {
 	return __u128_quo_mod(a, b, nil);
 }
 
-proc __i128_mod(a, b: i128) -> i128 #cc_odin #link_name "__modti3" {
+proc __i128_mod(a, b: i128) -> i128 #cc_c #link_name "__modti3" {
 	var r: i128;
 	__i128_quo_mod(a, b, &r);
 	return r;
 }
 
-proc __i128_quo(a, b: i128) -> i128 #cc_odin #link_name "__divti3" {
+proc __i128_quo(a, b: i128) -> i128 #cc_c #link_name "__divti3" {
 	return __i128_quo_mod(a, b, nil);
 }
 
-proc __i128_quo_mod(a, b: i128, rem: ^i128) -> (quo: i128) #cc_odin #link_name "__divmodti4" {
+proc __i128_quo_mod(a, b: i128, rem: ^i128) -> (quo: i128) #cc_c #link_name "__divmodti4" {
 	var s: i128;
 	s = b >> 127;
 	b = (b~s) - s;
@@ -39,7 +74,7 @@ proc __i128_quo_mod(a, b: i128, rem: ^i128) -> (quo: i128) #cc_odin #link_name "
 }
 
 
-proc __u128_quo_mod(a, b: u128, rem: ^u128) -> (quo: u128) #cc_odin #link_name "__udivmodti4" {
+proc __u128_quo_mod(a, b: u128, rem: ^u128) -> (quo: u128) #cc_c #link_name "__udivmodti4" {
 	var alo, ahi = u64(a), u64(a>>64);
 	var blo, bhi = u64(b), u64(b>>64);
 	if b == 0 {
@@ -68,7 +103,7 @@ proc __u128_quo_mod(a, b: u128, rem: ^u128) -> (quo: u128) #cc_odin #link_name "
 }
 
 /*
-proc __f16_to_f32(f: f16) -> f32 #cc_odin #no_inline #link_name "__gnu_h2f_ieee" {
+proc __f16_to_f32(f: f16) -> f32 #cc_c #no_inline #link_name "__gnu_h2f_ieee" {
 	when true {
 		// Source: https://fgiesen.wordpress.com/2012/03/28/half-to-float-done-quic/
 		const FP32 = raw_union {u: u32, f: f32};
@@ -92,7 +127,7 @@ proc __f16_to_f32(f: f16) -> f32 #cc_odin #no_inline #link_name "__gnu_h2f_ieee"
 		return 0;
 	}
 }
-proc __f32_to_f16(f_: f32) -> f16 #cc_odin #no_inline #link_name "__gnu_f2h_ieee" {
+proc __f32_to_f16(f_: f32) -> f16 #cc_c #no_inline #link_name "__gnu_f2h_ieee" {
 	when false {
 		// Source: https://gist.github.com/rygorous/2156668
 		const FP16 = raw_union {u: u16, f: f16};
@@ -182,11 +217,11 @@ proc __f32_to_f16(f_: f32) -> f16 #cc_odin #no_inline #link_name "__gnu_f2h_ieee
 	}
 }
 
-proc __f64_to_f16(f: f64) -> f16 #cc_odin #no_inline #link_name "__truncdfhf2" {
+proc __f64_to_f16(f: f64) -> f16 #cc_c #no_inline #link_name "__truncdfhf2" {
 	return __f32_to_f16(f32(f));
 }
 
-proc __f16_to_f64(f: f16) -> f64 #cc_odin #no_inline {
+proc __f16_to_f64(f: f16) -> f64 #cc_c #no_inline {
 	return f64(__f16_to_f32(f));
 }
 */

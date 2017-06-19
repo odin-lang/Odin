@@ -269,7 +269,11 @@ void init_build_context(void) {
 
 #if defined(GB_SYSTEM_WINDOWS)
 	bc->ODIN_OS      = str_lit("windows");
-	bc->ODIN_ARCH    = str_lit("amd64");
+	#if defined(GB_ARCH_64_BIT)
+		bc->ODIN_ARCH = str_lit("amd64");
+	#else
+		bc->ODIN_ARCH = str_lit("x86");
+	#endif
 	bc->ODIN_ENDIAN  = str_lit("little");
 #elif defined(GB_SYSTEM_OSX)
 	bc->ODIN_OS      = str_lit("osx");
@@ -287,29 +291,27 @@ void init_build_context(void) {
 	// across OSs. It doesn't make sense to allocate extra data on the heap
 	// here, so I just #defined the linker flags to keep things concise.
 	#if defined(GB_SYSTEM_WINDOWS)
-
-	#define LINK_FLAG_X64 "/machine:x64"
-	#define LINK_FLAG_X86 "/machine:x86"
+		#define LINK_FLAG_X64 "/machine:x64"
+		#define LINK_FLAG_X86 "/machine:x86"
 
 	#elif defined(GB_SYSTEM_OSX)
+		// NOTE(zangent): MacOS systems are x64 only, so ld doesn't have
+		// an architecture option. All compilation done on MacOS must be x64.
+		GB_ASSERT(bc->ODIN_ARCH == "amd64");
 
-	// NOTE(zangent): MacOS systems are x64 only, so ld doesn't have
-	// an architecture option. All compilation done on MacOS must be x64.
-	GB_ASSERT(bc->ODIN_ARCH == "amd64");
-
-	#define LINK_FLAG_X64 ""
-	#define LINK_FLAG_X86 ""
+		#define LINK_FLAG_X64 ""
+		#define LINK_FLAG_X86 ""
 	#else
-	// Linux, but also BSDs and the like.
-	// NOTE(zangent): When clang is swapped out with ld as the linker,
-	//   the commented flags here should be used. Until then, we'll have
-	//   to use alternative build flags made for clang.
-	/*
-		#define LINK_FLAG_X64 "-m elf_x86_64"
-		#define LINK_FLAG_X86 "-m elf_i386"
-	*/
-	#define LINK_FLAG_X64 "-arch x86-64"
-	#define LINK_FLAG_X86 "-arch x86"
+		// Linux, but also BSDs and the like.
+		// NOTE(zangent): When clang is swapped out with ld as the linker,
+		//   the commented flags here should be used. Until then, we'll have
+		//   to use alternative build flags made for clang.
+		/*
+			#define LINK_FLAG_X64 "-m elf_x86_64"
+			#define LINK_FLAG_X86 "-m elf_i386"
+		*/
+		#define LINK_FLAG_X64 "-arch x86-64"
+		#define LINK_FLAG_X86 "-arch x86"
 	#endif
 
 	if (bc->ODIN_ARCH == "amd64") {

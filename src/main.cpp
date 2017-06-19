@@ -305,166 +305,166 @@ int main(int argc, char **argv) {
 	#endif
 
 	#if defined(GB_SYSTEM_WINDOWS)
-	timings_start_section(&timings, str_lit("llvm-llc"));
-	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
-	exit_code = system_exec_command_line_app("llvm-llc", false,
-		"\"%.*sbin/llc\" \"%.*s.bc\" -filetype=obj -O%d "
-		"%.*s "
-		// "-debug-pass=Arguments "
-		"",
-		LIT(build_context.ODIN_ROOT),
-		LIT(output_base),
-		optimization_level,
-		LIT(build_context.llc_flags));
-	if (exit_code != 0) {
-		return exit_code;
-	}
+		timings_start_section(&timings, str_lit("llvm-llc"));
+		// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
+		exit_code = system_exec_command_line_app("llvm-llc", false,
+			"\"%.*sbin/llc\" \"%.*s.bc\" -filetype=obj -O%d "
+			"%.*s "
+			// "-debug-pass=Arguments "
+			"",
+			LIT(build_context.ODIN_ROOT),
+			LIT(output_base),
+			optimization_level,
+			LIT(build_context.llc_flags));
+		if (exit_code != 0) {
+			return exit_code;
+		}
 
-	timings_start_section(&timings, str_lit("msvc-link"));
+		timings_start_section(&timings, str_lit("msvc-link"));
 
-	gbString lib_str = gb_string_make(heap_allocator(), "");
-	// defer (gb_string_free(lib_str));
-	char lib_str_buf[1024] = {0};
-	for_array(i, ir_gen.module.foreign_library_paths) {
-		String lib = ir_gen.module.foreign_library_paths[i];
-		// gb_printf_err("Linking lib: %.*s\n", LIT(lib));
-		isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-		                        " \"%.*s\"", LIT(lib));
-		lib_str = gb_string_appendc(lib_str, lib_str_buf);
-	}
-
-	char *output_ext = "exe";
-	char *link_settings = "";
-	if (build_context.is_dll) {
-		output_ext = "dll";
-		link_settings = "/DLL";
-	} else {
-		link_settings = "/ENTRY:mainCRTStartup";
-	}
-
-	exit_code = system_exec_command_line_app("msvc-link", true,
-		"link \"%.*s\".obj -OUT:\"%.*s.%s\" %s "
-		"/defaultlib:libcmt "
-		"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
-		" %.*s "
-		" %s "
-		"",
-		LIT(output_base), LIT(output_base), output_ext,
-		lib_str, LIT(build_context.link_flags),
-		link_settings
-		);
-	if (exit_code != 0) {
-		return exit_code;
-	}
-
-	// timings_print_all(&timings);
-
-	if (run_output) {
-		system_exec_command_line_app("odin run", false, "%.*s.exe", LIT(output_base));
-	}
-
-	#else
-
-	// NOTE(zangent): Linux / Unix is unfinished and not tested very well.
-
-
-	timings_start_section(&timings, str_lit("llvm-llc"));
-	// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
-	exit_code = system_exec_command_line_app("llc", false,
-		"llc \"%.*s.bc\" -filetype=obj -relocation-model=pic -O%d "
-		"%.*s "
-		// "-debug-pass=Arguments "
-		"",
-		LIT(output_base),
-		optimization_level,
-		LIT(build_context.llc_flags));
-	if (exit_code != 0) {
-		return exit_code;
-	}
-
-	timings_start_section(&timings, str_lit("ld-link"));
-
-	gbString lib_str = gb_string_make(heap_allocator(), "");
-	// defer (gb_string_free(lib_str));
-	char lib_str_buf[1024] = {0};
-	for_array(i, ir_gen.module.foreign_library_paths) {
-		String lib = ir_gen.module.foreign_library_paths[i];
-
-		// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
-		//   This allows you to specify '-f' in a #foreign_system_library,
-		//   without having to implement any new syntax specifically for MacOS.
-		#if defined(GB_SYSTEM_OSX)
-			isize len;
-			if(lib.len > 2 && lib[0] == '-' && lib[1] == 'f') {
-				len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-				                        " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
-			} else {
-				len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-				                        " -l%.*s ", LIT(lib));
-			}
-		#else
+		gbString lib_str = gb_string_make(heap_allocator(), "");
+		// defer (gb_string_free(lib_str));
+		char lib_str_buf[1024] = {0};
+		for_array(i, ir_gen.module.foreign_library_paths) {
+			String lib = ir_gen.module.foreign_library_paths[i];
+			// gb_printf_err("Linking lib: %.*s\n", LIT(lib));
 			isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-			                        " -l%.*s ", LIT(lib));
-		#endif
-		lib_str = gb_string_appendc(lib_str, lib_str_buf);
-	}
+			                        " \"%.*s\"", LIT(lib));
+			lib_str = gb_string_appendc(lib_str, lib_str_buf);
+		}
 
-	// Unlike the Win32 linker code, the output_ext includes the dot, because
-	// typically executable files on *NIX systems don't have extensions.
-	char *output_ext = "";
-	char *link_settings = "";
-	char *linker;
-	if (build_context.is_dll) {
-		// Shared libraries are .dylib on MacOS and .so on Linux.
-		// TODO(zangent): Is that statement entirely truthful?
-		#if defined(GB_SYSTEM_OSX)
-			output_ext = ".dylib";
-		#else
-			output_ext = ".so";
-		#endif
+		char *output_ext = "exe";
+		char *link_settings = "";
+		if (build_context.is_dll) {
+			output_ext = "dll";
+			link_settings = "/DLL";
+		} else {
+			link_settings = "/ENTRY:mainCRTStartup";
+		}
 
-		link_settings = "-shared";
-	} else {
-		// TODO: Do I need anything here?
-		link_settings = "";
-	}
+		exit_code = system_exec_command_line_app("msvc-link", true,
+			"link \"%.*s\".obj -OUT:\"%.*s.%s\" %s "
+			"/defaultlib:libcmt "
+			"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
+			" %.*s "
+			" %s "
+			"",
+			LIT(output_base), LIT(output_base), output_ext,
+			lib_str, LIT(build_context.link_flags),
+			link_settings
+			);
+		if (exit_code != 0) {
+			return exit_code;
+		}
 
-	#if defined(GB_SYSTEM_OSX)
-		linker = "ld";
+		// timings_print_all(&timings);
+
+		if (run_output) {
+			system_exec_command_line_app("odin run", false, "%.*s.exe", LIT(output_base));
+		}
+
 	#else
-		// TODO(zangent): Figure out how to make ld work on Linux.
-		//   It probably has to do with including the entire CRT, but
-		//   that's quite a complicated issue to solve while remaining distro-agnostic.
-		//   Clang can figure out linker flags for us, and that's good enough _for now_.
-		linker = "clang -Wno-unused-command-line-argument";
-	#endif
 
-	exit_code = system_exec_command_line_app("ld-link", true,
-		"%s \"%.*s\".o -o \"%.*s%s\" %s "
-		"-lc -lm "
-		" %.*s "
-		" %s "
+		// NOTE(zangent): Linux / Unix is unfinished and not tested very well.
+
+
+		timings_start_section(&timings, str_lit("llvm-llc"));
+		// For more arguments: http://llvm.org/docs/CommandGuide/llc.html
+		exit_code = system_exec_command_line_app("llc", false,
+			"llc \"%.*s.bc\" -filetype=obj -relocation-model=pic -O%d "
+			"%.*s "
+			// "-debug-pass=Arguments "
+			"",
+			LIT(output_base),
+			optimization_level,
+			LIT(build_context.llc_flags));
+		if (exit_code != 0) {
+			return exit_code;
+		}
+
+		timings_start_section(&timings, str_lit("ld-link"));
+
+		gbString lib_str = gb_string_make(heap_allocator(), "");
+		// defer (gb_string_free(lib_str));
+		char lib_str_buf[1024] = {0};
+		for_array(i, ir_gen.module.foreign_library_paths) {
+			String lib = ir_gen.module.foreign_library_paths[i];
+
+			// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
+			//   This allows you to specify '-f' in a #foreign_system_library,
+			//   without having to implement any new syntax specifically for MacOS.
+			#if defined(GB_SYSTEM_OSX)
+				isize len;
+				if(lib.len > 2 && lib[0] == '-' && lib[1] == 'f') {
+					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+					                        " -framework %.*s ", (int)(lib.len) - 2, lib.text + 2);
+				} else {
+					len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+					                        " -l%.*s ", LIT(lib));
+				}
+			#else
+				isize len = gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
+				                        " -l%.*s ", LIT(lib));
+			#endif
+			lib_str = gb_string_appendc(lib_str, lib_str_buf);
+		}
+
+		// Unlike the Win32 linker code, the output_ext includes the dot, because
+		// typically executable files on *NIX systems don't have extensions.
+		char *output_ext = "";
+		char *link_settings = "";
+		char *linker;
+		if (build_context.is_dll) {
+			// Shared libraries are .dylib on MacOS and .so on Linux.
+			// TODO(zangent): Is that statement entirely truthful?
+			#if defined(GB_SYSTEM_OSX)
+				output_ext = ".dylib";
+			#else
+				output_ext = ".so";
+			#endif
+
+			link_settings = "-shared";
+		} else {
+			// TODO: Do I need anything here?
+			link_settings = "";
+		}
+
 		#if defined(GB_SYSTEM_OSX)
-			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
-			// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
-			//       make sure to also change the `mtriple` param passed to `opt`
-			" -macosx_version_min 10.8.0 "
-			// This points the linker to where the entry point is
-			" -e _main "
+			linker = "ld";
+		#else
+			// TODO(zangent): Figure out how to make ld work on Linux.
+			//   It probably has to do with including the entire CRT, but
+			//   that's quite a complicated issue to solve while remaining distro-agnostic.
+			//   Clang can figure out linker flags for us, and that's good enough _for now_.
+			linker = "clang -Wno-unused-command-line-argument";
 		#endif
-		, linker, LIT(output_base), LIT(output_base), output_ext,
-		lib_str, LIT(build_context.link_flags),
-		link_settings
-		);
-	if (exit_code != 0) {
-		return exit_code;
-	}
 
-	// timings_print_all(&timings);
+		exit_code = system_exec_command_line_app("ld-link", true,
+			"%s \"%.*s\".o -o \"%.*s%s\" %s "
+			"-lc -lm "
+			" %.*s "
+			" %s "
+			#if defined(GB_SYSTEM_OSX)
+				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
+				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
+				//       make sure to also change the `mtriple` param passed to `opt`
+				" -macosx_version_min 10.8.0 "
+				// This points the linker to where the entry point is
+				" -e _main "
+			#endif
+			, linker, LIT(output_base), LIT(output_base), output_ext,
+			lib_str, LIT(build_context.link_flags),
+			link_settings
+			);
+		if (exit_code != 0) {
+			return exit_code;
+		}
 
-	if (run_output) {
-		system_exec_command_line_app("odin run", false, "%.*s", LIT(output_base));
-	}
+		// timings_print_all(&timings);
+
+		if (run_output) {
+			system_exec_command_line_app("odin run", false, "%.*s", LIT(output_base));
+		}
 
 	#endif
 #endif

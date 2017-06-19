@@ -25,7 +25,7 @@ Type *   check_call_arguments           (Checker *c, Operand *operand, Type *pro
 void error_operand_not_expression(Operand *o) {
 	if (o->mode == Addressing_Type) {
 		gbString err = expr_to_string(o->expr);
-		error_node(o->expr, "`%s` is not an expression but a type", err);
+		error(o->expr, "`%s` is not an expression but a type", err);
 		gb_string_free(err);
 		o->mode = Addressing_Invalid;
 	}
@@ -34,7 +34,7 @@ void error_operand_not_expression(Operand *o) {
 void error_operand_no_value(Operand *o) {
 	if (o->mode == Addressing_NoValue) {
 		gbString err = expr_to_string(o->expr);
-		error_node(o->expr, "`%s` used as value", err);
+		error(o->expr, "`%s` used as value", err);
 		gb_string_free(err);
 		o->mode = Addressing_Invalid;
 	}
@@ -290,7 +290,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 		Type *target_type = type;
 		if (type == NULL || is_type_any(type)) {
 			if (type == NULL && is_type_untyped_nil(operand->type)) {
-				error_node(operand->expr, "Use of untyped nil in %.*s", LIT(context_name));
+				error(operand->expr, "Use of untyped nil in %.*s", LIT(context_name));
 				operand->mode = Addressing_Invalid;
 				return;
 			}
@@ -324,13 +324,13 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 		if (operand->mode == Addressing_Builtin) {
 			// TODO(bill): is this a good enough error message?
 			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
-			error_node(operand->expr,
+			error(operand->expr,
 			           "Cannot assign built-in procedure `%s` in %.*s",
 			           expr_str,
 			           LIT(context_name));
 		} else {
 			// TODO(bill): is this a good enough error message?
-			error_node(operand->expr,
+			error(operand->expr,
 			           "Cannot assign value `%s` of type `%s` to `%s` in %.*s",
 			           expr_str,
 			           op_type_str,
@@ -411,7 +411,7 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 
 		if (is_using) {
 			if (f->names.count > 1) {
-				error_node(f->names[0], "Cannot apply `using` to more than one of the same type");
+				error(f->names[0], "Cannot apply `using` to more than one of the same type");
 				is_using = false;
 			}
 		}
@@ -429,7 +429,7 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 			if (name_token.string == "_") {
 				fields[field_index++] = e;
 			} else if (name_token.string == "__tag") {
-				error_node(name, "`__tag` is a reserved identifier for fields");
+				error(name, "`__tag` is a reserved identifier for fields");
 			} else {
 				HashKey key = hash_string(name_token.string);
 				Entity **found = map_get(&entity_map, key);
@@ -595,7 +595,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 
 	if (st->align != NULL) {
 		if (st->is_packed) {
-			syntax_error_node(st->align, "`#align` cannot be applied with `#packed`");
+			syntax_error(st->align, "`#align` cannot be applied with `#packed`");
 			return;
 		}
 
@@ -603,7 +603,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 		check_expr(c, &o, st->align);
 		if (o.mode != Addressing_Constant) {
 			if (o.mode != Addressing_Invalid) {
-				error_node(st->align, "#align must be a constant");
+				error(st->align, "#align must be a constant");
 			}
 			return;
 		}
@@ -613,21 +613,21 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 			if (o.value.kind == ExactValue_Integer) {
 				i64 align = i128_to_i64(o.value.value_integer);
 				if (align < 1 || !gb_is_power_of_two(align)) {
-					error_node(st->align, "#align must be a power of 2, got %lld", align);
+					error(st->align, "#align must be a power of 2, got %lld", align);
 					return;
 				}
 
 				// NOTE(bill): Success!!!
 				i64 custom_align = gb_clamp(align, 1, build_context.max_align);
 				if (custom_align < align) {
-					warning_node(st->align, "Custom alignment has been clamped to %lld from %lld", align, custom_align);
+					warning(st->align, "Custom alignment has been clamped to %lld from %lld", align, custom_align);
 				}
 				struct_type->Record.custom_align = custom_align;
 				return;
 			}
 		}
 
-		error_node(st->align, "#align must be an integer");
+		error(st->align, "#align must be an integer");
 		return;
 	}
 
@@ -792,11 +792,11 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	}
 
 	if (base_type == NULL || !(is_type_integer(base_type) || is_type_float(base_type))) {
-		error_node(node, "Base type for enumeration must be numeric");
+		error(node, "Base type for enumeration must be numeric");
 		return;
 	}
 	if (is_type_enum(base_type)) {
-		error_node(node, "Base type for enumeration cannot be another enumeration");
+		error(node, "Base type for enumeration cannot be another enumeration");
 		return;
 	}
 
@@ -825,7 +825,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		if (field->kind == AstNode_FieldValue) {
 			ast_node(fv, FieldValue, field);
 			if (fv->field == NULL || fv->field->kind != AstNode_Ident) {
-				error_node(field, "An enum field's name must be an identifier");
+				error(field, "An enum field's name must be an identifier");
 				continue;
 			}
 			ident = fv->field;
@@ -833,7 +833,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		} else if (field->kind == AstNode_Ident) {
 			ident = field;
 		} else {
-			error_node(field, "An enum field's name must be an identifier");
+			error(field, "An enum field's name must be an identifier");
 			continue;
 		}
 		String name = ident->Ident.string;
@@ -842,7 +842,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 			Operand o = {};
 			check_expr(c, &o, init);
 			if (o.mode != Addressing_Constant) {
-				error_node(init, "Enumeration value must be a constant");
+				error(init, "Enumeration value must be a constant");
 				o.mode = Addressing_Invalid;
 			}
 			if (o.mode != Addressing_Invalid) {
@@ -862,19 +862,19 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		if (name == "_") {
 			continue;
 		} else if (name == "count") {
-			error_node(field, "`count` is a reserved identifier for enumerations");
+			error(field, "`count` is a reserved identifier for enumerations");
 			continue;
 		} else if (name == "min_value") {
-			error_node(field, "`min_value` is a reserved identifier for enumerations");
+			error(field, "`min_value` is a reserved identifier for enumerations");
 			continue;
 		} else if (name == "max_value") {
-			error_node(field, "`max_value` is a reserved identifier for enumerations");
+			error(field, "`max_value` is a reserved identifier for enumerations");
 			continue;
 		} else if (name == "names") {
-			error_node(field, "`names` is a reserved identifier for enumerations");
+			error(field, "`names` is a reserved identifier for enumerations");
 			continue;
 		}/*  else if (name == "base_type") {
-			error_node(field, "`base_type` is a reserved identifier for enumerations");
+			error(field, "`base_type` is a reserved identifier for enumerations");
 			continue;
 		} */
 
@@ -891,7 +891,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 
 		HashKey key = hash_string(name);
 		if (map_get(&entity_map, key) != NULL) {
-			error_node(ident, "`%.*s` is already declared in this enumeration", LIT(name));
+			error(ident, "`%.*s` is already declared in this enumeration", LIT(name));
 		} else {
 			map_set(&entity_map, key, e);
 			add_entity(c, c->context.scope, NULL, e);
@@ -940,7 +940,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 		AstNode *value = field->FieldValue.value;
 
 		if (ident->kind != AstNode_Ident) {
-			error_node(field, "A bit field value's name must be an identifier");
+			error(field, "A bit field value's name must be an identifier");
 			continue;
 		}
 		String name = ident->Ident.string;
@@ -948,17 +948,17 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 		Operand o = {};
 		check_expr(c, &o, value);
 		if (o.mode != Addressing_Constant) {
-			error_node(value, "Bit field bit size must be a constant");
+			error(value, "Bit field bit size must be a constant");
 			continue;
 		}
 		ExactValue v = exact_value_to_integer(o.value);
 		if (v.kind != ExactValue_Integer) {
-			error_node(value, "Bit field bit size must be a constant integer");
+			error(value, "Bit field bit size must be a constant integer");
 			continue;
 		}
 		i64 bits = i128_to_i64(v.value_integer);
 		if (bits < 0 || bits > 128) {
-			error_node(value, "Bit field's bit size must be within the range 1..<128, got %lld", cast(long long)bits);
+			error(value, "Bit field's bit size must be within the range 1..<128, got %lld", cast(long long)bits);
 			continue;
 		}
 
@@ -970,7 +970,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 		HashKey key = hash_string(name);
 		if (name != "_" &&
 		    map_get(&entity_map, key) != NULL) {
-			error_node(ident, "`%.*s` is already declared in this bit field", LIT(name));
+			error(ident, "`%.*s` is already declared in this bit field", LIT(name));
 		} else {
 			map_set(&entity_map, key, e);
 			add_entity(c, c->context.scope, NULL, e);
@@ -998,7 +998,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 		check_expr(c, &o, bft->align);
 		if (o.mode != Addressing_Constant) {
 			if (o.mode != Addressing_Invalid) {
-				error_node(bft->align, "#align must be a constant");
+				error(bft->align, "#align must be a constant");
 			}
 			return;
 		}
@@ -1008,21 +1008,21 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 			if (o.value.kind == ExactValue_Integer) {
 				i64 align = i128_to_i64(o.value.value_integer);
 				if (align < 1 || !gb_is_power_of_two(align)) {
-					error_node(bft->align, "#align must be a power of 2, got %lld", align);
+					error(bft->align, "#align must be a power of 2, got %lld", align);
 					return;
 				}
 
 				// NOTE(bill): Success!!!
 				i64 custom_align = gb_clamp(align, 1, build_context.max_align);
 				if (custom_align < align) {
-					warning_node(bft->align, "Custom alignment has been clamped to %lld from %lld", align, custom_align);
+					warning(bft->align, "Custom alignment has been clamped to %lld from %lld", align, custom_align);
 				}
 				bit_field_type->BitField.custom_align = custom_align;
 				return;
 			}
 		}
 
-		error_node(bft->align, "#align must be an integer");
+		error(bft->align, "#align must be an integer");
 		return;
 	}
 }
@@ -1079,7 +1079,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				if (is_operand_nil(o)) {
 					default_is_nil = true;
 				} else if (o.mode != Addressing_Constant) {
-					error_node(default_value, "Default parameter must be a constant");
+					error(default_value, "Default parameter must be a constant");
 				} else {
 					value = o.value;
 				}
@@ -1092,7 +1092,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				if (i+1 == params.count) {
 					is_variadic = true;
 				} else {
-					error_node(param, "Invalid AST: Invalid variadic parameter");
+					error(param, "Invalid AST: Invalid variadic parameter");
 				}
 			}
 			if (type_expr->kind == AstNode_HelperType) {
@@ -1115,7 +1115,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					if (is_operand_nil(o)) {
 						default_is_nil = true;
 					} else if (o.mode != Addressing_Constant) {
-						error_node(default_value, "Default parameter must be a constant");
+						error(default_value, "Default parameter must be a constant");
 					} else {
 						value = o.value;
 					}
@@ -1126,24 +1126,24 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 
 		}
 		if (type == NULL) {
-			error_node(params[i], "Invalid parameter type");
+			error(params[i], "Invalid parameter type");
 			type = t_invalid;
 		}
 		if (is_type_untyped(type)) {
-			error_node(params[i], "Cannot determine parameter type from a nil");
+			error(params[i], "Cannot determine parameter type from a nil");
 			type = t_invalid;
 		}
 
 		if (p->flags&FieldFlag_no_alias) {
 			if (!is_type_pointer(type)) {
-				error_node(params[i], "`#no_alias` can only be applied to fields of pointer type");
+				error(params[i], "`#no_alias` can only be applied to fields of pointer type");
 				p->flags &= ~FieldFlag_no_alias; // Remove the flag
 			}
 		}
 		if (p->flags&FieldFlag_c_vararg) {
 			if (p->type == NULL ||
 			    p->type->kind != AstNode_Ellipsis) {
-				error_node(params[i], "`#c_vararg` can only be applied to variadic type fields");
+				error(params[i], "`#c_vararg` can only be applied to variadic type fields");
 				p->flags &= ~FieldFlag_c_vararg; // Remove the flag
 			} else {
 				is_c_vararg = true;
@@ -1234,7 +1234,7 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 
 				AstNode *name = field->names[j];
 				if (name->kind != AstNode_Ident) {
-					error_node(name, "Expected an identifer for as the field name");
+					error(name, "Expected an identifer for as the field name");
 				} else {
 					token = name->Ident;
 				}
@@ -1622,11 +1622,11 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 
 	case Entity_ImportName:
 		if (!allow_import_name) {
-			error_node(n, "Use of import `%.*s` not in selector", LIT(name));
+			error(n, "Use of import `%.*s` not in selector", LIT(name));
 		}
 		return e;
 	case Entity_LibraryName:
-		error_node(n, "Use of library `%.*s` not in foreign block", LIT(name));
+		error(n, "Use of library `%.*s` not in foreign block", LIT(name));
 		return e;
 
 	case Entity_Label:
@@ -1660,9 +1660,9 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 	if (o.mode != Addressing_Constant) {
 		if (o.mode != Addressing_Invalid) {
 			if (is_map) {
-				error_node(e, "Fixed map count must be a constant");
+				error(e, "Fixed map count must be a constant");
 			} else {
-				error_node(e, "Array count must be a constant");
+				error(e, "Array count must be a constant");
 			}
 		}
 		return 0;
@@ -1675,21 +1675,21 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 				if (count > 0) {
 					return count;
 				}
-				error_node(e, "Invalid fixed map count");
+				error(e, "Invalid fixed map count");
 			} else {
 				if (count >= 0) {
 					return count;
 				}
-				error_node(e, "Invalid array count");
+				error(e, "Invalid array count");
 			}
 			return 0;
 		}
 	}
 
 	if (is_map) {
-		error_node(e, "Fixed map count must be an integer");
+		error(e, "Fixed map count must be an integer");
 	} else {
-		error_node(e, "Array count must be an integer");
+		error(e, "Array count must be an integer");
 	}
 	return 0;
 }
@@ -1714,17 +1714,17 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 
 	if (!is_type_valid_for_keys(key)) {
 		if (is_type_boolean(key)) {
-			error_node(node, "A boolean cannot be used as a key for a map");
+			error(node, "A boolean cannot be used as a key for a map");
 		} else {
 			gbString str = type_to_string(key);
-			error_node(node, "Invalid type of a key for a map, got `%s`", str);
+			error(node, "Invalid type of a key for a map, got `%s`", str);
 			gb_string_free(str);
 		}
 	}
 
 	if (count > 0) {
 		count = 0;
-		error_node(node, "Fixed map types are not yet implemented");
+		error(node, "Fixed map types are not yet implemented");
 	}
 
 	type->Map.count = count;
@@ -1803,7 +1803,7 @@ void check_map_type(Checker *c, Type *type, AstNode *node) {
 
 	type->Map.lookup_result_type = make_optional_ok_type(a, value);
 
-	// error_node(node, "`map` types are not yet implemented");
+	// error(node, "`map` types are not yet implemented");
 }
 
 bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) {
@@ -1827,12 +1827,12 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		} break;
 		case Addressing_NoValue: {
 			gbString err_str = expr_to_string(e);
-			error_node(e, "`%s` used as a type", err_str);
+			error(e, "`%s` used as a type", err_str);
 			gb_string_free(err_str);
 		} break;
 		default: {
 			gbString err_str = expr_to_string(e);
-			error_node(e, "`%s` used as a type when not a type", err_str);
+			error(e, "`%s` used as a type when not a type", err_str);
 			gb_string_free(err_str);
 		} break;
 		}
@@ -1851,12 +1851,12 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			return true;
 		case Addressing_NoValue: {
 			gbString err_str = expr_to_string(e);
-			error_node(e, "`%s` used as a type", err_str);
+			error(e, "`%s` used as a type", err_str);
 			gb_string_free(err_str);
 		} break;
 		default: {
 			gbString err_str = expr_to_string(e);
-			error_node(e, "`%s` is not a type", err_str);
+			error(e, "`%s` is not a type", err_str);
 			gb_string_free(err_str);
 		} break;
 		}
@@ -1896,14 +1896,14 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			Type *elem = check_type(c, at->elem, NULL);
 			i64 count = check_array_or_map_count(c, at->count, false);
 			if (count < 0) {
-				error_node(at->count, ".. can only be used in conjuction with compound literals");
+				error(at->count, ".. can only be used in conjuction with compound literals");
 				count = 0;
 			}
 #if 0
 			i64 esz = type_size_of(c->allocator, elem);
 			if (esz == 0) {
 				gbString str = type_to_string(elem);
-				error_node(at->elem, "Zero sized element type `%s` is not allowed", str);
+				error(at->elem, "Zero sized element type `%s` is not allowed", str);
 				gb_string_free(str);
 			}
 #endif
@@ -1914,7 +1914,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			i64 esz = type_size_of(c->allocator, elem);
 			if (esz == 0) {
 				gbString str = type_to_string(elem);
-				error_node(at->elem, "Zero sized element type `%s` is not allowed", str);
+				error(at->elem, "Zero sized element type `%s` is not allowed", str);
 				gb_string_free(str);
 			}
 #endif
@@ -1929,7 +1929,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 #if 0
 		if (esz == 0) {
 			gbString str = type_to_string(elem);
-			error_node(dat->elem, "Zero sized element type `%s` is not allowed", str);
+			error(dat->elem, "Zero sized element type `%s` is not allowed", str);
 			gb_string_free(str);
 		}
 #endif
@@ -1945,7 +1945,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		i64 count = check_array_or_map_count(c, vt->count, false);
 		if (is_type_vector(be) || (!is_type_boolean(be) && !is_type_numeric(be))) {
 			gbString err_str = type_to_string(elem);
-			error_node(vt->elem, "Vector element type must be numerical or a boolean, got `%s`", err_str);
+			error(vt->elem, "Vector element type must be numerical or a boolean, got `%s`", err_str);
 			gb_string_free(err_str);
 		}
 		*type = make_type_vector(c->allocator, elem, count);
@@ -2039,7 +2039,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 
 	if (!ok) {
 		gbString err_str = expr_to_string(e);
-		error_node(e, "`%s` is not a type", err_str);
+		error(e, "`%s` is not a type", err_str);
 		gb_string_free(err_str);
 		type = t_invalid;
 	}
@@ -2051,7 +2051,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 	if (type->kind == Type_Named) {
 		if (type->Named.base == NULL) {
 			gbString name = type_to_string(type);
-			error_node(e, "Invalid type definition of %s", name);
+			error(e, "Invalid type definition of %s", name);
 			gb_string_free(name);
 			type->Named.base = t_invalid;
 		}
@@ -2061,7 +2061,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 		add_type_and_value(&c->info, e, Addressing_Type, type, empty_exact_value);
 	} else {
 		gbString name = type_to_string(type);
-		error_node(e, "Invalid type definition of %s", name);
+		error(e, "Invalid type definition of %s", name);
 		gb_string_free(name);
 		type = t_invalid;
 	}
@@ -2074,7 +2074,7 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 bool check_unary_op(Checker *c, Operand *o, Token op) {
 	if (o->type == NULL) {
 		gbString str = expr_to_string(o->expr);
-		error_node(o->expr, "Expression has no value `%s`", str);
+		error(o->expr, "Expression has no value `%s`", str);
 		gb_string_free(str);
 		return false;
 	}
@@ -2128,7 +2128,7 @@ bool check_binary_op(Checker *c, Operand *o, Token op) {
 		}
 		if (base_type(type) == t_rawptr) {
 			gbString str = type_to_string(type);
-			error_node(o->expr, "Invalid pointer type for pointer arithmetic: `%s`", str);
+			error(o->expr, "Invalid pointer type for pointer arithmetic: `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
@@ -2310,7 +2310,7 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 		gbString b = type_to_string(type);
 		if (is_type_numeric(o->type) && is_type_numeric(type)) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
-				error_node(o->expr, "`%s` truncated to `%s`", a, b);
+				error(o->expr, "`%s` truncated to `%s`", a, b);
 			} else {
 				char buf[127] = {};
 				String str = {};
@@ -2320,10 +2320,10 @@ void check_is_expressible(Checker *c, Operand *o, Type *type) {
 				} else {
 					str = i128_to_string(i, buf, gb_size_of(buf));
 				}
-				error_node(o->expr, "`%s = %.*s` overflows `%s`", a, str, b);
+				error(o->expr, "`%s = %.*s` overflows `%s`", a, str, b);
 			}
 		} else {
-			error_node(o->expr, "Cannot convert `%s` to `%s`", a, b);
+			error(o->expr, "Cannot convert `%s` to `%s`", a, b);
 		}
 
 		gb_string_free(b);
@@ -2489,7 +2489,7 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 	}
 
 	if (err_str != NULL) {
-		error_node(x->expr, "Cannot compare expression, %s", err_str);
+		error(x->expr, "Cannot compare expression, %s", err_str);
 		x->type = t_untyped_bool;
 	} else {
 		if (x->mode == Addressing_Constant &&
@@ -2528,7 +2528,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 	bool x_is_untyped = is_type_untyped(x->type);
 	if (!(is_type_integer(x->type) || (x_is_untyped && x_val.kind == ExactValue_Integer))) {
 		gbString err_str = expr_to_string(x->expr);
-		error_node(node, "Shifted operand `%s` must be an integer", err_str);
+		error(node, "Shifted operand `%s` must be an integer", err_str);
 		gb_string_free(err_str);
 		x->mode = Addressing_Invalid;
 		return;
@@ -2544,7 +2544,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 		}
 	} else {
 		gbString err_str = expr_to_string(y->expr);
-		error_node(node, "Shift amount `%s` must be an unsigned integer", err_str);
+		error(node, "Shift amount `%s` must be an unsigned integer", err_str);
 		gb_string_free(err_str);
 		x->mode = Addressing_Invalid;
 		return;
@@ -2556,7 +2556,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 			ExactValue y_val = exact_value_to_integer(y->value);
 			if (y_val.kind != ExactValue_Integer) {
 				gbString err_str = expr_to_string(y->expr);
-				error_node(node, "Shift amount `%s` must be an unsigned integer", err_str);
+				error(node, "Shift amount `%s` must be an unsigned integer", err_str);
 				gb_string_free(err_str);
 				x->mode = Addressing_Invalid;
 				return;
@@ -2565,7 +2565,7 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 			i64 amount = i128_to_i64(y_val.value_integer);
 			if (amount > 128) {
 				gbString err_str = expr_to_string(y->expr);
-				error_node(node, "Shift amount too large: `%s`", err_str);
+				error(node, "Shift amount too large: `%s`", err_str);
 				gb_string_free(err_str);
 				x->mode = Addressing_Invalid;
 				return;
@@ -2599,13 +2599,13 @@ void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
 
 	if (y->mode == Addressing_Constant && i128_lt(y->value.value_integer, I128_ZERO)) {
 		gbString err_str = expr_to_string(y->expr);
-		error_node(node, "Shift amount cannot be negative: `%s`", err_str);
+		error(node, "Shift amount cannot be negative: `%s`", err_str);
 		gb_string_free(err_str);
 	}
 
 	if (!is_type_integer(x->type)) {
 		gbString err_str = expr_to_string(y->expr);
-		error_node(node, "Shift operand `%s` must be an integer", err_str);
+		error(node, "Shift operand `%s` must be an integer", err_str);
 		gb_string_free(err_str);
 		x->mode = Addressing_Invalid;
 		return;
@@ -2658,7 +2658,7 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 
 	if (base_type(ptr->type) == t_rawptr) {
 		gbString str = type_to_string(ptr->type);
-		error_node(node, "Invalid pointer type for pointer arithmetic: `%s`", str);
+		error(node, "Invalid pointer type for pointer arithmetic: `%s`", str);
 		gb_string_free(str);
 		operand.mode = Addressing_Invalid;
 		return operand;
@@ -2670,7 +2670,7 @@ Operand check_ptr_addition(Checker *c, TokenKind op, Operand *ptr, Operand *offs
 
 	if (elem_size <= 0) {
 		gbString str = type_to_string(elem);
-		error_node(node, "Size of pointer's element type `%s` is zero and cannot be used for pointer arithmetic", str);
+		error(node, "Size of pointer's element type `%s` is zero and cannot be used for pointer arithmetic", str);
 		gb_string_free(str);
 		operand.mode = Addressing_Invalid;
 		return operand;
@@ -2758,7 +2758,7 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 			// NOTE(bill): This error should suppress the next casting error as it's at the same position
 			gbString xs = type_to_string(x);
 			gbString ys = type_to_string(y);
-			error_node(operand->expr, "Cannot cast from a union pointer `%s` to `%s`, try using `union_cast` or cast to a `rawptr`", xs, ys);
+			error(operand->expr, "Cannot cast from a union pointer `%s` to `%s`, try using `union_cast` or cast to a `rawptr`", xs, ys);
 			gb_string_free(ys);
 			gb_string_free(xs);
 			return false;
@@ -2829,7 +2829,7 @@ void check_cast(Checker *c, Operand *x, Type *type) {
 		gbString expr_str = expr_to_string(x->expr);
 		gbString to_type  = type_to_string(type);
 		gbString from_type = type_to_string(x->type);
-		error_node(x->expr, "Cannot cast `%s` as `%s` from `%s`", expr_str, to_type, from_type);
+		error(x->expr, "Cannot cast `%s` as `%s` from `%s`", expr_str, to_type, from_type);
 		gb_string_free(from_type);
 		gb_string_free(to_type);
 		gb_string_free(expr_str);
@@ -2911,7 +2911,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			if (op.kind == Token_Sub) {
 				gbString lhs = expr_to_string(x->expr);
 				gbString rhs = expr_to_string(y->expr);
-				error_node(node, "Invalid pointer arithmetic, did you mean `%s %.*s %s`?", rhs, LIT(op.string), lhs);
+				error(node, "Invalid pointer arithmetic, did you mean `%s %.*s %s`?", rhs, LIT(op.string), lhs);
 				gb_string_free(rhs);
 				gb_string_free(lhs);
 				x->mode = Addressing_Invalid;
@@ -2993,7 +2993,7 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 			}
 
 			if (fail) {
-				error_node(y->expr, "Division by zero not allowed");
+				error(y->expr, "Division by zero not allowed");
 				x->mode = Addressing_Invalid;
 				return;
 			}
@@ -3091,7 +3091,7 @@ void update_expr_type(Checker *c, AstNode *e, Type *type, bool final) {
 	if (old.is_lhs && !is_type_integer(type)) {
 		gbString expr_str = expr_to_string(e);
 		gbString type_str = type_to_string(type);
-		error_node(e, "Shifted operand %s must be an integer, got %s", expr_str, type_str);
+		error(e, "Shifted operand %s must be an integer, got %s", expr_str, type_str);
 		gb_string_free(type_str);
 		gb_string_free(expr_str);
 		return;
@@ -3120,7 +3120,7 @@ void convert_untyped_error(Checker *c, Operand *operand, Type *target_type) {
 			}
 		}
 	}
-	error_node(operand->expr, "Cannot convert `%s` to `%s`%s", expr_str, type_str, extra_text);
+	error(operand->expr, "Cannot convert `%s` to `%s`%s", expr_str, type_str, extra_text);
 
 	gb_string_free(type_str);
 	gb_string_free(expr_str);
@@ -3255,7 +3255,7 @@ bool check_index_value(Checker *c, bool open_range, AstNode *index_value, i64 ma
 
 	if (!is_type_integer(operand.type)) {
 		gbString expr_str = expr_to_string(operand.expr);
-		error_node(operand.expr, "Index `%s` must be an integer", expr_str);
+		error(operand.expr, "Index `%s` must be an integer", expr_str);
 		gb_string_free(expr_str);
 		if (value) *value = 0;
 		return false;
@@ -3266,7 +3266,7 @@ bool check_index_value(Checker *c, bool open_range, AstNode *index_value, i64 ma
 		i64 i = i128_to_i64(exact_value_to_integer(operand.value).value_integer);
 		if (i < 0) {
 			gbString expr_str = expr_to_string(operand.expr);
-			error_node(operand.expr, "Index `%s` cannot be a negative value", expr_str);
+			error(operand.expr, "Index `%s` cannot be a negative value", expr_str);
 			gb_string_free(expr_str);
 			if (value) *value = 0;
 			return false;
@@ -3282,7 +3282,7 @@ bool check_index_value(Checker *c, bool open_range, AstNode *index_value, i64 ma
 			}
 			if (out_of_bounds) {
 				gbString expr_str = expr_to_string(operand.expr);
-				error_node(operand.expr, "Index `%s` is out of bounds range 0..<%lld", expr_str, max_count);
+				error(operand.expr, "Index `%s` is out of bounds range 0..<%lld", expr_str, max_count);
 				gb_string_free(expr_str);
 				return false;
 			}
@@ -3350,7 +3350,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 	if (selector->kind != AstNode_Ident && selector->kind != AstNode_BasicLit) {
 	// if (selector->kind != AstNode_Ident) {
-		error_node(selector, "Illegal selector kind: `%.*s`", LIT(ast_node_strings[selector->kind]));
+		error(selector, "Illegal selector kind: `%.*s`", LIT(ast_node_strings[selector->kind]));
 		operand->mode = Addressing_Invalid;
 		operand->expr = node;
 		return NULL;
@@ -3385,7 +3385,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 				}
 			}
 			if (!is_declared) {
-				error_node(op_expr, "`%.*s` is not declared by `%.*s`", LIT(entity_name), LIT(import_name));
+				error(op_expr, "`%.*s` is not declared by `%.*s`", LIT(entity_name), LIT(import_name));
 				operand->mode = Addressing_Invalid;
 				operand->expr = node;
 				return NULL;
@@ -3406,7 +3406,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 			if (is_not_exported) {
 				gbString sel_str = expr_to_string(selector);
-				error_node(op_expr, "`%s` is not exported by `%.*s`", sel_str, LIT(import_name));
+				error(op_expr, "`%s` is not exported by `%.*s`", sel_str, LIT(import_name));
 				gb_string_free(sel_str);
 				operand->mode = Addressing_Invalid;
 				operand->expr = node;
@@ -3473,7 +3473,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		sel = lookup_field(c->allocator, operand->type, field_name, operand->mode == Addressing_Type);
 
 		if (operand->mode != Addressing_Type && !check_is_field_exported(c, sel.entity)) {
-			error_node(op_expr, "`%.*s` is an unexported field", LIT(field_name));
+			error(op_expr, "`%.*s` is an unexported field", LIT(field_name));
 			operand->mode = Addressing_Invalid;
 			operand->expr = node;
 			return NULL;
@@ -3492,14 +3492,14 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			check_expr(c, &o, selector);
 			if (o.mode != Addressing_Constant ||
 			    !is_type_integer(o.type)) {
-				error_node(op_expr, "Indexed based selectors must be a constant integer %s");
+				error(op_expr, "Indexed based selectors must be a constant integer %s");
 				operand->mode = Addressing_Invalid;
 				operand->expr = node;
 				return NULL;
 			}
 			i64 index = i128_to_i64(o.value.value_integer);
 			if (index < 0) {
-				error_node(o.expr, "Index %lld cannot be a negative value", index);
+				error(o.expr, "Index %lld cannot be a negative value", index);
 				operand->mode = Addressing_Invalid;
 				operand->expr = node;
 				return NULL;
@@ -3512,7 +3512,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			}
 
 			if (index >= max_count) {
-				error_node(o.expr, "Index %lld is out of bounds range 0..<%lld", index, max_count);
+				error(o.expr, "Index %lld is out of bounds range 0..<%lld", index, max_count);
 				operand->mode = Addressing_Invalid;
 				operand->expr = node;
 				return NULL;
@@ -3524,7 +3524,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			GB_ASSERT(entity != NULL);
 
 		} else {
-			error_node(op_expr, "Indexed based selectors may only be used on structs or tuples");
+			error(op_expr, "Indexed based selectors may only be used on structs or tuples");
 			operand->mode = Addressing_Invalid;
 			operand->expr = node;
 			return NULL;
@@ -3544,7 +3544,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		gbString op_str   = expr_to_string(op_expr);
 		gbString type_str = type_to_string(operand->type);
 		gbString sel_str  = expr_to_string(selector);
-		error_node(op_expr, "`%s` of type `%s` has no field `%s`", op_str, type_str, sel_str);
+		error(op_expr, "`%s` of type `%s` has no field `%s`", op_str, type_str, sel_str);
 		gb_string_free(sel_str);
 		gb_string_free(type_str);
 		gb_string_free(op_str);
@@ -3557,7 +3557,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		gbString op_str   = expr_to_string(op_expr);
 		gbString type_str = type_to_string(operand->type);
 		gbString sel_str  = expr_to_string(selector);
-		error_node(op_expr, "Cannot access non-constant field `%s` from `%s`", sel_str, op_str);
+		error(op_expr, "Cannot access non-constant field `%s` from `%s`", sel_str, op_str);
 		gb_string_free(sel_str);
 		gb_string_free(type_str);
 		gb_string_free(op_str);
@@ -3632,7 +3632,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	if (ce->args.count > 0) {
 		if (ce->args[0]->kind == AstNode_FieldValue) {
-			error_node(call, "`field = value` calling is not allowed on built-in procedures");
+			error(call, "`field = value` calling is not allowed on built-in procedures");
 			return false;
 		}
 	}
@@ -3672,7 +3672,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		String name = bd->name;
 		GB_ASSERT(name == "location");
 		if (ce->args.count > 1) {
-			error_node(ce->args[0], "`#location` expects either 0 or 1 arguments, got %td", ce->args.count);
+			error(ce->args[0], "`#location` expects either 0 or 1 arguments, got %td", ce->args.count);
 		}
 		if (ce->args.count > 0) {
 			AstNode *arg = ce->args[0];
@@ -3684,7 +3684,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 				e = check_selector(c, &o, arg, NULL);
 			}
 			if (e == NULL) {
-				error_node(ce->args[0], "`#location` expected a valid entity name");
+				error(ce->args[0], "`#location` expected a valid entity name");
 			}
 		}
 
@@ -3731,7 +3731,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (mode == Addressing_Invalid) {
 			String name = builtin_procs[id].name;
 			gbString t = type_to_string(operand->type);
-			error_node(call, "`%.*s` is not supported for `%s`", LIT(name), t);
+			error(call, "`%.*s` is not supported for `%s`", LIT(name), t);
 			return false;
 		}
 
@@ -3746,7 +3746,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		check_expr_or_type(c, &op, ce->args[0]);
 		Type *type = op.type;
 		if ((op.mode != Addressing_Type && type == NULL) || type == t_invalid) {
-			error_node(ce->args[0], "Expected a type for `new`");
+			error(ce->args[0], "Expected a type for `new`");
 			return false;
 		}
 		operand->mode = Addressing_Value;
@@ -3760,13 +3760,13 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		check_expr_or_type(c, &op, ce->args[0]);
 		Type *type = op.type;
 		if ((op.mode != Addressing_Type && type == NULL) || type == t_invalid) {
-			error_node(ce->args[0], "Expected a type for `new_slice`");
+			error(ce->args[0], "Expected a type for `new_slice`");
 			return false;
 		}
 
 		isize arg_count = ce->args.count;
 		if (arg_count < 2 || 3 < arg_count) {
-			error_node(ce->args[0], "`new_slice` expects 2 or 3 arguments, found %td", arg_count);
+			error(ce->args[0], "`new_slice` expects 2 or 3 arguments, found %td", arg_count);
 			// NOTE(bill): Return the correct type to reduce errors
 		} else {
 			// If any are constant
@@ -3782,7 +3782,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			}
 
 			if (size_count == 2 && sizes[0] > sizes[1]) {
-				error_node(ce->args[1], "`new_slice` count and capacity are swapped");
+				error(ce->args[1], "`new_slice` count and capacity are swapped");
 				// No need quit
 			}
 		}
@@ -3798,7 +3798,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		check_expr_or_type(c, &op, ce->args[0]);
 		Type *type = op.type;
 		if ((op.mode != Addressing_Type && type == NULL) || type == t_invalid) {
-			error_node(ce->args[0], "Expected a type for `make`");
+			error(ce->args[0], "Expected a type for `make`");
 			return false;
 		}
 
@@ -3815,14 +3815,14 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			max_args = 3;
 		} else {
 			gbString str = type_to_string(type);
-			error_node(call, "Cannot `make` %s; type must be a slice, map, or dynamic array", str);
+			error(call, "Cannot `make` %s; type must be a slice, map, or dynamic array", str);
 			gb_string_free(str);
 			return false;
 		}
 
 		isize arg_count = ce->args.count;
 		if (arg_count < min_args || max_args < arg_count) {
-			error_node(ce->args[0], "`make` expects %td or %d argument, found %td", min_args, max_args, arg_count);
+			error(ce->args[0], "`make` expects %td or %d argument, found %td", min_args, max_args, arg_count);
 			return false;
 		}
 
@@ -3839,7 +3839,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		if (size_count == 2 && sizes[0] > sizes[1]) {
-			error_node(ce->args[1], "`make` count and capacity are swapped");
+			error(ce->args[1], "`make` count and capacity are swapped");
 			// No need quit
 		}
 
@@ -3868,7 +3868,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		if (!ok) {
 			gbString type_str = type_to_string(type);
-			error_node(operand->expr, "Invalid type for `free`, got `%s`", type_str);
+			error(operand->expr, "Invalid type for `free`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -3884,7 +3884,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *type = operand->type;
 		if (!is_type_dynamic_array(type) && !is_type_dynamic_map(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a dynamic array or dynamic map, got `%s`", str);
+			error(operand->expr, "Expected a dynamic array or dynamic map, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
@@ -3897,7 +3897,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 		Type *arg_type = base_type(op.type);
 		if (!is_type_integer(arg_type)) {
-			error_node(operand->expr, "`reserve` capacities must be an integer");
+			error(operand->expr, "`reserve` capacities must be an integer");
 			return false;
 		}
 
@@ -3911,7 +3911,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		type = base_type(type_deref(type));
 		if (!is_type_dynamic_array(type) && !is_type_map(type) && !is_type_slice(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Invalid type for `clear`, got `%s`", str);
+			error(operand->expr, "Invalid type for `clear`, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
@@ -3930,7 +3930,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		type = base_type(type_deref(type));
 		if (!is_type_dynamic_array(type) && !is_type_slice(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a slice or dynamic array, got `%s`", str);
+			error(operand->expr, "Expected a slice or dynamic array, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
@@ -3940,7 +3940,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			is_addressable = true;
 		}
 		if (!is_addressable) {
-			error_node(operand->expr, "`append` can only operate on addressable values");
+			error(operand->expr, "`append` can only operate on addressable values");
 			return false;
 		}
 
@@ -3973,7 +3973,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *type = operand->type;
 		if (!is_type_map(type)) {
 			gbString str = type_to_string(type);
-			error_node(operand->expr, "Expected a map, got `%s`", str);
+			error(operand->expr, "Expected a map, got `%s`", str);
 			gb_string_free(str);
 			return false;
 		}
@@ -3990,7 +3990,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (!check_is_assignable_to(c, &op, key)) {
 			gbString kt = type_to_string(key);
 			gbString ot = type_to_string(op.type);
-			error_node(operand->expr, "Expected a key of type `%s`, got `%s`", key, ot);
+			error(operand->expr, "Expected a key of type `%s`, got `%s`", key, ot);
 			gb_string_free(ot);
 			gb_string_free(kt);
 			return false;
@@ -4009,7 +4009,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 		Type *t = o.type;
 		if (t == NULL || t == t_invalid) {
-			error_node(ce->args[0], "Invalid argument for `size_of`");
+			error(ce->args[0], "Invalid argument for `size_of`");
 			return false;
 		}
 		t = default_type(t);
@@ -4028,7 +4028,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 		Type *t = o.type;
 		if (t == NULL || t == t_invalid) {
-			error_node(ce->args[0], "Invalid argument for `align_of`");
+			error(ce->args[0], "Invalid argument for `align_of`");
 			return false;
 		}
 		t = default_type(t);
@@ -4045,18 +4045,18 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *bt = check_type(c, ce->args[0]);
 		Type *type = base_type(bt);
 		if (type == NULL || type == t_invalid) {
-			error_node(ce->args[0], "Expected a type for `offset_of`");
+			error(ce->args[0], "Expected a type for `offset_of`");
 			return false;
 		}
 
 		AstNode *field_arg = unparen_expr(ce->args[1]);
 		if (field_arg == NULL ||
 		    field_arg->kind != AstNode_Ident) {
-			error_node(field_arg, "Expected an identifier for field argument");
+			error(field_arg, "Expected an identifier for field argument");
 			return false;
 		}
 		if (is_type_array(type) || is_type_vector(type)) {
-			error_node(field_arg, "Invalid type for `offset_of`");
+			error(field_arg, "Invalid type for `offset_of`");
 			return false;
 		}
 
@@ -4065,14 +4065,14 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Selection sel = lookup_field(c->allocator, type, arg->string, operand->mode == Addressing_Type);
 		if (sel.entity == NULL) {
 			gbString type_str = type_to_string(bt);
-			error_node(ce->args[0],
+			error(ce->args[0],
 			      "`%s` has no field named `%.*s`", type_str, LIT(arg->string));
 			gb_string_free(type_str);
 			return false;
 		}
 		if (sel.indirect) {
 			gbString type_str = type_to_string(bt);
-			error_node(ce->args[0],
+			error(ce->args[0],
 			      "Field `%.*s` is embedded via a pointer in `%s`", LIT(arg->string), type_str);
 			gb_string_free(type_str);
 			return false;
@@ -4091,7 +4091,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 		if (operand->type == NULL || operand->type == t_invalid) {
-			error_node(operand->expr, "Invalid argument to `type_of_val`");
+			error(operand->expr, "Invalid argument to `type_of_val`");
 			return false;
 		}
 		operand->mode = Addressing_Type;
@@ -4114,7 +4114,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 		Type *t = o.type;
 		if (t == NULL || t == t_invalid) {
-			error_node(ce->args[0], "Invalid argument for `size_of`");
+			error(ce->args[0], "Invalid argument for `size_of`");
 			return false;
 		}
 		t = default_type(t);
@@ -4130,13 +4130,13 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		if (!is_type_boolean(operand->type) && operand->mode != Addressing_Constant) {
 			gbString str = expr_to_string(ce->args[0]);
-			error_node(call, "`%s` is not a constant boolean", str);
+			error(call, "`%s` is not a constant boolean", str);
 			gb_string_free(str);
 			return false;
 		}
 		if (!operand->value.value_bool) {
 			gbString str = expr_to_string(ce->args[0]);
-			error_node(call, "Compile time assertion: `%s`", str);
+			error(call, "Compile time assertion: `%s`", str);
 			gb_string_free(str);
 		}
 
@@ -4163,7 +4163,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		if (dest_type == NULL || src_type == NULL) {
-			error_node(call, "`copy` only expects slices as arguments");
+			error(call, "`copy` only expects slices as arguments");
 			return false;
 		}
 
@@ -4172,7 +4172,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			gbString s_arg = expr_to_string(ce->args[1]);
 			gbString d_str = type_to_string(dest_type);
 			gbString s_str = type_to_string(src_type);
-			error_node(call,
+			error(call,
 			      "Arguments to `copy`, %s, %s, have different elem types: %s vs %s",
 			      d_arg, s_arg, d_str, s_str);
 			gb_string_free(s_str);
@@ -4191,7 +4191,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *vector_type = base_type(operand->type);
 		if (!is_type_vector(vector_type)) {
 			gbString type_str = type_to_string(operand->type);
-			error_node(call,
+			error(call,
 			      "You can only `swizzle` a vector, got `%s`",
 			      type_str);
 			gb_string_free(type_str);
@@ -4213,17 +4213,17 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			}
 			Type *arg_type = base_type(op.type);
 			if (!is_type_integer(arg_type) || op.mode != Addressing_Constant) {
-				error_node(op.expr, "Indices to `swizzle` must be constant integers");
+				error(op.expr, "Indices to `swizzle` must be constant integers");
 				return false;
 			}
 
 			if (i128_lt(op.value.value_integer, I128_ZERO)) {
-				error_node(op.expr, "Negative `swizzle` index");
+				error(op.expr, "Negative `swizzle` index");
 				return false;
 			}
 
 			if (i128_le(max_count128, op.value.value_integer)) {
-				error_node(op.expr, "`swizzle` index exceeds vector length");
+				error(op.expr, "`swizzle` index exceeds vector length");
 				return false;
 			}
 
@@ -4231,7 +4231,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		if (arg_count > max_count) {
-			error_node(call, "Too many `swizzle` indices, %td > %td", arg_count, max_count);
+			error(call, "Too many `swizzle` indices, %td > %td", arg_count, max_count);
 			return false;
 		}
 
@@ -4269,7 +4269,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (!are_types_identical(x.type, y.type)) {
 			gbString tx = type_to_string(x.type);
 			gbString ty = type_to_string(y.type);
-			error_node(call, "Mismatched types to `complex`, `%s` vs `%s`", tx, ty);
+			error(call, "Mismatched types to `complex`, `%s` vs `%s`", tx, ty);
 			gb_string_free(ty);
 			gb_string_free(tx);
 			return false;
@@ -4277,7 +4277,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		if (!is_type_float(x.type)) {
 			gbString s = type_to_string(x.type);
-			error_node(call, "Arguments have type `%s`, expected a floating point", s);
+			error(call, "Arguments have type `%s`, expected a floating point", s);
 			gb_string_free(s);
 			return false;
 		}
@@ -4320,7 +4320,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		if (!is_type_complex(x->type)) {
 			gbString s = type_to_string(x->type);
-			error_node(call, "Argument has type `%s`, expected a complex type", s);
+			error(call, "Argument has type `%s`, expected a complex type", s);
 			gb_string_free(s);
 			return false;
 		}
@@ -4358,7 +4358,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			}
 		} else {
 			gbString s = type_to_string(x->type);
-			error_node(call, "Expected a complex or quaternion, got `%s`", s);
+			error(call, "Expected a complex or quaternion, got `%s`", s);
 			gb_string_free(s);
 			return false;
 		}
@@ -4372,19 +4372,19 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *ptr_type = base_type(operand->type);
 		if (!is_type_pointer(ptr_type)) {
 			gbString type_str = type_to_string(operand->type);
-			error_node(call, "Expected a pointer to `slice_ptr`, got `%s`", type_str);
+			error(call, "Expected a pointer to `slice_ptr`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
 
 		if (ptr_type == t_rawptr) {
-			error_node(call, "`rawptr` cannot have pointer arithmetic");
+			error(call, "`rawptr` cannot have pointer arithmetic");
 			return false;
 		}
 
 		isize arg_count = ce->args.count;
 		if (arg_count < 2 || 3 < arg_count) {
-			error_node(ce->args[0], "`slice_ptr` expects 2 or 3 arguments, found %td", arg_count);
+			error(ce->args[0], "`slice_ptr` expects 2 or 3 arguments, found %td", arg_count);
 			// NOTE(bill): Return the correct type to reduce errors
 		} else {
 			// If any are constant
@@ -4400,7 +4400,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			}
 
 			if (size_count == 2 && sizes[0] > sizes[1]) {
-				error_node(ce->args[1], "`slice_ptr` count and capacity are swapped");
+				error(ce->args[1], "`slice_ptr` count and capacity are swapped");
 				// No need quit
 			}
 		}
@@ -4413,7 +4413,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *slice_type = base_type(operand->type);
 		if (!is_type_slice(slice_type)) {
 			gbString type_str = type_to_string(operand->type);
-			error_node(call, "Expected a slice type, got `%s`", type_str);
+			error(call, "Expected a slice type, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -4427,7 +4427,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *type = base_type(operand->type);
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
-			error_node(call, "Expected a ordered numeric type to `min`, got `%s`", type_str);
+			error(call, "Expected a ordered numeric type to `min`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -4441,7 +4441,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 		if (!is_type_ordered(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
 			gbString type_str = type_to_string(b.type);
-			error_node(call,
+			error(call,
 			      "Expected a ordered numeric type to `min`, got `%s`",
 			      type_str);
 			gb_string_free(type_str);
@@ -4477,7 +4477,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			if (!are_types_identical(a.type, b.type)) {
 				gbString type_a = type_to_string(a.type);
 				gbString type_b = type_to_string(b.type);
-				error_node(call,
+				error(call,
 				      "Mismatched types to `min`, `%s` vs `%s`",
 				      type_a, type_b);
 				gb_string_free(type_b);
@@ -4493,7 +4493,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *type = base_type(operand->type);
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
-			error_node(call,
+			error(call,
 			      "Expected a ordered numeric or string type to `max`, got `%s`",
 			      type_str);
 			gb_string_free(type_str);
@@ -4509,7 +4509,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 		if (!is_type_ordered(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
 			gbString type_str = type_to_string(b.type);
-			error_node(call,
+			error(call,
 			      "Expected a ordered numeric or string type to `max`, got `%s`",
 			      type_str);
 			gb_string_free(type_str);
@@ -4545,7 +4545,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			if (!are_types_identical(a.type, b.type)) {
 				gbString type_a = type_to_string(a.type);
 				gbString type_b = type_to_string(b.type);
-				error_node(call,
+				error(call,
 				      "Mismatched types to `max`, `%s` vs `%s`",
 				      type_a, type_b);
 				gb_string_free(type_b);
@@ -4560,7 +4560,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		// proc abs(n: numeric) -> numeric
 		if (!is_type_numeric(operand->type) && !is_type_vector(operand->type)) {
 			gbString type_str = type_to_string(operand->type);
-			error_node(call, "Expected a numeric type to `abs`, got `%s`", type_str);
+			error(call, "Expected a numeric type to `abs`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -4597,7 +4597,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		Type *type = base_type(operand->type);
 		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
 			gbString type_str = type_to_string(operand->type);
-			error_node(call, "Expected a ordered numeric or string type to `clamp`, got `%s`", type_str);
+			error(call, "Expected a ordered numeric or string type to `clamp`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -4614,7 +4614,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 		if (!is_type_ordered(y.type) || !(is_type_numeric(y.type) || is_type_string(y.type))) {
 			gbString type_str = type_to_string(y.type);
-			error_node(call, "Expected a ordered numeric or string type to `clamp`, got `%s`", type_str);
+			error(call, "Expected a ordered numeric or string type to `clamp`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -4625,7 +4625,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 		if (!is_type_ordered(z.type) || !(is_type_numeric(z.type) || is_type_string(z.type))) {
 			gbString type_str = type_to_string(z.type);
-			error_node(call, "Expected a ordered numeric or string type to `clamp`, got `%s`", type_str);
+			error(call, "Expected a ordered numeric or string type to `clamp`, got `%s`", type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -4669,7 +4669,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 				gbString type_x = type_to_string(x.type);
 				gbString type_y = type_to_string(y.type);
 				gbString type_z = type_to_string(z.type);
-				error_node(call,
+				error(call,
 				      "Mismatched types to `clamp`, `%s`, `%s`, `%s`",
 				      type_x, type_y, type_z);
 				gb_string_free(type_z);
@@ -4685,7 +4685,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		check_expr_or_type(c, &op, ce->args[0]);
 		Type *t = op.type;
 		if ((op.mode != Addressing_Type && t == NULL) || t == t_invalid) {
-			error_node(ce->args[0], "Expected a type for `transmute`");
+			error(ce->args[0], "Expected a type for `transmute`");
 			return false;
 		}
 		AstNode *expr = ce->args[1];
@@ -4697,7 +4697,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		if (o->mode == Addressing_Constant) {
 			gbString expr_str = expr_to_string(o->expr);
-			error_node(o->expr, "Cannot transmute a constant expression: `%s`", expr_str);
+			error(o->expr, "Cannot transmute a constant expression: `%s`", expr_str);
 			gb_string_free(expr_str);
 			o->mode = Addressing_Invalid;
 			o->expr = expr;
@@ -4706,7 +4706,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		if (is_type_untyped(o->type)) {
 			gbString expr_str = expr_to_string(o->expr);
-			error_node(o->expr, "Cannot transmute untyped expression: `%s`", expr_str);
+			error(o->expr, "Cannot transmute untyped expression: `%s`", expr_str);
 			gb_string_free(expr_str);
 			o->mode = Addressing_Invalid;
 			o->expr = expr;
@@ -4718,7 +4718,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (srcz != dstz) {
 			gbString expr_str = expr_to_string(o->expr);
 			gbString type_str = type_to_string(t);
-			error_node(o->expr, "Cannot transmute `%s` to `%s`, %lld vs %lld bytes", expr_str, type_str, srcz, dstz);
+			error(o->expr, "Cannot transmute `%s` to `%s`, %lld vs %lld bytes", expr_str, type_str, srcz, dstz);
 			gb_string_free(type_str);
 			gb_string_free(expr_str);
 			o->mode = Addressing_Invalid;
@@ -4891,7 +4891,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 
 		if (show_error) {
 			gbString proc_str = expr_to_string(ce->proc);
-			error_node(call, err_fmt, proc_str, param_count_excluding_defaults);
+			error(call, err_fmt, proc_str, param_count_excluding_defaults);
 			gb_string_free(proc_str);
 		}
 		if (score_) *score_ = score;
@@ -4915,7 +4915,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			if (o.mode == Addressing_Invalid) {
 				continue;
 			} else if (o.mode != Addressing_Type) {
-				error_node(o.expr, "Expected a type for the argument");
+				error(o.expr, "Expected a type for the argument");
 			}
 			continue;
 		}
@@ -4945,7 +4945,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				t = slice;
 				if (operand_index != param_count) {
 					if (show_error) {
-						error_node(o.expr, "`..` in a variadic procedure can only have one variadic argument at the end");
+						error(o.expr, "`..` in a variadic procedure can only have one variadic argument at the end");
 					}
 					if (score_) *score_ = score;
 					return CallArgumentError_MultipleVariadicExpand;
@@ -5008,7 +5008,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 		if (fv->field->kind != AstNode_Ident) {
 			if (show_error) {
 				gbString expr_str = expr_to_string(fv->field);
-				error_node(arg, "Invalid parameter name `%s` in procedure call", expr_str);
+				error(arg, "Invalid parameter name `%s` in procedure call", expr_str);
 				gb_string_free(expr_str);
 			}
 			err = CallArgumentError_InvalidFieldValue;
@@ -5018,14 +5018,14 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 		isize index = lookup_procedure_parameter(pt, name);
 		if (index < 0) {
 			if (show_error) {
-				error_node(arg, "No parameter named `%.*s` for this procedure type", LIT(name));
+				error(arg, "No parameter named `%.*s` for this procedure type", LIT(name));
 			}
 			err = CallArgumentError_ParameterNotFound;
 			continue;
 		}
 		if (params_visited[index]) {
 			if (show_error) {
-				error_node(arg, "Duplicate parameter `%.*s` in procedure call", LIT(name));
+				error(arg, "Duplicate parameter `%.*s` in procedure call", LIT(name));
 			}
 			err = CallArgumentError_DuplicateParameter;
 			continue;
@@ -5041,7 +5041,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			if (o->mode == Addressing_Invalid) {
 				continue;
 			} else if (o->mode != Addressing_Type) {
-				error_node(o->expr, "Expected a type for the argument");
+				error(o->expr, "Expected a type for the argument");
 			}
 			score += 1;
 		} else {
@@ -5081,7 +5081,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 
 			if (show_error) {
 				gbString str = type_to_string(e->type);
-				error_node(call, "Parameter `%.*s` of type `%s` is missing in procedure call",
+				error(call, "Parameter `%.*s` of type `%s` is missing in procedure call",
 				           LIT(e->token.string), str);
 				gb_string_free(str);
 			}
@@ -5171,10 +5171,10 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 
 
 		if (valid_count == 0) {
-			error_node(operand->expr, "No overloads for `%.*s` that match with the given arguments", LIT(name));
+			error(operand->expr, "No overloads for `%.*s` that match with the given arguments", LIT(name));
 			proc_type = t_invalid;
 		} else if (valid_count > 1) {
-			error_node(operand->expr, "Ambiguous procedure call `%.*s`, could be:", LIT(name));
+			error(operand->expr, "Ambiguous procedure call `%.*s`, could be:", LIT(name));
 			for (isize i = 0; i < valid_count; i++) {
 				Entity *proc = procs[valids[i].index];
 				TokenPos pos = proc->token.pos;
@@ -5257,7 +5257,7 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 				mix = arg->kind == AstNode_FieldValue;
 			}
 			if (mix) {
-				error_node(arg, "Mixture of `field = value` and value elements in a procedure all is not allowed");
+				error(arg, "Mixture of `field = value` and value elements in a procedure all is not allowed");
 				fail = true;
 			}
 		}
@@ -5288,12 +5288,12 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		operand->mode = Addressing_Invalid;
 		isize arg_count = ce->args.count;
 		switch (arg_count) {
-		case 0:  error_node(call, "Missing argument in conversion to `%s`", str);   break;
-		default: error_node(call, "Too many arguments in conversion to `%s`", str); break;
+		case 0:  error(call, "Missing argument in conversion to `%s`", str);   break;
+		default: error(call, "Too many arguments in conversion to `%s`", str); break;
 		case 1: {
 			AstNode *arg = ce->args[0];
 			if (arg->kind == AstNode_FieldValue) {
-				error_node(call, "`field = value` cannot be used in a type conversion");
+				error(call, "`field = value` cannot be used in a type conversion");
 				arg = arg->FieldValue.value;
 				// NOTE(bill): Carry on the cast regardless
 			}
@@ -5325,7 +5325,7 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 			AstNode *e = operand->expr;
 			gbString str = expr_to_string(e);
 			gbString type_str = type_to_string(operand->type);
-			error_node(e, "Cannot call a non-procedure: `%s` of type `%s`", str, type_str);
+			error(e, "Cannot call a non-procedure: `%s` of type `%s`", str, type_str);
 			gb_string_free(type_str);
 			gb_string_free(str);
 
@@ -5379,7 +5379,7 @@ ExprKind check_macro_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	GB_ASSERT(call->kind == AstNode_MacroCallExpr);
 	ast_node(mce, MacroCallExpr, call);
 
-	error_node(call, "Macro call expressions are not yet supported");
+	error(call, "Macro call expressions are not yet supported");
 	operand->mode = Addressing_Invalid;
 	operand->expr = call;
 	return Expr_Stmt;
@@ -5402,7 +5402,7 @@ void check_expr_with_type_hint(Checker *c, Operand *o, AstNode *e, Type *t) {
 	}
 	if (err_str != NULL) {
 		gbString str = expr_to_string(e);
-		error_node(e, "`%s` %s", str, err_str);
+		error(e, "`%s` %s", str, err_str);
 		gb_string_free(str);
 		o->mode = Addressing_Invalid;
 	}
@@ -5482,7 +5482,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		switch (i->kind) {
 		case Token_context:
 			if (c->context.proc_name.len == 0) {
-				error_node(node, "`context` is only allowed within procedures");
+				error(node, "`context` is only allowed within procedures");
 				return kind;
 			}
 
@@ -5490,7 +5490,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			o->type = t_context;
 			break;
 		default:
-			error_node(node, "Illegal implicit name `%.*s`", LIT(i->string));
+			error(node, "Illegal implicit name `%.*s`", LIT(i->string));
 			return kind;
 		}
 	case_end;
@@ -5530,7 +5530,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			o->value = exact_value_i64(bd->token.pos.line);
 		} else if (bd->name == "procedure") {
 			if (c->proc_stack.count == 0) {
-				error_node(node, "#procedure may only be used within procedures");
+				error(node, "#procedure may only be used within procedures");
 				o->type = t_untyped_string;
 				o->value = exact_value_string(str_lit(""));
 			} else {
@@ -5539,7 +5539,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			}
 		} else if (bd->name == "caller_location") {
 			init_preload(c);
-			error_node(node, "#caller_location may only be used as a default argument parameter");
+			error(node, "#caller_location may only be used as a default argument parameter");
 			o->type = t_source_code_location;
 			o->mode = Addressing_Value;
 		} else {
@@ -5559,14 +5559,14 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			c->context.decl = decl;
 
 			if (pl->tags != 0) {
-				error_node(node, "A procedure literal cannot have tags");
+				error(node, "A procedure literal cannot have tags");
 				pl->tags = 0; // TODO(bill): Should I zero this?!
 			}
 
 			check_procedure_type(c, type, pl->type);
 			if (!is_type_proc(type)) {
 				gbString str = expr_to_string(node);
-				error_node(node, "Invalid procedure literal `%s`", str);
+				error(node, "Invalid procedure literal `%s`", str);
 				gb_string_free(str);
 				check_close_scope(c);
 				return kind;
@@ -5585,7 +5585,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		Operand cond = {Addressing_Invalid};
 		check_expr(c, &cond, te->cond);
 		if (cond.mode != Addressing_Invalid && !is_type_boolean(cond.type)) {
-			error_node(te->cond, "Non-boolean condition in if expression");
+			error(te->cond, "Non-boolean condition in if expression");
 		}
 
 		Operand x = {Addressing_Invalid};
@@ -5595,7 +5595,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		if (te->y != NULL) {
 			check_expr_with_type_hint(c, &y, te->y, type_hint);
 		} else {
-			error_node(node, "A ternary expression must have an else clause");
+			error(node, "A ternary expression must have an else clause");
 			return kind;
 		}
 
@@ -5618,7 +5618,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		if (!are_types_identical(x.type, y.type)) {
 			gbString its = type_to_string(x.type);
 			gbString ets = type_to_string(y.type);
-			error_node(node, "Mismatched types in ternary expression, %s vs %s", its, ets);
+			error(node, "Mismatched types in ternary expression, %s vs %s", its, ets);
 			gb_string_free(ets);
 			gb_string_free(its);
 			return kind;
@@ -5665,7 +5665,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		}
 
 		if (type == NULL) {
-			error_node(node, "Missing type in compound literal");
+			error(node, "Missing type in compound literal");
 			return kind;
 		}
 
@@ -5675,7 +5675,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			if (!is_type_struct(t) && !is_type_union(t)) {
 				if (cl->elems.count != 0) {
 					gbString type_str = type_to_string(type);
-					error_node(node, "Illegal compound literal type `%s`", type_str);
+					error(node, "Illegal compound literal type `%s`", type_str);
 					gb_string_free(type_str);
 				}
 				break;
@@ -5694,13 +5694,13 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					for_array(i, cl->elems) {
 						AstNode *elem = cl->elems[i];
 						if (elem->kind != AstNode_FieldValue) {
-							error_node(elem, "Mixture of `field = value` and value elements in a structure literal is not allowed");
+							error(elem, "Mixture of `field = value` and value elements in a structure literal is not allowed");
 							continue;
 						}
 						ast_node(fv, FieldValue, elem);
 						if (fv->field->kind != AstNode_Ident) {
 							gbString expr_str = expr_to_string(fv->field);
-							error_node(elem, "Invalid field name `%s` in structure literal", expr_str);
+							error(elem, "Invalid field name `%s` in structure literal", expr_str);
 							gb_string_free(expr_str);
 							continue;
 						}
@@ -5709,17 +5709,17 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						Selection sel = lookup_field(c->allocator, type, name, o->mode == Addressing_Type);
 						bool is_unknown = sel.entity == NULL;
 						if (is_unknown) {
-							error_node(elem, "Unknown field `%.*s` in structure literal", LIT(name));
+							error(elem, "Unknown field `%.*s` in structure literal", LIT(name));
 							continue;
 						}
 						if (!is_unknown && !check_is_field_exported(c, sel.entity)) {
-							error_node(elem, "Cannot assign to an unexported field `%.*s` in structure literal", LIT(name));
+							error(elem, "Cannot assign to an unexported field `%.*s` in structure literal", LIT(name));
 							continue;
 						}
 
 
 						if (sel.index.count > 1) {
-							error_node(elem, "Cannot assign to an anonymous field `%.*s` in a structure literal (at the moment)", LIT(name));
+							error(elem, "Cannot assign to an anonymous field `%.*s` in a structure literal (at the moment)", LIT(name));
 							continue;
 						}
 
@@ -5727,7 +5727,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						add_entity_use(c, fv->field, field);
 
 						if (fields_visited[sel.index[0]]) {
-							error_node(elem, "Duplicate field `%.*s` in structure literal", LIT(name));
+							error(elem, "Duplicate field `%.*s` in structure literal", LIT(name));
 							continue;
 						}
 
@@ -5757,11 +5757,11 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					for_array(index, cl->elems) {
 						AstNode *elem = cl->elems[index];
 						if (elem->kind == AstNode_FieldValue) {
-							error_node(elem, "Mixture of `field = value` and value elements in a structure literal is not allowed");
+							error(elem, "Mixture of `field = value` and value elements in a structure literal is not allowed");
 							continue;
 						}
 						if (index >= field_count) {
-							error_node(o->expr, "Too many values in structure literal, expected %td", field_count);
+							error(o->expr, "Too many values in structure literal, expected %td", field_count);
 							break;
 						}
 
@@ -5774,7 +5774,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 						if (!check_is_field_exported(c, field)) {
 							gbString t = type_to_string(type);
-							error_node(o->expr, "Implicit assignment to an unexported field `%.*s` in `%s` literal",
+							error(o->expr, "Implicit assignment to an unexported field `%.*s` in `%s` literal",
 							           LIT(field->token.string), t);
 							gb_string_free(t);
 							continue;
@@ -5836,17 +5836,17 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				GB_ASSERT(cl->elems.data != NULL);
 				AstNode *e = cl->elems[index];
 				if (e == NULL) {
-					error_node(node, "Invalid literal element");
+					error(node, "Invalid literal element");
 					continue;
 				}
 
 				if (e->kind == AstNode_FieldValue) {
-					error_node(e, "`field = value` is only allowed in struct literals");
+					error(e, "`field = value` is only allowed in struct literals");
 					continue;
 				}
 
 				if (0 <= max_type_count && max_type_count <= index) {
-					error_node(e, "Index %lld is out of bounds (>= %lld) for %.*s", index, max_type_count, LIT(context_name));
+					error(e, "Index %lld is out of bounds (>= %lld) for %.*s", index, max_type_count, LIT(context_name));
 				}
 
 				Operand operand = {};
@@ -5863,7 +5863,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 			if (t->kind == Type_Vector) {
 				if (t->Vector.count > 1 && gb_is_between(index, 2, t->Vector.count-1)) {
-					error_node(cl->elems[0], "Expected either 1 (broadcast) or %td elements in vector literal, got %td", t->Vector.count, index);
+					error(cl->elems[0], "Expected either 1 (broadcast) or %td elements in vector literal, got %td", t->Vector.count, index);
 				}
 			}
 
@@ -5875,7 +5875,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		case Type_Basic: {
 			if (!is_type_any(t)) {
 				if (cl->elems.count != 0) {
-					error_node(node, "Illegal compound literal");
+					error(node, "Illegal compound literal");
 				}
 				break;
 			}
@@ -5891,13 +5891,13 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					for_array(i, cl->elems) {
 						AstNode *elem = cl->elems[i];
 						if (elem->kind != AstNode_FieldValue) {
-							error_node(elem, "Mixture of `field = value` and value elements in a `any` literal is not allowed");
+							error(elem, "Mixture of `field = value` and value elements in a `any` literal is not allowed");
 							continue;
 						}
 						ast_node(fv, FieldValue, elem);
 						if (fv->field->kind != AstNode_Ident) {
 							gbString expr_str = expr_to_string(fv->field);
-							error_node(elem, "Invalid field name `%s` in `any` literal", expr_str);
+							error(elem, "Invalid field name `%s` in `any` literal", expr_str);
 							gb_string_free(expr_str);
 							continue;
 						}
@@ -5905,14 +5905,14 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 						Selection sel = lookup_field(c->allocator, type, name, o->mode == Addressing_Type);
 						if (sel.entity == NULL) {
-							error_node(elem, "Unknown field `%.*s` in `any` literal", LIT(name));
+							error(elem, "Unknown field `%.*s` in `any` literal", LIT(name));
 							continue;
 						}
 
 						isize index = sel.index[0];
 
 						if (fields_visited[index]) {
-							error_node(elem, "Duplicate field `%.*s` in `any` literal", LIT(name));
+							error(elem, "Duplicate field `%.*s` in `any` literal", LIT(name));
 							continue;
 						}
 
@@ -5928,14 +5928,14 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					for_array(index, cl->elems) {
 						AstNode *elem = cl->elems[index];
 						if (elem->kind == AstNode_FieldValue) {
-							error_node(elem, "Mixture of `field = value` and value elements in a `any` literal is not allowed");
+							error(elem, "Mixture of `field = value` and value elements in a `any` literal is not allowed");
 							continue;
 						}
 
 
 						check_expr(c, o, elem);
 						if (index >= field_count) {
-							error_node(o->expr, "Too many values in `any` literal, expected %td", field_count);
+							error(o->expr, "Too many values in `any` literal, expected %td", field_count);
 							break;
 						}
 
@@ -5960,7 +5960,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				for_array(i, cl->elems) {
 					AstNode *elem = cl->elems[i];
 					if (elem->kind != AstNode_FieldValue) {
-						error_node(elem, "Only `field = value` elements are allowed in a map literal");
+						error(elem, "Only `field = value` elements are allowed in a map literal");
 						continue;
 					}
 					ast_node(fv, FieldValue, elem);
@@ -5978,7 +5978,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		default: {
 			gbString str = type_to_string(type);
-			error_node(node, "Invalid compound literal type `%s`", str);
+			error(node, "Invalid compound literal type `%s`", str);
 			gb_string_free(str);
 			return kind;
 		} break;
@@ -6000,7 +6000,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 	case_ast_node(te, TagExpr, node);
 		String name = te->name.string;
-		error_node(node, "Unknown tag expression, #%.*s", LIT(name));
+		error(node, "Unknown tag expression, #%.*s", LIT(name));
 		if (te->expr) {
 			kind = check_expr_base(c, o, te->expr, type_hint);
 		}
@@ -6023,7 +6023,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		if (o->mode == Addressing_Constant) {
 			gbString expr_str = expr_to_string(o->expr);
-			error_node(o->expr, "A type assertion cannot be applied to a constant expression: `%s`", expr_str);
+			error(o->expr, "A type assertion cannot be applied to a constant expression: `%s`", expr_str);
 			gb_string_free(expr_str);
 			o->mode = Addressing_Invalid;
 			o->expr = node;
@@ -6032,7 +6032,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		if (is_type_untyped(o->type)) {
 			gbString expr_str = expr_to_string(o->expr);
-			error_node(o->expr, "A type assertion cannot be applied to an untyped expression: `%s`", expr_str);
+			error(o->expr, "A type assertion cannot be applied to an untyped expression: `%s`", expr_str);
 			gb_string_free(expr_str);
 			o->mode = Addressing_Invalid;
 			o->expr = node;
@@ -6050,7 +6050,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		if (src_is_ptr != dst_is_ptr) {
 			gbString src_type_str = type_to_string(o->type);
 			gbString dst_type_str = type_to_string(t);
-			error_node(o->expr, "Invalid type assertion types: `%s` and `%s`", src_type_str, dst_type_str);
+			error(o->expr, "Invalid type assertion types: `%s` and `%s`", src_type_str, dst_type_str);
 			gb_string_free(dst_type_str);
 			gb_string_free(src_type_str);
 			o->mode = Addressing_Invalid;
@@ -6071,7 +6071,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			if (!ok) {
 				gbString expr_str = expr_to_string(o->expr);
 				gbString dst_type_str = type_to_string(t);
-				error_node(o->expr, "Cannot type assert `%s` to `%s`", expr_str, dst_type_str);
+				error(o->expr, "Cannot type assert `%s` to `%s`", expr_str, dst_type_str);
 				gb_string_free(dst_type_str);
 				gb_string_free(expr_str);
 				o->mode = Addressing_Invalid;
@@ -6091,7 +6091,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			add_type_info_type(c, o->type);
 			add_type_info_type(c, t);
 		} else {
-			error_node(o->expr, "Type assertions can only operate on unions");
+			error(o->expr, "Type assertions can only operate on unions");
 			o->mode = Addressing_Invalid;
 			o->expr = node;
 			return kind;
@@ -6170,9 +6170,9 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		if (!valid) {
 			gbString str = expr_to_string(o->expr);
 			if (is_const) {
-				error_node(o->expr, "Cannot index a constant `%s`", str);
+				error(o->expr, "Cannot index a constant `%s`", str);
 			} else {
-				error_node(o->expr, "Cannot index `%s`", str);
+				error(o->expr, "Cannot index `%s`", str);
 			}
 			gb_string_free(str);
 			o->mode = Addressing_Invalid;
@@ -6182,7 +6182,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		if (ie->index == NULL) {
 			gbString str = expr_to_string(o->expr);
-			error_node(o->expr, "Missing index for `%s`", str);
+			error(o->expr, "Missing index for `%s`", str);
 			gb_string_free(str);
 			o->mode = Addressing_Invalid;
 			o->expr = node;
@@ -6211,7 +6211,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		case Type_Basic:
 			if (is_type_string(t)) {
 				if (se->index3) {
-					error_node(node, "3-index slice on a string in not needed");
+					error(node, "3-index slice on a string in not needed");
 					o->mode = Addressing_Invalid;
 					o->expr = node;
 					return kind;
@@ -6229,7 +6229,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			max_count = t->Array.count;
 			if (o->mode != Addressing_Variable) {
 				gbString str = expr_to_string(node);
-				error_node(node, "Cannot slice array `%s`, value is not addressable", str);
+				error(node, "Cannot slice array `%s`, value is not addressable", str);
 				gb_string_free(str);
 				o->mode = Addressing_Invalid;
 				o->expr = node;
@@ -6250,7 +6250,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		if (!valid) {
 			gbString str = expr_to_string(o->expr);
-			error_node(o->expr, "Cannot slice `%s`", str);
+			error(o->expr, "Cannot slice `%s`", str);
 			gb_string_free(str);
 			o->mode = Addressing_Invalid;
 			o->expr = node;
@@ -6338,7 +6338,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				o->type = t->Pointer.elem;
  			} else {
  				gbString str = expr_to_string(o->expr);
- 				error_node(o->expr, "Cannot dereference `%s`", str);
+ 				error(o->expr, "Cannot dereference `%s`", str);
  				gb_string_free(str);
  				o->mode = Addressing_Invalid;
  				o->expr = node;
@@ -6419,7 +6419,7 @@ void check_not_tuple(Checker *c, Operand *o) {
 		if (o->type->kind == Type_Tuple) {
 			isize count = o->type->Tuple.variable_count;
 			GB_ASSERT(count != 1);
-			error_node(o->expr,
+			error(o->expr,
 			      "%td-valued tuple found where single value expected", count);
 			o->mode = Addressing_Invalid;
 		}
