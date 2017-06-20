@@ -28,6 +28,8 @@ struct irModule {
 	i32                   global_array_index; // For ConstantSlice
 	i32                   global_generated_index;
 
+	irValue *             global_default_context;
+
 	// NOTE(bill): To prevent strings from being copied a lot
 	// Mainly used for file names
 	Map<irValue *>        const_strings; // Key: String
@@ -125,6 +127,9 @@ struct irProcedure {
 	irTargetList *        target_list;
 	Array<irValue *>      referrers;
 
+	Array<irValue *>      context_stack;
+
+
 	Array<irBranchBlocks> branch_blocks;
 
 	i32                   local_count;
@@ -216,6 +221,7 @@ struct irProcedure {
 		irValue * return_ptr;                                         \
 		irValue **args;                                               \
 		isize     arg_count;                                          \
+		irValue * context_ptr;                                        \
 	})                                                                \
 	IR_INSTR_KIND(StartupRuntime, i32)                                \
 	IR_INSTR_KIND(DebugDeclare, struct {                              \
@@ -986,22 +992,23 @@ irValue *ir_instr_select(irProcedure *p, irValue *cond, irValue *t, irValue *f) 
 	return v;
 }
 
-irValue *ir_instr_call(irProcedure *p, irValue *value, irValue *return_ptr, irValue **args, isize arg_count, Type *result_type) {
+irValue *ir_instr_call(irProcedure *p, irValue *value, irValue *return_ptr, irValue **args, isize arg_count, Type *result_type, irValue *context_ptr) {
 	irValue *v = ir_alloc_instr(p, irInstr_Call);
-	v->Instr.Call.value = value;
-	v->Instr.Call.return_ptr = return_ptr;
-	v->Instr.Call.args = args;
-	v->Instr.Call.arg_count = arg_count;
-	v->Instr.Call.type = result_type;
+	v->Instr.Call.value       = value;
+	v->Instr.Call.return_ptr  = return_ptr;
+	v->Instr.Call.args        = args;
+	v->Instr.Call.arg_count   = arg_count;
+	v->Instr.Call.type        = result_type;
+	v->Instr.Call.context_ptr = context_ptr;
 	return v;
 }
 
 irValue *ir_instr_conv(irProcedure *p, irConvKind kind, irValue *value, Type *from, Type *to) {
 	irValue *v = ir_alloc_instr(p, irInstr_Conv);
-	v->Instr.Conv.kind = kind;
+	v->Instr.Conv.kind  = kind;
 	v->Instr.Conv.value = value;
-	v->Instr.Conv.from = from;
-	v->Instr.Conv.to = to;
+	v->Instr.Conv.from  = from;
+	v->Instr.Conv.to    = to;
 	return v;
 }
 
@@ -1472,10 +1479,29 @@ irValue *ir_emit_bitcast(irProcedure *proc, irValue *data, Type *type) {
 
 irValue *ir_emit_transmute(irProcedure *proc, irValue *value, Type *t);
 
+
+irValue *ir_emit_global_call(irProcedure *proc, char *name_, irValue **args, isize arg_count);
+
+irValue *ir_find_or_generate_context_ptr(irProcedure *proc) {
+	if (proc->context_stack.count > 0) {
+		return proc->context_stack[proc->context_stack.count-1];
+	}
+	irValue *c = ir_add_local_generated(proc, t_context);
+	ir_emit_store(proc, c, ir_emit_load(proc, proc->module->global_default_context));
+	array_add(&proc->context_stack, c);
+	return c;
+}
+
+
 irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_count) {
 	Type *pt = base_type(ir_type(value));
 	GB_ASSERT(pt->kind == Type_Proc);
 	Type *results = pt->Proc.results;
+
+	irValue *context_ptr = NULL;
+	if (pt->Proc.calling_convention == ProcCC_Odin) {
+		context_ptr = ir_find_or_generate_context_ptr(p);
+	}
 
 	isize param_count = pt->Proc.param_count;
 	if (pt->Proc.c_vararg) {
@@ -1500,11 +1526,11 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_
 	if (pt->Proc.return_by_pointer) {
 		irValue *return_ptr = ir_add_local_generated(p, rt);
 		GB_ASSERT(is_type_pointer(ir_type(return_ptr)));
-		ir_emit(p, ir_instr_call(p, value, return_ptr, args, arg_count, NULL));
+		ir_emit(p, ir_instr_call(p, value, return_ptr, args, arg_count, NULL, context_ptr));
 		return ir_emit_load(p, return_ptr);
 	}
 
-	irValue *result = ir_emit(p, ir_instr_call(p, value, NULL, args, arg_count, abi_rt));
+	irValue *result = ir_emit(p, ir_instr_call(p, value, NULL, args, arg_count, abi_rt, context_ptr));
 	if (abi_rt != results) {
 		result = ir_emit_transmute(p, result, rt);
 	}
@@ -4865,7 +4891,8 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		irValue *v = NULL;
 		switch (i->kind) {
 		case Token_context:
-			v = ir_find_global_variable(proc, str_lit("__context"));
+			v = ir_find_or_generate_context_ptr(proc);
+			// v = ir_find_global_variable(proc, str_lit("__context"));
 			break;
 		}
 
@@ -6716,13 +6743,13 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		ir_emit_comment(proc, str_lit("PushAllocator"));
 		ir_open_scope(proc);
 
-		irValue *context_ptr = ir_find_global_variable(proc, str_lit("__context"));
-		irValue *prev_context = ir_add_local_generated(proc, t_context);
-		ir_emit_store(proc, prev_context, ir_emit_load(proc, context_ptr));
+		irValue *prev = ir_find_or_generate_context_ptr(proc);
+		irValue *next = ir_add_local_generated(proc, t_context);
+		ir_emit_store(proc, next, ir_emit_load(proc, prev));
+		array_add(&proc->context_stack, next);
+		defer (array_pop(&proc->context_stack));
 
-		ir_add_defer_instr(proc, proc->scope_index, ir_instr_store(proc, context_ptr, ir_emit_load(proc, prev_context), false));
-
-		irValue *gep = ir_emit_struct_ep(proc, context_ptr, 1);
+		irValue *gep = ir_emit_struct_ep(proc, next, 1);
 		ir_emit_store(proc, gep, ir_build_expr(proc, pa->expr));
 
 		ir_build_stmt(proc, pa->body);
@@ -6735,13 +6762,12 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		ir_emit_comment(proc, str_lit("PushContext"));
 		ir_open_scope(proc);
 
-		irValue *context_ptr = ir_find_global_variable(proc, str_lit("__context"));
-		irValue *prev_context = ir_add_local_generated(proc, t_context);
-		ir_emit_store(proc, prev_context, ir_emit_load(proc, context_ptr));
+		irValue *prev = ir_find_or_generate_context_ptr(proc);
+		irValue *next = ir_add_local_generated(proc, t_context);
+		array_add(&proc->context_stack, next);
+		defer (array_pop(&proc->context_stack));
 
-		ir_add_defer_instr(proc, proc->scope_index, ir_instr_store(proc, context_ptr, ir_emit_load(proc, prev_context), false));
-
-		ir_emit_store(proc, context_ptr, ir_build_expr(proc, pc->expr));
+		ir_emit_store(proc, next, ir_build_expr(proc, pc->expr));
 
 		ir_build_stmt(proc, pc->body);
 
@@ -6785,12 +6811,14 @@ void ir_number_proc_registers(irProcedure *proc) {
 }
 
 void ir_begin_procedure_body(irProcedure *proc) {
+	gbAllocator a = proc->module->allocator;
 	array_add(&proc->module->procs, proc);
 
 	array_init(&proc->blocks,           heap_allocator());
 	array_init(&proc->defer_stmts,      heap_allocator());
 	array_init(&proc->children,         heap_allocator());
 	array_init(&proc->branch_blocks,    heap_allocator());
+	array_init(&proc->context_stack,    heap_allocator());
 
 	DeclInfo *decl = decl_info_of_entity(proc->module->info, proc->entity);
 	if (decl != NULL) {
@@ -6808,7 +6836,6 @@ void ir_begin_procedure_body(irProcedure *proc) {
 
 	if (proc->type->Proc.return_by_pointer) {
 		// NOTE(bill): this must be the first parameter stored
-		gbAllocator a = proc->module->allocator;
 		Type *ptr_type = make_type_pointer(a, reduce_tuple_to_single_type(proc->type->Proc.results));
 		Entity *e = make_entity_param(a, NULL, make_token_ident(str_lit("agg.result")), ptr_type, false, false);
 		e->flags |= EntityFlag_Sret | EntityFlag_NoAlias;
@@ -6848,6 +6875,13 @@ void ir_begin_procedure_body(irProcedure *proc) {
 	}
 
 
+	if (proc->type->Proc.calling_convention == ProcCC_Odin) {
+		Entity *e = make_entity_param(a, NULL, make_token_ident(str_lit("__.context_ptr")), t_context_ptr, false, false);
+		e->flags |= EntityFlag_NoAlias;
+		irValue *param = ir_value_param(a, proc, e, e->type);
+		ir_module_add_value(proc->module, e, param);
+		array_add(&proc->context_stack, param);
+	}
 }
 
 
@@ -7222,6 +7256,9 @@ void ir_gen_tree(irGen *s) {
 		}
 	}
 
+	{ // Add global default context
+		m->global_default_context = ir_add_global_generated(m, t_context, NULL);
+	}
 	struct irGlobalVariable {
 		irValue *var, *init;
 		DeclInfo *decl;
@@ -7478,7 +7515,7 @@ void ir_gen_tree(irGen *s) {
 		String name = str_lit(IR_STARTUP_RUNTIME_PROC_NAME);
 		Type *proc_type = make_type_proc(a, gb_alloc_item(a, Scope),
 		                                 NULL, 0,
-		                                 NULL, 0, false, ProcCC_Odin);
+		                                 NULL, 0, false, ProcCC_Contextless);
 		AstNode *body = gb_alloc_item(a, AstNode);
 		Entity *e = make_entity_procedure(a, NULL, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(a, m, e, proc_type, NULL, body, name);
@@ -7491,6 +7528,12 @@ void ir_gen_tree(irGen *s) {
 		proc->tags = ProcTag_no_inline; // TODO(bill): is no_inline a good idea?
 
 		ir_begin_procedure_body(proc);
+
+		{
+			irValue **args = gb_alloc_array(a, irValue *, 1);
+			args[0] = m->global_default_context;
+			ir_emit_global_call(proc, "__init_context", args, 1);
+		}
 
 		// TODO(bill): Should do a dependency graph do check which order to initialize them in?
 		for_array(i, global_variables) {

@@ -91,11 +91,12 @@ enum ProcTag {
 };
 
 enum ProcCallingConvention {
-	ProcCC_Invalid = 0,
-	ProcCC_Odin    = 1,
-	ProcCC_C       = 2,
-	ProcCC_Std     = 3,
-	ProcCC_Fast    = 4,
+	ProcCC_Invalid     = 0,
+	ProcCC_Odin        = 1,
+	ProcCC_Contextless = 2,
+	ProcCC_C           = 3,
+	ProcCC_Std         = 4,
+	ProcCC_Fast        = 5,
 };
 
 enum VarDeclFlag {
@@ -2070,11 +2071,15 @@ void parse_proc_tags(AstFile *f, u64 *tags, String *link_name, ProcCallingConven
 		ELSE_IF_ADD_TAG(no_bounds_check)
 		ELSE_IF_ADD_TAG(inline)
 		ELSE_IF_ADD_TAG(no_inline)
-		// ELSE_IF_ADD_TAG(dll_import)
-		// ELSE_IF_ADD_TAG(dll_export)
 		else if (tag_name == "cc_odin") {
 			if (cc == ProcCC_Invalid) {
 				cc = ProcCC_Odin;
+			} else {
+				syntax_error(tag_expr, "Multiple calling conventions for procedure type");
+			}
+		} else if (tag_name == "cc_contextless") {
+			if (cc == ProcCC_Invalid) {
+				cc = ProcCC_Contextless;
 			} else {
 				syntax_error(tag_expr, "Multiple calling conventions for procedure type");
 			}

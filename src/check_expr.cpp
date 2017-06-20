@@ -1419,7 +1419,9 @@ bool abi_compat_return_by_value(gbAllocator a, ProcCallingConvention cc, Type *a
 	if (abi_return_type == NULL) {
 		return false;
 	}
-	if (cc == ProcCC_Odin) {
+	switch (cc) {
+	case ProcCC_Odin:
+	case ProcCC_Contextless:
 		return false;
 	}
 
@@ -1465,6 +1467,8 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 		if (end->flags&EntityFlag_CVarArg) {
 			if (pt->calling_convention == ProcCC_Odin) {
 				error(end->token, "Odin calling convention does not support #c_vararg");
+			} else if (pt->calling_convention == ProcCC_Contextless) {
+				error(end->token, "Odin's contextless calling convention does not support #c_vararg");
 			} else if (pt->calling_convention == ProcCC_Fast) {
 				error(end->token, "Fast calling convention does not support #c_vararg");
 			} else {

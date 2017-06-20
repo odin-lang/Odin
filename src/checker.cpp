@@ -1779,14 +1779,16 @@ void check_all_global_entities(Checker *c) {
 			continue;
 		}
 
-		if (e->kind != Entity_Procedure && e->token.string == "main") {
-			if (e->scope->is_init) {
+		if (e->token.string == "main") {
+			if (e->kind != Entity_Procedure) {
+				if (e->scope->is_init) {
+					error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
+					continue;
+				}
+			} else if (e->scope->is_global) {
 				error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
 				continue;
 			}
-		} else if (e->scope->is_global && e->token.string == "main") {
-			error(e->token, "`main` is reserved as the entry point procedure in the initial scope");
-			continue;
 		}
 
 		CheckerContext prev_context = c->context;
