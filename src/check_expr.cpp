@@ -3409,7 +3409,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			isize overload_count = entity_overload_count(import_scope, entity_name);
 			bool is_overloaded = overload_count > 1;
 
-			bool implicit_is_found = map_get(&e->ImportName.scope->implicit, hash_pointer(entity)) != NULL;
+			bool implicit_is_found = is_entity_implicitly_imported(e, entity);
 			bool is_not_exported = !is_entity_exported(entity);
 			if (!implicit_is_found) {
 				is_not_exported = false;

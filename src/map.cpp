@@ -15,6 +15,12 @@ enum HashKeyKind {
 	HashKey_Default,
 	HashKey_String,
 	HashKey_Pointer,
+	HashKey_PointerAndId,
+};
+
+struct PointerAndId {
+	void *ptr;
+	u32   id;
 };
 
 struct HashKey {
@@ -22,8 +28,9 @@ struct HashKey {
 	// u128        key;
 	u64         key;
 	union {
-		String string; // if String, s.len > 0
-		void * ptr;
+		String       string; // if String, s.len > 0
+		void *       ptr;
+		PointerAndId ptr_and_id;
 	};
 };
 
@@ -44,11 +51,16 @@ gb_inline HashKey hash_string(String s) {
 }
 
 gb_inline HashKey hash_pointer(void *ptr) {
-	HashKey h = {HashKey_Default};
-	// h.key = u128_from_u64(cast(u64)cast(uintptr)ptr);
+	HashKey h = {HashKey_Pointer};
 	h.key = cast(u64)cast(uintptr)ptr;
 	h.ptr = ptr;
-	h.kind = HashKey_Default;
+	return h;
+}
+gb_inline HashKey hash_ptr_and_id(void *ptr, u32 id) {
+	HashKey h = {HashKey_PointerAndId};
+	h.key = cast(u64)cast(uintptr)ptr;
+	h.ptr_and_id.ptr = ptr;
+	h.ptr_and_id.id  = id;
 	return h;
 }
 
@@ -58,6 +70,11 @@ bool hash_key_equal(HashKey a, HashKey b) {
 		if (a.kind == HashKey_String) {
 			if (b.kind == HashKey_String) {
 				return a.string == b.string;
+			}
+			return false;
+		} else if (a.kind == HashKey_PointerAndId) {
+			if (b.kind == HashKey_PointerAndId) {
+				return a.ptr_and_id.id == b.ptr_and_id.id;
 			}
 			return false;
 		}

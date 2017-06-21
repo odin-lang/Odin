@@ -308,22 +308,23 @@ struct DelayedEntity {
 	DeclInfo *  decl;
 };
 
-Entity *     entity_of_ident        (CheckerInfo *i, AstNode *identifier);
+// CheckerInfo API
 TypeAndValue type_and_value_of_expr (CheckerInfo *i, AstNode *expr);
 Type *       type_of_expr           (CheckerInfo *i, AstNode *expr);
+Entity *     entity_of_ident        (CheckerInfo *i, AstNode *identifier);
 Entity *     implicit_entity_of_node(CheckerInfo *i, AstNode *clause);
 DeclInfo *   decl_info_of_entity    (CheckerInfo *i, Entity * e);
 DeclInfo *   decl_info_of_ident     (CheckerInfo *i, AstNode *ident);
 AstFile *    ast_file_of_filename   (CheckerInfo *i, String   filename);
 Scope *      scope_of_node          (CheckerInfo *i, AstNode *node);
-ExprInfo *   check_get_expr_info    (CheckerInfo *i, AstNode *expr);
-void         check_set_expr_info    (CheckerInfo *i, AstNode *expr, ExprInfo info);
-void         check_remove_expr_info (CheckerInfo *i, AstNode *expr);
+isize        type_info_index        (CheckerInfo *i, Type *type); // Only to use once checking is done
+
 
 Entity *current_scope_lookup_entity(Scope *s, String name);
-void    scope_lookup_parent_entity (Scope *s, String name, Scope **scope_, Entity **entity_);
 Entity *scope_lookup_entity        (Scope *s, String name);
+void    scope_lookup_parent_entity (Scope *s, String name, Scope **scope_, Entity **entity_);
 Entity *scope_insert_entity        (Scope *s, Entity *entity);
+
 
 
 
@@ -812,6 +813,11 @@ Entity *implicit_entity_of_node(CheckerInfo *i, AstNode *clause) {
 	}
 	return NULL;
 }
+bool is_entity_implicitly_imported(Entity *import_name, Entity *e) {
+	GB_ASSERT(import_name->kind == Entity_ImportName);
+	return map_get(&import_name->ImportName.scope->implicit, hash_pointer(e)) != NULL;
+}
+
 
 DeclInfo *decl_info_of_entity(CheckerInfo *i, Entity *e) {
 	if (e != NULL) {
@@ -853,6 +859,35 @@ void check_remove_expr_info(CheckerInfo *i, AstNode *expr) {
 
 
 
+isize type_info_index(CheckerInfo *info, Type *type) {
+	type = default_type(type);
+
+	isize entry_index = -1;
+	HashKey key = hash_pointer(type);
+	isize *found_entry_index = map_get(&info->type_info_map, key);
+	if (found_entry_index) {
+		entry_index = *found_entry_index;
+	}
+	if (entry_index < 0) {
+		// NOTE(bill): Do manual search
+		// TODO(bill): This is O(n) and can be very slow
+		for_array(i, info->type_info_map.entries){
+			auto *e = &info->type_info_map.entries[i];
+			Type *prev_type = cast(Type *)e->key.ptr;
+			if (are_types_identical(prev_type, type)) {
+				entry_index = e->value;
+				// NOTE(bill): Add it to the search map
+				map_set(&info->type_info_map, key, entry_index);
+				break;
+			}
+		}
+	}
+
+	if (entry_index < 0) {
+		compiler_error("TypeInfo for `%s` could not be found", type_to_string(type));
+	}
+	return entry_index;
+}
 
 
 void add_untyped(CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value) {
@@ -1194,6 +1229,12 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 	return map;
 }
 
+bool is_entity_in_dependency_map(Map<Entity *> *map, Entity *e) {
+	return map_get(map, hash_pointer(e)) != NULL;
+}
+
+
+
 
 Entity *find_core_entity(Checker *c, String name) {
 	Entity *e = current_scope_lookup_entity(c->global_scope, name);
@@ -1367,6 +1408,10 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 			GB_ASSERT(q->kind == Entity_Procedure);
 
 			TokenPos pos = q->token.pos;
+
+			if (q->type == NULL) {
+				continue;
+			}
 
 			if (is_type_proc(q->type)) {
 				TypeProc *ptq = &base_type(q->type)->Proc;

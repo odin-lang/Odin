@@ -1653,7 +1653,6 @@ irValue *ir_gen_map_header(irProcedure *proc, irValue *map_val, Type *map_type) 
 	ir_emit_store(proc, gep0, m);
 
 	if (is_type_string(key_type)) {
-		// GB_PANIC("TODO(bill): string map keys");
 		ir_emit_store(proc, ir_emit_struct_ep(proc, h, 1), v_true);
 	}
 
@@ -2111,13 +2110,6 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	case Token_Shl:
 	case Token_Shr:
 		left = ir_emit_conv(proc, left, type);
-		// if (!is_type_unsigned(ir_type(right))) {
-		// 	Type *t = t_u64;
-		// 	if (build_context.word_size == 32) {
-		// 		t = t_u32;
-		// 	}
-		// 	right = ir_emit_conv(proc, right, t);
-		// }
 		right = ir_emit_conv(proc, right, type);
 
 		break;
@@ -2149,6 +2141,9 @@ irValue *ir_emit_arith(irProcedure *proc, TokenKind op, irValue *left, irValue *
 	if (op == Token_ModMod) {
 		irValue *n = left;
 		irValue *m = right;
+		if (is_type_unsigned(type)) {
+			return ir_emit_arith(proc, Token_Mod, n, m, type);
+		}
 		irValue *a = ir_emit_arith(proc, Token_Mod, n, m, type);
 		irValue *b = ir_emit_arith(proc, Token_Add, a, m, type);
 		return ir_emit_arith(proc, Token_Mod, b, m, type);
@@ -3321,39 +3316,6 @@ irValue *ir_emit_any_cast(irProcedure *proc, irValue *value, Type *type, TokenPo
 	return ir_addr_load(proc, ir_emit_any_cast_addr(proc, value, type, pos));
 }
 
-
-
-isize ir_type_info_index(CheckerInfo *info, Type *type) {
-	type = default_type(type);
-
-	isize entry_index = -1;
-	HashKey key = hash_pointer(type);
-	isize *found_entry_index = map_get(&info->type_info_map, key);
-	if (found_entry_index) {
-		entry_index = *found_entry_index;
-	}
-	if (entry_index < 0) {
-		// NOTE(bill): Do manual search
-		// TODO(bill): This is O(n) and can be very slow
-		for_array(i, info->type_info_map.entries){
-			auto *e = &info->type_info_map.entries[i];
-			Type *prev_type = cast(Type *)e->key.ptr;
-			if (are_types_identical(prev_type, type)) {
-				entry_index = e->value;
-				// NOTE(bill): Add it to the search map
-				map_set(&info->type_info_map, key, entry_index);
-				break;
-			}
-		}
-	}
-
-	if (entry_index < 0) {
-		compiler_error("TypeInfo for `%s` could not be found", type_to_string(type));
-	}
-	return entry_index;
-}
-
-
 // TODO(bill): Try and make a lot of this constant aggregate literals in LLVM IR
 gb_global irValue *ir_global_type_info_data           = NULL;
 gb_global irValue *ir_global_type_info_member_types   = NULL;
@@ -3373,7 +3335,7 @@ irValue *ir_type_info(irProcedure *proc, Type *type) {
 
 	type = default_type(type);
 
-	i32 entry_index = ir_type_info_index(info, type);
+	i32 entry_index = type_info_index(info, type);
 
 	// gb_printf_err("%d %s\n", entry_index, type_to_string(type));
 
@@ -5997,7 +5959,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		if (pd->body != NULL) {
 			CheckerInfo *info = proc->module->info;
 
-			if (map_get(&proc->module->min_dep_map, hash_pointer(e)) == NULL) {
+			if (is_entity_in_dependency_map(&proc->module->min_dep_map, e) == false) {
 				// NOTE(bill): Nothing depends upon it so doesn't need to be built
 				break;
 			}
@@ -7009,7 +6971,7 @@ void ir_init_module(irModule *m, Checker *c) {
 				auto *entry = &m->info->type_info_map.entries[type_info_map_index];
 				Type *t = cast(Type *)entry->key.ptr;
 				t = default_type(t);
-				isize entry_index = ir_type_info_index(m->info, t);
+				isize entry_index = type_info_index(m->info, t);
 				if (max_index < entry_index) {
 					max_index = entry_index;
 				}
@@ -7161,7 +7123,7 @@ void ir_gen_destroy(irGen *s) {
 // Type Info stuff
 //
 irValue *ir_get_type_info_ptr(irProcedure *proc, Type *type) {
-	i32 index = cast(i32)ir_type_info_index(proc->module->info, type);
+	i32 index = cast(i32)type_info_index(proc->module->info, type);
 	// gb_printf_err("%d %s\n", index, type_to_string(type));
 	irValue *ptr = ir_emit_array_epi(proc, ir_global_type_info_data, index);
 	return ir_emit_bitcast(proc, ptr, t_type_info_ptr);
@@ -7608,7 +7570,7 @@ void ir_gen_tree(irGen *s) {
 				auto *entry = &info->type_info_map.entries[type_info_map_index];
 				Type *t = cast(Type *)entry->key.ptr;
 				t = default_type(t);
-				isize entry_index = ir_type_info_index(info, t);
+				isize entry_index = type_info_index(info, t);
 
 				irValue *tag = NULL;
 				irValue *ti_ptr = ir_emit_array_epi(proc, ir_global_type_info_data, entry_index);
