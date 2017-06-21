@@ -681,8 +681,8 @@ void i128_divide(i128 a, i128 b, i128 *quo, i128 *rem) {
 	i128 ni = *cast(i128 *)&n;
 	i128 ri = *cast(i128 *)&r;
 
-	if (quo) *quo = i128_sub(i128_xor(ri, s), s);
-	if (rem) *rem = i128_sub(i128_xor(ni, s), s);
+	if (quo) *quo = i128_sub(i128_xor(ni, s), s);
+	if (rem) *rem = i128_sub(i128_xor(ri, s), s);
 #else
 	if (i128_eq(b, I128_ZERO)) {
 		if (quo) *quo = i128_from_u64(a.lo/b.lo);

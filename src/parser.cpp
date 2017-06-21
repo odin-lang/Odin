@@ -339,14 +339,14 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		Array<AstNode *> names;  \
 		AstNode *        type;   \
 		Array<AstNode *> values; \
-		CommentGroup docs;  \
-		CommentGroup comment;        \
+		CommentGroup docs;       \
+		CommentGroup comment;    \
 	}) \
 	AST_NODE_KIND(TypeSpec, "type specification", struct { \
 		AstNode *name;          \
 		AstNode *type;          \
-		CommentGroup docs; \
-		CommentGroup comment;       \
+		CommentGroup docs;      \
+		CommentGroup comment;   \
 	}) \
 	AST_NODE_KIND(ImportSpec, "import specification", struct { \
 		bool     is_import;     \
@@ -354,8 +354,8 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		String   fullpath;      \
 		Token    import_name;   \
 		AstNode *cond;          \
-		CommentGroup docs; \
-		CommentGroup comment;       \
+		CommentGroup docs;      \
+		CommentGroup comment;   \
 	}) \
 	AST_NODE_KIND(ForeignLibrarySpec, "foreign library specification", struct { \
 		Token    filepath;      \
@@ -363,8 +363,8 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		String   base_dir;      \
 		AstNode *cond;          \
 		bool     is_system;     \
-		CommentGroup docs; \
-		CommentGroup comment;       \
+		CommentGroup docs;      \
+		CommentGroup comment;   \
 	}) \
 AST_NODE_KIND(_DeclEnd,   "", i32) \
 	AST_NODE_KIND(Field, "field", struct { \
@@ -425,28 +425,28 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		AstNode *align; \
 	}) \
 	AST_NODE_KIND(UnionType, "union type", struct { \
-		Token        token; \
-		Array<AstNode *> fields; \
-		isize        field_count; \
-		Array<AstNode *> variants; \
+		Token            token;       \
+		Array<AstNode *> fields;      \
+		isize            field_count; \
+		Array<AstNode *> variants;    \
 	}) \
 	AST_NODE_KIND(RawUnionType, "raw union type", struct { \
-		Token token; \
+		Token            token; \
 		Array<AstNode *> fields; \
-		isize field_count; \
+		isize            field_count; \
 	}) \
 	AST_NODE_KIND(EnumType, "enum type", struct { \
-		Token token; \
-		AstNode *base_type; \
+		Token            token; \
+		AstNode *        base_type; \
 		Array<AstNode *> fields; /* FieldValue */ \
 	}) \
 	AST_NODE_KIND(BitFieldType, "bit field type", struct { \
-		Token token; \
+		Token            token; \
 		Array<AstNode *> fields; /* FieldValue with : */ \
-		AstNode *align; \
+		AstNode *        align; \
 	}) \
 	AST_NODE_KIND(MapType, "map type", struct { \
-		Token token; \
+		Token    token; \
 		AstNode *count; \
 		AstNode *key; \
 		AstNode *value; \
@@ -793,13 +793,34 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		break;
 
 	case AstNode_BadDecl: break;
-	case AstNode_ForeignLibrarySpec:
-		n->ForeignLibrarySpec.cond = clone_ast_node(a, n->ForeignLibrarySpec.cond);
+	case AstNode_ProcDecl:
+		n->ProcDecl.name = clone_ast_node(a, n->ProcDecl.name);
+		n->ProcDecl.type = clone_ast_node(a, n->ProcDecl.type);
+		n->ProcDecl.body = clone_ast_node(a, n->ProcDecl.body);
+		// TODO(bill): Clone the comment group too?
+		break;
+	case AstNode_ForeignBlockDecl:
+		n->ForeignBlockDecl.foreign_library = clone_ast_node(a, n->ForeignBlockDecl.foreign_library);
+		n->ForeignBlockDecl.decls           = clone_ast_node_array(a, n->ForeignBlockDecl.decls);
 		break;
 	case AstNode_Label:
 		n->Label.name = clone_ast_node(a, n->Label.name);
 		break;
-
+	case AstNode_GenDecl:
+		n->GenDecl.specs = clone_ast_node_array(a, n->GenDecl.specs);
+		break;
+	case AstNode_ValueSpec:
+		n->ValueSpec.names  = clone_ast_node_array(a, n->ValueSpec.names);
+		n->ValueSpec.type   = clone_ast_node(a, n->ValueSpec.type);
+		n->ValueSpec.values = clone_ast_node_array(a, n->ValueSpec.values);
+		break;
+	case AstNode_TypeSpec:
+		n->TypeSpec.name = clone_ast_node(a, n->TypeSpec.name);
+		n->TypeSpec.type = clone_ast_node(a, n->TypeSpec.type);
+		break;
+	case AstNode_ForeignLibrarySpec:
+		n->ForeignLibrarySpec.cond = clone_ast_node(a, n->ForeignLibrarySpec.cond);
+		break;
 
 	case AstNode_Field:
 		n->Field.names = clone_ast_node_array(a, n->Field.names);
@@ -816,6 +837,8 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	case AstNode_HelperType:
 		break;
 	case AstNode_ProcType:
+		n->ProcType.params  = clone_ast_node(a, n->ProcType.params);
+		n->ProcType.results = clone_ast_node(a, n->ProcType.results);
 		break;
 	case AstNode_PointerType:
 		n->PointerType.type = clone_ast_node(a, n->PointerType.type);
@@ -836,6 +859,7 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		break;
 	case AstNode_StructType:
 		n->StructType.fields = clone_ast_node_array(a, n->StructType.fields);
+		n->StructType.align  = clone_ast_node(a, n->StructType.align);
 		break;
 	case AstNode_UnionType:
 		n->UnionType.fields   = clone_ast_node_array(a, n->UnionType.fields);
@@ -3393,10 +3417,10 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 			syntax_error(f->curr_token, "Default parameters can only be applied to single values");
 		}
 
+		parse_expect_field_separator(f, type);
 		AstNode *param = ast_field(f, names, type, default_value, set_flags, docs, f->line_comment);
 		array_add(&params, param);
 
-		parse_expect_field_separator(f, type);
 
 		while (f->curr_token.kind != follow &&
 		       f->curr_token.kind != Token_EOF) {
@@ -3429,10 +3453,11 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 				syntax_error(f->curr_token, "Default parameters can only be applied to single values");
 			}
 
+			bool ok = parse_expect_field_separator(f, param);
 			AstNode *param = ast_field(f, names, type, default_value, set_flags, docs, f->line_comment);
 			array_add(&params, param);
 
-			if (!parse_expect_field_separator(f, param)) {
+			if (!ok) {
 				break;
 			}
 		}

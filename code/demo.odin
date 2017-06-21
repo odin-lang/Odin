@@ -16,5 +16,6 @@ proc main() {
 		}
 	}
 
-	fmt.printf("The program \"%s\" calculates the value %d\n", program, accumulator);
+	fmt.printf("The program \"%s\" calculates the value %d\n",
+	           program, accumulator);
 }

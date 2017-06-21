@@ -1,12 +1,12 @@
-#import "fmt.odin";
+import "fmt.odin";
 
-#foreign_system_library ws2 "Ws2_32.lib" when ODIN_OS == "windows";
+foreign_system_library ws2 "Ws2_32.lib" when ODIN_OS == "windows";
 
 
-SOCKET :: #type uint;
-INVALID_SOCKET :: ~(cast(SOCKET)0);
+type SOCKET uint;
+const INVALID_SOCKET = ~SOCKET(0);
 
-AF :: enum i32 {
+type AF enum i32 {
 	UNSPEC    = 0,       // unspecified
 	UNIX      = 1,       // local to host (pipes, portals)
 	INET      = 2,       // internetwork: UDP, TCP, etc.
@@ -37,19 +37,22 @@ AF :: enum i32 {
 	MAX       = 26,
 };
 
-SOCK_STREAM  :: 1;
-SOCKET_ERROR :: -1;
-IPPROTO_TCP  :: 6;
-AI_PASSIVE   :: 0x0020;
-SOMAXCONN    :: 128;
+const (
+	SOCK_STREAM  = 1;
+	SOCKET_ERROR = -1;
+	IPPROTO_TCP  = 6;
+	AI_PASSIVE   = 0x0020;
+	SOMAXCONN    = 128;
+)
+const (
+	SD_RECEIVE = 0;
+	SD_SEND    = 1;
+	SD_BOTH    = 2;
+)
 
-SD_RECEIVE :: 0;
-SD_SEND    :: 1;
-SD_BOTH    :: 2;
-
-WSADESCRIPTION_LEN :: 256;
-WSASYS_STATUS_LEN  :: 128;
-WSADATA :: struct #ordered {
+const WSADESCRIPTION_LEN = 256;
+const WSASYS_STATUS_LEN  = 128;
+type WSADATA struct #ordered {
 	version:       i16,
 	high_version:  i16,
 
@@ -57,12 +60,12 @@ WSADATA :: struct #ordered {
 // NOTE(bill): This is x64 ordering
 	max_sockets:   u16,
 	max_udp_dg:    u16,
-	vendor_info:   ^byte,
-	description:   [WSADESCRIPTION_LEN+1]byte,
-	system_status: [WSASYS_STATUS_LEN+1]byte,
+	vendor_info:   ^u8,
+	description:   [WSADESCRIPTION_LEN+1]u8,
+	system_status: [WSASYS_STATUS_LEN+1]u8,
 }
 
-addrinfo :: struct #ordered {
+type addrinfo struct #ordered {
 	flags:     i32,
 	family:    i32,
 	socktype:  i32,
@@ -73,52 +76,53 @@ addrinfo :: struct #ordered {
 	next:      ^addrinfo,
 }
 
-sockaddr :: struct #ordered {
+type sockaddr struct #ordered {
 	family: u16,
-	data:   [14]byte,
+	data:   [14]u8,
 }
 
-
-WSAStartup      :: proc(version_requested: i16, data: ^WSADATA) -> i32                             #foreign ws2;
-WSACleanup      :: proc() -> i32                                                                   #foreign ws2;
-getaddrinfo     :: proc(node_name, service_name: ^u8, hints: ^addrinfo, result: ^^addrinfo) -> i32 #foreign ws2;
-freeaddrinfo    :: proc(ai: ^addrinfo)                                                             #foreign ws2;
-socket          :: proc(af, type_, protocol: i32) -> SOCKET                                        #foreign ws2;
-closesocket     :: proc(s: SOCKET) -> i32                                                          #foreign ws2;
-bind            :: proc(s: SOCKET, name: ^sockaddr, name_len: i32) -> i32                          #foreign ws2;
-listen          :: proc(s: SOCKET, back_log: i32) -> i32                                           #foreign ws2;
-accept          :: proc(s: SOCKET, addr: ^sockaddr, addr_len: i32) -> SOCKET                       #foreign ws2;
-recv            :: proc(s: SOCKET, buf: ^byte, len: i32, flags: i32) -> i32                        #foreign ws2;
-send            :: proc(s: SOCKET, buf: ^byte, len: i32, flags: i32) -> i32                        #foreign ws2;
-shutdown        :: proc(s: SOCKET, how: i32) -> i32                                                #foreign ws2;
-WSAGetLastError :: proc() -> i32                                                                   #foreign ws2;
-
-to_c_string :: proc(s: string) -> ^byte {
-	c_str := new_slice(byte, s.count+1);
-	assert(c_str.data != nil);
-	copy(c_str, cast([]byte)s);
-	c_str[s.count] = 0;
-	return c_str.data;
+foreign ws2 {
+	proc WSAStartup     (version_requested: i16, data: ^WSADATA) -> i32;
+	proc WSACleanup     () -> i32;
+	proc getaddrinfo    (node_name, service_name: ^u8, hints: ^addrinfo, result: ^^addrinfo) -> i32;
+	proc freeaddrinfo   (ai: ^addrinfo);
+	proc socket         (af, type_, protocol: i32) -> SOCKET;
+	proc closesocket    (s: SOCKET) -> i32;
+	proc bind           (s: SOCKET, name: ^sockaddr, name_len: i32) -> i32;
+	proc listen         (s: SOCKET, back_log: i32) -> i32;
+	proc accept         (s: SOCKET, addr: ^sockaddr, addr_len: i32) -> SOCKET;
+	proc recv           (s: SOCKET, buf: ^u8, len: i32, flags: i32) -> i32;
+	proc send           (s: SOCKET, buf: ^u8, len: i32, flags: i32) -> i32;
+	proc shutdown       (s: SOCKET, how: i32) -> i32;
+	proc WSAGetLastError() -> i32;
+}
+proc to_c_string(s: string) -> ^u8 {
+	var c_str = make([]u8, len(s)+1);
+	copy(c_str, []u8(s));
+	c_str[len(s)] = 0;
+	return &c_str[0];
 }
 
-run :: proc() {
-	wsa: WSADATA;
-	res:  ^addrinfo = nil;
-	hints: addrinfo;
-	s, client: SOCKET;
+proc run() {
+	var (
+		wsa: WSADATA;
+		res:  ^addrinfo = nil;
+		hints: addrinfo;
+		s, client: SOCKET;
+	)
 
-	if WSAStartup(2 | (2 << 8), ^wsa) != 0 {
+	if WSAStartup(2 | (2 << 8), &wsa) != 0 {
 		fmt.println("WSAStartup failed: ", WSAGetLastError());
 		return;
 	}
 	defer WSACleanup();
 
-	hints.family   = cast(i32)AF.INET;
+	hints.family   = i32(AF.INET);
 	hints.socktype = SOCK_STREAM;
 	hints.protocol = IPPROTO_TCP;
 	hints.flags    = AI_PASSIVE;
 
-	if getaddrinfo(nil, to_c_string("8080"), ^hints, ^res) != 0 {
+	if getaddrinfo(nil, to_c_string("8080"), &hints, &res) != 0 {
 		fmt.println("getaddrinfo failed: ", WSAGetLastError());
 		return;
 	}
@@ -131,7 +135,7 @@ run :: proc() {
 	}
 	defer closesocket(s);
 
-	bind(s, res.addr, cast(i32)res.addrlen);
+	bind(s, res.addr, i32(res.addrlen));
 	listen(s, SOMAXCONN);
 
 	client = accept(s, nil, 0);
@@ -141,7 +145,7 @@ run :: proc() {
 	}
 	defer closesocket(client);
 
-	html :=
+	var html =
 `HTTP/1.1 200 OK
 Connection: close
 Content-type: text/html
@@ -156,12 +160,12 @@ Content-type: text/html
 </html>
 `;
 
-	buf: [1024]byte;
+	var buf: [1024]u8;
 	for {
-		bytes := recv(client, ^buf[0], cast(i32)buf.count, 0);
+		var bytes = recv(client, &buf[0], i32(len(buf)), 0);
 		if bytes > 0 {
-			// fmt.println(buf[:bytes] as string)
-			bytes_sent := send(client, html.data, cast(i32)(html.count-1), 0);
+			// fmt.println(string(buf[0..<bytes]))
+			var bytes_sent = send(client, &html[0], i32(len(html)-1), 0);
 			if bytes_sent == SOCKET_ERROR {
 				fmt.println("send failed: ", WSAGetLastError());
 				return;

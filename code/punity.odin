@@ -1,35 +1,42 @@
-#import win32 "sys/windows.odin";
-#import "fmt.odin";
-#import "os.odin";
-#import "mem.odin";
+import (
+	win32 "sys/windows.odin";
+	"fmt.odin";
+	"os.odin";
+	"mem.odin";
+)
 
-CANVAS_WIDTH  :: 128;
-CANVAS_HEIGHT :: 128;
-CANVAS_SCALE  :: 3;
-FRAME_TIME    :: 1.0/30.0;
-WINDOW_TITLE  :: "Punity\x00";
+const (
+	CANVAS_WIDTH  = 128;
+	CANVAS_HEIGHT = 128;
+	CANVAS_SCALE  = 3;
+	FRAME_TIME    = 1.0/30.0;
+	WINDOW_TITLE  = "Punity\x00";
+)
 
-_ := compile_assert(CANVAS_WIDTH % 16 == 0);
+const _ = compile_assert(CANVAS_WIDTH % 16 == 0);
 
-WINDOW_WIDTH  :: CANVAS_WIDTH  * CANVAS_SCALE;
-WINDOW_HEIGHT :: CANVAS_HEIGHT * CANVAS_SCALE;
+const (
+	WINDOW_WIDTH  = CANVAS_WIDTH  * CANVAS_SCALE;
+	WINDOW_HEIGHT = CANVAS_HEIGHT * CANVAS_SCALE;
+)
 
+const (
+	STACK_CAPACITY   = 1<<20;
+	STORAGE_CAPACITY = 1<<20;
 
-STACK_CAPACITY   :: 1<<20;
-STORAGE_CAPACITY :: 1<<20;
+	DRAW_LIST_RESERVE = 128;
 
-DRAW_LIST_RESERVE :: 128;
+	MAX_KEYS = 256;
+)
 
-MAX_KEYS :: 256;
-
-Core :: struct {
+type Core struct {
 	stack:   ^Bank,
 	storage: ^Bank,
 
 	running:       bool,
 	key_modifiers: u32,
-	key_states:    [MAX_KEYS]byte,
-	key_deltas:    [MAX_KEYS]byte,
+	key_states:    [MAX_KEYS]u8,
+	key_deltas:    [MAX_KEYS]u8,
 
 	perf_frame,
 	perf_frame_inner,
@@ -45,52 +52,52 @@ Core :: struct {
 	draw_list: ^Draw_List,
 }
 
-Perf_Span :: struct {
+type Perf_Span struct {
 	stamp: f64,
 	delta: f32,
 }
 
-Bank :: struct {
-	memory: []byte,
+type Bank struct {
+	memory: []u8,
 	cursor: int,
 }
 
-Bank_State :: struct {
+type Bank_State struct {
 	state: Bank,
 	bank: ^Bank,
 }
 
 
-Color :: raw_union {
-	using channels: struct{a, b, g, r: byte},
+type Color raw_union {
+	using channels: struct{a, b, g, r: u8},
 	rgba: u32,
 }
 
-Palette :: struct {
+type Palette struct {
 	colors: [256]Color,
-	colors_count: byte,
+	colors_count: u8,
 }
 
 
-Rect :: raw_union {
+type Rect raw_union {
 	using minmax: struct {min_x, min_y, max_x, max_y: int},
 	using pos: struct {left, top, right, bottom: int},
 	e: [4]int,
 }
 
-Bitmap :: struct {
-	pixels: []byte,
+type Bitmap struct {
+	pixels: []u8,
 	width:  int,
 	height: int,
 }
 
-Font :: struct {
+type Font struct {
 	using bitmap: Bitmap,
 	char_width:   int,
 	char_height:  int,
 }
 
-Canvas :: struct {
+type Canvas struct {
 	using bitmap: ^Bitmap,
 	palette:      Palette,
 	translate_x:  int,
@@ -99,89 +106,92 @@ Canvas :: struct {
 	font:         ^Font,
 }
 
-DrawFlag :: enum {
+type DrawFlag enum {
 	NONE   = 0,
 	FLIP_H = 1<<0,
 	FLIP_V = 1<<1,
 	MASK   = 1<<2,
 }
 
-Draw_Item :: struct {}
-Draw_List :: struct {
+type Draw_Item struct {}
+type Draw_List struct {
 	items: []Draw_Item,
 }
 
-Key :: enum {
-	MOD_SHIFT   = 0x0001,
-	MOD_CONTROL = 0x0002,
-	MOD_ALT     = 0x0004,
-	MOD_SUPER   = 0x0008,
+type Key enum {
+	ModShift   = 0x0001,
+	ModControl = 0x0002,
+	ModAlt     = 0x0004,
+	ModSuper   = 0x0008,
 
-	UNKNOWN            =-1,
-	INVALID            =-2,
 
-	LBUTTON            = 1,
-	RBUTTON            = 2,
-	CANCEL             = 3,
-	MBUTTON            = 4,
+	Unknown            =-1,
+	Invalid            =-2,
 
-	BACK               = 8,
-	TAB                = 9,
-	CLEAR              = 12,
-	RETURN             = 13,
-	SHIFT              = 16,
-	CONTROL            = 17,
-	MENU               = 18,
-	PAUSE              = 19,
-	CAPITAL            = 20,
-	KANA               = 0x15,
-	HANGEUL            = 0x15,
-	HANGUL             = 0x15,
-	JUNJA              = 0x17,
-	FINAL              = 0x18,
-	HANJA              = 0x19,
-	KANJI              = 0x19,
-	ESCAPE             = 0x1B,
-	CONVERT            = 0x1C,
-	NONCONVERT         = 0x1D,
-	ACCEPT             = 0x1E,
-	MODECHANGE         = 0x1F,
-	SPACE              = 32,
-	PRIOR              = 33,
-	NEXT               = 34,
-	END                = 35,
-	HOME               = 36,
-	LEFT               = 37,
-	UP                 = 38,
-	RIGHT              = 39,
-	DOWN               = 40,
-	SELECT             = 41,
-	PRINT              = 42,
-	EXEC               = 43,
-	SNAPSHOT           = 44,
-	INSERT             = 45,
-	DELETE             = 46,
-	HELP               = 47,
-	LWIN               = 0x5B,
-	RWIN               = 0x5C,
-	APPS               = 0x5D,
-	SLEEP              = 0x5F,
-	NUMPAD0            = 0x60,
-	NUMPAD1            = 0x61,
-	NUMPAD2            = 0x62,
-	NUMPAD3            = 0x63,
-	NUMPAD4            = 0x64,
-	NUMPAD5            = 0x65,
-	NUMPAD6            = 0x66,
-	NUMPAD7            = 0x67,
-	NUMPAD8            = 0x68,
-	NUMPAD9            = 0x69,
-	MULTIPLY           = 0x6A,
-	ADD                = 0x6B,
-	SEPARATOR          = 0x6C,
-	SUBTRACT           = 0x6D,
-	DECIMAL            = 0x6E,
-	DIVIDE             = 0x6F,
+
+	Lbutton            = 1,
+	Rbutton            = 2,
+	Cancel             = 3,
+	Mbutton            = 4,
+
+
+	Back               = 8,
+	Tab                = 9,
+	Clear              = 12,
+	Return             = 13,
+	Shift              = 16,
+	Control            = 17,
+	Menu               = 18,
+	Pause              = 19,
+	Capital            = 20,
+	Kana               = 0x15,
+	Hangeul            = 0x15,
+	Hangul             = 0x15,
+	Junja              = 0x17,
+	Final              = 0x18,
+	Hanja              = 0x19,
+	Kanji              = 0x19,
+	Escape             = 0x1B,
+	Convert            = 0x1C,
+	NonConvert         = 0x1D,
+	Accept             = 0x1E,
+	ModeChange         = 0x1F,
+	Space              = 32,
+	Prior              = 33,
+	Next               = 34,
+	End                = 35,
+	Home               = 36,
+	Left               = 37,
+	Up                 = 38,
+	Right              = 39,
+	Down               = 40,
+	Select             = 41,
+	Print              = 42,
+	Exec               = 43,
+	Snapshot           = 44,
+	Insert             = 45,
+	Delete             = 46,
+	Help               = 47,
+	Lwin               = 0x5B,
+	Rwin               = 0x5C,
+	Apps               = 0x5D,
+	Sleep              = 0x5F,
+	Numpad0            = 0x60,
+	Numpad1            = 0x61,
+	Numpad2            = 0x62,
+	Numpad3            = 0x63,
+	Numpad4            = 0x64,
+	Numpad5            = 0x65,
+	Numpad6            = 0x66,
+	Numpad7            = 0x67,
+	Numpad8            = 0x68,
+	Numpad9            = 0x69,
+	Multiply           = 0x6A,
+	Add                = 0x6B,
+	Separator          = 0x6C,
+	Subtract           = 0x6D,
+	Decimal            = 0x6E,
+	Divide             = 0x6F,
 	F1                 = 0x70,
 	F2                 = 0x71,
 	F3                 = 0x72,
@@ -206,32 +216,33 @@ Key :: enum {
 	F22                = 0x85,
 	F23                = 0x86,
 	F24                = 0x87,
-	NUMLOCK            = 0x90,
-	SCROLL             = 0x91,
-	LSHIFT             = 0xA0,
-	RSHIFT             = 0xA1,
-	LCONTROL           = 0xA2,
-	RCONTROL           = 0xA3,
-	LMENU              = 0xA4,
-	RMENU              = 0xA5,
+	Numlock            = 0x90,
+	Scroll             = 0x91,
+	Lshift             = 0xA0,
+	Rshift             = 0xA1,
+	Lcontrol           = 0xA2,
+	Rcontrol           = 0xA3,
+	Lmenu              = 0xA4,
+	Rmenu              = 0xA5,
 
-	APOSTROPHE         = 39,  /* ' */
-	COMMA              = 44,  /* , */
-	MINUS              = 45,  /* - */
-	PERIOD             = 46,  /* . */
-	SLASH              = 47,  /* / */
-	NUM0               = 48,
-	NUM1               = 49,
-	NUM2               = 50,
-	NUM3               = 51,
-	NUM4               = 52,
-	NUM5               = 53,
-	NUM6               = 54,
-	NUM7               = 55,
-	NUM8               = 56,
-	NUM9               = 57,
-	SEMICOLON          = 59,  /* ; */
-	EQUAL              = 61,  /* = */
+
+	Apostrophe         = 39,  /* ' */
+	Comma              = 44,  /* , */
+	Minus              = 45,  /* - */
+	Period             = 46,  /* . */
+	Slash              = 47,  /* / */
+	Num0               = 48,
+	Num1               = 49,
+	Num2               = 50,
+	Num3               = 51,
+	Num4               = 52,
+	Num5               = 53,
+	Num6               = 54,
+	Num7               = 55,
+	Num8               = 56,
+	Num9               = 57,
+	Semicolon          = 59,  /* ; */
+	Equal              = 61,  /* = */
 	A                  = 65,
 	B                  = 66,
 	C                  = 67,
@@ -258,56 +269,55 @@ Key :: enum {
 	X                  = 88,
 	Y                  = 89,
 	Z                  = 90,
-	LEFT_BRACKET       = 91,  /* [ */
-	BACKSLASH          = 92,  /* \ */
-	RIGHT_BRACKET      = 93,  /* ] */
-	GRAVE_ACCENT       = 96,  /* ` */
+	LeftBracket        = 91,  /* [ */
+	Backslash          = 92,  /* \ */
+	RightBracket       = 93,  /* ] */
+	GraveAccent        = 96,  /* ` */
 };
 
 
-key_down :: proc(k: Key) -> bool {
+proc key_down(k: Key) -> bool {
 	return _core.key_states[k] != 0;
 }
 
-key_pressed :: proc(k: Key) -> bool {
+proc key_pressed(k: Key) -> bool {
 	return (_core.key_deltas[k] != 0) && key_down(k);
 }
 
 
 
 
-win32_perf_count_freq := win32.GetQueryPerformanceFrequency();
-time_now :: proc() -> f64 {
+let win32_perf_count_freq = win32.get_query_performance_frequency();
+proc time_now() -> f64 {
 	assert(win32_perf_count_freq != 0);
 
-	counter: i64;
-	win32.QueryPerformanceCounter(^counter);
-	result := cast(f64)counter / cast(f64)win32_perf_count_freq;
-	return result;
+	var counter: i64;
+	win32.query_performance_counter(&counter);
+	return f64(counter) / f64(win32_perf_count_freq);
 }
 
-_core: Core;
+var _core: Core;
 
-run :: proc(user_init, user_step: proc(c: ^Core)) {
+proc run(user_init, user_step: proc(c: ^Core)) {
 	using win32;
 
 	_core.running = true;
 
-	win32_proc :: proc(hwnd: win32.HWND, msg: u32, wparam: win32.WPARAM, lparam: win32.LPARAM) -> win32.LRESULT #no_inline #cc_c {
-		win32_app_key_mods :: proc() -> u32 {
-			mods: u32 = 0;
+	proc win32_proc(hwnd: win32.Hwnd, msg: u32, wparam: win32.Wparam, lparam: win32.Lparam) -> win32.Lresult #no_inline #cc_c {
+		proc win32_app_key_mods() -> u32 {
+			var mods: u32 = 0;
 
-			if is_key_down(Key_Code.SHIFT) {
-				mods |= cast(u32)Key.MOD_SHIFT;
+			if is_key_down(KeyCode.Shift) {
+				mods |= u32(Key.ModShift);
 			}
-			if is_key_down(Key_Code.CONTROL) {
-				mods |= cast(u32)Key.MOD_CONTROL;
+			if is_key_down(KeyCode.Control) {
+				mods |= u32(Key.ModControl);
 			}
-			if is_key_down(Key_Code.MENU) {
-				mods |= cast(u32)Key.MOD_ALT;
+			if is_key_down(KeyCode.Menu) {
+				mods |= u32(Key.ModAlt);
 			}
-			if is_key_down(Key_Code.LWIN) || is_key_down(Key_Code.RWIN) {
-				mods |= cast(u32)Key.MOD_SUPER;
+			if is_key_down(KeyCode.Lwin) || is_key_down(KeyCode.Rwin) {
+				mods |= u32(Key.ModSuper);
 			}
 
 			return mods;
@@ -331,61 +341,62 @@ run :: proc(user_init, user_step: proc(c: ^Core)) {
 			return 0;
 
 		case WM_CLOSE:
-			PostQuitMessage(0);
+			post_quit_message(0);
 			_core.running = false;
 			return 0;
 		}
 
-		return DefWindowProcA(hwnd, msg, wparam, lparam);
+		return def_window_proc_a(hwnd, msg, wparam, lparam);
 	}
 
 
-	window_class := WNDCLASSEXA{
-		class_name = (cast(string)"Punity\x00").data, // C-style string
-		size       = size_of(WNDCLASSEXA),
+	var class_name = "Punity\x00";
+	var window_class = WndClassExA{
+		class_name = &class_name[0],
+		size       = size_of(WndClassExA),
 		style      = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
-		instance   = cast(HINSTANCE)GetModuleHandleA(nil),
+		instance   = Hinstance(get_module_handle_a(nil)),
 		wnd_proc   = win32_proc,
 		// wnd_proc   = DefWindowProcA,
-		background = cast(HBRUSH)GetStockObject(BLACK_BRUSH),
+		background = Hbrush(get_stock_object(BLACK_BRUSH)),
 	};
 
-	if RegisterClassExA(^window_class) == 0 {
-		fmt.fprintln(os.stderr, "RegisterClassExA failed");
+	if register_class_ex_a(&window_class) == 0 {
+		fmt.fprintln(os.stderr, "register_class_ex_a failed");
 		return;
 	}
 
-	screen_width  := GetSystemMetrics(SM_CXSCREEN);
-	screen_height := GetSystemMetrics(SM_CYSCREEN);
+	var screen_width  = get_system_metrics(SM_CXSCREEN);
+	var screen_height = get_system_metrics(SM_CYSCREEN);
 
-	rc: RECT;
+	var rc: Rect;
 	rc.left   = (screen_width - WINDOW_WIDTH)   / 2;
 	rc.top    = (screen_height - WINDOW_HEIGHT) / 2;
 	rc.right  = rc.left + WINDOW_WIDTH;
 	rc.bottom = rc.top + WINDOW_HEIGHT;
 
-	style: u32 = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
-	assert(AdjustWindowRect(^rc, style, 0) != 0);
+	var style: u32 = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+	assert(adjust_window_rect(&rc, style, 0) != 0);
 
-	wt := WINDOW_TITLE;
+	var wt = WINDOW_TITLE;
 
-	win32_window := CreateWindowExA(0,
-	                                window_class.class_name,
-	                                wt.data,
-	                                style,
-	                                rc.left, rc.top,
-	                                rc.right-rc.left, rc.bottom-rc.top,
-	                                nil, nil, window_class.instance,
-	                                nil);
+	var win32_window = create_window_ex_a(0,
+	                                      window_class.class_name,
+	                                      &wt[0],
+	                                      style,
+	                                      rc.left, rc.top,
+	                                      rc.right-rc.left, rc.bottom-rc.top,
+	                                      nil, nil, window_class.instance,
+	                                      nil);
 
 	if win32_window == nil {
-		fmt.fprintln(os.stderr, "CreateWindowExA failed");
+		fmt.fprintln(os.stderr, "create_window_ex_a failed");
 		return;
 	}
 
 
-	window_bmi: BITMAPINFO;
-	window_bmi.size        = size_of(BITMAPINFOHEADER);
+	var window_bmi: BitmapInfo;
+	window_bmi.size        = size_of(BitmapInfoHeader);
 	window_bmi.width       = CANVAS_WIDTH;
 	window_bmi.height      = CANVAS_HEIGHT;
 	window_bmi.planes      = 1;
@@ -393,27 +404,27 @@ run :: proc(user_init, user_step: proc(c: ^Core)) {
 	window_bmi.compression = BI_RGB;
 
 
-	user_init(^_core);
+	user_init(&_core);
 
-	ShowWindow(win32_window, SW_SHOW);
+	show_window(win32_window, SW_SHOW);
 
-	window_buffer := new_slice(u32, CANVAS_WIDTH * CANVAS_HEIGHT);
+	var window_buffer = make([]u32, CANVAS_WIDTH * CANVAS_HEIGHT);
 	defer free(window_buffer);
 
-
-	for i := 0; i < window_buffer.count; i += 1 {
+	for _, i in window_buffer {
 		window_buffer[i] = 0xff00ff;
 	}
 
+	var (
+		dt: f64;
+		prev_time = time_now();
+		curr_time = time_now();
+		total_time : f64 = 0;
+		offset_x = 0;
+		offset_y = 0;
+	)
 
-	dt: f64;
-	prev_time := time_now();
-	curr_time := time_now();
-	total_time : f64 = 0;
-	offset_x := 0;
-	offset_y := 0;
-
-	message: MSG;
+	var message: Msg;
 	for _core.running {
 		curr_time = time_now();
 		dt = curr_time - prev_time;
@@ -424,64 +435,62 @@ run :: proc(user_init, user_step: proc(c: ^Core)) {
 		offset_y += 2;
 
 		{
-			data: [128]byte;
-			buf: fmt.Buffer;
-			buf.data = data[:];
-			fmt.bprintf(^buf, "Punity: %.4f ms\x00", dt*1000);
-			win32.SetWindowTextA(win32_window, ^buf[0]);
+			var buf: [128]u8;
+			var s = fmt.bprintf(buf[..], "Punity: %.4f ms\x00", dt*1000);
+			win32.set_window_text_a(win32_window, &s[0]);
 		}
 
 
-		for y := 0; y < CANVAS_HEIGHT; y += 1 {
-			for x := 0; x < CANVAS_WIDTH; x += 1 {
-				g := (x % 32) * 8;
-				b := (y % 32) * 8;
-				window_buffer[x + y*CANVAS_WIDTH] = cast(u32)(g << 8 | b);
+		for var y = 0; y < CANVAS_HEIGHT; y++ {
+			for var x = 0; x < CANVAS_WIDTH; x++ {
+				var g = (x % 32) * 8;
+				var b = (y % 32) * 8;
+				window_buffer[x + y*CANVAS_WIDTH] = u32(g << 8 | b);
 			}
 		}
 
-		mem.zero(^_core.key_deltas[0], size_of_val(_core.key_deltas));
+		mem.zero(&_core.key_deltas[0], size_of(_core.key_deltas));
 
-		for PeekMessageA(^message, nil, 0, 0, PM_REMOVE) != 0 {
+		for peek_message_a(&message, nil, 0, 0, PM_REMOVE) != 0 {
 			if message.message == WM_QUIT {
 				_core.running = false;
 			}
-			TranslateMessage(^message);
-			DispatchMessageA(^message);
+			translate_message(&message);
+			dispatch_message_a(&message);
 		}
 
-		user_step(^_core);
+		user_step(&_core);
 
-		dc := GetDC(win32_window);
-		StretchDIBits(dc,
-		              0, 0, CANVAS_WIDTH * CANVAS_SCALE, CANVAS_HEIGHT * CANVAS_SCALE,
-		              0, 0, CANVAS_WIDTH, CANVAS_HEIGHT,
-		              window_buffer.data,
-		              ^window_bmi,
-		              DIB_RGB_COLORS,
-		              SRCCOPY);
-		ReleaseDC(win32_window, dc);
+		var dc = get_dc(win32_window);
+		stretch_dibits(dc,
+		               0, 0, CANVAS_WIDTH * CANVAS_SCALE, CANVAS_HEIGHT * CANVAS_SCALE,
+		               0, 0, CANVAS_WIDTH, CANVAS_HEIGHT,
+		               &window_buffer[0],
+		               &window_bmi,
+		               DIB_RGB_COLORS,
+		               SRCCOPY);
+		release_dc(win32_window, dc);
 
 
 		{
-			delta := time_now() - prev_time;
-			ms := cast(i32)((FRAME_TIME - delta) * 1000);
+			var delta = time_now() - prev_time;
+			var ms = i32((FRAME_TIME - delta) * 1000);
 			if ms > 0 {
-				win32.Sleep(ms);
+				win32.sleep(ms);
 			}
 		}
 
-		_core.frame += 1;
+		_core.frame++;
 	}
 }
 
 
-main :: proc() {
-	user_init :: proc(c: ^Core) {
+proc main() {
+	proc user_init(c: ^Core) {
 
 	}
 
-	user_step :: proc(c: ^Core) {
+	proc user_step(c: ^Core) {
 
 	}
 

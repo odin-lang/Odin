@@ -1665,10 +1665,6 @@ void print_llvm_ir(irGen *ir) {
 	ir_fprintf(f, " = type {float, float} ; Basic_complex64\n");
 	ir_print_encoded_local(f, str_lit("..complex128"));
 	ir_fprintf(f, " = type {double, double} ; Basic_complex128\n");
-	ir_print_encoded_local(f, str_lit("..quaternion128"));
-	ir_fprintf(f, " = type {float, float, float, float} ; Basic_quaternion128\n");
-	ir_print_encoded_local(f, str_lit("..quaternion256"));
-	ir_fprintf(f, " = type {double, double, double, double} ; Basic_quaternion256\n");
 
 
 	ir_print_encoded_local(f, str_lit("..any"));
@@ -1679,6 +1675,7 @@ void print_llvm_ir(irGen *ir) {
 	ir_fprintf(f, "} ; Basic_any\n");
 
 	ir_fprintf(f, "declare void @llvm.dbg.declare(metadata, metadata, metadata) nounwind readnone \n");
+	ir_fprintf(f, "\n");
 
 
 	for_array(member_index, m->members.entries) {

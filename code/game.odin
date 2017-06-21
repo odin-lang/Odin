@@ -1,38 +1,37 @@
-#import win32 "sys/windows.odin" when ODIN_OS == "windows";
-#import wgl "sys/wgl.odin" when ODIN_OS == "windows";
-#import "fmt.odin";
-#import "math.odin";
-#import "os.odin";
-#import gl "opengl.odin";
+import win32 "sys/windows.odin" when ODIN_OS == "windows";
+import wgl "sys/wgl.odin" when ODIN_OS == "windows";
+import "fmt.odin";
+import "math.odin";
+import "os.odin";
+import gl "opengl.odin";
 
-TWO_HEARTS :: '💕';
+const TWO_HEARTS = '💕';
 
-win32_perf_count_freq := win32.GetQueryPerformanceFrequency();
-time_now :: proc() -> f64 {
+var win32_perf_count_freq = win32.get_query_performance_frequency();
+proc time_now() -> f64 {
 	assert(win32_perf_count_freq != 0);
 
-	counter: i64;
-	win32.QueryPerformanceCounter(^counter);
-	result := cast(f64)counter / cast(f64)win32_perf_count_freq;
-	return result;
+	var counter: i64;
+	win32.query_performance_counter(&counter);
+	return f64(counter) / f64(win32_perf_count_freq);
 }
-win32_print_last_error :: proc() {
-	err_code := cast(int)win32.GetLastError();
+proc win32_print_last_error() {
+	var err_code = win32.get_last_error();
 	if err_code != 0 {
-		fmt.println("GetLastError: %", err_code);
+		fmt.println("get_last_error: ", err_code);
 	}
 }
 
 // Yuk!
-to_c_string :: proc(s: string) -> []u8 {
-	c_str := make([]u8, len(s)+1);
-	copy(c_str, cast([]byte)s);
+proc to_c_string(s: string) -> []u8 {
+	var c_str = make([]u8, len(s)+1);
+	copy(c_str, []u8(s));
 	c_str[len(s)] = 0;
 	return c_str;
 }
 
 
-Window :: struct {
+type Window struct {
 	width, height:      int,
 	wc:                 win32.WndClassExA,
 	dc:                 win32.Hdc,
@@ -41,52 +40,52 @@ Window :: struct {
 	c_title:            []u8,
 }
 
-make_window :: proc(title: string, msg, height: int, window_proc: win32.Wnd_Proc) -> (Window, bool) {
+proc make_window(title: string, msg, height: int, window_proc: win32.WndProc) -> (Window, bool) {
 	using win32;
 
-	w: Window;
+	var w: Window;
 	w.width, w.height = msg, height;
 
-	class_name := "Win32-Odin-Window\x00";
-	c_class_name := ^class_name[0];
+	var class_name = "Win32-Odin-Window\x00";
+	var c_class_name = &class_name[0];
 	if title[len(title)-1] != 0 {
 		w.c_title = to_c_string(title);
 	} else {
-		w.c_title = cast([]u8)title;
+		w.c_title = []u8(title);
 	}
 
-	instance := GetModuleHandleA(nil);
+	var instance = get_module_handle_a(nil);
 
 	w.wc = WndClassExA{
 		size       = size_of(WndClassExA),
 		style      = CS_VREDRAW | CS_HREDRAW,
-		instance   = cast(Hinstance)instance,
+		instance   = Hinstance(instance),
 		class_name = c_class_name,
 		wnd_proc   = window_proc,
 	};
 
-	if RegisterClassExA(^w.wc) == 0 {
+	if register_class_ex_a(&w.wc) == 0 {
 		win32_print_last_error();
 		return w, false;
 	}
 
-	w.hwnd = CreateWindowExA(0,
-	                         c_class_name, ^w.c_title[0],
-	                         WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-	                         CW_USEDEFAULT, CW_USEDEFAULT,
-	                         cast(i32)w.width, cast(i32)w.height,
-	                         nil, nil, instance, nil);
+	w.hwnd = create_window_ex_a(0,
+	                            c_class_name, &w.c_title[0],
+	                            WS_VISIBLE | WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+	                            CW_USEDEFAULT, CW_USEDEFAULT,
+	                            i32(w.width), i32(w.height),
+	                            nil, nil, instance, nil);
 
 	if w.hwnd == nil {
 		win32_print_last_error();
 		return w, false;
 	}
 
-	w.dc = GetDC(w.hwnd);
+	w.dc = get_dc(w.hwnd);
 
 	{
-		pfd := PIXELFORMATDESCRIPTOR{
-			size         = size_of(PIXELFORMATDESCRIPTOR),
+		var pfd = PixelFormatDescriptor{
+			size         = size_of(PixelFormatDescriptor),
 			version      = 1,
 			flags        = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
 			pixel_type   = PFD_TYPE_RGBA,
@@ -97,88 +96,89 @@ make_window :: proc(title: string, msg, height: int, window_proc: win32.Wnd_Proc
 			layer_type   = PFD_MAIN_PLANE,
 		};
 
-		SetPixelFormat(w.dc, ChoosePixelFormat(w.dc, ^pfd), nil);
-		w.opengl_context = wgl.CreateContext(w.dc);
-		wgl.MakeCurrent(w.dc, w.opengl_context);
+		set_pixel_format(w.dc, choose_pixel_format(w.dc, &pfd), nil);
+		w.opengl_context = wgl.create_context(w.dc);
+		wgl.make_current(w.dc, w.opengl_context);
 
-		attribs := [8]i32{
+		var attribs = [8]i32{
 			wgl.CONTEXT_MAJOR_VERSION_ARB, 2,
 			wgl.CONTEXT_MINOR_VERSION_ARB, 1,
 			wgl.CONTEXT_PROFILE_MASK_ARB, wgl.CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
 			0, // NOTE(bill): tells the proc that this is the end of attribs
 		};
 
-		wgl_str := "wglCreateContextAttribsARB\x00";
-		wglCreateContextAttribsARB := cast(wgl.Create_Context_Attribs_ARB_Type)wgl.GetProcAddress(^wgl_str[0]);
-		w.rc = wglCreateContextAttribsARB(w.dc, nil, ^attribs[0]);
-		wgl.MakeCurrent(w.dc, w.rc);
-		SwapBuffers(w.dc);
+		var wgl_str = "wglCreateContextAttribsARB\x00";
+		var wglCreateContextAttribsARB = wgl.CreateContextAttribsARBType(wgl.get_proc_address(&wgl_str[0]));
+		w.rc = wglCreateContextAttribsARB(w.dc, nil, &attribs[0]);
+		wgl.make_current(w.dc, w.rc);
+		swap_buffers(w.dc);
 	}
 
 	return w, true;
 }
 
-destroy_window :: proc(w: ^Window) {
+proc destroy_window(w: ^Window) {
 	free(w.c_title);
 }
 
-display_window :: proc(w: ^Window) {
-	win32.SwapBuffers(w.dc);
+proc display_window(w: ^Window) {
+	win32.swap_buffers(w.dc);
 }
 
 
-run :: proc() {
-	using win32;
+proc run() {
 	using math;
 
-	win32_proc :: proc(hwnd: win32.Hwnd, msg: u32, wparam: win32.Wparam, lparam: win32.Lparam) -> win32.Lresult #no_inline {
+	proc win32_proc(hwnd: win32.Hwnd, msg: u32, wparam: win32.Wparam, lparam: win32.Lparam) -> win32.Lresult #no_inline {
+		using win32;
 		if msg == WM_DESTROY || msg == WM_CLOSE || msg == WM_QUIT {
 			os.exit(0);
 			return 0;
 		}
-		return DefWindowProcA(hwnd, msg, wparam, lparam);
+		return def_window_proc_a(hwnd, msg, wparam, lparam);
 	}
 
-	window, window_success := make_window("Odin Language Demo", 854, 480, cast(Wnd_Proc)win32_proc);
+	var window, window_success = make_window("Odin Language Demo", 854, 480, win32.WndProc(win32_proc));
 	if !window_success {
 		return;
 	}
-	defer destroy_window(^window);
+	defer destroy_window(&window);
 
 	gl.init();
 
+	using win32;
 
-	prev_time := time_now();
-	running := true;
+	var prev_time = time_now();
+	var running = true;
 
-	pos := Vec2{100, 100};
+	var pos = Vec2{100, 100};
 
 	for running {
-		curr_time := time_now();
-		dt := cast(f32)(curr_time - prev_time);
+		var curr_time = time_now();
+		var dt = f32(curr_time - prev_time);
 		prev_time = curr_time;
 
-		msg: Msg;
-		for PeekMessageA(^msg, nil, 0, 0, PM_REMOVE) > 0 {
+		var msg: Msg;
+		for peek_message_a(&msg, nil, 0, 0, PM_REMOVE) > 0 {
 			if msg.message == WM_QUIT {
 				running = false;
 			}
-			TranslateMessage(^msg);
-			DispatchMessageA(^msg);
+			translate_message(&msg);
+			dispatch_message_a(&msg);
 		}
 
-		if is_key_down(Key_Code.ESCAPE) {
+		if is_key_down(KeyCode.Escape) {
 			running = false;
 		}
 
 		{
-			SPEED :: 500;
-			v: Vec2;
+			const SPEED = 500;
+			var v: Vec2;
 
-			if is_key_down(Key_Code.RIGHT) { v[0] += 1; }
-			if is_key_down(Key_Code.LEFT)  { v[0] -= 1; }
-			if is_key_down(Key_Code.UP)    { v[1] += 1; }
-			if is_key_down(Key_Code.DOWN)  { v[1] -= 1; }
+			if is_key_down(KeyCode.Right) { v[0] += 1; }
+			if is_key_down(KeyCode.Left)  { v[0] -= 1; }
+			if is_key_down(KeyCode.Up)    { v[1] += 1; }
+			if is_key_down(KeyCode.Down)  { v[1] -= 1; }
 
 			v = norm(v);
 
@@ -190,10 +190,10 @@ run :: proc() {
 		gl.Clear(gl.COLOR_BUFFER_BIT);
 
 		gl.LoadIdentity();
-		gl.Ortho(0, cast(f64)window.width,
-		         0, cast(f64)window.height, 0, 1);
+		gl.Ortho(0, f64(window.width),
+		         0, f64(window.height), 0, 1);
 
-		draw_rect :: proc(x, y, w, h: f32) {
+		proc draw_rect(x, y, w, h: f32) {
 			gl.Begin(gl.TRIANGLES);
 			defer gl.End();
 
@@ -208,15 +208,15 @@ run :: proc() {
 
 		draw_rect(pos.x, pos.y, 50, 50);
 
-		display_window(^window);
-		ms_to_sleep := cast(i32)(16 - 1000*dt);
+		display_window(&window);
+		var ms_to_sleep = i32(16 - 1000*dt);
 		if ms_to_sleep > 0 {
-			win32.Sleep(ms_to_sleep);
+			win32.sleep(ms_to_sleep);
 		}
 	}
 }
 
 
-main :: proc() {
+proc main() {
 	run();
 }
