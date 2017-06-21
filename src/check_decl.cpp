@@ -333,6 +333,11 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			error(e->token, "Procedure type of `main` was expected to be `proc()`, got %s", str);
 			gb_string_free(str);
 		}
+		if (proc_type->Proc.calling_convention != ProcCC_Odin &&
+		    proc_type->Proc.calling_convention != ProcCC_Contextless) {
+			error(e->token, "Procedure `main` cannot have a custom calling convention");
+		}
+		proc_type->Proc.calling_convention = ProcCC_Contextless;
 	}
 
 	if (is_inline && is_no_inline) {

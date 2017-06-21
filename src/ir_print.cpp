@@ -199,6 +199,12 @@ void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
 			ir_print_type(f, m, t->Proc.abi_compat_params[i]);
 		}
 	}
+	if (t->Proc.calling_convention == ProcCC_Odin) {
+		if (param_count > 0) {
+			ir_fprintf(f, ", ");
+		}
+		ir_print_type(f, m, t_context_ptr);
+	}
 	ir_fprintf(f, ")");
 }
 
@@ -737,10 +743,11 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 
 void ir_print_calling_convention(irFileBuffer *f, irModule *m, ProcCallingConvention cc) {
 	switch (cc) {
-	case ProcCC_Odin: ir_fprintf(f, "");       break;
-	case ProcCC_C:    ir_fprintf(f, "ccc ");   break;
-	case ProcCC_Std:  ir_fprintf(f, "cc 64 "); break;
-	case ProcCC_Fast: ir_fprintf(f, "cc 65 "); break;
+	case ProcCC_Odin:        ir_fprintf(f, "");       break;
+	case ProcCC_Contextless: ir_fprintf(f, "");       break;
+	case ProcCC_C:           ir_fprintf(f, "ccc ");   break;
+	case ProcCC_Std:         ir_fprintf(f, "cc 64 "); break;
+	case ProcCC_Fast:        ir_fprintf(f, "cc 65 "); break;
 	default: GB_PANIC("unknown calling convention: %d", cc);
 	}
 }
@@ -1261,8 +1268,6 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 
 		if (call->arg_count > 0) {
-			Type *proc_type = base_type(ir_type(call->value));
-			GB_ASSERT(proc_type->kind == Type_Proc);
 			TypeTuple *params = &proc_type->Proc.params->Tuple;
 			if (proc_type->Proc.c_vararg) {
 				isize i = 0;
@@ -1293,7 +1298,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					ir_print_value(f, m, arg, t);
 				}
 			} else {
-				for (isize i = 0; i < call->arg_count; i++) {
+				GB_ASSERT(call->arg_count == params->variable_count);
+				isize param_count = params->variable_count;
+				for (isize i = 0; i < param_count; i++) {
 					Entity *e = params->variables[i];
 					GB_ASSERT(e != NULL);
 					irValue *arg = call->args[i];
@@ -1309,6 +1316,14 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					ir_print_value(f, m, arg, t);
 				}
 			}
+		}
+		if (proc_type->Proc.calling_convention == ProcCC_Odin) {
+			if (proc_type->Proc.param_count > 0) {
+				ir_fprintf(f, ", ");
+			}
+			ir_print_type(f, m, t_context_ptr);
+			ir_fprintf(f, " noalias nonnull");
+			ir_print_value(f, m, call->context_ptr, t_context_ptr);
 		}
 		ir_fprintf(f, ")\n");
 
@@ -1538,7 +1553,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 
 	if (param_count > 0) {
 		TypeTuple *params = &proc_type->params->Tuple;
-		for (isize i = 0; i < params->variable_count; i++) {
+		for (isize i = 0; i < param_count; i++) {
 			Entity *e = params->variables[i];
 			Type *original_type = e->type;
 			Type *abi_type = proc_type->abi_compat_params[i];
@@ -1563,6 +1578,13 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 				}
 			}
 		}
+	}
+	if (proc_type->calling_convention == ProcCC_Odin) {
+		if (param_count > 0) {
+			ir_fprintf(f, ", ");
+		}
+		ir_print_type(f, m, t_context_ptr);
+		ir_fprintf(f, " noalias nonnull %%__.context_ptr");
 	}
 
 	ir_fprintf(f, ") ");

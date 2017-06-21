@@ -32,11 +32,12 @@ type (
 	}
 	// NOTE(bill): This must match the compiler's
 	CallingConvention enum {
-		Invalid = 0,
-		Odin    = 1,
-		C       = 2,
-		Std     = 3,
-		Fast    = 4,
+		Invalid         = 0,
+		Odin            = 1,
+		Contextless     = 2,
+		C               = 3,
+		Std             = 4,
+		Fast            = 5,
 	}
 
 	TypeInfoRecord struct #ordered {
@@ -182,7 +183,7 @@ type (
 	}
 )
 
-#thread_local var __context: Context;
+// #thread_local var __context: Context;
 
 
 
@@ -192,7 +193,7 @@ type SourceCodeLocation struct {
 	procedure:             string,
 }
 
-proc make_source_code_location(file: string, line, column: i64, procedure: string) -> SourceCodeLocation #inline {
+proc make_source_code_location(file: string, line, column: i64, procedure: string) -> SourceCodeLocation #cc_contextless #inline {
 	return SourceCodeLocation{file, line, column, procedure};
 }
 
@@ -200,8 +201,14 @@ proc make_source_code_location(file: string, line, column: i64, procedure: strin
 
 const DEFAULT_ALIGNMENT = align_of([vector 4]f32);
 
+proc __init_context_from_ptr(c: ^Context, other: ^Context) #cc_contextless {
+	if c == nil {
+		return;
+	}
+	c^ = other^;
+}
 
-proc __init_context(c: ^Context) {
+proc __init_context(c: ^Context) #cc_contextless {
 	if c == nil {
 		return;
 	}
@@ -214,12 +221,14 @@ proc __init_context(c: ^Context) {
 }
 
 
+/*
 proc __check_context() {
 	__init_context(&__context);
 }
+*/
 
 proc alloc(size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr #inline {
-	__check_context();
+	// __check_context();
 	var a = context.allocator;
 	return a.procedure(a.data, AllocatorMode.Alloc, size, alignment, nil, 0, 0);
 }
@@ -235,19 +244,19 @@ proc free_ptr_with_allocator(a: Allocator, ptr: rawptr) #inline {
 }
 
 proc free_ptr(ptr: rawptr) #inline {
-	__check_context();
+	// __check_context();
 	free_ptr_with_allocator(context.allocator, ptr);
 }
 
 proc free_all() #inline {
-	__check_context();
+	// __check_context();
 	var a = context.allocator;
 	a.procedure(a.data, AllocatorMode.FreeAll, 0, 0, nil, 0, 0);
 }
 
 
 proc resize(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr #inline {
-	__check_context();
+	// __check_context();
 	var a = context.allocator;
 	return a.procedure(a.data, AllocatorMode.Resize, new_size, alignment, ptr, old_size, 0);
 }
@@ -312,7 +321,7 @@ proc default_allocator() -> Allocator {
 }
 
 
-proc assert(condition: bool, message = "", using location = #caller_location) -> bool {
+proc assert(condition: bool, message = "", using location = #caller_location) -> bool #cc_contextless {
 	if !condition {
 		if len(message) > 0 {
 			fmt.printf("%s(%d:%d) Runtime assertion: %s\n", fully_pathed_filename, line, column, message);
@@ -324,7 +333,7 @@ proc assert(condition: bool, message = "", using location = #caller_location) ->
 	return condition;
 }
 
-proc panic(message = "", using location = #caller_location) {
+proc panic(message = "", using location = #caller_location) #cc_contextless {
 	if len(message) > 0 {
 		fmt.printf("%s(%d:%d) Panic: %s\n", fully_pathed_filename, line, column, message);
 	} else {
@@ -336,7 +345,7 @@ proc panic(message = "", using location = #caller_location) {
 
 
 
-proc __string_eq(a, b: string) -> bool {
+proc __string_eq(a, b: string) -> bool #cc_contextless {
 	if len(a) != len(b) {
 		return false;
 	}
@@ -349,25 +358,25 @@ proc __string_eq(a, b: string) -> bool {
 	return __string_cmp(a, b) == 0;
 }
 
-proc __string_cmp(a, b: string) -> int {
+proc __string_cmp(a, b: string) -> int #cc_contextless {
 	return __mem_compare(&a[0], &b[0], min(len(a), len(b)));
 }
 
-proc __string_ne(a, b: string) -> bool #inline { return !__string_eq(a, b); }
-proc __string_lt(a, b: string) -> bool #inline { return __string_cmp(a, b) < 0; }
-proc __string_gt(a, b: string) -> bool #inline { return __string_cmp(a, b) > 0; }
-proc __string_le(a, b: string) -> bool #inline { return __string_cmp(a, b) <= 0; }
-proc __string_ge(a, b: string) -> bool #inline { return __string_cmp(a, b) >= 0; }
+proc __string_ne(a, b: string) -> bool #cc_contextless #inline { return !__string_eq(a, b); }
+proc __string_lt(a, b: string) -> bool #cc_contextless #inline { return __string_cmp(a, b) < 0; }
+proc __string_gt(a, b: string) -> bool #cc_contextless #inline { return __string_cmp(a, b) > 0; }
+proc __string_le(a, b: string) -> bool #cc_contextless #inline { return __string_cmp(a, b) <= 0; }
+proc __string_ge(a, b: string) -> bool #cc_contextless #inline { return __string_cmp(a, b) >= 0; }
 
 
-proc __complex64_eq (a, b: complex64)  -> bool #inline { return real(a) == real(b) && imag(a) == imag(b); }
-proc __complex64_ne (a, b: complex64)  -> bool #inline { return real(a) != real(b) || imag(a) != imag(b); }
+proc __complex64_eq (a, b: complex64)  -> bool #cc_contextless #inline { return real(a) == real(b) && imag(a) == imag(b); }
+proc __complex64_ne (a, b: complex64)  -> bool #cc_contextless #inline { return real(a) != real(b) || imag(a) != imag(b); }
 
-proc __complex128_eq(a, b: complex128) -> bool #inline { return real(a) == real(b) && imag(a) == imag(b); }
-proc __complex128_ne(a, b: complex128) -> bool #inline { return real(a) != real(b) || imag(a) != imag(b); }
+proc __complex128_eq(a, b: complex128) -> bool #cc_contextless #inline { return real(a) == real(b) && imag(a) == imag(b); }
+proc __complex128_ne(a, b: complex128) -> bool #cc_contextless #inline { return real(a) != real(b) || imag(a) != imag(b); }
 
 
-proc __bounds_check_error(file: string, line, column: int, index, count: int) {
+proc __bounds_check_error(file: string, line, column: int, index, count: int) #cc_contextless {
 	if 0 <= index && index < count {
 		return;
 	}
@@ -376,7 +385,7 @@ proc __bounds_check_error(file: string, line, column: int, index, count: int) {
 	__debug_trap();
 }
 
-proc __slice_expr_error(file: string, line, column: int, low, high, max: int) {
+proc __slice_expr_error(file: string, line, column: int, low, high, max: int) #cc_contextless {
 	if 0 <= low && low <= high && high <= max {
 		return;
 	}
@@ -385,7 +394,7 @@ proc __slice_expr_error(file: string, line, column: int, low, high, max: int) {
 	__debug_trap();
 }
 
-proc __substring_expr_error(file: string, line, column: int, low, high: int) {
+proc __substring_expr_error(file: string, line, column: int, low, high: int) #cc_contextless {
 	if 0 <= low && low <= high {
 		return;
 	}
@@ -393,7 +402,7 @@ proc __substring_expr_error(file: string, line, column: int, low, high: int) {
 	            file, line, column, low, high);
 	__debug_trap();
 }
-proc __type_assertion_check(ok: bool, file: string, line, column: int, from, to: ^TypeInfo) {
+proc __type_assertion_check(ok: bool, file: string, line, column: int, from, to: ^TypeInfo) #cc_contextless {
 	if !ok {
 		fmt.fprintf(os.stderr, "%s(%d:%d) Invalid type_assertion from %T to %T\n",
 		            file, line, column, from, to);
@@ -401,12 +410,12 @@ proc __type_assertion_check(ok: bool, file: string, line, column: int, from, to:
 	}
 }
 
-proc __string_decode_rune(s: string) -> (rune, int) #inline {
+proc __string_decode_rune(s: string) -> (rune, int) #cc_contextless #inline {
 	return utf8.decode_rune(s);
 }
 
 
-proc __mem_set(data: rawptr, value: i32, len: int) -> rawptr {
+proc __mem_set(data: rawptr, value: i32, len: int) -> rawptr #cc_contextless {
 	when size_of(rawptr) == 8 {
 		foreign __llvm_core proc llvm_memset_64bit(dst: rawptr, val: u8, len: int, align: i32, is_volatile: bool) #link_name "llvm.memset.p0i8.i64";
 		llvm_memset_64bit(data, u8(value), len, 1, false);
@@ -417,10 +426,10 @@ proc __mem_set(data: rawptr, value: i32, len: int) -> rawptr {
 		return data;
 	}
 }
-proc __mem_zero(data: rawptr, len: int) -> rawptr {
+proc __mem_zero(data: rawptr, len: int) -> rawptr #cc_contextless {
 	return __mem_set(data, 0, len);
 }
-proc __mem_copy(dst, src: rawptr, len: int) -> rawptr {
+proc __mem_copy(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
 	// NOTE(bill): This _must_ be implemented like C's memmove
 	when size_of(rawptr) == 8 {
 		foreign __llvm_core proc llvm_memmove_64bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memmove.p0i8.p0i8.i64";
@@ -432,7 +441,7 @@ proc __mem_copy(dst, src: rawptr, len: int) -> rawptr {
 		return dst;
 	}
 }
-proc __mem_copy_non_overlapping(dst, src: rawptr, len: int) -> rawptr {
+proc __mem_copy_non_overlapping(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
 	// NOTE(bill): This _must_ be implemented like C's memcpy
 	when size_of(rawptr) == 8 {
 		foreign __llvm_core proc llvm_memcpy_64bit(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i64";
@@ -445,7 +454,7 @@ proc __mem_copy_non_overlapping(dst, src: rawptr, len: int) -> rawptr {
 	}
 }
 
-proc __mem_compare(a, b: ^u8, n: int) -> int {
+proc __mem_compare(a, b: ^u8, n: int) -> int #cc_contextless {
 	for i in 0..<n {
 		match {
 		case (a+i)^ < (b+i)^:
@@ -461,11 +470,11 @@ foreign __llvm_core {
 	proc __sqrt_f32(x: f32) -> f32 #link_name "llvm.sqrt.f32";
 	proc __sqrt_f64(x: f64) -> f64 #link_name "llvm.sqrt.f64";
 }
-proc __abs_complex64(x: complex64) -> f32 #inline {
+proc __abs_complex64(x: complex64) -> f32 #inline #cc_contextless {
 	var r, i = real(x), imag(x);
 	return __sqrt_f32(r*r + i*i);
 }
-proc __abs_complex128(x: complex128) -> f64 #inline {
+proc __abs_complex128(x: complex128) -> f64 #inline #cc_contextless {
 	var r, i = real(x), imag(x);
 	return __sqrt_f64(r*r + i*i);
 }
@@ -475,7 +484,7 @@ proc __abs_complex128(x: complex128) -> f64 #inline {
 
 proc __dynamic_array_make(array_: rawptr, elem_size, elem_align: int, len, cap: int) {
 	var array = ^raw.DynamicArray(array_);
-	__check_context();
+	// __check_context();
 	array.allocator = context.allocator;
 	assert(array.allocator.procedure != nil);
 
@@ -492,7 +501,7 @@ proc __dynamic_array_reserve(array_: rawptr, elem_size, elem_align: int, cap: in
 		return true;
 	}
 
-	__check_context();
+	// __check_context();
 	if array.allocator.procedure == nil {
 		array.allocator = context.allocator;
 	}
