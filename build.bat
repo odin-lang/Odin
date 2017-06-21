@@ -42,10 +42,10 @@ set linker_settings=%libs% %linker_flags%
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-rem odin run code/demo.odin
 cl %compiler_settings% "src\main.cpp" ^
 	/link %linker_settings% -OUT:%exe_name% ^
 	&& odin run code/demo.odin
+	rem && odin docs core/fmt.odin
 
 del *.obj > NUL 2> NUL
 

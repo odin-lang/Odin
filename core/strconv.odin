@@ -455,14 +455,15 @@ proc is_integer_negative(u: u128, is_signed: bool, bit_size: int) -> (unsigned: 
 	return u, neg;
 }
 
-proc append_bits(buf: []u8, u_: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: IntFlag) -> string {
+proc append_bits(buf: []u8, u: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: IntFlag) -> string {
 	if base < 2 || base > MAX_BASE {
 		panic("strconv: illegal base passed to append_bits");
 	}
 
+	var neg: bool;
 	var a: [129]u8;
 	var i = len(a);
-	var u, neg = is_integer_negative(u_, is_signed, bit_size);
+	u, neg = is_integer_negative(u, is_signed, bit_size);
 	var b = u128(base);
 	for u >= b {
 		i--; a[i] = digits[uint(u % b)];
