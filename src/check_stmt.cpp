@@ -900,24 +900,26 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					gb_string_free(str);
 				}
 			}
-		} else {
-			// TODO(bill): Cleanup this checking of variables
-			if (result_count == 0 && rs->results.count > 0) {
-				error(rs->results[0], "No return values expected");
-			} else if (operands.count > result_count) {
+
+		} else if (result_count == 0 && rs->results.count > 0) {
+			error(rs->results[0], "No return values expected");
+		} else if (operands.count > result_count) {
+			if (result_count_excluding_defaults < result_count) {
 				error(node, "Expected a maximum of %td return values, got %td", result_count, operands.count);
-			} else if (operands.count < result_count_excluding_defaults) {
-				error(node, "Expected %td return values, got %td", result_count_excluding_defaults, operands.count);
-			} else if (result_count_excluding_defaults == 0) {
-				return;
-			} else if (rs->results.count == 0) {
-				error(node, "Expected %td return values, got 0", result_count_excluding_defaults);
 			} else {
-				isize max_count = rs->results.count;
-				for (isize i = 0; i < max_count; i++) {
-					Entity *e = pt->results->Tuple.variables[i];
-					check_assignment(c, &operands[i], e->type, str_lit("return statement"));
-				}
+				error(node, "Expected %td return values, got %td", result_count, operands.count);
+			}
+		} else if (operands.count < result_count_excluding_defaults) {
+			if (result_count_excluding_defaults < result_count) {
+				error(node, "Expected a minimum of %td return values, got %td", result_count_excluding_defaults, operands.count);
+			} else {
+				error(node, "Expected %td return values, got %td", result_count_excluding_defaults, operands.count);
+			}
+		} else {
+			isize max_count = rs->results.count;
+			for (isize i = 0; i < max_count; i++) {
+				Entity *e = pt->results->Tuple.variables[i];
+				check_assignment(c, &operands[i], e->type, str_lit("return statement"));
 			}
 		}
 
