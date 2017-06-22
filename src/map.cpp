@@ -14,11 +14,11 @@ struct MapFindResult {
 enum HashKeyKind {
 	HashKey_Default,
 	HashKey_String,
-	HashKey_Pointer,
-	HashKey_PointerAndId,
+	HashKey_Ptr,
+	HashKey_PtrAndId,
 };
 
-struct PointerAndId {
+struct PtrAndId {
 	void *ptr;
 	u32   id;
 };
@@ -30,7 +30,7 @@ struct HashKey {
 	union {
 		String       string; // if String, s.len > 0
 		void *       ptr;
-		PointerAndId ptr_and_id;
+		PtrAndId ptr_and_id;
 	};
 };
 
@@ -51,13 +51,13 @@ gb_inline HashKey hash_string(String s) {
 }
 
 gb_inline HashKey hash_pointer(void *ptr) {
-	HashKey h = {HashKey_Pointer};
+	HashKey h = {HashKey_Ptr};
 	h.key = cast(u64)cast(uintptr)ptr;
 	h.ptr = ptr;
 	return h;
 }
 gb_inline HashKey hash_ptr_and_id(void *ptr, u32 id) {
-	HashKey h = {HashKey_PointerAndId};
+	HashKey h = {HashKey_PtrAndId};
 	h.key = cast(u64)cast(uintptr)ptr;
 	h.ptr_and_id.ptr = ptr;
 	h.ptr_and_id.id  = id;
@@ -72,8 +72,8 @@ bool hash_key_equal(HashKey a, HashKey b) {
 				return a.string == b.string;
 			}
 			return false;
-		} else if (a.kind == HashKey_PointerAndId) {
-			if (b.kind == HashKey_PointerAndId) {
+		} else if (a.kind == HashKey_PtrAndId) {
+			if (b.kind == HashKey_PtrAndId) {
 				return a.ptr_and_id.id == b.ptr_and_id.id;
 			}
 			return false;

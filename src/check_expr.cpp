@@ -1321,6 +1321,10 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 Type *type_to_abi_compat_param_type(gbAllocator a, Type *original_type) {
 	Type *new_type = original_type;
 
+	if (build_context.ODIN_ARCH == "x86") {
+		return new_type;
+	}
+
 	if (build_context.ODIN_OS == "windows") {
 		// NOTE(bill): Changing the passing parameter value type is to match C's ABI
 		// IMPORTANT TODO(bill): This only matches the ABI on MSVC at the moment
@@ -3491,7 +3495,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 					}
 
 					// NOTE(bill): Check to see if it's imported
-					if (map_get(&import_scope->implicit, hash_pointer(procs[i]))) {
+					if (map_get(&import_scope->implicit, hash_entity(procs[i]))) {
 						gb_swap(Entity *, procs[i], procs[overload_count-1]);
 						overload_count--;
 						i--; // NOTE(bill): Counteract the post event

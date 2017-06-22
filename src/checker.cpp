@@ -302,11 +302,12 @@ struct Checker {
 };
 
 
-struct DelayedEntity {
-	AstNode *   ident;
-	Entity *    entity;
-	DeclInfo *  decl;
-};
+
+HashKey hash_node     (AstNode *node)  { return hash_ptr_and_id(node, 0); }
+HashKey hash_ast_file (AstFile *file)  { return hash_pointer(file); }
+HashKey hash_entity   (Entity *e)      { return hash_pointer(e); }
+HashKey hash_type     (Type *t)        { return hash_pointer(t); }
+HashKey hash_decl_info(DeclInfo *decl) { return hash_pointer(decl); }
 
 // CheckerInfo API
 TypeAndValue type_and_value_of_expr (CheckerInfo *i, AstNode *expr);
@@ -404,10 +405,11 @@ void destroy_scope(Scope *scope) {
 	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
 }
 
+
 void add_scope(Checker *c, AstNode *node, Scope *scope) {
 	GB_ASSERT(node != NULL);
 	GB_ASSERT(scope != NULL);
-	map_set(&c->info.scopes, hash_pointer(node), scope);
+	map_set(&c->info.scopes, hash_node(node), scope);
 }
 
 
@@ -578,7 +580,7 @@ void check_scope_usage(Checker *c, Scope *scope) {
 
 
 void add_dependency(DeclInfo *d, Entity *e) {
-	map_set(&d->deps, hash_pointer(e), cast(bool)true);
+	map_set(&d->deps, hash_entity(e), cast(bool)true);
 }
 
 void add_declaration_dependency(Checker *c, Entity *e) {
@@ -586,7 +588,7 @@ void add_declaration_dependency(Checker *c, Entity *e) {
 		return;
 	}
 	if (c->context.decl != NULL) {
-		DeclInfo **found = map_get(&c->info.entities, hash_pointer(e));
+		DeclInfo **found = map_get(&c->info.entities, hash_entity(e));
 		if (found) {
 			add_dependency(c->context.decl, e);
 		}
@@ -772,11 +774,11 @@ void destroy_checker(Checker *c) {
 
 Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
 	if (identifier->kind == AstNode_Ident) {
-		Entity **found = map_get(&i->definitions, hash_pointer(identifier));
+		Entity **found = map_get(&i->definitions, hash_node(identifier));
 		if (found) {
 			return *found;
 		}
-		found = map_get(&i->uses, hash_pointer(identifier));
+		found = map_get(&i->uses, hash_node(identifier));
 		if (found) {
 			return *found;
 		}
@@ -786,7 +788,7 @@ Entity *entity_of_ident(CheckerInfo *i, AstNode *identifier) {
 
 TypeAndValue type_and_value_of_expr(CheckerInfo *i, AstNode *expr) {
 	TypeAndValue result = {};
-	TypeAndValue *found = map_get(&i->types, hash_pointer(expr));
+	TypeAndValue *found = map_get(&i->types, hash_node(expr));
 	if (found) result = *found;
 	return result;
 }
@@ -807,7 +809,7 @@ Type *type_of_expr(CheckerInfo *i, AstNode *expr) {
 }
 
 Entity *implicit_entity_of_node(CheckerInfo *i, AstNode *clause) {
-	Entity **found = map_get(&i->implicits, hash_pointer(clause));
+	Entity **found = map_get(&i->implicits, hash_node(clause));
 	if (found != NULL) {
 		return *found;
 	}
@@ -815,13 +817,13 @@ Entity *implicit_entity_of_node(CheckerInfo *i, AstNode *clause) {
 }
 bool is_entity_implicitly_imported(Entity *import_name, Entity *e) {
 	GB_ASSERT(import_name->kind == Entity_ImportName);
-	return map_get(&import_name->ImportName.scope->implicit, hash_pointer(e)) != NULL;
+	return map_get(&import_name->ImportName.scope->implicit, hash_entity(e)) != NULL;
 }
 
 
 DeclInfo *decl_info_of_entity(CheckerInfo *i, Entity *e) {
 	if (e != NULL) {
-		DeclInfo **found = map_get(&i->entities, hash_pointer(e));
+		DeclInfo **found = map_get(&i->entities, hash_entity(e));
 		if (found != NULL) {
 			return *found;
 		}
@@ -841,20 +843,20 @@ AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
 	return NULL;
 }
 Scope *scope_of_node(CheckerInfo *i, AstNode *node) {
-	Scope **found = map_get(&i->scopes, hash_pointer(node));
+	Scope **found = map_get(&i->scopes, hash_node(node));
 	if (found) {
 		return *found;
 	}
 	return NULL;
 }
 ExprInfo *check_get_expr_info(CheckerInfo *i, AstNode *expr) {
-	return map_get(&i->untyped, hash_pointer(expr));
+	return map_get(&i->untyped, hash_node(expr));
 }
 void check_set_expr_info(CheckerInfo *i, AstNode *expr, ExprInfo info) {
-	map_set(&i->untyped, hash_pointer(expr), info);
+	map_set(&i->untyped, hash_node(expr), info);
 }
 void check_remove_expr_info(CheckerInfo *i, AstNode *expr) {
-	map_remove(&i->untyped, hash_pointer(expr));
+	map_remove(&i->untyped, hash_node(expr));
 }
 
 
@@ -863,7 +865,7 @@ isize type_info_index(CheckerInfo *info, Type *type) {
 	type = default_type(type);
 
 	isize entry_index = -1;
-	HashKey key = hash_pointer(type);
+	HashKey key = hash_type(type);
 	isize *found_entry_index = map_get(&info->type_info_map, key);
 	if (found_entry_index) {
 		entry_index = *found_entry_index;
@@ -891,7 +893,7 @@ isize type_info_index(CheckerInfo *info, Type *type) {
 
 
 void add_untyped(CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value) {
-	map_set(&i->untyped, hash_pointer(expression), make_expr_info(lhs, mode, basic_type, value));
+	map_set(&i->untyped, hash_node(expression), make_expr_info(lhs, mode, basic_type, value));
 }
 
 void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode, Type *type, ExactValue value) {
@@ -918,7 +920,7 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 	tv.type  = type;
 	tv.value = value;
 	tv.mode  = mode;
-	map_set(&i->types, hash_pointer(expression), tv);
+	map_set(&i->types, hash_node(expression), tv);
 }
 
 void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) {
@@ -927,7 +929,7 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 		if (identifier->Ident.string == "_") {
 			return;
 		}
-		HashKey key = hash_pointer(identifier);
+		HashKey key = hash_node(identifier);
 		map_set(&i->definitions, key, entity);
 	} else {
 		// NOTE(bill): Error should handled elsewhere
@@ -977,7 +979,7 @@ void add_entity_use(Checker *c, AstNode *identifier, Entity *entity) {
 	if (identifier->kind != AstNode_Ident) {
 		return;
 	}
-	HashKey key = hash_pointer(identifier);
+	HashKey key = hash_node(identifier);
 	map_set(&c->info.uses, key, entity);
 	add_declaration_dependency(c, entity); // TODO(bill): Should this be here?
 }
@@ -988,14 +990,14 @@ void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclIn
 	GB_ASSERT(e != NULL && d != NULL);
 	GB_ASSERT(identifier->Ident.string == e->token.string);
 	add_entity(c, e->scope, identifier, e);
-	map_set(&c->info.entities, hash_pointer(e), d);
+	map_set(&c->info.entities, hash_entity(e), d);
 }
 
 
 void add_implicit_entity(Checker *c, AstNode *node, Entity *e) {
 	GB_ASSERT(node != NULL);
 	GB_ASSERT(e != NULL);
-	map_set(&c->info.implicits, hash_pointer(node), e);
+	map_set(&c->info.implicits, hash_node(node), e);
 }
 
 
@@ -1014,7 +1016,7 @@ void add_type_info_type(Checker *c, Type *t) {
 		return; // Could be nil
 	}
 
-	if (map_get(&c->info.type_info_map, hash_pointer(t)) != NULL) {
+	if (map_get(&c->info.type_info_map, hash_type(t)) != NULL) {
 		// Types have already been added
 		return;
 	}
@@ -1035,7 +1037,7 @@ void add_type_info_type(Checker *c, Type *t) {
 		ti_index = c->info.type_info_count;
 		c->info.type_info_count++;
 	}
-	map_set(&c->info.type_info_map, hash_pointer(t), ti_index);
+	map_set(&c->info.type_info_map, hash_type(t), ti_index);
 
 
 
@@ -1153,7 +1155,7 @@ void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *dec
 	info.type  = type;
 	info.body  = body;
 	info.tags  = tags;
-	map_set(&c->procs, hash_pointer(decl), info);
+	map_set(&c->procs, hash_decl_info(decl), info);
 }
 
 void push_procedure(Checker *c, Type *type) {
@@ -1188,10 +1190,10 @@ void add_dependency_to_map(Map<Entity *> *map, CheckerInfo *info, Entity *entity
 	if (entity == NULL) {
 		return;
 	}
-	if (map_get(map, hash_pointer(entity)) != NULL) {
+	if (map_get(map, hash_entity(entity)) != NULL) {
 		return;
 	}
-	map_set(map, hash_pointer(entity), entity);
+	map_set(map, hash_entity(entity), entity);
 
 
 	DeclInfo *decl = decl_info_of_entity(info, entity);
@@ -1230,7 +1232,7 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 }
 
 bool is_entity_in_dependency_map(Map<Entity *> *map, Entity *e) {
-	return map_get(map, hash_pointer(e)) != NULL;
+	return map_get(map, hash_entity(e)) != NULL;
 }
 
 
@@ -2097,7 +2099,7 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 						// TODO(bill): Should these entities be imported but cause an error when used?
 						bool ok = add_entity(c, parent_scope, e->identifier, e);
 						if (ok) {
-							map_set(&parent_scope->implicit, hash_pointer(e), true);
+							map_set(&parent_scope->implicit, hash_entity(e), true);
 						}
 					}
 				} else {

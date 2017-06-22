@@ -813,7 +813,7 @@ String ir_get_global_name(irModule *m, irValue *v) {
 	irValueGlobal *g = &v->Global;
 	Entity *e = g->entity;
 	String name = e->token.string;
-	String *found = map_get(&m->entity_names, hash_pointer(e));
+	String *found = map_get(&m->entity_names, hash_entity(e));
 	if (found != NULL) {
 		name = *found;
 	}
@@ -1274,7 +1274,7 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, AstNode *expr) {
 	// }
 
 	if (expr != NULL && proc->entity != NULL) {
-		irDebugInfo *di = *map_get(&proc->module->debug_info, hash_pointer(proc->entity));
+		irDebugInfo *di = *map_get(&proc->module->debug_info, hash_entity(proc->entity));
 		ir_emit(proc, ir_instr_debug_declare(proc, di, expr, e, true, instr));
 	}
 
@@ -1406,7 +1406,7 @@ irDebugInfo *ir_add_debug_info_file(irProcedure *proc, AstFile *file) {
 	di->File.filename = filename;
 	di->File.directory = directory;
 
-	map_set(&proc->module->debug_info, hash_pointer(file), di);
+	map_set(&proc->module->debug_info, hash_ast_file(file), di);
 	return di;
 }
 
@@ -1423,7 +1423,7 @@ irDebugInfo *ir_add_debug_info_proc(irProcedure *proc, Entity *entity, String na
 	di->Proc.file = file;
 	di->Proc.pos = entity->token.pos;
 
-	map_set(&proc->module->debug_info, hash_pointer(entity), di);
+	map_set(&proc->module->debug_info, hash_entity(entity), di);
 	return di;
 }
 
@@ -3539,7 +3539,7 @@ void ir_mangle_add_sub_type_name(irModule *m, Entity *field, String parent) {
 	                                 "%.*s.%.*s", LIT(parent), LIT(cn));
 
 	String child = {text, new_name_len-1};
-	map_set(&m->entity_names, hash_pointer(field), child);
+	map_set(&m->entity_names, hash_entity(field), child);
 	ir_gen_global_type_name(m, field, child);
 }
 
@@ -4387,7 +4387,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			return ir_value_nil(proc->module->allocator, tv.type);
 		}
 
-		irValue **found = map_get(&proc->module->values, hash_pointer(e));
+		irValue **found = map_get(&proc->module->values, hash_entity(e));
 		if (found) {
 			irValue *v = *found;
 			if (v->kind == irValue_Proc) {
@@ -4795,7 +4795,7 @@ irValue *ir_get_using_variable(irProcedure *proc, Entity *e) {
 	Entity *parent = e->using_parent;
 	Selection sel = lookup_field(proc->module->allocator, parent->type, name, false);
 	GB_ASSERT(sel.entity != NULL);
-	irValue **pv = map_get(&proc->module->values, hash_pointer(parent));
+	irValue **pv = map_get(&proc->module->values, hash_entity(parent));
 	irValue *v = NULL;
 	if (pv != NULL) {
 		v = *pv;
@@ -4807,13 +4807,6 @@ irValue *ir_get_using_variable(irProcedure *proc, Entity *e) {
 	GB_ASSERT(parent->type == type_deref(ir_type(v)));
 	return ir_emit_deep_field_gep(proc, v, sel);
 }
-
-// irValue *ir_add_using_variable(irProcedure *proc, Entity *e) {
-// 	irValue *var = ir_get_using_variable(proc, e);
-// 	map_set(&proc->module->values, hash_pointer(e), var);
-// 	return var;
-// }
-
 
 bool ir_is_elem_const(irModule *m, AstNode *elem, Type *elem_type) {
 	if (base_type(elem_type) == t_any) {
@@ -4832,7 +4825,7 @@ irAddr ir_build_addr_from_entity(irProcedure *proc, Entity *e, AstNode *expr) {
 	GB_ASSERT(e->kind != Entity_Constant);
 
 	irValue *v = NULL;
-	irValue **found = map_get(&proc->module->values, hash_pointer(e));
+	irValue **found = map_get(&proc->module->values, hash_entity(e));
 	if (found) {
 		v = *found;
 	} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
@@ -5942,7 +5935,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 					irValue *value = ir_value_type_name(proc->module->allocator,
 					                                           name, e->type);
-					map_set(&proc->module->entity_names, hash_pointer(e), name);
+					map_set(&proc->module->entity_names, hash_entity(e), name);
 					ir_gen_global_type_name(proc->module, e, name);
 				}
 			} break;
@@ -6959,7 +6952,7 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 		AstFile *f = ast_file_of_filename(info, filename);
 		irDebugInfo *di_file = NULL;
 
-		irDebugInfo **di_file_found = map_get(&m->debug_info, hash_pointer(f));
+		irDebugInfo **di_file_found = map_get(&m->debug_info, hash_ast_file(f));
 		if (di_file_found) {
 			di_file = *di_file_found;
 			GB_ASSERT(di_file->kind == irDebugInfo_File);
@@ -7011,7 +7004,7 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 
 
 void ir_module_add_value(irModule *m, Entity *e, irValue *v) {
-	map_set(&m->values, hash_pointer(e), v);
+	map_set(&m->values, hash_entity(e), v);
 }
 
 void ir_init_module(irModule *m, Checker *c) {

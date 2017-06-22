@@ -1489,7 +1489,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						GB_PANIC("Unknown type to type match statement");
 					}
 
-					HashKey key = hash_pointer(y.type);
+					HashKey key = hash_type(y.type);
 					bool *found = map_get(&seen, key);
 					if (found) {
 						TokenPos pos = cc->token.pos;
