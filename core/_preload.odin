@@ -121,9 +121,8 @@ var (
 )
 
 proc type_info_base(info: ^TypeInfo) -> ^TypeInfo {
-	if info == nil {
-		return nil;
-	}
+	if info == nil -> return nil;
+
 	var base = info;
 	match i in base {
 	case TypeInfo.Named:
@@ -134,9 +133,8 @@ proc type_info_base(info: ^TypeInfo) -> ^TypeInfo {
 
 
 proc type_info_base_without_enum(info: ^TypeInfo) -> ^TypeInfo {
-	if info == nil {
-		return nil;
-	}
+	if info == nil -> return nil;
+
 	var base = info;
 	match i in base {
 	case TypeInfo.Named:
@@ -202,16 +200,20 @@ proc make_source_code_location(file: string, line, column: i64, procedure: strin
 const DEFAULT_ALIGNMENT = align_of([vector 4]f32);
 
 proc __init_context_from_ptr(c: ^Context, other: ^Context) #cc_contextless {
-	if c == nil {
-		return;
-	}
+	if c == nil -> return;
 	c^ = other^;
+
+	if c.allocator.procedure == nil {
+		c.allocator = default_allocator();
+	}
+	if c.thread_id == 0 {
+		c.thread_id = os.current_thread_id();
+	}
 }
 
 proc __init_context(c: ^Context) #cc_contextless {
-	if c == nil {
-		return;
-	}
+	if c == nil -> return;
+
 	if c.allocator.procedure == nil {
 		c.allocator = default_allocator();
 	}
@@ -497,9 +499,7 @@ proc __dynamic_array_make(array_: rawptr, elem_size, elem_align: int, len, cap: 
 proc __dynamic_array_reserve(array_: rawptr, elem_size, elem_align: int, cap: int) -> bool {
 	var array = ^raw.DynamicArray(array_);
 
-	if cap <= array.cap {
-		return true;
-	}
+	if cap <= array.cap -> return true;
 
 	// __check_context();
 	if array.allocator.procedure == nil {
@@ -512,9 +512,7 @@ proc __dynamic_array_reserve(array_: rawptr, elem_size, elem_align: int, cap: in
 	var allocator = array.allocator;
 
 	var new_data = allocator.procedure(allocator.data, AllocatorMode.Resize, new_size, elem_align, array.data, old_size, 0);
-	if new_data == nil {
-		return false;
-	}
+	if new_data == nil -> return false;
 
 	array.data = new_data;
 	array.cap = cap;
@@ -525,9 +523,7 @@ proc __dynamic_array_resize(array_: rawptr, elem_size, elem_align: int, len: int
 	var array = ^raw.DynamicArray(array_);
 
 	var ok = __dynamic_array_reserve(array_, elem_size, elem_align, len);
-	if ok {
-		array.len = len;
-	}
+	if ok -> array.len = len;
 	return ok;
 }
 
@@ -546,10 +542,9 @@ proc __dynamic_array_append(array_: rawptr, elem_size, elem_align: int,
 		var cap = 2 * array.cap + max(8, item_count);
 		ok = __dynamic_array_reserve(array, elem_size, elem_align, cap);
 	}
-	if !ok {
-		// TODO(bill): Better error handling for failed reservation
-		return array.len;
-	}
+	// TODO(bill): Better error handling for failed reservation
+	if !ok -> return array.len;
+
 	var data = ^u8(array.data);
 	assert(data != nil);
 	__mem_copy(data + (elem_size*array.len), items, elem_size * item_count);
@@ -565,10 +560,9 @@ proc __dynamic_array_append_nothing(array_: rawptr, elem_size, elem_align: int) 
 		var cap = 2 * array.cap + max(8, 1);
 		ok = __dynamic_array_reserve(array, elem_size, elem_align, cap);
 	}
-	if !ok {
-		// TODO(bill): Better error handling for failed reservation
-		return array.len;
-	}
+	// TODO(bill): Better error handling for failed reservation
+	if !ok -> return array.len;
+
 	var data = ^u8(array.data);
 	assert(data != nil);
 	__mem_zero(data + (elem_size*array.len), elem_size);
@@ -658,9 +652,7 @@ proc __dynamic_map_rehash(using header: __MapHeader, new_count: int) {
 
 	__dynamic_array_resize(nm_hashes, size_of(int), align_of(int), new_count);
 	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len);
-	for i in 0..<new_count {
-		nm.hashes[i] = -1;
-	}
+	for i in 0..<new_count -> nm.hashes[i] = -1;
 
 	for var i = 0; i < m.entries.len; i++ {
 		if len(nm.hashes) == 0 {
@@ -750,9 +742,7 @@ proc __dynamic_map_full(using h: __MapHeader) -> bool {
 
 proc __dynamic_map_hash_equal(h: __MapHeader, a, b: __MapKey) -> bool {
 	if a.hash == b.hash {
-		if h.is_key_string {
-			return a.str == b.str;
-		}
+		if h.is_key_string -> return a.str == b.str;
 		return true;
 	}
 	return false;

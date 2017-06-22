@@ -546,7 +546,14 @@ Token scan_number_to_token(Tokenizer *t, bool seen_decimal_point) {
 			if (t->curr - prev <= 2) {
 				token.kind = Token_Invalid;
 			}
-		} else {
+		} /* else if (t->curr_rune == 'h') { // Hexadecimal Float
+			token.kind = Token_Float;
+			advance_to_next_rune(t);
+			scan_mantissa(t, 16);
+			if (t->curr - prev <= 2) {
+				token.kind = Token_Invalid;
+			}
+		} */ else {
 			seen_decimal_point = false;
 			scan_mantissa(t, 10);
 

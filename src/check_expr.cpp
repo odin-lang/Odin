@@ -1221,15 +1221,64 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 	isize variable_index = 0;
 	for_array(i, results) {
 		ast_node(field, Field, results[i]);
-		Type *type = check_type(c, field->type);
+		AstNode *default_value = unparen_expr(field->default_value);
+		ExactValue value = {};
+		bool default_is_nil = false;
+
+		Type *type = NULL;
+		if (field->type == NULL) {
+			Operand o = {};
+			check_expr(c, &o, default_value);
+			if (is_operand_nil(o)) {
+				default_is_nil = true;
+			} else if (o.mode != Addressing_Constant) {
+				error(default_value, "Default parameter must be a constant");
+			} else {
+				value = o.value;
+			}
+
+			type = default_type(o.type);
+		} else {
+			type = check_type(c, field->type);
+
+			if (default_value != NULL) {
+				Operand o = {};
+				check_expr_with_type_hint(c, &o, default_value, type);
+
+				if (is_operand_nil(o)) {
+					default_is_nil = true;
+				} else if (o.mode != Addressing_Constant) {
+					error(default_value, "Default parameter must be a constant");
+				} else {
+					value = o.value;
+				}
+				check_is_assignable_to(c, &o, type);
+			}
+		}
+
+		if (type == NULL) {
+			error(results[i], "Invalid parameter type");
+			type = t_invalid;
+		}
+		if (is_type_untyped(type)) {
+			error(results[i], "Cannot determine parameter type from a nil");
+			type = t_invalid;
+		}
+
+
 		if (field->names.count == 0) {
 			Token token = ast_node_token(field->type);
 			token.string = str_lit("");
 			Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
+			param->Variable.default_value = value;
+			param->Variable.default_is_nil = default_is_nil;
 			variables[variable_index++] = param;
 		} else {
 			for_array(j, field->names) {
-				Token token = ast_node_token(field->type);
+				Token token = ast_node_token(results[i]);
+				if (field->type != NULL) {
+					token = ast_node_token(field->type);
+				}
 				token.string = str_lit("");
 
 				AstNode *name = field->names[j];
@@ -1240,6 +1289,8 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 				}
 
 				Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
+				param->Variable.default_value = value;
+				param->Variable.default_is_nil = default_is_nil;
 				variables[variable_index++] = param;
 			}
 		}
@@ -5002,6 +5053,20 @@ isize lookup_procedure_parameter(TypeProc *pt, String parameter_name) {
 	}
 	return -1;
 }
+isize lookup_procedure_result(TypeProc *pt, String result_name) {
+	isize result_count = pt->result_count;
+	for (isize i = 0; i < result_count; i++) {
+		Entity *e = pt->results->Tuple.variables[i];
+		String name = e->token.string;
+		if (name == "_") {
+			continue;
+		}
+		if (name == result_name) {
+			return i;
+		}
+	}
+	return -1;
+}
 
 CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	ast_node(ce, CallExpr, call);
@@ -5013,7 +5078,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	CallArgumentError err = CallArgumentError_None;
 
 	isize param_count = pt->param_count;
-	bool *params_visited = gb_alloc_array(c->allocator, bool, param_count);
+	bool *visited = gb_alloc_array(c->allocator, bool, param_count);
 
 	for_array(i, ce->args) {
 		AstNode *arg = ce->args[i];
@@ -5036,7 +5101,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			err = CallArgumentError_ParameterNotFound;
 			continue;
 		}
-		if (params_visited[index]) {
+		if (visited[index]) {
 			if (show_error) {
 				error(arg, "Duplicate parameter `%.*s` in procedure call", LIT(name));
 			}
@@ -5044,7 +5109,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			continue;
 		}
 
-		params_visited[index] = true;
+		visited[index] = true;
 		Operand *o = &operands[i];
 		Entity *e = pt->params->Tuple.variables[index];
 
@@ -5076,7 +5141,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 		param_count_to_check--;
 	}
 	for (isize i = 0; i < param_count_to_check; i++) {
-		if (!params_visited[i]) {
+		if (!visited[i]) {
 			Entity *e = pt->params->Tuple.variables[i];
 			if (e->token.string == "_") {
 				continue;
@@ -5095,7 +5160,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			if (show_error) {
 				gbString str = type_to_string(e->type);
 				error(call, "Parameter `%.*s` of type `%s` is missing in procedure call",
-				           LIT(e->token.string), str);
+				      LIT(e->token.string), str);
 				gb_string_free(str);
 			}
 			err = CallArgumentError_ParameterMissing;

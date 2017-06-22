@@ -11,9 +11,7 @@ type Decimal struct {
 
 proc decimal_to_string(buf: []u8, a: ^Decimal) -> string {
 	proc digit_zero(buf: []u8) -> int {
-		for _, i in buf {
-			buf[i] = '0';
-		}
+		for _, i in buf -> buf[i] = '0';
 		return len(buf);
 	}
 
@@ -198,9 +196,7 @@ proc shift(a: ^Decimal, k: int) {
 proc can_round_up(a: ^Decimal, nd: int) -> bool {
 	if nd < 0 || nd >= a.count { return false ; }
 	if a.digits[nd] == '5' && nd+1 == a.count {
-		if a.trunc {
-			return true;
-		}
+		if a.trunc -> return true;
 		return nd > 0 && (a.digits[nd-1]-'0')%2 != 0;
 	}
 

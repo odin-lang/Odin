@@ -3158,7 +3158,7 @@ AstNode *parse_block_stmt(AstFile *f, b32 is_when) {
 	return parse_body(f);
 }
 
-AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow);
+AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters);
 
 
 AstNode *parse_results(AstFile *f) {
@@ -3170,7 +3170,7 @@ AstNode *parse_results(AstFile *f) {
 		CommentGroup empty_group = {};
 		Token begin_token = f->curr_token;
 		Array<AstNode *> empty_names = {};
-		Array<AstNode *> list = make_ast_node_array(f);
+		Array<AstNode *> list = make_ast_node_array(f, 1);
 		AstNode *type = parse_type(f);
 		array_add(&list, ast_field(f, empty_names, type, NULL, 0, empty_group, empty_group));
 		return ast_field_list(f, begin_token, list);
@@ -3178,7 +3178,7 @@ AstNode *parse_results(AstFile *f) {
 
 	AstNode *list = NULL;
 	expect_token(f, Token_OpenParen);
-	list = parse_field_list(f, NULL, 0, Token_CloseParen);
+	list = parse_field_list(f, NULL, 0, Token_CloseParen, true);
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	return list;
 }
@@ -3188,7 +3188,7 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token, String *link_name_) {
 	AstNode *results = NULL;
 
 	expect_token(f, Token_OpenParen);
-	params = parse_field_list(f, NULL, FieldFlag_Signature, Token_CloseParen);
+	params = parse_field_list(f, NULL, FieldFlag_Signature, Token_CloseParen, true);
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	results = parse_results(f);
 
@@ -3357,7 +3357,7 @@ bool parse_expect_field_separator(AstFile *f, AstNode *param) {
 	return false;
 }
 
-AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow) {
+AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters) {
 	TokenKind separator = Token_Comma;
 	Token start_token = f->curr_token;
 
@@ -3370,13 +3370,12 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 
 	isize total_name_count = 0;
 	bool allow_ellipsis = allowed_flags&FieldFlag_ellipsis;
-	bool is_procedure = allowed_flags == FieldFlag_Signature;
 
 	while (f->curr_token.kind != follow &&
 	       f->curr_token.kind != Token_Colon &&
 	       f->curr_token.kind != Token_EOF) {
 		u32 flags = parse_field_prefixes(f);
-		AstNode *param = parse_var_type(f, allow_ellipsis, is_procedure);
+		AstNode *param = parse_var_type(f, allow_ellipsis, allow_default_parameters);
 		AstNodeAndFlags naf = {param, flags};
 		array_add(&list, naf);
 		if (f->curr_token.kind != Token_Comma) {
@@ -3403,12 +3402,12 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 
 		if (f->curr_token.kind != Token_Eq) {
 			expect_token_after(f, Token_Colon, "field list");
-			type = parse_var_type(f, allow_ellipsis, is_procedure);
+			type = parse_var_type(f, allow_ellipsis, allow_default_parameters);
 		}
 		if (allow_token(f, Token_Eq)) {
 			// TODO(bill): Should this be true==lhs or false==rhs?
 			default_value = parse_expr(f, false);
-			if (!is_procedure) {
+			if (!allow_default_parameters) {
 				syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
 			}
 		}
@@ -3439,12 +3438,12 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 			AstNode *default_value = NULL;
 			if (f->curr_token.kind != Token_Eq) {
 				expect_token_after(f, Token_Colon, "field list");
-				type = parse_var_type(f, allow_ellipsis, is_procedure);
+				type = parse_var_type(f, allow_ellipsis, allow_default_parameters);
 			}
 			if (allow_token(f, Token_Eq)) {
 				// TODO(bill): Should this be true==lhs or false==rhs?
 				default_value = parse_expr(f, false);
-				if (!is_procedure) {
+				if (!allow_default_parameters) {
 					syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
 				}
 			}
@@ -3486,7 +3485,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 
 
 AstNode *parse_record_fields(AstFile *f, isize *field_count_, u32 flags, String context) {
-	return parse_field_list(f, field_count_, flags, Token_CloseBrace);
+	return parse_field_list(f, field_count_, flags, Token_CloseBrace, false);
 }
 
 AstNode *parse_type_or_ident(AstFile *f) {
@@ -3821,7 +3820,14 @@ AstNode *parse_if_stmt(AstFile *f) {
 		syntax_error(f->curr_token, "Expected condition for if statement");
 	}
 
-	body = parse_block_stmt(f, false);
+	if (allow_token(f, Token_ArrowRight)) {
+		body = parse_stmt(f);
+		if (body->kind == AstNode_BlockStmt) {
+			syntax_error(body, "Expected a normal statement rather than a block statement");
+		}
+	} else {
+		body = parse_block_stmt(f, false);
+	}
 
 	if (allow_token(f, Token_else)) {
 		switch (f->curr_token.kind) {
@@ -3831,6 +3837,13 @@ AstNode *parse_if_stmt(AstFile *f) {
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, false);
 			break;
+		case Token_ArrowRight: {
+			Token arrow = expect_token(f, Token_ArrowRight);
+			body = parse_stmt(f);
+			if (body->kind == AstNode_BlockStmt) {
+				syntax_error(body, "Expected a normal statement rather than a block statement");
+			}
+		} break;
 		default:
 			syntax_error(f->curr_token, "Expected if statement block statement");
 			else_stmt = ast_bad_stmt(f, f->curr_token, f->tokens[f->curr_token_index+1]);
@@ -3858,7 +3871,14 @@ AstNode *parse_when_stmt(AstFile *f) {
 		syntax_error(f->curr_token, "Expected condition for when statement");
 	}
 
-	body = parse_block_stmt(f, true);
+	if (allow_token(f, Token_ArrowRight)) {
+		body = parse_stmt(f);
+		if (body->kind == AstNode_BlockStmt) {
+			syntax_error(body, "Expected a normal statement rather than a block statement");
+		}
+	} else {
+		body = parse_block_stmt(f, true);
+	}
 
 	if (allow_token(f, Token_else)) {
 		switch (f->curr_token.kind) {
@@ -3868,6 +3888,13 @@ AstNode *parse_when_stmt(AstFile *f) {
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, true);
 			break;
+		case Token_ArrowRight: {
+			Token arrow = expect_token(f, Token_ArrowRight);
+			body = parse_stmt(f);
+			if (body->kind == AstNode_BlockStmt) {
+				syntax_error(body, "Expected a normal statement rather than a block statement");
+			}
+		} break;
 		default:
 			syntax_error(f->curr_token, "Expected when statement block statement");
 			else_stmt = ast_bad_stmt(f, f->curr_token, f->tokens[f->curr_token_index+1]);
@@ -3890,11 +3917,22 @@ AstNode *parse_return_stmt(AstFile *f) {
 	}
 
 	Token token = expect_token(f, Token_return);
-	Array<AstNode *> results;
-	if (f->curr_token.kind != Token_Semicolon && f->curr_token.kind != Token_CloseBrace) {
-		results = parse_rhs_expr_list(f);
-	} else {
-		results = make_ast_node_array(f);
+	Array<AstNode *> results = make_ast_node_array(f);
+
+	while (f->curr_token.kind != Token_Semicolon) {
+		AstNode *arg = parse_expr(f, false);
+		if (f->curr_token.kind == Token_Eq) {
+			Token eq = expect_token(f, Token_Eq);
+			AstNode *value = parse_value(f);
+			arg = ast_field_value(f, arg, value, eq);
+		}
+
+		array_add(&results, arg);
+		if (f->curr_token.kind != Token_Comma ||
+		    f->curr_token.kind == Token_EOF) {
+		    break;
+		}
+		next_token(f);
 	}
 
 	AstNode *end = NULL;
@@ -3952,7 +3990,8 @@ AstNode *parse_for_stmt(AstFile *f) {
 			}
 		}
 
-		if (!is_range && f->curr_token.kind == Token_Semicolon) {
+		if (!is_range && (f->curr_token.kind == Token_Semicolon ||
+		                  f->curr_token.kind == Token_ArrowRight)) {
 			next_token(f);
 			init = cond;
 			cond = NULL;
@@ -3960,7 +3999,8 @@ AstNode *parse_for_stmt(AstFile *f) {
 				cond = parse_simple_stmt(f, StmtAllowFlag_None);
 			}
 			expect_semicolon(f, cond);
-			if (f->curr_token.kind != Token_OpenBrace) {
+			if (f->curr_token.kind != Token_OpenBrace &&
+			    f->curr_token.kind != Token_ArrowRight) {
 				post = parse_simple_stmt(f, StmtAllowFlag_None);
 			}
 		}
@@ -3968,7 +4008,14 @@ AstNode *parse_for_stmt(AstFile *f) {
 		f->expr_level = prev_level;
 	}
 
-	body = parse_block_stmt(f, false);
+	if (allow_token(f, Token_ArrowRight)) {
+		body = parse_stmt(f);
+		if (body->kind == AstNode_BlockStmt) {
+			syntax_error(body, "Expected a normal statement rather than a block statement");
+		}
+	} else {
+		body = parse_block_stmt(f, false);
+	}
 
 	if (is_range) {
 		GB_ASSERT(cond->kind == AstNode_AssignStmt);
@@ -4002,7 +4049,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 
 AstNode *parse_case_clause(AstFile *f, bool is_type) {
 	Token token = f->curr_token;
-	Array<AstNode *> list = make_ast_node_array(f);
+	Array<AstNode *> list = {};
 	expect_token(f, Token_case);
 	bool prev_allow_range = f->allow_range;
 	f->allow_range = !is_type;
@@ -4224,23 +4271,41 @@ AstNode *parse_stmt(AstFile *f) {
 
 	case Token_push_allocator: {
 		next_token(f);
+		AstNode *body = NULL;
 		isize prev_level = f->expr_level;
 		f->expr_level = -1;
 		AstNode *expr = parse_expr(f, false);
 		f->expr_level = prev_level;
 
-		AstNode *body = parse_block_stmt(f, false);
+		if (allow_token(f, Token_ArrowRight)) {
+			body = parse_stmt(f);
+			if (body->kind == AstNode_BlockStmt) {
+				syntax_error(body, "Expected a normal statement rather than a block statement");
+			}
+		} else {
+			body = parse_block_stmt(f, false);
+		}
+
 		return ast_push_allocator(f, token, expr, body);
 	} break;
 
 	case Token_push_context: {
 		next_token(f);
+		AstNode *body = NULL;
 		isize prev_level = f->expr_level;
 		f->expr_level = -1;
 		AstNode *expr = parse_expr(f, false);
 		f->expr_level = prev_level;
 
-		AstNode *body = parse_block_stmt(f, false);
+		if (allow_token(f, Token_ArrowRight)) {
+			body = parse_stmt(f);
+			if (body->kind == AstNode_BlockStmt) {
+				syntax_error(body, "Expected a normal statement rather than a block statement");
+			}
+		} else {
+			body = parse_block_stmt(f, false);
+		}
+
 		return ast_push_context(f, token, expr, body);
 	} break;
 

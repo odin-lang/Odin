@@ -117,6 +117,39 @@ f64 float_from_string(String string) {
 		i++;
 	}
 
+#if 0
+	if (len-i > 2 &&
+	    str[i] == '0' &&
+	    str[i+1] == 'h') {
+		i += 2;
+		u8 *text = string.text;
+		isize len = string.len;
+		if (has_prefix) {
+			text += 2;
+			len -= 2;
+		}
+
+		u64 base = 16;
+
+		u64 result = {0};
+		for (isize i = 0; i < len; i++) {
+			Rune r = cast(Rune)text[i];
+			if (r == '_') {
+				continue;
+			}
+			u64 v = bit128__digit_value(r);
+			if (v >= base) {
+				break;
+			}
+			result *= base;
+			result += v;
+		}
+
+
+		return *cast(f64 *)&result;
+	}
+#endif
+
 	f64 value = 0.0;
 	for (; i < len; i++) {
 		Rune r = cast(Rune)str[i];
