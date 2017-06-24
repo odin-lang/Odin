@@ -105,6 +105,31 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 
 
 
+Array<String> setup_args(int argc, char **argv) {
+	Array<String> args = {};
+	gbAllocator a = heap_allocator();
+	int i;
+
+#if defined(GB_SYSTEM_WINDOWS)
+	int wargc = 0;
+	wchar_t **wargv = command_line_to_wargv(GetCommandLineW(), &wargc);
+	array_init(&args, a, wargc);
+	for (i = 0; i < wargc; i++) {
+		wchar_t *warg = wargv[i];
+		isize wlen = string16_len(warg);
+		String16 wstr = make_string16(warg, wlen);
+		array_add(&args, string16_to_string(a, wstr));
+	}
+
+#else
+	array_init(&args, a, argc);
+	for (i = 0; i < argc; i++) {
+		array_add(&args, make_string_c(argv[i]));
+	}
+#endif
+	return args;
+}
+
 
 
 void print_usage_line(i32 indent, char *fmt, ...) {
@@ -118,10 +143,10 @@ void print_usage_line(i32 indent, char *fmt, ...) {
 	gb_printf_err("\n");
 }
 
-void usage(char *argv0) {
-	print_usage_line(0, "%s is a tool for managing Odin source code", argv0);
+void usage(String argv0) {
+	print_usage_line(0, "%.*s is a tool for managing Odin source code", LIT(argv0));
 	print_usage_line(0, "Usage:");
-	print_usage_line(1, "%s command [arguments]", argv0);
+	print_usage_line(1, "%.*s command [arguments]", LIT(argv0));
 	print_usage_line(0, "Commands:");
 	print_usage_line(1, "build        compile .odin file as executable");
 	print_usage_line(1, "build_dll    compile .odin file as dll");
@@ -130,64 +155,71 @@ void usage(char *argv0) {
 	print_usage_line(1, "version      print version");
 }
 
-int main(int argc, char **argv) {
-	if (argc < 2) {
-		usage(argv[0]);
+int main(int arg_count, char **arg_ptr) {
+	if (arg_count < 2) {
+		usage(make_string_c(arg_ptr[0]));
 		return 1;
 	}
 
 	Timings timings = {0};
 	timings_init(&timings, str_lit("Total Time"), 128);
-	// defer (timings_destroy(&timings));
+	defer (timings_destroy(&timings));
 	init_string_buffer_memory();
 	init_scratch_memory(gb_megabytes(10));
 	init_global_error_collector();
 
+	Array<String> args = setup_args(arg_count, arg_ptr);
+
+
 #if 1
 	init_build_context();
 
+	if (build_context.word_size == 4) {
+		print_usage_line(0, "%s 32-bit is not yet supported", args[0]);
+		return 1;
+	}
+
 	init_universal_scope();
 
-	char *init_filename = NULL;
+	String init_filename = {};
 	bool run_output = false;
-	String arg1 = make_string_c(argv[1]);
-	if (arg1 == "run") {
-		if (argc != 3) {
-			usage(argv[0]);
+	if (args[1] == "run") {
+		if (args.count != 3) {
+			usage(args[0]);
 			return 1;
 		}
-		init_filename = argv[2];
+		init_filename = args[2];
 		run_output = true;
-	} else if (arg1 == "build_dll") {
-		if (argc != 3) {
-			usage(argv[0]);
+	} else if (args[1] == "build_dll") {
+		if (args.count != 3) {
+			usage(args[0]);
 			return 1;
 		}
-		init_filename = argv[2];
+		init_filename = args[2];
 		build_context.is_dll = true;
-	} else if (arg1 == "build") {
-		if (argc != 3) {
-			usage(argv[0]);
+	} else if (args[1] == "build") {
+		if (args.count != 3) {
+			usage(args[0]);
 			return 1;
 		}
-		init_filename = argv[2];
-	} else if (arg1 == "docs") {
-		if (argc != 3) {
-			usage(argv[0]);
+		init_filename = args[2];
+	} else if (args[1] == "docs") {
+		if (args.count != 3) {
+			usage(args[0]);
 			return 1;
 		}
 
-		init_filename = argv[2];
+		init_filename = args[2];
 		build_context.generate_docs = true;
 		#if 1
 		print_usage_line(0, "Documentation generation is not yet supported");
 		return 1;
 		#endif
-	} else if (arg1 == "version") {
-		gb_printf("%s version %.*s\n", argv[0], LIT(build_context.ODIN_VERSION));
+	} else if (args[1] == "version") {
+		gb_printf("%s version %.*s\n", args[0], LIT(build_context.ODIN_VERSION));
 		return 0;
 	} else {
-		usage(argv[0]);
+		usage(args[0]);
 		return 1;
 	}
 
@@ -199,7 +231,7 @@ int main(int argc, char **argv) {
 	if (!init_parser(&parser)) {
 		return 1;
 	}
-	// defer (destroy_parser(&parser));
+	defer (destroy_parser(&parser));
 
 	if (parse_files(&parser, init_filename) != ParseFile_None) {
 		return 1;
@@ -216,7 +248,7 @@ int main(int argc, char **argv) {
 	Checker checker = {0};
 
 	init_checker(&checker, &parser);
-	// defer (destroy_checker(&checker));
+	defer (destroy_checker(&checker));
 
 	check_parsed_files(&checker);
 
@@ -239,7 +271,7 @@ int main(int argc, char **argv) {
 	if (!ir_gen_init(&ir_gen, &checker)) {
 		return 1;
 	}
-	// defer (ssa_gen_destroy(&ir_gen));
+	defer (ir_gen_destroy(&ir_gen));
 
 	timings_start_section(&timings, str_lit("llvm ir gen"));
 	ir_gen_tree(&ir_gen);
@@ -323,7 +355,7 @@ int main(int argc, char **argv) {
 		timings_start_section(&timings, str_lit("msvc-link"));
 
 		gbString lib_str = gb_string_make(heap_allocator(), "");
-		// defer (gb_string_free(lib_str));
+		defer (gb_string_free(lib_str));
 		char lib_str_buf[1024] = {0};
 		for_array(i, ir_gen.module.foreign_library_paths) {
 			String lib = ir_gen.module.foreign_library_paths[i];
@@ -385,7 +417,7 @@ int main(int argc, char **argv) {
 		timings_start_section(&timings, str_lit("ld-link"));
 
 		gbString lib_str = gb_string_make(heap_allocator(), "");
-		// defer (gb_string_free(lib_str));
+		defer (gb_string_free(lib_str));
 		char lib_str_buf[1024] = {0};
 		for_array(i, ir_gen.module.foreign_library_paths) {
 			String lib = ir_gen.module.foreign_library_paths[i];

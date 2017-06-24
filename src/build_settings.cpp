@@ -58,6 +58,8 @@ String odin_root_dir(void) {
 		}
 		array_resize(&path_buf, 2*path_buf.count + 300);
 	}
+	len += 1; // NOTE(bill): It needs an extra 1 for some reason
+
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 
@@ -65,6 +67,7 @@ String odin_root_dir(void) {
 
 	GetModuleFileNameW(NULL, text, len);
 	path = string16_to_string(heap_allocator(), make_string16(text, len));
+
 	for (i = path.len-1; i >= 0; i--) {
 		u8 c = path[i];
 		if (c == '/' || c == '\\') {
@@ -92,7 +95,7 @@ String odin_root_dir(void) {
 	Array<char> path_buf;
 	isize len, i;
 	gbTempArenaMemory tmp;
-	wchar_t *text;
+	u8 *text;
 
 	if (global_module_path_set) {
 		return global_module_path;
@@ -102,7 +105,7 @@ String odin_root_dir(void) {
 
 	len = 0;
 	for (;;) {
-		int sz = path_buf.count;
+		u32 sz = path_buf.count;
 		int res = _NSGetExecutablePath(&path_buf[0], &sz);
 		if(res == 0) {
 			len = sz;

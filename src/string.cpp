@@ -64,6 +64,17 @@ gb_inline String16 make_string16(wchar_t *text, isize len) {
 	return s;
 }
 
+isize string16_len(wchar_t *s) {
+	if (s == NULL) {
+		return 0;
+	}
+	wchar_t *p = s;
+	while (*p) {
+		p++;
+	}
+	return p - s;
+}
+
 
 gb_inline String make_string_c(char *text) {
 	return make_string(cast(u8 *)cast(void *)text, gb_strlen(text));
@@ -307,6 +318,7 @@ String16 string_to_string16(gbAllocator a, String s) {
 	return make_string16(text, len-1);
 }
 
+
 String string16_to_string(gbAllocator a, String16 s) {
 	int len, len1;
 	u8 *text;
@@ -319,6 +331,7 @@ String string16_to_string(gbAllocator a, String16 s) {
 	if (len == 0) {
 		return make_string(NULL, 0);
 	}
+	len += 1; // NOTE(bill): It needs an extra 1 for some reason
 
 	text = gb_alloc_array(a, u8, len+1);
 

@@ -3,9 +3,12 @@
 #include <xmmintrin.h>
 #endif
 
-// #define GB_NO_DEFER
 #define GB_IMPLEMENTATION
 #include "gb/gb.h"
+
+
+#include <wchar.h>
+#include <stdio.h>
 
 #include <math.h>
 
@@ -240,3 +243,68 @@ f64 gb_sqrt(f64 x) {
 } while (0)
 
 
+
+#if defined(GB_SYSTEM_WINDOWS)
+
+wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
+	u32 i, j;
+
+	u32 len = string16_len(cmd_line);
+	i = ((len+2)/2)*gb_size_of(void *) + gb_size_of(void *);
+
+	wchar_t **argv = cast(wchar_t **)GlobalAlloc(GMEM_FIXED, i + (len+2)*gb_size_of(wchar_t));
+	wchar_t *_argv = cast(wchar_t *)((cast(u8 *)argv)+i);
+
+	u32 argc = 0;
+	argv[argc] = _argv;
+	bool in_quote = false;
+	bool in_text = false;
+	bool in_space = true;
+	i = 0;
+	j = 0;
+
+	for (;;) {
+		wchar_t a = cmd_line[i];
+		if (a == 0) {
+			break;
+		}
+		if (in_quote) {
+			if (a == '\"') {
+				in_quote = false;
+			} else {
+				_argv[j++] = a;
+			}
+		} else {
+			switch (a) {
+			case '\"':
+				in_quote = true;
+				in_text = true;
+				if (in_space) argv[argc++] = _argv+j;
+				in_space = false;
+				break;
+			case ' ':
+			case '\t':
+			case '\n':
+			case '\r':
+				if (in_text) _argv[j++] = '\0';
+				in_text = false;
+				in_space = true;
+				break;
+			default:
+				in_text = true;
+				if (in_space) argv[argc++] = _argv+j;
+				_argv[j++] = a;
+				in_space = false;
+				break;
+			}
+		}
+		i++;
+	}
+	_argv[j] = '\0';
+	argv[argc] = NULL;
+
+	if (_argc) *_argc = argc;
+	return argv;
+}
+
+#endif

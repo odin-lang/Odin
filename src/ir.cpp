@@ -7544,7 +7544,8 @@ void ir_gen_tree(irGen *s) {
 		String name = str_lit(IR_STARTUP_RUNTIME_PROC_NAME);
 		Type *proc_type = make_type_proc(a, gb_alloc_item(a, Scope),
 		                                 NULL, 0,
-		                                 NULL, 0, false, ProcCC_Contextless);
+		                                 NULL, 0, false,
+		                                 ProcCC_Contextless);
 		AstNode *body = gb_alloc_item(a, AstNode);
 		Entity *e = make_entity_procedure(a, NULL, make_token_ident(name), proc_type, 0);
 		irValue *p = ir_value_procedure(a, m, e, proc_type, NULL, body, name);

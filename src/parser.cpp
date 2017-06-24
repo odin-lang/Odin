@@ -4664,8 +4664,10 @@ void parse_file(Parser *p, AstFile *f) {
 
 
 
-ParseFileError parse_files(Parser *p, char *init_filename) {
-	char *fullpath_str = gb_path_get_full_name(heap_allocator(), init_filename);
+ParseFileError parse_files(Parser *p, String init_filename) {
+	GB_ASSERT(init_filename.text[init_filename.len] == 0);
+
+	char *fullpath_str = gb_path_get_full_name(heap_allocator(), cast(char *)&init_filename[0]);
 	String init_fullpath = make_string_c(fullpath_str);
 	TokenPos init_pos = {};
 	ImportedFile init_imported_file = {init_fullpath, init_fullpath, init_pos};

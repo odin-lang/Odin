@@ -314,11 +314,12 @@ TypeAndValue type_and_value_of_expr (CheckerInfo *i, AstNode *expr);
 Type *       type_of_expr           (CheckerInfo *i, AstNode *expr);
 Entity *     entity_of_ident        (CheckerInfo *i, AstNode *identifier);
 Entity *     implicit_entity_of_node(CheckerInfo *i, AstNode *clause);
-DeclInfo *   decl_info_of_entity    (CheckerInfo *i, Entity * e);
-DeclInfo *   decl_info_of_ident     (CheckerInfo *i, AstNode *ident);
-AstFile *    ast_file_of_filename   (CheckerInfo *i, String   filename);
 Scope *      scope_of_node          (CheckerInfo *i, AstNode *node);
-isize        type_info_index        (CheckerInfo *i, Type *type); // Only to use once checking is done
+DeclInfo *   decl_info_of_ident     (CheckerInfo *i, AstNode *ident);
+DeclInfo *   decl_info_of_entity    (CheckerInfo *i, Entity * e);
+AstFile *    ast_file_of_filename   (CheckerInfo *i, String   filename);
+// IMPORTANT: Only to use once checking is done
+isize        type_info_index        (CheckerInfo *i, Type *   type);
 
 
 Entity *current_scope_lookup_entity(Scope *s, String name);
