@@ -475,7 +475,7 @@ String const ast_node_strings[] = {
 
 struct AstNode {
 	AstNodeKind kind;
-	u32 stmt_state_flags;
+	u32         stmt_state_flags;
 	union {
 #define AST_NODE_KIND(_kind_name_, name, ...) GB_JOIN2(AstNode, _kind_name_) _kind_name_;
 	AST_NODE_KINDS
@@ -629,9 +629,12 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	gb_memmove(n, node, gb_size_of(AstNode));
 
 	switch (n->kind) {
-	case AstNode_Ident: break;
-	case AstNode_Implicit: break;
-	case AstNode_BasicLit: break;
+	default: GB_PANIC("Unhandled AstNode %.*s", LIT(ast_node_strings[n->kind])); break;
+
+	case AstNode_Invalid:        break;
+	case AstNode_Ident:          break;
+	case AstNode_Implicit:       break;
+	case AstNode_BasicLit:       break;
 	case AstNode_BasicDirective: break;
 	case AstNode_Ellipsis:
 		n->Ellipsis.expr = clone_ast_node(a, n->Ellipsis.expr);

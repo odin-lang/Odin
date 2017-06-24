@@ -12,14 +12,18 @@ struct BuildContext {
 	i64    word_size; // Size of a pointer, must be >= 4
 	i64    max_align; // max alignment, must be >= 1 (and typically >= word_size)
 
+	String opt_flags;
 	String llc_flags;
 	String link_flags;
 	bool   is_dll;
 	bool   generate_docs;
+	i32    optimization_level;
 };
 
 
 gb_global BuildContext build_context = {0};
+
+
 
 
 
@@ -272,22 +276,23 @@ void init_build_context(void) {
 
 #if defined(GB_SYSTEM_WINDOWS)
 	bc->ODIN_OS      = str_lit("windows");
-	#if defined(GB_ARCH_64_BIT)
-		bc->ODIN_ARCH = str_lit("amd64");
-	#else
-		bc->ODIN_ARCH = str_lit("x86");
-	#endif
-	bc->ODIN_ENDIAN  = str_lit("little");
 #elif defined(GB_SYSTEM_OSX)
 	bc->ODIN_OS      = str_lit("osx");
-	bc->ODIN_ARCH    = str_lit("amd64");
-	bc->ODIN_ENDIAN  = str_lit("little");
 #else
 	bc->ODIN_OS      = str_lit("linux");
-	bc->ODIN_ARCH    = str_lit("amd64");
-	bc->ODIN_ENDIAN  = str_lit("little");
 #endif
 
+#if defined(GB_ARCH_64_BIT)
+	bc->ODIN_ARCH = str_lit("amd64");
+#else
+	bc->ODIN_ARCH = str_lit("x86");
+#endif
+
+	{
+		u16 x = 1;
+		bool big = !(*cast(u8 *)&x);
+		bc->ODIN_ENDIAN = big ? str_lit("big") : str_lit("little");
+	}
 
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
@@ -317,9 +322,11 @@ void init_build_context(void) {
 		#define LINK_FLAG_X86 "-arch x86"
 	#endif
 
+
 	if (bc->ODIN_ARCH == "amd64") {
 		bc->word_size = 8;
 		bc->max_align = 16;
+
 		bc->llc_flags = str_lit("-march=x86-64 ");
 		bc->link_flags = str_lit(LINK_FLAG_X64 " ");
 	} else if (bc->ODIN_ARCH == "x86") {
@@ -327,7 +334,26 @@ void init_build_context(void) {
 		bc->max_align = 8;
 		bc->llc_flags = str_lit("-march=x86 ");
 		bc->link_flags = str_lit(LINK_FLAG_X86 " ");
+	} else {
+		gb_printf_err("This current architecture is not supported");
+		gb_exit(1);
 	}
+
+
+	isize opt_max = 1023;
+	char *opt_flags_string = gb_alloc_array(heap_allocator(), char, opt_max+1);
+	isize opt_len = 0;
+	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
+	if (bc->optimization_level != 0) {
+		opt_len = gb_snprintf(opt_flags_string, opt_max, "-O%d", bc->optimization_level);
+	} else {
+		opt_len = gb_snprintf(opt_flags_string, opt_max, "");
+	}
+	if (opt_len > 0) {
+		opt_len--;
+	}
+	bc->opt_flags = make_string(cast(u8 *)opt_flags_string, opt_len);
+
 
 	#undef LINK_FLAG_X64
 	#undef LINK_FLAG_X86

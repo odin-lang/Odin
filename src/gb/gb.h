@@ -164,11 +164,11 @@ extern "C" {
 #endif
 
 
-#ifndef GB_EDIAN_ORDER
-#define GB_EDIAN_ORDER
+#ifndef GB_ENDIAN_ORDER
+#define GB_ENDIAN_ORDER
 	// TODO(bill): Is the a good way or is it better to test for certain compilers and macros?
-	#define GB_IS_BIG_EDIAN    (!*(u8*)&(u16){1})
-	#define GB_IS_LITTLE_EDIAN (!GB_IS_BIG_EDIAN)
+	#define GB_IS_BIG_ENDIAN    (!*(u8*)&(u16){1})
+	#define GB_IS_LITTLE_ENDIAN (!GB_IS_BIG_ENDIAN)
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)

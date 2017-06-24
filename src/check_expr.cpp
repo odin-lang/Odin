@@ -4840,6 +4840,7 @@ enum CallArgumentError {
 	CallArgumentError_ParameterNotFound,
 	CallArgumentError_ParameterMissing,
 	CallArgumentError_DuplicateParameter,
+	CallArgumentError_GenericProcedureNotSupported,
 };
 
 enum CallArgumentErrorMode {
@@ -5010,6 +5011,8 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			} else if (o.mode != Addressing_Type) {
 				error(o.expr, "Expected a type for the argument");
 			}
+
+			score += assign_score_function(1);
 			continue;
 		}
 		if (variadic) {
@@ -5150,7 +5153,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			} else if (o->mode != Addressing_Type) {
 				error(o->expr, "Expected a type for the argument");
 			}
-			score += 1;
+			score += assign_score_function(1);
 		} else {
 			i64 s = 0;
 			if (!check_is_assignable_to_with_score(c, o, e->type, &s)) {
@@ -5197,6 +5200,13 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	}
 #endif
 
+	if (pt->is_generic) {
+		if (show_error) {
+			error(call, "Generic procedures do not yet support named arguments");
+		}
+		err = CallArgumentError_GenericProcedureNotSupported;
+	}
+
 	if (score_) *score_ = score;
 
 	return err;
@@ -5209,6 +5219,8 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 	CallArgumentCheckerType *call_checker = check_call_arguments_internal;
 	Array<Operand> operands = {};
 	defer (array_free(&operands));
+
+	Type *result_type = t_invalid;
 
 	if (is_call_expr_field_value(ce)) {
 		call_checker = check_named_call_arguments;
@@ -5252,10 +5264,10 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 
 		for (isize i = 0; i < overload_count; i++) {
 			Entity *p = procs[i];
-			Type *proc_type = base_type(p->type);
-			if (proc_type != NULL && is_type_proc(proc_type)) {
+			Type *pt = base_type(p->type);
+			if (pt != NULL && is_type_proc(pt)) {
 				i64 score = 0;
-				CallArgumentError err = call_checker(c, call, proc_type, operands, CallArgumentMode_NoErrors, &score);
+				CallArgumentError err = call_checker(c, call, pt, operands, CallArgumentMode_NoErrors, &score);
 				if (err == CallArgumentError_None) {
 					valids[valid_count].index = i;
 					valids[valid_count].score = score;
@@ -5279,7 +5291,7 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 
 		if (valid_count == 0) {
 			error(operand->expr, "No overloads for `%.*s` that match with the given arguments", LIT(name));
-			proc_type = t_invalid;
+			result_type = t_invalid;
 		} else if (valid_count > 1) {
 			error(operand->expr, "Ambiguous procedure call `%.*s`, could be:", LIT(name));
 			for (isize i = 0; i < valid_count; i++) {
@@ -5289,7 +5301,7 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 				gb_printf_err("\t%.*s of type %s at %.*s(%td:%td) with score %lld\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
 				gb_string_free(pt);
 			}
-			proc_type = t_invalid;
+			result_type = t_invalid;
 		} else {
 			AstNode *expr = operand->expr;
 			while (expr->kind == AstNode_SelectorExpr) {
@@ -5301,14 +5313,20 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 			proc_type = e->type;
 			i64 score = 0;
 			CallArgumentError err = call_checker(c, call, proc_type, operands, CallArgumentMode_ShowErrors, &score);
+
+			if (proc_type != NULL && is_type_proc(proc_type)) {
+				result_type = base_type(proc_type)->Proc.results;
+			}
 		}
 	} else {
 		i64 score = 0;
 		CallArgumentError err = call_checker(c, call, proc_type, operands, CallArgumentMode_ShowErrors, &score);
+		if (proc_type != NULL && is_type_proc(proc_type)) {
+			result_type = base_type(proc_type)->Proc.results;
+		}
 	}
 
-
-	return proc_type;
+	return result_type;
 }
 
 
@@ -5443,36 +5461,39 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		}
 	}
 
-	proc_type = check_call_arguments(c, operand, proc_type, call);
+	Type *result_type = check_call_arguments(c, operand, proc_type, call);
 
 	gb_zero_item(operand);
+	operand->expr = call;
 
-	Type *pt = base_type(proc_type);
-	if (pt == NULL || !is_type_proc(pt)) {
+	if (result_type == t_invalid) {
 		operand->mode = Addressing_Invalid;
 		operand->type = t_invalid;
-		operand->expr = call;
 		return Expr_Stmt;
 	}
 
+	Type *pt = base_type(proc_type);
 	bool results_are_generic = false;
-	if (pt->Proc.results != NULL) {
+	if (is_type_proc(pt) && pt->Proc.results != NULL) {
 		results_are_generic = is_type_generic(pt->Proc.results);
 	}
 	if (results_are_generic) {
 		operand->mode = Addressing_NoValue;
+	} else if (result_type == NULL) {
+		operand->mode = Addressing_NoValue;
 	} else {
-		switch (pt->Proc.result_count) {
+		GB_ASSERT(is_type_tuple(result_type));
+		switch (result_type->Tuple.variable_count) {
 		case 0:
 			operand->mode = Addressing_NoValue;
 			break;
 		case 1:
 			operand->mode = Addressing_Value;
-			operand->type = pt->Proc.results->Tuple.variables[0]->type;
+			operand->type = result_type->Tuple.variables[0]->type;
 			break;
 		default:
 			operand->mode = Addressing_Value;
-			operand->type = pt->Proc.results;
+			operand->type = result_type;
 			break;
 		}
 	}

@@ -12,6 +12,7 @@
 
 #include <math.h>
 
+
 gbAllocator heap_allocator(void) {
 	return gb_heap_allocator();
 }

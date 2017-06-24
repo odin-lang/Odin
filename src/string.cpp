@@ -80,6 +80,13 @@ gb_inline String make_string_c(char *text) {
 	return make_string(cast(u8 *)cast(void *)text, gb_strlen(text));
 }
 
+String substring(String s, isize lo, isize hi) {
+	isize max = s.len;
+	GB_ASSERT(lo <= hi && hi <= max);
+
+	return make_string(s.text+lo, hi-lo);
+}
+
 
 
 

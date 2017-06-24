@@ -33,7 +33,9 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	va_start(va, fmt);
 	cmd_len = gb_snprintf_va(cmd_line, gb_size_of(cmd_line), fmt, va);
 	va_end(va);
-	// gb_printf("%.*s\n", cast(int)cmd_len, cmd_line);
+	if (!is_silent) {
+		// gb_printf("%.*s\n", cast(int)cmd_len, cmd_line);
+	}
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 
@@ -118,17 +120,25 @@ Array<String> setup_args(int argc, char **argv) {
 		wchar_t *warg = wargv[i];
 		isize wlen = string16_len(warg);
 		String16 wstr = make_string16(warg, wlen);
-		array_add(&args, string16_to_string(a, wstr));
+		String arg = string16_to_string(a, wstr);
+		if (arg.len > 0) {
+			array_add(&args, arg);
+		}
 	}
 
 #else
 	array_init(&args, a, argc);
 	for (i = 0; i < argc; i++) {
-		array_add(&args, make_string_c(argv[i]));
+		String arg = make_string_c(argv[i]);
+		if (arg.len > 0) {
+			array_add(&args, arg);
+		}
 	}
 #endif
 	return args;
 }
+
+
 
 
 
@@ -155,6 +165,163 @@ void usage(String argv0) {
 	print_usage_line(1, "version      print version");
 }
 
+
+
+enum BuildFlagKind {
+	BuildFlag_Invalid,
+
+	BuildFlag_OptimizationLevel,
+
+	BuildFlag_COUNT,
+};
+
+enum BuildFlagParamKind {
+	BuildFlagParam_None,
+
+	BuildFlagParam_Boolean,
+	BuildFlagParam_Integer,
+	BuildFlagParam_Float,
+	BuildFlagParam_String,
+
+	BuildFlagParam_COUNT,
+};
+
+struct BuildFlag {
+	BuildFlagKind      kind;
+	String             name;
+	BuildFlagParamKind param_kind;
+};
+
+
+void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind) {
+	BuildFlag flag = {kind, name, param_kind};
+	array_add(build_flags, flag);
+}
+
+bool parse_build_flags(Array<String> args) {
+	Array<BuildFlag> build_flags = {};
+	array_init(&build_flags, heap_allocator(), BuildFlag_COUNT);
+	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"), BuildFlagParam_Integer);
+
+	Array<String> flag_args = args;
+	flag_args.data  += 3;
+	flag_args.count -= 3;
+
+	bool set_flags[BuildFlag_COUNT] = {};
+
+	bool bad_flags = false;
+	for_array(i, flag_args) {
+		String flag = flag_args[i];
+		if (flag[0] != '-') {
+			gb_printf_err("Invalid flag: %.*s\n", LIT(flag));
+		} else {
+			String name = substring(flag, 1, flag.len);
+			isize end = 0;
+			for (; end < name.len; end++) {
+				if (name[end] == '=') {
+					break;
+				}
+			}
+			name.len = end;
+			String param = substring(flag, 2+end, flag.len);
+
+			bool found = false;
+			for_array(build_flag_index, build_flags) {
+				BuildFlag bf = build_flags[build_flag_index];
+				if (bf.name == name) {
+					found = true;
+					if (set_flags[bf.kind]) {
+						gb_printf_err("Previous flag set: `%.*s`\n", LIT(name));
+						bad_flags = true;
+					} else {
+						ExactValue value = {};
+						bool ok = false;
+						if (bf.param_kind == BuildFlagParam_None) {
+							if (param.len == 0) {
+								ok = true;
+							} else {
+								gb_printf_err("Flag `%.*s` was not expecting a parameter `%.*s`\n", LIT(name), LIT(param));
+								bad_flags = true;
+							}
+						} else {
+							if (param.len == 0) {
+								gb_printf_err("Flag missing for `%.*s`\n", LIT(name));
+								bad_flags = true;
+							} else {
+								ok = true;
+								switch (bf.param_kind) {
+								default: ok = false; break;
+								case BuildFlagParam_Boolean: {
+									if (param == "t") {
+										value = exact_value_bool(true);
+									} else if (param == "T") {
+										value = exact_value_bool(true);
+									} else if (param == "true") {
+										value = exact_value_bool(true);
+									} else if (param == "TRUE") {
+										value = exact_value_bool(true);
+									} else if (param == "1") {
+										value = exact_value_bool(true);
+									} else if (param == "f") {
+										value = exact_value_bool(false);
+									} else if (param == "F") {
+										value = exact_value_bool(false);
+									} else if (param == "false") {
+										value = exact_value_bool(false);
+									} else if (param == "FALSE") {
+										value = exact_value_bool(false);
+									} else if (param == "0") {
+										value = exact_value_bool(false);
+									} else {
+										gb_printf_err("Invalid flag parameter for `%.*s` = `%.*s`\n", LIT(name), LIT(param));
+									}
+								} break;
+								case BuildFlagParam_Integer:
+									value = exact_value_integer_from_string(param);
+									break;
+								case BuildFlagParam_Float:
+									value = exact_value_float_from_string(param);
+									break;
+								case BuildFlagParam_String:
+									value = exact_value_string(param);
+									break;
+								}
+							}
+
+						}
+						if (ok) {
+							switch (bf.kind) {
+							case BuildFlag_OptimizationLevel:
+								if (value.kind == ExactValue_Integer) {
+									build_context.optimization_level = cast(i32)i128_to_i64(value.value_integer);
+								} else {
+									gb_printf_err("%.*s expected an integer, got %.*s", LIT(name), LIT(param));
+									bad_flags = true;
+									ok = false;
+								}
+								break;
+							}
+						}
+
+
+						set_flags[bf.kind] = ok;
+					}
+					break;
+				}
+			}
+			if (!found) {
+				gb_printf_err("Unknown flag: `%.*s`\n", LIT(name));
+				bad_flags = true;
+			}
+		}
+	}
+
+	return !bad_flags;
+}
+
+
+
+
 int main(int arg_count, char **arg_ptr) {
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
@@ -172,39 +339,31 @@ int main(int arg_count, char **arg_ptr) {
 
 
 #if 1
-	init_build_context();
-
-	if (build_context.word_size == 4) {
-		print_usage_line(0, "%s 32-bit is not yet supported", args[0]);
-		return 1;
-	}
-
-	init_universal_scope();
 
 	String init_filename = {};
 	bool run_output = false;
 	if (args[1] == "run") {
-		if (args.count != 3) {
+		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
 		}
 		init_filename = args[2];
 		run_output = true;
 	} else if (args[1] == "build_dll") {
-		if (args.count != 3) {
+		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
 		}
 		init_filename = args[2];
 		build_context.is_dll = true;
 	} else if (args[1] == "build") {
-		if (args.count != 3) {
+		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
 		}
 		init_filename = args[2];
 	} else if (args[1] == "docs") {
-		if (args.count != 3) {
+		if (args.count < 3) {
 			usage(args[0]);
 			return 1;
 		}
@@ -222,6 +381,18 @@ int main(int arg_count, char **arg_ptr) {
 		usage(args[0]);
 		return 1;
 	}
+
+	if (!parse_build_flags(args)) {
+		return 1;
+	}
+
+
+	init_build_context();
+	if (build_context.word_size == 4) {
+		print_usage_line(0, "%s 32-bit is not yet supported", args[0]);
+		return 1;
+	}
+	init_universal_scope();
 
 	// TODO(bill): prevent compiling without a linker
 
@@ -291,49 +462,44 @@ int main(int arg_count, char **arg_ptr) {
 	String output_base = ir_gen.output_base;
 	int base_name_len = output_base.len;
 
-	i32 optimization_level = 0;
-	optimization_level = gb_clamp(optimization_level, 0, 3);
+	build_context.optimization_level = gb_clamp(build_context.optimization_level, 0, 3);
 
 	i32 exit_code = 0;
 
 	#if defined(GB_SYSTEM_WINDOWS)
-	// For more passes arguments: http://llvm.org/docs/Passes.html
-	exit_code = system_exec_command_line_app("llvm-opt", false,
-		"\"%.*sbin/opt\" \"%.*s\".ll -o \"%.*s\".bc "
-		"-mem2reg "
-		"-memcpyopt "
-		"-die "
-		// "-dse "
-		// "-dce "
-		// "-S "
-		"",
-		LIT(build_context.ODIN_ROOT),
-		LIT(output_base), LIT(output_base));
-	if (exit_code != 0) {
-		return exit_code;
-	}
+		// For more passes arguments: http://llvm.org/docs/Passes.html
+		exit_code = system_exec_command_line_app("llvm-opt", false,
+			"\"%.*sbin/opt\" \"%.*s\".ll -o \"%.*s\".bc %.*s "
+			"-mem2reg "
+			"-memcpyopt "
+			"-die "
+			"",
+			LIT(build_context.ODIN_ROOT),
+			LIT(output_base), LIT(output_base),
+			LIT(build_context.opt_flags));
+		if (exit_code != 0) {
+			return exit_code;
+		}
 	#else
-	// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
-	//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
-	exit_code = system_exec_command_line_app("llvm-opt", false,
-		"opt \"%.*s\".ll -o \"%.*s\".bc "
-		"-mem2reg "
-		"-memcpyopt "
-		"-die "
-		#if defined(GB_SYSTEM_OSX)
-			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
-			// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
-			//       make sure to also change the `macosx_version_min` param passed to `llc`
-			"-mtriple=x86_64-apple-macosx10.8 "
-		#endif
-		// "-dse "
-		// "-dce "
-		// "-S "
-		"",
-		LIT(output_base), LIT(output_base));
-	if (exit_code != 0) {
-		return exit_code;
-	}
+		// NOTE(zangent): This is separate because it seems that LLVM tools are packaged
+		//   with the Windows version, while they will be system-provided on MacOS and GNU/Linux
+		exit_code = system_exec_command_line_app("llvm-opt", false,
+			"opt \"%.*s\".ll -o \"%.*s\".bc %.*s "
+			"-mem2reg "
+			"-memcpyopt "
+			"-die "
+			#if defined(GB_SYSTEM_OSX)
+				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
+				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
+				//       make sure to also change the `macosx_version_min` param passed to `llc`
+				"-mtriple=x86_64-apple-macosx10.8 "
+			#endif
+			"",
+			LIT(output_base), LIT(output_base),
+			LIT(build_context.opt_flags));
+		if (exit_code != 0) {
+			return exit_code;
+		}
 	#endif
 
 	#if defined(GB_SYSTEM_WINDOWS)
@@ -346,7 +512,7 @@ int main(int arg_count, char **arg_ptr) {
 			"",
 			LIT(build_context.ODIN_ROOT),
 			LIT(output_base),
-			optimization_level,
+			build_context.optimization_level,
 			LIT(build_context.llc_flags));
 		if (exit_code != 0) {
 			return exit_code;
@@ -408,7 +574,7 @@ int main(int arg_count, char **arg_ptr) {
 			// "-debug-pass=Arguments "
 			"",
 			LIT(output_base),
-			optimization_level,
+			build_context.optimization_level,
 			LIT(build_context.llc_flags));
 		if (exit_code != 0) {
 			return exit_code;
