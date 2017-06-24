@@ -1516,6 +1516,7 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 	type->Proc.result_count       = result_count;
 	type->Proc.variadic           = variadic;
 	type->Proc.calling_convention = pt->calling_convention;
+	type->Proc.is_generic         = pt->generic;
 
 	if (param_count > 0) {
 		Entity *end = params->Tuple.variables[param_count-1];
@@ -1530,16 +1531,17 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 				type->Proc.c_vararg = true;
 			}
 		}
-
-		bool is_generic = false;
-		for (isize i = 0; i < param_count; i++) {
-			Entity *e = params->Tuple.variables[i];
-			if (e->type->kind == Type_Generic) {
-				is_generic = true;
-			}
-		}
-		type->Proc.is_generic = is_generic;
 	}
+
+
+	bool is_generic = false;
+	for (isize i = 0; i < param_count; i++) {
+		Entity *e = params->Tuple.variables[i];
+		if (e->type->kind == Type_Generic) {
+			is_generic = true;
+		}
+	}
+	GB_ASSERT(type->Proc.is_generic == is_generic);
 
 
 	type->Proc.abi_compat_params = gb_alloc_array(c->allocator, Type *, param_count);
@@ -4487,6 +4489,29 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		}
 
 		operand->type = t_u8_slice;
+		operand->mode = Addressing_Value;
+	} break;
+
+	case BuiltinProc_expand_to_tuple: {
+		Type *type = base_type(operand->type);
+		if (!is_type_struct(type) &
+		    !is_type_union(type)) {
+			gbString type_str = type_to_string(operand->type);
+			error(call, "Expected a struct or union type, got `%s`", type_str);
+			gb_string_free(type_str);
+			return false;
+		}
+		gbAllocator a = c->allocator;
+
+		Type *tuple = make_type_tuple(a);
+		i32 variable_count = type->Record.field_count;
+		tuple->Tuple.variables = gb_alloc_array(a, Entity *, variable_count);
+		tuple->Tuple.variable_count = variable_count;
+
+		// TODO(bill): Should I copy each of the entities or is this good enough?
+		gb_memcopy_array(tuple->Tuple.variables, type->Record.fields, variable_count);
+
+		operand->type = tuple;
 		operand->mode = Addressing_Value;
 	} break;
 

@@ -393,6 +393,7 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		AstNode *results; \
 		u64      tags;    \
 		ProcCallingConvention calling_convention; \
+		bool     generic; \
 	}) \
 	AST_NODE_KIND(PointerType, "pointer type", struct { \
 		Token token; \
@@ -1370,15 +1371,17 @@ AstNode *ast_helper_type(AstFile *f, Token token) {
 }
 
 
-AstNode *ast_proc_type(AstFile *f, Token token, AstNode *params, AstNode *results, u64 tags, ProcCallingConvention calling_convention) {
+AstNode *ast_proc_type(AstFile *f, Token token, AstNode *params, AstNode *results, u64 tags, ProcCallingConvention calling_convention, bool generic) {
 	AstNode *result = make_ast_node(f, AstNode_ProcType);
 	result->ProcType.token = token;
 	result->ProcType.params = params;
 	result->ProcType.results = results;
 	result->ProcType.tags = tags;
 	result->ProcType.calling_convention = calling_convention;
+	result->ProcType.generic = generic;
 	return result;
 }
+
 
 AstNode *ast_pointer_type(AstFile *f, Token token, AstNode *type) {
 	AstNode *result = make_ast_node(f, AstNode_PointerType);
@@ -3214,7 +3217,20 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token, String *link_name_) {
 
 	if (link_name_) *link_name_ = link_name;
 
-	return ast_proc_type(f, proc_token, params, results, tags, cc);
+	bool is_generic = false;
+
+	for_array(i, params->FieldList.list) {
+		AstNode *param = params->FieldList.list[i];
+		ast_node(f, Field, param);
+		if (f->type != NULL &&
+		    f->type->kind == AstNode_HelperType) {
+			is_generic = true;
+			break;
+		}
+	}
+
+
+	return ast_proc_type(f, proc_token, params, results, tags, cc, is_generic);
 }
 
 AstNode *parse_var_type(AstFile *f, bool allow_ellipsis, bool allow_type_token) {

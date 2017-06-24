@@ -4283,6 +4283,23 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		return ir_emit_load(proc, slice);
 	} break;
 
+	case BuiltinProc_expand_to_tuple: {
+		ir_emit_comment(proc, str_lit("expand_to_tuple"));
+		irValue *s = ir_build_expr(proc, ce->args[0]);
+		Type *t = base_type(ir_type(s));
+
+		GB_ASSERT(t->kind == Type_Record);
+		GB_ASSERT(is_type_tuple(tv.type));
+
+		irValue *tuple = ir_add_local_generated(proc, tv.type);
+		for (isize i = 0; i < t->Record.field_count; i++) {
+			irValue *f = ir_emit_struct_ev(proc, s, i);
+			irValue *ep = ir_emit_struct_ep(proc, tuple, i);
+			ir_emit_store(proc, ep, f);
+		}
+		return ir_emit_load(proc, tuple);
+	} break;
+
 	case BuiltinProc_min: {
 		ir_emit_comment(proc, str_lit("min"));
 		Type *t = type_of_expr(proc->module->info, expr);

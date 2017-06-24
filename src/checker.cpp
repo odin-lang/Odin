@@ -56,6 +56,8 @@ enum BuiltinProcId {
 	BuiltinProc_slice_ptr,
 	BuiltinProc_slice_to_bytes,
 
+	BuiltinProc_expand_to_tuple,
+
 	BuiltinProc_min,
 	BuiltinProc_max,
 	BuiltinProc_abs,
@@ -99,8 +101,10 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("imag"),             1, false, Expr_Expr},
 	{STR_LIT("conj"),             1, false, Expr_Expr},
 
-	{STR_LIT("slice_ptr"),        2, true,   Expr_Expr},
-	{STR_LIT("slice_to_bytes"),   1, false,  Expr_Stmt},
+	{STR_LIT("slice_ptr"),        2, true,  Expr_Expr},
+	{STR_LIT("slice_to_bytes"),   1, false, Expr_Stmt},
+
+	{STR_LIT("expand_to_tuple"),  1, false, Expr_Expr},
 
 	{STR_LIT("min"),              2, false, Expr_Expr},
 	{STR_LIT("max"),              2, false, Expr_Expr},
@@ -328,6 +332,15 @@ void    scope_lookup_parent_entity (Scope *s, String name, Scope **scope_, Entit
 Entity *scope_insert_entity        (Scope *s, Entity *entity);
 
 
+ExprInfo *check_get_expr_info(CheckerInfo *i, AstNode *expr);
+void check_set_expr_info(CheckerInfo *i, AstNode *expr, ExprInfo info);
+void check_remove_expr_info(CheckerInfo *i, AstNode *expr);
+void add_untyped(CheckerInfo *i, AstNode *expression, bool lhs, AddressingMode mode, Type *basic_type, ExactValue value);
+void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode, Type *type, ExactValue value);
+void add_entity_use(Checker *c, AstNode *identifier, Entity *entity);
+void add_implicit_entity(Checker *c, AstNode *node, Entity *e);
+void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d);
+void add_implicit_entity(Checker *c, AstNode *node, Entity *e);
 
 
 void init_declaration_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
