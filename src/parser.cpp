@@ -34,6 +34,7 @@ struct AstFile {
 	// NOTE(bill): Used to prevent type literals in control clauses
 	isize          expr_level;
 	bool           allow_range; // NOTE(bill): Ranges are only allowed in certain cases
+	bool           allow_gen_proc_type;
 	bool           in_foreign_block;
 
 	Array<AstNode *> decls;
@@ -2729,9 +2730,13 @@ AstNode *parse_proc_decl(AstFile *f) {
 	String link_name = {};
 
 
+	bool prev_allow_gen_proc_type = f->allow_gen_proc_type;
+	f->allow_gen_proc_type = true;
 	AstNode *name = parse_ident(f);
 	AstNode *type = parse_proc_type(f, token, &link_name);
 	u64 tags = type->ProcType.tags;
+	f->allow_gen_proc_type = prev_allow_gen_proc_type;
+
 
 	if (f->curr_token.kind == Token_OpenBrace) {
 		if ((tags & ProcTag_foreign) != 0) {
@@ -3404,12 +3409,13 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 
 	isize total_name_count = 0;
 	bool allow_ellipsis = allowed_flags&FieldFlag_ellipsis;
+	bool allow_type_token = f->allow_gen_proc_type && allow_default_parameters;
 
 	while (f->curr_token.kind != follow &&
 	       f->curr_token.kind != Token_Colon &&
 	       f->curr_token.kind != Token_EOF) {
 		u32 flags = parse_field_prefixes(f);
-		AstNode *param = parse_var_type(f, allow_ellipsis, allow_default_parameters);
+		AstNode *param = parse_var_type(f, allow_ellipsis, allow_type_token);
 		AstNodeAndFlags naf = {param, flags};
 		array_add(&list, naf);
 		if (f->curr_token.kind != Token_Comma) {
@@ -3436,7 +3442,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 
 		if (f->curr_token.kind != Token_Eq) {
 			expect_token_after(f, Token_Colon, "field list");
-			type = parse_var_type(f, allow_ellipsis, allow_default_parameters);
+			type = parse_var_type(f, allow_ellipsis, allow_type_token);
 		}
 		if (allow_token(f, Token_Eq)) {
 			// TODO(bill): Should this be true==lhs or false==rhs?
@@ -3788,7 +3794,10 @@ AstNode *parse_type_or_ident(AstFile *f) {
 
 	case Token_proc: {
 		Token token = f->curr_token; next_token(f);
+		bool prev_allow_gen_proc_type = f->allow_gen_proc_type;
+		f->allow_gen_proc_type = false;
 		AstNode *pt = parse_proc_type(f, token, NULL);
+		f->allow_gen_proc_type = prev_allow_gen_proc_type;
 		if (pt->ProcType.tags != 0) {
 			syntax_error(token, "A procedure type cannot have tags");
 		}

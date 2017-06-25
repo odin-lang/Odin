@@ -189,18 +189,26 @@ void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
 			ir_fprintf(f, ", ");
 		}
 	}
+	isize param_index = 0;
 	for (isize i = 0; i < param_count; i++) {
-		if (i > 0) {
+		if (param_index > 0) {
 			ir_fprintf(f, ", ");
 		}
+		Entity *e = t->Proc.params->Tuple.variables[i];
+		if (e->kind != Entity_Variable) {
+			continue;
+		}
+
 		if (i+1 == param_count && t->Proc.c_vararg) {
 			ir_fprintf(f, "...");
 		} else {
 			ir_print_type(f, m, t->Proc.abi_compat_params[i]);
 		}
+
+		param_index++;
 	}
 	if (t->Proc.calling_convention == ProcCC_Odin) {
-		if (param_count > 0) {
+		if (param_index > 0) {
 			ir_fprintf(f, ", ");
 		}
 		ir_print_type(f, m, t_context_ptr);
@@ -354,11 +362,16 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 			ir_print_type(f, m, t->Tuple.variables[0]->type);
 		} else {
 			ir_fprintf(f, "{");
+			isize index = 0;
 			for (isize i = 0; i < t->Tuple.variable_count; i++) {
-				if (i > 0) {
+				if (index > 0) {
 					ir_fprintf(f, ", ");
 				}
-				ir_print_type(f, m, t->Tuple.variables[i]->type);
+				Entity *e = t->Tuple.variables[i];
+				if (e->kind == Entity_Variable) {
+					ir_print_type(f, m, e->type);
+					index++;
+				}
 			}
 			ir_fprintf(f, "}");
 		}
@@ -1551,17 +1564,22 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 		}
 	}
 
+	isize param_index = 0;
 	if (param_count > 0) {
 		TypeTuple *params = &proc_type->params->Tuple;
 		for (isize i = 0; i < param_count; i++) {
 			Entity *e = params->variables[i];
 			Type *original_type = e->type;
 			Type *abi_type = proc_type->abi_compat_params[i];
-			if (i > 0) {
+			if (param_index > 0) {
 				ir_fprintf(f, ", ");
 			}
+			if (e->kind != Entity_Variable) {
+				continue;
+			}
+
 			if (i+1 == params->variable_count && proc_type->c_vararg) {
-					ir_fprintf(f, " ...");
+				ir_fprintf(f, " ...");
 			} else {
 				ir_print_type(f, m, abi_type);
 				if (e->flags&EntityFlag_NoAlias) {
@@ -1577,10 +1595,12 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 					}
 				}
 			}
+
+			param_index++;
 		}
 	}
 	if (proc_type->calling_convention == ProcCC_Odin) {
-		if (param_count > 0) {
+		if (param_index > 0) {
 			ir_fprintf(f, ", ");
 		}
 		ir_print_type(f, m, t_context_ptr);

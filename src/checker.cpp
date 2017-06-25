@@ -221,6 +221,7 @@ ExprInfo make_expr_info(bool is_lhs, AddressingMode mode, Type *type, ExactValue
 
 
 struct Scope {
+	AstNode *        node;
 	Scope *          parent;
 	Scope *          prev, *next;
 	Scope *          first_child;
@@ -238,8 +239,6 @@ struct Scope {
 	AstFile *        file;
 };
 gb_global Scope *universal_scope = NULL;
-
-
 
 
 
@@ -278,6 +277,7 @@ struct CheckerInfo {
 	Map<DeclInfo *>      entities;        // Key: Entity *
 	Map<Entity *>        foreigns;        // Key: String
 	Map<AstFile *>       files;           // Key: String (full path)
+
 	Map<isize>           type_info_map;   // Key: Type *
 	isize                type_info_count;
 };
@@ -423,12 +423,12 @@ void destroy_scope(Scope *scope) {
 void add_scope(Checker *c, AstNode *node, Scope *scope) {
 	GB_ASSERT(node != NULL);
 	GB_ASSERT(scope != NULL);
+	scope->node = node;
 	map_set(&c->info.scopes, hash_node(node), scope);
 }
 
 
 void check_open_scope(Checker *c, AstNode *node) {
-	GB_ASSERT(node != NULL);
 	node = unparen_expr(node);
 	GB_ASSERT(node->kind == AstNode_Invalid ||
 	          is_ast_node_stmt(node) ||

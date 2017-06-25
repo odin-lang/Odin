@@ -1030,7 +1030,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 
 
 
-Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_variadic_) {
+Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_variadic_, Array<Operand> *operands) {
 	if (_params == NULL) {
 		return NULL;
 	}
@@ -1040,6 +1040,11 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 	if (params.count == 0) {
 		return NULL;
 	}
+
+	if (operands != NULL) {
+		GB_ASSERT(operands->count == params.count);
+	}
+
 
 	isize variable_count = 0;
 	for_array(i, params) {
@@ -1096,32 +1101,45 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				}
 			}
 			if (type_expr->kind == AstNode_HelperType) {
-				type = make_type_generic(c->allocator, 0);
+				if (operands != NULL) {
+					Operand o = (*operands)[i];
+					if (o.mode == Addressing_Type) {
+						type = o.type;
+					} else {
+						error(o.expr, "Expected a type to assign to a type parameter");
+					}
+				} else {
+					type = make_type_generic(c->allocator, 0);
+				}
 			} else {
 				type = check_type(c, type_expr);
 			}
 
 			if (default_value != NULL) {
-				Operand o = {};
-				if (default_value->kind == AstNode_BasicDirective &&
-				    default_value->BasicDirective.name == "caller_location") {
-					init_preload(c);
-					default_is_location = true;
-					o.type = t_source_code_location;
-					o.mode = Addressing_Value;
+				if (type_expr->kind == AstNode_HelperType) {
+					error(default_value, "A type parameter may not have a default value");
 				} else {
-					check_expr_with_type_hint(c, &o, default_value, type);
-
-					if (is_operand_nil(o)) {
-						default_is_nil = true;
-					} else if (o.mode != Addressing_Constant) {
-						error(default_value, "Default parameter must be a constant");
+					Operand o = {};
+					if (default_value->kind == AstNode_BasicDirective &&
+					    default_value->BasicDirective.name == "caller_location") {
+						init_preload(c);
+						default_is_location = true;
+						o.type = t_source_code_location;
+						o.mode = Addressing_Value;
 					} else {
-						value = o.value;
-					}
-				}
+						check_expr_with_type_hint(c, &o, default_value, type);
 
-				check_is_assignable_to(c, &o, type);
+						if (is_operand_nil(o)) {
+							default_is_nil = true;
+						} else if (o.mode != Addressing_Constant) {
+							error(default_value, "Default parameter must be a constant");
+						} else {
+							value = o.value;
+						}
+					}
+
+					check_is_assignable_to(c, &o, type);
+				}
 			}
 
 		}
@@ -1154,7 +1172,13 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			AstNode *name = p->names[j];
 			if (ast_node_expect(name, AstNode_Ident)) {
 				Entity *param = NULL;
-				if (type->kind == Type_Generic) {
+				bool is_generic = type->kind == Type_Generic;
+				if (operands != NULL) {
+					Operand o = (*operands)[j];
+					is_generic = o.mode == Addressing_Type && o.type == type;
+				}
+
+				if (is_generic) {
 					param = make_entity_type_name(c->allocator, scope, name->Ident, type);
 				} else {
 					param = make_entity_param(c->allocator, scope, name->Ident, type,
@@ -1497,11 +1521,12 @@ bool abi_compat_return_by_value(gbAllocator a, ProcCallingConvention cc, Type *a
 	return false;
 }
 
-void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
+// NOTE(bill): `operands` is for generating non generic procedure type
+void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array<Operand> *operands = NULL) {
 	ast_node(pt, ProcType, proc_type_node);
 
 	bool variadic = false;
-	Type *params  = check_get_params(c, c->context.scope, pt->params, &variadic);
+	Type *params  = check_get_params(c, c->context.scope, pt->params, &variadic, operands);
 	Type *results = check_get_results(c, c->context.scope, pt->results);
 
 	isize param_count = 0;
@@ -1509,6 +1534,7 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 	if (params)  param_count  = params ->Tuple.variable_count;
 	if (results) result_count = results->Tuple.variable_count;
 
+	type->Proc.node               = proc_type_node;
 	type->Proc.scope              = c->context.scope;
 	type->Proc.params             = params;
 	type->Proc.param_count        = param_count;
@@ -1541,14 +1567,19 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node) {
 			is_generic = true;
 		}
 	}
-	GB_ASSERT(type->Proc.is_generic == is_generic);
+	if (operands == NULL) {
+		GB_ASSERT(type->Proc.is_generic == is_generic);
+	}
 
 
 	type->Proc.abi_compat_params = gb_alloc_array(c->allocator, Type *, param_count);
 	for (isize i = 0; i < param_count; i++) {
-		Type *original_type = type->Proc.params->Tuple.variables[i]->type;
-		Type *new_type = type_to_abi_compat_param_type(c->allocator, original_type);
-		type->Proc.abi_compat_params[i] = new_type;
+		Entity *e = type->Proc.params->Tuple.variables[i];
+		if (e->kind == Entity_Variable) {
+			Type *original_type = e->type;
+			Type *new_type = type_to_abi_compat_param_type(c->allocator, original_type);
+			type->Proc.abi_compat_params[i] = new_type;
+		}
 	}
 
 	// NOTE(bill): The types are the same
@@ -4829,6 +4860,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 enum CallArgumentError {
 	CallArgumentError_None,
+	CallArgumentError_NoneProcedureType,
 	CallArgumentError_WrongTypes,
 	CallArgumentError_NonVariadicExpand,
 	CallArgumentError_VariadicTuple,
@@ -4902,23 +4934,28 @@ bool check_unpack_arguments(Checker *c, isize lhs_count, Array<Operand> *operand
 	return optional_ok;
 }
 
-#define CALL_ARGUMENT_CHECKER(name) CallArgumentError name(Checker *c, AstNode *call, Type *proc_type, Array<Operand> operands, CallArgumentErrorMode show_error_mode, i64 *score_)
+#define CALL_ARGUMENT_CHECKER(name) CallArgumentError name(Checker *c, AstNode *call, Type *proc_type, Array<Operand> operands, CallArgumentErrorMode show_error_mode, i64 *score_, Type **result_type_)
 typedef CALL_ARGUMENT_CHECKER(CallArgumentCheckerType);
 
 
 CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 	ast_node(ce, CallExpr, call);
+	GB_ASSERT(is_type_proc(proc_type));
+	proc_type = base_type(proc_type);
+	TypeProc *pt = &proc_type->Proc;
+
 	isize param_count = 0;
 	isize param_count_excluding_defaults = 0;
-	bool variadic = proc_type->Proc.variadic;
+	bool variadic = pt->variadic;
 	bool vari_expand = (ce->ellipsis.pos.line != 0);
 	i64 score = 0;
 	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
 
+
 	TypeTuple *param_tuple = NULL;
 
-	if (proc_type->Proc.params != NULL) {
-		param_tuple = &proc_type->Proc.params->Tuple;
+	if (pt->params != NULL) {
+		param_tuple = &pt->params->Tuple;
 
 		param_count = param_tuple->variable_count;
 		if (variadic) {
@@ -4945,120 +4982,126 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		}
 	}
 
+	CallArgumentError err = CallArgumentError_None;
+	Type *final_proc_type = proc_type;
+
 	if (vari_expand && !variadic) {
 		if (show_error) {
 			error(ce->ellipsis,
 			      "Cannot use `..` in call to a non-variadic procedure: `%.*s`",
 			      LIT(ce->proc->Ident.string));
 		}
-		if (score_) *score_ = score;
-		return CallArgumentError_NonVariadicExpand;
-	}
-	if (vari_expand && proc_type->Proc.c_vararg) {
+		err = CallArgumentError_NonVariadicExpand;
+	} else if (vari_expand && pt->c_vararg) {
 		if (show_error) {
 			error(ce->ellipsis,
 			      "Cannot use `..` in call to a `#c_vararg` variadic procedure: `%.*s`",
 			      LIT(ce->proc->Ident.string));
 		}
-		if (score_) *score_ = score;
-		return CallArgumentError_NonVariadicExpand;
-	}
-
-	if (operands.count == 0 && param_count_excluding_defaults == 0) {
-		if (score_) *score_ = score;
-		return CallArgumentError_None;
-	}
-
-	i32 error_code = 0;
-	if (operands.count < param_count_excluding_defaults) {
-		error_code = -1;
-	} else if (!variadic && operands.count > param_count) {
-		error_code = +1;
-	}
-	if (error_code != 0) {
-		CallArgumentError err = CallArgumentError_TooManyArguments;
-		char *err_fmt = "Too many arguments for `%s`, expected %td arguments";
-		if (error_code < 0) {
-			err = CallArgumentError_TooFewArguments;
-			err_fmt = "Too few arguments for `%s`, expected %td arguments";
+		err = CallArgumentError_NonVariadicExpand;
+	} else if (operands.count == 0 && param_count_excluding_defaults == 0) {
+		err = CallArgumentError_None;
+	} else {
+		i32 error_code = 0;
+		if (operands.count < param_count_excluding_defaults) {
+			error_code = -1;
+		} else if (!variadic && operands.count > param_count) {
+			error_code = +1;
 		}
-
-		if (show_error) {
-			gbString proc_str = expr_to_string(ce->proc);
-			error(call, err_fmt, proc_str, param_count_excluding_defaults);
-			gb_string_free(proc_str);
-		}
-		if (score_) *score_ = score;
-		return err;
-	}
-
-	CallArgumentError err = CallArgumentError_None;
-
-
-	GB_ASSERT(proc_type->Proc.params != NULL);
-	Entity **sig_params = param_tuple->variables;
-	isize operand_index = 0;
-	isize max_operand_count = gb_min(param_count, operands.count);
-	for (; operand_index < max_operand_count; operand_index++) {
-		Entity *e = sig_params[operand_index];
-		Type *t = e->type;
-		Operand o = operands[operand_index];
-		if (e->kind == Entity_TypeName) {
-			GB_ASSERT(proc_type->Proc.is_generic);
-			GB_ASSERT(!variadic);
-			if (o.mode == Addressing_Invalid) {
-				continue;
-			} else if (o.mode != Addressing_Type) {
-				error(o.expr, "Expected a type for the argument");
+		if (error_code != 0) {
+			err = CallArgumentError_TooManyArguments;
+			char *err_fmt = "Too many arguments for `%s`, expected %td arguments";
+			if (error_code < 0) {
+				err = CallArgumentError_TooFewArguments;
+				err_fmt = "Too few arguments for `%s`, expected %td arguments";
 			}
 
-			score += assign_score_function(1);
-			continue;
-		}
-		if (variadic) {
-			o = operands[operand_index];
-		}
-		i64 s = 0;
-		if (!check_is_assignable_to_with_score(c, &o, t, &s)) {
 			if (show_error) {
-				check_assignment(c, &o, t, str_lit("argument"));
+				gbString proc_str = expr_to_string(ce->proc);
+				error(call, err_fmt, proc_str, param_count_excluding_defaults);
+				gb_string_free(proc_str);
 			}
-			err = CallArgumentError_WrongTypes;
-		}
-		score += s;
-	}
+		} else {
+			if (pt->is_generic) {
+				Scope *scope = make_scope(pt->scope->parent, c->allocator);
+				CheckerContext prev = c->context;
+				defer (c->context = prev);
+				c->context.scope = scope;
 
-	if (variadic) {
-		bool variadic_expand = false;
-		Type *slice = sig_params[param_count]->type;
-		GB_ASSERT(is_type_slice(slice));
-		Type *elem = base_type(slice)->Slice.elem;
-		Type *t = elem;
-		for (; operand_index < operands.count; operand_index++) {
-			Operand o = operands[operand_index];
-			if (vari_expand) {
-				variadic_expand = true;
-				t = slice;
-				if (operand_index != param_count) {
-					if (show_error) {
-						error(o.expr, "`..` in a variadic procedure can only have one variadic argument at the end");
+				final_proc_type = alloc_type(c->allocator, Type_Proc);
+				check_procedure_type(c, final_proc_type, pt->node, &operands);
+			}
+
+
+			TypeProc *pt = &final_proc_type->Proc;
+
+			GB_ASSERT(pt->params != NULL);
+			Entity **sig_params = pt->params->Tuple.variables;
+			isize operand_index = 0;
+			isize max_operand_count = gb_min(param_count, operands.count);
+			for (; operand_index < max_operand_count; operand_index++) {
+				Entity *e = sig_params[operand_index];
+				Type *t = e->type;
+				Operand o = operands[operand_index];
+				if (e->kind == Entity_TypeName) {
+					// GB_ASSERT(!variadic);
+					if (o.mode == Addressing_Invalid) {
+						continue;
+					} else if (o.mode != Addressing_Type) {
+						error(o.expr, "Expected a type for the argument");
 					}
-					if (score_) *score_ = score;
-					return CallArgumentError_MultipleVariadicExpand;
+
+					score += assign_score_function(1);
+					continue;
+				}
+				if (variadic) {
+					o = operands[operand_index];
+				}
+				i64 s = 0;
+				if (!check_is_assignable_to_with_score(c, &o, t, &s)) {
+					if (show_error) {
+						check_assignment(c, &o, t, str_lit("argument"));
+					}
+					err = CallArgumentError_WrongTypes;
+				}
+				score += s;
+			}
+
+			if (variadic) {
+				bool variadic_expand = false;
+				Type *slice = sig_params[param_count]->type;
+				GB_ASSERT(is_type_slice(slice));
+				Type *elem = base_type(slice)->Slice.elem;
+				Type *t = elem;
+				for (; operand_index < operands.count; operand_index++) {
+					Operand o = operands[operand_index];
+					if (vari_expand) {
+						variadic_expand = true;
+						t = slice;
+						if (operand_index != param_count) {
+							if (show_error) {
+								error(o.expr, "`..` in a variadic procedure can only have one variadic argument at the end");
+							}
+							if (score_) *score_ = score;
+							return CallArgumentError_MultipleVariadicExpand;
+						}
+					}
+					i64 s = 0;
+					if (!check_is_assignable_to_with_score(c, &o, t, &s)) {
+						if (show_error) {
+							check_assignment(c, &o, t, str_lit("argument"));
+						}
+						err = CallArgumentError_WrongTypes;
+					}
+					score += s;
 				}
 			}
-			i64 s = 0;
-			if (!check_is_assignable_to_with_score(c, &o, t, &s)) {
-				if (show_error) {
-					check_assignment(c, &o, t, str_lit("argument"));
-				}
-				err = CallArgumentError_WrongTypes;
-			}
-			score += s;
 		}
 	}
 
 	if (score_) *score_ = score;
+	if (result_type_) *result_type_ = final_proc_type->Proc.results;
+
 	return err;
 }
 
@@ -5208,6 +5251,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	}
 
 	if (score_) *score_ = score;
+	if (result_type_) *result_type_ = pt->results;
 
 	return err;
 }
@@ -5267,7 +5311,7 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 			Type *pt = base_type(p->type);
 			if (pt != NULL && is_type_proc(pt)) {
 				i64 score = 0;
-				CallArgumentError err = call_checker(c, call, pt, operands, CallArgumentMode_NoErrors, &score);
+				CallArgumentError err = call_checker(c, call, pt, operands, CallArgumentMode_NoErrors, &score, &result_type);
 				if (err == CallArgumentError_None) {
 					valids[valid_count].index = i;
 					valids[valid_count].score = score;
@@ -5312,18 +5356,11 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 			add_entity_use(c, expr, e);
 			proc_type = e->type;
 			i64 score = 0;
-			CallArgumentError err = call_checker(c, call, proc_type, operands, CallArgumentMode_ShowErrors, &score);
-
-			if (proc_type != NULL && is_type_proc(proc_type)) {
-				result_type = base_type(proc_type)->Proc.results;
-			}
+			CallArgumentError err = call_checker(c, call, proc_type, operands, CallArgumentMode_ShowErrors, &score, &result_type);
 		}
 	} else {
 		i64 score = 0;
-		CallArgumentError err = call_checker(c, call, proc_type, operands, CallArgumentMode_ShowErrors, &score);
-		if (proc_type != NULL && is_type_proc(proc_type)) {
-			result_type = base_type(proc_type)->Proc.results;
-		}
+		CallArgumentError err = call_checker(c, call, proc_type, operands, CallArgumentMode_ShowErrors, &score, &result_type);
 	}
 
 	return result_type;
@@ -5473,13 +5510,7 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	}
 
 	Type *pt = base_type(proc_type);
-	bool results_are_generic = false;
-	if (is_type_proc(pt) && pt->Proc.results != NULL) {
-		results_are_generic = is_type_generic(pt->Proc.results);
-	}
-	if (results_are_generic) {
-		operand->mode = Addressing_NoValue;
-	} else if (result_type == NULL) {
+	if (result_type == NULL) {
 		operand->mode = Addressing_NoValue;
 	} else {
 		GB_ASSERT(is_type_tuple(result_type));

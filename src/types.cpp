@@ -1,4 +1,5 @@
 struct Scope;
+struct AstNode;
 
 enum BasicKind {
 	Basic_Invalid,
@@ -135,18 +136,19 @@ struct TypeRecord {
 		i64 *    offsets;                                 \
 	})                                                    \
 	TYPE_KIND(Proc, struct {                              \
-		Scope *scope;                                     \
-		Type * params;  /* Type_Tuple */                  \
-		Type * results; /* Type_Tuple */                  \
-		i32    param_count;                               \
-		i32    result_count;                              \
-		bool   return_by_pointer;                         \
-		Type **abi_compat_params;                         \
-		Type * abi_compat_result_type;                    \
-		bool   variadic;                                  \
-		bool   require_results;                           \
-		bool   c_vararg;                                  \
-		bool   is_generic;                                \
+		AstNode *node;                                    \
+		Scope *  scope;                                   \
+		Type *   params;  /* Type_Tuple */                \
+		Type *   results; /* Type_Tuple */                \
+		i32      param_count;                             \
+		i32      result_count;                            \
+		bool     return_by_pointer;                       \
+		Type **  abi_compat_params;                       \
+		Type *   abi_compat_result_type;                  \
+		bool     variadic;                                \
+		bool     require_results;                         \
+		bool     c_vararg;                                \
+		bool     is_generic;                              \
 		ProcCallingConvention calling_convention;         \
 	})                                                    \
 	TYPE_KIND(Map, struct {                               \
@@ -1164,7 +1166,7 @@ bool are_types_identical(Type *x, Type *y) {
 				for (isize i = 0; i < x->Tuple.variable_count; i++) {
 					Entity *xe = x->Tuple.variables[i];
 					Entity *ye = y->Tuple.variables[i];
-					if (!are_types_identical(xe->type, ye->type)) {
+					if (xe->kind != ye->kind || !are_types_identical(xe->type, ye->type)) {
 						return false;
 					}
 				}
@@ -2383,19 +2385,24 @@ gbString write_type_to_string(gbString str, Type *type) {
 			for (isize i = 0; i < type->Tuple.variable_count; i++) {
 				Entity *var = type->Tuple.variables[i];
 				if (var != NULL) {
-					GB_ASSERT(var->kind == Entity_Variable);
 					if (i > 0) {
 						str = gb_string_appendc(str, ", ");
 					}
-					if (var->flags&EntityFlag_CVarArg) {
-						str = gb_string_appendc(str, "#c_vararg ");
-					}
-					if (var->flags&EntityFlag_Ellipsis) {
-						Type *slice = base_type(var->type);
-						str = gb_string_appendc(str, "..");
-						GB_ASSERT(is_type_slice(var->type));
-						str = write_type_to_string(str, slice->Slice.elem);
+					if (var->kind == Entity_Variable) {
+						if (var->flags&EntityFlag_CVarArg) {
+							str = gb_string_appendc(str, "#c_vararg ");
+						}
+						if (var->flags&EntityFlag_Ellipsis) {
+							Type *slice = base_type(var->type);
+							str = gb_string_appendc(str, "..");
+							GB_ASSERT(is_type_slice(var->type));
+							str = write_type_to_string(str, slice->Slice.elem);
+						} else {
+							str = write_type_to_string(str, var->type);
+						}
 					} else {
+						GB_ASSERT(var->kind == Entity_TypeName);
+						str = gb_string_appendc(str, "type/");
 						str = write_type_to_string(str, var->type);
 					}
 				}
