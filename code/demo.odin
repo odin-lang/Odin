@@ -2,11 +2,12 @@ import (
 	"fmt.odin";
 )
 
-proc new_type(T: type) -> ^T {
-	return ^T(alloc(size_of(T), align_of(T)));
-}
 
 proc main() {
+	proc new_type(T: type) -> ^T {
+		return ^T(alloc(size_of(T), align_of(T)));
+	}
+
 	var ptr = new_type(int);
 	ptr^ = 123;
 

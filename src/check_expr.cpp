@@ -5075,6 +5075,27 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				add_entity_use(c, ce->proc, gen_entity);
 
 				check_procedure_later(c, c->curr_ast_file, token, d, final_proc_type, pd->body, tags);
+
+
+				auto *found = map_get(&c->info.gen_procs, hash_pointer(entity->identifier));
+				if (found) {
+					bool ok = true;
+					for_array(i, *found) {
+						Entity *other = (*found)[i];
+						if (are_types_identical(other->type, gen_entity->type)) {
+							ok = false;
+							break;
+						}
+					}
+					if (ok) {
+						array_add(found, gen_entity);
+					}
+				} else {
+					Array<Entity *> array = {};
+					array_init(&array, heap_allocator());
+					array_add(&array, gen_entity);
+					map_set(&c->info.gen_procs, hash_pointer(entity->identifier), array);
+				}
 			}
 
 

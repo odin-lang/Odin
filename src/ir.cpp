@@ -5851,6 +5851,41 @@ void ir_type_case_body(irProcedure *proc, AstNode *label, AstNode *clause, irBlo
 }
 
 
+void ir_build_nested_proc(irProcedure *proc, AstNodeProcDecl *pd, Entity *e) {
+	GB_ASSERT(pd->body != NULL);
+
+	if (is_entity_in_dependency_map(&proc->module->min_dep_map, e) == false) {
+		// NOTE(bill): Nothing depends upon it so doesn't need to be built
+		return;
+	}
+
+	// NOTE(bill): Generate a new name
+	// parent.name-guid
+	String original_name = e->token.string;
+	String pd_name = original_name;
+	if (pd->link_name.len > 0) {
+		pd_name = pd->link_name;
+	}
+
+	isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
+	u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
+	i32 guid = cast(i32)proc->children.count;
+	name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
+	String name = make_string(name_text, name_len-1);
+
+
+	irValue *value = ir_value_procedure(proc->module->allocator,
+	                                    proc->module, e, e->type, pd->type, pd->body, name);
+
+	value->Proc.tags = pd->tags;
+	value->Proc.parent = proc;
+
+	ir_module_add_value(proc->module, e, value);
+	array_add(&proc->children, &value->Proc);
+	array_add(&proc->module->procs_to_generate, value);
+}
+
+
 void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 	switch (node->kind) {
 	case_ast_node(bs, EmptyStmt, node);
@@ -5972,43 +6007,21 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 	case_ast_node(pd, ProcDecl, node);
 		AstNode *ident = pd->name;
 		GB_ASSERT(ident->kind == AstNode_Ident);
-		Entity *e = entity_of_ident(proc->module->info, ident);
-		DeclInfo *dl = decl_info_of_entity(proc->module->info, e);
+		CheckerInfo *info = proc->module->info;
+		Entity *e = entity_of_ident(info, ident);
 
 		if (pd->body != NULL) {
-			CheckerInfo *info = proc->module->info;
-
-			if (is_entity_in_dependency_map(&proc->module->min_dep_map, e) == false) {
-				// NOTE(bill): Nothing depends upon it so doesn't need to be built
-				break;
+			if (is_type_gen_proc(e->type)) {
+				auto found = *map_get(&info->gen_procs, hash_pointer(ident));
+				for_array(i, found) {
+					Entity *e = found[i];
+					DeclInfo *d = decl_info_of_entity(info, e);
+					ir_build_nested_proc(proc, &d->proc_decl->ProcDecl, e);
+				}
+			} else {
+				ir_build_nested_proc(proc, pd, e);
 			}
-
-			// NOTE(bill): Generate a new name
-			// parent.name-guid
-			String original_name = e->token.string;
-			String pd_name = original_name;
-			if (pd->link_name.len > 0) {
-				pd_name = pd->link_name;
-			}
-
-			isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
-			u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-			i32 guid = cast(i32)proc->children.count;
-			name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
-			String name = make_string(name_text, name_len-1);
-
-
-			irValue *value = ir_value_procedure(proc->module->allocator,
-			                                    proc->module, e, e->type, pd->type, pd->body, name);
-
-			value->Proc.tags = pd->tags;
-			value->Proc.parent = proc;
-
-			ir_module_add_value(proc->module, e, value);
-			array_add(&proc->children, &value->Proc);
-			array_add(&proc->module->procs_to_generate, value);
 		} else {
-			CheckerInfo *info = proc->module->info;
 
 			// FFI - Foreign function interace
 			String original_name = e->token.string;
@@ -6018,7 +6031,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			}
 
 			irValue *value = ir_value_procedure(proc->module->allocator,
-			                                           proc->module, e, e->type, pd->type, pd->body, name);
+			                                    proc->module, e, e->type, pd->type, pd->body, name);
 
 			value->Proc.tags = pd->tags;
 

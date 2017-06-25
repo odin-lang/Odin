@@ -270,17 +270,18 @@ struct CheckerContext {
 
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
-	Map<TypeAndValue>    types;           // Key: AstNode * | Expression -> Type (and value)
-	Map<Entity *>        definitions;     // Key: AstNode * | Identifier -> Entity
-	Map<Entity *>        uses;            // Key: AstNode * | Identifier -> Entity
-	Map<Scope *>         scopes;          // Key: AstNode * | Node       -> Scope
-	Map<ExprInfo>        untyped;         // Key: AstNode * | Expression -> ExprInfo
-	Map<Entity *>        implicits;       // Key: AstNode *
-	Map<DeclInfo *>      entities;        // Key: Entity *
-	Map<Entity *>        foreigns;        // Key: String
-	Map<AstFile *>       files;           // Key: String (full path)
-	Map<isize>           type_info_map;   // Key: Type *
-	isize                type_info_count;
+	Map<TypeAndValue>     types;           // Key: AstNode * | Expression -> Type (and value)
+	Map<Entity *>         definitions;     // Key: AstNode * | Identifier -> Entity
+	Map<Entity *>         uses;            // Key: AstNode * | Identifier -> Entity
+	Map<Scope *>          scopes;          // Key: AstNode * | Node       -> Scope
+	Map<ExprInfo>         untyped;         // Key: AstNode * | Expression -> ExprInfo
+	Map<Entity *>         implicits;       // Key: AstNode *
+	Map<Array<Entity *> > gen_procs;       // Key: AstNode * | Identifier -> Entity
+	Map<DeclInfo *>       entities;        // Key: Entity *
+	Map<Entity *>         foreigns;        // Key: String
+	Map<AstFile *>        files;           // Key: String (full path)
+	Map<isize>            type_info_map;   // Key: Type *
+	isize                 type_info_count;
 };
 
 struct Checker {
@@ -291,7 +292,6 @@ struct Checker {
 	Scope *                    global_scope;
 	// NOTE(bill): Procedures to check
 	Map<ProcedureInfo>         procs; // Key: DeclInfo *
-	Map<Array<ProcedureInfo> > gen_procs;
 	Array<DelayedDecl>         delayed_imports;
 	Array<DelayedDecl>         delayed_foreign_libraries;
 	Array<CheckerFileNode>     file_nodes;
@@ -702,16 +702,17 @@ void init_universal_scope(void) {
 
 void init_checker_info(CheckerInfo *i) {
 	gbAllocator a = heap_allocator();
-	map_init(&i->types,            a);
+	map_init(&i->types,         a);
 	map_init(&i->definitions,   a);
 	map_init(&i->uses,          a);
-	map_init(&i->scopes,         a);
-	map_init(&i->entities,   a);
-	map_init(&i->untyped,    a);
+	map_init(&i->scopes,        a);
+	map_init(&i->entities,      a);
+	map_init(&i->untyped,       a);
 	map_init(&i->foreigns,      a);
 	map_init(&i->implicits,     a);
-	map_init(&i->type_info_map,  a);
-	map_init(&i->files,       a);
+	map_init(&i->gen_procs,     a);
+	map_init(&i->type_info_map, a);
+	map_init(&i->files,         a);
 	i->type_info_count = 0;
 
 }
@@ -725,6 +726,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->untyped);
 	map_destroy(&i->foreigns);
 	map_destroy(&i->implicits);
+	map_destroy(&i->gen_procs);
 	map_destroy(&i->type_info_map);
 	map_destroy(&i->files);
 }
@@ -743,7 +745,6 @@ void init_checker(Checker *c, Parser *parser) {
 
 	array_init(&c->proc_stack, a);
 	map_init(&c->procs, a);
-	map_init(&c->gen_procs, a);
 	array_init(&c->delayed_imports, a);
 	array_init(&c->delayed_foreign_libraries, a);
 	array_init(&c->file_nodes, a);
@@ -781,7 +782,6 @@ void destroy_checker(Checker *c) {
 	destroy_scope(c->global_scope);
 	array_free(&c->proc_stack);
 	map_destroy(&c->procs);
-	map_destroy(&c->gen_procs);
 	array_free(&c->delayed_imports);
 	array_free(&c->delayed_foreign_libraries);
 	array_free(&c->file_nodes);
