@@ -3784,7 +3784,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 
 	switch (id) {
-	case BuiltinProc_new:
+	// case BuiltinProc_new:
 	case BuiltinProc_make:
 	case BuiltinProc_size_of:
 	case BuiltinProc_align_of:
@@ -3878,6 +3878,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->type  = type;
 	} break;
 
+	#if 0
 	case BuiltinProc_new: {
 		// proc new(Type) -> ^Type
 		Operand op = {};
@@ -3890,6 +3891,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_Value;
 		operand->type = make_type_pointer(c->allocator, type);
 	} break;
+	#endif
 	#if 0
 	case BuiltinProc_new_slice: {
 		// proc new_slice(Type, len: int) -> []Type

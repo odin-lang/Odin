@@ -4,11 +4,7 @@ import (
 
 
 proc main() {
-	proc new_type(T: type) -> ^T {
-		return ^T(alloc(size_of(T), align_of(T)));
-	}
-
-	var ptr = new_type(int);
+	var ptr = new(int);
 	ptr^ = 123;
 
 	fmt.println(ptr^);

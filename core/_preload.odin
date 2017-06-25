@@ -264,6 +264,11 @@ proc resize(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGN
 }
 
 
+proc new(T: type) -> ^T {
+	return ^T(alloc(size_of(T), align_of(T)));
+}
+
+
 
 proc default_resize_align(old_memory: rawptr, old_size, new_size, alignment: int) -> rawptr {
 	if old_memory == nil {

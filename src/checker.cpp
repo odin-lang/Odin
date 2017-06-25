@@ -27,7 +27,7 @@ enum BuiltinProcId {
 	BuiltinProc_len,
 	BuiltinProc_cap,
 
-	BuiltinProc_new,
+	// BuiltinProc_new,
 	BuiltinProc_make,
 	BuiltinProc_free,
 
@@ -75,7 +75,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("len"),              1, false, Expr_Expr},
 	{STR_LIT("cap"),              1, false, Expr_Expr},
 
-	{STR_LIT("new"),              1, false, Expr_Expr},
+	// {STR_LIT("new"),              1, false, Expr_Expr},
 	{STR_LIT("make"),             1, true,  Expr_Expr},
 	{STR_LIT("free"),             1, false, Expr_Stmt},
 

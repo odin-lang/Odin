@@ -3772,6 +3772,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 
 	} break;
 
+	#if 0
 	case BuiltinProc_new: {
 		ir_emit_comment(proc, str_lit("new"));
 		// proc new(Type) -> ^Type
@@ -3807,6 +3808,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		}
 		return v;
 	} break;
+	#endif
 
 	case BuiltinProc_make: {
 		ir_emit_comment(proc, str_lit("make"));
