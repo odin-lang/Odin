@@ -307,7 +307,12 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		return;
 	}
 
-	Type *proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0, false, ProcCC_Odin);
+	Type *proc_type = e->type;
+	if (d->gen_proc_type != NULL) {
+		proc_type = d->gen_proc_type;
+	} else {
+		proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0, false, ProcCC_Odin);
+	}
 	e->type = proc_type;
 	ast_node(pd, ProcDecl, d->proc_decl);
 
@@ -575,7 +580,9 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 		TypeTuple *params = &type->Proc.params->Tuple;
 		for (isize i = 0; i < params->variable_count; i++) {
 			Entity *e = params->variables[i];
-			GB_ASSERT(e->kind == Entity_Variable);
+			if (e->kind != Entity_Variable) {
+				continue;
+			}
 			if (!(e->flags & EntityFlag_Using)) {
 				continue;
 			}

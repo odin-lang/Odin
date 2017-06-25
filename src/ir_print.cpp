@@ -1280,6 +1280,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		}
 
 
+		isize param_index = 0;
 		if (call->arg_count > 0) {
 			TypeTuple *params = &proc_type->Proc.params->Tuple;
 			if (proc_type->Proc.c_vararg) {
@@ -1287,8 +1288,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 				for (; i < params->variable_count-1; i++) {
 					Entity *e = params->variables[i];
 					GB_ASSERT(e != NULL);
+					if (e->kind != Entity_Variable) continue;
 					Type *t = proc_type->Proc.abi_compat_params[i];
-					if (i > 0) {
+					if (param_index > 0) {
 						ir_fprintf(f, ", ");
 					}
 					ir_print_type(f, m, t);
@@ -1298,9 +1300,10 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					ir_fprintf(f, " ");
 					irValue *arg = call->args[i];
 					ir_print_value(f, m, arg, t);
+					param_index++;
 				}
 				for (; i < call->arg_count; i++) {
-					if (i > 0) {
+					if (param_index > 0) {
 						ir_fprintf(f, ", ");
 					}
 
@@ -1309,6 +1312,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					ir_print_type(f, m, t);
 					ir_fprintf(f, " ");
 					ir_print_value(f, m, arg, t);
+					param_index++;
 				}
 			} else {
 				GB_ASSERT(call->arg_count == params->variable_count);
@@ -1316,9 +1320,10 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 				for (isize i = 0; i < param_count; i++) {
 					Entity *e = params->variables[i];
 					GB_ASSERT(e != NULL);
+					if (e->kind != Entity_Variable) continue;
 					irValue *arg = call->args[i];
 					Type *t = proc_type->Proc.abi_compat_params[i];
-					if (i > 0) {
+					if (param_index > 0) {
 						ir_fprintf(f, ", ");
 					}
 					ir_print_type(f, m, t);
@@ -1327,11 +1332,12 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					}
 					ir_fprintf(f, " ");
 					ir_print_value(f, m, arg, t);
+					param_index++;
 				}
 			}
 		}
 		if (proc_type->Proc.calling_convention == ProcCC_Odin) {
-			if (proc_type->Proc.param_count > 0) {
+			if (param_index > 0) {
 				ir_fprintf(f, ", ");
 			}
 			ir_print_type(f, m, t_context_ptr);

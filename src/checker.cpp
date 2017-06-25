@@ -188,6 +188,7 @@ struct DeclInfo {
 	AstNode *         type_expr;
 	AstNode *         init_expr;
 	AstNode *         proc_decl; // AstNode_ProcDecl
+	Type *            gen_proc_type; // Precalculated
 
 	Map<bool>         deps; // Key: Entity *
 	Array<BlockLabel> labels;
@@ -202,7 +203,7 @@ struct ProcedureInfo {
 	DeclInfo *            decl;
 	Type *                type; // Type_Procedure
 	AstNode *             body; // AstNode_BlockStmt
-	u32                   tags;
+	u64                   tags;
 };
 
 // ExprInfo stores information used for "untyped" expressions
@@ -266,6 +267,7 @@ struct CheckerContext {
 	AstNode *  curr_foreign_library;
 };
 
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Map<TypeAndValue>    types;           // Key: AstNode * | Expression -> Type (and value)
@@ -277,7 +279,6 @@ struct CheckerInfo {
 	Map<DeclInfo *>      entities;        // Key: Entity *
 	Map<Entity *>        foreigns;        // Key: String
 	Map<AstFile *>       files;           // Key: String (full path)
-
 	Map<isize>           type_info_map;   // Key: Type *
 	isize                type_info_count;
 };
@@ -286,28 +287,29 @@ struct Checker {
 	Parser *    parser;
 	CheckerInfo info;
 
-	AstFile *              curr_ast_file;
-	Scope *                global_scope;
+	AstFile *                  curr_ast_file;
+	Scope *                    global_scope;
 	// NOTE(bill): Procedures to check
-	Map<ProcedureInfo>     procs; // Key: DeclInfo *
-	Array<DelayedDecl>     delayed_imports;
-	Array<DelayedDecl>     delayed_foreign_libraries;
-	Array<CheckerFileNode> file_nodes;
+	Map<ProcedureInfo>         procs; // Key: DeclInfo *
+	Map<Array<ProcedureInfo> > gen_procs;
+	Array<DelayedDecl>         delayed_imports;
+	Array<DelayedDecl>         delayed_foreign_libraries;
+	Array<CheckerFileNode>     file_nodes;
 
-	gbArena                arena;
-	gbArena                tmp_arena;
-	gbAllocator            allocator;
-	gbAllocator            tmp_allocator;
+	gbArena                    arena;
+	gbArena                    tmp_arena;
+	gbAllocator                allocator;
+	gbAllocator                tmp_allocator;
 
-	CheckerContext         context;
+	CheckerContext             context;
 
-	Array<Type *>          proc_stack;
-	bool                   done_preload;
+	Array<Type *>              proc_stack;
+	bool                       done_preload;
 };
 
 
 
-HashKey hash_node     (AstNode *node)  { return hash_ptr_and_id(node, 0); }
+HashKey hash_node     (AstNode *node)  { return hash_pointer(node); }
 HashKey hash_ast_file (AstFile *file)  { return hash_pointer(file); }
 HashKey hash_entity   (Entity *e)      { return hash_pointer(e); }
 HashKey hash_type     (Type *t)        { return hash_pointer(t); }
@@ -741,6 +743,7 @@ void init_checker(Checker *c, Parser *parser) {
 
 	array_init(&c->proc_stack, a);
 	map_init(&c->procs, a);
+	map_init(&c->gen_procs, a);
 	array_init(&c->delayed_imports, a);
 	array_init(&c->delayed_foreign_libraries, a);
 	array_init(&c->file_nodes, a);
@@ -778,6 +781,7 @@ void destroy_checker(Checker *c) {
 	destroy_scope(c->global_scope);
 	array_free(&c->proc_stack);
 	map_destroy(&c->procs);
+	map_destroy(&c->gen_procs);
 	array_free(&c->delayed_imports);
 	array_free(&c->delayed_foreign_libraries);
 	array_free(&c->file_nodes);
@@ -946,7 +950,7 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 		HashKey key = hash_node(identifier);
 		map_set(&i->definitions, key, entity);
 	} else {
-		// NOTE(bill): Error should handled elsewhere
+		// NOTE(bill): Error should be handled elsewhere
 	}
 }
 
@@ -1161,7 +1165,7 @@ void add_type_info_type(Checker *c, Type *t) {
 }
 
 
-void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body, u32 tags) {
+void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body, u64 tags) {
 	ProcedureInfo info = {};
 	info.file = file;
 	info.token = token;
@@ -1204,6 +1208,14 @@ void add_dependency_to_map(Map<Entity *> *map, CheckerInfo *info, Entity *entity
 	if (entity == NULL) {
 		return;
 	}
+	if (entity->type != NULL &&
+	    is_type_gen_proc(entity->type)) {
+		DeclInfo *decl = decl_info_of_entity(info, entity);
+		if (decl->gen_proc_type == NULL) {
+			return;
+		}
+	}
+
 	if (map_get(map, hash_entity(entity)) != NULL) {
 		return;
 	}
@@ -2241,8 +2253,10 @@ void check_parsed_files(Checker *c) {
 
 		TypeProc *pt = &pi->type->Proc;
 		if (pt->is_generic) {
-			error(pi->token, "Generic procedures are not yet supported");
-			continue;
+			if (pi->decl->gen_proc_type == NULL) {
+				continue;
+			}
+			// gb_printf_err("Generic procedure `%.*s` -> %s\n", LIT(pi->token.string), type_to_string(pi->decl->gen_proc_type));
 		}
 
 		add_curr_ast_file(c, pi->file);

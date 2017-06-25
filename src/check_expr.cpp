@@ -1,3 +1,37 @@
+enum CallArgumentError {
+	CallArgumentError_None,
+	CallArgumentError_NoneProcedureType,
+	CallArgumentError_WrongTypes,
+	CallArgumentError_NonVariadicExpand,
+	CallArgumentError_VariadicTuple,
+	CallArgumentError_MultipleVariadicExpand,
+	CallArgumentError_ArgumentCount,
+	CallArgumentError_TooFewArguments,
+	CallArgumentError_TooManyArguments,
+	CallArgumentError_InvalidFieldValue,
+	CallArgumentError_ParameterNotFound,
+	CallArgumentError_ParameterMissing,
+	CallArgumentError_DuplicateParameter,
+	CallArgumentError_GenericProcedureNotSupported,
+};
+
+enum CallArgumentErrorMode {
+	CallArgumentMode_NoErrors,
+	CallArgumentMode_ShowErrors,
+};
+
+struct CallArgumentData {
+	Entity *gen_entity;
+	i64     score;
+	Type *  result_type;
+};
+
+
+#define CALL_ARGUMENT_CHECKER(name) CallArgumentError name(Checker *c, AstNode *call, Type *proc_type, Entity *entity, Array<Operand> operands, CallArgumentErrorMode show_error_mode, CallArgumentData *data)
+typedef CALL_ARGUMENT_CHECKER(CallArgumentCheckerType);
+
+
+
 void     check_expr                     (Checker *c, Operand *operand, AstNode *expression);
 void     check_multi_expr               (Checker *c, Operand *operand, AstNode *expression);
 void     check_expr_or_type             (Checker *c, Operand *operand, AstNode *expression);
@@ -19,7 +53,7 @@ void     check_stmt                     (Checker *c, AstNode *node, u32 flags);
 void     check_stmt_list                (Checker *c, Array<AstNode *> stmts, u32 flags);
 void     check_init_constant            (Checker *c, Entity *e, Operand *operand);
 bool     check_representable_as_constant(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
-Type *   check_call_arguments           (Checker *c, Operand *operand, Type *proc_type, AstNode *call);
+CallArgumentData check_call_arguments   (Checker *c, Operand *operand, Type *proc_type, AstNode *call);
 
 
 void error_operand_not_expression(Operand *o) {
@@ -1173,13 +1207,16 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			if (ast_node_expect(name, AstNode_Ident)) {
 				Entity *param = NULL;
 				bool is_generic = type->kind == Type_Generic;
+				Type *gen_type = type;
 				if (operands != NULL) {
 					Operand o = (*operands)[j];
 					is_generic = o.mode == Addressing_Type && o.type == type;
+					if (is_generic) gen_type = o.type;
 				}
 
 				if (is_generic) {
-					param = make_entity_type_name(c->allocator, scope, name->Ident, type);
+					param = make_entity_type_name(c->allocator, scope, name->Ident, gen_type);
+					param->TypeName.is_type_alias = true;
 				} else {
 					param = make_entity_param(c->allocator, scope, name->Ident, type,
 					                          (p->flags&FieldFlag_using) != 0, false);
@@ -4858,28 +4895,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	return true;
 }
 
-enum CallArgumentError {
-	CallArgumentError_None,
-	CallArgumentError_NoneProcedureType,
-	CallArgumentError_WrongTypes,
-	CallArgumentError_NonVariadicExpand,
-	CallArgumentError_VariadicTuple,
-	CallArgumentError_MultipleVariadicExpand,
-	CallArgumentError_ArgumentCount,
-	CallArgumentError_TooFewArguments,
-	CallArgumentError_TooManyArguments,
-	CallArgumentError_InvalidFieldValue,
-	CallArgumentError_ParameterNotFound,
-	CallArgumentError_ParameterMissing,
-	CallArgumentError_DuplicateParameter,
-	CallArgumentError_GenericProcedureNotSupported,
-};
-
-enum CallArgumentErrorMode {
-	CallArgumentMode_NoErrors,
-	CallArgumentMode_ShowErrors,
-};
-
 
 struct ValidProcAndScore {
 	isize index;
@@ -4934,8 +4949,7 @@ bool check_unpack_arguments(Checker *c, isize lhs_count, Array<Operand> *operand
 	return optional_ok;
 }
 
-#define CALL_ARGUMENT_CHECKER(name) CallArgumentError name(Checker *c, AstNode *call, Type *proc_type, Array<Operand> operands, CallArgumentErrorMode show_error_mode, i64 *score_, Type **result_type_)
-typedef CALL_ARGUMENT_CHECKER(CallArgumentCheckerType);
+
 
 
 CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
@@ -4984,6 +4998,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 
 	CallArgumentError err = CallArgumentError_None;
 	Type *final_proc_type = proc_type;
+	Entity *gen_entity = NULL;
 
 	if (vari_expand && !variadic) {
 		if (show_error) {
@@ -5022,14 +5037,44 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				gb_string_free(proc_str);
 			}
 		} else {
+			// NOTE(bill): Generate the procedure type for this generic instance
+			// TODO(bill): Clean this shit up!
 			if (pt->is_generic) {
-				Scope *scope = make_scope(pt->scope->parent, c->allocator);
-				CheckerContext prev = c->context;
-				defer (c->context = prev);
-				c->context.scope = scope;
+				GB_ASSERT(entity != NULL);
+				DeclInfo *old_decl = decl_info_of_entity(&c->info, entity);
+				GB_ASSERT(old_decl != NULL);
 
-				final_proc_type = alloc_type(c->allocator, Type_Proc);
+				gbAllocator a = heap_allocator();
+
+				Scope *scope = entity->scope;
+
+				AstNode *proc_decl = clone_ast_node(a, old_decl->proc_decl);
+				ast_node(pd, ProcDecl, proc_decl);
+
+				check_open_scope(c, pd->type);
+				defer (check_close_scope(c));
+
+				final_proc_type = make_type_proc(c->allocator, c->context.scope, NULL, 0, NULL, 0, false, pt->calling_convention);
 				check_procedure_type(c, final_proc_type, pt->node, &operands);
+
+				u64 tags = entity->Procedure.tags;
+				AstNode *ident = clone_ast_node(a, entity->identifier);
+				Token token = ident->Ident;
+				DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, old_decl->parent);
+				d->gen_proc_type = final_proc_type;
+				d->type_expr = pd->type;
+				d->proc_decl = proc_decl;
+
+				gen_entity = make_entity_procedure(c->allocator, entity->scope, token, final_proc_type, tags);
+				gen_entity->identifier = ident;
+
+				add_entity_and_decl_info(c, ident, gen_entity, d);
+				add_entity_definition(&c->info, ident, gen_entity);
+
+				add_entity_use(c, ident, gen_entity);
+				add_entity_use(c, ce->proc, gen_entity);
+
+				check_procedure_later(c, c->curr_ast_file, token, d, final_proc_type, pd->body, tags);
 			}
 
 
@@ -5082,7 +5127,11 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 							if (show_error) {
 								error(o.expr, "`..` in a variadic procedure can only have one variadic argument at the end");
 							}
-							if (score_) *score_ = score;
+							if (data) {
+								data->score = score;
+								data->result_type = final_proc_type->Proc.results;
+								data->gen_entity = gen_entity;
+							}
 							return CallArgumentError_MultipleVariadicExpand;
 						}
 					}
@@ -5099,8 +5148,11 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		}
 	}
 
-	if (score_) *score_ = score;
-	if (result_type_) *result_type_ = final_proc_type->Proc.results;
+	if (data) {
+		data->score = score;
+		data->result_type = final_proc_type->Proc.results;
+		data->gen_entity = gen_entity;
+	}
 
 	return err;
 }
@@ -5250,14 +5302,17 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 		err = CallArgumentError_GenericProcedureNotSupported;
 	}
 
-	if (score_) *score_ = score;
-	if (result_type_) *result_type_ = pt->results;
+	if (data) {
+		data->score = score;
+		data->result_type = pt->results;
+		data->gen_entity = NULL;
+	}
 
 	return err;
 }
 
 
-Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
+CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNode *call) {
 	ast_node(ce, CallExpr, call);
 
 	CallArgumentCheckerType *call_checker = check_call_arguments_internal;
@@ -5310,11 +5365,11 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 			Entity *p = procs[i];
 			Type *pt = base_type(p->type);
 			if (pt != NULL && is_type_proc(pt)) {
-				i64 score = 0;
-				CallArgumentError err = call_checker(c, call, pt, operands, CallArgumentMode_NoErrors, &score, &result_type);
+				CallArgumentData data = {};
+				CallArgumentError err = call_checker(c, call, pt, p, operands, CallArgumentMode_NoErrors, &data);
 				if (err == CallArgumentError_None) {
 					valids[valid_count].index = i;
-					valids[valid_count].score = score;
+					valids[valid_count].score = data.score;
 					valid_count++;
 				}
 			}
@@ -5355,15 +5410,20 @@ Type *check_call_arguments(Checker *c, Operand *operand, Type *proc_type, AstNod
 			Entity *e = procs[valids[0].index];
 			add_entity_use(c, expr, e);
 			proc_type = e->type;
-			i64 score = 0;
-			CallArgumentError err = call_checker(c, call, proc_type, operands, CallArgumentMode_ShowErrors, &score, &result_type);
+			CallArgumentData data = {};
+			CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
+			return data;
 		}
 	} else {
-		i64 score = 0;
-		CallArgumentError err = call_checker(c, call, proc_type, operands, CallArgumentMode_ShowErrors, &score, &result_type);
+		Entity *e = entity_of_ident(&c->info, operand->expr);
+		CallArgumentData data = {};
+		CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
+		return data;
 	}
 
-	return result_type;
+	CallArgumentData data = {};
+	data.result_type = t_invalid;
+	return data;
 }
 
 
@@ -5498,8 +5558,8 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		}
 	}
 
-	Type *result_type = check_call_arguments(c, operand, proc_type, call);
-
+	CallArgumentData data = check_call_arguments(c, operand, proc_type, call);
+	Type *result_type = data.result_type;
 	gb_zero_item(operand);
 	operand->expr = call;
 

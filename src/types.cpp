@@ -2234,6 +2234,10 @@ gbString write_type_to_string(gbString str, Type *type) {
 		str = gb_string_append_length(str, type->Basic.name.text, type->Basic.name.len);
 		break;
 
+	case Type_Generic:
+		str = gb_string_appendc(str, "type");
+		break;
+
 	case Type_Pointer:
 		str = gb_string_appendc(str, "^");
 		str = write_type_to_string(str, type->Pointer.elem);

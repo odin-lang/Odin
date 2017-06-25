@@ -1510,7 +1510,11 @@ irValue *ir_emit_call(irProcedure *p, irValue *value, irValue **args, isize arg_
 		GB_ASSERT(param_count == arg_count);
 	}
 	for (isize i = 0; i < param_count; i++) {
-		Type *original_type = pt->Proc.params->Tuple.variables[i]->type;
+		Entity *e = pt->Proc.params->Tuple.variables[i];
+		if (e->kind != Entity_Variable) {
+			continue;
+		}
+		Type *original_type = e->type;
 		Type *new_type = pt->Proc.abi_compat_params[i];
 		if (original_type != new_type) {
 			if (is_type_pointer(new_type)) {
@@ -4360,6 +4364,11 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	TypeAndValue tv = type_and_value_of_expr(proc->module->info, expr);
 	GB_ASSERT(tv.mode != Addressing_Invalid);
 
+	if (tv.mode == Addressing_Type) {
+		// TODO(bill): Handle this correctly
+		return ir_value_nil(proc->module->allocator, tv.type);
+	}
+
 	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): Edge case
 		if (tv.value.kind != ExactValue_Compound &&
@@ -4417,7 +4426,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		} else if (e != NULL && e->kind == Entity_Variable) {
 			return ir_addr_load(proc, ir_build_addr(proc, expr));
 		}
-		GB_PANIC("NULL value for expression from identifier: %.*s", LIT(i->string));
+		GB_PANIC("NULL value for expression from identifier: %.*s @ %p", LIT(i->string), expr);
 		return NULL;
 	case_end;
 
@@ -6911,6 +6920,10 @@ void ir_begin_procedure_body(irProcedure *proc) {
 			AstNode *name = field->names[q_index++];
 
 			Entity *e = params->variables[i];
+			if (e->kind != Entity_Variable) {
+				continue;
+			}
+
 			Type *abi_type = proc->type->Proc.abi_compat_params[i];
 			if (e->token.string != "" &&
 			    e->token.string != "_") {
@@ -7385,6 +7398,8 @@ void ir_gen_tree(irGen *s) {
 			ast_node(pd, ProcDecl, decl->proc_decl);
 			String original_name = name;
 			AstNode *body = pd->body;
+
+
 			if (e->Procedure.is_foreign) {
 				name = e->token.string; // NOTE(bill): Don't use the mangled name
 				ir_add_foreign_library_path(m, e->Procedure.foreign_library);

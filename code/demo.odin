@@ -3,11 +3,14 @@ import (
 )
 
 proc new_type(T: type) -> ^T {
-	return ^T(alloc_align(size_of(T), align_of(T)));
+	return ^T(alloc(size_of(T), align_of(T)));
 }
 
 proc main() {
 	var ptr = new_type(int);
+	ptr^ = 123;
+
+	fmt.println(ptr^);
 }
 
 /*
