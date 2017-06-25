@@ -1,4 +1,5 @@
 #define USE_CUSTOM_BACKEND 0
+// #define PRINT_TIMINGS
 
 #include "common.cpp"
 #include "timings.cpp"
@@ -33,9 +34,8 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 	va_start(va, fmt);
 	cmd_len = gb_snprintf_va(cmd_line, gb_size_of(cmd_line), fmt, va);
 	va_end(va);
-	if (!is_silent) {
-		// gb_printf("%.*s\n", cast(int)cmd_len, cmd_line);
-	}
+
+	// gb_printf_err("%.*s\n", cast(int)cmd_len, cmd_line);
 
 	tmp = gb_temp_arena_memory_begin(&string_buffer_arena);
 
@@ -543,6 +543,7 @@ int main(int arg_count, char **arg_ptr) {
 		exit_code = system_exec_command_line_app("msvc-link", true,
 			"link \"%.*s\".obj -OUT:\"%.*s.%s\" %s "
 			"/defaultlib:libcmt "
+			// "/nodefaultlib "
 			"/nologo /incremental:no /opt:ref /subsystem:CONSOLE "
 			" %.*s "
 			" %s "
@@ -555,7 +556,10 @@ int main(int arg_count, char **arg_ptr) {
 			return exit_code;
 		}
 
-		// timings_print_all(&timings);
+	#if defined(PRINT_TIMINGS)
+		timings_print_all(&timings);
+	#endif
+
 
 		if (run_output) {
 			system_exec_command_line_app("odin run", false, "%.*s.exe", LIT(output_base));
@@ -658,7 +662,9 @@ int main(int arg_count, char **arg_ptr) {
 			return exit_code;
 		}
 
-		// timings_print_all(&timings);
+	#if defined(PRINT_TIMINGS)
+		timings_print_all(&timings);
+	#endif
 
 		if (run_output) {
 			system_exec_command_line_app("odin run", false, "%.*s", LIT(output_base));

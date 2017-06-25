@@ -821,6 +821,10 @@ bool is_type_proc(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Proc;
 }
+bool is_type_gen_proc(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_Proc && t->Proc.is_generic;
+}
 Type *base_vector_type(Type *t) {
 	if (is_type_vector(t)) {
 		t = base_type(t);

@@ -4160,7 +4160,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		if (operand->mode == Addressing_Invalid || operand->mode == Addressing_Builtin) {
 			return false;
 		}
-		if (operand->type == NULL || operand->type == t_invalid) {
+		if (operand->type == NULL || operand->type == t_invalid || is_type_gen_proc(operand->type)) {
 			error(operand->expr, "Invalid argument to `type_of_val`");
 			return false;
 		}
@@ -4183,8 +4183,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 		Type *t = o.type;
-		if (t == NULL || t == t_invalid) {
-			error(ce->args[0], "Invalid argument for `size_of`");
+		if (t == NULL || t == t_invalid || is_type_gen_proc(operand->type)) {
+			error(ce->args[0], "Invalid argument for `type_info`");
 			return false;
 		}
 		t = default_type(t);
