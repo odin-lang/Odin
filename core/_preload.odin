@@ -264,7 +264,7 @@ proc resize(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGN
 }
 
 
-proc new(T: type) -> ^T {
+proc new(T: type) -> ^T #inline {
 	return ^T(alloc(size_of(T), align_of(T)));
 }
 

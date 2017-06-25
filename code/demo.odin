@@ -1,13 +1,7 @@
-import (
-	"fmt.odin";
-)
-
+import "fmt.odin";
 
 proc main() {
-	var ptr = new(int);
-	ptr^ = 123;
 
-	fmt.println(ptr^);
 }
 
 /*

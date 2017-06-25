@@ -955,6 +955,9 @@ void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) 
 }
 
 bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
+	if (scope == NULL) {
+		return false;
+	}
 	String name = entity->token.string;
 	if (name != "_") {
 		Entity *ie = scope_insert_entity(scope, entity);
@@ -1007,7 +1010,8 @@ void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclIn
 	GB_ASSERT(identifier->kind == AstNode_Ident);
 	GB_ASSERT(e != NULL && d != NULL);
 	GB_ASSERT(identifier->Ident.string == e->token.string);
-	add_entity(c, e->scope, identifier, e);
+	if (e->scope != NULL) add_entity(c, e->scope, identifier, e);
+	add_entity_definition(&c->info, identifier, e);
 	map_set(&c->info.entities, hash_entity(e), d);
 }
 

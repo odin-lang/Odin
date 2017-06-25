@@ -3497,8 +3497,8 @@ String ir_mangle_name(irGen *s, String path, Entity *e) {
 	isize base_len = ext-1-base;
 
 	isize max_len = base_len + 1 + 1 + 10 + 1 + name.len;
-	bool is_overloaded = check_is_entity_overloaded(e);
-	if (is_overloaded) {
+	bool require_suffix_id = check_is_entity_overloaded(e) || is_type_gen_proc(e->type);
+	if (require_suffix_id) {
 		max_len += 21;
 	}
 
@@ -3520,7 +3520,7 @@ String ir_mangle_name(irGen *s, String path, Entity *e) {
 			file->id,
 			LIT(name));
 	}
-	if (is_overloaded) {
+	if (require_suffix_id) {
 		char *str = cast(char *)new_name + new_name_len-1;
 		isize len = max_len-new_name_len;
 		isize extra = gb_snprintf(str, len, "-%llu", cast(unsigned long long)e->id);
@@ -5853,7 +5853,7 @@ void ir_type_case_body(irProcedure *proc, AstNode *label, AstNode *clause, irBlo
 }
 
 
-void ir_build_nested_proc(irProcedure *proc, AstNodeProcDecl *pd, Entity *e) {
+void ir_build_poly_proc(irProcedure *proc, AstNodeProcDecl *pd, Entity *e) {
 	GB_ASSERT(pd->body != NULL);
 
 	if (is_entity_in_dependency_map(&proc->module->min_dep_map, e) == false) {
@@ -6018,10 +6018,10 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				for_array(i, found) {
 					Entity *e = found[i];
 					DeclInfo *d = decl_info_of_entity(info, e);
-					ir_build_nested_proc(proc, &d->proc_decl->ProcDecl, e);
+					ir_build_poly_proc(proc, &d->proc_decl->ProcDecl, e);
 				}
 			} else {
-				ir_build_nested_proc(proc, pd, e);
+				ir_build_poly_proc(proc, pd, e);
 			}
 		} else {
 
@@ -7359,7 +7359,7 @@ void ir_gen_tree(irGen *s) {
 			continue;
 		}
 
-		if (!scope->is_global) {
+		if (!scope->is_global || is_type_gen_proc(e->type)) {
 			if (e->kind == Entity_Procedure && (e->Procedure.tags & ProcTag_export) != 0) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later
@@ -7413,7 +7413,6 @@ void ir_gen_tree(irGen *s) {
 			ast_node(pd, ProcDecl, decl->proc_decl);
 			String original_name = name;
 			AstNode *body = pd->body;
-
 
 			if (e->Procedure.is_foreign) {
 				name = e->token.string; // NOTE(bill): Don't use the mangled name

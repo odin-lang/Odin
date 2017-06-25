@@ -1075,9 +1075,6 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		return NULL;
 	}
 
-	if (operands != NULL) {
-		GB_ASSERT(operands->count == params.count);
-	}
 
 
 	isize variable_count = 0;
@@ -1088,6 +1085,11 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			variable_count += gb_max(f->names.count, 1);
 		}
 	}
+
+	if (operands != NULL) {
+		GB_ASSERT_MSG(operands->count == variable_count, "%td vs %td", operands->count, variable_count);
+	}
+
 
 	bool is_variadic = false;
 	bool is_c_vararg = false;
@@ -5059,45 +5061,50 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				final_proc_type = make_type_proc(c->allocator, c->context.scope, NULL, 0, NULL, 0, false, pt->calling_convention);
 				check_procedure_type(c, final_proc_type, pt->node, &operands);
 
-				u64 tags = entity->Procedure.tags;
-				AstNode *ident = clone_ast_node(a, entity->identifier);
-				Token token = ident->Ident;
-				DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, old_decl->parent);
-				d->gen_proc_type = final_proc_type;
-				d->type_expr = pd->type;
-				d->proc_decl = proc_decl;
 
-				gen_entity = make_entity_procedure(c->allocator, entity->scope, token, final_proc_type, tags);
-				gen_entity->identifier = ident;
-
-				add_entity_and_decl_info(c, ident, gen_entity, d);
-				add_entity_definition(&c->info, ident, gen_entity);
-
-				add_entity_use(c, ident, gen_entity);
-				add_entity_use(c, ce->proc, gen_entity);
-
-				check_procedure_later(c, c->curr_ast_file, token, d, final_proc_type, pd->body, tags);
-
-
+				bool skip = false;
 				auto *found = map_get(&c->info.gen_procs, hash_pointer(entity->identifier));
 				if (found) {
-					bool ok = true;
 					for_array(i, *found) {
 						Entity *other = (*found)[i];
-						if (are_types_identical(other->type, gen_entity->type)) {
-							ok = false;
+						if (are_types_identical(other->type, final_proc_type)) {
+							skip = true;
+							gen_entity = other;
+							final_proc_type = other->type;
 							break;
 						}
 					}
-					if (ok) {
-						array_add(found, gen_entity);
-					}
-				} else {
-					Array<Entity *> array = {};
-					array_init(&array, heap_allocator());
-					array_add(&array, gen_entity);
-					map_set(&c->info.gen_procs, hash_pointer(entity->identifier), array);
 				}
+
+				if (!skip) {
+					u64 tags = entity->Procedure.tags;
+					AstNode *ident = clone_ast_node(a, entity->identifier);
+					Token token = ident->Ident;
+					DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, old_decl->parent);
+					d->gen_proc_type = final_proc_type;
+					d->type_expr = pd->type;
+					d->proc_decl = proc_decl;
+
+					gen_entity = make_entity_procedure(c->allocator, NULL, token, final_proc_type, tags);
+					gen_entity->identifier = ident;
+
+					add_entity_and_decl_info(c, ident, gen_entity, d);
+					gen_entity->scope = entity->scope;
+					add_entity_use(c, ident, gen_entity);
+					check_procedure_later(c, c->curr_ast_file, token, d, final_proc_type, pd->body, tags);
+
+
+					if (found) {
+						array_add(found, gen_entity);
+					} else {
+						Array<Entity *> array = {};
+						array_init(&array, heap_allocator());
+						array_add(&array, gen_entity);
+						map_set(&c->info.gen_procs, hash_pointer(entity->identifier), array);
+					}
+				}
+
+				GB_ASSERT(gen_entity != NULL);
 			}
 
 
@@ -5119,7 +5126,12 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 						error(o.expr, "Expected a type for the argument");
 					}
 
-					score += assign_score_function(1);
+					if (are_types_identical(e->type, o.type)) {
+						score += assign_score_function(1);
+					} else {
+						score += assign_score_function(5);
+					}
+
 					continue;
 				}
 				if (variadic) {
@@ -5271,7 +5283,11 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			} else if (o->mode != Addressing_Type) {
 				error(o->expr, "Expected a type for the argument");
 			}
-			score += assign_score_function(1);
+			if (are_types_identical(e->type, o->type)) {
+				score += assign_score_function(1);
+			} else {
+				score += assign_score_function(5);
+			}
 		} else {
 			i64 s = 0;
 			if (!check_is_assignable_to_with_score(c, o, e->type, &s)) {
@@ -5581,8 +5597,12 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		}
 	}
 
+
 	CallArgumentData data = check_call_arguments(c, operand, proc_type, call);
 	Type *result_type = data.result_type;
+	if (data.gen_entity != NULL) {
+		add_entity_use(c, ce->proc, data.gen_entity);
+	}
 	gb_zero_item(operand);
 	operand->expr = call;
 
