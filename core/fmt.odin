@@ -559,7 +559,7 @@ proc _fmt_int(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, 
 	_pad(fi, s);
 }
 
-let (
+var (
 	__DIGITS_LOWER = "0123456789abcdefx";
 	__DIGITS_UPPER = "0123456789ABCDEFX";
 )

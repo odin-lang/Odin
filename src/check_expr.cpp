@@ -5865,6 +5865,12 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				check_close_scope(c);
 				return kind;
 			}
+
+			if (pl->body == NULL) {
+				error(node, "A procedure literal must have a body");
+				return kind;
+			}
+
 			check_procedure_later(c, c->curr_ast_file, empty_token, decl, type, pl->body, pl->tags);
 		}
 		check_close_scope(c);

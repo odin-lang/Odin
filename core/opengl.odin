@@ -41,7 +41,7 @@ proc _string_data(s: string) -> ^u8 #inline { return &s[0]; }
 
 var _libgl = win32.load_library_a(_string_data("opengl32.dll\x00"));
 
-proc get_proc_address(name: string) -> proc() #cc_c {
+proc get_proc_address(name: string) -> rawptr {
 	if name[len(name)-1] == 0 {
 		name = name[0..<len(name)-1];
 	}
@@ -51,7 +51,7 @@ proc get_proc_address(name: string) -> proc() #cc_c {
 	if res == nil {
 		res = win32.get_proc_address(_libgl, &name[0]);
 	}
-	return res;
+	return rawptr(res);
 }
 
 var (
@@ -118,7 +118,7 @@ var (
 
 proc init() {
 	proc set_proc_address(p: rawptr, name: string) #inline {
-		var x = ^(proc() #cc_c)(p);
+		var x = ^rawptr(p);
 		x^ = get_proc_address(name);
 	}
 

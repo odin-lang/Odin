@@ -43,7 +43,7 @@ const (
 )
 
 // "Argv" arguments converted to Odin strings
-let args = _alloc_command_line_arguments();
+var args = _alloc_command_line_arguments();
 
 type _FileTime struct #ordered {
 	seconds:     i64,

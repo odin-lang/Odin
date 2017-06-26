@@ -32,7 +32,7 @@ const (
 
 type AcceptRange struct { lo, hi: u8 }
 
-let (
+var (
 	accept_ranges = [5]AcceptRange{
 		{0x80, 0xbf},
 		{0xa0, 0xbf},

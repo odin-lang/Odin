@@ -5947,8 +5947,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		for_array(i, gd->specs) {
 			AstNode *spec = gd->specs[i];
 			switch (gd->token.kind) {
-			case Token_var:
-			case Token_let: {
+			case Token_var: {
 				ast_node(vd, ValueSpec, spec);
 
 				irModule *m = proc->module;

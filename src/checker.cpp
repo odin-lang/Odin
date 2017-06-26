@@ -1635,8 +1635,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					check_arity_match(c, vs);
 				} break;
 
-				case Token_var:
-				case Token_let: {
+				case Token_var: {
 					if (!c->context.scope->is_file) {
 						// NOTE(bill): local scope -> handle later and in order
 						break;
@@ -1671,7 +1670,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 							error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 							continue;
 						}
-						Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL, gd->token.kind == Token_let);
+						Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL, false);
 						e->Variable.is_thread_local = (gd->flags & VarDeclFlag_thread_local) != 0;
 						e->identifier = name;
 

@@ -54,7 +54,7 @@ const (
 )
 
 // "Argv" arguments converted to Odin strings
-let args = _alloc_command_line_arguments();
+var args = _alloc_command_line_arguments();
 
 
 proc open(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) {

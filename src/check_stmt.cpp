@@ -1657,7 +1657,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			if (decl->kind == AstNode_GenDecl) {
 				switch (decl->GenDecl.token.kind) {
 				case Token_var:
-				case Token_let:
 					check_stmt(c, decl, flags);
 					break;
 				}
@@ -1673,8 +1672,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		for_array(i, gd->specs) {
 			AstNode *spec = gd->specs[i];
 			switch (gd->token.kind) {
-			case Token_var:
-			case Token_let: {
+			case Token_var: {
 				ast_node(vd, ValueSpec, spec);
 
 				Entity **entities = gb_alloc_array(c->allocator, Entity *, vd->names.count);
@@ -1699,7 +1697,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 							found = current_scope_lookup_entity(c->context.scope, str);
 						}
 						if (found == NULL) {
-							entity = make_entity_variable(c->allocator, c->context.scope, token, NULL, gd->token.kind == Token_let);
+							entity = make_entity_variable(c->allocator, c->context.scope, token, NULL, false);
 							entity->identifier = name;
 
 							AstNode *fl = c->context.curr_foreign_library;

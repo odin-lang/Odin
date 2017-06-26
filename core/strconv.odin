@@ -416,7 +416,7 @@ proc round_shortest(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 }
 
 const MAX_BASE = 32;
-let digits = "0123456789abcdefghijklmnopqrstuvwxyz";
+var digits = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 
 proc is_integer_negative(u: u128, is_signed: bool, bit_size: int) -> (unsigned: u128, neg: bool) {

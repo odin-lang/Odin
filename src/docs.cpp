@@ -95,7 +95,6 @@ void print_declaration(AstNode *decl) {
 			AstNode *spec = gd->specs[spec_index];
 			switch(gd->token.kind) {
 			case Token_var:
-			case Token_let:
 				break;
 			case Token_const:
 				break;

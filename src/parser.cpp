@@ -1760,7 +1760,6 @@ void fix_advance_to_next_stmt(AstFile *f) {
 
 		case Token_var:
 		case Token_const:
-		case Token_let:
 		case Token_type:
 		case Token_proc:
 		case Token_foreign:
@@ -1902,7 +1901,6 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 		if (s->kind == AstNode_GenDecl) {
 			switch (s->GenDecl.token.kind) {
 			case Token_var:
-			case Token_let:
 				node_string = str_lit("variable declaration");
 				break;
 			case Token_const:
@@ -2292,7 +2290,9 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		AstNode *type = parse_proc_type(f, token, &link_name);
 		u64 tags = type->ProcType.tags;
 
-		if (f->curr_token.kind == Token_OpenBrace) {
+		if (allow_token(f, Token_Undef)) {
+			return ast_proc_lit(f, type, NULL, tags, link_name);
+		} else if (f->curr_token.kind == Token_OpenBrace) {
 			if ((tags & ProcTag_foreign) != 0) {
 				syntax_error(token, "A procedure tagged as `#foreign` cannot have a body");
 			}
@@ -2749,7 +2749,9 @@ AstNode *parse_proc_decl(AstFile *f) {
 	f->allow_gen_proc_type = prev_allow_gen_proc_type;
 
 
-	if (f->curr_token.kind == Token_OpenBrace) {
+	if (allow_token(f, Token_Undef)) {
+		body = NULL;
+	} else if (f->curr_token.kind == Token_OpenBrace) {
 		if ((tags & ProcTag_foreign) != 0) {
 			syntax_error(token, "A procedure tagged as `#foreign` cannot have a body");
 		}
@@ -3002,7 +3004,6 @@ void parse_foreign_block_decl(AstFile *f, Array<AstNode *> *decls) {
 	case AstNode_GenDecl:
 		switch (decl->GenDecl.token.kind) {
 		case Token_var:
-		case Token_let:
 			array_add(decls, decl);
 			return;
 		}
@@ -3019,7 +3020,6 @@ AstNode *parse_decl(AstFile *f) {
 	switch (f->curr_token.kind) {
 	case Token_var:
 	case Token_const:
-	case Token_let:
 		func = parse_value_spec;
 		break;
 
@@ -3088,7 +3088,6 @@ AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 	switch (f->curr_token.kind) {
 	case Token_var:
 	case Token_const:
-	case Token_let:
 		return parse_decl(f);
 	}
 
@@ -4247,7 +4246,6 @@ AstNode *parse_stmt(AstFile *f) {
 
 	case Token_var:
 	case Token_const:
-	case Token_let:
 	case Token_proc:
 	case Token_type:
 	case Token_import:
@@ -4287,8 +4285,7 @@ AstNode *parse_stmt(AstFile *f) {
 		// TODO(bill): Make using statements better
 		Token token = expect_token(f, Token_using);
 		AstNode *decl = NULL;
-		if (f->curr_token.kind == Token_var ||
-		    f->curr_token.kind == Token_let) {
+		if (f->curr_token.kind == Token_var) {
 			decl = parse_decl(f);
 			expect_semicolon(f, decl);
 		} else {
@@ -4307,8 +4304,7 @@ AstNode *parse_stmt(AstFile *f) {
 
 
 		if (decl != NULL && decl->kind == AstNode_GenDecl) {
-			if (decl->GenDecl.token.kind != Token_var &&
-			    decl->GenDecl.token.kind != Token_let) {
+			if (decl->GenDecl.token.kind != Token_var) {
 				syntax_error(token, "`using` may only be applied to variable declarations");
 				return decl;
 			}
@@ -4384,8 +4380,7 @@ AstNode *parse_stmt(AstFile *f) {
 			AstNode *s = parse_stmt(f);
 
 			if (s->kind == AstNode_GenDecl) {
-				if (s->GenDecl.token.kind != Token_var &&
-				    s->GenDecl.token.kind != Token_let) {
+				if (s->GenDecl.token.kind != Token_var) {
 					syntax_error(token, "`thread_local` may only be applied to variable declarations");
 				}
 				if (f->curr_proc != NULL) {
