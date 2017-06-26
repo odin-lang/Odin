@@ -191,13 +191,9 @@ void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
 	}
 	isize param_index = 0;
 	for (isize i = 0; i < param_count; i++) {
-		if (param_index > 0) {
-			ir_fprintf(f, ", ");
-		}
 		Entity *e = t->Proc.params->Tuple.variables[i];
-		if (e->kind != Entity_Variable) {
-			continue;
-		}
+		if (e->kind != Entity_Variable) continue;
+		if (param_index > 0) ir_fprintf(f, ", ");
 
 		if (i+1 == param_count && t->Proc.c_vararg) {
 			ir_fprintf(f, "...");
@@ -208,9 +204,7 @@ void ir_print_proc_type_without_pointer(irFileBuffer *f, irModule *m, Type *t) {
 		param_index++;
 	}
 	if (t->Proc.calling_convention == ProcCC_Odin) {
-		if (param_index > 0) {
-			ir_fprintf(f, ", ");
-		}
+		if (param_index > 0) ir_fprintf(f, ", ");
 		ir_print_type(f, m, t_context_ptr);
 	}
 	ir_fprintf(f, ")");
@@ -1293,10 +1287,10 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					Entity *e = params->variables[i];
 					GB_ASSERT(e != NULL);
 					if (e->kind != Entity_Variable) continue;
+
+					if (param_index > 0) ir_fprintf(f, ", ");
+
 					Type *t = proc_type->Proc.abi_compat_params[i];
-					if (param_index > 0) {
-						ir_fprintf(f, ", ");
-					}
 					ir_print_type(f, m, t);
 					if (e->flags&EntityFlag_NoAlias) {
 						ir_fprintf(f, " noalias");
@@ -1307,9 +1301,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					param_index++;
 				}
 				for (; i < call->arg_count; i++) {
-					if (param_index > 0) {
-						ir_fprintf(f, ", ");
-					}
+					if (param_index > 0) ir_fprintf(f, ", ");
 
 					irValue *arg = call->args[i];
 					Type *t = ir_type(arg);
@@ -1325,11 +1317,12 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 					Entity *e = params->variables[i];
 					GB_ASSERT(e != NULL);
 					if (e->kind != Entity_Variable) continue;
+
+					if (param_index > 0) ir_fprintf(f, ", ");
+
 					irValue *arg = call->args[i];
 					Type *t = proc_type->Proc.abi_compat_params[i];
-					if (param_index > 0) {
-						ir_fprintf(f, ", ");
-					}
+
 					ir_print_type(f, m, t);
 					if (e->flags&EntityFlag_NoAlias) {
 						ir_fprintf(f, " noalias");
@@ -1341,9 +1334,8 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			}
 		}
 		if (proc_type->Proc.calling_convention == ProcCC_Odin) {
-			if (param_index > 0) {
-				ir_fprintf(f, ", ");
-			}
+			if (param_index > 0) ir_fprintf(f, ", ");
+
 			ir_print_type(f, m, t_context_ptr);
 			ir_fprintf(f, " noalias nonnull");
 			ir_print_value(f, m, call->context_ptr, t_context_ptr);
@@ -1581,12 +1573,8 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 			Entity *e = params->variables[i];
 			Type *original_type = e->type;
 			Type *abi_type = proc_type->abi_compat_params[i];
-			if (param_index > 0) {
-				ir_fprintf(f, ", ");
-			}
-			if (e->kind != Entity_Variable) {
-				continue;
-			}
+			if (e->kind != Entity_Variable) continue;
+			if (param_index > 0) ir_fprintf(f, ", ");
 
 			if (i+1 == params->variable_count && proc_type->c_vararg) {
 				ir_fprintf(f, " ...");
@@ -1610,9 +1598,8 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 		}
 	}
 	if (proc_type->calling_convention == ProcCC_Odin) {
-		if (param_index > 0) {
-			ir_fprintf(f, ", ");
-		}
+		if (param_index > 0) ir_fprintf(f, ", ");
+
 		ir_print_type(f, m, t_context_ptr);
 		ir_fprintf(f, " noalias nonnull %%__.context_ptr");
 	}

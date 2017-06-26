@@ -1150,7 +1150,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			}
 			if (type_expr->kind == AstNode_HelperType) {
 				if (operands != NULL) {
-					Operand o = (*operands)[i];
+					Operand o = (*operands)[variable_index];
 					if (o.mode == Addressing_Type) {
 						type = o.type;
 					} else {
@@ -1223,7 +1223,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				bool is_generic = type->kind == Type_Generic;
 				Type *gen_type = type;
 				if (operands != NULL) {
-					Operand o = (*operands)[j];
+					Operand o = (*operands)[variable_index];
 					is_generic = o.mode == Addressing_Type && o.type == type;
 					if (is_generic) gen_type = o.type;
 				}
