@@ -87,7 +87,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("size_of"),          1, false, Expr_Expr},
 	{STR_LIT("align_of"),         1, false, Expr_Expr},
 	{STR_LIT("offset_of"),        2, false, Expr_Expr},
-	{STR_LIT("type_of_val"),      1, false, Expr_Expr},
+	{STR_LIT("type_of"),          1, false, Expr_Expr},
 	{STR_LIT("type_info"),        1, false, Expr_Expr},
 
 	{STR_LIT("compile_assert"),   1, false, Expr_Expr},
@@ -1456,7 +1456,7 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 				TypeProc *ptq = &base_type(q->type)->Proc;
 				if (ptq->is_generic) {
 					q->type = t_invalid;
-					error(q->token, "Generic procedure `%.*s` cannot be overloaded", LIT(name));
+					error(q->token, "Polymorphic procedure `%.*s` cannot be overloaded", LIT(name));
 					continue;
 				}
 			}
@@ -2269,7 +2269,6 @@ void check_parsed_files(Checker *c) {
 			if (pi->decl->gen_proc_type == NULL) {
 				continue;
 			}
-			// gb_printf_err("Generic procedure `%.*s` -> %s\n", LIT(pi->token.string), type_to_string(pi->decl->gen_proc_type));
 		}
 
 		add_curr_ast_file(c, pi->file);

@@ -12,7 +12,6 @@ enum CallArgumentError {
 	CallArgumentError_ParameterNotFound,
 	CallArgumentError_ParameterMissing,
 	CallArgumentError_DuplicateParameter,
-	CallArgumentError_GenericProcedureNotSupported,
 };
 
 enum CallArgumentErrorMode {
@@ -285,9 +284,11 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 
 
 	if (is_type_any(dst)) {
-		// NOTE(bill): Anything can cast to `Any`
-		add_type_info_type(c, s);
-		return 10;
+		if (!is_type_gen_proc(src)) {
+			// NOTE(bill): Anything can cast to `Any`
+			add_type_info_type(c, s);
+			return 10;
+		}
 	}
 
 
@@ -4241,13 +4242,17 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 
 	case BuiltinProc_type_of:
-		// proc type_of_val(val: Type) -> type(Type)
-		check_assignment(c, operand, NULL, str_lit("argument of `type_of_val`"));
+		// proc type_of(val: Type) -> type(Type)
+		check_assignment(c, operand, NULL, str_lit("argument of `type_of`"));
 		if (operand->mode == Addressing_Invalid || operand->mode == Addressing_Builtin) {
 			return false;
 		}
-		if (operand->type == NULL || operand->type == t_invalid || is_type_gen_proc(operand->type)) {
-			error(operand->expr, "Invalid argument to `type_of_val`");
+		if (operand->type == NULL || operand->type == t_invalid) {
+			error(operand->expr, "Invalid argument to `type_of`");
+			return false;
+		}
+		if (is_type_gen_proc(operand->type)) {
+			error(operand->expr, "`type_of` of generic procedure cannot be determined");
 			return false;
 		}
 		operand->mode = Addressing_Type;
@@ -4999,10 +5004,10 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 	Type *final_proc_type = make_type_proc(c->allocator, c->context.scope, NULL, 0, NULL, 0, false, pt->calling_convention);
 	check_procedure_type(c, final_proc_type, pt->node, operands);
 
-	auto *found = map_get(&c->info.gen_procs, hash_pointer(base_entity->identifier));
-	if (found) {
-		for_array(i, *found) {
-			Entity *other = (*found)[i];
+	auto *found_gen_procs = map_get(&c->info.gen_procs, hash_pointer(base_entity->identifier));
+	if (found_gen_procs) {
+		for_array(i, *found_gen_procs) {
+			Entity *other = (*found_gen_procs)[i];
 			if (are_types_identical(other->type, final_proc_type)) {
 			// NOTE(bill): This scope is not needed any more, destroy it
 				destroy_scope(scope);
@@ -5041,13 +5046,13 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 	proc_info.body  = pd->body;
 	proc_info.tags  = tags;
 
-	if (found) {
-		array_add(found, entity);
+	if (found_gen_procs) {
+		array_add(found_gen_procs, entity);
 	} else {
 		Array<Entity *> array = {};
 		array_init(&array, heap_allocator());
 		array_add(&array, entity);
-		map_set(&c->info.gen_procs, hash_pointer(entity->identifier), array);
+		map_set(&c->info.gen_procs, hash_pointer(base_entity->identifier), array);
 	}
 
 	GB_ASSERT(entity != NULL);
@@ -5373,7 +5378,6 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 
 	Entity *gen_entity = NULL;
 	if (pt->is_generic && err == CallArgumentError_None) {
-		// err = CallArgumentError_GenericProcedureNotSupported;
 		ProcedureInfo proc_info = {};
 		gen_entity = find_or_generate_polymorphic_procedure(c, entity, &ordered_operands, &proc_info);
 		if (gen_entity != NULL) {

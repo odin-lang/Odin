@@ -45,6 +45,11 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 			}
 			t = default_type(t);
 		}
+		if (is_type_gen_proc(t)) {
+			error(e->token, "Invalid use of a generic procedure in %.*s", LIT(context_name));
+			e->type = t_invalid;
+			return NULL;
+		}
 		if (is_type_bit_field_value(t)) {
 			t = default_bit_field_value_type(t);
 		}
@@ -361,7 +366,12 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 	if (pt->is_generic) {
 		if (pd->body == NULL) {
-			error(e->token, "Generic procedures must have a body");
+			error(e->token, "Polymorphic procedures must have a body");
+		}
+
+		if (is_foreign) {
+			error(e->token, "A foreign procedures cannot be a polymorphic");
+			return;
 		}
 	}
 
@@ -386,6 +396,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	} else {
 		pt->require_results = is_require_results;
 	}
+
+
 
 	if (is_foreign) {
 		String name = e->token.string;
