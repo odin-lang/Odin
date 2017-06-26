@@ -1099,7 +1099,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 	}
 
 	if (operands != NULL) {
-		GB_ASSERT_MSG(operands->count == variable_count, "%td vs %td", operands->count, variable_count);
+		GB_ASSERT_MSG(operands->count >= variable_count, "%td vs %td", operands->count, variable_count);
 	}
 
 
@@ -3794,7 +3794,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	bool vari_expand = (ce->ellipsis.pos.line != 0);
 	if (vari_expand && id != BuiltinProc_append) {
-		error(ce->ellipsis, "Invalid use of `..` with built-in procedure `append`");
+		// error(ce->ellipsis, "Invalid use of `..` with built-in procedure `append`");
 		return false;
 	}
 
@@ -4982,10 +4982,6 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 		return NULL;
 	}
 
-	if (pt->param_count != operands->count) {
-		return NULL;
-	}
-
 	DeclInfo *old_decl = decl_info_of_entity(&c->info, base_entity);
 	GB_ASSERT(old_decl != NULL);
 
@@ -5297,12 +5293,14 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
 	CallArgumentError err = CallArgumentError_None;
 
+	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
 	isize param_count = pt->param_count;
-	bool *visited = gb_alloc_array(c->allocator, bool, param_count);
+	bool *visited = gb_alloc_array(c->tmp_allocator, bool, param_count);
 
 	Array<Operand> ordered_operands = {};
-	array_init_count(&ordered_operands, heap_allocator(), param_count);
-	defer (array_free(&ordered_operands));
+	array_init_count(&ordered_operands, c->tmp_allocator, param_count);
 
 	for_array(i, ce->args) {
 		AstNode *arg = ce->args[i];
@@ -5337,6 +5335,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 		ordered_operands[index] = operands[i];
 	}
 
+	// NOTE(bill): Check for default values and missing parameters
 	isize param_count_to_check = param_count;
 	if (pt->variadic) {
 		param_count_to_check--;
@@ -5347,22 +5346,26 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			if (e->token.string == "_") {
 				continue;
 			}
-			GB_ASSERT(e->kind == Entity_Variable);
-			if (e->Variable.default_value.kind != ExactValue_Invalid) {
-				score += assign_score_function(1);
-				continue;
-			}
-
-			if (e->Variable.default_is_nil) {
-				score += assign_score_function(1);
-				continue;
+			if (e->kind == Entity_Variable) {
+				if (e->Variable.default_value.kind != ExactValue_Invalid) {
+					score += assign_score_function(1);
+					continue;
+				} else if (e->Variable.default_is_nil) {
+					score += assign_score_function(1);
+					continue;
+				}
 			}
 
 			if (show_error) {
-				gbString str = type_to_string(e->type);
-				error(call, "Parameter `%.*s` of type `%s` is missing in procedure call",
-				      LIT(e->token.string), str);
-				gb_string_free(str);
+				if (e->kind == Entity_TypeName) {
+					error(call, "Type parameter `%.*s` is missing in procedure call",
+					      LIT(e->token.string));
+				} else {
+					gbString str = type_to_string(e->type);
+					error(call, "Parameter `%.*s` of type `%s` is missing in procedure call",
+					      LIT(e->token.string), str);
+					gb_string_free(str);
+				}
 			}
 			err = CallArgumentError_ParameterMissing;
 		}
@@ -5377,10 +5380,12 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			if (proc_info.decl != NULL) {
 				check_procedure_later(c, proc_info);
 			}
-
-			pt = &base_type(gen_entity->type)->Proc;
+			Type *gept = base_type(gen_entity->type);
+			GB_ASSERT(is_type_proc(gept));
+			pt = &gept->Proc;
 		}
 	}
+
 
 	for (isize i = 0; i < param_count; i++) {
 		Operand *o = &ordered_operands[i];
@@ -5391,7 +5396,6 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 
 		if (e->kind == Entity_TypeName) {
 			GB_ASSERT(pt->is_generic);
-			GB_ASSERT(!pt->variadic);
 			if (o->mode != Addressing_Type) {
 				if (show_error) {
 					error(o->expr, "Expected a type for the argument `%.*s`", LIT(e->token.string));
@@ -5446,7 +5450,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 
 		bool vari_expand = (ce->ellipsis.pos.line != 0);
 		if (vari_expand) {
-			error(ce->ellipsis, "Invalid use of `..` with `field = value` call`");
+			// error(ce->ellipsis, "Invalid use of `..` with `field = value` call`");
 		}
 
 	} else {
