@@ -1,11 +1,7 @@
 import "fmt.odin";
 
 proc main() {
-
-}
-
-/*
-	let program = "+ + * - /";
+	var program = "+ + * - /";
 	var accumulator = 0;
 
 	for token in program {
@@ -20,5 +16,4 @@ proc main() {
 
 	fmt.printf("The program \"%s\" calculates the value %d\n",
 	           program, accumulator);
-*/
 }
