@@ -4967,8 +4967,99 @@ bool check_unpack_arguments(Checker *c, isize lhs_count, Array<Operand> *operand
 	return optional_ok;
 }
 
+// NOTE(bill): Returns `NULL` on failure
+Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Array<Operand> *operands, ProcedureInfo *proc_info_) {
+	if (base_entity == NULL) {
+		return NULL;
+	}
+
+	if (!is_type_proc(base_entity->type)) {
+		return NULL;
+	}
+
+	TypeProc *pt = &base_type(base_entity->type)->Proc;
+	if (!pt->is_generic || pt->is_generic_specialized) {
+		return NULL;
+	}
+
+	if (pt->param_count != operands->count) {
+		return NULL;
+	}
+
+	DeclInfo *old_decl = decl_info_of_entity(&c->info, base_entity);
+	GB_ASSERT(old_decl != NULL);
+
+	gbAllocator a = heap_allocator();
+
+	CheckerContext prev_context = c->context;
+	defer (c->context = prev_context);
+
+	Scope *scope = make_scope(base_entity->scope, a);
+	scope->is_proc = true;
+	c->context.scope = scope;
+
+	// NOTE(bill): This is slightly memory leaking if the type already exists
+	// Maybe it's better to check with the previous types first?
+	Type *final_proc_type = make_type_proc(c->allocator, c->context.scope, NULL, 0, NULL, 0, false, pt->calling_convention);
+	check_procedure_type(c, final_proc_type, pt->node, operands);
+
+	auto *found = map_get(&c->info.gen_procs, hash_pointer(base_entity->identifier));
+	if (found) {
+		for_array(i, *found) {
+			Entity *other = (*found)[i];
+			if (are_types_identical(other->type, final_proc_type)) {
+			// NOTE(bill): This scope is not needed any more, destroy it
+				destroy_scope(scope);
+				return other;
+			}
+		}
+	}
 
 
+	AstNode *proc_decl = clone_ast_node(a, old_decl->proc_decl);
+	ast_node(pd, ProcDecl, proc_decl);
+	// NOTE(bill): Associate the scope declared above with this procedure declaration's type
+	add_scope(c, pd->type, final_proc_type->Proc.scope);
+	final_proc_type->Proc.is_generic_specialized = true;
+
+	u64 tags = base_entity->Procedure.tags;
+	AstNode *ident = clone_ast_node(a, base_entity->identifier);
+	Token token = ident->Ident;
+	DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, old_decl->parent);
+	d->gen_proc_type = final_proc_type;
+	d->type_expr = pd->type;
+	d->proc_decl = proc_decl;
+
+
+	Entity *entity = make_entity_procedure(c->allocator, NULL, token, final_proc_type, tags);
+	entity->identifier = ident;
+
+	add_entity_and_decl_info(c, ident, entity, d);
+	entity->scope = base_entity->scope;
+
+	ProcedureInfo proc_info = {};
+	proc_info.file = c->curr_ast_file;
+	proc_info.token = token;
+	proc_info.decl  = d;
+	proc_info.type  = final_proc_type;
+	proc_info.body  = pd->body;
+	proc_info.tags  = tags;
+
+	if (found) {
+		array_add(found, entity);
+	} else {
+		Array<Entity *> array = {};
+		array_init(&array, heap_allocator());
+		array_add(&array, entity);
+		map_set(&c->info.gen_procs, hash_pointer(entity->identifier), array);
+	}
+
+	GB_ASSERT(entity != NULL);
+
+
+	if (proc_info_) *proc_info_ = proc_info;
+	return entity;
+}
 
 CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 	ast_node(ce, CallExpr, call);
@@ -5056,89 +5147,17 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			}
 		} else {
 			// NOTE(bill): Generate the procedure type for this generic instance
-			// TODO(bill): Clean this shit up!
-
 			ProcedureInfo proc_info = {};
 
 			if (pt->is_generic && !pt->is_generic_specialized) {
-				GB_ASSERT(entity != NULL);
-
-				DeclInfo *old_decl = decl_info_of_entity(&c->info, entity);
-				GB_ASSERT(old_decl != NULL);
-
-				gbAllocator a = heap_allocator();
-
-				CheckerContext prev_context = c->context;
-				defer (c->context = prev_context);
-
-				Scope *scope = make_scope(entity->scope, a);
-				scope->is_proc = true;
-				c->context.scope = scope;
-
-				// NOTE(bill): This is slightly memory leaking if the type already exists
-				// Maybe it's better to check with the previous types first?
-				final_proc_type = make_type_proc(c->allocator, c->context.scope, NULL, 0, NULL, 0, false, pt->calling_convention);
-				check_procedure_type(c, final_proc_type, pt->node, &operands);
-
-				bool skip = false;
-				auto *found = map_get(&c->info.gen_procs, hash_pointer(entity->identifier));
-				if (found) {
-					for_array(i, *found) {
-						Entity *other = (*found)[i];
-						if (are_types_identical(other->type, final_proc_type)) {
-							skip = true;
-							gen_entity = other;
-							final_proc_type = other->type;
-							break;
-						}
-					}
+				gen_entity = find_or_generate_polymorphic_procedure(c, entity, &operands, &proc_info);
+				if (gen_entity != NULL) {
+					GB_ASSERT(is_type_proc(gen_entity->type));
+					final_proc_type = gen_entity->type;
 				}
-
-				if (skip) {
-					// NOTE(bill): It is not needed any more, destroy it
-					destroy_scope(scope);
-				} else {
-					AstNode *proc_decl = clone_ast_node(a, old_decl->proc_decl);
-					ast_node(pd, ProcDecl, proc_decl);
-					// NOTE(bill): Associate the scope declared above with this procedure declaration's type
-					add_scope(c, pd->type, final_proc_type->Proc.scope);
-					final_proc_type->Proc.is_generic_specialized = true;
-
-					u64 tags = entity->Procedure.tags;
-					AstNode *ident = clone_ast_node(a, entity->identifier);
-					Token token = ident->Ident;
-					DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, old_decl->parent);
-					d->gen_proc_type = final_proc_type;
-					d->type_expr = pd->type;
-					d->proc_decl = proc_decl;
-
-					gen_entity = make_entity_procedure(c->allocator, NULL, token, final_proc_type, tags);
-					gen_entity->identifier = ident;
-
-					add_entity_and_decl_info(c, ident, gen_entity, d);
-					gen_entity->scope = entity->scope;
-					add_entity_use(c, ident, gen_entity);
-
-					proc_info.file = c->curr_ast_file;
-					proc_info.token = token;
-					proc_info.decl  = d;
-					proc_info.type  = final_proc_type;
-					proc_info.body  = pd->body;
-					proc_info.tags  = tags;
-
-					if (found) {
-						array_add(found, gen_entity);
-					} else {
-						Array<Entity *> array = {};
-						array_init(&array, heap_allocator());
-						array_add(&array, gen_entity);
-						map_set(&c->info.gen_procs, hash_pointer(entity->identifier), array);
-					}
-				}
-
-				GB_ASSERT(gen_entity != NULL);
 			}
 
+			GB_ASSERT(is_type_proc(final_proc_type));
 			TypeProc *pt = &final_proc_type->Proc;
 
 			GB_ASSERT(pt->params != NULL);
@@ -5154,7 +5173,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					if (o.mode == Addressing_Invalid) {
 						continue;
 					} else if (o.mode != Addressing_Type) {
-						error(o.expr, "Expected a type for the argument");
+						error(o.expr, "Expected a type for the argument `%.*s`", LIT(e->token.string));
 						err = CallArgumentError_WrongTypes;
 					}
 
@@ -5214,7 +5233,10 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			}
 
 			if (gen_entity != NULL && err == CallArgumentError_None) {
-				check_procedure_later(c, proc_info);
+				if (proc_info.decl != NULL) {
+					// NOTE(bill): Check the newly generated procedure body
+					check_procedure_later(c, proc_info);
+				}
 			}
 		}
 	}
@@ -5278,6 +5300,10 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	isize param_count = pt->param_count;
 	bool *visited = gb_alloc_array(c->allocator, bool, param_count);
 
+	Array<Operand> ordered_operands = {};
+	array_init_count(&ordered_operands, heap_allocator(), param_count);
+	defer (array_free(&ordered_operands));
+
 	for_array(i, ce->args) {
 		AstNode *arg = ce->args[i];
 		ast_node(fv, FieldValue, arg);
@@ -5308,36 +5334,9 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 		}
 
 		visited[index] = true;
-		Operand *o = &operands[i];
-		Entity *e = pt->params->Tuple.variables[index];
-
-		if (e->kind == Entity_TypeName) {
-			GB_ASSERT(pt->is_generic);
-			GB_ASSERT(!pt->variadic);
-			if (o->mode == Addressing_Invalid) {
-				continue;
-			} else if (o->mode != Addressing_Type) {
-				error(o->expr, "Expected a type for the argument");
-			}
-			if (are_types_identical(e->type, o->type)) {
-				score += assign_score_function(1);
-			} else {
-				score += assign_score_function(5);
-			}
-		} else {
-			i64 s = 0;
-			if (!check_is_assignable_to_with_score(c, o, e->type, &s)) {
-				if (show_error) {
-					check_assignment(c, o, e->type, str_lit("procedure argument"));
-				}
-				err = CallArgumentError_WrongTypes;
-			}
-			score += s;
-		}
+		ordered_operands[index] = operands[i];
 	}
 
-
-#if 1
 	isize param_count_to_check = param_count;
 	if (pt->variadic) {
 		param_count_to_check--;
@@ -5368,19 +5367,58 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			err = CallArgumentError_ParameterMissing;
 		}
 	}
-#endif
 
-	if (pt->is_generic) {
-		if (show_error) {
-			error(call, "Generic procedures do not yet support named arguments");
+	Entity *gen_entity = NULL;
+	if (pt->is_generic && err == CallArgumentError_None) {
+		// err = CallArgumentError_GenericProcedureNotSupported;
+		ProcedureInfo proc_info = {};
+		gen_entity = find_or_generate_polymorphic_procedure(c, entity, &ordered_operands, &proc_info);
+		if (gen_entity != NULL) {
+			if (proc_info.decl != NULL) {
+				check_procedure_later(c, proc_info);
+			}
+
+			pt = &base_type(gen_entity->type)->Proc;
 		}
-		err = CallArgumentError_GenericProcedureNotSupported;
+	}
+
+	for (isize i = 0; i < param_count; i++) {
+		Operand *o = &ordered_operands[i];
+		if (o->mode == Addressing_Invalid) {
+			continue;
+		}
+		Entity *e = pt->params->Tuple.variables[i];
+
+		if (e->kind == Entity_TypeName) {
+			GB_ASSERT(pt->is_generic);
+			GB_ASSERT(!pt->variadic);
+			if (o->mode != Addressing_Type) {
+				if (show_error) {
+					error(o->expr, "Expected a type for the argument `%.*s`", LIT(e->token.string));
+				}
+				err = CallArgumentError_WrongTypes;
+			}
+			if (are_types_identical(e->type, o->type)) {
+				score += assign_score_function(1);
+			} else {
+				score += assign_score_function(10);
+			}
+		} else {
+			i64 s = 0;
+			if (!check_is_assignable_to_with_score(c, o, e->type, &s)) {
+				if (show_error) {
+					check_assignment(c, o, e->type, str_lit("procedure argument"));
+				}
+				err = CallArgumentError_WrongTypes;
+			}
+			score += s;
+		}
 	}
 
 	if (data) {
 		data->score = score;
 		data->result_type = pt->results;
-		data->gen_entity = NULL;
+		data->gen_entity = gen_entity;
 	}
 
 	return err;
@@ -5487,12 +5525,14 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 			proc_type = e->type;
 			CallArgumentData data = {};
 			CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
+			if (data.gen_entity != NULL) add_entity_use(c, ce->proc, data.gen_entity);
 			return data;
 		}
 	} else {
 		Entity *e = entity_of_ident(&c->info, operand->expr);
 		CallArgumentData data = {};
 		CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
+		if (data.gen_entity != NULL) add_entity_use(c, ce->proc, data.gen_entity);
 		return data;
 	}
 

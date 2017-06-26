@@ -4680,15 +4680,19 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			TypeTuple *pt = &type->params->Tuple;
 			for (isize i = 0; i < param_count; i++) {
 				Entity *e = pt->variables[i];
-				GB_ASSERT(e->kind == Entity_Variable);
-				if (args[i] == NULL) {
-					if (e->Variable.default_value.kind != ExactValue_Invalid) {
-						args[i] = ir_value_constant(proc->module->allocator, e->type, e->Variable.default_value);
-					} else {
-						args[i] = ir_value_nil(proc->module->allocator, e->type);
-					}
+				if (e->kind == Entity_TypeName) {
+					args[i] = ir_value_nil(proc->module->allocator, e->type);
 				} else {
-					args[i] = ir_emit_conv(proc, args[i], e->type);
+					GB_ASSERT(e->kind == Entity_Variable);
+					if (args[i] == NULL) {
+						if (e->Variable.default_value.kind != ExactValue_Invalid) {
+							args[i] = ir_value_constant(proc->module->allocator, e->type, e->Variable.default_value);
+						} else {
+							args[i] = ir_value_nil(proc->module->allocator, e->type);
+						}
+					} else {
+						args[i] = ir_emit_conv(proc, args[i], e->type);
+					}
 				}
 			}
 

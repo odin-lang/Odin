@@ -1169,7 +1169,9 @@ void add_type_info_type(Checker *c, Type *t) {
 }
 
 void check_procedure_later(Checker *c, ProcedureInfo info) {
-	map_set(&c->procs, hash_decl_info(info.decl), info);
+	if (info.decl != NULL) {
+		map_set(&c->procs, hash_decl_info(info.decl), info);
+	}
 }
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body, u64 tags) {
@@ -1247,8 +1249,10 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 	for_array(i, info->definitions.entries) {
 		Entity *e = info->definitions.entries[i].value;
 		if (e->scope->is_global) {
-			// NOTE(bill): Require runtime stuff
-			add_dependency_to_map(&map, info, e);
+			if (!is_type_gen_proc(e->type))  {
+				// NOTE(bill): Require runtime stuff
+				add_dependency_to_map(&map, info, e);
+			}
 		} else if (e->kind == Entity_Procedure) {
 			if ((e->Procedure.tags & ProcTag_export) != 0) {
 				add_dependency_to_map(&map, info, e);
