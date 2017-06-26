@@ -387,9 +387,9 @@ Scope *make_scope(Scope *parent, gbAllocator allocator) {
 	Scope *s = gb_alloc_item(allocator, Scope);
 	s->parent = parent;
 	map_init(&s->elements,   heap_allocator());
-	map_init(&s->implicit,     heap_allocator());
-	array_init(&s->shared,          heap_allocator());
-	array_init(&s->imported,        heap_allocator());
+	map_init(&s->implicit,   heap_allocator());
+	array_init(&s->shared,   heap_allocator());
+	array_init(&s->imported, heap_allocator());
 
 	if (parent != NULL && parent != universal_scope) {
 		DLIST_APPEND(parent->first_child, parent->last_child, s);

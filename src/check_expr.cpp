@@ -5060,24 +5060,25 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 
 			ProcedureInfo proc_info = {};
 
-			if (pt->is_generic) {
+			if (pt->is_generic && !pt->is_generic_specialized) {
 				GB_ASSERT(entity != NULL);
+
 				DeclInfo *old_decl = decl_info_of_entity(&c->info, entity);
 				GB_ASSERT(old_decl != NULL);
 
 				gbAllocator a = heap_allocator();
 
-				Scope *scope = entity->scope;
+				CheckerContext prev_context = c->context;
+				defer (c->context = prev_context);
 
-				AstNode *proc_decl = clone_ast_node(a, old_decl->proc_decl);
-				ast_node(pd, ProcDecl, proc_decl);
+				Scope *scope = make_scope(entity->scope, a);
+				scope->is_proc = true;
+				c->context.scope = scope;
 
-				check_open_scope(c, pd->type);
-				defer (check_close_scope(c));
-
+				// NOTE(bill): This is slightly memory leaking if the type already exists
+				// Maybe it's better to check with the previous types first?
 				final_proc_type = make_type_proc(c->allocator, c->context.scope, NULL, 0, NULL, 0, false, pt->calling_convention);
 				check_procedure_type(c, final_proc_type, pt->node, &operands);
-
 
 				bool skip = false;
 				auto *found = map_get(&c->info.gen_procs, hash_pointer(entity->identifier));
@@ -5093,7 +5094,16 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					}
 				}
 
-				if (!skip) {
+				if (skip) {
+					// NOTE(bill): It is not needed any more, destroy it
+					destroy_scope(scope);
+				} else {
+					AstNode *proc_decl = clone_ast_node(a, old_decl->proc_decl);
+					ast_node(pd, ProcDecl, proc_decl);
+					// NOTE(bill): Associate the scope declared above with this procedure declaration's type
+					add_scope(c, pd->type, final_proc_type->Proc.scope);
+					final_proc_type->Proc.is_generic_specialized = true;
+
 					u64 tags = entity->Procedure.tags;
 					AstNode *ident = clone_ast_node(a, entity->identifier);
 					Token token = ident->Ident;
@@ -5151,7 +5161,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					if (are_types_identical(e->type, o.type)) {
 						score += assign_score_function(1);
 					} else {
-						score += assign_score_function(5);
+						score += assign_score_function(10);
 					}
 
 					continue;

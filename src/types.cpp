@@ -150,6 +150,7 @@ struct TypeRecord {
 		bool     require_results;                         \
 		bool     c_vararg;                                \
 		bool     is_generic;                              \
+		bool     is_generic_specialized;                  \
 		ProcCallingConvention calling_convention;         \
 	})                                                    \
 	TYPE_KIND(Map, struct {                               \
