@@ -1168,6 +1168,9 @@ void add_type_info_type(Checker *c, Type *t) {
 	}
 }
 
+void check_procedure_later(Checker *c, ProcedureInfo info) {
+	map_set(&c->procs, hash_decl_info(info.decl), info);
+}
 
 void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, AstNode *body, u64 tags) {
 	ProcedureInfo info = {};
@@ -1177,7 +1180,7 @@ void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *dec
 	info.type  = type;
 	info.body  = body;
 	info.tags  = tags;
-	map_set(&c->procs, hash_decl_info(decl), info);
+	check_procedure_later(c, info);
 }
 
 void push_procedure(Checker *c, Type *type) {
@@ -2252,6 +2255,9 @@ void check_parsed_files(Checker *c) {
 	// NOTE(bill): Nested procedures bodies will be added to this "queue"
 	for_array(i, c->procs.entries) {
 		ProcedureInfo *pi = &c->procs.entries[i].value;
+		if (pi->type == NULL) {
+			continue;
+		}
 		CheckerContext prev_context = c->context;
 		defer (c->context = prev_context);
 

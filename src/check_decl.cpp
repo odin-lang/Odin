@@ -34,7 +34,12 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 		Type *t = operand->type;
 		if (is_type_untyped(t)) {
 			if (t == t_invalid || is_type_untyped_nil(t)) {
-				error(e->token, "Use of untyped nil in %.*s", LIT(context_name));
+				error(e->token, "Invalid use of untyped nil in %.*s", LIT(context_name));
+				e->type = t_invalid;
+				return NULL;
+			}
+			if (t == t_invalid || is_type_untyped_undef(t)) {
+				error(e->token, "Invalid use of --- in %.*s", LIT(context_name));
 				e->type = t_invalid;
 				return NULL;
 			}

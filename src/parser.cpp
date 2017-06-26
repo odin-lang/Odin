@@ -140,6 +140,7 @@ Array<AstNode *> make_ast_node_array(AstFile *f, isize init_capacity = 8) {
 #define AST_NODE_KINDS \
 	AST_NODE_KIND(Ident,          "identifier",      Token) \
 	AST_NODE_KIND(Implicit,       "implicit",        Token) \
+	AST_NODE_KIND(Undef,          "undef",           Token) \
 	AST_NODE_KIND(BasicLit,       "basic literal",   Token) \
 	AST_NODE_KIND(BasicDirective, "basic directive", struct { \
 		Token token; \
@@ -516,6 +517,7 @@ Token ast_node_token(AstNode *node) {
 	switch (node->kind) {
 	case AstNode_Ident:          return node->Ident;
 	case AstNode_Implicit:       return node->Implicit;
+	case AstNode_Undef:          return node->Undef;
 	case AstNode_BasicLit:       return node->BasicLit;
 	case AstNode_BasicDirective: return node->BasicDirective.token;
 	case AstNode_ProcLit:        return ast_node_token(node->ProcLit.type);
@@ -635,6 +637,7 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	case AstNode_Invalid:        break;
 	case AstNode_Ident:          break;
 	case AstNode_Implicit:       break;
+	case AstNode_Undef:          break;
 	case AstNode_BasicLit:       break;
 	case AstNode_BasicDirective: break;
 	case AstNode_Ellipsis:
@@ -1071,6 +1074,11 @@ AstNode *ast_ident(AstFile *f, Token token) {
 AstNode *ast_implicit(AstFile *f, Token token) {
 	AstNode *result = make_ast_node(f, AstNode_Implicit);
 	result->Implicit = token;
+	return result;
+}
+AstNode *ast_undef(AstFile *f, Token token) {
+	AstNode *result = make_ast_node(f, AstNode_Undef);
+	result->Undef = token;
 	return result;
 }
 
@@ -2199,6 +2207,9 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	switch (f->curr_token.kind) {
 	case Token_Ident:
 		return parse_ident(f);
+
+	case Token_Undef:
+		return ast_undef(f, expect_token(f, Token_Undef));
 
 	case Token_context:
 		return ast_implicit(f, expect_token(f, Token_context));

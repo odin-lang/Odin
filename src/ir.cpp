@@ -312,6 +312,7 @@ enum irValueKind {
 	irValue_Constant,
 	irValue_ConstantSlice,
 	irValue_Nil,
+	irValue_Undef,
 	irValue_TypeName,
 	irValue_Global,
 	irValue_Param,
@@ -335,6 +336,10 @@ struct irValueConstantSlice {
 };
 
 struct irValueNil {
+	Type *type;
+};
+
+struct irValueUndef {
 	Type *type;
 };
 
@@ -380,6 +385,7 @@ struct irValue {
 		irValueConstant      Constant;
 		irValueConstantSlice ConstantSlice;
 		irValueNil           Nil;
+		irValueUndef         Undef;
 		irValueTypeName      TypeName;
 		irValueGlobal        Global;
 		irValueParam         Param;
@@ -630,6 +636,8 @@ Type *ir_type(irValue *value) {
 		return value->ConstantSlice.type;
 	case irValue_Nil:
 		return value->Nil.type;
+	case irValue_Undef:
+		return value->Undef.type;
 	case irValue_TypeName:
 		return value->TypeName.type;
 	case irValue_Global:
@@ -805,6 +813,13 @@ irValue *ir_value_nil(gbAllocator a, Type *type) {
 	v->Nil.type = type;
 	return v;
 }
+
+irValue *ir_value_undef(gbAllocator a, Type *type) {
+	irValue *v = ir_alloc_value(a, irValue_Undef);
+	v->Undef.type = type;
+	return v;
+}
+
 
 String ir_get_global_name(irModule *m, irValue *v) {
 	if (v->kind != irValue_Global) {
@@ -1261,7 +1276,7 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 
 
 
-irValue *ir_add_local(irProcedure *proc, Entity *e, AstNode *expr) {
+irValue *ir_add_local(irProcedure *proc, Entity *e, AstNode *expr, bool zero_initialized) {
 	irBlock *b = proc->decl_block; // all variables must be in the first block
 	irValue *instr = ir_instr_local(proc, e, true);
 	instr->Instr.parent = b;
@@ -1269,9 +1284,9 @@ irValue *ir_add_local(irProcedure *proc, Entity *e, AstNode *expr) {
 	array_add(&b->locals, instr);
 	proc->local_count++;
 
-	// if (zero_initialized) {
+	if (zero_initialized) {
 		ir_emit_zero_init(proc, instr);
-	// }
+	}
 
 	if (expr != NULL && proc->entity != NULL) {
 		irDebugInfo *di = *map_get(&proc->module->debug_info, hash_entity(proc->entity));
@@ -1302,7 +1317,7 @@ irValue *ir_add_local_for_identifier(irProcedure *proc, AstNode *name, bool zero
 				return *prev_value;
 			}
 		}
-		return ir_add_local(proc, e, name);
+		return ir_add_local(proc, e, name, zero_initialized);
 	}
 	return NULL;
 }
@@ -1318,7 +1333,7 @@ irValue *ir_add_local_generated(irProcedure *proc, Type *type) {
 	                                 scope,
 	                                 empty_token,
 	                                 type, false);
-	return ir_add_local(proc, e, NULL);
+	return ir_add_local(proc, e, NULL, true);
 }
 
 
@@ -1351,7 +1366,7 @@ irValue *ir_add_param(irProcedure *proc, Entity *e, AstNode *expr, Type *abi_typ
 
 	switch (p->kind) {
 	case irParamPass_Value: {
-		irValue *l = ir_add_local(proc, e, expr);
+		irValue *l = ir_add_local(proc, e, expr, false);
 		ir_emit_store(proc, l, v);
 		return v;
 	}
@@ -1360,7 +1375,7 @@ irValue *ir_add_param(irProcedure *proc, Entity *e, AstNode *expr, Type *abi_typ
 		return ir_emit_load(proc, v);
 	}
 	case irParamPass_Integer: {
-		irValue *l = ir_add_local(proc, e, expr);
+		irValue *l = ir_add_local(proc, e, expr, false);
 		irValue *iptr = ir_emit_conv(proc, l, make_type_pointer(proc->module->allocator, p->type));
 		ir_emit_store(proc, iptr, v);
 		return ir_emit_load(proc, l);
@@ -2770,6 +2785,9 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	// if (is_type_untyped_nil(src) && type_has_nil(dst)) {
 	if (is_type_untyped_nil(src)) {
 		return ir_value_nil(proc->module->allocator, t);
+	}
+	if (is_type_untyped_undef(src)) {
+		return ir_value_undef(proc->module->allocator, t);
 	}
 
 	if (value->kind == irValue_Constant) {
@@ -4403,6 +4421,10 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		return ir_addr_load(proc, ir_build_addr(proc, expr));
 	case_end;
 
+	case_ast_node(u, Undef, expr);
+		return ir_value_undef(proc->module->allocator, tv.type);
+	case_end;
+
 	case_ast_node(i, Ident, expr);
 		Entity *e = entity_of_ident(proc->module->info, expr);
 		if (e->kind == Entity_Builtin) {
@@ -5836,7 +5858,7 @@ void ir_build_range_interval(irProcedure *proc, AstNodeBinaryExpr *node, Type *v
 void ir_store_type_case_implicit(irProcedure *proc, AstNode *clause, irValue *value) {
 	Entity *e = implicit_entity_of_node(proc->module->info, clause);
 	GB_ASSERT(e != NULL);
-	irValue *x = ir_add_local(proc, e, NULL);
+	irValue *x = ir_add_local(proc, e, NULL, false);
 	ir_emit_store(proc, x, value);
 }
 

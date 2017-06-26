@@ -38,6 +38,7 @@ enum BasicKind {
 	Basic_UntypedString,
 	Basic_UntypedRune,
 	Basic_UntypedNil,
+	Basic_UntypedUndef,
 
 	Basic_COUNT,
 
@@ -267,6 +268,7 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_UntypedString,     BasicFlag_String     | BasicFlag_Untyped,   0, STR_LIT("untyped string")}},
 	{Type_Basic, {Basic_UntypedRune,       BasicFlag_Integer    | BasicFlag_Untyped,   0, STR_LIT("untyped rune")}},
 	{Type_Basic, {Basic_UntypedNil,        BasicFlag_Untyped,                          0, STR_LIT("untyped nil")}},
+	{Type_Basic, {Basic_UntypedUndef,      BasicFlag_Untyped,                          0, STR_LIT("untyped undefined")}},
 };
 
 // gb_global Type basic_type_aliases[] = {
@@ -311,6 +313,7 @@ gb_global Type *t_untyped_complex    = &basic_types[Basic_UntypedComplex];
 gb_global Type *t_untyped_string     = &basic_types[Basic_UntypedString];
 gb_global Type *t_untyped_rune       = &basic_types[Basic_UntypedRune];
 gb_global Type *t_untyped_nil        = &basic_types[Basic_UntypedNil];
+gb_global Type *t_untyped_undef      = &basic_types[Basic_UntypedUndef];
 
 
 gb_global Type *t_u8_ptr       = NULL;
@@ -905,6 +908,10 @@ bool is_type_untyped_nil(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Basic && t->Basic.kind == Basic_UntypedNil);
 }
+bool is_type_untyped_undef(Type *t) {
+	t = base_type(t);
+	return (t->kind == Type_Basic && t->Basic.kind == Basic_UntypedUndef);
+}
 
 
 
@@ -1000,6 +1007,11 @@ bool is_type_generic(Type *t) {
 	return false;
 }
 
+
+bool type_has_undef(Type *t) {
+	t = base_type(t);
+	return true;
+}
 
 bool type_has_nil(Type *t) {
 	t = base_type(t);

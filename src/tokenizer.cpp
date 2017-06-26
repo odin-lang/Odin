@@ -56,6 +56,7 @@ TOKEN_KIND(Token__AssignOpEnd,   "_AssignOpEnd"), \
 	TOKEN_KIND(Token_ArrowLeft,  "<-"), \
 	TOKEN_KIND(Token_Inc,        "++"), \
 	TOKEN_KIND(Token_Dec,        "--"), \
+	TOKEN_KIND(Token_Undef,      "---"), \
 \
 TOKEN_KIND(Token__ComparisonBegin, "_ComparisonBegin"), \
 	TOKEN_KIND(Token_CmpEq, "=="), \
@@ -916,7 +917,24 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '~': token.kind = token_kind_variant2(t, Token_Xor, Token_XorEq);                                        break;
 		case '!': token.kind = token_kind_variant2(t, Token_Not, Token_NotEq);                                        break;
 		case '+': token.kind = token_kind_variant3(t, Token_Add, Token_AddEq, '+', Token_Inc);                        break;
-		case '-': token.kind = token_kind_variant4(t, Token_Sub, Token_SubEq, '-', Token_Dec, '>', Token_ArrowRight); break;
+		case '-':
+			token.kind = Token_Sub;
+			if (t->curr_rune == '=') {
+				advance_to_next_rune(t);
+				token.kind = Token_SubEq;
+			} else if (t->curr_rune == '-') {
+				advance_to_next_rune(t);
+				token.kind = Token_Dec;
+				if (t->curr_rune == '-') {
+					advance_to_next_rune(t);
+					token.kind = Token_Undef;
+				}
+			} else if (t->curr_rune == '>') {
+				advance_to_next_rune(t);
+				token.kind = Token_ArrowRight;
+			}
+			break;
+
 		case '/': {
 			if (t->curr_rune == '/') {
 				while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {

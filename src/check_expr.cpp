@@ -166,6 +166,13 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 	Type *src = base_type(s);
 	Type *dst = base_type(type);
 
+	if (is_type_untyped_undef(src)) {
+		if (type_has_undef(dst)) {
+			return 1;
+		}
+		return -1;
+	}
+
 	if (is_type_untyped_nil(src)) {
 		if (type_has_nil(dst)) {
 			return 1;
@@ -325,6 +332,11 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 		if (type == NULL || is_type_any(type)) {
 			if (type == NULL && is_type_untyped_nil(operand->type)) {
 				error(operand->expr, "Use of untyped nil in %.*s", LIT(context_name));
+				operand->mode = Addressing_Invalid;
+				return;
+			}
+			if (type == NULL && is_type_untyped_undef(operand->type)) {
+				error(operand->expr, "Use of --- in %.*s", LIT(context_name));
 				operand->mode = Addressing_Invalid;
 				return;
 			}
@@ -3366,7 +3378,9 @@ void convert_to_typed(Checker *c, Operand *operand, Type *target_type, i32 level
 
 
 	default:
-		if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
+		if (is_type_untyped_undef(operand->type) && type_has_undef(target_type)) {
+			target_type = t_untyped_undef;
+		} else if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
 			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
 			return;
@@ -5043,6 +5057,9 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		} else {
 			// NOTE(bill): Generate the procedure type for this generic instance
 			// TODO(bill): Clean this shit up!
+
+			ProcedureInfo proc_info = {};
+
 			if (pt->is_generic) {
 				GB_ASSERT(entity != NULL);
 				DeclInfo *old_decl = decl_info_of_entity(&c->info, entity);
@@ -5091,8 +5108,13 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					add_entity_and_decl_info(c, ident, gen_entity, d);
 					gen_entity->scope = entity->scope;
 					add_entity_use(c, ident, gen_entity);
-					check_procedure_later(c, c->curr_ast_file, token, d, final_proc_type, pd->body, tags);
 
+					proc_info.file = c->curr_ast_file;
+					proc_info.token = token;
+					proc_info.decl  = d;
+					proc_info.type  = final_proc_type;
+					proc_info.body  = pd->body;
+					proc_info.tags  = tags;
 
 					if (found) {
 						array_add(found, gen_entity);
@@ -5106,7 +5128,6 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 
 				GB_ASSERT(gen_entity != NULL);
 			}
-
 
 			TypeProc *pt = &final_proc_type->Proc;
 
@@ -5124,6 +5145,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 						continue;
 					} else if (o.mode != Addressing_Type) {
 						error(o.expr, "Expected a type for the argument");
+						err = CallArgumentError_WrongTypes;
 					}
 
 					if (are_types_identical(e->type, o.type)) {
@@ -5179,6 +5201,10 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					}
 					score += s;
 				}
+			}
+
+			if (gen_entity != NULL && err == CallArgumentError_None) {
+				check_procedure_later(c, proc_info);
 			}
 		}
 	}
@@ -5748,6 +5774,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				return kind;
 			}
 
+			init_preload(c);
 			o->mode = Addressing_Value;
 			o->type = t_context;
 			break;
@@ -5759,6 +5786,11 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 	case_ast_node(i, Ident, node);
 		check_ident(c, o, node, NULL, type_hint, false);
+	case_end;
+
+	case_ast_node(u, Undef, node);
+		o->mode = Addressing_Value;
+		o->type = t_untyped_undef;
 	case_end;
 
 

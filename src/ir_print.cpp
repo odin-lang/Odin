@@ -730,6 +730,10 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 		ir_fprintf(f, "zeroinitializer");
 		break;
 
+	case irValue_Undef:
+		ir_fprintf(f, "undef");
+		break;
+
 	case irValue_TypeName:
 		ir_print_encoded_local(f, value->TypeName.name);
 		break;
