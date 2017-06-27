@@ -4609,7 +4609,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		tuple->Tuple.variable_count = variable_count;
 
 		// TODO(bill): Should I copy each of the entities or is this good enough?
-		gb_memcopy_array(tuple->Tuple.variables, type->Record.fields, variable_count);
+		gb_memcopy_array(tuple->Tuple.variables, type->Record.fields_in_src_order, variable_count);
 
 		operand->type = tuple;
 		operand->mode = Addressing_Value;

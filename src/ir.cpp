@@ -4316,9 +4316,11 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		GB_ASSERT(is_type_tuple(tv.type));
 
 		irValue *tuple = ir_add_local_generated(proc, tv.type);
-		for (isize i = 0; i < t->Record.field_count; i++) {
-			irValue *f = ir_emit_struct_ev(proc, s, i);
-			irValue *ep = ir_emit_struct_ep(proc, tuple, i);
+		for (isize src_index = 0; src_index < t->Record.field_count; src_index++) {
+			Entity *field = t->Record.fields_in_src_order[src_index];
+			i32 field_index = field->Variable.field_index;
+			irValue *f = ir_emit_struct_ev(proc, s, field_index);
+			irValue *ep = ir_emit_struct_ep(proc, tuple, src_index);
 			ir_emit_store(proc, ep, f);
 		}
 		return ir_emit_load(proc, tuple);
