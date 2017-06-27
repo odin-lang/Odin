@@ -1083,6 +1083,12 @@ bool are_types_identical(Type *x, Type *y) {
 	}
 
 	switch (x->kind) {
+	case Type_Generic:
+		if (y->kind == Type_Generic) {
+			return true; // TODO(bill): Is this correct?
+		}
+		break;
+
 	case Type_Basic:
 		if (y->kind == Type_Basic) {
 			return x->Basic.kind == y->Basic.kind;
@@ -1321,6 +1327,7 @@ enum ProcTypeOverloadKind {
 	ProcOverload_ParamTypes,
 	ProcOverload_ResultCount,
 	ProcOverload_ResultTypes,
+	ProcOverload_Polymorphic,
 
 	ProcOverload_NotProcedure,
 
@@ -1339,6 +1346,10 @@ ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 	// if (px.calling_convention != py.calling_convention) {
 		// return ProcOverload_CallingConvention;
 	// }
+
+	if (px.is_generic != py.is_generic) {
+		return ProcOverload_Polymorphic;
+	}
 
 	if (px.param_count != py.param_count) {
 		return ProcOverload_ParamCount;

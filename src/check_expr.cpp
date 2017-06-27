@@ -1077,14 +1077,17 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 
 
 
-Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_variadic_, Array<Operand> *operands) {
+Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_variadic_, bool *success_, Array<Operand> *operands) {
 	if (_params == NULL) {
 		return NULL;
 	}
+
+	bool success = true;
 	ast_node(field_list, FieldList, _params);
 	Array<AstNode *> params = field_list->list;
 
 	if (params.count == 0) {
+		if (success_) *success_ = success;
 		return NULL;
 	}
 
@@ -1120,6 +1123,8 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		ExactValue value = {};
 		bool default_is_nil = false;
 		bool default_is_location = false;
+		bool is_type_param = false;
+
 
 		if (type_expr == NULL) {
 			if (default_value->kind == AstNode_BasicDirective &&
@@ -1147,15 +1152,19 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					is_variadic = true;
 				} else {
 					error(param, "Invalid AST: Invalid variadic parameter");
+					success = false;
 				}
 			}
 			if (type_expr->kind == AstNode_HelperType) {
+				is_type_param = true;
 				if (operands != NULL) {
 					Operand o = (*operands)[variable_index];
 					if (o.mode == Addressing_Type) {
 						type = o.type;
 					} else {
-						error(o.expr, "Expected a type to assign to a type parameter");
+						error(o.expr, "Expected a type to assign to the type parameter");
+						type = t_invalid;
+						success = false;
 					}
 				} else {
 					type = make_type_generic(c->allocator, 0);
@@ -1197,7 +1206,11 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			type = t_invalid;
 		}
 		if (is_type_untyped(type)) {
-			error(params[i], "Cannot determine parameter type from a nil");
+			if (is_type_untyped_undef(type)) {
+				error(params[i], "Cannot determine parameter type from ---");
+			} else {
+				error(params[i], "Cannot determine parameter type from a nil");
+			}
 			type = t_invalid;
 		}
 
@@ -1221,16 +1234,8 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			AstNode *name = p->names[j];
 			if (ast_node_expect(name, AstNode_Ident)) {
 				Entity *param = NULL;
-				bool is_generic = type->kind == Type_Generic;
-				Type *gen_type = type;
-				if (operands != NULL) {
-					Operand o = (*operands)[variable_index];
-					is_generic = o.mode == Addressing_Type && o.type == type;
-					if (is_generic) gen_type = o.type;
-				}
-
-				if (is_generic) {
-					param = make_entity_type_name(c->allocator, scope, name->Ident, gen_type);
+				if (is_type_param) {
+					param = make_entity_type_name(c->allocator, scope, name->Ident, type);
 					param->TypeName.is_type_alias = true;
 				} else {
 					param = make_entity_param(c->allocator, scope, name->Ident, type,
@@ -1267,6 +1272,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 	tuple->Tuple.variables = variables;
 	tuple->Tuple.variable_count = variable_count;
 
+	if (success_) *success_ = success;
 	if (is_variadic_) *is_variadic_ = is_variadic;
 
 	return tuple;
@@ -1574,11 +1580,12 @@ bool abi_compat_return_by_value(gbAllocator a, ProcCallingConvention cc, Type *a
 }
 
 // NOTE(bill): `operands` is for generating non generic procedure type
-void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array<Operand> *operands = NULL) {
+bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array<Operand> *operands = NULL) {
 	ast_node(pt, ProcType, proc_type_node);
 
 	bool variadic = false;
-	Type *params  = check_get_params(c, c->context.scope, pt->params, &variadic, operands);
+	bool success = true;
+	Type *params  = check_get_params(c, c->context.scope, pt->params, &variadic, &success, operands);
 	Type *results = check_get_results(c, c->context.scope, pt->results);
 
 	isize param_count = 0;
@@ -1637,6 +1644,8 @@ void check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 	// NOTE(bill): The types are the same
 	type->Proc.abi_compat_result_type = type_to_abi_compat_result_type(c->allocator, type->Proc.results);
 	type->Proc.return_by_pointer = abi_compat_return_by_value(c->allocator, pt->calling_convention, type->Proc.abi_compat_result_type);
+
+	return success;
 }
 
 
@@ -5002,15 +5011,18 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 	// NOTE(bill): This is slightly memory leaking if the type already exists
 	// Maybe it's better to check with the previous types first?
 	Type *final_proc_type = make_type_proc(c->allocator, c->context.scope, NULL, 0, NULL, 0, false, pt->calling_convention);
-	check_procedure_type(c, final_proc_type, pt->node, operands);
+	bool success = check_procedure_type(c, final_proc_type, pt->node, operands);
+	// if (!success) {
+		// return NULL;
+	// }
 
 	auto *found_gen_procs = map_get(&c->info.gen_procs, hash_pointer(base_entity->identifier));
 	if (found_gen_procs) {
 		for_array(i, *found_gen_procs) {
 			Entity *other = (*found_gen_procs)[i];
 			if (are_types_identical(other->type, final_proc_type)) {
-			// NOTE(bill): This scope is not needed any more, destroy it
-				destroy_scope(scope);
+				// NOTE(bill): This scope is not needed any more, destroy it
+				// destroy_scope(scope);
 				return other;
 			}
 		}
@@ -5039,12 +5051,14 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 	entity->scope = base_entity->scope;
 
 	ProcedureInfo proc_info = {};
-	proc_info.file = c->curr_ast_file;
-	proc_info.token = token;
-	proc_info.decl  = d;
-	proc_info.type  = final_proc_type;
-	proc_info.body  = pd->body;
-	proc_info.tags  = tags;
+	if (success) {
+		proc_info.file = c->curr_ast_file;
+		proc_info.token = token;
+		proc_info.decl  = d;
+		proc_info.type  = final_proc_type;
+		proc_info.body  = pd->body;
+		proc_info.tags  = tags;
+	}
 
 	if (found_gen_procs) {
 		array_add(found_gen_procs, entity);

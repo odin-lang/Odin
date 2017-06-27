@@ -31,6 +31,7 @@ proc general_stuff() {
 
 	// By default, all variables are zeroed
 	// This can be overridden with the "uninitialized value"
+	// This is similar to `nil` but applied to everything
 	var undef_int: int = ---;
 
 
@@ -41,7 +42,8 @@ proc general_stuff() {
 	//
 	// It does mean that a pointer is implicitly passed procedures with the default
 	// Odin calling convention (#cc_odin)
-	// This can be overridden with something like #cc_contextless or #cc_c
+	// This can be overridden with something like #cc_contextless or #cc_c if performance
+	// is worried about
 
 }
 
@@ -80,7 +82,8 @@ proc named_arguments() {
 
 
 	// As the procedures have more and more parameters, it is very easy
-	// to get many of the arguments in the wrong order
+	// to get many of the arguments in the wrong order especialy if the
+	// types are the same
 	make_character("¡Ay, caramba!", "Frank", Green, Blue);
 
 	// Named arguments help to disambiguate this problem
@@ -102,7 +105,8 @@ proc named_arguments() {
 
 
 	// Named arguments can also aid with default arguments
-	proc numerous_things(s : string, a = 1, b = 2, c = 3.14, d = "The Best String!", e = false, f = 10.3/3.1, g = false) {
+	proc numerous_things(s : string, a = 1, b = 2, c = 3.14,
+	                     d = "The Best String!", e = false, f = 10.3/3.1, g = false) {
 		var g_str = g ? "true" : "false";
 		fmt.printf("How many?! %s: %v\n", s, g_str);
 	}
@@ -169,9 +173,11 @@ proc default_return_values() {
 
 proc call_location() {
 	proc amazing(n: int, using loc = #caller_location) {
-		fmt.printf("%s(%d:%d) just asked to do something amazing to %d.\n",
+		fmt.printf("%s(%d:%d) just asked to do something amazing.\n",
 		           fully_pathed_filename, line, column);
+		fmt.printf("Normal -> %d\n", n);
 		fmt.printf("Amazing -> %d\n", n+1);
+		fmt.println();
 	}
 
 	var loc = #location(main);
@@ -232,7 +238,7 @@ proc explicit_parametric_polymorphic_procedures() {
 
 
 	// A more complicated example using subtyping
-	// Something like this could be used a game
+	// Something like this could be used in a game
 	type Vector2 struct {x, y: f32};
 
 	type Entity struct {

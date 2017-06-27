@@ -1448,17 +1448,8 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 
 			TokenPos pos = q->token.pos;
 
-			if (q->type == NULL) {
+			if (q->type == NULL || q->type == t_invalid) {
 				continue;
-			}
-
-			if (is_type_proc(q->type)) {
-				TypeProc *ptq = &base_type(q->type)->Proc;
-				if (ptq->is_generic) {
-					q->type = t_invalid;
-					error(q->token, "Polymorphic procedure `%.*s` cannot be overloaded", LIT(name));
-					continue;
-				}
 			}
 
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
@@ -1478,6 +1469,10 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 			case ProcOverload_ResultCount:
 			case ProcOverload_ResultTypes:
 				error(p->token, "Overloaded procedure `%.*s` as the same parameters but different results in this scope", LIT(name));
+				is_invalid = true;
+				break;
+			case ProcOverload_Polymorphic:
+				error(p->token, "Overloaded procedure `%.*s` has a polymorphic counterpart in this scope which is not allowed", LIT(name));
 				is_invalid = true;
 				break;
 			case ProcOverload_ParamCount:
