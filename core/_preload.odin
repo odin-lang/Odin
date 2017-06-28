@@ -25,91 +25,89 @@ import (
 
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
-type (
-	TypeInfoEnumValue raw_union {
-		f: f64,
-		i: i128,
-	}
-	// NOTE(bill): This must match the compiler's
-	CallingConvention enum {
-		Invalid         = 0,
-		Odin            = 1,
-		Contextless     = 2,
-		C               = 3,
-		Std             = 4,
-		Fast            = 5,
-	}
+TypeInfoEnumValue :: raw_union {
+	f: f64,
+	i: i128,
+}
+// NOTE(bill): This must match the compiler's
+CallingConvention :: enum {
+	Invalid         = 0,
+	Odin            = 1,
+	Contextless     = 2,
+	C               = 3,
+	Std             = 4,
+	Fast            = 5,
+}
 
-	TypeInfoRecord struct #ordered {
-		types:        []^TypeInfo,
-		names:        []string,
-		offsets:      []int,  // offsets may not be used in tuples
-		usings:       []bool, // usings may not be used in tuples
-		packed:       bool,
-		ordered:      bool,
-		custom_align: bool,
-	}
+TypeInfoRecord :: struct #ordered {
+	types:        []^TypeInfo,
+	names:        []string,
+	offsets:      []int,  // offsets may not be used in tuples
+	usings:       []bool, // usings may not be used in tuples
+	packed:       bool,
+	ordered:      bool,
+	custom_align: bool,
+}
 
-	TypeInfo union {
-		size:  int,
-		align: int,
+TypeInfo :: union {
+	size:  int,
+	align: int,
 
-		Named{name: string, base: ^TypeInfo},
-		Integer{signed: bool},
-		Rune{},
-		Float{},
-		Complex{},
-		String{},
-		Boolean{},
-		Any{},
-		Pointer{
-			elem: ^TypeInfo, // nil -> rawptr
+	Named{name: string, base: ^TypeInfo},
+	Integer{signed: bool},
+	Rune{},
+	Float{},
+	Complex{},
+	String{},
+	Boolean{},
+	Any{},
+	Pointer{
+		elem: ^TypeInfo, // nil -> rawptr
+	},
+	Atomic{elem: ^TypeInfo},
+	Procedure{
+		params:     ^TypeInfo, // TypeInfo.Tuple
+		results:    ^TypeInfo, // TypeInfo.Tuple
+		variadic:   bool,
+		convention: CallingConvention,
+	},
+	Array{
+		elem:      ^TypeInfo,
+		elem_size: int,
+		count:     int,
+	},
+	DynamicArray{elem: ^TypeInfo, elem_size: int},
+	Slice       {elem: ^TypeInfo, elem_size: int},
+	Vector      {elem: ^TypeInfo, elem_size, count: int},
+	Tuple       {using record: TypeInfoRecord}, // Only really used for procedures
+	Struct      {using record: TypeInfoRecord},
+	RawUnion    {using record: TypeInfoRecord},
+	Union{
+		common_fields: struct {
+			types:     []^TypeInfo,
+			names:     []string,
+			offsets:   []int,    // offsets may not be used in tuples
 		},
-		Atomic{elem: ^TypeInfo},
-		Procedure{
-			params:     ^TypeInfo, // TypeInfo.Tuple
-			results:    ^TypeInfo, // TypeInfo.Tuple
-			variadic:   bool,
-			convention: CallingConvention,
-		},
-		Array{
-			elem:      ^TypeInfo,
-			elem_size: int,
-			count:     int,
-		},
-		DynamicArray{elem: ^TypeInfo, elem_size: int},
-		Slice       {elem: ^TypeInfo, elem_size: int},
-		Vector      {elem: ^TypeInfo, elem_size, count: int},
-		Tuple       {using record: TypeInfoRecord}, // Only really used for procedures
-		Struct      {using record: TypeInfoRecord},
-		RawUnion    {using record: TypeInfoRecord},
-		Union{
-			common_fields: struct {
-				types:     []^TypeInfo,
-				names:     []string,
-				offsets:   []int,    // offsets may not be used in tuples
-			},
-			variant_names: []string,
-			variant_types: []^TypeInfo,
-		},
-		Enum{
-			base:   ^TypeInfo,
-			names:  []string,
-			values: []TypeInfoEnumValue,
-		},
-		Map{
-			key:              ^TypeInfo,
-			value:            ^TypeInfo,
-			generated_struct: ^TypeInfo,
-			count:            int, // == 0 if dynamic
-		},
-		BitField{
-			names:   []string,
-			bits:    []i32,
-			offsets: []i32,
-		},
-	}
-)
+		variant_names: []string,
+		variant_types: []^TypeInfo,
+	},
+	Enum{
+		base:   ^TypeInfo,
+		names:  []string,
+		values: []TypeInfoEnumValue,
+	},
+	Map{
+		key:              ^TypeInfo,
+		value:            ^TypeInfo,
+		generated_struct: ^TypeInfo,
+		count:            int, // == 0 if dynamic
+	},
+	BitField{
+		names:   []string,
+		bits:    []i32,
+		offsets: []i32,
+	},
+}
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
@@ -154,37 +152,35 @@ foreign __llvm_core {
 }
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
-type (
-	AllocatorMode enum u8 {
-		Alloc,
-		Free,
-		FreeAll,
-		Resize,
-	}
-	AllocatorProc proc(allocator_data: rawptr, mode: AllocatorMode,
-	                   size, alignment: int,
-	                   old_memory: rawptr, old_size: int, flags: u64 = 0) -> rawptr;
-	Allocator struct #ordered {
-		procedure: AllocatorProc,
-		data:      rawptr,
-	}
+AllocatorMode :: enum u8 {
+	Alloc,
+	Free,
+	FreeAll,
+	Resize,
+}
+AllocatorProc :: proc(allocator_data: rawptr, mode: AllocatorMode,
+                      size, alignment: int,
+                      old_memory: rawptr, old_size: int, flags: u64 = 0) -> rawptr;
+Allocator :: struct #ordered {
+	procedure: AllocatorProc,
+	data:      rawptr,
+}
 
 
-	Context struct #ordered {
-		thread_id:  int,
+Context :: struct #ordered {
+	thread_id:  int,
 
-		allocator:  Allocator,
+	allocator:  Allocator,
 
-		user_data:  rawptr,
-		user_index: int,
-	}
-)
+	user_data:  rawptr,
+	user_index: int,
+}
 
 // #thread_local var __context: Context;
 
 
 
-type SourceCodeLocation struct {
+SourceCodeLocation :: struct {
 	fully_pathed_filename: string,
 	line, column:          i64,
 	procedure:             string,

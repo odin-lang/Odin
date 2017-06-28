@@ -9,12 +9,12 @@ import (
 
 _BUFFER_SIZE :: 1<<12;
 
-type StringBuffer union {
+StringBuffer :: union {
 	Static {buf: []u8},
 	Dynamic{buf: [dynamic]u8},
 }
 
-type FmtInfo struct {
+FmtInfo :: struct {
 	minus:     bool,
 	plus:      bool,
 	space:     bool,

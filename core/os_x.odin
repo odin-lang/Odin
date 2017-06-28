@@ -5,13 +5,10 @@ foreign_system_library (
 
 import "strings.odin";
 
-type (
-	Handle    i32;
-	FileTime  u64;
-	Errno     int;
-
-	AddressSize int;
-)
+Handle      :: i32;
+FileTime    :: u64;
+Errno       :: int;
+AddressSize :: int;
 
 
 O_RDONLY   :: 0x00000;
@@ -50,12 +47,12 @@ RTLD_FIRST    :: 0x100;
 
 args: [dynamic]string;
 
-type _FileTime struct #ordered {
+_FileTime :: struct #ordered {
 	seconds: i64,
 	nanoseconds: i64
 }
 
-type Stat struct #ordered {
+Stat :: struct #ordered {
 	device_id : i32, // ID of device containing file
 	mode      : u16, // Mode of the file
 	nlink     : u16, // Number of hard links

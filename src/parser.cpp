@@ -3033,9 +3033,11 @@ void parse_foreign_block_decl(AstFile *f, Array<AstNode *> *decls) {
 	case AstNode_BadDecl:
 		return;
 
+	case AstNode_ValueDecl:
 	case AstNode_ProcDecl:
 		array_add(decls, decl);
 		return;
+
 
 	case AstNode_GenDecl:
 		switch (decl->GenDecl.token.kind) {
@@ -3170,12 +3172,6 @@ AstNode *parse_value_decl(AstFile *f, Array<AstNode *> names, CommentGroup docs)
 
 AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 	Token token = f->curr_token;
-	switch (f->curr_token.kind) {
-	case Token_var:
-	case Token_const:
-		return parse_decl(f);
-	}
-
 	CommentGroup docs = f->lead_comment;
 
 	Array<AstNode *> lhs = parse_lhs_expr_list(f);
@@ -4333,7 +4329,7 @@ AstNode *parse_stmt(AstFile *f) {
 	// case Token_var:
 	// case Token_const:
 	case Token_proc:
-	case Token_type:
+	// case Token_type:
 	case Token_import:
 	case Token_import_load:
 	case Token_foreign:

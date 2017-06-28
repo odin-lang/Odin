@@ -194,7 +194,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 	if (init != NULL) {
 		check_expr_or_type(c, &operand, init);
 	}
-#if 0
+#if 1
 	if (operand.mode == Addressing_Type) {
 		e->kind = Entity_TypeName;
 

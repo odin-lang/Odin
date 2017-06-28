@@ -1,9 +1,8 @@
 import win32 "sys/windows.odin";
 
-type (
-	Handle   int;
-	FileTime u64;
-)
+Handle   :: int;
+FileTime :: u64;
+
 
 INVALID_HANDLE: Handle : -1;
 
@@ -22,7 +21,7 @@ O_SYNC     :: 0x01000;
 O_ASYNC    :: 0x02000;
 O_CLOEXEC  :: 0x80000;
 
-type Errno int;
+Errno :: int;
 
 ERROR_NONE:                   Errno : 0;
 ERROR_FILE_NOT_FOUND:         Errno : 2;

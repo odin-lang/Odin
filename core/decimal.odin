@@ -2,7 +2,7 @@
 // Multiple precision decimal numbers
 // NOTE: This is only for floating point printing and nothing else
 
-type Decimal struct {
+Decimal :: struct {
 	digits:        [384]u8, // big-endian digits
 	count:         int,
 	decimal_point: int,

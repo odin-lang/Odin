@@ -3,11 +3,11 @@ import (
 	"atomics.odin";
 )
 
-type Semaphore struct {
+Semaphore :: struct {
 	_handle: win32.Handle,
 }
 
-type Mutex struct {
+Mutex :: struct {
 	_semaphore: Semaphore,
 	_counter:   i32,
 	_owner:     i32,

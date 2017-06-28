@@ -6,25 +6,23 @@ foreign_system_library (
 	"shell32.lib"  when ODIN_OS == "windows";
 )
 
-type (
-	Handle    rawptr;
-	Hwnd      Handle;
-	Hdc       Handle;
-	Hinstance Handle;
-	Hicon     Handle;
-	Hcursor   Handle;
-	Hmenu     Handle;
-	Hbrush    Handle;
-	Hgdiobj   Handle;
-	Hmodule   Handle;
-	Hmonitor  Handle;
-	Wparam    uint;
-	Lparam    int;
-	Lresult   int;
-	WndProc   proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
-)
+Handle    :: rawptr;
+Hwnd      :: Handle;
+Hdc       :: Handle;
+Hinstance :: Handle;
+Hicon     :: Handle;
+Hcursor   :: Handle;
+Hmenu     :: Handle;
+Hbrush    :: Handle;
+Hgdiobj   :: Handle;
+Hmodule   :: Handle;
+Hmonitor  :: Handle;
+Wparam    :: uint;
+Lparam    :: int;
+Lresult   :: int;
+WndProc   :: proc(Hwnd, u32, Wparam, Lparam) -> Lresult #cc_c;
 
-type Bool i32;
+Bool :: i32;
 FALSE: Bool : 0;
 TRUE:  Bool : 1;
 
@@ -147,7 +145,7 @@ PixelFormatDescriptor :: struct #ordered {
 
 
 
-type Proc proc() #cc_c;
+Proc :: proc() #cc_c;
 
 MAPVK_VK_TO_VSC    :: 0;
 MAPVK_VSC_TO_VK    :: 1;
@@ -268,7 +266,7 @@ PFD_DEPTH_DONTCARE        :: 0x20000000;
 PFD_DOUBLEBUFFER_DONTCARE :: 0x40000000;
 PFD_STEREO_DONTCARE       :: 0x80000000;
 
-type GET_FILEEX_INFO_LEVELS i32;
+GET_FILEEX_INFO_LEVELS :: i32;
 GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0;
 GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1;
 

@@ -1,6 +1,6 @@
 import . "decimal.odin";
 
-type IntFlag enum {
+IntFlag :: enum {
 	Prefix = 1<<0,
 	Plus   = 1<<1,
 	Space  = 1<<2,

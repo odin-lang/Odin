@@ -16,18 +16,16 @@ EPSILON      :: 1.19209290e-7;
 τ :: TAU;
 π :: PI;
 
-type (
-	Vec2 [vector 2]f32;
-	Vec3 [vector 3]f32;
-	Vec4 [vector 4]f32;
+Vec2 :: [vector 2]f32;
+Vec3 :: [vector 3]f32;
+Vec4 :: [vector 4]f32;
 
-	// Column major
-	Mat2 [2][2]f32;
-	Mat3 [3][3]f32;
-	Mat4 [4][4]f32;
+// Column major
+Mat2 :: [2][2]f32;
+Mat3 :: [3][3]f32;
+Mat4 :: [4][4]f32;
 
-	Complex complex64;
-)
+Complex :: complex64;
 
 foreign __llvm_core {
 	proc sqrt(x: f32) -> f32          #link_name "llvm.sqrt.f32";
