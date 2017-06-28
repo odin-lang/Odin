@@ -1,15 +1,14 @@
 foreign_system_library "opengl32.lib" when ODIN_OS == "windows";
 import . "windows.odin";
 
-const (
-	CONTEXT_MAJOR_VERSION_ARB          = 0x2091;
-	CONTEXT_MINOR_VERSION_ARB          = 0x2092;
-	CONTEXT_FLAGS_ARB                  = 0x2094;
-	CONTEXT_PROFILE_MASK_ARB           = 0x9126;
-	CONTEXT_FORWARD_COMPATIBLE_BIT_ARB = 0x0002;
-	CONTEXT_CORE_PROFILE_BIT_ARB       = 0x00000001;
-	CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB = 0x00000002;
-)
+
+CONTEXT_MAJOR_VERSION_ARB             :: 0x2091;
+CONTEXT_MINOR_VERSION_ARB             :: 0x2092;
+CONTEXT_FLAGS_ARB                     :: 0x2094;
+CONTEXT_PROFILE_MASK_ARB              :: 0x9126;
+CONTEXT_FORWARD_COMPATIBLE_BIT_ARB    :: 0x0002;
+CONTEXT_CORE_PROFILE_BIT_ARB          :: 0x00000001;
+CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB :: 0x00000002;
 
 type (
 	Hglrc    Handle;
@@ -62,12 +61,12 @@ type (
 	GetExtensionsStringARBType  proc(Hdc) -> ^u8 #cc_c;
 )
 
-var (
+// Procedures
 	create_context_attribs_arb: CreateContextAttribsARBType;
 	choose_pixel_format_arb:    ChoosePixelFormatARBType;
 	swap_interval_ext:          SwapIntervalEXTType;
 	get_extensions_string_arb:  GetExtensionsStringARBType;
-)
+
 
 
 foreign opengl32 {

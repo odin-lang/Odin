@@ -39,7 +39,7 @@ foreign lib {
 
 proc _string_data(s: string) -> ^u8 #inline { return &s[0]; }
 
-var _libgl = win32.load_library_a(_string_data("opengl32.dll\x00"));
+_libgl := win32.load_library_a(_string_data("opengl32.dll\x00"));
 
 proc get_proc_address(name: string) -> rawptr {
 	if name[len(name)-1] == 0 {
@@ -47,14 +47,14 @@ proc get_proc_address(name: string) -> rawptr {
 	}
 	// NOTE(bill): null terminated
 	assert((&name[0] + len(name))^ == 0);
-	var res = wgl.get_proc_address(&name[0]);
+	res := wgl.get_proc_address(&name[0]);
 	if res == nil {
 		res = win32.get_proc_address(_libgl, &name[0]);
 	}
 	return rawptr(res);
 }
 
-var (
+// Procedures
 	GenBuffers:               proc(count: i32, buffers: ^u32) #cc_c;
 	GenVertexArrays:          proc(count: i32, buffers: ^u32) #cc_c;
 	GenSamplers:              proc(count: i32, buffers: ^u32) #cc_c;
@@ -114,11 +114,11 @@ var (
 	UniformMatrix4fv:         proc(loc: i32, count: u32, transpose: i32, value: ^f32) #cc_c;
 
 	GetUniformLocation:       proc(program: u32, name: ^u8) -> i32 #cc_c;
-)
+
 
 proc init() {
 	proc set_proc_address(p: rawptr, name: string) #inline {
-		var x = ^rawptr(p);
+		x := ^rawptr(p);
 		x^ = get_proc_address(name);
 	}
 

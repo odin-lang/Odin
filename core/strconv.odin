@@ -18,8 +18,8 @@ proc parse_bool(s: string) -> (result: bool, ok: bool) {
 }
 
 proc _digit_value(r: rune) -> int {
-	var ri = int(r);
-	var v: int = 16;
+	ri := int(r);
+	v: int = 16;
 	match r {
 	case '0'..'9': v = ri-'0';
 	case 'a'..'z': v = ri-'a'+10;
@@ -29,7 +29,7 @@ proc _digit_value(r: rune) -> int {
 }
 
 proc parse_i128(s: string) -> i128 {
-	var neg = false;
+	neg := false;
 	if len(s) > 1 {
 		match s[0] {
 		case '-':
@@ -41,7 +41,7 @@ proc parse_i128(s: string) -> i128 {
 	}
 
 
-	var base: i128 = 10;
+	base: i128 = 10;
 	if len(s) > 2 && s[0] == '0' {
 		match s[1] {
 		case 'b': base =  2;  s = s[2..];
@@ -53,13 +53,13 @@ proc parse_i128(s: string) -> i128 {
 	}
 
 
-	var value: i128;
+	value: i128;
 	for r in s {
 		if r == '_' {
 			continue;
 		}
 
-		var v = i128(_digit_value(r));
+		v := i128(_digit_value(r));
 		if v >= base {
 			break;
 		}
@@ -71,13 +71,13 @@ proc parse_i128(s: string) -> i128 {
 }
 
 proc parse_u128(s: string) -> u128 {
-	var neg = false;
+	neg := false;
 	if len(s) > 1 && s[0] == '+' {
 		s = s[1..];
 	}
 
 
-	var base = u128(10);
+	base := u128(10);
 	if len(s) > 2 && s[0] == '0' {
 		match s[1] {
 		case 'b': base =  2;  s = s[2..];
@@ -89,13 +89,13 @@ proc parse_u128(s: string) -> u128 {
 	}
 
 
-	var value: u128;
+	value: u128;
 	for r in s {
 		if r == '_' {
 			continue;
 		}
 
-		var v = u128(_digit_value(r));
+		v := u128(_digit_value(r));
 		if v >= base {
 			break;
 		}
@@ -115,21 +115,21 @@ proc parse_uint(s: string, base: int) -> uint {
 }
 
 proc parse_f64(s: string) -> f64 {
-	var i = 0;
+	i := 0;
 
-	var sign: f64 = 1;
+	sign: f64 = 1;
 	match s[i] {
 	case '-': i++; sign = -1;
 	case '+': i++;
 	}
 
-	var value: f64 = 0;
+	value: f64 = 0;
 	for ; i < len(s); i++ {
-		var r = rune(s[i]);
+		r := rune(s[i]);
 		if r == '_' {
 			continue;
 		}
-		var v = _digit_value(r);
+		v := _digit_value(r);
 		if v >= 10 {
 			break;
 		}
@@ -138,15 +138,15 @@ proc parse_f64(s: string) -> f64 {
 	}
 
 	if s[i] == '.' {
-		var pow10: f64 = 10;
+		pow10: f64 = 10;
 		i++;
 
 		for ; i < len(s); i++ {
-			var r = rune(s[i]);
+			r := rune(s[i]);
 			if r == '_' {
 				continue;
 			}
-			var v = _digit_value(r);
+			v := _digit_value(r);
 			if v >= 10 {
 				break;
 			}
@@ -155,8 +155,8 @@ proc parse_f64(s: string) -> f64 {
 		}
 	}
 
-	var frac = false;
-	var scale: f64 = 1;
+	frac := false;
+	scale: f64 = 1;
 
 	if s[i] == 'e' || s[i] == 'E' {
 		i++;
@@ -166,13 +166,13 @@ proc parse_f64(s: string) -> f64 {
 		case '+': i++;
 		}
 
-		var exp: u32 = 0;
+		exp: u32 = 0;
 		for ; i < len(s); i++ {
-			var r = rune(s[i]);
+			r := rune(s[i]);
 			if r == '_' {
 				continue;
 			}
-			var d = u32(_digit_value(r));
+			d := u32(_digit_value(r));
 			if d >= 10 {
 				break;
 			}
@@ -190,7 +190,7 @@ proc parse_f64(s: string) -> f64 {
 
 
 proc append_bool(buf: []u8, b: bool) -> string {
-	var s = b ? "true" : "false";
+	s := b ? "true" : "false";
 	append(buf, ..[]u8(s));
 	return string(buf);
 }
@@ -210,28 +210,28 @@ proc append_float(buf: []u8, f: f64, fmt: u8, prec, bit_size: int) -> string {
 
 
 
-type DecimalSlice struct {
+DecimalSlice :: struct {
 	digits:        []u8,
 	count:         int,
 	decimal_point: int,
 	neg:           bool,
 }
 
-type Float_Info struct {
+Float_Info :: struct {
 	mantbits: uint,
 	expbits:  uint,
 	bias:     int,
 }
 
-var (
-	_f16_info = Float_Info{10, 5,   -15};
-	_f32_info = Float_Info{23, 8,  -127};
-	_f64_info = Float_Info{52, 11, -1023};
-)
+
+_f16_info := Float_Info{10, 5,   -15};
+_f32_info := Float_Info{23, 8,  -127};
+_f64_info := Float_Info{52, 11, -1023};
+
 
 proc generic_ftoa(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 {
-	var bits: u64;
-	var flt: ^Float_Info;
+	bits: u64;
+	flt: ^Float_Info;
 	match bit_size {
 	case 32:
 		bits = u64(transmute(u32, f32(val)));
@@ -243,13 +243,13 @@ proc generic_ftoa(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 {
 		panic("strconv: invalid bit_size");
 	}
 
-	var neg = bits>>(flt.expbits+flt.mantbits) != 0;
-	var exp = int(bits>>flt.mantbits) & (1<<flt.expbits - 1);
-	var mant = bits & (u64(1) << flt.mantbits - 1);
+	neg  := bits>>(flt.expbits+flt.mantbits) != 0;
+	exp  := int(bits>>flt.mantbits) & (1<<flt.expbits - 1);
+	mant := bits & (u64(1) << flt.mantbits - 1);
 
 	match exp {
 	case 1<<flt.expbits - 1:
-		var s: string;
+		s: string;
 		if mant != 0 {
 			s = "NaN";
 		} else if neg {
@@ -269,12 +269,12 @@ proc generic_ftoa(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 {
 
 	exp += flt.bias;
 
-	var d_: Decimal;
-	var d = &d_;
+	d_: Decimal;
+	d := &d_;
 	assign(d, mant);
 	shift(d, exp - int(flt.mantbits));
-	var digs: DecimalSlice;
-	var shortest = prec < 0;
+	digs: DecimalSlice;
+	shortest := prec < 0;
 	if shortest {
 		round_shortest(d, mant, exp, flt);
 		digs = DecimalSlice{digits = d.digits[..], count = d.count, decimal_point = d.decimal_point};
@@ -308,7 +308,7 @@ proc format_digits(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, pre
 
 		// integer, padded with zeros when needed
 		if digs.decimal_point > 0 {
-			var m = min(digs.count, digs.decimal_point);
+			m := min(digs.count, digs.decimal_point);
 			append(buf, ..digs.digits[0..<m]);
 			for ; m < digs.decimal_point; m++ {
 				append(buf, '0');
@@ -322,8 +322,8 @@ proc format_digits(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, pre
 		if prec > 0 {
 			append(buf, '.');
 			for i in 0..<prec {
-				var c: u8 = '0';
-				if var j = digs.decimal_point + i; 0 <= j && j < digs.count {
+				c: u8 = '0';
+				if j := digs.decimal_point + i; 0 <= j && j < digs.count {
 					c = digs.digits[j];
 				}
 				append(buf, c);
@@ -341,9 +341,7 @@ proc format_digits(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, pre
 		return buf; // TODO
 	}
 
-	var c: [2]u8;
-	c[0] = '%';
-	c[1] = fmt;
+	c := [2]u8{'%', fmt};
 	append(buf, ..c[..]);
 	return buf;
 }
@@ -360,18 +358,18 @@ proc round_shortest(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 		log(2) >~ 0.332
 		332*(dp-nd) >= 100*(exp-mantbits)
 	 */
-	var minexp = flt.bias+1;
+	minexp := flt.bias+1;
 	if exp > minexp && 332*(d.decimal_point-d.count) >= 100*(exp - int(flt.mantbits)) {
 		// Number is already its shortest
 		return;
 	}
 
-	var upper_: Decimal; var upper = &upper_;
+	upper_: Decimal; upper := &upper_;
 	assign(upper, 2*mant - 1);
 	shift(upper, exp - int(flt.mantbits) - 1);
 
-	var mantlo: u64;
-	var explo:  int;
+	mantlo: u64;
+	explo:  int;
 	if mant > 1<<flt.mantbits || exp == minexp {
 		mantlo = mant-1;
 		explo = exp;
@@ -379,25 +377,25 @@ proc round_shortest(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 		mantlo = 2*mant - 1;
 		explo = exp-1;
 	}
-	var lower_: Decimal; var lower = &lower_;
+	lower_: Decimal; lower := &lower_;
 	assign(lower, 2*mantlo + 1);
 	shift(lower, explo - int(flt.mantbits) - 1);
 
-	var inclusive = mant%2 == 0;
+	inclusive := mant%2 == 0;
 
 	for i in 0..<d.count {
-		var l: u8 = '0'; // lower digit
+		l: u8 = '0'; // lower digit
 		if i < lower.count {
 			l = lower.digits[i];
 		}
-		var m = d.digits[i];   // middle digit
-		var u: u8 = '0'; // upper digit
+		m := d.digits[i];   // middle digit
+		u: u8 = '0'; // upper digit
 		if i < upper.count {
 			u = upper.digits[i];
 		}
 
-		var ok_round_down = l != m || inclusive && i+1 == lower.count;
-		var ok_round_up   = m != u && (inclusive || m+1 < u || i+1 < upper.count);
+		ok_round_down := l != m || inclusive && i+1 == lower.count;
+		ok_round_up   := m != u && (inclusive || m+1 < u || i+1 < upper.count);
 
 		if (ok_round_down && ok_round_up) {
 			round(d, i+1);
@@ -415,36 +413,36 @@ proc round_shortest(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 
 }
 
-const MAX_BASE = 32;
-var digits = "0123456789abcdefghijklmnopqrstuvwxyz";
+MAX_BASE :: 32;
+digits := "0123456789abcdefghijklmnopqrstuvwxyz";
 
 
 proc is_integer_negative(u: u128, is_signed: bool, bit_size: int) -> (unsigned: u128, neg: bool) {
-	var neg = false;
+	neg := false;
 	if is_signed {
 		match bit_size {
 		case 8:
-			var i = i8(u);
+			i := i8(u);
 			neg = i < 0;
 			if neg { i = -i; }
 			u = u128(i);
 		case 16:
-			var i = i16(u);
+			i := i16(u);
 			neg = i < 0;
 			if neg { i = -i; }
 			u = u128(i);
 		case 32:
-			var i = i32(u);
+			i := i32(u);
 			neg = i < 0;
 			if neg { i = -i; }
 			u = u128(i);
 		case 64:
-			var i = i64(u);
+			i := i64(u);
 			neg = i < 0;
 			if neg { i = -i; }
 			u = u128(i);
 		case 128:
-			var i = i128(u);
+			i := i128(u);
 			neg = i < 0;
 			if neg { i = -i; }
 			u = u128(i);
@@ -460,11 +458,11 @@ proc append_bits(buf: []u8, u: u128, base: int, is_signed: bool, bit_size: int, 
 		panic("strconv: illegal base passed to append_bits");
 	}
 
-	var neg: bool;
-	var a: [129]u8;
-	var i = len(a);
+	neg: bool;
+	a: [129]u8;
+	i := len(a);
 	u, neg = is_integer_negative(u, is_signed, bit_size);
-	var b = u128(base);
+	b := u128(base);
 	for u >= b {
 		i--; a[i] = digits[uint(u % b)];
 		u /= b;
@@ -472,7 +470,7 @@ proc append_bits(buf: []u8, u: u128, base: int, is_signed: bool, bit_size: int, 
 	i--; a[i] = digits[uint(u % b)];
 
 	if flags&IntFlag.Prefix != 0 {
-		var ok = true;
+		ok := true;
 		match base {
 		case  2: i--; a[i] = 'b';
 		case  8: i--; a[i] = 'o';

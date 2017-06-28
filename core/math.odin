@@ -1,22 +1,21 @@
-const (
-	TAU          = 6.28318530717958647692528676655900576;
-	PI           = 3.14159265358979323846264338327950288;
-	ONE_OVER_TAU = 0.636619772367581343075535053490057448;
-	ONE_OVER_PI  = 0.159154943091895335768883763372514362;
+TAU          :: 6.28318530717958647692528676655900576;
+PI           :: 3.14159265358979323846264338327950288;
+ONE_OVER_TAU :: 0.636619772367581343075535053490057448;
+ONE_OVER_PI  :: 0.159154943091895335768883763372514362;
 
-	E            = 2.71828182845904523536;
-	SQRT_TWO     = 1.41421356237309504880168872420969808;
-	SQRT_THREE   = 1.73205080756887729352744634150587236;
-	SQRT_FIVE    = 2.23606797749978969640917366873127623;
+E            :: 2.71828182845904523536;
+SQRT_TWO     :: 1.41421356237309504880168872420969808;
+SQRT_THREE   :: 1.73205080756887729352744634150587236;
+SQRT_FIVE    :: 2.23606797749978969640917366873127623;
 
-	LOG_TWO      = 0.693147180559945309417232121458176568;
-	LOG_TEN      = 2.30258509299404568401799145468436421;
+LOG_TWO      :: 0.693147180559945309417232121458176568;
+LOG_TEN      :: 2.30258509299404568401799145468436421;
 
-	EPSILON      = 1.19209290e-7;
+EPSILON      :: 1.19209290e-7;
 
-	τ = TAU;
-	π = PI;
-)
+τ :: TAU;
+π :: PI;
+
 type (
 	Vec2 [vector 2]f32;
 	Vec3 [vector 3]f32;
@@ -63,16 +62,16 @@ proc sign(x: f64) -> f64 { return x >= 0 ? +1 : -1; }
 
 
 proc copy_sign(x, y: f32) -> f32 {
-	var ix = transmute(u32, x);
-	var iy = transmute(u32, y);
+	ix := transmute(u32, x);
+	iy := transmute(u32, y);
 	ix &= 0x7fff_ffff;
 	ix |= iy & 0x8000_0000;
 	return transmute(f32, ix);
 }
 
 proc copy_sign(x, y: f64) -> f64 {
-	var ix = transmute(u64, x);
-	var iy = transmute(u64, y);
+	ix := transmute(u64, x);
+	iy := transmute(u64, y);
 	ix &= 0x7fff_ffff_ffff_ff;
 	ix |= iy & 0x8000_0000_0000_0000;
 	return transmute(f64, ix);
@@ -91,7 +90,7 @@ proc remainder(x, y: f32) -> f32 { return x - round(x/y) * y; }
 proc remainder(x, y: f64) -> f64 { return x - round(x/y) * y; }
 
 proc mod(x, y: f32) -> f32 {
-	var result: f32;
+	result: f32;
 	y = abs(y);
 	result = remainder(abs(x), y);
 	if sign(result) < 0 {
@@ -100,7 +99,7 @@ proc mod(x, y: f32) -> f32 {
 	return copy_sign(result, x);
 }
 proc mod(x, y: f64) -> f64 {
-	var result: f64;
+	result: f64;
 	y = abs(y);
 	result = remainder(abs(x), y);
 	if sign(result) < 0 {
@@ -115,13 +114,13 @@ proc to_degrees(radians: f32) -> f32 { return radians * 360 / TAU; }
 
 
 
-proc dot(a, b: Vec2) -> f32 { var c = a*b; return c.x + c.y; }
-proc dot(a, b: Vec3) -> f32 { var c = a*b; return c.x + c.y + c.z; }
-proc dot(a, b: Vec4) -> f32 { var c = a*b; return c.x + c.y + c.z + c.w; }
+proc dot(a, b: Vec2) -> f32 { c := a*b; return c.x + c.y; }
+proc dot(a, b: Vec3) -> f32 { c := a*b; return c.x + c.y + c.z; }
+proc dot(a, b: Vec4) -> f32 { c := a*b; return c.x + c.y + c.z + c.w; }
 
 proc cross(x, y: Vec3) -> Vec3 {
-	var a = swizzle(x, 1, 2, 0) * swizzle(y, 2, 0, 1);
-	var b = swizzle(x, 2, 0, 1) * swizzle(y, 1, 2, 0);
+	a := swizzle(x, 1, 2, 0) * swizzle(y, 2, 0, 1);
+	b := swizzle(x, 2, 0, 1) * swizzle(y, 1, 2, 0);
 	return a - b;
 }
 
@@ -135,7 +134,7 @@ proc norm(v: Vec3) -> Vec3 { return v / mag(v); }
 proc norm(v: Vec4) -> Vec4 { return v / mag(v); }
 
 proc norm0(v: Vec2) -> Vec2 {
-	var m = mag(v);
+	m := mag(v);
 	if m == 0 {
 		return 0;
 	}
@@ -143,7 +142,7 @@ proc norm0(v: Vec2) -> Vec2 {
 }
 
 proc norm0(v: Vec3) -> Vec3 {
-	var m = mag(v);
+	m := mag(v);
 	if m == 0 {
 		return 0;
 	}
@@ -151,7 +150,7 @@ proc norm0(v: Vec3) -> Vec3 {
 }
 
 proc norm0(v: Vec4) -> Vec4 {
-	var m = mag(v);
+	m := mag(v);
 	if m == 0 {
 		return 0;
 	}
@@ -179,7 +178,7 @@ proc mat4_transpose(m: Mat4) -> Mat4 {
 }
 
 proc mul(a, b: Mat4) -> Mat4 {
-	var c: Mat4;
+	c: Mat4;
 	for j in 0..<4 {
 		for i in 0..<4 {
 			c[j][i] = a[0][i]*b[j][0] +
@@ -201,29 +200,28 @@ proc mul(m: Mat4, v: Vec4) -> Vec4 {
 }
 
 proc inverse(m: Mat4) -> Mat4 {
-	var o: Mat4;
+	o: Mat4;
 
-	var (
-		sf00 = m[2][2] * m[3][3] - m[3][2] * m[2][3];
-		sf01 = m[2][1] * m[3][3] - m[3][1] * m[2][3];
-		sf02 = m[2][1] * m[3][2] - m[3][1] * m[2][2];
-		sf03 = m[2][0] * m[3][3] - m[3][0] * m[2][3];
-		sf04 = m[2][0] * m[3][2] - m[3][0] * m[2][2];
-		sf05 = m[2][0] * m[3][1] - m[3][0] * m[2][1];
-		sf06 = m[1][2] * m[3][3] - m[3][2] * m[1][3];
-		sf07 = m[1][1] * m[3][3] - m[3][1] * m[1][3];
-		sf08 = m[1][1] * m[3][2] - m[3][1] * m[1][2];
-		sf09 = m[1][0] * m[3][3] - m[3][0] * m[1][3];
-		sf10 = m[1][0] * m[3][2] - m[3][0] * m[1][2];
-		sf11 = m[1][1] * m[3][3] - m[3][1] * m[1][3];
-		sf12 = m[1][0] * m[3][1] - m[3][0] * m[1][1];
-		sf13 = m[1][2] * m[2][3] - m[2][2] * m[1][3];
-		sf14 = m[1][1] * m[2][3] - m[2][1] * m[1][3];
-		sf15 = m[1][1] * m[2][2] - m[2][1] * m[1][2];
-		sf16 = m[1][0] * m[2][3] - m[2][0] * m[1][3];
-		sf17 = m[1][0] * m[2][2] - m[2][0] * m[1][2];
-		sf18 = m[1][0] * m[2][1] - m[2][0] * m[1][1];
-	)
+	sf00 := m[2][2] * m[3][3] - m[3][2] * m[2][3];
+	sf01 := m[2][1] * m[3][3] - m[3][1] * m[2][3];
+	sf02 := m[2][1] * m[3][2] - m[3][1] * m[2][2];
+	sf03 := m[2][0] * m[3][3] - m[3][0] * m[2][3];
+	sf04 := m[2][0] * m[3][2] - m[3][0] * m[2][2];
+	sf05 := m[2][0] * m[3][1] - m[3][0] * m[2][1];
+	sf06 := m[1][2] * m[3][3] - m[3][2] * m[1][3];
+	sf07 := m[1][1] * m[3][3] - m[3][1] * m[1][3];
+	sf08 := m[1][1] * m[3][2] - m[3][1] * m[1][2];
+	sf09 := m[1][0] * m[3][3] - m[3][0] * m[1][3];
+	sf10 := m[1][0] * m[3][2] - m[3][0] * m[1][2];
+	sf11 := m[1][1] * m[3][3] - m[3][1] * m[1][3];
+	sf12 := m[1][0] * m[3][1] - m[3][0] * m[1][1];
+	sf13 := m[1][2] * m[2][3] - m[2][2] * m[1][3];
+	sf14 := m[1][1] * m[2][3] - m[2][1] * m[1][3];
+	sf15 := m[1][1] * m[2][2] - m[2][1] * m[1][2];
+	sf16 := m[1][0] * m[2][3] - m[2][0] * m[1][3];
+	sf17 := m[1][0] * m[2][2] - m[2][0] * m[1][2];
+	sf18 := m[1][0] * m[2][1] - m[2][0] * m[1][1];
+
 
 	o[0][0] = +(m[1][1] * sf00 - m[1][2] * sf01 + m[1][3] * sf02);
 	o[0][1] = -(m[1][0] * sf00 - m[1][2] * sf03 + m[1][3] * sf04);
@@ -245,7 +243,7 @@ proc inverse(m: Mat4) -> Mat4 {
 	o[3][2] = -(m[0][0] * sf14 - m[0][1] * sf16 + m[0][3] * sf18);
 	o[3][3] = +(m[0][0] * sf15 - m[0][1] * sf17 + m[0][2] * sf18);
 
-	var ood = 1.0 / (m[0][0] * o[0][0] +
+	ood := 1.0 / (m[0][0] * o[0][0] +
 	              m[0][1] * o[0][1] +
 	              m[0][2] * o[0][2] +
 	              m[0][3] * o[0][3]);
@@ -272,7 +270,7 @@ proc inverse(m: Mat4) -> Mat4 {
 
 
 proc mat4_translate(v: Vec3) -> Mat4 {
-	var m = mat4_identity();
+	m := mat4_identity();
 	m[3][0] = v.x;
 	m[3][1] = v.y;
 	m[3][2] = v.z;
@@ -281,15 +279,13 @@ proc mat4_translate(v: Vec3) -> Mat4 {
 }
 
 proc mat4_rotate(v: Vec3, angle_radians: f32) -> Mat4 {
-	var (
-		c = cos(angle_radians);
-		s = sin(angle_radians);
+	c := cos(angle_radians);
+	s := sin(angle_radians);
 
-		a = norm(v);
-		t = a * (1-c);
+	a := norm(v);
+	t := a * (1-c);
 
-		rot = mat4_identity();
-	)
+	rot := mat4_identity();
 
 	rot[0][0] = c + t.x*a.x;
 	rot[0][1] = 0 + t.x*a.y + s*a.z;
@@ -325,11 +321,9 @@ proc scale(m: Mat4, s: f32) -> Mat4 {
 
 
 proc look_at(eye, centre, up: Vec3) -> Mat4 {
-	var (
-		f = norm(centre - eye);
-		s = norm(cross(f, up));
-		u = cross(s, f);
-	)
+	f := norm(centre - eye);
+	s := norm(cross(f, up));
+	u := cross(s, f);
 
 	return Mat4{
 		{+s.x, +u.x, -f.x, 0},
@@ -340,10 +334,9 @@ proc look_at(eye, centre, up: Vec3) -> Mat4 {
 }
 
 proc perspective(fovy, aspect, near, far: f32) -> Mat4 {
-	var (
-		m: Mat4;
-		tan_half_fovy = tan(0.5 * fovy);
-	)
+	m: Mat4;
+	tan_half_fovy := tan(0.5 * fovy);
+
 	m[0][0] = 1.0 / (aspect*tan_half_fovy);
 	m[1][1] = 1.0 / (tan_half_fovy);
 	m[2][2] = -(far + near) / (far - near);
@@ -354,7 +347,7 @@ proc perspective(fovy, aspect, near, far: f32) -> Mat4 {
 
 
 proc ortho3d(left, right, bottom, top, near, far: f32) -> Mat4 {
-	var m = mat4_identity();
+	m := mat4_identity();
 	m[0][0] = +2.0 / (right - left);
 	m[1][1] = +2.0 / (top - bottom);
 	m[2][2] = -2.0 / (far - near);
@@ -367,30 +360,28 @@ proc ortho3d(left, right, bottom, top, near, far: f32) -> Mat4 {
 
 
 
-const (
-	F32_DIG        = 6;
-	F32_EPSILON    = 1.192092896e-07;
-	F32_GUARD      = 0;
-	F32_MANT_DIG   = 24;
-	F32_MAX        = 3.402823466e+38;
-	F32_MAX_10_EXP = 38;
-	F32_MAX_EXP    = 128;
-	F32_MIN        = 1.175494351e-38;
-	F32_MIN_10_EXP = -37;
-	F32_MIN_EXP    = -125;
-	F32_NORMALIZE  = 0;
-	F32_RADIX      = 2;
-	F32_ROUNDS     = 1;
+F32_DIG        :: 6;
+F32_EPSILON    :: 1.192092896e-07;
+F32_GUARD      :: 0;
+F32_MANT_DIG   :: 24;
+F32_MAX        :: 3.402823466e+38;
+F32_MAX_10_EXP :: 38;
+F32_MAX_EXP    :: 128;
+F32_MIN        :: 1.175494351e-38;
+F32_MIN_10_EXP :: -37;
+F32_MIN_EXP    :: -125;
+F32_NORMALIZE  :: 0;
+F32_RADIX      :: 2;
+F32_ROUNDS     :: 1;
 
-	F64_DIG        = 15;                       // # of decimal digits of precision
-	F64_EPSILON    = 2.2204460492503131e-016;  // smallest such that 1.0+F64_EPSILON != 1.0
-	F64_MANT_DIG   = 53;                       // # of bits in mantissa
-	F64_MAX        = 1.7976931348623158e+308;  // max value
-	F64_MAX_10_EXP = 308;                      // max decimal exponent
-	F64_MAX_EXP    = 1024;                     // max binary exponent
-	F64_MIN        = 2.2250738585072014e-308;  // min positive value
-	F64_MIN_10_EXP = -307;                     // min decimal exponent
-	F64_MIN_EXP    = -1021;                    // min binary exponent
-	F64_RADIX      = 2;                        // exponent radix
-	F64_ROUNDS     = 1;                        // addition rounding: near
-)
+F64_DIG        :: 15;                       // # of decimal digits of precision
+F64_EPSILON    :: 2.2204460492503131e-016;  // smallest such that 1.0+F64_EPSILON != 1.0
+F64_MANT_DIG   :: 53;                       // # of bits in mantissa
+F64_MAX        :: 1.7976931348623158e+308;  // max value
+F64_MAX_10_EXP :: 308;                      // max decimal exponent
+F64_MAX_EXP    :: 1024;                     // max binary exponent
+F64_MIN        :: 2.2250738585072014e-308;  // min positive value
+F64_MIN_10_EXP :: -307;                     // min decimal exponent
+F64_MIN_EXP    :: -1021;                    // min binary exponent
+F64_RADIX      :: 2;                        // exponent radix
+F64_ROUNDS     :: 1;                        // addition rounding: near

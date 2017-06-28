@@ -5,56 +5,55 @@ type (
 	FileTime u64;
 )
 
-const INVALID_HANDLE: Handle = -1;
+INVALID_HANDLE: Handle : -1;
 
 
-const (
-	O_RDONLY   = 0x00000;
-	O_WRONLY   = 0x00001;
-	O_RDWR     = 0x00002;
-	O_CREAT    = 0x00040;
-	O_EXCL     = 0x00080;
-	O_NOCTTY   = 0x00100;
-	O_TRUNC    = 0x00200;
-	O_NONBLOCK = 0x00800;
-	O_APPEND   = 0x00400;
-	O_SYNC     = 0x01000;
-	O_ASYNC    = 0x02000;
-	O_CLOEXEC  = 0x80000;
-)
+
+O_RDONLY   :: 0x00000;
+O_WRONLY   :: 0x00001;
+O_RDWR     :: 0x00002;
+O_CREAT    :: 0x00040;
+O_EXCL     :: 0x00080;
+O_NOCTTY   :: 0x00100;
+O_TRUNC    :: 0x00200;
+O_NONBLOCK :: 0x00800;
+O_APPEND   :: 0x00400;
+O_SYNC     :: 0x01000;
+O_ASYNC    :: 0x02000;
+O_CLOEXEC  :: 0x80000;
 
 type Errno int;
-const (
-	ERROR_NONE:               Errno = 0;
-	ERROR_FILE_NOT_FOUND            = 2;
-	ERROR_PATH_NOT_FOUND            = 3;
-	ERROR_ACCESS_DENIED             = 5;
-	ERROR_NO_MORE_FILES             = 18;
-	ERROR_HANDLE_EOF                = 38;
-	ERROR_NETNAME_DELETED           = 64;
-	ERROR_FILE_EXISTS               = 80;
-	ERROR_BROKEN_PIPE               = 109;
-	ERROR_BUFFER_OVERFLOW           = 111;
-	ERROR_INSUFFICIENT_BUFFER       = 122;
-	ERROR_MOD_NOT_FOUND             = 126;
-	ERROR_PROC_NOT_FOUND            = 127;
-	ERROR_DIR_NOT_EMPTY             = 145;
-	ERROR_ALREADY_EXISTS            = 183;
-	ERROR_ENVVAR_NOT_FOUND          = 203;
-	ERROR_MORE_DATA                 = 234;
-	ERROR_OPERATION_ABORTED         = 995;
-	ERROR_IO_PENDING                = 997;
-	ERROR_NOT_FOUND                 = 1168;
-	ERROR_PRIVILEGE_NOT_HELD        = 1314;
-	WSAEACCES                       = 10013;
-	WSAECONNRESET                   = 10054;
 
-	// Windows reserves errors >= 1<<29 for application use
-	ERROR_FILE_IS_PIPE              = 1<<29 + 0;
-)
+ERROR_NONE:                   Errno : 0;
+ERROR_FILE_NOT_FOUND:         Errno : 2;
+ERROR_PATH_NOT_FOUND:         Errno : 3;
+ERROR_ACCESS_DENIED:          Errno : 5;
+ERROR_NO_MORE_FILES:          Errno : 18;
+ERROR_HANDLE_EOF:             Errno : 38;
+ERROR_NETNAME_DELETED:        Errno : 64;
+ERROR_FILE_EXISTS:            Errno : 80;
+ERROR_BROKEN_PIPE:            Errno : 109;
+ERROR_BUFFER_OVERFLOW:        Errno : 111;
+ERROR_INSUFFICIENT_BUFFER:    Errno : 122;
+ERROR_MOD_NOT_FOUND:          Errno : 126;
+ERROR_PROC_NOT_FOUND:         Errno : 127;
+ERROR_DIR_NOT_EMPTY:          Errno : 145;
+ERROR_ALREADY_EXISTS:         Errno : 183;
+ERROR_ENVVAR_NOT_FOUND:       Errno : 203;
+ERROR_MORE_DATA:              Errno : 234;
+ERROR_OPERATION_ABORTED:      Errno : 995;
+ERROR_IO_PENDING:             Errno : 997;
+ERROR_NOT_FOUND:              Errno : 1168;
+ERROR_PRIVILEGE_NOT_HELD:     Errno : 1314;
+WSAEACCES:                    Errno : 10013;
+WSAECONNRESET:                Errno : 10054;
+
+// Windows reserves errors >= 1<<29 for application use
+ERROR_FILE_IS_PIPE:           Errno : 1<<29 + 0;
+
 
 // "Argv" arguments converted to Odin strings
-var args = _alloc_command_line_arguments();
+args := _alloc_command_line_arguments();
 
 
 proc open(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) {
@@ -62,7 +61,7 @@ proc open(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) 
 		return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
 	}
 
-	var access: u32;
+	access: u32;
 	match mode & (O_RDONLY|O_WRONLY|O_RDWR) {
 	case O_RDONLY: access = win32.FILE_GENERIC_READ;
 	case O_WRONLY: access = win32.FILE_GENERIC_WRITE;
@@ -77,14 +76,14 @@ proc open(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) 
 		access |=  win32.FILE_APPEND_DATA;
 	}
 
-	var share_mode = u32(win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE);
-	var sa: ^win32.Security_Attributes = nil;
-	var sa_inherit = win32.Security_Attributes{length = size_of(win32.Security_Attributes), inherit_handle = 1};
+	share_mode := u32(win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE);
+	sa: ^win32.Security_Attributes = nil;
+	sa_inherit := win32.Security_Attributes{length = size_of(win32.Security_Attributes), inherit_handle = 1};
 	if mode&O_CLOEXEC == 0 {
 		sa = &sa_inherit;
 	}
 
-	var create_mode: u32;
+	create_mode: u32;
 	match {
 	case mode&(O_CREAT|O_EXCL) == (O_CREAT | O_EXCL):
 		create_mode = win32.CREATE_NEW;
@@ -98,14 +97,14 @@ proc open(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) 
 		create_mode = win32.OPEN_EXISTING;
 	}
 
-	var buf: [300]u8;
+	buf: [300]u8;
 	copy(buf[..], []u8(path));
 
-	var handle = Handle(win32.create_file_a(&buf[0], access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
+	handle := Handle(win32.create_file_a(&buf[0], access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
 	if handle != INVALID_HANDLE {
 		return handle, ERROR_NONE;
 	}
-	var err = win32.get_last_error();
+	err := win32.get_last_error();
 	return INVALID_HANDLE, Errno(err);
 }
 
@@ -118,22 +117,22 @@ proc write(fd: Handle, data: []u8) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE;
 	}
-	var single_write_length: i32;
-	var total_write: i64;
-	var length = i64(len(data));
+	single_write_length: i32;
+	total_write: i64;
+	length := i64(len(data));
 
 	for total_write < length {
-		var remaining = length - total_write;
-		var to_read: i32;
-		const MAX = 1<<31-1;
+		remaining := length - total_write;
+		to_read: i32;
+		MAX :: 1<<31-1;
 		if remaining <= MAX {
 			to_read = i32(remaining);
 		} else {
 			to_read = MAX;
 		}
-		var e = win32.write_file(win32.Handle(fd), &data[total_write], to_read, &single_write_length, nil);
+		e := win32.write_file(win32.Handle(fd), &data[total_write], to_read, &single_write_length, nil);
 		if single_write_length <= 0 || e == win32.FALSE {
-			var err = win32.get_last_error();
+			err := win32.get_last_error();
 			return int(total_write), Errno(e);
 		}
 		total_write += i64(single_write_length);
@@ -146,23 +145,23 @@ proc read(fd: Handle, data: []u8) -> (int, Errno) {
 		return 0, ERROR_NONE;
 	}
 
-	var single_read_length: i32;
-	var total_read: i64;
-	var length = i64(len(data));
+	single_read_length: i32;
+	total_read: i64;
+	length := i64(len(data));
 
 	for total_read < length {
-		var remaining = length - total_read;
-		var to_read: u32;
-		const MAX = 1<<32-1;
+		remaining := length - total_read;
+		to_read: u32;
+		MAX :: 1<<32-1;
 		if remaining <= MAX {
 			to_read = u32(remaining);
 		} else {
 			to_read = MAX;
 		}
 
-		var e = win32.read_file(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
+		e := win32.read_file(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
 		if single_read_length <= 0 || e == win32.FALSE {
-			var err = win32.get_last_error();
+			err := win32.get_last_error();
 			return int(total_read), Errno(e);
 		}
 		total_read += i64(single_read_length);
@@ -171,29 +170,29 @@ proc read(fd: Handle, data: []u8) -> (int, Errno) {
 }
 
 proc seek(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
-	var w: u32;
+	w: u32;
 	match whence {
 	case 0: w = win32.FILE_BEGIN;
 	case 1: w = win32.FILE_CURRENT;
 	case 2: w = win32.FILE_END;
 	}
-	var hi = i32(offset>>32);
-	var lo = i32(offset);
-	var ft = win32.get_file_type(win32.Handle(fd));
+	hi := i32(offset>>32);
+	lo := i32(offset);
+	ft := win32.get_file_type(win32.Handle(fd));
 	if ft == win32.FILE_TYPE_PIPE {
 		return 0, ERROR_FILE_IS_PIPE;
 	}
-	var dw_ptr = win32.set_file_pointer(win32.Handle(fd), lo, &hi, w);
+	dw_ptr := win32.set_file_pointer(win32.Handle(fd), lo, &hi, w);
 	if dw_ptr == win32.INVALID_SET_FILE_POINTER {
-		var err = win32.get_last_error();
+		err := win32.get_last_error();
 		return 0, Errno(err);
 	}
 	return i64(hi)<<32 + i64(dw_ptr), ERROR_NONE;
 }
 
 proc file_size(fd: Handle) -> (i64, Errno) {
-	var length: i64;
-	var err: Errno;
+	length: i64;
+	err: Errno;
 	if win32.get_file_size_ex(win32.Handle(fd), &length) == 0 {
 		err = Errno(win32.get_last_error());
 	}
@@ -203,13 +202,13 @@ proc file_size(fd: Handle) -> (i64, Errno) {
 
 
 // NOTE(bill): Uses startup to initialize it
-var stdin  = get_std_handle(win32.STD_INPUT_HANDLE);
-var stdout = get_std_handle(win32.STD_OUTPUT_HANDLE);
-var stderr = get_std_handle(win32.STD_ERROR_HANDLE);
+stdin  := get_std_handle(win32.STD_INPUT_HANDLE);
+stdout := get_std_handle(win32.STD_OUTPUT_HANDLE);
+stderr := get_std_handle(win32.STD_ERROR_HANDLE);
 
 
 proc get_std_handle(h: int) -> Handle {
-	var fd = win32.get_std_handle(i32(h));
+	fd := win32.get_std_handle(i32(h));
 	win32.set_handle_information(fd, win32.HANDLE_FLAG_INHERIT, 0);
 	return Handle(fd);
 }
@@ -220,17 +219,17 @@ proc get_std_handle(h: int) -> Handle {
 
 
 proc last_write_time(fd: Handle) -> FileTime {
-	var file_info: win32.ByHandleFileInformation;
+	file_info: win32.ByHandleFileInformation;
 	win32.get_file_information_by_handle(win32.Handle(fd), &file_info);
-	var lo = FileTime(file_info.last_write_time.lo);
-	var hi = FileTime(file_info.last_write_time.hi);
+	lo := FileTime(file_info.last_write_time.lo);
+	hi := FileTime(file_info.last_write_time.hi);
 	return lo | hi << 32;
 }
 
 proc last_write_time_by_name(name: string) -> FileTime {
-	var last_write_time: win32.Filetime;
-	var data: win32.FileAttributeData;
-	var buf: [1024]u8;
+	last_write_time: win32.Filetime;
+	data: win32.FileAttributeData;
+	buf: [1024]u8;
 
 	assert(len(buf) > len(name));
 
@@ -240,8 +239,8 @@ proc last_write_time_by_name(name: string) -> FileTime {
 		last_write_time = data.last_write_time;
 	}
 
-	var l = FileTime(last_write_time.lo);
-	var h = FileTime(last_write_time.hi);
+	l := FileTime(last_write_time.lo);
+	h := FileTime(last_write_time.hi);
 	return l | h << 32;
 }
 
@@ -283,15 +282,15 @@ proc current_thread_id() -> int {
 
 proc _alloc_command_line_arguments() -> []string {
 	proc alloc_ucs2_to_utf8(wstr: ^u16) -> string {
-		var wstr_len = 0;
+		wstr_len := 0;
 		for (wstr+wstr_len)^ != 0 {
 			wstr_len++;
 		}
-		var len = 2*wstr_len-1;
-		var buf = make([]u8, len+1);
-		var str = slice_ptr(wstr, wstr_len+1);
+		len := 2*wstr_len-1;
+		buf := make([]u8, len+1);
+		str := slice_ptr(wstr, wstr_len+1);
 
-		var i, j = 0, 0;
+		i, j := 0, 0;
 		for str[j] != 0 {
 			match {
 			case str[j] < 0x80:
@@ -311,7 +310,7 @@ proc _alloc_command_line_arguments() -> []string {
 				if i+4 > len {
 					return "";
 				}
-				var c = rune((str[j] - 0xd800) << 10) + rune((str[j+1]) - 0xdc00) + 0x10000;
+				c := rune((str[j] - 0xd800) << 10) + rune((str[j+1]) - 0xdc00) + 0x10000;
 				buf[i] = u8(0xf0 +  (c >> 18));         i++;
 				buf[i] = u8(0x80 + ((c >> 12) & 0x3f)); i++;
 				buf[i] = u8(0x80 + ((c >>  6) & 0x3f)); i++;
@@ -333,9 +332,9 @@ proc _alloc_command_line_arguments() -> []string {
 		return string(buf[0..<i]);
 	}
 
-	var arg_count: i32;
-	var arg_list_ptr = win32.command_line_to_argv_w(win32.get_command_line_w(), &arg_count);
-	var arg_list = make([]string, arg_count);
+	arg_count: i32;
+	arg_list_ptr := win32.command_line_to_argv_w(win32.get_command_line_w(), &arg_count);
+	arg_list := make([]string, arg_count);
 	for _, i in arg_list {
 		arg_list[i] = alloc_ucs2_to_utf8((arg_list_ptr+i)^);
 	}

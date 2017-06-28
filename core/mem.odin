@@ -41,9 +41,9 @@ proc is_power_of_two(x: int) -> bool {
 proc align_forward(ptr: rawptr, align: int) -> rawptr {
 	assert(is_power_of_two(align));
 
-	var a = uint(align);
-	var p = uint(ptr);
-	var modulo = p & (a-1);
+	a := uint(align);
+	p := uint(ptr);
+	modulo := p & (a-1);
 	if modulo != 0 {
 		p += a - modulo;
 	}
@@ -58,9 +58,9 @@ type AllocationHeader struct {
 
 proc allocation_header_fill(header: ^AllocationHeader, data: rawptr, size: int) {
 	header.size = size;
-	var ptr = ^int(header+1);
+	ptr := ^int(header+1);
 
-	for var i = 0; rawptr(ptr) < data; i++ {
+	for i := 0; rawptr(ptr) < data; i++ {
 		(ptr+i)^ = -1;
 	}
 }
@@ -68,7 +68,7 @@ proc allocation_header(data: rawptr) -> ^AllocationHeader {
 	if data == nil {
 		return nil;
 	}
-	var p = ^int(data);
+	p := ^int(data);
 	for (p-1)^ == -1 {
 		p = (p-1);
 	}
@@ -130,20 +130,20 @@ proc arena_allocator_proc(allocator_data: rawptr, mode: AllocatorMode,
                           size, alignment: int,
                           old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
 	using AllocatorMode;
-	var arena = ^Arena(allocator_data);
+	arena := ^Arena(allocator_data);
 
 	match mode {
 	case Alloc:
-		var total_size = size + alignment;
+		total_size := size + alignment;
 
 		if arena.offset + total_size > len(arena.memory) {
 			fmt.fprintln(os.stderr, "Arena out of memory");
 			return nil;
 		}
 
-		#no_bounds_check var end = &arena.memory[arena.offset];
+		#no_bounds_check end := &arena.memory[arena.offset];
 
-		var ptr = align_forward(end, alignment);
+		ptr := align_forward(end, alignment);
 		arena.offset += total_size;
 		return zero(ptr, size);
 
@@ -162,7 +162,7 @@ proc arena_allocator_proc(allocator_data: rawptr, mode: AllocatorMode,
 }
 
 proc begin_arena_temp_memory(a: ^Arena) -> ArenaTempMemory {
-	var tmp: ArenaTempMemory;
+	tmp: ArenaTempMemory;
 	tmp.arena = a;
 	tmp.original_count = len(a.memory);
 	a.temp_count++;
@@ -196,8 +196,8 @@ proc align_of_type_info(type_info: ^TypeInfo) -> int {
 		return n - (n >> 1);
 	}
 
-	const WORD_SIZE = size_of(int);
-	const MAX_ALIGN = size_of([vector 64]f64); // TODO(bill): Should these constants be builtin constants?
+	WORD_SIZE :: size_of(int);
+	MAX_ALIGN :: size_of([vector 64]f64); // TODO(bill): Should these constants be builtin constants?
 	using TypeInfo;
 	match info in type_info {
 	case Named:
@@ -223,9 +223,9 @@ proc align_of_type_info(type_info: ^TypeInfo) -> int {
 	case Slice:
 		return WORD_SIZE;
 	case Vector:
-		var size = size_of_type_info(info.elem);
-		var count = int(max(prev_pow2(i64(info.count)), 1));
-		var total = size * count;
+		size  := size_of_type_info(info.elem);
+		count := int(max(prev_pow2(i64(info.count)), 1));
+		total := size * count;
 		return clamp(total, 1, MAX_ALIGN);
 	case Tuple:
 		return info.align;
@@ -245,12 +245,12 @@ proc align_of_type_info(type_info: ^TypeInfo) -> int {
 }
 
 proc align_formula(size, align: int) -> int {
-	var result = size + align-1;
+	result := size + align-1;
 	return result - result%align;
 }
 
 proc size_of_type_info(type_info: ^TypeInfo) -> int {
-	const WORD_SIZE = size_of(int);
+	WORD_SIZE :: size_of(int);
 	using TypeInfo;
 	match info in type_info {
 	case Named:
@@ -270,26 +270,26 @@ proc size_of_type_info(type_info: ^TypeInfo) -> int {
 	case Procedure:
 		return WORD_SIZE;
 	case Array:
-		var count = info.count;
+		count := info.count;
 		if count == 0 {
 			return 0;
 		}
-		var size      = size_of_type_info(info.elem);
-		var align     = align_of_type_info(info.elem);
-		var alignment = align_formula(size, align);
+		size      := size_of_type_info(info.elem);
+		align     := align_of_type_info(info.elem);
+		alignment := align_formula(size, align);
 		return alignment*(count-1) + size;
 	case DynamicArray:
 		return size_of(rawptr) + 2*size_of(int) + size_of(Allocator);
 	case Slice:
 		return 2*WORD_SIZE;
 	case Vector:
-		var count = info.count;
+		count := info.count;
 		if count == 0 {
 			return 0;
 		}
-		var size      = size_of_type_info(info.elem);
-		var align     = align_of_type_info(info.elem);
-		var alignment = align_formula(size, align);
+		size      := size_of_type_info(info.elem);
+		align     := align_of_type_info(info.elem);
+		alignment := align_formula(size, align);
 		return alignment*(count-1) + size;
 	case Struct:
 		return info.size;

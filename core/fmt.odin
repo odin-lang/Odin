@@ -7,7 +7,7 @@ import (
 	"raw.odin";
 )
 
-const _BUFFER_SIZE = 1<<12;
+_BUFFER_SIZE :: 1<<12;
 
 type StringBuffer union {
 	Static {buf: []u8},
@@ -89,45 +89,45 @@ proc write_rune(buf: ^StringBuffer, r: rune) {
 		return;
 	}
 
-	var b, n = utf8.encode_rune(r);
+	b, n := utf8.encode_rune(r);
 	write_bytes(buf, b[0..<n]);
 }
 
 proc write_int(buf: ^StringBuffer, i: i128, base: int) {
-	var b: [129]u8;
-	var s = strconv.append_bits(b[0..<0], u128(i), base, true, 128, strconv.digits, 0);
+	b: [129]u8;
+	s := strconv.append_bits(b[0..<0], u128(i), base, true, 128, strconv.digits, 0);
 	write_string(buf, s);
 }
 proc write_int(buf: ^StringBuffer, i: i64, base: int) {
-	var b: [129]u8;
-	var s = strconv.append_bits(b[0..<0], u128(i), base, true, 64, strconv.digits, 0);
+	b: [129]u8;
+	s := strconv.append_bits(b[0..<0], u128(i), base, true, 64, strconv.digits, 0);
 	write_string(buf, s);
 }
 
 
 
 proc fprint(fd: os.Handle, args: ..any) -> int {
-	var data: [_BUFFER_SIZE]u8;
-	var buf = make_string_buffer_from_slice(data[0..<0]);
+	data: [_BUFFER_SIZE]u8;
+	buf := make_string_buffer_from_slice(data[0..<0]);
 	sbprint(&buf, ..args);
-	var res = string_buffer_data(buf);
+	res := string_buffer_data(buf);
 	os.write(fd, res);
 	return len(res);
 }
 
 proc fprintln(fd: os.Handle, args: ..any) -> int {
-	var data: [_BUFFER_SIZE]u8;
-	var buf = make_string_buffer_from_slice(data[0..<0]);
+	data: [_BUFFER_SIZE]u8;
+	buf := make_string_buffer_from_slice(data[0..<0]);
 	sbprintln(&buf, ..args);
-	var res = string_buffer_data(buf);
+	res := string_buffer_data(buf);
 	os.write(fd, res);
 	return len(res);
 }
 proc fprintf(fd: os.Handle, fmt: string, args: ..any) -> int {
-	var data: [_BUFFER_SIZE]u8;
-	var buf = make_string_buffer_from_slice(data[0..<0]);
+	data: [_BUFFER_SIZE]u8;
+	buf := make_string_buffer_from_slice(data[0..<0]);
 	sbprintf(&buf, fmt, ..args);
-	var res = string_buffer_data(buf);
+	res := string_buffer_data(buf);
 	os.write(fd, res);
 	return len(res);
 }
@@ -145,17 +145,17 @@ proc printf_err  (fmt: string, args: ..any) -> int { return fprintf(os.stderr, f
 // aprint* procedures return a string that was allocated with the current context
 // They must be freed accordingly
 proc aprint(args: ..any) -> string {
-	var buf = make_string_dynamic_buffer();
+	buf := make_string_dynamic_buffer();
 	sbprint(&buf, ..args);
 	return to_string(buf);
 }
 proc aprintln(args: ..any) -> string {
-	var buf = make_string_dynamic_buffer();
+	buf := make_string_dynamic_buffer();
 	sbprintln(&buf, ..args);
 	return to_string(buf);
 }
 proc aprintf(fmt: string, args: ..any) -> string {
-	var buf = make_string_dynamic_buffer();
+	buf := make_string_dynamic_buffer();
 	sbprintf(&buf, fmt, ..args);
 	return to_string(buf);
 }
@@ -164,15 +164,15 @@ proc aprintf(fmt: string, args: ..any) -> string {
 // bprint* procedures return a string that was allocated with the current context
 // They must be freed accordingly
 proc bprint(buf: []u8, args: ..any) -> string {
-	var sb = make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
+	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprint(&sb, ..args);
 }
 proc bprintln(buf: []u8, args: ..any) -> string {
-	var sb = make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
+	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprintln(&sb, ..args);
 }
 proc bprintf(buf: []u8, fmt: string, args: ..any) -> string {
-	var sb = make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
+	sb := make_string_buffer_from_slice(buf[0..<0..<len(buf)]);
 	return sbprintf(&sb, fmt, ..args);
 }
 
@@ -182,8 +182,8 @@ proc bprintf(buf: []u8, fmt: string, args: ..any) -> string {
 
 
 proc fprint_type(fd: os.Handle, info: ^TypeInfo) {
-	var data: [_BUFFER_SIZE]u8;
-	var buf = make_string_buffer_from_slice(data[0..<0]);
+	data: [_BUFFER_SIZE]u8;
+	buf := make_string_buffer_from_slice(data[0..<0]);
 	write_type(&buf, info);
 	os.write(fd, string_buffer_data(buf));
 }
@@ -237,7 +237,7 @@ proc write_type(buf: ^StringBuffer, ti: ^TypeInfo) {
 		if info.params == nil {
 			write_string(buf, "()");
 		} else {
-			var t = info.params.(^Tuple);
+			t := info.params.(^Tuple);
 			write_string(buf, "(");
 			for t, i in t.types {
 				if i > 0 -> write_string(buf, ", ");
@@ -250,12 +250,12 @@ proc write_type(buf: ^StringBuffer, ti: ^TypeInfo) {
 			write_type(buf, info.results);
 		}
 	case Tuple:
-		var count = len(info.names);
+		count := len(info.names);
 		if count != 1 -> write_string(buf, "(");
 		for name, i in info.names {
 			if i > 0 -> write_string(buf, ", ");
 
-			var t = info.types[i];
+			t := info.types[i];
 
 			if len(name) > 0 {
 				write_string(buf, name);
@@ -267,7 +267,7 @@ proc write_type(buf: ^StringBuffer, ti: ^TypeInfo) {
 
 	case Array:
 		write_string(buf, "[");
-		var fi = FmtInfo{buf = buf};
+		fi := FmtInfo{buf = buf};
 		write_int(buf, i64(info.count), 10);
 		write_string(buf, "]");
 		write_type(buf, info.elem);
@@ -309,8 +309,8 @@ proc write_type(buf: ^StringBuffer, ti: ^TypeInfo) {
 
 	case Union:
 		write_string(buf, "union {");
-		var cf = info.common_fields;
-		var total_count = 0;
+		cf := info.common_fields;
+		total_count := 0;
 		for name, i in cf.names {
 			if i > 0 -> write_string(buf, ", ");
 			write_string(buf, name);
@@ -324,13 +324,13 @@ proc write_type(buf: ^StringBuffer, ti: ^TypeInfo) {
 			write_byte(buf, '{');
 			defer write_byte(buf, '}');
 
-			var variant_type = type_info_base(info.variant_types[i]);
-			var variant = variant_type.(^Struct);
+			variant_type := type_info_base(info.variant_types[i]);
+			variant := variant_type.(^Struct);
 
-			var vc = len(variant.names)-len(cf.names);
-			for j in 0..vc {
+			vc := len(variant.names)-len(cf.names);
+			for j in 0..<vc {
 				if j > 0 -> write_string(buf, ", ");
-				var index = j + len(cf.names);
+				index := j + len(cf.names);
 				write_string(buf, variant.names[index]);
 				write_string(buf, ": ");
 				write_type(buf, variant.types[index]);
@@ -382,12 +382,12 @@ proc _parse_int(s: string, offset: int) -> (result: int, offset: int, ok: bool) 
 		return '0' <= r && r <= '9';
 	}
 
-	var result = 0;
-	var ok = true;
+	result := 0;
+	ok := true;
 
-	var i = 0;
+	i := 0;
 	for i < len(s[offset..]) {
-		var c = rune(s[offset+i]);
+		c := rune(s[offset+i]);
 		if !is_digit(c) -> break;
 		i++;
 
@@ -406,7 +406,7 @@ proc _arg_number(fi: ^FmtInfo, arg_index: int, format: string, offset, arg_count
 
 		for i in 1..len(format) {
 			if format[i] == ']' {
-				var width, new_index, ok = _parse_int(format, 1);
+				width, new_index, ok := _parse_int(format, 1);
 				if !ok || new_index != i {
 					return 0, i+1, false;
 				}
@@ -422,7 +422,7 @@ proc _arg_number(fi: ^FmtInfo, arg_index: int, format: string, offset, arg_count
 		return arg_index, offset, false;
 	}
 	fi.reordered = true;
-	var index, width, ok = parse_arg_number(format[offset..]);
+	index, width, ok := parse_arg_number(format[offset..]);
 	if ok && 0 <= index && index < arg_count {
 		return index, offset+width, true;
 	}
@@ -431,11 +431,11 @@ proc _arg_number(fi: ^FmtInfo, arg_index: int, format: string, offset, arg_count
 }
 
 proc int_from_arg(args: []any, arg_index: int) -> (int, int, bool) {
-	var num = 0;
-	var new_arg_index = arg_index;
-	var ok = true;
+	num := 0;
+	new_arg_index := arg_index;
+	ok := true;
 	if arg_index < len(args) {
-		var arg = args[arg_index];
+		arg := args[arg_index];
 		arg.type_info = type_info_base(arg.type_info);
 		match i in arg {
 		case int:  num = i;
@@ -484,30 +484,30 @@ proc fmt_bool(using fi: ^FmtInfo, b: bool, verb: rune) {
 proc fmt_write_padding(fi: ^FmtInfo, width: int) {
 	if width <= 0 -> return;
 
-	var pad_byte: u8 = fi.space ? ' ' : '0';
+	pad_byte: u8 = fi.space ? ' ' : '0';
 
-	var data = string_buffer_data(fi.buf^);
-	var count = min(width, cap(data)-len(data));
+	data := string_buffer_data(fi.buf^);
+	count := min(width, cap(data)-len(data));
 	for _ in 0..<count -> write_byte(fi.buf, pad_byte);
 }
 
 proc _fmt_int(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
-	var _, neg = strconv.is_integer_negative(u128(u), is_signed, bit_size);
+	_, neg := strconv.is_integer_negative(u128(u), is_signed, bit_size);
 
-	const BUF_SIZE = 256;
+	BUF_SIZE :: 256;
 	if fi.width_set || fi.prec_set {
-		var width = fi.width + fi.prec + 3; // 3 extra bytes for sign and prefix
+		width := fi.width + fi.prec + 3; // 3 extra bytes for sign and prefix
 		if width > BUF_SIZE {
 			// TODO(bill):????
 			panic("_fmt_int: buffer overrun. Width and precision too big");
 		}
 	}
 
-	var prec = 0;
+	prec := 0;
 	if fi.prec_set {
 		prec = fi.prec;
 		if prec == 0 && u == 0 {
-			var prev_zero = fi.zero;
+			prev_zero := fi.zero;
 			fi.zero = false;
 			fmt_write_padding(fi, fi.width);
 			fi.zero = prev_zero;
@@ -528,18 +528,18 @@ proc _fmt_int(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, 
 		panic("_fmt_int: unknown base, whoops");
 	}
 
-	var buf: [256]u8;
-	var start = 0;
+	buf: [256]u8;
+	start := 0;
 
 
-	var flags: strconv.IntFlag;
+	flags: strconv.IntFlag;
 	if fi.hash && !fi.zero -> flags |= strconv.IntFlag.Prefix;
 	if fi.plus             -> flags |= strconv.IntFlag.Plus;
 	if fi.space            -> flags |= strconv.IntFlag.Space;
-	var s = strconv.append_bits(buf[start..<start], u128(u), base, is_signed, bit_size, digits, flags);
+	s := strconv.append_bits(buf[start..<start], u128(u), base, is_signed, bit_size, digits, flags);
 
 	if fi.hash && fi.zero {
-		var c: u8;
+		c: u8;
 		match base {
 		case 2:  c = 'b';
 		case 8:  c = 'o';
@@ -553,16 +553,15 @@ proc _fmt_int(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, 
 		}
 	}
 
-	var prev_zero = fi.zero;
+	prev_zero := fi.zero;
 	defer fi.zero = prev_zero;
 	fi.zero = false;
 	_pad(fi, s);
 }
 
-var (
-	__DIGITS_LOWER = "0123456789abcdefx";
-	__DIGITS_UPPER = "0123456789ABCDEFX";
-)
+
+__DIGITS_LOWER := "0123456789abcdefx";
+__DIGITS_UPPER := "0123456789ABCDEFX";
 
 proc fmt_rune(fi: ^FmtInfo, r: rune, verb: rune) {
 	match verb {
@@ -584,7 +583,7 @@ proc fmt_int(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: rune) 
 	case 'c', 'r':
 		fmt_rune(fi, rune(u), verb);
 	case 'U':
-		var r = rune(u);
+		r := rune(u);
 		if r < 0 || r > utf8.MAX_RUNE {
 			fmt_bad_verb(fi, verb);
 		} else {
@@ -602,7 +601,7 @@ proc _pad(fi: ^FmtInfo, s: string) {
 		write_string(fi.buf, s);
 		return;
 	}
-	var width = fi.width - utf8.rune_count(s);
+	width := fi.width - utf8.rune_count(s);
 	if fi.minus { // right pad
 		write_string(fi.buf, s);
 		fmt_write_padding(fi, width);
@@ -618,10 +617,10 @@ proc fmt_float(fi: ^FmtInfo, v: f64, bit_size: int, verb: rune) {
 	// case 'f', 'F', 'v':
 
 	case 'f', 'F', 'v':
-		var prec: int = fi.prec_set ? fi.prec : 3;
-		var buf: [386]u8;
+		prec: int = fi.prec_set ? fi.prec : 3;
+		buf: [386]u8;
 
-		var str = strconv.append_float(buf[1..<1], v, 'f', prec, bit_size);
+		str := strconv.append_float(buf[1..<1], v, 'f', prec, bit_size);
 		str = string(buf[0..len(str)]);
 		if str[1] == '+' || str[1] == '-' {
 			str = str[1..];
@@ -660,7 +659,7 @@ proc fmt_string(fi: ^FmtInfo, s: string, verb: rune) {
 		write_string(fi.buf, s);
 
 	case 'x', 'X':
-		var space = fi.space;
+		space := fi.space;
 		fi.space = false;
 		defer fi.space = space;
 
@@ -682,7 +681,7 @@ proc fmt_pointer(fi: ^FmtInfo, p: rawptr, verb: rune) {
 		fmt_bad_verb(fi, verb);
 		return;
 	}
-	var u = u128(uint(p));
+	u := u128(uint(p));
 	if !fi.hash || verb == 'v' {
 		write_string(fi.buf, "0x");
 	}
@@ -705,13 +704,10 @@ proc fmt_enum(fi: ^FmtInfo, v: any, verb: rune) {
 		case 'd', 'f':
 			fmt_arg(fi, any{v.data, type_info_base(e.base)}, verb);
 		case 's', 'v':
-			var (
-				i:  i128;
-				f:  f64;
-				ok: bool;
-				a:  any;
-			)
-			a = any{v.data, type_info_base(e.base)};
+			i:  i128;
+			f:  f64;
+			ok: bool;
+			a := any{v.data, type_info_base(e.base)};
 			match v in a {
 			case rune:  i = i128(v);
 			case i8:   i = i128(v);
@@ -785,7 +781,7 @@ proc fmt_value(fi: ^FmtInfo, v: any, verb: rune) {
 				write_string(fi.buf, b.names[i]);
 				write_string(fi.buf, " = ");
 
-				var data = ^u8(v.data) + b.offsets[i];
+				data := ^u8(v.data) + b.offsets[i];
 				fmt_arg(fi, any{rawptr(data), b.types[i]}, 'v');
 			}
 			write_byte(fi.buf, '}');
@@ -817,29 +813,29 @@ proc fmt_value(fi: ^FmtInfo, v: any, verb: rune) {
 		for i in 0..<info.count {
 			if i > 0 -> write_string(fi.buf, ", ");
 
-			var data = ^u8(v.data) + i*info.elem_size;
+			data := ^u8(v.data) + i*info.elem_size;
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
 		}
 
 	case DynamicArray:
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
-		var array = ^raw.DynamicArray(v.data);
+		array := ^raw.DynamicArray(v.data);
 		for i in 0..<array.len {
 			if i > 0 -> write_string(fi.buf, ", ");
 
-			var data = ^u8(array.data) + i*info.elem_size;
+			data := ^u8(array.data) + i*info.elem_size;
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
 		}
 
 	case Slice:
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
-		var slice = ^[]u8(v.data);
+		slice := ^[]u8(v.data);
 		for _, i in slice {
 			if i > 0 -> write_string(fi.buf, ", ");
 
-			var data = &slice[0] + i*info.elem_size;
+			data := &slice[0] + i*info.elem_size;
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
 		}
 
@@ -850,7 +846,7 @@ proc fmt_value(fi: ^FmtInfo, v: any, verb: rune) {
 		for i in 0..<info.count {
 			if i > 0 -> write_string(fi.buf, ", ");
 
-			var data = ^u8(v.data) + i*info.elem_size;
+			data := ^u8(v.data) + i*info.elem_size;
 			fmt_value(fi, any{rawptr(data), info.elem}, verb);
 		}
 
@@ -862,29 +858,29 @@ proc fmt_value(fi: ^FmtInfo, v: any, verb: rune) {
 
 		write_string(fi.buf, "map[");
 		defer write_byte(fi.buf, ']');
-		var (
-			entries    = &(^raw.DynamicMap(v.data).entries);
-			gs         = type_info_base(info.generated_struct).(^Struct);
-			ed         = type_info_base(gs.types[1]).(^DynamicArray);
-			entry_type = ed.elem.(^Struct);
-			entry_size = ed.elem_size;
-		)
+
+		entries    := &(^raw.DynamicMap(v.data).entries);
+		gs         := type_info_base(info.generated_struct).(^Struct);
+		ed         := type_info_base(gs.types[1]).(^DynamicArray);
+		entry_type := ed.elem.(^Struct);
+		entry_size := ed.elem_size;
+
 		for i in 0..<entries.len {
 			if i > 0 -> write_string(fi.buf, ", ");
 
-			var data = ^u8(entries.data) + i*entry_size;
-			var header = ^__MapEntryHeader(data);
+			data := ^u8(entries.data) + i*entry_size;
+			header := ^__MapEntryHeader(data);
 
 			if types.is_string(info.key) {
 				write_string(fi.buf, header.key.str);
 			} else {
-				var fi = FmtInfo{buf = fi.buf};
+				fi := FmtInfo{buf = fi.buf};
 				fmt_arg(&fi, any{rawptr(&header.key.hash), info.key}, 'v');
 			}
 
 			write_string(fi.buf, "=");
 
-			var value = data + entry_type.offsets[2];
+			value := data + entry_type.offsets[2];
 			fmt_arg(fi, any{rawptr(value), info.value}, 'v');
 		}
 
@@ -899,7 +895,7 @@ proc fmt_value(fi: ^FmtInfo, v: any, verb: rune) {
 
 			write_string(fi.buf, info.names[i]);
 			write_string(fi.buf, " = ");
-			var data = ^u8(v.data) + info.offsets[i];
+			data := ^u8(v.data) + info.offsets[i];
 			fmt_value(fi, any{rawptr(data), info.types[i]}, 'v');
 		}
 
@@ -907,13 +903,13 @@ proc fmt_value(fi: ^FmtInfo, v: any, verb: rune) {
 		write_byte(fi.buf, '{');
 		defer write_byte(fi.buf, '}');
 
-		var cf = info.common_fields;
+		cf := info.common_fields;
 		for _, i in cf.names {
 			if i > 0 -> write_string(fi.buf, ", ");
 
 			write_string(fi.buf, cf.names[i]);
 			write_string(fi.buf, " = ");
-			var data = ^u8(v.data) + cf.offsets[i];
+			data := ^u8(v.data) + cf.offsets[i];
 			fmt_value(fi, any{rawptr(data), cf.types[i]}, 'v');
 		}
 
@@ -933,7 +929,7 @@ proc fmt_value(fi: ^FmtInfo, v: any, verb: rune) {
 proc fmt_complex(fi: ^FmtInfo, c: complex128, bits: int, verb: rune) {
 	match verb {
 	case 'f', 'F', 'v':
-		var r, i = real(c), imag(c);
+		r, i := real(c), imag(c);
 		fmt_float(fi, r, bits/2, verb);
 		if !fi.plus && i >= 0 {
 			write_rune(fi.buf, '+');
@@ -963,7 +959,7 @@ proc fmt_arg(fi: ^FmtInfo, arg: any, verb: rune) {
 	fi.arg = arg;
 
 	if verb == 'T' {
-		var ti = arg.type_info;
+		ti := arg.type_info;
 		match a in arg {
 		case ^TypeInfo: ti = a;
 		}
@@ -972,7 +968,7 @@ proc fmt_arg(fi: ^FmtInfo, arg: any, verb: rune) {
 	}
 
 
-	var base_arg = arg;
+	base_arg := arg;
 	base_arg.type_info = type_info_base(base_arg.type_info);
 	match a in base_arg {
 	case any:           fmt_arg(fi,  a, verb);
@@ -1011,13 +1007,13 @@ proc fmt_arg(fi: ^FmtInfo, arg: any, verb: rune) {
 
 
 proc sbprint(buf: ^StringBuffer, args: ..any) -> string {
-	var fi: FmtInfo;
-	var prev_string = false;
+	fi: FmtInfo;
+	prev_string := false;
 
 	fi.buf = buf;
 
 	for arg, i in args {
-		var is_string = arg != nil && types.is_string(arg.type_info);
+		is_string := arg != nil && types.is_string(arg.type_info);
 		if i > 0 && !is_string && !prev_string {
 			write_byte(buf, ' ');
 		}
@@ -1028,7 +1024,7 @@ proc sbprint(buf: ^StringBuffer, args: ..any) -> string {
 }
 
 proc sbprintln(buf: ^StringBuffer, args: ..any) -> string {
-	var fi: FmtInfo;
+	fi: FmtInfo;
 	fi.buf = buf;
 
 	for arg, i in args {
@@ -1041,17 +1037,16 @@ proc sbprintln(buf: ^StringBuffer, args: ..any) -> string {
 }
 
 proc sbprintf(b: ^StringBuffer, fmt: string, args: ..any) -> string {
-	var (
-		end            = len(fmt);
-		arg_index: int = 0;
-		was_prev_index = false;
-		fi: FmtInfo;
-	)
+	fi: FmtInfo;
+	arg_index: int = 0;
+	end := len(fmt);
+	was_prev_index := false;
 
-	for var i = 0; i < end; /**/ {
+
+	for i := 0; i < end; /**/ {
 		fi = FmtInfo{buf = b, good_arg_index = true};
 
-		var prev_i = i;
+		prev_i := i;
 		for i < end && fmt[i] != '%' {
 			i++;
 		}
@@ -1142,7 +1137,7 @@ proc sbprintf(b: ^StringBuffer, fmt: string, args: ..any) -> string {
 			break;
 		}
 
-		var verb, w = utf8.decode_rune(fmt[i..]);
+		verb, w := utf8.decode_rune(fmt[i..]);
 		i += w;
 
 		if verb == '%' {

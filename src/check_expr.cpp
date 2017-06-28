@@ -2219,6 +2219,11 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 		}
 	}
 
+	if (is_type_gen_proc(type)) {
+		error(e, "Invalid use of polymorphic procedure type");
+		type = t_invalid;
+	}
+
 	if (is_type_typed(type)) {
 		add_type_and_value(&c->info, e, Addressing_Type, type, empty_exact_value);
 	} else {

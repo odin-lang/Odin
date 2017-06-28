@@ -1,12 +1,12 @@
 proc crc32(data: []u8) -> u32 {
-	var result = ~u32(0);
+	result := ~u32(0);
 	for b in data {
 		result = result>>8 ~ _crc32_table[(result ~ u32(b)) & 0xff];
 	}
 	return ~result;
 }
 proc crc64(data: []u8) -> u64 {
-	var result = ~u64(0);
+	result := ~u64(0);
 	for b in data {
 		result = result>>8 ~ _crc64_table[(result ~ u64(b)) & 0xff];
 	}
@@ -14,7 +14,7 @@ proc crc64(data: []u8) -> u64 {
 }
 
 proc fnv32(data: []u8) -> u32 {
-	var h: u32 = 0x811c9dc5;
+	h: u32 = 0x811c9dc5;
 	for b in data {
 		h = (h * 0x01000193) ~ u32(b);
 	}
@@ -22,7 +22,7 @@ proc fnv32(data: []u8) -> u32 {
 }
 
 proc fnv64(data: []u8) -> u64 {
-	var h: u64 = 0xcbf29ce484222325;
+	h: u64 = 0xcbf29ce484222325;
 	for b in data {
 		h = (h * 0x100000001b3) ~ u64(b);
 	}
@@ -30,7 +30,7 @@ proc fnv64(data: []u8) -> u64 {
 }
 
 proc fnv32a(data: []u8) -> u32 {
-	var h: u32 = 0x811c9dc5;
+	h: u32 = 0x811c9dc5;
 	for b in data {
 		h = (h ~ u32(b)) * 0x01000193;
 	}
@@ -38,7 +38,7 @@ proc fnv32a(data: []u8) -> u32 {
 }
 
 proc fnv64a(data: []u8) -> u64 {
-	var h: u64 = 0xcbf29ce484222325;
+	h: u64 = 0xcbf29ce484222325;
 	for b in data {
 		h = (h ~ u64(b)) * 0x100000001b3;
 	}
@@ -46,20 +46,16 @@ proc fnv64a(data: []u8) -> u64 {
 }
 
 proc murmur32(data: []u8) -> u32 {
-	const (
-		c1_32: u32 = 0xcc9e2d51;
-		c2_32: u32 = 0x1b873593;
-	)
+	c1_32: u32 : 0xcc9e2d51;
+	c2_32: u32 : 0x1b873593;
 
-	var (
-		h1: u32 = 0;
-		nblocks = len(data)/4;
-		p = &data[0];
-		p1 = p + 4*nblocks;
-	)
+	h1: u32 = 0;
+	nblocks := len(data)/4;
+	p := &data[0];
+	p1 := p + 4*nblocks;
 
 	for ; p < p1; p += 4 {
-		var k1 = ^u32(p)^;
+		k1 := ^u32(p)^;
 
 		k1 *= c1_32;
 		k1 = (k1 << 15) | (k1 >> 17);
@@ -70,8 +66,8 @@ proc murmur32(data: []u8) -> u32 {
 		h1 = h1*5 + 0xe6546b64;
 	}
 
-	var tail = data[nblocks*4 ..];
-	var k1: u32;
+	tail := data[nblocks*4 ..];
+	k1: u32;
 	match len(tail)&3 {
 	case 3:
 		k1 ~= u32(tail[2]) << 16;
@@ -99,19 +95,17 @@ proc murmur32(data: []u8) -> u32 {
 }
 
 proc murmur64(data: []u8) -> u64 {
-	const SEED = 0x9747b28c;
+	SEED :: 0x9747b28c;
 
 	when size_of(int) == 8 {
-		const (
-			m = 0xc6a4a7935bd1e995;
-			r = 47;
-		)
+		m :: 0xc6a4a7935bd1e995;
+		r :: 47;
 
-		var h: u64 = SEED ~ (u64(len(data)) * m);
-		var data64 = slice_ptr(^u64(&data[0]), len(data)/size_of(u64));
+		h: u64 = SEED ~ (u64(len(data)) * m);
+		data64 := slice_ptr(^u64(&data[0]), len(data)/size_of(u64));
 
 		for _, i in data64 {
-			var k = data64[i];
+			k := data64[i];
 
 			k *= m;
 			k ~= k>>r;
@@ -139,21 +133,17 @@ proc murmur64(data: []u8) -> u64 {
 
 		return h;
 	} else {
-		const (
-			m = 0x5bd1e995;
-			r = 24;
-		)
+		m :: 0x5bd1e995;
+		r :: 24;
 
-		var (
-			h1 = u32(SEED) ~ u32(len(data));
-			h2 = u32(SEED) >> 32;
-			data32 = slice_ptr(^u32(&data[0]), len(data)/size_of(u32));
-			len = len(data);
-			i = 0;
-		)
+		h1 := u32(SEED) ~ u32(len(data));
+		h2 := u32(SEED) >> 32;
+		data32 := slice_ptr(^u32(&data[0]), len(data)/size_of(u32));
+		len := len(data);
+		i := 0;
 
 		for len >= 8 {
-			var k1, k2: u32;
+			k1, k2: u32;
 			k1 = data32[i]; i++;
 			k1 *= m;
 			k1 ~= k1>>r;
@@ -172,7 +162,7 @@ proc murmur64(data: []u8) -> u64 {
 		}
 
 		if len >= 4 {
-			var k1: u32;
+			k1: u32;
 			k1 = data32[i]; i++;
 			k1 *= m;
 			k1 ~= k1>>r;
@@ -183,7 +173,7 @@ proc murmur64(data: []u8) -> u64 {
 		}
 
 		// TODO(bill): Fix this
-		#no_bounds_check var data8 = slice_to_bytes(data32[i..])[0..<3];
+		#no_bounds_check data8 := slice_to_bytes(data32[i..])[0..<3];
 		match len {
 		case 3:
 			h2 ~= u32(data8[2]) << 16;
@@ -210,7 +200,7 @@ proc murmur64(data: []u8) -> u64 {
 }
 
 
-var _crc32_table = [256]u32{
+_crc32_table := [256]u32{
 	0x00000000, 0x77073096, 0xee0e612c, 0x990951ba,
 	0x076dc419, 0x706af48f, 0xe963a535, 0x9e6495a3,
 	0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
@@ -276,7 +266,7 @@ var _crc32_table = [256]u32{
 	0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94,
 	0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d,
 };
-var _crc64_table = [256]u64{
+_crc64_table := [256]u64{
 	0x0000000000000000, 0x42f0e1eba9ea3693, 0x85e1c3d753d46d26, 0xc711223cfa3e5bb5,
 	0x493366450e42ecdf, 0x0bc387aea7a8da4c, 0xccd2a5925d9681f9, 0x8e224479f47cb76a,
 	0x9266cc8a1c85d9be, 0xd0962d61b56fef2d, 0x17870f5d4f51b498, 0x5577eeb6e6bb820b,

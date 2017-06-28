@@ -113,17 +113,16 @@ type (
 
 // NOTE(bill): only the ones that are needed (not all types)
 // This will be set by the compiler
-var (
-	__type_table: []TypeInfo;
+__type_table: []TypeInfo;
 
-	__argv__: ^^u8;
-	__argc__: i32;
-)
+__argv__: ^^u8;
+__argc__: i32;
+
 
 proc type_info_base(info: ^TypeInfo) -> ^TypeInfo {
 	if info == nil -> return nil;
 
-	var base = info;
+	base := info;
 	match i in base {
 	case TypeInfo.Named:
 		base = i.base;
@@ -135,7 +134,7 @@ proc type_info_base(info: ^TypeInfo) -> ^TypeInfo {
 proc type_info_base_without_enum(info: ^TypeInfo) -> ^TypeInfo {
 	if info == nil -> return nil;
 
-	var base = info;
+	base := info;
 	match i in base {
 	case TypeInfo.Named:
 		base = i.base;
@@ -197,7 +196,7 @@ proc make_source_code_location(file: string, line, column: i64, procedure: strin
 
 
 
-const DEFAULT_ALIGNMENT = align_of([vector 4]f32);
+DEFAULT_ALIGNMENT :: align_of([vector 4]f32);
 
 proc __init_context_from_ptr(c: ^Context, other: ^Context) #cc_contextless {
 	if c == nil -> return;
@@ -231,7 +230,7 @@ proc __check_context() {
 
 proc alloc(size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr #inline {
 	// __check_context();
-	var a = context.allocator;
+	a := context.allocator;
 	return a.procedure(a.data, AllocatorMode.Alloc, size, alignment, nil, 0, 0);
 }
 
@@ -252,14 +251,14 @@ proc free_ptr(ptr: rawptr) #inline {
 
 proc free_all() #inline {
 	// __check_context();
-	var a = context.allocator;
+	a := context.allocator;
 	a.procedure(a.data, AllocatorMode.FreeAll, 0, 0, nil, 0, 0);
 }
 
 
 proc resize(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr #inline {
 	// __check_context();
-	var a = context.allocator;
+	a := context.allocator;
 	return a.procedure(a.data, AllocatorMode.Resize, new_size, alignment, ptr, old_size, 0);
 }
 
@@ -284,7 +283,7 @@ proc default_resize_align(old_memory: rawptr, old_size, new_size, alignment: int
 		return old_memory;
 	}
 
-	var new_memory = alloc(new_size, alignment);
+	new_memory := alloc(new_size, alignment);
 	if new_memory == nil {
 		return nil;
 	}
@@ -312,7 +311,7 @@ proc default_allocator_proc(allocator_data: rawptr, mode: AllocatorMode,
 		// NOTE(bill): Does nothing
 
 	case Resize:
-		var ptr = os.heap_resize(old_memory, size);
+		ptr := os.heap_resize(old_memory, size);
 		assert(ptr != nil);
 		return ptr;
 	}
@@ -478,11 +477,11 @@ foreign __llvm_core {
 	proc __sqrt_f64(x: f64) -> f64 #link_name "llvm.sqrt.f64";
 }
 proc __abs_complex64(x: complex64) -> f32 #inline #cc_contextless {
-	var r, i = real(x), imag(x);
+	r, i := real(x), imag(x);
 	return __sqrt_f32(r*r + i*i);
 }
 proc __abs_complex128(x: complex128) -> f64 #inline #cc_contextless {
-	var r, i = real(x), imag(x);
+	r, i := real(x), imag(x);
 	return __sqrt_f64(r*r + i*i);
 }
 
@@ -490,7 +489,7 @@ proc __abs_complex128(x: complex128) -> f64 #inline #cc_contextless {
 
 
 proc __dynamic_array_make(array_: rawptr, elem_size, elem_align: int, len, cap: int) {
-	var array = ^raw.DynamicArray(array_);
+	array := ^raw.DynamicArray(array_);
 	// __check_context();
 	array.allocator = context.allocator;
 	assert(array.allocator.procedure != nil);
@@ -502,7 +501,7 @@ proc __dynamic_array_make(array_: rawptr, elem_size, elem_align: int, len, cap: 
 }
 
 proc __dynamic_array_reserve(array_: rawptr, elem_size, elem_align: int, cap: int) -> bool {
-	var array = ^raw.DynamicArray(array_);
+	array := ^raw.DynamicArray(array_);
 
 	if cap <= array.cap -> return true;
 
@@ -512,11 +511,11 @@ proc __dynamic_array_reserve(array_: rawptr, elem_size, elem_align: int, cap: in
 	}
 	assert(array.allocator.procedure != nil);
 
-	var old_size  = array.cap * elem_size;
-	var new_size  = cap * elem_size;
-	var allocator = array.allocator;
+	old_size  := array.cap * elem_size;
+	new_size  := cap * elem_size;
+	allocator := array.allocator;
 
-	var new_data = allocator.procedure(allocator.data, AllocatorMode.Resize, new_size, elem_align, array.data, old_size, 0);
+	new_data := allocator.procedure(allocator.data, AllocatorMode.Resize, new_size, elem_align, array.data, old_size, 0);
 	if new_data == nil -> return false;
 
 	array.data = new_data;
@@ -525,9 +524,9 @@ proc __dynamic_array_reserve(array_: rawptr, elem_size, elem_align: int, cap: in
 }
 
 proc __dynamic_array_resize(array_: rawptr, elem_size, elem_align: int, len: int) -> bool {
-	var array = ^raw.DynamicArray(array_);
+	array := ^raw.DynamicArray(array_);
 
-	var ok = __dynamic_array_reserve(array_, elem_size, elem_align, len);
+	ok := __dynamic_array_reserve(array_, elem_size, elem_align, len);
 	if ok -> array.len = len;
 	return ok;
 }
@@ -535,22 +534,22 @@ proc __dynamic_array_resize(array_: rawptr, elem_size, elem_align: int, len: int
 
 proc __dynamic_array_append(array_: rawptr, elem_size, elem_align: int,
                                items: rawptr, item_count: int) -> int {
-	var array = ^raw.DynamicArray(array_);
+	array := ^raw.DynamicArray(array_);
 
 	if item_count <= 0 || items == nil {
 		return array.len;
 	}
 
 
-	var ok = true;
+	ok := true;
 	if array.cap <= array.len+item_count {
-		var cap = 2 * array.cap + max(8, item_count);
+		cap := 2 * array.cap + max(8, item_count);
 		ok = __dynamic_array_reserve(array, elem_size, elem_align, cap);
 	}
 	// TODO(bill): Better error handling for failed reservation
 	if !ok -> return array.len;
 
-	var data = ^u8(array.data);
+	data := ^u8(array.data);
 	assert(data != nil);
 	__mem_copy(data + (elem_size*array.len), items, elem_size * item_count);
 	array.len += item_count;
@@ -558,17 +557,17 @@ proc __dynamic_array_append(array_: rawptr, elem_size, elem_align: int,
 }
 
 proc __dynamic_array_append_nothing(array_: rawptr, elem_size, elem_align: int) -> int {
-	var array = ^raw.DynamicArray(array_);
+	array := ^raw.DynamicArray(array_);
 
-	var ok = true;
+	ok := true;
 	if array.cap <= array.len+1 {
-		var cap = 2 * array.cap + max(8, 1);
+		cap := 2 * array.cap + max(8, 1);
 		ok = __dynamic_array_reserve(array, elem_size, elem_align, cap);
 	}
 	// TODO(bill): Better error handling for failed reservation
 	if !ok -> return array.len;
 
-	var data = ^u8(array.data);
+	data := ^u8(array.data);
 	assert(data != nil);
 	__mem_zero(data + (elem_size*array.len), elem_size);
 	array.len++;
@@ -577,7 +576,7 @@ proc __dynamic_array_append_nothing(array_: rawptr, elem_size, elem_align: int) 
 
 proc __slice_append(slice_: rawptr, elem_size, elem_align: int,
                        items: rawptr, item_count: int) -> int {
-	var slice = ^raw.Slice(slice_);
+	slice := ^raw.Slice(slice_);
 
 	if item_count <= 0 || items == nil {
 		return slice.len;
@@ -585,7 +584,7 @@ proc __slice_append(slice_: rawptr, elem_size, elem_align: int,
 
 	item_count = min(slice.cap-slice.len, item_count);
 	if item_count > 0 {
-		var data = ^u8(slice.data);
+		data := ^u8(slice.data);
 		assert(data != nil);
 		__mem_copy(data + (elem_size*slice.len), items, elem_size * item_count);
 		slice.len += item_count;
@@ -598,7 +597,7 @@ proc __slice_append(slice_: rawptr, elem_size, elem_align: int,
 
 proc __default_hash(data: []u8) -> u128 {
 	proc fnv128a(data: []u8) -> u128 {
-		var h: u128 = 0x6c62272e07bb014262b821756295c58d;
+		h: u128 = 0x6c62272e07bb014262b821756295c58d;
 		for b in data {
 			h = (h ~ u128(b)) * 0x1000000000000000000013b;
 		}
@@ -610,37 +609,35 @@ proc __default_hash_string(s: string) -> u128 {
 	return __default_hash([]u8(s));
 }
 
-const __INITIAL_MAP_CAP = 16;
+__INITIAL_MAP_CAP :: 16;
 
-type (
-	__MapKey struct #ordered {
-		hash: u128,
-		str:  string,
-	}
+__MapKey :: struct #ordered {
+	hash: u128,
+	str:  string,
+}
 
-	__MapFindResult struct #ordered {
-		hash_index:  int,
-		entry_prev:  int,
-		entry_index: int,
-	}
+__MapFindResult :: struct #ordered {
+	hash_index:  int,
+	entry_prev:  int,
+	entry_index: int,
+}
 
-	__MapEntryHeader struct #ordered {
-		key:  __MapKey,
-		next: int,
-	/*
-		value: Value_Type,
-	*/
-	}
+__MapEntryHeader :: struct #ordered {
+	key:  __MapKey,
+	next: int,
+/*
+	value: Value_Type,
+*/
+}
 
-	__MapHeader struct #ordered {
-		m:             ^raw.DynamicMap,
-		is_key_string: bool,
-		entry_size:    int,
-		entry_align:   int,
-		value_offset:  int,
-		value_size:    int,
-	}
-)
+__MapHeader :: struct #ordered {
+	m:             ^raw.DynamicMap,
+	is_key_string: bool,
+	entry_size:    int,
+	entry_align:   int,
+	value_offset:  int,
+	value_size:    int,
+}
 
 proc __dynamic_map_reserve(using header: __MapHeader, cap: int)  {
 	__dynamic_array_reserve(&m.hashes, size_of(int), align_of(int), cap);
@@ -648,37 +645,37 @@ proc __dynamic_map_reserve(using header: __MapHeader, cap: int)  {
 }
 
 proc __dynamic_map_rehash(using header: __MapHeader, new_count: int) {
-	var new_header: __MapHeader = header;
-	var nm: raw.DynamicMap;
+	new_header: __MapHeader = header;
+	nm: raw.DynamicMap;
 	new_header.m = &nm;
 
-	var header_hashes = ^raw.DynamicArray(&header.m.hashes);
-	var nm_hashes = ^raw.DynamicArray(&nm.hashes);
+	header_hashes := ^raw.DynamicArray(&header.m.hashes);
+	nm_hashes     := ^raw.DynamicArray(&nm.hashes);
 
 	__dynamic_array_resize(nm_hashes, size_of(int), align_of(int), new_count);
 	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len);
 	for i in 0..<new_count -> nm.hashes[i] = -1;
 
-	for var i = 0; i < m.entries.len; i++ {
+	for i := 0; i < m.entries.len; i++ {
 		if len(nm.hashes) == 0 {
 			__dynamic_map_grow(new_header);
 		}
 
-		var entry_header = __dynamic_map_get_entry(header, i);
-		var data = ^u8(entry_header);
+		entry_header := __dynamic_map_get_entry(header, i);
+		data := ^u8(entry_header);
 
-		var fr = __dynamic_map_find(new_header, entry_header.key);
-		var j = __dynamic_map_add_entry(new_header, entry_header.key);
+		fr := __dynamic_map_find(new_header, entry_header.key);
+		j := __dynamic_map_add_entry(new_header, entry_header.key);
 		if fr.entry_prev < 0 {
 			nm.hashes[fr.hash_index] = j;
 		} else {
-			var e = __dynamic_map_get_entry(new_header, fr.entry_prev);
+			e := __dynamic_map_get_entry(new_header, fr.entry_prev);
 			e.next = j;
 		}
 
-		var e = __dynamic_map_get_entry(new_header, j);
+		e := __dynamic_map_get_entry(new_header, j);
 		e.next = fr.entry_index;
-		var ndata = ^u8(e);
+		ndata := ^u8(e);
 		__mem_copy(ndata+value_offset, data+value_offset, value_size);
 
 		if __dynamic_map_full(new_header) {
@@ -691,17 +688,17 @@ proc __dynamic_map_rehash(using header: __MapHeader, new_count: int) {
 }
 
 proc __dynamic_map_get(h: __MapHeader, key: __MapKey) -> rawptr {
-	var index = __dynamic_map_find(h, key).entry_index;
+	index := __dynamic_map_find(h, key).entry_index;
 	if index >= 0 {
-		var data = ^u8(__dynamic_map_get_entry(h, index));
-		var val = data + h.value_offset;
+		data := ^u8(__dynamic_map_get_entry(h, index));
+		val := data + h.value_offset;
 		return val;
 	}
 	return nil;
 }
 
 proc __dynamic_map_set(using h: __MapHeader, key: __MapKey, value: rawptr) {
-	var index: int;
+	index: int;
 	assert(value != nil);
 
 
@@ -710,22 +707,22 @@ proc __dynamic_map_set(using h: __MapHeader, key: __MapKey, value: rawptr) {
 		__dynamic_map_grow(h);
 	}
 
-	var fr = __dynamic_map_find(h, key);
+	fr := __dynamic_map_find(h, key);
 	if fr.entry_index >= 0 {
 		index = fr.entry_index;
 	} else {
 		index = __dynamic_map_add_entry(h, key);
 		if fr.entry_prev >= 0 {
-			var entry = __dynamic_map_get_entry(h, fr.entry_prev);
+			entry := __dynamic_map_get_entry(h, fr.entry_prev);
 			entry.next = index;
 		} else {
 			m.hashes[fr.hash_index] = index;
 		}
 	}
 	{
-		var e = __dynamic_map_get_entry(h, index);
+		e := __dynamic_map_get_entry(h, index);
 		e.key = key;
-		var val = ^u8(e) + value_offset;
+		val := ^u8(e) + value_offset;
 		__mem_copy(val, value, value_size);
 	}
 
@@ -736,7 +733,7 @@ proc __dynamic_map_set(using h: __MapHeader, key: __MapKey, value: rawptr) {
 
 
 proc __dynamic_map_grow(using h: __MapHeader) {
-	var new_count = max(2*m.entries.cap + 8, __INITIAL_MAP_CAP);
+	new_count := max(2*m.entries.cap + 8, __INITIAL_MAP_CAP);
 	__dynamic_map_rehash(h, new_count);
 }
 
@@ -754,12 +751,12 @@ proc __dynamic_map_hash_equal(h: __MapHeader, a, b: __MapKey) -> bool {
 }
 
 proc __dynamic_map_find(using h: __MapHeader, key: __MapKey) -> __MapFindResult {
-	var fr = __MapFindResult{-1, -1, -1};
+	fr := __MapFindResult{-1, -1, -1};
 	if len(m.hashes) > 0 {
 		fr.hash_index = int(key.hash % u128(len(m.hashes)));
 		fr.entry_index = m.hashes[fr.hash_index];
 		for fr.entry_index >= 0 {
-			var entry = __dynamic_map_get_entry(h, fr.entry_index);
+			entry := __dynamic_map_get_entry(h, fr.entry_index);
 			if __dynamic_map_hash_equal(h, entry.key, key) {
 				return fr;
 			}
@@ -771,10 +768,10 @@ proc __dynamic_map_find(using h: __MapHeader, key: __MapKey) -> __MapFindResult 
 }
 
 proc __dynamic_map_add_entry(using h: __MapHeader, key: __MapKey) -> int {
-	var prev = m.entries.len;
-	var c = __dynamic_array_append_nothing(&m.entries, entry_size, entry_align);
+	prev := m.entries.len;
+	c := __dynamic_array_append_nothing(&m.entries, entry_size, entry_align);
 	if c != prev {
-		var end = __dynamic_map_get_entry(h, c-1);
+		end := __dynamic_map_get_entry(h, c-1);
 		end.key = key;
 		end.next = -1;
 	}
@@ -783,14 +780,14 @@ proc __dynamic_map_add_entry(using h: __MapHeader, key: __MapKey) -> int {
 
 
 proc __dynamic_map_delete(using h: __MapHeader, key: __MapKey) {
-	var fr = __dynamic_map_find(h, key);
+	fr := __dynamic_map_find(h, key);
 	if fr.entry_index >= 0 {
 		__dynamic_map_erase(h, fr);
 	}
 }
 
 proc __dynamic_map_get_entry(using h: __MapHeader, index: int) -> ^__MapEntryHeader {
-	var data = ^u8(m.entries.data) + index*entry_size;
+	data := ^u8(m.entries.data) + index*entry_size;
 	return ^__MapEntryHeader(data);
 }
 
@@ -805,7 +802,7 @@ proc __dynamic_map_erase(using h: __MapHeader, fr: __MapFindResult) {
 		m.entries.len--;
 	}
 	__mem_copy(__dynamic_map_get_entry(h, fr.entry_index), __dynamic_map_get_entry(h, m.entries.len-1), entry_size);
-	var last = __dynamic_map_find(h, __dynamic_map_get_entry(h, fr.entry_index).key);
+	last := __dynamic_map_find(h, __dynamic_map_get_entry(h, fr.entry_index).key);
 	if last.entry_prev >= 0 {
 		__dynamic_map_get_entry(h, last.entry_prev).next = fr.entry_index;
 	} else {

@@ -1,4 +1,22 @@
-import "fmt.odin";
+import (
+	"atomics.odin";
+	"bits.odin";
+	"decimal.odin";
+	"fmt.odin";
+	"hash.odin";
+	"math.odin";
+	"mem.odin";
+	"opengl.odin";
+	"os.odin";
+	"pool.odin";
+	"raw.odin";
+	"strconv.odin";
+	"strings.odin";
+	"sync.odin";
+	"types.odin";
+	"utf8.odin";
+	"utf16.odin";
+)
 
 proc general_stuff() {
 	// Complex numbers
@@ -20,13 +38,13 @@ proc general_stuff() {
 	}
 
 
-	type Foo struct {
+	Foo :: struct {
 		x: int,
 		y: f32,
 		z: string,
 	}
-	var foo = Foo{123, 0.513, "A string"};
-	var x, y, z = expand_to_tuple(foo);
+	foo := Foo{123, 0.513, "A string"};
+	x, y, z := expand_to_tuple(foo);
 	fmt.println(x, y, z);
 	compile_assert(type_of(x) == int);
 	compile_assert(type_of(y) == f32);
@@ -36,7 +54,7 @@ proc general_stuff() {
 	// By default, all variables are zeroed
 	// This can be overridden with the "uninitialized value"
 	// This is similar to `nil` but applied to everything
-	var undef_int: int = ---;
+	undef_int: int = ---;
 
 
 	// Context system is now implemented using Implicit Parameter Passing (IPP)
@@ -66,7 +84,7 @@ proc default_arguments() {
 }
 
 proc named_arguments() {
-	type Colour enum {
+	Colour :: enum {
 		Red,
 		Orange,
 		Yellow,
@@ -110,7 +128,7 @@ proc named_arguments() {
 	// Named arguments can also aid with default arguments
 	proc numerous_things(s: string, a = 1, b = 2, c = 3.14,
 	                     d = "The Best String!", e = false, f = 10.3/3.1, g = false) {
-		var g_str = g ? "true" : "false";
+		g_str := g ? "true" : "false";
 		fmt.printf("How many?! %s: %v\n", s, g_str);
 	}
 
@@ -150,13 +168,13 @@ proc default_return_values() {
 
 
 	// A more "real" example
-	type Error enum {
+	Error :: enum {
 		None,
 		WhyTheNumberThree,
 		TenIsTooBig,
 	};
 
-	type Entity struct {
+	Entity :: struct {
 		name: string,
 		id:   u32,
 	}
@@ -167,7 +185,7 @@ proc default_return_values() {
 		case input >= 10: return err = Error.TenIsTooBig;
 		}
 
-		var e = new(Entity);
+		e := new(Entity);
 		e.id = u32(input);
 
 		return result = e;
@@ -183,7 +201,7 @@ proc call_location() {
 		fmt.println();
 	}
 
-	var loc = #location(main);
+	loc := #location(main);
 	fmt.println("`main` is located at", loc);
 
 	fmt.println("This line is located at", #location());
@@ -203,18 +221,18 @@ proc explicit_parametric_polymorphic_procedures() {
 		return ^T(alloc(size_of(T), align_of(T)));
 	}
 
-	var int_ptr = alloc_type(int);
+	int_ptr := alloc_type(int);
 	defer free(int_ptr);
 	int_ptr^ = 137;
 	fmt.println(int_ptr, int_ptr^);
 
 	// Named arguments work too!
-	var another_ptr = alloc_type(T = f32);
+	another_ptr := alloc_type(T = f32);
 	defer free(another_ptr);
 
 
 	proc add(T: type, args: ..T) -> T {
-		var res: T;
+		res: T;
 		for arg in args {
 			res += arg;
 		}
@@ -224,12 +242,12 @@ proc explicit_parametric_polymorphic_procedures() {
 	fmt.println("add =", add(int, 1, 2, 3, 4, 5, 6));
 
 	proc swap(T: type, a, b: ^T) {
-		var tmp = a^;
+		tmp := a^;
 		a^ = b^;
 		b^ = tmp;
 	}
 
-	var a, b: int = 3, 4;
+	a, b: int = 3, 4;
 	fmt.println("Pre-swap:", a, b);
 	swap(int, &a, &b);
 	fmt.println("Post-swap:", a, b);
@@ -242,9 +260,9 @@ proc explicit_parametric_polymorphic_procedures() {
 
 	// A more complicated example using subtyping
 	// Something like this could be used in a game
-	type Vector2 struct {x, y: f32};
+	Vector2 :: struct {x, y: f32};
 
-	type Entity struct {
+	Entity :: struct {
 		using position: Vector2,
 		flags:          u64,
 		id:             u64,
@@ -254,27 +272,27 @@ proc explicit_parametric_polymorphic_procedures() {
 		derived:        any,
 	}
 
-	type Rock struct {
+	Rock :: struct {
 		using entity: ^Entity,
 		heavy: bool,
 	}
-	type Door struct {
+	Door :: struct {
 		using entity: ^Entity,
 		open:         bool,
 	}
-	type Monster struct {
+	Monster :: struct {
 		using entity: ^Entity,
 		is_robot:     bool,
 		is_zombie:    bool,
 	}
 
-	type EntityManager struct {
+	EntityManager :: struct {
 		batches: [dynamic]^EntityBatch,
 		next_portable_id: u32,
 	}
 
-	const ENTITIES_PER_BATCH = 16;
-	type EntityBatch struct {
+	ENTITIES_PER_BATCH :: 16;
+	EntityBatch :: struct {
 		data:        [ENTITIES_PER_BATCH]Entity,
 		occupied:    [ENTITIES_PER_BATCH]bool,
 		batch_index: u32,
@@ -285,7 +303,7 @@ proc explicit_parametric_polymorphic_procedures() {
 			if ok -> continue;
 			batch.occupied[i] = true;
 
-			var e = &batch.data[i];
+			e := &batch.data[i];
 			e.batch_index = u32(batch.batch_index);
 			e.slot_index  = u32(i);
 			e.portable_id = manager.next_portable_id;
@@ -297,11 +315,11 @@ proc explicit_parametric_polymorphic_procedures() {
 
 	proc gen_new_entity(manager: ^EntityManager) -> ^Entity {
 		for b in manager.batches {
-			var e = use_empty_slot(manager, b);
+			e := use_empty_slot(manager, b);
 			if e != nil -> return e;
 		}
 
-		var new_batch = new(EntityBatch);
+		new_batch := new(EntityBatch);
 		append(manager.batches, new_batch);
 		new_batch.batch_index = u32(len(manager.batches)-1);
 
@@ -311,7 +329,7 @@ proc explicit_parametric_polymorphic_procedures() {
 
 
 	proc new_entity(manager: ^EntityManager, Type: type, x, y: int) -> ^Type {
-		var result = new(Type);
+		result := new(Type);
 		result.entity = gen_new_entity(manager);
 		result.derived.data = result;
 		result.derived.type_info = type_info(Type);
@@ -322,16 +340,16 @@ proc explicit_parametric_polymorphic_procedures() {
 		return result;
 	}
 
-	var manager: EntityManager;
-	var entities: [dynamic]^Entity;
+	manager: EntityManager;
+	entities: [dynamic]^Entity;
 
-	var rock    = new_entity(&manager, Rock, 3, 5);
+	rock    := new_entity(&manager, Rock, 3, 5);
 
 	// Named arguments work too!
-	var door    = new_entity(manager = &manager, Type = Door, x = 3, y = 6);
+	door    := new_entity(manager = &manager, Type = Door, x = 3, y = 6);
 
 	// And named arguments can be any order
-	var monster = new_entity(
+	monster := new_entity(
 		y = 1,
 		x = 2,
 		manager = &manager,
@@ -417,8 +435,8 @@ proc main() {
 
 /*
 proc main() {
-	var program = "+ + * - /";
-	var accumulator = 0;
+	program := "+ + * - /";
+	accumulator := 0;
 
 	for token in program {
 		match token {

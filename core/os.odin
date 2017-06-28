@@ -9,13 +9,13 @@ proc write_string(fd: Handle, str: string) -> (int, Errno) {
 }
 
 proc read_entire_file(name: string) -> ([]u8, bool) {
-	var fd, err = open(name, O_RDONLY, 0);
+	fd, err := open(name, O_RDONLY, 0);
 	if err != 0 {
 		return nil, false;
 	}
 	defer close(fd);
 
-	var length: i64;
+	length: i64;
 	if length, err = file_size(fd); err != 0 {
 		return nil, false;
 	}
@@ -24,12 +24,12 @@ proc read_entire_file(name: string) -> ([]u8, bool) {
 		return nil, true;
 	}
 
-	var data = make([]u8, length);
+	data := make([]u8, length);
 	if data == nil {
 		return nil, false;
 	}
 
-	var bytes_read, read_err = read(fd, data);
+	bytes_read, read_err := read(fd, data);
 	if read_err != 0 {
 		free(data);
 		return nil, false;
@@ -38,12 +38,12 @@ proc read_entire_file(name: string) -> ([]u8, bool) {
 }
 
 proc write_entire_file(name: string, data: []u8) -> bool {
-	var fd, err = open(name, O_WRONLY, 0);
+	fd, err := open(name, O_WRONLY, 0);
 	if err != 0 {
 		return false;
 	}
 	defer close(fd);
 
-	var bytes_written, write_err = write(fd, data);
+	bytes_written, write_err := write(fd, data);
 	return write_err != 0;
 }

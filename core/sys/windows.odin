@@ -25,16 +25,14 @@ type (
 )
 
 type Bool i32;
-const (
-	FALSE: Bool = 0;
-	TRUE        = 1;
-)
+FALSE: Bool : 0;
+TRUE:  Bool : 1;
 
-type Point struct #ordered {
+Point :: struct #ordered {
 	x, y: i32,
 }
 
-type WndClassExA struct #ordered {
+WndClassExA :: struct #ordered {
 	size, style:           u32,
 	wnd_proc:              WndProc,
 	cls_extra, wnd_extra:  i32,
@@ -46,7 +44,7 @@ type WndClassExA struct #ordered {
 	sm:                    Hicon,
 }
 
-type Msg struct #ordered {
+Msg :: struct #ordered {
 	hwnd:    Hwnd,
 	message: u32,
 	wparam:  Wparam,
@@ -55,24 +53,24 @@ type Msg struct #ordered {
 	pt:      Point,
 }
 
-type Rect struct #ordered {
+Rect :: struct #ordered {
 	left:   i32,
 	top:    i32,
 	right:  i32,
 	bottom: i32,
 }
 
-type Filetime struct #ordered {
+Filetime :: struct #ordered {
 	lo, hi: u32,
 }
 
-type Systemtime struct #ordered {
+Systemtime :: struct #ordered {
 	year, month: u16,
 	day_of_week, day: u16,
 	hour, minute, second, millisecond: u16,
 }
 
-type ByHandleFileInformation struct #ordered {
+ByHandleFileInformation :: struct #ordered {
 	file_attributes:      u32,
 	creation_time,
 	last_access_time,
@@ -85,7 +83,7 @@ type ByHandleFileInformation struct #ordered {
 	file_index_low:       u32,
 }
 
-type FileAttributeData struct #ordered {
+FileAttributeData :: struct #ordered {
 	file_attributes:  u32,
 	creation_time,
 	last_access_time,
@@ -94,7 +92,7 @@ type FileAttributeData struct #ordered {
 	file_size_low:    u32,
 }
 
-type FindData struct #ordered {
+FindData :: struct #ordered {
     file_attributes:     u32,
     creation_time:       Filetime,
     last_access_time:    Filetime,
@@ -107,7 +105,7 @@ type FindData struct #ordered {
     alternate_file_name: [14]u8,
 }
 
-type Security_Attributes struct #ordered {
+Security_Attributes :: struct #ordered {
 	length:              u32,
 	security_descriptor: rawptr,
 	inherit_handle:      Bool,
@@ -115,7 +113,7 @@ type Security_Attributes struct #ordered {
 
 
 
-type PixelFormatDescriptor struct #ordered {
+PixelFormatDescriptor :: struct #ordered {
 	size,
 	version,
 	flags: u32,
@@ -151,138 +149,129 @@ type PixelFormatDescriptor struct #ordered {
 
 type Proc proc() #cc_c;
 
-const (
-	MAPVK_VK_TO_VSC    = 0;
-	MAPVK_VSC_TO_VK    = 1;
-	MAPVK_VK_TO_CHAR   = 2;
-	MAPVK_VSC_TO_VK_EX = 3;
-)
+MAPVK_VK_TO_VSC    :: 0;
+MAPVK_VSC_TO_VK    :: 1;
+MAPVK_VK_TO_CHAR   :: 2;
+MAPVK_VSC_TO_VK_EX :: 3;
 
 
 
-const INVALID_HANDLE = Handle(~int(0));
+
+INVALID_HANDLE :: Handle(~int(0));
 
 
-const (
-	CS_VREDRAW    = 0x0001;
-	CS_HREDRAW    = 0x0002;
-	CS_OWNDC      = 0x0020;
-	CW_USEDEFAULT = -0x80000000;
+CS_VREDRAW    :: 0x0001;
+CS_HREDRAW    :: 0x0002;
+CS_OWNDC      :: 0x0020;
+CW_USEDEFAULT :: -0x80000000;
 
-	WS_OVERLAPPED       = 0;
-	WS_MAXIMIZEBOX      = 0x00010000;
-	WS_MINIMIZEBOX      = 0x00020000;
-	WS_THICKFRAME       = 0x00040000;
-	WS_SYSMENU          = 0x00080000;
-	WS_BORDER           = 0x00800000;
-	WS_CAPTION          = 0x00C00000;
-	WS_VISIBLE          = 0x10000000;
-	WS_POPUP            = 0x80000000;
-	WS_OVERLAPPEDWINDOW = WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
-	WS_POPUPWINDOW      = WS_POPUP | WS_BORDER | WS_SYSMENU;
+WS_OVERLAPPED       :: 0;
+WS_MAXIMIZEBOX      :: 0x00010000;
+WS_MINIMIZEBOX      :: 0x00020000;
+WS_THICKFRAME       :: 0x00040000;
+WS_SYSMENU          :: 0x00080000;
+WS_BORDER           :: 0x00800000;
+WS_CAPTION          :: 0x00C00000;
+WS_VISIBLE          :: 0x10000000;
+WS_POPUP            :: 0x80000000;
+WS_OVERLAPPEDWINDOW :: WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX;
+WS_POPUPWINDOW      :: WS_POPUP | WS_BORDER | WS_SYSMENU;
 
-	WM_DESTROY           = 0x0002;
-	WM_SIZE	             = 0x0005;
-	WM_CLOSE             = 0x0010;
-	WM_ACTIVATEAPP       = 0x001C;
-	WM_QUIT              = 0x0012;
-	WM_KEYDOWN           = 0x0100;
-	WM_KEYUP             = 0x0101;
-	WM_SIZING            = 0x0214;
-	WM_SYSKEYDOWN        = 0x0104;
-	WM_SYSKEYUP          = 0x0105;
-	WM_WINDOWPOSCHANGED  = 0x0047;
-	WM_SETCURSOR         = 0x0020;
-	WM_CHAR              = 0x0102;
-	WM_ACTIVATE          = 0x0006;
-	WM_SETFOCUS          = 0x0007;
-	WM_KILLFOCUS         = 0x0008;
-	WM_USER              = 0x0400;
+WM_DESTROY           :: 0x0002;
+WM_SIZE	             :: 0x0005;
+WM_CLOSE             :: 0x0010;
+WM_ACTIVATEAPP       :: 0x001C;
+WM_QUIT              :: 0x0012;
+WM_KEYDOWN           :: 0x0100;
+WM_KEYUP             :: 0x0101;
+WM_SIZING            :: 0x0214;
+WM_SYSKEYDOWN        :: 0x0104;
+WM_SYSKEYUP          :: 0x0105;
+WM_WINDOWPOSCHANGED  :: 0x0047;
+WM_SETCURSOR         :: 0x0020;
+WM_CHAR              :: 0x0102;
+WM_ACTIVATE          :: 0x0006;
+WM_SETFOCUS          :: 0x0007;
+WM_KILLFOCUS         :: 0x0008;
+WM_USER              :: 0x0400;
 
-	WM_MOUSEWHEEL    = 0x020A;
-	WM_MOUSEMOVE     = 0x0200;
-	WM_LBUTTONDOWN   = 0x0201;
-	WM_LBUTTONUP     = 0x0202;
-	WM_LBUTTONDBLCLK = 0x0203;
-	WM_RBUTTONDOWN   = 0x0204;
-	WM_RBUTTONUP     = 0x0205;
-	WM_RBUTTONDBLCLK = 0x0206;
-	WM_MBUTTONDOWN   = 0x0207;
-	WM_MBUTTONUP     = 0x0208;
-	WM_MBUTTONDBLCLK = 0x0209;
+WM_MOUSEWHEEL    :: 0x020A;
+WM_MOUSEMOVE     :: 0x0200;
+WM_LBUTTONDOWN   :: 0x0201;
+WM_LBUTTONUP     :: 0x0202;
+WM_LBUTTONDBLCLK :: 0x0203;
+WM_RBUTTONDOWN   :: 0x0204;
+WM_RBUTTONUP     :: 0x0205;
+WM_RBUTTONDBLCLK :: 0x0206;
+WM_MBUTTONDOWN   :: 0x0207;
+WM_MBUTTONUP     :: 0x0208;
+WM_MBUTTONDBLCLK :: 0x0209;
 
-	PM_NOREMOVE = 0x0000;
-	PM_REMOVE   = 0x0001;
-	PM_NOYIELD  = 0x0002;
+PM_NOREMOVE :: 0x0000;
+PM_REMOVE   :: 0x0001;
+PM_NOYIELD  :: 0x0002;
 
-	BLACK_BRUSH = 4;
+BLACK_BRUSH :: 4;
 
-	SM_CXSCREEN = 0;
-	SM_CYSCREEN = 1;
+SM_CXSCREEN :: 0;
+SM_CYSCREEN :: 1;
 
-	SW_SHOW = 5;
-)
+SW_SHOW :: 5;
 
-const COLOR_BACKGROUND = Hbrush(int(1));
+COLOR_BACKGROUND :: Hbrush(int(1));
 
-const INVALID_SET_FILE_POINTER = ~u32(0);
-const HEAP_ZERO_MEMORY = 0x00000008;
-const INFINITE = 0xffffffff;
-const GWL_STYLE = -16;
-const Hwnd_TOP = Hwnd(uint(0));
+INVALID_SET_FILE_POINTER :: ~u32(0);
+HEAP_ZERO_MEMORY         :: 0x00000008;
+INFINITE                 :: 0xffffffff;
+GWL_STYLE                :: -16;
+Hwnd_TOP                 :: Hwnd(uint(0));
 
-const BI_RGB         = 0;
-const DIB_RGB_COLORS = 0x00;
-const SRCCOPY: u32   = 0x00cc0020;
+BI_RGB         :: 0;
+DIB_RGB_COLORS :: 0x00;
+SRCCOPY: u32    : 0x00cc0020;
 
-const (
-	MONITOR_DEFAULTTONULL    = 0x00000000;
-	MONITOR_DEFAULTTOPRIMARY = 0x00000001;
-	MONITOR_DEFAULTTONEAREST = 0x00000002;
-)
-const (
-	SWP_FRAMECHANGED  = 0x0020;
-	SWP_NOOWNERZORDER = 0x0200;
-	SWP_NOZORDER      = 0x0004;
-	SWP_NOSIZE        = 0x0001;
-	SWP_NOMOVE        = 0x0002;
-)
+
+MONITOR_DEFAULTTONULL    :: 0x00000000;
+MONITOR_DEFAULTTOPRIMARY :: 0x00000001;
+MONITOR_DEFAULTTONEAREST :: 0x00000002;
+
+SWP_FRAMECHANGED  :: 0x0020;
+SWP_NOOWNERZORDER :: 0x0200;
+SWP_NOZORDER      :: 0x0004;
+SWP_NOSIZE        :: 0x0001;
+SWP_NOMOVE        :: 0x0002;
 
 
 
 
 // Windows OpenGL
-const (
-	PFD_TYPE_RGBA             = 0;
-	PFD_TYPE_COLORINDEX       = 1;
-	PFD_MAIN_PLANE            = 0;
-	PFD_OVERLAY_PLANE         = 1;
-	PFD_UNDERLAY_PLANE        = -1;
-	PFD_DOUBLEBUFFER          = 1;
-	PFD_STEREO                = 2;
-	PFD_DRAW_TO_WINDOW        = 4;
-	PFD_DRAW_TO_BITMAP        = 8;
-	PFD_SUPPORT_GDI           = 16;
-	PFD_SUPPORT_OPENGL        = 32;
-	PFD_GENERIC_FORMAT        = 64;
-	PFD_NEED_PALETTE          = 128;
-	PFD_NEED_SYSTEM_PALETTE   = 0x00000100;
-	PFD_SWAP_EXCHANGE         = 0x00000200;
-	PFD_SWAP_COPY             = 0x00000400;
-	PFD_SWAP_LAYER_BUFFERS    = 0x00000800;
-	PFD_GENERIC_ACCELERATED   = 0x00001000;
-	PFD_DEPTH_DONTCARE        = 0x20000000;
-	PFD_DOUBLEBUFFER_DONTCARE = 0x40000000;
-	PFD_STEREO_DONTCARE       = 0x80000000;
-)
 
-
+PFD_TYPE_RGBA             :: 0;
+PFD_TYPE_COLORINDEX       :: 1;
+PFD_MAIN_PLANE            :: 0;
+PFD_OVERLAY_PLANE         :: 1;
+PFD_UNDERLAY_PLANE        :: -1;
+PFD_DOUBLEBUFFER          :: 1;
+PFD_STEREO                :: 2;
+PFD_DRAW_TO_WINDOW        :: 4;
+PFD_DRAW_TO_BITMAP        :: 8;
+PFD_SUPPORT_GDI           :: 16;
+PFD_SUPPORT_OPENGL        :: 32;
+PFD_GENERIC_FORMAT        :: 64;
+PFD_NEED_PALETTE          :: 128;
+PFD_NEED_SYSTEM_PALETTE   :: 0x00000100;
+PFD_SWAP_EXCHANGE         :: 0x00000200;
+PFD_SWAP_COPY             :: 0x00000400;
+PFD_SWAP_LAYER_BUFFERS    :: 0x00000800;
+PFD_GENERIC_ACCELERATED   :: 0x00001000;
+PFD_DEPTH_DONTCARE        :: 0x20000000;
+PFD_DOUBLEBUFFER_DONTCARE :: 0x40000000;
+PFD_STEREO_DONTCARE       :: 0x80000000;
 
 type GET_FILEEX_INFO_LEVELS i32;
-const (
-	GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS = 0;
-	GetFileExMaxInfoLevel                         = 1;
-)
+GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0;
+GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1;
+
 
 foreign kernel32 {
 	proc get_last_error     () -> i32                                                                                       #cc_std #link_name "GetLastError";
@@ -448,7 +437,7 @@ foreign winmm {
 
 
 proc get_query_performance_frequency() -> i64 {
-	var r: i64;
+	r: i64;
 	query_performance_frequency(&r);
 	return r;
 }
@@ -463,67 +452,66 @@ proc is_key_down(key: KeyCode) -> bool #inline { return get_async_key_state(i32(
 
 
 
-const (
-	MAX_PATH = 0x00000104;
 
-	HANDLE_FLAG_INHERIT = 1;
-	HANDLE_FLAG_PROTECT_FROM_CLOSE = 2;
+MAX_PATH :: 0x00000104;
 
-	FILE_BEGIN   = 0;
-	FILE_CURRENT = 1;
-	FILE_END     = 2;
+HANDLE_FLAG_INHERIT :: 1;
+HANDLE_FLAG_PROTECT_FROM_CLOSE :: 2;
 
-	FILE_SHARE_READ      = 0x00000001;
-	FILE_SHARE_WRITE     = 0x00000002;
-	FILE_SHARE_DELETE    = 0x00000004;
-	FILE_GENERIC_ALL     = 0x10000000;
-	FILE_GENERIC_EXECUTE = 0x20000000;
-	FILE_GENERIC_WRITE   = 0x40000000;
-	FILE_GENERIC_READ    = 0x80000000;
+FILE_BEGIN   :: 0;
+FILE_CURRENT :: 1;
+FILE_END     :: 2;
 
-	FILE_APPEND_DATA = 0x0004;
+FILE_SHARE_READ      :: 0x00000001;
+FILE_SHARE_WRITE     :: 0x00000002;
+FILE_SHARE_DELETE    :: 0x00000004;
+FILE_GENERIC_ALL     :: 0x10000000;
+FILE_GENERIC_EXECUTE :: 0x20000000;
+FILE_GENERIC_WRITE   :: 0x40000000;
+FILE_GENERIC_READ    :: 0x80000000;
 
-	STD_INPUT_HANDLE  = -10;
-	STD_OUTPUT_HANDLE = -11;
-	STD_ERROR_HANDLE  = -12;
+FILE_APPEND_DATA :: 0x0004;
 
-	CREATE_NEW        = 1;
-	CREATE_ALWAYS     = 2;
-	OPEN_EXISTING     = 3;
-	OPEN_ALWAYS       = 4;
-	TRUNCATE_EXISTING = 5;
+STD_INPUT_HANDLE  :: -10;
+STD_OUTPUT_HANDLE :: -11;
+STD_ERROR_HANDLE  :: -12;
 
-	INVALID_FILE_ATTRIBUTES  = -1;
+CREATE_NEW        :: 1;
+CREATE_ALWAYS     :: 2;
+OPEN_EXISTING     :: 3;
+OPEN_ALWAYS       :: 4;
+TRUNCATE_EXISTING :: 5;
 
-	FILE_ATTRIBUTE_READONLY             = 0x00000001;
-	FILE_ATTRIBUTE_HIDDEN               = 0x00000002;
-	FILE_ATTRIBUTE_SYSTEM               = 0x00000004;
-	FILE_ATTRIBUTE_DIRECTORY            = 0x00000010;
-	FILE_ATTRIBUTE_ARCHIVE              = 0x00000020;
-	FILE_ATTRIBUTE_DEVICE               = 0x00000040;
-	FILE_ATTRIBUTE_NORMAL               = 0x00000080;
-	FILE_ATTRIBUTE_TEMPORARY            = 0x00000100;
-	FILE_ATTRIBUTE_SPARSE_FILE          = 0x00000200;
-	FILE_ATTRIBUTE_REPARSE_Point        = 0x00000400;
-	FILE_ATTRIBUTE_COMPRESSED           = 0x00000800;
-	FILE_ATTRIBUTE_OFFLINE              = 0x00001000;
-	FILE_ATTRIBUTE_NOT_CONTENT_INDEXED  = 0x00002000;
-	FILE_ATTRIBUTE_ENCRYPTED            = 0x00004000;
+INVALID_FILE_ATTRIBUTES  :: -1;
 
-	FILE_TYPE_DISK = 0x0001;
-	FILE_TYPE_CHAR = 0x0002;
-	FILE_TYPE_PIPE = 0x0003;
-)
+FILE_ATTRIBUTE_READONLY             :: 0x00000001;
+FILE_ATTRIBUTE_HIDDEN               :: 0x00000002;
+FILE_ATTRIBUTE_SYSTEM               :: 0x00000004;
+FILE_ATTRIBUTE_DIRECTORY            :: 0x00000010;
+FILE_ATTRIBUTE_ARCHIVE              :: 0x00000020;
+FILE_ATTRIBUTE_DEVICE               :: 0x00000040;
+FILE_ATTRIBUTE_NORMAL               :: 0x00000080;
+FILE_ATTRIBUTE_TEMPORARY            :: 0x00000100;
+FILE_ATTRIBUTE_SPARSE_FILE          :: 0x00000200;
+FILE_ATTRIBUTE_REPARSE_Point        :: 0x00000400;
+FILE_ATTRIBUTE_COMPRESSED           :: 0x00000800;
+FILE_ATTRIBUTE_OFFLINE              :: 0x00001000;
+FILE_ATTRIBUTE_NOT_CONTENT_INDEXED  :: 0x00002000;
+FILE_ATTRIBUTE_ENCRYPTED            :: 0x00004000;
+
+FILE_TYPE_DISK :: 0x0001;
+FILE_TYPE_CHAR :: 0x0002;
+FILE_TYPE_PIPE :: 0x0003;
 
 
-type MonitorInfo struct #ordered {
+MonitorInfo :: struct #ordered {
 	size:      u32,
 	monitor:   Rect,
 	work:      Rect,
 	flags:     u32,
 }
 
-type WindowPlacement struct #ordered {
+WindowPlacement :: struct #ordered {
 	length:     u32,
 	flags:      u32,
 	show_cmd:   u32,
@@ -532,7 +520,7 @@ type WindowPlacement struct #ordered {
 	normal_pos: Rect,
 }
 
-type BitmapInfoHeader struct #ordered {
+BitmapInfoHeader :: struct #ordered {
 	size:              u32,
 	width, height:     i32,
 	planes, bit_count: i16,
@@ -543,16 +531,16 @@ type BitmapInfoHeader struct #ordered {
 	clr_used:          u32,
 	clr_important:     u32,
 }
-type BitmapInfo struct #ordered {
+BitmapInfo :: struct #ordered {
 	using header: BitmapInfoHeader,
 	colors:       [1]RgbQuad,
 }
 
 
-type RgbQuad struct #ordered { blue, green, red, reserved: u8 }
+RgbQuad :: struct #ordered { blue, green, red, reserved: u8 }
 
 
-type KeyCode enum i32 {
+KeyCode :: enum i32 {
 	Lbutton    = 0x01,
 	Rbutton    = 0x02,
 	Cancel     = 0x03,

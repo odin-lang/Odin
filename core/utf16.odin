@@ -1,12 +1,11 @@
-const (
-	REPLACEMENT_CHAR = '\uFFFD';
-	MAX_RUNE         = '\U0010FFFF';
+REPLACEMENT_CHAR :: '\uFFFD';
+MAX_RUNE         :: '\U0010FFFF';
 
-	_surr1           = 0xd800;
-	_surr2           = 0xdc00;
-	_surr3           = 0xe000;
-	_surr_self       = 0x10000;
-)
+_surr1           :: 0xd800;
+_surr2           :: 0xdc00;
+_surr3           :: 0xe000;
+_surr_self       :: 0x10000;
+
 
 proc is_surrogate(r: rune) -> bool {
 	return _surr1 <= r && r < _surr3;
@@ -29,14 +28,14 @@ proc encode_surrogate_pair(r: rune) -> (r1, r2: rune) {
 }
 
 proc encode(d: []u16, s: []rune) {
-	var n = len(s);
+	n := len(s);
 	for r in s {
 		if r >= _surr_self {
 			n++;
 		}
 	}
 
-	var max_n = min(len(d), n);
+	max_n := min(len(d), n);
 	n = 0;
 
 	for r in s {
@@ -46,7 +45,7 @@ proc encode(d: []u16, s: []rune) {
 			n++;
 
 		case _surr_self..MAX_RUNE:
-			var r1, r2 = encode_surrogate_pair(r);
+			r1, r2 := encode_surrogate_pair(r);
 			d[n]    = u16(r1);
 			d[n+1]  = u16(r2);
 			n += 2;

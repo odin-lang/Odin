@@ -1871,6 +1871,15 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 	case AstNode_ProcDecl:
 		return s->ProcDecl.body != NULL;
 
+	case AstNode_ValueDecl:
+		if (s->ValueDecl.is_mutable) {
+			return false;
+		}
+		if (s->ValueDecl.values.count > 0) {
+			return is_semicolon_optional_for_node(f, s->ValueDecl.values[s->ValueDecl.values.count-1]);
+		}
+		break;
+
 	case AstNode_GenDecl:
 		if (s->GenDecl.close.pos.line != 0) {
 			return true;
@@ -3149,7 +3158,11 @@ AstNode *parse_value_decl(AstFile *f, Array<AstNode *> names, CommentGroup docs)
 	}
 
 	if (f->expr_level >= 0) {
-		expect_semicolon(f, NULL);
+		AstNode *end = NULL;
+		if (!is_mutable && values.count > 0) {
+			end = values[values.count-1];
+		}
+		expect_semicolon(f, end);
 	}
 
 	return ast_value_decl(f, names, type, values, is_mutable, docs, f->line_comment);
@@ -4317,8 +4330,8 @@ AstNode *parse_stmt(AstFile *f) {
 		expect_semicolon(f, s);
 		return s;
 
-	case Token_var:
-	case Token_const:
+	// case Token_var:
+	// case Token_const:
 	case Token_proc:
 	case Token_type:
 	case Token_import:
