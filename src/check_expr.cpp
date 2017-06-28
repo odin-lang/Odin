@@ -5034,10 +5034,10 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 	}
 
 
-	AstNode *proc_decl = clone_ast_node(a, old_decl->proc_decl);
-	ast_node(pd, ProcDecl, proc_decl);
+	AstNode *proc_lit = clone_ast_node(a, old_decl->proc_lit);
+	ast_node(pl, ProcLit, proc_lit);
 	// NOTE(bill): Associate the scope declared above with this procedure declaration's type
-	add_scope(c, pd->type, final_proc_type->Proc.scope);
+	add_scope(c, pl->type, final_proc_type->Proc.scope);
 	final_proc_type->Proc.is_generic_specialized = true;
 
 	u64 tags = base_entity->Procedure.tags;
@@ -5045,8 +5045,8 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 	Token token = ident->Ident;
 	DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, old_decl->parent);
 	d->gen_proc_type = final_proc_type;
-	d->type_expr = pd->type;
-	d->proc_decl = proc_decl;
+	d->type_expr = pl->type;
+	d->proc_lit = proc_lit;
 
 
 	Entity *entity = make_entity_procedure(c->allocator, NULL, token, final_proc_type, tags);
@@ -5061,7 +5061,7 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 		proc_info.token = token;
 		proc_info.decl  = d;
 		proc_info.type  = final_proc_type;
-		proc_info.body  = pd->body;
+		proc_info.body  = pl->body;
 		proc_info.tags  = tags;
 	}
 
@@ -5926,7 +5926,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		check_open_scope(c, pl->type);
 		{
 			decl = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
-			decl->proc_decl = node;
+			decl->proc_lit  = node;
 			c->context.decl = decl;
 
 			if (pl->tags != 0) {

@@ -18,7 +18,7 @@ import (
 	"utf16.odin";
 )
 
-proc general_stuff() {
+general_stuff :: proc() {
 	// Complex numbers
 	a := 3 + 4i;
 	b: complex64 = 3 + 4i;
@@ -33,8 +33,7 @@ proc general_stuff() {
 	// C-style variadic procedures
 	foreign __llvm_core {
 		// The variadic part allows for extra type checking too which C does not provide
-		proc c_printf(fmt: ^u8, #c_vararg args: ..any) -> i32
-			#link_name "printf";
+		c_printf :: proc(fmt: ^u8, #c_vararg args: ..any) -> i32 #link_name "printf" ---;
 	}
 
 
@@ -69,12 +68,12 @@ proc general_stuff() {
 
 }
 
-proc foreign_blocks() {
+foreign_blocks :: proc() {
 	// See sys/windows.odin
 }
 
-proc default_arguments() {
-	proc hello(a: int = 9, b: int = 9) {
+default_arguments :: proc() {
+	hello :: proc(a: int = 9, b: int = 9) {
 		fmt.printf("a is %d; b is %d\n", a, b);
 	}
 	fmt.println("\nTesting default arguments:");
@@ -83,7 +82,7 @@ proc default_arguments() {
 	hello();
 }
 
-proc named_arguments() {
+named_arguments :: proc() {
 	Colour :: enum {
 		Red,
 		Orange,
@@ -94,7 +93,7 @@ proc named_arguments() {
 	};
 	using Colour;
 
-	proc make_character(name, catch_phrase: string, favourite_colour, least_favourite_colour: Colour) {
+	make_character :: proc(name, catch_phrase: string, favourite_colour, least_favourite_colour: Colour) {
 	    fmt.println();
 	    fmt.printf("My name is %v and I like %v.  %v\n", name, favourite_colour, catch_phrase);
 	}
@@ -126,7 +125,7 @@ proc named_arguments() {
 
 
 	// Named arguments can also aid with default arguments
-	proc numerous_things(s: string, a = 1, b = 2, c = 3.14,
+	numerous_things :: proc(s: string, a = 1, b = 2, c = 3.14,
 	                     d = "The Best String!", e = false, f = 10.3/3.1, g = false) {
 		g_str := g ? "true" : "false";
 		fmt.printf("How many?! %s: %v\n", s, g_str);
@@ -137,7 +136,7 @@ proc named_arguments() {
 
 
 	// Default values can be placed anywhere, not just at the end like in other languages
-	proc weird(pre: string, mid: int = 0, post: string) {
+	weird :: proc(pre: string, mid: int = 0, post: string) {
 		fmt.println(pre, mid, post);
 	}
 
@@ -147,8 +146,8 @@ proc named_arguments() {
 }
 
 
-proc default_return_values() {
-	proc foo(x: int) -> (first: string = "Hellope", second = "world!") {
+default_return_values :: proc() {
+	foo :: proc(x: int) -> (first: string = "Hellope", second = "world!") {
 		match x {
 		case 0: return;
 		case 1: return "Goodbye";
@@ -179,7 +178,7 @@ proc default_return_values() {
 		id:   u32,
 	}
 
-	proc some_thing(input: int) -> (result: ^Entity = nil, err = Error.None) {
+	some_thing :: proc(input: int) -> (result: ^Entity = nil, err = Error.None) {
 		match {
 		case input == 3: return err = Error.WhyTheNumberThree;
 		case input >= 10: return err = Error.TenIsTooBig;
@@ -192,8 +191,8 @@ proc default_return_values() {
 	}
 }
 
-proc call_location() {
-	proc amazing(n: int, using loc = #caller_location) {
+call_location :: proc() {
+	amazing :: proc(n: int, using loc = #caller_location) {
 		fmt.printf("%s(%d:%d) just asked to do something amazing.\n",
 		           fully_pathed_filename, line, column);
 		fmt.printf("Normal -> %d\n", n);
@@ -215,9 +214,9 @@ proc call_location() {
 }
 
 
-proc explicit_parametric_polymorphic_procedures() {
+explicit_parametric_polymorphic_procedures :: proc() {
 	// This is how `new` is actually implemented, see _preload.odin
-	proc alloc_type(T: type) -> ^T {
+	alloc_type :: proc(T: type) -> ^T {
 		return ^T(alloc(size_of(T), align_of(T)));
 	}
 
@@ -231,7 +230,7 @@ proc explicit_parametric_polymorphic_procedures() {
 	defer free(another_ptr);
 
 
-	proc add(T: type, args: ..T) -> T {
+	add :: proc(T: type, args: ..T) -> T {
 		res: T;
 		for arg in args {
 			res += arg;
@@ -241,7 +240,7 @@ proc explicit_parametric_polymorphic_procedures() {
 
 	fmt.println("add =", add(int, 1, 2, 3, 4, 5, 6));
 
-	proc swap(T: type, a, b: ^T) {
+	swap :: proc(T: type, a, b: ^T) {
 		tmp := a^;
 		a^ = b^;
 		b^ = tmp;
@@ -298,7 +297,7 @@ proc explicit_parametric_polymorphic_procedures() {
 		batch_index: u32,
 	}
 
-	proc use_empty_slot(manager: ^EntityManager, batch: ^EntityBatch) -> ^Entity {
+	use_empty_slot :: proc(manager: ^EntityManager, batch: ^EntityBatch) -> ^Entity {
 		for ok, i in batch.occupied {
 			if ok -> continue;
 			batch.occupied[i] = true;
@@ -313,7 +312,7 @@ proc explicit_parametric_polymorphic_procedures() {
 		return nil;
 	}
 
-	proc gen_new_entity(manager: ^EntityManager) -> ^Entity {
+	gen_new_entity :: proc(manager: ^EntityManager) -> ^Entity {
 		for b in manager.batches {
 			e := use_empty_slot(manager, b);
 			if e != nil -> return e;
@@ -328,7 +327,7 @@ proc explicit_parametric_polymorphic_procedures() {
 
 
 
-	proc new_entity(manager: ^EntityManager, Type: type, x, y: int) -> ^Type {
+	new_entity :: proc(manager: ^EntityManager, Type: type, x, y: int) -> ^Type {
 		result := new(Type);
 		result.entity = gen_new_entity(manager);
 		result.derived.data = result;
@@ -369,7 +368,7 @@ proc explicit_parametric_polymorphic_procedures() {
 }
 
 
-proc main() {
+main :: proc() {
 	general_stuff();
 	// foreign_blocks();
 	// default_arguments();
@@ -423,18 +422,18 @@ proc main() {
 		type MyInt int;
 		type BarType proc();
 
-		proc bar() {
+		bar :: proc() {
 		}
 
 		foreign lib {
-			proc foreign_bar();
+			foreign_bar :: proc();
 		}
 	 */
 
 }
 
 /*
-proc main() {
+main :: proc() {
 	program := "+ + * - /";
 	accumulator := 0;
 

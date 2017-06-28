@@ -14,39 +14,39 @@ Mutex :: struct {
 	_recursion: i32,
 }
 
-proc current_thread_id() -> i32 {
+current_thread_id :: proc() -> i32 {
 	return i32(win32.get_current_thread_id());
 }
 
-proc semaphore_init(s: ^Semaphore) {
+semaphore_init :: proc(s: ^Semaphore) {
 	s._handle = win32.create_semaphore_a(nil, 0, 1<<31-1, nil);
 }
 
-proc semaphore_destroy(s: ^Semaphore) {
+semaphore_destroy :: proc(s: ^Semaphore) {
 	win32.close_handle(s._handle);
 }
 
-proc semaphore_post(s: ^Semaphore, count: int) {
+semaphore_post :: proc(s: ^Semaphore, count: int) {
 	win32.release_semaphore(s._handle, i32(count), nil);
 }
 
-proc semaphore_release(s: ^Semaphore) #inline { semaphore_post(s, 1); }
+semaphore_release :: proc(s: ^Semaphore) #inline { semaphore_post(s, 1); }
 
-proc semaphore_wait(s: ^Semaphore) {
+semaphore_wait :: proc(s: ^Semaphore) {
 	win32.wait_for_single_object(s._handle, win32.INFINITE);
 }
 
 
-proc mutex_init(m: ^Mutex) {
+mutex_init :: proc(m: ^Mutex) {
 	atomics.store(&m._counter, 0);
 	atomics.store(&m._owner, current_thread_id());
 	semaphore_init(&m._semaphore);
 	m._recursion = 0;
 }
-proc mutex_destroy(m: ^Mutex) {
+mutex_destroy :: proc(m: ^Mutex) {
 	semaphore_destroy(&m._semaphore);
 }
-proc mutex_lock(m: ^Mutex) {
+mutex_lock :: proc(m: ^Mutex) {
 	thread_id := current_thread_id();
 	if atomics.fetch_add(&m._counter, 1) > 0 {
 		if thread_id != atomics.load(&m._owner) {
@@ -56,7 +56,7 @@ proc mutex_lock(m: ^Mutex) {
 	atomics.store(&m._owner, thread_id);
 	m._recursion++;
 }
-proc mutex_try_lock(m: ^Mutex) -> bool {
+mutex_try_lock :: proc(m: ^Mutex) -> bool {
 	thread_id := current_thread_id();
 	if atomics.load(&m._owner) == thread_id {
 		atomics.fetch_add(&m._counter, 1);
@@ -73,7 +73,7 @@ proc mutex_try_lock(m: ^Mutex) -> bool {
 	m._recursion++;
 	return true;
 }
-proc mutex_unlock(m: ^Mutex) {
+mutex_unlock :: proc(m: ^Mutex) {
 	recursion: i32;
 	thread_id := current_thread_id();
 	assert(thread_id == atomics.load(&m._owner));

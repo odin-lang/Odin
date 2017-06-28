@@ -4,11 +4,11 @@ import_load (
 	"os_linux.odin"   when ODIN_OS == "linux";
 )
 
-proc write_string(fd: Handle, str: string) -> (int, Errno) {
+write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, []u8(str));
 }
 
-proc read_entire_file(name: string) -> ([]u8, bool) {
+read_entire_file :: proc(name: string) -> ([]u8, bool) {
 	fd, err := open(name, O_RDONLY, 0);
 	if err != 0 {
 		return nil, false;
@@ -37,7 +37,7 @@ proc read_entire_file(name: string) -> ([]u8, bool) {
 	return data[0..<bytes_read], true;
 }
 
-proc write_entire_file(name: string, data: []u8) -> bool {
+write_entire_file :: proc(name: string, data: []u8) -> bool {
 	fd, err := open(name, O_WRONLY, 0);
 	if err != 0 {
 		return false;

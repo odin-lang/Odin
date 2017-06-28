@@ -3,42 +3,42 @@ import (
 	"os.odin";
 )
 foreign __llvm_core {
-	proc swap(b: u16) -> u16 #link_name "llvm.bswap.i16";
-	proc swap(b: u32) -> u32 #link_name "llvm.bswap.i32";
-	proc swap(b: u64) -> u64 #link_name "llvm.bswap.i64";
+	swap :: proc(b: u16) -> u16 #link_name "llvm.bswap.i16" ---;
+	swap :: proc(b: u32) -> u32 #link_name "llvm.bswap.i32" ---;
+	swap :: proc(b: u64) -> u64 #link_name "llvm.bswap.i64" ---;
 }
 
-proc set(data: rawptr, value: i32, len: int) -> rawptr {
+set :: proc(data: rawptr, value: i32, len: int) -> rawptr {
 	return __mem_set(data, value, len);
 }
-proc zero(data: rawptr, len: int) -> rawptr {
+zero :: proc(data: rawptr, len: int) -> rawptr {
 	return __mem_zero(data, len);
 }
-proc copy(dst, src: rawptr, len: int) -> rawptr {
+copy :: proc(dst, src: rawptr, len: int) -> rawptr {
 	return __mem_copy(dst, src, len);
 }
-proc copy_non_overlapping(dst, src: rawptr, len: int) -> rawptr {
+copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr {
 	return __mem_copy_non_overlapping(dst, src, len);
 }
-proc compare(a, b: []u8) -> int {
+compare :: proc(a, b: []u8) -> int {
 	return __mem_compare(&a[0], &b[0], min(len(a), len(b)));
 }
 
 
 
-proc kilobytes(x: int) -> int #inline { return          (x) * 1024; }
-proc megabytes(x: int) -> int #inline { return kilobytes(x) * 1024; }
-proc gigabytes(x: int) -> int #inline { return megabytes(x) * 1024; }
-proc terabytes(x: int) -> int #inline { return gigabytes(x) * 1024; }
+kilobytes :: proc(x: int) -> int #inline { return          (x) * 1024; }
+megabytes :: proc(x: int) -> int #inline { return kilobytes(x) * 1024; }
+gigabytes :: proc(x: int) -> int #inline { return megabytes(x) * 1024; }
+terabytes :: proc(x: int) -> int #inline { return gigabytes(x) * 1024; }
 
-proc is_power_of_two(x: int) -> bool {
+is_power_of_two :: proc(x: int) -> bool {
 	if x <= 0 {
 		return false;
 	}
 	return (x & (x-1)) == 0;
 }
 
-proc align_forward(ptr: rawptr, align: int) -> rawptr {
+align_forward :: proc(ptr: rawptr, align: int) -> rawptr {
 	assert(is_power_of_two(align));
 
 	a := uint(align);
@@ -56,7 +56,7 @@ AllocationHeader :: struct {
 	size: int,
 }
 
-proc allocation_header_fill(header: ^AllocationHeader, data: rawptr, size: int) {
+allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: int) {
 	header.size = size;
 	ptr := ^int(header+1);
 
@@ -64,7 +64,7 @@ proc allocation_header_fill(header: ^AllocationHeader, data: rawptr, size: int) 
 		(ptr+i)^ = -1;
 	}
 }
-proc allocation_header(data: rawptr) -> ^AllocationHeader {
+allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
 	if data == nil {
 		return nil;
 	}
@@ -97,19 +97,19 @@ ArenaTempMemory :: struct {
 
 
 
-proc init_arena_from_memory(using a: ^Arena, data: []u8) {
+init_arena_from_memory :: proc(using a: ^Arena, data: []u8) {
 	backing    = Allocator{};
 	memory     = data[0..<0];
 	temp_count = 0;
 }
 
-proc init_arena_from_context(using a: ^Arena, size: int) {
+init_arena_from_context :: proc(using a: ^Arena, size: int) {
 	backing = context.allocator;
 	memory = make([]u8, size);
 	temp_count = 0;
 }
 
-proc free_arena(using a: ^Arena) {
+free_arena :: proc(using a: ^Arena) {
 	if backing.procedure != nil {
 		push_allocator backing {
 			free(memory);
@@ -119,14 +119,14 @@ proc free_arena(using a: ^Arena) {
 	}
 }
 
-proc arena_allocator(arena: ^Arena) -> Allocator {
+arena_allocator :: proc(arena: ^Arena) -> Allocator {
 	return Allocator{
 		procedure = arena_allocator_proc,
 		data = arena,
 	};
 }
 
-proc arena_allocator_proc(allocator_data: rawptr, mode: AllocatorMode,
+arena_allocator_proc :: proc(allocator_data: rawptr, mode: AllocatorMode,
                           size, alignment: int,
                           old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
 	using AllocatorMode;
@@ -161,7 +161,7 @@ proc arena_allocator_proc(allocator_data: rawptr, mode: AllocatorMode,
 	return nil;
 }
 
-proc begin_arena_temp_memory(a: ^Arena) -> ArenaTempMemory {
+begin_arena_temp_memory :: proc(a: ^Arena) -> ArenaTempMemory {
 	tmp: ArenaTempMemory;
 	tmp.arena = a;
 	tmp.original_count = len(a.memory);
@@ -169,7 +169,7 @@ proc begin_arena_temp_memory(a: ^Arena) -> ArenaTempMemory {
 	return tmp;
 }
 
-proc end_arena_temp_memory(using tmp: ArenaTempMemory) {
+end_arena_temp_memory :: proc(using tmp: ArenaTempMemory) {
 	assert(len(arena.memory) >= original_count);
 	assert(arena.temp_count > 0);
 	arena.memory = arena.memory[0..<original_count];
@@ -182,8 +182,8 @@ proc end_arena_temp_memory(using tmp: ArenaTempMemory) {
 
 
 
-proc align_of_type_info(type_info: ^TypeInfo) -> int {
-	proc prev_pow2(n: i64) -> i64 {
+align_of_type_info :: proc(type_info: ^TypeInfo) -> int {
+	prev_pow2 :: proc(n: i64) -> i64 {
 		if n <= 0 {
 			return 0;
 		}
@@ -244,12 +244,12 @@ proc align_of_type_info(type_info: ^TypeInfo) -> int {
 	return 0;
 }
 
-proc align_formula(size, align: int) -> int {
+align_formula :: proc(size, align: int) -> int {
 	result := size + align-1;
 	return result - result%align;
 }
 
-proc size_of_type_info(type_info: ^TypeInfo) -> int {
+size_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 	WORD_SIZE :: size_of(int);
 	using TypeInfo;
 	match info in type_info {

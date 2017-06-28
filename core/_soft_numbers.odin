@@ -1,6 +1,6 @@
 #shared_global_scope;
 
-proc __multi3(a, b: u128) -> u128 #cc_c #link_name "__multi3" {
+__multi3 :: proc(a, b: u128) -> u128 #cc_c #link_name "__multi3" {
 	bits_in_dword_2 :: size_of(i64) * 4;
 	lower_mask :: u128(~u64(0) >> bits_in_dword_2);
 
@@ -35,27 +35,27 @@ proc __multi3(a, b: u128) -> u128 #cc_c #link_name "__multi3" {
 	return r.all;
 }
 
-proc __u128_mod(a, b: u128) -> u128 #cc_c #link_name "__umodti3" {
+__u128_mod :: proc(a, b: u128) -> u128 #cc_c #link_name "__umodti3" {
 	r: u128;
 	__u128_quo_mod(a, b, &r);
 	return r;
 }
 
-proc __u128_quo(a, b: u128) -> u128 #cc_c #link_name "__udivti3" {
+__u128_quo :: proc(a, b: u128) -> u128 #cc_c #link_name "__udivti3" {
 	return __u128_quo_mod(a, b, nil);
 }
 
-proc __i128_mod(a, b: i128) -> i128 #cc_c #link_name "__modti3" {
+__i128_mod :: proc(a, b: i128) -> i128 #cc_c #link_name "__modti3" {
 	r: i128;
 	__i128_quo_mod(a, b, &r);
 	return r;
 }
 
-proc __i128_quo(a, b: i128) -> i128 #cc_c #link_name "__divti3" {
+__i128_quo :: proc(a, b: i128) -> i128 #cc_c #link_name "__divti3" {
 	return __i128_quo_mod(a, b, nil);
 }
 
-proc __i128_quo_mod(a, b: i128, rem: ^i128) -> (quo: i128) #cc_c #link_name "__divmodti4" {
+__i128_quo_mod :: proc(a, b: i128, rem: ^i128) -> (quo: i128) #cc_c #link_name "__divmodti4" {
 	s: i128;
 	s = b >> 127;
 	b = (b~s) - s;
@@ -74,7 +74,7 @@ proc __i128_quo_mod(a, b: i128, rem: ^i128) -> (quo: i128) #cc_c #link_name "__d
 }
 
 
-proc __u128_quo_mod(a, b: u128, rem: ^u128) -> (quo: u128) #cc_c #link_name "__udivmodti4" {
+__u128_quo_mod :: proc(a, b: u128, rem: ^u128) -> (quo: u128) #cc_c #link_name "__udivmodti4" {
 	alo, ahi := u64(a), u64(a>>64);
 	blo, bhi := u64(b), u64(b>>64);
 	if b == 0 {
@@ -103,7 +103,7 @@ proc __u128_quo_mod(a, b: u128, rem: ^u128) -> (quo: u128) #cc_c #link_name "__u
 }
 
 /*
-proc __f16_to_f32(f: f16) -> f32 #cc_c #no_inline #link_name "__gnu_h2f_ieee" {
+__f16_to_f32 :: proc(f: f16) -> f32 #cc_c #no_inline #link_name "__gnu_h2f_ieee" {
 	when true {
 		// Source: https://fgiesen.wordpress.com/2012/03/28/half-to-float-done-quic/
 		FP32 :: raw_union {u: u32, f: f32};
@@ -127,7 +127,7 @@ proc __f16_to_f32(f: f16) -> f32 #cc_c #no_inline #link_name "__gnu_h2f_ieee" {
 		return 0;
 	}
 }
-proc __f32_to_f16(f_: f32) -> f16 #cc_c #no_inline #link_name "__gnu_f2h_ieee" {
+__f32_to_f16 :: proc(f_: f32) -> f16 #cc_c #no_inline #link_name "__gnu_f2h_ieee" {
 	when false {
 		// Source: https://gist.github.com/rygorous/2156668
 		FP16 :: raw_union {u: u16, f: f16};
@@ -217,11 +217,11 @@ proc __f32_to_f16(f_: f32) -> f16 #cc_c #no_inline #link_name "__gnu_f2h_ieee" {
 	}
 }
 
-proc __f64_to_f16(f: f64) -> f16 #cc_c #no_inline #link_name "__truncdfhf2" {
+__f64_to_f16 :: proc(f: f64) -> f16 #cc_c #no_inline #link_name "__truncdfhf2" {
 	return __f32_to_f16(f32(f));
 }
 
-proc __f16_to_f64(f: f16) -> f64 #cc_c #no_inline {
+__f16_to_f64 :: proc(f: f16) -> f64 #cc_c #no_inline {
 	return f64(__f16_to_f32(f));
 }
 */

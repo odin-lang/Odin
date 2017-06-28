@@ -1,11 +1,11 @@
-proc crc32(data: []u8) -> u32 {
+crc32 :: proc(data: []u8) -> u32 {
 	result := ~u32(0);
 	for b in data {
 		result = result>>8 ~ _crc32_table[(result ~ u32(b)) & 0xff];
 	}
 	return ~result;
 }
-proc crc64(data: []u8) -> u64 {
+crc64 :: proc(data: []u8) -> u64 {
 	result := ~u64(0);
 	for b in data {
 		result = result>>8 ~ _crc64_table[(result ~ u64(b)) & 0xff];
@@ -13,7 +13,7 @@ proc crc64(data: []u8) -> u64 {
 	return ~result;
 }
 
-proc fnv32(data: []u8) -> u32 {
+fnv32 :: proc(data: []u8) -> u32 {
 	h: u32 = 0x811c9dc5;
 	for b in data {
 		h = (h * 0x01000193) ~ u32(b);
@@ -21,7 +21,7 @@ proc fnv32(data: []u8) -> u32 {
 	return h;
 }
 
-proc fnv64(data: []u8) -> u64 {
+fnv64 :: proc(data: []u8) -> u64 {
 	h: u64 = 0xcbf29ce484222325;
 	for b in data {
 		h = (h * 0x100000001b3) ~ u64(b);
@@ -29,7 +29,7 @@ proc fnv64(data: []u8) -> u64 {
 	return h;
 }
 
-proc fnv32a(data: []u8) -> u32 {
+fnv32a :: proc(data: []u8) -> u32 {
 	h: u32 = 0x811c9dc5;
 	for b in data {
 		h = (h ~ u32(b)) * 0x01000193;
@@ -37,7 +37,7 @@ proc fnv32a(data: []u8) -> u32 {
 	return h;
 }
 
-proc fnv64a(data: []u8) -> u64 {
+fnv64a :: proc(data: []u8) -> u64 {
 	h: u64 = 0xcbf29ce484222325;
 	for b in data {
 		h = (h ~ u64(b)) * 0x100000001b3;
@@ -45,7 +45,7 @@ proc fnv64a(data: []u8) -> u64 {
 	return h;
 }
 
-proc murmur32(data: []u8) -> u32 {
+murmur32 :: proc(data: []u8) -> u32 {
 	c1_32: u32 : 0xcc9e2d51;
 	c2_32: u32 : 0x1b873593;
 
@@ -94,7 +94,7 @@ proc murmur32(data: []u8) -> u32 {
 	return h1;
 }
 
-proc murmur64(data: []u8) -> u64 {
+murmur64 :: proc(data: []u8) -> u64 {
 	SEED :: 0x9747b28c;
 
 	when size_of(int) == 8 {

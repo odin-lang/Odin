@@ -311,9 +311,9 @@ void init_entity_foreign_library(Checker *c, Entity *e) {
 
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e->type == NULL);
-	if (d->proc_decl->kind != AstNode_ProcDecl) {
+	if (d->proc_lit->kind != AstNode_ProcLit) {
 		// TOOD(bill): Better error message
-		error(d->proc_decl, "Expected a procedure to check");
+		error(d->proc_lit, "Expected a procedure to check");
 		return;
 	}
 
@@ -324,19 +324,19 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0, false, ProcCC_Odin);
 	}
 	e->type = proc_type;
-	ast_node(pd, ProcDecl, d->proc_decl);
+	ast_node(pl, ProcLit, d->proc_lit);
 
-	check_open_scope(c, pd->type);
+	check_open_scope(c, pl->type);
 	defer (check_close_scope(c));
 
-	check_procedure_type(c, proc_type, pd->type);
+	check_procedure_type(c, proc_type, pl->type);
 
-	bool is_foreign         = (pd->tags & ProcTag_foreign)   != 0;
-	bool is_link_name       = (pd->tags & ProcTag_link_name) != 0;
-	bool is_export          = (pd->tags & ProcTag_export)    != 0;
-	bool is_inline          = (pd->tags & ProcTag_inline)    != 0;
-	bool is_no_inline       = (pd->tags & ProcTag_no_inline) != 0;
-	bool is_require_results = (pd->tags & ProcTag_require_results) != 0;
+	bool is_foreign         = (pl->tags & ProcTag_foreign)   != 0;
+	bool is_link_name       = (pl->tags & ProcTag_link_name) != 0;
+	bool is_export          = (pl->tags & ProcTag_export)    != 0;
+	bool is_inline          = (pl->tags & ProcTag_inline)    != 0;
+	bool is_no_inline       = (pl->tags & ProcTag_no_inline) != 0;
+	bool is_require_results = (pl->tags & ProcTag_require_results) != 0;
 
 
 	TypeProc *pt = &proc_type->Proc;
@@ -356,16 +356,16 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 	if (is_inline && is_no_inline) {
-		error(pd->type, "You cannot apply both `inline` and `no_inline` to a procedure");
+		error(pl->type, "You cannot apply both `inline` and `no_inline` to a procedure");
 	}
 
 	if (is_foreign && is_export) {
-		error(pd->type, "A foreign procedure cannot have an `export` tag");
+		error(pl->type, "A foreign procedure cannot have an `export` tag");
 	}
 
 
 	if (pt->is_generic) {
-		if (pd->body == NULL) {
+		if (pl->body == NULL) {
 			error(e->token, "Polymorphic procedures must have a body");
 		}
 
@@ -375,24 +375,24 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		}
 	}
 
-	if (pd->body != NULL) {
+	if (pl->body != NULL) {
 		if (is_foreign) {
-			error(pd->body, "A foreign procedure cannot have a body");
+			error(pl->body, "A foreign procedure cannot have a body");
 		}
 		if (proc_type->Proc.c_vararg) {
-			error(pd->body, "A procedure with a `#c_vararg` field cannot have a body");
+			error(pl->body, "A procedure with a `#c_vararg` field cannot have a body");
 		}
 
 		d->scope = c->context.scope;
 
-		GB_ASSERT(pd->body->kind == AstNode_BlockStmt);
-		check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pd->body, pd->tags);
+		GB_ASSERT(pl->body->kind == AstNode_BlockStmt);
+		check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pl->body, pl->tags);
 	} else if (!is_foreign) {
 		error(e->token, "Only a foreign procedure cannot have a body");
 	}
 
 	if (pt->result_count == 0 && is_require_results) {
-		error(pd->type, "`#require_results` is not needed on a procedure with no results");
+		error(pl->type, "`#require_results` is not needed on a procedure with no results");
 	} else {
 		pt->require_results = is_require_results;
 	}
@@ -401,8 +401,8 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 
 	if (is_foreign) {
 		String name = e->token.string;
-		if (pd->link_name.len > 0) {
-			name = pd->link_name;
+		if (pl->link_name.len > 0) {
+			name = pl->link_name;
 		}
 		e->Procedure.is_foreign = true;
 		e->Procedure.link_name = name;
@@ -420,16 +420,16 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			Type *other_type = base_type(f->type);
 			if (is_type_proc(this_type) && is_type_proc(other_type)) {
 				if (!are_signatures_similar_enough(this_type, other_type)) {
-					error(d->proc_decl,
-							   "Redeclaration of foreign procedure `%.*s` with different type signatures\n"
-							   "\tat %.*s(%td:%td)",
-							   LIT(name), LIT(pos.file), pos.line, pos.column);
+					error(d->proc_lit,
+					      "Redeclaration of foreign procedure `%.*s` with different type signatures\n"
+					      "\tat %.*s(%td:%td)",
+					      LIT(name), LIT(pos.file), pos.line, pos.column);
 				}
 			} else if (!are_types_identical(this_type, other_type)) {
-				error(d->proc_decl,
-						   "Foreign entity `%.*s` previously declared elsewhere with a different type\n"
-						   "\tat %.*s(%td:%td)",
-						   LIT(name), LIT(pos.file), pos.line, pos.column);
+				error(d->proc_lit,
+				      "Foreign entity `%.*s` previously declared elsewhere with a different type\n"
+				      "\tat %.*s(%td:%td)",
+				      LIT(name), LIT(pos.file), pos.line, pos.column);
 			}
 		} else {
 			map_set(fp, key, e);
@@ -437,7 +437,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	} else {
 		String name = e->token.string;
 		if (is_link_name) {
-			name = pd->link_name;
+			name = pl->link_name;
 		}
 
 		if (is_link_name || is_export) {
@@ -451,10 +451,10 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 				Entity *f = *found;
 				TokenPos pos = f->token.pos;
 				// TODO(bill): Better error message?
-				error(d->proc_decl,
-						   "Non unique linking name for procedure `%.*s`\n"
-						   "\tother at %.*s(%td:%td)",
-						   LIT(name), LIT(pos.file), pos.line, pos.column);
+				error(d->proc_lit,
+				      "Non unique linking name for procedure `%.*s`\n"
+				      "\tother at %.*s(%td:%td)",
+				      LIT(name), LIT(pos.file), pos.line, pos.column);
 			} else {
 				map_set(fp, key, e);
 			}

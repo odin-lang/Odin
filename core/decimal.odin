@@ -9,8 +9,8 @@ Decimal :: struct {
 	neg, trunc:    bool,
 }
 
-proc decimal_to_string(buf: []u8, a: ^Decimal) -> string {
-	proc digit_zero(buf: []u8) -> int {
+decimal_to_string :: proc(buf: []u8, a: ^Decimal) -> string {
+	digit_zero :: proc(buf: []u8) -> int {
 		for _, i in buf -> buf[i] = '0';
 		return len(buf);
 	}
@@ -46,7 +46,7 @@ proc decimal_to_string(buf: []u8, a: ^Decimal) -> string {
 }
 
 // trim trailing zeros
-proc trim(a: ^Decimal) {
+trim :: proc(a: ^Decimal) {
 	for a.count > 0 && a.digits[a.count-1] == '0' {
 		a.count--;
 	}
@@ -56,7 +56,7 @@ proc trim(a: ^Decimal) {
 }
 
 
-proc assign(a: ^Decimal, i: u64) {
+assign :: proc(a: ^Decimal, i: u64) {
 	buf: [32]u8;
 	n := 0;
 	for i > 0 {
@@ -78,7 +78,7 @@ proc assign(a: ^Decimal, i: u64) {
 
 
 
-proc shift_right(a: ^Decimal, k: uint) {
+shift_right :: proc(a: ^Decimal, k: uint) {
 	r := 0; // read index
 	w := 0; // write index
 
@@ -129,7 +129,7 @@ proc shift_right(a: ^Decimal, k: uint) {
 	trim(a);
 }
 
-proc shift_left(a: ^Decimal, k: uint) {
+shift_left :: proc(a: ^Decimal, k: uint) {
 	delta := int(k/4);
 
 	r := a.count;       // read index
@@ -167,7 +167,7 @@ proc shift_left(a: ^Decimal, k: uint) {
 	trim(a);
 }
 
-proc shift(a: ^Decimal, k: int) {
+shift :: proc(a: ^Decimal, k: int) {
 	uint_size :: 8*size_of(uint);
 	max_shift :: uint_size-4;
 
@@ -191,7 +191,7 @@ proc shift(a: ^Decimal, k: int) {
 	}
 }
 
-proc can_round_up(a: ^Decimal, nd: int) -> bool {
+can_round_up :: proc(a: ^Decimal, nd: int) -> bool {
 	if nd < 0 || nd >= a.count { return false ; }
 	if a.digits[nd] == '5' && nd+1 == a.count {
 		if a.trunc -> return true;
@@ -201,7 +201,7 @@ proc can_round_up(a: ^Decimal, nd: int) -> bool {
 	return a.digits[nd] >= '5';
 }
 
-proc round(a: ^Decimal, nd: int) {
+round :: proc(a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return; }
 	if can_round_up(a, nd) {
 		round_up(a, nd);
@@ -210,7 +210,7 @@ proc round(a: ^Decimal, nd: int) {
 	}
 }
 
-proc round_up(a: ^Decimal, nd: int) {
+round_up :: proc(a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return; }
 
 	for i := nd-1; i >= 0; i-- {
@@ -227,7 +227,7 @@ proc round_up(a: ^Decimal, nd: int) {
 	a.decimal_point++;
 }
 
-proc round_down(a: ^Decimal, nd: int) {
+round_down :: proc(a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return; }
 	a.count = nd;
 	trim(a);
@@ -235,7 +235,7 @@ proc round_down(a: ^Decimal, nd: int) {
 
 
 // Extract integer part, rounded appropriately. There are no guarantees about overflow.
-proc rounded_integer(a: ^Decimal) -> u64 {
+rounded_integer :: proc(a: ^Decimal) -> u64 {
 	if a.decimal_point > 20 {
 		return 0xffff_ffff_ffff_ffff;
 	}

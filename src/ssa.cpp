@@ -2377,12 +2377,12 @@ void ssa_build_proc(ssaModule *m, ssaProc *p) {
 	p->module = m;
 	m->proc = p;
 
-	if (p->decl_info->proc_decl == NULL ||
-	    p->decl_info->proc_decl->kind != AstNode_ProcDecl) {
+	if (p->decl_info->proc_lit == NULL ||
+	    p->decl_info->proc_lit->kind != AstNode_ProcLit) {
 		return;
 	}
 
-	ast_node(pl, ProcLit, p->decl_info->proc_decl);
+	ast_node(pl, ProcLit, p->decl_info->proc_lit);
 	if (pl->body == NULL) {
 		return;
 	}
@@ -2495,14 +2495,14 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 		} break;
 
 		case Entity_Procedure: {
-			ast_node(pd, ProcDecl, decl->proc_decl);
+			ast_node(pl, ProcLit, decl->proc_lit);
 			String original_name = name;
-			AstNode *body = pd->body;
+			AstNode *body = pl->body;
 			if (e->Procedure.is_foreign) {
 				name = e->token.string; // NOTE(bill): Don't use the mangled name
 			}
-			if (pd->link_name.len > 0) {
-				name = pd->link_name;
+			if (pl->link_name.len > 0) {
+				name = pl->link_name;
 			}
 
 			if (e == entry_point) {
@@ -2511,7 +2511,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 			}
 
 			// ssaValue *p = ssa_make_value_procedure(a, m, e, e->type, decl->type_expr, body, name);
-			// p->Proc.tags = pd->tags;
+			// p->Proc.tags = pl->tags;
 
 			// ssa_module_add_value(m, e, p);
 			// HashKey hash_name = hash_string(name);

@@ -187,7 +187,7 @@ struct DeclInfo {
 
 	AstNode *         type_expr;
 	AstNode *         init_expr;
-	AstNode *         proc_decl; // AstNode_ProcDecl
+	AstNode *         proc_lit; // AstNode_ProcLit
 	Type *            gen_proc_type; // Precalculated
 
 	Map<bool>         deps; // Key: Entity *
@@ -366,10 +366,10 @@ bool decl_info_has_init(DeclInfo *d) {
 	if (d->init_expr != NULL) {
 		return true;
 	}
-	if (d->proc_decl != NULL) {
-		switch (d->proc_decl->kind) {
-		case_ast_node(pd, ProcDecl, d->proc_decl);
-			if (pd->body != NULL) {
+	if (d->proc_lit != NULL) {
+		switch (d->proc_lit->kind) {
+		case_ast_node(pl, ProcLit, d->proc_lit);
+			if (pl->body != NULL) {
 				return true;
 			}
 		case_end;
@@ -1386,7 +1386,6 @@ void init_preload(Checker *c) {
 
 
 
-bool check_arity_match(Checker *c, AstNodeValueSpec *s);
 bool check_arity_match(Checker *c, AstNodeValueDecl *vd);
 void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_scope);
 void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, bool is_file_scope);
@@ -1505,38 +1504,6 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 #include "check_decl.cpp"
 #include "check_stmt.cpp"
 
-
-
-
-bool check_arity_match(Checker *c, AstNodeValueSpec *spec) {
-	isize lhs = spec->names.count;
-	isize rhs = spec->values.count;
-
-	if (rhs == 0) {
-		if (spec->type == NULL) {
-			error(spec->names[0], "Missing type or initial expression");
-			return false;
-		}
-	} else if (lhs < rhs) {
-		if (lhs < spec->values.count) {
-			AstNode *n = spec->values[lhs];
-			gbString str = expr_to_string(n);
-			error(n, "Extra initial expression `%s`", str);
-			gb_string_free(str);
-		} else {
-			error(spec->names[0], "Extra initial expression");
-		}
-		return false;
-	} else if (lhs > rhs && rhs != 1) {
-		AstNode *n = spec->names[rhs];
-		gbString str = expr_to_string(n);
-		error(n, "Missing expression for `%s`", str);
-		gb_string_free(str);
-		return false;
-	}
-
-	return true;
-}
 
 
 bool check_arity_match(Checker *c, AstNodeValueDecl *vd) {
@@ -1705,6 +1672,10 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					}
 
 					AstNode *init = unparen_expr(vd->values[i]);
+					if (init == NULL) {
+						error(name, "Expected a value for this constant value declaration");
+						continue;
+					}
 
 					AstNode *fl = c->context.curr_foreign_library;
 					DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
@@ -1722,8 +1693,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 							e->Procedure.foreign_library_ident = fl;
 							pl->tags |= ProcTag_foreign;
 						}
-						GB_PANIC("TODO(bill): Constant procedure literals");
-						d->proc_decl = init;
+						d->proc_lit = init;
 						d->type_expr = pl->type;
 					} else {
 						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, empty_exact_value);
@@ -1733,7 +1703,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					e->identifier = name;
 
 					if (fl != NULL && e->kind != Entity_Procedure) {
-						error(name, "Only procedures and variables are allowed to be in a foreign block");
+						error(name, "Only procedures and variables are allowed to be in a foreign block, got %.*s", LIT(ast_node_strings[init->kind]));
 						// continue;
 					}
 
@@ -1746,137 +1716,9 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 		case_end;
 
 		case_ast_node(gd, GenDecl, decl);
-			AstNodeValueSpec empty_spec = {};
-			AstNodeValueSpec *last_spec = NULL;
 			for_array(i, gd->specs) {
 				AstNode *spec = gd->specs[i];
 				switch (gd->token.kind) {
-				case Token_const: {
-					ast_node(vs, ValueSpec, spec);
-
-					if (vs->type != NULL || vs->values.count > 0) {
-						last_spec = vs;
-					} else if (last_spec == NULL) {
-						last_spec = &empty_spec;
-					}
-
-					for_array(i, vs->names) {
-						AstNode *name = vs->names[i];
-						if (name->kind != AstNode_Ident) {
-							error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-							continue;
-						}
-
-						AstNode *init = NULL;
-						if (i < vs->values.count) {
-							init = vs->values[i];
-						}
-
-						DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
-						Entity *e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, empty_exact_value);
-						d->type_expr = last_spec->type;
-						d->init_expr = init;
-						e->identifier = name;
-
-						add_entity_and_decl_info(c, name, e, d);
-					}
-
-					check_arity_match(c, vs);
-				} break;
-
-				case Token_var: {
-					if (!c->context.scope->is_file) {
-						// NOTE(bill): local scope -> handle later and in order
-						break;
-					}
-					ast_node(vs, ValueSpec, spec);
-
-					// NOTE(bill): You need to store the entity information here unline a constant declaration
-					isize entity_cap = vs->names.count;
-					isize entity_count = 0;
-					Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_cap);
-					DeclInfo *di = NULL;
-					if (vs->values.count > 0) {
-						di = make_declaration_info(heap_allocator(), c->context.scope, c->context.decl);
-						di->entities = entities;
-						di->type_expr = vs->type;
-						di->init_expr = vs->values[0];
-
-
-						if (gd->flags & VarDeclFlag_thread_local) {
-							error(decl, "#thread_local variable declarations cannot have initialization values");
-						}
-					}
-
-
-					for_array(i, vs->names) {
-						AstNode *name = vs->names[i];
-						AstNode *value = NULL;
-						if (i < vs->values.count) {
-							value = vs->values[i];
-						}
-						if (name->kind != AstNode_Ident) {
-							error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-							continue;
-						}
-						Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL, false);
-						e->Variable.is_thread_local = (gd->flags & VarDeclFlag_thread_local) != 0;
-						e->identifier = name;
-
-						if (gd->flags & VarDeclFlag_using) {
-							gd->flags &= ~VarDeclFlag_using; // NOTE(bill): This error will be only caught once
-							error(name, "`using` is not allowed at the file scope");
-						}
-
-						AstNode *fl = c->context.curr_foreign_library;
-						if (fl != NULL) {
-							GB_ASSERT(fl->kind == AstNode_Ident);
-							e->Variable.is_foreign = true;
-							e->Variable.foreign_library_ident = fl;
-						}
-
-						entities[entity_count++] = e;
-
-						DeclInfo *d = di;
-						if (d == NULL) {
-							AstNode *init_expr = value;
-							d = make_declaration_info(heap_allocator(), e->scope, c->context.decl);
-							d->type_expr = vs->type;
-							d->init_expr = init_expr;
-						}
-
-						add_entity_and_decl_info(c, name, e, d);
-					}
-
-					if (di != NULL) {
-						di->entity_count = entity_count;
-					}
-
-					check_arity_match(c, vs);
-				} break;
-
-				case Token_type: {
-					ast_node(ts, TypeSpec, spec);
-
-					AstNode *name = ts->name;
-					if (name->kind != AstNode_Ident) {
-						error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-						break;
-					}
-
-
-					DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
-					Entity *e = NULL;
-
-					AstNode *type = unparen_expr(ts->type);
-					e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
-					d->type_expr = type;
-					d->init_expr = type;
-
-					e->identifier = name;
-					add_entity_and_decl_info(c, name, e, d);
-				} break;
-
 				case Token_import:
 				case Token_import_load: {
 					ast_node(ts, ImportSpec, spec);
@@ -1941,29 +1783,29 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 			c->context = prev_context;
 		case_end;
 
-		case_ast_node(pd, ProcDecl, decl);
-			AstNode *name = pd->name;
-			if (name->kind != AstNode_Ident) {
-				error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
-				break;
-			}
+		// case_ast_node(pd, ProcDecl, decl);
+		// 	AstNode *name = pd->name;
+		// 	if (name->kind != AstNode_Ident) {
+		// 		error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+		// 		break;
+		// 	}
 
 
-			DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
-			Entity *e = NULL;
+		// 	DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
+		// 	Entity *e = NULL;
 
-			e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, pd->tags);
-			AstNode *fl = c->context.curr_foreign_library;
-			if (fl != NULL) {
-				GB_ASSERT(fl->kind == AstNode_Ident);
-				e->Procedure.foreign_library_ident = fl;
-				pd->tags |= ProcTag_foreign;
-			}
-			d->proc_decl = decl;
-			d->type_expr = pd->type;
-			e->identifier = name;
-			add_entity_and_decl_info(c, name, e, d);
-		case_end;
+		// 	e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, pd->tags);
+		// 	AstNode *fl = c->context.curr_foreign_library;
+		// 	if (fl != NULL) {
+		// 		GB_ASSERT(fl->kind == AstNode_Ident);
+		// 		e->Procedure.foreign_library_ident = fl;
+		// 		pd->tags |= ProcTag_foreign;
+		// 	}
+		// 	d->proc_decl = decl;
+		// 	d->type_expr = pd->type;
+		// 	e->identifier = name;
+		// 	add_entity_and_decl_info(c, name, e, d);
+		// case_end;
 
 		default:
 			if (c->context.scope->is_file) {

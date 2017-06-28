@@ -7,7 +7,7 @@ IntFlag :: enum {
 }
 
 
-proc parse_bool(s: string) -> (result: bool, ok: bool) {
+parse_bool :: proc(s: string) -> (result: bool, ok: bool) {
 	match s {
 	case "1", "t", "T", "true", "TRUE", "True":
 		return true, true;
@@ -17,7 +17,7 @@ proc parse_bool(s: string) -> (result: bool, ok: bool) {
 	return false, false;
 }
 
-proc _digit_value(r: rune) -> int {
+_digit_value :: proc(r: rune) -> int {
 	ri := int(r);
 	v: int = 16;
 	match r {
@@ -28,7 +28,7 @@ proc _digit_value(r: rune) -> int {
 	return v;
 }
 
-proc parse_i128(s: string) -> i128 {
+parse_i128 :: proc(s: string) -> i128 {
 	neg := false;
 	if len(s) > 1 {
 		match s[0] {
@@ -70,7 +70,7 @@ proc parse_i128(s: string) -> i128 {
 	return neg ? -value : value;
 }
 
-proc parse_u128(s: string) -> u128 {
+parse_u128 :: proc(s: string) -> u128 {
 	neg := false;
 	if len(s) > 1 && s[0] == '+' {
 		s = s[1..];
@@ -107,14 +107,14 @@ proc parse_u128(s: string) -> u128 {
 }
 
 
-proc parse_int(s: string) -> int {
+parse_int :: proc(s: string) -> int {
 	return int(parse_i128(s));
 }
-proc parse_uint(s: string, base: int) -> uint {
+parse_uint :: proc(s: string, base: int) -> uint {
 	return uint(parse_u128(s));
 }
 
-proc parse_f64(s: string) -> f64 {
+parse_f64 :: proc(s: string) -> f64 {
 	i := 0;
 
 	sign: f64 = 1;
@@ -189,21 +189,21 @@ proc parse_f64(s: string) -> f64 {
 }
 
 
-proc append_bool(buf: []u8, b: bool) -> string {
+append_bool :: proc(buf: []u8, b: bool) -> string {
 	s := b ? "true" : "false";
 	append(buf, ..[]u8(s));
 	return string(buf);
 }
 
-proc append_uint(buf: []u8, u: u64, base: int) -> string {
+append_uint :: proc(buf: []u8, u: u64, base: int) -> string {
 	return append_bits(buf, u128(u), base, false, 8*size_of(uint), digits, 0);
 }
-proc append_int(buf: []u8, i: i64, base: int) -> string {
+append_int :: proc(buf: []u8, i: i64, base: int) -> string {
 	return append_bits(buf, u128(i), base, true, 8*size_of(int), digits, 0);
 }
-proc itoa(buf: []u8, i: int) -> string { return append_int(buf, i64(i), 10); }
+itoa :: proc(buf: []u8, i: int) -> string { return append_int(buf, i64(i), 10); }
 
-proc append_float(buf: []u8, f: f64, fmt: u8, prec, bit_size: int) -> string {
+append_float :: proc(buf: []u8, f: f64, fmt: u8, prec, bit_size: int) -> string {
 	return string(generic_ftoa(buf, f, fmt, prec, bit_size));
 }
 
@@ -229,7 +229,7 @@ _f32_info := Float_Info{23, 8,  -127};
 _f64_info := Float_Info{52, 11, -1023};
 
 
-proc generic_ftoa(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 {
+generic_ftoa :: proc(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 {
 	bits: u64;
 	flt: ^Float_Info;
 	match bit_size {
@@ -301,7 +301,7 @@ proc generic_ftoa(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 {
 
 
 
-proc format_digits(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, prec: int, fmt: u8) -> []u8 {
+format_digits :: proc(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, prec: int, fmt: u8) -> []u8 {
 	match fmt {
 	case 'f', 'F':
 		append(buf, neg ? '-' : '+');
@@ -346,7 +346,7 @@ proc format_digits(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, pre
 	return buf;
 }
 
-proc round_shortest(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
+round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 	if mant == 0 { // If mantissa is zero, the number is zero
 		d.count = 0;
 		return;
@@ -417,7 +417,7 @@ MAX_BASE :: 32;
 digits := "0123456789abcdefghijklmnopqrstuvwxyz";
 
 
-proc is_integer_negative(u: u128, is_signed: bool, bit_size: int) -> (unsigned: u128, neg: bool) {
+is_integer_negative :: proc(u: u128, is_signed: bool, bit_size: int) -> (unsigned: u128, neg: bool) {
 	neg := false;
 	if is_signed {
 		match bit_size {
@@ -453,7 +453,7 @@ proc is_integer_negative(u: u128, is_signed: bool, bit_size: int) -> (unsigned: 
 	return u, neg;
 }
 
-proc append_bits(buf: []u8, u: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: IntFlag) -> string {
+append_bits :: proc(buf: []u8, u: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: IntFlag) -> string {
 	if base < 2 || base > MAX_BASE {
 		panic("strconv: illegal base passed to append_bits");
 	}

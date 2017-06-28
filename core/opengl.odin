@@ -9,39 +9,39 @@ import (
 import_load "opengl_constants.odin";
 
 foreign lib {
-	proc Clear         (mask: u32)                                #link_name "glClear";
-	proc ClearColor    (r, g, b, a: f32)                          #link_name "glClearColor";
-	proc Begin         (mode: i32)                                #link_name "glBegin";
-	proc End           ()                                         #link_name "glEnd";
-	proc Finish        ()                                         #link_name "glFinish";
-	proc BlendFunc     (sfactor, dfactor: i32)                    #link_name "glBlendFunc";
-	proc Enable        (cap: i32)                                 #link_name "glEnable";
-	proc Disable       (cap: i32)                                 #link_name "glDisable";
-	proc GenTextures   (count: i32, result: ^u32)                 #link_name "glGenTextures";
-	proc DeleteTextures(count: i32, result: ^u32)                 #link_name "glDeleteTextures";
-	proc TexParameteri (target, pname, param: i32)                #link_name "glTexParameteri";
-	proc TexParameterf (target: i32, pname: i32, param: f32)      #link_name "glTexParameterf";
-	proc BindTexture   (target: i32, texture: u32)                #link_name "glBindTexture";
-	proc LoadIdentity  ()                                         #link_name "glLoadIdentity";
-	proc Viewport      (x, y, width, height: i32)                 #link_name "glViewport";
-	proc Ortho         (left, right, bottom, top, near, far: f64) #link_name "glOrtho";
-	proc Color3f       (r, g, b: f32)                             #link_name "glColor3f";
-	proc Vertex3f      (x, y, z: f32)                             #link_name "glVertex3f";
-	proc GetError      () -> i32                                  #link_name "glGetError";
-	proc GetString     (name: i32) -> ^u8                         #link_name "glGetString";
-	proc GetIntegerv   (name: i32, v: ^i32)                       #link_name "glGetIntegerv";
-	proc TexCoord2f    (x, y: f32)                                #link_name "glTexCoord2f";
-	proc TexImage2D    (target, level, internal_format,
-	                    width, height, border,
-	                    format, type_: i32, pixels: rawptr)       #link_name "glTexImage2D";
+	Clear          :: proc(mask: u32)                                #link_name "glClear"         ---;
+	ClearColor     :: proc(r, g, b, a: f32)                          #link_name "glClearColor"    ---;
+	Begin          :: proc(mode: i32)                                #link_name "glBegin"         ---;
+	End            :: proc()                                         #link_name "glEnd"           ---;
+	Finish         :: proc()                                         #link_name "glFinish"        ---;
+	BlendFunc      :: proc(sfactor, dfactor: i32)                    #link_name "glBlendFunc"     ---;
+	Enable         :: proc(cap: i32)                                 #link_name "glEnable"        ---;
+	Disable        :: proc(cap: i32)                                 #link_name "glDisable"       ---;
+	GenTextures    :: proc(count: i32, result: ^u32)                 #link_name "glGenTextures"   ---;
+	DeleteTextures :: proc(count: i32, result: ^u32)                 #link_name "glDeleteTextures"---;
+	TexParameteri  :: proc(target, pname, param: i32)                #link_name "glTexParameteri" ---;
+	TexParameterf  :: proc(target: i32, pname: i32, param: f32)      #link_name "glTexParameterf" ---;
+	BindTexture    :: proc(target: i32, texture: u32)                #link_name "glBindTexture"   ---;
+	LoadIdentity   :: proc()                                         #link_name "glLoadIdentity"  ---;
+	Viewport       :: proc(x, y, width, height: i32)                 #link_name "glViewport"      ---;
+	Ortho          :: proc(left, right, bottom, top, near, far: f64) #link_name "glOrtho"         ---;
+	Color3f        :: proc(r, g, b: f32)                             #link_name "glColor3f"       ---;
+	Vertex3f       :: proc(x, y, z: f32)                             #link_name "glVertex3f"      ---;
+	GetError       :: proc() -> i32                                  #link_name "glGetError"      ---;
+	GetString      :: proc(name: i32) -> ^u8                         #link_name "glGetString"     ---;
+	GetIntegerv    :: proc(name: i32, v: ^i32)                       #link_name "glGetIntegerv"   ---;
+	TexCoord2f     :: proc(x, y: f32)                                #link_name "glTexCoord2f"    ---;
+	TexImage2D     :: proc(target, level, internal_format,
+	                       width, height, border,
+	                       format, type_: i32, pixels: rawptr)       #link_name "glTexImage2D"    ---;
 }
 
 
-proc _string_data(s: string) -> ^u8 #inline { return &s[0]; }
+_string_data :: proc(s: string) -> ^u8 #inline { return &s[0]; }
 
 _libgl := win32.load_library_a(_string_data("opengl32.dll\x00"));
 
-proc get_proc_address(name: string) -> rawptr {
+get_proc_address :: proc(name: string) -> rawptr {
 	if name[len(name)-1] == 0 {
 		name = name[0..<len(name)-1];
 	}
@@ -116,8 +116,8 @@ proc get_proc_address(name: string) -> rawptr {
 	GetUniformLocation:       proc(program: u32, name: ^u8) -> i32 #cc_c;
 
 
-proc init() {
-	proc set_proc_address(p: rawptr, name: string) #inline {
+init :: proc() {
+	set_proc_address :: proc(p: rawptr, name: string) #inline {
 		x := ^rawptr(p);
 		x^ = get_proc_address(name);
 	}

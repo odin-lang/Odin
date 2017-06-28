@@ -55,7 +55,7 @@ ERROR_FILE_IS_PIPE:           Errno : 1<<29 + 0;
 args := _alloc_command_line_arguments();
 
 
-proc open(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) {
+open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) {
 	if len(path) == 0 {
 		return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
 	}
@@ -107,12 +107,12 @@ proc open(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) 
 	return INVALID_HANDLE, Errno(err);
 }
 
-proc close(fd: Handle) {
+close :: proc(fd: Handle) {
 	win32.close_handle(win32.Handle(fd));
 }
 
 
-proc write(fd: Handle, data: []u8) -> (int, Errno) {
+write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE;
 	}
@@ -139,7 +139,7 @@ proc write(fd: Handle, data: []u8) -> (int, Errno) {
 	return int(total_write), ERROR_NONE;
 }
 
-proc read(fd: Handle, data: []u8) -> (int, Errno) {
+read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE;
 	}
@@ -168,7 +168,7 @@ proc read(fd: Handle, data: []u8) -> (int, Errno) {
 	return int(total_read), ERROR_NONE;
 }
 
-proc seek(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
+seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	w: u32;
 	match whence {
 	case 0: w = win32.FILE_BEGIN;
@@ -189,7 +189,7 @@ proc seek(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	return i64(hi)<<32 + i64(dw_ptr), ERROR_NONE;
 }
 
-proc file_size(fd: Handle) -> (i64, Errno) {
+file_size :: proc(fd: Handle) -> (i64, Errno) {
 	length: i64;
 	err: Errno;
 	if win32.get_file_size_ex(win32.Handle(fd), &length) == 0 {
@@ -206,7 +206,7 @@ stdout := get_std_handle(win32.STD_OUTPUT_HANDLE);
 stderr := get_std_handle(win32.STD_ERROR_HANDLE);
 
 
-proc get_std_handle(h: int) -> Handle {
+get_std_handle :: proc(h: int) -> Handle {
 	fd := win32.get_std_handle(i32(h));
 	win32.set_handle_information(fd, win32.HANDLE_FLAG_INHERIT, 0);
 	return Handle(fd);
@@ -217,7 +217,7 @@ proc get_std_handle(h: int) -> Handle {
 
 
 
-proc last_write_time(fd: Handle) -> FileTime {
+last_write_time :: proc(fd: Handle) -> FileTime {
 	file_info: win32.ByHandleFileInformation;
 	win32.get_file_information_by_handle(win32.Handle(fd), &file_info);
 	lo := FileTime(file_info.last_write_time.lo);
@@ -225,7 +225,7 @@ proc last_write_time(fd: Handle) -> FileTime {
 	return lo | hi << 32;
 }
 
-proc last_write_time_by_name(name: string) -> FileTime {
+last_write_time_by_name :: proc(name: string) -> FileTime {
 	last_write_time: win32.Filetime;
 	data: win32.FileAttributeData;
 	buf: [1024]u8;
@@ -245,10 +245,10 @@ proc last_write_time_by_name(name: string) -> FileTime {
 
 
 
-proc heap_alloc(size: int) -> rawptr {
+heap_alloc :: proc(size: int) -> rawptr {
 	return win32.heap_alloc(win32.get_process_heap(), win32.HEAP_ZERO_MEMORY, size);
 }
-proc heap_resize(ptr: rawptr, new_size: int) -> rawptr {
+heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	if new_size == 0 {
 		heap_free(ptr);
 		return nil;
@@ -258,7 +258,7 @@ proc heap_resize(ptr: rawptr, new_size: int) -> rawptr {
 	}
 	return win32.heap_realloc(win32.get_process_heap(), win32.HEAP_ZERO_MEMORY, ptr, new_size);
 }
-proc heap_free(ptr: rawptr) {
+heap_free :: proc(ptr: rawptr) {
 	if ptr == nil {
 		return;
 	}
@@ -266,21 +266,21 @@ proc heap_free(ptr: rawptr) {
 }
 
 
-proc exit(code: int) {
+exit :: proc(code: int) {
 	win32.exit_process(u32(code));
 }
 
 
 
-proc current_thread_id() -> int {
+current_thread_id :: proc() -> int {
 	return int(win32.get_current_thread_id());
 }
 
 
 
 
-proc _alloc_command_line_arguments() -> []string {
-	proc alloc_ucs2_to_utf8(wstr: ^u16) -> string {
+_alloc_command_line_arguments :: proc() -> []string {
+	alloc_ucs2_to_utf8 :: proc(wstr: ^u16) -> string {
 		wstr_len := 0;
 		for (wstr+wstr_len)^ != 0 {
 			wstr_len++;

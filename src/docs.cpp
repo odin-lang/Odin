@@ -32,6 +32,7 @@ String alloc_comment_group_string(gbAllocator a, CommentGroup g) {
 	return make_string(text, len);
 }
 
+#if 0
 void print_type_spec(AstNode *spec) {
 	ast_node(ts, TypeSpec, spec);
 	GB_ASSERT(ts->name->kind == AstNode_Ident);
@@ -87,20 +88,13 @@ void print_proc_decl(AstNodeProcDecl *pd) {
 	}
 	gb_printf("\n\n");
 }
-
+#endif
 void print_declaration(AstNode *decl) {
 	switch (decl->kind) {
 	case_ast_node(gd, GenDecl, decl);
 		for_array(spec_index, gd->specs) {
 			AstNode *spec = gd->specs[spec_index];
 			switch(gd->token.kind) {
-			case Token_var:
-				break;
-			case Token_const:
-				break;
-			case Token_type:
-				// print_type_spec(spec);
-				break;
 			case Token_import:
 			case Token_import_load:
 				break;
@@ -111,9 +105,9 @@ void print_declaration(AstNode *decl) {
 		}
 	case_end;
 
-	case_ast_node(pd, ProcDecl, decl);
-		print_proc_decl(pd);
-	case_end;
+	// case_ast_node(pd, ProcDecl, decl);
+	// 	print_proc_decl(pd);
+	// case_end;
 
 	case_ast_node(fb, ForeignBlockDecl, decl);
 		// TODO(bill)
