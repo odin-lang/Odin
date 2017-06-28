@@ -2,12 +2,12 @@ import "fmt.odin";
 
 proc general_stuff() {
 	// Complex numbers
-	var a = 3 + 4i;
-	var b: complex64 = 3 + 4i;
-	var c: complex128 = 3 + 4i;
-	var d = complex(2, 3);
+	a := 3 + 4i;
+	b: complex64 = 3 + 4i;
+	c: complex128 = 3 + 4i;
+	d := complex(2, 3);
 
-	var e = a / conj(a);
+	e := a / conj(a);
 	fmt.println("(3+4i)/(3-4i) =", e);
 	fmt.println(real(e), "+", imag(e), "i");
 
@@ -15,7 +15,8 @@ proc general_stuff() {
 	// C-style variadic procedures
 	foreign __llvm_core {
 		// The variadic part allows for extra type checking too which C does not provide
-		proc c_printf(fmt: ^u8, #c_vararg args: ..any) -> i32 #link_name "printf";
+		proc c_printf(fmt: ^u8, #c_vararg args: ..any) -> i32
+			#link_name "printf";
 	}
 
 
@@ -27,6 +28,9 @@ proc general_stuff() {
 	var foo = Foo{123, 0.513, "A string"};
 	var x, y, z = expand_to_tuple(foo);
 	fmt.println(x, y, z);
+	compile_assert(type_of(x) == int);
+	compile_assert(type_of(y) == f32);
+	compile_assert(type_of(z) == string);
 
 
 	// By default, all variables are zeroed
@@ -51,7 +55,6 @@ proc foreign_blocks() {
 	// See sys/windows.odin
 }
 
-
 proc default_arguments() {
 	proc hello(a: int = 9, b: int = 9) {
 		fmt.printf("a is %d; b is %d\n", a, b);
@@ -73,9 +76,9 @@ proc named_arguments() {
 	};
 	using Colour;
 
-	proc make_character(name, catch_phrase: string, favorite_color, least_favorite_color: Colour) {
+	proc make_character(name, catch_phrase: string, favourite_colour, least_favourite_colour: Colour) {
 	    fmt.println();
-	    fmt.printf("My name is %v and I like %v.  %v\n", name, favorite_color, catch_phrase);
+	    fmt.printf("My name is %v and I like %v.  %v\n", name, favourite_colour, catch_phrase);
 	}
 
 	make_character("Frank", "¡Ay, caramba!", Blue, Green);
@@ -88,24 +91,24 @@ proc named_arguments() {
 
 	// Named arguments help to disambiguate this problem
 	make_character(catch_phrase = "¡Ay, caramba!", name = "Frank",
-	               least_favorite_color = Green, favorite_color = Blue);
+	               least_favourite_colour = Green, favourite_colour = Blue);
 
 
 	// The named arguments can be specifed in any order.
-	make_character(favorite_color = Octarine, catch_phrase = "U wot m8!",
-	               least_favorite_color = Green, name = "Dennis");
+	make_character(favourite_colour = Octarine, catch_phrase = "U wot m8!",
+	               least_favourite_colour = Green, name = "Dennis");
 
 
 	// NOTE: You cannot mix named arguments with normal values
 	/*
 	make_character("Dennis",
-	               favorite_color = Octarine, catch_phrase = "U wot m8!",
-	               least_favorite_color = Green);
+	               favourite_colour = Octarine, catch_phrase = "U wot m8!",
+	               least_favourite_colour = Green);
 	*/
 
 
 	// Named arguments can also aid with default arguments
-	proc numerous_things(s : string, a = 1, b = 2, c = 3.14,
+	proc numerous_things(s: string, a = 1, b = 2, c = 3.14,
 	                     d = "The Best String!", e = false, f = 10.3/3.1, g = false) {
 		var g_str = g ? "true" : "false";
 		fmt.printf("How many?! %s: %v\n", s, g_str);
@@ -340,21 +343,22 @@ proc explicit_parametric_polymorphic_procedures() {
 	// An alternative to `union`s
 	for entity in entities {
 		match e in entity.derived {
-		case Rock:    fmt.println("Rock",    e.portable_id);
-		case Door:    fmt.println("Door",    e.portable_id);
-		case Monster: fmt.println("Monster", e.portable_id);
+		case Rock:    fmt.println("Rock",    e.portable_id, e.x, e.y);
+		case Door:    fmt.println("Door",    e.portable_id, e.x, e.y);
+		case Monster: fmt.println("Monster", e.portable_id, e.x, e.y);
 		}
 	}
 }
 
+
 proc main() {
 	general_stuff();
-	foreign_blocks();
-	default_arguments();
-	named_arguments();
-	default_return_values();
-	call_location();
-	explicit_parametric_polymorphic_procedures();
+	// foreign_blocks();
+	// default_arguments();
+	// named_arguments();
+	// default_return_values();
+	// call_location();
+	// explicit_parametric_polymorphic_procedures();
 
 	// Command line argument(s)!
 	// -opt=0,1,2,3

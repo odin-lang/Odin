@@ -5949,6 +5949,83 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		ir_build_assign_op(proc, addr, v_one, op);
 	case_end;
 
+	case_ast_node(vd, ValueDecl, node);
+		if (vd->is_mutable) {
+			irModule *m = proc->module;
+			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
+
+			if (vd->values.count == 0) { // declared and zero-initialized
+				for_array(i, vd->names) {
+					AstNode *name = vd->names[i];
+					if (!ir_is_blank_ident(name)) {
+						ir_add_local_for_identifier(proc, name, true);
+					}
+				}
+			} else { // Tuple(s)
+				Array<irAddr> lvals = {};
+				Array<irValue *>  inits = {};
+				array_init(&lvals, m->tmp_allocator, vd->names.count);
+				array_init(&inits, m->tmp_allocator, vd->names.count);
+
+				for_array(i, vd->names) {
+					AstNode *name = vd->names[i];
+					irAddr lval = ir_addr(NULL);
+					if (!ir_is_blank_ident(name)) {
+						ir_add_local_for_identifier(proc, name, false);
+						lval = ir_build_addr(proc, name);
+					}
+
+					array_add(&lvals, lval);
+				}
+
+				for_array(i, vd->values) {
+					irValue *init = ir_build_expr(proc, vd->values[i]);
+					Type *t = ir_type(init);
+					if (t->kind == Type_Tuple) {
+						for (isize i = 0; i < t->Tuple.variable_count; i++) {
+							Entity *e = t->Tuple.variables[i];
+							irValue *v = ir_emit_struct_ev(proc, init, i);
+							array_add(&inits, v);
+						}
+					} else {
+						array_add(&inits, init);
+					}
+				}
+
+
+				for_array(i, inits) {
+					ir_addr_store(proc, lvals[i], inits[i]);
+				}
+			}
+
+			gb_temp_arena_memory_end(tmp);
+		} else {
+			for_array(i, vd->names) {
+				AstNode *ident = vd->names[i];
+				GB_ASSERT(ident->kind == AstNode_Ident);
+				Entity *e = entity_of_ident(proc->module->info, ident);
+				GB_ASSERT(e != NULL);
+				if (e->kind == Entity_TypeName) {
+					// NOTE(bill): Generate a new name
+					// parent_proc.name-guid
+					String ts_name = e->token.string;
+					isize name_len = proc->name.len + 1 + ts_name.len + 1 + 10 + 1;
+					u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
+					i32 guid = cast(i32)proc->module->members.entries.count;
+					name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(ts_name), guid);
+					String name = make_string(name_text, name_len-1);
+
+					irValue *value = ir_value_type_name(proc->module->allocator,
+					                                           name, e->type);
+					map_set(&proc->module->entity_names, hash_entity(e), name);
+					ir_gen_global_type_name(proc->module, e, name);
+				} else if (e->kind == Entity_Procedure) {
+					GB_PANIC("TODO(bill): Procedure values");
+				}
+			}
+		}
+	case_end;
+
 	case_ast_node(gd, GenDecl, node);
 		for_array(i, gd->specs) {
 			AstNode *spec = gd->specs[i];

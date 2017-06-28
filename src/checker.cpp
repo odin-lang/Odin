@@ -1387,6 +1387,7 @@ void init_preload(Checker *c) {
 
 
 bool check_arity_match(Checker *c, AstNodeValueSpec *s);
+bool check_arity_match(Checker *c, AstNodeValueDecl *vd);
 void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_scope);
 void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, bool is_file_scope);
 
@@ -1537,6 +1538,37 @@ bool check_arity_match(Checker *c, AstNodeValueSpec *spec) {
 	return true;
 }
 
+
+bool check_arity_match(Checker *c, AstNodeValueDecl *vd) {
+	isize lhs = vd->names.count;
+	isize rhs = vd->values.count;
+
+	if (rhs == 0) {
+		if (vd->type == NULL) {
+			error(vd->names[0], "Missing type or initial expression");
+			return false;
+		}
+	} else if (lhs < rhs) {
+		if (lhs < vd->values.count) {
+			AstNode *n = vd->values[lhs];
+			gbString str = expr_to_string(n);
+			error(n, "Extra initial expression `%s`", str);
+			gb_string_free(str);
+		} else {
+			error(vd->names[0], "Extra initial expression");
+		}
+		return false;
+	} else if (lhs > rhs && rhs != 1) {
+		AstNode *n = vd->names[rhs];
+		gbString str = expr_to_string(n);
+		error(n, "Missing expression for `%s`", str);
+		gb_string_free(str);
+		return false;
+	}
+
+	return true;
+}
+
 void check_collect_entities_from_when_stmt(Checker *c, AstNodeWhenStmt *ws, bool is_file_scope) {
 	Operand operand = {Addressing_Invalid};
 	check_expr(c, &operand, ws->cond);
@@ -1592,6 +1624,124 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 				error(decl, "`when` statements are not allowed at file scope");
 			} else {
 				// Will be handled later
+			}
+		case_end;
+
+		case_ast_node(vd, ValueDecl, decl);
+			if (vd->is_mutable) {
+				if (!c->context.scope->is_file) {
+					// NOTE(bill): local scope -> handle later and in order
+					break;
+				}
+
+				// NOTE(bill): You need to store the entity information here unline a constant declaration
+				isize entity_cap = vd->names.count;
+				isize entity_count = 0;
+				Entity **entities = gb_alloc_array(c->allocator, Entity *, entity_cap);
+				DeclInfo *di = NULL;
+				if (vd->values.count > 0) {
+					di = make_declaration_info(heap_allocator(), c->context.scope, c->context.decl);
+					di->entities = entities;
+					di->type_expr = vd->type;
+					di->init_expr = vd->values[0];
+
+
+					if (vd->flags & VarDeclFlag_thread_local) {
+						error(decl, "#thread_local variable declarations cannot have initialization values");
+					}
+				}
+
+
+				for_array(i, vd->names) {
+					AstNode *name = vd->names[i];
+					AstNode *value = NULL;
+					if (i < vd->values.count) {
+						value = vd->values[i];
+					}
+					if (name->kind != AstNode_Ident) {
+						error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+						continue;
+					}
+					Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL, false);
+					e->Variable.is_thread_local = (vd->flags & VarDeclFlag_thread_local) != 0;
+					e->identifier = name;
+
+					if (vd->flags & VarDeclFlag_using) {
+						vd->flags &= ~VarDeclFlag_using; // NOTE(bill): This error will be only caught once
+						error(name, "`using` is not allowed at the file scope");
+					}
+
+					AstNode *fl = c->context.curr_foreign_library;
+					if (fl != NULL) {
+						GB_ASSERT(fl->kind == AstNode_Ident);
+						e->Variable.is_foreign = true;
+						e->Variable.foreign_library_ident = fl;
+					}
+
+					entities[entity_count++] = e;
+
+					DeclInfo *d = di;
+					if (d == NULL) {
+						AstNode *init_expr = value;
+						d = make_declaration_info(heap_allocator(), e->scope, c->context.decl);
+						d->type_expr = vd->type;
+						d->init_expr = init_expr;
+					}
+
+					add_entity_and_decl_info(c, name, e, d);
+				}
+
+				if (di != NULL) {
+					di->entity_count = entity_count;
+				}
+
+				check_arity_match(c, vd);
+			} else {
+				for_array(i, vd->names) {
+					AstNode *name = vd->names[i];
+					if (name->kind != AstNode_Ident) {
+						error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
+						continue;
+					}
+
+					AstNode *init = unparen_expr(vd->values[i]);
+
+					AstNode *fl = c->context.curr_foreign_library;
+					DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
+					Entity *e = NULL;
+
+					if (is_ast_node_type(init)) {
+						e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
+						d->type_expr = init;
+						d->init_expr = init;
+					} else if (init->kind == AstNode_ProcLit) {
+						ast_node(pl, ProcLit, init);
+						e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, pl->tags);
+						if (fl != NULL) {
+							GB_ASSERT(fl->kind == AstNode_Ident);
+							e->Procedure.foreign_library_ident = fl;
+							pl->tags |= ProcTag_foreign;
+						}
+						GB_PANIC("TODO(bill): Constant procedure literals");
+						d->proc_decl = init;
+						d->type_expr = pl->type;
+					} else {
+						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, empty_exact_value);
+						d->type_expr = vd->type;
+						d->init_expr = init;
+					}
+					e->identifier = name;
+
+					if (fl != NULL && e->kind != Entity_Procedure) {
+						error(name, "Only procedures and variables are allowed to be in a foreign block");
+						// continue;
+					}
+
+
+					add_entity_and_decl_info(c, name, e, d);
+				}
+
+				check_arity_match(c, vd);
 			}
 		case_end;
 

@@ -337,6 +337,15 @@ AST_NODE_KIND(_DeclBegin,      "", i32) \
 		u64              flags; \
 		CommentGroup docs; \
 	}) \
+	AST_NODE_KIND(ValueDecl, "value declaration", struct { \
+		Array<AstNode *> names;      \
+		AstNode *        type;       \
+		Array<AstNode *> values;     \
+		u64              flags;      \
+		bool             is_mutable; \
+		CommentGroup     docs;       \
+		CommentGroup     comment;    \
+	}) \
 	AST_NODE_KIND(ValueSpec, "value specification", struct { \
 		Array<AstNode *> names;  \
 		AstNode *        type;   \
@@ -577,6 +586,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_Label:              return node->Label.token;
 
 	case AstNode_GenDecl:            return node->GenDecl.token;
+	case AstNode_ValueDecl:          return ast_node_token(node->ValueDecl.names[0]);
 	case AstNode_ValueSpec:          return ast_node_token(node->ValueSpec.names[0]);
 	case AstNode_ImportSpec:         return node->ImportSpec.import_name;
 	case AstNode_TypeSpec:           return ast_node_token(node->TypeSpec.name);
@@ -816,6 +826,11 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		break;
 	case AstNode_GenDecl:
 		n->GenDecl.specs = clone_ast_node_array(a, n->GenDecl.specs);
+		break;
+	case AstNode_ValueDecl:
+		n->ValueDecl.names  = clone_ast_node_array(a, n->ValueDecl.names);
+		n->ValueDecl.type   = clone_ast_node(a, n->ValueDecl.type);
+		n->ValueDecl.values = clone_ast_node_array(a, n->ValueDecl.values);
 		break;
 	case AstNode_ValueSpec:
 		n->ValueSpec.names  = clone_ast_node_array(a, n->ValueSpec.names);
@@ -1528,6 +1543,18 @@ AstNode *ast_gen_decl(AstFile *f, Token token, Token open, Token close, Array<As
 	result->GenDecl.close = close;
 	result->GenDecl.specs = specs;
 	result->GenDecl.docs = docs;
+	return result;
+}
+
+AstNode *ast_value_decl(AstFile *f, Array<AstNode *> names, AstNode *type, Array<AstNode *> values, bool is_mutable,
+                        CommentGroup docs, CommentGroup comment) {
+	AstNode *result = make_ast_node(f, AstNode_ValueDecl);
+	result->ValueDecl.names      = names;
+	result->ValueDecl.type       = type;
+	result->ValueDecl.values     = values;
+	result->ValueDecl.is_mutable = is_mutable;
+	result->ValueDecl.docs       = docs;
+	result->ValueDecl.comment    = comment;
 	return result;
 }
 
@@ -3081,7 +3108,52 @@ AstNode *parse_decl(AstFile *f) {
 	return parse_gen_decl(f, token, func);
 }
 
+AstNode *parse_value_decl(AstFile *f, Array<AstNode *> names, CommentGroup docs) {
+	bool is_mutable = true;
 
+	AstNode *type = NULL;
+	Array<AstNode *> values = {};
+
+	Token colon = expect_token_after(f, Token_Colon, "identifier list");
+	type = parse_type_attempt(f);
+
+	if (f->curr_token.kind == Token_Eq ||
+	    f->curr_token.kind == Token_Colon) {
+		Token sep = f->curr_token; next_token(f);
+		is_mutable = sep.kind != Token_Colon;
+		values = parse_rhs_expr_list(f);
+		if (values.count > names.count) {
+			syntax_error(f->curr_token, "Too many values on the right hand side of the declaration");
+		} else if (values.count < names.count && !is_mutable) {
+			syntax_error(f->curr_token, "All constant declarations must be defined");
+		} else if (values.count == 0) {
+			syntax_error(f->curr_token, "Expected an expression for this declaration");
+		}
+	}
+
+
+	if (is_mutable) {
+		if (type == NULL && values.count == 0) {
+			syntax_error(f->curr_token, "Missing variable type or initialization");
+			return ast_bad_decl(f, f->curr_token, f->curr_token);
+		}
+	} else {
+		if (type == NULL && values.count == 0 && names.count > 0) {
+			syntax_error(f->curr_token, "Missing constant value");
+			return ast_bad_decl(f, f->curr_token, f->curr_token);
+		}
+	}
+
+	if (values.data == NULL) {
+		values = make_ast_node_array(f);
+	}
+
+	if (f->expr_level >= 0) {
+		expect_semicolon(f, NULL);
+	}
+
+	return ast_value_decl(f, names, type, values, is_mutable, docs, f->line_comment);
+}
 
 AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 	Token token = f->curr_token;
@@ -3090,6 +3162,8 @@ AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 	case Token_const:
 		return parse_decl(f);
 	}
+
+	CommentGroup docs = f->lead_comment;
 
 	Array<AstNode *> lhs = parse_lhs_expr_list(f);
 	token = f->curr_token;
@@ -3163,8 +3237,7 @@ AstNode *parse_simple_stmt(AstFile *f, StmtAllowFlag flags) {
 			} break;
 			}
 		}
-
-		// return parse_value_decl(f, lhs);
+		return parse_value_decl(f, lhs, docs);
 	}
 
 	if (lhs.count > 1) {
