@@ -323,7 +323,7 @@ default_allocator :: proc() -> Allocator {
 }
 
 
-assert :: proc(condition: bool, message = "", using location = #caller_location) -> bool #cc_contextless {
+assert :: proc(condition: bool, message := "", using location := #caller_location) -> bool #cc_contextless {
 	if !condition {
 		if len(message) > 0 {
 			fmt.printf("%s(%d:%d) Runtime assertion: %s\n", fully_pathed_filename, line, column, message);
@@ -335,7 +335,7 @@ assert :: proc(condition: bool, message = "", using location = #caller_location)
 	return condition;
 }
 
-panic :: proc(message = "", using location = #caller_location) #cc_contextless {
+panic :: proc(message := "", using location := #caller_location) #cc_contextless {
 	if len(message) > 0 {
 		fmt.printf("%s(%d:%d) Panic: %s\n", fully_pathed_filename, line, column, message);
 	} else {

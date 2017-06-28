@@ -1654,12 +1654,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 		for_array(i, fb->decls) {
 			AstNode *decl = fb->decls[i];
-			if (decl->kind == AstNode_GenDecl) {
-				switch (decl->GenDecl.token.kind) {
-				case Token_var:
-					check_stmt(c, decl, flags);
-					break;
-				}
+			if (decl->kind == AstNode_ValueDecl && decl->ValueDecl.is_mutable) {
+				check_stmt(c, decl, flags);
 			}
 		}
 

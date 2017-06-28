@@ -1711,10 +1711,6 @@ void fix_advance_to_next_stmt(AstFile *f) {
 		case Token_Semicolon:
 			return;
 
-		case Token_var:
-		case Token_const:
-		case Token_type:
-		case Token_proc:
 		case Token_foreign:
 		case Token_foreign_library:
 		case Token_foreign_system_library:
@@ -1857,15 +1853,6 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 		String node_string = ast_node_strings[s->kind];
 		if (s->kind == AstNode_GenDecl) {
 			switch (s->GenDecl.token.kind) {
-			case Token_var:
-				node_string = str_lit("variable declaration");
-				break;
-			case Token_const:
-				node_string = str_lit("const declaration");
-				break;
-			case Token_type:
-				node_string = str_lit("type declaration");
-				break;
 			case Token_import:
 			case Token_import_load:
 				node_string = str_lit("import declaration");
@@ -2863,14 +2850,6 @@ void parse_foreign_block_decl(AstFile *f, Array<AstNode *> *decls) {
 		array_add(decls, decl);
 		return;
 
-
-	case AstNode_GenDecl:
-		switch (decl->GenDecl.token.kind) {
-		case Token_var:
-			array_add(decls, decl);
-			return;
-		}
-
 		/* fallthrough */
 	default:
 		error(decl, "Foreign blocks only allow procedure and variable declarations");
@@ -3329,8 +3308,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 		next_token(f);
 	}
 
-	if (f->curr_token.kind == Token_Colon ||
-	    f->curr_token.kind == Token_Eq) {
+	if (f->curr_token.kind == Token_Colon) {
 		Array<AstNode *> names = convert_to_ident_list(f, list, true); // Copy for semantic reasons
 		if (names.count == 0) {
 			syntax_error(f->curr_token, "Empty field declaration");
@@ -3345,8 +3323,8 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 		AstNode *type = NULL;
 		AstNode *default_value = NULL;
 
+		expect_token_after(f, Token_Colon, "field list");
 		if (f->curr_token.kind != Token_Eq) {
-			expect_token_after(f, Token_Colon, "field list");
 			type = parse_var_type(f, allow_ellipsis, allow_type_token);
 		}
 		if (allow_token(f, Token_Eq)) {
@@ -3381,8 +3359,8 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 
 			AstNode *type = NULL;
 			AstNode *default_value = NULL;
+			expect_token_after(f, Token_Colon, "field list");
 			if (f->curr_token.kind != Token_Eq) {
-				expect_token_after(f, Token_Colon, "field list");
 				type = parse_var_type(f, allow_ellipsis, allow_default_parameters);
 			}
 			if (allow_token(f, Token_Eq)) {
@@ -4174,36 +4152,31 @@ AstNode *parse_stmt(AstFile *f) {
 	}
 
 	case Token_using: {
-		// TODO(bill): Make using statements better
+		CommentGroup docs = f->lead_comment;
 		Token token = expect_token(f, Token_using);
 		AstNode *decl = NULL;
-		if (f->curr_token.kind == Token_var) {
-			decl = parse_decl(f);
-			expect_semicolon(f, decl);
-		} else {
-			Array<AstNode *> list = parse_lhs_expr_list(f);
-			if (list.count == 0) {
-				syntax_error(token, "Illegal use of `using` statement");
-				expect_semicolon(f, NULL);
-				return ast_bad_stmt(f, token, f->curr_token);
-			}
-
-			if (f->curr_token.kind != Token_Colon) {
-				expect_semicolon(f, list[list.count-1]);
-				return ast_using_stmt(f, token, list);
-			}
+		Array<AstNode *> list = parse_lhs_expr_list(f);
+		if (list.count == 0) {
+			syntax_error(token, "Illegal use of `using` statement");
+			expect_semicolon(f, NULL);
+			return ast_bad_stmt(f, token, f->curr_token);
 		}
 
+		if (f->curr_token.kind != Token_Colon) {
+			expect_semicolon(f, list[list.count-1]);
+			return ast_using_stmt(f, token, list);
+		}
+		decl = parse_value_decl(f, list, docs);
 
-		if (decl != NULL && decl->kind == AstNode_GenDecl) {
-			if (decl->GenDecl.token.kind != Token_var) {
+		if (decl != NULL && decl->kind == AstNode_ValueDecl) {
+			if (!decl->ValueDecl.is_mutable) {
 				syntax_error(token, "`using` may only be applied to variable declarations");
 				return decl;
 			}
 			if (f->curr_proc == NULL) {
 				syntax_error(token, "`using` is not allowed at the file scope");
 			} else {
-				decl->GenDecl.flags |= VarDeclFlag_using;
+				decl->ValueDecl.flags |= VarDeclFlag_using;
 			}
 			return decl;
 		}
@@ -4271,14 +4244,14 @@ AstNode *parse_stmt(AstFile *f) {
 		} else if (tag == "thread_local") {
 			AstNode *s = parse_stmt(f);
 
-			if (s->kind == AstNode_GenDecl) {
-				if (s->GenDecl.token.kind != Token_var) {
+			if (s->kind == AstNode_ValueDecl) {
+				if (!s->ValueDecl.is_mutable) {
 					syntax_error(token, "`thread_local` may only be applied to variable declarations");
 				}
 				if (f->curr_proc != NULL) {
 					syntax_error(token, "`thread_local` is only allowed at the file scope");
 				} else {
-					s->GenDecl.flags |= VarDeclFlag_thread_local;
+					s->ValueDecl.flags |= VarDeclFlag_thread_local;
 				}
 				return s;
 			}

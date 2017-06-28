@@ -125,8 +125,8 @@ named_arguments :: proc() {
 
 
 	// Named arguments can also aid with default arguments
-	numerous_things :: proc(s: string, a = 1, b = 2, c = 3.14,
-	                     d = "The Best String!", e = false, f = 10.3/3.1, g = false) {
+	numerous_things :: proc(s: string, a := 1, b := 2, c := 3.14,
+	                     d := "The Best String!", e := false, f := 10.3/3.1, g := false) {
 		g_str := g ? "true" : "false";
 		fmt.printf("How many?! %s: %v\n", s, g_str);
 	}
@@ -147,7 +147,7 @@ named_arguments :: proc() {
 
 
 default_return_values :: proc() {
-	foo :: proc(x: int) -> (first: string = "Hellope", second = "world!") {
+	foo :: proc(x: int) -> (first: string = "Hellope", second := "world!") {
 		match x {
 		case 0: return;
 		case 1: return "Goodbye";
@@ -178,7 +178,7 @@ default_return_values :: proc() {
 		id:   u32,
 	}
 
-	some_thing :: proc(input: int) -> (result: ^Entity = nil, err = Error.None) {
+	some_thing :: proc(input: int) -> (result: ^Entity = nil, err := Error.None) {
 		match {
 		case input == 3: return err = Error.WhyTheNumberThree;
 		case input >= 10: return err = Error.TenIsTooBig;
@@ -192,7 +192,7 @@ default_return_values :: proc() {
 }
 
 call_location :: proc() {
-	amazing :: proc(n: int, using loc = #caller_location) {
+	amazing :: proc(n: int, using loc := #caller_location) {
 		fmt.printf("%s(%d:%d) just asked to do something amazing.\n",
 		           fully_pathed_filename, line, column);
 		fmt.printf("Normal -> %d\n", n);
