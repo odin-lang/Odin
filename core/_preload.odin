@@ -61,6 +61,7 @@ TypeInfo :: union {
 	String{},
 	Boolean{},
 	Any{},
+	Type{},
 	Pointer{
 		elem: ^TypeInfo, // nil -> rawptr
 	},

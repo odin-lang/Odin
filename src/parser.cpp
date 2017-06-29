@@ -138,7 +138,7 @@ Array<AstNode *> make_ast_node_array(AstFile *f, isize init_capacity = 8) {
 // all the nodes and even memcpy in a different kind of node
 #define AST_NODE_KINDS \
 	AST_NODE_KIND(Ident,          "identifier",      struct { \
-		Token token; \
+		Token token;      \
 	}) \
 	AST_NODE_KIND(Implicit,       "implicit",        Token) \
 	AST_NODE_KIND(Undef,          "undef",           Token) \

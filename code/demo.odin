@@ -8,7 +8,6 @@ import (
 	"mem.odin";
 	"opengl.odin";
 	"os.odin";
-	"pool.odin";
 	"raw.odin";
 	"strconv.odin";
 	"strings.odin";
@@ -327,11 +326,11 @@ explicit_parametric_polymorphic_procedures :: proc() {
 
 
 
-	new_entity :: proc(manager: ^EntityManager, Type: type, x, y: int) -> ^Type {
-		result := new(Type);
+	new_entity :: proc(manager: ^EntityManager, T: type, x, y: int) -> ^T {
+		result := new(T);
 		result.entity = gen_new_entity(manager);
 		result.derived.data = result;
-		result.derived.type_info = type_info(Type);
+		result.derived.type_info = type_info(T);
 
 		result.position.x = f32(x);
 		result.position.y = f32(y);
@@ -345,14 +344,14 @@ explicit_parametric_polymorphic_procedures :: proc() {
 	rock    := new_entity(&manager, Rock, 3, 5);
 
 	// Named arguments work too!
-	door    := new_entity(manager = &manager, Type = Door, x = 3, y = 6);
+	door    := new_entity(manager = &manager, T = Door, x = 3, y = 6);
 
 	// And named arguments can be any order
 	monster := new_entity(
 		y = 1,
 		x = 2,
 		manager = &manager,
-		Type = Monster,
+		T = Monster,
 	);
 
 	append(entities, rock, door, monster);
@@ -379,6 +378,19 @@ main :: proc() {
 
 	// Command line argument(s)!
 	// -opt=0,1,2,3
+
+	a: Type = int;
+	b: Type = f32;
+	c: Type = int;
+	match a {
+	case int: fmt.println("a == int");
+	case f32: fmt.println("a == f32");
+	case:     fmt.println("What type is a?");
+	}
+	assert(a != b);
+	assert(b != c);
+	assert(a == c);
+
 
 	program := "+ + * - /";
 	accumulator := 0;

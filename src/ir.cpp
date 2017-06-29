@@ -749,6 +749,7 @@ void     ir_build_defer_stmt    (irProcedure *proc, irDefer d);
 irAddr   ir_build_addr          (irProcedure *proc, AstNode *expr);
 void     ir_build_proc          (irValue *value, irProcedure *parent);
 void     ir_gen_global_type_name(irModule *m, Entity *e, String name);
+irValue *ir_get_type_info_ptr   (irProcedure *proc, Type *type);
 
 
 
@@ -2771,6 +2772,23 @@ String ir_lookup_subtype_polymorphic_field(CheckerInfo *info, Type *dst, Type *s
 }
 
 
+irValue *ir_emit_ptr_to_int(irProcedure *proc, irValue *value, Type *t, bool allow_type_type = false) {
+	Type *vt = core_type(ir_type(value));
+	GB_ASSERT(is_type_pointer(vt));
+	if (allow_type_type) {
+		GB_ASSERT(is_type_int_or_uint(core_type(t)) || is_type_type(t));
+	} else {
+		GB_ASSERT(is_type_int_or_uint(core_type(t)));
+	}
+	return ir_emit(proc, ir_instr_conv(proc, irConv_ptrtoint, value, vt, t));
+}
+irValue *ir_emit_int_to_ptr(irProcedure *proc, irValue *value, Type *t) {
+	Type *vt = core_type(ir_type(value));
+	GB_ASSERT(is_type_int_or_uint(vt));
+	GB_ASSERT(is_type_pointer(core_type(t)));
+	return ir_emit(proc, ir_instr_conv(proc, irConv_inttoptr, value, vt, t));
+}
+
 
 irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	Type *src_type = ir_type(value);
@@ -2925,10 +2943,10 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 	// Pointer <-> int
 	if (is_type_pointer(src) && is_type_int_or_uint(dst)) {
-		return ir_emit(proc, ir_instr_conv(proc, irConv_ptrtoint, value, src_type, t));
+		return ir_emit_ptr_to_int(proc, value, t);
 	}
 	if (is_type_int_or_uint(src) && is_type_pointer(dst)) {
-		return ir_emit(proc, ir_instr_conv(proc, irConv_inttoptr, value, src_type, t));
+		return ir_emit_int_to_ptr(proc, value, t);
 	}
 
 	if (is_type_union(dst)) {
@@ -4388,7 +4406,14 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 	if (tv.mode == Addressing_Type) {
 		// TODO(bill): Handle this correctly
-		return ir_value_nil(proc->module->allocator, tv.type);
+		i32 entry_index = type_info_index(proc->module->info, tv.type, false);
+		if (entry_index >= 0) {
+			irValue *ptr = ir_get_type_info_ptr(proc, tv.type);
+			return ir_emit_ptr_to_int(proc, ptr, t_type, true);
+			// i32 id = entry_index+1;
+			// return ir_value_constant(proc->module->allocator, t_int, exact_value_i64(id));
+		}
+		return v_raw_nil;
 	}
 
 	if (tv.value.kind != ExactValue_Invalid) {
@@ -4766,7 +4791,10 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			GB_ASSERT(!vari_expand);
 			isize i = 0;
 			for (; i < type->param_count-1; i++) {
-				args[i] = ir_emit_conv(proc, args[i], pt->variables[i]->type);
+				Entity *e = pt->variables[i];
+				if (e->kind == Entity_Variable) {
+					args[i] = ir_emit_conv(proc, args[i], e->type);
+				}
 			}
 			Type *variadic_type = pt->variables[i]->type;
 			GB_ASSERT(is_type_slice(variadic_type));
@@ -4783,7 +4811,10 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		} else if (variadic) {
 			isize i = 0;
 			for (; i < type->param_count-1; i++) {
-				args[i] = ir_emit_conv(proc, args[i], pt->variables[i]->type);
+				Entity *e = pt->variables[i];
+				if (e->kind == Entity_Variable) {
+					args[i] = ir_emit_conv(proc, args[i], e->type);
+				}
 			}
 			if (!vari_expand) {
 				Type *variadic_type = pt->variables[i]->type;
@@ -4795,7 +4826,10 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 			}
 		} else {
 			for (isize i = 0; i < type->param_count; i++) {
-				args[i] = ir_emit_conv(proc, args[i], pt->variables[i]->type);
+				Entity *e = pt->variables[i];
+				if (e->kind == Entity_Variable) {
+					args[i] = ir_emit_conv(proc, args[i], e->type);
+				}
 			}
 		}
 
@@ -7698,6 +7732,10 @@ void ir_gen_tree(irGen *s) {
 				auto *entry = &info->type_info_map.entries[type_info_map_index];
 				Type *t = cast(Type *)entry->key.ptr;
 				t = default_type(t);
+				if (t == t_invalid) {
+					continue;
+				}
+
 				isize entry_index = type_info_index(info, t);
 
 				irValue *tag = NULL;
@@ -7770,6 +7808,10 @@ void ir_gen_tree(irGen *s) {
 
 					case Basic_any:
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_any_ptr);
+						break;
+
+					case Basic_Type:
+						tag = ir_emit_conv(proc, ti_ptr, t_type_info_type_ptr);
 						break;
 					}
 					break;

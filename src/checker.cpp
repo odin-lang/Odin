@@ -170,6 +170,9 @@ bool is_operand_value(Operand o) {
 bool is_operand_nil(Operand o) {
 	return o.mode == Addressing_Value && o.type == t_untyped_nil;
 }
+bool is_operand_a_type_value(Operand o) {
+	return is_operand_value(o) && is_type_type(o.type);
+}
 
 
 struct BlockLabel {
@@ -325,7 +328,7 @@ DeclInfo *   decl_info_of_ident     (CheckerInfo *i, AstNode *ident);
 DeclInfo *   decl_info_of_entity    (CheckerInfo *i, Entity * e);
 AstFile *    ast_file_of_filename   (CheckerInfo *i, String   filename);
 // IMPORTANT: Only to use once checking is done
-isize        type_info_index        (CheckerInfo *i, Type *   type);
+isize        type_info_index        (CheckerInfo *i, Type *   type, bool error_on_failure = true);
 
 
 Entity *current_scope_lookup_entity(Scope *s, String name);
@@ -879,7 +882,7 @@ void check_remove_expr_info(CheckerInfo *i, AstNode *expr) {
 
 
 
-isize type_info_index(CheckerInfo *info, Type *type) {
+isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	type = default_type(type);
 
 	isize entry_index = -1;
@@ -903,7 +906,7 @@ isize type_info_index(CheckerInfo *info, Type *type) {
 		}
 	}
 
-	if (entry_index < 0) {
+	if (error_on_failure && entry_index < 0) {
 		compiler_error("TypeInfo for `%s` could not be found", type_to_string(type));
 	}
 	return entry_index;
@@ -1086,6 +1089,9 @@ void add_type_info_type(Checker *c, Type *t) {
 			add_type_info_type(c, t_type_info_ptr);
 			add_type_info_type(c, t_rawptr);
 			break;
+		case Basic_Type:
+			add_type_info_type(c, t_type_info_type);
+			break;
 
 		case Basic_complex64:
 			add_type_info_type(c, t_type_info_float);
@@ -1248,9 +1254,12 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 
 	for_array(i, info->definitions.entries) {
 		Entity *e = info->definitions.entries[i].value;
-		if (e->scope->is_global && !is_type_polymorphic(e->type)) { // TODO(bill): is the check enough?
-			// NOTE(bill): Require runtime stuff
-			add_dependency_to_map(&map, info, e);
+		// if (e->scope->is_global && !is_type_poly_proc(e->type)) { // TODO(bill): is the check enough?
+		if (e->scope->is_global) { // TODO(bill): is the check enough?
+			if (!is_type_poly_proc(e->type))  {
+				// NOTE(bill): Require runtime stuff
+				add_dependency_to_map(&map, info, e);
+			}
 		} else if (e->kind == Entity_Procedure) {
 			if ((e->Procedure.tags & ProcTag_export) != 0) {
 				add_dependency_to_map(&map, info, e);
@@ -1299,7 +1308,7 @@ void init_preload(Checker *c) {
 
 
 
-		if (record->variant_count != 23) {
+		if (record->variant_count != 24) {
 			compiler_error("Invalid `TypeInfo` layout");
 		}
 		t_type_info_named         = record->variants[ 1]->type;
@@ -1310,20 +1319,21 @@ void init_preload(Checker *c) {
 		t_type_info_string        = record->variants[ 6]->type;
 		t_type_info_boolean       = record->variants[ 7]->type;
 		t_type_info_any           = record->variants[ 8]->type;
-		t_type_info_pointer       = record->variants[ 9]->type;
-		t_type_info_atomic        = record->variants[10]->type;
-		t_type_info_procedure     = record->variants[11]->type;
-		t_type_info_array         = record->variants[12]->type;
-		t_type_info_dynamic_array = record->variants[13]->type;
-		t_type_info_slice         = record->variants[14]->type;
-		t_type_info_vector        = record->variants[15]->type;
-		t_type_info_tuple         = record->variants[16]->type;
-		t_type_info_struct        = record->variants[17]->type;
-		t_type_info_raw_union     = record->variants[18]->type;
-		t_type_info_union         = record->variants[19]->type;
-		t_type_info_enum          = record->variants[20]->type;
-		t_type_info_map           = record->variants[21]->type;
-		t_type_info_bit_field     = record->variants[22]->type;
+		t_type_info_type          = record->variants[ 9]->type;
+		t_type_info_pointer       = record->variants[10]->type;
+		t_type_info_atomic        = record->variants[11]->type;
+		t_type_info_procedure     = record->variants[12]->type;
+		t_type_info_array         = record->variants[13]->type;
+		t_type_info_dynamic_array = record->variants[14]->type;
+		t_type_info_slice         = record->variants[15]->type;
+		t_type_info_vector        = record->variants[16]->type;
+		t_type_info_tuple         = record->variants[17]->type;
+		t_type_info_struct        = record->variants[18]->type;
+		t_type_info_raw_union     = record->variants[19]->type;
+		t_type_info_union         = record->variants[20]->type;
+		t_type_info_enum          = record->variants[21]->type;
+		t_type_info_map           = record->variants[22]->type;
+		t_type_info_bit_field     = record->variants[23]->type;
 
 		t_type_info_named_ptr         = make_type_pointer(c->allocator, t_type_info_named);
 		t_type_info_integer_ptr       = make_type_pointer(c->allocator, t_type_info_integer);
@@ -1333,6 +1343,7 @@ void init_preload(Checker *c) {
 		t_type_info_string_ptr        = make_type_pointer(c->allocator, t_type_info_string);
 		t_type_info_boolean_ptr       = make_type_pointer(c->allocator, t_type_info_boolean);
 		t_type_info_any_ptr           = make_type_pointer(c->allocator, t_type_info_any);
+		t_type_info_type_ptr          = make_type_pointer(c->allocator, t_type_info_type);
 		t_type_info_pointer_ptr       = make_type_pointer(c->allocator, t_type_info_pointer);
 		t_type_info_atomic_ptr        = make_type_pointer(c->allocator, t_type_info_atomic);
 		t_type_info_procedure_ptr     = make_type_pointer(c->allocator, t_type_info_procedure);
@@ -2197,6 +2208,9 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 void check_parsed_files(Checker *c) {
 	Map<Scope *> file_scopes; // Key: String (fullpath)
 	map_init(&file_scopes, heap_allocator());
+	defer (map_destroy(&file_scopes));
+
+	add_type_info_type(c, t_invalid);
 
 	// Map full filepaths to Scopes
 	for_array(i, c->parser->files) {
@@ -2349,7 +2363,4 @@ void check_parsed_files(Checker *c) {
 			}
 		}
 	}
-
-	map_destroy(&file_scopes);
-
 }

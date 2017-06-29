@@ -328,6 +328,14 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 		return;
 	}
 
+	if (operand->mode == Addressing_Type) {
+		if (type != NULL && is_type_type(type)) {
+			add_type_info_type(c, type);
+			add_type_info_type(c, operand->type);
+			return;
+		}
+	}
+
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
 		if (type == NULL || is_type_any(type)) {
@@ -2604,6 +2612,7 @@ void check_unary_expr(Checker *c, Operand *o, Token op, AstNode *node) {
 	o->mode = Addressing_Value;
 }
 
+
 void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 	if (x->mode == Addressing_Type && y->mode == Addressing_Type) {
 		bool comp = are_types_identical(x->type, y->type);
@@ -2614,6 +2623,15 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 		x->mode  = Addressing_Constant;
 		x->type  = t_untyped_bool;
 		x->value = exact_value_bool(comp);
+		return;
+	}
+	if (x->mode == Addressing_Type && is_operand_a_type_value(*y)) {
+		x->mode = Addressing_Value;
+		x->type = t_untyped_bool;
+		return;
+	} else if (y->mode == Addressing_Type && is_operand_a_type_value(*x)) {
+		x->mode = Addressing_Value;
+		x->type = t_untyped_bool;
 		return;
 	}
 
@@ -3046,11 +3064,13 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		check_expr_or_type(c, y, be->right);
 		bool xt = x->mode == Addressing_Type;
 		bool yt = y->mode == Addressing_Type;
+		bool xvt = is_operand_a_type_value(*x);
+		bool yvt = is_operand_a_type_value(*y);
 		// If only one is a type, this is an error
 		if (xt ^ yt) {
 			GB_ASSERT(xt != yt);
-			if (xt) error_operand_not_expression(x);
-			if (yt) error_operand_not_expression(y);
+			if (xt && !yvt) error_operand_not_expression(x);
+			if (yt && !xvt) error_operand_not_expression(y);
 		}
 	} break;
 
