@@ -381,10 +381,10 @@ main :: proc() {
 
 	// Command line argument(s)!
 	// -opt=0,1,2,3
+*/
 
 	program := "+ + * - /";
 	accumulator := 0;
-*/
 
 	for token in program {
 		match token {
