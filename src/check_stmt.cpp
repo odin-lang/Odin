@@ -187,7 +187,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 
 	// NOTE(bill): Ignore assignments to `_`
 	if (node->kind == AstNode_Ident &&
-	    node->Ident.string == "_") {
+	    node->Ident.token.string == "_") {
 		add_entity_definition(&c->info, node, NULL);
 		check_assignment(c, rhs, NULL, str_lit("assignment to `_` identifier"));
 		if (rhs->mode == Addressing_Invalid) {
@@ -238,7 +238,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 	} else {
 		if (node->kind == AstNode_Ident) {
 			ast_node(i, Ident, node);
-			e = scope_lookup_entity(c->context.scope, i->string);
+			e = scope_lookup_entity(c->context.scope, i->token.string);
 			if (e != NULL && e->kind == Entity_Variable) {
 				used = (e->flags & EntityFlag_Used) != 0; // TODO(bill): Make backup just in case
 			}
@@ -428,7 +428,7 @@ void check_label(Checker *c, AstNode *label) {
 		error(l->name, "A label's name must be an identifier");
 		return;
 	}
-	String name = l->name->Ident.string;
+	String name = l->name->Ident.token.string;
 	if (name == "_") {
 		error(l->name, "A label's name cannot be a blank identifier");
 		return;
@@ -451,7 +451,7 @@ void check_label(Checker *c, AstNode *label) {
 		}
 	}
 
-	Entity *e = make_entity_label(c->allocator, c->context.scope, l->name->Ident, t_invalid, label);
+	Entity *e = make_entity_label(c->allocator, c->context.scope, l->name->Ident.token, t_invalid, label);
 	add_entity(c, c->context.scope, l->name, e);
 	e->parent_proc_decl = c->context.curr_proc_decl;
 
@@ -862,7 +862,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					gb_string_free(expr_str);
 					continue;
 				}
-				String name = fv->field->Ident.string;
+				String name = fv->field->Ident.token.string;
 				isize index = lookup_procedure_result(pt, name);
 				if (index < 0) {
 					error(arg, "No result named `%.*s` for this procedure type", LIT(name));
@@ -1127,7 +1127,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			Entity *entity = NULL;
 			if (name->kind == AstNode_Ident) {
-				Token token = name->Ident;
+				Token token = name->Ident.token;
 				String str = token.string;
 				Entity *found = NULL;
 
@@ -1523,7 +1523,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 
 			check_open_scope(c, stmt);
 			{
-				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, lhs->Ident, case_type, false);
+				Entity *tag_var = make_entity_variable(c->allocator, c->context.scope, lhs->Ident.token, case_type, false);
 				tag_var->flags |= EntityFlag_Used;
 				tag_var->flags |= EntityFlag_Value;
 				add_entity(c, c->context.scope, lhs, tag_var);
@@ -1579,7 +1579,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				return;
 			}
 			AstNode *ident = bs->label;
-			String name = ident->Ident.string;
+			String name = ident->Ident.token.string;
 			Operand o = {};
 			Entity *e = check_ident(c, &o, ident, NULL, NULL, false);
 			if (e == NULL) {
@@ -1678,7 +1678,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				if (name->kind != AstNode_Ident) {
 					error(name, "A variable declaration must be an identifier");
 				} else {
-					Token token = name->Ident;
+					Token token = name->Ident.token;
 					String str = token.string;
 					Entity *found = NULL;
 					// NOTE(bill): Ignore assignments to `_`

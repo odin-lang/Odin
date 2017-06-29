@@ -594,7 +594,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				isize elem_count = cl->elems.count;
 				for (isize i = 0; i < elem_count; i++) {
 					ast_node(fv, FieldValue, cl->elems[i]);
-					String name = fv->field->Ident.string;
+					String name = fv->field->Ident.token.string;
 
 					TypeAndValue tav = type_and_value_of_expr(m->info, fv->value);
 					GB_ASSERT(tav.mode != Addressing_Invalid);

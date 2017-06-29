@@ -291,7 +291,7 @@ void init_entity_foreign_library(Checker *c, Entity *e) {
 	} else if (ident->kind != AstNode_Ident) {
 		error(ident, "foreign library names must be an identifier");
 	} else {
-		String name = ident->Ident.string;
+		String name = ident->Ident.token.string;
 		Entity *found = scope_lookup_entity(c->context.scope, name);
 		if (found == NULL) {
 			if (name == "_") {

@@ -469,7 +469,7 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 				continue;
 			}
 
-			Token name_token = name->Ident;
+			Token name_token = name->Ident.token;
 
 			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, is_using, cast(i32)field_index);
 			e->identifier = name;
@@ -501,7 +501,7 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 			if (!is_type_struct(t) && !is_type_raw_union(t) && !is_type_bit_field(t) &&
 			    f->names.count >= 1 &&
 			    f->names[0]->kind == AstNode_Ident) {
-				Token name_token = f->names[0]->Ident;
+				Token name_token = f->names[0]->Ident.token;
 				if (is_type_indexable(t)) {
 					bool ok = true;
 					for_array(emi, entity_map.entries) {
@@ -731,7 +731,7 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 			continue;
 		}
 		ast_node(f, UnionField, variant);
-		Token name_token = f->name->Ident;
+		Token name_token = f->name->Ident.token;
 
 		Type *base_type = make_type_struct(c->allocator);
 		{
@@ -883,7 +883,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 			error(field, "An enum field's name must be an identifier");
 			continue;
 		}
-		String name = ident->Ident.string;
+		String name = ident->Ident.token.string;
 
 		if (init != NULL) {
 			Operand o = {};
@@ -932,7 +932,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 			max_value = iota;
 		}
 
-		Entity *e = make_entity_constant(c->allocator, c->context.scope, ident->Ident, constant_type, iota);
+		Entity *e = make_entity_constant(c->allocator, c->context.scope, ident->Ident.token, constant_type, iota);
 		e->identifier = ident;
 		e->flags |= EntityFlag_Visited;
 
@@ -990,7 +990,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 			error(field, "A bit field value's name must be an identifier");
 			continue;
 		}
-		String name = ident->Ident.string;
+		String name = ident->Ident.token.string;
 
 		Operand o = {};
 		check_expr(c, &o, value);
@@ -1010,7 +1010,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 		}
 
 		Type *value_type = make_type_bit_field_value(c->allocator, bits);
-		Entity *e = make_entity_variable(c->allocator, bit_field_type->BitField.scope, ident->Ident, value_type, false);
+		Entity *e = make_entity_variable(c->allocator, bit_field_type->BitField.scope, ident->Ident.token, value_type, false);
 		e->identifier = ident;
 		e->flags |= EntityFlag_BitFieldValue;
 
@@ -1235,10 +1235,10 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			if (ast_node_expect(name, AstNode_Ident)) {
 				Entity *param = NULL;
 				if (is_type_param) {
-					param = make_entity_type_name(c->allocator, scope, name->Ident, type);
+					param = make_entity_type_name(c->allocator, scope, name->Ident.token, type);
 					param->TypeName.is_type_alias = true;
 				} else {
-					param = make_entity_param(c->allocator, scope, name->Ident, type,
+					param = make_entity_param(c->allocator, scope, name->Ident.token, type,
 					                          (p->flags&FieldFlag_using) != 0, false);
 					param->Variable.default_value = value;
 					param->Variable.default_is_nil = default_is_nil;
@@ -1367,7 +1367,7 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 				if (name->kind != AstNode_Ident) {
 					error(name, "Expected an identifer for as the field name");
 				} else {
-					token = name->Ident;
+					token = name->Ident.token;
 				}
 
 				Entity *param = make_entity_param(c->allocator, scope, token, type, false, false);
@@ -1653,14 +1653,14 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 	GB_ASSERT(n->kind == AstNode_Ident);
 	o->mode = Addressing_Invalid;
 	o->expr = n;
-	String name = n->Ident.string;
+	String name = n->Ident.token.string;
 
 	Entity *e = scope_lookup_entity(c->context.scope, name);
 	if (e == NULL) {
 		if (name == "_") {
-			error(n->Ident, "`_` cannot be used as a value type");
+			error(n, "`_` cannot be used as a value type");
 		} else {
-			error(n->Ident, "Undeclared name: %.*s", LIT(name));
+			error(n, "Undeclared name: %.*s", LIT(name));
 		}
 		o->type = t_invalid;
 		o->mode = Addressing_Invalid;
@@ -1672,10 +1672,10 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 	if (e->parent_proc_decl != NULL &&
 	    e->parent_proc_decl != c->context.curr_proc_decl) {
 		if (e->kind == Entity_Variable) {
-			error(n->Ident, "Nested procedures do not capture its parent's variables: %.*s", LIT(name));
+			error(n, "Nested procedures do not capture its parent's variables: %.*s", LIT(name));
 			return NULL;
 		} else if (e->kind == Entity_Label) {
-			error(n->Ident, "Nested procedures do not capture its parent's labels: %.*s", LIT(name));
+			error(n, "Nested procedures do not capture its parent's labels: %.*s", LIT(name));
 			return NULL;
 		}
 	}
@@ -3529,7 +3529,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 	}
 
 	if (op_expr->kind == AstNode_Ident) {
-		String op_name = op_expr->Ident.string;
+		String op_name = op_expr->Ident.token.string;
 		Entity *e = scope_lookup_entity(c->context.scope, op_name);
 
 		add_entity_use(c, op_expr, e);
@@ -3542,7 +3542,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 			// If you can clean this up, please do but be really careful
 			String import_name = op_name;
 			Scope *import_scope = e->ImportName.scope;
-			String entity_name = selector->Ident.string;
+			String entity_name = selector->Ident.token.string;
 
 			check_op_expr = false;
 			entity = scope_lookup_entity(import_scope, entity_name);
@@ -3641,7 +3641,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 
 
 	if (entity == NULL && selector->kind == AstNode_Ident) {
-		String field_name = selector->Ident.string;
+		String field_name = selector->Ident.token.string;
 		sel = lookup_field(c->allocator, operand->type, field_name, operand->mode == Addressing_Type);
 
 		if (operand->mode != Addressing_Type && !check_is_field_exported(c, sel.entity)) {
@@ -4236,18 +4236,18 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 
 		ast_node(arg, Ident, field_arg);
-		Selection sel = lookup_field(c->allocator, type, arg->string, operand->mode == Addressing_Type);
+		Selection sel = lookup_field(c->allocator, type, arg->token.string, operand->mode == Addressing_Type);
 		if (sel.entity == NULL) {
 			gbString type_str = type_to_string(bt);
 			error(ce->args[0],
-			      "`%s` has no field named `%.*s`", type_str, LIT(arg->string));
+			      "`%s` has no field named `%.*s`", type_str, LIT(arg->token.string));
 			gb_string_free(type_str);
 			return false;
 		}
 		if (sel.indirect) {
 			gbString type_str = type_to_string(bt);
 			error(ce->args[0],
-			      "Field `%.*s` is embedded via a pointer in `%s`", LIT(arg->string), type_str);
+			      "Field `%.*s` is embedded via a pointer in `%s`", LIT(arg->token.string), type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -5045,7 +5045,7 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 
 	u64 tags = base_entity->Procedure.tags;
 	AstNode *ident = clone_ast_node(a, base_entity->identifier);
-	Token token = ident->Ident;
+	Token token = ident->Ident.token;
 	DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, old_decl->parent);
 	d->gen_proc_type = final_proc_type;
 	d->type_expr = pl->type;
@@ -5136,14 +5136,14 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		if (show_error) {
 			error(ce->ellipsis,
 			      "Cannot use `..` in call to a non-variadic procedure: `%.*s`",
-			      LIT(ce->proc->Ident.string));
+			      LIT(ce->proc->Ident.token.string));
 		}
 		err = CallArgumentError_NonVariadicExpand;
 	} else if (vari_expand && pt->c_vararg) {
 		if (show_error) {
 			error(ce->ellipsis,
 			      "Cannot use `..` in call to a `#c_vararg` variadic procedure: `%.*s`",
-			      LIT(ce->proc->Ident.string));
+			      LIT(ce->proc->Ident.token.string));
 		}
 		err = CallArgumentError_NonVariadicExpand;
 	} else if (operands.count == 0 && param_count_excluding_defaults == 0) {
@@ -5341,7 +5341,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			err = CallArgumentError_InvalidFieldValue;
 			continue;
 		}
-		String name = fv->field->Ident.string;
+		String name = fv->field->Ident.token.string;
 		isize index = lookup_procedure_parameter(pt, name);
 		if (index < 0) {
 			if (show_error) {
@@ -6084,7 +6084,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 							gb_string_free(expr_str);
 							continue;
 						}
-						String name = fv->field->Ident.string;
+						String name = fv->field->Ident.token.string;
 
 						Selection sel = lookup_field(c->allocator, type, name, o->mode == Addressing_Type);
 						bool is_unknown = sel.entity == NULL;
@@ -6281,7 +6281,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 							gb_string_free(expr_str);
 							continue;
 						}
-						String name = fv->field->Ident.string;
+						String name = fv->field->Ident.token.string;
 
 						Selection sel = lookup_field(c->allocator, type, name, o->mode == Addressing_Type);
 						if (sel.entity == NULL) {
@@ -6853,7 +6853,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		break;
 
 	case_ast_node(i, Ident, node);
-		str = string_append_token(str, *i);
+		str = string_append_token(str, i->token);
 	case_end;
 
 	case_ast_node(i, Implicit, node);
@@ -7030,7 +7030,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 			}
 			AstNode *name = field->names[0];
 			ast_node(n, Ident, name);
-			if (n->string != "_") {
+			if (n->token.string != "_") {
 				has_name = true;
 				break;
 			}

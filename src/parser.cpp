@@ -137,7 +137,9 @@ Array<AstNode *> make_ast_node_array(AstFile *f, isize init_capacity = 8) {
 // for the AstNode. I personally prefer discriminated unions over subtype polymorphism as I can preallocate
 // all the nodes and even memcpy in a different kind of node
 #define AST_NODE_KINDS \
-	AST_NODE_KIND(Ident,          "identifier",      Token) \
+	AST_NODE_KIND(Ident,          "identifier",      struct { \
+		Token token; \
+	}) \
 	AST_NODE_KIND(Implicit,       "implicit",        Token) \
 	AST_NODE_KIND(Undef,          "undef",           Token) \
 	AST_NODE_KIND(BasicLit,       "basic literal",   Token) \
@@ -501,7 +503,7 @@ gb_inline bool is_ast_node_when_stmt(AstNode *node) {
 
 Token ast_node_token(AstNode *node) {
 	switch (node->kind) {
-	case AstNode_Ident:          return node->Ident;
+	case AstNode_Ident:          return node->Ident.token;
 	case AstNode_Implicit:       return node->Implicit;
 	case AstNode_Undef:          return node->Undef;
 	case AstNode_BasicLit:       return node->BasicLit;
@@ -1042,7 +1044,7 @@ AstNode *ast_deref_expr(AstFile *f, AstNode *expr, Token op) {
 
 AstNode *ast_ident(AstFile *f, Token token) {
 	AstNode *result = make_ast_node(f, AstNode_Ident);
-	result->Ident = token;
+	result->Ident.token = token;
 	return result;
 }
 

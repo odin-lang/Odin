@@ -534,7 +534,7 @@ bool ssa_is_op_const(ssaOp op) {
 bool ssa_is_blank_ident(AstNode *node) {
 	if (node->kind == AstNode_Ident) {
 		ast_node(i, Ident, node);
-		return is_blank_ident(i->string);
+		return is_blank_ident(i->token.string);
 	}
 	return false;
 }
@@ -1048,7 +1048,7 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 		ssa_emit_comment(p, str_lit("SelectorExpr"));
 		AstNode *sel = unparen_expr(se->selector);
 		if (sel->kind == AstNode_Ident) {
-			String selector = sel->Ident.string;
+			String selector = sel->Ident.token.string;
 			TypeAndValue tav = type_and_value_of_expr(p->module->info, se->expr);
 
 			if (tav.mode == Addressing_Invalid) {

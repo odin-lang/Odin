@@ -944,7 +944,7 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier != NULL);
 	if (identifier->kind == AstNode_Ident) {
-		if (identifier->Ident.string == "_") {
+		if (identifier->Ident.token.string == "_") {
 			return;
 		}
 		HashKey key = hash_node(identifier);
@@ -1009,7 +1009,7 @@ void add_entity_use(Checker *c, AstNode *identifier, Entity *entity) {
 void add_entity_and_decl_info(Checker *c, AstNode *identifier, Entity *e, DeclInfo *d) {
 	GB_ASSERT(identifier->kind == AstNode_Ident);
 	GB_ASSERT(e != NULL && d != NULL);
-	GB_ASSERT(identifier->Ident.string == e->token.string);
+	GB_ASSERT(identifier->Ident.token.string == e->token.string);
 	if (e->scope != NULL) add_entity(c, e->scope, identifier, e);
 	add_entity_definition(&c->info, identifier, e);
 	map_set(&c->info.entities, hash_entity(e), d);
@@ -1627,7 +1627,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 						error(name, "A declaration's name must be an identifier, got %.*s", LIT(ast_node_strings[name->kind]));
 						continue;
 					}
-					Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident, NULL, false);
+					Entity *e = make_entity_variable(c->allocator, c->context.scope, name->Ident.token, NULL, false);
 					e->Variable.is_thread_local = (vd->flags & VarDeclFlag_thread_local) != 0;
 					e->identifier = name;
 
@@ -1680,12 +1680,12 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					Entity *e = NULL;
 
 					if (is_ast_node_type(init)) {
-						e = make_entity_type_name(c->allocator, d->scope, name->Ident, NULL);
+						e = make_entity_type_name(c->allocator, d->scope, name->Ident.token, NULL);
 						d->type_expr = init;
 						d->init_expr = init;
 					} else if (init->kind == AstNode_ProcLit) {
 						ast_node(pl, ProcLit, init);
-						e = make_entity_procedure(c->allocator, d->scope, name->Ident, NULL, pl->tags);
+						e = make_entity_procedure(c->allocator, d->scope, name->Ident.token, NULL, pl->tags);
 						if (fl != NULL) {
 							GB_ASSERT(fl->kind == AstNode_Ident);
 							e->Procedure.foreign_library_ident = fl;
@@ -1694,7 +1694,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 						d->proc_lit = init;
 						d->type_expr = pl->type;
 					} else {
-						e = make_entity_constant(c->allocator, d->scope, name->Ident, NULL, empty_exact_value);
+						e = make_entity_constant(c->allocator, d->scope, name->Ident.token, NULL, empty_exact_value);
 						d->type_expr = vd->type;
 						d->init_expr = init;
 					}

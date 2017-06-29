@@ -656,7 +656,7 @@ Type *ir_type(irValue *value) {
 bool ir_is_blank_ident(AstNode *node) {
 	if (node->kind == AstNode_Ident) {
 		ast_node(i, Ident, node);
-		return is_blank_ident(i->string);
+		return is_blank_ident(i->token.string);
 	}
 	return false;
 }
@@ -4452,7 +4452,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		} else if (e != NULL && e->kind == Entity_Variable) {
 			return ir_addr_load(proc, ir_build_addr(proc, expr));
 		}
-		GB_PANIC("NULL value for expression from identifier: %.*s @ %p", LIT(i->string), expr);
+		GB_PANIC("NULL value for expression from identifier: %.*s @ %p", LIT(i->token.string), expr);
 		return NULL;
 	case_end;
 
@@ -4672,7 +4672,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 				AstNode *arg = ce->args[arg_index];
 				ast_node(fv, FieldValue, arg);
 				GB_ASSERT(fv->field->kind == AstNode_Ident);
-				String name = fv->field->Ident.string;
+				String name = fv->field->Ident.token.string;
 				isize index = lookup_procedure_parameter(type, name);
 				GB_ASSERT(index >= 0);
 				irValue *expr = ir_build_expr(proc, fv->value);
@@ -4928,7 +4928,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		ir_emit_comment(proc, str_lit("SelectorExpr"));
 		AstNode *sel = unparen_expr(se->selector);
 		if (sel->kind == AstNode_Ident) {
-			String selector = sel->Ident.string;
+			String selector = sel->Ident.token.string;
 			TypeAndValue tav = type_and_value_of_expr(proc->module->info, se->expr);
 
 			if (tav.mode == Addressing_Invalid) {
@@ -5344,7 +5344,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 					if (elem->kind == AstNode_FieldValue) {
 						ast_node(fv, FieldValue, elem);
-						String name = fv->field->Ident.string;
+						String name = fv->field->Ident.token.string;
 						Selection sel = lookup_field(proc->module->allocator, bt, name, false);
 						index = sel.index[0];
 						elem = fv->value;
@@ -5499,7 +5499,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 					if (elem->kind == AstNode_FieldValue) {
 						ast_node(fv, FieldValue, elem);
-						Selection sel = lookup_field(proc->module->allocator, bt, fv->field->Ident.string, false);
+						Selection sel = lookup_field(proc->module->allocator, bt, fv->field->Ident.token.string, false);
 						index = sel.index[0];
 						elem = fv->value;
 					} else {
@@ -6184,7 +6184,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				AstNode *arg = rs->results[arg_index];
 				ast_node(fv, FieldValue, arg);
 				GB_ASSERT(fv->field->kind == AstNode_Ident);
-				String name = fv->field->Ident.string;
+				String name = fv->field->Ident.token.string;
 				isize index = lookup_procedure_result(&proc->type->Proc, name);
 				GB_ASSERT(index >= 0);
 				irValue *expr = ir_build_expr(proc, fv->value);
