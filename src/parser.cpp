@@ -114,8 +114,9 @@ enum FieldFlag {
 	FieldFlag_using     = 1<<1,
 	FieldFlag_no_alias  = 1<<2,
 	FieldFlag_c_vararg  = 1<<3,
+	FieldFlag_dollar    = 1<<4,
 
-	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg,
+	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_dollar,
 };
 
 enum StmtAllowFlag {
@@ -377,6 +378,10 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 	AST_NODE_KIND(HelperType, "type", struct { \
 		Token token; \
 	}) \
+	AST_NODE_KIND(PolyType, "polymorphic type", struct { \
+		Token    token; \
+		AstNode *type;  \
+	}) \
 	AST_NODE_KIND(ProcType, "procedure type", struct { \
 		Token    token;   \
 		AstNode *params;  \
@@ -581,6 +586,7 @@ Token ast_node_token(AstNode *node) {
 		return ast_node_token(node->UnionField.name);
 
 	case AstNode_HelperType:       return node->HelperType.token;
+	case AstNode_PolyType:         return node->PolyType.token;
 	case AstNode_ProcType:         return node->ProcType.token;
 	case AstNode_PointerType:      return node->PointerType.token;
 	case AstNode_AtomicType:       return node->AtomicType.token;
@@ -1356,6 +1362,13 @@ AstNode *ast_union_field(AstFile *f, AstNode *name, AstNode *list) {
 AstNode *ast_helper_type(AstFile *f, Token token) {
 	AstNode *result = make_ast_node(f, AstNode_HelperType);
 	result->HelperType.token = token;
+	return result;
+}
+
+AstNode *ast_poly_type(AstFile *f, Token token, AstNode *type) {
+	AstNode *result = make_ast_node(f, AstNode_PolyType);
+	result->PolyType.token = token;
+	result->PolyType.type   = type;
 	return result;
 }
 
@@ -3116,6 +3129,10 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token, String *link_name_) {
 	for_array(i, params->FieldList.list) {
 		AstNode *param = params->FieldList.list[i];
 		ast_node(f, Field, param);
+		if (f->flags&FieldFlag_dollar) {
+			is_generic = true;
+			break;
+		}
 		if (f->type != NULL &&
 		    f->type->kind == AstNode_HelperType) {
 			is_generic = true;
@@ -3160,6 +3177,7 @@ enum FieldPrefixKind {
 	FieldPrefix_Using,
 	FieldPrefix_NoAlias,
 	FieldPrefix_CVarArg,
+	FieldPrefix_Dollar,
 };
 
 FieldPrefixKind is_token_field_prefix(AstFile *f) {
@@ -3169,6 +3187,9 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 
 	case Token_using:
 		return FieldPrefix_Using;
+
+	case Token_Dollar:
+		return FieldPrefix_Dollar;
 
 	case Token_Hash: {
 		next_token(f);
@@ -3192,6 +3213,7 @@ u32 parse_field_prefixes(AstFile *f) {
 	i32 using_count    = 0;
 	i32 no_alias_count = 0;
 	i32 c_vararg_count = 0;
+	i32 dollar_count   = 0;
 
 	for (;;) {
 		FieldPrefixKind kind = is_token_field_prefix(f);
@@ -3202,17 +3224,20 @@ u32 parse_field_prefixes(AstFile *f) {
 		case FieldPrefix_Using:     using_count    += 1; next_token(f); break;
 		case FieldPrefix_NoAlias:   no_alias_count += 1; next_token(f); break;
 		case FieldPrefix_CVarArg:   c_vararg_count += 1; next_token(f); break;
+		case FieldPrefix_Dollar:    dollar_count   += 1; next_token(f); break;
 		}
 	}
-	if (using_count     > 1) syntax_error(f->curr_token, "Multiple `using`     in this field list");
+	if (using_count     > 1) syntax_error(f->curr_token, "Multiple `using` in this field list");
 	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple `#no_alias` in this field list");
 	if (c_vararg_count  > 1) syntax_error(f->curr_token, "Multiple `#c_vararg` in this field list");
+	if (dollar_count    > 1) syntax_error(f->curr_token, "Multiple `$` in this field list");
 
 
 	u32 field_flags = 0;
 	if (using_count     > 0) field_flags |= FieldFlag_using;
 	if (no_alias_count  > 0) field_flags |= FieldFlag_no_alias;
 	if (c_vararg_count  > 0) field_flags |= FieldFlag_c_vararg;
+	if (dollar_count    > 0) field_flags |= FieldFlag_dollar;
 	return field_flags;
 }
 
@@ -3233,6 +3258,10 @@ u32 check_field_prefixes(AstFile *f, isize name_count, u32 allowed_flags, u32 se
 	if ((allowed_flags&FieldFlag_c_vararg) == 0 && (set_flags&FieldFlag_c_vararg)) {
 		syntax_error(f->curr_token, "`#c_vararg` is not allowed within this field list");
 		set_flags &= ~FieldFlag_c_vararg;
+	}
+	if ((allowed_flags&FieldFlag_dollar) == 0 && (set_flags&FieldFlag_dollar)) {
+		syntax_error(f->curr_token, "`$` is only allowed within procedures");
+		set_flags &= ~FieldFlag_dollar;
 	}
 	return set_flags;
 }
@@ -3417,6 +3446,12 @@ AstNode *parse_type_or_ident(AstFile *f) {
 	AstNode *type = NULL;
 
 	switch (f->curr_token.kind) {
+	case Token_Dollar: {
+		Token token = expect_token(f, Token_Dollar);
+		AstNode *type = parse_ident(f);
+		return ast_poly_type(f, token, type);
+	} break;
+
 	case Token_Ident:
 	{
 		AstNode *e = parse_ident(f);

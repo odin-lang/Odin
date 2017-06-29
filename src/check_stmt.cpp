@@ -1297,11 +1297,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					check_comparison(c, &a1, &b1, op);
 				} else {
 					Operand y = {};
-					if (is_operand_a_type_value(x)) {
-						check_expr_or_type(c, &y, expr);
-					} else {
-						check_expr(c, &y, expr);
-					}
+					check_expr(c, &y, expr);
+
 					if (x.mode == Addressing_Invalid ||
 					    y.mode == Addressing_Invalid) {
 						continue;

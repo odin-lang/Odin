@@ -2776,7 +2776,7 @@ irValue *ir_emit_ptr_to_int(irProcedure *proc, irValue *value, Type *t, bool all
 	Type *vt = core_type(ir_type(value));
 	GB_ASSERT(is_type_pointer(vt));
 	if (allow_type_type) {
-		GB_ASSERT(is_type_int_or_uint(core_type(t)) || is_type_type(t));
+		GB_ASSERT(is_type_int_or_uint(core_type(t)));
 	} else {
 		GB_ASSERT(is_type_int_or_uint(core_type(t)));
 	}
@@ -2788,7 +2788,6 @@ irValue *ir_emit_int_to_ptr(irProcedure *proc, irValue *value, Type *t) {
 	GB_ASSERT(is_type_pointer(core_type(t)));
 	return ir_emit(proc, ir_instr_conv(proc, irConv_inttoptr, value, vt, t));
 }
-
 
 irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	Type *src_type = ir_type(value);
@@ -4405,15 +4404,16 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 	GB_ASSERT(tv.mode != Addressing_Invalid);
 
 	if (tv.mode == Addressing_Type) {
-		// TODO(bill): Handle this correctly
-		i32 entry_index = type_info_index(proc->module->info, tv.type, false);
-		if (entry_index >= 0) {
-			irValue *ptr = ir_get_type_info_ptr(proc, tv.type);
-			return ir_emit_ptr_to_int(proc, ptr, t_type, true);
-			// i32 id = entry_index+1;
-			// return ir_value_constant(proc->module->allocator, t_int, exact_value_i64(id));
-		}
-		return v_raw_nil;
+		// // TODO(bill): Handle this correctly
+		// i32 entry_index = type_info_index(proc->module->info, tv.type, false);
+		// if (entry_index >= 0) {
+		// 	irValue *ptr = ir_get_type_info_ptr(proc, tv.type);
+		// 	return ir_emit_ptr_to_int(proc, ptr, t_type, true);
+		// 	// i32 id = entry_index+1;
+		// 	// return ir_value_constant(proc->module->allocator, t_int, exact_value_i64(id));
+		// }
+		// return v_raw_nil;
+		return ir_value_nil(proc->module->allocator, tv.type);
 	}
 
 	if (tv.value.kind != ExactValue_Invalid) {
@@ -7808,10 +7808,6 @@ void ir_gen_tree(irGen *s) {
 
 					case Basic_any:
 						tag = ir_emit_conv(proc, ti_ptr, t_type_info_any_ptr);
-						break;
-
-					case Basic_Type:
-						tag = ir_emit_conv(proc, ti_ptr, t_type_info_type_ptr);
 						break;
 					}
 					break;

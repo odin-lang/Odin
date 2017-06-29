@@ -30,7 +30,6 @@ enum BasicKind {
 	Basic_rawptr,
 	Basic_string, // ^u8 + int
 	Basic_any,    // ^Type_Info + rawptr
-	Basic_Type,   // `int` id of the type
 
 	Basic_UntypedBool,
 	Basic_UntypedInteger,
@@ -262,7 +261,6 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_rawptr,            BasicFlag_Pointer,                         -1, STR_LIT("rawptr")}},
 	{Type_Basic, {Basic_string,            BasicFlag_String,                          -1, STR_LIT("string")}},
 	{Type_Basic, {Basic_any,               0,                                         -1, STR_LIT("any")}},
-	{Type_Basic, {Basic_Type,              0,                                         -1, STR_LIT("Type")}},
 
 	{Type_Basic, {Basic_UntypedBool,       BasicFlag_Boolean    | BasicFlag_Untyped,   0, STR_LIT("untyped bool")}},
 	{Type_Basic, {Basic_UntypedInteger,    BasicFlag_Integer    | BasicFlag_Untyped,   0, STR_LIT("untyped integer")}},
@@ -308,7 +306,6 @@ gb_global Type *t_uint            = &basic_types[Basic_uint];
 gb_global Type *t_rawptr          = &basic_types[Basic_rawptr];
 gb_global Type *t_string          = &basic_types[Basic_string];
 gb_global Type *t_any             = &basic_types[Basic_any];
-gb_global Type *t_type            = &basic_types[Basic_Type];
 
 gb_global Type *t_untyped_bool       = &basic_types[Basic_UntypedBool];
 gb_global Type *t_untyped_integer    = &basic_types[Basic_UntypedInteger];
@@ -343,7 +340,6 @@ gb_global Type *t_type_info_rune              = NULL;
 gb_global Type *t_type_info_float             = NULL;
 gb_global Type *t_type_info_complex           = NULL;
 gb_global Type *t_type_info_any               = NULL;
-gb_global Type *t_type_info_type              = NULL;
 gb_global Type *t_type_info_string            = NULL;
 gb_global Type *t_type_info_boolean           = NULL;
 gb_global Type *t_type_info_pointer           = NULL;
@@ -368,7 +364,6 @@ gb_global Type *t_type_info_float_ptr         = NULL;
 gb_global Type *t_type_info_complex_ptr       = NULL;
 gb_global Type *t_type_info_quaternion_ptr    = NULL;
 gb_global Type *t_type_info_any_ptr           = NULL;
-gb_global Type *t_type_info_type_ptr          = NULL;
 gb_global Type *t_type_info_string_ptr        = NULL;
 gb_global Type *t_type_info_boolean_ptr       = NULL;
 gb_global Type *t_type_info_pointer_ptr       = NULL;
@@ -780,12 +775,6 @@ bool is_type_tuple(Type *t) {
 	return t->kind == Type_Tuple;
 }
 
-bool is_type_type(Type *t) {
-	t = base_type(t);
-	return t->kind == Type_Basic && t->Basic.kind == Basic_Type;
-}
-
-
 
 bool is_type_int_or_uint(Type *t) {
 	if (t->kind == Type_Basic) {
@@ -1065,7 +1054,6 @@ bool is_type_comparable(Type *t) {
 		case Basic_any:
 			return false;
 		case Basic_rune:
-		case Basic_Type:
 			return true;
 		}
 		return true;
@@ -1759,7 +1747,6 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		switch (t->Basic.kind) {
 		case Basic_string: return build_context.word_size;
 		case Basic_any:    return build_context.word_size;
-		case Basic_Type:   return build_context.word_size;
 
 		case Basic_int: case Basic_uint: case Basic_rawptr:
 			return build_context.word_size;
@@ -1985,7 +1972,6 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		switch (kind) {
 		case Basic_string: return 2*build_context.word_size;
 		case Basic_any:    return 2*build_context.word_size;
-		case Basic_Type:   return 1*build_context.word_size;
 
 		case Basic_int: case Basic_uint: case Basic_rawptr:
 			return build_context.word_size;

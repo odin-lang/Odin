@@ -327,15 +327,6 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 	if (operand->mode == Addressing_Invalid) {
 		return;
 	}
-
-	if (operand->mode == Addressing_Type) {
-		if (type != NULL && is_type_type(type)) {
-			add_type_info_type(c, type);
-			add_type_info_type(c, operand->type);
-			return;
-		}
-	}
-
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
 		if (type == NULL || is_type_any(type)) {
@@ -1179,6 +1170,11 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				}
 			} else {
 				type = check_type(c, type_expr);
+				if (p->flags&FieldFlag_dollar) {
+					error(type_expr, "`$` is only allowed for polymorphic type parameters at the moment");
+					type = NULL;
+				}
+
 			}
 
 			if (default_value != NULL) {
@@ -1630,12 +1626,13 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 	bool is_polymorphic = false;
 	for (isize i = 0; i < param_count; i++) {
 		Entity *e = params->Tuple.variables[i];
-		if (e->type->kind == Type_Generic) {
+		if (e->kind != Entity_Variable) {
 			is_polymorphic = true;
+			break;
 		}
 	}
 	if (operands == NULL) {
-		GB_ASSERT(type->Proc.is_polymorphic == is_polymorphic);
+		// GB_ASSERT(type->Proc.is_polymorphic == is_polymorphic);
 	}
 
 
@@ -2625,18 +2622,15 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 		x->value = exact_value_bool(comp);
 		return;
 	}
-	if (x->mode == Addressing_Type && is_operand_a_type_value(*y)) {
-		x->mode = Addressing_Value;
-		x->type = t_untyped_bool;
-		return;
-	} else if (y->mode == Addressing_Type && is_operand_a_type_value(*x)) {
-		x->mode = Addressing_Value;
-		x->type = t_untyped_bool;
-		return;
-	}
 
 	gbString err_str = NULL;
+
+	defer (if (err_str != NULL) {
+		gb_string_free(err_str);
+	});
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
+
 	if (check_is_assignable_to(c, x, y->type) ||
 	    check_is_assignable_to(c, y, x->type)) {
 		Type *err_type = x->type;
@@ -2698,10 +2692,6 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 		}
 	}
 
-	if (err_str != NULL) {
-		gb_string_free(err_str);
-	}
-	gb_temp_arena_memory_end(tmp);
 }
 
 void check_shift(Checker *c, Operand *x, Operand *y, AstNode *node) {
@@ -3064,13 +3054,11 @@ void check_binary_expr(Checker *c, Operand *x, AstNode *node) {
 		check_expr_or_type(c, y, be->right);
 		bool xt = x->mode == Addressing_Type;
 		bool yt = y->mode == Addressing_Type;
-		bool xvt = is_operand_a_type_value(*x);
-		bool yvt = is_operand_a_type_value(*y);
 		// If only one is a type, this is an error
 		if (xt ^ yt) {
 			GB_ASSERT(xt != yt);
-			if (xt && !yvt) error_operand_not_expression(x);
-			if (yt && !xvt) error_operand_not_expression(y);
+			if (xt) error_operand_not_expression(x);
+			if (yt) error_operand_not_expression(y);
 		}
 	} break;
 

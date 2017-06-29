@@ -246,7 +246,6 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		case Basic_uint:   ir_fprintf(f, "i%lld", word_bits);         return;
 		case Basic_int:    ir_fprintf(f, "i%lld", word_bits);         return;
 		case Basic_any:    ir_fprintf(f, "%%..any");                  return;
-		case Basic_Type:   ir_fprintf(f, "%%..Type");                 return;
 		}
 		break;
 	case Type_Pointer:
@@ -1691,11 +1690,6 @@ void print_llvm_ir(irGen *ir) {
 	ir_fprintf(f, ", ");
 	ir_print_type(f, m, t_type_info_ptr);
 	ir_fprintf(f, "} ; Basic_any\n");
-
-	ir_print_encoded_local(f, str_lit("..Type"));
-	ir_fprintf(f, " = type ");
-	ir_print_type(f, m, t_int);
-	ir_fprintf(f, " ; Basic_Type\n");
 
 	ir_fprintf(f, "declare void @llvm.dbg.declare(metadata, metadata, metadata) nounwind readnone \n");
 	ir_fprintf(f, "\n");

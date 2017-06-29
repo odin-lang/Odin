@@ -379,19 +379,6 @@ main :: proc() {
 	// Command line argument(s)!
 	// -opt=0,1,2,3
 
-	a: Type = int;
-	b: Type = f32;
-	c: Type = int;
-	match a {
-	case int: fmt.println("a == int");
-	case f32: fmt.println("a == f32");
-	case:     fmt.println("What type is a?");
-	}
-	assert(a != b);
-	assert(b != c);
-	assert(a == c);
-
-
 	program := "+ + * - /";
 	accumulator := 0;
 
