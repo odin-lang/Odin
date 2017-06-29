@@ -1218,7 +1218,7 @@ void add_dependency_to_map(Map<Entity *> *map, CheckerInfo *info, Entity *entity
 		return;
 	}
 	if (entity->type != NULL &&
-	    is_type_gen_proc(entity->type)) {
+	    is_type_polymorphic(entity->type)) {
 		DeclInfo *decl = decl_info_of_entity(info, entity);
 		if (decl->gen_proc_type == NULL) {
 			return;
@@ -1248,11 +1248,9 @@ Map<Entity *> generate_minimum_dependency_map(CheckerInfo *info, Entity *start) 
 
 	for_array(i, info->definitions.entries) {
 		Entity *e = info->definitions.entries[i].value;
-		if (e->scope->is_global) {
-			if (!is_type_gen_proc(e->type))  {
-				// NOTE(bill): Require runtime stuff
-				add_dependency_to_map(&map, info, e);
-			}
+		if (e->scope->is_global && !is_type_polymorphic(e->type)) { // TODO(bill): is the check enough?
+			// NOTE(bill): Require runtime stuff
+			add_dependency_to_map(&map, info, e);
 		} else if (e->kind == Entity_Procedure) {
 			if ((e->Procedure.tags & ProcTag_export) != 0) {
 				add_dependency_to_map(&map, info, e);
@@ -2252,7 +2250,7 @@ void check_parsed_files(Checker *c) {
 		defer (c->context = prev_context);
 
 		TypeProc *pt = &pi->type->Proc;
-		if (pt->is_generic) {
+		if (pt->is_polymorphic) {
 			if (pi->decl->gen_proc_type == NULL) {
 				continue;
 			}

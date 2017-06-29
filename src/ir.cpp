@@ -2739,7 +2739,7 @@ irValue *ir_find_or_add_entity_string(irModule *m, String str) {
 
 
 
-String ir_lookup_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
+String ir_lookup_subtype_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
 	Type *prev_src = src;
 	// Type *prev_dst = dst;
 	src = base_type(type_deref(src));
@@ -2760,7 +2760,7 @@ String ir_lookup_polymorphic_field(CheckerInfo *info, Type *dst, Type *src) {
 				}
 			}
 			if (is_type_struct(f->type)) {
-				String name = ir_lookup_polymorphic_field(info, dst, f->type);
+				String name = ir_lookup_subtype_polymorphic_field(info, dst, f->type);
 				if (name.len > 0) {
 					return name;
 				}
@@ -2963,7 +2963,7 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 		bool dt_is_ptr = is_type_pointer(dt);
 
 		GB_ASSERT(is_type_struct(st) || is_type_union(st));
-		String field_name = ir_lookup_polymorphic_field(proc->module->info, t, st);
+		String field_name = ir_lookup_subtype_polymorphic_field(proc->module->info, t, st);
 		// gb_printf("field_name: %.*s\n", LIT(field_name));
 		if (field_name.len > 0) {
 			// NOTE(bill): It can be casted
@@ -3515,7 +3515,7 @@ String ir_mangle_name(irGen *s, String path, Entity *e) {
 	isize base_len = ext-1-base;
 
 	isize max_len = base_len + 1 + 1 + 10 + 1 + name.len;
-	bool require_suffix_id = check_is_entity_overloaded(e) || is_type_gen_proc(e->type);
+	bool require_suffix_id = check_is_entity_overloaded(e) || is_type_poly_proc(e->type);
 	if (require_suffix_id) {
 		max_len += 21;
 	}
@@ -6024,7 +6024,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					DeclInfo *decl = decl_info_of_entity(info, e);
 					ast_node(pl, ProcLit, decl->proc_lit);
 					if (pl->body != NULL) {
-						if (is_type_gen_proc(e->type)) {
+						if (is_type_poly_proc(e->type)) {
 							auto found = *map_get(&info->gen_procs, hash_pointer(ident));
 							for_array(i, found) {
 								Entity *e = found[i];
@@ -7373,7 +7373,7 @@ void ir_gen_tree(irGen *s) {
 			continue;
 		}
 
-		if (!scope->is_global || is_type_gen_proc(e->type)) {
+		if (!scope->is_global || is_type_poly_proc(e->type)) {
 			if (e->kind == Entity_Procedure && (e->Procedure.tags & ProcTag_export) != 0) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later

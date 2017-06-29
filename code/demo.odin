@@ -370,70 +370,16 @@ explicit_parametric_polymorphic_procedures :: proc() {
 
 main :: proc() {
 	general_stuff();
-	// foreign_blocks();
-	// default_arguments();
-	// named_arguments();
-	// default_return_values();
-	// call_location();
-	// explicit_parametric_polymorphic_procedures();
+	foreign_blocks();
+	default_arguments();
+	named_arguments();
+	default_return_values();
+	call_location();
+	explicit_parametric_polymorphic_procedures();
 
 	// Command line argument(s)!
 	// -opt=0,1,2,3
 
-
-	/*************/
-	/* Questions */
-	/*************/
-
-	/*
-		I'm questioning if I should change the declaration syntax back to Jai-like
-		as I've found solutions to the problems I had with it before.
-
-		Should I change back to Jai-like declarations or keep with the Pascal-like?
-
-		Jai-like
-
-		x: int;
-		x: int = 123;
-		x := 123;
-
-		foo : int : 123;
-		foo :: 123;
-
-		MyInt :: int;
-		BarType :: proc();
-
-		bar :: proc() {
-		}
-
-		foreign lib {
-			foreign_bar :: proc() ---;
-		}
-
-		Pascal-like
-
-		var x: int;
-		var x: int = 123;
-		var x = 123;
-
-		const foo: int = 123;
-		const foo = 123;
-
-		type MyInt int;
-		type BarType proc();
-
-		bar :: proc() {
-		}
-
-		foreign lib {
-			foreign_bar :: proc();
-		}
-	 */
-
-}
-
-/*
-main :: proc() {
 	program := "+ + * - /";
 	accumulator := 0;
 
@@ -450,5 +396,4 @@ main :: proc() {
 	fmt.printf("The program \"%s\" calculates the value %d\n",
 	           program, accumulator);
 }
-*/
 

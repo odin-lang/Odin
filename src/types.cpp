@@ -149,8 +149,8 @@ struct TypeRecord {
 		bool     variadic;                                \
 		bool     require_results;                         \
 		bool     c_vararg;                                \
-		bool     is_generic;                              \
-		bool     is_generic_specialized;                  \
+		bool     is_polymorphic;                          \
+		bool     is_poly_specialized;                     \
 		ProcCallingConvention calling_convention;         \
 	})                                                    \
 	TYPE_KIND(Map, struct {                               \
@@ -827,9 +827,9 @@ bool is_type_proc(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Proc;
 }
-bool is_type_gen_proc(Type *t) {
+bool is_type_poly_proc(Type *t) {
 	t = base_type(t);
-	return t->kind == Type_Proc && t->Proc.is_generic;
+	return t->kind == Type_Proc && t->Proc.is_polymorphic;
 }
 Type *base_vector_type(Type *t) {
 	if (is_type_vector(t)) {
@@ -942,63 +942,66 @@ bool is_type_indexable(Type *t) {
 	return is_type_array(t) || is_type_slice(t) || is_type_vector(t) || is_type_string(t);
 }
 
-bool is_type_generic(Type *t) {
+bool is_type_polymorphic(Type *t) {
 	t = core_type(t);
 	switch (t->kind) {
 	case Type_Generic:
 		return true;
 
 	case Type_Pointer:
-		return is_type_generic(t->Pointer.elem);
+		return is_type_polymorphic(t->Pointer.elem);
 	case Type_Atomic:
-		return is_type_generic(t->Atomic.elem);
+		return is_type_polymorphic(t->Atomic.elem);
 	case Type_Array:
-		return is_type_generic(t->Array.elem);
+		return is_type_polymorphic(t->Array.elem);
 	case Type_DynamicArray:
-		return is_type_generic(t->DynamicArray.elem);
+		return is_type_polymorphic(t->DynamicArray.elem);
 	case Type_Vector:
-		return is_type_generic(t->Vector.elem);
+		return is_type_polymorphic(t->Vector.elem);
 	case Type_Slice:
-		return is_type_generic(t->Slice.elem);
+		return is_type_polymorphic(t->Slice.elem);
 
 	case Type_Tuple:
 		for (isize i = 0; i < t->Tuple.variable_count; i++) {
-			if (is_type_generic(t->Tuple.variables[i]->type)) {
+			if (is_type_polymorphic(t->Tuple.variables[i]->type)) {
 				return true;
 			}
 		}
 		break;
 
 	case Type_Proc:
-		if (t->Proc.param_count > 0 &&
-		    is_type_generic(t->Proc.params)) {
+		if (t->Proc.is_polymorphic) {
 			return true;
 		}
-		if (t->Proc.result_count > 0 &&
-		    is_type_generic(t->Proc.results)) {
-			return true;
-		}
+		// if (t->Proc.param_count > 0 &&
+		//     is_type_polymorphic(t->Proc.params)) {
+		// 	return true;
+		// }
+		// if (t->Proc.result_count > 0 &&
+		//     is_type_polymorphic(t->Proc.results)) {
+		// 	return true;
+		// }
 		break;
 
 	// case Type_Record:
 	// 	GB_ASSERT(t->Record.kind != TypeRecord_Enum);
 	// 	for (isize i = 0; i < t->Record.field_count; i++) {
-	// 	    if (is_type_generic(t->Record.fields[i]->type)) {
+	// 	    if (is_type_polymorphic(t->Record.fields[i]->type)) {
 	// 	    	return true;
 	// 	    }
 	// 	}
 	// 	for (isize i = 1; i < t->Record.variant_count; i++) {
-	// 	    if (is_type_generic(t->Record.variants[i]->type)) {
+	// 	    if (is_type_polymorphic(t->Record.variants[i]->type)) {
 	// 	    	return true;
 	// 	    }
 	// 	}
 	// 	break;
 
 	case Type_Map:
-		if (is_type_generic(t->Map.key)) {
+		if (is_type_polymorphic(t->Map.key)) {
 			return true;
 		}
-		if (is_type_generic(t->Map.value)) {
+		if (is_type_polymorphic(t->Map.value)) {
 			return true;
 		}
 		break;
@@ -1347,7 +1350,7 @@ ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 		// return ProcOverload_CallingConvention;
 	// }
 
-	if (px.is_generic != py.is_generic) {
+	if (px.is_polymorphic != py.is_polymorphic) {
 		return ProcOverload_Polymorphic;
 	}
 

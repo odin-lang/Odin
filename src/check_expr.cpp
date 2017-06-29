@@ -284,7 +284,7 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 
 
 	if (is_type_any(dst)) {
-		if (!is_type_gen_proc(src)) {
+		if (!is_type_polymorphic(src)) {
 			// NOTE(bill): Anything can cast to `Any`
 			add_type_info_type(c, s);
 			return 10;
@@ -1601,7 +1601,7 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 	type->Proc.result_count       = result_count;
 	type->Proc.variadic           = variadic;
 	type->Proc.calling_convention = pt->calling_convention;
-	type->Proc.is_generic         = pt->generic;
+	type->Proc.is_polymorphic     = pt->generic;
 
 	if (param_count > 0) {
 		Entity *end = params->Tuple.variables[param_count-1];
@@ -1619,15 +1619,15 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 	}
 
 
-	bool is_generic = false;
+	bool is_polymorphic = false;
 	for (isize i = 0; i < param_count; i++) {
 		Entity *e = params->Tuple.variables[i];
 		if (e->type->kind == Type_Generic) {
-			is_generic = true;
+			is_polymorphic = true;
 		}
 	}
 	if (operands == NULL) {
-		GB_ASSERT(type->Proc.is_generic == is_generic);
+		GB_ASSERT(type->Proc.is_polymorphic == is_polymorphic);
 	}
 
 
@@ -2219,8 +2219,11 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 		}
 	}
 
-	if (is_type_gen_proc(type)) {
-		error(e, "Invalid use of polymorphic procedure type");
+	// if (is_type_polymorphic(type)) {
+	if (is_type_poly_proc(type)) {
+		gbString str = type_to_string(type);
+		error(e, "Invalid use of a polymorphic type `%s`", str);
+		gb_string_free(str);
 		type = t_invalid;
 	}
 
@@ -4265,8 +4268,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			error(operand->expr, "Invalid argument to `type_of`");
 			return false;
 		}
-		if (is_type_gen_proc(operand->type)) {
-			error(operand->expr, "`type_of` of generic procedure cannot be determined");
+		if (is_type_polymorphic(operand->type)) {
+			error(operand->expr, "`type_of` of polymorphic type cannot be determined");
 			return false;
 		}
 		operand->mode = Addressing_Type;
@@ -4288,7 +4291,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 			return false;
 		}
 		Type *t = o.type;
-		if (t == NULL || t == t_invalid || is_type_gen_proc(operand->type)) {
+		if (t == NULL || t == t_invalid || is_type_polymorphic(operand->type)) {
 			error(ce->args[0], "Invalid argument for `type_info`");
 			return false;
 		}
@@ -4997,7 +5000,7 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 	}
 
 	TypeProc *pt = &base_type(base_entity->type)->Proc;
-	if (!pt->is_generic || pt->is_generic_specialized) {
+	if (!pt->is_polymorphic || pt->is_poly_specialized) {
 		return NULL;
 	}
 
@@ -5038,7 +5041,7 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 	ast_node(pl, ProcLit, proc_lit);
 	// NOTE(bill): Associate the scope declared above with this procedure declaration's type
 	add_scope(c, pl->type, final_proc_type->Proc.scope);
-	final_proc_type->Proc.is_generic_specialized = true;
+	final_proc_type->Proc.is_poly_specialized = true;
 
 	u64 tags = base_entity->Procedure.tags;
 	AstNode *ident = clone_ast_node(a, base_entity->identifier);
@@ -5169,7 +5172,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			// NOTE(bill): Generate the procedure type for this generic instance
 			ProcedureInfo proc_info = {};
 
-			if (pt->is_generic && !pt->is_generic_specialized) {
+			if (pt->is_polymorphic && !pt->is_poly_specialized) {
 				gen_entity = find_or_generate_polymorphic_procedure(c, entity, &operands, &proc_info);
 				if (gen_entity != NULL) {
 					GB_ASSERT(is_type_proc(gen_entity->type));
@@ -5396,7 +5399,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	}
 
 	Entity *gen_entity = NULL;
-	if (pt->is_generic && err == CallArgumentError_None) {
+	if (pt->is_polymorphic && err == CallArgumentError_None) {
 		ProcedureInfo proc_info = {};
 		gen_entity = find_or_generate_polymorphic_procedure(c, entity, &ordered_operands, &proc_info);
 		if (gen_entity != NULL) {
@@ -5418,7 +5421,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 		Entity *e = pt->params->Tuple.variables[i];
 
 		if (e->kind == Entity_TypeName) {
-			GB_ASSERT(pt->is_generic);
+			GB_ASSERT(pt->is_polymorphic);
 			if (o->mode != Addressing_Type) {
 				if (show_error) {
 					error(o->expr, "Expected a type for the argument `%.*s`", LIT(e->token.string));
