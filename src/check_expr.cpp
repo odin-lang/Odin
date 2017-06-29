@@ -1166,7 +1166,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 						success = false;
 					}
 				} else {
-					type = make_type_generic(c->allocator, 0);
+					type = make_type_generic(c->allocator, 0, str_lit(""));
 				}
 			} else {
 				type = check_type(c, type_expr);

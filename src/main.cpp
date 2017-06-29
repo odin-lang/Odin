@@ -375,7 +375,7 @@ int main(int arg_count, char **arg_ptr) {
 		return 1;
 		#endif
 	} else if (args[1] == "version") {
-		gb_printf("%s version %.*s\n", args[0], LIT(build_context.ODIN_VERSION));
+		gb_printf("%.*s version %.*s\n", LIT(args[0]), LIT(build_context.ODIN_VERSION));
 		return 0;
 	} else {
 		usage(args[0]);

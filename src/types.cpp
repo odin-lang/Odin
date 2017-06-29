@@ -117,7 +117,7 @@ struct TypeRecord {
 
 #define TYPE_KINDS                                        \
 	TYPE_KIND(Basic,   BasicType)                         \
-	TYPE_KIND(Generic, struct{ i64 id; })                 \
+	TYPE_KIND(Generic, struct{ i64 id; String name; })    \
 	TYPE_KIND(Pointer, struct { Type *elem; })            \
 	TYPE_KIND(Atomic,  struct { Type *elem; })            \
 	TYPE_KIND(Array,   struct { Type *elem; i64 count; }) \
@@ -478,9 +478,10 @@ Type *make_type_basic(gbAllocator a, BasicType basic) {
 	return t;
 }
 
-Type *make_type_generic(gbAllocator a, i64 id) {
+Type *make_type_generic(gbAllocator a, i64 id, String name) {
 	Type *t = alloc_type(a, Type_Generic);
 	t->Generic.id = id;
+	t->Generic.name = name;
 	return t;
 }
 
