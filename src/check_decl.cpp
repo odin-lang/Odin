@@ -329,7 +329,16 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	check_open_scope(c, pl->type);
 	defer (check_close_scope(c));
 
+	#if 0
+	if (e->token.string == "sort") {
+		gb_printf_err("%.*s\n", LIT(e->token.string));
+	}
+	#endif
+
+	bool prev_allow_polymorphic_types = c->context.allow_polymorphic_types;
+	c->context.allow_polymorphic_types = true;
 	check_procedure_type(c, proc_type, pl->type);
+	c->context.allow_polymorphic_types = prev_allow_polymorphic_types;
 
 	bool is_foreign         = (pl->tags & ProcTag_foreign)   != 0;
 	bool is_link_name       = (pl->tags & ProcTag_link_name) != 0;
@@ -348,11 +357,11 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			error(e->token, "Procedure type of `main` was expected to be `proc()`, got %s", str);
 			gb_string_free(str);
 		}
-		if (proc_type->Proc.calling_convention != ProcCC_Odin &&
-		    proc_type->Proc.calling_convention != ProcCC_Contextless) {
+		if (pt->calling_convention != ProcCC_Odin &&
+		    pt->calling_convention != ProcCC_Contextless) {
 			error(e->token, "Procedure `main` cannot have a custom calling convention");
 		}
-		proc_type->Proc.calling_convention = ProcCC_Contextless;
+		pt->calling_convention = ProcCC_Contextless;
 	}
 
 	if (is_inline && is_no_inline) {
@@ -362,7 +371,6 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	if (is_foreign && is_export) {
 		error(pl->type, "A foreign procedure cannot have an `export` tag");
 	}
-
 
 	if (pt->is_polymorphic) {
 		if (pl->body == NULL) {
@@ -472,8 +480,14 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	}
 	e->flags |= EntityFlag_Visited;
 
+	String context_name = str_lit("variable declaration");
+
 	if (type_expr != NULL) {
 		e->type = check_type(c, type_expr);
+	}
+	if (e->type != NULL && is_type_polymorphic(e->type)) {
+		error(e->token, "Invalid use of a polymorphic type in %.*s", LIT(context_name));
+		e->type = t_invalid;
 	}
 
 
@@ -514,7 +528,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 		GB_ASSERT(entities == NULL || entities[0] == e);
 		Operand operand = {};
 		check_expr(c, &operand, init_expr);
-		check_init_variable(c, e, &operand, str_lit("variable declaration"));
+		check_init_variable(c, e, &operand, context_name);
 	}
 
 	if (type_expr != NULL) {
@@ -527,7 +541,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	Array<AstNode *> inits;
 	array_init(&inits, c->allocator, 1);
 	array_add(&inits, init_expr);
-	check_init_variables(c, entities, entity_count, inits, str_lit("variable declaration"));
+	check_init_variables(c, entities, entity_count, inits, context_name);
 }
 
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {

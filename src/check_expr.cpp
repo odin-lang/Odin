@@ -1073,13 +1073,104 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 	}
 }
 
+bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool compound) {
+	Operand o = {Addressing_Value};
+	o.type = source;
+	switch (poly->kind) {
+	case Type_Basic:
+		if (compound) return are_types_identical(poly, source);
+		return check_is_assignable_to(c, &o, poly);
+	case Type_Named:
+		if (compound) return are_types_identical(poly, source);
+		return check_is_assignable_to(c, &o, poly);
 
+	case Type_Generic: {
+		Type *ds = default_type(source);
+		gb_memmove(poly, ds, gb_size_of(Type));
+		return true;
+	}
+	case Type_Pointer:
+		if (source->kind == Type_Pointer) {
+			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Pointer.elem, true);
+		}
+		return false;
+	case Type_Atomic:
+		if (source->kind == Type_Atomic) {
+			return is_polymorphic_type_assignable(c, poly->Atomic.elem, source->Atomic.elem, true);
+		}
+		return false;
+	case Type_Array:
+		if (source->kind == Type_Array &&
+		    poly->Array.count == source->Array.count) {
+			return is_polymorphic_type_assignable(c, poly->Array.elem, source->Array.elem, true);
+		}
+		return false;
+	case Type_DynamicArray:
+		if (source->kind == Type_DynamicArray) {
+			return is_polymorphic_type_assignable(c, poly->DynamicArray.elem, source->DynamicArray.elem, true);
+		}
+		return false;
+	case Type_Vector:
+		if (source->kind == Type_Vector &&
+		    poly->Vector.count == source->Vector.count) {
+			return is_polymorphic_type_assignable(c, poly->Vector.elem, source->Vector.elem, true);
+		}
+		return false;
+	case Type_Slice:
+		if (source->kind == Type_Slice) {
+			return is_polymorphic_type_assignable(c, poly->Slice.elem, source->Slice.elem, true);
+		}
+		return false;
 
+	case Type_Record:
+		if (source->kind == Type_Record) {
+			// TODO(bill): Polymorphic type assignment
+		}
+		return false;
+	case Type_Tuple:
+		GB_PANIC("This should never happen");
+		return false;
+	case Type_Proc:
+		if (source->kind == Type_Proc) {
+			// TODO(bill): Polymorphic type assignment
+		}
+		return false;
+	case Type_Map:
+		if (source->kind == Type_Map) {
+			bool key   = is_polymorphic_type_assignable(c, poly->Map.key, source->Map.key, true);
+			bool value = is_polymorphic_type_assignable(c, poly->Map.value, source->Map.value, true);
+			return key || value;
+		}
+		return false;
+	}
+	return false;
+}
+
+Type *determine_type_from_polymorphic(Checker *c, Type *poly_type, Operand operand) {
+	if (!is_operand_value(operand)) {
+		error(operand.expr, "Cannot determine polymorphic type from parameter");
+		return t_invalid;
+	}
+	if (is_polymorphic_type_assignable(c, poly_type, operand.type, false)) {
+		return poly_type;
+	}
+	gbString pts = type_to_string(poly_type);
+	gbString ots = type_to_string(operand.type);
+	defer (gb_string_free(pts));
+	defer (gb_string_free(ots));
+	error(operand.expr,
+	      "Cannot determine polymorphic type from parameter: `%s` to `%s`\n"
+	      "\tNote: Record and procedure types are not yet supported",
+	      ots, pts);
+	return t_invalid;
+}
 
 Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_variadic_, bool *success_, Array<Operand> *operands) {
 	if (_params == NULL) {
 		return NULL;
 	}
+
+	bool allow_polymorphic_types = c->context.allow_polymorphic_types;
 
 	bool success = true;
 	ast_node(field_list, FieldList, _params);
@@ -1123,6 +1214,8 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		bool default_is_nil = false;
 		bool default_is_location = false;
 		bool is_type_param = false;
+		bool is_type_polymorphic_type = false;
+		bool detemine_type_from_operand = false;
 
 
 		if (type_expr == NULL) {
@@ -1157,24 +1250,23 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			if (type_expr->kind == AstNode_HelperType) {
 				is_type_param = true;
 				if (operands != NULL) {
-					Operand o = (*operands)[variable_index];
-					if (o.mode == Addressing_Type) {
-						type = o.type;
-					} else {
-						error(o.expr, "Expected a type to assign to the type parameter");
-						type = t_invalid;
-						success = false;
-					}
+					detemine_type_from_operand = true;
+					type = t_invalid;
 				} else {
 					type = make_type_generic(c->allocator, 0, str_lit(""));
 				}
 			} else {
-				type = check_type(c, type_expr);
-				if (p->flags&FieldFlag_dollar) {
-					error(type_expr, "`$` is only allowed for polymorphic type parameters at the moment");
-					type = NULL;
+				bool prev = c->context.allow_polymorphic_types;
+				if (operands != NULL) {
+					c->context.allow_polymorphic_types = true;
 				}
+				type = check_type(c, type_expr);
 
+				c->context.allow_polymorphic_types = prev;
+
+				if (is_type_polymorphic(type)) {
+					is_type_polymorphic_type = true;
+				}
 			}
 
 			if (default_value != NULL) {
@@ -1218,12 +1310,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			type = t_invalid;
 		}
 
-		if (p->flags&FieldFlag_no_alias) {
-			if (!is_type_pointer(type)) {
-				error(params[i], "`#no_alias` can only be applied to fields of pointer type");
-				p->flags &= ~FieldFlag_no_alias; // Remove the flag
-			}
-		}
+
 		if (p->flags&FieldFlag_c_vararg) {
 			if (p->type == NULL ||
 			    p->type->kind != AstNode_Ellipsis) {
@@ -1234,19 +1321,44 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			}
 		}
 
+
 		for_array(j, p->names) {
 			AstNode *name = p->names[j];
 			if (ast_node_expect(name, AstNode_Ident)) {
 				Entity *param = NULL;
 				if (is_type_param) {
+					if (operands != NULL) {
+						Operand o = (*operands)[variable_index];
+						if (o.mode == Addressing_Type) {
+							type = o.type;
+						} else {
+							error(o.expr, "Expected a type to assign to the type parameter");
+							type = t_invalid;
+						}
+					}
 					param = make_entity_type_name(c->allocator, scope, name->Ident.token, type);
 					param->TypeName.is_type_alias = true;
 				} else {
+					if (operands != NULL && is_type_polymorphic_type) {
+						type = determine_type_from_polymorphic(c, type, (*operands)[variable_index]);
+						if (type == t_invalid) {
+							success = false;
+						}
+					}
+
+					if (p->flags&FieldFlag_no_alias) {
+						if (!is_type_pointer(type)) {
+							error(params[i], "`#no_alias` can only be applied to fields of pointer type");
+							p->flags &= ~FieldFlag_no_alias; // Remove the flag
+						}
+					}
+
 					param = make_entity_param(c->allocator, scope, name->Ident.token, type,
 					                          (p->flags&FieldFlag_using) != 0, false);
 					param->Variable.default_value = value;
 					param->Variable.default_is_nil = default_is_nil;
 					param->Variable.default_is_location = default_is_location;
+
 				}
 				if (p->flags&FieldFlag_no_alias) {
 					param->flags |= EntityFlag_NoAlias;
@@ -1629,11 +1741,12 @@ bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array
 		if (e->kind != Entity_Variable) {
 			is_polymorphic = true;
 			break;
+		} else if (is_type_polymorphic(e->type)) {
+			is_polymorphic = true;
+			break;
 		}
 	}
-	if (operands == NULL) {
-		// GB_ASSERT(type->Proc.is_polymorphic == is_polymorphic);
-	}
+	type->Proc.is_polymorphic = is_polymorphic;
 
 
 	type->Proc.abi_compat_params = gb_alloc_array(c->allocator, Type *, param_count);
@@ -2005,6 +2118,26 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		}
 	case_end;
 
+	case_ast_node(pt, PolyType, e);
+		AstNode *ident = pt->type;
+		if (ident->kind != AstNode_Ident) {
+			error(ident, "Expected an identifier after the $");
+			*type = t_invalid;
+			return false;
+		}
+
+		Token token = ident->Ident.token;
+		Type *t = make_type_generic(c->allocator, 0, token.string);
+		if (c->context.allow_polymorphic_types) {
+			Scope *s = c->context.scope;
+			Entity *e = make_entity_type_name(c->allocator, s, token, t);
+			e->TypeName.is_type_alias = true;
+			add_entity(c, s, ident, e);
+		}
+		*type = t;
+		return true;
+	case_end;
+
 	case_ast_node(se, SelectorExpr, e);
 		Operand o = {};
 		check_selector(c, &o, e, NULL);
@@ -2224,13 +2357,14 @@ Type *check_type(Checker *c, AstNode *e, Type *named_type) {
 		}
 	}
 
-	// if (is_type_polymorphic(type)) {
-	if (is_type_poly_proc(type)) {
+	#if 0
+	if (!c->context.allow_polymorphic_types && is_type_polymorphic(type)) {
 		gbString str = type_to_string(type);
 		error(e, "Invalid use of a polymorphic type `%s`", str);
 		gb_string_free(str);
 		type = t_invalid;
 	}
+	#endif
 
 	if (is_type_typed(type)) {
 		add_type_and_value(&c->info, e, Addressing_Type, type, empty_exact_value);

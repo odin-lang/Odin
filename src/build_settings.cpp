@@ -266,12 +266,12 @@ String get_fullpath_core(gbAllocator a, String path) {
 }
 
 
-
+String const ODIN_VERSION = str_lit("0.6.0-dev");
 
 void init_build_context(void) {
 	BuildContext *bc = &build_context;
 	bc->ODIN_VENDOR  = str_lit("odin");
-	bc->ODIN_VERSION = str_lit("0.6.0-dev");
+	bc->ODIN_VERSION = ODIN_VERSION;
 	bc->ODIN_ROOT    = odin_root_dir();
 
 #if defined(GB_SYSTEM_WINDOWS)

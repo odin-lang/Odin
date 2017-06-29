@@ -261,6 +261,7 @@ struct CheckerContext {
 	DeclInfo * decl;
 	u32        stmt_state_flags;
 	bool       in_defer; // TODO(bill): Actually handle correctly
+	bool       allow_polymorphic_types;
 	String     proc_name;
 	Type *     type_hint;
 	DeclInfo * curr_proc_decl;

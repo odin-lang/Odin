@@ -8,6 +8,8 @@ import (
 )
 import_load "opengl_constants.odin";
 
+_ := compile_assert(ODIN_OS != "osx");
+
 foreign lib {
 	Clear          :: proc(mask: u32)                                #link_name "glClear"         ---;
 	ClearColor     :: proc(r, g, b, a: f32)                          #link_name "glClearColor"    ---;

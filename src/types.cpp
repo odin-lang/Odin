@@ -944,7 +944,6 @@ bool is_type_indexable(Type *t) {
 }
 
 bool is_type_polymorphic(Type *t) {
-	t = core_type(t);
 	switch (t->kind) {
 	case Type_Generic:
 		return true;
@@ -974,29 +973,36 @@ bool is_type_polymorphic(Type *t) {
 		if (t->Proc.is_polymorphic) {
 			return true;
 		}
-		// if (t->Proc.param_count > 0 &&
-		//     is_type_polymorphic(t->Proc.params)) {
-		// 	return true;
-		// }
-		// if (t->Proc.result_count > 0 &&
-		//     is_type_polymorphic(t->Proc.results)) {
-		// 	return true;
-		// }
+		#if 0
+		if (t->Proc.param_count > 0 &&
+		    is_type_polymorphic(t->Proc.params)) {
+			return true;
+		}
+		if (t->Proc.result_count > 0 &&
+		    is_type_polymorphic(t->Proc.results)) {
+			return true;
+		}
+		#endif
 		break;
 
-	// case Type_Record:
-	// 	GB_ASSERT(t->Record.kind != TypeRecord_Enum);
-	// 	for (isize i = 0; i < t->Record.field_count; i++) {
-	// 	    if (is_type_polymorphic(t->Record.fields[i]->type)) {
-	// 	    	return true;
-	// 	    }
-	// 	}
-	// 	for (isize i = 1; i < t->Record.variant_count; i++) {
-	// 	    if (is_type_polymorphic(t->Record.variants[i]->type)) {
-	// 	    	return true;
-	// 	    }
-	// 	}
-	// 	break;
+	case Type_Record:
+		if (t->Record.kind == TypeRecord_Enum) {
+			if (t->Record.enum_base_type != NULL) {
+				return is_type_polymorphic(t->Record.enum_base_type);
+			}
+			return false;
+		}
+		for (isize i = 0; i < t->Record.field_count; i++) {
+		    if (is_type_polymorphic(t->Record.fields[i]->type)) {
+		    	return true;
+		    }
+		}
+		for (isize i = 1; i < t->Record.variant_count; i++) {
+		    if (is_type_polymorphic(t->Record.variants[i]->type)) {
+		    	return true;
+		    }
+		}
+		break;
 
 	case Type_Map:
 		if (is_type_polymorphic(t->Map.key)) {
@@ -2263,7 +2269,13 @@ gbString write_type_to_string(gbString str, Type *type) {
 		break;
 
 	case Type_Generic:
-		str = gb_string_appendc(str, "type");
+		if (type->Generic.name.len == 0) {
+			str = gb_string_appendc(str, "type");
+		} else {
+			String name = type->Generic.name;
+			str = gb_string_appendc(str, "$");
+			str = gb_string_append_length(str, name.text, name.len);
+		}
 		break;
 
 	case Type_Pointer:

@@ -8,7 +8,6 @@ import "strings.odin";
 Handle      :: i32;
 FileTime    :: u64;
 Errno       :: int;
-AddressSize :: int;
 
 
 O_RDONLY   :: 0x00000;
@@ -125,9 +124,9 @@ F_OK :: 0; // Test for file existance
 foreign libc {
 	unix_open    :: proc(path: ^u8, mode: int) -> Handle                              #link_name "open"    ---;
 	unix_close   :: proc(handle: Handle)                                              #link_name "close"   ---;
-	unix_read    :: proc(handle: Handle, buffer: rawptr, count: int) -> AddressSize   #link_name "read"    ---;
-	unix_write   :: proc(handle: Handle, buffer: rawptr, count: int) -> AddressSize   #link_name "write"   ---;
-	unix_lseek   :: proc(fs: Handle, offset: AddressSize, whence: int) -> AddressSize #link_name "lseek"   ---;
+	unix_read    :: proc(handle: Handle, buffer: rawptr, count: int) -> int   #link_name "read"    ---;
+	unix_write   :: proc(handle: Handle, buffer: rawptr, count: int) -> int   #link_name "write"   ---;
+	unix_lseek   :: proc(fs: Handle, offset: int, whence: int) -> int #link_name "lseek"   ---;
 	unix_gettid  :: proc() -> u64                                                     #link_name "gettid"  ---;
 	unix_stat    :: proc(path: ^u8, stat: ^Stat) -> int                               #link_name "stat"    ---;
 	unix_access  :: proc(path: ^u8, mask: int) -> int                                 #link_name "access"  ---;
@@ -168,7 +167,7 @@ close :: proc(fd: Handle) {
 	unix_close(fd);
 }
 
-write :: proc(fd: Handle, data: []u8) -> (AddressSize, Errno) {
+write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	assert(fd != -1);
 
 	bytes_written := unix_write(fd, &data[0], len(data));
@@ -178,7 +177,7 @@ write :: proc(fd: Handle, data: []u8) -> (AddressSize, Errno) {
 	return bytes_written, 0;
 }
 
-read :: proc(fd: Handle, data: []u8) -> (AddressSize, Errno) {
+read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	assert(fd != -1);
 
 	bytes_read := unix_read(fd, &data[0], len(data));
@@ -188,7 +187,7 @@ read :: proc(fd: Handle, data: []u8) -> (AddressSize, Errno) {
 	return bytes_read, 0;
 }
 
-seek :: proc(fd: Handle, offset: AddressSize, whence: int) -> (AddressSize, Errno) {
+seek :: proc(fd: Handle, offset: int, whence: int) -> (int, Errno) {
 	assert(fd != -1);
 
 	final_offset := unix_lseek(fd, offset, whence);

@@ -367,7 +367,10 @@ explicit_parametric_polymorphic_procedures :: proc() {
 }
 
 
+
+
 main :: proc() {
+/*
 	general_stuff();
 	foreign_blocks();
 	default_arguments();
@@ -381,6 +384,7 @@ main :: proc() {
 
 	program := "+ + * - /";
 	accumulator := 0;
+*/
 
 	for token in program {
 		match token {

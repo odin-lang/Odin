@@ -1717,6 +1717,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				init_type = check_type(c, vd->type, NULL);
 				if (init_type == NULL) {
 					init_type = t_invalid;
+				} else if (is_type_polymorphic(init_type)) {
+					error(vd->type, "Invalid use of a polymorphic type in variable declaration");
+					init_type = t_invalid;
 				}
 			}
 

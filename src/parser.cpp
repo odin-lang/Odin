@@ -632,6 +632,10 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 	case AstNode_Undef:          break;
 	case AstNode_BasicLit:       break;
 	case AstNode_BasicDirective: break;
+
+	case AstNode_PolyType:
+		n->PolyType.type = clone_ast_node(a, n->PolyType.type);
+		break;
 	case AstNode_Ellipsis:
 		n->Ellipsis.expr = clone_ast_node(a, n->Ellipsis.expr);
 		break;
@@ -3259,8 +3263,10 @@ u32 check_field_prefixes(AstFile *f, isize name_count, u32 allowed_flags, u32 se
 		syntax_error(f->curr_token, "`#c_vararg` is not allowed within this field list");
 		set_flags &= ~FieldFlag_c_vararg;
 	}
-	if ((allowed_flags&FieldFlag_dollar) == 0 && (set_flags&FieldFlag_dollar)) {
-		syntax_error(f->curr_token, "`$` is only allowed within procedures");
+	// if ((allowed_flags&FieldFlag_dollar) == 0 && (set_flags&FieldFlag_dollar)) {
+	if ((set_flags&FieldFlag_dollar)) {
+		// syntax_error(f->curr_token, "`$` is only allowed within procedures");
+		syntax_error(f->curr_token, "`$` is not yet supported");
 		set_flags &= ~FieldFlag_dollar;
 	}
 	return set_flags;

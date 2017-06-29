@@ -36,27 +36,27 @@ TOKEN_KIND(Token__OperatorBegin, "_OperatorBegin"), \
 	TOKEN_KIND(Token_CmpAnd, "&&"), \
 	TOKEN_KIND(Token_CmpOr,  "||"), \
 \
-TOKEN_KIND(Token__AssignOpBegin, "_AssignOpBegin"), \
-	TOKEN_KIND(Token_AddEq,      "+="), \
-	TOKEN_KIND(Token_SubEq,      "-="), \
-	TOKEN_KIND(Token_MulEq,      "*="), \
-	TOKEN_KIND(Token_QuoEq,      "/="), \
-	TOKEN_KIND(Token_ModEq,      "%="), \
-	TOKEN_KIND(Token_ModModEq,   "%%="), \
-	TOKEN_KIND(Token_AndEq,      "&="), \
-	TOKEN_KIND(Token_OrEq,       "|="), \
-	TOKEN_KIND(Token_XorEq,      "~="), \
-	TOKEN_KIND(Token_AndNotEq,   "&~="), \
-	TOKEN_KIND(Token_ShlEq,      "<<="), \
-	TOKEN_KIND(Token_ShrEq,      ">>="), \
-	TOKEN_KIND(Token_CmpAndEq,   "&&="), \
-	TOKEN_KIND(Token_CmpOrEq,    "||="), \
-TOKEN_KIND(Token__AssignOpEnd,   "_AssignOpEnd"), \
-	TOKEN_KIND(Token_ArrowRight, "->"), \
-	TOKEN_KIND(Token_ArrowLeft,  "<-"), \
-	TOKEN_KIND(Token_Inc,        "++"), \
-	TOKEN_KIND(Token_Dec,        "--"), \
-	TOKEN_KIND(Token_Undef,      "---"), \
+TOKEN_KIND(Token__AssignOpBegin,      "_AssignOpBegin"), \
+	TOKEN_KIND(Token_AddEq,           "+="), \
+	TOKEN_KIND(Token_SubEq,           "-="), \
+	TOKEN_KIND(Token_MulEq,           "*="), \
+	TOKEN_KIND(Token_QuoEq,           "/="), \
+	TOKEN_KIND(Token_ModEq,           "%="), \
+	TOKEN_KIND(Token_ModModEq,        "%%="), \
+	TOKEN_KIND(Token_AndEq,           "&="), \
+	TOKEN_KIND(Token_OrEq,            "|="), \
+	TOKEN_KIND(Token_XorEq,           "~="), \
+	TOKEN_KIND(Token_AndNotEq,        "&~="), \
+	TOKEN_KIND(Token_ShlEq,           "<<="), \
+	TOKEN_KIND(Token_ShrEq,           ">>="), \
+	TOKEN_KIND(Token_CmpAndEq,        "&&="), \
+	TOKEN_KIND(Token_CmpOrEq,         "||="), \
+TOKEN_KIND(Token__AssignOpEnd,        "_AssignOpEnd"), \
+	TOKEN_KIND(Token_ArrowRight,      "->"), \
+	TOKEN_KIND(Token_ThickArrowRight, "=>"), \
+	TOKEN_KIND(Token_Inc,             "++"), \
+	TOKEN_KIND(Token_Dec,             "--"), \
+	TOKEN_KIND(Token_Undef,           "---"), \
 \
 TOKEN_KIND(Token__ComparisonBegin, "_ComparisonBegin"), \
 	TOKEN_KIND(Token_CmpEq, "=="), \
@@ -910,7 +910,16 @@ Token tokenizer_get_token(Tokenizer *t) {
 		case '%': token.kind = token_kind_dub_eq(t, '%', Token_Mod, Token_ModEq, Token_ModMod, Token_ModModEq);      break;
 
 		case '*': token.kind = token_kind_variant2(t, Token_Mul, Token_MulEq);                                        break;
-		case '=': token.kind = token_kind_variant2(t, Token_Eq,  Token_CmpEq);                                        break;
+		case '=':
+			token.kind = Token_Eq;
+			if (t->curr_rune == '>') {
+				advance_to_next_rune(t);
+				token.kind = Token_ThickArrowRight;
+			} else if (t->curr_rune == '=') {
+				advance_to_next_rune(t);
+				token.kind = Token_CmpEq;
+			}
+			break;
 		case '~': token.kind = token_kind_variant2(t, Token_Xor, Token_XorEq);                                        break;
 		case '!': token.kind = token_kind_variant2(t, Token_Not, Token_NotEq);                                        break;
 		case '+': token.kind = token_kind_variant3(t, Token_Add, Token_AddEq, '+', Token_Inc);                        break;
@@ -967,11 +976,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 		} break;
 
 		case '<':
-			if (t->curr_rune == '-') {
-				token.kind = Token_ArrowLeft;
-			} else {
-				token.kind = token_kind_dub_eq(t, '<', Token_Lt, Token_LtEq, Token_Shl, Token_ShlEq);
-			}
+			token.kind = token_kind_dub_eq(t, '<', Token_Lt, Token_LtEq, Token_Shl, Token_ShlEq);
 			break;
 		case '>': token.kind = token_kind_dub_eq(t, '>', Token_Gt, Token_GtEq, Token_Shr, Token_ShrEq); break;
 
