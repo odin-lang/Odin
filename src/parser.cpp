@@ -3971,7 +3971,8 @@ AstNode *parse_for_stmt(AstFile *f) {
 	AstNode *body = NULL;
 	bool is_range = false;
 
-	if (f->curr_token.kind != Token_OpenBrace) {
+	if (f->curr_token.kind != Token_OpenBrace &&
+	    f->curr_token.kind != Token_do) {
 		isize prev_level = f->expr_level;
 		f->expr_level = -1;
 		if (f->curr_token.kind != Token_Semicolon) {
@@ -3981,8 +3982,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 			}
 		}
 
-		if (!is_range && (f->curr_token.kind == Token_Semicolon ||
-		                  f->curr_token.kind == Token_do)) {
+		if (!is_range && f->curr_token.kind == Token_Semicolon) {
 			next_token(f);
 			init = cond;
 			cond = NULL;

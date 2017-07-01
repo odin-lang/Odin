@@ -29,11 +29,7 @@ encode_surrogate_pair :: proc(r: rune) -> (r1, r2: rune) {
 
 encode :: proc(d: []u16, s: []rune) {
 	n := len(s);
-	for r in s {
-		if r >= _surr_self {
-			n++;
-		}
-	}
+	for r in s do if r >= _surr_self do n++;
 
 	max_n := min(len(d), n);
 	n = 0;
