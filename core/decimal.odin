@@ -11,7 +11,7 @@ Decimal :: struct {
 
 decimal_to_string :: proc(buf: []u8, a: ^Decimal) -> string {
 	digit_zero :: proc(buf: []u8) -> int {
-		for _, i in buf -> buf[i] = '0';
+		for _, i in buf do buf[i] = '0';
 		return len(buf);
 	}
 
@@ -194,7 +194,7 @@ shift :: proc(a: ^Decimal, k: int) {
 can_round_up :: proc(a: ^Decimal, nd: int) -> bool {
 	if nd < 0 || nd >= a.count { return false ; }
 	if a.digits[nd] == '5' && nd+1 == a.count {
-		if a.trunc -> return true;
+		if a.trunc do return true;
 		return nd > 0 && (a.digits[nd-1]-'0')%2 != 0;
 	}
 

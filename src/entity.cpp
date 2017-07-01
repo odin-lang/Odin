@@ -92,6 +92,7 @@ struct Entity {
 			bool       is_foreign;
 			Entity *   foreign_library;
 			AstNode *  foreign_library_ident;
+			String     link_name;
 		} Variable;
 		struct {
 			bool is_type_alias;

@@ -98,7 +98,7 @@ __u128_quo_mod :: proc(a, b: u128, rem: ^u128) -> (quo: u128) #cc_c #link_name "
 		d >>= 1;
 	}
 
-	if rem != nil { rem^ = r; }
+	if rem != nil do rem^ = r;
 	return q;
 }
 

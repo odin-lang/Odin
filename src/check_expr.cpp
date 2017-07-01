@@ -1073,7 +1073,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 	}
 }
 
-bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool compound) {
+bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool compound, bool modify_type) {
 	Operand o = {Addressing_Value};
 	o.type = source;
 	switch (poly->kind) {
@@ -1085,40 +1085,42 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 		return check_is_assignable_to(c, &o, poly);
 
 	case Type_Generic: {
-		Type *ds = default_type(source);
-		gb_memmove(poly, ds, gb_size_of(Type));
+		if (modify_type) {
+			Type *ds = default_type(source);
+			gb_memmove(poly, ds, gb_size_of(Type));
+		}
 		return true;
 	}
 	case Type_Pointer:
 		if (source->kind == Type_Pointer) {
-			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Pointer.elem, true);
+			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Pointer.elem, true, modify_type);
 		}
 		return false;
 	case Type_Atomic:
 		if (source->kind == Type_Atomic) {
-			return is_polymorphic_type_assignable(c, poly->Atomic.elem, source->Atomic.elem, true);
+			return is_polymorphic_type_assignable(c, poly->Atomic.elem, source->Atomic.elem, true, modify_type);
 		}
 		return false;
 	case Type_Array:
 		if (source->kind == Type_Array &&
 		    poly->Array.count == source->Array.count) {
-			return is_polymorphic_type_assignable(c, poly->Array.elem, source->Array.elem, true);
+			return is_polymorphic_type_assignable(c, poly->Array.elem, source->Array.elem, true, modify_type);
 		}
 		return false;
 	case Type_DynamicArray:
 		if (source->kind == Type_DynamicArray) {
-			return is_polymorphic_type_assignable(c, poly->DynamicArray.elem, source->DynamicArray.elem, true);
+			return is_polymorphic_type_assignable(c, poly->DynamicArray.elem, source->DynamicArray.elem, true, modify_type);
 		}
 		return false;
 	case Type_Vector:
 		if (source->kind == Type_Vector &&
 		    poly->Vector.count == source->Vector.count) {
-			return is_polymorphic_type_assignable(c, poly->Vector.elem, source->Vector.elem, true);
+			return is_polymorphic_type_assignable(c, poly->Vector.elem, source->Vector.elem, true, modify_type);
 		}
 		return false;
 	case Type_Slice:
 		if (source->kind == Type_Slice) {
-			return is_polymorphic_type_assignable(c, poly->Slice.elem, source->Slice.elem, true);
+			return is_polymorphic_type_assignable(c, poly->Slice.elem, source->Slice.elem, true, modify_type);
 		}
 		return false;
 
@@ -1137,8 +1139,8 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 		return false;
 	case Type_Map:
 		if (source->kind == Type_Map) {
-			bool key   = is_polymorphic_type_assignable(c, poly->Map.key, source->Map.key, true);
-			bool value = is_polymorphic_type_assignable(c, poly->Map.value, source->Map.value, true);
+			bool key   = is_polymorphic_type_assignable(c, poly->Map.key, source->Map.key, true, modify_type);
+			bool value = is_polymorphic_type_assignable(c, poly->Map.value, source->Map.value, true, modify_type);
 			return key || value;
 		}
 		return false;
@@ -1147,21 +1149,26 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 }
 
 Type *determine_type_from_polymorphic(Checker *c, Type *poly_type, Operand operand) {
+	bool modify_type = !c->context.no_polymorphic_errors;
 	if (!is_operand_value(operand)) {
-		error(operand.expr, "Cannot determine polymorphic type from parameter");
+		if (modify_type) {
+			error(operand.expr, "Cannot determine polymorphic type from parameter");
+		}
 		return t_invalid;
 	}
-	if (is_polymorphic_type_assignable(c, poly_type, operand.type, false)) {
+	if (is_polymorphic_type_assignable(c, poly_type, operand.type, false, modify_type)) {
 		return poly_type;
 	}
-	gbString pts = type_to_string(poly_type);
-	gbString ots = type_to_string(operand.type);
-	defer (gb_string_free(pts));
-	defer (gb_string_free(ots));
-	error(operand.expr,
-	      "Cannot determine polymorphic type from parameter: `%s` to `%s`\n"
-	      "\tNote: Record and procedure types are not yet supported",
-	      ots, pts);
+	if (modify_type) {
+		gbString pts = type_to_string(poly_type);
+		gbString ots = type_to_string(operand.type);
+		defer (gb_string_free(pts));
+		defer (gb_string_free(ots));
+		error(operand.expr,
+		      "Cannot determine polymorphic type from parameter: `%s` to `%s`\n"
+		      "\tNote: Record and procedure types are not yet supported",
+		      ots, pts);
+	}
 	return t_invalid;
 }
 
@@ -1332,7 +1339,10 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 						if (o.mode == Addressing_Type) {
 							type = o.type;
 						} else {
-							error(o.expr, "Expected a type to assign to the type parameter");
+							if (!c->context.no_polymorphic_errors) {
+								error(o.expr, "Expected a type to assign to the type parameter");
+							}
+							success = false;
 							type = t_invalid;
 						}
 					}
@@ -5338,7 +5348,9 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					if (o.mode == Addressing_Invalid) {
 						continue;
 					} else if (o.mode != Addressing_Type) {
-						error(o.expr, "Expected a type for the argument `%.*s`", LIT(e->token.string));
+						if (show_error) {
+							error(o.expr, "Expected a type for the argument `%.*s`", LIT(e->token.string));
+						}
 						err = CallArgumentError_WrongTypes;
 					}
 
@@ -5641,6 +5653,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 
 		for (isize i = 0; i < overload_count; i++) {
 			Entity *e = procs[i];
+			GB_ASSERT(e->token.string == name);
 			DeclInfo *d = decl_info_of_entity(&c->info, e);
 			GB_ASSERT(d != NULL);
 			check_entity_decl(c, e, d, NULL);
@@ -5651,7 +5664,11 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 			Type *pt = base_type(p->type);
 			if (pt != NULL && is_type_proc(pt)) {
 				CallArgumentData data = {};
+				bool prev = c->context.no_polymorphic_errors;
+				defer (c->context.no_polymorphic_errors = prev);
+				c->context.no_polymorphic_errors = true;
 				CallArgumentError err = call_checker(c, call, pt, p, operands, CallArgumentMode_NoErrors, &data);
+
 				if (err == CallArgumentError_None) {
 					valids[valid_count].index = i;
 					valids[valid_count].score = data.score;

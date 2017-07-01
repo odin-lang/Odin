@@ -882,9 +882,13 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 
 
 void error(AstNode *node, char *fmt, ...) {
+	Token token = {};
+	if (node != NULL) {
+		token = ast_node_token(node);
+	}
 	va_list va;
 	va_start(va, fmt);
-	error_va(ast_node_token(node), fmt, va);
+	error_va(token, fmt, va);
 	va_end(va);
 }
 
@@ -2263,6 +2267,26 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			AstNode *body = NULL;
 			f->curr_proc = type;
 			body = parse_body(f);
+			f->curr_proc = curr_proc;
+
+			return ast_proc_lit(f, type, body, tags, link_name);
+		} else if (allow_token(f, Token_do)) {
+			if ((tags & ProcTag_foreign) != 0) {
+				syntax_error(token, "A procedure tagged as `#foreign` cannot have a body");
+			}
+			AstNode *curr_proc = f->curr_proc;
+			AstNode *body = NULL;
+			f->curr_proc = type;
+			body = parse_stmt(f);
+			if (body->kind == AstNode_BlockStmt) {
+				syntax_error(body, "Expected a normal statement rather than a block statement");
+			} else {
+				Token open = ast_node_token(body);
+				Token close = ast_node_token(body);
+				Array<AstNode *> stmts = make_ast_node_array(f, 1);
+				array_add(&stmts, body);
+				body = ast_block_stmt(f, stmts, open, close);
+			}
 			f->curr_proc = curr_proc;
 
 			return ast_proc_lit(f, type, body, tags, link_name);
@@ -3787,7 +3811,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 		syntax_error(f->curr_token, "Expected condition for if statement");
 	}
 
-	if (allow_token(f, Token_ArrowRight)) {
+	if (allow_token(f, Token_do)) {
 		body = parse_stmt(f);
 		if (body->kind == AstNode_BlockStmt) {
 			syntax_error(body, "Expected a normal statement rather than a block statement");
@@ -3804,8 +3828,8 @@ AstNode *parse_if_stmt(AstFile *f) {
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, false);
 			break;
-		case Token_ArrowRight: {
-			Token arrow = expect_token(f, Token_ArrowRight);
+		case Token_do: {
+			Token arrow = expect_token(f, Token_do);
 			body = parse_stmt(f);
 			if (body->kind == AstNode_BlockStmt) {
 				syntax_error(body, "Expected a normal statement rather than a block statement");
@@ -3838,7 +3862,7 @@ AstNode *parse_when_stmt(AstFile *f) {
 		syntax_error(f->curr_token, "Expected condition for when statement");
 	}
 
-	if (allow_token(f, Token_ArrowRight)) {
+	if (allow_token(f, Token_do)) {
 		body = parse_stmt(f);
 		if (body->kind == AstNode_BlockStmt) {
 			syntax_error(body, "Expected a normal statement rather than a block statement");
@@ -3855,8 +3879,8 @@ AstNode *parse_when_stmt(AstFile *f) {
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, true);
 			break;
-		case Token_ArrowRight: {
-			Token arrow = expect_token(f, Token_ArrowRight);
+		case Token_do: {
+			Token arrow = expect_token(f, Token_do);
 			body = parse_stmt(f);
 			if (body->kind == AstNode_BlockStmt) {
 				syntax_error(body, "Expected a normal statement rather than a block statement");
@@ -3958,7 +3982,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 		}
 
 		if (!is_range && (f->curr_token.kind == Token_Semicolon ||
-		                  f->curr_token.kind == Token_ArrowRight)) {
+		                  f->curr_token.kind == Token_do)) {
 			next_token(f);
 			init = cond;
 			cond = NULL;
@@ -3967,7 +3991,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 			}
 			expect_semicolon(f, cond);
 			if (f->curr_token.kind != Token_OpenBrace &&
-			    f->curr_token.kind != Token_ArrowRight) {
+			    f->curr_token.kind != Token_do) {
 				post = parse_simple_stmt(f, StmtAllowFlag_None);
 			}
 		}
@@ -3975,7 +3999,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 		f->expr_level = prev_level;
 	}
 
-	if (allow_token(f, Token_ArrowRight)) {
+	if (allow_token(f, Token_do)) {
 		body = parse_stmt(f);
 		if (body->kind == AstNode_BlockStmt) {
 			syntax_error(body, "Expected a normal statement rather than a block statement");
@@ -4236,7 +4260,7 @@ AstNode *parse_stmt(AstFile *f) {
 		AstNode *expr = parse_expr(f, false);
 		f->expr_level = prev_level;
 
-		if (allow_token(f, Token_ArrowRight)) {
+		if (allow_token(f, Token_do)) {
 			body = parse_stmt(f);
 			if (body->kind == AstNode_BlockStmt) {
 				syntax_error(body, "Expected a normal statement rather than a block statement");
@@ -4256,7 +4280,7 @@ AstNode *parse_stmt(AstFile *f) {
 		AstNode *expr = parse_expr(f, false);
 		f->expr_level = prev_level;
 
-		if (allow_token(f, Token_ArrowRight)) {
+		if (allow_token(f, Token_do)) {
 			body = parse_stmt(f);
 			if (body->kind == AstNode_BlockStmt) {
 				syntax_error(body, "Expected a normal statement rather than a block statement");

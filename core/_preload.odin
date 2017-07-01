@@ -118,7 +118,7 @@ __argc__: i32;
 
 
 type_info_base :: proc(info: ^TypeInfo) -> ^TypeInfo {
-	if info == nil -> return nil;
+	if info == nil do return nil;
 
 	base := info;
 	match i in base {
@@ -130,7 +130,7 @@ type_info_base :: proc(info: ^TypeInfo) -> ^TypeInfo {
 
 
 type_info_base_without_enum :: proc(info: ^TypeInfo) -> ^TypeInfo {
-	if info == nil -> return nil;
+	if info == nil do return nil;
 
 	base := info;
 	match i in base {
@@ -195,7 +195,7 @@ make_source_code_location :: proc(file: string, line, column: i64, procedure: st
 DEFAULT_ALIGNMENT :: align_of([vector 4]f32);
 
 __init_context_from_ptr :: proc(c: ^Context, other: ^Context) #cc_contextless {
-	if c == nil -> return;
+	if c == nil do return;
 	c^ = other^;
 
 	if c.allocator.procedure == nil {
@@ -207,7 +207,7 @@ __init_context_from_ptr :: proc(c: ^Context, other: ^Context) #cc_contextless {
 }
 
 __init_context :: proc(c: ^Context) #cc_contextless {
-	if c == nil -> return;
+	if c == nil do return;
 
 	if c.allocator.procedure == nil {
 		c.allocator = default_allocator();
@@ -259,30 +259,22 @@ resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_AL
 }
 
 
-new :: proc(T: type) -> ^T #inline {
-	return ^T(alloc(size_of(T), align_of(T)));
-}
+new :: proc(T: type) -> ^T #inline do return ^T(alloc(size_of(T), align_of(T)));
 
 
 
 default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: int) -> rawptr {
-	if old_memory == nil {
-		return alloc(new_size, alignment);
-	}
+	if old_memory == nil do return alloc(new_size, alignment);
 
 	if new_size == 0 {
 		free(old_memory);
 		return nil;
 	}
 
-	if new_size == old_size {
-		return old_memory;
-	}
+	if new_size == old_size do return old_memory;
 
 	new_memory := alloc(new_size, alignment);
-	if new_memory == nil {
-		return nil;
-	}
+	if new_memory == nil do return nil;
 
 	__mem_copy(new_memory, old_memory, min(old_size, new_size));;
 	free(old_memory);
@@ -326,9 +318,9 @@ default_allocator :: proc() -> Allocator {
 assert :: proc(condition: bool, message := "", using location := #caller_location) -> bool #cc_contextless {
 	if !condition {
 		if len(message) > 0 {
-			fmt.printf("%s(%d:%d) Runtime assertion: %s\n", fully_pathed_filename, line, column, message);
+			fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion: %s\n", fully_pathed_filename, line, column, message);
 		} else {
-			fmt.printf("%s(%d:%d) Runtime assertion\n", fully_pathed_filename, line, column);
+			fmt.fprintf(os.stderr, "%s(%d:%d) Runtime assertion\n", fully_pathed_filename, line, column);
 		}
 		__debug_trap();
 	}
@@ -337,9 +329,9 @@ assert :: proc(condition: bool, message := "", using location := #caller_locatio
 
 panic :: proc(message := "", using location := #caller_location) #cc_contextless {
 	if len(message) > 0 {
-		fmt.printf("%s(%d:%d) Panic: %s\n", fully_pathed_filename, line, column, message);
+		fmt.fprintf(os.stderr, "%s(%d:%d) Panic: %s\n", fully_pathed_filename, line, column, message);
 	} else {
-		fmt.printf("%s(%d:%d) Panic\n", fully_pathed_filename, line, column);
+		fmt.fprintf(os.stderr, "%s(%d:%d) Panic\n", fully_pathed_filename, line, column);
 	}
 	__debug_trap();
 }
@@ -348,14 +340,10 @@ panic :: proc(message := "", using location := #caller_location) #cc_contextless
 
 
 __string_eq :: proc(a, b: string) -> bool #cc_contextless {
-	if len(a) != len(b) {
-		return false;
-	}
-	if len(a) == 0 {
-		return true;
-	}
-	if &a[0] == &b[0] {
-		return true;
+	match {
+	case len(a) != len(b): return false;
+	case len(a) == 0:      return true;
+	case &a[0] == &b[0]:   return true;
 	}
 	return __string_cmp(a, b) == 0;
 }
@@ -379,37 +367,30 @@ __complex128_ne :: proc(a, b: complex128) -> bool #cc_contextless #inline { retu
 
 
 __bounds_check_error :: proc(file: string, line, column: int, index, count: int) #cc_contextless {
-	if 0 <= index && index < count {
-		return;
-	}
+	if 0 <= index && index < count do return;
 	fmt.fprintf(os.stderr, "%s(%d:%d) Index %d is out of bounds range 0..<%d\n",
 	            file, line, column, index, count);
 	__debug_trap();
 }
 
 __slice_expr_error :: proc(file: string, line, column: int, low, high, max: int) #cc_contextless {
-	if 0 <= low && low <= high && high <= max {
-		return;
-	}
+	if 0 <= low && low <= high && high <= max do return;
 	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: [%d..<%d..<%d]\n",
 	            file, line, column, low, high, max);
 	__debug_trap();
 }
 
 __substring_expr_error :: proc(file: string, line, column: int, low, high: int) #cc_contextless {
-	if 0 <= low && low <= high {
-		return;
-	}
+	if 0 <= low && low <= high do return;
 	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid substring indices: [%d..<%d]\n",
 	            file, line, column, low, high);
 	__debug_trap();
 }
 __type_assertion_check :: proc(ok: bool, file: string, line, column: int, from, to: ^TypeInfo) #cc_contextless {
-	if !ok {
-		fmt.fprintf(os.stderr, "%s(%d:%d) Invalid type_assertion from %T to %T\n",
-		            file, line, column, from, to);
-		__debug_trap();
-	}
+	if ok do return;
+	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid type_assertion from %T to %T\n",
+	            file, line, column, from, to);
+	__debug_trap();
 }
 
 __string_decode_rune :: proc(s: string) -> (rune, int) #cc_contextless #inline {
@@ -499,7 +480,7 @@ __dynamic_array_make :: proc(array_: rawptr, elem_size, elem_align: int, len, ca
 __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap: int) -> bool {
 	array := ^raw.DynamicArray(array_);
 
-	if cap <= array.cap -> return true;
+	if cap <= array.cap do return true;
 
 	// __check_context();
 	if array.allocator.procedure == nil {
@@ -512,7 +493,7 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	allocator := array.allocator;
 
 	new_data := allocator.procedure(allocator.data, AllocatorMode.Resize, new_size, elem_align, array.data, old_size, 0);
-	if new_data == nil -> return false;
+	if new_data == nil do return false;
 
 	array.data = new_data;
 	array.cap = cap;
@@ -523,7 +504,7 @@ __dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: 
 	array := ^raw.DynamicArray(array_);
 
 	ok := __dynamic_array_reserve(array_, elem_size, elem_align, len);
-	if ok -> array.len = len;
+	if ok do array.len = len;
 	return ok;
 }
 
@@ -543,7 +524,7 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 		ok = __dynamic_array_reserve(array, elem_size, elem_align, cap);
 	}
 	// TODO(bill): Better error handling for failed reservation
-	if !ok -> return array.len;
+	if !ok do return array.len;
 
 	data := ^u8(array.data);
 	assert(data != nil);
@@ -561,7 +542,7 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 		ok = __dynamic_array_reserve(array, elem_size, elem_align, cap);
 	}
 	// TODO(bill): Better error handling for failed reservation
-	if !ok -> return array.len;
+	if !ok do return array.len;
 
 	data := ^u8(array.data);
 	assert(data != nil);
@@ -650,7 +631,7 @@ __dynamic_map_rehash :: proc(using header: __MapHeader, new_count: int) {
 
 	__dynamic_array_resize(nm_hashes, size_of(int), align_of(int), new_count);
 	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len);
-	for i in 0..<new_count -> nm.hashes[i] = -1;
+	for i in 0..<new_count do nm.hashes[i] = -1;
 
 	for i := 0; i < m.entries.len; i++ {
 		if len(nm.hashes) == 0 {
@@ -740,7 +721,7 @@ __dynamic_map_full :: proc(using h: __MapHeader) -> bool {
 
 __dynamic_map_hash_equal :: proc(h: __MapHeader, a, b: __MapKey) -> bool {
 	if a.hash == b.hash {
-		if h.is_key_string -> return a.str == b.str;
+		if h.is_key_string do return a.str == b.str;
 		return true;
 	}
 	return false;

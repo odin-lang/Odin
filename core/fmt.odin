@@ -189,7 +189,7 @@ fprint_type :: proc(fd: os.Handle, info: ^TypeInfo) {
 }
 
 write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
-	if ti == nil -> return;
+	if ti == nil do return;
 
 	using TypeInfo;
 	match info in ti {
@@ -240,7 +240,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 			t := info.params.(^Tuple);
 			write_string(buf, "(");
 			for t, i in t.types {
-				if i > 0 -> write_string(buf, ", ");
+				if i > 0 do write_string(buf, ", ");
 				write_type(buf, t);
 			}
 			write_string(buf, ")");
@@ -251,9 +251,9 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		}
 	case Tuple:
 		count := len(info.names);
-		if count != 1 -> write_string(buf, "(");
+		if count != 1 do write_string(buf, "(");
 		for name, i in info.names {
-			if i > 0 -> write_string(buf, ", ");
+			if i > 0 do write_string(buf, ", ");
 
 			t := info.types[i];
 
@@ -263,7 +263,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 			}
 			write_type(buf, t);
 		}
-		if count != 1 -> write_string(buf, ")");
+		if count != 1 do write_string(buf, ")");
 
 	case Array:
 		write_string(buf, "[");
@@ -291,8 +291,8 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 
 	case Struct:
 		write_string(buf, "struct ");
-		if info.packed  -> write_string(buf, "#packed ");
-		if info.ordered -> write_string(buf, "#ordered ");
+		if info.packed  do write_string(buf, "#packed ");
+		if info.ordered do write_string(buf, "#ordered ");
 		if info.custom_align {
 			write_string(buf, "#align ");
 			write_int(buf, i64(info.align), 10);
@@ -300,7 +300,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		}
 		write_byte(buf, '{');
 		for name, i in info.names {
-			if i > 0 -> write_string(buf, ", ");
+			if i > 0 do write_string(buf, ", ");
 			write_string(buf, name);
 			write_string(buf, ": ");
 			write_type(buf, info.types[i]);
@@ -312,14 +312,14 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		cf := info.common_fields;
 		total_count := 0;
 		for name, i in cf.names {
-			if i > 0 -> write_string(buf, ", ");
+			if i > 0 do write_string(buf, ", ");
 			write_string(buf, name);
 			write_string(buf, ": ");
 			write_type(buf, cf.types[i]);
 			total_count++;
 		}
 		for name, i in info.variant_names {
-			if total_count > 0 || i > 0 -> write_string(buf, ", ");
+			if total_count > 0 || i > 0 do write_string(buf, ", ");
 			write_string(buf, name);
 			write_byte(buf, '{');
 			defer write_byte(buf, '}');
@@ -329,7 +329,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 
 			vc := len(variant.names)-len(cf.names);
 			for j in 0..<vc {
-				if j > 0 -> write_string(buf, ", ");
+				if j > 0 do write_string(buf, ", ");
 				index := j + len(cf.names);
 				write_string(buf, variant.names[index]);
 				write_string(buf, ": ");
@@ -341,7 +341,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 	case RawUnion:
 		write_string(buf, "raw_union {");
 		for name, i in info.names {
-			if i > 0 -> write_string(buf, ", ");
+			if i > 0 do write_string(buf, ", ");
 			write_string(buf, name);
 			write_string(buf, ": ");
 			write_type(buf, info.types[i]);
@@ -353,7 +353,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		write_type(buf, info.base);
 		write_string(buf, " {");
 		for name, i in info.names {
-			if i > 0 -> write_string(buf, ", ");
+			if i > 0 do write_string(buf, ", ");
 			write_string(buf, name);
 		}
 		write_string(buf, "}");
@@ -366,7 +366,7 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 		}
 		write_string(buf, " {");
 		for name, i in info.names {
-			if i > 0 -> write_string(buf, ", ");
+			if i > 0 do write_string(buf, ", ");
 			write_string(buf, name);
 			write_string(buf, ": ");
 			write_int(buf, i64(info.bits[i]), 10);
@@ -388,7 +388,7 @@ _parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: boo
 	i := 0;
 	for i < len(s[offset..]) {
 		c := rune(s[offset+i]);
-		if !is_digit(c) -> break;
+		if !is_digit(c) do break;
 		i++;
 
 		result *= 10;
@@ -482,13 +482,13 @@ fmt_bool :: proc(using fi: ^FmtInfo, b: bool, verb: rune) {
 
 
 fmt_write_padding :: proc(fi: ^FmtInfo, width: int) {
-	if width <= 0 -> return;
+	if width <= 0 do return;
 
 	pad_byte: u8 = fi.space ? ' ' : '0';
 
 	data := string_buffer_data(fi.buf^);
 	count := min(width, cap(data)-len(data));
-	for _ in 0..<count -> write_byte(fi.buf, pad_byte);
+	for _ in 0..<count do write_byte(fi.buf, pad_byte);
 }
 
 _fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
@@ -533,9 +533,9 @@ _fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: in
 
 
 	flags: strconv.IntFlag;
-	if fi.hash && !fi.zero -> flags |= strconv.IntFlag.Prefix;
-	if fi.plus             -> flags |= strconv.IntFlag.Plus;
-	if fi.space            -> flags |= strconv.IntFlag.Space;
+	if fi.hash && !fi.zero do flags |= strconv.IntFlag.Prefix;
+	if fi.plus             do flags |= strconv.IntFlag.Plus;
+	if fi.space            do flags |= strconv.IntFlag.Space;
 	s := strconv.append_bits(buf[start..<start], u128(u), base, is_signed, bit_size, digits, flags);
 
 	if fi.hash && fi.zero {
@@ -664,7 +664,7 @@ fmt_string :: proc(fi: ^FmtInfo, s: string, verb: rune) {
 		defer fi.space = space;
 
 		for i in 0..<len(s) {
-			if i > 0 && space -> write_byte(fi.buf, ' ');
+			if i > 0 && space do write_byte(fi.buf, ' ');
 			_fmt_int(fi, u128(s[i]), 16, false, 8, verb == 'x' ? __DIGITS_LOWER : __DIGITS_UPPER);
 		}
 
@@ -777,7 +777,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			write_string(fi.buf, info.name);
 			write_byte(fi.buf, '{');
 			for _, i in b.names {
-				if i > 0 -> write_string(fi.buf, ", ");
+				if i > 0 do write_string(fi.buf, ", ");
 				write_string(fi.buf, b.names[i]);
 				write_string(fi.buf, " = ");
 
@@ -811,7 +811,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
 		for i in 0..<info.count {
-			if i > 0 -> write_string(fi.buf, ", ");
+			if i > 0 do write_string(fi.buf, ", ");
 
 			data := ^u8(v.data) + i*info.elem_size;
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
@@ -822,7 +822,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		defer write_byte(fi.buf, ']');
 		array := ^raw.DynamicArray(v.data);
 		for i in 0..<array.len {
-			if i > 0 -> write_string(fi.buf, ", ");
+			if i > 0 do write_string(fi.buf, ", ");
 
 			data := ^u8(array.data) + i*info.elem_size;
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
@@ -833,7 +833,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		defer write_byte(fi.buf, ']');
 		slice := ^[]u8(v.data);
 		for _, i in slice {
-			if i > 0 -> write_string(fi.buf, ", ");
+			if i > 0 do write_string(fi.buf, ", ");
 
 			data := &slice[0] + i*info.elem_size;
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
@@ -844,7 +844,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		defer write_byte(fi.buf, '>');
 
 		for i in 0..<info.count {
-			if i > 0 -> write_string(fi.buf, ", ");
+			if i > 0 do write_string(fi.buf, ", ");
 
 			data := ^u8(v.data) + i*info.elem_size;
 			fmt_value(fi, any{rawptr(data), info.elem}, verb);
@@ -866,7 +866,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		entry_size := ed.elem_size;
 
 		for i in 0..<entries.len {
-			if i > 0 -> write_string(fi.buf, ", ");
+			if i > 0 do write_string(fi.buf, ", ");
 
 			data := ^u8(entries.data) + i*entry_size;
 			header := ^__MapEntryHeader(data);
@@ -891,7 +891,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		defer write_byte(fi.buf, '}');
 
 		for _, i in info.names {
-			if i > 0 -> write_string(fi.buf, ", ");
+			if i > 0 do write_string(fi.buf, ", ");
 
 			write_string(fi.buf, info.names[i]);
 			write_string(fi.buf, " = ");
@@ -905,7 +905,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 
 		cf := info.common_fields;
 		for _, i in cf.names {
-			if i > 0 -> write_string(fi.buf, ", ");
+			if i > 0 do write_string(fi.buf, ", ");
 
 			write_string(fi.buf, cf.names[i]);
 			write_string(fi.buf, " = ");
@@ -1028,7 +1028,7 @@ sbprintln :: proc(buf: ^StringBuffer, args: ..any) -> string {
 	fi.buf = buf;
 
 	for arg, i in args {
-		if i > 0 -> write_byte(buf, ' ');
+		if i > 0 do write_byte(buf, ' ');
 
 		fmt_value(&fi, args[i], 'v');
 	}
@@ -1155,10 +1155,10 @@ sbprintf :: proc(b: ^StringBuffer, fmt: string, args: ..any) -> string {
 	if !fi.reordered && arg_index < len(args) {
 		write_string(b, "%!(EXTRA ");
 		for arg, index in args[arg_index..] {
-			if index > 0 -> write_string(b, ", ");
+			if index > 0 do write_string(b, ", ");
 
-			if arg == nil -> write_string(b, "<nil>");
-			else          -> fmt_arg(&fi, args[index], 'v');
+			if arg == nil do write_string(b, "<nil>");
+			else          do fmt_arg(&fi, args[index], 'v');
 		}
 		write_string(b, ")");
 	}

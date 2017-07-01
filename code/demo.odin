@@ -1,8 +1,9 @@
 import (
+	"fmt.odin";
+/*
 	"atomics.odin";
 	"bits.odin";
 	"decimal.odin";
-	"fmt.odin";
 	"hash.odin";
 	"math.odin";
 	"mem.odin";
@@ -15,6 +16,7 @@ import (
 	"types.odin";
 	"utf8.odin";
 	"utf16.odin";
+*/
 )
 
 general_stuff :: proc() {
@@ -34,6 +36,8 @@ general_stuff :: proc() {
 		// The variadic part allows for extra type checking too which C does not provide
 		c_printf :: proc(fmt: ^u8, #c_vararg args: ..any) -> i32 #link_name "printf" ---;
 	}
+	str := "%d\n";
+	c_printf(&str[0], i32(789456123));
 
 
 	Foo :: struct {
@@ -72,9 +76,7 @@ foreign_blocks :: proc() {
 }
 
 default_arguments :: proc() {
-	hello :: proc(a: int = 9, b: int = 9) {
-		fmt.printf("a is %d; b is %d\n", a, b);
-	}
+	hello :: proc(a: int = 9, b: int = 9) do fmt.printf("a is %d; b is %d\n", a, b);
 	fmt.println("\nTesting default arguments:");
 	hello(1, 2);
 	hello(1);
@@ -179,7 +181,7 @@ default_return_values :: proc() {
 
 	some_thing :: proc(input: int) -> (result: ^Entity = nil, err := Error.None) {
 		match {
-		case input == 3: return err = Error.WhyTheNumberThree;
+		case input == 3:  return err = Error.WhyTheNumberThree;
 		case input >= 10: return err = Error.TenIsTooBig;
 		}
 
@@ -215,9 +217,7 @@ call_location :: proc() {
 
 explicit_parametric_polymorphic_procedures :: proc() {
 	// This is how `new` is actually implemented, see _preload.odin
-	alloc_type :: proc(T: type) -> ^T {
-		return ^T(alloc(size_of(T), align_of(T)));
-	}
+	alloc_type :: proc(T: type) -> ^T do return ^T(alloc(size_of(T), align_of(T)));
 
 	int_ptr := alloc_type(int);
 	defer free(int_ptr);
@@ -231,9 +231,7 @@ explicit_parametric_polymorphic_procedures :: proc() {
 
 	add :: proc(T: type, args: ..T) -> T {
 		res: T;
-		for arg in args {
-			res += arg;
-		}
+		for arg in args do res += arg;
 		return res;
 	}
 
@@ -298,7 +296,7 @@ explicit_parametric_polymorphic_procedures :: proc() {
 
 	use_empty_slot :: proc(manager: ^EntityManager, batch: ^EntityBatch) -> ^Entity {
 		for ok, i in batch.occupied {
-			if ok -> continue;
+			if ok do continue;
 			batch.occupied[i] = true;
 
 			e := &batch.data[i];
@@ -314,7 +312,7 @@ explicit_parametric_polymorphic_procedures :: proc() {
 	gen_new_entity :: proc(manager: ^EntityManager) -> ^Entity {
 		for b in manager.batches {
 			e := use_empty_slot(manager, b);
-			if e != nil -> return e;
+			if e != nil do return e;
 		}
 
 		new_batch := new(EntityBatch);
@@ -366,12 +364,9 @@ explicit_parametric_polymorphic_procedures :: proc() {
 	}
 }
 
-
-
-
 main :: proc() {
-/*
 	general_stuff();
+/*
 	foreign_blocks();
 	default_arguments();
 	named_arguments();

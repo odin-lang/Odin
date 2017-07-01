@@ -262,6 +262,7 @@ struct CheckerContext {
 	u32        stmt_state_flags;
 	bool       in_defer; // TODO(bill): Actually handle correctly
 	bool       allow_polymorphic_types;
+	bool       no_polymorphic_errors;
 	String     proc_name;
 	Type *     type_hint;
 	DeclInfo * curr_proc_decl;
@@ -1474,8 +1475,10 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 				is_invalid = true;
 				break;
 			case ProcOverload_Polymorphic:
+				#if 1
 				error(p->token, "Overloaded procedure `%.*s` has a polymorphic counterpart in this scope which is not allowed", LIT(name));
 				is_invalid = true;
+				#endif
 				break;
 			case ProcOverload_ParamCount:
 			case ProcOverload_ParamTypes:
@@ -1705,7 +1708,11 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					e->identifier = name;
 
 					if (fl != NULL && e->kind != Entity_Procedure) {
-						error(name, "Only procedures and variables are allowed to be in a foreign block, got %.*s", LIT(ast_node_strings[init->kind]));
+						AstNodeKind kind = init->kind;
+						error(name, "Only procedures and variables are allowed to be in a foreign block, got %.*s", LIT(ast_node_strings[kind]));
+						if (kind == AstNode_ProcType) {
+							gb_printf_err("\tDid you forget to append `---` to the procedure?\n");
+						}
 						// continue;
 					}
 
