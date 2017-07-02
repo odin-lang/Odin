@@ -1475,7 +1475,7 @@ void check_procedure_overloading(Checker *c, Entity *e) {
 				is_invalid = true;
 				break;
 			case ProcOverload_Polymorphic:
-				#if 1
+				#if 0
 				error(p->token, "Overloaded procedure `%.*s` has a polymorphic counterpart in this scope which is not allowed", LIT(name));
 				is_invalid = true;
 				#endif

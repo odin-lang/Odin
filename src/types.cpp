@@ -2448,8 +2448,12 @@ gbString write_type_to_string(gbString str, Type *type) {
 						}
 					} else {
 						GB_ASSERT(var->kind == Entity_TypeName);
+						#if 0
 						str = gb_string_appendc(str, "type/");
 						str = write_type_to_string(str, var->type);
+						#else
+						str = gb_string_appendc(str, "type");
+						#endif
 					}
 				}
 			}

@@ -4477,7 +4477,7 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		} else if (e != NULL && e->kind == Entity_Variable) {
 			return ir_addr_load(proc, ir_build_addr(proc, expr));
 		}
-		GB_PANIC("NULL value for expression from identifier: %.*s @ %p", LIT(i->token.string), expr);
+		GB_PANIC("NULL value for expression from identifier: %.*s : %s @ %p", LIT(i->token.string), type_to_string(e->type), expr);
 		return NULL;
 	case_end;
 
@@ -5617,10 +5617,135 @@ irValue *ir_build_cond(irProcedure *proc, AstNode *cond, irBlock *true_block, ir
 	return v;
 }
 
+void ir_build_poly_proc(irProcedure *proc, AstNodeProcLit *pd, Entity *e) {
+	GB_ASSERT(pd->body != NULL);
+
+	if (is_entity_in_dependency_map(&proc->module->min_dep_map, e) == false) {
+		// NOTE(bill): Nothing depends upon it so doesn't need to be built
+		return;
+	}
+
+	// NOTE(bill): Generate a new name
+	// parent.name-guid
+	String original_name = e->token.string;
+	String pd_name = original_name;
+	if (pd->link_name.len > 0) {
+		pd_name = pd->link_name;
+	}
+
+	isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
+	u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
+	i32 guid = cast(i32)proc->children.count;
+	name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
+	String name = make_string(name_text, name_len-1);
 
 
+	irValue *value = ir_value_procedure(proc->module->allocator,
+	                                    proc->module, e, e->type, pd->type, pd->body, name);
+
+	value->Proc.tags = pd->tags;
+	value->Proc.parent = proc;
+
+	ir_module_add_value(proc->module, e, value);
+	array_add(&proc->children, &value->Proc);
+	array_add(&proc->module->procs_to_generate, value);
+}
+
+
+
+void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
+	if (vd == NULL || vd->is_mutable) {
+		return;
+	}
+
+	for_array(i, vd->names) {
+		AstNode *ident = vd->names[i];
+		GB_ASSERT(ident->kind == AstNode_Ident);
+		Entity *e = entity_of_ident(proc->module->info, ident);
+		GB_ASSERT(e != NULL);
+
+		bool polymorphic = is_type_polymorphic(e->type);
+
+		if (!polymorphic && map_get(&proc->module->min_dep_map, hash_pointer(e)) == NULL) {
+			// NOTE(bill): Nothing depends upon it so doesn't need to be built
+			continue;
+		}
+
+		if (e->kind == Entity_TypeName) {
+			// NOTE(bill): Generate a new name
+			// parent_proc.name-guid
+			String ts_name = e->token.string;
+			isize name_len = proc->name.len + 1 + ts_name.len + 1 + 10 + 1;
+			u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
+			i32 guid = cast(i32)proc->module->members.entries.count;
+			name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(ts_name), guid);
+			String name = make_string(name_text, name_len-1);
+
+			irValue *value = ir_value_type_name(proc->module->allocator,
+			                                           name, e->type);
+			map_set(&proc->module->entity_names, hash_entity(e), name);
+			ir_gen_global_type_name(proc->module, e, name);
+		} else if (e->kind == Entity_Procedure) {
+			CheckerInfo *info = proc->module->info;
+			DeclInfo *decl = decl_info_of_entity(info, e);
+			ast_node(pl, ProcLit, decl->proc_lit);
+			if (pl->body != NULL) {
+				auto *found = map_get(&info->gen_procs, hash_pointer(ident));
+				if (found) {
+					auto procs = *found;
+					for_array(i, procs) {
+						Entity *e = procs[i];
+						DeclInfo *d = decl_info_of_entity(info, e);
+						ir_build_poly_proc(proc, &d->proc_lit->ProcLit, e);
+					}
+				} else {
+					ir_build_poly_proc(proc, pl, e);
+				}
+			} else {
+
+				// FFI - Foreign function interace
+				String original_name = e->token.string;
+				String name = original_name;
+				if (pl->link_name.len > 0) {
+					name = pl->link_name;
+				}
+
+				irValue *value = ir_value_procedure(proc->module->allocator,
+				                                    proc->module, e, e->type, pl->type, pl->body, name);
+
+				value->Proc.tags = pl->tags;
+
+				ir_module_add_value(proc->module, e, value);
+				ir_build_proc(value, proc);
+
+				if (value->Proc.tags & ProcTag_foreign) {
+					HashKey key = hash_string(name);
+					irValue **prev_value = map_get(&proc->module->members, key);
+					if (prev_value == NULL) {
+						// NOTE(bill): Don't do mutliple declarations in the IR
+						map_set(&proc->module->members, key, value);
+					}
+				} else {
+					array_add(&proc->children, &value->Proc);
+				}
+			}
+		}
+	}
+}
 
 void ir_build_stmt_list(irProcedure *proc, Array<AstNode *> stmts) {
+	// NOTE(bill): Precollect constant entities
+	for_array(i, stmts) {
+		AstNode *stmt = stmts[i];
+		switch (stmt->kind) {
+		case_ast_node(vd, ValueDecl, stmt);
+			ir_build_constant_value_decl(proc, vd);
+		case_end;
+		case_ast_node(fb, ForeignBlockDecl, stmt);
+			ir_build_stmt_list(proc, fb->decls);
+		case_end;
+		}
+	}
 	for_array(i, stmts) {
 		ir_build_stmt(proc, stmts[i]);
 	}
@@ -5914,52 +6039,14 @@ void ir_type_case_body(irProcedure *proc, AstNode *label, AstNode *clause, irBlo
 	ir_emit_jump(proc, done);
 }
 
-
-void ir_build_poly_proc(irProcedure *proc, AstNodeProcLit *pd, Entity *e) {
-	GB_ASSERT(pd->body != NULL);
-
-	if (is_entity_in_dependency_map(&proc->module->min_dep_map, e) == false) {
-		// NOTE(bill): Nothing depends upon it so doesn't need to be built
-		return;
-	}
-
-	// NOTE(bill): Generate a new name
-	// parent.name-guid
-	String original_name = e->token.string;
-	String pd_name = original_name;
-	if (pd->link_name.len > 0) {
-		pd_name = pd->link_name;
-	}
-
-	isize name_len = proc->name.len + 1 + pd_name.len + 1 + 10 + 1;
-	u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-	i32 guid = cast(i32)proc->children.count;
-	name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(pd_name), guid);
-	String name = make_string(name_text, name_len-1);
-
-
-	irValue *value = ir_value_procedure(proc->module->allocator,
-	                                    proc->module, e, e->type, pd->type, pd->body, name);
-
-	value->Proc.tags = pd->tags;
-	value->Proc.parent = proc;
-
-	ir_module_add_value(proc->module, e, value);
-	array_add(&proc->children, &value->Proc);
-	array_add(&proc->module->procs_to_generate, value);
-}
-
-
 void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 	switch (node->kind) {
 	case_ast_node(bs, EmptyStmt, node);
 	case_end;
 
-	case_ast_node(fb, ForeignBlockDecl, node);
-		for_array(i, fb->decls) {
-			ir_build_stmt(proc, fb->decls[i]);
-		}
-	case_end;
+	// case_ast_node(fb, ForeignBlockDecl, node);
+	// 	ir_build_stmt_list(proc, fb->decls);
+	// case_end;
 
 	case_ast_node(us, UsingStmt, node);
 		for_array(i, us->list) {
@@ -5987,6 +6074,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		if (vd->is_mutable) {
 			irModule *m = proc->module;
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&m->tmp_arena);
+			defer (gb_temp_arena_memory_end(tmp));
 
 			if (vd->values.count == 0) { // declared and zero-initialized
 				for_array(i, vd->names) {
@@ -5996,8 +6084,8 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					}
 				}
 			} else { // Tuple(s)
-				Array<irAddr> lvals = {};
-				Array<irValue *>  inits = {};
+				Array<irAddr>    lvals = {};
+				Array<irValue *> inits = {};
 				array_init(&lvals, m->tmp_allocator, vd->names.count);
 				array_init(&inits, m->tmp_allocator, vd->names.count);
 
@@ -6029,73 +6117,6 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 				for_array(i, inits) {
 					ir_addr_store(proc, lvals[i], inits[i]);
-				}
-			}
-
-			gb_temp_arena_memory_end(tmp);
-		} else {
-			for_array(i, vd->names) {
-				AstNode *ident = vd->names[i];
-				GB_ASSERT(ident->kind == AstNode_Ident);
-				Entity *e = entity_of_ident(proc->module->info, ident);
-				GB_ASSERT(e != NULL);
-				if (e->kind == Entity_TypeName) {
-					// NOTE(bill): Generate a new name
-					// parent_proc.name-guid
-					String ts_name = e->token.string;
-					isize name_len = proc->name.len + 1 + ts_name.len + 1 + 10 + 1;
-					u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
-					i32 guid = cast(i32)proc->module->members.entries.count;
-					name_len = gb_snprintf(cast(char *)name_text, name_len, "%.*s.%.*s-%d", LIT(proc->name), LIT(ts_name), guid);
-					String name = make_string(name_text, name_len-1);
-
-					irValue *value = ir_value_type_name(proc->module->allocator,
-					                                           name, e->type);
-					map_set(&proc->module->entity_names, hash_entity(e), name);
-					ir_gen_global_type_name(proc->module, e, name);
-				} else if (e->kind == Entity_Procedure) {
-					CheckerInfo *info = proc->module->info;
-					DeclInfo *decl = decl_info_of_entity(info, e);
-					ast_node(pl, ProcLit, decl->proc_lit);
-					if (pl->body != NULL) {
-						if (is_type_poly_proc(e->type)) {
-							auto found = *map_get(&info->gen_procs, hash_pointer(ident));
-							for_array(i, found) {
-								Entity *e = found[i];
-								DeclInfo *d = decl_info_of_entity(info, e);
-								ir_build_poly_proc(proc, &d->proc_lit->ProcLit, e);
-							}
-						} else {
-							ir_build_poly_proc(proc, pl, e);
-						}
-					} else {
-
-						// FFI - Foreign function interace
-						String original_name = e->token.string;
-						String name = original_name;
-						if (pl->link_name.len > 0) {
-							name = pl->link_name;
-						}
-
-						irValue *value = ir_value_procedure(proc->module->allocator,
-						                                    proc->module, e, e->type, pl->type, pl->body, name);
-
-						value->Proc.tags = pl->tags;
-
-						ir_module_add_value(proc->module, e, value);
-						ir_build_proc(value, proc);
-
-						if (value->Proc.tags & ProcTag_foreign) {
-							HashKey key = hash_string(name);
-							irValue **prev_value = map_get(&proc->module->members, key);
-							if (prev_value == NULL) {
-								// NOTE(bill): Don't do mutliple declarations in the IR
-								map_set(&proc->module->members, key, value);
-							}
-						} else {
-							array_add(&proc->children, &value->Proc);
-						}
-					}
 				}
 			}
 		}

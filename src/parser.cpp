@@ -4022,7 +4022,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 			index = cond->AssignStmt.lhs[1];
 			break;
 		default:
-			error(cond, "Expected at 1 or 2 identifiers");
+			error(cond, "Expected either 1 or 2 identifiers");
 			return ast_bad_stmt(f, token, f->curr_token);
 		}
 

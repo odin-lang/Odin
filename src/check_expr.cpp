@@ -156,6 +156,10 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		return -1;
 	}
 
+	if (operand->mode == Addressing_Type) {
+		return -1;
+	}
+
 	Type *s = operand->type;
 
 	if (are_types_identical(s, type)) {
@@ -5692,6 +5696,14 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 
 		if (valid_count == 0) {
 			error(operand->expr, "No overloads for `%.*s` that match with the given arguments", LIT(name));
+			gb_printf_err("Did you mean to use one of these procedures:\n");
+			for (isize i = 0; i < overload_count; i++) {
+				Entity *proc = procs[i];
+				TokenPos pos = proc->token.pos;
+				gbString pt = type_to_string(proc->type);
+				gb_printf_err("\t%.*s :: %s at %.*s(%td:%td)\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
+				gb_string_free(pt);
+			}
 			result_type = t_invalid;
 		} else if (valid_count > 1) {
 			error(operand->expr, "Ambiguous procedure call `%.*s`, could be:", LIT(name));
@@ -5699,7 +5711,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 				Entity *proc = procs[valids[i].index];
 				TokenPos pos = proc->token.pos;
 				gbString pt = type_to_string(proc->type);
-				gb_printf_err("\t%.*s of type %s at %.*s(%td:%td) with score %lld\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
+				gb_printf_err("\t%.*s :: %s at %.*s(%td:%td)\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
 				gb_string_free(pt);
 			}
 			result_type = t_invalid;
