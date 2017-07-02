@@ -3532,7 +3532,7 @@ String ir_mangle_name(irGen *s, String path, Entity *e) {
 	isize base_len = ext-1-base;
 
 	isize max_len = base_len + 1 + 1 + 10 + 1 + name.len;
-	bool require_suffix_id = check_is_entity_overloaded(e) || is_type_poly_proc(e->type);
+	bool require_suffix_id = check_is_entity_overloaded(e) || is_type_polymorphic(e->type);
 	if (require_suffix_id) {
 		max_len += 21;
 	}
@@ -3922,6 +3922,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		}
 	} break;
 
+	#if 1
 	case BuiltinProc_free: {
 		ir_emit_comment(proc, str_lit("free"));
 
@@ -3995,6 +3996,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		args[0] = ptr;
 		return ir_emit_global_call(proc, "free_ptr", args, 1);
 	} break;
+	#endif
 
 	case BuiltinProc_reserve: {
 		ir_emit_comment(proc, str_lit("reserve"));
@@ -4183,39 +4185,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		return ir_emit_global_call(proc, "__dynamic_map_delete", args, 2);
 	} break;
 
-	case BuiltinProc_copy: {
-		ir_emit_comment(proc, str_lit("copy"));
-		// proc copy(dst, src: []Type) -> int
-		AstNode *dst_node = ce->args[0];
-		AstNode *src_node = ce->args[1];
-		irValue *dst_slice = ir_build_expr(proc, dst_node);
-		irValue *src_slice = ir_build_expr(proc, src_node);
-		Type *slice_type = base_type(ir_type(dst_slice));
-		GB_ASSERT(slice_type->kind == Type_Slice);
-		Type *elem_type = slice_type->Slice.elem;
-		i64 size_of_elem = type_size_of(proc->module->allocator, elem_type);
 
-		irValue *dst = ir_emit_conv(proc, ir_slice_elem(proc, dst_slice), t_rawptr);
-		irValue *src = ir_emit_conv(proc, ir_slice_elem(proc, src_slice), t_rawptr);
-
-		irValue *len_dst = ir_slice_count(proc, dst_slice);
-		irValue *len_src = ir_slice_count(proc, src_slice);
-
-		irValue *cond = ir_emit_comp(proc, Token_Lt, len_dst, len_src);
-		irValue *len = ir_emit_select(proc, cond, len_dst, len_src);
-
-		irValue *elem_size = ir_const_int(proc->module->allocator, size_of_elem);
-		irValue *byte_count = ir_emit_arith(proc, Token_Mul, len, elem_size, t_int);
-
-		irValue **args = gb_alloc_array(proc->module->allocator, irValue *, 3);
-		args[0] = dst;
-		args[1] = src;
-		args[2] = byte_count;
-
-		ir_emit_global_call(proc, "__mem_copy", args, 3);
-
-		return len;
-	} break;
 	case BuiltinProc_swizzle: {
 		ir_emit_comment(proc, str_lit("swizzle.begin"));
 		irAddr vector_addr = ir_build_addr(proc, ce->args[0]);
@@ -4288,6 +4258,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		return ir_emit_load(proc, res);
 	} break;
 
+	#if 1
 	case BuiltinProc_slice_ptr: {
 		ir_emit_comment(proc, str_lit("slice_ptr"));
 		irValue *ptr = ir_build_expr(proc, ce->args[0]);
@@ -4323,6 +4294,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		ir_fill_slice(proc, slice, ptr, count, capacity);
 		return ir_emit_load(proc, slice);
 	} break;
+	#endif
 
 	case BuiltinProc_expand_to_tuple: {
 		ir_emit_comment(proc, str_lit("expand_to_tuple"));
@@ -4924,7 +4896,10 @@ irAddr ir_build_addr_from_entity(irProcedure *proc, Entity *e, AstNode *expr) {
 	}
 
 	if (v == NULL) {
-		GB_PANIC("Unknown value: %.*s, entity: %p %.*s\n", LIT(e->token.string), e, LIT(entity_strings[e->kind]));
+		error(expr, "%.*s Unknown value: %.*s, entity: %p %.*s",
+		      LIT(proc->name),
+		      LIT(e->token.string), e, LIT(entity_strings[e->kind]));
+		GB_PANIC("Unknown value");
 	}
 
 	return ir_addr(v);
@@ -4937,7 +4912,6 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 		switch (i->kind) {
 		case Token_context:
 			v = ir_find_or_generate_context_ptr(proc);
-			// v = ir_find_global_variable(proc, str_lit("__context"));
 			break;
 		}
 
@@ -4950,7 +4924,9 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 			irAddr val = {};
 			return val;
 		}
+		String name = i->token.string;
 		Entity *e = entity_of_ident(proc->module->info, expr);
+		// GB_ASSERT(name == e->token.string);
 		return ir_build_addr_from_entity(proc, e, expr);
 	case_end;
 
@@ -7093,7 +7069,6 @@ void ir_build_proc(irValue *value, irProcedure *parent) {
 			proc->module->stmt_state_flags = out;
 		}
 
-
 		ir_begin_procedure_body(proc);
 		ir_insert_code_before_proc(proc, parent);
 		ir_build_stmt(proc, proc->body);
@@ -7423,12 +7398,14 @@ void ir_gen_tree(irGen *s) {
 			continue;
 		}
 
-		if (map_get(&m->min_dep_map, hash_pointer(e)) == NULL) {
+		if (map_get(&m->min_dep_map, hash_entity(e)) == NULL) {
 			// NOTE(bill): Nothing depends upon it so doesn't need to be built
 			continue;
 		}
 
-		if (!scope->is_global || is_type_poly_proc(e->type)) {
+		String original_name = name;
+
+		if (!scope->is_global || is_type_polymorphic(e->type)) {
 			if (e->kind == Entity_Procedure && (e->Procedure.tags & ProcTag_export) != 0) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later
@@ -7436,8 +7413,14 @@ void ir_gen_tree(irGen *s) {
 			} else {
 				name = ir_mangle_name(s, e->token.pos.file, e);
 			}
+		} else if (check_is_entity_overloaded(e)) {
+			name = ir_mangle_name(s, e->token.pos.file, e);
+
+			gb_printf_err("%.*s|%.*s :: %s\n", LIT(original_name), LIT(name), type_to_string(e->type));
+
 		}
-		map_set(&m->entity_names, hash_pointer(e), name);
+
+		map_set(&m->entity_names, hash_entity(e), name);
 
 		switch (e->kind) {
 		case Entity_TypeName:

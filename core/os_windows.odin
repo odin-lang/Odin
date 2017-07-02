@@ -1,4 +1,5 @@
 import win32 "sys/windows.odin";
+import "mem.odin";
 
 Handle   :: int;
 FileTime :: u64;
@@ -100,9 +101,8 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errn
 	copy(buf[..], []u8(path));
 
 	handle := Handle(win32.create_file_a(&buf[0], access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
-	if handle != INVALID_HANDLE {
-		return handle, ERROR_NONE;
-	}
+	if handle != INVALID_HANDLE do return handle, ERROR_NONE;
+
 	err := win32.get_last_error();
 	return INVALID_HANDLE, Errno(err);
 }
@@ -113,23 +113,18 @@ close :: proc(fd: Handle) {
 
 
 write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
-	if len(data) == 0 {
-		return 0, ERROR_NONE;
-	}
+	if len(data) == 0 do return 0, ERROR_NONE;
+
 	single_write_length: i32;
 	total_write: i64;
 	length := i64(len(data));
 
 	for total_write < length {
 		remaining := length - total_write;
-		to_read: i32;
 		MAX :: 1<<31-1;
-		if remaining <= MAX {
-			to_read = i32(remaining);
-		} else {
-			to_read = MAX;
-		}
-		e := win32.write_file(win32.Handle(fd), &data[total_write], to_read, &single_write_length, nil);
+		to_write: i32 = min(i32(remaining), MAX);
+
+		e := win32.write_file(win32.Handle(fd), &data[total_write], to_write, &single_write_length, nil);
 		if single_write_length <= 0 || e == win32.FALSE {
 			err := win32.get_last_error();
 			return int(total_write), Errno(e);
@@ -140,9 +135,7 @@ write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 }
 
 read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
-	if len(data) == 0 {
-		return 0, ERROR_NONE;
-	}
+	if len(data) == 0 do return 0, ERROR_NONE;
 
 	single_read_length: i32;
 	total_read: i64;
@@ -150,13 +143,8 @@ read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 
 	for total_read < length {
 		remaining := length - total_read;
-		to_read: u32;
 		MAX :: 1<<32-1;
-		if remaining <= MAX {
-			to_read = u32(remaining);
-		} else {
-			to_read = MAX;
-		}
+		to_read: u32 = min(u32(remaining), MAX);
 
 		e := win32.read_file(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
 		if single_read_length <= 0 || e == win32.FALSE {
@@ -178,9 +166,8 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	hi := i32(offset>>32);
 	lo := i32(offset);
 	ft := win32.get_file_type(win32.Handle(fd));
-	if ft == win32.FILE_TYPE_PIPE {
-		return 0, ERROR_FILE_IS_PIPE;
-	}
+	if ft == win32.FILE_TYPE_PIPE do return 0, ERROR_FILE_IS_PIPE;
+
 	dw_ptr := win32.set_file_pointer(win32.Handle(fd), lo, &hi, w);
 	if dw_ptr == win32.INVALID_SET_FILE_POINTER {
 		err := win32.get_last_error();
@@ -253,9 +240,8 @@ heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 		heap_free(ptr);
 		return nil;
 	}
-	if ptr == nil {
-		return heap_alloc(new_size);
-	}
+	if ptr == nil do return heap_alloc(new_size);
+
 	return win32.heap_realloc(win32.get_process_heap(), win32.HEAP_ZERO_MEMORY, ptr, new_size);
 }
 heap_free :: proc(ptr: rawptr) {
@@ -282,9 +268,8 @@ current_thread_id :: proc() -> int {
 _alloc_command_line_arguments :: proc() -> []string {
 	alloc_ucs2_to_utf8 :: proc(wstr: ^u16) -> string {
 		wstr_len := 0;
-		for (wstr+wstr_len)^ != 0 {
-			wstr_len++;
-		}
+		for (wstr+wstr_len)^ != 0 do wstr_len++;
+
 		len := 2*wstr_len-1;
 		buf := make([]u8, len+1);
 		str := slice_ptr(wstr, wstr_len+1);
@@ -293,22 +278,16 @@ _alloc_command_line_arguments :: proc() -> []string {
 		for str[j] != 0 {
 			match {
 			case str[j] < 0x80:
-				if i+1 > len {
-					return "";
-				}
+				if i+1 > len do return "";
 				buf[i] = u8(str[j]); i++;
 				j++;
 			case str[j] < 0x800:
-				if i+2 > len {
-					return "";
-				}
+				if i+2 > len do return "";
 				buf[i] = u8(0xc0 + (str[j]>>6));   i++;
 				buf[i] = u8(0x80 + (str[j]&0x3f)); i++;
 				j++;
 			case 0xd800 <= str[j] && str[j] < 0xdc00:
-				if i+4 > len {
-					return "";
-				}
+				if i+4 > len do return "";
 				c := rune((str[j] - 0xd800) << 10) + rune((str[j+1]) - 0xdc00) + 0x10000;
 				buf[i] = u8(0xf0 +  (c >> 18));         i++;
 				buf[i] = u8(0x80 + ((c >> 12) & 0x3f)); i++;
@@ -318,9 +297,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 			case 0xdc00 <= str[j] && str[j] < 0xe000:
 				return "";
 			case:
-				if i+3 > len {
-					return "";
-				}
+				if i+3 > len do return "";
 				buf[i] = 0xe0 + u8 (str[j] >> 12);         i++;
 				buf[i] = 0x80 + u8((str[j] >>  6) & 0x3f); i++;
 				buf[i] = 0x80 + u8((str[j]      ) & 0x3f); i++;
@@ -334,9 +311,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 	arg_count: i32;
 	arg_list_ptr := win32.command_line_to_argv_w(win32.get_command_line_w(), &arg_count);
 	arg_list := make([]string, arg_count);
-	for _, i in arg_list {
-		arg_list[i] = alloc_ucs2_to_utf8((arg_list_ptr+i)^);
-	}
+	for _, i in arg_list do arg_list[i] = alloc_ucs2_to_utf8((arg_list_ptr+i)^);
 	return arg_list;
 }
 

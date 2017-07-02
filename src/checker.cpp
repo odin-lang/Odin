@@ -44,8 +44,6 @@ enum BuiltinProcId {
 
 	BuiltinProc_compile_assert,
 
-	BuiltinProc_copy,
-
 	BuiltinProc_swizzle,
 
 	BuiltinProc_complex,
@@ -91,8 +89,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_info"),        1, false, Expr_Expr},
 
 	{STR_LIT("compile_assert"),   1, false, Expr_Expr},
-
-	{STR_LIT("copy"),             2, false, Expr_Expr},
 
 	{STR_LIT("swizzle"),          1, true,  Expr_Expr},
 
@@ -204,6 +200,7 @@ struct ProcedureInfo {
 	Type *                type; // Type_Procedure
 	AstNode *             body; // AstNode_BlockStmt
 	u64                   tags;
+	bool                  generated_from_polymorphic;
 };
 
 // ExprInfo stores information used for "untyped" expressions
@@ -241,6 +238,16 @@ struct Scope {
 };
 gb_global Scope *universal_scope = NULL;
 
+void scope_reset(Scope *scope) {
+	if (scope == NULL) return;
+
+	scope->first_child = NULL;
+	scope->last_child  = NULL;
+	map_clear  (&scope->elements);
+	map_clear  (&scope->implicit);
+	array_clear(&scope->shared);
+	array_clear(&scope->imported);
+}
 
 
 struct DelayedDecl {

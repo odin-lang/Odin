@@ -122,8 +122,7 @@ type_info_base :: proc(info: ^TypeInfo) -> ^TypeInfo {
 
 	base := info;
 	match i in base {
-	case TypeInfo.Named:
-		base = i.base;
+	case TypeInfo.Named: base = i.base;
 	}
 	return base;
 }
@@ -134,10 +133,8 @@ type_info_base_without_enum :: proc(info: ^TypeInfo) -> ^TypeInfo {
 
 	base := info;
 	match i in base {
-	case TypeInfo.Named:
-		base = i.base;
-	case TypeInfo.Enum:
-		base = i.base;
+	case TypeInfo.Named: base = i.base;
+	case TypeInfo.Enum:  base = i.base;
 	}
 	return base;
 }
@@ -258,8 +255,67 @@ resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_AL
 	return a.procedure(a.data, AllocatorMode.Resize, new_size, alignment, ptr, old_size, 0);
 }
 
+// append :: proc(s: ^[]$T, args: ..T) -> int {
+// 	if s == nil {
+// 		return 0;
+// 	}
+// 	slice := ^raw.Slice(s);
+// 	arg_len := len(args);
+// 	if arg_len <= 0 {
+// 		return slice.len;
+// 	}
 
-new :: proc(T: type) -> ^T #inline do return ^T(alloc(size_of(T), align_of(T)));
+// 	arg_len = min(slice.cap-slice.len, arg_len);
+// 	if arg_len > 0 {
+// 		data := ^T(slice.data);
+// 		assert(data != nil);
+// 		sz :: size_of(T);
+// 		__mem_copy(data + slice.len, &args[0], sz*arg_len);
+// 		slice.len += arg_len;
+// 	}
+// 	return slice.len;
+// }
+
+// append :: proc(a: ^[dynamic]$T, args: ..T) -> int {
+// 	array := ^raw.DynamicArray(a);
+
+// 	arg_len := len(args);
+// 	if arg_len <= 0 || items == nil {
+// 		return array.len;
+// 	}
+
+
+// 	ok := true;
+// 	if array.cap <= array.len+arg_len {
+// 		cap := 2 * array.cap + max(8, arg_len);
+// 		ok = __dynamic_array_reserve(array, size_of(T), align_of(T), cap);
+// 	}
+// 	// TODO(bill): Better error handling for failed reservation
+// 	if !ok do return array.len;
+
+// 	data := ^T(array.data);
+// 	assert(data != nil);
+// 	__mem_copy(data + array.len, items, size_of(T) * arg_len);
+// 	array.len += arg_len;
+// 	return array.len;
+// }
+
+copy :: proc(dst, src: []$T) -> int #cc_contextless {
+	n := max(0, min(len(dst), len(src)));
+	if n > 0 do __mem_copy(&dst[0], &src[0], n*size_of(T));
+	return n;
+}
+
+
+new  :: proc(T: type) -> ^T #inline do return ^T(alloc(size_of(T), align_of(T)));
+
+/*
+free :: proc(array: [dynamic]$T) do free_ptr(^raw.DynamicArray(&array).data);
+free :: proc(slice: []$T)        do free_ptr(^raw.Slice(&slice).data);
+free :: proc(str:   string)      do free_ptr(^raw.String(&str).data);
+free :: proc(ptr:   rawptr)      do free_ptr(ptr);
+*/
+
 
 
 
@@ -440,10 +496,8 @@ __mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #cc_con
 __mem_compare :: proc(a, b: ^u8, n: int) -> int #cc_contextless {
 	for i in 0..<n {
 		match {
-		case (a+i)^ < (b+i)^:
-			return -1;
-		case (a+i)^ > (b+i)^:
-			return +1;
+		case (a+i)^ < (b+i)^: return -1;
+		case (a+i)^ > (b+i)^: return +1;
 		}
 	}
 	return 0;
@@ -569,7 +623,6 @@ __slice_append :: proc(slice_: rawptr, elem_size, elem_align: int,
 	return slice.len;
 }
 
-
 // Map stuff
 
 __default_hash :: proc(data: []u8) -> u128 {
@@ -582,9 +635,7 @@ __default_hash :: proc(data: []u8) -> u128 {
 	}
 	return fnv128a(data);
 }
-__default_hash_string :: proc(s: string) -> u128 {
-	return __default_hash([]u8(s));
-}
+__default_hash_string :: proc(s: string) -> u128 do return __default_hash([]u8(s));
 
 __INITIAL_MAP_CAP :: 16;
 
@@ -634,9 +685,7 @@ __dynamic_map_rehash :: proc(using header: __MapHeader, new_count: int) {
 	for i in 0..<new_count do nm.hashes[i] = -1;
 
 	for i := 0; i < m.entries.len; i++ {
-		if len(nm.hashes) == 0 {
-			__dynamic_map_grow(new_header);
-		}
+		if len(nm.hashes) == 0 do __dynamic_map_grow(new_header);
 
 		entry_header := __dynamic_map_get_entry(header, i);
 		data := ^u8(entry_header);
@@ -655,9 +704,7 @@ __dynamic_map_rehash :: proc(using header: __MapHeader, new_count: int) {
 		ndata := ^u8(e);
 		__mem_copy(ndata+value_offset, data+value_offset, value_size);
 
-		if __dynamic_map_full(new_header) {
-			__dynamic_map_grow(new_header);
-		}
+		if __dynamic_map_full(new_header) do __dynamic_map_grow(new_header);
 	}
 	free_ptr_with_allocator(header_hashes.allocator, header_hashes.data);
 	free_ptr_with_allocator(header.m.entries.allocator, header.m.entries.data);

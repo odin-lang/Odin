@@ -144,9 +144,6 @@ PixelFormatDescriptor :: struct #ordered {
 
 
 
-
-Proc :: proc() #cc_c;
-
 MAPVK_VK_TO_VSC    :: 0;
 MAPVK_VSC_TO_VK    :: 1;
 MAPVK_VK_TO_CHAR   :: 2;
@@ -344,7 +341,7 @@ foreign kernel32 {
 
 	load_library_a   :: proc(c_str: ^u8) -> Hmodule                                                                            #cc_std #link_name "LoadLibraryA"                 ---;
 	free_library     :: proc(h: Hmodule)                                                                                       #cc_std #link_name "FreeLibrary"                  ---;
-	get_proc_address :: proc(h: Hmodule, c_str: ^u8) -> Proc                                                                   #cc_std #link_name "GetProcAddress"               ---;
+	get_proc_address :: proc(h: Hmodule, c_str: ^u8) -> rawptr                                                                 #cc_std #link_name "GetProcAddress"               ---;
 
 }
 

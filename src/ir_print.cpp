@@ -732,7 +732,8 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 		ir_print_encoded_local(f, value->TypeName.name);
 		break;
 	case irValue_Global: {
-		Scope *scope = value->Global.entity->scope;
+		Entity *e = value->Global.entity;
+		Scope *scope = e->scope;
 		bool in_global_scope = false;
 		if (scope != NULL) {
 			// TODO(bill): Fix this rule. What should it be?

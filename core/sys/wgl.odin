@@ -68,7 +68,7 @@ GetExtensionsStringARBType  :: proc(Hdc) -> ^u8 #cc_c;
 foreign opengl32 {
 	create_context            :: proc(hdc: Hdc) -> Hglrc                                                                                                 #link_name "wglCreateContext"          ---;
 	make_current              :: proc(hdc: Hdc, hglrc: Hglrc) -> Bool                                                                                    #link_name "wglMakeCurrent"            ---;
-	get_proc_address          :: proc(c_str: ^u8) -> Proc                                                                                                #link_name "wglGetProcAddress"         ---;
+	get_proc_address          :: proc(c_str: ^u8) -> rawptr                                                                                              #link_name "wglGetProcAddress"         ---;
 	delete_context            :: proc(hglrc: Hglrc) -> Bool                                                                                              #link_name "wglDeleteContext"          ---;
 	copy_context              :: proc(src, dst: Hglrc, mask: u32) -> Bool                                                                                #link_name "wglCopyContext"            ---;
 	create_layer_context      :: proc(hdc: Hdc, layer_plane: i32) -> Hglrc                                                                               #link_name "wglCreateLayerContext"     ---;

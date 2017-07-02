@@ -1,6 +1,7 @@
 import (
 	"fmt.odin";
 	"os.odin";
+	"raw.odin";
 )
 foreign __llvm_core {
 	swap :: proc(b: u16) -> u16 #link_name "llvm.bswap.i16" ---;
@@ -8,33 +9,50 @@ foreign __llvm_core {
 	swap :: proc(b: u64) -> u64 #link_name "llvm.bswap.i64" ---;
 }
 
-set :: proc(data: rawptr, value: i32, len: int) -> rawptr {
+set :: proc(data: rawptr, value: i32, len: int) -> rawptr #cc_contextless {
 	return __mem_set(data, value, len);
 }
-zero :: proc(data: rawptr, len: int) -> rawptr {
+zero :: proc(data: rawptr, len: int) -> rawptr #cc_contextless {
 	return __mem_zero(data, len);
 }
-copy :: proc(dst, src: rawptr, len: int) -> rawptr {
+copy :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
 	return __mem_copy(dst, src, len);
 }
-copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr {
+copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
 	return __mem_copy_non_overlapping(dst, src, len);
 }
-compare :: proc(a, b: []u8) -> int {
+compare :: proc(a, b: []u8) -> int #cc_contextless {
 	return __mem_compare(&a[0], &b[0], min(len(a), len(b)));
 }
 
+/*
+slice_ptr :: proc(ptr: ^$T, len: int) -> []T #cc_contextless {
+	assert(len >= 0);
+	slice := raw.Slice{data = ptr, len = len, cap = len};
+	return ^[]T(&slice)^;
+}
+slice_ptr :: proc(ptr: ^$T, len, cap: int) -> []T #cc_contextless {
+	assert(0 <= len && len <= cap);
+	slice := raw.Slice{data = ptr, len = len, cap = cap};
+	return ^[]T(&slice)^;
+}
+
+slice_to_bytes :: proc(slice: []$T) -> []u8 #cc_contextless {
+	s := ^raw.Slice(&slice);
+	s.len *= size_of(T);
+	s.cap *= size_of(T);
+	return ^[]u8(s)^;
+}
+*/
 
 
-kilobytes :: proc(x: int) -> int #inline { return          (x) * 1024; }
-megabytes :: proc(x: int) -> int #inline { return kilobytes(x) * 1024; }
-gigabytes :: proc(x: int) -> int #inline { return megabytes(x) * 1024; }
-terabytes :: proc(x: int) -> int #inline { return gigabytes(x) * 1024; }
+kilobytes :: proc(x: int) -> int #inline #cc_contextless { return          (x) * 1024; }
+megabytes :: proc(x: int) -> int #inline #cc_contextless { return kilobytes(x) * 1024; }
+gigabytes :: proc(x: int) -> int #inline #cc_contextless { return megabytes(x) * 1024; }
+terabytes :: proc(x: int) -> int #inline #cc_contextless { return gigabytes(x) * 1024; }
 
 is_power_of_two :: proc(x: int) -> bool {
-	if x <= 0 {
-		return false;
-	}
+	if x <= 0 do return false;
 	return (x & (x-1)) == 0;
 }
 
@@ -44,9 +62,7 @@ align_forward :: proc(ptr: rawptr, align: int) -> rawptr {
 	a := uint(align);
 	p := uint(ptr);
 	modulo := p & (a-1);
-	if modulo != 0 {
-		p += a - modulo;
-	}
+	if modulo != 0 do p += a - modulo;
 	return rawptr(p);
 }
 
@@ -65,13 +81,9 @@ allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: in
 	}
 }
 allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
-	if data == nil {
-		return nil;
-	}
+	if data == nil do return nil;
 	p := ^int(data);
-	for (p-1)^ == -1 {
-		p = (p-1);
-	}
+	for (p-1)^ == -1 do p = (p-1);
 	return ^AllocationHeader(p-1);
 }
 
@@ -184,9 +196,7 @@ end_arena_temp_memory :: proc(using tmp: ArenaTempMemory) {
 
 align_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 	prev_pow2 :: proc(n: i64) -> i64 {
-		if n <= 0 {
-			return 0;
-		}
+		if n <= 0 do return 0;
 		n |= n >> 1;
 		n |= n >> 2;
 		n |= n >> 4;
@@ -271,9 +281,7 @@ size_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 		return WORD_SIZE;
 	case Array:
 		count := info.count;
-		if count == 0 {
-			return 0;
-		}
+		if count == 0 do return 0;
 		size      := size_of_type_info(info.elem);
 		align     := align_of_type_info(info.elem);
 		alignment := align_formula(size, align);
@@ -284,9 +292,7 @@ size_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 		return 2*WORD_SIZE;
 	case Vector:
 		count := info.count;
-		if count == 0 {
-			return 0;
-		}
+		if count == 0 do return 0;
 		size      := size_of_type_info(info.elem);
 		align     := align_of_type_info(info.elem);
 		alignment := align_formula(size, align);

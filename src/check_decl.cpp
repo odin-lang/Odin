@@ -601,6 +601,8 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 	}
 
 	CheckerContext old_context = c->context;
+	defer (c->context = old_context);
+
 	c->context.scope = decl->scope;
 	c->context.decl = decl;
 	c->context.proc_name = proc_name;
@@ -660,7 +662,6 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 
 
 	check_scope_usage(c, c->context.scope);
-	c->context = old_context;
 
 	if (decl->parent != NULL) {
 		// NOTE(bill): Add the dependencies from the procedure literal (lambda)

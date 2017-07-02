@@ -1354,13 +1354,12 @@ ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 	TypeProc py = base_type(y)->Proc;
 
 
-	if (px.is_polymorphic != py.is_polymorphic) {
-		return ProcOverload_Polymorphic;
-	}
-
-
 	// if (px.calling_convention != py.calling_convention) {
 		// return ProcOverload_CallingConvention;
+	// }
+
+	// if (px.is_polymorphic != py.is_polymorphic) {
+		// return ProcOverload_Polymorphic;
 	// }
 
 	if (px.param_count != py.param_count) {
@@ -1377,6 +1376,11 @@ ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 	// IMPORTANT TODO(bill): Determine the rules for overloading procedures with variadic parameters
 	if (px.variadic != py.variadic) {
 		return ProcOverload_ParamVariadic;
+	}
+
+
+	if (px.is_polymorphic != py.is_polymorphic) {
+		return ProcOverload_Polymorphic;
 	}
 
 	if (px.result_count != py.result_count) {
@@ -2448,12 +2452,12 @@ gbString write_type_to_string(gbString str, Type *type) {
 						}
 					} else {
 						GB_ASSERT(var->kind == Entity_TypeName);
-						#if 0
-						str = gb_string_appendc(str, "type/");
-						str = write_type_to_string(str, var->type);
-						#else
-						str = gb_string_appendc(str, "type");
-						#endif
+						if (var->type->kind == Type_Generic) {
+							str = gb_string_appendc(str, "type/");
+							str = write_type_to_string(str, var->type);
+						} else {
+							str = gb_string_appendc(str, "type");
+						}
 					}
 				}
 			}

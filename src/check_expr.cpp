@@ -1084,6 +1084,7 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 	case Type_Basic:
 		if (compound) return are_types_identical(poly, source);
 		return check_is_assignable_to(c, &o, poly);
+
 	case Type_Named:
 		if (compound) return are_types_identical(poly, source);
 		return check_is_assignable_to(c, &o, poly);
@@ -1097,7 +1098,8 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 	}
 	case Type_Pointer:
 		if (source->kind == Type_Pointer) {
-			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Pointer.elem, true, modify_type);
+			if (compound) return are_types_identical(poly, source);
+			return check_is_assignable_to(c, &o, poly);
 		}
 		return false;
 	case Type_Atomic:
@@ -1354,7 +1356,8 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					param->TypeName.is_type_alias = true;
 				} else {
 					if (operands != NULL && is_type_polymorphic_type) {
-						type = determine_type_from_polymorphic(c, type, (*operands)[variable_index]);
+						Operand op = (*operands)[variable_index];
+						type = determine_type_from_polymorphic(c, type, op);
 						if (type == t_invalid) {
 							success = false;
 						}
@@ -4177,6 +4180,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->type = type;
 	} break;
 
+	#if 1
 	case BuiltinProc_free: {
 		// proc free(^Type)
 		// proc free([]Type)
@@ -4206,6 +4210,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->mode = Addressing_NoValue;
 	} break;
+	#endif
 
 
 	case BuiltinProc_reserve: {
@@ -4478,48 +4483,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->type = t_untyped_bool;
 		break;
 
-	case BuiltinProc_copy: {
-		// proc copy(x, y: []Type) -> int
-		Type *dest_type = NULL, *src_type = NULL;
-
-		Type *d = base_type(operand->type);
-		if (d->kind == Type_Slice) {
-			dest_type = d->Slice.elem;
-		}
-		Operand op = {};
-		check_expr(c, &op, ce->args[1]);
-		if (op.mode == Addressing_Invalid) {
-			return false;
-		}
-		Type *s = base_type(op.type);
-		if (s->kind == Type_Slice) {
-			src_type = s->Slice.elem;
-		}
-
-		if (dest_type == NULL || src_type == NULL) {
-			error(call, "`copy` only expects slices as arguments");
-			return false;
-		}
-
-		if (!are_types_identical(dest_type, src_type)) {
-			gbString d_arg = expr_to_string(ce->args[0]);
-			gbString s_arg = expr_to_string(ce->args[1]);
-			gbString d_str = type_to_string(dest_type);
-			gbString s_str = type_to_string(src_type);
-			error(call,
-			      "Arguments to `copy`, %s, %s, have different elem types: %s vs %s",
-			      d_arg, s_arg, d_str, s_str);
-			gb_string_free(s_str);
-			gb_string_free(d_str);
-			gb_string_free(s_arg);
-			gb_string_free(d_arg);
-			return false;
-		}
-
-		operand->type = t_int; // Returns number of elems copied
-		operand->mode = Addressing_Value;
-	} break;
-
 	case BuiltinProc_swizzle: {
 		// proc swizzle(v: {N}T, T..) -> {M}T
 		Type *vector_type = base_type(operand->type);
@@ -4699,6 +4662,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	} break;
 
+	#if 1
 	case BuiltinProc_slice_ptr: {
 		// proc slice_ptr(a: ^T, len: int) -> []T
 		// proc slice_ptr(a: ^T, len, cap: int) -> []T
@@ -4755,6 +4719,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->type = t_u8_slice;
 		operand->mode = Addressing_Value;
 	} break;
+	#endif
 
 	case BuiltinProc_expand_to_tuple: {
 		Type *type = base_type(operand->type);
@@ -5146,7 +5111,13 @@ bool check_unpack_arguments(Checker *c, isize lhs_count, Array<Operand> *operand
 }
 
 // NOTE(bill): Returns `NULL` on failure
-Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Array<Operand> *operands, ProcedureInfo *proc_info_) {
+Entity *find_or_generate_polymorphic_procedure(Checker *c, AstNode *call, Entity *base_entity, CallArgumentCheckerType *call_checker,
+                                               Array<Operand> *operands, ProcedureInfo *proc_info_) {
+	///////////////////////////////////////////////////////////////////////////////
+	//                                                                           //
+	// TODO CLEANUP(bill): This procedure is very messy and hacky. Clean this!!! //
+	//                                                                           //
+	///////////////////////////////////////////////////////////////////////////////
 	if (base_entity == NULL) {
 		return NULL;
 	}
@@ -5172,19 +5143,25 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 	scope->is_proc = true;
 	c->context.scope = scope;
 
+	bool generate_type_again = c->context.no_polymorphic_errors;
+
 	// NOTE(bill): This is slightly memory leaking if the type already exists
 	// Maybe it's better to check with the previous types first?
-	Type *final_proc_type = make_type_proc(c->allocator, c->context.scope, NULL, 0, NULL, 0, false, pt->calling_convention);
+	Type *final_proc_type = make_type_proc(c->allocator, scope, NULL, 0, NULL, 0, false, pt->calling_convention);
 	bool success = check_procedure_type(c, final_proc_type, pt->node, operands);
-	// if (!success) {
-		// return NULL;
-	// }
+	if (!success) {
+		ProcedureInfo proc_info = {};
+		if (proc_info_) *proc_info_ = proc_info;
+		return NULL;
+	}
 
 	auto *found_gen_procs = map_get(&c->info.gen_procs, hash_pointer(base_entity->identifier));
 	if (found_gen_procs) {
-		for_array(i, *found_gen_procs) {
-			Entity *other = (*found_gen_procs)[i];
-			if (are_types_identical(other->type, final_proc_type)) {
+		auto procs = *found_gen_procs;
+		for_array(i, procs) {
+			Entity *other = procs[i];
+			Type *pt = base_type(other->type);
+			if (are_types_identical(pt, final_proc_type)) {
 				// NOTE(bill): This scope is not needed any more, destroy it
 				// destroy_scope(scope);
 				return other;
@@ -5192,6 +5169,37 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 		}
 	}
 
+	if (generate_type_again) {
+		// LEAK TODO(bill): This is technically a memory leak as it has to generate the type twice
+
+		bool prev_no_polymorphic_errors = c->context.no_polymorphic_errors;
+		defer (c->context.no_polymorphic_errors = prev_no_polymorphic_errors);
+		c->context.no_polymorphic_errors = false;
+
+		// NOTE(bill): Reset scope from the failed procedure type
+		scope_reset(scope);
+
+		success = check_procedure_type(c, final_proc_type, pt->node, operands);
+
+		if (!success) {
+			ProcedureInfo proc_info = {};
+			if (proc_info_) *proc_info_ = proc_info;
+			return NULL;
+		}
+
+		if (found_gen_procs) {
+			auto procs = *found_gen_procs;
+			for_array(i, procs) {
+				Entity *other = procs[i];
+				Type *pt = base_type(other->type);
+				if (are_types_identical(pt, final_proc_type)) {
+					// NOTE(bill): This scope is not needed any more, destroy it
+					// destroy_scope(scope);
+					return other;
+				}
+			}
+		}
+	}
 
 	AstNode *proc_lit = clone_ast_node(a, old_decl->proc_lit);
 	ast_node(pl, ProcLit, proc_lit);
@@ -5202,7 +5210,7 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 	u64 tags = base_entity->Procedure.tags;
 	AstNode *ident = clone_ast_node(a, base_entity->identifier);
 	Token token = ident->Ident.token;
-	DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, old_decl->parent);
+	DeclInfo *d = make_declaration_info(c->allocator, scope, old_decl->parent);
 	d->gen_proc_type = final_proc_type;
 	d->type_expr = pl->type;
 	d->proc_lit = proc_lit;
@@ -5212,16 +5220,18 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, 
 	entity->identifier = ident;
 
 	add_entity_and_decl_info(c, ident, entity, d);
-	entity->scope = base_entity->scope;
+	// NOTE(bill): Set the scope afterwards as this is not real overloading
+	entity->scope = scope->parent;
 
 	ProcedureInfo proc_info = {};
 	if (success) {
-		proc_info.file = c->curr_ast_file;
+		proc_info.file  = c->curr_ast_file;
 		proc_info.token = token;
 		proc_info.decl  = d;
 		proc_info.type  = final_proc_type;
 		proc_info.body  = pl->body;
 		proc_info.tags  = tags;
+		proc_info.generated_from_polymorphic = true;
 	}
 
 	if (found_gen_procs) {
@@ -5329,7 +5339,7 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			ProcedureInfo proc_info = {};
 
 			if (pt->is_polymorphic && !pt->is_poly_specialized) {
-				gen_entity = find_or_generate_polymorphic_procedure(c, entity, &operands, &proc_info);
+				gen_entity = find_or_generate_polymorphic_procedure(c, call, entity, check_call_arguments_internal, &operands, &proc_info);
 				if (gen_entity != NULL) {
 					GB_ASSERT(is_type_proc(gen_entity->type));
 					final_proc_type = gen_entity->type;
@@ -5557,9 +5567,9 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	}
 
 	Entity *gen_entity = NULL;
-	if (pt->is_polymorphic && err == CallArgumentError_None) {
+	if (pt->is_polymorphic && !pt->is_poly_specialized && err == CallArgumentError_None) {
 		ProcedureInfo proc_info = {};
-		gen_entity = find_or_generate_polymorphic_procedure(c, entity, &ordered_operands, &proc_info);
+		gen_entity = find_or_generate_polymorphic_procedure(c, call, entity, check_named_call_arguments, &ordered_operands, &proc_info);
 		if (gen_entity != NULL) {
 			if (proc_info.decl != NULL) {
 				check_procedure_later(c, proc_info);
@@ -5684,8 +5694,13 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 		if (valid_count > 1) {
 			gb_sort_array(valids, valid_count, valid_proc_and_score_cmp);
 			i64 best_score = valids[0].score;
+			Entity *best_entity = procs[valids[0].index];
 			for (isize i = 0; i < valid_count; i++) {
 				if (best_score > valids[i].score) {
+					valid_count = i;
+					break;
+				}
+				if (best_entity == procs[valids[i].index]) {
 					valid_count = i;
 					break;
 				}
@@ -5695,12 +5710,15 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 
 
 		if (valid_count == 0) {
-			error(operand->expr, "No overloads for `%.*s` that match with the given arguments", LIT(name));
-			gb_printf_err("Did you mean to use one of these procedures:\n");
+			error(operand->expr, "No overloads or ambiguous call for `%.*s` that match with the given arguments", LIT(name));
+			if (overload_count > 0) {
+				gb_printf_err("Did you mean to use one of the following:\n");
+			}
 			for (isize i = 0; i < overload_count; i++) {
 				Entity *proc = procs[i];
 				TokenPos pos = proc->token.pos;
-				gbString pt = type_to_string(proc->type);
+				// gbString pt = type_to_string(proc->type);
+				gbString pt = expr_to_string(proc->type->Proc.node);
 				gb_printf_err("\t%.*s :: %s at %.*s(%td:%td)\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
 				gb_string_free(pt);
 			}
@@ -5711,7 +5729,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 				Entity *proc = procs[valids[i].index];
 				TokenPos pos = proc->token.pos;
 				gbString pt = type_to_string(proc->type);
-				gb_printf_err("\t%.*s :: %s at %.*s(%td:%td)\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
+				gb_printf_err("\t%.*s :: %s at %.*s(%td:%td) with score %lld\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
 				gb_string_free(pt);
 			}
 			result_type = t_invalid;
@@ -7251,6 +7269,10 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 			str = write_expr_to_string(str, arg);
 		}
 		str = gb_string_appendc(str, ")");
+	case_end;
+
+	case_ast_node(ht, HelperType, node);
+		str = gb_string_appendc(str, "type");
 	case_end;
 
 	case_ast_node(pt, ProcType, node);
