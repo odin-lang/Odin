@@ -5,6 +5,7 @@ import (
 	"fmt.odin";
 	"utf8.odin";
 	"raw.odin";
+	"types.odin";
 )
 // Naming Conventions:
 // In general, PascalCase for types and snake_case for values
@@ -115,6 +116,38 @@ __type_table: []TypeInfo;
 
 __argv__: ^^u8;
 __argc__: i32;
+
+
+__INITIAL_MAP_CAP :: 16;
+
+__MapKey :: struct #ordered {
+	hash: u128,
+	str:  string,
+}
+
+__MapFindResult :: struct #ordered {
+	hash_index:  int,
+	entry_prev:  int,
+	entry_index: int,
+}
+
+__MapEntryHeader :: struct #ordered {
+	key:  __MapKey,
+	next: int,
+/*
+	value: Value_Type,
+*/
+}
+
+__MapHeader :: struct #ordered {
+	m:             ^raw.DynamicMap,
+	is_key_string: bool,
+	entry_size:    int,
+	entry_align:   int,
+	value_offset:  int,
+	value_size:    int,
+}
+
 
 
 type_info_base :: proc(info: ^TypeInfo) -> ^TypeInfo {
@@ -256,6 +289,14 @@ resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_AL
 }
 
 
+copy :: proc(dst, src: []$T) -> int #cc_contextless {
+	n := max(0, min(len(dst), len(src)));
+	if n > 0 do __mem_copy(&dst[0], &src[0], n*size_of(T));
+	return n;
+}
+
+
+
 append :: proc(array: ^[]$T, args: ..T) -> int {
 	if array == nil {
 		return 0;
@@ -277,35 +318,147 @@ append :: proc(array: ^[]$T, args: ..T) -> int {
 	return slice.len;
 }
 
-append :: proc(array_: ^[dynamic]$T, args: ..T) -> int {
-	array := ^raw.DynamicArray(array_);
+append :: proc(array: ^[dynamic]$T, args: ..T) -> int {
+	if array == nil {
+		return 0;
+	}
+	a := ^raw.DynamicArray(array);
 
 	arg_len := len(args);
 	if arg_len <= 0 {
-		return array.len;
+		return a.len;
 	}
 
 
 	ok := true;
-	if array.cap <= array.len+arg_len {
-		cap := 2 * array.cap + max(8, arg_len);
-		ok = __dynamic_array_reserve(array, size_of(T), align_of(T), cap);
+	if a.cap <= a.len+arg_len {
+		cap := 2 * a.cap + max(8, arg_len);
+		ok = __dynamic_array_reserve(a, size_of(T), align_of(T), cap);
 	}
 	// TODO(bill): Better error handling for failed reservation
-	if !ok do return array.len;
+	if !ok do return a.len;
 
-	data := ^T(array.data);
+	data := ^T(a.data);
 	assert(data != nil);
-	__mem_copy(data + array.len, &args[0], size_of(T) * arg_len);
-	array.len += arg_len;
-	return array.len;
+	__mem_copy(data + a.len, &args[0], size_of(T) * arg_len);
+	a.len += arg_len;
+	return a.len;
 }
 
-copy :: proc(dst, src: []$T) -> int #cc_contextless {
-	n := max(0, min(len(dst), len(src)));
-	if n > 0 do __mem_copy(&dst[0], &src[0], n*size_of(T));
-	return n;
+pop :: proc(array: ^[]$T) -> T {
+	res: T;
+	if array do return res;
+	assert(len(array) > 0);
+	res = array[len(array)-1];
+	^raw.Slice(array).len -= 1;
+	return res;
 }
+
+pop :: proc(array: ^[dynamic]$T) -> T {
+	res: T;
+	if array do return res;
+	assert(len(array) > 0);
+	res = array[len(array)-1];
+	^raw.DynamicArray(array).len -= 1;
+	return res;
+}
+
+clear :: proc(slice: ^[]$T) #cc_contextless #inline {
+	if slice != nil do ^raw.Slice(slice).len = 0;
+}
+clear :: proc(array: ^[dynamic]$T) #cc_contextless #inline {
+	if array != nil do ^raw.DynamicArray(array).len = 0;
+}
+clear :: proc(m: ^map[$K]$V) #cc_contextless #inline {
+	if m == nil do return;
+	raw_map := ^raw.DynamicMap(array);
+	hashes  := ^raw.DynamicArray(&raw_map.hashes);
+	entries := ^raw.DynamicArray(&raw_map.entries);
+	hashes.len  = 0;
+	entries.len = 0;
+}
+
+reserve :: proc(array: ^[dynamic]$T, capacity: int) -> bool {
+	if array == nil do return false;
+	a := ^raw.DynamicArray(array);
+
+	if capacity <= a.cap do return true;
+
+	// __check_context();
+	if a.allocator.procedure == nil {
+		a.allocator = context.allocator;
+	}
+	assert(a.allocator.procedure != nil);
+
+	old_size  := a.cap * size_of(T);
+	new_size  := capacity * size_of(T);
+	allocator := a.allocator;
+
+	new_data := allocator.procedure(allocator.data, AllocatorMode.Resize, new_size, align_of(T), a.data, old_size, 0);
+	if new_data == nil do return false;
+
+	a.data = new_data;
+	a.cap = capacity;
+	return true;
+}
+
+
+__get_map_header :: proc(m: ^map[$K]$V) -> __MapHeader {
+	header := __MapHeader{m = ^raw.DynamicMap(m)};
+	Entry :: struct {
+		key:   __MapKey,
+		next:  int,
+		value: V,
+	}
+
+	header.is_key_string = types.is_string(type_info(K));
+	header.entry_size    = size_of(Entry);
+	header.entry_align   = align_of(Entry);
+	header.value_offset  = offset_of(Entry, value);
+	header.value_size    = size_of(V);
+	return header;
+}
+
+__get_map_key :: proc(key: $K) -> __MapKey {
+	map_key: __MapKey;
+	ti := type_info(K);
+	match {
+	case types.is_integer(ti):
+		match 8*size_of(key) {
+		case   8: map_key.hash = u128(  ^u8(&key)^);
+		case  16: map_key.hash = u128( ^u16(&key)^);
+		case  32: map_key.hash = u128( ^u32(&key)^);
+		case  64: map_key.hash = u128( ^u64(&key)^);
+		case 128: map_key.hash = u128(^u128(&key)^);
+		}
+	case types.is_rune(ti):
+		map_key.hash = u128(^rune(&key)^);
+	case types.is_pointer(ti):
+		map_key.hash = u128(uint(^rawptr(&key)^));
+	case types.is_float(ti):
+		match 8*size_of(key) {
+		case 32: map_key.hash = u128(^u32(&key)^);
+		case 64: map_key.hash = u128(^u64(&key)^);
+		case: panic("Unhandled float size");
+		}
+	case types.is_string(ti):
+		str := ^string(&key)^;
+		map_key.hash = __default_hash_string(str);
+		map_key.str  = str;
+	case:
+		panic("Unhandled map key type");
+	}
+	return map_key;
+}
+
+reserve :: proc(m: ^map[$K]$V, capacity: int) {
+	if m != nil do __dynamic_map_reserve(__get_map_header(m), capacity);
+}
+
+delete :: proc(m: ^map[$K]$V, key: K) {
+	if m != nil do __dynamic_map_delete(__get_map_header(m), __get_map_key(key));
+}
+
 
 
 new  :: proc(T: type) -> ^T #inline do return ^T(alloc(size_of(T), align_of(T)));
@@ -315,6 +468,23 @@ free :: proc(slice: []$T)        do free_ptr(^raw.Slice(&slice).data);
 free :: proc(str:   string)      do free_ptr(^raw.String(&str).data);
 free :: proc(ptr:   rawptr)      do free_ptr(ptr);
 
+slice_to_bytes :: proc(slice: []$T) -> []u8 {
+	s := ^raw.Slice(&slice);
+	s.len *= size_of(T);
+	s.cap *= size_of(T);
+	return ^[]u8(s)^;
+}
+
+slice_ptr :: proc(ptr: ^$T, len: int) -> []T {
+	assert(0 <= len);
+	s := raw.Slice{ptr, len, len};
+	return ^[]T(&s)^;
+}
+slice_ptr :: proc(ptr: ^$T, len, cap: int) -> []T {
+	assert(0 <= len && len <= cap);
+	s := raw.Slice{ptr, len, cap};
+	return ^[]T(&s)^;
+}
 
 
 
@@ -647,36 +817,6 @@ __default_hash :: proc(data: []u8) -> u128 {
 	return fnv128a(data);
 }
 __default_hash_string :: proc(s: string) -> u128 do return __default_hash([]u8(s));
-
-__INITIAL_MAP_CAP :: 16;
-
-__MapKey :: struct #ordered {
-	hash: u128,
-	str:  string,
-}
-
-__MapFindResult :: struct #ordered {
-	hash_index:  int,
-	entry_prev:  int,
-	entry_index: int,
-}
-
-__MapEntryHeader :: struct #ordered {
-	key:  __MapKey,
-	next: int,
-/*
-	value: Value_Type,
-*/
-}
-
-__MapHeader :: struct #ordered {
-	m:             ^raw.DynamicMap,
-	is_key_string: bool,
-	entry_size:    int,
-	entry_align:   int,
-	value_offset:  int,
-	value_size:    int,
-}
 
 __dynamic_map_reserve :: proc(using header: __MapHeader, cap: int)  {
 	__dynamic_array_reserve(&m.hashes, size_of(int), align_of(int), cap);

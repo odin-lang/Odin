@@ -4217,7 +4217,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->type = type;
 	} break;
 
-	#if 1
+	#if 0
 	case BuiltinProc_free: {
 		// proc free(^Type)
 		// proc free([]Type)
@@ -4250,6 +4250,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 	#endif
 
 
+	#if 0
 	case BuiltinProc_reserve: {
 		// proc reserve([dynamic]Type, count: int) {
 		// proc reserve(map[Key]Type, count: int) {
@@ -4276,7 +4277,8 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->type = NULL;
 		operand->mode = Addressing_NoValue;
 	} break;
-
+	#endif
+	#if 0
 	case BuiltinProc_clear: {
 		Type *type = operand->type;
 		bool is_pointer = is_type_pointer(type);
@@ -4291,7 +4293,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->type = NULL;
 		operand->mode = Addressing_NoValue;
 	} break;
-
+	#endif
 	#if 0
 	case BuiltinProc_append: {
 		// proc append([dynamic]Type, item: ..Type)
@@ -4341,7 +4343,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->type = t_int;
 	} break;
 	#endif
-
+	#if 0
 	case BuiltinProc_delete: {
 		// proc delete(map[Key]Value, key: Key)
 		Type *type = operand->type;
@@ -4372,6 +4374,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 		operand->mode = Addressing_NoValue;
 	} break;
+	#endif
 
 
 	case BuiltinProc_size_of: {
@@ -4701,7 +4704,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 	} break;
 
-	#if 1
+	#if 0
 	case BuiltinProc_slice_ptr: {
 		// proc slice_ptr(a: ^T, len: int) -> []T
 		// proc slice_ptr(a: ^T, len, cap: int) -> []T
@@ -4759,7 +4762,6 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_Value;
 	} break;
 	#endif
-
 	case BuiltinProc_expand_to_tuple: {
 		Type *type = base_type(operand->type);
 		if (!is_type_struct(type) &

@@ -3922,7 +3922,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		}
 	} break;
 
-	#if 1
+	#if 0
 	case BuiltinProc_free: {
 		ir_emit_comment(proc, str_lit("free"));
 
@@ -3997,7 +3997,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		return ir_emit_global_call(proc, "free_ptr", args, 1);
 	} break;
 	#endif
-
+	#if 0
 	case BuiltinProc_reserve: {
 		ir_emit_comment(proc, str_lit("reserve"));
 		gbAllocator a = proc->module->allocator;
@@ -4032,7 +4032,8 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			GB_PANIC("Unknown type for `reserve`");
 		}
 	} break;
-
+	#endif
+	#if 0
 	case BuiltinProc_clear: {
 		ir_emit_comment(proc, str_lit("clear"));
 		Type *original_type = type_of_expr(proc->module->info, ce->args[0]);
@@ -4058,7 +4059,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		}
 		return NULL;
 	} break;
-
+	#endif
 	#if 0
 	case BuiltinProc_append: {
 		ir_emit_comment(proc, str_lit("append"));
@@ -4169,7 +4170,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		return ir_emit_global_call(proc, "__dynamic_array_append", daa_args, 5);
 	} break;
 	#endif
-
+	#if 0
 	case BuiltinProc_delete: {
 		ir_emit_comment(proc, str_lit("delete"));
 		irValue *map = ir_build_expr(proc, ce->args[0]);
@@ -4186,7 +4187,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		args[1] = ir_gen_map_key(proc, key, key_type);
 		return ir_emit_global_call(proc, "__dynamic_map_delete", args, 2);
 	} break;
-
+	#endif
 
 	case BuiltinProc_swizzle: {
 		ir_emit_comment(proc, str_lit("swizzle.begin"));
@@ -4260,7 +4261,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		return ir_emit_load(proc, res);
 	} break;
 
-	#if 1
+	#if 0
 	case BuiltinProc_slice_ptr: {
 		ir_emit_comment(proc, str_lit("slice_ptr"));
 		irValue *ptr = ir_build_expr(proc, ce->args[0]);

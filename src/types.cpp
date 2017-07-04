@@ -919,6 +919,9 @@ bool is_type_untyped_undef(Type *t) {
 
 bool is_type_valid_for_keys(Type *t) {
 	t = core_type(t);
+	if (t->kind == Type_Generic) {
+		return true;
+	}
 	if (is_type_untyped(t)) {
 		return false;
 	}

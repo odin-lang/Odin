@@ -44,18 +44,18 @@ foreign __llvm_core {
 	fmuladd :: proc(a, b, c: f64) -> f64  #link_name "llvm.fmuladd.f64" ---;
 }
 
-tan    :: proc(θ: f32) -> f32 #inline { return sin(θ)/cos(θ); }
-tan    :: proc(θ: f64) -> f64 #inline { return sin(θ)/cos(θ); }
+tan    :: proc(θ: f32) -> f32 #inline do return sin(θ)/cos(θ);
+tan    :: proc(θ: f64) -> f64 #inline do return sin(θ)/cos(θ);
 
 
-lerp   :: proc(a, b, t: f32) -> (x: f32) { return a*(1-t) + b*t; }
-lerp   :: proc(a, b, t: f64) -> (x: f64) { return a*(1-t) + b*t; }
-unlerp :: proc(a, b, x: f32) -> (t: f32) { return (x-a)/(b-a); }
-unlerp :: proc(a, b, x: f64) -> (t: f64) { return (x-a)/(b-a); }
+lerp   :: proc(a, b, t: f32) -> (x: f32) do return a*(1-t) + b*t;
+lerp   :: proc(a, b, t: f64) -> (x: f64) do return a*(1-t) + b*t;
+unlerp :: proc(a, b, x: f32) -> (t: f32) do return (x-a)/(b-a);
+unlerp :: proc(a, b, x: f64) -> (t: f64) do return (x-a)/(b-a);
 
 
-sign :: proc(x: f32) -> f32 { return x >= 0 ? +1 : -1; }
-sign :: proc(x: f64) -> f64 { return x >= 0 ? +1 : -1; }
+sign :: proc(x: f32) -> f32 do return x >= 0 ? +1 : -1;
+sign :: proc(x: f64) -> f64 do return x >= 0 ? +1 : -1;
 
 
 
@@ -75,17 +75,17 @@ copy_sign :: proc(x, y: f64) -> f64 {
 	return transmute(f64, ix);
 }
 
-round :: proc(x: f32) -> f32 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
-round :: proc(x: f64) -> f64 { return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5); }
+round :: proc(x: f32) -> f32 do return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5);
+round :: proc(x: f64) -> f64 do return x >= 0 ? floor(x + 0.5) : ceil(x - 0.5);
 
-floor :: proc(x: f32) -> f32 { return x >= 0 ? f32(i64(x)) : f32(i64(x-0.5)); } // TODO: Get accurate versions
-floor :: proc(x: f64) -> f64 { return x >= 0 ? f64(i64(x)) : f64(i64(x-0.5)); } // TODO: Get accurate versions
+floor :: proc(x: f32) -> f32 do return x >= 0 ? f32(i64(x)) : f32(i64(x-0.5)); // TODO: Get accurate versions
+floor :: proc(x: f64) -> f64 do return x >= 0 ? f64(i64(x)) : f64(i64(x-0.5)); // TODO: Get accurate versions
 
-ceil :: proc(x: f32) -> f32 { return x <  0 ? f32(i64(x)) : f32(i64(x+1)); } // TODO: Get accurate versions
-ceil :: proc(x: f64) -> f64 { return x <  0 ? f64(i64(x)) : f64(i64(x+1)); } // TODO: Get accurate versions
+ceil :: proc(x: f32) -> f32 do return x <  0 ? f32(i64(x)) : f32(i64(x+1)); // TODO: Get accurate versions
+ceil :: proc(x: f64) -> f64 do return x <  0 ? f64(i64(x)) : f64(i64(x+1)); // TODO: Get accurate versions
 
-remainder :: proc(x, y: f32) -> f32 { return x - round(x/y) * y; }
-remainder :: proc(x, y: f64) -> f64 { return x - round(x/y) * y; }
+remainder :: proc(x, y: f32) -> f32 do return x - round(x/y) * y;
+remainder :: proc(x, y: f64) -> f64 do return x - round(x/y) * y;
 
 mod :: proc(x, y: f32) -> f32 {
 	result: f32;
@@ -107,8 +107,8 @@ mod :: proc(x, y: f64) -> f64 {
 }
 
 
-to_radians :: proc(degrees: f32) -> f32 { return degrees * TAU / 360; }
-to_degrees :: proc(radians: f32) -> f32 { return radians * 360 / TAU; }
+to_radians :: proc(degrees: f32) -> f32 do return degrees * TAU / 360;
+to_degrees :: proc(radians: f32) -> f32 do return radians * 360 / TAU;
 
 
 
@@ -123,36 +123,27 @@ cross :: proc(x, y: Vec3) -> Vec3 {
 }
 
 
-mag :: proc(v: Vec2) -> f32 { return sqrt(dot(v, v)); }
-mag :: proc(v: Vec3) -> f32 { return sqrt(dot(v, v)); }
-mag :: proc(v: Vec4) -> f32 { return sqrt(dot(v, v)); }
+mag :: proc(v: Vec2) -> f32 do return sqrt(dot(v, v));
+mag :: proc(v: Vec3) -> f32 do return sqrt(dot(v, v));
+mag :: proc(v: Vec4) -> f32 do return sqrt(dot(v, v));
 
-norm :: proc(v: Vec2) -> Vec2 { return v / mag(v); }
-norm :: proc(v: Vec3) -> Vec3 { return v / mag(v); }
-norm :: proc(v: Vec4) -> Vec4 { return v / mag(v); }
+norm :: proc(v: Vec2) -> Vec2 do return v / mag(v);
+norm :: proc(v: Vec3) -> Vec3 do return v / mag(v);
+norm :: proc(v: Vec4) -> Vec4 do return v / mag(v);
 
 norm0 :: proc(v: Vec2) -> Vec2 {
 	m := mag(v);
-	if m == 0 {
-		return 0;
-	}
-	return v / m;
+	return m == 0 ? 0 : v/m;
 }
 
 norm0 :: proc(v: Vec3) -> Vec3 {
 	m := mag(v);
-	if m == 0 {
-		return 0;
-	}
-	return v / m;
+	return m == 0 ? 0 : v/m;
 }
 
 norm0 :: proc(v: Vec4) -> Vec4 {
 	m := mag(v);
-	if m == 0 {
-		return 0;
-	}
-	return v / m;
+	return m == 0 ? 0 : v/m;
 }
 
 

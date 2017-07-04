@@ -11,6 +11,11 @@ is_integer :: proc(info: ^TypeInfo) -> bool {
 	_, ok := type_info_base(info).(^TypeInfo.Integer);
 	return ok;
 }
+is_rune :: proc(info: ^TypeInfo) -> bool {
+	if info == nil do return false;
+	_, ok := type_info_base(info).(^TypeInfo.Rune);
+	return ok;
+}
 is_float :: proc(info: ^TypeInfo) -> bool {
 	if info == nil do return false;
 	_, ok := type_info_base(info).(^TypeInfo.Float);

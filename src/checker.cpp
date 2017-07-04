@@ -29,12 +29,12 @@ enum BuiltinProcId {
 
 	// BuiltinProc_new,
 	BuiltinProc_make,
-	BuiltinProc_free,
+	// BuiltinProc_free,
 
-	BuiltinProc_reserve,
-	BuiltinProc_clear,
+	// BuiltinProc_reserve,
+	// BuiltinProc_clear,
 	// BuiltinProc_append,
-	BuiltinProc_delete,
+	// BuiltinProc_delete,
 
 	BuiltinProc_size_of,
 	BuiltinProc_align_of,
@@ -51,8 +51,8 @@ enum BuiltinProcId {
 	BuiltinProc_imag,
 	BuiltinProc_conj,
 
-	BuiltinProc_slice_ptr,
-	BuiltinProc_slice_to_bytes,
+	// BuiltinProc_slice_ptr,
+	// BuiltinProc_slice_to_bytes,
 
 	BuiltinProc_expand_to_tuple,
 
@@ -60,12 +60,6 @@ enum BuiltinProcId {
 	BuiltinProc_max,
 	BuiltinProc_abs,
 	BuiltinProc_clamp,
-
-/* 	BuiltinProc_sqrt,
-	BuiltinProc_sin,
-	BuiltinProc_cos,
-	BuiltinProc_tan,
-	BuiltinProc_pow, */
 
 	BuiltinProc_transmute,
 
@@ -81,12 +75,12 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	// {STR_LIT("new"),              1, false, Expr_Expr},
 	{STR_LIT("make"),             1, true,  Expr_Expr},
-	{STR_LIT("free"),             1, false, Expr_Stmt},
+	// {STR_LIT("free"),             1, false, Expr_Stmt},
 
-	{STR_LIT("reserve"),          2, false, Expr_Stmt},
-	{STR_LIT("clear"),            1, false, Expr_Stmt},
+	// {STR_LIT("reserve"),          2, false, Expr_Stmt},
+	// {STR_LIT("clear"),            1, false, Expr_Stmt},
 	// {STR_LIT("append"),           1, true,  Expr_Expr},
-	{STR_LIT("delete"),           2, false, Expr_Stmt},
+	// {STR_LIT("delete"),           2, false, Expr_Stmt},
 
 	{STR_LIT("size_of"),          1, false, Expr_Expr},
 	{STR_LIT("align_of"),         1, false, Expr_Expr},
@@ -103,8 +97,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("imag"),             1, false, Expr_Expr},
 	{STR_LIT("conj"),             1, false, Expr_Expr},
 
-	{STR_LIT("slice_ptr"),        2, true,  Expr_Expr},
-	{STR_LIT("slice_to_bytes"),   1, false, Expr_Stmt},
+	// {STR_LIT("slice_ptr"),        2, true,  Expr_Expr},
+	// {STR_LIT("slice_to_bytes"),   1, false, Expr_Expr},
 
 	{STR_LIT("expand_to_tuple"),  1, false, Expr_Expr},
 
@@ -112,14 +106,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("max"),              2, false, Expr_Expr},
 	{STR_LIT("abs"),              1, false, Expr_Expr},
 	{STR_LIT("clamp"),            3, false, Expr_Expr},
-
-/*
-	{STR_LIT("__sqrt"),            1, false, Expr_Expr},
-	{STR_LIT("__sin"),             1, false, Expr_Expr},
-	{STR_LIT("__cos"),             1, false, Expr_Expr},
-	{STR_LIT("__tan"),             1, false, Expr_Expr},
-	{STR_LIT("__pow"),             2, false, Expr_Expr},
- */
 
 	{STR_LIT("transmute"),        2, false, Expr_Expr},
 
