@@ -191,25 +191,80 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 	}
 
 	Operand operand = {};
-	if (init != NULL) {
-		check_expr_or_type(c, &operand, init);
-	}
-#if 1
-	if (operand.mode == Addressing_Type) {
-		e->kind = Entity_TypeName;
 
-		DeclInfo *d = c->context.decl;
-		d->type_expr = d->init_expr;
-		check_type_decl(c, e, d->type_expr, named_type);
-		return;
+	if (init != NULL) {
+		Entity *entity = NULL;
+		if (init->kind == AstNode_Ident) {
+			entity = check_ident(c, &operand, init, NULL, e->type, true);
+		} else if (init->kind == AstNode_SelectorExpr) {
+			entity = check_selector(c, &operand, init, e->type);
+		} else {
+			check_expr_or_type(c, &operand, init, e->type);
+		}
+
+		switch (operand.mode) {
+		case Addressing_Type: {
+			e->kind = Entity_TypeName;
+
+			DeclInfo *d = c->context.decl;
+			d->type_expr = d->init_expr;
+			check_type_decl(c, e, d->type_expr, named_type);
+			return;
+		} break;
+
+		case Addressing_Builtin:
+			if (e->type != NULL) {
+				error(type_expr, "A constant alias of a built-in procedure may not have a type initializer");
+			}
+			e->kind = Entity_Builtin;
+			e->Builtin.id = operand.builtin_id;
+			e->type = t_invalid;
+			return;
+
+		case Addressing_Overload:
+			e->kind = Entity_Alias;
+			e->Alias.base = operand.overload_entities[0];
+			e->type = t_invalid;
+			return;
+		}
+
+		if (entity != NULL) {
+			switch (entity->kind) {
+			case Entity_Procedure:
+				e->kind = Entity_Alias;
+				e->type = entity->type;
+				e->Alias.base = entity;
+				return;
+			case Entity_ImportName:
+				e->kind = Entity_ImportName;
+				e->type = entity->type;
+				e->ImportName.path  = entity->ImportName.path;
+				e->ImportName.name  = entity->ImportName.path;
+				e->ImportName.scope = entity->ImportName.scope;
+				e->ImportName.used  = false;
+				return;
+			case Entity_LibraryName:
+				e->kind = Entity_LibraryName;
+				e->type = entity->type;
+				e->LibraryName.path  = entity->LibraryName.path;
+				e->LibraryName.name  = entity->LibraryName.path;
+				e->LibraryName.used  = false;
+				return;
+			}
+		}
 	}
-#endif
+
+	if (init != NULL) {
+		check_expr_or_type(c, &operand, init, e->type);
+	}
 
 	check_init_constant(c, e, &operand);
 
 	if (operand.mode == Addressing_Invalid ||
 		base_type(operand.type) == t_invalid) {
-		error(e->token, "Invalid declaration type");
+		gbString str = expr_to_string(init);
+		error(e->token, "Invalid declaration type `%s`", str);
+		gb_string_free(str);
 	}
 }
 

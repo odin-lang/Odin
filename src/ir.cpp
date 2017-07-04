@@ -5639,6 +5639,13 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 		GB_ASSERT(ident->kind == AstNode_Ident);
 		Entity *e = entity_of_ident(proc->module->info, ident);
 		GB_ASSERT(e != NULL);
+		switch (e->kind) {
+		case Entity_TypeName:
+		case Entity_Procedure:
+			break;
+		default:
+			continue;
+		}
 
 		bool polymorphic = is_type_polymorphic(e->type);
 

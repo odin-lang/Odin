@@ -504,8 +504,20 @@ __mem_compare :: proc(a, b: ^u8, n: int) -> int #cc_contextless {
 }
 
 foreign __llvm_core {
-	__sqrt_f32 :: proc(x: f32) -> f32 #link_name "llvm.sqrt.f32" ---;
-	__sqrt_f64 :: proc(x: f64) -> f64 #link_name "llvm.sqrt.f64" ---;
+	__sqrt_f32 :: proc(x: f32) -> f32        #link_name "llvm.sqrt.f32" ---;
+	__sqrt_f64 :: proc(x: f64) -> f64        #link_name "llvm.sqrt.f64" ---;
+
+	__sin_f32  :: proc(θ: f32) -> f32        #link_name "llvm.sin.f32" ---;
+	__sin_f64  :: proc(θ: f64) -> f64        #link_name "llvm.sin.f64" ---;
+
+	__cos_f32  :: proc(θ: f32) -> f32        #link_name "llvm.cos.f32" ---;
+	__cos_f64  :: proc(θ: f64) -> f64        #link_name "llvm.cos.f64" ---;
+
+	__pow_f32  :: proc(x, power: f32) -> f32 #link_name "llvm.pow.f32" ---;
+	__pow_f64  :: proc(x, power: f64) -> f64 #link_name "llvm.pow.f64" ---;
+
+	fmuladd32  :: proc(a, b, c: f32) -> f32 #link_name "llvm.fmuladd.f32" ---;
+	fmuladd64  :: proc(a, b, c: f64) -> f64 #link_name "llvm.fmuladd.f64" ---;
 }
 __abs_complex64 :: proc(x: complex64) -> f32 #inline #cc_contextless {
 	r, i := real(x), imag(x);

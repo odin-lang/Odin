@@ -1,6 +1,5 @@
 import (
 	"fmt.odin";
-/*
 	"atomics.odin";
 	"bits.odin";
 	"decimal.odin";
@@ -16,6 +15,7 @@ import (
 	"types.odin";
 	"utf8.odin";
 	"utf16.odin";
+/*
 */
 )
 
@@ -370,9 +370,11 @@ main :: proc() {
 	foo :: proc(x: type, y: f32) do fmt.println("#2", type_info(x), y);
 	foo :: proc(x: type)         do fmt.println("#3", type_info(x));
 
-	foo(y = 3785.1546, x = 123);
-	foo(x = int, y = 897.513);
-	foo(x = f32);
+	f :: foo;
+
+	f(y = 3785.1546, x = 123);
+	f(x = int, y = 897.513);
+	f(x = f32);
 /*
 	general_stuff();
 	foreign_blocks();

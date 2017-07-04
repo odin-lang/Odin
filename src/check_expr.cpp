@@ -33,7 +33,7 @@ typedef CALL_ARGUMENT_CHECKER(CallArgumentCheckerType);
 
 void     check_expr                     (Checker *c, Operand *operand, AstNode *expression);
 void     check_multi_expr               (Checker *c, Operand *operand, AstNode *expression);
-void     check_expr_or_type             (Checker *c, Operand *operand, AstNode *expression);
+void     check_expr_or_type             (Checker *c, Operand *operand, AstNode *expression, Type *type_hint = NULL);
 ExprKind check_expr_base                (Checker *c, Operand *operand, AstNode *expression, Type *type_hint);
 void     check_expr_with_type_hint      (Checker *c, Operand *o, AstNode *e, Type *t);
 Type *   check_type                     (Checker *c, AstNode *expression, Type *named_type = NULL);
@@ -1260,7 +1260,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					success = false;
 				}
 			}
-			if (type_expr->kind == AstNode_HelperType) {
+			if (type_expr->kind == AstNode_TypeType) {
 				is_type_param = true;
 				if (operands != NULL) {
 					detemine_type_from_operand = true;
@@ -1283,7 +1283,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			}
 
 			if (default_value != NULL) {
-				if (type_expr->kind == AstNode_HelperType) {
+				if (type_expr->kind == AstNode_TypeType) {
 					error(default_value, "A type parameter may not have a default value");
 				} else {
 					Operand o = {};
@@ -1817,7 +1817,16 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 
 	bool is_overloaded = false;
 	isize overload_count = 0;
-	HashKey key = hash_string(name);
+
+	bool is_alias = false;
+	while (e->kind == Entity_Alias) {
+		GB_ASSERT(e->Alias.base != NULL);
+		e = e->Alias.base;
+		is_alias = true;
+	}
+
+	HashKey key = hash_string(e->token.string);
+
 
 	if (e->kind == Entity_Procedure) {
 		// NOTE(bill): Overloads are only allowed with the same scope
@@ -2133,6 +2142,10 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			gb_string_free(err_str);
 		} break;
 		}
+	case_end;
+
+	case_ast_node(ht, HelperType, e);
+		return check_type_internal(c, ht->type, type, named_type);
 	case_end;
 
 	case_ast_node(pt, PolyType, e);
@@ -6047,6 +6060,24 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			o->mode = Addressing_Value;
 			o->type = t_context;
 			break;
+
+		case Token_size_of:
+			o->mode       = Addressing_Builtin;
+			o->builtin_id = BuiltinProc_size_of;
+			break;
+		case Token_align_of:
+			o->mode       = Addressing_Builtin;
+			o->builtin_id = BuiltinProc_align_of;
+			break;
+		case Token_offset_of:
+			o->mode       = Addressing_Builtin;
+			o->builtin_id = BuiltinProc_offset_of;
+			break;
+		case Token_type_of:
+			o->mode       = Addressing_Builtin;
+			o->builtin_id = BuiltinProc_type_of;
+			break;
+
 		default:
 			error(node, "Illegal implicit name `%.*s`", LIT(i->string));
 			return kind;
@@ -6916,7 +6947,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		}
 	case_end;
 
-	case AstNode_HelperType:
+	case AstNode_TypeType:
 	case AstNode_ProcType:
 	case AstNode_PointerType:
 	case AstNode_ArrayType:
@@ -7001,8 +7032,8 @@ void check_expr(Checker *c, Operand *o, AstNode *e) {
 }
 
 
-void check_expr_or_type(Checker *c, Operand *o, AstNode *e) {
-	check_expr_base(c, o, e, NULL);
+void check_expr_or_type(Checker *c, Operand *o, AstNode *e, Type *type_hint) {
+	check_expr_base(c, o, e, type_hint);
 	check_not_tuple(c, o);
 	error_operand_no_value(o);
 }
@@ -7148,6 +7179,11 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, fv->value);
 	case_end;
 
+	case_ast_node(ht, HelperType, node);
+		str = gb_string_appendc(str, "#type ");
+		str = write_expr_to_string(str, ht->type);
+	case_end;
+
 	case_ast_node(pt, PointerType, node);
 		str = gb_string_appendc(str, "^");
 		str = write_expr_to_string(str, pt->type);
@@ -7271,7 +7307,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, ")");
 	case_end;
 
-	case_ast_node(ht, HelperType, node);
+	case_ast_node(ht, TypeType, node);
 		str = gb_string_appendc(str, "type");
 	case_end;
 

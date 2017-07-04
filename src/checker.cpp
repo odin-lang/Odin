@@ -61,6 +61,12 @@ enum BuiltinProcId {
 	BuiltinProc_abs,
 	BuiltinProc_clamp,
 
+/* 	BuiltinProc_sqrt,
+	BuiltinProc_sin,
+	BuiltinProc_cos,
+	BuiltinProc_tan,
+	BuiltinProc_pow, */
+
 	BuiltinProc_transmute,
 
 	BuiltinProc_DIRECTIVE, // NOTE(bill): This is used for specialized hash-prefixed procedures
@@ -106,6 +112,14 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("max"),              2, false, Expr_Expr},
 	{STR_LIT("abs"),              1, false, Expr_Expr},
 	{STR_LIT("clamp"),            3, false, Expr_Expr},
+
+/*
+	{STR_LIT("__sqrt"),            1, false, Expr_Expr},
+	{STR_LIT("__sin"),             1, false, Expr_Expr},
+	{STR_LIT("__cos"),             1, false, Expr_Expr},
+	{STR_LIT("__tan"),             1, false, Expr_Expr},
+	{STR_LIT("__pow"),             2, false, Expr_Expr},
+ */
 
 	{STR_LIT("transmute"),        2, false, Expr_Expr},
 

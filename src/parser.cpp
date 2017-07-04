@@ -375,8 +375,12 @@ AST_NODE_KIND(_DeclEnd,   "", i32) \
 		AstNode *list; \
 	}) \
 AST_NODE_KIND(_TypeBegin, "", i32) \
-	AST_NODE_KIND(HelperType, "type", struct { \
+	AST_NODE_KIND(TypeType, "type", struct { \
 		Token token; \
+	}) \
+	AST_NODE_KIND(HelperType, "helper type", struct { \
+		Token token; \
+		AstNode *type; \
 	}) \
 	AST_NODE_KIND(PolyType, "polymorphic type", struct { \
 		Token    token; \
@@ -585,6 +589,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_UnionField:
 		return ast_node_token(node->UnionField.name);
 
+	case AstNode_TypeType:         return node->TypeType.token;
 	case AstNode_HelperType:       return node->HelperType.token;
 	case AstNode_PolyType:         return node->PolyType.token;
 	case AstNode_ProcType:         return node->ProcType.token;
@@ -829,7 +834,10 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		n->UnionField.list = clone_ast_node(a, n->UnionField.list);
 		break;
 
+	case AstNode_TypeType:
+		break;
 	case AstNode_HelperType:
+		n->HelperType.type = clone_ast_node(a, n->HelperType.type);
 		break;
 	case AstNode_ProcType:
 		n->ProcType.params  = clone_ast_node(a, n->ProcType.params);
@@ -1367,11 +1375,19 @@ AstNode *ast_union_field(AstFile *f, AstNode *name, AstNode *list) {
 }
 
 
-AstNode *ast_helper_type(AstFile *f, Token token) {
-	AstNode *result = make_ast_node(f, AstNode_HelperType);
-	result->HelperType.token = token;
+AstNode *ast_type_type(AstFile *f, Token token) {
+	AstNode *result = make_ast_node(f, AstNode_TypeType);
+	result->TypeType.token = token;
 	return result;
 }
+
+AstNode *ast_helper_type(AstFile *f, Token token, AstNode *type) {
+	AstNode *result = make_ast_node(f, AstNode_HelperType);
+	result->HelperType.token = token;
+	result->HelperType.type  = type;
+	return result;
+}
+
 
 AstNode *ast_poly_type(AstFile *f, Token token, AstNode *type) {
 	AstNode *result = make_ast_node(f, AstNode_PolyType);
@@ -2187,6 +2203,14 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		next_token(f);
 		return operand;
 
+	case Token_size_of:
+	case Token_align_of:
+	case Token_offset_of: {
+		operand = ast_implicit(f, f->curr_token); next_token(f);
+		return parse_call_expr(f, operand);
+	}
+
+
 	case Token_String: {
 		Token token = f->curr_token;
 		next_token(f);
@@ -2228,6 +2252,9 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_Hash: {
 		Token token = expect_token(f, Token_Hash);
+		if (allow_token(f, Token_type)) {
+			return ast_helper_type(f, token, parse_type(f));
+		}
 		Token name  = expect_token(f, Token_Ident);
 		if (name.string == "run") {
 			AstNode *expr = parse_expr(f, false);
@@ -3162,7 +3189,7 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token, String *link_name_) {
 			break;
 		}
 		if (f->type != NULL &&
-		    f->type->kind == AstNode_HelperType) {
+		    f->type->kind == AstNode_TypeType) {
 			is_generic = true;
 			break;
 		}
@@ -3186,7 +3213,7 @@ AstNode *parse_var_type(AstFile *f, bool allow_ellipsis, bool allow_type_token) 
 	AstNode *type = NULL;
 	if (allow_type_token &&
 	    f->curr_token.kind == Token_type) {
-		type = ast_helper_type(f, expect_token(f, Token_type));
+		type = ast_type_type(f, expect_token(f, Token_type));
 	} else {
 		type = parse_type_attempt(f);
 	}
@@ -3473,8 +3500,6 @@ AstNode *parse_record_fields(AstFile *f, isize *field_count_, u32 flags, String 
 }
 
 AstNode *parse_type_or_ident(AstFile *f) {
-	AstNode *type = NULL;
-
 	switch (f->curr_token.kind) {
 	case Token_Dollar: {
 		Token token = expect_token(f, Token_Dollar);
@@ -3482,8 +3507,19 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		return ast_poly_type(f, token, type);
 	} break;
 
-	case Token_Ident:
-	{
+	case Token_type_of: {
+		AstNode *i = ast_implicit(f, expect_token(f, Token_type_of));
+		AstNode *type = parse_call_expr(f, i);
+		while (f->curr_token.kind == Token_Period) {
+			Token token = f->curr_token;
+			next_token(f);
+			AstNode *sel = parse_ident(f);
+			type = ast_selector_expr(f, token, type, sel);
+		}
+		return type;
+	} break;
+
+	case Token_Ident: {
 		AstNode *e = parse_ident(f);
 		while (f->curr_token.kind == Token_Period) {
 			Token token = f->curr_token;
@@ -3496,20 +3532,27 @@ AstNode *parse_type_or_ident(AstFile *f) {
 			// HACK NOTE(bill): For type_of_val(expr) et al.
 			// e = parse_call_expr(f, e);
 		// }
-		type = e;
+		return e;
 	} break;
 
 	case Token_Pointer: {
 		Token token = expect_token(f, Token_Pointer);
 		AstNode *elem = parse_type(f);
-		type = ast_pointer_type(f, token, elem);
+		return ast_pointer_type(f, token, elem);
 	} break;
 
 	case Token_atomic: {
 		Token token = expect_token(f, Token_atomic);
 		AstNode *elem = parse_type(f);
-		type = ast_atomic_type(f, token, elem);
+		return ast_atomic_type(f, token, elem);
 	} break;
+
+	case Token_Hash: {
+		Token hash_token = expect_token(f, Token_Hash);
+		Token type_token = expect_token(f, Token_type);
+		AstNode *type = parse_type(f);
+		return ast_helper_type(f, hash_token, type);
+	}
 
 	case Token_OpenBracket: {
 		Token token = expect_token(f, Token_OpenBracket);
@@ -3541,7 +3584,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		if (is_vector) {
 			return ast_vector_type(f, token, count_expr, parse_type(f));
 		}
-		type = ast_array_type(f, token, count_expr, parse_type(f));
+		return ast_array_type(f, token, count_expr, parse_type(f));
 	} break;
 
 	case Token_map: {
@@ -3559,7 +3602,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		Token close = expect_token(f, Token_CloseBracket);
 		value = parse_type(f);
 
-		type = ast_map_type(f, token, count, key, value);
+		return ast_map_type(f, token, count, key, value);
 	} break;
 
 	case Token_struct: {
@@ -3610,7 +3653,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 			decls = fields->FieldList.list;
 		}
 
-		type = ast_struct_type(f, token, decls, decl_count, is_packed, is_ordered, align);
+		return ast_struct_type(f, token, decls, decl_count, is_packed, is_ordered, align);
 	} break;
 
 	case Token_union: {
@@ -3664,7 +3707,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		Token close = expect_token(f, Token_CloseBrace);
 
 
-		type = ast_union_type(f, token, decls, total_decl_name_count, variants);
+		return ast_union_type(f, token, decls, total_decl_name_count, variants);
 	} break;
 
 	case Token_raw_union: {
@@ -3680,7 +3723,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 			decls = fields->FieldList.list;
 		}
 
-		type = ast_raw_union_type(f, token, decls, decl_count);
+		return ast_raw_union_type(f, token, decls, decl_count);
 	} break;
 
 	case Token_enum: {
@@ -3694,7 +3737,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		Array<AstNode *> values = parse_element_list(f);
 		Token close = expect_token(f, Token_CloseBrace);
 
-		type = ast_enum_type(f, token, base_type, values);
+		return ast_enum_type(f, token, base_type, values);
 	} break;
 
 	case Token_bit_field: {
@@ -3739,7 +3782,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 
 		close = expect_token(f, Token_CloseBrace);
 
-		type = ast_bit_field_type(f, token, fields, align);
+		return ast_bit_field_type(f, token, fields, align);
 	} break;
 
 	case Token_proc: {
@@ -3748,18 +3791,18 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		if (pt->ProcType.tags != 0) {
 			syntax_error(token, "A procedure type cannot have tags");
 		}
-		type = pt;
+		return pt;
 	} break;
 
 	case Token_OpenParen: {
 		Token    open  = expect_token(f, Token_OpenParen);
 		AstNode *type  = parse_type(f);
 		Token    close = expect_token(f, Token_CloseParen);
-		type = ast_paren_expr(f, type, open, close);
+		return ast_paren_expr(f, type, open, close);
 	} break;
 	}
 
-	return type;
+	return NULL;
 }
 
 

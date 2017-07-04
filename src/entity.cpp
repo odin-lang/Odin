@@ -12,6 +12,7 @@ struct DeclInfo;
 	ENTITY_KIND(TypeName) \
 	ENTITY_KIND(Procedure) \
 	ENTITY_KIND(Builtin) \
+	ENTITY_KIND(Alias) \
 	ENTITY_KIND(ImportName) \
 	ENTITY_KIND(LibraryName) \
 	ENTITY_KIND(Nil) \
@@ -108,6 +109,9 @@ struct Entity {
 		struct {
 			i32 id;
 		} Builtin;
+		struct {
+			Entity *base;
+		} Alias;
 		struct {
 			String path;
 			String name;
@@ -229,6 +233,12 @@ Entity *make_entity_procedure(gbAllocator a, Scope *scope, Token token, Type *si
 Entity *make_entity_builtin(gbAllocator a, Scope *scope, Token token, Type *type, i32 id) {
 	Entity *entity = alloc_entity(a, Entity_Builtin, scope, token, type);
 	entity->Builtin.id = id;
+	return entity;
+}
+
+Entity *make_entity_alias(gbAllocator a, Scope *scope, Token token, Type *type, Entity *base) {
+	Entity *entity = alloc_entity(a, Entity_Alias, scope, token, type);
+	entity->Alias.base = base;
 	return entity;
 }
 
