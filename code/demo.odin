@@ -251,10 +251,6 @@ explicit_parametric_polymorphic_procedures :: proc() {
 	a, b = b, a; // Or use this syntax for this silly example case
 
 
-
-
-
-
 	// A more complicated example using subtyping
 	// Something like this could be used in a game
 	Vector2 :: struct {x, y: f32};
@@ -412,6 +408,7 @@ when true {
 	// Command line argument(s)!
 	// -opt=0,1,2,3
 
+/*
 	program := "+ + * - /";
 	accumulator := 0;
 

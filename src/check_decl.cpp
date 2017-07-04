@@ -215,6 +215,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 			return;
 		} break;
 
+	// NOTE(bill): Check to see if the expression it to be aliases
 		case Addressing_Builtin:
 			if (e->type != NULL) {
 				error(type_expr, "A constant alias of a built-in procedure may not have a type initializer");
@@ -233,6 +234,11 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 
 		if (entity != NULL) {
 			switch (entity->kind) {
+			case Entity_Alias:
+				e->kind = Entity_Alias;
+				e->type = entity->type;
+				e->Alias.base = entity->Alias.base;
+				return;
 			case Entity_Procedure:
 				e->kind = Entity_Alias;
 				e->type = entity->type;
@@ -393,10 +399,10 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 	#endif
 
-	bool prev_allow_polymorphic_types = c->context.allow_polymorphic_types;
+	auto prev_context = c->context;
 	c->context.allow_polymorphic_types = true;
 	check_procedure_type(c, proc_type, pl->type);
-	c->context.allow_polymorphic_types = prev_allow_polymorphic_types;
+	c->context = prev_context;
 
 	bool is_foreign         = (pl->tags & ProcTag_foreign)   != 0;
 	bool is_link_name       = (pl->tags & ProcTag_link_name) != 0;
