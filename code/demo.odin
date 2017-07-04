@@ -424,6 +424,7 @@ when true {
 
 	fmt.printf("The program \"%s\" calculates the value %d\n",
 	           program, accumulator);
+*/
 }
 }
 
