@@ -4374,19 +4374,23 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 
 	TypeAndValue tv = type_and_value_of_expr(proc->module->info, expr);
 	GB_ASSERT(tv.mode != Addressing_Invalid);
+	GB_ASSERT(tv.mode != Addressing_Type);
 
+	#if 0
 	if (tv.mode == Addressing_Type) {
 		// // TODO(bill): Handle this correctly
-		// i32 entry_index = type_info_index(proc->module->info, tv.type, false);
-		// if (entry_index >= 0) {
-		// 	irValue *ptr = ir_get_type_info_ptr(proc, tv.type);
-		// 	return ir_emit_ptr_to_int(proc, ptr, t_type, true);
-		// 	// i32 id = entry_index+1;
-		// 	// return ir_value_constant(proc->module->allocator, t_int, exact_value_i64(id));
-		// }
+		#if 0
+		i32 entry_index = type_info_index(proc->module->info, tv.type, false);
+		if (entry_index >= 0) {
+			return ir_get_type_info_ptr(proc, tv.type);
+			// i32 id = entry_index+1;
+			// return ir_value_constant(proc->module->allocator, t_int, exact_value_i64(id));
+		}
+		#endif
 		// return v_raw_nil;
 		return ir_value_nil(proc->module->allocator, tv.type);
 	}
+	#endif
 
 	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): Edge case
@@ -4672,9 +4676,12 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 				String name = fv->field->Ident.token.string;
 				isize index = lookup_procedure_parameter(type, name);
 				GB_ASSERT(index >= 0);
-				irValue *expr = ir_build_expr(proc, fv->value);
-				args[index] = expr;
-
+				TypeAndValue tav = type_and_value_of_expr(proc->module->info, fv->value);
+				if (tav.mode == Addressing_Type) {
+					args[index] = ir_value_nil(proc->module->allocator, tav.type);
+				} else {
+					args[index] = ir_build_expr(proc, fv->value);
+				}
 			}
 			TypeTuple *pt = &type->params->Tuple;
 			for (isize i = 0; i < param_count; i++) {
@@ -4718,16 +4725,22 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		bool is_c_vararg = type->c_vararg;
 
 		for_array(i, ce->args) {
-			irValue *a = ir_build_expr(proc, ce->args[i]);
-			Type *at = ir_type(a);
-			if (at->kind == Type_Tuple) {
-				for (isize i = 0; i < at->Tuple.variable_count; i++) {
-					Entity *e = at->Tuple.variables[i];
-					irValue *v = ir_emit_struct_ev(proc, a, i);
-					args[arg_index++] = v;
-				}
+			AstNode *arg = ce->args[i];
+			TypeAndValue arg_tv = type_and_value_of_expr(proc->module->info, arg);
+			if (arg_tv.mode == Addressing_Type) {
+				args[arg_index++] = ir_value_nil(proc->module->allocator, arg_tv.type);
 			} else {
-				args[arg_index++] = a;
+				irValue *a = ir_build_expr(proc, arg);
+				Type *at = ir_type(a);
+				if (at->kind == Type_Tuple) {
+					for (isize i = 0; i < at->Tuple.variable_count; i++) {
+						Entity *e = at->Tuple.variables[i];
+						irValue *v = ir_emit_struct_ev(proc, a, i);
+						args[arg_index++] = v;
+					}
+				} else {
+					args[arg_index++] = a;
+				}
 			}
 		}
 

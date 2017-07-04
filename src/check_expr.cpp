@@ -331,6 +331,17 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 	if (operand->mode == Addressing_Invalid) {
 		return;
 	}
+	#if 0
+	if (operand->mode == Addressing_Type) {
+		Type *t = base_type(type);
+		if (t->kind == Type_Pointer &&
+		    t->Pointer.elem == t_type_info) {
+			add_type_info_type(c, type);
+			return;
+		}
+	}
+	#endif
+
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
 		if (type == NULL || is_type_any(type)) {
