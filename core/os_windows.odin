@@ -103,8 +103,8 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errn
 	handle := Handle(win32.create_file_a(&buf[0], access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL, nil));
 	if handle != INVALID_HANDLE do return handle, ERROR_NONE;
 
-	err := win32.get_last_error();
-	return INVALID_HANDLE, Errno(err);
+	err := Errno(win32.get_last_error());
+	return INVALID_HANDLE, err;
 }
 
 close :: proc(fd: Handle) {
@@ -126,8 +126,8 @@ write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 
 		e := win32.write_file(win32.Handle(fd), &data[total_write], to_write, &single_write_length, nil);
 		if single_write_length <= 0 || e == win32.FALSE {
-			err := win32.get_last_error();
-			return int(total_write), Errno(e);
+			err := Errno(win32.get_last_error());
+			return int(total_write), err;
 		}
 		total_write += i64(single_write_length);
 	}
@@ -148,8 +148,8 @@ read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 
 		e := win32.read_file(win32.Handle(fd), &data[total_read], to_read, &single_read_length, nil);
 		if single_read_length <= 0 || e == win32.FALSE {
-			err := win32.get_last_error();
-			return int(total_read), Errno(e);
+			err := Errno(win32.get_last_error());
+			return int(total_read), err;
 		}
 		total_read += i64(single_read_length);
 	}
@@ -170,8 +170,8 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 
 	dw_ptr := win32.set_file_pointer(win32.Handle(fd), lo, &hi, w);
 	if dw_ptr == win32.INVALID_SET_FILE_POINTER {
-		err := win32.get_last_error();
-		return 0, Errno(err);
+		err := Errno(win32.get_last_error());
+		return 0, err;
 	}
 	return i64(hi)<<32 + i64(dw_ptr), ERROR_NONE;
 }

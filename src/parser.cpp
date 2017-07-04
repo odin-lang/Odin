@@ -664,7 +664,7 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		n->RunExpr.expr = clone_ast_node(a, n->RunExpr.expr);
 		break;
 	case AstNode_UnaryExpr:
-		n->RunExpr.expr = clone_ast_node(a, n->RunExpr.expr);
+		n->UnaryExpr.expr = clone_ast_node(a, n->UnaryExpr.expr);
 		break;
 	case AstNode_BinaryExpr:
 		n->BinaryExpr.left  = clone_ast_node(a, n->BinaryExpr.left);

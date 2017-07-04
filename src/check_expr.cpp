@@ -193,6 +193,11 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 				if (check_representable_as_constant(c, operand->value, dst, NULL)) {
 					if (is_type_typed(dst) && src->kind == Type_Basic) {
 						switch (src->Basic.kind) {
+						case Basic_UntypedRune:
+							if (is_type_integer(dst) || is_type_rune(dst)) {
+								return 1;
+							}
+							break;
 						case Basic_UntypedInteger:
 							if (is_type_integer(dst) || is_type_rune(dst)) {
 								return 1;
@@ -211,6 +216,15 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 						}
 					}
 					return 2;
+				}
+				return -1;
+			}
+			if (src->kind == Type_Basic && src->Basic.kind == Basic_UntypedRune) {
+				if (is_type_integer(dst) || is_type_rune(dst)) {
+					if (is_type_typed(type)) {
+						return 2;
+					}
+					return 1;
 				}
 				return -1;
 			}
@@ -1098,8 +1112,7 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 	}
 	case Type_Pointer:
 		if (source->kind == Type_Pointer) {
-			if (compound) return are_types_identical(poly, source);
-			return check_is_assignable_to(c, &o, poly);
+			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Atomic.elem, true, modify_type);
 		}
 		return false;
 	case Type_Atomic:
@@ -3983,10 +3996,10 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 
 
 	bool vari_expand = (ce->ellipsis.pos.line != 0);
-	if (vari_expand && id != BuiltinProc_append) {
+	// if (vari_expand && id != BuiltinProc_append) {
 		// error(ce->ellipsis, "Invalid use of `..` with built-in procedure `append`");
-		return false;
-	}
+		// return false;
+	// }
 
 
 	switch (id) {
@@ -4268,6 +4281,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_NoValue;
 	} break;
 
+	#if 0
 	case BuiltinProc_append: {
 		// proc append([dynamic]Type, item: ..Type)
 		// proc append([]Type, item: ..Type)
@@ -4315,6 +4329,7 @@ bool check_builtin_procedure(Checker *c, Operand *operand, AstNode *call, i32 id
 		operand->mode = Addressing_Value;
 		operand->type = t_int;
 	} break;
+	#endif
 
 	case BuiltinProc_delete: {
 		// proc delete(map[Key]Value, key: Key)
@@ -5155,6 +5170,7 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, AstNode *call, Entity
 	Scope *scope = make_scope(base_entity->scope, a);
 	scope->is_proc = true;
 	c->context.scope = scope;
+	c->context.allow_polymorphic_types = true;
 
 	bool generate_type_again = c->context.no_polymorphic_errors;
 
@@ -5219,6 +5235,7 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, AstNode *call, Entity
 	// NOTE(bill): Associate the scope declared above with this procedure declaration's type
 	add_scope(c, pl->type, final_proc_type->Proc.scope);
 	final_proc_type->Proc.is_poly_specialized = true;
+	final_proc_type->Proc.is_polymorphic = true;
 
 	u64 tags = base_entity->Procedure.tags;
 	AstNode *ident = clone_ast_node(a, base_entity->identifier);
@@ -5236,16 +5253,23 @@ Entity *find_or_generate_polymorphic_procedure(Checker *c, AstNode *call, Entity
 	// NOTE(bill): Set the scope afterwards as this is not real overloading
 	entity->scope = scope->parent;
 
-	ProcedureInfo proc_info = {};
-	if (success) {
-		proc_info.file  = c->curr_ast_file;
-		proc_info.token = token;
-		proc_info.decl  = d;
-		proc_info.type  = final_proc_type;
-		proc_info.body  = pl->body;
-		proc_info.tags  = tags;
-		proc_info.generated_from_polymorphic = true;
+	AstFile *file = NULL;
+	{
+		Scope *s = entity->scope;
+		while (s != NULL && s->file == NULL) {
+			s = s->parent;
+		}
+		file = s->file;
 	}
+
+	ProcedureInfo proc_info = {};
+	proc_info.file  = file;
+	proc_info.token = token;
+	proc_info.decl  = d;
+	proc_info.type  = final_proc_type;
+	proc_info.body  = pl->body;
+	proc_info.tags  = tags;
+	proc_info.generated_from_polymorphic = true;
 
 	if (found_gen_procs) {
 		array_add(found_gen_procs, entity);
@@ -5434,6 +5458,10 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					}
 					score += s;
 				}
+			}
+
+			if (gen_entity != NULL && gen_entity->token.string == "append" && err != CallArgumentError_None) {
+				gb_printf_err("append %s with score %lld %d\n", type_to_string(final_proc_type), score, err);
 			}
 
 			if (gen_entity != NULL && err == CallArgumentError_None) {
@@ -5690,11 +5718,13 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 			Entity *p = procs[i];
 			Type *pt = base_type(p->type);
 			if (pt != NULL && is_type_proc(pt)) {
+				CallArgumentError err = CallArgumentError_None;
 				CallArgumentData data = {};
-				bool prev = c->context.no_polymorphic_errors;
-				defer (c->context.no_polymorphic_errors = prev);
+				CheckerContext prev_context = c->context;
 				c->context.no_polymorphic_errors = true;
-				CallArgumentError err = call_checker(c, call, pt, p, operands, CallArgumentMode_NoErrors, &data);
+				c->context.allow_polymorphic_types = is_type_polymorphic(pt);
+				err = call_checker(c, call, pt, p, operands, CallArgumentMode_NoErrors, &data);
+				c->context = prev_context;
 
 				if (err == CallArgumentError_None) {
 					valids[valid_count].index = i;
@@ -5747,24 +5777,39 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 			}
 			result_type = t_invalid;
 		} else {
-			AstNode *expr = operand->expr;
-			while (expr->kind == AstNode_SelectorExpr) {
-				expr = expr->SelectorExpr.selector;
+			AstNode *ident = operand->expr;
+			while (ident->kind == AstNode_SelectorExpr) {
+				AstNode *s = ident->SelectorExpr.selector;
+				ident = s;
 			}
-			GB_ASSERT(expr->kind == AstNode_Ident);
+
 			Entity *e = procs[valids[0].index];
-			add_entity_use(c, expr, e);
+
 			proc_type = e->type;
 			CallArgumentData data = {};
 			CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
-			if (data.gen_entity != NULL) add_entity_use(c, ce->proc, data.gen_entity);
+			if (data.gen_entity != NULL) {
+				add_entity_use(c, ident, data.gen_entity);
+			} else {
+				add_entity_use(c, ident, e);
+			}
 			return data;
 		}
 	} else {
-		Entity *e = entity_of_ident(&c->info, operand->expr);
+		AstNode *ident = operand->expr;
+		while (ident->kind == AstNode_SelectorExpr) {
+			AstNode *s = ident->SelectorExpr.selector;
+			ident = s;
+		}
+
+		Entity *e = entity_of_ident(&c->info, ident);
 		CallArgumentData data = {};
 		CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
-		if (data.gen_entity != NULL) add_entity_use(c, ce->proc, data.gen_entity);
+		if (data.gen_entity != NULL) {
+			add_entity_use(c, ident, data.gen_entity);
+		} else {
+			add_entity_use(c, ident, e);
+		}
 		return data;
 	}
 
@@ -5908,9 +5953,6 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 
 	CallArgumentData data = check_call_arguments(c, operand, proc_type, call);
 	Type *result_type = data.result_type;
-	if (data.gen_entity != NULL) {
-		add_entity_use(c, ce->proc, data.gen_entity);
-	}
 	gb_zero_item(operand);
 	operand->expr = call;
 
@@ -7130,6 +7172,15 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, be->right);
 	case_end;
 
+	case_ast_node(te, TernaryExpr, node);
+		str = write_expr_to_string(str, te->cond);
+		str = gb_string_appendc(str, " ? ");
+		str = write_expr_to_string(str, te->x);
+		str = gb_string_appendc(str, " : ");
+		str = write_expr_to_string(str, te->y);
+	case_end;
+
+
 	case_ast_node(pe, ParenExpr, node);
 		str = gb_string_appendc(str, "(");
 		str = write_expr_to_string(str, pe->expr);
@@ -7171,6 +7222,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(e, Ellipsis, node);
 		str = gb_string_appendc(str, "..");
+		str = write_expr_to_string(str, e->expr);
 	case_end;
 
 	case_ast_node(fv, FieldValue, node);
@@ -7182,6 +7234,12 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_ast_node(ht, HelperType, node);
 		str = gb_string_appendc(str, "#type ");
 		str = write_expr_to_string(str, ht->type);
+	case_end;
+
+
+	case_ast_node(pt, PolyType, node);
+		str = gb_string_appendc(str, "$");
+		str = write_expr_to_string(str, pt->type);
 	case_end;
 
 	case_ast_node(pt, PointerType, node);
@@ -7203,7 +7261,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_end;
 
 	case_ast_node(at, DynamicArrayType, node);
-		str = gb_string_appendc(str, "[..]");
+		str = gb_string_appendc(str, "[dynamic]");
 		str = write_expr_to_string(str, at->elem);
 	case_end;
 
@@ -7235,9 +7293,6 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		if (f->names.count > 0) {
 			str = gb_string_appendc(str, ": ");
 		}
-		if (f->flags&FieldFlag_ellipsis) {
-			str = gb_string_appendc(str, "..");
-		}
 		str = write_expr_to_string(str, f->type);
 	case_end;
 
@@ -7260,7 +7315,6 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 				break;
 			}
 		}
-
 
 		for_array(i, f->list) {
 			if (i > 0) {

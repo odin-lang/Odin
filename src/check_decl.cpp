@@ -207,6 +207,9 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 			e->kind = Entity_TypeName;
 
 			DeclInfo *d = c->context.decl;
+			if (d->type_expr != NULL) {
+				error(e->token, "A type declaration cannot have an type parameter");
+			}
 			d->type_expr = d->init_expr;
 			check_type_decl(c, e, d->type_expr, named_type);
 			return;
@@ -433,7 +436,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		}
 
 		if (is_foreign) {
-			error(e->token, "A foreign procedures cannot be a polymorphic");
+			error(e->token, "A foreign procedure cannot be a polymorphic");
 			return;
 		}
 	}
@@ -443,13 +446,15 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 			error(pl->body, "A foreign procedure cannot have a body");
 		}
 		if (proc_type->Proc.c_vararg) {
-			error(pl->body, "A procedure with a `#c_vararg` field cannot have a body");
+			error(pl->body, "A procedure with a `#c_vararg` field cannot have a body and must be foreign");
 		}
 
 		d->scope = c->context.scope;
 
 		GB_ASSERT(pl->body->kind == AstNode_BlockStmt);
-		check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pl->body, pl->tags);
+		if (!pt->is_polymorphic) {
+			check_procedure_later(c, c->curr_ast_file, e->token, d, proc_type, pl->body, pl->tags);
+		}
 	} else if (!is_foreign) {
 		error(e->token, "Only a foreign procedure cannot have a body");
 	}

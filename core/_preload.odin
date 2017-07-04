@@ -255,50 +255,51 @@ resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_AL
 	return a.procedure(a.data, AllocatorMode.Resize, new_size, alignment, ptr, old_size, 0);
 }
 
-// append :: proc(s: ^[]$T, args: ..T) -> int {
-// 	if s == nil {
-// 		return 0;
-// 	}
-// 	slice := ^raw.Slice(s);
-// 	arg_len := len(args);
-// 	if arg_len <= 0 {
-// 		return slice.len;
-// 	}
 
-// 	arg_len = min(slice.cap-slice.len, arg_len);
-// 	if arg_len > 0 {
-// 		data := ^T(slice.data);
-// 		assert(data != nil);
-// 		sz :: size_of(T);
-// 		__mem_copy(data + slice.len, &args[0], sz*arg_len);
-// 		slice.len += arg_len;
-// 	}
-// 	return slice.len;
-// }
+append :: proc(array: ^[]$T, args: ..T) -> int {
+	if array == nil {
+		return 0;
+	}
+	slice := ^raw.Slice(array);
+	arg_len := len(args);
+	if arg_len <= 0 {
+		return slice.len;
+	}
 
-// append :: proc(a: ^[dynamic]$T, args: ..T) -> int {
-// 	array := ^raw.DynamicArray(a);
+	arg_len = min(slice.cap-slice.len, arg_len);
+	if arg_len > 0 {
+		data := ^T(slice.data);
+		assert(data != nil);
+		sz :: size_of(T);
+		__mem_copy(data + slice.len, &args[0], sz*arg_len);
+		slice.len += arg_len;
+	}
+	return slice.len;
+}
 
-// 	arg_len := len(args);
-// 	if arg_len <= 0 || items == nil {
-// 		return array.len;
-// 	}
+append :: proc(array_: ^[dynamic]$T, args: ..T) -> int {
+	array := ^raw.DynamicArray(array_);
+
+	arg_len := len(args);
+	if arg_len <= 0 {
+		return array.len;
+	}
 
 
-// 	ok := true;
-// 	if array.cap <= array.len+arg_len {
-// 		cap := 2 * array.cap + max(8, arg_len);
-// 		ok = __dynamic_array_reserve(array, size_of(T), align_of(T), cap);
-// 	}
-// 	// TODO(bill): Better error handling for failed reservation
-// 	if !ok do return array.len;
+	ok := true;
+	if array.cap <= array.len+arg_len {
+		cap := 2 * array.cap + max(8, arg_len);
+		ok = __dynamic_array_reserve(array, size_of(T), align_of(T), cap);
+	}
+	// TODO(bill): Better error handling for failed reservation
+	if !ok do return array.len;
 
-// 	data := ^T(array.data);
-// 	assert(data != nil);
-// 	__mem_copy(data + array.len, items, size_of(T) * arg_len);
-// 	array.len += arg_len;
-// 	return array.len;
-// }
+	data := ^T(array.data);
+	assert(data != nil);
+	__mem_copy(data + array.len, &args[0], size_of(T) * arg_len);
+	array.len += arg_len;
+	return array.len;
+}
 
 copy :: proc(dst, src: []$T) -> int #cc_contextless {
 	n := max(0, min(len(dst), len(src)));
@@ -309,12 +310,10 @@ copy :: proc(dst, src: []$T) -> int #cc_contextless {
 
 new  :: proc(T: type) -> ^T #inline do return ^T(alloc(size_of(T), align_of(T)));
 
-/*
 free :: proc(array: [dynamic]$T) do free_ptr(^raw.DynamicArray(&array).data);
 free :: proc(slice: []$T)        do free_ptr(^raw.Slice(&slice).data);
 free :: proc(str:   string)      do free_ptr(^raw.String(&str).data);
 free :: proc(ptr:   rawptr)      do free_ptr(ptr);
-*/
 
 
 
@@ -813,7 +812,6 @@ __dynamic_map_add_entry :: proc(using h: __MapHeader, key: __MapKey) -> int {
 	}
 	return prev;
 }
-
 
 __dynamic_map_delete :: proc(using h: __MapHeader, key: __MapKey) {
 	fr := __dynamic_map_find(h, key);

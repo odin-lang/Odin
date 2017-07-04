@@ -19,6 +19,7 @@ import (
 */
 )
 
+
 general_stuff :: proc() {
 	// Complex numbers
 	a := 3 + 4i;
@@ -316,7 +317,7 @@ explicit_parametric_polymorphic_procedures :: proc() {
 		}
 
 		new_batch := new(EntityBatch);
-		append(manager.batches, new_batch);
+		append(&manager.batches, new_batch);
 		new_batch.batch_index = u32(len(manager.batches)-1);
 
 		return use_empty_slot(manager, new_batch);
@@ -324,14 +325,14 @@ explicit_parametric_polymorphic_procedures :: proc() {
 
 
 
-	new_entity :: proc(manager: ^EntityManager, T: type, x, y: int) -> ^T {
+	new_entity :: proc(manager: ^EntityManager, T: type, x, y: f32) -> ^T {
 		result := new(T);
 		result.entity = gen_new_entity(manager);
 		result.derived.data = result;
 		result.derived.type_info = type_info(T);
 
-		result.position.x = f32(x);
-		result.position.y = f32(y);
+		result.position.x = x;
+		result.position.y = y;
 
 		return result;
 	}
@@ -352,7 +353,7 @@ explicit_parametric_polymorphic_procedures :: proc() {
 		T = Monster,
 	);
 
-	append(entities, rock, door, monster);
+	append(&entities, rock, door, monster);
 
 	// An alternative to `union`s
 	for entity in entities {
@@ -365,7 +366,32 @@ explicit_parametric_polymorphic_procedures :: proc() {
 }
 
 
+pop :: proc(array: ^[]$T) -> T {
+	last: T;
+	if len(array) == 0 {
+		panic("Attempt to pop an empty slice");
+		return last;
+	}
+
+	last = array[len(array)-1];
+	^raw.Slice(array).len -= 1;
+	return last;
+}
+pop :: proc(a: ^[dynamic]$T) -> T {
+	last: T;
+	if len(a) == 0 {
+		panic("Attempt to pop an empty dynamic array");
+		return last;
+	}
+
+	last = array[len(array)-1];
+	^raw.DynamicArray(array).len -= 1;
+	return last;
+}
+
+
 main :: proc() {
+when true {
 	foo :: proc(x: i64,  y: f32) do fmt.println("#1", x, y);
 	foo :: proc(x: type, y: f32) do fmt.println("#2", type_info(x), y);
 	foo :: proc(x: type)         do fmt.println("#3", type_info(x));
@@ -375,7 +401,6 @@ main :: proc() {
 	f(y = 3785.1546, x = 123);
 	f(x = int, y = 897.513);
 	f(x = f32);
-/*
 	general_stuff();
 	foreign_blocks();
 	default_arguments();
@@ -402,7 +427,7 @@ main :: proc() {
 
 	fmt.printf("The program \"%s\" calculates the value %d\n",
 	           program, accumulator);
-*/
+}
 }
 
 

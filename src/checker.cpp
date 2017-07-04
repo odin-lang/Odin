@@ -33,7 +33,7 @@ enum BuiltinProcId {
 
 	BuiltinProc_reserve,
 	BuiltinProc_clear,
-	BuiltinProc_append,
+	// BuiltinProc_append,
 	BuiltinProc_delete,
 
 	BuiltinProc_size_of,
@@ -85,7 +85,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("reserve"),          2, false, Expr_Stmt},
 	{STR_LIT("clear"),            1, false, Expr_Stmt},
-	{STR_LIT("append"),           1, true,  Expr_Expr},
+	// {STR_LIT("append"),           1, true,  Expr_Expr},
 	{STR_LIT("delete"),           2, false, Expr_Stmt},
 
 	{STR_LIT("size_of"),          1, false, Expr_Expr},
@@ -591,11 +591,9 @@ Entity *scope_insert_entity(Scope *s, Entity *entity) {
 		}
 	}
 
-	if (prev != NULL &&
-	    entity->kind == Entity_Procedure) {
-		if (s->is_global) {
-			return prev;
-		}
+	if (prev != NULL && entity->kind == Entity_Procedure) {
+		// if (s->is_global) return prev;
+
 		multi_map_insert(&s->elements, key, entity);
 	} else {
 		map_set(&s->elements, key, entity);
@@ -1709,6 +1707,9 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 
 					if (is_ast_node_type(init)) {
 						e = make_entity_type_name(c->allocator, d->scope, name->Ident.token, NULL);
+						if (vd->type != NULL) {
+							error(name, "A type declaration cannot have an type parameter");
+						}
 						d->type_expr = init;
 						d->init_expr = init;
 					} else if (init->kind == AstNode_ProcLit) {
@@ -2285,10 +2286,9 @@ void check_parsed_files(Checker *c) {
 		defer (c->context = prev_context);
 
 		TypeProc *pt = &pi->type->Proc;
+		String name = pi->token.string;
 		if (pt->is_polymorphic) {
-			if (pi->decl->gen_proc_type == NULL) {
-				continue;
-			}
+			GB_ASSERT_MSG(pt->is_poly_specialized, "%.*s", LIT(name));
 		}
 
 		add_curr_ast_file(c, pi->file);

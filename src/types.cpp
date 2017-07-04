@@ -2445,7 +2445,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 						if (var->flags&EntityFlag_Ellipsis) {
 							Type *slice = base_type(var->type);
 							str = gb_string_appendc(str, "..");
-							GB_ASSERT(is_type_slice(var->type));
+							GB_ASSERT(var->type->kind == Type_Slice);
 							str = write_type_to_string(str, slice->Slice.elem);
 						} else {
 							str = write_type_to_string(str, var->type);

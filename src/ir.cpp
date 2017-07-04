@@ -4059,6 +4059,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		return NULL;
 	} break;
 
+	#if 0
 	case BuiltinProc_append: {
 		ir_emit_comment(proc, str_lit("append"));
 		gbAllocator a = proc->module->allocator;
@@ -4167,6 +4168,7 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 		}
 		return ir_emit_global_call(proc, "__dynamic_array_append", daa_args, 5);
 	} break;
+	#endif
 
 	case BuiltinProc_delete: {
 		ir_emit_comment(proc, str_lit("delete"));
@@ -7422,9 +7424,6 @@ void ir_gen_tree(irGen *s) {
 			}
 		} else if (check_is_entity_overloaded(e)) {
 			name = ir_mangle_name(s, e->token.pos.file, e);
-
-			gb_printf_err("%.*s|%.*s :: %s\n", LIT(original_name), LIT(name), type_to_string(e->type));
-
 		}
 
 		map_set(&m->entity_names, hash_entity(e), name);

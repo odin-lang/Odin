@@ -70,17 +70,17 @@ write_string :: proc(buf: ^StringBuffer, s: string) {
 write_bytes :: proc(buf: ^StringBuffer, data: []u8) {
 	match b in buf {
 	case StringBuffer.Static:
-		append(b.buf, ..data);
+		append(&b.buf, ..data);
 	case StringBuffer.Dynamic:
-		append(b.buf, ..data);
+		append(&b.buf, ..data);
 	}
 }
 write_byte :: proc(buf: ^StringBuffer, data: u8) {
 	match b in buf {
 	case StringBuffer.Static:
-		append(b.buf, data);
+		append(&b.buf, data);
 	case StringBuffer.Dynamic:
-		append(b.buf, data);
+		append(&b.buf, data);
 	}
 }
 write_rune :: proc(buf: ^StringBuffer, r: rune) {
@@ -484,7 +484,7 @@ fmt_bool :: proc(using fi: ^FmtInfo, b: bool, verb: rune) {
 fmt_write_padding :: proc(fi: ^FmtInfo, width: int) {
 	if width <= 0 do return;
 
-	pad_byte: u8 = fi.space ? ' ' : '0';
+	pad_byte := u8(fi.space ? ' ' : '0');
 
 	data := string_buffer_data(fi.buf^);
 	count := min(width, cap(data)-len(data));
