@@ -25,7 +25,7 @@ compare :: proc(a, b: []u8) -> int #cc_contextless {
 	return __mem_compare(&a[0], &b[0], min(len(a), len(b)));
 }
 
-/*
+
 slice_ptr :: proc(ptr: ^$T, len: int) -> []T #cc_contextless {
 	assert(len >= 0);
 	slice := raw.Slice{data = ptr, len = len, cap = len};
@@ -43,7 +43,6 @@ slice_to_bytes :: proc(slice: []$T) -> []u8 #cc_contextless {
 	s.cap *= size_of(T);
 	return ^[]u8(s)^;
 }
-*/
 
 
 kilobytes :: proc(x: int) -> int #inline #cc_contextless { return          (x) * 1024; }
@@ -121,7 +120,7 @@ init_arena_from_context :: proc(using a: ^Arena, size: int) {
 	temp_count = 0;
 }
 
-free_arena :: proc(using a: ^Arena) {
+destroy_arena :: proc(using a: ^Arena) {
 	if backing.procedure != nil {
 		push_allocator backing {
 			free(memory);
@@ -214,6 +213,8 @@ align_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 		return align_of_type_info(info.base);
 	case Integer:
 		return info.size;
+	case Rune:
+		return info.size;
 	case Float:
 		return info.size;
 	case String:
@@ -266,6 +267,8 @@ size_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 	case Named:
 		return size_of_type_info(info.base);
 	case Integer:
+		return info.size;
+	case Rune:
 		return info.size;
 	case Float:
 		return info.size;

@@ -23,6 +23,9 @@ gbAllocator heap_allocator(void) {
 #include "integer128.cpp"
 #include "murmurhash3.cpp"
 
+#define for_array(index_, array_) for (isize index_ = 0; index_ < (array_).count; index_++)
+
+
 u128 fnv128a(void const *data, isize len) {
 	u128 o = u128_lo_hi(0x13bull, 0x1000000ull);
 	u128 h = u128_lo_hi(0x62b821756295c58dull, 0x6c62272e07bb0142ull);
@@ -52,87 +55,145 @@ gbAllocator scratch_allocator(void) {
 	return gb_scratch_allocator(&scratch_memory);
 }
 
+struct Pool {
+	isize       memblock_size;
+	isize       out_of_band_size;
+	isize       alignment;
 
-struct DynamicArenaBlock {
-	DynamicArenaBlock *prev;
-	DynamicArenaBlock *next;
-	u8 *               start;
-	isize              count;
-	isize              capacity;
+	Array<u8 *> unused_memblock;
+	Array<u8 *> used_memblock;
+	Array<u8 *> out_of_band_allocations;
 
-	gbVirtualMemory    vm;
+	u8 *        current_memblock;
+	u8 *        current_pos;
+	isize       bytes_left;
+
+	gbAllocator block_allocator;
 };
 
-struct DynamicArena {
-	DynamicArenaBlock *start_block;
-	DynamicArenaBlock *current_block;
-	isize              block_size;
+enum {
+	POOL_BUCKET_SIZE_DEFAULT      = 65536,
+	POOL_OUT_OF_BAND_SIZE_DEFAULT = 6554,
 };
 
-DynamicArenaBlock *add_dynamic_arena_block(DynamicArena *a) {
-	GB_ASSERT(a != NULL);
-	GB_ASSERT(a->block_size > 0);
+void pool_init(Pool *pool,
+               isize memblock_size = POOL_BUCKET_SIZE_DEFAULT,
+               isize out_of_band_size = POOL_OUT_OF_BAND_SIZE_DEFAULT,
+               isize alignment = 8,
+               gbAllocator block_allocator = heap_allocator(),
+               gbAllocator array_allocator = heap_allocator()) {
+	pool->memblock_size = memblock_size;
+	pool->out_of_band_size = out_of_band_size;
+	pool->alignment = alignment;
+	pool->block_allocator = block_allocator;
 
-	gbVirtualMemory vm = gb_vm_alloc(NULL, a->block_size);
-	DynamicArenaBlock *block = cast(DynamicArenaBlock *)vm.data;
+	array_init(&pool->unused_memblock,         array_allocator);
+	array_init(&pool->used_memblock,           array_allocator);
+	array_init(&pool->out_of_band_allocations, array_allocator);
+}
 
-	u8 *start = cast(u8 *)gb_align_forward(cast(u8 *)(block + 1), GB_DEFAULT_MEMORY_ALIGNMENT);
-	u8 *end = cast(u8 *)vm.data + vm.size;
-
-	block->vm       = vm;
-	block->start    = start;
-	block->count    = 0;
-	block->capacity = end-start;
-
-	if (a->current_block != NULL) {
-		a->current_block->next = block;
-		block->prev = a->current_block;
+void pool_free_all(Pool *p) {
+	if (p->current_memblock != NULL) {
+		array_add(&p->unused_memblock, p->current_memblock);
+		p->current_memblock = NULL;
 	}
-	a->current_block = block;
-	return block;
+
+	for_array(i, p->used_memblock) {
+		array_add(&p->unused_memblock, p->used_memblock[i]);
+	}
+	array_clear(&p->unused_memblock);
+
+	for_array(i, p->out_of_band_allocations) {
+		gb_free(p->block_allocator, p->out_of_band_allocations[i]);
+	}
+	array_clear(&p->out_of_band_allocations);
 }
 
-void init_dynamic_arena(DynamicArena *a, isize block_size) {
-	isize size = gb_size_of(DynamicArenaBlock) + block_size;
-	size = cast(isize)gb_align_forward(cast(void *)cast(uintptr)size, GB_DEFAULT_MEMORY_ALIGNMENT);
-	a->block_size = size;
-	a->start_block = add_dynamic_arena_block(a);
-}
+void pool_destroy(Pool *p) {
+	pool_free_all(p);
 
-void destroy_dynamic_arena(DynamicArena *a) {
-	DynamicArenaBlock *b = a->current_block;
-	while (b != NULL) {
-		gbVirtualMemory vm = b->vm;
-		b = b->prev;
-		gb_vm_free(b->vm);
+	for_array(i, p->unused_memblock) {
+		gb_free(p->block_allocator, p->unused_memblock[i]);
 	}
 }
 
-GB_ALLOCATOR_PROC(dynamic_arena_allocator_proc) {
-	DynamicArena *a = cast(DynamicArena *)allocator_data;
+void pool_cycle_new_block(Pool *p) {
+	GB_ASSERT_MSG(p->block_allocator.proc != NULL,
+	              "You must call pool_init on a Pool before using it!");
+
+	if (p->current_memblock != NULL) {
+		array_add(&p->used_memblock, p->current_memblock);
+	}
+
+	u8 *new_block = NULL;
+
+	if (p->unused_memblock.count > 0) {
+		new_block = array_pop(&p->unused_memblock);
+	} else {
+		GB_ASSERT(p->block_allocator.proc != NULL);
+		new_block = cast(u8 *)gb_alloc_align(p->block_allocator, p->memblock_size, p->alignment);
+	}
+
+	p->bytes_left       = p->memblock_size;
+	p->current_memblock = new_block;
+	p->current_memblock = new_block;
+}
+
+void *pool_get(Pool *p,
+               isize size, isize alignment = 0) {
+	if (alignment <= 0) alignment = p->alignment;
+
+	isize extra = alignment - (size & alignment);
+	size += extra;
+	if (size >= p->out_of_band_size) {
+		GB_ASSERT(p->block_allocator.proc != NULL);
+		u8 *memory = cast(u8 *)gb_alloc_align(p->block_allocator, p->memblock_size, alignment);
+		if (memory != NULL) {
+			array_add(&p->out_of_band_allocations, memory);
+		}
+		return memory;
+	}
+
+	if (p->bytes_left < size) {
+		pool_cycle_new_block(p);
+		if (p->current_memblock != NULL) {
+			return NULL;
+		}
+	}
+
+	u8 *res = p->current_pos;
+	p->current_pos += size;
+	p->bytes_left  -= size;
+	return res;
+}
+
+
+gbAllocator pool_allocator(Pool *pool);
+
+GB_ALLOCATOR_PROC(pool_allocator_procedure) {
+	Pool *p = cast(Pool *)allocator_data;
 	void *ptr = NULL;
 
 	switch (type) {
-	case gbAllocation_Alloc: {
-
-	} break;
-
-	case gbAllocation_Free: {
-	} break;
-
-	case gbAllocation_Resize: {
-	} break;
-
-	case gbAllocation_FreeAll:
-		GB_PANIC("free_all is not supported by this allocator");
+	case gbAllocation_Alloc:
+		return pool_get(p, size, alignment);
+	case gbAllocation_Free:
+		// Does nothing
 		break;
+	case gbAllocation_FreeAll:
+		pool_free_all(p);
+		break;
+	case gbAllocation_Resize:
+		return gb_default_resize_align(pool_allocator(p), old_memory, old_size, size, alignment);
 	}
 
 	return ptr;
 }
 
-gbAllocator dynamic_arena_allocator(DynamicArena *a) {
-	gbAllocator allocator = {dynamic_arena_allocator_proc, a};
+gbAllocator pool_allocator(Pool *pool) {
+	gbAllocator allocator;
+	allocator.proc = pool_allocator_procedure;
+	allocator.data = pool;
 	return allocator;
 }
 
@@ -224,7 +285,6 @@ f64 gb_sqrt(f64 x) {
 
 
 
-#define for_array(index_, array_) for (isize index_ = 0; index_ < (array_).count; index_++)
 
 
 // Doubly Linked Lists

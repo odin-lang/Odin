@@ -7123,20 +7123,21 @@ void ir_init_module(irModule *m, Checker *c) {
 	// TODO(bill): Determine a decent size for the arena
 	isize token_count = c->parser->total_token_count;
 	isize arena_size = 4 * token_count * gb_size_of(irValue);
-	gb_arena_init_from_allocator(&m->arena, heap_allocator(), arena_size);
+	gb_arena_init_from_allocator(&m->arena,     heap_allocator(), arena_size);
 	gb_arena_init_from_allocator(&m->tmp_arena, heap_allocator(), arena_size);
-	m->allocator     = gb_arena_allocator(&m->arena);
+	// m->allocator     = gb_arena_allocator(&m->arena);
+	m->allocator     = heap_allocator();
 	m->tmp_allocator = gb_arena_allocator(&m->tmp_arena);
 	m->info = &c->info;
 
-	map_init(&m->values,  heap_allocator());
-	map_init(&m->members, heap_allocator());
-	map_init(&m->debug_info, heap_allocator());
-	map_init(&m->entity_names, heap_allocator());
-	array_init(&m->procs,    heap_allocator());
-	array_init(&m->procs_to_generate, heap_allocator());
+	map_init(&m->values,                  heap_allocator());
+	map_init(&m->members,                 heap_allocator());
+	map_init(&m->debug_info,              heap_allocator());
+	map_init(&m->entity_names,            heap_allocator());
+	array_init(&m->procs,                 heap_allocator());
+	array_init(&m->procs_to_generate,     heap_allocator());
 	array_init(&m->foreign_library_paths, heap_allocator());
-	map_init(&m->const_strings, heap_allocator());
+	map_init(&m->const_strings,           heap_allocator());
 
 	// Default states
 	m->stmt_state_flags = 0;

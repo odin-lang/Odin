@@ -1,3 +1,5 @@
+import "mem.odin";
+
 crc32 :: proc(data: []u8) -> u32 {
 	result := ~u32(0);
 	for b in data {
@@ -102,7 +104,7 @@ murmur64 :: proc(data: []u8) -> u64 {
 		r :: 47;
 
 		h: u64 = SEED ~ (u64(len(data)) * m);
-		data64 := slice_ptr(^u64(&data[0]), len(data)/size_of(u64));
+		data64 := mem.slice_ptr(^u64(&data[0]), len(data)/size_of(u64));
 
 		for _, i in data64 {
 			k := data64[i];
@@ -138,7 +140,7 @@ murmur64 :: proc(data: []u8) -> u64 {
 
 		h1 := u32(SEED) ~ u32(len(data));
 		h2 := u32(SEED) >> 32;
-		data32 := slice_ptr(^u32(&data[0]), len(data)/size_of(u32));
+		data32 := mem.slice_ptr(^u32(&data[0]), len(data)/size_of(u32));
 		len := len(data);
 		i := 0;
 

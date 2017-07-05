@@ -57,9 +57,7 @@ args := _alloc_command_line_arguments();
 
 
 open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errno) {
-	if len(path) == 0 {
-		return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
-	}
+	if len(path) == 0 do return INVALID_HANDLE, ERROR_FILE_NOT_FOUND;
 
 	access: u32;
 	match mode & (O_RDONLY|O_WRONLY|O_RDWR) {
@@ -245,9 +243,7 @@ heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	return win32.heap_realloc(win32.get_process_heap(), win32.HEAP_ZERO_MEMORY, ptr, new_size);
 }
 heap_free :: proc(ptr: rawptr) {
-	if ptr == nil {
-		return;
-	}
+	if ptr == nil do return;
 	win32.heap_free(win32.get_process_heap(), 0, ptr);
 }
 
@@ -272,7 +268,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 
 		len := 2*wstr_len-1;
 		buf := make([]u8, len+1);
-		str := slice_ptr(wstr, wstr_len+1);
+		str := mem.slice_ptr(wstr, wstr_len+1);
 
 		i, j := 0, 0;
 		for str[j] != 0 {

@@ -305,9 +305,10 @@ struct Checker {
 	Array<DelayedDecl>         delayed_foreign_libraries;
 	Array<CheckerFileNode>     file_nodes;
 
+	Pool                       pool;
+	gbAllocator                allocator;
 	gbArena                    arena;
 	gbArena                    tmp_arena;
-	gbAllocator                allocator;
 	gbAllocator                tmp_allocator;
 
 	CheckerContext             context;
@@ -773,11 +774,13 @@ void init_checker(Checker *c, Parser *parser) {
 		total_token_count += f->tokens.count;
 	}
 	isize arena_size = 2 * item_size * total_token_count;
-	gb_arena_init_from_allocator(&c->arena, a, arena_size);
 	gb_arena_init_from_allocator(&c->tmp_arena, a, arena_size);
+	gb_arena_init_from_allocator(&c->arena, a, arena_size);
 
-
-	c->allocator     = gb_arena_allocator(&c->arena);
+	pool_init(&c->pool, gb_megabytes(4), gb_kilobytes(384));
+	// c->allocator = pool_allocator(&c->pool);
+	c->allocator = heap_allocator();
+	// c->allocator     = gb_arena_allocator(&c->arena);
 	c->tmp_allocator = gb_arena_allocator(&c->tmp_arena);
 
 	c->global_scope = make_scope(universal_scope, c->allocator);
@@ -793,7 +796,9 @@ void destroy_checker(Checker *c) {
 	array_free(&c->delayed_foreign_libraries);
 	array_free(&c->file_nodes);
 
-	gb_arena_free(&c->arena);
+	pool_destroy(&c->pool);
+	gb_arena_free(&c->tmp_arena);
+	// gb_arena_free(&c->arena);
 }
 
 
