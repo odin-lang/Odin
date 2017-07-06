@@ -6,7 +6,7 @@ gb_inline void print_indent(isize indent) {
 }
 
 void print_ast(AstNode *node, isize indent) {
-	if (node == NULL)
+	if (node == nullptr)
 		return;
 
 	switch (node->kind) {

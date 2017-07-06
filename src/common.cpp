@@ -93,9 +93,9 @@ void pool_init(Pool *pool,
 }
 
 void pool_free_all(Pool *p) {
-	if (p->current_memblock != NULL) {
+	if (p->current_memblock != nullptr) {
 		array_add(&p->unused_memblock, p->current_memblock);
-		p->current_memblock = NULL;
+		p->current_memblock = nullptr;
 	}
 
 	for_array(i, p->used_memblock) {
@@ -118,19 +118,19 @@ void pool_destroy(Pool *p) {
 }
 
 void pool_cycle_new_block(Pool *p) {
-	GB_ASSERT_MSG(p->block_allocator.proc != NULL,
+	GB_ASSERT_MSG(p->block_allocator.proc != nullptr,
 	              "You must call pool_init on a Pool before using it!");
 
-	if (p->current_memblock != NULL) {
+	if (p->current_memblock != nullptr) {
 		array_add(&p->used_memblock, p->current_memblock);
 	}
 
-	u8 *new_block = NULL;
+	u8 *new_block = nullptr;
 
 	if (p->unused_memblock.count > 0) {
 		new_block = array_pop(&p->unused_memblock);
 	} else {
-		GB_ASSERT(p->block_allocator.proc != NULL);
+		GB_ASSERT(p->block_allocator.proc != nullptr);
 		new_block = cast(u8 *)gb_alloc_align(p->block_allocator, p->memblock_size, p->alignment);
 	}
 
@@ -146,9 +146,9 @@ void *pool_get(Pool *p,
 	isize extra = alignment - (size & alignment);
 	size += extra;
 	if (size >= p->out_of_band_size) {
-		GB_ASSERT(p->block_allocator.proc != NULL);
+		GB_ASSERT(p->block_allocator.proc != nullptr);
 		u8 *memory = cast(u8 *)gb_alloc_align(p->block_allocator, p->memblock_size, alignment);
-		if (memory != NULL) {
+		if (memory != nullptr) {
 			array_add(&p->out_of_band_allocations, memory);
 		}
 		return memory;
@@ -156,8 +156,8 @@ void *pool_get(Pool *p,
 
 	if (p->bytes_left < size) {
 		pool_cycle_new_block(p);
-		if (p->current_memblock != NULL) {
-			return NULL;
+		if (p->current_memblock != nullptr) {
+			return nullptr;
 		}
 	}
 
@@ -172,7 +172,7 @@ gbAllocator pool_allocator(Pool *pool);
 
 GB_ALLOCATOR_PROC(pool_allocator_procedure) {
 	Pool *p = cast(Pool *)allocator_data;
-	void *ptr = NULL;
+	void *ptr = nullptr;
 
 	switch (type) {
 	case gbAllocation_Alloc:
@@ -296,7 +296,7 @@ f64 gb_sqrt(f64 x) {
 } while (0)
 
 #define DLIST_APPEND(root_element, curr_element, next_element) do { \
-	if ((root_element) == NULL) { \
+	if ((root_element) == nullptr) { \
 		(root_element) = (curr_element) = (next_element); \
 	} else { \
 		DLIST_SET(curr_element, next_element); \
@@ -362,7 +362,7 @@ wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
 		i++;
 	}
 	_argv[j] = '\0';
-	argv[argc] = NULL;
+	argv[argc] = nullptr;
 
 	if (_argc) *_argc = argc;
 	return argv;

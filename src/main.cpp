@@ -41,8 +41,8 @@ i32 system_exec_command_line_app(char *name, bool is_silent, char *fmt, ...) {
 
 	cmd = string_to_string16(string_buffer_allocator, make_string(cast(u8 *)cmd_line, cmd_len-1));
 
-	if (CreateProcessW(NULL, cmd.text,
-	                   NULL, NULL, true, 0, NULL, NULL,
+	if (CreateProcessW(nullptr, cmd.text,
+	                   nullptr, nullptr, true, 0, nullptr, nullptr,
 	                   &start_info, &pi)) {
 		WaitForSingleObject(pi.hProcess, INFINITE);
 		GetExitCodeProcess(pi.hProcess, cast(DWORD *)&exit_code);

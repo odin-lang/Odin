@@ -520,7 +520,7 @@ u128 u128_quo(u128 a, u128 b) {
 	}
 
 	u128 res = {0};
-	u128_divide(a, b, &res, NULL);
+	u128_divide(a, b, &res, nullptr);
 	return res;
 }
 u128 u128_mod(u128 a, u128 b) {
@@ -528,7 +528,7 @@ u128 u128_mod(u128 a, u128 b) {
 		return u128_from_u64(a.lo%b.lo);
 	}
 	u128 res = {0};
-	u128_divide(a, b, NULL, &res);
+	u128_divide(a, b, nullptr, &res);
 	return res;
 }
 
@@ -716,11 +716,11 @@ void i128_divide(i128 a, i128 b, i128 *quo, i128 *rem) {
 
 i128 i128_quo(i128 a, i128 b) {
 	i128 res = {0};
-	i128_divide(a, b, &res, NULL);
+	i128_divide(a, b, &res, nullptr);
 	return res;
 }
 i128 i128_mod(i128 a, i128 b) {
 	i128 res = {0};
-	i128_divide(a, b, NULL, &res);
+	i128_divide(a, b, nullptr, &res);
 	return res;
 }

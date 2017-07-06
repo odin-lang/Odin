@@ -5,8 +5,8 @@ struct irFileBuffer {
 };
 
 void ir_file_buffer_init(irFileBuffer *f, gbFile *output) {
-	isize size = 8*gb_virtual_memory_page_size(NULL);
-	f->vm = gb_vm_alloc(NULL, size);
+	isize size = 8*gb_virtual_memory_page_size(nullptr);
+	f->vm = gb_vm_alloc(nullptr, size);
 	f->offset = 0;
 	f->output = output;
 }
@@ -268,10 +268,6 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		ir_fprintf(f, "]}");
 		return;
 	}
-/* 		ir_fprintf(f, "<%lld x ", t->Vector.count);
-		ir_print_type(f, m, t->Vector.elem);
-		ir_fprintf(f, ">");
-		return; */
 	case Type_Slice:
 		ir_fprintf(f, "{");
 		ir_print_type(f, m, t->Slice.elem);
@@ -345,7 +341,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 	case Type_Named:
 		if (is_type_struct(t) || is_type_union(t)) {
 			String *name = map_get(&m->entity_names, hash_pointer(t->Named.type_name));
-			GB_ASSERT_MSG(name != NULL, "%.*s", LIT(t->Named.name));
+			GB_ASSERT_MSG(name != nullptr, "%.*s", LIT(t->Named.name));
 			ir_print_encoded_local(f, *name);
 		} else {
 			ir_print_type(f, m, base_type(t));
@@ -376,7 +372,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 	} return;
 
 	case Type_Map: {
-		GB_ASSERT(t->Map.generated_struct_type != NULL);
+		GB_ASSERT(t->Map.generated_struct_type != nullptr);
 		ir_print_type(f, m, t->Map.generated_struct_type);
 	} break;
 
@@ -660,7 +656,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 }
 
 void ir_print_block_name(irFileBuffer *f, irBlock *b) {
-	if (b != NULL) {
+	if (b != nullptr) {
 		ir_print_escape_string(f, b->label, false, false);
 		ir_fprintf(f, "-%td", b->index);
 	} else {
@@ -669,7 +665,7 @@ void ir_print_block_name(irFileBuffer *f, irBlock *b) {
 }
 
 bool ir_print_is_proc_global(irModule *m, irProcedure *proc) {
-	if (proc->entity != NULL &&
+	if (proc->entity != nullptr &&
 	    proc->entity->kind == Entity_Procedure) {
 		if (m->entry_point_entity == proc->entity) {
 			// gb_printf("%.*s\n", LIT(proc->entity->token.string));
@@ -684,8 +680,8 @@ bool ir_print_is_proc_global(irModule *m, irProcedure *proc) {
 }
 
 void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hint) {
-	if (value == NULL) {
-		ir_fprintf(f, "!!!NULL_VALUE");
+	if (value == nullptr) {
+		ir_fprintf(f, "!!!nullptr_VALUE");
 		return;
 	}
 	switch (value->kind) {
@@ -697,7 +693,7 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 
 	case irValue_ConstantSlice: {
 		irValueConstantSlice *cs = &value->ConstantSlice;
-		if (cs->backing_array == NULL || cs->count == 0) {
+		if (cs->backing_array == nullptr || cs->count == 0) {
 			ir_fprintf(f, "zeroinitializer");
 		} else {
 			Type *at = base_type(type_deref(ir_type(cs->backing_array)));
@@ -735,7 +731,7 @@ void ir_print_value(irFileBuffer *f, irModule *m, irValue *value, Type *type_hin
 		Entity *e = value->Global.entity;
 		Scope *scope = e->scope;
 		bool in_global_scope = false;
-		if (scope != NULL) {
+		if (scope != nullptr) {
 			// TODO(bill): Fix this rule. What should it be?
 			in_global_scope = scope->is_global || scope->is_init;
 		}
@@ -925,8 +921,8 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 			}
 
 			irValue *edge = instr->Phi.edges[i];
-			irBlock *block = NULL;
-			if (instr->parent != NULL &&
+			irBlock *block = nullptr;
+			if (instr->parent != nullptr &&
 			    i < instr->parent->preds.count) {
 				block = instr->parent->preds[i];
 			}
@@ -1024,7 +1020,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	case irInstr_Return: {
 		irInstrReturn *ret = &instr->Return;
 		ir_fprintf(f, "ret ");
-		if (ret->value == NULL) {
+		if (ret->value == nullptr) {
 			ir_fprintf(f, "void");
 		} else {
 			Type *t = ir_type(ret->value);
@@ -1269,7 +1265,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 		ir_fprintf(f, "(");
 		if (proc_type->Proc.return_by_pointer) {
-			GB_ASSERT(call->return_ptr != NULL);
+			GB_ASSERT(call->return_ptr != nullptr);
 			ir_print_type(f, m, proc_type->Proc.results);
 			ir_fprintf(f, "* ");
 			ir_print_value(f, m, call->return_ptr, ir_type(call->return_ptr));
@@ -1286,7 +1282,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 				isize i = 0;
 				for (; i < params->variable_count-1; i++) {
 					Entity *e = params->variables[i];
-					GB_ASSERT(e != NULL);
+					GB_ASSERT(e != nullptr);
 					if (e->kind != Entity_Variable) continue;
 
 					if (param_index > 0) ir_fprintf(f, ", ");
@@ -1316,7 +1312,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 				isize param_count = params->variable_count;
 				for (isize i = 0; i < param_count; i++) {
 					Entity *e = params->variables[i];
-					GB_ASSERT(e != NULL);
+					GB_ASSERT(e != nullptr);
 					if (e->kind != Entity_Variable) continue;
 
 					if (param_index > 0) ir_fprintf(f, ", ");
@@ -1523,7 +1519,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 
 
 void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
-	if (proc->body == NULL) {
+	if (proc->body == nullptr) {
 		ir_fprintf(f, "declare ");
 		// if (proc->tags & ProcTag_dll_import) {
 			// ir_fprintf(f, "dllimport ");
@@ -1584,7 +1580,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 				if (e->flags&EntityFlag_NoAlias) {
 					ir_fprintf(f, " noalias");
 				}
-				if (proc->body != NULL) {
+				if (proc->body != nullptr) {
 					if (e->token.string != "" &&
 					    e->token.string != "_") {
 						ir_fprintf(f, " ");
@@ -1615,10 +1611,10 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	}
 
 
-	if (proc->entity != NULL) {
-		if (proc->body != NULL) {
+	if (proc->entity != nullptr) {
+		if (proc->body != nullptr) {
 			irDebugInfo **di_ = map_get(&proc->module->debug_info, hash_pointer(proc->entity));
-			if (di_ != NULL) {
+			if (di_ != nullptr) {
 				irDebugInfo *di = *di_;
 				GB_ASSERT(di->kind == irDebugInfo_Proc);
 				// ir_fprintf(f, "!dbg !%d ", di->id);
@@ -1627,7 +1623,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 	}
 
 
-	if (proc->body != NULL) {
+	if (proc->body != nullptr) {
 		// ir_fprintf(f, "nounwind uwtable {\n");
 
 		ir_fprintf(f, "{\n");
@@ -1716,7 +1712,7 @@ void print_llvm_ir(irGen *ir) {
 			continue;
 		}
 
-		if (v->Proc.body == NULL) {
+		if (v->Proc.body == nullptr) {
 			ir_print_proc(f, m, &v->Proc);
 		}
 	}
@@ -1728,7 +1724,7 @@ void print_llvm_ir(irGen *ir) {
 			continue;
 		}
 
-		if (v->Proc.body != NULL) {
+		if (v->Proc.body != nullptr) {
 			ir_print_proc(f, m, &v->Proc);
 		}
 	}
@@ -1742,7 +1738,7 @@ void print_llvm_ir(irGen *ir) {
 		irValueGlobal *g = &v->Global;
 		Scope *scope = g->entity->scope;
 		bool in_global_scope = false;
-		if (scope != NULL) {
+		if (scope != nullptr) {
 			// TODO(bill): Fix this rule. What should it be?
 			in_global_scope = scope->is_global || scope->is_init;
 			// in_global_scope = value->Global.name_is_not_mangled;
@@ -1773,7 +1769,7 @@ void print_llvm_ir(irGen *ir) {
 		ir_print_type(f, m, g->entity->type);
 		ir_fprintf(f, " ");
 		if (!g->is_foreign) {
-			if (g->value != NULL) {
+			if (g->value != nullptr) {
 				ir_print_value(f, m, g->value, g->entity->type);
 			} else {
 				ir_fprintf(f, "zeroinitializer");

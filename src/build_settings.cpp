@@ -53,9 +53,9 @@ String odin_root_dir(void) {
 
 	len = 0;
 	for (;;) {
-		len = GetModuleFileNameW(NULL, &path_buf[0], path_buf.count);
+		len = GetModuleFileNameW(nullptr, &path_buf[0], path_buf.count);
 		if (len == 0) {
-			return make_string(NULL, 0);
+			return make_string(nullptr, 0);
 		}
 		if (len < path_buf.count) {
 			break;
@@ -69,7 +69,7 @@ String odin_root_dir(void) {
 
 	text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
 
-	GetModuleFileNameW(NULL, text, len);
+	GetModuleFileNameW(nullptr, text, len);
 	path = string16_to_string(heap_allocator(), make_string16(text, len));
 
 	for (i = path.len-1; i >= 0; i--) {
@@ -168,7 +168,7 @@ String odin_root_dir(void) {
 		// path without checking this link. Sorry.
 		len = readlink("/proc/self/exe", &path_buf[0], path_buf.count);
 		if(len == 0) {
-			return make_string(NULL, 0);
+			return make_string(nullptr, 0);
 		}
 		if (len < path_buf.count) {
 			break;
@@ -208,10 +208,10 @@ String path_to_fullpath(gbAllocator a, String s) {
 	String16 string16 = string_to_string16(string_buffer_allocator, s);
 	String result = {0};
 
-	DWORD len = GetFullPathNameW(&string16[0], 0, NULL, NULL);
+	DWORD len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
 	if (len != 0) {
 		wchar_t *text = gb_alloc_array(string_buffer_allocator, wchar_t, len+1);
-		GetFullPathNameW(&string16[0], len, text, NULL);
+		GetFullPathNameW(&string16[0], len, text, nullptr);
 		text[len] = 0;
 		result = string16_to_string(a, make_string16(text, len));
 	}
@@ -221,7 +221,7 @@ String path_to_fullpath(gbAllocator a, String s) {
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
 String path_to_fullpath(gbAllocator a, String s) {
 	char *p = realpath(cast(char *)&s[0], 0);
-	if(p == NULL) return make_string_c("");
+	if(p == nullptr) return make_string_c("");
 
 	return make_string_c(p);
 }

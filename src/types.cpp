@@ -221,7 +221,7 @@ void selection_add_index(Selection *s, isize index) {
 	// IMPORTANT NOTE(bill): this requires a stretchy buffer/dynamic array so it requires some form
 	// of heap allocation
 	// TODO(bill): Find a way to use a backing buffer for initial use as the general case is probably .count<3
-	if (s->index.data == NULL) {
+	if (s->index.data == nullptr) {
 		array_init(&s->index, heap_allocator());
 	}
 	array_add(&s->index, cast(i32)index);
@@ -317,80 +317,80 @@ gb_global Type *t_untyped_nil        = &basic_types[Basic_UntypedNil];
 gb_global Type *t_untyped_undef      = &basic_types[Basic_UntypedUndef];
 
 
-gb_global Type *t_u8_ptr       = NULL;
-gb_global Type *t_int_ptr      = NULL;
-gb_global Type *t_i64_ptr      = NULL;
-gb_global Type *t_i128_ptr     = NULL;
-gb_global Type *t_f64_ptr      = NULL;
-gb_global Type *t_u8_slice     = NULL;
-gb_global Type *t_string_slice = NULL;
+gb_global Type *t_u8_ptr       = nullptr;
+gb_global Type *t_int_ptr      = nullptr;
+gb_global Type *t_i64_ptr      = nullptr;
+gb_global Type *t_i128_ptr     = nullptr;
+gb_global Type *t_f64_ptr      = nullptr;
+gb_global Type *t_u8_slice     = nullptr;
+gb_global Type *t_string_slice = nullptr;
 
 
 // Type generated for the "preload" file
-gb_global Type *t_type_info                   = NULL;
-gb_global Type *t_type_info_record            = NULL;
-gb_global Type *t_type_info_enum_value        = NULL;
-gb_global Type *t_type_info_ptr               = NULL;
-gb_global Type *t_type_info_record_ptr        = NULL;
-gb_global Type *t_type_info_enum_value_ptr    = NULL;
+gb_global Type *t_type_info                   = nullptr;
+gb_global Type *t_type_info_record            = nullptr;
+gb_global Type *t_type_info_enum_value        = nullptr;
+gb_global Type *t_type_info_ptr               = nullptr;
+gb_global Type *t_type_info_record_ptr        = nullptr;
+gb_global Type *t_type_info_enum_value_ptr    = nullptr;
 
-gb_global Type *t_type_info_named             = NULL;
-gb_global Type *t_type_info_integer           = NULL;
-gb_global Type *t_type_info_rune              = NULL;
-gb_global Type *t_type_info_float             = NULL;
-gb_global Type *t_type_info_complex           = NULL;
-gb_global Type *t_type_info_any               = NULL;
-gb_global Type *t_type_info_string            = NULL;
-gb_global Type *t_type_info_boolean           = NULL;
-gb_global Type *t_type_info_pointer           = NULL;
-gb_global Type *t_type_info_atomic            = NULL;
-gb_global Type *t_type_info_procedure         = NULL;
-gb_global Type *t_type_info_array             = NULL;
-gb_global Type *t_type_info_dynamic_array     = NULL;
-gb_global Type *t_type_info_slice             = NULL;
-gb_global Type *t_type_info_vector            = NULL;
-gb_global Type *t_type_info_tuple             = NULL;
-gb_global Type *t_type_info_struct            = NULL;
-gb_global Type *t_type_info_raw_union         = NULL;
-gb_global Type *t_type_info_union             = NULL;
-gb_global Type *t_type_info_enum              = NULL;
-gb_global Type *t_type_info_map               = NULL;
-gb_global Type *t_type_info_bit_field         = NULL;
+gb_global Type *t_type_info_named             = nullptr;
+gb_global Type *t_type_info_integer           = nullptr;
+gb_global Type *t_type_info_rune              = nullptr;
+gb_global Type *t_type_info_float             = nullptr;
+gb_global Type *t_type_info_complex           = nullptr;
+gb_global Type *t_type_info_any               = nullptr;
+gb_global Type *t_type_info_string            = nullptr;
+gb_global Type *t_type_info_boolean           = nullptr;
+gb_global Type *t_type_info_pointer           = nullptr;
+gb_global Type *t_type_info_atomic            = nullptr;
+gb_global Type *t_type_info_procedure         = nullptr;
+gb_global Type *t_type_info_array             = nullptr;
+gb_global Type *t_type_info_dynamic_array     = nullptr;
+gb_global Type *t_type_info_slice             = nullptr;
+gb_global Type *t_type_info_vector            = nullptr;
+gb_global Type *t_type_info_tuple             = nullptr;
+gb_global Type *t_type_info_struct            = nullptr;
+gb_global Type *t_type_info_raw_union         = nullptr;
+gb_global Type *t_type_info_union             = nullptr;
+gb_global Type *t_type_info_enum              = nullptr;
+gb_global Type *t_type_info_map               = nullptr;
+gb_global Type *t_type_info_bit_field         = nullptr;
 
-gb_global Type *t_type_info_named_ptr         = NULL;
-gb_global Type *t_type_info_integer_ptr       = NULL;
-gb_global Type *t_type_info_rune_ptr          = NULL;
-gb_global Type *t_type_info_float_ptr         = NULL;
-gb_global Type *t_type_info_complex_ptr       = NULL;
-gb_global Type *t_type_info_quaternion_ptr    = NULL;
-gb_global Type *t_type_info_any_ptr           = NULL;
-gb_global Type *t_type_info_string_ptr        = NULL;
-gb_global Type *t_type_info_boolean_ptr       = NULL;
-gb_global Type *t_type_info_pointer_ptr       = NULL;
-gb_global Type *t_type_info_atomic_ptr        = NULL;
-gb_global Type *t_type_info_procedure_ptr     = NULL;
-gb_global Type *t_type_info_array_ptr         = NULL;
-gb_global Type *t_type_info_dynamic_array_ptr = NULL;
-gb_global Type *t_type_info_slice_ptr         = NULL;
-gb_global Type *t_type_info_vector_ptr        = NULL;
-gb_global Type *t_type_info_tuple_ptr         = NULL;
-gb_global Type *t_type_info_struct_ptr        = NULL;
-gb_global Type *t_type_info_raw_union_ptr     = NULL;
-gb_global Type *t_type_info_union_ptr         = NULL;
-gb_global Type *t_type_info_enum_ptr          = NULL;
-gb_global Type *t_type_info_map_ptr           = NULL;
-gb_global Type *t_type_info_bit_field_ptr     = NULL;
+gb_global Type *t_type_info_named_ptr         = nullptr;
+gb_global Type *t_type_info_integer_ptr       = nullptr;
+gb_global Type *t_type_info_rune_ptr          = nullptr;
+gb_global Type *t_type_info_float_ptr         = nullptr;
+gb_global Type *t_type_info_complex_ptr       = nullptr;
+gb_global Type *t_type_info_quaternion_ptr    = nullptr;
+gb_global Type *t_type_info_any_ptr           = nullptr;
+gb_global Type *t_type_info_string_ptr        = nullptr;
+gb_global Type *t_type_info_boolean_ptr       = nullptr;
+gb_global Type *t_type_info_pointer_ptr       = nullptr;
+gb_global Type *t_type_info_atomic_ptr        = nullptr;
+gb_global Type *t_type_info_procedure_ptr     = nullptr;
+gb_global Type *t_type_info_array_ptr         = nullptr;
+gb_global Type *t_type_info_dynamic_array_ptr = nullptr;
+gb_global Type *t_type_info_slice_ptr         = nullptr;
+gb_global Type *t_type_info_vector_ptr        = nullptr;
+gb_global Type *t_type_info_tuple_ptr         = nullptr;
+gb_global Type *t_type_info_struct_ptr        = nullptr;
+gb_global Type *t_type_info_raw_union_ptr     = nullptr;
+gb_global Type *t_type_info_union_ptr         = nullptr;
+gb_global Type *t_type_info_enum_ptr          = nullptr;
+gb_global Type *t_type_info_map_ptr           = nullptr;
+gb_global Type *t_type_info_bit_field_ptr     = nullptr;
 
-gb_global Type *t_allocator                   = NULL;
-gb_global Type *t_allocator_ptr               = NULL;
-gb_global Type *t_context                     = NULL;
-gb_global Type *t_context_ptr                 = NULL;
+gb_global Type *t_allocator                   = nullptr;
+gb_global Type *t_allocator_ptr               = nullptr;
+gb_global Type *t_context                     = nullptr;
+gb_global Type *t_context_ptr                 = nullptr;
 
-gb_global Type *t_source_code_location        = NULL;
-gb_global Type *t_source_code_location_ptr    = NULL;
+gb_global Type *t_source_code_location        = nullptr;
+gb_global Type *t_source_code_location_ptr    = nullptr;
 
-gb_global Type *t_map_key                     = NULL;
-gb_global Type *t_map_header                  = NULL;
+gb_global Type *t_map_key                     = nullptr;
+gb_global Type *t_map_header                  = nullptr;
 
 
 
@@ -405,7 +405,7 @@ gbString type_to_string(Type *type);
 
 Type *base_type(Type *t) {
 	for (;;) {
-		if (t == NULL) {
+		if (t == nullptr) {
 			break;
 		}
 		if (t->kind != Type_Named) {
@@ -421,7 +421,7 @@ Type *base_type(Type *t) {
 
 Type *base_enum_type(Type *t) {
 	Type *bt = base_type(t);
-	if (bt != NULL &&
+	if (bt != nullptr &&
 	    bt->kind == Type_Record &&
 	    bt->Record.kind == TypeRecord_Enum) {
 		return bt->Record.enum_base_type;
@@ -431,7 +431,7 @@ Type *base_enum_type(Type *t) {
 
 Type *core_type(Type *t) {
 	for (;;) {
-		if (t == NULL) {
+		if (t == nullptr) {
 			break;
 		}
 
@@ -572,7 +572,7 @@ Type *make_type_proc(gbAllocator a, Scope *scope, Type *params, isize param_coun
 		if (param_count == 0) {
 			GB_PANIC("variadic procedure must have at least one parameter");
 		}
-		GB_ASSERT(params != NULL && params->kind == Type_Tuple);
+		GB_ASSERT(params != nullptr && params->kind == Type_Tuple);
 		Entity *e = params->Tuple.variables[param_count-1];
 		if (base_type(e->type)->kind != Type_Slice) {
 			// NOTE(bill): For custom calling convention
@@ -594,7 +594,7 @@ bool is_type_valid_for_keys(Type *t);
 
 Type *make_type_map(gbAllocator a, i64 count, Type *key, Type *value) {
 	Type *t = alloc_type(a, Type_Map);
-	if (key != NULL) {
+	if (key != nullptr) {
 		GB_ASSERT(is_type_valid_for_keys(key));
 	}
 	t->Map.count = count;
@@ -620,11 +620,11 @@ Type *make_type_bit_field(gbAllocator a) {
 
 
 Type *type_deref(Type *t) {
-	if (t != NULL) {
+	if (t != nullptr) {
 		Type *bt = base_type(t);
-		if (bt == NULL)
-			return NULL;
-		if (bt != NULL && bt->kind == Type_Pointer)
+		if (bt == nullptr)
+			return nullptr;
+		if (bt != nullptr && bt->kind == Type_Pointer)
 			return bt->Pointer.elem;
 	}
 	return t;
@@ -641,7 +641,7 @@ bool is_type_named_alias(Type *t) {
 		return false;
 	}
 	Entity *e = t->Named.type_name;
-	if (e == NULL) {
+	if (e == nullptr) {
 		return false;
 	}
 	if (e->kind != Entity_TypeName) {
@@ -698,7 +698,7 @@ bool is_type_string(Type *t) {
 }
 bool is_type_typed(Type *t) {
 	t = base_type(t);
-	if (t == NULL) {
+	if (t == nullptr) {
 		return false;
 	}
 	if (t->kind == Type_Basic) {
@@ -865,7 +865,7 @@ bool is_type_union(Type *t) {
 bool is_type_variant(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Record) {
-		return t->Record.kind == TypeRecord_Struct && t->Record.variant_parent != NULL;
+		return t->Record.kind == TypeRecord_Struct && t->Record.variant_parent != nullptr;
 	}
 	return false;
 }
@@ -990,7 +990,7 @@ bool is_type_polymorphic(Type *t) {
 
 	case Type_Record:
 		if (t->Record.kind == TypeRecord_Enum) {
-			if (t->Record.enum_base_type != NULL) {
+			if (t->Record.enum_base_type != nullptr) {
 				return is_type_polymorphic(t->Record.enum_base_type);
 			}
 			return false;
@@ -1090,8 +1090,8 @@ bool are_types_identical(Type *x, Type *y) {
 		return true;
 	}
 
-	if ((x == NULL && y != NULL) ||
-	    (x != NULL && y == NULL)) {
+	if ((x == nullptr && y != nullptr) ||
+	    (x != nullptr && y == nullptr)) {
 		return false;
 	}
 
@@ -1160,7 +1160,7 @@ bool are_types_identical(Type *x, Type *y) {
 								return false;
 							}
 						}
-						// NOTE(bill): zeroth variant is NULL
+						// NOTE(bill): zeroth variant is nullptr
 						for (isize i = 1; i < x->Record.variant_count; i++) {
 							if (!are_types_identical(x->Record.variants[i]->type, y->Record.variants[i]->type)) {
 								return false;
@@ -1230,7 +1230,7 @@ bool are_types_identical(Type *x, Type *y) {
 }
 
 Type *default_bit_field_value_type(Type *type) {
-	if (type == NULL) {
+	if (type == nullptr) {
 		return t_invalid;
 	}
 	Type *t = base_type(type);
@@ -1250,7 +1250,7 @@ Type *default_bit_field_value_type(Type *type) {
 }
 
 Type *default_type(Type *type) {
-	if (type == NULL) {
+	if (type == nullptr) {
 		return t_invalid;
 	}
 	if (type->kind == Type_Basic) {
@@ -1347,9 +1347,9 @@ enum ProcTypeOverloadKind {
 };
 
 ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
-	if (x == NULL && y == NULL) return ProcOverload_NotProcedure;
-	if (x == NULL && y != NULL) return ProcOverload_NotProcedure;
-	if (x != NULL && y == NULL) return ProcOverload_NotProcedure;
+	if (x == nullptr && y == nullptr) return ProcOverload_NotProcedure;
+	if (x == nullptr && y != nullptr) return ProcOverload_NotProcedure;
+	if (x != nullptr && y == nullptr) return ProcOverload_NotProcedure;
  	if (!is_type_proc(x))       return ProcOverload_NotProcedure;
  	if (!is_type_proc(y))       return ProcOverload_NotProcedure;
 
@@ -1398,7 +1398,7 @@ ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) {
 		}
 	}
 
-	if (px.params != NULL && py.params != NULL) {
+	if (px.params != nullptr && py.params != nullptr) {
 		Entity *ex = px.params->Tuple.variables[0];
 		Entity *ey = py.params->Tuple.variables[0];
 		bool ok = are_types_identical(ex->type, ey->type);
@@ -1474,11 +1474,11 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 }
 
 
-gb_global Entity *entity__any_data       = NULL;
-gb_global Entity *entity__any_type_info  = NULL;
+gb_global Entity *entity__any_data       = nullptr;
+gb_global Entity *entity__any_type_info  = nullptr;
 
 Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel) {
-	GB_ASSERT(type_ != NULL);
+	GB_ASSERT(type_ != nullptr);
 
 	if (field_name == "_") {
 		return empty_selection;
@@ -1498,11 +1498,11 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			// `Raw_Any` type?
 			String data_str = str_lit("data");
 			String type_info_str = str_lit("type_info");
-			if (entity__any_data == NULL) {
-				entity__any_data = make_entity_field(a, NULL, make_token_ident(data_str), t_rawptr, false, 0);
+			if (entity__any_data == nullptr) {
+				entity__any_data = make_entity_field(a, nullptr, make_token_ident(data_str), t_rawptr, false, 0);
 			}
-			if (entity__any_type_info == NULL) {
-				entity__any_type_info = make_entity_field(a, NULL, make_token_ident(type_info_str), t_type_info_ptr, false, 1);
+			if (entity__any_type_info == nullptr) {
+				entity__any_type_info = make_entity_field(a, nullptr, make_token_ident(type_info_str), t_type_info_ptr, false, 1);
 			}
 
 			if (field_name == data_str) {
@@ -1527,7 +1527,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			case (_length): \
 				if (field_name == _name) { \
 					selection_add_index(&sel, (_length)-1); \
-					sel.entity = make_entity_vector_elem(a, NULL, make_token_ident(str_lit(_name)), type->Vector.elem, (_length)-1); \
+					sel.entity = make_entity_vector_elem(a, nullptr, make_token_ident(str_lit(_name)), type->Vector.elem, (_length)-1); \
 					return sel; \
 				} \
 				/*fallthrough*/
@@ -1545,7 +1545,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 
 	if (is_type) {
 		if (type->kind == Type_Record) {
-			if (type->Record.names != NULL &&
+			if (type->Record.names != nullptr &&
 			    field_name == "names") {
 				sel.entity = type->Record.names;
 				return sel;
@@ -1566,7 +1566,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			}
 		} else if (is_type_enum(type)) {
 			// NOTE(bill): These may not have been added yet, so check in case
-			if (type->Record.enum_count != NULL) {
+			if (type->Record.enum_count != nullptr) {
 				if (field_name == "count") {
 					sel.entity = type->Record.enum_count;
 					return sel;
@@ -1612,7 +1612,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 
 				sel = lookup_field_with_selection(a, f->type, field_name, is_type, sel);
 
-				if (sel.entity != NULL) {
+				if (sel.entity != nullptr) {
 					if (is_type_pointer(f->type)) {
 						sel.indirect = true;
 					}
@@ -1624,7 +1624,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 		if (type->Record.kind == TypeRecord_Union) {
 			if (field_name == "__tag") {
 				Entity *e = type->Record.union__tag;
-				GB_ASSERT(e != NULL);
+				GB_ASSERT(e != nullptr);
 				selection_add_index(&sel, -1); // HACK(bill): Leaky memory
 				sel.entity = e;
 				return sel;
@@ -1666,11 +1666,11 @@ void type_path_free(TypePath *tp) {
 }
 
 void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
-	GB_ASSERT(tp != NULL);
+	GB_ASSERT(tp != nullptr);
 
 	GB_ASSERT(start_index < tp->path.count);
 	Type *t = tp->path[start_index];
-	GB_ASSERT(t != NULL);
+	GB_ASSERT(t != nullptr);
 
 	GB_ASSERT_MSG(is_type_named(t), "%s", type_to_string(t));
 	Entity *e = t->Named.type_name;
@@ -1689,7 +1689,7 @@ void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
 }
 
 TypePath *type_path_push(TypePath *tp, Type *t) {
-	GB_ASSERT(tp != NULL);
+	GB_ASSERT(tp != nullptr);
 
 	for (isize i = 0; i < tp->path.count; i++) {
 		if (tp->path[i] == t) {
@@ -1704,7 +1704,7 @@ TypePath *type_path_push(TypePath *tp, Type *t) {
 }
 
 void type_path_pop(TypePath *tp) {
-	if (tp != NULL && tp->path.count > 0) {
+	if (tp != nullptr && tp->path.count > 0) {
 		array_pop(&tp->path);
 	}
 }
@@ -1726,7 +1726,7 @@ i64 align_formula(i64 size, i64 align) {
 }
 
 i64 type_size_of(gbAllocator allocator, Type *t) {
-	if (t == NULL) {
+	if (t == nullptr) {
 		return 0;
 	}
 	i64 size;
@@ -1738,7 +1738,7 @@ i64 type_size_of(gbAllocator allocator, Type *t) {
 }
 
 i64 type_align_of(gbAllocator allocator, Type *t) {
-	if (t == NULL) {
+	if (t == nullptr) {
 		return 1;
 	}
 	i64 align;
@@ -2086,7 +2086,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			if (path->failure) {
 				return FAILURE_SIZE;
 			}
-			if (t->Record.are_offsets_being_processed && t->Record.offsets == NULL) {
+			if (t->Record.are_offsets_being_processed && t->Record.offsets == nullptr) {
 				type_path_print_illegal_cycle(path, path->path.count-1);
 				return FAILURE_SIZE;
 			}
@@ -2268,7 +2268,7 @@ i64 type_offset_of_from_selection(gbAllocator allocator, Type *type, Selection s
 }
 
 gbString write_type_to_string(gbString str, Type *type) {
-	if (type == NULL) {
+	if (type == nullptr) {
 		return gb_string_appendc(str, "<no type>");
 	}
 
@@ -2395,7 +2395,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 
 		case TypeRecord_Enum:
 			str = gb_string_appendc(str, "enum");
-			if (type->Record.enum_base_type != NULL) {
+			if (type->Record.enum_base_type != nullptr) {
 			str = gb_string_appendc(str, " ");
 				str = write_type_to_string(str, type->Record.enum_base_type);
 			}
@@ -2425,7 +2425,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 	} break;
 
 	case Type_Named:
-		if (type->Named.type_name != NULL) {
+		if (type->Named.type_name != nullptr) {
 			str = gb_string_append_length(str, type->Named.name.text, type->Named.name.len);
 		} else {
 			// NOTE(bill): Just in case
@@ -2437,7 +2437,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 		if (type->Tuple.variable_count > 0) {
 			for (isize i = 0; i < type->Tuple.variable_count; i++) {
 				Entity *var = type->Tuple.variables[i];
-				if (var != NULL) {
+				if (var != nullptr) {
 					if (i > 0) {
 						str = gb_string_appendc(str, ", ");
 					}
@@ -2503,7 +2503,7 @@ gbString write_type_to_string(gbString str, Type *type) {
 		for (isize i = 0; i < type->BitField.field_count; i++) {
 			Entity *f = type->BitField.fields[i];
 			GB_ASSERT(f->kind == Entity_Variable);
-			GB_ASSERT(f->type != NULL && f->type->kind == Type_BitFieldValue);
+			GB_ASSERT(f->type != nullptr && f->type->kind == Type_BitFieldValue);
 			str = gb_string_appendc(str, "{");
 			if (i > 0) {
 				str = gb_string_appendc(str, ", ");

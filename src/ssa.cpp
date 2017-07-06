@@ -206,7 +206,7 @@ ssaBlock *ssa_new_block(ssaProc *p, ssaBlockKind kind, char *name) {
 	b->kind = kind;
 	b->proc = p;
 	p->scope_level = p->scope_level;
-	if (name != NULL || name[0] != 0) {
+	if (name != nullptr || name[0] != 0) {
 		b->name = make_string_c(name);
 	}
 
@@ -218,34 +218,34 @@ ssaBlock *ssa_new_block(ssaProc *p, ssaBlockKind kind, char *name) {
 }
 
 void ssa_clear_block(ssaProc *p, ssaBlock *b) {
-	GB_ASSERT(b->proc != NULL);
+	GB_ASSERT(b->proc != nullptr);
 	array_clear(&b->values);
 	array_clear(&b->preds);
 	array_clear(&b->succs);
-	b->proc = NULL;
+	b->proc = nullptr;
 	b->kind = ssaBlock_Plain;
 }
 
 
 void ssa_start_block(ssaProc *p, ssaBlock *b) {
-	GB_ASSERT(p->curr_block == NULL);
+	GB_ASSERT(p->curr_block == nullptr);
 	p->curr_block = b;
 }
 
 ssaBlock *ssa_end_block(ssaProc *p) {
 	ssaBlock *b = p->curr_block;
-	if (b == NULL) {
-		return NULL;
+	if (b == nullptr) {
+		return nullptr;
 	}
-	p->curr_block = NULL;
+	p->curr_block = nullptr;
 	return b;
 }
 
 void ssa_add_edge_to(ssaBlock *b, ssaBlock *c) {
-	if (b == NULL) {
+	if (b == nullptr) {
 		return;
 	}
-	GB_ASSERT(c != NULL);
+	GB_ASSERT(c != nullptr);
 	isize i = b->succs.count;
 	isize j = b->preds.count;
 	ssaEdge s = {c, j};
@@ -255,11 +255,11 @@ void ssa_add_edge_to(ssaBlock *b, ssaBlock *c) {
 }
 
 void ssa_set_control(ssaBlock *b, ssaValue *v) {
-	if (b->control != NULL) {
+	if (b->control != nullptr) {
 		b->control->uses--;
 	}
 	b->control = v;
-	if (v != NULL) {
+	if (v != nullptr) {
 		v->uses++;
 	}
 }
@@ -295,7 +295,7 @@ void ssa_add_arg(ssaValueArgs *va, ssaValue *arg) {
 
 
 ssaValue *ssa_new_value(ssaProc *p, ssaOp op, Type *t, ssaBlock *b) {
-	GB_ASSERT(b != NULL);
+	GB_ASSERT(b != nullptr);
 	ssaValue *v = gb_alloc_item(p->allocator, ssaValue);
 	v->id    = p->value_id++;
 	v->op    = op;
@@ -388,7 +388,7 @@ ssaValue *ssa_const_int(ssaProc *p, Type *t, i64 c) {
 	case 64: return ssa_const_i64(p, t, cast(i64)c);
 	}
 	GB_PANIC("Unknown int size");
-	return NULL;
+	return nullptr;
 }
 
 
@@ -416,8 +416,8 @@ void ssa_reset(ssaValue *v, ssaOp op) {
 }
 
 ssaValue *ssa_get_last_value(ssaBlock *b) {
-	if (b == NULL) {
-		return NULL;
+	if (b == nullptr) {
+		return nullptr;
 	}
 	isize len = b->values.count;
 	if (len <= 0) {
@@ -428,7 +428,7 @@ ssaValue *ssa_get_last_value(ssaBlock *b) {
 }
 
 void ssa_emit_comment(ssaProc *p, String s) {
-	// ssa_new_value0v(p, ssaOp_Comment, NULL, exact_value_string(s));
+	// ssa_new_value0v(p, ssaOp_Comment, nullptr, exact_value_string(s));
 }
 
 void ssa_build_defer_stmt(ssaProc *p, ssaDefer d) {
@@ -463,7 +463,7 @@ void ssa_emit_defer_stmts(ssaProc *p, ssaDeferExitKind kind, ssaBlock *b) {
 		} else if (kind == ssaDeferExit_Return) {
 			ssa_build_defer_stmt(p, d);
 		} else if (kind == ssaDeferExit_Branch) {
-			GB_ASSERT(b != NULL);
+			GB_ASSERT(b != nullptr);
 			i32 lower_limit = b->scope_level+1;
 			if (lower_limit < d.scope_level) {
 				ssa_build_defer_stmt(p, d);
@@ -542,7 +542,7 @@ bool ssa_is_blank_ident(AstNode *node) {
 
 
 ssaAddr ssa_addr(ssaValue *v) {
-	if (v != NULL) {
+	if (v != nullptr) {
 		GB_ASSERT(is_type_pointer(v->type));
 	}
 	ssaAddr addr = {0};
@@ -551,13 +551,13 @@ ssaAddr ssa_addr(ssaValue *v) {
 }
 
 Type *ssa_addr_type(ssaAddr addr) {
-	if (addr.addr == NULL) {
-		return NULL;
+	if (addr.addr == nullptr) {
+		return nullptr;
 	}
 
 	if (addr.kind == ssaAddr_Map) {
 		GB_PANIC("TODO: ssa_addr_type");
-		return NULL;
+		return nullptr;
 	}
 
 	Type *t = addr.addr->type;
@@ -603,18 +603,18 @@ ssaAddr ssa_add_local_for_ident(ssaProc *p, AstNode *name) {
 		return ssa_add_local(p, e, name);
 	}
 
-	return ssa_addr(NULL);
+	return ssa_addr(nullptr);
 }
 
 ssaAddr ssa_add_local_generated(ssaProc *p, Type *t) {
-	GB_ASSERT(t != NULL);
+	GB_ASSERT(t != nullptr);
 
-	Scope *scope = NULL;
+	Scope *scope = nullptr;
 	if (p->curr_block) {
 		// scope = p->curr_block->scope;
 	}
 	Entity *e = make_entity_variable(p->allocator, scope, empty_token, t, false);
-	return ssa_add_local(p, e, NULL);
+	return ssa_add_local(p, e, nullptr);
 }
 
 
@@ -667,7 +667,7 @@ bool can_ssa_type(Type *t) {
 }
 
 void ssa_addr_store(ssaProc *p, ssaAddr addr, ssaValue *value) {
-	if (addr.addr == NULL) {
+	if (addr.addr == nullptr) {
 		return;
 	}
 	if (addr.kind == ssaAddr_Map) {
@@ -679,13 +679,13 @@ void ssa_addr_store(ssaProc *p, ssaAddr addr, ssaValue *value) {
 }
 
 ssaValue *ssa_addr_load(ssaProc *p, ssaAddr addr) {
-	if (addr.addr == NULL) {
-		return NULL;
+	if (addr.addr == nullptr) {
+		return nullptr;
 	}
 
 	if (addr.kind == ssaAddr_Map) {
 		GB_PANIC("here\n");
-		return NULL;
+		return nullptr;
 	}
 
 	Type *t = addr.addr->type;
@@ -702,23 +702,23 @@ ssaValue *ssa_get_using_variable(ssaProc *p, Entity *e) {
 	String name = e->token.string;
 	Entity *parent = e->using_parent;
 	Selection sel = lookup_field(p->allocator, parent->type, name, false);
-	GB_ASSERT(sel.entity != NULL);
+	GB_ASSERT(sel.entity != nullptr);
 	ssaValue **pv = map_get(&p->module->values, hash_pointer(parent));
-	ssaValue *v = NULL;
-	if (pv != NULL) {
+	ssaValue *v = nullptr;
+	if (pv != nullptr) {
 		v = *pv;
 	} else {
 		v = ssa_build_addr(p, e->using_expr).addr;
 	}
-	GB_ASSERT(v != NULL);
+	GB_ASSERT(v != nullptr);
 	GB_ASSERT(type_deref(v->type) == parent->type);
 	return ssa_emit_deep_field_ptr_index(p, v, sel);
 }
 
 ssaAddr ssa_build_addr_from_entity(ssaProc *p, Entity *e, AstNode *expr) {
-	GB_ASSERT(e != NULL);
+	GB_ASSERT(e != nullptr);
 
-	ssaValue *v = NULL;
+	ssaValue *v = nullptr;
 	ssaValue **found = map_get(&p->module->values, hash_pointer(e));
 	if (found) {
 		v = *found;
@@ -727,7 +727,7 @@ ssaAddr ssa_build_addr_from_entity(ssaProc *p, Entity *e, AstNode *expr) {
 		v = ssa_get_using_variable(p, e);
 	}
 
-	if (v == NULL) {
+	if (v == nullptr) {
 		GB_PANIC("Unknown value: %.*s, entity: %p %.*s\n", LIT(e->token.string), e, LIT(entity_strings[e->kind]));
 	}
 
@@ -773,11 +773,11 @@ ssaValue *ssa_emit_conv(ssaProc *p, ssaValue *v, Type *t) {
 
 	GB_PANIC("Invalid type conversion: `%s` to `%s`", type_to_string(src_type), type_to_string(t));
 
-	return NULL;
+	return nullptr;
 }
 
 
-// NOTE(bill): Returns NULL if not possible
+// NOTE(bill): Returns nullptr if not possible
 ssaValue *ssa_address_from_load_or_generate_local(ssaProc *p, ssaValue *v) {
 	if (v->op == ssaOp_Load) {
 		return v->args[0];
@@ -789,11 +789,11 @@ ssaValue *ssa_address_from_load_or_generate_local(ssaProc *p, ssaValue *v) {
 
 
 ssaValue *ssa_emit_array_index(ssaProc *p, ssaValue *v, ssaValue *index) {
-	GB_ASSERT(v != NULL);
+	GB_ASSERT(v != nullptr);
 	GB_ASSERT(is_type_pointer(v->type));
 	Type *t = base_type(type_deref(v->type));
 	GB_ASSERT_MSG(is_type_array(t) || is_type_vector(t), "%s", type_to_string(t));
-	Type *elem_ptr = NULL;
+	Type *elem_ptr = nullptr;
 	if (is_type_array(t)) {
 		elem_ptr = make_type_pointer(p->allocator, t->Array.elem);
 	} else if (is_type_vector(t)) {
@@ -806,7 +806,7 @@ ssaValue *ssa_emit_array_index(ssaProc *p, ssaValue *v, ssaValue *index) {
 ssaValue *ssa_emit_ptr_index(ssaProc *p, ssaValue *s, i64 index) {
 	gbAllocator a = p->allocator;
 	Type *t = base_type(type_deref(s->type));
-	Type *result_type = NULL;
+	Type *result_type = nullptr;
 
 	if (is_type_struct(t)) {
 		GB_ASSERT(t->Record.field_count > 0);
@@ -854,7 +854,7 @@ ssaValue *ssa_emit_ptr_index(ssaProc *p, ssaValue *s, i64 index) {
 		GB_PANIC("TODO(bill): ssa_emit_ptr_index type: %s, %d", type_to_string(s->type), index);
 	}
 
-	GB_ASSERT(result_type != NULL);
+	GB_ASSERT(result_type != nullptr);
 
 	return ssa_new_value1i(p, ssaOp_PtrIndex, result_type, index, s);
 }
@@ -869,7 +869,7 @@ ssaValue *ssa_emit_value_index(ssaProc *p, ssaValue *s, i64 index) {
 
 	gbAllocator a = p->allocator;
 	Type *t = base_type(s->type);
-	Type *result_type = NULL;
+	Type *result_type = nullptr;
 
 	if (is_type_struct(t)) {
 		GB_ASSERT(t->Record.field_count > 0);
@@ -917,7 +917,7 @@ ssaValue *ssa_emit_value_index(ssaProc *p, ssaValue *s, i64 index) {
 		GB_PANIC("TODO(bill): struct_ev type: %s, %d", type_to_string(s->type), index);
 	}
 
-	GB_ASSERT(result_type != NULL);
+	GB_ASSERT(result_type != nullptr);
 
 	return ssa_new_value1i(p, ssaOp_ValueIndex, result_type, index, s);
 }
@@ -1054,7 +1054,7 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 			if (tav.mode == Addressing_Invalid) {
 				// NOTE(bill): Imports
 				Entity *imp = entity_of_ident(p->module->info, se->expr);
-				if (imp != NULL) {
+				if (imp != nullptr) {
 					GB_ASSERT(imp->kind == Entity_ImportName);
 				}
 				return ssa_build_addr(p, se->selector);
@@ -1072,7 +1072,7 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 				// if (name == "names") {
 				// 	ssaValue *ti_ptr = ir_type_info(p, type);
 
-				// 	ssaValue *names_ptr = NULL;
+				// 	ssaValue *names_ptr = nullptr;
 
 				// 	if (is_type_enum(type)) {
 				// 		ssaValue *enum_info = ssa_emit_conv(p, ti_ptr, t_type_info_enum_ptr);
@@ -1089,7 +1089,7 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 			}
 
 			Selection sel = lookup_field(p->allocator, type, selector, false);
-			GB_ASSERT(sel.entity != NULL);
+			GB_ASSERT(sel.entity != nullptr);
 
 			ssaValue *a = ssa_build_addr(p, se->expr).addr;
 			a = ssa_emit_deep_field_ptr_index(p, a, sel);
@@ -1101,7 +1101,7 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 			i64 index = i128_to_i64(val.value_integer);
 
 			Selection sel = lookup_field_from_index(p->allocator, type, index);
-			GB_ASSERT(sel.entity != NULL);
+			GB_ASSERT(sel.entity != nullptr);
 
 			ssaValue *a = ssa_build_addr(p, se->expr).addr;
 			a = ssa_emit_deep_field_ptr_index(p, a, sel);
@@ -1156,7 +1156,7 @@ ssaAddr ssa_build_addr(ssaProc *p, AstNode *expr) {
 	         LIT(token_pos.file), token_pos.line, token_pos.column);
 
 
-	return ssa_addr(NULL);
+	return ssa_addr(nullptr);
 }
 
 
@@ -1382,7 +1382,7 @@ ssaOp ssa_determine_op(TokenKind op, Type *t) {
 
 
 ssaValue *ssa_emit_comp(ssaProc *p, TokenKind op, ssaValue *x, ssaValue *y) {
-	GB_ASSERT(x != NULL && y != NULL);
+	GB_ASSERT(x != nullptr && y != nullptr);
 	Type *a = core_type(x->type);
 	Type *b = core_type(y->type);
 	if (are_types_identical(a, b)) {
@@ -1486,7 +1486,7 @@ ssaValue *ssa_emit_unary_arith(ssaProc *p, TokenKind op, ssaValue *x, Type *type
 		GB_PANIC("unknown type for -x");
 	} break;
 	}
-	return NULL;
+	return nullptr;
 }
 ssaValue *ssa_emit_arith(ssaProc *p, TokenKind op, ssaValue *x, ssaValue *y, Type *type) {
 	if (is_type_vector(x->type)) {
@@ -1537,11 +1537,11 @@ ssaValue *ssa_emit_arith(ssaProc *p, TokenKind op, ssaValue *x, ssaValue *y, Typ
 	case Token_Or:
 	case Token_Xor:
 	case Token_AndNot:
-		GB_ASSERT(x != NULL && y != NULL);
+		GB_ASSERT(x != nullptr && y != nullptr);
 		return ssa_new_value2(p, ssa_determine_op(op, x->type), type, x, y);
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 
@@ -1589,7 +1589,7 @@ ssaValue *ssa_emit_logical_binary_expr(ssaProc *p, AstNode *expr) {
 	ssaBlock *rhs = ssa_new_block(p, ssaBlock_Plain, "logical.cmp.rhs");
 	ssaBlock *done = ssa_new_block(p, ssaBlock_Plain, "logical.cmp.done");
 
-	GB_ASSERT(p->curr_block != NULL);
+	GB_ASSERT(p->curr_block != nullptr);
 
 	Type *type = default_type(type_of_expr(p->module->info, expr));
 
@@ -1689,10 +1689,10 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 			GB_PANIC("TODO(bill): ssa_build_expr Entity_Builtin `%.*s`\n"
 			         "\t at %.*s(%td:%td)", LIT(builtin_procs[e->Builtin.id].name),
 			         LIT(token.pos.file), token.pos.line, token.pos.column);
-			return NULL;
+			return nullptr;
 		} else if (e->kind == Entity_Nil) {
 			GB_PANIC("TODO(bill): nil");
-			return NULL;
+			return nullptr;
 		}
 
 		ssaValue **found = map_get(&p->module->values, hash_pointer(e));
@@ -1737,7 +1737,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 		case Token_Shl:
 		case Token_Shr: {
 			GB_PANIC("TODO: shifts");
-			return NULL;
+			return nullptr;
 		}
 
 		case Token_CmpEq:
@@ -1772,29 +1772,29 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 	case_ast_node(te, TernaryExpr, expr);
 		ssa_emit_comment(p, str_lit("TernaryExpr"));
 
-		ssaValue *yes = NULL;
-		ssaValue *no = NULL;
+		ssaValue *yes = nullptr;
+		ssaValue *no = nullptr;
 
-		GB_ASSERT(te->y != NULL);
+		GB_ASSERT(te->y != nullptr);
 		ssaBlock *then  = ssa_new_block(p, ssaBlock_Plain, "if.then");
 		ssaBlock *done  = ssa_new_block(p, ssaBlock_Plain, "if.done"); // NOTE(bill): Append later
 		ssaBlock *else_ = ssa_new_block(p, ssaBlock_Plain, "if.else");
 
-		ssaBlock *v = NULL;
+		ssaBlock *v = nullptr;
 
 		ssa_build_cond(p, te->cond, then, else_);
 		ssa_start_block(p, then);
 
 		// ssa_open_scope(p);
 		yes = ssa_build_expr(p, te->x);
-		// ssa_close_scope(p, ssaDeferExit_Default, NULL);
+		// ssa_close_scope(p, ssaDeferExit_Default, nullptr);
 
 		ssa_emit_jump(p, done);
 		ssa_start_block(p, else_);
 
 		// ssa_open_scope(p);
 		no = ssa_build_expr(p, te->y);
-		// ssa_close_scope(p, ssaDeferExit_Default, NULL);
+		// ssa_close_scope(p, ssaDeferExit_Default, nullptr);
 
 		ssa_emit_jump(p, done);
 		ssa_start_block(p, done);
@@ -1815,7 +1815,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 
 		Type *type = type_of_expr(proc->module->info, expr);
 		irValue *value = ir_value_procedure(proc->module->allocator,
-		                                    proc->module, NULL, type, pl->type, pl->body, name);
+		                                    proc->module, nullptr, type, pl->type, pl->body, name);
 
 		value->Proc.tags = pl->tags;
 		value->Proc.parent = proc;
@@ -1854,7 +1854,7 @@ ssaValue *ssa_build_expr(ssaProc *p, AstNode *expr) {
 
 	GB_PANIC("Unexpected expression: %.*s", LIT(ast_node_strings[expr->kind]));
 
-	return NULL;
+	return nullptr;
 }
 
 
@@ -1927,7 +1927,7 @@ void ssa_build_stmt(ssaProc *p, AstNode *node) {
 	p->module->stmt_state_flags = prev_stmt_state_flags;
 }
 void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
-	if (p->curr_block == NULL) {
+	if (p->curr_block == nullptr) {
 		ssaBlock *dead_block = ssa_new_block(p, ssaBlock_Plain, "");
 		ssa_start_block(p, dead_block);
 	}
@@ -1939,7 +1939,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 	case_ast_node(bs, BlockStmt, node);
 		ssa_open_scope(p);
 		ssa_build_stmt_list(p, bs->stmts);
-		ssa_close_scope(p, ssaDeferExit_Default, NULL);
+		ssa_close_scope(p, ssaDeferExit_Default, nullptr);
 	case_end;
 
 	case_ast_node(us, UsingStmt, node);
@@ -2064,7 +2064,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 
 	case_ast_node(is, IfStmt, node);
 		ssa_emit_comment(p, str_lit("IfStmt"));
-		if (is->init != NULL) {
+		if (is->init != nullptr) {
 			ssaBlock *init = ssa_new_block(p, ssaBlock_Plain, "if.init");
 			ssa_emit_jump(p, init);
 			ssa_start_block(p, init);
@@ -2073,26 +2073,26 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 		ssaBlock *then  = ssa_new_block(p, ssaBlock_Plain, "if.then");
 		ssaBlock *done  = ssa_new_block(p, ssaBlock_Plain, "if.done");
 		ssaBlock *else_ = done;
-		if (is->else_stmt != NULL) {
+		if (is->else_stmt != nullptr) {
 			else_ = ssa_new_block(p, ssaBlock_Plain, "if.else");
 		}
-		ssaBlock *b = NULL;
+		ssaBlock *b = nullptr;
 
 		ssa_build_cond(p, is->cond, then, else_);
 		ssa_start_block(p, then);
 
 		ssa_open_scope(p);
 		ssa_build_stmt(p, is->body);
-		ssa_close_scope(p, ssaDeferExit_Default, NULL);
+		ssa_close_scope(p, ssaDeferExit_Default, nullptr);
 
 		ssa_emit_jump(p, done);
 
-		if (is->else_stmt != NULL) {
+		if (is->else_stmt != nullptr) {
 			ssa_start_block(p, else_);
 
 			ssa_open_scope(p);
 			ssa_build_stmt(p, is->else_stmt);
-			ssa_close_scope(p, ssaDeferExit_Default, NULL);
+			ssa_close_scope(p, ssaDeferExit_Default, nullptr);
 
 			ssa_emit_jump(p, done);
 		}
@@ -2103,7 +2103,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 
 	case_ast_node(fs, ForStmt, node);
 		ssa_emit_comment(p, str_lit("ForStmt"));
-		if (fs->init != NULL) {
+		if (fs->init != nullptr) {
 			ssaBlock *init = ssa_new_block(p, ssaBlock_Plain, "for.init");
 			ssa_emit_jump(p, init);
 			ssa_start_block(p, init);
@@ -2113,11 +2113,11 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 		ssaBlock *body = ssa_new_block(p, ssaBlock_Plain, "for.body");
 		ssaBlock *done = ssa_new_block(p, ssaBlock_Plain, "for.done");
 		ssaBlock *loop = body;
-		if (fs->cond != NULL) {
+		if (fs->cond != nullptr) {
 			loop = ssa_new_block(p, ssaBlock_Plain, "for.loop");
 		}
 		ssaBlock *post = loop;
-		if (fs->post != NULL) {
+		if (fs->post != nullptr) {
 			post = ssa_new_block(p, ssaBlock_Plain, "for.post");
 		}
 
@@ -2129,15 +2129,15 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 			ssa_start_block(p, body);
 		}
 
-		ssa_push_target_list(p, done, post, NULL);
+		ssa_push_target_list(p, done, post, nullptr);
 		ssa_open_scope(p);
 		ssa_build_stmt(p, fs->body);
-		ssa_close_scope(p, ssaDeferExit_Default, NULL);
+		ssa_close_scope(p, ssaDeferExit_Default, nullptr);
 		ssa_pop_target_list(p);
 
 		ssa_emit_jump(p, post);
 
-		if (fs->post != NULL) {
+		if (fs->post != nullptr) {
 			ssa_start_block(p, post);
 			ssa_build_stmt(p, fs->post);
 			ssa_emit_jump(p, post);
@@ -2159,25 +2159,25 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 	case_end;
 
 	case_ast_node(bs, BranchStmt, node);
-		ssaBlock *b = NULL;
+		ssaBlock *b = nullptr;
 		switch (bs->token.kind) {
 		case Token_break:
-			for (ssaTargetList *t = p->target_list; t != NULL && b == NULL; t = t->prev) {
+			for (ssaTargetList *t = p->target_list; t != nullptr && b == nullptr; t = t->prev) {
 				b = t->break_;
 			}
 			break;
 		case Token_continue:
-			for (ssaTargetList *t = p->target_list; t != NULL && b == NULL; t = t->prev) {
+			for (ssaTargetList *t = p->target_list; t != nullptr && b == nullptr; t = t->prev) {
 				b = t->continue_;
 			}
 			break;
 		case Token_fallthrough:
-			for (ssaTargetList *t = p->target_list; t != NULL && b == NULL; t = t->prev) {
+			for (ssaTargetList *t = p->target_list; t != nullptr && b == nullptr; t = t->prev) {
 				b = t->fallthrough_;
 			}
 			break;
 		}
-		if (b != NULL) {
+		if (b != nullptr) {
 			ssa_emit_defer_stmts(p, ssaDeferExit_Branch, b);
 		}
 		switch (bs->token.kind) {
@@ -2198,7 +2198,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 }
 
 void ssa_print_value(gbFile *f, ssaValue *v) {
-	if (v == NULL) {
+	if (v == nullptr) {
 		gb_fprintf(f, "nil");
 	}
 	gb_fprintf(f, "v%d", v->id);
@@ -2249,7 +2249,7 @@ void ssa_print_reg_value(gbFile *f, ssaValue *v) {
 	gb_fprintf(f, "    ");
 	gb_fprintf(f, "v%d = %.*s", v->id, LIT(ssa_op_strings[v->op]));
 
-	if (v->type != NULL) {
+	if (v->type != nullptr) {
 		gbString type_str = type_to_string(default_type(v->type));
 		gb_fprintf(f, " %s", type_str);
 		gb_string_free(type_str);
@@ -2313,7 +2313,7 @@ void ssa_print_proc(gbFile *f, ssaProc *p) {
 				bool skip = false;
 				for_array(k, v->args) {
 					ssaValue *w = v->args[k];
-					if (w != NULL && w->block == b && !printed[w->id]) {
+					if (w != nullptr && w->block == b && !printed[w->id]) {
 						skip = true;
 						break;
 					}
@@ -2377,13 +2377,13 @@ void ssa_build_proc(ssaModule *m, ssaProc *p) {
 	p->module = m;
 	m->proc = p;
 
-	if (p->decl_info->proc_lit == NULL ||
+	if (p->decl_info->proc_lit == nullptr ||
 	    p->decl_info->proc_lit->kind != AstNode_ProcLit) {
 		return;
 	}
 
 	ast_node(pl, ProcLit, p->decl_info->proc_lit);
-	if (pl->body == NULL) {
+	if (pl->body == nullptr) {
 		return;
 	}
 	p->entry = ssa_new_block(p, ssaBlock_Entry, "entry");
@@ -2392,7 +2392,7 @@ void ssa_build_proc(ssaModule *m, ssaProc *p) {
 	ssa_build_stmt(p, pl->body);
 
 	if (p->entity->type->Proc.result_count == 0) {
-		ssa_emit_defer_stmts(p, ssaDeferExit_Return, NULL);
+		ssa_emit_defer_stmts(p, ssaDeferExit_Return, nullptr);
 	}
 
 	p->exit = ssa_new_block(p, ssaBlock_Exit, "exit");
@@ -2429,7 +2429,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 	}
 
 	isize global_variable_max_count = 0;
-	Entity *entry_point = NULL;
+	Entity *entry_point = nullptr;
 	bool has_dll_main = false;
 	bool has_win_main = false;
 
@@ -2470,7 +2470,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 			continue;
 		}
 
-		if (map_get(&m.min_dep_map, hash_pointer(e)) == NULL) {
+		if (map_get(&m.min_dep_map, hash_pointer(e)) == nullptr) {
 			// NOTE(bill): Nothing depends upon it so doesn't need to be built
 			continue;
 		}
@@ -2515,7 +2515,7 @@ bool ssa_generate(Parser *parser, CheckerInfo *info) {
 
 			// ssa_module_add_value(m, e, p);
 			// HashKey hash_name = hash_string(name);
-			// if (map_get(&m.members, hash_name) == NULL) {
+			// if (map_get(&m.members, hash_name) == nullptr) {
 				// map_set(&m.members, hash_name, p);
 			// }
 		} break;

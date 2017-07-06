@@ -10,7 +10,7 @@ String alloc_comment_group_string(gbAllocator a, CommentGroup g) {
 		len += 1; // for \n
 	}
 	if (len == 0) {
-		return make_string(NULL, 0);
+		return make_string(nullptr, 0);
 	}
 
 	u8 *text = gb_alloc_array(a, u8, len+1);
@@ -70,7 +70,7 @@ void print_proc_decl(AstNodeProcDecl *pd) {
 	gbString params = expr_to_string(proc_type->params);
 	defer (gb_string_free(params));
 	gb_printf("proc %.*s(%s)", LIT(name), params);
-	if (proc_type->results != NULL)  {
+	if (proc_type->results != nullptr)  {
 		ast_node(fl, FieldList, proc_type->results);
 		isize count = fl->list.count;
 		if (count > 0) {

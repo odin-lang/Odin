@@ -71,8 +71,8 @@ struct Entity {
 	Token      token;
 	Scope *    scope;
 	Type *     type;
-	AstNode *  identifier; // Can be NULL
-	DeclInfo * parent_proc_decl; // NULL if in file/global scope
+	AstNode *  identifier; // Can be nullptr
+	DeclInfo * parent_proc_decl; // nullptr if in file/global scope
 
 	// TODO(bill): Cleanup how `using` works for entities
 	Entity *   using_parent;
@@ -131,7 +131,7 @@ struct Entity {
 	};
 };
 
-gb_global Entity *e_context = NULL;
+gb_global Entity *e_context = nullptr;
 
 bool is_entity_kind_exported(EntityKind kind) {
 	switch (kind) {
@@ -146,7 +146,7 @@ bool is_entity_kind_exported(EntityKind kind) {
 
 bool is_entity_exported(Entity *e) {
 	// TODO(bill): Determine the actual exportation rules for imports of entities
-	GB_ASSERT(e != NULL);
+	GB_ASSERT(e != nullptr);
 	if (!is_entity_kind_exported(e->kind)) {
 		return false;
 	}
@@ -177,7 +177,7 @@ Entity *make_entity_variable(gbAllocator a, Scope *scope, Token token, Type *typ
 }
 
 Entity *make_entity_using_variable(gbAllocator a, Entity *parent, Token token, Type *type) {
-	GB_ASSERT(parent != NULL);
+	GB_ASSERT(parent != nullptr);
 	token.pos = parent->token.pos;
 	Entity *entity = alloc_entity(a, Entity_Variable, parent->scope, token, type);
 	entity->using_parent = parent;
@@ -265,7 +265,7 @@ Entity *make_entity_library_name(gbAllocator a, Scope *scope, Token token, Type 
 
 Entity *make_entity_nil(gbAllocator a, String name, Type *type) {
 	Token token = make_token_ident(name);
-	Entity *entity = alloc_entity(a, Entity_Nil, NULL, token, type);
+	Entity *entity = alloc_entity(a, Entity_Nil, nullptr, token, type);
 	return entity;
 }
 
@@ -280,6 +280,6 @@ Entity *make_entity_label(gbAllocator a, Scope *scope, Token token, Type *type,
 
 Entity *make_entity_dummy_variable(gbAllocator a, Scope *scope, Token token) {
 	token.string = str_lit("_");
-	return make_entity_variable(a, scope, token, NULL, false);
+	return make_entity_variable(a, scope, token, nullptr, false);
 }
 

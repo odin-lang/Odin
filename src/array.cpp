@@ -61,7 +61,7 @@ Array<T> array_make(T *data, isize count, isize capacity) {
 
 template <typename T>
 void array_free(Array<T> *array) {
-	if (array->allocator.proc != NULL) {
+	if (array->allocator.proc != nullptr) {
 		gb_free(array->allocator, array->data);
 	}
 	array->count = 0;
@@ -123,7 +123,7 @@ void array_set_capacity(Array<T> *array, isize capacity) {
 		array_resize(array, capacity);
 	}
 
-	T *new_data = NULL;
+	T *new_data = nullptr;
 	if (capacity > 0) {
 		new_data = gb_alloc_array(array->allocator, T, capacity);
 		gb_memmove(new_data, array->data, gb_size_of(T) * array->capacity);
@@ -147,7 +147,7 @@ typedef Array(void) ArrayVoid;
 
 #define array_init_reserve(x_, allocator_, init_capacity_) do { \
 	void **e = cast(void **)&((x_)->e); \
-	GB_ASSERT((x_) != NULL); \
+	GB_ASSERT((x_) != nullptr); \
 	(x_)->allocator = (allocator_); \
 	(x_)->count = 0; \
 	(x_)->capacity = (init_capacity_); \
@@ -156,7 +156,7 @@ typedef Array(void) ArrayVoid;
 
 #define array_init_count(x_, allocator_, init_count_) do { \
 	void **e = cast(void **)&((x_)->e); \
-	GB_ASSERT((x_) != NULL); \
+	GB_ASSERT((x_) != nullptr); \
 	(x_)->allocator = (allocator_); \
 	(x_)->count = (init_count_); \
 	(x_)->capacity = (init_count_); \
@@ -203,7 +203,7 @@ typedef Array(void) ArrayVoid;
 
 void array__set_capacity(void *ptr, isize capacity, isize element_size) {
 	ArrayVoid *x = cast(ArrayVoid *)ptr;
-	GB_ASSERT(ptr != NULL);
+	GB_ASSERT(ptr != nullptr);
 
 	GB_ASSERT(element_size > 0);
 

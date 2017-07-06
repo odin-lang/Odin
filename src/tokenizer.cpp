@@ -433,7 +433,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 	// TODO(bill): Memory map rather than copy contents
 	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, c_str);
 	gb_zero_item(t);
-	if (fc.data != NULL) {
+	if (fc.data != nullptr) {
 		t->start = cast(u8 *)fc.data;
 		t->line = t->read_curr = t->curr = t->start;
 		t->end = t->start + fc.size;
@@ -468,7 +468,7 @@ TokenizerInitError init_tokenizer(Tokenizer *t, String fullpath) {
 }
 
 gb_inline void destroy_tokenizer(Tokenizer *t) {
-	if (t->start != NULL) {
+	if (t->start != nullptr) {
 		gb_free(heap_allocator(), t->start);
 	}
 	for_array(i, t->allocated_strings) {

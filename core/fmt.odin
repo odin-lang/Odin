@@ -484,11 +484,11 @@ fmt_bool :: proc(using fi: ^FmtInfo, b: bool, verb: rune) {
 fmt_write_padding :: proc(fi: ^FmtInfo, width: int) {
 	if width <= 0 do return;
 
-	pad_byte := u8(fi.space ? ' ' : '0');
+	pad_byte: u8 = fi.space ? ' ' : '0';
 
-	data := string_buffer_data(fi.buf^);
-	count := min(width, cap(data)-len(data));
-	for _ in 0..<count do write_byte(fi.buf, pad_byte);
+	for _ in 0..<width {
+		write_byte(fi.buf, pad_byte);
+	}
 }
 
 _fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
@@ -530,7 +530,6 @@ _fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: in
 
 	buf: [256]u8;
 	start := 0;
-
 
 	flags: strconv.IntFlag;
 	if fi.hash && !fi.zero do flags |= strconv.IntFlag.Prefix;
@@ -578,6 +577,7 @@ fmt_int :: proc(fi: ^FmtInfo, u: u128, is_signed: bool, bit_size: int, verb: run
 	case 'b': _fmt_int(fi, u,  2, is_signed, bit_size, __DIGITS_LOWER);
 	case 'o': _fmt_int(fi, u,  8, is_signed, bit_size, __DIGITS_LOWER);
 	case 'd': _fmt_int(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER);
+	case 'z': _fmt_int(fi, u, 12, is_signed, bit_size, __DIGITS_LOWER);
 	case 'x': _fmt_int(fi, u, 16, is_signed, bit_size, __DIGITS_LOWER);
 	case 'X': _fmt_int(fi, u, 16, is_signed, bit_size, __DIGITS_UPPER);
 	case 'c', 'r':
@@ -601,6 +601,8 @@ _pad :: proc(fi: ^FmtInfo, s: string) {
 		write_string(fi.buf, s);
 		return;
 	}
+
+
 	width := fi.width - utf8.rune_count(s);
 	if fi.minus { // right pad
 		write_string(fi.buf, s);

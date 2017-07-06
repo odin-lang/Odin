@@ -39,7 +39,7 @@ void ir_opt_add_operands(Array<irValue *> *ops, irInstr *i) {
 		array_add(ops, i->If.cond);
 		break;
 	case irInstr_Return:
-		if (i->Return.value != NULL) {
+		if (i->Return.value != nullptr) {
 			array_add(ops, i->Return.value);
 		}
 		break;
@@ -168,7 +168,7 @@ void ir_remove_dead_blocks(irProcedure *proc) {
 	isize j = 0;
 	for_array(i, proc->blocks) {
 		irBlock *b = proc->blocks[i];
-		if (b == NULL) {
+		if (b == nullptr) {
 			continue;
 		}
 		// NOTE(bill): Swap order
@@ -210,7 +210,7 @@ void ir_remove_unreachable_blocks(irProcedure *proc) {
 			}
 			// NOTE(bill): Mark as empty but don't actually free it
 			// As it's been allocated with an arena
-			proc->blocks[i] = NULL;
+			proc->blocks[i] = nullptr;
 		}
 	}
 	ir_remove_dead_blocks(proc);
@@ -245,7 +245,7 @@ bool ir_opt_block_fusion(irProcedure *proc, irBlock *a) {
 		ir_opt_block_replace_pred(b->succs[i], b, a);
 	}
 
-	proc->blocks[b->index] = NULL;
+	proc->blocks[b->index] = nullptr;
 	return true;
 }
 
@@ -258,7 +258,7 @@ void ir_opt_blocks(irProcedure *proc) {
 		changed = false;
 		for_array(i, proc->blocks) {
 			irBlock *b = proc->blocks[i];
-			if (b == NULL) {
+			if (b == nullptr) {
 				continue;
 			}
 			GB_ASSERT_MSG(b->index == i, "%d, %td", b->index, i);
@@ -286,11 +286,11 @@ void ir_opt_build_referrers(irProcedure *proc) {
 			ir_opt_add_operands(&ops, &instr->Instr);
 			for_array(k, ops) {
 				irValue *op = ops[k];
-				if (op == NULL) {
+				if (op == nullptr) {
 					continue;
 				}
 				Array<irValue *> *refs = ir_value_referrers(op);
-				if (refs != NULL) {
+				if (refs != nullptr) {
 					array_add(refs, instr);
 				}
 			}
@@ -325,10 +325,10 @@ i32 ir_lt_depth_first_search(irLTState *lt, irBlock *p, i32 i, irBlock **preorde
 	preorder[i] = p;
 	p->dom.pre = i++;
 	lt->sdom[p->index] = p;
-	ir_lt_link(lt, NULL, p);
+	ir_lt_link(lt, nullptr, p);
 	for_array(index, p->succs) {
 		irBlock *q = p->succs[index];
-		if (lt->sdom[q->index] == NULL) {
+		if (lt->sdom[q->index] == nullptr) {
 			lt->parent[q->index] = p;
 			i = ir_lt_depth_first_search(lt, q, i, preorder);
 		}
@@ -339,7 +339,7 @@ i32 ir_lt_depth_first_search(irLTState *lt, irBlock *p, i32 i, irBlock **preorde
 irBlock *ir_lt_eval(irLTState *lt, irBlock *v) {
 	irBlock *u = v;
 	for (;
-	     lt->ancestor[v->index] != NULL;
+	     lt->ancestor[v->index] != nullptr;
 	     v = lt->ancestor[v->index]) {
 		if (lt->sdom[v->index]->dom.pre < lt->sdom[u->index]->dom.pre) {
 			u = v;
@@ -432,7 +432,7 @@ void ir_opt_build_dom_tree(irProcedure *proc) {
 	for (isize i = 1; i < n; i++) {
 		irBlock *w = preorder[i];
 		if (w == root) {
-			w->dom.idom = NULL;
+			w->dom.idom = nullptr;
 		} else {
 			// Weird tree relationships here!
 
@@ -441,7 +441,7 @@ void ir_opt_build_dom_tree(irProcedure *proc) {
 			}
 
 			// Calculate children relation as inverse of idom
-			if (w->dom.idom->dom.children.data == NULL) {
+			if (w->dom.idom->dom.children.data == nullptr) {
 				// TODO(bill): Is this good enough for memory allocations?
 				array_init(&w->dom.idom->dom.children, heap_allocator());
 			}

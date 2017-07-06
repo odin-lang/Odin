@@ -23,39 +23,39 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 		}
 
 
-		if (e->type == NULL) {
+		if (e->type == nullptr) {
 			e->type = t_invalid;
 		}
-		return NULL;
+		return nullptr;
 	}
 
-	if (e->type == NULL) {
+	if (e->type == nullptr) {
 		// NOTE(bill): Use the type of the operand
 		Type *t = operand->type;
 		if (is_type_untyped(t)) {
 			if (t == t_invalid || is_type_untyped_nil(t)) {
 				error(e->token, "Invalid use of untyped nil in %.*s", LIT(context_name));
 				e->type = t_invalid;
-				return NULL;
+				return nullptr;
 			}
 			if (t == t_invalid || is_type_untyped_undef(t)) {
 				error(e->token, "Invalid use of --- in %.*s", LIT(context_name));
 				e->type = t_invalid;
-				return NULL;
+				return nullptr;
 			}
 			t = default_type(t);
 		}
 		if (is_type_polymorphic(t)) {
 			error(e->token, "Invalid use of a polymorphic type in %.*s", LIT(context_name));
 			e->type = t_invalid;
-			return NULL;
+			return nullptr;
 		}
 		if (is_type_bit_field_value(t)) {
 			t = default_bit_field_value_type(t);
 		}
 		if (is_type_variant(t)) {
 			Type *st = base_type(t);
-			GB_ASSERT(st->Record.variant_parent != NULL);
+			GB_ASSERT(st->Record.variant_parent != nullptr);
 			t = st->Record.variant_parent;
 		}
 		GB_ASSERT(is_type_typed(t));
@@ -66,14 +66,14 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 
 	check_assignment(c, operand, e->type, context_name);
 	if (operand->mode == Addressing_Invalid) {
-		return NULL;
+		return nullptr;
 	}
 
 	return e->type;
 }
 
 void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, Array<AstNode *> inits, String context_name) {
-	if ((lhs == NULL || lhs_count == 0) && inits.count == 0) {
+	if ((lhs == nullptr || lhs_count == 0) && inits.count == 0) {
 		return;
 	}
 
@@ -109,7 +109,7 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 	if (operand->mode == Addressing_Invalid ||
 		operand->type == t_invalid ||
 		e->type == t_invalid) {
-		if (e->type == NULL) {
+		if (e->type == nullptr) {
 			e->type = t_invalid;
 		}
 		return;
@@ -120,7 +120,7 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 		gbString str = expr_to_string(operand->expr);
 		error(operand->expr, "`%s` is not a constant", str);
 		gb_string_free(str);
-		if (e->type == NULL) {
+		if (e->type == nullptr) {
 			e->type = t_invalid;
 		}
 		return;
@@ -129,13 +129,13 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 		gbString type_str = type_to_string(operand->type);
 		error(operand->expr, "Invalid constant type: `%s`", type_str);
 		gb_string_free(type_str);
-		if (e->type == NULL) {
+		if (e->type == nullptr) {
 			e->type = t_invalid;
 		}
 		return;
 	}
 
-	if (e->type == NULL) { // NOTE(bill): type inference
+	if (e->type == nullptr) { // NOTE(bill): type inference
 		e->type = operand->type;
 	}
 
@@ -150,11 +150,11 @@ void check_init_constant(Checker *c, Entity *e, Operand *operand) {
 }
 
 void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
-	GB_ASSERT(e->type == NULL);
+	GB_ASSERT(e->type == nullptr);
 	String name = e->token.string;
-	Type *named = make_type_named(c->allocator, name, NULL, e);
+	Type *named = make_type_named(c->allocator, name, nullptr, e);
 	named->Named.type_name = e;
-	if (def != NULL && def->kind == Type_Named) {
+	if (def != nullptr && def->kind == Type_Named) {
 		def->Named.base = named;
 	}
 	e->type = named;
@@ -169,7 +169,7 @@ void check_type_decl(Checker *c, Entity *e, AstNode *type_expr, Type *def) {
 }
 
 void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, Type *named_type) {
-	GB_ASSERT(e->type == NULL);
+	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Constant);
 
 	if (e->flags & EntityFlag_Visited) {
@@ -192,10 +192,10 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 
 	Operand operand = {};
 
-	if (init != NULL) {
-		Entity *entity = NULL;
+	if (init != nullptr) {
+		Entity *entity = nullptr;
 		if (init->kind == AstNode_Ident) {
-			entity = check_ident(c, &operand, init, NULL, e->type, true);
+			entity = check_ident(c, &operand, init, nullptr, e->type, true);
 		} else if (init->kind == AstNode_SelectorExpr) {
 			entity = check_selector(c, &operand, init, e->type);
 		} else {
@@ -207,7 +207,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 			e->kind = Entity_TypeName;
 
 			DeclInfo *d = c->context.decl;
-			if (d->type_expr != NULL) {
+			if (d->type_expr != nullptr) {
 				error(e->token, "A type declaration cannot have an type parameter");
 			}
 			d->type_expr = d->init_expr;
@@ -217,7 +217,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 
 	// NOTE(bill): Check to see if the expression it to be aliases
 		case Addressing_Builtin:
-			if (e->type != NULL) {
+			if (e->type != nullptr) {
 				error(type_expr, "A constant alias of a built-in procedure may not have a type initializer");
 			}
 			e->kind = Entity_Builtin;
@@ -232,7 +232,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 			return;
 		}
 
-		if (entity != NULL) {
+		if (entity != nullptr) {
 			switch (entity->kind) {
 			case Entity_Alias:
 				e->kind = Entity_Alias;
@@ -263,7 +263,7 @@ void check_const_decl(Checker *c, Entity *e, AstNode *type_expr, AstNode *init, 
 		}
 	}
 
-	if (init != NULL) {
+	if (init != nullptr) {
 		check_expr_or_type(c, &operand, init, e->type);
 	}
 
@@ -334,8 +334,8 @@ bool are_signatures_similar_enough(Type *a_, Type *b_) {
 }
 
 void init_entity_foreign_library(Checker *c, Entity *e) {
-	AstNode *ident = NULL;
-	Entity **foreign_library = NULL;
+	AstNode *ident = nullptr;
+	Entity **foreign_library = nullptr;
 
 	switch (e->kind) {
 	case Entity_Procedure:
@@ -350,14 +350,14 @@ void init_entity_foreign_library(Checker *c, Entity *e) {
 		return;
 	}
 
-	if (ident == NULL) {
+	if (ident == nullptr) {
 		error(e->token, "foreign entiies must declare which library they are from");
 	} else if (ident->kind != AstNode_Ident) {
 		error(ident, "foreign library names must be an identifier");
 	} else {
 		String name = ident->Ident.token.string;
 		Entity *found = scope_lookup_entity(c->context.scope, name);
-		if (found == NULL) {
+		if (found == nullptr) {
 			if (name == "_") {
 				error(ident, "`_` cannot be used as a value type");
 			} else {
@@ -374,7 +374,7 @@ void init_entity_foreign_library(Checker *c, Entity *e) {
 }
 
 void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
-	GB_ASSERT(e->type == NULL);
+	GB_ASSERT(e->type == nullptr);
 	if (d->proc_lit->kind != AstNode_ProcLit) {
 		// TOOD(bill): Better error message
 		error(d->proc_lit, "Expected a procedure to check");
@@ -382,10 +382,10 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 	Type *proc_type = e->type;
-	if (d->gen_proc_type != NULL) {
+	if (d->gen_proc_type != nullptr) {
 		proc_type = d->gen_proc_type;
 	} else {
-		proc_type = make_type_proc(c->allocator, e->scope, NULL, 0, NULL, 0, false, ProcCC_Odin);
+		proc_type = make_type_proc(c->allocator, e->scope, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
 	}
 	e->type = proc_type;
 	ast_node(pl, ProcLit, d->proc_lit);
@@ -437,7 +437,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	}
 
 	if (pt->is_polymorphic) {
-		if (pl->body == NULL) {
+		if (pl->body == nullptr) {
 			error(e->token, "Polymorphic procedures must have a body");
 		}
 
@@ -447,7 +447,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 		}
 	}
 
-	if (pl->body != NULL) {
+	if (pl->body != nullptr) {
 		if (is_foreign) {
 			error(pl->body, "A foreign procedure cannot have a body");
 		}
@@ -537,7 +537,7 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 }
 
 void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count, AstNode *type_expr, AstNode *init_expr) {
-	GB_ASSERT(e->type == NULL);
+	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Variable);
 
 	if (e->flags & EntityFlag_Visited) {
@@ -548,17 +548,17 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 
 	String context_name = str_lit("variable declaration");
 
-	if (type_expr != NULL) {
+	if (type_expr != nullptr) {
 		e->type = check_type(c, type_expr);
 	}
-	if (e->type != NULL && is_type_polymorphic(e->type)) {
+	if (e->type != nullptr && is_type_polymorphic(e->type)) {
 		error(e->token, "Invalid use of a polymorphic type in %.*s", LIT(context_name));
 		e->type = t_invalid;
 	}
 
 
 	if (e->Variable.is_foreign) {
-		if (init_expr != NULL) {
+		if (init_expr != nullptr) {
 			error(e->token, "A foreign variable declaration cannot have a default value");
 		}
 		init_entity_foreign_library(c, e);
@@ -583,21 +583,21 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 		}
 	}
 
-	if (init_expr == NULL) {
-		if (type_expr == NULL) {
+	if (init_expr == nullptr) {
+		if (type_expr == nullptr) {
 			e->type = t_invalid;
 		}
 		return;
 	}
 
-	if (entities == NULL || entity_count == 1) {
-		GB_ASSERT(entities == NULL || entities[0] == e);
+	if (entities == nullptr || entity_count == 1) {
+		GB_ASSERT(entities == nullptr || entities[0] == e);
 		Operand operand = {};
 		check_expr(c, &operand, init_expr);
 		check_init_variable(c, e, &operand, context_name);
 	}
 
-	if (type_expr != NULL) {
+	if (type_expr != nullptr) {
 		for (isize i = 0; i < entity_count; i++) {
 			entities[i]->type = e->type;
 		}
@@ -611,13 +611,13 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 }
 
 void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
-	if (e->type != NULL) {
+	if (e->type != nullptr) {
 		return;
 	}
 
-	if (d == NULL) {
+	if (d == nullptr) {
 		d = decl_info_of_entity(&c->info, e);
-		if (d == NULL) {
+		if (d == nullptr) {
 			// TODO(bill): Err here?
 			e->type = t_invalid;
 			set_base_type(named_type, t_invalid);
@@ -653,7 +653,7 @@ void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type) {
 
 
 void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNode *body) {
-	if (body == NULL) {
+	if (body == nullptr) {
 		return;
 	}
 	GB_ASSERT(body->kind == AstNode_BlockStmt);
@@ -690,14 +690,14 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 			Type *t = base_type(type_deref(e->type));
 			if (is_type_struct(t) || is_type_raw_union(t)) {
 				Scope *scope = scope_of_node(&c->info, t->Record.node);
-				GB_ASSERT(scope != NULL);
+				GB_ASSERT(scope != nullptr);
 				for_array(i, scope->elements.entries) {
 					Entity *f = scope->elements.entries[i].value;
 					if (f->kind == Entity_Variable) {
 						Entity *uvar = make_entity_using_variable(c->allocator, e, f->token, f->type);
 						uvar->Variable.is_immutable = is_immutable;
 						Entity *prev = scope_insert_entity(c->context.scope, uvar);
-						if (prev != NULL) {
+						if (prev != nullptr) {
 							error(e->token, "Namespace collision while `using` `%.*s` of: %.*s", LIT(name), LIT(prev->token.string));
 							break;
 						}
@@ -729,7 +729,7 @@ void check_proc_body(Checker *c, Token token, DeclInfo *decl, Type *type, AstNod
 
 	check_scope_usage(c, c->context.scope);
 
-	if (decl->parent != NULL) {
+	if (decl->parent != nullptr) {
 		// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 		for_array(i, decl->deps.entries) {
 			HashKey key = decl->deps.entries[i].key;

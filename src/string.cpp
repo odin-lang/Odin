@@ -65,7 +65,7 @@ gb_inline String16 make_string16(wchar_t *text, isize len) {
 }
 
 isize string16_len(wchar_t *s) {
-	if (s == NULL) {
+	if (s == nullptr) {
 		return 0;
 	}
 	wchar_t *p = s;
@@ -256,7 +256,7 @@ String filename_from_path(String s) {
 		s.text += j+1;
 		s.len = i-j-1;
 	}
-	return make_string(NULL, 0);
+	return make_string(nullptr, 0);
 }
 
 
@@ -271,7 +271,7 @@ String filename_from_path(String s) {
 		return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, multibyte_input, input_length, output, output_size);
 	}
 	int convert_widechar_to_multibyte(wchar_t *widechar_input, int input_length, char *output, int output_size) {
-		return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, widechar_input, input_length, output, output_size, NULL, NULL);
+		return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, widechar_input, input_length, output, output_size, nullptr, nullptr);
 	}
 #elif defined(GB_SYSTEM_UNIX) || defined(GB_SYSTEM_OSX)
 
@@ -305,12 +305,12 @@ String16 string_to_string16(gbAllocator a, String s) {
 	wchar_t *text;
 
 	if (s.len < 1) {
-		return make_string16(NULL, 0);
+		return make_string16(nullptr, 0);
 	}
 
-	len = convert_multibyte_to_widechar(cast(char *)s.text, s.len, NULL, 0);
+	len = convert_multibyte_to_widechar(cast(char *)s.text, s.len, nullptr, 0);
 	if (len == 0) {
-		return make_string16(NULL, 0);
+		return make_string16(nullptr, 0);
 	}
 
 	text = gb_alloc_array(a, wchar_t, len+1);
@@ -318,7 +318,7 @@ String16 string_to_string16(gbAllocator a, String s) {
 	len1 = convert_multibyte_to_widechar(cast(char *)s.text, s.len, text, len);
 	if (len1 == 0) {
 		gb_free(a, text);
-		return make_string16(NULL, 0);
+		return make_string16(nullptr, 0);
 	}
 	text[len] = 0;
 
@@ -331,12 +331,12 @@ String string16_to_string(gbAllocator a, String16 s) {
 	u8 *text;
 
 	if (s.len < 1) {
-		return make_string(NULL, 0);
+		return make_string(nullptr, 0);
 	}
 
-	len = convert_widechar_to_multibyte(s.text, s.len, NULL, 0);
+	len = convert_widechar_to_multibyte(s.text, s.len, nullptr, 0);
 	if (len == 0) {
-		return make_string(NULL, 0);
+		return make_string(nullptr, 0);
 	}
 	len += 1; // NOTE(bill): It needs an extra 1 for some reason
 
@@ -345,7 +345,7 @@ String string16_to_string(gbAllocator a, String16 s) {
 	len1 = convert_widechar_to_multibyte(s.text, s.len, cast(char *)text, len);
 	if (len1 == 0) {
 		gb_free(a, text);
-		return make_string(NULL, 0);
+		return make_string(nullptr, 0);
 	}
 	text[len] = 0;
 

@@ -234,7 +234,7 @@ gb_inline T *map_get(Map<T> *h, HashKey key) {
 	if (index >= 0) {
 		return &h->entries[index].value;
 	}
-	return NULL;
+	return nullptr;
 }
 
 template <typename T>
@@ -303,7 +303,7 @@ template <typename T>
 MapEntry<T> *multi_map_find_first(Map<T> *h, HashKey key) {
 	isize i = map__find(h, key).entry_index;
 	if (i < 0) {
-		return NULL;
+		return nullptr;
 	}
 	return &h->entries[i];
 }
@@ -317,14 +317,14 @@ MapEntry<T> *multi_map_find_next(Map<T> *h, MapEntry<T> *e) {
 		}
 		i = h->entries[i].next;
 	}
-	return NULL;
+	return nullptr;
 }
 
 template <typename T>
 isize multi_map_count(Map<T> *h, HashKey key) {
 	isize count = 0;
 	MapEntry<T> *e = multi_map_find_first(h, key);
-	while (e != NULL) {
+	while (e != nullptr) {
 		count++;
 		e = multi_map_find_next(h, e);
 	}
@@ -335,7 +335,7 @@ template <typename T>
 void multi_map_get_all(Map<T> *h, HashKey key, T *items) {
 	isize i = 0;
 	MapEntry<T> *e = multi_map_find_first(h, key);
-	while (e != NULL) {
+	while (e != nullptr) {
 		items[i++] = e->value;
 		e = multi_map_find_next(h, e);
 	}
@@ -374,7 +374,7 @@ void multi_map_remove(Map<T> *h, HashKey key, MapEntry<T> *e) {
 
 template <typename T>
 void multi_map_remove_all(Map<T> *h, HashKey key) {
-	while (map_get(h, key) != NULL) {
+	while (map_get(h, key) != nullptr) {
 		map_remove(h, key);
 	}
 }
