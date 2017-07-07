@@ -415,7 +415,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			GB_ASSERT(is_type_array(type));
 			ir_fprintf(f, "c\"");
 			ir_print_escape_string(f, str, false, false);
-			ir_fprintf(f, "\"");
+			ir_fprintf(f, "\\00\"");
 		} else {
 			// HACK NOTE(bill): This is a hack but it works because strings are created at the very end
 			// of the .ll file

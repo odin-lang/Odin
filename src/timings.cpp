@@ -8,6 +8,7 @@ struct Timings {
 	TimeStamp        total;
 	Array<TimeStamp> sections;
 	u64              freq;
+	f64              total_time_seconds;
 };
 
 
@@ -123,16 +124,21 @@ void timings_print_all(Timings *t) {
 
 	GB_ASSERT(max_len <= gb_size_of(SPACES)-1);
 
-	gb_printf("%.*s%.*s - %.3f ms\n",
+	t->total_time_seconds = cast(f64)(t->total.finish - t->total.start) / cast(f64)t->freq;
+
+	f64 total_ms = time_stamp_as_ms(t->total, t->freq);
+
+	gb_printf("%.*s%.*s - % 9.3f ms\n",
 	          LIT(t->total.label),
 	          cast(int)(max_len-t->total.label.len), SPACES,
-	          time_stamp_as_ms(t->total, t->freq));
+	          total_ms);
 
 	for_array(i, t->sections) {
 		TimeStamp ts = t->sections[i];
-		gb_printf("%.*s%.*s - %.3f ms\n",
+		f64 section_ms = time_stamp_as_ms(ts, t->freq);
+		gb_printf("%.*s%.*s - % 9.3f ms - %5.2f%%\n",
 		          LIT(ts.label),
 	              cast(int)(max_len-ts.label.len), SPACES,
-		          time_stamp_as_ms(ts, t->freq));
+		          section_ms, 100*section_ms/total_ms);
 	}
 }

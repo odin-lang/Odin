@@ -10,12 +10,12 @@ struct Array {
 	isize       capacity;
 
 	T &operator[](isize index) {
-		GB_ASSERT_MSG(0 <= index && index < count, "Index out of bounds");
+		GB_ASSERT_MSG(0 <= index && index < count, "Index %td is out of bounds ranges 0..<%td", index, count);
 		return data[index];
 	}
 
 	T const &operator[](isize index) const {
-		GB_ASSERT_MSG(0 <= index && index < count, "Index out of bounds");
+		GB_ASSERT_MSG(0 <= index && index < count, "Index %td is out of bounds ranges 0..<%td", index, count);
 		return data[index];
 	}
 };
@@ -30,7 +30,6 @@ template <typename T> void     array_clear       (Array<T> *array);
 template <typename T> void     array_reserve     (Array<T> *array, isize capacity);
 template <typename T> void     array_resize      (Array<T> *array, isize count);
 template <typename T> void     array_set_capacity(Array<T> *array, isize capacity);
-
 
 template <typename T>
 void array_init(Array<T> *array, gbAllocator a, isize init_capacity) {

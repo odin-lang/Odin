@@ -1249,8 +1249,8 @@ irValue *ir_add_module_constant(irModule *m, Type *type, ExactValue value) {
 irValue *ir_add_global_string_array(irModule *m, String string) {
 	// TODO(bill): Should this use the arena allocator or the heap allocator?
 	// Strings could be huge!
-	gbAllocator a = m->allocator;
-	// gbAllocator a = gb_heap_allocator();
+	// gbAllocator a = m->allocator;
+	gbAllocator a = gb_heap_allocator();
 
 	isize max_len = 6+8+1;
 	u8 *str = cast(u8 *)gb_alloc_array(a, u8, max_len);
@@ -1260,12 +1260,12 @@ irValue *ir_add_global_string_array(irModule *m, String string) {
 	String name = make_string(str, len-1);
 	Token token = {Token_String};
 	token.string = name;
-	Type *type = make_type_array(a, t_u8, string.len);
+	Type *type = make_type_array(a, t_u8, string.len+1);
 	ExactValue ev = exact_value_string(string);
 	Entity *entity = make_entity_constant(a, nullptr, token, type, ev);
 	irValue *g = ir_value_global(a, entity, ir_add_module_constant(m, type, ev));
 	g->Global.is_private      = true;
-	// g->Global.is_unnamed_addr = true;
+	g->Global.is_unnamed_addr = true;
 	// g->Global.is_constant = true;
 
 	ir_module_add_value(m, entity, g);

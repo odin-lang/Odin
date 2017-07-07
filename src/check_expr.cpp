@@ -25,6 +25,12 @@ struct CallArgumentData {
 	Type *  result_type;
 };
 
+struct PolyProcData {
+	Entity *      gen_entity;
+	ProcedureInfo proc_info;
+};
+
+
 
 #define CALL_ARGUMENT_CHECKER(name) CallArgumentError name(Checker *c, AstNode *call, Type *proc_type, Entity *entity, Array<Operand> operands, CallArgumentErrorMode show_error_mode, CallArgumentData *data)
 typedef CALL_ARGUMENT_CHECKER(CallArgumentCheckerType);
@@ -52,8 +58,8 @@ void     check_stmt                     (Checker *c, AstNode *node, u32 flags);
 void     check_stmt_list                (Checker *c, Array<AstNode *> stmts, u32 flags);
 void     check_init_constant            (Checker *c, Entity *e, Operand *operand);
 bool     check_representable_as_constant(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
+bool     check_procedure_type           (Checker *c, Type *type, AstNode *proc_type_node, Array<Operand> *operands = nullptr);
 CallArgumentData check_call_arguments   (Checker *c, Operand *operand, Type *proc_type, AstNode *call);
-
 
 void error_operand_not_expression(Operand *o) {
 	if (o->mode == Addressing_Type) {
@@ -140,11 +146,219 @@ bool check_is_assignable_to_using_subtype(Type *src, Type *dst) {
 	return false;
 }
 
+bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Type *type,
+                                            Array<Operand> *param_operands, PolyProcData *poly_proc_data,
+                                            bool check_later) {
+	///////////////////////////////////////////////////////////////////////////////
+	//                                                                           //
+	// TODO CLEANUP(bill): This procedure is very messy and hacky. Clean this!!! //
+	//                                                                           //
+	///////////////////////////////////////////////////////////////////////////////
 
-// IMPORTANT TODO(bill): figure out the exact distance rules
-// -1 is not convertable
-// 0 is exact
-// >0 is convertable
+	if (base_entity == nullptr) {
+		return false;
+	}
+
+	if (!is_type_proc(base_entity->type)) {
+		return false;
+	}
+
+	Type *src = base_type(base_entity->type);
+	Type *dst = nullptr;
+	if (type != nullptr) dst = base_type(type);
+
+	if (param_operands == nullptr) {
+		GB_ASSERT(dst != nullptr);
+	}
+	if (param_operands != nullptr) {
+		GB_ASSERT(dst == nullptr);
+	}
+
+
+	if (!src->Proc.is_polymorphic || src->Proc.is_poly_specialized) {
+		return false;
+	}
+
+	if (dst != nullptr) {
+		if (dst->Proc.is_polymorphic) {
+			return false;
+		}
+
+		if (dst->Proc.param_count  != src->Proc.param_count ||
+		    dst->Proc.result_count != src->Proc.result_count) {
+		    return false;
+		}
+	}
+
+
+	DeclInfo *old_decl = decl_info_of_entity(&c->info, base_entity);
+	GB_ASSERT(old_decl != nullptr);
+
+	gbAllocator a = heap_allocator();
+
+	Array<Operand> operands = {};
+	if (param_operands) {
+		operands = *param_operands;
+	} else {
+		array_init(&operands, a, dst->Proc.param_count);
+		for (isize i = 0; i < dst->Proc.param_count; i++) {
+			Entity *param = dst->Proc.params->Tuple.variables[i];
+			Operand o = {Addressing_Value};
+			o.type = param->type;
+			array_add(&operands, o);
+		}
+	}
+
+	defer (if (param_operands == nullptr) {
+		array_free(&operands);
+	});
+
+
+	CheckerContext prev_context = c->context;
+	defer (c->context = prev_context);
+
+	Scope *scope = make_scope(base_entity->scope, a);
+	scope->is_proc = true;
+	c->context.scope = scope;
+	c->context.allow_polymorphic_types = true;
+	if (param_operands == nullptr) {
+		c->context.no_polymorphic_errors = false;
+	}
+
+	bool generate_type_again = c->context.no_polymorphic_errors;
+
+	auto *pt = &src->Proc;
+
+	// NOTE(bill): This is slightly memory leaking if the type already exists
+	// Maybe it's better to check with the previous types first?
+	Type *final_proc_type = make_type_proc(c->allocator, scope, nullptr, 0, nullptr, 0, false, pt->calling_convention);
+	bool success = check_procedure_type(c, final_proc_type, pt->node, &operands);
+	if (!success) {
+		return false;
+	}
+
+	auto *found_gen_procs = map_get(&c->info.gen_procs, hash_pointer(base_entity->identifier));
+	if (found_gen_procs) {
+		auto procs = *found_gen_procs;
+		for_array(i, procs) {
+			Entity *other = procs[i];
+			Type *pt = base_type(other->type);
+			if (are_types_identical(pt, final_proc_type)) {
+				if (poly_proc_data) {
+					poly_proc_data->gen_entity = other;
+				}
+				return true;
+			}
+		}
+	}
+
+	if (generate_type_again) {
+		// LEAK TODO(bill): This is technically a memory leak as it has to generate the type twice
+
+		bool prev_no_polymorphic_errors = c->context.no_polymorphic_errors;
+		defer (c->context.no_polymorphic_errors = prev_no_polymorphic_errors);
+		c->context.no_polymorphic_errors = false;
+
+		// NOTE(bill): Reset scope from the failed procedure type
+		scope_reset(scope);
+
+		success = check_procedure_type(c, final_proc_type, pt->node, &operands);
+
+		if (!success) {
+			return false;
+		}
+
+		if (found_gen_procs) {
+			auto procs = *found_gen_procs;
+			for_array(i, procs) {
+				Entity *other = procs[i];
+				Type *pt = base_type(other->type);
+				if (are_types_identical(pt, final_proc_type)) {
+					if (poly_proc_data) {
+						poly_proc_data->gen_entity = other;
+					}
+					return true;
+				}
+			}
+		}
+	}
+
+	AstNode *proc_lit = clone_ast_node(a, old_decl->proc_lit);
+	ast_node(pl, ProcLit, proc_lit);
+	// NOTE(bill): Associate the scope declared above with this procedure declaration's type
+	add_scope(c, pl->type, final_proc_type->Proc.scope);
+	final_proc_type->Proc.is_poly_specialized = true;
+	final_proc_type->Proc.is_polymorphic = true;
+
+	u64 tags = base_entity->Procedure.tags;
+	AstNode *ident = clone_ast_node(a, base_entity->identifier);
+	Token token = ident->Ident.token;
+	DeclInfo *d = make_declaration_info(c->allocator, scope, old_decl->parent);
+	d->gen_proc_type = final_proc_type;
+	d->type_expr = pl->type;
+	d->proc_lit = proc_lit;
+
+
+	Entity *entity = make_entity_procedure(c->allocator, nullptr, token, final_proc_type, tags);
+	entity->identifier = ident;
+
+	add_entity_and_decl_info(c, ident, entity, d);
+	// NOTE(bill): Set the scope afterwards as this is not real overloading
+	entity->scope = scope->parent;
+
+	AstFile *file = nullptr;
+	{
+		Scope *s = entity->scope;
+		while (s != nullptr && s->file == nullptr) {
+			s = s->parent;
+		}
+		file = s->file;
+	}
+
+	ProcedureInfo proc_info = {};
+	proc_info.file  = file;
+	proc_info.token = token;
+	proc_info.decl  = d;
+	proc_info.type  = final_proc_type;
+	proc_info.body  = pl->body;
+	proc_info.tags  = tags;
+	proc_info.generated_from_polymorphic = true;
+
+	if (found_gen_procs) {
+		array_add(found_gen_procs, entity);
+	} else {
+		Array<Entity *> array = {};
+		array_init(&array, heap_allocator());
+		array_add(&array, entity);
+		map_set(&c->info.gen_procs, hash_pointer(base_entity->identifier), array);
+	}
+
+	GB_ASSERT(entity != nullptr);
+
+
+	if (poly_proc_data) {
+		poly_proc_data->gen_entity = entity;
+		poly_proc_data->proc_info  = proc_info;
+	}
+
+	if (check_later) {
+		// NOTE(bill): Check the newly generated procedure body
+		check_procedure_later(c, proc_info);
+	}
+
+	return true;
+}
+
+bool check_polymorphic_procedure_assignment(Checker *c, Operand *operand, Type *type, PolyProcData *poly_proc_data) {
+	Entity *base_entity = entity_of_ident(&c->info, operand->expr);
+	if (base_entity == nullptr) return false;
+	return find_or_generate_polymorphic_procedure(c, base_entity, type, nullptr, poly_proc_data, true);
+}
+
+bool find_or_generate_polymorphic_procedure_from_parameters(Checker *c, Entity *base_entity, Array<Operand> *operands, PolyProcData *poly_proc_data) {
+	return find_or_generate_polymorphic_procedure(c, base_entity, nullptr, operands, poly_proc_data, false);
+}
+
 
 i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 	if (operand->mode == Addressing_Invalid ||
@@ -289,6 +503,11 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 	if (is_type_proc(dst)) {
 		if (are_types_identical(src, dst)) {
 			return 3;
+		}
+		PolyProcData poly_proc_data = {};
+		if (check_polymorphic_procedure_assignment(c, operand, type, &poly_proc_data)) {
+			add_entity_use(c, operand->expr, poly_proc_data.gen_entity);
+			return 4;
 		}
 	}
 
@@ -1737,7 +1956,7 @@ bool abi_compat_return_by_value(gbAllocator a, ProcCallingConvention cc, Type *a
 }
 
 // NOTE(bill): `operands` is for generating non generic procedure type
-bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array<Operand> *operands = nullptr) {
+bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array<Operand> *operands) {
 	ast_node(pt, ProcType, proc_type_node);
 
 	bool variadic = false;
@@ -5151,154 +5370,7 @@ bool check_unpack_arguments(Checker *c, isize lhs_count, Array<Operand> *operand
 	return optional_ok;
 }
 
-// NOTE(bill): Returns `nullptr` on failure
-Entity *find_or_generate_polymorphic_procedure(Checker *c, AstNode *call, Entity *base_entity, CallArgumentCheckerType *call_checker,
-                                               Array<Operand> *operands, ProcedureInfo *proc_info_) {
-	///////////////////////////////////////////////////////////////////////////////
-	//                                                                           //
-	// TODO CLEANUP(bill): This procedure is very messy and hacky. Clean this!!! //
-	//                                                                           //
-	///////////////////////////////////////////////////////////////////////////////
-	if (base_entity == nullptr) {
-		return nullptr;
-	}
 
-	if (!is_type_proc(base_entity->type)) {
-		return nullptr;
-	}
-
-	TypeProc *pt = &base_type(base_entity->type)->Proc;
-	if (!pt->is_polymorphic || pt->is_poly_specialized) {
-		return nullptr;
-	}
-
-	DeclInfo *old_decl = decl_info_of_entity(&c->info, base_entity);
-	GB_ASSERT(old_decl != nullptr);
-
-	gbAllocator a = heap_allocator();
-
-	CheckerContext prev_context = c->context;
-	defer (c->context = prev_context);
-
-	Scope *scope = make_scope(base_entity->scope, a);
-	scope->is_proc = true;
-	c->context.scope = scope;
-	c->context.allow_polymorphic_types = true;
-
-	bool generate_type_again = c->context.no_polymorphic_errors;
-
-	// NOTE(bill): This is slightly memory leaking if the type already exists
-	// Maybe it's better to check with the previous types first?
-	Type *final_proc_type = make_type_proc(c->allocator, scope, nullptr, 0, nullptr, 0, false, pt->calling_convention);
-	bool success = check_procedure_type(c, final_proc_type, pt->node, operands);
-	if (!success) {
-		ProcedureInfo proc_info = {};
-		if (proc_info_) *proc_info_ = proc_info;
-		return nullptr;
-	}
-
-	auto *found_gen_procs = map_get(&c->info.gen_procs, hash_pointer(base_entity->identifier));
-	if (found_gen_procs) {
-		auto procs = *found_gen_procs;
-		for_array(i, procs) {
-			Entity *other = procs[i];
-			Type *pt = base_type(other->type);
-			if (are_types_identical(pt, final_proc_type)) {
-				// NOTE(bill): This scope is not needed any more, destroy it
-				// destroy_scope(scope);
-				return other;
-			}
-		}
-	}
-
-	if (generate_type_again) {
-		// LEAK TODO(bill): This is technically a memory leak as it has to generate the type twice
-
-		bool prev_no_polymorphic_errors = c->context.no_polymorphic_errors;
-		defer (c->context.no_polymorphic_errors = prev_no_polymorphic_errors);
-		c->context.no_polymorphic_errors = false;
-
-		// NOTE(bill): Reset scope from the failed procedure type
-		scope_reset(scope);
-
-		success = check_procedure_type(c, final_proc_type, pt->node, operands);
-
-		if (!success) {
-			ProcedureInfo proc_info = {};
-			if (proc_info_) *proc_info_ = proc_info;
-			return nullptr;
-		}
-
-		if (found_gen_procs) {
-			auto procs = *found_gen_procs;
-			for_array(i, procs) {
-				Entity *other = procs[i];
-				Type *pt = base_type(other->type);
-				if (are_types_identical(pt, final_proc_type)) {
-					// NOTE(bill): This scope is not needed any more, destroy it
-					// destroy_scope(scope);
-					return other;
-				}
-			}
-		}
-	}
-
-	AstNode *proc_lit = clone_ast_node(a, old_decl->proc_lit);
-	ast_node(pl, ProcLit, proc_lit);
-	// NOTE(bill): Associate the scope declared above with this procedure declaration's type
-	add_scope(c, pl->type, final_proc_type->Proc.scope);
-	final_proc_type->Proc.is_poly_specialized = true;
-	final_proc_type->Proc.is_polymorphic = true;
-
-	u64 tags = base_entity->Procedure.tags;
-	AstNode *ident = clone_ast_node(a, base_entity->identifier);
-	Token token = ident->Ident.token;
-	DeclInfo *d = make_declaration_info(c->allocator, scope, old_decl->parent);
-	d->gen_proc_type = final_proc_type;
-	d->type_expr = pl->type;
-	d->proc_lit = proc_lit;
-
-
-	Entity *entity = make_entity_procedure(c->allocator, nullptr, token, final_proc_type, tags);
-	entity->identifier = ident;
-
-	add_entity_and_decl_info(c, ident, entity, d);
-	// NOTE(bill): Set the scope afterwards as this is not real overloading
-	entity->scope = scope->parent;
-
-	AstFile *file = nullptr;
-	{
-		Scope *s = entity->scope;
-		while (s != nullptr && s->file == nullptr) {
-			s = s->parent;
-		}
-		file = s->file;
-	}
-
-	ProcedureInfo proc_info = {};
-	proc_info.file  = file;
-	proc_info.token = token;
-	proc_info.decl  = d;
-	proc_info.type  = final_proc_type;
-	proc_info.body  = pl->body;
-	proc_info.tags  = tags;
-	proc_info.generated_from_polymorphic = true;
-
-	if (found_gen_procs) {
-		array_add(found_gen_procs, entity);
-	} else {
-		Array<Entity *> array = {};
-		array_init(&array, heap_allocator());
-		array_add(&array, entity);
-		map_set(&c->info.gen_procs, hash_pointer(base_entity->identifier), array);
-	}
-
-	GB_ASSERT(entity != nullptr);
-
-
-	if (proc_info_) *proc_info_ = proc_info;
-	return entity;
-}
 
 CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 	ast_node(ce, CallExpr, call);
@@ -5386,11 +5458,11 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			}
 		} else {
 			// NOTE(bill): Generate the procedure type for this generic instance
-			ProcedureInfo proc_info = {};
+			PolyProcData poly_proc_data = {};
 
 			if (pt->is_polymorphic && !pt->is_poly_specialized) {
-				gen_entity = find_or_generate_polymorphic_procedure(c, call, entity, check_call_arguments_internal, &operands, &proc_info);
-				if (gen_entity != nullptr) {
+				if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &operands, &poly_proc_data)) {
+					gen_entity = poly_proc_data.gen_entity;
 					GB_ASSERT(is_type_proc(gen_entity->type));
 					final_proc_type = gen_entity->type;
 				}
@@ -5477,11 +5549,9 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				gb_printf_err("append %s with score %lld %d\n", type_to_string(final_proc_type), score, err);
 			}
 
-			if (gen_entity != nullptr && err == CallArgumentError_None) {
-				if (proc_info.decl != nullptr) {
-					// NOTE(bill): Check the newly generated procedure body
-					check_procedure_later(c, proc_info);
-				}
+			if (err == CallArgumentError_None && poly_proc_data.proc_info.decl != nullptr) {
+				// NOTE(bill): Check the newly generated procedure body
+				check_procedure_later(c, poly_proc_data.proc_info);
 			}
 		}
 	}
@@ -5622,11 +5692,11 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 
 	Entity *gen_entity = nullptr;
 	if (pt->is_polymorphic && !pt->is_poly_specialized && err == CallArgumentError_None) {
-		ProcedureInfo proc_info = {};
-		gen_entity = find_or_generate_polymorphic_procedure(c, call, entity, check_named_call_arguments, &ordered_operands, &proc_info);
-		if (gen_entity != nullptr) {
-			if (proc_info.decl != nullptr) {
-				check_procedure_later(c, proc_info);
+		PolyProcData poly_proc_data = {};
+		if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &ordered_operands, &poly_proc_data)) {
+			gen_entity = poly_proc_data.gen_entity;
+			if (poly_proc_data.proc_info.decl != nullptr) {
+				check_procedure_later(c, poly_proc_data.proc_info);
 			}
 			Type *gept = base_type(gen_entity->type);
 			GB_ASSERT(is_type_proc(gept));

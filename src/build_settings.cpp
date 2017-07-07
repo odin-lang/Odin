@@ -18,6 +18,7 @@ struct BuildContext {
 	bool   is_dll;
 	bool   generate_docs;
 	i32    optimization_level;
+	bool   show_timings;
 };
 
 

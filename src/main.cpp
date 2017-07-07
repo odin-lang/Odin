@@ -1,5 +1,4 @@
 #define USE_CUSTOM_BACKEND 0
-// #define PRINT_TIMINGS
 
 #include "common.cpp"
 #include "timings.cpp"
@@ -171,6 +170,7 @@ enum BuildFlagKind {
 	BuildFlag_Invalid,
 
 	BuildFlag_OptimizationLevel,
+	BuildFlag_ShowTimings,
 
 	BuildFlag_COUNT,
 };
@@ -202,6 +202,9 @@ bool parse_build_flags(Array<String> args) {
 	Array<BuildFlag> build_flags = {};
 	array_init(&build_flags, heap_allocator(), BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"), BuildFlagParam_Integer);
+	add_flag(&build_flags, BuildFlag_ShowTimings, str_lit("show-timings"), BuildFlagParam_None);
+
+
 
 	Array<String> flag_args = args;
 	flag_args.data  += 3;
@@ -214,105 +217,111 @@ bool parse_build_flags(Array<String> args) {
 		String flag = flag_args[i];
 		if (flag[0] != '-') {
 			gb_printf_err("Invalid flag: %.*s\n", LIT(flag));
-		} else {
-			String name = substring(flag, 1, flag.len);
-			isize end = 0;
-			for (; end < name.len; end++) {
-				if (name[end] == '=') {
-					break;
-				}
-			}
-			name.len = end;
-			String param = substring(flag, 2+end, flag.len);
+			continue;
+		}
+		String name = substring(flag, 1, flag.len);
+		isize end = 0;
+		for (; end < name.len; end++) {
+			if (name[end] == '=') break;
+		}
+		name = substring(name, 0, end);
+		String param = {};
+		if (end < flag.len-1) param = substring(flag, 2+end, flag.len);
 
-			bool found = false;
-			for_array(build_flag_index, build_flags) {
-				BuildFlag bf = build_flags[build_flag_index];
-				if (bf.name == name) {
-					found = true;
-					if (set_flags[bf.kind]) {
-						gb_printf_err("Previous flag set: `%.*s`\n", LIT(name));
+		bool found = false;
+		for_array(build_flag_index, build_flags) {
+			BuildFlag bf = build_flags[build_flag_index];
+			if (bf.name == name) {
+				found = true;
+				if (set_flags[bf.kind]) {
+					gb_printf_err("Previous flag set: `%.*s`\n", LIT(name));
+					bad_flags = true;
+				} else {
+					ExactValue value = {};
+					bool ok = false;
+					if (bf.param_kind == BuildFlagParam_None) {
+						if (param.len == 0) {
+							ok = true;
+						} else {
+							gb_printf_err("Flag `%.*s` was not expecting a parameter `%.*s`\n", LIT(name), LIT(param));
+							bad_flags = true;
+						}
+					} else if (param.len == 0) {
+						gb_printf_err("Flag missing for `%.*s`\n", LIT(name));
 						bad_flags = true;
 					} else {
-						ExactValue value = {};
-						bool ok = false;
-						if (bf.param_kind == BuildFlagParam_None) {
-							if (param.len == 0) {
-								ok = true;
+						ok = true;
+						switch (bf.param_kind) {
+						default: ok = false; break;
+						case BuildFlagParam_Boolean: {
+							if (param == "t") {
+								value = exact_value_bool(true);
+							} else if (param == "T") {
+								value = exact_value_bool(true);
+							} else if (param == "true") {
+								value = exact_value_bool(true);
+							} else if (param == "TRUE") {
+								value = exact_value_bool(true);
+							} else if (param == "1") {
+								value = exact_value_bool(true);
+							} else if (param == "f") {
+								value = exact_value_bool(false);
+							} else if (param == "F") {
+								value = exact_value_bool(false);
+							} else if (param == "false") {
+								value = exact_value_bool(false);
+							} else if (param == "FALSE") {
+								value = exact_value_bool(false);
+							} else if (param == "0") {
+								value = exact_value_bool(false);
 							} else {
-								gb_printf_err("Flag `%.*s` was not expecting a parameter `%.*s`\n", LIT(name), LIT(param));
-								bad_flags = true;
+								gb_printf_err("Invalid flag parameter for `%.*s` = `%.*s`\n", LIT(name), LIT(param));
 							}
-						} else {
-							if (param.len == 0) {
-								gb_printf_err("Flag missing for `%.*s`\n", LIT(name));
-								bad_flags = true;
-							} else {
-								ok = true;
-								switch (bf.param_kind) {
-								default: ok = false; break;
-								case BuildFlagParam_Boolean: {
-									if (param == "t") {
-										value = exact_value_bool(true);
-									} else if (param == "T") {
-										value = exact_value_bool(true);
-									} else if (param == "true") {
-										value = exact_value_bool(true);
-									} else if (param == "TRUE") {
-										value = exact_value_bool(true);
-									} else if (param == "1") {
-										value = exact_value_bool(true);
-									} else if (param == "f") {
-										value = exact_value_bool(false);
-									} else if (param == "F") {
-										value = exact_value_bool(false);
-									} else if (param == "false") {
-										value = exact_value_bool(false);
-									} else if (param == "FALSE") {
-										value = exact_value_bool(false);
-									} else if (param == "0") {
-										value = exact_value_bool(false);
-									} else {
-										gb_printf_err("Invalid flag parameter for `%.*s` = `%.*s`\n", LIT(name), LIT(param));
-									}
-								} break;
-								case BuildFlagParam_Integer:
-									value = exact_value_integer_from_string(param);
-									break;
-								case BuildFlagParam_Float:
-									value = exact_value_float_from_string(param);
-									break;
-								case BuildFlagParam_String:
-									value = exact_value_string(param);
-									break;
-								}
-							}
-
+						} break;
+						case BuildFlagParam_Integer:
+							value = exact_value_integer_from_string(param);
+							break;
+						case BuildFlagParam_Float:
+							value = exact_value_float_from_string(param);
+							break;
+						case BuildFlagParam_String:
+							value = exact_value_string(param);
+							break;
 						}
-						if (ok) {
-							switch (bf.kind) {
-							case BuildFlag_OptimizationLevel:
-								if (value.kind == ExactValue_Integer) {
-									build_context.optimization_level = cast(i32)i128_to_i64(value.value_integer);
-								} else {
-									gb_printf_err("%.*s expected an integer, got %.*s", LIT(name), LIT(param));
-									bad_flags = true;
-									ok = false;
-								}
-								break;
-							}
-						}
-
-
-						set_flags[bf.kind] = ok;
 					}
-					break;
+					if (ok) {
+						switch (bf.kind) {
+						case BuildFlag_OptimizationLevel:
+							if (value.kind == ExactValue_Integer) {
+								build_context.optimization_level = cast(i32)i128_to_i64(value.value_integer);
+							} else {
+								gb_printf_err("%.*s expected an integer, got %.*s", LIT(name), LIT(param));
+								bad_flags = true;
+								ok = false;
+							}
+							break;
+						case BuildFlag_ShowTimings:
+							if (value.kind == ExactValue_Invalid) {
+								build_context.show_timings = true;
+							} else {
+								gb_printf_err("%.*s expected no value, got %.*s", LIT(name), LIT(param));
+								bad_flags = true;
+								ok = false;
+							}
+							break;
+						}
+
+					}
+
+
+					set_flags[bf.kind] = ok;
 				}
+				break;
 			}
-			if (!found) {
-				gb_printf_err("Unknown flag: `%.*s`\n", LIT(name));
-				bad_flags = true;
-			}
+		}
+		if (!found) {
+			gb_printf_err("Unknown flag: `%.*s`\n", LIT(name));
+			bad_flags = true;
 		}
 	}
 
@@ -320,7 +329,20 @@ bool parse_build_flags(Array<String> args) {
 }
 
 
+void show_timings(Checker *c, Timings *t) {
+	Parser *p = c->parser;
+	timings_print_all(t);
+	gb_printf("\n");
+	gb_printf("Total lines:  %td\n", p->total_line_count);
+	gb_printf("Lines/s:      %.3f\n", cast(f64)p->total_line_count/t->total_time_seconds);
+	gb_printf("us/Line:      %.3f\n", 1.0e6*t->total_time_seconds/cast(f64)p->total_line_count);
+	gb_printf("\n");
+	gb_printf("Total tokens: %td\n", p->total_token_count);
+	gb_printf("Tokens/s:     %.3f\n", cast(f64)p->total_token_count/t->total_time_seconds);
+	gb_printf("us/Token:     %.3f\n\n", 1.0e6*t->total_time_seconds/cast(f64)p->total_token_count);
+	gb_printf("\n");
 
+}
 
 int main(int arg_count, char **arg_ptr) {
 	if (arg_count < 2) {
@@ -556,9 +578,9 @@ int main(int arg_count, char **arg_ptr) {
 			return exit_code;
 		}
 
-	#if defined(PRINT_TIMINGS)
-		timings_print_all(&timings);
-	#endif
+		if (build_context.show_timings) {
+			show_timings(&checker, &timings);
+		}
 
 
 		if (run_output) {
@@ -662,9 +684,9 @@ int main(int arg_count, char **arg_ptr) {
 			return exit_code;
 		}
 
-	#if defined(PRINT_TIMINGS)
-		timings_print_all(&timings);
-	#endif
+		if (build_context.show_timings) {
+			show_timings(&checker, &timings);
+		}
 
 		if (run_output) {
 			system_exec_command_line_app("odin run", false, "%.*s", LIT(output_base));
