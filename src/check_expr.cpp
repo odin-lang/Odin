@@ -633,7 +633,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 			// TODO(bill): is this a good enough error message?
 			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error(operand->expr,
-			      "Cannot assign type `%s` as a value in %.*s",
+			      "Cannot assign `%s` which is a type in %.*s",
 			      op_type_str,
 			      LIT(context_name));
 		} else {
@@ -658,8 +658,9 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *> *entity_map) {
 	t = base_type(type_deref(t));
 	gbString str = nullptr;
+	defer (gb_string_free(str));
 	if (node != nullptr) {
-		expr_to_string(node);
+		str = expr_to_string(node);
 	}
 
 	if (t->kind == Type_Record) {
@@ -687,7 +688,6 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 		}
 	}
 
-	gb_string_free(str);
 }
 
 
@@ -696,6 +696,7 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
                    Entity **fields, isize field_count,
                    String context) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
 
 	Map<Entity *> entity_map = {};
 	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*field_count);
@@ -717,11 +718,9 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 		Type *type = check_type(c, f->type);
 		bool is_using = (f->flags&FieldFlag_using) != 0;
 
-		if (is_using) {
-			if (f->names.count > 1) {
-				error(f->names[0], "Cannot apply `using` to more than one of the same type");
-				is_using = false;
-			}
+		if (is_using && f->names.count > 1) {
+			error(f->names[0], "Cannot apply `using` to more than one of the same type");
+			is_using = false;
 		}
 
 		for_array(name_index, f->names) {
@@ -795,7 +794,6 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 		}
 	}
 
-	gb_temp_arena_memory_end(tmp);
 
 	return field_index;
 }
@@ -956,6 +954,7 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 	}
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
 
 	Map<Entity *> entity_map = {}; // Key: String
 	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*variant_count);
@@ -1057,7 +1056,6 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 
 	type_set_offsets(c->allocator, union_type);
 
-	gb_temp_arena_memory_end(tmp);
 
 	union_type->Record.variants      = variants;
 	union_type->Record.variant_count = variant_index;
@@ -1093,6 +1091,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	GB_ASSERT(is_type_enum(enum_type));
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
 
 	Type *base_type = t_int;
 	if (et->base_type != nullptr) {
@@ -1208,7 +1207,6 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		}
 	}
 	GB_ASSERT(field_count <= et->fields.count);
-	gb_temp_arena_memory_end(tmp);
 
 
 	enum_type->Record.fields = fields;
@@ -1230,7 +1228,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 	GB_ASSERT(is_type_bit_field(bit_field_type));
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
-
+	defer (gb_temp_arena_memory_end(tmp));
 
 	Map<Entity *> entity_map = {}; // Key: String
 	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*(bft->fields.count));
@@ -1293,7 +1291,6 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 		}
 	}
 	GB_ASSERT(field_count <= bft->fields.count);
-	gb_temp_arena_memory_end(tmp);
 
 	bit_field_type->BitField.fields      = fields;
 	bit_field_type->BitField.field_count = field_count;
@@ -2137,6 +2134,8 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 		multi_map_get_all(&s->elements, key, procs);
 		if (type_hint != nullptr) {
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+			defer (gb_temp_arena_memory_end(tmp));
+
 			// NOTE(bill): These should be done
 			for (isize i = 0; i < overload_count; i++) {
 				Type *t = base_type(procs[i]->type);
@@ -2153,8 +2152,6 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 					break;
 				}
 			}
-			gb_temp_arena_memory_end(tmp);
-
 		}
 
 		if (!skip) {
@@ -7073,7 +7070,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		}
 
 		if (se->low == nullptr && se->high != nullptr) {
-			error(se->interval0, "1st index is required if a 2nd index is specified");
+			// error(se->interval0, "1st index is required if a 2nd index is specified");
 			// It is okay to continue as it will assume the 1st index is zero
 		}
 
@@ -7094,7 +7091,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		TokenKind interval_kind = se->interval0.kind;
 
-		i64 indices[2] = {};
+		i64 indices[3] = {};
 		AstNode *nodes[3] = {se->low, se->high, se->max};
 		for (isize i = 0; i < gb_count_of(nodes); i++) {
 			i64 index = max_count;
@@ -7159,6 +7156,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 	case_end;
 
 	case AstNode_TypeType:
+	case AstNode_PolyType:
 	case AstNode_ProcType:
 	case AstNode_PointerType:
 	case AstNode_ArrayType:

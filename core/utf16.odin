@@ -36,7 +36,7 @@ encode :: proc(d: []u16, s: []rune) {
 
 	for r in s {
 		match r {
-		case 0..<_surr1, _surr3..<_surr_self:
+		case 0.._surr1, _surr3.._surr_self:
 			d[n] = u16(r);
 			n++;
 

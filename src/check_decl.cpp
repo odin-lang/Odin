@@ -79,6 +79,7 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, Array<AstNo
 
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+	defer (gb_temp_arena_memory_end(tmp));
 
 	// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 	// an extra allocation
@@ -100,9 +101,6 @@ void check_init_variables(Checker *c, Entity **lhs, isize lhs_count, Array<AstNo
 	if (rhs_count > 0 && lhs_count != rhs_count) {
 		error(lhs[0]->token, "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
 	}
-
-
-	gb_temp_arena_memory_end(tmp);
 }
 
 void check_init_constant(Checker *c, Entity *e, Operand *operand) {

@@ -191,7 +191,7 @@ parse_f64 :: proc(s: string) -> f64 {
 
 append_bool :: proc(buf: []u8, b: bool) -> string {
 	s := b ? "true" : "false";
-	append(&buf, ..[]u8(s));
+	append(&buf, ...[]u8(s));
 	return string(buf);
 }
 
@@ -257,7 +257,7 @@ generic_ftoa :: proc(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 
 		} else {
 			s = "+Inf";
 		}
-		append(&buf, ..[]u8(s));
+		append(&buf, ...[]u8(s));
 		return buf;
 
 	case 0: // denormalized
@@ -309,7 +309,7 @@ format_digits :: proc(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, 
 		// integer, padded with zeros when needed
 		if digs.decimal_point > 0 {
 			m := min(digs.count, digs.decimal_point);
-			append(&buf, ..digs.digits[0..<m]);
+			append(&buf, ...digs.digits[..m]);
 			for ; m < digs.decimal_point; m++ {
 				append(&buf, '0');
 			}
@@ -321,7 +321,7 @@ format_digits :: proc(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, 
 		// fractional part
 		if prec > 0 {
 			append(&buf, '.');
-			for i in 0..<prec {
+			for i in 0..prec {
 				c: u8 = '0';
 				if j := digs.decimal_point + i; 0 <= j && j < digs.count {
 					c = digs.digits[j];
@@ -342,7 +342,7 @@ format_digits :: proc(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, 
 	}
 
 	c := [2]u8{'%', fmt};
-	append(&buf, ..c[..]);
+	append(&buf, ...c[..]);
 	return buf;
 }
 
@@ -383,7 +383,7 @@ round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 
 	inclusive := mant%2 == 0;
 
-	for i in 0..<d.count {
+	for i in 0..d.count {
 		l: u8 = '0'; // lower digit
 		if i < lower.count {
 			l = lower.digits[i];
@@ -492,7 +492,7 @@ append_bits :: proc(buf: []u8, u: u128, base: int, is_signed: bool, bit_size: in
 		i--; a[i] = ' ';
 	}
 
-	append(&buf, ..a[i..]);
+	append(&buf, ...a[i..]);
 	return string(buf);
 }
 

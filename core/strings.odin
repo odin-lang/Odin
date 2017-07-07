@@ -4,7 +4,7 @@ new_string :: proc(s: string) -> string {
 	c := make([]u8, len(s)+1);
 	copy(c, []u8(s));
 	c[len(s)] = 0;
-	return string(c[0..<len(s)]);
+	return string(c[..len(s)]);
 }
 
 new_c_string :: proc(s: string) -> ^u8 {

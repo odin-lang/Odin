@@ -45,7 +45,7 @@ _libgl := win32.load_library_a(_string_data("opengl32.dll\x00"));
 
 get_proc_address :: proc(name: string) -> rawptr {
 	if name[len(name)-1] == 0 {
-		name = name[0..<len(name)-1];
+		name = name[..len(name)-1];
 	}
 	// NOTE(bill): null terminated
 	assert((&name[0] + len(name))^ == 0);

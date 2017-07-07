@@ -683,6 +683,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			}
 
 			gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+			defer (gb_temp_arena_memory_end(tmp));
 
 			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 			// an extra allocation
@@ -705,7 +706,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				error(as->lhs[0], "Assignment count mismatch `%td` = `%td`", lhs_count, rhs_count);
 			}
 
-			gb_temp_arena_memory_end(tmp);
 		} break;
 
 		default: {
@@ -1325,6 +1325,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						TypeAndToken *found = map_get(&seen, key);
 						if (found != nullptr) {
 							gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+							defer (gb_temp_arena_memory_end(tmp));
+
 							isize count = multi_map_count(&seen, key);
 							TypeAndToken *taps = gb_alloc_array(c->tmp_allocator, TypeAndToken, count);
 
@@ -1347,7 +1349,6 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 								}
 							}
 
-							gb_temp_arena_memory_end(tmp);
 
 							if (continue_outer) {
 								continue;

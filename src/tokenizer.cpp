@@ -78,8 +78,8 @@ TOKEN_KIND(Token__ComparisonEnd, "_ComparisonEnd"), \
 	TOKEN_KIND(Token_Semicolon,     ";"),   \
 	TOKEN_KIND(Token_Period,        "."),   \
 	TOKEN_KIND(Token_Comma,         ","),   \
-	TOKEN_KIND(Token_Ellipsis,      ".."),  \
-	TOKEN_KIND(Token_HalfClosed,    "..<"), \
+	TOKEN_KIND(Token_Ellipsis,      "..."), \
+	TOKEN_KIND(Token_HalfClosed,    ".."),  \
 	TOKEN_KIND(Token_BackSlash,     "\\"),  \
 TOKEN_KIND(Token__OperatorEnd, "_OperatorEnd"), \
 \
@@ -885,10 +885,10 @@ Token tokenizer_get_token(Tokenizer *t) {
 			token.kind = Token_Period; // Default
 			if (t->curr_rune == '.') { // Could be an ellipsis
 				advance_to_next_rune(t);
-				token.kind = Token_Ellipsis;
-				if (t->curr_rune == '<') {
+				token.kind = Token_HalfClosed;
+				if (t->curr_rune == '.') {
 					advance_to_next_rune(t);
-					token.kind = Token_HalfClosed;
+					token.kind = Token_Ellipsis;
 				}
 			}
 			break;

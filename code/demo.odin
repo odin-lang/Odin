@@ -12,13 +12,13 @@ import (
 	"strconv.odin";
 	"strings.odin";
 	"sync.odin";
+	"sort.odin";
 	"types.odin";
 	"utf8.odin";
 	"utf16.odin";
 /*
 */
 )
-
 
 general_stuff :: proc() {
 	// Complex numbers
@@ -35,10 +35,10 @@ general_stuff :: proc() {
 	// C-style variadic procedures
 	foreign __llvm_core {
 		// The variadic part allows for extra type checking too which C does not provide
-		c_printf :: proc(fmt: ^u8, #c_vararg args: ..any) -> i32 #link_name "printf" ---;
+		c_printf :: proc(fmt: ^u8, #c_vararg args: ...any) -> i32 #link_name "printf" ---;
 	}
-	str := "%d\n";
-	c_printf(&str[0], i32(789456123));
+	str := "%d\n\x00";
+	// c_printf(&str[0], i32(789456123));
 
 
 	Foo :: struct {
@@ -96,8 +96,8 @@ named_arguments :: proc() {
 	using Colour;
 
 	make_character :: proc(name, catch_phrase: string, favourite_colour, least_favourite_colour: Colour) {
-	    fmt.println();
-	    fmt.printf("My name is %v and I like %v.  %v\n", name, favourite_colour, catch_phrase);
+		fmt.println();
+		fmt.printf("My name is %v and I like %v.  %v\n", name, favourite_colour, catch_phrase);
 	}
 
 	make_character("Frank", "¡Ay, caramba!", Blue, Green);
@@ -128,7 +128,7 @@ named_arguments :: proc() {
 
 	// Named arguments can also aid with default arguments
 	numerous_things :: proc(s: string, a := 1, b := 2, c := 3.14,
-	                     d := "The Best String!", e := false, f := 10.3/3.1, g := false) {
+	                        d := "The Best String!", e := false, f := 10.3/3.1, g := false) {
 		g_str := g ? "true" : "false";
 		fmt.printf("How many?! %s: %v\n", s, g_str);
 	}
@@ -196,7 +196,7 @@ default_return_values :: proc() {
 call_location :: proc() {
 	amazing :: proc(n: int, using loc := #caller_location) {
 		fmt.printf("%s(%d:%d) just asked to do something amazing.\n",
-		           fully_pathed_filename, line, column);
+				   fully_pathed_filename, line, column);
 		fmt.printf("Normal -> %d\n", n);
 		fmt.printf("Amazing -> %d\n", n+1);
 		fmt.println();
@@ -230,7 +230,7 @@ explicit_parametric_polymorphic_procedures :: proc() {
 	defer free(another_ptr);
 
 
-	add :: proc(T: type, args: ..T) -> T {
+	add :: proc(T: type, args: ...T) -> T {
 		res: T;
 		for arg in args do res += arg;
 		return res;
@@ -362,32 +362,21 @@ explicit_parametric_polymorphic_procedures :: proc() {
 }
 
 
-pop :: proc(array: ^[]$T) -> T {
-	last: T;
-	if len(array) == 0 {
-		panic("Attempt to pop an empty slice");
-		return last;
+implicit_polymorphic_assignment :: proc() {
+	yep :: proc(p: proc(x: int)) {
+		p(123);
 	}
 
-	last = array[len(array)-1];
-	^raw.Slice(array).len -= 1;
-	return last;
+	frank :: proc(x: $T)    do fmt.println("frank ->", x);
+	tim   :: proc(x, y: $T) do fmt.println("tim ->", x, y);
+	yep(frank);
+	// yep(tim);
 }
-pop :: proc(a: ^[dynamic]$T) -> T {
-	last: T;
-	if len(a) == 0 {
-		panic("Attempt to pop an empty dynamic array");
-		return last;
-	}
 
-	last = array[len(array)-1];
-	^raw.DynamicArray(array).len -= 1;
-	return last;
-}
+
 
 
 main :: proc() {
-when true {
 	foo :: proc(x: i64,  y: f32) do fmt.println("#1", x, y);
 	foo :: proc(x: type, y: f32) do fmt.println("#2", type_info(x), y);
 	foo :: proc(x: type)         do fmt.println("#3", type_info(x));
@@ -397,6 +386,7 @@ when true {
 	f(y = 3785.1546, x = 123);
 	f(x = int, y = 897.513);
 	f(x = f32);
+
 	general_stuff();
 	foreign_blocks();
 	default_arguments();
@@ -404,6 +394,8 @@ when true {
 	default_return_values();
 	call_location();
 	explicit_parametric_polymorphic_procedures();
+	implicit_polymorphic_assignment();
+
 
 	// Command line argument(s)!
 	// -opt=0,1,2,3
@@ -423,11 +415,6 @@ when true {
 	}
 
 	fmt.printf("The program \"%s\" calculates the value %d\n",
-	           program, accumulator);
+			   program, accumulator);
 */
 }
-}
-
-
-
-

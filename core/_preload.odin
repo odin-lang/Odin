@@ -285,7 +285,7 @@ copy :: proc(dst, src: []$T) -> int #cc_contextless {
 
 
 
-append :: proc(array: ^[]$T, args: ..T) -> int #cc_contextless {
+append :: proc(array: ^[]$T, args: ...T) -> int #cc_contextless {
 	if array == nil do return 0;
 
 	arg_len := len(args);
@@ -303,7 +303,7 @@ append :: proc(array: ^[]$T, args: ..T) -> int #cc_contextless {
 	return len(array);
 }
 
-append :: proc(array: ^[dynamic]$T, args: ..T) -> int {
+append :: proc(array: ^[dynamic]$T, args: ...T) -> int {
 	if array == nil do return 0;
 
 	arg_len := len(args);
@@ -559,21 +559,21 @@ __complex128_ne :: proc(a, b: complex128) -> bool #cc_contextless #inline { retu
 
 __bounds_check_error :: proc(file: string, line, column: int, index, count: int) #cc_contextless {
 	if 0 <= index && index < count do return;
-	fmt.fprintf(os.stderr, "%s(%d:%d) Index %d is out of bounds range 0..<%d\n",
+	fmt.fprintf(os.stderr, "%s(%d:%d) Index %d is out of bounds range 0..%d\n",
 	            file, line, column, index, count);
 	__debug_trap();
 }
 
 __slice_expr_error :: proc(file: string, line, column: int, low, high, max: int) #cc_contextless {
 	if 0 <= low && low <= high && high <= max do return;
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: [%d..<%d..<%d]\n",
+	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid slice indices: [%d..%d..%d]\n",
 	            file, line, column, low, high, max);
 	__debug_trap();
 }
 
 __substring_expr_error :: proc(file: string, line, column: int, low, high: int) #cc_contextless {
 	if 0 <= low && low <= high do return;
-	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid substring indices: [%d..<%d]\n",
+	fmt.fprintf(os.stderr, "%s(%d:%d) Invalid substring indices: [%d..%d]\n",
 	            file, line, column, low, high);
 	__debug_trap();
 }
@@ -623,7 +623,7 @@ __mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #cc_con
 }
 
 __mem_compare :: proc(a, b: ^u8, n: int) -> int #cc_contextless {
-	for i in 0..<n {
+	for i in 0..n {
 		match {
 		case (a+i)^ < (b+i)^: return -1;
 		case (a+i)^ > (b+i)^: return +1;
@@ -791,9 +791,9 @@ __dynamic_map_rehash :: proc(using header: __MapHeader, new_count: int) {
 
 	__dynamic_array_resize(nm_hashes, size_of(int), align_of(int), new_count);
 	__dynamic_array_reserve(&nm.entries, entry_size, entry_align, m.entries.len);
-	for i in 0..<new_count do nm.hashes[i] = -1;
+	for i in 0..new_count do nm.hashes[i] = -1;
 
-	for i := 0; i < m.entries.len; i++ {
+	for i in 0..m.entries.len {
 		if len(nm.hashes) == 0 do __dynamic_map_grow(new_header);
 
 		entry_header := __dynamic_map_get_entry(header, i);
