@@ -104,9 +104,13 @@ void timings_start_section(Timings *t, String label) {
 	array_add(&t->sections, make_time_stamp(label));
 }
 
-f64 time_stamp_as_ms(TimeStamp ts, u64 freq) {
+f64 time_stamp_as_second(TimeStamp ts, u64 freq) {
 	GB_ASSERT_MSG(ts.finish >= ts.start, "time_stamp_as_ms - %.*s", LIT(ts.label));
-	return 1000.0 * cast(f64)(ts.finish - ts.start) / cast(f64)freq;
+	return cast(f64)(ts.finish - ts.start) / cast(f64)freq;
+}
+
+f64 time_stamp_as_ms(TimeStamp ts, u64 freq) {
+	return 1000.0*time_stamp_as_second(ts, freq);
 }
 
 void timings_print_all(Timings *t) {
@@ -124,19 +128,20 @@ void timings_print_all(Timings *t) {
 
 	GB_ASSERT(max_len <= gb_size_of(SPACES)-1);
 
-	t->total_time_seconds = cast(f64)(t->total.finish - t->total.start) / cast(f64)t->freq;
+	t->total_time_seconds = time_stamp_as_second(t->total, t->freq);
 
 	f64 total_ms = time_stamp_as_ms(t->total, t->freq);
 
-	gb_printf("%.*s%.*s - % 9.3f ms\n",
+	gb_printf("%.*s%.*s - % 9.3f ms - %6.2f%%\n",
 	          LIT(t->total.label),
 	          cast(int)(max_len-t->total.label.len), SPACES,
-	          total_ms);
+	          total_ms,
+	          cast(f64)100.0);
 
 	for_array(i, t->sections) {
 		TimeStamp ts = t->sections[i];
 		f64 section_ms = time_stamp_as_ms(ts, t->freq);
-		gb_printf("%.*s%.*s - % 9.3f ms - %5.2f%%\n",
+		gb_printf("%.*s%.*s - % 9.3f ms - %6.2f%%\n",
 		          LIT(ts.label),
 	              cast(int)(max_len-ts.label.len), SPACES,
 		          section_ms, 100*section_ms/total_ms);

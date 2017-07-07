@@ -114,9 +114,8 @@ enum FieldFlag {
 	FieldFlag_using     = 1<<1,
 	FieldFlag_no_alias  = 1<<2,
 	FieldFlag_c_vararg  = 1<<3,
-	FieldFlag_dollar    = 1<<4,
 
-	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_dollar,
+	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg,
 };
 
 enum StmtAllowFlag {
@@ -2181,6 +2180,19 @@ AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
 	return ast_bad_expr(f, f->curr_token, end);
 }
 
+AstNode *convert_stmt_to_body(AstFile *f, AstNode *stmt) {
+	if (stmt->kind == AstNode_BlockStmt) {
+		syntax_error(stmt, "Expected a normal statement rather than a block statement");
+		return stmt;
+	}
+	GB_ASSERT(is_ast_node_stmt(stmt));
+	Token open = ast_node_token(stmt);
+	Token close = ast_node_token(stmt);
+	Array<AstNode *> stmts = make_ast_node_array(f, 1);
+	array_add(&stmts, stmt);
+	return ast_block_stmt(f, stmts, open, close);
+}
+
 
 
 AstNode *parse_operand(AstFile *f, bool lhs) {
@@ -2304,16 +2316,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			AstNode *curr_proc = f->curr_proc;
 			AstNode *body = nullptr;
 			f->curr_proc = type;
-			body = parse_stmt(f);
-			if (body->kind == AstNode_BlockStmt) {
-				syntax_error(body, "Expected a normal statement rather than a block statement");
-			} else {
-				Token open = ast_node_token(body);
-				Token close = ast_node_token(body);
-				Array<AstNode *> stmts = make_ast_node_array(f, 1);
-				array_add(&stmts, body);
-				body = ast_block_stmt(f, stmts, open, close);
-			}
+			body = convert_stmt_to_body(f, parse_stmt(f));
 			f->curr_proc = curr_proc;
 
 			return ast_proc_lit(f, type, body, tags, link_name);
@@ -3184,12 +3187,9 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token, String *link_name_) {
 	for_array(i, params->FieldList.list) {
 		AstNode *param = params->FieldList.list[i];
 		ast_node(f, Field, param);
-		if (f->flags&FieldFlag_dollar) {
-			is_generic = true;
-			break;
-		}
 		if (f->type != nullptr &&
-		    f->type->kind == AstNode_TypeType) {
+		    (f->type->kind == AstNode_TypeType ||
+		     f->type->kind == AstNode_PolyType)) {
 			is_generic = true;
 			break;
 		}
@@ -3232,7 +3232,6 @@ enum FieldPrefixKind {
 	FieldPrefix_Using,
 	FieldPrefix_NoAlias,
 	FieldPrefix_CVarArg,
-	FieldPrefix_Dollar,
 };
 
 FieldPrefixKind is_token_field_prefix(AstFile *f) {
@@ -3242,9 +3241,6 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 
 	case Token_using:
 		return FieldPrefix_Using;
-
-	case Token_Dollar:
-		return FieldPrefix_Dollar;
 
 	case Token_Hash: {
 		next_token(f);
@@ -3268,7 +3264,6 @@ u32 parse_field_prefixes(AstFile *f) {
 	i32 using_count    = 0;
 	i32 no_alias_count = 0;
 	i32 c_vararg_count = 0;
-	i32 dollar_count   = 0;
 
 	for (;;) {
 		FieldPrefixKind kind = is_token_field_prefix(f);
@@ -3279,20 +3274,17 @@ u32 parse_field_prefixes(AstFile *f) {
 		case FieldPrefix_Using:     using_count    += 1; next_token(f); break;
 		case FieldPrefix_NoAlias:   no_alias_count += 1; next_token(f); break;
 		case FieldPrefix_CVarArg:   c_vararg_count += 1; next_token(f); break;
-		case FieldPrefix_Dollar:    dollar_count   += 1; next_token(f); break;
 		}
 	}
 	if (using_count     > 1) syntax_error(f->curr_token, "Multiple `using` in this field list");
 	if (no_alias_count  > 1) syntax_error(f->curr_token, "Multiple `#no_alias` in this field list");
 	if (c_vararg_count  > 1) syntax_error(f->curr_token, "Multiple `#c_vararg` in this field list");
-	if (dollar_count    > 1) syntax_error(f->curr_token, "Multiple `$` in this field list");
 
 
 	u32 field_flags = 0;
 	if (using_count     > 0) field_flags |= FieldFlag_using;
 	if (no_alias_count  > 0) field_flags |= FieldFlag_no_alias;
 	if (c_vararg_count  > 0) field_flags |= FieldFlag_c_vararg;
-	if (dollar_count    > 0) field_flags |= FieldFlag_dollar;
 	return field_flags;
 }
 
@@ -3313,12 +3305,6 @@ u32 check_field_prefixes(AstFile *f, isize name_count, u32 allowed_flags, u32 se
 	if ((allowed_flags&FieldFlag_c_vararg) == 0 && (set_flags&FieldFlag_c_vararg)) {
 		syntax_error(f->curr_token, "`#c_vararg` is not allowed within this field list");
 		set_flags &= ~FieldFlag_c_vararg;
-	}
-	// if ((allowed_flags&FieldFlag_dollar) == 0 && (set_flags&FieldFlag_dollar)) {
-	if ((set_flags&FieldFlag_dollar)) {
-		// syntax_error(f->curr_token, "`$` is only allowed within procedures");
-		syntax_error(f->curr_token, "`$` is not yet supported");
-		set_flags &= ~FieldFlag_dollar;
 	}
 	return set_flags;
 }
@@ -3806,6 +3792,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 }
 
 
+
 AstNode *parse_body(AstFile *f) {
 	Array<AstNode *> stmts = {};
 	Token open, close;
@@ -3855,10 +3842,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 	}
 
 	if (allow_token(f, Token_do)) {
-		body = parse_stmt(f);
-		if (body->kind == AstNode_BlockStmt) {
-			syntax_error(body, "Expected a normal statement rather than a block statement");
-		}
+		body = convert_stmt_to_body(f, parse_stmt(f));
 	} else {
 		body = parse_block_stmt(f, false);
 	}
@@ -3873,10 +3857,7 @@ AstNode *parse_if_stmt(AstFile *f) {
 			break;
 		case Token_do: {
 			Token arrow = expect_token(f, Token_do);
-			body = parse_stmt(f);
-			if (body->kind == AstNode_BlockStmt) {
-				syntax_error(body, "Expected a normal statement rather than a block statement");
-			}
+			else_stmt = convert_stmt_to_body(f, parse_stmt(f));
 		} break;
 		default:
 			syntax_error(f->curr_token, "Expected if statement block statement");
@@ -3906,10 +3887,7 @@ AstNode *parse_when_stmt(AstFile *f) {
 	}
 
 	if (allow_token(f, Token_do)) {
-		body = parse_stmt(f);
-		if (body->kind == AstNode_BlockStmt) {
-			syntax_error(body, "Expected a normal statement rather than a block statement");
-		}
+		body = convert_stmt_to_body(f, parse_stmt(f));
 	} else {
 		body = parse_block_stmt(f, true);
 	}
@@ -3924,10 +3902,7 @@ AstNode *parse_when_stmt(AstFile *f) {
 			break;
 		case Token_do: {
 			Token arrow = expect_token(f, Token_do);
-			body = parse_stmt(f);
-			if (body->kind == AstNode_BlockStmt) {
-				syntax_error(body, "Expected a normal statement rather than a block statement");
-			}
+			body = convert_stmt_to_body(f, parse_stmt(f));
 		} break;
 		default:
 			syntax_error(f->curr_token, "Expected when statement block statement");
@@ -4043,10 +4018,7 @@ AstNode *parse_for_stmt(AstFile *f) {
 	}
 
 	if (allow_token(f, Token_do)) {
-		body = parse_stmt(f);
-		if (body->kind == AstNode_BlockStmt) {
-			syntax_error(body, "Expected a normal statement rather than a block statement");
-		}
+		body = convert_stmt_to_body(f, parse_stmt(f));
 	} else {
 		body = parse_block_stmt(f, false);
 	}
@@ -4304,10 +4276,7 @@ AstNode *parse_stmt(AstFile *f) {
 		f->expr_level = prev_level;
 
 		if (allow_token(f, Token_do)) {
-			body = parse_stmt(f);
-			if (body->kind == AstNode_BlockStmt) {
-				syntax_error(body, "Expected a normal statement rather than a block statement");
-			}
+			body = convert_stmt_to_body(f, parse_stmt(f));
 		} else {
 			body = parse_block_stmt(f, false);
 		}
@@ -4324,10 +4293,7 @@ AstNode *parse_stmt(AstFile *f) {
 		f->expr_level = prev_level;
 
 		if (allow_token(f, Token_do)) {
-			body = parse_stmt(f);
-			if (body->kind == AstNode_BlockStmt) {
-				syntax_error(body, "Expected a normal statement rather than a block statement");
-			}
+			body = convert_stmt_to_body(f, parse_stmt(f));
 		} else {
 			body = parse_block_stmt(f, false);
 		}

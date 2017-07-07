@@ -330,18 +330,38 @@ bool parse_build_flags(Array<String> args) {
 
 
 void show_timings(Checker *c, Timings *t) {
-	Parser *p = c->parser;
-	timings_print_all(t);
-	gb_printf("\n");
-	gb_printf("Total lines:  %td\n", p->total_line_count);
-	gb_printf("Lines/s:      %.3f\n", cast(f64)p->total_line_count/t->total_time_seconds);
-	gb_printf("us/Line:      %.3f\n", 1.0e6*t->total_time_seconds/cast(f64)p->total_line_count);
-	gb_printf("\n");
-	gb_printf("Total tokens: %td\n", p->total_token_count);
-	gb_printf("Tokens/s:     %.3f\n", cast(f64)p->total_token_count/t->total_time_seconds);
-	gb_printf("us/Token:     %.3f\n\n", 1.0e6*t->total_time_seconds/cast(f64)p->total_token_count);
-	gb_printf("\n");
-
+	Parser *p    = c->parser;
+	isize lines  = p->total_line_count;
+	isize tokens = p->total_token_count;
+	isize files  = p->files.count;
+	{
+		timings_print_all(t);
+		gb_printf("\n");
+		gb_printf("Total Lines  - %td\n", lines);
+		gb_printf("Total Tokens - %td\n", tokens);
+		gb_printf("Total Files  - %td\n", files);
+		gb_printf("\n");
+	}
+	{
+		TimeStamp ts = t->sections[0];
+		GB_ASSERT(ts.label == "parse files");
+		f64 parse_time = time_stamp_as_second(ts, t->freq);
+		gb_printf("Parse pass\n");
+		gb_printf("LOC/s        - %.3f\n", cast(f64)lines/parse_time);
+		gb_printf("us/LOC       - %.3f\n", 1.0e6*parse_time/cast(f64)lines);
+		gb_printf("Tokens/s     - %.3f\n", cast(f64)tokens/parse_time);
+		gb_printf("us/Token     - %.3f\n", 1.0e6*parse_time/cast(f64)tokens);
+		gb_printf("\n");
+	}
+	{
+		f64 total_time = t->total_time_seconds;
+		gb_printf("Total pass\n");
+		gb_printf("LOC/s        - %.3f\n", cast(f64)lines/total_time);
+		gb_printf("us/LOC       - %.3f\n", 1.0e6*total_time/cast(f64)lines);
+		gb_printf("Tokens/s     - %.3f\n", cast(f64)tokens/total_time);
+		gb_printf("us/Token     - %.3f\n", 1.0e6*total_time/cast(f64)tokens);
+		gb_printf("\n");
+	}
 }
 
 int main(int arg_count, char **arg_ptr) {

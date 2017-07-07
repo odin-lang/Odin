@@ -1384,6 +1384,39 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 	case Type_Proc:
 		if (source->kind == Type_Proc) {
 			// TODO(bill): Polymorphic type assignment
+			#if 0
+			TypeProc *x = &poly->Proc;
+			TypeProc *y = &source->Proc;
+			if (x->calling_convention != y->calling_convention) {
+				return false;
+			}
+			if (x->c_vararg != y->c_vararg) {
+				return false;
+			}
+			if (x->variadic != y->variadic) {
+				return false;
+			}
+			if (x->param_count != y->param_count) {
+				return false;
+			}
+			if (x->result_count != y->result_count) {
+				return false;
+			}
+			for (isize i = 0; i < x->param_count; i++) {
+				Entity *a = x->params->Tuple.variables[i];
+				Entity *b = y->params->Tuple.variables[i];
+				bool ok = is_polymorphic_type_assignable(c, a->type, b->type, false, modify_type);
+				if (!ok) return false;
+			}
+			for (isize i = 0; i < x->result_count; i++) {
+				Entity *a = x->results->Tuple.variables[i];
+				Entity *b = y->results->Tuple.variables[i];
+				bool ok = is_polymorphic_type_assignable(c, a->type, b->type, false, modify_type);
+				if (!ok) return false;
+			}
+			// TODO(bill): Polymorphic type assignment
+			return true;
+			#endif
 		}
 		return false;
 	case Type_Map:
@@ -6735,6 +6768,10 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		} break;
 
 		default: {
+			if (cl->elems.count == 0) {
+				break; // NOTE(bill): No need to init
+			}
+
 			gbString str = type_to_string(type);
 			error(node, "Invalid compound literal type `%s`", str);
 			gb_string_free(str);

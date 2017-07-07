@@ -2,10 +2,9 @@
 
 import (
 	"os.odin";
-	"fmt.odin";
+	"fmt.odin"; // TODO(bill): Remove the need for `fmt` here
 	"utf8.odin";
 	"raw.odin";
-	"types.odin";
 )
 // Naming Conventions:
 // In general, PascalCase for types and snake_case for values
@@ -286,42 +285,40 @@ copy :: proc(dst, src: []$T) -> int #cc_contextless {
 
 
 
-append :: proc(array: ^[]$T, args: ..T) -> int {
+append :: proc(array: ^[]$T, args: ..T) -> int #cc_contextless {
 	if array == nil do return 0;
 
-	slice := ^raw.Slice(array);
-
 	arg_len := len(args);
-	if arg_len <= 0 do return slice.len;
+	if arg_len <= 0 do return len(array);
 
-	arg_len = min(slice.cap-slice.len, arg_len);
+	arg_len = min(cap(array)-len(array), arg_len);
 	if arg_len > 0 {
-		data := ^T(slice.data);
+		s := ^raw.Slice(array);
+		data := ^T(s.data);
 		assert(data != nil);
 		sz :: size_of(T);
-		__mem_copy(data + slice.len, &args[0], sz*arg_len);
-		slice.len += arg_len;
+		__mem_copy(data + s.len, &args[0], sz*arg_len);
+		s.len += arg_len;
 	}
-	return slice.len;
+	return len(array);
 }
 
 append :: proc(array: ^[dynamic]$T, args: ..T) -> int {
 	if array == nil do return 0;
 
-	a := ^raw.DynamicArray(array);
-
 	arg_len := len(args);
-	if arg_len <= 0 do return a.len;
+	if arg_len <= 0 do return len(array);
 
 
 	ok := true;
-	if a.cap <= a.len+arg_len {
-		cap := 2 * a.cap + max(8, arg_len);
-		ok = __dynamic_array_reserve(a, size_of(T), align_of(T), cap);
+	if cap(array) <= len(array)+arg_len {
+		cap := 2 * cap(array) + max(8, arg_len);
+		ok = reserve(array, cap);
 	}
 	// TODO(bill): Better error handling for failed reservation
-	if !ok do return a.len;
+	if !ok do return len(array);
 
+	a := ^raw.DynamicArray(array);
 	data := ^T(a.data);
 	assert(data != nil);
 	__mem_copy(data + a.len, &args[0], size_of(T) * arg_len);
@@ -405,8 +402,8 @@ __get_map_header :: proc(m: ^map[$K]$V) -> __MapHeader #cc_contextless {
 __get_map_key :: proc(key: $K) -> __MapKey #cc_contextless {
 	map_key: __MapKey;
 	ti := type_info_base_without_enum(type_info(K));
-	match {
-	case types.is_integer(ti):
+	match _ in ti {
+	case TypeInfo.Integer:
 		match 8*size_of(key) {
 		case   8: map_key.hash = u128(  ^u8(&key)^);
 		case  16: map_key.hash = u128( ^u16(&key)^);
@@ -414,17 +411,17 @@ __get_map_key :: proc(key: $K) -> __MapKey #cc_contextless {
 		case  64: map_key.hash = u128( ^u64(&key)^);
 		case 128: map_key.hash = u128(^u128(&key)^);
 		}
-	case types.is_rune(ti):
+	case TypeInfo.Rune:
 		map_key.hash = u128(^rune(&key)^);
-	case types.is_pointer(ti):
+	case TypeInfo.Pointer:
 		map_key.hash = u128(uint(^rawptr(&key)^));
-	case types.is_float(ti):
+	case TypeInfo.Float:
 		match 8*size_of(key) {
 		case 32: map_key.hash = u128(^u32(&key)^);
 		case 64: map_key.hash = u128(^u64(&key)^);
 		case: panic("Unhandled float size");
 		}
-	case types.is_string(ti):
+	case TypeInfo.String:
 		str := ^string(&key)^;
 		map_key.hash = __default_hash_string(str);
 		map_key.str  = str;
