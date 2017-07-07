@@ -194,6 +194,8 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	DeclInfo *old_decl = decl_info_of_entity(&c->info, base_entity);
 	GB_ASSERT(old_decl != nullptr);
 
+
+
 	gbAllocator a = heap_allocator();
 
 	Array<Operand> operands = {};
@@ -214,6 +216,8 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	});
 
 
+
+
 	CheckerContext prev_context = c->context;
 	defer (c->context = prev_context);
 
@@ -222,7 +226,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	c->context.scope = scope;
 	c->context.allow_polymorphic_types = true;
 	if (param_operands == nullptr) {
-		c->context.no_polymorphic_errors = false;
+		// c->context.no_polymorphic_errors = false;
 	}
 
 	bool generate_type_again = c->context.no_polymorphic_errors;
@@ -233,6 +237,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	// Maybe it's better to check with the previous types first?
 	Type *final_proc_type = make_type_proc(c->allocator, scope, nullptr, 0, nullptr, 0, false, pt->calling_convention);
 	bool success = check_procedure_type(c, final_proc_type, pt->node, &operands);
+
 	if (!success) {
 		return false;
 	}
@@ -251,6 +256,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 			}
 		}
 	}
+
 
 	if (generate_type_again) {
 		// LEAK TODO(bill): This is technically a memory leak as it has to generate the type twice
@@ -350,6 +356,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 }
 
 bool check_polymorphic_procedure_assignment(Checker *c, Operand *operand, Type *type, PolyProcData *poly_proc_data) {
+	if (operand->expr == NULL) return false;
 	Entity *base_entity = entity_of_ident(&c->info, operand->expr);
 	if (base_entity == nullptr) return false;
 	return find_or_generate_polymorphic_procedure(c, base_entity, type, nullptr, poly_proc_data, true);
@@ -619,17 +626,24 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 			// TODO(bill): is this a good enough error message?
 			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error(operand->expr,
-			           "Cannot assign built-in procedure `%s` in %.*s",
-			           expr_str,
-			           LIT(context_name));
+			      "Cannot assign built-in procedure `%s` in %.*s",
+			      expr_str,
+			      LIT(context_name));
+		} else if (operand->mode == Addressing_Type) {
+			// TODO(bill): is this a good enough error message?
+			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
+			error(operand->expr,
+			      "Cannot assign type `%s` as a value in %.*s",
+			      op_type_str,
+			      LIT(context_name));
 		} else {
 			// TODO(bill): is this a good enough error message?
 			error(operand->expr,
-			           "Cannot assign value `%s` of type `%s` to `%s` in %.*s",
-			           expr_str,
-			           op_type_str,
-			           type_str,
-			           LIT(context_name));
+			      "Cannot assign value `%s` of type `%s` to `%s` in %.*s",
+			      expr_str,
+			      op_type_str,
+			      type_str,
+			      LIT(context_name));
 		}
 		operand->mode = Addressing_Invalid;
 
@@ -1376,6 +1390,7 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 	case Type_Record:
 		if (source->kind == Type_Record) {
 			// TODO(bill): Polymorphic type assignment
+			// return check_is_assignable_to(c, &o, poly);
 		}
 		return false;
 	case Type_Tuple:
@@ -1383,8 +1398,9 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 		return false;
 	case Type_Proc:
 		if (source->kind == Type_Proc) {
+			// return check_is_assignable_to(c, &o, poly);
 			// TODO(bill): Polymorphic type assignment
-			#if 0
+			#if 1
 			TypeProc *x = &poly->Proc;
 			TypeProc *y = &source->Proc;
 			if (x->calling_convention != y->calling_convention) {
@@ -5837,10 +5853,10 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 				CallArgumentError err = CallArgumentError_None;
 				CallArgumentData data = {};
 				CheckerContext prev_context = c->context;
+				defer (c->context = prev_context);
 				c->context.no_polymorphic_errors = true;
 				c->context.allow_polymorphic_types = is_type_polymorphic(pt);
 				err = call_checker(c, call, pt, p, operands, CallArgumentMode_NoErrors, &data);
-				c->context = prev_context;
 
 				if (err == CallArgumentError_None) {
 					valids[valid_count].index = i;
