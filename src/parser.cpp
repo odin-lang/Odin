@@ -3992,7 +3992,25 @@ AstNode *parse_for_stmt(AstFile *f) {
 	if (f->curr_token.kind != Token_OpenBrace &&
 	    f->curr_token.kind != Token_do) {
 		isize prev_level = f->expr_level;
+		defer (f->expr_level = prev_level);
 		f->expr_level = -1;
+
+		if (f->curr_token.kind == Token_in) {
+			Token in_token = expect_token(f, Token_in);
+			AstNode *rhs = nullptr;
+			bool prev_allow_range = f->allow_range;
+			f->allow_range = true;
+			rhs = parse_expr(f, false);
+			f->allow_range = prev_allow_range;
+
+			if (allow_token(f, Token_do)) {
+				body = convert_stmt_to_body(f, parse_stmt(f));
+			} else {
+				body = parse_block_stmt(f, false);
+			}
+			return ast_range_stmt(f, token, nullptr, nullptr, in_token, rhs, body);
+		}
+
 		if (f->curr_token.kind != Token_Semicolon) {
 			cond = parse_simple_stmt(f, StmtAllowFlag_In);
 			if (cond->kind == AstNode_AssignStmt && cond->AssignStmt.op.kind == Token_in) {
@@ -4014,7 +4032,6 @@ AstNode *parse_for_stmt(AstFile *f) {
 			}
 		}
 
-		f->expr_level = prev_level;
 	}
 
 	if (allow_token(f, Token_do)) {

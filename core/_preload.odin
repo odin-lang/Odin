@@ -133,7 +133,8 @@ Allocator :: struct #ordered {
 
 
 Context :: struct #ordered {
-	thread_id:  int,
+	thread_guid:  int,
+	thread_index: int,
 
 	allocator:  Allocator,
 
@@ -229,8 +230,8 @@ __init_context_from_ptr :: proc(c: ^Context, other: ^Context) #cc_contextless {
 	if c.allocator.procedure == nil {
 		c.allocator = default_allocator();
 	}
-	if c.thread_id == 0 {
-		c.thread_id = os.current_thread_id();
+	if c.thread_guid == 0 {
+		c.thread_guid = os.current_thread_id();
 	}
 }
 
@@ -240,8 +241,8 @@ __init_context :: proc(c: ^Context) #cc_contextless {
 	if c.allocator.procedure == nil {
 		c.allocator = default_allocator();
 	}
-	if c.thread_id == 0 {
-		c.thread_id = os.current_thread_id();
+	if c.thread_guid == 0 {
+		c.thread_guid = os.current_thread_id();
 	}
 }
 
@@ -328,7 +329,7 @@ append :: proc(array: ^[dynamic]$T, args: ...T) -> int {
 
 pop :: proc(array: ^[]$T) -> T #cc_contextless {
 	res: T;
-	if array do return res;
+	if array != nil do return res;
 	assert(len(array) > 0);
 	res = array[len(array)-1];
 	^raw.Slice(array).len -= 1;
@@ -337,7 +338,7 @@ pop :: proc(array: ^[]$T) -> T #cc_contextless {
 
 pop :: proc(array: ^[dynamic]$T) -> T #cc_contextless {
 	res: T;
-	if array do return res;
+	if array != nil do return res;
 	assert(len(array) > 0);
 	res = array[len(array)-1];
 	^raw.DynamicArray(array).len -= 1;
@@ -352,7 +353,7 @@ clear :: proc(array: ^[dynamic]$T) #cc_contextless #inline {
 }
 clear :: proc(m: ^map[$K]$V) #cc_contextless #inline {
 	if m == nil do return;
-	raw_map := ^raw.DynamicMap(array);
+	raw_map := ^raw.DynamicMap(m);
 	hashes  := ^raw.DynamicArray(&raw_map.hashes);
 	entries := ^raw.DynamicArray(&raw_map.entries);
 	hashes.len  = 0;
@@ -391,7 +392,8 @@ __get_map_header :: proc(m: ^map[$K]$V) -> __MapHeader #cc_contextless {
 		value: V,
 	}
 
-	header.is_key_string = types.is_string(type_info(K));
+	_, is_string := type_info_base(type_info(K)).(^TypeInfo.String);
+	header.is_key_string = is_string;
 	header.entry_size    = size_of(Entry);
 	header.entry_align   = align_of(Entry);
 	header.value_offset  = offset_of(Entry, value);

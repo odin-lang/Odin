@@ -7,11 +7,17 @@ Semaphore :: struct {
 	_handle: win32.Handle,
 }
 
+/*
 Mutex :: struct {
 	_semaphore: Semaphore,
 	_counter:   i32,
 	_owner:     i32,
 	_recursion: i32,
+}
+*/
+
+Mutex :: struct {
+	_critical_section: win32.CriticalSection,
 }
 
 current_thread_id :: proc() -> i32 {
@@ -37,6 +43,29 @@ semaphore_wait :: proc(s: ^Semaphore) {
 }
 
 
+mutex_init :: proc(m: ^Mutex, spin_count := 0) {
+	win32.initialize_critical_section_and_spin_count(&m._critical_section, u32(spin_count));
+}
+
+mutex_destroy :: proc(m: ^Mutex) {
+	win32.delete_critical_section(&m._critical_section);
+}
+
+mutex_lock :: proc(m: ^Mutex) {
+	win32.enter_critical_section(&m._critical_section);
+}
+
+mutex_try_lock :: proc(m: ^Mutex) -> bool {
+	return win32.try_enter_critical_section(&m._critical_section) != 0;
+}
+
+mutex_unlock :: proc(m: ^Mutex) {
+	win32.leave_critical_section(&m._critical_section);
+}
+
+
+
+/*
 mutex_init :: proc(m: ^Mutex) {
 	atomics.store(&m._counter, 0);
 	atomics.store(&m._owner, current_thread_id());
@@ -90,4 +119,4 @@ mutex_unlock :: proc(m: ^Mutex) {
 		}
 	}
 }
-
+*/

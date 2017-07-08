@@ -94,14 +94,14 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_if,                     "if"),                     \
 	TOKEN_KIND(Token_else,                   "else"),                   \
 	TOKEN_KIND(Token_for,                    "for"),                    \
-	TOKEN_KIND(Token_in,                     "in"),                     \
 	TOKEN_KIND(Token_match,                  "match"),                  \
+	TOKEN_KIND(Token_in,                     "in"),                     \
+	TOKEN_KIND(Token_do,                     "do"),                     \
 	TOKEN_KIND(Token_case,                   "case"),                   \
 	TOKEN_KIND(Token_break,                  "break"),                  \
 	TOKEN_KIND(Token_continue,               "continue"),               \
 	TOKEN_KIND(Token_fallthrough,            "fallthrough"),            \
 	TOKEN_KIND(Token_defer,                  "defer"),                  \
-	TOKEN_KIND(Token_do,                     "do"),                     \
 	TOKEN_KIND(Token_return,                 "return"),                 \
 	TOKEN_KIND(Token_proc,                   "proc"),                   \
 	TOKEN_KIND(Token_macro,                  "macro"),                  \
@@ -111,9 +111,9 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_enum,                   "enum"),                   \
 	TOKEN_KIND(Token_bit_field,              "bit_field"),              \
 	TOKEN_KIND(Token_vector,                 "vector"),                 \
+	TOKEN_KIND(Token_map,                    "map"),                    \
 	TOKEN_KIND(Token_static,                 "static"),                 \
 	TOKEN_KIND(Token_dynamic,                "dynamic"),                \
-	TOKEN_KIND(Token_map,                    "map"),                    \
 	TOKEN_KIND(Token_using,                  "using"),                  \
 	TOKEN_KIND(Token_context,                "context"),                \
 	TOKEN_KIND(Token_push_context,           "push_context"),           \

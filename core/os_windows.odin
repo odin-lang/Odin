@@ -75,8 +75,8 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: u32 = 0) -> (Handle, Errn
 	}
 
 	share_mode := u32(win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE);
-	sa: ^win32.Security_Attributes = nil;
-	sa_inherit := win32.Security_Attributes{length = size_of(win32.Security_Attributes), inherit_handle = 1};
+	sa: ^win32.SecurityAttributes = nil;
+	sa_inherit := win32.SecurityAttributes{length = size_of(win32.SecurityAttributes), inherit_handle = 1};
 	if mode&O_CLOEXEC == 0 {
 		sa = &sa_inherit;
 	}

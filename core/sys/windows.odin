@@ -103,7 +103,7 @@ FindData :: struct #ordered {
     alternate_file_name: [14]u8,
 }
 
-Security_Attributes :: struct #ordered {
+SecurityAttributes :: struct #ordered {
 	length:              u32,
 	security_descriptor: rawptr,
 	inherit_handle:      Bool,
@@ -142,6 +142,30 @@ PixelFormatDescriptor :: struct #ordered {
 	damage_mask: u32,
 }
 
+CriticalSection :: struct #ordered {
+	debug_info:      ^CriticalSectionDebug,
+
+	lock_count:      i32,
+	recursion_count: i32,
+	owning_thread:   Handle,
+	lock_semaphore:  Handle,
+	spin_count:      ^u32,
+}
+
+CriticalSectionDebug :: struct #ordered {
+	typ:                           u16,
+	creator_back_trace_index:      u16,
+	critical_section:              ^CriticalSection,
+	process_locks_list:            ^ListEntry,
+	entry_count:                   u32,
+	contention_count:              u32,
+	flags:                         u32,
+	creator_back_trace_index_high: u16,
+	spare_word:                    u16,
+}
+
+ListEntry :: struct #ordered {flink, blink: ^ListEntry};
+
 
 
 MAPVK_VK_TO_VSC    :: 0;
@@ -154,6 +178,12 @@ MAPVK_VSC_TO_VK_EX :: 3;
 
 INVALID_HANDLE :: Handle(~int(0));
 
+CREATE_SUSPENDED                  :: 0x00000004;
+STACK_SIZE_PARAM_IS_A_RESERVATION :: 0x00010000;
+WAIT_ABANDONED :: 0x00000080;
+WAIT_OBJECT_0  :: 0;
+WAIT_TIMEOUT   :: 0x00000102;
+WAIT_FAILED    :: 0xffffffff;
 
 CS_VREDRAW    :: 0x0001;
 CS_HREDRAW    :: 0x0002;
@@ -316,28 +346,44 @@ foreign kernel32 {
 	get_process_heap :: proc() -> Handle                                                                                       #cc_std #link_name "GetProcessHeap"               ---;
 
 
-	create_semaphore_a     :: proc(attributes: ^Security_Attributes, initial_count, maximum_count: i32, name: ^u8) -> Handle   #cc_std #link_name "CreateSemaphoreA"             ---;
+	create_semaphore_a     :: proc(attributes: ^SecurityAttributes, initial_count, maximum_count: i32, name: ^u8) -> Handle    #cc_std #link_name "CreateSemaphoreA"             ---;
 	release_semaphore      :: proc(semaphore: Handle, release_count: i32, previous_count: ^i32) -> Bool                        #cc_std #link_name "ReleaseSemaphore"             ---;
 	wait_for_single_object :: proc(handle: Handle, milliseconds: u32) -> u32                                                   #cc_std #link_name "WaitForSingleObject"          ---;
 
 
-	interlocked_compare_exchange :: proc(dst: ^i32, exchange, comparand: i32) -> i32                                           #cc_std #link_name "InterlockedCompareExchange"   ---;
-	interlocked_exchange         :: proc(dst: ^i32, desired: i32) -> i32                                                       #cc_std #link_name "InterlockedExchange"          ---;
-	interlocked_exchange_add     :: proc(dst: ^i32, desired: i32) -> i32                                                       #cc_std #link_name "InterlockedExchangeAdd"       ---;
-	interlocked_and              :: proc(dst: ^i32, desired: i32) -> i32                                                       #cc_std #link_name "InterlockedAnd"               ---;
-	interlocked_or               :: proc(dst: ^i32, desired: i32) -> i32                                                       #cc_std #link_name "InterlockedOr"                ---;
+	interlocked_compare_exchange :: proc(dst: ^i32, exchange, comparand: i32) -> i32                                           #cc_c   #link_name "InterlockedCompareExchange"   ---;
+	interlocked_exchange         :: proc(dst: ^i32, desired: i32) -> i32                                                       #cc_c   #link_name "InterlockedExchange"          ---;
+	interlocked_exchange_add     :: proc(dst: ^i32, desired: i32) -> i32                                                       #cc_c   #link_name "InterlockedExchangeAdd"       ---;
+	interlocked_and              :: proc(dst: ^i32, desired: i32) -> i32                                                       #cc_c   #link_name "InterlockedAnd"               ---;
+	interlocked_or               :: proc(dst: ^i32, desired: i32) -> i32                                                       #cc_c   #link_name "InterlockedOr"                ---;
 
-	interlocked_compare_exchange64 :: proc(dst: ^i64, exchange, comparand: i64) -> i64                                         #cc_std #link_name "InterlockedCompareExchange64" ---;
-	interlocked_exchange64         :: proc(dst: ^i64, desired: i64) -> i64                                                     #cc_std #link_name "InterlockedExchange64"        ---;
-	interlocked_exchange_add64     :: proc(dst: ^i64, desired: i64) -> i64                                                     #cc_std #link_name "InterlockedExchangeAdd64"     ---;
-	interlocked_and64              :: proc(dst: ^i64, desired: i64) -> i64                                                     #cc_std #link_name "InterlockedAnd64"             ---;
-	interlocked_or64               :: proc(dst: ^i64, desired: i64) -> i64                                                     #cc_std #link_name "InterlockedOr64"              ---;
+	interlocked_compare_exchange64 :: proc(dst: ^i64, exchange, comparand: i64) -> i64                                         #cc_c   #link_name "InterlockedCompareExchange64" ---;
+	interlocked_exchange64         :: proc(dst: ^i64, desired: i64) -> i64                                                     #cc_c   #link_name "InterlockedExchange64"        ---;
+	interlocked_exchange_add64     :: proc(dst: ^i64, desired: i64) -> i64                                                     #cc_c   #link_name "InterlockedExchangeAdd64"     ---;
+	interlocked_and64              :: proc(dst: ^i64, desired: i64) -> i64                                                     #cc_c   #link_name "InterlockedAnd64"             ---;
+	interlocked_or64               :: proc(dst: ^i64, desired: i64) -> i64                                                     #cc_c   #link_name "InterlockedOr64"              ---;
 
 	mm_pause           :: proc()                                                                                               #cc_std #link_name "_mm_pause"                    ---;
 	read_write_barrier :: proc()                                                                                               #cc_std #link_name "ReadWriteBarrier"             ---;
 	write_barrier      :: proc()                                                                                               #cc_std #link_name "WriteBarrier"                 ---;
 	read_barrier       :: proc()                                                                                               #cc_std #link_name "ReadBarrier"                  ---;
 
+	create_thread        :: proc(thread_attributes: ^SecurityAttributes, stack_size: int, start_routine: rawptr,
+	                             parameter: rawptr, creation_flags: u32, thread_id: ^u32) -> Handle                            #cc_std #link_name "CreateThread"                 ---;
+	resume_thread        :: proc(thread: Handle) -> u32                                                                        #cc_std #link_name "ResumeThread"                 ---;
+	get_thread_priority  :: proc(thread: Handle) -> i32                                                                        #cc_std #link_name "GetThreadPriority"            ---;
+	set_thread_priority  :: proc(thread: Handle, priority: i32) -> Bool                                                        #cc_std #link_name "SetThreadPriority"            ---;
+	get_exit_code_thread :: proc(thread: Handle, exit_code: ^u32) -> Bool                                                      #cc_std #link_name "GetExitCodeThread"            ---;
+
+	initialize_critical_section                :: proc(critical_section: ^CriticalSection)                                     #cc_std #link_name "InitializeCriticalSection"             ---;
+	initialize_critical_section_and_spin_count :: proc(critical_section: ^CriticalSection, spin_count: u32)                    #cc_std #link_name "InitializeCriticalSectionAndSpinCount" ---;
+	delete_critical_section                    :: proc(critical_section: ^CriticalSection)                                     #cc_std #link_name "DeleteCriticalSection"                 ---;
+	set_critical_section_spin_count            :: proc(critical_section: ^CriticalSection, spin_count: u32) -> u32             #cc_std #link_name "SetCriticalSectionSpinCount"           ---;
+	try_enter_critical_section                 :: proc(critical_section: ^CriticalSection) -> Bool                             #cc_std #link_name "TryEnterCriticalSection"               ---;
+	enter_critical_section                     :: proc(critical_section: ^CriticalSection)                                     #cc_std #link_name "EnterCriticalSection"                  ---;
+	leave_critical_section                     :: proc(critical_section: ^CriticalSection)                                     #cc_std #link_name "LeaveCriticalSection"                  ---;
+
+	create_event_a :: proc(event_attributes: ^SecurityAttributes, manual_reset, initial_state: Bool, name: ^u8) -> Handle      #cc_std #link_name "CreateEventA"                 ---;
 
 	load_library_a   :: proc(c_str: ^u8) -> Hmodule                                                                            #cc_std #link_name "LoadLibraryA"                 ---;
 	free_library     :: proc(h: Hmodule)                                                                                       #cc_std #link_name "FreeLibrary"                  ---;
