@@ -90,6 +90,7 @@ struct TypeRecord {
 	i32      field_count; // == struct_offsets count
 	Entity **fields_in_src_order; // Entity_Variable
 	AstNode *node;
+	Scope *  scope;
 
 	// Entity_TypeName - union
 	Entity **variants;
@@ -1477,6 +1478,8 @@ Selection lookup_field_from_index(gbAllocator a, Type *type, i64 index) {
 gb_global Entity *entity__any_data       = nullptr;
 gb_global Entity *entity__any_type_info  = nullptr;
 
+Entity *current_scope_lookup_entity(Scope *s, String name);
+
 Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel) {
 	GB_ASSERT(type_ != nullptr);
 
@@ -1593,6 +1596,18 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				}
 			}
 		}
+
+		if (type->kind == Type_Record) {
+			Scope *s = type->Record.scope;
+			if (s != nullptr) {
+				Entity *found = current_scope_lookup_entity(s, field_name);
+				if (found != nullptr && found->kind != Entity_Variable) {
+					sel.entity = found;
+					return sel;
+				}
+			}
+		}
+
 	} else if (type->kind == Type_Record) {
 		for (isize i = 0; i < type->Record.field_count; i++) {
 			Entity *f = type->Record.fields[i];

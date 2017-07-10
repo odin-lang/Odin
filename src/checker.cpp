@@ -233,6 +233,7 @@ struct Scope {
 	bool             is_global;
 	bool             is_file;
 	bool             is_init;
+	bool             is_record;
 	bool             has_been_imported; // This is only applicable to file scopes
 	AstFile *        file;
 };
@@ -447,8 +448,16 @@ void check_open_scope(Checker *c, AstNode *node) {
 	          is_ast_node_type(node));
 	Scope *scope = make_scope(c->context.scope, c->allocator);
 	add_scope(c, node, scope);
-	if (node->kind == AstNode_ProcType) {
+	switch (node->kind) {
+	case AstNode_ProcType:
 		scope->is_proc = true;
+		break;
+	case AstNode_StructType:
+	case AstNode_EnumType:
+	case AstNode_UnionType:
+	case AstNode_RawUnionType:
+		scope->is_record = true;
+		break;
 	}
 	c->context.scope = scope;
 	c->context.stmt_state_flags |= StmtStateFlag_bounds_check;
@@ -1307,9 +1316,26 @@ void init_preload(Checker *c) {
 		GB_ASSERT(is_type_union(type_info_entity->type));
 		TypeRecord *record = &base_type(type_info_entity->type)->Record;
 
-		t_type_info_record = find_core_entity(c, str_lit("TypeInfoRecord"))->type;
+		// Entity *type_info_record = current_scope_lookup_entity(record->scope, str_lit("Record"));
+		// if (type_info_record == nullptr) {
+		// 	compiler_error("Could not find type declaration for TypeInfo.Record\n"
+		// 	               "Is `_preload.odin` missing from the `core` directory relative to the odin executable?");
+		// }
+		// Entity *type_info_enum_value = current_scope_lookup_entity(record->scope, str_lit("EnumValue"));
+		// if (type_info_record == nullptr) {
+		// 	compiler_error("Could not find type declaration for TypeInfo.EnumValue\n"
+		// 	               "Is `_preload.odin` missing from the `core` directory relative to the odin executable?");
+		// }
+
+		// GB_ASSERT(type_info_record->type != nullptr);
+		// GB_ASSERT(type_info_enum_value->type != nullptr);
+		Entity *type_info_record     = find_core_entity(c, str_lit("TypeInfoRecord"));
+		Entity *type_info_enum_value = find_core_entity(c, str_lit("TypeInfoEnumValue"));
+
+
+		t_type_info_record = type_info_record->type;
 		t_type_info_record_ptr = make_type_pointer(c->allocator, t_type_info_record);
-		t_type_info_enum_value = find_core_entity(c, str_lit("TypeInfoEnumValue"))->type;
+		t_type_info_enum_value = type_info_enum_value->type;
 		t_type_info_enum_value_ptr = make_type_pointer(c->allocator, t_type_info_enum_value);
 
 
@@ -1692,20 +1718,29 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 						continue;
 					}
 
+					Token token = name->Ident.token;
+					if (token.string == "EnumValue") {
+						gb_printf_err("EnumValue %p\n", name);
+					}
+
 					AstNode *fl = c->context.curr_foreign_library;
 					DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);
 					Entity *e = nullptr;
 
 					if (is_ast_node_type(init)) {
-						e = make_entity_type_name(c->allocator, d->scope, name->Ident.token, nullptr);
+						e = make_entity_type_name(c->allocator, d->scope, token, nullptr);
 						if (vd->type != nullptr) {
 							error(name, "A type declaration cannot have an type parameter");
 						}
 						d->type_expr = init;
 						d->init_expr = init;
 					} else if (init->kind == AstNode_ProcLit) {
+						if (c->context.scope->is_record) {
+							error(name, "Procedure declarations are not allowed within a record");
+							continue;
+						}
 						ast_node(pl, ProcLit, init);
-						e = make_entity_procedure(c->allocator, d->scope, name->Ident.token, nullptr, pl->tags);
+						e = make_entity_procedure(c->allocator, d->scope, token, nullptr, pl->tags);
 						if (fl != nullptr) {
 							GB_ASSERT(fl->kind == AstNode_Ident);
 							e->Procedure.foreign_library_ident = fl;
@@ -1714,7 +1749,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 						d->proc_lit = init;
 						d->type_expr = pl->type;
 					} else {
-						e = make_entity_constant(c->allocator, d->scope, name->Ident.token, nullptr, empty_exact_value);
+						e = make_entity_constant(c->allocator, d->scope, token, nullptr, empty_exact_value);
 						d->type_expr = vd->type;
 						d->init_expr = init;
 					}
@@ -1728,6 +1763,7 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 						}
 						// continue;
 					}
+
 
 
 					add_entity_and_decl_info(c, name, e, d);

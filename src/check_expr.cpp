@@ -692,14 +692,16 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 
 
 // Returns filled field_count
-isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
-                   Entity **fields, isize field_count,
-                   String context) {
+Array<Entity *> check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
+                             isize init_field_capacity, String context) {
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 	defer (gb_temp_arena_memory_end(tmp));
 
+	Array<Entity *> fields = {};
+	array_init(&fields, heap_allocator(), init_field_capacity);
+
 	Map<Entity *> entity_map = {};
-	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*field_count);
+	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*init_field_capacity);
 
 	Entity *using_index_expr = nullptr;
 
@@ -707,13 +709,32 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 		GB_ASSERT(node->kind != AstNode_UnionType);
 	}
 
-	isize field_index = 0;
+	check_collect_entities(c, decls, false);
+	for_array(i, c->context.scope->elements.entries) {
+		Entity *e = c->context.scope->elements.entries[i].value;
+		if (e->token.string == "EnumValue") {
+			// gb_printf_err("EnumValue\n");
+		}
+		DeclInfo *d = nullptr;
+		switch (e->kind) {
+		default: continue;
+		case Entity_Constant:
+		case Entity_TypeName:
+			d = decl_info_of_entity(&c->info, e);
+			if (d != nullptr) {
+				check_entity_decl(c, e, d, nullptr);
+			}
+			break;
+		}
+	}
+
 	for_array(decl_index, decls) {
 		AstNode *decl = decls[decl_index];
-		if (decl->kind != AstNode_ValueDecl) {
-			continue;
-		}
+		if (decl->kind != AstNode_ValueDecl) continue;
+
 		ast_node(vd, ValueDecl, decl);
+
+		if (!vd->is_mutable) continue;
 
 		Type *type = nullptr;
 		if (vd->type != nullptr) {
@@ -746,10 +767,10 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 
 			Token name_token = name->Ident.token;
 
-			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, is_using, cast(i32)field_index);
+			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, is_using, cast(i32)fields.count);
 			e->identifier = name;
 			if (name_token.string == "_") {
-				fields[field_index++] = e;
+				array_add(&fields, e);
 			} else if (name_token.string == "__tag") {
 				error(name, "`__tag` is a reserved identifier for fields");
 			} else {
@@ -763,7 +784,7 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 					error(e->token,   "\tpreviously declared");
 				} else {
 					map_set(&entity_map, key, e);
-					fields[field_index++] = e;
+					array_add(&fields, e);
 					add_entity(c, c->context.scope, name, e);
 				}
 				add_entity_use(c, name, e);
@@ -792,9 +813,9 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 						}
 					}
 					if (ok) {
-						using_index_expr = fields[field_index-1];
+						using_index_expr = fields[fields.count-1];
 					} else {
-						fields[field_index-1]->flags &= ~EntityFlag_Using;
+						fields[fields.count-1]->flags &= ~EntityFlag_Using;
 						error(name_token, "Previous `using` for an index expression `%.*s`", LIT(name_token.string));
 					}
 				} else {
@@ -810,7 +831,7 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 	}
 
 
-	return field_index;
+	return fields;
 }
 
 
@@ -863,26 +884,26 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
 
-	isize field_count = 0;
+	isize min_field_count = 0;
 	for_array(field_index, st->fields) {
 	AstNode *field = st->fields[field_index];
 		switch (field->kind) {
 		case_ast_node(f, ValueDecl, field);
-			field_count += f->names.count;
+			min_field_count += f->names.count;
 		case_end;
 		}
+
 	}
+	struct_type->Record.names = make_names_field_for_record(c, c->context.scope);
 
-	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
+	auto fields = check_fields(c, node, st->fields, min_field_count, str_lit("struct"));
 
-	field_count = check_fields(c, node, st->fields, fields, field_count, str_lit("struct"));
-
+	struct_type->Record.scope               = c->context.scope;
 	struct_type->Record.is_packed           = st->is_packed;
 	struct_type->Record.is_ordered          = st->is_ordered;
-	struct_type->Record.fields              = fields;
-	struct_type->Record.fields_in_src_order = fields;
-	struct_type->Record.field_count         = field_count;
-	struct_type->Record.names = make_names_field_for_record(c, c->context.scope);
+	struct_type->Record.fields              = fields.data;
+	struct_type->Record.fields_in_src_order = fields.data;
+	struct_type->Record.field_count         = fields.count;
 
 	type_set_offsets(c->allocator, struct_type);
 
@@ -893,8 +914,8 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 		struct_type->Record.offsets = nullptr;
 		// NOTE(bill): Reorder fields for reduced size/performance
 
-		Entity **reordered_fields = gb_alloc_array(c->allocator, Entity *, field_count);
-		for (isize i = 0; i < field_count; i++) {
+		Entity **reordered_fields = gb_alloc_array(c->allocator, Entity *, fields.count);
+		for (isize i = 0; i < fields.count; i++) {
 			reordered_fields[i] = struct_type->Record.fields_in_src_order[i];
 		}
 
@@ -902,9 +923,9 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 		// TODO(bill): Probably make an inline sorting procedure rather than use global variables
 		__checker_allocator = c->allocator;
 		// NOTE(bill): compound literal order must match source not layout
-		gb_sort_array(reordered_fields, field_count, cmp_reorder_struct_fields);
+		gb_sort_array(reordered_fields, fields.count, cmp_reorder_struct_fields);
 
-		for (isize i = 0; i < field_count; i++) {
+		for (isize i = 0; i < fields.count; i++) {
 			reordered_fields[i]->Variable.field_index = i;
 		}
 
@@ -959,12 +980,12 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 	ast_node(ut, UnionType, node);
 
 	isize variant_count = ut->variants.count+1;
-	isize field_count = 0;
+	isize min_field_count = 0;
 	for_array(i, ut->fields) {
 		AstNode *field = ut->fields[i];
 		switch (field->kind) {
 		case_ast_node(f, ValueDecl, field);
-			field_count += f->names.count;
+			min_field_count += f->names.count;
 		case_end;
 		}
 	}
@@ -977,23 +998,23 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 
 	Entity *using_index_expr = nullptr;
 
-	Entity **variants = gb_alloc_array(c->allocator, Entity *, variant_count);
-	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
+	Array<Entity *> variants = {};
+	array_init(&variants, heap_allocator(), variant_count);
 
-	isize variant_index = 0;
-	variants[variant_index++] = make_entity_type_name(c->allocator, c->context.scope, empty_token, nullptr);
+	array_add(&variants, make_entity_type_name(c->allocator, c->context.scope, empty_token, nullptr));
 
-	field_count = check_fields(c, nullptr, ut->fields, fields, field_count, str_lit("union"));
+	auto fields = check_fields(c, nullptr, ut->fields, min_field_count, str_lit("union"));
 
-	for (isize i = 0; i < field_count; i++) {
+	for (isize i = 0; i < fields.count; i++) {
 		Entity *f = fields[i];
 		String name = f->token.string;
 		map_set(&entity_map, hash_string(name), f);
 	}
 
-	union_type->Record.fields              = fields;
-	union_type->Record.fields_in_src_order = fields;
-	union_type->Record.field_count         = field_count;
+	union_type->Record.scope               = c->context.scope;
+	union_type->Record.fields              = fields.data;
+	union_type->Record.fields_in_src_order = fields.data;
+	union_type->Record.field_count         = fields.count;
 	union_type->Record.are_offsets_set     = false;
 	union_type->Record.is_ordered          = true;
 	{
@@ -1035,17 +1056,16 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 			AstNode *dummy_struct = ast_struct_type(c->curr_ast_file, token, list, list_count, false, true, nullptr);
 
 			check_open_scope(c, dummy_struct);
-			Entity **fields = gb_alloc_array(c->allocator, Entity *, list_count);
-			isize field_count = check_fields(c, dummy_struct, list, fields, list_count, str_lit("variant"));
+			base_type->Record.names = make_names_field_for_record(c, c->context.scope);
+			auto fields = check_fields(c, dummy_struct, list, list_count, str_lit("variant"));
 			base_type->Record.is_packed           = false;
 			base_type->Record.is_ordered          = true;
-			base_type->Record.fields              = fields;
-			base_type->Record.fields_in_src_order = fields;
-			base_type->Record.field_count         = field_count;
-			base_type->Record.names = make_names_field_for_record(c, c->context.scope);
-			base_type->Record.node = dummy_struct;
-			base_type->Record.variant_parent = named_type != nullptr ? named_type : union_type;
-			base_type->Record.variant_index = variant_index;
+			base_type->Record.fields              = fields.data;
+			base_type->Record.fields_in_src_order = fields.data;
+			base_type->Record.field_count         = fields.count;
+			base_type->Record.node                = dummy_struct;
+			base_type->Record.variant_parent      = named_type != nullptr ? named_type : union_type;
+			base_type->Record.variant_index       = variants.count;
 
 
 			type_set_offsets(c->allocator, base_type);
@@ -1069,7 +1089,7 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 			error(name_token, "`%.*s` is already declared in this union", LIT(name_token.string));
 		} else {
 			map_set(&entity_map, key, e);
-			variants[variant_index++] = e;
+			array_add(&variants, e);
 		}
 		add_entity_use(c, f->name, e);
 	}
@@ -1077,8 +1097,8 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 	type_set_offsets(c->allocator, union_type);
 
 
-	union_type->Record.variants      = variants;
-	union_type->Record.variant_count = variant_index;
+	union_type->Record.variants      = variants.data;
+	union_type->Record.variant_count = variants.count;
 }
 
 void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
@@ -1086,23 +1106,23 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
 	GB_ASSERT(is_type_raw_union(union_type));
 	ast_node(ut, RawUnionType, node);
 
-	isize field_count = 0;
+	isize min_field_count = 0;
 	for_array(i, ut->fields) {
 		AstNode *field = ut->fields[i];
 		switch (field->kind) {
 		case_ast_node(f, ValueDecl, field);
-			field_count += f->names.count;
+			min_field_count += f->names.count;
 		case_end;
 		}
 	}
 
-	Entity **fields = gb_alloc_array(c->allocator, Entity *, field_count);
-
-	field_count = check_fields(c, node, ut->fields, fields, field_count, str_lit("raw_union"));
-
-	union_type->Record.fields = fields;
-	union_type->Record.field_count = field_count;
 	union_type->Record.names = make_names_field_for_record(c, c->context.scope);
+
+	auto fields = check_fields(c, node, ut->fields, min_field_count, str_lit("raw_union"));
+
+	union_type->Record.scope       = c->context.scope;
+	union_type->Record.fields      = fields.data;
+	union_type->Record.field_count = fields.count;
 }
 
 
@@ -1133,8 +1153,8 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	Map<Entity *> entity_map = {}; // Key: String
 	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*(et->fields.count));
 
-	Entity **fields = gb_alloc_array(c->allocator, Entity *, et->fields.count);
-	isize field_count = 0;
+	Array<Entity *> fields = {};
+	array_init(&fields, c->allocator, et->fields.count);
 
 	Type *constant_type = enum_type;
 	if (named_type != nullptr) {
@@ -1222,18 +1242,18 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 		} else {
 			map_set(&entity_map, key, e);
 			add_entity(c, c->context.scope, nullptr, e);
-			fields[field_count++] = e;
+			array_add(&fields, e);
 			add_entity_use(c, field, e);
 		}
 	}
-	GB_ASSERT(field_count <= et->fields.count);
+	GB_ASSERT(fields.count <= et->fields.count);
 
 
-	enum_type->Record.fields = fields;
-	enum_type->Record.field_count = field_count;
+	enum_type->Record.fields      = fields.data;
+	enum_type->Record.field_count = fields.count;
 
 	enum_type->Record.enum_count = make_entity_constant(c->allocator, c->context.scope,
-		make_token_ident(str_lit("count")), t_int, exact_value_i64(field_count));
+		make_token_ident(str_lit("count")), t_int, exact_value_i64(fields.count));
 	enum_type->Record.enum_min_value = make_entity_constant(c->allocator, c->context.scope,
 		make_token_ident(str_lit("min_value")), constant_type, min_value);
 	enum_type->Record.enum_max_value = make_entity_constant(c->allocator, c->context.scope,

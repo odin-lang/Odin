@@ -34,6 +34,8 @@ CallingConvention :: enum {
 }
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
+
+
 TypeInfoEnumValue :: raw_union {
 	f: f64;
 	i: i128;
@@ -48,6 +50,7 @@ TypeInfoRecord :: struct #ordered {
 	ordered:      bool;
 	custom_align: bool;
 }
+
 
 TypeInfo :: union {
 	size:  int;

@@ -1366,6 +1366,7 @@ AstNode *ast_field_list(AstFile *f, Token token, Array<AstNode *> list) {
 	result->FieldList.list  = list;
 	return result;
 }
+
 AstNode *ast_union_field(AstFile *f, AstNode *name, AstNode *list) {
 	AstNode *result = make_ast_node(f, AstNode_UnionField);
 	result->UnionField.name = name;
@@ -3390,20 +3391,28 @@ AstNode *parse_record_field_list(AstFile *f, isize *name_count_) {
 	while (f->curr_token.kind != Token_CloseBrace &&
 	       f->curr_token.kind != Token_EOF) {
 		AstNode *decl = parse_stmt(f);
-		if (decl->kind != AstNode_ValueDecl) {
-			error(decl, "Expected a field list, got %.*s", LIT(ast_node_strings[decl->kind]));
-		} else {
-			ast_node(vd, ValueDecl, decl);
-			if (vd->is_mutable) {
-				if (vd->flags&VarDeclFlag_thread_local) {
-					vd->flags &= ~VarDeclFlag_thread_local;
-					error(decl, "Field values cannot be #thread_local");
-				}
-				array_add(&decls, decl);
-				total_name_count += vd->names.count;
-			} else {
-				error(decl, "Only variable declarations are allowed at the moment");
+		switch (decl->kind) {
+		case AstNode_EmptyStmt:
+		case AstNode_BadStmt:
+		case AstNode_BadDecl:
+			break;
+
+		case_ast_node(vd, ValueDecl, decl);
+			if (vd->flags&VarDeclFlag_thread_local) {
+				vd->flags &= ~VarDeclFlag_thread_local;
+				error(decl, "Field values cannot be #thread_local");
 			}
+			array_add(&decls, decl);
+			total_name_count += vd->names.count;
+		case_end;
+
+		case AstNode_WhenStmt:
+			array_add(&decls, decl);
+			break;
+
+		default:
+			error(decl, "Expected a value declaration, got %.*s", LIT(ast_node_strings[decl->kind]));
+			break;
 		}
 	}
 
@@ -3683,8 +3692,8 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		Token open = expect_token_after(f, Token_OpenBrace, "struct");
 
 		isize    name_count = 0;
-		AstNode *fields     = parse_record_field_list(f, &name_count);
-		Token    close      = expect_token(f, Token_CloseBrace);
+		AstNode *fields = parse_record_field_list(f, &name_count);
+		Token    close  = expect_token(f, Token_CloseBrace);
 
 		Array<AstNode *> decls = {};
 		if (fields != nullptr) {
@@ -3742,11 +3751,9 @@ AstNode *parse_type_or_ident(AstFile *f) {
 							vd->flags &= ~VarDeclFlag_thread_local;
 							error(decl, "Field values cannot be #thread_local");
 						}
-						array_add(&decls, decl);
-						total_decl_name_count += vd->names.count;
-					} else {
-						error(decl, "Only variable declarations are allowed at the moment");
 					}
+					array_add(&decls, decl);
+					total_decl_name_count += vd->names.count;
 				}
 			}
 		}

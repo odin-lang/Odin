@@ -3632,15 +3632,32 @@ void ir_pop_target_list(irProcedure *proc) {
 
 
 void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
+	if (e->type == nullptr) return;
+
 	irValue *t = ir_value_type_name(m->allocator, name, e->type);
 	ir_module_add_value(m, e, t);
 	map_set(&m->members, hash_string(name), t);
 
+	#if 0
 	if (is_type_union(e->type)) {
 		Type *bt = base_type(e->type);
 		// NOTE(bill): Zeroth entry is null (for `match type` stmts)
 		for (isize j = 1; j < bt->Record.variant_count; j++) {
 			ir_mangle_add_sub_type_name(m, bt->Record.variants[j], name);
+		}
+	}
+	#endif
+
+	Type *bt = base_type(e->type);
+	if (bt->kind == Type_Record) {
+		Scope *s = bt->Record.scope;
+		if (s != nullptr) {
+			for_array(i, s->elements.entries) {
+				Entity *e = s->elements.entries[i].value;
+				if (e->kind == Entity_TypeName) {
+					ir_mangle_add_sub_type_name(m, e, name);
+				}
+			}
 		}
 	}
 }
