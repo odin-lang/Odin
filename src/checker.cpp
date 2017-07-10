@@ -1152,20 +1152,17 @@ void add_type_info_type(Checker *c, Type *t) {
 		add_type_info_type(c, bt->Enum.base_type);
 		break;
 
+	case Type_Union:
+		add_type_info_type(c, t_int);
+		for (isize i = 0; i < bt->Union.variant_count; i++) {
+			add_type_info_type(c, bt->Union.variants[i]);
+		}
+		break;
+
 	case Type_Record: {
-		switch (bt->Record.kind) {
-		case TypeRecord_Union:
-			add_type_info_type(c, t_int);
-			for (isize i = 0; i < bt->Record.variant_count; i++) {
-				add_type_info_type(c, bt->Record.variants[i]);
-			}
-			/* fallthrough */
-		default:
-			for (isize i = 0; i < bt->Record.field_count; i++) {
-				Entity *f = bt->Record.fields[i];
-				add_type_info_type(c, f->type);
-			}
-			break;
+		for (isize i = 0; i < bt->Record.field_count; i++) {
+			Entity *f = bt->Record.fields[i];
+			add_type_info_type(c, f->type);
 		}
 	} break;
 
@@ -1343,7 +1340,7 @@ void init_preload(Checker *c) {
 		Entity *type_info_variant = record->fields_in_src_order[2];
 		Type *tiv_type = type_info_variant->type;
 		GB_ASSERT(is_type_union(tiv_type));
-		TypeRecord *tiv = &tiv_type->Record;
+		TypeUnion *tiv = &tiv_type->Union;
 
 		if (tiv->variant_count != 23) {
 			compiler_error("Invalid `TypeInfo` layout");

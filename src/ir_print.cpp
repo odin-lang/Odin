@@ -285,6 +285,23 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		ir_print_type(f, m, base_enum_type(t));
 		return;
 
+	case Type_Union: {
+		// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
+		// LLVM takes the first element's alignment as the entire alignment (like C)
+		i64 align = type_align_of(heap_allocator(), t);
+		i64 total_size = type_size_of(heap_allocator(), t);
+	#if 1
+		i64 block_size =  t->Union.variant_block_size;
+
+		ir_fprintf(f, "{[0 x <%lld x i8>], ", align);
+		ir_fprintf(f, "[%lld x i8], ", block_size);
+		ir_fprintf(f, "i%lld}", word_bits);
+	#else
+		i64 block_size = total_size - build_context.word_size;
+		ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8], i%lld}", align, block_size, word_bits);
+	#endif
+	} return;
+
 	case Type_Record: {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct:
@@ -309,26 +326,6 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 				ir_fprintf(f, ">");
 			}
 			return;
-		case TypeRecord_Union: {
-			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
-			// LLVM takes the first element's alignment as the entire alignment (like C)
-			i64 align = type_align_of(heap_allocator(), t);
-			i64 total_size = type_size_of(heap_allocator(), t);
-		#if 1
-			i64 block_size =  t->Record.variant_block_size;
-
-			ir_fprintf(f, "{[0 x <%lld x i8>], ", align);
-			for (isize i = 0; i < t->Record.field_count; i++) {
-				ir_print_type(f, m, t->Record.fields[i]->type);
-				ir_fprintf(f, ", ");
-			}
-			ir_fprintf(f, "[%lld x i8], ", block_size);
-			ir_fprintf(f, "i%lld}", word_bits);
-		#else
-			i64 block_size = total_size - build_context.word_size;
-			ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8], i%lld}", align, block_size, word_bits);
-		#endif
-		} return;
 		case TypeRecord_RawUnion: {
 			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
 			// LLVM takes the first element's alignment as the entire alignment (like C)
@@ -974,7 +971,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_fprintf(f, " 0, ");
 		ir_print_type(f, m, t_i32);
 	#if 1
-		ir_fprintf(f, " %d", 2 + t->Record.field_count);
+		ir_fprintf(f, " %d", 2);
 	#else
 		ir_fprintf(f, " %d", 2);
 	#endif
@@ -993,11 +990,11 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_value(f, m, instr->UnionTagValue.address, et);
 		ir_fprintf(f, ",");
 	#if 1
-		ir_fprintf(f, " %d", 2 + t->Record.field_count);
+		ir_fprintf(f, " %d", 2);
 	#else
 		ir_fprintf(f, " %d", 2);
 	#endif
-		ir_fprintf(f, ", %d", 2 + t->Record.field_count);
+		ir_fprintf(f, ", %d", 2);
 		ir_fprintf(f, " ; UnionTagValue");
 		ir_fprintf(f, "\n");
 	} break;

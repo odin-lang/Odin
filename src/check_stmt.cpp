@@ -1473,8 +1473,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					if (match_type_kind == MatchType_Union) {
 						GB_ASSERT(is_type_union(bt));
 						bool tag_type_found = false;
-						for (isize i = 0; i < bt->Record.variant_count; i++) {
-							Type *vt = bt->Record.variants[i];
+						for (isize i = 0; i < bt->Union.variant_count; i++) {
+							Type *vt = bt->Union.variants[i];
 							if (are_types_identical(vt, y.type)) {
 								tag_type_found = true;
 								break;

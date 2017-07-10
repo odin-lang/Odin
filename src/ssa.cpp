@@ -648,10 +648,11 @@ bool can_ssa_type(Type *t) {
 			}
 		}
 		return true;
+	case Type_Union:
+		return false;
+
 	case Type_Record:
-		if (t->Record.kind == TypeRecord_Union) {
-			return false;
-		} else if (t->Record.kind == TypeRecord_Struct) {
+		if (t->Record.kind == TypeRecord_Struct) {
 			if (t->Record.field_count > SSA_MAX_STRUCT_FIELD_COUNT) {
 				return false;
 			}

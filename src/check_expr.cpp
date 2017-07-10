@@ -499,8 +499,8 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 #endif
 
 	if (is_type_union(dst)) {
-		for (isize i = 0; i < dst->Record.variant_count; i++) {
-			Type *vt = dst->Record.variants[i];
+		for (isize i = 0; i < dst->Union.variant_count; i++) {
+			Type *vt = dst->Union.variants[i];
 			if (are_types_identical(vt, s)) {
 				return 1;
 			}
@@ -990,12 +990,10 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 	array_init(&variants, c->allocator, variant_count);
 	array_add(&variants, t_invalid);
 
-	union_type->Record.scope               = c->context.scope;
-	union_type->Record.are_offsets_set     = false;
-	union_type->Record.is_ordered          = true;
+	union_type->Union.scope               = c->context.scope;
 	{
 		Entity *__tag = make_entity_field(c->allocator, nullptr, make_token_ident(str_lit("__tag")), t_int, false, -1);
-		union_type->Record.union__tag = __tag;
+		union_type->Union.union__tag = __tag;
 	}
 
 	for_array(i, ut->variants) {
@@ -1016,11 +1014,8 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 		}
 	}
 
-	type_set_offsets(c->allocator, union_type);
-
-
-	union_type->Record.variants      = variants.data;
-	union_type->Record.variant_count = variants.count;
+	union_type->Union.variants      = variants.data;
+	union_type->Union.variant_count = variants.count;
 }
 
 void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
@@ -2549,7 +2544,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		check_open_scope(c, e);
 		check_union_type(c, named_type, *type, e);
 		check_close_scope(c);
-		(*type)->Record.node = e;
+		(*type)->Union.node = e;
 		return true;
 	case_end;
 
@@ -6436,7 +6431,13 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 		Type *t = base_type(type);
 		switch (t->kind) {
 		case Type_Record: {
-			if (!is_type_struct(t) && !is_type_union(t)) {
+			if (is_type_union(t)) {
+				is_constant = false;
+			}
+			if (cl->elems.count == 0) {
+				break; // NOTE(bill): No need to init
+			}
+			if (!is_type_struct(t)) {
 				if (cl->elems.count != 0) {
 					gbString type_str = type_to_string(type);
 					error(node, "Illegal compound literal type `%s`", type_str);
@@ -6444,12 +6445,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 				}
 				break;
 			}
-			if (is_type_union(t)) {
-				is_constant = false;
-			}
-			if (cl->elems.count == 0) {
-				break; // NOTE(bill): No need to init
-			}
+
 			{ // Checker values
 				isize field_count = t->Record.field_count;
 				if (cl->elems[0]->kind == AstNode_FieldValue) {
@@ -6817,8 +6813,8 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		if (is_type_union(src)) {
 			bool ok = false;
-			for (isize i = 1; i < bsrc->Record.variant_count; i++) {
-				Type *vt = bsrc->Record.variants[i];
+			for (isize i = 1; i < bsrc->Union.variant_count; i++) {
+				Type *vt = bsrc->Union.variants[i];
 				if (are_types_identical(vt, dst)) {
 					ok = true;
 					break;
