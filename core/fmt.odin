@@ -783,8 +783,12 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 				write_string(fi.buf, b.names[i]);
 				write_string(fi.buf, " = ");
 
-				data := ^u8(v.data) + b.offsets[i];
-				fmt_arg(fi, any{rawptr(data), b.types[i]}, 'v');
+				if t := b.types[i]; types.is_any(t) {
+					write_string(fi.buf, "any{}");
+				} else {
+					data := ^u8(v.data) + b.offsets[i];
+					fmt_arg(fi, any{rawptr(data), t}, 'v');
+				}
 			}
 			write_byte(fi.buf, '}');
 
@@ -897,8 +901,13 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 
 			write_string(fi.buf, info.names[i]);
 			write_string(fi.buf, " = ");
-			data := ^u8(v.data) + info.offsets[i];
-			fmt_value(fi, any{rawptr(data), info.types[i]}, 'v');
+
+			if t := info.types[i]; types.is_any(t) {
+				write_string(fi.buf, "any{}");
+			} else {
+				data := ^u8(v.data) + info.offsets[i];
+				fmt_arg(fi, any{rawptr(data), t}, 'v');
+			}
 		}
 
 	case Union:
@@ -911,8 +920,13 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 
 			write_string(fi.buf, cf.names[i]);
 			write_string(fi.buf, " = ");
-			data := ^u8(v.data) + cf.offsets[i];
-			fmt_value(fi, any{rawptr(data), cf.types[i]}, 'v');
+
+			if t := cf.types[i]; types.is_any(t) {
+				write_string(fi.buf, "any{}");
+			} else {
+				data := ^u8(v.data) + cf.offsets[i];
+				fmt_arg(fi, any{rawptr(data), t}, 'v');
+			}
 		}
 
 	case RawUnion:
