@@ -20,6 +20,7 @@ import (
 */
 )
 
+
 general_stuff :: proc() {
 	// Complex numbers
 	a := 3 + 4i;
@@ -251,112 +252,120 @@ explicit_parametric_polymorphic_procedures :: proc() {
 	a, b = b, a; // Or use this syntax for this silly example case
 
 
-	// A more complicated example using subtyping
-	// Something like this could be used in a game
 	Vector2 :: struct {x, y: f32;};
+	{
+		// A more complicated example using subtyping
+		// Something like this could be used in a game
 
-	Entity :: struct {
-		using position: Vector2;
-		flags:          u64;
-		id:             u64;
-		batch_index:    u32;
-		slot_index:     u32;
-		portable_id:    u32;
-		derived:        any;
-	}
-
-	Rock :: struct {
-		using entity: ^Entity;
-		heavy: bool;
-	}
-	Door :: struct {
-		using entity: ^Entity;
-		open:         bool;
-	}
-	Monster :: struct {
-		using entity: ^Entity;
-		is_robot:     bool;
-		is_zombie:    bool;
-	}
-
-	EntityManager :: struct {
-		batches: [dynamic]^EntityBatch;
-		next_portable_id: u32;
-	}
-
-	ENTITIES_PER_BATCH :: 16;
-	EntityBatch :: struct {
-		data:        [ENTITIES_PER_BATCH]Entity;
-		occupied:    [ENTITIES_PER_BATCH]bool;
-		batch_index: u32;
-	}
-
-	use_empty_slot :: proc(manager: ^EntityManager, batch: ^EntityBatch) -> ^Entity {
-		for ok, i in batch.occupied {
-			if ok do continue;
-			batch.occupied[i] = true;
-
-			e := &batch.data[i];
-			e.batch_index = u32(batch.batch_index);
-			e.slot_index  = u32(i);
-			e.portable_id = manager.next_portable_id;
-			manager.next_portable_id++;
-			return e;
-		}
-		return nil;
-	}
-
-	gen_new_entity :: proc(manager: ^EntityManager) -> ^Entity {
-		for b in manager.batches {
-			e := use_empty_slot(manager, b);
-			if e != nil do return e;
+		Entity :: struct {
+			using position: Vector2;
+			flags:          u64;
+			id:             u64;
+			derived:        any;
 		}
 
-		new_batch := new(EntityBatch);
-		append(&manager.batches, new_batch);
-		new_batch.batch_index = u32(len(manager.batches)-1);
+		Rock :: struct {
+			using entity: Entity;
+			heavy: bool;
+		}
+		Door :: struct {
+			using entity: Entity;
+			open:         bool;
+		}
+		Monster :: struct {
+			using entity: Entity;
+			is_robot:     bool;
+			is_zombie:    bool;
+		}
 
-		return use_empty_slot(manager, new_batch);
+		new_entity :: proc(T: type, x, y: f32) -> ^T {
+			result := new(T);
+			result.derived = result^;
+			result.x = x;
+			result.y = y;
+
+			return result;
+		}
+
+		entities: [dynamic]^Entity;
+
+		rock := new_entity(Rock, 3, 5);
+
+		// Named arguments work too!
+		door := new_entity(T = Door, x = 3, y = 6);
+
+		// And named arguments can be any order
+		monster := new_entity(
+			y = 1,
+			x = 2,
+			T = Monster,
+		);
+
+		append(&entities, rock, door, monster);
+
+		fmt.println("Subtyping");
+		for entity in entities {
+			match e in entity.derived {
+			case Rock:    fmt.println("Rock",    e.x, e.y);
+			case Door:    fmt.println("Door",    e.x, e.y);
+			case Monster: fmt.println("Monster", e.x, e.y);
+			}
+		}
 	}
+	{
+		Entity :: struct {
+			using position: Vector2;
+			flags:          u64;
+			id:             u64;
+			variant: union { Rock, Door, Monster };
+		}
 
+		Rock :: struct {
+			using entity: ^Entity;
+			heavy: bool;
+		}
+		Door :: struct {
+			using entity: ^Entity;
+			open:         bool;
+		}
+		Monster :: struct {
+			using entity: ^Entity;
+			is_robot:     bool;
+			is_zombie:    bool;
+		}
 
+		new_entity :: proc(T: type, x, y: f32) -> ^T {
+			result := new(Entity);
+			result.variant = T{entity = result};
+			result.x = x;
+			result.y = y;
 
-	new_entity :: proc(manager: ^EntityManager, T: type, x, y: f32) -> ^T {
-		result := new(T);
-		result.entity = gen_new_entity(manager);
-		result.derived.data = result;
-		result.derived.type_info = type_info(T);
+			return ^T(&result.variant);
+		}
 
-		result.position.x = x;
-		result.position.y = y;
+		entities: [dynamic]^Entity;
 
-		return result;
-	}
+		rock := new_entity(Rock, 3, 5);
 
-	manager: EntityManager;
-	entities: [dynamic]^Entity;
+		// Named arguments work too!
+		door := new_entity(T = Door, x = 3, y = 6);
 
-	rock    := new_entity(&manager, Rock, 3, 5);
+		// And named arguments can be any order
+		monster := new_entity(
+			y = 1,
+			x = 2,
+			T = Monster,
+		);
 
-	// Named arguments work too!
-	door    := new_entity(manager = &manager, T = Door, x = 3, y = 6);
+		append(&entities, rock, door, monster);
 
-	// And named arguments can be any order
-	monster := new_entity(
-		y = 1,
-		x = 2,
-		manager = &manager,
-		T = Monster,
-	);
-
-	append(&entities, rock, door, monster);
-
-	// An alternative to `union`s
-	for entity in entities {
-		match e in entity.derived {
-		case Rock:    fmt.println("Rock",    e.portable_id, e.x, e.y);
-		case Door:    fmt.println("Door",    e.portable_id, e.x, e.y);
-		case Monster: fmt.println("Monster", e.portable_id, e.x, e.y);
+		fmt.println("Union");
+		for entity in entities {
+			match e in entity.variant {
+			case Rock:    fmt.println("Rock",    e.x, e.y);
+			case Door:    fmt.println("Door",    e.x, e.y);
+			case Monster: fmt.println("Monster", e.x, e.y);
+			}
 		}
 	}
 }

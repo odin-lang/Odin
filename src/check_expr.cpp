@@ -3338,6 +3338,7 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 
 	// Cast between pointers
 	if (is_type_pointer(src) && is_type_pointer(dst)) {
+		#if 0
 		Type *s = base_type(type_deref(src));
 		if (is_type_union(s)) {
 			// NOTE(bill): Should the error be here?!
@@ -3349,6 +3350,7 @@ bool check_is_castable_to(Checker *c, Operand *operand, Type *y) {
 			gb_string_free(xs);
 			return false;
 		}
+		#endif
 		return true;
 	}
 
