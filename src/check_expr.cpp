@@ -691,6 +691,147 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 }
 
 
+void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields, Map<Entity *> *entity_map, AstNode *record_node, String context) {
+	if (decl->kind == AstNode_WhenStmt) {
+		ast_node(ws, WhenStmt, decl);
+		Operand operand = {Addressing_Invalid};
+		check_expr(c, &operand, ws->cond);
+		if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
+			error(ws->cond, "Non-constant boolean `when` condition");
+			return;
+		}
+		if (ws->body == nullptr || ws->body->kind != AstNode_BlockStmt) {
+			error(ws->cond, "Invalid body for `when` statement");
+			return;
+		}
+		if (operand.value.kind == ExactValue_Bool &&
+		    operand.value.value_bool) {
+			for_array(i, ws->body->BlockStmt.stmts) {
+				AstNode *stmt = ws->body->BlockStmt.stmts[i];
+				check_record_field_decl(c, stmt, fields, entity_map, record_node, context);
+			}
+		} else if (ws->else_stmt) {
+			switch (ws->else_stmt->kind) {
+			case AstNode_BlockStmt:
+				for_array(i, ws->else_stmt->BlockStmt.stmts) {
+					AstNode *stmt = ws->else_stmt->BlockStmt.stmts[i];
+					check_record_field_decl(c, stmt, fields, entity_map, record_node, context);
+				}
+				break;
+			case AstNode_WhenStmt:
+				check_record_field_decl(c, ws->else_stmt, fields, entity_map, record_node, context);
+				break;
+			default:
+				error(ws->else_stmt, "Invalid `else` statement in `when` statement");
+				break;
+			}
+		}
+	}
+
+	if (decl->kind != AstNode_ValueDecl) {
+		return;
+	}
+
+
+	ast_node(vd, ValueDecl, decl);
+
+	if (!vd->is_mutable) return;
+
+	Type *type = nullptr;
+	if (vd->type != nullptr) {
+		type = check_type(c, vd->type);
+	} else {
+		error(vd->names[0], "Expected a type for this field");
+		type = t_invalid;
+	}
+	bool is_using = (vd->flags&VarDeclFlag_using) != 0;
+
+	if (is_using && vd->names.count > 1) {
+		error(vd->names[0], "Cannot apply `using` to more than one of the same type");
+		is_using = false;
+	}
+
+	if (!vd->is_mutable) {
+		error(vd->names[0], "Immutable values in a %.*s are not yet supported", LIT(context));
+		return;
+	}
+
+	if (vd->values.count) {
+		error(vd->values[0], "Default values are not allowed within a %.*s", LIT(context));
+	}
+
+	for_array(name_index, vd->names) {
+		AstNode *name = vd->names[name_index];
+		if (!ast_node_expect(name, AstNode_Ident)) {
+			return;
+		}
+
+		Token name_token = name->Ident.token;
+
+		Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, is_using, cast(i32)fields->count);
+		e->identifier = name;
+		if (name_token.string == "_") {
+			array_add(fields, e);
+		} else if (name_token.string == "__tag") {
+			error(name, "`__tag` is a reserved identifier for fields");
+		} else {
+			HashKey key = hash_string(name_token.string);
+			Entity **found = map_get(entity_map, key);
+			if (found != nullptr) {
+				Entity *e = *found;
+				// NOTE(bill): Scope checking already checks the declaration but in many cases, this can happen so why not?
+				// This may be a little janky but it's not really that much of a problem
+				error(name_token, "`%.*s` is already declared in this type", LIT(name_token.string));
+				error(e->token,   "\tpreviously declared");
+			} else {
+				map_set(entity_map, key, e);
+				array_add(fields, e);
+				add_entity(c, c->context.scope, name, e);
+			}
+			add_entity_use(c, name, e);
+		}
+	}
+
+	Entity *using_index_expr = nullptr;
+
+	if (is_using) {
+		Type *t = base_type(type_deref(type));
+		if (!is_type_struct(t) && !is_type_raw_union(t) && !is_type_bit_field(t) &&
+		    vd->names.count >= 1 &&
+		    vd->names[0]->kind == AstNode_Ident) {
+			Token name_token = vd->names[0]->Ident.token;
+			if (is_type_indexable(t)) {
+				bool ok = true;
+				for_array(emi, entity_map->entries) {
+					Entity *e = entity_map->entries[emi].value;
+					if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
+						if (is_type_indexable(e->type)) {
+							if (e->identifier != vd->names[0]) {
+								ok = false;
+								using_index_expr = e;
+								break;
+							}
+						}
+					}
+				}
+				if (ok) {
+					using_index_expr = (*fields)[fields->count-1];
+				} else {
+					(*fields)[fields->count-1]->flags &= ~EntityFlag_Using;
+					error(name_token, "Previous `using` for an index expression `%.*s`", LIT(name_token.string));
+				}
+			} else {
+				gbString type_str = type_to_string(type);
+				error(name_token, "`using` cannot be applied to the field `%.*s` of type `%s`", LIT(name_token.string), type_str);
+				gb_string_free(type_str);
+				return;
+			}
+		}
+
+		populate_using_entity_map(c, record_node, type, entity_map);
+	}
+}
+
 // Returns filled field_count
 Array<Entity *> check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
                              isize init_field_capacity, String context) {
@@ -703,7 +844,6 @@ Array<Entity *> check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 	Map<Entity *> entity_map = {};
 	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*init_field_capacity);
 
-	Entity *using_index_expr = nullptr;
 
 	if (node != nullptr) {
 		GB_ASSERT(node->kind != AstNode_UnionType);
@@ -712,9 +852,6 @@ Array<Entity *> check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 	check_collect_entities(c, decls, false);
 	for_array(i, c->context.scope->elements.entries) {
 		Entity *e = c->context.scope->elements.entries[i].value;
-		if (e->token.string == "EnumValue") {
-			// gb_printf_err("EnumValue\n");
-		}
 		DeclInfo *d = nullptr;
 		switch (e->kind) {
 		default: continue;
@@ -729,105 +866,7 @@ Array<Entity *> check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 	}
 
 	for_array(decl_index, decls) {
-		AstNode *decl = decls[decl_index];
-		if (decl->kind != AstNode_ValueDecl) continue;
-
-		ast_node(vd, ValueDecl, decl);
-
-		if (!vd->is_mutable) continue;
-
-		Type *type = nullptr;
-		if (vd->type != nullptr) {
-			type = check_type(c, vd->type);
-		} else {
-			error(vd->names[0], "Expected a type for this field");
-			type = t_invalid;
-		}
-		bool is_using = (vd->flags&VarDeclFlag_using) != 0;
-
-		if (is_using && vd->names.count > 1) {
-			error(vd->names[0], "Cannot apply `using` to more than one of the same type");
-			is_using = false;
-		}
-
-		if (!vd->is_mutable) {
-			error(vd->names[0], "Immutable values in a %.*s are not yet supported", LIT(context));
-			continue;
-		}
-
-		if (vd->values.count) {
-			error(vd->values[0], "Default values are not allowed within a %.*s", LIT(context));
-		}
-
-		for_array(name_index, vd->names) {
-			AstNode *name = vd->names[name_index];
-			if (!ast_node_expect(name, AstNode_Ident)) {
-				continue;
-			}
-
-			Token name_token = name->Ident.token;
-
-			Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, is_using, cast(i32)fields.count);
-			e->identifier = name;
-			if (name_token.string == "_") {
-				array_add(&fields, e);
-			} else if (name_token.string == "__tag") {
-				error(name, "`__tag` is a reserved identifier for fields");
-			} else {
-				HashKey key = hash_string(name_token.string);
-				Entity **found = map_get(&entity_map, key);
-				if (found != nullptr) {
-					Entity *e = *found;
-					// NOTE(bill): Scope checking already checks the declaration but in many cases, this can happen so why not?
-					// This may be a little janky but it's not really that much of a problem
-					error(name_token, "`%.*s` is already declared in this type", LIT(name_token.string));
-					error(e->token,   "\tpreviously declared");
-				} else {
-					map_set(&entity_map, key, e);
-					array_add(&fields, e);
-					add_entity(c, c->context.scope, name, e);
-				}
-				add_entity_use(c, name, e);
-			}
-		}
-
-
-		if (is_using) {
-			Type *t = base_type(type_deref(type));
-			if (!is_type_struct(t) && !is_type_raw_union(t) && !is_type_bit_field(t) &&
-			    vd->names.count >= 1 &&
-			    vd->names[0]->kind == AstNode_Ident) {
-				Token name_token = vd->names[0]->Ident.token;
-				if (is_type_indexable(t)) {
-					bool ok = true;
-					for_array(emi, entity_map.entries) {
-						Entity *e = entity_map.entries[emi].value;
-						if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
-							if (is_type_indexable(e->type)) {
-								if (e->identifier != vd->names[0]) {
-									ok = false;
-									using_index_expr = e;
-									break;
-								}
-							}
-						}
-					}
-					if (ok) {
-						using_index_expr = fields[fields.count-1];
-					} else {
-						fields[fields.count-1]->flags &= ~EntityFlag_Using;
-						error(name_token, "Previous `using` for an index expression `%.*s`", LIT(name_token.string));
-					}
-				} else {
-					gbString type_str = type_to_string(type);
-					error(name_token, "`using` cannot be applied to the field `%.*s` of type `%s`", LIT(name_token.string), type_str);
-					gb_string_free(type_str);
-					continue;
-				}
-			}
-
-			populate_using_entity_map(c, node, type, &entity_map);
-		}
+		check_record_field_decl(c, decls[decl_index], &fields, &entity_map, node, str_lit("struct"));
 	}
 
 
