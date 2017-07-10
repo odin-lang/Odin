@@ -489,52 +489,22 @@ bool check_using_stmt_entity(Checker *c, AstNodeUsingStmt *us, AstNode *expr, bo
 						f->using_parent = e;
 					}
 				}
-			} else if (is_type_enum(t)) {
-				for (isize i = 0; i < t->Record.field_count; i++) {
-					Entity *f = t->Record.fields[i];
-					Entity *found = scope_insert_entity(c->context.scope, f);
-					if (found != nullptr) {
-						gbString expr_str = expr_to_string(expr);
-						error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
-						gb_string_free(expr_str);
-						return false;
-					}
-					f->using_parent = e;
+			}
+		} else if (t->kind == Type_Enum) {
+			for (isize i = 0; i < t->Enum.field_count; i++) {
+				Entity *f = t->Enum.fields[i];
+				Entity *found = scope_insert_entity(c->context.scope, f);
+				if (found != nullptr) {
+					gbString expr_str = expr_to_string(expr);
+					error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
+					gb_string_free(expr_str);
+					return false;
 				}
+				f->using_parent = e;
 			}
 		} else {
 			error(us->token, "`using` can be only applied to record type entities");
 		}
-		/* if (is_type_union(t)) {
-			TokenPos pos = ast_node_token(expr).pos;
-			for (isize i = 1; i < t->Record.variant_count; i++) {
-				Entity *f = t->Record.variants[i];
-				// gb_printf_err("%s\n", type_to_string(f->type));
-				Entity *found = scope_insert_entity(c->context.scope, f);
-				if (found != nullptr) {
-					gbString expr_str = expr_to_string(expr);
-					error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
-					gb_string_free(expr_str);
-					return false;
-				}
-				f->using_parent = e;
-			}
-		} else if (is_type_enum(t)) {
-			for (isize i = 0; i < t->Record.field_count; i++) {
-				Entity *f = t->Record.fields[i];
-				Entity *found = scope_insert_entity(c->context.scope, f);
-				if (found != nullptr) {
-					gbString expr_str = expr_to_string(expr);
-					error(us->token, "Namespace collision while `using` `%s` of: %.*s", expr_str, LIT(found->token.string));
-					gb_string_free(expr_str);
-					return false;
-				}
-				f->using_parent = e;
-			}
-
-		} else {
-			error(us->token, "`using` can be only applied to `union` or `enum` type entities");
-		} */
 	} break;
 
 	case Entity_ImportName: {

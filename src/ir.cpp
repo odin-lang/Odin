@@ -7995,6 +7995,55 @@ void ir_gen_tree(irGen *s) {
 					ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types, count, count);
 					ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names, count, count);
 				} break;
+				case Type_Enum:
+					ir_emit_comment(proc, str_lit("TypeInfoEnum"));
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_enum_ptr);
+					{
+						GB_ASSERT(t->Enum.base_type != nullptr);
+						irValue *base = ir_type_info(proc, t->Enum.base_type);
+						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), base);
+
+						if (t->Enum.field_count > 0) {
+							Entity **fields = t->Enum.fields;
+							isize count = t->Enum.field_count;
+							irValue *name_array  = ir_generate_array(m, t_string, count,
+							                                         str_lit("__$enum_names"), cast(i64)entry_index);
+							irValue *value_array = ir_generate_array(m, t_type_info_enum_value, count,
+							                                         str_lit("__$enum_values"), cast(i64)entry_index);
+
+							bool is_value_int = is_type_integer(t->Enum.base_type);
+
+							for (isize i = 0; i < count; i++) {
+								irValue *name_ep  = ir_emit_array_epi(proc, name_array, i);
+								irValue *value_ep = ir_emit_array_epi(proc, value_array, i);
+
+								ExactValue value = fields[i]->Constant.value;
+
+								if (is_value_int) {
+									value_ep = ir_emit_conv(proc, value_ep, t_i128_ptr);
+									ir_emit_store(proc, value_ep, ir_value_constant(a, t_i128, value));
+								} else {
+									GB_ASSERT(is_type_float(t->Enum.base_type));
+									f64 f = value.value_float;
+									value_ep = ir_emit_conv(proc, value_ep, t_f64_ptr);
+									ir_emit_store(proc, value_ep, ir_const_f64(a, f));
+								}
+
+								ir_emit_store(proc, name_ep, ir_const_string(a, fields[i]->token.string));
+							}
+
+							irValue *v_count = ir_const_int(a, count);
+
+							irValue *names = ir_emit_struct_ep(proc, tag, 1);
+							irValue *name_array_elem = ir_array_elem(proc, name_array);
+							ir_fill_slice(proc, names, name_array_elem, v_count, v_count);
+
+							irValue *values = ir_emit_struct_ep(proc, tag, 2);
+							irValue *value_array_elem = ir_array_elem(proc, value_array);
+							ir_fill_slice(proc, values, value_array_elem, v_count, v_count);
+						}
+					}
+					break;
 				case Type_Record: {
 					switch (t->Record.kind) {
 					case TypeRecord_Struct: {
@@ -8132,55 +8181,6 @@ void ir_gen_tree(irGen *s) {
 						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   count, count);
 						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, count, count);
 					} break;
-					case TypeRecord_Enum:
-						ir_emit_comment(proc, str_lit("TypeInfoEnum"));
-						tag = ir_emit_conv(proc, variant_ptr, t_type_info_enum_ptr);
-						{
-							GB_ASSERT(t->Record.enum_base_type != nullptr);
-							irValue *base = ir_type_info(proc, t->Record.enum_base_type);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), base);
-
-							if (t->Record.field_count > 0) {
-								Entity **fields = t->Record.fields;
-								isize count = t->Record.field_count;
-								irValue *name_array  = ir_generate_array(m, t_string, count,
-								                                         str_lit("__$enum_names"), cast(i64)entry_index);
-								irValue *value_array = ir_generate_array(m, t_type_info_enum_value, count,
-								                                         str_lit("__$enum_values"), cast(i64)entry_index);
-
-								bool is_value_int = is_type_integer(t->Record.enum_base_type);
-
-								for (isize i = 0; i < count; i++) {
-									irValue *name_ep  = ir_emit_array_epi(proc, name_array, i);
-									irValue *value_ep = ir_emit_array_epi(proc, value_array, i);
-
-									ExactValue value = fields[i]->Constant.value;
-
-									if (is_value_int) {
-										value_ep = ir_emit_conv(proc, value_ep, t_i128_ptr);
-										ir_emit_store(proc, value_ep, ir_value_constant(a, t_i128, value));
-									} else {
-										GB_ASSERT(is_type_float(t->Record.enum_base_type));
-										f64 f = value.value_float;
-										value_ep = ir_emit_conv(proc, value_ep, t_f64_ptr);
-										ir_emit_store(proc, value_ep, ir_const_f64(a, f));
-									}
-
-									ir_emit_store(proc, name_ep, ir_const_string(a, fields[i]->token.string));
-								}
-
-								irValue *v_count = ir_const_int(a, count);
-
-								irValue *names = ir_emit_struct_ep(proc, tag, 1);
-								irValue *name_array_elem = ir_array_elem(proc, name_array);
-								ir_fill_slice(proc, names, name_array_elem, v_count, v_count);
-
-								irValue *values = ir_emit_struct_ep(proc, tag, 2);
-								irValue *value_array_elem = ir_array_elem(proc, value_array);
-								ir_fill_slice(proc, values, value_array_elem, v_count, v_count);
-							}
-						}
-						break;
 					}
 				} break;
 				case Type_Map: {

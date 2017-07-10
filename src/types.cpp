@@ -74,7 +74,7 @@ enum TypeRecordKind {
 	TypeRecord_Struct,
 	TypeRecord_RawUnion,
 	TypeRecord_Union, // Tagged
-	TypeRecord_Enum,
+	// TypeRecord_Enum,
 
 	TypeRecord_Count,
 };
@@ -110,10 +110,10 @@ struct TypeRecord {
 	i64      custom_align; // NOTE(bill): Only used in structs at the moment
 	Entity * names;
 
-	Type *   enum_base_type;
-	Entity * enum_count;
-	Entity * enum_min_value;
-	Entity * enum_max_value;
+	// Type *   enum_base_type;
+	// Entity * enum_count;
+	// Entity * enum_min_value;
+	// Entity * enum_max_value;
 };
 
 #define TYPE_KINDS                                        \
@@ -126,6 +126,17 @@ struct TypeRecord {
 	TYPE_KIND(Vector,  struct { Type *elem; i64 count; }) \
 	TYPE_KIND(Slice,   struct { Type *elem; })            \
 	TYPE_KIND(Record,  TypeRecord)                        \
+	TYPE_KIND(Enum, struct {                              \
+		Entity **fields;                                  \
+		i32      field_count;                             \
+		AstNode *node;                                    \
+		Scope *  scope;                                   \
+		Entity * names;                                   \
+		Type *   base_type;                               \
+		Entity * count;                                   \
+		Entity * min_value;                               \
+		Entity * max_value;                               \
+	})                                                    \
 	TYPE_KIND(Named, struct {                             \
 		String  name;                                     \
 		Type *  base;                                     \
@@ -423,9 +434,8 @@ Type *base_type(Type *t) {
 Type *base_enum_type(Type *t) {
 	Type *bt = base_type(t);
 	if (bt != nullptr &&
-	    bt->kind == Type_Record &&
-	    bt->Record.kind == TypeRecord_Enum) {
-		return bt->Record.enum_base_type;
+	    bt->kind == Type_Enum) {
+		return bt->Enum.base_type;
 	}
 	return t;
 }
@@ -443,12 +453,9 @@ Type *core_type(Type *t) {
 			}
 			t = t->Named.base;
 			continue;
-		case Type_Record:
-			if (t->Record.kind == TypeRecord_Enum) {
-				t = t->Record.enum_base_type;
-				continue;
-			}
-			break;
+		case Type_Enum:
+			t = t->Enum.base_type;
+			continue;
 		case Type_Atomic:
 			t = t->Atomic.elem;
 			continue;
@@ -544,8 +551,7 @@ Type *make_type_raw_union(gbAllocator a) {
 }
 
 Type *make_type_enum(gbAllocator a) {
-	Type *t = alloc_type(a, Type_Record);
-	t->Record.kind = TypeRecord_Enum;
+	Type *t = alloc_type(a, Type_Enum);
 	return t;
 }
 
@@ -877,7 +883,7 @@ bool is_type_raw_union(Type *t) {
 }
 bool is_type_enum(Type *t) {
 	t = base_type(t);
-	return (t->kind == Type_Record && t->Record.kind == TypeRecord_Enum);
+	return (t->kind == Type_Enum);
 }
 bool is_type_bit_field(Type *t) {
 	t = base_type(t);
@@ -989,13 +995,14 @@ bool is_type_polymorphic(Type *t) {
 		#endif
 		break;
 
-	case Type_Record:
-		if (t->Record.kind == TypeRecord_Enum) {
-			if (t->Record.enum_base_type != nullptr) {
-				return is_type_polymorphic(t->Record.enum_base_type);
+	case Type_Enum:
+		if (t->kind == Type_Enum) {
+			if (t->Enum.base_type != nullptr) {
+				return is_type_polymorphic(t->Enum.base_type);
 			}
 			return false;
 		}
+	case Type_Record:
 		for (isize i = 0; i < t->Record.field_count; i++) {
 		    if (is_type_polymorphic(t->Record.fields[i]->type)) {
 		    	return true;
@@ -1070,12 +1077,8 @@ bool is_type_comparable(Type *t) {
 		return true;
 	case Type_Pointer:
 		return true;
-	case Type_Record: {
-		if (is_type_enum(t)) {
-			return is_type_comparable(core_type(t));
-		}
-		return false;
-	} break;
+	case Type_Enum:
+		return is_type_comparable(core_type(t));
 	case Type_Array:
 		return false;
 	case Type_Vector:
@@ -1133,6 +1136,10 @@ bool are_types_identical(Type *x, Type *y) {
 		}
 		break;
 
+
+	case Type_Enum:
+		return x == y; // NOTE(bill): All enums are unique
+
 	case Type_Record:
 		if (y->kind == Type_Record) {
 			if (x->Record.kind == y->Record.kind) {
@@ -1170,9 +1177,6 @@ bool are_types_identical(Type *x, Type *y) {
 						return true;
 					}
 					break;
-
-				case TypeRecord_Enum:
-					return x == y; // NOTE(bill): All enums are unique
 				}
 			}
 		}
@@ -1554,23 +1558,23 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 
 		if (is_type_enum(type)) {
 			// NOTE(bill): These may not have been added yet, so check in case
-			if (type->Record.enum_count != nullptr) {
+			if (type->Enum.count != nullptr) {
 				if (field_name == "count") {
-					sel.entity = type->Record.enum_count;
+					sel.entity = type->Enum.count;
 					return sel;
 				}
 				if (field_name == "min_value") {
-					sel.entity = type->Record.enum_min_value;
+					sel.entity = type->Enum.min_value;
 					return sel;
 				}
 				if (field_name == "max_value") {
-					sel.entity = type->Record.enum_max_value;
+					sel.entity = type->Enum.max_value;
 					return sel;
 				}
 			}
 
-			for (isize i = 0; i < type->Record.field_count; i++) {
-				Entity *f = type->Record.fields[i];
+			for (isize i = 0; i < type->Enum.field_count; i++) {
+				Entity *f = type->Enum.fields[i];
 				GB_ASSERT(f->kind == Entity_Constant);
 				String str = f->token.string;
 
@@ -1821,10 +1825,11 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		GB_PANIC("TODO(bill): Fixed map alignment");
 	} break;
 
+	case Type_Enum:
+		return type_align_of_internal(allocator, t->Enum.base_type, path);
+
 	case Type_Record: {
 		switch (t->Record.kind) {
-		case TypeRecord_Enum:
-			return type_align_of_internal(allocator, t->Record.enum_base_type, path);
 		case TypeRecord_Struct:
 			if (t->Record.custom_align > 0) {
 				return gb_clamp(t->Record.custom_align, 1, build_context.max_align);
@@ -2072,10 +2077,11 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 		return align_formula(size, align);
 	} break;
 
+	case Type_Enum:
+		return type_size_of_internal(allocator, t->Enum.base_type, path);
+
 	case Type_Record: {
 		switch (t->Record.kind) {
-		case TypeRecord_Enum:
-			return type_size_of_internal(allocator, t->Record.enum_base_type, path);
 
 		case TypeRecord_Struct: {
 			i64 count = t->Record.field_count;
@@ -2317,6 +2323,25 @@ gbString write_type_to_string(gbString str, Type *type) {
 		str = write_type_to_string(str, type->DynamicArray.elem);
 		break;
 
+	case Type_Enum:
+		str = gb_string_appendc(str, "enum");
+		if (type->Enum.base_type != nullptr) {
+		str = gb_string_appendc(str, " ");
+			str = write_type_to_string(str, type->Enum.base_type);
+		}
+		str = gb_string_appendc(str, " {");
+		for (isize i = 0; i < type->Enum.field_count; i++) {
+			Entity *f = type->Enum.fields[i];
+			GB_ASSERT(f->kind == Entity_Constant);
+			if (i > 0) {
+				str = gb_string_appendc(str, ", ");
+			}
+			str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
+			// str = gb_string_appendc(str, " = ");
+		}
+		str = gb_string_appendc(str, "}");
+		break;
+
 	case Type_Record: {
 		switch (type->Record.kind) {
 		case TypeRecord_Struct:
@@ -2374,25 +2399,6 @@ gbString write_type_to_string(gbString str, Type *type) {
 				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
 				str = gb_string_appendc(str, ": ");
 				str = write_type_to_string(str, f->type);
-			}
-			str = gb_string_appendc(str, "}");
-			break;
-
-		case TypeRecord_Enum:
-			str = gb_string_appendc(str, "enum");
-			if (type->Record.enum_base_type != nullptr) {
-			str = gb_string_appendc(str, " ");
-				str = write_type_to_string(str, type->Record.enum_base_type);
-			}
-			str = gb_string_appendc(str, " {");
-			for (isize i = 0; i < type->Record.field_count; i++) {
-				Entity *f = type->Record.fields[i];
-				GB_ASSERT(f->kind == Entity_Constant);
-				if (i > 0) {
-					str = gb_string_appendc(str, ", ");
-				}
-				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
-				// str = gb_string_appendc(str, " = ");
 			}
 			str = gb_string_appendc(str, "}");
 			break;

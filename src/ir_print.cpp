@@ -280,6 +280,11 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		ir_print_type(f, m, t_allocator);
 		ir_fprintf(f, "}");
 		return;
+
+	case Type_Enum:
+		ir_print_type(f, m, base_enum_type(t));
+		return;
+
 	case Type_Record: {
 		switch (t->Record.kind) {
 		case TypeRecord_Struct:
@@ -331,9 +336,6 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 			i64 align_of_union = type_align_of(heap_allocator(), t);
 			ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align_of_union, size_of_union);
 		} return;
-		case TypeRecord_Enum:
-			ir_print_type(f, m, base_enum_type(t));
-			return;
 		}
 	} break;
 

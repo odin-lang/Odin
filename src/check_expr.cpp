@@ -119,7 +119,7 @@ bool check_is_assignable_to_using_subtype(Type *src, Type *dst) {
 	src_is_ptr = src != prev_src;
 	src = base_type(src);
 
-	if (!is_type_struct(src) && !is_type_union(src)) {
+	if (!is_type_struct(src)) {
 		return false;
 	}
 
@@ -1070,7 +1070,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	}
 
 	// NOTE(bill): Must be up here for the `check_init_constant` system
-	enum_type->Record.enum_base_type = base_type;
+	enum_type->Enum.base_type = base_type;
 
 	Map<Entity *> entity_map = {}; // Key: String
 	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*(et->fields.count));
@@ -1171,17 +1171,17 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 	GB_ASSERT(fields.count <= et->fields.count);
 
 
-	enum_type->Record.fields      = fields.data;
-	enum_type->Record.field_count = fields.count;
+	enum_type->Enum.fields      = fields.data;
+	enum_type->Enum.field_count = fields.count;
 
-	enum_type->Record.enum_count = make_entity_constant(c->allocator, c->context.scope,
+	enum_type->Enum.count = make_entity_constant(c->allocator, c->context.scope,
 		make_token_ident(str_lit("count")), t_int, exact_value_i64(fields.count));
-	enum_type->Record.enum_min_value = make_entity_constant(c->allocator, c->context.scope,
+	enum_type->Enum.min_value = make_entity_constant(c->allocator, c->context.scope,
 		make_token_ident(str_lit("min_value")), constant_type, min_value);
-	enum_type->Record.enum_max_value = make_entity_constant(c->allocator, c->context.scope,
+	enum_type->Enum.max_value = make_entity_constant(c->allocator, c->context.scope,
 		make_token_ident(str_lit("max_value")), constant_type, max_value);
 
-	enum_type->Record.names = make_names_field_for_record(c, c->context.scope);
+	enum_type->Enum.names = make_names_field_for_record(c, c->context.scope);
 }
 
 
@@ -2569,7 +2569,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		check_open_scope(c, e);
 		check_enum_type(c, *type, named_type, e);
 		check_close_scope(c);
-		(*type)->Record.node = e;
+		(*type)->Enum.node = e;
 		return true;
 	case_end;
 
@@ -3069,8 +3069,6 @@ void check_comparison(Checker *c, Operand *x, Operand *y, TokenKind op) {
 			if (x->type == err_type && is_operand_nil(*x)) {
 				err_type = y->type;
 			}
-			gb_printf_err("%d %d\n", is_operand_nil(*x), type_has_nil(y->type));
-			gb_printf_err("%d %d\n", is_operand_nil(*y), type_has_nil(x->type));
 			gbString type_string = type_to_string(err_type);
 			err_str = gb_string_make(c->tmp_allocator,
 			                         gb_bprintf("operator `%.*s` not defined for type `%s`", LIT(token_strings[op]), type_string));

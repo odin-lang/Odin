@@ -1148,11 +1148,12 @@ void add_type_info_type(Checker *c, Type *t) {
 		add_type_info_type(c, t_int);
 		break;
 
+	case Type_Enum:
+		add_type_info_type(c, bt->Enum.base_type);
+		break;
+
 	case Type_Record: {
 		switch (bt->Record.kind) {
-		case TypeRecord_Enum:
-			add_type_info_type(c, bt->Record.enum_base_type);
-			break;
 		case TypeRecord_Union:
 			add_type_info_type(c, t_int);
 			for (isize i = 0; i < bt->Record.variant_count; i++) {
