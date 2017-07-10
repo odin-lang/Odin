@@ -3339,6 +3339,11 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 irAddr ir_emit_any_cast_addr(irProcedure *proc, irValue *value, Type *type, TokenPos pos) {
 	gbAllocator a = proc->module->allocator;
 	Type *src_type = ir_type(value);
+
+	if (is_type_pointer(src_type)) {
+		value = ir_emit_load(proc, value);
+	}
+
 	bool is_tuple = true;
 	Type *tuple = type;
 	if (type->kind != Type_Tuple) {
@@ -8049,11 +8054,9 @@ void ir_gen_tree(irGen *s) {
 					tag = ir_emit_conv(proc, variant_ptr, t_type_info_union_ptr);
 
 					{
-						irValue *variant_names = ir_emit_struct_ep(proc, tag, 1);
-						irValue *variant_types = ir_emit_struct_ep(proc, tag, 2);
+						irValue *variant_types = ir_emit_struct_ep(proc, tag, 0);
 
 						isize variant_count = gb_max(0, t->Union.variant_count-1);
-						irValue *memory_names = ir_type_info_member_names_offset(proc, variant_count);
 						irValue *memory_types = ir_type_info_member_types_offset(proc, variant_count);
 
 						// NOTE(bill): Zeroth is nil so ignore it
@@ -8067,7 +8070,6 @@ void ir_gen_tree(irGen *s) {
 						}
 
 						irValue *count = ir_const_int(a, variant_count);
-						ir_fill_slice(proc, variant_names, memory_names, count, count);
 						ir_fill_slice(proc, variant_types, memory_types, count, count);
 					}
 

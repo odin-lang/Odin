@@ -6837,14 +6837,14 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 			o->type = t;
 			o->mode = Addressing_OptionalOk;
-		} else if (is_type_any(o->type)) {
+		} else if (is_type_any(src)) {
 			o->type = t;
 			o->mode = Addressing_OptionalOk;
 
 			add_type_info_type(c, o->type);
 			add_type_info_type(c, t);
 		} else {
-			error(o->expr, "Type assertions can only operate on unions");
+			error(o->expr, "Type assertions can only operate on unions and `any`");
 			o->mode = Addressing_Invalid;
 			o->expr = node;
 			return kind;

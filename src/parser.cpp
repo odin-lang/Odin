@@ -4134,20 +4134,29 @@ AstNode *parse_match_stmt(AstFile *f) {
 	if (f->curr_token.kind != Token_OpenBrace) {
 		isize prev_level = f->expr_level;
 		f->expr_level = -1;
+		defer (f->expr_level = prev_level);
 
-		tag = parse_simple_stmt(f, StmtAllowFlag_In);
-		if (tag->kind == AstNode_AssignStmt && tag->AssignStmt.op.kind == Token_in) {
+		if (allow_token(f, Token_in)) {
+			Array<AstNode *> lhs = {};
+			Array<AstNode *> rhs = make_ast_node_array(f, 1);
+			array_add(&rhs, parse_expr(f, false));
+
+			tag = ast_assign_stmt(f, token, lhs, rhs);
 			is_type_match = true;
 		} else {
-			if (allow_token(f, Token_Semicolon)) {
-				init = tag;
-				tag = nullptr;
-				if (f->curr_token.kind != Token_OpenBrace) {
-					tag = parse_simple_stmt(f, StmtAllowFlag_None);
+			tag = parse_simple_stmt(f, StmtAllowFlag_In);
+			if (tag->kind == AstNode_AssignStmt && tag->AssignStmt.op.kind == Token_in) {
+				is_type_match = true;
+			} else {
+				if (allow_token(f, Token_Semicolon)) {
+					init = tag;
+					tag = nullptr;
+					if (f->curr_token.kind != Token_OpenBrace) {
+						tag = parse_simple_stmt(f, StmtAllowFlag_None);
+					}
 				}
 			}
 		}
-		f->expr_level = prev_level;
 	}
 	open = expect_token(f, Token_OpenBrace);
 

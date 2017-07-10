@@ -17,11 +17,13 @@ import (
 // Local Variables:    snake_case
 // Constant Variables: SCREAMING_SNAKE_CASE
 
+
+
+
 // IMPORTANT NOTE(bill): `type_info` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
 // This could change at a later date if the all these data structures are
 // implemented within the compiler rather than in this "preload" file
-
 
 // NOTE(bill): This must match the compiler's
 CallingConvention :: enum {
@@ -81,13 +83,7 @@ TypeInfo :: struct #ordered {
 	Struct       :: Record;
 	RawUnion     :: Record;
 	Union :: struct #ordered {
-		common_fields: struct #ordered {
-			types:     []^TypeInfo;
-			names:     []string;
-			offsets:   []int;    // offsets may not be used in tuples
-		};
-		variant_names: []string;
-		variant_types: []^TypeInfo;
+		variants: []^TypeInfo;
 	};
 	Enum :: struct #ordered {
 		base:   ^TypeInfo;
@@ -145,17 +141,19 @@ __argv__: ^^u8;
 __argc__: i32;
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
-AllocatorMode :: enum u8 {
-	Alloc,
-	Free,
-	FreeAll,
-	Resize,
-}
-AllocatorProc :: proc(allocator_data: rawptr, mode: AllocatorMode,
-                      size, alignment: int,
-                      old_memory: rawptr, old_size: int, flags: u64 = 0) -> rawptr;
+
 Allocator :: struct #ordered {
-	procedure: AllocatorProc;
+	Mode :: enum u8 {
+		Alloc,
+		Free,
+		FreeAll,
+		Resize,
+	}
+	Proc :: proc(allocator_data: rawptr, mode: Mode,
+	             size, alignment: int,
+	             old_memory: rawptr, old_size: int, flags: u64 = 0) -> rawptr;
+
+	procedure: Proc;
 	data:      rawptr;
 }
 
@@ -283,26 +281,26 @@ __check_context :: proc() {
 
 alloc :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr #inline {
 	a := context.allocator;
-	return a.procedure(a.data, AllocatorMode.Alloc, size, alignment, nil, 0, 0);
+	return a.procedure(a.data, Allocator.Mode.Alloc, size, alignment, nil, 0, 0);
 }
 
 free_ptr_with_allocator :: proc(a: Allocator, ptr: rawptr) #inline {
 	if ptr == nil do return;
 	if a.procedure == nil do return;
-	a.procedure(a.data, AllocatorMode.Free, 0, 0, ptr, 0, 0);
+	a.procedure(a.data, Allocator.Mode.Free, 0, 0, ptr, 0, 0);
 }
 
 free_ptr :: proc(ptr: rawptr) #inline do free_ptr_with_allocator(context.allocator, ptr);
 
 free_all :: proc() #inline {
 	a := context.allocator;
-	a.procedure(a.data, AllocatorMode.FreeAll, 0, 0, nil, 0, 0);
+	a.procedure(a.data, Allocator.Mode.FreeAll, 0, 0, nil, 0, 0);
 }
 
 
 resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT) -> rawptr #inline {
 	a := context.allocator;
-	return a.procedure(a.data, AllocatorMode.Resize, new_size, alignment, ptr, old_size, 0);
+	return a.procedure(a.data, Allocator.Mode.Resize, new_size, alignment, ptr, old_size, 0);
 }
 
 
@@ -403,7 +401,7 @@ reserve :: proc(array: ^[dynamic]$T, capacity: int) -> bool {
 	new_size  := capacity * size_of(T);
 	allocator := a.allocator;
 
-	new_data := allocator.procedure(allocator.data, AllocatorMode.Resize, new_size, align_of(T), a.data, old_size, 0);
+	new_data := allocator.procedure(allocator.data, Allocator.Mode.Resize, new_size, align_of(T), a.data, old_size, 0);
 	if new_data == nil do return false;
 
 	a.data = new_data;
@@ -503,10 +501,10 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 }
 
 
-default_allocator_proc :: proc(allocator_data: rawptr, mode: AllocatorMode,
+default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
                             size, alignment: int,
                             old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
-	using AllocatorMode;
+	using Allocator.Mode;
 
 	match mode {
 	case Alloc:
@@ -715,7 +713,7 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	new_size  := cap * elem_size;
 	allocator := array.allocator;
 
-	new_data := allocator.procedure(allocator.data, AllocatorMode.Resize, new_size, elem_align, array.data, old_size, 0);
+	new_data := allocator.procedure(allocator.data, Allocator.Mode.Resize, new_size, elem_align, array.data, old_size, 0);
 	if new_data == nil do return false;
 
 	array.data = new_data;
@@ -736,9 +734,8 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
                                items: rawptr, item_count: int) -> int {
 	array := ^raw.DynamicArray(array_);
 
-	if item_count <= 0 || items == nil {
-		return array.len;
-	}
+	if items == nil    do return 0;
+	if item_count <= 0 do return 0;
 
 
 	ok := true;

@@ -137,10 +137,10 @@ arena_allocator :: proc(arena: ^Arena) -> Allocator {
 	};
 }
 
-arena_allocator_proc :: proc(allocator_data: rawptr, mode: AllocatorMode,
-                          size, alignment: int,
-                          old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
-	using AllocatorMode;
+arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
+                             size, alignment: int,
+                             old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
+	using Allocator.Mode;
 	arena := ^Arena(allocator_data);
 
 	match mode {

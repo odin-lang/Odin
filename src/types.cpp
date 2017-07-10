@@ -84,22 +84,12 @@ struct TypeRecord {
 
 	// All record types
 	// Theses are arrays
-	// Entity_Variable - struct/raw_union/union (for common fields)
-	// Entity_Constant - enum
+	// Entity_Variable - struct/raw_union (for common fields)
 	Entity **fields;
 	i32      field_count; // == struct_offsets count
 	Entity **fields_in_src_order; // Entity_Variable
 	AstNode *node;
 	Scope *  scope;
-
-	// Entity_TypeName - union
-	// Type **  variants;
-	// i32      variant_count;
-	// Entity * union__tag;
-	// i64      variant_block_size; // NOTE(bill): Internal use only
-
-	// Type *   variant_parent;
-	// i32      variant_index;
 
 	i64 *    offsets;
 	bool     are_offsets_set;
@@ -109,11 +99,6 @@ struct TypeRecord {
 
 	i64      custom_align; // NOTE(bill): Only used in structs at the moment
 	Entity * names;
-
-	// Type *   enum_base_type;
-	// Entity * enum_count;
-	// Entity * enum_min_value;
-	// Entity * enum_max_value;
 };
 
 #define TYPE_KINDS                                        \
@@ -144,8 +129,6 @@ struct TypeRecord {
 		Scope *  scope;                                   \
 		Entity * union__tag;                              \
 		i64      variant_block_size;                      \
-		Type *   variant_parent;                          \
-		i32      variant_index;                           \
 		i64      custom_align;                            \
 	})                                                    \
 	TYPE_KIND(Named, struct {                             \
@@ -1559,13 +1542,23 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 	}
 
 	if (is_type) {
-		if (type->kind == Type_Record) {
+		switch (type->kind) {
+		case Type_Record:
 			if (type->Record.names != nullptr &&
 			    field_name == "names") {
 				sel.entity = type->Record.names;
 				return sel;
 			}
+			break;
+		case Type_Enum:
+			if (type->Enum.names != nullptr &&
+			    field_name == "names") {
+				sel.entity = type->Enum.names;
+				return sel;
+			}
+			break;
 		}
+
 
 		if (is_type_enum(type)) {
 			// NOTE(bill): These may not have been added yet, so check in case

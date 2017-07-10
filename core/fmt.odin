@@ -295,32 +295,9 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 
 	case Union:
 		write_string(buf, "union {");
-		cf := info.common_fields;
-		total_count := 0;
-		for name, i in cf.names {
+		for variant, i in info.variants {
 			if i > 0 do write_string(buf, ", ");
-			write_string(buf, name);
-			write_string(buf, ": ");
-			write_type(buf, cf.types[i]);
-			total_count++;
-		}
-		for name, i in info.variant_names {
-			if total_count > 0 || i > 0 do write_string(buf, ", ");
-			write_string(buf, name);
-			write_byte(buf, '{');
-			defer write_byte(buf, '}');
-
-			variant_type := type_info_base(info.variant_types[i]).variant;
-			variant := (&variant_type).(Struct);
-
-			vc := len(variant.names)-len(cf.names);
-			for j in 0..vc {
-				if j > 0 do write_string(buf, ", ");
-				index := j + len(cf.names);
-				write_string(buf, variant.names[index]);
-				write_string(buf, ": ");
-				write_type(buf, variant.types[index]);
-			}
+			write_type(buf, variant);
 		}
 		write_string(buf, "}");
 
@@ -897,23 +874,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		}
 
 	case Union:
-		write_byte(fi.buf, '{');
-		defer write_byte(fi.buf, '}');
-
-		cf := info.common_fields;
-		for _, i in cf.names {
-			if i > 0 do write_string(fi.buf, ", ");
-
-			write_string(fi.buf, cf.names[i]);
-			write_string(fi.buf, " = ");
-
-			if t := cf.types[i]; types.is_any(t) {
-				write_string(fi.buf, "any{}");
-			} else {
-				data := ^u8(v.data) + cf.offsets[i];
-				fmt_arg(fi, any{rawptr(data), t}, 'v');
-			}
-		}
+		write_string(fi.buf, "(union)");
 
 	case RawUnion:
 		write_string(fi.buf, "(raw_union)");
