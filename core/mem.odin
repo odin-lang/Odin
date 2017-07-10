@@ -208,15 +208,15 @@ align_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 	WORD_SIZE :: size_of(int);
 	MAX_ALIGN :: size_of([vector 64]f64); // TODO(bill): Should these constants be builtin constants?
 	using TypeInfo;
-	match info in type_info {
+	match info in type_info.variant {
 	case Named:
 		return align_of_type_info(info.base);
 	case Integer:
-		return info.size;
+		return type_info.align;
 	case Rune:
-		return info.size;
+		return type_info.align;
 	case Float:
-		return info.size;
+		return type_info.align;
 	case String:
 		return WORD_SIZE;
 	case Boolean:
@@ -239,13 +239,13 @@ align_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 		total := size * count;
 		return clamp(total, 1, MAX_ALIGN);
 	case Tuple:
-		return info.align;
+		return type_info.align;
 	case Struct:
-		return info.align;
+		return type_info.align;
 	case Union:
-		return info.align;
+		return type_info.align;
 	case RawUnion:
-		return info.align;
+		return type_info.align;
 	case Enum:
 		return align_of_type_info(info.base);
 	case Map:
@@ -263,15 +263,15 @@ align_formula :: proc(size, align: int) -> int {
 size_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 	WORD_SIZE :: size_of(int);
 	using TypeInfo;
-	match info in type_info {
+	match info in type_info.variant {
 	case Named:
 		return size_of_type_info(info.base);
 	case Integer:
-		return info.size;
+		return type_info.size;
 	case Rune:
-		return info.size;
+		return type_info.size;
 	case Float:
-		return info.size;
+		return type_info.size;
 	case String:
 		return 2*WORD_SIZE;
 	case Boolean:
@@ -301,11 +301,11 @@ size_of_type_info :: proc(type_info: ^TypeInfo) -> int {
 		alignment := align_formula(size, align);
 		return alignment*(count-1) + size;
 	case Struct:
-		return info.size;
+		return type_info.size;
 	case Union:
-		return info.size;
+		return type_info.size;
 	case RawUnion:
-		return info.size;
+		return type_info.size;
 	case Enum:
 		return size_of_type_info(info.base);
 	case Map:

@@ -500,8 +500,8 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 
 	if (is_type_union(dst)) {
 		for (isize i = 0; i < dst->Record.variant_count; i++) {
-			Entity *f = dst->Record.variants[i];
-			if (are_types_identical(f->type, s)) {
+			Type *vt = dst->Record.variants[i];
+			if (are_types_identical(vt, s)) {
 				return 1;
 			}
 		}
@@ -980,41 +980,17 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 	ast_node(ut, UnionType, node);
 
 	isize variant_count = ut->variants.count+1;
-	isize min_field_count = 0;
-	for_array(i, ut->fields) {
-		AstNode *field = ut->fields[i];
-		switch (field->kind) {
-		case_ast_node(f, ValueDecl, field);
-			min_field_count += f->names.count;
-		case_end;
-		}
-	}
 
 	gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
 	defer (gb_temp_arena_memory_end(tmp));
 
-	Map<Entity *> entity_map = {}; // Key: String
-	map_init_with_reserve(&entity_map, c->tmp_allocator, 2*variant_count);
-
 	Entity *using_index_expr = nullptr;
 
-	Array<Entity *> variants = {};
-	array_init(&variants, heap_allocator(), variant_count);
-
-	array_add(&variants, make_entity_type_name(c->allocator, c->context.scope, empty_token, nullptr));
-
-	auto fields = check_fields(c, nullptr, ut->fields, min_field_count, str_lit("union"));
-
-	for (isize i = 0; i < fields.count; i++) {
-		Entity *f = fields[i];
-		String name = f->token.string;
-		map_set(&entity_map, hash_string(name), f);
-	}
+	Array<Type *> variants = {};
+	array_init(&variants, c->allocator, variant_count);
+	array_add(&variants, t_invalid);
 
 	union_type->Record.scope               = c->context.scope;
-	union_type->Record.fields              = fields.data;
-	union_type->Record.fields_in_src_order = fields.data;
-	union_type->Record.field_count         = fields.count;
 	union_type->Record.are_offsets_set     = false;
 	union_type->Record.is_ordered          = true;
 	{
@@ -1023,75 +999,21 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 	}
 
 	for_array(i, ut->variants) {
-		AstNode *variant = ut->variants[i];
-		if (variant->kind != AstNode_UnionField) {
-			continue;
-		}
-		ast_node(f, UnionField, variant);
-		Token name_token = f->name->Ident.token;
-
-		Type *base_type = make_type_struct(c->allocator);
-		{
-			ast_node(fl, FieldList, f->list);
-
-			// NOTE(bill): Copy the contents for the common fields for now
-			Array<AstNode *> list = {};
-			array_init_count(&list, c->allocator, ut->fields.count+fl->list.count);
-			gb_memmove_array(list.data, ut->fields.data, ut->fields.count);
-			gb_memmove_array(list.data+ut->fields.count, fl->list.data, fl->list.count);
-
-			isize list_count = 0;
-			for_array(j, list) {
-				if (list[j]->kind == AstNode_Field) {
-					list_count += list[j]->Field.names.count;
-				} else {
-					ast_node(f, ValueDecl, list[j]);
-					list_count += f->names.count;
+		AstNode *node = ut->variants[i];
+		Type *t = check_type(c, node);
+		if (t != nullptr && t != t_invalid) {
+			bool ok = true;
+			for_array(j, variants) {
+				if (are_types_identical(t, variants[j])) {
+					ok = false;
+					gbString str = type_to_string(t);
+					error(node, "Duplicate variant type `%s`", str);
+					gb_string_free(str);
+					break;
 				}
 			}
-
-
-			Token token = name_token;
-			token.kind = Token_struct;
-			AstNode *dummy_struct = ast_struct_type(c->curr_ast_file, token, list, list_count, false, true, nullptr);
-
-			check_open_scope(c, dummy_struct);
-			base_type->Record.names = make_names_field_for_record(c, c->context.scope);
-			auto fields = check_fields(c, dummy_struct, list, list_count, str_lit("variant"));
-			base_type->Record.is_packed           = false;
-			base_type->Record.is_ordered          = true;
-			base_type->Record.fields              = fields.data;
-			base_type->Record.fields_in_src_order = fields.data;
-			base_type->Record.field_count         = fields.count;
-			base_type->Record.node                = dummy_struct;
-			base_type->Record.variant_parent      = named_type != nullptr ? named_type : union_type;
-			base_type->Record.variant_index       = variants.count;
-
-
-			type_set_offsets(c->allocator, base_type);
-
-			check_close_scope(c);
+			if (ok) array_add(&variants, t);
 		}
-
-		Type *type = make_type_named(c->allocator, name_token.string, base_type, nullptr);
-		Entity *e = make_entity_type_name(c->allocator, c->context.scope, name_token, type);
-		type->Named.type_name = e;
-		add_entity(c, c->context.scope, f->name, e);
-
-		if (name_token.string == "_") {
-			error(name_token, "`_` cannot be used a union subtype");
-			continue;
-		}
-
-		HashKey key = hash_string(name_token.string);
-		if (map_get(&entity_map, key) != nullptr) {
-			// NOTE(bill): Scope checking already checks the declaration
-			error(name_token, "`%.*s` is already declared in this union", LIT(name_token.string));
-		} else {
-			map_set(&entity_map, key, e);
-			array_add(&variants, e);
-		}
-		add_entity_use(c, f->name, e);
 	}
 
 	type_set_offsets(c->allocator, union_type);
@@ -6889,28 +6811,17 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 
 		bool src_is_ptr = is_type_pointer(o->type);
-		bool dst_is_ptr = is_type_pointer(t);
 		Type *src = type_deref(o->type);
-		Type *dst = type_deref(t);
+		Type *dst = t;
 		Type *bsrc = base_type(src);
 		Type *bdst = base_type(dst);
 
-		if (src_is_ptr != dst_is_ptr) {
-			gbString src_type_str = type_to_string(o->type);
-			gbString dst_type_str = type_to_string(t);
-			error(o->expr, "Invalid type assertion types: `%s` and `%s`", src_type_str, dst_type_str);
-			gb_string_free(dst_type_str);
-			gb_string_free(src_type_str);
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
 
 		if (is_type_union(src)) {
 			bool ok = false;
 			for (isize i = 1; i < bsrc->Record.variant_count; i++) {
-				Entity *f = bsrc->Record.variants[i];
-				if (are_types_identical(f->type, dst)) {
+				Type *vt = bsrc->Record.variants[i];
+				if (are_types_identical(vt, dst)) {
 					ok = true;
 					break;
 				}
@@ -7088,6 +6999,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		case Type_Slice:
 			valid = true;
+			o->type = type_deref(o->type);
 			break;
 
 		case Type_DynamicArray:
@@ -7602,7 +7514,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_ast_node(st, UnionType, node);
 		str = gb_string_appendc(str, "union ");
 		str = gb_string_appendc(str, "{");
-		str = write_record_fields_to_string(str, st->fields);
+		str = write_record_fields_to_string(str, st->variants);
 		str = gb_string_appendc(str, "}");
 	case_end;
 

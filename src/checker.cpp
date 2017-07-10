@@ -1156,8 +1156,7 @@ void add_type_info_type(Checker *c, Type *t) {
 		case TypeRecord_Union:
 			add_type_info_type(c, t_int);
 			for (isize i = 0; i < bt->Record.variant_count; i++) {
-				Entity *f = bt->Record.variants[i];
-				add_type_info_type(c, f->type);
+				add_type_info_type(c, bt->Record.variants[i]);
 			}
 			/* fallthrough */
 		default:
@@ -1307,30 +1306,30 @@ Entity *find_core_entity(Checker *c, String name) {
 	return e;
 }
 
+Entity *find_sub_core_entity(TypeRecord *parent, String name) {
+	GB_ASSERT(parent->scope->parent->is_global);
+	Entity *e = current_scope_lookup_entity(parent->scope, name);
+	if (e == nullptr) {
+		compiler_error("Could not find type declaration for `%.*s`\n"
+		               "Is `_preload.odin` missing from the `core` directory relative to odin.exe?", LIT(name));
+		// NOTE(bill): This will exit the program as it's cannot continue without it!
+	}
+	return e;
+}
+
+void check_entity_decl(Checker *c, Entity *e, DeclInfo *d, Type *named_type);
+
 void init_preload(Checker *c) {
 	if (t_type_info == nullptr) {
 		Entity *type_info_entity = find_core_entity(c, str_lit("TypeInfo"));
 
 		t_type_info = type_info_entity->type;
 		t_type_info_ptr = make_type_pointer(c->allocator, t_type_info);
-		GB_ASSERT(is_type_union(type_info_entity->type));
+		GB_ASSERT(is_type_struct(type_info_entity->type));
 		TypeRecord *record = &base_type(type_info_entity->type)->Record;
 
-		// Entity *type_info_record = current_scope_lookup_entity(record->scope, str_lit("Record"));
-		// if (type_info_record == nullptr) {
-		// 	compiler_error("Could not find type declaration for TypeInfo.Record\n"
-		// 	               "Is `_preload.odin` missing from the `core` directory relative to the odin executable?");
-		// }
-		// Entity *type_info_enum_value = current_scope_lookup_entity(record->scope, str_lit("EnumValue"));
-		// if (type_info_record == nullptr) {
-		// 	compiler_error("Could not find type declaration for TypeInfo.EnumValue\n"
-		// 	               "Is `_preload.odin` missing from the `core` directory relative to the odin executable?");
-		// }
-
-		// GB_ASSERT(type_info_record->type != nullptr);
-		// GB_ASSERT(type_info_enum_value->type != nullptr);
-		Entity *type_info_record     = find_core_entity(c, str_lit("TypeInfoRecord"));
-		Entity *type_info_enum_value = find_core_entity(c, str_lit("TypeInfoEnumValue"));
+		Entity *type_info_record     = find_sub_core_entity(record, str_lit("Record"));
+		Entity *type_info_enum_value = find_sub_core_entity(record, str_lit("EnumValue"));
 
 
 		t_type_info_record = type_info_record->type;
@@ -1338,33 +1337,38 @@ void init_preload(Checker *c) {
 		t_type_info_enum_value = type_info_enum_value->type;
 		t_type_info_enum_value_ptr = make_type_pointer(c->allocator, t_type_info_enum_value);
 
+		GB_ASSERT(record->field_count == 3);
 
+		Entity *type_info_variant = record->fields_in_src_order[2];
+		Type *tiv_type = type_info_variant->type;
+		GB_ASSERT(is_type_union(tiv_type));
+		TypeRecord *tiv = &tiv_type->Record;
 
-		if (record->variant_count != 23) {
+		if (tiv->variant_count != 23) {
 			compiler_error("Invalid `TypeInfo` layout");
 		}
-		t_type_info_named         = record->variants[ 1]->type;
-		t_type_info_integer       = record->variants[ 2]->type;
-		t_type_info_rune          = record->variants[ 3]->type;
-		t_type_info_float         = record->variants[ 4]->type;
-		t_type_info_complex       = record->variants[ 5]->type;
-		t_type_info_string        = record->variants[ 6]->type;
-		t_type_info_boolean       = record->variants[ 7]->type;
-		t_type_info_any           = record->variants[ 8]->type;
-		t_type_info_pointer       = record->variants[ 9]->type;
-		t_type_info_atomic        = record->variants[10]->type;
-		t_type_info_procedure     = record->variants[11]->type;
-		t_type_info_array         = record->variants[12]->type;
-		t_type_info_dynamic_array = record->variants[13]->type;
-		t_type_info_slice         = record->variants[14]->type;
-		t_type_info_vector        = record->variants[15]->type;
-		t_type_info_tuple         = record->variants[16]->type;
-		t_type_info_struct        = record->variants[17]->type;
-		t_type_info_raw_union     = record->variants[18]->type;
-		t_type_info_union         = record->variants[19]->type;
-		t_type_info_enum          = record->variants[20]->type;
-		t_type_info_map           = record->variants[21]->type;
-		t_type_info_bit_field     = record->variants[22]->type;
+		t_type_info_named         = tiv->variants[ 1];
+		t_type_info_integer       = tiv->variants[ 2];
+		t_type_info_rune          = tiv->variants[ 3];
+		t_type_info_float         = tiv->variants[ 4];
+		t_type_info_complex       = tiv->variants[ 5];
+		t_type_info_string        = tiv->variants[ 6];
+		t_type_info_boolean       = tiv->variants[ 7];
+		t_type_info_any           = tiv->variants[ 8];
+		t_type_info_pointer       = tiv->variants[ 9];
+		t_type_info_atomic        = tiv->variants[10];
+		t_type_info_procedure     = tiv->variants[11];
+		t_type_info_array         = tiv->variants[12];
+		t_type_info_dynamic_array = tiv->variants[13];
+		t_type_info_slice         = tiv->variants[14];
+		t_type_info_vector        = tiv->variants[15];
+		t_type_info_tuple         = tiv->variants[16];
+		t_type_info_struct        = tiv->variants[17];
+		t_type_info_raw_union     = tiv->variants[18];
+		t_type_info_union         = tiv->variants[19];
+		t_type_info_enum          = tiv->variants[20];
+		t_type_info_map           = tiv->variants[21];
+		t_type_info_bit_field     = tiv->variants[22];
 
 		t_type_info_named_ptr         = make_type_pointer(c->allocator, t_type_info_named);
 		t_type_info_integer_ptr       = make_type_pointer(c->allocator, t_type_info_integer);
@@ -1719,9 +1723,6 @@ void check_collect_entities(Checker *c, Array<AstNode *> nodes, bool is_file_sco
 					}
 
 					Token token = name->Ident.token;
-					if (token.string == "EnumValue") {
-						gb_printf_err("EnumValue %p\n", name);
-					}
 
 					AstNode *fl = c->context.curr_foreign_library;
 					DeclInfo *d = make_declaration_info(c->allocator, c->context.scope, c->context.decl);

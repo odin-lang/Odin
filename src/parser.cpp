@@ -425,8 +425,6 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 	}) \
 	AST_NODE_KIND(UnionType, "union type", struct { \
 		Token            token;       \
-		Array<AstNode *> fields;      \
-		isize            field_count; \
 		Array<AstNode *> variants;    \
 	}) \
 	AST_NODE_KIND(RawUnionType, "raw union type", struct { \
@@ -864,7 +862,6 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		n->StructType.align  = clone_ast_node(a, n->StructType.align);
 		break;
 	case AstNode_UnionType:
-		n->UnionType.fields   = clone_ast_node_array(a, n->UnionType.fields);
 		n->UnionType.variants = clone_ast_node_array(a, n->UnionType.variants);
 		break;
 	case AstNode_RawUnionType:
@@ -1459,11 +1456,9 @@ AstNode *ast_struct_type(AstFile *f, Token token, Array<AstNode *> fields, isize
 }
 
 
-AstNode *ast_union_type(AstFile *f, Token token, Array<AstNode *> fields, isize field_count, Array<AstNode *> variants) {
+AstNode *ast_union_type(AstFile *f, Token token, Array<AstNode *> variants) {
 	AstNode *result = make_ast_node(f, AstNode_UnionType);
 	result->UnionType.token = token;
-	result->UnionType.fields = fields;
-	result->UnionType.field_count = field_count;
 	result->UnionType.variants = variants;
 	return result;
 }
@@ -3707,7 +3702,6 @@ AstNode *parse_type_or_ident(AstFile *f) {
 	case Token_union: {
 		Token token = expect_token(f, Token_union);
 		Token open = expect_token_after(f, Token_OpenBrace, "union");
-		Array<AstNode *> decls    = make_ast_node_array(f);
 		Array<AstNode *> variants = make_ast_node_array(f);
 		isize total_decl_name_count = 0;
 
@@ -3717,50 +3711,18 @@ AstNode *parse_type_or_ident(AstFile *f) {
 
 		while (f->curr_token.kind != Token_CloseBrace &&
 		       f->curr_token.kind != Token_EOF) {
-			CommentGroup docs = f->lead_comment;
-			u32 flags = parse_field_prefixes(f);
-			auto names = parse_ident_list(f);
-			if (names.count == 0) {
-				break;
+			AstNode *type = parse_type(f);
+			if (type->kind != AstNode_BadExpr) {
+				array_add(&variants, type);
 			}
-			u32 set_flags = check_field_prefixes(f, names.count, FieldFlag_using, flags);
-			if (names.count == 1 && f->curr_token.kind == Token_OpenBrace) {
-				if (set_flags != 0) {
-					error(names[0], "Variants cannot have field prefixes");
-					set_flags = 0;
-				}
-				AstNode *name  = names[0];
-				Token    open  = expect_token(f, Token_OpenBrace);
-				isize decl_count = 0;
-				AstNode *list = parse_record_field_list(f, &decl_count);
-				Token    close = expect_token(f, Token_CloseBrace);
-
-				array_add(&variants, ast_union_field(f, name, list));
-				expect_semicolon(f, nullptr);
-			} else {
-				AstNode *decl = parse_value_decl(f, names, docs);
-				if (decl->kind != AstNode_ValueDecl) {
-					error(decl, "Expected a field list, got %.*s", LIT(ast_node_strings[decl->kind]));
-				} else {
-					ast_node(vd, ValueDecl, decl);
-					if (vd->is_mutable) {
-						if (set_flags&FieldFlag_using) {
-							vd->flags |= VarDeclFlag_using;
-						}
-						if (vd->flags&VarDeclFlag_thread_local) {
-							vd->flags &= ~VarDeclFlag_thread_local;
-							error(decl, "Field values cannot be #thread_local");
-						}
-					}
-					array_add(&decls, decl);
-					total_decl_name_count += vd->names.count;
-				}
+			if (!allow_token(f, Token_Comma)) {
+				break;
 			}
 		}
 
 		Token close = expect_token(f, Token_CloseBrace);
 
-		return ast_union_type(f, token, decls, total_decl_name_count, variants);
+		return ast_union_type(f, token, variants);
 	} break;
 
 	case Token_raw_union: {

@@ -1504,8 +1504,8 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 						GB_ASSERT(is_type_union(bt));
 						bool tag_type_found = false;
 						for (isize i = 0; i < bt->Record.variant_count; i++) {
-							Entity *f = bt->Record.variants[i];
-							if (are_types_identical(f->type, y.type)) {
+							Type *vt = bt->Record.variants[i];
+							if (are_types_identical(vt, y.type)) {
 								tag_type_found = true;
 								break;
 							}

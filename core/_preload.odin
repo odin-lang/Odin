@@ -34,59 +34,54 @@ CallingConvention :: enum {
 }
 // IMPORTANT NOTE(bill): Do not change the order of any of this data
 // The compiler relies upon this _exact_ order
+TypeInfo :: struct #ordered {
+// Core Types
+	EnumValue :: raw_union {
+		f: f64;
+		i: i128;
+	}
+	Record :: struct #ordered {
+		types:        []^TypeInfo;
+		names:        []string;
+		offsets:      []int;  // offsets may not be used in tuples
+		usings:       []bool; // usings may not be used in tuples
+		packed:       bool;
+		ordered:      bool;
+		custom_align: bool;
+	}
 
-
-TypeInfoEnumValue :: raw_union {
-	f: f64;
-	i: i128;
-}
-
-TypeInfoRecord :: struct #ordered {
-	types:        []^TypeInfo;
-	names:        []string;
-	offsets:      []int;  // offsets may not be used in tuples
-	usings:       []bool; // usings may not be used in tuples
-	packed:       bool;
-	ordered:      bool;
-	custom_align: bool;
-}
-
-
-TypeInfo :: union {
-	size:  int;
-	align: int;
-
-	Named{name: string; base: ^TypeInfo};
-	Integer{signed: bool};
-	Rune{};
-	Float{};
-	Complex{};
-	String{};
-	Boolean{};
-	Any{};
-	Pointer{
+// Variant Types
+	Named   :: struct #ordered {name: string; base: ^TypeInfo};
+	Integer :: struct #ordered {signed: bool};
+	Rune    :: struct{};
+	Float   :: struct{};
+	Complex :: struct{};
+	String  :: struct{};
+	Boolean :: struct{};
+	Any     :: struct{};
+	Pointer :: struct #ordered {
 		elem: ^TypeInfo; // nil -> rawptr
 	};
-	Atomic{elem: ^TypeInfo};
-	Procedure{
+	Atomic :: struct #ordered {elem: ^TypeInfo};
+	Procedure :: struct #ordered {
 		params:     ^TypeInfo; // TypeInfo.Tuple
 		results:    ^TypeInfo; // TypeInfo.Tuple
 		variadic:   bool;
 		convention: CallingConvention;
 	};
-	Array{
+	Array :: struct #ordered {
 		elem:      ^TypeInfo;
 		elem_size: int;
 		count:     int;
 	};
-	DynamicArray{elem: ^TypeInfo; elem_size: int};
-	Slice       {elem: ^TypeInfo; elem_size: int};
-	Vector      {elem: ^TypeInfo; elem_size, count: int};
-	Tuple       {using record: TypeInfoRecord}; // Only really used for procedures
-	Struct      {using record: TypeInfoRecord};
-	RawUnion    {using record: TypeInfoRecord};
-	Union{
-		common_fields: struct {
+	DynamicArray :: struct #ordered {elem: ^TypeInfo; elem_size: int};
+	Slice        :: struct #ordered {elem: ^TypeInfo; elem_size: int};
+	Vector       :: struct #ordered {elem: ^TypeInfo; elem_size, count: int};
+	Tuple        :: Record; // Only really used for procedures
+	Struct       :: Record;
+	RawUnion     :: Record;
+	Union :: struct #ordered {
+		common_fields: struct #ordered {
 			types:     []^TypeInfo;
 			names:     []string;
 			offsets:   []int;    // offsets may not be used in tuples
@@ -94,21 +89,51 @@ TypeInfo :: union {
 		variant_names: []string;
 		variant_types: []^TypeInfo;
 	};
-	Enum{
+	Enum :: struct #ordered {
 		base:   ^TypeInfo;
 		names:  []string;
-		values: []TypeInfoEnumValue;
+		values: []EnumValue;
 	};
-	Map{
+	Map :: struct #ordered {
 		key:              ^TypeInfo;
 		value:            ^TypeInfo;
 		generated_struct: ^TypeInfo;
 		count:            int; // == 0 if dynamic
 	};
-	BitField{
+	BitField :: struct #ordered {
 		names:   []string;
 		bits:    []i32;
 		offsets: []i32;
+	};
+
+
+// Fields
+	size:  int;
+	align: int;
+
+	variant: union {
+		Named,
+		Integer,
+		Rune,
+		Float,
+		Complex,
+		String,
+		Boolean,
+		Any,
+		Pointer,
+		Atomic,
+		Procedure,
+		Array,
+		DynamicArray,
+		Slice,
+		Vector,
+		Tuple,
+		Struct,
+		RawUnion,
+		Union,
+		Enum,
+		Map,
+		BitField,
 	};
 }
 
@@ -147,7 +172,7 @@ Context :: struct #ordered {
 
 DEFAULT_ALIGNMENT :: align_of([vector 4]f32);
 
-SourceCodeLocation :: struct {
+SourceCodeLocation :: struct #ordered {
 	fully_pathed_filename: string;
 	line, column:          i64;
 	procedure:             string;
@@ -190,7 +215,7 @@ type_info_base :: proc(info: ^TypeInfo) -> ^TypeInfo {
 	if info == nil do return nil;
 
 	base := info;
-	match i in base {
+	match i in base.variant {
 	case TypeInfo.Named: base = i.base;
 	}
 	return base;
@@ -201,7 +226,7 @@ type_info_base_without_enum :: proc(info: ^TypeInfo) -> ^TypeInfo {
 	if info == nil do return nil;
 
 	base := info;
-	match i in base {
+	match i in base.variant {
 	case TypeInfo.Named: base = i.base;
 	case TypeInfo.Enum:  base = i.base;
 	}

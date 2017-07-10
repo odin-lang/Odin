@@ -93,7 +93,7 @@ struct TypeRecord {
 	Scope *  scope;
 
 	// Entity_TypeName - union
-	Entity **variants;
+	Type **  variants;
 	i32      variant_count;
 	Entity * union__tag;
 	i64      variant_block_size; // NOTE(bill): Internal use only
@@ -1002,7 +1002,7 @@ bool is_type_polymorphic(Type *t) {
 		    }
 		}
 		for (isize i = 1; i < t->Record.variant_count; i++) {
-		    if (is_type_polymorphic(t->Record.variants[i]->type)) {
+		    if (is_type_polymorphic(t->Record.variants[i])) {
 		    	return true;
 		    }
 		}
@@ -1163,10 +1163,7 @@ bool are_types_identical(Type *x, Type *y) {
 						}
 						// NOTE(bill): zeroth variant is nullptr
 						for (isize i = 1; i < x->Record.variant_count; i++) {
-							if (!are_types_identical(x->Record.variants[i]->type, y->Record.variants[i]->type)) {
-								return false;
-							}
-							if (x->Record.variants[i]->token.string != y->Record.variants[i]->token.string) {
+							if (!are_types_identical(x->Record.variants[i], y->Record.variants[i])) {
 								return false;
 							}
 						}
@@ -1555,19 +1552,7 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 			}
 		}
 
-		if (is_type_union(type)) {
-			for (isize i = 1; i < type->Record.variant_count; i++) {
-				Entity *f = type->Record.variants[i];
-				GB_ASSERT(f->kind == Entity_TypeName);
-				String str = f->token.string;
-
-				if (str == field_name) {
-					sel.entity = f;
-					// selection_add_index(&sel, i);
-					return sel;
-				}
-			}
-		} else if (is_type_enum(type)) {
+		if (is_type_enum(type)) {
 			// NOTE(bill): These may not have been added yet, so check in case
 			if (type->Record.enum_count != nullptr) {
 				if (field_name == "count") {
@@ -1880,7 +1865,7 @@ i64 type_align_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			}
 			// NOTE(bill): field zero is null
 			for (isize i = 1; i < t->Record.variant_count; i++) {
-				Type *variant = t->Record.variants[i]->type;
+				Type *variant = t->Record.variants[i];
 				type_path_push(path, variant);
 				if (path->failure) {
 					return FAILURE_ALIGNMENT;
@@ -2139,7 +2124,7 @@ i64 type_size_of_internal(gbAllocator allocator, Type *t, TypePath *path) {
 			i64 field_size = max;
 
 			for (isize i = 1; i < variant_count; i++) {
-				Type *variant_type = t->Record.variants[i]->type;
+				Type *variant_type = t->Record.variants[i];
 				i64 size = type_size_of_internal(allocator, variant_type, path);
 				if (max < size) {
 					max = size;
@@ -2369,26 +2354,11 @@ gbString write_type_to_string(gbString str, Type *type) {
 				str = write_type_to_string(str, f->type);
 			}
 			for (isize i = 1; i < type->Record.variant_count; i++) {
-				Entity *f = type->Record.variants[i];
-				GB_ASSERT(f->kind == Entity_TypeName);
+				Type *t = type->Record.variants[i];
 				if (i > 1 || type->Record.field_count > 1) {
 					str = gb_string_appendc(str, ", ");
 				}
-				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
-				str = gb_string_appendc(str, "{");
-				Type *variant = base_type(f->type);
-				for (isize i = 0; i < variant->Record.field_count; i++) {
-					Entity *f = variant->Record.fields[i];
-					GB_ASSERT(f->kind == Entity_Variable);
-					if (i > 0) {
-						str = gb_string_appendc(str, ", ");
-					}
-					str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
-					str = gb_string_appendc(str, ": ");
-					str = write_type_to_string(str, f->type);
-				}
-				str = gb_string_appendc(str, "{");
-
+				str = write_type_to_string(str, t);
 			}
 			str = gb_string_appendc(str, "}");
 			break;

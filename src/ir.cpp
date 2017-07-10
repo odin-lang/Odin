@@ -2355,7 +2355,7 @@ irValue *ir_emit_struct_ep(irProcedure *proc, irValue *s, i32 index) {
 
 	if (is_type_struct(t)) {
 		GB_ASSERT(t->Record.field_count > 0);
-		GB_ASSERT(gb_is_between(index, 0, t->Record.field_count-1));
+		GB_ASSERT_MSG(gb_is_between(index, 0, t->Record.field_count-1), "0..%d..%d", index, t->Record.field_count);
 		result_type = make_type_pointer(a, t->Record.fields[index]->type);
 	} else if (is_type_union(t)) {
 		type_set_offsets(a, t);
@@ -2950,12 +2950,12 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 
 	if (is_type_union(dst)) {
 		for (isize i = 1; i < dst->Record.variant_count; i++) {
-			Entity *f = dst->Record.variants[i];
-			if (are_types_identical(f->type, src_type)) {
+			Type *vt = dst->Record.variants[i];
+			if (are_types_identical(vt, src_type)) {
 				ir_emit_comment(proc, str_lit("union - child to parent"));
 				gbAllocator a = proc->module->allocator;
 				irValue *parent = ir_add_local_generated(proc, t);
-				irValue *underlying = ir_emit_conv(proc, parent, make_type_pointer(a, f->type));
+				irValue *underlying = ir_emit_conv(proc, parent, make_type_pointer(a, vt));
 				ir_emit_store(proc, underlying, value);
 
 				irValue *tag_ptr = ir_emit_union_tag_ptr(proc, parent);
@@ -3207,6 +3207,7 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 
 	irValue *v = ir_add_local_generated(proc, tuple);
 
+	#if 0
 	if (is_ptr) {
 		Type *src = base_type(type_deref(src_type));
 		Type *src_ptr = src_type;
@@ -3217,8 +3218,8 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 		irValue *tag = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, value));
 		irValue *dst_tag = nullptr;
 		for (isize i = 1; i < src->Record.variant_count; i++) {
-			Entity *f = src->Record.variants[i];
-			if (are_types_identical(f->type, dst)) {
+			Type *vt = src->Record.variants[i];
+			if (are_types_identical(vt, dst)) {
 				dst_tag = ir_const_int(a, i);
 				break;
 			}
@@ -3252,8 +3253,8 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 		irValue *tag = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, value_));
 		irValue *dst_tag = nullptr;
 		for (isize i = 1; i < src->Record.variant_count; i++) {
-			Entity *f = src->Record.variants[i];
-			if (are_types_identical(f->type, dst)) {
+			Type *vt = src->Record.variants[i];
+			if (are_types_identical(vt, dst)) {
 				dst_tag = ir_const_int(a, i);
 				break;
 			}
@@ -3276,7 +3277,44 @@ irValue *ir_emit_union_cast(irProcedure *proc, irValue *value, Type *type, Token
 		ir_emit_jump(proc, end_block);
 		ir_start_block(proc, end_block);
 	}
+	#else
+	if (is_ptr) {
+		value = ir_emit_load(proc, value);
+	}
+	Type *src = base_type(type_deref(src_type));
+	GB_ASSERT(is_type_union(src));
+	Type *dst = tuple->Tuple.variables[0]->type;
+	Type *dst_ptr = make_type_pointer(a, dst);
 
+	irValue *value_ = ir_address_from_load_or_generate_local(proc, value);
+
+	irValue *tag = ir_emit_load(proc, ir_emit_union_tag_ptr(proc, value_));
+	irValue *dst_tag = nullptr;
+	for (isize i = 1; i < src->Record.variant_count; i++) {
+		Type *vt = src->Record.variants[i];
+		if (are_types_identical(vt, dst)) {
+			dst_tag = ir_const_int(a, i);
+			break;
+		}
+	}
+	GB_ASSERT(dst_tag != nullptr);
+
+	irBlock *ok_block = ir_new_block(proc, nullptr, "union_cast.ok");
+	irBlock *end_block = ir_new_block(proc, nullptr, "union_cast.end");
+	irValue *cond = ir_emit_comp(proc, Token_CmpEq, tag, dst_tag);
+	ir_emit_if(proc, cond, ok_block, end_block);
+	ir_start_block(proc, ok_block);
+
+	irValue *gep0 = ir_emit_struct_ep(proc, v, 0);
+	irValue *gep1 = ir_emit_struct_ep(proc, v, 1);
+
+	irValue *data = ir_emit_load(proc, ir_emit_conv(proc, value_, ir_type(gep0)));
+	ir_emit_store(proc, gep0, data);
+	ir_emit_store(proc, gep1, v_true);
+
+	ir_emit_jump(proc, end_block);
+	ir_start_block(proc, end_block);
+	#endif
 	if (!is_tuple) {
 		// NOTE(bill): Panic on invalid conversion
 		Type *dst_type = tuple->Tuple.variables[0]->type;
@@ -6789,8 +6827,8 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 					Type *ut = base_type(type_deref(parent_type));
 					GB_ASSERT(ut->Record.kind == TypeRecord_Union);
 					for (isize variant_index = 1; variant_index < ut->Record.variant_count; variant_index++) {
-						Entity *f = ut->Record.variants[variant_index];
-						if (are_types_identical(f->type, bt)) {
+						Type *vt = ut->Record.variants[variant_index];
+						if (are_types_identical(vt, bt)) {
 							index = ir_const_int(allocator, variant_index);
 							break;
 						}
@@ -7782,6 +7820,7 @@ void ir_gen_tree(irGen *s) {
 
 				irValue *tag = nullptr;
 				irValue *ti_ptr = ir_emit_array_epi(proc, ir_global_type_info_data, entry_index);
+				irValue *variant_ptr = ir_emit_struct_ep(proc, ti_ptr, 2);
 
 				ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 0), ir_const_int(a, type_size_of(a, t)));
 				ir_emit_store(proc, ir_emit_struct_ep(proc, ti_ptr, 1), ir_const_int(a, type_align_of(a, t)));
@@ -7790,21 +7829,21 @@ void ir_gen_tree(irGen *s) {
 				switch (t->kind) {
 				case Type_Named: {
 					ir_emit_comment(proc, str_lit("TypeInfoNamed"));
-					tag = ir_emit_conv(proc, ti_ptr, t_type_info_named_ptr);
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_named_ptr);
 
 					// TODO(bill): Which is better? The mangled name or actual name?
 					irValue *name = ir_const_string(a, t->Named.type_name->token.string);
 					irValue *gtip = ir_get_type_info_ptr(proc, t->Named.base);
 
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), name);
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3), gtip);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), name);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), gtip);
 				} break;
 
 				case Type_Basic:
 					ir_emit_comment(proc, str_lit("TypeInfoBasic"));
 					switch (t->Basic.kind) {
 					case Basic_bool:
-						tag = ir_emit_conv(proc, ti_ptr, t_type_info_boolean_ptr);
+						tag = ir_emit_conv(proc, variant_ptr, t_type_info_boolean_ptr);
 						break;
 
 					case Basic_i8:
@@ -7819,106 +7858,106 @@ void ir_gen_tree(irGen *s) {
 					case Basic_u128:
 					case Basic_int:
 					case Basic_uint: {
-						tag = ir_emit_conv(proc, ti_ptr, t_type_info_integer_ptr);
+						tag = ir_emit_conv(proc, variant_ptr, t_type_info_integer_ptr);
 						irValue *is_signed = ir_const_bool(a, (t->Basic.flags & BasicFlag_Unsigned) == 0);
-						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), is_signed);
+						ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), is_signed);
 					} break;
 
 					case Basic_rune:
-						tag = ir_emit_conv(proc, ti_ptr, t_type_info_rune_ptr);
+						tag = ir_emit_conv(proc, variant_ptr, t_type_info_rune_ptr);
 						break;
 
 					// case Basic_f16:
 					case Basic_f32:
 					case Basic_f64:
-						tag = ir_emit_conv(proc, ti_ptr, t_type_info_float_ptr);
+						tag = ir_emit_conv(proc, variant_ptr, t_type_info_float_ptr);
 						break;
 
 					// case Basic_complex32:
 					case Basic_complex64:
 					case Basic_complex128:
-						tag = ir_emit_conv(proc, ti_ptr, t_type_info_complex_ptr);
+						tag = ir_emit_conv(proc, variant_ptr, t_type_info_complex_ptr);
 						break;
 
 					case Basic_rawptr:
-						tag = ir_emit_conv(proc, ti_ptr, t_type_info_pointer_ptr);
+						tag = ir_emit_conv(proc, variant_ptr, t_type_info_pointer_ptr);
 						break;
 
 					case Basic_string:
-						tag = ir_emit_conv(proc, ti_ptr, t_type_info_string_ptr);
+						tag = ir_emit_conv(proc, variant_ptr, t_type_info_string_ptr);
 						break;
 
 					case Basic_any:
-						tag = ir_emit_conv(proc, ti_ptr, t_type_info_any_ptr);
+						tag = ir_emit_conv(proc, variant_ptr, t_type_info_any_ptr);
 						break;
 					}
 					break;
 
 				case Type_Pointer: {
 					ir_emit_comment(proc, str_lit("TypeInfoPointer"));
-					tag = ir_emit_conv(proc, ti_ptr, t_type_info_pointer_ptr);
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_pointer_ptr);
 					irValue *gep = ir_get_type_info_ptr(proc, t->Pointer.elem);
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), gep);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
 				} break;
 				case Type_Atomic: {
 					ir_emit_comment(proc, str_lit("TypeInfoAtomic"));
-					tag = ir_emit_conv(proc, ti_ptr, t_type_info_atomic_ptr);
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_atomic_ptr);
 					irValue *gep = ir_get_type_info_ptr(proc, t->Atomic.elem);
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), gep);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
 				} break;
 				case Type_Array: {
 					ir_emit_comment(proc, str_lit("TypeInfoArray"));
-					tag = ir_emit_conv(proc, ti_ptr, t_type_info_array_ptr);
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_array_ptr);
 					irValue *gep = ir_get_type_info_ptr(proc, t->Array.elem);
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), gep);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
 
 					isize ez = type_size_of(a, t->Array.elem);
-					irValue *elem_size = ir_emit_struct_ep(proc, tag, 3);
+					irValue *elem_size = ir_emit_struct_ep(proc, tag, 1);
 					ir_emit_store(proc, elem_size, ir_const_int(a, ez));
 
-					irValue *count = ir_emit_struct_ep(proc, tag, 4);
+					irValue *count = ir_emit_struct_ep(proc, tag, 2);
 					ir_emit_store(proc, count, ir_const_int(a, t->Array.count));
 
 				} break;
 				case Type_DynamicArray: {
 					ir_emit_comment(proc, str_lit("TypeInfoDynamicArray"));
-					tag = ir_emit_conv(proc, ti_ptr, t_type_info_dynamic_array_ptr);
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_dynamic_array_ptr);
 					irValue *gep = ir_get_type_info_ptr(proc, t->DynamicArray.elem);
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), gep);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
 
 					isize ez = type_size_of(a, t->DynamicArray.elem);
-					irValue *elem_size = ir_emit_struct_ep(proc, tag, 3);
+					irValue *elem_size = ir_emit_struct_ep(proc, tag, 1);
 					ir_emit_store(proc, elem_size, ir_const_int(a, ez));
 				} break;
 				case Type_Slice: {
 					ir_emit_comment(proc, str_lit("TypeInfoSlice"));
-					tag = ir_emit_conv(proc, ti_ptr, t_type_info_slice_ptr);
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_slice_ptr);
 					irValue *gep = ir_get_type_info_ptr(proc, t->Slice.elem);
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), gep);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
 
 					isize ez = type_size_of(a, t->Slice.elem);
-					irValue *elem_size = ir_emit_struct_ep(proc, tag, 3);
+					irValue *elem_size = ir_emit_struct_ep(proc, tag, 1);
 					ir_emit_store(proc, elem_size, ir_const_int(a, ez));
 				} break;
 				case Type_Vector: {
 					ir_emit_comment(proc, str_lit("TypeInfoVector"));
-					tag = ir_emit_conv(proc, ti_ptr, t_type_info_vector_ptr);
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_vector_ptr);
 					irValue *gep = ir_get_type_info_ptr(proc, t->Vector.elem);
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), gep);
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
 
 					isize ez = type_size_of(a, t->Vector.elem);
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 3), ir_const_int(a, ez));
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 4), ir_const_int(a, t->Vector.count));
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 1), ir_const_int(a, ez));
+					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), ir_const_int(a, t->Vector.count));
 
 				} break;
 				case Type_Proc: {
 					ir_emit_comment(proc, str_lit("TypeInfoProc"));
-					tag = ir_emit_conv(proc, ti_ptr, t_type_info_procedure_ptr);
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_procedure_ptr);
 
-					irValue *params     = ir_emit_struct_ep(proc, tag, 2);
-					irValue *results    = ir_emit_struct_ep(proc, tag, 3);
-					irValue *variadic   = ir_emit_struct_ep(proc, tag, 4);
-					irValue *convention = ir_emit_struct_ep(proc, tag, 5);
+					irValue *params     = ir_emit_struct_ep(proc, tag, 0);
+					irValue *results    = ir_emit_struct_ep(proc, tag, 1);
+					irValue *variadic   = ir_emit_struct_ep(proc, tag, 2);
+					irValue *convention = ir_emit_struct_ep(proc, tag, 3);
 
 					if (t->Proc.params != nullptr) {
 						ir_emit_store(proc, params, ir_get_type_info_ptr(proc, t->Proc.params));
@@ -7933,8 +7972,7 @@ void ir_gen_tree(irGen *s) {
 				} break;
 				case Type_Tuple: {
 					ir_emit_comment(proc, str_lit("TypeInfoTuple"));
-					tag = ir_emit_conv(proc, ti_ptr, t_type_info_tuple_ptr);
-					irValue *record = ir_emit_struct_ep(proc, tag, 2);
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_tuple_ptr);
 
 					irValue *memory_types = ir_type_info_member_types_offset(proc, t->Tuple.variable_count);
 					irValue *memory_names = ir_type_info_member_names_offset(proc, t->Tuple.variable_count);
@@ -7954,23 +7992,22 @@ void ir_gen_tree(irGen *s) {
 					}
 
 					irValue *count = ir_const_int(a, t->Tuple.variable_count);
-					ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 0), memory_types, count, count);
-					ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 1), memory_names, count, count);
+					ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types, count, count);
+					ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names, count, count);
 				} break;
 				case Type_Record: {
 					switch (t->Record.kind) {
 					case TypeRecord_Struct: {
 						ir_emit_comment(proc, str_lit("TypeInfoStruct"));
-						tag = ir_emit_conv(proc, ti_ptr, t_type_info_struct_ptr);
-						irValue *record = ir_emit_struct_ep(proc, tag, 2);
+						tag = ir_emit_conv(proc, variant_ptr, t_type_info_struct_ptr);
 
 						{
 							irValue *packed       = ir_const_bool(a, t->Record.is_packed);
 							irValue *ordered      = ir_const_bool(a, t->Record.is_ordered);
 							irValue *custom_align = ir_const_bool(a, t->Record.custom_align != 0);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 4), packed);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 5), ordered);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, record, 6), custom_align);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 4), packed);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 5), ordered);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 6), custom_align);
 						}
 
 						irValue *memory_types   = ir_type_info_member_types_offset(proc, t->Record.field_count);
@@ -8001,17 +8038,17 @@ void ir_gen_tree(irGen *s) {
 						}
 
 						irValue *count = ir_const_int(a, t->Record.field_count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 0), memory_types,   count, count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 1), memory_names,   count, count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 2), memory_offsets, count, count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 3), memory_usings,  count, count);
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types,   count, count);
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   count, count);
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, count, count);
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 3), memory_usings,  count, count);
 					} break;
 					case TypeRecord_Union: {
 						ir_emit_comment(proc, str_lit("TypeInfoUnion"));
-						tag = ir_emit_conv(proc, ti_ptr, t_type_info_union_ptr);
+						tag = ir_emit_conv(proc, variant_ptr, t_type_info_union_ptr);
 
 						{
-							irValue *common_fields = ir_emit_struct_ep(proc, tag, 2);
+							irValue *common_fields = ir_emit_struct_ep(proc, tag, 0);
 
 							isize field_count = t->Record.field_count;
 							irValue *memory_types   = ir_type_info_member_types_offset(proc, field_count);
@@ -8046,8 +8083,8 @@ void ir_gen_tree(irGen *s) {
 						}
 
 						{
-							irValue *variant_names = ir_emit_struct_ep(proc, tag, 3);
-							irValue *variant_types = ir_emit_struct_ep(proc, tag, 4);
+							irValue *variant_names = ir_emit_struct_ep(proc, tag, 1);
+							irValue *variant_types = ir_emit_struct_ep(proc, tag, 2);
 
 							isize variant_count = gb_max(0, t->Record.variant_count-1);
 							irValue *memory_names = ir_type_info_member_names_offset(proc, variant_count);
@@ -8055,17 +8092,12 @@ void ir_gen_tree(irGen *s) {
 
 							// NOTE(bill): Zeroth is nil so ignore it
 							for (isize variant_index = 0; variant_index < variant_count; variant_index++) {
-								Entity *f = t->Record.variants[variant_index+1]; // Skip zeroth
-								irValue *tip = ir_get_type_info_ptr(proc, f->type);
+								Type *vt = t->Record.variants[variant_index+1]; // Skip zeroth
+								irValue *tip = ir_get_type_info_ptr(proc, vt);
 
 								irValue *index     = ir_const_int(a, variant_index);
 								irValue *type_info = ir_emit_ptr_offset(proc, memory_types, index);
-								ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
-
-								if (f->token.string.len > 0) {
-									irValue *name = ir_emit_ptr_offset(proc, memory_names, index);
-									ir_emit_store(proc, name, ir_const_string(a, f->token.string));
-								}
+								ir_emit_store(proc, type_info, ir_type_info(proc, vt));
 							}
 
 							irValue *count = ir_const_int(a, variant_count);
@@ -8076,8 +8108,7 @@ void ir_gen_tree(irGen *s) {
 					} break;
 					case TypeRecord_RawUnion: {
 						ir_emit_comment(proc, str_lit("TypeInfoRawUnion"));
-						tag = ir_emit_conv(proc, ti_ptr, t_type_info_raw_union_ptr);
-						irValue *record = ir_emit_struct_ep(proc, tag, 2);
+						tag = ir_emit_conv(proc, variant_ptr, t_type_info_raw_union_ptr);
 
 						irValue *memory_types   = ir_type_info_member_types_offset(proc, t->Record.field_count);
 						irValue *memory_names   = ir_type_info_member_names_offset(proc, t->Record.field_count);
@@ -8097,17 +8128,17 @@ void ir_gen_tree(irGen *s) {
 						}
 
 						irValue *count = ir_const_int(a, t->Record.field_count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 0), memory_types,   count, count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 1), memory_names,   count, count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, record, 2), memory_offsets, count, count);
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types,   count, count);
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   count, count);
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, count, count);
 					} break;
 					case TypeRecord_Enum:
 						ir_emit_comment(proc, str_lit("TypeInfoEnum"));
-						tag = ir_emit_conv(proc, ti_ptr, t_type_info_enum_ptr);
+						tag = ir_emit_conv(proc, variant_ptr, t_type_info_enum_ptr);
 						{
 							GB_ASSERT(t->Record.enum_base_type != nullptr);
 							irValue *base = ir_type_info(proc, t->Record.enum_base_type);
-							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 2), base);
+							ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), base);
 
 							if (t->Record.field_count > 0) {
 								Entity **fields = t->Record.fields;
@@ -8140,11 +8171,11 @@ void ir_gen_tree(irGen *s) {
 
 								irValue *v_count = ir_const_int(a, count);
 
-								irValue *names = ir_emit_struct_ep(proc, tag, 3);
+								irValue *names = ir_emit_struct_ep(proc, tag, 1);
 								irValue *name_array_elem = ir_array_elem(proc, name_array);
 								ir_fill_slice(proc, names, name_array_elem, v_count, v_count);
 
-								irValue *values = ir_emit_struct_ep(proc, tag, 4);
+								irValue *values = ir_emit_struct_ep(proc, tag, 2);
 								irValue *value_array_elem = ir_array_elem(proc, value_array);
 								ir_fill_slice(proc, values, value_array_elem, v_count, v_count);
 							}
@@ -8154,12 +8185,12 @@ void ir_gen_tree(irGen *s) {
 				} break;
 				case Type_Map: {
 					ir_emit_comment(proc, str_lit("TypeInfoMap"));
-					tag = ir_emit_conv(proc, ti_ptr, t_type_info_map_ptr);
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_map_ptr);
 
-					irValue *key              = ir_emit_struct_ep(proc, tag, 2);
-					irValue *value            = ir_emit_struct_ep(proc, tag, 3);
-					irValue *generated_struct = ir_emit_struct_ep(proc, tag, 4);
-					irValue *count            = ir_emit_struct_ep(proc, tag, 5);
+					irValue *key              = ir_emit_struct_ep(proc, tag, 0);
+					irValue *value            = ir_emit_struct_ep(proc, tag, 1);
+					irValue *generated_struct = ir_emit_struct_ep(proc, tag, 2);
+					irValue *count            = ir_emit_struct_ep(proc, tag, 3);
 
 					ir_emit_store(proc, key,              ir_get_type_info_ptr(proc, t->Map.key));
 					ir_emit_store(proc, value,            ir_get_type_info_ptr(proc, t->Map.value));
@@ -8169,7 +8200,7 @@ void ir_gen_tree(irGen *s) {
 
 				case Type_BitField: {
 					ir_emit_comment(proc, str_lit("TypeInfoBitField"));
-					tag = ir_emit_conv(proc, ti_ptr, t_type_info_map_ptr);
+					tag = ir_emit_conv(proc, variant_ptr, t_type_info_map_ptr);
 					// names:   []string,
 					// bits:    []u32,
 					// offsets: []u32,
@@ -8196,15 +8227,15 @@ void ir_gen_tree(irGen *s) {
 
 						irValue *v_count = ir_const_int(a, count);
 
-						irValue *names = ir_emit_struct_ep(proc, tag, 3);
+						irValue *names = ir_emit_struct_ep(proc, tag, 1);
 						irValue *name_array_elem = ir_array_elem(proc, name_array);
 						ir_fill_slice(proc, names, name_array_elem, v_count, v_count);
 
-						irValue *bits = ir_emit_struct_ep(proc, tag, 4);
+						irValue *bits = ir_emit_struct_ep(proc, tag, 2);
 						irValue *bit_array_elem = ir_array_elem(proc, bit_array);
 						ir_fill_slice(proc, bits, bit_array_elem, v_count, v_count);
 
-						irValue *offsets = ir_emit_struct_ep(proc, tag, 5);
+						irValue *offsets = ir_emit_struct_ep(proc, tag, 3);
 						irValue *offset_array_elem = ir_array_elem(proc, offset_array);
 						ir_fill_slice(proc, offsets, offset_array_elem, v_count, v_count);
 					}
@@ -8216,18 +8247,20 @@ void ir_gen_tree(irGen *s) {
 					Type *tag_type = type_deref(ir_type(tag));
 					GB_ASSERT(is_type_named(tag_type));
 					Type *ti = base_type(t_type_info);
+					Type *tiv = base_type(ti->Record.fields_in_src_order[2]->type);
+					GB_ASSERT(is_type_union(tiv));
 					bool found = false;
-					for (isize i = 1; i < ti->Record.variant_count; i++) {
-						Entity *f = ti->Record.variants[i];
-						if (are_types_identical(f->type, tag_type)) {
+					for (isize i = 1; i < tiv->Record.variant_count; i++) {
+						Type *vt = tiv->Record.variants[i];
+						if (are_types_identical(vt, tag_type)) {
 							found = true;
-							irValue *tag = ir_const_int(a, i);
-							irValue *ptr = ir_emit_union_tag_ptr(proc, ti_ptr);
-							ir_emit_store(proc, ptr, tag);
+							irValue *tag_val = ir_const_int(a, i);
+							irValue *ptr = ir_emit_union_tag_ptr(proc, variant_ptr);
+							ir_emit_store(proc, ptr, tag_val);
 							break;
 						}
 					}
-					GB_ASSERT_MSG(found, "%s", type_to_string(tag_type));
+					GB_ASSERT_MSG(found, "Tag type not found: %s", type_to_string(tag_type));
 				} else {
 					GB_PANIC("Unhandled TypeInfo type: %s", type_to_string(t));
 				}
