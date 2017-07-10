@@ -253,7 +253,7 @@ explicit_parametric_polymorphic_procedures :: proc() {
 
 	// A more complicated example using subtyping
 	// Something like this could be used in a game
-	Vector2 :: struct {x, y: f32};
+	Vector2 :: struct {x, y: f32;};
 
 	Entity :: struct {
 		using position: Vector2;

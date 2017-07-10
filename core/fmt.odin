@@ -10,8 +10,8 @@ import (
 _BUFFER_SIZE :: 1<<12;
 
 StringBuffer :: union {
-	Static {buf: []u8};
-	Dynamic{buf: [dynamic]u8};
+	Static {buf: []u8;};
+	Dynamic{buf: [dynamic]u8;};
 }
 
 FmtInfo :: struct {

@@ -710,21 +710,36 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 	isize field_index = 0;
 	for_array(decl_index, decls) {
 		AstNode *decl = decls[decl_index];
-		if (decl->kind != AstNode_Field) {
+		if (decl->kind != AstNode_ValueDecl) {
 			continue;
 		}
-		ast_node(f, Field, decl);
+		ast_node(vd, ValueDecl, decl);
 
-		Type *type = check_type(c, f->type);
-		bool is_using = (f->flags&FieldFlag_using) != 0;
+		Type *type = nullptr;
+		if (vd->type != nullptr) {
+			type = check_type(c, vd->type);
+		} else {
+			error(vd->names[0], "Expected a type for this field");
+			type = t_invalid;
+		}
+		bool is_using = (vd->flags&VarDeclFlag_using) != 0;
 
-		if (is_using && f->names.count > 1) {
-			error(f->names[0], "Cannot apply `using` to more than one of the same type");
+		if (is_using && vd->names.count > 1) {
+			error(vd->names[0], "Cannot apply `using` to more than one of the same type");
 			is_using = false;
 		}
 
-		for_array(name_index, f->names) {
-			AstNode *name = f->names[name_index];
+		if (!vd->is_mutable) {
+			error(vd->names[0], "Immutable values in a %.*s are not yet supported", LIT(context));
+			continue;
+		}
+
+		if (vd->values.count) {
+			error(vd->values[0], "Default values are not allowed within a %.*s", LIT(context));
+		}
+
+		for_array(name_index, vd->names) {
+			AstNode *name = vd->names[name_index];
 			if (!ast_node_expect(name, AstNode_Ident)) {
 				continue;
 			}
@@ -759,16 +774,16 @@ isize check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 		if (is_using) {
 			Type *t = base_type(type_deref(type));
 			if (!is_type_struct(t) && !is_type_raw_union(t) && !is_type_bit_field(t) &&
-			    f->names.count >= 1 &&
-			    f->names[0]->kind == AstNode_Ident) {
-				Token name_token = f->names[0]->Ident.token;
+			    vd->names.count >= 1 &&
+			    vd->names[0]->kind == AstNode_Ident) {
+				Token name_token = vd->names[0]->Ident.token;
 				if (is_type_indexable(t)) {
 					bool ok = true;
 					for_array(emi, entity_map.entries) {
 						Entity *e = entity_map.entries[emi].value;
 						if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
 							if (is_type_indexable(e->type)) {
-								if (e->identifier != f->names[0]) {
+								if (e->identifier != vd->names[0]) {
 									ok = false;
 									using_index_expr = e;
 									break;
@@ -852,7 +867,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	for_array(field_index, st->fields) {
 	AstNode *field = st->fields[field_index];
 		switch (field->kind) {
-		case_ast_node(f, Field, field);
+		case_ast_node(f, ValueDecl, field);
 			field_count += f->names.count;
 		case_end;
 		}
@@ -947,9 +962,10 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 	isize field_count = 0;
 	for_array(i, ut->fields) {
 		AstNode *field = ut->fields[i];
-		if (field->kind == AstNode_Field) {
-			ast_node(f, Field, field);
+		switch (field->kind) {
+		case_ast_node(f, ValueDecl, field);
 			field_count += f->names.count;
+		case_end;
 		}
 	}
 
@@ -1005,8 +1021,12 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 
 			isize list_count = 0;
 			for_array(j, list) {
-				ast_node(f, Field, list[j]);
-				list_count += f->names.count;
+				if (list[j]->kind == AstNode_Field) {
+					list_count += list[j]->Field.names.count;
+				} else {
+					ast_node(f, ValueDecl, list[j]);
+					list_count += f->names.count;
+				}
 			}
 
 
@@ -1067,10 +1087,10 @@ void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
 	ast_node(ut, RawUnionType, node);
 
 	isize field_count = 0;
-	for_array(field_index, ut->fields) {
-		AstNode *field = ut->fields[field_index];
+	for_array(i, ut->fields) {
+		AstNode *field = ut->fields[i];
 		switch (field->kind) {
-		case_ast_node(f, Field, field);
+		case_ast_node(f, ValueDecl, field);
 			field_count += f->names.count;
 		case_end;
 		}
