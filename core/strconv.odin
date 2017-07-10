@@ -211,27 +211,27 @@ append_float :: proc(buf: []u8, f: f64, fmt: u8, prec, bit_size: int) -> string 
 
 
 DecimalSlice :: struct {
-	digits:        []u8,
-	count:         int,
-	decimal_point: int,
-	neg:           bool,
+	digits:        []u8;
+	count:         int;
+	decimal_point: int;
+	neg:           bool;
 }
 
-Float_Info :: struct {
-	mantbits: uint,
-	expbits:  uint,
-	bias:     int,
+FloatInfo :: struct {
+	mantbits: uint;
+	expbits:  uint;
+	bias:     int;
 }
 
 
-_f16_info := Float_Info{10, 5,   -15};
-_f32_info := Float_Info{23, 8,  -127};
-_f64_info := Float_Info{52, 11, -1023};
+_f16_info := FloatInfo{10, 5,   -15};
+_f32_info := FloatInfo{23, 8,  -127};
+_f64_info := FloatInfo{52, 11, -1023};
 
 
 generic_ftoa :: proc(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 {
 	bits: u64;
-	flt: ^Float_Info;
+	flt: ^FloatInfo;
 	match bit_size {
 	case 32:
 		bits = u64(transmute(u32, f32(val)));
@@ -346,7 +346,7 @@ format_digits :: proc(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, 
 	return buf;
 }
 
-round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^Float_Info) {
+round_shortest :: proc(d: ^Decimal, mant: u64, exp: int, flt: ^FloatInfo) {
 	if mant == 0 { // If mantissa is zero, the number is zero
 		d.count = 0;
 		return;

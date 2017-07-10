@@ -3354,6 +3354,123 @@ bool parse_expect_field_separator(AstFile *f, AstNode *param) {
 	return false;
 }
 
+bool parse_expect_struct_separator(AstFile *f, AstNode *param) {
+	Token token = f->curr_token;
+	if (allow_token(f, Token_Semicolon)) {
+		return true;
+	}
+
+	if (token.kind == Token_Colon) {
+		next_token(f);
+		error(f->curr_token, "Expected a semicolon, got a comma");
+		return true;
+	}
+
+	if (token.kind == Token_CloseBrace) {
+		if (token.pos.line == f->prev_token.pos.line) {
+			return true;
+		}
+	}
+	expect_token_after(f, Token_Semicolon, "field list");
+
+	return false;
+}
+
+
+AstNode *parse_struct_field_list(AstFile *f, isize *name_count_) {
+	CommentGroup docs = f->lead_comment;
+	Token start_token = f->curr_token;
+
+	Array<AstNode *> params = make_ast_node_array(f);
+	Array<AstNodeAndFlags> list = {}; array_init(&list, heap_allocator());
+	defer (array_free(&list));
+
+	isize total_name_count = 0;
+
+	while (f->curr_token.kind != Token_CloseBrace &&
+	       f->curr_token.kind != Token_Colon &&
+	       f->curr_token.kind != Token_EOF) {
+		u32 flags = parse_field_prefixes(f);
+		AstNode *param = parse_var_type(f, false, false);
+		AstNodeAndFlags naf = {param, flags};
+		array_add(&list, naf);
+		if (f->curr_token.kind != Token_Comma) {
+			break;
+		}
+		next_token(f);
+	}
+
+	if (f->curr_token.kind == Token_Colon) {
+		Array<AstNode *> names = convert_to_ident_list(f, list, true); // Copy for semantic reasons
+		if (names.count == 0) {
+			syntax_error(f->curr_token, "Empty field declaration");
+		}
+		u32 set_flags = 0;
+		if (list.count > 0) {
+			set_flags = list[0].flags;
+		}
+		set_flags = check_field_prefixes(f, names.count, FieldFlag_using, set_flags);
+		total_name_count += names.count;
+
+		AstNode *type = nullptr;
+
+		expect_token_after(f, Token_Colon, "field list");
+		type = parse_var_type(f, false, false);
+
+		parse_expect_struct_separator(f, type);
+		AstNode *param = ast_field(f, names, type, nullptr, set_flags, docs, f->line_comment);
+		array_add(&params, param);
+
+
+		while (f->curr_token.kind != Token_CloseBrace &&
+		       f->curr_token.kind != Token_EOF) {
+			CommentGroup docs = f->lead_comment;
+
+			u32 set_flags = parse_field_prefixes(f);
+			Array<AstNode *> names = parse_ident_list(f);
+			if (names.count == 0) {
+				syntax_error(f->curr_token, "Empty field declaration");
+				break;
+			}
+			set_flags = check_field_prefixes(f, names.count, FieldFlag_using, set_flags);
+			total_name_count += names.count;
+
+			AstNode *type = nullptr;
+
+			expect_token_after(f, Token_Colon, "field list");
+			type = parse_var_type(f, false, false);
+
+			bool ok = parse_expect_struct_separator(f, param);
+			AstNode *param = ast_field(f, names, type, nullptr, set_flags, docs, f->line_comment);
+			array_add(&params, param);
+
+			if (!ok) {
+				break;
+			}
+		}
+
+		if (name_count_) *name_count_ = total_name_count;
+		return ast_field_list(f, start_token, params);
+	}
+
+	for_array(i, list) {
+		Array<AstNode *> names = {};
+		AstNode *type = list[i].node;
+		Token token = blank_token;
+
+		array_init_count(&names, heap_allocator(), 1);
+		token.pos = ast_node_token(type).pos;
+		names[0] = ast_ident(f, token);
+		u32 flags = check_field_prefixes(f, list.count, FieldFlag_using, list[i].flags);
+
+		AstNode *param = ast_field(f, names, list[i].node, nullptr, flags, docs, f->line_comment);
+		array_add(&params, param);
+	}
+
+	if (name_count_) *name_count_ = total_name_count;
+	return ast_field_list(f, start_token, params);
+}
+
 AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters) {
 	TokenKind separator = Token_Comma;
 	Token start_token = f->curr_token;
@@ -3629,9 +3746,10 @@ AstNode *parse_type_or_ident(AstFile *f) {
 		}
 
 		Token open = expect_token_after(f, Token_OpenBrace, "struct");
-		isize decl_count = 0;
-		AstNode *fields = parse_record_fields(f, &decl_count, FieldFlag_using, str_lit("struct"));
-		Token close = expect_token(f, Token_CloseBrace);
+
+		isize    name_count = 0;
+		AstNode *fields     = parse_struct_field_list(f, &name_count);
+		Token    close      = expect_token(f, Token_CloseBrace);
 
 		Array<AstNode *> decls = {};
 		if (fields != nullptr) {
@@ -3639,7 +3757,7 @@ AstNode *parse_type_or_ident(AstFile *f) {
 			decls = fields->FieldList.list;
 		}
 
-		return ast_struct_type(f, token, decls, decl_count, is_packed, is_ordered, align);
+		return ast_struct_type(f, token, decls, name_count, is_packed, is_ordered, align);
 	} break;
 
 	case Token_union: {
@@ -3678,16 +3796,16 @@ AstNode *parse_type_or_ident(AstFile *f) {
 					AstNode *name  = names[0];
 					Token    open  = expect_token(f, Token_OpenBrace);
 					isize decl_count = 0;
-					AstNode *list  = parse_record_fields(f, &decl_count, FieldFlag_using, str_lit("union"));
+					AstNode *list = parse_struct_field_list(f, &decl_count);
+					// AstNode *list  = parse_record_fields(f, &decl_count, FieldFlag_using, str_lit("union"));
 					Token    close = expect_token(f, Token_CloseBrace);
 
 					array_add(&variants, ast_union_field(f, name, list));
 				}
 			}
-			if (f->curr_token.kind != Token_Comma) {
+			if (!parse_expect_struct_separator(f, nullptr)) {
 				break;
 			}
-			next_token(f);
 		}
 
 		Token close = expect_token(f, Token_CloseBrace);
@@ -3699,9 +3817,10 @@ AstNode *parse_type_or_ident(AstFile *f) {
 	case Token_raw_union: {
 		Token token = expect_token(f, Token_raw_union);
 		Token open = expect_token_after(f, Token_OpenBrace, "raw_union");
-		isize decl_count = 0;
-		AstNode *fields = parse_record_fields(f, &decl_count, FieldFlag_using, str_lit("raw_union"));
-		Token close = expect_token(f, Token_CloseBrace);
+
+		isize    decl_count = 0;
+		AstNode *fields     = parse_struct_field_list(f, &decl_count);
+		Token    close      = expect_token(f, Token_CloseBrace);
 
 		Array<AstNode *> decls = {};
 		if (fields != nullptr) {

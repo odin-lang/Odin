@@ -42,9 +42,9 @@ general_stuff :: proc() {
 
 
 	Foo :: struct {
-		x: int,
-		y: f32,
-		z: string,
+		x: int;
+		y: f32;
+		z: string;
 	}
 	foo := Foo{123, 0.513, "A string"};
 	x, y, z := expand_to_tuple(foo);
@@ -176,8 +176,8 @@ default_return_values :: proc() {
 	};
 
 	Entity :: struct {
-		name: string,
-		id:   u32,
+		name: string;
+		id:   u32;
 	}
 
 	some_thing :: proc(input: int) -> (result: ^Entity = nil, err := Error.None) {
@@ -256,39 +256,39 @@ explicit_parametric_polymorphic_procedures :: proc() {
 	Vector2 :: struct {x, y: f32};
 
 	Entity :: struct {
-		using position: Vector2,
-		flags:          u64,
-		id:             u64,
-		batch_index:    u32,
-		slot_index:     u32,
-		portable_id:    u32,
-		derived:        any,
+		using position: Vector2;
+		flags:          u64;
+		id:             u64;
+		batch_index:    u32;
+		slot_index:     u32;
+		portable_id:    u32;
+		derived:        any;
 	}
 
 	Rock :: struct {
-		using entity: ^Entity,
-		heavy: bool,
+		using entity: ^Entity;
+		heavy: bool;
 	}
 	Door :: struct {
-		using entity: ^Entity,
-		open:         bool,
+		using entity: ^Entity;
+		open:         bool;
 	}
 	Monster :: struct {
-		using entity: ^Entity,
-		is_robot:     bool,
-		is_zombie:    bool,
+		using entity: ^Entity;
+		is_robot:     bool;
+		is_zombie:    bool;
 	}
 
 	EntityManager :: struct {
-		batches: [dynamic]^EntityBatch,
-		next_portable_id: u32,
+		batches: [dynamic]^EntityBatch;
+		next_portable_id: u32;
 	}
 
 	ENTITIES_PER_BATCH :: 16;
 	EntityBatch :: struct {
-		data:        [ENTITIES_PER_BATCH]Entity,
-		occupied:    [ENTITIES_PER_BATCH]bool,
-		batch_index: u32,
+		data:        [ENTITIES_PER_BATCH]Entity;
+		occupied:    [ENTITIES_PER_BATCH]bool;
+		batch_index: u32;
 	}
 
 	use_empty_slot :: proc(manager: ^EntityManager, batch: ^EntityBatch) -> ^Entity {

@@ -10,27 +10,27 @@ import (
 _BUFFER_SIZE :: 1<<12;
 
 StringBuffer :: union {
-	Static {buf: []u8},
-	Dynamic{buf: [dynamic]u8},
+	Static {buf: []u8};
+	Dynamic{buf: [dynamic]u8};
 }
 
 FmtInfo :: struct {
-	minus:     bool,
-	plus:      bool,
-	space:     bool,
-	zero:      bool,
-	hash:      bool,
-	width_set: bool,
-	prec_set:  bool,
+	minus:     bool;
+	plus:      bool;
+	space:     bool;
+	zero:      bool;
+	hash:      bool;
+	width_set: bool;
+	prec_set:  bool;
 
-	width:     int,
-	prec:      int,
+	width:     int;
+	prec:      int;
 
-	reordered:      bool,
-	good_arg_index: bool,
+	reordered:      bool;
+	good_arg_index: bool;
 
-	buf: ^StringBuffer,
-	arg: any, // Temporary
+	buf: ^StringBuffer;
+	arg: any; // Temporary
 }
 
 

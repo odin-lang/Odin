@@ -7,13 +7,13 @@ __multi3 :: proc(a, b: u128) -> u128 #cc_c #link_name "__multi3" {
 
 	when ODIN_ENDIAN == "bit" {
 		TWords :: raw_union {
-			all: u128,
-			using _: struct {lo, hi: u64},
+			all: u128;
+			using _: struct {lo, hi: u64};
 		};
 	} else {
 		TWords :: raw_union {
-			all: u128,
-			using _: struct {hi, lo: u64},
+			all: u128;
+			using _: struct {hi, lo: u64};
 		};
 	}
 

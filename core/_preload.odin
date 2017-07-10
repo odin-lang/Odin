@@ -23,12 +23,6 @@ import (
 // implemented within the compiler rather than in this "preload" file
 
 
-// IMPORTANT NOTE(bill): Do not change the order of any of this data
-// The compiler relies upon this _exact_ order
-TypeInfoEnumValue :: raw_union {
-	f: f64,
-	i: i128,
-}
 // NOTE(bill): This must match the compiler's
 CallingConvention :: enum {
 	Invalid         = 0,
@@ -38,75 +32,81 @@ CallingConvention :: enum {
 	Std             = 4,
 	Fast            = 5,
 }
+// IMPORTANT NOTE(bill): Do not change the order of any of this data
+// The compiler relies upon this _exact_ order
+TypeInfoEnumValue :: raw_union {
+	f: f64;
+	i: i128;
+}
 
 TypeInfoRecord :: struct #ordered {
-	types:        []^TypeInfo,
-	names:        []string,
-	offsets:      []int,  // offsets may not be used in tuples
-	usings:       []bool, // usings may not be used in tuples
-	packed:       bool,
-	ordered:      bool,
-	custom_align: bool,
+	types:        []^TypeInfo;
+	names:        []string;
+	offsets:      []int;  // offsets may not be used in tuples
+	usings:       []bool; // usings may not be used in tuples
+	packed:       bool;
+	ordered:      bool;
+	custom_align: bool;
 }
 
 TypeInfo :: union {
-	size:  int,
-	align: int,
+	size:  int;
+	align: int;
 
-	Named{name: string, base: ^TypeInfo},
-	Integer{signed: bool},
-	Rune{},
-	Float{},
-	Complex{},
-	String{},
-	Boolean{},
-	Any{},
+	Named{name: string; base: ^TypeInfo};
+	Integer{signed: bool};
+	Rune{};
+	Float{};
+	Complex{};
+	String{};
+	Boolean{};
+	Any{};
 	Pointer{
-		elem: ^TypeInfo, // nil -> rawptr
-	},
-	Atomic{elem: ^TypeInfo},
+		elem: ^TypeInfo; // nil -> rawptr
+	};
+	Atomic{elem: ^TypeInfo};
 	Procedure{
-		params:     ^TypeInfo, // TypeInfo.Tuple
-		results:    ^TypeInfo, // TypeInfo.Tuple
-		variadic:   bool,
-		convention: CallingConvention,
-	},
+		params:     ^TypeInfo; // TypeInfo.Tuple
+		results:    ^TypeInfo; // TypeInfo.Tuple
+		variadic:   bool;
+		convention: CallingConvention;
+	};
 	Array{
-		elem:      ^TypeInfo,
-		elem_size: int,
-		count:     int,
-	},
-	DynamicArray{elem: ^TypeInfo, elem_size: int},
-	Slice       {elem: ^TypeInfo, elem_size: int},
-	Vector      {elem: ^TypeInfo, elem_size, count: int},
-	Tuple       {using record: TypeInfoRecord}, // Only really used for procedures
-	Struct      {using record: TypeInfoRecord},
-	RawUnion    {using record: TypeInfoRecord},
+		elem:      ^TypeInfo;
+		elem_size: int;
+		count:     int;
+	};
+	DynamicArray{elem: ^TypeInfo; elem_size: int};
+	Slice       {elem: ^TypeInfo; elem_size: int};
+	Vector      {elem: ^TypeInfo; elem_size, count: int};
+	Tuple       {using record: TypeInfoRecord}; // Only really used for procedures
+	Struct      {using record: TypeInfoRecord};
+	RawUnion    {using record: TypeInfoRecord};
 	Union{
 		common_fields: struct {
-			types:     []^TypeInfo,
-			names:     []string,
-			offsets:   []int,    // offsets may not be used in tuples
-		},
-		variant_names: []string,
-		variant_types: []^TypeInfo,
-	},
+			types:     []^TypeInfo;
+			names:     []string;
+			offsets:   []int;    // offsets may not be used in tuples
+		};
+		variant_names: []string;
+		variant_types: []^TypeInfo;
+	};
 	Enum{
-		base:   ^TypeInfo,
-		names:  []string,
-		values: []TypeInfoEnumValue,
-	},
+		base:   ^TypeInfo;
+		names:  []string;
+		values: []TypeInfoEnumValue;
+	};
 	Map{
-		key:              ^TypeInfo,
-		value:            ^TypeInfo,
-		generated_struct: ^TypeInfo,
-		count:            int, // == 0 if dynamic
-	},
+		key:              ^TypeInfo;
+		value:            ^TypeInfo;
+		generated_struct: ^TypeInfo;
+		count:            int; // == 0 if dynamic
+	};
 	BitField{
-		names:   []string,
-		bits:    []i32,
-		offsets: []i32,
-	},
+		names:   []string;
+		bits:    []i32;
+		offsets: []i32;
+	};
 }
 
 // NOTE(bill): only the ones that are needed (not all types)
@@ -127,58 +127,58 @@ AllocatorProc :: proc(allocator_data: rawptr, mode: AllocatorMode,
                       size, alignment: int,
                       old_memory: rawptr, old_size: int, flags: u64 = 0) -> rawptr;
 Allocator :: struct #ordered {
-	procedure: AllocatorProc,
-	data:      rawptr,
+	procedure: AllocatorProc;
+	data:      rawptr;
 }
 
 
 Context :: struct #ordered {
-	thread_guid:  int,
-	thread_index: int,
+	thread_guid:  int;
+	thread_index: int;
 
-	allocator:  Allocator,
+	allocator:  Allocator;
 
-	user_data:  rawptr,
-	user_index: int,
+	user_data:  rawptr;
+	user_index: int;
 }
 
 DEFAULT_ALIGNMENT :: align_of([vector 4]f32);
 
 SourceCodeLocation :: struct {
-	fully_pathed_filename: string,
-	line, column:          i64,
-	procedure:             string,
+	fully_pathed_filename: string;
+	line, column:          i64;
+	procedure:             string;
 }
 
 
 __INITIAL_MAP_CAP :: 16;
 
 __MapKey :: struct #ordered {
-	hash: u128,
-	str:  string,
+	hash: u128;
+	str:  string;
 }
 
 __MapFindResult :: struct #ordered {
-	hash_index:  int,
-	entry_prev:  int,
-	entry_index: int,
+	hash_index:  int;
+	entry_prev:  int;
+	entry_index: int;
 }
 
 __MapEntryHeader :: struct #ordered {
-	key:  __MapKey,
-	next: int,
+	key:  __MapKey;
+	next: int;
 /*
-	value: Value_Type,
+	value: Value_Type;
 */
 }
 
 __MapHeader :: struct #ordered {
-	m:             ^raw.DynamicMap,
-	is_key_string: bool,
-	entry_size:    int,
-	entry_align:   int,
-	value_offset:  int,
-	value_size:    int,
+	m:             ^raw.DynamicMap;
+	is_key_string: bool;
+	entry_size:    int;
+	entry_align:   int;
+	value_offset:  int;
+	value_size:    int;
 }
 
 
@@ -387,9 +387,9 @@ reserve :: proc(array: ^[dynamic]$T, capacity: int) -> bool {
 __get_map_header :: proc(m: ^map[$K]$V) -> __MapHeader #cc_contextless {
 	header := __MapHeader{m = ^raw.DynamicMap(m)};
 	Entry :: struct {
-		key:   __MapKey,
-		next:  int,
-		value: V,
+		key:   __MapKey;
+		next:  int;
+		value: V;
 	}
 
 	_, is_string := type_info_base(type_info(K)).(^TypeInfo.String);

@@ -4,14 +4,14 @@ import (
 )
 
 Semaphore :: struct {
-	// _handle: win32.Handle,
+	// _handle: win32.Handle;
 }
 
 Mutex :: struct {
-	_semaphore: Semaphore,
-	_counter:   i32,
-	_owner:     i32,
-	_recursion: i32,
+	_semaphore: Semaphore;
+	_counter:   i32;
+	_owner:     i32;
+	_recursion: i32;
 }
 
 current_thread_id :: proc() -> i32 {
