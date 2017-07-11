@@ -250,6 +250,18 @@ void scope_reset(Scope *scope) {
 	array_clear(&scope->imported);
 }
 
+i32 is_scope_an_ancestor(Scope *parent, Scope *child) {
+	isize i = 0;
+	while (child != nullptr) {
+		if (parent == child) {
+			return true;
+		}
+		child = child->parent;
+		i++;
+	}
+	return -1;
+}
+
 
 struct DelayedDecl {
 	Scope *  parent;
@@ -269,12 +281,14 @@ struct CheckerContext {
 	DeclInfo * decl;
 	u32        stmt_state_flags;
 	bool       in_defer; // TODO(bill): Actually handle correctly
-	bool       allow_polymorphic_types;
-	bool       no_polymorphic_errors;
 	String     proc_name;
 	Type *     type_hint;
 	DeclInfo * curr_proc_decl;
 	AstNode *  curr_foreign_library;
+
+	bool       allow_polymorphic_types;
+	bool       no_polymorphic_errors;
+	Scope *    polymorphic_scope;
 };
 
 

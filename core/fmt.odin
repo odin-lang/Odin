@@ -363,9 +363,7 @@ _parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: boo
 
 _arg_number :: proc(fi: ^FmtInfo, arg_index: int, format: string, offset, arg_count: int) -> (index, offset: int, ok: bool) {
 	parse_arg_number :: proc(format: string) -> (int, int, bool) {
-		if len(format) < 3 {
-			return 0, 1, false;
-		}
+		if len(format) < 3 do return 0, 1, false;
 
 		for i in 1...len(format) {
 			if format[i] == ']' {

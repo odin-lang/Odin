@@ -73,8 +73,6 @@ enum TypeRecordKind {
 
 	TypeRecord_Struct,
 	TypeRecord_RawUnion,
-	// TypeRecord_Union, // Tagged
-	// TypeRecord_Enum,
 
 	TypeRecord_Count,
 };

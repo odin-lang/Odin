@@ -192,7 +192,9 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 
 
 	DeclInfo *old_decl = decl_info_of_entity(&c->info, base_entity);
-	GB_ASSERT(old_decl != nullptr);
+	if (old_decl == nullptr) {
+		return false;
+	}
 
 
 
@@ -225,6 +227,9 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	scope->is_proc = true;
 	c->context.scope = scope;
 	c->context.allow_polymorphic_types = true;
+	if (c->context.polymorphic_scope == nullptr) {
+		c->context.polymorphic_scope = scope;
+	}
 	if (param_operands == nullptr) {
 		// c->context.no_polymorphic_errors = false;
 	}
@@ -617,10 +622,61 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 		return;
 	}
 
+	if (operand->mode == Addressing_Overload) {
+		// GB_PANIC("HERE!\n");
+
+		gbTempArenaMemory tmp = gb_temp_arena_memory_begin(&c->tmp_arena);
+		defer (gb_temp_arena_memory_end(tmp));
+
+		Entity **procs = operand->overload_entities;
+		isize overload_count = operand->overload_count;
+
+		bool good = false;
+		// NOTE(bill): These should be done
+		for (isize i = 0; i < overload_count; i++) {
+			Type *t = base_type(procs[i]->type);
+			if (t == t_invalid) {
+				continue;
+			}
+			Operand x = {};
+			x.mode = Addressing_Value;
+			x.type = t;
+			if (check_is_assignable_to(c, &x, type)) {
+				Entity *e = procs[i];
+				add_entity_use(c, operand->expr, e);
+				good = true;
+				break;
+			}
+		}
+
+		if (!good) {
+			gbString expr_str    = expr_to_string(operand->expr);
+			gbString op_type_str = type_to_string(operand->type);
+			gbString type_str    = type_to_string(type);
+
+			defer (gb_string_free(type_str));
+			defer (gb_string_free(op_type_str));
+			defer (gb_string_free(expr_str));
+
+			// TODO(bill): is this a good enough error message?
+			error(operand->expr,
+			      "Cannot assign overloaded procedure `%s` to `%s` in %.*s",
+			      expr_str,
+			      op_type_str,
+			      LIT(context_name));
+			operand->mode = Addressing_Invalid;
+		}
+		return;
+	}
+
 	if (!check_is_assignable_to(c, operand, type)) {
-		gbString type_str    = type_to_string(type);
-		gbString op_type_str = type_to_string(operand->type);
 		gbString expr_str    = expr_to_string(operand->expr);
+		gbString op_type_str = type_to_string(operand->type);
+		gbString type_str    = type_to_string(type);
+
+		defer (gb_string_free(type_str));
+		defer (gb_string_free(op_type_str));
+		defer (gb_string_free(expr_str));
 
 		if (operand->mode == Addressing_Builtin) {
 			// TODO(bill): is this a good enough error message?
@@ -647,9 +703,6 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 		}
 		operand->mode = Addressing_Invalid;
 
-		gb_string_free(expr_str);
-		gb_string_free(op_type_str);
-		gb_string_free(type_str);
 		return;
 	}
 }
@@ -1040,13 +1093,21 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 		Type *t = check_type(c, node);
 		if (t != nullptr && t != t_invalid) {
 			bool ok = true;
-			for_array(j, variants) {
-				if (are_types_identical(t, variants[j])) {
-					ok = false;
-					gbString str = type_to_string(t);
-					error(node, "Duplicate variant type `%s`", str);
-					gb_string_free(str);
-					break;
+			t = default_type(t);
+			if (is_type_untyped(t)) {
+				ok = false;
+				gbString str = type_to_string(t);
+				error(node, "Invalid type in union `%s`", str);
+				gb_string_free(str);
+			} else {
+				for_array(j, variants) {
+					if (are_types_identical(t, variants[j])) {
+						ok = false;
+						gbString str = type_to_string(t);
+						error(node, "Duplicate variant type `%s`", str);
+						gb_string_free(str);
+						break;
+					}
 				}
 			}
 			if (ok) array_add(&variants, t);
@@ -1377,6 +1438,26 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 	case Type_Slice:
 		if (source->kind == Type_Slice) {
 			return is_polymorphic_type_assignable(c, poly->Slice.elem, source->Slice.elem, true, modify_type);
+		}
+		return false;
+
+	case Type_Enum:
+		return false;
+
+	case Type_Union:
+		if (source->kind == Type_Union) {
+			TypeUnion *x = &poly->Union;
+			TypeUnion *y = &source->Union;
+			if (x->variant_count != y->variant_count) {
+				return false;
+			}
+			for (isize i = 1; i < x->variant_count; i++) {
+				Type *a = x->variants[i];
+				Type *b = y->variants[i];
+				bool ok = is_polymorphic_type_assignable(c, a, b, false, modify_type);
+				if (!ok) return false;
+			}
+			return true;
 		}
 		return false;
 
@@ -2001,6 +2082,10 @@ bool abi_compat_return_by_value(gbAllocator a, ProcCallingConvention cc, Type *a
 bool check_procedure_type(Checker *c, Type *type, AstNode *proc_type_node, Array<Operand> *operands) {
 	ast_node(pt, ProcType, proc_type_node);
 
+	if (c->context.polymorphic_scope == nullptr && c->context.allow_polymorphic_types) {
+		c->context.polymorphic_scope = c->context.scope;
+	}
+
 	bool variadic = false;
 	bool success = true;
 	Type *params  = check_get_params(c, c->context.scope, pt->params, &variadic, &success, operands);
@@ -2444,9 +2529,16 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		Token token = ident->Ident.token;
 		Type *t = make_type_generic(c->allocator, 0, token.string);
 		if (c->context.allow_polymorphic_types) {
+			Scope *ps = c->context.polymorphic_scope;
 			Scope *s = c->context.scope;
-			Entity *e = make_entity_type_name(c->allocator, s, token, t);
+			Scope *entity_scope = s;
+			if (ps != nullptr && ps != s) {
+				GB_ASSERT(is_scope_an_ancestor(ps, s) >= 0);
+				entity_scope = ps;
+			}
+			Entity *e = make_entity_type_name(c->allocator, entity_scope, token, t);
 			e->TypeName.is_type_alias = true;
+			add_entity(c, ps, ident, e);
 			add_entity(c, s, ident, e);
 		}
 		*type = t;
@@ -6057,6 +6149,8 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 	if (operand->mode == Addressing_Type) {
 		Type *t = operand->type;
 		gbString str = type_to_string(t);
+		defer (gb_string_free(str));
+
 		operand->mode = Addressing_Invalid;
 		isize arg_count = ce->args.count;
 		switch (arg_count) {
@@ -6076,7 +6170,6 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 		} break;
 		}
 
-		gb_string_free(str);
 		return Expr_Expr;
 	}
 
@@ -6890,6 +6983,26 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			o->expr = node;
 			return kind;
 		}
+	case_end;
+
+	case_ast_node(tc, TypeCast, node);
+		check_expr_or_type(c, o, tc->type);
+		if (o->mode != Addressing_Type) {
+			gbString str = expr_to_string(tc->type);
+			error(tc->type, "Expected a type, got %s", str);
+			gb_string_free(str);
+			o->mode = Addressing_Invalid;
+		}
+		if (o->mode == Addressing_Invalid) {
+			o->expr = node;
+			return kind;
+		}
+		Type *type = o->type;
+		check_expr_base(c, o, tc->expr, type);
+		if (o->mode != Addressing_Invalid) {
+			check_cast(c, o, type);
+		}
+		return Expr_Expr;
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, node);

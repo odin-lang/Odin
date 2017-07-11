@@ -4625,6 +4625,11 @@ irValue *ir_build_expr(irProcedure *proc, AstNode *expr) {
 		}
 	case_end;
 
+	case_ast_node(tc, TypeCast, expr);
+		irValue *e = ir_build_expr(proc, tc->expr);
+		return ir_emit_conv(proc, e, tv.type);
+	case_end;
+
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
 		case Token_And:

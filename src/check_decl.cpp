@@ -23,13 +23,27 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 		}
 
 
+		if (operand->mode == Addressing_Overload) {
+			if (e->type == nullptr) {
+				error(operand->expr, "Cannot determine type from overloaded procedure `%.*s`", LIT(operand->overload_entities[0]->token.string));
+			} else {
+				check_assignment(c, operand, e->type, str_lit("variable assignment"));
+				if (operand->mode != Addressing_Type) {
+					return operand->type;
+				}
+			}
+		}
+
 		if (e->type == nullptr) {
 			e->type = t_invalid;
 		}
 		return nullptr;
 	}
 
+
+
 	if (e->type == nullptr) {
+
 		// NOTE(bill): Use the type of the operand
 		Type *t = operand->type;
 		if (is_type_untyped(t)) {

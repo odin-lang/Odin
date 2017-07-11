@@ -201,6 +201,7 @@ AST_NODE_KIND(_ExprBegin,  "",  i32) \
 	AST_NODE_KIND(FieldValue,    "field value",         struct { Token eq; AstNode *field, *value; }) \
 	AST_NODE_KIND(TernaryExpr,   "ternary expression",  struct { AstNode *cond, *x, *y; }) \
 	AST_NODE_KIND(TypeAssertion, "type assertion",      struct { AstNode *expr; Token dot; AstNode *type; }) \
+	AST_NODE_KIND(TypeCast,      "type cast",           struct { Token token; AstNode *type, *expr; }) \
 AST_NODE_KIND(_ExprEnd,       "", i32) \
 AST_NODE_KIND(_StmtBegin,     "", i32) \
 	AST_NODE_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
@@ -542,6 +543,7 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_DerefExpr:     return node->DerefExpr.op;
 	case AstNode_TernaryExpr:   return ast_node_token(node->TernaryExpr.cond);
 	case AstNode_TypeAssertion: return ast_node_token(node->TypeAssertion.expr);
+	case AstNode_TypeCast:      return node->TypeCast.token;
 
 	case AstNode_BadStmt:       return node->BadStmt.begin;
 	case AstNode_EmptyStmt:     return node->EmptyStmt.token;
@@ -1146,6 +1148,14 @@ AstNode *ast_type_assertion(AstFile *f, AstNode *expr, Token dot, AstNode *type)
 	result->TypeAssertion.type = type;
 	return result;
 }
+AstNode *ast_type_cast(AstFile *f, Token token, AstNode *type, AstNode *expr) {
+	AstNode *result = make_ast_node(f, AstNode_TypeCast);
+	result->TypeCast.token = token;
+	result->TypeCast.type  = type;
+	result->TypeCast.expr  = expr;
+	return result;
+}
+
 
 
 
@@ -1875,12 +1885,8 @@ void expect_semicolon(AstFile *f, AstNode *s) {
 			if (is_semicolon_optional_for_node(f, s)) {
 				return;
 			}
-		} else {
-			if (s->kind == AstNode_ValueDecl) {
-				if (f->curr_token.kind == Token_CloseBrace) {
-					return;
-				}
-			}
+		} else if (f->curr_token.kind == Token_CloseBrace) {
+			return;
 		}
 		String node_string = ast_node_strings[s->kind];
 		if (s->kind == AstNode_GenDecl) {
@@ -2580,6 +2586,13 @@ AstNode *parse_unary_expr(AstFile *f, bool lhs) {
 		Token op = f->curr_token;
 		next_token(f);
 		return ast_unary_expr(f, op, parse_unary_expr(f, lhs));
+	} break;
+	case Token_cast: {
+		Token token = expect_token(f, Token_cast);
+		Token open  = expect_token_after(f, Token_OpenParen, "cast");
+		AstNode *type = parse_type(f);
+		Token close = expect_token(f, Token_CloseParen);
+		return ast_type_cast(f, token, type, parse_unary_expr(f, lhs));
 	} break;
 	}
 
