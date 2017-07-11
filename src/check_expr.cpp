@@ -4081,6 +4081,13 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		String op_name = op_expr->Ident.token.string;
 		Entity *e = scope_lookup_entity(c->context.scope, op_name);
 
+		bool is_alias = false;
+		while (e->kind == Entity_Alias) {
+			GB_ASSERT(e->Alias.base != nullptr);
+			e = e->Alias.base;
+			is_alias = true;
+		}
+
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
 
@@ -4111,8 +4118,23 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 				operand->expr = node;
 				return nullptr;
 			}
+
+
+			bool is_alias = false;
+			while (entity->kind == Entity_Alias) {
+				GB_ASSERT(e->Alias.base != nullptr);
+				entity = entity->Alias.base;
+				is_alias = true;
+			}
+
 			check_entity_decl(c, entity, nullptr, nullptr);
 			GB_ASSERT(entity->type != nullptr);
+
+			if (is_alias) {
+				// TODO(bill): Which scope do you search for for an alias?
+				// import_scope = entity->scope;
+				entity_name = entity->token.string;
+			}
 
 			isize overload_count = entity_overload_count(import_scope, entity_name);
 			bool is_overloaded = overload_count > 1;

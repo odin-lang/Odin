@@ -159,8 +159,7 @@ Allocator :: struct #ordered {
 
 
 Context :: struct #ordered {
-	thread_guid:  int;
-	thread_index: int;
+	thread_id:  int;
 
 	allocator:  Allocator;
 
@@ -256,8 +255,8 @@ __init_context_from_ptr :: proc(c: ^Context, other: ^Context) #cc_contextless {
 	if c.allocator.procedure == nil {
 		c.allocator = default_allocator();
 	}
-	if c.thread_guid == 0 {
-		c.thread_guid = os.current_thread_id();
+	if c.thread_id == 0 {
+		c.thread_id = os.current_thread_id();
 	}
 }
 
@@ -267,8 +266,8 @@ __init_context :: proc(c: ^Context) #cc_contextless {
 	if c.allocator.procedure == nil {
 		c.allocator = default_allocator();
 	}
-	if c.thread_guid == 0 {
-		c.thread_guid = os.current_thread_id();
+	if c.thread_id == 0 {
+		c.thread_id = os.current_thread_id();
 	}
 }
 
