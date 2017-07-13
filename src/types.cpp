@@ -94,6 +94,8 @@ struct TypeRecord {
 	bool     are_offsets_being_processed;
 	bool     is_packed;
 	bool     is_ordered;
+	bool     is_polymorphic;
+	Type *   polymorphic_params; // Type_Tuple
 
 	i64      custom_align; // NOTE(bill): Only used in structs at the moment
 	Entity * names;
@@ -937,6 +939,15 @@ bool is_type_indexable(Type *t) {
 	return is_type_array(t) || is_type_slice(t) || is_type_vector(t) || is_type_string(t);
 }
 
+bool is_type_polymorphic_struct(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Record &&
+	    t->Record.kind == TypeRecord_Struct) {
+		return t->Record.is_polymorphic;
+	}
+	return false;
+}
+
 bool is_type_polymorphic(Type *t) {
 	switch (t->kind) {
 	case Type_Generic:
@@ -967,7 +978,7 @@ bool is_type_polymorphic(Type *t) {
 		if (t->Proc.is_polymorphic) {
 			return true;
 		}
-		#if 0
+		#if 1
 		if (t->Proc.param_count > 0 &&
 		    is_type_polymorphic(t->Proc.params)) {
 			return true;
@@ -995,6 +1006,9 @@ bool is_type_polymorphic(Type *t) {
 		}
 		break;
 	case Type_Record:
+		if (t->Record.is_polymorphic) {
+			return true;
+		}
 		for (isize i = 0; i < t->Record.field_count; i++) {
 		    if (is_type_polymorphic(t->Record.fields[i]->type)) {
 		    	return true;

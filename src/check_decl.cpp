@@ -558,7 +558,7 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 	if (type_expr != nullptr) {
 		e->type = check_type(c, type_expr);
 	}
-	if (e->type != nullptr && is_type_polymorphic(e->type)) {
+	if (e->type != nullptr && is_type_polymorphic(base_type(e->type))) {
 		error(e->token, "Invalid use of a polymorphic type in %.*s", LIT(context_name));
 		e->type = t_invalid;
 	}

@@ -3670,6 +3670,18 @@ void ir_pop_target_list(irProcedure *proc) {
 void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	if (e->type == nullptr) return;
 
+	if (is_type_polymorphic(base_type(e->type))) {
+		auto found = map_get(&m->info->gen_types, hash_pointer(e->type));
+		if (found == nullptr) {
+			return;
+		}
+		for_array(i, *found) {
+			Entity *e = (*found)[i];
+			ir_mangle_add_sub_type_name(m, e, name);
+		}
+		return;
+	}
+
 	irValue *t = ir_value_type_name(m->allocator, name, e->type);
 	ir_module_add_value(m, e, t);
 	map_set(&m->members, hash_string(name), t);
@@ -5731,8 +5743,10 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 		}
 
 		bool polymorphic = is_type_polymorphic(e->type);
-
-		if (!polymorphic && map_get(&proc->module->min_dep_map, hash_pointer(e)) == nullptr) {
+		if (polymorphic && !is_type_struct(e->type)) {
+			continue;
+		}
+		if (map_get(&proc->module->min_dep_map, hash_pointer(e)) == nullptr) {
 			// NOTE(bill): Nothing depends upon it so doesn't need to be built
 			continue;
 		}
@@ -5741,6 +5755,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 			// NOTE(bill): Generate a new name
 			// parent_proc.name-guid
 			String ts_name = e->token.string;
+
 			isize name_len = proc->name.len + 1 + ts_name.len + 1 + 10 + 1;
 			u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
 			i32 guid = cast(i32)proc->module->members.entries.count;
@@ -5751,6 +5766,7 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 			                                           name, e->type);
 			map_set(&proc->module->entity_names, hash_entity(e), name);
 			ir_gen_global_type_name(proc->module, e, name);
+
 		} else if (e->kind == Entity_Procedure) {
 			CheckerInfo *info = proc->module->info;
 			DeclInfo *decl = decl_info_of_entity(info, e);

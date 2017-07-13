@@ -111,6 +111,7 @@ enum StmtStateFlag {
 };
 
 enum FieldFlag {
+	FieldFlag_NONE      = 0,
 	FieldFlag_ellipsis  = 1<<0,
 	FieldFlag_using     = 1<<1,
 	FieldFlag_no_alias  = 1<<2,
@@ -418,12 +419,13 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		AstNode *elem; \
 	}) \
 	AST_NODE_KIND(StructType, "struct type", struct { \
-		Token token; \
-		Array<AstNode *> fields; \
-		isize field_count; \
-		bool is_packed; \
-		bool is_ordered; \
-		AstNode *align; \
+		Token            token;               \
+		Array<AstNode *> fields;              \
+		isize            field_count;         \
+		AstNode *        polymorphic_params;  \
+		bool             is_packed;           \
+		bool             is_ordered;          \
+		AstNode *        align;               \
 	}) \
 	AST_NODE_KIND(UnionType, "union type", struct { \
 		Token            token;       \
@@ -866,6 +868,7 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		break;
 	case AstNode_StructType:
 		n->StructType.fields = clone_ast_node_array(a, n->StructType.fields);
+		n->StructType.polymorphic_params = clone_ast_node(a, n->StructType.polymorphic_params);
 		n->StructType.align  = clone_ast_node(a, n->StructType.align);
 		break;
 	case AstNode_UnionType:
@@ -1459,14 +1462,15 @@ AstNode *ast_vector_type(AstFile *f, Token token, AstNode *count, AstNode *elem)
 }
 
 AstNode *ast_struct_type(AstFile *f, Token token, Array<AstNode *> fields, isize field_count,
-                         bool is_packed, bool is_ordered, AstNode *align) {
+                         AstNode *polymorphic_params, bool is_packed, bool is_ordered, AstNode *align) {
 	AstNode *result = make_ast_node(f, AstNode_StructType);
-	result->StructType.token       = token;
-	result->StructType.fields      = fields;
-	result->StructType.field_count = field_count;
-	result->StructType.is_packed   = is_packed;
-	result->StructType.is_ordered  = is_ordered;
-	result->StructType.align       = align;
+	result->StructType.token              = token;
+	result->StructType.fields             = fields;
+	result->StructType.field_count        = field_count;
+	result->StructType.polymorphic_params = polymorphic_params;
+	result->StructType.is_packed          = is_packed;
+	result->StructType.is_ordered         = is_ordered;
+	result->StructType.align              = align;
 	return result;
 }
 
@@ -2182,6 +2186,8 @@ AstNode *        parse_simple_stmt      (AstFile *f, StmtAllowFlag flags);
 AstNode *        parse_type             (AstFile *f);
 AstNode *        parse_call_expr        (AstFile *f, AstNode *operand);
 AstNode *        parse_record_field_list(AstFile *f, isize *name_count_);
+AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_type_token);
+
 
 AstNode *convert_stmt_to_expr(AstFile *f, AstNode *statement, String kind) {
 	if (statement == nullptr) {
@@ -2205,7 +2211,7 @@ AstNode *convert_stmt_to_body(AstFile *f, AstNode *stmt) {
 		syntax_error(stmt, "Expected a normal statement rather than a block statement");
 		return stmt;
 	}
-	GB_ASSERT(is_ast_node_stmt(stmt));
+	GB_ASSERT(is_ast_node_stmt(stmt) || is_ast_node_decl(stmt));
 	Token open = ast_node_token(stmt);
 	Token close = ast_node_token(stmt);
 	Array<AstNode *> stmts = make_ast_node_array(f, 1);
@@ -2430,9 +2436,20 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_struct: {
 		Token token = expect_token(f, Token_struct);
+		AstNode *polymorphic_params = nullptr;
 		bool is_packed = false;
 		bool is_ordered = false;
 		AstNode *align = nullptr;
+
+		if (allow_token(f, Token_OpenParen)) {
+			isize param_count = 0;
+			polymorphic_params = parse_field_list(f, &param_count, 0, Token_CloseParen, false, true);
+			if (param_count == 0) {
+				syntax_error(polymorphic_params, "Expected at least 1 polymorphic parametric");
+				polymorphic_params = nullptr;
+			}
+			expect_token_after(f, Token_CloseParen, "parameter list");
+		}
 
 		isize prev_level = f->expr_level;
 		f->expr_level = -1;
@@ -2477,7 +2494,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			decls = fields->FieldList.list;
 		}
 
-		return ast_struct_type(f, token, decls, name_count, is_packed, is_ordered, align);
+		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_ordered, align);
 	} break;
 
 	case Token_union: {
@@ -3394,7 +3411,6 @@ AstNode *parse_block_stmt(AstFile *f, b32 is_when) {
 	return parse_body(f);
 }
 
-AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters);
 
 
 AstNode *parse_results(AstFile *f) {
@@ -3414,7 +3430,7 @@ AstNode *parse_results(AstFile *f) {
 
 	AstNode *list = nullptr;
 	expect_token(f, Token_OpenParen);
-	list = parse_field_list(f, nullptr, 0, Token_CloseParen, true);
+	list = parse_field_list(f, nullptr, 0, Token_CloseParen, true, false);
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	return list;
 }
@@ -3424,7 +3440,7 @@ AstNode *parse_proc_type(AstFile *f, Token proc_token, String *link_name_) {
 	AstNode *results = nullptr;
 
 	expect_token(f, Token_OpenParen);
-	params = parse_field_list(f, nullptr, FieldFlag_Signature, Token_CloseParen, true);
+	params = parse_field_list(f, nullptr, FieldFlag_Signature, Token_CloseParen, true, true);
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	results = parse_results(f);
 
@@ -3669,7 +3685,7 @@ AstNode *parse_record_field_list(AstFile *f, isize *name_count_) {
 	return ast_field_list(f, start_token, decls);
 }
 
-AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters) {
+AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_type_token) {
 	TokenKind separator = Token_Comma;
 	Token start_token = f->curr_token;
 
@@ -3682,7 +3698,6 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 
 	isize total_name_count = 0;
 	bool allow_ellipsis = allowed_flags&FieldFlag_ellipsis;
-	bool allow_type_token = allow_default_parameters;
 
 	while (f->curr_token.kind != follow &&
 	       f->curr_token.kind != Token_Colon &&
@@ -3691,10 +3706,9 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 		AstNode *param = parse_var_type(f, allow_ellipsis, allow_type_token);
 		AstNodeAndFlags naf = {param, flags};
 		array_add(&list, naf);
-		if (f->curr_token.kind != Token_Comma) {
+		if (!allow_token(f, Token_Comma)) {
 			break;
 		}
-		advance_token(f);
 	}
 
 	if (f->curr_token.kind == Token_Colon) {
@@ -3750,7 +3764,7 @@ AstNode *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, Tok
 			AstNode *default_value = nullptr;
 			expect_token_after(f, Token_Colon, "field list");
 			if (f->curr_token.kind != Token_Eq) {
-				type = parse_var_type(f, allow_ellipsis, allow_default_parameters);
+				type = parse_var_type(f, allow_ellipsis, allow_type_token);
 			}
 			if (allow_token(f, Token_Eq)) {
 				// TODO(bill): Should this be true==lhs or false==rhs?

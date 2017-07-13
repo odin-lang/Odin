@@ -12,6 +12,7 @@ enum CallArgumentError {
 	CallArgumentError_ParameterNotFound,
 	CallArgumentError_ParameterMissing,
 	CallArgumentError_DuplicateParameter,
+	CallArgumentError_NoneConstantParameter,
 };
 
 enum CallArgumentErrorMode {
@@ -972,7 +973,7 @@ Entity *make_names_field_for_record(Checker *c, Scope *scope) {
 	return e;
 }
 
-void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
+void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Operand> *poly_operands) {
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
 
@@ -984,11 +985,132 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 			min_field_count += f->names.count;
 		case_end;
 		}
-
 	}
 	struct_type->Record.names = make_names_field_for_record(c, c->context.scope);
 
-	auto fields = check_fields(c, node, st->fields, min_field_count, str_lit("struct"));
+	Type *polymorphic_params = nullptr;
+	bool is_polymorphic = false;
+	if (st->polymorphic_params != nullptr) {
+		ast_node(field_list, FieldList, st->polymorphic_params);
+		Array<AstNode *> params = field_list->list;
+		if (params.count != 0) {
+			isize variable_count = 0;
+			for_array(i, params) {
+				AstNode *field = params[i];
+				if (ast_node_expect(field, AstNode_Field)) {
+					ast_node(f, Field, field);
+					variable_count += gb_max(f->names.count, 1);
+				}
+			}
+
+			Array<Entity *> entities = {};
+			array_init(&entities, c->allocator, variable_count);
+
+			for_array(i, params) {
+				AstNode *param = params[i];
+				if (param->kind != AstNode_Field) {
+					continue;
+				}
+				ast_node(p, Field, param);
+				AstNode *type_expr = p->type;
+				Type *type = nullptr;
+				bool is_type_param = false;
+				bool is_type_polymorphic_type = false;
+				if (type_expr == nullptr) {
+					error(param, "Expected a type for this parameter");
+					continue;
+				}
+				if (type_expr->kind == AstNode_Ellipsis) {
+					type_expr = type_expr->Ellipsis.expr;
+					error(param, "A polymorphic parameter cannot be variadic");
+				}
+				if (type_expr->kind == AstNode_TypeType) {
+					is_type_param = true;
+					type = make_type_generic(c->allocator, 0, str_lit(""));
+				} else {
+					type = check_type(c, type_expr);
+					if (is_type_polymorphic(type)) {
+						is_type_polymorphic_type = true;
+					}
+				}
+
+				if (type == nullptr) {
+					error(params[i], "Invalid parameter type");
+					type = t_invalid;
+				}
+				if (is_type_untyped(type)) {
+					if (is_type_untyped_undef(type)) {
+						error(params[i], "Cannot determine parameter type from ---");
+					} else {
+						error(params[i], "Cannot determine parameter type from a nil");
+					}
+					type = t_invalid;
+				}
+
+				if (is_type_polymorphic_type) {
+					gbString str = type_to_string(type);
+					error(params[i], "Parameter types cannot be polymorphic, got %s", str);
+					gb_string_free(str);
+					type = t_invalid;
+				}
+
+				if (!is_type_param && !is_type_constant_type(type)) {
+					gbString str = type_to_string(type);
+					error(params[i], "A parameter must be a valid constant type, got %s", str);
+					gb_string_free(str);
+				}
+
+				Scope *scope = c->context.scope;
+				for_array(j, p->names) {
+					AstNode *name = p->names[j];
+					if (!ast_node_expect(name, AstNode_Ident)) {
+						continue;
+					}
+					Entity *e = nullptr;
+
+					Token token = name->Ident.token;
+
+					if (poly_operands != nullptr) {
+						Operand operand = (*poly_operands)[entities.count];
+						if (is_type_param) {
+							GB_ASSERT(operand.mode == Addressing_Type);
+							e = make_entity_type_name(c->allocator, scope, token, operand.type);
+							e->TypeName.is_type_alias = true;
+						} else {
+							GB_ASSERT(operand.mode == Addressing_Constant);
+							e = make_entity_constant(c->allocator, scope, token, operand.type, operand.value);
+						}
+					} else {
+						if (is_type_param) {
+							e = make_entity_type_name(c->allocator, scope, token, type);
+							e->TypeName.is_type_alias = true;
+						} else {
+							e = make_entity_constant(c->allocator, scope, token, type, empty_exact_value);
+						}
+					}
+
+					add_entity(c, scope, name, e);
+					array_add(&entities, e);
+				}
+			}
+
+			if (entities.count > 0) {
+				Type *tuple = make_type_tuple(c->allocator);
+				tuple->Tuple.variables = entities.data;
+				tuple->Tuple.variable_count = entities.count;
+
+				polymorphic_params = tuple;
+			}
+		}
+	}
+
+	is_polymorphic = polymorphic_params != nullptr && poly_operands == nullptr;
+
+	Array<Entity *> fields = {};
+
+	if (!is_polymorphic) {
+		fields = check_fields(c, node, st->fields, min_field_count, str_lit("struct"));
+	}
 
 	struct_type->Record.scope               = c->context.scope;
 	struct_type->Record.is_packed           = st->is_packed;
@@ -996,6 +1118,9 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node) {
 	struct_type->Record.fields              = fields.data;
 	struct_type->Record.fields_in_src_order = fields.data;
 	struct_type->Record.field_count         = fields.count;
+	struct_type->Record.polymorphic_params  = polymorphic_params;
+	struct_type->Record.is_polymorphic      = is_polymorphic;
+
 
 	type_set_offsets(c->allocator, struct_type);
 
@@ -1703,53 +1828,55 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 
 		for_array(j, p->names) {
 			AstNode *name = p->names[j];
-			if (ast_node_expect(name, AstNode_Ident)) {
-				Entity *param = nullptr;
-				if (is_type_param) {
-					if (operands != nullptr) {
-						Operand o = (*operands)[variable_index];
-						if (o.mode == Addressing_Type) {
-							type = o.type;
-						} else {
-							if (!c->context.no_polymorphic_errors) {
-								error(o.expr, "Expected a type to assign to the type parameter");
-							}
-							success = false;
-							type = t_invalid;
-						}
-					}
-					param = make_entity_type_name(c->allocator, scope, name->Ident.token, type);
-					param->TypeName.is_type_alias = true;
-				} else {
-					if (operands != nullptr && is_type_polymorphic_type) {
-						Operand op = (*operands)[variable_index];
-						type = determine_type_from_polymorphic(c, type, op);
-						if (type == t_invalid) {
-							success = false;
-						}
-					}
-
-					if (p->flags&FieldFlag_no_alias) {
-						if (!is_type_pointer(type)) {
-							error(params[i], "`#no_alias` can only be applied to fields of pointer type");
-							p->flags &= ~FieldFlag_no_alias; // Remove the flag
-						}
-					}
-
-					param = make_entity_param(c->allocator, scope, name->Ident.token, type,
-					                          (p->flags&FieldFlag_using) != 0, false);
-					param->Variable.default_value = value;
-					param->Variable.default_is_nil = default_is_nil;
-					param->Variable.default_is_location = default_is_location;
-
-				}
-				if (p->flags&FieldFlag_no_alias) {
-					param->flags |= EntityFlag_NoAlias;
-				}
-
-				add_entity(c, scope, name, param);
-				variables[variable_index++] = param;
+			if (!ast_node_expect(name, AstNode_Ident)) {
+				continue;
 			}
+
+			Entity *param = nullptr;
+			if (is_type_param) {
+				if (operands != nullptr) {
+					Operand o = (*operands)[variable_index];
+					if (o.mode == Addressing_Type) {
+						type = o.type;
+					} else {
+						if (!c->context.no_polymorphic_errors) {
+							error(o.expr, "Expected a type to assign to the type parameter");
+						}
+						success = false;
+						type = t_invalid;
+					}
+				}
+				param = make_entity_type_name(c->allocator, scope, name->Ident.token, type);
+				param->TypeName.is_type_alias = true;
+			} else {
+				if (operands != nullptr && is_type_polymorphic_type) {
+					Operand op = (*operands)[variable_index];
+					type = determine_type_from_polymorphic(c, type, op);
+					if (type == t_invalid) {
+						success = false;
+					}
+				}
+
+				if (p->flags&FieldFlag_no_alias) {
+					if (!is_type_pointer(type)) {
+						error(params[i], "`#no_alias` can only be applied to fields of pointer type");
+						p->flags &= ~FieldFlag_no_alias; // Remove the flag
+					}
+				}
+
+				param = make_entity_param(c->allocator, scope, name->Ident.token, type,
+				                          (p->flags&FieldFlag_using) != 0, false);
+				param->Variable.default_value = value;
+				param->Variable.default_is_nil = default_is_nil;
+				param->Variable.default_is_location = default_is_location;
+
+			}
+			if (p->flags&FieldFlag_no_alias) {
+				param->flags |= EntityFlag_NoAlias;
+			}
+
+			add_entity(c, scope, name, param);
+			variables[variable_index++] = param;
 		}
 	}
 
@@ -2358,7 +2485,7 @@ i64 check_array_or_map_count(Checker *c, AstNode *e, bool is_map) {
 				if (count >= 0) {
 					return count;
 				}
-				error(e, "Invalid array count");
+				error(e, "Invalid negative array count %lld", cast(long long)count);
 			}
 			return 0;
 		}
@@ -2663,7 +2790,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		*type = make_type_struct(c->allocator);
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
-		check_struct_type(c, *type, e);
+		check_struct_type(c, *type, e, nullptr);
 		check_close_scope(c);
 		(*type)->Record.node = e;
 		return true;
@@ -6114,8 +6241,263 @@ Entity *find_using_index_expr(Type *t) {
 	return nullptr;
 }
 
+isize lookup_polymorphic_struct_parameter(TypeRecord *st, String parameter_name) {
+	if (!st->is_polymorphic) return -1;
+
+	TypeTuple *params = &st->polymorphic_params->Tuple;
+	isize param_count = params->variable_count;
+	for (isize i = 0; i < param_count; i++) {
+		Entity *e = params->variables[i];
+		String name = e->token.string;
+		if (is_blank_ident(name)) {
+			continue;
+		}
+		if (name == parameter_name) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, AstNode *call) {
+	ast_node(ce, CallExpr, call);
+
+	Type *original_type = operand->type;
+	Type *struct_type = base_type(operand->type);
+	GB_ASSERT(is_type_struct(struct_type));
+	TypeRecord *st = &struct_type->Record;
+	GB_ASSERT(st->is_polymorphic);
+
+	bool show_error = true;
+
+	Array<Operand> operands = {};
+	defer (array_free(&operands));
+
+	bool named_fields = false;
+
+	if (is_call_expr_field_value(ce)) {
+		named_fields = true;
+		array_init_count(&operands, heap_allocator(), ce->args.count);
+		for_array(i, ce->args) {
+			AstNode *arg = ce->args[i];
+			ast_node(fv, FieldValue, arg);
+			check_expr_or_type(c, &operands[i], fv->value);
+		}
+
+		bool vari_expand = (ce->ellipsis.pos.line != 0);
+		if (vari_expand) {
+			error(ce->ellipsis, "Invalid use of `..` in a polymorphic type call`");
+		}
+
+	} else {
+		array_init(&operands, heap_allocator(), 2*ce->args.count);
+		check_unpack_arguments(c, -1, &operands, ce->args, false);
+	}
+
+	CallArgumentError err = CallArgumentError_None;
+
+	TypeTuple *tuple = &st->polymorphic_params->Tuple;
+	isize param_count = tuple->variable_count;
+
+	Array<Operand> ordered_operands = operands;
+	if (named_fields) {
+		bool *visited = gb_alloc_array(c->allocator, bool, param_count);
+
+		array_init_count(&ordered_operands, c->tmp_allocator, param_count);
+
+		for_array(i, ce->args) {
+			AstNode *arg = ce->args[i];
+			ast_node(fv, FieldValue, arg);
+			if (fv->field->kind != AstNode_Ident) {
+				if (show_error) {
+					gbString expr_str = expr_to_string(fv->field);
+					error(arg, "Invalid parameter name `%s` in polymorphic type call", expr_str);
+					gb_string_free(expr_str);
+				}
+				err = CallArgumentError_InvalidFieldValue;
+				continue;
+			}
+			String name = fv->field->Ident.token.string;
+			isize index = lookup_polymorphic_struct_parameter(st, name);
+			if (index < 0) {
+				if (show_error) {
+					error(arg, "No parameter named `%.*s` for this polymorphic type", LIT(name));
+				}
+				err = CallArgumentError_ParameterNotFound;
+				continue;
+			}
+			if (visited[index]) {
+				if (show_error) {
+					error(arg, "Duplicate parameter `%.*s` in polymorphic type", LIT(name));
+				}
+				err = CallArgumentError_DuplicateParameter;
+				continue;
+			}
+
+			visited[index] = true;
+			ordered_operands[index] = operands[i];
+		}
+
+		for (isize i = 0; i < param_count; i++) {
+			if (!visited[i]) {
+				Entity *e = tuple->variables[i];
+				if (is_blank_ident(e->token)) {
+					continue;
+				}
+
+				if (show_error) {
+					if (e->kind == Entity_TypeName) {
+						error(call, "Type parameter `%.*s` is missing in polymorphic type call",
+						      LIT(e->token.string));
+					} else {
+						gbString str = type_to_string(e->type);
+						error(call, "Parameter `%.*s` of type `%s` is missing in polymorphic type call",
+						      LIT(e->token.string), str);
+						gb_string_free(str);
+					}
+				}
+				err = CallArgumentError_ParameterMissing;
+			}
+		}
+	}
+
+	if (err != 0) {
+		operand->mode = Addressing_Invalid;
+		return err;
+	}
+
+	i64 score = 0;
+	for (isize i = 0; i < param_count; i++) {
+		Operand *o = &ordered_operands[i];
+		if (o->mode == Addressing_Invalid) {
+			continue;
+		}
+		Entity *e = tuple->variables[i];
+
+		if (e->kind == Entity_TypeName) {
+			if (o->mode != Addressing_Type) {
+				if (show_error) {
+					error(o->expr, "Expected a type for the argument `%.*s`", LIT(e->token.string));
+				}
+				err = CallArgumentError_WrongTypes;
+			}
+			if (are_types_identical(e->type, o->type)) {
+				score += assign_score_function(1);
+			} else {
+				score += assign_score_function(10);
+			}
+		} else {
+			i64 s = 0;
+			if (!check_is_assignable_to_with_score(c, o, e->type, &s)) {
+				if (show_error) {
+					check_assignment(c, o, e->type, str_lit("polymorphic type argument"));
+				}
+				err = CallArgumentError_WrongTypes;
+			}
+			o->type = e->type;
+			if (o->mode != Addressing_Constant) {
+				if (show_error) {
+					error(o->expr, "Expected a constant value for this polymorphic type argument");
+				}
+				err = CallArgumentError_NoneConstantParameter;
+			}
+			score += s;
+		}
+	}
+
+	if (param_count < ordered_operands.count) {
+		error(call, "Too many polymorphic type arguments, expected %td, got %td", param_count, ordered_operands.count);
+		err = CallArgumentError_TooManyArguments;
+	} else if (param_count > ordered_operands.count) {
+		error(call, "Too few polymorphic type arguments, expected %td, got %td", param_count, ordered_operands.count);
+		err = CallArgumentError_TooFewArguments;
+	}
+
+	if (err == 0) {
+		// TODO(bill): Check for previous types
+		gbAllocator a = c->allocator;
+
+		auto *found_gen_types = map_get(&c->info.gen_types, hash_pointer(original_type));
+
+		if (found_gen_types != nullptr) {
+			for_array(i, *found_gen_types) {
+				Entity *e = (*found_gen_types)[i];
+				Type *t = base_type(e->type);
+				TypeTuple *tuple = &t->Record.polymorphic_params->Tuple;
+				bool ok = true;
+				GB_ASSERT(param_count == tuple->variable_count);
+				for (isize j = 0; j < param_count; j++) {
+					Entity *p = tuple->variables[j];
+					Operand o = ordered_operands[j];
+					if (p->kind == Entity_TypeName) {
+						if (!are_types_identical(o.type, p->type)) {
+							ok = false;
+						}
+					} else if (p->kind == Entity_Constant) {
+						if (!are_types_identical(o.type, p->type)) {
+							ok = false;
+						}
+						if (!compare_exact_values(Token_CmpEq, o.value, p->Constant.value)) {
+							ok = false;
+						}
+					} else {
+						GB_PANIC("Unknown entity kind");
+					}
+				}
+				if (ok) {
+					operand->mode = Addressing_Type;
+					operand->type = e->type;
+					return err;
+				}
+			}
+		}
+
+		String generated_name = make_string_c(expr_to_string(call));
+
+		Type *named_type = make_type_named(a, generated_name, nullptr, nullptr);
+		Type *struct_type = make_type_struct(a);
+		AstNode *node = clone_ast_node(a, st->node);
+		set_base_type(named_type, struct_type);
+		check_open_scope(c, node);
+		check_struct_type(c, struct_type, node, &ordered_operands);
+		check_close_scope(c);
+		struct_type->Record.node = node;
+
+		Entity *e = nullptr;
+
+		{
+			Token token = ast_node_token(node);
+			token.kind = Token_String;
+			token.string = generated_name;
+
+			AstNode *node = gb_alloc_item(a, AstNode);
+			node->kind = AstNode_Ident;
+			node->Ident.token = token;
+
+			e = make_entity_type_name(a, st->scope->parent, token, named_type);
+			add_entity(c, st->scope->parent, node, e);
+			add_entity_use(c, node, e);
+		}
+
+		named_type->Named.type_name = e;
+
+		if (found_gen_types) {
+			array_add(found_gen_types, e);
+		} else {
+			Array<Entity *> array = {};
+			array_init(&array, heap_allocator());
+			array_add(&array, e);
+			map_set(&c->info.gen_types, hash_pointer(original_type), array);
+		}
+
+		operand->mode = Addressing_Type;
+		operand->type = named_type;
+	}
+	return err;
+}
+
+
 ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
-	GB_ASSERT(call->kind == AstNode_CallExpr);
 	ast_node(ce, CallExpr, call);
 	if (ce->proc != nullptr &&
 	    ce->proc->kind == AstNode_BasicDirective) {
@@ -6170,28 +6552,43 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 
 	if (operand->mode == Addressing_Type) {
 		Type *t = operand->type;
-		gbString str = type_to_string(t);
-		defer (gb_string_free(str));
+		if (is_type_polymorphic_struct(t)) {
+			auto err = check_polymorphic_struct_type(c, operand, call);
+			if (err == 0) {
+				AstNode *ident = operand->expr;
+				while (ident->kind == AstNode_SelectorExpr) {
+					AstNode *s = ident->SelectorExpr.selector;
+					ident = s;
+				}
+				add_entity_use(c, ident, entity_of_ident(&c->info, ident));
+				add_type_and_value(&c->info, call, Addressing_Type, operand->type, empty_exact_value);
+			} else {
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+			}
+		} else {
+			gbString str = type_to_string(t);
+			defer (gb_string_free(str));
 
-		operand->mode = Addressing_Invalid;
-		isize arg_count = ce->args.count;
-		switch (arg_count) {
-		case 0:  error(call, "Missing argument in conversion to `%s`", str);   break;
-		default: error(call, "Too many arguments in conversion to `%s`", str); break;
-		case 1: {
-			AstNode *arg = ce->args[0];
-			if (arg->kind == AstNode_FieldValue) {
-				error(call, "`field = value` cannot be used in a type conversion");
-				arg = arg->FieldValue.value;
-				// NOTE(bill): Carry on the cast regardless
+			operand->mode = Addressing_Invalid;
+			isize arg_count = ce->args.count;
+			switch (arg_count) {
+			case 0:  error(call, "Missing argument in conversion to `%s`", str);   break;
+			default: error(call, "Too many arguments in conversion to `%s`", str); break;
+			case 1: {
+				AstNode *arg = ce->args[0];
+				if (arg->kind == AstNode_FieldValue) {
+					error(call, "`field = value` cannot be used in a type conversion");
+					arg = arg->FieldValue.value;
+					// NOTE(bill): Carry on the cast regardless
+				}
+				check_expr(c, operand, arg);
+				if (operand->mode != Addressing_Invalid) {
+					check_cast(c, operand, t);
+				}
+			} break;
 			}
-			check_expr(c, operand, arg);
-			if (operand->mode != Addressing_Invalid) {
-				check_cast(c, operand, t);
-			}
-		} break;
 		}
-
 		return Expr_Expr;
 	}
 

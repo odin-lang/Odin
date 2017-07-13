@@ -301,6 +301,7 @@ struct CheckerInfo {
 	Map<ExprInfo>         untyped;         // Key: AstNode * | Expression -> ExprInfo
 	Map<Entity *>         implicits;       // Key: AstNode *
 	Map<Array<Entity *> > gen_procs;       // Key: AstNode * | Identifier -> Entity
+	Map<Array<Entity *> > gen_types;       // Key: Type *
 	Map<DeclInfo *>       entities;        // Key: Entity *
 	Map<Entity *>         foreigns;        // Key: String
 	Map<AstFile *>        files;           // Key: String (full path)
@@ -742,6 +743,7 @@ void init_checker_info(CheckerInfo *i) {
 	map_init(&i->foreigns,      a);
 	map_init(&i->implicits,     a);
 	map_init(&i->gen_procs,     a);
+	map_init(&i->gen_types,     a);
 	map_init(&i->type_info_map, a);
 	map_init(&i->files,         a);
 	i->type_info_count = 0;
@@ -758,6 +760,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->foreigns);
 	map_destroy(&i->implicits);
 	map_destroy(&i->gen_procs);
+	map_destroy(&i->gen_types);
 	map_destroy(&i->type_info_map);
 	map_destroy(&i->files);
 }

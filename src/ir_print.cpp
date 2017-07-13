@@ -340,7 +340,7 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 	case Type_Named:
 		if (is_type_struct(t) || is_type_union(t)) {
 			String *name = map_get(&m->entity_names, hash_pointer(t->Named.type_name));
-			GB_ASSERT_MSG(name != nullptr, "%.*s", LIT(t->Named.name));
+			GB_ASSERT_MSG(name != nullptr, "%.*s %p", LIT(t->Named.name), t->Named.type_name);
 			ir_print_encoded_local(f, *name);
 		} else {
 			ir_print_type(f, m, base_type(t));
