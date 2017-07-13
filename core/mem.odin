@@ -29,19 +29,19 @@ compare :: proc(a, b: []u8) -> int #cc_contextless {
 slice_ptr :: proc(ptr: ^$T, len: int) -> []T #cc_contextless {
 	assert(len >= 0);
 	slice := raw.Slice{data = ptr, len = len, cap = len};
-	return ^[]T(&slice)^;
+	return (cast(^[]T)&slice)^;
 }
 slice_ptr :: proc(ptr: ^$T, len, cap: int) -> []T #cc_contextless {
 	assert(0 <= len && len <= cap);
 	slice := raw.Slice{data = ptr, len = len, cap = cap};
-	return ^[]T(&slice)^;
+	return (cast(^[]T)&slice)^;
 }
 
 slice_to_bytes :: proc(slice: []$T) -> []u8 #cc_contextless {
-	s := ^raw.Slice(&slice);
+	s := cast(^raw.Slice)&slice;
 	s.len *= size_of(T);
 	s.cap *= size_of(T);
-	return ^[]u8(s)^;
+	return (cast(^[]u8)s)^;
 }
 
 
@@ -73,7 +73,7 @@ AllocationHeader :: struct {
 
 allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: int) {
 	header.size = size;
-	ptr := ^int(header+1);
+	ptr := cast(^int)(header+1);
 
 	for i := 0; rawptr(ptr) < data; i++ {
 		(ptr+i)^ = -1;
@@ -81,9 +81,9 @@ allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: in
 }
 allocation_header :: proc(data: rawptr) -> ^AllocationHeader {
 	if data == nil do return nil;
-	p := ^int(data);
+	p := cast(^int)data;
 	for (p-1)^ == -1 do p = (p-1);
-	return ^AllocationHeader(p-1);
+	return cast(^AllocationHeader)(p-1);
 }
 
 
@@ -141,7 +141,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator.Mode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int, flags: u64) -> rawptr {
 	using Allocator.Mode;
-	arena := ^Arena(allocator_data);
+	arena := cast(^Arena)allocator_data;
 
 	match mode {
 	case Alloc:

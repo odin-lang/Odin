@@ -823,7 +823,7 @@ void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 
 		Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, is_using, cast(i32)fields->count);
 		e->identifier = name;
-		if (name_token.string == "_") {
+		if (is_blank_ident(name_token)) {
 			array_add(fields, e);
 		} else if (name_token.string == "__tag") {
 			error(name, "`__tag` is a reserved identifier for fields");
@@ -1223,7 +1223,7 @@ void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *nod
 
 
 		// NOTE(bill): Skip blank identifiers
-		if (name == "_") {
+		if (is_blank_ident(name)) {
 			continue;
 		} else if (name == "count") {
 			error(field, "`count` is a reserved identifier for enumerations");
@@ -1331,7 +1331,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 		e->flags |= EntityFlag_BitFieldValue;
 
 		HashKey key = hash_string(name);
-		if (name != "_" &&
+		if (!is_blank_ident(name) &&
 		    map_get(&entity_map, key) != nullptr) {
 			error(ident, "`%.*s` is already declared in this bit field", LIT(name));
 		} else {
@@ -1879,12 +1879,12 @@ Type *check_get_results(Checker *c, Scope *scope, AstNode *_results) {
 
 	for (isize i = 0; i < variable_index; i++) {
 		String x = variables[i]->token.string;
-		if (x.len == 0 || x == "_") {
+		if (x.len == 0 || is_blank_ident(x)) {
 			continue;
 		}
 		for (isize j = i+1; j < variable_index; j++) {
 			String y = variables[j]->token.string;
-			if (y.len == 0 || y == "_") {
+			if (y.len == 0 || is_blank_ident(y)) {
 				continue;
 			}
 			if (x == y) {
@@ -2162,7 +2162,7 @@ Entity *check_ident(Checker *c, Operand *o, AstNode *n, Type *named_type, Type *
 
 	Entity *e = scope_lookup_entity(c->context.scope, name);
 	if (e == nullptr) {
-		if (name == "_") {
+		if (is_blank_ident(name)) {
 			error(n, "`_` cannot be used as a value type");
 		} else {
 			error(n, "Undeclared name: %.*s", LIT(name));
@@ -2603,7 +2603,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 			Type *elem = check_type(c, at->elem, nullptr);
 			i64 count = check_array_or_map_count(c, at->count, false);
 			if (count < 0) {
-				error(at->count, ".. can only be used in conjuction with compound literals");
+				error(at->count, "... can only be used in conjuction with compound literals");
 				count = 0;
 			}
 #if 0
@@ -5735,7 +5735,7 @@ isize lookup_procedure_parameter(TypeProc *pt, String parameter_name) {
 	for (isize i = 0; i < param_count; i++) {
 		Entity *e = pt->params->Tuple.variables[i];
 		String name = e->token.string;
-		if (name == "_") {
+		if (is_blank_ident(name)) {
 			continue;
 		}
 		if (name == parameter_name) {
@@ -5749,7 +5749,7 @@ isize lookup_procedure_result(TypeProc *pt, String result_name) {
 	for (isize i = 0; i < result_count; i++) {
 		Entity *e = pt->results->Tuple.variables[i];
 		String name = e->token.string;
-		if (name == "_") {
+		if (is_blank_ident(name)) {
 			continue;
 		}
 		if (name == result_name) {
@@ -5818,7 +5818,7 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	for (isize i = 0; i < param_count_to_check; i++) {
 		if (!visited[i]) {
 			Entity *e = pt->params->Tuple.variables[i];
-			if (e->token.string == "_") {
+			if (is_blank_ident(e->token)) {
 				continue;
 			}
 			if (e->kind == Entity_Variable) {
@@ -6664,7 +6664,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 					bool all_fields_are_blank = true;
 					for (isize i = 0; i < t->Record.field_count; i++) {
 						Entity *field = t->Record.fields_in_src_order[i];
-						if (field->token.string != "_") {
+						if (!is_blank_ident(field->token)) {
 							all_fields_are_blank = false;
 							break;
 						}
@@ -6682,7 +6682,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						}
 
 						Entity *field = t->Record.fields_in_src_order[index];
-						if (!all_fields_are_blank && field->token.string == "_") {
+						if (!all_fields_are_blank && is_blank_ident(field->token)) {
 							// NOTE(bill): Ignore blank identifiers
 							continue;
 						}
@@ -7599,9 +7599,7 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 			if (field->names.count == 0) {
 				continue;
 			}
-			AstNode *name = field->names[0];
-			ast_node(n, Ident, name);
-			if (n->token.string != "_") {
+			if (!is_blank_ident(field->names[0])) {
 				has_name = true;
 				break;
 			}

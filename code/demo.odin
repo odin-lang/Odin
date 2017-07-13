@@ -219,7 +219,7 @@ call_location :: proc() {
 
 explicit_parametric_polymorphic_procedures :: proc() {
 	// This is how `new` is actually implemented, see _preload.odin
-	alloc_type :: proc(T: type) -> ^T do return ^T(alloc(size_of(T), align_of(T)));
+	alloc_type :: proc(T: type) -> ^T do return cast(^T)alloc(size_of(T), align_of(T));
 
 	int_ptr := alloc_type(int);
 	defer free(int_ptr);
@@ -340,7 +340,7 @@ explicit_parametric_polymorphic_procedures :: proc() {
 			result.x = x;
 			result.y = y;
 
-			return ^T(&result.variant);
+			return cast(^T)&result.variant;
 		}
 
 		entities: [dynamic]^Entity;
@@ -386,6 +386,7 @@ implicit_polymorphic_assignment :: proc() {
 
 
 main :: proc() {
+/*
 	foo :: proc(x: i64,  y: f32) do fmt.println("#1", x, y);
 	foo :: proc(x: type, y: f32) do fmt.println("#2", type_info(x), y);
 	foo :: proc(x: type)         do fmt.println("#3", type_info(x));
@@ -408,7 +409,7 @@ main :: proc() {
 
 	// Command line argument(s)!
 	// -opt=0,1,2,3
-
+*/
 /*
 	program := "+ + * - /";
 	accumulator := 0;

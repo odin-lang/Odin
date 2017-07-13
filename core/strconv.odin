@@ -191,7 +191,7 @@ parse_f64 :: proc(s: string) -> f64 {
 
 append_bool :: proc(buf: []u8, b: bool) -> string {
 	s := b ? "true" : "false";
-	append(&buf, ...[]u8(s));
+	append(&buf, ...cast([]u8)s);
 	return string(buf);
 }
 
@@ -257,7 +257,7 @@ generic_ftoa :: proc(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 
 		} else {
 			s = "+Inf";
 		}
-		append(&buf, ...[]u8(s));
+		append(&buf, ...cast([]u8)s);
 		return buf;
 
 	case 0: // denormalized

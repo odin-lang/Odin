@@ -653,13 +653,6 @@ Type *ir_type(irValue *value) {
 }
 
 
-bool ir_is_blank_ident(AstNode *node) {
-	if (node->kind == AstNode_Ident) {
-		ast_node(i, Ident, node);
-		return is_blank_ident(i->token.string);
-	}
-	return false;
-}
 
 
 irInstr *ir_get_last_instr(irBlock *block) {
@@ -5001,7 +4994,7 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 	case_end;
 
 	case_ast_node(i, Ident, expr);
-		if (ir_is_blank_ident(expr)) {
+		if (is_blank_ident(expr)) {
 			irAddr val = {};
 			return val;
 		}
@@ -5614,6 +5607,15 @@ irAddr ir_build_addr(irProcedure *proc, AstNode *expr) {
 
 		return ir_addr(v);
 	case_end;
+
+	case_ast_node(tc, TypeCast, expr);
+		Type *type = type_of_expr(proc->module->info, expr);
+		irValue *x = ir_build_expr(proc, tc->expr);
+		irValue *e = ir_emit_conv(proc, x, type);
+		irValue *v = ir_add_local_generated(proc, type);
+		ir_emit_store(proc, v, e);
+		return ir_addr(v);
+	case_end;
 	}
 
 	TokenPos token_pos = ast_node_token(expr).pos;
@@ -6143,7 +6145,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			if (vd->values.count == 0) { // declared and zero-initialized
 				for_array(i, vd->names) {
 					AstNode *name = vd->names[i];
-					if (!ir_is_blank_ident(name)) {
+					if (!is_blank_ident(name)) {
 						ir_add_local_for_identifier(proc, name, true);
 					}
 				}
@@ -6156,7 +6158,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 				for_array(i, vd->names) {
 					AstNode *name = vd->names[i];
 					irAddr lval = ir_addr(nullptr);
-					if (!ir_is_blank_ident(name)) {
+					if (!is_blank_ident(name)) {
 						ir_add_local_for_identifier(proc, name, false);
 						lval = ir_build_addr(proc, name);
 					}
@@ -6200,7 +6202,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 			for_array(i, as->lhs) {
 				AstNode *lhs = as->lhs[i];
 				irAddr lval = {};
-				if (!ir_is_blank_ident(lhs)) {
+				if (!is_blank_ident(lhs)) {
 					lval = ir_build_addr(proc, lhs);
 				}
 				array_add(&lvals, lval);
@@ -6498,10 +6500,10 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 
 		Type *val_type = nullptr;
 		Type *idx_type = nullptr;
-		if (rs->value != nullptr && !ir_is_blank_ident(rs->value)) {
+		if (rs->value != nullptr && !is_blank_ident(rs->value)) {
 			val_type = type_of_expr(proc->module->info, rs->value);
 		}
-		if (rs->index != nullptr && !ir_is_blank_ident(rs->index)) {
+		if (rs->index != nullptr && !is_blank_ident(rs->index)) {
 			idx_type = type_of_expr(proc->module->info, rs->index);
 		}
 
@@ -7073,8 +7075,7 @@ void ir_begin_procedure_body(irProcedure *proc) {
 			}
 
 			Type *abi_type = proc->type->Proc.abi_compat_params[i];
-			if (e->token.string != "" &&
-			    e->token.string != "_") {
+			if (e->token.string != "" && !is_blank_ident(e->token)) {
 				irValue *param = ir_add_param(proc, e, name, abi_type);
 				array_add(&proc->params, param);
 			}

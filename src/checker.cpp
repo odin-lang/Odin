@@ -979,7 +979,7 @@ void add_type_and_value(CheckerInfo *i, AstNode *expression, AddressingMode mode
 void add_entity_definition(CheckerInfo *i, AstNode *identifier, Entity *entity) {
 	GB_ASSERT(identifier != nullptr);
 	if (identifier->kind == AstNode_Ident) {
-		if (identifier->Ident.token.string == "_") {
+		if (is_blank_ident(identifier)) {
 			return;
 		}
 		HashKey key = hash_node(identifier);
@@ -994,7 +994,7 @@ bool add_entity(Checker *c, Scope *scope, AstNode *identifier, Entity *entity) {
 		return false;
 	}
 	String name = entity->token.string;
-	if (name != "_") {
+	if (!is_blank_ident(name)) {
 		Entity *ie = scope_insert_entity(scope, entity);
 		if (ie) {
 			TokenPos pos = ie->token.pos;
@@ -2202,7 +2202,7 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 			}
 		} else {
 			String import_name = path_to_entity_name(id->import_name.string, id->fullpath);
-			if (import_name == "_") {
+			if (is_blank_ident(import_name)) {
 				error(token, "File name, %.*s, cannot be as an import name as it is not a valid identifier", LIT(id->import_name.string));
 			} else {
 				GB_ASSERT(id->import_name.pos.line != 0);
@@ -2254,7 +2254,7 @@ void check_import_entities(Checker *c, Map<Scope *> *file_scopes) {
 
 
 		String library_name = path_to_entity_name(fl->library_name.string, file_str);
-		if (library_name == "_") {
+		if (is_blank_ident(library_name)) {
 			error(spec, "File name, %.*s, cannot be as a library name as it is not a valid identifier", LIT(fl->library_name.string));
 		} else {
 			GB_ASSERT(fl->library_name.pos.line != 0);

@@ -365,7 +365,7 @@ void init_entity_foreign_library(Checker *c, Entity *e) {
 		String name = ident->Ident.token.string;
 		Entity *found = scope_lookup_entity(c->context.scope, name);
 		if (found == nullptr) {
-			if (name == "_") {
+			if (is_blank_ident(name)) {
 				error(ident, "`_` cannot be used as a value type");
 			} else {
 				error(ident, "Undeclared name: %.*s", LIT(name));

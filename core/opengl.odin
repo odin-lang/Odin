@@ -120,7 +120,7 @@ get_proc_address :: proc(name: string) -> rawptr {
 
 init :: proc() {
 	set_proc_address :: proc(p: rawptr, name: string) #inline {
-		x := ^rawptr(p);
+		x := cast(^rawptr)p;
 		x^ = get_proc_address(name);
 	}
 

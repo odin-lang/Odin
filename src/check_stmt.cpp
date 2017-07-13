@@ -186,8 +186,7 @@ Type *check_assignment_variable(Checker *c, Operand *rhs, AstNode *lhs_node) {
 	AstNode *node = unparen_expr(lhs_node);
 
 	// NOTE(bill): Ignore assignments to `_`
-	if (node->kind == AstNode_Ident &&
-	    node->Ident.token.string == "_") {
+	if (is_blank_ident(node)) {
 		add_entity_definition(&c->info, node, nullptr);
 		check_assignment(c, rhs, nullptr, str_lit("assignment to `_` identifier"));
 		if (rhs->mode == Addressing_Invalid) {
@@ -429,7 +428,7 @@ void check_label(Checker *c, AstNode *label) {
 		return;
 	}
 	String name = l->name->Ident.token.string;
-	if (name == "_") {
+	if (is_blank_ident(name)) {
 		error(l->name, "A label's name cannot be a blank identifier");
 		return;
 	}
@@ -884,7 +883,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			for (isize i = 0; i < result_count; i++) {
 				if (!visited[i]) {
 					Entity *e = pt->results->Tuple.variables[i];
-					if (e->token.string == "_") {
+					if (is_blank_ident(e->token)) {
 						continue;
 					}
 					GB_ASSERT(e->kind == Entity_Variable);
@@ -1133,7 +1132,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 				String str = token.string;
 				Entity *found = nullptr;
 
-				if (str != "_") {
+				if (!is_blank_ident(str)) {
 					found = current_scope_lookup_entity(c->context.scope, str);
 				}
 				if (found == nullptr) {
@@ -1686,7 +1685,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 					String str = token.string;
 					Entity *found = nullptr;
 					// NOTE(bill): Ignore assignments to `_`
-					if (str != "_") {
+					if (!is_blank_ident(str)) {
 						found = current_scope_lookup_entity(c->context.scope, str);
 					}
 					if (found == nullptr) {

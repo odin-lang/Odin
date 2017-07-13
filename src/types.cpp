@@ -1476,7 +1476,7 @@ Entity *current_scope_lookup_entity(Scope *s, String name);
 Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_name, bool is_type, Selection sel) {
 	GB_ASSERT(type_ != nullptr);
 
-	if (field_name == "_") {
+	if (is_blank_ident(field_name)) {
 		return empty_selection;
 	}
 

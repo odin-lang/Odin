@@ -5,7 +5,7 @@ import_load (
 )
 
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
-	return write(fd, []u8(str));
+	return write(fd, cast([]u8)str);
 }
 
 read_entire_file :: proc(name: string) -> ([]u8, bool) {

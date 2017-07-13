@@ -1580,8 +1580,7 @@ void ir_print_proc(irFileBuffer *f, irModule *m, irProcedure *proc) {
 					ir_fprintf(f, " noalias");
 				}
 				if (proc->body != nullptr) {
-					if (e->token.string != "" &&
-					    e->token.string != "_") {
+					if (e->token.string != "" && !is_blank_ident(e->token)) {
 						ir_fprintf(f, " ");
 						ir_print_encoded_local(f, e->token.string);
 					} else {

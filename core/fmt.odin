@@ -55,7 +55,7 @@ to_string :: proc(buf: StringBuffer) -> string {
 
 
 write_string :: proc(buf: ^StringBuffer, s: string) {
-	write_bytes(buf, []u8(s));
+	write_bytes(buf, cast([]u8)s);
 }
 write_bytes :: proc(buf: ^StringBuffer, data: []u8) {
 	match b in buf {
@@ -747,7 +747,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 				if t := b.types[i]; types.is_any(t) {
 					write_string(fi.buf, "any{}");
 				} else {
-					data := ^u8(v.data) + b.offsets[i];
+					data := cast(^u8)v.data + b.offsets[i];
 					fmt_arg(fi, any{rawptr(data), t}, 'v');
 				}
 			}
@@ -766,9 +766,9 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 
 	case Pointer:
 		if v.type_info == type_info(^TypeInfo) {
-			write_type(fi.buf, ^^TypeInfo(v.data)^);
+			write_type(fi.buf, (cast(^^TypeInfo)v.data)^);
 		} else {
-			fmt_pointer(fi, ^rawptr(v.data)^, verb);
+			fmt_pointer(fi, (cast(^rawptr)v.data)^, verb);
 		}
 
 	case Atomic:
@@ -780,25 +780,25 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		for i in 0..info.count {
 			if i > 0 do write_string(fi.buf, ", ");
 
-			data := ^u8(v.data) + i*info.elem_size;
+			data := cast(^u8)v.data + i*info.elem_size;
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
 		}
 
 	case DynamicArray:
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
-		array := ^raw.DynamicArray(v.data);
+		array := cast(^raw.DynamicArray)v.data;
 		for i in 0..array.len {
 			if i > 0 do write_string(fi.buf, ", ");
 
-			data := ^u8(array.data) + i*info.elem_size;
+			data := cast(^u8)array.data + i*info.elem_size;
 			fmt_arg(fi, any{rawptr(data), info.elem}, verb);
 		}
 
 	case Slice:
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
-		slice := ^[]u8(v.data);
+		slice := cast(^[]u8)v.data;
 		for _, i in slice {
 			if i > 0 do write_string(fi.buf, ", ");
 
@@ -813,7 +813,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		for i in 0..info.count {
 			if i > 0 do write_string(fi.buf, ", ");
 
-			data := ^u8(v.data) + i*info.elem_size;
+			data := cast(^u8)v.data + i*info.elem_size;
 			fmt_value(fi, any{rawptr(data), info.elem}, verb);
 		}
 
@@ -826,7 +826,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		write_string(fi.buf, "map[");
 		defer write_byte(fi.buf, ']');
 
-		entries    := &(^raw.DynamicMap(v.data).entries);
+		entries    := &((cast(^raw.DynamicMap)v.data).entries);
 		gs         := type_info_base(info.generated_struct).variant.(Struct);
 		ed         := type_info_base(gs.types[1]).variant.(DynamicArray);
 		entry_type := ed.elem.variant.(Struct);
@@ -835,8 +835,8 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 		for i in 0..entries.len {
 			if i > 0 do write_string(fi.buf, ", ");
 
-			data := ^u8(entries.data) + i*entry_size;
-			header := ^__MapEntryHeader(data);
+			data := cast(^u8)entries.data + i*entry_size;
+			header := cast(^__MapEntryHeader)data;
 
 			if types.is_string(info.key) {
 				write_string(fi.buf, header.key.str);
@@ -866,7 +866,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			if t := info.types[i]; types.is_any(t) {
 				write_string(fi.buf, "any{}");
 			} else {
-				data := ^u8(v.data) + info.offsets[i];
+				data := cast(^u8)v.data + info.offsets[i];
 				fmt_arg(fi, any{rawptr(data), t}, 'v');
 			}
 		}
@@ -883,7 +883,7 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 	case Procedure:
 		write_type(fi.buf, v.type_info);
 		write_string(fi.buf, " @ ");
-		fmt_pointer(fi, ^rawptr(v.data)^, 'p');
+		fmt_pointer(fi, (cast(^rawptr)v.data)^, 'p');
 	}
 }
 
