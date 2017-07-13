@@ -417,7 +417,7 @@ __get_map_header :: proc(m: ^map[$K]$V) -> __MapHeader #cc_contextless {
 		value: V;
 	}
 
-	_, is_string := type_info_base(type_info(K)).(^TypeInfo.String);
+	_, is_string := type_info_base(type_info(K)).variant.(TypeInfo.String);
 	header.is_key_string = is_string;
 	header.entry_size    = size_of(Entry);
 	header.entry_align   = align_of(Entry);

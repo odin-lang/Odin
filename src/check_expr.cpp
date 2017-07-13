@@ -6980,7 +6980,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			if (!ok) {
 				gbString expr_str = expr_to_string(o->expr);
 				gbString dst_type_str = type_to_string(t);
-				error(o->expr, "Cannot type assert `%s` to `%s`", expr_str, dst_type_str);
+				error(o->expr, "Cannot type assert `%s` to `%s` as it is not a variant of that union", expr_str, dst_type_str);
 				gb_string_free(dst_type_str);
 				gb_string_free(expr_str);
 				o->mode = Addressing_Invalid;
@@ -7000,7 +7000,9 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			add_type_info_type(c, o->type);
 			add_type_info_type(c, t);
 		} else {
-			error(o->expr, "Type assertions can only operate on unions and `any`");
+			gbString str = type_to_string(o->type);
+			error(o->expr, "Type assertions can only operate on unions and `any`, got %s", str);
+			gb_string_free(str);
 			o->mode = Addressing_Invalid;
 			o->expr = node;
 			return kind;
