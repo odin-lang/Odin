@@ -379,6 +379,7 @@ AST_NODE_KIND(_DeclEnd,   "", i32) \
 AST_NODE_KIND(_TypeBegin, "", i32) \
 	AST_NODE_KIND(TypeType, "type", struct { \
 		Token token; \
+		AstNode *specialization; \
 	}) \
 	AST_NODE_KIND(HelperType, "helper type", struct { \
 		Token token; \
@@ -387,6 +388,7 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 	AST_NODE_KIND(PolyType, "polymorphic type", struct { \
 		Token    token; \
 		AstNode *type;  \
+		AstNode *specialization;  \
 	}) \
 	AST_NODE_KIND(ProcType, "procedure type", struct { \
 		Token    token;   \
@@ -1390,9 +1392,10 @@ AstNode *ast_union_field(AstFile *f, AstNode *name, AstNode *list) {
 }
 
 
-AstNode *ast_type_type(AstFile *f, Token token) {
+AstNode *ast_type_type(AstFile *f, Token token, AstNode *specialization) {
 	AstNode *result = make_ast_node(f, AstNode_TypeType);
 	result->TypeType.token = token;
+	result->TypeType.specialization = specialization;
 	return result;
 }
 
@@ -1404,10 +1407,11 @@ AstNode *ast_helper_type(AstFile *f, Token token, AstNode *type) {
 }
 
 
-AstNode *ast_poly_type(AstFile *f, Token token, AstNode *type) {
+AstNode *ast_poly_type(AstFile *f, Token token, AstNode *type, AstNode *specialization) {
 	AstNode *result = make_ast_node(f, AstNode_PolyType);
 	result->PolyType.token = token;
 	result->PolyType.type   = type;
+	result->PolyType.specialization = specialization;
 	return result;
 }
 
@@ -2359,7 +2363,11 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	case Token_Dollar: {
 		Token token = expect_token(f, Token_Dollar);
 		AstNode *type = parse_ident(f);
-		return ast_poly_type(f, token, type);
+		AstNode *specialization = nullptr;
+		if (allow_token(f, Token_Quo)) {
+			specialization = parse_type(f);
+		}
+		return ast_poly_type(f, token, type, specialization);
 	} break;
 
 	case Token_type_of: {
@@ -3481,7 +3489,12 @@ AstNode *parse_var_type(AstFile *f, bool allow_ellipsis, bool allow_type_token) 
 	AstNode *type = nullptr;
 	if (allow_type_token &&
 	    f->curr_token.kind == Token_type) {
-		type = ast_type_type(f, expect_token(f, Token_type));
+		Token token = expect_token(f, Token_type);
+		AstNode *specialization = nullptr;
+		if (allow_token(f, Token_Quo)) {
+			specialization = parse_type(f);
+		}
+		type = ast_type_type(f, token, specialization);
 	} else {
 		type = parse_type_attempt(f);
 	}

@@ -95,7 +95,9 @@ struct TypeRecord {
 	bool     is_packed;
 	bool     is_ordered;
 	bool     is_polymorphic;
+	bool     is_poly_specialized;
 	Type *   polymorphic_params; // Type_Tuple
+	Type *   polymorphic_parent;
 
 	i64      custom_align; // NOTE(bill): Only used in structs at the moment
 	Entity * names;
@@ -103,7 +105,11 @@ struct TypeRecord {
 
 #define TYPE_KINDS                                        \
 	TYPE_KIND(Basic,   BasicType)                         \
-	TYPE_KIND(Generic, struct{ i64 id; String name; })    \
+	TYPE_KIND(Generic, struct {                           \
+		i64    id;                                        \
+		String name;                                      \
+		Type * specific;                                  \
+	})                                                    \
 	TYPE_KIND(Pointer, struct { Type *elem; })            \
 	TYPE_KIND(Atomic,  struct { Type *elem; })            \
 	TYPE_KIND(Array,   struct { Type *elem; i64 count; }) \
@@ -480,10 +486,11 @@ Type *make_type_basic(gbAllocator a, BasicType basic) {
 	return t;
 }
 
-Type *make_type_generic(gbAllocator a, i64 id, String name) {
+Type *make_type_generic(gbAllocator a, i64 id, String name, Type *specific) {
 	Type *t = alloc_type(a, Type_Generic);
 	t->Generic.id = id;
 	t->Generic.name = name;
+	t->Generic.specific = specific;
 	return t;
 }
 
@@ -948,10 +955,23 @@ bool is_type_polymorphic_struct(Type *t) {
 	return false;
 }
 
+bool is_type_polymorphic_struct_specialized(Type *t) {
+	t = base_type(t);
+	if (t->kind == Type_Record &&
+	    t->Record.kind == TypeRecord_Struct) {
+		return t->Record.is_polymorphic && t->Record.is_poly_specialized;
+	}
+	return false;
+}
+
+
 bool is_type_polymorphic(Type *t) {
 	switch (t->kind) {
 	case Type_Generic:
 		return true;
+
+	case Type_Named:
+		return is_type_polymorphic_struct(t->Named.base);
 
 	case Type_Pointer:
 		return is_type_polymorphic(t->Pointer.elem);
@@ -2271,6 +2291,10 @@ gbString write_type_to_string(gbString str, Type *type) {
 			String name = type->Generic.name;
 			str = gb_string_appendc(str, "$");
 			str = gb_string_append_length(str, name.text, name.len);
+			if (type->Generic.specific != nullptr) {
+				str = gb_string_appendc(str, "/");
+				str = write_type_to_string(str, type->Generic.specific);
+			}
 		}
 		break;
 

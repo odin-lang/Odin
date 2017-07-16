@@ -3670,7 +3670,18 @@ void ir_pop_target_list(irProcedure *proc) {
 void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	if (e->type == nullptr) return;
 
-	if (is_type_polymorphic(base_type(e->type))) {
+
+	Type *bt = base_type(e->type);
+
+	bool is_poly = is_type_polymorphic(bt);
+	if (!is_poly) {
+		if (bt->kind == Type_Record &&
+		    bt->Record.is_polymorphic &&
+		    !bt->Record.is_poly_specialized) {
+			is_poly = true;
+		}
+	}
+	if (is_poly) {
 		auto found = map_get(&m->info->gen_types, hash_pointer(e->type));
 		if (found == nullptr) {
 			return;
@@ -3696,7 +3707,6 @@ void ir_gen_global_type_name(irModule *m, Entity *e, String name) {
 	}
 	#endif
 
-	Type *bt = base_type(e->type);
 	if (bt->kind == Type_Record) {
 		Scope *s = bt->Record.scope;
 		if (s != nullptr) {
@@ -7503,14 +7513,23 @@ void ir_gen_tree(irGen *s) {
 			continue;
 		}
 
-		if (map_get(&m->min_dep_map, hash_entity(e)) == nullptr) {
+
+		bool polymorphic_struct = false;
+		if (e->type != nullptr && e->kind == Entity_TypeName) {
+			Type *bt = base_type(e->type);
+			if (bt->kind == Type_Record) {
+				polymorphic_struct = bt->Record.is_polymorphic;
+			}
+		}
+
+		if (!polymorphic_struct && map_get(&m->min_dep_map, hash_entity(e)) == nullptr) {
 			// NOTE(bill): Nothing depends upon it so doesn't need to be built
 			continue;
 		}
 
 		String original_name = name;
 
-		if (!scope->is_global || is_type_polymorphic(e->type)) {
+		if (!scope->is_global || polymorphic_struct || is_type_polymorphic(e->type)) {
 			if (e->kind == Entity_Procedure && (e->Procedure.tags & ProcTag_export) != 0) {
 			} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len > 0) {
 				// Handle later

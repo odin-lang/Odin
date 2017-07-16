@@ -990,6 +990,9 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 
 	Type *polymorphic_params = nullptr;
 	bool is_polymorphic = false;
+	bool can_check_fields = true;
+	bool is_poly_specialized = false;
+
 	if (st->polymorphic_params != nullptr) {
 		ast_node(field_list, FieldList, st->polymorphic_params);
 		Array<AstNode *> params = field_list->list;
@@ -1026,7 +1029,18 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 				}
 				if (type_expr->kind == AstNode_TypeType) {
 					is_type_param = true;
-					type = make_type_generic(c->allocator, 0, str_lit(""));
+					Type *specialization = nullptr;
+					if (type_expr->TypeType.specialization != nullptr) {
+						AstNode *s = type_expr->TypeType.specialization;
+						specialization = check_type(c, s);
+						if (!is_type_polymorphic_struct(specialization)) {
+							gbString str = type_to_string(specialization);
+							defer (gb_string_free(str));
+							error(s, "Expected a polymorphic record, got %s", str);
+							specialization = nullptr;
+						}
+					}
+					type = make_type_generic(c->allocator, 0, str_lit(""), specialization);
 				} else {
 					type = check_type(c, type_expr);
 					if (is_type_polymorphic(type)) {
@@ -1074,6 +1088,10 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 						Operand operand = (*poly_operands)[entities.count];
 						if (is_type_param) {
 							GB_ASSERT(operand.mode == Addressing_Type);
+							if (is_type_polymorphic(base_type(operand.type))) {
+								is_polymorphic = true;
+								can_check_fields = false;
+							}
 							e = make_entity_type_name(c->allocator, scope, token, operand.type);
 							e->TypeName.is_type_alias = true;
 						} else {
@@ -1104,7 +1122,19 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 		}
 	}
 
-	is_polymorphic = polymorphic_params != nullptr && poly_operands == nullptr;
+	if (!is_polymorphic) {
+		is_polymorphic = polymorphic_params != nullptr && poly_operands == nullptr;
+	}
+	if (poly_operands != nullptr) {
+		is_poly_specialized = true;
+		for (isize i = 0; i < poly_operands->count; i++) {
+			Operand o = (*poly_operands)[i];
+			if (is_type_polymorphic(o.type)) {
+				is_poly_specialized = false;
+				break;
+			}
+		}
+	}
 
 	Array<Entity *> fields = {};
 
@@ -1120,6 +1150,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 	struct_type->Record.field_count         = fields.count;
 	struct_type->Record.polymorphic_params  = polymorphic_params;
 	struct_type->Record.is_polymorphic      = is_polymorphic;
+	struct_type->Record.is_poly_specialized = is_poly_specialized;
 
 
 	type_set_offsets(c->allocator, struct_type);
@@ -1514,6 +1545,21 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 	}
 }
 
+bool is_polymorphic_type_assignable_to_specific(Checker *c, Type *source, Type *specific) {
+	if (!is_type_struct(specific)) {
+		return false;
+	}
+
+	if (!is_type_struct(source)) {
+		return false;
+	}
+
+	source = base_type(source);
+	GB_ASSERT(source->kind == Type_Record && source->Record.kind == TypeRecord_Struct);
+
+	return are_types_identical(source->Record.polymorphic_parent, specific);
+}
+
 bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool compound, bool modify_type) {
 	Operand o = {Addressing_Value};
 	o.type = source;
@@ -1527,6 +1573,12 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 		return check_is_assignable_to(c, &o, poly);
 
 	case Type_Generic: {
+		if (poly->Generic.specific != nullptr) {
+			Type *s = poly->Generic.specific;
+			if (!is_polymorphic_type_assignable_to_specific(c, source, s)) {
+				return false;
+			}
+		}
 		if (modify_type) {
 			Type *ds = default_type(source);
 			gb_memmove(poly, ds, gb_size_of(Type));
@@ -1661,12 +1713,37 @@ Type *determine_type_from_polymorphic(Checker *c, Type *poly_type, Operand opera
 		gbString ots = type_to_string(operand.type);
 		defer (gb_string_free(pts));
 		defer (gb_string_free(ots));
-		error(operand.expr,
-		      "Cannot determine polymorphic type from parameter: `%s` to `%s`\n"
-		      "\tNote: Record and procedure types are not yet supported",
-		      ots, pts);
+		error(operand.expr, "Cannot determine polymorphic type from parameter: `%s` to `%s`", ots, pts);
 	}
 	return t_invalid;
+}
+
+bool check_type_specialization_to(Checker *c, Type *type, Type *specialization) {
+	if (type == nullptr ||
+	    type == t_invalid) {
+		return true;
+	}
+
+	Type *t = base_type(type);
+	Type *s = base_type(specialization);
+	if (t->kind != s->kind) {
+		return false;
+	}
+	// gb_printf_err("#1 %s %s\n", type_to_string(type), type_to_string(specialization));
+	if (t->kind != Type_Record) {
+		return false;
+	}
+	// gb_printf_err("#2 %s %s\n", type_to_string(type), type_to_string(specialization));
+	if (t->Record.polymorphic_parent == specialization) {
+		return true;
+	}
+	// gb_printf_err("#3 %s %s\n", type_to_string(t->Record.polymorphic_parent), type_to_string(specialization));
+	if (t->Record.polymorphic_parent == s->Record.polymorphic_parent) {
+		return true;
+	}
+
+
+	return false;
 }
 
 Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_variadic_, bool *success_, Array<Operand> *operands) {
@@ -1720,6 +1797,7 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 		bool is_type_param = false;
 		bool is_type_polymorphic_type = false;
 		bool detemine_type_from_operand = false;
+		Type *specialization = nullptr;
 
 
 		if (type_expr == nullptr) {
@@ -1752,12 +1830,25 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 				}
 			}
 			if (type_expr->kind == AstNode_TypeType) {
+				ast_node(tt, TypeType, type_expr);
 				is_type_param = true;
+				specialization = check_type(c, tt->specialization);
+				if (specialization == t_invalid){
+					specialization = nullptr;
+				}
+				if (specialization) {
+					if (!is_type_polymorphic(specialization)) {
+						gbString str = type_to_string(specialization);
+						error(tt->specialization, "Type specialization requires a polymorphic type, got %s", str);
+						gb_string_free(str);
+					}
+				}
+
 				if (operands != nullptr) {
 					detemine_type_from_operand = true;
 					type = t_invalid;
 				} else {
-					type = make_type_generic(c->allocator, 0, str_lit(""));
+					type = make_type_generic(c->allocator, 0, str_lit(""), specialization);
 				}
 			} else {
 				bool prev = c->context.allow_polymorphic_types;
@@ -1843,6 +1934,18 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 							error(o.expr, "Expected a type to assign to the type parameter");
 						}
 						success = false;
+						type = t_invalid;
+					}
+					if (is_type_polymorphic_struct(type)) {
+						error(o.expr, "Cannot pass polymorphic struct as a parameter");
+						type = t_invalid;
+					}
+					if (specialization != nullptr && !check_type_specialization_to(c, type, specialization)) {
+						gbString t = type_to_string(type);
+						gbString s = type_to_string(specialization);
+						error(o.expr, "Cannot convert type `%s` to the specialization `%s`", t, s);
+						gb_string_free(s);
+						gb_string_free(t);
 						type = t_invalid;
 					}
 				}
@@ -2654,7 +2757,18 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		}
 
 		Token token = ident->Ident.token;
-		Type *t = make_type_generic(c->allocator, 0, token.string);
+		Type *specific = nullptr;
+		if (pt->specialization != nullptr) {
+			AstNode *s = pt->specialization;
+			specific = check_type(c, s);
+			if (!is_type_polymorphic_struct(specific)) {
+				gbString str = type_to_string(specific);
+				error(s, "Expected a polymorphic record, got %s", str);
+				gb_string_free(str);
+				specific = nullptr;
+			}
+		}
+		Type *t = make_type_generic(c->allocator, 0, token.string, specific);
 		if (c->context.allow_polymorphic_types) {
 			Scope *ps = c->context.polymorphic_scope;
 			Scope *s = c->context.scope;
@@ -6259,6 +6373,7 @@ isize lookup_polymorphic_struct_parameter(TypeRecord *st, String parameter_name)
 	return -1;
 }
 
+
 CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, AstNode *call) {
 	ast_node(ce, CallExpr, call);
 
@@ -6413,7 +6528,11 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 		err = CallArgumentError_TooFewArguments;
 	}
 
-	if (err == 0) {
+	if (err != 0) {
+		return err;
+	}
+
+	{
 		// TODO(bill): Check for previous types
 		gbAllocator a = c->allocator;
 
@@ -6462,6 +6581,7 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 		check_struct_type(c, struct_type, node, &ordered_operands);
 		check_close_scope(c);
 		struct_type->Record.node = node;
+		struct_type->Record.polymorphic_parent = original_type;
 
 		Entity *e = nullptr;
 
@@ -6481,13 +6601,15 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 
 		named_type->Named.type_name = e;
 
-		if (found_gen_types) {
-			array_add(found_gen_types, e);
-		} else {
-			Array<Entity *> array = {};
-			array_init(&array, heap_allocator());
-			array_add(&array, e);
-			map_set(&c->info.gen_types, hash_pointer(original_type), array);
+		if (!struct_type->Record.is_polymorphic) {
+			if (found_gen_types) {
+				array_add(found_gen_types, e);
+			} else {
+				Array<Entity *> array = {};
+				array_init(&array, heap_allocator());
+				array_add(&array, e);
+				map_set(&c->info.gen_types, hash_pointer(original_type), array);
+			}
 		}
 
 		operand->mode = Addressing_Type;
