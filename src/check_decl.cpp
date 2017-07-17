@@ -60,7 +60,9 @@ Type *check_init_variable(Checker *c, Entity *e, Operand *operand, String contex
 			t = default_type(t);
 		}
 		if (is_type_polymorphic(t)) {
-			error(e->token, "Invalid use of a polymorphic type in %.*s", LIT(context_name));
+			gbString str = type_to_string(t);
+			defer (gb_string_free(str));
+			error(e->token, "Invalid use of a polymorphic type `%s` in %.*s", str, LIT(context_name));
 			e->type = t_invalid;
 			return nullptr;
 		}
@@ -400,16 +402,15 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	check_open_scope(c, pl->type);
 	defer (check_close_scope(c));
 
-	#if 0
-	if (e->token.string == "sort") {
-		gb_printf_err("%.*s\n", LIT(e->token.string));
-	}
-	#endif
+
+
 
 	auto prev_context = c->context;
 	c->context.allow_polymorphic_types = true;
 	check_procedure_type(c, proc_type, pl->type);
 	c->context = prev_context;
+
+	TypeProc *pt = &proc_type->Proc;
 
 	bool is_foreign         = (pl->tags & ProcTag_foreign)   != 0;
 	bool is_link_name       = (pl->tags & ProcTag_link_name) != 0;
@@ -419,7 +420,6 @@ void check_proc_decl(Checker *c, Entity *e, DeclInfo *d) {
 	bool is_require_results = (pl->tags & ProcTag_require_results) != 0;
 
 
-	TypeProc *pt = &proc_type->Proc;
 
 	if (d->scope->is_file && e->token.string == "main") {
 		if (pt->param_count != 0 ||
@@ -559,7 +559,9 @@ void check_var_decl(Checker *c, Entity *e, Entity **entities, isize entity_count
 		e->type = check_type(c, type_expr);
 	}
 	if (e->type != nullptr && is_type_polymorphic(base_type(e->type))) {
-		error(e->token, "Invalid use of a polymorphic type in %.*s", LIT(context_name));
+		gbString str = type_to_string(e->type);
+		defer (gb_string_free(str));
+		error(e->token, "Invalid use of a polymorphic type `%s` in %.*s", str, LIT(context_name));
 		e->type = t_invalid;
 	}
 

@@ -2215,6 +2215,9 @@ AstNode *convert_stmt_to_body(AstFile *f, AstNode *stmt) {
 		syntax_error(stmt, "Expected a normal statement rather than a block statement");
 		return stmt;
 	}
+	if (stmt->kind == AstNode_EmptyStmt) {
+		syntax_error(stmt, "Expected a non-empty statement");
+	}
 	GB_ASSERT(is_ast_node_stmt(stmt) || is_ast_node_decl(stmt));
 	Token open = ast_node_token(stmt);
 	Token close = ast_node_token(stmt);

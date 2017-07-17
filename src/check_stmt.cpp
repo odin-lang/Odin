@@ -1608,15 +1608,20 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			Entity *e = nullptr;
 
 			bool is_selector = false;
-			if (expr->kind == AstNode_Ident) {
-				Operand o = {};
+			Operand o = {};
+			switch (expr->kind) {
+			case AstNode_Ident:
 				e = check_ident(c, &o, expr, nullptr, nullptr, true);
-			} else if (expr->kind == AstNode_SelectorExpr) {
-				Operand o = {};
+				break;
+			case AstNode_SelectorExpr:
 				e = check_selector(c, &o, expr, nullptr);
 				is_selector = true;
-			} else if (expr->kind == AstNode_Implicit) {
+				break;
+			case AstNode_Implicit:
 				error(us->token, "`using` applied to an implicit value");
+				continue;
+			default:
+				error(us->token, "`using` can only be applied to an entity, got %.*s", LIT(ast_node_strings[expr->kind]));
 				continue;
 			}
 
@@ -1722,7 +1727,9 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 			if (init_type == nullptr) {
 				init_type = t_invalid;
 			} else if (is_type_polymorphic(base_type(init_type))) {
-				error(vd->type, "Invalid use of a polymorphic type in variable declaration");
+				gbString str = type_to_string(init_type);
+				error(vd->type, "Invalid use of a polymorphic type `%s` in variable declaration", str);
+				gb_string_free(str);
 				init_type = t_invalid;
 			}
 		}

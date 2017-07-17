@@ -156,6 +156,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	//                                                                           //
 	///////////////////////////////////////////////////////////////////////////////
 
+
 	if (base_entity == nullptr) {
 		return false;
 	}
@@ -163,6 +164,7 @@ bool find_or_generate_polymorphic_procedure(Checker *c, Entity *base_entity, Typ
 	if (!is_type_proc(base_entity->type)) {
 		return false;
 	}
+	String name = base_entity->token.string;
 
 	Type *src = base_type(base_entity->type);
 	Type *dst = nullptr;
@@ -372,6 +374,9 @@ bool find_or_generate_polymorphic_procedure_from_parameters(Checker *c, Entity *
 	return find_or_generate_polymorphic_procedure(c, base_entity, nullptr, operands, poly_proc_data, false);
 }
 
+bool check_type_specialization_to(Checker *c, Type *type, Type *specialization, bool modify_type = false);
+bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool compound, bool modify_type);
+
 
 i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 	if (operand->mode == Addressing_Invalid ||
@@ -467,10 +472,11 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 		}
 	}
 
+#if 0
 	if (are_types_identical(dst, src) && (!is_type_named(dst) || !is_type_named(src))) {
 		return 1;
 	}
-
+#endif
 
 	if (is_type_bit_field_value(operand->type) && is_type_integer(type)) {
 		Type *bfv = base_type(operand->type);
@@ -503,6 +509,13 @@ i64 check_distance_between_types(Checker *c, Operand *operand, Type *type) {
 	    return 5;
 	}
 #endif
+
+	if (is_type_polymorphic(dst) && !is_type_polymorphic(src)) {
+		bool modify_type = !c->context.no_polymorphic_errors;
+		if (is_polymorphic_type_assignable(c, type, s, false, modify_type)) {
+			return 2;
+		}
+	}
 
 	if (is_type_union(dst)) {
 		for (isize i = 0; i < dst->Union.variant_count; i++) {
@@ -679,21 +692,21 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 		defer (gb_string_free(op_type_str));
 		defer (gb_string_free(expr_str));
 
-		if (operand->mode == Addressing_Builtin) {
-			// TODO(bill): is this a good enough error message?
+		switch (operand->mode) {
+		case Addressing_Builtin:
 			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error(operand->expr,
 			      "Cannot assign built-in procedure `%s` in %.*s",
 			      expr_str,
 			      LIT(context_name));
-		} else if (operand->mode == Addressing_Type) {
-			// TODO(bill): is this a good enough error message?
-			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
+			break;
+		case Addressing_Type:
 			error(operand->expr,
 			      "Cannot assign `%s` which is a type in %.*s",
 			      op_type_str,
 			      LIT(context_name));
-		} else {
+			break;
+		default:
 			// TODO(bill): is this a good enough error message?
 			error(operand->expr,
 			      "Cannot assign value `%s` of type `%s` to `%s` in %.*s",
@@ -701,6 +714,7 @@ void check_assignment(Checker *c, Operand *operand, Type *type, String context_n
 			      op_type_str,
 			      type_str,
 			      LIT(context_name));
+			break;
 		}
 		operand->mode = Addressing_Invalid;
 
@@ -1087,7 +1101,8 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 					if (poly_operands != nullptr) {
 						Operand operand = (*poly_operands)[entities.count];
 						if (is_type_param) {
-							GB_ASSERT(operand.mode == Addressing_Type);
+							GB_ASSERT(operand.mode == Addressing_Type ||
+							          operand.mode == Addressing_Invalid);
 							if (is_type_polymorphic(base_type(operand.type))) {
 								is_polymorphic = true;
 								can_check_fields = false;
@@ -1545,19 +1560,59 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 	}
 }
 
-bool is_polymorphic_type_assignable_to_specific(Checker *c, Type *source, Type *specific) {
-	if (!is_type_struct(specific)) {
-		return false;
+
+bool check_type_specialization_to(Checker *c, Type *type, Type *specialization, bool modify_type) {
+	if (type == nullptr ||
+	    type == t_invalid) {
+		return true;
 	}
 
-	if (!is_type_struct(source)) {
+	Type *t = base_type(type);
+	Type *s = base_type(specialization);
+	if (t->kind != s->kind) {
 		return false;
 	}
+	// gb_printf_err("#1 %s %s\n", type_to_string(type), type_to_string(specialization));
+	if (t->kind != Type_Record) {
+		return false;
+	}
+	bool show_stuff = false && modify_type;
 
-	source = base_type(source);
-	GB_ASSERT(source->kind == Type_Record && source->Record.kind == TypeRecord_Struct);
+	if (show_stuff) gb_printf_err("#1 %s %s\n", type_to_string(type), type_to_string(specialization));
+	if (t->Record.polymorphic_parent == specialization) {
+		return true;
+	}
+	if (show_stuff) gb_printf_err("#2 %s %s\n", type_to_string(t->Record.polymorphic_parent), type_to_string(specialization));
+	if (t->Record.polymorphic_parent == s->Record.polymorphic_parent) {
+		GB_ASSERT(s->Record.polymorphic_params != nullptr);
+		GB_ASSERT(t->Record.polymorphic_params != nullptr);
 
-	return are_types_identical(source->Record.polymorphic_parent, specific);
+		if (show_stuff) gb_printf_err("#3 %s -> %s\n", type_to_string(type), type_to_string(specialization));
+
+		TypeTuple *s_tuple = &s->Record.polymorphic_params->Tuple;
+		TypeTuple *t_tuple = &t->Record.polymorphic_params->Tuple;
+		GB_ASSERT(t_tuple->variable_count == s_tuple->variable_count);
+		for (isize i = 0; i < s_tuple->variable_count; i++) {
+			Entity *s_e = s_tuple->variables[i];
+			Entity *t_e = t_tuple->variables[i];
+			Type *st = s_e->type;
+			Type *tt = t_e->type;
+			if (show_stuff) gb_printf_err("\t@ %s -> %s\n", type_to_string(st), type_to_string(tt));
+			if (show_stuff && base_type(st)->kind == Type_Generic) gb_printf_err("\t$%.*s\n", LIT(base_type(st)->Generic.name));
+			bool ok = is_polymorphic_type_assignable(c, st, tt, true, modify_type);
+			if (show_stuff) gb_printf_err("\t$ %s -> %s\n\n", type_to_string(st), type_to_string(tt));
+		}
+
+
+		if (modify_type) {
+			// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it
+			gb_memmove(specialization, type, gb_size_of(Type));
+		}
+
+		return true;
+	}
+
+	return false;
 }
 
 bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool compound, bool modify_type) {
@@ -1565,17 +1620,21 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 	o.type = source;
 	switch (poly->kind) {
 	case Type_Basic:
-		if (compound) return are_types_identical(poly, source);
+		if (compound) return are_types_identical(source, poly);
 		return check_is_assignable_to(c, &o, poly);
 
-	case Type_Named:
+	case Type_Named: {
+		if (check_type_specialization_to(c, source, poly, modify_type)) {
+			return true;
+		}
 		if (compound) return are_types_identical(poly, source);
 		return check_is_assignable_to(c, &o, poly);
+	}
 
 	case Type_Generic: {
-		if (poly->Generic.specific != nullptr) {
-			Type *s = poly->Generic.specific;
-			if (!is_polymorphic_type_assignable_to_specific(c, source, s)) {
+		if (poly->Generic.specialized != nullptr) {
+			Type *s = poly->Generic.specialized;
+			if (!check_type_specialization_to(c, source, s, modify_type)) {
 				return false;
 			}
 		}
@@ -1587,7 +1646,7 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 	}
 	case Type_Pointer:
 		if (source->kind == Type_Pointer) {
-			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Atomic.elem, true, modify_type);
+			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Pointer.elem, true, modify_type);
 		}
 		return false;
 	case Type_Atomic:
@@ -1640,7 +1699,6 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 
 	case Type_Record:
 		if (source->kind == Type_Record) {
-			// TODO(bill): Polymorphic type assignment
 			// return check_is_assignable_to(c, &o, poly);
 		}
 		return false;
@@ -1718,33 +1776,6 @@ Type *determine_type_from_polymorphic(Checker *c, Type *poly_type, Operand opera
 	return t_invalid;
 }
 
-bool check_type_specialization_to(Checker *c, Type *type, Type *specialization) {
-	if (type == nullptr ||
-	    type == t_invalid) {
-		return true;
-	}
-
-	Type *t = base_type(type);
-	Type *s = base_type(specialization);
-	if (t->kind != s->kind) {
-		return false;
-	}
-	// gb_printf_err("#1 %s %s\n", type_to_string(type), type_to_string(specialization));
-	if (t->kind != Type_Record) {
-		return false;
-	}
-	// gb_printf_err("#2 %s %s\n", type_to_string(type), type_to_string(specialization));
-	if (t->Record.polymorphic_parent == specialization) {
-		return true;
-	}
-	// gb_printf_err("#3 %s %s\n", type_to_string(t->Record.polymorphic_parent), type_to_string(specialization));
-	if (t->Record.polymorphic_parent == s->Record.polymorphic_parent) {
-		return true;
-	}
-
-
-	return false;
-}
 
 Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_variadic_, bool *success_, Array<Operand> *operands) {
 	if (_params == nullptr) {
@@ -4323,7 +4354,7 @@ Entity *check_selector(Checker *c, Operand *operand, AstNode *node, Type *type_h
 		Entity *e = scope_lookup_entity(c->context.scope, op_name);
 
 		bool is_alias = false;
-		while (e->kind == Entity_Alias) {
+		while (e != nullptr && e->kind == Entity_Alias) {
 			GB_ASSERT(e->Alias.base != nullptr);
 			e = e->Alias.base;
 			is_alias = true;
@@ -6549,6 +6580,10 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 					Entity *p = tuple->variables[j];
 					Operand o = ordered_operands[j];
 					if (p->kind == Entity_TypeName) {
+						if (is_type_polymorphic(o.type)) {
+							// NOTE(bill): Do not add polymorphic version to the gen_types
+							ok = false;
+						}
 						if (!are_types_identical(o.type, p->type)) {
 							ok = false;
 						}
@@ -7619,12 +7654,14 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 		if (!valid) {
 			gbString str = expr_to_string(o->expr);
+			gbString type_str = type_to_string(o->type);
+			defer (gb_string_free(str));
+			defer (gb_string_free(type_str));
 			if (is_const) {
 				error(o->expr, "Cannot index a constant `%s`", str);
 			} else {
-				error(o->expr, "Cannot index `%s`", str);
+				error(o->expr, "Cannot index `%s` of type `%s`", str, type_str);
 			}
-			gb_string_free(str);
 			o->mode = Addressing_Invalid;
 			o->expr = node;
 			return kind;
@@ -8008,6 +8045,12 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, ".(");
 		str = write_expr_to_string(str, ta->type);
 		str = gb_string_appendc(str, ")");
+	case_end;
+		case_ast_node(tc, TypeCast, node);
+		str = gb_string_appendc(str, "cast(");
+		str = write_expr_to_string(str, tc->type);
+		str = gb_string_appendc(str, ")");
+		str = write_expr_to_string(str, tc->expr);
 	case_end;
 
 	case_ast_node(ie, IndexExpr, node);

@@ -108,7 +108,7 @@ struct TypeRecord {
 	TYPE_KIND(Generic, struct {                           \
 		i64    id;                                        \
 		String name;                                      \
-		Type * specific;                                  \
+		Type * specialized;                               \
 	})                                                    \
 	TYPE_KIND(Pointer, struct { Type *elem; })            \
 	TYPE_KIND(Atomic,  struct { Type *elem; })            \
@@ -486,11 +486,11 @@ Type *make_type_basic(gbAllocator a, BasicType basic) {
 	return t;
 }
 
-Type *make_type_generic(gbAllocator a, i64 id, String name, Type *specific) {
+Type *make_type_generic(gbAllocator a, i64 id, String name, Type *specialized) {
 	Type *t = alloc_type(a, Type_Generic);
 	t->Generic.id = id;
 	t->Generic.name = name;
-	t->Generic.specific = specific;
+	t->Generic.specialized = specialized;
 	return t;
 }
 
@@ -1632,6 +1632,10 @@ Selection lookup_field_with_selection(gbAllocator a, Type *type_, String field_n
 				}
 			}
 		}
+		if (type->kind == Type_Generic && type->Generic.specialized != nullptr) {
+			Type *specialized = type->Generic.specialized;
+			return lookup_field_with_selection(a, specialized, field_name, is_type, sel);
+		}
 
 	} else if (type->Record.kind == Type_Union) {
 		if (field_name == "__tag") {
@@ -2291,9 +2295,9 @@ gbString write_type_to_string(gbString str, Type *type) {
 			String name = type->Generic.name;
 			str = gb_string_appendc(str, "$");
 			str = gb_string_append_length(str, name.text, name.len);
-			if (type->Generic.specific != nullptr) {
+			if (type->Generic.specialized != nullptr) {
 				str = gb_string_appendc(str, "/");
-				str = write_type_to_string(str, type->Generic.specific);
+				str = write_type_to_string(str, type->Generic.specialized);
 			}
 		}
 		break;

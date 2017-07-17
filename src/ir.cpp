@@ -2826,6 +2826,9 @@ irValue *ir_emit_conv(irProcedure *proc, irValue *value, Type *t) {
 	}
 
 	if (are_types_identical(src, dst)) {
+		if (!are_types_identical(src_type, t)) {
+			return ir_emit_transmute(proc, value, t);
+		}
 		return value;
 	}
 
@@ -5752,19 +5755,24 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 			continue;
 		}
 
-		bool polymorphic = is_type_polymorphic(e->type);
-		if (polymorphic && !is_type_struct(e->type)) {
-			continue;
-		}
-		if (map_get(&proc->module->min_dep_map, hash_pointer(e)) == nullptr) {
-			// NOTE(bill): Nothing depends upon it so doesn't need to be built
-			continue;
-		}
+		String entity_name = e->token.string;
 
 		if (e->kind == Entity_TypeName) {
+			bool polymorphic_struct = false;
+			if (e->type != nullptr && e->kind == Entity_TypeName) {
+				Type *bt = base_type(e->type);
+				if (bt->kind == Type_Record) {
+					polymorphic_struct = bt->Record.is_polymorphic;
+				}
+			}
+
+			if (!polymorphic_struct && map_get(&proc->module->min_dep_map, hash_pointer(e)) == nullptr) {
+				continue;
+			}
+
 			// NOTE(bill): Generate a new name
 			// parent_proc.name-guid
-			String ts_name = e->token.string;
+			String ts_name = entity_name;
 
 			isize name_len = proc->name.len + 1 + ts_name.len + 1 + 10 + 1;
 			u8 *name_text = gb_alloc_array(proc->module->allocator, u8, name_len);
@@ -5787,6 +5795,9 @@ void ir_build_constant_value_decl(irProcedure *proc, AstNodeValueDecl *vd) {
 					auto procs = *found;
 					for_array(i, procs) {
 						Entity *e = procs[i];
+						if (map_get(&proc->module->min_dep_map, hash_pointer(e)) == nullptr) {
+							continue;
+						}
 						DeclInfo *d = decl_info_of_entity(info, e);
 						ir_build_poly_proc(proc, &d->proc_lit->ProcLit, e);
 					}
