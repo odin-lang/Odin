@@ -149,9 +149,9 @@ Allocator :: struct #ordered {
 		FreeAll,
 		Resize,
 	}
-	Proc :: proc(allocator_data: rawptr, mode: Mode,
-	             size, alignment: int,
-	             old_memory: rawptr, old_size: int, flags: u64 = 0) -> rawptr;
+	Proc :: #type proc(allocator_data: rawptr, mode: Mode,
+	                   size, alignment: int,
+	                   old_memory: rawptr, old_size: int, flags: u64 = 0) -> rawptr;
 
 	procedure: Proc;
 	data:      rawptr;
@@ -165,6 +165,8 @@ Context :: struct #ordered {
 
 	user_data:  rawptr;
 	user_index: int;
+
+	derived:    any; // May be used for derived data types
 }
 
 DEFAULT_ALIGNMENT :: align_of([vector 4]f32);
@@ -342,30 +344,28 @@ append :: proc(array: ^[dynamic]$T, args: ...T) -> int {
 		ok = reserve(array, cap);
 	}
 	// TODO(bill): Better error handling for failed reservation
-	if !ok do return len(array);
-
-	a := cast(^raw.DynamicArray)array;
-	data := cast(^T)a.data;
-	assert(data != nil);
-	__mem_copy(data + a.len, &args[0], size_of(T) * arg_len);
-	a.len += arg_len;
-	return a.len;
+	if ok {
+		a := cast(^raw.DynamicArray)array;
+		data := cast(^T)a.data;
+		assert(data != nil);
+		__mem_copy(data + a.len, &args[0], size_of(T) * arg_len);
+		a.len += arg_len;
+	}
+	return len(array);
 }
 
 pop :: proc(array: ^[]$T) -> T #cc_contextless {
-	res: T;
-	if array != nil do return res;
+	if array == nil do return T{};
 	assert(len(array) > 0);
-	res = array[len(array)-1];
+	res := array[len(array)-1];
 	(cast(^raw.Slice)array).len -= 1;
 	return res;
 }
 
 pop :: proc(array: ^[dynamic]$T) -> T #cc_contextless {
-	res: T;
-	if array != nil do return res;
+	if array == nil do return T{};
 	assert(len(array) > 0);
-	res = array[len(array)-1];
+	res := array[len(array)-1];
 	(cast(^raw.DynamicArray)array).len -= 1;
 	return res;
 }
@@ -437,6 +437,7 @@ __get_map_key :: proc(key: $K) -> __MapKey #cc_contextless {
 		case  32: map_key.hash = u128((cast( ^u32)&key)^);
 		case  64: map_key.hash = u128((cast( ^u64)&key)^);
 		case 128: map_key.hash = u128((cast(^u128)&key)^);
+		case: panic("Unhandled integer size");
 		}
 	case TypeInfo.Rune:
 		map_key.hash = u128((cast(^rune)&key)^);
@@ -468,14 +469,18 @@ delete :: proc(m: ^map[$K]$V, key: K) {
 
 
 
-new  :: proc(T: type) -> ^T #inline do return cast(^T)alloc(size_of(T), align_of(T));
+new  :: proc(T: type) -> ^T #inline {
+	ptr := cast(^T)alloc(size_of(T), align_of(T));
+	ptr^ = T{};
+	return ptr;
+}
 
 free :: proc(ptr:   rawptr)      do free_ptr(ptr);
 free :: proc(str:   string)      do free_ptr((cast(^raw.String)&str).data);
 free :: proc(array: [dynamic]$T) do free_ptr((cast(^raw.DynamicArray)&array).data);
 free :: proc(slice: []$T)        do free_ptr((cast(^raw.Slice)&slice).data);
 free :: proc(m:     map[$K]$V) {
-	raw := ^raw.DynamicMap(&m);
+	raw := cast(^raw.DynamicMap)&m;
 	free(raw.hashes);
 	free(raw.entries.data);
 }
@@ -641,11 +646,11 @@ __mem_copy :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
 __mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) -> rawptr #cc_contextless {
 	// NOTE(bill): This _must_ be implemented like C's memcpy
 	when size_of(rawptr) == 8 {
-		foreign __llvm_core llvm_memcpy_ :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i64" ---;
+		foreign __llvm_core llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i64" ---;
 	} else {
-		foreign __llvm_core llvm_memcpy_ :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i32";
+		foreign __llvm_core llvm_memcpy :: proc(dst, src: rawptr, len: int, align: i32, is_volatile: bool) #link_name "llvm.memcpy.p0i8.p0i8.i32";
 	}
-	llvm_memcpy_(dst, src, len, 1, false);
+	llvm_memcpy(dst, src, len, 1, false);
 	return dst;
 }
 
@@ -859,7 +864,6 @@ __dynamic_map_set :: proc(using h: __MapHeader, key: __MapKey, value: rawptr) {
 	index: int;
 	assert(value != nil);
 
-
 	if len(m.hashes) == 0 {
 		__dynamic_map_reserve(h, __INITIAL_MAP_CAP);
 		__dynamic_map_grow(h);
@@ -895,7 +899,7 @@ __dynamic_map_grow :: proc(using h: __MapHeader) {
 	__dynamic_map_rehash(h, new_count);
 }
 
-__dynamic_map_full :: proc(using h: __MapHeader) -> bool {
+__dynamic_map_full :: proc(using h: __MapHeader) -> bool #inline {
 	return int(0.75 * f64(len(m.hashes))) <= m.entries.cap;
 }
 

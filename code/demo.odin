@@ -41,8 +41,8 @@ expand :: proc(table: ^$T/Table) {
 	}
 }
 
-put :: proc(table: ^$T/Table, key: T.Key, value: T.Value) {
-// put :: proc(table: ^Table($K, $V), key: K, value: V) {
+// put :: proc(table: ^$T/Table, key: T.Key, value: T.Value) {
+put :: proc(table: ^Table($Key, $Value), key: Key, value: Value) {
 	hash := get_hash(key); // Ad-hoc method which would fail in differentcope
 	index := find_index(table, key, hash);
 	if index < 0 {
@@ -139,6 +139,7 @@ foo1 :: proc(a: type/Vector)         { fmt.println("foo1", a{}); }
 // foo2 :: proc(a: type/Vector(3, f32)) {}
 foo3 :: proc(a: type/Vector(3, $T))  {fmt.println("foo3", a{}); }
 // foo4 :: proc(a: type/Vector3)        {}
+
 
 
 
