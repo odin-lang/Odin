@@ -887,7 +887,11 @@ void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 			} else if (is_operand_undef(a)) {
 				e->Variable.default_is_undef = true;
 			} else if (b.mode != Addressing_Constant) {
-				error(b.expr, "Default field parameter must be a constant");
+				error(b.expr, "Default field value must be a constant");
+			} else if (is_type_any(e->type)) {
+				gbString str = type_to_string(e->type);
+				error(b.expr, "A struct field of type `%s` cannot have a default value", str);
+				gb_string_free(str);
 			} else {
 				e->Variable.default_value = b.value;
 			}
@@ -900,8 +904,6 @@ void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 
 		if (is_blank_ident(name_token)) {
 			array_add(fields, e);
-		} else if (name_token.string == "__tag") {
-			error(name, "`__tag` is a reserved identifier for fields");
 		} else {
 			HashKey key = hash_string(name_token.string);
 			Entity **found = map_get(entity_map, key);

@@ -474,6 +474,11 @@ new  :: proc(T: type) -> ^T #inline {
 	ptr^ = T{};
 	return ptr;
 }
+new_clone :: proc(data: $T) -> ^T #inline {
+	ptr := cast(^T)alloc(size_of(T), align_of(T));
+	ptr^ = data;
+	return ptr;
+}
 
 free :: proc(ptr:   rawptr)      do free_ptr(ptr);
 free :: proc(str:   string)      do free_ptr((cast(^raw.String)&str).data);
