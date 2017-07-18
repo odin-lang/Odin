@@ -390,7 +390,11 @@ void ir_print_compound_element(irFileBuffer *f, irModule *m, ExactValue v, Type 
 	ir_fprintf(f, " ");
 
 	if (v.kind == ExactValue_Invalid || base_type(elem_type) == t_any) {
-		ir_fprintf(f, "zeroinitializer");
+		if (ir_type_has_default_values(elem_type)) {
+			ir_print_exact_value(f, m, v, elem_type);
+		} else {
+			ir_fprintf(f, "zeroinitializer");
+		}
 	} else {
 		ir_print_exact_value(f, m, v, elem_type);
 	}
@@ -402,7 +406,11 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 	switch (value.kind) {
 	case ExactValue_Bool:
-		ir_fprintf(f, "%s", (value.value_bool ? "true" : "false"));
+		if (value.value_bool) {
+			ir_fprintf(f, "true");
+		} else {
+			ir_fprintf(f, "false");
+		}
 		break;
 	case ExactValue_String: {
 		String str = value.value_string;
@@ -514,9 +522,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 				if (!has_defaults) {
 					ir_fprintf(f, "zeroinitializer");
 				} else {
-					ir_fprintf(f, "[");
-
-					ir_fprintf(f, "]");
+					ir_print_compound_element(f, m, empty_exact_value, type);
 				}
 				break;
 			}
@@ -524,19 +530,14 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 			ir_fprintf(f, "[");
 
 			for (isize i = 0; i < elem_count; i++) {
-				if (i > 0) {
-					ir_fprintf(f, ", ");
-				}
+				if (i > 0) ir_fprintf(f, ", ");
 				TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[i]);
 				GB_ASSERT(tav.mode != Addressing_Invalid);
 				ir_print_compound_element(f, m, tav.value, elem_type);
 			}
 			for (isize i = elem_count; i < type->Array.count; i++) {
-				if (i >= elem_count) {
-					ir_fprintf(f, ", ");
-				}
-				ir_print_type(f, m, elem_type);
-				ir_fprintf(f, " zeroinitializer");
+				if (i >= elem_count) ir_fprintf(f, ", ");
+				ir_print_compound_element(f, m, empty_exact_value, elem_type);
 			}
 
 			ir_fprintf(f, "]");
@@ -611,8 +612,8 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 						visited[f->Variable.field_index] = true;
 					}
 				} else {
-					for (isize i = 0; i < value_count; i++) {
-						Entity *f = type->Record.fields[i];
+					for_array(i, cl->elems) {
+						Entity *f = type->Record.fields_in_src_order[i];
 						TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[i]);
 						ExactValue val = {};
 						if (tav.mode != Addressing_Invalid) {

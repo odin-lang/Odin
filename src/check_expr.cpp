@@ -7220,6 +7220,21 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 
 			{ // Checker values
 				isize field_count = t->Record.field_count;
+				isize min_field_count = t->Record.field_count;
+				for (isize i = min_field_count-1; i >= 0; i--) {
+					Entity *e = t->Record.fields_in_src_order[i];
+					GB_ASSERT(e->kind == Entity_Variable);
+					if (e->Variable.default_is_nil) {
+						min_field_count--;
+					} else if (e->Variable.default_is_undef) {
+						min_field_count--;
+					} else if (e->Variable.default_value.kind != ExactValue_Invalid) {
+						min_field_count--;
+					} else {
+						break;
+					}
+				}
+
 				if (cl->elems[0]->kind == AstNode_FieldValue) {
 					bool *fields_visited = gb_alloc_array(c->allocator, bool, field_count);
 
@@ -7293,7 +7308,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 							continue;
 						}
 						if (index >= field_count) {
-							error(o->expr, "Too many values in structure literal, expected %td", field_count);
+							error(o->expr, "Too many values in structure literal, expected %td, got %td", field_count, cl->elems.count);
 							break;
 						}
 
@@ -7322,7 +7337,13 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 						check_assignment(c, o, field->type, str_lit("structure literal"));
 					}
 					if (cl->elems.count < field_count) {
-						error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elems.count);
+						if (min_field_count < field_count) {
+						    if (cl->elems.count < min_field_count) {
+								error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, cl->elems.count);
+						    }
+						} else {
+							error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elems.count);
+						}
 					}
 				}
 			}
