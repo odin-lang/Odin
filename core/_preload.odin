@@ -64,7 +64,6 @@ TypeInfo :: struct #ordered {
 	Pointer :: struct #ordered {
 		elem: ^TypeInfo; // nil -> rawptr
 	};
-	Atomic :: struct #ordered {elem: ^TypeInfo};
 	Procedure :: struct #ordered {
 		params:     ^TypeInfo; // TypeInfo.Tuple
 		results:    ^TypeInfo; // TypeInfo.Tuple
@@ -117,7 +116,6 @@ TypeInfo :: struct #ordered {
 		Boolean,
 		Any,
 		Pointer,
-		Atomic,
 		Procedure,
 		Array,
 		DynamicArray,
@@ -821,7 +819,7 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 	data := cast(^u8)array.data;
 	assert(data != nil);
 	__mem_zero(data + (elem_size*array.len), elem_size);
-	array.len++;
+	array.len += 1;
 	return array.len;
 }
 
@@ -1007,7 +1005,7 @@ __dynamic_map_erase :: proc(using h: __MapHeader, fr: __MapFindResult) {
 	}
 
 	if fr.entry_index == m.entries.len-1 {
-		m.entries.len--;
+		m.entries.len -= 1;
 	}
 	__mem_copy(__dynamic_map_get_entry(h, fr.entry_index), __dynamic_map_get_entry(h, m.entries.len-1), entry_size);
 	last := __dynamic_map_find(h, __dynamic_map_get_entry(h, fr.entry_index).key);

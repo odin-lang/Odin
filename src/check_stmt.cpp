@@ -629,6 +629,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		check_stmt(c, ts->stmt, flags);
 	case_end;
 
+	#if 0
 	case_ast_node(s, IncDecStmt, node);
 		TokenKind op = s->op.kind;
 		switch (op) {
@@ -671,6 +672,7 @@ void check_stmt_internal(Checker *c, AstNode *node, u32 flags) {
 		}
 		check_assignment_variable(c, &x, left);
 	case_end;
+	#endif
 
 	case_ast_node(as, AssignStmt, node);
 		switch (as->op.kind) {

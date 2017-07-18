@@ -151,12 +151,8 @@ decode_last_rune :: proc(s: []u8) -> (rune, int) {
 
 	limit = max(end - UTF_MAX, 0);
 
-	start--;
-	for start >= limit {
-		if rune_start(s[start]) {
-			break;
-		}
-		start--;
+	for start-=1; start >= limit; start-=1 {
+		if rune_start(s[start]) do break;
 	}
 
 	start = max(start, 0);
@@ -187,7 +183,7 @@ valid_string :: proc(s: string) -> bool {
 	for i := 0; i < n; {
 		si := s[i];
 		if si < RUNE_SELF { // ascii
-			i++;
+			i += 1;
 			continue;
 		}
 		x := accept_sizes[si];
@@ -223,20 +219,20 @@ rune_count :: proc(s: []u8) -> int {
 	n := len(s);
 
 	for i := 0; i < n; {
-		defer count++;
+		defer count += 1;
 		si := s[i];
 		if si < RUNE_SELF { // ascii
-			i++;
+			i += 1;
 			continue;
 		}
 		x := accept_sizes[si];
 		if x == 0xf1 {
-			i++;
+			i += 1;
 			continue;
 		}
 		size := int(x & 7);
 		if i+size > n {
-			i++;
+			i += 1;
 			continue;
 		}
 		ar := accept_ranges[x>>4];

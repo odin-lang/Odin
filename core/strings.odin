@@ -16,6 +16,6 @@ new_c_string :: proc(s: string) -> ^u8 {
 
 to_odin_string :: proc(c: ^u8) -> string {
 	len := 0;
-	for (c+len)^ != 0 do len++;
+	for (c+len)^ != 0 do len+=1;
 	return string(mem.slice_ptr(c, len));
 }

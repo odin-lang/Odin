@@ -151,7 +151,7 @@ struct irProcedure {
 		Entity *     entity;                                          \
 		Type *       type;                                            \
 		bool         zero_initialized;                                \
-		Array<irValue *> referrers;                                       \
+		Array<irValue *> referrers;                                   \
 		i64          alignment;                                       \
 	})                                                                \
 	IR_INSTR_KIND(ZeroInit, struct { irValue *address; })             \
@@ -1481,7 +1481,7 @@ irValue *ir_emit_store(irProcedure *p, irValue *address, irValue *value) {
 		GB_ASSERT_MSG(are_types_identical(core_type(a), core_type(b)), "%s %s", type_to_string(a), type_to_string(b));
 	}
 #endif
-	return ir_emit(p, ir_instr_store(p, address, value, is_type_atomic(a)));
+	return ir_emit(p, ir_instr_store(p, address, value, false));
 }
 irValue *ir_emit_load(irProcedure *p, irValue *address) {
 	GB_ASSERT(address != nullptr);
@@ -6233,6 +6233,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		ir_build_when_stmt(proc, ws);
 	case_end;
 
+	#if 0
 	case_ast_node(s, IncDecStmt, node);
 		TokenKind op = Token_Add;
 		if (s->op.kind == Token_Dec) {
@@ -6241,6 +6242,7 @@ void ir_build_stmt_internal(irProcedure *proc, AstNode *node) {
 		irAddr addr = ir_build_addr(proc, s->expr);
 		ir_build_assign_op(proc, addr, v_one, op);
 	case_end;
+	#endif
 
 	case_ast_node(vd, ValueDecl, node);
 		if (vd->is_mutable) {
@@ -8022,12 +8024,6 @@ void ir_gen_tree(irGen *s) {
 					ir_emit_comment(proc, str_lit("TypeInfoPointer"));
 					tag = ir_emit_conv(proc, variant_ptr, t_type_info_pointer_ptr);
 					irValue *gep = ir_get_type_info_ptr(proc, t->Pointer.elem);
-					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
-				} break;
-				case Type_Atomic: {
-					ir_emit_comment(proc, str_lit("TypeInfoAtomic"));
-					tag = ir_emit_conv(proc, variant_ptr, t_type_info_atomic_ptr);
-					irValue *gep = ir_get_type_info_ptr(proc, t->Atomic.elem);
 					ir_emit_store(proc, ir_emit_struct_ep(proc, tag, 0), gep);
 				} break;
 				case Type_Array: {

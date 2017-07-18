@@ -1,4 +1,4 @@
-bubble_sort :: proc(array: []$T, f: proc(T, T) -> int) {
+bubble_sort :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	assert(f != nil);
 	count := len(array);
 
@@ -22,7 +22,7 @@ bubble_sort :: proc(array: []$T, f: proc(T, T) -> int) {
 	}
 }
 
-bubble_sort :: proc(array: []$T) {
+bubble_sort :: proc(array: $A/[]$T) {
 	count := len(array);
 
 	init_j, last_j := 0, count-1;
@@ -45,7 +45,7 @@ bubble_sort :: proc(array: []$T) {
 	}
 }
 
-quick_sort :: proc(array: []$T, f: proc(T, T) -> int) {
+quick_sort :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
 	assert(f != nil);
 	a := array;
 	n := len(a);
@@ -69,7 +69,7 @@ quick_sort :: proc(array: []$T, f: proc(T, T) -> int) {
 	quick_sort(a[i..n], f);
 }
 
-quick_sort :: proc(array: []$T) {
+quick_sort :: proc(array: $A/[]$T) {
 	a := array;
 	n := len(a);
 	if n < 2 do return;
@@ -94,19 +94,21 @@ quick_sort :: proc(array: []$T) {
 
 _log2 :: proc(n: int) -> int {
 	res := 0;
-	for ; n != 0; n >>= 1 do res++;
+	for ; n != 0; n >>= 1 do res += 1;
 	return res;
 }
 
-merge_sort :: proc(array: []$T, f: proc(T, T) -> int) {
-	merge_slices :: proc(arr1, arr2, out: []$T, f: proc(T, T) -> int) {
+merge_sort :: proc(array: $A/[]$T, f: proc(T, T) -> int) {
+	merge_slices :: proc(arr1, arr2, out: A, f: proc(T, T) -> int) {
 		N1, N2 := len(arr1), len(arr2);
 		i, j := 0, 0;
 		for k in 0..N1+N2 {
 			if j == N2 || i < N1 && j < N2 && f(arr1[i], arr2[j]) < 0 {
-				out[k] = arr1[i]; i++;
+				out[k] = arr1[i];
+				i += 1;
 			} else {
-				out[k] = arr2[j]; j++;
+				out[k] = arr2[j];
+				j += 1;
 			}
 		}
 	}
@@ -140,15 +142,17 @@ merge_sort :: proc(array: []$T, f: proc(T, T) -> int) {
 	if M & 1 == 0 do copy(arr2, arr1);
 }
 
-merge_sort :: proc(array: []$T) {
-	merge_slices :: proc(arr1, arr2, out: []$T) {
+merge_sort :: proc(array: $A/[]$T) {
+	merge_slices :: proc(arr1, arr2, out: A) {
 		N1, N2 := len(arr1), len(arr2);
 		i, j := 0, 0;
 		for k in 0..N1+N2 {
 			if j == N2 || i < N1 && j < N2 && arr1[i] < arr2[j] {
-				out[k] = arr1[i]; i++;
+				out[k] = arr1[i];
+				i += 1;
 			} else {
-				out[k] = arr2[j]; j++;
+				out[k] = arr2[j];
+				j += 1;
 			}
 		}
 	}

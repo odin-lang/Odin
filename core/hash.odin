@@ -146,7 +146,7 @@ murmur64 :: proc(data: []u8) -> u64 {
 
 		for len >= 8 {
 			k1, k2: u32;
-			k1 = data32[i]; i++;
+			k1 = data32[i]; i += 1;
 			k1 *= m;
 			k1 ~= k1>>r;
 			k1 *= m;
@@ -154,7 +154,7 @@ murmur64 :: proc(data: []u8) -> u64 {
 			h1 ~= k1;
 			len -= 4;
 
-			k2 = data32[i]; i++;
+			k2 = data32[i]; i += 1;
 			k2 *= m;
 			k2 ~= k2>>r;
 			k2 *= m;
@@ -165,7 +165,7 @@ murmur64 :: proc(data: []u8) -> u64 {
 
 		if len >= 4 {
 			k1: u32;
-			k1 = data32[i]; i++;
+			k1 = data32[i]; i += 1;
 			k1 *= m;
 			k1 ~= k1>>r;
 			k1 *= m;

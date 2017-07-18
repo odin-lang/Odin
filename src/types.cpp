@@ -111,7 +111,6 @@ struct TypeRecord {
 		Type * specialized;                               \
 	})                                                    \
 	TYPE_KIND(Pointer, struct { Type *elem; })            \
-	TYPE_KIND(Atomic,  struct { Type *elem; })            \
 	TYPE_KIND(Array,   struct { Type *elem; i64 count; }) \
 	TYPE_KIND(DynamicArray, struct { Type *elem; })       \
 	TYPE_KIND(Vector,  struct { Type *elem; i64 count; }) \
@@ -355,7 +354,6 @@ gb_global Type *t_type_info_any               = nullptr;
 gb_global Type *t_type_info_string            = nullptr;
 gb_global Type *t_type_info_boolean           = nullptr;
 gb_global Type *t_type_info_pointer           = nullptr;
-gb_global Type *t_type_info_atomic            = nullptr;
 gb_global Type *t_type_info_procedure         = nullptr;
 gb_global Type *t_type_info_array             = nullptr;
 gb_global Type *t_type_info_dynamic_array     = nullptr;
@@ -379,7 +377,6 @@ gb_global Type *t_type_info_any_ptr           = nullptr;
 gb_global Type *t_type_info_string_ptr        = nullptr;
 gb_global Type *t_type_info_boolean_ptr       = nullptr;
 gb_global Type *t_type_info_pointer_ptr       = nullptr;
-gb_global Type *t_type_info_atomic_ptr        = nullptr;
 gb_global Type *t_type_info_procedure_ptr     = nullptr;
 gb_global Type *t_type_info_array_ptr         = nullptr;
 gb_global Type *t_type_info_dynamic_array_ptr = nullptr;
@@ -456,9 +453,6 @@ Type *core_type(Type *t) {
 		case Type_Enum:
 			t = t->Enum.base_type;
 			continue;
-		case Type_Atomic:
-			t = t->Atomic.elem;
-			continue;
 		}
 		break;
 	}
@@ -497,12 +491,6 @@ Type *make_type_generic(gbAllocator a, i64 id, String name, Type *specialized) {
 Type *make_type_pointer(gbAllocator a, Type *elem) {
 	Type *t = alloc_type(a, Type_Pointer);
 	t->Pointer.elem = elem;
-	return t;
-}
-
-Type *make_type_atomic(gbAllocator a, Type *elem) {
-	Type *t = alloc_type(a, Type_Atomic);
-	t->Atomic.elem = elem;
 	return t;
 }
 
@@ -774,10 +762,6 @@ bool is_type_pointer(Type *t) {
 	}
 	return t->kind == Type_Pointer;
 }
-bool is_type_atomic(Type *t) {
-	t = base_type(t);
-	return t->kind == Type_Atomic;
-}
 bool is_type_tuple(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Tuple;
@@ -975,8 +959,6 @@ bool is_type_polymorphic(Type *t) {
 
 	case Type_Pointer:
 		return is_type_polymorphic(t->Pointer.elem);
-	case Type_Atomic:
-		return is_type_polymorphic(t->Atomic.elem);
 	case Type_Array:
 		return is_type_polymorphic(t->Array.elem);
 	case Type_DynamicArray:
@@ -2305,11 +2287,6 @@ gbString write_type_to_string(gbString str, Type *type) {
 	case Type_Pointer:
 		str = gb_string_appendc(str, "^");
 		str = write_type_to_string(str, type->Pointer.elem);
-		break;
-
-	case Type_Atomic:
-		str = gb_string_appendc(str, "atomic ");
-		str = write_type_to_string(str, type->Atomic.elem);
 		break;
 
 	case Type_Array:

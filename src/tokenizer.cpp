@@ -55,8 +55,8 @@ TOKEN_KIND(Token__AssignOpEnd, "_AssignOpEnd"), \
 	TOKEN_KIND(Token_ArrowRight,       "->"), \
 	TOKEN_KIND(Token_ArrowLeft,        "<-"), \
 	TOKEN_KIND(Token_DoubleArrowRight, "=>"), \
-	TOKEN_KIND(Token_Inc,              "++"), \
-	TOKEN_KIND(Token_Dec,              "--"), \
+/* 	TOKEN_KIND(Token_Inc,              "++"), */ \
+/* 	TOKEN_KIND(Token_Dec,              "--"), */ \
 	TOKEN_KIND(Token_Undef,            "---"), \
 \
 TOKEN_KIND(Token__ComparisonBegin, "_ComparisonBegin"), \
@@ -126,7 +126,6 @@ TOKEN_KIND(Token__KeywordBegin, "_KeywordBegin"), \
 	TOKEN_KIND(Token_asm,                    "asm"),                    \
 	TOKEN_KIND(Token_yield,                  "yield"),                  \
 	TOKEN_KIND(Token_await,                  "await"),                  \
-	TOKEN_KIND(Token_atomic,                 "atomic"),                 \
 TOKEN_KIND(Token__KeywordEnd, "_KeywordEnd"), \
 	TOKEN_KIND(Token_Count, "")
 
@@ -929,7 +928,8 @@ Token tokenizer_get_token(Tokenizer *t) {
 			break;
 		case '~': token.kind = token_kind_variant2(t, Token_Xor, Token_XorEq);                                        break;
 		case '!': token.kind = token_kind_variant2(t, Token_Not, Token_NotEq);                                        break;
-		case '+': token.kind = token_kind_variant3(t, Token_Add, Token_AddEq, '+', Token_Inc);                        break;
+		// case '+': token.kind = token_kind_variant3(t, Token_Add, Token_AddEq, '+', Token_Inc);                        break;
+		case '+': token.kind = token_kind_variant2(t, Token_Add, Token_AddEq);                                        break;
 		case '-':
 			token.kind = Token_Sub;
 			if (t->curr_rune == '=') {
@@ -937,7 +937,7 @@ Token tokenizer_get_token(Tokenizer *t) {
 				token.kind = Token_SubEq;
 			} else if (t->curr_rune == '-') {
 				advance_to_next_rune(t);
-				token.kind = Token_Dec;
+				token.kind = Token_Invalid;
 				if (t->curr_rune == '-') {
 					advance_to_next_rune(t);
 					token.kind = Token_Undef;

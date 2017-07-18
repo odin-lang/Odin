@@ -1956,6 +1956,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 		ssa_build_when_stmt(p, ws);
 	case_end;
 
+	#if 0
 	case_ast_node(s, IncDecStmt, node);
 		TokenKind op = Token_Add;
 		if (s->op.kind == Token_Dec) {
@@ -1965,6 +1966,7 @@ void ssa_build_stmt_internal(ssaProc *p, AstNode *node) {
 		Type *t = ssa_addr_type(addr);
 		ssa_build_assign_op(p, addr, ssa_const_int(p, t, 1), op);
 	case_end;
+	#endif
 
 	case_ast_node(as, AssignStmt, node);
 		ssa_emit_comment(p, str_lit("AssignStmt"));

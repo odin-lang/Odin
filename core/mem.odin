@@ -74,8 +74,9 @@ AllocationHeader :: struct {
 allocation_header_fill :: proc(header: ^AllocationHeader, data: rawptr, size: int) {
 	header.size = size;
 	ptr := cast(^int)(header+1);
+	n := cast(^int)data - ptr;
 
-	for i := 0; rawptr(ptr) < data; i++ {
+	for i in 0..n {
 		(ptr+i)^ = -1;
 	}
 }
@@ -176,7 +177,7 @@ begin_arena_temp_memory :: proc(a: ^Arena) -> ArenaTempMemory {
 	tmp: ArenaTempMemory;
 	tmp.arena = a;
 	tmp.original_count = len(a.memory);
-	a.temp_count++;
+	a.temp_count += 1;
 	return tmp;
 }
 
@@ -184,7 +185,7 @@ end_arena_temp_memory :: proc(using tmp: ArenaTempMemory) {
 	assert(len(arena.memory) >= original_count);
 	assert(arena.temp_count > 0);
 	arena.memory = arena.memory[..original_count];
-	arena.temp_count--;
+	arena.temp_count -= 1;
 }
 
 

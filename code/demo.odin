@@ -1,4 +1,22 @@
-import "fmt.odin";
+import (
+	"fmt.odin";
+	"atomics.odin";
+	"bits.odin";
+	"hash.odin";
+	"math.odin";
+	"mem.odin";
+	"opengl.odin";
+	"os.odin";
+	"pool.odin";
+	"raw.odin";
+	"sort.odin";
+	"strconv.odin";
+	"strings.odin";
+	"sync.odin";
+	"types.odin";
+	"utf8.odin";
+	"utf16.odin";
+)
 
 Table :: struct(Key, Value: type) {
 	Slot :: struct {
@@ -61,7 +79,7 @@ put :: proc(table: ^Table($Key, $Value), key: Key, value: Value) {
 			}
 		}
 
-		table.count++;
+		table.count += 1;
 	}
 
 	slot := &table.slots[index];
@@ -95,8 +113,9 @@ find_index :: proc(table: ^Table($Key, $Value), key: Key, hash: u32) -> int {
 			}
 		}
 
-		index++;
-		if index >= cap(table.slots) do index = 0;
+		if index += 1; index >= cap(table.slots) {
+			index = 0;
+		}
 	}
 
 	return -1;
@@ -121,8 +140,8 @@ Vector :: struct(N: int, T: type) {
 				when N >= 3 do z: T;
 				when N >= 4 do w: T;
 			};
-		}
-	};
+
+}	};
 }
 
 Vector3 :: Vector(3, f32);
@@ -137,15 +156,18 @@ add :: proc(a, b: $T/Vector) -> T {
 
 foo1 :: proc(a: type/Vector)         { fmt.println("foo1", a{}); }
 // foo2 :: proc(a: type/Vector(3, f32)) {}
-foo3 :: proc(a: type/Vector(3, $T))  {fmt.println("foo3", a{}); }
+foo3 :: proc(a: type/Vector(3, $T))  { fmt.println("foo3", a{}); }
 // foo4 :: proc(a: type/Vector3)        {}
 
 
-
-
-
-
 main :: proc() {
+	Foo :: struct {
+		a := 123;
+		b := true;
+	}
+	v1 := Foo{};
+	fmt.println(v1);
+
 	foo1(Vector(3, f32));
 	foo1(Vector3);
 	foo3(Vector(3, f32));

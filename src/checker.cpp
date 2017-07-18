@@ -1142,10 +1142,6 @@ void add_type_info_type(Checker *c, Type *t) {
 		add_type_info_type(c, bt->Pointer.elem);
 		break;
 
-	case Type_Atomic:
-		add_type_info_type(c, bt->Atomic.elem);
-		break;
-
 	case Type_Array:
 		add_type_info_type(c, bt->Array.elem);
 		add_type_info_type(c, make_type_pointer(c->allocator, bt->Array.elem));
@@ -1361,7 +1357,7 @@ void init_preload(Checker *c) {
 		GB_ASSERT(is_type_union(tiv_type));
 		TypeUnion *tiv = &tiv_type->Union;
 
-		if (tiv->variant_count != 23) {
+		if (tiv->variant_count != 22) {
 			compiler_error("Invalid `TypeInfo` layout");
 		}
 		t_type_info_named         = tiv->variants[ 1];
@@ -1373,19 +1369,18 @@ void init_preload(Checker *c) {
 		t_type_info_boolean       = tiv->variants[ 7];
 		t_type_info_any           = tiv->variants[ 8];
 		t_type_info_pointer       = tiv->variants[ 9];
-		t_type_info_atomic        = tiv->variants[10];
-		t_type_info_procedure     = tiv->variants[11];
-		t_type_info_array         = tiv->variants[12];
-		t_type_info_dynamic_array = tiv->variants[13];
-		t_type_info_slice         = tiv->variants[14];
-		t_type_info_vector        = tiv->variants[15];
-		t_type_info_tuple         = tiv->variants[16];
-		t_type_info_struct        = tiv->variants[17];
-		t_type_info_raw_union     = tiv->variants[18];
-		t_type_info_union         = tiv->variants[19];
-		t_type_info_enum          = tiv->variants[20];
-		t_type_info_map           = tiv->variants[21];
-		t_type_info_bit_field     = tiv->variants[22];
+		t_type_info_procedure     = tiv->variants[10];
+		t_type_info_array         = tiv->variants[11];
+		t_type_info_dynamic_array = tiv->variants[12];
+		t_type_info_slice         = tiv->variants[13];
+		t_type_info_vector        = tiv->variants[14];
+		t_type_info_tuple         = tiv->variants[15];
+		t_type_info_struct        = tiv->variants[16];
+		t_type_info_raw_union     = tiv->variants[17];
+		t_type_info_union         = tiv->variants[18];
+		t_type_info_enum          = tiv->variants[19];
+		t_type_info_map           = tiv->variants[20];
+		t_type_info_bit_field     = tiv->variants[21];
 
 		t_type_info_named_ptr         = make_type_pointer(c->allocator, t_type_info_named);
 		t_type_info_integer_ptr       = make_type_pointer(c->allocator, t_type_info_integer);
@@ -1396,7 +1391,6 @@ void init_preload(Checker *c) {
 		t_type_info_boolean_ptr       = make_type_pointer(c->allocator, t_type_info_boolean);
 		t_type_info_any_ptr           = make_type_pointer(c->allocator, t_type_info_any);
 		t_type_info_pointer_ptr       = make_type_pointer(c->allocator, t_type_info_pointer);
-		t_type_info_atomic_ptr        = make_type_pointer(c->allocator, t_type_info_atomic);
 		t_type_info_procedure_ptr     = make_type_pointer(c->allocator, t_type_info_procedure);
 		t_type_info_array_ptr         = make_type_pointer(c->allocator, t_type_info_array);
 		t_type_info_dynamic_array_ptr = make_type_pointer(c->allocator, t_type_info_dynamic_array);

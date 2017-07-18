@@ -252,9 +252,6 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 		ir_print_type(f, m, t->Pointer.elem);
 		ir_fprintf(f, "*");
 		return;
-	case Type_Atomic:
-		ir_print_type(f, m, t->Atomic.elem);
-		return;
 	case Type_Array:
 		ir_fprintf(f, "[%lld x ", t->Array.count);
 		ir_print_type(f, m, t->Array.elem);
@@ -890,7 +887,7 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		ir_print_type(f, m, type);
 		ir_fprintf(f, "* ");
 		ir_print_value(f, m, instr->Store.address, type);
-		if (is_type_atomic(type)) {
+		if (instr->Store.atomic) {
 			// TODO(bill): Do ordering
 			ir_fprintf(f, " unordered");
 			ir_fprintf(f, ", align %lld\n", type_align_of(m->allocator, type));
@@ -901,18 +898,18 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 	case irInstr_Load: {
 		Type *type = instr->Load.type;
 		ir_fprintf(f, "%%%d = load ", value->index);
-		if (is_type_atomic(type)) {
-			ir_fprintf(f, "atomic ");
-		}
+		// if (is_type_atomic(type)) {
+			// ir_fprintf(f, "atomic ");
+		// }
 		ir_print_type(f, m, type);
 		ir_fprintf(f, ", ");
 		ir_print_type(f, m, type);
 		ir_fprintf(f, "* ");
 		ir_print_value(f, m, instr->Load.address, type);
-		if (is_type_atomic(type)) {
+		// if (is_type_atomic(type)) {
 			// TODO(bill): Do ordering
-			ir_fprintf(f, " unordered");
-		}
+			// ir_fprintf(f, " unordered");
+		// }
 		ir_fprintf(f, ", align %lld\n", type_align_of(m->allocator, type));
 	} break;
 

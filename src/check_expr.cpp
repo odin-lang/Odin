@@ -1711,11 +1711,6 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Pointer.elem, true, modify_type);
 		}
 		return false;
-	case Type_Atomic:
-		if (source->kind == Type_Atomic) {
-			return is_polymorphic_type_assignable(c, poly->Atomic.elem, source->Atomic.elem, true, modify_type);
-		}
-		return false;
 	case Type_Array:
 		if (source->kind == Type_Array &&
 		    poly->Array.count == source->Array.count) {
@@ -2939,13 +2934,6 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		Type *elem = check_type(c, pt->type);
 		i64 esz = type_size_of(c->allocator, elem);
 		*type = make_type_pointer(c->allocator, elem);
-		return true;
-	case_end;
-
-	case_ast_node(at, AtomicType, e);
-		Type *elem = check_type(c, at->type);
-		i64 esz = type_size_of(c->allocator, elem);
-		*type = make_type_atomic(c->allocator, elem);
 		return true;
 	case_end;
 
@@ -8398,11 +8386,6 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 			str = write_expr_to_string(str, et->fields[i]);
 		}
 		str = gb_string_appendc(str, "}");
-	case_end;
-
-	case_ast_node(at, AtomicType, node);
-		str = gb_string_appendc(str, "atomic ");
-		str = write_expr_to_string(str, at->type);
 	case_end;
 	}
 

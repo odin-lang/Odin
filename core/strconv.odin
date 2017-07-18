@@ -119,29 +119,25 @@ parse_f64 :: proc(s: string) -> f64 {
 
 	sign: f64 = 1;
 	match s[i] {
-	case '-': i++; sign = -1;
-	case '+': i++;
+	case '-': i += 1; sign = -1;
+	case '+': i += 1;
 	}
 
 	value: f64 = 0;
-	for ; i < len(s); i++ {
+	for ; i < len(s); i += 1 {
 		r := rune(s[i]);
-		if r == '_' {
-			continue;
-		}
+		if r == '_' do continue;
 		v := _digit_value(r);
-		if v >= 10 {
-			break;
-		}
+		if v >= 10 do break;
 		value *= 10;
 		value += f64(v);
 	}
 
 	if s[i] == '.' {
 		pow10: f64 = 10;
-		i++;
+		i += 1;
 
-		for ; i < len(s); i++ {
+		for ; i < len(s); i += 1 {
 			r := rune(s[i]);
 			if r == '_' {
 				continue;
@@ -159,15 +155,15 @@ parse_f64 :: proc(s: string) -> f64 {
 	scale: f64 = 1;
 
 	if s[i] == 'e' || s[i] == 'E' {
-		i++;
+		i += 1;
 
 		match s[i] {
-		case '-': i++; frac = true;
-		case '+': i++;
+		case '-': i += 1; frac = true;
+		case '+': i += 1;
 		}
 
 		exp: u32 = 0;
-		for ; i < len(s); i++ {
+		for ; i < len(s); i += 1 {
 			r := rune(s[i]);
 			if r == '_' {
 				continue;
@@ -261,7 +257,7 @@ generic_ftoa :: proc(buf: []u8, val: f64, fmt: u8, prec, bit_size: int) -> []u8 
 		return buf;
 
 	case 0: // denormalized
-		exp++;
+		exp += 1;
 
 	case:
 		mant |= u64(1) << flt.mantbits;
@@ -310,7 +306,7 @@ format_digits :: proc(buf: []u8, shortest: bool, neg: bool, digs: DecimalSlice, 
 		if digs.decimal_point > 0 {
 			m := min(digs.count, digs.decimal_point);
 			append(&buf, ...digs.digits[..m]);
-			for ; m < digs.decimal_point; m++ {
+			for ; m < digs.decimal_point; m += 1 {
 				append(&buf, '0');
 			}
 		} else {
@@ -464,32 +460,32 @@ append_bits :: proc(buf: []u8, u: u128, base: int, is_signed: bool, bit_size: in
 	u, neg = is_integer_negative(u, is_signed, bit_size);
 	b := u128(base);
 	for u >= b {
-		i--; a[i] = digits[uint(u % b)];
+		i-=1; a[i] = digits[uint(u % b)];
 		u /= b;
 	}
-	i--; a[i] = digits[uint(u % b)];
+	i-=1; a[i] = digits[uint(u % b)];
 
 	if flags&IntFlag.Prefix != 0 {
 		ok := true;
 		match base {
-		case  2: i--; a[i] = 'b';
-		case  8: i--; a[i] = 'o';
-		case 10: i--; a[i] = 'd';
-		case 12: i--; a[i] = 'z';
-		case 16: i--; a[i] = 'x';
+		case  2: i-=1; a[i] = 'b';
+		case  8: i-=1; a[i] = 'o';
+		case 10: i-=1; a[i] = 'd';
+		case 12: i-=1; a[i] = 'z';
+		case 16: i-=1; a[i] = 'x';
 		case: ok = false;
 		}
 		if ok {
-			i--; a[i] = '0';
+			i-=1; a[i] = '0';
 		}
 	}
 
 	if neg {
-		i--; a[i] = '-';
+		i-=1; a[i] = '-';
 	} else if flags&IntFlag.Plus != 0 {
-		i--; a[i] = '+';
+		i-=1; a[i] = '+';
 	} else if flags&IntFlag.Space != 0 {
-		i--; a[i] = ' ';
+		i-=1; a[i] = ' ';
 	}
 
 	append(&buf, ...a[i..]);

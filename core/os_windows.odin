@@ -264,7 +264,7 @@ current_thread_id :: proc() -> int {
 _alloc_command_line_arguments :: proc() -> []string {
 	alloc_ucs2_to_utf8 :: proc(wstr: ^u16) -> string {
 		wstr_len := 0;
-		for (wstr+wstr_len)^ != 0 do wstr_len++;
+		for (wstr+wstr_len)^ != 0 do wstr_len += 1;
 
 		len := 2*wstr_len-1;
 		buf := make([]u8, len+1);
@@ -275,29 +275,29 @@ _alloc_command_line_arguments :: proc() -> []string {
 			match {
 			case str[j] < 0x80:
 				if i+1 > len do return "";
-				buf[i] = u8(str[j]); i++;
-				j++;
+				buf[i] = u8(str[j]); i += 1;
+				j += 1;
 			case str[j] < 0x800:
 				if i+2 > len do return "";
-				buf[i] = u8(0xc0 + (str[j]>>6));   i++;
-				buf[i] = u8(0x80 + (str[j]&0x3f)); i++;
-				j++;
+				buf[i] = u8(0xc0 + (str[j]>>6));   i += 1;
+				buf[i] = u8(0x80 + (str[j]&0x3f)); i += 1;
+				j += 1;
 			case 0xd800 <= str[j] && str[j] < 0xdc00:
 				if i+4 > len do return "";
 				c := rune((str[j] - 0xd800) << 10) + rune((str[j+1]) - 0xdc00) + 0x10000;
-				buf[i] = u8(0xf0 +  (c >> 18));         i++;
-				buf[i] = u8(0x80 + ((c >> 12) & 0x3f)); i++;
-				buf[i] = u8(0x80 + ((c >>  6) & 0x3f)); i++;
-				buf[i] = u8(0x80 + ((c      ) & 0x3f)); i++;
+				buf[i] = u8(0xf0 +  (c >> 18));         i += 1;
+				buf[i] = u8(0x80 + ((c >> 12) & 0x3f)); i += 1;
+				buf[i] = u8(0x80 + ((c >>  6) & 0x3f)); i += 1;
+				buf[i] = u8(0x80 + ((c      ) & 0x3f)); i += 1;
 				j += 2;
 			case 0xdc00 <= str[j] && str[j] < 0xe000:
 				return "";
 			case:
 				if i+3 > len do return "";
-				buf[i] = 0xe0 + u8 (str[j] >> 12);         i++;
-				buf[i] = 0x80 + u8((str[j] >>  6) & 0x3f); i++;
-				buf[i] = 0x80 + u8((str[j]      ) & 0x3f); i++;
-				j++;
+				buf[i] = 0xe0 + u8 (str[j] >> 12);         i += 1;
+				buf[i] = 0x80 + u8((str[j] >>  6) & 0x3f); i += 1;
+				buf[i] = 0x80 + u8((str[j]      ) & 0x3f); i += 1;
+				j += 1;
 			}
 		}
 

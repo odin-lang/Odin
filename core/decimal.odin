@@ -29,13 +29,13 @@ decimal_to_string :: proc(buf: []u8, a: ^Decimal) -> string {
 
 	w := 0;
 	if a.decimal_point <= 0 {
-		buf[w] = '0'; w++;
-		buf[w] = '.'; w++;
+		buf[w] = '0'; w+=1;
+		buf[w] = '.'; w+=1;
 		w += digit_zero(buf[w .. w-a.decimal_point]);
 		w += copy(buf[w..], a.digits[0..a.count]);
 	} else if a.decimal_point < a.count {
 		w += copy(buf[w..], a.digits[0..a.decimal_point]);
-		buf[w] = '.'; w++;
+		buf[w] = '.'; w+=1;
 		w += copy(buf[w..], a.digits[a.decimal_point .. a.count]);
 	} else {
 		w += copy(buf[w..], a.digits[0..a.count]);
@@ -48,7 +48,7 @@ decimal_to_string :: proc(buf: []u8, a: ^Decimal) -> string {
 // trim trailing zeros
 trim :: proc(a: ^Decimal) {
 	for a.count > 0 && a.digits[a.count-1] == '0' {
-		a.count--;
+		a.count -= 1;
 	}
 	if a.count == 0 {
 		a.decimal_point = 0;
@@ -63,14 +63,14 @@ assign :: proc(a: ^Decimal, i: u64) {
 		j := i/10;
 		i -= 10*j;
 		buf[n] = u8('0'+i);
-		n++;
+		n+=1;
 		i = j;
 	}
 
 	a.count = 0;
-	for n--; n >= 0; n-- {
+	for n -= 1; n >= 0; n -= 1 {
 		a.digits[a.count] = buf[n];
-		a.count++;
+		a.count+=1;
 	}
 	a.decimal_point = a.count;
 	trim(a);
@@ -83,7 +83,7 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 	w := 0; // write index
 
 	n: uint;
-	for ; n>>k == 0; r++ {
+	for ; n>>k == 0; r+=1 {
 		if r >= a.count {
 			if n == 0 {
 				// Just in case
@@ -92,7 +92,7 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 			}
 			for n>>k == 0 {
 				n = n * 10;
-				r++;
+				r+=1;
 			}
 			break;
 		}
@@ -103,12 +103,12 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 
 	mask: uint = (1<<k) - 1;
 
-	for ; r < a.count; r++ {
+	for ; r < a.count; r+=1 {
 		c := uint(a.digits[r]);
 		dig := n>>k;
 		n &= mask;
 		a.digits[w] = u8('0' + dig);
-		w++;
+		w+=1;
 		n = n*10 + c - '0';
 	}
 
@@ -117,7 +117,7 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 		n &= mask;
 		if w < len(a.digits) {
 			a.digits[w] = u8('0' + dig);
-			w++;
+			w+=1;
 		} else if dig > 0 {
 			a.trunc = true;
 		}
@@ -136,11 +136,11 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 	w := a.count+delta; // write index
 
 	n: uint;
-	for r--; r >= 0; r-- {
+	for r -= 1; r >= 0; r -= 1 {
 		n += (uint(a.digits[r]) - '0') << k;
 		quo := n/10;
 		rem := n - 10*quo;
-		w--;
+		w -= 1;
 		if w < len(a.digits) {
 			a.digits[w] = u8('0' + rem);
 		} else if rem != 0 {
@@ -152,7 +152,7 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 	for n > 0 {
 		quo := n/10;
 		rem := n - 10*quo;
-		w--;
+		w -= 1;
 		if 0 <= w && w < len(a.digits) {
 			a.digits[w] = u8('0' + rem);
 		} else if rem != 0 {
@@ -213,9 +213,9 @@ round :: proc(a: ^Decimal, nd: int) {
 round_up :: proc(a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return; }
 
-	for i := nd-1; i >= 0; i-- {
+	for i := nd-1; i >= 0; i -= 1 {
 		if c := a.digits[i]; c < '9' {
-			a.digits[i]++;
+			a.digits[i]+=1;
 			a.count = i+1;
 			return;
 		}
@@ -224,7 +224,7 @@ round_up :: proc(a: ^Decimal, nd: int) {
 	// Number is just 9s
 	a.digits[0] = '1';
 	a.count = 1;
-	a.decimal_point++;
+	a.decimal_point+=1;
 }
 
 round_down :: proc(a: ^Decimal, nd: int) {
@@ -239,17 +239,17 @@ rounded_integer :: proc(a: ^Decimal) -> u64 {
 	if a.decimal_point > 20 {
 		return 0xffff_ffff_ffff_ffff;
 	}
-	i: int;
+	i: int = 0;
 	n: u64 = 0;
 	m := min(a.decimal_point, a.count);
-	for i = 0; i < m; i++ {
+	for ; i < m; i += 1 {
 		n = n*10 + u64(a.digits[i]-'0');
 	}
-	for ; i < a.decimal_point; i++ {
+	for ; i < a.decimal_point; i += 1 {
 		n *= 10;
 	}
 	if can_round_up(a, a.decimal_point) {
-		n++;
+		n+=1;
 	}
 	return n;
 }

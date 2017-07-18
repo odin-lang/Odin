@@ -207,9 +207,6 @@ write_type :: proc(buf: ^StringBuffer, ti: ^TypeInfo) {
 	case Boolean: write_string(buf, "bool");
 	case Any:
 		write_string(buf, "any");
-	case Atomic:
-		write_string(buf, "atomic ");
-		write_type(buf, info.elem);
 
 	case Pointer:
 		if info.elem == nil {
@@ -352,7 +349,7 @@ _parse_int :: proc(s: string, offset: int) -> (result: int, offset: int, ok: boo
 	for i < len(s[offset..]) {
 		c := rune(s[offset+i]);
 		if !is_digit(c) do break;
-		i++;
+		i += 1;
 
 		result *= 10;
 		result += int(c)-'0';
@@ -478,7 +475,7 @@ _fmt_int :: proc(fi: ^FmtInfo, u: u128, base: int, is_signed: bool, bit_size: in
 		prec = fi.width;
 		if neg || fi.plus || fi.space {
 			// There needs to be space for the "sign"
-			prec--;
+			prec -= 1;
 		}
 	}
 
@@ -771,9 +768,6 @@ fmt_value :: proc(fi: ^FmtInfo, v: any, verb: rune) {
 			fmt_pointer(fi, (cast(^rawptr)v.data)^, verb);
 		}
 
-	case Atomic:
-		fmt_arg(fi, any{v.data, info.elem}, verb);
-
 	case Array:
 		write_byte(fi.buf, '[');
 		defer write_byte(fi.buf, ']');
@@ -1009,7 +1003,7 @@ sbprintf :: proc(b: ^StringBuffer, fmt: string, args: ...any) -> string {
 
 		prev_i := i;
 		for i < end && fmt[i] != '%' {
-			i++;
+			i += 1;
 		}
 		if i > prev_i {
 			write_string(b, fmt[prev_i..i]);
@@ -1019,9 +1013,9 @@ sbprintf :: proc(b: ^StringBuffer, fmt: string, args: ...any) -> string {
 		}
 
 		// Process a "verb"
-		i++;
+		i += 1;
 
-		prefix_loop: for ; i < end; i++ {
+		prefix_loop: for ; i < end; i += 1 {
 			match fmt[i] {
 			case '+':
 				fi.plus = true;
@@ -1043,7 +1037,7 @@ sbprintf :: proc(b: ^StringBuffer, fmt: string, args: ...any) -> string {
 
 		// Width
 		if i < end && fmt[i] == '*' {
-			i++;
+			i += 1;
 			fi.width, arg_index, fi.width_set = int_from_arg(args, arg_index);
 			if !fi.width_set {
 				write_string(b, "%!(BAD WIDTH)");
@@ -1064,13 +1058,13 @@ sbprintf :: proc(b: ^StringBuffer, fmt: string, args: ...any) -> string {
 
 		// Precision
 		if i < end && fmt[i] == '.' {
-			i++;
+			i += 1;
 			if was_prev_index { // %[6].2d
 				fi.good_arg_index = false;
 			}
 			if i < end && fmt[i] == '*' {
 				arg_index, i, was_prev_index = _arg_number(&fi, arg_index, fmt, i, len(args));
-				i++;
+				i += 1;
 				fi.prec, arg_index, fi.prec_set = int_from_arg(args, arg_index);
 				if fi.prec < 0 {
 					fi.prec = 0;
@@ -1109,7 +1103,7 @@ sbprintf :: proc(b: ^StringBuffer, fmt: string, args: ...any) -> string {
 			write_string(b, "%!(MISSING ARGUMENT)");
 		} else {
 			fmt_arg(&fi, args[arg_index], verb);
-			arg_index++;
+			arg_index += 1;
 		}
 	}
 
