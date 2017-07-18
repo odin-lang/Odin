@@ -306,7 +306,7 @@ _alloc_command_line_arguments :: proc() -> []string {
 
 	arg_count: i32;
 	arg_list_ptr := win32.command_line_to_argv_w(win32.get_command_line_w(), &arg_count);
-	arg_list := make([]string, arg_count);
+	arg_list := make([]string, int(arg_count));
 	for _, i in arg_list do arg_list[i] = alloc_ucs2_to_utf8((arg_list_ptr+i)^);
 	return arg_list;
 }

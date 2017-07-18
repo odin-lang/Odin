@@ -112,36 +112,36 @@ to_degrees :: proc(radians: f32) -> f32 do return radians * 360 / TAU;
 
 
 
-dot :: proc(a, b: Vec2) -> f32 { c := a*b; return c.x + c.y; }
-dot :: proc(a, b: Vec3) -> f32 { c := a*b; return c.x + c.y + c.z; }
-dot :: proc(a, b: Vec4) -> f32 { c := a*b; return c.x + c.y + c.z + c.w; }
+dot :: proc(a, b: $T/[vector 2]$E) -> E { c := a*b; return c.x + c.y; }
+dot :: proc(a, b: $T/[vector 3]$E) -> E { c := a*b; return c.x + c.y + c.z; }
+dot :: proc(a, b: $T/[vector 4]$E) -> E { c := a*b; return c.x + c.y + c.z + c.w; }
 
-cross :: proc(x, y: Vec3) -> Vec3 {
+cross :: proc(x, y: $T/[vector 3]$E) -> T {
 	a := swizzle(x, 1, 2, 0) * swizzle(y, 2, 0, 1);
 	b := swizzle(x, 2, 0, 1) * swizzle(y, 1, 2, 0);
-	return a - b;
+	return T(a - b);
 }
 
 
-mag :: proc(v: Vec2) -> f32 do return sqrt(dot(v, v));
-mag :: proc(v: Vec3) -> f32 do return sqrt(dot(v, v));
-mag :: proc(v: Vec4) -> f32 do return sqrt(dot(v, v));
+mag :: proc(v: $T/[vector 2]$E) -> E do return sqrt(dot(v, v));
+mag :: proc(v: $T/[vector 3]$E) -> E do return sqrt(dot(v, v));
+mag :: proc(v: $T/[vector 4]$E) -> E do return sqrt(dot(v, v));
 
-norm :: proc(v: Vec2) -> Vec2 do return v / mag(v);
-norm :: proc(v: Vec3) -> Vec3 do return v / mag(v);
-norm :: proc(v: Vec4) -> Vec4 do return v / mag(v);
+norm :: proc(v: $T/[vector 2]$E) -> T do return v / mag(v);
+norm :: proc(v: $T/[vector 3]$E) -> T do return v / mag(v);
+norm :: proc(v: $T/[vector 4]$E) -> T do return v / mag(v);
 
-norm0 :: proc(v: Vec2) -> Vec2 {
+norm0 :: proc(v: $T/[vector 2]$E) -> T {
 	m := mag(v);
 	return m == 0 ? 0 : v/m;
 }
 
-norm0 :: proc(v: Vec3) -> Vec3 {
+norm0 :: proc(v: $T/[vector 3]$E) -> T {
 	m := mag(v);
 	return m == 0 ? 0 : v/m;
 }
 
-norm0 :: proc(v: Vec4) -> Vec4 {
+norm0 :: proc(v: $T/[vector 4]$E) -> T {
 	m := mag(v);
 	return m == 0 ? 0 : v/m;
 }

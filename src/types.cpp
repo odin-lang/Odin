@@ -1121,7 +1121,7 @@ bool are_types_identical(Type *x, Type *y) {
 	switch (x->kind) {
 	case Type_Generic:
 		if (y->kind == Type_Generic) {
-			return true; // TODO(bill): Is this correct?
+			return are_types_identical(x->Generic.specialized, y->Generic.specialized);
 		}
 		break;
 

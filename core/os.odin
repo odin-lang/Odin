@@ -24,7 +24,7 @@ read_entire_file :: proc(name: string) -> ([]u8, bool) {
 		return nil, true;
 	}
 
-	data := make([]u8, length);
+	data := make([]u8, int(length));
 	if data == nil {
 		return nil, false;
 	}

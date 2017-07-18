@@ -375,7 +375,7 @@ bool find_or_generate_polymorphic_procedure_from_parameters(Checker *c, Entity *
 	return find_or_generate_polymorphic_procedure(c, base_entity, nullptr, operands, poly_proc_data, false);
 }
 
-bool check_type_specialization_to(Checker *c, Type *type, Type *specialization, bool modify_type = false);
+bool check_type_specialization_to(Checker *c, Type *specialization, Type *type, bool compound, bool modify_type);
 bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool compound, bool modify_type);
 
 
@@ -1111,7 +1111,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 					if (type_expr->TypeType.specialization != nullptr) {
 						AstNode *s = type_expr->TypeType.specialization;
 						specialization = check_type(c, s);
-						if (!is_type_polymorphic_struct(specialization)) {
+						if (false && !is_type_polymorphic_struct(specialization)) {
 							gbString str = type_to_string(specialization);
 							defer (gb_string_free(str));
 							error(s, "Expected a polymorphic record, got %s", str);
@@ -1625,7 +1625,7 @@ void check_bit_field_type(Checker *c, Type *bit_field_type, Type *named_type, As
 }
 
 
-bool check_type_specialization_to(Checker *c, Type *type, Type *specialization, bool modify_type) {
+bool check_type_specialization_to(Checker *c, Type *specialization, Type *type, bool compound, bool modify_type) {
 	if (type == nullptr ||
 	    type == t_invalid) {
 		return true;
@@ -1637,42 +1637,40 @@ bool check_type_specialization_to(Checker *c, Type *type, Type *specialization, 
 		return false;
 	}
 	// gb_printf_err("#1 %s %s\n", type_to_string(type), type_to_string(specialization));
-	if (t->kind != Type_Record) {
+	if (t->kind == Type_Record) {
+		if (t->Record.polymorphic_parent == specialization) {
+			return true;
+		}
+
+		if (t->Record.polymorphic_parent == s->Record.polymorphic_parent) {
+			GB_ASSERT(s->Record.polymorphic_params != nullptr);
+			GB_ASSERT(t->Record.polymorphic_params != nullptr);
+
+			TypeTuple *s_tuple = &s->Record.polymorphic_params->Tuple;
+			TypeTuple *t_tuple = &t->Record.polymorphic_params->Tuple;
+			GB_ASSERT(t_tuple->variable_count == s_tuple->variable_count);
+			for (isize i = 0; i < s_tuple->variable_count; i++) {
+				Entity *s_e = s_tuple->variables[i];
+				Entity *t_e = t_tuple->variables[i];
+				Type *st = s_e->type;
+				Type *tt = t_e->type;
+				bool ok = is_polymorphic_type_assignable(c, st, tt, true, modify_type);
+			}
+
+			if (modify_type) {
+				// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it
+				gb_memmove(specialization, type, gb_size_of(Type));
+			}
+
+			return true;
+		}
+	}
+
+	if (specialization->kind == Type_Named &&
+	    type->kind != Type_Named) {
 		return false;
 	}
-	bool show_stuff = false && modify_type;
-
-	if (show_stuff) gb_printf_err("#1 %s %s\n", type_to_string(type), type_to_string(specialization));
-	if (t->Record.polymorphic_parent == specialization) {
-		return true;
-	}
-	if (show_stuff) gb_printf_err("#2 %s %s\n", type_to_string(t->Record.polymorphic_parent), type_to_string(specialization));
-	if (t->Record.polymorphic_parent == s->Record.polymorphic_parent) {
-		GB_ASSERT(s->Record.polymorphic_params != nullptr);
-		GB_ASSERT(t->Record.polymorphic_params != nullptr);
-
-		if (show_stuff) gb_printf_err("#3 %s -> %s\n", type_to_string(type), type_to_string(specialization));
-
-		TypeTuple *s_tuple = &s->Record.polymorphic_params->Tuple;
-		TypeTuple *t_tuple = &t->Record.polymorphic_params->Tuple;
-		GB_ASSERT(t_tuple->variable_count == s_tuple->variable_count);
-		for (isize i = 0; i < s_tuple->variable_count; i++) {
-			Entity *s_e = s_tuple->variables[i];
-			Entity *t_e = t_tuple->variables[i];
-			Type *st = s_e->type;
-			Type *tt = t_e->type;
-			if (show_stuff) gb_printf_err("\t@ %s -> %s\n", type_to_string(st), type_to_string(tt));
-			if (show_stuff && base_type(st)->kind == Type_Generic) gb_printf_err("\t$%.*s\n", LIT(base_type(st)->Generic.name));
-			bool ok = is_polymorphic_type_assignable(c, st, tt, true, modify_type);
-			if (show_stuff) gb_printf_err("\t$ %s -> %s\n\n", type_to_string(st), type_to_string(tt));
-		}
-
-
-		if (modify_type) {
-			// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it
-			gb_memmove(specialization, type, gb_size_of(Type));
-		}
-
+	if (is_polymorphic_type_assignable(c, base_type(specialization), base_type(type), compound, modify_type)) {
 		return true;
 	}
 
@@ -1684,11 +1682,11 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 	o.type = source;
 	switch (poly->kind) {
 	case Type_Basic:
-		if (compound) return are_types_identical(source, poly);
+		if (compound) return are_types_identical(poly, source);
 		return check_is_assignable_to(c, &o, poly);
 
 	case Type_Named: {
-		if (check_type_specialization_to(c, source, poly, modify_type)) {
+		if (check_type_specialization_to(c, poly, source, compound, modify_type)) {
 			return true;
 		}
 		if (compound) return are_types_identical(poly, source);
@@ -1698,7 +1696,7 @@ bool is_polymorphic_type_assignable(Checker *c, Type *poly, Type *source, bool c
 	case Type_Generic: {
 		if (poly->Generic.specialized != nullptr) {
 			Type *s = poly->Generic.specialized;
-			if (!check_type_specialization_to(c, source, s, modify_type)) {
+			if (!check_type_specialization_to(c, s, source, compound, modify_type)) {
 				return false;
 			}
 		}
@@ -1867,9 +1865,21 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 			variable_count += gb_max(f->names.count, 1);
 		}
 	}
+	isize min_variable_count = variable_count;
+	for (isize i = params.count-1; i >= 0; i--) {
+		AstNode *field = params[i];
+		if (field->kind == AstNode_Field) {
+			ast_node(f, Field, field);
+			if (f->default_value == nullptr)  {
+				break;
+			}
+			min_variable_count--;
+		}
+	}
+
 
 	if (operands != nullptr) {
-		GB_ASSERT_MSG(operands->count >= variable_count, "%td vs %td", operands->count, variable_count);
+		GB_ASSERT_MSG(operands->count >= min_variable_count, "%td vs %td", operands->count, variable_count);
 	}
 
 
@@ -2033,14 +2043,19 @@ Type *check_get_params(Checker *c, Scope *scope, AstNode *_params, bool *is_vari
 					}
 					if (is_type_polymorphic_struct(type)) {
 						error(o.expr, "Cannot pass polymorphic struct as a parameter");
+						success = false;
 						type = t_invalid;
 					}
-					if (specialization != nullptr && !check_type_specialization_to(c, type, specialization)) {
-						gbString t = type_to_string(type);
-						gbString s = type_to_string(specialization);
-						error(o.expr, "Cannot convert type `%s` to the specialization `%s`", t, s);
-						gb_string_free(s);
-						gb_string_free(t);
+					bool modify_type = !c->context.no_polymorphic_errors;
+					if (specialization != nullptr && !check_type_specialization_to(c, specialization, type, false, modify_type)) {
+						if (!c->context.no_polymorphic_errors) {
+							gbString t = type_to_string(type);
+							gbString s = type_to_string(specialization);
+							error(o.expr, "Cannot convert type `%s` to the specialization `%s`", t, s);
+							gb_string_free(s);
+							gb_string_free(t);
+						}
+						success = false;
 						type = t_invalid;
 					}
 				}
@@ -2856,7 +2871,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		if (pt->specialization != nullptr) {
 			AstNode *s = pt->specialization;
 			specific = check_type(c, s);
-			if (!is_type_polymorphic_struct(specific)) {
+			if (false && !is_type_polymorphic_struct(specific)) {
 				gbString str = type_to_string(specific);
 				error(s, "Expected a polymorphic record, got %s", str);
 				gb_string_free(str);
@@ -2986,7 +3001,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		Type *elem = check_type(c, vt->elem);
 		Type *be = base_type(elem);
 		i64 count = check_array_or_map_count(c, vt->count, false);
-		if (is_type_vector(be) || (!is_type_boolean(be) && !is_type_numeric(be))) {
+		if (is_type_vector(be) || (!is_type_boolean(be) && !is_type_numeric(be) && be->kind != Type_Generic)) {
 			gbString err_str = type_to_string(elem);
 			error(vt->elem, "Vector element type must be numerical or a boolean, got `%s`", err_str);
 			gb_string_free(err_str);
@@ -6313,7 +6328,7 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 			gb_sort_array(valids, valid_count, valid_proc_and_score_cmp);
 			i64 best_score = valids[0].score;
 			Entity *best_entity = procs[valids[0].index];
-			for (isize i = 0; i < valid_count; i++) {
+			for (isize i = 1; i < valid_count; i++) {
 				if (best_score > valids[i].score) {
 					valid_count = i;
 					break;
@@ -6345,7 +6360,9 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 			for (isize i = 0; i < overload_count; i++) {
 				Entity *proc = procs[i];
 				TokenPos pos = proc->token.pos;
-				Type *t = base_type(proc->type); GB_ASSERT(t->kind == Type_Proc);
+				Type *t = base_type(proc->type);
+				if (t == t_invalid) continue;
+				GB_ASSERT(t->kind == Type_Proc);
 				gbString pt;
 				if (t->Proc.node != NULL) {
 					pt = expr_to_string(t->Proc.node);
@@ -6355,6 +6372,9 @@ CallArgumentData check_call_arguments(Checker *c, Operand *operand, Type *proc_t
 				gb_printf_err("\t%.*s :: %s at %.*s(%td:%td) with score %lld\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column, cast(long long)valids[i].score);
 				// gb_printf_err("\t%.*s :: %s at %.*s(%td:%td)\n", LIT(name), pt, LIT(pos.file), pos.line, pos.column);
 				gb_string_free(pt);
+			}
+			if (overload_count > 0) {
+				gb_printf_err("\n");
 			}
 			result_type = t_invalid;
 		} else if (valid_count > 1) {
@@ -6878,7 +6898,7 @@ ExprKind check_call_expr(Checker *c, Operand *operand, AstNode *call) {
 }
 
 
-ExprKind check_macro_call_expr(Checker *c, Operand *operand, AstNode *call) {
+ExprKind Ov(Checker *c, Operand *operand, AstNode *call) {
 	GB_ASSERT(call->kind == AstNode_MacroCallExpr);
 	ast_node(mce, MacroCallExpr, call);
 
@@ -7893,7 +7913,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 	case_end;
 
 	case_ast_node(ce, MacroCallExpr, node);
-		return check_macro_call_expr(c, o, node);
+		return Ov(c, o, node);
 	case_end;
 
 	case_ast_node(de, DerefExpr, node);
@@ -8178,6 +8198,10 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 	case_ast_node(pt, PolyType, node);
 		str = gb_string_appendc(str, "$");
 		str = write_expr_to_string(str, pt->type);
+		if (pt->specialization != nullptr) {
+			str = gb_string_appendc(str, "/");
+			str = write_expr_to_string(str, pt->specialization);
+		}
 	case_end;
 
 	case_ast_node(pt, PointerType, node);
@@ -8210,6 +8234,13 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = write_expr_to_string(str, vt->elem);
 	case_end;
 
+	case_ast_node(mt, MapType, node);
+		str = gb_string_appendc(str, "map[");
+		str = write_expr_to_string(str, mt->key);
+		str = gb_string_appendc(str, "]");
+		str = write_expr_to_string(str, mt->value);
+	case_end;
+
 	case_ast_node(f, Field, node);
 		if (f->flags&FieldFlag_using) {
 			str = gb_string_appendc(str, "using ");
@@ -8229,9 +8260,23 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 			str = write_expr_to_string(str, name);
 		}
 		if (f->names.count > 0) {
-			str = gb_string_appendc(str, ": ");
+			if (f->type == nullptr && f->default_value != nullptr) {
+				str = gb_string_appendc(str, " ");
+			}
+			str = gb_string_appendc(str, ":");
 		}
-		str = write_expr_to_string(str, f->type);
+		if (f->type != nullptr) {
+			str = gb_string_appendc(str, " ");
+			str = write_expr_to_string(str, f->type);
+		}
+		if (f->default_value != nullptr) {
+			if (f->type != nullptr) {
+				str = gb_string_appendc(str, " ");
+			}
+			str = gb_string_appendc(str, "= ");
+			str = write_expr_to_string(str, f->default_value);
+		}
+
 	case_end;
 
 	case_ast_node(f, FieldList, node);
@@ -8297,8 +8342,12 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 		str = gb_string_appendc(str, ")");
 	case_end;
 
-	case_ast_node(ht, TypeType, node);
+	case_ast_node(tt, TypeType, node);
 		str = gb_string_appendc(str, "type");
+		if (tt->specialization) {
+			str = gb_string_appendc(str, "/");
+			str = write_expr_to_string(str, tt->specialization);
+		}
 	case_end;
 
 	case_ast_node(pt, ProcType, node);

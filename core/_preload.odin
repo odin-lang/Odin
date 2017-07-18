@@ -305,7 +305,7 @@ resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_AL
 }
 
 
-copy :: proc(dst, src: []$T) -> int #cc_contextless {
+copy :: proc(dst, src: $T/[]$E) -> int #cc_contextless {
 	n := max(0, min(len(dst), len(src)));
 	if n > 0 do __mem_copy(&dst[0], &src[0], n*size_of(T));
 	return n;
@@ -313,7 +313,7 @@ copy :: proc(dst, src: []$T) -> int #cc_contextless {
 
 
 
-append :: proc(array: ^[]$T, args: ...T) -> int #cc_contextless {
+append :: proc(array: ^$T/[]$E, args: ...E) -> int #cc_contextless {
 	if array == nil do return 0;
 
 	arg_len := len(args);
@@ -322,16 +322,16 @@ append :: proc(array: ^[]$T, args: ...T) -> int #cc_contextless {
 	arg_len = min(cap(array)-len(array), arg_len);
 	if arg_len > 0 {
 		s := cast(^raw.Slice)array;
-		data := cast(^T)s.data;
+		data := cast(^E)s.data;
 		assert(data != nil);
-		sz :: size_of(T);
+		sz :: size_of(E);
 		__mem_copy(data + s.len, &args[0], sz*arg_len);
 		s.len += arg_len;
 	}
 	return len(array);
 }
 
-append :: proc(array: ^[dynamic]$T, args: ...T) -> int {
+append :: proc(array: ^$T/[dynamic]$E, args: ...E) -> int {
 	if array == nil do return 0;
 
 	arg_len := len(args);
@@ -346,37 +346,37 @@ append :: proc(array: ^[dynamic]$T, args: ...T) -> int {
 	// TODO(bill): Better error handling for failed reservation
 	if ok {
 		a := cast(^raw.DynamicArray)array;
-		data := cast(^T)a.data;
+		data := cast(^E)a.data;
 		assert(data != nil);
-		__mem_copy(data + a.len, &args[0], size_of(T) * arg_len);
+		__mem_copy(data + a.len, &args[0], size_of(E) * arg_len);
 		a.len += arg_len;
 	}
 	return len(array);
 }
 
-pop :: proc(array: ^[]$T) -> T #cc_contextless {
-	if array == nil do return T{};
+pop :: proc(array: ^$T/[]$E) -> E #cc_contextless {
+	if array == nil do return E{};
 	assert(len(array) > 0);
 	res := array[len(array)-1];
 	(cast(^raw.Slice)array).len -= 1;
 	return res;
 }
 
-pop :: proc(array: ^[dynamic]$T) -> T #cc_contextless {
-	if array == nil do return T{};
+pop :: proc(array: ^$T/[dynamic]$E) -> E #cc_contextless {
+	if array == nil do return E{};
 	assert(len(array) > 0);
 	res := array[len(array)-1];
 	(cast(^raw.DynamicArray)array).len -= 1;
 	return res;
 }
 
-clear :: proc(slice: ^[]$T) #cc_contextless #inline {
+clear :: proc(slice: ^$T/[]$E) #cc_contextless #inline {
 	if slice != nil do (cast(^raw.Slice)slice).len = 0;
 }
-clear :: proc(array: ^[dynamic]$T) #cc_contextless #inline {
+clear :: proc(array: ^$T/[dynamic]$E) #cc_contextless #inline {
 	if array != nil do (cast(^raw.DynamicArray)array).len = 0;
 }
-clear :: proc(m: ^map[$K]$V) #cc_contextless #inline {
+clear :: proc(m: ^$T/map[$K]$V) #cc_contextless #inline {
 	if m == nil do return;
 	raw_map := cast(^raw.DynamicMap)m;
 	hashes  := cast(^raw.DynamicArray)&raw_map.hashes;
@@ -385,7 +385,7 @@ clear :: proc(m: ^map[$K]$V) #cc_contextless #inline {
 	entries.len = 0;
 }
 
-reserve :: proc(array: ^[dynamic]$T, capacity: int) -> bool {
+reserve :: proc(array: ^$T/[dynamic]$E, capacity: int) -> bool {
 	if array == nil do return false;
 	a := cast(^raw.DynamicArray)array;
 
@@ -396,11 +396,11 @@ reserve :: proc(array: ^[dynamic]$T, capacity: int) -> bool {
 	}
 	assert(a.allocator.procedure != nil);
 
-	old_size  := a.cap * size_of(T);
-	new_size  := capacity * size_of(T);
+	old_size  := a.cap * size_of(E);
+	new_size  := capacity * size_of(E);
 	allocator := a.allocator;
 
-	new_data := allocator.procedure(allocator.data, Allocator.Mode.Resize, new_size, align_of(T), a.data, old_size, 0);
+	new_data := allocator.procedure(allocator.data, Allocator.Mode.Resize, new_size, align_of(E), a.data, old_size, 0);
 	if new_data == nil do return false;
 
 	a.data = new_data;
@@ -409,7 +409,7 @@ reserve :: proc(array: ^[dynamic]$T, capacity: int) -> bool {
 }
 
 
-__get_map_header :: proc(m: ^map[$K]$V) -> __MapHeader #cc_contextless {
+__get_map_header :: proc(m: ^$T/map[$K]$V) -> __MapHeader #cc_contextless {
 	header := __MapHeader{m = cast(^raw.DynamicMap)m};
 	Entry :: struct {
 		key:   __MapKey;
@@ -459,11 +459,11 @@ __get_map_key :: proc(key: $K) -> __MapKey #cc_contextless {
 	return map_key;
 }
 
-reserve :: proc(m: ^map[$K]$V, capacity: int) {
+reserve :: proc(m: ^$T/map[$K]$V, capacity: int) {
 	if m != nil do __dynamic_map_reserve(__get_map_header(m), capacity);
 }
 
-delete :: proc(m: ^map[$K]$V, key: K) {
+delete :: proc(m: ^$T/map[$K]$V, key: K) {
 	if m != nil do __dynamic_map_delete(__get_map_header(m), __get_map_key(key));
 }
 
@@ -480,15 +480,60 @@ new_clone :: proc(data: $T) -> ^T #inline {
 	return ptr;
 }
 
-free :: proc(ptr:   rawptr)      do free_ptr(ptr);
-free :: proc(str:   string)      do free_ptr((cast(^raw.String)&str).data);
-free :: proc(array: [dynamic]$T) do free_ptr((cast(^raw.DynamicArray)&array).data);
-free :: proc(slice: []$T)        do free_ptr((cast(^raw.Slice)&slice).data);
-free :: proc(m:     map[$K]$V) {
+free :: proc(ptr:   rawptr)         do free_ptr(ptr);
+free :: proc(str:   $T/string)      do free_ptr((cast(^raw.String)&str).data);
+free :: proc(array: $T/[dynamic]$E) do free_ptr((cast(^raw.DynamicArray)&array).data);
+free :: proc(slice: $T/[]$E)        do free_ptr((cast(^raw.Slice)&slice).data);
+free :: proc(m:     $T/map[$K]$V) {
 	raw := cast(^raw.DynamicMap)&m;
 	free(raw.hashes);
 	free(raw.entries.data);
 }
+
+// NOTE(bill): This code works but I will prefer having `make` a built-in procedure
+// to have better error messages
+/*
+make :: proc(T: type/[]$E, len: int, using location := #caller_location) -> T {
+	cap := len;
+	__slice_expr_error(fully_pathed_filename, int(line), int(column), 0, len, cap);
+	data := cast(^E)alloc(len * size_of(E), align_of(E));
+	for i in 0..len do (data+i)^ = E{};
+	s := raw.Slice{data = data, len = len, cap = len};
+	return (cast(^T)&s)^;
+}
+make :: proc(T: type/[]$E, len, cap: int, using location := #caller_location) -> T {
+	__slice_expr_error(fully_pathed_filename, int(line), int(column), 0, len, cap);
+	data := cast(^E)alloc(len * size_of(E), align_of(E));
+	for i in 0..len do (data+i)^ = E{};
+	s := raw.Slice{data = data, len = len, cap = len};
+	return (cast(^T)&s)^;
+}
+make :: proc(T: type/[dynamic]$E, len: int = 8, using location := #caller_location) -> T {
+	cap := len;
+	__slice_expr_error(fully_pathed_filename, int(line), int(column), 0, len, cap);
+	data := cast(^E)alloc(cap * size_of(E), align_of(E));
+	for i in 0..len do (data+i)^ = E{};
+	s := raw.DynamicArray{data = data, len = len, cap = cap, allocator = context.allocator};
+	return (cast(^T)&s)^;
+}
+make :: proc(T: type/[dynamic]$E, len, cap: int, using location := #caller_location) -> T {
+	__slice_expr_error(fully_pathed_filename, int(line), int(column), 0, len, cap);
+	data := cast(^E)alloc(cap * size_of(E), align_of(E));
+	for i in 0..len do (data+i)^ = E{};
+	s := raw.DynamicArray{data = data, len = len, cap = cap, allocator = context.allocator};
+	return (cast(^T)&s)^;
+}
+
+make :: proc(T: type/map[$K]$V, cap: int = 16, using location := #caller_location) -> T {
+	if cap < 0 do cap = 16;
+
+	m: T;
+	header := __get_map_header(&m);
+	__dynamic_map_reserve(header, cap);
+	return m;
+}
+*/
+
 
 
 default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: int) -> rawptr {
