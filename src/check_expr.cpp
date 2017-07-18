@@ -879,15 +879,20 @@ void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 		e->identifier = name;
 
 		if (name_field_index < default_values.count) {
-			Operand op = default_values[name_field_index++];
-			check_init_variable(c, e, &op, str_lit("struct field assignment"));
-			if (is_operand_nil(op)) {
+			Operand a = default_values[name_field_index];
+			Operand b = default_values[name_field_index];
+			check_init_variable(c, e, &b, str_lit("struct field assignment"));
+			if (is_operand_nil(a)) {
 				e->Variable.default_is_nil = true;
-			} else if (op.mode != Addressing_Constant) {
-				error(op.expr, "Default field parameter must be a constant");
+			} else if (is_operand_undef(a)) {
+				e->Variable.default_is_undef = true;
+			} else if (b.mode != Addressing_Constant) {
+				error(b.expr, "Default field parameter must be a constant");
 			} else {
-				e->Variable.default_value = op.value;
+				e->Variable.default_value = b.value;
 			}
+
+			name_field_index++;
 		} else {
 			GB_ASSERT(type != nullptr);
 		}

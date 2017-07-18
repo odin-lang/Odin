@@ -671,6 +671,8 @@ bool ir_type_has_default_values(Type *t) {
 					continue;
 				} else if (f->Variable.default_value.kind != ExactValue_Invalid) {
 					return true;
+				} else if (f->Variable.default_is_undef) {
+					return true;
 				}
 			}
 		}

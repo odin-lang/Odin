@@ -166,7 +166,9 @@ bool is_operand_value(Operand o) {
 bool is_operand_nil(Operand o) {
 	return o.mode == Addressing_Value && o.type == t_untyped_nil;
 }
-
+bool is_operand_undef(Operand o) {
+	return o.mode == Addressing_Value && o.type == t_untyped_undef;
+}
 
 struct BlockLabel {
 	String   name;

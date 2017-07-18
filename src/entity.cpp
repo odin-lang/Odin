@@ -87,6 +87,7 @@ struct Entity {
 			i32        field_src_index;
 			ExactValue default_value;
 			bool       default_is_nil;
+			bool       default_is_undef;
 			bool       default_is_location;
 			bool       is_immutable;
 			bool       is_thread_local;

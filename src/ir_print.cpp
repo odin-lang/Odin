@@ -648,9 +648,14 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 			for (isize i = 0; i < value_count; i++) {
 				if (i > 0) ir_fprintf(f, ", ");
-				Type *elem_type = type->Record.fields[i]->type;
+				Entity *e = type->Record.fields[i];
 
-				ir_print_compound_element(f, m, values[i], elem_type);
+				if (!visited[i] && e->Variable.default_is_undef) {
+					ir_print_type(f, m, e->type);
+					ir_fprintf(f, " undef");
+				} else {
+					ir_print_compound_element(f, m, values[i], e->type);
+				}
 			}
 
 
@@ -682,12 +687,17 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 				for (isize i = 0; i < value_count; i++) {
 					if (i > 0) ir_fprintf(f, ", ");
-					Entity *field = type->Record.fields[i];
-					ExactValue value = {};
-					if (!field->Variable.default_is_nil) {
-						value = field->Variable.default_value;
+					Entity *e = type->Record.fields[i];
+					if (e->Variable.default_is_undef) {
+						ir_print_type(f, m, e->type);
+						ir_fprintf(f, " undef");
+					} else {
+						ExactValue value = {};
+						if (!e->Variable.default_is_nil) {
+							value = e->Variable.default_value;
+						}
+						ir_print_compound_element(f, m, value, e->type);
 					}
-					ir_print_compound_element(f, m, value, field->type);
 				}
 
 				ir_fprintf(f, "}");

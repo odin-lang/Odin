@@ -110,7 +110,7 @@ get_hash :: proc(s: string) -> u32 {
 }
 
 
-/*
+
 Vector :: struct(N: int, T: type) {
 	using _: raw_union {
 		using e: [N]T;
@@ -140,29 +140,13 @@ foo1 :: proc(a: type/Vector)         { fmt.println("foo1", a{}); }
 foo3 :: proc(a: type/Vector(3, $T))  {fmt.println("foo3", a{}); }
 // foo4 :: proc(a: type/Vector3)        {}
 
-*/
 
 
-foo :: proc() -> (f32, f32) {
-	return 1, 2;
-}
+
 
 
 main :: proc() {
-
-	Vector3 :: struct {
-		x: f32 = 1;
-		y: f32 = 4;
-		z: f32 = 9;
-	}
-
-	v := make([dynamic]Vector3, 3);
-
-	array: [100]Vector3;
-	v2 := array[50];
-	fmt.println(v2);
-
-/*	foo1(Vector(3, f32));
+	foo1(Vector(3, f32));
 	foo1(Vector3);
 	foo3(Vector(3, f32));
 	foo3(Vector3);
@@ -179,9 +163,7 @@ main :: proc() {
 
 	v := add(a, b);
 	fmt.println(v.v);
-*/
 
-/*
 	table: Table(string, int);
 
 	for i in 0..36 do put(&table, "Hellope", i);
@@ -193,5 +175,4 @@ main :: proc() {
 
 	found, _ = find(&table, "World!");
 	fmt.printf("found is %v\n", found);
-*/
 }
