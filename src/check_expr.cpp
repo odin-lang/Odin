@@ -1055,6 +1055,8 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
 
+	String context = str_lit("struct");
+
 	isize min_field_count = 0;
 	for_array(field_index, st->fields) {
 	AstNode *field = st->fields[field_index];
@@ -1065,6 +1067,11 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 		}
 	}
 	struct_type->Record.names = make_names_field_for_record(c, c->context.scope);
+
+	if (st->is_raw_union) {
+		struct_type->Record.is_raw_union = true;
+		context = str_lit("struct #raw_union");
+	}
 
 	Type *polymorphic_params = nullptr;
 	bool is_polymorphic = false;
@@ -1218,7 +1225,7 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 	Array<Entity *> fields = {};
 
 	if (!is_polymorphic) {
-		fields = check_fields(c, node, st->fields, min_field_count, str_lit("struct"));
+		fields = check_fields(c, node, st->fields, min_field_count, context);
 	}
 
 	struct_type->Record.scope               = c->context.scope;
@@ -1232,34 +1239,35 @@ void check_struct_type(Checker *c, Type *struct_type, AstNode *node, Array<Opera
 	struct_type->Record.is_poly_specialized = is_poly_specialized;
 
 
-	type_set_offsets(c->allocator, struct_type);
+	if (!struct_type->Record.is_raw_union) {
+		type_set_offsets(c->allocator, struct_type);
 
+		if (!struct_type->failure && !st->is_packed && !st->is_ordered) {
+			struct_type->failure = false;
+			struct_type->Record.are_offsets_set = false;
+			struct_type->Record.offsets = nullptr;
+			// NOTE(bill): Reorder fields for reduced size/performance
 
-	if (!struct_type->failure && !st->is_packed && !st->is_ordered) {
-		struct_type->failure = false;
-		struct_type->Record.are_offsets_set = false;
-		struct_type->Record.offsets = nullptr;
-		// NOTE(bill): Reorder fields for reduced size/performance
+			Entity **reordered_fields = gb_alloc_array(c->allocator, Entity *, fields.count);
+			for (isize i = 0; i < fields.count; i++) {
+				reordered_fields[i] = struct_type->Record.fields_in_src_order[i];
+			}
 
-		Entity **reordered_fields = gb_alloc_array(c->allocator, Entity *, fields.count);
-		for (isize i = 0; i < fields.count; i++) {
-			reordered_fields[i] = struct_type->Record.fields_in_src_order[i];
+			// NOTE(bill): Hacky thing
+			// TODO(bill): Probably make an inline sorting procedure rather than use global variables
+			__checker_allocator = c->allocator;
+			// NOTE(bill): compound literal order must match source not layout
+			gb_sort_array(reordered_fields, fields.count, cmp_reorder_struct_fields);
+
+			for (isize i = 0; i < fields.count; i++) {
+				reordered_fields[i]->Variable.field_index = i;
+			}
+
+			struct_type->Record.fields = reordered_fields;
 		}
 
-		// NOTE(bill): Hacky thing
-		// TODO(bill): Probably make an inline sorting procedure rather than use global variables
-		__checker_allocator = c->allocator;
-		// NOTE(bill): compound literal order must match source not layout
-		gb_sort_array(reordered_fields, fields.count, cmp_reorder_struct_fields);
-
-		for (isize i = 0; i < fields.count; i++) {
-			reordered_fields[i]->Variable.field_index = i;
-		}
-
-		struct_type->Record.fields = reordered_fields;
+		type_set_offsets(c->allocator, struct_type);
 	}
-
-	type_set_offsets(c->allocator, struct_type);
 
 
 	if (st->align != nullptr) {
@@ -1353,29 +1361,29 @@ void check_union_type(Checker *c, Type *named_type, Type *union_type, AstNode *n
 	union_type->Union.variant_count = variants.count;
 }
 
-void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
-	GB_ASSERT(node->kind == AstNode_RawUnionType);
-	GB_ASSERT(is_type_raw_union(union_type));
-	ast_node(ut, RawUnionType, node);
+// void check_raw_union_type(Checker *c, Type *union_type, AstNode *node) {
+// 	GB_ASSERT(node->kind == AstNode_RawUnionType);
+// 	GB_ASSERT(is_type_raw_union(union_type));
+// 	ast_node(ut, RawUnionType, node);
 
-	isize min_field_count = 0;
-	for_array(i, ut->fields) {
-		AstNode *field = ut->fields[i];
-		switch (field->kind) {
-		case_ast_node(f, ValueDecl, field);
-			min_field_count += f->names.count;
-		case_end;
-		}
-	}
+// 	isize min_field_count = 0;
+// 	for_array(i, ut->fields) {
+// 		AstNode *field = ut->fields[i];
+// 		switch (field->kind) {
+// 		case_ast_node(f, ValueDecl, field);
+// 			min_field_count += f->names.count;
+// 		case_end;
+// 		}
+// 	}
 
-	union_type->Record.names = make_names_field_for_record(c, c->context.scope);
+// 	union_type->Record.names = make_names_field_for_record(c, c->context.scope);
 
-	auto fields = check_fields(c, node, ut->fields, min_field_count, str_lit("raw_union"));
+// 	auto fields = check_fields(c, node, ut->fields, min_field_count, str_lit("raw_union"));
 
-	union_type->Record.scope       = c->context.scope;
-	union_type->Record.fields      = fields.data;
-	union_type->Record.field_count = fields.count;
-}
+// 	union_type->Record.scope       = c->context.scope;
+// 	union_type->Record.fields      = fields.data;
+// 	union_type->Record.field_count = fields.count;
+// }
 
 
 void check_enum_type(Checker *c, Type *enum_type, Type *named_type, AstNode *node) {
@@ -3018,7 +3026,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		return true;
 	case_end;
 
-	case_ast_node(rut, RawUnionType, e);
+/* 	case_ast_node(rut, RawUnionType, e);
 		*type = make_type_raw_union(c->allocator);
 		set_base_type(named_type, *type);
 		check_open_scope(c, e);
@@ -3027,7 +3035,7 @@ bool check_type_internal(Checker *c, AstNode *e, Type **type, Type *named_type) 
 		(*type)->Record.node = e;
 		return true;
 	case_end;
-
+ */
 	case_ast_node(et, EnumType, e);
 		*type = make_type_enum(c->allocator);
 		set_base_type(named_type, *type);
@@ -6482,7 +6490,7 @@ CallArgumentError check_polymorphic_struct_type(Checker *c, Operand *operand, As
 
 	Type *original_type = operand->type;
 	Type *struct_type = base_type(operand->type);
-	GB_ASSERT(is_type_struct(struct_type));
+	GB_ASSERT(struct_type->kind == Type_Record);
 	TypeRecord *st = &struct_type->Record;
 	GB_ASSERT(st->is_polymorphic);
 
@@ -7738,7 +7746,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 			valid = false;
 		}
 
-		if (!valid && (is_type_struct(t) || is_type_raw_union(t))) {
+		if (!valid && t->kind == Type_Record) {
 			Entity *found = find_using_index_expr(t);
 			if (found != nullptr) {
 				valid = check_set_index_data(o, found->type, is_type_pointer(found->type), &max_count);
@@ -7937,7 +7945,7 @@ ExprKind check_expr_base_internal(Checker *c, Operand *o, AstNode *node, Type *t
 	case AstNode_VectorType:
 	case AstNode_StructType:
 	case AstNode_UnionType:
-	case AstNode_RawUnionType:
+	// case AstNode_RawUnionType:
 	case AstNode_EnumType:
 	case AstNode_MapType:
 		o->mode = Addressing_Type;
@@ -8351,19 +8359,20 @@ gbString write_expr_to_string(gbString str, AstNode *node) {
 
 	case_ast_node(st, StructType, node);
 		str = gb_string_appendc(str, "struct ");
-		if (st->is_packed)  str = gb_string_appendc(str, "#packed ");
-		if (st->is_ordered) str = gb_string_appendc(str, "#ordered ");
+		if (st->is_packed)    str = gb_string_appendc(str, "#packed ");
+		if (st->is_ordered)   str = gb_string_appendc(str, "#ordered ");
+		if (st->is_raw_union) str = gb_string_appendc(str, "#raw_union ");
 		str = gb_string_appendc(str, "{");
 		str = write_record_fields_to_string(str, st->fields);
 		str = gb_string_appendc(str, "}");
 	case_end;
 
-	case_ast_node(st, RawUnionType, node);
-		str = gb_string_appendc(str, "raw_union ");
-		str = gb_string_appendc(str, "{");
-		str = write_record_fields_to_string(str, st->fields);
-		str = gb_string_appendc(str, "}");
-	case_end;
+	// case_ast_node(st, RawUnionType, node);
+	// 	str = gb_string_appendc(str, "raw_union ");
+	// 	str = gb_string_appendc(str, "{");
+	// 	str = write_record_fields_to_string(str, st->fields);
+	// 	str = gb_string_appendc(str, "}");
+	// case_end;
 
 	case_ast_node(st, UnionType, node);
 		str = gb_string_appendc(str, "union ");

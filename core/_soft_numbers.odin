@@ -6,12 +6,12 @@ __multi3 :: proc(a, b: u128) -> u128 #cc_c #link_name "__multi3" {
 
 
 	when ODIN_ENDIAN == "bit" {
-		TWords :: raw_union {
+		TWords :: struct #raw_union {
 			all: u128;
 			using _: struct {lo, hi: u64;};
 		};
 	} else {
-		TWords :: raw_union {
+		TWords :: struct #raw_union {
 			all: u128;
 			using _: struct {hi, lo: u64;};
 		};
@@ -106,7 +106,7 @@ __u128_quo_mod :: proc(a, b: u128, rem: ^u128) -> (quo: u128) #cc_c #link_name "
 __f16_to_f32 :: proc(f: f16) -> f32 #cc_c #no_inline #link_name "__gnu_h2f_ieee" {
 	when true {
 		// Source: https://fgiesen.wordpress.com/2012/03/28/half-to-float-done-quic/
-		FP32 :: raw_union {u: u32, f: f32};
+		FP32 :: struct #raw_union {u: u32, f: f32};
 
 		magic, was_infnan: FP32;
 		magic.u = (254-15) << 23;
@@ -130,8 +130,8 @@ __f16_to_f32 :: proc(f: f16) -> f32 #cc_c #no_inline #link_name "__gnu_h2f_ieee"
 __f32_to_f16 :: proc(f_: f32) -> f16 #cc_c #no_inline #link_name "__gnu_f2h_ieee" {
 	when false {
 		// Source: https://gist.github.com/rygorous/2156668
-		FP16 :: raw_union {u: u16, f: f16};
-		FP32 :: raw_union {u: u32, f: f32};
+		FP16 :: struct #raw_union {u: u16, f: f16};
+		FP32 :: struct #raw_union {u: u32, f: f32};
 
 		f32infty, f16infty, magic: FP32;
 		f32infty.u = 255<<23;

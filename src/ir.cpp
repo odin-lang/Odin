@@ -662,7 +662,7 @@ bool ir_type_has_default_values(Type *t) {
 		return ir_type_has_default_values(t->Array.elem);
 
 	case Type_Record:
-		if (t->Record.kind == TypeRecord_Struct) {
+		if (!t->Record.is_raw_union) {
 			for (isize i = 0; i < t->Record.field_count; i++) {
 				Entity *f = t->Record.fields_in_src_order[i];
 				if (f->kind != Entity_Variable) continue;
@@ -7355,12 +7355,7 @@ void ir_init_module(irModule *m, Checker *c) {
 					count += t->Union.variant_count;
 					break;
 				case Type_Record:
-					switch (t->Record.kind) {
-					case TypeRecord_Struct:
-					case TypeRecord_RawUnion:
-						count += t->Record.field_count;
-						break;
-					}
+					count += t->Record.field_count;
 					break;
 				case Type_Tuple:
 					count += t->Tuple.variable_count;
@@ -8193,8 +8188,32 @@ void ir_gen_tree(irGen *s) {
 				} break;
 
 				case Type_Record: {
-					switch (t->Record.kind) {
-					case TypeRecord_Struct: {
+					if (t->Record.is_raw_union) {
+						ir_emit_comment(proc, str_lit("TypeInfoRawUnion"));
+						tag = ir_emit_conv(proc, variant_ptr, t_type_info_raw_union_ptr);
+
+						irValue *memory_types   = ir_type_info_member_types_offset(proc, t->Record.field_count);
+						irValue *memory_names   = ir_type_info_member_names_offset(proc, t->Record.field_count);
+						irValue *memory_offsets = ir_type_info_member_offsets_offset(proc, t->Record.field_count);
+
+						for (isize i = 0; i < t->Record.field_count; i++) {
+							Entity *f = t->Record.fields[i];
+							irValue *index     = ir_const_int(a, i);
+							irValue *type_info = ir_emit_ptr_offset(proc, memory_types, index);
+							// NOTE(bill): Offsets are always 0
+
+							ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
+							if (f->token.string.len > 0) {
+								irValue *name = ir_emit_ptr_offset(proc, memory_names, index);
+								ir_emit_store(proc, name, ir_const_string(a, f->token.string));
+							}
+						}
+
+						irValue *count = ir_const_int(a, t->Record.field_count);
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types,   count, count);
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   count, count);
+						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, count, count);
+					} else {
 						ir_emit_comment(proc, str_lit("TypeInfoStruct"));
 						tag = ir_emit_conv(proc, variant_ptr, t_type_info_struct_ptr);
 
@@ -8239,33 +8258,6 @@ void ir_gen_tree(irGen *s) {
 						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   count, count);
 						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, count, count);
 						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 3), memory_usings,  count, count);
-					} break;
-					case TypeRecord_RawUnion: {
-						ir_emit_comment(proc, str_lit("TypeInfoRawUnion"));
-						tag = ir_emit_conv(proc, variant_ptr, t_type_info_raw_union_ptr);
-
-						irValue *memory_types   = ir_type_info_member_types_offset(proc, t->Record.field_count);
-						irValue *memory_names   = ir_type_info_member_names_offset(proc, t->Record.field_count);
-						irValue *memory_offsets = ir_type_info_member_offsets_offset(proc, t->Record.field_count);
-
-						for (isize i = 0; i < t->Record.field_count; i++) {
-							Entity *f = t->Record.fields[i];
-							irValue *index     = ir_const_int(a, i);
-							irValue *type_info = ir_emit_ptr_offset(proc, memory_types, index);
-							// NOTE(bill): Offsets are always 0
-
-							ir_emit_store(proc, type_info, ir_type_info(proc, f->type));
-							if (f->token.string.len > 0) {
-								irValue *name = ir_emit_ptr_offset(proc, memory_names, index);
-								ir_emit_store(proc, name, ir_const_string(a, f->token.string));
-							}
-						}
-
-						irValue *count = ir_const_int(a, t->Record.field_count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 0), memory_types,   count, count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 1), memory_names,   count, count);
-						ir_fill_slice(proc, ir_emit_struct_ep(proc, tag, 2), memory_offsets, count, count);
-					} break;
 					}
 				} break;
 				case Type_Map: {

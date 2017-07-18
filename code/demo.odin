@@ -130,18 +130,16 @@ get_hash :: proc(s: string) -> u32 {
 
 
 
-Vector :: struct(N: int, T: type) {
-	using _: raw_union {
-		using e: [N]T;
-		when 0 < N && N <= 4 {
-			using v: struct {
-				when N >= 1 do x: T;
-				when N >= 2 do y: T;
-				when N >= 3 do z: T;
-				when N >= 4 do w: T;
-			};
-
-}	};
+Vector :: struct(N: int, T: type) #raw_union {
+	using e: [N]T;
+	when 0 < N && N <= 4 {
+		using v: struct {
+			when N >= 1 do x: T;
+			when N >= 2 do y: T;
+			when N >= 3 do z: T;
+			when N >= 4 do w: T;
+		};
+	}
 }
 
 Vector3 :: Vector(3, f32);
@@ -161,17 +159,17 @@ foo3 :: proc(a: type/Vector(3, $T))  { fmt.println("foo3", a{}); }
 
 
 main :: proc() {
-	Foo :: struct {
-		a := 123;
-		b := true;
-	}
-	v1 := Foo{};
-	fmt.println(v1);
+	// Foo :: struct {
+	// 	a := 123;
+	// 	b := true;
+	// }
+	// v1 := Foo{};
+	// fmt.println(v1);
 
-	foo1(Vector(3, f32));
-	foo1(Vector3);
-	foo3(Vector(3, f32));
-	foo3(Vector3);
+	// foo1(Vector(3, f32));
+	// foo1(Vector3);
+	// foo3(Vector(3, f32));
+	// foo3(Vector3);
 
 
 	a, b: Vector3;
@@ -184,17 +182,18 @@ main :: proc() {
 	b.z = 5;
 
 	v := add(a, b);
-	fmt.println(v.v);
+	fmt.println(size_of(Vector3));
+	fmt.println(v.e, v.v);
 
-	table: Table(string, int);
+	// table: Table(string, int);
 
-	for i in 0..36 do put(&table, "Hellope", i);
-	for i in 0..42 do put(&table, "World!",  i);
+	// for i in 0..36 do put(&table, "Hellope", i);
+	// for i in 0..42 do put(&table, "World!",  i);
 
 
-	found, _ := find(&table, "Hellope");
-	fmt.printf("found is %v\n", found);
+	// found, _ := find(&table, "Hellope");
+	// fmt.printf("found is %v\n", found);
 
-	found, _ = find(&table, "World!");
-	fmt.printf("found is %v\n", found);
+	// found, _ = find(&table, "World!");
+	// fmt.printf("found is %v\n", found);
 }

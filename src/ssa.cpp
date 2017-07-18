@@ -652,7 +652,7 @@ bool can_ssa_type(Type *t) {
 		return false;
 
 	case Type_Record:
-		if (t->Record.kind == TypeRecord_Struct) {
+		if (!t->Record.is_raw_union) {
 			if (t->Record.field_count > SSA_MAX_STRUCT_FIELD_COUNT) {
 				return false;
 			}

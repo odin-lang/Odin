@@ -423,16 +423,12 @@ AST_NODE_KIND(_TypeBegin, "", i32) \
 		AstNode *        polymorphic_params;  \
 		bool             is_packed;           \
 		bool             is_ordered;          \
+		bool             is_raw_union;        \
 		AstNode *        align;               \
 	}) \
 	AST_NODE_KIND(UnionType, "union type", struct { \
 		Token            token;       \
 		Array<AstNode *> variants;    \
-	}) \
-	AST_NODE_KIND(RawUnionType, "raw union type", struct { \
-		Token            token; \
-		Array<AstNode *> fields; \
-		isize            field_count; \
 	}) \
 	AST_NODE_KIND(EnumType, "enum type", struct { \
 		Token            token; \
@@ -599,7 +595,6 @@ Token ast_node_token(AstNode *node) {
 	case AstNode_VectorType:       return node->VectorType.token;
 	case AstNode_StructType:       return node->StructType.token;
 	case AstNode_UnionType:        return node->UnionType.token;
-	case AstNode_RawUnionType:     return node->RawUnionType.token;
 	case AstNode_EnumType:         return node->EnumType.token;
 	case AstNode_BitFieldType:     return node->BitFieldType.token;
 	case AstNode_MapType:          return node->MapType.token;
@@ -867,9 +862,6 @@ AstNode *clone_ast_node(gbAllocator a, AstNode *node) {
 		break;
 	case AstNode_UnionType:
 		n->UnionType.variants = clone_ast_node_array(a, n->UnionType.variants);
-		break;
-	case AstNode_RawUnionType:
-		n->RawUnionType.fields = clone_ast_node_array(a, n->RawUnionType.fields);
 		break;
 	case AstNode_EnumType:
 		n->EnumType.base_type = clone_ast_node(a, n->EnumType.base_type);
@@ -1451,7 +1443,8 @@ AstNode *ast_vector_type(AstFile *f, Token token, AstNode *count, AstNode *elem)
 }
 
 AstNode *ast_struct_type(AstFile *f, Token token, Array<AstNode *> fields, isize field_count,
-                         AstNode *polymorphic_params, bool is_packed, bool is_ordered, AstNode *align) {
+                         AstNode *polymorphic_params, bool is_packed, bool is_ordered, bool is_raw_union,
+                         AstNode *align) {
 	AstNode *result = make_ast_node(f, AstNode_StructType);
 	result->StructType.token              = token;
 	result->StructType.fields             = fields;
@@ -1459,6 +1452,7 @@ AstNode *ast_struct_type(AstFile *f, Token token, Array<AstNode *> fields, isize
 	result->StructType.polymorphic_params = polymorphic_params;
 	result->StructType.is_packed          = is_packed;
 	result->StructType.is_ordered         = is_ordered;
+	result->StructType.is_raw_union       = is_raw_union;
 	result->StructType.align              = align;
 	return result;
 }
@@ -1468,14 +1462,6 @@ AstNode *ast_union_type(AstFile *f, Token token, Array<AstNode *> variants) {
 	AstNode *result = make_ast_node(f, AstNode_UnionType);
 	result->UnionType.token = token;
 	result->UnionType.variants = variants;
-	return result;
-}
-
-AstNode *ast_raw_union_type(AstFile *f, Token token, Array<AstNode *> fields, isize field_count) {
-	AstNode *result = make_ast_node(f, AstNode_RawUnionType);
-	result->RawUnionType.token = token;
-	result->RawUnionType.fields = fields;
-	result->RawUnionType.field_count = field_count;
 	return result;
 }
 
@@ -1837,7 +1823,6 @@ bool is_semicolon_optional_for_node(AstFile *f, AstNode *s) {
 
 	case AstNode_StructType:
 	case AstNode_UnionType:
-	case AstNode_RawUnionType:
 	case AstNode_EnumType:
 	case AstNode_BitFieldType:
 		return true;
@@ -2424,8 +2409,9 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 	case Token_struct: {
 		Token token = expect_token(f, Token_struct);
 		AstNode *polymorphic_params = nullptr;
-		bool is_packed = false;
-		bool is_ordered = false;
+		bool is_packed    = false;
+		bool is_ordered   = false;
+		bool is_raw_union = false;
 		AstNode *align = nullptr;
 
 		if (allow_token(f, Token_OpenParen)) {
@@ -2458,6 +2444,11 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
 				}
 				align = parse_expr(f, true);
+			} else if (tag.string == "raw_union") {
+				if (is_raw_union) {
+					syntax_error(tag, "Duplicate struct tag `#%.*s`", LIT(tag.string));
+				}
+				is_raw_union = true;
 			} else {
 				syntax_error(tag, "Invalid struct tag `#%.*s`", LIT(tag.string));
 			}
@@ -2467,6 +2458,14 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 
 		if (is_packed && is_ordered) {
 			syntax_error(token, "`#ordered` is not needed with `#packed` which implies ordering");
+		}
+		if (is_raw_union && is_packed) {
+			is_packed = false;
+			syntax_error(token, "`#raw_union` cannot also be `#packed`");
+		}
+		if (is_raw_union && is_ordered) {
+			is_ordered = false;
+			syntax_error(token, "`#raw_union` cannot also be `#ordered`");
 		}
 
 		Token open = expect_token_after(f, Token_OpenBrace, "struct");
@@ -2481,7 +2480,7 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 			decls = fields->FieldList.list;
 		}
 
-		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_ordered, align);
+		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_ordered, is_raw_union, align);
 	} break;
 
 	case Token_union: {
@@ -2508,23 +2507,6 @@ AstNode *parse_operand(AstFile *f, bool lhs) {
 		Token close = expect_token(f, Token_CloseBrace);
 
 		return ast_union_type(f, token, variants);
-	} break;
-
-	case Token_raw_union: {
-		Token token = expect_token(f, Token_raw_union);
-		Token open = expect_token_after(f, Token_OpenBrace, "raw_union");
-
-		isize    decl_count = 0;
-		AstNode *fields     = parse_record_field_list(f, &decl_count);
-		Token    close      = expect_token(f, Token_CloseBrace);
-
-		Array<AstNode *> decls = {};
-		if (fields != nullptr) {
-			GB_ASSERT(fields->kind == AstNode_FieldList);
-			decls = fields->FieldList.list;
-		}
-
-		return ast_raw_union_type(f, token, decls, decl_count);
 	} break;
 
 	case Token_enum: {

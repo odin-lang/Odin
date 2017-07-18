@@ -38,7 +38,7 @@ CallingConvention :: enum {
 // The compiler relies upon this _exact_ order
 TypeInfo :: struct #ordered {
 // Core Types
-	EnumValue :: raw_union {
+	EnumValue :: struct #raw_union {
 		f: f64;
 		i: i128;
 	}

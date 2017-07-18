@@ -472,7 +472,6 @@ void check_open_scope(Checker *c, AstNode *node) {
 	case AstNode_StructType:
 	case AstNode_EnumType:
 	case AstNode_UnionType:
-	case AstNode_RawUnionType:
 		scope->is_record = true;
 		break;
 	}

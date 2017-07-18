@@ -300,8 +300,14 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 	} return;
 
 	case Type_Record: {
-		switch (t->Record.kind) {
-		case TypeRecord_Struct:
+		if (t->Record.is_raw_union) {
+			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
+			// LLVM takes the first element's alignment as the entire alignment (like C)
+			i64 size_of_union  = type_size_of(heap_allocator(), t);
+			i64 align_of_union = type_align_of(heap_allocator(), t);
+			ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align_of_union, size_of_union);
+			return;
+		} else {
 			if (t->Record.is_packed) {
 				ir_fprintf(f, "<");
 			}
@@ -323,13 +329,6 @@ void ir_print_type(irFileBuffer *f, irModule *m, Type *t) {
 				ir_fprintf(f, ">");
 			}
 			return;
-		case TypeRecord_RawUnion: {
-			// NOTE(bill): The zero size array is used to fix the alignment used in a structure as
-			// LLVM takes the first element's alignment as the entire alignment (like C)
-			i64 size_of_union  = type_size_of(heap_allocator(), t);
-			i64 align_of_union = type_align_of(heap_allocator(), t);
-			ir_fprintf(f, "{[0 x <%lld x i8>], [%lld x i8]}", align_of_union, size_of_union);
-		} return;
 		}
 	} break;
 
