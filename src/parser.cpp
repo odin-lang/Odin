@@ -2597,6 +2597,7 @@ bool is_literal_type(AstNode *node) {
 	case AstNode_StructType:
 	case AstNode_DynamicArrayType:
 	case AstNode_MapType:
+	case AstNode_CallExpr:
 		return true;
 	}
 	return false;
