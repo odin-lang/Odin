@@ -61,6 +61,7 @@ void     check_init_constant            (Checker *c, Entity *e, Operand *operand
 bool     check_representable_as_constant(Checker *c, ExactValue in_value, Type *type, ExactValue *out_value);
 bool     check_procedure_type           (Checker *c, Type *type, AstNode *proc_type_node, Array<Operand> *operands = nullptr);
 CallArgumentData check_call_arguments   (Checker *c, Operand *operand, Type *proc_type, AstNode *call);
+Type *           check_init_variable    (Checker *c, Entity *e, Operand *operand, String context_name);
 
 void error_operand_not_expression(Operand *o) {
 	if (o->mode == Addressing_Type) {
@@ -759,7 +760,8 @@ void populate_using_entity_map(Checker *c, AstNode *node, Type *t, Map<Entity *>
 }
 
 
-void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields, Map<Entity *> *entity_map, AstNode *record_node, String context) {
+void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields, Map<Entity *> *entity_map, AstNode *record_node, String context, bool allow_default_values) {
+	GB_ASSERT(fields != nullptr);
 	if (decl->kind == AstNode_WhenStmt) {
 		ast_node(ws, WhenStmt, decl);
 		Operand operand = {Addressing_Invalid};
@@ -776,18 +778,18 @@ void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 		    operand.value.value_bool) {
 			for_array(i, ws->body->BlockStmt.stmts) {
 				AstNode *stmt = ws->body->BlockStmt.stmts[i];
-				check_record_field_decl(c, stmt, fields, entity_map, record_node, context);
+				check_record_field_decl(c, stmt, fields, entity_map, record_node, context, allow_default_values);
 			}
 		} else if (ws->else_stmt) {
 			switch (ws->else_stmt->kind) {
 			case AstNode_BlockStmt:
 				for_array(i, ws->else_stmt->BlockStmt.stmts) {
 					AstNode *stmt = ws->else_stmt->BlockStmt.stmts[i];
-					check_record_field_decl(c, stmt, fields, entity_map, record_node, context);
+					check_record_field_decl(c, stmt, fields, entity_map, record_node, context, allow_default_values);
 				}
 				break;
 			case AstNode_WhenStmt:
-				check_record_field_decl(c, ws->else_stmt, fields, entity_map, record_node, context);
+				check_record_field_decl(c, ws->else_stmt, fields, entity_map, record_node, context, allow_default_values);
 				break;
 			default:
 				error(ws->else_stmt, "Invalid `else` statement in `when` statement");
@@ -805,13 +807,6 @@ void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 
 	if (!vd->is_mutable) return;
 
-	Type *type = nullptr;
-	if (vd->type != nullptr) {
-		type = check_type(c, vd->type);
-	} else {
-		error(vd->names[0], "Expected a type for this field");
-		type = t_invalid;
-	}
 	bool is_using = (vd->flags&VarDeclFlag_using) != 0;
 
 	if (is_using && vd->names.count > 1) {
@@ -819,15 +814,59 @@ void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 		is_using = false;
 	}
 
-	if (!vd->is_mutable) {
-		error(vd->names[0], "Immutable values in a %.*s are not yet supported", LIT(context));
-		return;
-	}
+	bool arity_ok = check_arity_match(c, vd);
 
-	if (vd->values.count) {
+	if (vd->values.count > 0 && !allow_default_values) {
 		error(vd->values[0], "Default values are not allowed within a %.*s", LIT(context));
 	}
 
+
+	Type *type = nullptr;
+	if (vd->type != nullptr) {
+		type = check_type(c, vd->type);
+	} else if (!allow_default_values) {
+		error(vd->names[0], "Expected a type for this field");
+		type = t_invalid;
+	}
+
+	Array<Operand> default_values = {};
+	defer (array_free(&default_values));
+	if (vd->values.count > 0 && allow_default_values) {
+		array_init(&default_values, heap_allocator(), 2*vd->values.count);
+
+		Type *type_hint = nullptr;
+		if (type != t_invalid && type != nullptr) {
+			type_hint = type;
+		}
+
+		for_array(i, vd->values) {
+			AstNode *v = vd->values[i];
+			Operand o = {};
+
+			check_expr_base(c, &o, v, type_hint);
+			check_not_tuple(c, &o);
+
+			if (o.mode == Addressing_NoValue) {
+				error_operand_no_value(&o);
+			} else {
+				if (o.mode == Addressing_Value && o.type->kind == Type_Tuple) {
+					// NOTE(bill): Tuples are not first class thus never named
+					isize count = o.type->Tuple.variable_count;
+					for (isize index = 0; index < count; index++) {
+						Operand single = {Addressing_Value};
+						single.type    = o.type->Tuple.variables[index]->type;
+						single.expr    = v;
+						array_add(&default_values, single);
+					}
+				} else {
+					array_add(&default_values, o);
+				}
+			}
+		}
+	}
+
+
+	isize name_field_index = 0;
 	for_array(name_index, vd->names) {
 		AstNode *name = vd->names[name_index];
 		if (!ast_node_expect(name, AstNode_Ident)) {
@@ -838,6 +877,22 @@ void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 
 		Entity *e = make_entity_field(c->allocator, c->context.scope, name_token, type, is_using, cast(i32)fields->count);
 		e->identifier = name;
+
+		if (name_field_index < default_values.count) {
+			Operand op = default_values[name_field_index++];
+			check_init_variable(c, e, &op, str_lit("struct field assignment"));
+			if (is_operand_nil(op)) {
+				e->Variable.default_is_nil = true;
+			} else if (op.mode != Addressing_Constant) {
+				error(op.expr, "Default field parameter must be a constant");
+			} else {
+				e->Variable.default_value = op.value;
+			}
+		} else {
+			GB_ASSERT(type != nullptr);
+		}
+
+
 		if (is_blank_ident(name_token)) {
 			array_add(fields, e);
 		} else if (name_token.string == "__tag") {
@@ -858,12 +913,14 @@ void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 			}
 			add_entity_use(c, name, e);
 		}
+
 	}
 
 	Entity *using_index_expr = nullptr;
 
-	if (is_using) {
-		Type *t = base_type(type_deref(type));
+	if (is_using && fields->count > 0) {
+		Type *first_type = (*fields)[fields->count-1]->type;
+		Type *t = base_type(type_deref(first_type));
 		if (!is_type_struct(t) && !is_type_raw_union(t) && !is_type_bit_field(t) &&
 		    vd->names.count >= 1 &&
 		    vd->names[0]->kind == AstNode_Ident) {
@@ -889,7 +946,7 @@ void check_record_field_decl(Checker *c, AstNode *decl, Array<Entity *> *fields,
 					error(name_token, "Previous `using` for an index expression `%.*s`", LIT(name_token.string));
 				}
 			} else {
-				gbString type_str = type_to_string(type);
+				gbString type_str = type_to_string(first_type);
 				error(name_token, "`using` cannot be applied to the field `%.*s` of type `%s`", LIT(name_token.string), type_str);
 				gb_string_free(type_str);
 				return;
@@ -934,7 +991,7 @@ Array<Entity *> check_fields(Checker *c, AstNode *node, Array<AstNode *> decls,
 	}
 
 	for_array(decl_index, decls) {
-		check_record_field_decl(c, decls[decl_index], &fields, &entity_map, node, str_lit("struct"));
+		check_record_field_decl(c, decls[decl_index], &fields, &entity_map, node, context, context == "struct");
 	}
 
 

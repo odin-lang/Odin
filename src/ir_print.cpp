@@ -506,14 +506,22 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 		type = base_type(type);
 		if (is_type_array(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);
+
+			Type *elem_type = type->Array.elem;
 			isize elem_count = cl->elems.count;
+			bool has_defaults = ir_type_has_default_values(type);
 			if (elem_count == 0) {
-				ir_fprintf(f, "zeroinitializer");
+				if (!has_defaults) {
+					ir_fprintf(f, "zeroinitializer");
+				} else {
+					ir_fprintf(f, "[");
+
+					ir_fprintf(f, "]");
+				}
 				break;
 			}
 
 			ir_fprintf(f, "[");
-			Type *elem_type = type->Array.elem;
 
 			for (isize i = 0; i < elem_count; i++) {
 				if (i > 0) {
@@ -575,7 +583,8 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 			ast_node(cl, CompoundLit, value.value_compound);
 
-			if (cl->elems.count == 0) {
+			bool has_defaults = ir_type_has_default_values(type);
+			if (cl->elems.count == 0 && !has_defaults) {
 				ir_fprintf(f, "zeroinitializer");
 				break;
 			}
@@ -583,39 +592,51 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 			isize value_count = type->Record.field_count;
 			ExactValue *values = gb_alloc_array(m->tmp_allocator, ExactValue, value_count);
+			bool *visited = gb_alloc_array(m->tmp_allocator, bool, value_count);
 
+			if (cl->elems.count > 0) {
+				if (cl->elems[0]->kind == AstNode_FieldValue) {
+					isize elem_count = cl->elems.count;
+					for (isize i = 0; i < elem_count; i++) {
+						ast_node(fv, FieldValue, cl->elems[i]);
+						String name = fv->field->Ident.token.string;
 
-			if (cl->elems[0]->kind == AstNode_FieldValue) {
-				isize elem_count = cl->elems.count;
-				for (isize i = 0; i < elem_count; i++) {
-					ast_node(fv, FieldValue, cl->elems[i]);
-					String name = fv->field->Ident.token.string;
+						TypeAndValue tav = type_and_value_of_expr(m->info, fv->value);
+						GB_ASSERT(tav.mode != Addressing_Invalid);
 
-					TypeAndValue tav = type_and_value_of_expr(m->info, fv->value);
-					GB_ASSERT(tav.mode != Addressing_Invalid);
+						Selection sel = lookup_field(m->allocator, type, name, false);
+						Entity *f = type->Record.fields[sel.index[0]];
 
-					Selection sel = lookup_field(m->allocator, type, name, false);
-					Entity *f = type->Record.fields[sel.index[0]];
-
-					values[f->Variable.field_index] = tav.value;
-				}
-			} else {
-				for (isize i = 0; i < value_count; i++) {
-					Entity *f = type->Record.fields_in_src_order[i];
-					TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[i]);
-					ExactValue val = {};
-					if (tav.mode != Addressing_Invalid) {
-						val = tav.value;
+						values[f->Variable.field_index] = tav.value;
+						visited[f->Variable.field_index] = true;
 					}
-					values[f->Variable.field_index] = val;
+				} else {
+					for (isize i = 0; i < value_count; i++) {
+						Entity *f = type->Record.fields[i];
+						TypeAndValue tav = type_and_value_of_expr(m->info, cl->elems[i]);
+						ExactValue val = {};
+						if (tav.mode != Addressing_Invalid) {
+							val = tav.value;
+						}
+						values[f->Variable.field_index] = val;
+						visited[f->Variable.field_index] = true;
+					}
 				}
 			}
 
-
-
-			if (type->Record.is_packed) {
-				ir_fprintf(f, "<");
+			for (isize i = 0; i < value_count; i++) {
+				if (visited[i]) continue;
+				Entity *f = type->Record.fields[i];
+				ExactValue v = {};
+				if (!f->Variable.default_is_nil) {
+					v = f->Variable.default_value;
+				}
+				values[i] = v;
 			}
+
+
+
+			if (type->Record.is_packed) ir_fprintf(f, "<");
 			ir_fprintf(f, "{");
 			if (type->Record.custom_align > 0) {
 				ir_fprintf(f, "[0 x <%lld x i8>] zeroinitializer", cast(i64)type->Record.custom_align);
@@ -626,9 +647,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 
 			for (isize i = 0; i < value_count; i++) {
-				if (i > 0) {
-					ir_fprintf(f, ", ");
-				}
+				if (i > 0) ir_fprintf(f, ", ");
 				Type *elem_type = type->Record.fields[i]->type;
 
 				ir_print_compound_element(f, m, values[i], elem_type);
@@ -636,9 +655,7 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 
 			ir_fprintf(f, "}");
-			if (type->Record.is_packed) {
-				ir_fprintf(f, ">");
-			}
+			if (type->Record.is_packed) ir_fprintf(f, ">");
 
 			gb_temp_arena_memory_end(tmp);
 		} else {
@@ -647,10 +664,56 @@ void ir_print_exact_value(irFileBuffer *f, irModule *m, ExactValue value, Type *
 
 	} break;
 
-	default:
-		ir_fprintf(f, "zeroinitializer");
+	default: {
+		bool has_defaults = ir_type_has_default_values(type);
+		if (!has_defaults) {
+			ir_fprintf(f, "zeroinitializer");
+		} else {
+			if (is_type_struct(type)) {
+				i32 value_count = type->Record.field_count;
+				if (type->Record.is_packed) ir_fprintf(f, "<");
+				ir_fprintf(f, "{");
+				if (type->Record.custom_align > 0) {
+					ir_fprintf(f, "[0 x <%lld x i8>] zeroinitializer", cast(i64)type->Record.custom_align);
+					if (value_count > 0) {
+						ir_fprintf(f, ", ");
+					}
+				}
+
+				for (isize i = 0; i < value_count; i++) {
+					if (i > 0) ir_fprintf(f, ", ");
+					Entity *field = type->Record.fields[i];
+					ExactValue value = {};
+					if (!field->Variable.default_is_nil) {
+						value = field->Variable.default_value;
+					}
+					ir_print_compound_element(f, m, value, field->type);
+				}
+
+				ir_fprintf(f, "}");
+				if (type->Record.is_packed) ir_fprintf(f, ">");
+
+			} else if (is_type_array(type)) {
+				i64 count = type->Array.count;
+				if (count == 0) {
+					ir_fprintf(f, "zeroinitializer");
+				} else {
+					Type *elem = type->Array.elem;
+					ir_fprintf(f, "[");
+					for (i64 i = 0; i < count; i++) {
+						if (i > 0) ir_fprintf(f, ", ");
+						ir_print_type(f, m, elem);
+						ir_fprintf(f, " ");
+						ir_print_exact_value(f, m, empty_exact_value, elem);
+					}
+					ir_fprintf(f, "]");
+				}
+			} else {
+				GB_PANIC("Unknown type for default values");
+			}
+		}
 		// GB_PANIC("Invalid ExactValue: %d", value.kind);
-		break;
+	} break;
 	}
 }
 
@@ -796,7 +859,9 @@ void ir_print_instr(irFileBuffer *f, irModule *m, irValue *value) {
 		Type *type = type_deref(ir_type(instr->ZeroInit.address));
 		ir_fprintf(f, "store ");
 		ir_print_type(f, m, type);
-		ir_fprintf(f, " zeroinitializer, ");
+		ir_fprintf(f, " ");
+		ir_print_exact_value(f, m, empty_exact_value, type);
+		ir_fprintf(f, ", ");
 		ir_print_type(f, m, type);
 		ir_fprintf(f, "* %%%d\n", instr->ZeroInit.address->index);
 	} break;

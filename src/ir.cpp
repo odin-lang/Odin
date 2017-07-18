@@ -653,6 +653,32 @@ Type *ir_type(irValue *value) {
 }
 
 
+bool ir_type_has_default_values(Type *t) {
+	switch (t->kind) {
+	case Type_Named:
+		return ir_type_has_default_values(t->Named.base);
+
+	case Type_Array:
+		return ir_type_has_default_values(t->Array.elem);
+
+	case Type_Record:
+		if (t->Record.kind == TypeRecord_Struct) {
+			for (isize i = 0; i < t->Record.field_count; i++) {
+				Entity *f = t->Record.fields_in_src_order[i];
+				if (f->kind != Entity_Variable) continue;
+				if (f->Variable.default_is_nil) {
+					// NOTE(bill): This is technically zero
+					continue;
+				} else if (f->Variable.default_value.kind != ExactValue_Invalid) {
+					return true;
+				}
+			}
+		}
+		break;
+	}
+
+	return false;
+}
 
 
 irInstr *ir_get_last_instr(irBlock *block) {
@@ -3791,6 +3817,45 @@ irValue *ir_emit_source_code_location(irProcedure *proc, String procedure, Token
 	return ir_emit_global_call(proc, "make_source_code_location", args, 4);
 }
 
+void ir_emit_increment(irProcedure *proc, irValue *addr) {
+	GB_ASSERT(is_type_pointer(ir_type(addr)));
+	Type *type = type_deref(ir_type(addr));
+	ir_emit_store(proc, addr, ir_emit_arith(proc, Token_Add, ir_emit_load(proc, addr), v_one, type));
+
+}
+
+void ir_init_data_with_defaults(irProcedure *proc, irValue *ptr, irValue *count) {
+	Type *elem_type = type_deref(ir_type(ptr));
+	GB_ASSERT(is_type_struct(elem_type) || is_type_array(elem_type));
+
+	irValue *index = ir_add_local_generated(proc, t_int);
+	ir_emit_store(proc, index, ir_const_int(proc->module->allocator, 0));
+
+	irBlock *loop = nullptr;
+	irBlock *done = nullptr;
+	irBlock *body = nullptr;
+
+	loop = ir_new_block(proc, nullptr, "make.init.loop");
+	ir_emit_jump(proc, loop);
+	ir_start_block(proc, loop);
+
+	body = ir_new_block(proc, nullptr, "make.init.body");
+	done = ir_new_block(proc, nullptr, "make.init.done");
+
+	irValue *cond = ir_emit_comp(proc, Token_Lt, ir_emit_load(proc, index), count);
+	ir_emit_if(proc, cond, body, done);
+	ir_start_block(proc, body);
+
+	irValue *offset_ptr = ir_emit_ptr_offset(proc, ptr, ir_emit_load(proc, index));
+	ir_emit_zero_init(proc, offset_ptr);
+
+	ir_emit_increment(proc, index);
+
+	ir_emit_jump(proc, loop);
+	ir_start_block(proc, done);
+}
+
+
 irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv, BuiltinProcId id) {
 	ast_node(ce, CallExpr, expr);
 
@@ -3952,8 +4017,12 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			irValue *call = ir_emit_global_call(proc, "alloc", args, 2);
 
 			irValue *ptr = ir_emit_conv(proc, call, elem_ptr_type);
-			irValue *slice = ir_add_local_generated(proc, type);
 
+			if (ir_type_has_default_values(elem_type)) {
+				ir_init_data_with_defaults(proc, ptr, count);
+			}
+
+			irValue *slice = ir_add_local_generated(proc, type);
 			ir_fill_slice(proc, slice, ptr, count, capacity);
 			return ir_emit_load(proc, slice);
 		} else if (is_type_dynamic_map(type)) {
@@ -3991,10 +4060,14 @@ irValue *ir_build_builtin_proc(irProcedure *proc, AstNode *expr, TypeAndValue tv
 			irValue **args = gb_alloc_array(a, irValue *, 5);
 			args[0] = ir_emit_conv(proc, array, t_rawptr);
 			args[1] = ir_const_int(a, type_size_of(a, elem_type));
-			args[2] = ir_const_int(a, type_align_of(a, elem_type));;
+			args[2] = ir_const_int(a, type_align_of(a, elem_type));
 			args[3] = len;
 			args[4] = cap;
 			ir_emit_global_call(proc, "__dynamic_array_make", args, 5);
+
+			if (ir_type_has_default_values(elem_type)) {
+				ir_init_data_with_defaults(proc, ir_dynamic_array_elem(proc, ir_emit_load(proc, array)), len);
+			}
 
 			return ir_emit_load(proc, array);
 		}
@@ -5901,12 +5974,6 @@ void ir_build_when_stmt(irProcedure *proc, AstNodeWhenStmt *ws) {
 	}
 }
 
-void ir_emit_increment(irProcedure *proc, irValue *addr) {
-	GB_ASSERT(is_type_pointer(ir_type(addr)));
-	Type *type = type_deref(ir_type(addr));
-	ir_emit_store(proc, addr, ir_emit_arith(proc, Token_Add, ir_emit_load(proc, addr), v_one, type));
-
-}
 
 
 void ir_build_range_indexed(irProcedure *proc, irValue *expr, Type *val_type, irValue *count_ptr,
